@@ -14,6 +14,7 @@ Everything the tool cannot prove safe is REPORTED, never guessed.
 import re, sys, os, json, collections
 
 TARGET = {
+    # ---- rank 1c: the four [IcacheRef.icfg] constants ----
     ('dev',   'mword 32'): 'icfg_dev',
     ('nib',   'nat'):      'icfg_nib',
     ('inodestart', 'Z'):   'icfg_ist',
@@ -21,6 +22,29 @@ TARGET = {
     ('γ',     'log_names'):    'icfg_log',
     ('glog',  'log_names'):    'icfg_log',
     ('γlog',  'log_names'):    'icfg_log',
+    # ---- rank 1d: the device/allocator names and the image's numbers.
+    # The gname ones are told apart by NAME, and every spelling below was
+    # checked against its use ([kalloc_env]/[kalloc_env_at]'s first argument
+    # is the kmem LOCK, its second the count/seal PAIR; [γk]/[gk] at bare
+    # [gname] is always "virtio_disk".lock, [γk] at [gname * gname] the
+    # kalloc pair).  ----
+    ('bn',    'bio_names'):  'fsc_bio',
+    ('γu',    'uart_names'): 'fsc_uart',
+    ('gu',    'uart_names'): 'fsc_uart',
+    ('γd',    'disk_names'): 'fsc_disk',
+    ('gd',    'disk_names'): 'fsc_disk',
+    ('γk',    'gname'):      'fsc_dlock',
+    ('gk',    'gname'):      'fsc_dlock',
+    ('γa',    'gname'):      'fsc_kalloc',
+    ('ga',    'gname'):      'fsc_kalloc',
+    ('γkl',   'gname'):      'fsc_kalloc',
+    ('γpr',   'gname'):      'fsc_printk',
+    ('gpr',   'gname'):      'fsc_printk',
+    ('γk',    'gname * gname'): 'fsc_kpages',
+    ('γka',   'gname * gname'): 'fsc_kpages',
+    ('bmapstart', 'Z'): 'fsc_bmapstart',
+    ('size',      'Z'): 'fsc_size',
+    ('ninodes',   'Z'): 'fsc_ninodes',
 }
 TOKENS = set(n for (n, _) in TARGET)
 

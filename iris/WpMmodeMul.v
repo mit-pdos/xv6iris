@@ -178,7 +178,7 @@ Section WpMulGpr.
                         (mulop_mul.(mul_op_result_part)))
                      eq_refl Hrd with "Hcert Hf") ].
       iIntros (e) "[-> Hf]". iSplitR; [done|]. iFrame "Hf HPC HnPC".
-    - iNext. iIntros "Hmm Hpmpc Hpc Hf _".
+    - iApply bi.later_intro. iIntros "Hmm Hpmpc Hpc Hf _".
       iApply ("Hcont" with "Hmm Hpmpc Hpc Hf").
   Qed.
 End WpMulGpr.

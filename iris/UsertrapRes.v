@@ -77,6 +77,13 @@ Require Import FsCfg.    (* [fsc_printk] etc -- the ambient names the ties point
 Require Import FirstTok.     (* [first_done] -- what the park's closer is handed *)
 Require Import SyscParkEnv.  (* [sysc_park_extra] / [park_world] -- the park's syscall-side rows *)
 Require Import WireInv KptExecMap.   (* [park_world_open]'s rows *)
+(* [uexec_wp] -- the per-process user-execution WP the trap loop runs, which
+   [ut_own]/[ut_own_nopt] carry as their last conjunct.  REQUIRED DIRECTLY
+   rather than picked up through [SyscParkEnv]: [Typeclasses Opaque] does not
+   travel through a re-export, and this file puts slots in and out of the
+   proof-mode context (durable-notes).  See
+   claude-notes/projects/user-wp-slot.md SS1.3. *)
+Require Import UexecWp.
 Require Import FsReady.
 Require Import SpecConsoleintr.  (* [console_caps] -- devintr's console row *)
 Require Import TicksInv.         (* [is_tickslock] -- the tick keeper's real arm *)
@@ -445,24 +452,19 @@ Section UsertrapRes.
     un_s  : list gname;               (* the proc array's per-slot locks     *)
     un_j  : nat;                      (* the running process's slot          *)
     un_l  : gname;
-    un_u  : uart_names;
-    un_v  : disk_names;
-    un_k  : gname;                    (* virtio_disk.lock                   *)
+    (* the three virtio ring pages: the one part of the fabric that is not
+       a [FsCfg.fscfg] field (that record's ruling R1) *)
     un_pd : mword 64;
     un_pav : mword 64;
     un_pu : mword 64;
     un_tk : gname;                    (* the ticks lock                     *)
-    un_pr : gname;                    (* the pr lock (printk-general)        *)
-    un_bn : bio_names;
     (* [un_lg] / [un_dev] ARE GONE (rank 1c): the log's names and the file
-       system's device are ambient. *)
+       system's device are ambient.  [un_u] / [un_v] / [un_k] / [un_pr] /
+       [un_bn] / [un_kl] / [un_ka] / [un_bmapstart] / [un_size] went the
+       same way in rank 1d -- what is left of this record is the PROCESS,
+       the ftable, the ticks lock and the three ring pages. *)
     un_ip  : mword 64;                (* the initproc pointer's value        *)
     un_dqi : dfrac;
-    un_kl  : gname;                   (* kmem.lock                          *)
-    un_ka  : gname * gname;
-    un_bmapstart : Z;
-    (* ...and so are [un_inodestart] / [un_nib]. *)
-    un_size : Z;
     un_ks  : mword 64;                (* the kernel stack's BASE             *)
     un_pid : mword 32;
   }.
@@ -472,11 +474,11 @@ Section UsertrapRes.
   Definition un_pj (N : ut_names) : mword 64 := proc_addr (un_j N).
 
   Definition un_fn (N : ut_names) : fclose_names :=
-    MkFCloseNames (un_s N) (un_j N) (un_l N) (un_kl N) (un_ka N)
-      (un_u N) (un_v N) (un_k N) (un_pd N) (un_pav N) (un_pu N)
-      (un_bn N)
+    MkFCloseNames (un_s N) (un_j N) (un_l N)
+ (un_pd N) (un_pav N) (un_pu N)
+
       (un_pid N) (DfracOwn (1/4))
-      (un_bmapstart N) (un_size N).
+.
 
   (* NO FIELD OF [ut_names] MOVES ACROSS A SYSCALL.  The block bitmap used
      to ride here as an exclusive, set-indexed [fileclose_bm], re-indexed by
@@ -595,25 +597,27 @@ Section UsertrapRes.
     (procs_inv (un_s N) ∗
      kernel_data ∗
      is_kstack (un_pj N) (un_ks N) ∗
-     devintr_caps_any (un_u N) (un_v N) (un_k N) (un_tk N) (un_s N)
+     devintr_caps_any (fsc_uart) (fsc_disk) (fsc_dlock) (un_tk N) (un_s N)
        (un_pd N) (un_pav N) (un_pu N) ∗
-     printk_env (un_pr N) (un_u N) (un_v N) ∗
+     printk_env (fsc_printk) (fsc_uart) (fsc_disk) ∗
      is_lock (un_w N) wait_lock_addr "wait_lock"%string wait_res ∗
      is_ftable (un_ft N) (un_f N) ∗
-     is_lock (un_kl N) (mword_of_int KernelSyms.kmem) "kmem"%string
-       (kmem_res (un_ka N) (mword_of_int (KernelSyms.kmem + 24))) ∗
-     is_lock (un_k N) d_lock "virtio_disk"%string
-       (disk_res (un_v N) (un_pd N) (un_pav N) (un_pu N)) ∗
-     bio_ctx (un_bn N) (fs_view fsc_fs (un_v N) icfg_dev fsc_cov) ∗
-     log_ctx icfg_log (un_bn N) fsc_fs fsc_cov fsc_logst icfg_dev ∗
+     is_lock (fsc_kalloc) (mword_of_int KernelSyms.kmem) "kmem"%string
+       (kmem_res (fsc_kpages) (mword_of_int (KernelSyms.kmem + 24))) ∗
+     is_lock (fsc_dlock) d_lock "virtio_disk"%string
+       (disk_res (fsc_disk) (un_pd N) (un_pav N) (un_pu N)) ∗
+     bio_ctx (fsc_bio) (fs_view fsc_fs (fsc_disk) icfg_dev fsc_cov) ∗
+     log_ctx icfg_log (fsc_bio) fsc_fs fsc_cov fsc_logst icfg_dev ∗
      fs_crash_seam fsc_cov fsc_logst ∗
      gen_cert ∗
-     dev_inv (un_u N) (un_v N) ∗
-     disk_geom (un_v N) (un_pd N) (un_pav N) (un_pu N) ∗
-     kalloc_avail (un_ka N) None ∗
-     (* the file system as fileclose/kexit see it: the ambient [fs_ready]
-        and the ties from [un_fn N]'s fields to the ambient names *)
-     ⌜fclose_ties (un_fn N)⌝ ∗
+     dev_inv (fsc_uart) (fsc_disk) ∗
+     disk_geom (fsc_disk) (un_pd N) (un_pav N) (un_pu N) ∗
+     kalloc_avail (fsc_kpages) None ∗
+     (* the file system as fileclose/kexit see it: the ambient [fs_ready],
+        and nothing beside it.  The TIES that used to ride here
+        ([SpecFileclose.fclose_ties]) said [un_fn N]'s device/allocator
+        fields were the ambient names; rank 1d took those fields off the
+        record, so there is nothing left to say. *)
      FsReady.fs_ready ∗
      (* ...AND THE WORLD A CHILD'S PARK NEEDS ([SyscParkEnv.park_world]):
         what fork hands down.  It is here so that usertrap can pass it to
@@ -656,19 +660,20 @@ Section UsertrapRes.
      identifies the two -- which is exactly the recovery that lemma exists
      for, and what [ProofSyscall.sysc_fs_env] already does with it.
 
-     [un_pr] IS THE ONE FIELD [fclose_ties] DOES NOT REACH.  The tie record
-     is [SpecFileclose]'s, so it says nothing about the printk gname; the
-     equation is stated here beside it. *)
+     THERE ARE NO TIES LEFT IN IT.  [SpecFileclose.fclose_ties] and the
+     [un_pr] equation beside it both died with rank 1d: every field they
+     named -- the uart, the disk, the two locks, the allocator pair, the bio
+     record, the bitmap's two numbers and the printk gname -- is a
+     [FsCfg.fscfg] field now, so a park package owes the file system nothing
+     pure at all. *)
   Definition ut_park_caps (N : ut_names) : iProp Σ :=
-    (⌜fclose_ties (un_fn N)⌝ ∗
-     ⌜un_pr N = fsc_printk⌝ ∗
-     procs_inv (un_s N) ∗
+    (procs_inv (un_s N) ∗
      is_kstack (un_pj N) (un_ks N) ∗
-     devintr_caps_any (un_u N) (un_v N) (un_k N) (un_tk N) (un_s N)
+     devintr_caps_any (fsc_uart) (fsc_disk) (fsc_dlock) (un_tk N) (un_s N)
        (un_pd N) (un_pav N) (un_pu N) ∗
      is_lock (un_w N) wait_lock_addr "wait_lock"%string wait_res ∗
      is_ftable (un_ft N) (un_f N) ∗
-     disk_geom (un_v N) (un_pd N) (un_pav N) (un_pu N) ∗
+     disk_geom (fsc_disk) (un_pd N) (un_pav N) (un_pu N) ∗
      park_world (un_s N))%I.
 
   Global Instance ut_park_caps_persistent N : Persistent (ut_park_caps N).
@@ -683,15 +688,11 @@ Section UsertrapRes.
   Lemma ut_caps_of_park (N : ut_names) :
     ut_park_caps N -∗ FsReady.fs_ready -∗ ut_caps N.
   Proof.
-    iIntros "(%Hties & %Hpr & #Hprocs & #Hkst & #Hdev & #Hwl & #Hft & #Hdg & #Hpw) #Hfs".
-    (* the twelve field equations, spelled at the RECORD's fields rather
-       than at [un_fn]'s projections of them, so every [rewrite] below is
-       syntactic.  [Hties] itself is kept whole: it is conjunct 17. *)
-    pose proof Hties as Ht.
-    destruct Ht as [Huart Hdisk Hdlock Hkmem Hkalloc Hbio Hbms Hsize].
-    cbn [un_fn fcn_uart fcn_disk fcn_dlock fcn_kmem fcn_kalloc fcn_bio
-         fcn_bmapstart fcn_size]
-      in Huart, Hdisk, Hdlock, Hkmem, Hkalloc, Hbio, Hbms, Hsize.
+    iIntros "(#Hprocs & #Hkst & #Hdev & #Hwl & #Hft & #Hdg & #Hpw) #Hfs".
+    (* NOT ONE [rewrite] BY A TIE (rank 1d).  Every equation this proof used
+       to spell out -- twelve of them, from [un_fn]'s projections to the
+       ambient fields -- is now [X = X], which Rocq refuses to rewrite by.
+       Both sides of the goal name the [fscfg] fields directly. *)
     (* THE DISK FABRIC, and it is the only row that is not a copy: the
        record's three pages are identified with [fs_ready]'s witness by the
        persistent cells both [disk_geom]s read. *)
@@ -699,7 +700,7 @@ Section UsertrapRes.
     iDestruct "Hdex" as (pd pav pu) "[#Hdg2 #Hdlk]".
     iDestruct (disk_geom_agree (fsc_disk) (un_pd N) (un_pav N) (un_pu N)
                  pd pav pu with "[] []") as %(Hpd & Hpav & Hpu);
-      [ rewrite -Hdisk; iExact "Hdg" | iExact "Hdg2" |].
+      [ iExact "Hdg" | iExact "Hdg2" |].
     iDestruct (fs_ready_kmem with "Hfs") as "[#Hkml #Hkav]".
     iDestruct (fs_ready_printk with "Hfs") as "[#Hpe _]".
     (* SEVENTEEN [iSplitR]s, NOT one [iFrame]: the goal's tail conjuncts are
@@ -712,22 +713,18 @@ Section UsertrapRes.
     iSplitR; [iApply (fs_ready_data with "Hfs")|].
     iSplitR; [iExact "Hkst"|].
     iSplitR; [iExact "Hdev"|].
-    iSplitR; [rewrite Hpr Huart Hdisk; iExact "Hpe"|].
+    iSplitR; [iExact "Hpe"|].
     iSplitR; [iExact "Hwl"|].
     iSplitR; [iExact "Hft"|].
-    iSplitR; [rewrite Hkmem Hkalloc; iExact "Hkml"|].
-    iSplitR; [rewrite Hdlock Hdisk Hpd Hpav Hpu; iExact "Hdlk"|].
-    iSplitR; [rewrite Hbio Hdisk;
-              iApply (fs_ready_bio with "Hfs")|].
-    iSplitR.
-    { rewrite Hbio.
-      iApply (fs_ready_log with "Hfs"). }
+    iSplitR; [iExact "Hkml"|].
+    iSplitR; [rewrite Hpd Hpav Hpu; iExact "Hdlk"|].
+    iSplitR; [iApply (fs_ready_bio with "Hfs")|].
+    iSplitR; [iApply (fs_ready_log with "Hfs")|].
     iSplitR; [ iApply (fs_ready_seam with "Hfs")|].
     iSplitR; [iApply (fs_ready_gen with "Hfs")|].
-    iSplitR; [rewrite Huart Hdisk; iExact "Hdinv"|].
+    iSplitR; [iExact "Hdinv"|].
     iSplitR; [iExact "Hdg"|].
-    iSplitR; [rewrite Hkalloc; iExact "Hkav"|].
-    iSplitR; [iPureIntro; exact Hties|].
+    iSplitR; [iExact "Hkav"|].
     iSplitR; [iExact "Hfs"|].
     iExact "Hpw".
   Qed.
@@ -735,16 +732,16 @@ Section UsertrapRes.
   (* vmfault's and the kalloc cone's bundle, assembled out of three
      persistent members of [ut_caps] rather than carried separately. *)
   Lemma ut_caps_kalloc (N : ut_names) :
-    ut_caps N -∗ kalloc_env (un_kl N) None.
+    ut_caps N -∗ kalloc_env (fsc_kalloc) None.
   Proof.
     iIntros "(_ & _ & _ & _ & _ & _ & _ & #Hkm & _ & _ & _ & _ & _ & _ & _ & #Hav & _)".
-    iExists (un_ka N). iFrame "Hkm Hav".
+    iExists (fsc_kpages). iFrame "Hkm Hav".
   Qed.
 
   (* the EXCLUSIVE remainder: what a callee can consume and must give back --
      plus [proc_priv], which every callee gives back at a MOVED record, which
      is why [V] is a parameter of this half and not of [ut_caps]. *)
-  Definition ut_own (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+  Definition ut_own (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
       (N : ut_names) (V : pprivate) : iProp Σ :=
     (bslots 3 ∗
      (mword_of_int KernelSyms.initproc : mword 64) ↦₈{un_dqi N} (un_ip N) ∗
@@ -768,9 +765,27 @@ Section UsertrapRes.
         that wants to state a delta takes [fd_frags] at an explicit list. *)
      fd_frags_any (pv_fdg V) ∗
      (* everything the twenty-two syscall table entries consume, abstractly *)
-     Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N))%I.
+     Rsys (un_f N) (un_pj N) (un_fn N) ∗
+     (* THE USER-EXECUTION WP THIS PROCESS RUNS WHEN USERRET RESUMES IT --
+        the per-process slot, BESIDE [proc_priv] rather than inside it.  See
+        claude-notes/projects/user-wp-slot.md SS1.3 for why here: [ut_own] IS
+        the exclusive per-process bundle in hand at userret, it rides
+        [ut_res_bare] across user execution and through every park, which is
+        exactly the lifetime wanted -- while a [proc_priv] field would be one
+        more parameter in the 216 files that name [proc_priv], for a conjunct
+        only the trap loop reads, and [proc_priv]'s accessors are
+        borrow-and-return wands that swallow the block (the same argument
+        that put [fd_frags_any] beside it).
+        AT STEP 1 THIS IS THE INDEX-FREE [uexec_wp] -- the forall-state form,
+        happy with any resume state -- so every closer below threads it
+        exactly like [bslots 3] and the [forall V'] closers need no new
+        argument.  In the step-3 era it becomes the trapframe-keyed slot at
+        the SAME [V] as the [proc_priv] beside it; the accessor
+        [ut_res_bare_uwp_acc] is the seam that localizes that move.
+        LAST, per durable-notes' "a new conjunct goes last". *)
+     uexec_wp)%I.
 
-  Definition ut_env (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+  Definition ut_env (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
       (N : ut_names) (V : pprivate) : iProp Σ :=
     (ut_caps N ∗ ut_own Rsys N V)%I.
 
@@ -780,23 +795,25 @@ Section UsertrapRes.
   (* THE BUNDLE COMES OUT WITH THE BLOCK, and goes back with it: a syscall
      that retypes a descriptor needs both, and one that does not simply
      hands the bundle straight back. *)
-  Lemma ut_own_priv (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ) (N : ut_names)
+  Lemma ut_own_priv (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ) (N : ut_names)
       (V : pprivate) :
     ut_own Rsys N V -∗
     proc_priv (un_f N) (un_pj N) (un_pid N) V ∗
     fd_frags_any (pv_fdg V) ∗
-    Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N) ∗
+    Rsys (un_f N) (un_pj N) (un_fn N) ∗
     (∀ V' : pprivate,
        proc_priv (un_f N) (un_pj N) (un_pid N) V' -∗
        fd_frags_any (pv_fdg V') -∗
-       Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N) -∗ ut_own Rsys N V').
+       Rsys (un_f N) (un_pj N) (un_fn N) -∗ ut_own Rsys N V').
   Proof.
-    iIntros "(Hb & Hip & Hfd & Hir & Hpv & Hfr & Hsy)".
+    iIntros "(Hb & Hip & Hfd & Hir & Hpv & Hfr & Hsy & Huwp)".
     iFrame "Hpv Hfr Hsy". iIntros (V') "Hpv Hfr Hsy".
-    rewrite /ut_own. iFrame "Hb Hip Hfd Hir Hpv Hfr Hsy".
+    (* the slot is index-free at step 1, so the closer RETAINS it rather
+       than taking it back as an argument -- see [ut_own]'s note. *)
+    rewrite /ut_own. iFrame "Hb Hip Hfd Hir Hpv Hfr Hsy Huwp".
   Qed.
 
-  (* [ut_own]'s SIX raw conjuncts, straight back into [ut_own N] -- the
+  (* [ut_own]'s EIGHT raw conjuncts, straight back into [ut_own N] -- the
      rebuild [ProofUsertrapSys.v]'s syscall block needs after
      [wp_syscall_sconf]'s crossing hands the pieces back.  A DEDICATED
      lemma, proved here against a small context, rather than an inline
@@ -804,7 +821,7 @@ Section UsertrapRes.
      caller's own ~100-hypothesis proof state behind it makes [iFrame]'s
      search degenerate (durable-notes.md's "failing tactic looks like a
      hang" family). *)
-  Lemma ut_own_rebuild (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ) (N : ut_names)
+  Lemma ut_own_rebuild (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ) (N : ut_names)
       (V : pprivate) :
     bslots 3 -∗
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{un_dqi N} (un_ip N) -∗
@@ -812,12 +829,14 @@ Section UsertrapRes.
     iref_slots IREFSPARE -∗
     proc_priv (un_f N) (un_pj N) (un_pid N) V -∗
     fd_frags_any (pv_fdg V) -∗
-    Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N) -∗
+    Rsys (un_f N) (un_pj N) (un_fn N) -∗
+    (* the slot, LAST, exactly where [ut_own] holds it *)
+    uexec_wp -∗
     ut_own Rsys N V.
   Proof.
     rewrite /ut_own.
-    iIntros "Hb Hip Hfd Hir Hpv Hfr Hsy".
-    iFrame "Hb Hip Hfd Hir Hpv Hfr Hsy".
+    iIntros "Hb Hip Hfd Hir Hpv Hfr Hsy Huwp".
+    iFrame "Hb Hip Hfd Hir Hpv Hfr Hsy Huwp".
   Qed.
 
   (* THE TRAPFRAME BORROW, at the [proc_priv] level.  [proc_fields] /
@@ -912,7 +931,7 @@ Section UsertrapRes.
   (* ------------------------------------------------------------------- *)
   (* [usertrap_res] itself.                                              *)
   (* ------------------------------------------------------------------- *)
-  Definition ut_res (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+  Definition ut_res (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
       (pt : uptd) (ksp : mword 64) : iProp Σ :=
     (∃ (N : ut_names) (V : pprivate) (av : nat),
        (* THE PROCESS RUNNING IS THE ONE WHOSE TABLE THE TRAMPOLINE PARKED.
@@ -943,7 +962,7 @@ Section UsertrapRes.
   (* [ut_res]'s parked twin -- see [ut_trap_parked]'s header.  This is what
      survives user execution (no [satp]); [ut_res] itself is what usertrap
      consumes. *)
-  Definition ut_res_parked (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+  Definition ut_res_parked (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
       (pt : uptd) (ksp : mword 64) : iProp Σ :=
     (∃ (N : ut_names) (V : pprivate) (av : nat),
        ⌜ pv_upt V = pt ⌝ ∗
@@ -967,7 +986,7 @@ Section UsertrapRes.
   (* THE TRANSLATION BORROW, lifted to the residue.  [_close] is uservec's
      move (its exit switch just produced [tlb_res_pt kroot]); [_open] is
      userret's (its entry switch is about to consume it). *)
-  Lemma ut_res_tlb_close (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+  Lemma ut_res_tlb_close (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
       (pt : uptd) (ksp : mword 64) (kroot : mword 44) :
     ut_res_parked Rsys pt ksp -∗ tlb_res_pt kroot -∗ ut_res Rsys pt ksp.
   Proof.
@@ -990,7 +1009,7 @@ Section UsertrapRes.
     iSplitL "Htrap"; [iExact "Htrap" | iExact "Henv"].
   Qed.
 
-  Lemma ut_res_tlb_open (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+  Lemma ut_res_tlb_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
       (pt : uptd) (ksp : mword 64) :
     ut_res Rsys pt ksp -∗
     ∃ kroot : mword 44, tlb_res_pt kroot ∗ ut_res_parked Rsys pt ksp.
@@ -1014,7 +1033,7 @@ Section UsertrapRes.
      of [SpecUsertrap.USERTRAP_RES.usertrap_res_tf_open].  Opens via
      [ut_own_priv] + [proc_priv_tf_open]; the closer moves [V] to
      [upd_tf V ws'] (its [pv_upt] is unchanged, so [pt] is unaffected). *)
-  Lemma ut_res_tf_open (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+  Lemma ut_res_tf_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
       (pt : uptd) (ksp : mword 64) :
     ut_res_parked Rsys pt ksp -∗
     ∃ (kroot : mword 44) (ws : list (mword 64)),
@@ -1090,7 +1109,7 @@ Section UsertrapRes.
     (bslots 3 ∗
      (mword_of_int KernelSyms.initproc : mword 64) ↦₈{un_dqi N} (un_ip N))%I.
 
-  Definition ut_own_nopt (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+  Definition ut_own_nopt (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
       (N : ut_names) (V : pprivate) : iProp Σ :=
     (bslots 3 ∗
      (mword_of_int KernelSyms.initproc : mword 64) ↦₈{un_dqi N} (un_ip N) ∗
@@ -1099,51 +1118,58 @@ Section UsertrapRes.
      proc_priv_nopt (un_f N) (un_pj N) (un_pid N) V ∗
      (* the descriptor-state fragments -- see [ut_own]'s note *)
      fd_frags_any (pv_fdg V) ∗
-     Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N))%I.
+     Rsys (un_f N) (un_pj N) (un_fn N) ∗
+     (* the user-execution WP -- see [ut_own]'s note.  It is in BOTH forms
+        because it must survive the window the address space does not: the
+        BARE residue is what parks across user execution, and losing the slot
+        there would mean the loop had nothing to resume the process with. *)
+     uexec_wp)%I.
 
-  Definition ut_env_nopt (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+  Definition ut_env_nopt (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
       (N : ut_names) (V : pprivate) : iProp Σ :=
     (ut_caps N ∗ ut_own_nopt Rsys N V)%I.
 
 
-  Lemma ut_own_pt_close (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+  Lemma ut_own_pt_close (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
       (N : ut_names) (V : pprivate) :
     ut_own_nopt Rsys N V -∗ proc_pt (pv_upt V) -∗ ut_own Rsys N V.
   Proof.
     rewrite /ut_own /ut_own_nopt proc_priv_split_pt.
-    iIntros "(Hb & Hip & Hfd & Hir & Hpv & Hfr & Hsy) Hpt".
-    iFrame "Hb Hip Hfd Hir Hpv Hfr Hpt Hsy".
+    iIntros "(Hb & Hip & Hfd & Hir & Hpv & Hfr & Hsy & Huwp) Hpt".
+    iFrame "Hb Hip Hfd Hir Hpv Hfr Hpt Hsy Huwp".
   Qed.
 
-  Lemma ut_own_pt_open (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+  Lemma ut_own_pt_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
       (N : ut_names) (V : pprivate) :
     ut_own Rsys N V -∗ ut_own_nopt Rsys N V ∗ proc_pt (pv_upt V).
   Proof.
     rewrite /ut_own /ut_own_nopt proc_priv_split_pt.
-    iIntros "(Hb & Hip & Hfd & Hir & (Hpv & Hpt) & Hfr & Hsy)".
-    iFrame "Hb Hip Hfd Hir Hpv Hfr Hpt Hsy".
+    iIntros "(Hb & Hip & Hfd & Hir & (Hpv & Hpt) & Hfr & Hsy & Huwp)".
+    iFrame "Hb Hip Hfd Hir Hpv Hfr Hpt Hsy Huwp".
   Qed.
 
   (* the borrow accessor, at the reduced environment -- [ut_own_priv]'s twin *)
-  Lemma ut_own_nopt_priv (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ) (N : ut_names)
+  Lemma ut_own_nopt_priv (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ) (N : ut_names)
       (V : pprivate) :
     ut_own_nopt Rsys N V -∗
     proc_priv_nopt (un_f N) (un_pj N) (un_pid N) V ∗
     fd_frags_any (pv_fdg V) ∗
-    Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N) ∗
+    Rsys (un_f N) (un_pj N) (un_fn N) ∗
     (∀ V' : pprivate,
        proc_priv_nopt (un_f N) (un_pj N) (un_pid N) V' -∗
        fd_frags_any (pv_fdg V') -∗
-       Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N) -∗ ut_own_nopt Rsys N V').
+       Rsys (un_f N) (un_pj N) (un_fn N) -∗ ut_own_nopt Rsys N V').
   Proof.
-    iIntros "(Hb & Hip & Hfd & Hir & Hpv & Hfr & Hsy)".
+    iIntros "(Hb & Hip & Hfd & Hir & Hpv & Hfr & Hsy & Huwp)".
     iFrame "Hpv Hfr Hsy". iIntros (V') "Hpv Hfr Hsy".
-    rewrite /ut_own_nopt. iFrame "Hb Hip Hfd Hir Hpv Hfr Hsy".
+    (* the slot is index-free at step 1, so the closer RETAINS it -- see
+       [ut_own]'s note. *)
+    rewrite /ut_own_nopt. iFrame "Hb Hip Hfd Hir Hpv Hfr Hsy Huwp".
   Qed.
 
   (* the descriptor's derived footprint field is invisible to the reduced
      environment -- see [ProcInv.proc_priv_nopt_upt_irrel] *)
-  Lemma ut_own_nopt_upt_irrel (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+  Lemma ut_own_nopt_upt_irrel (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
       (N : ut_names) (V : pprivate) (Q : uptd) :
     ud_root (pv_upt V) = ud_root Q ->
     ud_tfp (pv_upt V) = ud_tfp Q ->
@@ -1155,7 +1181,7 @@ Section UsertrapRes.
     reflexivity.
   Qed.
 
-  Definition ut_res_bare (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+  Definition ut_res_bare (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
       (pt : uptd) (ksp : mword 64) : iProp Σ :=
     (∃ (N : ut_names) (V : pprivate) (av : nat),
        ⌜ pv_upt V = pt ⌝ ∗
@@ -1186,7 +1212,7 @@ Section UsertrapRes.
      [devintr_caps_any].  So the trap loop takes it from the residue it
      already holds rather than from a new premise.  Persistent, hence handed
      straight back. *)
-  Lemma ut_res_bare_sstc (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+  Lemma ut_res_bare_sstc (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
       (pt : uptd) (ksp : mword 64) :
     ut_res_bare Rsys pt ksp -∗ sstc_enabled ∗ ut_res_bare Rsys pt ksp.
   Proof.
@@ -1215,7 +1241,53 @@ Section UsertrapRes.
     iSplitL "Htrap"; [iExact "Htrap" | iExact "Henv"].
   Qed.
 
-  Lemma ut_res_pt_close (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+  (* THE SLOT'S SEAM: extraction and re-deposit, in one accessor.
+     [ut_own]'s last conjunct is the WP this process runs when userret
+     resumes it (user-wp-slot.md SS1.3), and the trap loop is its only
+     reader: each round it PULLS the slot out here, applies it at the
+     concrete resume state userret built out of the residue's own trapframe
+     and pages, and PUTS one back for the next round.
+     THE CLOSER TAKES A POSSIBLY DIFFERENT SLOT, and that is the point --
+     it is a plain wand, so nothing forces the deposited slot to be the one
+     that came out.  At step 1 the loop re-deposits a freshly minted generic
+     slot (the conjunct is the index-free [uexec_wp], deliberately
+     re-mintable); from step 3 on the deposit is the continuation the
+     process itself produced, at the pair its trapframe now records, and
+     this signature does not change.
+     LINEAR IN, LINEAR OUT: unlike [ut_res_bare_sstc] (persistent, handed
+     straight back) the slot really leaves the bundle, so the residue has to
+     be rebuilt around the hole -- row by row, per [ut_res_tlb_close]. *)
+  Lemma ut_res_bare_uwp_acc (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
+      (pt : uptd) (ksp : mword 64) :
+    ut_res_bare Rsys pt ksp -∗
+    uexec_wp ∗ (uexec_wp -∗ ut_res_bare Rsys pt ksp).
+  Proof.
+    iIntros "H".
+    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
+    iEval (rewrite /ut_own_nopt) in "Hown".
+    iDestruct "Hown" as "(Hb & Hip & Hfd & Hir & Hpv & Hfr & Hsy & Huwp)".
+    iSplitL "Huwp"; [iExact "Huwp" |].
+    iIntros "Huwp".
+    (* row by row, not framed -- see [ut_res_tlb_close] *)
+    iExists N, V, av. rewrite /ut_env_nopt /ut_own_nopt.
+    iSplitR; [iPureIntro; exact Hupt |].
+    iSplitR; [iPureIntro; exact Hksp |].
+    iSplitR; [iPureIntro; exact Hwf |].
+    iSplitR; [iPureIntro; exact Hav |].
+    iSplitR; [iExact "Htfk" |].
+    iSplitR; [iExact "Htc" |].
+    iSplitL "Htrap"; [iExact "Htrap" |].
+    iSplitL "Hcaps"; [iExact "Hcaps" |].
+    iSplitL "Hb"; [iExact "Hb" |].
+    iSplitL "Hip"; [iExact "Hip" |].
+    iSplitL "Hfd"; [iExact "Hfd" |].
+    iSplitL "Hir"; [iExact "Hir" |].
+    iSplitL "Hpv"; [iExact "Hpv" |].
+    iSplitL "Hfr"; [iExact "Hfr" |].
+    iSplitL "Hsy"; [iExact "Hsy" | iExact "Huwp"].
+  Qed.
+
+  Lemma ut_res_pt_close (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
       (pt : uptd) (ksp : mword 64) :
     ut_res_bare Rsys pt ksp -∗ proc_pt pt -∗ ut_res_parked Rsys pt ksp.
   Proof.
@@ -1235,7 +1307,7 @@ Section UsertrapRes.
     iSplitL "Hcaps"; [iExact "Hcaps" | iExact "Hown"].
   Qed.
 
-  Lemma ut_res_pt_open (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+  Lemma ut_res_pt_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
       (pt : uptd) (ksp : mword 64) :
     ut_res_parked Rsys pt ksp -∗ proc_pt pt ∗ ut_res_bare Rsys pt ksp.
   Proof.
@@ -1262,7 +1334,7 @@ Section UsertrapRes.
      may be re-keyed on [ud_norm pt] for free.  This is what lets the trap
      loop hand the user tier a descriptor whose [udata_cov] holds by
      construction -- see [ProcPtOwn.user_pt_inv_close]. *)
-  Lemma ut_res_bare_norm (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+  Lemma ut_res_bare_norm (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
       (pt : uptd) (ksp : mword 64) :
     ut_res_bare Rsys pt ksp -∗ ut_res_bare Rsys (ud_norm pt) ksp.
   Proof.
@@ -1289,7 +1361,7 @@ Section UsertrapRes.
      save/restore walks open: the trapframe page never leaves the residue
      (physical tier, unreachable from user mode), so it is available in
      exactly the window where the address space is not. *)
-  Lemma ut_res_bare_tf_open (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+  Lemma ut_res_bare_tf_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
       (pt : uptd) (ksp : mword 64) :
     ut_res_bare Rsys pt ksp -∗
     ∃ (kroot : mword 44) (ws : list (mword 64)),
@@ -1330,7 +1402,7 @@ Section UsertrapRes.
      two state-enable pins to [UserExec.user_cfg] for the user phase, keeping
      the closer wand as the parked remainder.  Open/close, not a tier of its
      own: nothing needs a name for "the residue minus its CSRs". *)
-  Lemma ut_res_bare_csrs_open (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+  Lemma ut_res_bare_csrs_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
       (pt : uptd) (ksp : mword 64) :
     ut_res_bare Rsys pt ksp -∗
     hart_csrs ∗ (hart_csrs -∗ ut_res_bare Rsys pt ksp).
@@ -1364,7 +1436,7 @@ Section UsertrapRes.
      borrows therefore overlap.  Each single accessor consumes the whole
      residue, so neither can be applied to the other's remainder -- a sealed
      bundle's simultaneous borrows have to come out of ONE opener. *)
-  Lemma ut_res_bare_tf_csrs_open (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+  Lemma ut_res_bare_tf_csrs_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
       (pt : uptd) (ksp : mword 64) :
     ut_res_bare Rsys pt ksp -∗
     ∃ (kroot : mword 44) (ws : list (mword 64)),
@@ -1408,6 +1480,64 @@ Section UsertrapRes.
     iSplitL "Hb2"; [iExact "Hb2" |].
     iSplitL "Hgh"; [iExact "Hgh" |].
     iSplitL "Hcpu"; [iExact "Hcpu" | iExact "Hclm"].
+  Qed.
+
+  (* THE RUN OPENER: the slot OUT and the trapframe words BORROWED, from one
+     opener, with the closer landing in the HOLED form.  This is what the
+     forkret entry needs and what neither [ut_res_bare_uwp_acc] nor
+     [ut_res_bare_tf_open] can give it alone -- each consumes the whole
+     sealed bundle, so they do not compose (same reason as
+     [ut_res_bare_tf_csrs_open]).
+
+     THE HOLE IS THE POINT (MILESTONE G).  The entry hands the extracted WP
+     to user execution and gets the NEXT one back at the trap; between those
+     two moments the residue is a bundle MINUS a WP, and that is exactly the
+     [uexec_wp -* ut_res_bare] this closer returns.  So the tf-closer's
+     conclusion IS the [Rut] the loop parks across user execution, and no
+     slot is minted anywhere on the path. *)
+  Lemma ut_res_bare_run_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
+      (pt : uptd) (ksp : mword 64) :
+    ut_res_bare Rsys pt ksp -∗
+    uexec_wp ∗
+    ∃ (kroot : mword 44) (ws : list (mword 64)),
+      kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
+      (∀ ws' : list (mword 64),
+         ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗
+         (uexec_wp -∗ ut_res_bare Rsys pt ksp)).
+  Proof.
+    iIntros "H".
+    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
+    (* the slot, peeled off the process block by hand -- [ut_own_nopt_priv]
+       RETAINS it, and here it has to leave *)
+    iEval (rewrite /ut_own_nopt) in "Hown".
+    iDestruct "Hown" as "(Hb & Hip & Hfd & Hir & Hpv & Hfr & Hsy & Huwp)".
+    iSplitL "Huwp"; [iExact "Huwp" |].
+    (* ...and the trapframe page, out of the same block *)
+    iDestruct (proc_priv_nopt_tf_open with "Hpv") as (ws) "(-> & Htf & Hclose)".
+    rewrite Hupt.
+    iDestruct "Htfk" as (kroot) "[#Hkpt %Htfk]".
+    iExists kroot, (pv_tf V). iFrame "Hkpt". iSplitR; [iPureIntro; exact Htfk |]. iFrame "Htf".
+    iIntros (ws') "%Htfk' Htf' Huwp".
+    iDestruct ("Hclose" $! ws' with "Htf'") as "Hpv'".
+    iExists N, (upd_tf V ws'), av.
+    iDestruct (ut_tfk_intro ksp (upd_tf V ws') kroot Htfk' with "Hkpt") as "#Htfk'".
+    (* row by row, not framed -- see [ut_res_tlb_close] *)
+    rewrite /ut_env_nopt /ut_own_nopt.
+    iSplitR; [iPureIntro; rewrite /upd_tf; exact Hupt |].
+    iSplitR; [iPureIntro; exact Hksp |].
+    iSplitR; [iPureIntro; exact Hwf |].
+    iSplitR; [iPureIntro; exact Hav |].
+    iSplitR; [iExact "Htfk'" |].
+    iSplitR; [iExact "Htc" |].
+    iSplitL "Htrap"; [iExact "Htrap" |].
+    iSplitL "Hcaps"; [iExact "Hcaps" |].
+    iSplitL "Hb"; [iExact "Hb" |].
+    iSplitL "Hip"; [iExact "Hip" |].
+    iSplitL "Hfd"; [iExact "Hfd" |].
+    iSplitL "Hir"; [iExact "Hir" |].
+    iSplitL "Hpv'"; [iExact "Hpv'" |].
+    iSplitL "Hfr"; [iExact "Hfr" |].
+    iSplitL "Hsy"; [iExact "Hsy" | iExact "Huwp"].
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -1565,7 +1695,7 @@ Section UsertrapRes.
      That is what makes the tail blocks index-generic, which they have to be:
      +0xa6 is reached at [true] from the syscall arm and at [false] from the
      other four. *)
-  Definition ut_hold (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+  Definition ut_hold (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
       (N : ut_names) (V : pprivate) (b : bool) (lks : gset string) : iProp Σ :=
     (cpu_own 0%nat b (un_pj N) b lks ∗
      trap_csrs_ext KT1 b ∗
@@ -1690,18 +1820,27 @@ Definition ut_park_intro_body
           block ([ProcInv.proc_dormant_unused]) and whoever resumes the
           process hands them back in. *)
        fd_frags_any (pv_fdg V') -∗
+       (* ...AND THE CHILD'S USER-EXECUTION WP, [ut_own_nopt]'s last row.
+          It travels the fd-fragments' route exactly: CAPTURED AT THE PARK
+          ([ParkCap.park_token_park] takes one and closes over it) and fed
+          in here at the resume, so the party that RESUMES a process needs
+          none.  It is LINEAR -- nothing persistent anywhere carries a copy
+          -- which is what makes the two mint sites (userinit's park,
+          sys_fork's kfork call) the only places a WP enters the world.
+          LAST, per durable-notes' "a new conjunct goes last". *)
+       uexec_wp -∗
        URB h pt' (add_vec (un_ks N) (mword_of_int 4096))).
 
 Lemma ut_res_bare_park
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId}
-    (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+    (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
     (W : iProp Σ)
     (N : ut_names) (av : nat) :
   ut_wf N ->
   (K_usertrap <= av)%nat ->
   ut_park_caps N -∗
-  (FirstTok.first_done -∗ W -∗ Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N)) -∗
+  (FirstTok.first_done -∗ W -∗ Rsys (un_f N) (un_pj N) (un_fn N)) -∗
   park_own N -∗
   (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
      ⌜pv_upt V' = pt'⌝ -∗
@@ -1720,11 +1859,18 @@ Lemma ut_res_bare_park
      fd_slots FDSPARE -∗
      iref_slots IREFSPARE -∗
      fd_frags_any (pv_fdg V') -∗
+     (* PARKING A PROCESS CONSUMES A WP FOR IT.  [ut_own_nopt]'s last row is
+        a LINEAR [uexec_wp] and this is where it comes from: the WP is handed
+        in on the channel, captured at the park by [ParkCap.park_token_park]
+        the way the fd fragments above are.  Nothing persistent carries a
+        copy any more -- [SyscParkEnv.park_world] used to, and that made the
+        WP ambiently duplicable from inside every trap round. *)
+     uexec_wp -∗
      ut_res_bare (CID := h) Rsys pt'
        (add_vec (un_ks N) (mword_of_int 4096))).
 Proof.
   iIntros (Hwf Hav) "#Hpark Hderive Hown".
-  iIntros (h pt' V') "%Hupt #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref Hfrag".
+  iIntros (h pt' V') "%Hupt #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref Hfrag Huwp".
   iDestruct ("Hderive" with "Hdone HW") as "Hsys".
   iDestruct "Hdone" as "[_ #Hrdy]".
   iDestruct (ut_caps_of_park with "Hpark Hrdy") as "#Hcaps".
@@ -1746,7 +1892,9 @@ Proof.
   iSplitL "Hfd"; [iExact "Hfd" |].
   iSplitL "Hiref"; [iExact "Hiref" |].
   iSplitL "Hpriv"; [iExact "Hpriv" |].
-  iSplitL "Hfrag"; [iExact "Hfrag" | iExact "Hsys"].
+  iSplitL "Hfrag"; [iExact "Hfrag" |].
+  iSplitL "Hsys"; [iExact "Hsys" | iExact "Huwp"].
+  (* [Huwp] is the WP the parker handed in -- linear, spent exactly here *)
 Qed.
 
 
@@ -1794,7 +1942,7 @@ Qed.
 
 Lemma ut_hold_transport
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
-    (CID0 CID1 : CpuId) (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+    (CID0 CID1 : CpuId) (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
     (N : ut_names) (V : pprivate) (b : bool) (lks : gset string) :
   (b = false \/ un_pj N = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
   ut_hold (CID := CID0) Rsys N V b lks -∗ ut_hold (CID := CID1) Rsys N V b lks.

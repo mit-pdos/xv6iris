@@ -770,7 +770,7 @@ Section ProofFdalloc.
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (fdi_1c with "Htext"). }
-        iNext. iIntros (CIDbt HsBt) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDbt HsBt) "Hcg Hpc".
         assert (Htgt32 : add_vec (mword_of_int (KernelSyms.fdalloc + 0x1c) : mword 64)
                            (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 11 : mword 8) ('b"0"))))
                          = mword_of_int (KernelSyms.fdalloc + 0x32))
@@ -852,7 +852,7 @@ Section ProofFdalloc.
                   G3 (av - 4)%nat b ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (fdi_3e with "Htext"). }
-        iIntros (CIDcj HsCj). iNext. iIntros "Hcg Hpc".
+        iIntros (CIDcj HsCj). iApply bi.later_intro. iIntros "Hcg Hpc".
         assert (Htgt28 : add_vec (mword_of_int (KernelSyms.fdalloc + 0x3e) : mword 64)
                            (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2037 : mword 11) ('b"0"))))
                          = mword_of_int (KernelSyms.fdalloc + 0x28))
@@ -1023,7 +1023,7 @@ Section ProofFdalloc.
                     ltac:(rewrite Htgt1a; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (fdi_22 with "Htext"). }
-          iNext. iIntros (CIDtaken HsTaken) "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDtaken HsTaken) "Hcg Hpc".
           iEval (rewrite Htgt1a) in "Hpc".
           assert (Hshiftrec : b = false \/ p = zero_reg -> (CIDtaken : CPU) = (CID0 : CPU)) by wp_next_chain.
           iDestruct (wp_next_shift Hshiftrec with "Hcont") as "Hcont".

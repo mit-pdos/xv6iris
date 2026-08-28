@@ -237,10 +237,9 @@ Qed.
 Definition wp_readi_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (ktb : ktier) `{!KtierLe ktb KT1} (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
-    (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
+  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
-    (γa : gname) (γf : gname)                         (* kalloc, file table  *)
+ (γf : gname)                         (* kalloc, file table  *)
     (ip : mword 64)
     (bm : blkmap) (data : nat -> list (bv 8))
     (dn : dinode)
@@ -321,7 +320,7 @@ Definition wp_readi_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
+  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
   (* THE BYTE VIEW'S ROW (durable-disk 1c-flip step 3).  readi is the one
      whole-block reader in the tree that holds NO log/region/bitmap
      invariant -- by design, it takes no [log_ctx] -- so the row it needs
@@ -330,7 +329,7 @@ Definition wp_readi_sconf_body
      ([InodeRegion.ireg_inv_bytes]). *)
   fs_bytes_any fsc_fs -∗
   (* either_copyout's user arm reaches copyout, which reaches vmfault/kalloc *)
-  kalloc_env γa None -∗
+  kalloc_env fsc_kalloc None -∗
   (* ip->dev: read, never written -- a FRACTION *)
   i_dev ip ↦₄{dqd} icfg_dev -∗
   (* ip->size, read once at +0x000 and never written.  The whole metadata
@@ -379,9 +378,9 @@ Definition wp_readi_sconf_body
   (* the running-thread bundle *)
   procs_inv γs -∗
   (* the disk fabric *)
-  dev_inv γu γd -∗
-  disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  dev_inv fsc_uart fsc_disk -∗
+  disk_geom fsc_disk pd pav pu -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
   (* ONE slot unit.  bmap-with-no-allocation wants one and hands it back
      before readi's own bread takes it; brelse returns that one too. *)
   bslot -∗
@@ -434,10 +433,8 @@ Module Type READI.
   Parameter wp_readi_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
       (ktb : ktier) `{!KtierLe ktb KT1} (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (γa : gname) (γf : gname)
+ (γf : gname)
       (ip : mword 64)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn : dinode)
@@ -446,7 +443,7 @@ Module Type READI.
       (pidv : mword 32) (dq dqd : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_readi_sconf_body ktb γs j γl γu γd γk pd pav pu bn γa γf
+      wp_readi_sconf_body ktb γs j γl pd pav pu γf
  ip bm data dn
                           user off n dst_olds V
                           pidv dq dqd m K eb b lks.

@@ -506,7 +506,7 @@ Section ProofProcdumpParts.
               Q13 K' b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (pdi_54 with "Htext"). }
-    iIntros (CID14 Hs14). iNext. iIntros "Hcg Hpc".
+    iIntros (CID14 Hs14). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Hp6e : add_vec (mword_of_int (PD + 0x54) : mword 64)
                      (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 13 : mword 11) ('b"0"))))
                    = mword_of_int (PD + 0x6e)) by pcstep.

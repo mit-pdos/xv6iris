@@ -174,6 +174,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import SyscParkEnv ParkCap.   (* [park_world] / [park_token] *)
+Require Import UexecWp.   (* [uexec_wp] -- the child's WP, spent by the park *)
 Require Import Xv6Cameras.  (* [logG]: [ireg_inv]'s own instance argument *)
 Local Open Scope Z_scope.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -187,7 +188,7 @@ Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Notation K_kfork := (56%nat) (only parsing).
 Definition kfork_post
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (γk : gname * gname) (γf : gname) (lvl : nat) (eb : bool)
+ (γf : gname) (lvl : nat) (eb : bool)
     (pme : mword 64)
     (b : bool) (pid_p : mword 32) (Vp : pprivate)
     (K : nat) (mr : regfile) (rv : mword 64) (lks : gset string) : iProp Σ :=
@@ -202,7 +203,7 @@ Definition kfork_post
     (* THE ALLOCATOR'S STATE IS THE SAME ON EVERY ARM, so it is stated ONCE
        here rather than per-disjunct.  See the header: with no page count
        there is nothing left for the arms to disagree about. *)
-    kalloc_env_at γa γk None ∗
+    kalloc_env_at fsc_kalloc fsc_kpages None ∗
     (* ... and what IS left is only the return value.  Nothing about the
        CHILD appears: on the failure arm freeproc returned it to
        [procs_inv], on the success arm the RUNNABLE park swallowed it. *)
@@ -213,7 +214,7 @@ Definition kfork_post
 
 Definition wp_kfork_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (γk : gname * gname) (γp γw γl γf : gname)  (γs : list gname)
+ (γp γw γl γf : gname)  (γs : list gname)
     (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
     (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kfork in
@@ -250,7 +251,7 @@ Definition wp_kfork_sconf_body
      (the dispatch's [sysc_fs_env]), so it costs a caller a frame and
      nothing else.  kfork reads no dinode and touches no log. *)
   ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
-  kalloc_env_at γa γk None -∗
+  kalloc_env_at fsc_kalloc fsc_kpages None -∗
   (* THE PROC TABLE'S SEALED REGIME.  kfork allocates a proc, so it needs
      [ProcAvail]'s authority to mint the new slot's allocation marker -- and
      it takes the count-free arm, which is persistent and says nothing, so
@@ -266,6 +267,18 @@ Definition wp_kfork_sconf_body
      which would be a module cycle, since that proof runs the trap loop
      kfork sits inside.  See ParkCap.v. *)
   park_token γs -∗
+  (* THE CHILD'S USER-EXECUTION WP, consumed by the park.  A LINEAR premise,
+     and the reason kfork's contract has one: the WP the child's trap loop
+     will run is a resource of the child's residue
+     ([UsertrapRes.ut_own_nopt]'s last row), captured at the park
+     ([ParkCap.park_token_park]) and paid by whoever forks -- sys_fork, the
+     one caller, mints the generic inhabitant for it.  Nothing persistent in
+     the tree carries a WP ([SyscParkEnv.park_world] used to), so this
+     premise is what makes the parent responsible for its child's WP -- the
+     shape a verified fork needs, where the child's WP will come from the
+     parent's own fork-continuation deposit rather than from the generic
+     theorem.  See claude-notes/design/user-wp-slot.md. *)
+  uexec_wp -∗
   (* THE STEADY ARM OF [FirstTok.first_tok], and the ONE thing fork cannot
      take out of the parent's block: the parent's token may be the EXCLUSIVE
      boot arm, and the child needs a token of its own.  [first_done] is
@@ -278,7 +291,7 @@ Definition wp_kfork_sconf_body
     ∀ (mr : regfile),
       ⌜ callee_saved m mr ⌝ -∗
       pc_is ret_tgt -∗
-      kfork_post γa γk γf lvl eb pme b pid_p Vp K mr
+      kfork_post γf lvl eb pme b pid_p Vp K mr
         (mr !!! Regidx (mword_of_int 10 : mword 5)) lks -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -286,9 +299,9 @@ Definition wp_kfork_sconf_body
 Module Type KFORK.
   Parameter wp_kfork_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (γk : gname * gname) (γp γw γl γf : gname) (γs : list gname)
+ (γp γw γl γf : gname) (γs : list gname)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
       (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string),
-      wp_kfork_sconf_body γa γk γp γw γl γf γs
+      wp_kfork_sconf_body γp γw γl γf γs
  m lvl K eb pme b pid_p Vp lks.
 End KFORK.

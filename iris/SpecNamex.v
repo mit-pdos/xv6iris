@@ -327,8 +327,6 @@ Definition namex_post
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (pj pv nb ret_tgt : mword 64) (pl : list (bv 8))
     (m : regfile) (K : nat) (b eb : bool) (lks : gset string)
- (bn : bio_names)
-    (bmapstart size : Z)
     (plen : nat) (pfun : nat -> bv 8)
     (npar : bool) (n : nat) (pidv : mword 32)
     (dq dqb dqs dqpv : dfrac) (Vpr : pprivate) : iProp Σ :=
@@ -341,7 +339,7 @@ Definition namex_post
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       (* EVERYTHING LOANED COMES BACK *)
-      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       proc_priv_bare pj pidv Vpr -∗
       inode_held (pv_cwd Vpr) -∗
@@ -377,8 +375,6 @@ Definition namex_postS
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (pj pv nb ret_tgt : mword 64) (pl : list (bv 8))
     (m : regfile) (K : nat) (b eb : bool) (lks : gset string)
- (bn : bio_names)
-    (bmapstart size : Z)
     (plen : nat) (pfun : nat -> bv 8)
     (npar : bool) (n : nat) (Sb : gset Z) (pidv : mword 32)
     (dq dqb dqs dqpv : dfrac) (Vpr : pprivate) : iProp Σ :=
@@ -391,7 +387,7 @@ Definition namex_postS
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       (* EVERYTHING LOANED COMES BACK *)
-      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       proc_priv_bare pj pidv Vpr -∗
       inode_held (pv_cwd Vpr) -∗
@@ -409,7 +405,7 @@ Definition namex_postS
          create's FIRST dirlink then claims as its own [crb]
          (CreateBudget's mkdir row: at [w = true] the walk's unit comes off
          the top and that dirlink gives it straight back). *)
-      ⌜w = true -> bmapstart ∈ Sb'⌝ -∗
+      ⌜w = true -> fsc_bmapstart ∈ Sb'⌝ -∗
       ⌜((n - (walk_spend w + (if ok then 0%nat else 1%nat)))%nat <= n')%nat
        /\ (n' <= n)%nat⌝ -∗
       (* THE SET FORM BESIDE THE TOKEN (durable-fs-plan.md section 3,
@@ -442,12 +438,9 @@ Definition wp_namex_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
-    (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
+   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
-    (ga : gname) (gf : gname)                          (* kalloc, file table  *)
-    (bmapstart : Z)
-    (size : Z)
+ (gf : gname)                          (* kalloc, file table  *)
     (plen : nat) (pfun : nat -> bv 8)                  (* the path buffer     *)
     (nfun : nat -> bv 8)                               (* the name buffer, in *)
     (npar : bool)                                      (* the a1 flag         *)
@@ -468,12 +461,12 @@ Definition wp_namex_sconf_body
   (0 < icfg_nib)%nat ->
   (* (3) the fs geometry: iput's / itrunc's, threaded verbatim *)
   log_geom_ok fsc_cov fsc_logst ->
-  0 < size <= BPB ->
-  0 <= bmapstart ->
-  bmapstart ∈ fsc_cov ->
-  ~ (bmapstart ∈ log_region_set fsc_logst) ->
+  0 < fsc_size <= BPB ->
+  0 <= fsc_bmapstart ->
+  fsc_bmapstart ∈ fsc_cov ->
+  ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
   0 <= icfg_ist ->
-  cov_below fsc_cov size ->
+  cov_below fsc_cov fsc_size ->
   (* the LAYOUT fact that discharges ilock's / iput's per-inum block
      membership at inums namex learns only at run time (N3's finding 2) *)
   ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
@@ -506,9 +499,9 @@ Definition wp_namex_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) -∗
-  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
-  kalloc_env ga None -∗
+  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+  log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
+  kalloc_env fsc_kalloc None -∗
   (* ---- THE ICACHE'S PERSISTENT SET.  The FAMILIES, not the singletons:
      namex's slots are dirlookup's outputs and cannot be named in advance,
      which is the same reason iget takes [ic_escrows] and dirlink defined
@@ -529,13 +522,13 @@ Definition wp_namex_sconf_body
   ireg_open -∗
   (* ---- the running-thread bundle and the disk fabric ---- *)
   procs_inv gs -∗
-  dev_inv gu gd -∗
-  disk_geom gd pd pav pu -∗
-  is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+  dev_inv fsc_uart fsc_disk -∗
+  disk_geom fsc_disk pd pav pu -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
   (* ---- iput's / itrunc's own resources ---- *)
-  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-  bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+  bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   (* ---- the caller's own pid cell (acquiresleep records it) ---- *)
   proc_priv_bare pj pidv Vpr -∗
   (* ---- THE WORKING DIRECTORY: cell and reference, both handed back ---- *)
@@ -570,7 +563,7 @@ Definition wp_namex_sconf_body
      comes back on the hart it called from, which a park makes false. *)
   wp_next true pj (fun (CIDc : CpuId) =>
     namex_post (CID := CIDc) pj pv nb ret_tgt pl m K b eb lks
- bn bmapstart size
+
                plen pfun npar n pidv dq dqb dqs dqpv Vpr) -∗
   WP (Loop : expr riscv_lang).
 
@@ -595,12 +588,9 @@ Definition wp_namex_gen_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
-    (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
+   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
-    (ga : gname) (gf : gname)                          (* kalloc, file table  *)
-    (bmapstart : Z)
-    (size : Z)
+ (gf : gname)                          (* kalloc, file table  *)
     (plen : nat) (pfun : nat -> bv 8)                  (* the path buffer     *)
     (nfun : nat -> bv 8)                               (* the name buffer, in *)
     (npar : bool)                                      (* the a1 flag         *)
@@ -621,12 +611,12 @@ Definition wp_namex_gen_body
   (0 < icfg_nib)%nat ->
   (* (3) the fs geometry: iput's / itrunc's, threaded verbatim *)
   log_geom_ok fsc_cov fsc_logst ->
-  0 < size <= BPB ->
-  0 <= bmapstart ->
-  bmapstart ∈ fsc_cov ->
-  ~ (bmapstart ∈ log_region_set fsc_logst) ->
+  0 < fsc_size <= BPB ->
+  0 <= fsc_bmapstart ->
+  fsc_bmapstart ∈ fsc_cov ->
+  ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
   0 <= icfg_ist ->
-  cov_below fsc_cov size ->
+  cov_below fsc_cov fsc_size ->
   (* the LAYOUT fact that discharges ilock's / iput's per-inum block
      membership at inums namex learns only at run time (N3's finding 2) *)
   ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
@@ -665,9 +655,9 @@ Definition wp_namex_gen_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) -∗
-  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
-  kalloc_env ga None -∗
+  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+  log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
+  kalloc_env fsc_kalloc None -∗
   (* ---- THE ICACHE'S PERSISTENT SET.  The FAMILIES, not the singletons:
      namex's slots are dirlookup's outputs and cannot be named in advance,
      which is the same reason iget takes [ic_escrows] and dirlink defined
@@ -688,13 +678,13 @@ Definition wp_namex_gen_body
   ireg_open -∗
   (* ---- the running-thread bundle and the disk fabric ---- *)
   procs_inv gs -∗
-  dev_inv gu gd -∗
-  disk_geom gd pd pav pu -∗
-  is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+  dev_inv fsc_uart fsc_disk -∗
+  disk_geom fsc_disk pd pav pu -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
   (* ---- iput's / itrunc's own resources ---- *)
-  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-  bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+  bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   (* ---- the caller's own pid cell (acquiresleep records it) ---- *)
   proc_priv_bare pj pidv Vpr -∗
   (* ---- THE WORKING DIRECTORY: cell and reference, both handed back ---- *)
@@ -732,7 +722,7 @@ Definition wp_namex_gen_body
      comes back on the hart it called from, which a park makes false. *)
   wp_next true pj (fun (CIDc : CpuId) =>
     namex_postS (CID := CIDc) pj pv nb ret_tgt pl m K b eb lks
- bn bmapstart size
+
                 plen pfun npar n Sb pidv dq dqb dqs dqpv Vpr) -∗
   WP (Loop : expr riscv_lang).
 
@@ -741,12 +731,8 @@ Module Type NAMEX.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (ga : gname) (gf : gname)
-      (bmapstart : Z)
-      (size : Z)
+ (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (nfun : nat -> bv 8)
       (npar : bool)
@@ -754,9 +740,9 @@ Module Type NAMEX.
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_namex_sconf_body gs j gl gu gd gk pd pav pu bn
-                          ga gf bmapstart
-                          size plen pfun nfun npar n
+      wp_namex_sconf_body gs j gl pd pav pu
+ gf
+ plen pfun nfun npar n
                           pidv dq dqb dqs dqpv m K eb b lks Vpr.
   (* the set-form contract; [wp_namex_sconf] is this at the [log_op]
      existential's own witness, with the grown set forgotten again. *)
@@ -764,12 +750,8 @@ Module Type NAMEX.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (ga : gname) (gf : gname)
-      (bmapstart : Z)
-      (size : Z)
+ (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (nfun : nat -> bv 8)
       (npar : bool)
@@ -777,9 +759,9 @@ Module Type NAMEX.
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_namex_gen_body gs j gl gu gd gk pd pav pu bn
-                        ga gf bmapstart
-                        size plen pfun nfun npar n Sb
+      wp_namex_gen_body gs j gl pd pav pu
+ gf
+ plen pfun nfun npar n Sb
                         pidv dq dqb dqs dqpv m K eb b lks Vpr.
 End NAMEX.
 

@@ -1440,7 +1440,7 @@ Section BreadBlocks.
     iDestruct (wordw_claim_of (KTR := KT0) 4 (b_valid (bpa k)) (DfracOwn 1)
                  vldq ltac:(lia) with "Hvldq") as "#HclaimD".
     iMod ("Hcloseq" with "[Hvldq Hdevfullq Hbufq]") as "_".
-    { iNext. iApply (escrow_close_mid bn V k).
+    { iApply bi.later_intro. iApply (escrow_close_mid bn V k).
       rewrite /buf_mid. iExists vldq, bnoq, bsq. iFrame.
       iPureIntro. exact Hpinq. }
     iModIntro.

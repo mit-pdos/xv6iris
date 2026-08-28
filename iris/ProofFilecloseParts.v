@@ -613,7 +613,7 @@ Section ProofFilecloseParts.
     iApply (wp_cj_s_sconf (mword_of_int ze) jimm U4 K b
               ltac:(rewrite Hjt; vm_compute; reflexivity)
               with "Hcg Hpc Hie").
-    iIntros (CID5 Hs5). iNext. iIntros "Hcg Hpc".
+    iIntros (CID5 Hs5). iApply bi.later_intro. iIntros "Hcg Hpc".
     iEval (rewrite Hjt) in "Hpc".
     iSpecialize ("Hcont" $! CID5 with "[]"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! U4 with "[%] Hcg Hpc Hb4 Hb5 Hb6 Hb7").

@@ -13,6 +13,11 @@ EVERY REFUTATION FILE NAMED BELOW IS DELETED — `iris/FsDurRefute.v`,
 citation of one as "(file deleted)"; the RULES they closed are in
 `design/durable-fs-plan.md` §8 and `design/fs-ghost-state.md`.
 
+THE `fs-state.md` §4½–§4⁹ AND `crash.md` SECTIONS CITED BELOW ARE
+RETIRED: those design docs now state only what stands, and the design of
+record for the durable side is `design/durable-fs-plan.md`.  Read such a
+citation as pointing here, to the report beside it.
+
 ---
 
 # durable-disk — the worklist under ruling 3 (rewritten from the tree, 2026-08-23)

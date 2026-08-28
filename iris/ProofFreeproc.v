@@ -774,7 +774,7 @@ Section ProofFreeproc.
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (fri_1a with "Htext"). }
-        iNext. iIntros (CIDp3 Hsp3) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDp3 Hsp3) "Hcg Hpc".
         assert (Htg22 : add_vec (mword_of_int (FR + 0x1a) : mword 64)
                           (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 4 : mword 8) ('b"0"))))
                         = mword_of_int (FR + 0x22)) by (apply bv_eq; vm_compute; reflexivity).
@@ -909,7 +909,7 @@ Section ProofFreeproc.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (fri_0e with "Htext"). }
-      iNext. iIntros (CID8 Hs8) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID8 Hs8) "Hcg Hpc".
       assert (Htg14 : add_vec (mword_of_int (FR + 0x0e) : mword 64)
                         (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0"))))
                       = mword_of_int (FR + 0x14)) by (apply bv_eq; vm_compute; reflexivity).

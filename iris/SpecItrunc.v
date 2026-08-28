@@ -166,13 +166,13 @@ Section ItruncSpec.
      unit comes back -- paid again.  So a loop that frees an unknown number
      of blocks carries this ONE assertion and never case-splits on how many
      it has freed so far. *)
-  Definition bm_paid (bmapstart : Z) (u : nat) : iProp Σ :=
-    ((∃ Sb : gset Z, ⌜bmapstart ∈ Sb⌝ ∗ log_opS icfg_log (S u) Sb)
+  Definition bm_paid (u : nat) : iProp Σ :=
+    ((∃ Sb : gset Z, ⌜fsc_bmapstart ∈ Sb⌝ ∗ log_opS icfg_log (S u) Sb)
      ∨ (∃ Sb : gset Z, log_opS icfg_log (S (S u)) Sb))%I.
 
   (* entering the loops: two units and no credit yet *)
-  Lemma bm_paid_intro bmapstart u :
-    log_opb icfg_log (S (S u)) -∗ bm_paid bmapstart u.
+  Lemma bm_paid_intro u :
+    log_opb icfg_log (S (S u)) -∗ bm_paid u.
   Proof.
     iIntros "H". rewrite /log_opb. iDestruct "H" as (Sb) "H".
     iRight. iExists Sb. iFrame.
@@ -211,9 +211,9 @@ Section ItruncSpec.
   (*  bfree in the loops would otherwise close the existential (§G.20's     *)
   (*  blocker).  Threaded, not proven: one more parameter on the two loop   *)
   (*  states.                                                              *)
-  Definition bm_paidS (bmapstart : Z) (crb : bool)
+  Definition bm_paidS (crb : bool)
       (u : nat) (Sb : gset Z) (e0 : nat) : iProp Σ :=
-    ((∃ Sb' : gset Z, ⌜Sb ⊆ Sb'⌝ ∗ ⌜bmapstart ∈ Sb'⌝ ∗ log_opSe icfg_log (S u) Sb' e0)
+    ((∃ Sb' : gset Z, ⌜Sb ⊆ Sb'⌝ ∗ ⌜fsc_bmapstart ∈ Sb'⌝ ∗ log_opSe icfg_log (S u) Sb' e0)
      ∨ (⌜crb = false⌝ ∗
         ∃ Sb' : gset Z, ⌜Sb ⊆ Sb'⌝ ∗ log_opSe icfg_log (S (S u)) Sb' e0))%I.
 
@@ -245,9 +245,9 @@ Section ItruncSpec.
   (* entering the loops CREDITED: the paid disjunct at the caller's own set,
      so no unit is spent on the bitmap at all.  At [crb = false] this is
      [bm_paid_intro] with the set remembered. *)
-  Lemma bm_paidS_intro bmapstart crb u Sb e0 :
-    (crb = true -> bmapstart ∈ Sb) ->
-    log_opSe icfg_log (it_entry crb u) Sb e0 -∗ bm_paidS bmapstart crb u Sb e0.
+  Lemma bm_paidS_intro crb u Sb e0 :
+    (crb = true -> fsc_bmapstart ∈ Sb) ->
+    log_opSe icfg_log (it_entry crb u) Sb e0 -∗ bm_paidS crb u Sb e0.
   Proof.
     intros Hcrb. iIntros "H". rewrite /bm_paidS /it_entry.
     destruct crb.
@@ -267,10 +267,10 @@ Section ItruncSpec.
      have paid could then learn neither "it paid" nor "it did not".  [w] is
      [negb crb && paid]: at [crb = true] the entry level IS [S u], nothing
      was spent, and the caller carries the membership itself. *)
-  Lemma bm_paidS_elim bmapstart crb u Sb e0 :
-    bm_paidS bmapstart crb u Sb e0 -∗
+  Lemma bm_paidS_elim crb u Sb e0 :
+    bm_paidS crb u Sb e0 -∗
       ∃ (w : bool) (n : nat) (Sb' : gset Z),
-        ⌜Sb ⊆ Sb'⌝ ∗ ⌜w = true -> bmapstart ∈ Sb'⌝ ∗
+        ⌜Sb ⊆ Sb'⌝ ∗ ⌜w = true -> fsc_bmapstart ∈ Sb'⌝ ∗
         ⌜crb = true -> w = false⌝ ∗
         ⌜(it_entry crb u - it_bm w <= n <= it_entry crb u)%nat
          /\ (S u <= n)%nat⌝ ∗
@@ -290,8 +290,8 @@ Section ItruncSpec.
   Qed.
 
   (* leaving them: at least the [S u] units iupdate still needs *)
-  Lemma bm_paid_elim bmapstart u :
-    bm_paid bmapstart u -∗ ∃ n : nat, ⌜(S u <= n <= S (S u))%nat⌝ ∗ log_opb icfg_log n.
+  Lemma bm_paid_elim u :
+    bm_paid u -∗ ∃ n : nat, ⌜(S u <= n <= S (S u))%nat⌝ ∗ log_opb icfg_log n.
   Proof.
     iIntros "[H|H]".
     - iDestruct "H" as (Sb) "(_ & H)". iExists (S u).
@@ -305,11 +305,8 @@ End ItruncSpec.
 Definition wp_itrunc_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
-    (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
+  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
-    (bmapstart : Z)
-    (size : Z)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
     (data : nat -> list (bv 8))
@@ -323,10 +320,10 @@ Definition wp_itrunc_sconf_body
   (K_itrunc <= K)%nat ->
   log_geom_ok fsc_cov fsc_logst ->
   (* ONE BITMAP BLOCK -- the fact that makes the budget work at all *)
-  0 < size <= BPB ->
-  0 <= bmapstart ->
-  bmapstart ∈ fsc_cov ->
-  ~ (bmapstart ∈ log_region_set fsc_logst) ->
+  0 < fsc_size <= BPB ->
+  0 <= fsc_bmapstart ->
+  fsc_bmapstart ∈ fsc_cov ->
+  ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
   (* the inode's own block, for the closing iupdate *)
   0 <= icfg_ist ->
   IBLOCK inum icfg_ist ∈ fsc_cov ->
@@ -373,7 +370,7 @@ Definition wp_itrunc_sconf_body
      [ind_res]), and bfree derives the bit-is-set fact from that run itself
      ([FsStateBitmap.free_pool_used]).  Demanding it here would have made
      the contract uncallable by iput, which has no source for it. *)
-  cov_below fsc_cov size ->
+  cov_below fsc_cov fsc_size ->
   (* EVERY DATA BLOCK IS A BLOCK'S WORTH OF BYTES.  bfree demands it of the
      block it frees, and [inode_blocks] does not carry it: the bundle names
      contents but says nothing about their length.  Like the range premise
@@ -408,8 +405,8 @@ Definition wp_itrunc_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
-  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+  log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
   (* ip->dev and ip->inum: read, never written *)
   i_dev ip ↦₄{dqd} icfg_dev -∗
   i_inum ip ↦₄{dqn} inum -∗
@@ -420,10 +417,10 @@ Definition wp_itrunc_sconf_body
   (* THE DATA BLOCKS, which is what actually gets freed *)
   inode_blocks fsc_fs bm data -∗
   (* the two superblock fields, read and handed straight back *)
-  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   (* the bitmap, with its free pool *)
-  bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+  bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   (* THE INODE REGION, and this inum's (stale) on-disk record: iupdate's
      resources, threaded through (design §11.3/§12) *)
   ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
@@ -433,9 +430,9 @@ Definition wp_itrunc_sconf_body
   (* the running-thread bundle *)
   procs_inv γs -∗
   (* the disk fabric *)
-  dev_inv γu γd -∗
-  disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  dev_inv fsc_uart fsc_disk -∗
+  disk_geom fsc_disk pd pav pu -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
   (* THREE slot units, not two.  The indirect arm's bread holds ONE across
      the whole 256-entry loop -- the buffer stays checked out while the
      entries are freed -- and each nested bfree still wants the two its own
@@ -465,7 +462,7 @@ Definition wp_itrunc_sconf_body
       proc_priv_bare pj pidv Vpr -∗
       i_dev ip ↦₄{dqd} icfg_dev -∗
       i_inum ip ↦₄{dqn} inum -∗
-      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       (* THE INODE IS EMPTY: no block, size zero *)
       inode_meta ip (di_trunc dn) -∗
@@ -512,11 +509,8 @@ Definition wp_itrunc_sconf_body
 Definition wp_itrunc_gen_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
-    (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
+  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
-    (bmapstart : Z)
-    (size : Z)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
     (data : nat -> list (bv 8))
@@ -534,12 +528,12 @@ Definition wp_itrunc_gen_body
      because the bitmap block is one this op logs itself -- the credit is
      handed straight to [bm_paidS_intro]'s paid disjunct, never to a group
      claimant. *)
-  (crb = true -> bmapstart ∈ Sb) ->
+  (crb = true -> fsc_bmapstart ∈ Sb) ->
   log_geom_ok fsc_cov fsc_logst ->
-  0 < size <= BPB ->
-  0 <= bmapstart ->
-  bmapstart ∈ fsc_cov ->
-  ~ (bmapstart ∈ log_region_set fsc_logst) ->
+  0 < fsc_size <= BPB ->
+  0 <= fsc_bmapstart ->
+  fsc_bmapstart ∈ fsc_cov ->
+  ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
   0 <= icfg_ist ->
   IBLOCK inum icfg_ist ∈ fsc_cov ->
   ~ (IBLOCK inum icfg_ist ∈ log_region_set fsc_logst) ->
@@ -548,7 +542,7 @@ Definition wp_itrunc_gen_body
   di_type_stable dn dn0 ->
   di_nlink_stable dn dn0 ->
   blkmap_wf fsc_cov fsc_logst bm ->
-  cov_below fsc_cov size ->
+  cov_below fsc_cov fsc_size ->
   (forall i : nat, (i < MAXFILE)%nat -> length (data i) = BSIZE) ->
   di_addrs dn = bm_cells bm ->
   (j < NPROC)%nat ->
@@ -564,23 +558,23 @@ Definition wp_itrunc_gen_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
-  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+  log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
   i_dev ip ↦₄{dqd} icfg_dev -∗
   i_inum ip ↦₄{dqn} inum -∗
   inode_meta ip dn -∗
   inode_map fsc_fs ip bm -∗
   inode_blocks fsc_fs bm data -∗
-  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-  bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+  bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   dinode_at fsc_ireg inum dn0 -∗
   proc_priv_bare pj pidv Vpr -∗
   procs_inv γs -∗
-  dev_inv γu γd -∗
-  disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  dev_inv fsc_uart fsc_disk -∗
+  disk_geom fsc_disk pd pav pu -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
   bslots 3 -∗
   (* THE TAIL FLUSH'S CREDIT, AS A RESOURCE AT A NAMED EPOCH (fs-log.md
      §G.20).  [cru] says "this inode's block is already in lh.block[]", and
@@ -610,7 +604,7 @@ Definition wp_itrunc_gen_body
       proc_priv_bare pj pidv Vpr -∗
       i_dev ip ↦₄{dqd} icfg_dev -∗
       i_inum ip ↦₄{dqn} inum -∗
-      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       inode_meta ip (di_trunc dn) -∗
       inode_map fsc_fs ip bm_empty -∗
@@ -630,7 +624,7 @@ Definition wp_itrunc_gen_body
       (∃ (w : bool) (u' : nat) (Sb' : gset Z),
          ⌜Sb ⊆ Sb'⌝ ∗
          ⌜IBLOCK inum icfg_ist ∈ Sb'⌝ ∗
-         ⌜w = true -> bmapstart ∈ Sb'⌝ ∗
+         ⌜w = true -> fsc_bmapstart ∈ Sb'⌝ ∗
          (* A CREDITED CALLER IS NEVER CHARGED ITS OWN CREDIT BACK
             (fs-log.md §G.25): at [crb = true] the paid disjunct pins the
             level, so the report is [false] -- which is what lets a walk's
@@ -646,11 +640,7 @@ Module Type ITRUNC.
   Parameter wp_itrunc_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (bmapstart : Z)
-      (size : Z)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
       (data : nat -> list (bv 8))
@@ -658,8 +648,8 @@ Module Type ITRUNC.
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_itrunc_sconf_body γs j γl γu γd γk pd pav pu bn
-                           bmapstart size
+      wp_itrunc_sconf_body γs j γl pd pav pu
+
                            ip inum dn dn0 bm data u
                            pidv dq dqd dqn dqb dqs m K eb b lks Vpr.
   (* the credited set-form contract; [wp_itrunc_sconf] is this at
@@ -668,11 +658,7 @@ Module Type ITRUNC.
   Parameter wp_itrunc_gen :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (bmapstart : Z)
-      (size : Z)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
       (data : nat -> list (bv 8))
@@ -680,8 +666,8 @@ Module Type ITRUNC.
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_itrunc_gen_body γs j γl γu γd γk pd pav pu bn
-                         bmapstart size
+      wp_itrunc_gen_body γs j γl pd pav pu
+
                          ip inum dn dn0 bm data u Sb crb cru e0
                          pidv dq dqd dqn dqb dqs m K eb b lks Vpr.
 End ITRUNC.

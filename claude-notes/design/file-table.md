@@ -148,9 +148,13 @@ this file**, tied to the content by `FileInvDefs.fdstate_ok`:
 Definition fdstate_ok (inum : mword 32) (C : fcontent) (st : fdstate) : Prop :=
   match st with
   | FdClosed             => fc_type C = FD_NONE
-  | FdOpen (FdPipe b)    => fc_type C = FD_PIPE  /\ fc_writable C = if b then 1 else 0
-  | FdOpen (FdInode n)   => fc_type C = FD_INODE /\ n  = bv_unsigned inum
-  | FdOpen (FdDevice mj) => fc_type C = FD_DEVICE /\ mj = bv_unsigned (fc_major C)
+  | FdOpen r w t =>
+      fc_readable C = (if r then 1 else 0) /\ fc_writable C = (if w then 1 else 0)
+      /\ match t with
+         | FdPipe      => fc_type C = FD_PIPE
+         | FdInode n   => fc_type C = FD_INODE  /\ n  = bv_unsigned inum
+         | FdDevice mj => fc_type C = FD_DEVICE /\ mj = bv_unsigned (fc_major C)
+         end
   end.
 ```
 

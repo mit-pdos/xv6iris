@@ -180,6 +180,13 @@ Require Import InodeRegion.
 Require Import FsState.
 Require Import FsBytesGamma.
 Require Import LogDefs.       (* [fs_home_set] -- [ic_loaded_open]'s row *)
+(* THE TRANSACTION PIN (rank 5).  Every park below that keeps a share of an
+   open transaction's [ln_tx] element -- [ic_dep_own]'s write arm and its
+   reading [ic_dep_side], [ic_out_frz]'s freeze window, the slot pin
+   [ic_pin_tx], and section 5c's two pool ledgers -- spells it with this one
+   vocabulary, and every refutation the commit reads off them is an instance
+   of [TxPin.tx_pin_no_ops]. *)
+Require Import TxPin.
 Require Import FsStateEra.
 Require Import EscrowDefs.
 Require Import EscrowInode.   (* OPTION A: pool_pending, reg_full *)
@@ -329,12 +336,6 @@ Section IcacheEscrow.
   Definition ic_mid (cn : ic_names) (k : nat) : iProp Σ :=
     lock_tok_excl (icn_mid cn k).
 
-  Lemma ic_tok_exclusive cn k : ic_tok cn k -∗ ic_tok cn k -∗ False.
-  Proof.
-    rewrite /ic_tok. iIntros "H1 H2".
-    iDestruct (ghost_var_valid_2 with "H1 H2") as %[Hv _].
-    iPureIntro. by apply (Qp.not_add_le_l 1 1).
-  Qed.
 
   (* ...and the WHOLE variable against a DEPOSITED half, which is what
      [ic_swap_checkout] refutes the checked-out arm with -- the same one line
@@ -587,6 +588,246 @@ Section IcacheEscrow.
     intros _. pose proof (di_nlink_nonneg dn). lia.
   Qed.
 
+  (* ==================================================================== *)
+  (*  THE PER-INODE ESCROWED LEG                                          *)
+  (*  (durable-disk EV, the era-vocabulary unification, stage 4)          *)
+  (* ==================================================================== *)
+
+  (* EVERYTHING A SLOT HOLDS OF ONE INODE, AT A SHARE -- AND IT IS EXACTLY
+     THE PIECE THE COMMIT'S COLLECTION ASSEMBLES.  [FsState]'s per-inum
+     conjunct is [FsStateInode.inode_owned] = [inode_phi] beside
+     [inode_ghost], and 2b-inode-1/4's rulings (fs-state.md section 7) put
+     its four parts in three hands:
+
+       - the RECORD's bytes and this inum's link AUTHORITY are region-side
+         ([InodeRegion.ireg_recs] at [FsStateInode.rec_owned_at],
+         [InodeRegion.ireg_lnk_at] around [FsStateLink.link_auth]) and never
+         travel;
+       - the DATA LEG -- [FsStateInode.inode_dat_q], which is [inode_phi]
+         MINUS its record -- and this inode's entry TOKENS
+         ([FsStateInode.ent_toks_x], the Φ-free half's other piece) are
+         HERE, in whichever escrow arm or pool row owns the inum;
+       - the era's own two, the record PROXY [dinode_at] and the abstract
+         fragment [FsState.top_frag], ride with the leg and are RESIDUE to
+         the collection, which consumes neither.
+
+     So the pair is what every arm carries and what [ic_slot_cover]'s third
+     alternative lends, and naming it ONCE is what lets the collection take
+     it off a slot without re-associating anything.  The three readings
+     below -- [ic_inode_leg_phi_at], [ic_inode_leg_ghost] and their join
+     [ic_inode_leg_owned] -- are the whole of the translation into the
+     collection's own vocabulary; each one is the leg beside what the REGION
+     kept.
+
+     IT SITS IN [dlinks]' CONJUNCT POSITION in all three arms (durable-notes,
+     "replacing one conjunct of a big payload: bundle the pair in the old
+     one's position"), and [dlinks γfs (bv_unsigned inum) dn bm data] IS
+     [ent_toks_x _ (bv_unsigned inum) (era_node dn bm data)] -- one unfold --
+     so no arm's textual order moved and the arity dropped by one.
+     [ic_inode_leg_era_open]/[_era_intro] are the two directions at the
+     era's own [(dn, bm, data)] triple. *)
+  Definition ic_inode_leg (γfs : fs_names) (dq : dfrac) (γi : gname)
+      (inum : mword 32) (n : fs_node) : iProp Σ :=
+    (FsStateInode.ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n
+     ∗ inode_owned_era_q γfs dq γi inum n)%I.
+
+  (* NAMED, NOT SEARCHED, and the difference is 19 seconds -- measured, on
+     this one sentence.  Both leaves have declared instances, but a bare
+     [apply _] (which is what [tl_struct] falls through to at a leaf) has
+     to REACH them past every other [Timeless] instance in scope, with the
+     node a VARIABLE so nothing in [ent_toks_x]'s body reduces to cut the
+     search short.  Naming the two instances makes the sentence free. *)
+  Global Instance ic_inode_leg_timeless γfs dq γi inum n :
+    Timeless (ic_inode_leg γfs dq γi inum n).
+  Proof.
+    rewrite /ic_inode_leg.
+    apply bi.sep_timeless;
+      [apply FsStateInode.ent_toks_x_timeless
+      | apply inode_owned_era_q_timeless].
+  Qed.
+
+  (* SEALED THE DAY IT IS WRITTEN (durable-notes, the [iFrame]-up-to-delta
+     rule): it rides inside [ic_loaded] and [ipool_alloc], whose framing
+     searches this file runs constantly, and unsealed it would cost each of
+     them the era bundle's four conjuncts on top of what they already walk.
+     [rewrite /ic_inode_leg] and the declared [Timeless] instance still
+     work, and the four openers below are what the proofs use.
+
+     GLOBAL SINCE STAGE 5, because the seal has a second consumer now:
+     [FsCollect.col_side] IS this predicate, and a seal does not travel
+     (durable-notes, "a [Typeclasses Opaque] seal does not travel").  An
+     unsealed leg there would let a framing search walk into the era
+     bundle's four conjuncts at every one of the collection's inums. *)
+  Global Typeclasses Opaque ic_inode_leg.
+
+  Lemma ic_inode_leg_open γfs dq γi (inum : mword 32) n :
+    ic_inode_leg γfs dq γi inum n -∗
+      FsStateInode.ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n
+      ∗ inode_owned_era_q γfs dq γi inum n.
+  Proof. rewrite /ic_inode_leg. iIntros "[H1 H2]". iFrame. Qed.
+
+  Lemma ic_inode_leg_intro γfs dq γi (inum : mword 32) n :
+    FsStateInode.ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n -∗
+    inode_owned_era_q γfs dq γi inum n -∗
+    ic_inode_leg γfs dq γi inum n.
+  Proof.
+    rewrite /ic_inode_leg. iIntros "H1 H2".
+    iSplitL "H1"; [iExact "H1" | iExact "H2"].
+  Qed.
+
+  Lemma ic_inode_leg_era_open γfs dq γi (inum : mword 32) dn bm data :
+    ic_inode_leg γfs dq γi inum (era_node dn bm data) -∗
+      dlinks γfs (bv_unsigned inum) dn bm data
+      ∗ inode_owned_era_q γfs dq γi inum (era_node dn bm data).
+  Proof. rewrite /ic_inode_leg /dlinks. iIntros "[H1 H2]". iFrame. Qed.
+
+  Lemma ic_inode_leg_era_intro γfs dq γi (inum : mword 32) dn bm data :
+    dlinks γfs (bv_unsigned inum) dn bm data -∗
+    inode_owned_era_q γfs dq γi inum (era_node dn bm data) -∗
+    ic_inode_leg γfs dq γi inum (era_node dn bm data).
+  Proof.
+    rewrite /ic_inode_leg /dlinks. iIntros "H1 H2".
+    iSplitL "H1"; [iExact "H1" | iExact "H2"].
+  Qed.
+
+  (* the leg's own pure reading: [inode_local] is the era bundle's last
+     conjunct and a consumer that only wants it should not have to open the
+     pair. *)
+  Lemma ic_inode_leg_local γfs dq γi (inum : mword 32) n :
+    ic_inode_leg γfs dq γi inum n -∗ ⌜inode_local (bv_unsigned inum) n⌝.
+  Proof.
+    rewrite /ic_inode_leg /inode_owned_era_q.
+    iIntros "(_ & _ & _ & _ & $)".
+  Qed.
+
+  (* THE READER'S QUARTER, AT THE LEG.  [FsStateEra.inode_owned_era_shed_to]
+     is about the era bundle alone; the entry TOKENS do not split (they are
+     the Φ-free half and stay whole on the arm), so the leg's shed is the
+     bundle's beside an untouched token conjunct.  [ic_loaded_shed] and
+     [ic_rd_join] are these two and the cells. *)
+  Lemma ic_inode_leg_shed_to γfs γi (inum : mword 32) n :
+    ic_inode_leg γfs (DfracOwn 1) γi inum n -∗
+    ic_inode_leg γfs (DfracOwn (3/4)) γi inum n
+    ∗ inode_rd_era γfs (DfracOwn (1/4)) inum n.
+  Proof.
+    rewrite /ic_inode_leg. iIntros "[Hte Hn]".
+    iDestruct (inode_owned_era_shed_to with "Hn") as "[Hn34 Hn14]".
+    iSplitR "Hn14"; [| iExact "Hn14"].
+    iSplitL "Hte"; [iExact "Hte" | iExact "Hn34"].
+  Qed.
+
+  (* the read arm's re-identification, at the leg: the era's abstract
+     fragment is inside the bundle, so the pin travels with the leg and
+     [ic_rd_join] never opens it. *)
+  Lemma ic_inode_leg_rd_agree γfs dq1 dq2 γi (inum : mword 32) n1 n2 :
+    ic_inode_leg γfs dq1 γi inum n1 -∗
+    inode_rd_era γfs dq2 inum n2 -∗ ⌜n1 = n2⌝.
+  Proof.
+    rewrite /ic_inode_leg. iIntros "[_ Hn] Hrd".
+    iApply (inode_rd_era_agree with "Hn Hrd").
+  Qed.
+
+  Lemma ic_inode_leg_shed_of γfs γi (inum : mword 32) n :
+    ic_inode_leg γfs (DfracOwn (3/4)) γi inum n -∗
+    inode_rd_era γfs (DfracOwn (1/4)) inum n -∗
+    ic_inode_leg γfs (DfracOwn 1) γi inum n.
+  Proof.
+    rewrite /ic_inode_leg. iIntros "[Hte Hn34] Hn14".
+    iSplitL "Hte"; [iExact "Hte" |].
+    iApply (inode_owned_era_shed_of with "Hn34 Hn14").
+  Qed.
+
+  (* ---- WHAT THE COLLECTION TAKES OFF A LEG ---------------------------- *)
+
+  (* (i) THE Φ HALF.  The leg's data leg beside the REGION's own record run
+     at this inum IS [FsStateInode.inode_phi_at] -- the geometry-free
+     reading, which is what [FsCollectAll.col_recs_by_inum] hands in (the
+     inode region has no superblock, only [icfg_ist] and a plain [Z]).  The
+     era's two residue pieces come out beside it and the collection consumes
+     neither; the tokens come out because they are the OTHER half's input,
+     [ic_inode_leg_ghost]'s. *)
+  Lemma ic_inode_leg_phi_at γfs γi (inum : mword 32) (n : fs_node)
+      (istart : Z) :
+    ic_inode_leg γfs (DfracOwn 1) γi inum n -∗
+    FsStateInode.rec_owned_at (fs_gamma_L γfs) istart (bv_unsigned inum)
+      (fn_rec n) -∗
+    FsStateInode.inode_phi_at (fs_gamma_L γfs) istart (bv_unsigned inum) n
+    ∗ FsStateInode.ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n
+    ∗ ⌜inode_local (bv_unsigned inum) n⌝
+    ∗ dinode_at γi inum (fn_rec n)
+    ∗ top_frag (fs_gamma_L γfs) (bv_unsigned inum) n.
+  Proof.
+    rewrite /ic_inode_leg /inode_owned_era_q /FsStateInode.inode_phi_at.
+    rewrite -(FsStateInode.inode_dat_1 (fs_gamma_L γfs) n).
+    iIntros "(Hte & Hd & Hb & Ht & %Hloc) Hrec".
+    iSplitL "Hrec Hb"; [iSplitL "Hrec"; [iExact "Hrec" | iExact "Hb"] |].
+    iSplitL "Hte"; [iExact "Hte" |].
+    iSplitR; [by iPureIntro |].
+    iSplitL "Hd"; [iExact "Hd" | iExact "Ht"].
+  Qed.
+
+  (* (ii) THE Φ-FREE HALF, and it is [FsStateInode.inode_ghost_of] with the
+     leg supplying both of that lemma's inputs it can supply: the entry
+     TOKENS and [inode_local].  What it cannot supply is the region's
+     per-inum AUTHORITY and the type agreement [fn_ity_ok] -- the collection
+     reads the second off [InodeRegion.ireg_reg_ok] when it peels
+     [ireg_lnk_at], which is where the first comes from too. *)
+  Lemma ic_inode_leg_ghost γfs γi (inum : mword 32) (n : fs_node) v :
+    fn_ity_ok n v ->
+    ic_inode_leg γfs (DfracOwn 1) γi inum n -∗
+    FsStateLink.link_auth (fs_gamma_L γfs) (bv_unsigned inum) (fn_mult n) v -∗
+    FsStateInode.inode_ghost (fs_gamma_L γfs) (bv_unsigned inum) n
+    ∗ FsStateInode.inode_dat (fs_gamma_L γfs) n
+    ∗ dinode_at γi inum (fn_rec n)
+    ∗ top_frag (fs_gamma_L γfs) (bv_unsigned inum) n.
+  Proof.
+    intros Hv.
+    rewrite /ic_inode_leg /inode_owned_era_q.
+    rewrite -(FsStateInode.inode_dat_1 (fs_gamma_L γfs) n).
+    iIntros "(Hte & Hd & Hb & Ht & %Hloc) Hla".
+    iSplitR "Hb Hd Ht".
+    { iApply (FsStateInode.inode_ghost_of _ (bv_unsigned inum) n v Hv Hloc
+                with "Hla Hte"). }
+    iSplitL "Hb"; [iExact "Hb" |].
+    iSplitL "Hd"; [iExact "Hd" | iExact "Ht"].
+  Qed.
+
+  (* (iii) THE TWO TOGETHER, at the superblock the state is stated over: a
+     slot's whole leg, the region's record run and the region's link
+     authority ADD UP TO [FsState]'s own per-inum conjunct, with the era's
+     residue left over.  [FsStateInode.inode_phi_sb]'s range premise is free
+     here -- [bv_unsigned] of a [mword 32] is in [0, 2^32) by construction --
+     which is the honest reading of "an inum is a 32-bit word". *)
+  Lemma ic_inode_leg_owned γfs γi (inum : mword 32) (n : fs_node)
+      (sb : FsImg.fs_sb) v :
+    fn_ity_ok n v ->
+    ic_inode_leg γfs (DfracOwn 1) γi inum n -∗
+    FsStateInode.rec_owned_at (fs_gamma_L γfs) (FsImg.sb_inodestart sb)
+      (bv_unsigned inum) (fn_rec n) -∗
+    FsStateLink.link_auth (fs_gamma_L γfs) (bv_unsigned inum) (fn_mult n) v -∗
+    FsStateInode.inode_owned (fs_gamma_L γfs) sb (bv_unsigned inum) n
+    ∗ dinode_at γi inum (fn_rec n)
+    ∗ top_frag (fs_gamma_L γfs) (bv_unsigned inum) n.
+  Proof.
+    intros Hv.
+    (* the range premise, proved with the proofmode context still EMPTY --
+       [lia] in a nine-conjunct Iris context is the hygiene rule's case *)
+    assert (Hrng : 0 <= bv_unsigned inum < 2 ^ 32).
+    { pose proof (bv_unsigned_in_range 32 inum) as H.
+      unfold bv_modulus in H. exact H. }
+    iIntros "Hleg Hrec Hla".
+    iDestruct (ic_inode_leg_phi_at with "Hleg Hrec")
+      as "(Hphi & Hte & %Hloc & Hd & Ht)".
+    rewrite /FsStateInode.inode_owned.
+    rewrite -(FsStateInode.inode_phi_sb (fs_gamma_L γfs) sb
+                (bv_unsigned inum) n Hrng).
+    iSplitR "Hd Ht".
+    { iSplitL "Hphi"; [iExact "Hphi" |].
+      iApply (FsStateInode.inode_ghost_of _ (bv_unsigned inum) n v Hv Hloc
+                with "Hla Hte"). }
+    iSplitL "Hd"; [iExact "Hd" | iExact "Ht"].
+  Qed.
+
   Definition ipool_alloc (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (inum : mword 32) : iProp Σ :=
     (∃ (dn0 : dinode) (bm0 : blkmap) (data0 : nat -> list (bv 8)),
@@ -595,8 +836,12 @@ Section IcacheEscrow.
        ⌜dir_dots_ix (bv_unsigned inum) dn0 data0⌝ ∗
        ⌜dir_orphan_clean dn0 data0⌝ ∗
        ⌜dir_uniq dn0 data0⌝ ∗
-       dlinks γfs (bv_unsigned inum) dn0 bm0 data0 ∗
-       inode_owned_era γfs γi inum (era_node dn0 bm0 data0) ∗
+       (* THE PER-INODE ESCROWED LEG (durable-disk EV stage 4), in [dlinks]'
+          own conjunct position and absorbing the era bundle beside it: the
+          entry TOKENS and [FsStateEra.inode_owned_era_q] at fraction 1, i.e.
+          exactly what the commit's collection takes off this inum.
+          [ic_inode_leg_era_open]/[_era_intro] are the two directions. *)
+       ic_inode_leg γfs (DfracOwn 1) γi inum (era_node dn0 bm0 data0) ∗
        (* ...AND THE CONTENTS HOLD, TIED (namei-pinned-lookup.md §9 W2).  The
           tie is DEFINITIONAL (Revision 1): the abstract entry map is a
           function of the record and the bytes this arm already owns, so the
@@ -825,16 +1070,17 @@ Section IcacheEscrow.
        ⌜dir_dots_ix (bv_unsigned inum) dn data⌝ ∗
        ⌜dir_orphan_clean dn data⌝ ∗
        ⌜dir_uniq dn data⌝ ∗
-       dlinks γfs (bv_unsigned inum) dn bm data ∗
-       (* THE OWNERSHIP IS THE ERA BUNDLE (durable-disk 2b-inode-3), at this
-          payload's own node.  It CONTAINS what three conjuncts used to say
-          separately -- [dinode_at], [ind_res] and [inode_blocks] -- and
-          adds the era's abstract value [top_frag], which is what a holder
-          retags at its writes ([InodeRegion.ireg_top_retag]).  A consumer
-          that wants the old shape back applies [ic_loaded_open], an
-          ordinary entailment; see [ipool_alloc]'s note for why [inode_ok]
-          stays a conjunct rather than being derived. *)
-       inode_owned_era γfs γi inum (era_node dn bm data) ∗
+       (* THE OWNERSHIP IS THE PER-INODE ESCROWED LEG (durable-disk EV
+          stage 4), which is [dlinks] and the era bundle (durable-disk
+          2b-inode-3) as ONE conjunct at this payload's own node.  The
+          bundle CONTAINS what three conjuncts used to say separately --
+          [dinode_at], [ind_res] and [inode_blocks] -- and adds the era's
+          abstract value [top_frag], which is what a holder retags at its
+          writes ([InodeRegion.ireg_top_retag]).  A consumer that wants the
+          old shape back applies [ic_loaded_open], an ordinary entailment;
+          see [ipool_alloc]'s note for why [inode_ok] stays a conjunct
+          rather than being derived. *)
+       ic_inode_leg γfs (DfracOwn 1) γi inum (era_node dn bm data) ∗
        inode_meta (ientry k) dn ∗
        inode_addrs (ientry k) (bm_cells bm) ∗
        (* ...AND THE CONTENTS HOLD, TIED, the twin of [ipool_alloc]'s: see
@@ -899,15 +1145,17 @@ Section IcacheEscrow.
        ⌜dir_dots_ix (bv_unsigned inum) dn data⌝ ∗
        ⌜dir_orphan_clean dn data⌝ ∗
        ⌜dir_uniq dn data⌝ ∗
-       dlinks γfs (bv_unsigned inum) dn bm data ∗
-       inode_owned_era_q γfs (DfracOwn (3/4)) γi inum (era_node dn bm data) ∗
+       (* the leg at THREE QUARTERS -- the same conjunct [ic_loaded] carries
+          at 1, which is what makes [ic_loaded_shed]/[ic_rd_join] a fraction
+          move and nothing else *)
+       ic_inode_leg γfs (DfracOwn (3/4)) γi inum (era_node dn bm data) ∗
        dv_ride (bv_unsigned inum) (dv_of dn data) ∗
        fv_ride (bv_unsigned inum) (fv_of dn data))%I.
 
   (* ...and what the READ-LOCKING HOLDER carries in its place.  [inode_ok] is
      restated here (it is pure, so both sides keep it) because the holder
      needs it to call [readi]; [inode_local] of the node is what
-     [FsStateEra.inode_bytes_era_to] takes to turn the quarter into
+     [FsStateEra.inode_dat_era_to] takes to turn the quarter into
      [readi]'s [inode_map_q] / [inode_blocks_q] pair. *)
   Definition ic_rd_held (γfs : fs_names) (cov : gset Z) (logstart : Z)
       (k : nat) (inum : mword 32) (dn : dinode) (bm : blkmap) : iProp Σ :=
@@ -947,11 +1195,11 @@ Section IcacheEscrow.
   Proof.
     rewrite /ic_loaded /ic_rd_arm /ic_rd_held. iIntros "H".
     iDestruct "H" as (data)
-      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hl & Hn & Hm & Ha & Hv & Hw)".
-    iDestruct (inode_owned_era_local with "Hn") as %Hloc.
-    iDestruct (inode_owned_era_shed_to with "Hn") as "[Hn34 Hn14]".
+      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hleg & Hm & Ha & Hv & Hw)".
+    iDestruct (ic_inode_leg_local with "Hleg") as %Hloc.
+    iDestruct (ic_inode_leg_shed_to with "Hleg") as "[Hleg34 Hn14]".
     iSplitR "Hm Ha Hn14".
-    - iExists dn, bm, data. iFrame "Hl Hn34 Hv Hw".
+    - iExists dn, bm, data. iFrame "Hleg34 Hv Hw".
       iSplitR; [iPureIntro; exact Hok |].
       iSplitR; [iPureIntro; exact Hdok |].
       iSplitR; [iPureIntro; exact Hddix |].
@@ -975,9 +1223,9 @@ Section IcacheEscrow.
     rewrite /ic_rd_arm /ic_rd_held /ic_loaded.
     iIntros "Harm Hheld".
     iDestruct "Harm" as (dn' bm' data')
-      "(%Hok' & %Hdok & %Hddix & %Hdoc & %Hduq & Hl & Hn34 & Hv & Hw)".
+      "(%Hok' & %Hdok & %Hddix & %Hdoc & %Hduq & Hleg & Hv & Hw)".
     iDestruct "Hheld" as (data) "(%Hok & %Hloc & Hm & Ha & Hn14)".
-    iDestruct (inode_rd_era_agree with "Hn34 Hn14") as %Hnode.
+    iDestruct (ic_inode_leg_rd_agree with "Hleg Hn14") as %Hnode.
     destruct (era_node_pair_inj cov logstart dn' dn bm' bm data' data
                 Hok' Hok Hnode) as [<- <-].
     (* the HELD quarter is at the holder's [data], the arm's residue at its
@@ -992,23 +1240,14 @@ Section IcacheEscrow.
     iSplitR; [iPureIntro; exact Hddix |].
     iSplitR; [iPureIntro; exact Hdoc |].
     iSplitR; [iPureIntro; exact Hduq |].
-    iFrame "Hl".
-    iSplitL "Hn34 Hn14";
-      [iApply (inode_owned_era_shed_of with "Hn34 Hn14") |].
+    iSplitL "Hleg Hn14";
+      [iApply (ic_inode_leg_shed_of with "Hleg Hn14") |].
     iFrame "Hm Ha Hv Hw".
   Qed.
 
   (* the arm's own reading of the residue, which is what plan section 4's
      collection takes off an open escrow: the record proxy, the byte legs at
      three quarters and the node's well-formedness. *)
-  Lemma ic_rd_arm_owned γfs γi cov logstart (inum : mword 32) :
-    ic_rd_arm γfs γi cov logstart inum -∗
-    ∃ n : fs_node, inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n.
-  Proof.
-    rewrite /ic_rd_arm. iIntros "H".
-    iDestruct "H" as (dn bm data) "(_ & _ & _ & _ & _ & _ & Hn & _ & _)".
-    iExists (era_node dn bm data). iExact "Hn".
-  Qed.
 
   (* THE PAYLOAD THE VALID WORD KEYS, AT THE SLOT'S GENERATION, AND THE
      GENERATION'S TYPE ONE-SHOT ON ITS TWO POLARITIES (design §17.3 (A) /
@@ -1184,7 +1423,7 @@ Section IcacheEscrow.
 
   Definition ic_pin_tx (k : nat) : iProp Σ :=
     (∃ (t : nat) (q : Qp),
-       hpn_h k (Some (t, q)) ∗ t ↪[ln_tx icfg_log]{#q} tt)%I.
+       hpn_h k (Some (t, q)) ∗ tx_pin icfg_log t q)%I.
 
   Global Instance ic_pin_rest_timeless k : Timeless (ic_pin_rest k).
   Proof. rewrite /ic_pin_rest. tl_struct. Qed.
@@ -1195,16 +1434,9 @@ Section IcacheEscrow.
      an arm inside one of iput's two windows holds a POSITIVE share of some
      transaction's [ln_tx] element, so at a commit -- where the WAL's
      authority for that map is EMPTY -- neither window can be standing.
-     [ic_dep_own_tx_no_ops]'s line, at the pin instead of the descriptor. *)
-  Lemma ic_pin_tx_no_ops k :
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
-    ic_pin_tx k -∗ False.
-  Proof.
-    iIntros "Ha Hpin". rewrite /ic_pin_tx.
-    iDestruct "Hpin" as (t q) "[_ Htx]".
-    iDestruct (ghost_map_lookup with "Ha Htx") as %Hbad.
-    rewrite lookup_empty in Hbad. discriminate.
-  Qed.
+     NO NAMED LEMMA: the two consumers ([ic_escrow_body_cover]'s mid-free
+     park and its held arm) open the pin's existential and call the generic
+     [TxPin.tx_pin_no_ops] on the share inside. *)
 
   (* THE PIN'S OWN MOVERS, as the two windows use them.  ENTER: the arm at
      rest hands out the WHOLE cell, the walk names its transaction and its
@@ -1216,7 +1448,7 @@ Section IcacheEscrow.
     ic_pin_rest k -∗ t ↪[ln_tx icfg_log]{#q} tt ==∗
     ic_pin_tx k ∗ hpn_h k (Some (t, q)).
   Proof.
-    iIntros "Hp Htx". rewrite /ic_pin_rest /ic_pin_tx.
+    iIntros "Hp Htx". rewrite /ic_pin_rest /ic_pin_tx /tx_pin.
     iMod (hpn_full_update _ _ (Some (t, q)) with "Hp") as "Hp".
     rewrite hpn_split. iDestruct "Hp" as "[Hp1 Hp2]".
     iModIntro. iSplitR "Hp2"; [| iExact "Hp2"].
@@ -1227,7 +1459,7 @@ Section IcacheEscrow.
     hpn_h k (Some (t, q)) -∗ ic_pin_tx k ==∗
     ic_pin_rest k ∗ t ↪[ln_tx icfg_log]{#q} tt.
   Proof.
-    iIntros "Hh Hpin". rewrite /ic_pin_tx /ic_pin_rest.
+    iIntros "Hh Hpin". rewrite /ic_pin_tx /ic_pin_rest /tx_pin.
     iDestruct "Hpin" as (t' q') "[Hh' Htx]".
     iDestruct (hpn_agree with "Hh Hh'") as %Heq.
     inversion Heq as [Heq']. subst t' q'.
@@ -1342,14 +1574,6 @@ Section IcacheEscrow.
   (* ...and the arm-level pack, which is the [_np] one plus the token the
      arm owes (§3.9).  The holder that re-parks a named record presents
      both. *)
-  Lemma ic_payload_at_pack γfs γi cov logstart k inum g dn bm :
-    ic_payload_at γfs γi cov logstart k inum g dn bm -∗
-    ifreeze_off (bv_unsigned inum) -∗
-    ic_payload γfs γi cov logstart k inum g true.
-  Proof.
-    iIntros "H Ht". iApply (ic_payload_join with "[H] Ht").
-    iApply (ic_payload_at_pack_np with "H").
-  Qed.
 
   (* ------------------------------------------------------------------ *)
   (*  3.  THE THREE ARMS                                                 *)
@@ -1413,11 +1637,11 @@ Section IcacheEscrow.
        [end_op] consumes the WHOLE [ln_tx] element, so it cannot run while
        any inode of the transaction is checked out for writing, and at a
        commit (where the authority is empty) this arm is refuted outright
-       ([ic_dep_own_tx_no_ops]).  The descriptor names [(t, q)], so the park
-       gives back exactly the share the checkout took. *)
+       ([TxPin.tx_pin_no_ops] at the share).  The descriptor names [(t, q)],
+       so the park gives back exactly the share the checkout took. *)
     | DepTx s dv nu g t q =>
         (⌜dv = dev /\ nu = inum⌝ ∗ inode_shr_gen_bare k s dev inum g ∗
-         t ↪[ln_tx icfg_log]{#q} tt)%I
+         tx_pin icfg_log t q)%I
     (* THE READ ARM (durable-fs-plan.md section 3): the write arm's
        credential VERBATIM.  What distinguishes the arm is not it but what
        the escrow KEEPS beside it -- [ic_rd_arm], the bundle's three
@@ -1488,17 +1712,6 @@ Section IcacheEscrow.
       rewrite /inode_shr_gen. iFrame.
   Qed.
 
-  Lemma ic_dep_res_ident k d dev inum :
-    ic_dep_res k d dev inum -∗
-    ∃ f : Qp,
-      inode_ident k (DfracOwn f) dev inum ∗
-      (inode_ident k (DfracOwn f) dev inum -∗ ic_dep_res k d dev inum).
-  Proof.
-    rewrite /ic_dep_res. iIntros "[Hown Hhalf]".
-    iDestruct (ic_dep_own_ident with "Hown") as (f) "[Hid Hback]".
-    iExists f. iFrame "Hid". iIntros "Hid". iFrame "Hhalf".
-    iApply ("Hback" with "Hid").
-  Qed.
 
   (* ...AND BOTH CARRY A LIVENESS SLICE, which is what a lock-free reader
      INSIDE the critical section borrows for its [ip->ref] guard
@@ -1573,14 +1786,32 @@ Section IcacheEscrow.
     | _ => None
     end.
 
-  Definition ic_dep_side (d : ic_dep) : iProp Σ :=
+  (* WHICH TRANSACTION THE DESCRIPTOR PINS, as a PURE reading of it -- the
+     [option] shape [TxPin.tx_pin_o] is stated at, and hence what makes
+     [ic_dep_side] one instance of the vocabulary rather than a match of its
+     own.  It lived in [SpecIunlockput] (the walk that needed to NAME the
+     [(t, q)] without destructing a descriptor); its home is here, beside
+     [ic_dep_shr], which reads the descriptor's OTHER half. *)
+  Definition ic_dep_side_tx (d : ic_dep) : option (nat * Qp) :=
     match d with
-    | DepTx _ _ _ _ t q => t ↪[ln_tx icfg_log]{#q} tt
-    | _ => emp%I
+    | DepTx _ _ _ _ t q => Some (t, q)
+    | _ => None
     end.
 
+  Definition ic_dep_side (d : ic_dep) : iProp Σ :=
+    tx_pin_o icfg_log (ic_dep_side_tx d).
+
+  (* the equation the two generic [iunlockput] bodies take as a pure premise:
+     with the descriptor's pin NAMED, the side condition IS the pin.  It is a
+     LEIBNIZ equality between propositions, discharged by [reflexivity] --
+     which is what [tx_pin]'s transparency buys ([TxPin]'s header). *)
+  Lemma ic_dep_side_of_tx (d : ic_dep) (t : nat) (q : Qp) :
+    ic_dep_side_tx d = Some (t, q) ->
+    ic_dep_side d = tx_pin icfg_log t q.
+  Proof. rewrite /ic_dep_side. intros ->. reflexivity. Qed.
+
   Global Instance ic_dep_side_timeless d : Timeless (ic_dep_side d).
-  Proof. rewrite /ic_dep_side. destruct d; tl_struct. Qed.
+  Proof. rewrite /ic_dep_side. apply _. Qed.
 
   Lemma ic_dep_gname_of_shr d (s : Qp) (dev inum : mword 32) (g : gname) :
     ic_dep_shr d = Some (s, dev, inum, g) -> ic_dep_gname d = Some g.
@@ -1676,10 +1907,10 @@ Section IcacheEscrow.
          frzsel k ((1/2)/2)%Qp true ∗
          (* THE PARKED TRANSACTION SHARE (durable-disk B''-tx5), [DepTx]'s
             conjunct at the window that carries no ordinary deposit: it is
-            what makes the commit refute this arm ([ic_out_frz_no_ops]) and
+            what makes the commit refute this arm ([TxPin.tx_pin_no_ops]) and
             the descriptor is what pins it to the share the freer must get
             back.  LAST, so no destructuring pattern above moved. *)
-         t ↪[ln_tx icfg_log]{#qt} tt)%I
+         tx_pin icfg_log t qt)%I
     | _ => False%I
     end.
 
@@ -1687,19 +1918,11 @@ Section IcacheEscrow.
     Timeless (ic_out_frz k d dev inum).
   Proof. rewrite /ic_out_frz /inode_ident. destruct d; tl_struct. Qed.
 
-  (* ...and the refutation the commit reads off it ([ic_dep_own_tx_no_ops]'s
-     line at the freeze window): a [DepFrz] arm holds a positive share of an
-     open transaction's element, so at an empty authority it cannot stand. *)
-  Lemma ic_out_frz_no_ops k (qf : Qp) (dv nu : mword 32) (t : nat) (qt : Qp)
-      (dev inum : mword 32) :
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
-    ic_out_frz k (DepFrz qf dv nu t qt) dev inum -∗ False.
-  Proof.
-    iIntros "Ha Hfrz". rewrite /ic_out_frz.
-    iDestruct "Hfrz" as "(_ & _ & _ & _ & _ & Htx)".
-    iDestruct (ghost_map_lookup with "Ha Htx") as %Hbad.
-    rewrite lookup_empty in Hbad. discriminate.
-  Qed.
+  (* ...and the refutation the commit reads off it, at the freeze window: a
+     [DepFrz] arm holds a positive share of an open transaction's element, so
+     at an empty authority it cannot stand.  NO NAMED LEMMA -- the one
+     consumer ([ic_escrow_body_cover]'s frozen alternative) takes the share
+     out of the arm and calls [TxPin.tx_pin_no_ops]. *)
 
   (* WHAT THE ARM KEEPS BESIDE THE CREDENTIAL, keyed by the descriptor: the
      READ arm's three quarters at [DepRd], and nothing at all at every other
@@ -1737,11 +1960,6 @@ Section IcacheEscrow.
      then ic_rd_held γfs cov logstart k inum dn bm
      else ic_loaded γfs γi cov logstart k inum dn bm)%I.
 
-  Lemma ic_dep_held_loaded γfs γi cov logstart d k (inum : mword 32) dn bm :
-    ic_dep_rd d = false ->
-    ic_loaded γfs γi cov logstart k inum dn bm -∗
-    ic_dep_held γfs γi cov logstart d k inum dn bm.
-  Proof. intros H. rewrite /ic_dep_held H. iIntros "$". Qed.
 
   (* THE ARM GAINED THE FILE SYSTEM'S NAMES, and nothing outside this file
      names [ic_out] at all. *)
@@ -1867,9 +2085,6 @@ Section IcacheEscrow.
 
   (* two DIFFERENT slots' escrows are at DISJOINT namespaces, which is what
      lets the commit hold both open *)
-  Lemma ic_escrow_ns_disjoint (k j : nat) :
-    k <> j -> ↑(icEscN .@ k) ## (↑(icEscN .@ j) : coPset).
-  Proof. intros Hne. by apply ndot_ne_disjoint. Qed.
 
   (* ...and each of them is inside the family's own mask, so a caller that
      only excludes [↑icEscN] is unaffected *)
@@ -1960,23 +2175,6 @@ Section IcacheEscrow.
     iSplitL "Hm"; [iExact "Hm" | iExact "Hg"].
   Qed.
 
-  Lemma ic_mk_parked cn γfs γi cov logstart k (dev inum : mword 32) (v : bool)
-      (g : gname) :
-    i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
-    i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
-    i_valid (ientry k) ↦₄ valid_word v -∗
-    ic_payload γfs γi cov logstart k inum g v -∗
-    live_gen k (1/2) g -∗
-    ic_pin_rest k -∗
-    ic_mid cn k -∗
-    ic_id cn k (1/2) true dev inum -∗
-    ic_parked cn γfs γi cov logstart k.
-  Proof.
-    iIntros "Hd Hn Hv Hp Hl Hpin Hm Hg".
-    iDestruct (ic_payload_to_arm with "Hp Hl Hpin") as "Hp".
-    iApply (ic_mk_parked_arm cn γfs γi cov logstart k dev inum v g
-              with "Hd Hn Hv Hp Hm Hg").
-  Qed.
 
   Lemma ic_mk_mid_arm cn γfs γi cov logstart k (dev inum w : mword 32) :
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
@@ -2047,9 +2245,9 @@ Section IcacheEscrow.
     rewrite /ic_loaded.
     iExists data. iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
     iSplitR; [done |]. iSplitR; [done |].
-    iSplitL "Hl"; [iExact "Hl" |].
     iSplitR "Hm Ha Hv Hw".
-    { iApply (inode_owned_era_era_node_of γfs γi inum dn bm data Hsh Hloc
+    { iApply (ic_inode_leg_era_intro with "Hl").
+      iApply (inode_owned_era_era_node_of γfs γi inum dn bm data Hsh Hloc
                 with "Hd Hr Hb Ht"). }
     iSplitL "Hm"; [iExact "Hm" |]. iSplitL "Ha"; [iExact "Ha" |].
     iSplitL "Hv"; [iExact "Hv" | iExact "Hw"].
@@ -2107,7 +2305,8 @@ Section IcacheEscrow.
   Proof.
     iIntros "H". rewrite /ic_loaded /ic_loaded_flat_body.
     iDestruct "H" as (data)
-      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hl & Hn & Hm & Ha & Hv & Hw)".
+      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hleg & Hm & Ha & Hv & Hw)".
+    iDestruct (ic_inode_leg_era_open with "Hleg") as "[Hl Hn]".
     pose proof (node_shape_ok_of_inode_ok cov logstart dn bm data Hok) as Hsh.
     iDestruct (inode_owned_era_local with "Hn") as %Hloc.
     iDestruct (inode_owned_era_era_node_to γfs γi inum dn bm data Hsh with "Hn")
@@ -2459,26 +2658,6 @@ Section IcacheEscrow.
   (* ...and the ORDINARY parker's signature, unchanged from IIId: a holder
      whose descriptor keeps NO bundle in the arm carries the payload whole,
      with the inum's unfrozen token, which is the arm's left disjunct. *)
-  Lemma ic_swap_park cn γfs γi cov logstart k (d : ic_dep) (g : gname)
-      (v : bool) (dev inum : mword 32) :
-    ic_dep_gname d = Some g ->
-    ic_dep_rd d = false ->
-    ic_escrow_body cn γfs γi cov logstart k -∗
-    ic_deposit cn k d -∗
-    i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
-    i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
-    i_valid (ientry k) ↦₄ valid_word v -∗
-    ic_payload γfs γi cov logstart k inum g v -∗
-    |==> ic_escrow_body cn γfs γi cov logstart k ∗
-      ic_tok cn k ∗
-      ic_dep_own k d dev inum.
-  Proof.
-    iIntros (Hdg Hnrd) "Hbody Hdep Hid Hin Hvld Hpay".
-    iApply (ic_swap_park_arm cn γfs γi cov logstart k d g v dev inum Hdg
-              with "Hbody Hdep Hid Hin Hvld [Hpay]").
-    rewrite (ic_out_rd_none γfs γi cov logstart d inum Hnrd).
-    iIntros "_". iExact "Hpay".
-  Qed.
 
   (* ...AND THE FREE PATH'S PARK (IVd, iput +0x70), which is the ONE parker
      that arrives with no payload: [ic_out]'s frozen alternative goes to
@@ -2985,7 +3164,7 @@ Section IcacheEscrow.
         [| iDestruct "Hpay" as "[[Hr Hp] _]"; iFrame "Hr"; iExact "Hp" ].
       iDestruct "Hpay" as (dn bm) "[Hlk _]".
       iDestruct "Hlk" as (data)
-        "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hera & Hmeta &
+        "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hleg & Hmeta &
           Haddrs & Hdv & Hfv)".
       pose proof Hok as Hok'.
       destruct Hok' as (Hwf & _ & Hda & _ & _ & _ & _).
@@ -3004,7 +3183,10 @@ Section IcacheEscrow.
       iSplitR; [iPureIntro; exact Hddix |].
       iSplitR; [iPureIntro; exact Hdoc |].
       iSplitR; [iPureIntro; exact Hduq |].
-      iSplitL "Hdlk"; [iExact "Hdlk" |]. iFrame. }
+      (* the eviction hands the LEG straight across: the loaded arm's and
+         the pool's allocated arm's are the same conjunct at the same
+         fraction (durable-disk EV stage 4), so nothing is opened here *)
+      iFrame. }
     (* the two right-hand conjuncts go out structurally: [iFrame "Hgf2
        Hpool"] would search the [ic_escrow_body] conjunct -- five arms, each
        an existential over [ic_payload]/[inode_raw] -- for each of the two
@@ -3172,63 +3354,12 @@ Section IcacheEscrow.
      THE ARM IS DECIDED BY [ifreeze_pre] AT EVERY READER, which is why the
      freer keeps that fragment in hand from the mint at +0x50 to the close at
      +0x8a and parks the receipt instead. *)
-  Lemma ic_close_frozen cn γfs γi cov logstart k (dev inum : mword 32)
-      (v : bool) :
-    i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
-    i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
-    i_valid (ientry k) ↦₄ valid_word v -∗
-    frzown (bv_unsigned inum) -∗ frzsel k ((1/2)/2)%Qp true -∗
-    ic_pin_tx k -∗
-    ic_mid cn k -∗
-    ic_id cn k (1/2) true dev inum -∗
-    ic_escrow_body cn γfs γi cov logstart k.
-  Proof.
-    iIntros "Hd Hn Hv Hrc Hsel Hpin Hm Hg". iLeft.
-    rewrite /ic_parked. iExists dev, inum, v, inhabitant.
-    iFrame "Hd Hn Hv Hm Hg".
-    iApply (ic_payload_arm_frz with "Hrc Hsel Hpin").
-  Qed.
 
   (* ...and its opener.  The freer identifies the arm by the identity slice it
      kept when the window exit split [i_inum] three ways (its own [q], the
      arm's ½ and the table's ½ − q), refutes OUT with the sleeplock's own
      token, MID/HELD/EMPTY with the cells, and [ic_parked]'s ORDINARY
      alternative with the [ifreeze_pre] in its hand. *)
-  Lemma ic_open_frozen cn γfs γi cov logstart k (q : Qp) (dev inum : mword 32)
-      (rg : frzidx) :
-    ic_escrow_body cn γfs γi cov logstart k -∗
-    ifreeze_pre rg (bv_unsigned inum) -∗
-    inode_ident k (DfracOwn q) dev inum -∗
-    ic_tok cn k -∗
-    ifreeze_pre rg (bv_unsigned inum) ∗ inode_ident k (DfracOwn q) dev inum ∗
-    ic_tok cn k ∗ frzown (bv_unsigned inum) ∗ frzsel k ((1/2)/2)%Qp true ∗
-    ic_pin_tx k ∗
-    (∃ v : bool,
-       i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev ∗
-       i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum ∗
-       i_valid (ientry k) ↦₄ valid_word v ∗
-       ic_mid cn k ∗
-       ic_id cn k (1/2) true dev inum).
-  Proof.
-    iIntros "Hbody Hpre Hid Htok".
-    iDestruct "Hid" as "[Hrd Hrn]".
-    iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | [Hvg | Hhd]]]]".
-    - iDestruct "Hpk" as (dev' inum' v ga) "(Hidv & Hin & Hvld & Hpay & Hmid & Hgid)".
-      iDestruct (word4_pointsto_agree with "Hrd Hidv") as %<-.
-      iDestruct (word4_pointsto_agree with "Hrn Hin") as %<-.
-      iDestruct (ic_payload_arm_decide_frz with "Hpre Hpay")
-        as "(Hpre & Hrc & Hsel & Hpin)".
-      iFrame "Hpre Hrd Hrn Htok Hrc Hsel Hpin".
-      iExists v. iFrame.
-    - iDestruct "Hout" as (d' dev' inum') "(Hdep' & _ & _ & _ & _)".
-      iExFalso. iApply (ic_tok_deposit_excl with "Htok Hdep'").
-    - iDestruct "Hmid" as (dev' inum' w) "(_ & Hin & _ & _ & _)".
-      iExFalso. iApply (ic_word4_excl with "Hin Hrn").
-    - iDestruct "Hvg" as (dev' inum' w) "(Hidv & _ & _ & _ & _ & _)".
-      iExFalso. iApply (ic_word4_excl with "Hidv Hrd").
-    - iDestruct "Hhd" as (dev' inum' w) "(_ & Hin & _ & _ & _)".
-      iExFalso. iApply (ic_word4_excl with "Hin Hrn").
-  Qed.
 
   (* (e) THE RECYCLER'S RE-OPEN AT ITS VALID STORE (iget, +0x7c)
      (BioInv.escrow_open_mid).
@@ -3384,45 +3515,12 @@ Section IcacheEscrow.
      iput calls at +0x3c: the parked arm's pin is at rest and in its hand,
      the share is its caller's, and the two go into [ic_held] together while
      the freer keeps the other half of the cell for the exit. *)
-  Lemma ic_close_held_tx cn γfs γi cov logstart k (t : nat) (q : Qp)
-      (dev inum w : mword 32) :
-    i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
-    i_inum (ientry k) ↦₄ inum -∗
-    i_valid (ientry k) ↦₄{DfracOwn (1/2)} w -∗
-    ic_mid cn k -∗
-    ic_id cn k (1/2) true dev inum -∗
-    ic_pin_rest k -∗
-    t ↪[ln_tx icfg_log]{#q} tt ==∗
-    ic_escrow_body cn γfs γi cov logstart k ∗ hpn_h k (Some (t, q)).
-  Proof.
-    iIntros "Hd Hn Hv Hm Hg Hpin Htx".
-    iMod (ic_pin_enter k t q with "Hpin Htx") as "[Hpin Hhalf]".
-    iModIntro. iSplitR "Hhalf"; [| iExact "Hhalf"].
-    iApply ic_close_held. rewrite /ic_held. iExists dev, inum, w. iFrame.
-  Qed.
 
   (* ...and closing back at OUT, which is where the window EXITS: the
      checkout state, reached by hand rather than through
      [ic_swap_checkout] because the payload never went back into the
      invariant in between.  Same arm, same contents -- this is only the
      constructor, exported so ProofIput need not unfold [ic_escrow_body]. *)
-  Lemma ic_close_out cn γfs γi cov logstart k (d : ic_dep) (dev inum : mword 32) :
-    (* [ic_swap_checkout]'s side condition, for [ic_swap_checkout]'s reason:
-       this arm keeps no bundle. *)
-    ic_dep_rd d = false ->
-    ic_deposit cn k d -∗
-    ic_dep_res k d dev inum -∗
-    ic_mid cn k -∗
-    ic_id cn k (1/2) true dev inum -∗
-    ic_pin_rest k -∗
-    ic_escrow_body cn γfs γi cov logstart k.
-  Proof.
-    iIntros (Hnrd) "Hdep Hres Hmt Hgid Hpin".
-    (* [iFrame] takes the LEFT alternative on its own: the frozen one needs a
-       [frzown] nobody here has. *)
-    iRight; iLeft. rewrite /ic_out. iExists d, dev, inum.
-    rewrite (ic_out_rd_none γfs γi cov logstart d inum Hnrd). iFrame.
-  Qed.
 
   (* ...AND THE FREE PATH'S WINDOW EXIT (IVd, +0x5e), which closes at the
      SECOND alternative.  What goes in is the reference MINUS its two live
@@ -3530,12 +3628,6 @@ Section IcacheEscrow.
     Timeless (ic_tx_dep_at cn k s dev inum g t q).
   Proof. rewrite /ic_tx_dep_at. tl_struct. Qed.
 
-  Lemma ic_tx_dep_at_half cn k s dev inum g t :
-    ic_tx_dep_at cn k s dev inum g t (1/2) -∗ ic_tx_dep cn k s dev inum g.
-  Proof.
-    rewrite /ic_tx_dep_at. iIntros "[Hd Ht]".
-    iApply (ic_tx_dep_intro with "Hd Ht").
-  Qed.
 
   Lemma ic_tx_dep_at_of_half cn k s dev inum g :
     ic_tx_dep cn k s dev inum g -∗
@@ -3680,7 +3772,7 @@ Section IcacheEscrow.
     iMod (ic_shrink_tx_body _ _ _ _ _ _ _ _ _ _ _ _ q q1 q2 Hq
             with "Hbody Hvld Hdep")
       as "(Hvld & Hdep & Htx & Hbody)".
-    iMod ("Hclose" with "[Hbody]") as "_"; [iNext; iExact "Hbody" |].
+    iMod ("Hclose" with "[Hbody]") as "_"; [iApply bi.later_intro; iExact "Hbody" |].
     iModIntro. iFrame "Hvld Hdep Htx".
   Qed.
 
@@ -3703,7 +3795,7 @@ Section IcacheEscrow.
     iMod (ic_grow_tx_body _ _ _ _ _ _ _ _ _ _ _ _ q q1 q2 Hq
             with "Hbody Hvld Hdep Htx")
       as "(Hvld & Hdep & Hbody)".
-    iMod ("Hclose" with "[Hbody]") as "_"; [iNext; iExact "Hbody" |].
+    iMod ("Hclose" with "[Hbody]") as "_"; [iApply bi.later_intro; iExact "Hbody" |].
     iModIntro. iFrame "Hvld Hdep".
   Qed.
 
@@ -3782,34 +3874,11 @@ Section IcacheEscrow.
      escrow can be write-armed.  This is the escrow-side twin of
      [InodeRegion.ireg_clean_acc]; together they are "no inode is
      write-locked and no inum is armed", durable-fs-plan.md section 4's
-     first bullet. *)
-  Lemma ic_dep_own_tx_no_ops k (s : Qp) (dv nu : mword 32) (g : gname)
-      (t : nat) (q : Qp) (dev inum : mword 32) :
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
-    ic_dep_own k (DepTx s dv nu g t q) dev inum -∗ False.
-  Proof.
-    iIntros "Ha Hown". rewrite /ic_dep_own.
-    iDestruct "Hown" as "[_ [_ Htx]]".
-    iDestruct (ghost_map_lookup with "Ha Htx") as %Hbad.
-    rewrite lookup_empty in Hbad. discriminate.
-  Qed.
+     first bullet.  NO NAMED LEMMA: [ic_escrow_body_cover] opens the arm and
+     calls [TxPin.tx_pin_no_ops] on the parked share. *)
 
   (* ...as the collection meets it: the OUT arm beside a write-armed
      deposit is refuted outright at an empty authority. *)
-  Lemma ic_out_no_write_arm cn γfs γi cov logstart k (s : Qp)
-      (dev inum : mword 32) (g : gname) (t : nat) (q : Qp) :
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
-    ic_out cn γfs γi cov logstart k -∗
-    ic_deposit cn k (DepTx s dev inum g t q) -∗ False.
-  Proof.
-    iIntros "Ha Hout Hdep0".
-    iDestruct "Hout" as (d dev2 inum2) "(Hdep & Hres & _ & _ & _)".
-    iDestruct (ic_deposit_agree with "Hdep0 Hdep") as %<-.
-    iDestruct "Hres" as "[Hres | Hfrz]".
-    2:{ rewrite /ic_out_frz. iDestruct "Hfrz" as "[]". }
-    rewrite /ic_dep_res. iDestruct "Hres" as "[Hown _]".
-    iApply (ic_dep_own_tx_no_ops with "Ha Hown").
-  Qed.
 
   (* ================================================================== *)
   (*  4e.  THE COLLECTION'S READING OF ONE SLOT                          *)
@@ -3859,12 +3928,19 @@ Section IcacheEscrow.
            ([ipool_shape_np]), the same shape [ipool_inv] hands out, so the
            collection reads it exactly there.  ([ic_mid_arm], and PARKED at
            [valid = 0].)
-       (c) LIVE AND LOADED -- the bundle is inside AT A SHARE WHOSE DOUBLE IS
-           INVALID: fraction 1 for an unlocked inode ([ic_loaded]), three
-           quarters for a read-locked one ([ic_rd_arm]).  That premise is
-           exactly what cross-inode block disjointness needs
-           ([FsStateDefs.blk_owned_ne_34] at 3/4, [blk_owned_ne_full] at 1),
-           and it is why the reader's withdrawal is a QUARTER and not a half.
+       (c) LIVE AND LOADED -- the bundle is inside AT THREE QUARTERS.  It
+           used to be lent at a SHARE OF ITS OWN, existentially bound with
+           only [~ ✓ (dq ⋅ dq)] on it: fraction 1 for an unlocked inode
+           ([ic_loaded]), three quarters for a read-locked one
+           ([ic_rd_arm]).  Since EV-X the cover fixes the share at the
+           SMALLER of the two -- the unlocked arm sheds its quarter into
+           the lend's own frame ([ic_inode_leg_shed_to] out,
+           [ic_inode_leg_shed_of] back) -- because what the commit hands
+           the transport is [FsState.fs_state] at ONE uniform share, and
+           three quarters is the largest one every arm can supply.  It is
+           still above a half, which is all cross-inode block
+           disjointness ever needed ([FsStateDefs.blk_owned_ne_34]), and
+           it is why the reader's withdrawal is a QUARTER and not a half.
      THERE IS NO FOURTH ALTERNATIVE (durable-disk B''-tx5), and that is what
      finishes plan section 4's per-slot half.  The residue used to be "live,
      and the escrow holds no bundle at all", inhabited by IPUT'S THREE
@@ -3875,18 +3951,19 @@ Section IcacheEscrow.
      authority is EMPTY -- none of them can be standing:
 
        * [DepFrz] carries [(t, qt)] as CONSTRUCTOR FIELDS and the share rides
-         in [ic_out_frz] ([ic_out_frz_no_ops]), exactly as [DepTx]'s does in
-         [ic_dep_own];
+         in [ic_out_frz], exactly as [DepTx]'s does in [ic_dep_own];
        * the other two carry no descriptor at all, so they name the share
-         through the per-slot pin [IcacheRef.hpn_h] instead -- [ic_pin_tx],
-         refuted by [ic_pin_tx_no_ops].
+         through the per-slot pin [IcacheRef.hpn_h] instead -- [ic_pin_tx].
+
+     ALL THREE ARE ONE REFUTATION, [TxPin.tx_pin_no_ops], applied to the
+     share the arm parks; [ic_escrow_body_cover] calls it in place.
 
      LANE C READS THIS THROUGH [ic_escrow_body_cover_all], and there is now
      nothing per-slot that it cannot close.
 
      THE WRITE ARM IS REFUTED FOR THE SAME REASON, and that is what the
      [ln_tx] authority buys: a [DepTx] arm holds a positive share of an open
-     transaction's element ([ic_dep_own_tx_no_ops]).  Together with
+     transaction's element.  Together with
      [IregClean.ireg_snap_local_acc] (nothing is armed) this is plan section
      4's FIRST bullet, per slot. *)
   Definition ic_slot_cover (cn : ic_names) (γfs : fs_names) (γi : gname)
@@ -3896,8 +3973,7 @@ Section IcacheEscrow.
        ∨ ic_lend cn γfs γi cov logstart k
            (ic_id cn k (1/2) true dev inum
             ∗ ipool_shape_np γfs γi cov logstart inum)
-       ∨ (∃ (dq : dfrac) (n : fs_node),
-            ⌜~ ✓ (dq ⋅ dq)⌝ ∗
+       ∨ (∃ n : fs_node,
             (* ...AND THIS INODE'S THREE DIRECTORY CLAUSES (durable-disk
                lane E-clauses), which is what the commit's collection
                reads [FsDurSnap.sk_dirloc] off.  Pure, so the closing
@@ -3905,12 +3981,15 @@ Section IcacheEscrow.
             ⌜FsStateInode.node_dir_local (bv_unsigned inum) icfg_nib n⌝ ∗
             ic_lend cn γfs γi cov logstart k
               (ic_id cn k (1/2) true dev inum
-               ∗ inode_owned_era_q γfs dq γi inum n
-               (* ...AND THIS INODE'S LINK TOKENS (durable-disk C-8), which
+               (* ...AND THE WHOLE PER-INODE LEG (durable-disk EV stage 4),
+                  which is [FsStateEra.inode_owned_era_q] at [dq] beside
+                  THIS INODE'S LINK TOKENS (durable-disk C-8) -- the tokens
                   are what the collection's [FsState.fs_links] leg needs
-                  beside the region's per-inum authority.  See
+                  beside the region's per-inum authority, and since the two
+                  are one conjunct the collection takes them off a slot
+                  without re-associating anything.  See
                   [ic_loaded_lend_owned] below. *)
-               ∗ FsStateInode.ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n)))%I.
+               ∗ ic_inode_leg γfs (DfracOwn (3/4)) γi inum n)))%I.
 
   (* the two readings of a bundle at a share the cover's third alternative
      is built from, as accessors, so the proof never unfolds [ic_loaded] or
@@ -3937,23 +4016,20 @@ Section IcacheEscrow.
          [FsStateEra.inode_owned_era_q] carries only [inode_local] -- which
          cannot state [DirView.dir_ok] at all (it has no region width). *)
       ⌜FsStateInode.node_dir_local (bv_unsigned inum) icfg_nib n⌝
-      ∗ (inode_owned_era_q γfs (DfracOwn 1) γi inum n
-       ∗ FsStateInode.ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n)
-      ∗ ((inode_owned_era_q γfs (DfracOwn 1) γi inum n
-          ∗ FsStateInode.ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n) -∗
+      ∗ ic_inode_leg γfs (DfracOwn 1) γi inum n
+      ∗ (ic_inode_leg γfs (DfracOwn 1) γi inum n -∗
            ic_loaded γfs γi cov logstart k inum dn bm).
   Proof.
     rewrite /ic_loaded. iIntros "H".
     iDestruct "H" as (data)
-      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hl & Hn & Hm & Ha & Hv & Hw)".
-    rewrite /dlinks. iRename "Hl" into "Hte".
+      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hleg & Hm & Ha & Hv & Hw)".
     iExists (era_node dn bm data).
     iSplitR.
     { iPureIntro.
       exact (FsStateEra.node_dir_local_of_ok (bv_unsigned inum) cov logstart
                icfg_nib dn bm data Hok Hdok Hddix Hdoc). }
-    rewrite -inode_owned_era_1. iFrame "Hn Hte". iIntros "[Hn Hte]".
-    iExists data. rewrite /dlinks. iFrame "Hte Hn Hm Ha Hv Hw".
+    iFrame "Hleg". iIntros "Hleg".
+    iExists data. iFrame "Hleg Hm Ha Hv Hw".
     iSplitR; [iPureIntro; exact Hok |].
     iSplitR; [iPureIntro; exact Hdok |].
     iSplitR; [iPureIntro; exact Hddix |].
@@ -3966,23 +4042,20 @@ Section IcacheEscrow.
     ∃ n : fs_node,
       (* ...and the read arm's own copy of the three, for the same reason *)
       ⌜FsStateInode.node_dir_local (bv_unsigned inum) icfg_nib n⌝
-      ∗ (inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n
-       ∗ FsStateInode.ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n)
-      ∗ ((inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n
-          ∗ FsStateInode.ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum) n) -∗
+      ∗ ic_inode_leg γfs (DfracOwn (3/4)) γi inum n
+      ∗ (ic_inode_leg γfs (DfracOwn (3/4)) γi inum n -∗
            ic_rd_arm γfs γi cov logstart inum).
   Proof.
     rewrite /ic_rd_arm. iIntros "H".
     iDestruct "H" as (dn bm data)
-      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hl & Hn & Hv & Hw)".
-    rewrite /dlinks. iRename "Hl" into "Hte".
+      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hleg & Hv & Hw)".
     iExists (era_node dn bm data).
     iSplitR.
     { iPureIntro.
       exact (FsStateEra.node_dir_local_of_ok (bv_unsigned inum) cov logstart
                icfg_nib dn bm data Hok Hdok Hddix Hdoc). }
-    iFrame "Hn Hte". iIntros "[Hn Hte]".
-    iExists dn, bm, data. rewrite /dlinks. iFrame "Hte Hn Hv Hw".
+    iFrame "Hleg". iIntros "Hleg".
+    iExists dn, bm, data. iFrame "Hleg Hv Hw".
     iSplitR; [iPureIntro; exact Hok |].
     iSplitR; [iPureIntro; exact Hdok |].
     iSplitR; [iPureIntro; exact Hddix |].
@@ -4012,9 +4085,13 @@ Section IcacheEscrow.
         * (* LOADED: the bundle is inside at 1 *)
           iDestruct "Hp" as (dn bm) "[Hload #Hshot]".
           iDestruct (ic_loaded_lend_owned with "Hload")
-            as (n) "[%Hdl [[Hn Hte] Hback]]".
-          iRight; iRight. iExists (DfracOwn 1), n.
-          iSplitR; [iPureIntro; exact (dfrac_full_nvalid (DfracOwn 1)) |].
+            as (n) "[%Hdl [Hleg Hback]]".
+          (* THE UNLOCKED ARM SHEDS ITS QUARTER (durable-disk EV-X): the
+             cover lends the leg at THREE QUARTERS, the same share the
+             read arm has, and the quarter rides in the lend's own frame
+             so the escrow closes with the bundle it was opened with. *)
+          iDestruct (ic_inode_leg_shed_to with "Hleg") as "[Hleg Hn14]".
+          iRight; iRight. iExists n.
           iSplitR; [iPureIntro; exact Hdl |].
           iApply (ic_lend_intro _ _ _ _ _ _ _
                     (i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev
@@ -4024,19 +4101,19 @@ Section IcacheEscrow.
                      ∗ live_gen k (1/2) ga
                      ∗ ic_pin_rest k
                      ∗ ic_mid cn k
-                     ∗ ((inode_owned_era_q γfs (DfracOwn 1) γi inum n
-                         ∗ FsStateInode.ent_toks_x (fs_gamma_L γfs)
-                             (bv_unsigned inum) n) -∗
+                     ∗ inode_rd_era γfs (DfracOwn (1/4)) inum n
+                     ∗ (ic_inode_leg γfs (DfracOwn 1) γi inum n -∗
                           ic_loaded γfs γi cov logstart k inum dn bm))%I
-                    with "[Hgid Hn Hte] [Hidd Hidn Hvld Hoff Hlv Hpin Hmt Hback] []").
-          { iFrame "Hgid Hn Hte". }
-          { iFrame "Hidd Hidn Hvld Hoff Hlv Hpin Hmt Hback". }
-          iIntros "(Hgid & Hn & Hte) (Hidd & Hidn & Hvld & Hoff & Hlv & Hpin & Hmt & Hback)".
+                    with "[Hgid Hleg] [Hidd Hidn Hvld Hoff Hlv Hpin Hmt Hn14 Hback] []").
+          { iFrame "Hgid Hleg". }
+          { iFrame "Hidd Hidn Hvld Hoff Hlv Hpin Hmt Hn14 Hback". }
+          iIntros "(Hgid & Hleg) (Hidd & Hidn & Hvld & Hoff & Hlv & Hpin & Hmt & Hn14 & Hback)".
           iLeft. rewrite /ic_parked. iExists dev, inum, true, ga.
           iFrame "Hidd Hidn Hvld Hmt Hgid".
           rewrite /ic_payload_arm. iLeft. iFrame "Hoff Hlv Hpin".
           rewrite /ic_payload_np. iExists dn, bm. iFrame "Hshot".
-          iApply ("Hback" with "[$Hn $Hte]").
+          iDestruct (ic_inode_leg_shed_of with "Hleg Hn14") as "Hleg".
+          iApply ("Hback" with "Hleg").
         * (* UNLOADED: the escrow holds a POOL row *)
           iDestruct "Hp" as "[Hun Hpend]".
           rewrite /ic_unloaded. iDestruct "Hun" as "[Hraw Hpool]".
@@ -4062,7 +4139,8 @@ Section IcacheEscrow.
       + (* iput's MID-FREE PARK: A WINDOW, and the pin it carries names the
            open transaction whose share it parked (durable-disk B''-tx5). *)
         iExFalso. iDestruct "Hfrz" as "(_ & _ & Hpin)".
-        iApply (ic_pin_tx_no_ops with "Ha Hpin").
+        rewrite /ic_pin_tx. iDestruct "Hpin" as (tp qp) "[_ Hp]".
+        iApply (tx_pin_no_ops with "Ha Hp").
     - (* OUT: the write arm is refuted, the read arm gives three quarters,
          the other three are the residue *)
       iDestruct "Hout" as (d dev inum) "(Hdep & Hres & Hmt & Hgid & Hrd & Hpin)".
@@ -4071,39 +4149,39 @@ Section IcacheEscrow.
         * rewrite /ic_dep_res /ic_dep_own. iDestruct "Hres" as "[[] _]".
         * rewrite /ic_dep_res /ic_dep_own. iDestruct "Hres" as "[[] _]".
         * (* THE WRITE ARM: REFUTED at an empty authority *)
-          rewrite /ic_dep_res. iDestruct "Hres" as "[Hown _]".
-          iExFalso. iApply (ic_dep_own_tx_no_ops with "Ha Hown").
+          rewrite /ic_dep_res /ic_dep_own. iDestruct "Hres" as "[Hown _]".
+          iDestruct "Hown" as "[_ [_ Hp]]".
+          iExFalso. iApply (tx_pin_no_ops with "Ha Hp").
         * (* THE READ ARM: three quarters are inside *)
           iFrame "Ha". iExists dev, inum.
           cbn [ic_out_rd].
           iDestruct (ic_rd_arm_lend_owned with "Hrd")
-            as (n) "[%Hdl [[Hn Hte] Hback]]".
-          iRight; iRight. iExists (DfracOwn (3/4)), n.
-          iSplitR; [iPureIntro; exact dfrac_34_nvalid |].
+            as (n) "[%Hdl [Hleg Hback]]".
+          iRight; iRight. iExists n.
           iSplitR; [iPureIntro; exact Hdl |].
           iApply (ic_lend_intro _ _ _ _ _ _ _
                     (ic_deposit cn k (DepRd s dv nu g)
                      ∗ ic_dep_res k (DepRd s dv nu g) dev inum
                      ∗ ic_mid cn k
                      ∗ ic_pin_rest k
-                     ∗ ((inode_owned_era_q γfs (DfracOwn (3/4)) γi inum n
-                         ∗ FsStateInode.ent_toks_x (fs_gamma_L γfs)
-                             (bv_unsigned inum) n) -∗
+                     ∗ (ic_inode_leg γfs (DfracOwn (3/4)) γi inum n -∗
                           ic_rd_arm γfs γi cov logstart inum))%I
-                    with "[Hgid Hn Hte] [Hdep Hres Hmt Hpin Hback] []").
-          { iFrame "Hgid Hn Hte". }
+                    with "[Hgid Hleg] [Hdep Hres Hmt Hpin Hback] []").
+          { iFrame "Hgid Hleg". }
           { iFrame "Hdep Hres Hmt Hpin Hback". }
-          iIntros "(Hgid & Hn & Hte) (Hdep & Hres & Hmt & Hpin & Hback)".
+          iIntros "(Hgid & Hleg) (Hdep & Hres & Hmt & Hpin & Hback)".
           iRight; iLeft. rewrite /ic_out.
           iExists (DepRd s dv nu g), dev, inum.
           iFrame "Hdep Hmt Hgid". iSplitL "Hres"; [iLeft; iExact "Hres" |].
-          cbn [ic_out_rd]. iSplitL "Hn Hte Hback";
-            [iApply ("Hback" with "[$Hn $Hte]") | iExact "Hpin"].
+          cbn [ic_out_rd]. iSplitL "Hleg Hback";
+            [iApply ("Hback" with "Hleg") | iExact "Hpin"].
       + (* the FROZEN alternative: [DepFrz], iput's +0x5e window -- and it
            parks its transaction's share in its own fields (B''-tx5) *)
         destruct d as [| qf dv nu tf qtf | s dv nu g t q | s dv nu g];
           try (rewrite /ic_out_frz; iDestruct "Hfrz" as "[]").
-        iExFalso. iApply (ic_out_frz_no_ops with "Ha Hfrz").
+        iExFalso. rewrite /ic_out_frz.
+        iDestruct "Hfrz" as "(_ & _ & _ & _ & _ & Hp)".
+        iApply (tx_pin_no_ops with "Ha Hp").
     - (* MID: the recycle window holds a POOL row *)
       iDestruct "Hmid" as (dev inum w) "(Hidd & Hidn & Hvld & Hun & Hgid & Hpin)".
       rewrite /ic_unloaded. iDestruct "Hun" as "[Hraw Hpool]".
@@ -4140,27 +4218,13 @@ Section IcacheEscrow.
     - (* HELD: iput's authority-side window -- A WINDOW, refuted by the pin
          it parks (durable-disk B''-tx5). *)
       iDestruct "Hhd" as (dev inum w) "(_ & _ & _ & _ & _ & Hpin)".
-      iExFalso. iApply (ic_pin_tx_no_ops with "Ha Hpin").
+      iExFalso. rewrite /ic_pin_tx. iDestruct "Hpin" as (tp qp) "[_ Hp]".
+      iApply (tx_pin_no_ops with "Ha Hp").
   Qed.
 
   (* ...AND OVER THE FIFTY SLOTS.  The escrows are at pairwise disjoint
      namespaces ([ic_escrow_ns_disjoint]), so this is the per-slot lemma
      under a [big_sepS]; the commit runs it at one ghost step. *)
-  Lemma ic_escrow_body_cover_all (S : gset nat) cn γfs γi cov logstart :
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
-    ([∗ set] k ∈ S, ic_escrow_body cn γfs γi cov logstart k) -∗
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
-    ∗ ([∗ set] k ∈ S, ic_slot_cover cn γfs γi cov logstart k).
-  Proof.
-    iIntros "Ha Hs".
-    iInduction S as [| k S Hk] "IH" using set_ind_L.
-    { rewrite !big_sepS_empty. iFrame "Ha". }
-    rewrite !big_sepS_insert //.
-    iDestruct "Hs" as "[Hk Hrest]".
-    iDestruct (ic_escrow_body_cover with "Ha Hk") as "[Ha Hck]".
-    iDestruct ("IH" with "Ha Hrest") as "[Ha Hrest]".
-    iFrame.
-  Qed.
 
   (* full ownership of a word is EXCLUSIVE -- [FileOff.word4_pointsto_excl]
      restated, because this file must not depend on the file layer *)
@@ -4210,36 +4274,15 @@ Section IcacheEscrow.
     rewrite /ic_payload_np. destruct v.
     - iIntros "Hpay".
       iDestruct "Hpay" as (dn bm) "[Hlk _]".
-      iDestruct "Hlk" as (data) "(_ & _ & _ & _ & _ & _ & _ & Hmeta & _)".
+      iDestruct "Hlk" as (data) "(_ & _ & _ & _ & _ & _ & Hmeta & _)".
       rewrite /inode_meta. iDestruct "Hmeta" as "(_ & _ & _ & _ & Hsz)".
       iExists (di_size dn). iExact "Hsz".
     - iIntros "[Hu _]". iApply (ic_unloaded_size with "Hu").
   Qed.
 
-  Lemma ic_payload_excl γfs γi cov logstart k inum1 inum2 g1 g2 (v1 v2 : bool) :
-    ic_payload γfs γi cov logstart k inum1 g1 v1 -∗
-    ic_payload γfs γi cov logstart k inum2 g2 v2 -∗ False.
-  Proof.
-    iIntros "H1 H2".
-    iDestruct (ic_payload_split with "H1") as "[Hp1 _]".
-    iDestruct (ic_payload_split with "H2") as "[Hp2 _]".
-    iDestruct (ic_payload_size with "Hp1") as (w1) "H1".
-    iDestruct (ic_payload_size with "Hp2") as (w2) "H2".
-    iApply (iesc_word4_excl with "H1 H2").
-  Qed.
 
   (* ...and the same against a bare MID stock, which is what [ic_open_held]'s
      third branch meets (§17.6: [ic_mid_arm] holds [ic_unloaded] directly). *)
-  Lemma ic_payload_unloaded_excl γfs γi cov logstart k inum1 inum2 g1 (v1 : bool) :
-    ic_payload γfs γi cov logstart k inum1 g1 v1 -∗
-    ic_unloaded γfs γi cov logstart k inum2 -∗ False.
-  Proof.
-    iIntros "H1 H2".
-    iDestruct (ic_payload_split with "H1") as "[Hp1 _]".
-    iDestruct (ic_payload_size with "Hp1") as (w1) "H1".
-    iDestruct (ic_unloaded_size with "H2") as (w2) "H2".
-    iApply (iesc_word4_excl with "H1 H2").
-  Qed.
 
   (* The size cell of a record-named payload -- the ONE thing the window
      opener below uses its caller's bundle for (both refutations go through
@@ -4617,21 +4660,7 @@ Section IcacheEscrow.
   (* THE PARTITION'S TWO SET MOVES.  [set_solver] does not close either --
      both need the decidable split on [y = z], which [naive_solver] will not
      take -- so they are stated once here and cited at the movers. *)
-  Lemma gset_move_out (A B C : gset Z) (z : Z) :
-    z ∈ A -> A ∪ B ∪ C = (A ∖ {[z]}) ∪ B ∪ (C ∪ {[z]}).
-  Proof.
-    intros Hz. apply set_eq. intros y.
-    rewrite !elem_of_union elem_of_difference elem_of_singleton.
-    destruct (decide (y = z)) as [->|Hne]; naive_solver.
-  Qed.
 
-  Lemma gset_move_mid (A B C : gset Z) (z : Z) :
-    z ∈ B -> A ∪ B ∪ C = A ∪ (B ∖ {[z]}) ∪ (C ∪ {[z]}).
-  Proof.
-    intros Hz. apply set_eq. intros y.
-    rewrite !elem_of_union elem_of_difference elem_of_singleton.
-    destruct (decide (y = z)) as [->|Hne]; naive_solver.
-  Qed.
 
   (* THE IN-TRANSITION KEY, the twin of [ipool_key] and in the same two
      places: one half inside the invariant, one inside [ipool]. *)
@@ -4651,7 +4680,7 @@ Section IcacheEscrow.
   (*  opposite: that window is INSIDE one transaction (iput holds a share  *)
   (*  of its caller's token, durable-disk B''-tx5), so the row can park    *)
   (*  one and the commit refutes it exactly as it refutes iput's three     *)
-  (*  windows ([ic_pin_tx_no_ops]).                                       *)
+  (*  windows, at [TxPin.tx_pin_no_ops]'s line.                            *)
   (*                                                                      *)
   (*  SO THE TRANSIT PART GETS ITS OWN KEY, and the share must sit in      *)
   (*  [ipool_body] -- not under the itable lock -- because the commit's    *)
@@ -4668,9 +4697,10 @@ Section IcacheEscrow.
   Definition ipool_tkey (T : gmap Z (nat * Qp)) : iProp Σ :=
     ghost_var icfg_ptrn (1/2) T.
 
-  (* one parked share per inum in transit, at the ledger's own [(t, q)] *)
+  (* one parked share per inum in transit, at the ledger's own [(t, q)] --
+     [TxPin.tx_pins] at the pool's key, which is exactly the shape *)
   Definition ipool_transit (T : gmap Z (nat * Qp)) : iProp Σ :=
-    ([∗ map] z ↦ p ∈ T, p.1 ↪[ln_tx icfg_log]{#(p.2)} tt)%I.
+    tx_pins icfg_log T.
 
   Global Instance ipool_transit_timeless T : Timeless (ipool_transit T).
   Proof. rewrite /ipool_transit. tl_struct. Qed.
@@ -4678,19 +4708,9 @@ Section IcacheEscrow.
   (* THE REFUTATION THE COMMIT READS, and the whole reason the ledger exists:
      every inum in transit has a POSITIVE share of some transaction's [ln_tx]
      element parked for it, so at a commit -- where the WAL's authority for
-     that map is EMPTY -- nothing is in transit.  [ic_pin_tx_no_ops]'s line,
-     at the pool's ledger instead of a slot's pin. *)
-  Lemma ipool_transit_no_ops (T : gmap Z (nat * Qp)) :
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
-    ipool_transit T -∗ ⌜T = ∅⌝.
-  Proof.
-    iIntros "Ha HT". rewrite /ipool_transit.
-    destruct (decide (T = ∅)) as [-> | Hne]; [done |].
-    destruct (map_choose T Hne) as (z & p & Hz).
-    iDestruct (big_sepM_lookup _ _ z p Hz with "HT") as "Htx".
-    iDestruct (ghost_map_lookup with "Ha Htx") as %Hbad.
-    rewrite lookup_empty in Hbad. discriminate.
-  Qed.
+     that map is EMPTY -- nothing is in transit.  NO NAMED LEMMA: the ledger
+     IS a [TxPin.tx_pins], so its one consumer ([ipool_quiesce_acc]) calls
+     [TxPin.tx_pins_no_ops] on it directly. *)
 
   (* ==================================================================== *)
   (*  5c''.  THE CORPSE LEDGER (durable-disk lane C-7, plan section 4)     *)
@@ -4710,8 +4730,8 @@ Section IcacheEscrow.
   (*                                                                      *)
   (*    [CrpPre t q] -- the deposit has not run, and the row parks the     *)
   (*      freeing transaction's share, so a commit refutes the state       *)
-  (*      outright ([ipool_corpse_no_ops], [ipool_transit_no_ops]'s line   *)
-  (*      at the corpse ledger).  The share is the very one the transit    *)
+  (*      outright ([ipool_corpse_no_ops], whose row is a                  *)
+  (*      [TxPin.tx_pin_no_ops]).  The share is the very one the transit   *)
   (*      ledger returns at [ipool_put_corpse]: iput parks it and the      *)
   (*      deposit hands it back.                                          *)
   (*    [CrpDep] -- the deposit HAS run, and the row parks                 *)
@@ -4740,7 +4760,7 @@ Section IcacheEscrow.
   (* what one row parks, by its value *)
   Definition crp_row (γi : gname) (z : Z) (v : icorpse) : iProp Σ :=
     match v with
-    | CrpPre t q => (t ↪[ln_tx icfg_log]{#q} tt)%I
+    | CrpPre t q => tx_pin icfg_log t q
     | CrpDep => imark γi z
     end.
 
@@ -4756,24 +4776,14 @@ Section IcacheEscrow.
   Global Instance ipool_ckey_timeless K : Timeless (ipool_ckey K).
   Proof. rewrite /ipool_ckey. tl_struct. Qed.
 
-  (* ONE ROW, REFUTED: a corpse whose deposit has not run parks a POSITIVE
-     share of the freeing transaction's element, and at a commit the WAL's
-     authority for that map is empty. *)
-  Lemma crp_row_no_ops γi z v :
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
-    crp_row γi z v -∗ ⌜v = CrpDep⌝.
-  Proof.
-    iIntros "Ha Hrow". destruct v as [t q |]; [| done].
-    rewrite /crp_row.
-    iDestruct (ghost_map_lookup with "Ha Hrow") as %Hbad.
-    rewrite lookup_empty in Hbad. discriminate.
-  Qed.
-
-  (* ...AND THE WHOLE LEDGER: at a commit every corpse has been deposited,
-     so every row is an [imark] and the collection reaches every [X] inum.
-     [ipool_transit_no_ops]'s line, at the ledger the pending/await rows
-     needed and the transit set could not supply (durable-disk C-4's second
-     finding). *)
+  (* THE WHOLE LEDGER, REFUTED ROW BY ROW: a corpse whose deposit has not
+     run parks a POSITIVE share of the freeing transaction's element, and at
+     a commit the WAL's authority for that map is empty -- so every row is an
+     [imark] and the collection reaches every [X] inum.  The ledger the
+     pending/await rows needed and the transit set could not supply
+     (durable-disk C-4's second finding).  The row's own refutation is
+     [TxPin.tx_pin_no_ops] and gets no name of its own; the induction stays
+     because the conclusion is a [map_Forall], not [K = ∅]. *)
   Lemma ipool_corpse_no_ops γi (K : gmap Z icorpse) :
     ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     ipool_corpse γi K -∗ ⌜map_Forall (fun _ v => v = CrpDep) K⌝.
@@ -4783,7 +4793,8 @@ Section IcacheEscrow.
     { iIntros "_ _". iPureIntro. apply map_Forall_empty. }
     iIntros "Ha HK". rewrite big_sepM_insert; [| exact Hz].
     iDestruct "HK" as "[Hrow HK]".
-    iDestruct (crp_row_no_ops with "Ha Hrow") as %->.
+    destruct v as [t q |].
+    { rewrite /crp_row. iDestruct (tx_pin_no_ops with "Ha Hrow") as %[]. }
     iDestruct ("IH" with "Ha HK") as %HF.
     iPureIntro. by apply map_Forall_insert_2.
   Qed.
@@ -4932,13 +4943,6 @@ Section IcacheEscrow.
   Lemma ic_ids_of_length dvs : length (ic_ids_of dvs) = NINODE.
   Proof. rewrite /ic_ids_of length_fmap length_seq //. Qed.
 
-  Lemma ic_ids_of_lookup dvs (k : nat) :
-    (k < NINODE)%nat ->
-    ic_ids_of dvs !! k = Some (false, (dvs k).1, (dvs k).2).
-  Proof.
-    intros Hk. rewrite /ic_ids_of list_lookup_fmap.
-    rewrite (lookup_seq_lt 0 NINODE k Hk) //.
-  Qed.
 
   Lemma ic_ids_of_live dvs : ic_live_inums (ic_ids_of dvs) = ∅.
   Proof.
@@ -5045,11 +5049,11 @@ Section IcacheEscrow.
       rewrite Qp.half_half. iExact "Htkey". }
     iMod (inv_alloc ipoolN E (ipool_body cn γfs γi cov logstart nib)
             with "[Hk1 Hx1 Ht1 Hckey Hids Hrows]") as "#Hinv".
-    { iNext. rewrite /ipool_body. iExists (region_inums nib), ∅, ∅, ids, ∅.
+    { iApply bi.later_intro. rewrite /ipool_body. iExists (region_inums nib), ∅, ∅, ids, ∅.
       iSplitR; [iPureIntro; exact Hlen |].
       iSplitR; [iPureIntro; rewrite Hlive dom_empty_L; set_solver |].
       iSplitR; [iPureIntro; exact dom_empty_L |].
-      rewrite /ipool_ckey /ipool_transit /ipool_corpse !big_sepM_empty.
+      rewrite /ipool_ckey /ipool_transit /tx_pins /ipool_corpse !big_sepM_empty.
       iFrame "Hk1 Hx1 Ht1 Hids Hrows Hckey". }
     iModIntro. iFrame "Hinv". rewrite /ipool.
     iExists (region_inums nib). iSplitR; [iPureIntro; set_solver |].
@@ -5185,7 +5189,7 @@ Section IcacheEscrow.
       iDestruct (ic_id_quarters_split with "Hhalf") as "[Hq1 Hq2]".
       iDestruct ("Hidsback" $! true dv1 nu1 with "Hq2") as "Hids".
       iMod ("Hclose" with "[Hk1 Hx1 Ht1 Htr Hids Hrows Hck Hcrp]") as "_".
-      { iNext. rewrite /ipool_body.
+      { iApply bi.later_intro. rewrite /ipool_body.
         iExists (O ∖ {[bv_unsigned inum]}), (P ∖ O), ∅,
           (<[k := (true, dv1, nu1)]> ids), K.
         iSplitR; [iPureIntro; rewrite length_insert; exact Hlen |].
@@ -5259,7 +5263,7 @@ Section IcacheEscrow.
       iDestruct (ic_id_quarters_split with "Hhalf") as "[Hq1 Hq2]".
       iDestruct ("Hidsback" $! true dv1 nu1 with "Hq2") as "Hids".
       iMod ("Hclose" with "[Hk1 Hx1 Ht1 Htr Hids Hrows Hck Hcrp]") as "_".
-      { iNext. rewrite /ipool_body.
+      { iApply bi.later_intro. rewrite /ipool_body.
         iExists O, ((P ∖ O) ∖ {[bv_unsigned inum]}), ∅,
           (<[k := (true, dv1, nu1)]> ids), (delete (bv_unsigned inum) K).
         iSplitR; [iPureIntro; rewrite length_insert; exact Hlen |].
@@ -5331,7 +5335,7 @@ Section IcacheEscrow.
     iDestruct (ic_id_quarters_split with "Hhalf") as "[Hq1 Hq2]".
     iDestruct ("Hidsback" $! false dv1 nu1 with "Hq2") as "Hids".
     iMod ("Hclose" with "[Hk1 Hx1 Ht1 Htr Htx Hids Hrows Hck Hcrp]") as "_".
-    { iNext. rewrite /ipool_body.
+    { iApply bi.later_intro. rewrite /ipool_body.
       iExists O, (P ∖ O), {[z := (t, q)]}, (<[k := (false, dv1, nu1)]> ids), K.
       iSplitR; [iPureIntro; rewrite length_insert; exact Hlen |].
       iSplitR.
@@ -5346,7 +5350,7 @@ Section IcacheEscrow.
       iSplitR; [iPureIntro; exact Hdk |].
       iDestruct "Htr" as "_".
       iFrame "Hk1 Hx1 Ht1 Hids Hrows Hck Hcrp".
-      rewrite /ipool_transit big_sepM_singleton /=. iExact "Htx". }
+      rewrite /ipool_transit /tx_pins big_sepM_singleton /=. iExact "Htx". }
     iModIntro. iExact "Hq1".
   Qed.
 
@@ -5384,7 +5388,7 @@ Section IcacheEscrow.
     iDestruct (ic_id_quarters_split with "Hhalf") as "[Hq1 Hq2]".
     iDestruct ("Hidsback" $! false dv1 nu1 with "Hq2") as "Hids".
     iMod ("Hclose" with "[Hk1 Hx1 Ht1 Htr Hids Hrows Hck Hcrp]") as "_".
-    { iNext. rewrite /ipool_body.
+    { iApply bi.later_intro. rewrite /ipool_body.
       iExists O, X, T, (<[k := (false, dv1, nu1)]> ids), K.
       iSplitR; [iPureIntro; rewrite length_insert; exact Hlen |].
       iSplitR;
@@ -5428,19 +5432,19 @@ Section IcacheEscrow.
     iDestruct (ghost_var_agree with "Hx1 Hxkey") as %->.
     iDestruct (ghost_var_agree with "Ht1 Htkey") as %->.
     rewrite dom_singleton_L in Hrow.
-    rewrite /ipool_transit big_sepM_singleton /=.
+    rewrite /ipool_transit /tx_pins big_sepM_singleton /=.
     iMod (ghost_var_update_halves (∅ : gmap Z (nat * Qp)) with "Ht1 Htkey")
       as "[Ht1 Htkey]".
     iMod (ghost_var_update_halves ({[z]} ∪ O) with "Hk1 Hkey")
       as "[Hk1 Hkey]".
     iMod ("Hclose" with "[Hk1 Hx1 Ht1 Hids Hrows Hrow Hck Hcrp]") as "_".
-    { iNext. rewrite /ipool_body. iExists ({[z]} ∪ O), (P ∖ O), ∅, ids, K.
+    { iApply bi.later_intro. rewrite /ipool_body. iExists ({[z]} ∪ O), (P ∖ O), ∅, ids, K.
       iSplitR; [iPureIntro; exact Hlen |].
       iSplitR;
         [iPureIntro; rewrite dom_empty_L Hrow; clear Hrow; set_solver |].
       iSplitR; [iPureIntro; exact Hdk |].
       iFrame "Hk1 Hx1 Ht1 Hids Hck Hcrp".
-      iSplitR; [rewrite /ipool_transit big_sepM_empty; done |].
+      iSplitR; [rewrite /ipool_transit /tx_pins big_sepM_empty; done |].
       rewrite /ipool_rows big_sepS_union; [| set_solver].
       iSplitL "Hrow"; [| iExact "Hrows"].
       rewrite big_sepS_singleton. iExact "Hrow". }
@@ -5484,7 +5488,7 @@ Section IcacheEscrow.
     iDestruct (ghost_var_agree with "Hx1 Hxkey") as %->.
     iDestruct (ghost_var_agree with "Ht1 Htkey") as %->.
     rewrite dom_singleton_L in Hrow.
-    rewrite /ipool_transit big_sepM_singleton /=.
+    rewrite /ipool_transit /tx_pins big_sepM_singleton /=.
     iMod (ghost_var_update_halves (∅ : gmap Z (nat * Qp)) with "Ht1 Htkey")
       as "[Ht1 Htkey]".
     iMod (ghost_var_update_halves ({[z]} ∪ (P ∖ O)) with "Hx1 Hxkey")
@@ -5495,14 +5499,14 @@ Section IcacheEscrow.
     { apply not_elem_of_dom. rewrite Hdk. set_solver. }
     iMod (ghost_map_insert z (CrpPre t q) HKz with "Hck") as "[Hck Hel]".
     iMod ("Hclose" with "[Hk1 Hx1 Ht1 Hids Hrows Hck Hcrp Htr]") as "_".
-    { iNext. rewrite /ipool_body.
+    { iApply bi.later_intro. rewrite /ipool_body.
       iExists O, ({[z]} ∪ (P ∖ O)), ∅, ids, (<[z := CrpPre t q]> K).
       iSplitR; [iPureIntro; exact Hlen |].
       iSplitR;
         [iPureIntro; rewrite dom_empty_L Hrow; clear Hrow; set_solver |].
       iSplitR; [iPureIntro; rewrite dom_insert_L Hdk; reflexivity |].
       iFrame "Hk1 Hx1 Ht1 Hids Hrows Hck".
-      iSplitR; [rewrite /ipool_transit big_sepM_empty; done |].
+      iSplitR; [rewrite /ipool_transit /tx_pins big_sepM_empty; done |].
       rewrite /ipool_corpse big_sepM_insert; [| exact HKz].
       iSplitL "Htr"; [iExact "Htr" | iExact "Hcrp"]. }
     iModIntro. iFrame "Hel". rewrite /ipool. iExists O.
@@ -5543,10 +5547,10 @@ Section IcacheEscrow.
     iDestruct (ghost_map_lookup with "Hck Hel") as %HKz.
     rewrite {1}/ipool_corpse (big_sepM_delete _ K z (CrpPre t q) HKz).
     iDestruct "Hcrp" as "[Hshare Hcrp]".
-    iEval (rewrite /crp_row) in "Hshare".
+    iEval (rewrite /crp_row /tx_pin) in "Hshare".
     iMod (ghost_map_update CrpDep with "Hck Hel") as "[Hck Hel]".
     iMod ("Hclose" with "[Hk1 Hx1 Ht1 Htr Hids Hrows Hck Hcrp Hmk]") as "_".
-    { iNext. rewrite /ipool_body.
+    { iApply bi.later_intro. rewrite /ipool_body.
       iExists O, X, T, ids, (<[z := CrpDep]> K).
       iSplitR; [iPureIntro; exact Hlen |].
       iSplitR; [iPureIntro; exact Hrow |].
@@ -5646,7 +5650,7 @@ Section IcacheEscrow.
     iSplitR; [iPureIntro; exact Hrow |].
     iSplitR; [iPureIntro; exact Hdk |].
     iFrame "Hrows Hids Htr Hcrp".
-    iIntros "(Hrows & Hids & Htr & Hcrp)". iApply "Hclose". iNext.
+    iIntros "(Hrows & Hids & Htr & Hcrp)". iApply "Hclose". iApply bi.later_intro.
     rewrite /ipool_body. iExists O, X, T, ids, K.
     iSplitR; [iPureIntro; exact Hlen |].
     iSplitR; [iPureIntro; exact Hrow |].
@@ -5663,7 +5667,8 @@ Section IcacheEscrow.
      holding; this says what the POOL is, and together they exhaust
      [region_inums nib] -- which is the whole point of C-3b's partition.
 
-     [T = ∅] is read off the parked shares ([ipool_transit_no_ops]): a walk
+     [T = ∅] is read off the parked shares ([TxPin.tx_pins_no_ops] at the
+     transit ledger, which IS a [tx_pins]): a walk
      between an eviction's identity flip and its deposit is inside iput,
      hence inside its caller's transaction, and at a commit the WAL's
      [ln_tx] authority is empty.  So the row comes out in B''-join's own
@@ -5698,7 +5703,7 @@ Section IcacheEscrow.
     iIntros (HE) "#Hinv Htxa".
     iMod (ipool_inv_acc E cn γfs γi cov logstart nib HE with "Hinv")
       as (O X T ids K) "(%Hlen & %Hrow & %Hdk & Hrows & Hids & Htr & Hcrp & Hback)".
-    iDestruct (ipool_transit_no_ops T with "Htxa Htr") as %->.
+    iDestruct (tx_pins_no_ops _ T with "Htxa Htr") as %->.
     iDestruct (ipool_corpse_no_ops γi K with "Htxa Hcrp") as %HF.
     iEval (rewrite (ipool_corpse_marks γi K HF) Hdk) in "Hcrp".
     iModIntro. iExists O, X, ids.
@@ -5707,7 +5712,7 @@ Section IcacheEscrow.
     { iPureIntro. rewrite dom_empty_L in Hrow. rewrite Hrow. set_solver. }
     iFrame "Htxa Hrows Hids Hcrp".
     iIntros "(Hrows & Hids & Hcrp)". iApply "Hback". iFrame "Hrows Hids".
-    iSplitR; [rewrite /ipool_transit big_sepM_empty; done |].
+    iSplitR; [rewrite /ipool_transit /tx_pins big_sepM_empty; done |].
     iEval (rewrite (ipool_corpse_marks γi K HF) Hdk). iExact "Hcrp".
   Qed.
 
@@ -5752,56 +5757,10 @@ Section IcacheEscrow.
      body, and PINS it to that inum against the pool's quarter.  What the
      collection does next is [ic_escrow_body_cover] at that slot, whose four
      alternatives are all stated at this very [dev]/[inum] pair. *)
-  Lemma ipool_partition_cached (cn : ic_names) (γfs : fs_names) (γi : gname)
-      (cov : gset Z) (logstart : Z) (nib : nat) (O X : gset Z)
-      (ids : list (bool * mword 32 * mword 32)) (z : Z) :
-    length ids = NINODE ->
-    region_inums nib = O ∪ X ∪ ic_live_inums ids ->
-    z ∈ region_inums nib -> z ∉ O -> z ∉ X ->
-    ic_ids cn ids -∗
-    ([∗ list] j ∈ seq 0 NINODE, ic_escrow_body cn γfs γi cov logstart j) -∗
-    ∃ (k : nat) (dev inum : mword 32),
-      ⌜(k < NINODE)%nat /\ bv_unsigned inum = z⌝ ∗
-      ic_id cn k (1/2) true dev inum ∗
-      ic_ids cn ids ∗
-      (ic_id cn k (1/2) true dev inum -∗
-         [∗ list] j ∈ seq 0 NINODE, ic_escrow_body cn γfs γi cov logstart j).
-  Proof.
-    intros Hlen Hrow Hz Hno Hnx. iIntros "Hids Hbodies".
-    destruct (ipool_cover_inum O X ids nib z Hrow Hz)
-      as [Hc | [Hc | (k & p & Hp & Hpv & Hpn)]]; [contradiction | contradiction |].
-    destruct p as [[pv pd] pn]. cbn [fst snd] in Hpv, Hpn. subst pv.
-    assert (Hk : (k < NINODE)%nat)
-      by (rewrite -Hlen; exact (lookup_lt_Some ids k _ Hp)).
-    iDestruct (big_sepL_lookup_acc
-                 (fun (_ : nat) (j : nat) => ic_escrow_body cn γfs γi cov logstart j)
-                 (seq 0 NINODE) k k
-                 ltac:(apply lookup_seq; split; [lia | exact Hk])
-                 with "Hbodies") as "[Hbody Hback]".
-    iDestruct (ic_escrow_body_ident with "Hbody") as (live dev inum) "[Hgid Hbody]".
-    iDestruct (ic_ids_pin cn ids k true pd pn (1/2) live dev inum Hp
-                 with "Hids Hgid") as %(-> & <- & <-).
-    iExists k, dev, inum.
-    iSplitR; [iPureIntro; split; [exact Hk | exact Hpn] |].
-    iFrame "Hgid Hids". iIntros "Hgid".
-    iApply "Hback". iApply ("Hbody" with "Hgid").
-  Qed.
 
   (* the obstruction the split is FOR, checked: the in-transition row is not
      Timeless, so a pool shape carrying it could never have moved into an
      invariant whole. *)
-  Lemma ipool_no_timeless_check (γfs : fs_names) (γi : gname) (cov : gset Z)
-      (logstart : Z) (inum : mword 32) : True.
-  Proof.
-    (* the ordinary row is timeless ... *)
-    assert (Timeless (ipool_ord γfs γi cov logstart inum)) by apply _.
-    (* ... the in-transition one is NOT, and neither is the [inv] that makes
-       it so -- which is what forbids [iInv .. as ">"] on a pool invariant. *)
-    Fail (assert (Timeless (ipool_ext γfs γi cov logstart inum)) by apply _).
-    Fail (assert (forall (N : namespace) (P : iProp Σ), Timeless (inv N P))
-           by (intros; apply _)).
-    done.
-  Qed.
 
   (* ------------------------------------------------------------------ *)
   (*  6.  THE itable LOCK'S RESOURCE, v2                                 *)

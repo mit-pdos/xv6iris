@@ -476,7 +476,7 @@ Section ProofWakeupPartsPro.
               with "Hcg Hpc []").
     { iApply (wki_28 with "Htext"). }
     iIntros (CID17 Hst17).
-    iNext. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htgtj : add_vec (mword_of_int (KernelSyms.wakeup + 0x28) : mword 64) (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 8 : mword 11) ('b"0")))) = mword_of_int (KernelSyms.wakeup + 0x38))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtj) in "Hpc".

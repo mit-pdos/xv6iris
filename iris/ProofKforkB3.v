@@ -438,7 +438,7 @@ Section KforkB3Proof.
                     ltac:(rgne; rgne; exact Hcmp) ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (kfk_092 with "Htext"). }
-          iNext. iIntros (CID3 Hst3) "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CID3 Hst3) "Hcg Hpc".
           assert (Htgta4 : add_vec (mword_of_int (KF + 0x92) : mword 64)
                              (sign_extend' 64 (mword_of_int 18 : mword 13))
                            = mword_of_int (KF + 0xa4))
@@ -525,7 +525,7 @@ Section KforkB3Proof.
                   Hz ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kfk_098 with "Htext"). }
-        iNext. iIntros (CIDm Hstm) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDm Hstm) "Hcg Hpc".
         assert (Htgt8e : add_vec (mword_of_int (KF + 0x98) : mword 64)
                            (sign_extend' 64 (sign_extend' 13
                               (concat_vec (mword_of_int 251 : mword 8) ('b"0"))))
@@ -680,7 +680,7 @@ Section KforkB3Proof.
                   mr (rsv + (K - 8))%nat b ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kfk_0a2 with "Htext"). }
-        iIntros (CIDq Hstq). iNext. iIntros "Hcg Hpc".
+        iIntros (CIDq Hstq). iApply bi.later_intro. iIntros "Hcg Hpc".
         assert (Htgt8e' : add_vec (mword_of_int (KF + 0xa2) : mword 64)
                            (sign_extend' 64 (sign_extend' 21
                               (concat_vec (mword_of_int 2038 : mword 11) ('b"0"))))

@@ -255,19 +255,14 @@ Record fwrite_names := MkFWriteNames {
   fwn_procs      : list gname;    (* the proc table's per-slot lock names   *)
   fwn_j          : nat;           (* the running process's index            *)
   fwn_plock      : gname;
-  fwn_uart       : uart_names;
-  fwn_disk       : disk_names;
-  fwn_dlock      : gname;         (* virtio_disk.lock                       *)
   fwn_txlock     : gname;         (* uart tx_lock -- the DEVICE arm's        *)
+  (* [fwn_uart] / [fwn_disk] / [fwn_dlock] / [fwn_bio] / [fwn_pr] /
+     [fwn_bmapstart] / [fwn_size] ARE GONE (rank 1d): each was a copy of a
+     [FsCfg.fscfg] field.  The three ring pages stay for FsCfg.v's
+     ruling-R1 reason. *)
   fwn_pd         : mword 64;
   fwn_pav        : mword 64;
   fwn_pu         : mword 64;
-  fwn_bio        : bio_names;
-  (* [fwn_log] and [fwn_inodestart] ARE GONE (rank 1c): the log's names and
-     the inode region's first block are ambient. *)
-  fwn_pr         : gname;         (* balloc's printk credential             *)
-  fwn_bmapstart  : Z;             (* the bitmap, for bmap -> balloc          *)
-  fwn_size       : Z;             (* sb.size                                *)
   fwn_dqs        : dfrac;         (* sb.inodestart                          *)
   fwn_dqb        : dfrac;         (* sb.bmapstart                           *)
   fwn_dqbs       : dfrac;         (* sb.size                                *)
@@ -286,16 +281,13 @@ Record fwrite_names := MkFWriteNames {
 Global Instance fwrite_names_inhabited : Inhabited fwrite_names :=
   populate (MkFWriteNames
     [] 0%nat 1%positive
-    (UartNames 1%positive 1%positive 1%positive 1%positive)
-    (DiskNames 1%positive 1%positive 1%positive 1%positive 1%positive 1%positive
-               1%positive 1%positive 1%positive 1%positive 1%positive)
-    1%positive 1%positive
+
+
+ 1%positive
     (mword_of_int 0) (mword_of_int 0) (mword_of_int 0)
-    (MkBioNames 1%positive 1%positive
-       (fun _ => (1%positive, 1%positive)) (fun _ => 1%positive)
-       (fun _ => 1%positive))
-    1%positive
-    0 0
+
+
+
     (DfracOwn 1) (DfracOwn 1) (DfracOwn 1)
     (fun _ => mword_of_int 0) (fun _ => DfracOwn 1)).
 
@@ -318,8 +310,8 @@ Section SpecFilewrite.
      read side's twin ([SpecFileread.fileread_dev_caps]) is one conjunct
      rather than two because consoleread never touches the UART. *)
   Definition filewrite_dev_caps (fn : fwrite_names) : iProp Σ :=
-    (dev_inv (fwn_uart fn) (fwn_disk fn) ∗
-     is_txlock (fwn_txlock fn) (fwn_uart fn))%I.
+    (dev_inv (fsc_uart) (fsc_disk) ∗
+     is_txlock (fwn_txlock fn) (fsc_uart))%I.
 
   Global Instance filewrite_dev_caps_persistent fn :
     Persistent (filewrite_dev_caps fn).
@@ -446,23 +438,23 @@ Section SpecFilewrite.
         ~ (IBLOCK inum icfg_ist
              ∈ log_region_set fsc_logst)⌝ ∗
      (* the bitmap's geometry, forwarded through bmap to balloc *)
-     ⌜bitmap_geom_ok fsc_cov fsc_logst (fwn_bmapstart fn)
-                     (fwn_size fn)⌝ ∗
+     ⌜bitmap_geom_ok fsc_cov fsc_logst (fsc_bmapstart)
+                     (fsc_size)⌝ ∗
      (* balloc's out-of-blocks arm calls the GENERAL printk path; carried as
         a hypothesis, never a functor (SpecBalloc.v's header) *)
-     ⌜printk_gen_contract (kt := KT1) (fwn_pr fn) (fwn_uart fn) (fwn_disk fn)⌝ ∗
-     bio_ctx (fwn_bio fn)
-       (fs_view fsc_fs (fwn_disk fn) icfg_dev fsc_cov) ∗
+     ⌜printk_gen_contract (kt := KT1) (fsc_printk) (fsc_uart) (fsc_disk)⌝ ∗
+     bio_ctx (fsc_bio)
+       (fs_view fsc_fs (fsc_disk) icfg_dev fsc_cov) ∗
      (* THE LOG: begin_op mints the reservation, end_op spends it, and the
         loop does one transaction PER CHUNK *)
-     log_ctx icfg_log (fwn_bio fn) fsc_fs fsc_cov
+     log_ctx icfg_log (fsc_bio) fsc_fs fsc_cov
              fsc_logst icfg_dev ∗
      (* end_op's crash seam and era certificate *)
      fs_crash_seam fsc_cov fsc_logst ∗
      gen_cert ∗
      (* balloc's two PERSISTENT printk credentials *)
      kernel_data ∗
-     printk_env (fwn_pr fn) (fwn_uart fn) (fwn_disk fn) ∗
+     printk_env (fsc_printk) (fsc_uart) (fsc_disk) ∗
      (* THE THREE PERSISTENT ICACHE INVARIANTS SpecIlock / SpecIunlock take,
         the escrow at the FAMILY where it was per-slot *)
      itable_inv ∗
@@ -484,17 +476,17 @@ Section SpecFilewrite.
      (* sb.inodestart (iupdate), sb.size and sb.bmapstart (bmap -> balloc) *)
      sb_inodestart ↦₄{fwn_dqs fn}
        (mword_of_int icfg_ist : mword 32) ∗
-     sb_size ↦₄{fwn_dqbs fn} (mword_of_int (fwn_size fn) : mword 32) ∗
-     sb_bmapstart ↦₄{fwn_dqb fn} (mword_of_int (fwn_bmapstart fn) : mword 32) ∗
+     sb_size ↦₄{fwn_dqbs fn} (mword_of_int (fsc_size) : mword 32) ∗
+     sb_bmapstart ↦₄{fwn_dqb fn} (mword_of_int (fsc_bmapstart) : mword 32) ∗
      (* THE BITMAP's invariant (BitmapInv.v): the pool bmap -> balloc draws
         from; persistent, and it says nothing about which blocks are in use *)
-     bitmap_inv fsc_fs (fwn_bmapstart fn) fsc_cov fsc_logst
-                (fwn_size fn) ∗
+     bitmap_inv fsc_fs (fsc_bmapstart) fsc_cov fsc_logst
+                (fsc_size) ∗
      (* the disk fabric *)
-     dev_inv (fwn_uart fn) (fwn_disk fn) ∗
-     disk_geom (fwn_disk fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn) ∗
-     is_lock (fwn_dlock fn) d_lock "virtio_disk"%string
-       (disk_res (fwn_disk fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)) ∗
+     dev_inv (fsc_uart) (fsc_disk) ∗
+     disk_geom (fsc_disk) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn) ∗
+     is_lock (fsc_dlock) d_lock "virtio_disk"%string
+       (disk_res (fsc_disk) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)) ∗
      (* THREE slot units: writei's peak (bmap's, and its own bread held
         across either_copyin and log_write).  ilock's bread and end_op's
         commit borrow from the same three, one transaction at a time. *)
@@ -508,8 +500,8 @@ Section SpecFilewrite.
   Definition filewrite_fs_out (fn : fwrite_names) : iProp Σ :=
     (sb_inodestart ↦₄{fwn_dqs fn}
        (mword_of_int icfg_ist : mword 32) ∗
-     sb_size ↦₄{fwn_dqbs fn} (mword_of_int (fwn_size fn) : mword 32) ∗
-     sb_bmapstart ↦₄{fwn_dqb fn} (mword_of_int (fwn_bmapstart fn) : mword 32) ∗
+     sb_size ↦₄{fwn_dqbs fn} (mword_of_int (fsc_size) : mword 32) ∗
+     sb_bmapstart ↦₄{fwn_dqb fn} (mword_of_int (fsc_bmapstart) : mword 32) ∗
      bslots 3)%I.
 
   (* ---- and the three, selected by the file's type ---- *)
@@ -517,18 +509,18 @@ Section SpecFilewrite.
   Definition filewrite_env (γf : gname)
       (fn : fwrite_names) (st : fdstate) : iProp Σ :=
     (match st with
-     | FdOpen (FdPipe _)    => emp
-     | FdOpen (FdDevice mj) => filewrite_dev_env fn mj
-     | FdOpen (FdInode _)   => filewrite_fs_env γf fn
+     | FdOpen _ _ FdPipe        => emp
+     | FdOpen _ _ (FdDevice mj) => filewrite_dev_env fn mj
+     | FdOpen _ _ (FdInode _)   => filewrite_fs_env γf fn
      | FdClosed             => emp
      end)%I.
 
   Definition filewrite_env_out (fn : fwrite_names) (st : fdstate)
       : iProp Σ :=
     (match st with
-     | FdOpen (FdPipe _)    => emp
-     | FdOpen (FdDevice mj) => filewrite_dev_out fn mj
-     | FdOpen (FdInode _)   => filewrite_fs_out fn
+     | FdOpen _ _ FdPipe        => emp
+     | FdOpen _ _ (FdDevice mj) => filewrite_dev_out fn mj
+     | FdOpen _ _ (FdInode _)   => filewrite_fs_out fn
      | FdClosed             => emp
      end)%I.
 
@@ -549,7 +541,7 @@ Section SpecFilewrite.
     filewrite_env γf fn st -∗ filewrite_env_out fn st.
   Proof.
     rewrite /filewrite_env /filewrite_env_out.
-    destruct st as [|[?|?|?]]; try by iIntros "$".
+    destruct st as [|? ? [?| |?]]; try by iIntros "$".
     iApply filewrite_fs_env_out.
   Qed.
 
@@ -564,7 +556,7 @@ End SpecFilewrite.
 
 Definition wp_filewrite_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
+ (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
     (k : nat) (q : Qp) (st : fdstate)            (* the borrowed reference  *)
     (fn : fwrite_names)                          (* the heavy arms' ghosts  *)
@@ -613,7 +605,7 @@ Definition wp_filewrite_sconf_body
   file_ref γf k q st -∗
   (* ambient, because three of the four arms copy FROM user memory *)
   proc_priv_core pj pidv V -∗
-  kalloc_env γa None -∗
+  kalloc_env fsc_kalloc None -∗
   procs_inv γs -∗
   (* ...and what the file's TYPE selects *)
   filewrite_env γf fn st -∗
@@ -641,11 +633,11 @@ Definition wp_filewrite_sconf_body
 Module Type FILEWRITE.
   Parameter wp_filewrite_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (γf : gname)
+ (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (k : nat) (q : Qp) (st : fdstate)
       (fn : fwrite_names)
       (pidv : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string),
-      wp_filewrite_sconf_body γa γf γs j γlp k q st fn pidv V m K eb n b lks.
+      wp_filewrite_sconf_body γf γs j γlp k q st fn pidv V m K eb n b lks.
 End FILEWRITE.

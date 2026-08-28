@@ -6,10 +6,9 @@ of machine-checked refutations (archived with their lane reports in
 the Coq files that held them are deleted and §8 below carries their
 lessons).  The live worklist is
 [`../projects/durable-disk.md`](../projects/durable-disk.md).  This file
-supersedes the accreted rulings §4½–§4⁹ of
-[`fs-state.md`](fs-state.md); `fs-state.md` §0–§2 (the guiding rule and
-the nested predicate) and §7 (as-built notes) remain the reference for
-the predicate itself.
+is where the durable side's design lives; [`fs-state.md`](fs-state.md)
+§0–§2 (the guiding rule and the nested predicate) and §7 (as-built notes)
+remain the reference for the predicate itself.
 
 Vocabulary used below is xv6's and CSL's only.  "The crash predicate" is
 the one Iris predicate the machine layer preserves across a power cycle
@@ -48,7 +47,18 @@ that is what makes the `∗` between two inodes of a durable `fs_state`
 mean something, and because the ONE allocator core has to serve the boot
 mint too (§5) and the era's `fsΦ` cannot be `□`-ed.
 
-## 2. The file-system predicate `fs_state Γ S`
+## 2. The file-system predicate `fs_state Γ dq S`
+
+**IT TAKES A SHARE (owner ruling, EV-X).**  Every BYTE of the file system
+rides at `dq` and the ghost column — the link authority, the type register,
+a directory's entry tokens — stays WHOLE; `fs_state Γ (DfracOwn 1) S` is the
+old predicate by `reflexivity`.  It is written at `FsStateDefs.gamma_q Γ dq`,
+the view whose `fsΦ` is pinned at `dq`, so there is no parallel hierarchy of
+`_q` definitions and every Γ-generic lemma reads at a share for free.  The
+share stops at `fs_state_split`: only `fs_footprint` takes it, `fs_ghost` is
+Φ-free.  That is the whole reason the transport below is provable at any
+`q > 1/2` — the link family's slacked validity is read off a source held at
+ANY share.
 
 One definition (`iris/FsState*.v`), used twice.  `S : fs_state_rec` is
 the abstract state (superblock, inode table `fss_inodes : gmap Z
@@ -88,15 +98,24 @@ live directory, unique names).  There is NO cross-inode pure clause:
   gname family is existential.  The cost is two capacity classes
   (`fsLinkG`/`fsTopG`) on `FsCrash`'s sections, which every consumer already
   has out of `Xv6G.xv6G`.  **THE ALLOCATOR IS A RESOURCE TRANSPORT**
-  (`iris/FsDurXfer.v`, lane H): `fs_state Γ S ==∗ fs_state Γ S ∗ fs_state Γ' S`
-  over a fresh `Γ'`, with `phi_excl Γ` and the SOURCE'S OWN AUTHORITY
-  (`phi_agree Γ A M`, satisfied by one `ghost_map_lookup` at either
-  instance) as its premises.  Both ends of a transport are `fs_state`s and
+  (`iris/FsDurXfer.v`, lane H; at a SHARE since EV-X):
+  `fs_state Γ (DfracOwn q) S ==∗ fs_state Γ (DfracOwn q) S ∗ fs_state Γ' (DfracOwn 1) S`
+  for every `q > 1/2`, over a fresh `Γ'`, with `phi_excl Γ` and the SOURCE'S
+  OWN AUTHORITY (`phi_agree Γ A M`, satisfied by one `ghost_map_lookup` at
+  either instance) as its premises.  **The `q > 1/2` premise IS the
+  disjointness argument**: two shares of one byte that each exceed a half do
+  not fit inside it, so "the mint meets the same block twice" is refuted from
+  OWNERSHIP (`dfrac_own_gt_half` into `phi_runs_q_disj`) and no pure
+  disjointness fact about the state is materialised anywhere.  Both ends of
+  a transport are `fs_state`s and
   nothing is computed from `S`; the output map is a SUBSET of the source's,
-  which is where a snapshot's IDENTITY comes from.  Its ALLOCATION HALF
-  stands alone (`fs_footprint_mint` / `fs_state_mint_runs`, lane H4) and
-  takes pure readings and no resource, which is the entry every live
-  producer uses — `FsDurSnap.fs_snap_alloc_mint` / `P_dur_alloc_mint`.
+  which is where a snapshot's IDENTITY comes from.  **IT IS THE COMMIT'S
+  ENTRY** since EV-Y (`FsDurSnap.P_dur_alloc_xfer` over
+  `fs_state_xfer_tok`); its allocation half `fs_footprint_mint` stands
+  alone and is what `fs_footprint_xfer` runs after it has read its three
+  facts.  Lane H4's readings-only entry (`snap_mint`,
+  `fs_snap_alloc_mint`, `P_dur_alloc_mint`, `fs_state_mint_runs`) is
+  DELETED at EV-Y.
   The value-first form survives at ONE producer, era 0's image
   (`iris/FsDurAlloc.v`, lane H5), because there is no source instance to
   read anything off.
@@ -217,15 +236,16 @@ live directory, unique names).  There is NO cross-inode pure clause:
   `eo_snap_law_of_auth` is the reading; `eo_commit`/`eo_loop` are the two
   statements that carry it.
 
-  **WHAT THE FILE SYSTEM HANDS THE MINT IS A PACKAGE OF READINGS, NOT
-  `snap_ok`** (lane H4).  `FsDurSnap.snap_mint S D` is the geometry, the
-  local clauses, the superblock's parse, the link family's slacked
-  validity, and the RUNS row — the byte legs' shape, their pairwise
-  DISJOINTNESS and the fact that their union sits inside the committed
-  view's flattening.  Four of the five come off the collected resources
-  (`FsDurXfer.phi_runs_ex_disj` is `phi_excl`, `phi_runs_ex_in` is one
-  `ghost_map_lookup`), the fifth is the geometry, and nothing is
-  accumulated.  `P_dur_alloc_mint` takes it and no resource at all.
+  **WHAT THE FILE SYSTEM HANDS THE MINT IS THE PREDICATE ITSELF** (EV-Y).
+  `FsDurSnap.P_dur_alloc_xfer` takes `fs_state Γ (DfracOwn q) S` at any
+  `q > 1/2`, the source's byte authority as `phi_agree`, and the root's
+  keep-alive fragment; it returns all three and `P_dur D`.  Two PURE
+  premises ride beside them and neither is about disjointness: the
+  snapshot's own `snap_shape` — the one clause no resource pins — and
+  "the source's byte map is inside the committed view's flattening",
+  which is where the epoch's IDENTITY comes from.  Lane H4's
+  readings-only `snap_mint`, whose `sm_runs` MATERIALISED the runs'
+  pairwise disjointness as a pure fact, is deleted.
 
   Its receipt is `FsCrash.fs_commit_receipt`: the committed view equals the
   logged view (`D' = L` at home maps, which is `fs_receipt_any`'s index) and
@@ -323,36 +343,26 @@ onto the instance, so what a mint owes about `D` at all is ONE clause.
 algebra `fp_slot`/`fp_list`/`fp_disj`, `blk_ledger`, `ledger_carve`,
 `blk_ledger_cut`, `fs_state_of_ledger` and the registry's value-first
 entries `fs_snap_alloc`/`P_dur_alloc`.  Its ONE caller is
-`FsDurImg.img_fs_snap_alloc`; `FsCrash.P_fs_alloc` no longer takes a pure
+`FsDurImg.img_P_dur_alloc`; `FsCrash.P_fs_alloc` no longer takes a pure
 tie at all but era 0's EPOCH, as a resource (`⊢ |==> P_dur D0`), so the
 crash predicate does not know how a file system is built out of bytes and
 nothing at or below it takes `snap_ok` as a premise.
 
-**AND THE COMMIT'S CALL SITE HAS NOW MOVED (lane H4) — TO THE MINT, NOT TO
-THE TRANSPORT.**  Quiescence never yields an `fs_state` and never will: the
-records sit REGION-side at fraction 1 while each inode's data legs arrive
-at THAT inode's own share, existentially bound with the single constraint
-"the double is invalid" (`FsCollect.col_bundle`; `DfracOwn (3/4)` satisfies
-it — `dfrac_34_no_pair` — and cannot be promoted — `phi_no_promote`).  Two
-shapes make such a source legal.  First, THE RUNS CARRY A SHARE PER RUN
-(`FsDurXfer.phi_runs_q`, and `phi_runs_ex` with the share existentially
-bound per object, which is what avoids a choice function over the inode
-map): the disjointness is read off `phi_excl` at MIXED shares
-(`dfrac_nvalid_pair`) and the union's place inside the source's own map
-POINTWISE off `phi_agree`.  The full-share machinery is not duplicated —
-`gamma_q Γ dq` is the view whose `fsΦ` ignores the dfrac it is handed, so
-every Γ-generic shape reads at a share with no new lemma.  Second, THE
-ALLOCATION HALF STANDS ALONE: everything `fs_footprint_xfer` does with its
-source is read PURE facts off it, so `fs_footprint_mint` /
-`fs_state_mint_runs` take those facts and NO RESOURCE AT ALL.  **So the
-collection never had to become an accessor** — the allocation runs after
-every invariant has closed, off facts, and `FsCollectAll.pure_keep` stays
-exactly as it was.  `FsCollectAll.col_hand_mint` is the reading
-(`col_hand ⊢ ⌜snap_mint …⌝`) and `fs_snap_law_build` calls
-`P_dur_alloc_mint`; `col_snap_bytes`/`col_snap_ok`/`col_snap_ok_ex` are
-deleted, and `col_snap_shape` is down to one clause beside `col_fs_geom`'s
-four.  The value-first allocator keeps ONE caller, era 0's image, so
-**`snap_ok` is handed IN nowhere else in the tree**.
+**AND THE COMMIT'S CALL SITE IS THE TRANSPORT (EV-Y).**  Lane H4 routed it
+around the transport instead — quiescence did not yield an `fs_state`, so
+the mint took a package of pure READINGS (`snap_mint`) and the collection
+stayed destructive under `pure_keep`.  EV-X made the predicate
+share-aware and EV-Y made the collection an ACCESSOR, and with both the
+ruling's shape is the real one: the commit hands
+`fs_state (fs_gamma_L γfs) (DfracOwn (3/4)) S` to
+`FsDurXfer.fs_state_xfer_tok` (through `FsDurSnap.P_dur_alloc_xfer`), the
+transport returns the source unchanged, and the closing wand puts every
+invariant body back.  `snap_mint` with its pure `xr_disj`,
+`fs_snap_alloc_mint`, `P_dur_alloc_mint` and `fs_state_mint_runs` are
+DELETED; `col_snap_bytes`/`col_snap_ok`/`col_snap_ok_ex` were already, and
+`col_snap_shape` is down to one clause beside `col_fs_geom`'s four.  The
+value-first allocator keeps ONE caller, era 0's image, so **`snap_ok` is
+handed IN nowhere else in the tree**.
 
 The BOOT mint reads it one level up instead: `FsCfgSnap.fs_cfg_alloc_snap`
 never builds `fs_state (fs_gamma_L γfs) S` at all — it distributes the
@@ -368,15 +378,72 @@ more are `FsState.fs_geom` on the instance, one is the WAL's own row (b),
 and every remaining clause — the byte ties, the used-set coupling, both
 disjointness clauses, the local clauses — is derived where it is needed.
 
-**THE COLLECTION IS `FsCollectAll.fs_collect_mint`**, and what makes it
-possible is that its conclusion is PURE: an entailment `R ⊢ ⌜φ⌝` yields
-`R ⊢ ⌜φ⌝ ∗ R` in an affine logic (`FsCollectAll.pure_keep`), so the
-collection runs DESTRUCTIVELY — dropping the overlap of the pool's index,
-the corpse ledger's and the fifty slots', which the partition row does not
-make disjoint — while the caller still closes every invariant with the body
-it opened.  Its one non-resource premise is `FsCollect.col_geom`, whose
+**AND THE COLLECTION'S OWN OUTPUT IS THE PREDICATE ITSELF, AT A SHARE**
+(EV-X; stage 5's `fs_footprint_q`, with a share bound existentially PER
+INODE, is deleted).  `FsCollectAll.col_hand_footprint_acc` is `col_hand ⊢ … ∗
+fs_footprint (fs_gamma_L γfs) (DfracOwn (3/4)) (col_state …)` beside the
+three things the ghost half is read off (`col_auth`, `fs_links`, the root's
+`ireg_keep`) and two pure rows, and `col_hand_state_acc` is that plus the
+ghost half: `fs_state (fs_gamma_L γfs) (DfracOwn (3/4)) (col_state …)`.
+Both carry a CLOSING WAND since EV-Y.  `FsDurXfer.fs_footprint_runs_q` is
+the ONE runs call the transport makes.
+
+**AND `fs_state` DOES COME OUT OF A COMMIT, AT THREE QUARTERS (EV-X;
+this REPLACES the stage-5 finding above it).**  The old measurement was
+about the FRACTION-1 predicate: `IcacheEscrow.ic_rd_arm` lends
+`ic_inode_leg γfs (DfracOwn (3/4)) …`, three quarters cannot be promoted,
+and nothing at a commit refutes a read lock (the three windows the commit
+does refute each park a share of `LogDefs.ln_tx`; a read-locking `ilock`
+opens no transaction).  With the dfrac IN the predicate the question is
+instead "is there ONE share every arm can supply", and there is: three
+quarters.  `ic_slot_cover`'s bundle alternative and `FsCollect.col_side` /
+`col_bundle` are stated at it — the unlocked arm sheds its quarter into the
+lend's own frame, the pool's and the region's free bundles shed and drop
+theirs — and every metadata object and every region record comes down the
+same way (`FsStateDefs.view_shed`/`gamma_shed_34`,
+`FsStateInode.rec_owned_at_shed_to`, `FsState.fs_footprint_shed`).
+`FsCollectAll.col_hand_state_acc` is `col_hand ⊢ … ∗ fs_state (fs_gamma_L
+γfs) (DfracOwn (3/4)) (col_state …)`, exactly `fs_state_xfer`'s source at
+`q = 3/4`.  `FsState.fs_footprint_q`, `FsStateInode.inode_phi_q` and
+`FsDurXfer`'s whole per-run share vocabulary (`phi_runs_ex` and friends) are
+deleted with it.
+
+**AND THE COLLECTION IS AN ACCESSOR (EV-Y), WHICH IS WHAT A TRANSPORT AT
+`q > 1/2` NEEDS.**  Such a transport takes MORE THAN HALF of every byte, so
+a collection that feeds it cannot also keep the invariants' bodies unless it
+takes the source back out — which the transport returns.  Three things made
+the turn:
+
+- **THE PARTITION IS DISJOINT, from separation logic.**
+  `IcacheEscrow.ipool_quiesce_acc` states its three index sets as a UNION
+  and nothing pure says they do not overlap.  They do not, and the witness
+  is the REGION's own slot at the shared inum: two `col_side`s there are
+  two owners of one exclusive `ghost_map` element
+  (`FsCollect.col_side_slot_excl`, `FsCollectAll.col_sidez_disj`).  So the
+  three columns merge and re-split by the EXACT `big_sepS_union` and
+  `big_sepS_union_weak` — which covered the union by dropping the overlap —
+  is deleted.  `IcacheEscrow.v` is not touched.
+- **A SUPPLIER'S ROW CARRIES ITS OWN WAY BACK** (`FsCollect.col_row`, the
+  accessor form of `col_side`, in `ic_lend`'s shape).  It is parameterised
+  by the ROW and not by `col_side`, because the marker supplier cannot be
+  closed from a disjunction that has forgotten which arm it is.  The door
+  (`col_row_slot_acc` over `col_region_slot_lnk_acc`) hands out
+  `InodeRegion.ireg_lnk` BESIDE the bundle out of ONE destructuring, which
+  is the obstruction EV stage 5 recorded and which was never a theorem.
+- **NOTHING IS DROPPED AT THE FOOTPRINT** (`col_hand_footprint_acc`).  The
+  era's residue — `dinode_at`, `top_frag_q`, the region's proxy authority —
+  and the quarter each metadata object sheds ride the wand's frame.  Three
+  of the four rejoin by an `⊣⊢`; the FREE POOL needs an agreement, because
+  its rows hide their bytes under an existential, and the agreement is the
+  byte authority the collection holds anyway (`col_free_pool_join`).
+
+**THE COLLECTION IS `FsCollectAll.fs_collect_dur`** (`col_bodies_acc`
+inside it).  Its one non-resource premise is `FsCollect.col_geom`, whose
 `cg_reg` rests on the region's width tie and therefore comes from the boot
-image (`FirstTok.first_fsinit_pures`) and nowhere else.
+image (`FirstTok.first_fsinit_pures`) and nowhere else.  The ONE pure row
+that still crosses the boundary is `snap_shape`'s, the clause no resource
+pins (§2), beside "the source's byte map is inside the committed view's
+flattening", which is where the epoch's IDENTITY comes from.
 
 ## 5. Boot, adequacy, and the theorem
 
@@ -408,6 +475,21 @@ which is what `fs_boot_pure` already carries.  What lane H5 changed
 instead is the PROVENANCE: `snap_ok` is no longer carried by anything, so
 the facts the mint spends are read off the epoch's own resources one level
 up.
+
+**RE-CHECKED AT EV STAGE 5, and the answer did not move.**  The plan's
+stage 7 asked for `fs_cfg_alloc_snap` to become "identity on `fs_state`".
+It cannot be a shape it does not have: the mint's inputs are a BYTE
+FUNCTION `Pb`, `disk_bytes γv` and the PURE `snap_ok S D` — there is no
+source instance anywhere on the boot side — and its output is not an
+`fs_state` either but the era's whole configuration (`ICFG`/`FSC` plus the
+two kits), distributed into region, pool, bitmap and `ftop_inv`.  Nor can
+the `snap_ok` premise be dropped: the proof spends `sk_bytes` (the decode
+bridge `snap_rec_decode`), `sk_local`, `sk_own_used`/`sk_meta_used` (every
+peel of the boot ledger, `snap_names_cov`), `sk_sbok`, `sk_regdom` and
+`sk_links` — and its supplier is a value-first allocation at era 0
+(`FsDurAlloc`/`FsDurImg`), which is the one caller of the carve.  Turning
+that around is a boot-side lane about where the era's byte AUTHORITY is
+minted (reason (i) above), not a stage of the era-vocabulary campaign.
 
 **Ghost-wise recovery is a NO-OP, and the mint runs AT POWERON (RULING,
 corrected by lane E-mint).**  `D` is a pure function of the raw disk —

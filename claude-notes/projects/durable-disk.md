@@ -2957,7 +2957,18 @@ banner says once rather than 21 times.
     instance-taking entry points; `fs_state_xfer_era` / `fs_state_xfer_snap`
     are the two non-vacuity checks (the era's non-`□`-able full element and
     the snapshot's are both legal sources).  `snap_gamma` /
-    `snap_gamma_gtimeless` / `snap_gamma_excl` moved to `FsDurXfer`.
+    `snap_gamma_gtimeless` / `snap_gamma_excl` are **`FsDurBytes`' section
+    3**, not the transport's: they were `FsDurXfer`'s for one commit, which
+    made `FsDurRead` Require the transport for three lines of record and
+    nothing else.  Both files above instantiate the flattening over that
+    record and NEITHER needs the other, so it belongs at the bottom of the
+    durable stack — and `FsDurBytes` is the only file there that can hold
+    it, because it is the only one with no `ghost_map` class of its own in
+    scope (put `diskImgG` beside `FsBytesGamma.fs_gamma_L`'s `fsLogG` byte
+    map and `ghost_map_auth (fs_bytes γfs) 1 Lb` resolves through the wrong
+    class, which is the trap `fs_bytes_auth`'s section already dodges).
+    `snap_gamma_agree` stayed with the transport: `phi_agree` is the
+    transport's own notion.
   - **WALL — the COMMIT cannot move without editing `LogInv.v`.**
     `LogSnapLaw.snap_law` is `log_ctx`'s last conjunct and its conclusion is
     PURE precisely so it can cross `end_op`'s lock release as a Coq
@@ -4028,10 +4039,17 @@ the rows below and in `design/fs-ghost-state.md`).
     `design/crash.md`, `fs-state.md`, `durable-fs-plan.md` and `fs-icache.md`
     got banners where they described the deleted fixed-layer fields,
     `dir_owned` or the v1 `is_itable`/`itable_res` as live.
-- [ ] **Rank 1 — de-thread the ambient names** (AFTER S2): the fs contracts
-  stop binding copies of `icfg`/`fscfg`'s per-boot constants
-  (`γfs cov logstart cn γi γl nib inodestart dev`); the 339 tie equations
-  vanish; `fs_world` collapses into `fs_ready`.  First slice `cn : ic_names`.
+- [x] **Rank 1 — de-thread the ambient names** (DONE, R1a–R1d): the fs
+  contracts stop binding copies of `icfg`/`fscfg`'s per-boot constants —
+  `cn` (1a), `γfs cov logstart γi` and the itable lock (1b), `dev nib
+  inodestart` and the log's names (1c), and the six device/allocator gnames
+  with the image's three numbers (1d).  All 339 tie equations are gone, and
+  so are the three records that carried them: `FsSyscalls.fs_world` and
+  `SpecFileclose.fclose_ties` are DELETED and `ProofSyscall.sysc_ties` is
+  four PROCESS fields under the name `sysc_proc_ties`.  What is left is the
+  boot side (where the era's numbers are tied to the fields at the point the
+  instance is BUILT), everything structurally below `FsCfg`, and nine honest
+  per-call identity facts.
 
   **AS LANDED — R1a: THE PROBE AND THE WHOLE `cn : ic_names` SLICE.  Whole
   tree green, `make audit-only` identical BY NAME to a pre-change run of the
@@ -4335,25 +4353,951 @@ the rows below and in `design/fs-ghost-state.md`).
     re-run the slice's own rewriter on a scratch copy of the pre-change tree
     with that one file swapped in.  It is deterministic, so the answer is the
     same one the sweep would have produced had the fold landed first.
-  - **WHAT STAGE 4 STILL OWES**: the bundle collapse proper.  `fs_world` →
-    `fs_ready` + `fs_ready_disk` (its eight remaining equations are the six
-    device/allocator names `γpr γa γu γd γk bn` and `bmapstart`/`size`);
-    `fs_world_all`'s 25-second `iSplit` chain; `FsSyscalls.fs_geom` (now
-    fifteen fields) dies in favour of `FsReady.fs_geom_ok`;
-    `sysc_ties` → four process fields; `fclose_names` 20 → 8 fields and
-    `fclose_ties` dies; `fs_fabric` still takes eight names.
-- [ ] **EV — the era-vocabulary unification** (approved): five staged
-  lanes; three of the four holders are already predicate-vocabulary; the
-  payoff is the commit handing a real `fs_state` to the transport.  Runs
-  AFTER rank 1 or before it, never concurrently (same payload bodies).
-- [ ] **Rank 4 — the `dview`/`fview` ghosts and the pinned-lookup island**:
-  AWAITING RULING (keep for the fs-syscall-specs port, or delete).
-- [ ] **Rank 5 — one uniform per-inum transaction pin** (absorbs `DepTx`'s
+
+  **AS LANDED — R1d: THE BUNDLE COLLAPSE, AND THE LAST TEN NAMES.  Whole
+  tree green (zero `Error`), `SystemAdequacy.v` / `SystemAssumptions.v`
+  byte-identical to `origin/main` — the audited theorem never named any of
+  the ten, and its `sb`/`nib`/`cov` are the image's numbers, tied inside
+  `boot_shared_alloc`.**
+
+  - **THE TEN NAMES, MEASURED OVER THE 103-FILE CUT** (rank 1c's 91 plus
+    `ProofItruncParts`, `ProofKexecC`, `ProofKexecD` and the
+    fileread/filestat/sysread/sysfstat/syswrite family, which had to follow
+    because they CALL `ilock`/`readi`): `bn : bio_names` → `fsc_bio`,
+    `γu`/`gu` → `fsc_uart`, `γd`/`gd` → `fsc_disk`, `γk`/`gk` at bare
+    `gname` → `fsc_dlock`, `γa`/`ga`/`γkl` → `fsc_kalloc`, `γk`/`γka` at
+    `gname * gname` → `fsc_kpages`, `γpr`/`gpr` → `fsc_printk`, and the
+    image's three numbers `bmapstart`/`size`/`ninodes` → `fsc_bmapstart` /
+    `fsc_size` / `fsc_ninodes`.  **1842 binder positions went, 774
+    applications lost a positional argument, 2626 uses became a class
+    field.**  Eight files gained `Require Import FsCfg` (`ProofKexec`,
+    `ProofKexecB2`, `SpecSysWrite`, `ProofUsertrap`, `ProofUsertrapArms`,
+    `SpecSysFstat`, `SpecSysRead`, `SpecSyscall`).
+  - **WHICH GNAME IS WHICH IS A USE QUESTION, and every spelling was
+    checked against one.**  `KvmSpec.kalloc_env_at γa γk` takes the kmem
+    LOCK first and the free-list count/seal PAIR second, so `γa`/`ga`/`γkl`
+    are `fsc_kalloc` and `γk` at `gname * gname` / `γka` are `fsc_kpages`;
+    `γk`/`gk` at bare `gname` is always the `"virtio_disk"` lock
+    (`is_lock γk d_lock "virtio_disk"`).  The three spellings that mean
+    something else — `γf`/`gf` the file table, `γl`/`gl` the running
+    process's slot lock, `γtk` the ticks lock — are untouched.
+  - **THE CUT IS UPWARD-CLOSED, WHICH IS WHY IT IS SMALLER THAN THE NAMES
+    ARE.**  `γa`, `γu` and `γpr` are threaded through 262 files — the whole
+    kalloc/vm/console/pipe cone — and almost none of that is the FS
+    contract surface.  The forbidden direction is a de-threaded CALLEE
+    forcing a tie premise on a threaded caller; a de-threaded CALLER
+    instantiating a threaded callee is free and costs nothing.  So the cut
+    is the fs surface and everything above it, and `SpecCopyin`,
+    `SpecWalk`, `SpecKalloc`, `SpecUvmalloc`, the WAL, the bio layer and
+    the bitmap/bmap contracts keep their parameters and are INSTANTIATED at
+    the fields.
+  - **THE THREE TIE BUNDLES ARE GONE, and the meter reads zero.**
+    `FsSyscalls.fs_world` (8 equations) is DELETED, with `fs_world_all`
+    (whose twenty-one-step `iSplit` chain is `FsReady.fs_ready_all`, where
+    it always belonged), `fs_world_persistent`, `fs_world_ready` and
+    `fs_ready_world`.  `SpecFileclose.fclose_ties` (8) is DELETED, and
+    `ProofSyscall.sysc_fclose_ties` with it.  `ProofSyscall.sysc_ties`
+    13 → **4** fields and is renamed `sysc_proc_ties`: what survives is
+    `sct_dq`, `sct_pj`, `sct_j`, `sct_plock` — the pid quarter and the
+    three PROCESS facts, which are there precisely because `fs_ready`
+    carries no process content at all.
+  - **AND `FsSyscalls.fs_geom` WITH THEM.**  The fifteen-field pure record
+    parameterised by `bmapstart`/`ninodes`/`size` is `FsReady.fs_geom_ok`,
+    which says the same about the ambient configuration and takes no
+    parameters; its four `bitmap_geom_ok` conjuncts come through the
+    `fgo_size`/`fgo_bm_nn`/`fgo_bm_cov`/`fgo_bm_out` accessors rather than
+    being restated.  The two friendly bodies lose thirteen parameters
+    between them — including `pd`/`pav`/`pu`, which they never needed: the
+    proof unpacks `fs_ready`'s own existential and instantiates the seal at
+    the witness.  `fs_res` loses four.
+  - **`SpecKexec.fs_fabric`: SEVENTEEN ROWS AND EIGHT PARAMETERS BECOME
+    FOUR AND FOUR.**  It is `FsReady.fs_ready ∗ procs_inv gs ∗ disk_geom
+    fsc_disk pd pav pu ∗ is_lock fsc_dlock …` — a bundle spelled entirely
+    at ambient names IS that predicate, and a copy of a parameter-free
+    predicate is still a copy.  `fs_fabric_all` hands the sixteen rows back
+    in the cone's own order, so the six positional `iDestruct`s did not
+    move; `ProofKexecTail.fs_fabric_mk` is DELETED, because its ten call
+    sites were rebuilding a PERSISTENT bundle they still held — each is one
+    `iExact "Hfab"` now, and the 107.7 s / 90.6 s that lemma was written to
+    avoid goes with it.  The two builders (`ProofForkret`,
+    `ProofSyscall.sysc_fs_fabric`) went from sixteen and fifteen `iSplitR`s
+    to four.
+  - **FIVE NAMES RECORDS LOSE THE FIELDS THAT ONLY CARRIED A COPY DOWN**,
+    and had to, for rank 1a's reason — a record field whose value IS a
+    `FsCfg.fscfg` field can only carry a copy of it, and the equation
+    saying so is one Rocq will not let a proof `rewrite` by:
+    `fclose_names` 16 → **8**, `UsertrapRes.ut_names` 23 → **14**,
+    `fwrite_names` 19 → **12**, `fread_names` 14 → **10**, `fstat_names`
+    8 → **4**.  What survives in each is the PROCESS, the device arm's own
+    lock (`frn_cons`, `fwn_txlock`), and the three virtio ring pages.
+  - **THE RING PAGES ARE THE ONE THING THAT STAYS, everywhere.**
+    `fsc_desc`/`fsc_avail`/`fsc_used` left `fscfg` in fs-cfg-boot.md's R1
+    (`virtio_disk_init` `kalloc`s them at WP time), so `fs_ready`
+    QUANTIFIES them and every bundle above carries `disk_geom` at its own
+    three as a RESOURCE.  `FsReady.disk_geom_agree` is the bridge, and it
+    is why `fcn_pd`/`un_pd`/`frn_pd`/`fsn_pd`/`fwn_pd` are still fields.
+  - **ONE SPEC ROW CHANGED SHAPE RATHER THAN DYING**, and it is the
+    allocator's.  `SpecSysFork` took `kalloc_env fsc_kalloc None`, whose
+    `∃ γk` hides the free-list pair; kfork NAMES the pair
+    (`kalloc_env_at`, because allocproc speaks about the count) and the
+    pair is `fsc_kpages` now, so a hidden witness could no longer be handed
+    on.  The row is `kalloc_env_at fsc_kalloc fsc_kpages None` — the same
+    row at the ambient pair, and every caller has it spelled out inside
+    `fs_ready` (`fs_ready_kmem`).  For the same reason
+    `ProofSyscall.syscall_env_all` loses four of its eight existentials:
+    the allocator's lock and printk's three names are fields, and hiding a
+    field behind an `∃` hands an arm a name nothing says anything about —
+    this file's own unreachable-witness argument.
+  - **TWO NEW TRAPS, BOTH MEASURED, AND THEY ARE THE SAME TRAP.**  A class
+    field written in an EXPLICIT-ARGUMENT position elaborates to
+    `@fsc_ninodes ?fscfg`, and typeclass resolution is deferred to the END
+    of the application — so (i) an `ltac:` side condition supplied inside
+    that application and (ii) a goal opened by a proofmode `$!`
+    specialization both run with the instance still an EVAR.  `lia` then
+    treats the goal's field and the context's as two different atoms and
+    fails with *"Cannot find witness"* on a REFLEXIVE inequality
+    (`Z.to_nat (fsc_ninodes - 1) <= Z.to_nat (fsc_ninodes - 1)`), which
+    reads like a broken hypothesis and is not.  The tell is
+    `constr_eq`/`Set Printing All`: the goal says `?fscfg` where the
+    hypothesis says `FSC`.  Two fixes, both local and both in the source:
+    pass a hypothesis whose statement was elaborated ON ITS OWN (`Hn64` in
+    `ProofIalloc`/`ProofIreclaim`), or route the term through `constr:`,
+    which elaborates with resolution ON.
+  - **NOTHING GOT SLOWER, MEASURED** (standalone `rocq compile`, same VM,
+    against the branch's BASE TREE BUILT BESIDE IT — `git archive` of the
+    base commit into a sibling directory, so both sets of `.vo`s exist at
+    once and the comparison is one machine, one minute apart):
+    `ProofSyscall` 43.8 → 43.2 s, `ProofFileclose` 19.1 → 19.5,
+    `ProofCreate` 139.6 → 139.1, `ProofSysOpen` 63.7 → 64.2,
+    `ProofSysOpenTails` 21.9 → 22.1, `ProofSysUnlink` 131 → 141 on the
+    first pair and 141 → 130 on the second (three runs a side: base
+    131/141/139, after 141/130/142 — the VM is SHARED and this file's
+    variance is ±8 %, which is larger than any effect here).  **Peak RSS is
+    the reading that is not noisy, and it moves the right way**:
+    `ProofSysUnlink` 3.07 → 2.81 GB (−8 %), `ProofSysOpen` −4 %, the rest
+    flat.  That is the expected answer — dropping a parameter shortens a
+    statement without changing a proof step, and a shorter statement is a
+    smaller term.
+  - **WHAT IS LEFT, AND WHERE.**  The tie meter over the whole tree (with
+    comments stripped, and reading `<=` as the comparison it is) is 41
+    equations and every one is in a sanctioned class: the boot side, where
+    the era's image numbers are tied to the fields WHERE THE INSTANCE IS
+    BUILT (`FirstTok`, `SpecFsinit`, `FsCfgBoot`); structurally below
+    `FsCfg` (`FsCollect`, `FsCollectAll`, `FsCollectImg`, `IcacheBoot`,
+    `InodeRegion`'s five `⌜γ = icfg_log⌝`, discharged by `eq_refl`); the
+    nine honest per-call identity facts read off an entry's own cells
+    (`ProofIget`, `ProofIput`); and the five STALE files `_CoqProject` does
+    not list (`DirViewPin`, `NameiInitPinned`, `ProofKexecPinned*`,
+    `SpecKexecPinned`), which rank 1b left alone and which whoever revives
+    the pinned corner ports across 1a–1d together.  **Not one tie is left
+    on the fs contract surface.**  `tools/dethread_check.py` reports
+    `0 declarations out of scope`.
+- [x] **EV — the era-vocabulary unification** (approved): five staged
+  lanes; three of the four holders were already predicate-vocabulary.
+  ALL FIVE STAGES ARE LANDED (EV1 = 1 and 2, EV3 = 3, EV4 = 4, EV5 = 5).
+  The payoff was stated as "the commit hands a real `fs_state` to the
+  transport"; EV5 REFUTED that half — a read-locked inode's bundle stands
+  at three quarters and nothing at a commit refutes a read lock, so the
+  strongest true form is `FsState.fs_footprint_q`, which is what the
+  assembly now names.  The stage-7 follow-on (the boot mint as the same
+  transport) is answered in EV5's paragraph and is a BOOT-SIDE lane, not
+  a stage of this campaign.
+
+  **AS LANDED — EV1 (stages 1 and 2).  Whole tree green (zero `Error`,
+  `MAKEEXIT=0`), `tools/dethread_check.py` at "0 declarations out of
+  scope", and `iris/SystemAdequacy.v` / `iris/SystemAssumptions.v`
+  byte-identical to main — neither ever named anything either stage
+  touched.**
+
+  - **STAGE 1 IS `inode_dat_q`, AND IT IS `inode_phi` MINUS ITS RECORD.**
+    `FsStateInode.inode_dat_q Γ dq n` is the block big-op over
+    `blk_owned_q` beside `ind_owned_q`; `inode_dat` is its `DfracOwn 1`
+    reading, CONVERTIBLE to it (`inode_dat_1` is `reflexivity`), and
+    `inode_phi_dat : inode_phi Γ sb i n = rec_owned Γ sb i (fn_rec n) ∗
+    inode_dat Γ n` is `reflexivity` too — `bi_sep` associates to the
+    right, so `inode_phi`'s text did not move and no existing
+    destructuring pattern in the tree moved with it.  Beside it:
+    `inode_phi_at` (the geometry-free `rec_owned_at ∗ inode_dat`, the
+    `free_bitmap_at` pattern), the superblock step `inode_phi_sb` (an
+    `⊣⊢` under `rec_owned_sb`'s real `0 ≤ i < 2^32`), `inode_dat_q_split`,
+    `inode_dat_q_blk_acc`, the three Timeless instances through a
+    `tl_struct` peel, and `inode_ghost_of`.  Sealed
+    `Typeclasses Opaque inode_dat_q inode_dat inode_phi_at`.  150 lines,
+    purely additive: nothing else in the tree changed at stage 1.
+  - **THE CLASS CHECK IS NOT OPTIONAL AND IT PASSED.**  A probe's `About`
+    shows `inode_dat_q` / `inode_dat` / `inode_phi_at` / `inode_phi_sb`
+    quantified over `{Σ}` ALONE — Rocq's section discharge adds only the
+    variables a term USES, so living inside `Section InodeOwned`'s
+    `` `{!fsLinkG Σ} `` costs them nothing — while `inode_ghost_of`
+    correctly carries `fsLinkG` because it genuinely reads the link RA.
+    Stage 3 can therefore name the leg from `InodeInv` without dragging a
+    capacity class into that file's cone.
+  - **STAGE 2 DELETED `inode_bytes_era` RATHER THAN ALIASING IT.**  It was
+    a twin of `inode_dat_q` at the logged view, so `inode_owned_era_q`,
+    `inode_owned_era`, `inode_rd_era` and `inode_owned_era_split` are
+    restated over `inode_dat_q`/`inode_dat` directly and the name is gone.
+    THE PLAN'S COUNT WAS LOW: 20 bare occurrences of the predicate plus 8
+    of its six-member lemma family, on 27 lines — all inside
+    `FsStateEra.v`, as the plan said — and two more PROSE citations
+    outside it (`IcacheEscrow.v`'s `ic_rd_held` header,
+    `InodeRegion.v`'s `free_node` header), both retargeted.
+  - **THREE OF THAT FAMILY HAD NO CALLER AT ALL** and simply died:
+    `inode_bytes_era_split`, `inode_bytes_era_q_split`,
+    `inode_bytes_era_blk_read` (with the local `blk_big_sepM_split` that
+    served them).  Their general forms are stage 1's `inode_dat_q_split` /
+    `inode_dat_q_blk_acc`.  `inode_bytes_era_timeless` became
+    `inode_dat_q_timeless`.  `_to`/`_of` survive, RENAMED
+    `inode_dat_era_to`/`_of`: they are the era's remaining debt to the
+    `InodeInv` vocabulary and stage 3 is what pays it off.
+  - **THE ONE COST IS ONE BRACKET.**  The bundle's data leg is now one
+    conjunct where it was two, so `(Hd & Hb & Hi & Ht & %Hl)` becomes
+    `(Hd & [Hb Hi] & Ht & %Hl)` and a builder unfolds `/inode_dat`
+    alongside `/inode_owned_era`.  Note `rewrite /inode_dat` does NOT
+    re-associate — the flat five-way pattern does not come back and every
+    such site has to move its bracket.  Fourteen proof sites in
+    `FsStateEra.v` and ELEVEN in `FsCollect.v` — nine at an
+    `/inode_owned_era*` unfold, plus the two `iDestruct "Hown"` of a free
+    inum's bundle in `ireg_slot`'s collection arms.  Every other consumer
+    (`IcacheBoot`, `EscrowDeposit`, `FsCollectAll`, `FsCollectImg`,
+    `ProofIlock`, `ProofFileread`, `ProofFilestat`) goes through
+    `_of`/`_to`/`_era_node_*` and did not move at all.
+  - **THE SEAL LIST SHRANK BY ONE AND THAT IS AN IMPROVEMENT, not a
+    weakening.**  `FsStateEra`'s `Global Typeclasses Opaque` is now
+    `inode_owned_era_q inode_rd_era`; the leg carries its own seal at its
+    home, so the UNSEALED `inode_owned_era` that forty payload sites frame
+    through now has a data leg that is ONE sealed atom instead of two
+    conjuncts.  (This is the predicate whose unsealed `Timeless` search
+    once ran nineteen minutes on `IcacheEscrow.ic_rd_arm`, so the seal was
+    not optional.)
+  - **THE PLAN'S "ALREADY PREDICATE-VOCABULARY" CLAIM, CHECKED BY
+    READING.**  Three of the four are exact: `BitmapInv.bitmap_res γfs bms
+    size used = FsStateBitmap.free_bitmap_at (fs_gamma_L γfs) bms size
+    used` (a one-line body); `InodeRegion.ireg_recs` is a `[∗ list]` over
+    `seq 0 16` of `FsStateInode.rec_owned_at` at the region's own
+    numbering; `IcacheEscrow.dlinks γfs self dn bm data =
+    FsStateInode.ent_toks_x (fs_gamma_L γfs) self (era_node dn bm data)`,
+    also a one-line body.  **THE FOURTH IS DRIFT.**
+    `InodeRegion.ireg_lnk_at` is NOT `FsStateLink.link_auth`: it is
+    `∃ v, ⌜ireg_reg_ok ty v⌝ ∗ link_auth (fs_gamma_L γfs) z
+    (ireg_mult_at n ty) v ∗ ireg_keep γfs z v`.  Stage 5 therefore owes
+    two things the plan did not price — the multiplicity bridge
+    `FsCfgSnap.fn_mult_ireg` (`fn_mult n = ireg_mult_at (fn_nlink n)
+    (fn_type n)`) and the ROOT's `ireg_keep`, an unspendable keep-alive
+    `link_tok` that is `emp` at every other inum and must come out as
+    RESIDUE, not be folded into `inode_ghost`.
+
+  - **WHAT STAGE 3 SHOULD KNOW.**  (a) The leg is class-free, so
+    re-basing `blk_res_q`/`ind_blk_q` on `blk_owned_q` needs no new
+    binder.  (b) The two bridges left in `FsStateEra` are
+    `inode_dat_era_to`/`_of` (via `inode_blocks_era_q` / `ind_res_era_q`,
+    both of which take `inode_local i n`), and they are the whole of what
+    the era still owes `InodeInv` on the data leg — when stage 3 lands,
+    they and their two in-file callers
+    (`inode_rd_era_era_node_to`/`_of`) are what goes away.  (c) The
+    `FsBytesGamma` crossing is still `gamma_blk_owned_q`, untouched.
+    (d) Stage 5 already has `FsCollectAll.col_recs_by_inum` handing
+    `rec_owned_at` PER INUM, so `inode_phi_at` + `inode_phi_sb` is the
+    assembled `inode_phi`, and `inode_ghost_of` the assembled
+    `inode_ghost`; what is missing is the peel of `ireg_lnk_at` above.
+
+  **AS LANDED — EV3 (stage 3).  Whole tree green (zero `Error`,
+  `MAKEEXIT=0`, the 356-file `InodeInv` cone rebuilt — the plan's
+  estimate was 355), `tools/dethread_check.py` at "0
+  declarations out of scope", and `iris/SystemAdequacy.v` /
+  `iris/SystemAssumptions.v` byte-identical to main.**
+
+  - **THE FOUR BLOCK-INDEXED VIEWS ARE THE ABSTRACT RUNS NOW.**
+    `InodeInv.blk_res`/`blk_res_q`/`ind_blk`/`ind_blk_q` are
+    `FsStateDefs.blk_owned`/`blk_owned_q` at `FsBytesGamma.fs_gamma_L
+    γfs` under the same `decide` guard; `ind_res`/`ind_res_q`/
+    `inode_blocks`/`inode_blocks_q`/`inode_map`/`inode_map_q` are the
+    unchanged wrappers, every `_1` equation is still `reflexivity`, and
+    `InodeInv.v` gained one `Require Import FsBytesGamma`.  **NOT ONE
+    STATEMENT IN THE FILE MOVED**, which is why the plan's risk list
+    (`SpecLogWrite`'s 16 `fsblock`, `BitmapInv`'s 9, `ProofBalloc`'s 5,
+    `ProofBmapParts`/`ProofReadiParts`) cost nothing at all: those files
+    reach the views only through lemmas, and the lemmas still speak
+    `fsblock`.
+  - **THE CROSSING IS FOUR LEMMAS, AND THAT IS THE WHOLE MECHANISM.**
+    `blk_res_run` / `blk_res_q_run` / `ind_blk_nz` / `ind_blk_q_nz` are
+    the `decide`-peel and `gamma_blk_owned`/`_q` in ONE rewrite, taking
+    the slot's nonzero-ness as premise.  They exist because the two heads
+    are convertible but BOTH `Typeclasses Opaque`, so `iExact`/`iFrame`
+    will not cross on its own — and because a bare `rewrite
+    gamma_blk_owned` after a `rewrite /blk_res` picks whichever
+    occurrence it meets first in `Δ` and is a coin flip.  Naming the
+    arguments is what makes the rewrite deterministic.  Every proof in
+    the tree that used to unfold a view and land on `fsblock` now goes
+    through one of the four: twelve uses inside `InodeInv` itself, three
+    in `ProofItruncParts`, five in `ProofBmap`.  `FsStateEra` keeps four
+    direct `gamma_blk_owned` rewrites, in `inode_owned_era_home_slot`
+    alone, because that lemma crosses to `FsBlocks.fsblock_home_open` and
+    not to a view.  FOUR FILES CHANGED IN TOTAL — `InodeInv`,
+    `FsStateEra`, `ProofBmap`, `ProofItruncParts` — plus two stale
+    comments in `FsBlocks`/`FsStateEra`.
+  - **THE ERA'S BRIDGES STOPPED CROSSING A VOCABULARY, AND THE PLAN WAS
+    WRONG ABOUT WHAT THAT BUYS.**  `inode_blocks_era`/`_q` lost their
+    `gamma_blk_owned`/`_q` step (the branch is `rewrite /fn_data Hbs //`)
+    and `ind_res_era`/`_q`'s nonzero branch is now `done` — those two are
+    the guard peel alone.  But `inode_dat_era_to`/`_of` and their callers
+    `inode_rd_era_era_node_to`/`_of` DID NOT die and could not: what they
+    carry is a change of GRANULARITY, the 268-slot `big_sepL` with `True`
+    holes against the `big_sepM` over `fn_blk n`, and that needs
+    `inode_local` to make the two index sets agree.  No re-basing of the
+    views can remove it; only re-basing `inode_blocks_q` itself on the
+    map would, and the plan's own KEEP list forbids that.  **Stage 3's
+    real deliverable is that the era side names no bridge at all any
+    more**, not that the bridges died.
+  - **NO `FsBytesGamma` LEMMA BECAME CALLER-LESS**, so none was retired.
+    `gamma_blk_owned_q`'s callers moved rather than vanished: the two in
+    `FsStateEra` are gone, and what is left is `InodeInv`'s three `_q`
+    crossings plus `FsCollect.col_blk`.  `gamma_blk_owned` keeps the
+    bitmap/superblock/collect family (`BitmapInv` 7, `FsCfgSnap` 2,
+    `FsCollectImg` 1, `FsCollectAll` 1, `FsCollect` 1, `InodeRegion` 1)
+    and four sites in `FsStateEra.inode_owned_era_home_slot`, which
+    crosses for a DIFFERENT reason — `FsBlocks.fsblock_home_open` is a
+    byte-invariant lemma in the concrete vocabulary.  Retiring the bridge
+    outright would mean restating `FsBlocks`' predicates over the view
+    record, i.e. moving `FsStateDefs` below `FsBlocks`; that is a
+    log-layer restructuring, not a stage of this campaign.
+  - **WHAT STAGES 4 AND 5 SHOULD KNOW.**  (a) `IcacheEscrow`'s
+    `ind_blk_timeless`/`blk_res_timeless` (odd home, unmoved) now resolve
+    through `blk_owned_timeless` + `fs_gamma_L_timeless`; that file
+    already imported `FsBytesGamma`, so nothing there moved and stage 4
+    inherits the seal list unchanged.  (b) Stage 5's collect side is the
+    only remaining `gamma_blk_owned_q` caller outside `InodeInv`
+    (`FsCollect.col_blk`), and `inode_blocks_of_slots`/`_of_blocks` are
+    still `fsblock`-facing on purpose — the image and the free pool are
+    genuinely in the concrete vocabulary.  (c) fs-state.md §2c-body's
+    "price the proper fix" is now half-paid: the four definitions have the
+    `blk_owned Γ` shape, so a Γ-generic restatement is an ARITY move on
+    four definitions (358 dependents) and no longer a change of shape.
+
+  **AS LANDED — EV4 (stage 4).  Whole tree green (zero `Error`,
+  `MAKEEXIT=0`), `tools/dethread_check.py` at "0 declarations out of
+  scope", and `iris/SystemAdequacy.v` / `iris/SystemAssumptions.v`
+  byte-identical to main.**
+
+  - **THE STAGE IS ONE DEFINITION: `IcacheEscrow.ic_inode_leg γfs dq γi
+    inum n` = `FsStateInode.ent_toks_x (fs_gamma_L γfs) (bv_unsigned inum)
+    n ∗ FsStateEra.inode_owned_era_q γfs dq γi inum n`** — everything a
+    slot holds of ONE inode, at a share.  The four bundles were ALREADY in
+    EV1's vocabulary through the era bundle (whose data leg has been
+    `inode_dat_q` since stage 2); what was missing was that the two pieces
+    the collection needs — the data leg and the entry TOKENS — were two
+    conjuncts in three arms and were spelled out flat a fourth time in
+    `ic_slot_cover`.  Naming them once is the whole of stage 4.
+  - **IT WENT IN `dlinks`' OWN CONJUNCT POSITION** (durable-notes,
+    "replacing one conjunct of a big payload"), absorbing the
+    `inode_owned_era` beside it, in `ic_loaded`, `ipool_alloc` and
+    `ic_rd_arm`.  `dlinks γfs (bv_unsigned inum) dn bm data` IS
+    `ent_toks_x _ (bv_unsigned inum) (era_node dn bm data)`, so no arm's
+    textual order moved and each lost exactly one conjunct.
+    `ic_inode_leg_era_open`/`_era_intro` are the two directions at the
+    era's `(dn, bm, data)` triple, `_open`/`_intro` at a bare node.
+  - **`ic_rd_held` NEEDED NOTHING.**  Its data leg is
+    `FsStateEra.inode_rd_era`, which stage 2 already restated as
+    `inode_dat_q` beside `top_frag_q`; the read arm keeps the entry tokens
+    on the ARM side (they are the Φ-free half and do not split), so there
+    is no pair to name there.  What stage 4 gave it instead is the leg's
+    own `ic_inode_leg_shed_to`/`_shed_of` and `ic_inode_leg_rd_agree`, so
+    `ic_loaded_shed` and `ic_rd_join` never open the leg at all.
+  - **THE THREE COLLECTION READINGS ARE THE POINT.**
+    `ic_inode_leg_phi_at` takes the leg at fraction 1 and ONE
+    `FsStateInode.rec_owned_at` to `inode_phi_at`;
+    `ic_inode_leg_ghost` is `FsStateInode.inode_ghost_of` with the leg
+    supplying the tokens and `inode_local`; `ic_inode_leg_owned` is the
+    two together at a superblock, yielding `FsStateInode.inode_owned`
+    outright.  `inode_phi_sb`'s `0 ≤ i < 2^32` premise is FREE there —
+    `bv_unsigned_in_range 32 inum` after `unfold bv_modulus`, `exact` (not
+    `lia`: `cbn` turns the bound into a literal and `lia` then treats
+    `2^32` as an opaque atom and reports "Cannot find witness" on what
+    looks like a reflexive inequality).  Each reading leaves the era's
+    residue — `dinode_at` and `top_frag` — which the collection consumes
+    neither of.  The premise `fn_ity_ok n v` is real and has a supplier:
+    `InodeRegion.ireg_reg_ok`, read off the same `ireg_lnk_at` peel that
+    produces the `link_auth`.
+  - **THE STATEMENTS THAT WERE FIXED STAYED FIXED.**
+    `ic_loaded_flat_body`, `ic_loaded_open`, `ic_loaded_flat` and
+    `ic_mk_loaded` are unchanged and are now bridges from the new body
+    (one `ic_inode_leg_era_open` in the open, one `_era_intro` in the
+    close).  **NOT ONE CONSUMER OF THE THREE MOVED** — the fifteen files
+    that `iDestruct (ic_loaded_open …)` or `iApply ic_loaded_flat` are
+    untouched — and neither did
+    `ic_unloaded`, `ipool_shape_np`, `ipool_ord`, `ic_loaded_shed` or
+    `ic_rd_join`.  THREE FILES CHANGED OUTSIDE `IcacheEscrow.v`, four
+    hunks in total: `IcacheBoot.ipool_shape_alloc` (the pool's
+    constructor), `FsCollectAll.ipool_shape_np_side` and
+    `ic_slot_cover_side` (the two `col_side` boundaries), and
+    `ProofIlock`'s fill — which is not an `ic_loaded` site at all: it
+    destructs the POOL's allocated arm flat, and gained one
+    `ic_inode_leg_era_open`.
+  - **`ic_slot_cover` LENDS THE LEG NOW**, as does
+    `ic_loaded_lend_owned`/`ic_rd_arm_lend_owned`: one conjunct where
+    there were two.  `FsCollect.col_side` was deliberately left spelling
+    the pair out — that is stage 5's file — so the boundary is exactly the
+    two `ic_inode_leg_open`s in `FsCollectAll`.
+  - **SEALED, AND THE SEAL'S `Timeless` PROOF MUST NAME ITS INSTANCES.**
+    `Local Typeclasses Opaque ic_inode_leg` makes it a fourth seal in the
+    file (beside `ic_rd_arm ic_rd_held`, `ic_out_rd`, `ic_lend`) and the
+    six existing `Timeless` instances over the arms all still close
+    through `tl_struct`.  **The new instance does not, and that cost 19.5
+    seconds on ONE sentence**: `tl_struct` falls through to a bare
+    `apply _` at a leaf, and at `Timeless (ent_toks_x Γ i n)` with the
+    node a VARIABLE nothing in the body reduces to cut the search short
+    even though a declared instance exists.  Measured, standalone, same
+    VM, against the base tree beside it: `IcacheEscrow.v` 23.7/24.0 s
+    base → 42.4/42.6 s with the search, → 23.8 s once the proof names
+    `FsStateInode.ent_toks_x_timeless` and
+    `FsStateEra.inode_owned_era_q_timeless` explicitly.  Peak RSS flat
+    (1.147 → 1.157 GB).  No other file's cost moved: every consumer
+    reaches the arms through lemmas whose statements did not change.
+  - **WHAT STAGE 5 CAN NOW TAKE OFF A SLOT, WITHOUT RE-ASSOCIATION.**
+    `FsCollectAll.ic_slot_cover_side`'s bundle arm hands out
+    `ic_inode_leg γfs dq γi inum n` beside `⌜node_dir_local⌝` and the
+    share condition `⌜~ ✓ (dq ⋅ dq)⌝`.  At `dq = DfracOwn 1` (the parked
+    and the pool-allocated arms) that leg plus `col_recs_by_inum`'s
+    `rec_owned_at` plus the region's `link_auth` is `inode_owned` by
+    `ic_inode_leg_owned` — one lemma, no unfolding — with `dinode_at` and
+    `top_frag` as the residue.  What stage 5 still owes is what EV1
+    already priced and stage 4 did not touch: peeling
+    `InodeRegion.ireg_lnk_at` (the multiplicity bridge
+    `FsCfgSnap.fn_mult_ireg` and the ROOT's unspendable `ireg_keep`), and
+    the READ arm's `dq = 3/4`, where the leg is short of a quarter and the
+    holder's `ic_rd_held` has it — `ic_inode_leg_shed_of` is the join, but
+    at a commit no read-locker is standing, so the quarter arrives through
+    the share condition and not through a resource.
+
+  **AS LANDED — EV5 (stage 5, and the stage-7 follow-on ANSWERED rather
+  than built).  Whole tree green (zero `Error`, `MAKEEXIT=0`),
+  `tools/dethread_check.py` at "0 declarations out of scope", and
+  `iris/SystemAdequacy.v` / `iris/SystemAssumptions.v` byte-identical to
+  main.**
+
+  - **(a) `FsCollect.col_side` IS `IcacheEscrow.ic_inode_leg`**, so the
+    two `ic_inode_leg_open`s EV4 left at the `FsCollectAll` boundary
+    (`ic_slot_cover_side`, `ipool_shape_np_side`) are gone and all three
+    suppliers hand the collection ONE predicate.  `FsCollect` pays a
+    `Require IcacheEscrow` for it — **five files on a 90-file cone, and
+    measured free**: two probe files carrying only the old and the new
+    Require lists compile in 1.08/1.09 s at 650/653 MB peak, twice each.
+    The file's LEAF claim is about the BOOT chain (`FsCfgBoot`,
+    `FsDurImg`), which stays out; the header says so now.
+    `ic_inode_leg`'s seal went `Local` → `Global`, because a
+    `Typeclasses Opaque` seal does not travel and `col_side` is a second
+    consumer.
+  - **THE SLOT'S HAND IS ONE STEP: `FsCollect.col_leg_bundle`** (with
+    `FsCollectAll.col_leg_bundle_z` at the cache's currency).  The leg
+    beside what the REGION kept — the record's `ireg_lnk` — yields
+    `col_bundle`, the `FsState.fs_links` element and the root's
+    `ireg_keep`, with both agreements (the map's node, the region's
+    record) inside.  `col_sides_bundles` is that step and nothing else.
+    `col_region_quiesce_acc`, the caller-less ACCESSOR twin, is DELETED:
+    the collection's conclusion is pure, so `pure_keep` hands the
+    invariants back and no closing wand has work to do.
+  - **(b) THE ASSEMBLY IS `FsCollectAll.col_hand_footprint`, AND ITS
+    TARGET IS `FsState.fs_footprint_q` — NOT `fs_state`.**
+    `fs_footprint_q Γ S` is `fs_footprint` with the inode column at a
+    share per inode (`∃ dq, ⌜¬ ✓ (dq ⋅ dq)⌝ ∗ inode_phi_q Γ dq (fss_sb S)
+    i n`: the record at fraction 1, region-side, beside `inode_dat_q Γ dq
+    n`).  The lemma is
+    `col_hand … ⊢ ⌜parse⌝ ∗ ⌜inode_local⌝ ∗ col_auth ∗ fs_links ∗ (∃ kv,
+    ireg_keep γfs ireg_root kv) ∗ fs_footprint_q (fs_gamma_L γfs)
+    (col_state …)`, and what it DROPS is named in its header:
+    `InodeRegion.dinode_at`, `FsState.top_frag_q` (at the bundle's
+    share), the region's proxy authority `ghost_map_auth γi 1 m` (spent
+    on the record agreement), and the pure rows a caller reads first.
+    New beside it: `FsStateInode.inode_phi_q` / `inode_phi_at_q` /
+    `inode_phi_sb_q` (EV1's family at a share; `inode_phi_q_1` and
+    `inode_phi_at_q_1` are `reflexivity`, both sealed) and
+    `FsState.fs_footprint_q_1`, the full-share reading that witnesses the
+    weakening is one.
+  - **`col_hand_mint` FACTORS THROUGH ONE RUNS CALL.**
+    `FsDurXfer.fs_footprint_q_runs` is `fs_footprint_runs`'
+    share-generic twin, over `inode_phi_q_runs`, `fs_inodes_phi_q_runs`
+    and the one-line `gamma_q_inode_dat` (`inode_dat (gamma_q Γ dq) n ⊣⊢
+    inode_dat_q Γ dq n`).  `FsCollect.col_bundle_dats`, `col_inode_runs`
+    and `col_bundles_lens` are DELETED — replaced by the three-line
+    `col_bundle_phi` — and `col_hand_mint` is now two pure readings that
+    keep the hand, the assembly step, that one runs call, and
+    `phi_runs_ex_disj`/`phi_runs_ex_in`: sixty lines shorter, with no run
+    arithmetic anywhere in the collection.
+  - **(c) `FsDurXfer.fs_state_xfer` DOES NOT GET A CALLER, AND THE
+    REASON IS A THEOREM ABOUT THIS KERNEL, not about the proof.**  The
+    plan's stage 5 asked for one; three lines of the tree refute it.
+    `IcacheEscrow.ic_rd_arm_lend_owned` lends `ic_inode_leg γfs (DfracOwn
+    (3/4)) γi inum n` at a READ-LOCKED inode (`IcacheEscrow.v:4032`), and
+    `FsStateEra.inode_owned_era_q` (`FsStateEra.v:1206`) carries
+    `FsState.top_frag_q Γ dq` at THAT SAME `dq`, while
+    `FsStateInode.inode_ghost` wants the whole element — so a read-locked
+    inum yields neither `inode_phi` nor `inode_ghost`, hence no
+    `inode_owned` and no `fs_state`.  And nothing at a commit refutes the
+    arm: the three windows the commit DOES refute each park a positive
+    share of `LogDefs.ln_tx` (`ic_out_no_write_arm`, `ic_pin_tx_no_ops`,
+    `ic_out_frz_no_ops`), and a read-locking `ilock` opens no transaction
+    — which is exactly why `ic_slot_cover`'s bundle alternative is stated
+    at a share at all.  This is lane H2's ruling re-derived at the
+    vocabulary the campaign built, and `fs_footprint_q` is the strongest
+    true form of what the plan asked for.  `fs_state_xfer`/`_tok` and
+    `fs_snap_alloc_xfer`/`P_dur_alloc_xfer` stay as they are: the
+    transport's live half is its ALLOCATION half, which takes no resource
+    at all.
+  - **(d) THE BOOT MINT CANNOT BECOME THE SAME TRANSPORT EITHER, and it
+    is not a matter of effort.**  `FsCfgSnap.fs_cfg_alloc_snap` has no
+    `fs_state` on EITHER side: its inputs are a byte function `Pb`,
+    `disk_bytes γv` and the PURE `snap_ok S D` (there is no source
+    instance anywhere on the boot side — `RiscvAdequacy`'s `Hproj` is a
+    pure projection), and its output is the era's whole configuration
+    (`ICFG`/`FSC` and the two kits), distributed into region, pool,
+    bitmap and `ftop_inv`.  "Identity on `fs_state`" is not a shape it
+    has.  Nor can the `snap_ok` premise be dropped here: the proof spends
+    `sk_bytes` (the decode bridge `snap_rec_decode`), `sk_local`,
+    `sk_own_used`/`sk_meta_used` (every peel of the boot ledger,
+    `snap_names_cov`), `sk_sbok`, `sk_regdom` and `sk_links`, and its
+    supplier at era 0 is the value-first allocation in `FsDurAlloc` /
+    `FsDurImg`.  WHAT REMAINS is therefore a BOOT-SIDE lane, not a stage
+    of this campaign: lane H5's reason (i) — the era's byte AUTHORITY is
+    minted at the WHOLE home map (`FsBoot.fs_boot_ghosts`, which the
+    WAL's `fs_bytes_inv` row demands), so its elements arrive as one flat
+    `∗` and have to be split by pure facts whatever the mint does — and
+    reason (ii), that the region wants WHOLE BLOCKS while `fs_state`
+    holds a record as a 64-byte run.
+  - **NOTHING GOT SLOWER, measured standalone on the same VM**
+    (`rocq compile`, wall and peak RSS): `FsStateInode` 4.96 → 5.00 s
+    (713 → 715 MB), `FsState` 8.38 → 8.44 s (1168 → 1166 MB),
+    `FsDurXfer` 4.81 → 5.18 s (718 → 722 MB, and the +0.37 s is the four
+    new lemmas), `FsCollect` 7.76 s and `FsCollectAll` 6.14 s after (the
+    base pair could not be timed in place — recompiling the base
+    `FsStateInode.vo` makes every sibling `.vo` inconsistent — and the
+    import they gained is the probe measured above, 0.01 s).  Every one
+    is an order of magnitude under the five-minute red flag.
+- [ ] **EV-X — `fs_state` is share-aware, and the transport is real**
+  (owner ruling, 2026-08-28, after EV5's wall): `fs_state` takes a
+  `dfrac`; the transport reads
+  `fs_state Γ (DfracOwn q) S ==∗ ∃ Γ', fs_state Γ (DfracOwn q) S ∗ fs_state Γ' (DfracOwn 1) S`
+  for every `q > 1/2`.  The `q > 1/2` premise is the whole point: it is
+  what makes "the mint meets the same block twice" a contradiction from
+  OWNERSHIP (two shares of one block summing past 1), so the new era's
+  `gmap_auth` is allocated without any pure disjointness fact.  The commit
+  collects each inode at 1 or ¾ (EV5's `fs_footprint_q`), so it hands the
+  transport `fs_state Γ (DfracOwn ¾) S` (splitting the whole ones); the
+  transport is the mint's caller and `fs_state_mint_runs` retires there.
+
+  **AS LANDED — EV-X.  Whole tree green (zero `Error`, `MAKEEXIT=0`),
+  `tools/dethread_check.py` at "0 declarations out of scope", and
+  `iris/SystemAdequacy.v` / `iris/SystemAssumptions.v` byte-identical to
+  main.  Three commits; the first two are the ruling verbatim, the third
+  is as far as the collection can go without becoming an accessor.**
+
+  - **(1) `fs_state Γ dq S`, AND IT COSTS ONE DEFINITION.**  Every BYTE of
+    a file system rides at `dq`; the Φ-FREE column — `link_auth`, the type
+    register, a directory's `ent_toks_x`, i.e. `FsStateInode.inode_ghost`
+    — stays WHOLE.  The predicate is written at
+    `FsStateDefs.gamma_q Γ dq`, the constant-share view whose `fsΦ`
+    discards the dfrac it is handed (moved down from `FsDurXfer`, where
+    lane H4 introduced it, with `gamma_q_byte_range`/`gamma_q_blk_owned`;
+    its inode readings `gamma_q_ind_owned`/`gamma_q_inode_dat`/
+    `gamma_q_inode_phi`/`gamma_q_inode_ghost`/`gamma_q_rec_owned` are in
+    `FsStateInode`).  **`gamma_q_inode_ghost` IS `reflexivity`** —
+    `gamma_q` copies `γlink` and `γtop` — and that one line is the whole
+    content of "the byte legs take the share, the authorities stay whole".
+    `fs_state Γ (DfracOwn 1) S` is the old predicate by `reflexivity` too
+    (`fs_state_1`, `fs_footprint_1`), so the SEVEN consumers moved by a
+    sweep; `fs_state_gq`/`fs_footprint_gq` are the other direction
+    (`gamma_q` is idempotent in its second argument), which is what lets
+    every Γ-generic lemma be read at a share with no new proof.  New
+    beside them: `FsStateDefs.view_shed` and the shed chain
+    (`byte_range_shed`, `blk_owned_shed`, `ind_owned_shed`,
+    `inode_phi_shed`, `free_pool_shed`, `fs_footprint_shed`,
+    `gamma_shed_34`) — ONE DIRECTION ONLY, because a free pool row hides
+    its bytes under an existential and two halves cannot be rejoined
+    without an agreement law; and `rec_owned_q`/`rec_owned_at_q` with
+    `rec_owned_at_shed_to`, since a record now rides at the uniform share
+    too.  RETIRED, all caller-less and superseded by the transport:
+    `FsState.fs_view`, `fs_view_timeless`, `fs_state_mint`,
+    `fs_view_mint`.
+  - **(2) THE TRANSPORT AT `q > 1/2`, AND THE PREMISE IS THE PROOF.**
+    `FsDurXfer.fs_state_xfer`/`_tok` read
+    `(1/2 < q) -> A -∗ fs_state Γ (DfracOwn q) S ==∗ A ∗ fs_state Γ (DfracOwn q) S ∗ fs_state Γ' (DfracOwn 1) S`.
+    `dfrac_own_gt_half` into `phi_runs_q_disj` over `phi_excl` refutes
+    "the mint meets the same block twice" from OWNERSHIP; nothing pure
+    about the state is materialised on the way.  What makes the statement
+    TRUE is that the share stops at `fs_state_split`: `fs_ghost` is
+    Φ-free, so `fs_links_valid_tok` reads the family's slacked validity
+    off a source held at any `q` and the fresh family is one `own_alloc`
+    at the source's own element.  Two new steps, both two rewrites:
+    `fs_footprint_runs_q` / `fs_footprint_of_runs_q`.  The full-ownership
+    transport is the instance at `q = 1` (`qp_half_lt_1`); nothing was
+    duplicated and nothing retired.
+  - **(3) THE COLLECTION YIELDS `fs_state … (DfracOwn ¾)`, AND EV5's WALL
+    IS GONE.**  EV5's finding was about the FRACTION-1 predicate ("¾
+    cannot be promoted"); with the dfrac in the predicate the question is
+    "is there ONE share every arm can supply", and there is.
+    `IcacheEscrow.ic_slot_cover`'s bundle alternative is now stated AT ¾
+    with no existential share and no `~ ✓ (dq ⋅ dq)` row — the unlocked
+    arm sheds its quarter into `ic_lend`'s own frame
+    (`ic_inode_leg_shed_to` out, `_shed_of` back, six lines in
+    `ic_escrow_body_cover`), the read arm already had it.  `col_side` and
+    `col_bundle` follow; the pool's row (`ipool_shape_np_side`), the
+    region's free bundle (`col_region_quiesce_take`) and
+    `col_bundle_of_owned`/`col_bundle_free` shed and DROP the quarter
+    (the collection is destructive, so nothing has to be given back).
+    `col_bundle_phi` sheds the REGION's record — records park region-side
+    at fraction 1 and that does not change; what changes is that the
+    collection takes ¾ of one.  `col_hand_footprint` sheds block 1, the
+    bitmap block and the free pool the same way and its target is
+    `fs_footprint (fs_gamma_L γfs) (DfracOwn (3/4)) (col_state …)`; the
+    new **`FsCollectAll.col_hand_state`** adds the Φ-free half off
+    `col_hand`'s own `fs_links` leg and is
+    `col_hand ⊢ col_auth ∗ (∃ kv, ireg_keep γfs ireg_root kv) ∗ fs_state
+    (fs_gamma_L γfs) (DfracOwn (3/4)) (col_state …)`.  It is not a
+    standing exhibit: `col_hand_mint` goes THROUGH it now
+    (`fs_state_to` supplies the parse, the local clauses and `fs_geom`),
+    so `col_fs_geom`'s and `col_hand_footprint`'s only caller is
+    `col_hand_state`.
+  - **DELETED with it, all caller-less once the source is uniform:**
+    `FsState.fs_footprint_q`/`fs_footprint_q_1`,
+    `FsStateInode.inode_phi_q`/`inode_phi_at_q`/`inode_phi_q_1`/
+    `inode_phi_at_q_1`/`inode_phi_sb_q` and their two `Timeless`
+    instances, and `FsDurXfer`'s whole per-run share vocabulary —
+    `phi_runs_ex` with `_at`/`_full`/`_app`/`_cons`/`_concat`/`_disj`/
+    `_in`, `gamma_q_1_runs`, `inode_phi_q_runs`, `fs_inodes_phi_q_runs`,
+    `fs_footprint_q_runs`.  `xqrun`/`xq_at`/`xq_ok`/`xq_strip`/
+    `phi_runs_q`/`phi_runs_q_disj`/`phi_runs_q_in` SURVIVE: they are what
+    the transport reads.
+  - **THE WALL, AND IT IS NOT ABOUT SHARES** (SUPERSEDED by EV-Y below,
+    which turned the collection around; the diagnosis was right about the
+    shape and wrong about "no accessor can do both").  The ruling's third item —
+    "the transport is the mint's caller" — is NOT landed, and the reason
+    is a theorem about the collection, not about the proof.  A transport
+    at `q > 1/2` takes MORE THAN HALF of every byte, so a collection that
+    feeds it cannot also keep the invariants' bodies: it has to be an
+    ACCESSOR and take its source back out of the transport (which returns
+    it unchanged).  `FsCollectAll.col_bodies_mint` is destructive by
+    construction — that is exactly what `pure_keep` buys, and it is sound
+    only because the conclusion is PURE — and three of its steps drop
+    resource irreversibly: `big_sepS_union_weak`
+    (`FsCollectAll.v:131`) at the pool/marker/live partition, which
+    `IcacheEscrow.ipool_quiesce_acc` (`IcacheEscrow.v:5693`) states as
+    `region_inums nib = O ∪ X ∪ ic_live_inums ids` and does NOT make
+    disjoint; `col_keeps_root`, which drops every non-root keep-alive
+    fragment; and `col_hand_footprint`, which drops the era's residue
+    (`dinode_at`, `top_frag_q`, the region's proxy authority).  Nor can
+    the fupd be routed around it: `R ⊢ |==> P_dur D ∗ R` is not derivable
+    from a destructive `R ⊢ fs_state Γ ¾ S ∗ True` plus the transport,
+    and `bupd_plainly` only recovers PURE conclusions — which is the
+    route already taken.  So `fs_state_xfer`/`_tok` and
+    `fs_snap_alloc_xfer`/`P_dur_alloc_xfer` are still caller-less, and
+    `snap_mint`'s `sm_runs` still carries the pure `xr_disj`.  **What the
+    next lane needs is `col_bodies_mint` as an accessor**, which means (a)
+    a disjointness row on `ipool_quiesce_acc`'s partition, (b) closing
+    wands for the keep-alive column and the era residue, and (c) the
+    `NoDup` form of `big_sepS_of_list` — after which `col_hand_state` is
+    already the source and `fs_state_xfer` is already the caller.
+  - **THE BOOT SIDE, unchanged and reported as asked.**  For
+    `FsCfgSnap.fs_cfg_alloc_snap` to call the same transport it would need
+    an `fs_state` on its INPUT side, and there is none: its inputs are a
+    byte function `Pb`, `disk_bytes γv` and the PURE `snap_ok S D`, and
+    `RiscvAdequacy`'s `Hproj` is a pure projection, so no era-0 or
+    post-crash resource can be lent to it.  The dfrac does not help there:
+    the obstacle is provenance (lane H5's reason (i) — the era's byte
+    AUTHORITY is minted at the WHOLE home map, so its elements arrive as
+    one flat `∗`) and geometry (reason (ii) — the region wants WHOLE
+    BLOCKS while `fs_state` holds a record as a 64-byte run).  What the
+    boot side WOULD need to call `fs_state_xfer` is a source instance at
+    the SNAPSHOT's names, i.e. `P_dur` lent as a resource rather than
+    projected as a fact — a change to `RiscvAdequacy`'s boot fupd, not to
+    this predicate.
+  - **COSTS.**  No proof grew a typeclass search: the sheds are three-line
+    inductions, the transport's new steps are rewrites, and the one new
+    instance (`GTimeless (gamma_q Γ dq)`) fires only at that head.
+    Measured standalone on the VM after the landing (wall / peak RSS):
+    `FsStateDefs` 1.67 s / 0.66 GB, `FsStateInode` 5.21 s / 0.73 GB,
+    `FsState` 8.66 s / 1.23 GB, `FsDurXfer` 4.74 s / 0.71 GB,
+    `FsCollect` 7.77 s / 1.12 GB, `FsCollectAll` 6.27 s / 0.79 GB,
+    `IcacheEscrow` 23.91 s / 1.15 GB -- every one an order of magnitude
+    under the five-minute red flag, and within noise of EV5's figures for
+    the three files it measured (`FsStateInode` 5.00 s, `FsState` 8.44 s,
+    `FsDurXfer` 5.18 s, `FsCollect` 7.76 s, `FsCollectAll` 6.14 s,
+    `IcacheEscrow` 23.8 s).
+  - **LEFTOVERS FOR A CLEANUP LANE (not touched here, to keep the share
+    sweep mechanical).**  `FsCollect` still carries the pure-carve support
+    that EV5's deletion of `col_snap_bytes` orphaned, all caller-less:
+    `col_bundles_disj` (which MATERIALISES cross-inode block disjointness
+    as a pure fact -- exactly what the ruling wants gone),
+    `col_bundles_used`, `col_bundles_blk`, `col_bundles_ind`,
+    `col_bundles_slot`, `col_bundles_not_meta`, `col_meta_used`,
+    `col_rec_tie`, `col_auth_pure`, `col_view_len`, `col_pool_dom`, and
+    the per-bundle readings only they use (`col_bundle_owns`,
+    `col_bundle_slot`, `col_bundle_data`, `col_bundle_ind`).  Their share
+    was fixed mechanically (a `pose (dq := DfracOwn (3/4))` at each
+    destructuring) rather than deleted; deleting them is a two-hunk
+    change once someone confirms nothing off-tree names them.
+  **AS LANDED — EV-Y.  Whole tree green (zero `Error`, `MAKEEXIT=0`),
+  `tools/dethread_check.py` at "0 declarations out of scope", and
+  `iris/SystemAdequacy.v` / `iris/SystemAssumptions.v` byte-identical to
+  main.  Three commits.  THE RULING'S THIRD ITEM IS LANDED: the commit
+  COLLECTS `fs_state (fs_gamma_L γfs) (DfracOwn (3/4)) S` out of the
+  invariants and hands it to `FsDurXfer.fs_state_xfer_tok`, which returns
+  it; nothing pure about the state is materialised anywhere on that path.
+  `IcacheEscrow.v` is NOT touched.**
+
+  - **(1) THE PARTITION IS DISJOINT, FROM SEPARATION LOGIC.**
+    `IcacheEscrow.ipool_quiesce_acc` states its three index sets as a
+    UNION and nothing pure says they do not overlap.  They do not: two
+    `col_side`s at one inum are two owners of one exclusive `ghost_map`
+    element, and the witness that decides which is the REGION's own slot
+    (`FsCollect.col_side_slot_excl` — a bundle arm carries
+    `InodeRegion.dinode_at` at FULL fraction, a marker arm carries
+    `imark` at the mirrored key, so the two arms do not refute each
+    OTHER and `col_region_slot_acc` supplies the third party).
+    `FsCollectAll.col_sidez_disj` is that over a set, and the collection
+    now joins its three columns with the EXACT `big_sepS_union`;
+    `big_sepS_union_weak` is deleted.  **DELETED with it**, all
+    caller-less since lane H4 dropped `col_snap_bytes`:
+    `FsCollect.col_bundles_disj` (which MATERIALISED cross-inode block
+    disjointness as a pure fact), `col_bundles_used`, `col_bundles_blk`,
+    `col_bundles_ind`, `col_bundles_slot`, `col_bundles_not_meta`,
+    `col_meta_used`, `col_rec_tie`, `col_auth_pure`, `col_view_len`,
+    `col_pool_dom`, `col_bundle_owns`, `col_bundle_slot`,
+    `col_bundle_data`, `col_bundle_ind`, `col_recs_blk`,
+    `col_used_of_blk`, `col_blk_full`; and `FsDurXfer`'s `xq_ok_app`,
+    `xq_strip_app`, `phi_runs_q_app`, `phi_runs_q_nil`.
+  - **(2) THE COLLECTION IS AN ACCESSOR.**  `FsCollectAll.col_bodies_acc`
+    yields the transport's source beside a closing wand that rebuilds
+    every one of the six invariant bodies.  What it took, in order:
+    * **A SUPPLIER'S ROW WITH ITS OWN WAY BACK.** `FsCollect.col_row`
+      (`col_row_side`, `col_row_mark`, `col_row_frame`, `col_row_mono`) is
+      the accessor form of `col_side`, in `IcacheEscrow.ic_lend`'s shape.
+      It is parameterised by the ROW and not by `col_side`, because the
+      marker supplier cannot be closed from a disjunction that has
+      forgotten which arm it is.  The three suppliers are
+      `FsCollectAll.ipool_shape_np_row`/`ipool_ord_row`/`ipool_rows_rows`,
+      `imarks_rows` and `ic_cover_row`.
+    * **THE DOOR HANDS `ireg_lnk` OUT BESIDE THE BUNDLE.**  EV stage 5
+      recorded that no accessor could, `InodeRegion.ireg_lnk` being a
+      conjunct of the very slot the marker arm's reading consumes.  It
+      can — the pair comes out of ONE destructuring
+      (`col_region_slot_lnk_acc`, `col_free_slot_lnk_acc`,
+      `col_row_slot_acc`).  `col_link_of_acc` and `col_leg_bundle_acc`
+      are the reversible packs; the root's keep-alive value is pinned by
+      `FsStateLink.link_auth_tok_agree`, so the wand takes any `kv`.
+    * **THE COLUMNS MERGE AND RE-SPLIT EXACTLY.**  `col_got` is the
+      per-inum output, SELF-DESCRIBING so the wand can match it (the node
+      pinned by the abstract map, the keep-alive under its own
+      existential).  `col_row_got`/`col_rows_got_acc` serve the pool and
+      the corpse ledger; `esc_covers_got_acc` serves the fifty slots and
+      REFUTES the duplicate inum inside its own induction, so no `NoDup`
+      side condition is carried anywhere.  A cover is a body
+      (`ic_slot_cover_body`) — `ic_lend` already carries the way back.
+    * **NOTHING IS DROPPED AT THE FOOTPRINT.**
+      `col_hand_footprint_acc`/`col_hand_state_acc` keep `dinode_at`,
+      `top_frag_q`, the region's proxy authority and the quarter each
+      metadata object sheds.  Three of the four rejoin by an `⊣⊢`
+      (`blk_owned_split_34`, `rec_owned_at_split_34`); the FREE POOL
+      needs an agreement, because its rows hide their bytes under an
+      existential, and the agreement is the byte authority the collection
+      holds anyway (`col_free_pool_join`, `col_pool_join_list`,
+      `blk_owned_join_34`).  The records and the region's slots cross
+      back with no choice to make, the per-block `ds` being determined by
+      `m` (`col_recs_pure`, `col_recs_of_inum`, `ireg_blks_collect_of`,
+      `nested_of_set`, `big_sepS_of_list_nodup`,
+      `big_sepL_seq_of_list_of`).
+  - **(3) THE CALLER.**  `FsDurSnap.P_dur_alloc_xfer` over
+    `fs_state_xfer_tok`, and `FsCollectAll.fs_collect_dur` (which REPLACES
+    `fs_collect_mint`) runs it between the opening and the closing;
+    `fs_snap_law_build` is unchanged apart from the call.  **RETIRED with
+    it**: `pure_keep`/`pure_keep_wand` and the whole destructive chain
+    (`col_bodies_mint`, `col_hand_mint`, `col_hand_state`,
+    `col_hand_footprint`, `ipool_ord_side`, `ipool_rows_side`,
+    `imarks_side`, `col_region_quiesce_take_z`, `col_leg_bundle_z`,
+    `col_sides_bundles`, `col_keeps_root`, `col_region_quiesce_take`,
+    `col_region_slot_take`, `col_leg_bundle`, `col_link_of`,
+    `col_bundle_phi`), and the READINGS-ONLY MINT: `FsDurSnap.snap_mint`
+    (with `sm_runs`, the pure `xr_disj` the ruling wanted gone),
+    `fs_snap_alloc_mint`, `P_dur_alloc_mint` and
+    `FsDurXfer.fs_state_mint_runs`.  `fs_footprint_mint` stays —
+    `fs_footprint_xfer` is its caller — and era 0's image keeps the
+    value-first allocator, so `snap_ok` is handed IN nowhere else.
+  - **WHAT STILL CROSSES THE BOUNDARY AS A PURE FACT, and neither is
+    about disjointness**: `FsDurSnap.snap_shape` (the ONE clause no
+    resource pins — an authority may hold entries no fragment names) and
+    "the source's byte map is inside the committed view's flattening"
+    (`col_auth_dbytes`), which is where the epoch's IDENTITY comes from.
+  - **THE BOOT SIDE IS UNCHANGED**, and EV-X's reading of it stands: for
+    `FsCfgSnap.fs_cfg_alloc_snap` to call the same transport it would need
+    an `fs_state` on its INPUT side, and `RiscvAdequacy`'s `Hproj` is a
+    pure projection.  That is a change to the boot fupd, not to this
+    predicate.
+  - **COSTS.**  Measured standalone on the VM after the landing (wall /
+    peak RSS): `FsDurXfer` 4.71 s / 0.68 GB, `FsDurSnap` 4.26 s / 0.66 GB,
+    `FsCollect` 8.21 s / 0.73 GB, `FsCollectAll` 13.35 s / 0.89 GB,
+    `IcacheEscrow` 25.25 s / 1.10 GB.  `FsCollectAll` roughly doubled
+    (6.27 s at EV-X): the accessor's inductions carry a wand at every
+    step.  Every file is two orders of magnitude under the five-minute
+    red flag and no proof grew a typeclass search.
+
+- [x] **Rank 5 — one uniform per-inum transaction pin** (absorbs `DepTx`'s
   and `DepFrz`'s `(t,q)`, `ic_pin_*`, `ireg_cpin`/`ireg_fpin`, the transit
-  ledger, `CrpPre`; ten `_no_ops` → one): AWAITING RULING; independent
-  of the others.
-- [ ] Ranks 6/7 (`frzown`; `icnt` into the reference columns): probe-gated,
-  last.
+  ledger, `CrpPre`; ten `_no_ops` → one): APPROVED (owner, 2026-08-27),
+  ran AFTER EV.  **DONE** at R5a (stages 0–4) + R5b (stage 5).  FINAL METER:
+  the tree's eleven refutation sites go through ONE core fact and its three
+  forms (`TxPin.tx_pin_no_ops` / `tx_pin_o_no_ops` / `tx_pins_no_ops`); five
+  named per-park wrappers deleted, five kept because they say strictly more
+  than the pin.
+  - **Rank 5 — as landed (R5a, stages 0–4).**  **THE PER-INUM SINGLE PIN
+    IS REFUTED**, and the counterexamples are machine-visible in the tree:
+    two pins stand at ONE inum at ONE moment three times over —
+    `ProofCreateFreshTy.v:246–248/307/319` takes and returns BOTH the
+    child's `DepTx` share and the claim box's `ireg_cpin` at the same
+    transaction; `EscrowDeposit.v:157` returns `ireg_fpin rg` and the
+    transit ledger's share in ONE postcondition; iput's +0x70..+0x8a
+    window has the slot pin and the f column up together.  A single-valued
+    per-inum ghost map cannot hold two pins at one key, and a multi-valued
+    one would re-create the re-identification problem the seven existing
+    devices already solve.  Three of the eight parks are not inum-keyed at
+    all (`ic_dep_side`/`ic_out_frz`/`ic_pin_tx` are keyed by SLOT,
+    `ireg_parked` by a fresh ARM ID), and `fs-ghost-state.md` §5a′ already
+    argues inum-keying the registry is impossible.
+  - **WHAT UNIFIED INSTEAD: the ATOM and two combinators, in the new leaf
+    `iris/TxPin.v` (cone 0).**  `tx_pin γ t q` (= `t ↪[ln_tx γ]{#q} tt`),
+    `tx_pin_o γ (o : option (nat * Qp))` for a column or descriptor that
+    may be empty, `tx_pins γ (M : gmap K (nat * Qp))` for a ledger, plus
+    `tx_pin_no_ops` / `tx_pin_o_no_ops` / `tx_pins_no_ops`, three explicit
+    `Timeless` instances, `tx_pin_split` / `tx_pin_join_q` restated from
+    `LogInv`, and `tx_pin_elem` (the bridge to the raw element).  The file
+    is **γ-parametric, never `icfg_log`-ambient** — it has no `icfg` in
+    scope — and **not `Typeclasses Opaque`**: seven downstream `Timeless`
+    instances are one-line `apply _`/`tl_struct` and `ic_dep_side_of_tx`
+    is a Leibniz equality between propositions closed by `reflexivity`.
+  - **The eight parks now read as instances.**  `IcacheEscrow`:
+    `ic_dep_own`'s `DepTx` arm and `ic_dep_side` (which IS
+    `tx_pin_o icfg_log (ic_dep_side_tx d)` since the projection was hoisted
+    here from `SpecIunlockput`), `ic_out_frz`'s last conjunct, `ic_pin_tx`,
+    `ipool_transit` (= `tx_pins icfg_log`), `crp_row`'s `CrpPre`.
+    `InodeRegion`: `ireg_fpin`, `ireg_parked`, and `ireg_cpin` through a new
+    PURE projection `cty_pin : ctyUR -> option (nat * Qp)`.  Nine copies of
+    the `ghost_map_lookup` / `lookup_empty` / `discriminate` idiom, plus
+    `ireg_clean_acc`'s unnamed tenth (the armed registry IS a `tx_pins`
+    ledger at `fst <$> A`), collapse to three.  `ipool_corpse_no_ops` keeps
+    its `map_ind` (its conclusion is `map_Forall (= CrpDep)`, not `= ∅`),
+    and `ireg_cpin_no_ops` / `ireg_fsh_no_ops` keep their statements AND
+    their pure premises — `ireg_claim_ok` / `ireg_frz_ok` are what kill the
+    `ExclBot` arm, which the pin says nothing about.
+  - **The seven re-identification devices all stay** (`hpn_h`, `ic_deposit`,
+    `iclaim`, `ifreeze_pre`/`_post`, `ipool_tkey`, `crp_elem`,
+    `ireg_armed`): each solves a different problem and none is deletable.
+    `Xv6Cameras.v` was NOT touched — a `txidx := (nat * Qp)` unification
+    there is cone 897 for zero proof content.
+  - **Statements: only one contract's home moved.**  `ic_dep_side_tx` and
+    `ic_dep_side_of_tx` now live in `IcacheEscrow`; the latter is restated
+    as `ic_dep_side d = tx_pin icfg_log t q`.  `SpecIunlockput`'s two
+    contracts keep `ic_dep_side_tx d = Some (tid, qtx)` verbatim.  All
+    twelve `rewrite /ic_dep_side` sites outside the file closed unchanged;
+    the one line the move cost is `ProofIunlockput`'s return leg, which
+    takes an `iEval (rewrite -tx_pin_elem)` before folding the descriptor
+    back in (iput's post hands the element back RAW).
+  - **NOTHING GOT SLOWER** (`rocq compile`, same VM, `.lia.cache` cleared):
+    `IcacheEscrow` 24.98 → 23.74 s (1148 → 1148 MB), `InodeRegion`
+    20.12 → 17.71 s (1109 → 1113 MB), `TxPin` 1.0 s.  Whole tree green at
+    every stage; `SystemAdequacy.v`/`SystemAssumptions.v` byte-identical.
+  - **Rank 5 — as landed (R5b, stage 5: THE COLLAPSE).**  The five wrappers
+    whose body had become a single generic call are DELETED and their
+    consumers call the form in place, all inside `IcacheEscrow.v`:
+    `ic_pin_tx_no_ops`, `ic_dep_own_tx_no_ops` and `ic_out_frz_no_ops` at
+    `ic_escrow_body_cover`'s four refuted arms (the mid-free park and the
+    held arm open `ic_pin_tx`'s existential, the write arm and the frozen
+    alternative take the share out of the descriptor's conjuncts, then
+    `tx_pin_no_ops`); `crp_row_no_ops` inside `ipool_corpse_no_ops`, where
+    the `map_ind`'s step now does `destruct v` itself; `ipool_transit_no_ops`
+    at `ipool_quiesce_acc`, which calls `tx_pins_no_ops` on the ledger
+    directly (`ipool_transit` IS a `tx_pins`, so unification unfolds it).
+    KEPT, because each says strictly more than the pin: `ipool_corpse_no_ops`
+    (`map_Forall (= CrpDep)`, not `= ∅`), `ireg_cpin_no_ops` / `ireg_fsh_no_ops`
+    (their pure premises kill the `ExclBot` arm), `col_claim_box_no_ops` /
+    `col_corpse_no_ops`.  No statement changed; the prose mentions of the
+    dead names were retouched in `IcacheEscrow.v`, `InodeRegion.v`,
+    `ProofIput.v` and `fs-ghost-state.md` §2c/§2b/§5a/§5b.  LEFTOVER:
+    `FsCollect.v:108`'s banner still names `ipool_transit_no_ops` in prose —
+    that file was off-limits to this lane (concurrent EV work), and it is a
+    comment, not a reference.
+- [x] **Small leftovers** (APPROVED, one lane after rank 5): four of the
+  five landed; iput's double-parked window is RULED NOT REDUNDANT and
+  nothing was done to it.  NOT the five off-build pinned-`/init` files —
+  owner: do nothing about them.
+
+  **AS LANDED — L1.  Whole tree green at each of the four commits (zero
+  `Error`, `MAKEEXIT=0`); `SystemAdequacy.v` / `SystemAssumptions.v`
+  byte-identical to main — no deletion was in the audited theorem's
+  cone.**
+
+  - **DEAD CODE.**  `FsDurBytes.fs_dbytes_dom`, `fs_dbytes_union` and
+    `dbytes_ok_insert_2` (the union's only consumer) are gone, and so is
+    `FsStateInode.inode_link_tok_nz` with its now-empty section banner.  No
+    cascade: `dbytes_ok_head`, `fs_dbytes_insert`,
+    `FsStateLink.link_auth_zero_no_tok` and `fn_mult_zero` all keep other
+    consumers.
+  - **THE BOOT POINT'S TWO DEAD ENTRY POINTS**, plus what only they
+    supported: `FsDurImg.img_fs_snap_alloc`, `img_boot_P_fs_dur` (with the
+    now-empty `DurImgSnap` section) and `FsCrash.P_fs_alloc_clean`.
+    `SystemAdequacy` mints era 0 through `P_fs_alloc` off
+    `img_P_dur_alloc`, which is the whole live route.  `FsDurAlloc.
+    fs_snap_alloc` STAYS — it is `P_dur_alloc`'s own step, not a second
+    entry point.
+  - **ONE INSTALLATION STEP.**  `ProofEndOp.eo_minst` was
+    `LogDefs.lm_install` at `Ws = map uint W` with its three readings
+    re-proved by induction; the fixpoint and the inductions are gone.  The
+    commit tail names `lm_install` directly and `eo_install_miss` / `_hdr` /
+    `_hit` are three short derivations of `lm_install_miss` / `_hdr` /
+    `_hit` in the tail's vocabulary (a WORD write set whose
+    duplicate-freedom is a `NoDup`, not the injectivity `lm_install_hit`
+    takes).  No published contract moved — all three are local to
+    `ProofEndOp` — and the file still compiles in 42 s.
+  - **IPUT'S TWO PARKS ARE NOT ONE PARK, and the reason is that they
+    refute DISJOINT windows.**  `IcacheEscrow.ic_pin_tx k` (slot-keyed,
+    re-identified by the `hpn_h` half the walk holds) sits in
+    `ic_payload_arm`'s FROZEN alternative and refutes the MID-FREE PARK,
+    +0x70..+0x8a, inside `ic_escrow_body_cover`.
+    `InodeRegion.ireg_fpin rg` (inum-keyed, re-identified by the freeze
+    INDEX `rg` the `ifreeze_pre`/`_post` fragment already carries) sits in
+    `ireg_fsh (FrzPre/FrzPost rg)` and refutes the CORPSE — the marked slot
+    from the +0x8a eviction to the +0xba deposit, at which the inum has no
+    bundle anywhere — inside `ireg_fsh_no_ops` / `FsCollect.
+    col_corpse_no_ops`.  The two parks overlap in TIME (the region's runs
+    from the +0x50 mint to the +0xba deposit, so it contains the escrow's)
+    and cover different HOLES: at +0x8a..+0xba the escrow has no arm at
+    all, and at +0x70..+0x8a the escrow's arm is what the per-slot cover
+    walks.  Neither refutation reaches the other's window.
+    WHAT A REMOVAL WOULD COST, measured: both cover lemmas take exactly one
+    resource besides their own body — `ghost_map_auth (ln_tx icfg_log) 1 ∅`
+    — so an arm can only be refuted from its own conjuncts.  Dropping the
+    escrow's copy means `ic_escrow_body_cover` / `_all` (lane C's entry)
+    must additionally take the region's f-column verdict AT THE ARM'S INUM,
+    which `ic_parked` binds existentially: the premise has to be the whole
+    `∀ inum` region verdict, hoisted above the fifty-slot cover, which is a
+    statement change on both cover lemmas AND an ordering coupling between
+    two invariant walks that are independent today (`ic_escrow_ns_disjoint`
+    is what lets all fifty be held open at one ghost step).  Dropping the
+    region's copy instead leaves the corpse un-refutable outright.  So this
+    is the brief's "contract change or re-identification redesign" case and
+    nothing was done.
+  - **PROSE.**  `fs-state.md` §4½–§4⁹ (1132 lines of superseded rulings and
+    their as-built reports) is ONE paragraph saying the durable instance is
+    a snapshot and pointing at `durable-fs-plan.md`; the same for
+    `crash.md`'s `P_disk`/`P_wf` narrative, whose split-predicate ruling
+    above it now states today's shape instead of `P_wf` / `fs_durable_wf` /
+    `end_op`'s vanished FS-facing premise.  Trimmed on the way past, same
+    reason: `fs-state.md` §4's debt paragraphs (`Dbt`, `fs_dstep_rebase`)
+    and §7's "3a: `P_wf`'s body".  `README.md` and the plan's header drop
+    their pointers to the retired sections; the archive carries one banner.
+  - **LEFTOVER FOR WHOEVER PASSES NEXT.**  `fs-state.md` §5's Ψ/debt half
+    (`log_psi_step`, `log_psi_commit`, `fs_dstep`, `log_ctx_at Ψ`) is the
+    same kind of drift and was out of this lane's brief: `log_ctx` carries
+    no Ψ today and none of those names exists in the tree.
+- [ ] Ranks 6/7 (`frzown`; `icnt` into the reference columns): read-only
+  probes AFTER the leftovers land, then lanes only if the probes pay.
+- [ ] **Rank 4 — the `dview`/`fview` ghosts and the pinned-lookup island**:
+  PARKED (owner: leave for now; the fs-syscall-specs port decides).
 
 ## Sizing notes for whoever runs the lanes
 

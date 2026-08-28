@@ -119,18 +119,14 @@ Section ProofSysExit.
   Lemma wp_sys_exit_sconf
       (γft γf γw : gname)
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (ip : mword 64) (dqi : dfrac)
-      (γkl : gname) (γka : gname * gname)
-      (bmapstart : Z) (size : Z)
       (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (b : bool)
       (pid : mword 32) (V : pprivate) (v0 : mword 64) (lks : gset string)
-    : wp_sys_exit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn
- ip dqi γkl γka
-                             bmapstart size
+    : wp_sys_exit_sconf_body γft γf γw γs j γl pd pav pu
+ ip dqi
+
                              on fn m av eb b pid V v0 lks.
   Proof.
     cbv beta delta [wp_sys_exit_sconf_body].
@@ -138,7 +134,7 @@ Section ProofSysExit.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcl Hcpu #Htext #Hdata Hpc #Hprocs #Hpenv
              #Hlk #Hft #Hkl Hkav #Hbio #Hlog #Hcrash #Hcert #Hdev #Hgeom
-             #Hdlk Hbs %Hties Hrdy Hip Hfds Hirs Hpriv Hufrag".
+             #Hdlk Hbs Hrdy Hip Hfds Hirs Hpriv Hufrag".
     (* ===================== PROLOGUE (32-byte frame) ===================== *)
     set (M1 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
@@ -334,20 +330,17 @@ Section ProofSysExit.
        Hb3lo/Hb4) is simply framed away in [-] -- nothing ever reloads
        them, because nothing after this call is reachable. *)
     iDestruct (cpu_own_transport CID8 CID10 0%nat eb pj b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Kexit.wp_kexit_sconf γft γf γw γs j γl γu γd γk pd pav pu bn
- ip dqi γkl γka
-              bmapstart size
+    iApply (Kexit.wp_kexit_sconf γft γf γw γs j γl pd pav pu
+ ip dqi
+
               on fn B2 (av - 4)%nat eb b lks pid V
               Hfn Hj Hgl (sex_Kke av Hav) Hgeo Hbelow
               with "Hcg Hcl4 Hcpu [] [] Htext Hdata Hpc Hprocs Hpenv Hlk
                     Hft Hkl Hkav Hbio Hlog Hcrash Hcert Hdev Hgeom Hdlk Hbs
-                    [%] Hrdy Hip Hfds Hirs Hpriv Hufrag").
+                    Hrdy Hip Hfds Hirs Hpriv Hufrag").
     all: try lkbelow.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
-    (* the ties, straight through: sys_exit threads kexit's names and kexit
-       threads fileclose's, so the one record travels unchanged. *)
-    { exact Hties. }
   Qed.
 
 End ProofSysExit.

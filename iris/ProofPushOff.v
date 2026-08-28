@@ -801,7 +801,7 @@ Section ProofPushOff.
                 with "Hcg Hpc []").
       { iApply (poi_16 with "Htext"). }
       iApply wp_next_off_intro.
-      iNext.
+      iApply bi.later_intro.
       iIntros "Hcg Hpc".
       assert (Htgt2c : add_vec (mword_of_int (KernelSyms.push_off + 0x16) : mword 64)
                  (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 11 : mword 8) ('b"0")))) = mword_of_int (KernelSyms.push_off + 0x2c))
@@ -882,7 +882,7 @@ Section ProofPushOff.
                 with "Hcg Hpc []").
       { iApply (poi_38 with "Htext"). }
       iApply wp_next_off_intro.
-      iNext.
+      iApply bi.later_intro.
       iIntros "Hcg Hpc".
       assert (Htgt18t : add_vec (mword_of_int (KernelSyms.push_off + 0x38) : mword 64)
                  (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2032 : mword 11) ('b"0")))) = mword_of_int (KernelSyms.push_off + 0x18))
@@ -1483,7 +1483,7 @@ Section ProofPushOff.
                 with "Hcg Hpc []").
       { iApply (ppi_1e with "Htext"). }
       iApply wp_next_off_intro.
-      iNext.
+      iApply bi.later_intro.
       iIntros "Hcg Hpc".
       assert (Htgt28 : add_vec (mword_of_int (KernelSyms.pop_off + 0x1e) : mword 64)
                  (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 5 : mword 8) ('b"0")))) = mword_of_int (KernelSyms.pop_off + 0x28))
@@ -1665,7 +1665,7 @@ Section ProofPushOff.
                   with "Hcg Hpc []").
         { iApply (ppi_22 with "Htext"). }
         iApply wp_next_off_intro.
-        iNext.
+        iApply bi.later_intro.
         iIntros "Hcg Hpc".
         assert (Htgt28' : add_vec (mword_of_int (KernelSyms.pop_off + 0x22) : mword 64)
                    (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0")))) = mword_of_int (KernelSyms.pop_off + 0x28))

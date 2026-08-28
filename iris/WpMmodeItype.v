@@ -57,7 +57,7 @@ Section WpAddiGpr.
         [| iApply (swp_execute_rw rs1 rd m (execute (ITYPE (imm, Regidx rs1, Regidx rd, ADDI)))
                RETIRE_SUCCESS (fun a => add_vec a (sign_extend' 64 imm)) eq_refl Hrd with "Hcert Hf") ].
       iIntros (e) "[-> Hf]". iSplitR; [done|]. iFrame "Hf HPC HnPC".
-    - iNext. iIntros "Hmm Hpmpc Hpc Hf _".
+    - iApply bi.later_intro. iIntros "Hmm Hpmpc Hpc Hf _".
       iApply ("Hcont" with "Hmm Hpmpc Hpc Hf").
   Qed.
 End WpAddiGpr.
@@ -98,7 +98,7 @@ Section WpLogicITypeGpr.
         [| iApply (swp_execute_rw rs1 rd m (execute (ITYPE (imm, Regidx rs1, Regidx rd, ORI)))
                RETIRE_SUCCESS (fun a => or_vec a (sign_extend' 64 imm)) eq_refl Hrd with "Hcert Hf") ].
       iIntros (e) "[-> Hf]". iSplitR; [done|]. iFrame "Hf HPC HnPC".
-    - iNext. iIntros "Hmm Hpmpc Hpc Hf _".
+    - iApply bi.later_intro. iIntros "Hmm Hpmpc Hpc Hf _".
       iApply ("Hcont" with "Hmm Hpmpc Hpc Hf").
   Qed.
 

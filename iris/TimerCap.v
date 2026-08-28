@@ -105,7 +105,7 @@ Section TimerCap.
     iIntros (HTM) "Hmcen Hstc".
     iMod (sstc_enabled_intro dq mcen HTM with "Hmcen") as "#Hen".
     iMod (inv_alloc timerN E stimecmp_free with "[Hstc]") as "#Hinv".
-    { iNext. iApply (stimecmp_free_intro with "Hstc"). }
+    { iApply bi.later_intro. iApply (stimecmp_free_intro with "Hstc"). }
     iModIntro. iFrame "Hen Hinv".
   Qed.
 

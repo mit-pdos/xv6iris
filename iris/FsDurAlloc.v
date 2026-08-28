@@ -6,7 +6,7 @@
 (*  A snapshot is normally MINTED off readings -- the runs' shape, their   *)
 (*  pairwise disjointness, the place of their union inside the committed   *)
 (*  view -- all of them read off a SOURCE INSTANCE's own resources         *)
-(*  ([FsDurXfer.fs_state_mint_runs], [FsDurSnap.snap_mint]).  Era 0 has no *)
+(*  ([FsDurXfer.fs_state_xfer_tok]).  Era 0 has no                        *)
 (*  source instance: the first file system exists only as BYTES on the     *)
 (*  mkfs image.  So exactly one producer in the tree still has to take a   *)
 (*  byte MAP and CARVE an [FsState.fs_state] out of it by pure             *)
@@ -19,7 +19,7 @@
 (*  ([sk_own_used], [sk_meta_used], [sk_disj]) and its three cut clauses   *)
 (*  ([sk_sbok], [sk_reg], [sk_slot]).  NOTHING ELSE IN THE TREE READS      *)
 (*  THEM: at a commit the epoch is minted off the era's own [∗]            *)
-(*  ([FsCollectAll.col_hand_mint]), and at a boot the era's configuration  *)
+(*  ([FsCollectAll.col_bodies_acc]), and at a boot the era's configuration *)
 (*  is distributed off the snapshot's own readings.                        *)
 (*                                                                        *)
 (*  WHAT IS HERE, bottom up:                                               *)
@@ -29,7 +29,8 @@
 (*    2.  [blk_ledger] / [ledger_carve] / [blk_ledger_cut] -- the cut      *)
 (*        itself, and [fs_state_of_ledger], the Gamma-generic core.        *)
 (*    3.  [fs_snap_alloc] / [P_dur_alloc] -- the registry's value-first    *)
-(*        entry points, whose ONE caller is [FsDurImg.img_fs_snap_alloc].  *)
+(*        entry points.  [fs_snap_alloc] is [P_dur_alloc]'s own step, and  *)
+(*        [P_dur_alloc]'s ONE caller is [FsDurImg.img_P_dur_alloc].        *)
 (* ====================================================================== *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list list_numbers bitvector.definitions.
@@ -52,8 +53,10 @@ Require Import RiscvModelBytes.
 Require Import FsImg.
 Require Import LogDefs.       (* [fs_dbytes] -- the byte flattening       *)
 Require Import Xv6Cameras.
-Require Import FsDurBytes.    (* [fs_dbytes_blocks] -- Gamma-generically  *)
-Require Import FsDurXfer.     (* [snap_gamma] -- the fresh family's record *)
+Require Import FsDurBytes.    (* [fs_dbytes_blocks] -- Gamma-generically;
+                                 [snap_gamma] -- the durable family's record.
+                                 The TRANSPORT is not required here: this
+                                 file names none of it *)
 Require Import FsDurRead.     (* [snap_auth] -- the epoch's IDENTITY       *)
 Require Import RiscvPtsto.
 Require Import FsBlocks.
@@ -816,7 +819,8 @@ Section Ledger.
 
   Lemma fs_state_of_ledger Γ S D :
     snap_ok S D ->
-    blk_ledger Γ D -∗ fs_links (γlink Γ) (fss_inodes S) -∗ fs_state Γ S.
+    blk_ledger Γ D -∗ fs_links (γlink Γ) (fss_inodes S) -∗
+    fs_state Γ (DfracOwn 1) S.
   Proof.
     intros [Hok Hloc]. iIntros "Hled Hlinks".
     iDestruct (blk_ledger_cut Γ S D Hok with "Hled") as "H".
@@ -829,7 +833,7 @@ Section Ledger.
     iEval (rewrite big_sepL_fmap big_sepL_elements_dom) in "Hind".
     iEval (rewrite big_sepL_fmap) in "Hpool".
     (* ---- assemble ---- *)
-    rewrite /fs_state. iSplitL "Hsb"; last iSplitR "Hbm Hpool".
+    rewrite fs_state_1. iSplitL "Hsb"; last iSplitR "Hbm Hpool".
     - (* the superblock *)
       rewrite /sb_owned. iSplitL; [| iPureIntro; exact (sk_parse Hok)].
       iEval (rewrite fp_sb_blk fp_sb_off (fp_sb_bs S D)) in "Hsb".

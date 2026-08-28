@@ -91,7 +91,7 @@ Context `{GEN : GenId} `{CID : CpuId}.
                  (⌜npc = add_vec_int pc (if is_rvc then 2 else 4)⌝ ∗
                   ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗ S)%I)
               with "Hcg Hpc Hinstr [HR Hacc Hcont]").
-    iNext.
+    iApply bi.later_intro.
     rename CID into CID0.
     iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "HR Hacc".
     - (* ---------------- THE INSTRUCTION ---------------- *)
@@ -226,14 +226,14 @@ Context `{GEN : GenId} `{CID : CpuId}.
                     with "[$Hua $Hpldev $Hvdev] Huf") as "[Hdev' Huf']".
             iMod ("Hacc" $! u u' with "[//] Hg HR") as "[Hg' HS]".
             iMod ("Hdclose" with "[Huf' Hg']") as "_".
-            { iNext. iExists u'. iFrame. }
+            { iApply bi.later_intro. iExists u'. iFrame. }
             iMod (fupd_mask_subseteq ∅) as "Hb2"; [set_solver|].
             iModIntro. iExists (set_duart sigma.(mdev) u').
             iSplitR.
             { iPureIntro. rewrite Hpaid Heapa.
               apply (dev_write_uart sigma.(mdev) off storebyte u' Hoff).
               rewrite <- Hduart. exact Hwrite_u. }
-            iNext. iMod "Hb2" as "_". iModIntro.
+            iApply bi.later_intro. iMod "Hb2" as "_". iModIntro.
             iFrame "Hreg Hmem Hdev' HS". }
       (* ---- the post ---- *)
       iIntros (e) "(-> & Hfile & Hland)".
@@ -344,7 +344,7 @@ Qed.
                     ⌜m' = <[Regidx rd := regval_into_reg (ldval bt)]> m⌝ ∗
                     ⌜n' = n⌝ ∗ S bt)%I)
               with "Hcg Hpc Hinstr [HR Hacc Hcont]").
-    iNext.
+    iApply bi.later_intro.
     rename CID into CID0.
     iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "HR Hacc".
     - (* ---------------- THE INSTRUCTION ---------------- *)
@@ -477,14 +477,14 @@ Qed.
                     with "[$Hua $Hpldev $Hvdev] Huf") as "[Hdev' Huf']".
             iMod ("Hacc" $! u bt u' with "[//] Hg HR") as "[Hg' HS]".
             iMod ("Hdclose" with "[Huf' Hg']") as "_".
-            { iNext. iExists u'. iFrame. }
+            { iApply bi.later_intro. iExists u'. iFrame. }
             iMod (fupd_mask_subseteq ∅) as "Hb2"; [set_solver|].
             iModIntro. iExists bt, (set_duart sigma.(mdev) u').
             iSplitR.
             { iPureIntro. rewrite Hpaid Heapa.
               apply (dev_read_uart sigma.(mdev) off bt u' Hoff).
               rewrite <- Hduart. exact Hread_u. }
-            iNext. iMod "Hb2" as "_". iModIntro.
+            iApply bi.later_intro. iMod "Hb2" as "_". iModIntro.
             iFrame "Hreg Hmem Hdev' HS". }
       (* ---- the post ---- *)
       iIntros (e) "(-> & Hpost)".

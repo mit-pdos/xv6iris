@@ -1630,54 +1630,6 @@ Section SRegimeKtier.
        kt' = KT0 -- the pin IS [kadm_ident], fed to [sr_adm]/[sr_absorb];
        kt' = KT1 -- [KtierLe KT1 kt] forces kt = KT1, so the witness IS
                     [sr_kwit R] and [sr_absorb_wit] applies one-for-one. *)
-  Lemma sr_absorb_ktier (R : s_regime) (kt kt' : ktier) `{Hle : !KtierLe kt' kt} :
-    forall (acc : MemoryAccessType mem_payload) (va pa : mword 64)
-        (ppn : mword 44) (pc : kperm) (σ : mstate) (E : coPset),
-      s_acc_ok acc ->
-      kperm_allows pc acc ->
-      neq_vec (bits_of_virtaddr (Virtaddr va))
-         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
-      zero_extend' 64 (concat_vec ppn
-          (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa ->
-      register_lookup misa σ.(sregs) = MISA_C ->
-      register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
-      register_lookup htif_tohost_base σ.(sregs) = None ->
-      register_lookup cur_privilege σ.(sregs) = Supervisor ->
-      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
-      exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
-        = Some (Supervisor, σ) ->
-      exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
-      pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
-      ktier_pin kt' ppn va ->
-      ↑kptN ⊆ E ->
-      ⊢ sr_ktier_wit R kt -∗ kmap_at (svpn_of va) ppn pc -∗
-        reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ sr_inv R ={E}=∗
-        ∃ σ' : mstate,
-          ⌜ exec (translateAddr (Virtaddr va) acc) σ
-            = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
-          ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
-          ⌜ (σ'.(sregs) = σ.(sregs) \/
-             exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
-          ⌜ pmp_grant_facts σ' ⌝ ∗
-          reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ sr_inv R.
-  Proof.
-    intros acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp
-           HSXL Heff Hss Hall Hpin HE.
-    destruct kt' as [|].
-    - (* KT0: the pin IS [kadm_ident va ppn]; the witness is [emp]. *)
-      iIntros "_ Hk Hri Hgh Hinv".
-      iApply (sr_absorb R acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa
-                Hmenv Hhtif Hcp HSXL Heff Hss Hall (sr_adm_id R va ppn Hpin) HE
-                with "Hk Hri Hgh Hinv").
-    - (* KT1: [KtierLe KT1 kt] leaves only kt = KT1, so the witness IS
-         [sr_kwit R] and there is nothing to reconcile per-address. *)
-      destruct (ktier_le_cases _ _ Hle) as [Heq | [Hbad _]]; [| discriminate Hbad].
-      rewrite -Heq.
-      iIntros "Hw Hk Hri Hgh Hinv".
-      iApply (sr_absorb_wit R acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa
-                Hmenv Hhtif Hcp HSXL Heff Hss Hall HE
-                with "Hw Hk Hri Hgh Hinv").
-  Qed.
 
 End SRegimeKtier.
 

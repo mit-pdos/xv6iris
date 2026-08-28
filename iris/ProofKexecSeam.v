@@ -575,10 +575,7 @@ Section KexecBSeam.
   (* --------------------------------------------------------------- *)
   Definition kxc_at_1a2
       (jp : nat)
-      (bn : bio_names)
-      (ga gf : gname)
-      (bmapstart : Z)
-      (size : Z)
+      (gf : gname)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap)
       (gilf gislf : gname) (n2 : nat)
@@ -616,11 +613,11 @@ Section KexecBSeam.
               gilf gislf ∗
      log_opb icfg_log n2 ∗
      iref_slots 1 ∗
-     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
+     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) ∗
-     bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size ∗
+     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      bslots 3 ∗
-     kalloc_env ga None ∗
+     kalloc_env fsc_kalloc None ∗
      proc_pt P ∗
      proc_priv gf (proc_addr jp) pidv V ∗
      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) ∗
@@ -657,10 +654,7 @@ Section KexecBSeam.
   (* --------------------------------------------------------------- *)
   Definition kxc_at_12c
       (jp : nat)
-      (bn : bio_names)
-      (ga gf : gname)
-      (bmapstart : Z)
-      (size : Z)
+      (gf : gname)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap)
       (gilf gislf : gname) (n2 : nat)
@@ -701,11 +695,11 @@ Section KexecBSeam.
               gilf gislf ∗
      log_opb icfg_log n2 ∗
      iref_slots 1 ∗
-     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
+     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) ∗
-     bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size ∗
+     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      bslots 3 ∗
-     kalloc_env ga None ∗
+     kalloc_env fsc_kalloc None ∗
      proc_pt P ∗
      proc_priv gf (proc_addr jp) pidv V ∗
      ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) ∗
@@ -730,10 +724,7 @@ Section KexecBSeam.
   (* --------------------------------------------------------------- *)
   Definition kxc_at_1a4
       (jp : nat)
-      (bn : bio_names)
-      (ga gf : gname)
-      (bmapstart : Z)
-      (size : Z)
+      (gf : gname)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap)
       (gilf gislf : gname) (n2 : nat)
@@ -772,11 +763,11 @@ Section KexecBSeam.
               gilf gislf ∗
      log_opb icfg_log n2 ∗
      iref_slots 1 ∗
-     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
+     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) ∗
-     bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size ∗
+     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      bslots 3 ∗
-     kalloc_env ga None ∗
+     kalloc_env fsc_kalloc None ∗
      proc_pt P ∗
      proc_priv gf (proc_addr jp) pidv V ∗
      ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) ∗
@@ -796,9 +787,7 @@ Section KexecBSeam.
   (* --------------------------------------------------------------- *)
   Definition kxc_at_1ae
       (jp : nat)
-      (bn : bio_names) (ga gf : gname)
-      (bmapstart : Z)
-      (size : Z)
+ (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -825,11 +814,11 @@ Section KexecBSeam.
      trap_csrs_ext KT1 eb ∗
      cpu_claim_ext eb (proc_addr jp) ∗
      iref_slots 2 ∗
-     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
+     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) ∗
-     bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size ∗
+     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      bslots 3 ∗
-     kalloc_env ga None ∗
+     kalloc_env fsc_kalloc None ∗
      proc_pt P ∗
      proc_priv gf (proc_addr jp) pidv V ∗
      ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) ∗
@@ -879,9 +868,7 @@ Section KexecBSeam.
   (* INSIDE -- [kxc_res]'s phase-C analogue, minus the FS/icache pieces     *)
   (* phase B closed out at +0x1ae and plus [iref_slots 2] (both back). *)
   Definition kxc_c_res
-      (jp : nat) (bn : bio_names) (ga gf : gname)
-      (bmapstart : Z)
-      (size : Z)
+      (jp : nat) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -891,11 +878,11 @@ Section KexecBSeam.
       (ef : nat -> bv 8) (P : uptd) (c : nat) (sz1 : mword 64)
       (alen : nat -> nat) : iProp Σ :=
     (iref_slots 2 ∗
-     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
+     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) ∗
-     bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size ∗
+     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      bslots 3 ∗
-     kalloc_env ga None ∗
+     kalloc_env fsc_kalloc None ∗
      proc_pt P ∗
      proc_priv gf (proc_addr jp) pidv V ∗
      ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) ∗
@@ -912,9 +899,7 @@ Section KexecBSeam.
   (*  at the old size); [sz1] is the running stack top, [S1]'s own value.   *)
   (* --------------------------------------------------------------- *)
   Definition kxc_at_21a
-      (jp : nat) (bn : bio_names) (ga gf : gname)
-      (bmapstart : Z)
-      (size : Z)
+      (jp : nat) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -944,7 +929,7 @@ Section KexecBSeam.
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
      trap_csrs_ext KT1 eb ∗
      cpu_claim_ext eb (proc_addr jp) ∗
-     kxc_c_res jp bn ga gf bmapstart size
+     kxc_c_res jp gf
                plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
                sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P c sz1 alen)%I.
@@ -969,9 +954,7 @@ Section KexecBSeam.
   (*  for exactly this one use.  See claude-notes/kernel-defects.md.        *)
   (* --------------------------------------------------------------- *)
   Definition kxc_at_272
-      (jp : nat) (bn : bio_names) (ga gf : gname)
-      (bmapstart : Z)
-      (size : Z)
+      (jp : nat) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -1016,7 +999,7 @@ Section KexecBSeam.
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
      trap_csrs_ext KT1 eb ∗
      cpu_claim_ext eb (proc_addr jp) ∗
-     kxc_c_res jp bn ga gf bmapstart size
+     kxc_c_res jp gf
                plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
                sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P c sz1 alen)%I.
@@ -1030,9 +1013,7 @@ Section KexecBSeam.
   (*  commit reads [elf.entry] out of it at +0x2f0.                         *)
   (* --------------------------------------------------------------- *)
   Definition kxc_d_res
-      (jp : nat) (bn : bio_names) (ga gf : gname)
-      (bmapstart : Z)
-      (size : Z)
+      (jp : nat) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -1041,11 +1022,11 @@ Section KexecBSeam.
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (c : nat) : iProp Σ :=
     (iref_slots 2 ∗
-     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
+     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) ∗
-     bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size ∗
+     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      bslots 3 ∗
-     kalloc_env ga None ∗
+     kalloc_env fsc_kalloc None ∗
      proc_pt P ∗
      proc_priv gf (proc_addr jp) pidv V ∗
      ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) ∗
@@ -1066,9 +1047,7 @@ Section KexecBSeam.
   (*  because +0x28e set it for the two [bad:] branches that no longer fire. *)
   (* --------------------------------------------------------------- *)
   Definition kxc_at_2a6
-      (jp : nat) (bn : bio_names) (ga gf : gname)
-      (bmapstart : Z)
-      (size : Z)
+      (jp : nat) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -1097,7 +1076,7 @@ Section KexecBSeam.
      cpu_own 0 eb (proc_addr jp) eb ∅ ∗
      trap_csrs_ext KT1 eb ∗
      cpu_claim_ext eb (proc_addr jp) ∗
-     kxc_d_res jp bn ga gf bmapstart size
+     kxc_d_res jp gf
                plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
                sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P c)%I.

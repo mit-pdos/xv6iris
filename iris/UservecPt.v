@@ -265,7 +265,7 @@ Section WpUsdPt.
             iMod (phys_word_pointsto_write sigma.(mem) tfpa wold
                     (m !!! Regidx rs2) with "Hmem Hbw") as "[Hmem Hbw]".
             iMod (fupd_mask_subseteq ∅) as "Hclose"; [set_solver|].
-            iModIntro. iNext. iMod "Hclose" as "_". iModIntro.
+            iModIntro. iApply bi.later_intro. iMod "Hclose" as "_". iModIntro.
             iFrame "Hreg Hmem Hdev Hbw". }
       iIntros (e) "(-> & Hfile & Hland)".
       iDestruct "Hland" as (rsf) "(%Hshape & Hrw & Hro & HRes & Hword & Hfrag)".
@@ -298,7 +298,7 @@ Section WpUsdPt.
       iFrame "Hms Hmdl HPC HnPC".
       iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
       iFrame "Hfile Hword".
-    - iNext. iIntros (npc ms1 mdv1)
+    - iApply bi.later_intro. iIntros (npc ms1 mdv1)
         "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc
          (-> & -> & -> & Hfile & Hword)".
       iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile
@@ -612,7 +612,7 @@ Section WpUCsrPt.
       iFrame "Hms Hmdl HPC HnPC".
       iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
       iFrame "Hfile Hsscr".
-    - iNext. iIntros (npc ms1 mdv1)
+    - iApply bi.later_intro. iIntros (npc ms1 mdv1)
         "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc
          (-> & -> & -> & Hfile & Hsscr)".
       iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsscr Hutlb Hpc
@@ -752,7 +752,7 @@ Section WpUCsrPt.
       iFrame "Hms Hmdl HPC HnPC".
       iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
       iFrame "Hfile Hsscr".
-    - iNext. iIntros (npc ms1 mdv1)
+    - iApply bi.later_intro. iIntros (npc ms1 mdv1)
         "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc
          (-> & -> & -> & Hfile & Hsscr)".
       iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsscr Hutlb Hpc

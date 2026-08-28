@@ -133,6 +133,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.  (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -186,8 +187,7 @@ End SpecSysFstat.
 Definition wp_sys_fstat_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
-    (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
+ (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
     (fn : fstat_names)                           (* the file system's ghosts *)
     (pidv : mword 32) (V : pprivate)
@@ -216,7 +216,7 @@ Definition wp_sys_fstat_sconf_body
   (* filestat itself never panics; ilock and iunlock do, and this is theirs *)
   panic_env -∗
   proc_priv γf pj pidv V -∗
-  kalloc_env γa None -∗
+  kalloc_env fsc_kalloc None -∗
   procs_inv γs -∗
   (* ...and the file system, in the form that does NOT name a file *)
   filestat_fs_env fn -∗
@@ -233,7 +233,7 @@ Definition wp_sys_fstat_sconf_body
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf pj pidv (upd_upt V P') -∗
-      kalloc_env γa None -∗
+      kalloc_env fsc_kalloc None -∗
       (* the file system, back.  filestat's own postcondition returns the
          superblock fraction and the slot unit; everything else in the bundle
          is persistent, so the syscall re-presents the WHOLE bundle to its
@@ -247,12 +247,11 @@ Module Type SYSFSTAT.
   Parameter wp_sys_fstat_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
-      (γa : gname) (γf : gname)
+ (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fstat_names)
       (pidv : mword 32) (V : pprivate)
       (v : mword 64)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string),
-      wp_sys_fstat_sconf_body γa γf γs j γlp fn pidv V v m av eb b lks.
+      wp_sys_fstat_sconf_body γf γs j γlp fn pidv V v m av eb b lks.
 End SYSFSTAT.

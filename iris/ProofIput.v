@@ -695,9 +695,8 @@ Section IputTail.
   Qed.
 
   Lemma ip_tail_exit `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
-      (j : nat) (bn : bio_names)
-      (bmapstart : Z)
-      (size : Z) (Sb Sb' : gset Z)
+      (j : nat)
+ (Sb Sb' : gset Z)
       (k n n' : nat) (spf : bool -> nat) (wb crb0 : bool)
       (tid : nat) (qtx : Qp)
       (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -716,7 +715,7 @@ Section IputTail.
     (* THE PAID-BITMAP REPORT (G-4c): what this run of iput did with the
        bitmap unit, carried to the contract's post verbatim, with §G.25's
        credited-caller clause beside it. *)
-    (wb = true -> bmapstart ∈ Sb') ->
+    (wb = true -> fsc_bmapstart ∈ Sb') ->
     (crb0 = true -> wb = false) ->
     (* THE FRESHNESS PREMISE: the entry resource below already carries
        [itable]'s rank ([ref--; release(&itable.lock)] is the tail this
@@ -752,7 +751,7 @@ Section IputTail.
     pa_stk sp0 5 ↦₈[KT1] vg5 -∗
     pa_stk sp0 6 ↦₈[KT1] vg6 -∗
     proc_priv_bare pj pidv Vpr -∗
-    sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+    sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     bslots 3 -∗
     log_opS icfg_log n' Sb' -∗
@@ -770,11 +769,11 @@ Section IputTail.
         cpu_claim_ext eb pj -∗
         pc_is ret_tgt -∗
         proc_priv_bare pj pidv Vpr -∗
-        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+        sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
         bslots 3 -∗
         ⌜Sb ⊆ Sb''⌝ -∗
-        ⌜w = true -> bmapstart ∈ Sb''⌝ -∗
+        ⌜w = true -> fsc_bmapstart ∈ Sb''⌝ -∗
         ⌜crb0 = true -> w = false⌝ -∗
         ⌜((n - spf w)%nat <= n'')%nat /\ (n'' <= n)%nat⌝ -∗
         log_opS icfg_log n'' Sb'' -∗
@@ -907,9 +906,8 @@ Section IputTail.
 
   (* ---- THE TAIL PROPER: +0x20 (the re-read) .. +0x24 (the close) ---- *)
   Lemma ip_tail `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
-      (j : nat) (bn : bio_names)
-      (bmapstart : Z)
-      (size : Z) (Sb Sb' : gset Z)
+      (j : nat)
+ (Sb Sb' : gset Z)
       (k : nat) (q : Qp) (inum : mword 32)
       (Mt : gmap nat (Qp * positive)) (ci : gmap nat (mword 32 * mword 32))
       (n n' : nat) (spf : bool -> nat) (wb crb0 : bool)
@@ -934,7 +932,7 @@ Section IputTail.
     (* THE PAID-BITMAP REPORT (G-4c): what this run of iput did with the
        bitmap unit, carried to the contract's post verbatim, with §G.25's
        credited-caller clause beside it. *)
-    (wb = true -> bmapstart ∈ Sb') ->
+    (wb = true -> fsc_bmapstart ∈ Sb') ->
     (crb0 = true -> wb = false) ->
     (* THE FRESHNESS PREMISE -- see [ip_tail_exit]; this lemma's own entry
        is already past iput's FIRST [acquire(&itable.lock)]. *)
@@ -980,7 +978,7 @@ Section IputTail.
     pa_stk sp0 5 ↦₈[KT1] vg5 -∗
     pa_stk sp0 6 ↦₈[KT1] vg6 -∗
     proc_priv_bare pj pidv Vpr -∗
-    sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+    sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     bslots 3 -∗
     log_opS icfg_log n' Sb' -∗
@@ -998,11 +996,11 @@ Section IputTail.
         cpu_claim_ext eb pj -∗
         pc_is ret_tgt -∗
         proc_priv_bare pj pidv Vpr -∗
-        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+        sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
         bslots 3 -∗
         ⌜Sb ⊆ Sb''⌝ -∗
-        ⌜w = true -> bmapstart ∈ Sb''⌝ -∗
+        ⌜w = true -> fsc_bmapstart ∈ Sb''⌝ -∗
         ⌜crb0 = true -> w = false⌝ -∗
         ⌜((n - spf w)%nat <= n'')%nat /\ (n'' <= n)%nat⌝ -∗
         log_opS icfg_log n'' Sb'' -∗
@@ -1135,7 +1133,8 @@ Section IputTail.
          of its caller's transaction, so it parks one for the window and
          [ipool_put] hands it straight back at the same [(tid, qtx)] -- which
          is what makes the transit part of the partition REFUTABLE at a
-         commit ([IcacheEscrow.ipool_transit_no_ops]). *)
+         commit ([IcacheEscrow.ipool_quiesce_acc], through
+         [TxPin.tx_pins_no_ops]). *)
       iMod (ipool_evict_lend ⊤ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib
               (region_inums icfg_nib ∖ ci_inums ci) k (bv_unsigned inum) icfg_dev inum
               tid qtx
@@ -1233,8 +1232,8 @@ Section IputTail.
         apply ip_pool_set; [exact Hinreg | exact Hincid]. }
       iEval (rewrite -Hpoolset) in "Hpool".
       iEval (rewrite Hp1) in "Hiu".
-      iApply (ip_tail_exit CID0 j bn bmapstart
- size Sb Sb' k n n' spf wb crb0 tid qtx pidv dq dqb dqs m D2 K eb sp0 vg4 vg5 vg6 lks Vpr rg
+      iApply (ip_tail_exit CID0 j
+ Sb Sb' k n n' spf wb crb0 tid qtx pidv dq dqb dqs m D2 K eb sp0 vg4 vg5 vg6 lks Vpr rg
                 HK Hanch Hsp0 HD2regs Hlo Hhi Hssub Hwm Hwc Hfresh
                 with "Htext Hlock Hpc Hcg Hcnt Hpay Hextc Hextm Htok [-Hiu Hgreg Hr24 Hr16 Hr8 Hg4 Hg5 Hg6 Hppid Hbms Hins Hbslots Hop Htx Hcont] Hiu Hgreg
                       Hr24 Hr16 Hr8 Hg4 Hg5 Hg6 Hppid Hbms Hins Hbslots Hop Htx Hcont").
@@ -1314,8 +1313,8 @@ Section IputTail.
       { intros i Hi. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
       { intros i Hi. reflexivity. }
       { rewrite /islot2 lookup_insert Hcik. iFrame. }
-      iApply (ip_tail_exit CID0 j bn bmapstart
- size Sb Sb' k n n' spf wb crb0 tid qtx pidv dq dqb dqs m D2 K eb sp0 vg4 vg5 vg6 lks Vpr rg
+      iApply (ip_tail_exit CID0 j
+ Sb Sb' k n n' spf wb crb0 tid qtx pidv dq dqb dqs m D2 K eb sp0 vg4 vg5 vg6 lks Vpr rg
                 HK Hanch Hsp0 HD2regs Hlo Hhi Hssub Hwm Hwc Hfresh
                 with "Htext Hlock Hpc Hcg Hcnt Hpay Hextc Hextm Htok [-Hislot Hgreg Hr24 Hr16 Hr8 Hg4 Hg5 Hg6 Hppid Hbms Hins Hbslots Hop Htx Hcont] Hislot Hgreg
                       Hr24 Hr16 Hr8 Hg4 Hg5 Hg6 Hppid Hbms Hins Hbslots Hop Htx Hcont").
@@ -1397,13 +1396,13 @@ Section IputFreePath.
       M !!! Regidx c = (m !!! Regidx c : mword 64).
 
   (* [iu_held_L], inlined (ProofIupdate-module-local otherwise). *)
-  Lemma ipo_held_L (bn : bio_names) (γd : disk_names)
+  Lemma ipo_held_L
  (k : nat) (pidv dv bno : mword 32)
       (bs bsl bsd : list (bv 8)) (d : bool) :
-    bio_held bn (fs_view fsc_fs γd icfg_dev fsc_cov) k pidv dv bno bs bsl bsd d -∗
+    bio_held fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) k pidv dv bno bs bsl bsd d -∗
       (uint bno ↪[fs_cache fsc_fs]{#(1/2)} bsl) ∗
       ((uint bno ↪[fs_cache fsc_fs]{#(1/2)} bsl) -∗
-       bio_held bn (fs_view fsc_fs γd icfg_dev fsc_cov) k pidv dv bno bs bsl bsd d).
+       bio_held fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) k pidv dv bno bs bsl bsd d).
   Proof.
     rewrite /bio_held /bio_pay /fs_view /=.
     iIntros "(%A & %B & %C & H1 & H3 & H4 & H5 & H6 & Hpay)".
@@ -1441,9 +1440,7 @@ Section IputFreePath.
      ====================================================================== *)
   Lemma ip_free_offlock `{GEN : GenId} `{CID0 : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
  (inum : mword 32) (dn : dinode)
       (ge gr gd : gname)
       (u : nat) (Sb : gset Z) (cru : bool) (e0 v : nat)
@@ -1487,8 +1484,8 @@ Section IputFreePath.
     cpu_claim_ext eb pj -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (KernelSyms.iput + 0xa8) : mword 64) -∗
     panic_env -∗
-    bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
-    log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+    bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+    log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
     ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
     dinode_at fsc_ireg inum dn -∗
     (* ---- THE LEDGER's UNCACHED CAPITAL IS NOT HERE (iclaim-ledger.md IVd),
@@ -1526,9 +1523,9 @@ Section IputFreePath.
     crp_elem (bv_unsigned inum) (CrpPre t q) -∗
     proc_priv_bare pj pidv Vpr -∗
     procs_inv γs -∗
-    dev_inv γu γd -∗
-    disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    dev_inv fsc_uart fsc_disk -∗
+    disk_geom fsc_disk pd pav pu -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     bslots 2 -∗
     log_epoch_lb icfg_log v -∗
@@ -1599,7 +1596,7 @@ Section IputFreePath.
     { rewrite /bno bb_uint32 moi32_unsigned. apply bvw32_small.
       change (2^32)%Z with 4294967296%Z. lia. }
     assert (Hbnolt : (uint bno < 2147483648)%Z) by (rewrite Hbno; lia).
-    assert (Hbnocov : uint bno ∈ bv_cov (fs_view fsc_fs γd icfg_dev fsc_cov))
+    assert (Hbnocov : uint bno ∈ bv_cov (fs_view fsc_fs fsc_disk icfg_dev fsc_cov))
       by (rewrite Hbno; exact Hcov).
     pose proof (bv_unsigned_in_range _ inum) as [Hinum0 Hinum1].
     assert (Hm32 : bv_modulus (MachineWord.MachineWord.Z_idx 32) = 4294967296)
@@ -1650,8 +1647,8 @@ Section IputFreePath.
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID1) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     (* ===== bread ===== *)
-    iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
-              (fs_view fsc_fs γd icfg_dev fsc_cov) pidv icfg_dev bno dq
+    iApply (BR.wp_bread_sconf γs j γl fsc_uart fsc_disk fsc_dlock pd pav pu fsc_bio
+              (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) pidv icfg_dev bno dq
               R0 K eb b
               lks Vpr HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HR0a0 HR0a1
               ltac:(lkbelow)
@@ -1880,7 +1877,7 @@ Section IputFreePath.
         [ exact (dinode_bytes_length dn' Hdn'wf)
         | exact (diblk_bytes_splice ds (DinodeEnc.islot inum) dn'
                    Hdswf Hdn'wf Hslot16) ]. }
-    iApply (LW.wp_log_write_au_range bn icfg_log fsc_fs γd fsc_cov fsc_logst icfg_dev kk pidv bno
+    iApply (LW.wp_log_write_au_range fsc_bio icfg_log fsc_fs fsc_disk fsc_cov fsc_logst icfg_dev kk pidv bno
               (diblk_bytes (<[DinodeEnc.islot inum := dn']> ds)) (diblk_bytes ds) bsd0 d0 u
               (64 * DinodeEnc.islot inum)%nat 64%nat (dinode_bytes dn')
               cru Sb e0 v (⊤ ∖ ↑iregN)
@@ -1966,7 +1963,7 @@ Section IputFreePath.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID21) (CIDb := CID24) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (BL.wp_brelse_sconf γs bn (fs_view fsc_fs γd icfg_dev fsc_cov) kk
+    iApply (BL.wp_brelse_sconf γs fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) kk
               pidv icfg_dev bno dq T1 K eb pj
               (diblk_bytes (<[DinodeEnc.islot inum := dn']> ds)) bsd0 true b
               lks Vpr HKbl Hkk HT1a0 ltac:(lkbelow)
@@ -2153,7 +2150,7 @@ Section IputFreePath.
      3855 B in Delta at every step of that walk
      (optimization.md, fold block continuations). *)
   Definition ip_locked_exit1 `{GEN : GenId}
-      (bmapstart : Z) (u : nat) (Sb : gset Z) (crb : bool) (cru : bool) (crz : bool) (tid : nat) (qtx : Qp) (pidv : mword 32) (dqb : dfrac) (dqs : dfrac) (sp0 : mword 64) (vra : mword 64) (vs0 : mword 64) (vs1 : mword 64) (vs2 : mword 64) (vs3 : mword 64) (vs4 : mword 64) (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) (rg : frzidx) (pj : mword 64) (CID : CpuId) : iProp Σ :=
+ (u : nat) (Sb : gset Z) (crb : bool) (cru : bool) (crz : bool) (tid : nat) (qtx : Qp) (pidv : mword 32) (dqb : dfrac) (dqs : dfrac) (sp0 : mword 64) (vra : mword 64) (vs0 : mword 64) (vs1 : mword 64) (vs2 : mword 64) (vs3 : mword 64) (vs4 : mword 64) (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) (rg : frzidx) (pj : mword 64) (CID : CpuId) : iProp Σ :=
     (∀ (mf : regfile) (n'' : nat) (Sb'' : gset Z) (w : bool),
         (* the register threading is [ipo_thr]'s, not [callee_saved]:
            s1 holds the off-lock tail's [bp] and is restored by the epilogue
@@ -2167,7 +2164,7 @@ Section IputFreePath.
         cpu_claim_ext (CID := CID) eb pj -∗
         pc_is (CID := CID) (mword_of_int (KernelSyms.iput + 0x30) : mword 64) -∗
         proc_priv_bare pj pidv Vpr -∗
-        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+        sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
         (* NO POOL ROW HERE (IVd).  Under the REORDER the itable lock goes
            at +0x94, BEFORE the +0xba deposit, and [IcacheEscrow.ic_ci_wf]'s
@@ -2180,7 +2177,7 @@ Section IputFreePath.
            this lemma. *)
         bslots 3 -∗
         ⌜Sb ⊆ Sb''⌝ -∗
-        ⌜w = true -> bmapstart ∈ Sb''⌝ -∗
+        ⌜w = true -> fsc_bmapstart ∈ Sb''⌝ -∗
         ⌜crb = true -> w = false⌝ -∗
         (* THE BUDGET CLAUSE, which this post used to be missing outright and
            without which [wp_iput_gen]'s own post cannot be stated.  The figure
@@ -2246,12 +2243,8 @@ Section IputFreePath.
      ========================================================================== *)
   Lemma ip_free_locked `{GEN : GenId} `{CID0 : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (gil gisl g1 : gname)
-      (bmapstart : Z)
-      (size : Z)
       (k : nat) (q : Qp) (inum : mword 32)
       (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8))
       (Mt : gmap nat (Qp * positive)) (ci : gmap nat (mword 32 * mword 32))
@@ -2276,11 +2269,11 @@ Section IputFreePath.
     (3 <= u)%nat ->
     (* the vacuous [Z.of_nat u + 2 < 2^31] is GONE: log_write's bound is on
        the CPU NESTING LEVEL and the off-lock tail calls it at level 0. *)
-    (crb = true -> bmapstart ∈ Sb) ->
+    (crb = true -> fsc_bmapstart ∈ Sb) ->
     log_geom_ok fsc_cov fsc_logst ->
-    0 < size <= BPB ->
-    0 <= bmapstart -> bmapstart ∈ fsc_cov ->
-    ~ (bmapstart ∈ log_region_set fsc_logst) ->
+    0 < fsc_size <= BPB ->
+    0 <= fsc_bmapstart -> fsc_bmapstart ∈ fsc_cov ->
+    ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
     0 <= icfg_ist ->
     IBLOCK inum icfg_ist ∈ fsc_cov ->
     ~ (IBLOCK inum icfg_ist ∈ log_region_set fsc_logst) ->
@@ -2289,7 +2282,7 @@ Section IputFreePath.
     bv_unsigned (di_nlink dn) = 0 ->
     dinode_wf dn ->
     blkmap_wf fsc_cov fsc_logst bm ->
-    cov_below fsc_cov size ->
+    cov_below fsc_cov fsc_size ->
     (forall i : nat, (i < MAXFILE)%nat -> length (data i) = BSIZE) ->
     di_addrs dn = bm_cells bm ->
     icM_wf Mt ->
@@ -2313,8 +2306,8 @@ Section IputFreePath.
     cpu_claim_ext eb pj -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (KernelSyms.iput + 0x5a) : mword 64) -∗
     panic_env -∗
-    bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
-    log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+    bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+    log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
     (* the itable, HELD *)
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
     itable_inv -∗
@@ -2436,16 +2429,16 @@ Section IputFreePath.
        its +0x8a call since [IcacheInv.v] gained the premise.  Threaded, not
        invented: the caller (task 18's [ProofIput] splice) owns it. *)
     IcacheRef.runit bfl (bv_unsigned inum) -∗
-    sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+    sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     (* THE BITMAP'S INVARIANT (BitmapInv.v): persistent, so nothing
        bitmap-shaped comes back on any arm. *)
-    bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+    bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
     proc_priv_bare pj pidv Vpr -∗
     procs_inv γs -∗
-    dev_inv γu γd -∗
-    disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    dev_inv fsc_uart fsc_disk -∗
+    disk_geom fsc_disk pd pav pu -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
     bslots 3 -∗
     (* THE GROUP CREDIT (fs-log.md §G.18's chain, §G.21's tier; [SpecIput]'s
        [wp_iput_gen_body] premise verbatim).  At [crz = false] this is [emp]
@@ -2476,7 +2469,7 @@ Section IputFreePath.
     add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) ↦₈[KT1] vs3 -∗
     add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) ↦₈[KT1] vs4 -∗
     (* THE CALLER'S CONTINUATION at 0x30 (iput's real post; ip_tail's shape) *)
-    wp_next (CID0 := CID0) true pj (fun CID : CpuId => ip_locked_exit1 bmapstart u Sb crb cru crz tid qtx pidv dqb dqs sp0 vra vs0 vs1 vs2 vs3 vs4 m K eb b lks Vpr rg pj CID) -∗
+    wp_next (CID0 := CID0) true pj (fun CID : CpuId => ip_locked_exit1 u Sb crb cru crz tid qtx pidv dqb dqs sp0 vra vs0 vs1 vs2 vs3 vs4 m K eb b lks Vpr rg pj CID) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros ip pj HK HKit Hk Hu2 Hcrb Hgeom Hsize Hbmpos Hbmcov Hbmlog Histpos Hicov Hilog
@@ -2785,8 +2778,8 @@ Section IputFreePath.
         iModIntro. iFrame "Hdat". rewrite orb_false_r. iExact "Hcrd". }
     iModIntro.
     (* ===== itrunc ===== *)
-    iApply (IT.wp_itrunc_gen γs j γl γu γd γk pd pav pu bn
-              bmapstart size
+    iApply (IT.wp_itrunc_gen γs j γl pd pav pu
+
               (ip : mword 64) inum dn dn bm data2 uit Sb crb (cru || crz)%bool e0
               pidv dq (DfracOwn (1/2)) (DfracOwn (1/2)) dqb dqs J2 (K - 6)%nat
               eb eb lks Vpr
@@ -3608,7 +3601,7 @@ Section IputFreePath.
     iDestruct (cpu_claim_ext_transport CIDit CIDp5 eb pj
                  ltac:(wp_next_chain) with "Hclm") as "Hclm".
     (* ===== +0xa8 .. j 0x30 : ip_free_offlock ===== *)
-    iApply (ip_free_offlock γs j γl γu γd γk pd pav pu bn
+    iApply (ip_free_offlock γs j γl pd pav pu
  inum dn2 ge gr gd
               uoff Sb' true e0' e0' pidv dq dqs
               sp0 vra vs0 vs1 vs2 vs3 vs4 P5 (K - 6)%nat eb eb lks Vpr rg
@@ -3708,7 +3701,7 @@ Section IputFreePath.
      (optimization.md, fold block continuations).  The forall stays
      OUTSIDE so the call sites can still instantiate it. *)
   Definition ip_entry_exit2 `{GEN : GenId} `{CIDa : CpuId}
- (bmapstart : Z) (k : nat) (q : Qp) (inum : mword 32) (Mt : gmap nat (Qp * positive)) (ci : gmap nat (mword 32 * mword 32)) (u : nat) (Sb : gset Z) (cru : bool) (e0 : nat) (v : nat) (tid : nat) (qtx : Qp) (pidv : mword 32) (dqb : dfrac) (dqs : dfrac) (m : regfile) (K : nat) (eb : bool) (lks : gset string) (Vpr : pprivate) (rg : bool) (ip : mword 64) (pj : mword 64) (sp0 : mword 64) (spd : mword 64) (M5 : regfile) (g1 : gname) (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) : iProp Σ :=
+ (k : nat) (q : Qp) (inum : mword 32) (Mt : gmap nat (Qp * positive)) (ci : gmap nat (mword 32 * mword 32)) (u : nat) (Sb : gset Z) (cru : bool) (e0 : nat) (v : nat) (tid : nat) (qtx : Qp) (pidv : mword 32) (dqb : dfrac) (dqs : dfrac) (m : regfile) (K : nat) (eb : bool) (lks : gset string) (Vpr : pprivate) (rg : bool) (ip : mword 64) (pj : mword 64) (sp0 : mword 64) (spd : mword 64) (M5 : regfile) (g1 : gname) (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) : iProp Σ :=
     (⌜bv_unsigned (di_type dn) <> 0⌝ -∗
        ⌜bv_unsigned (di_nlink dn) = 0⌝ -∗
        ⌜dinode_wf dn⌝ -∗
@@ -3814,7 +3807,7 @@ Section IputFreePath.
           which is the one thing that can spend it. *)
        IcacheRef.frzsel k (1/2)%Qp false -∗
        i_valid (ientry k) ↦₄{DfracOwn (1/2)} (valid_word true) -∗
-       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+       sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
        sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
        proc_priv_bare pj pidv Vpr -∗
        bslots 3 -∗
@@ -3839,7 +3832,7 @@ Section IputFreePath.
      (optimization.md, fold block continuations).  The forall stays
      OUTSIDE so the call sites can still instantiate it. *)
   Definition ip_entry_exit1 `{GEN : GenId} `{CIDa : CpuId}
- (bmapstart : Z) (k : nat) (q : Qp) (inum : mword 32) (Mt : gmap nat (Qp * positive)) (ci : gmap nat (mword 32 * mword 32)) (u : nat) (Sb : gset Z) (cru : bool) (e0 : nat) (v : nat) (tid : nat) (qtx : Qp) (pidv : mword 32) (dqb : dfrac) (dqs : dfrac) (m : regfile) (K : nat) (eb : bool) (lks : gset string) (Vpr : pprivate) (rg : bool) (pj : mword 64) (sp0 : mword 64) (spd : mword 64) (M' : regfile) (vg4' : mword 64) (vg5' : mword 64) (vg6' : mword 64) : iProp Σ :=
+ (k : nat) (q : Qp) (inum : mword 32) (Mt : gmap nat (Qp * positive)) (ci : gmap nat (mword 32 * mword 32)) (u : nat) (Sb : gset Z) (cru : bool) (e0 : nat) (v : nat) (tid : nat) (qtx : Qp) (pidv : mword 32) (dqb : dfrac) (dqs : dfrac) (m : regfile) (K : nat) (eb : bool) (lks : gset string) (Vpr : pprivate) (rg : bool) (pj : mword 64) (sp0 : mword 64) (spd : mword 64) (M' : regfile) (vg4' : mword 64) (vg5' : mword 64) (vg6' : mword 64) : iProp Σ :=
     (⌜iput_regs m M' spd k⌝ -∗
        ⌜M' !!! Regidx Ra5 = sign_extend' 64 (iref_word Mt k)⌝ -∗
        sie_cap_gpr KT1 M' (trap_res eb + (K - 6))%nat false pj -∗
@@ -3858,7 +3851,7 @@ Section IputFreePath.
        (* RULING G: both Exit-A arms turn back BEFORE the +0x50 mint, so the
           regime the caller lent has not been spent and comes straight back. *)
        ireg_regime rg -∗
-       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+       sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
        sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
        proc_priv_bare pj pidv Vpr -∗
        bslots 3 -∗
@@ -3886,12 +3879,8 @@ Section IputFreePath.
      ========================================================================== *)
   Lemma ip_free_entry `{GEN : GenId} `{CID0 : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (gil gisl : gname)
-      (bmapstart : Z)
-      (size : Z)
       (k : nat) (q : Qp) (inum : mword 32)
       (Mt : gmap nat (Qp * positive)) (ci : gmap nat (mword 32 * mword 32))
       (u : nat) (Sb : gset Z) (crb cru : bool) (e0 v : nat)
@@ -3912,16 +3901,16 @@ Section IputFreePath.
        off-lock flush's [log_opSe γ (S u) Sb e0]; the bound is its companion. *)
     (3 <= u)%nat ->
     (* the vacuous [Z.of_nat u + 2 < 2^31] is GONE (see [ip_free_locked]) *)
-    (crb = true -> bmapstart ∈ Sb) ->
+    (crb = true -> fsc_bmapstart ∈ Sb) ->
     log_geom_ok fsc_cov fsc_logst ->
-    0 < size <= BPB ->
-    0 <= bmapstart -> bmapstart ∈ fsc_cov ->
-    ~ (bmapstart ∈ log_region_set fsc_logst) ->
+    0 < fsc_size <= BPB ->
+    0 <= fsc_bmapstart -> fsc_bmapstart ∈ fsc_cov ->
+    ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
     0 <= icfg_ist ->
     IBLOCK inum icfg_ist ∈ fsc_cov ->
     ~ (IBLOCK inum icfg_ist ∈ log_region_set fsc_logst) ->
     bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
-    cov_below fsc_cov size ->
+    cov_below fsc_cov fsc_size ->
     icM_wf Mt ->
     ic_ci_wf Mt ci icfg_nib icfg_dev ->
     (* FREE-PATH GUARD: the +0x1c branch was TAKEN -- this is the last ref. *)
@@ -3940,8 +3929,8 @@ Section IputFreePath.
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.iput + 0x3a) : mword 64) -∗
     panic_env -∗
-    bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
-    log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+    bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+    log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
     itable_inv -∗
     ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k -∗
@@ -3972,16 +3961,16 @@ Section IputFreePath.
        ([EscrowDeposit.ireg_free_deposit_au]'s second fupd); on the two Exit-A
        arms, which never reach the mint, it comes straight back below. *)
     ireg_regime rg -∗
-    sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+    sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     (* THE BITMAP'S INVARIANT (BitmapInv.v): persistent, so nothing
        bitmap-shaped comes back on any arm. *)
-    bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+    bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
     proc_priv_bare pj pidv Vpr -∗
     procs_inv γs -∗
-    dev_inv γu γd -∗
-    disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    dev_inv fsc_uart fsc_disk -∗
+    disk_geom fsc_disk pd pav pu -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
     bslots 3 -∗
     log_epoch_lb icfg_log v -∗
     log_credit icfg_log cru Sb e0 (IBLOCK inum icfg_ist) -∗
@@ -4010,7 +3999,7 @@ Section IputFreePath.
     ((* ===== EXIT A: pc +0x20, the ip_tail seam (valid==0 OR nlink!=0);
        the bundle goes back UNTOUCHED, the payload is re-parked ===== *)
      (∀ (M' : regfile) (vg4' vg5' vg6' : mword 64),
-       ip_entry_exit1 (CIDa := CID0) bmapstart k q inum Mt ci u Sb cru e0 v tid qtx pidv dqb dqs m K eb lks Vpr rg pj sp0 spd M' vg4' vg5' vg6')
+       ip_entry_exit1 (CIDa := CID0) k q inum Mt ci u Sb cru e0 v tid qtx pidv dqb dqs m K eb lks Vpr rg pj sp0 spd M' vg4' vg5' vg6')
      ∧
      (* ===== EXIT B: pc +0x5a, byte-compatible with ip_free_locked's ENTRY
        (IputFreeLockedDev.v:247).  dn/bm/data/g1 are the body's discoveries
@@ -4018,7 +4007,7 @@ Section IputFreePath.
        premise list verbatim ===== *)
     (∀ (M5 : regfile) (g1 : gname) (dn : dinode) (bm : blkmap)
        (data : nat -> list (bv 8)),
-       ip_entry_exit2 (CIDa := CID0) bmapstart k q inum Mt ci u Sb cru e0 v tid qtx pidv dqb dqs m K eb lks Vpr rg ip pj sp0 spd M5 g1 dn bm data)) -∗
+       ip_entry_exit2 (CIDa := CID0) k q inum Mt ci u Sb cru e0 v tid qtx pidv dqb dqs m K eb lks Vpr rg ip pj sp0 spd M5 g1 dn bm data)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros ip pj sp0 spd HK HKit Hk Hu3 Hcrb Hgeom Hsize Hbmpos Hbmcov Hbmlog
@@ -4137,10 +4126,11 @@ Section IputFreePath.
                            (* THE ARM's TAIL, DECIDED (A⁗, §3.16 / ZZProbeFrz
                               P2).  The tail is a disjunction since §3.14's
                               DEVIATION 1, widened by A⁗; its FROZEN
-                              alternative is the receipt, and the [false]
-                              mirror half this walk just extracted refutes it
-                              through the region's own receipt clause
-                              ([InodeRegion.ireg_frzown_off_absurd]).  So what
+                              alternative carries a QUARTER of the slot's
+                              freeze SELECTOR, and the positive liveness slice
+                              inside this walk's own [iref_tok] refutes it
+                              straight from the invariant
+                              ([IcacheInv.frz_slot_kill], RULING R-e).  So what
                               comes out is the payload, the inum's UNFROZEN
                               token -- which is exactly what the MINT at +0x50
                               consumes -- and the arm's liveness half. *)
@@ -4173,11 +4163,19 @@ Section IputFreePath.
       destruct vld.
       - (* LOADED: the payload leaves with us; the FULL inum cell stays *)
         rewrite /ic_payload_arm.
-        iDestruct "Hpayl" as "[(Hpayl & Hoff & Hlvh & Hpin) | [Hrc _]]";
+        iDestruct "Hpayl" as "[(Hpayl & Hoff & Hlvh & Hpin) | (_ & Hselt & _)]";
           last first.
-        { iMod (ireg_frzown_off_absurd (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ k))
-                  fsc_ireg fsc_fs icfg_ist icfg_nib inum ltac:(solve_ndisj) Hnib
-                  with "Hireg Hmirf Hrc") as "[]". }
+        { (* RULING R-e, the selector route (rank-6 probe, Stage 1): the
+             frozen alternative carries a QUARTER of the slot's freeze
+             SELECTOR, whose other half sits in [IcacheInv.live_slot]'s
+             frozen alternative beside the slot's WHOLE liveness unit; this
+             walk's own [iref_tok] carries a positive slice of that unit.  A
+             whole unit and a positive slice cannot coexist, so the branch is
+             dead -- no region open, no receipt, no index.  Same one-liner as
+             ProofIlock:2621 and (in its pure flavour) ProofIput:1157. *)
+          iDestruct "Hrtok" as "(_ & Hrlv & _)".
+          iMod (frz_slot_kill (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ k)) k ((1/2)/2)%Qp q
+                  ltac:(solve_ndisj) Hk with "Hitinv Hselt Hrlv") as "[]". }
         iDestruct "Hrident" as "[Hrd Hrn]".
         iEval (rewrite /islot_rest_at Ert) in "Hrest".
         iDestruct "Hrest" as "[Htd Htn]".
@@ -4878,20 +4876,16 @@ Section ProofIput.
      is the seal after this proof. *)
   Lemma wp_iput_gen
       (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (gil gisl : gname)
-      (bmapstart : Z)
-      (size : Z)
       (k : nat) (q : Qp) (inum : mword 32)
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (tid : nat) (qtx : Qp)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate) (rg : bool)
-    : wp_iput_gen_body gs j gl gu gd gk pd pav pu bn gil gisl
-                       bmapstart size
+    : wp_iput_gen_body gs j gl pd pav pu gil gisl
+
                        k q inum n Sb crb cru crz e0 tid qtx pidv dq dqb dqs m K eb b lks Vpr rg.
   Proof.
     cbv beta delta [wp_iput_gen_body].
@@ -5211,8 +5205,8 @@ Section ProofIput.
       (* the epoch is FORGOTTEN at the close arms' seam: [ip_tail] is stated
          over [log_opS] and nothing past this point compares epochs. *)
       iDestruct (log_opSe_opS with "Hop") as "Hop".
-      iApply (ip_tail (CID := CIDacq) CID j bn bmapstart
- size Sb Sb k q inum Mt ci n n
+      iApply (ip_tail (CID := CIDacq) CID j
+ Sb Sb k q inum Mt ci n n
                 (fun w => ip_spend_w w cru crz) false crb tid qtx pidv dq dqb dqs
                 m E2 K eb sp0 vg4 vg5 vg6 lks Vpr rg
                 HK Hk ltac:(wp_next_chain) Hsp0eq HE2regs ltac:(rewrite Hiw; exact HE2a5) Hwf Hciwf
@@ -5251,8 +5245,8 @@ Section ProofIput.
       [ iApply log_credit_own; exact Hcru |].
     assert (Hitne : "itable"%string ∉ lks)
       by exact (locks_below_not_elem _ _ Hitbelow).
-    iApply (ip_free_entry gs j gl gu gd gk pd pav pu bn gil gisl
-              bmapstart size
+    iApply (ip_free_entry gs j gl pd pav pu gil gisl
+
               k q inum Mt ci n Sb crb cru e0 0%nat tid qtx pidv dq dqb dqs
               vg4 vg5 vg6 m E2 K eb lks Vpr rg
               HK ltac:(lia) Hk ltac:(lia) Hcrb
@@ -5280,8 +5274,8 @@ Section ProofIput.
       (* the epoch is FORGOTTEN at the close arms' seam: [ip_tail] is stated
          over [log_opS] and nothing past this point compares epochs. *)
       iDestruct (log_opSe_opS with "Hop") as "Hop".
-      iApply (ip_tail (CID := CIDacq) CID j bn bmapstart
- size Sb Sb k q inum Mt ci n n
+      iApply (ip_tail (CID := CIDacq) CID j
+ Sb Sb k q inum Mt ci n n
                 (fun w => ip_spend_w w cru crz) false crb tid qtx pidv dq dqb dqs
                 m M' K eb sp0 vg4' vg5' vg6' lks Vpr rg
                 HK Hk ltac:(wp_next_chain) Hsp0eq HM'regs HM'a5 Hwf Hciwf
@@ -5323,8 +5317,8 @@ Section ProofIput.
       iEval (rewrite -Hf1) in "Hr24". iEval (rewrite -Hf2) in "Hr16".
       iEval (rewrite -Hf3) in "Hr8".  iEval (rewrite -Hf4) in "Hg4".
       iEval (rewrite -Hf5) in "Hg5".  iEval (rewrite -Hf6) in "Hg6".
-      iApply (ip_free_locked gs j gl gu gd gk pd pav pu bn gil gisl g1
-                bmapstart size
+      iApply (ip_free_locked gs j gl pd pav pu gil gisl g1
+
                 k q inum dn bm data Mt ci n Sb crb cru crz false e0 0%nat tid (qtx/2)%Qp
                 pidv dq dqb dqs
                 spr (m !!! Regidx Rra) (m !!! Regidx Rs0) (m !!! Regidx Rs1)
@@ -5407,19 +5401,15 @@ Section ProofIput.
   (* ===================================================================== *)
   Lemma wp_iput_sconf
       (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (gil gisl : gname)
-      (bmapstart : Z)
-      (size : Z)
       (k : nat) (q : Qp) (inum : mword 32)
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn gil gisl
-                          bmapstart size
+    : wp_iput_sconf_body gs j gl pd pav pu gil gisl
+
                           k q inum n pidv dq dqb dqs m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_iput_sconf_body].
@@ -5442,8 +5432,8 @@ Section ProofIput.
        [ireg_open] itself; the indexed form the gen contract keeps is that
        proposition at [rg := true], and it is not given back. *)
     iEval (rewrite -ireg_regime_true) in "Hropen".
-    iApply (wp_iput_gen gs j gl gu gd gk pd pav pu bn gil gisl
-              bmapstart size
+    iApply (wp_iput_gen gs j gl pd pav pu gil gisl
+
               k q inum n Sb0 false false false e00 t0 (1/2)%Qp pidv dq dqb dqs m K eb b lks Vpr true
               HK Hk ltac:(discriminate) ltac:(discriminate)
               Hgeom Hsz Hbm0 Hbmcov Hbmlog Hist Hicov Hilog

@@ -1614,12 +1614,13 @@ Section ProofPipealloc.
     iAssert (file_pay_st γf k0 1
                (MkFContent FD_PIPE (mword_of_int 1 : mword 8)
                   (mword_of_int 0 : mword 8) pi
-                  (fc_ip Cf0) (fc_major Cf0)) (FdOpen (FdPipe false)))
+                  (fc_ip Cf0) (fc_major Cf0)) (FdOpen true false FdPipe))
       with "[Hpn0 Hrd Hiru0 Hoh0]" as "Hpay0".
     { iExists (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_ocv pn0)
                  (fp_inum pn0)).
       (* the retype IS the descriptor's state change: a pipe end reports
-         [FdOpen FdPipe], and [fp_inum] is meaningless on this arm *)
+         [FdOpen r w FdPipe] at the flags it stores, and [fp_inum] is
+         meaningless on this arm *)
       iSplitR; [iPureIntro; by split|].
       iFrame "Hpn0".
       rewrite /file_payload /file_core /fc_wbool;
@@ -1638,7 +1639,7 @@ Section ProofPipealloc.
     iAssert (file_pay_st γf k1 1
                (MkFContent FD_PIPE (mword_of_int 0 : mword 8)
                   (mword_of_int 1 : mword 8) pi
-                  (fc_ip Cf1) (fc_major Cf1)) (FdOpen (FdPipe true)))
+                  (fc_ip Cf1) (fc_major Cf1)) (FdOpen false true FdPipe))
       with "[Hpn1 Hwr Hiru1 Hoh1]" as "Hpay1".
     { iExists (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_ocv pn1)
                  (fp_inum pn1)).

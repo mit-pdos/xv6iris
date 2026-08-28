@@ -116,6 +116,7 @@ Require Import ProcGeom.
 Require Import TrampPt UptTree.
 Require Import KptShare.   (* [tlb_res_pt] -- the translation slot the parked residue drops *)
 Require Import UserPtTree UserExec.
+Require Import UexecWp.    (* [uexec_wp] -- the residue's user-execution WP slot *)
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import TimerCap.   (* [sstc_enabled]: the residue's mcounteren pin *)
@@ -127,7 +128,7 @@ Import Defs.
 (* the mstatus facts usertrap's return guarantees: exactly userret's
    premises (the sret decodes to User and does not trap) plus the FS/VS
    pins the user-mode invariant carries across the sret
-   ([userret_to_user_inv], UserKernelBridge.v). *)
+   ([userret_to_user_state], UserKernelBridge.v). *)
 Definition usertrap_ret_ms (ms : mword 64) : Prop :=
   eq_vec (_get_Mstatus_SIE ms) ('b"1") = false /\
   eq_vec (_get_Mstatus_MPRV ms) ('b"1") = false /\
@@ -519,6 +520,31 @@ Module Type USERTRAP_RES.
            ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗ hart_csrs -∗
            usertrap_res_bare pt ksp).
 
+  (* THE USER-EXECUTION WP, EXTRACTED AND RE-DEPOSITED.  The residue carries
+     one more per-process resource than the kernel plumbing above: the WP
+     that says what THIS process does when userret resumes it
+     ([UexecWp.uexec_wp], a conjunct of [UsertrapRes.ut_own]/[ut_own_nopt] --
+     see claude-notes/projects/user-wp-slot.md, SS1.3 for why it lives beside
+     [proc_priv] rather than inside it).  The trap loop is its only reader:
+     at each round it pulls the slot out here, applies it at the concrete
+     resume state userret built from the residue's own trapframe and pages,
+     and puts one back for the next round.  Stated on the BARE form because
+     that is the one that parks across user execution -- the window in which
+     losing the slot would leave the loop with nothing to resume.
+
+     THE CLOSER TAKES A POSSIBLY DIFFERENT SLOT, which is the whole seam: it
+     is a plain wand, so nothing forces the deposit to be the extraction.  At
+     step 1 the conjunct is the forall-state [uexec_wp] and the loop
+     re-deposits a freshly minted generic one (deliberately re-mintable --
+     the wiring is the deliverable); from step 3 on the deposit is the
+     continuation the process itself produced, at the pair its trapframe now
+     records, and this signature does not change.  That is what the accessor
+     exists to localize.  Concrete: [UsertrapRes.ut_res_bare_uwp_acc]. *)
+  Parameter usertrap_res_uwp_acc :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64),
+      usertrap_res_bare pt ksp -∗
+      uexec_wp ∗ (uexec_wp -∗ usertrap_res_bare pt ksp).
+
   Parameter usertrap_res_tf_open :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64),
       (* THE CROSS-ROUND HISTORICAL FACT, bare and undischarged -- see
@@ -529,6 +555,30 @@ Module Type USERTRAP_RES.
         (∀ ws' : list (mword 64),
            ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗
            usertrap_res_bare pt ksp).
+
+  (* THE RUN OPENER: the slot OUT and the trapframe words BORROWED, together,
+     with the closer landing in the HOLED form.  This is the shape the trap
+     loop's ENTRY (forkret's tail, [SpecUserretClosed.wp_userret_closed])
+     needs: it hands the extracted WP to user execution and, since MILESTONE
+     G, gets the NEXT one back at the trap -- so between those two moments
+     what it parks is a residue MINUS a WP, i.e. exactly this closer's
+     [uexec_wp -* usertrap_res_bare].  Nothing on that path mints a slot.
+
+     Why it cannot be [usertrap_res_uwp_acc] followed by
+     [usertrap_res_tf_open]: each accessor consumes the WHOLE sealed residue,
+     so neither applies to the other's remainder -- simultaneous borrows of a
+     sealed bundle come out of ONE opener, the same argument as
+     [usertrap_res_tf_csrs_open]'s.  Concrete:
+     [UsertrapRes.ut_res_bare_run_open]. *)
+  Parameter usertrap_res_run_open :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64),
+      usertrap_res_bare pt ksp -∗
+      uexec_wp ∗
+      ∃ (kroot : mword 44) (ws : list (mword 64)),
+        kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
+        (∀ ws' : list (mword 64),
+           ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗
+           (uexec_wp -∗ usertrap_res_bare pt ksp)).
 End USERTRAP_RES.
 
 Module Type USERTRAP.

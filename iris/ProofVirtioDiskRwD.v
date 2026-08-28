@@ -651,7 +651,7 @@ Section VdrwdLeaves.
     iEval (rewrite -Haddrp) in "Hw2p".
     iDestruct ("Hbackp" with "Hw2p") as "[Hprotop Hpub]".
     iMod ("Hdclosep" with "[Hvfp Hprotop]") as "_".
-    { iNext. iExists vstp. iFrame. iPureIntro. exact Hvokp. }
+    { iApply bi.later_intro. iExists vstp. iFrame. iPureIntro. exact Hvokp. }
     iModIntro.
     iApply (wp_load_s_sconf_au (kt := KT1) (ktd := KT0) 2 false true pc rd rs1 imm m n
               (fun w => zero_extend' 64 w)
@@ -681,7 +681,7 @@ Section VdrwdLeaves.
       iEval (rewrite -Haddr) in "Hw2".
       iDestruct ("Hback" with "Hw2") as "[Hproto Hpub]".
       iMod ("Hdclose" with "[Hvf Hproto]") as "_".
-      { iNext. iExists vst. iFrame. iPureIntro. exact Hvok. }
+      { iApply bi.later_intro. iExists vst. iFrame. iPureIntro. exact Hvok. }
       iModIntro. iFrame "Hpub". done. }
     iIntros (w). iApply wp_next_off_intro. iIntros "Hcg Hpc Hpost". rgall.
     iDestruct "Hpost" as "(-> & Hpub)".
@@ -768,7 +768,7 @@ Section VdrwdLeaves.
     iEval (rewrite -Haddrp) in "Hw2p".
     iDestruct ("Hbackp" with "Hw2p") as "[Hprotop Hpub]".
     iMod ("Hdclosep" with "[Hvfp Hprotop]") as "_".
-    { iNext. iExists vstp. iFrame. iPureIntro. exact Hvokp. }
+    { iApply bi.later_intro. iExists vstp. iFrame. iPureIntro. exact Hvokp. }
     iModIntro.
     iApply (wp_store_s_sconf_au (kt := KT1) (ktd := KT0) 2 false pc rs2 rs1 imm m n
               (h : SailStdpp.Values.mword 16)
@@ -804,7 +804,7 @@ Section VdrwdLeaves.
       iEval (rewrite -Haddr) in "Hw2".
       iMod ("Hclose" with "Hw2") as "(Hproto & Hpub & Hstg & Hfrag)".
       iMod ("Hdclose" with "[Hvf Hproto]") as "_".
-      { iNext. iExists vst. iFrame. iPureIntro. exact Hvok. }
+      { iApply bi.later_intro. iExists vst. iFrame. iPureIntro. exact Hvok. }
       iModIntro. iFrame "Hpub Hstg Hfrag". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc [Hpub [Hstg Hfrag]]". rgall.
     iApply ("Hcont" with "Hcg Hpc Hpub Hstg Hfrag").
@@ -900,7 +900,7 @@ Section VdrwdLeaves.
     iEval (rewrite -Haddrp) in "Hw2p".
     iDestruct ("Hbackp" with "Hw2p") as "[Hprotop Hpub]".
     iMod ("Hdclosep" with "[Hvfp Hprotop]") as "_".
-    { iNext. iExists vstp. iFrame. iPureIntro. exact Hvokp. }
+    { iApply bi.later_intro. iExists vstp. iFrame. iPureIntro. exact Hvokp. }
     iModIntro.
     iApply (wp_store_s_sconf_au (kt := KT1) (ktd := KT0) 2 false pc rs2 rs1 imm m n
               (wrap16 (S np) : SailStdpp.Values.mword 16)
@@ -943,7 +943,7 @@ Section VdrwdLeaves.
       iEval (rewrite -Haddr) in "Hw2".
       iMod ("Hclose" with "Hw2") as "(Hproto & Hpub & Hstg & Hact)".
       iMod ("Hdclose" with "[Hvf Hproto]") as "_".
-      { iNext. iExists vst. iFrame. iPureIntro. exact Hvok. }
+      { iApply bi.later_intro. iExists vst. iFrame. iPureIntro. exact Hvok. }
       iModIntro. iFrame "Hpub Hstg Hact". }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc [Hpub [Hstg Hact]]". rgall.

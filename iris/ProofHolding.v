@@ -173,7 +173,7 @@ Section ProofHolding.
               with "Hcg Hpc []").
     { iApply (hi_02 with "Htext"). }
     iApply wp_next_off_intro.
-    iNext.
+    iApply bi.later_intro.
     iIntros "Hcg Hpc".
     assert (Htgt08 : add_vec (mword_of_int (KernelSyms.holding + 0x02) : mword 64)
                (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0")))) = mword_of_int (KernelSyms.holding + 0x08))
@@ -540,7 +540,7 @@ Section ProofHolding.
               with "Hcg Hpc []").
     { iApply (hi_02 with "Htext"). }
     iApply wp_next_off_intro.
-    iNext.
+    iApply bi.later_intro.
     iIntros "Hcg Hpc".
     assert (Htgt08 : add_vec (mword_of_int (KernelSyms.holding + 0x02) : mword 64)
                (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0")))) = mword_of_int (KernelSyms.holding + 0x08))

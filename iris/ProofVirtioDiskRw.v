@@ -738,7 +738,7 @@ Section ProofVirtioDiskRw.
                    ltac:(vm_compute; reflexivity)
                    with "Hcg Hpc [] [Hcell Hbun Hrest Hcont]");
          [ iApply (rwi_06c with "Htext")
-         | iNext; rewrite wp_next_off; iIntros "Hcg Hpc"; rgall;
+         | iApply bi.later_intro; rewrite wp_next_off; iIntros "Hcg Hpc"; rgall;
            assert (Hbk : add_vec (mword_of_int (KernelSyms.virtio_disk_rw + 0x06c) : mword 64)
                            (sign_extend' 64 (sign_extend' 13
                               (concat_vec (mword_of_int 237 : mword 8) ('b"0"))))

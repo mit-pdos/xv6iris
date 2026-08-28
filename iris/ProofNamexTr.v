@@ -241,14 +241,14 @@ Section ProofNamexTrMain.
      Stated as a WAND PAIR, not as an [⊣⊢]: rewriting with the equivalence
      inside an [iAssert] body makes ssreflect complain
      "_pattern_value_ is used in conclusion". *)
-  Lemma nx_bs3_split (bn : bio_names) :
+  Lemma nx_bs3_split :
     (bslots 3 : iProp Σ) -∗ bslot ∗ bslots 2.
   Proof.
     rewrite /bslot. change 3%nat with (1 + 2)%nat. rewrite bslots_op.
     iIntros "$".
   Qed.
 
-  Lemma nx_bs3_join (bn : bio_names) :
+  Lemma nx_bs3_join :
     (bslot : iProp Σ) -∗ bslots 2 -∗ bslots 3.
   Proof.
     iIntros "A B". rewrite /bslot. change 3%nat with (1 + 2)%nat.
@@ -651,8 +651,6 @@ Section ProofNamexTrMain.
       (j : nat) (b : bool) (K : nat) (m : regfile)
       (sp0 pv nb ret_tgt : mword 64) (plen L : nat) (pfun : nat -> bv 8)
       (pl : list (bv 8)) (eb : bool)
- (bn : bio_names)
-      (bmapstart size : Z)
       (P : nat -> Z -> iProp Σ) (Pmiss : nat -> Z -> iProp Σ)
       (n : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac) (fuel : nat) (CIDl : CpuId) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
@@ -687,7 +685,7 @@ Section ProofNamexTrMain.
      ⌜(iput_units <= ncur)%nat⌝ -∗
      ⌜(0 < length (path_elems (drop off pl)))%nat ->
       (iput_units + (if wc then 0%nat else 1%nat) <= ncur)%nat⌝ -∗
-     ⌜wc = true -> bmapstart ∈ Scur⌝ -∗
+     ⌜wc = true -> fsc_bmapstart ∈ Scur⌝ -∗
      ⌜Sb ⊆ Scur⌝ -∗
      ⌜nx_regs m sp0 (pa_add pv off) ipv nb
               (m !!! Regidx Ra1 : mword 64) Ml⌝ -∗
@@ -710,7 +708,7 @@ Section ProofNamexTrMain.
      (pa_stk sp0 12) ↦₈[KT1] (m !!! Regidx Rs10 : mword 64) -∗
      inode_held_at ipv dcur -∗
      iref_slots 1 -∗
-     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
      proc_priv_bare (proc_addr j) pidv Vpr -∗
      inode_held (pv_cwd Vpr) -∗
@@ -731,7 +729,7 @@ Section ProofNamexTrMain.
         is about an arbitrary hart. *)
      wp_next (CID0 := CIDl) true (proc_addr j) (fun CIDc : CpuId =>
        namex_tr_post (CID := CIDc) (proc_addr j) pv nb ret_tgt pl m K b eb lks
- bn bmapstart size
+
                      plen pfun n Sb P Pmiss pidv dq dqb dqs dqpv Vpr) -∗
      WP (Loop : expr riscv_lang))%I.
 
@@ -740,8 +738,6 @@ Section ProofNamexTrMain.
       (plen a e : nat) (pfun : nat -> bv 8) (ipv : mword 64) (ncur : nat)
       (Scur : gset Z) (pl : list (bv 8)) (kk : nat) (dcur : Z)
       (P : nat -> Z -> iProp Σ) (Pmiss : nat -> Z -> iProp Σ) (eb : bool)
- (bn : bio_names)
-      (bmapstart size : Z)
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (CIDt : CpuId) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
     (∀ (Mt : regfile) (nf' : nat -> bv 8),
@@ -769,7 +765,7 @@ Section ProofNamexTrMain.
      (pa_stk sp0 12) ↦₈[KT1] (m !!! Regidx Rs10 : mword 64) -∗
      inode_held_at ipv dcur -∗
      iref_slots 1 -∗
-     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
      proc_priv_bare (proc_addr j) pidv Vpr -∗
      inode_held (pv_cwd Vpr) -∗
@@ -791,12 +787,8 @@ Section ProofNamexTrMain.
      premises rather than proved. *)
   Lemma wp_namex_tr
       (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (ga : gname) (gf : gname)
-      (bmapstart : Z)
-      (size : Z)
+ (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (nfun : nat -> bv 8)
       (n : nat) (Sb : gset Z)
@@ -804,9 +796,9 @@ Section ProofNamexTrMain.
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_namex_tr_body gs j gl gu gd gk pd pav pu bn
-                       ga gf bmapstart
-                       size plen pfun nfun n Sb P Pmiss
+    : wp_namex_tr_body gs j gl pd pav pu
+ gf
+ plen pfun nfun n Sb P Pmiss
                        pidv dq dqb dqs dqpv m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_namex_tr_body].
@@ -2221,7 +2213,7 @@ Section ProofNamexTrMain.
     iAssert (∀ fuel : nat, wp_next (CID0 := CID) true (proc_addr j)
                (fun CIDl : CpuId =>
                   nx_loop_body j b K m sp0 pv nb ret_tgt plen L pfun pl eb
- bn bmapstart size
+
                                P Pmiss n Sb pidv dq dqb dqs dqpv fuel CIDl lks Vpr))%I
       with "[]" as "Hloop".
     { (* ---- local disequality helpers, used all through the body ---- *)
@@ -2493,8 +2485,8 @@ Section ProofNamexTrMain.
                           (fun CIDt : CpuId =>
                              nx_rest_body j b K m sp0 pv nb plen a e pfun ipv ncur
                                           Scur pl (length es0) dcur P Pmiss
-                                          eb bn bmapstart
- size pidv dq dqb dqs dqpv
+                                          eb
+ pidv dq dqb dqs dqpv
                                           CIDt lks Vpr))%I
                  with "[IHl Hcont]" as "Hrest".
                { iIntros (CIDt Hst Mt nf') "%Hregt %Hviewt Hcg Hcnt Hextc Hclmc Hpc
@@ -2583,7 +2575,7 @@ Section ProofNamexTrMain.
                                 with "Hesc") as "#Hesck".
                    iDestruct (ic_sleeplocks_lookup fsc_ic ik Hik with "Hslks")
                      as (gilk gislk) "#Hslkk".
-                   iDestruct (nx_bs3_split bn with "Hbslot")
+                   iDestruct (nx_bs3_split with "Hbslot")
                      as "[Hbs1 Hbs2]".
                    (* +0xc0 c.mv a0,s4 *)
                    iApply (wp_cmv_s_sconf (mword_of_int (NX + 0xc0)) Ra0 Rs4
@@ -2657,7 +2649,7 @@ Section ProofNamexTrMain.
                       whole locked window, and the residue rides the
                       descriptor conjunct home. *)
 
-                   iApply (IL.wp_ilock_tx_sconf gs j gl gu gd gk pd pav pu bn
+                   iApply (IL.wp_ilock_tx_sconf gs j gl pd pav pu
                              gilk gislk
                              ik (iq/2)%Qp gsh PlainK iinum pidv dq dqs
                              V2 (K - 12)%nat eb b lks Vpr
@@ -2821,7 +2813,7 @@ Section ProofNamexTrMain.
                        iSplitL "Hity Himaj Himin Hinl Hisz".
                        - rewrite /inode_meta /i_type. iFrame.
                        - iFrame. }
-                     iDestruct (nx_bs3_join bn with "Hbs1 Hbs2") as "Hbslot".
+                     iDestruct (nx_bs3_join with "Hbs1 Hbs2") as "Hbslot".
                      (* +0x54 c.mv a0,s4 *)
                      iApply (wp_cmv_s_sconf (mword_of_int (NX + 0x7a)) Ra0 Rs4
                                W0 (K - 12)%nat b ltac:(nz) ltac:(rdok)
@@ -2879,9 +2871,9 @@ Section ProofNamexTrMain.
                      iDestruct (log_opS_named with "Hlog") as (enxB) "Hlog".
                      iDestruct (inode_ref_short_gen_forget with "Hkeep")
                        as "Hkeep2".
-                     iApply (IUP.wp_iunlockput_tx_gen gs j gl gu gd gk pd pav pu
-                               bn gilk gislk
-                               bmapstart size
+                     iApply (IUP.wp_iunlockput_tx_gen gs j gl pd pav pu
+ gilk gislk
+
                                ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
                                Scur wc false false enxB
                                pidv dq dqb dqs ND2 (K - 12)%nat eb b lks Vpr
@@ -3225,8 +3217,8 @@ Section ProofNamexTrMain.
                          assert (Hholesl : blk_holes_zero bml datl)
                            by (destruct Hiok as (_ & _ & _ & _ & _ & Hq & _);
                                exact Hq).
-                         iApply (DL.wp_dirlookup_sconf gs j gl gu gd gk
-                                   pd pav pu bn ga gf
+                         iApply (DL.wp_dirlookup_sconf gs j gl
+                                   pd pav pu gf
  (ientry ik) iinum
                                    bml datl dnl dnl
                                    nf' false (mword_of_int 0 : mword 32)
@@ -3344,7 +3336,7 @@ Section ProofNamexTrMain.
                              iSplitR; [iPureIntro; exact Hduq |].
                              iSplitL "Hdlnk"; [iExact "Hdlnk" |].
                              iFrame "Hdiat Hmeta Haddrs Hind Hblocks Hdview Hfview". }
-                           iDestruct (nx_bs3_join bn with "Hbs1 Hbs2")
+                           iDestruct (nx_bs3_join with "Hbs1 Hbs2")
                              as "Hbslot".
                            assert (Hklt : (kdir < dir_nrec
                                      (bv_unsigned (di_size dnl)))%nat)
@@ -3489,10 +3481,10 @@ Section ProofNamexTrMain.
                                         ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
                            iDestruct (inode_ref_short_gen_forget with "Hkeep")
                              as "Hkeep2".
-                           iApply (IUP.wp_iunlockput_tx_gen gs j gl gu gd gk
-                                     pd pav pu bn gilk gislk
-                                     bmapstart
-                                     size ik (iq/2)%Qp (iq/2)%Qp gsh
+                           iApply (IUP.wp_iunlockput_tx_gen gs j gl
+                                     pd pav pu gilk gislk
+
+ ik (iq/2)%Qp (iq/2)%Qp gsh
                                      iinum dnl bml ncur Scur wc false true
                                      enx pidv dq dqb dqs
                                      GB3 (K - 12)%nat eb b lks Vpr
@@ -3555,7 +3547,7 @@ Section ProofNamexTrMain.
                            (* the report's membership rides the level's own
                               set growth *)
                            assert (Hnb4 : (wc || wup)%bool = true ->
-                                     bmapstart ∈ Sup).
+                                     fsc_bmapstart ∈ Sup).
                            { intros Hw. destruct wc; destruct wup;
                                simpl in Hw;
                                first [ exact (Hsup _ (HbW eq_refl))
@@ -3627,7 +3619,7 @@ Section ProofNamexTrMain.
                              iSplitR; [iPureIntro; exact Hduq |].
                              iSplitL "Hdlnk"; [iExact "Hdlnk" |].
                              iFrame "Hdiat Hmeta Haddrs Hind Hblocks Hdview Hfview". }
-                           iDestruct (nx_bs3_join bn with "Hbs1 Hbs2")
+                           iDestruct (nx_bs3_join with "Hbs1 Hbs2")
                              as "Hbslot".
                            (* +0xe8 c.mv s2,a0 *)
                            iApply (wp_cmv_s_sconf (mword_of_int (NX + 0xe8))
@@ -3747,10 +3739,10 @@ Section ProofNamexTrMain.
                                         ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
                            iDestruct (inode_ref_short_gen_forget with "Hkeep")
                              as "Hkeep2".
-                           iApply (IUP.wp_iunlockput_tx_gen gs j gl gu gd gk
-                                     pd pav pu bn gilk gislk
-                                     bmapstart
-                                     size ik (iq/2)%Qp (iq/2)%Qp gsh
+                           iApply (IUP.wp_iunlockput_tx_gen gs j gl
+                                     pd pav pu gilk gislk
+
+ ik (iq/2)%Qp (iq/2)%Qp gsh
                                      iinum dnl bml ncur Scur wc false true
                                      enx pidv dq dqb dqs
                                      GC3 (K - 12)%nat eb b lks Vpr
@@ -3934,7 +3926,7 @@ Section ProofNamexTrMain.
                        iSplitL "Hity Himaj Himin Hinl Hisz".
                        - rewrite /inode_meta /i_type. iFrame.
                        - iFrame. }
-                     iDestruct (nx_bs3_join bn with "Hbs1 Hbs2") as "Hbslot".
+                     iDestruct (nx_bs3_join with "Hbs1 Hbs2") as "Hbslot".
                      (* +0x54 c.mv a0,s4 *)
                      iApply (wp_cmv_s_sconf (mword_of_int (NX + 0x54)) Ra0 Rs4
                                V3 (K - 12)%nat b ltac:(nz) ltac:(rdok)
@@ -3992,9 +3984,9 @@ Section ProofNamexTrMain.
                      iDestruct (log_opS_named with "Hlog") as (enxB) "Hlog".
                      iDestruct (inode_ref_short_gen_forget with "Hkeep")
                        as "Hkeep2".
-                     iApply (IUP.wp_iunlockput_tx_gen gs j gl gu gd gk pd pav pu
-                               bn gilk gislk
-                               bmapstart size
+                     iApply (IUP.wp_iunlockput_tx_gen gs j gl pd pav pu
+ gilk gislk
+
                                ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
                                Scur wc false false enxB
                                pidv dq dqb dqs ND2 (K - 12)%nat eb b lks Vpr

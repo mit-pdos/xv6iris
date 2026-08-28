@@ -321,7 +321,7 @@ Section WpUldPt.
               iPureIntro. exact Hmj. }
             iMod (fupd_mask_subseteq ∅) as "Hclose"; [set_solver|].
             iModIntro. iSplitR; [iPureIntro; exact Hbf |].
-            iNext. iMod "Hclose" as "_". iModIntro.
+            iApply bi.later_intro. iMod "Hclose" as "_". iModIntro.
             iFrame "Hreg Hmem Hdev".
             rewrite /phys_word_pointsto. iFrame "Hbytes".
             iPureIntro. exact Hbal. }
@@ -356,7 +356,7 @@ Section WpUldPt.
       iFrame "Hms Hmdl HPC HnPC".
       iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
       rewrite Hev. iFrame "Hfile Hword".
-    - iNext. iIntros (npc ms1 mdv1)
+    - iApply bi.later_intro. iIntros (npc ms1 mdv1)
         "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc
          (-> & -> & -> & Hfile & Hword)".
       iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile
@@ -1243,7 +1243,7 @@ Section WpUaluUsretPt.
       iExists mstatus0, mdv0, (add_vec_int va (if is_rvc then 2 else 4)).
       iFrame "Hms Hmdl HPC HnPC".
       iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iExact "Hfile".
-    - iNext. iIntros (npc ms1 mdv1)
+    - iApply bi.later_intro. iIntros (npc ms1 mdv1)
         "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc (-> & -> & -> & Hfile)".
       iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile").
   Qed.
@@ -1344,7 +1344,7 @@ Section WpUaluUsretPt.
       iFrame "Hms Hmdl HPC HnPC".
       iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
       iFrame "Hfile Hsepc".
-    - iNext. iIntros (npc ms1 mdv1)
+    - iApply bi.later_intro. iIntros (npc ms1 mdv1)
         "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc
          (-> & -> & -> & Hfile & Hsepc)".
       iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenvc Hsepc Hutlb

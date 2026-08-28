@@ -109,7 +109,7 @@ Section kptnode.
     { change (pt_base (ptree_canon t0) = pt_base (ptree_canon t)).
       rewrite Hcan. reflexivity. }
     iMod ("Hclose" with "[Ht HM]") as "_".
-    { iNext. iExists t, M. iFrame "Ht HM Hlbt". iPureIntro. exact Hspec. }
+    { iApply bi.later_intro. iExists t, M. iFrame "Ht HM Hlbt". iPureIntro. exact Hspec. }
     iModIntro. iFrame "Hgh". iExists q0. iPureIntro.
     unfold pt_addr2. rewrite Hbase.
     split; [exact H2 |]. split; [exact H1 |]. split; [exact H0 | exact Hq].
@@ -148,7 +148,7 @@ Section kptnode.
     iMod (fupd_mask_subseteq (∅ : coPset)) as "Hback"; [ set_solver | ].
     iModIntro. iSplitR.
     { iPureIntro. exact (read_bytes_of_slot σ a w (Hsel σ q0 H2 H1 H0 Hq)). }
-    iNext. iMod "Hback" as "_". iModIntro. iFrame "Hreg Hgh Hdev".
+    iApply bi.later_intro. iMod "Hback" as "_". iModIntro. iFrame "Hreg Hgh Hdev".
   Qed.
 
   (* the two PINNED levels *)
@@ -207,7 +207,7 @@ Section kptnode.
     iMod (fupd_mask_subseteq (∅ : coPset)) as "Hback"; [ set_solver | ].
     iModIntro. iSplitR.
     { iExists q0. iPureIntro. split; [exact (read_bytes_of_slot σ _ q0 H0) | exact Hq]. }
-    iNext. iMod "Hback" as "_". iModIntro. iFrame "Hreg Hgh Hdev".
+    iApply bi.later_intro. iMod "Hback" as "_". iModIntro. iFrame "Hreg Hgh Hdev".
   Qed.
 
 
@@ -297,7 +297,7 @@ Section kptnode.
     assert (Ha2' : kpt_addr_ok (pt_addr2 t0 vpn))
       by (unfold pt_addr2; rewrite Hb0; exact Ha2).
     iMod ("Hclose" with "[Ht HM]") as "_".
-    { iNext. iExists t, M. iFrame "Ht HM Hlbt". iPureIntro. exact Hspec. }
+    { iApply bi.later_intro. iExists t, M. iFrame "Ht HM Hlbt". iPureIntro. exact Hspec. }
     iModIntro. iExists q2, q1, a1, d1. iPureIntro. rewrite <- Hr0.
     exact (conj Hbt0 (conj Hm0 (conj Ha2' (conj Ha1 Ha0)))).
   Qed.
@@ -520,10 +520,10 @@ Section kptnode.
                Hspec Hm' HMlk).
       exists a1, d1. exact Hq0. }
     iMod ("Hclose" with "[Ht HM]") as "_".
-    { iNext. iExists (ptree_set_leaf t vpn m0'), M.
+    { iApply bi.later_intro. iExists (ptree_set_leaf t vpn m0'), M.
       iFrame "Ht HM Hlb'". iPureIntro. exact Hspec'. }
     iMod (fupd_mask_subseteq (∅ : coPset)) as "Hback2"; [ set_solver | ].
-    iModIntro. iNext. iMod "Hback2" as "_". iModIntro.
+    iModIntro. iApply bi.later_intro. iMod "Hback2" as "_". iModIntro.
     iSplitL; [| done].
     cbn [Interface.WriteReq.value mwrite_req8_con].
     rewrite TypeCasts.cast_N_refl autocast_id.

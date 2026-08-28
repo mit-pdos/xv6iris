@@ -1,13 +1,21 @@
 (* UserretUser.v -- THE DOVETAIL: userret's postcondition enters the
-   user-execution WP.
+   user-execution WP THE CALLER SUPPLIES.
 
-   A functor over the two sealed interfaces: [USERRET] (SpecUserret.v, the
-   trampoline return path) and [USER] (SpecUser.v, arbitrary user-mode
-   execution).  [wp_userret_user] runs userret and, in its continuation,
-   repackages the returned machine into [user_inv C pt] via
-   [userret_to_user_inv] (UserKernelBridge.v) and concludes with
-   [U.wp_user_exec_closed].  Type-checking this file is the proof that the
-   userret spec's postcondition is EXACTLY strong enough for SpecUser.v's
+   A functor over ONE sealed interface, [USERRET] (SpecUserret.v, the
+   trampoline return path).  It used to be a functor over [USER] as well
+   and to finish by applying the ONE hardwired generic-safety theorem; it
+   now takes the WP TO RUN as a premise -- [UexecWp.uexec_wp], the
+   per-process user-execution slot the caller extracted from the kernel
+   residue (claude-notes/projects/user-wp-slot.md).  Whether that slot is
+   the generic one or a verified program's continuation is no longer this
+   file's business, which is exactly the point of the seam.
+
+   [wp_userret_user] runs userret and, in its continuation, repackages the
+   returned machine into the CONCRETE resume state the slot consumes via
+   [userret_to_user_state] (UserKernelBridge.v) -- the [u_regs] bundle,
+   [user_pt_inv] at the delivered image, [user_cfg] -- and applies the
+   slot at it.  Type-checking this file is the proof that the userret
+   spec's postcondition is EXACTLY strong enough for the slot's
    precondition:
 
      - userret returns the sret'd machine (User privilege, mstatus
@@ -20,7 +28,12 @@
      - the mstatus pins [user_mstatus_ok (sret_ms5 mstatus0)] follow from
        the S-mode pins on the pre-sret mstatus0 (SXL/MXR from userret's own
        premises, FS/VS/TVM/TSR as extra premises here -- all facts the
-       S-mode config world carries).
+       S-mode config world carries);
+     - the slot's other pure premise, [loop_ok C pt], is NOT derivable from
+       what userret needs (it pins stvec/mie/medeleg and the descriptor's
+       normal form, which userret is indifferent to), so it is taken as a
+       premise.  Every caller of this dovetail is a trap-loop entry and has
+       it in hand.
 
    What is left over in userret's continuation -- the 31 trapframe words --
    is exactly what the kernel-side residue [Rut] owns while user code runs,
@@ -38,6 +51,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
+Require Import RiscvExtras.   (* [ret_pc]: the sret'd pc the slot resumes at *)
 Require Import RegFile.
 Require Import MinstretInv InstrBytes WireInv.
 Require Import WpGpr.
@@ -48,13 +62,19 @@ Require Import KptExecMap.
 Require Import UserPtTree UserExec UserKernelBridge.
 Require Import KptShare.
 Require Import TrampPt.
-Require Import SpecUserret SpecUser.
+Require Import UexecWp.   (* [uexec_wp] / [loop_ok] -- the slot this runs.
+                             REQUIRED DIRECTLY, not through a re-export: the
+                             file manipulates a slot hypothesis and the
+                             [Typeclasses Opaque] seal does not travel
+                             (durable-notes, "iFrame RESOLVES ITS INSTANCES
+                             UP TO DELTA"). *)
+Require Import SpecUserret.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
-Module UserretUser (R : USERRET) (U : USER).
+Module UserretUser (R : USERRET).
 Section UserretUser.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
@@ -100,6 +120,9 @@ Section UserretUser.
     (* ---- the user data pages' pure facts ---- *)
     uva_pa_inj pt ->
     upt_acc_wf (ud_um pt) ->
+    (* ---- the loop-invariant shape of [C]/[pt], which the SLOT demands and
+           userret is indifferent to (see the header) ---- *)
+    loop_ok C pt ->
     kernel_text -∗
     hw_config -∗
     minstret_inv -∗
@@ -204,12 +227,23 @@ Section UserretUser.
        tf_pa (ud_tfp pt) 280 ↦ₚ₈{ dqm } vt6 -∗
        tf_pa (ud_tfp pt) 112 ↦ₚ₈{ dqm } va0f -∗
      Rut pt) -∗
-    (* ---- the (still assumed) kernel re-entry contract ---- *)
-    ▷ stvec_handler_wp C pt Rut -∗
+    (* ---- THE WP TO RUN.  Not a functor-fixed theorem any more: the caller
+           extracted this slot from the kernel residue it is about to park,
+           and it is what user mode runs on ([UexecWp.uexec_wp]).  Applied
+           below at the concrete post-sret state the bridge builds. ---- *)
+    uexec_wp -∗
+    (* ---- THE TRAP SEAM, in both directions.  The kernel re-entry contract
+           as always -- hand me the trapped frame and I run forever -- but
+           PAIRED with the WP user execution returns at that trap, which is
+           what the next round resumes the process with (MILESTONE G: the
+           WP circulates, nothing is re-minted).  The returned one is typed
+           at the general [uexec_wp]: a verified process may hand back any
+           successor. ---- *)
+    ▷ (user_trap_frame C pt Rut ∗ uexec_wp -∗ WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HSIE HMPRV HSXL HTVM HMXR Hmm Hwf HTSR Hsup Ha0 HuMode Huasid Huppn
-      HFS HVS HXS HSD HMPP HSPIE Hdqc Hinj Hacc.
+      HFS HVS HXS HSD HMPP HSPIE Hdqc Hinj Hacc Hlok.
     iIntros "#Hkt #Hhw #Hmi #Hwi Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc
              #Hclaim Hktlb Hufr Hpc Hfile
              Htf40 Htf48 Htf56 Htf64 Htf72 Htf80 Htf88 Htf96 Htf104 Htf120
@@ -217,7 +251,7 @@ Section UserretUser.
              Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256 Htf264
              Htf272 Htf280 Htf112
              Hsc Hstval Hstvec Hmedl Hmse Hsse #Hmcen #Hscen #Hhpm
-             Hdata Hrutw Hhandler".
+             Hdata Hrutw Huwp Hhandler".
     iApply (R.wp_userret_pt kroot (ud_root pt) (ud_tfp pt) (ud_um pt) m usatp
               mstatus0 (uc_mie C) (uc_mideleg C) MENVCFG_S (mword_of_int 0) sepc0
               vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2 va3 va4 va5 va6 va7
@@ -243,7 +277,8 @@ Section UserretUser.
                              Htf168 Htf176 Htf184 Htf192 Htf200 Htf208 Htf216
                              Htf224 Htf232 Htf240 Htf248 Htf256 Htf264 Htf272
                              Htf280 Htf112") as "Hrut".
-    iDestruct (userret_to_user_inv C pt Rut mstatus0 sepc0 sc_v stval_v
+    (* the machine, UNPACKED into the triple the slot consumes *)
+    iDestruct (userret_to_user_state C pt mstatus0 sepc0 sc_v stval_v
                  (uc_mie C) (uc_mideleg C) MENVCFG_S (mword_of_int 0)
                  (uc_stvec C) (uc_medeleg C)
                  (ud_root pt) (ud_tfp pt) (ud_um pt)
@@ -259,9 +294,22 @@ Section UserretUser.
                  Hinj Hacc
                  with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb Hpc
                        Hfile Hsc Hstval Hstvec Hmedl Hmse Hsse
-                       Hmcen Hscen Hhpm Hdata Hrut")
-      as "Hinv".
-    iApply (U.wp_user_exec_closed C pt Rut with "Hhw Hmi Hwi Hinv Hhandler").
+                       Hmcen Hscen Hhpm Hdata")
+      as (M) "(%Hmsok & Hregs & Hupt & Hcfg)".
+    (* AND THE SLOT RUNS.  The seal comes off HERE ONLY, and only on the
+       hypothesis: the proofmode has to see the slot's foralls to instantiate
+       them, but [Hhandler]'s own [uexec_wp] -- the WP user execution returns
+       -- must stay folded, since that is the type the slot's handler premise
+       is stated at.  A bare [rewrite] would unfold both. *)
+    iEval (rewrite uexec_wp_unfold /uexec_F) in "Huwp".
+    iApply ("Huwp" $! CID C pt Rut M
+              (userret_gpr m vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2
+                 va3 va4 va5 va6 va7 vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10
+                 vs11 vt3 vt4 vt5 vt6 va0f)
+              (sret_ms5 mstatus0) sc_v stval_v sepc0 (ret_pc sepc0)
+              with "[%] [%] Hhw Hmi Hwi Hregs Hupt Hcfg Hrut Hhandler").
+    - exact Hlok.
+    - exact Hmsok.
   Qed.
 
 End UserretUser.

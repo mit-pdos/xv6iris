@@ -23,6 +23,7 @@ Require Import FdSlots FileInvDefs IrefSlots ProcAvail Xv6Cameras ProcDefs.
 Require Import ProcPtOwn UserPtTree ProcGeom TimerCap.
 Require Import IntrDefs KptShare.
 Require Import UsertrapRes.
+Require Import UexecWp.   (* [uexec_wp] -- named by the slot accessor's type *)
 Require Import ParkCap.
 Require Import SpecSyscall.
 Require Import SpecUsertrap.
@@ -134,6 +135,12 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES_PARK.
     usertrap_res_bare pt ksp -∗ sstc_enabled ∗ usertrap_res_bare pt ksp.
   Proof. exact (ut_res_bare_sstc (SY.syscall_env) pt ksp). Qed.
 
+  Lemma usertrap_res_uwp_acc
+      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
+    usertrap_res_bare pt ksp -∗
+    uexec_wp ∗ (uexec_wp -∗ usertrap_res_bare pt ksp).
+  Proof. exact (ut_res_bare_uwp_acc (SY.syscall_env) pt ksp). Qed.
+
   Lemma usertrap_res_tf_csrs_open
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
     usertrap_res_bare pt ksp -∗
@@ -144,6 +151,17 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES_PARK.
          ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗ hart_csrs -∗
          usertrap_res_bare pt ksp).
   Proof. exact (ut_res_bare_tf_csrs_open (SY.syscall_env) pt ksp). Qed.
+
+  Lemma usertrap_res_run_open
+      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
+    usertrap_res_bare pt ksp -∗
+    uexec_wp ∗
+    ∃ (kroot : mword 44) (ws : list (mword 64)),
+      kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
+      (∀ ws' : list (mword 64),
+         ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗
+         (uexec_wp -∗ usertrap_res_bare pt ksp)).
+  Proof. exact (ut_res_bare_run_open (SY.syscall_env) pt ksp). Qed.
 
   (* THE PRODUCER, ASSEMBLED.  Two halves, and the seam between them is the
      whole reason this is provable at all: [ut_res_bare_park] turns
@@ -168,9 +186,9 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES_PARK.
     iApply (ut_res_bare_park (SY.syscall_env) (park_token (un_s N)) N av Hwf Hav
             with "Hcaps [] Hown").
     iIntros "#Hdone #Htok".
-    iDestruct "Hcaps" as "(%Hties & _ & #Hprocs & _ & _ & #Hwl & #Hft & #Hdg & #Hpw)".
+    iDestruct "Hcaps" as "(#Hprocs & _ & _ & #Hwl & #Hft & #Hdg & #Hpw)".
     iApply (SY.syscall_env_park (un_f N) (un_w N) (un_ft N) (un_tk N)
-              (un_fn N) Hties Hj Hplock eq_refl
+              (un_fn N) Hj Hplock eq_refl
             with "Hextra Hwl Hft Hprocs Hdg Hdone Hpw Htok").
   Qed.
 

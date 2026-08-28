@@ -61,19 +61,16 @@ Require Import IrefSlots.
 Require Import ProcAvail.
 Require Import SpecUsertrap.
 Require Import UtResFits.  (* [USERTRAP_RES_PARK] -- the residue plus its producer *)
+(* [loop_ok] MOVED DOWN into UexecWp.v -- the per-process user-execution WP
+   slot's statement needs it, and that file has to sit below UsertrapRes.v.
+   Exported, not merely imported, so every consumer of this interface keeps
+   seeing [loop_ok] under the same name from the same place
+   (claude-notes/projects/user-wp-slot.md SS1.1). *)
+Require Export UexecWp.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
-
-(* the loop-invariant shape of the config record and the descriptor *)
-Definition loop_ok (C : ucfg) (pt : uptd) : Prop :=
-  uc_stvec C = (mword_of_int TRAMPOLINE : mword 64) /\
-  uc_dqc C = DfracOwn 1 /\
-  uc_mie C = MIE_S /\
-  uc_medeleg C = MEDELEG_S /\
-  ud_data pt = ud_pas pt /\
-  proc_pt_wf pt.
 
 (* ===================================================================== *)
 (* THE DELEGATION WORD DELEGATES EVERY USER EXCEPTION.                  *)

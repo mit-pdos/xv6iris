@@ -111,6 +111,15 @@ Section ParkWorld.
        procs_avail None ∗
        wire_inv ∗
        kmap_at tramp_vpn tramp_ppn KP_rx ∗
+       (* THE USER-EXECUTION WP IS NOT HERE, and deliberately so.  This
+          bundle is PERSISTENT and rides in [UsertrapRes.ut_park_caps], so
+          a conjunct of it is ambiently duplicable from inside every trap
+          round -- which is exactly what a per-process WP must not be.  The
+          child's WP is a LINEAR resource the PARKER supplies instead, on
+          the park channel ([UsertrapRes.ut_park_intro_body] /
+          [ParkCap.park_chan], captured at [ParkCap.park_token_park] the
+          way the child's [fd_frags_any] is); it enters the world at the
+          two mint sites named in claude-notes/design/user-wp-slot.md. *)
        (∃ ip : mword 64, (mword_of_int KernelSyms.initproc : mword 64) ↦₈□ ip))%I.
 
   Global Instance park_world_persistent γs : Persistent (park_world γs).

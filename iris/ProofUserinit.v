@@ -111,7 +111,8 @@ Require Import SpecForkretPark.
 Require Import SpecForkretParkPaid.   (* [FORKRET_PARK_PAID] -- [park_token_intro] *)
 Require Import ParkCap.               (* [park_token_park] *)
 Require Import UsertrapRes.           (* [ut_names], [park_env], [park_own] *)
-Require Import SyscParkEnv.           (* [sysc_park_extra] *)
+Require Import SyscParkEnv.           (* [sysc_park_extra] / [park_world] *)
+Require Import UexecWp.               (* [UEXEC_GEN] / [uexec_wp] -- the park's *)
 Require Import FsReady.               (* [fs_geom_ok] *)
 Require Import DiskInv TicksInv.      (* [disk_geom], [is_tickslock] *)
 Require Import SpecUserinit.
@@ -211,8 +212,22 @@ End PstateRunnableHelper.
 
 (* ===================================================================== *)
 
+(* [UG] -- THE GENERIC USER-EXECUTION WP, as a functor argument.  userinit
+   PARKS the first process, and parking a process now COSTS a WP for it: the
+   child's [UexecWp.uexec_wp] is a LINEAR row of the park channel, captured
+   at [ParkCap.park_token_park] (see claude-notes/design/user-wp-slot.md).
+   Nothing persistent carries a WP -- [SyscParkEnv.park_world] used to, which
+   made it duplicable from inside every trap round -- so this is one of the
+   tree's TWO mint sites, the other being sys_fork's kfork call.  Nothing
+   else in userinit's cone reaches a [SpecUser.USER], so the inhabitant
+   arrives here rather than being derived inline the way consumers that
+   already hold a [USER] do ([ProofUexecWp]'s header).  It is a [box]
+   proposition proved from no linear hypothesis, so the argument costs the
+   composition exactly one application: [LinkUserinit.v] passes
+   [UexecGen UserProof]. *)
 Module UserinitProof (AP : ALLOCPROC) (NR : NAMEI_ROOT_BOOT)
-                     (RL : RELEASE) (FP : FORKRET_PARK_PAID) : USERINIT.
+                     (RL : RELEASE) (FP : FORKRET_PARK_PAID)
+                     (UG : UEXEC_GEN) : USERINIT.
 
 Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 Local Ltac nz := vm_compute; discriminate.
@@ -701,10 +716,10 @@ Section ProofUserinit.
       iDestruct "Hp" as "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
                          _ & _ & _ & _ & %Hg)".
       iPureIntro. exact Hg. }
-    pose (N := MkUtNames γft γf γw γs j γl fsc_uart fsc_disk fsc_dlock pd pav pu
-                 γtl fsc_printk fsc_bio
-                 iv1 DfracDiscarded fsc_kalloc fsc_kpages
-                 fsc_bmapstart fsc_size ks pid).
+    pose (N := MkUtNames γft γf γw γs j γl pd pav pu
+                 γtl
+                 iv1 DfracDiscarded
+ ks pid).
     assert (Hwf : ut_wf N).
     { split_and!; [exact Hj | exact Hgl | exact Hnproc | exact (fgo_loggeom Hgeomok)]. }
     iAssert (park_env N) as "#Henv".
@@ -712,8 +727,8 @@ Section ProofUserinit.
       { iDestruct "Hdcaps" as "(_ & _ & $ & _ & $ & _)". }
       rewrite /park_env /ut_park_caps /sysc_park_extra.
       iSplitL.
-      { iSplitR; [iPureIntro; constructor; reflexivity|].
-        iSplitR; [iPureIntro; reflexivity|].
+      { (* the two PURE rows are gone (rank 1d): [fclose_ties] and the printk
+           equation both named record fields that no longer exist. *)
         iSplitR; [iExact "Hpinv"|].
         iSplitR; [iExact "Hks"|].
         iSplitR; [iExact "Hdcaps"|].
@@ -725,7 +740,7 @@ Section ProofUserinit.
         iDestruct "Hdcaps" as "(#Hd1 & #Hd2 & #Hd3 & #Hd4 & #Hd5 & #Hd6)".
         iFrame "Hd1 Hd2 Hd3 Hd4 Hd5 Hd6 Hcready Hwire Htramp Hpav".
         iSplitR; [iExists γp; iExact "Hlpid"|].
-        iExists iv1. iExact "Hip1". }
+        iExists iv1; iExact "Hip1". }
       iSplitR; [iExists γp; iExact "Hlpid"|].
       iSplitR; [iExact "Hpav"|].
       iSplitR; [iExact "Htl"|].
@@ -736,8 +751,15 @@ Section ProofUserinit.
     (* THE TOKEN: the park, proved once at the top ([FP.park_token_intro])
        and from here on a resource every process hands its children. *)
     iPoseProof (FP.park_token_intro γs) as "#Htoken".
+    (* MINT SITE #1 (the other is sys_fork's, at its kfork call): the first
+       process's user-execution WP, the GENERIC inhabitant out of this
+       functor's [UG] argument.  The [box] is eliminated once, here, into a
+       LINEAR resource the park below consumes -- nothing persistent carries
+       a WP any more (claude-notes/design/user-wp-slot.md). *)
+    iAssert (uexec_wp) as "Huwp".
+    { iPoseProof UG.uexec_wp_gen as "#Hgen". iExact "Hgen". }
     iMod (park_token_park N rest (upd_cwd V ipv) Hwf Hrest
-            with "Htoken Htext Hwire Htramp Hmk Hstack Henv Hown Hfrag
+            with "Htoken Htext Hwire Htramp Hmk Hstack Henv Hown Hfrag Huwp
                   [Hks Hctx Hpriv Hfd Hirs]")
       as "Hpctx".
     { rewrite /park_child. iFrame "Hks Hpriv Hfd Hirs". iExact "Hctx". }

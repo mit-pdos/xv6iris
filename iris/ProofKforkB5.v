@@ -81,6 +81,7 @@ Require Import SpecProcinit.
 Require Import SpecForkretPark.
 Require Import ParkCap.   (* [park_token] / [park_token_park] -- the park, as a resource *)
 Require Import UsertrapRes SyscParkEnv FsReady FileInv FirstTok DiskInv ProcDefs FsCfg.   (* the park's vocabulary *)
+Require Import UexecWp.   (* [uexec_wp] -- the child's WP, captured at the park *)
 Require Import SpecAcquire SpecRelease.
 Require Import CodeKfork.
 From Kernel Require KernelSyms.
@@ -189,6 +190,12 @@ Section ProofKforkB5.
     (* the child's descriptor-state fragments, minted with its block by
        allocproc; the park captures them into the resume closer. *)
     FdSlots.fd_frags_any (ProcDefs.pv_fdg Vc) -∗
+    (* ...and the child's user-execution WP, on the very same route: kfork's
+       caller supplies it ([SpecKfork]'s contract) and the park captures it
+       into the resume closer, where [UsertrapRes.ut_res_bare_park] spends
+       it on the child's residue.  LINEAR -- see
+       claude-notes/design/user-wp-slot.md. *)
+    uexec_wp -∗
     (* the slot's ALLOCATION MARKER, minted by allocproc and carried here
        through kfork's body: every non-UNUSED arm of the lock invariant
        holds it, so both releases below need it ([ProcAvail.v]).
@@ -213,7 +220,7 @@ Section ProofKforkB5.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hlvl Hj Hgl Hrest Hb Hm20 Hm21 Hm9 Hfresh.
-    iIntros "Hcg Hown Hpay #Htext Hpc #Hpinv #Hwl #Hft #Hworld #Htoken #Hfdone Hheld Hhart Hpriv Hfrag #Hmk
+    iIntros "Hcg Hown Hpay #Htext Hpc #Hpinv #Hwl #Hft #Hworld #Htoken #Hfdone Hheld Hhart Hpriv Hfrag Huwp #Hmk
              Hfd Hirsp Hbsl Hkfree #Hks Hctx Hcont".
     (* -------------------------------------------------------------- *)
     (* MOVE 1a: build [proc_lock_res γs γl (proc_addr j)] at USED, via the *)
@@ -230,10 +237,10 @@ Section ProofKforkB5.
     iDestruct (SchedCtx.procs_inv_len with "Hpinv") as %Hnproc.
     iAssert (⌜FsReady.fs_geom_ok⌝)%I as %Hgeomok.
     { iDestruct "Hfdone" as "[_ #Hrdy]". iApply (FsReady.fs_ready_geom with "Hrdy"). }
-    pose (N := MkUtNames γft γf γw γs j γl fsc_uart fsc_disk fsc_dlock pd pav pu
-                 γtl fsc_printk fsc_bio
-                 iv1 DfracDiscarded fsc_kalloc fsc_kpages
-                 fsc_bmapstart fsc_size ks pid_c).
+    pose (N := MkUtNames γft γf γw γs j γl pd pav pu
+                 γtl
+                 iv1 DfracDiscarded
+ ks pid_c).
     assert (Hwf : ut_wf N).
     { split_and!; [exact Hj | exact Hgl | exact Hnproc | exact (FsReady.fgo_loggeom Hgeomok)]. }
     iAssert (park_env N) as "#Henv".
@@ -241,8 +248,9 @@ Section ProofKforkB5.
       { iDestruct "Hdcaps" as "(_ & _ & $ & _)". }
       rewrite /park_env /ut_park_caps.
       iSplitL; [| iExact "Hextra"].
-      iSplitR; [iPureIntro; constructor; reflexivity|].
-      iSplitR; [iPureIntro; reflexivity|].
+      (* the two PURE rows are gone (rank 1d): [fclose_ties] and the printk
+         equation both named [fclose_names]/[ut_names] fields that no longer
+         exist. *)
       iSplitR; [iExact "Hpinv"|].
       iSplitR; [iExact "Hks"|].
       iSplitR; [iExact "Hdcaps"|].
@@ -254,7 +262,7 @@ Section ProofKforkB5.
     { rewrite /park_own. iFrame "Hbsl". iExact "Hip1". }
     iDestruct (ProcDefs.kstack_free_at with "Hks Hkfree") as "Hstack".
     iMod (park_token_park N rest Vc Hwf Hrest
-            with "Htoken Htext Hwire Htramp Hmk Hstack Henv Hown_park Hfrag
+            with "Htoken Htext Hwire Htramp Hmk Hstack Henv Hown_park Hfrag Huwp
                   [Hks Hctx Hpriv Hfd Hirsp]")
       as "Hpctx".
     { rewrite /park_child. iFrame "Hks Hpriv Hfd Hirsp".

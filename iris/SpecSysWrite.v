@@ -106,6 +106,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.  (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -136,7 +137,7 @@ Section SpecSysWrite.
     (filewrite_env_out fn st -∗ filewrite_fs_out fn ∗ filewrite_devsw fn).
   Proof.
     iIntros "Hfs Hdev". rewrite /filewrite_env /filewrite_env_out.
-    destruct st as [|[?|?|mj]].
+    destruct st as [|? ? [?| |mj]].
     { (* CLOSED *)
       iSplitR; [done|]. iIntros "_".
       iDestruct (filewrite_fs_env_out with "Hfs") as "Hout".
@@ -161,7 +162,7 @@ End SpecSysWrite.
 
 Definition wp_sys_write_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
+ (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
     (fn : fwrite_names)                          (* the file system's ghosts *)
     (pidv : mword 32) (V : pprivate)
@@ -206,7 +207,7 @@ Definition wp_sys_write_sconf_body
      mints the literal, and this is the console bundle printk needs. *)
   panic_env -∗
   proc_priv γf pj pidv V -∗
-  kalloc_env γa None -∗
+  kalloc_env fsc_kalloc None -∗
   procs_inv γs -∗
   (* ...and the file system in the form that does NOT name a file, plus the
      device table's write column -- which now comes from the CONSOLE TABLE
@@ -229,7 +230,7 @@ Definition wp_sys_write_sconf_body
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf pj pidv (upd_upt V P') -∗
-      kalloc_env γa None -∗
+      kalloc_env fsc_kalloc None -∗
       (* the file system, back *)
       filewrite_fs_out fn -∗
       (* the device column is NOT returned: it is persistent, and the caller
@@ -240,11 +241,11 @@ Definition wp_sys_write_sconf_body
 Module Type SYSWRITE.
   Parameter wp_sys_write_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (γf : gname)
+ (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fwrite_names)
       (pidv : mword 32) (V : pprivate)
       (v v2 : mword 64)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string),
-      wp_sys_write_sconf_body γa γf γs j γlp fn pidv V v v2 m av eb b lks.
+      wp_sys_write_sconf_body γf γs j γlp fn pidv V v v2 m av eb b lks.
 End SYSWRITE.

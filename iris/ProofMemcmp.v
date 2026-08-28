@@ -529,7 +529,7 @@ Section ProofMemcmp.
                   M5 (K - 2)%nat b ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (mci_28 with "Htext"). }
-        iIntros (CID8 Hs8). iNext. iIntros "Hcg Hpc".
+        iIntros (CID8 Hs8). iApply bi.later_intro. iIntros "Hcg Hpc".
         assert (Ht2e : add_vec (mword_of_int (KernelSyms.memcmp + 0x28) : mword 64)
                   (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 3 : mword 11) ('b"0"))))
                 = mword_of_int (KernelSyms.memcmp + 0x2e))
@@ -560,7 +560,7 @@ Section ProofMemcmp.
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (mci_22 with "Htext"). }
-        iNext. iIntros (CID6 Hs6) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID6 Hs6) "Hcg Hpc".
         assert (Hback12 : add_vec (mword_of_int (KernelSyms.memcmp + 0x22) : mword 64)
                             (sign_extend' 64 (mword_of_int 8176 : mword 13))
                           = mword_of_int (KernelSyms.memcmp + 0x12))
@@ -582,7 +582,7 @@ Section ProofMemcmp.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (mci_1a with "Htext"). }
-      iNext. iIntros (CID3 Hs3) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID3 Hs3) "Hcg Hpc".
       assert (Ht2a : add_vec (mword_of_int (KernelSyms.memcmp + 0x1a) : mword 64)
                        (sign_extend' 64 (mword_of_int 16 : mword 13))
                      = mword_of_int (KernelSyms.memcmp + 0x2a))
@@ -749,7 +749,7 @@ Section ProofMemcmp.
                 ltac:(rewrite HR2a2'; exact Ea2) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (mci_08 with "Htext"). }
-      iNext. iIntros (CID5 Hs5) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID5 Hs5) "Hcg Hpc".
       assert (Ht36 : add_vec (mword_of_int (KernelSyms.memcmp + 0x08) : mword 64)
                 (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 23 : mword 8) ('b"0"))))
               = mword_of_int (KernelSyms.memcmp + 0x36))
@@ -775,7 +775,7 @@ Section ProofMemcmp.
                 Z1 (K - 2)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (mci_38 with "Htext"). }
-      iIntros (CID7 Hs7). iNext. iIntros "Hcg Hpc".
+      iIntros (CID7 Hs7). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Ht2e : add_vec (mword_of_int (KernelSyms.memcmp + 0x38) : mword 64)
                 (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2043 : mword 11) ('b"0"))))
               = mword_of_int (KernelSyms.memcmp + 0x2e))

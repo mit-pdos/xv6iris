@@ -198,6 +198,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
+Require Import FsReady. (* [fs_ready]: the fabric IS this predicate now *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -345,51 +346,90 @@ Definition kexec_ok (V V' : pprivate) (r : mword 64)
 Definition fs_fabric
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (gs : list gname) (gu : uart_names) (gd : disk_names) (gk : gname)
-    (pd pav pu : mword 64) (bn : bio_names)
+    (gs : list gname)
+    (pd pav pu : mword 64)
     : iProp Σ :=
-  (* THE AMBIENT KERNEL ENVIRONMENT, which every fs contract below this one
-     now also asks for by name: the .rodata image the panic literals come
-     out of, and the console credentials [panic] hands to printk.  Both are
-     persistent and both are supplied once at boot, so putting them in the
-     fabric rather than in each block lemma's premise list is what keeps the
-     kexec cone's dozen internal lemmas unchanged. *)
-  (kernel_data ∗
-   panic_env ∗
-   bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) ∗
-   log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev ∗
-   fs_crash_seam fsc_cov fsc_logst ∗
-   gen_cert ∗
-   is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev ∗
-   itable_inv ∗
-   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst ∗
-   ic_sleeplocks fsc_ic ∗
-   ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
-   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2 RULING B, §6'' RULING
-      G').  The kexec cone reaches iput (fileclose on the exec'ing process's
-      table, and kexit's), whose free path FREEZES -- and §2.3's boot-shelter
-      clause makes a freezer exhibit the regime it is freezing under.  It is
-      persistent and RULING B fires it before [kexec("/init")], so the fabric
-      is exactly where it belongs: every consumer of this bundle already has
-      it, and no block lemma's premise list grows. *)
-   ireg_open ∗
+  (* FOUR ROWS WHERE THERE WERE SEVENTEEN (rank 1d).  This bundle used to
+     SPELL the file system out -- the .rodata image, panic's credentials,
+     the block and log ctx's, the crash seam, the era certificate, the
+     icache's four, the inode region and its sealed regime, the device
+     invariant -- at names each caller threaded.  Every one of those names
+     is a [FsCfg.fscfg] / [IcacheRef.icfg] field now, and a bundle spelled
+     entirely at ambient names IS [FsReady.fs_ready]: a copy of a
+     parameter-free predicate is still a copy.  [fs_fabric_all] below hands
+     back the sixteen rows in the ORDER the cone's destructs read them, so
+     nothing downstream had to move.
+
+     WHAT IS NOT [fs_ready], and why each is here.  [procs_inv gs] is a
+     PROCESS resource at the CALLER's own proc array -- the file system has
+     no process content at all (FsCfg.v's header).  The disk fabric is at
+     the caller's own three ring pages, which [fs_ready] QUANTIFIES (that
+     record's ruling R1: [virtio_disk_init] [kalloc]s them at WP time), and
+     the kexec cone threads them down to [bread]; [FsReady.disk_geom_agree]
+     is the bridge in the other direction. *)
+  (FsReady.fs_ready ∗
    procs_inv gs ∗
-   dev_inv gu gd ∗
-   disk_geom gd pd pav pu ∗
-   (* THE AMBIENT LOG IS NO LONGER A CONJUNCT.  It used to be
-      [⌜g = icfg_log⌝] -- the fabric's own tie, LAST so no destructuring
-      pattern above it moved -- because kexec write-locks the inode it is
-      reading and the escrow parks its transaction at [icfg_log], having no
-      [log_names] parameter of its own.  The fabric names the ambient log
-      directly now (rank 1c), so there is nothing left to tie. *)
-   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu))%I.
+   disk_geom fsc_disk pd pav pu ∗
+   is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu))%I.
 
 Global Instance fs_fabric_persistent
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    gs gu gd gk pd pav pu bn :
-  Persistent (fs_fabric gs gu gd gk pd pav pu bn).
-Proof. apply _. Qed.
+    gs pd pav pu :
+  Persistent (fs_fabric gs pd pav pu).
+Proof. rewrite /fs_fabric. apply _. Qed.
+
+(* THE UNPACK, in the bundle's own historical order -- which is what keeps
+   the cone's six positional [iDestruct]s verbatim across the collapse.
+   Twelve of the sixteen rows are one [FsReady] projection each; the other
+   four ride in the bundle. *)
+Lemma fs_fabric_all
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    (gs : list gname) (pd pav pu : mword 64) :
+  fs_fabric gs pd pav pu -∗
+  kernel_data ∗
+  panic_env ∗
+  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) ∗
+  log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev ∗
+  fs_crash_seam fsc_cov fsc_logst ∗
+  gen_cert ∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev ∗
+  itable_inv ∗
+  ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst ∗
+  ic_sleeplocks fsc_ic ∗
+  ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
+  ireg_open ∗
+  procs_inv gs ∗
+  dev_inv fsc_uart fsc_disk ∗
+  disk_geom fsc_disk pd pav pu ∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu).
+Proof.
+  (* row by row, not one [iFrame]: every conjunct is definition-valued, so a
+     named frame pays a goal-side conversion per hypothesis -- the same
+     measurement (107.7 s and 90.6 s at two call sites) that made the old
+     constructor lemma worth having. *)
+  iIntros "(#Hrdy & #Hprocs & #Hgeom & #Hdlock)".
+  iDestruct (FsReady.fs_ready_icache with "Hrdy") as "(#Hitab & #Hitinv & #Hesc & #Hslks)".
+  iDestruct (FsReady.fs_ready_region with "Hrdy") as "[#Hireg #Hropen]".
+  iDestruct (FsReady.fs_ready_disk with "Hrdy") as "[#Hdevi _]".
+  iSplitR; [iApply (FsReady.fs_ready_data with "Hrdy") |].
+  iSplitR; [iApply (FsReady.fs_ready_panic with "Hrdy") |].
+  iSplitR; [iApply (FsReady.fs_ready_bio with "Hrdy") |].
+  iSplitR; [iApply (FsReady.fs_ready_log with "Hrdy") |].
+  iSplitR; [iApply (FsReady.fs_ready_seam with "Hrdy") |].
+  iSplitR; [iApply (FsReady.fs_ready_gen with "Hrdy") |].
+  iSplitR; [iExact "Hitab"  |].
+  iSplitR; [iExact "Hitinv" |].
+  iSplitR; [iExact "Hesc"   |].
+  iSplitR; [iExact "Hslks"  |].
+  iSplitR; [iExact "Hireg"  |].
+  iSplitR; [iExact "Hropen" |].
+  iSplitR; [iExact "Hprocs" |].
+  iSplitR; [iExact "Hdevi"  |].
+  iSplitR; [iExact "Hgeom"  |].
+  iExact "Hdlock".
+Qed.
 
 (* ===================================================================== *)
 (*  The contract.                                                         *)
@@ -398,12 +438,9 @@ Definition wp_kexec_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (gs : list gname) (jp : nat) (gl : gname)           (* the running process *)
-    (gu : uart_names) (gd : disk_names) (gk : gname)    (* disk fabric + lock  *)
+    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
-    (ga : gname) (gf : gname)                           (* kalloc, file table  *)
-    (bmapstart : Z)
-    (size : Z)
+ (gf : gname)                           (* kalloc, file table  *)
     (plen : nat) (pfun : nat -> bv 8)                   (* the path buffer     *)
     (na : nat) (avf : nat -> mword 64)                  (* argv[0 .. na]       *)
     (alen : nat -> nat) (aslen : nat -> nat)            (* strlen / owned len  *)
@@ -421,12 +458,12 @@ Definition wp_kexec_sconf_body
   icfg_dev = ROOTDEV ->
   (0 < icfg_nib)%nat ->
   log_geom_ok fsc_cov fsc_logst ->
-  0 < size <= BPB ->
-  0 <= bmapstart ->
-  bmapstart ∈ fsc_cov ->
-  ~ (bmapstart ∈ log_region_set fsc_logst) ->
+  0 < fsc_size <= BPB ->
+  0 <= fsc_bmapstart ->
+  fsc_bmapstart ∈ fsc_cov ->
+  ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
   0 <= icfg_ist ->
-  cov_below fsc_cov size ->
+  cov_below fsc_cov fsc_size ->
   ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
   (* ---- the path ---- *)
   bb_cstr pfun plen ->
@@ -499,15 +536,15 @@ Definition wp_kexec_sconf_body
   trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
-  fs_fabric gs gu gd gk pd pav pu bn
+  fs_fabric gs pd pav pu
  -∗
-  kalloc_env ga None -∗
-  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+  kalloc_env fsc_kalloc None -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   (* THE BLOCK BITMAP'S INVARIANT (BitmapInv.v): persistent; namei's walk
      and the O-arm's iput/iunlockput free into it, and the B2 stage bundle
      [SpecKexecB2.kxc_res] carries it, so this is the row that funds them. *)
-  bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+  bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   (* THE PROCESS'S PRIVATE BLOCK.  p->pid, p->cwd and the cwd reference namei
      needs are all inside it (ProcInv.proc_priv_cwd_pid); so are the p->name
      bytes safestrcpy writes and the trapframe words the commit block writes. *)
@@ -554,9 +591,9 @@ Definition wp_kexec_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-      kalloc_env ga None -∗
+      kalloc_env fsc_kalloc None -∗
       proc_priv gf pj pidv V' -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
       ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
@@ -572,12 +609,8 @@ Module Type KEXEC.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (jp : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (ga : gname) (gf : gname)
-      (bmapstart : Z)
-      (size : Z)
+ (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64)
       (alen aslen : nat -> nat) (afun : nat -> nat -> bv 8)
@@ -585,8 +618,8 @@ Module Type KEXEC.
       (dqb dqs dqa dqpv dqas : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_kexec_sconf_body gs jp gl gu gd gk pd pav pu bn
-                          ga gf bmapstart
-                          size plen pfun na avf alen aslen afun
+      wp_kexec_sconf_body gs jp gl pd pav pu
+ gf
+ plen pfun na avf alen aslen afun
                           pidv V dqb dqs dqa dqpv dqas m K eb b lks.
 End KEXEC.

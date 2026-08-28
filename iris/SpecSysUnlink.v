@@ -290,7 +290,7 @@ Definition sys_unlink_closer
     (gf : gname) (pj : mword 64) (pid : mword 32) (V : pprivate)
     (m : regfile) (ret_tgt : mword 64) (K : nat) (eb b : bool)
     (lks : gset string) (dqb dqs dqbs : dfrac)
-    (bmapstart size : Z) : iProp Σ :=
+ : iProp Σ :=
   (∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       (* the page table may have GROWN: argstr's fetchstr faults user pages
@@ -302,9 +302,9 @@ Definition sys_unlink_closer
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       bslots 3 -∗
-      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-      sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
+      sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
       (* NO ORDERING on the free pool: the zeroing's writei can ALLOCATE and
          every iunlockput can FREE (itrunc).  See the header. *)
       (* the allowance, whole: see the header's reference ledger *)
@@ -317,13 +317,10 @@ Definition sys_unlink_closer
 Definition wp_sys_unlink_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γf : gname) (γa : gname) (γpr : gname)      (* ftable, kalloc, printk   *)
+    (γf : gname)      (* ftable, kalloc, printk   *)
     (gs : list gname) (j : nat) (gl : gname)     (* the running process      *)
-    (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock *)
+   (* disk fabric + lock *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
-    (bmapstart : Z)
-    (size : Z)
     (dqb dqs dqbs : dfrac)
     (v0 : mword 64)                           (* syscall argument 0         *)
     (pid : mword 32) (V : pprivate)
@@ -337,13 +334,13 @@ Definition wp_sys_unlink_sconf_body
   (0 < icfg_nib)%nat ->
   (* ---- the block-layer geometry ---- *)
   log_geom_ok fsc_cov fsc_logst ->
-  0 < size <= BPB ->
-  0 <= bmapstart ->
-  bmapstart ∈ fsc_cov ->
-  ~ (bmapstart ∈ log_region_set fsc_logst) ->
+  0 < fsc_size <= BPB ->
+  0 <= fsc_bmapstart ->
+  fsc_bmapstart ∈ fsc_cov ->
+  ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
   0 <= icfg_ist ->
-  cov_below fsc_cov size ->
-  bitmap_geom_ok fsc_cov fsc_logst bmapstart size ->
+  cov_below fsc_cov fsc_size ->
+  bitmap_geom_ok fsc_cov fsc_logst fsc_bmapstart fsc_size ->
   ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
   (* mkfs's [ushort] geometry: the zeroed record's [de.inum] is a halfword
      and [dirlookup]'s answer is read back against the region's inum range,
@@ -352,7 +349,7 @@ Definition wp_sys_unlink_sconf_body
   16 * Z.of_nat icfg_nib <= 2 ^ 16 ->
   (* ---- balloc's out-of-blocks arm (under the zeroing writei) calls
      printk, not panic ---- *)
-  printk_gen_contract (kt := KT1) γpr gu gd ->
+  printk_gen_contract (kt := KT1) fsc_printk fsc_uart fsc_disk ->
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
   (* nameiparent's own premise, inherited: the walker runs with the base
@@ -373,15 +370,15 @@ Definition wp_sys_unlink_sconf_body
   trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  printk_env γpr gu gd -∗
+  printk_env fsc_printk fsc_uart fsc_disk -∗
   (* ---- the block layer ---- *)
-  bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) -∗
-  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+  log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
   fs_crash_seam fsc_cov fsc_logst -∗
   gen_cert -∗
-  dev_inv gu gd -∗
-  disk_geom gd pd pav pu -∗
-  is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+  dev_inv fsc_uart fsc_disk -∗
+  disk_geom fsc_disk pd pav pu -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
   bslots 3 -∗
   (* ---- the inode cache, and the region the two flushes write ---- *)
   is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
@@ -400,12 +397,12 @@ Definition wp_sys_unlink_sconf_body
   ireg_open -∗
   (* ---- the three superblock cells the zeroing's writei / bmap / balloc
      and the walk's own iunlockputs read ---- *)
-  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-  sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-  bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+  sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
+  bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   (* argstr's page-table side, and the walk's (iget's ipool arm allocates) *)
-  kalloc_env γa None -∗
+  kalloc_env fsc_kalloc None -∗
   (* the running-thread bundle *)
   procs_inv gs -∗
   (* ---- the process, and the reference allowance the walk needs ---- *)
@@ -418,26 +415,22 @@ Definition wp_sys_unlink_sconf_body
   (* the return continuation, named: see [sys_unlink_closer] above *)
   wp_next true pj (fun (CID : CpuId) =>
     sys_unlink_closer (CID := CID) γf pj pid V m ret_tgt K eb b lks
-                      dqb dqs dqbs bmapstart size) -∗
+                      dqb dqs dqbs) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type SYSUNLINK.
   Parameter wp_sys_unlink_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γf : gname) (γa : gname) (γpr : gname)
+      (γf : gname)
       (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (bmapstart : Z)
-      (size : Z)
       (dqb dqs dqbs : dfrac)
       (v0 : mword 64)
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_sys_unlink_sconf_body γf γa γpr gs j gl gu gd gk pd pav pu bn
-                               bmapstart
- size dqb dqs dqbs v0 pid V
+      wp_sys_unlink_sconf_body γf gs j gl pd pav pu
+
+ dqb dqs dqbs v0 pid V
                                m K eb b lks.
 End SYSUNLINK.

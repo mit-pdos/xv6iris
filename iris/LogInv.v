@@ -1033,8 +1033,8 @@ Section LogInv.
      VALUE across the commit cycle -- which it does, through [FsCrash]'s
      value-chained permits -- row (b) at the deposit is pure bookkeeping
      over the chain.  The three chain facts it asks for are exactly what
-     [ProofEndOp]'s [eo_minst_hit] / [eo_minst_miss] / [eo_ext] invariants
-     deliver:
+     [ProofEndOp]'s [eo_install_hit] / [eo_install_miss] / [eo_ext]
+     invariants deliver:
 
        - every LOGGED home block ends at its logged content (the install
          pass wrote [Lw j] there),

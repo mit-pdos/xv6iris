@@ -342,7 +342,6 @@ Section IupdateDefs.
   (* THE CONTINUATION, named so it is not re-traversed by every proofmode
      split (claude-notes/optimization.md). *)
   Definition iu_cont `{GEN : GenId} `{CID0 : CpuId}
-      (bn : bio_names)
  (ip : mword 64) (inum : mword 32)
       (dn : dinode) (bm : blkmap) (u : nat) (Sbo : gset Z) (v : nat)
       (Pout : iProp Σ)
@@ -409,7 +408,6 @@ Section IupdateTail.
 
   Local Lemma iu_tail `{GEN : GenId} `{CID0 : CpuId}
       (γs : list gname) (j : nat)
-      (γd : disk_names) (bn : bio_names)
       (ip : mword 64) (inum : mword 32) (dn : dinode) (bm : blkmap)
       (ds : list dinode) (u : nat) (Sb : gset Z) (cru : bool) (e0 v : nat)
       (kk : nat) (bno : mword 32) (bsd : list (bv 8)) (d0 : bool)
@@ -443,8 +441,8 @@ Section IupdateTail.
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.iupdate + 0x66) : mword 64) -∗
-    bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
-    log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+    bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+    log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
     procs_inv γs -∗
     iu_frame m -∗
     proc_priv_bare (proc_addr j) pidv Vpr -∗
@@ -470,9 +468,9 @@ Section IupdateTail.
        walk learned it at its own bread), so the premise is the AU itself
        rather than [iu_region_step]'s quantified form. *)
     iu_region_au inum dn ds e0 Pout -∗
-    bio_held bn (fs_view fsc_fs γd icfg_dev fsc_cov) kk pidv icfg_dev bno
+    bio_held fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) kk pidv icfg_dev bno
        (diblk_bytes (<[islot inum := dn]> ds)) (diblk_bytes ds) bsd d0 -∗
-    iu_cont (CID0 := CID0) bn ip inum dn bm
+    iu_cont (CID0 := CID0) ip inum dn bm
             (if cru then S u else u)
             (Sb ∪ {[IBLOCK inum icfg_ist]}) v Pout
  pidv dq dqd dqn dqs j m K eb b lks Vpr -∗
@@ -564,7 +562,7 @@ Section IupdateTail.
        move exactly this inode's 64 bytes of the buffer, so what it hands
        [log_write] is the sub-range form, and the shape obligation is the
        encoding fact [InodeRegion.diblk_bytes_splice]. *)
-    iApply (LW.wp_log_write_au_range bn icfg_log fsc_fs γd fsc_cov fsc_logst icfg_dev kk pidv bno
+    iApply (LW.wp_log_write_au_range fsc_bio icfg_log fsc_fs fsc_disk fsc_cov fsc_logst icfg_dev kk pidv bno
               (diblk_bytes (<[islot inum := dn]> ds)) (diblk_bytes ds) bsd d0 u
               (64 * islot inum)%nat 64%nat (dinode_bytes dn)
               cru Sb e0 v (⊤ ∖ ↑iregN) Pout
@@ -652,7 +650,7 @@ Section IupdateTail.
     iDestruct (wp_next_shift (b := true) (CIDa := CID2) (CIDb := CID5) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 4)%nat) by (lia).
-    iApply (BL.wp_brelse_sconf γs bn (fs_view fsc_fs γd icfg_dev fsc_cov) kk
+    iApply (BL.wp_brelse_sconf γs fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) kk
               pidv icfg_dev bno dq T3 (K - 4)%nat eb (proc_addr j)
               (diblk_bytes (<[islot inum := dn]> ds)) bsd true b
               lks Vpr HKbl Hkk HT3a0
@@ -912,9 +910,7 @@ Section ProofIupdateMain.
      contract threading the real wands through at [cru := false]. *)
   Lemma iu_main_gen
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat) (Sb : gset Z) (cru : bool) (e0 v : nat) (Pout : iProp Σ)
@@ -945,8 +941,8 @@ Section ProofIupdateMain.
       cpu_claim_ext eb pj -∗
       kernel_text -∗ kernel_data -∗ pc_is pcE -∗
       panic_env -∗
-      bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
-      log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+      bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+      log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
       i_dev ip ↦₄{dqd} icfg_dev -∗
       i_inum ip ↦₄{dqn} inum -∗
       inode_meta ip dn -∗
@@ -963,9 +959,9 @@ Section ProofIupdateMain.
       iu_region_step inum dn dn0 e0 Pout -∗
       proc_priv_bare pj pidv Vpr -∗
       procs_inv γs -∗
-      dev_inv γu γd -∗
-      disk_geom γd pd pav pu -∗
-      is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+      dev_inv fsc_uart fsc_disk -∗
+      disk_geom fsc_disk pd pav pu -∗
+      is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
       bslots 2 -∗
       log_epoch_lb icfg_log v -∗
       log_credit icfg_log cru Sb e0 (IBLOCK inum icfg_ist) -∗
@@ -1003,7 +999,7 @@ Section ProofIupdateMain.
     { rewrite /bno bb_uint32 moi32_unsigned. apply bvw32_small.
       change (2^32)%Z with 4294967296%Z. lia. }
     assert (Hbnolt : (uint bno < 2147483648)%Z) by (rewrite Hbno; lia).
-    assert (Hbnocov : uint bno ∈ bv_cov (fs_view fsc_fs γd icfg_dev fsc_cov))
+    assert (Hbnocov : uint bno ∈ bv_cov (fs_view fsc_fs fsc_disk icfg_dev fsc_cov))
       by (rewrite Hbno; exact Hcov).
     (* the slot index *)
     pose proof (bv_unsigned_in_range _ inum) as [Hinum0 Hinum1].
@@ -1026,7 +1022,7 @@ Section ProofIupdateMain.
        once, used only to guard the [_ext_transport]s below -- [b] is never
        [subst]ed, it is spelled by name in dozens of leaf-instruction calls. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
-    iAssert (iu_cont (CID0 := CID) bn ip inum dn bm
+    iAssert (iu_cont (CID0 := CID) ip inum dn bm
                (if cru then S u else u)
                (Sb ∪ {[IBLOCK inum icfg_ist]}) v Pout
  pidv dq dqd dqn dqs j m K eb b lks Vpr)%I with "[Hcont]" as "Hcont";
@@ -1358,8 +1354,8 @@ Section ProofIupdateMain.
                  with "Hcont") as "Hcont".
     assert (HKbr : (K_bread <= K - 4)%nat) by (lia).
     iDestruct (iu_slots_split 1 1 with "Hsl") as "[Hsl Hsl1]".
-    iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
-              (fs_view fsc_fs γd icfg_dev fsc_cov) pidv icfg_dev bno dq
+    iApply (BR.wp_bread_sconf γs j γl fsc_uart fsc_disk fsc_dlock pd pav pu fsc_bio
+              (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) pidv icfg_dev bno dq
               RA (K - 4)%nat eb b
               lks Vpr HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HRAa0 HRAa1
               (* bread's bound is "bcache"(4); iupdate's own is "log"(3),
@@ -1969,7 +1965,7 @@ Section ProofIupdateMain.
        step, which cannot build it. *)
     iDestruct ("Hstep" $! ds with "[%] Hdn") as "Hau";
       [exact Hdswf |].
-    iApply (iu_tail (CID0 := CID36) γs j γd bn
+    iApply (iu_tail (CID0 := CID36) γs j
 
               ip inum dn bm ds u Sb cru e0 v kk bno bsd0 d0 Pout
               pidv dq dqd dqn dqs m mM K eb b lks
@@ -1987,16 +1983,14 @@ Qed.
 
   Lemma wp_iupdate_gen
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iupdate_gen_body γs j γl γu γd γk pd pav pu bn
+    : wp_iupdate_gen_body γs j γl pd pav pu
  ip inum dn dn0 bm u Sb
                           pidv dq dqd dqn dqs m K eb b lks Vpr.
   Proof.
@@ -2024,7 +2018,7 @@ Qed.
     iPoseProof (iu_step_out inum dn dn0 e0 Hnib
                   (iu_dinode_wf dn bm Hda Hdirlen) Hstab Hnlk Hnzty
                   with "Hireg") as "Hstep".
-    iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn
+    iApply (iu_main_gen γs j γl pd pav pu
  ip inum dn dn0 bm u Sb false e0 0%nat
               (ireg_out fsc_ireg inum dn)
               pidv dq dqd dqn dqs m K eb b lks
@@ -2049,16 +2043,14 @@ Qed.
      [eb] its own pass-through contract quantifies over. *)
   Lemma wp_iupdate_credgen
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat) (Sb : gset Z) (cru : bool) (e0 v : nat)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iupdate_credgen_body γs j γl γu γd γk pd pav pu bn
+    : wp_iupdate_credgen_body γs j γl pd pav pu
  ip inum dn dn0 bm u Sb cru e0 v
                               pidv dq dqd dqn dqs m K eb b lks Vpr.
   Proof.
@@ -2070,7 +2062,7 @@ Qed.
     iPoseProof (iu_step_out inum dn dn0 e0 Hnib
                   (iu_dinode_wf dn bm Hda Hdirlen) Hstab Hnlk Hnzty
                   with "Hireg") as "Hstep".
-    iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn
+    iApply (iu_main_gen γs j γl pd pav pu
  ip inum dn dn0 bm u Sb cru e0 v
               (ireg_out fsc_ireg inum dn)
               pidv dq dqd dqn dqs m K eb b lks
@@ -2094,16 +2086,14 @@ Qed.
      two [emp] wands the generic core hands back. *)
   Lemma wp_iupdate_cred
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat) (Sb : gset Z) (cru : bool)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iupdate_cred_body γs j γl γu γd γk pd pav pu bn
+    : wp_iupdate_cred_body γs j γl pd pav pu
  ip inum dn dn0 bm u Sb cru
                            pidv dq dqd dqn dqs m K eb b lks Vpr.
   Proof.
@@ -2123,7 +2113,7 @@ Qed.
     iPoseProof (iu_step_out inum dn dn0 e0 Hnib
                   (iu_dinode_wf dn bm Hda Hdirlen) Hstab Hnlk Hnzty
                   with "Hireg") as "Hstep".
-    iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn
+    iApply (iu_main_gen γs j γl pd pav pu
  ip inum dn dn0 bm u Sb cru e0 0%nat
               (ireg_out fsc_ireg inum dn)
               pidv dq dqd dqn dqs m K true b lks
@@ -2153,16 +2143,14 @@ Qed.
      is both false and unnecessary. *)
   Lemma wp_iupdate_sconf
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iupdate_sconf_body γs j γl γu γd γk pd pav pu bn
+    : wp_iupdate_sconf_body γs j γl pd pav pu
  ip inum dn dn0 bm u
                             pidv dq dqd dqn dqs m K eb b lks Vpr.
   Proof.
@@ -2179,7 +2167,7 @@ Qed.
     iPoseProof (iu_step_out inum dn dn0 e0 Hnib
                   (iu_dinode_wf dn bm Hda Hdirlen) Hstab Hnlk Hnzty
                   with "Hireg") as "Hstep".
-    iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn
+    iApply (iu_main_gen γs j γl pd pav pu
  ip inum dn dn0 bm u Sb0 false e0 0%nat
               (ireg_out fsc_ireg inum dn)
               pidv dq dqd dqn dqs m K eb b lks
@@ -2207,9 +2195,7 @@ Qed.
      [Pout] parameter was introduced to make visible. *)
   Lemma wp_iupdate_link
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat) (Sb : gset Z) (cru : bool)
@@ -2217,7 +2203,7 @@ Qed.
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iupdate_link_body γs j γl γu γd γk pd pav pu bn
+    : wp_iupdate_link_body γs j γl pd pav pu
  ip inum dn dn0 bm u Sb cru
                            pin oty pidv dq dqd dqn dqs m K eb b lks Vpr.
   Proof.
@@ -2240,7 +2226,7 @@ Qed.
                   (iu_dinode_wf dn bm Hda Hdirlen) Hnz Hstab Hbump Hgrd
                   Hup
                   with "Hireg Hpin") as "Hstep".
-    iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn
+    iApply (iu_main_gen γs j γl pd pav pu
  ip inum dn dn0 bm u Sb cru e0 0%nat
               (dinode_at fsc_ireg inum dn ∗
                (∃ v : ity,
@@ -2280,9 +2266,7 @@ Qed.
      and that is the whole of what [SpecLogWrite]'s C4 edit bought. *)
   Lemma wp_iupdate_unlink
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat) (Sb : gset Z) (cru : bool)
@@ -2290,7 +2274,7 @@ Qed.
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iupdate_unlink_body γs j γl γu γd γk pd pav pu bn
+    : wp_iupdate_unlink_body γs j γl pd pav pu
  ip inum dn dn0 bm u Sb cru
                              uty pidv dq dqd dqn dqs m K eb b lks Vpr.
   Proof.
@@ -2314,7 +2298,7 @@ Qed.
     iPoseProof (iu_step_unlink inum dn dn0 e0 uty Hnib
                   (iu_dinode_wf dn bm Hda Hdirlen) Hnz Hstab Hnl
                   with "Hireg Htok") as "Hstep".
-    iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn
+    iApply (iu_main_gen γs j γl pd pav pu
  ip inum dn dn0 bm u Sb cru e0 0%nat
               (dinode_at fsc_ireg inum dn)%I
               pidv dq dqd dqn dqs m K true b lks Vpr

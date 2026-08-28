@@ -117,14 +117,6 @@ Import Defs.
 
 (* every non-tlb register survives a translation step (the absorption
    theorem's sregs shape: unchanged, or exactly one tlb register_set) *)
-Lemma pt_regs_preserved (rs rs' : regstate) :
-  (rs' = rs \/ exists tv, rs' = register_set tlb tv rs)%type ->
-  forall rr, register_beq rr tlb = false ->
-    register_lookup rr rs' = register_lookup rr rs.
-Proof.
-  intros [-> | (tv & ->)] rr Hrr; [reflexivity |].
-  apply (irrelevant_register_set rr tlb rs tv Hrr).
-Qed.
 
 (* Sv39 canonicality from the positive-half bound alone -- the
    [addr_is_ram]-free analogue of [ram_canonical] (a va with [uint va < 2^38]

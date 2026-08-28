@@ -532,10 +532,9 @@ Definition wp_dirlookup_tree_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
-    (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
+  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
-    (γa : gname) (γf : gname)                         (* kalloc, file table  *)
+ (γf : gname)                         (* kalloc, file table  *)
     (ip : mword 64)
     (bm : blkmap) (data : nat -> list (bv 8))
     (dn : dinode)
@@ -580,8 +579,8 @@ Definition wp_dirlookup_tree_body
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
-  kalloc_env γa None -∗
+  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+  kalloc_env fsc_kalloc None -∗
   (* ---- THE LOCKED DIRECTORY: the cells, and THE NODE FRAGMENT ---- *)
   i_dev ip ↦₄{dqd} icfg_dev -∗
   inode_meta ip dn -∗
@@ -595,9 +594,9 @@ Definition wp_dirlookup_tree_body
   proc_priv_bare pj pidv Vpr -∗
   (* ---- the running-thread bundle and the disk fabric ---- *)
   procs_inv γs -∗
-  dev_inv γu γd -∗
-  disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  dev_inv fsc_uart fsc_disk -∗
+  disk_geom fsc_disk pd pav pu -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
   bslot -∗
   (* ---- THE ICACHE, exactly as iget takes it ---- *)
   is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
@@ -669,10 +668,8 @@ Module FsLookupTree (DL : DIRLOOKUP).
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
         !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (γa : gname) (γf : gname)
+ (γf : gname)
       (ip : mword 64)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn : dinode)
@@ -682,8 +679,8 @@ Module FsLookupTree (DL : DIRLOOKUP).
       (pidv : mword 32) (dq dqd dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate) :
-      wp_dirlookup_tree_body γs j γl γu γd γk pd pav pu bn
-                             γa γf ip bm data dn
+      wp_dirlookup_tree_body γs j γl pd pav pu
+ γf ip bm data dn
                              dpi ents fn hasp pofv pidv dq dqd dqn
                              m K eb b lks Vpr.
   Proof.
@@ -704,8 +701,8 @@ Module FsLookupTree (DL : DIRLOOKUP).
     iAssert (dlinks fsc_fs (bv_unsigned (inum_of dpi)) dn bm data)
       with "[Hedges]" as "Hedges".
     { rewrite Hkeq. iExact "Hedges". }
-    iApply (DL.wp_dirlookup_sconf γs j γl γu γd γk pd pav pu bn
-              γa γf ip (inum_of dpi) bm data dn dn
+    iApply (DL.wp_dirlookup_sconf γs j γl pd pav pu
+ γf ip (inum_of dpi) bm data dn dn
               fn hasp pofv
               pidv dq dqd dqn m K eb b lks Vpr
               HK (node_rep_T_DIR ents dn data Hrep) Hlg Hbwf Hbcov Hszb Hholes

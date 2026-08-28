@@ -1294,7 +1294,7 @@ Section WriteHeadBlocks.
                 Hcmp ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (whi_42 with "Htext"). }
-      iNext. iIntros (CID5 Hs5) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID5 Hs5) "Hcg Hpc".
       assert (Htgt3a : add_vec (mword_of_int (KernelSyms.write_head + 0x42) : mword 64)
                          (sign_extend' 64 (mword_of_int 8184 : mword 13))
                        = mword_of_int (KernelSyms.write_head + 0x3a))
@@ -1754,7 +1754,7 @@ Section ProofWriteHead.
                 ltac:(vm_compute; discriminate) Hcmp ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (whi_28 with "Htext"). }
-      iNext. iIntros (CID16 Hs16) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID16 Hs16) "Hcg Hpc".
       assert (Htgt46 : add_vec (mword_of_int (KernelSyms.write_head + 0x28) : mword 64)
                          (sign_extend' 64 (mword_of_int 30 : mword 13))
                        = mword_of_int (KernelSyms.write_head + 0x46))

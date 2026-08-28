@@ -974,7 +974,7 @@ Section DevLoops.
       iMod ("Hclose" with "[Hv' Hlease']") as "_".
       { iNext. iExists vnew. iFrame.
         iPureIntro. exact (virtio_req_step_isr_ok vs mv vnew w i Hvok Hdisk). }
-      iMod ("Hpclose" with "[Hpbody]") as "_"; [iNext; iExact "Hpbody"|].
+      iMod ("Hpclose" with "[Hpbody]") as "_"; [iApply bi.later_intro; iExact "Hpbody"|].
       iModIntro. iFrame "Hgr Hmem' Hdev'".
       iDestruct "Hdur'" as (dmap') "[Hdauth' %Hdv']".
       iEval (rewrite Himg) in "Hdauth'".
@@ -1002,7 +1002,7 @@ Section DevLoops.
       iMod ("Hclose" with "[Hv' Hlease]") as "_".
       { iNext. iExists vnew. iFrame "Hv' Hlease".
         iPureIntro. exact (virtio_capture_step_isr_ok vs mv vnew i Hvok Hcap). }
-      iMod ("Hpclose" with "[Hpbody]") as "_"; [iNext; iExact "Hpbody"|].
+      iMod ("Hpclose" with "[Hpbody]") as "_"; [iApply bi.later_intro; iExact "Hpbody"|].
       assert (Hdk : v_disk vnew = v_disk (dvirtio d))
         by (rewrite Hv; exact (virtio_capture_step_disk vs mv vnew i Hcap)).
       iModIntro. iFrame "Hgr Hmem Hdev'".
@@ -1031,7 +1031,7 @@ Section DevLoops.
       iMod ("Hclose" with "[Hv' Hlease]") as "_".
       { iNext. iExists vnew. iFrame "Hv' Hlease".
         iPureIntro. exact (virtio_pop_step_isr_ok vs mv vnew Hvok Hpop). }
-      iMod ("Hpclose" with "[Hpbody]") as "_"; [iNext; iExact "Hpbody"|].
+      iMod ("Hpclose" with "[Hpbody]") as "_"; [iApply bi.later_intro; iExact "Hpbody"|].
       assert (Hdk : v_disk vnew = v_disk (dvirtio d))
         by (rewrite Hv; exact (virtio_pop_step_disk vs mv vnew Hpop)).
       iModIntro. iFrame "Hgr Hmem Hdev'".
@@ -1091,7 +1091,7 @@ Section DevLoops.
       iMod ("Hclose" with "[Hv' Hlease']") as "_".
       { iNext. iExists vnew. iFrame.
         iPureIntro. exact (virtio_drain_step_isr_ok vs s vnew Hvok Hdrain). }
-      iMod ("Hpclose" with "[Hpbody]") as "_"; [iNext; iExact "Hpbody"|].
+      iMod ("Hpclose" with "[Hpbody]") as "_"; [iApply bi.later_intro; iExact "Hpbody"|].
       iModIntro. iFrame "Hgr Hmem Hdev'".
       iDestruct "Hdur'" as (dmap') "[Hdauth' %Hdv']".
       iEval (rewrite Himg) in "Hdauth'".
@@ -1126,7 +1126,7 @@ Section DevLoops.
       { iNext. iExists p'. iFrame "Hp'". iPureIntro.
         apply (plic_ok_latch p p' virtio_irq_id);
           [ rewrite <- Hp; exact Hlatch | exact Hpok ]. }
-      iMod ("Hpclose" with "[Hpbody]") as "_"; [iNext; iExact "Hpbody"|].
+      iMod ("Hpclose" with "[Hpbody]") as "_"; [iApply bi.later_intro; iExact "Hpbody"|].
       iModIntro. iFrame "Hgr Hmem Hdev'".
       iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
       iSplitL "Hdauth".
@@ -1135,7 +1135,7 @@ Section DevLoops.
       iFrame "Htie Hsa".
       iApply "IH".
     - (* the totality stutter (RiscvLang §3c) *)
-      iMod ("Hpclose" with "[Hpbody]") as "_"; [iNext; iExact "Hpbody"|].
+      iMod ("Hpclose" with "[Hpbody]") as "_"; [iApply bi.later_intro; iExact "Hpbody"|].
       iModIntro. iFrame "Hgr Hmem Hdev".
       iSplitL "Hdur"; [iExact "Hdur"|].
       iFrame "Htie Hsa". iApply "IH".

@@ -138,7 +138,7 @@ Section EscrowInode.
     iMod (own_alloc (Excl ())) as (gd) "Hdep"; [done|].
     iMod (inv_alloc (escAN z) _ (escA_body γfs ge gr gd z rg)
             with "[Hauth Hfz Htop]") as "#Hinv".
-    { iNext. iLeft. iFrame "Hauth Hfz Htop". }
+    { iApply bi.later_intro. iLeft. iFrame "Hauth Hfz Htop". }
     iModIntro. iExists ge, gr, gd. iFrame "Hinv Htick Hdep".
   Qed.
 
@@ -174,7 +174,7 @@ Section EscrowInode.
       iMod (mono_nat_own_update ST_FILLED with "Hauth") as "[Hauth #Hlb]".
       { lia. }
       iMod ("Hcl" with "[Hauth Hmk Hoff Hdep]") as "_".
-      { iNext. iRight; iLeft. iFrame "Hauth Hmk Hoff Hdep". }
+      { iApply bi.later_intro. iRight; iLeft. iFrame "Hauth Hmk Hoff Hdep". }
       iModIntro. iExact "Hlb".
     - iExFalso. iApply (redeem_ticketA_excl with "Hdep Hd2").
     - iExFalso. iApply (redeem_ticketA_excl with "Hdep Hd2").
@@ -194,7 +194,7 @@ Section EscrowInode.
     - iMod (mono_nat_own_update ST_REDEEMED with "Hauth") as "[Hauth _]".
       { lia. }
       iMod ("Hcl" with "[Hauth Htick Hd]") as "_".
-      { iNext. iRight; iRight. iFrame "Hauth Htick Hd". }
+      { iApply bi.later_intro. iRight; iRight. iFrame "Hauth Htick Hd". }
       iModIntro. iFrame "Hmk Hoff".
     - iExFalso. iApply (redeem_ticketA_excl with "Htick Htick2").
   Qed.
@@ -227,7 +227,7 @@ Section EscrowInode.
     - iMod (mono_nat_own_update ST_REDEEMED with "Hauth") as "[Hauth _]".
       { lia. }
       iMod ("Hcl" with "[Hauth Htick Hd]") as "_".
-      { iNext. iRight; iRight. iFrame "Hauth Htick Hd". }
+      { iApply bi.later_intro. iRight; iRight. iFrame "Hauth Htick Hd". }
       iModIntro. iFrame "HP Hmk Hoff".
     - iExFalso. iApply (redeem_ticketA_excl with "Htick Htick2").
   Qed.

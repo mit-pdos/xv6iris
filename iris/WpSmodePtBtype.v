@@ -182,7 +182,7 @@ Section WpSmodePtBtype.
       iExists mstatus0, mdv0, (add_vec_int pc 4).
       iFrame "Hms Hmdl HPC HnPC".
       iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iExact "Hfile".
-    - iNext. iIntros (npc ms1 mdv1)
+    - iApply bi.later_intro. iIntros (npc ms1 mdv1)
         "Hhs Hpriv Hms Hmie Hmdl Hmenv Hinv Hpc (-> & -> & -> & Hfile)".
       iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hinv Hpc Hfile").
   Qed.
@@ -240,7 +240,7 @@ Section WpSmodePtBtype.
       iExists mstatus0, mdv0, (add_vec pc (sign_extend' 64 imm)).
       iFrame "Hms Hmdl HPC HnPC".
       iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iExact "Hfile".
-    - iNext. iIntros (npc ms1 mdv1)
+    - iApply bi.later_intro. iIntros (npc ms1 mdv1)
         "Hhs Hpriv Hms Hmie Hmdl Hmenv Hinv Hpc (-> & -> & -> & Hfile)".
       iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hinv Hpc Hfile").
   Qed.

@@ -286,10 +286,8 @@ Section KexecB2Res.
   Context `{GEN : GenId}.
 
   Definition kxc_res
-      (jp : nat) (bn : bio_names)
+      (jp : nat)
       (gf : gname)
-      (bmapstart : Z)
-      (size : Z)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (gilf gislf : gname) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
@@ -303,9 +301,9 @@ Section KexecB2Res.
               gilf gislf ∗
      log_opb icfg_log n2 ∗
      iref_slots 1 ∗
-     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
+     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) ∗
-     bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size ∗
+     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      bslots 3 ∗
      proc_pt P ∗
      proc_priv gf (proc_addr jp) pidv V ∗
@@ -587,11 +585,8 @@ Definition kxc_bad324_body
       (Q : mword 64 -> Prop)
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId}
     (gs : list gname) (jp : nat) (gl : gname)
-    (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
-    (bn : bio_names)
-    (gilf gislf : gname) (ga gf : gname)
-    (bmapstart : Z)
-    (size : Z)
+ (pd pav pu : mword 64)
+    (gilf gislf : gname) (gf : gname)
     (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
     (dnf : dinode) (bmf : blkmap) (n2 : nat)
     (plen : nat) (pfun : nat -> bv 8)
@@ -604,12 +599,12 @@ Definition kxc_bad324_body
   (K_kexec <= K)%nat ->
   (kf < NINODE)%nat ->
   log_geom_ok fsc_cov fsc_logst ->
-  0 < size <= BPB ->
-  0 <= bmapstart ->
-  bmapstart ∈ fsc_cov ->
-  ~ (bmapstart ∈ log_region_set fsc_logst) ->
+  0 < fsc_size <= BPB ->
+  0 <= fsc_bmapstart ->
+  fsc_bmapstart ∈ fsc_cov ->
+  ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
   0 <= icfg_ist ->
-  cov_below fsc_cov size ->
+  cov_below fsc_cov fsc_size ->
   ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
   bv_unsigned inumf < 16 * Z.of_nat icfg_nib ->
   (iput_units <= n2)%nat ->
@@ -636,16 +631,16 @@ Definition kxc_bad324_body
   cpu_claim_ext eb (proc_addr jp) -∗
   kernel_text -∗
   pc_is (mword_of_int (KXB + 0x31e) : mword 64) -∗
-  fs_fabric gs gu gd gk pd pav pu bn
+  fs_fabric gs pd pav pu
  -∗
   kxc_open pidv kf qf sf gyf inumf dnf bmf
            gilf gislf -∗
-  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   (* THE BLOCK BITMAP'S INVARIANT: persistent, and NOT droppable here --
      this block's [kxc_bad64] runs iunlockput, whose iput frees into it. *)
-  bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
-  kalloc_env ga None -∗
+  bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
+  kalloc_env fsc_kalloc None -∗
   proc_pt P -∗
   proc_priv gf (proc_addr jp) pidv V -∗
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -663,8 +658,8 @@ Definition kxc_bad324_body
     w63 szf w67 -∗
   (* ---- kexec's own continuation, which [kxc_bad64] closes ---- *)
   wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    KexecOkQ.kexec_closer Q gf ga (proc_addr jp) pidv V m (ret_pc ra0) K
-         eb eb lks dqb dqs bmapstart na alen plen pv dqpv pfun
+    KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv V m (ret_pc ra0) K
+         eb eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
          av dqa avf aslen dqas afun) -∗
   WP (Loop : expr riscv_lang).
 
@@ -678,11 +673,8 @@ Definition kxc_ls_body
       (Q : mword 64 -> Prop)
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId}
     (gs : list gname) (jp : nat) (gl : gname)
-    (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
-    (bn : bio_names)
-    (gilf gislf : gname) (ga gf : gname)
-    (bmapstart : Z)
-    (size : Z)
+ (pd pav pu : mword 64)
+    (gilf gislf : gname) (gf : gname)
     (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
     (dnf : dinode) (bmf : blkmap) (n2 : nat)
     (plen : nat) (pfun : nat -> bv 8)
@@ -696,12 +688,12 @@ Definition kxc_ls_body
   (K_kexec <= K)%nat ->
   (kf < NINODE)%nat ->
   log_geom_ok fsc_cov fsc_logst ->
-  0 < size <= BPB ->
-  0 <= bmapstart ->
-  bmapstart ∈ fsc_cov ->
-  ~ (bmapstart ∈ log_region_set fsc_logst) ->
+  0 < fsc_size <= BPB ->
+  0 <= fsc_bmapstart ->
+  fsc_bmapstart ∈ fsc_cov ->
+  ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
   0 <= icfg_ist ->
-  cov_below fsc_cov size ->
+  cov_below fsc_cov fsc_size ->
   ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
   bv_unsigned inumf < 16 * Z.of_nat icfg_nib ->
   (iput_units <= n2)%nat ->
@@ -741,10 +733,10 @@ Definition kxc_ls_body
   cpu_claim_ext eb (proc_addr jp) -∗
   kernel_text -∗
   pc_is (mword_of_int (KXB + 0x0f6) : mword 64) -∗
-  fs_fabric gs gu gd gk pd pav pu bn
+  fs_fabric gs pd pav pu
  -∗
-  kalloc_env ga None -∗
-  kxc_res jp bn gf bmapstart size
+  kalloc_env fsc_kalloc None -∗
+  kxc_res jp gf
           kf qf sf gyf inumf dnf bmf gilf gislf n2 plen pfun na avf
           aslen afun pidv V dqb dqs dqa dqpv dqas sp0 ra0 s00 s10 s20 pv av
           (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
@@ -757,8 +749,8 @@ Definition kxc_ls_body
      hands the continuation BACK, which is what keeps the single linear
      [wp_next] enough for both. ---- *)
   wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    KexecOkQ.kexec_closer Q gf ga (proc_addr jp) pidv V m (ret_pc ra0) K
-         eb eb lks dqb dqs bmapstart na alen plen pv dqpv pfun
+    KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv V m (ret_pc ra0) K
+         eb eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
          av dqa avf aslen dqas afun) -∗
   (* ---- THE ONE OUTPUT: +0x116, the segment is in memory.  s1 and s2
      are dead there (+0x116 reloads s2 from slot 65 and the phdr loop
@@ -779,7 +771,7 @@ Definition kxc_ls_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb (proc_addr jp) -∗
       pc_is (mword_of_int (KXB + 0x116) : mword 64) -∗
-      kxc_res jp bn gf bmapstart size
+      kxc_res jp gf
               kf qf sf gyf inumf dnf bmf gilf gislf n2 plen pfun na avf
               aslen afun pidv V dqb dqs dqa dqpv dqas sp0 ra0 s00 s10 s20 pv av
               (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
@@ -787,8 +779,8 @@ Definition kxc_ls_body
               (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
               w63 w65 w67 ef P -∗
       wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
-        KexecOkQ.kexec_closer Q gf ga (proc_addr jp) pidv V m (ret_pc ra0) K
-             eb eb lks dqb dqs bmapstart na alen plen pv dqpv
+        KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv V m (ret_pc ra0) K
+             eb eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv
              pfun av dqa avf aslen dqas afun) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -798,11 +790,8 @@ Module Type KEXECB2.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId}
       (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
-      (bn : bio_names)
-      (gilf gislf : gname) (ga gf : gname)
-      (bmapstart : Z)
-      (size : Z)
+ (pd pav pu : mword 64)
+      (gilf gislf : gname) (gf : gname)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
@@ -812,8 +801,8 @@ Module Type KEXECB2.
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w63 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (eb : bool) (lks : gset string),
-    kxc_bad324_body Q gs jp gl gu gd gk pd pav pu bn gilf gislf
-      ga gf bmapstart size
+    kxc_bad324_body Q gs jp gl pd pav pu gilf gislf
+ gf
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V dqb dqs dqa dqpv dqas m Mt K sp0 ra0 s00 s10 s20 pv av w63 w67
       ef P szf eb lks.
@@ -822,11 +811,8 @@ Module Type KEXECB2.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId}
       (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
-      (bn : bio_names)
-      (gilf gislf : gname) (ga gf : gname)
-      (bmapstart : Z)
-      (size : Z)
+ (pd pav pu : mword 64)
+      (gilf gislf : gname) (gf : gname)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
@@ -837,8 +823,8 @@ Module Type KEXECB2.
       (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd)
       (ip : nat) (va : mword 64) (fz po : Z) (eb : bool) (lks : gset string),
-    kxc_ls_body Q gs jp gl gu gd gk pd pav pu bn gilf gislf
-      ga gf bmapstart size
+    kxc_ls_body Q gs jp gl pd pav pu gilf gislf
+ gf
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67
       ef P ip va fz po eb lks.

@@ -330,7 +330,7 @@ Section ProofDirlookupMain.
       (nrec : nat) (dn : dinode) (data : nat -> list (bv 8)) (s : list (bv 8))
       (m : regfile) (ip nb pf pj ret_tgt : mword 64) (K : nat)
       (b eb hasp : bool) (lks : gset string) (Vpr : pprivate) (dq dqd dqn : dfrac)
-      (pofv pidv : mword 32) (fn : nat -> bv 8) (bn : bio_names)
+      (pofv pidv : mword 32) (fn : nat -> bv 8)
       (dinum : mword 32) (dr : dinode)
       (bm : blkmap) (CIDc : CpuId) : iProp Σ :=
     (∀ (mf : regfile) (found : bool) (kk : nat) (kslot : nat) (q : Qp),
@@ -373,7 +373,7 @@ Section ProofDirlookupMain.
       (nrec : nat) (dn : dinode) (data : nat -> list (bv 8)) (s : list (bv 8))
       (m : regfile) (sp0 ip nb pf pj ret_tgt : mword 64) (K : nat)
       (b eb hasp : bool) (lks : gset string) (Vpr : pprivate) (dq dqd dqn : dfrac)
-      (pofv pidv : mword 32) (fn : nat -> bv 8) (bn : bio_names)
+      (pofv pidv : mword 32) (fn : nat -> bv 8)
       (dinum : mword 32) (dr : dinode)
       (bm : blkmap) (fuel : nat) (CIDl : CpuId) : iProp Σ :=
     (∀ (i : nat) (Ml : regfile) (dol : nat -> bv 8) (mt10 : mword 64),
@@ -410,14 +410,14 @@ Section ProofDirlookupMain.
        dinode_at fsc_ireg dinum dr -∗
        wp_next (CID0 := CID) true pj (fun (CIDc : CpuId) =>
          dl_found_cont nrec dn data s m ip nb pf pj ret_tgt K b eb hasp lks Vpr
-           dq dqd dqn pofv pidv fn bn dinum dr bm CIDc) -∗
+           dq dqd dqn pofv pidv fn dinum dr bm CIDc) -∗
        WP (Loop : expr riscv_lang))%I.
 
   Definition dl_latch_body
       (nrec : nat) (dn : dinode) (data : nat -> list (bv 8)) (s : list (bv 8))
       (m : regfile) (sp0 ip nb pf pj ret_tgt : mword 64) (K : nat)
       (b eb hasp : bool) (lks : gset string) (Vpr : pprivate) (dq dqd dqn : dfrac)
-      (pofv pidv : mword 32) (fn : nat -> bv 8) (bn : bio_names)
+      (pofv pidv : mword 32) (fn : nat -> bv 8)
       (dinum : mword 32) (dr : dinode)
       (bm : blkmap) (i : nat) (CIDp : CpuId) : iProp Σ :=
     (∀ (Mp : regfile) (dol' : nat -> bv 8) (mt10' : mword 64),
@@ -452,15 +452,13 @@ Section ProofDirlookupMain.
        dinode_at fsc_ireg dinum dr -∗
        wp_next (CID0 := CID) true pj (fun (CIDc : CpuId) =>
          dl_found_cont nrec dn data s m ip nb pf pj ret_tgt K b eb hasp lks Vpr
-           dq dqd dqn pofv pidv fn bn dinum dr bm CIDc) -∗
+           dq dqd dqn pofv pidv fn dinum dr bm CIDc) -∗
        WP (Loop : expr riscv_lang))%I.
 
   Lemma wp_dirlookup_sconf
       (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (ga : gname) (gf : gname)
+ (gf : gname)
       (ip : mword 64) (dinum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn : dinode) (dr : dinode)
@@ -469,8 +467,8 @@ Section ProofDirlookupMain.
       (pidv : mword 32) (dq dqd dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_dirlookup_sconf_body gs j gl gu gd gk pd pav pu bn
-                              ga gf ip dinum bm data dn dr
+    : wp_dirlookup_sconf_body gs j gl pd pav pu
+ gf ip dinum bm data dn dr
                               fn hasp pofv pidv dq dqd dqn m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_dirlookup_sconf_body].
@@ -1231,7 +1229,7 @@ Section ProofDirlookupMain.
                 ltac:(rewrite Htgt96; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (dli_38 with "Htext"). }
-      iIntros (CID25 Hq25). iNext. iIntros "Hcg Hpc".
+      iIntros (CID25 Hq25). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt96) in "Hpc".
       assert (Hnone : dir_first data nrec s = None).
       { apply dlk_first_none_zero. apply dlk_nrec_zero. exact Hsz0. }
@@ -1264,7 +1262,7 @@ Section ProofDirlookupMain.
       iAssert (∀ fuel : nat,
         wp_next (CID0 := CID) true pj (fun CIDl : CpuId =>
           dl_loop_body nrec dn data s m sp0 ip nb pf pj ret_tgt K b eb hasp lks Vpr
-            dq dqd dqn pofv pidv fn bn dinum dr bm fuel CIDl))%I
+            dq dqd dqn pofv pidv fn dinum dr bm fuel CIDl))%I
         with "[]" as "Hloop".
       { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
         { iIntros (CIDl Hsl i Ml dol mt10)
@@ -1287,7 +1285,7 @@ Section ProofDirlookupMain.
         (* ------------- THE LATCH at +0x52 (both misses land here) ------- *)
         iAssert (wp_next (CID0 := CIDl) true pj (fun CIDp : CpuId =>
                    dl_latch_body nrec dn data s m sp0 ip nb pf pj ret_tgt K b
-                     eb hasp lks Vpr dq dqd dqn pofv pidv fn bn dinum dr
+                     eb hasp lks Vpr dq dqd dqn pofv pidv fn dinum dr
                      bm i CIDp))%I
           with "[]" as "Hlatch".
         { iIntros (CIDp Hsp Mp dol' mt10')
@@ -1379,7 +1377,7 @@ Section ProofDirlookupMain.
                       ltac:(rewrite Htgt94; vm_compute; reflexivity)
                       with "Hcg Hpc []").
             { iApply (dli_58 with "Htext"). }
-            iNext. iIntros (CIDP3 HqP3) "Hcg Hpc".
+            iApply bi.later_intro. iIntros (CIDP3 HqP3) "Hcg Hpc".
             iEval (rewrite Htgt94) in "Hpc".
             (* +0x94 c.li a0,0 *)
             iApply (wp_cli_s_sconf (mword_of_int (DL + 0x94)) Ra0
@@ -1630,7 +1628,7 @@ Section ProofDirlookupMain.
         iPoseProof (ireg_inv_bytes with "Hireg") as "#Hrow".
         iDestruct (inode_map_q_1_to _ _ _ _ eq_refl with "Hmap") as "Hmap".
         iDestruct (inode_blocks_q_1_to _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
-        iApply (RD.wp_readi_sconf KT1 gs j gl gu gd gk pd pav pu bn ga gf
+        iApply (RD.wp_readi_sconf KT1 gs j gl pd pav pu gf
  ip bm data dn
                   false (16 * i)%nat 16%nat dol Vpr
                   pidv (DfracOwn 1) dqd L6 (K - 12)%nat eb b lks
@@ -1693,7 +1691,7 @@ Section ProofDirlookupMain.
                     ltac:(rewrite Htk46; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (dli_6a with "Htext"). }
-          iNext. iIntros (CIDpa1 Hqpa1) "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDpa1 Hqpa1) "Hcg Hpc".
           iEval (rewrite Htk46) in "Hpc".
           (* +0x46 auipc a0,0x4 : the panic string, high part *)
           iApply (wp_auipc_s_sconf (mword_of_int (DL + 0x46)) Ra0
@@ -1817,7 +1815,7 @@ Section ProofDirlookupMain.
                     ltac:(rewrite Htgt52; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (dli_72 with "Htext"). }
-          iNext. iIntros (CIDB9 HqB9) "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDB9 HqB9) "Hcg Hpc".
           iEval (rewrite Htgt52) in "Hpc".
           iAssert ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj
                      ↦ₘ[KT1] file_byte data (16 * i + jj)%nat)%I
@@ -1999,7 +1997,7 @@ Section ProofDirlookupMain.
                           ltac:(rewrite Htgt86; vm_compute; reflexivity)
                           with "Hcg Hpc []").
                 { iApply (dli_7e with "Htext"). }
-                iNext. iIntros (CIDS1 HqS1) "Hcg Hpc".
+                iApply bi.later_intro. iIntros (CIDS1 HqS1) "Hcg Hpc".
                 iEval (rewrite Htgt86) in "Hpc".
                 iSpecialize ("Hk" $! CIDS1 with "[%]"); [wp_next_chain |].
                 iApply ("Hk" with "Hcg Hpc Hpv"). }
@@ -2222,7 +2220,7 @@ Section ProofDirlookupMain.
                       ltac:(rewrite Htgt96b; vm_compute; reflexivity)
                       with "Hcg Hpc []").
             { iApply (dli_92 with "Htext"). }
-            iIntros (CIDB18 HqB18). iNext. iIntros "Hcg Hpc".
+            iIntros (CIDB18 HqB18). iApply bi.later_intro. iIntros "Hcg Hpc".
             iEval (rewrite Htgt96b) in "Hpc".
             (* the de buffer goes back to sixteen raw bytes for the tail *)
             iAssert ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj
@@ -2271,7 +2269,7 @@ Section ProofDirlookupMain.
                       ltac:(rewrite Htgt52b; vm_compute; reflexivity)
                       with "Hcg Hpc []").
             { iApply (dli_7c with "Htext"). }
-            iNext. iIntros (CIDB13 HqB13) "Hcg Hpc".
+            iApply bi.later_intro. iIntros (CIDB13 HqB13) "Hcg Hpc".
             iEval (rewrite Htgt52b) in "Hpc".
             iAssert ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 12) jj
                        ↦ₘ[KT1] file_byte data (16 * i + jj)%nat)%I
@@ -2302,7 +2300,7 @@ Section ProofDirlookupMain.
                 ltac:(rewrite Htgt5c; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (dli_36 with "Htext"). }
-      iNext. iIntros (CID24 Hq24) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID24 Hq24) "Hcg Hpc".
       iEval (rewrite Htgt5c) in "Hpc".
       iDestruct (cpu_own_transport CID CID24 0%nat eb pj b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".

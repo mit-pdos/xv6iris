@@ -632,69 +632,60 @@ Lemma eo_ext_eq (Lw : nat -> list (bv 8)) (t : nat) (bs : list (bv 8)) :
 Proof. rewrite /eo_ext. destruct (Nat.eqb_spec t t); [reflexivity | lia]. Qed.
 
 (* ===================================================================== *)
-(*  THE INSTALL PASS'S PICTURE, AS A TERM (durable-disk flip-B).          *)
+(*  THE INSTALL PASS'S PICTURE IS [LogDefs.lm_install].                   *)
 (*                                                                       *)
-(*  install_trans's crash permits are CURSOR-INDEXED now                  *)
+(*  install_trans's crash permits are CURSOR-INDEXED                     *)
 (*  ([SpecInstallTrans]'s [R : nat -> iProp]), because the value-chained  *)
 (*  form hands back the era's mirror half at a DIFFERENT value per entry: *)
 (*  entry [i] overwrites home block [W[i]] with the logged content        *)
-(*  [Lw i].  This is that chain, and the three readings the commit tail    *)
-(*  needs of it -- what it does to a block it never writes, what it does   *)
-(*  to the on-disk header's reading, and what it leaves at an installed    *)
-(*  block.  The last one is half of the CAUGHT-UP fact                     *)
-(*  ([FsCrash.fs_clear_keep_seq_permit]'s premise): home = slot at every   *)
-(*  entry, by computation on the chained value and nothing about the disk. *)
+(*  [Lw i].  That chain is [lm_install] over the header's own decoded     *)
+(*  write set [map uint W] -- the same pass the recovering install runs   *)
+(*  ([ProofInitlog]), block-keyed.  What is here is its three readings IN *)
+(*  THE COMMIT TAIL'S VOCABULARY: a write set of WORDS, whose             *)
+(*  duplicate-freedom this proof holds as a [NoDup] rather than as the    *)
+(*  injectivity [lm_install_hit] takes.  The third is half of the         *)
+(*  CAUGHT-UP fact ([FsCrash.fs_clear_keep_seq_permit]'s premise): home = *)
+(*  slot at every entry, by computation on the chained value and nothing  *)
+(*  about the disk.                                                      *)
 (* ===================================================================== *)
-Fixpoint eo_minst (ls : Z) (W : list (mword 32)) (Lw : nat -> list (bv 8))
-    (M : log_mirror) (t : nat) : log_mirror :=
-  match t with
-  | O => M
-  | S t' => lm_upd (eo_minst ls W Lw M t') (uint (W !!! t')) (Lw t')
-  end.
-
-Lemma eo_minst_miss (ls : Z) (W : list (mword 32)) (Lw : nat -> list (bv 8))
+Lemma eo_install_miss (W : list (mword 32)) (Lw : nat -> list (bv 8))
     (M : log_mirror) (t : nat) (c : Z) :
   (t <= length W)%nat ->
-  (forall (i : nat) (w : mword 32), (i < t)%nat -> W !! i = Some w -> uint w <> c) ->
-  lm_view (eo_minst ls W Lw M t) c = lm_view M c.
+  (forall (i : nat) (w : mword 32), (i < t)%nat -> W !! i = Some w ->
+     uint w <> c) ->
+  lm_view (lm_install M (map uint W) Lw t) c = lm_view M c.
 Proof.
-  induction t as [|t IH]; [reflexivity|].
-  intros Ht Hne. cbn [eo_minst].
-  destruct (lookup_lt_is_Some_2 W t ltac:(lia)) as [w Hw].
-  rewrite (list_lookup_total_correct W t w Hw).
-  rewrite (lm_upd_view_ne _ _ _ _ (not_eq_sym (Hne t w ltac:(lia) Hw))).
-  apply IH; [lia | intros i v Hi Hv; exact (Hne i v ltac:(lia) Hv)].
+  intros Ht Hne.
+  apply (lm_install_miss M (map uint W) Lw t c
+           ltac:(rewrite length_map; lia)).
+  intros i b Hi Hb.
+  destruct (eo_map_lookup_inv W i b Hb) as (w & Hw & ->).
+  exact (Hne i w Hi Hw).
 Qed.
 
-Lemma eo_minst_hdr (ls : Z) (W : list (mword 32)) (Lw : nat -> list (bv 8))
-    (M : log_mirror) (t : nat) :
+Lemma eo_install_hdr (W : list (mword 32)) (Lw : nat -> list (bv 8))
+    (M : log_mirror) (ls : Z) (t : nat) :
   (t <= length W)%nat ->
   (forall (i : nat) (w : mword 32), (i < t)%nat -> W !! i = Some w ->
      uint w <> log_hdr_bno ls) ->
-  lm_hdr (eo_minst ls W Lw M t) ls = lm_hdr M ls.
+  lm_hdr (lm_install M (map uint W) Lw t) ls = lm_hdr M ls.
 Proof.
-  intros Ht Hne. rewrite /lm_hdr (eo_minst_miss ls W Lw M t _ Ht Hne) //.
+  intros Ht Hne. rewrite /lm_hdr (eo_install_miss W Lw M t _ Ht Hne) //.
 Qed.
 
-Lemma eo_minst_hit (ls : Z) (W : list (mword 32)) (Lw : nat -> list (bv 8))
+Lemma eo_install_hit (W : list (mword 32)) (Lw : nat -> list (bv 8))
     (M : log_mirror) (t j : nat) (w : mword 32) :
   NoDup (map uint W) ->
   (t <= length W)%nat ->
   (j < t)%nat -> W !! j = Some w ->
-  lm_view (eo_minst ls W Lw M t) (uint w) = Lw j.
+  lm_view (lm_install M (map uint W) Lw t) (uint w) = Lw j.
 Proof.
-  induction t as [|t IH]; [lia|]. intros Hnd Ht Hj Hw. cbn [eo_minst].
-  destruct (lookup_lt_is_Some_2 W t ltac:(lia)) as [v Hv].
-  rewrite (list_lookup_total_correct W t v Hv).
-  destruct (decide (j = t)) as [Heq|Hne].
-  - subst j. rewrite Hv in Hw. injection Hw as ->. by rewrite lm_upd_view_eq.
-  - assert (Hneq : uint w <> uint v).
-    { intro Hc. apply Hne.
-      refine (NoDup_lookup (map uint W) j t (uint w)
-                ltac:(by apply NoDup_ListNoDup) (eo_map_lookup W j w Hw) _).
-      rewrite (eo_map_lookup W t v Hv) Hc //. }
-    rewrite (lm_upd_view_ne _ _ _ _ Hneq).
-    apply IH; [exact Hnd | lia | lia | exact Hw].
+  intros Hnd Ht Hj Hw.
+  exact (lm_install_hit M (map uint W) Lw t j (uint w)
+           ltac:(intros i k c Hi Hk;
+                 exact (NoDup_lookup (map uint W) i k c
+                          ltac:(by apply NoDup_ListNoDup) Hi Hk))
+           ltac:(rewrite length_map; lia) Hj (eo_map_lookup W j w Hw)).
 Qed.
 
 (* ===================================================================== *)
@@ -868,7 +859,7 @@ Section EndOpDefs.
             Hsz Hom Hdom Hlens Htie Hdm with "Hctx Hba Ht")
       as "(Hlaw & Hba & Ht)".
     iMod ("Hclose" with "[Hba HC Hxa]") as "_".
-    { iNext. iExists Lb, C, ∅. by iFrame. }
+    { iApply bi.later_intro. iExists Lb, C, ∅. by iFrame. }
     iModIntro. iFrame "HcL Ht".
     rewrite /snap_law_out.
     rewrite -(eo_restrict_of_sub C L (fs_home_set cov logstart) Hdom Hsub).
@@ -2155,12 +2146,12 @@ Section EndOpBlocks.
        reading rides the whole pass unchanged -- which is what each entry's
        permit needs to know that the block it overwrites is a LOGGED one *)
     assert (HMihdr : forall t : nat, (t <= n)%nat ->
-              lm_hdr (eo_minst logstart W Lw
-                        (lm_upd Mc (log_hdr_bno logstart) bs1) t) logstart
+              lm_hdr (lm_install (lm_upd Mc (log_hdr_bno logstart) bs1)
+                        (map uint W) Lw t) logstart
               = (n, map uint W)).
     { intros t Ht.
-      rewrite (eo_minst_hdr logstart W Lw
-                 (lm_upd Mc (log_hdr_bno logstart) bs1) t ltac:(lia)
+      rewrite (eo_install_hdr W Lw
+                 (lm_upd Mc (log_hdr_bno logstart) bs1) logstart t ltac:(lia)
                  ltac:(intros k v Hk Hv; exact (Hnehdr k v Hv))).
       exact HMcmhdr. }
     (* THE CAUGHT-UP FACT, AND IT IS COMPUTATION ON THE CHAIN (stage E3):
@@ -2170,18 +2161,18 @@ Section EndOpBlocks.
        [FsCrash.fs_clear_keep_seq_permit]'s premise, i.e. what lets the
        closing clear PRESERVE the committed view instead of re-basing it. *)
     assert (Hcaught : forall (jj : nat) (b : Z), map uint W !! jj = Some b ->
-              lm_view (eo_minst logstart W Lw
-                         (lm_upd Mc (log_hdr_bno logstart) bs1) n) b
-              = lm_view (eo_minst logstart W Lw
-                           (lm_upd Mc (log_hdr_bno logstart) bs1) n)
+              lm_view (lm_install (lm_upd Mc (log_hdr_bno logstart) bs1)
+                         (map uint W) Lw n) b
+              = lm_view (lm_install (lm_upd Mc (log_hdr_bno logstart) bs1)
+                           (map uint W) Lw n)
                   (log_slot_bno logstart jj)).
     { intros jj b Hb.
       destruct (eo_map_lookup_inv W jj b Hb) as (v & Hv & ->).
       assert (Hjlt : (jj < n)%nat) by (apply lookup_lt_Some in Hv; lia).
-      rewrite (eo_minst_hit logstart W Lw
+      rewrite (eo_install_hit W Lw
                  (lm_upd Mc (log_hdr_bno logstart) bs1) n jj v
                  Hnd ltac:(lia) Hjlt Hv).
-      rewrite (eo_minst_miss logstart W Lw
+      rewrite (eo_install_miss W Lw
                  (lm_upd Mc (log_hdr_bno logstart) bs1) n
                  (log_slot_bno logstart jj) ltac:(lia)
                  ltac:(intros k u Hk Hu;
@@ -2287,8 +2278,9 @@ Section EndOpBlocks.
               (<[log_hdr_bno logstart := bs1]> L) D
               pidv dq A3 (K - 8)%nat eb eb
               (fun i : nat =>
-                 log_mirror_half (eo_minst logstart W Lw
-                    (lm_upd Mc (log_hdr_bno logstart) bs1) i)) lks Vpr
+                 log_mirror_half
+                   (lm_install (lm_upd Mc (log_hdr_bno logstart) bs1)
+                      (map uint W) Lw i)) lks Vpr
               ltac:(pose proof (eo_Kit K HK); lia) Hgeom Hj Hgl HA3a0
               (conj HnW Hn30) Hnd
               (* install_trans reads only the covered-home half of the row *)
@@ -2311,9 +2303,12 @@ Section EndOpBlocks.
        back, because recovery re-installs a logged block from its slot no
        matter what the home write put there. *)
     { iModIntro. iIntros (i w) "%Hwi %Hlen'".
-      cbn [eo_minst]. rewrite (list_lookup_total_correct W i w Hwi).
+      cbn [lm_install].
+      rewrite (list_lookup_total_correct (map uint W) i (uint w)
+                 (eo_map_lookup W i w Hwi)).
       iApply (fs_install_v_seq_permit cov logstart n (map uint W) i (uint w)
-                (eo_minst logstart W Lw (lm_upd Mc (log_hdr_bno logstart) bs1) i)
+                (lm_install (lm_upd Mc (log_hdr_bno logstart) bs1)
+                   (map uint W) Lw i)
                 (Lw i)
                 ltac:(exact Hlen')
                 ltac:(by apply NoDup_ListNoDup)
@@ -2323,7 +2318,7 @@ Section EndOpBlocks.
                 ltac:(exact (proj1 (proj2 (Hwok w (eo_lookup_elem W i w Hwi)))))
                 ltac:(apply HMihdr; apply lookup_lt_Some in Hwi; lia)
                 with "Hseam Hregc Hswlb"). }
-    { iNext. iExact "Hmirc". }
+    { iApply bi.later_intro. iExact "Hmirc". }
     iIntros (CIDb2 Hsb2 mf2) "%Hcs2 Hcg Hcnt Hextc Hextm Hpc Hppid
                               Hncell HW HauthL HauthD _ Hent Hu2 >Hmirc".
     assert (Hpc10e : ret_pc (A3 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0x10e)).
@@ -2423,8 +2418,8 @@ Section EndOpBlocks.
               A5 (K - 8)%nat eb eb
               (fun bs' : list (bv 8) =>
                  log_mirror_half (lm_upd
-                    (eo_minst logstart W Lw
-                       (lm_upd Mc (log_hdr_bno logstart) bs1) n)
+                    (lm_install (lm_upd Mc (log_hdr_bno logstart) bs1)
+                       (map uint W) Lw n)
                     (log_hdr_bno logstart) bs')) lks Vpr
               ltac:(pose proof (eo_Kwh K HK); lia) Hgeom Hj Hgl Hshape0
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell [] HauthL [Hhdr] Hu3
@@ -2437,9 +2432,10 @@ Section EndOpBlocks.
        which is the form [log_state] parks in the lock. *)
     { iIntros (bs' Hlen' Hhn' Hdec').
       iApply (fs_clear_keep_seq_permit cov logstart
-                (eo_minst logstart W Lw (lm_upd Mc (log_hdr_bno logstart) bs1) n)
-                (lm_view (eo_minst logstart W Lw
-                            (lm_upd Mc (log_hdr_bno logstart) bs1) n))
+                (lm_install (lm_upd Mc (log_hdr_bno logstart) bs1)
+                   (map uint W) Lw n)
+                (lm_view (lm_install (lm_upd Mc (log_hdr_bno logstart) bs1)
+                            (map uint W) Lw n))
                 n (map uint W) bs'
                 ltac:(exact Hlen') ltac:(rewrite Hhn'; reflexivity)
                 Hn30 (HMihdr n ltac:(lia)) (fun _ _ => eq_refl) Hcaught
@@ -2573,8 +2569,9 @@ Section EndOpBlocks.
     (* the clear's own write is the last move of the chain, and it lands the
        header back at CLEAN -- which is the picture [log_state] parks in the
        lock, now at a NAME rather than under an existential *)
-    assert (Hfinhdr : lm_hdr (lm_upd (eo_minst logstart W Lw
-                          (lm_upd Mc (log_hdr_bno logstart) bs1) n)
+    assert (Hfinhdr : lm_hdr (lm_upd
+                          (lm_install (lm_upd Mc (log_hdr_bno logstart) bs1)
+                             (map uint W) Lw n)
                           (log_hdr_bno logstart) bs2) logstart = (0%nat, [])).
     { rewrite /lm_hdr lm_upd_view_eq. apply hdr_dec_zero.
       rewrite Hhdrn2. reflexivity. }
@@ -2586,8 +2583,8 @@ Section EndOpBlocks.
        says [L] agrees with [Lw] at every entry.  The two header inserts are
        off the row's domain by [home_set_ne_hdr]. *)
     assert (Hdep : log_mirror_tie_body
-                     (lm_upd (eo_minst logstart W Lw
-                                (lm_upd Mc (log_hdr_bno logstart) bs1) n)
+                     (lm_upd (lm_install (lm_upd Mc (log_hdr_bno logstart) bs1)
+                                (map uint W) Lw n)
                         (log_hdr_bno logstart) bs2)
                      (<[log_hdr_bno logstart := bs2]>
                         (<[log_hdr_bno logstart := bs1]> L))
@@ -2604,14 +2601,14 @@ Section EndOpBlocks.
         destruct (eo_map_lookup_inv W jj b Hb) as (v & Hv & ->).
         assert (Hjlt : (jj < n)%nat) by (apply lookup_lt_Some in Hv; lia).
         rewrite (lm_upd_view_ne _ _ _ _ (Hnehdr jj v Hv)).
-        exact (eo_minst_hit logstart W Lw
+        exact (eo_install_hit W Lw
                  (lm_upd Mc (log_hdr_bno logstart) bs1) n jj v
                  Hnd ltac:(lia) Hjlt Hv).
       - (* ...and no other home block moved at all *)
         intros b Hb HbW.
         pose proof (FsCrash.home_set_ne_hdr cov logstart b Hb) as Hbh.
         rewrite (lm_upd_view_ne _ _ _ _ Hbh).
-        rewrite (eo_minst_miss logstart W Lw
+        rewrite (eo_install_miss W Lw
                    (lm_upd Mc (log_hdr_bno logstart) bs1) n b ltac:(lia)
                    ltac:(intros k u Hk Hu Heq; apply HbW; rewrite -Heq;
                          apply elem_of_list_to_set;
@@ -2633,12 +2630,14 @@ Section EndOpBlocks.
     assert (Hdeprow : forall b : Z, b ∈ fs_home_set cov logstart ->
               (<[log_hdr_bno logstart := bs2]>
                  (<[log_hdr_bno logstart := bs1]> L)) !! b
-              = Some (lm_view (lm_upd (eo_minst logstart W Lw
-                        (lm_upd Mc (log_hdr_bno logstart) bs1) n)
+              = Some (lm_view (lm_upd
+                        (lm_install (lm_upd Mc (log_hdr_bno logstart) bs1)
+                           (map uint W) Lw n)
                         (log_hdr_bno logstart) bs2) b))
       by (intros b Hb; exact (Hdep b Hb (not_elem_of_empty b))).
-    assert (Hdepidx : lm_committed (lm_upd (eo_minst logstart W Lw
-                        (lm_upd Mc (log_hdr_bno logstart) bs1) n)
+    assert (Hdepidx : lm_committed (lm_upd
+                        (lm_install (lm_upd Mc (log_hdr_bno logstart) bs1)
+                           (map uint W) Lw n)
                         (log_hdr_bno logstart) bs2) cov logstart
                       = lm_logged L cov logstart).
     { rewrite (lm_committed_clean _ _ cov logstart Hfinhdr Hdeprow)
@@ -2658,8 +2657,8 @@ Section EndOpBlocks.
     { iApply (eo_open_to_batch bn γfs cov logstart
                 (<[log_hdr_bno logstart := bs2]> (<[log_hdr_bno logstart := bs1]> L))
                 (dirty_clear D (map uint W)) Lw ∅
-                (lm_upd (eo_minst logstart W Lw
-                           (lm_upd Mc (log_hdr_bno logstart) bs1) n)
+                (lm_upd (lm_install (lm_upd Mc (log_hdr_bno logstart) bs1)
+                           (map uint W) Lw n)
                    (log_hdr_bno logstart) bs2)
                 Hfinhdr Hdep with "Hmirc").
       rewrite /eo_open.

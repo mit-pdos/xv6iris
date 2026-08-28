@@ -366,7 +366,7 @@ Section memrun.
         iDestruct (bytes_own_read mm sg.(mem) _ nb w Hrb with "Hown Hmem")
           as %Hrb'.
         iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hcl".
-        iExists w. iSplitR; [done|]. iNext. iMod "Hcl" as "_". iModIntro.
+        iExists w. iSplitR; [done|]. iApply bi.later_intro. iMod "Hcl" as "_". iModIntro.
         iSplitL "Hri Hmem Hdv"; [iFrame|].
         iIntros "Hfrag". rewrite Hres.
         iApply (IH rs mm _ x rs' mm' Hf with "Hcert [Hfrag] Hrw Hro Hown").
@@ -378,7 +378,7 @@ Section memrun.
         iDestruct (bytes_own_read mm sg.(mem) _ nb w Hrb with "Hown Hmem")
           as %Hrb'.
         iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hcl".
-        iExists w. iSplitR; [done|]. iNext. iMod "Hcl" as "_". iModIntro.
+        iExists w. iSplitR; [done|]. iApply bi.later_intro. iMod "Hcl" as "_". iModIntro.
         iSplitL "Hri Hmem Hdv"; [iFrame|].
         rewrite Hres.
         iApply (IH rs mm _ x rs' mm' Hf with "Hcert Hany Hrw Hro Hown"). }
@@ -405,7 +405,7 @@ Section memrun.
       iIntros (sg) "Hsi". rewrite /mstate_interp.
       iDestruct "Hsi" as "(Hri & Hmem & Hdv)".
       iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hcl".
-      iNext. iMod "Hcl" as "_".
+      iApply bi.later_intro. iMod "Hcl" as "_".
       iMod (bytes_own_write (Interface.WriteReq.pa wreq) nb
               (Interface.WriteReq.value wreq) mm sg.(mem) Hfp
               with "Hmem Hown") as "[Hmem Hown]".

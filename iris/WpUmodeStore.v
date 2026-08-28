@@ -1929,7 +1929,7 @@ Section WpUmodeStore.
     iApply (wp_uv_store_later Ψ M m pc is_rvc i o imm rs1 rs2 k w_st va wval
               Hkw Hui Hred Hg1 Hlpad Hexp Hva Hwval Hl Hchk Hcanon Hpg Hal HMb
               with "Hcg Hpc [Hcont]").
-    iNext. iExact "Hcont".
+    iApply bi.later_intro. iExact "Hcont".
   Qed.
 
   (* ------------------------------------------------------------------- *)

@@ -507,7 +507,7 @@ Section ProofStrlen.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (sli_1a with "Htext"). }
-      iNext. iIntros (CID1 Hs1) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID1 Hs1) "Hcg Hpc".
       assert (Hback12 : add_vec (mword_of_int (KernelSyms.strlen + 0x1a) : mword 64)
                 (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 252 : mword 8) ('b"0"))))
               = mword_of_int (KernelSyms.strlen + 0x12))
@@ -667,7 +667,7 @@ Section ProofStrlen.
                 ltac:(rewrite HR3a5'; exact Ez) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (sli_0c with "Htext"). }
-      iNext. iIntros (CID6 Hs6) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID6 Hs6) "Hcg Hpc".
       assert (Ht28 : add_vec (mword_of_int (KernelSyms.strlen + 0x0c) : mword 64)
                 (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 14 : mword 8) ('b"0"))))
               = mword_of_int (KernelSyms.strlen + 0x28))
@@ -696,7 +696,7 @@ Section ProofStrlen.
                 Z1 (K - 2)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (sli_2a with "Htext"). }
-      iIntros (CID8 Hs8). iNext. iIntros "Hcg Hpc".
+      iIntros (CID8 Hs8). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Ht20 : add_vec (mword_of_int (KernelSyms.strlen + 0x2a) : mword 64)
                 (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2043 : mword 11) ('b"0"))))
               = mword_of_int (KernelSyms.strlen + 0x20))

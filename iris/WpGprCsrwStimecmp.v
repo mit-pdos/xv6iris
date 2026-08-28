@@ -620,7 +620,7 @@ Section WpCsrwStimecmp.
       + iIntros "Hrw Hro".
         iApply (swp_write_CSR_stimecmp (DfracOwn (q/2)) stimecmp0
                   (m !!! Regidx rs1) ip Hfresh with "Hcert Hip Hrw Hro").
-    - iNext. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hcsr')".
+    - iApply bi.later_intro. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hcsr')".
       iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
       iCombine "Hpmpc' Hpmpc_k'" as "Hpmpc''".
       iApply ("Hcont" with "Hmm'' Hpmpc'' Hpc' Hf' Hcsr'").

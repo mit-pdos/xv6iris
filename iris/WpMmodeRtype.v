@@ -51,7 +51,7 @@ Section WpLogicRTypeGpr.
       iApply (swp_mono with "[HPC HnPC] [Hf]");
         [| iApply (swp_execute_RTYPE_OR rs2 rs1 rd m Hrd with "Hcert Hf") ].
       iIntros (e) "[-> Hf]". iSplitR; [done|]. iFrame "Hf HPC HnPC".
-    - iNext. iIntros "Hmm Hpmpc Hpc Hf _".
+    - iApply bi.later_intro. iIntros "Hmm Hpmpc Hpc Hf _".
       iApply ("Hcont" with "Hmm Hpmpc Hpc Hf").
   Qed.
 
@@ -87,7 +87,7 @@ Section WpLogicRTypeGpr.
       iApply (swp_mono with "[HPC HnPC] [Hf]");
         [| iApply (swp_execute_RTYPE_AND rs2 rs1 rd m Hrd with "Hcert Hf") ].
       iIntros (e) "[-> Hf]". iSplitR; [done|]. iFrame "Hf HPC HnPC".
-    - iNext. iIntros "Hmm Hpmpc Hpc Hf _".
+    - iApply bi.later_intro. iIntros "Hmm Hpmpc Hpc Hf _".
       iApply ("Hcont" with "Hmm Hpmpc Hpc Hf").
   Qed.
 
@@ -126,7 +126,7 @@ Section WpLogicRTypeGpr.
       iApply (swp_mono with "[HPC HnPC] [Hf]");
         [| iApply (swp_execute_RTYPE_ADD rs2 rs1 rd m Hrd with "Hcert Hf") ].
       iIntros (e) "[-> Hf]". iSplitR; [done|]. iFrame "Hf HPC HnPC".
-    - iNext. iIntros "Hmm Hpmpc Hpc Hf _".
+    - iApply bi.later_intro. iIntros "Hmm Hpmpc Hpc Hf _".
       iApply ("Hcont" with "Hmm Hpmpc Hpc Hf").
   Qed.
 

@@ -138,26 +138,39 @@ Definition fdslotUR : ucmra := authUR natUR.
    -- the share already pinned it, through a points-to on the entry's own
    [i_inum] cell; naming it is what this costs.
 
-   [FdPipe] CARRIES ITS DIRECTION, and on a pipe that is not a mode but an
-   IDENTITY: pipealloc's two files differ in nothing else -- same type, same
-   [f->pipe] -- so [f->writable] is the whole of what says which end a
-   descriptor holds.  Without it the two ends are indistinguishable to a
-   client, and sys_pipe's postcondition could not say that fd[0] reads and
-   fd[1] writes.  It is tied to [f->writable] by [FileInvDefs.fdstate_ok],
-   through [fc_wbool].
-
    A [Z], like [FdDevice]'s major and for the same reason: these are the
    numbers a USER program reads, and the machine widths belong on the
    kernel side of the boundary.  [FileInvDefs.fdstate_ok] is where the two
    meet, and it does the [bv_unsigned]. *)
 Inductive fdtype :=
 | FdInode (inum : Z)
-| FdPipe (writable : bool)
+| FdPipe
 | FdDevice (major : Z).
 
+(* THE TWO MODE FLAGS RIDE ON [FdOpen], NOT ON THE TYPE.  [f->readable] and
+   [f->writable] are fields of every [struct file] whatever its type, so
+   putting them on each constructor would be the same pair written three
+   times -- and every consumer that only cares about the mode would have to
+   match on the type to find it.
+
+   They are what a descriptor's user most wants after "which file": whether
+   a read or a write on this fd can succeed at all.  fileread returns -1 on
+   [f->readable == 0] before it looks at the type, and filewrite likewise on
+   [f->writable]; both tests are now facts about the STATE.
+
+   On a PIPE the pair is not a mode but an IDENTITY: pipealloc's two files
+   differ in nothing else -- same type, same [f->pipe] -- so the flags are
+   the whole of what says which end a descriptor holds.  [FdOpen true false
+   FdPipe] is the read end and [FdOpen false true FdPipe] the write end,
+   which is how sys_pipe's postcondition still says that fd[0] reads and
+   fd[1] writes.
+
+   Both are tied to their cells by [FileInvDefs.fdstate_ok], at the C
+   reading: the field holds 1 when the flag is set and 0 when it is not,
+   which is what open() and pipealloc() actually store. *)
 Inductive fdstate :=
 | FdClosed
-| FdOpen (t : fdtype).
+| FdOpen (readable writable : bool) (t : fdtype).
 
 Global Instance fdtype_eq_dec : EqDecision fdtype.
 Proof. solve_decision. Defined.

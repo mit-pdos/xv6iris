@@ -444,11 +444,9 @@ Definition wp_dirlink_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
-    (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
+  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
-    (γa : gname) (γf : gname) (γpr : gname)
-    (bmapstart : Z) (size : Z)
+ (γf : gname)
     (ip : mword 64) (dinum : mword 32)                (* the DIRECTORY       *)
     (bm : blkmap) (data : nat -> list (bv 8))
     (dn dn0 : dinode)
@@ -517,14 +515,14 @@ Definition wp_dirlink_sconf_body
      linked, and it is what lets a caller re-park [DirView.dir_ok] over the
      record dirlink stores.  See the header. *)
   bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
-  bitmap_geom_ok fsc_cov fsc_logst bmapstart size ->
-  printk_gen_contract (kt := KT1) γpr γu γd ->
+  bitmap_geom_ok fsc_cov fsc_logst fsc_bmapstart fsc_size ->
+  printk_gen_contract (kt := KT1) fsc_printk fsc_uart fsc_disk ->
   (* ---- iput's premises (itrunc's geometry) ---- *)
-  0 < size <= BPB ->
-  0 <= bmapstart ->
-  bmapstart ∈ fsc_cov ->
-  ~ (bmapstart ∈ log_region_set fsc_logst) ->
-  cov_below fsc_cov size ->
+  0 < fsc_size <= BPB ->
+  0 <= fsc_bmapstart ->
+  fsc_bmapstart ∈ fsc_cov ->
+  ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
+  cov_below fsc_cov fsc_size ->
   ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
   (* ENOUGH BUDGET for either arm -- see the header *)
   (dirlink_units <= ncount)%nat ->
@@ -546,10 +544,10 @@ Definition wp_dirlink_sconf_body
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   kernel_data -∗
-  printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
-  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
-  kalloc_env γa None -∗
+  printk_env fsc_printk fsc_uart fsc_disk -∗
+  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+  log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
+  kalloc_env fsc_kalloc None -∗
   (* ---- THE LOCKED DIRECTORY ---- *)
   i_dev ip ↦₄{dqd} icfg_dev -∗
   i_inum ip ↦₄{dqf} dinum -∗
@@ -560,9 +558,9 @@ Definition wp_dirlink_sconf_body
   ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
   (* ---- the superblock cells and the bitmap ---- *)
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-  sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+  sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
+  bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   (* ---- the inode region and the directory's own (stale) record ---- *)
   ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
@@ -579,9 +577,9 @@ Definition wp_dirlink_sconf_body
   proc_priv_bare pj pidv Vpr -∗
   (* ---- the running-thread bundle and the disk fabric ---- *)
   procs_inv γs -∗
-  dev_inv γu γd -∗
-  disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  dev_inv fsc_uart fsc_disk -∗
+  disk_geom fsc_disk pd pav pu -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
   bslots 3 -∗
   (* ---- THE ICACHE ---- *)
   is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
@@ -616,8 +614,8 @@ Definition wp_dirlink_sconf_body
       inode_blocks fsc_fs bm' data' -∗
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-      sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       dinode_at fsc_ireg dinum dn0' -∗
       proc_priv_bare pj pidv Vpr -∗
       bslots 3 -∗
@@ -710,11 +708,9 @@ Definition wp_dirlink_gen_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
-    (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
+  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
-    (γa : gname) (γf : gname) (γpr : gname)
-    (bmapstart : Z) (size : Z)
+ (γf : gname)
     (ip : mword 64) (dinum : mword 32)                (* the DIRECTORY       *)
     (bm : blkmap) (data : nat -> list (bv 8))
     (dn dn0 : dinode)
@@ -783,14 +779,14 @@ Definition wp_dirlink_gen_body
      linked, and it is what lets a caller re-park [DirView.dir_ok] over the
      record dirlink stores.  See the header. *)
   bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
-  bitmap_geom_ok fsc_cov fsc_logst bmapstart size ->
-  printk_gen_contract (kt := KT1) γpr γu γd ->
+  bitmap_geom_ok fsc_cov fsc_logst fsc_bmapstart fsc_size ->
+  printk_gen_contract (kt := KT1) fsc_printk fsc_uart fsc_disk ->
   (* ---- iput's premises (itrunc's geometry) ---- *)
-  0 < size <= BPB ->
-  0 <= bmapstart ->
-  bmapstart ∈ fsc_cov ->
-  ~ (bmapstart ∈ log_region_set fsc_logst) ->
-  cov_below fsc_cov size ->
+  0 < fsc_size <= BPB ->
+  0 <= fsc_bmapstart ->
+  fsc_bmapstart ∈ fsc_cov ->
+  ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
+  cov_below fsc_cov fsc_size ->
   ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
   (* ENOUGH BUDGET for either arm, AT THE HONEST FIGURE (see the header).
      [crb] and [ind] are [dl16_post]'s own two booleans, read off the entry
@@ -799,7 +795,7 @@ Definition wp_dirlink_gen_body
      caller with nothing to claim supplies [dl_need_crb]/[dl_need_ind] and
      is back at six; the COUNTED contract supplies [dl_need_le] and is back
      at seven, which is why its own statement did not move. *)
-  (dl_need (bool_decide (bmapstart ∈ Sb))
+  (dl_need (bool_decide (fsc_bmapstart ∈ Sb))
            (bmap_ind ((16 * k0) `div` BSIZE)%nat) <= ncount)%nat ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
@@ -819,10 +815,10 @@ Definition wp_dirlink_gen_body
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   kernel_data -∗
-  printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
-  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
-  kalloc_env γa None -∗
+  printk_env fsc_printk fsc_uart fsc_disk -∗
+  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+  log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
+  kalloc_env fsc_kalloc None -∗
   (* ---- THE LOCKED DIRECTORY ---- *)
   i_dev ip ↦₄{dqd} icfg_dev -∗
   i_inum ip ↦₄{dqf} dinum -∗
@@ -833,9 +829,9 @@ Definition wp_dirlink_gen_body
   ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
   (* ---- the superblock cells and the bitmap ---- *)
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-  sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+  sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
+  bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   (* ---- the inode region and the directory's own (stale) record ---- *)
   ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
@@ -852,9 +848,9 @@ Definition wp_dirlink_gen_body
   proc_priv_bare pj pidv Vpr -∗
   (* ---- the running-thread bundle and the disk fabric ---- *)
   procs_inv γs -∗
-  dev_inv γu γd -∗
-  disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  dev_inv fsc_uart fsc_disk -∗
+  disk_geom fsc_disk pd pav pu -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
   bslots 3 -∗
   (* ---- THE ICACHE ---- *)
   is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
@@ -895,8 +891,8 @@ Definition wp_dirlink_gen_body
       inode_blocks fsc_fs bm' data' -∗
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-      sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       dinode_at fsc_ireg dinum dn0' -∗
       proc_priv_bare pj pidv Vpr -∗
       bslots 3 -∗
@@ -915,7 +911,7 @@ Definition wp_dirlink_gen_body
       (* ...and on the success-append arm, the credit-aware spend and the
          membership trio create's next call needs.  ADDITIVE -- the counted
          [dirlink_units] clause above is untouched. *)
-      ⌜dl16_post bmapstart dinum icfg_ist ncount n' k0 tot found
+      ⌜dl16_post fsc_bmapstart dinum icfg_ist ncount n' k0 tot found
                  bm bm' Sb Sb'⌝ -∗
       (* ...and the FOUND arm's OWN spend, which the counted
          [dirlink_units] above does not price finely enough for a caller
@@ -1007,11 +1003,8 @@ Module Type DIRLINK.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (γa : gname) (γf : gname) (γpr : gname)
-      (bmapstart : Z) (size : Z)
+ (γf : gname)
       (ip : mword 64) (dinum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn dn0 : dinode)
@@ -1021,9 +1014,9 @@ Module Type DIRLINK.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_dirlink_sconf_body γs j γl γu γd γk pd pav pu bn
-                            γa γf γpr bmapstart
-                            size ip dinum bm data dn dn0 fn inum
+      wp_dirlink_sconf_body γs j γl pd pav pu
+ γf
+ ip dinum bm data dn dn0 fn inum
                             ncount pidv dq dqd dqn dqs dqb dqbs dqf
                             m K eb b lks Vpr.
 
@@ -1034,11 +1027,8 @@ Module Type DIRLINK.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (γa : gname) (γf : gname) (γpr : gname)
-      (bmapstart : Z) (size : Z)
+ (γf : gname)
       (ip : mword 64) (dinum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn dn0 : dinode)
@@ -1048,9 +1038,9 @@ Module Type DIRLINK.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_dirlink_gen_body γs j γl γu γd γk pd pav pu bn
-                          γa γf γpr bmapstart
-                          size ip dinum bm data dn dn0 fn inum
+      wp_dirlink_gen_body γs j γl pd pav pu
+ γf
+ ip dinum bm data dn dn0 fn inum
                           ncount Sb tid qtx pidv dq dqd dqn dqs dqb dqbs dqf
                           m K eb b lks Vpr.
 End DIRLINK.

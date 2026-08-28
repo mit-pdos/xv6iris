@@ -368,7 +368,7 @@ Section WpSconfMem.
                    ⌜m' = <[Regidx rd := regval_into_reg (ext v)]> m⌝ ∗
                    ⌜n' = n⌝ ∗ Ψ v)%I
               with "Hcg Hpc Hinstr [HAU Hcont]").
-    iNext.
+    iApply bi.later_intro.
     rename CID into CID0.
     iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "HAU".
     - (* ---------------- THE INSTRUCTION ---------------- *)
@@ -507,7 +507,7 @@ Section WpSconfMem.
             iModIntro. iExists v.
             iSplitR.
             { iPureIntro. intros j Hj. apply Hbf. lia. }
-            iNext. iMod "Hb2" as "_". iModIntro.
+            iApply bi.later_intro. iMod "Hb2" as "_". iModIntro.
             iFrame "Hreg Hmem Hdev HPsi". }
       (* ---- the post ---- *)
       iIntros (e) "(-> & Hpost)".
@@ -1019,7 +1019,7 @@ Section WpSconfMem.
                  (⌜npc = add_vec_int pc (if c then 2 else 4)⌝ ∗
                   ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗ Ψ)%I)
               with "Hcg Hpc Hinstr [HAU Hcont]").
-    iNext.
+    iApply bi.later_intro.
     rename CID into CID0.
     iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "HAU".
     - (* ---------------- THE INSTRUCTION ---------------- *)
@@ -1146,7 +1146,7 @@ Section WpSconfMem.
             iMod ("Hcl" with "Hbw") as "HPsi".
             iMod "Hb1" as "_".
             iMod (fupd_mask_subseteq ∅) as "Hb2"; [set_solver|].
-            iModIntro. iNext. iMod "Hb2" as "_". iModIntro.
+            iModIntro. iApply bi.later_intro. iMod "Hb2" as "_". iModIntro.
             iFrame "Hreg Hmem Hdev HPsi". }
       (* ---- the post ---- *)
       iIntros (e) "(-> & Hfile & Hland)".

@@ -1923,7 +1923,7 @@ Section WpSconfCsr.
                  ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗
                  stvec ↦ᵣ wval)%I
               with "Hcg Hpc Hinstr [Hstv Hcont]").
-    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iApply bi.later_intro. iApply wp_next_off_intro. rewrite /sconf_step_obl.
     iSplitL "Hstv".
     - iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
@@ -2048,7 +2048,7 @@ Section WpSconfCsr.
               (fun (_ : CpuId) npc ms' m' n' =>
                  ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗ Rout)%I
               with "Hcg Hpc Hinstr [Hbit Hslot Hcont]").
-    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iApply bi.later_intro. iApply wp_next_off_intro. rewrite /sconf_step_obl.
     iSplitL "Hbit Hslot".
     - (* ---- the instruction ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
@@ -2220,7 +2220,7 @@ Section WpSconfCsr.
                  ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗
                  sepc ↦ᵣ mepc_val wval)%I
               with "Hcg Hpc Hinstr [Hsepc Hcont]").
-    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iApply bi.later_intro. iApply wp_next_off_intro. rewrite /sconf_step_obl.
     iSplitL "Hsepc".
     - iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
@@ -2394,7 +2394,7 @@ Section WpSconfCsr.
               with "Hcg Hpc Hinstr [Hrdcsr Hcell Hcont]").
     (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic callback
        is discharged at the ambient hart and nothing is renamed. *)
-    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iApply bi.later_intro. iApply wp_next_off_intro. rewrite /sconf_step_obl.
     iSplitL "Hrdcsr Hcell".
     - (* ---- the instruction ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
@@ -2655,7 +2655,7 @@ Section WpSconfCsr.
                  ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗
                  ⌜∃ ms : mword 64, sconf_ms_facts ms⌝)%I
               with "Hcg Hpc Hinstr [Hcont]").
-    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iApply bi.later_intro. iApply wp_next_off_intro. rewrite /sconf_step_obl.
     iSplitR "Hcont".
     - (* ---- the instruction: a read-MODIFY-write at x0 ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
@@ -2787,7 +2787,7 @@ Section WpSconfCsr.
                  ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗
                  ⌜∃ ms : mword 64, sconf_ms_facts ms⌝)%I
               with "Hcg Hpc Hinstr [Hcont]").
-    iNext.
+    iApply bi.later_intro.
     (* FREE THE NAME [CID] FOR THE REBOUND HART: with interrupts enabled the
        instruction can be trapped and the thread resumed elsewhere, so every
        resource below is about the hart the callback binds. *)
@@ -2961,7 +2961,7 @@ Section WpSconfCsr.
                  ⌜_get_Mstatus_SPIE ms' = _get_Sstatus_SPIE wval⌝ ∗
                  sret_bits (_get_Mstatus_SPP ms') (_get_Mstatus_SPIE ms'))%I
               with "Hcg Hpc Hinstr [Hsppc Hcont]").
-    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iApply bi.later_intro. iApply wp_next_off_intro. rewrite /sconf_step_obl.
     iSplitL "Hsppc".
     - (* ---- the instruction ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
@@ -3166,7 +3166,7 @@ Section WpSconfCsr.
                       (satp_to_ppn (autocast (T := mword) sp0 : mword 64))
                       = root⌝ ∗ kpt_inv root)%I
               with "Hcg Hpc Hinstr [Hcont]").
-    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iApply bi.later_intro. iApply wp_next_off_intro. rewrite /sconf_step_obl.
     iSplitR "Hcont".
     - (* ---- the instruction ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
@@ -3315,7 +3315,7 @@ Section WpSconfCsr.
               with "Hcg Hpc Hinstr
                     [Htok Hhx Hkptr Hsepcx Hscausex Hstvalx Hsppc Hcells Hclm
                      Hcont]").
-    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iApply bi.later_intro. iApply wp_next_off_intro. rewrite /sconf_step_obl.
     iSplitR "Hcont".
     - (* ---- the instruction, and the four-piece ghost flip ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
@@ -3541,7 +3541,7 @@ Section WpSconfCsr.
                  ⌜m' = <[Regidx rd := regval_into_reg (sstatus_read ms')]> m⌝ ∗
                  ⌜n' = n⌝)%I
               with "Hcg Hpc Hinstr [Hcont]").
-    iNext.
+    iApply bi.later_intro.
     (* FREE THE NAME [CID] FOR THE REBOUND HART: at [b = true] the read can be
        trapped and the thread resumed elsewhere, and every resource the
        continuation hands on is then about THAT hart. *)
@@ -3720,7 +3720,7 @@ Section WpSconfCsr.
                  trap_csrs (CID := CIDr) kt ∗ cpu_claim (CID := CIDr) p ∗
                  cpu_priv_pay (CID := CIDr) true p)%I
               with "Hcg Hpc Hinstr [Hcont]").
-    iNext.
+    iApply bi.later_intro.
     rename CID into CID0.
     iIntros (CID Hs). rewrite /sconf_step_obl.
     iSplitR "Hcont".
@@ -3912,7 +3912,7 @@ Section WpSconfCsr.
                    cpu_claim_pay (CID := CIDr) 0 true p ∗
                    cpu_priv_pay (CID := CIDr) true p)%I
                 with "Hcg Hpc Hinstr [Hcont]").
-      iNext.
+      iApply bi.later_intro.
       rename CID into CID0.
       iIntros (CID Hs). rewrite /sconf_step_obl.
       iSplitR "Hcont".
@@ -4070,7 +4070,7 @@ Section WpSconfCsr.
                    cpu_claim_pay (CID := CIDr) k eb p ∗
                    cpu_priv_pay (CID := CIDr) false p)%I
                 with "Hcg Hpc Hinstr [Hcnt Hcont]").
-      iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+      iApply bi.later_intro. iApply wp_next_off_intro. rewrite /sconf_step_obl.
       iSplitR "Hcont".
       + iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
         iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)

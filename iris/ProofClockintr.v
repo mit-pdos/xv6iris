@@ -440,7 +440,7 @@ Section ProofClockintr.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (cii_0c with "Htext"). }
-      iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
       assert (Hpc28 : add_vec (mword_of_int (KernelSyms.clockintr + 0x0c) : mword 64)
                         (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 14 : mword 8) ('b"0"))))
                       = mword_of_int (KernelSyms.clockintr + 0x28))
@@ -751,7 +751,7 @@ Section ProofClockintr.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (cii_54 with "Htext"). }
-      iApply wp_next_off_intro. iNext. iIntros "Hcg Hpc".
+      iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Hpcback : add_vec (mword_of_int (KernelSyms.clockintr + 0x54) : mword 64)
                           (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2013 : mword 11) ('b"0"))))
                         = mword_of_int (KernelSyms.clockintr + 0x0e))

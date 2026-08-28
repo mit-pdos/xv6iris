@@ -233,7 +233,7 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : Gen
   (* stvec points at the trampoline base *)
   uc_stvec C = mword_of_int TRAMPOLINE ->
   (* the kernel owns the config cells outright at this join (same fact the
-     userret-side bridge [userret_to_user_inv] requires): the step leaves
+     userret-side bridge [userret_to_user_state] requires): the step leaves
      drive all six machine/config cells at ONE dfrac, and the trap frame
      holds hart_state/cur_privilege/mstatus at full *)
   uc_dqc C = DfracOwn 1 ->

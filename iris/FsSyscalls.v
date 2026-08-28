@@ -65,14 +65,19 @@
     the syscall boundary a CALLING CONVENTION -- three bundles and two
     wrappers derived from the landed seals, which do not move:
 
-      [fs_geom]   the 19 pure geometry/ties premises, as ONE record.  Both
-                  syscalls take the SAME one; chdir ignores five fields.
-      [fs_world]  the 19 ambient resources, as ONE assertion -- **and it is
-                  PERSISTENT**, which is the whole point.  A client
-                  establishes the file system's world once and every syscall
-                  is free of it forever after.  This is the honest content
-                  of "the ambient is absorbed": not that the seals hide it,
-                  but that all of it is duplicable and none of it is spent.
+      [FsReady.fs_geom_ok]  the pure geometry, as ONE PARAMETER-FREE
+                  record about the ambient configuration.  Both syscalls
+                  take the SAME one; chdir ignores five fields.  (This file
+                  used to own a threaded copy called [fs_geom]; rank 1d
+                  retired it -- there was nothing left to thread.)
+      [FsReady.fs_ready]  the 19 ambient resources, as ONE assertion --
+                  **and it is PERSISTENT**, which is the whole point.  A
+                  client establishes the file system's world once and every
+                  syscall is free of it forever after.  This is the honest
+                  content of "the ambient is absorbed": not that the seals
+                  hide it, but that all of it is duplicable and none of it
+                  is spent.  (This file used to own a wrapper called
+                  [fs_world]; rank 1d retired that too.)
       [fs_res]    the 6 consumable resources that go in and come back:
                   [bslots], the four superblock cells and the iref ledger.  THIS is the part a client must account for,
                   and (S3) is exactly a statement about it.
@@ -147,56 +152,27 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import FsCfg.     (* the ambient fs names [fs_ready] is stated at *)
-Require Import FsReady.   (* SIMP-2: [fs_world] is now the derived form *)
+Require Import FsReady.   (* the file system's world, and its geometry *)
 Import Defs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
-(*  1.  THE PURE SIDE: ONE RECORD FOR THE FILE SYSTEM'S GEOMETRY           *)
+(*  1.  THE PURE SIDE: THERE IS NO RECORD HERE ANY MORE                    *)
 (* ====================================================================== *)
 
-(*  The nineteen pure premises the two seals take between them, in the
-    order [SpecSysMkdir.v]:201-223 states them.  It is deliberately the
-    UNION and not the intersection: a friendly client establishes the file
-    system's geometry ONCE (it is a fact about mkfs's image and the boot
-    configuration, not about a call) and hands the same record to every
-    syscall.  sys_chdir ignores [fg_bmgeom] and the four [ninodes] fields;
-    that is five unused hypotheses at one call site against re-deriving
-    fourteen at every other one.
-
-    THE FOUR [icfg] TIES ARE FIELDS RATHER THAN A COERCION, and the
-    instance is left implicit ON PURPOSE: at a use site it resolves from
-    the ambient [fileG], which is the same [icfg] every [ic_*] resource in
-    the same statement resolves through.  Binding a standalone [icfg]
-    beside a [fileG] is SpecCreate.v:443-454's two-instance trap, and
-    ProbeR1a.v exhibits it: the two halves of one proposition end up at
-    [ICFG] and at [@file_icfg _ fileG0], print identically and do not
-    unify. *)
-Record fs_geom `{ICFG : icfg, FSC : fscfg}
-    (fsc_cov : gset Z) (fsc_logst bmapstart : Z)
-    (ninodes size : Z) : Prop := MkFsGeom {
-  (* [fg_dev] / [fg_nib] / [fg_log] / [fg_ist] ARE GONE (rank 1c): they tied
-     a threaded copy of the device, the inode count, the log's names and the
-     region's first block to the [icfg] instance, and the contracts read all
-     four off the class now. *)
-  fg_rootdev  : icfg_dev = ROOTDEV;
-  fg_nib_pos  : (0 < icfg_nib)%nat;
-  fg_loggeom  : log_geom_ok fsc_cov fsc_logst;
-  fg_size     : 0 < size <= BPB;
-  fg_bm_nn    : 0 <= bmapstart;
-  fg_bm_cov   : bmapstart ∈ fsc_cov;
-  fg_bm_out   : ~ (bmapstart ∈ log_region_set fsc_logst);
-  fg_ist_nn   : 0 <= icfg_ist;
-  fg_covbelow : cov_below fsc_cov size;
-  fg_bmgeom   : bitmap_geom_ok fsc_cov fsc_logst bmapstart size;
-  fg_iblocks  : ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst;
-  fg_nin_lo   : 1 < ninodes;
-  fg_nin_hi   : ninodes <= 16 * Z.of_nat icfg_nib;
-  fg_nin_31   : ninodes < 2 ^ 31;
-  fg_ushort   : 16 * Z.of_nat icfg_nib <= 2 ^ 16;
-}.
+(*  [fs_geom] IS GONE (rank 1d).  It was the nineteen pure premises the two
+    seals take between them, as one record parameterised by the numbers a
+    syscall contract used to thread.  Every one of those numbers is a
+    [FsCfg.fscfg] / [IcacheRef.icfg] field now -- [fsc_bmapstart],
+    [fsc_size], [fsc_ninodes] were the last three -- so the record has no
+    parameters left to take, and a parameter-free statement of the image's
+    geometry already exists one layer down: [FsReady.fs_geom_ok], with
+    [fgo_size] / [fgo_bm_nn] / [fgo_bm_cov] / [fgo_bm_out] as the accessors
+    for [bitmap_geom_ok]'s four conjuncts.  The two friendly bodies below
+    take THAT, and a client holding [FsReady.fs_ready] gets it for nothing
+    ([FsReady.fs_ready_geom]).  *)
 
 (* ====================================================================== *)
 (*  2.  THE TWO RESOURCE BUNDLES                                           *)
@@ -209,214 +185,48 @@ Section FsBundles.
      [fileG] exactly as [icfg] does (see the note on [FileInvDefs.fileG]),
      so there is no binder here and no second instance path. *)
 
-  (* THE AMBIENT, AND IT IS PERSISTENT.  Every invariant, lock handle and
-     certificate the fs cone runs on, plus the printk credential PAIR (the
-     resource and its pure contract, which travel together and are wanted
-     together by ialloc's out-of-inodes arm).
+  (* THE AMBIENT IS [FsReady.fs_ready], AND THERE IS NO WRAPPER LEFT.
 
-     [fs_world_persistent] below is this file's real theorem about hiding:
-     the seals CONSUME all nineteen and return NONE of them, and that is
-     sound precisely because not one of them is spent.  A friendly client
-     pays for the file system's world once, at boot. *)
-  (* REHOMED BY SIMP-2 (ghost-simplification.md §5.2).  The nineteen
-     conjuncts are now [FsReady.fs_ready], a LEAF below this layer, and
-     this is the derived form: the definition below is an alias, so the two
-     friendly seals read exactly as before and every consumer of the name
-     is unaffected.
+     [fs_world] IS GONE (rank 1d), and with it [fs_world_all],
+     [fs_world_persistent], [fs_world_ready] and [fs_ready_world].  It was
+     [fs_ready] plus the EQUATIONS saying a caller's own threaded names were
+     the ambient ones -- nineteen of them once, eight after rank 1c (the six
+     device/allocator gnames and the bitmap's two numbers).  Those eight
+     names are [FsCfg.fscfg] fields now ([fsc_printk], [fsc_kalloc],
+     [fsc_uart], [fsc_disk], [fsc_dlock], [fsc_bio], [fsc_bmapstart],
+     [fsc_size]), so there is nothing left on either side of an equation:
+     what remained of the definition was the parameter-free [fs_ready]
+     itself, plus [fs_ready_disk]'s converse at a caller's three ring pages.
 
-     What moved with the predicate is what this file never had: a PRODUCER
-     ([FsReady.fs_ready_establish] -- the boot chain's eighteen plus
-     fsinit's returned [ireg_boot], in one [bupd]) and a PROJECTION FAMILY
-     (each an [iDestruct], statable only inside [FsReady]'s own section --
-     the class-used-as-index trap, see that file's header).  "A friendly
-     client pays for the file system's world once, at boot" is, since
-     SIMP-2, a lemma rather than an assumption. *)
-  (* [fs_world] AT A CALLER'S OWN NAMES.  [FsReady.fs_ready] is now
-     PARAMETER-FREE -- every ghost name it used to take is ambient, in
-     [FsCfg.fscfg] and [IcacheRef.icfg] (see FsCfg.v's header for why a
-     carried predicate must not be an existential).  The contracts below
-     still THREAD the DEVICE and ALLOCATOR names, so what they want is the
-     ambient predicate plus the equations saying the two agree.  The four
-     [icfg] rows left with rank 1c; the six device/allocator ones and the
-     bitmap's two numbers are stage 4's.  True at boot by construction; the
-     boot chain builds the [fscfg] instance out of exactly these names.
+     A namer wants one of two things and both are one lemma away:
+     [FsReady.fs_ready] as it stands, or -- if it threads its own
+     [pd]/[pav]/[pu] -- [FsReady.fs_ready_disk] to unpack the witness and
+     [FsReady.disk_geom_agree] to identify the two.  The three ring pages
+     are the ONE thing here that is not ambient (FsCfg.v's ruling R1:
+     [virtio_disk_init] [kalloc]s them at WP time), which is why they are
+     the only reason the converse exists at all.
 
-     [procs_inv] IS NO LONGER IN IT.  It is persistent, it is a PROCESS
-     resource rather than a file-system one, and it was the only conjunct
-     that reached back into the process layer.  The two bodies below take
-     it as their own premise. *)
-  (* THE THREE RING PAGES ARE A RESOURCE HERE, NOT AN EQUATION (R1).
-     [fsc_desc]/[fsc_avail]/[fsc_used] left [FsCfg.fscfg] because
-     [virtio_disk_init] [kalloc]s them at WP time, so there is no field left
-     for [⌜pd = fsc_desc⌝] to name.  What replaces the three equations is the
-     disk fabric SPELLED AT THE CALLER'S OWN [pd]/[pav]/[pu] -- which is what
-     the equations bought in the first place, and it is the same trade every
-     other row here makes, only one step earlier.
-
-     IT IS A RE-SPELLING, NOT A STRENGTHENING.  [fs_ready] carries
-     [∃ pd pav pu, disk_geom fsc_disk pd pav pu ∗ is_lock fsc_dlock ...], and
-     [⌜γd = fsc_disk⌝] is still here, so a producer discharges the two new
-     rows by unpacking that existential and instantiating this predicate's
-     [pd]/[pav]/[pu] at the witness; conversely a consumer that wants the
-     ambient form gets it back by [FsReady.disk_geom_agree].  The two forms
-     are interderivable, [fs_world_all]'s statement is unchanged, and so is
-     every contract below that takes [pd]/[pav]/[pu] as parameters. *)
-  (* EIGHT EQUATIONS, AND THE BLOCK BITMAP IS WHY TWO OF THEM ARE HERE.
-     [BitmapInv.bitmap_inv] is a conjunct of [fs_ready] at the AMBIENT
-     geometry ([fsc_bmapstart], [fsc_size]); every fs contract that takes it
-     -- [SpecSysMkdir], [SpecSysChdir] -- still spells it at the CALLER's
-     [bmapstart]/[size], so those two ride here as equations.  The coverage
-     set, the log's start, and (rank 1c) the log's names, the inode region's
-     first block, the inode count and the device no longer do: a contract
-     that names [fsc_cov]/[fsc_logst]/[icfg_log]/[icfg_ist]/[icfg_nib]/
-     [icfg_dev] directly has nothing left to tie.  What remains is the six
-     DEVICE/ALLOCATOR names the syscall layer still threads and the two
-     bitmap numbers -- rank 1's stage 4. *)
-  Definition fs_world (γpr γa : gname) (γs : list gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
-      (pd pav pu : mword 64) (bn : bio_names)
-      (bmapstart : Z)
-      (size : Z)
-      : iProp Σ :=
-    (⌜γpr = fsc_printk⌝ ∗ ⌜γa = fsc_kalloc⌝ ∗
-     ⌜γu = fsc_uart⌝ ∗ ⌜γd = fsc_disk⌝ ∗ ⌜γk = fsc_dlock⌝ ∗
-     ⌜bn = fsc_bio⌝ ∗
-     ⌜bmapstart = fsc_bmapstart⌝ ∗ ⌜size = fsc_size⌝ ∗
-     disk_geom γd pd pav pu ∗
-     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) ∗
-     FsReady.fs_ready)%I.
-
-  Global Instance fs_world_persistent γpr γa γs γu γd γk pd pav pu bn
-      bmapstart size :
-    Persistent (fs_world γpr γa γs γu γd γk pd pav pu bn
-                         bmapstart size).
-  Proof. rewrite /fs_world. apply _. Qed.
-
-  (* THE UNPACK, at the caller's names.  This is what the [γs] parameter's
-     departure and the ties buy: a body that threads its own names still
-     destructs ONE row and gets the eighteen constituents spelled the way
-     its callee spells them.  The substitution happens here, once, instead
-     of in every consumer. *)
-  Lemma fs_world_all γpr γa γs γu γd γk pd pav pu bn
-      bmapstart size :
-    fs_world γpr γa γs γu γd γk pd pav pu bn
-             bmapstart size -∗
-    kernel_text ∗ kernel_data ∗
-    printk_env γpr γu γd ∗ ⌜printk_gen_contract (kt := KT1) γpr γu γd⌝ ∗
-    bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) ∗
-    log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev ∗
-    fs_crash_seam fsc_cov fsc_logst ∗ gen_cert ∗
-    dev_inv γu γd ∗ disk_geom γd pd pav pu ∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) ∗
-    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev ∗ itable_inv ∗
-    ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst ∗ ic_sleeplocks fsc_ic ∗
-    ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗ ireg_open ∗
-    kalloc_env γa None ∗
-    (* ...and the two rows SIMP-3 added to the predicate: the image's own
-       arithmetic and the four superblock cells (FsReady.v §0, §0b).  They
-       are at the AMBIENT names on purpose -- unlike the eighteen above,
-       nothing here is re-spelled at the caller's, because [fs_geom_ok] is a
-       statement about the [fscfg]/[icfg] instance itself and the cells are
-       named by its fields.  A caller that threads its own names rewrites by
-       the tie equations it just destructed. *)
-    ⌜FsReady.fs_geom_ok⌝ ∗ FsReady.fs_sb_cells ∗
-    (* ...AND THE BLOCK BITMAP, at the caller's [bmapstart]/[size].  It is a
-       persistent conjunct of [fs_ready] now (BitmapInv.v), so it comes out
-       here like every other invariant and NOTHING about the free pool
-       crosses a call any more. *)
-    bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size.
-  Proof.
-    rewrite /fs_world.
-    (* EIGHT equations -- everything rank 1 has made ambient reads off the
-       class instead, so no caller threads a copy for an equation to tie --
-       and the disk fabric arrives as
-       two RESOURCES at the caller's own [pd]/[pav]/[pu] (R1).  So the two
-       disk rows of the conclusion come from them rather than from
-       [fs_ready], whose own disk conjunct is the existential this predicate
-       replaced -- and it is dropped ([_] at slot 10). *)
-    iIntros "(-> & -> & -> & -> & -> & -> & -> & ->
-              & #Hgeom & #Hdlock & Hw)".
-    iDestruct (FsReady.fs_ready_all with "Hw") as
-      "(H1 & H2 & H3 & %H4 & H5 & H6 & H7 & H8 & H9 & _ & H11 & H12 & H13
-        & H14 & H15 & H16 & H17 & %H18 & #H19 & #H20)".
-    (* TWENTY-ONE ROWS, ONE SPLIT EACH, NOT ONE [iFrame].  This lemma's
-       whole job is to REASSEMBLE a named bundle whose every row is
-       definition-valued ([printk_env], [bio_ctx], [log_ctx], an [is_lock]
-       over [disk_res], [is_itable2], [ic_escrows], the fifty-fold
-       [ic_sleeplocks] big-op, [fs_sb_cells], [bitmap_inv]), so every
-       (name x conjunct) attempt is a conversion and no single [iSplit]
-       helps -- the case claude-notes/optimization.md calls "build the WHOLE
-       bundle".  The [iFrame] pair below cost 25 s of this file; the chain
-       is one syntactic check per row. *)
-    iSplitL "H1"; [iExact "H1"|].
-    iSplitL "H2"; [iExact "H2"|].
-    iSplitL "H3"; [iExact "H3"|].
-    iSplitR; [iPureIntro; exact H4|].
-    iSplitL "H5"; [iExact "H5"|].
-    iSplitL "H6"; [iExact "H6"|].
-    iSplitL "H7"; [iExact "H7"|].
-    iSplitL "H8"; [iExact "H8"|].
-    iSplitL "H9"; [iExact "H9"|].
-    iSplitR; [iExact "Hgeom"|].
-    iSplitR; [iExact "Hdlock"|].
-    iSplitL "H11"; [iExact "H11"|].
-    iSplitL "H12"; [iExact "H12"|].
-    iSplitL "H13"; [iExact "H13"|].
-    iSplitL "H14"; [iExact "H14"|].
-    iSplitL "H15"; [iExact "H15"|].
-    iSplitL "H16"; [iExact "H16"|].
-    iSplitL "H17"; [iExact "H17"|].
-    iSplitR; [iPureIntro; exact H18|].
-    iSplitR; [iExact "H19"|].
-    iExact "H20".
-  Qed.
-
-  (* the alias, as a lemma, so a reader need not take the [Definition]'s
-     word for it: at the ambient names, [fs_world] IS [fs_ready] -- MODULO
-     THE THREE RING PAGES, which are no longer ambient (R1).  That is the
-     whole content of the change, and it is why this is now two one-way
-     lemmas rather than one [⊣⊢]: the pages are universally quantified going
-     down (any [pd] whose [disk_geom] you can show) and existentially coming
-     back (the witness [fs_ready] already holds). *)
-  Lemma fs_world_ready γs pd pav pu :
-    fs_world fsc_printk fsc_kalloc γs fsc_uart fsc_disk fsc_dlock
-             pd pav pu fsc_bio
-             fsc_bmapstart
- fsc_size
-    ⊢ FsReady.fs_ready.
-  Proof.
-    rewrite /fs_world.
-    by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & $)".
-  Qed.
-
-  Lemma fs_ready_world γs :
-    FsReady.fs_ready ⊢
-    ∃ pd pav pu, fs_world fsc_printk fsc_kalloc γs fsc_uart fsc_disk fsc_dlock
-                   pd pav pu fsc_bio
-                   fsc_bmapstart
- fsc_size.
-  Proof.
-    iIntros "#H".
-    iDestruct (FsReady.fs_ready_disk with "H") as "[_ Hd]".
-    iDestruct "Hd" as (pd pav pu) "[#Hg #Hl]".
-    iExists pd, pav, pu. rewrite /fs_world.
-    iFrame "Hg Hl H". by repeat iSplit.
-  Qed.
+     [fs_world_all]'s twenty-one-step [iSplit] chain -- written because a
+     single [iFrame] over a bundle of definition-valued rows cost 25 s of
+     this file -- is [FsReady.fs_ready_all], where it always belonged. *)
 
   (* THE CONSUMABLES.  What actually crosses the call and comes back: the
      three block slots, the four superblock cells, and the reference ledger
      at [ns].  Everything F3 has to ACCOUNT for is in here, which is why
      (S3) is a statement about this bundle's [ns] and nothing else.  (The
      block bitmap is NOT a consumable: [BitmapInv.bitmap_inv] is a
-     persistent conjunct of [fs_ready].) *)
-  Definition fs_res (bn : bio_names)
-      (bmapstart ninodes size : Z)
-      (ns : nat) (dqb dqs dqbs dqn : dfrac) : iProp Σ :=
+     persistent conjunct of [fs_ready].)
+
+     THE FOUR GEOMETRY PARAMETERS ARE GONE (rank 1d): the cells are named by
+     [fsc_ninodes] / [icfg_ist] / [fsc_size] / [fsc_bmapstart], and [bn] was
+     never read by this bundle at all -- it rode along because every other
+     row of the calling convention took it. *)
+  Definition fs_res (ns : nat) (dqb dqs dqbs dqn : dfrac) : iProp Σ :=
     (bslots 3 ∗
-     sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) ∗
+     sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) ∗
-     sb_size ↦₄{dqbs} (mword_of_int size : mword 32) ∗
-     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
+     sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) ∗
+     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) ∗
      iref_slots ns)%I.
 
 End FsBundles.
@@ -428,11 +238,12 @@ End FsBundles.
 (*  [SpecSysMkdir.wp_sys_mkdir_sconf_body], REPACKAGED.  Five differences
     and no others:
 
-      - the 26 pure premises become SIX: [fs_geom], the stack budget, the
-        reference allowance, the two process-index facts and argstr's
-        trapframe read.  (Nineteen went into the record; [eb = true] is
-        discharged below, not assumed.)
-      - the 19 ambient resources become ONE PERSISTENT [fs_world];
+      - the 26 pure premises become SIX: [FsReady.fs_geom_ok], the stack
+        budget, the reference allowance, the two process-index facts and
+        argstr's trapframe read.  (Fifteen are the image's own geometry and
+        live on the ambient record; [eb = true] is discharged below, not
+        assumed.)
+      - the 19 ambient resources become ONE PERSISTENT [FsReady.fs_ready];
       - the 7 consumables become ONE [fs_res], in the pre and in the post;
       - [eb] is GONE as a parameter, fixed at the [true] the seal's own
         premise forces, and with it [trap_csrs_ext] / [cpu_claim_ext]
@@ -450,13 +261,8 @@ End FsBundles.
 Definition wp_sys_mkdir_friendly_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γf γa γpr : gname)                                 (* ftable, kalloc, printk *)
+    (γf : gname)                                         (* the file table *)
     (γs : list gname) (j : nat) (γl : gname)             (* the running process *)
-    (γu : uart_names) (γd : disk_names) (γk : gname)     (* disk fabric + lock  *)
-    (pd pav pu : mword 64)
-    (bn : bio_names)
-    (bmapstart : Z)
-    (ninodes size : Z)
     (ns : nat)
     (dqb dqs dqbs dqn : dfrac)
     (v : mword 64)                                       (* syscall argument 0 *)
@@ -466,7 +272,7 @@ Definition wp_sys_mkdir_friendly_body
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_sys_mkdir <= K)%nat ->
-  fs_geom fsc_cov fsc_logst bmapstart ninodes size ->
+  FsReady.fs_geom_ok ->
   (create_slots <= ns)%nat ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
@@ -474,13 +280,18 @@ Definition wp_sys_mkdir_friendly_body
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 true pj b lks -∗
   pc_is pcE -∗
-  fs_world γpr γa γs γu γd γk pd pav pu bn
-           bmapstart size -∗
+  (* THE FILE SYSTEM'S WORLD, AS IT IS: one persistent, parameter-free
+     predicate.  [fs_world] used to sit here and it was this plus eight
+     equations tying a caller's threaded device/allocator names to the
+     ambient ones; the names are [FsCfg.fscfg] fields now (rank 1d).  The
+     three virtio ring pages are quantified INSIDE it, which is why this
+     body no longer takes [pd]/[pav]/[pu] either: the proof unpacks them
+     out of [FsReady.fs_ready_disk] and hands the witness to the seal. *)
+  FsReady.fs_ready -∗
   (* [procs_inv] left [fs_ready] (FsCfg.v's header): a PROCESS resource,
      persistent, and every caller already holds it. *)
   procs_inv γs -∗
-  fs_res bn bmapstart ninodes size ns
-         dqb dqs dqbs dqn -∗
+  fs_res ns dqb dqs dqbs dqn -∗
   proc_priv γf pj pid V -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (ns' : nat) (P' : uptd),
@@ -491,8 +302,7 @@ Definition wp_sys_mkdir_friendly_body
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 true pj b lks -∗
       pc_is ret_tgt -∗
-      fs_res bn bmapstart ninodes size ns'
-             dqb dqs dqbs dqn -∗
+      fs_res ns' dqb dqs dqbs dqn -∗
       proc_priv γf pj pid (upd_upt V P') -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -505,48 +315,57 @@ Module FsSysMkdir (M : SYSMKDIR).
   Lemma wp_sys_mkdir_friendly
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
         !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γf γa γpr : gname)
+      (γf : gname)
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
-      (pd pav pu : mword 64)
-      (bn : bio_names)
-      (bmapstart : Z)
-      (ninodes size : Z)
       (ns : nat)
       (dqb dqs dqbs dqn : dfrac)
       (v : mword 64)
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (b : bool) (lks : gset string) :
-      wp_sys_mkdir_friendly_body γf γa γpr γs j γl γu γd γk pd pav pu bn
- bmapstart
- ninodes size ns
+      wp_sys_mkdir_friendly_body γf γs j γl ns
                                  dqb dqs dqbs dqn v pid V m K b lks.
   Proof.
     unfold wp_sys_mkdir_friendly_body. cbv zeta.
     intros HK Hg Hns Hj Hgs Htf.
-    destruct Hg as [Hroot Hnibp Hlg Hsz Hbnn Hbcov Hbout
-                    Histnn Hcb Hbg Hib Hn1 Hn2 Hn3 Hus].
-    iIntros "Hcg Hown Hpc Hw Hprocs Hres Hpriv Hcont".
+    (* [FsReady.fs_geom_ok] has ELEVEN fields where [fs_geom] had fifteen:
+       [bitmap_geom_ok]'s four conjuncts are reached through [fgo_bmgeom]'s
+       accessors rather than restated, so nothing here is a hedged copy of
+       anything else (FsReady.v §0). *)
+    pose proof (FsReady.fgo_rootdev  Hg) as Hroot.
+    pose proof (FsReady.fgo_nib_pos  Hg) as Hnibp.
+    pose proof (FsReady.fgo_loggeom  Hg) as Hlg.
+    pose proof (FsReady.fgo_size     Hg) as Hsz.
+    pose proof (FsReady.fgo_bm_nn    Hg) as Hbnn.
+    pose proof (FsReady.fgo_bm_cov   Hg) as Hbcov.
+    pose proof (FsReady.fgo_bm_out   Hg) as Hbout.
+    pose proof (FsReady.fgo_ist_nn   Hg) as Histnn.
+    pose proof (FsReady.fgo_covbelow Hg) as Hcb.
+    pose proof (FsReady.fgo_bmgeom   Hg) as Hbg.
+    pose proof (FsReady.fgo_iblocks  Hg) as Hib.
+    pose proof (FsReady.fgo_nin_lo   Hg) as Hn1.
+    pose proof (FsReady.fgo_nin_hi   Hg) as Hn2.
+    pose proof (FsReady.fgo_nin_31   Hg) as Hn3.
+    pose proof (FsReady.fgo_ushort   Hg) as Hus.
+    iIntros "Hcg Hown Hpc #Hw Hprocs Hres Hpriv Hcont".
     (* SIMP-2: the unpack is [FsReady]'s own projection rather than a raw
        [iDestruct].  It has to be: [fs_ready] is [Typeclasses Opaque] (see
        that file's two seals and the measurement behind them), so the
        nineteen conjuncts come out through the family, which is exactly what
-       the family is for. *)
-    (* SIMP-2: the unpack is [fs_world]'s own projection rather than a raw
-       [iDestruct].  It has to be: [fs_ready] is [Typeclasses Opaque] (see
-       FsReady.v's two seals and the measurement behind them), and it is now
-       parameter-free, so the eighteen constituents come out through the
-       family AT THIS BODY'S OWN NAMES -- which is what [fs_world_all]'s
-       ties are for.  [procs_inv] is no longer among them; it arrives as its
-       own premise. *)
-    iDestruct (fs_world_all with "Hw") as
+       the family is for.  Since rank 1d there is no [fs_world_all] in
+       between: the family is applied to the predicate the caller handed in,
+       at the AMBIENT names, which are the names the seal below reads too.
+       The three ring pages are the one thing still quantified, so they are
+       unpacked here and the seal is instantiated at the witness. *)
+    iDestruct (FsReady.fs_ready_all with "Hw") as
       "(Htext & Hdata & Hpr & %Hprg & Hbio & Hlogc &
-        Hseam & Hgc & Hdev & Hdgeom & Hdlk & Hitb2 & Hitbl &
+        Hseam & Hgc & Hdev & Hdisk & Hitb2 & Hitbl &
         Hesc & Hisl & Hireg & Hiopen & Hkenv & %Hgeo & #Hsbc & #Hbmi)".
+    iDestruct "Hdisk" as (pd pav pu) "[#Hdgeom #Hdlk]".
     iDestruct "Hres" as "(Hbsl & Hsbn & Hsbi & Hsbs & Hsbb & Hir)".
-    iApply (M.wp_sys_mkdir_sconf γf γa γpr γs j γl γu γd γk pd pav pu bn
- bmapstart
-              ninodes size ns dqb dqs dqbs dqn v pid V m K true
+    iApply (M.wp_sys_mkdir_sconf γf γs j γl
+ pd pav pu
+
+ ns dqb dqs dqbs dqn v pid V m K true
               b lks
               HK Hroot Hnibp Hlg Hsz Hbnn Hbcov Hbout
               Histnn Hcb Hbg Hib Hn1 Hn2 Hn3 Hus Hprg Hns Hj Hgs
@@ -617,13 +436,8 @@ End FsSysMkdir.
 Definition wp_sys_chdir_friendly_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γf γa γpr : gname)
+    (γf : gname)
     (γs : list gname) (j : nat) (γl : gname)
-    (γu : uart_names) (γd : disk_names) (γk : gname)
-    (pd pav pu : mword 64)
-    (bn : bio_names)
-    (bmapstart : Z)
-    (ninodes size : Z)
     (dqb dqs dqbs dqn : dfrac)
     (v : mword 64)
     (pid : mword 32) (V : pprivate)
@@ -632,20 +446,20 @@ Definition wp_sys_chdir_friendly_body
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_sys_chdir <= K)%nat ->
-  fs_geom fsc_cov fsc_logst bmapstart ninodes size ->
+  FsReady.fs_geom_ok ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   pv_tf V !! tf_arg_idx 0 = Some v ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 true pj b lks -∗
   pc_is pcE -∗
-  fs_world γpr γa γs γu γd γk pd pav pu bn
-           bmapstart size -∗
+  (* the file system's world, parameter-free -- see the mkdir body above for
+     what [fs_world] used to add to it and why nothing is left of that. *)
+  FsReady.fs_ready -∗
   (* [procs_inv] left [fs_ready] (FsCfg.v's header): a PROCESS resource,
      persistent, and every caller already holds it. *)
   procs_inv γs -∗
-  fs_res bn bmapstart ninodes size 2
-         dqb dqs dqbs dqn -∗
+  fs_res 2 dqb dqs dqbs dqn -∗
   proc_priv γf pj pid V -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (P' : uptd),
@@ -655,8 +469,7 @@ Definition wp_sys_chdir_friendly_body
       cpu_own 0 true pj b lks -∗
       pc_is ret_tgt -∗
       (* THE LEDGER IS RESTORED AT THE LITERAL 2 -- the composability half *)
-      fs_res bn bmapstart ninodes size 2
-             dqb dqs dqbs dqn -∗
+      fs_res 2 dqb dqs dqbs dqn -∗
       sys_chdir_post γf pj pid (upd_upt V P')
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -667,48 +480,47 @@ Module FsSysChdir (M : SYSCHDIR).
   Lemma wp_sys_chdir_friendly
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
         !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γf γa γpr : gname)
+      (γf : gname)
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
-      (pd pav pu : mword 64)
-      (bn : bio_names)
-      (bmapstart : Z)
-      (ninodes size : Z)
       (dqb dqs dqbs dqn : dfrac)
       (v : mword 64)
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (b : bool) (lks : gset string) :
-      wp_sys_chdir_friendly_body γf γa γpr γs j γl γu γd γk pd pav pu bn
- bmapstart
- ninodes size
+      wp_sys_chdir_friendly_body γf γs j γl
                                  dqb dqs dqbs dqn v pid V m K b lks.
   Proof.
     unfold wp_sys_chdir_friendly_body. cbv zeta.
     intros HK Hg Hj Hgs Htf.
-    destruct Hg as [Hroot Hnibp Hlg Hsz Hbnn Hbcov Hbout
-                    Histnn Hcb Hbg Hib Hn1 Hn2 Hn3 Hus].
-    iIntros "Hcg Hown Hpc Hw Hprocs Hres Hpriv Hcont".
+    pose proof (FsReady.fgo_rootdev  Hg) as Hroot.
+    pose proof (FsReady.fgo_nib_pos  Hg) as Hnibp.
+    pose proof (FsReady.fgo_loggeom  Hg) as Hlg.
+    pose proof (FsReady.fgo_size     Hg) as Hsz.
+    pose proof (FsReady.fgo_bm_nn    Hg) as Hbnn.
+    pose proof (FsReady.fgo_bm_cov   Hg) as Hbcov.
+    pose proof (FsReady.fgo_bm_out   Hg) as Hbout.
+    pose proof (FsReady.fgo_ist_nn   Hg) as Histnn.
+    pose proof (FsReady.fgo_covbelow Hg) as Hcb.
+    pose proof (FsReady.fgo_iblocks  Hg) as Hib.
+    iIntros "Hcg Hown Hpc #Hw Hprocs Hres Hpriv Hcont".
     (* SIMP-2: the unpack is [FsReady]'s own projection rather than a raw
        [iDestruct].  It has to be: [fs_ready] is [Typeclasses Opaque] (see
        that file's two seals and the measurement behind them), so the
        nineteen conjuncts come out through the family, which is exactly what
-       the family is for. *)
-    (* SIMP-2: the unpack is [fs_world]'s own projection rather than a raw
-       [iDestruct].  It has to be: [fs_ready] is [Typeclasses Opaque] (see
-       FsReady.v's two seals and the measurement behind them), and it is now
-       parameter-free, so the eighteen constituents come out through the
-       family AT THIS BODY'S OWN NAMES -- which is what [fs_world_all]'s
-       ties are for.  [procs_inv] is no longer among them; it arrives as its
-       own premise. *)
-    iDestruct (fs_world_all with "Hw") as
+       the family is for.  Since rank 1d nothing sits between the caller's
+       predicate and this unpack: the names the family hands over ARE the
+       names the seal below reads.  The three ring pages are the one thing
+       still quantified, so they are unpacked here. *)
+    iDestruct (FsReady.fs_ready_all with "Hw") as
       "(Htext & Hdata & Hpr & %Hprg & Hbio & Hlogc &
-        Hseam & Hgc & Hdev & Hdgeom & Hdlk & Hitb2 & Hitbl &
+        Hseam & Hgc & Hdev & Hdisk & Hitb2 & Hitbl &
         Hesc & Hisl & Hireg & Hiopen & Hkenv & %Hgeo & #Hsbc & #Hbmi)".
+    iDestruct "Hdisk" as (pd pav pu) "[#Hdgeom #Hdlk]".
     iDestruct "Hres" as "(Hbsl & Hsbn & Hsbi & Hsbs & Hsbb & Hir)".
     iPoseProof (printk_env_panic with "Hpr") as "#Hpe".
-    iApply (M.wp_sys_chdir_sconf γf γa γs j γl γu γd γk pd pav pu bn
- bmapstart
-              size dqb dqs v pid V m K true b lks
+    iApply (M.wp_sys_chdir_sconf γf γs j γl
+ pd pav pu
+
+ dqb dqs v pid V m K true b lks
               HK Hroot Hnibp Hlg Hsz Hbnn Hbcov Hbout
               Histnn Hcb Hib Hj Hgs eq_refl Htf
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlogc

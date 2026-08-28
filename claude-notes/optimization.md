@@ -959,12 +959,27 @@ and it did not move.
 - **Strip only the GOAL's later with `iApply bi.later_intro`** — and this is
 worth SWEEPING, not just applying to new proofs. Converting `ProofKexecB3`'s
 fifteen `iNext`s measured **74.4 s → 64.8 s (−13.0 %)**, `.vo` −1.7 %, peak
-RSS −6.8 %: **0.64 s per call**, with no other change. There are 477 `iNext`
-calls left in files ≥10 s across 111 files, and almost none of those files use
-the cheap form; the per-call cost scales with `|Δ|`, so the big-context proofs
-are where it pays. `iNext` is only replaceable where the proof does not need
-its hypothesis-side later-stripping — `coqc` says so per file, so the sweep is
-safe with a per-file fallback.; reach for `iNext`
+RSS −6.8 %: **0.64 s per call**, with no other change. **THE SWEEP IS DONE (2026-08-27): 420 sites in 139 files.** A sample
+re-measured isolated — `ProofSysOpen` 63.1 → 55.3 s, `ProofDirlookup` 40.5 →
+38.2 s, `ProofKexecB2` 31.3 → 28.4 s — is **−13.0 s over 29 sites, 0.45 s per
+site**, matching the 0.64 s/site on `ProofKexecB3`. The converted files span
+2177 s of build, so the whole sweep is worth on the order of a minute and a
+half of tree time.
+
+The `iNext;` sequencing form was swept too: 24 code sites, 18 kept in 10
+files (`FsCrash`, `HartSpan`, `HartSMem` rejected it). Not separately timed —
+it is the same substitution, and 18 sites mostly in cheap files is under the
+noise floor of a shared box. **The `[iNext]` occurrences are PROSE**, the
+notes' own bracket convention for naming a tactic: all 42 are inside comments
+and none is a code site, so a `\biNext\b` sweep must blank comments first.
+
+**Where it is NOT replaceable, `coqc` says so**, which is what makes the sweep
+safe: ~90 files rejected it and were reverted, and they are almost all the
+engine/leaf layer (`WpSmode*`, `UserStep*`, `HartStep*`, `ParkCap`,
+`TrampStepPt`, `UptWalkPt`, `SchedCtx`, `FsCrash`, `InodeRegion`) — i.e. the
+Löb back edges, where `iNext` genuinely has to strip the hypothesis-side
+later. Reverting on failure takes ~14 build rounds because each round only
+surfaces the next dependency layer.; reach for `iNext`
   only at a genuine Löb back edge. `iNext` is `iModIntro` at `▷`, so it runs
   `MaybeIntoLaterN` over every hypothesis in both environments: ~1.1 s per call
   in a whole-function proof against ~0.06 s for the same effect. The tell that a
@@ -1300,7 +1315,14 @@ splice a closer into argument position.
   proofs the same three `Strategy` lines were all inside noise, and one file does
   not even compile with them (it `unfold`s `tp_pin`). The outlier had both a
   20+-link `pose` chain and a large Iris context; that combination is what makes
-  conversion dominate. The cost is invisible to tactic profiling — it lands in
+  conversion dominate. **`ProofSysUnlink` is the best-fitting candidate left
+  (101 links, the tree's largest context) and it is a NULL: 128.0 s → 129.5 s,
+  min of two (2026-08-27), compiling with no `rget_ne` repair needed.** So the
+  lever really is confined to `ProofVirtioDiskInit`'s shape; stop looking.
+  A caution from that same A/B: the first pair read **−15.8 %** because the
+  base arm happened to run at load 52 and the sealed arm at load 81 — the
+  inversion this file's Diagnosis section warns about, seen live. Only the
+  second pair, at load 9–15, showed the truth. The cost is invisible to tactic profiling — it lands in
   the kernel at `Qed` and inside `iEval`/`pm_reduce`.
 - **Invert a symbolic-step executor over its ABSTRACT parameters** — never
   `cbn`/`unfold` it into a hypothesis and destruct the guards there. Each

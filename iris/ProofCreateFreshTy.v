@@ -127,11 +127,7 @@ Definition create_fresh_ty_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
       ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat) (γl : gname)
-    (γu : uart_names) (γd : disk_names) (γk : gname)
     (pd pav pu : mword 64)
-    (bn : bio_names)
-    (γpr : gname)
- (ninodes : Z)
  (ty : mword 16)
     (kd : nat) (dqp : dfrac)                     (* the LOCKED PARENT's slot *)
     (u : nat) (Sb : gset Z)
@@ -163,13 +159,13 @@ Definition create_fresh_ty_body
   log_geom_ok fsc_cov fsc_logst ->
   0 <= icfg_ist ->
   InodeInv.ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
-  1 < ninodes ->
-  ninodes <= 16 * Z.of_nat icfg_nib ->
-  ninodes < 2 ^ 31 ->
+  1 < fsc_ninodes ->
+  fsc_ninodes <= 16 * Z.of_nat icfg_nib ->
+  fsc_ninodes < 2 ^ 31 ->
   bv_unsigned ty <> 0 ->
   (* durable-disk 2b-inode-3: ialloc's claim box owes the region (L5) *)
   InodeRegion.ireg_ty_ok (ialloc_fresh ty) ->
-  printk_gen_contract (kt := KT1) γpr γu γd ->
+  printk_gen_contract (kt := KT1) fsc_printk fsc_uart fsc_disk ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   icfg_dev = ROOTDEV ->
@@ -192,29 +188,25 @@ Definition create_fresh_ty_body
      the two calls. ---- *)
   (forall `{CIDa : CpuId}
      (γs' : list gname) (j' : nat) (γl' : gname)
-     (γu' : uart_names) (γd' : disk_names) (γk' : gname)
-     (pd' pav' pu' : mword 64) (bn' : bio_names)
-     (γpr' : gname)
-     (ninodes' : Z)
+     (pd' pav' pu' : mword 64)
      (ty' : mword 16) (u' : nat) (Sb' : gset Z)
      (pidv' : mword 32) (dq' dqs' dqn' : dfrac)
      (m' : regfile) (K' : nat) (eb' : bool) (b' : bool)
      (lks' : gset string) (Vpr' : pprivate) (t' : nat) (qt' : Qp),
-     wp_ialloc_gen_body (CID := CIDa) γs' j' γl' γu' γd' γk' pd' pav' pu' bn'
-                        γpr'
-                        ninodes' ty' u' Sb' pidv' dq' dqs' dqn'
+     wp_ialloc_gen_body (CID := CIDa) γs' j' γl' pd' pav' pu'
+
+ ty' u' Sb' pidv' dq' dqs' dqn'
                         m' K' eb' b' lks' Vpr' t' qt') ->
   (forall `{CIDl : CpuId}
      (γs' : list gname) (j' : nat) (γl' : gname)
-     (γu' : uart_names) (γd' : disk_names) (γk' : gname)
-     (pd' pav' pu' : mword 64) (bn' : bio_names)
+     (pd' pav' pu' : mword 64)
      (gil' gisl' : gname)
      (k' : nat) (s' : Qp) (g' : gname) (d' : ic_dep) (o' : ilkc)
      (inum' : mword 32)
      (pidv' : mword 32) (dq' dqs' : dfrac)
      (m' : regfile) (K' : nat) (eb' : bool) (b' : bool)
      (lks' : gset string) (Vpr' : pprivate),
-     wp_ilock_dep_sconf_body (CID := CIDl) γs' j' γl' γu' γd' γk' pd' pav' pu' bn'
+     wp_ilock_dep_sconf_body (CID := CIDl) γs' j' γl' pd' pav' pu'
                              gil' gisl'
                              k' s' g' d' o' inum' pidv' dq' dqs'
                              m' K' eb' b' lks' Vpr') ->
@@ -223,9 +215,9 @@ Definition create_fresh_ty_body
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is (mword_of_int (KernelSyms.create + 0xa4) : mword 64) -∗
   kernel_data -∗
-  printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
-  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+  printk_env fsc_printk fsc_uart fsc_disk -∗
+  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+  log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
   is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
@@ -238,10 +230,10 @@ Definition create_fresh_ty_body
      the span borrows it and hands nothing back. *)
   ireg_open -∗
   procs_inv γs -∗
-  dev_inv γu γd -∗
-  disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-  sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
+  dev_inv fsc_uart fsc_disk -∗
+  disk_geom fsc_disk pd pav pu -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+  sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   proc_priv_bare pj pidv Vpr -∗
   bslots 3 -∗
@@ -262,7 +254,7 @@ Definition create_fresh_ty_body
       ⌜cr_cs_but_s3 Ma Mo⌝ -∗
       sie_cap_gpr KT1 Mo K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
+      sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       proc_priv_bare pj pidv Vpr -∗
       bslots 3 -∗
@@ -272,7 +264,7 @@ Definition create_fresh_ty_body
          (* ---- CONTROL IS AT +0xb4, THE INODE IS LOCKED AND FILLED ---- *)
          ⌜Mo !!! Regidx (mword_of_int 19 : mword 5) = ientry kslot
           /\ (kslot < NINODE)%nat
-          /\ 0 < bv_unsigned inum < ninodes
+          /\ 0 < bv_unsigned inum < fsc_ninodes
           /\ bv_unsigned inum < 16 * Z.of_nat icfg_nib
           (* THE ONE ASSUMED FACT.  Everything else in this arm is
              [wp_ialloc_gen]'s or [wp_ilock_sconf]'s own postcondition. *)
@@ -398,19 +390,15 @@ Lemma create_fresh_ty :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
              ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (γpr : gname)
- (ninodes : Z)
  (ty : mword 16)
       (kd : nat) (dqp : dfrac)
       (u : nat) (Sb : gset Z) (t : nat) (qt : Qp) (qc : Qp)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (Ma : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      create_fresh_ty_body γs j γl γu γd γk pd pav pu bn γpr
- ninodes ty kd dqp
+      create_fresh_ty_body γs j γl pd pav pu
+ ty kd dqp
                            u Sb t qt qc pidv dq dqs dqn Ma K eb b lks Vpr.
 Proof.
   intros.
@@ -500,8 +488,8 @@ Proof.
   iDestruct (cft_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
   iDestruct (cpu_own_transport CID CID3 0%nat eb (proc_addr j) b
                ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-  iApply (Hia CID3 γs j γl γu γd γk pd pav pu bn γpr
-            ninodes ty u Sb pidv dq dqs dqn A3 K eb b lks Vpr
+  iApply (Hia CID3 γs j γl pd pav pu
+            ty u Sb pidv dq dqs dqn A3 K eb b lks Vpr
             t qc
             HKia Hlg Hist Hiregb Hn1 Hn2 Hn3 Htynz Htyk Hpkc Hj Hgs HA3a0 HA3a1 Heb
             Hbelow
@@ -600,7 +588,7 @@ Proof.
     iDestruct (inode_ref_short_shr_gen_agree with "Hkeep Hshr") as %->.
     iDestruct (cpu_own_transport CID4 CID7 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Hil CID7 γs j γl γu γd γk pd pav pu bn gilc gislc
+    iApply (Hil CID7 γs j γl pd pav pu gilc gislc
               kslot (q/2)%Qp gsh
               (DepTx (q/2)%Qp icfg_dev inum gsh t qt) (ClaimK ty t qc) inum pidv dq dqs
               B1 K eb b lks Vpr

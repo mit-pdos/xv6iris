@@ -172,21 +172,17 @@ Section ProofNameiTrMain.
      this file does with them. *)
   Lemma wp_namei_tr
       (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (ga : gname) (gf : gname)
-      (bmapstart : Z)
-      (size : Z)
+ (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (n : nat) (Sb : gset Z)
       (P : nat -> Z -> iProp Σ) (Pmiss : nat -> Z -> iProp Σ)
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_namei_tr_body gs j gl gu gd gk pd pav pu bn
-                       ga gf bmapstart
-                       size plen pfun n Sb P Pmiss
+    : wp_namei_tr_body gs j gl pd pav pu
+ gf
+ plen pfun n Sb P Pmiss
                        pidv dq dqb dqs dqpv m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_namei_tr_body].
@@ -378,8 +374,8 @@ Section ProofNameiTrMain.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID7) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (NX.wp_namex_tr gs j gl gu gd gk pd pav pu bn
-              ga gf bmapstart size
+    iApply (NX.wp_namex_tr gs j gl pd pav pu
+ gf
               plen pfun nfun n Sb P Pmiss pidv dq dqb dqs dqpv R5 (K - 4)%nat eb b
               _ Vpr Knx Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
               Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hpfun0 Hbud Hj Hgs

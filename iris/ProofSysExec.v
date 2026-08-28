@@ -932,7 +932,7 @@ Section SysExecHead.
   Local Ltac nz := vm_compute; discriminate.
 
   Lemma sx_head
-      (γf γa : gname) (jp : nat)
+      (γf : gname) (jp : nat)
       (pid : mword 32) (V : pprivate) (v0 v1 : mword 64)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
@@ -944,7 +944,7 @@ Section SysExecHead.
     cpu_own 0 eb (proc_addr jp) b lks -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int SX : mword 64) -∗
     proc_priv γf (proc_addr jp) pid V -∗
-    kalloc_env γa None -∗
+    kalloc_env fsc_kalloc None -∗
     (* ---- THE TWO WAYS OUT, AS ONE CONTINUATION.  Both of them need the
        caller's exit and a [wp_next] is LINEAR, so this block cannot publish
        two of them (kexec.md's block-interface rule): the -1 return, which
@@ -1296,7 +1296,7 @@ Section SysExecHead.
     iEval (rewrite -HM10a1) in "Hbuf".
     iDestruct (cpu_own_transport CID8 CID12 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Argstr.wp_argstr_sconf γa γf M10 (K - 60)%nat 0%nat eb
+    iApply (Argstr.wp_argstr_sconf fsc_kalloc γf M10 (K - 60)%nat 0%nat eb
               (proc_addr jp) 0%nat v0 pid V 128%nat bf b lks
               sx_arg0_lt ltac:(rewrite HM10a0; reflexivity) Harg0 sx_noff0 Kar
               ltac:(rewrite HM10a2; reflexivity) sx_maxpath_lt Hlb
@@ -2274,7 +2274,7 @@ Section SysExecFree.
      The induction is on the FUEL [W] bounding [t - k]; the head is entered
      only at [k < 32], so the array is never read out of range. *)
   Lemma sx_free_loop `{CID0 : CpuId}
-      (ga : gname) (sp0 pj : mword 64)
+ (sp0 pj : mword 64)
       (K : nat) (eb b : bool) (lks : gset string)
       (pg : nat -> mword 64) (afun : nat -> nat -> bv 8) (t : nat)
       (base ea : Z) (imm8 : mword 8) (jimm : mword 21) :
@@ -2313,7 +2313,7 @@ Section SysExecFree.
     (M !!! Regidx Rs1 : mword 64) = pa_stk sp0 (58 - k)%nat ->
     (M !!! Regidx Rs4 : mword 64) = pa_stk sp0 26 ->
     kernel_text -∗
-    kalloc_env ga None -∗
+    kalloc_env fsc_kalloc None -∗
     pc_is (mword_of_int (SX + base) : mword 64) -∗
     sie_cap_gpr KT1 M (K - 60)%nat b pj -∗
     cpu_own 0 eb pj b lks -∗
@@ -2421,7 +2421,7 @@ Section SysExecFree.
     iDestruct (cpu_own_transport CID0 CID3 0%nat eb pj b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (bb_page_of_named (pg k) (afun k) with "Hpage") as "Hpage".
-    iApply (Kfree.wp_kfree_sconf KT1 ga γk (mword_of_int KernelSyms.kmem)
+    iApply (Kfree.wp_kfree_sconf KT1 fsc_kalloc γk (mword_of_int KernelSyms.kmem)
               (mword_of_int (KernelSyms.kmem + 24)) M2 None 0%nat eb pj
               (K - 60)%nat b lks K14 eq_refl eq_refl sx_noff0 Hlb
               with "Hcg Hcnt Htext Hpc Hlk [Hpage] Hav").
@@ -3030,7 +3030,7 @@ Section SysExecStep.
   (*  ONE ITERATION, +0x056 .. +0x090.                                      *)
   (* ===================================================================== *)
   Lemma sx_step `{CID0 : CpuId}
-      (γf γa : gname) (jp : nat) (pid : mword 32) (V : pprivate)
+      (γf : gname) (jp : nat) (pid : mword 32) (V : pprivate)
       (K : nat) (eb b : bool) (lks : gset string)
       (sp0 : mword 64) (m : regfile) (plen : nat) (pfun rest : nat -> bv 8)
       (uav : mword 64)
@@ -3039,7 +3039,7 @@ Section SysExecStep.
     (K_sys_exec <= K)%nat ->
     locks_below lks "kmem" ->
     kernel_text -∗
-    kalloc_env γa None -∗
+    kalloc_env fsc_kalloc None -∗
     sx_body γf jp pid V K eb b lks sp0 m plen pfun rest uav
             M P i pg alen afun (mword_of_int (SX + 0x56) : mword 64) -∗
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
@@ -3064,7 +3064,7 @@ Section SysExecStep.
     rewrite /sx_body.
     iDestruct "Hst" as "((%Hi32 & %Hext & %Hok & %HR) & Hpc & Hcg & Hcnt & Hpriv
                          & Hcarry & F59 & F60 & Harr & Hpgs)".
-    iAssert (kalloc_env γa None) as "#Hka2"; [iExact "Hka" |].
+    iAssert (kalloc_env fsc_kalloc None) as "#Hka2"; [iExact "Hka" |].
     iDestruct "Hka2" as (γk) "(#Hlk & #Hav)".
     (* ===== +0x056 slli a0,s2,3 : 8*i ===== *)
     assert (Hg2 : rget M Rs2 = (M !!! Regidx Rs2 : mword 64))
@@ -3165,7 +3165,7 @@ Section SysExecStep.
     iEval (rewrite -HN5a1) in "F60".
     iDestruct (cpu_own_transport CID0 CID5 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Fetchaddr.wp_fetchaddr_sconf γa γf N5 (K - 60)%nat eb (proc_addr jp)
+    iApply (Fetchaddr.wp_fetchaddr_sconf fsc_kalloc γf N5 (K - 60)%nat eb (proc_addr jp)
               pid (upd_upt V P) u0 b lks Kfa
               with "Hcg Hcnt Htext Hpc Hpriv Hka F60").
     iIntros (CID6 Hq6 mf Pa) "%Hcsa %Hexta Hcg Hcnt Hpc Hpriv Hfa".
@@ -3321,7 +3321,7 @@ Section SysExecStep.
       by (rewrite /Q2 upd_eq; pcw).
     iDestruct (cpu_own_transport CID6 CID10 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Kalloc.wp_kalloc_sconf KT1 γa γk
+    iApply (Kalloc.wp_kalloc_sconf KT1 fsc_kalloc γk
               (mword_of_int (KernelSyms.kmem + 24)) Q2 None 0%nat eb
               (proc_addr jp) (K - 60)%nat b lks K14 eq_refl sx_noff0 Hlb
               with "Hcg Hcnt Htext Hpc Hlk Hav").
@@ -3485,7 +3485,7 @@ Section SysExecStep.
     iEval (rewrite -HQ6a1) in "Hpg".
     iDestruct (cpu_own_transport CID11 CID17 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Fetchstr.wp_fetchstr_sconf KT0 γa γf Q6 (K - 60)%nat 0%nat eb
+    iApply (Fetchstr.wp_fetchstr_sconf KT0 fsc_kalloc γf Q6 (K - 60)%nat 0%nat eb
               (proc_addr jp) pid (upd_upt V Pa) 4096%nat fpg b lks
               sx_noff0 Kfs HQ6a2 sx_pgsize_lt Hlb
               with "Hcg Hcnt Htext Hpc Hpriv Hka Hpg").
@@ -3685,7 +3685,7 @@ Section SysExecStep.
   (*  THE LOOP, by induction on the fuel [32 - i].                          *)
   (* ===================================================================== *)
   Lemma sx_loop `{CID0 : CpuId}
-      (γf γa : gname) (jp : nat) (pid : mword 32) (V : pprivate)
+      (γf : gname) (jp : nat) (pid : mword 32) (V : pprivate)
       (K : nat) (eb b : bool) (lks : gset string)
       (sp0 : mword 64) (m : regfile) (plen : nat) (pfun rest : nat -> bv 8)
       (uav : mword 64) :
@@ -3695,7 +3695,7 @@ Section SysExecStep.
       (pg : nat -> mword 64) (alen : nat -> nat) (afun : nat -> nat -> bv 8),
     (32 - i <= W)%nat ->
     kernel_text -∗
-    kalloc_env γa None -∗
+    kalloc_env fsc_kalloc None -∗
     sx_body γf jp pid V K eb b lks sp0 m plen pfun rest uav
             M P i pg alen afun (mword_of_int (SX + 0x56) : mword 64) -∗
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
@@ -3719,7 +3719,7 @@ Section SysExecStep.
     iIntros "#Htext #Hka Hst Hout".
     iAssert (⌜(i < 32)%nat⌝)%I as "%Hi32".
     { rewrite /sx_body. iDestruct "Hst" as "((%H & _) & _)". iPureIntro. exact H. }
-    iApply (sx_step (CID0 := CID0) γf γa jp pid V K eb b lks sp0 m plen
+    iApply (sx_step (CID0 := CID0) γf jp pid V K eb b lks sp0 m plen
               pfun rest uav M P i pg alen afun HK Hlb
               with "Htext Hka Hst [Hout]").
     iIntros (CIDn Hqn M' P' i' pg' alen' afun') "[[%Hsi Hhead] | [Hbrk | Hbad]]".
@@ -4142,7 +4142,7 @@ Section SysExecBadTail.
   Qed.
 
   Lemma sx_bad_tail `{CID0 : CpuId}
-      (γf γa : gname) (jp : nat) (pid : mword 32) (V : pprivate)
+      (γf : gname) (jp : nat) (pid : mword 32) (V : pprivate)
       (K : nat) (eb b : bool) (lks : gset string)
       (sp0 : mword 64) (m : regfile) (plen : nat) (pfun rest : nat -> bv 8)
       (uav : mword 64) (M : regfile) (P : uptd) (t : nat)
@@ -4153,7 +4153,7 @@ Section SysExecBadTail.
     (plen < 128)%nat ->
     sx_alp sp0 ->
     kernel_text -∗
-    kalloc_env γa None -∗
+    kalloc_env fsc_kalloc None -∗
     sx_bad γf jp pid V K eb b lks sp0 m plen pfun rest uav M P t pg afun -∗
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       ∀ mf : regfile,
@@ -4202,7 +4202,7 @@ Section SysExecBadTail.
     iDestruct (sx_argv0_at sp0 t pg with "Harr") as "Harr".
     iDestruct (cpu_own_transport CID0 CID1 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (sx_free_loop (CID0 := CID1) γa sp0 (proc_addr jp) K eb b lks
+    iApply (sx_free_loop (CID0 := CID1) sp0 (proc_addr jp) K eb b lks
               pg afun t 0x96 0xf4 (mword_of_int 46 : mword 8)
               (mword_of_int 2078150 : mword 21)
               HK Ht32 Hpgok Hlb ltac:(pcw) ltac:(pcw) ltac:(csf) ltac:(pcw)
@@ -4346,7 +4346,7 @@ Section SysExecSuccTail.
   Local Ltac csf := vm_compute; reflexivity.
 
   Lemma sx_succ_tail `{CID0 : CpuId}
-      (γf γa : gname) (jp : nat) (pid : mword 32) (W : pprivate)
+      (γf : gname) (jp : nat) (pid : mword 32) (W : pprivate)
       (K : nat) (eb b : bool) (lks : gset string)
       (sp0 : mword 64) (m : regfile) (plen : nat) (pfun rest : nat -> bv 8)
       (uav rv : mword 64) (M : regfile) (t : nat)
@@ -4364,7 +4364,7 @@ Section SysExecSuccTail.
     (M !!! Regidx Rs4 : mword 64) = pa_stk sp0 58 ->
     (M !!! Regidx Ra0 : mword 64) = rv ->
     kernel_text -∗
-    kalloc_env γa None -∗
+    kalloc_env fsc_kalloc None -∗
     pc_is (mword_of_int (SX + 0xce) : mword 64) -∗
     sie_cap_gpr KT1 M (K - 60)%nat b (proc_addr jp) -∗
     cpu_own 0 eb (proc_addr jp) b lks -∗
@@ -4440,7 +4440,7 @@ Section SysExecSuccTail.
     iDestruct (sx_argv0_at sp0 t pg with "Harr") as "Harr".
     iDestruct (cpu_own_transport CID0 CID2 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (sx_free_loop (CID0 := CID2) γa sp0 (proc_addr jp) K eb b lks
+    iApply (sx_free_loop (CID0 := CID2) sp0 (proc_addr jp) K eb b lks
               pg afun t 0xd4 0xe2 (mword_of_int 6 : mword 8)
               (mword_of_int 2078088 : mword 21)
               HK Ht32 Hpgok Hlb ltac:(pcw) ltac:(pcw) ltac:(csf) ltac:(pcw)
@@ -4635,12 +4635,8 @@ Section SysExecBreak.
 
   Lemma sx_break `{CID0 : CpuId}
       (gs : list gname) (jp : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (γa γf : gname)
-      (bmapstart : Z)
-      (size : Z)
+      (γf : gname)
       (dqb dqs : dfrac)
       (pid : mword 32) (V : pprivate)
       (K : nat) (eb b : bool) (lks : gset string)
@@ -4654,22 +4650,22 @@ Section SysExecBreak.
     sx_alp sp0 ->
     icfg_dev = ROOTDEV -> (0 < icfg_nib)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
-    0 < size <= BPB ->
-    0 <= bmapstart ->
-    bmapstart ∈ fsc_cov ->
-    ~ (bmapstart ∈ log_region_set fsc_logst) ->
+    0 < fsc_size <= BPB ->
+    0 <= fsc_bmapstart ->
+    fsc_bmapstart ∈ fsc_cov ->
+    ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
     0 <= icfg_ist ->
-    cov_below fsc_cov size ->
+    cov_below fsc_cov fsc_size ->
     ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
     (jp < NPROC)%nat -> gs !! jp = Some gl ->
     b = true -> eb = true ->
     kernel_text -∗
-    fs_fabric gs gu gd gk pd pav pu bn
+    fs_fabric gs pd pav pu
  -∗
-    kalloc_env γa None -∗
-    sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+    kalloc_env fsc_kalloc None -∗
+    sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-    bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+    bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
     bslots 3 -∗
     iref_slots 2 -∗
     sx_body γf jp pid V K eb b lks sp0 m plen pfun rest uav
@@ -4683,7 +4679,7 @@ Section SysExecBreak.
         sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
         cpu_own 0 eb (proc_addr jp) b lks -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+        sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
         bslots 3 -∗
         iref_slots 2 -∗
@@ -4843,8 +4839,8 @@ Section SysExecBreak.
     iEval (rewrite -HN6a0) in "Hpb".
     iDestruct (cpu_own_transport CID0 CID7 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Kexec.wp_kexec_sconf gs jp gl gu gd gk pd pav pu bn
-              γa γf bmapstart size
+    iApply (Kexec.wp_kexec_sconf gs jp gl pd pav pu
+ γf
               plen pfun i (sx_avf pg i) alen (fun _ => 4096%nat) afun
               pid (upd_upt V P) dqb dqs (DfracOwn 1) (DfracOwn 1) (DfracOwn 1)
               N6 (K - 60)%nat eb b lks
@@ -4881,7 +4877,7 @@ Section SysExecBreak.
     iAssert (sx_argv0 sp0 i pg) with "[Havf Hhi]" as "Harr".
     { rewrite (sx_argv_kx sp0 i pg ltac:(lia)).
       iSplitL "Havf"; [iExact "Havf" | iExact "Hhi"]. }
-    iApply (sx_succ_tail (CID0 := CID8) γf γa jp pid V' K eb b lks sp0 m plen
+    iApply (sx_succ_tail (CID0 := CID8) γf jp pid V' K eb b lks sp0 m plen
               pfun rest uav (mf !!! Regidx Ra0 : mword 64) mf i pg afun
               HK Hlb Hsp0 Hplen Halp ltac:(lia) (sx_ok_pgok pg alen afun i Hok)
               (sxr_sp HRf) (sxr_thr HRf) (sxr_s0 HRf) (sxr_s1 HRf) (sxr_s4 HRf)
@@ -4959,21 +4955,17 @@ Section SysExecWhole.
   Qed.
 
   Lemma wp_sys_exec_sconf
-      (γf : gname) (γa : gname)
+      (γf : gname)
       (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (bmapstart : Z)
-      (size : Z)
       (dqb dqs : dfrac)
       (v0 v1 : mword 64)
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
-      wp_sys_exec_sconf_body γf γa gs j gl gu gd gk pd pav pu bn
-                             bmapstart
-                             size dqb dqs v0 v1 pid V m K eb b lks.
+      wp_sys_exec_sconf_body γf gs j gl pd pav pu
+
+ dqb dqs v0 v1 pid V m K eb b lks.
   Proof.
     cbv beta zeta delta [wp_sys_exec_sconf_body].
     intros HK Hroot Hnib0 Hlg Hsize Hbm0 Hbmc Hbml Hist0
@@ -4991,7 +4983,7 @@ Section SysExecWhole.
     pose proof (locks_below_empty "kmem") as Hlb.
     set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     (* ===== +0x000 .. +0x026 : the prologue ===== *)
-    iApply (sx_head γf γa j pid V v0 v1 m K true true ∅
+    iApply (sx_head γf j pid V v0 v1 m K true true ∅
               HK Harg0 Harg1 Hlb with "Hcg Hcnt Htext Hdata Hpc Hpriv Hka").
     iIntros (CID1 Hq1 M P' plen pfun rst v59 v60) "[Hm1 | Hft]".
     { (* ---- argstr failed: -1, and the block never moved ---- *)
@@ -5053,15 +5045,15 @@ Section SysExecWhole.
         iSplitR; [done | iExact "Hargv"]. }
       { rewrite /sx_pages sx_seq00 big_sepL_nil. done. } }
     (* ===== +0x056 .. +0x090 : the fill loop ===== *)
-    iApply (sx_loop (CID0 := CID2) γf γa j pid V K true true ∅ sp0 m plen
+    iApply (sx_loop (CID0 := CID2) γf j pid V K true true ∅ sp0 m plen
               pfun rst v59 HK Hlb 32%nat M2 P' 0%nat
               (fun _ => (mword_of_int 0 : mword 64)) (fun _ => 0%nat)
               (fun _ _ => (mword_of_int 0 : mword 8)) ltac:(lia)
               with "Htext Hka Hbody").
     iIntros (CID3 Hq3 M3 P3 i3 pg3 al3 af3) "[Hbrk | Hbad]".
     - (* ---- the break: argv[i] = 0, then kexec ---- *)
-      iApply (sx_break (CID0 := CID3) gs j gl gu gd gk pd pav pu bn
-                γa γf bmapstart size
+      iApply (sx_break (CID0 := CID3) gs j gl pd pav pu
+ γf
                 dqb dqs pid V K true true ∅ sp0 m plen pfun rst v59
                 M3 P3 i3 pg3 al3 af3
                 HK Hlb eq_refl Hplen Hpcstr Halp Hroot Hnib0
@@ -5079,7 +5071,7 @@ Section SysExecWhole.
         iExists V', i3, al3, entry, spv, szv'.
         iSplitR; [iPureIntro; exact Hkok |]. iExact "Hpriv". }
     - (* ---- [bad:]: free what was allocated and return -1 ---- *)
-      iApply (sx_bad_tail (CID0 := CID3) γf γa j pid V K true true ∅ sp0 m
+      iApply (sx_bad_tail (CID0 := CID3) γf j pid V K true true ∅ sp0 m
                 plen pfun rst v59 M3 P3 i3 pg3 af3
                 HK Hlb eq_refl Hplen Halp with "Htext Hka Hbad").
       iIntros (CID4 Hq4 mf) "%Hcs %Ha0 %Hext3 Hcg Hcnt Hpc Hpriv".

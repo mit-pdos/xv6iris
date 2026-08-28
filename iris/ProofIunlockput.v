@@ -42,6 +42,7 @@ Require Import InodeInv.
 Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import IcacheEscrow.
+Require Import TxPin.   (* [tx_pin_elem]: the pin and the raw element *)
 Require Import CodeIunlockput.
 Require Import SpecIunlock SpecIput.
 Require Import SpecIunlockput.
@@ -92,12 +93,8 @@ Section ProofIunlockputMain.
      after the proof. *)
   Lemma wp_iunlockput_dep_gen
       (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (gil gisl : gname)
-      (bmapstart : Z)
-      (size : Z)
       (k : nat) (qi s : Qp) (gy : gname) (d : ic_dep) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
@@ -105,9 +102,9 @@ Section ProofIunlockputMain.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iunlockput_dep_gen_body gs j gl gu gd gk pd pav pu bn
-                                 gil gisl bmapstart
-                                 size k qi s gy d inum dn' bm' n Sb crb cru
+    : wp_iunlockput_dep_gen_body gs j gl pd pav pu
+                                 gil gisl
+ k qi s gy d inum dn' bm' n Sb crb cru
                                  crz e0 tid qtx pidv dq dqb dqs m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_iunlockput_dep_gen_body].
@@ -359,8 +356,8 @@ Section ProofIunlockputMain.
        state the regime at the persistent [ireg_open]; iput's gen form keeps
        the index, and this is it at [rg := true]. *)
     iEval (rewrite -ireg_regime_true) in "Hropen".
-    iApply (IP.wp_iput_gen gs j gl gu gd gk pd pav pu bn gil gisl
-              bmapstart size
+    iApply (IP.wp_iput_gen gs j gl pd pav pu gil gisl
+
               k (qi + s)%Qp inum n Sb crb cru crz e0 tid qtx pidv dq dqb dqs R6 (K - 4)%nat eb b lks Vpr true
               ltac:(lia) Hk Hcrb Hcru
               Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0 Hiblk Hiblklog
@@ -376,6 +373,10 @@ Section ProofIunlockputMain.
              %Hssub %Hwbm %Hwc %Hbud Hlogop Htx Hslot _".
 
     iRename "Htx" into "Hside".
+    (* iput's post hands the element back RAW, and since rank 5
+       [IcacheEscrow.ic_dep_side_of_tx] is stated at [TxPin.tx_pin]; spell it
+       that way before folding the descriptor's own reading back in. *)
+    iEval (rewrite -tx_pin_elem) in "Hside".
     rewrite -(ic_dep_side_of_tx d tid qtx Hdside).
     assert (Hpc16 : ret_pc (R6 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iunlockput + 0x16))
@@ -590,21 +591,17 @@ Section ProofIunlockputMain.
   (* ===================================================================== *)
   Local Lemma wp_iunlockput_dep_sconf
       (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (gil gisl : gname)
-      (bmapstart : Z)
-      (size : Z)
       (k : nat) (qi s : Qp) (gy : gname) (d : ic_dep) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat) (tid : nat) (qtx : Qp)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iunlockput_dep_sconf_body gs j gl gu gd gk pd pav pu bn
-                                   gil gisl bmapstart
- size k qi s gy d inum
+    : wp_iunlockput_dep_sconf_body gs j gl pd pav pu
+                                   gil gisl
+ k qi s gy d inum
                                    dn' bm' n tid qtx pidv dq dqb dqs m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_iunlockput_dep_sconf_body].
@@ -616,8 +613,8 @@ Section ProofIunlockputMain.
               Hcont".
     rewrite {1}/log_opb. iDestruct "Hlogop" as (Sb0) "Hlogop".
     iDestruct (log_opS_named with "Hlogop") as (e00) "Hlogop".
-    iApply (wp_iunlockput_dep_gen gs j gl gu gd gk pd pav pu bn gil gisl
-              bmapstart size
+    iApply (wp_iunlockput_dep_gen gs j gl pd pav pu gil gisl
+
               k qi s gy d inum dn' bm' n Sb0 false false false e00 tid qtx
               pidv dq dqb dqs m K eb b lks Vpr
               HK Hdsh Hk ltac:(discriminate) ltac:(discriminate)
@@ -649,21 +646,17 @@ Section ProofIunlockputMain.
      stands before an iunlockput any more. *)
   Lemma wp_iunlockput_tx_sconf
       (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (gil gisl : gname)
-      (bmapstart : Z)
-      (size : Z)
       (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iunlockput_tx_sconf_body gs j gl gu gd gk pd pav pu bn
-                                  gil gisl bmapstart
- size k qi s gy inum dn' bm' n
+    : wp_iunlockput_tx_sconf_body gs j gl pd pav pu
+                                  gil gisl
+ k qi s gy inum dn' bm' n
                                   pidv dq dqb dqs m K eb b lks Vpr.
   Proof.
     apply wp_iunlockput_tx_of_dep_sconf. intros d tid qtx.
@@ -672,21 +665,17 @@ Section ProofIunlockputMain.
 
   Lemma wp_iunlockput_tx_gen
       (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (gil gisl : gname)
-      (bmapstart : Z)
-      (size : Z)
       (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_iunlockput_tx_gen_body gs j gl gu gd gk pd pav pu bn
-                                gil gisl bmapstart
-                                size k qi s gy inum dn' bm' n Sb crb cru
+    : wp_iunlockput_tx_gen_body gs j gl pd pav pu
+                                gil gisl
+ k qi s gy inum dn' bm' n Sb crb cru
                                 crz e0 pidv dq dqb dqs m K eb b lks Vpr.
   Proof.
     apply wp_iunlockput_tx_of_dep_gen. intros d tid qtx.

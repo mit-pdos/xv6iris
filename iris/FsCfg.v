@@ -25,9 +25,27 @@
 
     The four names the inode cache already owns stay in [icfg] and are NOT
     duplicated: [icfg_log] (the log's four gnames), [icfg_ist], [icfg_nib]
-    and [icfg_dev].  [SpecKexec] and [SpecFsinit] already tie threaded
-    copies to them by pure premise ([g = icfg_log], [dev = icfg_dev], ...);
-    the fields below take the same door for the same reason.
+    and [icfg_dev].
+
+    ---- AND NOTHING TIES THEM ANY MORE (rank 1) -------------------------
+
+    The fields below arrived through the door [icfg]'s four had used: a
+    contract threaded its own copy and a PURE PREMISE ([g = icfg_log],
+    [dev = icfg_dev], [γd = fsc_disk], ...) said the two were the same.
+    Rank 1 walked that back and closed the door.  NO fs contract threads
+    any of these names now -- ranks 1a-1d took [cn], [γfs], [cov],
+    [logstart], [γi], the itable lock, [dev], [nib], [inodestart], the
+    log's names, the six DEVICE/ALLOCATOR names and the image's three
+    numbers off the surface in that order -- so there is no threaded copy
+    left for an equation to name, and the three tie records that carried
+    them ([FsSyscalls.fs_world], [SpecFileclose.fclose_ties],
+    [ProofSyscall.sysc_ties]) are gone or reduced to their PROCESS half.
+    Two doors stay open on purpose and both are BOOT-side: the era's own
+    image numbers are tied to these fields where the instance is BUILT
+    ([FsCfgBoot], [FirstTok], [SpecFsinit]), and everything structurally
+    BELOW this file keeps its parameters -- a contract INSTANTIATES
+    [log_ctx] / [bio_ctx] / [is_itable2] / [ireg_inv] at the fields, which
+    costs nothing.
 
     [procs_inv]'s [γs] is not here either, and that is deliberate: it is a
     PROCESS name, and it was in [fs_ready] only because [procs_inv] was a

@@ -1037,7 +1037,7 @@ Section ProofFilealloc.
                 G4 (K - 4)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (fai_40 with "Htext"). }
-      iIntros (CIDg2 Hsg2). iNext. iIntros "Hcg Hpc".
+      iIntros (CIDg2 Hsg2). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Htgtj : add_vec (mword_of_int (KernelSyms.filealloc + 0x40) : mword 64)
                         (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 9 : mword 11) ('b"0"))))
                       = mword_of_int (KernelSyms.filealloc + 0x52))

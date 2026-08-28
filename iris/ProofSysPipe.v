@@ -1560,9 +1560,9 @@ Section ProofSysPipe.
     iDestruct "Hpipe" as (k0 k1) "(%Hklt & Hb6 & Hb7 & Href0 & Href1)".
     destruct Hklt as [Hk0lt Hk1lt].
     (* Nothing about the pipe appears from here on, and that is the point:
-       each end rides INSIDE its file's [FileInv.file_ref] as the payload
-       [pipe_file] pins, so installing a descriptor installs the reference to
-       the pipe with it.  (Before the payload link this proof had to DROP the
+       each end rides INSIDE its file's [FileInv.file_ref], in the payload
+       [file_core]'s pipe arm holds, so installing a descriptor installs the
+       reference to the pipe with it.  (Before the payload link this proof had to DROP the
        two ends here -- affine, so it typechecked, and it meant sys_pipe's
        descriptors were not connected to the pipe in the model.) *)
     assert (HW1a0' : W1 !!! Regidx Ra0 = (zero_reg : mword 64))
@@ -1779,11 +1779,12 @@ Section ProofSysPipe.
     (* SETTLE: the descriptor fdalloc filled owes a payload, and this is the
        reference pipealloc handed us for that end. *)
     (* THE FIRST DESCRIPTOR'S RETYPE: fdalloc handed out its authority at
-       [FdClosed] and the pipe end makes it [FdOpen FdPipe]. *)
+       [FdClosed] and the pipe end makes it [FdOpen _ _ FdPipe], at the
+       flags that say which end it is. *)
     iDestruct (fd_frags_any_acc (pv_fdg V) fd0 Hfd0N with "Hfrag")
       as (stq0) "[Hfr0 Hfrback0]".
     iMod (proc_priv_settle γf p pid V fd0 k0 1%Qp
-                 (FdOpen (FdPipe false)) FdClosed stq0
+                 (FdOpen true false FdPipe) FdClosed stq0
                  Hfd0N Hlen1 Hk0lt ltac:(discriminate)
                  with "Hcore Hof Href0 Hauth0 Hfr0") as "[Hpriv Hfr0]".
     iDestruct ("Hfrback0" with "Hfr0") as "Hfrag".
@@ -2054,7 +2055,7 @@ Section ProofSysPipe.
     iDestruct (fd_frags_any_acc (pv_fdg V) fd1 Hfd1N with "Hfrag")
       as (stq1) "[Hfr1 Hfrback1]".
     iMod (proc_priv_settle γf p pid (upd_ofile V fd0 (fnode k0)) fd1 k1
-                 1%Qp (FdOpen (FdPipe true)) FdClosed stq1 Hfd1N Hlen2' Hk1lt
+                 1%Qp (FdOpen false true FdPipe) FdClosed stq1 Hfd1N Hlen2' Hk1lt
                  ltac:(discriminate)
                  with "Hcore Hof Href1 Hauth1 Hfr1") as "[Hpriv Hfr1]".
     iDestruct ("Hfrback1" with "Hfr1") as "Hfrag".

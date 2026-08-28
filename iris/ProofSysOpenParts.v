@@ -519,6 +519,54 @@ Lemma so_wr_byte_rdonly :
   trunc8 (so_wr_word (mword_of_int 0 : mword 32)) = (mword_of_int 0 : mword 8).
 Proof. rewrite so_wr_rdonly. apply bv_eq; vm_compute; reflexivity. Qed.
 
+(* ---- THE TWO MODE BYTES ARE C BOOLS -------------------------------------
+
+   [FdSlots.fdstate]'s [FdOpen] carries [readable] and [writable], and
+   [FileInvDefs.fdstate_ok] ties each to its cell holding exactly 1 or 0.
+   sys_open is the producer that has to earn that: [f->writable] is a [snez]
+   result, visibly a bit, but [f->readable] is [!(omode & O_WRONLY)], which
+   gcc compiles to [andi a4,a5,1 ; xori a4,a4,1] -- and "(om & 1) xor 1 is a
+   bit" is an argument rather than a computation.
+
+   The mask is a bit because [Z.land _ 1] is [_ mod 2]; from there the word
+   is one of two closed terms and the byte follows by [vm_compute]. *)
+Lemma so_and1_01 (om : mword 32) :
+  so_and om 1 = (mword_of_int 0 : mword 64)
+  \/ so_and om 1 = (mword_of_int 1 : mword 64).
+Proof.
+  assert (Hv : bv_unsigned (so_and om 1) = bv_unsigned (so_omv om) mod 2).
+  { unfold so_and. rewrite and_vec64_unsigned.
+    assert (H1 : bv_unsigned (sign_extend' 64 (mword_of_int 1 : mword 12)
+                              : mword 64) = Z.ones 1)
+      by (vm_compute; reflexivity).
+    rewrite H1 Z.land_ones; [| lia]. reflexivity. }
+  pose proof (Z.mod_pos_bound (bv_unsigned (so_omv om)) 2 ltac:(lia)) as Hb.
+  destruct (decide (bv_unsigned (so_omv om) mod 2 = 0)) as [Hz | Hnz].
+  - left. apply bv_eq. rewrite Hv Hz. by vm_compute.
+  - right. apply bv_eq. rewrite Hv.
+    assert (Heq : bv_unsigned (so_omv om) mod 2 = 1) by lia.
+    rewrite Heq. by vm_compute.
+Qed.
+
+Lemma so_rd_byte_bool (om : mword 32) :
+  ∃ b : bool, trunc8 (so_rd_word om)
+              = ((if b then mword_of_int 1 else mword_of_int 0) : mword 8).
+Proof.
+  unfold so_rd_word. destruct (so_and1_01 om) as [H0 | H1]; rewrite H0 || rewrite H1.
+  - exists true. apply bv_eq; vm_compute; reflexivity.
+  - exists false. apply bv_eq; vm_compute; reflexivity.
+Qed.
+
+Lemma so_wr_byte_bool (om : mword 32) :
+  ∃ b : bool, trunc8 (so_wr_word om)
+              = ((if b then mword_of_int 1 else mword_of_int 0) : mword 8).
+Proof.
+  unfold so_wr_word.
+  destruct (zopz0zI_u (zero_reg : mword 64) (so_and om 3)).
+  - exists true. apply bv_eq; vm_compute; reflexivity.
+  - exists false. apply bv_eq; vm_compute; reflexivity.
+Qed.
+
 (* the readable byte at O_RDONLY, for completeness: [!(0 & 1)] is ONE.  The
    walk never needs its value -- nothing in the file layer is keyed on
    [f->readable] -- but it is the fact that says the published descriptor is
@@ -682,7 +730,7 @@ Section ProofSysOpenPublish.
 
   Lemma so_publish (E : coPset) (gf : gname) (kf kk : nat) (qi s : Qp)
       (gy : gname) (inum : mword 32) (ty : bv 16) (C : fcontent)
-      (pn : fpnames) (om : mword 32) (voff : mword 32) :
+      (pn : fpnames) (om : mword 32) (voff : mword 32) (rb wb : bool) :
     ↑fileipN ⊆ E -> ↑(offN .@ kf) ⊆ E ->
     (kk < NINODE)%nat ->
     bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
@@ -691,6 +739,13 @@ Section ProofSysOpenPublish.
     (* THE THEOREM OF THE WALK, in the form the two arms prove it: the
        [snez] stored [f->writable], and a T_DIR inode forced [omode = 0]. *)
     fc_writable C = trunc8 (so_wr_word om) ->
+    (* THE TWO MODE CELLS ARE C BOOLS, which is what the published
+       descriptor's [FdOpen rb wb] claims.  sys_open earns both from
+       [so_rd_byte_bool] / [so_wr_byte_bool]; they are separate from the
+       [so_wr_word] equation above because that one is about the WITNESS
+       (T_DIR is never opened for writing), not about the cell's shape. *)
+    fc_readable C = ((if rb then mword_of_int 1 else mword_of_int 0) : mword 8) ->
+    fc_writable C = ((if wb then mword_of_int 1 else mword_of_int 0) : mword 8) ->
     (bv_unsigned ty = T_DIR_z -> om = (mword_of_int 0 : mword 32)) ->
     off_wf voff ->
     (* the parent the walk kept, short by the share it lent ilock ... *)
@@ -718,7 +773,7 @@ Section ProofSysOpenPublish.
        projection because [fdstate_ok] is a relation -- see its note. *)
     |={E}=> ∃ st : fdstate, ⌜fdstate_ok inum C st⌝ ∗ file_ref gf kf 1 st.
   Proof.
-    intros HEi HEo Hkk Hinb Hip Hty Hwrb Hdir Hwf.
+    intros HEi HEo Hkk Hinb Hip Hty Hwrb Hrdb Hwdb Hdir Hwf.
     iIntros "Hkeep Hru Hshr #Hshot Href Hlive Hflds Hnames Hip Hoff".
     (* ---- the generation: name the returned share and pin it ---- *)
     rewrite inode_shr_gen_intro. iDestruct "Hshr" as (g2) "Hshr".
@@ -759,15 +814,15 @@ Section ProofSysOpenPublish.
     (* the state the file now gives: its type, and -- on the FD_INODE arm --
        the inum of the reference it just parked *)
     set (stpub := if bool_decide (fc_type C = FD_INODE)
-                  then FdOpen (FdInode (bv_unsigned inum))
-                  else FdOpen (FdDevice (bv_unsigned (fc_major C)))).
+                  then FdOpen rb wb (FdInode (bv_unsigned inum))
+                  else FdOpen rb wb (FdDevice (bv_unsigned (fc_major C)))).
     assert (Hokpub : fdstate_ok inum C stpub).
     { rewrite /stpub. destruct Hty as [Ht | Ht].
-      - rewrite (bool_decide_true _ Ht). cbn. by split.
+      - rewrite (bool_decide_true _ Ht). cbn. by repeat split.
       - rewrite bool_decide_false.
         2:{ rewrite Ht. unfold FD_DEVICE, FD_INODE. intro Hc.
             apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc. }
-        cbn. by split. }
+        cbn. by repeat split. }
     iExists stpub. iSplitR; [iPureIntro; exact Hokpub|].
     rewrite /file_ref /file_pay_st /file_payload /file_core.
     iExists C. iFrame "Href Hflds Hlive".

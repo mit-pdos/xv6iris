@@ -8,7 +8,7 @@
      FsStateLink.v    the link-counting RA
      FsStateInode.v   [rec_owned], [ind_owned], [inode_owned]
      FsStateBitmap.v  [free_bitmap]
-     FsState.v        [sb_owned], [fs_inodes], [fs_state], [fs_view], the mint
+     FsState.v        [sb_owned], [fs_inodes], [fs_state], [fs_footprint]
 
    THE ONE [∗]-ITERATION is [fs_inodes]; there is NO pure clause at this
    level or at [fs_state]'s (fs-state.md section 2, last bullet).  The
@@ -16,14 +16,22 @@
    there is no tree, no reachability, no "used set", no completeness clause,
    and nothing anywhere states a fact about more than one inode.
 
-   THE MINT ([fs_state_mint], fs-state.md section 1 "Functoriality") walks
-   the durable instance and allocates the logged instance's link ghosts to
-   match.  It is a TRANSPORT: [fs_state_split] factors [fs_state] into the
-   Φ-only [fs_footprint] and the Φ-free [fs_ghost], the caller supplies the
-   footprint at the other Φ, and the mint moves the rest.  The link family's
-   VALIDITY -- which is exactly "#tokens ≤ nlink at every inum", the one
-   whole-state fact in the design -- is READ OFF the durable instance's own
-   [own] by [fs_links_valid]; it is never proved and never maintained. *)
+   [fs_state] TAKES A DFRAC (durable-disk EV-X): every BYTE of the file
+   system rides at that share and the ghost column -- the link authority,
+   the type register, a directory's entry tokens -- stays WHOLE.  It is
+   written at [FsStateDefs.gamma_q Γ dq], the view whose [fsΦ] is pinned at
+   [dq], so there is no parallel hierarchy of [_q] definitions and
+   [fs_state Γ (DfracOwn 1) S] is the old predicate by [reflexivity]
+   ([fs_state_1]).
+
+   THE MINT IS THE TRANSPORT ([FsDurXfer.fs_state_xfer]), which ALLOCATES
+   the target's byte map at the flattening of the source's own runs.
+   [fs_state_split] factors [fs_state] into the Φ-only [fs_footprint] (at
+   the share) and the Φ-free [fs_ghost] (whole), which is what makes that
+   possible.  The link family's VALIDITY -- exactly "#tokens ≤ nlink at
+   every inum", the one whole-state fact in the design -- is READ OFF the
+   source instance's own [own] by [fs_links_valid]; it is never proved and
+   never maintained. *)
 
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
@@ -164,20 +172,64 @@ Section FsState.
   Definition fs_inodes Γ (sb : fs_sb) (I : gmap Z fs_node) : iProp Σ :=
     ([∗ map] i ↦ n ∈ I, inode_owned Γ sb i n)%I.
 
-  (* LAST, so no destructuring pattern above the first three conjuncts
-     moves (durable-notes.md, "when a new conjunct goes into a predicate
-     forty proofs destructure, put it LAST"). *)
-  Definition fs_state Γ S : iProp Σ :=
-    (sb_owned Γ (fss_sb S) (fss_sbb S)
-     ∗ fs_inodes Γ (fss_sb S) (fss_inodes S)
-     ∗ free_bitmap Γ (fss_sb S) (fss_used S)
+  (* ---------------------------------------------------------------- *)
+  (*  2a.  THE PREDICATE TAKES A SHARE (durable-disk EV-X)              *)
+  (*                                                                    *)
+  (*  [fs_state Γ dq S] is the file system with EVERY BYTE at [dq] and   *)
+  (*  the ghost column WHOLE.  It is written at the constant-share view  *)
+  (*  [FsStateDefs.gamma_q Γ dq] rather than through a parallel          *)
+  (*  hierarchy of [_q] definitions, and that is the whole trick: a      *)
+  (*  view's [fsΦ] is what every byte shape below reads, so pinning it   *)
+  (*  at [dq] moves the record, the data blocks, the indirect block,     *)
+  (*  the superblock block, the bitmap block and the free pool together  *)
+  (*  and leaves [γlink] and [γtop] -- hence [FsStateInode.inode_ghost]  *)
+  (*  (the link authority, the type register and the entry tokens) --    *)
+  (*  LITERALLY UNCHANGED ([gamma_q_inode_ghost] is [reflexivity]).      *)
+  (*                                                                    *)
+  (*  WHY THE AUTHORITIES DO NOT SPLIT.  [link_auth] is an [auth] whose  *)
+  (*  fragments are the entry tokens: half of it is not half a file      *)
+  (*  system, it is an unusable element, and the mint allocates the      *)
+  (*  family from the SOURCE'S OWN element ([fs_links_valid_tok]) at any *)
+  (*  share of the bytes.  Same for the abstract map's fragments, which  *)
+  (*  do split ([top_frag_q]) but are not part of [fs_state] at all --   *)
+  (*  they ride with the era's escrow arms and with a snapshot's         *)
+  (*  [FsDurSnap.fs_snap], never inside the predicate.                   *)
+  (*                                                                    *)
+  (*  [fs_state Γ (DfracOwn 1) S] IS the old fraction-1 predicate:       *)
+  (*  [byte_range] hands [DfracOwn 1] down and the constant view then    *)
+  (*  ignores it, so [fs_state_1] below is [reflexivity] and every       *)
+  (*  consumer of the old form moved by a SWEEP.                         *)
+  (*                                                                    *)
+  (*  LAST, so no destructuring pattern above the first three conjuncts  *)
+  (*  moves (durable-notes.md, the rule on a new conjunct going into a   *)
+  (*  predicate forty proofs destructure: put it LAST).                  *)
+  (* ---------------------------------------------------------------- *)
+
+  Definition fs_state Γ (dq : dfrac) S : iProp Σ :=
+    (sb_owned (gamma_q Γ dq) (fss_sb S) (fss_sbb S)
+     ∗ fs_inodes (gamma_q Γ dq) (fss_sb S) (fss_inodes S)
+     ∗ free_bitmap (gamma_q Γ dq) (fss_sb S) (fss_used S)
      ∗ ⌜fs_geom S⌝)%I.
 
-  (* fs-state.md section 4.  [γtop] is the abstract map a holder of one
-     [inode_owned] carries a fragment of; that fragment is how it updates
-     the top at its AU. *)
-  Definition fs_view Γ : iProp Σ :=
-    (∃ S, ghost_map_auth (γtop Γ) 1 (fss_inodes S) ∗ fs_state Γ S)%I.
+  (* THE ONE-LINE BRIDGE. *)
+  Lemma fs_state_1 Γ S :
+    fs_state Γ (DfracOwn 1) S
+    ⊣⊢ (sb_owned Γ (fss_sb S) (fss_sbb S)
+        ∗ fs_inodes Γ (fss_sb S) (fss_inodes S)
+        ∗ free_bitmap Γ (fss_sb S) (fss_used S)
+        ∗ ⌜fs_geom S⌝).
+  Proof. reflexivity. Qed.
+
+  (* ...AND THE OTHER WAY ROUND: the predicate at a share IS the predicate
+     at FULL share over the constant-share VIEW, because [gamma_q] is
+     idempotent in its second argument ([gamma_q (gamma_q Γ dq) (DfracOwn 1)]
+     and [gamma_q Γ dq] are the same term).  That is what lets every
+     Gamma-generic lemma about the fraction-1 predicate -- the runs
+     correspondence of [FsDurXfer] above all -- be READ at a share with no
+     new proof (durable-disk EV-X). *)
+  Lemma fs_state_gq Γ dq S :
+    fs_state Γ dq S = fs_state (gamma_q Γ dq) (DfracOwn 1) S.
+  Proof. reflexivity. Qed.
 
   Definition top_frag Γ (i : Z) (n : fs_node) : iProp Σ := i ↪[γtop Γ] n.
 
@@ -229,12 +281,9 @@ Section FsState.
     Timeless (fs_inodes Γ sb I).
   Proof. rewrite /fs_inodes. apply _. Qed.
 
-  Global Instance fs_state_timeless `{!GTimeless Γ} S :
-    Timeless (fs_state Γ S).
+  Global Instance fs_state_timeless `{!GTimeless Γ} dq S :
+    Timeless (fs_state Γ dq S).
   Proof. rewrite /fs_state. apply _. Qed.
-
-  Global Instance fs_view_timeless `{!GTimeless Γ} : Timeless (fs_view Γ).
-  Proof. rewrite /fs_view. apply _. Qed.
 
   Global Instance top_frag_timeless Γ i n : Timeless (top_frag Γ i n).
   Proof. rewrite /top_frag. apply _. Qed.
@@ -248,33 +297,92 @@ Section FsState.
   (*  of these two facts.                                              *)
   (* ---------------------------------------------------------------- *)
 
-  Definition fs_footprint Γ S : iProp Σ :=
-    (blk_owned Γ SB_BNO (fss_sbb S)
-     ∗ ([∗ map] i ↦ n ∈ fss_inodes S, inode_phi Γ (fss_sb S) i n)
-     ∗ blk_owned Γ (sb_bmapstart (fss_sb S)) (bm_bytes BSIZE (fss_used S))
-     ∗ free_pool Γ (sb_size (fss_sb S)) (fss_used S))%I.
+  Definition fs_footprint Γ (dq : dfrac) S : iProp Σ :=
+    (blk_owned (gamma_q Γ dq) SB_BNO (fss_sbb S)
+     ∗ ([∗ map] i ↦ n ∈ fss_inodes S,
+          inode_phi (gamma_q Γ dq) (fss_sb S) i n)
+     ∗ blk_owned (gamma_q Γ dq) (sb_bmapstart (fss_sb S))
+         (bm_bytes BSIZE (fss_used S))
+     ∗ free_pool (gamma_q Γ dq) (sb_size (fss_sb S)) (fss_used S))%I.
+
+  Lemma fs_footprint_1 Γ S :
+    fs_footprint Γ (DfracOwn 1) S
+    ⊣⊢ (blk_owned Γ SB_BNO (fss_sbb S)
+        ∗ ([∗ map] i ↦ n ∈ fss_inodes S, inode_phi Γ (fss_sb S) i n)
+        ∗ blk_owned Γ (sb_bmapstart (fss_sb S)) (bm_bytes BSIZE (fss_used S))
+        ∗ free_pool Γ (sb_size (fss_sb S)) (fss_used S)).
+  Proof. reflexivity. Qed.
+
+  Lemma fs_footprint_gq Γ dq S :
+    fs_footprint Γ dq S = fs_footprint (gamma_q Γ dq) (DfracOwn 1) S.
+  Proof. reflexivity. Qed.
 
   Definition fs_ghost Γ S : iProp Σ :=
     (⌜fs_parse_sb (fun _ => fss_sbb S) = Some (fss_sb S)⌝
      ∗ ([∗ map] i ↦ n ∈ fss_inodes S, inode_ghost Γ i n)
      ∗ ⌜fs_geom S⌝)%I.
 
-  Global Instance fs_footprint_timeless `{!GTimeless Γ} S :
-    Timeless (fs_footprint Γ S).
+  Global Instance fs_footprint_timeless `{!GTimeless Γ} dq S :
+    Timeless (fs_footprint Γ dq S).
   Proof. rewrite /fs_footprint. apply _. Qed.
 
   Global Instance fs_ghost_timeless Γ S : Timeless (fs_ghost Γ S).
   Proof. rewrite /fs_ghost. apply _. Qed.
 
   (* the footprint does not read [γlink] or [γtop] *)
-  Lemma fs_footprint_gname Γ g t S :
-    fs_footprint Γ S ⊣⊢ fs_footprint (MkFsView (fsΦ Γ) g t) S.
+  Lemma fs_footprint_gname Γ g t dq S :
+    fs_footprint Γ dq S ⊣⊢ fs_footprint (MkFsView (fsΦ Γ) g t) dq S.
   Proof. done. Qed.
 
-  Lemma fs_state_split Γ S : fs_state Γ S ⊣⊢ fs_footprint Γ S ∗ fs_ghost Γ S.
+  (* SHEDDING A SHARE (durable-disk EV-X).  The commit's collection meets
+     the metadata objects and the region's records at fraction 1 and each
+     inode's data leg at three quarters, so it sheds the whole ones down to
+     the uniform share the transport takes.  It is stated in ONE direction:
+     the free pool's element hides its bytes under an existential, so two
+     halves of a pool row cannot be rejoined without an agreement law, and
+     nothing ever needs to. *)
+  Lemma fs_footprint_shed Γ (Hfr : phi_frac Γ) (q1 q2 : Qp) S :
+    fs_footprint Γ (DfracOwn (q1 + q2)) S
+    ⊢ fs_footprint Γ (DfracOwn q1) S ∗ fs_footprint Γ (DfracOwn q2) S.
+  Proof.
+    pose proof (gamma_q_shed Γ Hfr q1 q2) as Hs.
+    rewrite /fs_footprint. iIntros "(Hsb & Hin & Hbm & Hpool)".
+    iDestruct (blk_owned_shed _ _ _ Hs with "Hsb") as "[Hsb1 Hsb2]".
+    iDestruct (blk_owned_shed _ _ _ Hs with "Hbm") as "[Hbm1 Hbm2]".
+    iDestruct (free_pool_shed _ _ _ Hs with "Hpool") as "[Hp1 Hp2]".
+    iAssert ([∗ map] i ↦ n ∈ fss_inodes S,
+               inode_phi (gamma_q Γ (DfracOwn q1)) (fss_sb S) i n
+               ∗ inode_phi (gamma_q Γ (DfracOwn q2)) (fss_sb S) i n)%I
+      with "[Hin]" as "Hin".
+    { iApply (big_sepM_impl with "Hin"). iIntros "!>" (i n Hi) "H".
+      iApply (inode_phi_shed _ _ _ Hs with "H"). }
+    rewrite big_sepM_sep. iDestruct "Hin" as "[Hin1 Hin2]".
+    iSplitL "Hsb1 Hin1 Hbm1 Hp1"; iFrame.
+  Qed.
+
+
+  (* [fs_footprint_q] -- EV stage 5's footprint with a share PER INODE,
+     existentially bound with only "the double is invalid" on it -- is
+     DELETED at EV-X.  [fs_state] takes a dfrac now, so the commit collects
+     at ONE uniform share (three quarters: every escrow arm can supply it
+     and every fraction-1 owner can shed to it) and what quiescence yields
+     is [fs_footprint Γ (DfracOwn (3/4)) S] on the nose
+     ([FsCollectAll.col_hand_footprint_acc]).  With it went
+     [FsStateInode.inode_phi_q] and [FsDurXfer]'s whole per-run share
+     vocabulary ([phi_runs_ex] and friends). *)
+
+  Lemma fs_state_split Γ dq S :
+    fs_state Γ dq S ⊣⊢ fs_footprint Γ dq S ∗ fs_ghost Γ S.
   Proof.
     rewrite /fs_state /fs_footprint /fs_ghost /sb_owned /fs_inodes
             /free_bitmap /free_bitmap_at /inode_owned.
+    rewrite (big_sepM_proper
+               (fun i n => inode_phi (gamma_q Γ dq) (fss_sb S) i n
+                           ∗ inode_ghost (gamma_q Γ dq) i n)%I
+               (fun i n => inode_phi (gamma_q Γ dq) (fss_sb S) i n
+                           ∗ inode_ghost Γ i n)%I);
+      last first.
+    { intros i n _. rewrite gamma_q_inode_ghost //. }
     rewrite big_sepM_sep.
     iSplit.
     - iIntros "((Hsb & %Hp) & [Hphi Hg] & (Hbm & Hpool) & %Hgeo)". by iFrame.
@@ -510,7 +618,7 @@ Section FsState.
   (* ---------------------------------------------------------------- *)
   (*  5b. THE BOOT ALLOCATION (B3)                                      *)
   (*                                                                    *)
-  (*  Stage 4's [fs_state_mint] takes the family's validity OFF the      *)
+  (*  Stage 4's mint took the family's validity OFF the                  *)
   (*  durable instance ([fs_links_valid]).  At boot there is no durable  *)
   (*  instance to read it off, so the boot OWES it -- and that debt is   *)
   (*  stated here as a PREMISE, not hidden: [✓ link_elem I] IS the       *)
@@ -709,16 +817,16 @@ Section FsState.
      [⊣⊢] inside the proofmode rewrites the CONTEXT and the CONCLUSION
      together and desyncs them (durable-notes.md), and every consumer of the
      factoring already holds its input as a hypothesis. *)
-  Lemma fs_state_to Γ S :
-    fs_state Γ S -∗
-      fs_footprint Γ S ∗ fs_links (γlink Γ) (fss_inodes S) ∗ fs_pure S.
+  Lemma fs_state_to Γ dq S :
+    fs_state Γ dq S -∗
+      fs_footprint Γ dq S ∗ fs_links (γlink Γ) (fss_inodes S) ∗ fs_pure S.
   Proof.
     rewrite {1}fs_state_split fs_ghost_split. iIntros "($ & $ & $)".
   Qed.
 
-  Lemma fs_state_of Γ S :
-    fs_footprint Γ S -∗ fs_links (γlink Γ) (fss_inodes S) -∗ fs_pure S -∗
-    fs_state Γ S.
+  Lemma fs_state_of Γ dq S :
+    fs_footprint Γ dq S -∗ fs_links (γlink Γ) (fss_inodes S) -∗ fs_pure S -∗
+    fs_state Γ dq S.
   Proof.
     rewrite fs_state_split fs_ghost_split. iIntros "H1 H2 H3". iFrame.
   Qed.
@@ -726,61 +834,24 @@ Section FsState.
   (* THE GEOMETRY IS A READING, AT EITHER INSTANCE (durable-disk lane H5).
      Nothing is spent -- the conclusion is pure -- so a snapshot's consumer
      and a commit's collection read it the same way. *)
-  Lemma fs_state_geom Γ S : fs_state Γ S -∗ ⌜fs_geom S⌝.
+  Lemma fs_state_geom Γ dq S : fs_state Γ dq S -∗ ⌜fs_geom S⌝.
   Proof. rewrite /fs_state. iIntros "(_ & _ & _ & $)". Qed.
 
   Lemma fs_pure_geom S : fs_pure S -∗ ⌜fs_geom S⌝.
   Proof. rewrite /fs_pure. iIntros "(_ & _ & $)". Qed.
 
   (* ---------------------------------------------------------------- *)
-  (*  6.  THE MINT                                                     *)
-  (*                                                                   *)
-  (*  [ΓL] carries only the target [fsΦ]; its gname fields are not      *)
-  (*  read (fs_footprint_gname), and the fresh ones come out of the     *)
-  (*  conclusion.                                                      *)
+  (*  6.  THE MINT IS THE TRANSPORT, AND IT LIVES IN [FsDurXfer]        *)
+  (*                                                                    *)
+  (*  Stage 4's [fs_state_mint] / [fs_view_mint] -- which took the       *)
+  (*  target's footprint AS A PREMISE and only moved the ghost half --   *)
+  (*  are RETIRED at EV-X.  They never acquired a caller: the real mint  *)
+  (*  ALLOCATES the target's byte map at the flattening of the source's  *)
+  (*  own runs ([FsDurXfer.fs_state_xfer]), so nobody ever has a         *)
+  (*  footprint at the fresh view to hand in.  [fs_state_to] /           *)
+  (*  [fs_state_of] above are the factoring they were built out of and   *)
+  (*  the transport uses those directly.                                *)
   (* ---------------------------------------------------------------- *)
-
-  Lemma fs_state_mint (ΓD ΓL : fs_view_names Σ) S :
-    fs_state ΓD S -∗ fs_footprint ΓL S ==∗
-      ∃ gl gt : gname,
-        fs_state ΓD S ∗ fs_state (MkFsView (fsΦ ΓL) gl gt) S.
-  Proof.
-    iIntros "HD Hfp".
-    iDestruct (fs_state_to with "HD") as "(HDfp & HDl & #Hpure)".
-    iDestruct (fs_links_valid with "HDl") as %(f & Hok & Hv).
-    iMod (fs_links_alloc (fss_inodes S) f Hok Hv) as (gl) "HLl".
-    iMod (ghost_map_alloc_empty (K := Z) (V := fs_node)) as (gt) "_".
-    iModIntro. iExists gl, gt.
-    iSplitL "HDfp HDl".
-    { iApply (fs_state_of with "HDfp HDl Hpure"). }
-    iApply (fs_state_of (MkFsView (fsΦ ΓL) gl gt) S with "[Hfp] HLl Hpure").
-    iExact "Hfp".
-  Qed.
-
-  (* the same, delivering the top map too: the era's [fs_view], plus one
-     [top_frag] per inode -- which is what a holder of [inode_owned] carries
-     (fs-state.md section 4). *)
-  Lemma fs_view_mint (ΓD ΓL : fs_view_names Σ) S :
-    fs_state ΓD S -∗ fs_footprint ΓL S ==∗
-      ∃ gl gt : gname,
-        fs_state ΓD S
-        ∗ fs_view (MkFsView (fsΦ ΓL) gl gt)
-        ∗ ([∗ map] i ↦ n ∈ fss_inodes S,
-             top_frag (MkFsView (fsΦ ΓL) gl gt) i n).
-  Proof.
-    iIntros "HD Hfp".
-    iDestruct (fs_state_to with "HD") as "(HDfp & HDl & #Hpure)".
-    iDestruct (fs_links_valid with "HDl") as %(f & Hok & Hv).
-    iMod (fs_links_alloc (fss_inodes S) f Hok Hv) as (gl) "HLl".
-    iMod (ghost_map_alloc (fss_inodes S)) as (gt) "[Hauth Hfrag]".
-    iModIntro. iExists gl, gt.
-    iSplitL "HDfp HDl".
-    { iApply (fs_state_of with "HDfp HDl Hpure"). }
-    iFrame "Hfrag".
-    rewrite /fs_view. iExists S. iFrame "Hauth".
-    iApply (fs_state_of (MkFsView (fsΦ ΓL) gl gt) S with "[Hfp] HLl Hpure").
-    iExact "Hfp".
-  Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  7.  Reading one inode out of the state                           *)
@@ -804,15 +875,15 @@ Section FsState.
      but [fg_dirloc] is about the node's CONTENT.  Every mover in the tree
      has it -- it is what [IcacheEscrow]'s deposit arms re-prove -- so the
      wand takes it. *)
-  Lemma fs_state_inode_acc Γ S i n :
+  Lemma fs_state_inode_acc Γ dq S i n :
     fss_inodes S !! i = Some n ->
-    fs_state Γ S ⊢
-      inode_owned Γ (fss_sb S) i n
+    fs_state Γ dq S ⊢
+      inode_owned (gamma_q Γ dq) (fss_sb S) i n
       ∗ (∀ n', ⌜node_dir_local i (fs_nib S) n'⌝ -∗
-               inode_owned Γ (fss_sb S) i n'
-                    -∗ fs_state Γ (MkFsS (fss_sb S) (fss_sbb S)
-                                         (<[i := n']> (fss_inodes S))
-                                         (fss_used S))).
+               inode_owned (gamma_q Γ dq) (fss_sb S) i n'
+                    -∗ fs_state Γ dq (MkFsS (fss_sb S) (fss_sbb S)
+                                            (<[i := n']> (fss_inodes S))
+                                            (fss_used S))).
   Proof.
     intros Hi. rewrite /fs_state.
     iIntros "(Hsb & Hin & Hbm & %Hgeo)".

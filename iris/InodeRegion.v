@@ -166,6 +166,12 @@ Require Import DirViewLend.
    and hence in the context of the four files that STATE something over
    [ireg_inv] -- the enumerated sweep. *)
 Require Import LogInv.
+(* THE TRANSACTION PIN (rank 5).  The region's three parks -- the f column's
+   freeze window [ireg_fpin], the c column's claim box [ireg_cpin] and the
+   armed registry's [ireg_parked] -- all keep a share of an open
+   transaction's [ln_tx] element, and every refutation the commit reads off
+   them is an instance of [TxPin.tx_pin_no_ops]. *)
+Require Import TxPin.
 (* [add_vec_unsigned], for (L4)'s two bridge lemmas below.  Already in this
    file's transitive closure (through [IcacheRef]); named here because a
    [Require Import] in a sibling does not put its lemmas in scope. *)
@@ -450,17 +456,13 @@ Proof. intros (_ & _ & _ & Hnl). exact Hnl. Qed.
 Definition ireg_bare (d : dinode) : Prop :=
   bv_unsigned (di_size d) = 0 /\ di_addrs d = replicate 13 (bv_0 32).
 
-Lemma fresh_shape_bare (d : dinode) : fresh_shape d -> ireg_bare d.
-Proof. intros (_ & Hsz & Ha & _). split; [exact Hsz | exact Ha]. Qed.
 
-Lemma ireg_bare_wf (d : dinode) : ireg_bare d -> dinode_wf d.
-Proof. intros (_ & Ha). rewrite /dinode_wf Ha length_replicate //. Qed.
 
 (* THE NODE A BARE RECORD DETERMINES.  [FsStateInode.fn_bare]'s three
    non-record clauses are exactly "no entries, no blocks", so a bare record
    leaves the node no freedom at all -- which is why the tie below needs no
    existential and why the collection's [FsCollect.col_bundle] legs
-   ([FsStateEra.inode_bytes_era]'s two big-ops) are [emp] there. *)
+   ([FsStateInode.inode_dat]'s two big-ops) are [emp] there. *)
 Definition free_node (d : dinode) : fs_node :=
   MkNode d (replicate FsImg.FS_NINDIRECT (bv_0 32)) ∅.
 
@@ -671,9 +673,6 @@ Lemma ireg_ref_ok_zero (n : nat) (c : ctyUR) (d : dinode) :
 Proof. rewrite /ireg_ref_ok. split_and!; [lia | intros _; done | intros _; done]. Qed.
 
 (* (R1) read off *)
-Lemma ireg_ref_ok_le (r rc n : nat) (c : ctyUR) (d : dinode) :
-  ireg_ref_ok r rc n c d -> (r + rc <= n)%nat.
-Proof. intros [H _]. exact H. Qed.
 
 (* (R1) at a count-0 slot -- [EscrowDeposit.ireg_free_deposit_au]'s payment *)
 Lemma ireg_ref_ok_count0 (r rc n : nat) (c : ctyUR) (d : dinode) :
@@ -697,9 +696,6 @@ Qed.
 
 (* (R3) -- THE PIN, and its contrapositive, which is the form §5'.3's
    withdraw uses *)
-Lemma ireg_ref_ok_claim (r rc n : nat) (c : ctyUR) (d : dinode) :
-  ireg_ref_ok r rc n c d -> c <> None -> r = 0%nat.
-Proof. intros [_ [_ H]]. exact H. Qed.
 
 Lemma ireg_ref_ok_unclaimed (r rc n : nat) (c : ctyUR)
     (d : dinode) :
@@ -733,9 +729,6 @@ Proof.
     | intros Hne; destruct (Hne eq_refl) ].
 Qed.
 
-Lemma ireg_ref_ok_rc_count (r rc n : nat) (c : ctyUR) (d : dinode) :
-  ireg_ref_ok r rc n c d -> (1 <= rc)%nat -> (1 <= n)%nat.
-Proof. intros [H1 _] Hrc. lia. Qed.
 
 Lemma ireg_ref_ok_unclaim (r rc n : nat) (c : ctyUR) (d : dinode) :
   ireg_ref_ok r rc n c d -> ireg_ref_ok r rc n None d.
@@ -753,10 +746,6 @@ Proof. intros Hty [H1 [H2 H3]]. rewrite /ireg_ref_ok Hty. split_and!; assumption
 
 (* ...and so does a move of the COUNT alone upwards ([ireg_freeze_au] does
    not move it at all; this is the shape the phase step needs) *)
-Lemma ireg_ref_ok_count (r rc n n' : nat) (c : ctyUR)
-    (d : dinode) :
-  (n <= n')%nat -> ireg_ref_ok r rc n c d -> ireg_ref_ok r rc n' c d.
-Proof. intros Hle [H1 [H2 H3]]. rewrite /ireg_ref_ok. split_and!; [lia | exact H2 | exact H3]. Qed.
 
 (* THE CLAIM's ESTABLISH ([ireg_claim_au]): (R3) comes from (R2) at the OLD,
    type-0 record and the new record's nonzero type makes (R2) vacuous. *)
@@ -873,9 +862,6 @@ Lemma ireg_frzm_ok_true (rg : frzidx) :
 Proof. reflexivity. Qed.
 
 (* the one direction every DECIDER uses: at [FrzPre] the bit is up *)
-Lemma ireg_frzm_ok_pre (b : bool) (f : frzUR) :
-  ireg_frzm_ok b f -> frz_preb f = true -> b = true.
-Proof. intros -> Hf. exact Hf. Qed.
 
 Definition ireg_frz_ok (f : frzUR) (n : nat) (d : dinode) : Prop :=
   match f with
@@ -1022,9 +1008,6 @@ Lemma di_type_stable_eq (dn' dn : dinode) :
   di_type dn' = di_type dn -> di_type_stable dn' dn.
 Proof. intros H. right. exact H. Qed.
 
-Lemma di_type_stable_zero (dn' dn : dinode) :
-  bv_unsigned (di_type dn') = 0 -> di_type_stable dn' dn.
-Proof. intros H. left. exact H. Qed.
 
 Lemma di_type_stable_refl (dn : dinode) : di_type_stable dn dn.
 Proof. right. reflexivity. Qed.
@@ -1095,14 +1078,6 @@ Proof. intros Hnz. exact (di_nlink_stable_eq dn dn eq_refl Hnz). Qed.
    There the second conjunct is the whole point and the first rides on it:
    the flushed record carries the [nlink] iput tested at +0x40 and found
    zero, so both halves come out of that one zero. *)
-Lemma di_nlink_stable_free (dn' dn : dinode) :
-  di_nlink dn' = di_nlink dn ->
-  bv_unsigned (di_nlink dn) = 0 ->
-  di_nlink_stable dn' dn.
-Proof.
-  intros Heq Hz. rewrite /di_nlink_stable.
-  split; [exact Heq | intros _; rewrite Heq; exact Hz].
-Qed.
 
 (* (L1)'s arithmetic steps, over plain [Z] and outside every section --
    durable-notes' rule, since the goals below have a [bv 32] in context and
@@ -1110,17 +1085,8 @@ Qed.
    flush needs none of them: [di_nlink_stable]'s first conjunct is an
    EQUALITY, so [ireg_write_au] carries (L1) by rewriting.  What is left
    here is the LINK/UNLINK arithmetic, where [nlink] really does move. *)
-Lemma ireg_wle_zero (a : Z) (w : nat) :
-  (w <= Z.to_nat a)%nat -> a = 0 -> w = 0%nat.
-Proof. intros H Ha. subst a. cbn in H. lia. Qed.
 
-Lemma ireg_wle_succ (a b : Z) (w : nat) :
-  0 <= b -> (S w <= Z.to_nat a)%nat -> a = b + 1 -> (w <= Z.to_nat b)%nat.
-Proof. lia. Qed.
 
-Lemma ireg_wle_plus (a b : Z) (w : nat) :
-  0 <= a -> (w <= Z.to_nat a)%nat -> b = a + 1 -> (S w <= Z.to_nat b)%nat.
-Proof. lia. Qed.
 
 (* ...and the side condition all four of them take.  Named because every
    arm move needs it and [lia] cannot see it: a [bv 16]'s non-negativity is
@@ -1287,15 +1253,8 @@ Qed.
    marker entry is ever updated -- only moved. *)
 Definition imark_key (z : Z) : Z := -(z + 1).
 
-Lemma imark_key_neg (z : Z) : 0 <= z -> imark_key z < 0.
-Proof. rewrite /imark_key. lia. Qed.
 
-Lemma imark_key_inj (z1 z2 : Z) : imark_key z1 = imark_key z2 -> z1 = z2.
-Proof. rewrite /imark_key. lia. Qed.
 
-Lemma imark_key_ne_slot (z : Z) (j i : nat) :
-  0 <= z -> imark_key z <> (16 * Z.of_nat j + Z.of_nat i)%Z.
-Proof. rewrite /imark_key. lia. Qed.
 
 (* ===================================================================== *)
 (*  3.  THE GHOST, AND WHAT A CALLER HOLDS                                *)
@@ -1396,10 +1355,6 @@ Section InodeRegion.
      then imark γi (bv_unsigned inum)
      else dinode_at γi inum dn)%I.
 
-  Lemma ireg_out_alloc γi inum dn :
-    bv_unsigned (di_type dn) <> 0 ->
-    dinode_at γi inum dn -∗ ireg_out γi inum dn.
-  Proof. intros H. rewrite /ireg_out decide_False; [by iIntros "$" | exact H]. Qed.
 
   Lemma ireg_out_alloc_inv γi inum dn :
     bv_unsigned (di_type dn) <> 0 ->
@@ -1444,9 +1399,6 @@ Section InodeRegion.
   Definition ireg_in (c : ctyUR) (d : dinode) : Prop :=
     bv_unsigned (di_type d) = 0 \/ (fresh_shape d /\ c <> None).
 
-  Lemma ireg_in_free (c : ctyUR) (d : dinode) :
-    bv_unsigned (di_type d) = 0 -> ireg_in c d.
-  Proof. intros H. left. exact H. Qed.
 
   Lemma ireg_in_shape (c : ctyUR) (d : dinode) :
     ireg_in c d -> bv_unsigned (di_type d) <> 0 -> fresh_shape d.
@@ -1869,7 +1821,7 @@ Section InodeRegion.
      where the freezer's own [IcacheRef.ifreeze_pre] / [ifreeze_post] fragment
      already re-identifies it, so no new ghost and no new column. *)
   Definition ireg_fpin (rg : frzidx) : iProp Σ :=
-    (rg.2.1 ↪[ln_tx icfg_log]{#(rg.2.2)} tt)%I.
+    tx_pin icfg_log rg.2.1 rg.2.2.
 
   Global Instance ireg_fpin_timeless rg : Timeless (ireg_fpin rg).
   Proof. rewrite /ireg_fpin. apply _. Qed.
@@ -1892,9 +1844,6 @@ Section InodeRegion.
     ireg_regime rg.1 -∗ ireg_fpin rg -∗ ireg_fsh (Some (Excl (FrzPre rg))).
   Proof. iIntros "H1 H2". iFrame. Qed.
 
-  Lemma ireg_fsh_post (rg : frzidx) :
-    ireg_regime rg.1 -∗ ireg_fpin rg -∗ ireg_fsh (Some (Excl (FrzPost rg))).
-  Proof. iIntros "H1 H2". iFrame. Qed.
 
   (* RULING G's RETURN LEG, as one line: with the column pinned at [FrzPost rg]
      by the walk's own token, the parked arm IS the regime the freezer lent --
@@ -1917,11 +1866,9 @@ Section InodeRegion.
     intros Hfrz. iIntros "Ha Hp".
     destruct f as [[[| rg | rg] |] |]; [by iPureIntro | | | |].
     - iDestruct "Hp" as "[_ Hp]". rewrite /ireg_fpin.
-      iDestruct (ghost_map_lookup with "Ha Hp") as %Hbad.
-      rewrite lookup_empty in Hbad. discriminate.
+      iDestruct (tx_pin_no_ops with "Ha Hp") as %[].
     - iDestruct "Hp" as "[_ Hp]". rewrite /ireg_fpin.
-      iDestruct (ghost_map_lookup with "Ha Hp") as %Hbad.
-      rewrite lookup_empty in Hbad. discriminate.
+      iDestruct (tx_pin_no_ops with "Ha Hp") as %[].
     - exfalso. exact Hfrz.
     - exfalso. exact Hfrz.
   Qed.
@@ -2112,29 +2059,10 @@ Section InodeRegion.
      inside the region open reads [1 <= r] off its own PLAIN unit with
      [IcacheRef.link_runit_ge] and applies [ireg_ref_ok_unclaimed] to the
      clause.  Everything is borrowed; the conclusion is pure. *)
-  Lemma ireg_rcol_unclaimed (z : Z) (c : ctyUR) (r : nat) (f : frzUR)
-      (n : nat) (d : dinode) :
-    ireg_rcol z c r f n d -∗ IcacheRef.runit false z -∗
-    ⌜c = None⌝.
-  Proof.
-    rewrite /ireg_rcol. iIntros "(%rc & Hla & %Href) Hu".
-    iDestruct (IcacheRef.link_runit_ge with "Hla Hu") as %Hge. cbn in Hge.
-    iPureIntro. exact (ireg_ref_ok_unclaimed r rc n c d Href Hge).
-  Qed.
 
   (* ...AND ITS ALLOCATEDNESS TWIN, which is what idup's mint pays its type
      premise with: it holds its caller's own unit, at EITHER flavour, and
      needs no licence at all. *)
-  Lemma ireg_rcol_alloc (bfl : bool) (z : Z) (c : ctyUR) (r : nat)
-      (f : frzUR) (n : nat) (d : dinode) :
-    ireg_rcol z c r f n d -∗ IcacheRef.runit bfl z -∗
-    ⌜bv_unsigned (di_type d) <> 0⌝.
-  Proof.
-    rewrite /ireg_rcol. iIntros "(%rc & Hla & %Href) Hu".
-    iDestruct (IcacheRef.link_runit_ge with "Hla Hu") as %Hge.
-    iPureIntro. apply (ireg_ref_ok_alloc r rc n c d Href).
-    destruct bfl; cbn in Hge; lia.
-  Qed.
 
   (* ...AND THE TWO OF THEM FUSED, which is [ireg_rcol_mint]'s premise pair
      exactly -- the shape [IgetLic.iname_mint_ok] delivers at iget and the
@@ -2211,10 +2139,6 @@ Section InodeRegion.
   Lemma ireg_mult_at_le n ty : (ireg_mult_at n ty <= S n)%nat.
   Proof. rewrite /ireg_mult_at. destruct (_ && _)%bool; lia. Qed.
 
-  Lemma ireg_mult_at_nz n ty : ireg_mult_at n ty <> 0%nat -> n <> 0%nat.
-  Proof.
-    intros Hm Hz. apply Hm. rewrite Hz. exact (ireg_mult_at_zero ty).
-  Qed.
 
   Lemma ireg_mult_zero d :
     bv_unsigned (di_nlink d) = 0 -> ireg_mult d = 0%nat.
@@ -2293,15 +2217,7 @@ Section InodeRegion.
       [exists (TDir 0) | exists TFile]; exact H.
   Qed.
 
-  Lemma ireg_reg_ok_dir ty v :
-    ireg_reg_ok ty v -> ty = ireg_dir_ty -> exists p, v = TDir p.
-  Proof.
-    destruct v as [| p]; intros Hok Hd; [destruct (Hok Hd) | by exists p].
-  Qed.
 
-  Lemma ireg_reg_ok_file ty v :
-    ireg_reg_ok ty v -> ty <> ireg_dir_ty -> v = TFile.
-  Proof. destruct v as [| p]; intros Hok Hd; [done | destruct (Hd Hok)]. Qed.
 
   (* THE ROOT KEEP-ALIVE FRAGMENT.  [ent_tokenless] exempts the ROOT's
      [".."] -- which names the root -- so the image's [nlink = 1] at the
@@ -2614,13 +2530,6 @@ Section InodeRegion.
      through untouched.  That is every mover but the free deposit
      ([ireg_write_au], the two link writes and [ireg_claim_au] all write a
      record with a type). *)
-  Lemma ireg_top_park_retype γfs z d d' :
-    bv_unsigned (di_type d') <> 0 ->
-    ireg_top_park γfs z d -∗ ireg_top_park γfs z d'.
-  Proof.
-    intros Hnz. iIntros "(%n & _ & Hf)".
-    iApply (ireg_top_park_nz γfs z d' n Hnz with "Hf").
-  Qed.
 
   (* WHAT THE COLLECTION READS OFF IT (FsCollect's supplier (D)): at a free
      record the park IS the node, so the fragment can be handed out at
@@ -2655,30 +2564,34 @@ Section InodeRegion.
   (*  [IcacheRef.link_claim_agree] re-identifies [(t, q)] at the fill --   *)
   (*  which is why [Xv6Cameras.ctyval] carries the pair as FIELDS and not  *)
   (*  existentially: two halves of one element are not the whole.          *)
-  Definition ireg_cpin (c : ctyUR) : iProp Σ :=
+  (* WHICH TRANSACTION THE COLUMN PINS, as a PURE reading of it: the value's
+     second field at a live claim, nothing at an empty or invalid one.  The
+     [ExclBot] arm reads [None] here and is killed by [ireg_claim_ok]
+     instead -- which is exactly why [ireg_cpin_no_ops] keeps that premise. *)
+  Definition cty_pin (c : ctyUR) : option (nat * Qp) :=
     match c with
-    | Some (Excl v) => (v.2.1 ↪[ln_tx icfg_log]{#(v.2.2)} tt)%I
-    | _             => emp%I
+    | Some (Excl v) => Some v.2
+    | _             => None
     end.
 
+  Definition ireg_cpin (c : ctyUR) : iProp Σ :=
+    tx_pin_o icfg_log (cty_pin c).
+
   Global Instance ireg_cpin_timeless c : Timeless (ireg_cpin c).
-  Proof. rewrite /ireg_cpin. destruct c as [[v |] |]; apply _. Qed.
+  Proof. rewrite /ireg_cpin. apply _. Qed.
 
   Lemma ireg_cpin_none : ⊢ ireg_cpin None.
-  Proof. rewrite /ireg_cpin. done. Qed.
+  Proof. rewrite /ireg_cpin /cty_pin /tx_pin_o. done. Qed.
 
   Lemma ireg_cpin_some (v : ctyval) :
     v.2.1 ↪[ln_tx icfg_log]{#(v.2.2)} tt -∗ ireg_cpin (Some (Excl v)).
-  Proof. iIntros "H". iExact "H". Qed.
+  Proof. rewrite /ireg_cpin /cty_pin /tx_pin_o /tx_pin. iIntros "H". iExact "H". Qed.
 
-  Lemma ireg_cpin_open (v : ctyval) :
-    ireg_cpin (Some (Excl v)) -∗ v.2.1 ↪[ln_tx icfg_log]{#(v.2.2)} tt.
-  Proof. iIntros "H". iExact "H". Qed.
 
   (* THE REFUTATION THE COMMIT READS.  A standing claim holds a positive
      share of an open transaction's element, so at a commit -- where the
      WAL's authority for that map is empty -- no claim can be standing.
-     [IcacheEscrow.ic_pin_tx_no_ops]'s line, at the c column; the
+     [TxPin.tx_pin_o_no_ops]'s line, at the c column; the
      [ExclBot] arm is refuted by the slot's own claim pin, which is why the
      lemma takes it. *)
   Lemma ireg_cpin_no_ops (c : ctyUR) (f : frzUR) (d : dinode) :
@@ -2686,12 +2599,11 @@ Section InodeRegion.
     ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     ireg_cpin c -∗ ⌜c = None⌝.
   Proof.
-    intros Hclm. iIntros "Ha Hp". destruct c as [[v |] |].
-    - rewrite /ireg_cpin.
-      iDestruct (ghost_map_lookup with "Ha Hp") as %Hbad.
-      rewrite lookup_empty in Hbad. discriminate.
+    intros Hclm. iIntros "Ha Hp". rewrite /ireg_cpin.
+    iDestruct (tx_pin_o_no_ops with "Ha Hp") as %Hnone.
+    iPureIntro. destruct c as [[v |] |]; [| | reflexivity].
+    - cbn in Hnone. discriminate.
     - exfalso. exact (proj2 (proj2 Hclm)).
-    - done.
   Qed.
 
   (* THE SHELTER AND THE PIN, AS ONE CONJUNCT, in [ireg_fsh]'s own position
@@ -3161,7 +3073,7 @@ Section InodeRegion.
 
   (* what an arm parks: its transaction's element, at the arm's own share *)
   Definition ireg_parked (e : ireg_arm_ent) : iProp Σ :=
-    (e.1.1 ↪[ln_tx icfg_log]{#(e.1.2)} tt)%I.
+    tx_pin icfg_log e.1.1 e.1.2.
 
   Global Instance ireg_parked_timeless e : Timeless (ireg_parked e).
   Proof. rewrite /ireg_parked. apply _. Qed.
@@ -3246,7 +3158,7 @@ Section InodeRegion.
       iFrame "Hta Hla".
       iSplitL "Hpark Ht".
       { rewrite big_sepM_insert; [| exact Hfree].
-        rewrite /ireg_parked. cbn [fst snd]. iFrame "Ht Hpark". }
+        rewrite /ireg_parked /tx_pin. cbn [fst snd]. iFrame "Ht Hpark". }
       iPureIntro. intros j m Hj Hun. apply (Hcl j m Hj).
       intros k' t' q' S' Hk'. apply (Hun k' t' q' S').
       rewrite lookup_insert_ne; [exact Hk' |].
@@ -3258,51 +3170,9 @@ Section InodeRegion.
      elsewhere: it is [ireg_arm] at [q = 1], and [ireg_release_tx] undoes
      it.  [create] is the one walk in this kernel that arms, and this is the
      form it takes until a transactional [ilock] starts parking shares. *)
-  Lemma ireg_arm_tx (E : coPset) (γfs : fs_names) (i : Z) :
-    ↑ftopN ⊆ E ->
-    ftop_inv γfs -∗ log_tx icfg_log ={E}=∗
-      ∃ k t : nat, ireg_armed k t 1%Qp {[i]}.
-  Proof.
-    iIntros (HE) "#Hi Htx". rewrite /log_tx. iDestruct "Htx" as (t) "Ht".
-    iMod (ireg_arm E γfs i t 1%Qp HE with "Hi Ht") as (k) "Hrec".
-    iModIntro. iExists k, t. iExact "Hrec".
-  Qed.
 
   (* ---- ...AND ONE MORE INUM UNDER THE SAME TRANSACTION --------------- *)
 
-  Lemma ireg_arm_more (E : coPset) (γfs : fs_names) (k t : nat) (q : Qp)
-      (S : gset Z) (i : Z) :
-    ↑ftopN ⊆ E ->
-    ftop_inv γfs -∗ ireg_armed k t q S ={E}=∗ ireg_armed k t q ({[i]} ∪ S).
-  Proof.
-    iIntros (HE) "#Hi Hrec". rewrite /ireg_armed.
-    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [exact HE |].
-    iDestruct "Hbody" as ">Hb". iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
-    iDestruct (ghost_map_lookup with "Hla Hrec") as %HAt.
-    iMod (ghost_map_update (t, q, {[i]} ∪ S) with "Hla Hrec") as "[Hla Hrec]".
-    iMod ("Hclose" with "[Hta Hla Hpark]") as "_".
-    { iNext. rewrite /ftop_body. iExists I, (<[k := (t, q, {[i]} ∪ S)]> A).
-      iFrame "Hta Hla".
-      iSplitL "Hpark".
-      { rewrite (big_sepM_delete _ (<[k := (t, q, {[i]} ∪ S)]> A) k
-                   (t, q, {[i]} ∪ S)); [| by rewrite lookup_insert].
-        rewrite (big_sepM_delete _ A k (t, q, S)); [| exact HAt].
-        iDestruct "Hpark" as "[Ht Hrest]".
-        rewrite /ireg_parked. cbn [fst snd]. iFrame "Ht".
-        rewrite delete_insert_delete. iExact "Hrest". }
-      iPureIntro. intros j m Hj Hun. apply (Hcl j m Hj).
-      intros k' t' q' S' Hk'. destruct (decide (k' = k)) as [->|Hne].
-      - rewrite HAt in Hk'. injection Hk' as <- <- <-.
-        (* the inline [ltac:] is the recorded trap: the expected type is an
-           evar at elaboration time, so the rewrite has nothing to match *)
-        assert (Hlk : <[k := (t, q, {[i]} ∪ S)]> A !! k
-                      = Some (t, q, {[i]} ∪ S)) by apply lookup_insert.
-        specialize (Hun k t q ({[i]} ∪ S) Hlk).
-        set_unfold in Hun. intros Hin. apply Hun. right. exact Hin.
-      - apply (Hun k' t' q' S').
-        rewrite lookup_insert_ne; [exact Hk' | exact (not_eq_sym Hne)]. }
-    iModIntro. iExact "Hrec".
-  Qed.
 
   (* ---- THE DISARM: the row comes back, one inum at a time ------------ *)
 
@@ -3331,7 +3201,7 @@ Section InodeRegion.
                    (t, q, S ∖ {[i]})); [| by rewrite lookup_insert].
         rewrite (big_sepM_delete _ A k (t, q, S)); [| exact HAt].
         iDestruct "Hpark" as "[Ht Hrest]".
-        rewrite /ireg_parked. cbn [fst snd]. iFrame "Ht".
+        rewrite /ireg_parked /tx_pin. cbn [fst snd]. iFrame "Ht".
         rewrite delete_insert_delete. iExact "Hrest". }
       iPureIntro. intros j m Hj Hun.
       destruct (decide (j = i)) as [->|Hne].
@@ -3359,7 +3229,7 @@ Section InodeRegion.
     iDestruct (ghost_map_lookup with "Hla Hrec") as %HAt.
     rewrite (big_sepM_delete _ A k (t, q, ∅)); [| exact HAt].
     iDestruct "Hpark" as "[Ht Hpark]".
-    rewrite /ireg_parked. cbn [fst snd].
+    rewrite /ireg_parked /tx_pin. cbn [fst snd].
     iMod (ghost_map_delete with "Hla Hrec") as "Hla".
     iMod ("Hclose" with "[Hta Hla Hpark]") as "_".
     { iNext. rewrite /ftop_body. iExists I, (delete k A).
@@ -3373,14 +3243,6 @@ Section InodeRegion.
   Qed.
 
   (* ...and the WHOLE-token reading, [ireg_arm_tx]'s undo *)
-  Lemma ireg_release_tx (E : coPset) (γfs : fs_names) (k t : nat) :
-    ↑ftopN ⊆ E ->
-    ftop_inv γfs -∗ ireg_armed k t 1%Qp ∅ ={E}=∗ log_tx icfg_log.
-  Proof.
-    iIntros (HE) "#Hi Hrec".
-    iMod (ireg_release E γfs k t 1%Qp HE with "Hi Hrec") as "Ht".
-    iModIntro. rewrite /log_tx. iExists t. iExact "Ht".
-  Qed.
 
   (* ---- THE COMMIT'S READING (lane A item 5) -------------------------- *)
 
@@ -3405,13 +3267,15 @@ Section InodeRegion.
     iDestruct "Hbody" as ">Hb". iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
     (* nothing is armed: an entry would park a token the empty authority
        cannot account for *)
+    (* THE REGISTRY'S ROWS ARE A [TxPin.tx_pins] LEDGER at the arm ids, once
+       the entry's third field (the suspended inums) is projected away: the
+       refutation is [tx_pins_no_ops] and not an eleventh copy of the
+       [lookup_empty] idiom. *)
     iAssert (⌜A = ∅⌝)%I as %HA.
-    { destruct (decide (A = ∅)) as [->|Hne]; [done |].
-      apply map_choose in Hne as (k & e & HAk).
-      iDestruct (big_sepM_lookup _ _ k e HAk with "Hpark") as "Ht".
-      rewrite /ireg_parked.
-      iDestruct (ghost_map_lookup with "Htxa Ht") as %Hbad.
-      rewrite lookup_empty in Hbad. discriminate. }
+    { iDestruct (tx_pins_no_ops icfg_log (fst <$> A) with "Htxa [Hpark]")
+        as %Hemp.
+      { rewrite /tx_pins big_sepM_fmap. iExact "Hpark". }
+      iPureIntro. exact (fmap_empty_inv _ _ Hemp). }
     subst A.
     iModIntro. iExists I. iFrame "Hta Htxa".
     iSplitR.
@@ -3539,11 +3403,7 @@ Section InodeRegion.
   Lemma logN_iregN_disj : (↑logN : coPset) ## ↑iregN.
   Proof. solve_ndisj. Qed.
 
-  Lemma logN_ftopN_disj : (↑logN : coPset) ## ↑ftopN.
-  Proof. solve_ndisj. Qed.
 
-  Lemma iregN_ftopN_disj : (↑iregN : coPset) ## ↑ftopN.
-  Proof. solve_ndisj. Qed.
 
 
   Global Instance ireg_blk_timeless γi γfs inodestart m bi :
@@ -4983,7 +4843,7 @@ Section InodeRegion.
         (* THE PARKED SHARE, IDENTIFIED.  The claimant's own fragment pins
            the column, hence the pair the region parked, so what comes out
            is the very element create handed ialloc. *)
-        iEval (rewrite Hcl /ireg_cpin /=) in "Hcpin".
+        iEval (rewrite Hcl /ireg_cpin /cty_pin /tx_pin_o /tx_pin /=) in "Hcpin".
         iDestruct (IcacheRef.link_rc_ge with "Hla Hru") as %Hrcge.
         destruct rcl as [| rcl0]; [exfalso; lia |].
         iMod (IcacheRef.link_spend_refc with "Hla Hru") as "Hla".
@@ -5752,25 +5612,6 @@ Section InodeRegion.
      carries, and agreement against the ESCROWED ¼ is what forces the lent
      value to be the pinned one.  On the cancelled arm the client takes the
      persistent receipt instead. *)
-  Lemma dv_pin_redeem (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (z : Z) (e : gmap fname Z)
-      (dqv : dfrac) (ents : gmap fname Z) :
-    ↑iregN ⊆ E ->
-    ireg_inv γi γfs inodestart nib -∗
-    dv_pin z e -∗ dv_half z dqv ents ={E}=∗
-      dv_half z dqv ents ∗
-      ((⌜ents = e⌝ ∗ dv_pin_spent z e) ∨ dv_cancelled z e).
-  Proof.
-    iIntros (HE) "#Hinv Hpin Hdv".
-    iDestruct "Hpin" as "[%Hdom Hpin']".
-    iAssert (dv_pin z e)%I with "[Hpin']" as "Hpin".
-    { rewrite /dv_pin. iSplitR; [by iPureIntro |]. iExact "Hpin'". }
-    iApply (ireg_lcol_use E γi γfs inodestart nib z with "Hinv");
-      [exact HE | exact Hdom |].
-    iIntros "Hcol".
-    iMod (dv_col_redeem z e ents dqv with "Hpin Hdv Hcol") as "[$ $]".
-    by iModIntro.
-  Qed.
 
   (* ==================================================================== *)
   (*  §LF.  THE fview LEND'S OPERATIONS (N-5.2A, §13 D-52c)                *)
@@ -5800,25 +5641,6 @@ Section InodeRegion.
       iModIntro. by iApply fv_ride_of_hold.
   Qed.
 
-  Lemma fv_pin_redeem (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (z : Z) (b : list (bv 8))
-      (dqv : dfrac) (bs : list (bv 8)) :
-    ↑iregN ⊆ E ->
-    ireg_inv γi γfs inodestart nib -∗
-    fv_pin z b -∗ fv_half z dqv bs ={E}=∗
-      fv_half z dqv bs ∗
-      ((⌜bs = b⌝ ∗ fv_pin_spent z b) ∨ fv_cancelled z b).
-  Proof.
-    iIntros (HE) "#Hinv Hpin Hfv".
-    iDestruct "Hpin" as "[%Hdom Hpin']".
-    iAssert (fv_pin z b)%I with "[Hpin']" as "Hpin".
-    { rewrite /fv_pin. iSplitR; [by iPureIntro |]. iExact "Hpin'". }
-    iApply (ireg_fcol_use E γi γfs inodestart nib z with "Hinv");
-      [exact HE | exact Hdom |].
-    iIntros "Hcol".
-    iMod (fv_col_redeem z b bs dqv with "Hpin Hfv Hcol") as "[$ $]".
-    by iModIntro.
-  Qed.
 
   (* ==================================================================== *)
   (*  §LW.  THE COMBINED MOVERS (N-5.2A, §13 D-52b)                        *)
@@ -5848,14 +5670,5 @@ Section InodeRegion.
      leaves [di_size] alone ([DirViewLend.dv_ride_size] and its twin, taken
      together): there BOTH readings are unchanged and no fupd is needed at
      all -- the resource is simply re-typed. *)
-  Lemma dvw_ride_size (z : Z) (dn1 dn2 : dinode) (data : nat -> list (bv 8)) :
-    di_size dn1 = di_size dn2 ->
-    dv_ride z (dv_of dn1 data) -∗ fv_ride z (fv_of dn1 data) -∗
-    dv_ride z (dv_of dn2 data) ∗ fv_ride z (fv_of dn2 data).
-  Proof.
-    intros Hs. iIntros "Hd Hf".
-    iSplitL "Hd"; [iApply (dv_ride_size z dn1 dn2 data Hs with "Hd")
-                  | iApply (fv_ride_size z dn1 dn2 data Hs with "Hf")].
-  Qed.
 
 End InodeRegion.

@@ -122,7 +122,7 @@ Section WpSconfBtype.
               eq_vec m n b eq_refl
               with "[] Hcg Hpc Hinstr [Hcont]").
     - iIntros (hh) "Hf". iFrame "Hf". iPureIntro. exact (Hcmp_all hh).
-    - iNext. iExact "Hcont".
+    - iApply bi.later_intro. iExact "Hcont".
   Qed.
 
   Lemma wp_bne_fall_s_sconf
@@ -149,7 +149,7 @@ Section WpSconfBtype.
               neq_vec m n b eq_refl
               with "[] Hcg Hpc Hinstr [Hcont]").
     - iIntros (hh) "Hf". iFrame "Hf". iPureIntro. exact (Hcmp_all hh).
-    - iNext. iExact "Hcont".
+    - iApply bi.later_intro. iExact "Hcont".
   Qed.
 
   Lemma wp_bltu_fall_s_sconf
@@ -176,7 +176,7 @@ Section WpSconfBtype.
               zopz0zI_u m n b eq_refl
               with "[] Hcg Hpc Hinstr [Hcont]").
     - iIntros (hh) "Hf". iFrame "Hf". iPureIntro. exact (Hcmp_all hh).
-    - iNext. iExact "Hcont".
+    - iApply bi.later_intro. iExact "Hcont".
   Qed.
 
   (* BLT-fall, the SIGNED twin of [wp_bltu_fall_s_sconf] at two general
@@ -206,7 +206,7 @@ Section WpSconfBtype.
               zopz0zI_s m n b eq_refl
               with "[] Hcg Hpc Hinstr [Hcont]").
     - iIntros (hh) "Hf". iFrame "Hf". iPureIntro. exact (Hcmp_all hh).
-    - iNext. iExact "Hcont".
+    - iApply bi.later_intro. iExact "Hcont".
   Qed.
 
   (* ...and the TAKEN arm of the same two-register BLT (a copy loop's back
@@ -265,7 +265,7 @@ Section WpSconfBtype.
               zopz0zKzJ_u m n b eq_refl
               with "[] Hcg Hpc Hinstr [Hcont]").
     - iIntros (hh) "Hf". iFrame "Hf". iPureIntro. exact (Hcmp_all hh).
-    - iNext. iExact "Hcont".
+    - iApply bi.later_intro. iExact "Hcont".
   Qed.
 
   (* BLTU-taken (the freerange empty-page-list path skips the loop to the
@@ -358,7 +358,7 @@ Section WpSconfBtype.
               zopz0zKzJ_s m n b eq_refl
               with "[] Hcg Hpc Hinstr [Hcont]").
     - iIntros (hh) "Hf". iFrame "Hf". iPureIntro. exact (Hcmp_all hh).
-    - iNext. iExact "Hcont".
+    - iApply bi.later_intro. iExact "Hcont".
   Qed.
 
   Lemma wp_bge_taken_s_sconf
@@ -417,7 +417,7 @@ Section WpSconfBtype.
       iDestruct (gpr_file_x0 (CID := hh) (tp_pin (CID := hh) m) (mword_of_int 0 : mword 5)
                    ltac:(vm_compute; reflexivity) with "Hf") as "[%Hx0 Hf]".
       iFrame "Hf". iPureIntro. unfold rget. rewrite Hx0. exact (Hcmp_all hh).
-    - iNext. iExact "Hcont".
+    - iApply bi.later_intro. iExact "Hcont".
   Qed.
 
   (* BLT against x0 -- a [bltz rs1] error test (the -1 return of
@@ -451,7 +451,7 @@ Section WpSconfBtype.
       iDestruct (gpr_file_x0 (CID := hh) (tp_pin (CID := hh) m) (mword_of_int 0 : mword 5)
                    ltac:(vm_compute; reflexivity) with "Hf") as "[%Hx0 Hf]".
       iFrame "Hf". iPureIntro. unfold rget. rewrite Hx0. exact (Hcmp_all hh).
-    - iNext. iExact "Hcont".
+    - iApply bi.later_intro. iExact "Hcont".
   Qed.
 
   (* ...and its TAKEN twin: the [bltz rs1] error test that DID fire (the
@@ -522,7 +522,7 @@ Section WpSconfBtype.
       iDestruct (gpr_file_x0 (CID := hh) (tp_pin (CID := hh) m) (mword_of_int 0 : mword 5)
                    ltac:(vm_compute; reflexivity) with "Hf") as "[%Hx0 Hf]".
       iFrame "Hf". iPureIntro. unfold rget. rewrite Hx0. exact (Hcmp_all hh).
-    - iNext. iExact "Hcont".
+    - iApply bi.later_intro. iExact "Hcont".
   Qed.
 
   Lemma wp_bgtz_taken_s_sconf
@@ -591,7 +591,7 @@ Section WpSconfBtype.
       iDestruct (gpr_file_x0 (CID := hh) (tp_pin (CID := hh) m) (mword_of_int 0 : mword 5)
                    ltac:(vm_compute; reflexivity) with "Hf") as "[%Hx0 Hf]".
       iFrame "Hf". iPureIntro. unfold rget. rewrite Hx0. exact (Hcmp_all hh).
-    - iNext. iExact "Hcont".
+    - iApply bi.later_intro. iExact "Hcont".
   Qed.
 
   Lemma wp_bgez_taken_s_sconf
@@ -721,7 +721,7 @@ Section WpSconfBtype.
       iDestruct (gpr_file_x0 (CID := hh) (tp_pin (CID := hh) m) (zero_extend' 5 ('b"00") : mword 5)
                    ltac:(vm_compute; reflexivity) with "Hf") as "[%Hx0 Hf]".
       iFrame "Hf". iPureIntro. unfold rget. rewrite Hx0. exact (Hcmp_all hh).
-    - iNext. iExact "Hcont".
+    - iApply bi.later_intro. iExact "Hcont".
   Qed.
 
   (* WHAT AN [SrcOk] FAILURE LOOKS LIKE, so nobody has to rediscover it.  A
@@ -795,7 +795,7 @@ Section WpSconfBtype.
       iDestruct (gpr_file_x0 (CID := hh) (tp_pin (CID := hh) m) (zero_extend' 5 ('b"00") : mword 5)
                    ltac:(vm_compute; reflexivity) with "Hf") as "[%Hx0 Hf]".
       iFrame "Hf". iPureIntro. unfold rget. rewrite Hx0. exact (Hcmp_all hh).
-    - iNext. iExact "Hcont".
+    - iApply bi.later_intro. iExact "Hcont".
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -1003,7 +1003,7 @@ Section WpSconfBtype.
       iDestruct (gpr_file_x0 (CID := hh) (tp_pin (CID := hh) m) (zero_extend' 5 ('b"00") : mword 5)
                    ltac:(vm_compute; reflexivity) with "Hf") as "[%Hx0 Hf]".
       iFrame "Hf". iPureIntro. unfold rget. rewrite Hx0. exact (Hcmp_all hh).
-    - iNext. iExact "Hcont".
+    - iApply bi.later_intro. iExact "Hcont".
   Qed.
 
   (* bnez (x0 as rs2), the uncompressed form -- the back-edge of printk's %p
@@ -1069,7 +1069,7 @@ Section WpSconfBtype.
       iDestruct (gpr_file_x0 (CID := hh) (tp_pin (CID := hh) m) (zero_extend' 5 ('b"00") : mword 5)
                    ltac:(vm_compute; reflexivity) with "Hf") as "[%Hx0 Hf]".
       iFrame "Hf". iPureIntro. unfold rget. rewrite Hx0. exact (Hcmp_all hh).
-    - iNext. iExact "Hcont".
+    - iApply bi.later_intro. iExact "Hcont".
   Qed.
 
   (* ------------------------------------------------------------------- *)

@@ -460,6 +460,65 @@ Section RecOwned.
     Timeless (rec_owned_at Γ istart z dn).
   Proof. rewrite /rec_owned_at. apply _. Qed.
 
+  (* THE RECORD AT A SHARE (durable-disk EV-X).  It used NOT to need one --
+     records park region-side at fraction 1 always and no lock splits them
+     (fs-state.md section 7's ruling (i)) -- but the transport's source is
+     an [FsState.fs_state] at a UNIFORM share, so the record rides at that
+     share too and the region's fraction-1 copy is shed down to it.
+     [rec_owned] / [rec_owned_at] are the [DfracOwn 1] readings and their
+     text has not moved, so nothing that spells either one changes. *)
+  Definition rec_owned_q Γ (dq : dfrac) (sb : fs_sb) (i : Z) (dn : dinode)
+    : iProp Σ :=
+    byte_range_q Γ dq (IBLOCK (fs_inum_bv i) (sb_inodestart sb))
+                 (Z.of_nat (64 * islot (fs_inum_bv i))) (dinode_bytes dn).
+
+  Definition rec_owned_at_q Γ (dq : dfrac) (istart z : Z) (dn : dinode)
+    : iProp Σ :=
+    byte_range_q Γ dq (istart + z `div` 16) (64 * (z `mod` 16))
+                 (dinode_bytes dn).
+
+  Lemma rec_owned_q_1 Γ sb i dn :
+    rec_owned Γ sb i dn = rec_owned_q Γ (DfracOwn 1) sb i dn.
+  Proof. reflexivity. Qed.
+
+  Lemma rec_owned_at_q_1 Γ istart z dn :
+    rec_owned_at Γ istart z dn = rec_owned_at_q Γ (DfracOwn 1) istart z dn.
+  Proof. reflexivity. Qed.
+
+  Global Instance rec_owned_q_timeless `{!GTimeless Γ} dq sb i dn :
+    Timeless (rec_owned_q Γ dq sb i dn).
+  Proof. rewrite /rec_owned_q. apply _. Qed.
+
+  Global Instance rec_owned_at_q_timeless `{!GTimeless Γ} dq istart z dn :
+    Timeless (rec_owned_at_q Γ dq istart z dn).
+  Proof. rewrite /rec_owned_at_q. apply _. Qed.
+
+  Lemma gamma_q_rec_owned Γ dq sb i dn :
+    rec_owned (gamma_q Γ dq) sb i dn ⊣⊢ rec_owned_q Γ dq sb i dn.
+  Proof. rewrite /rec_owned /rec_owned_q gamma_q_byte_range //. Qed.
+
+  Lemma gamma_q_rec_owned_at Γ dq istart z dn :
+    rec_owned_at (gamma_q Γ dq) istart z dn ⊣⊢ rec_owned_at_q Γ dq istart z dn.
+  Proof. rewrite /rec_owned_at /rec_owned_at_q gamma_q_byte_range //. Qed.
+
+  (* the region's fraction-1 record, shed to the share the collection hands
+     the transport (durable-disk EV-X) *)
+  Lemma rec_owned_at_q_split Γ (Hfr : phi_frac Γ) (q1 q2 : Qp) istart z dn :
+    rec_owned_at_q Γ (DfracOwn (q1 + q2)) istart z dn
+    ⊣⊢ rec_owned_at_q Γ (DfracOwn q1) istart z dn
+        ∗ rec_owned_at_q Γ (DfracOwn q2) istart z dn.
+  Proof. rewrite /rec_owned_at_q (byte_range_q_split Γ Hfr) //. Qed.
+
+  Lemma rec_owned_at_split_34 Γ (Hfr : phi_frac Γ) istart z dn :
+    rec_owned_at Γ istart z dn
+    ⊣⊢ rec_owned_at_q Γ (DfracOwn (3/4)) istart z dn
+        ∗ rec_owned_at_q Γ (DfracOwn (1/4)) istart z dn.
+  Proof.
+    rewrite rec_owned_at_q_1 -(rec_owned_at_q_split Γ Hfr (3/4) (1/4)).
+    rewrite Qp.three_quarter_quarter //.
+  Qed.
+
+
   (* THE RANGE PREMISE IS REAL, not slack: [rec_owned] goes through
      [FsImg.fs_inum_bv i = Z_to_bv 32 i], which WRAPS.  Every caller has it
      ([sb_ninodes] is far below 2^32); it is the premise
@@ -479,6 +538,24 @@ Section RecOwned.
     assert (Hoff : Z.of_nat (64 * islot (fs_inum_bv i)) = 64 * (i `mod` 16)).
     { rewrite /islot Hbv Nat2Z.inj_mul Z2Nat.id; [reflexivity | lia]. }
     rewrite /rec_owned /rec_owned_at Hblk Hoff //.
+  Qed.
+
+  (* the shed as a WAND (durable-notes: an [⊣⊢] used with [rewrite] inside a
+     proof that holds a tower rewrites the whole proofmode goal) *)
+  Lemma rec_owned_at_shed_to Γ (Hfr : phi_frac Γ) istart z dn :
+    rec_owned_at Γ istart z dn -∗
+    rec_owned_at_q Γ (DfracOwn (3/4)) istart z dn
+    ∗ rec_owned_at_q Γ (DfracOwn (1/4)) istart z dn.
+  Proof. iIntros "H". by iApply (rec_owned_at_split_34 Γ Hfr). Qed.
+
+  Lemma rec_owned_sb_q Γ dq sb i dn :
+    0 <= i < 2 ^ 32 ->
+    rec_owned_q Γ dq sb i dn ⊣⊢ rec_owned_at_q Γ dq (sb_inodestart sb) i dn.
+  Proof.
+    intros Hi.
+    rewrite -(gamma_q_rec_owned Γ dq sb i dn)
+            -(gamma_q_rec_owned_at Γ dq (sb_inodestart sb) i dn).
+    exact (rec_owned_sb (gamma_q Γ dq) sb i dn Hi).
   Qed.
 
   (* ---- the 16-fold split/gather ------------------------------------ *)
@@ -637,11 +714,198 @@ Section InodeOwned.
     rewrite Qp.three_quarter_quarter //.
   Qed.
 
+  (* ---------------------------------------------------------------- *)
+  (*  3d. THE DATA LEG -- an inode's bytes OTHER THAN ITS RECORD       *)
+  (*                                                                   *)
+  (*  This is the one shape BOTH holders of an inode carry: it is      *)
+  (*  [inode_phi]'s tail here, and it is the whole of what a           *)
+  (*  checked-out era payload holds of an inode's bytes                *)
+  (*  ([FsStateEra.inode_owned_era_q]'s middle two conjuncts), because *)
+  (*  the RECORD parks region-side at fraction 1 always (fs-state.md   *)
+  (*  section 7, 2b-inode-1's ruling (i)).  Stating it once is what    *)
+  (*  makes the era's data leg literally this predicate rather than a  *)
+  (*  twin of it (durable-disk EV, the era-vocabulary unification).    *)
+  (*                                                                   *)
+  (*  IT IS FRACTION-INDEXED for the reason [blk_owned_q] is (plan     *)
+  (*  sections 4 and 6): a read-locking [ilock] withdraws exactly      *)
+  (*  [inode_dat_q _ (DfracOwn (1/4)) n].  [inode_dat] is the          *)
+  (*  [DfracOwn 1] reading and is CONVERTIBLE to it, so                *)
+  (*  [inode_dat_1] is [reflexivity].                                  *)
+  (* ---------------------------------------------------------------- *)
+
+  Definition inode_dat_q Γ (dq : dfrac) (n : fs_node) : iProp Σ :=
+    (([∗ map] k ↦ bs ∈ fn_blk n, blk_owned_q Γ dq (fn_naddr n k) bs)
+     ∗ ind_owned_q Γ dq n)%I.
+
+  Definition inode_dat Γ (n : fs_node) : iProp Σ :=
+    (([∗ map] k ↦ bs ∈ fn_blk n, blk_owned Γ (fn_naddr n k) bs)
+     ∗ ind_owned Γ n)%I.
+
+  Lemma inode_dat_1 Γ n : inode_dat Γ n = inode_dat_q Γ (DfracOwn 1) n.
+  Proof. reflexivity. Qed.
+
+  (* Peel one connective per step and call [apply _] only at the LEAVES
+     (optimization.md; the idiom is [IcacheEscrow]'s).  The leaves here are
+     [blk_owned_q]/[ind_owned_q], both of which have declared instances. *)
+  Local Ltac tl_struct :=
+    lazymatch goal with
+    | |- Timeless (bi_exist _) => apply bi.exist_timeless; intro; tl_struct
+    | |- Timeless (bi_sep _ _) => apply bi.sep_timeless; [tl_struct | tl_struct]
+    | |- _ => apply _
+    end.
+
+  Global Instance inode_dat_q_timeless `{!GTimeless Γ} dq n :
+    Timeless (inode_dat_q Γ dq n).
+  Proof. rewrite /inode_dat_q. tl_struct. Qed.
+
+  Global Instance inode_dat_timeless `{!GTimeless Γ} n :
+    Timeless (inode_dat Γ n).
+  Proof. rewrite inode_dat_1. apply _. Qed.
+
+  (* the block big-op at a sum of shares, which is the half of the split
+     that is not already [ind_owned_q_split] *)
+  Lemma inode_dat_blks_split Γ (Hfr : phi_frac Γ) (q1 q2 : Qp) n :
+    ([∗ map] k ↦ bs ∈ fn_blk n,
+       blk_owned_q Γ (DfracOwn (q1 + q2)) (fn_naddr n k) bs)
+    ⊣⊢ ([∗ map] k ↦ bs ∈ fn_blk n,
+          blk_owned_q Γ (DfracOwn q1) (fn_naddr n k) bs)
+        ∗ ([∗ map] k ↦ bs ∈ fn_blk n,
+             blk_owned_q Γ (DfracOwn q2) (fn_naddr n k) bs).
+  Proof.
+    rewrite -big_sepM_sep.
+    apply big_sepM_proper. intros k bs _.
+    apply (blk_owned_q_split Γ Hfr).
+  Qed.
+
+  Lemma inode_dat_q_split Γ (Hfr : phi_frac Γ) (q1 q2 : Qp) n :
+    inode_dat_q Γ (DfracOwn (q1 + q2)) n
+    ⊣⊢ inode_dat_q Γ (DfracOwn q1) n ∗ inode_dat_q Γ (DfracOwn q2) n.
+  Proof.
+    rewrite /inode_dat_q (inode_dat_blks_split Γ Hfr q1 q2 n).
+    rewrite (ind_owned_q_split Γ Hfr q1 q2 n).
+    iSplit.
+    - iIntros "[[Hb1 Hb2] [Hi1 Hi2]]". iFrame.
+    - iIntros "[[Hb1 Hi1] [Hb2 Hi2]]". iFrame.
+  Qed.
+
+  (* ONE BLOCK OUT AND BACK, the leg untouched otherwise. *)
+  Lemma inode_dat_q_blk_acc Γ dq n (k : nat) bs :
+    fn_blk n !! k = Some bs ->
+    inode_dat_q Γ dq n -∗
+      blk_owned_q Γ dq (fn_naddr n k) bs
+      ∗ (blk_owned_q Γ dq (fn_naddr n k) bs -∗ inode_dat_q Γ dq n).
+  Proof.
+    intros Hbs. iIntros "[Hb Hi]".
+    iDestruct (big_sepM_delete _ _ k bs Hbs with "Hb") as "[Hbk Hrest]".
+    iFrame "Hbk". iIntros "Hbk".
+    iDestruct (big_sepM_delete _ _ k bs Hbs) as "[_ Hback]".
+    rewrite /inode_dat_q. iFrame. iApply "Hback". iFrame.
+  Qed.
+
   (* the Φ-only part of an inode: exactly its footprint *)
   Definition inode_phi Γ (sb : fs_sb) (i : Z) (n : fs_node) : iProp Σ :=
     (rec_owned Γ sb i (fn_rec n)
      ∗ ([∗ map] k ↦ bs ∈ fn_blk n, blk_owned Γ (fn_naddr n k) bs)
      ∗ ind_owned Γ n)%I.
+
+  (* [inode_phi] IS the record beside the data leg -- [bi_sep] associates to
+     the right, so this is [reflexivity] and no consumer's destructuring
+     pattern moves. *)
+  Lemma inode_phi_dat Γ sb i n :
+    inode_phi Γ sb i n = (rec_owned Γ sb i (fn_rec n) ∗ inode_dat Γ n)%I.
+  Proof. reflexivity. Qed.
+
+  (* THE GEOMETRY-FREE READING, the [rec_owned_at]/[free_bitmap_at] pattern:
+     the inode REGION has no superblock, only [icfg_ist] and an inum as a
+     plain [Z], so the collection that rebuilds an [fs_state] out of the
+     region's records and the payloads' data legs assembles THIS, and
+     [inode_phi_sb] is the one step that puts the superblock back. *)
+  Definition inode_phi_at Γ (istart z : Z) (n : fs_node) : iProp Σ :=
+    (rec_owned_at Γ istart z (fn_rec n) ∗ inode_dat Γ n)%I.
+
+  Global Instance inode_phi_at_timeless `{!GTimeless Γ} istart z n :
+    Timeless (inode_phi_at Γ istart z n).
+  Proof. rewrite /inode_phi_at. tl_struct. Qed.
+
+  (* THE RANGE PREMISE IS [rec_owned_sb]'s, and it is real for the same
+     reason: [fs_inum_bv] wraps at 2^32. *)
+  Lemma inode_phi_sb Γ sb i n :
+    0 <= i < 2 ^ 32 ->
+    inode_phi_at Γ (sb_inodestart sb) i n ⊣⊢ inode_phi Γ sb i n.
+  Proof.
+    intros Hi.
+    rewrite /inode_phi_at inode_phi_dat (rec_owned_sb Γ sb i (fn_rec n) Hi) //.
+  Qed.
+
+  (* [inode_phi_q] / [inode_phi_at_q] -- EV stage 5's pair with the RECORD
+     pinned at fraction 1 and only the data leg share-generic -- are DELETED
+     at EV-X.  The transport's source is [FsState.fs_state] at ONE uniform
+     share, so an inode's record rides at that share too and the shape the
+     collection assembles is [inode_phi] at the constant-share view
+     ([gamma_q_inode_phi] below); the region's fraction-1 record is SHED
+     down to it ([rec_owned_at_shed_to]). *)
+
+  (* ---------------------------------------------------------------- *)
+  (*  3f.  THE SAME SHAPES AT THE CONSTANT-SHARE VIEW (durable-disk     *)
+  (*       EV-X; [gamma_q] moved down from [FsDurXfer] to               *)
+  (*       [FsStateDefs])                                               *)
+  (*                                                                    *)
+  (*  Reading a Gamma-generic byte shape at [gamma_q Γ dq] IS reading it *)
+  (*  at the share [dq], and each translation is one [rewrite]: that is  *)
+  (*  what lets [FsState.fs_state] take a dfrac without a parallel       *)
+  (*  hierarchy of [_q] definitions.  [gamma_q_inode_ghost] -- the       *)
+  (*  Φ-free half, which does NOT move -- sits below with                *)
+  (*  [inode_ghost] itself.  Beside them, the SHED at an inode's bytes   *)
+  (*  ([FsStateDefs.view_shed]), which is how a fraction-1 owner comes    *)
+  (*  down to the share the collection stands at.                        *)
+  (* ---------------------------------------------------------------- *)
+
+  Lemma gamma_q_ind_owned Γ dq n :
+    ind_owned (gamma_q Γ dq) n ⊣⊢ ind_owned_q Γ dq n.
+  Proof.
+    rewrite /ind_owned /ind_owned_q. case_decide as Hz; [done |].
+    apply gamma_q_blk_owned.
+  Qed.
+
+  Lemma gamma_q_inode_dat Γ dq n :
+    inode_dat (gamma_q Γ dq) n ⊣⊢ inode_dat_q Γ dq n.
+  Proof.
+    rewrite /inode_dat /inode_dat_q gamma_q_ind_owned.
+    apply bi.sep_proper; [| done].
+    apply big_sepM_proper. intros k bs _. apply gamma_q_blk_owned.
+  Qed.
+
+  (* SHEDDING, AT ONE INODE'S BYTES ([FsStateDefs.view_shed]). *)
+  Lemma ind_owned_shed Γ Γ1 Γ2 (Hs : view_shed Γ Γ1 Γ2) n :
+    ind_owned Γ n ⊢ ind_owned Γ1 n ∗ ind_owned Γ2 n.
+  Proof.
+    rewrite /ind_owned. case_decide.
+    - iIntros "_". iSplitR; done.
+    - apply (blk_owned_shed Γ Γ1 Γ2 Hs).
+  Qed.
+
+  Lemma inode_phi_shed Γ Γ1 Γ2 (Hs : view_shed Γ Γ1 Γ2) sb i n :
+    inode_phi Γ sb i n ⊢ inode_phi Γ1 sb i n ∗ inode_phi Γ2 sb i n.
+  Proof.
+    rewrite /inode_phi /rec_owned. iIntros "(Hr & Hb & Hi)".
+    iDestruct (byte_range_shed Γ Γ1 Γ2 Hs with "Hr") as "[Hr1 Hr2]".
+    iDestruct (ind_owned_shed Γ Γ1 Γ2 Hs with "Hi") as "[Hi1 Hi2]".
+    iAssert ([∗ map] k ↦ bs ∈ fn_blk n,
+               blk_owned Γ1 (fn_naddr n k) bs ∗ blk_owned Γ2 (fn_naddr n k) bs)%I
+      with "[Hb]" as "Hb".
+    { iApply (big_sepM_impl with "Hb"). iIntros "!>" (k bs Hk) "H".
+      iApply (blk_owned_shed Γ Γ1 Γ2 Hs with "H"). }
+    rewrite big_sepM_sep. iDestruct "Hb" as "[Hb1 Hb2]".
+    iSplitL "Hr1 Hb1 Hi1"; iFrame.
+  Qed.
+
+  Lemma gamma_q_inode_phi Γ dq sb i n :
+    inode_phi (gamma_q Γ dq) sb i n
+    ⊣⊢ rec_owned_q Γ dq sb i (fn_rec n) ∗ inode_dat_q Γ dq n.
+  Proof.
+    rewrite inode_phi_dat gamma_q_inode_dat /rec_owned /rec_owned_q
+            gamma_q_byte_range //.
+  Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  4.  The TYPE REGISTER's fragments an inode's entries carry       *)
@@ -841,6 +1105,45 @@ Section InodeOwned.
   Lemma inode_owned_local Γ sb i n :
     inode_owned Γ sb i n -∗ ⌜inode_local i n⌝.
   Proof. iIntros "[_ (%v & _ & _ & _ & $)]". Qed.
+
+  (* THE Φ-FREE HALF DOES NOT MOVE AT A SHARE, and this is the EV-X ruling
+     in one line: [FsStateDefs.gamma_q] copies [γlink] and [γtop], so an
+     inode's link authority and entry tokens at the constant-share view are
+     the SAME proposition they are at [Γ].  The byte legs take the share;
+     the authorities stay whole. *)
+  Lemma gamma_q_inode_ghost Γ dq i n :
+    inode_ghost (gamma_q Γ dq) i n = inode_ghost Γ i n.
+  Proof. reflexivity. Qed.
+
+  Lemma gamma_q_inode_owned Γ dq sb i n :
+    inode_owned (gamma_q Γ dq) sb i n
+    ⊣⊢ (rec_owned_q Γ dq sb i (fn_rec n) ∗ inode_dat_q Γ dq n)
+        ∗ inode_ghost Γ i n.
+  Proof.
+    rewrite /inode_owned gamma_q_inode_phi gamma_q_inode_ghost //.
+  Qed.
+
+  (* THE RE-JOIN.  In the era the two halves of [inode_ghost] are held by
+     two different parties -- the AUTHORITY behind [iregN]
+     ([InodeRegion.ireg_lnk_at], which wraps this [link_auth]) and the
+     TOKENS in the checked-out payload ([IcacheEscrow.dlinks], which IS
+     [ent_toks_x]) -- and that distribution is 2b-inode-4's ruling
+     (fs-state.md section 7).  So the collection that rebuilds an
+     [fs_state] at a commit meets them in two hands, and this is the one
+     step that puts them back together.  The two pure facts are Coq
+     premises because the collection has them from elsewhere: the register
+     value's type agreement off [InodeRegion.ireg_reg_ok], the local
+     clause off the payload. *)
+  Lemma inode_ghost_of Γ (i : Z) (n : fs_node) (v : ity) :
+    fn_ity_ok n v -> inode_local i n ->
+    link_auth Γ i (fn_mult n) v -∗ ent_toks_x Γ i n -∗ inode_ghost Γ i n.
+  Proof.
+    intros Hv Hl. iIntros "Ha Ht".
+    rewrite /inode_ghost. iExists v.
+    iSplitR; [by iPureIntro |].
+    iSplitL "Ha"; [iExact "Ha" |].
+    iSplitL "Ht"; [iExact "Ht" |]. by iPureIntro.
+  Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  5.  Timelessness                                                 *)
@@ -1779,18 +2082,16 @@ Section InodeOwned.
   Lemma fn_orphan_set_blk n k bs : fn_orphan (fn_set_blk n k bs) = fn_orphan n.
   Proof. done. Qed.
 
-  (* ---------------------------------------------------------------- *)
-  (*  10. The link reading of an owned inode                           *)
-  (* ---------------------------------------------------------------- *)
-
-  (* the direction safety uses: at [nlink = 0] no entry points here *)
-  Lemma inode_link_tok_nz Γ sb i n ty :
-    inode_owned Γ sb i n -∗ link_tok Γ i ty -∗ ⌜fn_nlink n <> 0%nat⌝.
-  Proof.
-    iIntros "[_ (%v & _ & Ha & _ & _)] Ht".
-    destruct (decide (fn_nlink n = 0%nat)) as [Hz | Hnz]; [| done].
-    rewrite (fn_mult_zero n Hz).
-    iDestruct (link_auth_zero_no_tok with "Ha Ht") as "[]".
-  Qed.
-
 End InodeOwned.
+
+(* [iFrame] resolves its instances up to delta, so a big-op behind a
+   [Definition] is a hang unless it is sealed (durable-notes.md).  The data
+   leg is a [big_sepM] over an inode's blocks, and every consumer wants it
+   framed as ONE atom: the escrow's payload, the read-locker's quarter and
+   the collection's per-inum hand all move the whole leg or none of it.
+   [inode_phi_at] is sealed for the same reason.
+
+   A SEAL DOES NOT TRAVEL: a file that puts one of these in its
+   intuitionistic context must [Require Import FsStateInode] directly. *)
+Global Typeclasses Opaque inode_dat_q inode_dat inode_phi_at
+                         rec_owned_q rec_owned_at_q.

@@ -536,12 +536,9 @@ Definition wp_create_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
-    (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
+  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
-    (γa : gname) (γf : gname) (γpr : gname)           (* kalloc, ftable, printk *)
-    (bmapstart : Z)
-    (ninodes : Z) (size : Z)
+ (γf : gname)           (* kalloc, ftable, printk *)
     (plen : nat) (pfun : nat -> bv 8)                 (* the PATH buffer     *)
     (ty major minor : mword 16)                       (* a1, a2, a3          *)
     (V : pprivate)                                    (* the running process *)
@@ -559,21 +556,21 @@ Definition wp_create_sconf_body
   icfg_dev = ROOTDEV ->
   (0 < icfg_nib)%nat ->
   log_geom_ok fsc_cov fsc_logst ->
-  0 < size <= BPB ->
-  0 <= bmapstart ->
-  bmapstart ∈ fsc_cov ->
-  ~ (bmapstart ∈ log_region_set fsc_logst) ->
+  0 < fsc_size <= BPB ->
+  0 <= fsc_bmapstart ->
+  fsc_bmapstart ∈ fsc_cov ->
+  ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
   0 <= icfg_ist ->
-  cov_below fsc_cov size ->
-  bitmap_geom_ok fsc_cov fsc_logst bmapstart size ->
+  cov_below fsc_cov fsc_size ->
+  bitmap_geom_ok fsc_cov fsc_logst fsc_bmapstart fsc_size ->
   InodeInv.ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
   (* ---- namex's path buffer ---- *)
   bb_cstr pfun plen ->
   (Z.of_nat plen < 2 ^ 31)%Z ->
   (* ---- ialloc's three geometry premises, and its live type premise ---- *)
-  1 < ninodes ->
-  ninodes <= 16 * Z.of_nat icfg_nib ->
-  ninodes < 2 ^ 31 ->
+  1 < fsc_ninodes ->
+  fsc_ninodes <= 16 * Z.of_nat icfg_nib ->
+  fsc_ninodes < 2 ^ 31 ->
   (* ...and mkfs's own [ushort] geometry beside them, carried as a premise
      rather than as a slot widening (D0-a): it is what makes the
      [lw a2,4(s3)] at +0xb6 agree with dirlink's ZERO-extended halfword
@@ -588,7 +585,7 @@ Definition wp_create_sconf_body
      entries pass a literal. *)
   InodeRegion.ireg_ty_ok_w ty ->
   (* ---- ialloc's no-inodes arm calls printk, not panic ---- *)
-  printk_gen_contract (kt := KT1) γpr γu γd ->
+  printk_gen_contract (kt := KT1) fsc_printk fsc_uart fsc_disk ->
   (* ---- THE TWO LEDGERS (see the header) ---- *)
   (create_units <= u)%nat ->
   (create_slots <= ns)%nat ->
@@ -609,10 +606,10 @@ Definition wp_create_sconf_body
   (* the two persistent credentials ialloc's printk arm needs, and the
      rodata image the "." / ".." literals live in *)
   kernel_data -∗
-  printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
-  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
-  kalloc_env γa None -∗
+  printk_env fsc_printk fsc_uart fsc_disk -∗
+  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+  log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
+  kalloc_env fsc_kalloc None -∗
   (* ---- THE ICACHE, THE ITABLE AND THE INODE REGION ---- *)
   is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
@@ -629,11 +626,11 @@ Definition wp_create_sconf_body
      EXISTING [LinkForkretNF.wp_forkret_nf_ax] IOU. *)
   ireg_open -∗
   (* ---- the four superblock cells ---- *)
-  sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
+  sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-  sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+  sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
+  bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   (* ---- THE RUNNING PROCESS, WHOLE ----
      create needs the pid quarter (every sleeplock records it), the p->cwd
      CELL and the cwd REFERENCE (namex's starting point) -- which is
@@ -647,9 +644,9 @@ Definition wp_create_sconf_body
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
   (* ---- the running-thread bundle and the disk fabric ---- *)
   procs_inv γs -∗
-  dev_inv γu γd -∗
-  disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  dev_inv fsc_uart fsc_disk -∗
+  disk_geom fsc_disk pd pav pu -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
   bslots 3 -∗
   iref_slots ns -∗
   (* ---- THE OP-WIDE RESERVATION, IN SET FORM (section 18 clause 1) ---- *)
@@ -679,10 +676,10 @@ Definition wp_create_sconf_body
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       (* everything structural comes back untouched *)
-      sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
+      sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-      sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       (* NO ORDERING on the bitmap: create both ALLOCATES (balloc, under
          dirlink's writei) and FREES (itrunc, under the fail arm's
          iunlockput of a link-count-zero inode). *)
@@ -749,12 +746,8 @@ Module Type CREATE.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (γa : gname) (γf : gname) (γpr : gname)
-      (bmapstart : Z)
-      (ninodes : Z) (size : Z)
+ (γf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (ty major minor : mword 16)
       (V : pprivate)
@@ -763,8 +756,8 @@ Module Type CREATE.
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_create_sconf_body γs j γl γu γd γk pd pav pu bn
-                           γa γf γpr bmapstart
-                           ninodes size plen pfun ty major minor
+      wp_create_sconf_body γs j γl pd pav pu
+ γf
+ plen pfun ty major minor
                            V u Sb ns pidv dqb dqs dqbs dqn m K eb b lks.
 End CREATE.

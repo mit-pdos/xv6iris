@@ -90,27 +90,6 @@ Section SpecPipealloc.
   (* [pf0]/[pf1] are the CALLER's two [struct file *] locals -- cells on its
      own frame -- so they ride the caller's regime. *)
 
-  (* the four content fields pipealloc writes into each [struct file]: it makes
-     the [w = false] file the READ end and the [w = true] file the WRITE end,
-     both pointing at the same pipe.  [ip], [off] and [major] are NOT written
-     -- a pipe file inherits whatever the recycled table slot held, which is
-     the real xv6 behaviour.
-
-     IT IS NO LONGER IN THE POSTCONDITION.  A reference hides its [fcontent]
-     ([FileInvDefs.file_ref]), so the post cannot name a [C] to say this
-     about; what survives is the half a DESCRIPTOR can see, which is the
-     direction, and that rides in the state as [FdSlots.FdPipe b].  The
-     conjunct that has no home yet is [fc_pipe C = pi] -- "both ends belong
-     to one pipe" -- which would need [FdPipe] to carry the pipe's identity
-     the way [FdInode] carries its inum.  Kept here because it is the
-     statement of what pipealloc writes, and the definition the proof's own
-     stores are checked against. *)
-  Definition pipe_file (pi : mword 64) (w : bool) (C : fcontent) : Prop :=
-    fc_type C = FD_PIPE /\
-    fc_pipe C = pi /\
-    fc_readable C = ((if w then mword_of_int 0 else mword_of_int 1) : mword 8) /\
-    fc_writable C = ((if w then mword_of_int 1 else mword_of_int 0) : mword 8).
-
   Definition pipealloc_post (γf : gname) (γk : gname * gname) (on : option nat)
       (pf0 pf1 r : mword 64) : iProp Σ :=
     ((* FAILURE (a0 = -1): the ftable was full, or kalloc found no page.  Every
@@ -133,28 +112,30 @@ Section SpecPipealloc.
         Each [file_ref] is EXCLUSIVE (fraction 1) -- pipealloc's own unlocked
         stores are what proves that legal, and the caller inherits the same
         right (it must, since sys_pipe still has to install them in its fd
-        table).  The pipe itself is not a separate conjunct: [pipe_file]
-        pins each file's type and pipe pointer, and [FileInv.file_payload]
-        reads the end off exactly those fields. *)
+        table).  The pipe itself is not a separate conjunct: each end rides
+        INSIDE its file's payload ([FileInvDefs.file_core]'s pipe arm holds
+        [is_pipe] and [pipe_ref]), so installing a descriptor installs the
+        reference to the pipe with it. *)
      ⌜r = (zero_reg : mword 64)⌝ ∗
      kalloc_avail γk (avail_dec on) ∗
-     (* WHICH END IS WHICH, IN THE STATE ITSELF.  [FdPipe false] is the read
-        end and [FdPipe true] the write end -- the direction is tied to
-        [f->writable] by [FileInvDefs.fdstate_ok], and on a pipe that field
-        is the WHOLE of what distinguishes the two files (same type, same
-        [f->pipe]).  So the post still says fd[0] reads and fd[1] writes,
-        with no [fcontent] named anywhere.
-        What it no longer says is that the two are ends of the SAME pipe:
-        that was [pipe_file pi _ C]'s [fc_pipe] conjunct, and a reference
-        hides its content.  No caller consumed it -- sys_pipe's own proof
-        says as much where it destructures this -- and restoring it means
-        giving [FdPipe] the pipe's identity too, exactly as [FdInode] has
-        its inum. *)
+     (* WHICH END IS WHICH, IN THE STATE ITSELF.  [FdOpen true false FdPipe]
+        is the read end and [FdOpen false true FdPipe] the write end -- the
+        two flags are tied to [f->readable] / [f->writable] by
+        [FileInvDefs.fdstate_ok], and on a pipe they are the WHOLE of what
+        distinguishes the two files (same type, same [f->pipe]).  So the post
+        says fd[0] reads and fd[1] writes, with no [fcontent] named anywhere.
+
+        WHAT IT DOES NOT SAY is that the two are ends of the SAME pipe.  That
+        used to be a [fc_pipe C = pi] conjunct, i.e. an equation between two
+        recycled POINTERS, which is the wrong currency for the fact -- the
+        same reason [f->ip] cannot name a file across time.  When the pipe's
+        identity is wanted it will come from the pipe's own ghost state, not
+        from the pointer cell, so nothing here is kept warm for it. *)
      (∃ (k0 k1 : nat),
         ⌜(k0 < NFILE)%nat /\ (k1 < NFILE)%nat⌝ ∗
         pf0 ↦₈[KT1] fnode k0 ∗ pf1 ↦₈[KT1] fnode k1 ∗
-        file_ref γf k0 1 (FdOpen (FdPipe false)) ∗
-        file_ref γf k1 1 (FdOpen (FdPipe true))))%I.
+        file_ref γf k0 1 (FdOpen true false FdPipe) ∗
+        file_ref γf k1 1 (FdOpen false true FdPipe)))%I.
 
 End SpecPipealloc.
 

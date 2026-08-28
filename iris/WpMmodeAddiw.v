@@ -50,7 +50,7 @@ Section WpAddiwGpr.
                (fun a => sign_extend' 64 (subrange_vec_dec (add_vec a (sign_extend' 64 immv)) 31 0))
                eq_refl Hrd with "Hcert Hf") ].
       iIntros (e) "[-> Hf]". iSplitR; [done|]. iFrame "Hf HPC HnPC".
-    - iNext. iIntros "Hmm Hpmpc Hpc Hf _".
+    - iApply bi.later_intro. iIntros "Hmm Hpmpc Hpc Hf _".
       iApply ("Hcont" with "Hmm Hpmpc Hpc Hf").
   Qed.
 

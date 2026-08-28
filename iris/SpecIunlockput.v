@@ -112,26 +112,12 @@ Local Open Scope Z_scope.
    them at an empty authority; [SpecIput.wp_iput_gen_body] therefore takes
    one.  iunlockput needs no caller to supply it: it is [iunlock] then
    [iput], and the share the WRITE ARM parked comes home at the first of the
-   two ([IcacheEscrow.ic_dep_side]).  This is that observation as a pure
-   equation on the descriptor, so the two generic bodies below can name the
-   [(t, q)] without destructing anything. *)
-Definition ic_dep_side_tx (d : ic_dep) : option (nat * Qp) :=
-  match d with
-  | DepTx _ _ _ _ t q => Some (t, q)
-  | _ => None
-  end.
-
-Section IunlockputSide.
-  Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg}.
-
-  Lemma ic_dep_side_of_tx (d : ic_dep) (t : nat) (q : Qp) :
-    ic_dep_side_tx d = Some (t, q) ->
-    ic_dep_side d = (t ↪[ln_tx icfg_log]{#q} ())%I.
-  Proof.
-    destruct d; try discriminate. cbn. intro H.
-    injection H as -> ->. reflexivity.
-  Qed.
-End IunlockputSide.
+   two ([IcacheEscrow.ic_dep_side]).  That observation is a pure equation on
+   the descriptor, so the two generic bodies below can name the [(t, q)]
+   without destructing anything -- and since rank 5 it is not this file's:
+   [IcacheEscrow.ic_dep_side_tx] IS [ic_dep_side]'s own [TxPin.tx_pin_o]
+   index, and [IcacheEscrow.ic_dep_side_of_tx] is its reading.  The two
+   contracts below keep the premise at the same spelling. *)
 
 (* iunlockput's own frame is 32 bytes (4 slots: ra@24 s0@16 s1@8, one hole);
    its deepest callee is iput (60).  iunlock wants 26.
@@ -162,12 +148,9 @@ Notation K_iunlockput := (78%nat) (only parsing).
 Definition wp_iunlockput_dep_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
-    (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
+   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
     (gil gisl : gname)                                 (* ip->lock            *)
-    (bmapstart : Z)
-    (size : Z)
     (k : nat) (qi s : Qp) (gy : gname) (d : ic_dep) (inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (n : nat) (tid : nat) (qtx : Qp)
@@ -189,15 +172,15 @@ Definition wp_iunlockput_dep_sconf_body
   (k < NINODE)%nat ->
   (* --- iput's geometry, threaded verbatim (SpecIput.v) --- *)
   log_geom_ok fsc_cov fsc_logst ->
-  0 < size <= BPB ->
-  0 <= bmapstart ->
-  bmapstart ∈ fsc_cov ->
-  ~ (bmapstart ∈ log_region_set fsc_logst) ->
+  0 < fsc_size <= BPB ->
+  0 <= fsc_bmapstart ->
+  fsc_bmapstart ∈ fsc_cov ->
+  ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
   0 <= icfg_ist ->
   IBLOCK inum icfg_ist ∈ fsc_cov ->
   ~ (IBLOCK inum icfg_ist ∈ log_region_set fsc_logst) ->
   bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
-  cov_below fsc_cov size ->
+  cov_below fsc_cov fsc_size ->
   (iput_units <= n)%nat ->
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
@@ -226,8 +209,8 @@ Definition wp_iunlockput_dep_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) -∗
-  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+  log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
   (* ---- THE ICACHE'S PERSISTENT SET ---- *)
   is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
@@ -269,14 +252,14 @@ Definition wp_iunlockput_dep_sconf_body
      leaves behind, and [inode_held_short] is now stated over it. *)
   inode_refp_short k (qi + s)%Qp qi icfg_dev inum -∗
   (* ---- iput's own resources ---- *)
-  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-  bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+  bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   proc_priv_bare pj pidv Vpr -∗
   procs_inv gs -∗
-  dev_inv gu gd -∗
-  disk_geom gd pd pav pu -∗
-  is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+  dev_inv fsc_uart fsc_disk -∗
+  disk_geom fsc_disk pd pav pu -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
   bslots 3 -∗
   (* THE BUDGET HALF ONLY: at a [DepTx] descriptor this caller's transaction
      token is part-parked in the escrow, so it cannot present [log_op]; the
@@ -295,7 +278,7 @@ Definition wp_iunlockput_dep_sconf_body
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       proc_priv_bare pj pidv Vpr -∗
-      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       bslots 3 -∗
       ⌜((n - iput_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
@@ -310,12 +293,9 @@ Definition wp_iunlockput_dep_sconf_body
 Definition wp_iunlockput_dep_gen_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
-    (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
+   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
     (gil gisl : gname)                                 (* ip->lock            *)
-    (bmapstart : Z)
-    (size : Z)
     (k : nat) (qi s : Qp) (gy : gname) (d : ic_dep) (inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
@@ -337,19 +317,19 @@ Definition wp_iunlockput_dep_gen_body
   (* ENTRY BY SLOT -- iunlock's null test and iput's [ientry_inj] both *)
   (k < NINODE)%nat ->
   (* the two absorption credits, threaded verbatim to iput *)
-  (crb = true -> bmapstart ∈ Sb) ->
+  (crb = true -> fsc_bmapstart ∈ Sb) ->
   (cru = true -> IBLOCK inum icfg_ist ∈ Sb) ->
   (* --- iput's geometry, threaded verbatim (SpecIput.v) --- *)
   log_geom_ok fsc_cov fsc_logst ->
-  0 < size <= BPB ->
-  0 <= bmapstart ->
-  bmapstart ∈ fsc_cov ->
-  ~ (bmapstart ∈ log_region_set fsc_logst) ->
+  0 < fsc_size <= BPB ->
+  0 <= fsc_bmapstart ->
+  fsc_bmapstart ∈ fsc_cov ->
+  ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
   0 <= icfg_ist ->
   IBLOCK inum icfg_ist ∈ fsc_cov ->
   ~ (IBLOCK inum icfg_ist ∈ log_region_set fsc_logst) ->
   bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
-  cov_below fsc_cov size ->
+  cov_below fsc_cov fsc_size ->
   (iput_units <= n)%nat ->
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
@@ -378,8 +358,8 @@ Definition wp_iunlockput_dep_gen_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) -∗
-  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+  log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
   (* ---- THE ICACHE'S PERSISTENT SET ---- *)
   is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
@@ -421,14 +401,14 @@ Definition wp_iunlockput_dep_gen_body
      leaves behind, and [inode_held_short] is now stated over it. *)
   inode_refp_short k (qi + s)%Qp qi icfg_dev inum -∗
   (* ---- iput's own resources ---- *)
-  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-  bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+  bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   proc_priv_bare pj pidv Vpr -∗
   procs_inv gs -∗
-  dev_inv gu gd -∗
-  disk_geom gd pd pav pu -∗
-  is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+  dev_inv fsc_uart fsc_disk -∗
+  disk_geom fsc_disk pd pav pu -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
   bslots 3 -∗
   (* THE GROUP CREDIT, threaded verbatim to iput (SpecIput.v's [crz]):
      [emp] at [crz = false], the walker's [nlz_obs] plus the region's two
@@ -448,14 +428,14 @@ Definition wp_iunlockput_dep_gen_body
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       proc_priv_bare pj pidv Vpr -∗
-      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       bslots 3 -∗
       ⌜Sb ⊆ Sb'⌝ -∗
       (* THE PAID-BITMAP REPORT (G-4c): [w] is "this call spent the bitmap
          unit", and it comes with the membership that makes a walker's next
          level able to claim [crb := true]. *)
-      ⌜w = true -> bmapstart ∈ Sb'⌝ -∗
+      ⌜w = true -> fsc_bmapstart ∈ Sb'⌝ -∗
       (* ...and a CREDITED caller is never charged its own credit back
          (fs-log.md §G.25): at [crb = true] the report is [false], which is
          what makes a walk's next level FREE and not merely bounded. *)
@@ -478,12 +458,9 @@ Definition wp_iunlockput_dep_gen_body
 Definition wp_iunlockput_tx_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
-    (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
+   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
     (gil gisl : gname)                                 (* ip->lock            *)
-    (bmapstart : Z)
-    (size : Z)
     (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (n : nat)
@@ -499,15 +476,15 @@ Definition wp_iunlockput_tx_sconf_body
   (k < NINODE)%nat ->
   (* --- iput's geometry, threaded verbatim (SpecIput.v) --- *)
   log_geom_ok fsc_cov fsc_logst ->
-  0 < size <= BPB ->
-  0 <= bmapstart ->
-  bmapstart ∈ fsc_cov ->
-  ~ (bmapstart ∈ log_region_set fsc_logst) ->
+  0 < fsc_size <= BPB ->
+  0 <= fsc_bmapstart ->
+  fsc_bmapstart ∈ fsc_cov ->
+  ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
   0 <= icfg_ist ->
   IBLOCK inum icfg_ist ∈ fsc_cov ->
   ~ (IBLOCK inum icfg_ist ∈ log_region_set fsc_logst) ->
   bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
-  cov_below fsc_cov size ->
+  cov_below fsc_cov fsc_size ->
   (iput_units <= n)%nat ->
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
@@ -528,8 +505,8 @@ Definition wp_iunlockput_tx_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) -∗
-  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+  log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
   (* ---- THE ICACHE'S PERSISTENT SET ---- *)
   is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
@@ -575,14 +552,14 @@ Definition wp_iunlockput_tx_sconf_body
      leaves behind, and [inode_held_short] is now stated over it. *)
   inode_refp_short k (qi + s)%Qp qi icfg_dev inum -∗
   (* ---- iput's own resources ---- *)
-  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-  bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+  bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   proc_priv_bare pj pidv Vpr -∗
   procs_inv gs -∗
-  dev_inv gu gd -∗
-  disk_geom gd pd pav pu -∗
-  is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+  dev_inv fsc_uart fsc_disk -∗
+  disk_geom fsc_disk pd pav pu -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
   bslots 3 -∗
   (* THE BUDGET HALF ONLY: this caller's transaction token is HALF-PARKED
      in the escrow, so it cannot present [log_op]; the disarm re-forms the
@@ -600,7 +577,7 @@ Definition wp_iunlockput_tx_sconf_body
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       proc_priv_bare pj pidv Vpr -∗
-      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       bslots 3 -∗
       ⌜((n - iput_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
@@ -611,12 +588,9 @@ Definition wp_iunlockput_tx_sconf_body
 Definition wp_iunlockput_tx_gen_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
-    (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
+   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
     (gil gisl : gname)                                 (* ip->lock            *)
-    (bmapstart : Z)
-    (size : Z)
     (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
@@ -631,19 +605,19 @@ Definition wp_iunlockput_tx_gen_body
   (* ENTRY BY SLOT -- iunlock's null test and iput's [ientry_inj] both *)
   (k < NINODE)%nat ->
   (* the two absorption credits, threaded verbatim to iput *)
-  (crb = true -> bmapstart ∈ Sb) ->
+  (crb = true -> fsc_bmapstart ∈ Sb) ->
   (cru = true -> IBLOCK inum icfg_ist ∈ Sb) ->
   (* --- iput's geometry, threaded verbatim (SpecIput.v) --- *)
   log_geom_ok fsc_cov fsc_logst ->
-  0 < size <= BPB ->
-  0 <= bmapstart ->
-  bmapstart ∈ fsc_cov ->
-  ~ (bmapstart ∈ log_region_set fsc_logst) ->
+  0 < fsc_size <= BPB ->
+  0 <= fsc_bmapstart ->
+  fsc_bmapstart ∈ fsc_cov ->
+  ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
   0 <= icfg_ist ->
   IBLOCK inum icfg_ist ∈ fsc_cov ->
   ~ (IBLOCK inum icfg_ist ∈ log_region_set fsc_logst) ->
   bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
-  cov_below fsc_cov size ->
+  cov_below fsc_cov fsc_size ->
   (iput_units <= n)%nat ->
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
@@ -664,8 +638,8 @@ Definition wp_iunlockput_tx_gen_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) -∗
-  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+  log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
   (* ---- THE ICACHE'S PERSISTENT SET ---- *)
   is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
@@ -711,14 +685,14 @@ Definition wp_iunlockput_tx_gen_body
      leaves behind, and [inode_held_short] is now stated over it. *)
   inode_refp_short k (qi + s)%Qp qi icfg_dev inum -∗
   (* ---- iput's own resources ---- *)
-  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-  bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+  bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   proc_priv_bare pj pidv Vpr -∗
   procs_inv gs -∗
-  dev_inv gu gd -∗
-  disk_geom gd pd pav pu -∗
-  is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+  dev_inv fsc_uart fsc_disk -∗
+  disk_geom fsc_disk pd pav pu -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
   bslots 3 -∗
   (* THE GROUP CREDIT, threaded verbatim to iput (SpecIput.v's [crz]):
      [emp] at [crz = false], the walker's [nlz_obs] plus the region's two
@@ -738,14 +712,14 @@ Definition wp_iunlockput_tx_gen_body
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       proc_priv_bare pj pidv Vpr -∗
-      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       bslots 3 -∗
       ⌜Sb ⊆ Sb'⌝ -∗
       (* THE PAID-BITMAP REPORT (G-4c): [w] is "this call spent the bitmap
          unit", and it comes with the membership that makes a walker's next
          level able to claim [crb := true]. *)
-      ⌜w = true -> bmapstart ∈ Sb'⌝ -∗
+      ⌜w = true -> fsc_bmapstart ∈ Sb'⌝ -∗
       (* ...and a CREDITED caller is never charged its own credit back
          (fs-log.md §G.25): at [crb = true] the report is [false], which is
          what makes a walk's next level FREE and not merely bounded. *)
@@ -768,12 +742,8 @@ Section IunlockputOfDep.
 
   Lemma wp_iunlockput_tx_of_dep_sconf
       (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (gil gisl : gname)
-      (bmapstart : Z)
-      (size : Z)
       (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat)
@@ -781,14 +751,14 @@ Section IunlockputOfDep.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate) :
     (forall (d : ic_dep) (tid : nat) (qtx : Qp),
-       wp_iunlockput_dep_sconf_body gs j gl gu gd gk pd pav pu bn
-                                    gil gisl bmapstart
- size k qi s gy d inum
+       wp_iunlockput_dep_sconf_body gs j gl pd pav pu
+                                    gil gisl
+ k qi s gy d inum
                                     dn' bm' n tid qtx pidv dq dqb dqs m K eb b lks
                                     Vpr) ->
-    wp_iunlockput_tx_sconf_body gs j gl gu gd gk pd pav pu bn
-                                gil gisl bmapstart
-                                size k qi s gy inum dn' bm' n
+    wp_iunlockput_tx_sconf_body gs j gl pd pav pu
+                                gil gisl
+ k qi s gy inum dn' bm' n
                                 pidv dq dqb dqs m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_iunlockput_tx_sconf_body wp_iunlockput_dep_sconf_body].
@@ -820,12 +790,8 @@ Section IunlockputOfDep.
 
   Lemma wp_iunlockput_tx_of_dep_gen
       (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (gil gisl : gname)
-      (bmapstart : Z)
-      (size : Z)
       (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
@@ -833,14 +799,14 @@ Section IunlockputOfDep.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate) :
     (forall (d : ic_dep) (tid : nat) (qtx : Qp),
-       wp_iunlockput_dep_gen_body gs j gl gu gd gk pd pav pu bn
-                                  gil gisl bmapstart
- size k qi s gy d inum
+       wp_iunlockput_dep_gen_body gs j gl pd pav pu
+                                  gil gisl
+ k qi s gy d inum
                                   dn' bm' n Sb crb cru crz e0 tid qtx
                                   pidv dq dqb dqs m K eb b lks Vpr) ->
-    wp_iunlockput_tx_gen_body gs j gl gu gd gk pd pav pu bn
-                              gil gisl bmapstart
-                              size k qi s gy inum dn' bm' n Sb crb cru
+    wp_iunlockput_tx_gen_body gs j gl pd pav pu
+                              gil gisl
+ k qi s gy inum dn' bm' n Sb crb cru
                               crz e0 pidv dq dqb dqs m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_iunlockput_tx_gen_body wp_iunlockput_dep_gen_body].
@@ -882,12 +848,8 @@ Module Type IUNLOCKPUT.
   Parameter wp_iunlockput_dep_gen :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (gil gisl : gname)
-      (bmapstart : Z)
-      (size : Z)
       (k : nat) (qi s : Qp) (gy : gname) (d : ic_dep) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
@@ -895,9 +857,9 @@ Module Type IUNLOCKPUT.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iunlockput_dep_gen_body gs j gl gu gd gk pd pav pu bn
-                                 gil gisl bmapstart
- size k qi s gy d inum dn' bm' n Sb
+      wp_iunlockput_dep_gen_body gs j gl pd pav pu
+                                 gil gisl
+ k qi s gy d inum dn' bm' n Sb
                                  crb cru crz e0 tid qtx pidv dq dqb dqs m K eb b lks
                                  Vpr.
   (* the two TRANSACTIONAL forms (durable-disk B''-tx); [ProofIunlockput]
@@ -905,39 +867,31 @@ Module Type IUNLOCKPUT.
   Parameter wp_iunlockput_tx_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (gil gisl : gname)
-      (bmapstart : Z)
-      (size : Z)
       (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iunlockput_tx_sconf_body gs j gl gu gd gk pd pav pu bn
-                                  gil gisl bmapstart
- size k qi s gy inum dn' bm' n
+      wp_iunlockput_tx_sconf_body gs j gl pd pav pu
+                                  gil gisl
+ k qi s gy inum dn' bm' n
                                   pidv dq dqb dqs m K eb b lks Vpr.
   Parameter wp_iunlockput_tx_gen :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (gil gisl : gname)
-      (bmapstart : Z)
-      (size : Z)
       (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iunlockput_tx_gen_body gs j gl gu gd gk pd pav pu bn
-                                gil gisl bmapstart
-                                size k qi s gy inum dn' bm' n Sb crb cru
+      wp_iunlockput_tx_gen_body gs j gl pd pav pu
+                                gil gisl
+ k qi s gy inum dn' bm' n Sb crb cru
                                 crz e0 pidv dq dqb dqs m K eb b lks Vpr.
 End IUNLOCKPUT.

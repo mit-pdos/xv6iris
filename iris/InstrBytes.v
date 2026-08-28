@@ -1046,7 +1046,7 @@ Section InstrBytes.
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
     iDestruct (text_read_bytes σ.(mem) pa n w with "Hmem Htext") as %Hrb.
     iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
-    iSplitR; [done|]. iNext. iMod "Hmask" as "_". iModIntro. by iFrame.
+    iSplitR; [done|]. iApply bi.later_intro. iMod "Hmask" as "_". iModIntro. by iFrame.
   Qed.
 
   (* ==================================================================== *)

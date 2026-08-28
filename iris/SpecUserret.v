@@ -6,9 +6,9 @@
    switches satp to the USER table (the pt2 window), restores the 31 saved
    user registers from the TRAPFRAME page, and sret's to User mode at the
    process's sepc.  The continuation therefore receives a USER-privilege
-   machine over [utlb_inv_pt] -- exactly what [userret_to_user_inv]
-   (UserKernelBridge.v) repackages into [user_inv] for the user-execution
-   capstone.  The kernel table is SHARED throughout (KptShare.kpt_inv):
+   machine over [utlb_inv_pt] -- exactly what [userret_to_user_state]
+   (UserKernelBridge.v) repackages into the concrete resume state the trap
+   loop hands to the user-execution WP it holds.  The kernel table is SHARED throughout (KptShare.kpt_inv):
    this spec takes it as the ordinary [tlb_res_pt kroot] residue on entry
    and hands nothing back on exit -- the switch folds it straight into
    [kpt_inv], so there is no parked [kpt_frame] for uservec's return trip

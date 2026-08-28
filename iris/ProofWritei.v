@@ -507,7 +507,6 @@ Section WriteiDefs.
   (* THE CONTINUATION, named so it is not re-traversed by every proofmode
      split (claude-notes/optimization.md). *)
   Definition wi_cont `{CID0 : CpuId}
-      (bn : bio_names)
       (γf : gname)
       (ip : mword 64) (inum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
@@ -605,7 +604,6 @@ Section WriteiRet.
   Context {ktb : ktier}.
   Context `{!KtierLe ktb KT1}.
   Local Lemma wi_ret `{CID0 : CpuId} 
-      (bn : bio_names)
       (γf : gname)
       (ip : mword 64) (inum : mword 32)
       (bm bm' : blkmap) (data data' : nat -> list (bv 8))
@@ -682,7 +680,7 @@ Section WriteiRet.
           proc_priv_bare (proc_addr j) pidv V) -∗
     bslots 3 -∗
     log_opS icfg_log n' Sb' -∗
-    wi_cont (ktb := ktb) (CID0 := CID0) bn γf ip inum
+    wi_cont (ktb := ktb) (CID0 := CID0) γf ip inum
             bm data dn dn0 user off n src_bytes V ncount Sb
             pidv dq dqd dqn dqs A j
             m K eb b lks -∗
@@ -993,9 +991,7 @@ Section WriteiJoin.
   Context `{!KtierLe ktb KT1}.
   Local Lemma wi_join `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (γf : gname)
       (ip : mword 64) (inum : mword 32)
       (bm bm' : blkmap) (data data' : nat -> list (bv 8))
@@ -1069,12 +1065,12 @@ Section WriteiJoin.
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (WI + 0xd2) : mword 64) -∗
     panic_env -∗
-    bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
-    log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+    bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+    log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
     procs_inv γs -∗
-    dev_inv γu γd -∗
-    disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    dev_inv fsc_uart fsc_disk -∗
+    disk_geom fsc_disk pd pav pu -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
     wi_fr8 m -∗
     i_dev ip ↦₄{dqd} icfg_dev -∗
     i_inum ip ↦₄{dqn} inum -∗
@@ -1092,7 +1088,7 @@ Section WriteiJoin.
           proc_priv_bare (proc_addr j) pidv V) -∗
     bslots 3 -∗
     log_opS icfg_log (S u) SbC -∗
-    wi_cont (ktb := ktb) (CID0 := CID0) bn γf ip inum
+    wi_cont (ktb := ktb) (CID0 := CID0) γf ip inum
             bm data dn dn0 user off n src_bytes V ncount Sb
             pidv dq dqd dqn dqs A j
             m K eb b lks -∗
@@ -1201,7 +1197,7 @@ Section WriteiJoin.
                   SbC e0 (IBLOCK inum icfg_ist)
                   ltac:(intros Hc; exact (proj1 (bool_decide_eq_true _) Hc)))
       as "#Hcrdu".
-    iApply (IU.wp_iupdate_credgen γs j γl γu γd γk pd pav pu bn
+    iApply (IU.wp_iupdate_credgen γs j γl pd pav pu
  ip inum dn' dn0 bm' u SbC
               (bool_decide (IBLOCK inum icfg_ist ∈ SbC)) e0 0%nat
               pidv (wi_q user dq) dqd dqn dqs T1 (K - 14)%nat eb b lks (if user then upd_upt V P' else V)
@@ -1335,7 +1331,7 @@ Section WriteiJoin.
     assert (Hdwf' : dinode_wf dn').
     { rewrite /dinode_wf Hadr /bm_cells length_app Hdirlen /=.
       unfold NDIRECT. lia. }
-    iApply (wi_ret (CID0 := CID5) bn γf
+    iApply (wi_ret (CID0 := CID5) γf
  ip inum
               bm bm' data data' dn dn' dn0 dn'
               user off n tot src_bytes wrote dist dstb V P' ncount
@@ -1389,9 +1385,7 @@ Section WriteiSize.
   Context `{!KtierLe ktb KT1}.
   Local Lemma wi_size `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (γf : gname)
       (ip : mword 64) (inum : mword 32)
       (bm bm' : blkmap) (data data' : nat -> list (bv 8))
@@ -1458,12 +1452,12 @@ Section WriteiSize.
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (WI + 0xbc) : mword 64) -∗
     panic_env -∗
-    bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
-    log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+    bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+    log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
     procs_inv γs -∗
-    dev_inv γu γd -∗
-    disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    dev_inv fsc_uart fsc_disk -∗
+    disk_geom fsc_disk pd pav pu -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
     wi_fr13 m -∗
     i_dev ip ↦₄{dqd} icfg_dev -∗
     i_inum ip ↦₄{dqn} inum -∗
@@ -1481,7 +1475,7 @@ Section WriteiSize.
           proc_priv_bare (proc_addr j) pidv V) -∗
     bslots 3 -∗
     log_opS icfg_log (S u) SbC -∗
-    wi_cont (ktb := ktb) (CID0 := CID0) bn γf ip inum
+    wi_cont (ktb := ktb) (CID0 := CID0) γf ip inum
             bm data dn dn0 user off n src_bytes V ncount Sb
             pidv dq dqd dqn dqs A j
             m K eb b lks -∗
@@ -1733,7 +1727,7 @@ Section WriteiSize.
                    ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (IntrDefs.cpu_claim_ext_transport CID0 CIDz3 eb (proc_addr j)
                    ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
-      iApply (wi_join (CID0 := CIDz3) γs j γl γu γd γk pd pav pu bn γf
+      iApply (wi_join (CID0 := CIDz3) γs j γl pd pav pu γf
  ip inum bm bm' data data' dn
                 (wi_dinode dn bm' off tot) dn0 user off n tot src_bytes wrote
                 dist dstb V P' ncount u Sb SbC pidv dq dqd dqn dqs A m QB5 K eb b lks
@@ -1946,7 +1940,7 @@ Section WriteiSize.
       assert (Hszn : bv_unsigned (di_size (wi_dinode dn bm' off tot)) < 2147483648).
       { rewrite Hdsz. rewrite moi32_small; [lia |].
         change (2 ^ 32)%Z with 4294967296%Z. lia. }
-      iApply (wi_join (CID0 := CIDQA5) γs j γl γu γd γk pd pav pu bn γf
+      iApply (wi_join (CID0 := CIDQA5) γs j γl pd pav pu γf
  ip inum bm bm' data data' dn
                 (wi_dinode dn bm' off tot) dn0 user off n tot src_bytes wrote
                 dist dstb V P' ncount u Sb SbC pidv dq dqd dqn dqs A m QA5 K eb b lks
@@ -2007,10 +2001,8 @@ Section WriteiLoop.
 
   Local Lemma wi_loop `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (γf γa : gname)
+      (γf : gname)
       (ip : mword 64) (inum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn dn0 : dinode)
@@ -2088,7 +2080,7 @@ Section WriteiLoop.
     M !!! Regidx Rs3 = (mword_of_int (Z.of_nat tot) : mword 64) ->
     M !!! Regidx Rs9 = (mword_of_int 1024 : mword 64) ->
     M !!! Regidx Rs8 = (mword_of_int (-1) : mword 64) ->
-    printk_gen_contract (kt := KT1) (ba_pr A) γu γd ->
+    printk_gen_contract (kt := KT1) (ba_pr A) fsc_uart fsc_disk ->
     (* THE ORDER PREMISE.  Every callee this iteration reaches that carries
        one wants its own rank: bread and brelse want "bcache" (4,
        SpecBread.v / SpecBrelse.v), log_write wants "log" (3,
@@ -2111,14 +2103,14 @@ Section WriteiLoop.
     (* forwarded to bmap, and through it to balloc's out-of-blocks arm; both
        PERSISTENT, so neither is returned *)
     kernel_data -∗
-    printk_env (ba_pr A) γu γd -∗
-    bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
-    log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
-    kalloc_env γa None -∗
+    printk_env (ba_pr A) fsc_uart fsc_disk -∗
+    bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+    log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
+    kalloc_env fsc_kalloc None -∗
     procs_inv γs -∗
-    dev_inv γu γd -∗
-    disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    dev_inv fsc_uart fsc_disk -∗
+    disk_geom fsc_disk pd pav pu -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
     wi_fr13 m -∗
     i_dev ip ↦₄{dqd} icfg_dev -∗
     i_inum ip ↦₄{dqn} inum -∗
@@ -2136,7 +2128,7 @@ Section WriteiLoop.
           proc_priv_bare (proc_addr j) pidv V) -∗
     bslots 3 -∗
     log_opS icfg_log nI SI -∗
-    wi_cont (ktb := ktb) (CID0 := CID0) bn γf ip inum
+    wi_cont (ktb := ktb) (CID0 := CID0) γf ip inum
             bm data dn dn0 user off n src_bytes V ncount Sb
             pidv dq dqd dqn dqs A j
             m K eb b lks -∗
@@ -2261,7 +2253,7 @@ Section WriteiLoop.
        three Psi-free forms retired with the payload's second index, so this
        proof opens [LogInv.log_ctx]'s existential once and hands the plain
        form back to everything else it calls. *)
-    iApply (BM.wp_bmap_gen γs j γl γu γd γk pd pav pu bn icfg_log fsc_fs
+    iApply (BM.wp_bmap_gen γs j γl fsc_uart fsc_disk fsc_dlock pd pav pu fsc_bio icfg_log fsc_fs
               fsc_cov fsc_logst (ba_bms A) (ba_size A) icfg_dev (ba_pr A)
               ip bmI dataI fbn nI (bool_decide (ba_bms A ∈ SI)) SI
               pidv (wi_q user dq) dqd (ba_dqb A) (ba_dqs A)
@@ -2424,7 +2416,7 @@ Section WriteiLoop.
                    ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (IntrDefs.cpu_claim_ext_transport CIDa4 CIDa6 eb (proc_addr j)
                    ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
-      iApply (wi_size (CID0 := CIDa6) γs j γl γu γd γk pd pav pu bn γf
+      iApply (wi_size (CID0 := CIDa6) γs j γl pd pav pu γf
  ip inum bm bm2 data data2 dn dn0
                 user off n tot src_bytes wroteI 0%nat wroteI V PI ncount uX
                 Sb Sb2
@@ -2476,7 +2468,7 @@ Section WriteiLoop.
       assert (Hubno : uint (blkmap_get bm2 fbn : mword 32)
                       = bv_unsigned (blkmap_get bm2 fbn)) by apply bb_uint32.
       assert (Hbcov' : uint (blkmap_get bm2 fbn : mword 32)
-                       ∈ bv_cov (fs_view fsc_fs γd icfg_dev fsc_cov))
+                       ∈ bv_cov (fs_view fsc_fs fsc_disk icfg_dev fsc_cov))
         by (rewrite Hubno; exact Hbcov).
       assert (Hblt' : (uint (blkmap_get bm2 fbn : mword 32) < 2147483648)%Z)
         by (rewrite Hubno; exact Hblt).
@@ -2557,8 +2549,8 @@ Section WriteiLoop.
       iDestruct (wi_src_bare γf j pidv dq user (upd_upt V PI) V
                    (m !!! Regidx Ra2 : mword 64) n src_bytes with "Hsrc")
         as "[Hppid Hsrcback]".
-      iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
-                (fs_view fsc_fs γd icfg_dev fsc_cov) pidv icfg_dev (blkmap_get bm2 fbn)
+      iApply (BR.wp_bread_sconf γs j γl fsc_uart fsc_disk fsc_dlock pd pav pu fsc_bio
+                (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) pidv icfg_dev (blkmap_get bm2 fbn)
                 (wi_q user dq)
                 B3 (K - 14)%nat eb b lks (if user then upd_upt V PI else V)
                 HKbr Hblt' eq_refl Hbcov'
@@ -2611,7 +2603,7 @@ Section WriteiLoop.
       iEval (rewrite /bio_locked) in "Hheld".
       iDestruct (wi_held_k with "Hheld") as %Hkklt.
       iApply fupd_wp.
-      iMod (wi_held_content ⊤ bn fsc_fs γd icfg_dev fsc_cov _ pidv icfg_dev _
+      iMod (wi_held_content ⊤ fsc_bio fsc_fs fsc_disk icfg_dev fsc_cov _ pidv icfg_dev _
               _ _ _ _ _ logN_top with "Hrow Hfsb1 Hheld")
         as "(%Hbs0eq & Hfsb1 & Hheld)".
       iModIntro.
@@ -2944,7 +2936,7 @@ Section WriteiLoop.
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iEval (rewrite -HD8a0) in "Hwin".
         iEval (rewrite -HD8a2) in "Hsrcw".
-        iApply (EC.wp_either_copyin_sconf KT0 ktb γa γf D8 (K - 14)%nat 0%nat eb
+        iApply (EC.wp_either_copyin_sconf KT0 ktb fsc_kalloc γf D8 (K - 14)%nat 0%nat eb
                   (proc_addr j) pidv (upd_upt V PI) user mm
                   (fun jj => src_bytes (tot + jj)%nat)
                   (fun i => (data2 fbn) !!! (o + i)%nat) b lks
@@ -3109,7 +3101,7 @@ Section WriteiLoop.
              bmap just allocated this data block then balloc's [bzero]
              already logged it and this write is FREE.  The premise is
              discharged by the very bool_decide that names the credit. *)
-          iApply (LW.wp_log_write_gen bn icfg_log fsc_fs γd fsc_cov fsc_logst icfg_dev kkb pidv
+          iApply (LW.wp_log_write_gen fsc_bio icfg_log fsc_fs fsc_disk fsc_cov fsc_logst icfg_dev kkb pidv
                     (blkmap_get bm2 fbn) (wi_splice (data2 fbn) o mm g)
                     (data2 fbn) bsdB dB uX
                     (bool_decide (uint (blkmap_get bm2 fbn : mword 32) ∈ Sb2)) Sb2
@@ -3252,7 +3244,7 @@ Section WriteiLoop.
           iDestruct (wi_src_bare γf j pidv dq user (upd_upt V P2) V
                        (m !!! Regidx Ra2 : mword 64) n src_bytes with "Hsrc")
             as "[Hppid Hsrcback]".
-          iApply (BL.wp_brelse_sconf γs bn (fs_view fsc_fs γd icfg_dev fsc_cov) kkb
+          iApply (BL.wp_brelse_sconf γs fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) kkb
                     pidv icfg_dev (blkmap_get bm2 fbn) (wi_q user dq)
                     F4 (K - 14)%nat eb
                     (proc_addr j) (wi_splice (data2 fbn) o mm g) bsdB true b lks (if user then upd_upt V P2 else V)
@@ -3488,7 +3480,7 @@ Section WriteiLoop.
               - intros _. split.
                 + exact (wiset_in_sing_r _ _).
                 + intros Ha. exact (wiset_in_add_r _ _ _ (Hbc5 Ha)). }
-            iApply (wi_size (CID0 := CIDc11) γs j γl γu γd γk pd pav pu bn γf
+            iApply (wi_size (CID0 := CIDc11) γs j γl pd pav pu γf
  ip inum bm bm2 data
                       (<[fbn := wi_splice (data2 fbn) o mm g]> data2) dn dn0
                       user off n (tot + mm)%nat src_bytes wrote2 0%nat wrote2
@@ -3639,7 +3631,7 @@ Section WriteiLoop.
              bmap just allocated this data block then balloc's [bzero]
              already logged it and this write is FREE.  The premise is
              discharged by the very bool_decide that names the credit. *)
-          iApply (LW.wp_log_write_gen bn icfg_log fsc_fs γd fsc_cov fsc_logst icfg_dev kkb pidv
+          iApply (LW.wp_log_write_gen fsc_bio icfg_log fsc_fs fsc_disk fsc_cov fsc_logst icfg_dev kkb pidv
                     (blkmap_get bm2 fbn) (wi_splice (data2 fbn) o mm g)
                     (data2 fbn) bsdB dB uX
                     (bool_decide (uint (blkmap_get bm2 fbn : mword 32) ∈ Sb2)) Sb2
@@ -3762,7 +3754,7 @@ Section WriteiLoop.
           iDestruct (wi_src_bare γf j pidv dq user (upd_upt V P2) V
                        (m !!! Regidx Ra2 : mword 64) n src_bytes with "Hsrc")
             as "[Hppid Hsrcback]".
-          iApply (BL.wp_brelse_sconf γs bn (fs_view fsc_fs γd icfg_dev fsc_cov) kkb
+          iApply (BL.wp_brelse_sconf γs fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) kkb
                     pidv icfg_dev (blkmap_get bm2 fbn) (wi_q user dq)
                     J4 (K - 14)%nat eb
                     (proc_addr j) (wi_splice (data2 fbn) o mm g) bsdB true b lks (if user then upd_upt V P2 else V)
@@ -3848,7 +3840,7 @@ Section WriteiLoop.
                        ltac:(lia) HnLlo Hhon).
             - left. exact Ht0.
             - intros Hpos. exfalso. lia. }
-          iApply (wi_size (CID0 := CIDd7) γs j γl γu γd γk pd pav pu bn γf
+          iApply (wi_size (CID0 := CIDd7) γs j γl pd pav pu γf
  ip inum bm bm2 data
                     (<[fbn := wi_splice (data2 fbn) o mm g]> data2) dn dn0
                     user off n tot src_bytes wroteI mm g V P2 ncount uY
@@ -4016,12 +4008,8 @@ Section WriteiMain.
      [wp_writei_sconf] below is this with the set forgotten. *)
   Lemma wp_writei_gen
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (γa : gname) (γf : gname)
-      (bmapstart : Z) (size : Z)
-      (γpr : gname)
+ (γf : gname)
       (ip : mword 64) (inum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn dn0 : dinode)
@@ -4030,8 +4018,8 @@ Section WriteiMain.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-    : wp_writei_gen_body ktb γs j γl γu γd γk pd pav pu bn γa γf
- bmapstart size γpr
+    : wp_writei_gen_body ktb γs j γl pd pav pu γf
+
                          ip inum bm data dn dn0
                          user off n src_bytes V ncount Sb
                          pidv dq dqd dqn dqs dqb dqbs m K eb b lks.
@@ -4040,7 +4028,7 @@ Section WriteiMain.
     intros pcE pj src ret_tgt HK Hcost Hgeom Hist Hicov Hilog Hnib Hadr Hdtnz Hstab Hnlk
            Hwf Hhz Hcovin Hsum Hszdn Hgok Hprkc Hj Hgl Ha0 Ha1 Ha3 Ha4 Hbelow.
     (* the whole allocation side travels as ONE record from here down *)
-    set (A := MkBmAlloc icfg_log bmapstart size dqb dqbs γpr).
+    set (A := MkBmAlloc icfg_log fsc_bmapstart fsc_size dqb dqbs fsc_printk).
     pose proof HK as HK'. 
     change (2 ^ 31)%Z with 2147483648%Z in Hsum, Hszdn.
     assert (Hofflt : (Z.of_nat off < 2147483648)%Z) by lia.
@@ -4058,7 +4046,7 @@ Section WriteiMain.
     (* THE ADAPTER: the interior carries the two superblock cells inside the
        bundle, the public contract hands them back on their own.  Written
        once here rather than at every interior continuation. *)
-    iAssert (wi_cont (ktb := ktb) (CID0 := CID) bn γf
+    iAssert (wi_cont (ktb := ktb) (CID0 := CID) γf
                ip inum bm data dn dn0 user off n src_bytes V ncount Sb
                pidv dq dqd dqn dqs A j m K eb b lks)%I with "[Hcont]" as "Hcont".
     { rewrite /wi_cont. iEval (rewrite /wp_next).
@@ -4591,7 +4579,7 @@ Section WriteiMain.
                    ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (IntrDefs.cpu_claim_ext_transport CID CIDy3 eb (proc_addr j)
                    ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
-      iApply (wi_ret (CID0 := CIDy3) bn γf
+      iApply (wi_ret (CID0 := CIDy3) γf
 
                 ip inum bm bm data data dn dn dn0 dn0 user off n 0%nat src_bytes
                 (fun _ => bv_0 8) 0%nat (fun _ => bv_0 8) V (pv_upt V) ncount ncount
@@ -4755,7 +4743,7 @@ Section WriteiMain.
                    ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (IntrDefs.cpu_claim_ext_transport CID CIDz3 eb (proc_addr j)
                    ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
-      iApply (wi_join (CID0 := CIDz3) γs j γl γu γd γk pd pav pu bn γf
+      iApply (wi_join (CID0 := CIDz3) γs j γl pd pav pu γf
  ip inum bm bm data data dn dn dn0
                 user off 0%nat 0%nat src_bytes (fun _ => bv_0 8)
                 0%nat (fun _ => bv_0 8) V (pv_upt V) (S unc) unc Sb Sb
@@ -4979,7 +4967,7 @@ Section WriteiMain.
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CIDp17) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (wi_loop (CID0 := CIDp17) γs j γl γu γd γk pd pav pu bn γf γa
+    iApply (wi_loop (CID0 := CIDp17) γs j γl pd pav pu γf
  ip inum bm data dn dn0 user off n
               src_bytes V ncount Sb (m !!! Regidx Ra1 : mword 64)
               pidv dq dqd dqn dqs A m K eb b lks
@@ -5019,12 +5007,8 @@ Section WriteiMain.
      since [wi_inv_enter] holds at ANY entry set. *)
   Lemma wp_writei_sconf
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (γa : gname) (γf : gname)
-      (bmapstart : Z) (size : Z)
-      (γpr : gname)
+ (γf : gname)
       (ip : mword 64) (inum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn dn0 : dinode)
@@ -5033,8 +5017,8 @@ Section WriteiMain.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-    : wp_writei_sconf_body ktb γs j γl γu γd γk pd pav pu bn γa γf
- bmapstart size γpr
+    : wp_writei_sconf_body ktb γs j γl pd pav pu γf
+
                            ip inum bm data dn dn0
                            user off n src_bytes V ncount
                            pidv dq dqd dqn dqs dqb dqbs m K eb b lks.
@@ -5047,8 +5031,8 @@ Section WriteiMain.
               Hmeta Hmap Hblocks Hsb Hszc Hbmsc #Hbminv #Hireg Hdn Hsrc
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
     iDestruct (log_op_openS with "Hop") as (Sb0) "[Hop Htx]".
-    iApply (wp_writei_gen γs j γl γu γd γk pd pav pu bn γa γf
- bmapstart size γpr
+    iApply (wp_writei_gen γs j γl pd pav pu γf
+
               ip inum bm data dn dn0 user off n src_bytes V ncount Sb0
               pidv dq dqd dqn dqs dqb dqbs m K eb b lks
               HK Hcost Hgeom Hist Hicov Hilog Hnib Hadr Hdtnz Hstab Hnlk

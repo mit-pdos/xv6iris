@@ -253,10 +253,9 @@ Definition wp_dirlookup_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
-    (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
+  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
-    (γa : gname) (γf : gname)                         (* kalloc, file table  *)
+ (γf : gname)                         (* kalloc, file table  *)
     (ip : mword 64) (dinum : mword 32)                (* the HOME's inum     *)
     (bm : blkmap) (data : nat -> list (bv 8))
     (dn : dinode) (dr : dinode)                       (* in-core / REGION    *)
@@ -354,8 +353,8 @@ Definition wp_dirlookup_sconf_body
      console credentials printk needs out of [panic_env].  Both persistent,
      and every caller of dirlookup already holds them. *)
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
-  kalloc_env γa None -∗
+  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+  kalloc_env fsc_kalloc None -∗
   (* ---- THE LOCKED DIRECTORY, readi's bundle verbatim ---- *)
   i_dev ip ↦₄{dqd} icfg_dev -∗
   inode_meta ip dn -∗
@@ -369,9 +368,9 @@ Definition wp_dirlookup_sconf_body
   proc_priv_bare pj pidv Vpr -∗
   (* ---- the running-thread bundle and the disk fabric ---- *)
   procs_inv γs -∗
-  dev_inv γu γd -∗
-  disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  dev_inv fsc_uart fsc_disk -∗
+  disk_geom fsc_disk pd pav pu -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
   bslot -∗
   (* ---- THE ICACHE, exactly as iget takes it ---- *)
   is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
@@ -446,10 +445,8 @@ Module Type DIRLOOKUP.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (γa : gname) (γf : gname)
+ (γf : gname)
       (ip : mword 64) (dinum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn : dinode) (dr : dinode)
@@ -458,7 +455,7 @@ Module Type DIRLOOKUP.
       (pidv : mword 32) (dq dqd dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_dirlookup_sconf_body γs j γl γu γd γk pd pav pu bn
-                              γa γf ip dinum bm data dn dr
+      wp_dirlookup_sconf_body γs j γl pd pav pu
+ γf ip dinum bm data dn dr
                               fn hasp pofv pidv dq dqd dqn m K eb b lks Vpr.
 End DIRLOOKUP.

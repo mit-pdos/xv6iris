@@ -1274,7 +1274,7 @@ Section ProofIget.
             iDestruct (wordw_claim_of (KTR := KT0) 4 (i_dev (ientry e))
                          (DfracOwn 1) devT ltac:(lia) with "Hcellp") as "#Hclaim1".
             iMod ("Hclosep" with "[Hcbp Hcellp]") as "_";
-              [ iNext; iApply ("Hcbp" with "Hcellp") |].
+              [ iApply bi.later_intro; iApply ("Hcbp" with "Hcellp") |].
             iModIntro.
             iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iget + 0x6e)) Rs2 Rs3
                       (mword_of_int 0 : mword 12) N1 (trap_res b + (K - 6))%nat
@@ -1298,7 +1298,7 @@ Section ProofIget.
                       with "Hbody Hgid") as "(Hcell & Hgid & Hcb)".
               iModIntro. iExists devT. iFrame "Hcell". iIntros "Hcell".
               iMod ("Hclose2" with "[Hcb Hcell]") as "_";
-                [ iNext; iApply ("Hcb" with "Hcell") |].
+                [ iApply bi.later_intro; iApply ("Hcb" with "Hcell") |].
               iMod ("Hidback" with "Hgid") as "Hgid".
               iModIntro. iFrame "Hgid". }
             iApply wp_next_off_intro. iIntros "Hcg Hpc Hgid".
@@ -1520,7 +1520,7 @@ Section ProofIget.
             iDestruct (wordw_claim_of (KTR := KT0) 4 (i_valid (ientry e))
                          (DfracOwn 1) wvp ltac:(lia) with "Hvldp") as "#Hclaim4".
             iMod ("Hclosep" with "[Hd1p Hincellp Hvldp Hpayp Hgid1p Hpinp]") as "_".
-            { iNext. iApply (ic_close_mid fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst e).
+            { iApply bi.later_intro. iApply (ic_close_mid fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst e).
               (* NAMED, in the goal's conjunct order (optimization.md,
                  "Never bare iFrame in a large context"): [ic_mid_arm]'s
                  fourth conjunct is [ic_unloaded], whose pool bundle is an ∃

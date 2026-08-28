@@ -149,7 +149,7 @@ Section WpSconfSret.
                      Hcont]").
     (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic callback
        is discharged at the ambient hart and nothing is renamed. *)
-    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iApply bi.later_intro. iApply wp_next_off_intro. rewrite /sconf_step_obl.
     iSplitR "Hcont".
     - (* ---- the instruction ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".

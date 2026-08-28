@@ -353,7 +353,7 @@ Section BitmapRes.
     iIntros "#Hbinv H".
     iMod (inv_alloc bitmapN E (bitmap_body γfs bms size)
             with "[H]") as "#Hi".
-    { iNext. rewrite /bitmap_body. iExists used. iExact "H". }
+    { iApply bi.later_intro. rewrite /bitmap_body. iExists used. iExact "H". }
     iModIntro. rewrite /bitmap_reg. iFrame "Hi Hbinv".
   Qed.
 
@@ -421,7 +421,7 @@ Section BitmapRes.
       ">(Ha & HC & Hxa & %Hdom & %Hlens & %Htie & %Hdm & %Hxs & %Hxv)".
     iDestruct (pool_home_pure γfs L home size u Hdm with "Ha Hpool") as %Hres.
     iMod ("Hclose" with "[Ha HC Hxa]") as "_".
-    { iNext. iExists L, C, X. by iFrame. }
+    { iApply bi.later_intro. iExists L, C, X. by iFrame. }
     iModIntro. by iFrame.
   Qed.
 
@@ -518,7 +518,7 @@ Section BitmapRes.
     iMod (bitmap_pool_home (E ∖ ↑bitmapN) γfs (fs_home_set cov ls) Xv size used
             HlogB with "Hbinv Hpool") as "(%Hhome & Hpool)".
     iMod ("Hclose" with "[Hfsb Hpool]") as "_".
-    { iNext. rewrite /bitmap_body. iExists used. rewrite bitmap_res_open.
+    { iApply bi.later_intro. rewrite /bitmap_body. iExists used. rewrite bitmap_res_open.
       iFrame. }
     iModIntro. iFrame "Hhalf". iPureIntro. exists used.
     split; [exact Hbytes | exact (bitmap_ok_of_home cov ls size used Hhome)].
@@ -558,7 +558,7 @@ Section BitmapRes.
     iMod (bitmap_pool_home (E ∖ ↑bitmapN) γfs (fs_home_set cov ls) Xv size used
             HlogB with "Hbinv Hpool") as "(%Hhome & Hpool)".
     iMod ("Hclose" with "[Hfsb Hpool]") as "_".
-    { iNext. rewrite /bitmap_body. iExists used. rewrite bitmap_res_open.
+    { iApply bi.later_intro. rewrite /bitmap_body. iExists used. rewrite bitmap_res_open.
       iFrame. }
     iModIntro. iFrame "Hown Hhalf". iPureIntro. exists used.
     split; [exact Hbytes |].
@@ -602,7 +602,7 @@ Section BitmapRes.
     rewrite (free_pool_take (fs_gamma_L γfs) size u1 bi Hbi Hnu1).
     iDestruct "Hpool" as "[Hblk Hpool]".
     iMod ("Hclose" with "[Hfsb' Hpool]") as "_".
-    { iNext. rewrite /bitmap_body. iExists (u1 ∪ {[bi]}).
+    { iApply bi.later_intro. rewrite /bitmap_body. iExists (u1 ∪ {[bi]}).
       rewrite bitmap_res_open.
       rewrite (bitmap_bytes_eq_union u0 u1 bi (eq_sym Hbytes)). iFrame. }
     iModIntro. rewrite -free_blk_of_owned. iExact "Hblk".
@@ -638,7 +638,7 @@ Section BitmapRes.
     iDestruct (free_pool_give (fs_gamma_L γfs) (fs_gamma_L_excl γfs)
                  size u1 b bsx Hb with "Hblk Hpool") as "Hpool".
     iMod ("Hclose" with "[Hfsb' Hpool]") as "_".
-    { iNext. rewrite /bitmap_body. iExists (u1 ∖ {[b]}).
+    { iApply bi.later_intro. rewrite /bitmap_body. iExists (u1 ∖ {[b]}).
       rewrite bitmap_res_open.
       rewrite (bitmap_bytes_eq_diff u0 u1 b (eq_sym Hbytes)). iFrame. }
     done.

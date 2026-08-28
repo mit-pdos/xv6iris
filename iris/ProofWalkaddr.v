@@ -290,7 +290,7 @@ Section ProofWalkaddr.
               Hcmpg ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (wai_04 with "Htext"). }
-    iNext. iIntros (CID6 Hs6) "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID6 Hs6) "Hcg Hpc".
     assert (Htgt0c : add_vec (mword_of_int (KernelSyms.walkaddr + 0x04) : mword 64)
               (sign_extend' 64 (mword_of_int 8 : mword 13)) = mword_of_int (KernelSyms.walkaddr + 0x0c))
       by (apply bv_eq; vm_compute; reflexivity).
@@ -622,7 +622,7 @@ Section ProofWalkaddr.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (wai_1a with "Htext"). }
-      iNext. iIntros (CID18 Hs18) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID18 Hs18) "Hcg Hpc".
       assert (Htgt2a : add_vec (mword_of_int (KernelSyms.walkaddr + 0x1a) : mword 64)
                 (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 8 : mword 8) ('b"0"))))
               = mword_of_int (KernelSyms.walkaddr + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
@@ -800,7 +800,7 @@ Section ProofWalkaddr.
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (wai_26 with "Htext"). }
-    iNext. iIntros (CID25 Hs25) "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID25 Hs25) "Hcg Hpc".
     assert (Htgt32 : add_vec (mword_of_int (KernelSyms.walkaddr + 0x26) : mword 64)
               (sign_extend' 64 (mword_of_int 12 : mword 13)) = mword_of_int (KernelSyms.walkaddr + 0x32))
       by (apply bv_eq; vm_compute; reflexivity).
@@ -867,7 +867,7 @@ Section ProofWalkaddr.
               B6 (K - 2)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (wai_38 with "Htext"). }
-    iIntros (CID28 Hs28). iNext. iIntros "Hcg Hpc".
+    iIntros (CID28 Hs28). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htgt2a' : add_vec (mword_of_int (KernelSyms.walkaddr + 0x38) : mword 64)
               (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2041 : mword 11) ('b"0"))))
             = mword_of_int (KernelSyms.walkaddr + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).

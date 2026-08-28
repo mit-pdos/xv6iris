@@ -44,7 +44,7 @@
    `kalloc_env`/`printk_env` pair at fresh existentials.  It is now
 
        syscall_env γf pj bn fn  =  sysc_proc_env γf ∗ sysc_fs_env pj bn fn
-       sysc_fs_env pj bn fn     =  ⌜sysc_ties pj bn fn⌝ ∗ procs_inv (fcn_procs fn)
+       sysc_fs_env pj bn fn     =  ⌜sysc_proc_ties pj bn fn⌝ ∗ procs_inv (fcn_procs fn)
                                    ∗ disk_geom (fcn_disk fn) (fcn_pd fn) …
                                    ∗ is_lock (fcn_dlock fn) … (disk_res …)
                                    ∗ FsReady.fs_ready
@@ -57,7 +57,7 @@
    `kalloc`s them at WP time, so the boot-era fupd that builds the record
    cannot know them.  `fs_ready` quantifies them and the pair of resources
    above is what an equation against a field used to buy -- see
-   `sysc_ties`' note.  Interderivable, so nothing below moved.  Two more
+   `sysc_proc_ties`' note.  Interderivable, so nothing below moved.  Two more
    equations left later, for a different reason: `sct_dqb`/`sct_dqs` named
    `fclose_names` fields that the bitmap-invariant sweep deleted, the
    superblock cells now being DISCARDED for good and every contract that
@@ -469,7 +469,7 @@ Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 Ltac stkeq := unfold pa_stk, add_vec_int; f_equal; apply bv_eq; vm_compute; reflexivity.
 
 (* ===================================================================== *)
-(* THE TIES: [bn] AND [fn] *ARE* THE AMBIENT FILE SYSTEM.
+(* WHAT IS LEFT OF THE TIES: THE PROCESS [fn] IS ABOUT.
 
    [SpecSyscall.v]'s header calls the problem these solve the
    UNREACHABLE-WITNESS problem: a bundle that held the fs fabric at FRESH
@@ -500,31 +500,8 @@ Ltac stkeq := unfold pa_stk, add_vec_int; f_equal; apply bv_eq; vm_compute; refl
    dispatch's, and then it needs them.  [fs_ready] carries no process
    content at all (FsCfg.v's header), which is why they live here and not
    there. *)
-Record sysc_ties `{ICFG : icfg} `{FSC : fscfg}
-    (pj : mword 64) (bn : bio_names) (fn : fclose_names) : Prop := MkSyscTies {
-  (* ---- the block layer and the disk fabric ---- *)
-  sct_bn         : bn = fsc_bio;
-  sct_bio        : fcn_bio fn = bn;
-  sct_bmapstart  : fcn_bmapstart fn = fsc_bmapstart;
-  sct_size       : fcn_size fn = fsc_size;
-  sct_uart       : fcn_uart fn = fsc_uart;
-  sct_disk       : fcn_disk fn = fsc_disk;
-  sct_dlock      : fcn_dlock fn = fsc_dlock;
-  (* [sct_pd]/[sct_pav]/[sct_pu] ARE GONE, and they are the only three
-     equations this record has ever lost.  [fsc_desc]/[fsc_avail]/[fsc_used]
-     left [FsCfg.fscfg] (ruling R1: [virtio_disk_init] [kalloc]s the three
-     ring pages at WP time, so no boot-era [fupd] can give the record a
-     value for them), so there is no field left for an equation to name.
-     [fclose_names] KEEPS [fcn_pd]/[fcn_pav]/[fcn_pu] -- every callee still
-     threads them -- and what pins them is now a RESOURCE rather than an
-     equation: [sysc_fs_env] carries [disk_geom (fcn_disk fn) (fcn_pd fn)
-     ...] and the virtio lock at [fn]'s own three, which is what the three
-     equations were there to buy.  [sysc_fs_env_all]'s statement, and hence
-     every arm below, is unchanged. *)
-  (* ---- the inode cache, the region and the log ---- *)
-  (* ---- the allocator: the "kmem" lock and its free-list count pair ---- *)
-  sct_kmem       : fcn_kmem fn = fsc_kalloc;
-  sct_kalloc     : fcn_kalloc fn = fsc_kpages;
+Record sysc_proc_ties `{ICFG : icfg} `{FSC : fscfg}
+    (pj : mword 64) (fn : fclose_names) : Prop := MkSyscProcTies {
   (* ---- the one fraction left.  [fcn_dqb]/[fcn_dqs] are GONE from
          [fclose_names] (the superblock cells are DISCARDED for good --
          FsReady.v §0b -- and every contract that reads one takes it at a
@@ -614,8 +591,8 @@ Section SyscallVocab.
   Definition sysc_fs_env
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
         !irefslotG Σ, !pavG Σ} `{GEN : GenId}
-      (pj : mword 64) (bn : bio_names) (fn : fclose_names) : iProp Σ :=
-    (⌜sysc_ties pj bn fn⌝ ∗
+      (pj : mword 64) (fn : fclose_names) : iProp Σ :=
+    (⌜sysc_proc_ties pj fn⌝ ∗
      (* the proc array, at [fn]'s own names.  Not a conjunct of [fs_ready]:
         it is a PROCESS resource and the file system has no process content
         (FsCfg.v's header).  [sysc_arm_pre] carries the DISPATCH's own
@@ -624,7 +601,7 @@ Section SyscallVocab.
         either spelling. *)
      procs_inv (fcn_procs fn) ∗
      (* THE DISK FABRIC AT [fn]'s OWN THREE PAGES (R1).  This replaces
-        [sysc_ties]' [sct_pd]/[sct_pav]/[sct_pu]: the pages are no longer
+        [sysc_proc_ties]' [sct_pd]/[sct_pav]/[sct_pu]: the pages are no longer
         [fscfg] fields, so [fs_ready] quantifies them
         ([FsReady.fs_ready]'s disk conjunct) and there is nothing for an
         equation to point at.  Both rows are Persistent, so the bundle is
@@ -636,9 +613,9 @@ Section SyscallVocab.
         way, [FsReady.disk_geom_agree] identifies any two.  So the
         precondition is the SAME precondition, spelled where the pages
         actually live. *)
-     disk_geom (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) ∗
-     is_lock (fcn_dlock fn) d_lock "virtio_disk"%string
-       (disk_res (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)) ∗
+     disk_geom (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) ∗
+     is_lock (fsc_dlock) d_lock "virtio_disk"%string
+       (disk_res (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)) ∗
      FsReady.fs_ready)%I.
 
   (* no explicit binder list here -- unlike the Definition above, an
@@ -646,27 +623,14 @@ Section SyscallVocab.
      [GEN] is rejected ("GEN is already used").  The Section's variables are
      the right ones anyway: the instance is only ever looked up after [End]
      discharges them. *)
-  Global Instance sysc_fs_env_persistent pj bn fn : Persistent (sysc_fs_env pj bn fn).
+  Global Instance sysc_fs_env_persistent pj fn : Persistent (sysc_fs_env pj fn).
   Proof. rewrite /sysc_fs_env. apply _. Qed.
 
-  (* THE CLOSER'S OWN TIE RECORD, out of the dispatch's.  [fclose_ties] is
-     [SpecFileclose]'s twelve-equation statement of "this [fclose_names]
-     names the ambient file system"; [sysc_ties] says the same and more (the
-     three process facts, the [bn] equation, the pid fraction), so this is a
-     projection with one composition in it -- [fcn_bio] goes through [bn]. *)
-  Lemma sysc_fclose_ties (pj : mword 64) (bn : bio_names) (fn : fclose_names) :
-    sysc_ties pj bn fn -> fclose_ties fn.
-  Proof.
-    intro T. constructor.
-    - exact (sct_uart _ _ _ T).
-    - exact (sct_disk _ _ _ T).
-    - exact (sct_dlock _ _ _ T).
-    - exact (sct_kmem _ _ _ T).
-    - exact (sct_kalloc _ _ _ T).
-    - rewrite (sct_bio _ _ _ T). exact (sct_bn _ _ _ T).
-    - exact (sct_bmapstart _ _ _ T).
-    - exact (sct_size _ _ _ T).
-  Qed.
+  (* [sysc_fclose_ties] IS GONE with [SpecFileclose.fclose_ties] (rank 1d):
+     that record's eight equations said a [fclose_names]' device/allocator
+     names were the ambient ones, and the record has no such fields left to
+     name.  What survives of BOTH is [sysc_proc_ties], which is about the
+     PROCESS. *)
 
   (* THE INODE CACHE, AS THE ARMS READ IT OFF THE BUNDLE.  It USED TO be a
      [Definition] here -- a verbatim copy of the body the DELETED
@@ -675,25 +639,25 @@ Section SyscallVocab.
      not have to move.  A copy of a deleted definition is still a copy: every
      one of these fifteen conjuncts is a PROJECTION of the
      [FsReady.fs_ready] the bundle already carries, re-spelled at [fn]'s own
-     fields by [sysc_ties].  So it is a LEMMA now, the row is gone from
+     fields by [sysc_proc_ties].  So it is a LEMMA now, the row is gone from
      [sysc_fs_env_all], and an arm that wants the cache asks for it ONCE --
      one lemma application per arm, so the derivation is shared rather than
      unfolded into each proof term.  The CONJUNCT ORDER is the old body's,
      which is what keeps the arms' inner destruct patterns verbatim. *)
-  Lemma sysc_ic_env_of_ready (pj : mword 64) (bn : bio_names)
+  Lemma sysc_ic_env_of_ready (pj : mword 64)
       (fn : fclose_names) :
-    sysc_fs_env pj bn fn -∗
-    (⌜0 < fcn_size fn <= BPB⌝ ∗
-     ⌜0 <= fcn_bmapstart fn⌝ ∗
-     ⌜fcn_bmapstart fn ∈ fsc_cov⌝ ∗
-     ⌜~ (fcn_bmapstart fn ∈ log_region_set fsc_logst)⌝ ∗
+    sysc_fs_env pj fn -∗
+    (⌜0 < fsc_size <= BPB⌝ ∗
+     ⌜0 <= fsc_bmapstart⌝ ∗
+     ⌜fsc_bmapstart ∈ fsc_cov⌝ ∗
+     ⌜~ (fsc_bmapstart ∈ log_region_set fsc_logst)⌝ ∗
      ⌜0 <= icfg_ist⌝ ∗
      ⌜forall inum : mword 32,
         bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
         DinodeEnc.IBLOCK inum icfg_ist ∈ fsc_cov /\
         ~ (DinodeEnc.IBLOCK inum icfg_ist
              ∈ log_region_set fsc_logst)⌝ ∗
-     ⌜IcacheInv.cov_below fsc_cov (fcn_size fn)⌝ ∗
+     ⌜IcacheInv.cov_below fsc_cov (fsc_size)⌝ ∗
      IcacheEscrow.is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg
                 fsc_cov fsc_logst icfg_nib icfg_dev ∗
      IcacheInv.itable_inv ∗
@@ -719,22 +683,19 @@ Section SyscallVocab.
        this goal through no hypothesis (the pure rows below carry them out of
        [G] instead), and a rewrite with no subterm to hit is an error. *)
     iSplit.
-    { iPureIntro. rewrite (sct_size _ _ _ T). exact (FsReady.fgo_size G). }
+    { iPureIntro. exact (FsReady.fgo_size G). }
     iSplit.
-    { iPureIntro. rewrite (sct_bmapstart _ _ _ T). exact (FsReady.fgo_bm_nn G). }
+    { iPureIntro. exact (FsReady.fgo_bm_nn G). }
     iSplit.
-    { iPureIntro. rewrite (sct_bmapstart _ _ _ T).
-      exact (FsReady.fgo_bm_cov G). }
+    { iPureIntro. exact (FsReady.fgo_bm_cov G). }
     iSplit.
-    { iPureIntro. rewrite (sct_bmapstart _ _ _ T).
-      exact (FsReady.fgo_bm_out G). }
+    { iPureIntro. exact (FsReady.fgo_bm_out G). }
     iSplit.
     { iPureIntro. exact (FsReady.fgo_ist_nn G). }
     iSplit.
     { iPureIntro. exact (FsReady.fgo_iblocks G). }
     iSplit.
-    { iPureIntro. rewrite (sct_size _ _ _ T).
-      exact (FsReady.fgo_covbelow G). }
+    { iPureIntro. exact (FsReady.fgo_covbelow G). }
     iSplit; [ iExact "Hit"     |].
     iSplit; [ iExact "Hitinv"  |].
     iSplit; [ iExact "Hesc"    |].
@@ -758,52 +719,51 @@ Section SyscallVocab.
      for the inode count), the printk contract ialloc's out-of-inodes arm
      needs, and printk's own credential.  All four come out of [fs_ready]
      free; none of them could have been stated at [fn]'s fields at all. *)
-  Lemma sysc_fs_env_ties (pj : mword 64) (bn : bio_names) (fn : fclose_names) :
-    sysc_fs_env pj bn fn -∗ ⌜sysc_ties pj bn fn⌝.
+  Lemma sysc_fs_env_ties (pj : mword 64) (fn : fclose_names) :
+    sysc_fs_env pj fn -∗ ⌜sysc_proc_ties pj fn⌝.
   Proof. rewrite /sysc_fs_env. by iIntros "($ & _)". Qed.
 
   Lemma sysc_fs_env_all
-      (pj : mword 64) (bn : bio_names) (fn : fclose_names) :
-    sysc_fs_env pj bn fn -∗
+      (pj : mword 64) (fn : fclose_names) :
+    sysc_fs_env pj fn -∗
     ⌜icfg_dev = InodeInv.ROOTDEV⌝ ∗
     ⌜(0 < icfg_nib)%nat⌝ ∗
     ⌜fcn_dq fn = DfracOwn (1/4)⌝ ∗
-    ⌜fcn_bio fn = bn⌝ ∗
     ⌜pj = proc_addr (fcn_j fn)⌝ ∗
     ⌜(fcn_j fn < NPROC)%nat⌝ ∗
     ⌜fcn_procs fn !! fcn_j fn = Some (fcn_plock fn)⌝ ∗
     ⌜log_geom_ok fsc_cov fsc_logst⌝ ∗
     procs_inv (fcn_procs fn) ∗
     SpecPanic.panic_env ∗
-    BioInv.bio_ctx bn (fs_view fsc_fs (fcn_disk fn) icfg_dev fsc_cov) ∗
-    log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev ∗
+    BioInv.bio_ctx fsc_bio (fs_view fsc_fs (fsc_disk) icfg_dev fsc_cov) ∗
+    log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev ∗
     fs_crash_seam fsc_cov fsc_logst ∗
     gen_cert ∗
-    dev_inv (fcn_uart fn) (fcn_disk fn) ∗
-    disk_geom (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) ∗
-    is_lock (fcn_dlock fn) d_lock "virtio_disk"%string
-      (disk_res (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)) ∗
-    is_lock (fcn_kmem fn) (mword_of_int KernelSyms.kmem) "kmem"%string
-      (kmem_res (fcn_kalloc fn) (mword_of_int (KernelSyms.kmem + 24))) ∗
-    kalloc_avail (fcn_kalloc fn) None ∗
+    dev_inv (fsc_uart) (fsc_disk) ∗
+    disk_geom (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) ∗
+    is_lock (fsc_dlock) d_lock "virtio_disk"%string
+      (disk_res (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)) ∗
+    is_lock (fsc_kalloc) (mword_of_int KernelSyms.kmem) "kmem"%string
+      (kmem_res (fsc_kpages) (mword_of_int (KernelSyms.kmem + 24))) ∗
+    kalloc_avail (fsc_kpages) None ∗
     (* [sysc_ic_env fn] USED TO BE HERE, between the allocator and
        [ireg_open].  It is [sysc_ic_env_of_ready] now: the icache rows are a
        projection of this bundle's own [fs_ready], so an arm derives them
        instead of unpacking a row that had to be rebuilt here first. *)
     ireg_open ∗
     (* ---- the four rows the old bundle could not state ---- *)
-    ⌜bitmap_geom_ok fsc_cov fsc_logst (fcn_bmapstart fn) (fcn_size fn)⌝ ∗
+    ⌜bitmap_geom_ok fsc_cov fsc_logst (fsc_bmapstart) (fsc_size)⌝ ∗
     ⌜1 < fsc_ninodes /\ fsc_ninodes <= 16 * Z.of_nat icfg_nib
       /\ fsc_ninodes < 2 ^ 31 /\ 16 * Z.of_nat icfg_nib <= 2 ^ 16⌝ ∗
     InodeInv.sb_ninodes ↦₄□ (mword_of_int fsc_ninodes : mword 32) ∗
-    BitmapInv.sb_size ↦₄□ (mword_of_int (fcn_size fn) : mword 32) ∗
+    BitmapInv.sb_size ↦₄□ (mword_of_int (fsc_size) : mword 32) ∗
     (* ...AT [fn]'s UART/disk names, like every other fabric row above --
        the printk GNAME has no [fclose_names] field, so it stays ambient.
        Spelling the pair at [fn]'s is what lets one arm hand [dev_inv] and
        [printk_env] to a callee that takes ONE uart parameter for both
        (every create-family entry does). *)
-    ⌜printk_gen_contract (kt := KT1) fsc_printk (fcn_uart fn) (fcn_disk fn)⌝ ∗
-    printk_env fsc_printk (fcn_uart fn) (fcn_disk fn).
+    ⌜printk_gen_contract (kt := KT1) fsc_printk (fsc_uart) (fsc_disk)⌝ ∗
+    printk_env fsc_printk (fsc_uart) (fsc_disk).
   Proof.
     (* [Hgeom]/[Hdlock] come out of the BUNDLE now, at [fn]'s own three ring
        pages, and [fs_ready]'s own disk conjunct -- which quantifies them
@@ -826,17 +786,12 @@ Section SyscallVocab.
        so they are NOT re-spelled and each pure row below rewrites its own
        way (durable-notes.md's note on the un-scoped rewrite, at
        [sysc_arm_exit]). *)
-    rewrite -(sct_bn _ _ _ T) -(sct_bmapstart _ _ _ T) -(sct_size _ _ _ T)
-            -(sct_uart _ _ _ T) -(sct_disk _ _ _ T)
-            (* [sct_dlock] IS NOT IN THIS CHAIN, and that is R1's doing:
-               [fsc_dlock] used to reach the goal only through [fs_ready]'s
-               [is_lock fsc_dlock … (disk_res fsc_disk fsc_desc …)] row, and
-               that row is now the BUNDLE's own [is_lock (fcn_dlock fn) …].
-               So there is no [fsc_dlock] left anywhere in [Δ] or the
-               conclusion, and the rewrite would fail with "does not match
-               any subterm".  The tie itself stays on the record -- a
-               consumer still reads [fcn_dlock fn = fsc_dlock]. *)
-            -(sct_kmem _ _ _ T) -(sct_kalloc _ _ _ T).
+    (* THE TIE-REWRITE CHAIN IS GONE (rank 1d).  It re-spelled nine ambient
+       names at [fn]'s own fields; [fclose_names] has no such fields left, so
+       both sides of every one of those equations print the same and Rocq
+       REFUSES the rewrite outright ("all matches of the RHS are equal to the
+       LHS").  The bundle and [fs_ready] now speak the same names, which is
+       the whole point of the rank. *)
     (* assembled conjunct by conjunct rather than with a named [iFrame]: the
        thirty-one rows are in this bundle's own order and every one of them
        is persistent, so a mismatch names the row that moved instead of
@@ -848,11 +803,10 @@ Section SyscallVocab.
     { iPureIntro. exact (FsReady.fgo_rootdev G). }
     iSplit.
     { iPureIntro. exact (FsReady.fgo_nib_pos G). }
-    iSplit; [ iPureIntro; exact (sct_dq _ _ _ T) |].
-    iSplit; [ iPureIntro; exact (sct_bio _ _ _ T) |].
-    iSplit; [ iPureIntro; exact (sct_pj _ _ _ T) |].
-    iSplit; [ iPureIntro; exact (sct_j _ _ _ T) |].
-    iSplit; [ iPureIntro; exact (sct_plock _ _ _ T) |].
+    iSplit; [ iPureIntro; exact (sct_dq _ _ T) |].
+    iSplit; [ iPureIntro; exact (sct_pj _ _ T) |].
+    iSplit; [ iPureIntro; exact (sct_j _ _ T) |].
+    iSplit; [ iPureIntro; exact (sct_plock _ _ T) |].
     iSplit.
     { iPureIntro. 
       exact (FsReady.fgo_loggeom G). }
@@ -874,9 +828,7 @@ Section SyscallVocab.
        are the only place they do. *)
     iSplit; [ iExact "Hropen" |].
     iSplit.
-    { iPureIntro. rewrite
-                          (sct_bmapstart _ _ _ T) (sct_size _ _ _ T).
-      exact (FsReady.fgo_bmgeom G). }
+    { iPureIntro. exact (FsReady.fgo_bmgeom G). }
     iSplit.
     { iPureIntro.
       split; [ exact (FsReady.fgo_nin_lo G) |].
@@ -885,7 +837,7 @@ Section SyscallVocab.
     iSplit; [ iExact "Hsbn" |].
     iSplit; [ iExact "Hsbs" |].
     iSplit.
-    { iPureIntro. rewrite (sct_uart _ _ _ T) (sct_disk _ _ _ T). exact Hprg. }
+    { iPureIntro. exact Hprg. }
     iExact "Hpr".
   Qed.
 
@@ -917,9 +869,9 @@ Section SyscallVocab.
   Definition syscall_env
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
         !irefslotG Σ, !pavG Σ} `{GEN : GenId}
-      (γf : gname) (pj : mword 64) (bn : bio_names) (fn : fclose_names)
+      (γf : gname) (pj : mword 64) (fn : fclose_names)
       : iProp Σ :=
-    (sysc_proc_env γf ∗ ConsoleInv.console_ready ∗ sysc_fs_env pj bn fn ∗
+    (sysc_proc_env γf ∗ ConsoleInv.console_ready ∗ sysc_fs_env pj fn ∗
      (* THE STEADY ARM OF proc.c's [static int first]
         ([FirstTok.first_done]).  It is here, and LAST, for two reasons.
         HERE: fork is the one syscall that BUILDS a second process block,
@@ -967,26 +919,22 @@ Section SyscallVocab.
      witness is opened here and [FsReady.disk_geom_agree] identifies it with
      the caller's [disk_geom].  That is exactly what that lemma exists for.
 
-     [sysc_ties] IS DERIVED, NOT TAKEN.  Fourteen of its equations are
-     [fclose_ties]' verbatim, [sct_bn]/[sct_bio] are that record's [fcn_bio]
-     row read twice, and the remaining four are the pure premises above --
-     so a caller that already owes [fclose_ties fn] for [ut_caps] owes
-     nothing new here. *)
+     [sysc_proc_ties] IS DERIVED, NOT TAKEN, and since rank 1d it is only
+     the pure premises above: the equations it used to carry all named a
+     [fclose_names] field that no longer exists. *)
   Lemma sysc_ties_of_fclose (fn : fclose_names) :
-    fclose_ties fn ->
     (fcn_j fn < NPROC)%nat ->
     fcn_procs fn !! fcn_j fn = Some (fcn_plock fn) ->
     fcn_dq fn = DfracOwn (1/4) ->
-    sysc_ties (proc_addr (fcn_j fn)) (fcn_bio fn) fn.
+    sysc_proc_ties (proc_addr (fcn_j fn)) fn.
   Proof.
-    intros [Huart Hdisk Hdlock Hkmem Hkalloc Hbio Hbms Hsize] Hj Hplock Hdq.
-    (* [sct_bio] and [sct_pj] are [reflexivity] because the indices were
-       READ OFF [fn]; everything else is one of the twenty-two hypotheses. *)
+    intros Hj Hplock Hdq.
+    (* [sct_pj] is [reflexivity] because the index was READ OFF [fn];
+       everything else is one of the three hypotheses. *)
     constructor; try assumption; try reflexivity.
   Qed.
 
   Lemma syscall_env_park (γf γw γft γtk : gname) (fn : fclose_names) :
-    fclose_ties fn ->
     (fcn_j fn < NPROC)%nat ->
     fcn_procs fn !! fcn_j fn = Some (fcn_plock fn) ->
     fcn_dq fn = DfracOwn (1/4) ->
@@ -994,23 +942,21 @@ Section SyscallVocab.
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     is_ftable γft γf -∗
     procs_inv (fcn_procs fn) -∗
-    disk_geom (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) -∗
+    disk_geom (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) -∗
     first_done -∗
     park_world (fcn_procs fn) -∗
     park_token (fcn_procs fn) -∗
-    syscall_env γf (proc_addr (fcn_j fn)) (fcn_bio fn) fn.
+    syscall_env γf (proc_addr (fcn_j fn)) fn.
   Proof.
-    iIntros (Hties Hj Hplock Hdq) "#Hextra #Hwl #Hft #Hprocs #Hdg #Hdone #Hworld #Htok".
+    iIntros (Hj Hplock Hdq) "#Hextra #Hwl #Hft #Hprocs #Hdg #Hdone #Hworld #Htok".
     iDestruct "Hextra" as "(#Hnextpid & #Hpav & #Htick & #Hcons)".
     iDestruct "Hdone" as "[#Hcell #Hrdy]".
-    pose proof Hties as Ht.
-    destruct Ht as [Huart Hdisk Hdlock _ _ _ _ _ _ _ _ _].
     (* the disk fabric, at [fn]'s pages rather than at [fs_ready]'s witness *)
     iDestruct (FsReady.fs_ready_disk with "Hrdy") as "[_ Hdex]".
     iDestruct "Hdex" as (pd pav pu) "[#Hdg2 #Hdlk]".
     iDestruct (FsReady.disk_geom_agree fsc_disk (fcn_pd fn) (fcn_pav fn)
                  (fcn_pu fn) pd pav pu with "[] []") as %(Hpd & Hpav & Hpu);
-      [ rewrite -Hdisk; iExact "Hdg" | iExact "Hdg2" |].
+      [ iExact "Hdg" | iExact "Hdg2" |].
     rewrite /syscall_env.
     iSplitR.
     { rewrite /sysc_proc_env.
@@ -1020,9 +966,9 @@ Section SyscallVocab.
     iSplitR.
     { rewrite /sysc_fs_env.
       iSplitR;
-        [iPureIntro; exact (sysc_ties_of_fclose fn Hties Hj Hplock Hdq)|].
+        [iPureIntro; exact (sysc_ties_of_fclose fn Hj Hplock Hdq)|].
       iFrame "Hprocs Hdg".
-      iSplitR; [rewrite Hdlock Hdisk Hpd Hpav Hpu; iExact "Hdlk"|].
+      iSplitR; [rewrite Hpd Hpav Hpu; iExact "Hdlk"|].
       iExact "Hrdy". }
     iSplitR; [rewrite /first_done; iFrame "Hcell Hrdy"|].
     iSplitR; [iExact "Hworld"|].
@@ -1046,26 +992,26 @@ Section SyscallVocab.
      that file notes: [syscall_env] is entirely persistent, so a second
      process's copy costs nothing. *)
   Lemma syscall_env_console (γf : gname) (pj : mword 64)
-      (bn : bio_names) (fn : fclose_names) :
-    syscall_env γf pj bn fn -∗ ConsoleInv.console_ready.
+ (fn : fclose_names) :
+    syscall_env γf pj fn -∗ ConsoleInv.console_ready.
   Proof. by iIntros "(_ & $ & _)". Qed.
 
   (* ...and the fork row, on its own for the same reason the console is:
      ONE arm wants it, and adding it to [syscall_env_all]'s output would
      move eleven [iDestruct] patterns. *)
   Lemma syscall_env_first (γf : gname) (pj : mword 64)
-      (bn : bio_names) (fn : fclose_names) :
-    syscall_env γf pj bn fn -∗ FirstTok.first_done.
+ (fn : fclose_names) :
+    syscall_env γf pj fn -∗ FirstTok.first_done.
   Proof. by iIntros "(_ & _ & _ & $ & _)". Qed.
 
   Lemma syscall_env_world (γf : gname) (pj : mword 64)
-      (bn : bio_names) (fn : fclose_names) :
-    syscall_env γf pj bn fn -∗ park_world (fcn_procs fn).
+ (fn : fclose_names) :
+    syscall_env γf pj fn -∗ park_world (fcn_procs fn).
   Proof. by iIntros "(_ & _ & _ & _ & $ & _)". Qed.
 
   Lemma syscall_env_token (γf : gname) (pj : mword 64)
-      (bn : bio_names) (fn : fclose_names) :
-    syscall_env γf pj bn fn -∗ park_token (fcn_procs fn).
+ (fn : fclose_names) :
+    syscall_env γf pj fn -∗ park_token (fcn_procs fn).
   Proof. by iIntros "(_ & _ & _ & _ & _ & $)". Qed.
 
   (* ...and the OLD shape, as a projection.  Same reason [sysc_fs_env_all]
@@ -1073,18 +1019,23 @@ Section SyscallVocab.
      re-shuffling eleven of them by hand is the kind of edit that compiles
      while meaning something else. *)
   Lemma syscall_env_all (γf : gname) (pj : mword 64)
-      (bn : bio_names) (fn : fclose_names) :
-    syscall_env γf pj bn fn -∗
-    ∃ (γa γp γw γft γtk γpr : gname)
-      (γud : uart_names) (γvd : disk_names),
-      kalloc_env γa None ∗
+ (fn : fclose_names) :
+    syscall_env γf pj fn -∗
+    (* FOUR OF THE EIGHT EXISTENTIALS ARE GONE (rank 1d): the allocator's
+       lock and printk's three names are [FsCfg.fscfg] fields, so hiding
+       them behind an [∃] would hand an arm a name nothing says anything
+       about -- which is exactly the unreachable-witness shape this file's
+       header argues against.  The four that remain (nextpid, wait_lock,
+       ftable, ticks) are PROCESS locks and genuinely quantified. *)
+    ∃ (γp γw γft γtk : gname),
+      kalloc_env fsc_kalloc None ∗
       is_lock γp alp_pid_lock "nextpid"%string nextpid_res ∗
       procs_avail None ∗
       is_lock γw wait_lock_addr "wait_lock"%string wait_res ∗
       is_ftable γft γf ∗
       is_tickslock γtk ∗
-      printk_env γpr γud γvd ∗
-      sysc_fs_env pj bn fn.
+      printk_env fsc_printk fsc_uart fsc_disk ∗
+      sysc_fs_env pj fn.
   Proof.
     iIntros "(#Hproc & _ & #Hfs & _)".
     iDestruct "Hproc" as (γp γw γft γtk)
@@ -1095,7 +1046,7 @@ Section SyscallVocab.
     iDestruct "Hfsc" as "(_ & _ & _ & _ & #Hrdy)".
     iDestruct (FsReady.fs_ready_kalloc with "Hrdy") as "#Hkalloc".
     iDestruct (FsReady.fs_ready_printk with "Hrdy") as "[#Hpr _]".
-    iExists fsc_kalloc, γp, γw, γft, γtk, fsc_printk, fsc_uart, fsc_disk.
+    iExists γp, γw, γft, γtk.
     iFrame "Hkalloc Hnextpid Hpav Hwaitlk Hftable Htick Hpr Hfs".
   Qed.
 
@@ -1105,41 +1056,25 @@ Section SyscallVocab.
      already holds, and [procs_inv γs] at the dispatch's own [γs] -- see
      [sysc_fs_env]'s note on why they cannot live in the bundle. *)
   Lemma sysc_fs_fabric (γf : gname) (pj : mword 64) (γs : list gname)
-      (bn : bio_names) (fn : fclose_names) :
-    kernel_data -∗ procs_inv γs -∗ syscall_env γf pj bn fn -∗
-    SpecKexec.fs_fabric γs (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
-      (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
+ (fn : fclose_names) :
+    kernel_data -∗ procs_inv γs -∗ syscall_env γf pj fn -∗
+    SpecKexec.fs_fabric γs
+      (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
 
 .
   Proof.
     iIntros "#Hdata #Hprocs #Henv".
-    iDestruct (syscall_env_all with "Henv") as (γa γp γw γft γtk γpr γud γvd)
-      "(_ & _ & _ & _ & _ & _ & _ & #Hfs)".
-    iDestruct (sysc_fs_env_all with "Hfs") as
-      "( _ & _ & _ & _ & _ & _ & _ & _ &
-        _ & #Hpanic & #Hbio & #Hlog & #Hseam & #Hgen & #Hdevi & #Hgeom &
-        #Hdlock & _ & _ & _ )".
-    iDestruct (sysc_ic_env_of_ready with "Hfs") as
-      "( _ & _ & _ & _ & _ & _ & _ & #Hit & #Hitinv & #Hesc & #Hireg &
-        #Hropen & #Hsl )".
-    (* assembled conjunct by conjunct rather than with [iFrame "#"]: the
-       fifteen are in the fabric's own order, and a mismatch then names the
-       one that moved instead of leaving an unsolved goal. *)
+    iDestruct "Henv" as "(_ & _ & #Hfs & _)".
+    iDestruct "Hfs" as "(_ & _ & #Hgeom & #Hdlock & #Hrdy)".
+    (* FOUR ROWS (rank 1d): the fabric IS [FsReady.fs_ready] plus the
+       dispatch's own [procs_inv] and the disk fabric at [fn]'s three ring
+       pages, which is exactly what [sysc_fs_env] already carries.  The
+       fifteen-step chain this replaces existed because a named [iFrame]
+       over that many definition-valued rows is a goal-side search per
+       hypothesis. *)
     rewrite /SpecKexec.fs_fabric.
-    iSplitR; [iExact "Hdata"   |].
-    iSplitR; [iExact "Hpanic"  |].
-    iSplitR; [iExact "Hbio"    |].
-    iSplitR; [iExact "Hlog"    |].
-    iSplitR; [iExact "Hseam"   |].
-    iSplitR; [iExact "Hgen"    |].
-    iSplitR; [iExact "Hit"     |].
-    iSplitR; [iExact "Hitinv"  |].
-    iSplitR; [iExact "Hesc"    |].
-    iSplitR; [iExact "Hsl"     |].
-    iSplitR; [iExact "Hireg"   |].
-    iSplitR; [iExact "Hropen"  |].
+    iSplitR; [iExact "Hrdy"    |].
     iSplitR; [iExact "Hprocs"  |].
-    iSplitR; [iExact "Hdevi"   |].
     iSplitR; [iExact "Hgeom"   |].
     iExact "Hdlock".
   Qed.
@@ -1154,19 +1089,17 @@ Section SyscallVocab.
 
      Stated as a lemma only so no arm has to spell [fn]'s six field
      accessors, exactly as the old split did. *)
-  Lemma sysc_bm_cells (pj : mword 64) (bn : bio_names) (fn : fclose_names) :
-    sysc_fs_env pj bn fn -∗
-    sb_bmapstart ↦₄□ (mword_of_int (fcn_bmapstart fn) : mword 32) ∗
+  Lemma sysc_bm_cells (pj : mword 64) (fn : fclose_names) :
+    sysc_fs_env pj fn -∗
+    sb_bmapstart ↦₄□ (mword_of_int (fsc_bmapstart) : mword 32) ∗
     InodeInv.sb_inodestart ↦₄□ (mword_of_int icfg_ist : mword 32) ∗
-    bitmap_inv fsc_fs (fcn_bmapstart fn) fsc_cov fsc_logst
-               (fcn_size fn).
+    bitmap_inv fsc_fs (fsc_bmapstart) fsc_cov fsc_logst
+               (fsc_size).
   Proof.
     iIntros "#Hfs".
-    iDestruct (sysc_fs_env_ties with "Hfs") as "%T".
     iDestruct "Hfs" as "(_ & _ & _ & _ & #Hrdy)".
     iDestruct (FsReady.fs_ready_sb_four with "Hrdy") as "(_ & #Hisp & _ & #Hbmp)".
     iDestruct (FsReady.fs_ready_bitmap with "Hrdy") as "#Hbmi".
-    rewrite (sct_bmapstart _ _ _ T) (sct_size _ _ _ T).
     iSplitR; [ iExact "Hbmp" |].
     iSplitR; [ iExact "Hisp" |].
     iExact "Hbmi".
@@ -1174,18 +1107,16 @@ Section SyscallVocab.
 
   (* [fn] REBUILT FROM ITS OWN ACCESSORS, which is what [sys_exit]'s
      [fn = MkFCloseNames ...] premise reduces to once every parameter it
-     quantifies is instantiated at [fn]'s matching field.  Only three of the
-     twenty-six are not already [fn]'s own: [bn] and [pid] are the ambient
-     dispatch's, and the [1/4] is a literal -- so the premise IS record eta,
-     modulo those three ties. *)
-  Lemma sysc_fn_eta (fn : fclose_names) (bn : bio_names) (pid : mword 32) :
-    fcn_bio fn = bn -> fcn_pid fn = pid -> fcn_dq fn = DfracOwn (1/4) ->
-    fn = MkFCloseNames (fcn_procs fn) (fcn_j fn) (fcn_plock fn) (fcn_kmem fn)
-           (fcn_kalloc fn) (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
-           (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
-           pid (DfracOwn (1/4))
-           (fcn_bmapstart fn) (fcn_size fn).
-  Proof. intros <- <- <-. destruct fn; reflexivity. Qed.
+     quantifies is instantiated at [fn]'s matching field.  Only two of the
+     eight are not already [fn]'s own: [pid] is the ambient dispatch's and
+     the [1/4] is a literal -- so the premise IS record eta, modulo those
+     two ties. *)
+  Lemma sysc_fn_eta (fn : fclose_names) (pid : mword 32) :
+    fcn_pid fn = pid -> fcn_dq fn = DfracOwn (1/4) ->
+    fn = MkFCloseNames (fcn_procs fn) (fcn_j fn) (fcn_plock fn)
+           (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
+           pid (DfracOwn (1/4)).
+  Proof. intros <- <-. destruct fn; reflexivity. Qed.
 
   (* the dispatch carries [IREFSPARE] = 4 units of the inode-reference
      allowance; kexec's walk wants 2 and gives them back. *)
@@ -1567,7 +1498,6 @@ Section SyscallVocab.
      table entry's own known address, plus every resource
      [wp_syscall_sconf_body] threads opaquely through the dispatch. *)
   Definition sysc_arm_pre `{CIDh : CpuId} (γf : gname) (pj : mword 64) (γs : list gname)
-      (bn : bio_names)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64) (pid : mword 32)
       (V : pprivate) (lks : gset string) (av : nat) (M : regfile)
       (tgt : mword 64) :=
@@ -1579,7 +1509,7 @@ Section SyscallVocab.
         cone reaches -- both persistent, both already held by the capstone,
         and between them what most table entries need beyond [proc_priv] *)
      procs_inv γs ∗
-     syscall_env γf pj bn fn ∗
+     syscall_env γf pj fn ∗
      bslots 3 ∗
      (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip ∗
      fd_slots FDSPARE ∗
@@ -1595,7 +1525,7 @@ Section SyscallVocab.
      named [iFrame] searches the goal's conjuncts; its final [proc_priv]
      contains the 4096-word trapframe page, making that search seconds long. *)
   Lemma sysc_arm_pre_intro `{CIDh : CpuId}
-      (γf : gname) (pj : mword 64) (γs : list gname) (bn : bio_names)
+      (γf : gname) (pj : mword 64) (γs : list gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64) (pid : mword 32)
       (V : pprivate) (lks : gset string) (av : nat) (M : regfile)
       (tgt : mword 64) :
@@ -1604,14 +1534,14 @@ Section SyscallVocab.
     cpu_own 0%nat true pj true lks -∗
     kernel_text -∗
     procs_inv γs -∗
-    syscall_env γf pj bn fn -∗
+    syscall_env γf pj fn -∗
     bslots 3 -∗
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
     fd_slots FDSPARE -∗
     iref_slots IREFSPARE -∗
     proc_priv γf pj pid V -∗
     fd_frags_any (pv_fdg V) -∗
-    sysc_arm_pre γf pj γs bn fn dqi ip pid V lks av M tgt.
+    sysc_arm_pre γf pj γs fn dqi ip pid V lks av M tgt.
   Proof.
     iIntros "Hpc Hcg Hcpu Htext Hprocs HR Hbs Hip Hfd Hir Hpriv Hufrag".
     rewrite /sysc_arm_pre.
@@ -1633,7 +1563,7 @@ Section SyscallVocab.
      arm/the epilogue can take it as an explicit parameter rather than
      restate it -- [V]/[m] here are the WHOLE FUNCTION's entry values,
      fixed for the whole proof; only [mf]/[V'] vary per return. *)
-  Definition sysc_hcont_ty `{CIDh : CpuId} (γf : gname) (pj : mword 64) (bn : bio_names)
+  Definition sysc_hcont_ty `{CIDh : CpuId} (γf : gname) (pj : mword 64)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64) (pid : mword 32)
       (V : pprivate) (lks : gset string) (av : nat) (m : regfile)
       (ret_tgt : mword 64) : iProp Σ :=
@@ -1651,7 +1581,7 @@ Section SyscallVocab.
         (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
         fd_slots FDSPARE -∗
         iref_slots IREFSPARE -∗
-        syscall_env γf pj bn fn -∗
+        syscall_env γf pj fn -∗
         proc_priv γf pj pid V' -∗
         fd_frags_any (pv_fdg V) -∗
         pc_is ret_tgt -∗
@@ -1668,10 +1598,10 @@ Section SyscallVocab.
      [sysc_ret_tail], [sysc_epilogue_tail] and [sysc_fallback] still take the
      bare [wp_next] and never learn that the conjunction happened. *)
   Definition sysc_exit_ty `{CIDh : CpuId} (γf : gname) (pj : mword 64)
-      (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
+ (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m : regfile) (ret_tgt : mword 64) : iProp Σ :=
-    (sysc_hcont_ty γf pj bn fn dqi ip pid V lks av m ret_tgt
+    (sysc_hcont_ty γf pj fn dqi ip pid V lks av m ret_tgt
      ∧ kstack_closer pj (m !!! Regidx csp_rs1) (trap_res true + av))%I.
 
   (* the crossing, for the whole slot.  Only the LEFT conjunct is
@@ -1679,12 +1609,12 @@ Section SyscallVocab.
      so [kstack_closer] crosses a migration untouched and the right branch is
      a bare re-assertion. *)
   Lemma sysc_exit_retarget (CID0 CID1 : CpuId) (γf : gname) (pj : mword 64)
-      (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
+ (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m : regfile) (ret_tgt : mword 64) :
     (true = false \/ pj = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
-    sysc_exit_ty (CIDh := CID0) γf pj bn fn dqi ip pid V lks av m ret_tgt -∗
-    sysc_exit_ty (CIDh := CID1) γf pj bn fn dqi ip pid V lks av m ret_tgt.
+    sysc_exit_ty (CIDh := CID0) γf pj fn dqi ip pid V lks av m ret_tgt -∗
+    sysc_exit_ty (CIDh := CID1) γf pj fn dqi ip pid V lks av m ret_tgt.
   Proof.
     intro Hcr. iIntros "H". rewrite /sysc_exit_ty. iSplit.
     - iDestruct "H" as "[H _]".
@@ -1727,7 +1657,7 @@ Section SyscallVocab.
      bespoke type. *)
   Definition sysc_arm_goal `{CIDh : CpuId} (k : nat) (γf : gname) (pj : mword 64)
       (γs : list gname) (j : nat) (γl : gname)
-      (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
+ (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) : Prop :=
     (* WHICH process this is, in the vocabulary the per-process entries state
@@ -1752,13 +1682,13 @@ Section SyscallVocab.
     (K_syscall <= av)%nat ->
     (* the tie [syscall_env]'s indices cannot reach -- SpecSyscall.v's note *)
     fcn_pid fn = pid ->
-    sysc_arm_pre γf pj γs bn fn dqi ip pid V lks (av - 4)%nat M (mword_of_int (sysc_target k)) -∗
+    sysc_arm_pre γf pj γs fn dqi ip pid V lks (av - 4)%nat M (mword_of_int (sysc_target k)) -∗
     word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
     word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
     word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
     word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
     kernel_data -∗
-    sysc_exit_ty γf pj bn fn dqi ip pid V lks av m (ret_pc (m !!! Regidx Rra)) -∗
+    sysc_exit_ty γf pj fn dqi ip pid V lks av m (ret_pc (m !!! Regidx Rra)) -∗
     WP (Loop : expr riscv_lang).
 
   (* ------------------------------------------------------------------- *)
@@ -1774,7 +1704,7 @@ Section SyscallVocab.
      what [E] currently holds live.  [E]'s own [sie_cap_gpr] is at
      [av - 4], same convention as [sysc_arm_goal]. *)
   Lemma sysc_epilogue_tail
-      (γf : gname) (pj : mword 64) (bn : bio_names) (fn : fclose_names)
+      (γf : gname) (pj : mword 64) (fn : fclose_names)
       (dqi : dfrac) (ip : mword 64) (pid : mword 32) (V V' : pprivate)
       (lks : gset string) (av : nat)
       (m E : regfile) :
@@ -1796,10 +1726,10 @@ Section SyscallVocab.
     bslots 3 -∗
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
     fd_slots FDSPARE -∗ iref_slots IREFSPARE -∗
-    syscall_env γf pj bn fn -∗ proc_priv γf pj pid V' -∗
+    syscall_env γf pj fn -∗ proc_priv γf pj pid V' -∗
     fd_frags_any (pv_fdg V) -∗
     pc_is (mword_of_int (KernelSyms.syscall + 0x58) : mword 64) -∗
-    sysc_hcont_ty γf pj bn fn dqi ip pid V lks av m (ret_pc (m !!! Regidx Rra)) -∗
+    sysc_hcont_ty γf pj fn dqi ip pid V lks av m (ret_pc (m !!! Regidx Rra)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HEsp Hrest Hav4 Hud Hfg.
@@ -2138,14 +2068,14 @@ Section SyscallVocab.
      the bitmap or the pid cell.  The records are strict SUBSETS of
      [fclose_names]'s fields, so the dispatch builds each one out of [fn] --
      the ONE thing that makes this work is that both bundles are stated at
-     the AMBIENT [icfg_dev]/[icfg_nib], which [sysc_ties] says are [fn]'s own
+     the AMBIENT [icfg_dev]/[icfg_nib], which [sysc_proc_ties] says are [fn]'s own
      ([sysc_fs_env_all]'s first two rows).  Before [fs_ready], the bundle
      these are carved out of held its fabric at fresh existentials and this
      carving was impossible -- SpecSyscall.v's UNREACHABLE-WITNESS problem,
      in the shape it takes for a NON-closer callee. *)
-  Definition sysc_fstat_names (bn : bio_names) (fn : fclose_names) : fstat_names :=
-    MkFStatNames (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
-      (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
+  Definition sysc_fstat_names (fn : fclose_names) : fstat_names :=
+    MkFStatNames
+      (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
       DfracDiscarded.
 
   (* =================================================================== *)
@@ -2165,25 +2095,24 @@ Section SyscallVocab.
   (*  [ConsoleInv.console_ready] out of [syscall_env] ONCE -- which is why   *)
   (*  the gname is existential there and not a field of [fclose_names].      *)
   (* =================================================================== *)
-  Definition sysc_fread_names (γc : gname) (bn : bio_names) (fn : fclose_names)
+  Definition sysc_fread_names (γc : gname) (fn : fclose_names)
       : fread_names :=
     MkFReadNames (fcn_procs fn) (fcn_j fn) (fcn_plock fn)
-      (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn) γc
-      (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
+ γc
+      (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
       DfracDiscarded
       ConsoleInv.devsw_read_val (fun _ => DfracDiscarded).
 
   Lemma sysc_fileread_env (γf : gname) (γc : gname) (pj : mword 64)
-      (bn : bio_names) (fn : fclose_names) :
-    sysc_fs_env pj bn fn -∗ bslot -∗
-    SpecFileread.fileread_fs_env γf (sysc_fread_names γc bn fn) ∗
-    (SpecFileread.fileread_fs_out (sysc_fread_names γc bn fn) -∗ bslot).
+ (fn : fclose_names) :
+    sysc_fs_env pj fn -∗ bslot -∗
+    SpecFileread.fileread_fs_env γf (sysc_fread_names γc fn) ∗
+    (SpecFileread.fileread_fs_out (sysc_fread_names γc fn) -∗ bslot).
   Proof.
     iIntros "#Hfs Hsl".
     iDestruct (sysc_fs_env_all with "Hfs") as
-      "( _ & _ & _ & _ & _ & _ & _ & %Hlg &
-        _ & _ & #Hbio & _ & _ & _ & #Hdevi & #Hgeom & #Hdlock & _ & _ &
-        _ )".
+      "(_ & _ & _ & _ & _ & _ & %Hlg & _ & _ & #Hbio & _ & _ & _ & #Hdevi &
+        #Hgeom & #Hdlock & _ & _ & _)".
     iDestruct (sysc_ic_env_of_ready with "Hfs") as
       "( _ & _ & _ & _ & %Hist0 & %Hib & _ & #Hit & #Hitinv & #Hesc &
         #Hireg & _ & #Hsl2 )".
@@ -2213,17 +2142,16 @@ Section SyscallVocab.
     by iDestruct "Hout" as "[_ $]".
   Qed.
 
-  Lemma sysc_filestat_env (pj : mword 64) (bn : bio_names) (fn : fclose_names)
+  Lemma sysc_filestat_env (pj : mword 64) (fn : fclose_names)
       :
-    sysc_fs_env pj bn fn -∗ bslot -∗
-    SpecFilestat.filestat_fs_env (sysc_fstat_names bn fn) ∗
-    (SpecFilestat.filestat_fs_out (sysc_fstat_names bn fn) -∗ bslot).
+    sysc_fs_env pj fn -∗ bslot -∗
+    SpecFilestat.filestat_fs_env (sysc_fstat_names fn) ∗
+    (SpecFilestat.filestat_fs_out (sysc_fstat_names fn) -∗ bslot).
   Proof.
     iIntros "#Hfs Hsl".
     iDestruct (sysc_fs_env_all with "Hfs") as
-      "( _ & _ & _ & _ & _ & _ & _ & %Hlg &
-        _ & _ & #Hbio & _ & _ & _ & #Hdevi & #Hgeom & #Hdlock & _ & _ &
-        _ )".
+      "(_ & _ & _ & _ & _ & _ & %Hlg & _ & _ & #Hbio & _ & _ & _ & #Hdevi &
+        #Hgeom & #Hdlock & _ & _ & _)".
     iDestruct (sysc_ic_env_of_ready with "Hfs") as
       "( _ & _ & _ & _ & %Hist0 & %Hib & _ & #Hit & #Hitinv & #Hesc &
         #Hireg & _ & #Hsl2 )".
@@ -2271,12 +2199,13 @@ Section SyscallVocab.
      the two entries lend the quarter out of their own [proc_priv] (see
      SpecSysClose.v's note; [SpecFileclose.fileclose_loop_open] is the
      pairing). *)
-  Lemma sysc_fclose_pipe_env (pj : mword 64) (bn : bio_names) (fn : fclose_names) :
-    sysc_fs_env pj bn fn -∗ fileclose_pipe_env fn None 0%nat.
+  Lemma sysc_fclose_pipe_env (pj : mword 64) (fn : fclose_names) :
+    sysc_fs_env pj fn -∗ fileclose_pipe_env fn None 0%nat.
   Proof.
     iIntros "#Hfs".
     iDestruct (sysc_fs_env_all with "Hfs") as
-      "( _ & _ & _ & _ & _ & _ & _ & _ & #Hpi & _ & _ & _ & _ & _ & _ & _ & _ & #Hkm & #Hav & _ )".
+      "(_ & _ & _ & _ & _ & _ & _ & #Hpi & _ & _ & _ & _ & _ & _ & _ & _ & #Hkm
+        & #Hav & _)".
     rewrite /fileclose_pipe_env.
     iSplit; [ iPureIntro; cbn; lia |].
     iFrame "Hpi Hkm Hav".
@@ -2289,9 +2218,9 @@ Section SyscallVocab.
      as well are all projections of the ONE predicate this carries.  What is
      left to assemble is the four process pures, the ties, [procs_inv],
      [fs_ready] itself, and the slots. *)
-  Lemma sysc_fclose_fs_env (pj : mword 64) (bn : bio_names) (fn : fclose_names)
+  Lemma sysc_fclose_fs_env (pj : mword 64) (fn : fclose_names)
       (eb : bool) :
-    sysc_fs_env pj bn fn -∗ bslots 3 -∗
+    sysc_fs_env pj fn -∗ bslots 3 -∗
     fileclose_fs_env_nopid fn 0%nat eb pj.
   Proof.
     iIntros "#Hfs Hbs".
@@ -2302,10 +2231,9 @@ Section SyscallVocab.
        and this goal never names [bn]. *)
     rewrite /fileclose_fs_env_nopid.
     iSplit; [ iPureIntro; reflexivity |].
-    iSplit; [ iPureIntro; exact (sct_pj _ _ _ T) |].
-    iSplit; [ iPureIntro; exact (sct_j _ _ _ T) |].
-    iSplit; [ iPureIntro; exact (sct_plock _ _ _ T) |].
-    iSplit; [ iPureIntro; exact (sysc_fclose_ties _ _ _ T) |].
+    iSplit; [ iPureIntro; exact (sct_pj _ _ T) |].
+    iSplit; [ iPureIntro; exact (sct_j _ _ T) |].
+    iSplit; [ iPureIntro; exact (sct_plock _ _ T) |].
     (* conjunct by conjunct, not [iFrame]: the goal's tail is [fs_ready] and
        [bslots], both definition-valued, so a frame walks each name past them
        by CONVERSION -- 58.4 s, measured on this sentence's predecessor. *)
@@ -2334,14 +2262,14 @@ Section SyscallVocab.
      arm's callees are all indexed by them), and taking them here makes both
      equations [reflexivity] at the call instead of an injectivity argument
      about [proc_addr]. *)
-  Definition sysc_fwrite_names (γpr γl : gname)
-      (γs : list gname) (j : nat) (γlp : gname) (bn : bio_names)
+  Definition sysc_fwrite_names (γl : gname)
+      (γs : list gname) (j : nat) (γlp : gname)
       (fn : fclose_names) : fwrite_names :=
     MkFWriteNames γs j γlp
-      (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn) γl
-      (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
-      γpr
-      (fcn_bmapstart fn) (fcn_size fn)
+ γl
+      (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
+
+
       DfracDiscarded DfracDiscarded DfracDiscarded
       ConsoleInv.devsw_write_val (fun _ => DfracDiscarded).
 
@@ -2352,16 +2280,16 @@ Section SyscallVocab.
      it stays a parameter and the arm destructs it once. *)
   Lemma sysc_filewrite_env (γf γl : gname) (γs : list gname) (j : nat)
       (γlp : gname) (pj : mword 64)
-      (bn : bio_names) (fn : fclose_names) :
-    kernel_data -∗ is_txlock γl (fcn_uart fn) -∗
-    sysc_fs_env pj bn fn -∗ bslots 3 -∗
-    SpecFilewrite.filewrite_fs_env γf (sysc_fwrite_names fsc_printk γl γs j γlp bn fn).
+ (fn : fclose_names) :
+    kernel_data -∗ is_txlock γl (fsc_uart) -∗
+    sysc_fs_env pj fn -∗ bslots 3 -∗
+    SpecFilewrite.filewrite_fs_env γf (sysc_fwrite_names γl γs j γlp fn).
   Proof.
     iIntros "#Hkd #Htx #Hfs Hbs".
     iDestruct (sysc_fs_env_all with "Hfs") as
-      "( _ & _ & _ & _ & _ & _ & _ & %Hlg &
-        _ & _ & #Hbio & #Hlog & #Hseam & #Hgen & #Hdevi & #Hgeom & #Hdlock &
-        _ & _ & _ & %Hbg & _ & _ & #Hsz & %Hpg & #Hpe )".
+      "(_ & _ & _ & _ & _ & _ & %Hlg & _ & _ & #Hbio & #Hlog & #Hseam & #Hgen &
+        #Hdevi & #Hgeom & #Hdlock & _ & _ & _ & %Hbg & _ & _ & #Hsz & %Hpg &
+        #Hpe)".
     iDestruct (sysc_ic_env_of_ready with "Hfs") as
       "( _ & _ & _ & _ & %Hist0 & %Hib & _ & #Hit & #Hitinv & #Hesc &
         #Hireg & _ & #Hsl2 )".
@@ -2402,15 +2330,12 @@ Section SyscallVocab.
      three block slots, back out.  THE BITMAP IS NO LONGER PART OF IT --
      [bitmap_inv] is persistent and rides inside [fs_ready] -- so the block
      slots are the whole of what a caller has to recover. *)
-  Lemma sysc_fclose_fs_out (bn : bio_names) (fn : fclose_names)
+  Lemma sysc_fclose_fs_out (fn : fclose_names)
       (n : nat) (eb : bool) (pj : mword 64) :
-    fcn_bio fn = bn ->
     fileclose_fs_env_nopid fn n eb pj -∗ bslots 3.
   Proof.
-    (* [Hb] is vestigial now: the slot supply is at the canonical ghost
-       name, so the count on either side names no bio record. *)
-    intro Hb. rewrite /fileclose_fs_env_nopid.
-    by iIntros "(_ & _ & _ & _ & _ & _ & _ & $)".
+    rewrite /fileclose_fs_env_nopid.
+    by iIntros "(_ & _ & _ & _ & _ & _ & $)".
   Qed.
 
 End SyscallVocab.
@@ -2432,7 +2357,7 @@ Section SyscallRet.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma sysc_ret_tail
-      (γf : gname) (pj : mword 64) (bn : bio_names) (fn : fclose_names)
+      (γf : gname) (pj : mword 64) (fn : fclose_names)
       (dqi : dfrac) (ip : mword 64) (pid : mword 32) (V V' : pprivate)
       (lks : gset string) (av : nat)
       (m E : regfile) :
@@ -2455,10 +2380,10 @@ Section SyscallRet.
     bslots 3 -∗
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
     fd_slots FDSPARE -∗ iref_slots IREFSPARE -∗
-    syscall_env γf pj bn fn -∗ proc_priv γf pj pid V' -∗
+    syscall_env γf pj fn -∗ proc_priv γf pj pid V' -∗
     fd_frags_any (pv_fdg V) -∗
     pc_is (mword_of_int (KernelSyms.syscall + 0x3a) : mword 64) -∗
-    sysc_hcont_ty γf pj bn fn dqi ip pid V lks av m (ret_pc (m !!! Regidx Rra)) -∗
+    sysc_hcont_ty γf pj fn dqi ip pid V lks av m (ret_pc (m !!! Regidx Rra)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HEsp HEs2 Hrest Hav4 Hud Hfg.
@@ -2510,7 +2435,7 @@ Section SyscallRet.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDb true pj _ Hcrb with "Hcont") as "Hcont".
     iDestruct (cpu_own_transport CID CIDb 0%nat true pj true Hcrb with "Hcpu") as "Hcpu".
-    iApply (sysc_epilogue_tail (CID := CIDb) γf pj bn fn dqi ip pid V
+    iApply (sysc_epilogue_tail (CID := CIDb) γf pj fn dqi ip pid V
               (upd_tf V' (<[tf_arg_idx 0 := rget E Ra0]> (pv_tf V')))
               lks av m E HEsp Hrest Hav4 Hud
               ltac:(cbn [pv_fdg upd_tf]; exact Hfg)
@@ -2539,10 +2464,10 @@ Section SyscallArms.
      the two lines that call its contract and read [callee_saved] out of its
      post; the rest is [sysc_ret_tail], shared with every other entry. *)
   Lemma sysc_arm_getpid (γf : gname) (pj : mword 64)
-      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
+      (γs : list gname) (j : nat) (γl : gname) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) :
-    sysc_arm_goal 11 γf pj γs j γl bn fn dqi ip pid V lks av m M.
+    sysc_arm_goal 11 γf pj γs j γl fn dqi ip pid V lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
@@ -2580,7 +2505,7 @@ Section SyscallArms.
     assert (Hcry : true = false \/ pj = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true pj _ Hcry with "Hcont") as "Hcont".
-    iApply (sysc_ret_tail (CID := CIDy) γf pj bn fn dqi ip pid V V lks av m mf
+    iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid V V lks av m mf
               Hmfsp Hmfs2 Hmfrest ltac:(lia) eq_refl eq_refl
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
@@ -2610,10 +2535,10 @@ Section SyscallArms.
   Qed.
 
   Lemma sysc_arm_sbrk (γf : gname) (pj : mword 64)
-      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
+      (γs : list gname) (j : nat) (γl : gname) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) :
-    sysc_arm_goal 12 γf pj γs j γl bn fn dqi ip pid V lks av m M.
+    sysc_arm_goal 12 γf pj γs j γl fn dqi ip pid V lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
@@ -2638,10 +2563,10 @@ Section SyscallArms.
     (* [kalloc_env], peeled off a COPY of the (fully persistent) environment
        bundle, so the original stays available to hand back verbatim *)
     iPoseProof "Henv" as "#Henvc".
-    iDestruct (syscall_env_all with "Henvc") as (γa γp γw γft γtk γpr γud γvd)
+    iDestruct (syscall_env_all with "Henvc") as (γp γw γft γtk)
       "(#Hkalloc & _)".
     (* ---- the call ---- *)
-    iApply (SysSbrk.wp_sys_sbrk_sconf γa γf M (av - 4)%nat true pj pid V v0 v1 true lks
+    iApply (SysSbrk.wp_sys_sbrk_sconf fsc_kalloc γf M (av - 4)%nat true pj pid V v0 v1 true lks
               Hv0 Hv1 ltac:(lia)
               with "Hcg Hcpu Htext Hdata Hpc Hpriv Hkalloc").
     iIntros (CIDy Hsy mf P' szv') "%Hcs %Hok Hcg Hcpu Hpc Hpriv".
@@ -2666,7 +2591,7 @@ Section SyscallArms.
     assert (Hcry : true = false \/ pj = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true pj _ Hcry with "Hcont") as "Hcont".
-    iApply (sysc_ret_tail (CID := CIDy) γf pj bn fn dqi ip pid V
+    iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid V
               (upd_sz (upd_upt V P') szv') lks av m mf
               Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' ltac:(reflexivity)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
@@ -2681,11 +2606,11 @@ Section SyscallArms.
      private block's page-table descriptor (the reaped child's pages are
      freed through it), and [uptd_ext_sz] is what pins the trapframe page. *)
   Lemma sysc_arm_wait (γf : gname) (pj : mword 64)
-      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
+      (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) :
-    sysc_arm_goal 3 γf pj γs j γl bn fn dqi ip pid V lks av m M.
+    sysc_arm_goal 3 γf pj γs j γl fn dqi ip pid V lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
@@ -2707,10 +2632,10 @@ Section SyscallArms.
     destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 0)
                 ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v0 Hv0].
     iPoseProof "Henv" as "#Henvc".
-    iDestruct (syscall_env_all with "Henvc") as (γa γp γw γft γtk γpr γud γvd)
+    iDestruct (syscall_env_all with "Henvc") as (γp γw γft γtk)
       "(#Hkalloc & _ & _ & #Hwaitlk & _)".
     (* ---- the call ---- *)
-    iApply (SysWait.wp_sys_wait_sconf γa γf γw γs j γl M (av - 4)%nat true true lks pid V v0
+    iApply (SysWait.wp_sys_wait_sconf fsc_kalloc γf γw γs j γl M (av - 4)%nat true true lks pid V v0
               Hj Hgamma Hv0 ltac:(lia) eq_refl
               with "Hcg Hcpu Htext Hdata Hpc Hprocs Hwaitlk Hkalloc Hpriv").
     iIntros (CIDy Hsy mf P' rv) "%Hcs %Hext Hcg Hcpu Hpc Hpriv".
@@ -2735,7 +2660,7 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
-    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) bn fn dqi ip pid V
+    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid V
               (upd_upt V P') lks av m mf
               Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' ltac:(reflexivity)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
@@ -2762,11 +2687,11 @@ Section SyscallArms.
      [proc_priv], no trapframe word), and wants exactly the tickslock out of
      [syscall_env] plus the rank bound its [acquire] raises. *)
   Lemma sysc_arm_uptime (γf : gname) (pj : mword 64)
-      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
+      (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) :
-    sysc_arm_goal 14 γf pj γs j γl bn fn dqi ip pid V lks av m M.
+    sysc_arm_goal 14 γf pj γs j γl fn dqi ip pid V lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
@@ -2781,7 +2706,7 @@ Section SyscallArms.
     iEval (rewrite Hpce) in "Hpc".
     iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlks Hcpu]". subst lks.
     iPoseProof "Henv" as "#Henvc".
-    iDestruct (syscall_env_all with "Henvc") as (γa γp γw γft γtk γpr γud γvd)
+    iDestruct (syscall_env_all with "Henvc") as (γp γw γft γtk)
       "(_ & _ & _ & _ & _ & #Hticks & _)".
     (* ---- the call ---- *)
     iApply (SysUptime.wp_sys_uptime_sconf γtk M 0%nat true pj (av - 4)%nat true ∅
@@ -2805,7 +2730,7 @@ Section SyscallArms.
     assert (Hcry : true = false \/ pj = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true pj _ Hcry with "Hcont") as "Hcont".
-    iApply (sysc_ret_tail (CID := CIDy) γf pj bn fn dqi ip pid V V ∅ av m mf
+    iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid V V ∅ av m mf
               Hmfsp Hmfs2 Hmfrest ltac:(lia) eq_refl eq_refl
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
@@ -2819,11 +2744,11 @@ Section SyscallArms.
      scan) and the [length γs = NPROC] that scan's bound needs, which
      [procs_inv] itself carries. *)
   Lemma sysc_arm_kill (γf : gname) (pj : mword 64)
-      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
+      (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) :
-    sysc_arm_goal 6 γf pj γs j γl bn fn dqi ip pid V lks av m M.
+    sysc_arm_goal 6 γf pj γs j γl fn dqi ip pid V lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
@@ -2868,7 +2793,7 @@ Section SyscallArms.
     assert (Hcry : true = false \/ pj = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true pj _ Hcry with "Hcont") as "Hcont".
-    iApply (sysc_ret_tail (CID := CIDy) γf pj bn fn dqi ip pid V V ∅ av m mf
+    iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid V V ∅ av m mf
               Hmfsp Hmfs2 Hmfrest ltac:(lia) eq_refl eq_refl
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
@@ -2880,11 +2805,11 @@ Section SyscallArms.
      needs.  Its [eb = true] parking premise is what [sysc_arm_pre]'s own
      [cpu_own 0 true ...] already says. *)
   Lemma sysc_arm_pause (γf : gname) (pj : mword 64)
-      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
+      (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) :
-    sysc_arm_goal 13 γf pj γs j γl bn fn dqi ip pid V lks av m M.
+    sysc_arm_goal 13 γf pj γs j γl fn dqi ip pid V lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
@@ -2905,7 +2830,7 @@ Section SyscallArms.
     destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 0)
                 ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v0 Hv0].
     iPoseProof "Henv" as "#Henvc".
-    iDestruct (syscall_env_all with "Henvc") as (γa γp γw γft γtk γpr γud γvd)
+    iDestruct (syscall_env_all with "Henvc") as (γp γw γft γtk)
       "(_ & _ & _ & _ & _ & #Hticks & _)".
     (* ---- the call ---- *)
     iApply (SysPause.wp_sys_pause_sconf γs j γl γtk M (av - 4)%nat true 0%nat
@@ -2931,7 +2856,7 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
-    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) bn fn dqi ip pid V V ∅ av m mf
+    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid V V ∅ av m mf
               Hmfsp Hmfs2 Hmfrest ltac:(lia) eq_refl eq_refl
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
@@ -2968,11 +2893,11 @@ Section SyscallArms.
      read.  Its post is the named [sys_dup_post], collapsed by
      [sysc_dup_priv]: which of the three exits ran is invisible to the tail. *)
   Lemma sysc_arm_dup (γf : gname) (pj : mword 64)
-      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
+      (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) :
-    sysc_arm_goal 10 γf pj γs j γl bn fn dqi ip pid V lks av m M.
+    sysc_arm_goal 10 γf pj γs j γl fn dqi ip pid V lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
@@ -2992,7 +2917,7 @@ Section SyscallArms.
     destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 0)
                 ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v0 Hv0].
     iPoseProof "Henv" as "#Henvc".
-    iDestruct (syscall_env_all with "Henvc") as (γa γp γw γft γtk γpr γud γvd)
+    iDestruct (syscall_env_all with "Henvc") as (γp γw γft γtk)
       "(_ & _ & _ & _ & #Hftable & _)".
     (* ---- the call ---- *)
     iApply (SysDup.wp_sys_dup_sconf γft γf M (av - 4)%nat 0%nat true pj v0 pid V true ∅
@@ -3017,7 +2942,7 @@ Section SyscallArms.
     assert (Hcry : true = false \/ pj = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true pj _ Hcry with "Hcont") as "Hcont".
-    iApply (sysc_ret_tail (CID := CIDy) γf pj bn fn dqi ip pid V V' ∅ av m mf
+    iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid V V' ∅ av m mf
               Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' Hfg'
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
@@ -3030,11 +2955,11 @@ Section SyscallArms.
      process indexing: it takes the running process as a bare pointer and
      hands [proc_priv] back verbatim, kfork having only read it. *)
   Lemma sysc_arm_fork (γf : gname) (pj : mword 64)
-      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
+      (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) :
-    sysc_arm_goal 1 γf pj γs j γl bn fn dqi ip pid V lks av m M.
+    sysc_arm_goal 1 γf pj γs j γl fn dqi ip pid V lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
@@ -3049,14 +2974,14 @@ Section SyscallArms.
     iEval (rewrite Hpce) in "Hpc".
     iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlks Hcpu]". subst lks.
     iPoseProof "Henv" as "#Henvc".
-    iDestruct (syscall_env_all with "Henvc") as (γa γp γw γft γtk γpr γud γvd)
+    iDestruct (syscall_env_all with "Henvc") as (γp γw γft γtk)
       "(#Hkalloc & #Hnextpid & #Hpav & #Hwaitlk & #Hftable & _ & _ & #Hfsenv)".
     (* the itable's names are [fn]'s own now, and they reach this arm through
        [sysc_ic_env_of_ready] rather than as [syscall_env] conjuncts of their
        own (see [sysc_fs_env]).  [SpecSysFork] spells the device at the
        AMBIENT [icfg_dev], so the tie is what bridges the two spellings. *)
-    iDestruct (sysc_fs_env_all with "Hfsenv") as "( _ & _ & _ & _ & _ & _ & _ & _ &
-                            _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ )".
+    iDestruct (sysc_fs_env_all with "Hfsenv") as "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
+        _)".
     (* the REGION handle comes out of the same bundle, one conjunct past
        [ic_escrows]: idup's [ref++] is a ledger move since increment IVe
        (iclaim-ledger.md §3.19), so [SpecSysFork] passes it down to kfork. *)
@@ -3068,15 +2993,21 @@ Section SyscallArms.
     iDestruct (syscall_env_token with "Henvc") as "#Htoken".
     (* the proc array at [fn]'s OWN spelling: the world and the token are
        stated there, so the callee is instantiated there too *)
-    iDestruct "Hfsenv" as "(_ & #Hprocs' & _)".
+    iDestruct "Hfsenv" as "(_ & #Hprocs' & _ & _ & #Hrdy')".
+    (* ...AND THE ALLOCATOR AT ITS PAIR.  kfork names the free-list
+       count/seal pair, and since rank 1d that pair is [fsc_kpages] rather
+       than an existential -- so the arm hands over the spelled-out form
+       [FsReady.fs_ready] already carries, not [kalloc_env]'s [∃ γk]. *)
+    iDestruct (FsReady.fs_ready_kmem with "Hrdy'") as "[#Hkml' #Hkav']".
+    iDestruct (KvmSpec.kalloc_env_at_intro with "Hkml' Hkav'") as "#Hkat".
     (* ---- the call ---- *)
-    iApply (SysFork.wp_sys_fork_sconf γa γp γw γft γf
+    iApply (SysFork.wp_sys_fork_sconf γp γw γft γf
               (fcn_procs fn)
 
               M 0%nat (av - 4)%nat true pj true pid V ∅
               ltac:(lia) sysc_noff0b
               (locks_below_empty "wait_lock")
-              with "Hcg Hcpu Htext Hpc Hprocs' Hnextpid Hwaitlk Hftable Hitable Hitinv Hireg Hkalloc Hpav Hworld Htoken Hfdone Hpriv").
+              with "Hcg Hcpu Htext Hpc Hprocs' Hnextpid Hwaitlk Hftable Hitable Hitinv Hireg Hkat Hpav Hworld Htoken Hfdone Hpriv").
     iIntros (CIDy Hsy mf) "%Hcs Hcg Hcpu Hpc Hpriv Hka %Hrv".
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
@@ -3094,7 +3025,7 @@ Section SyscallArms.
     assert (Hcry : true = false \/ pj = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true pj _ Hcry with "Hcont") as "Hcont".
-    iApply (sysc_ret_tail (CID := CIDy) γf pj bn fn dqi ip pid V V ∅ av m mf
+    iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid V V ∅ av m mf
               Hmfsp Hmfs2 Hmfrest ltac:(lia) eq_refl eq_refl
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
@@ -3152,11 +3083,11 @@ Section SyscallArms.
      The budget is exact rather than slack: [K_syscall = 4 + K_sys_exec], so
      an arm running at [av - 4] has precisely sys_exec's own bound. *)
   Lemma sysc_arm_exec (γf : gname) (pj : mword 64)
-      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
+      (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) :
-    sysc_arm_goal 7 γf pj γs j γl bn fn dqi ip pid V lks av m M.
+    sysc_arm_goal 7 γf pj γs j γl fn dqi ip pid V lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
@@ -3180,15 +3111,15 @@ Section SyscallArms.
     destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 1)
                 ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v1 Hv1].
     (* ---- the environment: the fabric, the allocator, and the pure ties ---- *)
-    iPoseProof (sysc_fs_fabric γf (proc_addr j) γs bn fn
+    iPoseProof (sysc_fs_fabric γf (proc_addr j) γs fn
                   with "Hdata Hprocs Henv") as "#Hfab".
     iPoseProof "Henv" as "#Henvc".
-    iDestruct (syscall_env_all with "Henvc") as (γa γp γw γft γtk γpr γud γvd)
+    iDestruct (syscall_env_all with "Henvc") as (γp γw γft γtk)
       "(#Hkalloc & _ & _ & _ & _ & _ & _ & #Hfsenv)".
     (* the ties, then the icache bundle's own nine pure facts *)
     iDestruct (sysc_fs_env_all with "Hfsenv") as
-      "( %Hroot & %Hnib0 & _ & _ & _ & _ & _ &
-        %Hlg & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ )".
+      "(%Hroot & %Hnib0 & _ & _ & _ & _ & %Hlg & _ & _ & _ & _ & _ & _ & _ & _
+        & _ & _ & _ & _)".
     iDestruct (sysc_ic_env_of_ready with "Hfsenv") as
       "( %Hsize & %Hbm0 & %Hbmc & %Hbml & %Hist0 & %Hireg & %Hcb & _ )".
     (* ---- the three consumable families, carved to sys_exec's own shape ---- *)
@@ -3197,12 +3128,12 @@ Section SyscallArms.
     iPoseProof sysc_trap_ext_true as "Htcx".
     iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
     (* ---- the call ---- *)
-    iApply (SysExec.wp_sys_exec_sconf γf γa γs j γl
-              (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
-              (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
+    iApply (SysExec.wp_sys_exec_sconf γf γs j γl
 
-              (fcn_bmapstart fn)
- (fcn_size fn)
+              (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
+
+
+
               DfracDiscarded DfracDiscarded v0 v1 pid V M (av - 4)%nat true true lks
               ltac:(lia) Hroot Hnib0 Hlg Hsize
               Hbm0 Hbmc Hbml Hist0 Hcb Hireg Hj Hgamma eq_refl Hv0 Hv1
@@ -3244,7 +3175,7 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
-    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) bn fn dqi ip pid V V'
+    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid V V'
               lks av m mf
               Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' Hfg'
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
@@ -3281,11 +3212,11 @@ Section SyscallArms.
          dropped.  The "bespoke branch" the header used to promise is one
          [iApply]. *)
   Lemma sysc_arm_exit (γf : gname) (pj : mword 64)
-      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
+      (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) :
-    sysc_arm_goal 2 γf pj γs j γl bn fn dqi ip pid V lks av m M.
+    sysc_arm_goal 2 γf pj γs j γl fn dqi ip pid V lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
@@ -3303,19 +3234,17 @@ Section SyscallArms.
                 ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v0 Hv0].
     (* ---- the environment ---- *)
     iPoseProof "Henv" as "#Henvc".
-    iDestruct (syscall_env_all with "Henvc") as (γa γp γw γft γtk γpr γud γvd)
+    iDestruct (syscall_env_all with "Henvc") as (γp γw γft γtk)
       "(_ & _ & _ & #Hwaitlk & #Hftable & _ & _ & #Hfsenv)".
     iDestruct (sysc_fs_env_all with "Hfsenv") as
-      "( _ & _ & %Hdq & %Hbio & %Hpja & %Hjn & %Hlk & %Hlg &
+      "( _ & _ & %Hdq & %Hpja & %Hjn & %Hlk & %Hlg &
         #Hpi & #Hpanic & #Hbio' & #Hlog & #Hseam & #Hgen & #Hdevi & #Hgeom &
         #Hdlock & #Hkmem & #Hka & _ )".
-    (* THE TWO ROWS THAT REPLACED [fileclose_ic_env fn]: the twelve-equation
-       tie record and the ONE predicate every fs fact is a projection of.
-       Both persistent, both already in hand -- the ties come off
-       [sysc_ties], which says everything [fclose_ties] does and more. *)
+    (* THE ONE ROW THAT REPLACED [fileclose_ic_env fn]: the predicate every
+       fs fact is a projection of.  Its companion -- the twelve-equation tie
+       record -- died with rank 1d, so the callee below asks for [fs_ready]
+       and nothing pure beside it. *)
     iDestruct (sysc_fs_env_ties with "Hfsenv") as "%T".
-    iAssert (⌜fclose_ties fn⌝)%I as "#Hties".
-    { iPureIntro. exact (sysc_fclose_ties _ _ _ T). }
     iDestruct "Hfsenv" as "(_ & _ & _ & _ & #Hrdy)".
     (* ---- the closer, walked down syscall's own frame ---- *)
     iDestruct "Hcont" as "[_ Hkcl]".
@@ -3337,19 +3266,19 @@ Section SyscallArms.
     (* ---- the call: it does not return ---- *)
     iApply (SysExit.wp_sys_exit_sconf γft γf γw
               (fcn_procs fn) (fcn_j fn) (fcn_plock fn)
-              (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
-              (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
+
+              (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
 
  ip dqi
-              (fcn_kmem fn) (fcn_kalloc fn)
-              (fcn_bmapstart fn) (fcn_size fn)
+
+
               None fn
               M (av - 4)%nat true true pid V v0 ∅
-              (sysc_fn_eta fn bn pid Hbio Hpidt Hdq)
+              (sysc_fn_eta fn pid Hpidt Hdq)
               Hjn Hlk Hv0 ltac:(lia) Hlg eq_refl (locks_below_empty "log")
               with "Hcg Hkcl4 Hcpu Htext Hdata Hpc Hpi Hpanic Hwaitlk Hftable
                     Hkmem Hka Hbio' Hlog Hseam Hgen Hdevi Hgeom Hdlock Hbs
-                    Hties Hrdy Hip Hfd Hir Hpriv Hufrag").
+                    Hrdy Hip Hfd Hir Hpriv Hufrag").
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -3357,14 +3286,14 @@ Section SyscallArms.
      It wants ONE resource, [log_ctx], plus the running-thread triple its
      interior [sleep] needs; no process block, no bitmap, no allowance.  It
      was on the GAP list only because [syscall_env] held the log at a fresh
-     existential; at [fn]'s own names (which is what [sysc_ties] makes the
+     existential; at [fn]'s own names (which is what [sysc_proc_ties] makes the
      ambient ones) it is a two-line call. *)
   Lemma sysc_arm_sync (γf : gname) (pj : mword 64)
-      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
+      (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) :
-    sysc_arm_goal 22 γf pj γs j γl bn fn dqi ip pid V lks av m M.
+    sysc_arm_goal 22 γf pj γs j γl fn dqi ip pid V lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
@@ -3377,14 +3306,13 @@ Section SyscallArms.
     iEval (rewrite Hpce) in "Hpc".
     iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlks Hcpu]". subst lks.
     iPoseProof "Henv" as "#Henvc".
-    iDestruct (syscall_env_all with "Henvc") as (γa γp γw γft γtk γpr γud γvd)
+    iDestruct (syscall_env_all with "Henvc") as (γp γw γft γtk)
       "(_ & _ & _ & _ & _ & _ & _ & #Hfsenv)".
     iDestruct (sysc_fs_env_all with "Hfsenv") as
-      "( _ & _ & _ & _ & _ & _ & _ & _ &
-        _ & _ & _ & #Hlog & _ )".
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hlog & _)".
     iPoseProof sysc_trap_ext_true as "Htcx".
     iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
-    iApply (SysSync.wp_sys_sync_sconf γs j γl bn icfg_log fsc_fs
+    iApply (SysSync.wp_sys_sync_sconf γs j γl fsc_bio icfg_log fsc_fs
               fsc_cov fsc_logst icfg_dev
               M (av - 4)%nat true true ∅
               ltac:(lia) Hj Hgamma (locks_below_empty "log")
@@ -3406,7 +3334,7 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
-    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) bn fn dqi ip pid V V
+    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid V V
               ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) eq_refl eq_refl
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
@@ -3423,11 +3351,11 @@ Section SyscallArms.
      "shape decision" the header warned about ([syscall_env] would stop
      being fully persistent) never arises. *)
   Lemma sysc_arm_write (γf : gname) (pj : mword 64)
-      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
+      (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) :
-    sysc_arm_goal 16 γf pj γs j γl bn fn dqi ip pid V lks av m M.
+    sysc_arm_goal 16 γf pj γs j γl fn dqi ip pid V lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
@@ -3455,16 +3383,15 @@ Section SyscallArms.
     destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 2)
                 ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v2 Hv2].
     iPoseProof "Henv" as "#Henvc".
-    iDestruct (syscall_env_all with "Henvc") as (γa γp γw γft γtk γpr γud γvd)
+    iDestruct (syscall_env_all with "Henvc") as (γp γw γft γtk)
       "(#Hkalloc & _ & _ & _ & _ & _ & _ & #Hfsenv)".
     (* [printk_env] is taken HERE and not out of [syscall_env_all]: that
        projection closes over the uart/disk names existentially, so its
        [is_txlock] would be at a gname nothing ties to [fcn_uart fn].  This
        one states it at the record's own names. *)
     iDestruct (sysc_fs_env_all with "Hfsenv") as
-      "( _ & _ & _ & _ & _ & _ & _ & _ &
-        _ & #Hpanic & _ & _ & _ & _ & #Hdevi & _ & _ &
-        _ & _ & _ & _ & _ & _ & _ & _ & #Hpe )".
+      "(_ & _ & _ & _ & _ & _ & _ & _ & #Hpanic & _ & _ & _ & _ & #Hdevi & _ &
+        _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hpe)".
     (* filewrite's FD_INODE arm is the whole log cone, so it wants all THREE
        block slots -- unlike fstat/read, which take one and hand it back. *)
     (* filewrite's DEVICE arm wants the TX lock, not the cons lock --
@@ -3478,16 +3405,16 @@ Section SyscallArms.
     iDestruct "Hxl" as (γtxl) "#Htx".
     (* the ambient log, named: filewrite's FD_INODE arm write-locks inside
        its own transaction and the escrow parks at [icfg_log] (durable-disk
-       B''-tx).  [sysc_ties] has said so all along. *)
+       B''-tx).  [sysc_proc_ties] has said so all along. *)
     iDestruct (sysc_fs_env_ties with "Hfsenv") as %Twr.
     iAssert (SpecFilewrite.filewrite_dev_caps
-               (sysc_fwrite_names fsc_printk γtxl γs j γl bn fn)) as "#Hcaps".
+               (sysc_fwrite_names γtxl γs j γl fn)) as "#Hcaps".
     { rewrite /SpecFilewrite.filewrite_dev_caps /sysc_fwrite_names; cbn.
       iSplitR; [iExact "Hdevi" | iExact "Htx"]. }
-    iDestruct (sysc_filewrite_env γf γtxl γs j γl (proc_addr j) bn fn
+    iDestruct (sysc_filewrite_env γf γtxl γs j γl (proc_addr j) fn
                  with "Hdata Htx Hfsenv Hbs") as "Hfse".
-    iApply (SysWrite.wp_sys_write_sconf γa γf γs j γl
-              (sysc_fwrite_names fsc_printk γtxl γs j γl bn fn)
+    iApply (SysWrite.wp_sys_write_sconf γf γs j γl
+              (sysc_fwrite_names γtxl γs j γl fn)
               pid V v0 v2 M (av - 4)%nat true true ∅
               ltac:(lia) Hj Hgamma Hlen eq_refl eq_refl Hv0
               (ex_intro _ v1 Hv1) Hv2 eq_refl eq_refl eq_refl
@@ -3520,17 +3447,17 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
-    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) bn fn dqi ip pid V
+    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid V
               (upd_upt V P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' ltac:(reflexivity)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
   Lemma sysc_arm_read (γf : gname) (pj : mword 64)
-      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
+      (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) :
-    sysc_arm_goal 5 γf pj γs j γl bn fn dqi ip pid V lks av m M.
+    sysc_arm_goal 5 γf pj γs j γl fn dqi ip pid V lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
@@ -3557,20 +3484,19 @@ Section SyscallArms.
     destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 2)
                 ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v2 Hv2].
     iPoseProof "Henv" as "#Henvc".
-    iDestruct (syscall_env_all with "Henvc") as (γa γp γw γft γtk γpr γud γvd)
+    iDestruct (syscall_env_all with "Henvc") as (γp γw γft γtk)
       "(#Hkalloc & _ & _ & _ & _ & _ & _ & #Hfsenv)".
     iDestruct (sysc_fs_env_all with "Hfsenv") as
-      "( _ & _ & _ & _ & _ & _ & _ & _ &
-        _ & #Hpanic & _ )".
+      "(_ & _ & _ & _ & _ & _ & _ & _ & #Hpanic & _)".
     (* the environment, carved out of [fs_ready] plus one slot unit *)
     iDestruct (sysc_bslot_split with "Hbs") as "[Hsl Hbs2]".
     (* THE CONSOLE, destructed ONCE: the arm builds the names record around
        the gname it gets, which is the whole reason [console_ready] hides it
        rather than [fclose_names] carrying it. *)
     iDestruct (syscall_env_console with "Henvc") as (γc) "#Hci".
-    iDestruct (sysc_fileread_env γf γc (proc_addr j) bn fn with "Hfsenv Hsl")
+    iDestruct (sysc_fileread_env γf γc (proc_addr j) fn with "Hfsenv Hsl")
       as "[Hfse Hback]".
-    iApply (SysRead.wp_sys_read_sconf γa γf γs j γl (sysc_fread_names γc bn fn)
+    iApply (SysRead.wp_sys_read_sconf γf γs j γl (sysc_fread_names γc fn)
               pid V v0 v2 M (av - 4)%nat true true ∅
               ltac:(lia) Hj Hgamma Hlen Hv0 (ex_intro _ v1 Hv1) Hv2
               eq_refl eq_refl eq_refl
@@ -3597,17 +3523,17 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
-    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) bn fn dqi ip pid V
+    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid V
               (upd_upt V P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' ltac:(reflexivity)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
   Lemma sysc_arm_fstat (γf : gname) (pj : mword 64)
-      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
+      (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) :
-    sysc_arm_goal 8 γf pj γs j γl bn fn dqi ip pid V lks av m M.
+    sysc_arm_goal 8 γf pj γs j γl fn dqi ip pid V lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
@@ -3629,16 +3555,15 @@ Section SyscallArms.
     destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 1)
                 ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v1 Hv1].
     iPoseProof "Henv" as "#Henvc".
-    iDestruct (syscall_env_all with "Henvc") as (γa γp γw γft γtk γpr γud γvd)
+    iDestruct (syscall_env_all with "Henvc") as (γp γw γft γtk)
       "(#Hkalloc & _ & _ & _ & _ & _ & _ & #Hfsenv)".
     iDestruct (sysc_fs_env_all with "Hfsenv") as
-      "( _ & _ & _ & _ & _ & _ & _ & _ &
-        _ & #Hpanic & _ )".
+      "(_ & _ & _ & _ & _ & _ & _ & _ & #Hpanic & _)".
     (* the environment, carved out of [fs_ready] plus one slot unit *)
     iDestruct (sysc_bslot_split with "Hbs") as "[Hsl Hbs2]".
-    iDestruct (sysc_filestat_env (proc_addr j) bn fn with "Hfsenv Hsl")
+    iDestruct (sysc_filestat_env (proc_addr j) fn with "Hfsenv Hsl")
       as "[Hfse Hback]".
-    iApply (SysFstat.wp_sys_fstat_sconf γa γf γs j γl (sysc_fstat_names bn fn)
+    iApply (SysFstat.wp_sys_fstat_sconf γf γs j γl (sysc_fstat_names fn)
               pid V v0 M (av - 4)%nat true true ∅
               ltac:(lia) Hj Hgamma Hlen Hv0 (ex_intro _ v1 Hv1) eq_refl
               with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hkalloc Hprocs Hfse").
@@ -3664,7 +3589,7 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
-    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) bn fn dqi ip pid V
+    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid V
               (upd_upt V P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' ltac:(reflexivity)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
@@ -3678,11 +3603,11 @@ Section SyscallArms.
      whose old one is iput as well).  That is what lets the dispatch hand it
      half its own [IREFSPARE] allowance and get the half back. *)
   Lemma sysc_arm_chdir (γf : gname) (pj : mword 64)
-      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
+      (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) :
-    sysc_arm_goal 9 γf pj γs j γl bn fn dqi ip pid V lks av m M.
+    sysc_arm_goal 9 γf pj γs j γl fn dqi ip pid V lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
@@ -3700,12 +3625,11 @@ Section SyscallArms.
     destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 0)
                 ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v0 Hv0].
     iPoseProof "Henv" as "#Henvc".
-    iDestruct (syscall_env_all with "Henvc") as (γa γp γw γft γtk γpr γud γvd)
+    iDestruct (syscall_env_all with "Henvc") as (γp γw γft γtk)
       "(#Hkalloc & _ & _ & _ & _ & _ & _ & #Hfsenv)".
     iDestruct (sysc_fs_env_all with "Hfsenv") as
-      "( %Hroot & %Hnib0 & _ & _ & _ & _ & _ &
-        %Hlg & _ & #Hpanic & #Hbio & #Hlog & #Hseam & #Hgen & #Hdevi & #Hgeom &
-        #Hdlock & _ & _ & _ )".
+      "(%Hroot & %Hnib0 & _ & _ & _ & _ & %Hlg & _ & #Hpanic & #Hbio & #Hlog &
+        #Hseam & #Hgen & #Hdevi & #Hgeom & #Hdlock & _ & _ & _)".
     iDestruct (sysc_ic_env_of_ready with "Hfsenv") as
       "( %Hsize & %Hbm0 & %Hbmc & %Hbml & %Hist0 & %Hib & %Hcb &
         #Hit & #Hitinv & #Hesc & #Hireg & #Hropen & #Hsl2 )".
@@ -3713,12 +3637,12 @@ Section SyscallArms.
     iDestruct (sysc_iref_split with "Hir") as "[Hirk Hirc]".
     iPoseProof sysc_trap_ext_true as "Htcx".
     iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
-    iApply (SysChdir.wp_sys_chdir_sconf γf γa γs j γl
-              (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
-              (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
+    iApply (SysChdir.wp_sys_chdir_sconf γf γs j γl
 
-              (fcn_bmapstart fn)
- (fcn_size fn)
+              (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
+
+
+
               DfracDiscarded DfracDiscarded v0 pid V M (av - 4)%nat true true ∅
               ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
               Hbml Hist0 Hcb Hib Hj Hgamma eq_refl Hv0
@@ -3761,7 +3685,7 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
-    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) bn fn dqi ip pid V V'
+    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid V V'
               ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' Hfg'
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
@@ -3784,11 +3708,11 @@ Section SyscallArms.
      off [sysc_fs_env_all]'s tail, out of [FsReady.fs_geom_ok] and
      [FsReady.fs_sb_cells]. *)
   Lemma sysc_arm_unlink (γf : gname) (pj : mword 64)
-      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
+      (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) :
-    sysc_arm_goal 18 γf pj γs j γl bn fn dqi ip pid V lks av m M.
+    sysc_arm_goal 18 γf pj γs j γl fn dqi ip pid V lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
@@ -3806,12 +3730,12 @@ Section SyscallArms.
                 ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v0 Hv0].
     iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlks Hcpu]". subst lks.
     iPoseProof "Henv" as "#Henvc".
-    iDestruct (syscall_env_all with "Henvc") as (γa γp γw γft γtk γpr γud γvd)
+    iDestruct (syscall_env_all with "Henvc") as (γp γw γft γtk)
       "(#Hkalloc & _ & _ & _ & _ & _ & _ & #Hfsenv)".
     iDestruct (sysc_fs_env_all with "Hfsenv") as
-      "( %Hroot & %Hnib0 & _ & _ & _ & _ & _ &
-        %Hlg & _ & _ & #Hbio & #Hlog & #Hseam & #Hgen & #Hdevi & #Hgeom &
-        #Hdlock & _ & _ & _ & %Hbg & %Hnin & _ & #Hsbs & %Hprg & #Hpr )".
+      "(%Hroot & %Hnib0 & _ & _ & _ & _ & %Hlg & _ & _ & #Hbio & #Hlog & #Hseam
+        & #Hgen & #Hdevi & #Hgeom & #Hdlock & _ & _ & _ & %Hbg & %Hnin & _ &
+        #Hsbs & %Hprg & #Hpr)".
     iDestruct (sysc_ic_env_of_ready with "Hfsenv") as
       "( %Hsize & %Hbm0 & %Hbmc & %Hbml & %Hist0 & %Hib & %Hcb &
         #Hit & #Hitinv & #Hesc & #Hireg & #Hropen & #Hsl2 )".
@@ -3819,12 +3743,12 @@ Section SyscallArms.
     iPoseProof sysc_trap_ext_true as "Htcx".
     iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
     iDestruct (sysc_iref_split with "Hir") as "[Hirk Hiru]".
-    iApply (SysUnlink.wp_sys_unlink_sconf γf γa fsc_printk γs j γl
-              (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
-              (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
+    iApply (SysUnlink.wp_sys_unlink_sconf γf γs j γl
 
-              (fcn_bmapstart fn)
- (fcn_size fn)
+              (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
+
+
+
               DfracDiscarded DfracDiscarded DfracDiscarded v0 pid V M
               (av - 4)%nat true true ∅
               ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
@@ -3855,18 +3779,18 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
-    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) bn fn dqi ip pid V
+    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid V
               (upd_upt V P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' ltac:(reflexivity)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
 
   Lemma sysc_arm_link (γf : gname) (pj : mword 64)
-      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
+      (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) :
-    sysc_arm_goal 19 γf pj γs j γl bn fn dqi ip pid V lks av m M.
+    sysc_arm_goal 19 γf pj γs j γl fn dqi ip pid V lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
@@ -3886,12 +3810,12 @@ Section SyscallArms.
                 ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v1 Hv1].
     iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlks Hcpu]". subst lks.
     iPoseProof "Henv" as "#Henvc".
-    iDestruct (syscall_env_all with "Henvc") as (γa γp γw γft γtk γpr γud γvd)
+    iDestruct (syscall_env_all with "Henvc") as (γp γw γft γtk)
       "(#Hkalloc & _ & _ & _ & _ & _ & _ & #Hfsenv)".
     iDestruct (sysc_fs_env_all with "Hfsenv") as
-      "( %Hroot & %Hnib0 & _ & _ & _ & _ & _ &
-        %Hlg & _ & _ & #Hbio & #Hlog & #Hseam & #Hgen & #Hdevi & #Hgeom &
-        #Hdlock & _ & _ & _ & %Hbg & %Hnin & _ & #Hsbs & %Hprg & #Hpr )".
+      "(%Hroot & %Hnib0 & _ & _ & _ & _ & %Hlg & _ & _ & #Hbio & #Hlog & #Hseam
+        & #Hgen & #Hdevi & #Hgeom & #Hdlock & _ & _ & _ & %Hbg & %Hnin & _ &
+        #Hsbs & %Hprg & #Hpr)".
     iDestruct (sysc_ic_env_of_ready with "Hfsenv") as
       "( %Hsize & %Hbm0 & %Hbmc & %Hbml & %Hist0 & %Hib & %Hcb &
         #Hit & #Hitinv & #Hesc & #Hireg & #Hropen & #Hsl2 )".
@@ -3899,12 +3823,12 @@ Section SyscallArms.
     iPoseProof sysc_trap_ext_true as "Htcx".
     iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
     iDestruct (sysc_iref_split3 with "Hir") as "[Hirl Hirk]".
-    iApply (SysLink.wp_sys_link_sconf γf γa fsc_printk γs j γl
-              (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
-              (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
+    iApply (SysLink.wp_sys_link_sconf γf γs j γl
 
-              (fcn_bmapstart fn)
- (fcn_size fn)
+              (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
+
+
+
               DfracDiscarded DfracDiscarded DfracDiscarded v0 v1 pid V M
               (av - 4)%nat true true ∅
               ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
@@ -3935,7 +3859,7 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
-    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) bn fn dqi ip pid V
+    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid V
               (upd_upt V P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' ltac:(reflexivity)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
@@ -3950,11 +3874,11 @@ Section SyscallArms.
      bundle and lends the quarter out of its own process block, so what the
      dispatch owes is exactly what the dispatch has. *)
   Lemma sysc_arm_close (γf : gname) (pj : mword 64)
-      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
+      (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) :
-    sysc_arm_goal 21 γf pj γs j γl bn fn dqi ip pid V lks av m M.
+    sysc_arm_goal 21 γf pj γs j γl fn dqi ip pid V lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
@@ -3972,13 +3896,13 @@ Section SyscallArms.
     destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 0)
                 ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v0 Hv0].
     iPoseProof "Henv" as "#Henvc".
-    iDestruct (syscall_env_all with "Henvc") as (γa γp γw γft γtk γpr γud γvd)
+    iDestruct (syscall_env_all with "Henvc") as (γp γw γft γtk)
       "(_ & _ & _ & _ & #Hftable & _ & _ & #Hfsenv)".
     iDestruct (sysc_fs_env_ties with "Hfsenv") as "%T".
     iDestruct (sysc_fs_env_all with "Hfsenv") as
-      "( _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hpanic & _ )".
-    iPoseProof (sysc_fclose_pipe_env (proc_addr j) bn fn with "Hfsenv") as "#Hpenv".
-    iDestruct (sysc_fclose_fs_env (proc_addr j) bn fn true
+      "(_ & _ & _ & _ & _ & _ & _ & _ & #Hpanic & _)".
+    iPoseProof (sysc_fclose_pipe_env (proc_addr j) fn with "Hfsenv") as "#Hpenv".
+    iDestruct (sysc_fclose_fs_env (proc_addr j) fn true
                  with "Hfsenv Hbs") as "Hfenv".
     iPoseProof sysc_trap_ext_true as "Htcx".
     iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
@@ -3988,15 +3912,15 @@ Section SyscallArms.
     iApply (SysClose.wp_sys_close_sconf γft γf fn None M (av - 4)%nat 0%nat
               true (proc_addr j) v0 pid V true ∅
               Hv0 ltac:(cbn; lia) ltac:(lia) (locks_below_empty "log")
-              Hpidt (sct_dq _ _ _ T)
+              Hpidt (sct_dq _ _ T)
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hftable Hpanic Hpriv
                     Hufrag Hiru Hpenv Hfenv").
     iIntros (CIDy Hsy mf) "%Hcs Hcg Hcpu _ _ Hpc Hpost Hpe' Hfe' Hiru".
     (* the three block slots, back out of the nopid bundle.  THE BITMAP DOES
        NOT COME WITH THEM any more -- it is an invariant, so the bundle never
        had to give it back and the post no longer quantifies a used-set. *)
-    iDestruct (sysc_fclose_fs_out bn fn 0%nat true (proc_addr j)
-                 (sct_bio _ _ _ T) with "Hfe'") as "Hbs".
+    iDestruct (sysc_fclose_fs_out fn 0%nat true (proc_addr j)
+                 with "Hfe'") as "Hbs".
     iAssert (∃ V' : pprivate,
                ⌜ud_tfp (pv_upt V') = ud_tfp (pv_upt V)⌝ ∗
                (* ...and the ghost name: close retypes a descriptor, not the
@@ -4025,7 +3949,7 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
-    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) bn fn dqi ip pid V V'
+    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid V V'
               ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' Hfg'
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd [Hir Hiru] Henv Hpriv Hufrag Hpc Hcont").
     iApply (sysc_iref_join3 with "Hir Hiru").
@@ -4053,13 +3977,13 @@ Section SyscallArms.
      contract takes the NOPID bundle beside [proc_priv] and lends the block
      out of it at each fileclose call.  Its two remaining tie premises are
      discharged the way sys_close's are -- [fcn_pid] from the dispatch's own
-     [Hpidt], [fcn_dq] off the [sysc_ties] record. *)
+     [Hpidt], [fcn_dq] off the [sysc_proc_ties] record. *)
   Lemma sysc_arm_pipe (γf : gname) (pj : mword 64)
-      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
+      (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) :
-    sysc_arm_goal 4 γf pj γs j γl bn fn dqi ip pid V lks av m M.
+    sysc_arm_goal 4 γf pj γs j γl fn dqi ip pid V lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
@@ -4080,13 +4004,13 @@ Section SyscallArms.
     destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 0)
                 ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v0 Hv0].
     iPoseProof "Henv" as "#Henvc".
-    iDestruct (syscall_env_all with "Henvc") as (γa γp γw γft γtk γpr γud γvd)
+    iDestruct (syscall_env_all with "Henvc") as (γp γw γft γtk)
       "(#Hkalloc & _ & _ & _ & #Hftable & _ & _ & #Hfsenv)".
     iDestruct (sysc_fs_env_ties with "Hfsenv") as "%T".
     iDestruct (sysc_fs_env_all with "Hfsenv") as
-      "( _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hpanic & _ )".
-    iPoseProof (sysc_fclose_pipe_env (proc_addr j) bn fn with "Hfsenv") as "#Hpenv".
-    iDestruct (sysc_fclose_fs_env (proc_addr j) bn fn true
+      "(_ & _ & _ & _ & _ & _ & _ & _ & #Hpanic & _)".
+    iPoseProof (sysc_fclose_pipe_env (proc_addr j) fn with "Hfsenv") as "#Hpenv".
+    iDestruct (sysc_fclose_fs_env (proc_addr j) fn true
                  with "Hfsenv Hbs") as "Hfenv".
     (* two of the four spare units out, and the same two back below *)
     iDestruct (fd_slots_split 1 3 with "Hfd") as "[Hfd0 Hfd]".
@@ -4097,18 +4021,18 @@ Section SyscallArms.
        reaches fileclose on three error paths and through pipealloc, and one
        unit serves them all. *)
     iDestruct (sysc_iref_split3 with "Hir") as "[Hir Hiru]".
-    iApply (SysPipe.wp_sys_pipe_sconf γa γft γf fn None M (av - 4)%nat
+    iApply (SysPipe.wp_sys_pipe_sconf fsc_kalloc γft γf fn None M (av - 4)%nat
               true (proc_addr j) v0 pid V true ∅
               Hv0 ltac:(lia) (locks_below_empty "log")
-              Hpidt (sct_dq _ _ _ T)
+              Hpidt (sct_dq _ _ T)
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpanic Hftable Hkalloc
                     Hpriv Hufrag Hfd0 Hfd1 Hiru Hpenv Hfenv").
     iIntros (CIDy Hsy mf P') "%Hcs %Hupt Hcg Hcpu _ _ Hpc Hpost Hiru Hpe' Hfe'".
     (* the three block slots, back out of the nopid bundle.  THE BITMAP DOES
        NOT COME WITH THEM any more -- it is an invariant, so the bundle never
        had to give it back and the post no longer quantifies a used-set. *)
-    iDestruct (sysc_fclose_fs_out bn fn 0%nat true (proc_addr j)
-                 (sct_bio _ _ _ T) with "Hfe'") as "Hbs".
+    iDestruct (sysc_fclose_fs_out fn 0%nat true (proc_addr j)
+                 with "Hfe'") as "Hbs".
     iDestruct "Hpost" as "(Hpv & Hufrag & Hfd0 & Hfd1)".
     iDestruct (fd_slots_combine 1 2 with "Hfd1 Hfd") as "Hfd".
     iDestruct (fd_slots_combine 1 3 with "Hfd0 Hfd") as "Hfd".
@@ -4149,7 +4073,7 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
-    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) bn fn dqi ip pid V V'
+    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid V V'
               ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' Hfg'
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd [Hir Hiru] Henv Hpriv Hufrag Hpc Hcont").
     iApply (sysc_iref_join3 with "Hir Hiru").
@@ -4184,11 +4108,11 @@ Section SyscallArms.
      [DfracDiscarded], which is the second of the four rows the old
      twenty-five-conjunct environment could not state at all. *)
   Lemma sysc_arm_mkdir (γf : gname) (pj : mword 64)
-      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
+      (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) :
-    sysc_arm_goal 20 γf pj γs j γl bn fn dqi ip pid V lks av m M.
+    sysc_arm_goal 20 γf pj γs j γl fn dqi ip pid V lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
@@ -4206,13 +4130,12 @@ Section SyscallArms.
     destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 0)
                 ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v0 Hv0].
     iPoseProof "Henv" as "#Henvc".
-    iDestruct (syscall_env_all with "Henvc") as (γa γp γw γft γtk γpr γud γvd)
+    iDestruct (syscall_env_all with "Henvc") as (γp γw γft γtk)
       "(#Hkalloc & _ & _ & _ & _ & _ & _ & #Hfsenv)".
     iDestruct (sysc_fs_env_all with "Hfsenv") as
-      "( %Hroot & %Hnib0 & _ & _ & _ & _ & _ &
-        %Hlg & _ & _ & #Hbio & #Hlog & #Hseam & #Hgen & #Hdevi & #Hgeom &
-        #Hdlock & _ & _ & _ & %Hbmgeo & %Hnin & #Hsbn & #Hsbs &
-        %Hprg & #Hpr )".
+      "(%Hroot & %Hnib0 & _ & _ & _ & _ & %Hlg & _ & _ & #Hbio & #Hlog & #Hseam
+        & #Hgen & #Hdevi & #Hgeom & #Hdlock & _ & _ & _ & %Hbmgeo & %Hnin &
+        #Hsbn & #Hsbs & %Hprg & #Hpr)".
     iDestruct (sysc_ic_env_of_ready with "Hfsenv") as
       "( %Hsize & %Hbm0 & %Hbmc & %Hbml & %Hist0 & %Hib & %Hcb &
         #Hit & #Hitinv & #Hesc & #Hireg & #Hropen & #Hsl2 )".
@@ -4220,12 +4143,12 @@ Section SyscallArms.
     iDestruct (sysc_bm_cells with "Hfsenv") as "(#Hbmp & #Hisp & #Hbmr)".
     iPoseProof sysc_trap_ext_true as "Htcx".
     iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
-    iApply (SysMkdir.wp_sys_mkdir_sconf γf γa fsc_printk γs j γl
-              (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
-              (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
+    iApply (SysMkdir.wp_sys_mkdir_sconf γf γs j γl
 
-              (fcn_bmapstart fn)
- fsc_ninodes (fcn_size fn)
+              (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
+
+
+
  IREFSPARE
               DfracDiscarded DfracDiscarded DfracDiscarded DfracDiscarded
               v0 pid V M (av - 4)%nat true true ∅
@@ -4261,7 +4184,7 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
-    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) bn fn dqi ip pid V
+    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid V
               (upd_upt V P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' ltac:(reflexivity)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
@@ -4274,11 +4197,11 @@ Section SyscallArms.
      postcondition, and the ledger that closes at [IREFSPARE] -- is the
      same; see [sysc_arm_mkdir] for why the entry is wirable at all. *)
   Lemma sysc_arm_mknod (γf : gname) (pj : mword 64)
-      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
+      (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) :
-    sysc_arm_goal 17 γf pj γs j γl bn fn dqi ip pid V lks av m M.
+    sysc_arm_goal 17 γf pj γs j γl fn dqi ip pid V lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
@@ -4300,13 +4223,12 @@ Section SyscallArms.
     destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 2)
                 ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v2 Hv2].
     iPoseProof "Henv" as "#Henvc".
-    iDestruct (syscall_env_all with "Henvc") as (γa γp γw γft γtk γpr γud γvd)
+    iDestruct (syscall_env_all with "Henvc") as (γp γw γft γtk)
       "(#Hkalloc & _ & _ & _ & _ & _ & _ & #Hfsenv)".
     iDestruct (sysc_fs_env_all with "Hfsenv") as
-      "( %Hroot & %Hnib0 & _ & _ & _ & _ & _ &
-        %Hlg & _ & _ & #Hbio & #Hlog & #Hseam & #Hgen & #Hdevi & #Hgeom &
-        #Hdlock & _ & _ & _ & %Hbmgeo & %Hnin & #Hsbn & #Hsbs &
-        %Hprg & #Hpr )".
+      "(%Hroot & %Hnib0 & _ & _ & _ & _ & %Hlg & _ & _ & #Hbio & #Hlog & #Hseam
+        & #Hgen & #Hdevi & #Hgeom & #Hdlock & _ & _ & _ & %Hbmgeo & %Hnin &
+        #Hsbn & #Hsbs & %Hprg & #Hpr)".
     iDestruct (sysc_ic_env_of_ready with "Hfsenv") as
       "( %Hsize & %Hbm0 & %Hbmc & %Hbml & %Hist0 & %Hib & %Hcb &
         #Hit & #Hitinv & #Hesc & #Hireg & #Hropen & #Hsl2 )".
@@ -4314,12 +4236,12 @@ Section SyscallArms.
     iDestruct (sysc_bm_cells with "Hfsenv") as "(#Hbmp & #Hisp & #Hbmr)".
     iPoseProof sysc_trap_ext_true as "Htcx".
     iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
-    iApply (SysMknod.wp_sys_mknod_sconf γf γa fsc_printk γs j γl
-              (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
-              (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
+    iApply (SysMknod.wp_sys_mknod_sconf γf γs j γl
 
-              (fcn_bmapstart fn)
- fsc_ninodes (fcn_size fn)
+              (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
+
+
+
  IREFSPARE
               DfracDiscarded DfracDiscarded DfracDiscarded DfracDiscarded
               v0 v1 v2 pid V M (av - 4)%nat true true ∅
@@ -4355,7 +4277,7 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
-    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) bn fn dqi ip pid V
+    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid V
               (upd_upt V P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' ltac:(reflexivity)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
@@ -4381,11 +4303,11 @@ Section SyscallArms.
      nothing is spent -- see [SpecSysOpen]'s post.  With the equality the
      arm is the same three lines every other create-family entry is. *)
   Lemma sysc_arm_open (γf : gname) (pj : mword 64)
-      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
+      (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) :
-    sysc_arm_goal 15 γf pj γs j γl bn fn dqi ip pid V lks av m M.
+    sysc_arm_goal 15 γf pj γs j γl fn dqi ip pid V lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
@@ -4405,13 +4327,12 @@ Section SyscallArms.
     destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 1)
                 ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v1 Hv1].
     iPoseProof "Henv" as "#Henvc".
-    iDestruct (syscall_env_all with "Henvc") as (γa γp γw γft γtk γpr γud γvd)
+    iDestruct (syscall_env_all with "Henvc") as (γp γw γft γtk)
       "(#Hkalloc & _ & _ & _ & #Hftable & _ & _ & #Hfsenv)".
     iDestruct (sysc_fs_env_all with "Hfsenv") as
-      "( %Hroot & %Hnib0 & _ & _ & _ & _ & _ &
-        %Hlg & _ & _ & #Hbio & #Hlog & #Hseam & #Hgen & #Hdevi & #Hgeom &
-        #Hdlock & _ & _ & _ & %Hbmgeo & %Hnin & #Hsbn & #Hsbs &
-        %Hprg & #Hpr )".
+      "(%Hroot & %Hnib0 & _ & _ & _ & _ & %Hlg & _ & _ & #Hbio & #Hlog & #Hseam
+        & #Hgen & #Hdevi & #Hgeom & #Hdlock & _ & _ & _ & %Hbmgeo & %Hnin &
+        #Hsbn & #Hsbs & %Hprg & #Hpr)".
     iDestruct (sysc_ic_env_of_ready with "Hfsenv") as
       "( %Hsize & %Hbm0 & %Hbmc & %Hbml & %Hist0 & %Hib & %Hcb &
         #Hit & #Hitinv & #Hesc & #Hireg & #Hropen & #Hsl2 )".
@@ -4421,12 +4342,12 @@ Section SyscallArms.
     iDestruct (fd_slots_split 1 3 with "Hfd") as "[Hfd0 Hfd]".
     iPoseProof sysc_trap_ext_true as "Htcx".
     iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
-    iApply (SysOpen.wp_sys_open_sconf γft γf γa fsc_printk γs j γl
-              (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
-              (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
+    iApply (SysOpen.wp_sys_open_sconf γft γf γs j γl
 
-              (fcn_bmapstart fn)
- fsc_ninodes (fcn_size fn)
+              (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
+
+
+
  IREFSPARE
               DfracDiscarded DfracDiscarded DfracDiscarded DfracDiscarded
               v0 v1 pid V M (av - 4)%nat true true ∅
@@ -4481,7 +4402,7 @@ Section SyscallArms.
     assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
-    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) bn fn dqi ip pid V V'
+    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid V V'
               ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' Hfg'
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
@@ -4492,57 +4413,57 @@ Section SyscallArms.
      the capstone) because the capstone applies it AFTER the [c.jalr]'s own
      hart crossing. *)
   Lemma sysc_arm_dispatch (k : nat) (γf : gname) (pj : mword 64)
-      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
+      (γs : list gname) (j : nat) (γl : gname) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) :
     (1 <= k <= 22)%nat ->
-    sysc_arm_goal k γf pj γs j γl bn fn dqi ip pid V lks av m M.
+    sysc_arm_goal k γf pj γs j γl fn dqi ip pid V lks av m M.
   Proof.
     intro Hk.
     destruct (decide (k = 1%nat)) as [-> | Hne1].
-    { exact (sysc_arm_fork γf pj γs j γl bn fn dqi ip pid V lks av m M). }
+    { exact (sysc_arm_fork γf pj γs j γl fn dqi ip pid V lks av m M). }
     destruct (decide (k = 2%nat)) as [-> | Hne2].
-    { exact (sysc_arm_exit γf pj γs j γl bn fn dqi ip pid V lks av m M). }
+    { exact (sysc_arm_exit γf pj γs j γl fn dqi ip pid V lks av m M). }
     destruct (decide (k = 3%nat)) as [-> | Hne3].
-    { exact (sysc_arm_wait γf pj γs j γl bn fn dqi ip pid V lks av m M). }
+    { exact (sysc_arm_wait γf pj γs j γl fn dqi ip pid V lks av m M). }
     destruct (decide (k = 6%nat)) as [-> | Hne4].
-    { exact (sysc_arm_kill γf pj γs j γl bn fn dqi ip pid V lks av m M). }
+    { exact (sysc_arm_kill γf pj γs j γl fn dqi ip pid V lks av m M). }
     destruct (decide (k = 7%nat)) as [-> | Hne5].
-    { exact (sysc_arm_exec γf pj γs j γl bn fn dqi ip pid V lks av m M). }
+    { exact (sysc_arm_exec γf pj γs j γl fn dqi ip pid V lks av m M). }
     destruct (decide (k = 10%nat)) as [-> | Hne6].
-    { exact (sysc_arm_dup γf pj γs j γl bn fn dqi ip pid V lks av m M). }
+    { exact (sysc_arm_dup γf pj γs j γl fn dqi ip pid V lks av m M). }
     destruct (decide (k = 11%nat)) as [-> | Hne7].
-    { exact (sysc_arm_getpid γf pj γs j γl bn fn dqi ip pid V lks av m M). }
+    { exact (sysc_arm_getpid γf pj γs j γl fn dqi ip pid V lks av m M). }
     destruct (decide (k = 12%nat)) as [-> | Hne8].
-    { exact (sysc_arm_sbrk γf pj γs j γl bn fn dqi ip pid V lks av m M). }
+    { exact (sysc_arm_sbrk γf pj γs j γl fn dqi ip pid V lks av m M). }
     destruct (decide (k = 13%nat)) as [-> | Hne9].
-    { exact (sysc_arm_pause γf pj γs j γl bn fn dqi ip pid V lks av m M). }
+    { exact (sysc_arm_pause γf pj γs j γl fn dqi ip pid V lks av m M). }
     destruct (decide (k = 14%nat)) as [-> | Hne10].
-    { exact (sysc_arm_uptime γf pj γs j γl bn fn dqi ip pid V lks av m M). }
+    { exact (sysc_arm_uptime γf pj γs j γl fn dqi ip pid V lks av m M). }
     destruct (decide (k = 8%nat)) as [-> | Hne11].
-    { exact (sysc_arm_fstat γf pj γs j γl bn fn dqi ip pid V lks av m M). }
+    { exact (sysc_arm_fstat γf pj γs j γl fn dqi ip pid V lks av m M). }
     destruct (decide (k = 9%nat)) as [-> | Hne12].
-    { exact (sysc_arm_chdir γf pj γs j γl bn fn dqi ip pid V lks av m M). }
+    { exact (sysc_arm_chdir γf pj γs j γl fn dqi ip pid V lks av m M). }
     destruct (decide (k = 18%nat)) as [-> | Hne13].
-    { exact (sysc_arm_unlink γf pj γs j γl bn fn dqi ip pid V lks av m M). }
+    { exact (sysc_arm_unlink γf pj γs j γl fn dqi ip pid V lks av m M). }
     destruct (decide (k = 19%nat)) as [-> | Hne14].
-    { exact (sysc_arm_link γf pj γs j γl bn fn dqi ip pid V lks av m M). }
+    { exact (sysc_arm_link γf pj γs j γl fn dqi ip pid V lks av m M). }
     destruct (decide (k = 21%nat)) as [-> | Hne15].
-    { exact (sysc_arm_close γf pj γs j γl bn fn dqi ip pid V lks av m M). }
+    { exact (sysc_arm_close γf pj γs j γl fn dqi ip pid V lks av m M). }
     destruct (decide (k = 22%nat)) as [-> | Hne16].
-    { exact (sysc_arm_sync γf pj γs j γl bn fn dqi ip pid V lks av m M). }
+    { exact (sysc_arm_sync γf pj γs j γl fn dqi ip pid V lks av m M). }
     destruct (decide (k = 4%nat)) as [-> | Hne17].
-    { exact (sysc_arm_pipe γf pj γs j γl bn fn dqi ip pid V lks av m M). }
+    { exact (sysc_arm_pipe γf pj γs j γl fn dqi ip pid V lks av m M). }
     destruct (decide (k = 20%nat)) as [-> | Hne18].
-    { exact (sysc_arm_mkdir γf pj γs j γl bn fn dqi ip pid V lks av m M). }
+    { exact (sysc_arm_mkdir γf pj γs j γl fn dqi ip pid V lks av m M). }
     destruct (decide (k = 17%nat)) as [-> | Hne19].
-    { exact (sysc_arm_mknod γf pj γs j γl bn fn dqi ip pid V lks av m M). }
+    { exact (sysc_arm_mknod γf pj γs j γl fn dqi ip pid V lks av m M). }
     destruct (decide (k = 15%nat)) as [-> | Hne20].
-    { exact (sysc_arm_open γf pj γs j γl bn fn dqi ip pid V lks av m M). }
+    { exact (sysc_arm_open γf pj γs j γl fn dqi ip pid V lks av m M). }
     destruct (decide (k = 5%nat)) as [-> | Hne21].
-    { exact (sysc_arm_read γf pj γs j γl bn fn dqi ip pid V lks av m M). }
+    { exact (sysc_arm_read γf pj γs j γl fn dqi ip pid V lks av m M). }
     destruct (decide (k = 16%nat)) as [-> | Hne22].
-    { exact (sysc_arm_write γf pj γs j γl bn fn dqi ip pid V lks av m M). }
+    { exact (sysc_arm_write γf pj γs j γl fn dqi ip pid V lks av m M). }
     (* EVERY ONE of the 22 is above, so with [Hk] this case is empty.  This
        is what retires [sysc_arm_placeholder] -- the tree's only [Admitted]. *)
     exfalso. lia.
@@ -4578,7 +4499,7 @@ Section SyscallArms.
      "pr" rank premise out of [cpu_own 0], and the 48-slot budget out of
      [K_syscall]'s own 82. *)
   Lemma sysc_fallback (γf : gname) (pj : mword 64)
-      (γs : list gname) (j : nat) (bn : bio_names) (fn : fclose_names)
+      (γs : list gname) (j : nat) (fn : fclose_names)
       (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) :
@@ -4590,14 +4511,14 @@ Section SyscallArms.
        r <> csp_rs1 -> r <> Rs0 -> r <> Rs1 -> r <> Rs2 ->
        M !!! Regidx r = m !!! Regidx r) ->
     (K_syscall <= av)%nat ->
-    sysc_arm_pre γf pj γs bn fn dqi ip pid V lks (av - 4)%nat M
+    sysc_arm_pre γf pj γs fn dqi ip pid V lks (av - 4)%nat M
       (mword_of_int (KernelSyms.syscall + 0x40) : mword 64) -∗
     word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
     word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
     word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
     word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
     kernel_data -∗
-    sysc_hcont_ty γf pj bn fn dqi ip pid V lks av m (ret_pc (m !!! Regidx Rra)) -∗
+    sysc_hcont_ty γf pj fn dqi ip pid V lks av m (ret_pc (m !!! Regidx Rra)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hj Hpj HMsp HMs1 HMother Hav.
@@ -4608,7 +4529,7 @@ Section SyscallArms.
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
     iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlks Hcpu]". subst lks.
     iPoseProof "Henv" as "#Henvc".
-    iDestruct (syscall_env_all with "Henvc") as (γa γp γw γft γtk γpr γud γvd)
+    iDestruct (syscall_env_all with "Henvc") as (γp γw γft γtk)
       "(_ & _ & _ & _ & _ & _ & #Hpenv & _)".
     (* ---- +0x40: addi a2,s1,344 -- a2 := &p->name ---- *)
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.syscall + 0x40)) Ra2 Rs1
@@ -4740,7 +4661,7 @@ Section SyscallArms.
     iPoseProof (sysc_fmt_str with "Hdata") as "Hfmt".
     iDestruct (cpu_own_transport CID CIDe 0%nat true (proc_addr j) true
                  ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Printk.wp_printk_gen_sconf KT1 (CID := CIDe) γpr γud γvd F4 (av - 4)%nat true
+    iApply (Printk.wp_printk_gen_sconf KT1 (CID := CIDe) fsc_printk fsc_uart fsc_disk F4 (av - 4)%nat true
               (proc_addr j) (dqf := DfracDiscarded) sysc_fmt
               [PkANum; PkAStr (DfracOwn 1) nm; PkANum] true ∅
               ltac:(lia) sysc_fmt_len sysc_fmt_nonul
@@ -4865,7 +4786,7 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (cpu_own_transport CIDf CIDi 0%nat true (proc_addr j) true Hcrfi
                  with "Hcpu") as "Hcpu".
-    iApply (sysc_epilogue_tail (CID := CIDi) γf (proc_addr j) bn fn dqi ip pid V
+    iApply (sysc_epilogue_tail (CID := CIDi) γf (proc_addr j) fn dqi ip pid V
               (upd_tf V (<[tf_arg_idx 0 := rget G1 Ra4]> (pv_tf V)))
               ∅ av m G1 HG1sp HG1rest ltac:(lia) eq_refl eq_refl
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
@@ -4892,11 +4813,11 @@ Section SyscallMain.
      `decide (k = <literal>)` branch inside that combinator and NOTHING here
      would move. *)
   Lemma wp_syscall_sconf (γf : gname) (γs : list gname) (j : nat) (γl : gname)
-      (bn : bio_names) (fn : fclose_names)
+ (fn : fclose_names)
       (ip : mword 64) (dqi : dfrac)
       (m : regfile) (av : nat)
       (pid : mword 32) (V : pprivate) (lks : gset string)
-    : wp_syscall_sconf_body syscall_env γf γs j γl bn fn ip dqi m av pid V lks.
+    : wp_syscall_sconf_body syscall_env γf γs j γl fn ip dqi m av pid V lks.
   Proof.
     cbv beta delta [wp_syscall_sconf_body].
     intros pcE pj ret_tgt Hj Hgamma Hav Hpidt.
@@ -5349,12 +5270,12 @@ Section SyscallMain.
       (* the WHOLE slot crosses here -- the arm this resolves to may be the
          one that never returns, so the closer has to survive the crossing
          with the continuation *)
-      iDestruct (sysc_exit_retarget CID CID22 γf pj bn fn dqi ip pid V lks av m
+      iDestruct (sysc_exit_retarget CID CID22 γf pj fn dqi ip pid V lks av m
                    (ret_pc (m !!! Regidx Rra)) Hcr22 with "Hcont") as "Hcont".
       assert (Hcr8_22 : true = false \/ pj = zero_reg -> (CID22 : CPU) = (CID8 : CPU))
         by wp_next_chain.
       iDestruct (cpu_own_transport CID8 CID22 0%nat true pj true Hcr8_22 with "Hcpu") as "Hcpu".
-      iApply (sysc_arm_dispatch (CID := CID22) k γf pj γs j γl bn fn dqi ip pid V lks av m D0 Hk
+      iApply (sysc_arm_dispatch (CID := CID22) k γf pj γs j γl fn dqi ip pid V lks av m D0 Hk
                 Hj Hgamma eq_refl HD0armsp HD0s2 HD0ra HD0other HD0avb Hpidt
                 with "[Hpc Hcg Hcpu Htext Hprocs HR Hbs Hip Hfd Hir Hpriv Hufrag] Hr24 Hr16 Hr8 Hr0 Hdata Hcont").
       { iApply (sysc_arm_pre_intro with
@@ -5387,7 +5308,7 @@ Section SyscallMain.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (syci_22 with "Htext"). }
-      iNext.
+      iApply bi.later_intro.
       iIntros (CID15 Hs15) "Hcg Hpc".
       assert (Hp40 : add_vec (mword_of_int (KernelSyms.syscall + 0x22) : mword 64) (sign_extend' 64 (mword_of_int 30 : mword 13)) = mword_of_int (KernelSyms.syscall + 0x40)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp40) in "Hpc".
@@ -5435,7 +5356,7 @@ Section SyscallMain.
       assert (Hcr8_15 : true = false \/ pj = zero_reg -> (CID15 : CPU) = (CID8 : CPU))
         by wp_next_chain.
       iDestruct (cpu_own_transport CID8 CID15 0%nat true pj true Hcr8_15 with "Hcpu") as "Hcpu".
-      iApply (sysc_fallback (CID := CID15) γf pj γs j bn fn dqi ip pid V lks av m B5
+      iApply (sysc_fallback (CID := CID15) γf pj γs j fn dqi ip pid V lks av m B5
                 Hj eq_refl HB5armsp HB5s1 HB5other HB5avb
                 with "[Hpc Hcg Hcpu Htext Hprocs HR Hbs Hip Hfd Hir Hpriv Hufrag] Hr24 Hr16 Hr8 Hr0 Hdata Hcont").
       { iApply (sysc_arm_pre_intro with

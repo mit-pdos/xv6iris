@@ -235,6 +235,126 @@ Section GammaDefs.
   Qed.
 
   (* ---------------------------------------------------------------- *)
+  (*  2b.  THE CONSTANT-SHARE VIEW (durable-disk lane H4, moved down    *)
+  (*       here at EV-X)                                                *)
+  (*                                                                    *)
+  (*  [gamma_q Γ dq] is [Γ] with its byte points-to pinned at ONE share: *)
+  (*  its [fsΦ] DISCARDS the dfrac it is handed and always uses [dq].    *)
+  (*  Consequently EVERY Gamma-generic shape in the tree -- [byte_range],*)
+  (*  [blk_owned], [FsStateInode.inode_phi], [FsStateBitmap.free_pool],  *)
+  (*  [FsState.fs_state] -- reads AT A SHARE with no new definition and  *)
+  (*  no new lemma: the [_q] twins below are what those shapes BECOME    *)
+  (*  at this view, on the nose ([gamma_q_byte_range] is [reflexivity]). *)
+  (*  That is what makes [FsState.fs_state]'s dfrac argument cost one    *)
+  (*  line rather than a parallel hierarchy (durable-disk EV-X).         *)
+  (*                                                                    *)
+  (*  THE GHOST COLUMN IS UNTOUCHED: [γlink] and [γtop] are copied, so   *)
+  (*  every Φ-FREE piece of a file system ([FsStateInode.inode_ghost],   *)
+  (*  [FsState.fs_links], [top_frag]) is LITERALLY the same proposition  *)
+  (*  at [gamma_q Γ dq] as at [Γ] -- which is the whole content of the   *)
+  (*  ruling: byte legs take the share, authorities stay whole.          *)
+  (*                                                                    *)
+  (*  IT DOES NOT SATISFY [phi_excl] (its [fsΦ] ignores the dfracs the   *)
+  (*  law quantifies over), so exclusivity is always read at [Γ] with a  *)
+  (*  [~ ✓ (dq ⋅ dq)] side condition -- [FsDurXfer]'s [phi_runs_q_disj]. *)
+  (* ---------------------------------------------------------------- *)
+
+  Definition gamma_q (Γ : fs_view_names) (dq : dfrac) : fs_view_names :=
+    MkFsView (fun (_ : dfrac) (a : Z) (v : bv 8) => fsΦ Γ dq a v)
+             (γlink Γ) (γtop Γ).
+
+  Lemma gamma_q_byte_range Γ dq b off bs :
+    byte_range (gamma_q Γ dq) b off bs ⊣⊢ byte_range_q Γ dq b off bs.
+  Proof. rewrite /byte_range /byte_range_q /gamma_q //. Qed.
+
+  Lemma gamma_q_blk_owned Γ dq b bs :
+    blk_owned (gamma_q Γ dq) b bs ⊣⊢ blk_owned_q Γ dq b bs.
+  Proof. rewrite /blk_owned /blk_owned_q gamma_q_byte_range //. Qed.
+
+  (* THE FULL-SHARE READING IS THE THING ITSELF, on the nose: [byte_range]
+     hands [DfracOwn 1] down, and that is what the constant view then
+     ignores.  This is why a consumer of the old fraction-1 predicate moves
+     by a SWEEP ([DfracOwn 1] in the argument list) and not by re-proof. *)
+  Lemma gamma_q_1_byte_range Γ b off bs :
+    byte_range (gamma_q Γ (DfracOwn 1)) b off bs = byte_range Γ b off bs.
+  Proof. reflexivity. Qed.
+
+  Lemma gamma_q_1_blk_owned Γ b bs :
+    blk_owned (gamma_q Γ (DfracOwn 1)) b bs = blk_owned Γ b bs.
+  Proof. reflexivity. Qed.
+
+  Global Instance gamma_q_gtimeless Γ `{!GTimeless Γ} dq :
+    GTimeless (gamma_q Γ dq).
+  Proof. intros dq' a v. rewrite /gamma_q /=. apply gtimeless. Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (*  2c.  SHEDDING A SHARE, AS A MAP BETWEEN VIEWS                     *)
+  (*                                                                    *)
+  (*  The commit's collection meets the metadata objects and the         *)
+  (*  region's records at fraction 1 while a read-locked inode's data    *)
+  (*  leg stands at three quarters, so the whole ones are SHED down to   *)
+  (*  the uniform share the transport takes (durable-disk EV-X).  Stated *)
+  (*  once, at the VIEW: [view_shed Γ Γ1 Γ2] says a byte at [Γ] splits   *)
+  (*  into one at [Γ1] and one at [Γ2], and every shape above then sheds *)
+  (*  by one three-line induction each.  Both instances are [phi_frac]   *)
+  (*  verbatim: [gamma_q_shed] splits a view already at a share, and     *)
+  (*  [gamma_shed_full] / [gamma_shed_34] split a WHOLE object into two  *)
+  (*  constant-share views -- which is what the commit's collection runs *)
+  (*  on the region's records, block 1, the bitmap and the free pool.    *)
+  (*                                                                    *)
+  (*  ONE DIRECTION ONLY.  Rejoining is not stated here because the free *)
+  (*  pool's element hides its bytes under an existential, so two halves *)
+  (*  of a pool row cannot be put back without an agreement law -- and   *)
+  (*  nothing ever needs to: the transport RETURNS its source.           *)
+  (* ---------------------------------------------------------------- *)
+
+  (* Stated at [DfracOwn 1] alone, because that is the ONLY dfrac the
+     shapes above ever hand [fsΦ]: [byte_range] passes it down and a share
+     enters only through [gamma_q]. *)
+  Definition view_shed (Γ Γ1 Γ2 : fs_view_names) : Prop :=
+    forall (a : Z) (v : bv 8),
+      fsΦ Γ (DfracOwn 1) a v
+      ⊢ fsΦ Γ1 (DfracOwn 1) a v ∗ fsΦ Γ2 (DfracOwn 1) a v.
+
+  Lemma gamma_q_shed Γ (Hfr : phi_frac Γ) (q1 q2 : Qp) :
+    view_shed (gamma_q Γ (DfracOwn (q1 + q2)))
+              (gamma_q Γ (DfracOwn q1)) (gamma_q Γ (DfracOwn q2)).
+  Proof. intros a v. rewrite /gamma_q /=. rewrite (Hfr a v q1 q2) //. Qed.
+
+  (* ...and the one every fraction-1 owner runs: a WHOLE object shed into
+     two constant-share views whose shares sum to one.  This is how the
+     commit's collection gets the region's records, block 1 and the bitmap
+     down to the share the transport takes (durable-disk EV-X). *)
+  Lemma gamma_shed_full Γ (Hfr : phi_frac Γ) (q1 q2 : Qp) :
+    (q1 + q2)%Qp = 1%Qp ->
+    view_shed Γ (gamma_q Γ (DfracOwn q1)) (gamma_q Γ (DfracOwn q2)).
+  Proof.
+    intros Hsum a v. rewrite /gamma_q /= -Hsum. rewrite (Hfr a v q1 q2) //.
+  Qed.
+
+  Lemma gamma_shed_34 Γ (Hfr : phi_frac Γ) :
+    view_shed Γ (gamma_q Γ (DfracOwn (3/4))) (gamma_q Γ (DfracOwn (1/4))).
+  Proof.
+    apply (gamma_shed_full Γ Hfr (3/4) (1/4)).
+    exact Qp.three_quarter_quarter.
+  Qed.
+
+  Lemma byte_range_shed Γ Γ1 Γ2 (Hs : view_shed Γ Γ1 Γ2) b off bs :
+    byte_range Γ b off bs ⊢ byte_range Γ1 b off bs ∗ byte_range Γ2 b off bs.
+  Proof.
+    rewrite /byte_range /byte_range_q -big_sepL_sep.
+    apply big_sepL_mono. intros k v _. apply (Hs _ v).
+  Qed.
+
+  Lemma blk_owned_shed Γ Γ1 Γ2 (Hs : view_shed Γ Γ1 Γ2) b bs :
+    blk_owned Γ b bs ⊢ blk_owned Γ1 b bs ∗ blk_owned Γ2 b bs.
+  Proof.
+    rewrite /blk_owned. iIntros "[%Hl H]".
+    iDestruct (byte_range_shed Γ Γ1 Γ2 Hs with "H") as "[H1 H2]".
+    iSplitL "H1"; by iFrame.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
   (*  3.  Exclusivity: two owners of one byte is [False]               *)
   (*                                                                   *)
   (*  This is the ONE exclusivity law the design ever invokes -- used  *)

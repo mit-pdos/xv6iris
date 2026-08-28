@@ -57,7 +57,7 @@ Section WpAuipcGpr.
                      (fun w => add_vec w (auipc_off imm)) eq_refl Hrd
                      with "Hcert Hf HPC") ].
       iIntros (e) "(-> & Hf & HPC)". iSplitR; [done|]. iFrame "Hf HPC HnPC".
-    - iNext. iIntros "Hmm Hpmpc Hpc Hf _".
+    - iApply bi.later_intro. iIntros "Hmm Hpmpc Hpc Hf _".
       iApply ("Hcont" with "Hmm Hpmpc Hpc Hf").
   Qed.
 End WpAuipcGpr.
@@ -102,7 +102,7 @@ Section WpLuiGpr.
         [| iApply (swp_execute_pure_w rd m (execute (UTYPE (imm, Regidx rd, LUI)))
                RETIRE_SUCCESS (luival imm) eq_refl Hrd with "Hcert Hf") ].
       iIntros (e) "[-> Hf]". iSplitR; [done|]. iFrame "Hf HPC HnPC".
-    - iNext. iIntros "Hmm Hpmpc Hpc Hf _".
+    - iApply bi.later_intro. iIntros "Hmm Hpmpc Hpc Hf _".
       iApply ("Hcont" with "Hmm Hpmpc Hpc Hf").
   Qed.
 End WpLuiGpr.

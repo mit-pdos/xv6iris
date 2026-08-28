@@ -133,6 +133,8 @@ Section Res.
   Definition usertrap_res_bare_norm := UC.usertrap_res_bare_norm.
   Definition usertrap_res_csrs_open := UC.usertrap_res_csrs_open.
   Definition usertrap_res_sstc := UC.usertrap_res_sstc.
+  Definition usertrap_res_uwp_acc := UC.usertrap_res_uwp_acc.
+  Definition usertrap_res_run_open := UC.usertrap_res_run_open.
   Definition usertrap_res_tf_csrs_open := UC.usertrap_res_tf_csrs_open.
   Definition usertrap_res_tf_open := UC.usertrap_res_tf_open.
   (* ...and the park's one producer-side entry, threaded like the rest.
@@ -994,10 +996,10 @@ Proof.
                ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
   iDestruct (cpu_claim_ext_transport CID CIDb8 eb p
                ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-  iApply (FS.wp_fsinit_sconf γs j γl fsc_uart fsc_disk fsc_dlock pd pav pu
-            fsc_bio fsc_printk
-            fsc_bmapstart fsc_ninodes
-            fsc_size
+  iApply (FS.wp_fsinit_sconf γs j γl pd pav pu
+
+
+
             v_magic (mword_of_int fsc_size) v_nblocks
             (mword_of_int fsc_ninodes) v_nlog (mword_of_int fsc_logst)
             (mword_of_int icfg_ist) (mword_of_int fsc_bmapstart)
@@ -1295,26 +1297,15 @@ Proof.
   iDestruct (fs_ready_panic with "Hfsr") as "#Hpenv2".
   iDestruct (fs_ready_region with "Hfsr") as "[_ #Hropen]".
   iDestruct (fs_ready_kalloc with "Hfsr") as "#Hkaenv".
-  iAssert (fs_fabric γs fsc_uart fsc_disk fsc_dlock pd pav pu fsc_bio)
+  iAssert (fs_fabric γs pd pav pu)
     as "#Hfab".
-  (* ...and the same row-by-row build, for the same measured reason: this
-     named [iFrame] over the fabric's sixteen definition-valued rows was
-     61.0 s. *)
+  (* FOUR ROWS, not sixteen (rank 1d): the fabric IS [fs_ready] plus the
+     process array and the disk fabric at this caller's own three pages.
+     The sixteen-step chain this replaces was written because a named
+     [iFrame] over that many definition-valued rows measured 61.0 s. *)
   { rewrite /fs_fabric.
-    iSplitR; [iExact "Hkdata" |].
-    iSplitR; [iExact "Hpenv2" |].
-    iSplitR; [iExact "Hbio" |].
-    iSplitR; [iExact "Hlctx" |].
-    iSplitR; [iExact "Hseam" |].
-    iSplitR; [iExact "Hgen" |].
-    iSplitR; [iExact "Hitb2" |].
-    iSplitR; [iExact "Hitbl" |].
-    iSplitR; [iExact "Hesc" |].
-    iSplitR; [iExact "Hslks" |].
-    iSplitR; [iExact "HiregS" |].
-    iSplitR; [iExact "Hropen" |].
+    iSplitR; [iExact "Hfsr" |].
     iSplitR; [iExact "Hpinv" |].
-    iSplitR; [iExact "Hdevi" |].
     iSplitR; [iExact "Hdgeom" |].
     iExact "Hdlock". }
   (* ---- the process block, put back together: the token is the steady
@@ -1356,10 +1347,10 @@ Proof.
                ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
   iDestruct (cpu_claim_ext_transport CIDf1 CIDb19 eb p
                ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-  iApply (KX.wp_kexec_sconf γs j γl fsc_uart fsc_disk fsc_dlock pd pav pu
-            fsc_bio
-            fsc_kalloc γf fsc_bmapstart
-            fsc_size
+  iApply (KX.wp_kexec_sconf γs j γl pd pav pu
+
+ γf
+
             5%nat fkr_init_bytes 1%nat fkr_argv
             (fun _ => 5%nat) (fun _ => 6%nat) (fun _ => fkr_init_bytes)
             pid V
@@ -1927,7 +1918,7 @@ Proof.
             ltac:(vm_compute; discriminate) HT4a5 fkr_beqz_align
             with "Hcg Hpc []").
   { iApply (fkr_24 with "Htext"). }
-  iNext. iIntros (CID6 Hk6) "Hcg Hpc".
+  iApply bi.later_intro. iIntros (CID6 Hk6) "Hcg Hpc".
   iEval (rewrite fkr_beqz_tgt) in "Hpc".
   
   assert (HT4sp : T4 !!! Regidx csp_rs1 = pa_stk ksp 6).

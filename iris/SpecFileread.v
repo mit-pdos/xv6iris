@@ -266,14 +266,13 @@ Record fread_names := MkFReadNames {
   frn_procs      : list gname;    (* the proc table's per-slot lock names   *)
   frn_j          : nat;           (* the running process's index            *)
   frn_plock      : gname;
-  frn_uart       : uart_names;
-  frn_disk       : disk_names;
-  frn_dlock      : gname;         (* virtio_disk.lock                       *)
   frn_cons       : gname;         (* cons.lock -- the DEVICE arm's           *)
+  (* [frn_uart] / [frn_disk] / [frn_dlock] / [frn_bio] ARE GONE (rank 1d):
+     each was a copy of a [FsCfg.fscfg] field.  The three ring pages stay
+     for FsCfg.v's ruling-R1 reason. *)
   frn_pd         : mword 64;
   frn_pav        : mword 64;
   frn_pu         : mword 64;
-  frn_bio        : bio_names;
   (* [frn_inodestart] IS GONE (rank 1c), as [fsn_inodestart] is. *)
   frn_dqs        : dfrac;         (* sb.inodestart                          *)
   (* THE DEVICE TABLE'S READ COLUMN, AS FUNCTIONS OF THE MAJOR.  Scalars
@@ -296,14 +295,11 @@ Record fread_names := MkFReadNames {
 Global Instance fread_names_inhabited : Inhabited fread_names :=
   populate (MkFReadNames
     [] 0%nat 1%positive
-    (UartNames 1%positive 1%positive 1%positive 1%positive)
-    (DiskNames 1%positive 1%positive 1%positive 1%positive 1%positive 1%positive
-               1%positive 1%positive 1%positive 1%positive 1%positive)
-    1%positive 1%positive
+
+
+ 1%positive
     (mword_of_int 0) (mword_of_int 0) (mword_of_int 0)
-    (MkBioNames 1%positive 1%positive
-       (fun _ => (1%positive, 1%positive)) (fun _ => 1%positive)
-       (fun _ => 1%positive))
+
     (DfracOwn 1)
     (fun _ => mword_of_int 0) (fun _ => DfracOwn 1)).
 
@@ -460,8 +456,8 @@ Section SpecFileread.
      ⌜forall inum : mword 32,
         bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
         IBLOCK inum icfg_ist ∈ fsc_cov⌝ ∗
-     bio_ctx (frn_bio fn)
-       (fs_view fsc_fs (frn_disk fn) icfg_dev fsc_cov) ∗
+     bio_ctx (fsc_bio)
+       (fs_view fsc_fs (fsc_disk) icfg_dev fsc_cov) ∗
      (* THE THREE PERSISTENT INVARIANTS SpecIlock / SpecIunlock take: the
         [ref] words, the entries' content escrows, the inode region -- the
         escrow at the FAMILY where it was per-slot. *)
@@ -474,10 +470,10 @@ Section SpecFileread.
      sb_inodestart ↦₄{frn_dqs fn}
        (mword_of_int icfg_ist : mword 32) ∗
      (* the disk fabric *)
-     dev_inv (frn_uart fn) (frn_disk fn) ∗
-     disk_geom (frn_disk fn) (frn_pd fn) (frn_pav fn) (frn_pu fn) ∗
-     is_lock (frn_dlock fn) d_lock "virtio_disk"%string
-       (disk_res (frn_disk fn) (frn_pd fn) (frn_pav fn) (frn_pu fn)) ∗
+     dev_inv (fsc_uart) (fsc_disk) ∗
+     disk_geom (fsc_disk) (frn_pd fn) (frn_pav fn) (frn_pu fn) ∗
+     is_lock (fsc_dlock) d_lock "virtio_disk"%string
+       (disk_res (fsc_disk) (frn_pd fn) (frn_pav fn) (frn_pu fn)) ∗
      (* ONE slot unit: ilock's bread takes it and brelse gives it back;
         readi's does the same, one after the other *)
      bslot)%I.
@@ -502,17 +498,17 @@ Section SpecFileread.
   Definition fileread_env (γf : gname)
       (fn : fread_names) (st : fdstate) : iProp Σ :=
     (match st with
-     | FdOpen (FdPipe _)    => emp
-     | FdOpen (FdDevice mj) => fileread_dev_env fn mj
-     | FdOpen (FdInode _)   => fileread_fs_env γf fn
+     | FdOpen _ _ FdPipe        => emp
+     | FdOpen _ _ (FdDevice mj) => fileread_dev_env fn mj
+     | FdOpen _ _ (FdInode _)   => fileread_fs_env γf fn
      | FdClosed             => emp
      end)%I.
 
   Definition fileread_env_out (fn : fread_names) (st : fdstate) : iProp Σ :=
     (match st with
-     | FdOpen (FdPipe _)    => emp
-     | FdOpen (FdDevice mj) => fileread_dev_out fn mj
-     | FdOpen (FdInode _)   => fileread_fs_out fn
+     | FdOpen _ _ FdPipe        => emp
+     | FdOpen _ _ (FdDevice mj) => fileread_dev_out fn mj
+     | FdOpen _ _ (FdInode _)   => fileread_fs_out fn
      | FdClosed             => emp
      end)%I.
 
@@ -532,7 +528,7 @@ Section SpecFileread.
     fileread_env γf fn st -∗ fileread_env_out fn st.
   Proof.
     rewrite /fileread_env /fileread_env_out.
-    destruct st as [|[?|?|?]]; try by iIntros "$".
+    destruct st as [|? ? [?| |?]]; try by iIntros "$".
     iApply fileread_fs_env_out.
   Qed.
 
@@ -560,11 +556,11 @@ Section SpecFileread.
      making a third copy. *)
 
   (* the generation-named share splits, exactly as its ∃-form does *)
-  Lemma inode_shr_gen_split2 (ik : nat) (s1 s2 : Qp) (dev inum : mword 32)
+  Lemma inode_shr_gen_split2 (ik : nat) (s1 s2 : Qp) (inum : mword 32)
       (g : gname) :
-    IcacheRef.inode_shr_gen ik (s1 + s2)%Qp dev inum g ⊣⊢
-    IcacheRef.inode_shr_gen ik s1 dev inum g ∗
-    IcacheRef.inode_shr_gen ik s2 dev inum g.
+    IcacheRef.inode_shr_gen ik (s1 + s2)%Qp icfg_dev inum g ⊣⊢
+    IcacheRef.inode_shr_gen ik s1 icfg_dev inum g ∗
+    IcacheRef.inode_shr_gen ik s2 icfg_dev inum g.
   Proof.
     rewrite /IcacheRef.inode_shr_gen IcacheRef.inode_ident_split
             IcacheRef.live_gen_split SleepLock.slh_tok_split.
@@ -574,11 +570,11 @@ Section SpecFileread.
   (* halving, as its OWN lemma -- durable-notes' [rewrite -(Qp.div_2 q)]
      trap: written at a call site inside the proofmode the split's evar lands
      out of [s]'s scope. *)
-  Lemma inode_shr_gen_halve2 (ik : nat) (s : Qp) (dev inum : mword 32)
+  Lemma inode_shr_gen_halve2 (ik : nat) (s : Qp) (inum : mword 32)
       (g : gname) :
-    IcacheRef.inode_shr_gen ik s dev inum g ⊣⊢
-    IcacheRef.inode_shr_gen ik (s/2)%Qp dev inum g ∗
-    IcacheRef.inode_shr_gen ik (s/2)%Qp dev inum g.
+    IcacheRef.inode_shr_gen ik s icfg_dev inum g ⊣⊢
+    IcacheRef.inode_shr_gen ik (s/2)%Qp icfg_dev inum g ∗
+    IcacheRef.inode_shr_gen ik (s/2)%Qp icfg_dev inum g.
   Proof. rewrite -inode_shr_gen_split2 Qp.div_2. reflexivity. Qed.
 
   (* THE REGEN.  iunlock returns the arity-preserving [IcacheRef.inode_shr]
@@ -587,11 +583,11 @@ Section SpecFileread.
      ([IcacheRef.live_gen_agree]), and the half that was NOT lent is exactly
      such a slice -- which is why the carve lends [s/2] and keeps [s/2].
      Verbatim [ProofFilewriteParts.fw_shr_regen]. *)
-  Lemma inode_shr_regen2 (ik : nat) (s1 s2 : Qp) (dev inum : mword 32)
+  Lemma inode_shr_regen2 (ik : nat) (s1 s2 : Qp) (inum : mword 32)
       (g : gname) :
-    IcacheRef.inode_shr_gen ik s1 dev inum g -∗
-    IcacheRef.inode_shr ik s2 dev inum -∗
-    IcacheRef.inode_shr_gen ik (s1 + s2)%Qp dev inum g.
+    IcacheRef.inode_shr_gen ik s1 icfg_dev inum g -∗
+    IcacheRef.inode_shr ik s2 icfg_dev inum -∗
+    IcacheRef.inode_shr_gen ik (s1 + s2)%Qp icfg_dev inum g.
   Proof.
     iIntros "H1 H2".
     iEval (rewrite IcacheRef.inode_shr_gen_intro) in "H2".
@@ -678,8 +674,7 @@ End SpecFileread.
 Definition wp_fileread_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
-    (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
+ (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
     (k : nat) (q : Qp) (st : fdstate)            (* the borrowed reference  *)
     (fn : fread_names)                           (* the heavy arms' ghosts  *)
@@ -725,7 +720,7 @@ Definition wp_fileread_sconf_body
   file_ref γf k q st -∗
   (* ambient, because three of the four arms copy into user memory *)
   proc_priv_core pj pidv V -∗
-  kalloc_env γa None -∗
+  kalloc_env fsc_kalloc None -∗
   procs_inv γs -∗
   (* ...and what the file's TYPE selects *)
   fileread_env γf fn st -∗
@@ -756,12 +751,11 @@ Module Type FILEREAD.
   Parameter wp_fileread_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
-      (γa : gname) (γf : gname)
+ (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (k : nat) (q : Qp) (st : fdstate)
       (fn : fread_names)
       (pidv : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string),
-      wp_fileread_sconf_body γa γf γs j γlp k q st fn pidv V m K eb n b lks.
+      wp_fileread_sconf_body γf γs j γlp k q st fn pidv V m K eb n b lks.
 End FILEREAD.

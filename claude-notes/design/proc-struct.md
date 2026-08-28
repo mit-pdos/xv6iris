@@ -1037,9 +1037,8 @@ pointers.  So the user-visible state is carried as GHOST STATE beside the
 array:
 
 ```coq
-Inductive fdtype  := FdInode (inum : Z) | FdPipe (writable : bool)
-                   | FdDevice (major : Z).
-Inductive fdstate := FdClosed | FdOpen (t : fdtype).
+Inductive fdtype  := FdInode (inum : Z) | FdPipe | FdDevice (major : Z).
+Inductive fdstate := FdClosed | FdOpen (readable writable : bool) (t : fdtype).
 ```
 
 `FdDevice`'s major is what separates the console (`CONSOLE = 1`) from any
@@ -1053,11 +1052,18 @@ a client wants to know — it wants to know WHICH FILE, and on this file system
 a file IS its inum.  That one argument is what made increment 3 more than a
 constructor change; see "Where the inum comes from" below.
 
-**`FdPipe` carries its direction**, and on a pipe that is identity rather than
-mode: pipealloc's two files differ in nothing else — same type, same
-`f->pipe` — so `f->writable` is the whole of what says which end a descriptor
-holds.  Without it `pipealloc_post` could not say that `fd[0]` reads and
-`fd[1]` writes.
+**The two mode flags ride on `FdOpen`, not on the type.**  `f->readable` and
+`f->writable` are fields of every `struct file` whatever its type, so putting
+them on each constructor would be the same pair written three times, and any
+consumer that cares only about the mode would have to match on the type to
+find it.  They are what a descriptor's user most wants after "which file":
+fileread returns −1 on `f->readable == 0` *before* it looks at the type, and
+filewrite likewise on `f->writable`.
+
+On a pipe the pair is identity rather than mode — pipealloc's two files differ
+in nothing else — so `FdOpen true false FdPipe` is the read end and
+`FdOpen false true FdPipe` the write end, which is how `pipealloc_post` still
+says that `fd[0]` reads and `fd[1]` writes.
 
 `ProcInv.ofile_slot_agree` is what the whole thing is for, and it is a real
 lemma rather than a vacuous one: a holder of ONE descriptor's fragment learns
@@ -1173,6 +1179,15 @@ as a relation each arm pins the type in both directions, which is what lets
 (`fdstate_ok_inj`), so nothing that depended on the projection's determinism
 was lost.
 
+The mode flags are tied to the **cells**, not to any mode expression, because
+the two producers reach them differently: `pipealloc` stores literal 0 and 1,
+while `sys_open` stores `!(omode & O_WRONLY)` — which gcc compiles to
+`andi a4,a5,1 ; xori a4,a4,1`, since `O_WRONLY` is `1`.  "That is a bit" is an
+argument rather than a computation (`ProofSysOpenParts.so_and1_01`, via
+`Z.land _ 1 = _ mod 2`), and it was the one real obligation this increment
+added — `f->readable` had been entirely unconstrained until now, so
+`so_publish` and `so_tail_pub` both had to start carrying it.
+
 Device files hold an inode reference too and are NOT given their inum: a
 device fd's identity to its user is the driver behind it (`fc_major`), and the
 inode it was opened through is a mount detail.  `FileInvDefs.fdstate_of` is
@@ -1197,13 +1212,14 @@ What made this work rather than merely typecheck is that the four
 (sys_read, sys_write, sys_fstat, sys_close, kexit) never have to name a
 content.
 
-**The one exception, and why it is one.**  `ProofFilewrite.fw_ref` is the
-reference held OPEN — `fref_tok ∗ file_fields k q Cf ∗ file_pay_st … Cf st ∗
-flive_tok` — because filewrite's loop branches on `f->writable` on the INODE
-arm, and the write mode of an inode file is not something `fdstate` tracks.
-It is `Local`, nothing outside that file holds it, and the caller re-seals
-into `file_ref` at the loop's exit.  Putting a `writable` bit on `FdInode`
-(the way `FdPipe` has one) would delete it.
+**There is no exception.**  `ProofFilewrite.fw_loop` briefly held the
+reference open, because it branches on `f->writable` and the mode was not yet
+in the state; once `FdOpen` carried the flags it went back to taking
+`file_ref gf kx qx stx` with a single premise, `stx = FdOpen rx true (FdInode
+nx)`.  The loop opens the reference per iteration and re-derives the two field
+equations it works with (`fc_type Cf = FD_INODE`, `fc_wbool Cf = true`) from
+`fdstate_ok` — whatever content the reference happens to carry that round.
+Every place in the tree that holds a `struct file *` now holds `file_ref`.
 
 ### The loan window
 

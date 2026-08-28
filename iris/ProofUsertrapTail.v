@@ -100,7 +100,7 @@ Section ProofUsertrapTail.
   Context `{GEN : GenId} `{CID : CpuId}.
   (* the syscall environment, an ordinary hart-free parameter here: the tail
      never touches it, it only hands it on.  See SpecSyscall's note. *)
-  Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
+  Context (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ).
 
 
   (* ==================================================================== *)
@@ -139,19 +139,19 @@ Section ProofUsertrapTail.
     iIntros "#Htext Hpc Hcg Hcl (Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
     iDestruct "Hcaps" as "(#Hpi & #Hkd & #Hks & #Hdi & #Hpk & #Hw & #Hft
                            & #Hkm & #Hdk & #Hbio & #Hlog & #Hseam & #Hgc & #Hdev
-                           & #Hgeom & #Hav & #Hties & #Hfsr & #Hpw)".
+                           & #Hgeom & #Hav & #Hfsr & #Hpw)".
     iDestruct "Hown" as "(Hbs & Hip & Hfd & Hir & Hpv & Hufr & _)".
     iPoseProof (SpecPrintk.printk_env_panic with "Hpk") as "#Hpe".
     iApply (KE.wp_kexit_sconf (un_ft N) (un_f N) (un_w N) (un_s N) (un_j N) (un_l N)
-              (un_u N) (un_v N) (un_k N) (un_pd N) (un_pav N) (un_pu N)
-              (un_bn N)
-              (un_ip N) (un_dqi N) (un_kl N) (un_ka N)
-              (un_bmapstart N)
- (un_size N)
+ (un_pd N) (un_pav N) (un_pu N)
+
+              (un_ip N) (un_dqi N)
+
+
               None (un_fn N) m nx b b _ (un_pid N) V
               eq_refl Hj Hjl Hnx Hlg Hbelow
               with "Hcg Hcl Hcpu Hcsrs Hclm Htext Hkd Hpc Hpi Hpe Hw Hft Hkm Hav
-                    Hbio Hlog Hseam Hgc Hdev Hgeom Hdk Hbs Hties Hfsr Hip Hfd Hir Hpv Hufr").
+                    Hbio Hlog Hseam Hgc Hdev Hgeom Hdk Hbs Hfsr Hip Hfd Hir Hpv Hufr").
     all: try lkbelow.
   Qed.
 
@@ -161,7 +161,7 @@ End ProofUsertrapTail.
 Section UtRet2.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
+  Context (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ).
 
   (* ==================================================================== *)
   (* +0xb2 .. +0xc6: MAKE_SATP, the epilogue, THE EXIT.                    *)
@@ -635,7 +635,7 @@ End UtRet2.
 Section UtRet.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
+  Context (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ).
 
   (* ==================================================================== *)
   (* +0xae: jal prepare_return, then the second half at ITS hart.          *)
@@ -757,7 +757,7 @@ End UtRet.
 Section UtA6.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
+  Context (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ).
 
   (* ==================================================================== *)
   (* +0xa6:  if (killed(p)) { which_dev = 0; kexit(-1); }                  *)
@@ -893,7 +893,7 @@ Section UtA6.
                 ltac:(rewrite Hrgmf; exact Hnz) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc [] [-]").
       { iApply (uti_0ac with "Htext"). }
-      iNext. iIntros (CID4 Hk4) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID4 Hk4) "Hcg Hpc".
       assert (Hpf4 : add_vec (mword_of_int (UT + 0xac) : mword 64)
                        (sign_extend' 64 (sign_extend' 13
                           (concat_vec (mword_of_int 36 : mword 8) ('b"0"))))
@@ -1017,7 +1017,7 @@ End UtA6.
 Section UtFa.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
+  Context (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ).
 
   (* ==================================================================== *)
   (* +0xfc:  if (which_dev == 2) yield();   then +0xae                     *)
@@ -1096,7 +1096,7 @@ Section UtFa.
                 Hne ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc [] [-]").
       { iApply (uti_0fe with "Htext"). }
-      iNext. iIntros (CID2 Hk2) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID2 Hk2) "Hcg Hpc".
       assert (Hpae : add_vec (mword_of_int (UT + 0xfe) : mword 64)
                        (sign_extend' 64 (mword_of_int 8112 : mword 13))
                      = mword_of_int (UT + 0xae)) by pcw.
@@ -1175,7 +1175,7 @@ Section UtFa.
                 mf nx b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc [] [-]").
       { iApply (uti_106 with "Htext"). }
-      iIntros (CID5 Hk5). iNext. iIntros "Hcg Hpc".
+      iIntros (CID5 Hk5). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Hpae2 : add_vec (mword_of_int (UT + 0x106) : mword 64)
                         (sign_extend' 64 (sign_extend' 21
                            (concat_vec (mword_of_int 2004 : mword 11) ('b"0"))))

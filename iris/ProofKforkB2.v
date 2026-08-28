@@ -619,7 +619,7 @@ Section KforkTfLoop.
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kfk_062 with "Htext"). }
-        iNext. iApply wp_next_off_intro.
+        iApply bi.later_intro. iApply wp_next_off_intro.
         iIntros "Hcg Hpc". iEval (rewrite Htgt) in "Hpc".
         iApply ("IHf" $! (S k) M6 cur4
                   with "[%] [%] [%] [%] [%] Hcg Hpc Hsrcp Hdstp Hcont").

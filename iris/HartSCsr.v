@@ -1323,7 +1323,7 @@ Section HartSCsr.
     iDestruct "Hd" as (d) "Hpt".
     iMod (reg_update _ r _ w with "Hreg Hpt") as "[Hreg Hpt]".
     iMod "Hclose" as "_".
-    iMod ("Hcl" with "[Hpt]") as "_"; [iNext; iExists w; iExact "Hpt"|].
+    iMod ("Hcl" with "[Hpt]") as "_"; [iApply bi.later_intro; iExists w; iExact "Hpt"|].
     iModIntro.
     iSplitL "Hreg Hmem Hdev";
       [rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg; by iFrame|].

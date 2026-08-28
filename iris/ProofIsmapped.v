@@ -389,7 +389,7 @@ Section ProofIsmapped.
                 with "Hcg Hpc []").
       1: { rgne. rewrite Ha0z. vm_compute; reflexivity. }
       { iApply (imi_0e with "Htext"). }
-      iNext. iIntros (CID8 Hs8) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID8 Hs8) "Hcg Hpc".
       assert (Htgt14 : add_vec (mword_of_int (KernelSyms.ismapped + 0x0e) : mword 64)
                 (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0"))))
               = mword_of_int (KernelSyms.ismapped + 0x14)) by (apply bv_eq; vm_compute; reflexivity).

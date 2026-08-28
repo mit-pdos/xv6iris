@@ -327,10 +327,10 @@ Section ProofSysWrite.
   (*  THE CAPSTONE.                                                       *)
   (* =================================================================== *)
   Lemma wp_sys_write_sconf
-      (γa γf : gname) (γs : list gname) (j : nat) (γlp : gname)
+      (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (fn : fwrite_names) (pidv : mword 32) (V : pprivate) (v v2 : mword 64)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-    : wp_sys_write_sconf_body γa γf γs j γlp fn pidv V v v2 m av eb b lks.
+    : wp_sys_write_sconf_body γf γs j γlp fn pidv V v v2 m av eb b lks.
   Proof.
     cbv beta delta [wp_sys_write_sconf_body].
     intros pcE pj ret_tgt Hav Hj Hgs Hlens Hfj Hfprocs
@@ -794,7 +794,7 @@ Section ProofSysWrite.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (swri_2c with "Htext"). }
-      iNext. iIntros (CID20 Hs20) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID20 Hs20) "Hcg Hpc".
       assert (Htgt40 : add_vec (mword_of_int (KernelSyms.sys_write + 0x2c) : mword 64)
                 (sign_extend' 64 (mword_of_int 20 : mword 13))
                 = mword_of_int (KernelSyms.sys_write + 0x40))
@@ -944,7 +944,7 @@ Section ProofSysWrite.
       iDestruct (write_env_frame γf fn stf with "Henv Hdev") as "[Hfenv Hfback]".
       iDestruct (cpu_own_transport CID17 CID24 0%nat eb pj b 
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
-      iApply (Filewrite.wp_filewrite_sconf γa γf γs j γlp kk qq stf fn pidv V
+      iApply (Filewrite.wp_filewrite_sconf γf γs j γlp kk qq stf fn pidv V
                 S4 (av - 6)%nat eb (sys_rw_count v2) b lks
                 ltac:(lia) Hkk Hj Hgs Hlens
                 Hfj Hfprocs HS4a0' HS4a2 Hnrange Heb

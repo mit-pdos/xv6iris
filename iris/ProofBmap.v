@@ -1412,9 +1412,7 @@ Section BmapTail.
     (* THE COUPLING: the buffer's bytes ARE the entry list's byte image *)
     iEval (rewrite /bio_locked) in "Hheld".
     iDestruct (bm_held_k with "Hheld") as %Hkk.
-    iEval (rewrite /ind_blk_q) in "Hindblk".
-    destruct (decide (bv_unsigned (bm_ind bmI) = 0)) as [Hz0|_];
-      [exfalso; exact (Hindnz Hz0)|].
+    iEval (rewrite (ind_blk_q_nz γfs dq bmI Hindnz)) in "Hindblk".
     iEval (rewrite -Huind) in "Hindblk".
     iApply fupd_wp.
     iMod (bm_held_content ⊤ bn γfs γd dq dev cov kk pidv dev
@@ -1800,10 +1798,8 @@ Section BmapTail.
         iEval (rewrite (bm_buf_restore (ind_bytes (bm_ent bmI)) q Hlen0)) in "Hbuf".
         iDestruct ("Hheldback" $! (ind_bytes (bm_ent bmI)) with "Hbuf") as "Hheld".
         iAssert (inode_map_q γfs dq ip bmI) with "[Haddrs Hindblk]" as "Hmap".
-        { rewrite /inode_map_q /ind_res_q /ind_blk_q.
+        { rewrite /inode_map_q /ind_res_q (ind_blk_q_nz γfs dq bmI Hindnz).
           iSplitL "Haddrs"; [iExact "Haddrs"|].
-          destruct (decide (bv_unsigned (bm_ind bmI) = 0)) as [Hz1|_];
-            [exfalso; exact (Hindnz Hz1)|].
           iEval (rewrite -Huind). iExact "Hindblk". }
         iDestruct (cpu_own_transport CID15 CID17 0 eb (proc_addr j) b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2047,11 +2043,12 @@ Section BmapTail.
           destruct (decide (fbn = (NDIRECT + q)%nat)) as [_|Hc];
             [reflexivity | exfalso; apply Hc; exact Hfbn]. }
         iAssert (inode_map_q γfs dq ip bmJ) with "[Haddrs Hindblk]" as "Hmap".
-        { rewrite /inode_map_q /ind_res_q /ind_blk_q /bmJ.
+        { rewrite /inode_map_q /ind_res_q
+                  (ind_blk_q_nz γfs dq bmJ
+                     ltac:(rewrite /bmJ; cbn [bm_ind]; exact Hindnz))
+                  /bmJ.
           cbn [bm_ind bm_ent bm_dir].
           iSplitL "Haddrs"; [iExact "Haddrs"|].
-          destruct (decide (bv_unsigned (bm_ind bmI) = 0)) as [Hz1|_];
-            [exfalso; exact (Hindnz Hz1)|].
           iEval (rewrite -Huind). iExact "Hindblk". }
         (* the ONE fraction-1 step of the tail: balloc's fresh run is FULL,
            so this deposit is only available on an allocating arm *)
@@ -2150,10 +2147,8 @@ Section BmapTail.
       iEval (rewrite (bm_buf_restore (ind_bytes (bm_ent bmI)) q Hlen0)) in "Hbuf".
       iDestruct ("Hheldback" $! (ind_bytes (bm_ent bmI)) with "Hbuf") as "Hheld".
       iAssert (inode_map_q γfs dq ip bmI) with "[Haddrs Hindblk]" as "Hmap".
-      { rewrite /inode_map_q /ind_res_q /ind_blk_q.
+      { rewrite /inode_map_q /ind_res_q (ind_blk_q_nz γfs dq bmI Hindnz).
         iSplitL "Haddrs"; [iExact "Haddrs"|].
-        destruct (decide (bv_unsigned (bm_ind bmI) = 0)) as [Hz1|_];
-          [exfalso; exact (Hindnz Hz1)|].
         iEval (rewrite -Huind). iExact "Hindblk". }
       iDestruct (cpu_own_transport CID4 CID12 0 eb (proc_addr j) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -3413,8 +3408,9 @@ Section ProofBmapMain.
                           = replicate BSIZE (bv_0 8))
             by (unfold NINDIRECT, BSIZE; rewrite ind_bytes_replicate; reflexivity).
           iAssert (ind_blk γfs bmI) with "[Hfsb]" as "Hindblk2".
-          { rewrite /ind_blk /bmI. cbn [bm_ind bm_ent].
-            case_decide as Hz; [exfalso; exact (Hblknz Hz)|].
+          { rewrite (ind_blk_nz γfs bmI
+                       ltac:(rewrite /bmI; cbn [bm_ind]; exact Hblknz)).
+            rewrite /bmI. cbn [bm_ind bm_ent].
             rewrite Hindz. iExact "Hfsb". }
           iDestruct (ind_blk_q_1_to γfs dq bmI Hd1 with "Hindblk2")
             as "Hindblk2".

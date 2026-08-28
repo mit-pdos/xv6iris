@@ -652,7 +652,7 @@ Section ProofSafestrcpy.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (sscp_18 with "Htext"). }
-      iNext. iIntros (CID1 Hs1) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID1 Hs1) "Hcg Hpc".
       assert (Ht2a : add_vec (mword_of_int (KernelSyms.safestrcpy + 0x18) : mword 64)
                 (sign_extend' 64 (mword_of_int 18 : mword 13))
                 = mword_of_int (KernelSyms.safestrcpy + 0x2a))
@@ -866,7 +866,7 @@ Section ProofSafestrcpy.
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (sscp_28 with "Htext"). }
-        iNext. iIntros (CID6 Hs6) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID6 Hs6) "Hcg Hpc".
         assert (Hback18 : add_vec (mword_of_int (KernelSyms.safestrcpy + 0x28) : mword 64)
                   (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 248 : mword 8) ('b"0"))))
                 = mword_of_int (KernelSyms.safestrcpy + 0x18))
@@ -1003,7 +1003,7 @@ Section ProofSafestrcpy.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (sscp_08 with "Htext"). }
-      iNext. iIntros (CID5 Hs5) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID5 Hs5) "Hcg Hpc".
       assert (Ht2e : add_vec (mword_of_int (KernelSyms.safestrcpy + 0x08) : mword 64)
                 (sign_extend' 64 (mword_of_int 38 : mword 13))
                 = mword_of_int (KernelSyms.safestrcpy + 0x2e))
