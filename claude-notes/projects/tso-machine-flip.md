@@ -11488,3 +11488,177 @@ at this boundary.
    inside the handler contract's ∀; the λ-conversion alone does not close it.
 4. `ProofMain`'s publication wiring, `ProofForkret`'s threading, the virtio
    pair, and the two U-mode files under §0.24′.
+
+### A6.90 ITEM (3) IS MEASURED TO A SINGLE FACT — `ProofMain` IS GREEN EXCEPT
+### FOR THE PUBLICATION CREDENTIAL, AND `main` CONTAINS NO DRAINING INSTRUCTION
+
+Executing the coordinator's item (3) (`ProofMain`'s publication wiring: the
+third `strans_res_at`/`kpt_res_at` arm plus the flag-write leaf), in the
+fliptree, on the GCP VM under `flock`.  **The flag-write leaf is already
+green and always was; the whole residue of item (3) is ONE fact, and the fact
+is false of the compiled image.**
+
+#### (1) WHAT LANDED: THE KERNEL STACKS TRAVEL *FILLED*, NOT MERELY OWNED
+
+`ProofMain:995` was `kstack_bank_intro pas Hpasok`, and `kstack_bank_intro`
+had grown a `(c : bv 8)` parameter — A6.88 §(2)'s statement move, which lists
+`kstack_own_intro` among the lemmas whose premise became `page_filled`.  The
+reason is §0.32′ itself: a `page_own` is the VISIBILITY-FREE page, and a
+kernel stack is a run of WORDS somebody wrote (`stack_own` is
+`bwin_words8`), so ownership alone is no longer enough to make one.
+
+The fix is the chain, and it is the ruling's own recipe (*"clients that
+wanted only ownership downgrade with one `page_own_of_filled`"* — this client
+wants more, so it must not downgrade):
+`ProofProcMapstacks` takes `kalloc_post_success_filled` instead of
+`kalloc_post_success`, and the 64-page conjunct is
+`page_filled … kalloc_junk` from there through `SpecProcMapstacks`,
+`ProofKvmmake`, `SpecKvmmake`, `SpecKvminit` to `main`.  **Twelve big-op
+sites, five files, and every one of them a spelling** (`pms_pages_ext`, the
+pas-extension congruence, follows for free).  All six files green
+single-file; `ProofMain`'s error moved to the next line.
+
+> *The general rule this instance teaches: when a resource's meaning is
+> weakened at the SOURCE, the audit is not "who still compiles" but "who
+> needed the strength" — and the answer is found where a downgrade sits on
+> a path, not where the name is mentioned.*
+
+#### (2) THE PROBE, AND IT IS THE RESULT: EVERYTHING ELSE IN `ProofMain`
+#### ALREADY WORKS
+
+A scratch copy (`ZZMainProbe.v`, not in `_CoqProject`, deleted) with exactly
+two `admit`s —
+
+```coq
+    iAssert (kpt_inv (pt_base t))%I   as "#Hkinv";  [ admit | ].
+    iAssert (KptShare.kpt_creds)%I    as "#Hcreds"; [ admit | ].
+```
+
+— **compiles clean, end to end.**  So `mn_grp_kvm`'s tail, `mn_grp_trap`,
+`mn_grp_fs`, **`mn_grp_started` (the started producer's release sequence, the
+`fence`, the `started = 1` store into the escrow and the deposit wand)**,
+`wp_main_boot_sconf` and the module seal are all already correct.  §0.33′'s
+reading is confirmed by measurement: `main_deposit`'s membership is right,
+nothing re-homes, and *the producer wiring is not owed — only the credential
+that lets the producer's own hart use what it published.*
+
+#### (3) THE ONE FACT, AND ITS TWO FACES ARE THE SAME FACE
+
+```coq
+  KptShare.kpt_creds := ∃ B, kpt_bound B ∗ view_lb … (hart_agent cpu_id) B
+```
+
+and `KptShare.kpt_inv_alloc` wants `kptree_own B 2 (DfracOwn 1) t`
+(= `ptree_own_at (KTier B)`), whose only producer is
+`KptPublish.kptree_publish` → `CtxPinMint.ctx_phys_pin_mint`, which pins at
+`g.(gtv) cpu_id` under the premise
+
+```coq
+    (own_pub (hart_agent cpu_id) g.(glog) <= g.(gtv) cpu_id)%nat   (* "drained" *)
+```
+
+**Both are the same requirement**: *hart 0's own view has passed hart 0's own
+page-table writes.*  Choosing `B := length glog` instead moves the debt and
+does not remove it — the mint becomes free and the receipt becomes the
+strongest one in the system.  It cannot be removed by choosing `B` at all: a
+pin is a promise to EVERY hart at view ≥ `B`, and a hart's store-buffered
+writes are seen by nobody at any view.  (`vstep` leaves the storer's own view
+where it was; only `fence_post` at `drain = true`, or an AMO, moves it.)
+
+#### (4) THE MEASUREMENT, AND IT REFUTES A6.70's STANDING ASSUMPTION
+
+`KptPublish.v`'s header says: *"hart 0 reaches `__sync_synchronize` — a
+`Barrier_RISCV_rw_rw`, which `RiscvLang.fence_drains` DRAINS"*, and
+`SpecKvminithart`'s `kpt_creds` premise is justified as *"hart 0 through its
+own fence, a secondary through the `started` handshake."*  **Measured against
+the compiled image (`CodeMain.v`, which decodes it):**
+
+| site | encoding | kind | drains? |
+|---|---|---|---|
+| `main + 0x18` | `FENCE (0, pred=2, succ=3)` = `fence r,rw` | `r_rw` | **no** |
+| `main + 0xac` | `FENCE (0, pred=3, succ=1)` = `fence rw,w` | `rw_w` | **no** |
+
+`fence_drains` is `rw_rw | rw_r | w_rw | w_r` — the W→R edges, which is
+correct for Ztso — so **neither of `main`'s two fences drains**, and `+0xac`
+is after `kvminithart` in any case.  Sweeping every `FENCE` the kernel text
+contains: **four draining fences in the whole image, all four `fence
+iorw,iorw` and all four in the virtio driver** (`virtio_disk_intr` ×2,
+`virtio_disk_rw` ×2); the other five sites are `fence r,rw` (main+0x18,
+forkret+0x1e) and `fence rw,w` (main+0xac, forkret+0x34, release+0x16).
+
+**The fence `kpt_creds`'s comment names does not exist.**  Nor is there an
+AMO in the window: `main` runs `kinit(); kvminit(); kvminithart();`, the last
+AMO before the publication is the `acquire(&kmem.lock)` of the last `kalloc`
+INSIDE `kvmmake`, and every PTE that `kvmmap` writes afterwards is above the
+view that AMO pinned.  *Hart 0 in fact never drains again inside `main` — the
+next AMO it executes is the scheduler's `acquire(&p->lock)`.*
+
+> **AND THE KERNEL IS NOT WRONG; THE MODEL IS BEING HONEST.**  Nothing here
+> is a bug in xv6: a hart always sees its own stores, and `sfence.vma` — which
+> `kvminithart` executes — is the architectural barrier that publishes page
+> tables to the WALKER.  What is missing is a proof-side account of "the
+> publisher reads its own table", and `sfence.vma` is modelled as the TLB
+> flush, not as a `Barrier` node.
+
+#### (5) THE SHAPE OF THE ANSWER IS A6.89 ONE TIER UP — WHICH IS WHAT THE
+#### QUEUE'S "THIRD ARM" NAMES
+
+The secondary harts' channel is already right and already built: they read
+`started`, and the flag-read receipt dominates every boot write (§0.29′'s
+barrier, `main_deposit`'s rows).  **Hart 0 is not a reader on that channel —
+it is the AUTHOR**, and it consumes its own publication (`kvminithart`, then
+every translated access until the scheduler's first AMO) with no barrier in
+between.  So the missing arm is an AUTHOR arm:
+
+`strans_res_at` today is a two-way disjunction — Bare/pending, and the shared
+KPT arm whose `kpt_res_at` carries `kpt_creds`'s view receipt.  **The third
+arm is the publisher's**: the same table, justified not by `view_lb ≥ B` but
+by "this hart wrote it", live from the publication until hart 0's first
+draining event.  That is exactly A6.89's finding one tier up — *at the ctx
+tower exactness was context-relative; with a pin it is view-relative, and the
+author's own use of what it published is neither* — and it is why the
+coordinator's queue calls item (3) "the third `strans_res_at`/`kpt_res_at`
+arm (the started producer)".
+
+Its cost is not a leaf: the arm has to be carried through the regime slot and
+consumed by the WALKER's read gates (`TransPt`, `ledger_read_pin_ok`'s
+`B ≤ tv` becoming a two-armed obligation).  **This is a design move of the
+same weight as the two already with the owner, so per the standing rule it is
+characterized and STOPPED here, not guessed at.**  Three candidate
+directions, for the ruling:
+
+1. **the author arm** (above) — no model change, but a new arm in a core
+   definition and a second arm in the walk's read obligation;
+2. **make `sfence.vma` a draining node** — one line in the model's fence
+   dispatch, architecturally defensible (RISC-V requires it before the walker
+   observes PTE writes), and it puts a real drain exactly where the kernel
+   already has one, inside `kvminithart`;
+3. **publish at the started barrier and give hart 0 the author arm only for
+   the `kvminithart`..`scheduler` window** — the two above, split by phase.
+
+Direction 2 is by far the cheapest if the model's `sfence.vma` node can carry
+a view step; whether it may is a machine question, not a proof question.
+
+#### (6) THE NUMBER, AND THE BOUNDARY IS HELD
+
+**1098 of 1296, RED 11 — the baseline set, file for file**, sentinel-backed
+(`MAKEEXIT=2`) over the five-file `page_filled` chain plus `ProofMain`.
+`md5sum kernel-rocq/*.v user-rocq/*.v` unchanged
+(`edd91972b6bc1b944fd98a2cc2363815`, the clean round's digest).  `^Abort` /
+`^Admitted` / `^Axiom` all 0.  **No green file went red.**  `ProofMain`'s
+single error moved from `:995` (`kstack_bank_intro`, fixed) to `:996`
+(`kpt_inv_alloc`, §(3)).  The durable mirror was refreshed at this boundary.
+
+#### (7) THE FRONTIER
+
+1. **`WpSconfLock`'s remaining leaves** — A6.89 §(7)'s floor-receipt channel
+   (owner), then the cpu-store tranche and the AMO gate.  Still the only
+   thing between here and the 160-file cone.
+2. **§0.27′** — the p->lock resume tie; same files.
+3. **§0.28′** — the caps premise moves inside `intr_handler_spec`'s ∀
+   (A6.89 §(8); layering question, owner).
+4. **`ProofMain`** — §(5)'s publication credential (owner).  Everything else
+   in the file is green under the two-`admit` probe, so this is the last
+   item it owes.
+5. `ProofForkret`'s threading, the virtio pair, and the two U-mode files
+   under §0.24′.
