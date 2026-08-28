@@ -103,7 +103,7 @@
    SLOT, neither of which a syscall can name ([ProcInv.ofile_slot] quantifies
    the slot, the fraction and the content existentially).  S4' overturned it,
    and the reason is stronger than taste: the opener promised back a
-   [file_ref gf k q' Cf] at a SMALLER fraction, and NO SUCH THING EXISTS --
+   [file_ref gf k q'] at a SMALLER fraction, and NO SUCH THING EXISTS --
    [FileInvDefs.fref_tok]'s reference COUNT rides in the same map entry as the
    fraction, so two fragments at [q/2] compose to [(q, 2)] and not to
    [(q, 1)].  Splitting a [file_ref] at all needs the ftable AUTHORITY, i.e.
@@ -238,30 +238,29 @@ Section SpecSysRead.
      neither bundle mentions the content: the syscall owns both, fileread's
      type test decides which is consumed, and either way both come back.
      ([SpecFileclose.fileclose_env_frame] is the same move one stage down.) *)
-  Lemma read_env_frame (γf : gname) (fn : fread_names) (Cf : fcontent) :
+  Lemma read_env_frame (γf : gname) (fn : fread_names) (st : fdstate) :
     fileread_fs_env γf fn -∗ fileread_devsw fn -∗
-    fileread_env γf fn Cf ∗
-    (fileread_env_out fn Cf -∗ fileread_fs_out fn ∗ fileread_devsw fn).
+    fileread_env γf fn st ∗
+    (fileread_env_out fn st -∗ fileread_fs_out fn ∗ fileread_devsw fn).
   Proof.
     iIntros "Hfs Hdev". rewrite /fileread_env /fileread_env_out.
-    case_bool_decide.
-    { (* FD_PIPE: nothing is asked for, and the fs half must still answer
+    destruct st as [|[?|?|mj]].
+    { (* CLOSED -- the panic arm; argfd never hands one over, but the
+         environment is total. *)
+      iSplitR; [done|]. iIntros "_".
+      iDestruct (fileread_fs_env_out with "Hfs") as "$". iFrame "Hdev". }
+    { (* an INODE: the fs half goes, the column stays *)
+      iSplitL "Hfs"; [iExact "Hfs"|]. iIntros "$". iFrame "Hdev". }
+    { (* a PIPE: nothing is asked for, and the fs half must still answer
          [fileread_fs_out] -- which it does, [fileread_fs_env_out]. *)
       iSplitR; [done|]. iIntros "_".
       iDestruct (fileread_fs_env_out with "Hfs") as "$". iFrame "Hdev". }
-    case_bool_decide.
-    { (* FD_DEVICE: hand over the entry the major names, keep the column's
+    { (* a DEVICE: hand over the entry the major names, keep the column's
          wand, and answer the fs half out of the bundle nothing touched. *)
-      iDestruct (fileread_devsw_acc fn Cf with "Hdev") as "[Hone Hback]".
+      iDestruct (fileread_devsw_acc fn mj with "Hdev") as "[Hone Hback]".
       iSplitL "Hone"; [iExact "Hone"|].
       iIntros "Hout". iDestruct ("Hback" with "Hout") as "$".
       iApply (fileread_fs_env_out with "Hfs"). }
-    case_bool_decide.
-    { (* FD_INODE: the fs half goes, the column stays *)
-      iSplitL "Hfs"; [iExact "Hfs"|]. iIntros "$". iFrame "Hdev". }
-    { (* the panic arm *)
-      iSplitR; [done|]. iIntros "_".
-      iDestruct (fileread_fs_env_out with "Hfs") as "$". iFrame "Hdev". }
   Qed.
 
 End SpecSysRead.

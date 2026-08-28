@@ -16,7 +16,7 @@
    [ftable_res] owns all NFILE of them and no reference ever carries one; and
    it touches no OTHER field of any entry, which is why the scan needs no
    content fraction at all.  What it returns on success is the exclusive
-   reference [file_ref γf k 1 Cf]: fraction 1 of all seven content cells, so
+   reference [file_ref γf k 1]: fraction 1 of all seven content cells, so
    the caller (sys_open, pipealloc) can initialize them with no lock held,
    which is precisely the discipline the real kernel relies on.  The
    [fc_type Cf = FD_NONE] conjunct is the free-slot invariant coming back out
@@ -61,11 +61,15 @@ Section SpecFilealloc.
      (FdSlots.v).  A caller that retries, or that allocates two files and
      must return its whole allowance whichever way the calls went (pipealloc,
      hence sys_pipe), cannot balance its books without this. *)
+  (* THE FILE IS UNTYPED AND THE STATE SAYS SO.  There is no [fcontent] in
+     this post any more: [FdClosed] is exactly the claim [fc_type = FD_NONE]
+     used to make ([FileInvDefs.fdstate_ok]), and the caller reads the
+     content off the reference when it opens it ([ProofSysOpenParts.
+     so_open_slot]) rather than being handed a name for it here. *)
   Definition filealloc_post (γf : gname) (r : mword 64) : iProp Σ :=
     (⌜r = (zero_reg : mword 64)⌝ ∗ fd_slot
-     ∨ ∃ (k : nat) (Cf : fcontent),
-         ⌜(k < NFILE)%nat /\ r = fnode k /\ fc_type Cf = FD_NONE⌝ ∗
-         file_ref γf k 1 Cf FdClosed)%I.
+     ∨ ∃ k : nat,
+         ⌜(k < NFILE)%nat /\ r = fnode k⌝ ∗ file_ref γf k 1 FdClosed)%I.
 
 End SpecFilealloc.
 

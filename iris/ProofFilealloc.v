@@ -928,8 +928,8 @@ Section ProofFilealloc.
         rewrite /R3 upd_ne; [| regne].
         rewrite /R2 upd_ne; [| regne].
         rewrite /R1 upd_ne; [reflexivity | regne]. }
-      { rewrite /filealloc_post. iRight. iExists i, Cf. iFrame "Href".
-        iPureIntro. split; [lia|]. split; [reflexivity | exact HCtype]. }
+      { rewrite /filealloc_post. iRight. iExists i. iFrame "Href".
+        iPureIntro. split; [lia | reflexivity]. }
       (* [Hepi] handed back its own [wp_next]-shaped obligation, relative to
          CIDr; NOW (with the FULL chain -- Hs1..Hs8, Hsacq, the acquire-to-
          release hop, Hsr, and Hepi's own internal steps -- all in scope) is

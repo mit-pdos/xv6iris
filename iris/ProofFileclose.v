@@ -143,11 +143,11 @@ Section ProofFileclose.
   Qed.
 
   Lemma wp_fileclose_sconf  (γfl γf : gname)
-      (k : nat) (q : Qp) (Cf : fcontent) (st : fdstate)
+      (k : nat) (q : Qp) (st : fdstate)
       (fn : fclose_names) (on : option nat)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string) (pidv : mword 32) (Vpr : pprivate)
-    : wp_fileclose_sconf_body γfl γf k q Cf st fn on m n eb p K b lks pidv Vpr.
+    : wp_fileclose_sconf_body γfl γf k q st fn on m n eb p K b lks pidv Vpr.
   Proof.
     cbv beta delta [wp_fileclose_sconf_body].
     intros pcE ret_tgt HK HnZ Ha0 Hbelow.
@@ -348,7 +348,9 @@ Section ProofFileclose.
        THE CRITICAL SECTION (literal [false]: no hart threading).
        =================================================================== *)
     iDestruct "HRres" as (Mg) "(Hauth & Hfdauth & %Hdom & Hslots)".
-    iDestruct "Href" as "(Hrtok & Hrfields & Hrpay & Hrlv)".
+    iDestruct "Href" as (Cf) "(Hrtok & Hrfields & Hrpay & Hrlv)".
+    iDestruct (file_pay_st_ok with "Hrpay") as "[%Hokx Hrpay]".
+    destruct Hokx as (inumx & Hok).
     iDestruct (fref_tok_lookup with "Hauth Hrtok")
       as %(qt & cnt & HMk & Hqt1 & Hn1 & _ & Hqlt).
     assert (Hk : (k < NFILE)%nat) by (apply Hdom; rewrite HMk; eauto).
@@ -466,11 +468,15 @@ Section ProofFileclose.
       (* ---- the ghost step: the departing share goes home ---- *)
       destruct (proj1 (Qp.lt_sum q qt) (Hqlt Hmany)) as [qr Hqr].
       assert (Hsub : (qt - q)%Qp = Some qr) by (apply Qp.sub_Some; exact Hqr).
-      iMod (file_close_step γf Mg k q Cf st qt n' qr
+      iMod (file_close_step γf Mg k q st qt n' qr
               ltac:(rewrite -Hsucc; exact HMk) Hsub
-              with "Hauth [Hrtok Hrfields Hrpay Hrlv]") as "(Hauth & Hfl & Hpy)".
-      { rewrite /file_ref /fref_tok. iFrame "Hrtok Hrfields Hrpay Hrlv". }
-      iDestruct (file_rest_absorb γf k qt q qr Cf Hsub Hqt1 with "Hrest Hfl Hpy")
+              with "Hauth [Hrtok Hrfields Hrpay Hrlv]") as "(Hauth & %Cf' & Hfl & Hpy)".
+      { rewrite /file_ref /fref_tok. iExists Cf.
+        iFrame "Hrtok Hrfields Hrpay Hrlv". }
+      (* [Cf'] is what the step gave back -- the reference's own content,
+         which it now carries under its own quantifier.  The absorb does not
+         care which it is, only that the two pieces agree. *)
+      iDestruct (file_rest_absorb γf k qt q qr Cf' Hsub Hqt1 with "Hrest Hfl Hpy")
         as "Hrest".
       (* the fd slot the destroyed reference was holding comes back *)
       assert (Hton : Pos.to_nat cnt = (Pos.to_nat n' + 1)%nat)
@@ -1139,8 +1145,10 @@ Section ProofFileclose.
            never spent it, so [file_core] still has it and pipeclose has no
            use for it. *)
         iDestruct "Hcore" as "(#Hispipe & Hpref & Hiru)".
-        iEval (rewrite /fileclose_env Hpipe bool_decide_eq_true_2; [|reflexivity])
-          in "Henv".
+        (* the environment is keyed on the descriptor's STATE and the code
+           branched on [f->type]; [fdstate_ok] is what makes those one fact *)
+        destruct (fdstate_ok_pipe _ _ _ Hok Hpipe) as [bdir Hstp].
+        iEval (rewrite Hstp /fileclose_env) in "Henv".
         rewrite /fileclose_pipe_env.
         iDestruct "Henv" as "(%Hn2 & #Hprocs & #Hkmem & Hav)".
         iEval (rewrite -HP3a0) in "Hispipe".
@@ -1237,7 +1245,7 @@ Section ProofFileclose.
         iApply ("Hcont" $! mf with "Hcg Hcnt Hextc Hextm [Hpc] [%] Hfd Hiru [Hav] Hpbare").
         { iEval (rewrite /ret_tgt). iExact "Hpc". }
         { exact Hcsf. }
-        { rewrite /fileclose_env_out Hpipe bool_decide_eq_true_2; [|reflexivity].
+        { rewrite Hstp /fileclose_env_out.
           rewrite /fileclose_pipe_out. iExact "Hav". }
       + (* ============ not a pipe: the inode test at +0x5a ============ *)
         iApply (wp_beq_fall_s_sconf (mword_of_int (FC + 0x56))
@@ -1314,8 +1322,10 @@ Section ProofFileclose.
           { apply orb_true_intro. destruct Hinode as [H|H]; [left|right];
               by apply bool_decide_eq_true_2. }
           iAssert (fileclose_fs_env fn n eb p) with "[Henv]" as "Henv".
-          { rewrite /fileclose_env bool_decide_eq_false_2; [|exact Hnpipe].
-            rewrite Hib. iExact "Henv". }
+          { rewrite /fileclose_env.
+            destruct Hinode as [Ht | Ht];
+              [ rewrite (fdstate_ok_inode _ _ _ Hok Ht)
+              | rewrite (fdstate_ok_device _ _ _ Hok Ht) ]; iExact "Henv". }
           (* THE PAYLOAD IS THE REFERENCE, and this closer holds ALL of it:
              [file_rest_join] gave fraction one, so the cancel token is
              whole and [FileInv.inode_pay_cancel] turns it into the inode
@@ -1656,8 +1666,11 @@ Section ProofFileclose.
              and the two superblock cells are persistent.  (iput's
              [iref_slot] is spent above rather than dropped -- see the note
              on [Hislot].) *)
-          { rewrite /fileclose_env_out bool_decide_eq_false_2; [|exact Hnpipe].
-            rewrite Hib /fileclose_fs_out. iExact "Hbsl". }
+          { rewrite /fileclose_env_out.
+            destruct Hinode as [Ht | Ht];
+              [ rewrite (fdstate_ok_inode _ _ _ Hok Ht)
+              | rewrite (fdstate_ok_device _ _ _ Hok Ht) ];
+              rewrite /fileclose_fs_out; iExact "Hbsl". }
         * (* ======== FD_NONE (or anything else): nothing to do ========== *)
           iApply (wp_bgeu_fall_s_sconf (mword_of_int (FC + 0x60))
                     (mword_of_int 74 : mword 13) Ra5 Ra4 Q2 (K - 8)%nat b

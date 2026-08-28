@@ -776,7 +776,7 @@ Section ProofSysClose.
       iDestruct (proc_priv_bare_ofile γf p pid V fd fv Hlk with "Hpriv")
         as "(Hpbare & Hslot & Hback)".
       iDestruct "Hslot" as "[Hcell [[%Hz _] | Href]]"; [by exfalso; apply Hfvnz|].
-      iDestruct "Href" as (k q Cf stf) "((%Hfv & %Hklt & %Hty) & Href & Hst)".
+      iDestruct "Href" as (k q stf) "((%Hfv & %Hklt & %Hty) & Href & Hst)".
       (* ---- +0x2c: sd x0,0(a0) -- p->ofile[fd] = 0 ---- *)
       assert (Haddrof : forall CID' : CpuId,
                 add_vec (rget (CID := CID') C4 (mword_of_int 10 : mword 5))
@@ -852,9 +852,9 @@ Section ProofSysClose.
          keep the other ([fileclose_env_split]). *)
       (* the block, re-spelled at [fn]'s own names -- which is all the
          remaining tie premise is for *)
-      iDestruct (fileclose_loop_open fn on n eb p Cf with "Hpenv Hfenv")
+      iDestruct (fileclose_loop_open fn on n eb p stf with "Hpenv Hfenv")
         as "[Hfcenv Hfcback]".
-      iApply (Fileclose.wp_fileclose_sconf γl γf k q Cf stf fn on D n eb p (av - 4)%nat b lks pid V
+      iApply (Fileclose.wp_fileclose_sconf γl γf k q stf fn on D n eb p (av - 4)%nat b lks pid V
                 ltac:(lia) Hn HDa0
                 Hbelow
                 with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpe Href Hpbare Hiru Hfcenv").

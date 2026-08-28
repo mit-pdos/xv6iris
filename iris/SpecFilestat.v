@@ -61,7 +61,7 @@
    ==== THE REFERENCE, AND WHAT SELECTS THE ENVIRONMENT ==================
 
    SpecFileread.v's shape, and for the same reason.  filestat takes
-   [file_ref γf k q Cf] at an ARBITRARY q -- it is a borrower, not a reference
+   [file_ref γf k q] at an ARBITRARY q -- it is a borrower, not a reference
    holder -- and gives it back unchanged.  The type is read out of the
    reference's own content fraction, so the loaded word IS [fc_type Cf] and
    the branch being taken is the Coq fact about [Cf]; no ghost state has to
@@ -283,11 +283,20 @@ Section SpecFilestat.
      bslot)%I.
 
   (* ---- and the two, selected by the file's type ---- *)
-  Definition filestat_env (fn : fstat_names) (Cf : fcontent) : iProp Σ :=
-    (if decide (fstat_has_inode Cf) then filestat_fs_env fn else emp)%I.
+  (* keyed on the descriptor's STATE -- see [SpecFileread.fileread_env].
+     [fstat_has_inode] stays as the CONTENT-side reading of the same
+     condition, for [filestat_pay_carve], which is inside the reference. *)
+  Definition filestat_env (fn : fstat_names) (st : fdstate) : iProp Σ :=
+    (match st with
+     | FdOpen (FdInode _) | FdOpen (FdDevice _) => filestat_fs_env fn
+     | _ => emp
+     end)%I.
 
-  Definition filestat_env_out (fn : fstat_names) (Cf : fcontent) : iProp Σ :=
-    (if decide (fstat_has_inode Cf) then filestat_fs_out fn else emp)%I.
+  Definition filestat_env_out (fn : fstat_names) (st : fdstate) : iProp Σ :=
+    (match st with
+     | FdOpen (FdInode _) | FdOpen (FdDevice _) => filestat_fs_out fn
+     | _ => emp
+     end)%I.
 
   (* The type-error arm returns before ilock, so the environment must already
      contain everything the postcondition promises.  Checked here rather than
@@ -302,12 +311,12 @@ Section SpecFilestat.
     iFrame "Hsb Hbs".
   Qed.
 
-  Lemma filestat_env_out_of_env fn Cf :
-    filestat_env fn Cf -∗ filestat_env_out fn Cf.
+  Lemma filestat_env_out_of_env fn st :
+    filestat_env fn st -∗ filestat_env_out fn st.
   Proof.
     rewrite /filestat_env /filestat_env_out.
-    case_decide; [| by iIntros "$"].
-    iApply filestat_fs_env_out.
+    destruct st as [|[?|?|?]]; try by iIntros "$".
+    all: iApply filestat_fs_env_out.
   Qed.
 
   (* ==================================================================== *)
@@ -440,9 +449,12 @@ Section SpecFilestat.
   Qed.
 
   (* A file that carries no inode costs its stat-er nothing. *)
-  Lemma filestat_env_none fn Cf :
-    ~ fstat_has_inode Cf -> ⊢ filestat_env fn Cf.
-  Proof. intro Ht. rewrite /filestat_env. case_decide; [contradiction | done]. Qed.
+  Lemma filestat_env_none fn st :
+    match st with
+    | FdOpen (FdInode _) | FdOpen (FdDevice _) => False
+    | _ => True
+    end -> ⊢ filestat_env fn st.
+  Proof. destruct st as [|[?|?|?]]; done. Qed.
 
 End SpecFilestat.
 
@@ -452,7 +464,7 @@ Definition wp_filestat_sconf_body
 
     (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
-    (k : nat) (q : Qp) (Cf : fcontent) (st : fdstate) (* the borrowed reference *)
+    (k : nat) (q : Qp) (st : fdstate)            (* the borrowed reference  *)
     (fn : fstat_names)                           (* the inode arm's ghosts  *)
     (pidv : mword 32) (V : pprivate)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) :=
@@ -482,13 +494,13 @@ Definition wp_filestat_sconf_body
   (* filestat itself never panics; ilock and iunlock do, and this is theirs *)
   panic_env -∗
   (* the borrowed reference -- at an ARBITRARY fraction, and given back *)
-  file_ref γf k q Cf st -∗
+  file_ref γf k q st -∗
   (* ambient: myproc runs first, and the surviving arm copies out *)
   proc_priv_core pj pidv V -∗
   kalloc_env γa None -∗
   procs_inv γs -∗
   (* ...and what the file's TYPE selects *)
-  filestat_env fn Cf -∗
+  filestat_env fn st -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  filestat can SLEEP (its
      ilock does), and a park moves the hart with interrupts off, so the
      crossing has nothing to do with SIE.  Spelled [b] the two coincide at
@@ -502,9 +514,9 @@ Definition wp_filestat_sconf_body
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
-      file_ref γf k q Cf st -∗
+      file_ref γf k q st -∗
       proc_priv_core pj pidv (upd_upt V P') -∗
-      filestat_env_out fn Cf -∗
+      filestat_env_out fn st -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -515,9 +527,9 @@ Module Type FILESTAT.
 
       (γa : gname) (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
-      (k : nat) (q : Qp) (Cf : fcontent) (st : fdstate)
+      (k : nat) (q : Qp) (st : fdstate)
       (fn : fstat_names)
       (pidv : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string),
-      wp_filestat_sconf_body γa γf γs j γlp k q Cf st fn pidv V m K eb b lks.
+      wp_filestat_sconf_body γa γf γs j γlp k q st fn pidv V m K eb b lks.
 End FILESTAT.

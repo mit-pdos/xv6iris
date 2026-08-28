@@ -2865,7 +2865,7 @@ Section IcacheHeld.
      on the entry's own [i_inum] cell, so the quantifier hid a fact the
      resource carried anyway.  Naming it is what lets a file descriptor's
      user-visible state say WHICH FILE it is open on
-     ([FdSlots.FdInode], [FileInvDefs.fdstate_of]), and that is the only
+     ([FdSlots.FdInode], [FileInvDefs.fdstate_ok]), and that is the only
      reason it had not been named before.
 
      [inode_shr_held] (no generation) still hides its indices: it is the

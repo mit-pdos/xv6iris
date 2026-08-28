@@ -24,7 +24,7 @@
 
    ==== THE REFERENCE, AND WHAT IT ALREADY CARRIES ======================
 
-   fileread takes [file_ref γf k q Cf] at an ARBITRARY q -- it is a borrower,
+   fileread takes [file_ref γf k q] at an ARBITRARY q -- it is a borrower,
    not a reference holder: [SpecArgfd]'s caller lends it out of the
    (thread-local) fd table for the duration and takes it back.  It gives the
    reference back unchanged.
@@ -339,19 +339,23 @@ Section SpecFileread.
      honest statement of what the kernel installs: [consoleinit] fills
      [devsw[CONSOLE]] and nothing fills any other entry, so a read slot is
      either null (and the code returns -1) or [consoleread]. *)
-  Definition fileread_dev_env (fn : fread_names) (Cf : fcontent) : iProp Σ :=
-    (if decide (dev_major Cf <= NDEV_max)
-     then ⌜frn_rp fn (dev_major Cf) = (zero_reg : mword 64)
-           \/ frn_rp fn (dev_major Cf)
+  (* KEYED ON THE MAJOR ITSELF, not on the file: [FdSlots.FdDevice] carries
+     the number, so the descriptor's state is all a caller needs to say which
+     entry it is talking about.  The lower bound joins the range test because
+     the index is now a plain [Z] rather than a [bv_unsigned] -- out of range
+     EITHER WAY is [emp], which is what keeps the accessor total. *)
+  Definition fileread_dev_env (fn : fread_names) (mj : Z) : iProp Σ :=
+    (if decide (0 <= mj <= NDEV_max)
+     then ⌜frn_rp fn mj = (zero_reg : mword 64)
+           \/ frn_rp fn mj
                = (mword_of_int KernelSyms.consoleread : mword 64)⌝ ∗
-          a_devsw_read (dev_major Cf) ↦₈{frn_dqv fn (dev_major Cf)}
-            frn_rp fn (dev_major Cf) ∗
+          a_devsw_read mj ↦₈{frn_dqv fn mj} frn_rp fn mj ∗
           fileread_dev_caps fn
      else emp)%I.
 
   (* it is only READ, so it comes back as it went in *)
-  Definition fileread_dev_out (fn : fread_names) (Cf : fcontent) : iProp Σ :=
-    fileread_dev_env fn Cf.
+  Definition fileread_dev_out (fn : fread_names) (mj : Z) : iProp Σ :=
+    fileread_dev_env fn mj.
 
   (* ---- THE WHOLE COLUMN, and how one entry comes out of it ----
 
@@ -401,9 +405,9 @@ Section SpecFileread.
     iExact "Hr".
   Qed.
 
-  Lemma fileread_devsw_acc (fn : fread_names) (Cf : fcontent) :
+  Lemma fileread_devsw_acc (fn : fread_names) (mj : Z) :
     fileread_devsw fn -∗
-    fileread_dev_env fn Cf ∗ (fileread_dev_out fn Cf -∗ fileread_devsw fn).
+    fileread_dev_env fn mj ∗ (fileread_dev_out fn mj -∗ fileread_devsw fn).
   Proof.
     (* THE UNFOLD ORDER MATTERS: [/fileread_dev_out] rewrites to [fileread_dev_env], so
        unfolding [fileread_dev_env] FIRST leaves the out side folded and the
@@ -413,12 +417,9 @@ Section SpecFileread.
     iIntros "[#Hcaps H]".
     case_decide as Hle;
       [| iSplitR; [done | iIntros "_"; iFrame "Hcaps"; iExact "H"]].
-    (* the major is a [bv_unsigned], hence non-negative, so it IS the index
-       [Z.to_nat] of it names *)
-    pose proof (proj1 (bv_unsigned_in_range _ (fc_major Cf))) as Hnn.
-    rewrite /dev_major in Hle Hnn |- *.
-    set (i := Z.to_nat (bv_unsigned (fc_major Cf))).
-    assert (Hid : Z.of_nat i = bv_unsigned (fc_major Cf))
+    destruct Hle as [Hnn Hle].
+    set (i := Z.to_nat mj).
+    assert (Hid : Z.of_nat i = mj)
       by (rewrite /i; apply Z2Nat.id; exact Hnn).
     assert (Hlk : seq 0 (Z.to_nat NDEV_max + 1) !! i = Some i).
     { rewrite lookup_seq. split; [reflexivity|].
@@ -491,19 +492,29 @@ Section SpecFileread.
      bslot)%I.
 
   (* ---- and the three, selected by the file's type ---- *)
-  Definition fileread_env (γf : gname)
-      (fn : fread_names) (Cf : fcontent) : iProp Σ :=
-    (if bool_decide (fc_type Cf = FD_PIPE) then emp
-     else if bool_decide (fc_type Cf = FD_DEVICE) then fileread_dev_env fn Cf
-     else if bool_decide (fc_type Cf = FD_INODE)
-     then fileread_fs_env γf fn
-     else emp)%I.
+  (* ---- KEYED ON THE DESCRIPTOR'S STATE, not on the file's content ----
 
-  Definition fileread_env_out (fn : fread_names) (Cf : fcontent) : iProp Σ :=
-    (if bool_decide (fc_type Cf = FD_PIPE) then emp
-     else if bool_decide (fc_type Cf = FD_DEVICE) then fileread_dev_out fn Cf
-     else if bool_decide (fc_type Cf = FD_INODE) then fileread_fs_out fn
-     else emp)%I.
+     This dispatch only ever read [fc_type] and, on the device arm,
+     [fc_major] -- and those are exactly what [FdSlots.fdstate] carries.  So
+     the environment is a function of the state, and NOTHING above
+     [file_fields] has to name an [fcontent] any more: a caller says which
+     descriptor it is reading and that fixes which resources it owes. *)
+  Definition fileread_env (γf : gname)
+      (fn : fread_names) (st : fdstate) : iProp Σ :=
+    (match st with
+     | FdOpen (FdPipe _)    => emp
+     | FdOpen (FdDevice mj) => fileread_dev_env fn mj
+     | FdOpen (FdInode _)   => fileread_fs_env γf fn
+     | FdClosed             => emp
+     end)%I.
+
+  Definition fileread_env_out (fn : fread_names) (st : fdstate) : iProp Σ :=
+    (match st with
+     | FdOpen (FdPipe _)    => emp
+     | FdOpen (FdDevice mj) => fileread_dev_out fn mj
+     | FdOpen (FdInode _)   => fileread_fs_out fn
+     | FdClosed             => emp
+     end)%I.
 
   (* THE EARLY RETURN'S OBLIGATION, checked here rather than discovered in
      the proof: [f->readable == 0] returns before the type is ever tested, so
@@ -517,27 +528,19 @@ Section SpecFileread.
     iFrame "Hsb Hbs".
   Qed.
 
-  Lemma fileread_env_out_of_env γf fn Cf :
-    fileread_env γf fn Cf -∗ fileread_env_out fn Cf.
+  Lemma fileread_env_out_of_env γf fn st :
+    fileread_env γf fn st -∗ fileread_env_out fn st.
   Proof.
     rewrite /fileread_env /fileread_env_out.
-    case_bool_decide; [by iIntros "$"|].
-    case_bool_decide; [by iIntros "$"|].
-    case_bool_decide; [|by iIntros "$"].
+    destruct st as [|[?|?|?]]; try by iIntros "$".
     iApply fileread_fs_env_out.
   Qed.
 
   (* A file that is neither a pipe, nor a device, nor an inode costs its
      reader nothing -- the arm is [panic], discharged against [SpecPanic]. *)
-  Lemma fileread_env_none γf fn Cf :
-    fc_type Cf = FD_NONE -> ⊢ fileread_env γf fn Cf.
-  Proof.
-    intro Ht. rewrite /fileread_env Ht.
-    rewrite bool_decide_eq_false_2; [|by vm_compute].
-    rewrite bool_decide_eq_false_2; [|by vm_compute].
-    rewrite bool_decide_eq_false_2; [|by vm_compute].
-    done.
-  Qed.
+  Lemma fileread_env_none γf fn :
+    ⊢ fileread_env γf fn FdClosed.
+  Proof. done. Qed.
 
   (* ==================================================================== *)
   (*  THE CARVE, AND THE SHARE ALGEBRA IT NEEDS                           *)
@@ -678,7 +681,7 @@ Definition wp_fileread_sconf_body
 
     (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
-    (k : nat) (q : Qp) (Cf : fcontent) (st : fdstate) (* the borrowed reference *)
+    (k : nat) (q : Qp) (st : fdstate)            (* the borrowed reference  *)
     (fn : fread_names)                           (* the heavy arms' ghosts  *)
     (pidv : mword 32) (V : pprivate)
     (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string) :=
@@ -719,13 +722,13 @@ Definition wp_fileread_sconf_body
      already in every caller's hand, so neither costs the caller anything. *)
   panic_env -∗
   (* the borrowed reference -- at an ARBITRARY fraction, and given back *)
-  file_ref γf k q Cf st -∗
+  file_ref γf k q st -∗
   (* ambient, because three of the four arms copy into user memory *)
   proc_priv_core pj pidv V -∗
   kalloc_env γa None -∗
   procs_inv γs -∗
   (* ...and what the file's TYPE selects *)
-  fileread_env γf fn Cf -∗
+  fileread_env γf fn st -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
      (its bread / ilock / bwrite does), and a park moves the hart with
      interrupts off, so the crossing has nothing to do with SIE -- the
@@ -743,9 +746,9 @@ Definition wp_fileread_sconf_body
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
-      file_ref γf k q Cf st -∗
+      file_ref γf k q st -∗
       proc_priv_core pj pidv (upd_upt V P') -∗
-      fileread_env_out fn Cf -∗
+      fileread_env_out fn st -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -756,9 +759,9 @@ Module Type FILEREAD.
 
       (γa : gname) (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
-      (k : nat) (q : Qp) (Cf : fcontent) (st : fdstate)
+      (k : nat) (q : Qp) (st : fdstate)
       (fn : fread_names)
       (pidv : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string),
-      wp_fileread_sconf_body γa γf γs j γlp k q Cf st fn pidv V m K eb n b lks.
+      wp_fileread_sconf_body γa γf γs j γlp k q st fn pidv V m K eb n b lks.
 End FILEREAD.

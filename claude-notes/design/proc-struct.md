@@ -1037,7 +1037,8 @@ pointers.  So the user-visible state is carried as GHOST STATE beside the
 array:
 
 ```coq
-Inductive fdtype  := FdInode (inum : Z) | FdPipe | FdDevice (major : Z).
+Inductive fdtype  := FdInode (inum : Z) | FdPipe (writable : bool)
+                   | FdDevice (major : Z).
 Inductive fdstate := FdClosed | FdOpen (t : fdtype).
 ```
 
@@ -1051,6 +1052,12 @@ ghost says open" are ONE clause rather than two.
 a client wants to know — it wants to know WHICH FILE, and on this file system
 a file IS its inum.  That one argument is what made increment 3 more than a
 constructor change; see "Where the inum comes from" below.
+
+**`FdPipe` carries its direction**, and on a pipe that is identity rather than
+mode: pipealloc's two files differ in nothing else — same type, same
+`f->pipe` — so `f->writable` is the whole of what says which end a descriptor
+holds.  Without it `pipealloc_post` could not say that `fd[0]` reads and
+`fd[1]` writes.
 
 `ProcInv.ofile_slot_agree` is what the whole thing is for, and it is a real
 lemma rather than a vacuous one: a holder of ONE descriptor's fragment learns
@@ -1113,7 +1120,7 @@ that moves the ghost without the cell, or the cell without the ghost:
 | cell | ghost | who pays |
 |---|---|---|
 | `v = 0` | `fd_st_auth γd fd FdClosed` | the null disjunct |
-| `v = fnode k` | `file_ref γf k q C st ∗ fd_st_auth γd fd st`, with `st ≠ FdClosed` | the file disjunct |
+| `v = fnode k` | `file_ref γf k q st ∗ fd_st_auth γd fd st`, with `st ≠ FdClosed` | the file disjunct |
 
 The fd's ghost is **the reference's own state index**, not a function applied
 to the reference — one variable occurring twice in one predicate, so no step
@@ -1138,8 +1145,9 @@ reference the file parks in `f->ip`.
 So the chain that ties `FdInode inum` to the machine is:
 
 ```
-ofile_slot          fd_st_auth γd fd st   ∧   file_ref γf k q C st
-FileInvDefs.file_ref            st = fdstate_of (fp_inum pn) C
+ofile_slot          fd_st_auth γd fd st   ∧   file_ref γf k q st
+FileInvDefs.file_ref            ∃ C, … file_pay_st γ k q C st …
+FileInvDefs.file_pay_st         fdstate_ok (fp_inum pn) C st
 FileInvDefs.file_core           inode_pay … (fp_inum pn) …
 FileInvDefs.inode_pay           inode_shr_held_gen (fc_ip C) _ g (fp_inum pn)
 IcacheRef.inode_shr_gen         inode_ident k' _ icfg_dev (fp_inum pn)
@@ -1154,23 +1162,48 @@ file agree on it for the same reason they agree on the rest of `pn`
 of "some inode, number unknown" was never worth holding — the resource
 already pinned the number, the quantifier just hid it.
 
+`FileInvDefs.fdstate_ok` is a RELATION and not a function of the file, for two
+reasons.  The first is the inum: it is not a `struct file` field, so `C` alone
+cannot supply it.  The second matters more — **a total function has to send
+the type codes it does not recognise somewhere**, and the only honest target
+is `FdClosed`, which would make `FdClosed` say nothing about `f->type`.  Read
+as a relation each arm pins the type in both directions, which is what lets
+`so_open_slot` and `filealloc_post` drop their `fc_type C = FD_NONE` premises
+— the state they hold *is* that equation.  It is still functional
+(`fdstate_ok_inj`), so nothing that depended on the projection's determinism
+was lost.
+
 Device files hold an inode reference too and are NOT given their inum: a
 device fd's identity to its user is the driver behind it (`fc_major`), and the
 inode it was opened through is a mount detail.  `FileInvDefs.fdstate_of` is
 the single site that would change if that turns out to be wanted.
 
-### Why the state rides on `file_ref`
+### Why the state rides on `file_ref` — and the content does not
 
-`file_ref γ k q C st` — five arguments, the last redundant (`file_ref_state`
-recovers `st = fdstate_of inum C`).  The redundancy is the point: `st` is *a
-place to put the inum* at the altitude a descriptor can read it, and once it
-is there `ofile_slot` needs no projection function at all.
+`file_ref γ k q st`.  The `fcontent` is INSIDE, under a quantifier, because
+nothing above the file layer ever read it: the ten files of the descriptor
+layer contain **zero** occurrences of `fc_type` and friends, and named `C`
+only to thread it.  `ProcInv.v` now has no occurrence of `fcontent` at all.
 
-The index rides INSIDE the payload (`file_pay_st` occupies exactly the slot
-`file_pay` used to) rather than as a fifth conjunct or a leading existential.
-That is what kept the change to ~30 files: the ~40 sites in `ProofFileread`,
-`ProofFilewrite` and `ProofFilestat` that take a reference apart and put it
-back see the same four-way shape they always did.
+The file layer does read the fields — fileread steps through `lw a5, f->type`
+— and gets at them by opening the quantifier, which is the same step it
+already took to reach `file_fields`.
+
+What made this work rather than merely typecheck is that the four
+**environment families re-keyed from `Cf` to `st`**.  `fileread_env`,
+`filewrite_env`, `filestat_env` and `fileclose_env` dispatched on exactly
+`fc_type` and, on the device arm, `fc_major` — both of which `fdstate` carries
+— so they are functions of the state, and the callers that supply them
+(sys_read, sys_write, sys_fstat, sys_close, kexit) never have to name a
+content.
+
+**The one exception, and why it is one.**  `ProofFilewrite.fw_ref` is the
+reference held OPEN — `fref_tok ∗ file_fields k q Cf ∗ file_pay_st … Cf st ∗
+flive_tok` — because filewrite's loop branches on `f->writable` on the INODE
+arm, and the write mode of an inode file is not something `fdstate` tracks.
+It is `Local`, nothing outside that file holds it, and the caller re-seals
+into `file_ref` at the loop's exit.  Putting a `writable` bit on `FdInode`
+(the way `FdPipe` has one) would delete it.
 
 ### The loan window
 

@@ -138,13 +138,21 @@ Definition fdslotUR : ucmra := authUR natUR.
    -- the share already pinned it, through a points-to on the entry's own
    [i_inum] cell; naming it is what this costs.
 
+   [FdPipe] CARRIES ITS DIRECTION, and on a pipe that is not a mode but an
+   IDENTITY: pipealloc's two files differ in nothing else -- same type, same
+   [f->pipe] -- so [f->writable] is the whole of what says which end a
+   descriptor holds.  Without it the two ends are indistinguishable to a
+   client, and sys_pipe's postcondition could not say that fd[0] reads and
+   fd[1] writes.  It is tied to [f->writable] by [FileInvDefs.fdstate_ok],
+   through [fc_wbool].
+
    A [Z], like [FdDevice]'s major and for the same reason: these are the
    numbers a USER program reads, and the machine widths belong on the
-   kernel side of the boundary.  [FileInvDefs.fdstate_of] does the
-   [bv_unsigned]. *)
+   kernel side of the boundary.  [FileInvDefs.fdstate_ok] is where the two
+   meet, and it does the [bv_unsigned]. *)
 Inductive fdtype :=
 | FdInode (inum : Z)
-| FdPipe
+| FdPipe (writable : bool)
 | FdDevice (major : Z).
 
 Inductive fdstate :=

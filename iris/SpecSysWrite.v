@@ -54,7 +54,7 @@
    S4 froze this contract with an OPENER wand, because [filewrite_env] was
    indexed by the file's CONTENT and by its fd SLOT.  S4' overturned that,
    and for a reason stronger than taste: the opener promised back a
-   [file_ref gf k q' Cf] at a SMALLER fraction, and no such thing exists --
+   [file_ref gf k q'] at a SMALLER fraction, and no such thing exists --
    [FileInvDefs.fref_tok]'s reference COUNT rides in the same map entry as
    the fraction.  SpecSysFstat.v's and SpecSysRead.v's headers have the full
    account.
@@ -130,29 +130,31 @@ Section SpecSysWrite.
      content-independent bundles this contract owns.
      [SpecSysRead.read_env_frame]'s twin, and the whole of what the S4 opener
      was trying to be. *)
-  Lemma write_env_frame (γf : gname) (fn : fwrite_names) (Cf : fcontent) :
+  Lemma write_env_frame (γf : gname) (fn : fwrite_names) (st : fdstate) :
     filewrite_fs_env γf fn -∗ filewrite_devsw fn -∗
-    filewrite_env γf fn Cf ∗
-    (filewrite_env_out fn Cf -∗ filewrite_fs_out fn ∗ filewrite_devsw fn).
+    filewrite_env γf fn st ∗
+    (filewrite_env_out fn st -∗ filewrite_fs_out fn ∗ filewrite_devsw fn).
   Proof.
     iIntros "Hfs Hdev". rewrite /filewrite_env /filewrite_env_out.
-    case_bool_decide.
-    { iSplitR; [done|]. iIntros "_".
+    destruct st as [|[?|?|mj]].
+    { (* CLOSED *)
+      iSplitR; [done|]. iIntros "_".
       iDestruct (filewrite_fs_env_out with "Hfs") as "Hout".
       iSplitL "Hout"; [iExact "Hout" | iFrame "Hdev"]. }
-    case_bool_decide.
-    { iDestruct (filewrite_devsw_acc fn Cf with "Hdev") as "[Hone Hback]".
+    { (* an INODE *)
+      iSplitL "Hfs"; [iExact "Hfs"|]. iIntros "Hout".
+      iSplitL "Hout"; [iExact "Hout" | iFrame "Hdev"]. }
+    { (* a PIPE *)
+      iSplitR; [done|]. iIntros "_".
+      iDestruct (filewrite_fs_env_out with "Hfs") as "Hout".
+      iSplitL "Hout"; [iExact "Hout" | iFrame "Hdev"]. }
+    { (* a DEVICE *)
+      iDestruct (filewrite_devsw_acc fn mj with "Hdev") as "[Hone Hback]".
       iSplitL "Hone"; [iExact "Hone"|].
       iIntros "Hout".
       iDestruct ("Hback" with "Hout") as "Hdev".
       iDestruct (filewrite_fs_env_out with "Hfs") as "Hfo".
       iSplitL "Hfo"; [iExact "Hfo" | iFrame "Hdev"]. }
-    case_bool_decide.
-    { iSplitL "Hfs"; [iExact "Hfs"|]. iIntros "Hout".
-      iSplitL "Hout"; [iExact "Hout" | iFrame "Hdev"]. }
-    { iSplitR; [done|]. iIntros "_".
-      iDestruct (filewrite_fs_env_out with "Hfs") as "Hout".
-      iSplitL "Hout"; [iExact "Hout" | iFrame "Hdev"]. }
   Qed.
 
 End SpecSysWrite.

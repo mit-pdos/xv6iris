@@ -327,30 +327,29 @@ Section ProofFileread.
   Local Ltac regne := reg_ne_side.
 
   (* ---- the type-indexed environment, opened at the type the code read ---- *)
-  Local Lemma fr_env_dev (γf' : gname)
-      (fn' : fread_names) (Cf' : fcontent) :
-    fc_type Cf' = FD_DEVICE ->
-    fileread_env γf' fn' Cf' -∗ fileread_dev_env fn' Cf'.
+  (* ---- the state-keyed environment, opened at the type the code READ ----
+     The environment is keyed on the descriptor's state and the code branches
+     on [f->type]; [fdstate_ok] is what makes those the same question, and
+     these four bridges are where the two meet. *)
+  Local Lemma fr_env_dev (γf' : gname) (fn' : fread_names)
+      (st' : fdstate) (Cf' : fcontent) (inum : mword 32) :
+    fdstate_ok inum Cf' st' -> fc_type Cf' = FD_DEVICE ->
+    fileread_env γf' fn' st' -∗ fileread_dev_env fn' (dev_major Cf').
   Proof.
-    intro Ht. rewrite /fileread_env Ht.
-    rewrite bool_decide_eq_false_2; [| by vm_compute].
-    rewrite bool_decide_eq_true_2; [| reflexivity].
-    by iIntros "$".
+    intros Hok Ht. rewrite (fdstate_ok_device inum Cf' st' Hok Ht). by iIntros "$".
   Qed.
 
-  Local Lemma fr_env_out_dev (fn' : fread_names) (Cf' : fcontent) :
-    fc_type Cf' = FD_DEVICE ->
-    fileread_dev_env fn' Cf' -∗ fileread_env_out fn' Cf'.
+  Local Lemma fr_env_out_dev (fn' : fread_names)
+      (st' : fdstate) (Cf' : fcontent) (inum : mword 32) :
+    fdstate_ok inum Cf' st' -> fc_type Cf' = FD_DEVICE ->
+    fileread_dev_env fn' (dev_major Cf') -∗ fileread_env_out fn' st'.
   Proof.
-    intro Ht. rewrite /fileread_env_out /fileread_dev_out Ht.
-    rewrite bool_decide_eq_false_2; [| by vm_compute].
-    rewrite bool_decide_eq_true_2; [| reflexivity].
-    by iIntros "$".
+    intros Hok Ht. rewrite (fdstate_ok_device inum Cf' st' Hok Ht). by iIntros "$".
   Qed.
 
   Local Lemma fr_dev_in (fn' : fread_names) (Cf' : fcontent) :
     (dev_major Cf' <= NDEV_max)%Z ->
-    fileread_dev_env fn' Cf' -∗
+    fileread_dev_env fn' (dev_major Cf') -∗
     ⌜frn_rp fn' (dev_major Cf') = (zero_reg : mword 64)
       \/ frn_rp fn' (dev_major Cf')
           = (mword_of_int KernelSyms.consoleread : mword 64)⌝ ∗
@@ -359,7 +358,11 @@ Section ProofFileread.
     is_conslock (frn_cons fn').
   Proof.
     intro H. rewrite /fileread_dev_env /fileread_dev_caps.
-    case_decide as H'; [by iIntros "$" | contradiction].
+    case_decide as H'; [by iIntros "$"|].
+    (* the major is a [bv_unsigned], hence non-negative: the lower half of
+       the range test the [Z]-keyed environment now carries *)
+    exfalso. apply H'. split; [| exact H]. rewrite /dev_major.
+    apply (proj1 (bv_unsigned_in_range _ (fc_major Cf'))).
   Qed.
 
   Local Lemma fr_dev_in_back (fn' : fread_names) (Cf' : fcontent) :
@@ -370,43 +373,38 @@ Section ProofFileread.
     a_devsw_read (dev_major Cf') ↦₈{frn_dqv fn' (dev_major Cf')}
       frn_rp fn' (dev_major Cf') -∗
     is_conslock (frn_cons fn') -∗
-    fileread_dev_env fn' Cf'.
+    fileread_dev_env fn' (dev_major Cf').
   Proof.
     intro H. rewrite /fileread_dev_env /fileread_dev_caps.
-    case_decide as H'; [| contradiction].
+    case_decide as H'; last first.
+    { exfalso. apply H'. split; [| exact H]. rewrite /dev_major.
+      apply (proj1 (bv_unsigned_in_range _ (fc_major Cf'))). }
     iIntros "%Hd Hc #Hcl".
     iSplitR; [iPureIntro; exact Hd |]. iFrame "Hc Hcl".
   Qed.
 
-  Local Lemma fr_env_fs (γf' : gname)
-      (fn' : fread_names) (Cf' : fcontent) :
-    fc_type Cf' = FD_INODE ->
-    fileread_env γf' fn' Cf' -∗ fileread_fs_env γf' fn'.
+  Local Lemma fr_env_fs (γf' : gname) (fn' : fread_names)
+      (st' : fdstate) (Cf' : fcontent) (inum : mword 32) :
+    fdstate_ok inum Cf' st' -> fc_type Cf' = FD_INODE ->
+    fileread_env γf' fn' st' -∗ fileread_fs_env γf' fn'.
   Proof.
-    intro Ht. rewrite /fileread_env Ht.
-    rewrite bool_decide_eq_false_2; [| by vm_compute].
-    rewrite bool_decide_eq_false_2; [| by vm_compute].
-    rewrite bool_decide_eq_true_2; [| reflexivity].
-    by iIntros "$".
+    intros Hok Ht. rewrite (fdstate_ok_inode inum Cf' st' Hok Ht). by iIntros "$".
   Qed.
 
-  Local Lemma fr_env_out_fs (fn' : fread_names) (Cf' : fcontent) :
-    fc_type Cf' = FD_INODE ->
-    fileread_fs_out fn' -∗ fileread_env_out fn' Cf'.
+  Local Lemma fr_env_out_fs (fn' : fread_names)
+      (st' : fdstate) (Cf' : fcontent) (inum : mword 32) :
+    fdstate_ok inum Cf' st' -> fc_type Cf' = FD_INODE ->
+    fileread_fs_out fn' -∗ fileread_env_out fn' st'.
   Proof.
-    intro Ht. rewrite /fileread_env_out Ht.
-    rewrite bool_decide_eq_false_2; [| by vm_compute].
-    rewrite bool_decide_eq_false_2; [| by vm_compute].
-    rewrite bool_decide_eq_true_2; [| reflexivity].
-    by iIntros "$".
+    intros Hok Ht. rewrite (fdstate_ok_inode inum Cf' st' Hok Ht). by iIntros "$".
   Qed.
 
   Lemma wp_fileread_sconf 
       (γa γf : gname) (γs : list gname) (j : nat) (γlp : gname)
-      (k : nat) (q : Qp) (Cf : fcontent) (st : fdstate) (fn : fread_names)
+      (k : nat) (q : Qp) (st : fdstate) (fn : fread_names)
       (pidv : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string)
-    : wp_fileread_sconf_body γa γf γs j γlp k q Cf st fn pidv V m K eb n b lks.
+    : wp_fileread_sconf_body γa γf γs j γlp k q st fn pidv V m K eb n b lks.
   Proof.
     cbv beta delta [wp_fileread_sconf_body].
     intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Ha0 Ha2 Hn Heb Hbelow.
@@ -416,7 +414,9 @@ Section ProofFileread.
     assert (Hspm : m !!! Regidx csp_rs1 = sp0) by reflexivity.
     (* the reference, taken apart: the four content cells the dispatch reads
        are fractions of it, and it is rebuilt unchanged at every exit. *)
-    iDestruct "Href" as "(Hrtok & Hrfields & Hrpay & Hrlv)".
+    iDestruct "Href" as (Cf) "(Hrtok & Hrfields & Hrpay & Hrlv)".
+    iDestruct (file_pay_st_ok with "Hrpay") as "[%Hokx Hrpay]".
+    destruct Hokx as (inumx & Hok).
     iEval (rewrite /file_fields) in "Hrfields".
     iDestruct "Hrfields" as "(Hcty & Hcrd & Hcwr & Hcpp & Hcip & Hcmaj)".
     (* ===================================================================
@@ -1235,7 +1235,7 @@ Section ProofFileread.
              which is exactly what the environment's guard is about. *)
           assert (Htyd : fc_type Cf = FD_DEVICE)
             by (apply eq_vec_true_iff; exact Hp3).
-          iDestruct (fr_env_dev γf fn Cf Htyd with "Henv") as "Henv".
+          iDestruct (fr_env_dev γf fn st Cf inumx Hok Htyd with "Henv") as "Henv".
           pose proof (fr_major_range (fc_major Cf : mword 16)) as Hmjr.
           assert (HB6a0 : B6 !!! Regidx Ra0 = fnode k).
           { rewrite /B6 upd_ne; [| vm_compute; discriminate].
@@ -1585,7 +1585,7 @@ Section ProofFileread.
                 { rewrite /file_ref /file_fields.
                   iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
                 { rewrite HVid. iExact "Hpriv". }
-                { iApply (fr_env_out_dev fn Cf Htyd).
+                { iApply (fr_env_out_dev fn st Cf inumx Hok Htyd).
                   iApply (fr_dev_in_back fn Cf Hin with "[%] Hslot Hconslk").
                   by left. }
              ** (* ---- the console's read: the INDIRECT CALL at +0x94 ---- *)
@@ -1752,7 +1752,7 @@ Section ProofFileread.
                 { iEval (rewrite /ret_tgt). iExact "Hpc". }
                 { rewrite /file_ref /file_fields.
                   iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
-                { iApply (fr_env_out_dev fn Cf Htyd).
+                { iApply (fr_env_out_dev fn st Cf inumx Hok Htyd).
                   iApply (fr_dev_in_back fn Cf Hin with "[%] Hslot Hconslk").
                   by right. }
           ++ (* --------- the major is OUT OF RANGE: return -1 ------------
@@ -1825,7 +1825,7 @@ Section ProofFileread.
              { rewrite /file_ref /file_fields.
                iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
              { rewrite HVid. iExact "Hpriv". }
-             { by iApply (fr_env_out_dev fn Cf Htyd). }
+             { by iApply (fr_env_out_dev fn st Cf inumx Hok Htyd). }
         * (* ---- +0x28 c.li a4,2 ; +0x2a bne a5,a4 -> panic ---- *)
           iApply (wp_beq_fall_s_sconf (mword_of_int (FR + 0x2a))
                     (mword_of_int 78 : mword 13) Ra4 Ra5 B6 (K - 6)%nat b
@@ -1866,7 +1866,7 @@ Section ProofFileread.
                 BORROW protocol; iunlock. *)
              assert (Htyi : fc_type Cf = FD_INODE)
                by (apply eq_vec_true_iff; exact Hp2).
-             iDestruct (fr_env_fs γf fn Cf Htyi with "Henv") as "Henv".
+             iDestruct (fr_env_fs γf fn st Cf inumx Hok Htyi with "Henv") as "Henv".
              rewrite /fileread_fs_env.
              iDestruct "Henv" as "(%Hlg & %Hist & %Hgeo &
                                    #Hbio & #Hitbl & #Hescs &
@@ -2556,7 +2556,7 @@ Section ProofFileread.
                 { iEval (rewrite /ret_tgt). iExact "Hpc". }
                 { rewrite /file_ref /file_fields.
                   iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
-                { iApply (fr_env_out_fs fn Cf Htyi). rewrite /fileread_fs_out.
+                { iApply (fr_env_out_fs fn st Cf inumx Hok Htyi). rewrite /fileread_fs_out.
                   iFrame "Hsb Hbslot". }
              ++ (* ---- the update RUNS: f->off += r ---- *)
                 assert (Hadv : (Z.of_nat (Z.to_nat (bv_unsigned v)) + Z.of_nat tot
@@ -2844,7 +2844,7 @@ Section ProofFileread.
                 { iEval (rewrite /ret_tgt). iExact "Hpc". }
                 { rewrite /file_ref /file_fields.
                   iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
-                { iApply (fr_env_out_fs fn Cf Htyi). rewrite /fileread_fs_out.
+                { iApply (fr_env_out_fs fn st Cf inumx Hok Htyi). rewrite /fileread_fs_out.
                   iFrame "Hsb Hbslot". }
           -- (* ================ NOT A FILE AT ALL: panic ==========
                 [SpecPanic] discharges the arm; panic never

@@ -61,7 +61,7 @@
    a syscall cannot know which file its descriptor names
    ([ProcInv.ofile_slot] quantifies the slot, the fraction and the content
    existentially).  S4' overturned it, and the reason is stronger than
-   taste: the opener promised back a [file_ref gf k q' Cf] at a SMALLER
+   taste: the opener promised back a [file_ref gf k q'] at a SMALLER
    fraction, and NO SUCH THING EXISTS.  [FileInvDefs.fref_tok] is
    [fref_own g (fragment {[k := (q, 1%positive)]})] -- the reference COUNT
    rides with the fraction -- so two fragments at [q/2] compose to [(q, 2)]
@@ -160,7 +160,7 @@ Section SpecSysFstat.
      The header above records the shape S4 froze: an OPENER, a wand turning
      the reference the descriptor turned out to hold into filestat's
      environment for THAT file.  S4' overturned it, and for a reason stronger
-     than taste: the opener promised back a [file_ref γf k q' Cf] at a
+     than taste: the opener promised back a [file_ref γf k q'] at a
      SMALLER fraction, and there is no such thing.  [FileInvDefs.fref_tok] is
      [fref_own γ (◯ {[k := (q, 1%positive)]})] -- the count component rides
      WITH the fraction, so two fragments at [q/2] compose to [(q, 2)], not to

@@ -239,7 +239,7 @@ Section ProofSysOpenBody.
   (*  generation-ERASED share [inode_shr kk s dev inum]; only then are   *)
   (*  the parent and its share in ONE hand and [so_publish] callable.    *)
   (*  What crosses the tail is the six raw pieces of the slot plus the   *)
-  (*  retained parent, and what comes back out is [file_ref gf kf 1 C] --  *)
+  (*  retained parent, and what comes back out is [file_ref gf kf 1] --  *)
   (*  which [ProcInv.proc_priv_settle] turns into the descriptor.         *)
   (* ================================================================== *)
   Lemma so_tail_pub `{GEN : GenId} `{CID0 : CpuId}
@@ -388,17 +388,18 @@ Section ProofSysOpenBody.
             ltac:(solve_ndisj) ltac:(solve_ndisj) Hkk Hinb Hip Htyor Hwrb Hdir
             Hwf
             with "Hkeep Hru Hshr Hshot Hfref Hflive Hflds Hfpn Hfip Hfoff")
-      as "Href".
+      as (stpub) "[%Hokpub Href]".
     (* the descriptor's ghost state: the file is FD_INODE or FD_DEVICE, so
-       the descriptor sys_open returns is OPEN at that type. *)
+       the descriptor sys_open returns is OPEN at that type -- [stpub] is the
+       state the publish minted, and [Hokpub] ties it to the file. *)
     (* THE ONE GHOST STEP: the descriptor fdalloc opened is now OPEN, at the
        new file's type.  fdalloc handed out its authority at [FdClosed] and
        the matching fragment comes out of the bundle -- which is why
        sys_open's contract takes [fd_frags_any] at all. *)
     iDestruct (fd_frags_any_acc (pv_fdg V) fd Hfdlt with "Hfrag")
       as (stq) "[Hfr Hfrback]".
-    iMod (proc_priv_settle gf (proc_addr jx) pidv V fd kf 1 C _ FdClosed stq
-                 Hfdlt Hlen Hkf (fdstate_of_open _ C (or_intror Htyor))
+    iMod (proc_priv_settle gf (proc_addr jx) pidv V fd kf 1 stpub FdClosed stq
+                 Hfdlt Hlen Hkf (fdstate_ok_open _ C stpub Hokpub (or_intror Htyor))
                  with "Hcore Howe Href Hauth Hfr") as "[Hpriv Hfr]".
     iDestruct ("Hfrback" with "Hfr") as "Hfrag".
     iModIntro.
@@ -1389,7 +1390,7 @@ Section ProofSysOpenBody.
     iEval (rewrite Hpp64) in "Hpc".
     (* ===== +0x66 c.beqz a0, +0x12e  [ARM E-FAIL] ===== *)
     rewrite /filealloc_post.
-    iDestruct "Hfapost" as "[[%Hz Hfds] | (%kf & %Cf & [%Hkf [%Hfn %Hty0]] & Href)]".
+    iDestruct "Hfapost" as "[[%Hz Hfds] | (%kf & [%Hkf %Hfn] & Href)]".
     { (* ---- filealloc refused ---- *)
       iApply (wp_cbeqz_taken_s_sconf (CID := CID4) (mword_of_int (SO + 0x66))
                 (mword_of_int 100 : mword 8) (Cregidx (mword_of_int 2)) Ra0
@@ -1591,7 +1592,7 @@ Section ProofSysOpenBody.
       iApply (Tails.so_tail_f (CID0 := CID10) gfl gf gs jx gl gu gd gk pd pav
                 pu bn gil gisl bmapstart
                 size kk qi s gy inum dn bm
-                kf 1%Qp Cf _ inhabitant None u pidv
+                kf 1%Qp _ inhabitant None u pidv
                 (DfracOwn (1/4)) dqb dqs m M4 sp0 K eb b lks w6
                 (word_of_words lo om) w24 bp V
                 HKup HKeo HKfc HK24 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog
@@ -1603,7 +1604,7 @@ Section ProofSysOpenBody.
                       Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpbare
                       Hprocs Hdev Hgeo Hdlk Hbsl Hires Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
                       HbP H23 H24 [Hcback Howe Hisl Hfrag Hcont]").
-      { iApply (fileclose_env_none _ _ _ _ _ Cf Hty0). }
+      { iApply fileclose_env_none. }
       iEval (rewrite /wp_next).
       iIntros (CIDy) "%Hqy". iIntros (mf)
         "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpbare Hsbb Hsbi
@@ -1639,9 +1640,9 @@ Section ProofSysOpenBody.
       by (rewrite HM4s3; exact Hfdv).
     (* ---- THE FRESH SLOT, OPENED: six cells plain, [f->ip] WHOLE ---- *)
     iApply fupd_wp.
-    iMod (so_open_slot ⊤ gf kf Cf ltac:(solve_ndisj) Hty0 with "Href")
-      as (pn voff) "(%Hwf & Hiru & Hfref & Hflive & Hfpn & Hfty & Hfrd & Hfwr
-                    & Hfpip & Hfmaj & Hfip & Hfoff)".
+    iMod (so_open_slot ⊤ gf kf ltac:(solve_ndisj) with "Href")
+      as (Cf pn voff) "(%Hty0 & %Hwf & Hiru & Hfref & Hflive & Hfpn & Hfty
+                        & Hfrd & Hfwr & Hfpip & Hfmaj & Hfip & Hfoff)".
     iModIntro.
     (* the loan is not spent on this arm -- the file is about to be PUBLISHED,
        not closed -- so fold it back before the stores block, which is where

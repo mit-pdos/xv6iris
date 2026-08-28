@@ -112,9 +112,10 @@ Definition file_fields k dq C : iProp Σ :=          (* the 7 non-ref cells *)
   a_ftype k ↦₄{dq} fc_type C ∗ a_freadable k ↦ₘ{dq} fc_readable C ∗ … .
 
 (* THE predicate: holding one reference on file slot [k]. *)
-Definition file_ref γ k q C st : iProp Σ :=
-  fref_tok γ k q ∗ file_fields k (DfracOwn q) C ∗ file_pay_st γ k q C st
-  ∗ flive_tok γ k.
+Definition file_ref γ k q st : iProp Σ :=
+  ∃ C : fcontent,
+    fref_tok γ k q ∗ file_fields k (DfracOwn q) C ∗ file_pay_st γ k q C st
+    ∗ flive_tok γ k.
 ```
 
 `file_ref` is the unit of ownership everywhere: a process's `p->ofile[fd]`, a
@@ -130,20 +131,49 @@ properties:
   same thing to their user;
 - **`file_ref γ k 1 C st` is writable** — the exclusive/uninitialized state.
 
+**The `fcontent` is INSIDE.** A reference does not tell you what is in the
+`struct file`; it tells you what state a descriptor holding it is in. The
+content is still owned — `file_fields` is the fractional points-to on the
+seven cells, and a proof that has to read `f->type` opens the quantifier to
+get at them — but nothing above the file layer names it. That is measured
+rather than asserted: the ten files of the descriptor layer (`ProcInv`,
+`sys_close/dup/read/write/fstat`, `kexit`, `kfork`, `fdalloc`) contain zero
+occurrences of `fc_type` and friends, and `ProcInv.v` no longer mentions
+`fcontent` at all.
+
 `st : FdSlots.fdstate` is the **user-visible state of any descriptor naming
-this file**, and it is REDUNDANT: `file_ref_state` recovers `st = fdstate_of
-inum C` for the payload's inum.  It is carried anyway because it is the only
-place the INODE NUMBER can live at an altitude a descriptor can read — the
-number is not a `struct file` field, so `fcontent` cannot hold it, and
-`file_pay` quantifies it away.  `proc-struct.md`'s "The fd-state ghost" has the
-full chain; the short version is that `ProcInv.ofile_slot` reads
+this file**, tied to the content by `FileInvDefs.fdstate_ok`:
 
 ```coq
-file_ref γf k q C st ∗ fd_st_auth γd fd st
+Definition fdstate_ok (inum : mword 32) (C : fcontent) (st : fdstate) : Prop :=
+  match st with
+  | FdClosed             => fc_type C = FD_NONE
+  | FdOpen (FdPipe b)    => fc_type C = FD_PIPE  /\ fc_writable C = if b then 1 else 0
+  | FdOpen (FdInode n)   => fc_type C = FD_INODE /\ n  = bv_unsigned inum
+  | FdOpen (FdDevice mj) => fc_type C = FD_DEVICE /\ mj = bv_unsigned (fc_major C)
+  end.
 ```
 
-and the descriptor's ghost is the reference's own index.  A reference and the
-fd authority that came out with it therefore cannot be recombined across
+A RELATION, not a projection, and both halves of that matter:
+
+- **It pins `fc_type` in both directions.** A total function from files to
+  states has to send the type codes it does not recognise somewhere, and the
+  only honest target is `FdClosed` — which would make `FdClosed` say nothing
+  about `f->type`. Read as a relation, each arm pins it, and that is what let
+  `so_open_slot` and `filealloc_post` drop their `fc_type C = FD_NONE`
+  premises: the state they already hold *is* that equation.
+- **It is still functional** (`fdstate_ok_inj`): one file plus its inum admits
+  at most one state, so two shares of a slot agree (`file_ref_agree`) and
+  reading a descriptor's state twice cannot give two answers.
+
+`ProcInv.ofile_slot` then reads
+
+```coq
+file_ref γf k q st ∗ fd_st_auth γd fd st
+```
+
+— the descriptor's ghost is the reference's own index. A reference and the fd
+authority that came out with it therefore cannot be recombined across
 different files.
 
 ### `file_payload`: the thing the file is a reference *to*

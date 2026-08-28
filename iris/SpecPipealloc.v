@@ -94,8 +94,17 @@ Section SpecPipealloc.
      the [w = false] file the READ end and the [w = true] file the WRITE end,
      both pointing at the same pipe.  [ip], [off] and [major] are NOT written
      -- a pipe file inherits whatever the recycled table slot held, which is
-     the real xv6 behaviour -- so they stay existentially quantified in the
-     postcondition's [fcontent]. *)
+     the real xv6 behaviour.
+
+     IT IS NO LONGER IN THE POSTCONDITION.  A reference hides its [fcontent]
+     ([FileInvDefs.file_ref]), so the post cannot name a [C] to say this
+     about; what survives is the half a DESCRIPTOR can see, which is the
+     direction, and that rides in the state as [FdSlots.FdPipe b].  The
+     conjunct that has no home yet is [fc_pipe C = pi] -- "both ends belong
+     to one pipe" -- which would need [FdPipe] to carry the pipe's identity
+     the way [FdInode] carries its inum.  Kept here because it is the
+     statement of what pipealloc writes, and the definition the proof's own
+     stores are checked against. *)
   Definition pipe_file (pi : mword 64) (w : bool) (C : fcontent) : Prop :=
     fc_type C = FD_PIPE /\
     fc_pipe C = pi /\
@@ -129,12 +138,23 @@ Section SpecPipealloc.
         reads the end off exactly those fields. *)
      ⌜r = (zero_reg : mword 64)⌝ ∗
      kalloc_avail γk (avail_dec on) ∗
-     (∃ (pi : mword 64) (k0 k1 : nat) (C0 C1 : fcontent),
+     (* WHICH END IS WHICH, IN THE STATE ITSELF.  [FdPipe false] is the read
+        end and [FdPipe true] the write end -- the direction is tied to
+        [f->writable] by [FileInvDefs.fdstate_ok], and on a pipe that field
+        is the WHOLE of what distinguishes the two files (same type, same
+        [f->pipe]).  So the post still says fd[0] reads and fd[1] writes,
+        with no [fcontent] named anywhere.
+        What it no longer says is that the two are ends of the SAME pipe:
+        that was [pipe_file pi _ C]'s [fc_pipe] conjunct, and a reference
+        hides its content.  No caller consumed it -- sys_pipe's own proof
+        says as much where it destructures this -- and restoring it means
+        giving [FdPipe] the pipe's identity too, exactly as [FdInode] has
+        its inum. *)
+     (∃ (k0 k1 : nat),
         ⌜(k0 < NFILE)%nat /\ (k1 < NFILE)%nat⌝ ∗
-        ⌜pipe_file pi false C0⌝ ∗ ⌜pipe_file pi true C1⌝ ∗
         pf0 ↦₈[KT1] fnode k0 ∗ pf1 ↦₈[KT1] fnode k1 ∗
-        file_ref γf k0 1 C0 (FdOpen FdPipe) ∗
-        file_ref γf k1 1 C1 (FdOpen FdPipe)))%I.
+        file_ref γf k0 1 (FdOpen (FdPipe false)) ∗
+        file_ref γf k1 1 (FdOpen (FdPipe true))))%I.
 
 End SpecPipealloc.
 
