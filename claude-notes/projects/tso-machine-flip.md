@@ -10565,3 +10565,330 @@ is red on pre-existing debt at line 275).  **NOT EDITED, characterized:**
 **DIFF MANIFEST:** `/shared/xv6iris-3-parktree/PARK-PORT.diff`, a unified
 diff of the port's files against the fliptree snapshot they were forked
 from (md5-verified identical at fork for every file in the set).
+
+### A6.85 THE §0.26′ RESTATEMENT IS LANDED — AND THE FREER'S PAGE COST
+### NINE LINES, BECAUSE kalloc'S OWN MEMSET IS THE MINT
+
+Workspace: `FLIPTREE = /tmp/claude-0/-shared-xv6iris-3/861bc642-…/scratchpad/fliptree`
+(the flip workspace, with A6.90's park-port diff merged).  All numbers from
+the GCP VM under `flock /tmp/claude-gcp.lock`.
+
+#### (0) THE BASELINE, RECONCILED AGAINST A6.90
+
+**1098 of 1296, RED 11** — one full `-k` round on the merged tree, the first
+validating round the park merge ever had.  The red set is A6.90's exactly:
+`ProofForkret`, `ProofForkretPark`, `ProofKernelvec`, `ProofMain`,
+`ProofSwtch`, `ProofUserretClosed`, `ProofVirtioDiskIntr`,
+`ProofVirtioDiskRwD`, `UptWalkPt`, `UserMemPt`, `WpSconfLock`.  No `Abort`,
+no `Admitted`, no `Axiom` — `UsertrapRes.ut_res_bare_park` is dead as A6.90
+reported, and `UtResFits` is green.  198 rows unbuilt, all in the eleven's
+cones (148 of them `Link*`, behind `WpSconfLock` → `ProofAcquire` /
+`ProofRelease` / `ProofHolding`).
+
+**THE ONE DISCREPANCY: A6.90 SAID 1099 AND THIS SAYS 1098**, same red set,
+same denominator, nothing red here that was green there.  A6.90's number was
+eight incrementals deep on PARKTREE's own remote mirror and it says so
+("HONEST QUALIFIER: this is not a clean number"); this one is a single full
+round on the merged tree with every `.vo` accounted for against
+`_CoqProject` (`comm` of the two lists is empty in both directions).  Take
+1098 as the boundary; the missing `.vo` was a PARKTREE mirror artifact, and
+*a count taken mid-incremental is not comparable to one taken after a full
+round even when the red sets agree.*
+
+#### (1) THE RULING, AND THE ONE THING THAT MAKES IT CHEAP
+
+§0.26′: kfree does not require regular points-to facts for the 4096 bytes;
+it requires LOWER-LEVEL OWNERSHIP with no value-stability promise.  The tier
+is landed as `TsoCtx.phys_free` (physical fraction + the per-byte timestamp
+element) and its VA-keyed twin `TsoCtx.mem_free`.
+
+> **AND THE CASCADE COLLAPSED TO NINE LINES, BECAUSE THE ALLOCATOR'S OWN
+> MEMSET IS THE MINT.**  The obvious reading of the ruling is that
+> `KallocInv.page_own` — the page body under ~63 files — becomes
+> visibility-free, and then every kalloc client owes something.  It does
+> not.  xv6's `kalloc` memsets the page it returns *before returning it*,
+> and a store re-mints determinacy with no evidence; so the honest
+> restatement is ASYMMETRIC:
+>
+> | | tier | why |
+> |---|---|---|
+> | `kfree_pre` | **`page_free`** (visibility-free) | the freer owes only the future |
+> | `kalloc_post` | `page_own` (registered, UNCHANGED) | kalloc's own memset wrote it |
+> | `run_page` / `freelist_chain` / `kmem_res` | UNCHANGED | kfree memsets BEFORE it pushes |
+>
+> The free list therefore stays registered end to end, kalloc's own read of
+> `r->next` stays licensed (it is the allocator's protocol under the kmem
+> lock, not a client reading junk), and **every one of the ~63 files that
+> mentions a page body is textually unmoved except the nine that BUILD
+> `kfree_pre`.**  The old note's "page bodies cross ~56 files" was the M1-era
+> count of files that MENTION them; re-measured, the files that unfold them
+> are 18, and the files the ruling actually moves are 9.
+
+#### (2) THE KIT, ALL ADDITIVE AND ALL GREEN FIRST TRY
+
+| where | what |
+|---|---|
+| `TsoCtx.phys_free a dq` | `∃ v e, phys_pointsto a dq v ∗ a ↪[ts_name]{dq} e` |
+| `TsoCtx.mem_free a dq` | the same under the kmap claim (a free byte still knows WHERE it is) |
+| `phys_ledger_free` / `_at_free` / `_pin_free` / `_wpay_free` | the four reclamations |
+| `ctx_phys_pointsto_free`, `ctx_pointsto_free` | the registered → free forgetting |
+| `ctx_store_free_ok`, `ctx_store_win_free_ok` | the store gate AT the free tier |
+| `SmodeCorePt.wordw_win_store_free_c` | its window form through `gs_of` |
+| `WpSconfMem.wordw_free`, `wp_store_s_sconf_free_gen`, `wp_sb_free_s_sconf` | the leaf |
+| memset: `wp_memset_loop_free_sconf`, `wp_memset_free_sconf`, `wp_memset_page_free_{val_,}sconf` | free buffer in, REGISTERED buffer out |
+| `KallocInv.byte_free` / `page_free` / `page_own_free` / `kfree_pre_of_own` | the client surface |
+
+> **THE STORE GATE DID NOT NEED WEAKENING — IT NEEDED READING.**
+> `TsoCtx.ctx_store_bytes` destructed the registered byte and then
+> `iClear`ed its justification bit, three lines in.  A store does not read,
+> so the writer never owed a license on the cell it is about to overwrite;
+> the premise was simply stated too strong.  **`ctx_store_ok` is now a
+> five-line corollary of `ctx_store_free_ok` and its statement did not
+> move**, so `ctx_store_sub_ok` / `ctx_store_win_ok` and their seven
+> external callers (`HartMStore`, `HartMemRun`, `SmodeCorePt`, `TransPt`,
+> `UptTree`, `UserPtTree`, `KptTree`) are untouched.  The same trick runs
+> the whole way up: at each layer the FREE form is the primitive and the
+> registered form is its corollary, which is why the memset engine changed
+> tier with ZERO client edits.
+
+> **THE RECLAMATION IS AN `⊢`, NOT A GHOST STEP — AND THAT IS THE
+> CORRECTION THIS TRANCHE OWES §0.26′ (ii).**  The ruling says the lock-cell
+> reclamation is "an EVIDENCE-FREE ghost reset of the history payload at
+> full element ownership".  A ghost reset needs `ghost_map_update`, which
+> needs the AUTH, which is inside `tso_interp_at`, which by A6.68 is in hand
+> only INSIDE a leaf — and `ProofPipeclose:749` is a pure entailment several
+> nodes away from any leaf.  **The fix is to make the payload existential in
+> the resource rather than reset in the authority**: `phys_free` quantifies
+> over the whole element, so `phys_ledger_wpay_free` is `iExists`, and the
+> auth-side re-keying happens LAZILY at the next store (`ctx_store_bytes`
+> re-keys every written byte to `(S i, ts_pay_none)` from whatever it was).
+> The ruling's content is exactly right — removing a history claim only
+> weakens the interpretation — but its SITE is the next write, not the
+> handover.  *A claim you can forget existentially never needed an update.*
+
+**AND THE VALUE IS HIDDEN TOO** (owner correction, folded in): `phys_free`
+takes no `v`.  The byte's value is ghost bookkeeping for the interp's
+flat-memory tie — it promises nothing, licenses nothing, and is
+re-established by the very store the resource exists to license — so leaving
+it in the spelling would let a reader mistake it for a stability claim.
+`mem_free` follows, `byte_free` collapses to `mem_free` at `DfracOwn 1` (its
+`∃b` was re-adding what the primitive should hide), and the memset engine's
+`olds` parameter **dies** on the free side, taking `ProofMemsetPage`'s
+`bytes_choose` with it.  Each coercion gained or lost exactly one `∃`-intro.
+
+#### (3) THE CLIENT LEDGER, MEASURED BY A ROUND AND NOT BY GREP
+
+The flip round reached **7 files**, every one a `kfree_pre` construction
+site, every one one line: `ProofFreerange`, `ProofFreeproc`, `ProofSysExec`,
+`ProofUvmalloc`, `ProofVmfault`, `ProofPipeclose`, `PtFree`.  Two more sites
+(`ProofUvmcopy`, `ProofUvmunmap`) sit behind those in the DAG and were
+patched with them, for **9 sites in 9 files**.  The line is
+`iApply page_own_free` (or `iApply (page_own_free with "Hpage")`).
+
+**THE VALIDATING ROUND: 1098 of 1296, RED 11, THE BASELINE SET EXACTLY.**
+The restatement lands on its own green boundary -- no green file went red,
+and the eleven are §(0)'s eleven.
+
+**AND THE AUDIT THE OWNER ASKED FOR IS CLEAN: NO kalloc CLIENT READS A
+FRESH PAGE BEFORE WRITING IT.**  Swept at the source: `kvmmake`, `walk`,
+`uvmcreate`, `uvmalloc`, `vmfault` memset first; `uvmcopy` `memmove`s into
+it; `pipealloc` writes all five fields then `initlock`s; `proc_mapstacks`
+hands it to `kvmmap` as a stack; `virtio_disk_init` memsets all three.
+The one site worth naming and explicitly NOT a bug: `allocproc`'s trapframe
+page is never memset by its caller, and for the FIRST process `userret`
+restores GPRs from trapframe slots that only `kalloc`'s own
+`memset(r, 5, PGSIZE)` ever wrote.  That is the ALLOCATOR's write, not a
+client read-before-write, and it is exactly why `kalloc_post` must stay at
+the registered tier.  **If a future kalloc client is found reading first,
+per the owner's addendum it is a KERNEL BUG and is to be reported, not
+proved around.**
+
+#### (4) WHAT THIS UNBLOCKS
+
+`ProofPipeclose:749` — A6.84 §(2)'s blocker — is dissolved: kfree's
+precondition no longer asks the lock's eight owner bytes to be ctx bytes, so
+a `phys_ledger_wpay` cell can be handed back through
+`phys_ledger_wpay_free`.  **A tier change is local to everything that
+RECLAIMS the storage (A6.84's rule) — and the way to pay it is to make the
+reclaiming contract weaker, not the reclaimed cell stronger.**
+
+### A6.86 THE M4 CONTRACT FLIP IS RE-APPLIED AND LANDS — THE SHIM IS
+### RETIRED — AND THE CLAIM IS PAID OFF THE TOWER BEFORE THE CELL LEAVES IT
+
+Executing A6.84 §(5) with its blocker dissolved by A6.85.  Everything the
+archive predicted held; the two things it did NOT predict are in §(2) and
+§(3) below, and the second of them is the reusable idea.
+
+#### (1) THE FLIP GOES BACK IN, AND `WpLock` IS GREEN ON ITS OWN AGAIN
+
+`ZZM4Flip/wplock_new.py` applied CLEAN to the merged tree (the park port
+touched no lock file), and `WpLock.vo` came back green.  Three manual steps
+the archive's README named and the script does not do: the three added
+imports; **the racy kit block MOVED above the physical fields** (it defines
+`lkcpu_z` / `lkcpu_cp`, which `lk_cpu_pay` is stated at); and
+`rewrite /lock_inv` before each `iFrame "Hc4 Hc8"` — `lock_body` is not a
+separate definition in the archived text, so the README's spelling of that
+last step is off by one name.
+
+> **AND THE BLOCK MOVE HAS A TRAP WORTH ONE LINE.**  The insertion point
+> "just before `lk_cpu_pay`" is INSIDE a 160-line banner comment, so a
+> naive move puts 145 lines of definitions inside a comment and the only
+> symptom is `The reference lkcpu_z was not found`.  *When you move a block
+> in a file whose comments are this large, place it by COMMENT DEPTH, not
+> by blank line.*
+
+The two additional archived residues are re-applied with it:
+`wp_sd_zero_wpay_s_sconf` hands the address claim back, and the two load
+AUs (`_dat`, `_exv`, still zero external consumers) take the `ktier_pin`
+premise the store form already had.
+
+#### (2) THE CLIENT SWEEP CAME OUT AT 27 SITES IN 22 FILES, NOT 20 IN 16
+
+A6.84 §(5) priced it at "16 files, 20 sites, every one a one-line spelling
+change".  The spelling change is exactly one line everywhere, and the count
+is **27 sites in 22 files**: the sixteen A6.84 listed, plus `SleepLockAt`,
+`SpecInitsleeplock`, `SpecConsoleinit`'s post, and — the two the earlier
+estimate could not see — `BioInitAt` and `FsBoot`, which name
+`bcache.lock`'s owner word by its OFFSET ARITHMETIC
+(`add_vec bcache_addr (sign_extend' 64 (mword_of_int 16))`) rather than
+through `lock_cpu`, so no grep for `lock_cpu` finds them.  *A creator
+cascade is counted by the RESOURCE, not by the spelling; the two sites the
+count missed are the two that spell the address out.*
+
+#### (3) THE PRODUCER SIDE: PAY THE CLAIM OFF THE TOWER, NOT AFTER IT
+
+`initlock`'s `lk->cpu = 0` becomes the MINT SITE — `wp_sd_zero_wpay_s_sconf`
+stores the clear word and mints the window payload in one leaf (store-THEN-
+mint, A6.82's forced order) — and the creators' `lk_cpu_fresh` is that
+payload beside the address claim a ledger cell does not carry.
+
+**AND `lk_addr_claim` HAD TO GROW ITS PER-BYTE HALF, WHICH IS WHERE THE
+DESIGN IDEA IS.**  §0.26′'s free page is `KallocInv.page_free`, whose bytes
+are `TsoCtx.mem_free` — the kmap claim OVER the visibility-free byte, one
+per byte.  A base-keyed claim does not give those: deriving byte `j`'s
+mapping from the window's base is `svpn_of_pa_add` + `pa_of_pa_add` +
+canonicality + an in-page offset bound, i.e. real address arithmetic in a
+file that has no business doing it.
+
+> **THE ARITHMETIC NEVER HAPPENS, BECAUSE THE CLAIM IS READ OFF THE TOWER
+> BEFORE THE CELL LEAVES IT.**  Every creator pays `lk_addr_claim` from a
+> CTX WORD it still holds, and a ctx word IS ctx bytes, each carrying its
+> own `kmap_at` / canonicality / tier pin.  So `lk_addr_claim` carries the
+> per-byte list as well as the base facts, `lk_addr_claim_of4` /
+> `lk_addr_claim_of8` are one shared `lk_addr_claim_of_bytes`, and
+> `ProofInitlock` reads the eight-byte claim off `Hcpu` on the line BEFORE
+> the store that takes the cell out of the tower.  *When a resource is about
+> to lose a fact, harvest the fact while it is still there — reconstructing
+> it afterwards is the expensive direction, and it is expensive exactly
+> because the loss was real.*  The price: `lk_addr_claim` is now strictly
+> stronger than `WpSconfMem.wordw_claim` rather than convertible with it, so
+> `WpSconfLock` carries a one-line projection (`lk_addr_claim_wordw`).
+
+#### (4) `ProofPipeclose` CLOSES THE LOOP, AND THE LEMMA IS ONE ⊢
+
+`WpLock.lk_cpu_fresh_free : lk_cpu_fresh lk ⊢ [∗ list] j ∈ seq 0 8,
+TsoCtx.mem_free (pa_add (lock_cpu lk) j) (DfracOwn 1)` — the claim supplies
+the mapping the cell dropped, `phys_ledger_wpay_free` supplies the fraction
+and the element, `ktier_pin_id` identifies `pa_of ppj a` with `a`.  Then
+`PipeInv.pipe_bytes_page_free` is `pipe_raw_page_own`'s proof window for
+window, with `bwin_free_split` for the splits, a `bwin_any_free` on each
+REGISTERED window, and the owner window already free.  **The crossing A6.84
+called impossible is not performed: nothing re-enters the ctx tower — the
+PAGE came down to meet the cell.**
+
+#### (5) THE SHIM IS RETIRED
+
+`TsoCtxShim`'s last live use was `WpSconfLock.lock_claims`, which forgot the
+owner cell to a raw word to read an ADDRESS claim off it and crossed back
+through `ctx_word_of_mem`.  At the ledger tier the invariant holds the two
+`lk_addr_claim`s explicitly, so `lock_claims` is a peek that closes with what
+it opened, and the crossing is gone.  Ledger after the pass: **0 `Require`
+lines** (20 removed), **0 code references**, `own_context_alloc` had no
+callers and is deleted, and the file is a TOMBSTONE that records the three
+ways its statements died (forgetting → `TsoCtx.ctx_pointsto_forget`; boot
+minting → `BootCarve.boot_ctx_of_mem_*`; the last crossing → this flip).
+28 files still mention it in COMMENTS; that is history, and the tombstone is
+what a grep now lands on.
+
+> **AND ONE PROCESS SCAR, RECORDED BECAUSE IT COST A ROUND.**  The script
+> that stripped the 20 dead `Require TsoCtxShim` lines swallowed the
+> *sentence*, and a `Require` line whose trailing comment runs over several
+> lines does not end where the sentence does — so it ate the NEXT import in
+> 14 of the 20 files (`KernelRvcDecode` in `WpMemsetArray`, `SieCapCtx` in
+> `ProofAcquire`/`ProofRelease`, and eleven `Local Open Scope Z_scope.` /
+> `Import Defs.`).  The symptom is `The variable frame_cancel_16 was not
+> found`, which looks like a tier problem and is a text-editing one.  It was
+> found and repaired by diffing the import STEMS (text before `(*`) against
+> the main tree's copies — *for a mechanical edit over 20 files, the audit
+> is a diff against a sibling tree, not a re-read of the script.*
+
+#### (6) THE NUMBERS
+
+**Round 9 (incremental, on the flipped tree): 1098 of 1296, RED 11 — the
+BASELINE SET EXACTLY** (`ProofForkret`, `ProofForkretPark`, `ProofKernelvec`,
+`ProofMain`, `ProofSwtch`, `ProofUserretClosed`, `ProofVirtioDiskIntr`,
+`ProofVirtioDiskRwD`, `UptWalkPt`, `UserMemPt`, `WpSconfLock`).  **No green
+file went red** — the discipline A6.84 reverted for is met, and the reason it
+is met is A6.85.
+
+**`WpSconfLock` STAYS RED, DELIBERATELY, and that is the frontier.**  Its
+`lock_claims` is fixed and the shim reference is gone, but its LEAVES still
+open `lock_inv` as a bare existential (`WpSconfLock:211` and its siblings);
+the invariant now carries two more conjuncts, so each leaf owes an
+`iDestruct` shape change.  That is A6.84 §(5) item 3, it is mechanical, and
+it is the single thing between here and the 160-file cone (148 `Link*` rows,
+`ProofAcquire` / `ProofRelease` / `ProofHolding`, `SystemAdequacy`).
+**THE CONE DID NOT OPEN THIS PASS.**
+
+#### (7) THE CLOSING NUMBER, AND IT IS A CLEAN ONE
+
+**1098 of 1296, RED 11 — from a MODEL-AWARE CLEAN ROUND** (`rm -f iris/*.vo
+iris/*.vok iris/*.vos iris/*.glob`, one full `-j 36 -k` build, `MAKEEXIT=2`
+as `-k` gives with reds).  A6.38's rule is satisfied: this is not an
+incremental number.  **The red set is the baseline's eleven, file for
+file.**  `Abort` 0, `Admitted` 0, `Axiom` 0.  `Require TsoCtxShim` 0.
+
+So the session's two tranches — §0.26′'s restatement and M4's contract flip —
+**both land on the SAME boundary the session opened on**, which is the whole
+point of a green-boundary discipline: the tree is the same size and it is
+carrying two contracts it could not carry this morning.
+
+> **AND ONE PROCESS SCAR THAT COST NOTHING BUT WOULD HAVE.**  Six `make -k`
+> rounds were live in the same remote tree at once, because each new round
+> was launched while the previous one was still finishing (`make -k` keeps
+> going long after its last useful compile).  `remote-build-gcp.md` warns
+> that two makes in ONE tree race; six is the same trap at scale, and the
+> tell is the `/proc/*/cwd` loop, not the log.  *Before launching a round,
+> kill your own previous one by PID* -- the log's `MAKEEXIT` is the only
+> honest "finished", and polling `.vo` counts while another of your own
+> rounds is writing them is how a number stops meaning anything.
+
+#### (8) THE FRONTIER, IN THE ORDER THE OWNER'S RULINGS SEQUENCE IT
+
+1. **`WpSconfLock`'s leaves** (A6.84 §(5) item 3).  Mechanical: `lock_inv`
+   grew two conjuncts, so each leaf's `iDestruct`/`iExists` shape moves.
+   `lock_claims` is done and is the worked example.  **This is the only
+   thing between here and the 160-file cone** (148 `Link*`, `ProofAcquire` /
+   `ProofRelease` / `ProofHolding`, `SystemAdequacy`).
+2. **§0.27′ — the resume-freshness design** (committed `22e669d3`).  It
+   SUPERSEDES A6.90's "publish the stamp + thread the receipt as separate
+   travelers"; do not implement that older shape.  It rides on the M4 flip
+   (the tie `⌜T ≤ t_rel⌝` is at the lock word's own ledger element
+   timestamp, which exists only now), so it comes after item 1.  Expected to
+   green `ProofSwtch` and unblock the scheduler chain.
+3. **§0.28′ + §0.29′ — the trap-handler capability problem DISSOLVES**
+   (`acf8d0f4`, `ff8082dc`, `2109f288`).  No transport is to be built.  The
+   pass is: finish the M3 λ-conversion on the straggler payloads
+   (`cons_res` is the real one), re-home the naked discarded cell families
+   (virtio ring pointers INTO `vdisk_lock`'s payload; `devsw` as ROWS OF THE
+   STARTED DEPOSIT at `main_deposit`'s named context `ξd`, NOT behind
+   `fs_ready`), retire `caps_morph`, and check that `ProofKernelvec`'s
+   remaining error dies with no new machinery.  Sweep for the whole class
+   while there — every boot-published read-only fact (everything hart 0
+   writes before the started flag) distributes through the started deposit —
+   and record the per-fact channel assignments, because *every persistent
+   fact names the barrier that distributes it*.  The virtio pair likely
+   follows from the same re-homing.
+4. `ProofForkret`'s mechanical threading of `SpecForkret`'s new premises
+   (A6.90's note), and the two U-mode files (`UserMemPt`, `UptWalkPt`) under
+   §0.24′'s generic/binary split.
