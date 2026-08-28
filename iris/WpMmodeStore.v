@@ -516,7 +516,9 @@ Section WpStoreGpr.
         iApply bi.later_intro. iMod "Hmask" as "_".
         iMod (upd_window_8 sg.(mem) ea (m !!! Regidx rs2) vold
                 with "Hmem Hbytes") as "[Hmem Hbytes]".
-        iModIntro. rewrite st_write_value. by iFrame. }
+        (* [HartMStore.wobl_ram] is the obligation's NAMED form; open it to
+           reach the write. *)
+        iModIntro. rewrite /wobl_ram. rewrite st_write_value. by iFrame. }
     iIntros (v0) "(-> & Hf & Hrw & Hro & Hbytes & Hfrag)". w_glue.
     iApply swp_ret.
     iDestruct (st_frames_out (DfracOwn (q/2)) ms0 mseccfg0 pmpcfg0 st_paddr0
@@ -664,7 +666,9 @@ Section MmodeStoreTor.
         iApply bi.later_intro. iMod "Hmask" as "_".
         iMod (upd_window_8 sg.(mem) ea (m !!! Regidx rs2) vold
                 with "Hmem Hbytes") as "[Hmem Hbytes]".
-        iModIntro. rewrite st_write_value. by iFrame. }
+        (* [HartMStore.wobl_ram] is the obligation's NAMED form; open it to
+           reach the write. *)
+        iModIntro. rewrite /wobl_ram. rewrite st_write_value. by iFrame. }
     iIntros (v0) "(-> & Hf & Hrw & Hro & Hbytes & Hfrag)". w_glue.
     iApply swp_ret.
     iDestruct (st_frames_tor_out (DfracOwn (q/2)) ms0 mseccfg0 pmpcfg0 pmpaddrs

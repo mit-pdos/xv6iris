@@ -465,6 +465,38 @@ Section store.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  (* ------------------------------------------------------------------ *)
+  (* THE STORE OBLIGATION, SPELLED ONCE.                                  *)
+  (*                                                                      *)
+  (* A store IS the flat memory update, so what the caller owes back is    *)
+  (* exactly the machine interpretation at the written state --            *)
+  (* [wobl_ram] below.  Under a weak-memory semantics the same name would  *)
+  (* denote the interp bundle at the appended write log and the moved      *)
+  (* view; the caller would pay it with its own points-to window.  Naming  *)
+  (* it is what keeps that a change to ONE definition body.                *)
+  (*                                                                      *)
+  (* THE WHOLE CHAIN BELOW IS A PASS-THROUGH for it: nothing in this file  *)
+  (* owns a points-to, so no lemma here DISCHARGES the obligation; each    *)
+  (* one takes it as [wobl_prem] and hands it down UNOPENED.  That is why  *)
+  (* the premise is a NAMED abbreviation and not inlined eight times.      *)
+  (* ------------------------------------------------------------------ *)
+  Definition wobl_ram (σ : mstate) (n : N)
+      (req : Interface.WriteReq.t n) : iProp Σ :=
+    mstate_interp
+      (MState σ.(sregs)
+         (write_bytes σ.(mem) (Interface.WriteReq.pa req) n
+            (Interface.WriteReq.value req))
+         σ.(mdev)).
+
+  (* the callback that owes it: the caller opens its own atomic update
+     against the machine state and returns the obligation.  [σ] is
+     universally quantified because the leaf does not know the state until
+     the event fires. *)
+  Definition wobl_prem (n : N) (req : Interface.WriteReq.t n)
+      (R : iProp Σ) : iProp Σ :=
+    (∀ σ : mstate, mstate_interp σ ={⊤,∅}=∗
+       ▷ (|={∅,⊤}=> wobl_ram σ n req ∗ R))%I.
+
   Lemma swp_mem_write_ea (Drw Dro : gset register) (Df : register -> dfrac)
       (rs : regstate) (pa : SailStdpp.Values.mword 64)
       (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n) :
@@ -640,12 +672,7 @@ Section store.
     resv_frag cpu_id rr -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ▷ (|={∅,⊤}=> mstate_interp
-             (MState σ.(sregs)
-                (write_bytes σ.(mem) pa 4
-                   (Interface.WriteReq.value (mwrite_req pa v)))
-                σ.(mdev)) ∗ R)) -∗
+    wobl_prem 4 (mwrite_req pa v) R -∗
     swp (checked_mem_write (Physaddr pa) 4 v (Store Data) PBMT_PMA Machine
            tt false false false)
       (fun r => ⌜r = Values.Ok true⌝ ∗
@@ -690,6 +717,10 @@ Section store.
     iIntros (v0) "(-> & Hrw & Hro)". s_glue.
     change (8 * (0 + 1) * 4 - 1) with 31. change (8 * 0 * 4) with 0.
     rewrite subrange_full_32 autocast_id.
+    (* the obligation is CONSUMED here (this is the innermost lemma of the
+       eight), so the abbreviation is opened; every lemma above just
+       forwards [Hmem] unopened. *)
+    rewrite /wobl_prem /wobl_ram.
     iApply (swp_use_cer4 (write_ram Write_plain (Physaddr pa) 4 v tt)
               _ _ _ _ _ C HC with "[Hrw Hro Hmem Hfrag] [-]").
     { iApply (swp_hart_ram_write 4 (mwrite_req pa v) _
@@ -728,12 +759,7 @@ Section store.
     resv_frag cpu_id rr -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ▷ (|={∅,⊤}=> mstate_interp
-             (MState σ.(sregs)
-                (write_bytes σ.(mem) pa 8
-                   (Interface.WriteReq.value (mwrite_req8 pa v)))
-                σ.(mdev)) ∗ R)) -∗
+    wobl_prem 8 (mwrite_req8 pa v) R -∗
     swp (checked_mem_write (Physaddr pa) 8 v (Store Data) PBMT_PMA Machine
            tt false false false)
       (fun r => ⌜r = Values.Ok true⌝ ∗
@@ -778,6 +804,10 @@ Section store.
     iIntros (v0) "(-> & Hrw & Hro)". s_glue.
     change (8 * (0 + 1) * 8 - 1) with 63. change (8 * 0 * 8) with 0.
     rewrite RiscvExtras.subrange_full_64 autocast_id.
+    (* the obligation is CONSUMED here (this is the innermost lemma of the
+       eight), so the abbreviation is opened; every lemma above just
+       forwards [Hmem] unopened. *)
+    rewrite /wobl_prem /wobl_ram.
     iApply (swp_use_cer4 (write_ram Write_plain (Physaddr pa) 8 v tt)
               _ _ _ _ _ C HC with "[Hrw Hro Hmem Hfrag] [-]").
     { iApply (swp_hart_ram_write 8 (mwrite_req8 pa v) _
@@ -825,12 +855,7 @@ Section store.
     resv_frag cpu_id rr -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ▷ (|={∅,⊤}=> mstate_interp
-             (MState σ.(sregs)
-                (write_bytes σ.(mem) pa 4
-                   (Interface.WriteReq.value (mwrite_req pa v)))
-                σ.(mdev)) ∗ R)) -∗
+    wobl_prem 4 (mwrite_req pa v) R -∗
     swp (mem_write_value (Physaddr pa) 4 v (Store Data) PBMT_PMA
            false false false)
       (fun r => ⌜r = Values.Ok true⌝ ∗
@@ -893,12 +918,7 @@ Section store.
     resv_frag cpu_id rr -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ▷ (|={∅,⊤}=> mstate_interp
-             (MState σ.(sregs)
-                (write_bytes σ.(mem) pa 8
-                   (Interface.WriteReq.value (mwrite_req8 pa v)))
-                σ.(mdev)) ∗ R)) -∗
+    wobl_prem 8 (mwrite_req8 pa v) R -∗
     swp (mem_write_value (Physaddr pa) 8 v (Store Data) PBMT_PMA
            false false false)
       (fun r => ⌜r = Values.Ok true⌝ ∗
@@ -968,12 +988,7 @@ Section store.
     resv_frag cpu_id rr -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ▷ (|={∅,⊤}=> mstate_interp
-             (MState σ.(sregs)
-                (write_bytes σ.(mem) pa 4
-                   (Interface.WriteReq.value (mwrite_req pa v)))
-                σ.(mdev)) ∗ R)) -∗
+    wobl_prem 4 (mwrite_req pa v) R -∗
     swp (vmem_write_addr (Virtaddr pa) 4 v (Store Data) false false false)
       (fun r => ⌜r = Values.Ok true⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R ∗
@@ -1067,12 +1082,7 @@ Section store.
     resv_frag cpu_id rr -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ▷ (|={∅,⊤}=> mstate_interp
-             (MState σ.(sregs)
-                (write_bytes σ.(mem) pa 8
-                   (Interface.WriteReq.value (mwrite_req8 pa v)))
-                σ.(mdev)) ∗ R)) -∗
+    wobl_prem 8 (mwrite_req8 pa v) R -∗
     swp (vmem_write_addr (Virtaddr pa) 8 v (Store Data) false false false)
       (fun r => ⌜r = Values.Ok true⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R ∗
@@ -1193,12 +1203,7 @@ Section store.
        swp (get_transformed_data_addr base offset (Store Data) 4)
          (fun r => ⌜r = Ext_DataAddr_OK (Virtaddr pa)⌝ ∗ Q ∗
                    hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ▷ (|={∅,⊤}=> mstate_interp
-             (MState σ.(sregs)
-                (write_bytes σ.(mem) pa 4
-                   (Interface.WriteReq.value (mwrite_req pa v)))
-                σ.(mdev)) ∗ R)) -∗
+    wobl_prem 4 (mwrite_req pa v) R -∗
     swp (vmem_write base offset 4 v (Store Data) false false false)
       (fun r => ⌜r = Values.Ok true⌝ ∗ Q ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R ∗
@@ -1262,12 +1267,7 @@ Section store.
        swp (get_transformed_data_addr base offset (Store Data) 8)
          (fun r => ⌜r = Ext_DataAddr_OK (Virtaddr pa)⌝ ∗ Q ∗
                    hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ▷ (|={∅,⊤}=> mstate_interp
-             (MState σ.(sregs)
-                (write_bytes σ.(mem) pa 8
-                   (Interface.WriteReq.value (mwrite_req8 pa v)))
-                σ.(mdev)) ∗ R)) -∗
+    wobl_prem 8 (mwrite_req8 pa v) R -∗
     swp (vmem_write base offset 8 v (Store Data) false false false)
       (fun r => ⌜r = Values.Ok true⌝ ∗ Q ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R ∗
