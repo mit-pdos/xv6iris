@@ -1631,32 +1631,6 @@ Section HartActiveRVC.
   Hypothesis Hexec : exec (execute instr) s_pc = Some (ExecuteAs other, s_pc).
   Hypothesis Hexec2 : exec (execute other) s_pc = Some (resf, s_x).
 
-  Lemma exec_hart_active_progress_RVC :
-    exec (run_hart_active 0) s
-    = Some (Step_Execute (resf, zero_extend' 32 h), s_x).
-  Proof using All.
-    unfold run_hart_active.
-    rewrite exec_catch_early_return.
-    rewrite execR_bind execR_liftR exec_read_reg Hpriv. cbn match.
-    rewrite execR_bind execR_liftR Hdisp. cbn match.
-    rewrite execR_bind. rewrite execR_bind0 execR_returnR. cbn match.
-    rewrite execR_liftR Hfetch. cbn match. cbn match.
-    unfold ext_fetch_hook. cbn match. cbn beta iota.
-    rewrite execR_bind execR_liftR Hdec. cbn match.
-    unfold get_config_print_instr. cbn match.
-    rewrite execR_bind. rewrite execR_bind0 execR_returnR. cbn match.
-    (* is_landing_pad_expected -> false (plain, no and_boolM in the RVC branch) *)
-    rewrite execR_liftR exec_is_landing_pad Hlpad. cbn match.
-    (* currentlyEnabled Ext_Zca -> true *)
-    rewrite execR_bind execR_liftR Hzca. cbn match.
-    (* read PC -> pc ; write nextPC (pc+2) ; execute instr -> ExecuteAs other *)
-    rewrite execR_bind execR_liftR (exec_read_reg PC) HpcF. cbn match.
-    rewrite execR_bind. rewrite execR_bind0 execR_liftR (exec_write_reg nextPC). cbn match.
-    fold s_pc. rewrite execR_liftR Hexec. cbn match. cbn match.
-    (* w11 = ExecuteAs other -> liftR (execute other) -> resf, fed to Step_Execute *)
-    rewrite execR_bind execR_liftR Hexec2. cbn match.
-    rewrite execR_returnR. cbn match. reflexivity.
-  Qed.
 
 End HartActiveRVC.
 

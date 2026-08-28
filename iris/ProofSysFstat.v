@@ -160,14 +160,17 @@ Section ProofSysFstat.
      decides whether it is consumed, and either way [filestat_fs_out] comes
      back -- on the [emp] branch out of the bundle the syscall still holds
      ([filestat_fs_env_out]), on the other out of filestat's own post. *)
-  Local Lemma sfs_env_frame (fn : fstat_names) (Cf : fcontent) :
+  Local Lemma sfs_env_frame (fn : fstat_names) (st : fdstate) :
     filestat_fs_env fn -∗
-    filestat_env fn Cf ∗ (filestat_env_out fn Cf -∗ filestat_fs_out fn).
+    filestat_env fn st ∗ (filestat_env_out fn st -∗ filestat_fs_out fn).
   Proof.
-    rewrite /filestat_env /filestat_env_out. case_decide.
+    rewrite /filestat_env /filestat_env_out. destruct st as [|[?|?|?]].
+    - iIntros "H". iSplitR; [done|]. iIntros "_".
+      iApply (filestat_fs_env_out with "H").
     - iIntros "H". iSplitL "H"; [iExact "H"|]. iIntros "$".
     - iIntros "H". iSplitR; [done|]. iIntros "_".
       iApply (filestat_fs_env_out with "H").
+    - iIntros "H". iSplitL "H"; [iExact "H"|]. iIntros "$".
   Qed.
 
   (* =================================================================== *)
@@ -795,12 +798,12 @@ Section ProofSysFstat.
       (* ---- THE B1 SEAM.  Lend the descriptor's reference out of the block,
          keep the core for filestat, and settle the loan when it returns. ---- *)
       iDestruct (proc_priv_lend γf pj pidv V fd fv Hlk Hfvnz with "Hpriv")
-        as (kk qq Cf stf) "((%Hfvk & %Hkk & %Hty) & Href & Hauth & Hcore & Howe)".
+        as (kk qq stf) "((%Hfvk & %Hkk & %Hty) & Href & Hauth & Hcore & Howe)".
       assert (HS3a0' : S3 !!! Regidx Ra0 = fnode kk) by (rewrite HS3a0; exact Hfvk).
-      iDestruct (sfs_env_frame fn Cf with "Henv") as "[Hfenv Hfback]".
+      iDestruct (sfs_env_frame fn stf with "Henv") as "[Hfenv Hfback]".
       iDestruct (cpu_own_transport CID13 CID19 0%nat eb pj b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
-      iApply (Filestat.wp_filestat_sconf γa γf γs j γlp kk qq Cf stf fn pidv V
+      iApply (Filestat.wp_filestat_sconf γa γf γs j γlp kk qq stf fn pidv V
                 S3 (av - 4)%nat eb b lks
                 ltac:(lia) Hkk Hj Hgs Hlens HS3a0' Heb
                 with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv").
@@ -814,7 +817,7 @@ Section ProofSysFstat.
         by (rewrite Hlk Hfvk; reflexivity).
       (* the SAME file goes back, so the SAME authority does: this arm moves
          no descriptor's state and needs no fd-state fragment. *)
-      iDestruct (proc_ofiles_repay γf (pv_fdg V) pj (pv_ofile V) ∅ fd kk qq Cf stf
+      iDestruct (proc_ofiles_repay γf (pv_fdg V) pj (pv_ofile V) ∅ fd kk qq stf
                    ltac:(apply not_elem_of_empty) Hlkk Hkk Hty
                    with "[Howe] Href Hauth") as "Howe".
       { rewrite (union_empty_r_L {[fd]}). iExact "Howe". }

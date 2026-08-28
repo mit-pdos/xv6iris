@@ -22,6 +22,7 @@ stays TRANSPARENT and the `iApply ("H" $! …)` sites unify through it.
 | `ProofKforkB6`: three `kfk_pro_exit*` (8.5 kB of a 12.6 kB statement) | 17.6 → 13.6 s (**−23.0 %**), `.vo` −35.1 % |
 | `ProofKexecA`: `kxc_a2_exit1` (3.0 kB into a 23.5 s lemma) | 28.7 → 26.7 s (**−7.0 %**), `.vo` −12.4 % |
 | `ProofIput`: `ip_entry_exit1/2` (1.7 + 7.6 kB into a 15.6 s lemma) | 68.0 → 63.6 s (**−6.5 %**), `.vo` −5.4 % |
+| `ProofIput`: `ip_locked_exit1` (3.9 kB into a 23.7 s lemma) — the one the old note says regressed +13 s | 63.9 → 61.1 s (**−4.4 %**), `.vo` −4.5 % |
 | `ProofSysUnlink`: `sys_unlink_closer` + `su_w1/w2/w3_seam` | 153.7 s → 133.1 s (−13.4 %), `.vo` −14.8 % |
 | kexec: `KexecOkQ.kexec_closer`, 36 inline copies across 12 files | B3/C/A 166.6 s → 153.6 s (−7.8 %), `.vo` −7 to −10 % |
 
@@ -54,20 +55,36 @@ those is inside the noise of a 48 s file. Compare `ProofSysUnlink.su_w3`:
 **one** lemma, 26.5 s, with a 48 % item in its Δ — that is the regime where
 the fold pays.
 
-**THE PREDICTOR IS ABSOLUTE BYTES REMOVED FROM Δ, NOT SHARE**, times how long
-they sit there. Every result so far fits it and nothing else does:
+**THE PREDICTOR IS THE SIZE OF THE SEPARATION-LOGIC TREE THE CONTINUATION
+ADDS TO Δ** — its `-∗`/`∗` count — times how long Δ carries it. Printed bytes
+is a proxy for that and, in this tree, a tight one: bytes per `-∗` runs 45–155
+across every case measured, so the two rankings barely differ. Nine A/Bs:
 
-| | removed from Δ | result |
-|---|---|---|
-| ProofSysUnlink | ~6.5 kB, whole walk | **−13.4 %** |
-| kexec (B3/C/A) | ~0.8 kB, 67 s walk | **−7.8 %** |
-| ProofNamex/Tr | ~1 kB, part of the walk | −1.2 / −1.6 % |
-| ProofCopyout `co_loop` | 0.46 kB | nil (+0.5 %, `.vo` −4.0 %) |
-| ProofPrintk ×11 | 0.35 kB, 0.3–2.7 s lemmas | nil |
+| case | `-∗` | bytes | result |
+|---|---|---|---|
+| `SysUnlink su_w3` | 88 | 7.0 kB | −13.4 % |
+| `Iput ip_free_entry` | 82 | 9.8 kB | −6.5 % |
+| `Dirlink dl_scan` | 61 | 5.4 kB | −7.7 % |
+| `KforkB6 kfk_prologue` | 33 | 4.8 kB | **−23.0 %** |
+| `KexecA kxc_a2` | 32 | 3.0 kB | −7.0 % |
+| `Iput ip_free_locked` | 25 | 3.9 kB | −4.4 % |
+| kexec closer (×36 sites) | 19 | 2.8 kB | −7.8 % |
+| `Namex nx_skip` | 19 | 1.2 kB | −1.4 % |
+| `Iupdate iu_main_gen` | 16 | 0.7 kB | **nil** |
+| `Printk arm tail` | 8 | 0.4 kB | **nil** |
+| `Copyout co_exit` | 6 | 0.6 kB | **nil** |
 
-**Below ~1 kB removed, do not bother** — share can read 30–50 % and still be
-worth nothing, because per-step cost is `|Δ|` ABSOLUTE. Attribute cost with
-`coqc -time` per enclosing `Lemma` (the `Chars` offsets are BYTES).
+**The bar: ≥ ~19 `-∗`, in a carrier lemma that costs ≥15 s.** Every null is
+below it, every win above. The two metrics are COLLINEAR here so this data
+cannot say which is the real cause; if anything the ratio cuts weakly against
+connectives (the most `-∗`-dense case, `iu_main_gen` at 45 B per wand, is a
+null, while the sparsest, the kexec closer at 148, wins) — but both of those
+are confounded. Prefer the connective count when they disagree: it is the
+quantity the proofmode actually walks, and bytes inflates with long
+identifiers and big literal arguments that cost nothing structurally.
+
+Attribute carrier cost with `coqc -time` per enclosing `Lemma` (the
+`Chars` offsets are BYTES).
 
 ## Remaining, ranked — bytes removable × the cost of the lemma that CARRIES them
 
@@ -78,7 +95,6 @@ anything:
 
 | candidate | bytes × lemma | note |
 |---|---|---|
-| `ProofIput.ip_free_locked` | 3.9 kB × 23.7 s | the ONLY one left, and it is the continuation that regressed +13 s once. `ip_free_entry`, in the same file, paid −6.5 %, so it is worth an A/B — but on its own. |
 
 Everything else on the ≥1 kB list fails on the carrying lemma being cheap, and
 `WpSconfCsr.wp_csrr_sstatus_s_sconf` is the cautionary one: **89.5 % share, the
@@ -110,6 +126,19 @@ Namex. That is source duplication, not Δ: both files already pay the folded
 cost, so hoisting them into a shared file is a tidiness change with no
 measurable win. Do not read a cross-file span match as a fold opportunity
 without checking whether both sides are already named.
+
+## A CONTRACT's continuation is NOT worth folding (measured)
+
+Naming the 4.1 kB exit continuation in `SpecIlock`'s two contract bodies —
+999 s of consumer build across fifteen files that apply them — moved the
+consumers' `.vo` by **−0.06 % and −0.10 %** and their wall not at all
+(`ProofIlock` −0.8 %, `ProofSysLink` +2.2 %, both noise). Reverted.
+
+The reason generalises to every `Spec*.v` on the candidate list: a contract's
+continuation is INTRO'D AT THE CALL and consumed, not carried across the
+caller's walk, so it never sits in Δ for the many steps that make the fold pay.
+Fold continuations that a proof CARRIES (block seams, exits handed between
+blocks), not ones it immediately takes apart.
 
 ## Not instances — do not go looking here
 

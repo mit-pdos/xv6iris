@@ -211,20 +211,7 @@ End SPtFetch.
 (* regime's two remaining obligations come from the fold's producer fields  *)
 (* ([sr_adm_of_pin], [sr_swp_side_ok]).  Nothing here names a regime.       *)
 (* ===================================================================== *)
-Lemma spf_Db_in_sda (r : register) : spf_Db r = true -> r ∈ sda_Drw ∪ sda_Dro.
-Proof.
-  unfold spf_Db. intros Hr.
-  apply orb_true_elim in Hr as [Hr|Hr]; apply register_beq_eq in Hr; subst r;
-    [exact sda_in_mst | exact sda_in_satp].
-Qed.
 
-Lemma spf_leafchk_in_sda (r : register) :
-  D_leafchk r = true -> r ∈ sda_Drw ∪ sda_Dro.
-Proof.
-  unfold D_leafchk. intros Hr.
-  apply orb_true_elim in Hr as [Hr|Hr]; apply register_beq_eq in Hr; subst r;
-    [exact sda_in_misa | exact sda_in_menv].
-Qed.
 
 (* both at an ARBITRARY data write set: every register either set mentions
    lives in [sda_Dro], so the generalization is free. *)
@@ -362,55 +349,6 @@ Section SPtData.
   (* THE KPT PINNING, and the only place [sr_swp_side_ok]'s [tlb ∈ Drw]
      premise is paid on the data side: at [sda_Drw] the cell IS the write set.
      Every existing caller means this one. *)
-  Lemma sda_translate (R : s_regime) (kt kt' : ktier) `{Hle : !KtierLe kt' kt}
-      (dq : dfrac) (acc : MemoryAccessType mem_payload) (kp : kperm)
-      (mst0 menv0 satp0 : SailStdpp.Values.mword 64)
-      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
-      (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb)
-      (va : SailStdpp.Values.mword 64) (ppn : SailStdpp.Values.mword 44)
-      (rr : option resv) :
-    s_acc_ok acc ->
-    kperm_allows kp acc ->
-    menv0 = MENVCFG_S ->
-    _get_Mstatus_SXL mst0 = 'b"10" ->
-    eq_vec (_get_Mstatus_MPRV mst0) ('b"1") = false ->
-    sr_swp_satp_ok R satp0 ->
-    pmp_ent0_ok pcfg paddr ->
-    pma_allows_ram pmar0 ->
-    (uint va < 274877906944)%Z ->
-    ktier_pin kt' ppn va ->
-    sr_ktier_wit R kt -∗
-    kmap_at (svpn_of va) ppn kp -∗ gen_cert -∗ resv_frag cpu_id rr -∗
-    sr_swp_res R (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) -∗
-    hreg_frame (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) sda_Drw -∗
-    hreg_frame_ro (sda_Df dq)
-      (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) sda_Dro -∗
-    swp (translateAddr (Virtaddr va) acc)
-      (fun r => ⌜r = Values.Ok (Physaddr (pa_of ppn va), PBMT_PMA,
-                                init_ext_ptw)⌝ ∗
-                ∃ rsf : regstate,
-                  ⌜ rsf = sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv \/
-                    exists tv, rsf = register_set tlb tv
-                                 (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr
-                                    tlbv) ⌝ ∗
-                  hreg_frame rsf sda_Drw ∗
-                  hreg_frame_ro (sda_Df dq) rsf sda_Dro ∗
-                  sr_swp_res R rsf ∗ resv_any cpu_id).
-  Proof.
-    intros Hacc Hallow Hmenv HSXL HMPRV Hsok Hpmp Hpma Hlt Hpin.
-    iApply (sda_translate_D R sda_Drw kt kt' dq acc kp mst0 menv0 satp0 pmar0
-              pcfg paddr tlbv va ppn rr Hacc Hallow Hmenv HSXL HMPRV Hsok
-              Hpmp Hpma Hlt Hpin sda_disj).
-    apply (sr_swp_side_ok R acc va ppn kp spf_Db sda_Drw sda_Dro _ _ Hacc);
-      [ rewrite sda_rs_satp; exact Hsok
-      | rewrite sda_rs_pcfg sda_rs_paddr; exact Hpmp
-      | rewrite sda_rs_pma; exact Hpma
-      | rewrite sda_rs_mst; exact HMPRV
-      | exact spf_Db_mst | exact spf_Db_satp
-      | cbn [sregs]; rewrite sda_rs_mst; exact HSXL
-      | cbn [sregs]; reflexivity
-      | rewrite /sda_Drw; set_solver ].
-  Qed.
 
 
   (* ==================================================================== *)

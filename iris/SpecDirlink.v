@@ -443,15 +443,12 @@ Definition ireg_blocks_ok (inodestart : Z) (nib : nat)
 Definition wp_dirlink_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names)
     (γa : gname) (γf : gname) (γpr : gname)
-    (inodestart : Z) (nib : nat)
-    (bmapstart : Z) (size : Z) (dev : mword 32)
+    (bmapstart : Z) (size : Z)
     (ip : mword 64) (dinum : mword 32)                (* the DIRECTORY       *)
     (bm : blkmap) (data : nat -> list (bv 8))
     (dn dn0 : dinode)
@@ -473,7 +470,7 @@ Definition wp_dirlink_sconf_body
   di_type dn = T_DIR ->
   bm_covers bm (bv_unsigned (di_size dn)) ->
   bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
-  dir_inums_ok data nrec nib ->
+  dir_inums_ok data nrec icfg_nib ->
   (* ---- THE BORROWED LICENCE, RELAYED TO THE INNER dirlookup (R13(ii),
      fs-fragments.md §7.1/§7.5.6).  dirlink's own lookup is where the name
      it is about to link is checked for, and that lookup's [iget] on the
@@ -511,15 +508,15 @@ Definition wp_dirlink_sconf_body
   blk_holes_zero bm data ->
   di_addrs dn = bm_cells bm ->
   bv_unsigned (di_size dn) < 2 ^ 31 ->
-  0 <= inodestart ->
-  IBLOCK dinum inodestart ∈ fsc_cov ->
-  ~ (IBLOCK dinum inodestart ∈ log_region_set fsc_logst) ->
-  bv_unsigned dinum < 16 * Z.of_nat nib ->
+  0 <= icfg_ist ->
+  IBLOCK dinum icfg_ist ∈ fsc_cov ->
+  ~ (IBLOCK dinum icfg_ist ∈ log_region_set fsc_logst) ->
+  bv_unsigned dinum < 16 * Z.of_nat icfg_nib ->
   (* ---- THE LINKED CHILD'S OWN RANGE (unused here, owed to the writer) ----
      the premise above is the DIRECTORY's inum; this one is the inum being
      linked, and it is what lets a caller re-park [DirView.dir_ok] over the
      record dirlink stores.  See the header. *)
-  bv_unsigned inum < 16 * Z.of_nat nib ->
+  bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
   bitmap_geom_ok fsc_cov fsc_logst bmapstart size ->
   printk_gen_contract (kt := KT1) γpr γu γd ->
   (* ---- iput's premises (itrunc's geometry) ---- *)
@@ -528,7 +525,7 @@ Definition wp_dirlink_sconf_body
   bmapstart ∈ fsc_cov ->
   ~ (bmapstart ∈ log_region_set fsc_logst) ->
   cov_below fsc_cov size ->
-  ireg_blocks_ok inodestart nib fsc_cov fsc_logst ->
+  ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
   (* ENOUGH BUDGET for either arm -- see the header *)
   (dirlink_units <= ncount)%nat ->
   (j < NPROC)%nat ->
@@ -545,21 +542,16 @@ Definition wp_dirlink_sconf_body
   (* the order premise, at the LOWEST rank this cone touches; every
      higher one follows by [locks_below_mono]. *)
   locks_below lks "log" ->
-  (* THE AMBIENT LOG, named (durable-disk B''-tx5): dirlink's "already
-     exists" arm iputs the inode dirlookup found, and iput's three windows
-     park a share of [icfg_log]'s element.  LAST, so no landed positional
-     argument list moved. *)
-  γ = icfg_log ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   kernel_data -∗
   printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
-  log_ctx γ bn fsc_fs fsc_cov fsc_logst dev -∗
+  bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
+  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
   kalloc_env γa None -∗
   (* ---- THE LOCKED DIRECTORY ---- *)
-  i_dev ip ↦₄{dqd} dev -∗
+  i_dev ip ↦₄{dqd} icfg_dev -∗
   i_inum ip ↦₄{dqf} dinum -∗
   inode_meta ip dn -∗
   inode_map fsc_fs ip bm -∗
@@ -567,12 +559,12 @@ Definition wp_dirlink_sconf_body
   (* ---- THE CALLER'S 14-BYTE NAME BUFFER (namecmp's f, strncpy's src) ---- *)
   ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
   (* ---- the superblock cells and the bitmap ---- *)
-  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
   (* ---- the inode region and the directory's own (stale) record ---- *)
-  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
      Persistent, borrowed and never spent; it rides the SAME channel
      [ireg_inv] does.  It is here because this contract reaches iput, whose
@@ -592,7 +584,7 @@ Definition wp_dirlink_sconf_body
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   bslots 3 -∗
   (* ---- THE ICACHE ---- *)
-  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
@@ -600,7 +592,7 @@ Definition wp_dirlink_sconf_body
   (* the borrowed ticket list, over the PRE-state *)
   IcacheEscrow.dlinks fsc_fs (bv_unsigned dinum) dn bm data -∗
   (* ---- THIS OPERATION'S RESERVATION ---- *)
-  log_op γ ncount -∗
+  log_op icfg_log ncount -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP,
      and a park moves the hart with interrupts off, so the crossing has
      nothing to do with SIE.  Spelled [b] the two coincide at the only
@@ -617,13 +609,13 @@ Definition wp_dirlink_sconf_body
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       (* ---- everything comes back, at the possibly-updated indices ---- *)
-      i_dev ip ↦₄{dqd} dev -∗
+      i_dev ip ↦₄{dqd} icfg_dev -∗
       i_inum ip ↦₄{dqf} dinum -∗
       inode_meta ip dn' -∗
       inode_map fsc_fs ip bm' -∗
       inode_blocks fsc_fs bm' data' -∗
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
-      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       dinode_at fsc_ireg dinum dn0' -∗
@@ -638,7 +630,7 @@ Definition wp_dirlink_sconf_body
       IcacheEscrow.dlinks fsc_fs (bv_unsigned dinum) dn bm data -∗
       (* at most [dirlink_units] gone, and none gained *)
       ⌜((ncount - dirlink_units)%nat <= n')%nat /\ (n' <= ncount)%nat⌝ -∗
-      log_op γ n' -∗
+      log_op icfg_log n' -∗
       (* ---- THE TWO [inode_ok] CONJUNCTS A RE-PARKER NEEDS, AS
          PRESERVATIONS (fs-sysfile S5a finding 2; the cap, D₀-a repair 3b) --
          [InodeLock.inode_ok] has seven conjuncts and the arms below
@@ -717,15 +709,12 @@ Definition wp_dirlink_sconf_body
 Definition wp_dirlink_gen_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names)
     (γa : gname) (γf : gname) (γpr : gname)
-    (inodestart : Z) (nib : nat)
-    (bmapstart : Z) (size : Z) (dev : mword 32)
+    (bmapstart : Z) (size : Z)
     (ip : mword 64) (dinum : mword 32)                (* the DIRECTORY       *)
     (bm : blkmap) (data : nat -> list (bv 8))
     (dn dn0 : dinode)
@@ -747,7 +736,7 @@ Definition wp_dirlink_gen_body
   di_type dn = T_DIR ->
   bm_covers bm (bv_unsigned (di_size dn)) ->
   bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
-  dir_inums_ok data nrec nib ->
+  dir_inums_ok data nrec icfg_nib ->
   (* ---- THE BORROWED LICENCE, RELAYED TO THE INNER dirlookup (R13(ii),
      fs-fragments.md §7.1/§7.5.6).  dirlink's own lookup is where the name
      it is about to link is checked for, and that lookup's [iget] on the
@@ -785,15 +774,15 @@ Definition wp_dirlink_gen_body
   blk_holes_zero bm data ->
   di_addrs dn = bm_cells bm ->
   bv_unsigned (di_size dn) < 2 ^ 31 ->
-  0 <= inodestart ->
-  IBLOCK dinum inodestart ∈ fsc_cov ->
-  ~ (IBLOCK dinum inodestart ∈ log_region_set fsc_logst) ->
-  bv_unsigned dinum < 16 * Z.of_nat nib ->
+  0 <= icfg_ist ->
+  IBLOCK dinum icfg_ist ∈ fsc_cov ->
+  ~ (IBLOCK dinum icfg_ist ∈ log_region_set fsc_logst) ->
+  bv_unsigned dinum < 16 * Z.of_nat icfg_nib ->
   (* ---- THE LINKED CHILD'S OWN RANGE (unused here, owed to the writer) ----
      the premise above is the DIRECTORY's inum; this one is the inum being
      linked, and it is what lets a caller re-park [DirView.dir_ok] over the
      record dirlink stores.  See the header. *)
-  bv_unsigned inum < 16 * Z.of_nat nib ->
+  bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
   bitmap_geom_ok fsc_cov fsc_logst bmapstart size ->
   printk_gen_contract (kt := KT1) γpr γu γd ->
   (* ---- iput's premises (itrunc's geometry) ---- *)
@@ -802,7 +791,7 @@ Definition wp_dirlink_gen_body
   bmapstart ∈ fsc_cov ->
   ~ (bmapstart ∈ log_region_set fsc_logst) ->
   cov_below fsc_cov size ->
-  ireg_blocks_ok inodestart nib fsc_cov fsc_logst ->
+  ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
   (* ENOUGH BUDGET for either arm, AT THE HONEST FIGURE (see the header).
      [crb] and [ind] are [dl16_post]'s own two booleans, read off the entry
      set and the append slot -- so this premise is not a new interface, it
@@ -826,21 +815,16 @@ Definition wp_dirlink_gen_body
   (* the order premise, at the LOWEST rank this cone touches; every
      higher one follows by [locks_below_mono]. *)
   locks_below lks "log" ->
-  (* THE AMBIENT LOG, named (durable-disk B''-tx5): dirlink's "already
-     exists" arm iputs the inode dirlookup found, and iput's three windows
-     park a share of [icfg_log]'s element.  LAST, so no landed positional
-     argument list moved. *)
-  γ = icfg_log ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   kernel_data -∗
   printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
-  log_ctx γ bn fsc_fs fsc_cov fsc_logst dev -∗
+  bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
+  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
   kalloc_env γa None -∗
   (* ---- THE LOCKED DIRECTORY ---- *)
-  i_dev ip ↦₄{dqd} dev -∗
+  i_dev ip ↦₄{dqd} icfg_dev -∗
   i_inum ip ↦₄{dqf} dinum -∗
   inode_meta ip dn -∗
   inode_map fsc_fs ip bm -∗
@@ -848,12 +832,12 @@ Definition wp_dirlink_gen_body
   (* ---- THE CALLER'S 14-BYTE NAME BUFFER (namecmp's f, strncpy's src) ---- *)
   ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
   (* ---- the superblock cells and the bitmap ---- *)
-  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
   (* ---- the inode region and the directory's own (stale) record ---- *)
-  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
      Persistent, borrowed and never spent; it rides the SAME channel
      [ireg_inv] does.  It is here because this contract reaches iput, whose
@@ -873,7 +857,7 @@ Definition wp_dirlink_gen_body
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   bslots 3 -∗
   (* ---- THE ICACHE ---- *)
-  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
@@ -881,13 +865,13 @@ Definition wp_dirlink_gen_body
   (* the borrowed ticket list, over the PRE-state *)
   IcacheEscrow.dlinks fsc_fs (bv_unsigned dinum) dn bm data -∗
   (* ---- THIS OPERATION'S RESERVATION ---- *)
-  log_opS γ ncount Sb -∗
+  log_opS icfg_log ncount Sb -∗
   (* ...AND THE SHARE IPUT'S WINDOWS PARK (durable-disk B''-tx5).  dirlink
      holds no token of its own -- a write-locked walk's is part-parked in the
      escrow -- so its caller lends a share out of the residue it kept, and it
      comes back below.  The COUNTED form has the whole element and halves it
      ([wp_dirlink_sconf]), so no landed caller of THAT one moved. *)
-  tid ↪[ln_tx γ]{#qtx} () -∗
+  tid ↪[ln_tx icfg_log]{#qtx} () -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP,
      and a park moves the hart with interrupts off, so the crossing has
      nothing to do with SIE.  Spelled [b] the two coincide at the only
@@ -904,13 +888,13 @@ Definition wp_dirlink_gen_body
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       (* ---- everything comes back, at the possibly-updated indices ---- *)
-      i_dev ip ↦₄{dqd} dev -∗
+      i_dev ip ↦₄{dqd} icfg_dev -∗
       i_inum ip ↦₄{dqf} dinum -∗
       inode_meta ip dn' -∗
       inode_map fsc_fs ip bm' -∗
       inode_blocks fsc_fs bm' data' -∗
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
-      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       dinode_at fsc_ireg dinum dn0' -∗
@@ -931,7 +915,7 @@ Definition wp_dirlink_gen_body
       (* ...and on the success-append arm, the credit-aware spend and the
          membership trio create's next call needs.  ADDITIVE -- the counted
          [dirlink_units] clause above is untouched. *)
-      ⌜dl16_post bmapstart dinum inodestart ncount n' k0 tot found
+      ⌜dl16_post bmapstart dinum icfg_ist ncount n' k0 tot found
                  bm bm' Sb Sb'⌝ -∗
       (* ...and the FOUND arm's OWN spend, which the counted
          [dirlink_units] above does not price finely enough for a caller
@@ -947,9 +931,9 @@ Definition wp_dirlink_gen_body
          LARGEST constant that closes sys_link's arm
          ([sl_found_at_four_busts] refutes four). *)
       ⌜found = true -> ((ncount - iput_units)%nat <= n')%nat⌝ -∗
-      log_opS γ n' Sb' -∗
+      log_opS icfg_log n' Sb' -∗
       (* the share, back at exactly the [(tid, qtx)] that went in *)
-      tid ↪[ln_tx γ]{#qtx} () -∗
+      tid ↪[ln_tx icfg_log]{#qtx} () -∗
       (* ---- THE TWO [inode_ok] CONJUNCTS A RE-PARKER NEEDS, AS
          PRESERVATIONS (fs-sysfile S5a finding 2; the cap, D₀-a repair 3b) --
          [InodeLock.inode_ok] has seven conjuncts and the arms below
@@ -1026,10 +1010,8 @@ Module Type DIRLINK.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names)
       (γa : gname) (γf : gname) (γpr : gname)
-      (inodestart : Z) (nib : nat)
-      (bmapstart : Z) (size : Z) (dev : mword 32)
+      (bmapstart : Z) (size : Z)
       (ip : mword 64) (dinum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn dn0 : dinode)
@@ -1039,9 +1021,9 @@ Module Type DIRLINK.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_dirlink_sconf_body γs j γl γu γd γk pd pav pu bn γ
-                            γa γf γpr inodestart nib bmapstart
-                            size dev ip dinum bm data dn dn0 fn inum
+      wp_dirlink_sconf_body γs j γl γu γd γk pd pav pu bn
+                            γa γf γpr bmapstart
+                            size ip dinum bm data dn dn0 fn inum
                             ncount pidv dq dqd dqn dqs dqb dqbs dqf
                             m K eb b lks Vpr.
 
@@ -1055,10 +1037,8 @@ Module Type DIRLINK.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names)
       (γa : gname) (γf : gname) (γpr : gname)
-      (inodestart : Z) (nib : nat)
-      (bmapstart : Z) (size : Z) (dev : mword 32)
+      (bmapstart : Z) (size : Z)
       (ip : mword 64) (dinum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn dn0 : dinode)
@@ -1068,9 +1048,9 @@ Module Type DIRLINK.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_dirlink_gen_body γs j γl γu γd γk pd pav pu bn γ
-                          γa γf γpr inodestart nib bmapstart
-                          size dev ip dinum bm data dn dn0 fn inum
+      wp_dirlink_gen_body γs j γl γu γd γk pd pav pu bn
+                          γa γf γpr bmapstart
+                          size ip dinum bm data dn dn0 fn inum
                           ncount Sb tid qtx pidv dq dqd dqn dqs dqb dqbs dqf
                           m K eb b lks Vpr.
 End DIRLINK.

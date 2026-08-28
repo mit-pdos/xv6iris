@@ -179,15 +179,13 @@ End SpecSysExec.
 Definition wp_sys_exec_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
     (γf : gname) (γa : gname)                           (* ftable, kalloc      *)
     (gs : list gname) (j : nat) (gl : gname)            (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (g : log_names)
-    (bmapstart inodestart : Z) (nib : nat)
-    (size : Z) (dev : mword 32)
+    (bmapstart : Z)
+    (size : Z)
     (dqb dqs : dfrac)
     (v0 v1 : mword 64)                        (* syscall arguments 0 and 1 *)
     (pid : mword 32) (V : pprivate)
@@ -197,22 +195,17 @@ Definition wp_sys_exec_sconf_body
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_sys_exec <= K)%nat ->
-  (* ---- the icache's ambient ties, threaded verbatim to kexec ---- *)
-  dev = icfg_dev ->
-  nib = icfg_nib ->
-  g = icfg_log ->
-  inodestart = icfg_ist ->
-  dev = ROOTDEV ->
-  (0 < nib)%nat ->
+  icfg_dev = ROOTDEV ->
+  (0 < icfg_nib)%nat ->
   (* ---- the block-layer geometry, threaded verbatim to kexec ---- *)
   log_geom_ok fsc_cov fsc_logst ->
   0 < size <= BPB ->
   0 <= bmapstart ->
   bmapstart ∈ fsc_cov ->
   ~ (bmapstart ∈ log_region_set fsc_logst) ->
-  0 <= inodestart ->
+  0 <= icfg_ist ->
   cov_below fsc_cov size ->
-  ireg_blocks_ok inodestart nib fsc_cov fsc_logst ->
+  ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
   (* kexec's own premise, inherited: the FS layer's contracts are callable
@@ -237,10 +230,10 @@ Definition wp_sys_exec_sconf_body
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* ---- the file system, as kexec's own bundle: thirteen persistent
          resources this function only relays ---- *)
-  fs_fabric gs gu gd gk pd pav pu bn g
-            inodestart nib dev -∗
+  fs_fabric gs gu gd gk pd pav pu bn
+ -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
   bslots 3 -∗
   (* the loop's own [kalloc]s, argstr's page faults, and kexec's page-table
@@ -264,7 +257,7 @@ Definition wp_sys_exec_sconf_body
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       (* the free pool only SHRINKS -- kexec's cone is the only mover *)
       bslots 3 -∗
       kalloc_env γa None -∗
@@ -283,15 +276,14 @@ Module Type SYSEXEC.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names)
-      (bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32)
+      (bmapstart : Z)
+      (size : Z)
       (dqb dqs : dfrac)
       (v0 v1 : mword 64)
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_sys_exec_sconf_body γf γa gs j gl gu gd gk pd pav pu bn g
-                             bmapstart inodestart nib
-                             size dev dqb dqs v0 v1 pid V m K eb b lks.
+      wp_sys_exec_sconf_body γf γa gs j gl gu gd gk pd pav pu bn
+                             bmapstart
+                             size dqb dqs v0 v1 pid V m K eb b lks.
 End SYSEXEC.

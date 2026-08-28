@@ -270,26 +270,25 @@ def is_signature_field(secpath, name, modtypes, sealed):
 
 REF_RE = re.compile(r"^R(\d+):(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s*$")
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--dir", default=".", help="directory with .glob and .v files")
-    ap.add_argument("--all", action="store_true", help="also report implicit kinds")
-    ap.add_argument("--kinds", default="", help="comma list of glob kinds to report")
-    ap.add_argument("--triage", action="store_true",
-                    help="group by heuristic category instead of by file")
-    ap.add_argument("--files-only", action="store_true",
-                    help="only list .v files imported by nothing else (skip the "
-                         "per-definition analysis)")
-    ap.add_argument("--no-files", action="store_true",
-                    help="skip the trailing unreferenced-.v-file report")
-    args = ap.parse_args()
-    d = args.dir
 
-    only_mods = coqproject_modules(d)
+def analyze_dead(d, want, only_mods=None):
+    """Core analysis, reusable by other tools (see `tools/proof_profile.py`,
+    which loads this module the same way it loads `find_weak_imports.py`).
 
-    if args.files_only:
-        print_unimported(d, module_set(d, only_mods))
-        return
+    `want` is the set of glob kinds to consider (see PRIMARY/IMPLICIT above).
+    `only_mods` defaults to `coqproject_modules(d)`.
+
+    Returns a dict with:
+      dead      -- [(module, secpath, name, kind, gbase, off), ...], the final
+                   report set (signature obligations and KEEP-UNREFERENCED
+                   already excluded)
+      kept      -- same shape, excluded by a KEEP-UNREFERENCED marker
+      sigfields -- same shape, excluded as a module-signature obligation
+      n_globs   -- number of .glob files scanned
+      loc       -- loc(gbase, off) -> "gbase.v:LINE" (1-based)
+    """
+    if only_mods is None:
+        only_mods = coqproject_modules(d)
 
     globs = sorted(g for g in os.listdir(d) if g.endswith(".glob"))
     if only_mods is not None:
@@ -317,14 +316,6 @@ def main():
                 if kind in ("var", "binder", "sec"):
                     continue
                 defs.append((module, sec, name, kind, g[:-5], int(s)))
-
-    want = set()
-    if args.kinds:
-        want = set(args.kinds.split(","))
-    else:
-        want = set(PRIMARY)
-        if args.all:
-            want |= IMPLICIT
 
     # A def is dead if (module, secpath, name) is referenced nowhere.
     #
@@ -388,6 +379,63 @@ def main():
     sigfields = [r for r in dead if is_signature_field(r[1], r[2], modtypes, sealed)]
     dead = [r for r in dead if not is_signature_field(r[1], r[2], modtypes, sealed)]
 
+    return dict(dead=dead, kept=kept, sigfields=sigfields, n_globs=len(globs), loc=loc)
+
+
+def dead_by_file(d, kinds=None, only_mods=None):
+    """Convenience wrapper for external callers (`tools/proof_profile.py`):
+    {gbase: [(line, kind, name, secpath), ...]}, sorted by line, over the
+    same `dead` set `main()` reports (signature obligations / KEEP-UNREFERENCED
+    already excluded).  `kinds` defaults to PRIMARY minus `scheme` -- the
+    auto-generated induction schemes an `Inductive` emits for free, which are
+    "dead" by construction (see `category()`'s "NOT dead" bucket) and cannot
+    be removed independently of the type they belong to.
+    """
+    want = kinds if kinds is not None else (PRIMARY - {"scheme"})
+    result = analyze_dead(d, want, only_mods=only_mods)
+    by_file = {}
+    for module, sec, name, kind, gbase, off in result["dead"]:
+        ln = int(result["loc"](gbase, off).rsplit(":", 1)[1])
+        by_file.setdefault(gbase, []).append((ln, kind, name, sec))
+    for gbase in by_file:
+        by_file[gbase].sort()
+    return by_file
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--dir", default=".", help="directory with .glob and .v files")
+    ap.add_argument("--all", action="store_true", help="also report implicit kinds")
+    ap.add_argument("--kinds", default="", help="comma list of glob kinds to report")
+    ap.add_argument("--triage", action="store_true",
+                    help="group by heuristic category instead of by file")
+    ap.add_argument("--files-only", action="store_true",
+                    help="only list .v files imported by nothing else (skip the "
+                         "per-definition analysis)")
+    ap.add_argument("--no-files", action="store_true",
+                    help="skip the trailing unreferenced-.v-file report")
+    args = ap.parse_args()
+    d = args.dir
+
+    only_mods = coqproject_modules(d)
+
+    if args.files_only:
+        print_unimported(d, module_set(d, only_mods))
+        return
+
+    want = set()
+    if args.kinds:
+        want = set(args.kinds.split(","))
+    else:
+        want = set(PRIMARY)
+        if args.all:
+            want |= IMPLICIT
+
+    result = analyze_dead(d, want, only_mods=only_mods)
+    dead, kept, sigfields = result["dead"], result["kept"], result["sigfields"]
+    loc = result["loc"]
+    n_globs = result["n_globs"]
+
     if not args.triage:
         by_file = {}
         for module, sec, name, kind, gbase, off in dead:
@@ -420,7 +468,7 @@ def main():
     kinds_desc = ",".join(sorted(want))
     nfiles = len({r[4] for r in dead})
     print(f"\n== {total} unreferenced {kinds_desc} across {nfiles} files "
-          f"(of {len(globs)} globs scanned) ==")
+          f"(of {n_globs} globs scanned) ==")
     if sigfields:
         nf = len({r[4] for r in sigfields})
         print(f"   ({len(sigfields)} module-signature obligation(s) across {nf} file(s) "

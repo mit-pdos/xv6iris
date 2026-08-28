@@ -161,15 +161,13 @@ Notation K_iunlockput := (78%nat) (only parsing).
    post as [IcacheEscrow.ic_dep_side d]. *)
 Definition wp_iunlockput_dep_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (g : log_names)
     (gil gisl : gname)                                 (* ip->lock            *)
-    (bmapstart inodestart : Z) (nib : nat)
-    (size : Z) (dev : mword 32)
+    (bmapstart : Z)
+    (size : Z)
     (k : nat) (qi s : Qp) (gy : gname) (d : ic_dep) (inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (n : nat) (tid : nat) (qtx : Qp)
@@ -186,7 +184,7 @@ Definition wp_iunlockput_dep_sconf_body
      to a bundleless arm happens in the SAME ghost step as the park
      ([IcacheEscrow.ic_swap_park_dep]), so no descriptor out-state stands
      between a disarm fupd and the release. *)
-  ic_dep_shr d = Some (s, dev, inum, gy) ->
+  ic_dep_shr d = Some (s, icfg_dev, inum, gy) ->
   (* ENTRY BY SLOT -- iunlock's null test and iput's [ientry_inj] both *)
   (k < NINODE)%nat ->
   (* --- iput's geometry, threaded verbatim (SpecIput.v) --- *)
@@ -195,10 +193,10 @@ Definition wp_iunlockput_dep_sconf_body
   0 <= bmapstart ->
   bmapstart ∈ fsc_cov ->
   ~ (bmapstart ∈ log_region_set fsc_logst) ->
-  0 <= inodestart ->
-  IBLOCK inum inodestart ∈ fsc_cov ->
-  ~ (IBLOCK inum inodestart ∈ log_region_set fsc_logst) ->
-  bv_unsigned inum < 16 * Z.of_nat nib ->
+  0 <= icfg_ist ->
+  IBLOCK inum icfg_ist ∈ fsc_cov ->
+  ~ (IBLOCK inum icfg_ist ∈ log_region_set fsc_logst) ->
+  bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
   cov_below fsc_cov size ->
   (iput_units <= n)%nat ->
   (j < NPROC)%nat ->
@@ -209,12 +207,6 @@ Definition wp_iunlockput_dep_sconf_body
      [iput]'s own requirement; iunlock's "sleep lock" (6) is higher and
      follows by [locks_below_mono]. *)
   locks_below lks "log" ->
-  (* THE AMBIENT LOG, named (durable-disk B''-tx5): the share this contract
-     relays to iput is of [icfg_log]'s element -- the escrow's windows park
-     it and have no [log_names] parameter -- so the two must agree.  LAST, so
-     no landed positional argument list above it moved; the two published
-     [_tx_] readings below already carry the very same equation. *)
-  g = icfg_log ->
   (* ...AND THE PARK IS A *WRITE* ARM'S (durable-disk B''-tx5).  iunlockput
      is [iunlock] then [iput], and the share the arm parked comes home at the
      FIRST of the two -- so the share iput's three windows need is the one
@@ -234,13 +226,13 @@ Definition wp_iunlockput_dep_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
-  log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
+  bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) -∗
+  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
   (* ---- THE ICACHE'S PERSISTENT SET ---- *)
-  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
   ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k -∗
-  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   (* THE SEALED REGIME (iclaim-ledger.md §6′, RULING G) -- [SpecIput]'s
      runtime premise verbatim, because iunlockput's whole obligation here is
      iput's.  SPECIALIZED BY SIMP-1, and here the specialization is total:
@@ -252,7 +244,7 @@ Definition wp_iunlockput_dep_sconf_body
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
   sleeplocked_q gisl s (i_lock ip) pidv -∗
   ic_deposit fsc_ic k d -∗
-  i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
+  i_dev ip ↦₄{DfracOwn (1/2)} icfg_dev -∗
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
   i_valid ip ↦₄ valid_word true -∗
   ic_dep_held fsc_fs fsc_ireg fsc_cov fsc_logst d k inum dn' bm' -∗
@@ -275,10 +267,10 @@ Definition wp_iunlockput_dep_sconf_body
      the travelling share (item 7a-wire).  Every caller already holds the
      pair in this shape: it is exactly what [IcacheRef.inode_held_shed]
      leaves behind, and [inode_held_short] is now stated over it. *)
-  inode_refp_short k (qi + s)%Qp qi dev inum -∗
+  inode_refp_short k (qi + s)%Qp qi icfg_dev inum -∗
   (* ---- iput's own resources ---- *)
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
   proc_priv_bare pj pidv Vpr -∗
   procs_inv gs -∗
@@ -290,7 +282,7 @@ Definition wp_iunlockput_dep_sconf_body
      token is part-parked in the escrow, so it cannot present [log_op]; the
      post hands the parked share back as [ic_dep_side d] and the caller
      rejoins it there ([LogInv.log_opb_op]). *)
-  log_opb g n -∗
+  log_opb icfg_log n -∗
   (* THE CROSSING IS THE LITERAL [true]: iunlockput parks (through iput,
      down to sleep), so it can return on another hart whatever SIE was
      doing. *)
@@ -304,10 +296,10 @@ Definition wp_iunlockput_dep_sconf_body
       pc_is ret_tgt -∗
       proc_priv_bare pj pidv Vpr -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       bslots 3 -∗
       ⌜((n - iput_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
-      log_opb g n' -∗
+      log_opb icfg_log n' -∗
       iref_slot -∗
       (* ...AND WHAT THE ARM PARKED, back: the transaction share at [DepTx],
          nothing at the other descriptors. *)
@@ -317,15 +309,13 @@ Definition wp_iunlockput_dep_sconf_body
 
 Definition wp_iunlockput_dep_gen_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (g : log_names)
     (gil gisl : gname)                                 (* ip->lock            *)
-    (bmapstart inodestart : Z) (nib : nat)
-    (size : Z) (dev : mword 32)
+    (bmapstart : Z)
+    (size : Z)
     (k : nat) (qi s : Qp) (gy : gname) (d : ic_dep) (inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
@@ -343,22 +333,22 @@ Definition wp_iunlockput_dep_gen_body
      to a bundleless arm happens in the SAME ghost step as the park
      ([IcacheEscrow.ic_swap_park_dep]), so no descriptor out-state stands
      between a disarm fupd and the release. *)
-  ic_dep_shr d = Some (s, dev, inum, gy) ->
+  ic_dep_shr d = Some (s, icfg_dev, inum, gy) ->
   (* ENTRY BY SLOT -- iunlock's null test and iput's [ientry_inj] both *)
   (k < NINODE)%nat ->
   (* the two absorption credits, threaded verbatim to iput *)
   (crb = true -> bmapstart ∈ Sb) ->
-  (cru = true -> IBLOCK inum inodestart ∈ Sb) ->
+  (cru = true -> IBLOCK inum icfg_ist ∈ Sb) ->
   (* --- iput's geometry, threaded verbatim (SpecIput.v) --- *)
   log_geom_ok fsc_cov fsc_logst ->
   0 < size <= BPB ->
   0 <= bmapstart ->
   bmapstart ∈ fsc_cov ->
   ~ (bmapstart ∈ log_region_set fsc_logst) ->
-  0 <= inodestart ->
-  IBLOCK inum inodestart ∈ fsc_cov ->
-  ~ (IBLOCK inum inodestart ∈ log_region_set fsc_logst) ->
-  bv_unsigned inum < 16 * Z.of_nat nib ->
+  0 <= icfg_ist ->
+  IBLOCK inum icfg_ist ∈ fsc_cov ->
+  ~ (IBLOCK inum icfg_ist ∈ log_region_set fsc_logst) ->
+  bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
   cov_below fsc_cov size ->
   (iput_units <= n)%nat ->
   (j < NPROC)%nat ->
@@ -369,12 +359,6 @@ Definition wp_iunlockput_dep_gen_body
      [iput]'s own requirement; iunlock's "sleep lock" (6) is higher and
      follows by [locks_below_mono]. *)
   locks_below lks "log" ->
-  (* THE AMBIENT LOG, named (durable-disk B''-tx5): the share this contract
-     relays to iput is of [icfg_log]'s element -- the escrow's windows park
-     it and have no [log_names] parameter -- so the two must agree.  LAST, so
-     no landed positional argument list above it moved; the two published
-     [_tx_] readings below already carry the very same equation. *)
-  g = icfg_log ->
   (* ...AND THE PARK IS A *WRITE* ARM'S (durable-disk B''-tx5).  iunlockput
      is [iunlock] then [iput], and the share the arm parked comes home at the
      FIRST of the two -- so the share iput's three windows need is the one
@@ -394,13 +378,13 @@ Definition wp_iunlockput_dep_gen_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
-  log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
+  bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) -∗
+  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
   (* ---- THE ICACHE'S PERSISTENT SET ---- *)
-  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
   ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k -∗
-  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   (* THE SEALED REGIME (iclaim-ledger.md §6′, RULING G) -- [SpecIput]'s
      runtime premise verbatim, because iunlockput's whole obligation here is
      iput's.  SPECIALIZED BY SIMP-1, and here the specialization is total:
@@ -412,7 +396,7 @@ Definition wp_iunlockput_dep_gen_body
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
   sleeplocked_q gisl s (i_lock ip) pidv -∗
   ic_deposit fsc_ic k d -∗
-  i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
+  i_dev ip ↦₄{DfracOwn (1/2)} icfg_dev -∗
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
   i_valid ip ↦₄ valid_word true -∗
   ic_dep_held fsc_fs fsc_ireg fsc_cov fsc_logst d k inum dn' bm' -∗
@@ -435,10 +419,10 @@ Definition wp_iunlockput_dep_gen_body
      the travelling share (item 7a-wire).  Every caller already holds the
      pair in this shape: it is exactly what [IcacheRef.inode_held_shed]
      leaves behind, and [inode_held_short] is now stated over it. *)
-  inode_refp_short k (qi + s)%Qp qi dev inum -∗
+  inode_refp_short k (qi + s)%Qp qi icfg_dev inum -∗
   (* ---- iput's own resources ---- *)
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
   proc_priv_bare pj pidv Vpr -∗
   procs_inv gs -∗
@@ -449,11 +433,9 @@ Definition wp_iunlockput_dep_gen_body
   (* THE GROUP CREDIT, threaded verbatim to iput (SpecIput.v's [crz]):
      [emp] at [crz = false], the walker's [nlz_obs] plus the region's two
      ambient ties at [crz = true]. *)
-  (if crz then nlz_obs (bv_unsigned inum) e0 ∗ ⌜g = icfg_log⌝ ∗
-                ⌜inodestart = icfg_ist⌝
-   else emp) -∗
+  (if crz then nlz_obs (bv_unsigned inum) e0 else emp) -∗
   (* the reservation, EPOCH-NAMED: [log_opSe] in, [log_opS] out *)
-  log_opSe g n Sb e0 -∗
+  log_opSe icfg_log n Sb e0 -∗
   (* THE CROSSING IS THE LITERAL [true]: iunlockput parks (through iput,
      down to sleep), so it can return on another hart whatever SIE was
      doing. *)
@@ -467,7 +449,7 @@ Definition wp_iunlockput_dep_gen_body
       pc_is ret_tgt -∗
       proc_priv_bare pj pidv Vpr -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       bslots 3 -∗
       ⌜Sb ⊆ Sb'⌝ -∗
       (* THE PAID-BITMAP REPORT (G-4c): [w] is "this call spent the bitmap
@@ -479,7 +461,7 @@ Definition wp_iunlockput_dep_gen_body
          what makes a walk's next level FREE and not merely bounded. *)
       ⌜crb = true -> w = false⌝ -∗
       ⌜((n - ip_spend_w w cru crz)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
-      log_opS g n' Sb' -∗
+      log_opS icfg_log n' Sb' -∗
       iref_slot -∗
       (* ...AND WHAT THE ARM PARKED, back: the transaction share at [DepTx],
          nothing at the other descriptors. *)
@@ -495,15 +477,13 @@ Definition wp_iunlockput_dep_gen_body
    line of iunlockput's own proof is re-run. *)
 Definition wp_iunlockput_tx_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (g : log_names)
     (gil gisl : gname)                                 (* ip->lock            *)
-    (bmapstart inodestart : Z) (nib : nat)
-    (size : Z) (dev : mword 32)
+    (bmapstart : Z)
+    (size : Z)
     (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (n : nat)
@@ -523,10 +503,10 @@ Definition wp_iunlockput_tx_sconf_body
   0 <= bmapstart ->
   bmapstart ∈ fsc_cov ->
   ~ (bmapstart ∈ log_region_set fsc_logst) ->
-  0 <= inodestart ->
-  IBLOCK inum inodestart ∈ fsc_cov ->
-  ~ (IBLOCK inum inodestart ∈ log_region_set fsc_logst) ->
-  bv_unsigned inum < 16 * Z.of_nat nib ->
+  0 <= icfg_ist ->
+  IBLOCK inum icfg_ist ∈ fsc_cov ->
+  ~ (IBLOCK inum icfg_ist ∈ log_region_set fsc_logst) ->
+  bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
   cov_below fsc_cov size ->
   (iput_units <= n)%nat ->
   (j < NPROC)%nat ->
@@ -537,11 +517,6 @@ Definition wp_iunlockput_tx_sconf_body
      [iput]'s own requirement; iunlock's "sleep lock" (6) is higher and
      follows by [locks_below_mono]. *)
   locks_below lks "log" ->
-  (* THE AMBIENT LOG, named: the escrow's write arm parks a share of
-     [icfg_log]'s element (the escrow has no [log_names] parameter), so a
-     contract that re-forms this caller's token has to know the two agree.
-     Every caller has it -- it is the walk's own [g = icfg_log] premise. *)
-  g = icfg_log ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* the trap-CSR complement, threaded straight from iput's own precondition
@@ -553,13 +528,13 @@ Definition wp_iunlockput_tx_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
-  log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
+  bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) -∗
+  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
   (* ---- THE ICACHE'S PERSISTENT SET ---- *)
-  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
   ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k -∗
-  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   (* THE SEALED REGIME (iclaim-ledger.md §6′, RULING G) -- [SpecIput]'s
      runtime premise verbatim, because iunlockput's whole obligation here is
      iput's.  SPECIALIZED BY SIMP-1, and here the specialization is total:
@@ -574,8 +549,8 @@ Definition wp_iunlockput_tx_sconf_body
      at [DepTx] with the holder's residue beside it, and the disarm --
      iunlockput's own first ghost step -- returns exactly the share it
      recorded. *)
-  ic_tx_dep fsc_ic k s dev inum gy -∗
-  i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
+  ic_tx_dep fsc_ic k s icfg_dev inum gy -∗
+  i_dev ip ↦₄{DfracOwn (1/2)} icfg_dev -∗
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
   i_valid ip ↦₄ valid_word true -∗
   ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dn' bm' -∗
@@ -598,10 +573,10 @@ Definition wp_iunlockput_tx_sconf_body
      the travelling share (item 7a-wire).  Every caller already holds the
      pair in this shape: it is exactly what [IcacheRef.inode_held_shed]
      leaves behind, and [inode_held_short] is now stated over it. *)
-  inode_refp_short k (qi + s)%Qp qi dev inum -∗
+  inode_refp_short k (qi + s)%Qp qi icfg_dev inum -∗
   (* ---- iput's own resources ---- *)
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
   proc_priv_bare pj pidv Vpr -∗
   procs_inv gs -∗
@@ -612,7 +587,7 @@ Definition wp_iunlockput_tx_sconf_body
   (* THE BUDGET HALF ONLY: this caller's transaction token is HALF-PARKED
      in the escrow, so it cannot present [log_op]; the disarm re-forms the
      whole one inside.  [LogInv.log_opb_op] is the join. *)
-  log_opb g n -∗
+  log_opb icfg_log n -∗
   (* THE CROSSING IS THE LITERAL [true]: iunlockput parks (through iput,
      down to sleep), so it can return on another hart whatever SIE was
      doing. *)
@@ -626,24 +601,22 @@ Definition wp_iunlockput_tx_sconf_body
       pc_is ret_tgt -∗
       proc_priv_bare pj pidv Vpr -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       bslots 3 -∗
       ⌜((n - iput_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
-      log_op g n' -∗
+      log_op icfg_log n' -∗
       iref_slot -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 Definition wp_iunlockput_tx_gen_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (g : log_names)
     (gil gisl : gname)                                 (* ip->lock            *)
-    (bmapstart inodestart : Z) (nib : nat)
-    (size : Z) (dev : mword 32)
+    (bmapstart : Z)
+    (size : Z)
     (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
@@ -659,17 +632,17 @@ Definition wp_iunlockput_tx_gen_body
   (k < NINODE)%nat ->
   (* the two absorption credits, threaded verbatim to iput *)
   (crb = true -> bmapstart ∈ Sb) ->
-  (cru = true -> IBLOCK inum inodestart ∈ Sb) ->
+  (cru = true -> IBLOCK inum icfg_ist ∈ Sb) ->
   (* --- iput's geometry, threaded verbatim (SpecIput.v) --- *)
   log_geom_ok fsc_cov fsc_logst ->
   0 < size <= BPB ->
   0 <= bmapstart ->
   bmapstart ∈ fsc_cov ->
   ~ (bmapstart ∈ log_region_set fsc_logst) ->
-  0 <= inodestart ->
-  IBLOCK inum inodestart ∈ fsc_cov ->
-  ~ (IBLOCK inum inodestart ∈ log_region_set fsc_logst) ->
-  bv_unsigned inum < 16 * Z.of_nat nib ->
+  0 <= icfg_ist ->
+  IBLOCK inum icfg_ist ∈ fsc_cov ->
+  ~ (IBLOCK inum icfg_ist ∈ log_region_set fsc_logst) ->
+  bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
   cov_below fsc_cov size ->
   (iput_units <= n)%nat ->
   (j < NPROC)%nat ->
@@ -680,11 +653,6 @@ Definition wp_iunlockput_tx_gen_body
      [iput]'s own requirement; iunlock's "sleep lock" (6) is higher and
      follows by [locks_below_mono]. *)
   locks_below lks "log" ->
-  (* THE AMBIENT LOG, named: the escrow's write arm parks a share of
-     [icfg_log]'s element (the escrow has no [log_names] parameter), so a
-     contract that re-forms this caller's token has to know the two agree.
-     Every caller has it -- it is the walk's own [g = icfg_log] premise. *)
-  g = icfg_log ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* the trap-CSR complement, threaded straight from iput's own precondition
@@ -696,13 +664,13 @@ Definition wp_iunlockput_tx_gen_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
-  log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
+  bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) -∗
+  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
   (* ---- THE ICACHE'S PERSISTENT SET ---- *)
-  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
   ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k -∗
-  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   (* THE SEALED REGIME (iclaim-ledger.md §6′, RULING G) -- [SpecIput]'s
      runtime premise verbatim, because iunlockput's whole obligation here is
      iput's.  SPECIALIZED BY SIMP-1, and here the specialization is total:
@@ -717,8 +685,8 @@ Definition wp_iunlockput_tx_gen_body
      at [DepTx] with the holder's residue beside it, and the disarm --
      iunlockput's own first ghost step -- returns exactly the share it
      recorded. *)
-  ic_tx_dep fsc_ic k s dev inum gy -∗
-  i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
+  ic_tx_dep fsc_ic k s icfg_dev inum gy -∗
+  i_dev ip ↦₄{DfracOwn (1/2)} icfg_dev -∗
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
   i_valid ip ↦₄ valid_word true -∗
   ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dn' bm' -∗
@@ -741,10 +709,10 @@ Definition wp_iunlockput_tx_gen_body
      the travelling share (item 7a-wire).  Every caller already holds the
      pair in this shape: it is exactly what [IcacheRef.inode_held_shed]
      leaves behind, and [inode_held_short] is now stated over it. *)
-  inode_refp_short k (qi + s)%Qp qi dev inum -∗
+  inode_refp_short k (qi + s)%Qp qi icfg_dev inum -∗
   (* ---- iput's own resources ---- *)
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
   proc_priv_bare pj pidv Vpr -∗
   procs_inv gs -∗
@@ -755,11 +723,9 @@ Definition wp_iunlockput_tx_gen_body
   (* THE GROUP CREDIT, threaded verbatim to iput (SpecIput.v's [crz]):
      [emp] at [crz = false], the walker's [nlz_obs] plus the region's two
      ambient ties at [crz = true]. *)
-  (if crz then nlz_obs (bv_unsigned inum) e0 ∗ ⌜g = icfg_log⌝ ∗
-                ⌜inodestart = icfg_ist⌝
-   else emp) -∗
+  (if crz then nlz_obs (bv_unsigned inum) e0 else emp) -∗
   (* the reservation, EPOCH-NAMED: [log_opSe] in, [log_opS] out *)
-  log_opSe g n Sb e0 -∗
+  log_opSe icfg_log n Sb e0 -∗
   (* THE CROSSING IS THE LITERAL [true]: iunlockput parks (through iput,
      down to sleep), so it can return on another hart whatever SIE was
      doing. *)
@@ -773,7 +739,7 @@ Definition wp_iunlockput_tx_gen_body
       pc_is ret_tgt -∗
       proc_priv_bare pj pidv Vpr -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       bslots 3 -∗
       ⌜Sb ⊆ Sb'⌝ -∗
       (* THE PAID-BITMAP REPORT (G-4c): [w] is "this call spent the bitmap
@@ -785,9 +751,9 @@ Definition wp_iunlockput_tx_gen_body
          what makes a walk's next level FREE and not merely bounded. *)
       ⌜crb = true -> w = false⌝ -∗
       ⌜((n - ip_spend_w w cru crz)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
-      log_opS g n' Sb' -∗
+      log_opS icfg_log n' Sb' -∗
       (* the transaction's token, whole again *)
-      log_tx g -∗
+      log_tx icfg_log -∗
       iref_slot -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -805,10 +771,9 @@ Section IunlockputOfDep.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names)
       (gil gisl : gname)
-      (bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32)
+      (bmapstart : Z)
+      (size : Z)
       (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat)
@@ -816,27 +781,27 @@ Section IunlockputOfDep.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate) :
     (forall (d : ic_dep) (tid : nat) (qtx : Qp),
-       wp_iunlockput_dep_sconf_body gs j gl gu gd gk pd pav pu bn g
+       wp_iunlockput_dep_sconf_body gs j gl gu gd gk pd pav pu bn
                                     gil gisl bmapstart
-                                    inodestart nib size dev k qi s gy d inum
+ size k qi s gy d inum
                                     dn' bm' n tid qtx pidv dq dqb dqs m K eb b lks
                                     Vpr) ->
-    wp_iunlockput_tx_sconf_body gs j gl gu gd gk pd pav pu bn g
-                                gil gisl bmapstart inodestart nib
-                                size dev k qi s gy inum dn' bm' n
+    wp_iunlockput_tx_sconf_body gs j gl gu gd gk pd pav pu bn
+                                gil gisl bmapstart
+                                size k qi s gy inum dn' bm' n
                                 pidv dq dqb dqs m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_iunlockput_tx_sconf_body wp_iunlockput_dep_sconf_body].
     intros Hgen pcE ip pj ret_tgt HK Hk Hgeom Hsz Hbm0 Hbmc Hbml Hist Hcov
-      Hnlog Hinlt Hcb Hn Hj Hgl Ha0 Hbelow Hclog.
+      Hnlog Hinlt Hcb Hn Hj Hgl Ha0 Hbelow.
     iIntros "Hcg Hown Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hitb2 #Hitbl
              #Hesc Hireg Hropen Hslk Hslkd Hdep Hidev Hiinum Hivalid Hload
              Hshot Hfrz Hshort Hsbb Hsbi Hbmi Hppid Hprocs Hdevi Hdgeom Hdlock
              Hbs Hopb Hcont".
     iDestruct (ic_tx_dep_at_of_half with "Hdep") as (t) "Hdep".
     rewrite /ic_tx_dep_at. iDestruct "Hdep" as "[Hdep Ht2]".
-    iApply (Hgen (DepTx s dev inum gy t (1/2)) t (1/2)%Qp HK eq_refl Hk Hgeom Hsz Hbm0
-              Hbmc Hbml Hist Hcov Hnlog Hinlt Hcb Hn Hj Hgl Ha0 Hbelow Hclog eq_refl
+    iApply (Hgen (DepTx s icfg_dev inum gy t (1/2)) t (1/2)%Qp HK eq_refl Hk Hgeom Hsz Hbm0
+              Hbmc Hbml Hist Hcov Hnlog Hinlt Hcb Hn Hj Hgl Ha0 Hbelow eq_refl
               with "Hcg Hown Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hitb2
                     Hitbl Hesc Hireg Hropen Hslk Hslkd Hdep Hidev Hiinum
                     Hivalid [Hload] Hshot Hfrz Hshort Hsbb Hsbi Hbmi Hppid
@@ -846,7 +811,7 @@ Section IunlockputOfDep.
              Hbs %Hbnd Hopb Hslot Ht1".
     rewrite /ic_dep_side.
     iDestruct (log_tx_join icfg_log t with "Ht1 Ht2") as "Htx".
-    iEval (rewrite -Hclog) in "Htx".
+
     iApply ("Hcont" $! CIDx Hqx mf n' with
               "[%] Hcg Hown Hextc Hextm Hpc Hppid Hsbb Hsbi Hbs [%]
                [Hopb Htx] Hslot"); [exact Hcs | exact Hbnd |].
@@ -858,10 +823,9 @@ Section IunlockputOfDep.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names)
       (gil gisl : gname)
-      (bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32)
+      (bmapstart : Z)
+      (size : Z)
       (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
@@ -869,28 +833,28 @@ Section IunlockputOfDep.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate) :
     (forall (d : ic_dep) (tid : nat) (qtx : Qp),
-       wp_iunlockput_dep_gen_body gs j gl gu gd gk pd pav pu bn g
+       wp_iunlockput_dep_gen_body gs j gl gu gd gk pd pav pu bn
                                   gil gisl bmapstart
-                                  inodestart nib size dev k qi s gy d inum
+ size k qi s gy d inum
                                   dn' bm' n Sb crb cru crz e0 tid qtx
                                   pidv dq dqb dqs m K eb b lks Vpr) ->
-    wp_iunlockput_tx_gen_body gs j gl gu gd gk pd pav pu bn g
-                              gil gisl bmapstart inodestart nib
-                              size dev k qi s gy inum dn' bm' n Sb crb cru
+    wp_iunlockput_tx_gen_body gs j gl gu gd gk pd pav pu bn
+                              gil gisl bmapstart
+                              size k qi s gy inum dn' bm' n Sb crb cru
                               crz e0 pidv dq dqb dqs m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_iunlockput_tx_gen_body wp_iunlockput_dep_gen_body].
     intros Hgen pcE ip pj ret_tgt HK Hk Hcrb0 Hcru0 Hgeom Hsz Hbm0 Hbmc Hbml
-      Hist Hcov Hnlog Hinlt Hcb Hn Hj Hgl Ha0 Hbelow Hclog.
+      Hist Hcov Hnlog Hinlt Hcb Hn Hj Hgl Ha0 Hbelow.
     iIntros "Hcg Hown Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hitb2 #Hitbl
              #Hesc Hireg Hropen Hslk Hslkd Hdep Hidev Hiinum Hivalid Hload
              Hshot Hfrz Hshort Hsbb Hsbi Hbmi Hppid Hprocs Hdevi Hdgeom Hdlock
              Hbs Hcr Hops Hcont".
     iDestruct (ic_tx_dep_at_of_half with "Hdep") as (t) "Hdep".
     rewrite /ic_tx_dep_at. iDestruct "Hdep" as "[Hdep Ht2]".
-    iApply (Hgen (DepTx s dev inum gy t (1/2)) t (1/2)%Qp HK eq_refl Hk Hcrb0 Hcru0 Hgeom
+    iApply (Hgen (DepTx s icfg_dev inum gy t (1/2)) t (1/2)%Qp HK eq_refl Hk Hcrb0 Hcru0 Hgeom
               Hsz Hbm0 Hbmc Hbml Hist Hcov Hnlog Hinlt Hcb Hn Hj Hgl Ha0
-              Hbelow Hclog eq_refl
+              Hbelow eq_refl
               with "Hcg Hown Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hitb2
                     Hitbl Hesc Hireg Hropen Hslk Hslkd Hdep Hidev Hiinum
                     Hivalid [Hload] Hshot Hfrz Hshort Hsbb Hsbi Hbmi Hppid
@@ -900,7 +864,7 @@ Section IunlockputOfDep.
              Hsbi Hbs %Hsub %Hw %Hcrb %Hnn Hops Hslot Ht1".
     rewrite /ic_dep_side.
     iDestruct (log_tx_join icfg_log t with "Ht1 Ht2") as "Htx".
-    iEval (rewrite -Hclog) in "Htx".
+
     iApply ("Hcont" $! CIDx Hqx mf n' Sb' w with
               "[%] Hcg Hown Hextc Hextm Hpc Hppid Hsbb Hsbi Hbs [%] [%] [%]
                [%] Hops Htx Hslot");
@@ -921,10 +885,9 @@ Module Type IUNLOCKPUT.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names)
       (gil gisl : gname)
-      (bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32)
+      (bmapstart : Z)
+      (size : Z)
       (k : nat) (qi s : Qp) (gy : gname) (d : ic_dep) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
@@ -932,9 +895,9 @@ Module Type IUNLOCKPUT.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iunlockput_dep_gen_body gs j gl gu gd gk pd pav pu bn g
-                                 gil gisl bmapstart inodestart
-                                 nib size dev k qi s gy d inum dn' bm' n Sb
+      wp_iunlockput_dep_gen_body gs j gl gu gd gk pd pav pu bn
+                                 gil gisl bmapstart
+ size k qi s gy d inum dn' bm' n Sb
                                  crb cru crz e0 tid qtx pidv dq dqb dqs m K eb b lks
                                  Vpr.
   (* the two TRANSACTIONAL forms (durable-disk B''-tx); [ProofIunlockput]
@@ -945,19 +908,18 @@ Module Type IUNLOCKPUT.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names)
       (gil gisl : gname)
-      (bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32)
+      (bmapstart : Z)
+      (size : Z)
       (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iunlockput_tx_sconf_body gs j gl gu gd gk pd pav pu bn g
-                                  gil gisl bmapstart inodestart
-                                  nib size dev k qi s gy inum dn' bm' n
+      wp_iunlockput_tx_sconf_body gs j gl gu gd gk pd pav pu bn
+                                  gil gisl bmapstart
+ size k qi s gy inum dn' bm' n
                                   pidv dq dqb dqs m K eb b lks Vpr.
   Parameter wp_iunlockput_tx_gen :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
@@ -965,18 +927,17 @@ Module Type IUNLOCKPUT.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names)
       (gil gisl : gname)
-      (bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32)
+      (bmapstart : Z)
+      (size : Z)
       (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iunlockput_tx_gen_body gs j gl gu gd gk pd pav pu bn g
-                                gil gisl bmapstart inodestart nib
-                                size dev k qi s gy inum dn' bm' n Sb crb cru
+      wp_iunlockput_tx_gen_body gs j gl gu gd gk pd pav pu bn
+                                gil gisl bmapstart
+                                size k qi s gy inum dn' bm' n Sb crb cru
                                 crz e0 pidv dq dqb dqs m K eb b lks Vpr.
 End IUNLOCKPUT.

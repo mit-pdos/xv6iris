@@ -214,10 +214,9 @@ Section KexecBBody.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names)
       (ga : gname) (gf : gname)
-      (bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32)
+      (bmapstart : Z)
+      (size : Z)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap)
       (gilf gislf : gname) (n2 : nat)
@@ -244,13 +243,13 @@ Section KexecBBody.
     0 <= bmapstart ->
     bmapstart ∈ fsc_cov ->
     ~ (bmapstart ∈ log_region_set fsc_logst) ->
-    0 <= inodestart ->
+    0 <= icfg_ist ->
     cov_below fsc_cov size ->
-    ireg_blocks_ok inodestart nib fsc_cov fsc_logst ->
+    ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
     (jp < NPROC)%nat ->
     gs !! jp = Some gl ->
     (kf < NINODE)%nat ->
-    bv_unsigned inumf < 16 * Z.of_nat nib ->
+    bv_unsigned inumf < 16 * Z.of_nat icfg_nib ->
     (iput_units <= n2)%nat ->
     m !!! Regidx csp_rs1 = sp0 ->
     m !!! Regidx Rra = ra0 ->
@@ -267,19 +266,19 @@ Section KexecBBody.
         r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs4 ->
         M90 !!! Regidx r = m !!! Regidx r) ->
     kernel_text -∗
-    fs_fabric gs gu gd gk pd pav pu bn g
-              inodestart nib dev -∗
+    fs_fabric gs gu gd gk pd pav pu bn
+ -∗
     pc_is (mword_of_int (KXB + 0x090) : mword 64) -∗
     sie_cap_gpr KT1 M90 (K - 68)%nat b (proc_addr jp) -∗
     cpu_own 0 eb (proc_addr jp) b lks -∗
     trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jp) -∗
-    kxc_open dev pidv kf qf sf gyf inumf dnf bmf
+    kxc_open pidv kf qf sf gyf inumf dnf bmf
               gilf gislf -∗
-    log_opb g n2 -∗
+    log_opb icfg_log n2 -∗
     iref_slots 1 -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-    sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+    sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
     bslots 3 -∗
     kalloc_env ga None -∗
@@ -292,13 +291,13 @@ Section KexecBBody.
     (* ---- kexec's OWN continuation: the +0x31c tail closes the -1 arm ---- *)
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       KexecOkQ.kexec_closer Q gf ga (proc_addr jp) pidv V m (ret_pc ra0) K b
-           eb lks dqb dqs bmapstart inodestart na alen plen pv dqpv pfun
+           eb lks dqb dqs bmapstart na alen plen pv dqpv pfun
            av dqa avf aslen dqas afun) -∗
     (* ---- OUTPUT 1: [elf.phnum = 0], the loop is skipped ---- *)
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M : regfile) (P : uptd) (w13 w67 : mword 64),
-        kxc_at_1a2 jp bn g ga gf bmapstart inodestart
-                   nib size dev kf qf sf gyf inumf dnf bmf
+        kxc_at_1a2 jp bn ga gf bmapstart
+ size kf qf sf gyf inumf dnf bmf
                    gilf gislf n2
                    plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas
                    m M K sp0 ra0 s00 s10 s20 pv av
@@ -311,14 +310,14 @@ Section KexecBBody.
            be left without one.  durable-notes' "CHAINING TWO HALVES". *)
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
           KexecOkQ.kexec_closer Q gf ga (proc_addr jp) pidv V m (ret_pc ra0) K b
-               eb lks dqb dqs bmapstart inodestart na alen plen pv dqpv
+               eb lks dqb dqs bmapstart na alen plen pv dqpv
                pfun av dqa avf aslen dqas afun) -∗
         WP (Loop : expr riscv_lang)) -∗
     (* ---- OUTPUT 2: the phdr loop's body entry, at [i = 0], [sz = 0] ---- *)
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M : regfile) (P : uptd),
-        kxc_at_12c jp bn g ga gf bmapstart inodestart
-                   nib size dev kf qf sf gyf inumf dnf bmf
+        kxc_at_12c jp bn ga gf bmapstart
+ size kf qf sf gyf inumf dnf bmf
                    gilf gislf n2
                    plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas
                    m M K sp0 ra0 s00 s10 s20 pv av
@@ -332,7 +331,7 @@ Section KexecBBody.
            be left without one.  durable-notes' "CHAINING TWO HALVES". *)
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
           KexecOkQ.kexec_closer Q gf ga (proc_addr jp) pidv V m (ret_pc ra0) K b
-               eb lks dqb dqs bmapstart inodestart na alen plen pv dqpv
+               eb lks dqb dqs bmapstart na alen plen pv dqpv
                pfun av dqa avf aslen dqas afun) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1235,9 +1234,9 @@ Section KexecBBody.
                      (CID8 : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_retarget CID0 CID8 true (proc_addr jp) _ Hcr8
                    with "Hcont") as "Hcont".
-      iApply (A.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn g
-                gilf gislf ga gf bmapstart inodestart nib size
-                dev kf qf sf gyf inumf dnf bmf n2
+      iApply (A.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn
+                gilf gislf ga gf bmapstart size
+ kf qf sf gyf inumf dnf bmf n2
                 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
                 m B1 K eb lks sp0 ra0 s00 s10 s20 pv av
                 HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2

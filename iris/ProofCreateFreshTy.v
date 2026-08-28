@@ -126,15 +126,13 @@ Definition cr_cs_but_s3 (m mf : regfile) : Prop :=
 Definition create_fresh_ty_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
       ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
     (γs : list gname) (j : nat) (γl : gname)
     (γu : uart_names) (γd : disk_names) (γk : gname)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names)
     (γpr : gname)
-    (inodestart : Z) (ninodes : Z) (nib : nat)
-    (dev : mword 32) (ty : mword 16)
+ (ninodes : Z)
+ (ty : mword 16)
     (kd : nat) (dqp : dfrac)                     (* the LOCKED PARENT's slot *)
     (u : nat) (Sb : gset Z)
     (* THE SHARE THE CHILD'S CHECKOUT PARKS (durable-disk B''-tx3).  The
@@ -163,10 +161,10 @@ Definition create_fresh_ty_body
   (K_ialloc <= K)%nat ->
   (K_ilock <= K)%nat ->
   log_geom_ok fsc_cov fsc_logst ->
-  0 <= inodestart ->
-  InodeInv.ireg_blocks_ok inodestart nib fsc_cov fsc_logst ->
+  0 <= icfg_ist ->
+  InodeInv.ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
   1 < ninodes ->
-  ninodes <= 16 * Z.of_nat nib ->
+  ninodes <= 16 * Z.of_nat icfg_nib ->
   ninodes < 2 ^ 31 ->
   bv_unsigned ty <> 0 ->
   (* durable-disk 2b-inode-3: ialloc's claim box owes the region (L5) *)
@@ -174,7 +172,7 @@ Definition create_fresh_ty_body
   printk_gen_contract (kt := KT1) γpr γu γd ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
-  dev = ROOTDEV ->
+  icfg_dev = ROOTDEV ->
   (* ---- THE PINNING PREMISE.  [ty] is the halfword in s4, which is what
      makes this statement consistent: at two different [ty] these two
      equations cannot both hold.  See the header. ---- *)
@@ -196,31 +194,29 @@ Definition create_fresh_ty_body
      (γs' : list gname) (j' : nat) (γl' : gname)
      (γu' : uart_names) (γd' : disk_names) (γk' : gname)
      (pd' pav' pu' : mword 64) (bn' : bio_names)
-     (γ' : log_names)
      (γpr' : gname)
-     (inodestart' ninodes' : Z) (nib' : nat)
-     (dev' : mword 32) (ty' : mword 16) (u' : nat) (Sb' : gset Z)
+     (ninodes' : Z)
+     (ty' : mword 16) (u' : nat) (Sb' : gset Z)
      (pidv' : mword 32) (dq' dqs' dqn' : dfrac)
      (m' : regfile) (K' : nat) (eb' : bool) (b' : bool)
      (lks' : gset string) (Vpr' : pprivate) (t' : nat) (qt' : Qp),
      wp_ialloc_gen_body (CID := CIDa) γs' j' γl' γu' γd' γk' pd' pav' pu' bn'
-                        γ' γpr' inodestart'
-                        ninodes' nib' dev' ty' u' Sb' pidv' dq' dqs' dqn'
+                        γpr'
+                        ninodes' ty' u' Sb' pidv' dq' dqs' dqn'
                         m' K' eb' b' lks' Vpr' t' qt') ->
   (forall `{CIDl : CpuId}
      (γs' : list gname) (j' : nat) (γl' : gname)
      (γu' : uart_names) (γd' : disk_names) (γk' : gname)
      (pd' pav' pu' : mword 64) (bn' : bio_names)
      (gil' gisl' : gname)
-     (inodestart' : Z) (nib' : nat)
      (k' : nat) (s' : Qp) (g' : gname) (d' : ic_dep) (o' : ilkc)
-     (dev' inum' : mword 32)
+     (inum' : mword 32)
      (pidv' : mword 32) (dq' dqs' : dfrac)
      (m' : regfile) (K' : nat) (eb' : bool) (b' : bool)
      (lks' : gset string) (Vpr' : pprivate),
      wp_ilock_dep_sconf_body (CID := CIDl) γs' j' γl' γu' γd' γk' pd' pav' pu' bn'
-                             gil' gisl' inodestart'
-                             nib' k' s' g' d' o' dev' inum' pidv' dq' dqs'
+                             gil' gisl'
+                             k' s' g' d' o' inum' pidv' dq' dqs'
                              m' K' eb' b' lks' Vpr') ->
   (* ================= THE SPAN ================= *)
   sie_cap_gpr KT1 Ma K b pj -∗
@@ -228,13 +224,13 @@ Definition create_fresh_ty_body
   kernel_text -∗ pc_is (mword_of_int (KernelSyms.create + 0xa4) : mword 64) -∗
   kernel_data -∗
   printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
-  log_ctx γ bn fsc_fs fsc_cov fsc_logst dev -∗
-  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
+  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
-  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B).  The span
      covers [jal ialloc] at +0xa8, and [wp_ialloc_gen_body] -- the
      HYPOTHESIS this axiom takes for that callee -- now asks for it (via
@@ -246,19 +242,19 @@ Definition create_fresh_ty_body
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
-  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   proc_priv_bare pj pidv Vpr -∗
   bslots 3 -∗
   iref_slot -∗
   (* THE PARENT'S OWN [dev] CELL: the [lw a0,0(s1)] at +0xa6 reads it, and
      it comes straight back.  It is the only piece of the locked parent the
      span touches. *)
-  i_dev (ientry kd) ↦₄{dqp} dev -∗
+  i_dev (ientry kd) ↦₄{dqp} icfg_dev -∗
   (* the share the child's checkout parks -- see the header *)
   t ↪[ln_tx icfg_log]{#qt} tt -∗
   (* the share the CLAIM BOX parks -- see the binder *)
   t ↪[ln_tx icfg_log]{#qc} tt -∗
-  log_opS γ (S u) Sb -∗
+  log_opS icfg_log (S u) Sb -∗
   wp_next true pj (fun (CIDo : CpuId) =>
   ∀ (Mo : regfile) (alloc : bool)
     (kslot : nat) (q : Qp) (g : gname) (inum : mword 32)
@@ -267,17 +263,17 @@ Definition create_fresh_ty_body
       sie_cap_gpr KT1 Mo K b pj -∗
       cpu_own 0 eb pj b lks -∗
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
-      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       proc_priv_bare pj pidv Vpr -∗
       bslots 3 -∗
-      i_dev (ientry kd) ↦₄{dqp} dev -∗
+      i_dev (ientry kd) ↦₄{dqp} icfg_dev -∗
       (if alloc
        then
          (* ---- CONTROL IS AT +0xb4, THE INODE IS LOCKED AND FILLED ---- *)
          ⌜Mo !!! Regidx (mword_of_int 19 : mword 5) = ientry kslot
           /\ (kslot < NINODE)%nat
           /\ 0 < bv_unsigned inum < ninodes
-          /\ bv_unsigned inum < 16 * Z.of_nat nib
+          /\ bv_unsigned inum < 16 * Z.of_nat icfg_nib
           (* THE ONE ASSUMED FACT.  Everything else in this arm is
              [wp_ialloc_gen]'s or [wp_ilock_sconf]'s own postcondition. *)
           /\ di_type dn = ty
@@ -288,8 +284,8 @@ Definition create_fresh_ty_body
          is_sleeplock_gen gil gisl (i_lock (ientry kslot)) "inode"%string
                           (ic_tok fsc_ic kslot) (slh_tok (icfg_isl kslot)) ∗
          sleeplocked_q gisl (q/2)%Qp (i_lock (ientry kslot)) pidv ∗
-         ic_deposit fsc_ic kslot (DepTx (q/2)%Qp dev inum g t qt) ∗
-         i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} dev ∗
+         ic_deposit fsc_ic kslot (DepTx (q/2)%Qp icfg_dev inum g t qt) ∗
+         i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} icfg_dev ∗
          i_inum (ientry kslot) ↦₄{DfracOwn (1/2)} inum ∗
          i_valid (ientry kslot) ↦₄ valid_word true ∗
          ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kslot inum dn bm ∗
@@ -308,7 +304,7 @@ Definition create_fresh_ty_body
             comes straight back, and create returns it at the child's
             iunlock. *)
          ifreeze_off (bv_unsigned inum) ∗
-         inode_ref_short_gen kslot (q/2 + q/2)%Qp (q/2)%Qp dev inum g ∗
+         inode_ref_short_gen kslot (q/2 + q/2)%Qp (q/2)%Qp icfg_dev inum g ∗
          (* ...AND ITS PROVENANCE UNIT (item 7a-wire, iclaim-ledger.md
             §5''.3): ialloc's [ClaimL] iget minted it, and the iunlockput
             that closes the child spends it. *)
@@ -319,7 +315,7 @@ Definition create_fresh_ty_body
          t ↪[ln_tx icfg_log]{#qc} tt ∗
          (* ialloc's [ia_spend = 1], and the membership create's own
             [iupdate(ip)] and every [dirlink] on [ip] credit against *)
-         log_opS γ u (Sb ∪ {[IBLOCK inum inodestart]})
+         log_opS icfg_log u (Sb ∪ {[IBLOCK inum icfg_ist]})
        else
          (* ---- CONTROL IS AT +0xec, ARM A-FAIL: nothing was claimed ---- *)
          ⌜Mo !!! Regidx (mword_of_int 19 : mword 5)
@@ -330,7 +326,7 @@ Definition create_fresh_ty_body
             back bare *)
          t ↪[ln_tx icfg_log]{#qt} tt ∗
          t ↪[ln_tx icfg_log]{#qc} tt ∗
-         log_opS γ (S u) Sb) -∗
+         log_opS icfg_log (S u) Sb) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -405,17 +401,16 @@ Lemma create_fresh_ty :
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names)
       (γpr : gname)
-      (inodestart : Z) (ninodes : Z) (nib : nat)
-      (dev : mword 32) (ty : mword 16)
+ (ninodes : Z)
+ (ty : mword 16)
       (kd : nat) (dqp : dfrac)
       (u : nat) (Sb : gset Z) (t : nat) (qt : Qp) (qc : Qp)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (Ma : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      create_fresh_ty_body γs j γl γu γd γk pd pav pu bn γ γpr
-                           inodestart ninodes nib dev ty kd dqp
+      create_fresh_ty_body γs j γl γu γd γk pd pav pu bn γpr
+ ninodes ty kd dqp
                            u Sb t qt qc pidv dq dqs dqn Ma K eb b lks Vpr.
 Proof.
   intros.
@@ -455,16 +450,16 @@ Proof.
   iEval (rewrite -Hdevadr) in "Hidev".
   iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0)
             (mword_of_int (CK + 0xa6)) Ra0 Rs1
-            (mword_of_int 0 : mword 12) A1 K dev b (dqm := dqp)
+            (mword_of_int 0 : mword 12) A1 K icfg_dev b (dqm := dqp)
             ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hidev").
   { iApply (cri_0a6 with "Htext"). }
   iIntros (CID2 Hq2) "Hcg Hpc Hidev".
   iEval (rewrite Hdevadr) in "Hidev".
   pose (A2 := <[Regidx Ra0 := regval_into_reg
-                 (sign_extend' 64 (dev : mword 32))]> A1).
+                 (sign_extend' 64 (icfg_dev : mword 32))]> A1).
   change (<[Regidx Ra0 := regval_into_reg
-              (sign_extend' 64 (dev : mword 32))]> A1) with A2.
-  assert (HA2a0 : A2 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64))
+              (sign_extend' 64 (icfg_dev : mword 32))]> A1) with A2.
+  assert (HA2a0 : A2 !!! Regidx Ra0 = (sign_extend' 64 icfg_dev : mword 64))
     by (rewrite /A2; apply upd_eq).
   assert (HA2a1 : A2 !!! Regidx Ra1 = (sign_extend' 64 ty : mword 64))
     by (rewrite /A2 upd_ne; [exact HA1a1 | nz]).
@@ -489,7 +484,7 @@ Proof.
   assert (HA3ra : A3 !!! Regidx Rra
                   = add_vec_int (mword_of_int (CK + 0xa8) : mword 64) 4)
     by (rewrite /A3; apply upd_eq).
-  assert (HA3a0 : A3 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64))
+  assert (HA3a0 : A3 !!! Regidx Ra0 = (sign_extend' 64 icfg_dev : mword 64))
     by (rewrite /A3 upd_ne; [exact HA2a0 | nz]).
   assert (HA3a1 : A3 !!! Regidx Ra1 = (sign_extend' 64 ty : mword 64))
     by (rewrite /A3 upd_ne; [exact HA2a1 | nz]).
@@ -505,8 +500,8 @@ Proof.
   iDestruct (cft_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
   iDestruct (cpu_own_transport CID CID3 0%nat eb (proc_addr j) b
                ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-  iApply (Hia CID3 γs j γl γu γd γk pd pav pu bn γ γpr
-            inodestart ninodes nib dev ty u Sb pidv dq dqs dqn A3 K eb b lks Vpr
+  iApply (Hia CID3 γs j γl γu γd γk pd pav pu bn γpr
+            ninodes ty u Sb pidv dq dqs dqn A3 K eb b lks Vpr
             t qc
             HKia Hlg Hist Hiregb Hn1 Hn2 Hn3 Htynz Htyk Hpkc Hj Hgs HA3a0 HA3a1 Heb
             Hbelow
@@ -593,7 +588,7 @@ Proof.
        handed over as it stands.  ([ireg_wd_lic]'s
        ClaimK arm does not mention its gname, so the [fsc_ireg] here is any gname
        in scope and the [gsh] the call wants is convertible with it.) *)
-    iDestruct (inode_claimed_to_ClaimK ty kslot q dev inum t qc fsc_ireg with "Hpkg")
+    iDestruct (inode_claimed_to_ClaimK ty kslot q icfg_dev inum t qc fsc_ireg with "Hpkg")
       as "[Href Hlic]".
     (* the claimant's reference SHEDS a share for ilock and keeps the rest *)
     iEval (rewrite inode_ref_shed) in "Href".
@@ -606,8 +601,8 @@ Proof.
     iDestruct (cpu_own_transport CID4 CID7 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Hil CID7 γs j γl γu γd γk pd pav pu bn gilc gislc
-              inodestart nib kslot (q/2)%Qp gsh
-              (DepTx (q/2)%Qp dev inum gsh t qt) (ClaimK ty t qc) dev inum pidv dq dqs
+              kslot (q/2)%Qp gsh
+              (DepTx (q/2)%Qp icfg_dev inum gsh t qt) (ClaimK ty t qc) inum pidv dq dqs
               B1 K eb b lks Vpr
               HKil eq_refl ltac:(discriminate)
               Hkslt Hlg Hist Hcblk Hinb Hj Hgs HB1a0 ltac:(lkbelow)

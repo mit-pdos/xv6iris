@@ -702,9 +702,9 @@ Section ProofUserinit.
                          _ & _ & _ & _ & %Hg)".
       iPureIntro. exact Hg. }
     pose (N := MkUtNames γft γf γw γs j γl fsc_uart fsc_disk fsc_dlock pd pav pu
-                 γtl fsc_printk fsc_bio icfg_log icfg_dev
+                 γtl fsc_printk fsc_bio
                  iv1 DfracDiscarded fsc_kalloc fsc_kpages
-                 fsc_bmapstart icfg_ist icfg_nib fsc_size ks pid).
+                 fsc_bmapstart fsc_size ks pid).
     assert (Hwf : ut_wf N).
     { split_and!; [exact Hj | exact Hgl | exact Hnproc | exact (fgo_loggeom Hgeomok)]. }
     iAssert (park_env N) as "#Henv".

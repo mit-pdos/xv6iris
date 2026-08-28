@@ -205,28 +205,6 @@ Fixpoint run {X} (m : M X) (s : mstate) (x : X) (s' : mstate) {struct m} : Prop 
    [v_disk] ([DevModel.dev_read_v_disk]/[dev_write_v_disk]).  This is what
    lets the hart base rule FRAME [state_interp]'s durable disk conjunct;
    only the DISK's own DMA step moves the image. *)
-Lemma run_v_disk {X} (m : M X) :
-  forall s x s', run m s x s' ->
-    v_disk (dvirtio (mdev s')) = v_disk (dvirtio (mdev s)).
-Proof.
-  induction m as [y|T oc k IH]; intros s x s' Hrun.
-  - destruct Hrun as [_ ->]. reflexivity.
-  - destruct oc; simpl in Hrun;
-      try (exact (IH _ _ _ _ Hrun));
-      try (exfalso; exact Hrun);
-      try (destruct Hrun as (c & Hrun); exact (IH _ _ _ _ Hrun));
-      (destruct (dev_addr _) eqn:Hd;
-       [ (destruct (dev_read _ _ _) as [[w0 d']|] eqn:Hdr;
-          [ etransitivity; [exact (IH _ _ _ _ Hrun)|];
-            cbn; exact (dev_read_v_disk _ _ _ _ _ Hdr)
-          | exfalso; exact Hrun ])
-         ||
-         (destruct (dev_write _ _ _ _) as [d'|] eqn:Hdw;
-          [ etransitivity; [exact (IH _ _ _ _ Hrun)|];
-            cbn; exact (dev_write_v_disk _ _ _ _ _ Hdw)
-          | exfalso; exact Hrun ])
-       | try (destruct Hrun as (w & _ & Hrun)); exact (IH _ _ _ _ Hrun) ]).
-Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* 3. The fixed loop body: ONE real fetch-decode-execute cycle.            *)
@@ -358,12 +336,6 @@ Inductive mobs :=
 (* the OUTPUT bytes of an observation list -- [uart_step_wire]'s currency.
    A direct Fixpoint (not stdpp's [omap] instance method) so [cbn] reduces
    it on literal lists without unfolding through the typeclass. *)
-Fixpoint obs_wire (κ : list mobs) : list (bv 8) :=
-  match κ with
-  | [] => []
-  | ObsUartOut b :: κ' => b :: obs_wire κ'
-  | _ :: κ' => obs_wire κ'
-  end.
 
 (* ---------------------------------------------------------------------- *)
 (* 3c. The device execution contexts -- THREE of them, one per device.      *)
@@ -455,19 +427,6 @@ Proof. intros H. destruct H; reflexivity. Qed.
    counterpart: an accepted byte is recorded nowhere cumulative -- the rx
    FIFO is consumed -- so [ObsUartIn] is DEFINED as the acceptance event
    rather than mirrored from state.) *)
-Lemma uart_step_wire (d : dev_state) (κ : list mobs) (d' : dev_state) :
-  uart_step d κ d' ->
-  u_wire (duart d') = u_wire (duart d) ++ obs_wire κ.
-Proof.
-  intros H. destruct H as [b u' Htx | b u' Hrx | p' _ _ |].
-  - cbn [duart set_duart]. rewrite (uart_tx_pop_wire _ _ _ Htx).
-    destruct (uart_loopback d.(duart)); cbn [obs_wire];
-      by rewrite ?app_nil_r.
-  - cbn [duart set_duart]. rewrite (uart_rx_push_wire _ _ _ Hrx).
-    cbn [obs_wire]. by rewrite app_nil_r.
-  - cbn [duart set_dplic obs_wire]. by rewrite app_nil_r.
-  - cbn [obs_wire]. by rewrite app_nil_r.
-Qed.
 
 (* The disk: complete a queued request by DMA, scribble anywhere if the queue
    the driver published is malformed, latch its own interrupt source, or
@@ -1190,18 +1149,8 @@ Lemma reset_regs_mideleg (c : CPU) (rs : regstate) :
   reset_regs c rs -> register_lookup mideleg rs = boot_w64 0.
 Proof. intros (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & H & _). exact H. Qed.
 
-Lemma reset_regs_senvcfg (c : CPU) (rs : regstate) :
-  reset_regs c rs -> register_lookup senvcfg rs = boot_w64 0.
-Proof. intros (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & H & _). exact H. Qed.
 
-Lemma reset_regs_mstateen0 (c : CPU) (rs : regstate) :
-  reset_regs c rs -> register_lookup mstateen0 rs = boot_w64 0.
-Proof. intros (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & H & _). exact H. Qed.
 
-Lemma reset_regs_sstateen0 (c : CPU) (rs : regstate) :
-  reset_regs c rs ->
-  register_lookup sstateen0 rs = (SailStdpp.Values.mword_of_int 0 : SailStdpp.Values.mword 32).
-Proof. intros (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & H). exact H. Qed.
 
 (* WHAT A BOOTED MACHINE LOOKS LIKE, with no reference to the machine it
    replaces: this is the fact set the power thread hands the boot client
@@ -1278,7 +1227,6 @@ Notation Loop := (LoopE gen_id cpu_id).
 Notation UartLoop := (UartLoopE gen_id).
 Notation DiskLoop := (DiskLoopE gen_id).
 Notation PlicLoop := (PlicLoopE gen_id).
-Notation PowerLoop := PowerLoopE.
 
 Definition prim_step
     (e : mexpr) (g : gstate) (κ : list mobs)
@@ -1400,19 +1348,6 @@ Proof.
   injection Heq as ->. by split_and!.
 Qed.
 
-Lemma prim_step_power_inv g κ e' g' efs :
-  prim_step PowerLoopE g κ e' g' efs ->
-  e' = PowerLoopE /\
-  ((g.(gpow) = true /\ κ = [ObsPowerOff] /\ efs = [] /\
-     g' = GState g.(gregs) g.(gmem) g.(gdev) (S g.(ggen)) false g.(gresv))
-   \/ (g.(gpow) = false /\ κ = [ObsPowerOn] /\ efs = power_fork g.(ggen) /\
-       boot_shape g g')).
-Proof.
-  intros [(? & ? & ? & Heq & _)
-         | [(? & Heq & _) | [(? & Heq & _) | [(? & Heq & _) | (_ & ? & Harm)]]]];
-    try discriminate Heq.
-  by split_and!.
-Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* SHAPE FACTS a hart step preserves: the successor is the SAME hart of the *)
@@ -1421,14 +1356,7 @@ Qed.
 (* [destruct] is over ~20 outcome arms, so it is done ONCE here.            *)
 (* ---------------------------------------------------------------------- *)
 
-Lemma hart_node_step_shape gen g cpu m e' g' :
-  hart_node_step gen g cpu m e' g' -> exists m', e' = HartE gen cpu m'.
-Proof. intros (m' & s' & r' & _ & -> & _). by eexists. Qed.
 
-Lemma hart_node_step_era gen g cpu m e' g' :
-  hart_node_step gen g cpu m e' g' ->
-  g'.(ggen) = g.(ggen) /\ g'.(gpow) = g.(gpow).
-Proof. by intros (m' & s' & r' & _ & _ & ->). Qed.
 
 (* A hart node never moves the disk IMAGE (crash.md): register effects and
    RAM accesses do not touch the device fabric at all, and an MMIO
@@ -1457,13 +1385,6 @@ Proof.
   - (* Choose *) by intros (ch & _ & -> & _).
 Qed.
 
-Lemma hart_node_step_v_disk gen g cpu m e' g' :
-  hart_node_step gen g cpu m e' g' ->
-  v_disk (dvirtio g'.(gdev)) = v_disk (dvirtio g.(gdev)).
-Proof.
-  intros (m' & s' & r' & Hn & _ & ->). cbn.
-  exact (mnode_step_v_disk _ _ _ _ _ _ _ Hn).
-Qed.
 
 (* THE BATCHING LICENCE (claude-notes/design/main-cycle-port.md §5): apart
    from hart [c]'s own steps and a PowerOn's whole-machine reset, the ONLY
@@ -1472,32 +1393,6 @@ Qed.
    the meta-level soundness of every batched register rule: a stretch of nodes
    whose registers the caller owns (and NEITHER pin is ownable -- both live in
    [WireInv]) cannot be invalidated by interference. *)
-Lemma prim_step_hart_regs_frame e g κ e' g' efs (c : CPU) :
-  prim_step e g κ e' g' efs ->
-  (forall gen m, e <> HartE gen c m) ->
-  e <> PowerLoopE ->
-  g'.(gregs) c = g.(gregs) c \/
-  g'.(gregs) c = register_set sig_seip
-      (bool_to_bit (dev_seip g.(gdev) (fin_to_nat c))) (g.(gregs) c) \/
-  g'.(gregs) c = register_set sig_meip
-      (bool_to_bit (dev_meip g.(gdev) (fin_to_nat c))) (g.(gregs) c).
-Proof.
-  intros Hstep Hnot Hnp.
-  destruct Hstep as
-    [ (gen & cpu & m & -> & _ & _ & [ (_ & (m' & s' & r' & _ & _ & ->)) | (_ & _ & ->) ])
-    | [ (gen & -> & _ & _ & [ (_ & d' & _ & ->) | (_ & _ & ->) ])
-    | [ (gen & -> & _ & _ & _ & [ (_ & d' & m' & _ & _ & ->) | (_ & ->) ])
-    | [ (gen & -> & _ & _ & _ & [ (_ & gr' & Hp & ->) | (_ & ->) ])
-    | (-> & _) ] ] ] ];
-    try (by left).
-  - (* another hart's node: [c] is not [cpu], so the insert misses [c] *)
-    left. cbn. rewrite /insert /greg_insert.
-    case_decide as Hc; [exfalso; subst c; exact (Hnot gen m eq_refl)|done].
-  - (* a wire: [sig_seip] or [sig_meip] on whichever hart the PLIC chose *)
-    destruct Hp as [c0|c0]; cbn; rewrite /insert /greg_insert;
-      case_decide as Hc; [subst c0; by right; left|by left
-                         |subst c0; by right; right|by left].
-Qed.
 
 (* THE CORPSE STEP is always available, at every expression that carries a
    generation -- which is what makes [wp_dead] provable uniformly. *)
@@ -1513,17 +1408,6 @@ Qed.
    than as [g]: the two are only EXTENSIONALLY equal, and collapsing them
    would cost this file [functional_extensionality] for a reducibility
    witness that does not need it. *)
-Lemma prim_step_hart_restart gen cpu g (tick : bool) :
-  thread_live g gen ->
-  prim_step (LoopE gen cpu) g [] (HartE gen cpu (riscv_step tick))
-    (GState (<[cpu := g.(gregs) cpu]> g.(gregs)) g.(gmem) g.(gdev)
-       g.(ggen) g.(gpow) (<[cpu := None]> g.(gresv))) [].
-Proof.
-  intros Hl. left. exists gen, cpu, (Interface.Ret tt).
-  split_and!; try reflexivity. left. split; [exact Hl|].
-  exists (riscv_step tick), (MState (g.(gregs) cpu) g.(gmem) g.(gdev)), None.
-  split_and!; [by exists tick|reflexivity|reflexivity].
-Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* THE RESERVATION INVARIANT [resv_ok] IS PRESERVED BY EVERY STEP           *)
@@ -1569,15 +1453,6 @@ Proof.
     exists i. split_and!; [apply elem_of_list_further, Hi|done|done].
 Qed.
 
-Local Lemma foldr_ins_dom (l : list nat) (pa : Arch.pa) (f : nat -> bv 8)
-    (mm : gmap Arch.pa (bv 8)) :
-  dom (foldr (fun j acc => <[pa_add pa j := f j]> acc) mm l)
-  = list_to_set (pa_add pa <$> l) ∪ dom mm.
-Proof.
-  induction l as [|j l IH].
-  - cbn [foldr fmap list_fmap list_to_set]. set_solver.
-  - cbn [foldr fmap list_fmap list_to_set]. rewrite dom_insert_L IH. set_solver.
-Qed.
 
 (* a store leaves every byte OUTSIDE its footprint alone *)
 Lemma write_bytes_lookup_notin {w : N} (mm : gmap Arch.pa (bv 8))
@@ -1589,12 +1464,6 @@ Proof.
   apply elem_of_seq in Hj. split; [lia|done].
 Qed.
 
-Lemma dom_snap_of {w : N} (pa : Arch.pa) (n : N) (v : bv w) :
-  dom (snap_of pa n v) = footprint pa n.
-Proof.
-  unfold snap_of, write_bytes, footprint. rewrite foldr_ins_dom dom_empty_L.
-  set_solver.
-Qed.
 
 Lemma snap_of_lookup_Some {w : N} (pa : Arch.pa) (n : N) (v : bv w)
     (a : Arch.pa) (b : bv 8) :

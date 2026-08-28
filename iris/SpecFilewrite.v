@@ -263,9 +263,9 @@ Record fwrite_names := MkFWriteNames {
   fwn_pav        : mword 64;
   fwn_pu         : mword 64;
   fwn_bio        : bio_names;
-  fwn_log        : log_names;     (* begin_op / end_op                      *)
+  (* [fwn_log] and [fwn_inodestart] ARE GONE (rank 1c): the log's names and
+     the inode region's first block are ambient. *)
   fwn_pr         : gname;         (* balloc's printk credential             *)
-  fwn_inodestart : Z;
   fwn_bmapstart  : Z;             (* the bitmap, for bmap -> balloc          *)
   fwn_size       : Z;             (* sb.size                                *)
   fwn_dqs        : dfrac;         (* sb.inodestart                          *)
@@ -294,9 +294,8 @@ Global Instance fwrite_names_inhabited : Inhabited fwrite_names :=
     (MkBioNames 1%positive 1%positive
        (fun _ => (1%positive, 1%positive)) (fun _ => 1%positive)
        (fun _ => 1%positive))
-    (MkLogNames 1%positive 1%positive 1%positive 1%positive 1%positive)
     1%positive
-    0 0 0
+    0 0
     (DfracOwn 1) (DfracOwn 1) (DfracOwn 1)
     (fun _ => mword_of_int 0) (fun _ => DfracOwn 1)).
 
@@ -333,19 +332,20 @@ Section SpecFilewrite.
      is ASSUMED -- LinkConsolewrite.v, the write side's twin of
      LinkConsoleread.v).  The address is [a_devsw_write], NOT
      [SpecFileread.a_devsw_read]: decode note 2. *)
-  Definition filewrite_dev_env (fn : fwrite_names) (Cf : fcontent) : iProp Σ :=
-    (if decide (dev_major Cf <= NDEV_max)
-     then ⌜fwn_wp fn (dev_major Cf) = (zero_reg : mword 64)
-           \/ fwn_wp fn (dev_major Cf)
+  (* keyed on the MAJOR, [SpecFileread.fileread_dev_env]'s twin -- see its
+     note for why the lower bound joined the range test. *)
+  Definition filewrite_dev_env (fn : fwrite_names) (mj : Z) : iProp Σ :=
+    (if decide (0 <= mj <= NDEV_max)
+     then ⌜fwn_wp fn mj = (zero_reg : mword 64)
+           \/ fwn_wp fn mj
                = (mword_of_int KernelSyms.consolewrite : mword 64)⌝ ∗
-          a_devsw_write (dev_major Cf) ↦₈{fwn_dqv fn (dev_major Cf)}
-            fwn_wp fn (dev_major Cf) ∗
+          a_devsw_write mj ↦₈{fwn_dqv fn mj} fwn_wp fn mj ∗
           filewrite_dev_caps fn
      else emp)%I.
 
   (* it is only READ, so it comes back as it went in *)
-  Definition filewrite_dev_out (fn : fwrite_names) (Cf : fcontent) : iProp Σ :=
-    filewrite_dev_env fn Cf.
+  Definition filewrite_dev_out (fn : fwrite_names) (mj : Z) : iProp Σ :=
+    filewrite_dev_env fn mj.
 
   (* ---- THE WHOLE COLUMN, and how one entry comes out of it ----
      [SpecFileread.fileread_devsw]'s twin at the write side, and there for the
@@ -382,9 +382,9 @@ Section SpecFilewrite.
     iExact "Hw".
   Qed.
 
-  Lemma filewrite_devsw_acc (fn : fwrite_names) (Cf : fcontent) :
+  Lemma filewrite_devsw_acc (fn : fwrite_names) (mj : Z) :
     filewrite_devsw fn -∗
-    filewrite_dev_env fn Cf ∗ (filewrite_dev_out fn Cf -∗ filewrite_devsw fn).
+    filewrite_dev_env fn mj ∗ (filewrite_dev_out fn mj -∗ filewrite_devsw fn).
   Proof.
     (* THE UNFOLD ORDER MATTERS: [/filewrite_dev_out] rewrites to [filewrite_dev_env], so
        unfolding [filewrite_dev_env] FIRST leaves the out side folded and the
@@ -394,12 +394,9 @@ Section SpecFilewrite.
     iIntros "[#Hcaps H]".
     case_decide as Hle;
       [| iSplitR; [done | iIntros "_"; iFrame "Hcaps"; iExact "H"]].
-    (* the major is a [bv_unsigned], hence non-negative, so it IS the index
-       [Z.to_nat] of it names *)
-    pose proof (proj1 (bv_unsigned_in_range _ (fc_major Cf))) as Hnn.
-    rewrite /dev_major in Hle Hnn |- *.
-    set (i := Z.to_nat (bv_unsigned (fc_major Cf))).
-    assert (Hid : Z.of_nat i = bv_unsigned (fc_major Cf))
+    destruct Hle as [Hnn Hle].
+    set (i := Z.to_nat mj).
+    assert (Hid : Z.of_nat i = mj)
       by (rewrite /i; apply Z2Nat.id; exact Hnn).
     assert (Hlk : seq 0 (Z.to_nat NDEV_max + 1) !! i = Some i).
     { rewrite lookup_seq. split; [reflexivity|].
@@ -436,17 +433,17 @@ Section SpecFilewrite.
      reference at the call ([SpecFileread.fileread_pay_carve]). *)
   Definition filewrite_fs_env (γf : gname) (fn : fwrite_names) : iProp Σ :=
     (⌜log_geom_ok fsc_cov fsc_logst⌝ ∗
-     ⌜0 <= fwn_inodestart fn⌝ ∗
+     ⌜0 <= icfg_ist⌝ ∗
      (* EVERY inum the region covers has its block inside [cov] *)
      ⌜forall inum : mword 32,
         bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
-        IBLOCK inum (fwn_inodestart fn) ∈ fsc_cov⌝ ∗
+        IBLOCK inum icfg_ist ∈ fsc_cov⌝ ∗
      (* ...and none of those blocks is one of the log's own slots.  writei's
         iupdate flushes the inode's block, and this is iupdate's premise,
         quantified for the same reason as the one above. *)
      ⌜forall inum : mword 32,
         bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
-        ~ (IBLOCK inum (fwn_inodestart fn)
+        ~ (IBLOCK inum icfg_ist
              ∈ log_region_set fsc_logst)⌝ ∗
      (* the bitmap's geometry, forwarded through bmap to balloc *)
      ⌜bitmap_geom_ok fsc_cov fsc_logst (fwn_bmapstart fn)
@@ -458,7 +455,7 @@ Section SpecFilewrite.
        (fs_view fsc_fs (fwn_disk fn) icfg_dev fsc_cov) ∗
      (* THE LOG: begin_op mints the reservation, end_op spends it, and the
         loop does one transaction PER CHUNK *)
-     log_ctx (fwn_log fn) (fwn_bio fn) fsc_fs fsc_cov
+     log_ctx icfg_log (fwn_bio fn) fsc_fs fsc_cov
              fsc_logst icfg_dev ∗
      (* end_op's crash seam and era certificate *)
      fs_crash_seam fsc_cov fsc_logst ∗
@@ -471,7 +468,7 @@ Section SpecFilewrite.
      itable_inv ∗
      ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov
                 fsc_logst ∗
-     ireg_inv fsc_ireg fsc_fs (fwn_inodestart fn) icfg_nib ∗
+     ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
      (* EVERY ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
      ic_sleeplocks fsc_ic ∗
      (* THE LENT SHARE AND ITS GENERATION'S TYPE WITNESS ARE NOT HERE.
@@ -486,7 +483,7 @@ Section SpecFilewrite.
         condition together, and takes the share back. *)
      (* sb.inodestart (iupdate), sb.size and sb.bmapstart (bmap -> balloc) *)
      sb_inodestart ↦₄{fwn_dqs fn}
-       (mword_of_int (fwn_inodestart fn) : mword 32) ∗
+       (mword_of_int icfg_ist : mword 32) ∗
      sb_size ↦₄{fwn_dqbs fn} (mword_of_int (fwn_size fn) : mword 32) ∗
      sb_bmapstart ↦₄{fwn_dqb fn} (mword_of_int (fwn_bmapstart fn) : mword 32) ∗
      (* THE BITMAP's invariant (BitmapInv.v): the pool bmap -> balloc draws
@@ -510,27 +507,30 @@ Section SpecFilewrite.
      And nothing about the bitmap: its invariant is persistent. *)
   Definition filewrite_fs_out (fn : fwrite_names) : iProp Σ :=
     (sb_inodestart ↦₄{fwn_dqs fn}
-       (mword_of_int (fwn_inodestart fn) : mword 32) ∗
+       (mword_of_int icfg_ist : mword 32) ∗
      sb_size ↦₄{fwn_dqbs fn} (mword_of_int (fwn_size fn) : mword 32) ∗
      sb_bmapstart ↦₄{fwn_dqb fn} (mword_of_int (fwn_bmapstart fn) : mword 32) ∗
      bslots 3)%I.
 
   (* ---- and the three, selected by the file's type ---- *)
+  (* keyed on the descriptor's STATE -- see [SpecFileread.fileread_env]. *)
   Definition filewrite_env (γf : gname)
-      (fn : fwrite_names) (Cf : fcontent) : iProp Σ :=
-    (if bool_decide (fc_type Cf = FD_PIPE) then emp
-     else if bool_decide (fc_type Cf = FD_DEVICE) then filewrite_dev_env fn Cf
-     else if bool_decide (fc_type Cf = FD_INODE)
-     then filewrite_fs_env γf fn
-     else emp)%I.
+      (fn : fwrite_names) (st : fdstate) : iProp Σ :=
+    (match st with
+     | FdOpen (FdPipe _)    => emp
+     | FdOpen (FdDevice mj) => filewrite_dev_env fn mj
+     | FdOpen (FdInode _)   => filewrite_fs_env γf fn
+     | FdClosed             => emp
+     end)%I.
 
-  Definition filewrite_env_out (fn : fwrite_names) (Cf : fcontent)
+  Definition filewrite_env_out (fn : fwrite_names) (st : fdstate)
       : iProp Σ :=
-    (if bool_decide (fc_type Cf = FD_PIPE) then emp
-     else if bool_decide (fc_type Cf = FD_DEVICE) then filewrite_dev_out fn Cf
-     else if bool_decide (fc_type Cf = FD_INODE)
-     then filewrite_fs_out fn
-     else emp)%I.
+    (match st with
+     | FdOpen (FdPipe _)    => emp
+     | FdOpen (FdDevice mj) => filewrite_dev_out fn mj
+     | FdOpen (FdInode _)   => filewrite_fs_out fn
+     | FdClosed             => emp
+     end)%I.
 
   (* THE EARLY RETURN'S OBLIGATION, checked here rather than discovered in
      the proof: [f->writable == 0] returns BEFORE THE PROLOGUE (decode note
@@ -545,37 +545,28 @@ Section SpecFilewrite.
     iFrame "Hsbi Hsbs Hsbb Hbsl".
   Qed.
 
-  Lemma filewrite_env_out_of_env γf fn Cf :
-    filewrite_env γf fn Cf -∗ filewrite_env_out fn Cf.
+  Lemma filewrite_env_out_of_env γf fn st :
+    filewrite_env γf fn st -∗ filewrite_env_out fn st.
   Proof.
     rewrite /filewrite_env /filewrite_env_out.
-    case_bool_decide; [by iIntros "$"|].
-    case_bool_decide; [by iIntros "$"|].
-    case_bool_decide; [|by iIntros "$"].
+    destruct st as [|[?|?|?]]; try by iIntros "$".
     iApply filewrite_fs_env_out.
   Qed.
 
   (* A file that is neither a pipe, nor a device, nor an inode costs its
      writer nothing -- the arm is [panic] at +0x11e (decode note 3), and
      [SpecPanic] discharges it. *)
-  Lemma filewrite_env_none γf fn Cf :
-    fc_type Cf = FD_NONE -> ⊢ filewrite_env γf fn Cf.
-  Proof.
-    intro Ht. rewrite /filewrite_env Ht.
-    rewrite bool_decide_eq_false_2; [|by vm_compute].
-    rewrite bool_decide_eq_false_2; [|by vm_compute].
-    rewrite bool_decide_eq_false_2; [|by vm_compute].
-    done.
-  Qed.
+  Lemma filewrite_env_none γf fn :
+    ⊢ filewrite_env γf fn FdClosed.
+  Proof. done. Qed.
 
 End SpecFilewrite.
 
 Definition wp_filewrite_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
     (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
-    (k : nat) (q : Qp) (Cf : fcontent) (st : fdstate) (* the borrowed reference *)
+    (k : nat) (q : Qp) (st : fdstate)            (* the borrowed reference  *)
     (fn : fwrite_names)                          (* the heavy arms' ghosts  *)
     (pidv : mword 32) (V : pprivate)
     (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string) :=
@@ -606,18 +597,6 @@ Definition wp_filewrite_sconf_body
   - 2 ^ 31 <= n < 2 ^ 31 ->
   (* PARKING PREMISE (hart-generic scheduler protocol): every arm sleeps. *)
   eb = true ->
-  (* filewrite's FD_INODE arm is the whole cone: begin_op/end_op ("log", 3),
-     ilock ("bcache", 4), iunlock ("sleep lock", 6) -- "log" is the lowest,
-     so one premise there covers the whole cone via [locks_below_mono]. *)
-  (* THE AMBIENT LOG, named (durable-fs-plan.md section 3, [ilock];
-     durable-disk B''-tx).  The FD_INODE arm write-locks its inode inside
-     its own transaction, and the escrow's write arm parks a share of
-     [icfg_log]'s element -- the escrow carries no [log_names] parameter.
-     It joins [fwn_j]/[fwn_procs] as one more equation the record takes
-     rather than derives; [ProofSyscall]'s [sysc_ties] already proves it
-     ([sct_log]).  It sits BEFORE the rank premise because every caller
-     discharges that one by [lkbelow] at the end. *)
-  fwn_log fn = icfg_log ->
   locks_below lks "log" ->
   sie_cap_gpr KT1 m K b pj -∗
   (* noff = 0: everything below reaches sleep *)
@@ -631,13 +610,13 @@ Definition wp_filewrite_sconf_body
      this path [filewrite_env] reduces to [emp]. *)
   panic_env -∗
   (* the borrowed reference -- at an ARBITRARY fraction, and given back *)
-  file_ref γf k q Cf st -∗
+  file_ref γf k q st -∗
   (* ambient, because three of the four arms copy FROM user memory *)
   proc_priv_core pj pidv V -∗
   kalloc_env γa None -∗
   procs_inv γs -∗
   (* ...and what the file's TYPE selects *)
-  filewrite_env γf fn Cf -∗
+  filewrite_env γf fn st -∗
   (* THE CROSSING IS [true], NOT [b].  Every arm of this function parks, and
      the porting guide's rule is that a PARKING function's [wp_next] index is
      [true] unconditionally -- a swtch moves the hart whatever SIE was doing.
@@ -653,21 +632,20 @@ Definition wp_filewrite_sconf_body
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
-      file_ref γf k q Cf st -∗
+      file_ref γf k q st -∗
       proc_priv_core pj pidv (upd_upt V P') -∗
-      filewrite_env_out fn Cf -∗
+      filewrite_env_out fn st -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type FILEWRITE.
   Parameter wp_filewrite_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
       (γa : gname) (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
-      (k : nat) (q : Qp) (Cf : fcontent) (st : fdstate)
+      (k : nat) (q : Qp) (st : fdstate)
       (fn : fwrite_names)
       (pidv : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string),
-      wp_filewrite_sconf_body γa γf γs j γlp k q Cf st fn pidv V m K eb n b lks.
+      wp_filewrite_sconf_body γa γf γs j γlp k q st fn pidv V m K eb n b lks.
 End FILEWRITE.

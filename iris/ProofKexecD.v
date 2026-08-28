@@ -752,7 +752,7 @@ Section KexecDCommit.
   (* ------------------------------------------------------------------- *)
   Definition kxd_res
       (jp : nat) (bn : bio_names) (ga gf : gname)
-      (bmapstart inodestart : Z)
+      (bmapstart : Z)
       (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
@@ -763,7 +763,7 @@ Section KexecDCommit.
       (ef : nat -> bv 8) (P : uptd) (c : nat) (last : mword 64) : iProp Σ :=
     (iref_slots 2 ∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
-     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
+     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) ∗
      bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size ∗
      bslots 3 ∗
      proc_pt P ∗
@@ -876,7 +876,7 @@ Section KexecDCommit.
   Lemma kxd_commit
       (Q : mword 64 -> Prop)
       (jp : nat) (bn : bio_names) (ga gf : gname)
-      (bmapstart inodestart : Z)
+      (bmapstart : Z)
       (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -926,7 +926,7 @@ Section KexecDCommit.
     trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jp) -∗
     kalloc_env ga None -∗
-    kxd_res jp bn ga gf bmapstart inodestart size
+    kxd_res jp bn ga gf bmapstart size
             plen pfun na avf aslen afun pidv
             (upd_tf V (<[tf_arg_idx 1
                          := (mword_of_int (kxc_sp_final (uint sz1) alen c)
@@ -935,7 +935,7 @@ Section KexecDCommit.
             w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P c (pa_add pv q) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
     KexecOkQ.kexec_closer Q gf ga (proc_addr jp) pidv V m (ret_pc ra0) K
-         eb eb ∅ dqb dqs bmapstart inodestart na alen plen pv dqpv pfun
+         eb eb ∅ dqb dqs bmapstart na alen plen pv dqpv pfun
          av dqa avf aslen dqas afun) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1895,7 +1895,7 @@ Section KexecDMain.
   Lemma kxd_phaseD
       (Q : mword 64 -> Prop)
       (jp : nat) (bn : bio_names) (ga gf : gname)
-      (bmapstart inodestart : Z)
+      (bmapstart : Z)
       (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -1924,13 +1924,13 @@ Section KexecDMain.
     m !!! Regidx Rs6 = w8 -> m !!! Regidx Rs7 = w9 -> m !!! Regidx Rs8 = w10 ->
     m !!! Regidx Rs9 = w11 -> m !!! Regidx Rs10 = w12 ->
     kernel_text -∗
-    kxc_at_2a6 jp bn ga gf bmapstart inodestart size
+    kxc_at_2a6 jp bn ga gf bmapstart size
                plen pfun na avf alen aslen afun pidv V eb dqb dqs dqa dqpv dqas
                M K sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P (pv_sz V) sz1 (m !!! Regidx Rs11) c -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
     KexecOkQ.kexec_closer Q gf ga (proc_addr jp) pidv V m (ret_pc ra0) K
-         eb eb ∅ dqb dqs bmapstart inodestart na alen plen pv dqpv pfun
+         eb eb ∅ dqb dqs bmapstart na alen plen pv dqpv pfun
          av dqa avf aslen dqas afun) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -2125,7 +2125,7 @@ Section KexecDMain.
     iAssert (∀ (last : mword 64),
                word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) last -∗
                ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) -∗
-               kxd_res jp bn ga gf bmapstart inodestart size
+               kxd_res jp bn ga gf bmapstart size
                        plen pfun na avf aslen afun pidv
                        (upd_tf V (<[tf_arg_idx 1
                                     := (mword_of_int
@@ -2185,7 +2185,7 @@ Section KexecDMain.
       iDestruct (wp_next_retarget CID0 CID5 true (proc_addr jp) _ Hcr5
                    with "Hcont") as "Hcont".
       iApply (kxd_commit (CID0 := CID5) Q jp bn ga gf bmapstart
-                inodestart size plen pfun na avf alen aslen afun pidv V eb
+                size plen pfun na avf alen aslen afun pidv V eb
                 dqb dqs dqa dqpv dqas m D3 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P sz1 c 0%nat
                 HQe ltac:(lia) Hcstr ltac:(lia) Hnamax Hsz1ge Hceq
@@ -2330,7 +2330,7 @@ Section KexecDMain.
       iDestruct (wp_next_retarget CID0 CID9 true (proc_addr jp) _ Hcr9
                    with "Hcont") as "Hcont".
       iApply (kxd_commit (CID0 := CID9) Q jp bn ga gf bmapstart
-                inodestart size plen pfun na avf alen aslen afun pidv V eb
+                size plen pfun na avf alen aslen afun pidv V eb
                 dqb dqs dqa dqpv dqas m Mf K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P sz1 c q'
                 HQe ltac:(lia) Hcstr Hq' Hnamax Hsz1ge Hceq

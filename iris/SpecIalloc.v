@@ -65,13 +65,13 @@
 
    ialloc's last act is [return iget(dev, inum)] at +0xaa, so the success
    arm's payout is [SpecIget]'s: a slot [kslot < NINODE], a fraction [q],
-   [a0 = ientry kslot], and ONE [IcacheRef.inode_ref kslot q dev inum].  The
-   inum is existential -- the scan finds it -- and its region bound
-   [bv_unsigned inum < 16 * nib] travels with it, which is what lets a
-   caller rebuild [IcacheRef.inode_held] once it also knows
-   [dev = icfg_dev] and [nib = icfg_nib].  Deliberately NOT a premise here:
-   ialloc is device-generic exactly as iget is, and the two ties are the
-   caller's to make.
+   [a0 = ientry kslot], and ONE [IcacheRef.inode_ref kslot q icfg_dev inum].
+   The inum is existential -- the scan finds it -- and its region bound
+   [bv_unsigned inum < 16 * icfg_nib] travels with it, which is what lets a
+   caller rebuild [IcacheRef.inode_held] outright.  Until rank 1c the device
+   and the inode count were THREADED and the caller had to bring
+   [dev = icfg_dev] / [nib = icfg_nib]; there is one file system and one
+   device, so both are read off the class now and the two ties are gone.
 
    The claimed record is named too, as [ialloc_fresh ty] -- nonzero type,
    zero size, thirteen zero address words, and NOTHING ELSE, because the
@@ -180,15 +180,13 @@ Proof. rewrite /dinode_wf /ialloc_fresh /=. reflexivity. Qed.
 Definition wp_ialloc_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
       ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names)
     (γpr : gname)
-    (inodestart : Z) (ninodes : Z) (nib : nat)
-    (dev : mword 32) (ty : mword 16)
+ (ninodes : Z)
+ (ty : mword 16)
     (u : nat)
     (pidv : mword 32) (dq dqs dqn : dfrac)
     (m : regfile) (K : nat) (eb : bool)
@@ -201,15 +199,15 @@ Definition wp_ialloc_sconf_body
   (* bread's / log_write's block-number arithmetic, and the log's own
      storage *)
   log_geom_ok fsc_cov fsc_logst ->
-  0 <= inodestart ->
+  0 <= icfg_ist ->
   (* EVERY inum the region covers lives in a covered HOME block: bread's
      premise and log_write's, for the inum the scan happens to stop at.
      The scan cannot know it in advance, so the premise is the quantified
      one ([InodeInv.ireg_blocks_ok]). *)
-  ireg_blocks_ok inodestart nib fsc_cov fsc_logst ->
+  ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
   (* THE THREE GEOMETRY PREMISES -- see the header *)
   1 < ninodes ->
-  ninodes <= 16 * Z.of_nat nib ->
+  ninodes <= 16 * Z.of_nat icfg_nib ->
   ninodes < 2 ^ 31 ->
   (* the type actually installs an ALLOCATED record; [fresh_shape] and
      therefore the whole claim need it, and every caller passes a literal *)
@@ -229,7 +227,7 @@ Definition wp_ialloc_sconf_body
   γs !! j = Some γl ->
   (* a0 = dev, a1 = type: the RV64 ABI's sign extension, and [sh s6,0(s3)]
      at +0x94 stores exactly the low sixteen bits of a1 *)
-  m !!! Regidx (mword_of_int 10 : mword 5) = (sign_extend' 64 dev : mword 64) ->
+  m !!! Regidx (mword_of_int 10 : mword 5) = (sign_extend' 64 icfg_dev : mword 64) ->
   m !!! Regidx (mword_of_int 11 : mword 5) = (sign_extend' 64 ty : mword 64) ->
   (* PARKING PREMISE (hart-generic scheduler protocol) -- bread sleeps *)
   eb = true ->
@@ -244,15 +242,15 @@ Definition wp_ialloc_sconf_body
   (* the general printk path's two PERSISTENT credentials *)
   kernel_data -∗
   printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
-  log_ctx γ bn fsc_fs fsc_cov fsc_logst dev -∗
+  bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
+  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
   (* the two superblock fields, read and handed straight back *)
   sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
-  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   (* THE INODE REGION -- persistent, and the ONLY region resource in this
      contract.  The claim is [InodeRegion.ireg_claim_au] and it takes
      nothing; see the header. *)
-  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B).  §2.4's
      claim-pin clause makes [ireg_slot]'s [c = Some] arm exhibit
      [IcacheRef.ireg_open], so [InodeRegion.ireg_claim_au] -- the one mover
@@ -277,13 +275,13 @@ Definition wp_ialloc_sconf_body
      one of its own; brelse gives it back *)
   bslots 2 -∗
   (* ---- THE ICACHE, exactly as iget takes it ---- *)
-  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   (* ONE ledger unit for the tail iget; RETURNED on the no-inodes arm *)
   iref_slot -∗
   (* THIS OPERATION'S RESERVATION: the one log_write the claim runs *)
-  log_op γ (S u) -∗
+  log_op icfg_log (S u) -∗
   (* THE CLAIMING TRANSACTION'S SHARE (durable-disk C-5, [FsCollect.v]'s
      residue (E)).  ialloc's claim leaves a CLAIM BOX -- a [fresh_shape]
      record on the region's IN arm -- standing until create's own [ilock]
@@ -310,7 +308,7 @@ Definition wp_ialloc_sconf_body
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
-      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       proc_priv_bare pj pidv Vpr -∗
       bslots 2 -∗
       (if alloc
@@ -318,7 +316,7 @@ Definition wp_ialloc_sconf_body
          ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = ientry kslot
           /\ (kslot < NINODE)%nat
           /\ 0 < bv_unsigned inum < ninodes
-          /\ bv_unsigned inum < 16 * Z.of_nat nib
+          /\ bv_unsigned inum < 16 * Z.of_nat icfg_nib
           (* what the claim WROTE: [ialloc_fresh ty], the weakest record a
              claim can promise and exactly what ilock's fill needs *)
           /\ dn' = ialloc_fresh ty
@@ -348,15 +346,15 @@ Definition wp_ialloc_sconf_body
             [InodeRegion.inode_claimed_to_ClaimK]: what sits beside the
             surviving reference IS [ireg_wd_lic (ClaimK ty)], the licence
             [wp_ilock_sconf]'s ClaimK arm asks for. *)
-         inode_claimed ty kslot q dev inum t qt ∗
-         log_op γ u
+         inode_claimed ty kslot q icfg_dev inum t qt ∗
+         log_op icfg_log u
        else (* NO INODES: a0 = 0, the ledger unit back, nothing spent -- and
                no claim box, so the transaction's share comes straight back *)
          ⌜mf !!! Regidx (mword_of_int 10 : mword 5)
           = (mword_of_int 0 : mword 64)⌝ ∗
          iref_slot ∗
          t ↪[ln_tx icfg_log]{#qt} tt ∗
-         log_op γ (S u)) -∗
+         log_op icfg_log (S u)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -379,15 +377,13 @@ Definition wp_ialloc_sconf_body
 Definition wp_ialloc_gen_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
       ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names)
     (γpr : gname)
-    (inodestart : Z) (ninodes : Z) (nib : nat)
-    (dev : mword 32) (ty : mword 16)
+ (ninodes : Z)
+ (ty : mword 16)
     (u : nat) (Sb : gset Z)
     (pidv : mword 32) (dq dqs dqn : dfrac)
     (m : regfile) (K : nat) (eb : bool)
@@ -400,15 +396,15 @@ Definition wp_ialloc_gen_body
   (* bread's / log_write's block-number arithmetic, and the log's own
      storage *)
   log_geom_ok fsc_cov fsc_logst ->
-  0 <= inodestart ->
+  0 <= icfg_ist ->
   (* EVERY inum the region covers lives in a covered HOME block: bread's
      premise and log_write's, for the inum the scan happens to stop at.
      The scan cannot know it in advance, so the premise is the quantified
      one ([InodeInv.ireg_blocks_ok]). *)
-  ireg_blocks_ok inodestart nib fsc_cov fsc_logst ->
+  ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
   (* THE THREE GEOMETRY PREMISES -- see the header *)
   1 < ninodes ->
-  ninodes <= 16 * Z.of_nat nib ->
+  ninodes <= 16 * Z.of_nat icfg_nib ->
   ninodes < 2 ^ 31 ->
   (* the type actually installs an ALLOCATED record; [fresh_shape] and
      therefore the whole claim need it, and every caller passes a literal *)
@@ -428,7 +424,7 @@ Definition wp_ialloc_gen_body
   γs !! j = Some γl ->
   (* a0 = dev, a1 = type: the RV64 ABI's sign extension, and [sh s6,0(s3)]
      at +0x94 stores exactly the low sixteen bits of a1 *)
-  m !!! Regidx (mword_of_int 10 : mword 5) = (sign_extend' 64 dev : mword 64) ->
+  m !!! Regidx (mword_of_int 10 : mword 5) = (sign_extend' 64 icfg_dev : mword 64) ->
   m !!! Regidx (mword_of_int 11 : mword 5) = (sign_extend' 64 ty : mword 64) ->
   (* PARKING PREMISE (hart-generic scheduler protocol) -- bread sleeps *)
   eb = true ->
@@ -443,15 +439,15 @@ Definition wp_ialloc_gen_body
   (* the general printk path's two PERSISTENT credentials *)
   kernel_data -∗
   printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
-  log_ctx γ bn fsc_fs fsc_cov fsc_logst dev -∗
+  bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
+  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
   (* the two superblock fields, read and handed straight back *)
   sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
-  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   (* THE INODE REGION -- persistent, and the ONLY region resource in this
      contract.  The claim is [InodeRegion.ireg_claim_au] and it takes
      nothing; see the header. *)
-  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B).  §2.4's
      claim-pin clause makes [ireg_slot]'s [c = Some] arm exhibit
      [IcacheRef.ireg_open], so [InodeRegion.ireg_claim_au] -- the one mover
@@ -476,7 +472,7 @@ Definition wp_ialloc_gen_body
      one of its own; brelse gives it back *)
   bslots 2 -∗
   (* ---- THE ICACHE, exactly as iget takes it ---- *)
-  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   (* ONE ledger unit for the tail iget; RETURNED on the no-inodes arm *)
@@ -486,7 +482,7 @@ Definition wp_ialloc_gen_body
      block it logs -- the spend is UNCONDITIONAL, which is why this form
      carries no boolean where [wp_iupdate_cred] carries [cru]
      ([CreateBudget.ia_spend] is the literal 1). *)
-  log_opS γ (S u) Sb -∗
+  log_opS icfg_log (S u) Sb -∗
   (* THE CLAIMING TRANSACTION'S SHARE (durable-disk C-5, [FsCollect.v]'s
      residue (E)).  ialloc's claim leaves a CLAIM BOX -- a [fresh_shape]
      record on the region's IN arm -- standing until create's own [ilock]
@@ -513,7 +509,7 @@ Definition wp_ialloc_gen_body
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
-      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       proc_priv_bare pj pidv Vpr -∗
       bslots 2 -∗
       (if alloc
@@ -521,7 +517,7 @@ Definition wp_ialloc_gen_body
          ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = ientry kslot
           /\ (kslot < NINODE)%nat
           /\ 0 < bv_unsigned inum < ninodes
-          /\ bv_unsigned inum < 16 * Z.of_nat nib
+          /\ bv_unsigned inum < 16 * Z.of_nat icfg_nib
           (* what the claim WROTE: [ialloc_fresh ty], the weakest record a
              claim can promise and exactly what ilock's fill needs *)
           /\ dn' = ialloc_fresh ty
@@ -529,17 +525,17 @@ Definition wp_ialloc_gen_body
           /\ fresh_shape dn'⌝ ∗
          (* THE RECEIPT, AS ONE ROW -- see the sconf twin above (SIMP-2;
             §2.4 / IIIb step 4). *)
-         inode_claimed ty kslot q dev inum t qt ∗
+         inode_claimed ty kslot q icfg_dev inum t qt ∗
          (* THE SET GROWTH IS DETERMINATE, exactly as [wp_iupdate_gen]'s is:
             ialloc logs the claimed inum's HOME BLOCK and nothing else. *)
-         log_opS γ u (Sb ∪ {[IBLOCK inum inodestart]})
+         log_opS icfg_log u (Sb ∪ {[IBLOCK inum icfg_ist]})
        else (* NO INODES: a0 = 0, the ledger unit back, nothing spent -- and
                no claim box, so the transaction's share comes straight back *)
          ⌜mf !!! Regidx (mword_of_int 10 : mword 5)
           = (mword_of_int 0 : mword 64)⌝ ∗
          iref_slot ∗
          t ↪[ln_tx icfg_log]{#qt} tt ∗
-         log_opS γ (S u) Sb) -∗
+         log_opS icfg_log (S u) Sb) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -554,17 +550,16 @@ Module Type IALLOC.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names)
       (γpr : gname)
-      (inodestart : Z) (ninodes : Z) (nib : nat)
-      (dev : mword 32) (ty : mword 16)
+ (ninodes : Z)
+ (ty : mword 16)
       (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (t : nat) (qt : Qp),
-      wp_ialloc_gen_body γs j γl γu γd γk pd pav pu bn γ γpr
-                         inodestart ninodes nib dev ty u Sb
+      wp_ialloc_gen_body γs j γl γu γd γk pd pav pu bn γpr
+ ninodes ty u Sb
                          pidv dq dqs dqn m K eb b lks Vpr t qt.
 
   Parameter wp_ialloc_sconf :
@@ -574,16 +569,15 @@ Module Type IALLOC.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names)
       (γpr : gname)
-      (inodestart : Z) (ninodes : Z) (nib : nat)
-      (dev : mword 32) (ty : mword 16)
+ (ninodes : Z)
+ (ty : mword 16)
       (u : nat)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (t : nat) (qt : Qp),
-      wp_ialloc_sconf_body γs j γl γu γd γk pd pav pu bn γ γpr
-                           inodestart ninodes nib dev ty u
+      wp_ialloc_sconf_body γs j γl γu γd γk pd pav pu bn γpr
+ ninodes ty u
                            pidv dq dqs dqn m K eb b lks Vpr t qt.
 End IALLOC.

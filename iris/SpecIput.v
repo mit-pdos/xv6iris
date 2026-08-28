@@ -129,15 +129,13 @@ Definition iput_units : nat := 3%nat.
 
 Definition wp_iput_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
     (gs : list gname) (j : nat) (gl : gname)          (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (g : log_names)
     (gil gisl : gname)                                (* ip->lock            *)
-    (bmapstart inodestart : Z) (nib : nat)
-    (size : Z) (dev : mword 32)
+    (bmapstart : Z)
+    (size : Z)
     (k : nat) (q : Qp) (inum : mword 32)
     (n : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -148,15 +146,6 @@ Definition wp_iput_sconf_body
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_iput <= K)%nat ->
-  (* THE ONE NEW PREMISE (durable-disk B''-tx5).  iput's three windows park a
-     SHARE of the freeing transaction's [LogDefs.ln_tx] element in the slot's
-     escrow, which is what lets a commit refute them; the escrow has no
-     [log_names] parameter, so the share it parks is [icfg_log]'s.  This form
-     needs no extra RESOURCE for it -- [log_op g n]'s own [LogInv.log_tx] is
-     the WHOLE element, and the derivation halves it -- only the equation
-     that says the two are the same log.  Every caller has it: it is
-     [ProofSyscall]'s [sct_log], the walk's own [g = icfg_log]. *)
-  g = icfg_log ->
   (* ENTRY BY SLOT -- a0 is the entry address, and [ientry_inj] is what
      makes the 64-bit pointer and the slot the same thing *)
   (k < NINODE)%nat ->
@@ -167,11 +156,11 @@ Definition wp_iput_sconf_body
   0 <= bmapstart ->
   bmapstart ∈ fsc_cov ->
   ~ (bmapstart ∈ log_region_set fsc_logst) ->
-  0 <= inodestart ->
-  IBLOCK inum inodestart ∈ fsc_cov ->
-  ~ (IBLOCK inum inodestart ∈ log_region_set fsc_logst) ->
+  0 <= icfg_ist ->
+  IBLOCK inum icfg_ist ∈ fsc_cov ->
+  ~ (IBLOCK inum icfg_ist ∈ log_region_set fsc_logst) ->
   (* the inum is one the inode REGION covers: ireg_read / ipool_acc *)
-  bv_unsigned inum < 16 * Z.of_nat nib ->
+  bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
   (* bfree's per-slot range fact, via IcacheInv.blkmap_slot_inrange *)
   cov_below fsc_cov size ->
   (* enough budget for the truncate-and-free arm *)
@@ -201,18 +190,18 @@ Definition wp_iput_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
-  log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
+  bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) -∗
+  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
   (* ---- THE ICACHE'S PERSISTENT SET ---- *)
   (* the itable spinlock over the v2 resource; §13.11's trailing device *)
-  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   (* the [ref] words *)
   itable_inv -∗
   (* THIS slot's escrow -- iput knows its slot, so unlike iget it needs no
      ic_escrows family *)
   ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k -∗
   (* the inode region *)
-  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   (* THE SEALED REGIME, AT THE RUNTIME ARM (iclaim-ledger.md §6′, RULING G;
      SPECIALIZED BY SIMP-1).  iput's free path FREEZES the inode
      ([InodeRegion.ireg_freeze_au] at +0x50), and §2.3's boot-shelter clause
@@ -245,10 +234,10 @@ Definition wp_iput_sconf_body
      one -- which is why the package's plain form suffices and the
      restatement is a rename ([IcacheRef.inode_refp_spend], by
      [reflexivity]). *)
-  inode_refp k q dev inum -∗
+  inode_refp k q icfg_dev inum -∗
   (* ---- itrunc / iupdate's own resources ---- *)
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
   (* the caller's own pid cell (acquiresleep records it) *)
   proc_priv_bare pj pidv Vpr -∗
@@ -261,7 +250,7 @@ Definition wp_iput_sconf_body
   (* three buffer slots: itrunc's indirect arm is what forces three *)
   bslots 3 -∗
   (* this operation's reservation *)
-  log_op g n -∗
+  log_op icfg_log n -∗
   (* THE CROSSING IS THE LITERAL [true]: iput sleeps (ilock/itrunc/begin_op),
      so it can return on another hart whatever SIE was doing. *)
   wp_next true pj (fun (CID : CpuId) =>
@@ -278,11 +267,11 @@ Definition wp_iput_sconf_body
       pc_is ret_tgt -∗
       proc_priv_bare pj pidv Vpr -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       bslots 3 -∗
       (* at most [iput_units] gone, and none gained *)
       ⌜((n - iput_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
-      log_op g n' -∗
+      log_op icfg_log n' -∗
       (* THE LEDGER: one unit back, on EVERY arm.  islot2's live arm holds
          [iref_slots (Pos.to_nat n)]; a non-last close takes n -> n-1 and
          frees one, a last close deletes the slot and frees the one the
@@ -353,15 +342,13 @@ Definition ip_spend_w (w cru crz : bool) : nat :=
 
 Definition wp_iput_gen_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
     (gs : list gname) (j : nat) (gl : gname)
     (gu : uart_names) (gd : disk_names) (gk : gname)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (g : log_names)
     (gil gisl : gname)
-    (bmapstart inodestart : Z) (nib : nat)
-    (size : Z) (dev : mword 32)
+    (bmapstart : Z)
+    (size : Z)
     (k : nat) (q : Qp) (inum : mword 32)
     (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
     (tid : nat) (qtx : Qp)
@@ -373,21 +360,19 @@ Definition wp_iput_gen_body
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_iput <= K)%nat ->
-  (* see [wp_iput_sconf_body]: the escrow parks at [icfg_log]. *)
-  g = icfg_log ->
   (k < NINODE)%nat ->
   (* the two absorption credits, travelling to itrunc unchanged *)
   (crb = true -> bmapstart ∈ Sb) ->
-  (cru = true -> IBLOCK inum inodestart ∈ Sb) ->
+  (cru = true -> IBLOCK inum icfg_ist ∈ Sb) ->
   log_geom_ok fsc_cov fsc_logst ->
   0 < size <= BPB ->
   0 <= bmapstart ->
   bmapstart ∈ fsc_cov ->
   ~ (bmapstart ∈ log_region_set fsc_logst) ->
-  0 <= inodestart ->
-  IBLOCK inum inodestart ∈ fsc_cov ->
-  ~ (IBLOCK inum inodestart ∈ log_region_set fsc_logst) ->
-  bv_unsigned inum < 16 * Z.of_nat nib ->
+  0 <= icfg_ist ->
+  IBLOCK inum icfg_ist ∈ fsc_cov ->
+  ~ (IBLOCK inum icfg_ist ∈ log_region_set fsc_logst) ->
+  bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
   cov_below fsc_cov size ->
   (iput_units <= n)%nat ->
   (j < NPROC)%nat ->
@@ -401,12 +386,12 @@ Definition wp_iput_gen_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
-  log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
-  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) -∗
+  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
   ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k -∗
-  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   (* THE SEALED REGIME, BORROWED AND RETURNED (iclaim-ledger.md §6′, RULING G).
      iput's free path FREEZES the inode ([InodeRegion.ireg_freeze_au] at
      +0x50), and §2.3's boot-shelter clause makes a freezer exhibit the regime
@@ -429,9 +414,9 @@ Definition wp_iput_gen_body
                    (slh_tok (icfg_isl k)) -∗
   (* the reference being destroyed, WITH its provenance unit: ONE ROW
      (SIMP-2), exactly as in the [_sconf] body above. *)
-  inode_refp k q dev inum -∗
+  inode_refp k q icfg_dev inum -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
   proc_priv_bare pj pidv Vpr -∗
   procs_inv gs -∗
@@ -450,9 +435,7 @@ Definition wp_iput_gen_body
      iput cashes it with [InodeRegion.ireg_obs_use] at the record whose
      nlink its own +0x44 test found ZERO, and hands the resulting
      [LogInv.log_credit] to itrunc's tail flush. *)
-  (if crz then nlz_obs (bv_unsigned inum) e0 ∗ ⌜g = icfg_log⌝ ∗
-                ⌜inodestart = icfg_ist⌝
-   else emp) -∗
+  (if crz then nlz_obs (bv_unsigned inum) e0 else emp) -∗
   (* the reservation, EPOCH-NAMED (§G.20's asymmetry: [log_opSe] in,
      [log_opS] out -- nothing above log_write compares epochs).  [e0] is the
      op's birth epoch, the one the credit above is ordered against. *)
@@ -461,7 +444,7 @@ Definition wp_iput_gen_body
      substitution.  iput parks it in whichever of its three windows the free
      path enters and takes it back at the window's exit, so it comes home on
      EVERY arm -- see the post. *)
-  log_opSet g n Sb e0 tid qtx -∗
+  log_opSet icfg_log n Sb e0 tid qtx -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (n' : nat) (Sb' : gset Z) (w : bool),
       ⌜callee_saved m mf⌝ -∗
@@ -472,7 +455,7 @@ Definition wp_iput_gen_body
       pc_is ret_tgt -∗
       proc_priv_bare pj pidv Vpr -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       bslots 3 -∗
       (* the set only GROWS, and at most the credited worst case is gone *)
       ⌜Sb ⊆ Sb'⌝ -∗
@@ -485,12 +468,12 @@ Definition wp_iput_gen_body
          what makes a walk's next level FREE and not merely bounded. *)
       ⌜crb = true -> w = false⌝ -∗
       ⌜((n - ip_spend_w w cru crz)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
-      log_opS g n' Sb' -∗
+      log_opS icfg_log n' Sb' -∗
       (* the share, back at exactly the [(t, qt)] that went in: the windows
          NAME what they parked ([Xv6Cameras.DepFrz]'s two fields,
          [IcacheRef.hpn_h] for the other two), which is the whole reason the
          pin exists (durable-disk B''-tx5). *)
-      tid ↪[ln_tx g]{#qtx} () -∗
+      tid ↪[ln_tx icfg_log]{#qtx} () -∗
       iref_slot -∗
       (* RULING G: the regime comes back, on every arm (see the premise). *)
       ireg_regime rg -∗
@@ -504,17 +487,16 @@ Module Type IPUT.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names)
       (gil gisl : gname)
-      (bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32)
+      (bmapstart : Z)
+      (size : Z)
       (k : nat) (q : Qp) (inum : mword 32)
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn g gil gisl
-                          bmapstart inodestart nib size dev
+      wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn gil gisl
+                          bmapstart size
                           k q inum n pidv dq dqb dqs m K eb b lks Vpr.
   (* the credited set-form contract; [wp_iput_sconf] is this at
      [crb := cru := crz := false], derived at the [log_op] existential's own
@@ -527,17 +509,16 @@ Module Type IPUT.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names)
       (gil gisl : gname)
-      (bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32)
+      (bmapstart : Z)
+      (size : Z)
       (k : nat) (q : Qp) (inum : mword 32)
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (tid : nat) (qtx : Qp)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate) (rg : bool),
-      wp_iput_gen_body gs j gl gu gd gk pd pav pu bn g gil gisl
-                       bmapstart inodestart nib size dev
+      wp_iput_gen_body gs j gl gu gd gk pd pav pu bn gil gisl
+                       bmapstart size
                        k q inum n Sb crb cru crz e0 tid qtx pidv dq dqb dqs m K eb b lks Vpr rg.
 End IPUT.

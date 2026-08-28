@@ -200,14 +200,12 @@ Local Open Scope Z_scope.
 Notation K_ilock := (62%nat) (only parsing).
 Definition wp_ilock_dep_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
     (gil gisl : gname)                                 (* ip->lock            *)
-    (inodestart : Z) (nib : nat)
-    (k : nat) (s : Qp) (g : gname) (d : ic_dep) (o : ilkc) (dev inum : mword 32)
+    (k : nat) (s : Qp) (g : gname) (d : ic_dep) (o : ilkc) (inum : mword 32)
     (pidv : mword 32) (dq dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) (Vpr : pprivate) :=
@@ -239,7 +237,7 @@ Definition wp_ilock_dep_sconf_body
      [ic_dep_shr] is what the three have in common -- the caller's own
      generation-named share, unchanged in all three -- and the two
      projections below are what differs. *)
-  ic_dep_shr d = Some (s, dev, inum, g) ->
+  ic_dep_shr d = Some (s, icfg_dev, inum, g) ->
   (* ...AND WHAT THE READ ARM COSTS, which is nothing its two callers do not
      already pay.  [DepRd]'s arm keeps three quarters of the bundle, so the
      checkout can only be taken where one EXISTS -- and the record proxy stays
@@ -259,11 +257,11 @@ Definition wp_ilock_dep_sconf_body
   log_geom_ok fsc_cov fsc_logst ->
   (* the superblock field is a real block number, so the [addw] that forms
      IBLOCK cannot wrap *)
-  0 <= inodestart ->
+  0 <= icfg_ist ->
   (* the inode's own block is a covered HOME block: bread's premise *)
-  IBLOCK inum inodestart ∈ fsc_cov ->
+  IBLOCK inum icfg_ist ∈ fsc_cov ->
   (* the inum is inside the inode region: [ireg_read]'s premise *)
-  bv_unsigned inum < 16 * Z.of_nat nib ->
+  bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
   (* a0 = ip *)
@@ -286,12 +284,12 @@ Definition wp_ilock_dep_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
+  bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) -∗
   (* THE THREE PERSISTENT INVARIANTS: the [ref] words, the entry's content,
      the inode region *)
   itable_inv -∗
   ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k -∗
-  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   (* THE ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
   (* THE ENTRY'S SLEEPLOCK -- TRACKED, and at the cache's canonical gname
      for the slot: what a holder deposits in it is a share of somebody's
@@ -308,7 +306,7 @@ Definition wp_ilock_dep_sconf_body
      what lets this contract EXPOSE that generation's type witness below.
      Mechanical for every existing caller: [IcacheRef.inode_shr_gen_intro]
      is the existential its [inode_shr] already carries. *)
-  inode_shr_gen k s dev inum g -∗
+  inode_shr_gen k s icfg_dev inum g -∗
   (* WHAT THE DESCRIPTOR PARKS BESIDE THE SHARE: the transaction share at
      [DepTx], [emp] at the other two. *)
   ic_dep_side d -∗
@@ -348,7 +346,7 @@ Definition wp_ilock_dep_sconf_body
      reason. *)
   ireg_wd_lic o g (bv_unsigned inum) -∗
   (* sb.inodestart, read once *)
-  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   (* the caller's own pid cell (acquiresleep records it in the lock) *)
   proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle *)
@@ -375,7 +373,7 @@ Definition wp_ilock_dep_sconf_body
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       proc_priv_bare pj pidv Vpr -∗
-      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       bslot -∗
       (* THE LOCK IS HELD ... *)
       sleeplocked_q gisl s (i_lock ip) pidv -∗
@@ -386,7 +384,7 @@ Definition wp_ilock_dep_sconf_body
          record the region agrees with.  Exactly [ic_swap_park]'s input,
          i.e. exactly SpecIunlock v3's precondition. *)
       ic_deposit fsc_ic k d -∗
-      i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
+      i_dev ip ↦₄{DfracOwn (1/2)} icfg_dev -∗
       i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
       i_valid ip ↦₄ valid_word true -∗
       ic_dep_held fsc_fs fsc_ireg fsc_cov fsc_logst d k inum dn bm -∗
@@ -458,14 +456,12 @@ Definition wp_ilock_dep_sconf_body
    re-run. *)
 Definition wp_ilock_tx_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
     (gil gisl : gname)                                 (* ip->lock            *)
-    (inodestart : Z) (nib : nat)
-    (k : nat) (s : Qp) (g : gname) (o : ilkc) (dev inum : mword 32)
+    (k : nat) (s : Qp) (g : gname) (o : ilkc) (inum : mword 32)
     (pidv : mword 32) (dq dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) (Vpr : pprivate) :=
@@ -482,11 +478,11 @@ Definition wp_ilock_tx_sconf_body
   log_geom_ok fsc_cov fsc_logst ->
   (* the superblock field is a real block number, so the [addw] that forms
      IBLOCK cannot wrap *)
-  0 <= inodestart ->
+  0 <= icfg_ist ->
   (* the inode's own block is a covered HOME block: bread's premise *)
-  IBLOCK inum inodestart ∈ fsc_cov ->
+  IBLOCK inum icfg_ist ∈ fsc_cov ->
   (* the inum is inside the inode region: [ireg_read]'s premise *)
-  bv_unsigned inum < 16 * Z.of_nat nib ->
+  bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
   (* a0 = ip *)
@@ -509,12 +505,12 @@ Definition wp_ilock_tx_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
+  bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) -∗
   (* THE THREE PERSISTENT INVARIANTS: the [ref] words, the entry's content,
      the inode region *)
   itable_inv -∗
   ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k -∗
-  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   (* THE ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
   (* THE ENTRY'S SLEEPLOCK -- TRACKED, and at the cache's canonical gname
      for the slot: what a holder deposits in it is a share of somebody's
@@ -531,7 +527,7 @@ Definition wp_ilock_tx_sconf_body
      what lets this contract EXPOSE that generation's type witness below.
      Mechanical for every existing caller: [IcacheRef.inode_shr_gen_intro]
      is the existential its [inode_shr] already carries. *)
-  inode_shr_gen k s dev inum g -∗
+  inode_shr_gen k s icfg_dev inum g -∗
   (* ---- THE FILL's LICENCE, INDEXED (iclaim-ledger.md §5''''', RULING C')
 
      §16.4's fill has a sub-arm -- the CLAIM BOX -- that no caller can be
@@ -568,7 +564,7 @@ Definition wp_ilock_tx_sconf_body
      reason. *)
   ireg_wd_lic o g (bv_unsigned inum) -∗
   (* sb.inodestart, read once *)
-  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   (* the caller's own pid cell (acquiresleep records it in the lock) *)
   proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle *)
@@ -615,7 +611,7 @@ Definition wp_ilock_tx_sconf_body
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       proc_priv_bare pj pidv Vpr -∗
-      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       bslot -∗
       (* THE LOCK IS HELD ... *)
       sleeplocked_q gisl s (i_lock ip) pidv -∗
@@ -625,8 +621,8 @@ Definition wp_ilock_tx_sconf_body
          identity halves, the valid cell, and the loaded content at a
          record the region agrees with.  Exactly [ic_swap_park]'s input,
          i.e. exactly SpecIunlock v3's precondition. *)
-      ic_tx_dep fsc_ic k s dev inum g -∗
-      i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
+      ic_tx_dep fsc_ic k s icfg_dev inum g -∗
+      i_dev ip ↦₄{DfracOwn (1/2)} icfg_dev -∗
       i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
       i_valid ip ↦₄ valid_word true -∗
       ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dn bm -∗
@@ -700,17 +696,16 @@ Lemma wp_ilock_tx_of_dep
     (pd pav pu : mword 64)
     (bn : bio_names)
     (gil gisl : gname)
-    (inodestart : Z) (nib : nat)
-    (k : nat) (s : Qp) (g : gname) (o : ilkc) (dev inum : mword 32)
+    (k : nat) (s : Qp) (g : gname) (o : ilkc) (inum : mword 32)
     (pidv : mword 32) (dq dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) (Vpr : pprivate) :
   (forall d : ic_dep,
      wp_ilock_dep_sconf_body gs j gl gu gd gk pd pav pu bn gil gisl
-                             inodestart nib k s g d o dev inum
+ k s g d o inum
                              pidv dq dqs m K eb b lks Vpr) ->
   wp_ilock_tx_sconf_body gs j gl gu gd gk pd pav pu bn gil gisl
-                         inodestart nib k s g o dev inum
+ k s g o inum
                          pidv dq dqs m K eb b lks Vpr.
 Proof.
   cbv beta delta [wp_ilock_tx_sconf_body wp_ilock_dep_sconf_body].
@@ -718,7 +713,7 @@ Proof.
   iIntros "Hcg Hown Hextc Hextm Htext Hkd Hpc Hpenv Hbio #Hitbl #Hesc Hireg
            Hslk Hshr Hlic Hsb Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Htx Hcont".
   iDestruct (log_tx_halve with "Htx") as (t) "[Ht1 Ht2]".
-  iApply (Hgen (DepTx s dev inum g t (1/2))
+  iApply (Hgen (DepTx s icfg_dev inum g t (1/2))
             HK eq_refl ltac:(discriminate) Hk Hgeom Hst Hcov Hinlt Hj Hgl
             Ha0 Hbelow
             with "Hcg Hown Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hitbl Hesc
@@ -744,37 +739,33 @@ Module Type ILOCK.
      retires [ic_shed_rd] at those two sites. *)
   Parameter wp_ilock_dep_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
       (gil gisl : gname)
-      (inodestart : Z) (nib : nat)
-      (k : nat) (s : Qp) (g : gname) (d : ic_dep) (o : ilkc) (dev inum : mword 32)
+      (k : nat) (s : Qp) (g : gname) (d : ic_dep) (o : ilkc) (inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_ilock_dep_sconf_body gs j gl gu gd gk pd pav pu bn gil gisl
-                              inodestart nib k s g d o dev inum
+ k s g d o inum
                               pidv dq dqs m K eb b lks Vpr.
   (* THE TRANSACTIONAL FORM (durable-disk B''-tx).  Same C function, same
      proof; what selects it is whether the caller brings [LogInv.log_tx].
      [ProofIlock] defines it by [wp_ilock_tx_of_dep]. *)
   Parameter wp_ilock_tx_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
       (gil gisl : gname)
-      (inodestart : Z) (nib : nat)
-      (k : nat) (s : Qp) (g : gname) (o : ilkc) (dev inum : mword 32)
+      (k : nat) (s : Qp) (g : gname) (o : ilkc) (inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_ilock_tx_sconf_body gs j gl gu gd gk pd pav pu bn gil gisl
-                             inodestart nib k s g o dev inum
+ k s g o inum
                              pidv dq dqs m K eb b lks Vpr.
 End ILOCK.

@@ -186,8 +186,7 @@ Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Notation K_idup := (14%nat) (only parsing).
 Definition wp_idup_sconf_body
     `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    (inodestart : Z) (nib : nat)
-    (k : nat) (dev : mword 32)
+    (k : nat)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64)
     (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.idup in
@@ -197,12 +196,6 @@ Definition wp_idup_sconf_body
   (k < NINODE)%nat ->
   (* a0 = ip, and a [struct inode *] IS its slot: [ientry_inj]. *)
   m !!! Regidx (mword_of_int 10 : mword 5) = ientry k ->
-  (* THE PURE TIE, and it rides exactly as [FsSyscalls.sysc_fs_env]'s do:
-     the package below is POINTER-keyed, so its device is the cache's own
-     ([IcacheRef.icfg_dev], design §13.11's single-device pin), while the
-     itable handle above is stated at whatever [dev] the caller names.
-     Every caller has this equation already. *)
-  dev = icfg_dev ->
   (* THE FRESHNESS PREMISE: idup acquires and releases [itable.lock]
      internally (balanced -- [lks] is unchanged across the whole call), so
      the caller must already hold only locks BELOW "itable"'s rank. *)
@@ -210,14 +203,14 @@ Definition wp_idup_sconf_body
   sie_cap_gpr KT1 m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
   (* THE INODE REGION, and GHOST-ONLY (header, §3.19): the [ref++] carries
      the ledger's [icnt] half and the region owns the other one, so the
      mover ([IcacheInv.iref_upgrade_mir_store_au]) opens [↑iregN] around the
      same instruction.  No dinode is read.  Persistent, so it costs a caller
      a frame and nothing else. *)
-  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   (* THE precondition that makes [ip->ref++] safe -- see the header. *)
   iref_slot -∗
   (* ---- ONE ROW IN, TWO ROWS OUT (SIMP-2) ---------------------------
@@ -267,10 +260,9 @@ Definition wp_idup_sconf_body
 Module Type IDUP.
   Parameter wp_idup_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      (inodestart : Z) (nib : nat)
-      (k : nat) (dev : mword 32)
+      (k : nat)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
-      wp_idup_sconf_body inodestart nib k dev
+      wp_idup_sconf_body k
                          m n eb p K b lks.
 End IDUP.

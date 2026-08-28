@@ -177,7 +177,7 @@ Definition kexec_closer
     (Q : mword 64 -> Prop)
     (gf ga : gname) (pj : mword 64) (pidv : mword 32) (V : pprivate)
     (m : regfile) (ret_tgt : mword 64) (K : nat) (b eb : bool)
-    (lks : gset string) (dqb dqs : dfrac) (bmapstart inodestart : Z)
+    (lks : gset string) (dqb dqs : dfrac) (bmapstart : Z)
     (na : nat) (alen : nat -> nat)
     (plen : nat) (pv : mword 64) (dqpv : dfrac) (pfun : nat -> bv 8)
     (av : mword 64) (dqa : dfrac) (avf : nat -> mword 64)
@@ -193,7 +193,7 @@ Definition kexec_closer
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       kalloc_env ga None -∗
       proc_priv gf pj pidv V' -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗

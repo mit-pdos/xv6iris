@@ -257,14 +257,6 @@ Definition mread_req (pa : SailStdpp.Values.mword 64)
      Interface.ReadReq.translation := tt;
      Interface.ReadReq.tag := false |}.
 
-Local Lemma hread_req_at_red_local (n : N) (req : Interface.ReadReq.t n)
-    (K : (bv (8 * n) * option bool + Arch.abort)%type -> M unit) :
-  hread_req_at n (Interface.Next (Interface.MemRead n req) K) = Some req.
-Proof.
-  simpl. destruct (decide (n = n)) as [Heq|Hne]; [|congruence].
-  assert (Heq = eq_refl) as -> by apply proof_irrel.
-  reflexivity.
-Qed.
 
 Lemma hread_req_at_read_ram (pa : SailStdpp.Values.mword 64) :
   hread_req_at 4 (read_ram Read_plain (Physaddr pa) 4 false)
@@ -324,14 +316,6 @@ Definition mread_req2 (pa : SailStdpp.Values.mword 64)
      Interface.ReadReq.translation := tt;
      Interface.ReadReq.tag := false |}.
 
-Local Lemma hread_req_at_red_local2 (n : N) (req : Interface.ReadReq.t n)
-    (K : (bv (8 * n) * option bool + Arch.abort)%type -> M unit) :
-  hread_req_at n (Interface.Next (Interface.MemRead n req) K) = Some req.
-Proof.
-  simpl. destruct (decide (n = n)) as [Heq|Hne]; [|congruence].
-  assert (Heq = eq_refl) as -> by apply proof_irrel.
-  reflexivity.
-Qed.
 
 Lemma hread_req_at_read_ram2 (pa : SailStdpp.Values.mword 64) :
   hread_req_at 2 (read_ram Read_plain (Physaddr pa) 2 false)

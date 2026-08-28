@@ -626,8 +626,7 @@ Section ProofSysPipe.
   Lemma sp_close2 `{CID0 : CpuId}  (γfl γf : gname)
       (fn : fclose_names) (on : option nat)
       (Mt : regfile) (nav : nat) (eb : bool) (p : mword 64)
-      (sp0 : mword 64) (k0 k1 : nat) (q0 q1 : Qp) (Cf0 Cf1 : fcontent)
-      (st0 st1 : fdstate)
+      (sp0 : mword 64) (k0 k1 : nat) (q0 q1 : Qp) (st0 st1 : fdstate)
       (za zb zc zd ze zf : Z) (imm1 imm2 : mword 21) (b : bool) (lks : gset string)
       (pidv : mword 32) (Vpr : pprivate) :
     (fileclose_stack <= nav)%nat ->
@@ -666,8 +665,8 @@ Section ProofSysPipe.
       (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx Ra5, ADDI)) -∗
     word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) (fnode k0) -∗
     word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) (fnode k1) -∗
-    file_ref γf k0 q0 Cf0 st0 -∗
-    file_ref γf k1 q1 Cf1 st1 -∗
+    file_ref γf k0 q0 st0 -∗
+    file_ref γf k1 q1 st1 -∗
     (* both closes run under ONE environment, threaded through: the first may
        have moved the page count, so what the second gets, and what comes
        out, is at an existential [on'] *)
@@ -742,9 +741,9 @@ Section ProofSysPipe.
                  ltac:(rewrite Hb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID0 CID6 eb p
                  ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
-    iDestruct (fileclose_env_frame fn on 0%nat eb p Cf0 with "Hpenv Hfenv")
+    iDestruct (fileclose_env_frame fn on 0%nat eb p st0 with "Hpenv Hfenv")
       as "[Hfcenv0 Hfcback0]".
-    iApply (Fileclose.wp_fileclose_sconf γfl γf k0 q0 Cf0 _ fn on D2 0%nat eb p nav b lks pidv Vpr
+    iApply (Fileclose.wp_fileclose_sconf γfl γf k0 q0 st0 fn on D2 0%nat eb p nav b lks pidv Vpr
               Hnav sp_noff0 HD2a0 Hbelow
               with "Hcg Hcpu Hextc Hextm Htext Hkd Hpc Hftab Hpe Href0 Hpbare Hiru Hfcenv0").
     all: try lkbelow.
@@ -792,9 +791,9 @@ Section ProofSysPipe.
                  ltac:(rewrite Hb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID7 CID9 eb p
                  ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
-    iDestruct (fileclose_env_frame fn on1 0%nat eb p Cf1 with "Hpenv Hfenv")
+    iDestruct (fileclose_env_frame fn on1 0%nat eb p st1 with "Hpenv Hfenv")
       as "[Hfcenv1 Hfcback1]".
-    iApply (Fileclose.wp_fileclose_sconf γfl γf k1 q1 Cf1 _ fn on1 F2 0%nat eb p nav b lks pidv Vpr
+    iApply (Fileclose.wp_fileclose_sconf γfl γf k1 q1 st1 fn on1 F2 0%nat eb p nav b lks pidv Vpr
               Hnav sp_noff0 HF2a0 Hbelow
               with "Hcg Hcpu Hextc Hextm Htext Hkd Hpc Hftab Hpe Href1 Hpbare Hiru Hfcenv1").
     all: try lkbelow.
@@ -1558,8 +1557,7 @@ Section ProofSysPipe.
       iLeft. iSplitR; [done|]. iExact "Hpriv". }
     (* ============ pipealloc succeeded ================================= *)
     iDestruct "Hsucc" as "(%Hr0 & _ & Hpipe)".
-    iDestruct "Hpipe" as (pi k0 k1 Cf0 Cf1)
-      "(%Hklt & %Hpf0 & %Hpf1 & Hb6 & Hb7 & Href0 & Href1)".
+    iDestruct "Hpipe" as (k0 k1) "(%Hklt & Hb6 & Hb7 & Href0 & Href1)".
     destruct Hklt as [Hk0lt Hk1lt].
     (* Nothing about the pipe appears from here on, and that is the point:
        each end rides INSIDE its file's [FileInv.file_ref] as the payload
@@ -1740,7 +1738,7 @@ Section ProofSysPipe.
          [sp_lend_pid] *)
       iDestruct (sp_lend_pid γf fn 0%nat eb p pid _
                    with "Hpriv Hfenv") as "(Hpbare & Hfefull & Hpback)".
-      iApply (sp_close2 (CID0 := CID43)  γfl γf fn on Y0 (av - 8)%nat eb p sp0 k0 k1 1%Qp 1%Qp Cf0 Cf1 _ _
+      iApply (sp_close2 (CID0 := CID43)  γfl γf fn on Y0 (av - 8)%nat eb p sp0 k0 k1 1%Qp 1%Qp _ _
                 (KernelSyms.sys_pipe + 0xc8) (KernelSyms.sys_pipe + 0xcc) (KernelSyms.sys_pipe + 0xd0) (KernelSyms.sys_pipe + 0xd4) (KernelSyms.sys_pipe + 0xd8) (KernelSyms.sys_pipe + 0xda)
                 (mword_of_int 2091962 : mword 21) (mword_of_int 2091954 : mword 21) b lks pid _
                 Havfc HY0s0 Hcc4a Hcc4b Hcc4c Hcc4d Hcc4e Hcc4f Hcc4g Hbelow
@@ -1784,8 +1782,8 @@ Section ProofSysPipe.
        [FdClosed] and the pipe end makes it [FdOpen FdPipe]. *)
     iDestruct (fd_frags_any_acc (pv_fdg V) fd0 Hfd0N with "Hfrag")
       as (stq0) "[Hfr0 Hfrback0]".
-    iMod (proc_priv_settle γf p pid V fd0 k0 1%Qp Cf0
-                 (FdOpen FdPipe) FdClosed stq0
+    iMod (proc_priv_settle γf p pid V fd0 k0 1%Qp
+                 (FdOpen (FdPipe false)) FdClosed stq0
                  Hfd0N Hlen1 Hk0lt ltac:(discriminate)
                  with "Hcore Hof Href0 Hauth0 Hfr0") as "[Hpriv Hfr0]".
     iDestruct ("Hfrback0" with "Hfr0") as "Hfrag".
@@ -1955,7 +1953,7 @@ Section ProofSysPipe.
                    with "Hpriv") as "[Hslot Hback]".
       iDestruct "Hslot" as "[Hcell [[%Hz _] | Href]]";
         [by exfalso; apply (fnode_ne_zero k0 Hk0lt)|].
-      iDestruct "Href" as (k0' q0' C0' st0') "((%Hfv0 & %Hk0'lt & %Hty0) & Href0 & Hst0)".
+      iDestruct "Href" as (k0' q0' st0') "((%Hfv0 & %Hk0'lt & %Hty0) & Href0 & Hst0)".
       (* +0xbc .. +0xc4: p->ofile[fd0] = 0 *)
       iApply (sp_ofile_null (CID0 := CID52) F1 (av - 8)%nat p fd0 Ra5 Rs1
                 (KernelSyms.sys_pipe + 0xbc) (KernelSyms.sys_pipe + 0xbe) (KernelSyms.sys_pipe + 0xc2) (KernelSyms.sys_pipe + 0xc4) (KernelSyms.sys_pipe + 0xc8) (fnode k0) b
@@ -1991,7 +1989,7 @@ Section ProofSysPipe.
          [sp_lend_pid] *)
       iDestruct (sp_lend_pid γf fn 0%nat eb p pid _
                    with "Hpriv Hfenv") as "(Hpbare & Hfefull & Hpback)".
-      iApply (sp_close2 (CID0 := CID53)  γfl γf fn on F2 (av - 8)%nat eb p sp0 k0' k1 q0' 1%Qp C0' Cf1 _ _
+      iApply (sp_close2 (CID0 := CID53)  γfl γf fn on F2 (av - 8)%nat eb p sp0 k0' k1 q0' 1%Qp _ _
                 (KernelSyms.sys_pipe + 0xc8) (KernelSyms.sys_pipe + 0xcc) (KernelSyms.sys_pipe + 0xd0) (KernelSyms.sys_pipe + 0xd4) (KernelSyms.sys_pipe + 0xd8) (KernelSyms.sys_pipe + 0xda)
                 (mword_of_int 2091962 : mword 21) (mword_of_int 2091954 : mword 21) b lks pid _
                 Havfc HF2s0 Hcc4a Hcc4b Hcc4c Hcc4d Hcc4e Hcc4f Hcc4g Hbelow
@@ -2056,7 +2054,7 @@ Section ProofSysPipe.
     iDestruct (fd_frags_any_acc (pv_fdg V) fd1 Hfd1N with "Hfrag")
       as (stq1) "[Hfr1 Hfrback1]".
     iMod (proc_priv_settle γf p pid (upd_ofile V fd0 (fnode k0)) fd1 k1
-                 1%Qp Cf1 (FdOpen FdPipe) FdClosed stq1 Hfd1N Hlen2' Hk1lt
+                 1%Qp (FdOpen (FdPipe true)) FdClosed stq1 Hfd1N Hlen2' Hk1lt
                  ltac:(discriminate)
                  with "Hcore Hof Href1 Hauth1 Hfr1") as "[Hpriv Hfr1]".
     iDestruct ("Hfrback1" with "Hfr1") as "Hfrag".
@@ -2408,7 +2406,7 @@ Section ProofSysPipe.
                    fd0 (fnode k0) Hlk0' with "Hpriv") as "[Hslot Hback]".
       iDestruct "Hslot" as "[Hcell [[%Hz _] | Href]]";
         [by exfalso; apply (fnode_ne_zero k0 Hk0lt)|].
-      iDestruct "Href" as (k0' q0' C0' st0') "((%Hfv0 & %Hk0'lt & %Hty0) & Hrf0 & Hst0)".
+      iDestruct "Href" as (k0' q0' st0') "((%Hfv0 & %Hk0'lt & %Hty0) & Hrf0 & Hst0)".
       iApply (sp_ofile_null (CID0 := CID62) E1 (av - 8)%nat p fd0 Ra5 Rs1
                 (KernelSyms.sys_pipe + 0x84) (KernelSyms.sys_pipe + 0x86) (KernelSyms.sys_pipe + 0x8a) (KernelSyms.sys_pipe + 0x8c) (KernelSyms.sys_pipe + 0x90) (fnode k0) b
                 Hfd0b16 (or_introl (conj eq_refl eq_refl)) HE1a5 HE1s1 Hn80a Hn80b Hn80c Hn80d
@@ -2459,7 +2457,7 @@ Section ProofSysPipe.
                    fd1 (fnode k1) Hlk1'' with "Hpriv") as "[Hslot1 Hback1]".
       iDestruct "Hslot1" as "[Hcell1 [[%Hz1 _] | Href1']]";
         [by exfalso; apply (fnode_ne_zero k1 Hk1lt)|].
-      iDestruct "Href1'" as (k1' q1' C1' st1') "((%Hfv1 & %Hk1'lt & %Hty1) & Hrf1 & Hst1)".
+      iDestruct "Href1'" as (k1' q1' st1') "((%Hfv1 & %Hk1'lt & %Hty1) & Hrf1 & Hst1)".
       iApply (sp_ofile_null (CID0 := CID64) E3 (av - 8)%nat p fd1 Rs1 Ra5
                 (KernelSyms.sys_pipe + 0x94) (KernelSyms.sys_pipe + 0x96) (KernelSyms.sys_pipe + 0x9a) (KernelSyms.sys_pipe + 0x9c) (KernelSyms.sys_pipe + 0xa0) (fnode k1) b
                 Hfd1b16 (or_intror (conj eq_refl eq_refl)) HE3a5 HE3s1 Hn90a Hn90b Hn90c Hn90d
@@ -2504,7 +2502,7 @@ Section ProofSysPipe.
       iDestruct "Hpenv" as (on2) "Hpenv".
       iDestruct (sp_lend_pid γf fn 0%nat eb p pid _
                    with "Hpriv Hfenv") as "(Hpbare & Hfefull & Hpback)".
-      iApply (sp_close2 (CID0 := CID65)  γfl γf fn on2 E4 (av - 8)%nat eb p sp0 k0' k1' q0' q1' C0' C1' _ _
+      iApply (sp_close2 (CID0 := CID65)  γfl γf fn on2 E4 (av - 8)%nat eb p sp0 k0' k1' q0' q1' _ _
                 (KernelSyms.sys_pipe + 0xa0) (KernelSyms.sys_pipe + 0xa4) (KernelSyms.sys_pipe + 0xa8) (KernelSyms.sys_pipe + 0xac) (KernelSyms.sys_pipe + 0xb0) (KernelSyms.sys_pipe + 0xb2)
                 (mword_of_int 2092002 : mword 21) (mword_of_int 2091994 : mword 21) b lks pid _
                 Havfc HE4s0 Hc9ca Hc9cb Hc9cc Hc9cd Hc9ce Hc9cf Hc9cg Hbelow

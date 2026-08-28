@@ -642,12 +642,16 @@ Section ProofSysOpenPublish.
      is where that reference lives.  The entry holds exactly one unit's worth
      either way, which is what makes sys_open's whole allowance come back
      ([SpecSysOpen]'s ledger) rather than leak one per successful open. *)
-  Lemma so_open_slot (E : coPset) (gf : gname) (kf : nat) (Cf : fcontent) :
+  (* [Cf] IS AN OUTPUT, and so is its untypedness: the reference hides its
+     content, and [FdClosed] is exactly the claim that what is hidden has
+     [fc_type = FD_NONE] ([FileInvDefs.fdstate_ok]).  So the caller no longer
+     has to carry filealloc's type fact here -- the state it already holds
+     says it. *)
+  Lemma so_open_slot (E : coPset) (gf : gname) (kf : nat) :
     ↑(offN .@ kf) ⊆ E ->
-    fc_type Cf = FD_NONE ->
-    file_ref gf kf 1 Cf FdClosed ={E}=∗
-    ∃ (pn : fpnames) (voff : mword 32),
-      ⌜off_wf voff⌝ ∗
+    file_ref gf kf 1 FdClosed ={E}=∗
+    ∃ (Cf : fcontent) (pn : fpnames) (voff : mword 32),
+      ⌜fc_type Cf = FD_NONE⌝ ∗ ⌜off_wf voff⌝ ∗
       iref_slot ∗
       fref_tok gf kf 1 ∗ flive_tok gf kf ∗ fpay_tok gf kf 1 pn ∗
       a_ftype kf     ↦₄ fc_type Cf ∗
@@ -658,8 +662,10 @@ Section ProofSysOpenPublish.
       a_fip kf       ↦₈ fc_ip Cf ∗
       a_foff kf      ↦₄ voff.
   Proof.
-    intros HE Ht.
-    iIntros "(Href & Hflds & (%pn & _ & Hnames & Hcore & Hoff) & Hlive)".
+    intros HE.
+    iIntros "(%Cf & Href & Hflds & (%pn & %Hok & Hnames & Hcore & Hoff) & Hlive)".
+    (* [fdstate_ok]'s [FdClosed] arm IS the type equation *)
+    cbn in Hok. set (Ht := Hok : fc_type Cf = FD_NONE).
     rewrite (file_armed_none Cf Ht).
     iMod (off_hold_cancel_raw E gf kf (fp_ocv pn) HE with "Hoff") as "Hraw".
     iMod "Hraw" as "(%ipold & %voff & Hip2 & Hoffc & %Hwf)".
@@ -668,7 +674,8 @@ Section ProofSysOpenPublish.
     iDestruct (so_word_half_join with "Hip1 Hip2") as "Hip".
     iEval (rewrite (file_core_none 1 pn Cf Ht)) in "Hcore".
     iEval (rewrite -iref_slot_frac) in "Hcore".
-    iModIntro. iExists pn, voff.
+    iModIntro. iExists Cf, pn, voff.
+    iSplitR; [iPureIntro; exact Ht |].
     iSplitR; [iPureIntro; exact Hwf |].
     iFrame "Hcore Href Hlive Hnames Hty Hrd Hwr Hpip Hmaj Hip Hoffc".
   Qed.
@@ -705,7 +712,11 @@ Section ProofSysOpenPublish.
     (* the two cells the publisher wrote with the UNARMED cinv cancelled *)
     a_fip kf ↦₈{DfracOwn (1/2)} (ientry kk) -∗
     a_foff kf ↦₄ voff -∗
-    |={E}=> file_ref gf kf 1 C (fdstate_of inum C).
+    (* AT THE STATE THE PUBLISHED FILE GIVES ITS DESCRIPTOR, which is the
+       output sys_open then installs in the fd's ghost.  [st] is determined
+       by [C] and [inum] ([fdstate_ok_inj]); it is a parameter rather than a
+       projection because [fdstate_ok] is a relation -- see its note. *)
+    |={E}=> ∃ st : fdstate, ⌜fdstate_ok inum C st⌝ ∗ file_ref gf kf 1 st.
   Proof.
     intros HEi HEo Hkk Hinb Hip Hty Hwrb Hdir Hwf.
     iIntros "Hkeep Hru Hshr #Hshot Href Hlive Hflds Hnames Hip Hoff".
@@ -745,10 +756,23 @@ Section ProofSysOpenPublish.
     assert (Hnp : bool_decide (fc_type C = FD_PIPE) = false).
     { apply bool_decide_false. destruct Hty as [Ht | Ht]; rewrite Ht;
         intro Hc; by vm_compute in Hc. }
+    (* the state the file now gives: its type, and -- on the FD_INODE arm --
+       the inum of the reference it just parked *)
+    set (stpub := if bool_decide (fc_type C = FD_INODE)
+                  then FdOpen (FdInode (bv_unsigned inum))
+                  else FdOpen (FdDevice (bv_unsigned (fc_major C)))).
+    assert (Hokpub : fdstate_ok inum C stpub).
+    { rewrite /stpub. destruct Hty as [Ht | Ht].
+      - rewrite (bool_decide_true _ Ht). cbn. by split.
+      - rewrite bool_decide_false.
+        2:{ rewrite Ht. unfold FD_DEVICE, FD_INODE. intro Hc.
+            apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc. }
+        cbn. by split. }
+    iExists stpub. iSplitR; [iPureIntro; exact Hokpub|].
     rewrite /file_ref /file_pay_st /file_payload /file_core.
-    iFrame "Href Hflds Hlive".
+    iExists C. iFrame "Href Hflds Hlive".
     iExists (MkFPNames (fp_lock pn) (fp_pipe pn) gx s gy go inum).
-    cbn [fp_inum]. iSplitR; [done|].
+    cbn [fp_inum]. iSplitR; [iPureIntro; exact Hokpub|].
     iFrame "Hnames". rewrite Harm Hnp.
     assert (Hor : (bool_decide (fc_type C = FD_INODE)
                    || bool_decide (fc_type C = FD_DEVICE))%bool = true)

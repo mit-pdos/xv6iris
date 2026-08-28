@@ -322,26 +322,11 @@ Proof. reflexivity. Qed.
    REPORTS the transmit interrupt is the acknowledgement of it and clears the
    latch -- so a driver that reads the ISR twice sees the interrupt go away,
    which is what the hardware does and what the level model could not do. *)
-Lemma uart_read_isr_value (u : uart_state) (b : bv 8) (u' : uart_state) :
-  uart_read u 2 = Some (b, u') -> b = uart_isr u.
-Proof.
-  unfold uart_read. cbn [Z.eqb].
-  destruct (uart_isr_thri u); intro H; by injection H as <- _.
-Qed.
 
 (* the read that reports something else -- or nothing -- leaves the device
    alone, which is the form a poll of the ISR uses *)
-Lemma uart_read_isr_quiet (u : uart_state) :
-  uart_isr_thri u = false -> uart_read u 2 = Some (uart_isr u, u).
-Proof. intro H. unfold uart_read. cbn [Z.eqb]. by rewrite H. Qed.
 
 (* ...and the read that DOES report it disarms it *)
-Lemma uart_read_isr_acks (u : uart_state) (b : bv 8) (u' : uart_state) :
-  uart_isr_thri u = true -> uart_read u 2 = Some (b, u') -> u_thri u' = false.
-Proof.
-  intros Hth H. unfold uart_read in H. cbn [Z.eqb] in H.
-  rewrite Hth in H. by injection H as _ <-.
-Qed.
 
 (* -- MMIO totality --
 
@@ -650,24 +635,8 @@ Qed.
    SOUT held marking).  This is the pure fact behind the language's UART
    OUTPUT OBSERVATION (RiscvLang.uart_step): the observation list of a drain
    step is exactly the wire's growth. *)
-Lemma uart_tx_pop_wire (u : uart_state) (b : bv 8) (u' : uart_state) :
-  uart_tx_pop u = Some (b, u') ->
-  u_wire u' = if uart_loopback u then u_wire u else u_wire u ++ [b].
-Proof.
-  unfold uart_tx_pop. destruct (u_tx u) as [| b0 tx'] eqn:Htx; [discriminate|].
-  destruct (uart_loopback u); intro H; injection H as <- <-.
-  - by rewrite uart_recv_wire.
-  - reflexivity.
-Qed.
 
 (* ... and a byte ARRIVING never touches the wire: SOUT is the transmitter's *)
-Lemma uart_rx_push_wire (u : uart_state) (b : bv 8) (u' : uart_state) :
-  uart_rx_push u b = Some u' -> u_wire u' = u_wire u.
-Proof.
-  unfold uart_rx_push.
-  destruct (length (u_rx u) <? uart_fifo_depth)%nat; [| discriminate].
-  intro H. injection H as <-. by rewrite uart_recv_wire.
-Qed.
 
 (* no MMIO access transmits anything: every [uart_write] branch, and every
    [uart_read] branch, carries [u_out] through untouched *)

@@ -464,7 +464,7 @@ Section CreateSpec.
      sys_open, sys_mkdir and sys_mknod all consume it and none of them
      should have to re-spell it. *)
   Definition create_locked
-      (dev : mword 32) (pidv : mword 32)
+ (pidv : mword 32)
       (k : nat) (qi s : Qp) (g : gname) (inum : mword 32)
       (dn : dinode) (bm : blkmap) : iProp Σ :=
     (∃ γil γisl : gname,
@@ -477,8 +477,8 @@ Section CreateSpec.
           bare [ic_deposit fsc_ic k d] stands, at the same arguments, and it is
           why this contract's post no longer hands the
           caller a separate [LogInv.log_tx] on the success arm. *)
-       ic_tx_dep fsc_ic k s dev inum g ∗
-       i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev ∗
+       ic_tx_dep fsc_ic k s icfg_dev inum g ∗
+       i_dev (ientry k) ↦₄{DfracOwn (1/2)} icfg_dev ∗
        i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum ∗
        i_valid (ientry k) ↦₄ valid_word true ∗
        ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dn bm ∗
@@ -490,7 +490,7 @@ Section CreateSpec.
           over) and hands it on to whichever of sys_open / sys_mkdir /
           sys_mknod releases the child. *)
        ifreeze_off (bv_unsigned inum) ∗
-       inode_ref_short_gen k (qi + s)%Qp qi dev inum g ∗
+       inode_ref_short_gen k (qi + s)%Qp qi icfg_dev inum g ∗
        (* ...AND ITS PROVENANCE UNIT (item 7a-wire, iclaim-ledger.md §5''.3).
           This bundle IS [SpecIunlockput]'s precondition, and since item
           7a-wire that precondition includes the unit the closing iput
@@ -505,20 +505,20 @@ Section CreateSpec.
      site in ProofCreate.v -- [iSplitL]/[iExact] is free, the same fix as
      [IcacheEscrow.ic_mk_loaded] for the same reason (optimization.md,
      "Framing"). *)
-  Lemma create_locked_mk dev pidv k qi s g inum dn bm
+  Lemma create_locked_mk pidv k qi s g inum dn bm
       γil γisl :
     is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string (ic_tok fsc_ic k) (slh_tok (icfg_isl k)) -∗
     sleeplocked_q γisl s (i_lock (ientry k)) pidv -∗
-    ic_tx_dep fsc_ic k s dev inum g -∗
-    i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
+    ic_tx_dep fsc_ic k s icfg_dev inum g -∗
+    i_dev (ientry k) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry k) ↦₄ valid_word true -∗
     ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dn bm -∗
     ity_shot g (di_type dn) -∗
     ifreeze_off (bv_unsigned inum) -∗
-    inode_ref_short_gen k (qi + s)%Qp qi dev inum g -∗
+    inode_ref_short_gen k (qi + s)%Qp qi icfg_dev inum g -∗
     runit_any (bv_unsigned inum) -∗
-    create_locked dev pidv k qi s g inum dn bm.
+    create_locked pidv k qi s g inum dn bm.
   Proof.
     iIntros "Hlk Hlkd Hdep Hdev Hinum Hvalid Hload Hshot Hfrz Href Hru".
     rewrite /create_locked. iExists γil, γisl.
@@ -535,15 +535,13 @@ End CreateSpec.
 Definition wp_create_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names)
     (γa : gname) (γf : gname) (γpr : gname)           (* kalloc, ftable, printk *)
-    (bmapstart inodestart : Z) (nib : nat)
-    (ninodes : Z) (size : Z) (dev : mword 32)
+    (bmapstart : Z)
+    (ninodes : Z) (size : Z)
     (plen : nat) (pfun : nat -> bv 8)                 (* the PATH buffer     *)
     (ty major minor : mword 16)                       (* a1, a2, a3          *)
     (V : pprivate)                                    (* the running process *)
@@ -558,33 +556,23 @@ Definition wp_create_sconf_body
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   let pl := bview plen pfun in
   (K_create <= K)%nat ->
-  (* ---- the file system's geometry (the union of every callee's) ---- *)
-  dev = icfg_dev ->
-  nib = icfg_nib ->
-  (* the region's two AMBIENT TIES (fs-log.md §G.25's ruling: pure premises,
-     beside the [dev]/[nib] pair above, because there is one log and one
-     inode region and a boolean to opt out of that would be an interface
-     the guiding principle says never to keep).  create threads them
-     verbatim to [wp_nameiparent_gen], which is where they are consumed. *)
-  γ = icfg_log ->
-  inodestart = icfg_ist ->
-  dev = ROOTDEV ->
-  (0 < nib)%nat ->
+  icfg_dev = ROOTDEV ->
+  (0 < icfg_nib)%nat ->
   log_geom_ok fsc_cov fsc_logst ->
   0 < size <= BPB ->
   0 <= bmapstart ->
   bmapstart ∈ fsc_cov ->
   ~ (bmapstart ∈ log_region_set fsc_logst) ->
-  0 <= inodestart ->
+  0 <= icfg_ist ->
   cov_below fsc_cov size ->
   bitmap_geom_ok fsc_cov fsc_logst bmapstart size ->
-  InodeInv.ireg_blocks_ok inodestart nib fsc_cov fsc_logst ->
+  InodeInv.ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
   (* ---- namex's path buffer ---- *)
   bb_cstr pfun plen ->
   (Z.of_nat plen < 2 ^ 31)%Z ->
   (* ---- ialloc's three geometry premises, and its live type premise ---- *)
   1 < ninodes ->
-  ninodes <= 16 * Z.of_nat nib ->
+  ninodes <= 16 * Z.of_nat icfg_nib ->
   ninodes < 2 ^ 31 ->
   (* ...and mkfs's own [ushort] geometry beside them, carried as a premise
      rather than as a slot widening (D0-a): it is what makes the
@@ -592,7 +580,7 @@ Definition wp_create_sconf_body
      argument.  BOTH of create's proof halves consume it ([cr_alloc_half],
      [cr_fail_half]) and nothing below the seal supplies it, so the seal
      is where it has to stand. *)
-  16 * Z.of_nat nib <= 2 ^ 16 ->
+  16 * Z.of_nat icfg_nib <= 2 ^ 16 ->
   bv_unsigned ty <> 0 ->
   (* durable-disk 2b-inode-3: ialloc's claim box owes the region (L5) --
      the type it writes is one of the four the enumeration admits.  Stated
@@ -622,15 +610,15 @@ Definition wp_create_sconf_body
      rodata image the "." / ".." literals live in *)
   kernel_data -∗
   printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
-  log_ctx γ bn fsc_fs fsc_cov fsc_logst dev -∗
+  bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
+  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
   kalloc_env γa None -∗
   (* ---- THE ICACHE, THE ITABLE AND THE INODE REGION ---- *)
-  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
-  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B).  Persistent,
      borrowed, never spent.  create is the only function in the tree that
      runs [ialloc], and [SpecIalloc] now takes this because
@@ -642,7 +630,7 @@ Definition wp_create_sconf_body
   ireg_open -∗
   (* ---- the four superblock cells ---- *)
   sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
-  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
@@ -665,7 +653,7 @@ Definition wp_create_sconf_body
   bslots 3 -∗
   iref_slots ns -∗
   (* ---- THE OP-WIDE RESERVATION, IN SET FORM (section 18 clause 1) ---- *)
-  log_opS γ u Sb -∗
+  log_opS icfg_log u Sb -∗
   (* ---- THE TRANSACTION TOKEN (durable-disk lane A, plan section 4b) ----
      create is the one function whose child is MID-BUILT across a call: a
      mkdir's child carries [nlink = 1] from +0xc4 and gets its two dot
@@ -677,7 +665,7 @@ Definition wp_create_sconf_body
      its inode well-formed at each write and needs none of this.
      THE TOKEN COMES BACK ON EVERY ARM: create's caller ends the operation,
      and end_op takes the whole [LogInv.log_op]. *)
-  log_tx γ -∗
+  log_tx icfg_log -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b]: create parks (ilock,
      bread, the whole fs cone), and a park moves the hart with interrupts
      off, so the crossing has nothing to do with SIE. *)
@@ -692,7 +680,7 @@ Definition wp_create_sconf_body
       pc_is ret_tgt -∗
       (* everything structural comes back untouched *)
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
-      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       (* NO ORDERING on the bitmap: create both ALLOCATES (balloc, under
@@ -720,7 +708,7 @@ Definition wp_create_sconf_body
          on [Sb' ∖ Sb] -- see the header.  The floor is GUARDED ON [ok] and
          that guard is forced, not a convenience: see the header. *)
       ⌜Sb ⊆ Sb' /\ (u' <= u)%nat /\ (ok = true -> (iput_units <= u')%nat)⌝ -∗
-      log_opS γ u' Sb' -∗
+      log_opS icfg_log u' Sb' -∗
       (* THE TRANSACTION TOKEN GOES WITH THE ANSWER (durable-disk B''-tx2).
          No arm of create leaves an inode's row suspended (lane A), but the
          SUCCESS arms return a write-locked child, whose escrow holds half
@@ -732,7 +720,7 @@ Definition wp_create_sconf_body
        then (* BOTH SUCCESS ARMS RETURN A LOCKED INODE *)
          ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = ientry k
           /\ (k < NINODE)%nat
-          /\ 0 < bv_unsigned inum < 16 * Z.of_nat nib
+          /\ 0 < bv_unsigned inum < 16 * Z.of_nat icfg_nib
           /\ (if made
               then (* [ARM C-OK]: this inode was just allocated.  The type
                       is ialloc's, the three halfword stores are create's,
@@ -748,11 +736,11 @@ Definition wp_create_sconf_body
                       tests at +0x4c / +0x5c passed. *)
                 ty = T_FILE
                 /\ (di_type dn = T_FILE \/ di_type dn = T_DEVICE))⌝ ∗
-         create_locked dev pidv k qi s g inum dn bm
+         create_locked pidv k qi s g inum dn bm
        else (* ARMS N / F-BAD / A-FAIL / FAIL: a0 = 0 and create holds
                nothing -- every inode it touched has been iunlockput. *)
          ⌜mf !!! Regidx (mword_of_int 10 : mword 5)
-          = (mword_of_int 0 : mword 64)⌝ ∗ log_tx γ) -∗
+          = (mword_of_int 0 : mword 64)⌝ ∗ log_tx icfg_log) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -764,10 +752,9 @@ Module Type CREATE.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names)
       (γa : gname) (γf : gname) (γpr : gname)
-      (bmapstart inodestart : Z) (nib : nat)
-      (ninodes : Z) (size : Z) (dev : mword 32)
+      (bmapstart : Z)
+      (ninodes : Z) (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
       (ty major minor : mword 16)
       (V : pprivate)
@@ -776,8 +763,8 @@ Module Type CREATE.
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_create_sconf_body γs j γl γu γd γk pd pav pu bn γ
-                           γa γf γpr bmapstart inodestart nib
-                           ninodes size dev plen pfun ty major minor
+      wp_create_sconf_body γs j γl γu γd γk pd pav pu bn
+                           γa γf γpr bmapstart
+                           ninodes size plen pfun ty major minor
                            V u Sb ns pidv dqb dqs dqbs dqn m K eb b lks.
 End CREATE.

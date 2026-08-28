@@ -82,26 +82,19 @@ Section FileInv.
     file_fields k q C -∗ a_fip k ↦₈{DfracOwn (q/2)} fc_ip C.
   Proof. iIntros "(_ & _ & _ & _ & $ & _)". Qed.
 
-  (* Two references onto one slot agree on the CONTENT for free (genuine
-     points-to fractions) and on the STATE because the payload's names ghost
-     makes them agree on [fp_inum] -- which is the whole reason the inum is
-     carried there rather than being conjured at each holder.  So two
-     descriptors onto one file report the same thing to their user, and
-     filedup's two shares cannot drift apart. *)
-  Lemma file_ref_agree γ k q1 C1 st1 q2 C2 st2 :
-    file_ref γ k q1 C1 st1 -∗ file_ref γ k q2 C2 st2 -∗ ⌜C1 = C2 /\ st1 = st2⌝.
+  (* Two references onto one slot agree on the STATE -- so two descriptors
+     onto one file report the same thing to their user, and filedup's two
+     shares cannot drift apart.  It holds because the payload's names ghost
+     makes them agree on [fp_inum] and the points-tos make them agree on the
+     content, which is also why the CONTENT half no longer has to be stated:
+     each reference carries its own [C] under its own quantifier, and no
+     caller has two of them in hand to compare. *)
+  Lemma file_ref_agree γ k q1 st1 q2 st2 :
+    file_ref γ k q1 st1 -∗ file_ref γ k q2 st2 -∗ ⌜st1 = st2⌝.
   Proof.
-    iIntros "(_ & H1 & Hp1 & _) (_ & H2 & Hp2 & _)".
+    iIntros "(%C1 & _ & H1 & Hp1 & _) (%C2 & _ & H2 & Hp2 & _)".
     iDestruct (file_fields_agree with "H1 H2") as %<-.
     by iDestruct (file_pay_st_agree with "Hp1 Hp2") as %<-.
-  Qed.
-
-  (* the content half alone, which is all most callers were after. *)
-  Lemma file_ref_agree_c γ k q1 C1 st1 q2 C2 st2 :
-    file_ref γ k q1 C1 st1 -∗ file_ref γ k q2 C2 st2 -∗ ⌜C1 = C2⌝.
-  Proof.
-    iIntros "H1 H2".
-    by iDestruct (file_ref_agree with "H1 H2") as %[? ?].
   Qed.
 
   (* the split filedup performs and fileclose undoes. *)
@@ -371,7 +364,7 @@ Section FileInv.
   Lemma file_alloc_step γ M k C :
     M !! k = None -> fc_type C = FD_NONE ->
     ftable_auth γ M -∗ file_fields k 1 C -∗ file_pay γ k 1 C ==∗
-    ftable_auth γ (<[k := (1%Qp, 1%positive)]> M) ∗ file_ref γ k 1 C FdClosed.
+    ftable_auth γ (<[k := (1%Qp, 1%positive)]> M) ∗ file_ref γ k 1 FdClosed.
   Proof.
     iIntros (HM Hty) "[Ha Hl] Hf Hp".
     iDestruct (file_pay_st_none _ _ _ _ Hty with "Hp") as "Hp".
@@ -387,19 +380,20 @@ Section FileInv.
       split; done. }
     rewrite fref_own_op. iDestruct "H" as "[Ha Hfrag]".
     rewrite Mcount_insert. cbn [snd].
-    iModIntro. iFrame "Ha Hl". rewrite /file_ref /fref_tok. iFrame.
+    iModIntro. iFrame "Ha Hl". rewrite /file_ref /fref_tok.
+    iExists C. iFrame.
   Qed.
 
   (* filedup: [ref++].  The new reference's fraction comes out of the
      CALLER's -- nothing is conjured, which is exactly why the invariant's
      leftover [file_rest γ k qt] is untouched. *)
-  Lemma file_dup_step γ M k q C st qt (n : positive) :
+  Lemma file_dup_step γ M k q st qt (n : positive) :
     M !! k = Some (qt, n) ->
-    ftable_auth γ M -∗ file_ref γ k q C st ==∗
+    ftable_auth γ M -∗ file_ref γ k q st ==∗
     ftable_auth γ (<[k := (qt, Pos.succ n)]> M) ∗
-    file_ref γ k (q/2)%Qp C st ∗ file_ref γ k (q/2)%Qp C st.
+    file_ref γ k (q/2)%Qp st ∗ file_ref γ k (q/2)%Qp st.
   Proof.
-    iIntros (HM) "[Ha Hl] (Hf & Hc & Hp & Hlv)".
+    iIntros (HM) "[Ha Hl] (%C & Hf & Hc & Hp & Hlv)".
     rewrite /ftable_auth /fref_tok.
     assert (Hml : Mcount M !! k = Some n)
       by (rewrite Mcount_lookup HM; reflexivity).
@@ -428,21 +422,25 @@ Section FileInv.
     iEval (rewrite -{1}(Qp.div_2 q) file_fields_frac_split) in "Hc".
     iEval (rewrite -{1}(Qp.div_2 q) file_pay_st_split) in "Hp".
     iDestruct "Hc" as "[Hca Hcb]". iDestruct "Hp" as "[Hpa Hpb]".
-    iFrame.
+    (* both halves at the SAME content, which is what a filedup means *)
+    iSplitL "Hfa Hca Hpa Hlv1"; iExists C; by iFrame.
   Qed.
 
   (* fileclose, [--ref > 0]: the departing reference's fraction has to go
      SOMEWHERE, and it goes back into the authority's outstanding total (and,
      on the points-to side, into [file_rest]).  That is why the frac component
      tracks outstanding fraction rather than being pinned at 1. *)
-  Lemma file_close_step γ M k q C st qt (n : positive) (qr : Qp) :
+  (* [C] IS AN OUTPUT NOW, not a parameter: the reference carries its own
+     content under its own quantifier, so what comes back out is whatever was
+     in there.  It is the same [C] the caller used to have to supply. *)
+  Lemma file_close_step γ M k q st qt (n : positive) (qr : Qp) :
     M !! k = Some (qt, Pos.succ n) ->
     (qt - q)%Qp = Some qr ->
-    ftable_auth γ M -∗ file_ref γ k q C st ==∗
-    ftable_auth γ (<[k := (qr, n)]> M) ∗ file_fields k q C ∗
-    file_pay γ k q C.
+    ftable_auth γ M -∗ file_ref γ k q st ==∗
+    ftable_auth γ (<[k := (qr, n)]> M) ∗
+    ∃ C : fcontent, file_fields k q C ∗ file_pay γ k q C.
   Proof.
-    iIntros (HM Hsub) "[Ha Hl] (Hf & Hc & Hp & Hlv)".
+    iIntros (HM Hsub) "[Ha Hl] (%C & Hf & Hc & Hp & Hlv)".
     iDestruct (file_pay_st_pay with "Hp") as "Hp".
     rewrite /ftable_auth /fref_tok.
     assert (Hml : Mcount M !! k = Some (Pos.succ n))
@@ -541,16 +539,16 @@ Section FileInv.
      GHOST half above instead, because it has to cancel the off-borrow cinv
      first (the refutation reads the entry this step deletes) and by then it
      holds the joined fraction rather than [qt]. *)
-  Lemma file_close_last_step γ M k C st (qt : Qp) :
+  Lemma file_close_last_step γ M k st (qt : Qp) :
     M !! k = Some (qt, 1%positive) ->
-    ftable_auth γ M -∗ file_ref γ k qt C st ==∗
-    ftable_auth γ (delete k M) ∗ file_fields k qt C ∗
-    file_pay γ k qt C.
+    ftable_auth γ M -∗ file_ref γ k qt st ==∗
+    ftable_auth γ (delete k M) ∗
+    ∃ C : fcontent, file_fields k qt C ∗ file_pay γ k qt C.
   Proof.
-    iIntros (HM) "Hauth (Hf & Hc & Hp & Hlv)".
+    iIntros (HM) "Hauth (%C & Hf & Hc & Hp & Hlv)".
     iDestruct (file_pay_st_pay with "Hp") as "Hp".
     iMod (file_close_last_ghost γ M k qt HM with "Hauth Hf Hlv") as "$".
-    iModIntro. iFrame.
+    iModIntro. iExists C. iFrame.
   Qed.
 
   (* ------------------------------------------------------------------ *)

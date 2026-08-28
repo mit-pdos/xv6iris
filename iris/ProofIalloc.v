@@ -319,7 +319,7 @@ Lemma ia_fresh_of_zero (ty : mword 16) :
 Proof. reflexivity. Qed.
 
 Section IallocBytes.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, FSC : fscfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, FSC : fscfg}.
 
   (* THE RAW 64-BYTE WINDOW of slot [k], borrowed out of the block's byte
      image and given back AT A NEW RECORD.  [DinodeSlot.diblk_slot_acc] is
@@ -374,12 +374,12 @@ Section IallocBytes.
      BOTH polarities.  [ProofIupdate.iu_held_L] verbatim; a Proof file may
      not require another Proof file, so it is restated here. *)
   Lemma ia_held_L (bn : bio_names) (γfs : fs_names) (γd : disk_names)
-      (dev : mword 32) (k : nat) (pidv dv bno : mword 32)
+ (k : nat) (pidv dv bno : mword 32)
       (bs bsl bsd : list (bv 8)) (d : bool) :
-    bio_held bn (fs_view γfs γd dev fsc_cov) k pidv dv bno bs bsl bsd d -∗
+    bio_held bn (fs_view γfs γd icfg_dev fsc_cov) k pidv dv bno bs bsl bsd d -∗
       (uint bno ↪[fs_cache γfs]{#(1/2)} bsl) ∗
       ((uint bno ↪[fs_cache γfs]{#(1/2)} bsl) -∗
-       bio_held bn (fs_view γfs γd dev fsc_cov) k pidv dv bno bs bsl bsd d).
+       bio_held bn (fs_view γfs γd icfg_dev fsc_cov) k pidv dv bno bs bsl bsd d).
   Proof.
     rewrite /bio_held /bio_pay /fs_view /=.
     iIntros "(%A & %B & %C & H1 & H3 & H4 & H5 & H6 & Hpay)".
@@ -454,33 +454,33 @@ Section IallocDefs.
      fresh box's only licence (ClaimL, §2.6's fourth row) and create's fill
      spends it at [ireg_withdraw].  Before this increment the AU's output
      was dropped at the claim site's [iIntros]. *)
-  Definition ia_arms (γ : log_names) (dev : mword 32)
-      (inodestart ninodes : Z) (nib : nat) (ty : mword 16) (u : nat)
+  Definition ia_arms
+      (ninodes : Z) (ty : mword 16) (u : nat)
       (Sb : gset Z) (t : nat) (qt : Qp) (av : mword 64) : iProp Σ :=
     ((* NO INODES: a0 = 0, the iget ledger unit unspent, the reservation
         untouched -- and no claim box, so the transaction's share comes
         straight back (durable-disk C-5) *)
      (⌜av = (mword_of_int 0 : mword 64)⌝ ∗ iref_slot
-      ∗ t ↪[ln_tx icfg_log]{#qt} tt ∗ log_opS γ (S u) Sb)
+      ∗ t ↪[ln_tx icfg_log]{#qt} tt ∗ log_opS icfg_log (S u) Sb)
      ∨
      (* THE CLAIM: iget's postcondition verbatim, and one unit gone *)
      (∃ (kslot : nat) (q : Qp) (inum : mword 32),
         ⌜av = ientry kslot
          /\ (kslot < NINODE)%nat
          /\ 0 < bv_unsigned inum < ninodes
-         /\ bv_unsigned inum < 16 * Z.of_nat nib⌝ ∗
-        inode_ref kslot q dev inum ∗
+         /\ bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
+        inode_ref kslot q icfg_dev inum ∗
         (* the minted provenance unit, at the CLAIM flavour (item 7a-wire;
            spelled [runit_claim] since RULING C' -- see SpecIalloc) *)
         runit_claim (bv_unsigned inum) ∗
         iclaim (bv_unsigned inum) ty t qt ∗
-        log_opS γ u (Sb ∪ {[IBLOCK inum inodestart]})))%I.
+        log_opS icfg_log u (Sb ∪ {[IBLOCK inum icfg_ist]})))%I.
 
   (* THE CONTINUATION, named so it is not re-traversed by every proofmode
      split (claude-notes/optimization.md). *)
   Definition ia_cont `{GEN : GenId} `{CID0 : CpuId}
-      (γ : log_names) (bn : bio_names)
-      (inodestart ninodes : Z) (nib : nat) (dev : mword 32) (ty : mword 16)
+ (bn : bio_names)
+      (ninodes : Z) (ty : mword 16)
       (u : nat) (Sb : gset Z) (pidv : mword 32) (dq dqs dqn : dfrac) (j : nat)
       (m : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate)
       (t : nat) (qt : Qp) : iProp Σ :=
@@ -492,14 +492,14 @@ Section IallocDefs.
         cpu_own 0 true (proc_addr j) b lks -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
-        sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+        sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
         proc_priv_bare (proc_addr j) pidv Vpr -∗
         bslots 2 -∗
         (if alloc
          then ⌜mf !!! Regidx Ra0 = ientry kslot
                /\ (kslot < NINODE)%nat
                /\ 0 < bv_unsigned inum < ninodes
-               /\ bv_unsigned inum < 16 * Z.of_nat nib
+               /\ bv_unsigned inum < 16 * Z.of_nat icfg_nib
                /\ dn' = ialloc_fresh ty
                /\ di_type dn' = ty
                /\ fresh_shape dn'⌝ ∗
@@ -507,12 +507,12 @@ Section IallocDefs.
                  post.  [ia_arms] below still carries the three constituents
                  separately -- that is the epilogue's internal shape, and the
                  pack happens once, here, where the contract is met. *)
-              inode_claimed ty kslot q dev inum t qt ∗
-              log_opS γ u (Sb ∪ {[IBLOCK inum inodestart]})
+              inode_claimed ty kslot q icfg_dev inum t qt ∗
+              log_opS icfg_log u (Sb ∪ {[IBLOCK inum icfg_ist]})
          else ⌜mf !!! Regidx Ra0 = (mword_of_int 0 : mword 64)⌝ ∗
               iref_slot ∗
               t ↪[ln_tx icfg_log]{#qt} tt ∗
-              log_opS γ (S u) Sb) -∗
+              log_opS icfg_log (S u) Sb) -∗
         WP (Loop : expr riscv_lang))%I.
 
 End IallocDefs.
@@ -545,8 +545,8 @@ Section IallocEpilogue.
             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma ia_epilogue `{GEN : GenId} `{CID0 : CpuId}
-      (j : nat) (bn : bio_names) (γ : log_names)
-      (inodestart ninodes : Z) (nib : nat) (dev : mword 32) (ty : mword 16)
+      (j : nat) (bn : bio_names)
+      (ninodes : Z) (ty : mword 16)
       (u : nat) (Sb : gset Z) (t : nat) (qt : Qp)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m M : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) :
@@ -566,11 +566,11 @@ Section IallocEpilogue.
     ia_frame m -∗
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
-    sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+    sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     bslots 2 -∗
-    ia_arms γ dev inodestart ninodes nib ty u Sb t qt
+    ia_arms ninodes ty u Sb t qt
             (M !!! Regidx Ra0 : mword 64) -∗
-    ia_cont (CID0 := CID0) γ bn inodestart ninodes nib dev ty u Sb
+    ia_cont (CID0 := CID0) bn ninodes ty u Sb
             pidv dq dqs dqn j m K b lks Vpr t qt -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -771,9 +771,9 @@ Section IallocOut.
             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma ia_out `{GEN : GenId} `{CID0 : CpuId}
-      (j : nat) (bn : bio_names) (γ : log_names)
+      (j : nat) (bn : bio_names)
       (γpr : gname) (γu : uart_names) (γd : disk_names)
-      (inodestart ninodes : Z) (nib : nat) (dev : mword 32) (ty : mword 16)
+      (ninodes : Z) (ty : mword 16)
       (u : nat) (Sb : gset Z) (t : nat) (qt : Qp)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m M : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) :
@@ -791,15 +791,15 @@ Section IallocOut.
     ia_frame m -∗
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
-    sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+    sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     bslots 2 -∗
     iref_slot -∗
-    log_opS γ (S u) Sb -∗
+    log_opS icfg_log (S u) Sb -∗
     (* THE CLAIMING TRANSACTION'S SHARE (durable-disk C-5): parked in the
        region by [InodeRegion.ireg_claim_au] for as long as the claim box
        stands, returned unspent on the no-inodes arm. *)
     t ↪[ln_tx icfg_log]{#qt} tt -∗
-    ia_cont (CID0 := CID0) γ bn inodestart ninodes nib dev ty u Sb
+    ia_cont (CID0 := CID0) bn ninodes ty u Sb
             pidv dq dqs dqn j m K b lks Vpr t qt -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1080,7 +1080,7 @@ Section IallocOut.
     iEval (rewrite Hpp80) in "Hpc".
     iDestruct (cpu_own_transport CID10 CID11 0 true (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (ia_epilogue (CID0 := CID11) j bn γ inodestart ninodes nib dev ty u Sb
+    iApply (ia_epilogue (CID0 := CID11) j bn ninodes ty u Sb
               t qt pidv dq dqs dqn m QB K b lks Vpr HK Hty Htyk HQBsp HQBthr
               with "Hcg Hcnt Htext Hpc Hframe Hppid Hsbn Hsbi Hsl
                     [Hiref Hop Htx] [Hcont]").
@@ -1113,9 +1113,9 @@ Section IallocClaim.
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names) (γ : log_names)
-      (inodestart ninodes : Z) (nib : nat)
-      (dev : mword 32) (ty : mword 16)
+      (bn : bio_names)
+      (ninodes : Z)
+ (ty : mword 16)
       (inum : mword 32) (ds : list dinode) (u : nat) (Sb : gset Z)
       (t : nat) (qt : Qp)
       (kk : nat) (bno : mword 32) (bsd : list (bv 8)) (d0 : bool)
@@ -1128,15 +1128,15 @@ Section IallocClaim.
     ia_thr8 m M ->
     M !!! Regidx Rs1 = bnode kk ->
     M !!! Regidx Rs3 = pa_add (b_data (bpa kk)) (64 * DinodeEnc.islot inum)%nat ->
-    M !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64) ->
+    M !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64) ->
     M !!! Regidx Rs6 = (sign_extend' 64 ty : mword 64) ->
     M !!! Regidx Rs2 = (sign_extend' 64 inum : mword 64) ->
     (kk < NBUF)%nat ->
-    uint bno = IBLOCK inum inodestart ->
-    IBLOCK inum inodestart ∈ fsc_cov ->
-    ~ (IBLOCK inum inodestart ∈ log_region_set fsc_logst) ->
+    uint bno = IBLOCK inum icfg_ist ->
+    IBLOCK inum icfg_ist ∈ fsc_cov ->
+    ~ (IBLOCK inum icfg_ist ∈ log_region_set fsc_logst) ->
     (* the claim's own premises, all four of [ireg_claim_au]'s *)
-    bv_unsigned inum < 16 * Z.of_nat nib ->
+    bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
     diblk_wf ds ->
     bv_unsigned (di_type (ds !!! DinodeEnc.islot inum)) = 0 ->
     bv_unsigned ty <> 0 ->
@@ -1153,9 +1153,9 @@ Section IallocClaim.
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.ialloc + 0x88) : mword 64) -∗
     panic_env -∗
-    bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
-    log_ctx γ bn fsc_fs fsc_cov fsc_logst dev -∗
-    ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+    bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
+    log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+    ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
     (* RULING B (iclaim-ledger.md §3.2): the sealed regime, which
        [InodeRegion.ireg_claim_au] now takes.  Persistent -- borrowed, never
        spent -- and it rides the same channel [ireg_inv] does. *)
@@ -1164,23 +1164,23 @@ Section IallocClaim.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
     itable_inv -∗
     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
     iref_slot -∗
     ia_frame m -∗
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
-    sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+    sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     bslots 1 -∗
-    log_opS γ (S u) Sb -∗
+    log_opS icfg_log (S u) Sb -∗
     (* THE CLAIMING TRANSACTION'S SHARE (durable-disk C-5): parked in the
        region by [InodeRegion.ireg_claim_au] for as long as the claim box
        stands, returned unspent on the no-inodes arm. *)
     t ↪[ln_tx icfg_log]{#qt} tt -∗
-    bio_held bn (fs_view fsc_fs γd dev fsc_cov) kk pidv dev bno
+    bio_held bn (fs_view fsc_fs γd icfg_dev fsc_cov) kk pidv icfg_dev bno
        (diblk_bytes ds) (diblk_bytes ds) bsd d0 -∗
-    ia_cont (CID0 := CID0) γ bn inodestart ninodes nib dev ty u Sb
+    ia_cont (CID0 := CID0) bn ninodes ty u Sb
             pidv dq dqs dqn j m K b lks Vpr t qt -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1216,7 +1216,7 @@ Section IallocClaim.
       by (rewrite /W0 upd_ne; [exact Hs2 | nz]).
     assert (HW0s3 : W0 !!! Regidx Rs3 = (pa_add (b_data (bpa kk)) (64 * DinodeEnc.islot inum)%nat))
       by (rewrite /W0 upd_ne; [exact Hs3 | nz]).
-    assert (HW0s5 : W0 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HW0s5 : W0 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /W0 upd_ne; [exact Hs5 | nz]).
     assert (HW0s6 : W0 !!! Regidx Rs6 = (sign_extend' 64 ty : mword 64))
       by (rewrite /W0 upd_ne; [exact Hs6 | nz]).
@@ -1246,7 +1246,7 @@ Section IallocClaim.
       by (rewrite /W1 upd_ne; [exact HW0s2 | nz]).
     assert (HW1s3 : W1 !!! Regidx Rs3 = (pa_add (b_data (bpa kk)) (64 * DinodeEnc.islot inum)%nat))
       by (rewrite /W1 upd_ne; [exact HW0s3 | nz]).
-    assert (HW1s5 : W1 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HW1s5 : W1 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /W1 upd_ne; [exact HW0s5 | nz]).
     assert (HW1s6 : W1 !!! Regidx Rs6 = (sign_extend' 64 ty : mword 64))
       by (rewrite /W1 upd_ne; [exact HW0s6 | nz]).
@@ -1277,7 +1277,7 @@ Section IallocClaim.
       by (rewrite /W2 upd_ne; [exact HW1s2 | nz]).
     assert (HW2s3 : W2 !!! Regidx Rs3 = (pa_add (b_data (bpa kk)) (64 * DinodeEnc.islot inum)%nat))
       by (rewrite /W2 upd_ne; [exact HW1s3 | nz]).
-    assert (HW2s5 : W2 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HW2s5 : W2 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /W2 upd_ne; [exact HW1s5 | nz]).
     assert (HW2s6 : W2 !!! Regidx Rs6 = (sign_extend' 64 ty : mword 64))
       by (rewrite /W2 upd_ne; [exact HW1s6 | nz]).
@@ -1314,7 +1314,7 @@ Section IallocClaim.
       by (rewrite /W3 upd_ne; [exact HW2s2 | nz]).
     assert (HW3s3 : W3 !!! Regidx Rs3 = (pa_add (b_data (bpa kk)) (64 * DinodeEnc.islot inum)%nat))
       by (rewrite /W3 upd_ne; [exact HW2s3 | nz]).
-    assert (HW3s5 : W3 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HW3s5 : W3 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /W3 upd_ne; [exact HW2s5 | nz]).
     assert (HW3s6 : W3 !!! Regidx Rs6 = (sign_extend' 64 ty : mword 64))
       by (rewrite /W3 upd_ne; [exact HW2s6 | nz]).
@@ -1348,7 +1348,7 @@ Section IallocClaim.
     assert (HmMs3 : mM !!! Regidx Rs3 = (pa_add (b_data (bpa kk)) (64 * DinodeEnc.islot inum)%nat))
       by (rewrite (callee_saved_lookup Hcsm_cs Rs3 ltac:(vm_compute; reflexivity));
           exact HW3s3).
-    assert (HmMs5 : mM !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HmMs5 : mM !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite (callee_saved_lookup Hcsm_cs Rs5 ltac:(vm_compute; reflexivity));
           exact HW3s5).
     assert (HmMs6 : mM !!! Regidx Rs6 = (sign_extend' 64 ty : mword 64))
@@ -1422,7 +1422,7 @@ Section IallocClaim.
       by (rewrite /W4 upd_ne; [exact HmMs1 | nz]).
     assert (HW4s2 : W4 !!! Regidx Rs2 = (sign_extend' 64 inum : mword 64))
       by (rewrite /W4 upd_ne; [exact HmMs2 | nz]).
-    assert (HW4s5 : W4 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HW4s5 : W4 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /W4 upd_ne; [exact HmMs5 | nz]).
     assert (HW4sp : ia_sp m W4)
       by (rewrite /ia_sp /W4 upd_ne; [exact HmMsp | nz]).
@@ -1451,7 +1451,7 @@ Section IallocClaim.
       by (rewrite /W5 upd_ne; [exact HW4s1 | nz]).
     assert (HW5s2 : W5 !!! Regidx Rs2 = (sign_extend' 64 inum : mword 64))
       by (rewrite /W5 upd_ne; [exact HW4s2 | nz]).
-    assert (HW5s5 : W5 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HW5s5 : W5 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /W5 upd_ne; [exact HW4s5 | nz]).
     assert (HW5sp : ia_sp m W5)
       by (rewrite /ia_sp /W5 upd_ne; [exact HW4sp | nz]).
@@ -1480,9 +1480,9 @@ Section IallocClaim.
        the AU hands the log's parked payload to the client's own update.
        The plain form is recovered immediately, so nothing else moves. *)
     (* THE PAYLOAD-STEP PREMISE (durable-disk 3a, ratified (D)) *)
-    iApply fupd_wp. iMod (log_epoch_lb_0 γ) as "#Hlb0". iModIntro.
+    iApply fupd_wp. iMod (log_epoch_lb_0 icfg_log) as "#Hlb0". iModIntro.
     iDestruct (log_opS_named with "HopS") as (e0) "HopS".
-    iPoseProof (log_credit_own γ false Sb e0 (uint bno) ltac:(discriminate))
+    iPoseProof (log_credit_own icfg_log false Sb e0 (uint bno) ltac:(discriminate))
       as "#Hcrd".
     (* THE RECORD-GRANULAR FORM (durable-disk 2b-inode-1): ialloc's
        memset+stores move exactly the claimed slot's 64 bytes of the
@@ -1504,7 +1504,7 @@ Section IallocClaim.
         [ exact (dinode_bytes_length _ Hfrwf)
         | exact (diblk_bytes_splice ds (DinodeEnc.islot inum) (ialloc_fresh ty)
                    Hdswf Hfrwf Hslot16) ]. }
-    iApply (LW.wp_log_write_au_range bn γ fsc_fs γd fsc_cov fsc_logst dev kk pidv bno
+    iApply (LW.wp_log_write_au_range bn icfg_log fsc_fs γd fsc_cov fsc_logst icfg_dev kk pidv bno
               (diblk_bytes (<[DinodeEnc.islot inum := ialloc_fresh ty]> ds))
               (diblk_bytes ds) bsd d0 u
               (64 * DinodeEnc.islot inum)%nat 64%nat
@@ -1532,7 +1532,7 @@ Section IallocClaim.
          bound) are still dropped -- one adapter line, fs-log.md §G.17 --
          but the ANCHOR is now [iclaim]; see the instantiation above. *)
       iApply lw_au_rec.
-      iApply (ireg_claim_au ⊤ fsc_ireg fsc_fs inodestart nib inum (ialloc_fresh ty) ds
+      iApply (ireg_claim_au ⊤ fsc_ireg fsc_fs icfg_ist icfg_nib inum (ialloc_fresh ty) ds
                 t qt ltac:(solve_ndisj) Hnib Hdswf Ht0
                 (ialloc_fresh_shape ty Hty) Htyk with "Hireg Hiopen Htx"). }
     (* THE RECEIPT LANDS HERE (iclaim-ledger.md §2.4 / IIIb step 4).  The
@@ -1559,7 +1559,7 @@ Section IallocClaim.
     assert (HmLs2 : mL !!! Regidx Rs2 = (sign_extend' 64 inum : mword 64))
       by (rewrite (callee_saved_lookup Hcsl_cs Rs2 ltac:(vm_compute; reflexivity));
           exact HW5s2).
-    assert (HmLs5 : mL !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HmLs5 : mL !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite (callee_saved_lookup Hcsl_cs Rs5 ltac:(vm_compute; reflexivity));
           exact HW5s5).
     assert (HmLsp : ia_sp m mL).
@@ -1581,7 +1581,7 @@ Section IallocClaim.
     { rewrite /W6 upd_eq. rgne. rewrite HmLs1. apply add_vec_zero_l. }
     assert (HW6s2 : W6 !!! Regidx Rs2 = (sign_extend' 64 inum : mword 64))
       by (rewrite /W6 upd_ne; [exact HmLs2 | nz]).
-    assert (HW6s5 : W6 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HW6s5 : W6 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /W6 upd_ne; [exact HmLs5 | nz]).
     assert (HW6sp : ia_sp m W6)
       by (rewrite /ia_sp /W6 upd_ne; [exact HmLsp | nz]).
@@ -1608,7 +1608,7 @@ Section IallocClaim.
       by (rewrite /W7 upd_ne; [exact HW6a0 | nz]).
     assert (HW7s2 : W7 !!! Regidx Rs2 = (sign_extend' 64 inum : mword 64))
       by (rewrite /W7 upd_ne; [exact HW6s2 | nz]).
-    assert (HW7s5 : W7 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HW7s5 : W7 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /W7 upd_ne; [exact HW6s5 | nz]).
     assert (HW7sp : ia_sp m W7)
       by (rewrite /ia_sp /W7 upd_ne; [exact HW6sp | nz]).
@@ -1623,8 +1623,8 @@ Section IallocClaim.
     iDestruct (wp_next_shift (b := true) (CIDa := CID8) (CIDb := CID11) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 8)%nat) by (lia).
-    iApply (BL.wp_brelse_sconf γs bn (fs_view fsc_fs γd dev fsc_cov) kk
-              pidv dev bno dq W7 (K - 8)%nat true (proc_addr j)
+    iApply (BL.wp_brelse_sconf γs bn (fs_view fsc_fs γd icfg_dev fsc_cov) kk
+              pidv icfg_dev bno dq W7 (K - 8)%nat true (proc_addr j)
               (diblk_bytes (<[DinodeEnc.islot inum := ialloc_fresh ty]> ds))
               bsd true b lks Vpr HKbl Hkk HW7a0
               (* brelse's bound is "bcache"(4); ia_claim's own is
@@ -1641,7 +1641,7 @@ Section IallocClaim.
     assert (HmRs2 : mR !!! Regidx Rs2 = (sign_extend' 64 inum : mword 64))
       by (rewrite (callee_saved_lookup Hcsr_cs Rs2 ltac:(vm_compute; reflexivity));
           exact HW7s2).
-    assert (HmRs5 : mR !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HmRs5 : mR !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite (callee_saved_lookup Hcsr_cs Rs5 ltac:(vm_compute; reflexivity));
           exact HW7s5).
     assert (HmRsp : ia_sp m mR).
@@ -1666,7 +1666,7 @@ Section IallocClaim.
     assert (HW8a1 : W8 !!! Regidx Ra1 = (sign_extend' 64 inum : mword 64)).
     { rewrite /W8 upd_eq. rgne. rewrite HmRs2 iu_off0.
       rewrite (iu_sub31_sext inum). reflexivity. }
-    assert (HW8s5 : W8 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HW8s5 : W8 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /W8 upd_ne; [exact HmRs5 | nz]).
     assert (HW8sp : ia_sp m W8)
       by (rewrite /ia_sp /W8 upd_ne; [exact HmRsp | nz]).
@@ -1683,7 +1683,7 @@ Section IallocClaim.
     iIntros (CID14 Hq14) "Hcg Hpc".
     set (W9 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (rget W8 Rs5))]> W8).
-    assert (HW9a0 : W9 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64)).
+    assert (HW9a0 : W9 !!! Regidx Ra0 = (sign_extend' 64 icfg_dev : mword 64)).
     { rewrite /W9 upd_eq. rgne. rewrite HW8s5. apply add_vec_zero_l. }
     assert (HW9a1 : W9 !!! Regidx Ra1 = (sign_extend' 64 inum : mword 64))
       by (rewrite /W9 upd_ne; [exact HW8a1 | nz]).
@@ -1708,7 +1708,7 @@ Section IallocClaim.
                        (sign_extend' 64 (mword_of_int 2096424 : mword 21))
                      = mword_of_int KernelSyms.iget) by pcw.
     iEval (rewrite Htgtig) in "Hpc".
-    assert (HWAa0 : WA !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64))
+    assert (HWAa0 : WA !!! Regidx Ra0 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /WA upd_ne; [exact HW9a0 | nz]).
     assert (HWAa1 : WA !!! Regidx Ra1 = (sign_extend' 64 inum : mword 64))
       by (rewrite /WA upd_ne; [exact HW9a1 | nz]).
@@ -1749,7 +1749,7 @@ Section IallocClaim.
         It is create's [ilock(ip)] that finally spends it, at
         [InodeRegion.ireg_withdraw]. *)
     iPoseProof (ireg_inv_reg with "Hireg") as "#Hiregr".
-    iApply (IG.wp_iget_sconf inodestart nib dev inum
+    iApply (IG.wp_iget_sconf inum
               (ClaimL ty t qt)
               WA 0%nat true (proc_addr j) (K - 8)%nat b lks
               ltac:(lia) ltac:(vm_compute; reflexivity)
@@ -1961,7 +1961,7 @@ Section IallocClaim.
     iEval (rewrite Hjt) in "Hpc".
     iDestruct (cpu_own_transport CID16 CID23 0 true (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (ia_epilogue (CID0 := CID23) j bn γ inodestart ninodes nib dev ty u Sb
+    iApply (ia_epilogue (CID0 := CID23) j bn ninodes ty u Sb
               t qt pidv dq dqs dqn m V6 K b lks Vpr HK Hty Htyk HV6sp HV6thr
               with "Hcg Hcnt Htext Hpc Hframe Hppid Hsbn Hsbi Hsl
                     [Href Hru Hclaim Hop] [Hcont]").
@@ -1992,19 +1992,19 @@ Section IallocScan.
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names) (γ : log_names)
+      (bn : bio_names)
       (γpr : gname)
-      (inodestart ninodes : Z) (nib : nat)
-      (dev : mword 32) (ty : mword 16) (u : nat) (Sb : gset Z)
+      (ninodes : Z)
+ (ty : mword 16) (u : nat) (Sb : gset Z)
       (t : nat) (qt : Qp)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) :
     (K_ialloc <= K)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
-    0 <= inodestart ->
-    ireg_blocks_ok inodestart nib fsc_cov fsc_logst ->
+    0 <= icfg_ist ->
+    ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
     1 < ninodes ->
-    ninodes <= 16 * Z.of_nat nib ->
+    ninodes <= 16 * Z.of_nat icfg_nib ->
     ninodes < 2 ^ 31 ->
     bv_unsigned ty <> 0 ->
     InodeRegion.ireg_ty_ok (ialloc_fresh ty) ->
@@ -2017,9 +2017,9 @@ Section IallocScan.
     locks_below lks "log" ->
     kernel_text -∗ kernel_data -∗
     printk_env γpr γu γd -∗
-    bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
-    log_ctx γ bn fsc_fs fsc_cov fsc_logst dev -∗
-    ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+    bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
+    log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+    ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
     (* RULING B (iclaim-ledger.md §3.2): the sealed regime, which
        [InodeRegion.ireg_claim_au] now takes.  Persistent -- borrowed, never
        spent -- and it rides the same channel [ireg_inv] does. *)
@@ -2028,7 +2028,7 @@ Section IallocScan.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
     itable_inv -∗
     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
     (* ONE turn of the loop, at any surviving [inum], under any fuel that
@@ -2042,7 +2042,7 @@ Section IallocScan.
          ⌜ia_thr8 m Ml⌝ -∗
          ⌜Ml !!! Regidx Rs2 = (sign_extend' 64 inum : mword 64)⌝ -∗
          ⌜Ml !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64)⌝ -∗
-         ⌜Ml !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64)⌝ -∗
+         ⌜Ml !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64)⌝ -∗
          ⌜Ml !!! Regidx Rs6 = (sign_extend' 64 ty : mword 64)⌝ -∗
          sie_cap_gpr KT1 Ml (K - 8)%nat b (proc_addr j) -∗
          cpu_own 0 true (proc_addr j) b lks -∗
@@ -2050,12 +2050,12 @@ Section IallocScan.
          ia_frame m -∗
          proc_priv_bare (proc_addr j) pidv Vpr -∗
          sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
-         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+         sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
          bslots 2 -∗
          iref_slot -∗
-         log_opS γ (S u) Sb -∗
+         log_opS icfg_log (S u) Sb -∗
          t ↪[ln_tx icfg_log]{#qt} tt -∗
-         ia_cont (CID0 := CIDc) γ bn inodestart ninodes nib dev ty u Sb
+         ia_cont (CID0 := CIDc) bn ninodes ty u Sb
                  pidv dq dqs dqn j m K b lks Vpr t qt -∗
          WP (Loop : expr riscv_lang))).
   Proof.
@@ -2082,17 +2082,17 @@ Section IallocScan.
       rewrite Hm32 in Hinum32.
       assert (Hinum31 : bv_unsigned inum < 2147483648)
         by (change (2^31)%Z with 2147483648%Z in Hn31; lia).
-      assert (Hnib : bv_unsigned inum < 16 * Z.of_nat nib) by lia.
+      assert (Hnib : bv_unsigned inum < 16 * Z.of_nat icfg_nib) by lia.
       destruct (Hblk inum Hnib) as [Hcov Hlog].
       destruct (Hcovok _ Hcov) as [Hibpos Hiblt].
-      assert (Hib : 0 <= IBLOCK inum inodestart < 2147483648)
+      assert (Hib : 0 <= IBLOCK inum icfg_ist < 2147483648)
         by (change (2 ^ 31)%Z with 2147483648%Z in Hiblt; lia).
-      set (bno := (mword_of_int (IBLOCK inum inodestart) : mword 32)).
-      assert (Hbno : uint bno = IBLOCK inum inodestart).
+      set (bno := (mword_of_int (IBLOCK inum icfg_ist) : mword 32)).
+      assert (Hbno : uint bno = IBLOCK inum icfg_ist).
       { rewrite /bno bb_uint32 moi32_unsigned. apply bvw32_small.
         change (2^32)%Z with 4294967296%Z. lia. }
       assert (Hbnolt : (uint bno < 2147483648)%Z) by (rewrite Hbno; lia).
-      assert (Hbnocov : uint bno ∈ bv_cov (fs_view fsc_fs γd dev fsc_cov))
+      assert (Hbnocov : uint bno ∈ bv_cov (fs_view fsc_fs γd icfg_dev fsc_cov))
         by (rewrite Hbno; exact Hcov).
       assert (Hslotz : Z.of_nat (DinodeEnc.islot inum) = bv_unsigned inum `mod` 16).
       { rewrite /DinodeEnc.islot Z2Nat.id; [reflexivity |].
@@ -2116,7 +2116,7 @@ Section IallocScan.
         by (rewrite /G0 upd_ne; [exact Hs2 | nz]).
       assert (HG0s4 : G0 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
         by (rewrite /G0 upd_ne; [exact Hs4 | nz]).
-      assert (HG0s5 : G0 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+      assert (HG0s5 : G0 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
         by (rewrite /G0 upd_ne; [exact Hs5 | nz]).
       assert (HG0s6 : G0 !!! Regidx Rs6 = (sign_extend' 64 ty : mword 64))
         by (rewrite /G0 upd_ne; [exact Hs6 | nz]).
@@ -2136,15 +2136,15 @@ Section IallocScan.
       iEval (rewrite -Hsbiadr) in "Hsbi".
       iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.ialloc + 0x34)) Ra5 Rs4
                 (mword_of_int 24 : mword 12) G0 (K - 8)%nat
-                (mword_of_int inodestart : mword 32) b
+                (mword_of_int icfg_ist : mword 32) b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hsbi").
       { iApply (iali_34 with "Htext"). }
       iIntros (CID2 Hq2) "Hcg Hpc Hsbi".
       iEval (rewrite Hsbiadr) in "Hsbi".
       set (G1 := <[Regidx Ra5 := regval_into_reg
-                    (sign_extend' 64 (mword_of_int inodestart : mword 32))]> G0).
+                    (sign_extend' 64 (mword_of_int icfg_ist : mword 32))]> G0).
       assert (HG1a5 : G1 !!! Regidx Ra5
-                      = (sign_extend' 64 (mword_of_int inodestart : mword 32) : mword 64))
+                      = (sign_extend' 64 (mword_of_int icfg_ist : mword 32) : mword 64))
         by (rewrite /G1; apply upd_eq).
       assert (HG1a1 : G1 !!! Regidx Ra1
                       = (mword_of_int (bv_unsigned inum / 16) : mword 64))
@@ -2153,7 +2153,7 @@ Section IallocScan.
         by (rewrite /G1 upd_ne; [exact HG0s2 | nz]).
       assert (HG1s4 : G1 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
         by (rewrite /G1 upd_ne; [exact HG0s4 | nz]).
-      assert (HG1s5 : G1 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+      assert (HG1s5 : G1 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
         by (rewrite /G1 upd_ne; [exact HG0s5 | nz]).
       assert (HG1s6 : G1 !!! Regidx Rs6 = (sign_extend' 64 ty : mword 64))
         by (rewrite /G1 upd_ne; [exact HG0s6 | nz]).
@@ -2180,12 +2180,12 @@ Section IallocScan.
         (* ialloc's [c.addw a1,a5] has the two summands the other way round
            from iupdate's [c.addw a1,a1,a5] -- hence the commutation *)
         rewrite ia_add_vec32_comm.
-        apply (iu_addw_ibl inum inodestart Hst Hib). }
+        apply (iu_addw_ibl inum icfg_ist Hst Hib). }
       assert (HG2s2 : G2 !!! Regidx Rs2 = (sign_extend' 64 inum : mword 64))
         by (rewrite /G2 upd_ne; [exact HG1s2 | nz]).
       assert (HG2s4 : G2 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
         by (rewrite /G2 upd_ne; [exact HG1s4 | nz]).
-      assert (HG2s5 : G2 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+      assert (HG2s5 : G2 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
         by (rewrite /G2 upd_ne; [exact HG1s5 | nz]).
       assert (HG2s6 : G2 !!! Regidx Rs6 = (sign_extend' 64 ty : mword 64))
         by (rewrite /G2 upd_ne; [exact HG1s6 | nz]).
@@ -2204,7 +2204,7 @@ Section IallocScan.
       iIntros (CID4 Hq4) "Hcg Hpc".
       set (G3 := <[Regidx Ra0 := regval_into_reg
                     (add_vec (zero_reg : mword 64) (rget G2 Rs5))]> G2).
-      assert (HG3a0 : G3 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64)).
+      assert (HG3a0 : G3 !!! Regidx Ra0 = (sign_extend' 64 icfg_dev : mword 64)).
       { rewrite /G3 upd_eq. rgne. rewrite HG2s5. apply add_vec_zero_l. }
       assert (HG3a1 : G3 !!! Regidx Ra1 = (sign_extend' 64 bno : mword 64))
         by (rewrite /G3 upd_ne; [exact HG2a1 | nz]).
@@ -2212,7 +2212,7 @@ Section IallocScan.
         by (rewrite /G3 upd_ne; [exact HG2s2 | nz]).
       assert (HG3s4 : G3 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
         by (rewrite /G3 upd_ne; [exact HG2s4 | nz]).
-      assert (HG3s5 : G3 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+      assert (HG3s5 : G3 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
         by (rewrite /G3 upd_ne; [exact HG2s5 | nz]).
       assert (HG3s6 : G3 !!! Regidx Rs6 = (sign_extend' 64 ty : mword 64))
         by (rewrite /G3 upd_ne; [exact HG2s6 | nz]).
@@ -2237,7 +2237,7 @@ Section IallocScan.
                          (sign_extend' 64 (mword_of_int 2095772 : mword 21))
                        = mword_of_int KernelSyms.bread) by pcw.
       iEval (rewrite Htgtbr) in "Hpc".
-      assert (HG4a0 : G4 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64))
+      assert (HG4a0 : G4 !!! Regidx Ra0 = (sign_extend' 64 icfg_dev : mword 64))
         by (rewrite /G4 upd_ne; [exact HG3a0 | nz]).
       assert (HG4a1 : G4 !!! Regidx Ra1 = (sign_extend' 64 bno : mword 64))
         by (rewrite /G4 upd_ne; [exact HG3a1 | nz]).
@@ -2245,7 +2245,7 @@ Section IallocScan.
         by (rewrite /G4 upd_ne; [exact HG3s2 | nz]).
       assert (HG4s4 : G4 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
         by (rewrite /G4 upd_ne; [exact HG3s4 | nz]).
-      assert (HG4s5 : G4 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+      assert (HG4s5 : G4 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
         by (rewrite /G4 upd_ne; [exact HG3s5 | nz]).
       assert (HG4s6 : G4 !!! Regidx Rs6 = (sign_extend' 64 ty : mword 64))
         by (rewrite /G4 upd_ne; [exact HG3s6 | nz]).
@@ -2264,7 +2264,7 @@ Section IallocScan.
       assert (HKbr : (K_bread <= K - 8)%nat) by (lia).
       iDestruct (iu_slots_split 1 1 with "Hsl") as "[Hsl Hsl1]".
       iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
-                (fs_view fsc_fs γd dev fsc_cov) pidv dev bno dq
+                (fs_view fsc_fs γd icfg_dev fsc_cov) pidv icfg_dev bno dq
                 G4 (K - 8)%nat true b lks Vpr
                 HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HG4a0 HG4a1
                 (* bread's bound is "bcache"(4); ia_scan's own is
@@ -2287,7 +2287,7 @@ Section IallocScan.
       assert (HmBs4 : mB !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
         by (rewrite (callee_saved_lookup Hcsb_cs Rs4 ltac:(vm_compute; reflexivity));
             exact HG4s4).
-      assert (HmBs5 : mB !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+      assert (HmBs5 : mB !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
         by (rewrite (callee_saved_lookup Hcsb_cs Rs5 ltac:(vm_compute; reflexivity));
             exact HG4s5).
       assert (HmBs6 : mB !!! Regidx Rs6 = (sign_extend' 64 ty : mword 64))
@@ -2308,12 +2308,12 @@ Section IallocScan.
       iDestruct (iu_held_k with "Hheld") as %Hkk.
       iDestruct (ia_held_L with "Hheld") as "[HpL Hheldback0]".
       iApply fupd_wp.
-      iEval (rewrite Hbno (ireg_bi_iblock inum inodestart)) in "HpL".
-      iMod (ireg_read_blk ⊤ fsc_ireg fsc_fs inodestart nib (ireg_bi inum) bs0
-              ltac:(solve_ndisj) logN_top (ireg_bi_lt inum nib Hnib)
+      iEval (rewrite Hbno (ireg_bi_iblock inum icfg_ist)) in "HpL".
+      iMod (ireg_read_blk ⊤ fsc_ireg fsc_fs icfg_ist icfg_nib (ireg_bi inum) bs0
+              ltac:(solve_ndisj) logN_top (ireg_bi_lt inum icfg_nib Hnib)
               with "Hireg HpL") as "(%Hex & HpL)".
       iModIntro.
-      iEval (rewrite -(ireg_bi_iblock inum inodestart) -Hbno) in "HpL".
+      iEval (rewrite -(ireg_bi_iblock inum icfg_ist) -Hbno) in "HpL".
       iDestruct ("Hheldback0" with "HpL") as "Hheld".
       destruct Hex as (ds & Hdswf & Hbs0).
       subst bs0.
@@ -2348,7 +2348,7 @@ Section IallocScan.
         by (rewrite /G5 upd_ne; [exact HmBs2 | nz]).
       assert (HG5s4 : G5 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
         by (rewrite /G5 upd_ne; [exact HmBs4 | nz]).
-      assert (HG5s5 : G5 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+      assert (HG5s5 : G5 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
         by (rewrite /G5 upd_ne; [exact HmBs5 | nz]).
       assert (HG5s6 : G5 !!! Regidx Rs6 = (sign_extend' 64 ty : mword 64))
         by (rewrite /G5 upd_ne; [exact HmBs6 | nz]).
@@ -2379,7 +2379,7 @@ Section IallocScan.
         by (rewrite /G6 upd_ne; [exact HG5s2 | nz]).
       assert (HG6s4 : G6 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
         by (rewrite /G6 upd_ne; [exact HG5s4 | nz]).
-      assert (HG6s5 : G6 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+      assert (HG6s5 : G6 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
         by (rewrite /G6 upd_ne; [exact HG5s5 | nz]).
       assert (HG6s6 : G6 !!! Regidx Rs6 = (sign_extend' 64 ty : mword 64))
         by (rewrite /G6 upd_ne; [exact HG5s6 | nz]).
@@ -2415,7 +2415,7 @@ Section IallocScan.
         by (rewrite /G7 upd_ne; [exact HG6s2 | nz]).
       assert (HG7s4 : G7 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
         by (rewrite /G7 upd_ne; [exact HG6s4 | nz]).
-      assert (HG7s5 : G7 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+      assert (HG7s5 : G7 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
         by (rewrite /G7 upd_ne; [exact HG6s5 | nz]).
       assert (HG7s6 : G7 !!! Regidx Rs6 = (sign_extend' 64 ty : mword 64))
         by (rewrite /G7 upd_ne; [exact HG6s6 | nz]).
@@ -2450,7 +2450,7 @@ Section IallocScan.
         by (rewrite /G8 upd_ne; [exact HG7s2 | nz]).
       assert (HG8s4 : G8 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
         by (rewrite /G8 upd_ne; [exact HG7s4 | nz]).
-      assert (HG8s5 : G8 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+      assert (HG8s5 : G8 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
         by (rewrite /G8 upd_ne; [exact HG7s5 | nz]).
       assert (HG8s6 : G8 !!! Regidx Rs6 = (sign_extend' 64 ty : mword 64))
         by (rewrite /G8 upd_ne; [exact HG7s6 | nz]).
@@ -2480,7 +2480,7 @@ Section IallocScan.
         by (rewrite /G9 upd_ne; [exact HG8s2 | nz]).
       assert (HG9s4 : G9 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
         by (rewrite /G9 upd_ne; [exact HG8s4 | nz]).
-      assert (HG9s5 : G9 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+      assert (HG9s5 : G9 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
         by (rewrite /G9 upd_ne; [exact HG8s5 | nz]).
       assert (HG9s6 : G9 !!! Regidx Rs6 = (sign_extend' 64 ty : mword 64))
         by (rewrite /G9 upd_ne; [exact HG8s6 | nz]).
@@ -2531,7 +2531,7 @@ Section IallocScan.
         by (rewrite /GA upd_ne; [exact HG9s2 | nz]).
       assert (HGAs4 : GA !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
         by (rewrite /GA upd_ne; [exact HG9s4 | nz]).
-      assert (HGAs5 : GA !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+      assert (HGAs5 : GA !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
         by (rewrite /GA upd_ne; [exact HG9s5 | nz]).
       assert (HGAs6 : GA !!! Regidx Rs6 = (sign_extend' 64 ty : mword 64))
         by (rewrite /GA upd_ne; [exact HG9s6 | nz]).
@@ -2575,8 +2575,8 @@ Section IallocScan.
         iEval (rewrite Hjt) in "Hpc".
         iDestruct (cpu_own_transport CID6 CID13 0 true (proc_addr j) b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-        iApply (ia_claim (CID0 := CID13) γs j γl γu γd γk pd pav pu bn γ
-                  inodestart ninodes nib dev ty inum ds u Sb
+        iApply (ia_claim (CID0 := CID13) γs j γl γu γd γk pd pav pu bn
+ ninodes ty inum ds u Sb
                   t qt kk bno bsd0 d0 pidv dq dqs dqn m GA K b lks
                   Vpr HK Hgeom HGAsp HGAthr HGAs1 HGAs3 HGAs5 HGAs6 HGAs2 Hkk
                   Hbno Hcov Hlog Hnib Hdswf Ht0 Hty Htyk Hinum Hslotal
@@ -2618,7 +2618,7 @@ Section IallocScan.
           by (rewrite /GB upd_ne; [exact HGAs2 | nz]).
         assert (HGBs4 : GB !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
           by (rewrite /GB upd_ne; [exact HGAs4 | nz]).
-        assert (HGBs5 : GB !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+        assert (HGBs5 : GB !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
           by (rewrite /GB upd_ne; [exact HGAs5 | nz]).
         assert (HGBs6 : GB !!! Regidx Rs6 = (sign_extend' 64 ty : mword 64))
           by (rewrite /GB upd_ne; [exact HGAs6 | nz]).
@@ -2635,11 +2635,11 @@ Section IallocScan.
         iDestruct (wp_next_shift (b := true) (CIDa := CID5) (CIDb := CID14) ltac:(wp_next_chain)
                      with "Hcont") as "Hcont".
         assert (HKbl : (K_brelse <= K - 8)%nat) by (lia).
-        iAssert (bio_locked bn (fs_view fsc_fs γd dev fsc_cov) kk pidv dev bno
+        iAssert (bio_locked bn (fs_view fsc_fs γd icfg_dev fsc_cov) kk pidv icfg_dev bno
                    (diblk_bytes ds) bsd0 d0) with "[Hheld]" as "Hlk";
           [rewrite /bio_locked; iExact "Hheld" |].
-        iApply (BL.wp_brelse_sconf γs bn (fs_view fsc_fs γd dev fsc_cov) kk
-                  pidv dev bno dq GB (K - 8)%nat true (proc_addr j)
+        iApply (BL.wp_brelse_sconf γs bn (fs_view fsc_fs γd icfg_dev fsc_cov) kk
+                  pidv icfg_dev bno dq GB (K - 8)%nat true (proc_addr j)
                   (diblk_bytes ds) bsd0 d0 b lks Vpr HKbl Hkk HGBa0
                   (* brelse's bound is "bcache"(4); ia_scan's own is
                      "itable"(2), and [locks_below_mono] weakens it. *)
@@ -2658,7 +2658,7 @@ Section IallocScan.
         assert (HmRs4 : mR !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
           by (rewrite (callee_saved_lookup Hcsr_cs Rs4 ltac:(vm_compute; reflexivity));
               exact HGBs4).
-        assert (HmRs5 : mR !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+        assert (HmRs5 : mR !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
           by (rewrite (callee_saved_lookup Hcsr_cs Rs5 ltac:(vm_compute; reflexivity));
               exact HGBs5).
         assert (HmRs6 : mR !!! Regidx Rs6 = (sign_extend' 64 ty : mword 64))
@@ -2704,7 +2704,7 @@ Section IallocScan.
           reflexivity. }
         assert (HGCs4 : GC !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
           by (rewrite /GC upd_ne; [exact HmRs4 | nz]).
-        assert (HGCs5 : GC !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+        assert (HGCs5 : GC !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
           by (rewrite /GC upd_ne; [exact HmRs5 | nz]).
         assert (HGCs6 : GC !!! Regidx Rs6 = (sign_extend' 64 ty : mword 64))
           by (rewrite /GC upd_ne; [exact HmRs6 | nz]).
@@ -2738,7 +2738,7 @@ Section IallocScan.
           by (rewrite /GD upd_ne; [exact HGCs2 | nz]).
         assert (HGDs4 : GD !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
           by (rewrite /GD upd_ne; [exact HGCs4 | nz]).
-        assert (HGDs5 : GD !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+        assert (HGDs5 : GD !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
           by (rewrite /GD upd_ne; [exact HGCs5 | nz]).
         assert (HGDs6 : GD !!! Regidx Rs6 = (sign_extend' 64 ty : mword 64))
           by (rewrite /GD upd_ne; [exact HGCs6 | nz]).
@@ -2771,7 +2771,7 @@ Section IallocScan.
           by (rewrite /GE upd_ne; [exact HGDs2 | nz]).
         assert (HGEs4 : GE !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64))
           by (rewrite /GE upd_ne; [exact HGDs4 | nz]).
-        assert (HGEs5 : GE !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+        assert (HGEs5 : GE !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
           by (rewrite /GE upd_ne; [exact HGDs5 | nz]).
         assert (HGEs6 : GE !!! Regidx Rs6 = (sign_extend' 64 ty : mword 64))
           by (rewrite /GE upd_ne; [exact HGDs6 | nz]).
@@ -2837,8 +2837,8 @@ Section IallocScan.
           iEval (rewrite Hpp66) in "Hpc".
           iDestruct (cpu_own_transport CID15 CID19 0 true (proc_addr j) b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-          iApply (ia_out (CID0 := CID19) j bn γ γpr γu γd inodestart ninodes nib
-                    dev ty u Sb t qt pidv dq dqs dqn m GE K b lks
+          iApply (ia_out (CID0 := CID19) j bn γpr γu γd ninodes
+ ty u Sb t qt pidv dq dqs dqn m GE K b lks
                     Vpr HK Hty Htyk Hpk HGEsp HGEthr
                     with "Hcg Hcnt Htext Hkdata Hpc Hpenv Hframe Hppid
                           Hsbn Hsbi Hsl Hiref Hop Htx [Hcont]").
@@ -2860,17 +2860,16 @@ Section IallocMain.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names)
       (γpr : gname)
-      (inodestart : Z) (ninodes : Z) (nib : nat)
-      (dev : mword 32) (ty : mword 16)
+ (ninodes : Z)
+ (ty : mword 16)
       (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (t : nat) (qt : Qp) :
-      wp_ialloc_gen_body γs j γl γu γd γk pd pav pu bn γ γpr
-                         inodestart ninodes nib dev ty u Sb
+      wp_ialloc_gen_body γs j γl γu γd γk pd pav pu bn γpr
+ ninodes ty u Sb
                          pidv dq dqs dqn m K eb b lks Vpr t qt.
   Proof.
     cbv beta delta [wp_ialloc_gen_body].
@@ -2893,7 +2892,7 @@ Section IallocMain.
     iIntros "Hcg Hcnt #Htext Hpc #Hkdata #Hpenv #Hbio #Hlctx
               Hsbn Hsbi #Hireg #Hiopen Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsl
               #Hitb2 #Hitbl #Hesc Hiref Hop Htx Hcont".
-    iAssert (ia_cont (CID0 := CID) γ bn inodestart ninodes nib dev ty u Sb
+    iAssert (ia_cont (CID0 := CID) bn ninodes ty u Sb
                pidv dq dqs dqn j m K b lks Vpr t qt)%I with "[Hcont]" as "Hcont";
       [rewrite /ia_cont; iExact "Hcont" |].
     (* ===== +0x00 c.addi16sp sp,-64 : the 8-slot frame ===== *)
@@ -3012,7 +3011,7 @@ Section IallocMain.
                   (sign_extend' 64 (mword_of_int ninodes : mword 32))]> R3).
     assert (HR4a4 : R4 !!! Regidx Ra4 = (mword_of_int ninodes : mword 64))
       by (rewrite /R4 upd_eq; exact Hnsext).
-    assert (HR4a0 : R4 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64)).
+    assert (HR4a0 : R4 !!! Regidx Ra0 = (sign_extend' 64 icfg_dev : mword 64)).
     { rewrite /R4 upd_ne; [| nz]. rewrite /R3 upd_ne; [| nz].
       rewrite /R2 upd_ne; [| nz]. rewrite /R1 upd_ne; [exact Ha0 | nz]. }
     assert (HR4a1 : R4 !!! Regidx Ra1 = (sign_extend' 64 ty : mword 64)).
@@ -3041,7 +3040,7 @@ Section IallocMain.
       by (rewrite /R5; apply upd_eq).
     assert (HR5a4 : R5 !!! Regidx Ra4 = (mword_of_int ninodes : mword 64))
       by (rewrite /R5 upd_ne; [exact HR4a4 | nz]).
-    assert (HR5a0 : R5 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64))
+    assert (HR5a0 : R5 !!! Regidx Ra0 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /R5 upd_ne; [exact HR4a0 | nz]).
     assert (HR5a1 : R5 !!! Regidx Ra1 = (sign_extend' 64 ty : mword 64))
       by (rewrite /R5 upd_ne; [exact HR4a1 | nz]).
@@ -3191,7 +3190,7 @@ Section IallocMain.
     iIntros (CID15 Hq15) "Hcg Hpc".
     set (R6 := <[Regidx Rs5 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (rget R5 Ra0))]> R5).
-    assert (HR6s5 : R6 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64)).
+    assert (HR6s5 : R6 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64)).
     { rewrite /R6 upd_eq. rgne. rewrite HR5a0. apply add_vec_zero_l. }
     assert (HR6a1 : R6 !!! Regidx Ra1 = (sign_extend' 64 ty : mword 64))
       by (rewrite /R6 upd_ne; [exact HR5a1 | nz]).
@@ -3215,7 +3214,7 @@ Section IallocMain.
                   (add_vec (zero_reg : mword 64) (rget R6 Ra1))]> R6).
     assert (HR7s6 : R7 !!! Regidx Rs6 = (sign_extend' 64 ty : mword 64)).
     { rewrite /R7 upd_eq. rgne. rewrite HR6a1. apply add_vec_zero_l. }
-    assert (HR7s5 : R7 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HR7s5 : R7 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /R7 upd_ne; [exact HR6s5 | nz]).
     assert (HR7a5 : R7 !!! Regidx Ra5
                     = (sign_extend' 64 (mword_of_int 1 : mword 32) : mword 64))
@@ -3238,7 +3237,7 @@ Section IallocMain.
     assert (HR8s2 : R8 !!! Regidx Rs2
                     = (sign_extend' 64 (mword_of_int 1 : mword 32) : mword 64)).
     { rewrite /R8 upd_eq. rgne. rewrite HR7a5. apply add_vec_zero_l. }
-    assert (HR8s5 : R8 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HR8s5 : R8 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /R8 upd_ne; [exact HR7s5 | nz]).
     assert (HR8s6 : R8 !!! Regidx Rs6 = (sign_extend' 64 ty : mword 64))
       by (rewrite /R8 upd_ne; [exact HR7s6 | nz]).
@@ -3266,7 +3265,7 @@ Section IallocMain.
     assert (HR9s2 : R9 !!! Regidx Rs2
                     = (sign_extend' 64 (mword_of_int 1 : mword 32) : mword 64))
       by (rewrite /R9 upd_ne; [exact HR8s2 | nz]).
-    assert (HR9s5 : R9 !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HR9s5 : R9 !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /R9 upd_ne; [exact HR8s5 | nz]).
     assert (HR9s6 : R9 !!! Regidx Rs6 = (sign_extend' 64 ty : mword 64))
       by (rewrite /R9 upd_ne; [exact HR8s6 | nz]).
@@ -3292,7 +3291,7 @@ Section IallocMain.
     assert (HRAs2 : RA !!! Regidx Rs2
                     = (sign_extend' 64 (mword_of_int 1 : mword 32) : mword 64))
       by (rewrite /RA upd_ne; [exact HR9s2 | nz]).
-    assert (HRAs5 : RA !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64))
+    assert (HRAs5 : RA !!! Regidx Rs5 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /RA upd_ne; [exact HR9s5 | nz]).
     assert (HRAs6 : RA !!! Regidx Rs6 = (sign_extend' 64 ty : mword 64))
       by (rewrite /RA upd_ne; [exact HR9s6 | nz]).
@@ -3312,8 +3311,8 @@ Section IallocMain.
     assert (Hunit1 : bv_unsigned (mword_of_int 1 : mword 32) = 1).
     { rewrite moi32_unsigned. apply bvw32_small.
       change (2^32)%Z with 4294967296%Z. lia. }
-    iPoseProof (ia_scan (CIDe := CID19) γs j γl γu γd γk pd pav pu bn γ
-                  γpr inodestart ninodes nib dev ty u Sb
+    iPoseProof (ia_scan (CIDe := CID19) γs j γl γu γd γk pd pav pu bn
+                  γpr ninodes ty u Sb
                   t qt pidv dq dqs dqn m K b lks
                   Vpr HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Htyk Hpk Hj Hgl Hbelow
                   with "Htext Hkdata Hpenv Hbio Hlctx Hireg Hiopen Hprocs
@@ -3345,17 +3344,16 @@ Section IallocMain.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names)
       (γpr : gname)
-      (inodestart : Z) (ninodes : Z) (nib : nat)
-      (dev : mword 32) (ty : mword 16)
+ (ninodes : Z)
+ (ty : mword 16)
       (u : nat)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (t : nat) (qt : Qp) :
-      wp_ialloc_sconf_body γs j γl γu γd γk pd pav pu bn γ γpr
-                           inodestart ninodes nib dev ty u
+      wp_ialloc_sconf_body γs j γl γu γd γk pd pav pu bn γpr
+ ninodes ty u
                            pidv dq dqs dqn m K eb b lks Vpr t qt.
   Proof.
     cbv beta delta [wp_ialloc_sconf_body].
@@ -3365,8 +3363,8 @@ Section IallocMain.
               Hsbn Hsbi #Hireg #Hiopen Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsl
               #Hitb2 #Hitbl #Hesc Hiref Hop Htxc Hcont".
     iDestruct (log_op_openS with "Hop") as (Sb) "[HopS Htx]".
-    iApply (wp_ialloc_gen (CID := CID) γs j γl γu γd γk pd pav pu bn γ
-              γpr inodestart ninodes nib dev ty u Sb
+    iApply (wp_ialloc_gen (CID := CID) γs j γl γu γd γk pd pav pu bn
+              γpr ninodes ty u Sb
               pidv dq dqs dqn m K eb b lks
               Vpr t qt HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Htyk Hpk Hj Hgl Ha0 Ha1 Heb Hbelow
               with "Hcg Hcnt Htext Hpc Hkdata Hpenv Hbio Hlctx

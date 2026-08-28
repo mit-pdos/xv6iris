@@ -221,17 +221,6 @@ Section KptShare.
   (* §3 The one-way door from the exclusive bundle.                      *)
   (* ------------------------------------------------------------------- *)
 
-  Lemma tlb_inv_pt_share (root_ppn : mword 44) (E : coPset) :
-    tlb_inv_pt root_ppn -∗ kpt_unset ={E}=∗ tlb_res_pt root_ppn.
-  Proof.
-    iIntros "Hinv Hnone".
-    iDestruct (tlb_inv_pt_open with "Hinv") as (satp0 tlbvec t M)
-      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hok & %Hspec & HM & Ht & Hpmp)".
-    iMod (kpt_inv_alloc root_ppn t M E Hspec with "Ht HM Hnone") as "[#Hkinv #Hlb]".
-    iModIntro.
-    iApply (tlb_res_pt_intro root_ppn satp0 tlbvec t Hmode Hasid Hppn Hok
-              with "Hsatp Htlb Hlb Hpmp Hkinv").
-  Qed.
 
 End KptShare.
 

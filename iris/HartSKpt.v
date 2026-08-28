@@ -58,35 +58,8 @@ Local Open Scope Z_scope.
 (* is what the walk's no-write-back arms need, and it is the ONLY A/D     *)
 (* shape for which they hold: see the note at the end of this file.       *)
 (* ===================================================================== *)
-Lemma kpt_noupd (ppn : mword 44) (pc : kperm)
-    (acc : MemoryAccessType mem_payload) :
-  update_PTE_Bits (mk_pte ppn (kperm_flags pc) : mword 64) acc = None.
-Proof.
-  unfold update_PTE_Bits. cbv zeta.
-  rewrite (mk_pte_flags ppn (kperm_flags pc)
-             (kperm_flags_ad_bound pc (true, true))).
-  assert (HD : eq_vec (_get_PTE_Flags_D
-                 (Mk_PTE_Flags (mword_of_int (kperm_flags pc) : mword 8)))
-                 ('b"0") = false)
-    by (destruct pc; vm_compute; reflexivity).
-  assert (HA : eq_vec (_get_PTE_Flags_A
-                 (Mk_PTE_Flags (mword_of_int (kperm_flags pc) : mword 8)))
-                 ('b"0") = false)
-    by (destruct pc; vm_compute; reflexivity).
-  rewrite HD HA. cbn [andb orb]. reflexivity.
-Qed.
 
 (* the same, as the A/D VARIANT the tree layer actually speaks of *)
-Lemma kpt_noupd_variant (ppn : mword 44) (pc : kperm) (a d : mword 1)
-    (acc : MemoryAccessType mem_payload) :
-  eq_vec a ('b"1") = true -> eq_vec d ('b"1") = true ->
-  update_PTE_Bits
-    (pte_set_ad (mk_pte ppn (kperm_flags pc)) a d : mword 64) acc = None.
-Proof.
-  intros Ha Hd.
-  rewrite kperm_set_ad_leaf. unfold ad_of. rewrite Ha Hd.
-  apply kpt_noupd.
-Qed.
 
 Section kptnode.
   Context `{!riscvGS Σ}.
@@ -259,9 +232,6 @@ Section kptnode.
     addr_is_ram a /\ addr_is_ram (pa_add a 7) /\
     is_aligned_paddr (Physaddr a) 8 = true.
 
-  Lemma kpt_addr_ok_of_slot (σ : mstate) (a w : mword 64) :
-    pt_slot_mem σ a w -> kpt_addr_ok a.
-  Proof. intros (_ & H1 & H2 & H3). exact (conj H1 (conj H2 H3)). Qed.
 
   (* STATE-FREE: the slot's own points-to already carries both ends'
      RAM-ness and the alignment ([slot_mem_of_own] takes the heap only for

@@ -722,9 +722,9 @@ Section ProofSysLinkBody.
      T_DIR into [di_type dnd = T_DIR] at the record ilock returns.  Pure
      resource algebra; its home is [IcacheRef.v] and it is here for that
      file's rebuild-cone reason. *)
-  Lemma sl_carve_gen (k : nat) (q s : Qp) (dev inum : mword 32) (g : gname) :
-    inode_ref_gen k (q + s)%Qp dev inum g ⊣⊢
-    inode_ref_short_gen k (q + s)%Qp q dev inum g ∗ inode_shr_gen k s dev inum g.
+  Lemma sl_carve_gen (k : nat) (q s : Qp) (inum : mword 32) (g : gname) :
+    inode_ref_gen k (q + s)%Qp icfg_dev inum g ⊣⊢
+    inode_ref_short_gen k (q + s)%Qp q icfg_dev inum g ∗ inode_shr_gen k s icfg_dev inum g.
   Proof.
     rewrite /inode_ref_gen /inode_ref_short_gen /inode_shr_gen
             live_gen_split inode_ident_split SleepLock.slh_tok_split.
@@ -733,12 +733,12 @@ Section ProofSysLinkBody.
     - iIntros "[($ & $ & $ & $) ($ & $ & $)]".
   Qed.
 
-  Lemma sl_shed_gen (k : nat) (q : Qp) (dev inum : mword 32) (g : gname) :
-    inode_ref_gen k q dev inum g ⊣⊢
-    inode_ref_short_gen k (q/2 + q/2)%Qp (q/2)%Qp dev inum g ∗
-    inode_shr_gen k (q/2)%Qp dev inum g.
+  Lemma sl_shed_gen (k : nat) (q : Qp) (inum : mword 32) (g : gname) :
+    inode_ref_gen k q icfg_dev inum g ⊣⊢
+    inode_ref_short_gen k (q/2 + q/2)%Qp (q/2)%Qp icfg_dev inum g ∗
+    inode_shr_gen k (q/2)%Qp icfg_dev inum g.
   Proof.
-    pose proof (sl_carve_gen k (q/2)%Qp (q/2)%Qp dev inum g) as Hc.
+    pose proof (sl_carve_gen k (q/2)%Qp (q/2)%Qp inum g) as Hc.
     by rewrite {1}(Qp.div_2 q) in Hc.
   Qed.
 
@@ -748,21 +748,20 @@ Section ProofSysLinkBody.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names)
-      (bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32)
+      (bmapstart : Z)
+      (size : Z)
       (dqb dqs dqbs : dfrac)
       (v0 v1 : mword 64)
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
-    wp_sys_link_sconf_body γf γa γpr gs j gl gu gd gk pd pav pu bn g
-                           bmapstart inodestart nib
-                           size dev dqb dqs dqbs v0 v1 pid V
+    wp_sys_link_sconf_body γf γa γpr gs j gl gu gd gk pd pav pu bn
+                           bmapstart
+                           size dqb dqs dqbs v0 v1 pid V
                            m K eb b lks.
   Proof.
     cbv beta delta [wp_sys_link_sconf_body].
-    intros pcE pj ret_tgt HK Hcdev Hcnib Hclog Hcist HdevR Hnib0 Hgeom Hsize
+    intros pcE pj ret_tgt HK HdevR Hnib0 Hgeom Hsize
            Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hnib16 Hprkc Hj Hgl
            Heb Harg0 Harg1.
     destruct (sl_kb K HK) as (Kna & Knp & Kdl & Kar & Kbo & Keo & Kil & Kiu
@@ -1202,8 +1201,8 @@ Section ProofSysLinkBody.
                             (m !!! Regidx Rs2 : mword 64) Q0)
           by (rewrite /Q0; apply sl_regs_caller; [exact Hcsra | exact HN4regs]).
         sl_own_transport CID16 CID20 eb pj b.
-        iApply (BeginOp.wp_begin_op_sconf (CID := CID20) gs j gl bn g fsc_fs fsc_cov
-                  fsc_logst dev pid (DfracOwn (1/4)) Q0 (K - 38)%nat eb b lks
+        iApply (BeginOp.wp_begin_op_sconf (CID := CID20) gs j gl bn icfg_log fsc_fs fsc_cov
+                  fsc_logst icfg_dev pid (DfracOwn (1/4)) Q0 (K - 38)%nat eb b lks
                   (upd_upt V P2) ltac:(exact Kbo) Hj Hgl (Hlb "log"%string)
                   with "Hcg Hown [] [] Htext Hpc Hlog Hpidq Hprocs").
         { rewrite Heb /trap_csrs_ext. done. }
@@ -1259,11 +1258,11 @@ Section ProofSysLinkBody.
           as "[Hbufk Hbufrest]".
         sl_own_transport CID21 CID23 eb pj b.
         iApply (Namei.wp_namei_gen (CID := CID23) gs j gl gu gd gk pd pav pu bn
-                  g γa γf bmapstart inodestart nib
-                  size dev pk1 bo1 MAXOPBLOCKS Sb0
+ γa γf bmapstart
+                  size pk1 bo1 MAXOPBLOCKS Sb0
                   pid (DfracOwn (1/4)) dqb dqs (DfracOwn 1)
                   Q2 (K - 38)%nat eb b lks (upd_upt V P2)
-                  ltac:(exact Kna) Hcdev Hcnib Hclog Hcist HdevR Hnib0 Hgeom
+                  ltac:(exact Kna) HdevR Hnib0 Hgeom
                   Hsize Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb Hpcstr1
                   (sl_plen_lt pk1 Hpk1) (sl_bud_walk _) Hj Hgl
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hkenv Hitab Hitinv
@@ -1323,9 +1322,9 @@ Section ProofSysLinkBody.
           (* THE REFERENCE namei MADE, taken apart: the slot it names is what
              ilock / iunlock / iupdate / iunlockput are all indexed by. *)
           iDestruct "Hheldip" as (kk qq inum) "(%Hipe & %Hkk & %Hinumc & Hrefip & Hru)".
-          iEval (rewrite -Hcdev) in "Hrefip".
-          assert (Hinb : bv_unsigned inum < 16 * Z.of_nat nib)
-            by (rewrite Hcnib; exact Hinumc).
+
+          assert (Hinb : bv_unsigned inum < 16 * Z.of_nat icfg_nib)
+            by (exact Hinumc).
           destruct (Hiregb inum Hinb) as [Hiblk Hiblog].
           iEval (rewrite inode_ref_shed) in "Hrefip".
           iDestruct "Hrefip" as "[Hkeep Hshr]".
@@ -1374,10 +1373,10 @@ Section ProofSysLinkBody.
              durable-disk B''-tx): half the transaction's element sits in
              the escrow's checked-out arm for the whole locked window,
              and the residue rides the descriptor conjunct home. *)
-          iEval (rewrite Hclog) in "Htx".
+
           iApply (Ilock.wp_ilock_tx_sconf (CID := CID27) gs j gl gu gd gk pd pav pu
-                    bn gil gisl inodestart nib
-                    kk (qq/2)%Qp gsh PlainK dev inum pid (DfracOwn (1/4)) dqs
+                    bn gil gisl
+                    kk (qq/2)%Qp gsh PlainK inum pid (DfracOwn (1/4)) dqs
                     R0 (K - 38)%nat eb b lks
                     (upd_upt V P2) ltac:(exact Kil) Hkk Hgeom Hist0 Hiblk Hinb Hj Hgl HR0a0
                     (Hlb "bcache"%string)
@@ -1485,13 +1484,13 @@ Section ProofSysLinkBody.
                           ltac:(wp_next_chain) with "Hcont") as "Hcont".
              sl_own_transport CID28 CID31 eb pj b.
              iApply (Tails.sl_tail_c (CID0 := CID31) gs j gl gu gd gk pd pav pu
-                       bn g gil gisl bmapstart
-                       inodestart nib size dev kk (qq/2)%Qp (qq/2)%Qp gsh
+                       bn gil gisl bmapstart
+ size kk (qq/2)%Qp (qq/2)%Qp gsh
                        inum dn bm n1 pid (DfracOwn (1/4)) dqb dqs
                        m R2 sp0 K eb b lks u4 bn0 bw1 bo2
                        (upd_upt V P2) ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop Hkk Hgeom
                        Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb
-                       Hiu1 Hj Hgl Hclog Hlkempty ltac:(reflexivity)
+                       Hiu1 Hj Hgl Hlkempty ltac:(reflexivity)
                        (sl_regs_sp _ _ _ _ _ HR2regs)
                        (sl_regs_thr _ _ _ _ _ HR2regs) HR2s1 HR2s2 Hal
                        with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
@@ -1644,13 +1643,13 @@ Section ProofSysLinkBody.
                              with "Hcont") as "Hcont".
                 sl_own_transport CID28 CID35 eb pj b.
                 iApply (Tails.sl_tail_d (CID0 := CID35) gs j gl gu gd gk pd pav pu
-                          bn g gil gisl bmapstart
-                          inodestart nib size dev kk (qq/2)%Qp (qq/2)%Qp gsh
+                          bn gil gisl bmapstart
+ size kk (qq/2)%Qp (qq/2)%Qp gsh
                           inum dn bm n1 pid (DfracOwn (1/4)) dqb dqs
                           m R5 sp0 K eb b lks u4 bn0 bw1 bo2
                           (upd_upt V P2) ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop Hkk Hgeom
                           Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb
-                          Hiu1 Hj Hgl Hclog Hlkempty ltac:(reflexivity)
+                          Hiu1 Hj Hgl Hlkempty ltac:(reflexivity)
                           (sl_regs_sp _ _ _ _ _ HR5regs)
                           (sl_regs_thr _ _ _ _ _ HR5regs) HR5s1 HR5s2 Hal
                           with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam
@@ -1815,7 +1814,7 @@ Section ProofSysLinkBody.
                   by exact (blkmap_wf_dir_len fsc_cov fsc_logst bm (proj1 Hiok)).
                 sl_own_transport CID28 CID40 eb pj b.
                 iApply (Iupdate.wp_iupdate_link (CID := CID40) gs j gl gu gd gk
-                          pd pav pu bn g inodestart nib dev
+                          pd pav pu bn
                           (ientry kk) inum (sl_incnl dn) dn bm c1 Sb1 false
                           (* pin = true: this site pays the TOKEN arm (§3.9) *)
                           (* NO REGISTER VALUE IS CHOSEN HERE (lane G5).  The
@@ -2012,7 +2011,7 @@ Section ProofSysLinkBody.
                       [exact Hcsra | exact HS3regs]).
                 sl_own_transport CID41 CID43 eb pj b.
                 iApply (Iunlock.wp_iunlock_tx_sconf (CID := CID43) gs gil
-                          gisl kk (qq/2)%Qp gsh dev inum
+                          gisl kk (qq/2)%Qp gsh icfg_dev inum
                           (sl_incnl dn) bm pid (DfracOwn (1/4))
                           S4 (K - 38)%nat eb pj b lks
                           (upd_upt V P2) ltac:(exact Kiu) Hkk HS4a0 (Hlb "sleep lock"%string)
@@ -2020,7 +2019,7 @@ Section ProofSysLinkBody.
                                 Hslkd Hpidq Hprocs Hdep Hidev Hiinum
                                 Hivalid Hload Hshot2 Hfrz").
                 iIntros (CID44 Hq44 mul) "%Hcsul Hcg Hown Hpc Hpidq Hshr Htx".
-                iEval (rewrite -Hclog) in "Htx".
+
                 (* THE GENERATION SURVIVES THE WINDOW, and sys_link is the
                    caller that needs it: the share it still holds denies the
                    recycler [live_gen_bump]'s whole unit, so the [ity_shot]
@@ -2107,12 +2106,12 @@ Section ProofSysLinkBody.
                   [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
                 sl_own_transport CID44 CID47 eb pj b.
                 iApply (Nameiparent.wp_nameiparent_gen (CID := CID47) gs j gl gu
-                          gd gk pd pav pu bn g γa γf
-                          bmapstart inodestart nib size dev
-                          pk2 bw1 bn0 c1 (Sb1 ∪ {[IBLOCK inum inodestart]})
+                          gd gk pd pav pu bn γa γf
+                          bmapstart size
+                          pk2 bw1 bn0 c1 (Sb1 ∪ {[IBLOCK inum icfg_ist]})
                           pid (DfracOwn (1/4)) dqb dqs (DfracOwn 1)
                           T2 (K - 38)%nat eb b lks (upd_upt V P2)
-                          ltac:(exact Knp) Hcdev Hcnib Hclog Hcist HdevR Hnib0
+                          ltac:(exact Knp) HdevR Hnib0
                           Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb
                           Hpcstr2 (sl_plen_lt pk2 Hpk2)
                           ltac:(exact (sl_walk2_need _ w1 c1 Hu2)) Hj Hgl
@@ -2136,10 +2135,10 @@ Section ProofSysLinkBody.
                 assert (Hnpregs : sl_regs m sp0 (ientry kk)
                                     (m !!! Regidx Rs2 : mword 64) mnp)
                   by exact (sl_regs_cs m sp0 _ _ T2 mnp Hcsnp HT2regs).
-                assert (Hmem2 : IBLOCK inum inodestart
-                                ∈ (Sb1 ∪ {[IBLOCK inum inodestart]}))
+                assert (Hmem2 : IBLOCK inum icfg_ist
+                                ∈ (Sb1 ∪ {[IBLOCK inum icfg_ist]}))
                   by (apply elem_of_union_r, elem_of_singleton; reflexivity).
-                assert (Hmem2' : IBLOCK inum inodestart ∈ Sb2)
+                assert (Hmem2' : IBLOCK inum icfg_ist ∈ Sb2)
                   by exact (HSb2 _ Hmem2).
                 (* ===== +0x7c c.mv s2,a0 ===== *)
                 iApply (wp_cmv_s_sconf (CID := CID48) (mword_of_int (SL + 0x7c))
@@ -2194,11 +2193,11 @@ Section ProofSysLinkBody.
                       [di_type dnd = T_DIR] at ilock's own record. *)
                    iEval (rewrite sl_shed_gen) in "Hrefdp".
                    iDestruct "Hrefdp" as "[Hkeepd Hshrd]".
-                   iEval (rewrite -Hcdev) in "Hkeepd".
-                   iEval (rewrite -Hcdev) in "Hshrd".
+
+
                    iDestruct (inode_ref_short_gen_forget with "Hkeepd") as "Hkeepd".
-                   assert (Hdinb : bv_unsigned dinum < 16 * Z.of_nat nib)
-                     by (rewrite Hcnib; exact Hdinumc).
+                   assert (Hdinb : bv_unsigned dinum < 16 * Z.of_nat icfg_nib)
+                     by (exact Hdinumc).
                    destruct (Hiregb dinum Hdinb) as [Hdiblk Hdiblog].
                    iDestruct (sl_esc_acc kd Hkd
                                 with "Hescrows") as "#Hescd".
@@ -2245,10 +2244,10 @@ Section ProofSysLinkBody.
                    (* ---- THE WRITE ARM for the directory's lock
                       (durable-fs-plan.md section 3, [ilock];
                       durable-disk B''-tx) *)
-                   iEval (rewrite Hclog) in "Htx".
+
                    iApply (Ilock.wp_ilock_tx_sconf (CID := CID51) gs j gl gu gd gk pd
-                             pav pu bn gild gisld inodestart
-                             nib kd (qd/2)%Qp gyd PlainK dev dinum pid
+                             pav pu bn gild gisld
+ kd (qd/2)%Qp gyd PlainK dinum pid
                              (DfracOwn (1/4)) dqs
                              U0 (K - 38)%nat eb b lks
                              (upd_upt V P2) ltac:(exact Kil) Hkd Hgeom Hist0 Hdiblk Hdinb Hj Hgl
@@ -2381,8 +2380,8 @@ Section ProofSysLinkBody.
                                   with "Hcont") as "Hcont".
                      sl_own_transport CID52 CIDg1 eb pj b.
                      iApply (Tails.sl_tail_e2 (CID0 := CIDg1) gs j gl gu gd gk pd
-                               pav pu bn g gil gisl gild gisld
-                               bmapstart inodestart nib size dev
+                               pav pu bn gil gisl gild gisld
+                               bmapstart size
                                kk (qq/2)%Qp (qq/2)%Qp gsh inum
                                (di_type (sl_incnl dn))
                                kd (qd/2)%Qp (qd/2)%Qp gyd dinum dnd bmd
@@ -2390,7 +2389,7 @@ Section ProofSysLinkBody.
                                m Ug sp0 K eb b lks bn1 bw2 bo2
                                (upd_upt V P2) ltac:(exact Kil) ltac:(exact Kiupd)
                                ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop
-                               Hkk Hkd Hclog Hcist Hgeom Hsize Hbm0 Hbmcov
+                               Hkk Hkd Hgeom Hsize Hbm0 Hbmcov
                                Hbmlog Hist0 Hiblk Hiblog Hinb
                                Hdiblk Hdiblog
                                Hdinb Hcovb Hmem2'
@@ -2463,15 +2462,15 @@ Section ProofSysLinkBody.
                    iEval (rewrite /i_dev) in "Hidevd".
                    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (CID := CID53) (mword_of_int (SL + 0x8c))
                              Ra4 Rs2 (mword_of_int 0 : mword 12) U1 (K - 38)%nat
-                             dev b ltac:(nz) ltac:(rdok) with "Hcg Hpc [] [Hidevd]").
+                             icfg_dev b ltac:(nz) ltac:(rdok) with "Hcg Hpc [] [Hidevd]").
                    { iApply (slki_8c with "Htext"). }
                    { iEval (rgne; rewrite HU1s2). iExact "Hidevd". }
                    iIntros (CID54 Hq54) "Hcg Hpc Hidevd".
                    iEval (rgne; rewrite HU1s2) in "Hidevd".
                    set (U2 := <[Regidx Ra4 := regval_into_reg
-                                 (sign_extend' 64 dev : mword 64)]> U1).
+                                 (sign_extend' 64 icfg_dev : mword 64)]> U1).
                    assert (HU2a4 : (U2 !!! Regidx Ra4 : mword 64)
-                                   = (sign_extend' 64 dev : mword 64))
+                                   = (sign_extend' 64 icfg_dev : mword 64))
                      by (rewrite /U2; apply upd_eq).
                    assert (HU2regs : sl_regs m sp0 (ientry kk) (ientry kd) U2)
                      by (rewrite /U2; apply sl_regs_caller;
@@ -2496,18 +2495,18 @@ Section ProofSysLinkBody.
                      as "(Hkfrag & Hklive & (Hipdev & Hipinum) & Hkshare)".
                    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (CID := CID54) (mword_of_int (SL + 0x90))
                              Ra5 Rs1 (mword_of_int 0 : mword 12) U2 (K - 38)%nat
-                             dev b ltac:(nz) ltac:(rdok) with "Hcg Hpc [] [Hipdev]").
+                             icfg_dev b ltac:(nz) ltac:(rdok) with "Hcg Hpc [] [Hipdev]").
                    { iApply (slki_90 with "Htext"). }
                    { iEval (rgne; rewrite HU2s1). iExact "Hipdev". }
                    iIntros (CID55 Hq55) "Hcg Hpc Hipdev".
                    iEval (rgne; rewrite HU2s1) in "Hipdev".
                    set (U3 := <[Regidx Ra5 := regval_into_reg
-                                 (sign_extend' 64 dev : mword 64)]> U2).
+                                 (sign_extend' 64 icfg_dev : mword 64)]> U2).
                    assert (HU3a5 : (U3 !!! Regidx Ra5 : mword 64)
-                                   = (sign_extend' 64 dev : mword 64))
+                                   = (sign_extend' 64 icfg_dev : mword 64))
                      by (rewrite /U3; apply upd_eq).
                    assert (HU3a4 : (U3 !!! Regidx Ra4 : mword 64)
-                                   = (sign_extend' 64 dev : mword 64))
+                                   = (sign_extend' 64 icfg_dev : mword 64))
                      by (rewrite /U3 upd_ne; [exact HU2a4 | nz]).
                    assert (HU3regs : sl_regs m sp0 (ientry kk) (ientry kd) U3)
                      by (rewrite /U3; apply sl_regs_caller;
@@ -2617,13 +2616,13 @@ Section ProofSysLinkBody.
                        apply HSb2. apply elem_of_union_l. exact (Hw1 eq_refl).
                      - destruct w2; [| reflexivity]. exfalso. apply Hf.
                        exact (Hw2 eq_refl). }
-                   assert (Hlow16 : bv_unsigned (sl_low16 inum) < 16 * Z.of_nat nib).
+                   assert (Hlow16 : bv_unsigned (sl_low16 inum) < 16 * Z.of_nat icfg_nib).
                    { rewrite sl_low16_unsigned; [exact Hinb |].
                      assert (E16 : (2 ^ 16 = 65536)%Z) by (vm_compute; reflexivity).
                      lia. }
                    assert (Hlow16i : bv_unsigned (sl_low16 inum)
                                      < 16 * Z.of_nat icfg_nib)
-                     by (rewrite -Hcnib; exact Hlow16).
+                     by (exact Hlow16).
                    sl_own_transport CID52 CID59 eb pj b.
                    (* dirlink borrows the LEDGER half alone (durable-disk
                       2b-inode-5); the counting RA's tokens stay in this
@@ -2640,10 +2639,10 @@ Section ProofSysLinkBody.
                    iDestruct (log_tx_split icfg_log td (1/2) (1/4) (1/4)
                                 (eq_sym Qp.quarter_quarter) with "Htd")
                      as "[Htd Htxs]".
-                   iEval (rewrite -Hclog) in "Htxs".
+
                    iApply (Dirlink.wp_dirlink_gen (CID := CID59) gs j gl gu gd gk pd
-                             pav pu bn g γa γf γpr
-                             inodestart nib bmapstart size dev (ientry kd)
+                             pav pu bn γa γf γpr
+ bmapstart size (ientry kd)
                              dinum bmd datd dnd dnd nf (sl_low16 inum) n2 Sb2
                              _ _
                              pid (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn 1)
@@ -2652,7 +2651,7 @@ Section ProofSysLinkBody.
                              (upd_upt V P2) ltac:(exact Kdl) Htyd
                              ltac:(exact (proj1 (proj2 Hdiok)))
                              ltac:(exact (proj1 (proj2 (proj2 (proj2 (proj2 Hdiok))))))
-                             ltac:(rewrite Hcnib;
+                             ltac:(
                                    exact (Hddok ltac:(rewrite Htyd;
                                                       vm_compute; reflexivity)))
                              (* THE BORROWED LICENCE, LEFT DISJUNCT: earned by
@@ -2678,7 +2677,7 @@ Section ProofSysLinkBody.
                              Hist0 Hdiblk Hdiblog Hdinb Hlow16 Hbmgeo Hprkc Hsize
                              Hbm0 Hbmcov Hbmlog Hcovb Hiregb
                              ltac:(exact (sl_dl_need_ok _ w1 w2 _ n2 Hcrok2 Hu3))
-                             Hj Hgl HU6a0 HU6a2 Heb (Hlb "log"%string) Hclog
+                             Hj Hgl HU6a0 HU6a2 Heb (Hlb "log"%string)
                              with "Hcg Hown Htext Hpc Hdata Hprk Hbio Hlog
                                    Hkenv Hidevd Hiinumd Hmetad Hmapd Hblocksd
                                    [Hnm14] Hsbi Hsbs Hsbb Hbmres Hireg Hropen Hdiatd Hpidq
@@ -2689,7 +2688,7 @@ Section ProofSysLinkBody.
                      "%Hcsdl Hcg Hown Hpc Hidevd Hiinumd Hmetad Hmapd Hblocksd
                       Hnm14 Hsbi Hsbs Hsbb Hdiatd Hpidq Hbsl Hir1c Hdlnkd %Hn3
                       %HSb3 %Hdlp %Hfnd HopS Htxs %Hcapd %Hsizedd %Harm".
-                   iEval (rewrite Hclog) in "Htxs".
+
                    iDestruct (log_tx_add icfg_log td (1/2) (1/4) (1/4)
                                 (eq_sym Qp.quarter_quarter) with "Htd Htxs")
                      as "Htd".
@@ -2721,9 +2720,9 @@ Section ProofSysLinkBody.
                                     bool_decide (bmapstart ∈ Sb3) = true).
                    { intro Ht. apply bool_decide_eq_true.
                      apply HSb3. exact (proj1 (bool_decide_eq_true _) Ht). }
-                   assert (Hmem3 : IBLOCK inum inodestart ∈ Sb3)
+                   assert (Hmem3 : IBLOCK inum icfg_ist ∈ Sb3)
                      by exact (HSb3 _ Hmem2').
-                   iAssert (inode_ref_short kk (qq/2 + qq/2)%Qp (qq/2)%Qp dev inum)
+                   iAssert (inode_ref_short kk (qq/2 + qq/2)%Qp (qq/2)%Qp icfg_dev inum)
                      with "[Hkfrag Hklive Hipdev Hipinum Hkshare]" as "Hkeep".
                    { rewrite /inode_ref_short /inode_ident /i_dev /i_inum. iFrame. }
                    (* the three post-dirlink arms.  TWO of them go to
@@ -2792,8 +2791,8 @@ Section ProofSysLinkBody.
                                     with "Hcont") as "Hcont".
                        sl_own_transport CID60 CID61 eb pj b.
                        iApply (Tails.sl_tail_f (CID0 := CID61) gs j gl gu gd gk pd
-                                 pav pu bn g gil gisl gild gisld
-                                 bmapstart inodestart nib size dev
+                                 pav pu bn gil gisl gild gisld
+                                 bmapstart size
                                  kk (qq/2)%Qp (qq/2)%Qp gsh inum
                                  (di_type (sl_incnl dn))
                                  kd (qd/2)%Qp (qd/2)%Qp gyd dinum dnd bmd
@@ -2802,7 +2801,7 @@ Section ProofSysLinkBody.
                                  m mdl sp0 K eb b lks bn1 bw2 bo2
                                  (upd_upt V P2) ltac:(exact Kil) ltac:(exact Kiupd)
                                  ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop
-                                 Hkk Hkd Hclog Hcist Hgeom Hsize Hbm0 Hbmcov
+                                 Hkk Hkd Hgeom Hsize Hbm0 Hbmcov
                                  Hbmlog Hist0 Hiblk Hiblog Hinb
                                Hdiblk Hdiblog
                                  Hdinb Hcovb
@@ -3180,9 +3179,9 @@ Section ProofSysLinkBody.
                             iDestruct (log_opS_named with "HopS") as (e0) "HopE".
                             sl_own_transport CID60 CID63 eb pj b.
                             iApply (Iunlockput.wp_iunlockput_tx_gen (CID := CID63) gs j
-                                      gl gu gd gk pd pav pu bn g gild
-                                      gisld bmapstart inodestart nib
-                                      size dev kd (qd/2)%Qp (qd/2)%Qp gyd
+                                      gl gu gd gk pd pav pu bn gild
+                                      gisld bmapstart
+                                      size kd (qd/2)%Qp (qd/2)%Qp gyd
                                       dinum dnd' bmd' n3 Sb3
                                       (bool_decide (bmapstart ∈ Sb3)) true false e0
                                       pid (DfracOwn (1/4)) dqb dqs
@@ -3192,7 +3191,7 @@ Section ProofSysLinkBody.
                                       ltac:(intros _; exact Hmiblk)
                                       Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hdiblk
                                       Hdiblog Hdinb Hcovb Hiu3 Hj Hgl HW1a0
-                                      ltac:(rewrite Hlkempty; apply locks_below_empty) Hclog
+                                      ltac:(rewrite Hlkempty; apply locks_below_empty)
                                       with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog
                                             Hitab Hitinv Hescd Hireg Hropen Hslkd0 Hslkdd
                                             Hdepd Hidevd Hiinumd Hivalidd
@@ -3271,12 +3270,12 @@ Section ProofSysLinkBody.
                             iDestruct (inode_ref_gather with "Hkeep Hshr") as "Hrefip".
                             sl_own_transport CID64 CID66 eb pj b.
                             iApply (Iput.wp_iput_sconf (CID := CID66) gs j gl gu gd gk
-                                      pd pav pu bn g gil gisl
-                                      bmapstart inodestart nib size dev
+                                      pd pav pu bn gil gisl
+                                      bmapstart size
                                       kk (qq/2 + qq/2)%Qp inum n4
                                       pid (DfracOwn (1/4)) dqb dqs
                                       W3 (K - 38)%nat eb b lks
-                                      (upd_upt V P2) ltac:(exact Kip) Hclog Hkk Hgeom Hsize Hbm0 Hbmcov
+                                      (upd_upt V P2) ltac:(exact Kip) Hkk Hgeom Hsize Hbm0 Hbmcov
                                       Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hiu4 Hj
                                       Hgl HW3a0
                                       ltac:(rewrite Hlkempty; apply locks_below_empty)
@@ -3322,7 +3321,7 @@ Section ProofSysLinkBody.
                                   [exact Hcsra | exact Hipregs]).
                             sl_own_transport CID67 CID68 eb pj b.
                             iApply (EndOp.wp_end_op_sconf (CID := CID68) gs j gl gu gd
-                                      gk pd pav pu bn g fsc_fs fsc_cov fsc_logst dev n5 pid
+                                      gk pd pav pu bn icfg_log fsc_fs fsc_cov fsc_logst icfg_dev n5 pid
                                       (DfracOwn (1/4)) W4 (K - 38)%nat eb b lks
                                       (upd_upt V P2) ltac:(exact Keo) Hgeom Hj Hgl
                                       ltac:(rewrite Hlkempty; apply locks_below_empty)
@@ -3636,9 +3635,9 @@ Section ProofSysLinkBody.
                                          with "Hcont") as "Hcont".
                             sl_own_transport CID60 CID61 eb pj b.
                             iApply (Tails.sl_tail_f (CID0 := CID61) gs j gl gu gd gk
-                                      pd pav pu bn g gil gisl gild
-                                      gisld bmapstart inodestart nib
-                                      size dev kk (qq/2)%Qp (qq/2)%Qp gsh
+                                      pd pav pu bn gil gisl gild
+                                      gisld bmapstart
+                                      size kk (qq/2)%Qp (qq/2)%Qp gsh
                                       inum (di_type (sl_incnl dn))
                                       kd (qd/2)%Qp (qd/2)%Qp gyd dinum dnd' bmd'
                                       n3 Sb3 (bool_decide (bmapstart ∈ Sb3)) false e0
@@ -3646,7 +3645,7 @@ Section ProofSysLinkBody.
                                       m mdl sp0 K eb b lks bn1 bw2 bo2
                                       (upd_upt V P2) ltac:(exact Kil) ltac:(exact Kiupd)
                                       ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop
-                                      Hkk Hkd Hclog Hcist Hgeom Hsize Hbm0 Hbmcov
+                                      Hkk Hkd Hgeom Hsize Hbm0 Hbmcov
                                       Hbmlog Hist0 Hiblk Hiblog Hinb
                                Hdiblk Hdiblog
                                       Hdinb Hcovb
@@ -3730,14 +3729,14 @@ Section ProofSysLinkBody.
                    destruct n2 as [| c2];
                      [exfalso; unfold iput_units in Hiu2; lia |].
                    iApply (Tails.sl_tail_bad (CID0 := CID50) gs j gl gu gd gk pd
-                             pav pu bn g gil gisl
-                             bmapstart inodestart nib size dev kk
+                             pav pu bn gil gisl
+                             bmapstart size kk
                              (qq/2)%Qp (qq/2)%Qp gsh inum
                              (di_type (sl_incnl dn)) c2 Sb2
                              _ pid (DfracOwn (1/4)) dqb dqs
                              m T3 sp0 K eb b lks bn1 bw2 bo2
                              (upd_upt V P2) ltac:(exact Kil) ltac:(exact Kiupd) ltac:(exact Kiup)
-                             ltac:(exact Keo) K38 Kpop Hkk Hclog Hcist Hgeom
+                             ltac:(exact Keo) K38 Kpop Hkk Hgeom
                              Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb
                              Hcovb Hmem2'
                              ltac:(exact Hiu2)
@@ -3788,7 +3787,7 @@ Section ProofSysLinkBody.
                        ltac:(wp_next_chain) with "Hcont") as "Hcont".
           sl_own_transport CID24 CID26 eb pj b.
           iApply (Tails.sl_tail_b (CID0 := CID26) gs j gl gu gd gk pd pav pu bn
-                    g dev n1 pid (DfracOwn (1/4)) m Q3 sp0 K eb
+ n1 pid (DfracOwn (1/4)) m Q3 sp0 K eb
  b lks u4 bn0 bw1 bo2
                     (upd_upt V P2) ltac:(exact Keo) K38 Kpop Hgeom Hj Hgl Hlkempty
                     ltac:(reflexivity)

@@ -178,11 +178,6 @@ Set Printing Depth 40.
    step lemma true at all: without it a CREDITED level's post admits
    [w = true], i.e. that the level spent the unit the caller had already
    paid, and the invariant cannot be re-established. *)
-Lemma nx_wi_iu (Lr ncur : nat) (wc : bool) :
-  (0 < Lr)%nat ->
-  ((0 < Lr)%nat -> (iput_units + (if wc then 0%nat else 1%nat) <= ncur)%nat) ->
-  (iput_units <= ncur)%nat.
-Proof. intros H1 H2. specialize (H2 H1). destruct wc; lia. Qed.
 
 Lemma nx_wi_need (L n : nat) :
   (walk_need L <= n)%nat -> (0 < L)%nat -> (iput_units + 1 <= n)%nat.
@@ -633,25 +628,7 @@ Section ProofNamexMain.
     rewrite seq_app. reflexivity.
   Qed.
 
-  Lemma nx_buf_split (q : mword 64) (g : nat -> bv 8) (l N : nat) :
-    (l <= N)%nat ->
-    ([∗ list] i ∈ seq 0 N, pa_add q i ↦ₘ[KT1] g i) -∗
-    ([∗ list] i ∈ seq 0 l, pa_add q i ↦ₘ[KT1] g i)
-    ∗ ([∗ list] i ∈ seq l (N - l), pa_add q i ↦ₘ[KT1] g i).
-  Proof.
-    intro H. iIntros "Hb". rewrite (nx_seq_split l N H) big_sepL_app.
-    iDestruct "Hb" as "[H1 H2]". iFrame.
-  Qed.
 
-  Lemma nx_buf_join (q : mword 64) (g : nat -> bv 8) (l N : nat) :
-    (l <= N)%nat ->
-    ([∗ list] i ∈ seq 0 l, pa_add q i ↦ₘ[KT1] g i) -∗
-    ([∗ list] i ∈ seq l (N - l), pa_add q i ↦ₘ[KT1] g i) -∗
-    ([∗ list] i ∈ seq 0 N, pa_add q i ↦ₘ[KT1] g i).
-  Proof.
-    intro H. iIntros "H1 H2". rewrite (nx_seq_split l N H) big_sepL_app.
-    iFrame.
-  Qed.
 
   (* the middle window, re-based: [seq a l] IS [(a +) <$> seq 0 l] *)
   Lemma nx_win_shift (q : mword 64) (dqm : dfrac) (g : nat -> bv 8) (a l : nat) :
@@ -1034,8 +1011,8 @@ Section ProofNamexMain.
       (j : nat) (b : bool) (K : nat) (m : regfile)
       (sp0 pv nb ret_tgt : mword 64) (plen L : nat) (pfun : nat -> bv 8)
       (pl : list (bv 8)) (eb : bool)
-      (g : log_names) (bn : bio_names)
-      (bmapstart inodestart size : Z)
+ (bn : bio_names)
+      (bmapstart size : Z)
       (npar : bool) (n : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac) (fuel : nat) (CIDl : CpuId) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
     (* THE GROWING SET (fs-sysfile GR-2b, retrofit 6).  [Sb] is the caller's,
@@ -1086,7 +1063,7 @@ Section ProofNamexMain.
      inode_held ipv -∗
      iref_slots 1 -∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
      proc_priv_bare (proc_addr j) pidv Vpr -∗
      inode_held (pv_cwd Vpr) -∗
      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -1094,7 +1071,7 @@ Section ProofNamexMain.
      bslots 3 -∗
      (* the set form beside the transaction's token: the walk's [ilock]
         takes the write arm (durable-disk B''-tx) *)
-     log_opSt g ncur Scur -∗
+     log_opSt icfg_log ncur Scur -∗
      (* ---- THE CONTRACT'S OWN CONTINUATION, at the loop's hart.  Kept
         SEALED as [SpecNamex.namex_post]: spelled out here it would be
         twenty more wands inside the loop invariant, i.e. carried by
@@ -1104,7 +1081,7 @@ Section ProofNamexMain.
         is about an arbitrary hart. *)
      wp_next (CID0 := CIDl) true (proc_addr j) (fun CIDc : CpuId =>
        namex_postS (CID := CIDc) (proc_addr j) pv nb ret_tgt pl m K b eb lks
-                   g bn bmapstart inodestart size
+ bn bmapstart size
                    plen pfun npar n Sb pidv dq dqb dqs dqpv Vpr) -∗
      WP (Loop : expr riscv_lang))%I.
 
@@ -1112,8 +1089,8 @@ Section ProofNamexMain.
       (j : nat) (b : bool) (K : nat) (m : regfile) (sp0 pv nb : mword 64)
       (plen a e : nat) (pfun : nat -> bv 8) (ipv : mword 64) (ncur : nat)
       (Scur : gset Z) (eb : bool)
-      (g : log_names) (bn : bio_names)
-      (bmapstart inodestart size : Z)
+ (bn : bio_names)
+      (bmapstart size : Z)
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (CIDt : CpuId) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
     (∀ (Mt : regfile) (nf' : nat -> bv 8),
@@ -1142,7 +1119,7 @@ Section ProofNamexMain.
      inode_held ipv -∗
      iref_slots 1 -∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
      proc_priv_bare (proc_addr j) pidv Vpr -∗
      inode_held (pv_cwd Vpr) -∗
      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -1150,7 +1127,7 @@ Section ProofNamexMain.
      bslots 3 -∗
      (* the set form beside the transaction's token: the walk's [ilock]
         takes the write arm (durable-disk B''-tx) *)
-     log_opSt g ncur Scur -∗
+     log_opSt icfg_log ncur Scur -∗
      WP (Loop : expr riscv_lang))%I.
 
   (* THE WALK IS THE SET FORM (GR-2a finding 1).  The counted seal is
@@ -1160,10 +1137,9 @@ Section ProofNamexMain.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names)
       (ga : gname) (gf : gname)
-      (bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32)
+      (bmapstart : Z)
+      (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
       (nfun : nat -> bv 8)
       (npar : bool)
@@ -1171,14 +1147,14 @@ Section ProofNamexMain.
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_namex_gen_body gs j gl gu gd gk pd pav pu bn g
-                        ga gf bmapstart inodestart nib
-                        size dev plen pfun nfun npar n Sb
+    : wp_namex_gen_body gs j gl gu gd gk pd pav pu bn
+                        ga gf bmapstart
+                        size plen pfun nfun npar n Sb
                         pidv dq dqb dqs dqpv m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_namex_gen_body].
     intros pcE pjv pv nb ret_tgt pl L
-           HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
+           HK Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
            Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs Ha1 Hbelow.
     destruct (nx_kb K HK) as (Kmp & Kid & Kig & Kmm & Kil & Kiu & Kiup
                               & Kdl & Kip & Kpop & K12).
@@ -2587,7 +2563,7 @@ Section ProofNamexMain.
     iAssert (∀ fuel : nat, wp_next (CID0 := CID) true (proc_addr j)
                (fun CIDl : CpuId =>
                   nx_loop_body j b K m sp0 pv nb ret_tgt plen L pfun pl eb
-                               g bn bmapstart inodestart size
+ bn bmapstart size
                                npar n Sb pidv dq dqb dqs dqpv fuel CIDl lks Vpr))%I
       with "[]" as "Hloop".
     { (* ---- local disequality helpers, used all through the body ---- *)
@@ -2698,11 +2674,11 @@ Section ProofNamexMain.
                        = add_vec_int (mword_of_int (NX + 0x146) : mword 64) 4)
                  by (rewrite /T2; apply upd_eq).
                iDestruct "Hip" as (pk pq pinum) "(%Hpe & %Hpk & %Hpb & Href & Hru)".
-               iEval (rewrite -Hdev) in "Href".
+
                assert (HT2a0 : T2 !!! Regidx Ra0 = ientry pk).
                { rewrite /T2 upd_ne; [| nz]. rewrite HT1a0. exact Hpe. }
-               assert (Hpb' : bv_unsigned pinum < 16 * Z.of_nat nib)
-                 by (rewrite Hnib; exact Hpb).
+               assert (Hpb' : bv_unsigned pinum < 16 * Z.of_nat icfg_nib)
+                 by (exact Hpb).
                destruct (Hiregb pinum Hpb') as [Hibc Hibl].
                iDestruct (nx_esc_acc pk Hpk with "Hesc")
                  as "#Hescp".
@@ -2721,15 +2697,15 @@ Section ProofNamexMain.
                   is HOLDING its transaction's token at this level (it must
                   be, for the per-level [ilock]), so half of it goes with the
                   iput and the two rejoin on the way out. *)
-               iEval (rewrite Htlog) in "Htx".
+
                iDestruct (log_tx_halve with "Htx") as (tnx) "[Htxa Htxb]".
-               iEval (rewrite -Htlog) in "Htxa".
-               iApply (IP.wp_iput_gen gs j gl gu gd gk pd pav pu bn g
-                         gilp gislp bmapstart inodestart
-                         nib size dev pk pq pinum ncur Scur wc false
+
+               iApply (IP.wp_iput_gen gs j gl gu gd gk pd pav pu bn
+                         gilp gislp bmapstart
+ size pk pq pinum ncur Scur wc false
                          false enxA tnx (1/2)%Qp pidv dq dqb dqs
                          T2 (K - 12)%nat eb b
-                         _ Vpr true Kip Htlog Hpk HbW ltac:(discriminate)
+                         _ Vpr true Kip Hpk HbW ltac:(discriminate)
                          Hlg Hsize Hbmap0 Hbmapcov Hbmaplog Hinos0
                          Hibc Hibl Hpb' Hcovb HbD
                          Hj Hgs HT2a0 Hbelow
@@ -2744,9 +2720,9 @@ Section ProofNamexMain.
                iIntros (CIDip Hqip mip nip Sip wip)
                  "%Hcsip Hcg Hcnt Hextc Hclmc Hpc Hppid Hbmap Hinos Hbslot
                   %Hsip %Hwip %Hwipc %Hbdip Hlog Htxa Hisl2 _".
-               iEval (rewrite Htlog) in "Htxa".
+
                iDestruct (log_tx_join icfg_log tnx with "Htxa Htxb") as "Htx".
-               iEval (rewrite -Htlog) in "Htx".
+
                  (* THE CREDITED BOUND IS STRONGER THAN THE COUNTED ONE, and
                     namex is stated at the counted one.  [ip_spend_w w false
                     false = 2] where [iput_units = 3] -- iput's own third unit
@@ -3037,8 +3013,8 @@ Section ProofNamexMain.
                iAssert (wp_next (CID0 := CIDl) true (proc_addr j)
                           (fun CIDt : CpuId =>
                              nx_rest_body j b K m sp0 pv nb plen a e pfun ipv ncur
-                                          Scur eb g bn bmapstart
-                                          inodestart size pidv dq dqb dqs dqpv
+                                          Scur eb bn bmapstart
+ size pidv dq dqb dqs dqpv
                                           CIDt lks Vpr))%I
                  with "[IHl Hcont]" as "Hrest".
                { iIntros (CIDt Hst Mt nf') "%Hregt %Hviewt Hcg Hcnt Hextc Hclmc Hpc
@@ -3097,11 +3073,11 @@ Section ProofNamexMain.
                    (* ---- THE SHED: ilock takes a share ---- *)
                    iDestruct "Hip" as (ik iq iinum)
                      "(%Hie & %Hik & %Hib & Href & Hru)".
-                   iEval (rewrite -Hdev) in "Href".
+
                    rewrite inode_ref_shed.
                    iDestruct "Href" as "[Hkeep Hshr]".
-                   assert (Hib' : bv_unsigned iinum < 16 * Z.of_nat nib)
-                     by (rewrite Hnib; exact Hib).
+                   assert (Hib' : bv_unsigned iinum < 16 * Z.of_nat icfg_nib)
+                     by (exact Hib).
                    destruct (Hiregb iinum Hib') as [Hibc Hibl].
                    iDestruct (nx_esc_acc ik Hik
                                 with "Hesc") as "#Hesck".
@@ -3181,10 +3157,10 @@ Section ProofNamexMain.
                       [iunlockput], and half the transaction's element sits
                       in the escrow's checked-out arm for that whole window;
                       the residue rides the descriptor conjunct home. *)
-                   iEval (rewrite Htlog) in "Htx".
+
                    iApply (IL.wp_ilock_tx_sconf gs j gl gu gd gk pd pav pu bn
-                             gilk gislk inodestart nib
-                             ik (iq/2)%Qp gsh PlainK dev iinum pidv dq dqs
+                             gilk gislk
+                             ik (iq/2)%Qp gsh PlainK iinum pidv dq dqs
                              V2 (K - 12)%nat eb b lks Vpr
                              Kil Hik Hlg Hinos0 Hibc Hib' Hj Hgs HV2a0
                              ltac:(lkbelow)
@@ -3405,15 +3381,15 @@ Section ProofNamexMain.
                      iDestruct (inode_ref_short_gen_forget with "Hkeep")
                        as "Hkeep2".
                      iApply (IUP.wp_iunlockput_tx_gen gs j gl gu gd gk pd pav pu
-                               bn g gilk gislk
-                               bmapstart inodestart nib size dev
+                               bn gilk gislk
+                               bmapstart size
                                ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
                                Scur wc false false enxB
                                pidv dq dqb dqs ND2 (K - 12)%nat eb b lks Vpr
                                Kiup Hik HbW ltac:(discriminate)
                                Hlg Hsize Hbmap0 Hbmapcov Hbmaplog
                                Hinos0 Hibc Hibl Hib' Hcovb Hiu Hj Hgs
-                               HND2a0 Hbelow Htlog
+                               HND2a0 Hbelow
                                with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc
                                      Hitb2 Hitbl Hesck Hireg [] Hslkk Hslkd
                                      Hdep Hidev Hiinum Hivalid Hload
@@ -3545,18 +3521,16 @@ Section ProofNamexMain.
                      iDestruct (log_opS_named with "Hlog") as (enx) "Hlog".
                      iDestruct (log_opSe_lb with "Hlog") as "#Hlbnx".
                      iApply fupd_wp.
-                     iMod (InodeRegion.ireg_obs_mint ⊤ fsc_ireg fsc_fs inodestart nib
-                             iinum dnl g enx ltac:(solve_ndisj) Hib' Htlog
+                     iMod (InodeRegion.ireg_obs_mint ⊤ fsc_ireg fsc_fs icfg_ist icfg_nib
+                             iinum dnl icfg_log enx ltac:(solve_ndisj) Hib' eq_refl
                              (nx_nlink_nz _ Hnl0)
                              with "Hireg Hdiat Hlbnx") as "[Hdiat #Hobs]".
                      iModIntro.
                      (* the [crz] premise the two credited sites present:
-                        the observation plus the region's two ambient ties,
-                        which this contract carries as premises (§G.25) *)
-                     iAssert (nlz_obs (bv_unsigned iinum) enx ∗
-                              ⌜g = icfg_log⌝ ∗ ⌜inodestart = icfg_ist⌝)%I
-                       as "#Hcrz".
-                     { iFrame "Hobs". iPureIntro. split; assumption. }
+                        the observation alone.  The region's two ambient
+                        ties used to ride beside it and are [True] now. *)
+                     iAssert (nlz_obs (bv_unsigned iinum) enx)%I as "#Hcrz".
+                     { iFrame "Hobs". }
                      assert (Htg0ce : add_vec
                                (mword_of_int (NX + 0xd4) : mword 64)
                                (sign_extend' 64 (mword_of_int 10 : mword 13))
@@ -3699,7 +3673,7 @@ Section ProofNamexMain.
                        iDestruct (cpu_claim_ext_transport CIDil CIDP5 eb (proc_addr j)
                                     ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
                        iApply (IU.wp_iunlock_tx_sconf gs gilk gislk
-                                 ik (iq/2)%Qp gsh dev iinum dnl bml
+                                 ik (iq/2)%Qp gsh icfg_dev iinum dnl bml
                                  pidv dq NP3 (K - 12)%nat eb (proc_addr j) b lks Vpr
                                  Kiu Hik HP3a0
                                  ltac:(lkbelow)
@@ -3709,7 +3683,7 @@ Section ProofNamexMain.
                        all: try lkbelow.
                        iIntros (CIDiu Hqiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid
                                                   Hshr Htx".
-                       iEval (rewrite -Htlog) in "Htx".
+
                        iDestruct (inode_shr_gen_forget with "Hshr")
                          as "Hshr".
                        assert (Hpc80 : ret_pc (NP3 !!! Regidx Rra)
@@ -3731,7 +3705,7 @@ Section ProofNamexMain.
                        iDestruct (inode_ref_short_shr_gen_agree
                                     with "Hkeep Hshr") as %<-.
                        iDestruct (inode_ref_gather_gen ik (iq/2)%Qp (iq/2)%Qp
-                                    dev iinum gsh with "Hkeep Hshr") as "Href".
+                                    icfg_dev iinum gsh with "Hkeep Hshr") as "Href".
                        iEval (rewrite Qp.div_2) in "Href".
                        assert (HtydP : di_type dnl = T_DIR)
                          by (unfold T_DIR; exact Hty).
@@ -3740,7 +3714,7 @@ Section ProofNamexMain.
                          iSplitR; [iPureIntro; exact Hie |].
                          iSplitR; [iPureIntro; exact Hik |].
                          iSplitR; [iPureIntro; exact Hib |].
-                         iSplitL "Href"; [rewrite -Hdev; iExact "Href" |].
+                         iSplitL "Href"; [iExact "Href" |].
                          iFrame "Hru". rewrite -HtydP. iExact "Hshot". }
                        assert (Hmiuregs : nx_regs m sp0 (pa_add pv o2) ipv nb
                                   (m !!! Regidx Ra1 : mword 64) miu)
@@ -3840,8 +3814,8 @@ Section ProofNamexMain.
                          by (destruct Hiok as (_ & _ & _ & _ & Hq & _);
                              exact Hq).
                        assert (Hdio : dir_inums_ok datl
-                                 (dir_nrec (bv_unsigned (di_size dnl))) nib).
-                       { rewrite Hnib.
+                                 (dir_nrec (bv_unsigned (di_size dnl))) icfg_nib).
+                       {
                          exact (dir_ok_dir icfg_nib dnl datl Hty Hdok). }
                        (* the block at +0xde is reached by TWO routes; it is
                           stated once, consuming everything but the registers,
@@ -4003,7 +3977,7 @@ Section ProofNamexMain.
                                exact Hq).
                          iApply (DL.wp_dirlookup_sconf gs j gl gu gd gk
                                    pd pav pu bn ga gf
-                                   inodestart nib dev (ientry ik) iinum
+ (ientry ik) iinum
                                    bml datl dnl dnl
                                    nf' false (mword_of_int 0 : mword 32)
                                    pidv dq (DfracOwn (1/2)) (DfracOwn 1)
@@ -4094,7 +4068,7 @@ Section ProofNamexMain.
                            assert (Hcinb : bv_unsigned
                                      (zero_extend' 32
                                         (dir_inum datl kdir : mword 16)
-                                      : mword 32) < 16 * Z.of_nat nib).
+                                      : mword 32) < 16 * Z.of_nat icfg_nib).
                            { rewrite (dlk_zext32_unsigned
                                         (dir_inum datl kdir)).
                              exact (Hdio kdir Hklt Hklive). }
@@ -4106,9 +4080,9 @@ Section ProofNamexMain.
                                   (dir_inum datl kdir : mword 16)).
                              iSplitR; [done |].
                              iSplitR; [iPureIntro; exact Hkslot |].
-                             iSplitR; [iPureIntro; rewrite -Hnib;
+                             iSplitR; [iPureIntro;
                                        exact Hcinb |].
-                             iFrame "Hru2". rewrite -Hdev. iExact "Href2". }
+                             iFrame "Hru2". iExact "Href2". }
                            (* +0xe8 c.mv s2,a0 *)
                            iApply (wp_cmv_s_sconf (mword_of_int (NX + 0xe8))
                                      Rs2 Ra0 mdl (K - 12)%nat b ltac:(nz)
@@ -4224,16 +4198,16 @@ Section ProofNamexMain.
                            iDestruct (inode_ref_short_gen_forget with "Hkeep")
                              as "Hkeep2".
                            iApply (IUP.wp_iunlockput_tx_gen gs j gl gu gd gk
-                                     pd pav pu bn g gilk gislk
-                                     bmapstart inodestart nib
-                                     size dev ik (iq/2)%Qp (iq/2)%Qp gsh
+                                     pd pav pu bn gilk gislk
+                                     bmapstart
+                                     size ik (iq/2)%Qp (iq/2)%Qp gsh
                                      iinum dnl bml ncur Scur wc false true
                                      enx pidv dq dqb dqs
                                      GB3 (K - 12)%nat eb b lks Vpr
                                      Kiup Hik HbW ltac:(discriminate)
                                      Hlg Hsize Hbmap0 Hbmapcov
                                      Hbmaplog Hinos0 Hibc Hibl Hib' Hcovb
-                                     Hiu Hj Hgs HGB3a0 Hbelow Htlog
+                                     Hiu Hj Hgs HGB3a0 Hbelow
                                      with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio
                                            Hlogc Hitb2 Hitbl Hesck Hireg []
                                            Hslkk Hslkd Hdep Hidev
@@ -4455,16 +4429,16 @@ Section ProofNamexMain.
                            iDestruct (inode_ref_short_gen_forget with "Hkeep")
                              as "Hkeep2".
                            iApply (IUP.wp_iunlockput_tx_gen gs j gl gu gd gk
-                                     pd pav pu bn g gilk gislk
-                                     bmapstart inodestart nib
-                                     size dev ik (iq/2)%Qp (iq/2)%Qp gsh
+                                     pd pav pu bn gilk gislk
+                                     bmapstart
+                                     size ik (iq/2)%Qp (iq/2)%Qp gsh
                                      iinum dnl bml ncur Scur wc false true
                                      enx pidv dq dqb dqs
                                      GC3 (K - 12)%nat eb b lks Vpr
                                      Kiup Hik HbW ltac:(discriminate)
                                      Hlg Hsize Hbmap0 Hbmapcov
                                      Hbmaplog Hinos0 Hibc Hibl Hib' Hcovb
-                                     Hiu Hj Hgs HGC3a0 Hbelow Htlog
+                                     Hiu Hj Hgs HGC3a0 Hbelow
                                      with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio
                                            Hlogc Hitb2 Hitbl Hesck Hireg []
                                            Hslkk Hslkd Hdep Hidev
@@ -4766,15 +4740,15 @@ Section ProofNamexMain.
                      iDestruct (inode_ref_short_gen_forget with "Hkeep")
                        as "Hkeep2".
                      iApply (IUP.wp_iunlockput_tx_gen gs j gl gu gd gk pd pav pu
-                               bn g gilk gislk
-                               bmapstart inodestart nib size dev
+                               bn gilk gislk
+                               bmapstart size
                                ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
                                Scur wc false false enxB
                                pidv dq dqb dqs ND2 (K - 12)%nat eb b lks Vpr
                                Kiup Hik HbW ltac:(discriminate)
                                Hlg Hsize Hbmap0 Hbmapcov Hbmaplog
                                Hinos0 Hibc Hibl Hib' Hcovb Hiu Hj Hgs
-                               HND2a0 Hbelow Htlog
+                               HND2a0 Hbelow
                                with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc
                                      Hitb2 Hitbl Hesck Hireg [] Hslkk Hslkd
                                      Hdep Hidev Hiinum Hivalid Hload
@@ -5527,16 +5501,16 @@ Section ProofNamexMain.
       assert (HA3ra : A3 !!! Regidx Rra
                       = add_vec_int (mword_of_int (NX + 0x4c) : mword 64) 4)
         by (rewrite /A3; apply upd_eq).
-      assert (HA3a0 : A3 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64)).
+      assert (HA3a0 : A3 !!! Regidx Ra0 = (sign_extend' 64 icfg_dev : mword 64)).
       { rewrite /A3 upd_ne; [| nz]. rewrite HA2a0 Hroot.
         unfold ROOTDEV. pcw. }
       assert (HA3a1 : A3 !!! Regidx Ra1 = (sign_extend' 64 ROOTINO : mword 64)).
       { rewrite /A3 upd_ne; [| nz]. rewrite HA2a1. unfold ROOTINO. pcw. }
-      assert (Hrino : bv_unsigned ROOTINO < 16 * Z.of_nat nib).
+      assert (Hrino : bv_unsigned ROOTINO < 16 * Z.of_nat icfg_nib).
       { unfold ROOTINO.
         assert (Hu : bv_unsigned (mword_of_int 1 : mword 32) = 1)
           by (vm_compute; reflexivity).
-        rewrite Hu. assert (Hnz : 1 <= Z.of_nat nib) by lia. lia. }
+        rewrite Hu. assert (Hnz : 1 <= Z.of_nat icfg_nib) by lia. lia. }
       iDestruct (cpu_own_transport CID CID23 0%nat eb (proc_addr j) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (trap_csrs_ext_transport CID CID23 eb (proc_addr j)
@@ -5554,10 +5528,10 @@ Section ProofNamexMain.
          ([IgetLic.iname_root_alloc]).  The licence is PURE: the evidence
          lives in the region's invariant, not in this walk's hands, which
          is why it costs the walk nothing. *)
-      iAssert (iname fsc_ireg fsc_fs inodestart ROOTINO RootL) as "Hlicr";
+      iAssert (iname fsc_ireg fsc_fs icfg_ist ROOTINO RootL) as "Hlicr";
         [rewrite /iname; iPureIntro; exact ireg_root_ROOTINO |].
       iPoseProof (ireg_inv_reg with "Hireg") as "#Hiregr".
-      iApply (IG.wp_iget_sconf inodestart nib dev ROOTINO
+      iApply (IG.wp_iget_sconf ROOTINO
                 RootL
                 A3 0%nat eb (proc_addr j) (K - 12)%nat b lks
                 Kig ltac:(vm_compute; reflexivity)
@@ -5639,8 +5613,8 @@ Section ProofNamexMain.
       iAssert (inode_held (ientry kig)) with "[Href Hru]" as "Hip".
       { rewrite /inode_held. iExists kig, qig, ROOTINO.
         iSplitR; [done |]. iSplitR; [iPureIntro; exact Hkig |].
-        iSplitR; [iPureIntro; rewrite -Hnib; exact Hrino |].
-        iFrame "Hru". rewrite -Hdev. iExact "Href". }
+        iSplitR; [iPureIntro;exact Hrino |].
+        iFrame "Hru". iExact "Href". }
       (* ===== +0x3c .. +0x46 : the four constants, then [c.j +0xf4] ===== *)
       iApply (wp_li4_s_sconf (mword_of_int (NX + 0x3c)) Rs3
                 (mword_of_int 47 : mword 12) (mword_of_int 47 : mword 64)
@@ -5856,9 +5830,9 @@ Section ProofNamexMain.
          its [ref++] is a ledger move, so it takes the region handle this
          walk already carries -- persistent, and the same [Hireg] the iget
          above was given. *)
-      iApply (ID.wp_idup_sconf inodestart nib
-                ck dev B3 0%nat eb (proc_addr j) (K - 12)%nat b lks
-                Kid ltac:(vm_compute; reflexivity) Hckl HB3a0 Hdev
+      iApply (ID.wp_idup_sconf
+                ck B3 0%nat eb (proc_addr j) (K - 12)%nat b lks
+                Kid ltac:(vm_compute; reflexivity) Hckl HB3a0
                 ltac:(lkbelow)
                 with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hireg Hisl1 Hcheld").
       all: try lkbelow.
@@ -6050,10 +6024,9 @@ Section ProofNamexMain.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names)
       (ga : gname) (gf : gname)
-      (bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32)
+      (bmapstart : Z)
+      (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
       (nfun : nat -> bv 8)
       (npar : bool)
@@ -6061,14 +6034,14 @@ Section ProofNamexMain.
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_namex_sconf_body gs j gl gu gd gk pd pav pu bn g
-                          ga gf bmapstart inodestart nib
-                          size dev plen pfun nfun npar n
+    : wp_namex_sconf_body gs j gl gu gd gk pd pav pu bn
+                          ga gf bmapstart
+                          size plen pfun nfun npar n
                           pidv dq dqb dqs dqpv m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_namex_sconf_body].
     intros pcE pjv pv nb ret_tgt pl L
-           HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
+           HK Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
            Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs Ha1 Hbelow.
     iIntros "Hcg Hcnt Hextc Hclmc #Htext #Hkd Hpc #Hpenv #Hbio #Hlogc #Hkenv #Hitb2 #Hitbl
               #Hesc #Hslks #Hireg #Hropen #Hprocs #Hdev #Hgeom #Hdlk Hbmap Hinos
@@ -6077,10 +6050,10 @@ Section ProofNamexMain.
        now takes the TOKEN with it (durable-disk B''-tx), so the seal hands
        the pair over rather than framing the token past the walk. *)
     iDestruct (log_op_openSt with "Hlog") as (Sb0) "Hlog".
-    iApply (wp_namex_gen gs j gl gu gd gk pd pav pu bn g
-              ga gf bmapstart inodestart nib size dev
+    iApply (wp_namex_gen gs j gl gu gd gk pd pav pu bn
+              ga gf bmapstart size
               plen pfun nfun npar n Sb0 pidv dq dqb dqs dqpv m K eb b lks Vpr
-              HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
+              HK Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
               Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen
               (walk_need_counted L n Hbud) Hj Hgs Ha1 Hbelow
               with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl

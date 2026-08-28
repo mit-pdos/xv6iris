@@ -113,9 +113,9 @@ Section ProofFiledup.
   Qed.
 
   Lemma wp_filedup_sconf
-      (γl γf : gname) (k : nat) (q : Qp) (Cf : fcontent) (st : fdstate)
+      (γl γf : gname) (k : nat) (q : Qp) (st : fdstate)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string)
-    : wp_filedup_sconf_body γl γf k q Cf st m n eb p K b lks.
+    : wp_filedup_sconf_body γl γf k q st m n eb p K b lks.
   Proof.
     cbv beta delta [wp_filedup_sconf_body].
     intros pcE ret_tgt HK HnZ Ha0 Hbelow.
@@ -295,7 +295,7 @@ Section ProofFiledup.
     (* ===== the critical section (literal [false], no hart threading) ===== *)
     iDestruct "HRres" as (Mg) "(Hauth & Hfdauth & %Hdom & Hslots)".
     (* the caller's reference names a live slot *)
-    iDestruct "Href" as "[Hrtok Hrfields]".
+    iDestruct "Href" as (Cf) "[Hrtok Hrfields]".
     iDestruct (fref_tok_lookup with "Hauth Hrtok") as %(qt & cnt & HMk & _ & _).
     assert (Hk : (k < NFILE)%nat) by (apply Hdom; rewrite HMk; eauto).
     iDestruct (ftable_slots_acc γf Mg k Hk with "Hslots") as "[Hslot Hback]".
@@ -376,7 +376,7 @@ Section ProofFiledup.
       f_equal. rewrite Pos2Z.inj_succ. lia. }
     iEval (rewrite Hstv) in "Hcell".
     (* the ghost step: one more reference, the caller's fraction halved *)
-    iMod (file_dup_step γf Mg k q Cf st qt cnt HMk with "Hauth [Hrtok Hrfields]") as "(Hauth & Href1 & Href2)".
+    iMod (file_dup_step γf Mg k q st qt cnt HMk with "Hauth [Hrtok Hrfields]") as "(Hauth & Href1 & Href2)".
     { rewrite /file_ref /fref_tok. iFrame "Hrtok Hrfields". }
     iDestruct ("Hback" $! (<[k := (qt, Pos.succ cnt)]> Mg) with "[%] [Hcell Hrest Hfd]") as "Hslots".
     { intros j Hj. rewrite lookup_insert_ne; [reflexivity | congruence]. }

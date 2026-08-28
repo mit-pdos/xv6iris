@@ -184,16 +184,13 @@ Notation K_ireclaim := (84%nat) (only parsing).
 Definition wp_ireclaim_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
       ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names)
     (γpr : gname)
-    (bmapstart inodestart : Z)
-    (ninodes : Z) (nib : nat) (size : Z)
-    (dev : mword 32)
+    (bmapstart : Z)
+    (ninodes : Z) (size : Z)
     (pidv : mword 32) (dq dqb dqs dqn : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) (Vpr : pprivate) :=
@@ -203,13 +200,13 @@ Definition wp_ireclaim_sconf_body
   (K_ireclaim <= K)%nat ->
   (* bread's / the log's block-number arithmetic, and the log's own storage *)
   log_geom_ok fsc_cov fsc_logst ->
-  0 <= inodestart ->
+  0 <= icfg_ist ->
   (* EVERY inum the region covers lives in a covered HOME block that is not
      log storage: bread's premise, ilock's and iput's.  The scan cannot know
      which inum it stops at, so the premise is the quantified one
      ([InodeInv.ireg_blocks_ok]) -- and it delivers BOTH conjuncts iput
      wants. *)
-  ireg_blocks_ok inodestart nib fsc_cov fsc_logst ->
+  ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
   (* ---- itrunc's geometry, threaded through iput verbatim ---- *)
   0 < size <= BPB ->
   0 <= bmapstart ->
@@ -224,27 +221,20 @@ Definition wp_ireclaim_sconf_body
      [bv_unsigned inum < 16 * nib].  [ninodes < 2^31] is what makes the
      [lw]-then-[bgeu] comparison at +0x70..+0x78 numeric. ---- *)
   1 < ninodes ->
-  ninodes <= 16 * Z.of_nat nib ->
+  ninodes <= 16 * Z.of_nat icfg_nib ->
   ninodes < 2 ^ 31 ->
   (* THE ORPHAN ARM'S FIRST CALLEE, as a hypothesis and not a functor *)
   printk_gen_contract (kt := KT1) γpr γu γd ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* a0 = dev: the RV64 ABI's sign extension of an [int] *)
-  m !!! Regidx (mword_of_int 10 : mword 5) = (sign_extend' 64 dev : mword 64) ->
+  m !!! Regidx (mword_of_int 10 : mword 5) = (sign_extend' 64 icfg_dev : mword 64) ->
   (* ireclaim's cone is the union of its callees': bread/brelse ("bcache",
      4), printk ("pr", 14), iget/iput ("itable", 2), begin_op/end_op
      ("log", 3), ilock ("bcache", 4), iunlock ("sleep lock", 6) --
      "itable" is the lowest, so one premise there covers the whole cone
      via [locks_below_mono]. *)
   locks_below lks "log" ->
-  (* THE AMBIENT LOG, named (durable-fs-plan.md section 3, [ilock];
-     durable-disk B''-tx).  ireclaim's orphan arm write-locks an inode
-     inside its own transaction, and the escrow's write arm parks a share of
-     [icfg_log]'s element -- the escrow carries no [log_names] parameter.
-     [ProofFsinit] calls this contract AT [icfg_log], so the discharge is
-     [eq_refl] and no premise reaches any further caller. *)
-  γ = icfg_log ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, in and out.  ireclaim holds no lock across its
@@ -259,19 +249,19 @@ Definition wp_ireclaim_sconf_body
   (* the general printk path's two PERSISTENT credentials *)
   kernel_data -∗
   printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
-  log_ctx γ bn fsc_fs fsc_cov fsc_logst dev -∗
+  bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
+  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
   (* end_op's crash seam and era certificate *)
   fs_crash_seam fsc_cov fsc_logst -∗
   gen_cert -∗
   (* the three superblock fields, read and handed straight back *)
   sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
-  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   (* THE INODE REGION -- persistent.  ireclaim never claims and never writes
      a dinode, so [DinodeSlot.diblk_slot_acc] is all its scan needs and
      [InodeRegion.ireg_claim_au] never appears. *)
-  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   (* THE BOOT-SHELTER TOKEN (fs-fragments.md §7.12 / §7.1.7).  ireclaim's [iget]
      fires at a claim-SHAPED record (type ≠ 0, nlink 0); the licence alone does
      not exclude a mid-window claim box, and the exclusion is the boot-order
@@ -281,7 +271,7 @@ Definition wp_ireclaim_sconf_body
      only caller, hands it in and takes it back. *)
   ireg_boot -∗
   (* ---- THE ICACHE, as iget / ilock / iput take it ---- *)
-  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   (* THE FIFTY ENTRY SLEEPLOCKS, as a family: the scan does not know which
@@ -321,7 +311,7 @@ Definition wp_ireclaim_sconf_body
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
-      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       proc_priv_bare pj pidv Vpr -∗
       bslots 3 -∗
@@ -343,15 +333,13 @@ Module Type IRECLAIM.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names)
       (γpr : gname)
-      (bmapstart inodestart : Z)
-      (ninodes : Z) (nib : nat) (size : Z)
-      (dev : mword 32)
+      (bmapstart : Z)
+      (ninodes : Z) (size : Z)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_ireclaim_sconf_body γs j γl γu γd γk pd pav pu bn γ γpr
-                             bmapstart inodestart ninodes nib size
-                             dev pidv dq dqb dqs dqn m K eb b lks Vpr.
+      wp_ireclaim_sconf_body γs j γl γu γd γk pd pav pu bn γpr
+                             bmapstart ninodes size
+ pidv dq dqb dqs dqn m K eb b lks Vpr.
 End IRECLAIM.

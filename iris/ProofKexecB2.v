@@ -290,10 +290,10 @@ Section KexecB2Body.
       (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
-      (bn : bio_names) (g : log_names)
+      (bn : bio_names)
       (gilf gislf : gname) (ga gf : gname)
-      (bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32)
+      (bmapstart : Z)
+      (size : Z)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
@@ -303,8 +303,8 @@ Section KexecB2Body.
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w63 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (eb : bool) (lks : gset string) :
-    kxc_bad324_body Q gs jp gl gu gd gk pd pav pu bn g gilf gislf
-      ga gf bmapstart inodestart nib size dev
+    kxc_bad324_body Q gs jp gl gu gd gk pd pav pu bn gilf gislf
+      ga gf bmapstart size
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V dqb dqs dqa dqpv dqas m Mt K sp0 ra0 s00 s10 s20 pv av w63 w67
       ef P szf eb lks.
@@ -652,9 +652,9 @@ Section KexecB2Body.
                   (CID13 : CPU) = (CID0 : CPU)) by wp_next_chain.
     iDestruct (wp_next_retarget CID0 CID13 true (proc_addr jp) _ Hcr
                  with "Hcont") as "Hcont".
-    iApply (A.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn g
-              gilf gislf ga gf bmapstart inodestart nib size
-              dev kf qf sf gyf inumf dnf bmf n2
+    iApply (A.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn
+              gilf gislf ga gf bmapstart size
+ kf qf sf gyf inumf dnf bmf n2
               plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
               m U8 K eb lks sp0 ra0 s00 s10 s20 pv av
               HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
@@ -776,10 +776,10 @@ Section KexecB2Loops.
       (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
-      (bn : bio_names) (g : log_names)
+      (bn : bio_names)
       (gilf gislf : gname) (ga gf : gname)
-      (bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32)
+      (bmapstart : Z)
+      (size : Z)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
@@ -790,15 +790,15 @@ Section KexecB2Loops.
       (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd)
       (ip : nat) (va : mword 64) (fz po : Z) (eb : bool) (lks : gset string) :
-    kxc_ls_body Q gs jp gl gu gd gk pd pav pu bn g gilf gislf
-      ga gf bmapstart inodestart nib size dev
+    kxc_ls_body Q gs jp gl gu gd gk pd pav pu bn gilf gislf
+      ga gf bmapstart size
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67
       ef P ip va fz po eb lks.
   Proof.
     cbv beta delta [kxc_ls_body].
     intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp Hgs
-           Hdevc Hsp Hra Hs0 Hs1 Hs2 Hal Hbelow Hcovp Hfzr Hpor.
+ Hsp Hra Hs0 Hs1 Hs2 Hal Hbelow Hcovp Hfzr Hpor.
     pose proof HK as HK'. 
     assert (Hmb : (Z.of_nat MAXFILE * Z.of_nat BSIZE = 274432)%Z)
       by (vm_compute; reflexivity).
@@ -819,7 +819,7 @@ Section KexecB2Loops.
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
-                          #Hdlock & %Hclogf)".
+                          #Hdlock)".
     rewrite /kxc_res.
     iDestruct "Hres" as "(Hopen & Hlog & Hirs & Hbm & Hins & Hbits & Hbs & Hpt &
                           Hpriv & Hpath & Hargv & Hargs & Helf & Hframe)".
@@ -1361,7 +1361,7 @@ Section KexecB2Loops.
       iDestruct (inode_map_q_1_to _ _ _ _ eq_refl with "Hmap") as "Hmap".
       iDestruct (inode_blocks_q_1_to _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
       iApply (Readi.wp_readi_sconf KT0 gs jp gl gu gd gk pd pav pu bn ga gf
-                dev (ientry kf) bmf datl dnf false offn nn fpg V
+ (ientry kf) bmf datl dnf false offn nn fpg V
                 pidv (DfracOwn 1) (DfracOwn (1/2)) D6 (K - 68)%nat eb
                 eb lks ltac:(lia) Hlg Hbmwf Hbmcov Hszb
                 ltac:(rewrite HoffnZ; lia)
@@ -1391,7 +1391,7 @@ Section KexecB2Loops.
                    Hiok Hrl Hdok Hddix Hdoc Hduq
                    with "Hdlk Hdiat Hmeta Hmap Hblocks Hdview Hfview Htop") as "Hload".
       iDestruct (A.kxa_bs3_join with "Hbs1 Hbs2") as "Hbs".
-      iDestruct (kxc_open_intro dev pidv kf qf sf gyf
+      iDestruct (kxc_open_intro pidv kf qf sf gyf
                    inumf dnf bmf gilf gislf
                    with "Hslkk Hslkd Hdep Hidev Hiinum Hivalid Hload
                          Hity Hfrz Hkeep Hru") as "Hopen".
@@ -1608,9 +1608,9 @@ Section KexecB2Loops.
                     with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hka
                           [Hopen Hlog Hirs Hbm Hins Hbits Hbs Hpt Hpriv Hpath
                            Hargv Hargs Helf Hframe] Hcont Hc116").
-          { iApply (A.fs_fabric_mk with "[%] Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
+          { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
                                          Hesc Hslks Hireg Hropen Hprocs Hdevi Hdgeom
-                                         Hdlock"). exact Hclogf. }
+                                         Hdlock"). }
           { rewrite /kxc_res.
             iSplitL "Hopen"; [iExact "Hopen" |].
             iSplitL "Hlog"; [iExact "Hlog" |]. iSplitL "Hirs"; [iExact "Hirs" |].
@@ -1644,9 +1644,9 @@ Section KexecB2Loops.
                   (CIDb1 : CPU) = (CID0 : CPU)) by wp_next_chain.
         iDestruct (wp_next_retarget CID0 CIDb1 true (proc_addr jp) _ Hcr3
                      with "Hcont") as "Hcont".
-        iApply (kxc_bad324 (CID0 := CIDb1) Q gs jp gl gu gd gk pd pav pu bn g
-                  gilf gislf ga gf bmapstart inodestart
-                  nib size dev kf qf sf gyf inumf dnf bmf n2 plen
+        iApply (kxc_bad324 (CID0 := CIDb1) Q gs jp gl gu gd gk pd pav pu bn
+                  gilf gislf ga gf bmapstart
+ size kf qf sf gyf inumf dnf bmf n2 plen
                   pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas m M2 K
                   sp0 ra0 s00 s10 s20 pv av w63 w67 ef P w65 eb lks
                   HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp
@@ -1663,9 +1663,9 @@ Section KexecB2Loops.
                   with "Hcg Hcnt Hextc Hclmc Htext Hpc [] Hopen Hbm Hins Hbits Hka
                         Hpt Hpriv Hpath Hargv Hargs Helf Hbs Hirs Hlog Hframe
                         Hcont").
-        { iApply (A.fs_fabric_mk with "[%] Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
+        { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
                                        Hesc Hslks Hireg Hropen Hprocs Hdevi Hdgeom
-                                       Hdlock"). exact Hclogf. } }
+                                       Hdlock"). } }
 
     (* ---- +0x10e: bgeu s9,a5,+0x0da ---- *)
     assert (Hcmp : zopz0zKzJ_u (rget N9 Rs9) (rget N9 Ra5)

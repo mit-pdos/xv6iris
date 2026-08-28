@@ -468,22 +468,10 @@ Class riscvGS (Σ : gFunctors) := RiscvGS {
    Each is a plain definition (NOT an instance -- the [::] substructures
    above already provide the unique resolution path), so a use site
    elaborates to the same projection chain resolution produces. *)
-Definition riscv_invGS `{!riscvGS Σ} : invGS Σ := riscvF_invGS.
-Definition riscv_regGS `{!riscvGS Σ} :
-  ghost_mapG Σ register (sigT type_of_register) := riscvF_regGS.
-Definition riscv_uartGS `{!riscvGS Σ} : ghost_varG Σ uart_state := riscvF_uartGS.
-Definition riscv_plicGS `{!riscvGS Σ} : ghost_varG Σ plic_state := riscvF_plicGS.
-Definition riscv_virtioGS `{!riscvGS Σ} : ghost_varG Σ virtio_state :=
-  riscvF_virtioGS.
 Definition riscv_kmapGS `{!riscvGS Σ} :
   @ghost_mapG Σ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
     (@SailStdpp.Instances.Decidable_eq_mword 27)
     (@SailStdpp.Instances.Countable_mword 27) := riscvF_kmapGS.
-Definition riscv_kptGS `{!riscvGS Σ} : inG Σ kptR := riscvF_kptGS.
-Definition riscv_lockSetGS `{!riscvGS Σ} : inG Σ lockSetR := riscvF_lockSetGS.
-Definition riscv_parkGS `{!riscvGS Σ} : ghost_varG Σ CPU := riscvF_parkGS.
-Definition riscv_pstateGS `{!riscvGS Σ} : ghost_varG Σ (SailStdpp.Values.mword 32) :=
-  riscvF_pstateGS.
 Definition era_memGS_of `{!riscvFixedGS Σ} (E : riscvEraGS) : gen_heapGS Arch.pa (bv 8) Σ :=
   GenHeapGS _ _ _ (era_heap_name E) (era_meta_name E).
 Global Instance riscv_memGS `{!riscvGS Σ} : gen_heapGS Arch.pa (bv 8) Σ :=
@@ -570,34 +558,9 @@ Proof. rewrite /swap_lb. apply _. Qed.
    the era's receipt bounds the arm's generation from BELOW, the started
    counter the completion threads in bounds it from ABOVE, and together they
    pin it to the ambient generation. *)
-Lemma swap_lb_le `{!riscvFixedGS Σ} (g g'' : nat) :
-  swap_auth g'' -∗ swap_lb g -∗ ⌜(g <= g'')%nat⌝.
-Proof.
-  rewrite /swap_auth /swap_lb. iIntros "Ha Hl".
-  iDestruct (mono_nat_lb_own_valid with "Ha Hl") as %[_ Hle]. done.
-Qed.
 
-Lemma gen_started_le `{!riscvFixedGS Σ} (g'' n : nat) :
-  start_auth n -∗ gen_started g'' -∗ ⌜(S g'' <= n)%nat⌝.
-Proof.
-  rewrite /start_auth /gen_started. iIntros "Ha Hl".
-  iDestruct (mono_nat_lb_own_valid with "Ha Hl") as %[_ Hle]. done.
-Qed.
 
-Lemma swap_auth_update `{!riscvFixedGS Σ} (g'' g : nat) :
-  (g'' <= g)%nat -> swap_auth g'' ==∗ swap_auth g ∗ swap_lb g.
-Proof.
-  intros Hle. rewrite /swap_auth /swap_lb. iIntros "Ha".
-  iMod (mono_nat_own_update g with "Ha") as "[Ha #Hlb]"; [lia|].
-  iModIntro. iFrame "Ha Hlb".
-Qed.
 
-Lemma swap_auth_alloc `{!riscvFixedGS Σ} (g : nat) :
-  swap_auth g -∗ swap_auth g ∗ swap_lb g.
-Proof.
-  rewrite /swap_auth /swap_lb. iIntros "Ha".
-  iDestruct (mono_nat_lb_own_get with "Ha") as "#Hlb". iFrame "Ha Hlb".
-Qed.
 
 (* THE DISK IMAGE TIE (claude-notes/design/crash.md, design/fs-log.md): era
    [E]'s image auth, pinned to the state's own [v_disk].  It is a conjunct of
@@ -1032,11 +995,6 @@ Qed.
 Lemma addr_is_kdata_ram a : addr_is_kdata a -> addr_is_ram a.
 Proof.
   unfold addr_is_kdata, addr_is_ram, text_end, ram_base, ram_size. lia.
-Qed.
-Lemma addr_is_ram_split a : addr_is_ram a <-> addr_is_text a \/ addr_is_kdata a.
-Proof.
-  unfold addr_is_ram, addr_is_text, addr_is_kdata, text_end, ram_base, ram_size.
-  lia.
 Qed.
 
 (* The two legacy MMIO-disjointness predicates, kept as the interface the
@@ -1559,11 +1517,6 @@ Section phys_word_pointsto.
     is_aligned_paddr (Physaddr a) 8 = true ->
     ([∗ list] j ∈ seq 0 8, (pa_add a j) ↦ₚ{dq} nth_byte w j) ⊢ phys_word_pointsto a dq w.
   Proof. iIntros (Hal) "H". by iFrame. Qed.
-  Lemma phys_word_pointsto_unfold a dq w :
-    phys_word_pointsto a dq w ⊣⊢
-    ⌜is_aligned_paddr (Physaddr a) 8 = true⌝ ∗
-    ([∗ list] j ∈ seq 0 8, (pa_add a j) ↦ₚ{dq} nth_byte w j).
-  Proof. reflexivity. Qed.
 End phys_word_pointsto.
 
 (* ---------------------------------------------------------------------- *)
@@ -1597,9 +1550,6 @@ Section word2_pointsto.
   Context `{!riscvGS Σ}.
   Context `{KTR : !CurKtier}.
 
-  Lemma word2_pointsto_aligned_p a dq w :
-    word2_pointsto a dq w ⊢ ⌜is_aligned_paddr (Physaddr a) 2 = true⌝.
-  Proof. iIntros "[$ _]". Qed.
   Lemma word2_pointsto_bytes a dq w :
     word2_pointsto a dq w ⊢ [∗ list] j ∈ seq 0 2, (pa_add a j) ↦ₘ{dq} nth_byte w j.
   Proof. iIntros "[_ $]". Qed.
@@ -1607,11 +1557,6 @@ Section word2_pointsto.
     is_aligned_paddr (Physaddr a) 2 = true ->
     ([∗ list] j ∈ seq 0 2, (pa_add a j) ↦ₘ{dq} nth_byte w j) ⊢ word2_pointsto a dq w.
   Proof. iIntros (Hal) "H". by iFrame. Qed.
-  Lemma word2_pointsto_unfold a dq w :
-    word2_pointsto a dq w ⊣⊢
-    ⌜is_aligned_paddr (Physaddr a) 2 = true⌝ ∗
-    ([∗ list] j ∈ seq 0 2, (pa_add a j) ↦ₘ{dq} nth_byte w j).
-  Proof. reflexivity. Qed.
 
   (* ---- sharing (see [mem_pointsto_share]) ---- *)
   Lemma word2_pointsto_agree {kt1 kt2 : ktier} a dq1 w1 dq2 w2 :
@@ -1628,12 +1573,6 @@ Section word2_pointsto.
     iSplit; [iIntros "[#$ [$ $]]" | iIntros "[[#$ $] [_ $]]"].
   Qed.
 
-  Lemma word2_ktier_mono (kt kt' : ktier) `{!KtierLe kt kt'} a dq w :
-    a ↦₂[kt]{dq} w ⊢ a ↦₂[kt']{dq} w.
-  Proof.
-    iIntros "[$ Hbs]". iApply (big_sepL_mono with "Hbs").
-    iIntros (k j _) "H". iApply (mem_ktier_mono kt kt' with "H").
-  Qed.
 End word2_pointsto.
 
 (* ---------------------------------------------------------------------- *)
@@ -1733,12 +1672,6 @@ Section word4_pointsto.
     a ↦₄{DfracOwn (1/2)} w -∗ a ↦₄{DfracOwn (1/2)} w -∗ a ↦₄ w.
   Proof. iIntros "H1 H2". rewrite word4_pointsto_half. iFrame "H1 H2". Qed.
 
-  Lemma word4_ktier_mono (kt kt' : ktier) `{!KtierLe kt kt'} a dq w :
-    a ↦₄[kt]{dq} w ⊢ a ↦₄[kt']{dq} w.
-  Proof.
-    iIntros "[$ Hbs]". iApply (big_sepL_mono with "Hbs").
-    iIntros (k j _) "H". iApply (mem_ktier_mono kt kt' with "H").
-  Qed.
 End word4_pointsto.
 
 (* ---------------------------------------------------------------------- *)
@@ -1800,10 +1733,6 @@ Section string_pointsto.
     Persistent (string_pointsto (KTR := ktr) a DfracDiscarded s).
   Proof. exact (string_pointsto_persistent ktr a s). Qed.
 
-  Lemma string_pointsto_bytes a dq s :
-    string_pointsto a dq s ⊣⊢
-    [∗ list] j ↦ b ∈ cstring_bytes s, (pa_add a j) ↦ₘ{dq} b.
-  Proof. reflexivity. Qed.
 
   (* the terminating NUL is the last byte owned *)
   Lemma cstring_bytes_length s :
@@ -1813,12 +1742,6 @@ Section string_pointsto.
     induction s as [|c s IH]; simpl; [reflexivity | rewrite IH; reflexivity].
   Qed.
 
-  Lemma string_ktier_mono (kt kt' : ktier) `{!KtierLe kt kt'} a dq s :
-    a ↦ₛ[kt]{dq} s ⊢ a ↦ₛ[kt']{dq} s.
-  Proof.
-    iIntros "Hs". iApply (big_sepL_mono with "Hs").
-    iIntros (k b _) "H". iApply (mem_ktier_mono kt kt' with "H").
-  Qed.
 End string_pointsto.
 
 (* ---------------------------------------------------------------------- *)
@@ -2075,8 +1998,6 @@ Proof. iApply wp_mono. iIntros ([]). Qed.
 Definition wp_triv `{!irisGS riscv_lang Σ} (E : coPset) (e : expr riscv_lang) : iProp Σ :=
   WP e @ E {{ _, True%I }}.
 
-Lemma wp_triv_eq `{!irisGS riscv_lang Σ} E e Φ : wp_triv E e ⊣⊢ WP e @ E {{ Φ }}.
-Proof. rewrite /wp_triv. iSplit; iApply wp_post_irrel. Qed.
 
 Notation "'WP' e @ E" := (wp_triv E e%E) (at level 20, e at level 20) : bi_scope.
 Notation "'WP' e" := (wp_triv ⊤ e%E) (at level 20, e at level 20) : bi_scope.
@@ -2126,15 +2047,6 @@ Section RegAt.
     Timeless (reg_pointsto_at c r dq v).
   Proof. rewrite /reg_pointsto_at. apply _. Qed.
 
-  Lemma reg_valid_at (c : CPU) rs r dq v :
-    reg_interp_at (cpu_reg_name c) rs -∗ reg_pointsto_at c r dq v -∗
-    ⌜register_lookup r rs = v⌝.
-  Proof.
-    rewrite /reg_pointsto_at /reg_interp_at.
-    iIntros "Hi Hr". iDestruct "Hi" as (m) "[Hm %Hag]".
-    iDestruct (ghost_map_lookup with "Hm Hr") as %Hlk.
-    iPureIntro. symmetry. by apply reg_existT_inj, (Hag r _ Hlk).
-  Qed.
 
   Lemma reg_update_at (c : CPU) rs r v v' :
     reg_interp_at (cpu_reg_name c) rs -∗ reg_pointsto_at c r (DfracOwn 1) v ==∗
@@ -2290,13 +2202,6 @@ Section Bridge.
   (* PA-SIDE region fact: the byte's PHYSICAL address is in RAM (the
      claim ppn identifies the page).  Identity consumers recover the va-side
      fact via [pa_of_id] (KptPt). *)
-  Lemma mem_ram a dq b :
-    a ↦ₘ{dq} b -∗ ∃ ppn : mword 44,
-      kmap_at (svpn_of a) ppn KP_rw ∗ ⌜addr_is_ram (pa_of ppn a)⌝.
-  Proof.
-    rewrite /mem_pointsto. iIntros "H". iDestruct "H" as (ppn) "(#Hk & _ & %Hd & _ & _)".
-    iExists ppn. iFrame "Hk". iPureIntro; exact Hd.
-  Qed.
 
   (* reading a memory byte agrees with the byte heap AT ITS PHYSICAL address. *)
   Lemma mem_valid (mm : gmap Arch.pa (bv 8)) a dq b :
@@ -2415,28 +2320,12 @@ Section Bridge.
   (* WEAKENING along the tier order: the pin is the only tier-dependent
      conjunct and it weakens ([ktier_pin_mono]); at KT1 there is nothing
      left to prove. *)
-  Lemma text_ktier_mono (kt kt' : ktier) `{!KtierLe kt kt'} a dq b :
-    a ↦ₓ[kt]{dq} b ⊢ a ↦ₓ[kt']{dq} b.
-  Proof.
-    rewrite /text_pointsto. iIntros "H". iDestruct "H" as (ppn) "(#Hk & %Hc & %Hd & %Hp & Hpt)".
-    iExists ppn. iFrame "Hk Hpt". iPureIntro.
-    split; [exact Hc | split; [exact Hd | exact (ktier_pin_mono kt kt' ppn a Hp)]].
-  Qed.
 
   (* two holders of the same code byte, at ANY two dfracs and ANY two tiers,
      agree on its value: agreement runs through [kmap_at_agree] +
      [pointsto_agree], neither of which looks at the pin.  This is what lets
      a TRAMPOLINE-va (KT1) code byte be reconciled with the identity (KT0)
      image byte it is minted from. *)
-  Lemma text_pointsto_agree {kt1 kt2 : ktier} a dq1 b1 dq2 b2 :
-    a ↦ₓ[kt1]{dq1} b1 -∗ a ↦ₓ[kt2]{dq2} b2 -∗ ⌜b1 = b2⌝.
-  Proof.
-    rewrite /text_pointsto. iIntros "H1 H2".
-    iDestruct "H1" as (ppn1) "(Hk1 & _ & _ & _ & Hp1)".
-    iDestruct "H2" as (ppn2) "(Hk2 & _ & _ & _ & Hp2)".
-    iDestruct (kmap_at_agree with "Hk1 Hk2") as %[-> _].
-    by iDestruct (pointsto_agree with "Hp1 Hp2") as %->.
-  Qed.
 
   (* ---- the PHYSICAL points-to bridge (the OLD pa-era [mem_*] bodies) ---- *)
 
@@ -2475,13 +2364,6 @@ Section Bridge.
      same read at index 7 -- and it is what the PMA RAM class needs: the
      platform's DRAM region ends at PHYSTOP, so an 8-byte access is inside it
      only if its END is ([RiscvExtras.pma_access_ram]). *)
-  Lemma phys_word_pointsto_ram7 a dq w : a ↦ₚ₈{dq} w ⊢ ⌜addr_is_ram (pa_add a 7)⌝.
-  Proof.
-    iIntros "Hw". iDestruct (phys_word_pointsto_bytes with "Hw") as "Hbs".
-    iDestruct (big_sepL_lookup _ _ 7%nat 7%nat with "Hbs") as "Hb7".
-    { rewrite lookup_seq_lt; [reflexivity | lia]. }
-    iDestruct (phys_ram with "Hb7") as %Hram7. iPureIntro. exact Hram7.
-  Qed.
 
   Global Instance phys_pointsto_discarded_persistent a b : Persistent (a ↦ₚ□ b).
   Proof. rewrite /phys_pointsto. apply _. Qed.
@@ -2492,8 +2374,6 @@ Section Bridge.
     iModIntro. by iFrame.
   Qed.
 
-  Lemma phys_pointsto_dup a b : a ↦ₚ□ b -∗ a ↦ₚ□ b ∗ a ↦ₚ□ b.
-  Proof. iIntros "#H". by iSplitR. Qed.
 
   Lemma phys_update (mm : _) (a : Arch.pa) (b b' : bv 8) :
     gen_heap_interp (hG:=riscv_memGS) mm -∗ a ↦ₚ{DfracOwn 1} b ==∗
@@ -2636,24 +2516,10 @@ Section pointsto_persist.
     iModIntro. by iFrame.
   Qed.
 
-  Lemma string_pointsto_persist a dq s : a ↦ₛ{dq} s ==∗ a ↦ₛ□ s.
-  Proof.
-    iIntros "Hs". iApply big_sepL_bupd. iApply (big_sepL_mono with "Hs").
-    iIntros (k b _) "H". by iApply mem_pointsto_persist.
-  Qed.
 
   Global Instance phys_word_pointsto_discarded_persistent a w : Persistent (a ↦ₚ₈□ w).
   Proof. rewrite /phys_word_pointsto. apply _. Qed.
 
-  Lemma phys_word_pointsto_persist a dq w : a ↦ₚ₈{dq} w ==∗ a ↦ₚ₈□ w.
-  Proof.
-    iIntros "[%Hal Hbs]".
-    iAssert (|==> [∗ list] j ∈ seq 0 8,
-               (pa_add a j) ↦ₚ□ nth_byte w j)%I with "[Hbs]" as ">Hbs".
-    { iApply big_sepL_bupd. iApply (big_sepL_mono with "Hbs").
-      iIntros (k j _) "H". by iApply phys_pointsto_persist. }
-    iModIntro. by iFrame.
-  Qed.
 End pointsto_persist.
 
 (* Seal [mem_pointsto] for typeclass (Frame) resolution: without this, [iFrame]

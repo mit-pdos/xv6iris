@@ -162,14 +162,6 @@ Qed.
 (* fact) be CONSUMED by the node-granular adapter rather than re-derived.    *)
 (* ---------------------------------------------------------------------- *)
 
-Corollary hart_block_exec (tick : bool) (s s' s'' : mstate) :
-  exec (riscv_step tick) s = Some (tt, s'') ->
-  mblock (riscv_step tick, s) (Interface.Ret tt, s') ->
-  s' = s''.
-Proof.
-  intros He Hb. destruct (exec_run_det _ _ _ _ He) as [_ Huniq].
-  by destruct (Huniq _ _ (hart_block_run _ _ _ Hb)) as [_ ->].
-Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* 3. The reusable WP rule for deterministic ops.                          *)
@@ -528,13 +520,6 @@ Section WPDev.
   (* The device-thread analogues, same four-way split.  Their callbacks
      still hand over the same full interp triple as before. *)
 
-  Local Lemma dev_step_prelude (g : gstate)
-      (Hbge : gen_id <= g.(ggen)) (Hsge : S gen_id <= start_count g) :
-    g.(ggen) = gen_id -> g.(gpow) = true \/ gen_id < g.(ggen).
-  Proof.
-    intros Heq. destruct (g.(gpow)) eqn:Hpw; [by left|].
-    exfalso. rewrite /start_count Hpw Heq Nat.add_0_r in Hsge. lia.
-  Qed.
 
   (* the continuation is ∀-quantified over the step's OBSERVATION LIST too
      (RiscvLang §3b'): the tx/rx arms emit the console I/O events, and a
@@ -902,19 +887,6 @@ Proof. intros H. rewrite exec_bind0 H. reflexivity. Qed.
 (* caller composes its no-tick witness with a [tick_clock] exec fact.      *)
 (* ---------------------------------------------------------------------- *)
 
-Lemma exec_riscv_step_tick (s s' s'' : mstate) :
-  exec (riscv_step false) s = Some (tt, s') ->
-  exec (tick_clock tt) s' = Some (tt, s'') ->
-  exec (riscv_step true) s = Some (tt, s'').
-Proof.
-  intros H1 H2.
-  unfold riscv_step in H1 |- *.
-  rewrite exec_bind in H1. rewrite exec_bind.
-  destruct (exec (try_step 0 false) s) as [[b s1]|]; [|discriminate].
-  cbn beta iota in H1 |- *.
-  rewrite exec_returnm in H1.
-  inversion H1; subst. exact H2.
-Qed.
 
 (* exec-leaves (functional twins of run_read_reg / run_write_reg). *)
 Lemma exec_read_reg (r : register) s :
@@ -965,71 +937,6 @@ Section StepHartActive.
                       (add_vec_int (register_lookup minstret s_tick.(sregs)) 1)
          else s_tick.
 
-  Lemma exec_riscv_step_hart_active : exec (riscv_step false) s = Some (tt, s_final).
-  Proof using All.
-    unfold riscv_step.
-    rewrite (exec_bind_Some _ _ _ _ _
-              (_ : exec (try_step 0 false) s = Some (false, s_final))).
-    { reflexivity. }
-    (* now prove exec (try_step 0 false) s = Some (false, s_final) *)
-    unfold try_step.
-    cbn [ext_pre_step_hook].
-    (* read cur_privilege -- kept SYMBOLIC (whatever privilege [s] is in) *)
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
-    cbn beta.
-    (* should_inc_minstret <that privilege> -> b *)
-    rewrite (exec_bind_Some _ _ _ _ _ Hsi). cbn beta.
-    (* write minstret_increment b >> read hart_state *)
-    rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg (R_bool minstret_increment) b s)).
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg hart_state s_a)).
-    cbn beta. rewrite Hhart_a. cbn beta iota.
-    (* run_hart_active 0 -> Step_Execute (RETIRE_SUCCESS, _), s_exec *)
-    rewrite (exec_bind_Some _ _ _ _ _ Hha). cbn beta.
-    unfold RETIRE_SUCCESS. cbn beta iota.
-    (* try_step TAIL: BODY = bind (bind0 ARM (read hart_state)) (fun w10 => MATCH10). *)
-    (* Step A: exec (bind0 ARM (read hart_state)) s_exec = Some (HART_ACTIVE tt, s_exec). *)
-    erewrite exec_bind_Some.
-    2:{ erewrite exec_bind0_Some.
-        2:{ (* exec ARM s_exec = Some(tt, s_exec) *)
-            erewrite exec_bind_Some.
-            2:{ apply exec_read_reg. }
-            rewrite Hhart_exec. unfold Defs.assert_exp. cbn [hart_is_active].
-            reflexivity. }
-        (* exec (read hart_state) s_exec = Some(HART_ACTIVE tt, s_exec) *)
-        apply exec_read_reg. }
-    rewrite Hhart_exec. cbn beta iota.
-    (* REST10 = bind0 (tick_pc) (bind (and_boolM (returnM true)(read mi)) (fun w12 => TAIL2)) *)
-    erewrite exec_bind0_Some.
-    2:{ apply exec_tick_pc. }
-    erewrite exec_bind_Some.
-    2:{ unfold Defs.and_boolM.
-        erewrite exec_bind_Some.
-        2:{ reflexivity. }
-        cbn beta iota. apply (exec_read_reg minstret_increment). }
-    change (get_config_rvfi tt) with false.
-    replace (register_lookup minstret_increment
-               (set_reg s_exec PC (register_lookup nextPC s_exec.(sregs))).(sregs))
-      with b.
-    2:{ rewrite ?sregs_set_reg.
-        rewrite irrelevant_register_set;
-          [ (exact Hmi_exec || (symmetry; exact Hmi_exec)) | reflexivity ]. }
-    unfold s_final, s_tick.
-    destruct b.
-    - (* b = true: minstret += 1 *)
-      erewrite exec_bind0_Some.
-      2:{ erewrite exec_bind0_Some.
-          2:{ erewrite exec_bind_Some.
-              2:{ apply (exec_read_reg minstret). }
-              apply exec_write_reg. }
-          cbn beta iota. reflexivity. }
-      reflexivity.
-    - (* b = false *)
-      erewrite exec_bind0_Some.
-      2:{ erewrite exec_bind0_Some.
-          2:{ cbn beta iota. reflexivity. }
-          cbn beta iota. reflexivity. }
-      reflexivity.
-  Qed.
 
 End StepHartActive.
 
@@ -1060,21 +967,4 @@ End StepADD.
 (* [should_inc_minstret] is TOTAL: it only reads mcountinhibit + minstretcfg
    and combines them with [and_boolM], so at any state / privilege its [exec]
    yields [Some (_, s)] for SOME boolean -- we never need to know which. *)
-Lemma exec_should_inc_minstret_Some (priv : Privilege) s :
-  ∃ b : bool, exec (should_inc_minstret priv) s = Some (b, s).
-Proof.
-  unfold should_inc_minstret, Defs.and_boolM.
-  (* outer bind on [read mcountinhibit >>= returnM _] *)
-  erewrite exec_bind_Some.
-  2:{ erewrite exec_bind_Some.
-      2:{ apply (exec_read_reg mcountinhibit s). }
-      apply exec_returnm. }
-  cbn beta.
-  (* [if <mcountinhibit bit> then (read minstretcfg >>= returnM _) else returnM false] *)
-  match goal with |- context [ if ?c then _ else _ ] => destruct c end.
-  - erewrite exec_bind_Some.
-    2:{ apply (exec_read_reg minstretcfg s). }
-    eexists. apply exec_returnm.
-  - eexists. apply exec_returnm.
-Qed.
 

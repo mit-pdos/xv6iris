@@ -25,7 +25,7 @@
    THE RESOURCE STORY.  [p->cwd] names icache slot [ck] ([pv_cwd Vp = ientry
    ck], a premise of kfork's own contract because [ProcInv.cwd_ref] is [emp]
    and cannot produce idup's argument -- see SpecKfork.v's header).  idup
-   hands back TWO halves of [inode_ref ck (cq/2) cdev cinum]; this block
+   hands back TWO halves of [inode_ref ck (cq/2) icfg_dev cinum]; this block
    keeps one and drops the other (the child's [cwd_ref] is [emp], so there
    is nowhere to put it).  safestrcpy's characterisation of the child's
    new name bytes ([ssc_stop]/[ssc_post]) USED TO BE dropped on the way out.
@@ -216,7 +216,6 @@ Section KforkB4Proof.
      and [ProofKforkB3.kfkb3_fd_loop]. *)
   Lemma kfk_b4
       (γf : gname)
-      (inodestart : Z) (nib : nat)
       (pid_p pid_c : mword 32) (Vp Vc : pprivate)
       (pme npa : mword 64)
       (m : regfile) (rsv K lvl : nat) (eb : bool) (lks : gset string) :
@@ -242,12 +241,12 @@ Section KforkB4Proof.
     cpu_own lvl eb pme false lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
-    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib icfg_dev -∗
+    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
     itable_inv -∗
     (* THE INODE REGION -- pure pass-through to the [idup] below, whose
        [ref++] became a ledger move in increment IVe (iclaim-ledger.md
        §3.19).  Persistent; this block reads no dinode. *)
-    ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+    ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
     (* the child's iref units: the [1] is what [idup] spends here, and
        [IREFSPARE] rides through to the park. *)
     iref_slots (1 + IREFSPARE) -∗
@@ -309,7 +308,6 @@ Section KforkB4Proof.
     { iExists ck, cq, cinum.
       iSplitR; [done |]. iSplitR; [iPureIntro; exact Hcklt |].
       iSplitR; [iPureIntro; exact Hcinumb |]. iExact "Hrefp". }
-    set (cdev := icfg_dev).
     (* THE SHED THAT USED TO STAND HERE IS GONE (SIMP-2).  idup still runs
        on a count-0 share and still mints the child's reference from the
        table's retained slice (design §14.7(3)) -- but the carve, and the
@@ -368,13 +366,13 @@ Section KforkB4Proof.
     (* ------------------------------------------------------------- *)
     (* THE idup CALL.                                                 *)
     (* ------------------------------------------------------------- *)
-    iApply (ID.wp_idup_sconf inodestart nib
-              ck cdev M1 lvl eb pme (rsv + (K - 8))%nat false lks
+    iApply (ID.wp_idup_sconf
+              ck M1 lvl eb pme (rsv + (K - 8))%nat false lks
               (* the callee's bound is stated with a NAMED constant, so go through
                  [etransitivity] rather than [lia]: [exact] converts the name to
                  its literal, and only the [rsv] slack is left for [lia]. *)
               ltac:(etransitivity; [exact (kfk_b4_stack_idup K HK) | lia]) Hlvl Hcklt HM1a0
-              eq_refl Hfresh
+ Hfresh
               with "Hcg Hown Htext Hpc Hitb Hitinv Hireg Hirs Hpheld").
     all: try lkbelow.
     iApply wp_next_off_intro.

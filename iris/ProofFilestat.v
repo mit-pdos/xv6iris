@@ -171,27 +171,34 @@ Section ProofFilestat.
 
   (* ---- the type-indexed environment, opened at the decision the code
          performed ---- *)
-  Local Lemma fst_env_in (fn : fstat_names) (Cf : fcontent) :
-    fstat_has_inode Cf -> filestat_env fn Cf -∗ filestat_fs_env fn.
+  Local Lemma fst_env_in (fn : fstat_names) (st : fdstate) :
+    match st with
+    | FdOpen (FdInode _) | FdOpen (FdDevice _) => True
+    | _ => False
+    end -> filestat_env fn st -∗ filestat_fs_env fn.
   Proof.
-    intro H. rewrite /filestat_env. case_decide; [by iIntros "$" | contradiction].
+    destruct st as [|[?|?|?]]; cbn; intros H; [contradiction| |contradiction|];
+      by iIntros "$".
   Qed.
 
-  Local Lemma fst_env_out_in (fn : fstat_names) (Cf : fcontent) :
-    fstat_has_inode Cf -> filestat_fs_out fn -∗ filestat_env_out fn Cf.
+  Local Lemma fst_env_out_in (fn : fstat_names) (st : fdstate) :
+    match st with
+    | FdOpen (FdInode _) | FdOpen (FdDevice _) => True
+    | _ => False
+    end -> filestat_fs_out fn -∗ filestat_env_out fn st.
   Proof.
-    intro H. rewrite /filestat_env_out.
-    case_decide; [by iIntros "$" | contradiction].
+    destruct st as [|[?|?|?]]; cbn; intros H; [contradiction| |contradiction|];
+      by iIntros "$".
   Qed.
 
   Lemma wp_filestat_sconf
       (γa : gname) (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
-      (k : nat) (q : Qp) (Cf : fcontent) (st : fdstate)
+      (k : nat) (q : Qp) (st : fdstate)
       (fn : fstat_names)
       (pidv : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
-    : wp_filestat_sconf_body γa γf γs j γlp k q Cf st fn pidv V m K eb b lks.
+    : wp_filestat_sconf_body γa γf γs j γlp k q st fn pidv V m K eb b lks.
   Proof.
     cbv beta delta [wp_filestat_sconf_body].
     intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Ha0 Heb Hbelow.
@@ -207,7 +214,11 @@ Section ProofFilestat.
     assert (Hspm : m !!! Regidx csp_rs1 = sp0) by reflexivity.
     (* the reference, taken apart: the two content cells the body reads are
        fractions of it, and it is rebuilt unchanged at both exits. *)
-    iDestruct "Href" as "(Hrtok & Hrfields & Hrpay & Hrlv)".
+    iDestruct "Href" as (Cf) "(Hrtok & Hrfields & Hrpay & Hrlv)".
+    (* the state the caller keyed its environment on, related to the content
+       the code is about to branch on *)
+    iDestruct (file_pay_st_ok with "Hrpay") as "[%Hokx Hrpay]".
+    destruct Hokx as (inumx & Hok).
     iEval (rewrite /file_fields) in "Hrfields".
     iDestruct "Hrfields" as "(Hcty & Hcrd & Hcwr & Hcpp & Hcip & Hcmaj)".
     (* =================================================================
@@ -514,7 +525,13 @@ Section ProofFilestat.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp1e) in "Hpc".
       (* the environment, opened at the decision the code took *)
-      iDestruct (fst_env_in fn Cf Hin with "Henv") as "Henv".
+      assert (Hin' : match st with
+                     | FdOpen (FdInode _) | FdOpen (FdDevice _) => True
+                     | _ => False end).
+      { destruct Hin as [Ht | Ht];
+          [ rewrite (fdstate_ok_inode _ _ _ Hok Ht)
+          | rewrite (fdstate_ok_device _ _ _ Hok Ht) ]; done. }
+      iDestruct (fst_env_in fn st Hin' with "Henv") as "Henv".
       iEval (rewrite /filestat_fs_env) in "Henv".
       iDestruct "Henv" as "(%Hlg & %Hist & %Hgeo &
                             #Hbio & #Hitbl & #Hescs & #Hireg & #Hslks &
@@ -528,7 +545,7 @@ Section ProofFilestat.
       iDestruct (filestat_pay_carve γf k q Cf _ Hin with "Hrpay")
         as (ikk inm ssh gsh tysh)
            "(%Hipk & %Hik & %Hinlt & #Hshot0 & Hshr0 & Hpayback)".
-      assert (Hibcov : IBLOCK inm (fsn_inodestart fn) ∈ fsc_cov)
+      assert (Hibcov : IBLOCK inm icfg_ist ∈ fsc_cov)
         by (apply Hgeo; exact Hinlt).
       iDestruct (ic_escrows_acc2
                    ikk Hik with "Hescs")
@@ -672,10 +689,10 @@ Section ProofFilestat.
                 (fsn_dlock fn) (fsn_pd fn) (fsn_pav fn) (fsn_pu fn)
                 (fsn_bio fn)
                 gil gisl
-                (fsn_inodestart fn)
-                icfg_nib ikk (ssh/2)%Qp gsh
+
+ ikk (ssh/2)%Qp gsh
                 (DepRd (ssh/2)%Qp icfg_dev inm gsh) (ShotK tysh)
-                icfg_dev inm
+ inm
                 pidv (DfracOwn (1/4)) (fsn_dqs fn)
                 Q3 (K - 10)%nat eb b
                 _ V (fst_av_ilock K HK) eq_refl
@@ -1317,7 +1334,7 @@ Section ProofFilestat.
       { iEval (rewrite /ret_tgt). iExact "Hpc". }
       { rewrite /file_ref /file_fields.
         iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
-      { iApply (fst_env_out_in fn Cf Hin). rewrite /filestat_fs_out.
+      { iApply (fst_env_out_in fn st Hin'). rewrite /filestat_fs_out.
         iFrame "Hsb Hbslot". }
     - (* =============== NEITHER: the c.li a0,-1 arm ==================== *)
       assert (Hne2 : fc_type Cf <> (mword_of_int 2 : mword 32)).

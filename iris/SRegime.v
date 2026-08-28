@@ -885,37 +885,6 @@ Section SRegimeDef.
      [kadm_ident]'s), so the witness that would let [sr_absorb_wit] skip
      the identity premise must be UNSATISFIABLE here -- unsoundness shows
      up as an unpayable WITNESS, never an unpayable premise. *)
-  Lemma bare_absorb_wit :
-    forall acc va pa (ppn : mword 44) (pc : kperm) σ (E : coPset), s_acc_ok acc ->
-      kperm_allows pc acc ->
-      neq_vec (bits_of_virtaddr (Virtaddr va))
-         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
-      zero_extend' 64 (concat_vec ppn
-          (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa ->
-      register_lookup misa σ.(sregs) = MISA_C ->
-      register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
-      register_lookup htif_tohost_base σ.(sregs) = None ->
-      register_lookup cur_privilege σ.(sregs) = Supervisor ->
-      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
-      exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
-        = Some (Supervisor, σ) ->
-      exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
-      pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
-      ↑kptN ⊆ E ->
-      ⊢ (False : iProp Σ) -∗ kmap_at (svpn_of va) ppn pc -∗
-        reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ bare_inv ={E}=∗
-        ∃ σ' : mstate,
-          ⌜ exec (translateAddr (Virtaddr va) acc) σ
-            = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
-          ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
-          ⌜ (σ'.(sregs) = σ.(sregs) \/
-             exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
-          ⌜ pmp_grant_facts σ' ⌝ ∗
-          reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ bare_inv.
-  Proof.
-    intros acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall HE.
-    iIntros "H". iDestruct "H" as %[].
-  Qed.
 
   (* ---------------- the BARE instance ---------------- *)
 
@@ -1007,9 +976,6 @@ Section SRegimeDef.
      [bare_swp_open] / [bare_swp_close] pair any more: the record's bundle
      face went with the flip, since neither could hand out a tlb cell. *)
 
-  Lemma bare_swp_res_agree (rs : regstate) :
-    (True : iProp Σ) ⊣⊢ (True : iProp Σ).
-  Proof. reflexivity. Qed.
 
   (* -------------------------------------------------------------------- *)
   (* THE SIDE CONDITIONS, INTRODUCED FROM THE PURE CONFIG FACTS A LEAF HAS. *)
@@ -1063,67 +1029,7 @@ Section SRegimeDef.
     exact (bare_swp_side_intro acc va ppn kp Db Drw Dro rs dst Hacc Hsatp HMPRV).
   Qed.
 
-  Lemma bare_swp_mode_ok (satp0 : mword 64) :
-    bare_satp_ok satp0 ->
-    satpMode_of_bits RV64 (_get_Satp64_Mode (Mk_Satp64 satp0)) = Some Bare.
-  Proof. intros Hmode. rewrite Hmode. vm_compute. reflexivity. Qed.
 
-  Lemma bare_swp_translate_wit :
-    forall (acc : MemoryAccessType mem_payload)
-        (Drw Dro : gset register) (Df : register -> dfrac)
-        (rs : regstate) (dst : mstate) (Db : register -> bool)
-        (va pa : mword 64) (ppn : mword 44) (kp : kperm) (rr : option resv),
-      Drw ## Dro ->
-      s_acc_ok acc ->
-      kperm_allows kp acc ->
-      (mstatus : register) ∈ Drw ∪ Dro ->
-      (cur_privilege : register) ∈ Drw ∪ Dro ->
-      (satp : register) ∈ Drw ∪ Dro ->
-      (pma_regions : register) ∈ Drw ∪ Dro ->
-      (pmpcfg_n : register) ∈ Drw ∪ Dro ->
-      (pmpaddr_n : register) ∈ Drw ∪ Dro ->
-      (htif_tohost_base : register) ∈ Drw ∪ Dro ->
-      (forall r : register, Db r = true -> r ∈ Drw ∪ Dro) ->
-      (forall r : register, Db r = true ->
-         register_lookup r rs = register_lookup r dst.(sregs)) ->
-      (forall r : register, D_leafchk r = true -> r ∈ Drw ∪ Dro) ->
-      (forall r : register, D_leafchk r = true ->
-         register_lookup r rs = register_lookup r dst.(sregs)) ->
-      register_lookup cur_privilege rs = Supervisor ->
-      register_lookup htif_tohost_base rs = None ->
-      register_lookup mstatus rs = register_lookup mstatus dst.(sregs) ->
-      register_lookup misa dst.(sregs) = MISA_C ->
-      register_lookup menvcfg dst.(sregs) = MENVCFG_S ->
-      _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
-      exec (effectivePrivilege acc (register_lookup mstatus dst.(sregs)) Supervisor) dst
-        = Some (Supervisor, dst) ->
-      goodb Db (effectivePrivilege acc (register_lookup mstatus dst.(sregs)) Supervisor)
-        dst = true ->
-      exec (is_shadow_stack_access acc) dst = Some (false, dst) ->
-      goodb Db (is_shadow_stack_access acc) dst = true ->
-      neq_vec (bits_of_virtaddr (Virtaddr va))
-        (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
-                            (Z.sub 39 1) 0)) = false ->
-      zero_extend' 64 (concat_vec ppn
-        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
-           (Z.sub pagesize_bits 1) 0)) = pa ->
-      bare_swp_side acc va ppn kp Db Drw Dro rs dst ->
-      ⊢ (False%I : iProp Σ) -∗ kmap_at (svpn_of va) ppn kp -∗ gen_cert -∗ resv_frag cpu_id rr -∗
-        (True : iProp Σ) -∗
-        hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
-        swp (translateAddr (Virtaddr va) acc)
-          (fun r => ⌜r = Values.Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)⌝ ∗
-                    ∃ rsf : regstate,
-                      ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
-                      hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
-                      (True : iProp Σ) ∗ resv_any cpu_id).
-  Proof.
-    intros acc Drw Dro Df rs dst Db va pa ppn kp rr Hdisj Hacc Hallow
-      HDmst HDpriv HDsatp HDpma HDcfg HDaddr HDhtif HDb Hag HDlc Haglc
-      Hcp Hhtif Hmstag Hmisa Hmenv HSXL Heff Heffg Hss Hssg Hcanon Hconcat
-      Hside.
-    iIntros "H". iDestruct "H" as %[].
-  Qed.
 
   (* THE BARE ARM's accessor: always the right disjunct, and post-flip it
      does not mention a tlb cell at all -- there is none to park.  The
@@ -1131,70 +1037,8 @@ Section SRegimeDef.
      walking disjunct and [sr_swp_res_at] are stated over it), so the Bare
      arm answers it with [tlb_none]: its residue is [True] and ignores the
      index entirely. *)
-  Lemma bare_slot_acc :
-    bare_inv -∗
-    ∃ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
-      (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb),
-      ⌜ bare_satp_ok satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
-      satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
-      (True : iProp Σ) ∗
-      ( (tlb ↦ᵣ tlbv ∗ (False : iProp Σ) ∗
-         (∀ tv' : type_of_register tlb,
-            satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
-            tlb ↦ᵣ tv' -∗ (True : iProp Σ) -∗ bare_inv))
-      ∨ (⌜ bare_satp_ok satp0 ⌝ ∗
-         ⌜ forall (acc : MemoryAccessType mem_payload) (va : mword 64)
-                (ppn : mword 44) (kp : kperm) (Db : register -> bool)
-                (Drw Dro : gset register) (rs : regstate) (dst : mstate),
-             s_acc_ok acc ->
-             bare_satp_ok (register_lookup satp rs) ->
-             eq_vec (_get_Mstatus_MPRV (register_lookup mstatus rs))
-               ('b"1") = false ->
-             bare_swp_side acc va ppn kp Db Drw Dro rs dst ⌝ ∗
-         (∀ tv' : type_of_register tlb,
-            satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
-            (True : iProp Σ) -∗ bare_inv)) ).
-  Proof.
-    iIntros "H". iDestruct "H" as (satp0) "(Hsatp & %Hmode & Hpmp)".
-    iDestruct "Hpmp" as (pcfg paddr)
-      "(Hpcfg & Hpaddr & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
-    assert (Hpok : pmp_ent0_ok pcfg paddr)
-      by (unfold pmp_ent0_ok; split_and!; assumption).
-    iExists satp0, pcfg, paddr, tlb_none.
-    iSplitR; [iPureIntro; exact Hmode |].
-    iSplitR; [iPureIntro; exact Hpok |].
-    iFrame "Hsatp Hpcfg Hpaddr".
-    iSplitR; [done |].
-    iRight. iSplitR; [iPureIntro; exact Hmode |].
-    iSplitR; [iPureIntro; exact bare_swp_side_intro |].
-    iIntros (tv') "Hsatp Hpcfg Hpaddr _".
-    rewrite /bare_inv. iExists satp0. iFrame "Hsatp".
-    iSplitR; [iPureIntro; exact Hmode |].
-    iApply (pmp_config_intro (mword_of_int 0) pcfg paddr HA Hord HX HW HR Hcov
-              with "Hpcfg Hpaddr").
-  Qed.
 
-  Lemma bare_slot_reopen :
-    (False : iProp Σ) -∗ bare_inv -∗
-    ∃ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
-      (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb),
-      ⌜ bare_satp_ok satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
-      satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
-      tlb ↦ᵣ tlbv ∗ (True : iProp Σ) ∗
-      (∀ tv' : type_of_register tlb,
-         satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
-         tlb ↦ᵣ tv' -∗ (True : iProp Σ) -∗ bare_inv).
-  Proof. iIntros "[] _". Qed.
 
-  Definition bare_regime : s_regime :=
-    SRegime bare_inv kadm_ident (fun _ _ H => H) bare_absorb bare_transform
-            bare_tmode (False%I) _ bare_absorb_wit
-            (fun _ => True%I) bare_swp_side bare_swp_translate
-            bare_swp_translate_wit
-            (fun _ _ => True%I) bare_satp_ok bare_swp_res_agree
-            (False%I) _ bare_slot_reopen bare_slot_acc
-            (fun _ _ H => H) bare_swp_side_ok
-            (fun _ => Bare) bare_swp_mode_ok.
 
 End SRegimeDef.
 
@@ -1713,9 +1557,6 @@ Section SRegimeShared.
             (fun _ _ _ => I) (kpt_swp_side_ok root_ppn)
             (fun _ => Sv39) (kpt_swp_mode_ok root_ppn).
 
-  Lemma kpt_share_regime_inv (root_ppn : mword 44) :
-    sr_inv (kpt_share_regime root_ppn) ⊣⊢ tlb_res_pt root_ppn.
-  Proof. reflexivity. Qed.
 
 End SRegimeShared.
 

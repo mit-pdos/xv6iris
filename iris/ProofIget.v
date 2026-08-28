@@ -462,12 +462,11 @@ Section ProofIget.
      [iAssert]s below; this file gets no RULE ONE win. *)
 
   Lemma wp_iget_sconf
-      (inodestart : Z) (nib : nat)
-      (dev inum : mword 32)
+      (inum : mword 32)
       (l : ilic)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string)
-    : wp_iget_sconf_body inodestart nib dev inum l
+    : wp_iget_sconf_body inum l
                          m n eb p K b lks.
   Proof.
     cbv beta delta [wp_iget_sconf_body].
@@ -601,7 +600,7 @@ Section ProofIget.
     iIntros (CID9 Hs9) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (R3 := <[Regidx Rs2 := regval_into_reg (add_vec zero_reg (R2 !!! Regidx Ra0))]> R2).
-    assert (HR3s2 : R3 !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64)).
+    assert (HR3s2 : R3 !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64)).
     { rewrite /R3 upd_eq. rewrite /R2 upd_ne; [| nz]. rewrite /R1 upd_ne; [| nz].
       rewrite Ha0. apply add_vec_zero_l. }
     assert (Hpp12 : add_vec_int (mword_of_int (KernelSyms.iget + 0x10) : mword 64) 2 = mword_of_int (KernelSyms.iget + 0x12)) by pcw.
@@ -615,7 +614,7 @@ Section ProofIget.
     assert (HR4s4 : R4 !!! Regidx Rs4 = (sign_extend' 64 inum : mword 64)).
     { rewrite /R4 upd_eq. rewrite /R3 upd_ne; [| nz]. rewrite /R2 upd_ne; [| nz].
       rewrite /R1 upd_ne; [| nz]. rewrite Ha1. apply add_vec_zero_l. }
-    assert (HR4s2 : R4 !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+    assert (HR4s2 : R4 !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite /R4 upd_ne; [exact HR3s2 | nz]).
     assert (Hpp14 : add_vec_int (mword_of_int (KernelSyms.iget + 0x12) : mword 64) 2 = mword_of_int (KernelSyms.iget + 0x14)) by pcw.
     iEval (rewrite Hpp14) in "Hpc".
@@ -657,7 +656,7 @@ Section ProofIget.
       exact HspR1. }
     assert (HmAa0 : mA !!! Regidx Ra0 = itable_lock)
       by (rewrite /mA upd_ne; [exact HR6a0 | nz]).
-    assert (HmAs2 : mA !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64)).
+    assert (HmAs2 : mA !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64)).
     { rewrite /mA upd_ne; [| nz]. rewrite /R6 upd_ne; [| nz].
       rewrite /R5 upd_ne; [| nz]. exact HR4s2. }
     assert (HmAs4 : mA !!! Regidx Rs4 = (sign_extend' 64 inum : mword 64)).
@@ -677,7 +676,7 @@ Section ProofIget.
     iDestruct (cpu_own_transport CID CID13 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf KT1 fsc_itlock "itable"%string
-              (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev) mA
+              (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) mA
               n eb p (K - 6)%nat b lks ltac:(lia) ltac:(lia) Hfresh
               with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
@@ -689,7 +688,7 @@ Section ProofIget.
     pose proof Hacqpins as Hacqpins_cs.
     assert (Hmsp : macq !!! Regidx csp_rs1 = spr)
       by (rewrite (callee_saved_lookup Hacqpins_cs csp_rs1 ltac:(vm_compute; reflexivity)); exact HmAsp).
-    assert (Hms2 : macq !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+    assert (Hms2 : macq !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
       by (rewrite (callee_saved_lookup Hacqpins_cs (mword_of_int 18) ltac:(vm_compute; reflexivity)); exact HmAs2).
     assert (Hms4 : macq !!! Regidx Rs4 = (sign_extend' 64 inum : mword 64))
       by (rewrite (callee_saved_lookup Hacqpins_cs (mword_of_int 20) ltac:(vm_compute; reflexivity)); exact HmAs4).
@@ -806,7 +805,7 @@ Section ProofIget.
         sie_cap_gpr KT1 (CID := CIDt) mt (K - 6)%nat b p -∗
         cpu_own (CID := CIDt) n eb p b lks -∗
         pc_is (CID := CIDt) (mword_of_int (KernelSyms.iget + 0x8c) : mword 64) -∗
-        IcacheRef.inode_ref kk q dev inum -∗
+        IcacheRef.inode_ref kk q icfg_dev inum -∗
         (* THE MINTED PROVENANCE UNIT (item 7a-wire), beside the reference it
            belongs to and flavoured by the licence that paid for it. *)
         runit (is_claim l) (bv_unsigned inum) -∗
@@ -817,7 +816,7 @@ Section ProofIget.
            the pool's await arm -- so it can no longer be captured here at
            +0x44 and produced at +0x9c.  Each arm hands back what the mover
            returned, at the SAME [l], and this tail relays it to [Hcont]. *)
-        iname fsc_ireg fsc_fs inodestart inum l -∗
+        iname fsc_ireg fsc_fs icfg_ist inum l -∗
         WP (Loop : expr riscv_lang)))%I).
     iAssert TAILC
       with "[Hcont Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hcont2".
@@ -1013,7 +1012,7 @@ Section ProofIget.
       ⌜(j < NINODE)%nat⌝ -∗
       ⌜ Mr !!! Regidx Rs1 = ientry j
         /\ Mr !!! Regidx Ra3 = (mword_of_int KernelSyms.log : mword 64)
-        /\ Mr !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64)
+        /\ Mr !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64)
         /\ Mr !!! Regidx Rs4 = (sign_extend' 64 inum : mword 64)
         /\ Mr !!! Regidx csp_rs1 = spr
         /\ Mr !!! Regidx Rra = macq !!! Regidx Rra
@@ -1021,7 +1020,7 @@ Section ProofIget.
               Mr !!! Regidx c = macq !!! Regidx c) ⌝ -∗
       ⌜ forall (i : nat) (qi : Qp) (ni : positive) (di ii : mword 32),
           (i < j)%nat -> M !! i = Some (qi, ni) -> ci !! i = Some (di, ii) ->
-          ~ (di = dev /\ ii = inum) ⌝ -∗
+          ~ (di = icfg_dev /\ ii = inum) ⌝ -∗
       ⌜ Mr !!! Regidx Rs3 = (zero_reg : mword 64)
         \/ (exists e : nat, (e < NINODE)%nat /\ Mr !!! Regidx Rs3 = ientry e
                             /\ M !! e = None) ⌝ -∗
@@ -1034,11 +1033,11 @@ Section ProofIget.
       iref_slots_auth -∗
       isl_pool M -∗
       ([∗ list] i0 ∈ seq 0 NINODE, islot2 fsc_ic M ci i0) -∗
-      ipool fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums nib ∖ ci_inums ci) ∅ -∗
+      ipool fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib ∖ ci_inums ci) ∅ -∗
       iref_slot -∗
       (* THE LICENCE rides the scan (increment IIIe): it is spent at whichever
          exit the scan takes, so it can no longer sit inside [TAILC]. *)
-      iname fsc_ireg fsc_fs inodestart inum l -∗
+      iname fsc_ireg fsc_fs icfg_ist inum l -∗
       TAILC -∗
       WP (Loop : expr riscv_lang))%I with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
@@ -1052,7 +1051,7 @@ Section ProofIget.
       iAssert (∀ (Ms : regfile),
         ⌜ Ms !!! Regidx Rs1 = ientry j
           /\ Ms !!! Regidx Ra3 = (mword_of_int KernelSyms.log : mword 64)
-          /\ Ms !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64)
+          /\ Ms !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64)
           /\ Ms !!! Regidx Rs4 = (sign_extend' 64 inum : mword 64)
           /\ Ms !!! Regidx csp_rs1 = spr
           /\ Ms !!! Regidx Rra = macq !!! Regidx Rra
@@ -1060,7 +1059,7 @@ Section ProofIget.
                 Ms !!! Regidx c = macq !!! Regidx c) ⌝ -∗
         ⌜ forall (i : nat) (qi : Qp) (ni : positive) (di ii : mword 32),
             (i < S j)%nat -> M !! i = Some (qi, ni) -> ci !! i = Some (di, ii) ->
-            ~ (di = dev /\ ii = inum) ⌝ -∗
+            ~ (di = icfg_dev /\ ii = inum) ⌝ -∗
         ⌜ Ms !!! Regidx Rs3 = (zero_reg : mword 64)
           \/ (exists e : nat, (e < NINODE)%nat /\ Ms !!! Regidx Rs3 = ientry e
                               /\ M !! e = None) ⌝ -∗
@@ -1073,9 +1072,9 @@ Section ProofIget.
         iref_slots_auth -∗
         isl_pool M -∗
         ([∗ list] i0 ∈ seq 0 NINODE, islot2 fsc_ic M ci i0) -∗
-        ipool fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums nib ∖ ci_inums ci) ∅ -∗
+        ipool fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib ∖ ci_inums ci) ∅ -∗
         iref_slot -∗
-        iname fsc_ireg fsc_fs inodestart inum l -∗
+        iname fsc_ireg fsc_fs icfg_ist inum l -∗
         TAILC -∗
         WP (Loop : expr riscv_lang))%I with "[]" as "Hstep".
       { iIntros (Ms) "%Hsreg %Hscan' %Hemp' Hcg Hpc Hcnt Hpay Htok Hhalf Hiauth Hipool Hslots Hpool Hislot Hlic Hcont2".
@@ -1094,7 +1093,7 @@ Section ProofIget.
         { rewrite /N1 upd_eq. rewrite HSs1. apply ig_cursor_step. }
         assert (HN1a3 : N1 !!! Regidx Ra3 = (mword_of_int KernelSyms.log : mword 64))
           by (rewrite /N1 upd_ne; [exact HSa3 | nz]).
-        assert (HN1s2 : N1 !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+        assert (HN1s2 : N1 !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
           by (rewrite /N1 upd_ne; [exact HSs2 | nz]).
         assert (HN1s4 : N1 !!! Regidx Rs4 = (sign_extend' 64 inum : mword 64))
           by (rewrite /N1 upd_ne; [exact HSs4 | nz]).
@@ -1211,7 +1210,7 @@ Section ProofIget.
                PAIR; the table's single-device clause (§13.11) turns that into
                "no live slot carries this INUM", which is [ipool_take]'s
                premise -- the pool being inum-keyed. *)
-            assert (Hzin : bv_unsigned inum ∈ region_inums nib ∖ ci_inums ci).
+            assert (Hzin : bv_unsigned inum ∈ region_inums icfg_nib ∖ ci_inums ci).
             { apply elem_of_difference. split.
               - apply region_inums_spec.
                 pose proof (bv_unsigned_in_range _ inum) as [Hlo _].
@@ -1220,7 +1219,7 @@ Section ProofIget.
                 destruct pi as [di ii]. cbn [snd] in Heq.
                 destruct Hciwf as (Hdom & Hinj & Hrange & Hdv).
                 assert (Hii : ii = inum) by (apply bv_eq; symmetry; exact Heq).
-                assert (Hdi : di = dev) by exact (Hdv i (di, ii) Hci).
+                assert (Hdi : di = icfg_dev) by exact (Hdv i (di, ii) Hci).
                 assert (Hlive : is_Some (M !! i)).
                 { assert (Hin2 : i ∈ dom ci) by (apply elem_of_dom; by eexists).
                   rewrite Hdom in Hin2. by apply elem_of_dom in Hin2. }
@@ -1256,7 +1255,7 @@ Section ProofIget.
             assert (Hpa6e : add_vec (rget N1 Rs3) (sign_extend' 64 (mword_of_int 0 : mword 12))
                             = i_dev (ientry e)).
             { rewrite (rget_ne N1 Rs3 ltac:(nz)) HN1s3e. reflexivity. }
-            assert (Hsv6e : trunc32 (rget N1 Rs2) = dev).
+            assert (Hsv6e : trunc32 (rget N1 Rs2) = icfg_dev).
             { rewrite (rget_ne N1 Rs2 ltac:(nz)) HN1s2. apply trunc32_sext. }
     (* THE ADDRESS CLAIM, READ OFF THE CELL ITSELF.  The per-node form takes
        [WpSconfMem.wordw_claim] beside the (linear) atomic update, so it has
@@ -1279,7 +1278,7 @@ Section ProofIget.
             iModIntro.
             iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iget + 0x6e)) Rs2 Rs3
                       (mword_of_int 0 : mword 12) N1 (trap_res b + (K - 6))%nat
-                      (ic_id fsc_ic e (1/4) false dev inumT)
+                      (ic_id fsc_ic e (1/4) false icfg_dev inumT)
                       (⊤ ∖ ↑minstretN ∖ ↑ipoolN ∖ ↑(icEscN .@ e)) false
                       ltac:(solve_ndisj)
                       with "Hcg Hpc [] [] [Hgid]").
@@ -1291,11 +1290,11 @@ Section ProofIget.
                  beside the partition, so the two are ONE ghost step.  The
                  slot is NOT LIVE on either side of the re-tag, so the
                  partition itself does not move ([ipool_id_lend]). *)
-              iMod (ipool_id_lend (⊤ ∖ ↑minstretN) fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib
+              iMod (ipool_id_lend (⊤ ∖ ↑minstretN) fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib
                       e devT inumT ltac:(solve_ndisj) He with "Hpinv Hgid")
                 as "[Hgid Hidback]".
               iInv "Hesc" as ">Hbody" "Hclose2".
-              iMod (ic_open_empty_dev fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst e devT inumT dev
+              iMod (ic_open_empty_dev fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst e devT inumT icfg_dev
                       with "Hbody Hgid") as "(Hcell & Hgid & Hcb)".
               iModIntro. iExists devT. iFrame "Hcell". iIntros "Hcell".
               iMod ("Hclose2" with "[Hcb Hcell]") as "_";
@@ -1341,19 +1340,19 @@ Section ProofIget.
                          (DfracOwn (1/2)) inumT ltac:(lia) with "HinT") as "#Hclaim2".
             iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iget + 0x72)) Rs4 Rs3
                       (mword_of_int 4 : mword 12) N1 (trap_res b + (K - 6))%nat
-                      (i_dev (ientry e) ↦₄{DfracOwn (1/2)} dev ∗
-                       ic_id fsc_ic e (1/4) true dev inum ∗ ic_mid fsc_ic e ∗
+                      (i_dev (ientry e) ↦₄{DfracOwn (1/2)} icfg_dev ∗
+                       ic_id fsc_ic e (1/4) true icfg_dev inum ∗ ic_mid fsc_ic e ∗
                        (* the PEELED ledger pair and the returned licence:
                           they come out of the pool bundle here and are spent
                           at +0x78's 0 -> 1 ([iref_alloc_store_au]) *)
                        icnt_half (bv_unsigned inum) 0%nat ∗
                        frzm_h (bv_unsigned inum) false ∗
                        ifreeze_off (bv_unsigned inum) ∗
-                       iname fsc_ireg fsc_fs inodestart inum l ∗
+                       iname fsc_ireg fsc_fs icfg_ist inum l ∗
                        (* the lock's pool, ONE ENTRY SHORTER: the take now
                           happens inside this update (see the note above) *)
                        ipool fsc_fs fsc_ireg fsc_cov fsc_logst
-                         (region_inums nib ∖ ci_inums ci
+                         (region_inums icfg_nib ∖ ci_inums ci
                           ∖ {[bv_unsigned inum]}) ∅)%I
                       (⊤ ∖ ↑minstretN ∖ ↑ipoolN ∖ ↑(icEscN .@ e)) false
                       ltac:(solve_ndisj)
@@ -1375,16 +1374,16 @@ Section ProofIget.
                  What comes out is an ORDINARY row's four pieces -- the [np]
                  shape, the count half at 0, the mirror and the [ifreeze_off]
                  token, all spent at +0x78 -- plus the borrowed licence. *)
-              iMod (ipool_take_lend (⊤ ∖ ↑minstretN) fsc_ic fsc_fs fsc_ireg inodestart fsc_cov
-                      fsc_logst nib (region_inums nib ∖ ci_inums ci) e inum
-                      dev inumT l
+              iMod (ipool_take_lend (⊤ ∖ ↑minstretN) fsc_ic fsc_fs fsc_ireg icfg_ist fsc_cov
+                      fsc_logst icfg_nib (region_inums icfg_nib ∖ ci_inums ci) e inum
+                      icfg_dev inumT l
                       ltac:(solve_ndisj) ltac:(solve_ndisj) ltac:(solve_ndisj)
                       ltac:(solve_ndisj) He Hzin Hnib
                       with "Hrinv Hpinv Hpool Hgid Hlic")
                 as "(Hlic & Hbundle & Hicnt0 & Hmir0 & Hfoff & Hpool & Hgid &
                      Hidback)".
               iInv "Hesc" as ">Hbody" "Hclose2".
-              iMod (ic_open_empty_free fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst e dev inumT dev inum
+              iMod (ic_open_empty_free fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst e icfg_dev inumT icfg_dev inum
                       with "Hbody Hgid HinT")
                 as "(Hincell & Hdcell & Hvld & Hraw & Hmt & Hgid1 & Hgid2 & Hpin)".
               iModIntro. iExists inumT. iFrame "Hincell". iIntros "Hincell".
@@ -1392,10 +1391,10 @@ Section ProofIget.
               iDestruct "Hvld" as (wv) "Hvld".
               iMod ("Hclose2" with "[Hd1 Hincell Hvld Hraw Hbundle Hgid1 Hpin]") as "_".
               { iApply bi.later_intro. iApply ic_close_mid.
-                iApply (ic_mk_mid_arm fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst e dev inum wv
+                iApply (ic_mk_mid_arm fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst e icfg_dev inum wv
                           with "Hd1 Hincell Hvld [Hraw Hbundle] Hgid1 Hpin").
                 iApply (ic_mk_unloaded with "Hraw Hbundle"). }
-              iMod ("Hidback" $! dev inum with "[%] Hgid2") as "Hgid2";
+              iMod ("Hidback" $! icfg_dev inum with "[%] Hgid2") as "Hgid2";
                 [reflexivity |].
               iModIntro. iFrame "Hd2 Hgid2 Hmt Hicnt0 Hmir0 Hfoff Hlic Hpool". }
             iApply wp_next_off_intro.
@@ -1453,7 +1452,7 @@ Section ProofIget.
                        iref_tok e (1/2/2)%Qp ∗
                        (∃ g : gname, live_gen e (1/2) g ∗ ity_pending g) ∗
                        IcacheRef.frzsel e (1/2)%Qp false ∗
-                       iname fsc_ireg fsc_fs inodestart inum l ∗
+                       iname fsc_ireg fsc_fs icfg_ist inum l ∗
                        ifreeze_off (bv_unsigned inum) ∗
                        icnt_half (bv_unsigned inum) 1%nat ∗
                        runit (is_claim l) (bv_unsigned inum))%I
@@ -1473,7 +1472,7 @@ Section ProofIget.
                  bundle, which is exactly what +0x72's peel just handed us.
                  Both come back -- the token travels on into the entry's parked
                  arm at +0x7c, the half into [islot2]'s live one. *)
-              iMod (iref_alloc_store_au (⊤ ∖ ↑minstretN) fsc_ireg fsc_fs inodestart nib
+              iMod (iref_alloc_store_au (⊤ ∖ ↑minstretN) fsc_ireg fsc_fs icfg_ist icfg_nib
                       M e inum l (1/2/2)%Qp
                       ltac:(solve_ndisj) ltac:(solve_ndisj)
                       ltac:(apply subseteq_difference_r;
@@ -1533,9 +1532,9 @@ Section ProofIget.
             iModIntro.
             iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iget + 0x7c)) Rz Rs3
                       (mword_of_int 64 : mword 12) V1 (trap_res b + (K - 6))%nat
-                      (i_dev (ientry e) ↦₄{DfracOwn (1/2)} dev ∗
+                      (i_dev (ientry e) ↦₄{DfracOwn (1/2)} icfg_dev ∗
                        i_inum (ientry e) ↦₄{DfracOwn (1/2)} inum ∗
-                       ic_id fsc_ic e (1/4) true dev inum)%I
+                       ic_id fsc_ic e (1/4) true icfg_dev inum)%I
                       (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ e)) false ltac:(solve_ndisj)
                       with "Hcg Hpc [] [] [Hmt Hgid2 Hd2 Hlvh Hpend Hfoff]").
             { iApply (igi_7c with "Htext"). }
@@ -1552,7 +1551,7 @@ Section ProofIget.
                  (design §17.6 (1)/(3)): it was minted with the [sw 1] at
                  +0x78, carried by hand across MID, and until §17.6 it was
                  simply dropped at this line. *)
-              iDestruct (ic_close_mid_to_parked fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst e dev inum gnew
+              iDestruct (ic_close_mid_to_parked fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst e icfg_dev inum gnew
                            with "Hmt Hgid1 Hd1 Hincell Hvld Hpay Hlvh Hpend Hfoff Hpin")
                 as "[Hbody Hinhalf]".
               iMod ("Hclose2" with "[Hbody]") as "_"; [by iNext |].
@@ -1560,13 +1559,13 @@ Section ProofIget.
             iApply wp_next_off_intro. iIntros "Hcg Hpc (Hd2 & Hinhalf & Hgid2)".
             (* the identity budget: half of each cell is the table's, and the
                minted reference takes 1/4 of it (§13.1b/§13.1e). *)
-            iDestruct (inode_ident_split e (1/2/2) (1/2/2) dev inum) as "[Hsplit _]".
+            iDestruct (inode_ident_split e (1/2/2) (1/2/2) icfg_dev inum) as "[Hsplit _]".
             iEval (rewrite Qp.div_2) in "Hsplit".
             iDestruct ("Hsplit" with "[Hd2 Hinhalf]") as "[Hid1 Hid2]";
               [ rewrite /inode_ident; iFrame | ].
             assert (Hp1 : Pos.to_nat 1 = 1%nat) by reflexivity.
             iDestruct ("Hback" $! (<[e := ((1/2/2)%Qp, 1%positive)]> M)
-                         (<[e := (dev, inum)]> ci)
+                         (<[e := (icfg_dev, inum)]> ci)
                          with "[%] [%] [Hid1 Hislot Hgid2 Hicnt1 Hmir0 Hsel]") as "Hslots".
             { intros i Hi. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
             { intros i Hi. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
@@ -1579,9 +1578,9 @@ Section ProofIget.
               iFrame "Hidd Hidn Hgid2 Hicnt1".
               iSplitR "Hmir0 Hsel";
                 [iExact "Hislot" | iApply (frz_park_intro_off with "Hmir0 Hsel")]. }
-            iAssert (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev)
+            iAssert (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev)
               with "[Hhalf Hiauth Hipool Hslots Hpool]" as "HRres".
-            { iExists (<[e := ((1/2/2)%Qp, 1%positive)]> M), (<[e := (dev, inum)]> ci).
+            { iExists (<[e := ((1/2/2)%Qp, 1%positive)]> M), (<[e := (icfg_dev, inum)]> ci).
               iFrame "Hhalf Hiauth".
               iSplitR; [| iSplitR].
               - iPureIntro. destruct Hwf as [Hdom Hcnt']. split.
@@ -1622,7 +1621,7 @@ Section ProofIget.
                   * rewrite lookup_insert_ne in Hp1'; [| by apply not_eq_sym].
                     exact (Hdv k1 p1 Hp1').
               - iFrame "Hipool Hslots".
-                rewrite (ig_ci_inums_insert ci e dev inum Hcik) ig_pool_set.
+                rewrite (ig_ci_inums_insert ci e icfg_dev inum Hcik) ig_pool_set.
                 iExact "Hpool". }
             assert (Hpp80 : add_vec_int (mword_of_int (KernelSyms.iget + 0x7c) : mword 64) 4
                             = mword_of_int (KernelSyms.iget + 0x80)) by pcw.
@@ -1687,7 +1686,7 @@ Section ProofIget.
                acquire/release pair compose back to [N]. *)
             iEval (rewrite Houtb) in "Hcg".
             iApply (Release.wp_release_sconf KT1 fsc_itlock itable_lock "itable"%string
-                      (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev) V4
+                      (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) V4
                       n eb p (K - 6)%nat ({["itable"]} ∪ lks)
                       ltac:(rewrite HV4a0; reflexivity) ltac:(lia)
                       with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
@@ -1786,7 +1785,7 @@ Section ProofIget.
           by (rewrite /L1; apply upd_eq).
         assert (HL1s1 : L1 !!! Regidx Rs1 = ientry j)
           by (rewrite /L1 upd_ne; [exact HMs1 | nz]).
-        assert (HL1s2 : L1 !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+        assert (HL1s2 : L1 !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
           by (rewrite /L1 upd_ne; [exact HMs2 | nz]).
         assert (HL1s4 : L1 !!! Regidx Rs4 = (sign_extend' 64 inum : mword 64))
           by (rewrite /L1 upd_ne; [exact HMs4 | nz]).
@@ -1853,7 +1852,7 @@ Section ProofIget.
           by (rewrite /L2; apply upd_eq).
         assert (HL2s1 : L2 !!! Regidx Rs1 = ientry j)
           by (rewrite /L2 upd_ne; [exact HL1s1 | nz]).
-        assert (HL2s2 : L2 !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+        assert (HL2s2 : L2 !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
           by (rewrite /L2 upd_ne; [exact HL1s2 | nz]).
         assert (HL2s4 : L2 !!! Regidx Rs4 = (sign_extend' 64 inum : mword 64))
           by (rewrite /L2 upd_ne; [exact HL1s4 | nz]).
@@ -1874,7 +1873,7 @@ Section ProofIget.
         assert (Htgt3c : add_vec (mword_of_int (KernelSyms.iget + 0x4c) : mword 64)
                            (sign_extend' 64 (mword_of_int 8176 : mword 13))
                          = mword_of_int (KernelSyms.iget + 0x3c)) by pcw.
-        destruct (decide (dj = dev)) as [Hdeq | Hdne]; last first.
+        destruct (decide (dj = icfg_dev)) as [Hdeq | Hdne]; last first.
         { (* the device differs: MISS, and [ip->inum] is never read *)
           iApply (wp_bne_taken_s_sconf (mword_of_int (KernelSyms.iget + 0x4c))
                     (mword_of_int 8176 : mword 13) Rs2 Ra4 L2 (trap_res b + (K - 6))%nat false
@@ -1904,7 +1903,7 @@ Section ProofIget.
         iApply (wp_bne_fall_s_sconf (mword_of_int (KernelSyms.iget + 0x4c))
                   (mword_of_int 8176 : mword 13) Rs2 Ra4 L2 (trap_res b + (K - 6))%nat false
                   ltac:(nz) ltac:(nz)
-                  ltac:(rgne; rgne; rewrite HL2a4 HL2s2; exact (ig_neqv_refl dev))
+                  ltac:(rgne; rgne; rewrite HL2a4 HL2s2; exact (ig_neqv_refl icfg_dev))
                   with "Hcg Hpc []").
         { iApply (igi_4c with "Htext"). }
         iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -1931,7 +1930,7 @@ Section ProofIget.
         { rewrite /L3 upd_ne; [| nz]. rewrite /L2 upd_ne; [| nz]. exact HL1a5. }
         assert (HL3s1 : L3 !!! Regidx Rs1 = ientry j)
           by (rewrite /L3 upd_ne; [exact HL2s1 | nz]).
-        assert (HL3s2 : L3 !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+        assert (HL3s2 : L3 !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
           by (rewrite /L3 upd_ne; [exact HL2s2 | nz]).
         assert (HL3s4 : L3 !!! Regidx Rs4 = (sign_extend' 64 inum : mword 64))
           by (rewrite /L3 upd_ne; [exact HL2s4 | nz]).
@@ -1989,7 +1988,7 @@ Section ProofIget.
            the region's bit is DOWN and the frozen alternative dies on
            [frzm_agree].  The three MISS exits above re-park it untouched. *)
         iApply fupd_wp.
-        iMod (frz_park_lic_off ⊤ fsc_ireg fsc_fs inodestart nib inum l j
+        iMod (frz_park_lic_off ⊤ fsc_ireg fsc_fs icfg_ist icfg_nib inum l j
                 ltac:(solve_ndisj) Hnib with "Hrinv Hlic Hpark")
           as "(Hlic & Hmirj & Hselj)".
         iModIntro.
@@ -2056,7 +2055,7 @@ Section ProofIget.
                    isl_slot (<[j := ((qj + qj'/2)%Qp, Pos.succ nj)]> M) j ∗
                    iref_tok j (qj'/2)%Qp ∗
                    IcacheRef.frzsel j (1/2)%Qp false ∗
-                   iname fsc_ireg fsc_fs inodestart inum l ∗
+                   iname fsc_ireg fsc_fs icfg_ist inum l ∗
                    icnt_half (bv_unsigned inum) (Pos.to_nat (Pos.succ nj)) ∗
                    runit (is_claim l) (bv_unsigned inum))%I
                   (⊤ ∖ ↑minstretN ∖ ↑icacheN ∖ ↑iregN) false ltac:(solve_ndisj)
@@ -2070,7 +2069,7 @@ Section ProofIget.
              presents [l] instead and the mover refutes both frozen phases
              inside its own [↑iregN] open ([IgetLic.iname_not_frozen]).  It
              comes straight back, and travels on to [Hcont2]. *)
-          iMod (iref_incr_store_au (⊤ ∖ ↑minstretN) fsc_ireg fsc_fs inodestart nib M j inum l
+          iMod (iref_incr_store_au (⊤ ∖ ↑minstretN) fsc_ireg fsc_fs icfg_ist icfg_nib M j inum l
                   qj (qj'/2)%Qp nj
                   ltac:(solve_ndisj) ltac:(solve_ndisj)
                   ltac:(apply subseteq_difference_r;
@@ -2087,7 +2086,7 @@ Section ProofIget.
                      with "[%] Hisl") as "Hipool".
         { intros i Hi. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
         (* the minted identity fraction comes out of the table's retained share *)
-        iDestruct (inode_ident_split j (qj'/2) (qj'/2) dev inum) as "[Hsplit _]".
+        iDestruct (inode_ident_split j (qj'/2) (qj'/2) icfg_dev inum) as "[Hsplit _]".
         iEval (rewrite Qp.div_2) in "Hsplit".
         iDestruct ("Hsplit" with "[Hdcell Hncell]") as "[Hid1 Hid2]";
           [ rewrite /inode_ident; iFrame | ].
@@ -2100,7 +2099,7 @@ Section ProofIget.
             [| iApply (frz_park_intro_off with "Hmirj Hselj")].
           rewrite /islot_rest_at (ig_frac_rest qj qj' ltac:(by apply Qp.sub_Some)).
           rewrite /inode_ident. iFrame. }
-        iAssert (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev)
+        iAssert (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev)
           with "[Hhalf Hiauth Hipool Hslots Hpool]" as "HRres".
         { iExists (<[j := ((qj + qj'/2)%Qp, Pos.succ nj)]> M), ci.
           iFrame "Hhalf Hiauth Hpool Hipool".
@@ -2186,7 +2185,7 @@ Section ProofIget.
         (* same re-spelling as the HIT arm above. *)
         iEval (rewrite Houtb) in "Hcg".
         iApply (Release.wp_release_sconf KT1 fsc_itlock itable_lock "itable"%string
-                  (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev) L7
+                  (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) L7
                   n eb p (K - 6)%nat ({["itable"]} ∪ lks)
                   ltac:(rewrite HL7a0; reflexivity) ltac:(lia)
                   with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
@@ -2259,7 +2258,7 @@ Section ProofIget.
           by (rewrite /L1; apply upd_eq).
         assert (HL1s1 : L1 !!! Regidx Rs1 = ientry j)
           by (rewrite /L1 upd_ne; [exact HMs1 | nz]).
-        assert (HL1s2 : L1 !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+        assert (HL1s2 : L1 !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
           by (rewrite /L1 upd_ne; [exact HMs2 | nz]).
         assert (HL1s4 : L1 !!! Regidx Rs4 = (sign_extend' 64 inum : mword 64))
           by (rewrite /L1 upd_ne; [exact HMs4 | nz]).
@@ -2321,7 +2320,7 @@ Section ProofIget.
           { rewrite /L2 upd_eq. rewrite HL1s1. apply add_vec_zero_l. }
           assert (HL2s1 : L2 !!! Regidx Rs1 = ientry j)
             by (rewrite /L2 upd_ne; [exact HL1s1 | nz]).
-          assert (HL2s2 : L2 !!! Regidx Rs2 = (sign_extend' 64 dev : mword 64))
+          assert (HL2s2 : L2 !!! Regidx Rs2 = (sign_extend' 64 icfg_dev : mword 64))
             by (rewrite /L2 upd_ne; [exact HL1s2 | nz]).
           assert (HL2s4 : L2 !!! Regidx Rs4 = (sign_extend' 64 inum : mword 64))
             by (rewrite /L2 upd_ne; [exact HL1s4 | nz]).

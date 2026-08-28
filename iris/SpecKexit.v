@@ -152,11 +152,9 @@ Definition wp_kexit_sconf_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names)
-    (dev : mword 32)
     (ip : mword 64) (dqi : dfrac)                     (* the initproc cell   *)
     (γkl : gname) (γka : gname * gname)               (* kmem.lock, kalloc   *)
-    (bmapstart inodestart : Z) (nib : nat) (size : Z)
+    (bmapstart : Z) (size : Z)
     (on : option nat) (fn : fclose_names)
     (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
     (pid : mword 32) (V : pprivate) :=
@@ -166,9 +164,8 @@ Definition wp_kexit_sconf_body
      bundled the way fileclose's environment is indexed.  One equation rather
      than fifteen coherence conjuncts, and it computes away in the proof.  The
      pid fraction is the quarter [ProcInv.proc_priv_pid_ofile] lends. *)
-  fn = MkFCloseNames γs j γl γkl γka γu γd γk pd pav pu bn γ
-         dev pid (DfracOwn (1/4))
-         bmapstart inodestart nib size ->
+  fn = MkFCloseNames γs j γl γkl γka γu γd γk pd pav pu bn
+         pid (DfracOwn (1/4)) bmapstart size ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (K_kexit <= av)%nat ->
@@ -237,8 +234,8 @@ Definition wp_kexit_sconf_body
     (kmem_res γka (mword_of_int (KernelSyms.kmem + 24))) -∗
   kalloc_avail γka on -∗
   (* the file system, for [begin_op(); iput(p->cwd); end_op();] *)
-  bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
-  log_ctx γ bn fsc_fs fsc_cov fsc_logst dev -∗
+  bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
+  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
   fs_crash_seam fsc_cov fsc_logst -∗
   gen_cert -∗
   dev_inv γu γd -∗
@@ -325,16 +322,14 @@ Module Type KEXIT.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names)
-      (dev : mword 32)
       (ip : mword 64) (dqi : dfrac)
       (γkl : gname) (γka : gname * gname)
-      (bmapstart inodestart : Z) (nib : nat) (size : Z)
+      (bmapstart : Z) (size : Z)
         (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
       (pid : mword 32) (V : pprivate),
-      wp_kexit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn γ
-                          dev ip dqi γkl γka
-                          bmapstart inodestart nib size
+      wp_kexit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn
+ ip dqi γkl γka
+                          bmapstart size
                           on fn m av eb b lks pid V.
 End KEXIT.

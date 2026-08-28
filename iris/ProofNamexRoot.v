@@ -124,15 +124,14 @@ Section ProofNamexRoot.
   Notation Rs10 := (mword_of_int 26 : mword 5).
 
   Lemma wp_namex_root
-      (inodestart : Z) (nib : nat) (dev : mword 32)
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_namex_root_body inodestart nib dev dqp
+    : wp_namex_root_body dqp
                          m n K eb p b lks Vpr.
   Proof.
     cbv beta delta [wp_namex_root_body].
-    intros pcE pv ret_tgt HK Hn Hdev Hnib Hroot Hnib0 Ha1 Hbelow.
+    intros pcE pv ret_tgt HK Hn Hroot Hnib0 Ha1 Hbelow.
     destruct (nxr_kb K HK) as (Kig & K12 & Kpop).
     iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hitb2 #Hitbl #Hesc #Hireg Hisl Hp0 Hp1 Hcont".
     (* the path's first byte is at [pv] itself *)
@@ -494,16 +493,16 @@ Section ProofNamexRoot.
     assert (HA3ra : A3 !!! Regidx Rra
                     = add_vec_int (mword_of_int (NX + 0x4c) : mword 64) 4)
       by (rewrite /A3; apply upd_eq).
-    assert (HA3a0 : A3 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64)).
+    assert (HA3a0 : A3 !!! Regidx Ra0 = (sign_extend' 64 icfg_dev : mword 64)).
     { rewrite /A3 upd_ne; [| nz]. rewrite HA2a0 Hroot.
       unfold ROOTDEV. pcw. }
     assert (HA3a1 : A3 !!! Regidx Ra1 = (sign_extend' 64 ROOTINO : mword 64)).
     { rewrite /A3 upd_ne; [| nz]. rewrite HA2a1. unfold ROOTINO. pcw. }
-    assert (Hrino : bv_unsigned ROOTINO < 16 * Z.of_nat nib).
+    assert (Hrino : bv_unsigned ROOTINO < 16 * Z.of_nat icfg_nib).
     { unfold ROOTINO.
       assert (Hu : bv_unsigned (mword_of_int 1 : mword 32) = 1)
         by (vm_compute; reflexivity).
-      rewrite Hu. assert (Hnz : 1 <= Z.of_nat nib) by lia. lia. }
+      rewrite Hu. assert (Hnz : 1 <= Z.of_nat icfg_nib) by lia. lia. }
     iDestruct (cpu_own_transport CID CID23 n eb p b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := b) (CIDa := CID) (CIDb := CID23)
@@ -518,9 +517,9 @@ Section ProofNamexRoot.
        ([IgetLic.iname_root_alloc]).  The licence itself is PURE -- the
        evidence lives in the region's invariant, not in the caller's hands
        -- which is exactly why it costs this walk nothing. *)
-    iAssert (iname fsc_ireg fsc_fs inodestart ROOTINO RootL) as "Hlic";
+    iAssert (iname fsc_ireg fsc_fs icfg_ist ROOTINO RootL) as "Hlic";
       [rewrite /iname; iPureIntro; exact ireg_root_ROOTINO |].
-    iApply (IG.wp_iget_sconf inodestart nib dev ROOTINO
+    iApply (IG.wp_iget_sconf ROOTINO
               RootL
               A3 n eb p (K - 12)%nat b lks
               Kig Hn Hrino HA3a0 HA3a1 Hbelow
@@ -534,8 +533,8 @@ Section ProofNamexRoot.
     iAssert (inode_held (ientry kig)) with "[Href Hru]" as "Hip".
     { rewrite /inode_held. iExists kig, qig, ROOTINO.
       iSplitR; [done |]. iSplitR; [iPureIntro; exact Hkig |].
-      iSplitR; [iPureIntro; rewrite -Hnib; exact Hrino |].
-      iFrame "Hru". rewrite -Hdev. iExact "Href". }
+      iSplitR; [iPureIntro;exact Hrino |].
+      iFrame "Hru". iExact "Href". }
     (* ===== +0x050 c.mv s4,a0 ===== *)
     iApply (wp_cmv_s_sconf (mword_of_int (NX + 0x50)) Rs4 Ra0 mig (K - 12)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc []").

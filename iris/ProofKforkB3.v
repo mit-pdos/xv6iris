@@ -550,7 +550,7 @@ Section KforkB3Proof.
         split; [exact HL1s2|]. split; [exact HL1s3|]. split; [exact HL1s4|].
         split; [exact HL1s5|]. exact HL1thr.
       + (* ============ NON-NULL: filedup ============ *)
-        iDestruct "Hpay" as "[[%Hz0 _]|(%k & %q & %Cf & %stf & (%Hfn & %Hk & %Hty) & Href & Hst)]".
+        iDestruct "Hpay" as "[[%Hz0 _]|(%k & %q & %stf & (%Hfn & %Hk & %Hty) & Href & Hst)]".
         { exfalso. apply Hvnz. exact Hz0. }
         assert (Hz : eq_vec (L1 !!! Regidx Ra0) (zero_reg : mword 64) = false)
           by (rewrite HL1a0; apply eq_vec_false_iff; exact Hvnz).
@@ -611,7 +611,7 @@ Section KforkB3Proof.
         assert (HL2a0k : L2 !!! Regidx Ra0 = fnode k) by (rewrite HL2a0; exact Hfn).
         iDestruct (cpu_own_transport CIDk CIDn n eb pme b ltac:(wp_next_chain) with "Hown")
           as "Hown".
-        iApply (FD.wp_filedup_sconf γl γf k q Cf stf L2 n eb pme (rsv + (K - 8))%nat b
+        iApply (FD.wp_filedup_sconf γl γf k q stf L2 n eb pme (rsv + (K - 8))%nat b
                   _ HK14 Hn HL2a0k Hbelow
                   with "Hcg Hown Htext Hpc Hft Hfds Href").
         all: try lkbelow.
@@ -662,7 +662,7 @@ Section KforkB3Proof.
         iMod (fd_st_move _ i FdClosed stq stf with "Hst2 Hcfr")
           as "[Hst2 Hcfr]".
         iDestruct ("Hcfrback" with "Hcfr") as "Hcfrag".
-        iDestruct (ofile_slot_file γf _ npa i k (q/2)%Qp Cf stf Hk Hty
+        iDestruct (ofile_slot_file γf _ npa i k (q/2)%Qp stf Hk Hty
                      with "Hcell2 Hslotb Hst2") as "Hslot2".
         iDestruct ("Hback2" $! (fnode k) with "Hslot2") as "Hpv2".
         assert (Hvfn : pv_ofile Vp !! i = Some (fnode k)) by (rewrite Hv Hfn; reflexivity).
@@ -670,7 +670,7 @@ Section KforkB3Proof.
           in "Hpv2".
         (* close the parent's slot back: it names the SAME file it always did *)
         iEval (rewrite Hfn) in "Hcell".
-        iDestruct (ofile_slot_file γf _ pme i k (q/2)%Qp Cf stf Hk Hty
+        iDestruct (ofile_slot_file γf _ pme i k (q/2)%Qp stf Hk Hty
                      with "Hcell Hslota Hst") as "Hslot".
         iDestruct ("Hback" $! (fnode k) with "Hslot") as "Hpv".
         iEval (rewrite (upd_ofile_id _ _ _ Hvfn)) in "Hpv".

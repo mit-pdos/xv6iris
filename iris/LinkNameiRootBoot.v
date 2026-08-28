@@ -57,13 +57,13 @@ Module NameiRootBoot : NAMEI_ROOT_BOOT.
        serves.  BootCarveMain's zero record is the one other dummy in the
        tree; duplicated rather than exported -- it is one literal. *)
     iApply (NameiRoot.wp_namei_root
-              icfg_ist icfg_nib icfg_dev dqp m n K eb p b lks
+ dqp m n K eb p b lks
               (MkPPriv (zero_reg : mword 64)
                  (UPTD (mword_of_int 0 : mword 44) (mword_of_int 0 : mword 44) ∅ ∅)
                  [] (replicate NOFILE (zero_reg : mword 64))
                  1%positive            (* the fd-state name: junk in a dummy *)
                  (zero_reg : mword 64) [])
-              HK Hn eq_refl eq_refl Hdev Hnib Hlks
+              HK Hn Hdev Hnib Hlks
               with "Hcg Hcpu Htext Hkd Hpc Hpenv Hitl Hitinv Hesc Hireg
                     Hisl Hp0 Hp1 Hcont").
   Qed.

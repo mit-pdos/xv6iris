@@ -107,8 +107,8 @@ Definition namex_tr_post
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (pj pv nb ret_tgt : mword 64) (pl : list (bv 8))
     (m : regfile) (K : nat) (b eb : bool) (lks : gset string)
-    (g : log_names) (bn : bio_names)
-    (bmapstart inodestart size : Z)
+ (bn : bio_names)
+    (bmapstart size : Z)
     (plen : nat) (pfun : nat -> bv 8)
     (n : nat) (Sb : gset Z)
     (P : nat -> Z -> iProp Σ) (Pmiss : nat -> Z -> iProp Σ)
@@ -124,7 +124,7 @@ Definition namex_tr_post
       pc_is ret_tgt -∗
       (* EVERYTHING LOANED COMES BACK *)
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       proc_priv_bare pj pidv Vpr -∗
       inode_held (pv_cwd Vpr) -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -137,7 +137,7 @@ Definition namex_tr_post
       (* the set form beside the transaction's token: this walk's [ilock]
          takes the write arm (durable-disk B''-tx), so the token travels
          with it -- in [log_opS]'s own position, so no stage lemma moved *)
-      log_opSt g n' Sb' -∗
+      log_opSt icfg_log n' Sb' -∗
       (if ok
        then (* THE PIN: the register, the package AT ITS INUM, and the
                cursor having walked the whole path to that same inum.  The
@@ -169,15 +169,13 @@ Definition namex_tr_post
 Definition wp_namex_tr_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (g : log_names)
     (ga : gname) (gf : gname)                          (* kalloc, file table  *)
-    (bmapstart inodestart : Z) (nib : nat)
-    (size : Z) (dev : mword 32)
+    (bmapstart : Z)
+    (size : Z)
     (plen : nat) (pfun : nat -> bv 8)                  (* the path buffer     *)
     (nfun : nat -> bv 8)                               (* the name buffer, in *)
     (n : nat) (Sb : gset Z)
@@ -194,20 +192,16 @@ Definition wp_namex_tr_body
   let pl := bview plen pfun in
   let L := length (path_elems pl) in
   (K_namex <= K)%nat ->
-  dev = icfg_dev ->
-  nib = icfg_nib ->
-  g = icfg_log ->
-  inodestart = icfg_ist ->
-  dev = ROOTDEV ->
-  (0 < nib)%nat ->
+  icfg_dev = ROOTDEV ->
+  (0 < icfg_nib)%nat ->
   log_geom_ok fsc_cov fsc_logst ->
   0 < size <= BPB ->
   0 <= bmapstart ->
   bmapstart ∈ fsc_cov ->
   ~ (bmapstart ∈ log_region_set fsc_logst) ->
-  0 <= inodestart ->
+  0 <= icfg_ist ->
   cov_below fsc_cov size ->
-  ireg_blocks_ok inodestart nib fsc_cov fsc_logst ->
+  ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
   bb_cstr pfun plen ->
   (Z.of_nat plen < 2 ^ 31)%Z ->
   (* ABSOLUTE PATHS ONLY (ruling Q-c): the walk starts at the root and the
@@ -227,21 +221,21 @@ Definition wp_namex_tr_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs gd dev fsc_cov) -∗
-  log_ctx g bn fsc_fs fsc_cov fsc_logst dev -∗
+  bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) -∗
+  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
   kalloc_env ga None -∗
-  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
-  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   ireg_open -∗
   procs_inv gs -∗
   dev_inv gu gd -∗
   disk_geom gd pd pav pu -∗
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
   proc_priv_bare pj pidv Vpr -∗
   inode_held (pv_cwd Vpr) -∗
@@ -250,7 +244,7 @@ Definition wp_namex_tr_body
   bslots 3 -∗
   iref_slots 2 -∗
   (* the set form beside the transaction's token (durable-disk B''-tx) *)
-  log_opSt g n Sb -∗
+  log_opSt icfg_log n Sb -∗
   (* ---- THE TRACE (the two new resource premises) ---- *)
   P 0%nat (bv_unsigned ROOTINO) -∗
   nx_hops_from P Pmiss pl 0%nat -∗
@@ -258,7 +252,7 @@ Definition wp_namex_tr_body
      [SpecNamex.wp_namex_gen_body]'s note. *)
   wp_next true pj (fun (CIDc : CpuId) =>
     namex_tr_post (CID := CIDc) pj pv nb ret_tgt pl m K b eb lks
-                  g bn bmapstart inodestart size
+ bn bmapstart size
                   plen pfun n Sb P Pmiss pidv dq dqb dqs dqpv Vpr) -∗
   WP (Loop : expr riscv_lang).
 
@@ -270,10 +264,9 @@ Module Type NAMEX_TR.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (g : log_names)
       (ga : gname) (gf : gname)
-      (bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32)
+      (bmapstart : Z)
+      (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
       (nfun : nat -> bv 8)
       (n : nat) (Sb : gset Z)
@@ -281,8 +274,8 @@ Module Type NAMEX_TR.
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_namex_tr_body gs j gl gu gd gk pd pav pu bn g
-                       ga gf bmapstart inodestart nib
-                       size dev plen pfun nfun n Sb P Pmiss
+      wp_namex_tr_body gs j gl gu gd gk pd pav pu bn
+                       ga gf bmapstart
+                       size plen pfun nfun n Sb P Pmiss
                        pidv dq dqb dqs dqpv m K eb b lks Vpr.
 End NAMEX_TR.

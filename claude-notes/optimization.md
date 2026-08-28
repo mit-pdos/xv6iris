@@ -564,12 +564,15 @@ worth 20× on individual files.
 
 ### ProofIput RESISTS ALL FOUR OF THIS FILE'S LEVERS (measured 2026-08-27)
 
-**Except the fold, on a DIFFERENT continuation — 68.0 s → 63.6 s (−6.5 %),
-`.vo` −5.4 %, later the same day.** What regressed below is
-`ip_free_locked`'s closer; `ip_free_entry` carries two more (1.7 kB and
-7.6 kB, the largest inline continuation in the tree) and naming those pays.
-Do not read "this file resists the lever" as "this file resists it
-everywhere" — the unit is the continuation, not the file.
+**Except the fold — 68.0 s → 61.1 s (−10.2 %) in two steps, later the same
+day.** `ip_free_entry`'s two continuations (1.7 kB and 7.6 kB, the largest
+inline one in the tree) gave −6.5 %, and `ip_free_locked`'s own 3.9 kB gave a
+further −4.4 % — i.e. the very continuation the +13 s result below is about
+now measures NEGATIVE, folded as a seam on the current tree. The two
+measurements are not reconciled (the file has changed a great deal since, and
+the 60-row span that note describes is not obviously the 26-row one folded
+here); take it as: **re-measure before trusting an old per-file verdict, and
+never read "this file resists the lever" as "this continuation does".**
 
 `ProofIput.v` is 113 s in the build and 2.3x the tree's median cost per
 sentence, so it reads like a textbook RULE ONE file. It is not fixable by the
@@ -953,7 +956,15 @@ and it did not move.
 
 ## Modalities and rewriting
 
-- **Strip only the GOAL's later with `iApply bi.later_intro`**; reach for `iNext`
+- **Strip only the GOAL's later with `iApply bi.later_intro`** — and this is
+worth SWEEPING, not just applying to new proofs. Converting `ProofKexecB3`'s
+fifteen `iNext`s measured **74.4 s → 64.8 s (−13.0 %)**, `.vo` −1.7 %, peak
+RSS −6.8 %: **0.64 s per call**, with no other change. There are 477 `iNext`
+calls left in files ≥10 s across 111 files, and almost none of those files use
+the cheap form; the per-call cost scales with `|Δ|`, so the big-context proofs
+are where it pays. `iNext` is only replaceable where the proof does not need
+its hypothesis-side later-stripping — `coqc` says so per file, so the sweep is
+safe with a per-file fallback.; reach for `iNext`
   only at a genuine Löb back edge. `iNext` is `iModIntro` at `▷`, so it runs
   `MaybeIntoLaterN` over every hypothesis in both environments: ~1.1 s per call
   in a whole-function proof against ~0.06 s for the same effect. The tell that a

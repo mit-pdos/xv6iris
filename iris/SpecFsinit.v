@@ -64,14 +64,15 @@
    up they are premises about a named 32-byte record instead of five
    free-floating unexplained hypotheses on five different contracts.
 
-   ---- THE FOUR-LINE DEVICE TIE, IN SpecNamex's EXACT SHAPE -----------
+   ---- THE TWO-LINE DEVICE PREMISE, IN SpecNamex's EXACT SHAPE ---------
 
    N5a's ledger settled where these go and it is here, not in IcacheBoot:
    [icache_boot] is device-generic BY CONSTRUCTION (it takes [dv] and [nib]
    as parameters), and the [dv = icfg_dev] tie is [IcacheRef.icfg_alloc]'s to
-   make.  So this contract carries SpecNamex's four lines verbatim --
-   [dev = icfg_dev], [nib = icfg_nib], [dev = ROOTDEV], [(0 < nib)%nat] --
-   and hands ireclaim the raw device-generic form it wants.
+   make.  The two TIES that used to ride here ([dev = icfg_dev],
+   [nib = icfg_nib]) are gone with the threaded copies (rank 1c); what is
+   left is what they were there to enable -- [icfg_dev = ROOTDEV] and
+   [(0 < icfg_nib)%nat] -- and ireclaim gets the same form as before.
 
    [ROOTDEV] itself was hoisted out of [SpecNamex.v] into [InodeInv.v] (N5d,
    beside [sb_ninodes]) precisely so that this file could name it: a Spec
@@ -250,15 +251,13 @@ Qed.
 Definition wp_fsinit_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
       ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γpr : gname)
-    (bmapstart inodestart : Z)
-    (ninodes : Z) (nib : nat) (size : Z)
-    (dev : mword 32)
+    (bmapstart : Z)
+    (ninodes : Z) (size : Z)
     (* ---- the image's block 1, field by field ---- *)
     (v_magic v_size v_nblocks v_ninodes v_nlog
      v_logstart v_inodestart v_bmapstart : mword 32)
@@ -316,32 +315,28 @@ Definition wp_fsinit_sconf_body
           are consumed here and nowhere else: fsinit builds the file
           system's law out of the invariants it already holds and hands it
           to [initlog], which parks it in [LogInv.log_ctx]. *)
-  col_geom sbrec inodestart nib (fs_home_set fsc_cov fsc_logst) ->
+  col_geom sbrec icfg_ist icfg_nib (fs_home_set fsc_cov fsc_logst) ->
   FsImg.sb_bmapstart sbrec = bmapstart ->
   FsImg.sb_size sbrec = size ->
   (* (b) the magic, which is what refutes the LIVE panic arm at +0x40 *)
   bv_unsigned v_magic = FSMAGIC ->
   (* (c) the three field values every fs contract downstream reads *)
   v_ninodes = (mword_of_int ninodes : mword 32) ->
-  v_inodestart = (mword_of_int inodestart : mword 32) ->
+  v_inodestart = (mword_of_int icfg_ist : mword 32) ->
   v_bmapstart = (mword_of_int bmapstart : mword 32) ->
   v_logstart = (mword_of_int fsc_logst : mword 32) ->
   (* (d) THE THREE ninodes TIES -- SpecIalloc's and SpecIreclaim's, finally
          stated about a real record.  [ninodes <= 16 * nib] is the one that
          existed nowhere in the tree before (N5c). *)
   1 < ninodes ->
-  ninodes <= 16 * Z.of_nat nib ->
+  ninodes <= 16 * Z.of_nat icfg_nib ->
   ninodes < 2 ^ 31 ->
-  (* (e) THE FOUR-LINE DEVICE TIE, SpecNamex's shape verbatim.  [ROOTDEV] is
-         [InodeInv.ROOTDEV] since the N5d hoist. *)
-  dev = icfg_dev ->
-  nib = icfg_nib ->
-  dev = ROOTDEV ->
-  (0 < nib)%nat ->
+  icfg_dev = ROOTDEV ->
+  (0 < icfg_nib)%nat ->
   (* (f) the inode region's block geometry, and itrunc's, threaded to
          ireclaim *)
-  0 <= inodestart ->
-  ireg_blocks_ok inodestart nib fsc_cov fsc_logst ->
+  0 <= icfg_ist ->
+  ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
   0 < size <= BPB ->
   0 <= bmapstart ->
   bmapstart ∈ fsc_cov ->
@@ -377,7 +372,7 @@ Definition wp_fsinit_sconf_body
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* a0 = dev *)
-  m !!! Regidx (mword_of_int 10 : mword 5) = (sign_extend' 64 dev : mword 64) ->
+  m !!! Regidx (mword_of_int 10 : mword 5) = (sign_extend' 64 icfg_dev : mword 64) ->
   (* fsinit's cone: its own bread/brelse ("bcache", 4), initlog
      ("bcache", 4) and ireclaim ("itable", 2) -- "itable" is the lowest,
      so one premise there covers the whole cone via [locks_below_mono]. *)
@@ -394,7 +389,7 @@ Definition wp_fsinit_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
+  bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
   (* initlog's crash seam, era certificate and the era's BORN-TRUE mirror
      half + swap receipt (durable-disk 1a) *)
   fs_crash_seam fsc_cov fsc_logst -∗
@@ -428,7 +423,7 @@ Definition wp_fsinit_sconf_body
   ([∗ list] i ∈ seq 0 32, pa_add sb_base i ↦ₘ sb_old i) -∗
   (* ---- the icache's four persistent things, straight from
          [IcacheBoot.icache_boot] ---- *)
-  ireg_reg fsc_ireg fsc_fs inodestart nib -∗
+  ireg_reg fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   (* THE BOOT-SHELTER TOKEN (fs-fragments.md §7.12), from [icfg_alloc] through
      the boot chain: fsinit frames it across bread/memmove/initlog and hands it
      to ireclaim, which is the only reason it is safe there (§7.1.7).  Returned
@@ -436,7 +431,7 @@ Definition wp_fsinit_sconf_body
      returns and before [kexec("/init")] -- that seal is OWED to forkret's
      first branch. *)
   ireg_boot -∗
-  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
@@ -504,7 +499,7 @@ Definition wp_fsinit_sconf_body
       InodeInv.sb_ninodes ↦₄ (mword_of_int ninodes : mword 32) -∗
       sb_nlog ↦₄ v_nlog -∗
       sb_logstart ↦₄ (mword_of_int fsc_logst : mword 32) -∗
-      InodeInv.sb_inodestart ↦₄ (mword_of_int inodestart : mword 32) -∗
+      InodeInv.sb_inodestart ↦₄ (mword_of_int icfg_ist : mword 32) -∗
       BitmapInv.sb_bmapstart ↦₄ (mword_of_int bmapstart : mword 32) -∗
       (* NOTHING COMES BACK FOR BLOCK 1 (durable-disk lane C-3a).  The run
          used to be returned here and DROPPED by forkret; it is now spent
@@ -514,9 +509,9 @@ Definition wp_fsinit_sconf_body
          ireclaim at +0x54.  It does not cross the boundary as an input.
          AT [icfg_log], not existentially: this is [FsReady.fs_ready]'s log
          conjunct, modulo the seal site's instantiation of [bn]/[fsc_fs]/[fsc_cov]/
-         [fsc_logst] at [fsc_bio]/[fsc_fs]/[fsc_cov]/[fsc_logst] and
-         [dev = icfg_dev], which premise (e) above already gives. *)
-      log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst dev -∗
+         [fsc_logst] at [fsc_bio]/[fsc_fs]/[fsc_cov]/[fsc_logst] -- the
+         device it is stated at IS [icfg_dev] since rank 1c. *)
+      log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
       (* three, not two: see the header *)
       bslots 3 -∗
       iref_slot -∗
@@ -535,9 +530,8 @@ Module Type FSINIT.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γpr : gname)
-      (bmapstart inodestart : Z)
-      (ninodes : Z) (nib : nat) (size : Z)
-      (dev : mword 32)
+      (bmapstart : Z)
+      (ninodes : Z) (size : Z)
       (v_magic v_size v_nblocks v_ninodes v_nlog
        v_logstart v_inodestart v_bmapstart : mword 32)
       (bs_sb : list (bv 8))
@@ -553,8 +547,8 @@ Module Type FSINIT.
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (sbrec : fs_sb),
       wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn γpr
-                           bmapstart inodestart ninodes nib size
-                           dev
+                           bmapstart ninodes size
+
                            v_magic v_size v_nblocks v_ninodes v_nlog
                            v_logstart v_inodestart v_bmapstart bs_sb sb_old
                            bs_hdr Xv M L D vlock vname vcpu v_start v_dev v_nc v_n

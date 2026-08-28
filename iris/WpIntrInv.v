@@ -295,28 +295,6 @@ Ltac lkp10 := peel1; reflexivity.
 
 (* the ONE file transport the engine needs: the cycle commits nextPC and the
    fetch may have filled the tlb, and the result is the tower again. *)
-Lemma s_rs_set_nPC_tlb (pc npc npc' ms : mword 64) (bmi : bool)
-    (cy ti ip mst0 : mword 64) (pcfg : type_of_register pmpcfg_n)
-    (paddr : type_of_register pmpaddr_n) (mc : mword 32)
-    (micfg misa0 mseccfg0 senv0 : mword 64) (pmar0 : list PMA_Region)
-    (elp0 : type_of_register elp) (satp0 mie0 mdv0 menv0 : mword 64)
-    (tlbv tv : type_of_register tlb) :
-  reg_agree_on (s_Drw ∪ s_Dro)
-    (register_set (R_bitvector_64 nextPC) npc'
-       (register_set tlb tv
-          (s_rs pc npc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
-             senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv)))
-    (s_rs pc npc' ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
-       senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tv).
-Proof.
-  apply s_rs_agree;
-    [ lkp s_rs_PC | lkp0 | lkp s_rs_ms | lkp s_rs_mi | lkp s_rs_cy
-    | lkp s_rs_ti | lkp s_rs_ip | lkp0 | lkp s_rs_priv | lkp s_rs_mst
-    | lkp s_rs_hart | lkp s_rs_pcfg | lkp s_rs_paddr | lkp s_rs_mc
-    | lkp s_rs_micfg | lkp s_rs_misa | lkp s_rs_sec | lkp s_rs_pma
-    | lkp s_rs_htif | lkp s_rs_elp | lkp s_rs_senv | lkp s_rs_satp
-    | lkp s_rs_mie | lkp s_rs_mdl | lkp s_rs_menv ].
-Qed.
 
 (* ...and the same transport with the tlb ALREADY at the landing value: the
    per-node cycle body hands its frames back at the tower it walked to, so
@@ -445,8 +423,6 @@ Proof. rewrite /ti_Drw. set_solver. Qed.
 Lemma ti_in_se : (sepc : register) ∈ ti_Drw ∪ ti_Dro.
 Proof. rewrite /ti_Drw. set_solver. Qed.
 Lemma ti_in_priv : (cur_privilege : register) ∈ ti_Drw ∪ ti_Dro.
-Proof. rewrite /ti_Drw. set_solver. Qed.
-Lemma ti_in_npc : (R_bitvector_64 nextPC : register) ∈ ti_Drw ∪ ti_Dro.
 Proof. rewrite /ti_Drw. set_solver. Qed.
 Lemma ti_in_pc : (R_bitvector_64 PC : register) ∈ ti_Drw ∪ ti_Dro.
 Proof. rewrite /ti_Dro. set_solver. Qed.
@@ -1605,51 +1581,12 @@ Section IntrEngine.
     intros [[_ H] | [_ H]]; [ left; exact H | right; exact H ].
   Qed.
 
-  Lemma s_arm_frame_ok (SD : gset register) (satp0 : mword 64) :
-    s_arm_ok SD satp0 -> s_frame_ok SD.
-  Proof.
-    intros [[-> _] | [-> _]];
-      [ exact s_frame_ok_Drwb | exact s_frame_ok_Drw ].
-  Qed.
 
-  Lemma s_arm_cells (SD : gset register) (satp0 : mword 64) :
-    s_arm_ok SD satp0 -> SD = s_Drw \/ SD = s_Drwb.
-  Proof. intros [[-> _] | [-> _]]; [ right | left ]; reflexivity. Qed.
 
   (* the regime's FETCH side condition, out of the arm.  [sr_swp_side_ok]
      cannot serve: it demands [tlb ∈ Drw], which the Bare arm's empty-of-tlb
      set cannot pay -- and does not need to, since Bare's translateAddr never
      touches the cell. *)
-  Lemma strans_side_of_arm (SD : gset register) (satp0 : mword 64)
-      (acc : MemoryAccessType mem_payload) (va : mword 64) (ppn : mword 44)
-      (kp : kperm) (Db : register -> bool) (rs : regstate) (dst : mstate) :
-    s_arm_ok SD satp0 ->
-    s_acc_ok acc ->
-    register_lookup satp rs = satp0 ->
-    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus rs)) ('b"1") = false ->
-    pmp_ent0_ok (register_lookup pmpcfg_n rs) (register_lookup pmpaddr_n rs) ->
-    pma_allows_ram (register_lookup pma_regions rs) ->
-    Db mstatus = true -> Db satp = true ->
-    _get_Mstatus_SXL (register_lookup mstatus dst.(sregs)) = 'b"10" ->
-    register_lookup satp dst.(sregs) = satp0 ->
-    strans_swp_side acc va ppn kp Db SD s_Dro rs dst.
-  Proof.
-    intros Harm Hacc Hsatp HMPRV Hpok Hpma HDm HDs HSXL Hdsatp.
-    destruct Harm as [[-> Hb] | [-> Hk]].
-    - apply (strans_swp_side_bare acc va ppn kp Db s_Drwb s_Dro rs dst Hacc);
-        [ rewrite Hsatp; exact Hb | exact HMPRV ].
-    - right. unfold strans_root. rewrite Hsatp.
-      apply (kpt_swp_side_intro (strans_root_of satp0) acc va ppn kp Db
-               s_Drw s_Dro rs dst).
-      + rewrite Hsatp. exact Hk.
-      + exact Hpok.
-      + exact Hpma.
-      + exact HDm.
-      + exact HDs.
-      + exact HSXL.
-      + rewrite Hdsatp Hsatp. reflexivity.
-      + exact s_w_tlb.
-  Qed.
 
   Section SCells.
     Context (pc npc ms : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
@@ -1858,14 +1795,6 @@ Section IntrEngine.
     iPureIntro. split; assumption.
   Qed.
 
-  Lemma sconf_at_priv_close (ms : mword 64) : sconf_at_priv ms -∗ sconf.
-  Proof.
-    iIntros "H". iDestruct "H" as (mdv)
-      "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Htie & Hmie &
-        Hmdl & Hmenv)".
-    iApply (sconf_of_cells ms mdv Hmsf Hmm
-              with "Hhw Hminv Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv").
-  Qed.
 
   (* the accessor face, built from the cells: the closer is [sconf_of_cells]
      at the REPLACEMENT mstatus, whose facts ride in [sconf_msown] itself. *)
@@ -1887,14 +1816,6 @@ Section IntrEngine.
               with "Hhw Hminv Hpriv Hms' Hhalf' Htie' Hmie Hmdl Hmenv").
   Qed.
 
-  Lemma sconf_at_of_priv (ms : mword 64) : sconf_at_priv ms -∗ sconf_at ms.
-  Proof.
-    iIntros "H". iDestruct "H" as (mdv)
-      "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Htie & Hmie &
-        Hmdl & Hmenv)".
-    iApply (sconf_at_of_cells ms mdv Hmsf Hmm
-              with "Hhw Hminv Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv").
-  Qed.
 
   Lemma tlb_res_to_cells (root_ppn : mword 44) :
     tlb_res_pt root_ppn -∗
@@ -3128,32 +3049,4 @@ Qed.
    which is what every leaf that does not name one wants -- and it is what
    keeps the 68 call sites of the funnel unchanged.                        *)
 (* ===================================================================== *)
-Lemma wp_exec_step_intr `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID0 : CpuId}
-    {kt : ktier} (pc0 : mword 64) (m : regfile) (av : nat) (p : mword 64)
-    (is_rvc : bool) (i : instruction) (b' : bool)
-    (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
-  ret_pc pc0 = pc0 ->
-  sie_cap_gpr kt m av true p -∗
-  pc_is pc0 -∗
-  instr pc0 is_rvc i -∗
-  ▷ wp_next true p (fun CID => intr_cb kt m av p pc0 is_rvc i b' R (CID := CID)) -∗
-  WP (Loop : expr riscv_lang).
-Proof.
-  intros Hpc0. iIntros "Hcg Hpc Hinstr Hbody".
-  iApply (wp_exec_step_intr_clock pc0 m av p is_rvc i b' R Hpc0
-            with "Hcg Hpc Hinstr [Hbody]").
-  iNext. iIntros (CID Hs).
-  iDestruct (wp_next_at true p _ CID Hs with "Hbody") as "Hb".
-  iEval (rewrite /intr_cb) in "Hb".
-  iDestruct "Hb" as "[Hobl Hcont]".
-  rewrite /intr_cb_clock.
-  iSplitR "Hcont"; [| iExact "Hcont" ].
-  iIntros "Hsc Hcap Hfile HPC HnPC Hresv Hclk".
-  iApply (swp_mono (CID := CID) with "[Hclk] [-]");
-    [| iApply ("Hobl" with "Hsc Hcap Hfile HPC HnPC Hresv") ].
-  iIntros (e) "(-> & Hres)".
-  iDestruct "Hres" as (npc ms' m' av')
-    "(HPC & HnPC & Hresv2 & Hsc' & Hcap' & Hfile' & HRv)".
-  iSplitR; [done|]. iExists npc, ms', m', av'. iFrame.
-Qed.
 

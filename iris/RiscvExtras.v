@@ -698,20 +698,10 @@ Qed.
 
 (* a ONE-byte access needs no end bound at all: the base being in the bank IS
    the end being in the bank. *)
-Lemma pma_access_ram_byte (a : mword 64) : addr_is_ram a -> pma_ram_access a 1.
-Proof.
-  intros [Hlo Hhi].
-  exact (conj (pma_width_ok 1 eq_refl eq_refl)
-              (conj Hlo (pma_fit_byte (uint a) Hhi))).
-Qed.
 
 (* the same class from the RANGE BOUNDS themselves, where the applier has
    already computed them (several memory leaves derive an [Hlo]/[Hfit] pair
    for their PMP range match and can reuse it here). *)
-Lemma pma_access_ram_fit (a : mword 64) (n : Z) :
-  (ram_base <= uint a)%Z -> (uint a + n <= ram_base + ram_size)%Z ->
-  1 <= n <= 4096 -> pma_ram_access a n.
-Proof. intros Hlo Hfit Hn. exact (conj Hn (conj Hlo Hfit)). Qed.
 
 (* THE DEVICE CLASS, from the window bounds the device leaves already own
    ([plic_base <= uint a8 < plic_base + plic_size], and the UART / virtio
@@ -765,30 +755,6 @@ Qed.
    bit 38 (and every bit >= 39) is 0, so sign-extending the low 39 bits back
    to 64 returns [a] unchanged.  This is exactly the [neq_vec ... = false]
    canonicality check the S-mode [translateAddr] lemmas demand. *)
-Lemma ram_canonical (a : mword 64) :
-  addr_is_ram a ->
-  neq_vec (bits_of_virtaddr (Virtaddr a))
-     (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a)) (Z.sub 39 1) 0)) = false.
-Proof.
-  intros Hram. pose proof Hram as [Hlo Hhi].
-  rewrite uint_unsigned in Hlo, Hhi. unfold ram_base, ram_size in *.
-  cbn [bits_of_virtaddr].
-  unfold neq_vec. rewrite negb_false_iff. unfold eq_vec.
-  rewrite MachineWord.MachineWord.eqb_true_iff. apply bv_eq. symmetry.
-  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec to_word get_word
-       MachineWord.MachineWord.sign_extend].
-  rewrite bv_sign_extend_unsigned.
-  unfold bv_signed.
-  rewrite (ram_subrange_unsigned a Hram).
-  assert (Hsw : bv_swrap (39 - 0) (uint a) = uint a).
-  { apply bv_swrap_small. rewrite uint_unsigned.
-    assert (bv_half_modulus (39 - 0) = 274877906944) as -> by (vm_compute; reflexivity). lia. }
-  rewrite Hsw. rewrite uint_unsigned.
-  apply bv_wrap_small.
-  pose proof (bv_unsigned_in_range 64 a) as Hr.
-  assert (bv_modulus 64 = 18446744073709551616) as E by (vm_compute; reflexivity).
-  rewrite E in Hr |- *. lia.
-Qed.
 
 (* the Sv39 VPN (bits 38:12) of an address, as a 27-bit word.  This is the
    [svpn] the S-mode WPs abstract over; defining it as the extraction lets the
@@ -926,31 +892,11 @@ Proof.
   rewrite Z.mul_comm. apply Z_mod_mult.
 Qed.
 
-Lemma aligned2_jump_bit (a : mword 64) :
-  is_aligned_paddr (Physaddr a) 2 = true ->
-  eq_vec (access_vec_dec a 0) ('b"0") = true.
-Proof.
-  intros H. pose proof (align2_low_bit a H) as H0.
-  unfold neq_vec in H0. apply negb_false_iff in H0. exact H0.
-Qed.
 
 (* 4-byte alignment of a jump target -> the two low-bit facts the model's
    [jump_to] checks (bit 0 = 0 via [eq_vec .. 'b"0"], bit 1 = 0 via
    [bit_to_bool]).  Lets JAL / JALR state a single [is_aligned_paddr .. 4]
    premise instead of two per-bit facts. *)
-Lemma aligned4_jump_bits (a : mword 64) :
-  is_aligned_paddr (Physaddr a) 4 = true ->
-  eq_vec (access_vec_dec a 0) ('b"0") = true /\
-  bit_to_bool (access_vec_dec a 1) = false.
-Proof.
-  intros H. destruct (align4_low_bits a H) as [H0 H1].
-  unfold neq_vec in H0, H1.
-  apply negb_false_iff in H0. apply negb_false_iff in H1.
-  split; [ exact H0 |].
-  unfold bit_to_bool, eq_vec, get_word in H1.
-  rewrite MachineWord.MachineWord.eqb_true_iff in H1.
-  rewrite H1. reflexivity.
-Qed.
 
 (* ====================================================================== *)
 (* ret_pc: THE canonical return-target pc.                                 *)
@@ -1300,11 +1246,7 @@ Ltac kill_autocast :=
    normalises to.  [rewrite] is syntactic, so a proof reaches these by
    [change]-ing the arithmetic first ([change (8 * 1 * 8) with 64], …); the
    loop-shaped instances above are the ones [checked_mem_read] wants. *)
-Lemma usvd_zeros8 (v : mword 8) : update_subrange_vec_dec (zeros' 8) 7 0 v = v.
-Proof. usvd_zeros_full_tac. Qed.
 
-Lemma usvd_zeros16 (v : mword 16) : update_subrange_vec_dec (zeros' 16) 15 0 v = v.
-Proof. usvd_zeros_full_tac. Qed.
 
 Lemma usvd_zeros32 (v : mword 32) : update_subrange_vec_dec (zeros' 32) 31 0 v = v.
 Proof. usvd_zeros_full_tac. Qed.
@@ -1315,16 +1257,6 @@ Proof. usvd_zeros_full_tac. Qed.
 (* An access that does not cross a page boundary is not split at the vmem
    level: [split_on_page_boundary] answers (width, 0), so
    [vmem_read_addr]/[vmem_write_addr]'s [do_split_access] is false. *)
-Lemma exec_split_on_page_boundary_intra {n : Z} (addr : mword n) (width : Z) s :
-  eq_vec (and_vec addr (update_subrange_vec_dec ((ones n) : bits n) (pagesize_bits - 1) 0
-                          (zeros' (12 - 1 - (0 - 1)))))
-         (and_vec (sub_vec_int (add_vec_int addr width) 1)
-                  (update_subrange_vec_dec ((ones n) : bits n) (pagesize_bits - 1) 0
-                     (zeros' (12 - 1 - (0 - 1))))) = true ->
-  exec (split_on_page_boundary addr width) s = Some ((width, 0), s).
-Proof.
-  intro Hin. unfold split_on_page_boundary. rewrite Hin. apply exec_returnm.
-Qed.
 
 (* ====================================================================== *)
 (* WRITING A BIT FIELD BACK WITH ITS OWN VALUE IS THE IDENTITY.            *)
@@ -1554,20 +1486,6 @@ Qed.
 (* The width-GENERIC full-width subrange: with a symbolic width the result
    type is [mword (n-1-0+1)], so the identity can only be stated up to the
    [autocast] that transports it back to [mword n]. *)
-Lemma subrange_full_gen (n : Z) (a : mword n) :
-  0 < n -> subrange_vec_dec a (n - 1) 0 = autocast (T := mword) a.
-Proof.
-  intro Hn.
-  pose proof (bv_unsigned_in_range (MachineWord.MachineWord.Z_idx n) a) as Hr.
-  unfold bv_modulus in Hr.
-  assert (Hpow : 2 ^ Z.of_N (MachineWord.MachineWord.Z_idx n) = 2 ^ n)
-    by (cbn; rewrite Z2N.id; [ reflexivity | lia ]).
-  rewrite Hpow in Hr.
-  apply bv_eq.
-  rewrite (subrange_dec_unsigned_lo0 a (n - 1) (2 ^ n) ltac:(lia) ltac:(f_equal; lia)).
-  rewrite (autocast_unsigned n (n - 1 - 0 + 1) a ltac:(lia)).
-  apply Z.mod_small. exact Hr.
-Qed.
 
 (* ...and the same, composed with the [autocast] that transports it back --
    the shape [checked_mem_write]'s split loop hands to [write_ram]. *)
@@ -1737,14 +1655,6 @@ Proof.
   rewrite H64 in H1. rewrite H64. lia.
 Qed.
 
-Lemma z_align8_room_8 (u : Z) : 0 <= u -> u < 2 ^ 64 -> u mod 8 = 0 -> u + 8 <= 2 ^ 64.
-Proof.
-  intros H0 H1 H8.
-  assert (Hdv : (8 | u)) by (apply Z.mod_divide; [ lia | exact H8 ]).
-  destruct Hdv as [k Hk].
-  assert (H64 : (2:Z) ^ 64 = 18446744073709551616) by (vm_compute; reflexivity).
-  rewrite H64 in H1. rewrite H64. lia.
-Qed.
 
 Lemma exec_split_on_page_boundary_aligned8 (a : mword 64) s :
   is_aligned_vaddr (Virtaddr a) 8 = true ->

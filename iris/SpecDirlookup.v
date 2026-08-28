@@ -64,7 +64,7 @@
        [IcacheEscrow.ic_loaded] and in [ipool_shape_np]'s allocated arm, so
        namex destructs it out of ilock's postcondition at a directory it
        could not have named in advance -- [DirView.dir_ok_dir] is the one
-       step, and it wants [nib = icfg_nib].
+       step, and it is at [icfg_nib] outright since rank 1c.
 
    ---- THE GRANULARITY PREMISE IS GONE (fs-icache.md §15(b)) -----------
 
@@ -252,13 +252,11 @@ Qed.
 Definition wp_dirlookup_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γa : gname) (γf : gname)                         (* kalloc, file table  *)
-    (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (dinum : mword 32)                (* the HOME's inum     *)
     (bm : blkmap) (data : nat -> list (bv 8))
     (dn : dinode) (dr : dinode)                       (* in-core / REGION    *)
@@ -290,7 +288,7 @@ Definition wp_dirlookup_sconf_body
      above come out of. *)
   blk_holes_zero bm data ->
   (* (3) iget's argument bound, over the records -- see the header *)
-  dir_inums_ok data nrec nib ->
+  dir_inums_ok data nrec icfg_nib ->
   (* (4) THE LICENCE PREMISE, §7.5.6 verbatim.  See the header for why it
      is a disjunction and which of the six call sites brings which half. *)
   (bv_unsigned (di_nlink dn) <> 0
@@ -356,10 +354,10 @@ Definition wp_dirlookup_sconf_body
      console credentials printk needs out of [panic_env].  Both persistent,
      and every caller of dirlookup already holds them. *)
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs γd dev fsc_cov) -∗
+  bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
   kalloc_env γa None -∗
   (* ---- THE LOCKED DIRECTORY, readi's bundle verbatim ---- *)
-  i_dev ip ↦₄{dqd} dev -∗
+  i_dev ip ↦₄{dqd} icfg_dev -∗
   inode_meta ip dn -∗
   inode_map fsc_fs ip bm -∗
   inode_blocks fsc_fs bm data -∗
@@ -376,7 +374,7 @@ Definition wp_dirlookup_sconf_body
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   bslot -∗
   (* ---- THE ICACHE, exactly as iget takes it ---- *)
-  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst nib dev -∗
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   (* ---- THE INODE REGION, and it is iget's premise, not dirlookup's own
@@ -385,7 +383,7 @@ Definition wp_dirlookup_sconf_body
      columns; dirlookup itself still reads dinodes only through [readi] and
      the borrowed [dinode_at] below.  Persistent, so it is a frame at every
      one of the five call sites. ---- *)
-  ireg_inv fsc_ireg fsc_fs inodestart nib -∗
+  ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   (* ONE ledger unit for the iget on the found arm; RETURNED on the other *)
   iref_slot -∗
   (* ---- THE BORROWED TICKET LIST, THE HOME'S ENTRY UNITS AND ITS OWN
@@ -406,7 +404,7 @@ Definition wp_dirlookup_sconf_body
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       (* THE DIRECTORY COMES BACK UNTOUCHED *)
-      i_dev ip ↦₄{dqd} dev -∗
+      i_dev ip ↦₄{dqd} icfg_dev -∗
       inode_meta ip dn -∗
       inode_map fsc_fs ip bm -∗
       inode_blocks fsc_fs bm data -∗
@@ -421,7 +419,7 @@ Definition wp_dirlookup_sconf_body
        then ⌜dir_first data nrec s = Some k
              /\ (kslot < NINODE)%nat
              /\ mf !!! Regidx (mword_of_int 10 : mword 5) = ientry kslot⌝ ∗
-            inode_ref kslot q dev
+            inode_ref kslot q icfg_dev
               (zero_extend' 32 (dir_inum data k : mword 16) : mword 32) ∗
             (* THE MINTED PROVENANCE UNIT (item 7a-wire, iclaim-ledger.md
                §5''.3): dirlookup's iget mints one, flavoured by the licence
@@ -452,7 +450,6 @@ Module Type DIRLOOKUP.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γa : gname) (γf : gname)
-      (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (dinum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn : dinode) (dr : dinode)
@@ -462,6 +459,6 @@ Module Type DIRLOOKUP.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_dirlookup_sconf_body γs j γl γu γd γk pd pav pu bn
-                              γa γf inodestart nib dev ip dinum bm data dn dr
+                              γa γf ip dinum bm data dn dr
                               fn hasp pofv pidv dq dqd dqn m K eb b lks Vpr.
 End DIRLOOKUP.

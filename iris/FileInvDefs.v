@@ -457,90 +457,139 @@ Record fcontent := MkFContent {
 (*  ... AND THE PART OF IT A FILE DESCRIPTOR SHOWS ITS USER            *)
 (* ------------------------------------------------------------------ *)
 
-(* [FdSlots.fdstate] is the user-visible state of one descriptor; this is
-   the reading of a file's contents that a descriptor NAMING that file
-   reports.  It is a total function with FD_NONE mapping to [FdClosed]
-   because that is the honest reading -- an untyped [struct file] is what
-   filealloc hands back before its caller has decided what the file IS, and
-   a descriptor may not name one.  [ProcInv.ofile_slot] states exactly that
-   as [st <> FdClosed] on its file disjunct, so "the descriptor is open" and
-   "the file it names is typed" are ONE clause rather than two.
+(* [FdSlots.fdstate] is the user-visible state of one descriptor; this says
+   WHEN a state is the honest reading of a given file.  It is a RELATION and
+   not a function of the file, for two reasons, and the second is the one
+   that matters:
 
-   It is stated ONCE, at [file_ref]'s definition, and every holder of a
-   reference carries the answer as an index rather than recomputing it --
-   see the note there for why the reference is what has to carry it.
+   - the inode NUMBER is not a [struct file] field.  What the struct records
+     is [f->ip], the itable ENTRY, and entries are recycled, so [C] alone
+     cannot say which file this is; the number comes from the reference
+     parked in [f->ip], via [fpnames.fp_inum].
 
-   [fc_readable] / [fc_writable] are deliberately not read here: this
-   increment tracks only whether a descriptor is open and what KIND of file
-   it names.  Adding the mode later is a field on [fdtype], not a change of
-   shape.
+   - IT CONSTRAINS [fc_type] IN BOTH DIRECTIONS.  A function from files to
+     states has to send the type codes it does not recognise somewhere, and
+     the only honest target is [FdClosed] -- which would mean [FdClosed] told
+     a holder nothing about [f->type].  Read as a relation each arm PINS the
+     type: a descriptor in state [FdOpen (FdPipe _)] is on a file whose
+     [f->type] is FD_PIPE, and one in state [FdClosed] is on an UNTYPED
+     file.  That is what lets [file_ref] hide its [fcontent] entirely --
+     everything a holder used to read off [C] at this altitude, it now reads
+     off the state.
 
-   THE INUM IS A PARAMETER RATHER THAN A FIELD OF [C], and that asymmetry
-   with [fc_major] is the whole reason this function is not a function of
-   the file alone.  [fc_major] is a [struct file] field, so a reference
-   carries it in its points-tos; the inum is not -- what the struct records
-   is [f->ip], the itable ENTRY, and entries are recycled.  The number lives
-   one layer down, in the reference the file parks there, and it reaches a
-   descriptor through [fp_inum] and [file_ref]'s state index.  Off the
-   FD_INODE arm it is ignored, exactly as [fc_major] is off FD_DEVICE.
+   [fc_readable] / [fc_writable] are deliberately not related here: this
+   increment tracks only whether a descriptor is open, what KIND of file it
+   names, and which one.  Adding the mode later is a field on [fdtype], not
+   a change of shape.
 
    DEVICE FILES ARE NOT GIVEN THEIR INUM even though they hold an inode
    reference too and could be.  A device fd's identity to its user is the
    driver behind it, which is [fc_major]; the inode it was opened through is
-   a mount detail.  If that turns out to be wanted it is another argument on
+   a mount detail.  If that turns out to be wanted it is another conjunct on
    the [FdDevice] arm, and this is the only site that would change. *)
-Definition fdstate_of (inum : mword 32) (C : fcontent) : fdstate :=
-  if bool_decide (fc_type C = FD_PIPE) then FdOpen FdPipe
-  else if bool_decide (fc_type C = FD_INODE)
-       then FdOpen (FdInode (bv_unsigned inum))
-  else if bool_decide (fc_type C = FD_DEVICE)
-       then FdOpen (FdDevice (bv_unsigned (fc_major C)))
-       else FdClosed.
+Definition fdstate_ok (inum : mword 32) (C : fcontent) (st : fdstate) : Prop :=
+  match st with
+  | FdClosed             => fc_type C = FD_NONE
+  | FdOpen (FdPipe b)    => fc_type C = FD_PIPE /\
+                            fc_writable C
+                              = ((if b then mword_of_int 1
+                                        else mword_of_int 0) : mword 8)
+  | FdOpen (FdInode n)   => fc_type C = FD_INODE /\ n = bv_unsigned inum
+  | FdOpen (FdDevice mj) => fc_type C = FD_DEVICE
+                            /\ mj = bv_unsigned (fc_major C)
+  end.
 
-Lemma fdstate_of_pipe (inum : mword 32) (C : fcontent) :
-  fc_type C = FD_PIPE -> fdstate_of inum C = FdOpen FdPipe.
-Proof. intro H. rewrite /fdstate_of bool_decide_true //. Qed.
-
-Lemma fdstate_of_inode (inum : mword 32) (C : fcontent) :
-  fc_type C = FD_INODE -> fdstate_of inum C = FdOpen (FdInode (bv_unsigned inum)).
+(* THE FORWARD READINGS, one per type code.  A proof that has just loaded
+   [f->type] and branched on it learns which state its descriptor is in --
+   which is how the [st]-keyed environments in SpecFileread and friends line
+   up with the arm the code took.  (The converse direction is the definition
+   above and needs no lemma.) *)
+(* the pipe reading names its DIRECTION existentially: which end a
+   descriptor holds is produced by pipealloc and consumed by nobody in the
+   kernel -- the closers only need to know it is a pipe. *)
+Lemma fdstate_ok_pipe (inum : mword 32) (C : fcontent) (st : fdstate) :
+  fdstate_ok inum C st -> fc_type C = FD_PIPE ->
+  ∃ b : bool, st = FdOpen (FdPipe b).
 Proof.
-  intro H. rewrite /fdstate_of bool_decide_false; [by rewrite bool_decide_true|].
-  rewrite H. unfold FD_INODE, FD_PIPE. intro Hc.
-  apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc.
+  destruct st as [|[n|b|mj]]; cbn; intros Hok Ht.
+  - exfalso. rewrite Ht in Hok. apply (f_equal bv_unsigned) in Hok.
+    by vm_compute in Hok.
+  - exfalso. destruct Hok as [Hc _]. rewrite Ht in Hc.
+    apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc.
+  - by exists b.
+  - exfalso. destruct Hok as [Hc _]. rewrite Ht in Hc.
+    apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc.
 Qed.
 
-Lemma fdstate_of_device (inum : mword 32) (C : fcontent) :
-  fc_type C = FD_DEVICE ->
-  fdstate_of inum C = FdOpen (FdDevice (bv_unsigned (fc_major C))).
+Lemma fdstate_ok_inode (inum : mword 32) (C : fcontent) (st : fdstate) :
+  fdstate_ok inum C st -> fc_type C = FD_INODE ->
+  st = FdOpen (FdInode (bv_unsigned inum)).
 Proof.
-  intro H. rewrite /fdstate_of bool_decide_false.
-  2:{ rewrite H. unfold FD_DEVICE, FD_PIPE. intro Hc.
-      apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc. }
-  rewrite bool_decide_false; [by rewrite bool_decide_true|].
-  rewrite H. unfold FD_DEVICE, FD_INODE. intro Hc.
-  apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc.
+  destruct st as [|[n|wr|mj]]; cbn; intros Hok Ht.
+  - exfalso. rewrite Ht in Hok. apply (f_equal bv_unsigned) in Hok.
+    by vm_compute in Hok.
+  - destruct Hok as [_ ->]. reflexivity.
+  - exfalso. destruct Hok as [Hc _]. rewrite Ht in Hc.
+    apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc.
+  - exfalso. destruct Hok as [Hc _]. rewrite Ht in Hc.
+    apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc.
+Qed.
+
+Lemma fdstate_ok_device (inum : mword 32) (C : fcontent) (st : fdstate) :
+  fdstate_ok inum C st -> fc_type C = FD_DEVICE ->
+  st = FdOpen (FdDevice (bv_unsigned (fc_major C))).
+Proof.
+  destruct st as [|[n|wr|mj]]; cbn; intros Hok Ht.
+  - exfalso. rewrite Ht in Hok. apply (f_equal bv_unsigned) in Hok.
+    by vm_compute in Hok.
+  - exfalso. destruct Hok as [Hc _]. rewrite Ht in Hc.
+    apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc.
+  - exfalso. destruct Hok as [Hc _]. rewrite Ht in Hc.
+    apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc.
+  - destruct Hok as [_ ->]. reflexivity.
+Qed.
+
+Lemma fdstate_ok_none (inum : mword 32) (C : fcontent) (st : fdstate) :
+  fdstate_ok inum C st -> fc_type C = FD_NONE -> st = FdClosed.
+Proof.
+  destruct st as [|[n|wr|mj]]; cbn; intros Hok Ht; [reflexivity | | |];
+    exfalso; destruct Hok as [Hc _]; rewrite Ht in Hc;
+    apply (f_equal bv_unsigned) in Hc; by vm_compute in Hc.
+Qed.
+
+(* IT IS STILL FUNCTIONAL, which is the half of "projection" worth keeping:
+   a file plus its inum admits AT MOST ONE state.  So two shares of one file
+   report the same thing to their users ([file_pay_st_agree]), and reading a
+   descriptor's state twice cannot give two answers.  What the relation drops
+   is only the other half -- the obligation to invent a state for a file
+   whose [f->type] is none of the four codes. *)
+Lemma fdstate_ok_inj (inum : mword 32) (C : fcontent) (st1 st2 : fdstate) :
+  fdstate_ok inum C st1 -> fdstate_ok inum C st2 -> st1 = st2.
+Proof.
+  destruct st1 as [|[n1|wr1|m1]]; cbn; intros H1 H2.
+  - by rewrite (fdstate_ok_none inum C st2 H2 H1).
+  - destruct H1 as [Ht ->]. by rewrite (fdstate_ok_inode inum C st2 H2 Ht).
+  - destruct H1 as [Ht Hw1].
+    destruct (fdstate_ok_pipe inum C st2 H2 Ht) as [b2 ->].
+    destruct H2 as [_ Hw2]. cbn in Hw2.
+    (* the two directions agree because the CELL does *)
+    destruct wr1, b2; try reflexivity; exfalso;
+      rewrite Hw1 in Hw2; apply (f_equal bv_unsigned) in Hw2;
+      by vm_compute in Hw2.
+  - destruct H1 as [Ht ->]. by rewrite (fdstate_ok_device inum C st2 H2 Ht).
 Qed.
 
 (* the three ways a descriptor's file can be typed, as ONE fact -- what
-   every producer of an [ofile_slot] file disjunct actually has to pay.
-   Note it holds at EVERY inum: openness does not depend on which file. *)
-Lemma fdstate_of_open (inum : mword 32) (C : fcontent) :
+   every producer of an [ofile_slot] file disjunct actually has to pay. *)
+Lemma fdstate_ok_open (inum : mword 32) (C : fcontent) (st : fdstate) :
+  fdstate_ok inum C st ->
   fc_type C = FD_PIPE \/ fc_type C = FD_INODE \/ fc_type C = FD_DEVICE ->
-  fdstate_of inum C <> FdClosed.
+  st <> FdClosed.
 Proof.
-  intros [H|[H|H]].
-  - rewrite (fdstate_of_pipe inum C H). discriminate.
-  - rewrite (fdstate_of_inode inum C H). discriminate.
-  - rewrite (fdstate_of_device inum C H). discriminate.
-Qed.
-
-Lemma fdstate_of_none (inum : mword 32) (C : fcontent) :
-  fc_type C = FD_NONE -> fdstate_of inum C = FdClosed.
-Proof.
-  intro H. rewrite /fdstate_of !bool_decide_false //; rewrite H;
-    [ unfold FD_NONE, FD_DEVICE | unfold FD_NONE, FD_INODE
-    | unfold FD_NONE, FD_PIPE ];
-    intro Hc; apply (f_equal bv_unsigned) in Hc; by vm_compute in Hc.
+  intros Hok [H|[H|H]].
+  - destruct (fdstate_ok_pipe inum C st Hok H) as [b ->]. discriminate.
+  - rewrite (fdstate_ok_inode inum C st Hok H). discriminate.
+  - rewrite (fdstate_ok_device inum C st Hok H). discriminate.
 Qed.
 
 (* ------------------------------------------------------------------ *)
@@ -1196,9 +1245,6 @@ Section FileInv.
   (* [f->writable] as the BOOL that indexes the pipe's two ends -- the same
      bool pipeclose takes as its second argument, and the truth value of the
      byte fileclose loads with [lbu]. *)
-  Definition fc_wbool (C : fcontent) : bool :=
-    negb (eq_vec (fc_writable C : mword 8) (mword_of_int 0 : mword 8)).
-
   (* WHAT THE FILE OWNS, as a function of its CONTENT and its payload names.
      A function of [C] alone (given the names) is what lets the exclusive
      holder publish a payload by STORING to [f->type] and [f->pipe]: there is
@@ -1241,6 +1287,9 @@ Section FileInv.
      so a WHOLE unit either way -- from here on the pipe arm, from [iput] on
      the inode arm -- which is what goes back into the freed slot.  Neither
      the type nor the lastness has to appear in fileclose's postcondition. *)
+  Definition fc_wbool (C : fcontent) : bool :=
+    negb (eq_vec (fc_writable C : mword 8) (mword_of_int 0 : mword 8)).
+
   Definition file_core (q : Qp) (pn : fpnames) (C : fcontent) : iProp Σ :=
     (if bool_decide (fc_type C = FD_PIPE)
      then is_pipe (fp_lock pn) (fp_pipe pn) (fc_pipe C) ∗
@@ -1251,7 +1300,12 @@ Section FileInv.
      else iref_frac q)%I.
 
   (* AN UNTYPED SLOT'S PAYLOAD IS EXACTLY ITS IREF UNIT.  What filealloc
-     hands out and what a retype to FD_PIPE moves into the pipe arm. *)
+     hands out and what a retype to FD_PIPE moves into the pipe arm.
+
+     The hypothesis is [fc_type C = FD_NONE] and a holder of a REFERENCE can
+     state it even though the reference hides its [C]: [fdstate_ok]'s
+     [FdClosed] arm IS this equation, so a descriptor known to be closed
+     hands it over by definition. *)
   Lemma file_core_none q pn C :
     fc_type C = FD_NONE -> file_core q pn C ⊣⊢ iref_frac q.
   Proof.
@@ -1333,24 +1387,24 @@ Section FileInv.
      view of it pulled out of the quantifier.
 
      WHY [st] AND NOT [fp_inum].  The inum alone would do the job, but every
-     consumer would then have to apply [fdstate_of] itself, and the FD_NONE
+     consumer would then have to relate it to a type itself, and the FD_NONE
      and FD_PIPE arms would carry a number that means nothing.  [st] is what
-     the consumers actually want, and it is the same fact. *)
+     the consumers actually want, and by [fdstate_ok] it is the same fact --
+     in BOTH directions, which is what lets [file_ref] hide [C]. *)
   Definition file_pay_st (γ : gname) (k : nat) (q : Qp) (C : fcontent)
       (st : fdstate) : iProp Σ :=
-    (∃ pn, ⌜st = fdstate_of (fp_inum pn) C⌝ ∗ fpay_tok γ k q pn ∗
+    (∃ pn, ⌜fdstate_ok (fp_inum pn) C st⌝ ∗ fpay_tok γ k q pn ∗
            file_payload γ k q pn C)%I.
 
+  (* the forgetful direction only.  There is no [file_pay -∗ ∃ st,
+     file_pay_st]: a payload whose [f->type] is none of the four codes has NO
+     honest state, and inventing one is exactly what [fdstate_ok] refuses to
+     do.  Every caller that needs the indexed form knows the type -- see
+     [file_pay_st_none], which is filealloc's. *)
   Lemma file_pay_st_pay γ k q C st :
     file_pay_st γ k q C st -∗ file_pay γ k q C.
   Proof. iIntros "(%pn & _ & Hn & Hp)". iExists pn. iFrame. Qed.
 
-  Lemma file_pay_st_intro γ k q C :
-    file_pay γ k q C -∗ ∃ st, file_pay_st γ k q C st.
-  Proof.
-    iIntros "(%pn & Hn & Hp)".
-    iExists (fdstate_of (fp_inum pn) C), pn. by iFrame.
-  Qed.
 
   (* an UNTYPED payload gives [FdClosed] and there is nothing to choose:
      what filealloc needs to know about the file it just handed out. *)
@@ -1359,7 +1413,7 @@ Section FileInv.
     file_pay γ k q C -∗ file_pay_st γ k q C FdClosed.
   Proof.
     iIntros (Hty) "(%pn & Hn & Hp)". iExists pn. iFrame.
-    iPureIntro. by rewrite (fdstate_of_none _ C Hty).
+    iPureIntro. exact Hty.
   Qed.
 
   (* THE SPLIT, at ONE state: filedup's two shares describe one file.  It is
@@ -1379,11 +1433,25 @@ Section FileInv.
       iExists pn1. rewrite fpay_tok_split file_payload_split. by iFrame.
   Qed.
 
+  (* THE TIE, READ WITHOUT SPENDING THE PAYLOAD.  An [∧] rather than a [∗]
+     so that both sides see the whole resource: the pure fact is what a proof
+     that has just branched on [f->type] needs in order to say which state
+     its descriptor is in, and it must not have to give up the payload to
+     learn it. *)
+  Lemma file_pay_st_ok γ k q C st :
+    file_pay_st γ k q C st -∗
+    ⌜∃ inum : mword 32, fdstate_ok inum C st⌝ ∧ file_pay_st γ k q C st.
+  Proof.
+    iIntros "H". iSplit; [| iExact "H"].
+    iDestruct "H" as (pn) "(%Hok & _)". iPureIntro. by exists (fp_inum pn).
+  Qed.
+
   Lemma file_pay_st_agree γ k q1 st1 q2 st2 C :
     file_pay_st γ k q1 C st1 -∗ file_pay_st γ k q2 C st2 -∗ ⌜st1 = st2⌝.
   Proof.
-    iIntros "(%pn1 & -> & Hn1 & _) (%pn2 & -> & Hn2 & _)".
-    by iDestruct (fpay_tok_agree with "Hn1 Hn2") as %<-.
+    iIntros "(%pn1 & %H1 & Hn1 & _) (%pn2 & %H2 & Hn2 & _)".
+    iDestruct (fpay_tok_agree with "Hn1 Hn2") as %<-.
+    iPureIntro. exact (fdstate_ok_inj _ _ _ _ H1 H2).
   Qed.
 
   (* ---- THE predicate: holding one reference on file slot [k] ----
@@ -1392,7 +1460,7 @@ Section FileInv.
      p->ofile[fd], a syscall's local [struct file *f], pipealloc's two
      half-built files.  It is NOT persistent and NOT duplicable -- duplicating
      it is filedup, which must run under ftable.lock and bump the physical
-     count.  [file_ref γ k 1 C st] is the exclusive (writable) state.
+     count.  [file_ref γ k 1 st] is the exclusive (writable) state.
 
      ---- WHY [st] IS AN ARGUMENT ------------------------------------------
 
@@ -1400,13 +1468,13 @@ Section FileInv.
      ([FdSlots.fdstate]), and a reference carries it because a reference is
      precisely what a descriptor holds.  [ProcInv.ofile_slot] then reads
 
-         file_ref γf k q C st ∗ fd_st_auth γd fd st
+         file_ref γf k q st ∗ fd_st_auth γd fd st
 
      -- the fd's ghost is the reference's own index, not a function applied
      to it -- and "this descriptor is open" is literally [st <> FdClosed].
 
-     It is REDUNDANT and that is deliberate: [st] is [fdstate_of inum C] for
-     the payload's inum, so it adds no information to the reference.  What it
+     It is REDUNDANT of the CONTENT and that is deliberate: [st] is
+     pinned by the reference's own [C] and [fp_inum].  What it
      adds is A PLACE TO PUT THE INUM.  The type and major number are [struct
      file] fields, so [C] has them; the inode NUMBER is not -- the struct
      holds [f->ip], the itable ENTRY, and entries are recycled, so the
@@ -1414,27 +1482,41 @@ Section FileInv.
      down in [fp_inum], under [file_pay]'s quantifier, and indexing the
      reference is what lifts it out to where a descriptor can state it.
 
+     ---- AND WHY [C] IS NOT AN ARGUMENT ------------------------------------
+
+     It used to be.  Nothing outside the file layer ever projected a field of
+     it: the ten files of the descriptor layer ([ProcInv], sys_close / dup /
+     read / write / fstat, kexit, kfork, fdalloc) contain ZERO occurrences of
+     [fc_type] and friends.  They named [C] only to pass it along, and every
+     one of them already had it under a quantifier of its own -- [ofile_slot]
+     and [proc_ofiles_lend] both bound it existentially, so the argument was
+     doing nothing but forcing each of those sites to introduce a variable
+     and thread it.
+
+     The file layer DOES read the fields -- fileread steps through
+     [lw a5, f->type] and has to know what it loaded -- but it reads them off
+     [file_fields], which it gets by taking the reference apart.  Opening the
+     existential is that same step.
+
      THE CONSEQUENCE FOR THE LOAN WINDOW.  [ProcInv.proc_ofiles_lend] hands
      a descriptor's ghost authority out WITH the reference; because both name
      [st], a syscall cannot put back a reference to a DIFFERENT file than the
      one the fd's ghost still claims.  A bare reference plus a free-floating
-     authority could, and nothing would catch it.
+     authority could, and nothing would catch it. *)
+  Definition file_ref (γ : gname) (k : nat) (q : Qp) (st : fdstate) : iProp Σ :=
+    (∃ C : fcontent,
+       fref_tok γ k q ∗ file_fields k q C ∗ file_pay_st γ k q C st ∗
+       flive_tok γ k)%I.
 
-     THE INDEX RIDES IN THE PAYLOAD, not as a fifth conjunct or a leading
-     existential, and that is why adding it left the ~40 sites that take a
-     reference apart and put it back alone: [file_pay_st] occupies exactly
-     the slot [file_pay] used to, so the four-way shape below is what it
-     always was. *)
-  Definition file_ref (γ : gname) (k : nat) (q : Qp) (C : fcontent)
-      (st : fdstate) : iProp Σ :=
-    (fref_tok γ k q ∗ file_fields k q C ∗ file_pay_st γ k q C st ∗
-     flive_tok γ k)%I.
-
-  (* the redundancy, made available: every [fc_type]-to-[st] bridge in the
-     tree goes through this plus an [fdstate_of_*] lemma. *)
-  Lemma file_ref_state γ k q C st :
-    file_ref γ k q C st -∗ ∃ inum : mword 32, ⌜st = fdstate_of inum C⌝.
-  Proof. iIntros "(_ & _ & (%pn & %Hst & _) & _)". by iExists (fp_inum pn). Qed.
+  (* THE BRIDGE OUT OF THE QUANTIFIER: what a proof that has to look at the
+     file's own cells opens the reference for.  Every [fc_type]-to-[st]
+     step in the tree goes through this plus an [fdstate_ok_*] lemma. *)
+  Lemma file_ref_state γ k q st :
+    file_ref γ k q st -∗
+    ∃ (C : fcontent) (inum : mword 32), ⌜fdstate_ok inum C st⌝.
+  Proof.
+    iIntros "(%C & _ & _ & (%pn & %Hst & _) & _)". by iExists C, (fp_inum pn).
+  Qed.
 
   (* ---- the ftable lock's resource ----
 

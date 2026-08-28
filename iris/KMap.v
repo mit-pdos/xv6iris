@@ -39,12 +39,6 @@ Local Open Scope Z_scope.
 (* the whole static map; the returned static fragments are PERSISTED and  *)
 (* distributed (into the identity ↦ₘ/↦ₓ□ and the bundle below).           *)
 (* ===================================================================== *)
-Lemma kmap_alloc `{!ghost_mapG Σ (mword 27) (mword 44 * kperm)} :
-  ⊢ |==> ∃ γ : gname, ghost_map_auth γ 1 kmap_M0.
-Proof.
-  iMod (ghost_map_alloc kmap_M0) as (γ) "[Hauth _]".
-  iModIntro. iExists γ. iExact "Hauth".
-Qed.
 
 Section KMap.
   Context `{!riscvGS Σ}.
@@ -180,18 +174,6 @@ Section KMap.
      [mem_ident_phys] runs, stopped one step earlier, and it is what makes
      "weaken to pass through a KT1 context, strengthen on the way back" a
      complete round trip rather than a one-way door. ---- *)
-  Lemma mem_ktier_pin_intro (kt : ktier) (va : mword 64) dq b :
-    kmap_static (svpn_of va) KP_rw ->
-    kmap_static_claims -∗ va ↦ₘ[kt]{dq} b -∗ va ↦ₘ[KT0]{dq} b.
-  Proof.
-    iIntros (Hs) "#Hb H".
-    iDestruct (kmap_static_claims_at (svpn_of va) KP_rw Hs with "Hb") as "#Hk0".
-    iDestruct (mem_pointsto_pin (KTR := kt) va dq b (kpt_leaf_ppn (svpn_of va))
-                 with "Hk0 H") as "(%Hc & %Hd & _ & Hp & _)".
-    rewrite /mem_pointsto. iExists (kpt_leaf_ppn (svpn_of va)).
-    iFrame "Hk0 Hp". iPureIntro.
-    split; [exact Hc | split; [exact Hd | exact (pa_of_id va Hc)]].
-  Qed.
 
   (* text tier: ↦ₓ ⇄ ↦ₚ at KP_rx / addr_is_text *)
   Lemma text_ident_phys (pa : mword 64) dq b :
