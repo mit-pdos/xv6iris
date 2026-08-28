@@ -10088,6 +10088,197 @@ unchanged after both rounds.
    files, `ProofMain`'s last mile.
 
 
+### A6.84 THE M4 UNIT'S CONTRACT FLIP IS BUILT AND COMPILES — AND IT IS
+### BLOCKED BY THE DESTROY PATH'S RECLAIM, WHICH IS NOT AN M4 PROBLEM
+
+Executing the coordinator's instruction to run the M4 atomic unit in one
+pass.  **The flip was written, compiled, and REVERTED**, and the reason is
+a blocker no note before this one names: a lock on a `kalloc`'d page must
+be able to DIE, and a cell that has moved to the ledger tier cannot come
+back to the ctx tower without a drain.  Everything else about the unit
+went through, including the piece A6.83 called "the one open design".
+
+**THE TREE IS BACK AT ITS GREEN BOUNDARY — 1091 of 1296, RED 9, the same
+nine** (§(6)).  The additive kit below is KEPT; only the contract flip is
+reverted, and it is archived verbatim at the workspace root (`ZZM4Flip/`)
+so the next pass re-applies rather than re-derives it.
+
+#### (1) WHAT THE FLIP WAS, AND IT COMPILED
+
+`WpLock` went to the ledger tier WHOLE and **green on its own**:
+
+| what | from | to |
+|---|---|---|
+| `lock_word` | `∃ ξ, ctx_word4_pointsto ξ lk 1 v` | `TsoCtx.phys_ledger_word4 lk 1 v` |
+| `lk_cpu_res` | `∃ ξ, ctx_word_pointsto ξ …` ∗ frag | the eight `phys_ledger_wpay` cells ∗ frag |
+| `lock_inv` | the ∃-body | `lock_body ∗ lk_addr_claim lk 4 ∗ lk_addr_claim (lock_cpu lk) 8` |
+| the four creators + both finishers | `lock_cpu lk ↦₈ 0` | `lk_cpu_fresh lk` |
+
+> **THE ∃ξ DID NOT NEED CLOSING — IT NEEDED DELETING.**  §0.19′ put an ∃
+> on the lock word to keep `is_lock` a closed term, and A6.72 replayed it
+> here; the M4 memo §4(ii) then observed that the two word READS become
+> unprovable under it ("a cell at an unknown ξ licenses no load at
+> ours").  **At the ledger tier there is no ξ at all**: `phys_ledger_word4`
+> is ξ-free by construction and its store gates are context-free, so
+> `is_lock` is closed for the reason §0.19′ wanted and with no residual
+> existential.  That is the third time in this port a ∃-over-contexts has
+> turned out to be a tier error rather than a quantifier one.
+
+**AND THE ADDRESS CLAIM IS WHAT THE TIER COSTS.**  A ledger cell carries
+no MAPPING, so the invariant keeps two persistent `lk_addr_claim`s —
+`WpSconfMem.mem_claim`'s content under its alignment, plus ONE conjunct
+(*the whole window is RAM, not merely its base*).  That extra conjunct is
+worth its line: it makes the free-path word read need **no resource from
+the invariant at all** (`ledger_read_any_word_ok` is payable from RAM-ness
+and the interp), which is A6.78 §(2) at its sharpest — *the read that
+concludes nothing also owns nothing*.  `lock_claims` becomes a peek, and
+**`TsoCtxShim`'s last live use dies with it.**
+
+**A6.83 §(5)'s "one open design" is settled and it was one sentence, as
+predicted:**
+
+```coq
+  Definition lk_own_ok (ex : option CPU) (own : agent -> option nat) : Prop :=
+    forall h, own h = None -> exists i, ex = Some i /\ h = hart_agent i.
+```
+
+*the only agent that may be missing an own-last record is the HOLDER* —
+acquire's store revokes its entry (`ledger_store_wpay_ok`'s second arm),
+release's restores it (the first), every other agent's frames.  A
+`notheld` reader is a non-holder by definition, so this IS
+`lkcpu_read_not_mine`'s first premise.
+
+**AND THE HELD ARM CARRIES MORE THAN THE OTHER TWO** (A6.78 §(2), now
+implemented): `lk_cpu_pay_vis` puts the store's own `ledger_vis` fragment
+beside every byte, which is what makes the holder's read of the cell it
+wrote EXACT.  `lk_cpu_res_held`'s statement grows by one index; the free
+and window forms do not move.
+
+#### (2) THE BLOCKER, AT A LINE NUMBER: `ProofPipeclose:749`
+
+```coq
+  (* KallocInv *)  page_own p := [∗ list] j ∈ seq 0 4096, byte_any (pa_add p j)
+                   byte_any a  := ∃ b : bv 8, a ↦ₘ b          (* a CTX byte *)
+```
+
+`ProofPipeclose` — **GREEN** — rebuilds `page_own pi` with
+`pipe_bytes_page_own` and hands it to `kfree`.  Eight of those 4096 bytes
+are the lock's owner word, and after the flip they are `phys_ledger_wpay`
+cells.  **A wpay cell cannot become a ctx byte.**  What is missing is the
+clean/dirty bit, and minting a DIRTY entry needs the context's own
+authority at an index at or above the cell's timestamp
+(`TsoCtx.ctx_store_bytes`' invariant `∀ k ∈ dom D, k.1 ≤ i`) — i.e. a
+DRAIN.  At the destroy point the cell's timestamp is release's own store,
+the top of the log, and no fence stands between.
+
+> **AND THE FLIP IS NOT WHAT MADE THIS UNPROVABLE — IT IS WHAT MOVED IT
+> INTO A GREEN FILE.**  Today `lk_cpu_res`'s cell is at an unknown ξ and
+> `lock_finisher` wants it at the AMBIENT one, so the destroy path is
+> already unprovable; the impossibility just lives in `ProofRelease`,
+> which is RED.  Green files only CONSUME that post.  Change the post's
+> TYPE and the consumer breaks — which is the standing discipline's
+> "green files do not go red", and it is why this reverted.
+>
+> **THE RULE THIS LEAVES.**  *A tier change is not local to the tier's
+> own clients: it is local to everything that RECLAIMS the storage.*  The
+> pin and the parked record never met this because nothing frees a page
+> table or a lock's payload; the racy payload is the first cell in the
+> port that both carries a history claim and lives in memory somebody
+> gives back.
+
+**WHAT WOULD UNBLOCK IT, and it is the reclaim lane, not M4:** a gate
+`own_context ξ -∗ phys_ledger_at a dq v t ==∗ own_context ξ ∗
+ctx_phys_pointsto ξ a dq v` — a byte RE-ENTERING the tower as DIRTY.  It
+is sound in principle (the dirty arm is exactly "this context wrote it and
+has not drained"), and its side condition is the context's index against
+`t`.  A6.9's "a byte that leaves the ledger can never come back" is about
+the RAW tier and does not forbid it; what forbids it TODAY is that no
+lemma builds a dirty entry outside `ctx_store_bytes`.
+
+#### (3) LANDED AND KEPT: THE LEDGER-TIER GATES THE UNIT NEEDS
+
+All additive, all green, all now sitting in `TsoCtx` with no consumer
+until the flip returns:
+
+| name | what |
+|---|---|
+| `ctx_pointsto_ledger_kt0` | a KT0 ctx byte IS a ledger byte (`ktier_pin_id` is the whole bridge) |
+| `phys_ledger_word4` + family | the lock word's ξ-free carrier |
+| `ctx_word4_ledger_kt0` / `ctx_word_ledger_kt0` | the creators' one-way crossing |
+| `ledger_read_wpay_vis_ok` (+ bytes form) | `ledger_read_vis_ok` at a cell whose payload is SET — the holder's exact read |
+| `phys_ledger_wpay_ram` | a windowed byte is RAM |
+| `phys_ledger_wpay_win_map` / `_at_win_map` | the list↔map bridges the window store needs |
+| `ledger_store_win_wpay_ok` | the cpu word's store: `z`, `cp` and the FLOOR framed, only `own` moves, and the append's own message fragment handed back |
+
+> **ONE MEASUREMENT INSIDE THAT LIST IS WORTH KEEPING.**  The window store
+> gate needed the payload keyed by ADDRESS (the store gate's footprint is
+> a `gmap`) and by OFFSET (the payload's `tw_j`), and `pa_add` is
+> injective but not computably invertible.  The bridge is
+> `tso_pa_off base a := Z.to_nat ((uint a - uint base) mod 2^64)` —
+> **and the outer `mod` is what makes it need no no-wrap side condition**,
+> because it absorbs whatever wrap the window's own addition did.  Three
+> lines, and it is the shape any future window-keyed payload will want.
+
+#### (4) THE PARK LANE'S TWO ITEMS
+
+- **The `Persistent` instance the park port needed IS ALREADY IN THIS
+  FILE and DOES fire.**  Probed (a scratch file against this tree's
+  `TsoCtx.vo`, all four goals by `apply _`):
+  `ctx_word_pointsto` / `ctx_word4_pointsto` / `ctx_word2_pointsto` at
+  `DfracDiscarded` are `Global Instance`s at `TsoCtx:737 / 953 / 835`, and
+  they resolve **through the client notation `a ↦₈□ w`** as well.  So the
+  park lane's local duplication wand can die, and whatever did not fire at
+  its use site is not a missing instance — the two candidates worth
+  checking there are a non-default `CurKtier` in scope and a
+  `Typeclasses Opaque` seal (`is_lock` carries one, deliberately, and
+  resolution stops at it).
+- **`ProofSwtch:157`'s receipt** is recorded on this lane's queue as
+  instructed, and it belongs with §(2)'s reclaim question rather than with
+  M4: both are "a resource must cross a context boundary and the crossing
+  needs a DRAIN", and `valid_context` publishing its stamp is the same
+  publication the reclaim gate's index condition wants.  They should be
+  designed together.
+
+#### (5) WHAT THE NEXT PASS SHOULD DO, IN ORDER
+
+1. **The reclaim gate** (§(2)) — it is the only thing between the flip and
+   the leaves, and it is smaller than the flip: one ghost lemma plus its
+   index condition.  Design it with `ProofSwtch`'s stamp (§(4)).
+2. **Re-apply `ZZM4Flip/wplock_new.py`** (it compiled) plus the client
+   sweep this pass measured: `SpecInitlock`'s post, `SpecProcinit.lk_fresh`
+   + `lk_fresh_pieces`, `ProofInitlock`'s one store site, `WpLockAt:82`,
+   and the seven `c_cpu ↦₈ 0` posts (`SpecFileinit` / `SpecPrintkinit` /
+   `SpecIinit` / `SpecVirtioDiskInit` / `SpecTrapinit` / `SpecBinit` /
+   `SpecInitlockWrapper`) plus `TicksInv` / `PipeInv` / `IcacheBoot` ×2 /
+   `SpecRelease` / `ProofRelease` / `SpecInitsleeplock` / `SleepLockAt` /
+   `SleepLock` ×4 / `BioInv`.  **Measured: 16 files, 20 sites, every one a
+   one-line spelling change** — the creator cascade §0.18′ priced at 19
+   sites, and it is exactly that size.
+3. **`WpSconfLock`'s leaves**, with `lock_claims` already written (it is a
+   peek now) and the free-path word read needing no invariant resource.
+
+#### (6) THE NUMBERS, AND ONE CORRECTION TO WHAT THIS LANE BELIEVED
+
+**1091 of 1296, RED 9 — the A6.83 boundary exactly**, measured on the VM
+after the revert (`ls iris/*.vo | wc -l` = 1091 on the VM, and the same
+nine targets: `UserMemPt`, `UptWalkPt`, `WpSconfLock`, `ProofSwtch`,
+`ProofVirtioDiskRwD`, `ProofVirtioDiskIntr`, `ProofKernelvec`,
+`ProofMain`, `UtResFits`).  No `Admitted`, no `admit`, no `Axiom`; the one
+`Abort` is still `UsertrapRes.ut_res_bare_park` at `:1768`.  The shim
+ledger is unchanged at **one live use**, `WpSconfLock:146` — it dies with
+the flip, and only with the flip.
+
+> **THE PARK LANE'S DIFF IS NOT IN THIS TREE**, and the mistake is worth
+> recording because it cost a wrong reading of a build.  `UtResFits.v`
+> here is dated 08-26 and its failure is the LONG-STANDING one --
+> `ut_res_bare_park was not found` at `:169`, because the lemma it names
+> is the `Abort` in `UsertrapRes`.  Mid-tranche this lane read a
+> `grep -c "^Abort"` of **`UtResFits.v` alone** as evidence the merge had
+> landed; the abort is in a DIFFERENT file and is indented, so the count
+> was zero for two independent wrong reasons.  *A grep that returns zero
+> is evidence of nothing until you have seen it return one somewhere.*
+
+
 ## 7. Order of work
 
 1. `iris/TsoMemPa.v` — the pure machine at machine types (NEW, no
