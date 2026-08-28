@@ -456,10 +456,33 @@ survives only at era 0 inside `P_fs_alloc`/`FsDurImg` (it produces era 0's
 snapshot).  The value the mint takes is `D = fr_D` of the boot recovery
 record, read off the crash predicate's `P_dur` (`P_fs_dur_acc`,
 `P_dur_tie` — pure content, so it rides `riscv_power_adequacy`'s
-`Hproj`/`Ppure` with no new parameter).
+`Hproj`/`Ppure`).  **Since durable-disk BT the EPOCH ITSELF also reaches
+the boot**, as a resource on `power_boot_res`'s new client conjunct
+`Rb` (below, and `design/crash.md`); `boot_shared_alloc` receives it and
+drops it until BT-3 hands it to the mint.
 
-**AND IT CANNOT BECOME A TRANSPORT, measured (lane H5).**  Three things
-say so, and none of them is about the proof effort.  (i) The era's byte
+**IT CAN, AND THE CHANNEL IS OPEN (durable-disk BT; H5's three reasons,
+below, are superseded).**  Reasons (i) and (ii) fell to lemmas that were
+already in the tree: `FsDurXfer.phi_runs_union` is an `⊣⊢`, so the era's
+flat home map splits into the file system's footprint and a remainder at
+`xr_union (xr_fs S PM)` — a MAP VALUE the durable source determines, read
+off `phi_excl`/`phi_agree` inside the lemma (`fs_footprint_install`,
+`fs_state_install`, with `fs_footprint_install_facts` supplying all three
+pure inputs off the epoch itself); and `InodeRegion.ireg_recs_blk` is
+already an `⊣⊢` between the sixteen 64-byte record runs and the whole
+block.  Reason (iii) — the real one — fell to a channel: `RiscvAdequacy`
+now takes a client resource parameter `Rb` whose value crosses on
+`Hswap`'s post and `power_boot_res` (`design/crash.md`, "`Hswap` ALSO
+CARRIES A RESOURCE OUT"), and `FsCrash.P_fs_swap` fills it with
+`P_fs_lend cov ls dk = ∃ D, ⌜fs_recovery (fs_blocks dk) D cov ls⌝ ∗
+P_dur D` — the crash predicate's own epoch, CLONED (`P_dur_clone`) and
+returned, at the one point in the system holding both the fixed disk auth
+and `crashN`.  The bridge from the era's `[∗ set] b ∈ home, fsblock` to a
+flat byte map is `FsDurBytes.fs_dbytes_set_blocks`.  What remains is
+plumbing: `boot_shared_alloc` still DROPS the lent epoch, and
+`fs_cfg_alloc_snap` still takes the pure `snap_ok` (stages BT-3..BT-5).
+
+**H5's three reasons, kept for the record (they were right when written).**  (i) The era's byte
 AUTHORITY is minted at the WHOLE home map (`FsBoot.fs_boot_ghosts`, which
 the WAL's `fs_bytes_inv` row demands), not at the file system's footprint,
 so its elements arrive as one flat `∗` and have to be split by pure facts
