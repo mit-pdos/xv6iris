@@ -64,32 +64,8 @@ Section UmodeKernelTie.
     rewrite /umem. iFrame "Htlb Hmem".
   Qed.
 
-  (* ------------------------------------------------------------------- *)
-  (* SS2 The machine-cell half.                                            *)
-  (* ------------------------------------------------------------------- *)
-
-  (* the slot's concrete [u_regs] (PC and nextPC both at [va]) is
-     [uv_regs] -- CSR values swallowed by its existentials -- plus the two
-     resources every verified leaf threads separately. *)
-  Lemma u_regs_uv_regs (ms_v sc_v stval_v sepc_v va : mword 64) (g : regfile) :
-    user_mstatus_ok ms_v ->
-    u_regs (HART_ACTIVE tt) ms_v sc_v stval_v sepc_v va va g -∗
-    uv_regs ∗ gpr_file g ∗ pc_is va.
-  Proof.
-    iIntros (Hms) "Hregs".
-    iEval (rewrite u_regs_pc_is) in "Hregs".
-    iDestruct "Hregs" as "(Hhs & Hpriv & Hmst & Hsc & Hstv & Hsep & Hpc & Hg)".
-    rewrite /uv_regs.
-    iFrame "Hg Hpc".
-    iExists ms_v, sc_v, stval_v, sepc_v.
-    iFrame "Hhs Hpriv Hmst Hsc Hstv Hsep".
-    iPureIntro. exact Hms.
-  Qed.
-
-  (* the three persistent premises ARE [uv_amb] *)
-  Lemma uv_amb_intro :
-    hw_config -∗ minstret_inv -∗ wire_inv -∗ uv_amb.
-  Proof. iIntros "Hhw Hmi Hwi". rewrite /uv_amb. iFrame "Hhw Hmi Hwi". Qed.
+  (* SS2 The machine-cell half -- [u_regs_uv_regs] / [uv_amb_intro] -- lives
+     in UmodeRegs.v now. *)
 
   (* ------------------------------------------------------------------- *)
   (* SS3 THE COMPOSITE: a slot's whole spatial premise set, plus the trap   *)

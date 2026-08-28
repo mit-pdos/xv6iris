@@ -384,6 +384,64 @@ premise; = `W'` on the transparent arms); the old definitions and
 `Rut_hole` are deleted.  (5) Exec's success arm is where sync's
 constructor is tried.
 
-Open decisions the owner has not yet ruled: `uexec_ret` with the precise
-`usys_mem_ok` table vs. a coarse `∀ r M'` first cut; whether `uvis_tf`
-shrinks to the 32 user-visible words.
+**Stage 2, as landed** (the parallel forms; nothing kernel-facing moved):
+
+- `UsysMemOk.v` (pure, below `UexecWp`): `usys_num tf` (the a7 word read
+  signed at 32 bits, definitionally `sysc_num` at `pv_tf`),
+  `usys_mem_ok n tf r M M'` — `sysc_mem_ok`'s table on the word list, the
+  RETURN VALUE `r` a parameter because exec's row is the failure arm
+  `r = -1 ∧ M' = M`; sbrk's row is the three arms at an EXISTENTIAL new
+  size (exactly the kernel's information; tying it to `r + a0` is sbrk's
+  contract's refinement); `bump_tf tf r` (epc + 4, a0 := r) with its
+  three word readers; `uecall_scause := 8`.  `UsysMemOkSpec.v` (above
+  `SpecSyscall`) proves `sysc_mem_ok V V' M M' -> usys_mem_ok (sysc_num V)
+  (pv_tf V) r M M'` for every entry but exec — the kernel's discharge at J.
+- `UmodeRegs.v`: `uv_regs` / `uv_amb` moved out of `UmodeCap.v` (which
+  re-exports them) with the movers to and from `u_regs`, so the contract
+  file can name them without the capability layer in its cone.
+- `UexecRet.v`: `trapped_machine C pt Rut sc stv W` (sepc = W's epc word,
+  `gpr_file (tf_resume_gpr0 (uvis_tf W))`, `user_pt_inv pt (uvis_M W)`,
+  `Rut pt`); ONE guarded fixpoint `uslot : uvis -> iProp` over
+  `uvis -d> iPropO Σ` (`uslot_F`, `Contractive` by `solve_contractive`),
+  with `uexec_ret`, `ukont`, `uvb` the functional's pieces read back at it
+  (`uexec_ret_F` / `ukont_F` / `uvb_F`); `uslot_unfold`; the arm readers
+  `uexec_ret_ecall` / `uexec_ret_transparent`; `Typeclasses Opaque uslot
+  uvb`.  `uslot` is `uexec_slot`'s successor and takes its name at J.
+- **x0, decided: PINNED.**  `WpGpr.gpr_file f` does not ignore x0 the way
+  `HartTp` pins tp — its x0 entry is the pure fact `f x0 = zero_reg`
+  (`gpr_file_x0`).  So there is a canonical base, `zero_rf`, and the file
+  the new slot restores is `tf_resume_gpr0 tf := tf_resume_gpr zero_rf
+  tf`; the ∀-bound dead base is gone from the new shape.
+  `tf_resume_gpr_x0` (any base with x0 = 0 gives the same file) is what
+  the loop uses to meet it.
+- The boundary: `tf_of m pc` (36 words, kernel words zero),
+  `uvis_of_run m pc M`, `bump W r M'`; round trips `tf_of_resume_gpr`
+  (needs `m x0 = zero_reg`), `tf_of_resume_pc` (needs 2-alignment of
+  `pc`: `tf_resume_pc` applies `ret_pc`), `tf_resume_gpr_bump` /
+  `tf_resume_pc_bump` / `bump_run_gpr` / `bump_run_pc`.  The 32-insert
+  chain is read back by enumerating the 32 `mword 5` values and peeling
+  per case (`exact (upd_eq …)` / `vm_compute; discriminate`), never by
+  `rewrite`: an ssr `rewrite` of an insert-chain lemma unifies the
+  `Insert` instance up to delta and does not terminate.
+- **The generic inhabitant of the new shape IS provable**:
+  `uexec_wp_uslot : □ uexec_wp -∗ uslot W`, a Löb returning itself
+  (`user_trap_frame_trapped` turns the old existential frame into a
+  `trapped_machine` at the key uservec saves; `uexec_ret_of_all` fills
+  every arm from the Löb hypothesis; the linear `uexec_wp` the old
+  channel returns is dropped).  It needs the `□`: fork's arm hands back
+  two slots.
+
+**Stage 3 is BLOCKED on an owner ruling about the key** (detail and the
+options in `projects/user-wp-slot.md` §3 item 2): with the table ∀-bound
+inside `uslot`, EVERY U-mode continuation re-binds the table, and the
+table facts a program runs on (its text page fetch-permitted, its stack
+page writable) are not functions of anything the key carries — the image
+domain pins which pages are mapped, `upt_acc_wf` only says each leaf is
+ok-or-denied per access.  `UexecCond.sync_entry_tbl_refuted` is the
+witness: the existing ∀-table guard is unsatisfiable (the empty table is
+`loop_ok`), so `sync_uexec_slot` / `cond_entry_slot(_gated)` are vacuous
+as stated.
+
+Open decisions the owner has not yet ruled: whether `uvis_tf` shrinks to
+the 32 user-visible words; the per-page permission view in the key (the
+stage-3 blocker above).  The precise `usys_mem_ok` table is what landed.

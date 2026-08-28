@@ -225,6 +225,7 @@ CommonWalk.v
 DecodeTotalU.v
 DecodeSetU.v
 UserExec.v
+UsysMemOk.v
 UexecWp.v
 UexecSlot.v
 UserStep.v
@@ -234,6 +235,8 @@ UserMem.v
 UserFetch.v
 UserStepFull.v
 UmodeMem.v
+UmodeRegs.v
+UexecRet.v
 UmodeCap.v
 UmodeFetch.v
 UmodeAbi.v
@@ -1194,6 +1197,7 @@ ProofUsertrapArms.v
 ProofUsertrapSys.v
 SyscParkEnv.v
 SpecSyscall.v
+UsysMemOkSpec.v
 UtResFits.v
 LinkSyscall.v
 ProofUsertrap.v

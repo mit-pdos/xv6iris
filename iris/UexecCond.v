@@ -30,7 +30,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
-Require Import ProcGeom ProcDefs ProcPtOwn.
+Require Import ProcGeom ProcDefs ProcPt ProcPtOwn.
 Require Import UserPtTree UserFrame UserExec.
 Require Import UmodeMem UmodeCap UmodeAbi UmodeSyscall.
 Require Import UCodeSync.
@@ -218,3 +218,42 @@ Qed.
 Lemma text_region_eq_hits (M : gmap Z (bv 8)) (a : Z) (b : bv 8) :
   SyncInstrs.sync_bytes !! a = Some b -> text_region_eq M -> M !! a = Some b.
 Proof. intros Hb Heq. exact (text_region_eq_uimg_sub M Heq a b Hb). Qed.
+
+(* ===================================================================== *)
+(* SS6 THE ∀-TABLE GUARD IS UNSATISFIABLE -- the satisfiability witness   *)
+(* durable-notes' "GAP PREMISE" rule asks for.                            *)
+(*                                                                        *)
+(* [sync_entry_tbl M sp] owes [sync_layout P] at EVERY [loop_ok] table    *)
+(* [P], and the empty table (userinit's, [upt_desc root tfp]) is one: its *)
+(* text page is unmapped, so [sync_layout] fails there                    *)
+(* ([sync_layout_upt_desc]).  Hence no [M], [sp] satisfies                *)
+(* [sync_entry_tbl] once ANY [loop_ok] config exists -- and one does,     *)
+(* since the loop runs.  [sync_uexec_slot] and both [cond_entry_slot]     *)
+(* forms are therefore vacuous as stated: the table facts a program needs *)
+(* (its text page fetch-permitted, its stack page writable) are not a     *)
+(* function of the image's DOMAIN, which is all the slot's ∀ pins, and    *)
+(* [upt_acc_wf] only says each leaf is ok-or-denied per access, never     *)
+(* which.  The fix is an owner ruling on the KEY (the per-page permission *)
+(* view is user-visible state); see claude-notes/projects/user-wp-slot.md *)
+(* SS3 item 2.                                                            *)
+(* ===================================================================== *)
+Lemma loop_ok_upt_desc (C : ucfg) (P : uptd) (root tfp : mword 44) :
+  loop_ok C P -> page_valid (page_base tfp) -> loop_ok C (upt_desc root tfp).
+Proof.
+  intros (Hstvec & Hdqc & Hmie & Hmedl & _ & _) Hv.
+  split_and!; [ exact Hstvec | exact Hdqc | exact Hmie | exact Hmedl | reflexivity | ].
+  unfold upt_desc. cbn [ud_um ud_tfp].
+  split; [ exact ProcPt.upt_map_wf_empty | ].
+  split; [ exact upt_acc_wf_empty | ].
+  split; [ exact um_pages_valid_empty | ].
+  split; [ exact um_inj_empty | exact Hv ].
+Qed.
+
+Lemma sync_entry_tbl_refuted (C : ucfg) (P : uptd) (root tfp : mword 44)
+    (M : gmap Z (bv 8)) (sp : mword 64) :
+  loop_ok C P -> page_valid (page_base tfp) -> ~ sync_entry_tbl M sp.
+Proof.
+  intros Hlo Hv Htbl.
+  destruct (Htbl C (upt_desc root tfp) (loop_ok_upt_desc C P root tfp Hlo Hv)) as [Hlay _].
+  exact (sync_layout_upt_desc root tfp Hlay).
+Qed.
