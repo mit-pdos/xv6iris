@@ -201,9 +201,8 @@ Notation K_ilock := (62%nat) (only parsing).
 Definition wp_ilock_dep_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
-    (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
+   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
     (gil gisl : gname)                                 (* ip->lock            *)
     (k : nat) (s : Qp) (g : gname) (d : ic_dep) (o : ilkc) (inum : mword 32)
     (pidv : mword 32) (dq dqs : dfrac)
@@ -284,7 +283,7 @@ Definition wp_ilock_dep_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) -∗
+  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
   (* THE THREE PERSISTENT INVARIANTS: the [ref] words, the entry's content,
      the inode region *)
   itable_inv -∗
@@ -352,9 +351,9 @@ Definition wp_ilock_dep_sconf_body
   (* the running-thread bundle *)
   procs_inv gs -∗
   (* the disk fabric *)
-  dev_inv gu gd -∗
-  disk_geom gd pd pav pu -∗
-  is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+  dev_inv fsc_uart fsc_disk -∗
+  disk_geom fsc_disk pd pav pu -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
   (* ONE slot unit: bread's reference, which brelse gives back *)
   bslot -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function PARKS (its
@@ -457,9 +456,8 @@ Definition wp_ilock_dep_sconf_body
 Definition wp_ilock_tx_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
-    (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
+   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
     (gil gisl : gname)                                 (* ip->lock            *)
     (k : nat) (s : Qp) (g : gname) (o : ilkc) (inum : mword 32)
     (pidv : mword 32) (dq dqs : dfrac)
@@ -505,7 +503,7 @@ Definition wp_ilock_tx_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) -∗
+  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
   (* THE THREE PERSISTENT INVARIANTS: the [ref] words, the entry's content,
      the inode region *)
   itable_inv -∗
@@ -570,9 +568,9 @@ Definition wp_ilock_tx_sconf_body
   (* the running-thread bundle *)
   procs_inv gs -∗
   (* the disk fabric *)
-  dev_inv gu gd -∗
-  disk_geom gd pd pav pu -∗
-  is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+  dev_inv fsc_uart fsc_disk -∗
+  disk_geom fsc_disk pd pav pu -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
   (* ONE slot unit: bread's reference, which brelse gives back *)
   bslot -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function PARKS (its
@@ -692,19 +690,17 @@ Definition wp_ilock_tx_sconf_body
 Lemma wp_ilock_tx_of_dep
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (gs : list gname) (j : nat) (gl : gname)
-    (gu : uart_names) (gd : disk_names) (gk : gname)
     (pd pav pu : mword 64)
-    (bn : bio_names)
     (gil gisl : gname)
     (k : nat) (s : Qp) (g : gname) (o : ilkc) (inum : mword 32)
     (pidv : mword 32) (dq dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) (Vpr : pprivate) :
   (forall d : ic_dep,
-     wp_ilock_dep_sconf_body gs j gl gu gd gk pd pav pu bn gil gisl
+     wp_ilock_dep_sconf_body gs j gl pd pav pu gil gisl
  k s g d o inum
                              pidv dq dqs m K eb b lks Vpr) ->
-  wp_ilock_tx_sconf_body gs j gl gu gd gk pd pav pu bn gil gisl
+  wp_ilock_tx_sconf_body gs j gl pd pav pu gil gisl
  k s g o inum
                          pidv dq dqs m K eb b lks Vpr.
 Proof.
@@ -740,15 +736,13 @@ Module Type ILOCK.
   Parameter wp_ilock_dep_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (gil gisl : gname)
       (k : nat) (s : Qp) (g : gname) (d : ic_dep) (o : ilkc) (inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_ilock_dep_sconf_body gs j gl gu gd gk pd pav pu bn gil gisl
+      wp_ilock_dep_sconf_body gs j gl pd pav pu gil gisl
  k s g d o inum
                               pidv dq dqs m K eb b lks Vpr.
   (* THE TRANSACTIONAL FORM (durable-disk B''-tx).  Same C function, same
@@ -757,15 +751,13 @@ Module Type ILOCK.
   Parameter wp_ilock_tx_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (gil gisl : gname)
       (k : nat) (s : Qp) (g : gname) (o : ilkc) (inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_ilock_tx_sconf_body gs j gl gu gd gk pd pav pu bn gil gisl
+      wp_ilock_tx_sconf_body gs j gl pd pav pu gil gisl
  k s g o inum
                              pidv dq dqs m K eb b lks Vpr.
 End ILOCK.

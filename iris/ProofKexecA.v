@@ -318,12 +318,8 @@ Section KexecABody.
   Lemma kxc_a1
       (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (ga : gname) (gf : gname)
-      (bmapstart : Z)
-      (size : Z)
+ (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64)
       (alen : nat -> nat) (aslen : nat -> nat)
@@ -338,12 +334,12 @@ Section KexecABody.
     icfg_dev = ROOTDEV ->
     (0 < icfg_nib)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
-    0 < size <= BPB ->
-    0 <= bmapstart ->
-    bmapstart ∈ fsc_cov ->
-    ~ (bmapstart ∈ log_region_set fsc_logst) ->
+    0 < fsc_size <= BPB ->
+    0 <= fsc_bmapstart ->
+    fsc_bmapstart ∈ fsc_cov ->
+    ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
     0 <= icfg_ist ->
-    cov_below fsc_cov size ->
+    cov_below fsc_cov fsc_size ->
     ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
     bb_cstr pfun plen ->
     (Z.of_nat plen < 2 ^ 31)%Z ->
@@ -361,12 +357,12 @@ Section KexecABody.
     trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jp) -∗
     kernel_text -∗ pc_is (mword_of_int KXA : mword 64) -∗
-    fs_fabric gs gu gd gk pd pav pu bn
+    fs_fabric gs pd pav pu
  -∗
-    kalloc_env ga None -∗
-    sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+    kalloc_env fsc_kalloc None -∗
+    sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-    bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+    bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
     proc_priv gf (proc_addr jp) pidv V -∗
     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
     ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
@@ -388,8 +384,8 @@ Section KexecABody.
        passes its exit and the identity wand. ---- *)
     wp_next true (proc_addr jp) KEX -∗
     □ (∀ CX : CpuId, KEX CX -∗
-      KexecOkQ.kexec_closer Q gf ga (proc_addr jp) pidv V m (ret_pc ra0) K b
-           eb lks dqb dqs bmapstart na alen plen pv dqpv pfun
+      KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv V m (ret_pc ra0) K b
+           eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
            av dqa avf aslen dqas afun) -∗
     (* ---- and the FALL-THROUGH: the state at +0x032.
            IT HANDS THE EXIT BACK.  [Hcont] above is linear and phase A's
@@ -403,7 +399,7 @@ Section KexecABody.
            (WpNext.v's note on [wp_next_at]). ---- *)
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M32 : regfile) (ipv : mword 64) (zi : Z) (n1 : nat),
-        kxc_at_a2 jp bn ga gf bmapstart size
+        kxc_at_a2 jp gf
                   plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
                   m M32 K eb b lks sp0 ra0 s00 s10 s20 pv av ipv zi n1 -∗
         wp_next (CID0 := CID) true (proc_addr jp) KEX -∗
@@ -507,7 +503,7 @@ Section KexecABody.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CIDj1 CIDj2 eb (proc_addr jp)
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-    iApply (BeginOp.wp_begin_op_sconf gs jp gl bn icfg_log fsc_fs fsc_cov fsc_logst icfg_dev
+    iApply (BeginOp.wp_begin_op_sconf gs jp gl fsc_bio icfg_log fsc_fs fsc_cov fsc_logst icfg_dev
               pidv (DfracOwn (1/4)) N3 (K - 68)%nat eb eb lks
               V ltac:(lia) Hjp Hgs
               with "Hcg Hcnt Hextc Hclmc Htext Hpc Hlogc Hppid Hprocs").
@@ -574,8 +570,8 @@ Section KexecABody.
        leaving it is [LogInv.log_opS_op]; nothing else in the phase moves.
        (sys_chdir did this first -- SpecSysChdir.v's ledger section.) ---- *)
     iDestruct (log_op_openS with "Hlog") as (Sb0) "[Hlog Htx]".
-    iApply (Namei.wp_namei_gen gs jp gl gu gd gk pd pav pu bn
-              ga gf bmapstart size
+    iApply (Namei.wp_namei_gen gs jp gl pd pav pu
+ gf
               plen pfun MAXOPBLOCKS Sb0 pidv (DfracOwn (1/4)) dqb dqs dqpv
               N5 (K - 68)%nat eb eb lks
               V ltac:(lia) Hroot Hnib0 Hlg Hsz Hbm0
@@ -739,7 +735,7 @@ Section KexecABody.
                    ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CIDn CIDj4 eb (proc_addr jp)
                    ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-      iApply (EndOp.wp_end_op_sconf gs jp gl gu gd gk pd pav pu bn icfg_log fsc_fs
+      iApply (EndOp.wp_end_op_sconf gs jp gl fsc_uart fsc_disk fsc_dlock pd pav pu fsc_bio icfg_log fsc_fs
                 fsc_cov fsc_logst icfg_dev n1 pidv (DfracOwn (1/4)) P1 (K - 68)%nat
                 eb eb lks V ltac:(lia) Hlg Hjp Hgs
                 with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hcrash Hcert
@@ -799,7 +795,7 @@ Section KexecABody.
         rewrite (callee_saved_lookup Hcse r Hr).
         rewrite /P1 upd_ne; [| regne].
         exact (HM4thr r Hr Nsp Ns0 Ns1 Ns2). }
-      iApply (T.kxc_exit_m1 Q (proc_addr jp) bn ga gf bmapstart
+      iApply (T.kxc_exit_m1 Q (proc_addr jp) gf
                 plen pfun na avf alen aslen afun pidv V
                 dqb dqs dqa dqpv dqas m P2 K eb eb lks sp0 ra0 s00 s10 s20 pv av
                 ltac:(lia) Hsp Hra Hs0 Hs1 Hs2 HP2sp HP2a0 HP2thr
@@ -820,7 +816,7 @@ Section KexecABody.
      2959 B in Delta at every step of that walk
      (optimization.md, fold block continuations). *)
   Definition kxc_a2_exit1
-      (jp : nat) (ga : gname) (gf : gname) (bmapstart : Z) (size : Z) (plen : nat) (pfun : nat -> bv 8) (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat) (afun : nat -> nat -> bv 8) (pidv : mword 32) (V : pprivate) (dqb : dfrac) (dqs : dfrac) (dqa : dfrac) (dqpv : dfrac) (dqas : dfrac) (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (sp0 : mword 64) (ra0 : mword 64) (s00 : mword 64) (s10 : mword 64) (s20 : mword 64) (pv : mword 64) (av : mword 64) (HD : option (nat -> bv 8)) (XCH : iProp Σ) (KEX : CpuId -> iProp Σ) (CID : CpuId) : iProp Σ :=
+      (jp : nat) (gf : gname) (plen : nat) (pfun : nat -> bv 8) (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat) (afun : nat -> nat -> bv 8) (pidv : mword 32) (V : pprivate) (dqb : dfrac) (dqs : dfrac) (dqa : dfrac) (dqpv : dfrac) (dqas : dfrac) (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (sp0 : mword 64) (ra0 : mword 64) (s00 : mword 64) (s10 : mword 64) (s20 : mword 64) (pv : mword 64) (av : mword 64) (HD : option (nat -> bv 8)) (XCH : iProp Σ) (KEX : CpuId -> iProp Σ) (CID : CpuId) : iProp Σ :=
     (∀ (M90 : regfile) (kf : nat) (qf sf : Qp) (inumf : mword 32)
         (dnf : dinode) (bmf : blkmap) (gilf gislf gyf : gname)
         (n2 : nat) (ef : nat -> bv 8),
@@ -858,11 +854,11 @@ Section KexecABody.
         runit_any (bv_unsigned inumf) -∗
         log_opb icfg_log n2 -∗
         iref_slots 1 -∗
-        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+        sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-        bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+        bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
         bslots 3 -∗
-        kalloc_env ga None -∗
+        kalloc_env fsc_kalloc None -∗
         proc_priv gf (proc_addr jp) pidv V -∗
         ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
         ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
@@ -897,12 +893,8 @@ Section KexecABody.
   Lemma kxc_a2
       (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (ga : gname) (gf : gname)
-      (bmapstart : Z)
-      (size : Z)
+ (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64)
       (alen : nat -> nat) (aslen : nat -> nat)
@@ -929,12 +921,12 @@ Section KexecABody.
     icfg_dev = ROOTDEV ->
     (0 < icfg_nib)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
-    0 < size <= BPB ->
-    0 <= bmapstart ->
-    bmapstart ∈ fsc_cov ->
-    ~ (bmapstart ∈ log_region_set fsc_logst) ->
+    0 < fsc_size <= BPB ->
+    0 <= fsc_bmapstart ->
+    fsc_bmapstart ∈ fsc_cov ->
+    ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
     0 <= icfg_ist ->
-    cov_below fsc_cov size ->
+    cov_below fsc_cov fsc_size ->
     ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
     (jp < NPROC)%nat ->
     gs !! jp = Some gl ->
@@ -944,7 +936,7 @@ Section KexecABody.
     m !!! Regidx Rs1 = s10 ->
     m !!! Regidx Rs2 = s20 ->
     kernel_text -∗
-    fs_fabric gs gu gd gk pd pav pu bn
+    fs_fabric gs pd pav pu
  -∗
     (* ---- THE HEADER ORACLE (N-5.2B) ------------------------------------
        ONE ghost step, fired at the instant ilock's payload is open and
@@ -962,7 +954,7 @@ Section KexecABody.
         fv_ride zi (fv_of dn data) ={⊤}=∗
           fv_ride zi (fv_of dn data) ∗
           □ (⌜kxq_hdr_ok HD (fun j => file_byte data j)⌝ ∨ XCH)) -∗
-    kxc_at_a2 jp bn ga gf bmapstart size
+    kxc_at_a2 jp gf
               plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
               m M32 K eb b lks sp0 ra0 s00 s10 s20 pv av ipv zi n1 -∗
     (* ---- kexec's OWN continuation: the +0x064 tail closes the -1 arm ---- *)
@@ -979,11 +971,11 @@ Section KexecABody.
        passes its exit and the identity wand. ---- *)
     wp_next true (proc_addr jp) KEX -∗
     □ (∀ CX : CpuId, KEX CX -∗
-      KexecOkQ.kexec_closer Q gf ga (proc_addr jp) pidv V m (ret_pc ra0) K b
-           eb lks dqb dqs bmapstart na alen plen pv dqpv pfun
+      KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv V m (ret_pc ra0) K b
+           eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
            av dqa avf aslen dqas afun) -∗
     (* ---- and the FALL-THROUGH: the state at +0x090, phase B's entry ---- *)
-    wp_next true (proc_addr jp) (fun CID : CpuId => kxc_a2_exit1 jp ga gf bmapstart size plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas m K eb b lks sp0 ra0 s00 s10 s20 pv av HD XCH KEX CID) -∗
+    wp_next true (proc_addr jp) (fun CID : CpuId => kxc_a2_exit1 jp gf plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas m K eb b lks sp0 ra0 s00 s10 s20 pv av HD XCH KEX CID) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
@@ -1112,7 +1104,7 @@ Section KexecABody.
        seam is the BUDGET half. *)
     iDestruct (log_op_split with "Hlog") as "[Hlog Htx]".
 
-    iApply (Ilock.wp_ilock_tx_sconf gs jp gl gu gd gk pd pav pu bn
+    iApply (Ilock.wp_ilock_tx_sconf gs jp gl pd pav pu
               gilk gislk k (q/2)%Qp gy PlainK
  inum
               pidv (DfracOwn (1/4)) dqs Q2 (K - 68)%nat eb eb lks
@@ -1321,7 +1313,7 @@ Section KexecABody.
     iPoseProof (log_ctx_bytes_any with "Hlogc") as "#Hrow".
     iDestruct (inode_map_q_1_to _ _ _ _ eq_refl with "Hmap") as "Hmap".
     iDestruct (inode_blocks_q_1_to _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
-    iApply (Readi.wp_readi_sconf KT1 gs jp gl gu gd gk pd pav pu bn ga gf
+    iApply (Readi.wp_readi_sconf KT1 gs jp gl pd pav pu gf
  (ientry k) bml datl dnl false 0%nat 64%nat fb V
               pidv (DfracOwn 1) (DfracOwn (1/2)) Q8 (K - 68)%nat eb eb lks
               ltac:(lia) Hlg Hbmwf Hbmcov Hszb
@@ -1644,8 +1636,8 @@ Section KexecABody.
         iDestruct (wp_next_retarget CID0 CID15 true (proc_addr jp) _ Hcr15
                      with "Hcont") as "Hcont".
         iDestruct (kxc_exit_open with "Hkw Hcont") as "Hcont".
-      iApply (T.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn
-                  gilk gislk ga gf bmapstart size
+      iApply (T.kxc_bad64 Q gs jp gl pd pav pu
+                  gilk gislk gf
  k (q/2)%Qp (q/2)%Qp gy inum dnl bml n1
                   plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
                   m Q12 K eb lks sp0 ra0 s00 s10 s20 pv av
@@ -1726,8 +1718,8 @@ Section KexecABody.
       iDestruct (wp_next_retarget CID0 CID11 true (proc_addr jp) _ Hcr11
                    with "Hcont") as "Hcont".
       iDestruct (kxc_exit_open with "Hkw Hcont") as "Hcont".
-      iApply (T.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn
-                gilk gislk ga gf bmapstart size
+      iApply (T.kxc_bad64 Q gs jp gl pd pav pu
+                gilk gislk gf
  k (q/2)%Qp (q/2)%Qp gy inum dnl bml n1
                 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
                 m Q9 K eb lks sp0 ra0 s00 s10 s20 pv av
@@ -1801,12 +1793,8 @@ Section KexecAMain.
   Lemma kxc_phaseA
       (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (ga : gname) (gf : gname)
-      (bmapstart : Z)
-      (size : Z)
+ (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64)
       (alen : nat -> nat) (aslen : nat -> nat)
@@ -1829,12 +1817,12 @@ Section KexecAMain.
     icfg_dev = ROOTDEV ->
     (0 < icfg_nib)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
-    0 < size <= BPB ->
-    0 <= bmapstart ->
-    bmapstart ∈ fsc_cov ->
-    ~ (bmapstart ∈ log_region_set fsc_logst) ->
+    0 < fsc_size <= BPB ->
+    0 <= fsc_bmapstart ->
+    fsc_bmapstart ∈ fsc_cov ->
+    ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
     0 <= icfg_ist ->
-    cov_below fsc_cov size ->
+    cov_below fsc_cov fsc_size ->
     ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
     bb_cstr pfun plen ->
     (Z.of_nat plen < 2 ^ 31)%Z ->
@@ -1852,7 +1840,7 @@ Section KexecAMain.
     trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jp) -∗
     kernel_text -∗ pc_is (mword_of_int KXA : mword 64) -∗
-    fs_fabric gs gu gd gk pd pav pu bn
+    fs_fabric gs pd pav pu
  -∗
     (* THE HEADER ORACLE, relayed to [kxc_a2] -- see its statement.  Phase A
        is the block that FINDS the inum, so the oracle is quantified over it
@@ -1861,10 +1849,10 @@ Section KexecAMain.
         fv_ride zi (fv_of dn data) ={⊤}=∗
           fv_ride zi (fv_of dn data) ∗
           □ (⌜kxq_hdr_ok HD (fun j => file_byte data j)⌝ ∨ XCH)) -∗
-    kalloc_env ga None -∗
-    sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+    kalloc_env fsc_kalloc None -∗
+    sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-    bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+    bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
     proc_priv gf (proc_addr jp) pidv V -∗
     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
     ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
@@ -1886,8 +1874,8 @@ Section KexecAMain.
        passes its exit and the identity wand. ---- *)
     wp_next true (proc_addr jp) KEX -∗
     □ (∀ CX : CpuId, KEX CX -∗
-      KexecOkQ.kexec_closer Q gf ga (proc_addr jp) pidv V m (ret_pc ra0) K b
-           eb lks dqb dqs bmapstart na alen plen pv dqpv pfun
+      KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv V m (ret_pc ra0) K b
+           eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
            av dqa avf aslen dqas afun) -∗
     (* ---- and the FALL-THROUGH: phase B's entry at +0x090 ---- *)
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
@@ -1928,11 +1916,11 @@ Section KexecAMain.
         runit_any (bv_unsigned inumf) -∗
         log_opb icfg_log n2 -∗
         iref_slots 1 -∗
-        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+        sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-        bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+        bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
         bslots 3 -∗
-        kalloc_env ga None -∗
+        kalloc_env fsc_kalloc None -∗
         proc_priv gf (proc_addr jp) pidv V -∗
         ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
         ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
@@ -1957,8 +1945,8 @@ Section KexecAMain.
     iIntros "Hcg Hcnt Hextc Hclmc #Htext Hpc #Hfab Horacle #Hka Hbm Hins #Hbits Hpriv
              Hpath Hargv Hargs Hbs Hirs Hcont #Hkw Hcont90".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hebb.
-    iApply (kxc_a1 (CID0 := CID0) Q gs jp gl gu gd gk pd pav pu bn ga gf
-              bmapstart size
+    iApply (kxc_a1 (CID0 := CID0) Q gs jp gl pd pav pu gf
+
               plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
               m K eb b lks sp0 ra0 s00 s10 s20 pv av KEX
               HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
@@ -1970,8 +1958,8 @@ Section KexecAMain.
     iIntros (CIDs Hss M32 ipv zi n1) "Hseam Hexit".
     iDestruct (wp_next_retarget CID0 CIDs true (proc_addr jp) _ Hss
                  with "Hcont90") as "Hcont90".
-    iApply (kxc_a2 (CID0 := CIDs) Q gs jp gl gu gd gk pd pav pu bn ga gf
-              bmapstart size
+    iApply (kxc_a2 (CID0 := CIDs) Q gs jp gl pd pav pu gf
+
               plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
               m M32 K eb b lks sp0 ra0 s00 s10 s20 pv av ipv zi n1 HD XCH KEX
               HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb

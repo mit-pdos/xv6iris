@@ -207,13 +207,13 @@ Proof. rewrite /fstat_has_inode. apply _. Defined.
    sleeplock FAMILY.  What is left is exactly the content-independent bundle
    [SpecFileclose.fileclose_fs_env] already had. *)
 Record fstat_names := MkFStatNames {
-  fsn_uart       : uart_names;
-  fsn_disk       : disk_names;
-  fsn_dlock      : gname;         (* virtio_disk.lock                       *)
+  (* the three virtio ring pages -- all that is left, and the reason is
+     [FsCfg.fscfg]'s ruling R1: they are the one part of the fabric the
+     ambient record cannot hold.  [fsn_uart] / [fsn_disk] / [fsn_dlock] /
+     [fsn_bio] left in rank 1d. *)
   fsn_pd         : mword 64;
   fsn_pav        : mword 64;
   fsn_pu         : mword 64;
-  fsn_bio        : bio_names;
   (* [fsn_inodestart] IS GONE (rank 1c): the inode region's first block is
      ambient, so a threaded copy carried nothing. *)
   fsn_dqs        : dfrac;         (* sb.inodestart                          *)
@@ -221,14 +221,7 @@ Record fstat_names := MkFStatNames {
 
 Global Instance fstat_names_inhabited : Inhabited fstat_names :=
   populate (MkFStatNames
-    (UartNames 1%positive 1%positive 1%positive 1%positive)
-    (DiskNames 1%positive 1%positive 1%positive 1%positive 1%positive 1%positive
-               1%positive 1%positive 1%positive 1%positive 1%positive)
-    1%positive
     (mword_of_int 0) (mword_of_int 0) (mword_of_int 0)
-    (MkBioNames 1%positive 1%positive
-       (fun _ => (1%positive, 1%positive)) (fun _ => 1%positive)
-       (fun _ => 1%positive))
     (DfracOwn 1)).
 
 Section SpecFilestat.
@@ -253,8 +246,8 @@ Section SpecFilestat.
      ⌜forall inum : mword 32,
         bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
         IBLOCK inum icfg_ist ∈ fsc_cov⌝ ∗
-     bio_ctx (fsn_bio fn)
-       (fs_view fsc_fs (fsn_disk fn) icfg_dev fsc_cov) ∗
+     bio_ctx (fsc_bio)
+       (fs_view fsc_fs (fsc_disk) icfg_dev fsc_cov) ∗
      (* the three persistent invariants SpecIlock v3 / SpecIunlock v3 take,
         at the FAMILY where they were per-slot *)
      itable_inv ∗
@@ -266,10 +259,10 @@ Section SpecFilestat.
      sb_inodestart ↦₄{fsn_dqs fn}
        (mword_of_int icfg_ist : mword 32) ∗
      (* the disk fabric *)
-     dev_inv (fsn_uart fn) (fsn_disk fn) ∗
-     disk_geom (fsn_disk fn) (fsn_pd fn) (fsn_pav fn) (fsn_pu fn) ∗
-     is_lock (fsn_dlock fn) d_lock "virtio_disk"%string
-       (disk_res (fsn_disk fn) (fsn_pd fn) (fsn_pav fn) (fsn_pu fn)) ∗
+     dev_inv (fsc_uart) (fsc_disk) ∗
+     disk_geom (fsc_disk) (fsn_pd fn) (fsn_pav fn) (fsn_pu fn) ∗
+     is_lock (fsc_dlock) d_lock "virtio_disk"%string
+       (disk_res (fsc_disk) (fsn_pd fn) (fsn_pav fn) (fsn_pu fn)) ∗
      (* ONE slot unit: ilock's bread takes it and brelse gives it back *)
      bslot)%I.
 
@@ -332,11 +325,11 @@ Section SpecFilestat.
      the two share laws and go with them. *)
 
   (* the generation-named share splits, exactly as its ∃-form does *)
-  Lemma inode_shr_gen_split2 (ik : nat) (s1 s2 : Qp) (dev inum : mword 32)
+  Lemma inode_shr_gen_split2 (ik : nat) (s1 s2 : Qp) (inum : mword 32)
       (g : gname) :
-    IcacheRef.inode_shr_gen ik (s1 + s2)%Qp dev inum g ⊣⊢
-    IcacheRef.inode_shr_gen ik s1 dev inum g ∗
-    IcacheRef.inode_shr_gen ik s2 dev inum g.
+    IcacheRef.inode_shr_gen ik (s1 + s2)%Qp icfg_dev inum g ⊣⊢
+    IcacheRef.inode_shr_gen ik s1 icfg_dev inum g ∗
+    IcacheRef.inode_shr_gen ik s2 icfg_dev inum g.
   Proof.
     rewrite /IcacheRef.inode_shr_gen IcacheRef.inode_ident_split
             IcacheRef.live_gen_split SleepLock.slh_tok_split.
@@ -346,11 +339,11 @@ Section SpecFilestat.
   (* halving, as its OWN lemma -- durable-notes' [rewrite -(Qp.div_2 q)]
      trap: written at a call site inside the proofmode the split's evar lands
      out of [s]'s scope. *)
-  Lemma inode_shr_gen_halve2 (ik : nat) (s : Qp) (dev inum : mword 32)
+  Lemma inode_shr_gen_halve2 (ik : nat) (s : Qp) (inum : mword 32)
       (g : gname) :
-    IcacheRef.inode_shr_gen ik s dev inum g ⊣⊢
-    IcacheRef.inode_shr_gen ik (s/2)%Qp dev inum g ∗
-    IcacheRef.inode_shr_gen ik (s/2)%Qp dev inum g.
+    IcacheRef.inode_shr_gen ik s icfg_dev inum g ⊣⊢
+    IcacheRef.inode_shr_gen ik (s/2)%Qp icfg_dev inum g ∗
+    IcacheRef.inode_shr_gen ik (s/2)%Qp icfg_dev inum g.
   Proof. rewrite -inode_shr_gen_split2 Qp.div_2. reflexivity. Qed.
 
   (* THE REGEN.  iunlock returns the arity-preserving [IcacheRef.inode_shr]
@@ -360,11 +353,11 @@ Section SpecFilestat.
      such a slice -- which is why the carve lends [s/2] and keeps [s/2].
      Verbatim [ProofFilewriteParts.fw_shr_regen], which is where filewrite
      already does this. *)
-  Lemma inode_shr_regen2 (ik : nat) (s1 s2 : Qp) (dev inum : mword 32)
+  Lemma inode_shr_regen2 (ik : nat) (s1 s2 : Qp) (inum : mword 32)
       (g : gname) :
-    IcacheRef.inode_shr_gen ik s1 dev inum g -∗
-    IcacheRef.inode_shr ik s2 dev inum -∗
-    IcacheRef.inode_shr_gen ik (s1 + s2)%Qp dev inum g.
+    IcacheRef.inode_shr_gen ik s1 icfg_dev inum g -∗
+    IcacheRef.inode_shr ik s2 icfg_dev inum -∗
+    IcacheRef.inode_shr_gen ik (s1 + s2)%Qp icfg_dev inum g.
   Proof.
     iIntros "H1 H2".
     iEval (rewrite IcacheRef.inode_shr_gen_intro) in "H2".
@@ -461,8 +454,7 @@ End SpecFilestat.
 Definition wp_filestat_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
-    (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
+ (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
     (k : nat) (q : Qp) (st : fdstate)            (* the borrowed reference  *)
     (fn : fstat_names)                           (* the inode arm's ghosts  *)
@@ -497,7 +489,7 @@ Definition wp_filestat_sconf_body
   file_ref γf k q st -∗
   (* ambient: myproc runs first, and the surviving arm copies out *)
   proc_priv_core pj pidv V -∗
-  kalloc_env γa None -∗
+  kalloc_env fsc_kalloc None -∗
   procs_inv γs -∗
   (* ...and what the file's TYPE selects *)
   filestat_env fn st -∗
@@ -524,12 +516,11 @@ Module Type FILESTAT.
   Parameter wp_filestat_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
-      (γa : gname) (γf : gname)
+ (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (k : nat) (q : Qp) (st : fdstate)
       (fn : fstat_names)
       (pidv : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string),
-      wp_filestat_sconf_body γa γf γs j γlp k q st fn pidv V m K eb b lks.
+      wp_filestat_sconf_body γf γs j γlp k q st fn pidv V m K eb b lks.
 End FILESTAT.

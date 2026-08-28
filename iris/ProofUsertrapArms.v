@@ -107,6 +107,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.  (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
@@ -143,7 +144,7 @@ Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 Section UtArmsCommon.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
+  Context (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ).
 
   (* ==================================================================== *)
   (* [ut_hold] AT THE LITERAL [false], BOTH WAYS.                          *)
@@ -202,7 +203,7 @@ End UtArmsCommon.
 Section Ut56.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
+  Context (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ).
 
   (* ==================================================================== *)
   (* +0x56 .. +0x82: THE UNEXPECTED-SCAUSE ARM.                            *)
@@ -219,7 +220,7 @@ Section Ut56.
   Lemma ut_56 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat)
       (mie_v menvcfg0 : mword 64) (lks : gset string) :
-    printk_gen_contract (kt := KT1) (un_pr N) (un_u N) (un_v N) ->
+    printk_gen_contract (kt := KT1) (fsc_printk) (fsc_uart) (fsc_disk) ->
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res false + nx)%nat = (av - 4)%nat ->
@@ -259,7 +260,7 @@ Section Ut56.
     { iDestruct "Hcaps" as "($ & _)". }
     iAssert (kernel_data) with "[]" as "#Hkd".
     { iDestruct "Hcaps" as "(_ & $ & _)". }
-    iAssert (printk_env (un_pr N) (un_u N) (un_v N)) with "[]" as "#Hpenv".
+    iAssert (printk_env (fsc_printk) (fsc_uart) (fsc_disk)) with "[]" as "#Hpenv".
     { iDestruct "Hcaps" as "(_ & _ & _ & _ & $ & _)". }
     iPoseProof (ut_fmt1_str with "Hkd") as "#Hf1".
     iPoseProof (ut_fmt2_str with "Hkd") as "#Hf2".
@@ -617,7 +618,7 @@ End Ut56.
 Section UtD0.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
+  Context (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ).
 
   (* ==================================================================== *)
   (* +0xd0 .. +0xe8: THE VMFAULT ARM.                                      *)
@@ -644,7 +645,7 @@ Section UtD0.
   Lemma ut_d0 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat)
       (mie_v menvcfg0 : mword 64) (lks : gset string) :
-    printk_gen_contract (kt := KT1) (un_pr N) (un_u N) (un_v N) ->
+    printk_gen_contract (kt := KT1) (fsc_printk) (fsc_uart) (fsc_disk) ->
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res false + nx)%nat = (av - 4)%nat ->
@@ -677,7 +678,7 @@ Section UtD0.
     (* depth 0 forces the held set empty, so the printk / killed / setkilled
        order premises need no hypothesis of this lemma's own. *)
     iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
-    iAssert (kalloc_env (un_kl N) None) with "[]" as "#Hkenv".
+    iAssert (kalloc_env (fsc_kalloc) None) with "[]" as "#Hkenv".
     { iApply (ut_caps_kalloc N with "Hcaps"). }
     iDestruct "Hcsrs" as "(Hsepc & Hscause & Hstval & Hsret & Hres & Hkpt)".
     iDestruct "Hscause" as (sc) "Hscause".
@@ -871,7 +872,7 @@ Section UtD0.
       by (rewrite (ua_pin_lookup M7 Rs1 ltac:(reg_neq)); exact HM7s1).
     assert (HcsP7 : ut_cs m0 (tp_pin M7)) by exact (ua_pin_cs m0 M7 HcsM7).
     iEval (rewrite <- (ua_pin_sie_cap_gpr M7 nx false (un_pj N))) in "Hcg".
-    iApply (VM.wp_vmfault_sconf (un_kl N) (tp_pin M7) (pv_upt V) (pv_sz V) nx
+    iApply (VM.wp_vmfault_sconf (fsc_kalloc) (tp_pin M7) (pv_upt V) (pv_sz V) nx
               0%nat false (un_pj N) false lks
               ltac:(lia) (rget_tp M7) HP7a0 HP7a1 Hszb
               ltac:(vm_compute; reflexivity)
@@ -992,7 +993,7 @@ End UtD0.
 Section UtE8.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
+  Context (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ).
 
   (* ==================================================================== *)
   (* +0xea .. +0xf2: THE DEVICE ARM'S killed CHECK.                        *)

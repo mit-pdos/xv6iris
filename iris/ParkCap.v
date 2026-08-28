@@ -201,7 +201,7 @@ Section ParkCap.
     iEval (rewrite park_token_unfold /park_token_F) in "Htok'".
     iDestruct "Htok'" as (URB) "[#Hcap #Hchan]".
     iAssert (procs_inv (un_s N)) as "#Hprocs".
-    { iDestruct "Henv" as "[Hcaps _]". iDestruct "Hcaps" as "(_ & _ & $ & _)". }
+    { iDestruct "Henv" as "[Hcaps _]". iDestruct "Hcaps" as "($ & _)". }
     iDestruct ("Hchan" $! N KSTACK_AV with "[%] [%] [%]") as "Hclose";
       [reflexivity | exact Hwf | exact Hkav |].
     iApply ("Hcap" $! (un_f N) (un_pj N) (un_ks N) rest (un_pid N) V KSTACK_AV

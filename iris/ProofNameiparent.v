@@ -149,21 +149,17 @@ Section ProofNameiparentMain.
   (* THE WALK IS THE SET FORM; the counted seal follows it. *)
   Lemma wp_nameiparent_gen
       (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (ga : gname) (gf : gname)
-      (bmapstart : Z)
-      (size : Z)
+ (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (nfun : nat -> bv 8)
       (n : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_nameiparent_gen_body gs j gl gu gd gk pd pav pu bn
-                                ga gf bmapstart
-                                size plen pfun nfun n Sb
+    : wp_nameiparent_gen_body gs j gl pd pav pu
+ gf
+ plen pfun nfun n Sb
                                 pidv dq dqb dqs dqpv m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_nameiparent_gen_body].
@@ -347,8 +343,8 @@ Section ProofNameiparentMain.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID7) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (NX.wp_namex_gen gs j gl gu gd gk pd pav pu bn
-              ga gf bmapstart size
+    iApply (NX.wp_namex_gen gs j gl pd pav pu
+ gf
               plen pfun nfun true n Sb pidv dq dqb dqs dqpv R5 (K - 2)%nat eb b
               _ Vpr Knx Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
               Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs
@@ -546,21 +542,17 @@ Section ProofNameiparentMain.
   (* ===================================================================== *)
   Lemma wp_nameiparent_sconf
       (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (ga : gname) (gf : gname)
-      (bmapstart : Z)
-      (size : Z)
+ (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (nfun : nat -> bv 8)
       (n : nat)
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_nameiparent_sconf_body gs j gl gu gd gk pd pav pu bn
-                          ga gf bmapstart
-                          size plen pfun nfun n
+    : wp_nameiparent_sconf_body gs j gl pd pav pu
+ gf
+ plen pfun nfun n
                           pidv dq dqb dqs dqpv m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_nameiparent_sconf_body].
@@ -575,9 +567,9 @@ Section ProofNameiparentMain.
        raise is [locks_below ∅ _], which [lkbelow] closes outright. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     iDestruct (log_op_openSt with "Hlog") as (Sb0) "Hlog".
-    iApply (wp_nameiparent_gen gs j gl gu gd gk pd pav pu bn
-              ga gf bmapstart
-              size plen pfun nfun n Sb0
+    iApply (wp_nameiparent_gen gs j gl pd pav pu
+ gf
+ plen pfun nfun n Sb0
               pidv dq dqb dqs dqpv m K eb b
               _ Vpr HK Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen (walk_need_counted L n Hbud) Hj Hgs
               with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl Hesc Hslks Hireg Hropen Hprocs Hdev Hgeom Hdlk Hbmap Hinos Hbits Hppid Hcwdr Hpath Hname Hbslot Hislot Hlog [Hcont]").

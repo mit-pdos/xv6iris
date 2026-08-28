@@ -1011,8 +1011,6 @@ Section ProofNamexMain.
       (j : nat) (b : bool) (K : nat) (m : regfile)
       (sp0 pv nb ret_tgt : mword 64) (plen L : nat) (pfun : nat -> bv 8)
       (pl : list (bv 8)) (eb : bool)
- (bn : bio_names)
-      (bmapstart size : Z)
       (npar : bool) (n : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac) (fuel : nat) (CIDl : CpuId) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
     (* THE GROWING SET (fs-sysfile GR-2b, retrofit 6).  [Sb] is the caller's,
@@ -1039,7 +1037,7 @@ Section ProofNamexMain.
      ⌜(iput_units <= ncur)%nat⌝ -∗
      ⌜(0 < length (path_elems (drop off pl)))%nat ->
       (iput_units + (if wc then 0%nat else 1%nat) <= ncur)%nat⌝ -∗
-     ⌜wc = true -> bmapstart ∈ Scur⌝ -∗
+     ⌜wc = true -> fsc_bmapstart ∈ Scur⌝ -∗
      ⌜Sb ⊆ Scur⌝ -∗
      ⌜nx_regs m sp0 (pa_add pv off) ipv nb
               (m !!! Regidx Ra1 : mword 64) Ml⌝ -∗
@@ -1062,7 +1060,7 @@ Section ProofNamexMain.
      (pa_stk sp0 12) ↦₈[KT1] (m !!! Regidx Rs10 : mword 64) -∗
      inode_held ipv -∗
      iref_slots 1 -∗
-     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
      proc_priv_bare (proc_addr j) pidv Vpr -∗
      inode_held (pv_cwd Vpr) -∗
@@ -1081,7 +1079,7 @@ Section ProofNamexMain.
         is about an arbitrary hart. *)
      wp_next (CID0 := CIDl) true (proc_addr j) (fun CIDc : CpuId =>
        namex_postS (CID := CIDc) (proc_addr j) pv nb ret_tgt pl m K b eb lks
- bn bmapstart size
+
                    plen pfun npar n Sb pidv dq dqb dqs dqpv Vpr) -∗
      WP (Loop : expr riscv_lang))%I.
 
@@ -1089,8 +1087,6 @@ Section ProofNamexMain.
       (j : nat) (b : bool) (K : nat) (m : regfile) (sp0 pv nb : mword 64)
       (plen a e : nat) (pfun : nat -> bv 8) (ipv : mword 64) (ncur : nat)
       (Scur : gset Z) (eb : bool)
- (bn : bio_names)
-      (bmapstart size : Z)
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (CIDt : CpuId) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
     (∀ (Mt : regfile) (nf' : nat -> bv 8),
@@ -1118,7 +1114,7 @@ Section ProofNamexMain.
      (pa_stk sp0 12) ↦₈[KT1] (m !!! Regidx Rs10 : mword 64) -∗
      inode_held ipv -∗
      iref_slots 1 -∗
-     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
      proc_priv_bare (proc_addr j) pidv Vpr -∗
      inode_held (pv_cwd Vpr) -∗
@@ -1134,12 +1130,8 @@ Section ProofNamexMain.
      after the proof. *)
   Lemma wp_namex_gen
       (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (ga : gname) (gf : gname)
-      (bmapstart : Z)
-      (size : Z)
+ (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (nfun : nat -> bv 8)
       (npar : bool)
@@ -1147,9 +1139,9 @@ Section ProofNamexMain.
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_namex_gen_body gs j gl gu gd gk pd pav pu bn
-                        ga gf bmapstart
-                        size plen pfun nfun npar n Sb
+    : wp_namex_gen_body gs j gl pd pav pu
+ gf
+ plen pfun nfun npar n Sb
                         pidv dq dqb dqs dqpv m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_namex_gen_body].
@@ -2563,7 +2555,7 @@ Section ProofNamexMain.
     iAssert (∀ fuel : nat, wp_next (CID0 := CID) true (proc_addr j)
                (fun CIDl : CpuId =>
                   nx_loop_body j b K m sp0 pv nb ret_tgt plen L pfun pl eb
- bn bmapstart size
+
                                npar n Sb pidv dq dqb dqs dqpv fuel CIDl lks Vpr))%I
       with "[]" as "Hloop".
     { (* ---- local disequality helpers, used all through the body ---- *)
@@ -2700,9 +2692,9 @@ Section ProofNamexMain.
 
                iDestruct (log_tx_halve with "Htx") as (tnx) "[Htxa Htxb]".
 
-               iApply (IP.wp_iput_gen gs j gl gu gd gk pd pav pu bn
-                         gilp gislp bmapstart
- size pk pq pinum ncur Scur wc false
+               iApply (IP.wp_iput_gen gs j gl pd pav pu
+                         gilp gislp
+ pk pq pinum ncur Scur wc false
                          false enxA tnx (1/2)%Qp pidv dq dqb dqs
                          T2 (K - 12)%nat eb b
                          _ Vpr true Kip Hpk HbW ltac:(discriminate)
@@ -3013,8 +3005,8 @@ Section ProofNamexMain.
                iAssert (wp_next (CID0 := CIDl) true (proc_addr j)
                           (fun CIDt : CpuId =>
                              nx_rest_body j b K m sp0 pv nb plen a e pfun ipv ncur
-                                          Scur eb bn bmapstart
- size pidv dq dqb dqs dqpv
+                                          Scur eb
+ pidv dq dqb dqs dqpv
                                           CIDt lks Vpr))%I
                  with "[IHl Hcont]" as "Hrest".
                { iIntros (CIDt Hst Mt nf') "%Hregt %Hviewt Hcg Hcnt Hextc Hclmc Hpc
@@ -3158,7 +3150,7 @@ Section ProofNamexMain.
                       in the escrow's checked-out arm for that whole window;
                       the residue rides the descriptor conjunct home. *)
 
-                   iApply (IL.wp_ilock_tx_sconf gs j gl gu gd gk pd pav pu bn
+                   iApply (IL.wp_ilock_tx_sconf gs j gl pd pav pu
                              gilk gislk
                              ik (iq/2)%Qp gsh PlainK iinum pidv dq dqs
                              V2 (K - 12)%nat eb b lks Vpr
@@ -3380,9 +3372,9 @@ Section ProofNamexMain.
                      iDestruct (log_opS_named with "Hlog") as (enxB) "Hlog".
                      iDestruct (inode_ref_short_gen_forget with "Hkeep")
                        as "Hkeep2".
-                     iApply (IUP.wp_iunlockput_tx_gen gs j gl gu gd gk pd pav pu
-                               bn gilk gislk
-                               bmapstart size
+                     iApply (IUP.wp_iunlockput_tx_gen gs j gl pd pav pu
+ gilk gislk
+
                                ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
                                Scur wc false false enxB
                                pidv dq dqb dqs ND2 (K - 12)%nat eb b lks Vpr
@@ -3975,8 +3967,8 @@ Section ProofNamexMain.
                          assert (Hholesl : blk_holes_zero bml datl)
                            by (destruct Hiok as (_ & _ & _ & _ & _ & Hq & _);
                                exact Hq).
-                         iApply (DL.wp_dirlookup_sconf gs j gl gu gd gk
-                                   pd pav pu bn ga gf
+                         iApply (DL.wp_dirlookup_sconf gs j gl
+                                   pd pav pu gf
  (ientry ik) iinum
                                    bml datl dnl dnl
                                    nf' false (mword_of_int 0 : mword 32)
@@ -4197,10 +4189,10 @@ Section ProofNamexMain.
                                         ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
                            iDestruct (inode_ref_short_gen_forget with "Hkeep")
                              as "Hkeep2".
-                           iApply (IUP.wp_iunlockput_tx_gen gs j gl gu gd gk
-                                     pd pav pu bn gilk gislk
-                                     bmapstart
-                                     size ik (iq/2)%Qp (iq/2)%Qp gsh
+                           iApply (IUP.wp_iunlockput_tx_gen gs j gl
+                                     pd pav pu gilk gislk
+
+ ik (iq/2)%Qp (iq/2)%Qp gsh
                                      iinum dnl bml ncur Scur wc false true
                                      enx pidv dq dqb dqs
                                      GB3 (K - 12)%nat eb b lks Vpr
@@ -4263,7 +4255,7 @@ Section ProofNamexMain.
                            (* the report's membership rides the level's own
                               set growth *)
                            assert (Hnb4 : (wc || wup)%bool = true ->
-                                     bmapstart ∈ Sup).
+                                     fsc_bmapstart ∈ Sup).
                            { intros Hw. destruct wc; destruct wup;
                                simpl in Hw;
                                first [ exact (Hsup _ (HbW eq_refl))
@@ -4428,10 +4420,10 @@ Section ProofNamexMain.
                                         ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
                            iDestruct (inode_ref_short_gen_forget with "Hkeep")
                              as "Hkeep2".
-                           iApply (IUP.wp_iunlockput_tx_gen gs j gl gu gd gk
-                                     pd pav pu bn gilk gislk
-                                     bmapstart
-                                     size ik (iq/2)%Qp (iq/2)%Qp gsh
+                           iApply (IUP.wp_iunlockput_tx_gen gs j gl
+                                     pd pav pu gilk gislk
+
+ ik (iq/2)%Qp (iq/2)%Qp gsh
                                      iinum dnl bml ncur Scur wc false true
                                      enx pidv dq dqb dqs
                                      GC3 (K - 12)%nat eb b lks Vpr
@@ -4739,9 +4731,9 @@ Section ProofNamexMain.
                      iDestruct (log_opS_named with "Hlog") as (enxB) "Hlog".
                      iDestruct (inode_ref_short_gen_forget with "Hkeep")
                        as "Hkeep2".
-                     iApply (IUP.wp_iunlockput_tx_gen gs j gl gu gd gk pd pav pu
-                               bn gilk gislk
-                               bmapstart size
+                     iApply (IUP.wp_iunlockput_tx_gen gs j gl pd pav pu
+ gilk gislk
+
                                ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
                                Scur wc false false enxB
                                pidv dq dqb dqs ND2 (K - 12)%nat eb b lks Vpr
@@ -6021,12 +6013,8 @@ Section ProofNamexMain.
   (* ===================================================================== *)
   Lemma wp_namex_sconf
       (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (ga : gname) (gf : gname)
-      (bmapstart : Z)
-      (size : Z)
+ (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (nfun : nat -> bv 8)
       (npar : bool)
@@ -6034,9 +6022,9 @@ Section ProofNamexMain.
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_namex_sconf_body gs j gl gu gd gk pd pav pu bn
-                          ga gf bmapstart
-                          size plen pfun nfun npar n
+    : wp_namex_sconf_body gs j gl pd pav pu
+ gf
+ plen pfun nfun npar n
                           pidv dq dqb dqs dqpv m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_namex_sconf_body].
@@ -6050,8 +6038,8 @@ Section ProofNamexMain.
        now takes the TOKEN with it (durable-disk B''-tx), so the seal hands
        the pair over rather than framing the token past the walk. *)
     iDestruct (log_op_openSt with "Hlog") as (Sb0) "Hlog".
-    iApply (wp_namex_gen gs j gl gu gd gk pd pav pu bn
-              ga gf bmapstart size
+    iApply (wp_namex_gen gs j gl pd pav pu
+ gf
               plen pfun nfun npar n Sb0 pidv dq dqb dqs dqpv m K eb b lks Vpr
               HK Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
               Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen

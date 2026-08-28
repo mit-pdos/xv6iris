@@ -137,9 +137,7 @@ Section ProofSysLinkTails.
   (* ================================================================== *)
   Lemma sl_tail_b `{GEN : GenId} `{CID0 : CpuId}
       (gs : list gname) (jx : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (u : nat) (pidv : mword 32) (dq : dfrac)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (w4 : mword 64)
@@ -158,15 +156,15 @@ Section ProofSysLinkTails.
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xbc)) -∗
     panic_env -∗
-    bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) -∗
-    log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+    bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+    log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
     proc_priv_bare (proc_addr jx) pidv Vpr -∗
     procs_inv gs -∗
-    dev_inv gu gd -∗
-    disk_geom gd pd pav pu -∗
-    is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+    dev_inv fsc_uart fsc_disk -∗
+    disk_geom fsc_disk pd pav pu -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
     log_op icfg_log u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
@@ -222,7 +220,7 @@ Section ProofSysLinkTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID0 CID1 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    iApply (EndOp.wp_end_op_sconf (CID := CID1) gs jx gl gu gd gk pd pav pu bn
+    iApply (EndOp.wp_end_op_sconf (CID := CID1) gs jx gl fsc_uart fsc_disk fsc_dlock pd pav pu fsc_bio
               icfg_log fsc_fs fsc_cov fsc_logst icfg_dev u pidv dq M1 (K - 38)%nat eb b lks
               Vpr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
@@ -344,12 +342,8 @@ Section ProofSysLinkTails.
   (* ================================================================== *)
   Lemma sl_tail_c `{GEN : GenId} `{CID0 : CpuId}
       (gs : list gname) (jx : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (gil gisl : gname)
-      (bmapstart : Z)
-      (size : Z)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn : dinode) (bm : blkmap)
       (u : nat) (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -360,15 +354,15 @@ Section ProofSysLinkTails.
     (38 <= K)%nat -> ((K - 38) + 38 = K)%nat ->
     (kk < NINODE)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
-    0 < size <= BPB ->
-    0 <= bmapstart ->
-    bmapstart ∈ fsc_cov ->
-    ~ (bmapstart ∈ log_region_set fsc_logst) ->
+    0 < fsc_size <= BPB ->
+    0 <= fsc_bmapstart ->
+    fsc_bmapstart ∈ fsc_cov ->
+    ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
     0 <= icfg_ist ->
     IBLOCK inum icfg_ist ∈ fsc_cov ->
     ~ (IBLOCK inum icfg_ist ∈ log_region_set fsc_logst) ->
     bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
-    cov_below fsc_cov size ->
+    cov_below fsc_cov fsc_size ->
     (iput_units <= u)%nat ->
     (jx < NPROC)%nat -> gs !! jx = Some gl ->
     lks = ∅ ->
@@ -383,8 +377,8 @@ Section ProofSysLinkTails.
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xc6)) -∗
     panic_env -∗
-    bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) -∗
-    log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+    bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+    log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
@@ -407,14 +401,14 @@ Section ProofSysLinkTails.
     inode_ref_short kk (qi + s)%Qp qi icfg_dev inum -∗
     (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
     runit_any (bv_unsigned inum) -∗
-    sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+    sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-    bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+    bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
     proc_priv_bare (proc_addr jx) pidv Vpr -∗
     procs_inv gs -∗
-    dev_inv gu gd -∗
-    disk_geom gd pd pav pu -∗
-    is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+    dev_inv fsc_uart fsc_disk -∗
+    disk_geom fsc_disk pd pav pu -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
     bslots 3 -∗
     (* the BUDGET half only: half this transaction's element is parked
        in the escrow's write arm for the whole locked window
@@ -437,7 +431,7 @@ Section ProofSysLinkTails.
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         proc_priv_bare (proc_addr jx) pidv Vpr -∗
-        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+        sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
         bslots 3 -∗
         iref_slot -∗
@@ -503,9 +497,9 @@ Section ProofSysLinkTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID0 CID2 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID2) gs jx gl gu gd gk
-              pd pav pu bn gil gisl bmapstart
- size kk qi s gy inum dn bm u pidv dq
+    iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID2) gs jx gl
+              pd pav pu gil gisl
+ kk qi s gy inum dn bm u pidv dq
               dqb dqs M2 (K - 38)%nat eb b lks
               Vpr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HM2a0
@@ -558,7 +552,7 @@ Section ProofSysLinkTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID3 CID4 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    iApply (EndOp.wp_end_op_sconf (CID := CID4) gs jx gl gu gd gk pd pav pu bn
+    iApply (EndOp.wp_end_op_sconf (CID := CID4) gs jx gl fsc_uart fsc_disk fsc_dlock pd pav pu fsc_bio
               icfg_log fsc_fs fsc_cov fsc_logst icfg_dev n2 pidv dq M3 (K - 38)%nat eb b lks
               Vpr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
@@ -669,12 +663,8 @@ Section ProofSysLinkTails.
      instructions at +0xd6.  See ARM C's banner. ---- *)
   Lemma sl_tail_d `{GEN : GenId} `{CID0 : CpuId}
       (gs : list gname) (jx : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (gil gisl : gname)
-      (bmapstart : Z)
-      (size : Z)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn : dinode) (bm : blkmap)
       (u : nat) (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -685,15 +675,15 @@ Section ProofSysLinkTails.
     (38 <= K)%nat -> ((K - 38) + 38 = K)%nat ->
     (kk < NINODE)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
-    0 < size <= BPB ->
-    0 <= bmapstart ->
-    bmapstart ∈ fsc_cov ->
-    ~ (bmapstart ∈ log_region_set fsc_logst) ->
+    0 < fsc_size <= BPB ->
+    0 <= fsc_bmapstart ->
+    fsc_bmapstart ∈ fsc_cov ->
+    ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
     0 <= icfg_ist ->
     IBLOCK inum icfg_ist ∈ fsc_cov ->
     ~ (IBLOCK inum icfg_ist ∈ log_region_set fsc_logst) ->
     bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
-    cov_below fsc_cov size ->
+    cov_below fsc_cov fsc_size ->
     (iput_units <= u)%nat ->
     (jx < NPROC)%nat -> gs !! jx = Some gl ->
     lks = ∅ ->
@@ -708,8 +698,8 @@ Section ProofSysLinkTails.
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xd6)) -∗
     panic_env -∗
-    bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) -∗
-    log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+    bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+    log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
@@ -732,14 +722,14 @@ Section ProofSysLinkTails.
     inode_ref_short kk (qi + s)%Qp qi icfg_dev inum -∗
     (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
     runit_any (bv_unsigned inum) -∗
-    sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+    sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-    bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+    bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
     proc_priv_bare (proc_addr jx) pidv Vpr -∗
     procs_inv gs -∗
-    dev_inv gu gd -∗
-    disk_geom gd pd pav pu -∗
-    is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+    dev_inv fsc_uart fsc_disk -∗
+    disk_geom fsc_disk pd pav pu -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
     bslots 3 -∗
     (* the BUDGET half only: half this transaction's element is parked
        in the escrow's write arm for the whole locked window
@@ -762,7 +752,7 @@ Section ProofSysLinkTails.
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         proc_priv_bare (proc_addr jx) pidv Vpr -∗
-        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+        sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
         bslots 3 -∗
         iref_slot -∗
@@ -828,9 +818,9 @@ Section ProofSysLinkTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID0 CID2 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID2) gs jx gl gu gd gk
-              pd pav pu bn gil gisl bmapstart
- size kk qi s gy inum dn bm u pidv dq
+    iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID2) gs jx gl
+              pd pav pu gil gisl
+ kk qi s gy inum dn bm u pidv dq
               dqb dqs M2 (K - 38)%nat eb b lks
               Vpr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HM2a0
@@ -883,7 +873,7 @@ Section ProofSysLinkTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID3 CID4 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    iApply (EndOp.wp_end_op_sconf (CID := CID4) gs jx gl gu gd gk pd pav pu bn
+    iApply (EndOp.wp_end_op_sconf (CID := CID4) gs jx gl fsc_uart fsc_disk fsc_dlock pd pav pu fsc_bio
               icfg_log fsc_fs fsc_cov fsc_logst icfg_dev n2 pidv dq M3 (K - 38)%nat eb b lks
               Vpr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
@@ -1023,12 +1013,8 @@ Section ProofSysLinkTails.
   (* ================================================================== *)
   Lemma sl_tail_bad `{GEN : GenId} `{CID0 : CpuId}
       (gs : list gname) (jx : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (gil gisl : gname)
-      (bmapstart : Z)
-      (size : Z)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (ty : mword 16)
       (u : nat) (Sb : gset Z)
@@ -1042,15 +1028,15 @@ Section ProofSysLinkTails.
     (38 <= K)%nat -> ((K - 38) + 38 = K)%nat ->
     (kk < NINODE)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
-    0 < size <= BPB ->
-    0 <= bmapstart ->
-    bmapstart ∈ fsc_cov ->
-    ~ (bmapstart ∈ log_region_set fsc_logst) ->
+    0 < fsc_size <= BPB ->
+    0 <= fsc_bmapstart ->
+    fsc_bmapstart ∈ fsc_cov ->
+    ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
     0 <= icfg_ist ->
     IBLOCK inum icfg_ist ∈ fsc_cov ->
     ~ (IBLOCK inum icfg_ist ∈ log_region_set fsc_logst) ->
     bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
-    cov_below fsc_cov size ->
+    cov_below fsc_cov fsc_size ->
     IBLOCK inum icfg_ist ∈ Sb ->
     (iput_units <= S u)%nat ->
     (jx < NPROC)%nat -> gs !! jx = Some gl ->
@@ -1071,8 +1057,8 @@ Section ProofSysLinkTails.
     cpu_own 0 eb (proc_addr jx) b lks -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xf4)) -∗
     panic_env -∗
-    bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) -∗
-    log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+    bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+    log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
@@ -1092,14 +1078,14 @@ Section ProofSysLinkTails.
        the token the [ip->nlink++] minted and the failed [dirlink] never
        filed in a directory's [FsStateInode.ent_toks]. *)
     FsStateLink.link_tok (fs_gamma_L fsc_fs) (bv_unsigned inum) uty -∗
-    sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+    sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-    bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+    bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
     proc_priv_bare (proc_addr jx) pidv Vpr -∗
     procs_inv gs -∗
-    dev_inv gu gd -∗
-    disk_geom gd pd pav pu -∗
-    is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+    dev_inv fsc_uart fsc_disk -∗
+    disk_geom fsc_disk pd pav pu -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
     bslots 3 -∗
     log_opS icfg_log (S u) Sb -∗
     (* the transaction token beside the budget: this tail runs iupdate and
@@ -1122,7 +1108,7 @@ Section ProofSysLinkTails.
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         proc_priv_bare (proc_addr jx) pidv Vpr -∗
-        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+        sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
         bslots 3 -∗
         iref_slot -∗
@@ -1190,7 +1176,7 @@ Section ProofSysLinkTails.
        undo its nlink, and half the transaction's element sits in the
        escrow for that window. *)
 
-    iApply (Ilock.wp_ilock_tx_sconf (CID := CID2) gs jx gl gu gd gk pd pav pu bn
+    iApply (Ilock.wp_ilock_tx_sconf (CID := CID2) gs jx gl pd pav pu
               gil gisl kk s gy PlainK
  inum
               pidv dq dqs M2 (K - 38)%nat eb b lks
@@ -1372,8 +1358,8 @@ Section ProofSysLinkTails.
       by exact (blkmap_wf_dir_len fsc_cov fsc_logst bm (proj1 Hiok)).
     iDestruct (cpu_own_transport CID3 CID8 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (Iupdate.wp_iupdate_unlink (CID := CID8) gs jx gl gu gd gk pd pav pu
-              bn (ientry kk) inum
+    iApply (Iupdate.wp_iupdate_unlink (CID := CID8) gs jx gl pd pav pu
+ (ientry kk) inum
               dn' dn bm u Sb true uty pidv dq (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
               P4 (K - 38)%nat eb b lks
               Vpr HKiup ltac:(intros _; exact Hmem) Hgeom Hist0 Hiblk Hiblog Hinb
@@ -1512,9 +1498,9 @@ Section ProofSysLinkTails.
       exact (HQ1thr c Hc N2 N8 N9 N18). }
     iDestruct (cpu_own_transport CID9 CID11 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID11) gs jx gl gu gd gk
-              pd pav pu bn gil gisl bmapstart
- size kk qi s gy inum dn' bm (S u) pidv dq
+    iApply (Iunlockput.wp_iunlockput_tx_sconf (CID := CID11) gs jx gl
+              pd pav pu gil gisl
+ kk qi s gy inum dn' bm (S u) pidv dq
               dqb dqs Q2 (K - 38)%nat eb b lks
               Vpr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HQ2a0
@@ -1561,7 +1547,7 @@ Section ProofSysLinkTails.
       exact (Hupthr c Hc N2 N8 N9 N18). }
     iDestruct (cpu_own_transport CID12 CID13 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (EndOp.wp_end_op_sconf (CID := CID13) gs jx gl gu gd gk pd pav pu bn
+    iApply (EndOp.wp_end_op_sconf (CID := CID13) gs jx gl fsc_uart fsc_disk fsc_dlock pd pav pu fsc_bio
               icfg_log fsc_fs fsc_cov fsc_logst icfg_dev n2 pidv dq Q3 (K - 38)%nat eb b lks
               Vpr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
@@ -1688,12 +1674,8 @@ Section ProofSysLinkTails.
   (* ================================================================== *)
   Lemma sl_tail_f `{GEN : GenId} `{CID0 : CpuId}
       (gs : list gname) (jx : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (gil gisl : gname) (gild gisld : gname)
-      (bmapstart : Z)
-      (size : Z)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (ty : mword 16)
       (kd : nat) (qd sd : Qp) (gyd : gname) (dinum : mword 32)
@@ -1709,10 +1691,10 @@ Section ProofSysLinkTails.
     (38 <= K)%nat -> ((K - 38) + 38 = K)%nat ->
     (kk < NINODE)%nat -> (kd < NINODE)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
-    0 < size <= BPB ->
-    0 <= bmapstart ->
-    bmapstart ∈ fsc_cov ->
-    ~ (bmapstart ∈ log_region_set fsc_logst) ->
+    0 < fsc_size <= BPB ->
+    0 <= fsc_bmapstart ->
+    fsc_bmapstart ∈ fsc_cov ->
+    ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
     0 <= icfg_ist ->
     IBLOCK inum icfg_ist ∈ fsc_cov ->
     ~ (IBLOCK inum icfg_ist ∈ log_region_set fsc_logst) ->
@@ -1720,8 +1702,8 @@ Section ProofSysLinkTails.
     IBLOCK dinum icfg_ist ∈ fsc_cov ->
     ~ (IBLOCK dinum icfg_ist ∈ log_region_set fsc_logst) ->
     bv_unsigned dinum < 16 * Z.of_nat icfg_nib ->
-    cov_below fsc_cov size ->
-    (crb = true -> bmapstart ∈ Sb) ->
+    cov_below fsc_cov fsc_size ->
+    (crb = true -> fsc_bmapstart ∈ Sb) ->
     (cru = true -> IBLOCK dinum icfg_ist ∈ Sb) ->
     IBLOCK inum icfg_ist ∈ Sb ->
     (iput_units <= n)%nat ->
@@ -1750,8 +1732,8 @@ Section ProofSysLinkTails.
     cpu_own 0 eb (proc_addr jx) b lks -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xee)) -∗
     panic_env -∗
-    bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) -∗
-    log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+    bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+    log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
@@ -1785,14 +1767,14 @@ Section ProofSysLinkTails.
     inode_ref_short kd (qd + sd)%Qp qd icfg_dev dinum -∗
     (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
     runit_any (bv_unsigned dinum) -∗
-    sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+    sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-    bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+    bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
     proc_priv_bare (proc_addr jx) pidv Vpr -∗
     procs_inv gs -∗
-    dev_inv gu gd -∗
-    disk_geom gd pd pav pu -∗
-    is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+    dev_inv fsc_uart fsc_disk -∗
+    disk_geom fsc_disk pd pav pu -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
     bslots 3 -∗
     log_opSe icfg_log n Sb e0 -∗
     (* the transaction token is INSIDE the checked-out descriptor while
@@ -1815,7 +1797,7 @@ Section ProofSysLinkTails.
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         proc_priv_bare (proc_addr jx) pidv Vpr -∗
-        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+        sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
         bslots 3 -∗
         iref_slots 2 -∗
@@ -1879,9 +1861,9 @@ Section ProofSysLinkTails.
       exact (HM1thr c Hc N2 N8 N9 N18). }
     iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (Iunlockput.wp_iunlockput_tx_gen (CID := CID2) gs jx gl gu gd gk
-              pd pav pu bn gild gisld bmapstart
- size kd qd sd gyd dinum dnd bmd
+    iApply (Iunlockput.wp_iunlockput_tx_gen (CID := CID2) gs jx gl
+              pd pav pu gild gisld
+ kd qd sd gyd dinum dnd bmd
               n Sb crb cru false e0 pidv dq dqb dqs
               M2 (K - 38)%nat eb b lks
               Vpr HKup Hkd Hcrb Hcru Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
@@ -1916,8 +1898,8 @@ Section ProofSysLinkTails.
     assert (Hmem1 : IBLOCK inum icfg_ist ∈ Sb1) by exact (Hsb1 _ Hmem).
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID3)
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (sl_tail_bad (CID0 := CID3) gs jx gl gu gd gk pd pav pu bn
-              gil gisl bmapstart size
+    iApply (sl_tail_bad (CID0 := CID3) gs jx gl pd pav pu
+              gil gisl
               kk qi s gy inum ty u1 Sb1 uty pidv dq dqb dqs m mup sp0 K eb b
               lks bnm bw bo
               Vpr HKil HKiup HKup HKeo HK38 Kpop Hkk Hgeom Hsize Hbm0
@@ -1964,12 +1946,8 @@ Section ProofSysLinkTails.
   (* ================================================================== *)
   Lemma sl_tail_e2 `{GEN : GenId} `{CID0 : CpuId}
       (gs : list gname) (jx : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (gil gisl : gname) (gild gisld : gname)
-      (bmapstart : Z)
-      (size : Z)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (ty : mword 16)
       (kd : nat) (qd sd : Qp) (gyd : gname) (dinum : mword 32)
@@ -1985,10 +1963,10 @@ Section ProofSysLinkTails.
     (38 <= K)%nat -> ((K - 38) + 38 = K)%nat ->
     (kk < NINODE)%nat -> (kd < NINODE)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
-    0 < size <= BPB ->
-    0 <= bmapstart ->
-    bmapstart ∈ fsc_cov ->
-    ~ (bmapstart ∈ log_region_set fsc_logst) ->
+    0 < fsc_size <= BPB ->
+    0 <= fsc_bmapstart ->
+    fsc_bmapstart ∈ fsc_cov ->
+    ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
     0 <= icfg_ist ->
     IBLOCK inum icfg_ist ∈ fsc_cov ->
     ~ (IBLOCK inum icfg_ist ∈ log_region_set fsc_logst) ->
@@ -1996,7 +1974,7 @@ Section ProofSysLinkTails.
     IBLOCK dinum icfg_ist ∈ fsc_cov ->
     ~ (IBLOCK dinum icfg_ist ∈ log_region_set fsc_logst) ->
     bv_unsigned dinum < 16 * Z.of_nat icfg_nib ->
-    cov_below fsc_cov size ->
+    cov_below fsc_cov fsc_size ->
     IBLOCK inum icfg_ist ∈ Sb ->
     (iput_units <= n)%nat ->
     (* THE LEDGER'S CLOSURE, over the ONE figure the parent's free reports.
@@ -2025,8 +2003,8 @@ Section ProofSysLinkTails.
     cpu_own 0 eb (proc_addr jx) b lks -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xe6)) -∗
     panic_env -∗
-    bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) -∗
-    log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+    bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+    log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
@@ -2060,14 +2038,14 @@ Section ProofSysLinkTails.
     inode_ref_short kd (qd + sd)%Qp qd icfg_dev dinum -∗
     (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
     runit_any (bv_unsigned dinum) -∗
-    sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+    sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-    bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+    bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
     proc_priv_bare (proc_addr jx) pidv Vpr -∗
     procs_inv gs -∗
-    dev_inv gu gd -∗
-    disk_geom gd pd pav pu -∗
-    is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+    dev_inv fsc_uart fsc_disk -∗
+    disk_geom fsc_disk pd pav pu -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
     bslots 3 -∗
     log_opSe icfg_log n Sb e0 -∗
     (* the transaction token is INSIDE the checked-out descriptor while
@@ -2090,7 +2068,7 @@ Section ProofSysLinkTails.
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         proc_priv_bare (proc_addr jx) pidv Vpr -∗
-        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+        sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
         bslots 3 -∗
         iref_slots 2 -∗
@@ -2154,9 +2132,9 @@ Section ProofSysLinkTails.
       exact (HM1thr c Hc N2 N8 N9 N18). }
     iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (Iunlockput.wp_iunlockput_tx_gen (CID := CID2) gs jx gl gu gd gk
-              pd pav pu bn gild gisld bmapstart
- size kd qd sd gyd dinum dnd bmd
+    iApply (Iunlockput.wp_iunlockput_tx_gen (CID := CID2) gs jx gl
+              pd pav pu gild gisld
+ kd qd sd gyd dinum dnd bmd
               n Sb false false false e0 pidv dq dqb dqs
               M2 (K - 38)%nat eb b lks
               Vpr HKup Hkd ltac:(discriminate) ltac:(discriminate) Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
@@ -2211,8 +2189,8 @@ Section ProofSysLinkTails.
     assert (Hmem1 : IBLOCK inum icfg_ist ∈ Sb1) by exact (Hsb1 _ Hmem).
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID4)
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (sl_tail_bad (CID0 := CID4) gs jx gl gu gd gk pd pav pu bn
-              gil gisl bmapstart size
+    iApply (sl_tail_bad (CID0 := CID4) gs jx gl pd pav pu
+              gil gisl
               kk qi s gy inum ty u1 Sb1 uty pidv dq dqb dqs m mup sp0 K eb b
               lks bnm bw bo
               Vpr HKil HKiup HKup HKeo HK38 Kpop Hkk Hgeom Hsize Hbm0

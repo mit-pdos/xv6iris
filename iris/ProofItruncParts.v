@@ -369,39 +369,39 @@ Section ItruncDefs.
      set is the existential inside [bm_paidS]).  So the set retrofit here is
      two threaded parameters, not a proof obligation; this is
      [ProofIalloc]'s pattern. *)
-  Definition it_dir_state (γ : log_names) (γfs : fs_names)
+  Definition it_dir_state (γfs : fs_names)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8))
-      (cov : gset Z) (logstart bmapstart size : Z)
-      (bn : bio_names) (crb : bool) (Sb : gset Z) (e0 : nat)
+      (cov : gset Z) (logstart : Z)
+ (crb : bool) (Sb : gset Z) (e0 : nat)
       (w : nat) (k : nat) : iProp Σ :=
     (inode_map γfs ip (bm_dir_zeroed bm k) ∗
      inode_blocks γfs (bm_dir_zeroed bm k) data ∗
-     bm_paidS bmapstart crb w Sb e0)%I.
+     bm_paidS crb w Sb e0)%I.
 
   (* Opened and closed by LEMMA, never by [rewrite /it_dir_state]: the Iris
      context is part of the goal term, so unfolding the definition in the
      body also unfolds it inside the induction hypothesis, and the IH then
      no longer matches the bundle the loop carries. *)
-  Lemma it_dir_state_open (γ : log_names) (γfs : fs_names)
+  Lemma it_dir_state_open (γfs : fs_names)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8))
-      (cov : gset Z) (logstart bmapstart size : Z)
-      (bn : bio_names) (crb : bool) (Sb : gset Z) (e0 : nat)
+      (cov : gset Z) (logstart : Z)
+ (crb : bool) (Sb : gset Z) (e0 : nat)
       (w : nat) (k : nat) :
-    it_dir_state γ γfs ip bm data cov logstart bmapstart size bn crb Sb e0 w k -∗
+    it_dir_state γfs ip bm data cov logstart crb Sb e0 w k -∗
       inode_map γfs ip (bm_dir_zeroed bm k) ∗
       inode_blocks γfs (bm_dir_zeroed bm k) data ∗
-      bm_paidS bmapstart crb w Sb e0.
+      bm_paidS crb w Sb e0.
   Proof. iIntros "H". iExact "H". Qed.
 
-  Lemma it_dir_state_close (γ : log_names) (γfs : fs_names)
+  Lemma it_dir_state_close (γfs : fs_names)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8))
-      (cov : gset Z) (logstart bmapstart size : Z)
-      (bn : bio_names) (crb : bool) (Sb : gset Z) (e0 : nat)
+      (cov : gset Z) (logstart : Z)
+ (crb : bool) (Sb : gset Z) (e0 : nat)
       (w : nat) (k : nat) :
     inode_map γfs ip (bm_dir_zeroed bm k) -∗
     inode_blocks γfs (bm_dir_zeroed bm k) data -∗
-    bm_paidS bmapstart crb w Sb e0 -∗
-    it_dir_state γ γfs ip bm data cov logstart bmapstart size bn crb Sb e0 w k.
+    bm_paidS crb w Sb e0 -∗
+    it_dir_state γfs ip bm data cov logstart crb Sb e0 w k.
   Proof. iIntros "A B D". rewrite /it_dir_state. iFrame "A B D". Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -420,12 +420,12 @@ Section ItruncDefs.
     ([∗ list] t ∈ seq q (NINDIRECT - q),
        blk_res γfs (bm_ent bm !!! t) (data (NDIRECT + t)%nat))%I.
 
-  Definition it_ent_state (γ : log_names) (γfs : fs_names)
+  Definition it_ent_state (γfs : fs_names)
       (bm : blkmap) (data : nat -> list (bv 8))
-      (cov : gset Z) (logstart bmapstart size : Z)
+      (cov : gset Z) (logstart : Z)
       (crb : bool) (Sb : gset Z) (e0 : nat) (w : nat) (q : nat) : iProp Σ :=
     (it_ent_res γfs bm data q ∗
-     bm_paidS bmapstart crb w Sb e0)%I.
+     bm_paidS crb w Sb e0)%I.
 
   (* THE ONE STEP bfree TAKES, and why the loops never case-split.
 
@@ -442,12 +442,12 @@ Section ItruncDefs.
      and a loop that frees an unknown number of blocks carries the single
      assertion unchanged.  This is the whole payoff of the absorption
      credit being a positive client-held claim. *)
-  Lemma bm_paid_use (bmapstart : Z) (u : nat) :
-    bm_paid bmapstart u -∗ ∃ (cr : bool) (u' : nat) (Sb : gset Z),
-      ⌜cr = true -> bmapstart ∈ Sb⌝ ∗
+  Lemma bm_paid_use (u : nat) :
+    bm_paid u -∗ ∃ (cr : bool) (u' : nat) (Sb : gset Z),
+      ⌜cr = true -> fsc_bmapstart ∈ Sb⌝ ∗
       ⌜(if cr then S u' else u') = S u⌝ ∗
       log_opS icfg_log (S u') Sb ∗
-      (log_opS icfg_log (S u) (Sb ∪ {[bmapstart]}) -∗ bm_paid bmapstart u).
+      (log_opS icfg_log (S u) (Sb ∪ {[fsc_bmapstart]}) -∗ bm_paid u).
   Proof.
     rewrite /bm_paid. iIntros "[H|H]".
     - (* already paid: present the credit, keep the unit *)
@@ -455,14 +455,14 @@ Section ItruncDefs.
       iExists true, u, Sb.
       iSplitR; [iPureIntro; intros _; exact Hin|].
       iSplitR; [iPureIntro; reflexivity|].
-      iFrame "Hop". iIntros "Hop". iLeft. iExists (Sb ∪ {[bmapstart]}).
+      iFrame "Hop". iIntros "Hop". iLeft. iExists (Sb ∪ {[fsc_bmapstart]}).
       iSplitR; [iPureIntro; set_solver|]. iFrame "Hop".
     - (* not yet: spend the spare unit and become paid *)
       iDestruct "H" as (Sb) "Hop".
       iExists false, (S u), Sb.
       iSplitR; [iPureIntro; discriminate|].
       iSplitR; [iPureIntro; reflexivity|].
-      iFrame "Hop". iIntros "Hop". iLeft. iExists (Sb ∪ {[bmapstart]}).
+      iFrame "Hop". iIntros "Hop". iLeft. iExists (Sb ∪ {[fsc_bmapstart]}).
       iSplitR; [iPureIntro; set_solver|]. iFrame "Hop".
   Qed.
 
@@ -477,14 +477,14 @@ Section ItruncDefs.
 
      The two [set_solver]s are inside a small definitional lemma, which is
      where they belong (S3l's rule); do not lift one to a call site. *)
-  Lemma bm_paidS_use (bmapstart : Z) (crb : bool)
+  Lemma bm_paidS_use (crb : bool)
       (u : nat) (Sb : gset Z) (e0 : nat) :
-    bm_paidS bmapstart crb u Sb e0 -∗ ∃ (cr : bool) (u' : nat) (Sb0 : gset Z),
-      ⌜cr = true -> bmapstart ∈ Sb0⌝ ∗
+    bm_paidS crb u Sb e0 -∗ ∃ (cr : bool) (u' : nat) (Sb0 : gset Z),
+      ⌜cr = true -> fsc_bmapstart ∈ Sb0⌝ ∗
       ⌜(if cr then S u' else u') = S u⌝ ∗
       ⌜Sb ⊆ Sb0⌝ ∗
       log_opSe icfg_log (S u') Sb0 e0 ∗
-      (log_opSe icfg_log (S u) (Sb0 ∪ {[bmapstart]}) e0 -∗ bm_paidS bmapstart crb u Sb e0).
+      (log_opSe icfg_log (S u) (Sb0 ∪ {[fsc_bmapstart]}) e0 -∗ bm_paidS crb u Sb e0).
   Proof.
     rewrite /bm_paidS. iIntros "[H|[%Hc H]]".
     - (* already paid: present the credit, keep the unit *)
@@ -493,7 +493,7 @@ Section ItruncDefs.
       iSplitR; [iPureIntro; intros _; exact Hin|].
       iSplitR; [iPureIntro; reflexivity|].
       iSplitR; [iPureIntro; exact Hsub|].
-      iFrame "Hop". iIntros "Hop". iLeft. iExists (Sb0 ∪ {[bmapstart]}).
+      iFrame "Hop". iIntros "Hop". iLeft. iExists (Sb0 ∪ {[fsc_bmapstart]}).
       iSplitR; [iPureIntro; set_solver|].
       iSplitR; [iPureIntro; set_solver|]. iFrame "Hop".
     - (* not yet: spend the spare unit and become paid *)
@@ -502,7 +502,7 @@ Section ItruncDefs.
       iSplitR; [iPureIntro; discriminate|].
       iSplitR; [iPureIntro; reflexivity|].
       iSplitR; [iPureIntro; exact Hsub|].
-      iFrame "Hop". iIntros "Hop". iLeft. iExists (Sb0 ∪ {[bmapstart]}).
+      iFrame "Hop". iIntros "Hop". iLeft. iExists (Sb0 ∪ {[fsc_bmapstart]}).
       iSplitR; [iPureIntro; set_solver|].
       iSplitR; [iPureIntro; set_solver|]. iFrame "Hop".
   Qed.
@@ -578,10 +578,10 @@ Section ItruncDefs.
   (* bread hands back a handle but no buffer index bound; the handle itself
      carries it, as [bio_held]'s first conjunct.  Read it out and give the
      handle straight back. *)
-  Lemma bio_locked_kbound (bn : bio_names) (V : bio_view Σ) (k : nat)
-      (pidv dev bno : mword 32) (bs bsd : list (bv 8)) (d : bool) :
-    bio_locked bn V k pidv dev bno bs bsd d -∗
-      ⌜(k < NBUF)%nat⌝ ∗ bio_locked bn V k pidv dev bno bs bsd d.
+  Lemma bio_locked_kbound (V : bio_view Σ) (k : nat)
+      (pidv bno : mword 32) (bs bsd : list (bv 8)) (d : bool) :
+    bio_locked fsc_bio V k pidv icfg_dev bno bs bsd d -∗
+      ⌜(k < NBUF)%nat⌝ ∗ bio_locked fsc_bio V k pidv icfg_dev bno bs bsd d.
   Proof.
     rewrite /bio_locked /bio_held.
     iIntros "(%Hk & %Hc & %Hd & Hr)".
@@ -602,22 +602,22 @@ Section ItruncDefs.
 
   (* opened and closed by lemma, for the same IH reason as the direct
      loop's state *)
-  Lemma it_ent_state_open (γ : log_names) (γfs : fs_names) (bm : blkmap)
+  Lemma it_ent_state_open (γfs : fs_names) (bm : blkmap)
       (data : nat -> list (bv 8)) (cov : gset Z)
-      (logstart bmapstart size : Z)
+      (logstart : Z)
       (crb : bool) (Sb : gset Z) (e0 : nat) (w : nat) (q : nat) :
-    it_ent_state γ γfs bm data cov logstart bmapstart size crb Sb e0 w q -∗
+    it_ent_state γfs bm data cov logstart crb Sb e0 w q -∗
       it_ent_res γfs bm data q ∗
-      bm_paidS bmapstart crb w Sb e0.
+      bm_paidS crb w Sb e0.
   Proof. iIntros "H". iExact "H". Qed.
 
-  Lemma it_ent_state_close (γ : log_names) (γfs : fs_names) (bm : blkmap)
+  Lemma it_ent_state_close (γfs : fs_names) (bm : blkmap)
       (data : nat -> list (bv 8)) (cov : gset Z)
-      (logstart bmapstart size : Z)
+      (logstart : Z)
       (crb : bool) (Sb : gset Z) (e0 : nat) (w : nat) (q : nat) :
     it_ent_res γfs bm data q -∗
-    bm_paidS bmapstart crb w Sb e0 -∗
-    it_ent_state γ γfs bm data cov logstart bmapstart size crb Sb e0 w q.
+    bm_paidS crb w Sb e0 -∗
+    it_ent_state γfs bm data cov logstart crb Sb e0 w q.
   Proof. iIntros "A C". rewrite /it_ent_state. iFrame "A C". Qed.
 
   (* THE HANDOFF from the direct loop to the indirect one.  After the direct

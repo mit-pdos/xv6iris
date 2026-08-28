@@ -325,10 +325,10 @@ Section ProofSysFstat.
   (*  THE CAPSTONE.                                                       *)
   (* =================================================================== *)
   Lemma wp_sys_fstat_sconf
-      (γa γf : gname) (γs : list gname) (j : nat) (γlp : gname)
+      (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (fn : fstat_names) (pidv : mword 32) (V : pprivate) (v : mword 64)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-    : wp_sys_fstat_sconf_body γa γf γs j γlp fn pidv V v m av eb b lks.
+    : wp_sys_fstat_sconf_body γf γs j γlp fn pidv V v m av eb b lks.
   Proof.
     cbv beta delta [wp_sys_fstat_sconf_body].
     intros pcE pj ret_tgt Hav Hj Hgs Hlens Harg0 Harg1 Heb.
@@ -803,7 +803,7 @@ Section ProofSysFstat.
       iDestruct (sfs_env_frame fn stf with "Henv") as "[Hfenv Hfback]".
       iDestruct (cpu_own_transport CID13 CID19 0%nat eb pj b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
-      iApply (Filestat.wp_filestat_sconf γa γf γs j γlp kk qq stf fn pidv V
+      iApply (Filestat.wp_filestat_sconf γf γs j γlp kk qq stf fn pidv V
                 S3 (av - 4)%nat eb b lks
                 ltac:(lia) Hkk Hj Hgs Hlens HS3a0' Heb
                 with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv").

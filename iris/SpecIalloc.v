@@ -181,11 +181,8 @@ Definition wp_ialloc_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
       ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
-    (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
+  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
-    (γpr : gname)
- (ninodes : Z)
  (ty : mword 16)
     (u : nat)
     (pidv : mword 32) (dq dqs dqn : dfrac)
@@ -206,9 +203,9 @@ Definition wp_ialloc_sconf_body
      one ([InodeInv.ireg_blocks_ok]). *)
   ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
   (* THE THREE GEOMETRY PREMISES -- see the header *)
-  1 < ninodes ->
-  ninodes <= 16 * Z.of_nat icfg_nib ->
-  ninodes < 2 ^ 31 ->
+  1 < fsc_ninodes ->
+  fsc_ninodes <= 16 * Z.of_nat icfg_nib ->
+  fsc_ninodes < 2 ^ 31 ->
   (* the type actually installs an ALLOCATED record; [fresh_shape] and
      therefore the whole claim need it, and every caller passes a literal *)
   bv_unsigned ty <> 0 ->
@@ -222,7 +219,7 @@ Definition wp_ialloc_sconf_body
      moves. *)
   InodeRegion.ireg_ty_ok (ialloc_fresh ty) ->
   (* THE NO-INODES ARM'S CALLEE, as a hypothesis and not a functor *)
-  printk_gen_contract (kt := KT1) γpr γu γd ->
+  printk_gen_contract (kt := KT1) fsc_printk fsc_uart fsc_disk ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* a0 = dev, a1 = type: the RV64 ABI's sign extension, and [sh s6,0(s3)]
@@ -241,11 +238,11 @@ Definition wp_ialloc_sconf_body
   kernel_text -∗ pc_is pcE -∗
   (* the general printk path's two PERSISTENT credentials *)
   kernel_data -∗
-  printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
-  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+  printk_env fsc_printk fsc_uart fsc_disk -∗
+  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+  log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
   (* the two superblock fields, read and handed straight back *)
-  sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
+  sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   (* THE INODE REGION -- persistent, and the ONLY region resource in this
      contract.  The claim is [InodeRegion.ireg_claim_au] and it takes
@@ -268,9 +265,9 @@ Definition wp_ialloc_sconf_body
   proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle and the disk fabric *)
   procs_inv γs -∗
-  dev_inv γu γd -∗
-  disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  dev_inv fsc_uart fsc_disk -∗
+  disk_geom fsc_disk pd pav pu -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
   (* TWO slot units: bread's reference is held across log_write, which wants
      one of its own; brelse gives it back *)
   bslots 2 -∗
@@ -307,7 +304,7 @@ Definition wp_ialloc_sconf_body
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
-      sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
+      sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       proc_priv_bare pj pidv Vpr -∗
       bslots 2 -∗
@@ -315,7 +312,7 @@ Definition wp_ialloc_sconf_body
        then (* SUCCESS: iget's postcondition verbatim, at the claimed inum *)
          ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = ientry kslot
           /\ (kslot < NINODE)%nat
-          /\ 0 < bv_unsigned inum < ninodes
+          /\ 0 < bv_unsigned inum < fsc_ninodes
           /\ bv_unsigned inum < 16 * Z.of_nat icfg_nib
           (* what the claim WROTE: [ialloc_fresh ty], the weakest record a
              claim can promise and exactly what ilock's fill needs *)
@@ -378,11 +375,8 @@ Definition wp_ialloc_gen_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
       ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
-    (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
+  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
-    (γpr : gname)
- (ninodes : Z)
  (ty : mword 16)
     (u : nat) (Sb : gset Z)
     (pidv : mword 32) (dq dqs dqn : dfrac)
@@ -403,9 +397,9 @@ Definition wp_ialloc_gen_body
      one ([InodeInv.ireg_blocks_ok]). *)
   ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
   (* THE THREE GEOMETRY PREMISES -- see the header *)
-  1 < ninodes ->
-  ninodes <= 16 * Z.of_nat icfg_nib ->
-  ninodes < 2 ^ 31 ->
+  1 < fsc_ninodes ->
+  fsc_ninodes <= 16 * Z.of_nat icfg_nib ->
+  fsc_ninodes < 2 ^ 31 ->
   (* the type actually installs an ALLOCATED record; [fresh_shape] and
      therefore the whole claim need it, and every caller passes a literal *)
   bv_unsigned ty <> 0 ->
@@ -419,7 +413,7 @@ Definition wp_ialloc_gen_body
      moves. *)
   InodeRegion.ireg_ty_ok (ialloc_fresh ty) ->
   (* THE NO-INODES ARM'S CALLEE, as a hypothesis and not a functor *)
-  printk_gen_contract (kt := KT1) γpr γu γd ->
+  printk_gen_contract (kt := KT1) fsc_printk fsc_uart fsc_disk ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* a0 = dev, a1 = type: the RV64 ABI's sign extension, and [sh s6,0(s3)]
@@ -438,11 +432,11 @@ Definition wp_ialloc_gen_body
   kernel_text -∗ pc_is pcE -∗
   (* the general printk path's two PERSISTENT credentials *)
   kernel_data -∗
-  printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
-  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+  printk_env fsc_printk fsc_uart fsc_disk -∗
+  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+  log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
   (* the two superblock fields, read and handed straight back *)
-  sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
+  sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   (* THE INODE REGION -- persistent, and the ONLY region resource in this
      contract.  The claim is [InodeRegion.ireg_claim_au] and it takes
@@ -465,9 +459,9 @@ Definition wp_ialloc_gen_body
   proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle and the disk fabric *)
   procs_inv γs -∗
-  dev_inv γu γd -∗
-  disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  dev_inv fsc_uart fsc_disk -∗
+  disk_geom fsc_disk pd pav pu -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
   (* TWO slot units: bread's reference is held across log_write, which wants
      one of its own; brelse gives it back *)
   bslots 2 -∗
@@ -508,7 +502,7 @@ Definition wp_ialloc_gen_body
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
-      sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
+      sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       proc_priv_bare pj pidv Vpr -∗
       bslots 2 -∗
@@ -516,7 +510,7 @@ Definition wp_ialloc_gen_body
        then (* SUCCESS: iget's postcondition verbatim, at the claimed inum *)
          ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = ientry kslot
           /\ (kslot < NINODE)%nat
-          /\ 0 < bv_unsigned inum < ninodes
+          /\ 0 < bv_unsigned inum < fsc_ninodes
           /\ bv_unsigned inum < 16 * Z.of_nat icfg_nib
           (* what the claim WROTE: [ialloc_fresh ty], the weakest record a
              claim can promise and exactly what ilock's fill needs *)
@@ -547,37 +541,29 @@ Module Type IALLOC.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
              ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (γpr : gname)
- (ninodes : Z)
  (ty : mword 16)
       (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (t : nat) (qt : Qp),
-      wp_ialloc_gen_body γs j γl γu γd γk pd pav pu bn γpr
- ninodes ty u Sb
+      wp_ialloc_gen_body γs j γl pd pav pu
+ ty u Sb
                          pidv dq dqs dqn m K eb b lks Vpr t qt.
 
   Parameter wp_ialloc_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
              ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (γpr : gname)
- (ninodes : Z)
  (ty : mword 16)
       (u : nat)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (t : nat) (qt : Qp),
-      wp_ialloc_sconf_body γs j γl γu γd γk pd pav pu bn γpr
- ninodes ty u
+      wp_ialloc_sconf_body γs j γl pd pav pu
+ ty u
                            pidv dq dqs dqn m K eb b lks Vpr t qt.
 End IALLOC.

@@ -252,12 +252,8 @@ Definition wp_fsinit_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
       ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
-    (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
+  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
-    (γpr : gname)
-    (bmapstart : Z)
-    (ninodes : Z) (size : Z)
     (* ---- the image's block 1, field by field ---- *)
     (v_magic v_size v_nblocks v_ninodes v_nlog
      v_logstart v_inodestart v_bmapstart : mword 32)
@@ -316,32 +312,32 @@ Definition wp_fsinit_sconf_body
           system's law out of the invariants it already holds and hands it
           to [initlog], which parks it in [LogInv.log_ctx]. *)
   col_geom sbrec icfg_ist icfg_nib (fs_home_set fsc_cov fsc_logst) ->
-  FsImg.sb_bmapstart sbrec = bmapstart ->
-  FsImg.sb_size sbrec = size ->
+  FsImg.sb_bmapstart sbrec = fsc_bmapstart ->
+  FsImg.sb_size sbrec = fsc_size ->
   (* (b) the magic, which is what refutes the LIVE panic arm at +0x40 *)
   bv_unsigned v_magic = FSMAGIC ->
   (* (c) the three field values every fs contract downstream reads *)
-  v_ninodes = (mword_of_int ninodes : mword 32) ->
+  v_ninodes = (mword_of_int fsc_ninodes : mword 32) ->
   v_inodestart = (mword_of_int icfg_ist : mword 32) ->
-  v_bmapstart = (mword_of_int bmapstart : mword 32) ->
+  v_bmapstart = (mword_of_int fsc_bmapstart : mword 32) ->
   v_logstart = (mword_of_int fsc_logst : mword 32) ->
   (* (d) THE THREE ninodes TIES -- SpecIalloc's and SpecIreclaim's, finally
          stated about a real record.  [ninodes <= 16 * nib] is the one that
          existed nowhere in the tree before (N5c). *)
-  1 < ninodes ->
-  ninodes <= 16 * Z.of_nat icfg_nib ->
-  ninodes < 2 ^ 31 ->
+  1 < fsc_ninodes ->
+  fsc_ninodes <= 16 * Z.of_nat icfg_nib ->
+  fsc_ninodes < 2 ^ 31 ->
   icfg_dev = ROOTDEV ->
   (0 < icfg_nib)%nat ->
   (* (f) the inode region's block geometry, and itrunc's, threaded to
          ireclaim *)
   0 <= icfg_ist ->
   ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
-  0 < size <= BPB ->
-  0 <= bmapstart ->
-  bmapstart ∈ fsc_cov ->
-  ~ (bmapstart ∈ log_region_set fsc_logst) ->
-  cov_below fsc_cov size ->
+  0 < fsc_size <= BPB ->
+  0 <= fsc_bmapstart ->
+  fsc_bmapstart ∈ fsc_cov ->
+  ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
+  cov_below fsc_cov fsc_size ->
   (* (g) THE ON-DISK HEADER IS WELL FORMED, AND THAT IS ALL (durable-disk
          lane E-except; the CLEAN-IMAGE premise [hdr_n bs_hdr = 0] IS GONE).
          These are [FsCrash.hdr_wf]'s three clauses at the header block's
@@ -368,7 +364,7 @@ Definition wp_fsinit_sconf_body
          [log_state] pack's row (b) provable. *)
   (forall b : Z, b ∈ fsc_cov -> L !! b = Some (lm_view M b)) ->
   (* ---- ireclaim's printk, as a hypothesis and not a functor ---- *)
-  printk_gen_contract (kt := KT1) γpr γu γd ->
+  printk_gen_contract (kt := KT1) fsc_printk fsc_uart fsc_disk ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* a0 = dev *)
@@ -388,8 +384,8 @@ Definition wp_fsinit_sconf_body
   trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
+  printk_env fsc_printk fsc_uart fsc_disk -∗
+  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
   (* initlog's crash seam, era certificate and the era's BORN-TRUE mirror
      half + swap receipt (durable-disk 1a) *)
   fs_crash_seam fsc_cov fsc_logst -∗
@@ -436,7 +432,7 @@ Definition wp_fsinit_sconf_body
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ic_sleeplocks fsc_ic -∗
   (* itrunc's bitmap, through ireclaim's iput *)
-  bitmap_reg fsc_fs bmapstart fsc_cov fsc_logst size -∗
+  bitmap_reg fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   (* ---- initlog's RAW struct log cells, threaded straight through ---- *)
   log_addr ↦₄ vlock -∗
   lock_name_field log_addr ↦₈ vname -∗
@@ -459,9 +455,9 @@ Definition wp_fsinit_sconf_body
   proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle and the disk fabric *)
   procs_inv γs -∗
-  dev_inv γu γd -∗
-  disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  dev_inv fsc_uart fsc_disk -∗
+  disk_geom fsc_disk pd pav pu -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
   (* THIRTY-FIVE slot units.  initlog seals 32 of them into [log_state]'s
      pool and returns two; ireclaim needs three; so ONE is held back across
      the [jal initlog] at +0x4e.  See the header. *)
@@ -496,11 +492,11 @@ Definition wp_fsinit_sconf_body
       sb_magic ↦₄ v_magic -∗
       BitmapInv.sb_size ↦₄ v_size -∗
       sb_nblocks ↦₄ v_nblocks -∗
-      InodeInv.sb_ninodes ↦₄ (mword_of_int ninodes : mword 32) -∗
+      InodeInv.sb_ninodes ↦₄ (mword_of_int fsc_ninodes : mword 32) -∗
       sb_nlog ↦₄ v_nlog -∗
       sb_logstart ↦₄ (mword_of_int fsc_logst : mword 32) -∗
       InodeInv.sb_inodestart ↦₄ (mword_of_int icfg_ist : mword 32) -∗
-      BitmapInv.sb_bmapstart ↦₄ (mword_of_int bmapstart : mword 32) -∗
+      BitmapInv.sb_bmapstart ↦₄ (mword_of_int fsc_bmapstart : mword 32) -∗
       (* NOTHING COMES BACK FOR BLOCK 1 (durable-disk lane C-3a).  The run
          used to be returned here and DROPPED by forkret; it is now spent
          inside, into [initlog]'s [SbPark] park, and rides out as a conjunct
@@ -511,7 +507,7 @@ Definition wp_fsinit_sconf_body
          conjunct, modulo the seal site's instantiation of [bn]/[fsc_fs]/[fsc_cov]/
          [fsc_logst] at [fsc_bio]/[fsc_fs]/[fsc_cov]/[fsc_logst] -- the
          device it is stated at IS [icfg_dev] since rank 1c. *)
-      log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+      log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
       (* three, not two: see the header *)
       bslots 3 -∗
       iref_slot -∗
@@ -526,12 +522,7 @@ Module Type FSINIT.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
              ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (γpr : gname)
-      (bmapstart : Z)
-      (ninodes : Z) (size : Z)
       (v_magic v_size v_nblocks v_ninodes v_nlog
        v_logstart v_inodestart v_bmapstart : mword 32)
       (bs_sb : list (bv 8))
@@ -546,8 +537,8 @@ Module Type FSINIT.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
       (sbrec : fs_sb),
-      wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn γpr
-                           bmapstart ninodes size
+      wp_fsinit_sconf_body γs j γl pd pav pu
+
 
                            v_magic v_size v_nblocks v_ninodes v_nlog
                            v_logstart v_inodestart v_bmapstart bs_sb sb_old

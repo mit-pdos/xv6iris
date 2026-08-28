@@ -92,7 +92,7 @@ Notation K_sys_fork := ((K_kfork + 2)%nat) (only parsing).
 Definition wp_sys_fork_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa γp γw γl γf : gname) (γs : list gname)
+    (γp γw γl γf : gname) (γs : list gname)
     (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
     (b : bool) (pid : mword 32) (V : pprivate) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_fork in
@@ -118,7 +118,14 @@ Definition wp_sys_fork_sconf_body
      [fs_ready] its bundle carries), so a dispatcher pays nothing
      extra.  sys_fork does no I/O and touches no log. *)
   ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
-  kalloc_env γa None -∗
+  (* THE ALLOCATOR AT ITS PAIR, not behind [kalloc_env]'s existential (rank
+     1d).  kfork NAMES the free-list count/seal pair ([KvmSpec.kalloc_env_at],
+     because allocproc must speak about the count), and the pair is
+     [FsCfg.fscfg]'s [fsc_kpages] now rather than a threaded gname -- so a
+     row that hid it behind an [∃ γk] could no longer be handed on.  Every
+     caller has it: it is spelled out inside [FsReady.fs_ready]
+     ([fs_ready_kmem]), which is exactly why the field is there. *)
+  kalloc_env_at fsc_kalloc fsc_kpages None -∗
   (* the proc table's sealed regime, threaded to kfork's allocproc
      ([ProcAvail.v]); persistent, so it costs nothing to carry *)
   procs_avail None -∗
@@ -144,7 +151,7 @@ Definition wp_sys_fork_sconf_body
       pc_is ret_tgt -∗
       (* the caller's block comes back verbatim: kfork only reads it *)
       proc_priv γf p pid V -∗
-      kalloc_env γa None -∗
+      kalloc_env_at fsc_kalloc fsc_kpages None -∗
       (* ... and the return value is kfork's own, unchanged *)
       ⌜ mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int (-1) : mword 64)
         \/ (exists pidv : mword 32,
@@ -157,9 +164,9 @@ Module Type SYSFORK.
   Parameter wp_sys_fork_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa γp γw γl γf : gname) (γs : list gname)
+      (γp γw γl γf : gname) (γs : list gname)
       (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
       (b : bool) (pid : mword 32) (V : pprivate) (lks : gset string),
-      wp_sys_fork_sconf_body γa γp γw γl γf γs
+      wp_sys_fork_sconf_body γp γw γl γf γs
  m lvl av eb p b pid V lks.
 End SYSFORK.

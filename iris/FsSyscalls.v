@@ -362,10 +362,10 @@ Module FsSysMkdir (M : SYSMKDIR).
         Hesc & Hisl & Hireg & Hiopen & Hkenv & %Hgeo & #Hsbc & #Hbmi)".
     iDestruct "Hdisk" as (pd pav pu) "[#Hdgeom #Hdlk]".
     iDestruct "Hres" as "(Hbsl & Hsbn & Hsbi & Hsbs & Hsbb & Hir)".
-    iApply (M.wp_sys_mkdir_sconf γf fsc_kalloc fsc_printk γs j γl
-              fsc_uart fsc_disk fsc_dlock pd pav pu fsc_bio
-              fsc_bmapstart
-              fsc_ninodes fsc_size ns dqb dqs dqbs dqn v pid V m K true
+    iApply (M.wp_sys_mkdir_sconf γf γs j γl
+ pd pav pu
+
+ ns dqb dqs dqbs dqn v pid V m K true
               b lks
               HK Hroot Hnibp Hlg Hsz Hbnn Hbcov Hbout
               Histnn Hcb Hbg Hib Hn1 Hn2 Hn3 Hus Hprg Hns Hj Hgs
@@ -517,10 +517,10 @@ Module FsSysChdir (M : SYSCHDIR).
     iDestruct "Hdisk" as (pd pav pu) "[#Hdgeom #Hdlk]".
     iDestruct "Hres" as "(Hbsl & Hsbn & Hsbi & Hsbs & Hsbb & Hir)".
     iPoseProof (printk_env_panic with "Hpr") as "#Hpe".
-    iApply (M.wp_sys_chdir_sconf γf fsc_kalloc γs j γl
-              fsc_uart fsc_disk fsc_dlock pd pav pu fsc_bio
-              fsc_bmapstart
-              fsc_size dqb dqs v pid V m K true b lks
+    iApply (M.wp_sys_chdir_sconf γf γs j γl
+ pd pav pu
+
+ dqb dqs v pid V m K true b lks
               HK Hroot Hnibp Hlg Hsz Hbnn Hbcov Hbout
               Histnn Hcb Hib Hj Hgs eq_refl Htf
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlogc

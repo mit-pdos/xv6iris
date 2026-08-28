@@ -89,3 +89,15 @@ SpecSysUnlink
 SpecSysWrite
 SpecWritei
 ProofFilewrite
+ProofItruncParts
+ProofKexecC
+ProofKexecD
+SpecFileread
+ProofFileread
+SpecFilestat
+ProofFilestat
+SpecSysRead
+ProofSysRead
+SpecSysFstat
+ProofSysFstat
+ProofSysWrite

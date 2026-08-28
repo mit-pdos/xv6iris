@@ -95,19 +95,17 @@ Definition wp_sys_exit_sconf_body
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γft γf γw : gname)                               (* ftable lock, ftable, wait *)
      (γs : list gname) (j : nat) (γl : gname)
-    (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
+  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
     (ip : mword 64) (dqi : dfrac)                     (* the initproc cell   *)
-    (γkl : gname) (γka : gname * gname)               (* kmem.lock, kalloc   *)
-    (bmapstart : Z) (size : Z)
+               (* kmem.lock, kalloc   *)
     (on : option nat) (fn : fclose_names)
     (m : regfile) (av : nat) (eb : bool) (b : bool)
     (pid : mword 32) (V : pprivate) (v0 : mword 64) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_exit in
   let pj := proc_addr j in
-  fn = MkFCloseNames γs j γl γkl γka γu γd γk pd pav pu bn
-         pid (DfracOwn (1/4)) bmapstart size ->
+  fn = MkFCloseNames γs j γl pd pav pu
+         pid (DfracOwn (1/4)) ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* the syscall argument, out of the trapframe page [proc_priv] carries *)
@@ -149,21 +147,20 @@ Definition wp_sys_exit_sconf_body
   (* the open-file table: every non-null descriptor is fileclose'd *)
   is_ftable γft γf -∗
   (* ...and closing one can free a pipe's page *)
-  is_lock γkl (mword_of_int KernelSyms.kmem) "kmem"%string
-    (kmem_res γka (mword_of_int (KernelSyms.kmem + 24))) -∗
-  kalloc_avail γka on -∗
+  is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
+    (kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) -∗
+  kalloc_avail fsc_kpages on -∗
   (* the file system, for [begin_op(); iput(p->cwd); end_op();] inside kexit *)
-  bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
-  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+  log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
   fs_crash_seam fsc_cov fsc_logst -∗
   gen_cert -∗
-  dev_inv γu γd -∗
-  disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  dev_inv fsc_uart fsc_disk -∗
+  disk_geom fsc_disk pd pav pu -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
   bslots 3 -∗
   (* the inode cache and the two regions iput's truncate arm frees into,
      kexit's verbatim *)
-  ⌜fclose_ties fn⌝ -∗
   FsReady.fs_ready -∗
   (* the initproc pointer, at any fraction *)
   (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
@@ -187,17 +184,13 @@ Module Type SYSEXIT.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γft γf γw : gname)
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (ip : mword 64) (dqi : dfrac)
-      (γkl : gname) (γka : gname * gname)
-      (bmapstart : Z) (size : Z)
         (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (b : bool)
       (pid : mword 32) (V : pprivate) (v0 : mword 64) (lks : gset string),
-      wp_sys_exit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn
- ip dqi γkl γka
-                             bmapstart size
+      wp_sys_exit_sconf_body γft γf γw γs j γl pd pav pu
+ ip dqi
+
                              on fn m av eb b pid V v0 lks.
 End SYSEXIT.

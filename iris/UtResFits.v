@@ -168,9 +168,9 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES_PARK.
     iApply (ut_res_bare_park (SY.syscall_env) (park_token (un_s N)) N av Hwf Hav
             with "Hcaps [] Hown").
     iIntros "#Hdone #Htok".
-    iDestruct "Hcaps" as "(%Hties & _ & #Hprocs & _ & _ & #Hwl & #Hft & #Hdg & #Hpw)".
+    iDestruct "Hcaps" as "(#Hprocs & _ & _ & #Hwl & #Hft & #Hdg & #Hpw)".
     iApply (SY.syscall_env_park (un_f N) (un_w N) (un_ft N) (un_tk N)
-              (un_fn N) Hties Hj Hplock eq_refl
+              (un_fn N) Hj Hplock eq_refl
             with "Hextra Hwl Hft Hprocs Hdg Hdone Hpw Htok").
   Qed.
 

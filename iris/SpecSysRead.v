@@ -170,6 +170,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.  (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -268,8 +269,7 @@ End SpecSysRead.
 Definition wp_sys_read_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
-    (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
+ (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
     (fn : fread_names)                           (* the file system's ghosts *)
     (pidv : mword 32) (V : pprivate)
@@ -315,7 +315,7 @@ Definition wp_sys_read_sconf_body
      bundle printk needs.  Persistent, and syscall already holds it. *)
   panic_env -∗
   proc_priv γf pj pidv V -∗
-  kalloc_env γa None -∗
+  kalloc_env fsc_kalloc None -∗
   procs_inv γs -∗
   (* ...and the file system in the form that does NOT name a file, plus the
      CONSOLE INVARIANT, which is where the device table's read column comes
@@ -339,7 +339,7 @@ Definition wp_sys_read_sconf_body
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf pj pidv (upd_upt V P') -∗
-      kalloc_env γa None -∗
+      kalloc_env fsc_kalloc None -∗
       (* the file system, back.  fileread's own postcondition returns the
          superblock fraction and the slot unit; everything else in the bundle
          is persistent, which is why what comes back is [fileread_fs_out] and
@@ -355,12 +355,11 @@ Module Type SYSREAD.
   Parameter wp_sys_read_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-
-      (γa : gname) (γf : gname)
+ (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fread_names)
       (pidv : mword 32) (V : pprivate)
       (v v2 : mword 64)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string),
-      wp_sys_read_sconf_body γa γf γs j γlp fn pidv V v v2 m av eb b lks.
+      wp_sys_read_sconf_body γf γs j γlp fn pidv V v v2 m av eb b lks.
 End SYSREAD.

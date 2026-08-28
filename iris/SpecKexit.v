@@ -149,12 +149,10 @@ Definition wp_kexit_sconf_body
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γft γf γw : gname)                               (* ftable lock, ftable, wait *)
      (γs : list gname) (j : nat) (γl : gname)
-    (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
+  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
     (ip : mword 64) (dqi : dfrac)                     (* the initproc cell   *)
-    (γkl : gname) (γka : gname * gname)               (* kmem.lock, kalloc   *)
-    (bmapstart : Z) (size : Z)
+               (* kmem.lock, kalloc   *)
     (on : option nat) (fn : fclose_names)
     (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
     (pid : mword 32) (V : pprivate) :=
@@ -164,8 +162,8 @@ Definition wp_kexit_sconf_body
      bundled the way fileclose's environment is indexed.  One equation rather
      than fifteen coherence conjuncts, and it computes away in the proof.  The
      pid fraction is the quarter [ProcInv.proc_priv_pid_ofile] lends. *)
-  fn = MkFCloseNames γs j γl γkl γka γu γd γk pd pav pu bn
-         pid (DfracOwn (1/4)) bmapstart size ->
+  fn = MkFCloseNames γs j γl pd pav pu
+         pid (DfracOwn (1/4)) ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (K_kexit <= av)%nat ->
@@ -230,24 +228,23 @@ Definition wp_kexit_sconf_body
   (* ...and closing one can free a pipe's page, so kexit owns kalloc's side
      too.  The count comes back MOVED -- a descriptor may have held a pipe's
      last end -- which is why the loop carries it existentially. *)
-  is_lock γkl (mword_of_int KernelSyms.kmem) "kmem"%string
-    (kmem_res γka (mword_of_int (KernelSyms.kmem + 24))) -∗
-  kalloc_avail γka on -∗
+  is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
+    (kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) -∗
+  kalloc_avail fsc_kpages on -∗
   (* the file system, for [begin_op(); iput(p->cwd); end_op();] *)
-  bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
-  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+  log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
   fs_crash_seam fsc_cov fsc_logst -∗
   gen_cert -∗
-  dev_inv γu γd -∗
-  disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  dev_inv fsc_uart fsc_disk -∗
+  disk_geom fsc_disk pd pav pu -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
   bslots 3 -∗
   (* THE FILE SYSTEM, as [SpecFileclose] sees it: the ambient [fs_ready]
-     and the ties that make [fn]'s names the ambient ones.  kexit hands them
-     to fileclose once per descriptor and then spends them itself on
-     [iput(p->cwd)], so stating them differently would be stating them
-     twice. *)
-  ⌜fclose_ties fn⌝ -∗
+     and NOTHING pure beside it: [fclose_ties] died with the eight
+     [fclose_names] fields it tied (rank 1d).  kexit hands the predicate to
+     fileclose once per descriptor and then spends it itself on
+     [iput(p->cwd)], so stating it differently would be stating it twice. *)
   FsReady.fs_ready -∗
   (* the initproc pointer, at any fraction (write-once; see the header) *)
   (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
@@ -319,17 +316,13 @@ Module Type KEXIT.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γft γf γw : gname)
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (ip : mword 64) (dqi : dfrac)
-      (γkl : gname) (γka : gname * gname)
-      (bmapstart : Z) (size : Z)
         (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
       (pid : mword 32) (V : pprivate),
-      wp_kexit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn
- ip dqi γkl γka
-                          bmapstart size
+      wp_kexit_sconf_body γft γf γw γs j γl pd pav pu
+ ip dqi
+
                           on fn m av eb b lks pid V.
 End KEXIT.

@@ -991,10 +991,7 @@ Section KexecASeam.
 
   Definition kxc_at_a2
       (jp : nat)
-      (bn : bio_names)
-      (ga : gname) (gf : gname)
-      (bmapstart : Z)
-      (size : Z)
+ (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -1041,11 +1038,11 @@ Section KexecASeam.
             PERSISTENT [BitmapInv.bitmap_inv] now, so nothing about the free
             pool crosses this seam -- the ledger that used to ride here
             ([used1 ⊆ used]) has no statement left to make. ---- *)
-     bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size ∗
+     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      bslots 3 ∗
-     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
+     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) ∗
-     kalloc_env ga None ∗
+     kalloc_env fsc_kalloc None ∗
      (* ---- the process, WHOLE (convention 2) ---- *)
      proc_priv gf pj pidv V ∗
      (* ---- the caller's buffers.  THE PATH IS FULL; see the header. ---- *)
@@ -1085,7 +1082,7 @@ Section KexecExitQ.
 
   Lemma kxc_exit_qgen `{CIDx : CpuId}
       (Q : mword 64 -> Prop)
-      (pj : mword 64) (ga gf : gname) (bmapstart : Z)
+      (pj : mword 64) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -1101,9 +1098,9 @@ Section KexecExitQ.
           trap_csrs_ext KT1 eb -∗
           cpu_claim_ext eb pj -∗
           pc_is (ret_pc ra0) -∗
-          sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+          sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-          kalloc_env ga None -∗
+          kalloc_env fsc_kalloc None -∗
           proc_priv gf pj pidv V' -∗
           ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
           ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
@@ -1113,8 +1110,8 @@ Section KexecExitQ.
           iref_slots 2 -∗
           WP (Loop : expr riscv_lang)) -∗
     wp_next (CID0 := CIDx) true pj (fun (CID : CpuId) =>
-      KexecOkQ.kexec_closer Q gf ga pj pidv V m (ret_pc ra0) K b eb lks dqb
-           dqs bmapstart na alen plen pv dqpv pfun av dqa avf
+      KexecOkQ.kexec_closer Q gf fsc_kalloc pj pidv V m (ret_pc ra0) K b eb lks dqb
+           dqs fsc_bmapstart na alen plen pv dqpv pfun av dqa avf
            aslen dqas afun).
   Proof.
     rewrite /wp_next. iIntros "H" (CID Hcr).
@@ -1229,11 +1226,11 @@ Section KexecAExit.
   (*  where the context is exactly the thirteen pieces and nothing else,  *)
   (*  the same search is a no-op; a caller then writes one [iApply].      *)
   (* =================================================================== *)
-  Lemma fs_fabric_mk gs gu gd gk pd pav pu bn :
+  Lemma fs_fabric_mk gs pd pav pu :
     kernel_data -∗
     panic_env -∗
-    bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) -∗
-    log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+    bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+    log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
@@ -1243,10 +1240,10 @@ Section KexecAExit.
     ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
     ireg_open -∗
     procs_inv gs -∗
-    dev_inv gu gd -∗
-    disk_geom gd pd pav pu -∗
-    is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
-    fs_fabric gs gu gd gk pd pav pu bn.
+    dev_inv fsc_uart fsc_disk -∗
+    disk_geom fsc_disk pd pav pu -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    fs_fabric gs pd pav pu.
   Proof.
     iIntros "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc Hslks Hireg Hropen
              Hprocs Hdevi Hdgeom Hdlock".
@@ -1279,8 +1276,7 @@ Section KexecAExit.
   (* =================================================================== *)
   Lemma kxc_exit_m1
       (Q : mword 64 -> Prop)
-      (pj : mword 64) (bn : bio_names) (ga gf : gname)
-      (bmapstart : Z)
+      (pj : mword 64) (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -1304,9 +1300,9 @@ Section KexecAExit.
     kernel_text -∗
     pc_is (mword_of_int (KXA + 0x072) : mword 64) -∗
     kxc_frame sp0 ra0 s00 s10 s20 -∗
-    sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+    sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-    kalloc_env ga None -∗
+    kalloc_env fsc_kalloc None -∗
     proc_priv gf pj pidv V -∗
     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
     ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
@@ -1315,8 +1311,8 @@ Section KexecAExit.
     bslots 3 -∗
     iref_slots 2 -∗
     wp_next true pj (fun (CID : CpuId) =>
-      KexecOkQ.kexec_closer Q gf ga pj pidv V m (ret_pc ra0) K b eb lks dqb
-           dqs bmapstart na alen plen pv dqpv pfun av dqa avf
+      KexecOkQ.kexec_closer Q gf fsc_kalloc pj pidv V m (ret_pc ra0) K b eb lks dqb
+           dqs fsc_bmapstart na alen plen pv dqpv pfun av dqa avf
            aslen dqas afun) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1392,11 +1388,8 @@ Section KexecABad.
   Lemma kxc_bad64
       (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
-      (bn : bio_names)
-      (gil gisl : gname) (ga gf : gname)
-      (bmapstart : Z)
-      (size : Z)
+ (pd pav pu : mword 64)
+      (gil gisl : gname) (gf : gname)
       (* [gy]: the GENERATION the caller's share names (SpecIlock v5 /
          fs-icache 17.6 (5)).  It rides through the deposit and pins the
          [ity_shot] SpecIunlockput now demands. *)
@@ -1412,15 +1405,15 @@ Section KexecABad.
     (K_kexec <= K)%nat ->
     (k < NINODE)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
-    0 < size <= BPB ->
-    0 <= bmapstart ->
-    bmapstart ∈ fsc_cov ->
-    ~ (bmapstart ∈ log_region_set fsc_logst) ->
+    0 < fsc_size <= BPB ->
+    0 <= fsc_bmapstart ->
+    fsc_bmapstart ∈ fsc_cov ->
+    ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
     0 <= icfg_ist ->
     IBLOCK inum icfg_ist ∈ fsc_cov ->
     ~ (IBLOCK inum icfg_ist ∈ log_region_set fsc_logst) ->
     bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
-    cov_below fsc_cov size ->
+    cov_below fsc_cov fsc_size ->
     (iput_units <= n2)%nat ->
     (jp < NPROC)%nat ->
     gs !! jp = Some gl ->
@@ -1439,7 +1432,7 @@ Section KexecABad.
     cpu_claim_ext eb (proc_addr jp) -∗
     kernel_text -∗
     pc_is (mword_of_int (KXA + 0x064) : mword 64) -∗
-    fs_fabric gs gu gd gk pd pav pu bn
+    fs_fabric gs pd pav pu
  -∗
     is_sleeplock_gen gil gisl (i_lock (ientry k)) "inode"%string (ic_tok fsc_ic k) (slh_tok (icfg_isl k)) -∗
     (* ---- the open inode: exactly SpecIunlockput's input ---- *)
@@ -1460,10 +1453,10 @@ Section KexecABad.
     (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
     runit_any (bv_unsigned inum) -∗
     (* ---- and the rest of kexec's state ---- *)
-    sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+    sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-    bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
-    kalloc_env ga None -∗
+    bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
+    kalloc_env fsc_kalloc None -∗
     proc_priv gf (proc_addr jp) pidv V -∗
     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
     ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
@@ -1474,8 +1467,8 @@ Section KexecABad.
     log_opb icfg_log n2 -∗
     kxc_frameA6 sp0 ra0 s00 s10 s20 pv av (m !!! Regidx Rs4) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-      KexecOkQ.kexec_closer Q gf ga (proc_addr jp) pidv V m (ret_pc ra0) K
-           eb eb lks dqb dqs bmapstart na alen plen pv dqpv
+      KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv V m (ret_pc ra0) K
+           eb eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv
            pfun av dqa avf aslen dqas afun) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1538,8 +1531,8 @@ Section KexecABad.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID0 CIDj1 eb (proc_addr jp)
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-    iApply (Iunlockput.wp_iunlockput_tx_sconf gs jp gl gu gd gk pd pav pu bn
-              gil gisl bmapstart size
+    iApply (Iunlockput.wp_iunlockput_tx_sconf gs jp gl pd pav pu
+              gil gisl
               k qi sq gy inum dn bm n2 pidv (DfracOwn (1/4)) dqb dqs
               B2 (K - 68)%nat eb eb lks V
               ltac:(lia) Hk Hlg Hsz Hbm0 Hbmc
@@ -1583,7 +1576,7 @@ Section KexecABad.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CIDu CIDj2 eb (proc_addr jp)
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-    iApply (EndOp.wp_end_op_sconf gs jp gl gu gd gk pd pav pu bn icfg_log fsc_fs
+    iApply (EndOp.wp_end_op_sconf gs jp gl fsc_uart fsc_disk fsc_dlock pd pav pu fsc_bio icfg_log fsc_fs
               fsc_cov fsc_logst icfg_dev n3 pidv (DfracOwn (1/4)) B3 (K - 68)%nat
               eb eb lks V ltac:(lia) Hlg Hjp Hgs
               with "Hcg Hcnt Hextc Hclmc Htext Hkd Hpc Hpenv Hbio Hlogc Hcrash Hcert Hppid
@@ -1686,7 +1679,7 @@ Section KexecABad.
       change 55%nat with (50 + 5)%nat.
       rewrite (stack_own_app (KTR := KT1)) (pa_stk_assoc sp0 13 50).
       iSplitL "Hmid"; [iExact "Hmid" | iExact "Htop"]. }
-    iApply (kxc_exit_m1 Q (proc_addr jp) bn ga gf bmapstart
+    iApply (kxc_exit_m1 Q (proc_addr jp) gf
  plen pfun na avf alen aslen afun pidv V
               dqb dqs dqa dqpv dqas m B5 K eb eb lks sp0 ra0 s00 s10 s20 pv av
               ltac:(lia)
@@ -1787,8 +1780,7 @@ Section KexecCBad.
   Lemma kxc_bad_1d6
       (Q : mword 64 -> Prop)
       (jp : nat)
-      (ga gf : gname) (bn : bio_names)
-      (bmapstart : Z)
+      (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -1820,8 +1812,8 @@ Section KexecCBad.
     kernel_text -∗
     pc_is (mword_of_int (KXA + 0x1d6) : mword 64) -∗
     proc_pt P -∗
-    kalloc_env ga None -∗
-    sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+    kalloc_env fsc_kalloc None -∗
+    sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     proc_priv gf (proc_addr jp) pidv V -∗
     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -1838,8 +1830,8 @@ Section KexecCBad.
       (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
       (m !!! Regidx Rs9) (m !!! Regidx Rs10) w13 -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-      KexecOkQ.kexec_closer Q gf ga (proc_addr jp) pidv V m (ret_pc ra0) K
-           eb eb lks dqb dqs bmapstart na alen plen pv dqpv
+      KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv V m (ret_pc ra0) K
+           eb eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv
            pfun av dqa avf aslen dqas afun) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1917,7 +1909,7 @@ Section KexecCBad.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID0 CID3 eb (proc_addr jp)
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-    iApply (PFP.wp_proc_freepagetable_sconf ga B3 P (K - 68)%nat eb
+    iApply (PFP.wp_proc_freepagetable_sconf fsc_kalloc B3 P (K - 68)%nat eb
               (proc_addr jp) 0%nat eb lks
               ltac:(lia) ltac:(lia) HB3a0
               ltac:(rewrite HB3a1 uint_unsigned; exact Hmax)
@@ -2189,7 +2181,7 @@ Section KexecCBad.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID3 CIDj eb (proc_addr jp)
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-    iApply (T.kxc_exit_m1 Q (proc_addr jp) bn ga gf bmapstart
+    iApply (T.kxc_exit_m1 Q (proc_addr jp) gf
  plen pfun na avf alen aslen afun pidv V
               dqb dqs dqa dqpv dqas m B13 K eb eb lks sp0 ra0 s00 s10 s20 pv av
               ltac:(lia) Hsp Hra Hs0 Hs1 Hs2 HB13sp HB13a0 HB13thr

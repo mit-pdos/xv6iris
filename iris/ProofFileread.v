@@ -400,11 +400,11 @@ Section ProofFileread.
   Qed.
 
   Lemma wp_fileread_sconf 
-      (γa γf : gname) (γs : list gname) (j : nat) (γlp : gname)
+      (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (k : nat) (q : Qp) (st : fdstate) (fn : fread_names)
       (pidv : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string)
-    : wp_fileread_sconf_body γa γf γs j γlp k q st fn pidv V m K eb n b lks.
+    : wp_fileread_sconf_body γf γs j γlp k q st fn pidv V m K eb n b lks.
   Proof.
     cbv beta delta [wp_fileread_sconf_body].
     intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Ha0 Ha2 Hn Heb Hbelow.
@@ -1093,7 +1093,7 @@ Section ProofFileread.
           exact (HB5thr c Hcs N2 N8 N9 N18 N19). }
         iDestruct (cpu_own_transport CID CID17 0%nat eb pj b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
-        iApply (Piperead.wp_piperead_sconf γa γf γs j γlp (fp_lock pn) (fp_pipe pn)
+        iApply (Piperead.wp_piperead_sconf fsc_kalloc γf γs j γlp (fp_lock pn) (fp_pipe pn)
                   (fc_wbool Cf) q Q2 (K - 6)%nat eb pidv V n b
                   _ Hj Hgs Hlens HQ2a2 (fr_n_range n Hn) (fr_av_pipe K HK) Heb
                   with "Hcg Hcnt Htext Hpc [] Hpref Hpriv Hkenv Hprocs").
@@ -1652,7 +1652,7 @@ Section ProofFileread.
                   exact (HD9thr c Hcs N2 N8 N9 N18 N19). }
                 iDestruct (cpu_own_transport CID CID58 0%nat eb pj b ltac:(wp_next_chain)
                              with "Hcnt") as "Hcnt".
-                iApply (Consoleread.wp_consoleread_sconf γa γf γs j γlp
+                iApply (Consoleread.wp_consoleread_sconf fsc_kalloc γf γs j γlp
                           (frn_cons fn)
                           E2 (K - 6)%nat eb pidv V n b
                           lks Hj Hgs Hlens HE2a0 HE2a2 (fr_n_range n Hn)
@@ -2009,9 +2009,9 @@ Section ProofFileread.
                 the payload's slice already does, so nothing has to be
                 introduced here -- the [inode_shr_gen_intro] this call used
                 to open with is gone with the caller-supplied [inode_shr]. *)
-             iApply (Ilock.wp_ilock_dep_sconf γs j γlp (frn_uart fn) (frn_disk fn)
-                       (frn_dlock fn) (frn_pd fn) (frn_pav fn) (frn_pu fn)
-                       (frn_bio fn)
+             iApply (Ilock.wp_ilock_dep_sconf γs j γlp
+ (frn_pd fn) (frn_pav fn) (frn_pu fn)
+
                        gil gisl
 
  ikk (ssh/2)%Qp gsh
@@ -2289,9 +2289,9 @@ Section ProofFileread.
                           with "Hcnt") as "Hcnt".
              (* the byte view's row (durable-disk 1c-flip step 3) *)
              iPoseProof (ireg_inv_bytes with "Hireg") as "#Hrow".
-             iApply (Readi.wp_readi_sconf KT0 γs j γlp (frn_uart fn) (frn_disk fn)
-                       (frn_dlock fn) (frn_pd fn) (frn_pav fn) (frn_pu fn)
-                       (frn_bio fn) γa γf
+             iApply (Readi.wp_readi_sconf KT0 γs j γlp
+ (frn_pd fn) (frn_pav fn) (frn_pu fn)
+ γf
  (fc_ip Cf)
                        bml data dnl
                        true (Z.to_nat (bv_unsigned v)) (Z.to_nat n)
@@ -2491,7 +2491,7 @@ Section ProofFileread.
                    and the payload takes the whole slice back.  From here the
                    reference is intact again. *)
                 iDestruct (inode_shr_regen2 ikk (ssh/2)%Qp (ssh/2)%Qp
-                             icfg_dev inm gsh with "Hkeep Hrefout") as "Hshr".
+ inm gsh with "Hkeep Hrefout") as "Hshr".
                 iEval (rewrite Qp.div_2) in "Hshr".
                 iDestruct ("Hpayback" with "Hshr Hoh") as "Hrpay".
                 assert (Hpc54 : ret_pc (N2 !!! Regidx Rra) = mword_of_int (FR + 0x5a)).
@@ -2779,7 +2779,7 @@ Section ProofFileread.
                    and the payload takes the whole slice back.  From here the
                    reference is intact again. *)
                 iDestruct (inode_shr_regen2 ikk (ssh/2)%Qp (ssh/2)%Qp
-                             icfg_dev inm gsh with "Hkeep Hrefout") as "Hshr".
+ inm gsh with "Hkeep Hrefout") as "Hshr".
                 iEval (rewrite Qp.div_2) in "Hshr".
                 iDestruct ("Hpayback" with "Hshr Hoh") as "Hrpay".
                 assert (Hpc54 : ret_pc (N2 !!! Regidx Rra) = mword_of_int (FR + 0x5a)).

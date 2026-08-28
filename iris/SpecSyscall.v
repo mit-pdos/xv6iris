@@ -143,6 +143,7 @@ Require Import FirstTok.     (* [first_done] -- what the environment's producer 
 Require Import SyscParkEnv. (* [sysc_park_extra] -- and the four rows it does not *)
 Require Import ParkCap.     (* [park_token] -- the park, as the resource fork hands down *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.  (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -155,9 +156,9 @@ Notation K_syscall := ((4 + K_sys_exec)%nat) (only parsing).
 Definition wp_syscall_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (R : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+    (R : gname -> mword 64 -> fclose_names -> iProp Σ)
     (γf : gname) (γs : list gname) (j : nat) (γl : gname)
-    (bn : bio_names) (fn : fclose_names)
+    (fn : fclose_names)
     (ip : mword 64) (dqi : dfrac)
     (m : regfile) (av : nat)
     (pid : mword 32) (V : pprivate) (lks : gset string) :=
@@ -204,7 +205,7 @@ Definition wp_syscall_sconf_body
      have no way to prove its own internal witnesses equal the ambient
      ones -- the "two owners" trap in reverse: not a competing copy, but an
      UNREACHABLE one. *)
-  R γf pj bn fn -∗
+  R γf pj fn -∗
   proc_priv γf pj pid V -∗
   (* THE DESCRIPTOR-STATE FRAGMENTS, in and out on the same channel as the
      four families above and for the same reason: [UsertrapRes.ut_own] holds
@@ -261,7 +262,7 @@ Definition wp_syscall_sconf_body
       (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
       fd_slots FDSPARE -∗
       iref_slots IREFSPARE -∗
-      R γf pj bn fn -∗
+      R γf pj fn -∗
       proc_priv γf pj pid V' -∗
       fd_frags_any (pv_fdg V) -∗
       pc_is ret_tgt -∗
@@ -291,7 +292,7 @@ Module Type SYSCALL.
   Parameter syscall_env :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId},
-      gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ.
+      gname -> mword 64 -> fclose_names -> iProp Σ.
   (* ===================================================================== *)
   (* THE ENVIRONMENT'S PRODUCER -- the one thing about [syscall_env] that   *)
   (* has never had one.                                                     *)
@@ -323,14 +324,13 @@ Module Type SYSCALL.
      header section for the whole ordering argument.
 
      THE INDICES ARE READ OFF [fn] rather than taken as parameters, because
-     [sysc_ties] pins them: [pj] must be [proc_addr (fcn_j fn)] and [bn]
-     must be [fcn_bio fn].  The four pure premises are the rest of that
-     record -- everything it says that is not already [fclose_ties]. *)
+     [sysc_proc_ties] pins them: [pj] must be [proc_addr (fcn_j fn)].  The
+     three pure premises below ARE that record, which since rank 1d is the
+     PROCESS half and nothing else. *)
   Parameter syscall_env_park :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId}
       (γf γw γft γtk : gname) (fn : fclose_names),
-      fclose_ties fn ->
       (fcn_j fn < NPROC)%nat ->
       fcn_procs fn !! fcn_j fn = Some (fcn_plock fn) ->
       fcn_dq fn = DfracOwn (1/4) ->
@@ -338,7 +338,7 @@ Module Type SYSCALL.
       is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
       is_ftable γft γf -∗
       procs_inv (fcn_procs fn) -∗
-      disk_geom (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) -∗
+      disk_geom (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) -∗
       first_done -∗
       (* the world a child's park needs, copied in -- see [ProofSyscall]'s
          [syscall_env] *)
@@ -347,27 +347,27 @@ Module Type SYSCALL.
          the resource a process hands its children.  Supplied at the
          resume, by forkret, which holds it outright. *)
       park_token (fcn_procs fn) -∗
-      syscall_env γf (proc_addr (fcn_j fn)) (fcn_bio fn) fn.
+      syscall_env γf (proc_addr (fcn_j fn)) fn.
 
   (* ...and read back out, for fork's sake *)
   Parameter syscall_env_world :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId}
-      (γf : gname) (pj : mword 64) (bn : bio_names) (fn : fclose_names),
-      syscall_env γf pj bn fn -∗ park_world (fcn_procs fn).
+      (γf : gname) (pj : mword 64) (fn : fclose_names),
+      syscall_env γf pj fn -∗ park_world (fcn_procs fn).
   Parameter syscall_env_token :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId}
-      (γf : gname) (pj : mword 64) (bn : bio_names) (fn : fclose_names),
-      syscall_env γf pj bn fn -∗ park_token (fcn_procs fn).
+      (γf : gname) (pj : mword 64) (fn : fclose_names),
+      syscall_env γf pj fn -∗ park_token (fcn_procs fn).
 
   Parameter wp_syscall_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γf : gname) (γs : list gname) (j : nat) (γl : gname)
-      (bn : bio_names) (fn : fclose_names)
+      (fn : fclose_names)
       (ip : mword 64) (dqi : dfrac)
       (m : regfile) (av : nat)
       (pid : mword 32) (V : pprivate) (lks : gset string),
-      wp_syscall_sconf_body (syscall_env) γf γs j γl bn fn ip dqi m av pid V lks.
+      wp_syscall_sconf_body (syscall_env) γf γs j γl fn ip dqi m av pid V lks.
 End SYSCALL.

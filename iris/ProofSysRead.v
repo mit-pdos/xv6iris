@@ -312,10 +312,10 @@ Section ProofSysRead.
   (*  THE CAPSTONE.                                                       *)
   (* =================================================================== *)
   Lemma wp_sys_read_sconf
-      (γa γf : gname) (γs : list gname) (j : nat) (γlp : gname)
+      (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (fn : fread_names) (pidv : mword 32) (V : pprivate) (v v2 : mword 64)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-    : wp_sys_read_sconf_body γa γf γs j γlp fn pidv V v v2 m av eb b lks.
+    : wp_sys_read_sconf_body γf γs j γlp fn pidv V v v2 m av eb b lks.
   Proof.
     cbv beta delta [wp_sys_read_sconf_body].
     intros pcE pj ret_tgt Hav Hj Hgs Hlens Harg0 Harg1 Harg2 Hrp Hdq Heb.
@@ -921,7 +921,7 @@ Section ProofSysRead.
       iDestruct (read_env_frame γf fn stf with "Henv Hdev") as "[Hfenv Hfback]".
       iDestruct (cpu_own_transport CID17 CID24 0%nat eb pj b 
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
-      iApply (Fileread.wp_fileread_sconf γa γf γs j γlp kk qq stf fn pidv V
+      iApply (Fileread.wp_fileread_sconf γf γs j γlp kk qq stf fn pidv V
                 S4 (av - 6)%nat eb (sys_rw_count v2) b
                 _ ltac:(lia) Hkk Hj Hgs Hlens
                 HS4a0' HS4a2 (sys_rw_count_range v2) Heb

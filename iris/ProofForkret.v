@@ -994,10 +994,10 @@ Proof.
                ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
   iDestruct (cpu_claim_ext_transport CID CIDb8 eb p
                ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-  iApply (FS.wp_fsinit_sconf γs j γl fsc_uart fsc_disk fsc_dlock pd pav pu
-            fsc_bio fsc_printk
-            fsc_bmapstart fsc_ninodes
-            fsc_size
+  iApply (FS.wp_fsinit_sconf γs j γl pd pav pu
+
+
+
             v_magic (mword_of_int fsc_size) v_nblocks
             (mword_of_int fsc_ninodes) v_nlog (mword_of_int fsc_logst)
             (mword_of_int icfg_ist) (mword_of_int fsc_bmapstart)
@@ -1295,7 +1295,7 @@ Proof.
   iDestruct (fs_ready_panic with "Hfsr") as "#Hpenv2".
   iDestruct (fs_ready_region with "Hfsr") as "[_ #Hropen]".
   iDestruct (fs_ready_kalloc with "Hfsr") as "#Hkaenv".
-  iAssert (fs_fabric γs fsc_uart fsc_disk fsc_dlock pd pav pu fsc_bio)
+  iAssert (fs_fabric γs pd pav pu)
     as "#Hfab".
   (* ...and the same row-by-row build, for the same measured reason: this
      named [iFrame] over the fabric's sixteen definition-valued rows was
@@ -1356,10 +1356,10 @@ Proof.
                ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
   iDestruct (cpu_claim_ext_transport CIDf1 CIDb19 eb p
                ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-  iApply (KX.wp_kexec_sconf γs j γl fsc_uart fsc_disk fsc_dlock pd pav pu
-            fsc_bio
-            fsc_kalloc γf fsc_bmapstart
-            fsc_size
+  iApply (KX.wp_kexec_sconf γs j γl pd pav pu
+
+ γf
+
             5%nat fkr_init_bytes 1%nat fkr_argv
             (fun _ => 5%nat) (fun _ => 6%nat) (fun _ => fkr_init_bytes)
             pid V

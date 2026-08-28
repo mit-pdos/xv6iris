@@ -452,7 +452,7 @@ Section UtSysBlock.
         apply ut_cs_insert; [vm_compute; reflexivity |].
         exact Hcsmf. }
       iApply (SY.wp_syscall_sconf (CID := CID1) (un_f N) (un_s N) (un_j N) (un_l N)
-                (un_bn N) (un_fn N) (un_ip N) (un_dqi N)
+ (un_fn N) (un_ip N) (un_dqi N)
                 S4 n2 (un_pid N) V1 lks
                 Hj Hjl ltac:(rewrite Hn2; lia) eq_refl
                 with "Hcg [] Htext Hkd Hpc Hpi Hbs Hip Hfd Hir Hsy Hpv Hufr [-]").

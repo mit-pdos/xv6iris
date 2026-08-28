@@ -1163,7 +1163,7 @@ Section ProofFileclose.
         iDestruct (cpu_own_transport CIDr2 CIDp4 n eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         iApply (Pipeclose.wp_pipeclose_sconf (CID := CIDp4)  (fcn_procs fn) (fp_lock pn)
-                  (fp_pipe pn) (fc_wbool Cf) (fcn_kmem fn) (fcn_kalloc fn)
+                  (fp_pipe pn) (fc_wbool Cf) (fsc_kalloc) (fsc_kpages)
                   (mword_of_int KernelSyms.kmem)
                   (mword_of_int (KernelSyms.kmem + 24)) on
                   P3 n eb p (K - 8)%nat b
@@ -1350,22 +1350,15 @@ Section ProofFileclose.
           (* FIVE pure conjuncts, not six: the bundle no longer pins
              [eb = true], and this arm runs at a generic index.  [n] and [p]
              still are pinned, and both substitutions stay. *)
-          iDestruct "Henv" as "(%Hn0 & %Hpj & %Hjlt & %Hgl & %Hties &
+          iDestruct "Henv" as "(%Hn0 & %Hpj & %Hjlt & %Hgl &
                                 #Hprocs & #Hrdy & Hbsl)".
           subst n. subst p.
-          (* ---- THE TIES, DESTRUCTED ONCE ----
-             [fclose_ties] says [fn]'s own names ARE the ambient ones, so the
-             whole FS arm below is spelled AMBIENTLY and the twelve
-             equations are used only where a resource ARRIVES at [fn]'s
-             spelling ([Hbsl]) or has to LEAVE at it (the postcondition's
-             [fileclose_fs_out]).  That is [FsSyscalls.fs_world_all]'s idiom
-             with the substitution going the other way: there the ties are
-             [->]d into the ambient predicate, here the callees are
-             instantiated at the ambient names directly. *)
-          destruct Hties as [Ht_uart Ht_disk Ht_dlock Ht_kmem Ht_kalloc Ht_bio Ht_log Ht_dev Ht_bms Ht_ist Ht_nib Ht_size].
-          (* the [fcn_bio] tie has nothing to rewrite in a [bslots] any
-             more: the slot supply is at the CANONICAL ghost name, so the
-             count no longer mentions the bio record at all. *)
+          (* ---- THERE ARE NO TIES LEFT TO DESTRUCT (rank 1d) ----
+             [fclose_ties] said [fn]'s own names ARE the ambient ones; the
+             eight fields it named left [fclose_names] in the same slice, so
+             the whole FS arm below is spelled ambiently from the start and
+             every callee is instantiated at the [fscfg]/[icfg] fields
+             directly. *)
           (* ---- AND THE FILE SYSTEM, OUT OF [fs_ready] ----
              Each row is one projection.  What used to be [fileclose_ic_env]
              (nine pure facts and six invariants) and [fileclose_bm] (the two
@@ -1510,12 +1503,12 @@ Section ProofFileclose.
           iDestruct (cpu_claim_ext_transport CIDf3 CIDf5 eb (proc_addr (fcn_j fn))
                        ltac:(ext_chain Hebf b) with "Hextm") as "Hextm".
           iApply (Iput.wp_iput_sconf (CID := CIDf5) (fcn_procs fn) (fcn_j fn)
-                    (fcn_plock fn) fsc_uart fsc_disk fsc_dlock
-                    pdd pavd pud fsc_bio
+                    (fcn_plock fn)
+                    pdd pavd pud
 
                     gil gisl
-                    fsc_bmapstart
- fsc_size
+
+
  kk qq inum MAXOPBLOCKS
                     pidv (fcn_dq fn) DfracDiscarded DfracDiscarded
                     B3 (K - 8)%nat eb b lks Vpr

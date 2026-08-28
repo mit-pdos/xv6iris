@@ -192,13 +192,13 @@ Section ProofFilestat.
   Qed.
 
   Lemma wp_filestat_sconf
-      (γa : gname) (γf : gname)
+ (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (k : nat) (q : Qp) (st : fdstate)
       (fn : fstat_names)
       (pidv : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
-    : wp_filestat_sconf_body γa γf γs j γlp k q st fn pidv V m K eb b lks.
+    : wp_filestat_sconf_body γf γs j γlp k q st fn pidv V m K eb b lks.
   Proof.
     cbv beta delta [wp_filestat_sconf_body].
     intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Ha0 Heb Hbelow.
@@ -685,9 +685,9 @@ Section ProofFilestat.
                    with "Hcnt") as "Hcnt".
       (* SpecIlock v4 names the share's GENERATION (design 17.3 (A)); the
          payload's slice already does, so nothing has to be introduced here. *)
-      iApply (Ilock.wp_ilock_dep_sconf γs j γlp (fsn_uart fn) (fsn_disk fn)
-                (fsn_dlock fn) (fsn_pd fn) (fsn_pav fn) (fsn_pu fn)
-                (fsn_bio fn)
+      iApply (Ilock.wp_ilock_dep_sconf γs j γlp
+ (fsn_pd fn) (fsn_pav fn) (fsn_pu fn)
+
                 gil gisl
 
  ikk (ssh/2)%Qp gsh
@@ -1013,7 +1013,7 @@ Section ProofFilestat.
       (* THE GATHER: iunlock gives the half back WITHOUT its generation; the
          half that never left pins it, and the payload takes the whole slice
          back.  From here the reference is intact again. *)
-      iDestruct (inode_shr_regen2 ikk (ssh/2)%Qp (ssh/2)%Qp icfg_dev inm gsh
+      iDestruct (inode_shr_regen2 ikk (ssh/2)%Qp (ssh/2)%Qp inm gsh
                    with "Hkeep Hshr") as "Hshr".
       iEval (rewrite Qp.div_2) in "Hshr".
       iDestruct ("Hpayback" with "Hshr") as "Hrpay".
@@ -1198,7 +1198,7 @@ Section ProofFilestat.
       iEval (rewrite -HU6a3) in "Hbuf".
       iDestruct (cpu_own_transport CIDiu CID31 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iApply (Copyout.wp_copyout_sconf KT1 γa U6 (pv_upt V) (pv_sz V) 24%nat fbytes (DfracOwn 1)
+      iApply (Copyout.wp_copyout_sconf KT1 fsc_kalloc U6 (pv_upt V) (pv_sz V) 24%nat fbytes (DfracOwn 1)
                 (K - 10)%nat 0%nat eb pj b lks
                 (fst_av_copyout K HK) HU6a0 HU6a1 HU6a4 fst_len24 Hszb fst_noff0
                 with "Hcg Hcnt Htext Hpc Hpt Hkenv Hbuf").

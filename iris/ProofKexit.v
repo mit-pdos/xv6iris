@@ -1538,11 +1538,8 @@ Section KexitRest.
   Lemma kx_rest `{GEN : GenId} `{CID0 : CpuId}
        (γf γw : gname) (γs : list gname)
       (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (* the inode cache and the two regions iput's truncate arm frees into *)
-      (bmapstart : Z) (size : Z)
       (dqb dqs : dfrac)
       (ip sv spF : mword 64) (dqi : dfrac)
       (M : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
@@ -1554,15 +1551,15 @@ Section KexitRest.
     log_geom_ok fsc_cov fsc_logst ->
     kxt_regs M pj sv spF ->
     pv_ofile V = replicate NOFILE (zero_reg : mword 64) ->
-    (0 < size <= BPB)%Z ->
-    (0 <= bmapstart)%Z ->
-    bmapstart ∈ fsc_cov ->
-    ~ (bmapstart ∈ log_region_set fsc_logst) ->
+    (0 < fsc_size <= BPB)%Z ->
+    (0 <= fsc_bmapstart)%Z ->
+    fsc_bmapstart ∈ fsc_cov ->
+    ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
     (0 <= icfg_ist)%Z ->
     (forall inum : mword 32, bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
        IBLOCK inum icfg_ist ∈ fsc_cov /\
        ~ (IBLOCK inum icfg_ist ∈ log_region_set fsc_logst)) ->
-    cov_below fsc_cov size ->
+    cov_below fsc_cov fsc_size ->
     (* THE FRESHNESS PREMISE, AT THE LOWEST RANK kx_rest (OR ANY CALLEE)
        TOUCHES: "itable" (2), via [iput(p->cwd)] directly.  [end_op] (rank
        "log", 3) and the tail [kx_park] (rank "wait_lock", 10) both follow
@@ -1581,13 +1578,13 @@ Section KexitRest.
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (KX + 0x4c)) -∗
     procs_inv γs -∗ panic_env -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
-    bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
-    log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+    bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+    log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
-    dev_inv γu γd -∗
-    disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    dev_inv fsc_uart fsc_disk -∗
+    disk_geom fsc_disk pd pav pu -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
     bslots 3 -∗
     (* ---- the inode cache's persistent set, and the two regions ---- *)
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
@@ -1602,9 +1599,9 @@ Section KexitRest.
        which is where [SpecFileclose.fileclose_ic_env] used to sit. *)
     ireg_open -∗
     ic_sleeplocks fsc_ic -∗
-    sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+    sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-    bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+    bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
     fd_slots FDSPARE -∗
     iref_slots IREFSPARE -∗
@@ -1678,7 +1675,7 @@ Section KexitRest.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID0 CID1 eb pj
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    iApply (BeginOp.wp_begin_op_sconf (CID := CID1)  γs j γl bn icfg_log fsc_fs fsc_cov fsc_logst icfg_dev
+    iApply (BeginOp.wp_begin_op_sconf (CID := CID1)  γs j γl fsc_bio icfg_log fsc_fs fsc_cov fsc_logst icfg_dev
               pid (DfracOwn (1/4)) Q0 av eb b lks
               V ltac:(lia) Hj Hgl
               (* "log" (3) outranks "itable" (2), [Hfresh]'s own bound. *)
@@ -1756,8 +1753,8 @@ Section KexitRest.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID2 CID4 eb pj
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    iApply (Iput.wp_iput_sconf (CID := CID4) γs j γl γu γd γk pd pav pu bn
-              gil gisl bmapstart size
+    iApply (Iput.wp_iput_sconf (CID := CID4) γs j γl pd pav pu
+              gil gisl
  kk qq inum MAXOPBLOCKS pid (DfracOwn (1/4)) dqb dqs
               Q2 av eb b lks
               V ltac:(lia) Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog
@@ -1814,7 +1811,7 @@ Section KexitRest.
     (* "log" (3) outranks "itable" (2): weaken [Hfresh]'s bound. *)
     assert (Hfresh_log : locks_below lks "log")
       by lkbelow.
-    iApply (EndOp.wp_end_op_sconf (CID := CID6)  γs j γl γu γd γk pd pav pu bn icfg_log fsc_fs
+    iApply (EndOp.wp_end_op_sconf (CID := CID6)  γs j γl fsc_uart fsc_disk fsc_dlock pd pav pu fsc_bio icfg_log fsc_fs
               fsc_cov fsc_logst icfg_dev n' pid (DfracOwn (1/4)) Q3 av eb b lks
               V ltac:(lia) Hgeom Hj Hgl
               Hfresh_log
@@ -1894,18 +1891,14 @@ Section ProofKexit.
   Lemma wp_kexit_sconf `{GEN : GenId} `{CID0 : CpuId}
       (γft γf γw : gname)
       (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
       (ip : mword 64) (dqi : dfrac)
-      (γkl : gname) (γka : gname * gname)
-      (bmapstart : Z) (size : Z)
       (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
       (pid : mword 32) (V : pprivate)
-    : wp_kexit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn
- ip dqi γkl γka
-                          bmapstart size
+    : wp_kexit_sconf_body γft γf γw γs j γl pd pav pu
+ ip dqi
+
                           on fn m av eb b lks pid V.
   Proof.
     cbv beta delta [wp_kexit_sconf_body].
@@ -1913,23 +1906,18 @@ Section ProofKexit.
     
     iIntros "Hcg Hcloser Hown Htce Hcce #Htext #Hkd Hpc #Hprocs #Hpanenv #Hwl #Hft".
     iIntros "#Hkmem Hav0".
-    iIntros "#Hbio #Hlog #Hseam #Hgen #Hdev #Hgeo #Hdlk Hbsl %Hties #Hrdy".
+    iIntros "#Hbio #Hlog #Hseam #Hgen #Hdev #Hgeo #Hdlk Hbsl #Hrdy".
     iIntros "Hinit Hsp Hir Hpriv Hfrag".
-    (* ---- THE TIES, AND THE FILE SYSTEM THEY POINT AT ----
-       [fclose_ties] says kexit's own twelve threaded names ARE the ambient
-       ones, and every one of them is a BINDER of this lemma -- so the
-       equations are not rewritten, they are [subst]ed, and the whole body
-       below runs at [FsCfg]/[IcacheRef]'s fields.  What used to arrive as
-       [fileclose_ic_env] (nine pure facts and six invariants) and
-       [fileclose_bm] (two superblock cells and a threaded [bitmap_res]) is
-       then one projection each out of [fs_ready] -- the cells at [□], the
-       bitmap as its persistent invariant. *)
-    pose proof Hties as Hties'.
-    destruct Hties' as [Ht_uart Ht_disk Ht_dlock Ht_kmem Ht_kalloc Ht_bio Ht_bms Ht_size].
-    cbn [fcn_uart fcn_disk fcn_dlock fcn_kmem fcn_kalloc fcn_bio
-         fcn_bmapstart fcn_size]
-      in Ht_uart, Ht_disk, Ht_dlock, Ht_kmem, Ht_kalloc, Ht_bio, Ht_bms, Ht_size.
-    subst γu γd γk γkl γka bn bmapstart size.
+    (* ---- THE FILE SYSTEM, AT THE ONLY NAMES THERE ARE ----
+       kexit used to take a [fclose_ties] record here and [subst] its twelve
+       equations, because every ambient name was also a BINDER of this
+       lemma.  Rank 1d took those binders away: the body runs at
+       [FsCfg]/[IcacheRef]'s fields from the start, so there is nothing to
+       substitute.  What used to arrive as [fileclose_ic_env] (nine pure
+       facts and six invariants) and [fileclose_bm] (two superblock cells
+       and a threaded [bitmap_res]) is one projection each out of
+       [fs_ready] -- the cells at [□], the bitmap as its persistent
+       invariant. *)
     iDestruct (FsReady.fs_ready_geom with "Hrdy") as "%Hgok".
     iDestruct (FsReady.fs_ready_icache with "Hrdy")
       as "(#Hitab & #Hitinv & #Hescrows & #Hslks)".
@@ -2225,34 +2213,29 @@ Section ProofKexit.
          The pid cell is NOT in it: it comes out of [proc_priv] one call at a
          time ([ProcInv.proc_priv_pid_ofile]), since the block is what the
          loop is walking. *)
-      iAssert (∃ on', fileclose_pipe_env (MkFCloseNames γs j γl fsc_kalloc fsc_kpages fsc_uart fsc_disk
-                        fsc_dlock pd pav pu fsc_bio
+      iAssert (∃ on', fileclose_pipe_env (MkFCloseNames γs j γl
+ pd pav pu
                         pid (DfracOwn (1/4))
-                        fsc_bmapstart fsc_size)
+)
                         on' 0%nat)%I with "[Hav0]" as "Hpenv".
-      { iExists on. rewrite /fileclose_pipe_env; cbn [fcn_procs fcn_kmem fcn_kalloc].
+      { iExists on. rewrite /fileclose_pipe_env; cbn [fcn_procs].
         iSplitR.
         { iPureIntro.
           assert (E : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity).
           rewrite E. lia. }
         iFrame "Hprocs Hkmem Hav0". }
-      iAssert (fileclose_fs_env_nopid (MkFCloseNames γs j γl fsc_kalloc fsc_kpages fsc_uart fsc_disk
-                        fsc_dlock pd pav pu fsc_bio
+      iAssert (fileclose_fs_env_nopid (MkFCloseNames γs j γl
+ pd pav pu
                         pid (DfracOwn (1/4))
-                        fsc_bmapstart fsc_size)
+)
                  0%nat eb pj)%I with "[Hbsl]" as "Hfenv".
       { rewrite /fileclose_fs_env_nopid.
-        cbn [fcn_procs fcn_j fcn_plock fcn_disk fcn_dlock fcn_pd fcn_pav
-             fcn_pu fcn_bio].
+        cbn [fcn_procs fcn_j fcn_plock fcn_pd fcn_pav fcn_pu].
         (* two pure conjuncts, not three: [⌜eb = true⌝] left this bundle when
            the complement moved to the top level of fileclose's contract. *)
         iSplitR; [done|]. iSplitR; [done|].
         iSplitR; [iPureIntro; exact Hj|].
         iSplitR; [iPureIntro; exact Hgl|].
-        (* the TIES, verbatim -- the row that used to be [log_geom_ok], and
-           the one that replaces the whole [fileclose_ic_env]/[fileclose_bm]
-           pair below. *)
-        iSplitR; [iPureIntro; exact Hties|].
         (* Split STRUCTURALLY before framing: a named [iFrame] still walks
            the whole goal per hypothesis (the same cost measured for
            [fileclose_fs_env_reuse] in SpecFileclose.v); [iSplitL]/[iExact]
@@ -2263,10 +2246,10 @@ Section ProofKexit.
         iSplitL "Hrdy"; [iExact "Hrdy"|].
         iExact "Hbsl". }
       iPoseProof (kx_loop (CID0 := CID8)  γft γf
-                    (MkFCloseNames γs j γl fsc_kalloc fsc_kpages fsc_uart fsc_disk
-                        fsc_dlock pd pav pu fsc_bio
+                    (MkFCloseNames γs j γl
+ pd pav pu
                         pid (DfracOwn (1/4))
-                        fsc_bmapstart fsc_size) j pid
+) j pid
                     (m !!! Regidx (mword_of_int 10 : mword 5)) (pv_cwd V)
                     (pa_stk (m !!! Regidx csp_rs1) 6)
                     (av - 6)%nat eb b lks Hj eq_refl eq_refl eq_refl
@@ -2284,15 +2267,14 @@ Section ProofKexit.
         (* the bundle gives back the three slots and nothing else: the
            superblock cells are persistent and the bitmap is an invariant,
            so both are still in the intuitionistic context from the top. *)
-        iDestruct "Hfenv" as "(_ & _ & _ & _ & _ & _ & _ & Hbsl)".
-        cbn [fcn_bio].
+        iDestruct "Hfenv" as "(_ & _ & _ & _ & _ & _ & Hbsl)".
         (* "itable" (2) outranks "ftable" (1): weaken [Hfresh]'s bound. *)
         assert (Hfresh_it : locks_below lks "itable")
           by lkbelow.
-        iApply (kx_rest (CID0 := CIDx)  γf γw γs j γl fsc_uart fsc_disk fsc_dlock
-                  pd pav pu fsc_bio
+        iApply (kx_rest (CID0 := CIDx)  γf γw γs j γl
+                  pd pav pu
 
-                  fsc_bmapstart fsc_size
+
                   DfracDiscarded DfracDiscarded
                   ip (m !!! Regidx (mword_of_int 10 : mword 5))
                   (pa_stk (m !!! Regidx csp_rs1) 6) dqi

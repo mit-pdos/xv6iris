@@ -151,29 +151,22 @@ Record fclose_names := MkFCloseNames {
   fcn_procs    : list gname;      (* the proc table's per-slot lock names   *)
   fcn_j        : nat;             (* the running process's index            *)
   fcn_plock    : gname;
-  fcn_kmem     : gname;           (* kmem.lock                              *)
-  fcn_kalloc   : gname * gname;
-  fcn_uart     : uart_names;
-  fcn_disk     : disk_names;
-  fcn_dlock    : gname;           (* virtio_disk.lock                       *)
+  (* the three virtio ring pages, and they are the ONLY fs-shaped fields
+     left: [FsReady.fs_ready] quantifies them (FsCfg.v, ruling R1 --
+     [virtio_disk_init] [kalloc]s them at WP time, so no boot-era [fupd] can
+     give the ambient record a value for them), so a caller that wants the
+     fabric at its OWN three carries [disk_geom] there and identifies it
+     with [FsReady.disk_geom_agree]. *)
   fcn_pd       : mword 64;
   fcn_pav      : mword 64;
   fcn_pu       : mword 64;
-  fcn_bio      : bio_names;
-  (* [fcn_log] / [fcn_dev] ARE GONE (rank 1c): the log's names and the
-     file system's device are ambient, so a threaded copy had nothing to
-     do but carry an equation. *)
+  (* [fcn_kmem] / [fcn_kalloc] / [fcn_uart] / [fcn_disk] / [fcn_dlock] /
+     [fcn_bio] / [fcn_bmapstart] / [fcn_size] ARE GONE (rank 1d), as
+     [fcn_log] / [fcn_dev] / [fcn_inodestart] / [fcn_nib] went in rank 1c:
+     each was a threaded copy of a [FsCfg.fscfg] field, and all a copy could
+     do was carry the equation ([fclose_ties]) that said so. *)
   fcn_pid      : mword 32;        (* the caller's own pid cell              *)
-  fcn_dq       : dfrac;
-  (* ---- C6b: iput's own indices.  Everything below is the INODE CACHE and
-     the two file-system regions its truncate arm reaches -- the inode
-     region it frees a dinode into, and the bitmap it frees blocks into.
-     They are fields rather than parameters for the same reason the rest
-     are: one equation at the caller ([SpecKexit]'s [fn = MkFCloseNames
-     ...]) instead of a dozen coherence conjuncts. *)
-  fcn_bmapstart : Z;
-  (* ...and so are [fcn_inodestart] / [fcn_nib], for the same reason. *)
-  fcn_size     : Z;               (* the bitmap's covered size              *)
+  fcn_dq       : dfrac;           (* the pid quarter iput is lent            *)
 }.
 
 (* Spelled out rather than derived: several of these records have no
@@ -182,17 +175,9 @@ Record fclose_names := MkFCloseNames {
    the caller that passes them -- so any closed term does. *)
 Global Instance fclose_names_inhabited : Inhabited fclose_names :=
   populate (MkFCloseNames
-    [] 0%nat 1%positive 1%positive (1%positive, 1%positive)
-    (UartNames 1%positive 1%positive 1%positive 1%positive)
-    (DiskNames 1%positive 1%positive 1%positive 1%positive 1%positive 1%positive
-               1%positive 1%positive 1%positive 1%positive 1%positive)
-    1%positive
+    [] 0%nat 1%positive
     (mword_of_int 0) (mword_of_int 0) (mword_of_int 0)
-    (MkBioNames 1%positive 1%positive
-       (fun _ => (1%positive, 1%positive)) (fun _ => 1%positive)
-       (fun _ => 1%positive))
-    (mword_of_int 0) (DfracOwn 1)
-    0 0).
+    (mword_of_int 0) (DfracOwn 1)).
 
 Section SpecFileclose.
   (* NOTE [icacheG] is NOT here: [fileG] carries it (FileInv.v's header --
@@ -209,15 +194,15 @@ Section SpecFileclose.
       (on : option nat) (n : nat) : iProp Σ :=
     (⌜(Z.of_nat n + 2 < 2 ^ 31)%Z⌝ ∗
      procs_inv (fcn_procs fn) ∗
-     is_lock (fcn_kmem fn) (mword_of_int KernelSyms.kmem) "kmem"%string
-       (kmem_res (fcn_kalloc fn) (mword_of_int (KernelSyms.kmem + 24))) ∗
-     kalloc_avail (fcn_kalloc fn) on)%I.
+     is_lock (fsc_kalloc) (mword_of_int KernelSyms.kmem) "kmem"%string
+       (kmem_res (fsc_kpages) (mword_of_int (KernelSyms.kmem + 24))) ∗
+     kalloc_avail (fsc_kpages) on)%I.
 
   (* the page came back iff this was the pipe's LAST end; the caller cannot
      tell, and does not need to. *)
   Definition fileclose_pipe_out (fn : fclose_names) (on : option nat) : iProp Σ :=
-    (kalloc_avail (fcn_kalloc fn) on ∨
-     kalloc_avail (fcn_kalloc fn) (avail_inc on))%I.
+    (kalloc_avail (fsc_kpages) on ∨
+     kalloc_avail (fsc_kpages) (avail_inc on))%I.
 
   (* ---- the FD_INODE / FD_DEVICE arm's environment: begin_op / iput /
          end_op's, which is the whole file system ---- *)
@@ -248,26 +233,23 @@ Section SpecFileclose.
 
   (* THE FILE SYSTEM, AS A CLOSER SEES IT: [FsReady.fs_ready] -- the one
      persistent, parameter-free predicate every runtime fs caller holds --
-     beside the TIES that say [fn]'s own names ARE the ambient ones.  This
-     is [FsSyscalls.fs_world]'s idiom at [fclose_names]' fields: a record so
-     a proof destructs it once and rewrites.  Every fs fact the last-
-     reference arm's callees want -- the block/log fabric, the icache's
-     four, the inode region and its sealed regime, the superblock cells at
-     [□], the block bitmap's invariant, the image's arithmetic -- is a
-     projection of [fs_ready] after the rewrite; nothing fs-shaped is
-     restated here.  fileclose is unreachable pre-seal (it is a process-
-     level function), so taking [fs_ready] is the adoption audit's
-     "ALREADY DONE" row, not its "MUST NOT" one (fs-ghost-state.md §7d). *)
-  Record fclose_ties (fn : fclose_names) : Prop := MkFCloseTies {
-    fct_uart   : fcn_uart fn = fsc_uart;
-    fct_disk   : fcn_disk fn = fsc_disk;
-    fct_dlock  : fcn_dlock fn = fsc_dlock;
-    fct_kmem   : fcn_kmem fn = fsc_kalloc;
-    fct_kalloc : fcn_kalloc fn = fsc_kpages;
-    fct_bio    : fcn_bio fn = fsc_bio;
-    fct_bms    : fcn_bmapstart fn = fsc_bmapstart;
-    fct_size   : fcn_size fn = fsc_size;
-  }.
+     AND NOTHING BESIDE IT.  Every fs fact the last-reference arm's callees
+     want (the block/log fabric, the icache's four, the inode region and its
+     sealed regime, the superblock cells at [□], the block bitmap's
+     invariant, the image's arithmetic) is a projection of it.  fileclose is
+     unreachable pre-seal (it is a process-level function), so taking
+     [fs_ready] is the adoption audit's "ALREADY DONE" row, not its
+     "MUST NOT" one (fs-ghost-state.md §7d).
+
+     [fclose_ties] IS GONE (rank 1d).  It was eight equations saying that
+     [fn]'s own device/allocator names -- the uart, the disk, the virtio and
+     kmem locks, the free-list pair, the bio record, the bitmap's start and
+     size -- were the ambient ones.  Those eight fields left [fclose_names]
+     in the same slice, because a record whose value is a [FsCfg.fscfg]
+     field can only ever carry a copy of it; and an equation whose two sides
+     print the same is one Rocq will not even let a proof [rewrite] by.  So
+     the closer's environment states the file system ONCE, at the names it
+     actually has. *)
 
   (* the bundle WITHOUT the caller's pid cell.  kexit closes every
      descriptor in a loop while holding [proc_priv], and the pid cell the FS
@@ -287,7 +269,6 @@ Section SpecFileclose.
     (⌜(n = 0)%nat⌝ ∗ ⌜p = proc_addr (fcn_j fn)⌝ ∗
      ⌜(fcn_j fn < NPROC)%nat⌝ ∗
      ⌜fcn_procs fn !! fcn_j fn = Some (fcn_plock fn)⌝ ∗
-     ⌜fclose_ties fn⌝ ∗
      procs_inv (fcn_procs fn) ∗
      (* NO disk-fabric rows: [fs_ready]'s own disk conjunct quantifies the
         three ring pages, and the inode arm runs at THAT witness -- rows at
@@ -367,7 +348,7 @@ Section SpecFileclose.
     fileclose_fs_env fn n eb p -∗ fileclose_fs_out fn.
   Proof.
     rewrite /fileclose_fs_env /fileclose_fs_env_nopid /fileclose_fs_out.
-    iIntros "(_ & _ & _ & _ & _ & _ & _ & Hbs)".
+    iIntros "(_ & _ & _ & _ & _ & _ & Hbs)".
     iExact "Hbs".
   Qed.
 
@@ -419,9 +400,9 @@ Section SpecFileclose.
     □ (fileclose_fs_out fn -∗ fileclose_fs_env fn n eb p).
   Proof.
     rewrite /fileclose_fs_env /fileclose_fs_env_nopid /fileclose_fs_out.
-    iIntros "(%H1 & %H2 & %H3 & %H4 & %H5 & #Hpr & #Hrdy & Hbs)".
+    iIntros "(%H1 & %H2 & %H3 & %H4 & #Hpr & #Hrdy & Hbs)".
     iSplitL "Hbs".
-    { do 5 (iSplitR; [iPureIntro; assumption|]).
+    { do 4 (iSplitR; [iPureIntro; assumption|]).
       (* Split STRUCTURALLY before framing, front to back -- a named [iFrame]
          still walks the whole goal per hypothesis (measured ~7 s a side
          here); [iSplitL]/[iExact] name both sides, so nothing is
@@ -430,7 +411,7 @@ Section SpecFileclose.
       iSplitL "Hrdy"; [iExact "Hrdy"|].
       iExact "Hbs". }
     iModIntro. iIntros "Hbs".
-    do 5 (iSplitR; [iPureIntro; assumption|]).
+    do 4 (iSplitR; [iPureIntro; assumption|]).
     iSplitL "Hpr"; [iExact "Hpr"|].
     iSplitL "Hrdy"; [iExact "Hrdy"|].
     iExact "Hbs".

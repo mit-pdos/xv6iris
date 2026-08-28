@@ -509,12 +509,9 @@ Definition wi_dinode (dn : dinode) (bm' : blkmap) (off tot : nat) : dinode :=
 Definition wp_writei_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
     (ktb : ktier) `{!KtierLe ktb KT1} (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
-    (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
+  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
-    (γa : gname) (γf : gname)                         (* kalloc, file table  *)
-    (bmapstart : Z) (size : Z)
-    (γpr : gname)
+ (γf : gname)                         (* kalloc, file table  *)
     (ip : mword 64) (inum : mword 32)
     (bm : blkmap) (data : nat -> list (bv 8))
     (dn dn0 : dinode)
@@ -588,10 +585,10 @@ Definition wp_writei_sconf_body
   (Z.of_nat off + Z.of_nat n < 2 ^ 31) ->
   bv_unsigned (di_size dn) < 2 ^ 31 ->
   (* the bitmap's geometry, forwarded through bmap to balloc *)
-  bitmap_geom_ok fsc_cov fsc_logst bmapstart size ->
+  bitmap_geom_ok fsc_cov fsc_logst fsc_bmapstart fsc_size ->
   (* balloc's out-of-blocks arm calls the GENERAL printk path; carried as a
      hypothesis, never a functor.  See SpecBalloc.v's header. *)
-  printk_gen_contract (kt := KT1) γpr γu γd ->
+  printk_gen_contract (kt := KT1) fsc_printk fsc_uart fsc_disk ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* a0 = ip *)
@@ -633,11 +630,11 @@ Definition wp_writei_sconf_body
   kernel_text -∗ pc_is pcE -∗
   (* the two PERSISTENT printk credentials, forwarded through bmap to balloc *)
   kernel_data -∗
-  printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
-  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+  printk_env fsc_printk fsc_uart fsc_disk -∗
+  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+  log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
   (* either_copyin's user arm reaches copyin, which reaches vmfault/kalloc *)
-  kalloc_env γa None -∗
+  kalloc_env fsc_kalloc None -∗
   (* ip->dev and ip->inum: read, never written -- FRACTIONS *)
   i_dev ip ↦₄{dqd} icfg_dev -∗
   i_inum ip ↦₄{dqn} inum -∗
@@ -650,9 +647,9 @@ Definition wp_writei_sconf_body
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   (* sb.size and sb.bmapstart, and THE BITMAP: bmap's interior balloc needs
      all three, and writei calls bmap once per straddled block *)
-  sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+  sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
+  bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   (* THE INODE REGION, and this inum's (stale) on-disk record: iupdate's
      resources, threaded through (design §11.3/§12) *)
   ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
@@ -685,9 +682,9 @@ Definition wp_writei_sconf_body
   (* the running-thread bundle *)
   procs_inv γs -∗
   (* the disk fabric *)
-  dev_inv γu γd -∗
-  disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  dev_inv fsc_uart fsc_disk -∗
+  disk_geom fsc_disk pd pav pu -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
   (* THREE slot units -- bmap's peak; writei's own bread holds one across
      either_copyin and log_write, and log_write wants one of its own *)
   bslots 3 -∗
@@ -762,8 +759,8 @@ Definition wp_writei_sconf_body
       inode_map fsc_fs ip bm' -∗
       inode_blocks fsc_fs bm' data' -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-      sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       dinode_at fsc_ireg inum dn0' -∗
       (* the source goes back the way it came -- with the kernel arm's
          buffer, or inside the user arm's block *)
@@ -790,12 +787,9 @@ Definition wp_writei_sconf_body
 Definition wp_writei_gen_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
     (ktb : ktier) `{!KtierLe ktb KT1} (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
-    (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
+  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
-    (γa : gname) (γf : gname)                         (* kalloc, file table  *)
-    (bmapstart : Z) (size : Z)
-    (γpr : gname)
+ (γf : gname)                         (* kalloc, file table  *)
     (ip : mword 64) (inum : mword 32)
     (bm : blkmap) (data : nat -> list (bv 8))
     (dn dn0 : dinode)
@@ -869,10 +863,10 @@ Definition wp_writei_gen_body
   (Z.of_nat off + Z.of_nat n < 2 ^ 31) ->
   bv_unsigned (di_size dn) < 2 ^ 31 ->
   (* the bitmap's geometry, forwarded through bmap to balloc *)
-  bitmap_geom_ok fsc_cov fsc_logst bmapstart size ->
+  bitmap_geom_ok fsc_cov fsc_logst fsc_bmapstart fsc_size ->
   (* balloc's out-of-blocks arm calls the GENERAL printk path; carried as a
      hypothesis, never a functor.  See SpecBalloc.v's header. *)
-  printk_gen_contract (kt := KT1) γpr γu γd ->
+  printk_gen_contract (kt := KT1) fsc_printk fsc_uart fsc_disk ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* a0 = ip *)
@@ -904,11 +898,11 @@ Definition wp_writei_gen_body
   kernel_text -∗ pc_is pcE -∗
   (* the two PERSISTENT printk credentials, forwarded through bmap to balloc *)
   kernel_data -∗
-  printk_env γpr γu γd -∗
-  bio_ctx bn (fs_view fsc_fs γd icfg_dev fsc_cov) -∗
-  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+  printk_env fsc_printk fsc_uart fsc_disk -∗
+  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+  log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
   (* either_copyin's user arm reaches copyin, which reaches vmfault/kalloc *)
-  kalloc_env γa None -∗
+  kalloc_env fsc_kalloc None -∗
   (* ip->dev and ip->inum: read, never written -- FRACTIONS *)
   i_dev ip ↦₄{dqd} icfg_dev -∗
   i_inum ip ↦₄{dqn} inum -∗
@@ -921,9 +915,9 @@ Definition wp_writei_gen_body
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   (* sb.size and sb.bmapstart, and THE BITMAP: bmap's interior balloc needs
      all three, and writei calls bmap once per straddled block *)
-  sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+  sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
+  bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   (* THE INODE REGION, and this inum's (stale) on-disk record: iupdate's
      resources, threaded through (design §11.3/§12) *)
   ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
@@ -956,9 +950,9 @@ Definition wp_writei_gen_body
   (* the running-thread bundle *)
   procs_inv γs -∗
   (* the disk fabric *)
-  dev_inv γu γd -∗
-  disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  dev_inv fsc_uart fsc_disk -∗
+  disk_geom fsc_disk pd pav pu -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
   (* THREE slot units -- bmap's peak; writei's own bread holds one across
      either_copyin and log_write, and log_write wants one of its own *)
   bslots 3 -∗
@@ -1025,11 +1019,11 @@ Definition wp_writei_gen_body
       (* ...and on a single-block success, the spend is the credit-aware
          [wi16_spend] and the three logged blocks are IN the returned set.
          ADDITIVE -- see [wi16_post]'s header. *)
-      ⌜wi16_post bmapstart inum icfg_ist ncount n' off n tot bm bm' Sb Sb'⌝ -∗
+      ⌜wi16_post fsc_bmapstart inum icfg_ist ncount n' off n tot bm bm' Sb Sb'⌝ -∗
       (* ...the SAME spend bound with no success guard on it, and the
          chunk-granularity fact that goes with it.  ADDITIVE -- see
          [wi16_spend_any] / [wi16_atomic]. *)
-      ⌜wi16_spend_any bmapstart inum icfg_ist ncount n' off n bm bm' Sb⌝ -∗
+      ⌜wi16_spend_any fsc_bmapstart inum icfg_ist ncount n' off n bm bm' Sb⌝ -∗
       ⌜wi16_atomic off n tot⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
@@ -1043,8 +1037,8 @@ Definition wp_writei_gen_body
       inode_map fsc_fs ip bm' -∗
       inode_blocks fsc_fs bm' data' -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-      sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       dinode_at fsc_ireg inum dn0' -∗
       (* the source goes back the way it came -- with the kernel arm's
          buffer, or inside the user arm's block *)
@@ -1061,12 +1055,8 @@ Module Type WRITEI.
   Parameter wp_writei_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
       (ktb : ktier) `{!KtierLe ktb KT1} (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (γa : gname) (γf : gname)
-      (bmapstart : Z) (size : Z)
-      (γpr : gname)
+ (γf : gname)
       (ip : mword 64) (inum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn dn0 : dinode)
@@ -1075,8 +1065,8 @@ Module Type WRITEI.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_writei_sconf_body ktb γs j γl γu γd γk pd pav pu bn γa γf
- bmapstart size γpr
+      wp_writei_sconf_body ktb γs j γl pd pav pu γf
+
                            ip inum bm data dn dn0
                            user off n src_bytes V ncount
                            pidv dq dqd dqn dqs dqb dqbs m K eb b lks.
@@ -1087,12 +1077,8 @@ Module Type WRITEI.
   Parameter wp_writei_gen :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
       (ktb : ktier) `{!KtierLe ktb KT1} (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (γa : gname) (γf : gname)
-      (bmapstart : Z) (size : Z)
-      (γpr : gname)
+ (γf : gname)
       (ip : mword 64) (inum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn dn0 : dinode)
@@ -1101,8 +1087,8 @@ Module Type WRITEI.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_writei_gen_body ktb γs j γl γu γd γk pd pav pu bn γa γf
- bmapstart size γpr
+      wp_writei_gen_body ktb γs j γl pd pav pu γf
+
                          ip inum bm data dn dn0
                          user off n src_bytes V ncount Sb
                          pidv dq dqd dqn dqs dqb dqbs m K eb b lks.

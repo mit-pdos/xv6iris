@@ -182,13 +182,10 @@ End SpecSysMkdir.
 Definition wp_sys_mkdir_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γf : gname) (γa : gname) (γpr : gname)             (* ftable, kalloc, printk *)
+    (γf : gname)             (* ftable, kalloc, printk *)
     (gs : list gname) (j : nat) (gl : gname)            (* the running process *)
-    (gu : uart_names) (gd : disk_names) (gk : gname)    (* disk fabric + lock  *)
+    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
-    (bmapstart : Z)
-    (ninodes : Z) (size : Z)
     (ns : nat)                                          (* the iref ledger     *)
     (dqb dqs dqbs dqn : dfrac)
     (v : mword 64)                                      (* syscall argument 0  *)
@@ -203,21 +200,21 @@ Definition wp_sys_mkdir_sconf_body
   (0 < icfg_nib)%nat ->
   (* ---- the block-layer geometry, threaded verbatim to create / iunlockput ---- *)
   log_geom_ok fsc_cov fsc_logst ->
-  0 < size <= BPB ->
-  0 <= bmapstart ->
-  bmapstart ∈ fsc_cov ->
-  ~ (bmapstart ∈ log_region_set fsc_logst) ->
+  0 < fsc_size <= BPB ->
+  0 <= fsc_bmapstart ->
+  fsc_bmapstart ∈ fsc_cov ->
+  ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
   0 <= icfg_ist ->
-  cov_below fsc_cov size ->
-  bitmap_geom_ok fsc_cov fsc_logst bmapstart size ->
+  cov_below fsc_cov fsc_size ->
+  bitmap_geom_ok fsc_cov fsc_logst fsc_bmapstart fsc_size ->
   ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
   (* ---- ialloc's three geometry premises, and mkfs's [ushort] tie ---- *)
-  1 < ninodes ->
-  ninodes <= 16 * Z.of_nat icfg_nib ->
-  ninodes < 2 ^ 31 ->
+  1 < fsc_ninodes ->
+  fsc_ninodes <= 16 * Z.of_nat icfg_nib ->
+  fsc_ninodes < 2 ^ 31 ->
   16 * Z.of_nat icfg_nib <= 2 ^ 16 ->
   (* ---- ialloc's no-inodes arm calls printk, not panic ---- *)
-  printk_gen_contract (kt := KT1) γpr gu gd ->
+  printk_gen_contract (kt := KT1) fsc_printk fsc_uart fsc_disk ->
   (* ---- the reference allowance create's walk needs ---- *)
   (create_slots <= ns)%nat ->
   (j < NPROC)%nat ->
@@ -238,15 +235,15 @@ Definition wp_sys_mkdir_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* ---- the two persistent credentials ialloc's printk arm needs ---- *)
-  printk_env γpr gu gd -∗
+  printk_env fsc_printk fsc_uart fsc_disk -∗
   (* ---- the block layer ---- *)
-  bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) -∗
-  log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev -∗
+  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
+  log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
   fs_crash_seam fsc_cov fsc_logst -∗
   gen_cert -∗
-  dev_inv gu gd -∗
-  disk_geom gd pd pav pu -∗
-  is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+  dev_inv fsc_uart fsc_disk -∗
+  disk_geom fsc_disk pd pav pu -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
   bslots 3 -∗
   (* ---- the inode cache, and the region ialloc claims out of ---- *)
   is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
@@ -263,13 +260,13 @@ Definition wp_sys_mkdir_sconf_body
      new axiom, and a premise pulls nothing into [Print Assumptions]. *)
   ireg_open -∗
   (* ---- the FOUR superblock cells (create reads all of them) ---- *)
-  sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
+  sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-  sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+  sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
+  bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   (* argstr's page-table side, and create's (iget's ipool arm allocates) *)
-  kalloc_env γa None -∗
+  kalloc_env fsc_kalloc None -∗
   (* the running-thread bundle *)
   procs_inv gs -∗
   (* ---- the process, whole, and the reference allowance ---- *)
@@ -290,10 +287,10 @@ Definition wp_sys_mkdir_sconf_body
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       bslots 3 -∗
-      sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
+      sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-      sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       (* NO ORDERING on the free pool: create both ALLOCATES (balloc under
          dirlink) and FREES (itrunc under its fail arm's iunlockput of a
          link-count-zero inode), and the two do not cancel. *)
@@ -315,21 +312,17 @@ Definition wp_sys_mkdir_sconf_body
 Module Type SYSMKDIR.
   Parameter wp_sys_mkdir_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γf : gname) (γa : gname) (γpr : gname)
+      (γf : gname)
       (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (bmapstart : Z)
-      (ninodes : Z) (size : Z)
       (ns : nat)
       (dqb dqs dqbs dqn : dfrac)
       (v : mword 64)
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_sys_mkdir_sconf_body γf γa γpr gs j gl gu gd gk pd pav pu bn
-                              bmapstart
-                              ninodes size ns dqb dqs dqbs dqn v
+      wp_sys_mkdir_sconf_body γf gs j gl pd pav pu
+
+ ns dqb dqs dqbs dqn v
                               pid V m K eb b lks.
 End SYSMKDIR.

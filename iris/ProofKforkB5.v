@@ -230,10 +230,10 @@ Section ProofKforkB5.
     iDestruct (SchedCtx.procs_inv_len with "Hpinv") as %Hnproc.
     iAssert (⌜FsReady.fs_geom_ok⌝)%I as %Hgeomok.
     { iDestruct "Hfdone" as "[_ #Hrdy]". iApply (FsReady.fs_ready_geom with "Hrdy"). }
-    pose (N := MkUtNames γft γf γw γs j γl fsc_uart fsc_disk fsc_dlock pd pav pu
-                 γtl fsc_printk fsc_bio
-                 iv1 DfracDiscarded fsc_kalloc fsc_kpages
-                 fsc_bmapstart fsc_size ks pid_c).
+    pose (N := MkUtNames γft γf γw γs j γl pd pav pu
+                 γtl
+                 iv1 DfracDiscarded
+ ks pid_c).
     assert (Hwf : ut_wf N).
     { split_and!; [exact Hj | exact Hgl | exact Hnproc | exact (FsReady.fgo_loggeom Hgeomok)]. }
     iAssert (park_env N) as "#Henv".
@@ -241,8 +241,9 @@ Section ProofKforkB5.
       { iDestruct "Hdcaps" as "(_ & _ & $ & _)". }
       rewrite /park_env /ut_park_caps.
       iSplitL; [| iExact "Hextra"].
-      iSplitR; [iPureIntro; constructor; reflexivity|].
-      iSplitR; [iPureIntro; reflexivity|].
+      (* the two PURE rows are gone (rank 1d): [fclose_ties] and the printk
+         equation both named [fclose_names]/[ut_names] fields that no longer
+         exist. *)
       iSplitR; [iExact "Hpinv"|].
       iSplitR; [iExact "Hks"|].
       iSplitR; [iExact "Hdcaps"|].

@@ -86,10 +86,10 @@ Section ProofSysFork.
   (*  THE CAPSTONE.                                                       *)
   (* =================================================================== *)
   Lemma wp_sys_fork_sconf
-      (γa γp γw γl γf : gname) (γs : list gname)
+      (γp γw γl γf : gname) (γs : list gname)
       (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
       (b : bool) (pid : mword 32) (V : pprivate) (lks : gset string)
-    : wp_sys_fork_sconf_body γa γp γw γl γf γs
+    : wp_sys_fork_sconf_body γp γw γl γf γs
  m lvl av eb p b pid V lks.
   Proof.
     cbv beta delta [wp_sys_fork_sconf_body].
@@ -175,18 +175,17 @@ Section ProofSysFork.
        than hiding it behind [kalloc_env]'s [∃ γk].  sys_fork is at [None]
        and needs no PARTICULAR name -- only some name, which its own bundle
        supplies -- so the pair is opened here and re-bundled on the way out. *)
-    iDestruct "Henv" as (γk) "[#Hkalk #Hkaav]".
-    iDestruct (kalloc_env_at_intro with "Hkalk Hkaav") as "#Henvn".
-    iApply (Kfork.wp_kfork_sconf γa γk γp γw γl γf γs
+    (* the pair arrives NAMED (rank 1d): [fsc_kpages] is a [FsCfg.fscfg]
+       field, so there is no existential left to open. *)
+    iPoseProof "Henv" as "#Henvn".
+    iApply (Kfork.wp_kfork_sconf γp γw γl γf γs
 
               Bj lvl (av - 2)%nat eb p b pid V lks
               ltac:(lia) Hlvl ltac:(lkbelow)
               with "Hcg Hcpu Htext Hpc Hprocs Hplock Hwlock Hftbl
                     Hitbl Hitinv Hireg Henvn Hpav Hworld Htoken Hfdone Hpriv").
     iIntros (CID6 Hs6 MF) "%HcsMF Hpc Hpost".
-    iDestruct "Hpost" as "(Hcg & Hcpu & Hpriv & Henvr & %Hrv)".
-    (* ...and back to the bundle sys_fork's own contract hands on. *)
-    iDestruct (kalloc_env_at_env with "Henvr") as "#Henv".
+    iDestruct "Hpost" as "(Hcg & Hcpu & Hpriv & #Henv & %Hrv)".
     assert (Hpc0c : ret_pc (Bj !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_fork + 0x0c))
       by (rewrite HBjra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc0c) in "Hpc".

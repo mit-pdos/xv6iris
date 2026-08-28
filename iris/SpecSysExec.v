@@ -179,13 +179,10 @@ End SpecSysExec.
 Definition wp_sys_exec_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γf : gname) (γa : gname)                           (* ftable, kalloc      *)
+    (γf : gname)                           (* ftable, kalloc      *)
     (gs : list gname) (j : nat) (gl : gname)            (* the running process *)
-    (gu : uart_names) (gd : disk_names) (gk : gname)    (* disk fabric + lock  *)
+    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
-    (bmapstart : Z)
-    (size : Z)
     (dqb dqs : dfrac)
     (v0 v1 : mword 64)                        (* syscall arguments 0 and 1 *)
     (pid : mword 32) (V : pprivate)
@@ -199,12 +196,12 @@ Definition wp_sys_exec_sconf_body
   (0 < icfg_nib)%nat ->
   (* ---- the block-layer geometry, threaded verbatim to kexec ---- *)
   log_geom_ok fsc_cov fsc_logst ->
-  0 < size <= BPB ->
-  0 <= bmapstart ->
-  bmapstart ∈ fsc_cov ->
-  ~ (bmapstart ∈ log_region_set fsc_logst) ->
+  0 < fsc_size <= BPB ->
+  0 <= fsc_bmapstart ->
+  fsc_bmapstart ∈ fsc_cov ->
+  ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
   0 <= icfg_ist ->
-  cov_below fsc_cov size ->
+  cov_below fsc_cov fsc_size ->
   ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
@@ -230,15 +227,15 @@ Definition wp_sys_exec_sconf_body
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* ---- the file system, as kexec's own bundle: thirteen persistent
          resources this function only relays ---- *)
-  fs_fabric gs gu gd gk pd pav pu bn
+  fs_fabric gs pd pav pu
  -∗
-  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-  bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+  bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   bslots 3 -∗
   (* the loop's own [kalloc]s, argstr's page faults, and kexec's page-table
      builder all run in the UNCOUNTED regime *)
-  kalloc_env γa None -∗
+  kalloc_env fsc_kalloc None -∗
   (* ---- the process, and the reference allowance kexec's walk needs ---- *)
   iref_slots 2 -∗
   proc_priv γf pj pid V -∗
@@ -256,11 +253,11 @@ Definition wp_sys_exec_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       (* the free pool only SHRINKS -- kexec's cone is the only mover *)
       bslots 3 -∗
-      kalloc_env γa None -∗
+      kalloc_env fsc_kalloc None -∗
       (* the allowance, whole: kexec gives back what it took *)
       iref_slots 2 -∗
       sys_exec_post γf pj pid (upd_upt V P')
@@ -271,19 +268,15 @@ Definition wp_sys_exec_sconf_body
 Module Type SYSEXEC.
   Parameter wp_sys_exec_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γf : gname) (γa : gname)
+      (γf : gname)
       (gs : list gname) (j : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (bmapstart : Z)
-      (size : Z)
       (dqb dqs : dfrac)
       (v0 v1 : mword 64)
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_sys_exec_sconf_body γf γa gs j gl gu gd gk pd pav pu bn
-                             bmapstart
-                             size dqb dqs v0 v1 pid V m K eb b lks.
+      wp_sys_exec_sconf_body γf gs j gl pd pav pu
+
+ dqb dqs v0 v1 pid V m K eb b lks.
 End SYSEXEC.

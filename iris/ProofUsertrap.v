@@ -105,6 +105,7 @@ Require Import ProcAvail.
 Require Import TimerCap.   (* [sstc_enabled]: the residue's mcounteren pin *)
 Import Defs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.  (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -146,7 +147,7 @@ Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 Section UtEntry.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
+  Context (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ).
 
   (* the trapframe page's own [page_valid], read off [proc_priv] without
      consuming it -- [proc_pt_wf]'s last conjunct.  A PURE-goal [iDestruct]
@@ -724,7 +725,7 @@ Section UtDispatch.
       (m0 m : regfile) (av nx : nat)
       (ep sc st : mword 64)
       (mie_v menvcfg0 : mword 64) :
-    printk_gen_contract (kt := KT1) (un_pr N) (un_u N) (un_v N) ->
+    printk_gen_contract (kt := KT1) (fsc_printk) (fsc_uart) (fsc_disk) ->
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res false + nx)%nat = (av - 4)%nat ->
@@ -758,7 +759,7 @@ Section UtDispatch.
     iIntros "#Htext Hpc Hcg Hcpu Hclm Hraw Henv Hframe Hcont".
     iDestruct "Henv" as "[#Hcaps Hown]".
     (* the device complement, at THIS hart, out of the bundle's [∀ h] form *)
-    iAssert (devintr_caps_any (un_u N) (un_v N) (un_k N) (un_tk N) (un_s N)
+    iAssert (devintr_caps_any (fsc_uart) (fsc_disk) (fsc_dlock) (un_tk N) (un_s N)
                (un_pd N) (un_pav N) (un_pu N)) with "[]" as "#Hdca".
     { iDestruct "Hcaps" as "(_ & _ & _ & $ & _)". }
     (* THIS HART'S TIMER CAPABILITY, read off the kernel bundle rather than
@@ -766,12 +767,12 @@ Section UtDispatch.
        one member of [devintr_caps] the hart-free [devintr_caps_any] cannot
        carry. *)
     iDestruct (sie_cap_gpr_timer_cap with "Hcg") as "[#Htc Hcg]".
-    iAssert (devintr_caps (un_u N) (un_v N) (un_k N) (un_tk N) (un_s N)
+    iAssert (devintr_caps (fsc_uart) (fsc_disk) (fsc_dlock) (un_tk N) (un_s N)
                (un_pd N) (un_pav N) (un_pu N)) with "[]" as "#Hdc".
     { iApply (devintr_caps_any_at CID with "Hdca Htc"). }
     (* THE KERNELVEC FUNCTOR ARGUMENT, cashed here and nowhere else *)
     iDestruct (ut_dup_hw with "Hcg") as "(#Hhw & #Hmin & Hcg)".
-    iPoseProof (KV.kernelvec_handler_spec (un_u N) (un_v N) (un_k N) (un_tk N)
+    iPoseProof (KV.kernelvec_handler_spec (fsc_uart) (fsc_disk) (fsc_dlock) (un_tk N)
                   (un_s N) (un_pd N) (un_pav N) (un_pu N) Hlen
                   with "Hhw Hmin Htext Hdc") as "#Hih".
     iDestruct "Hraw" as "(Hep & Hsc & Hst & Hstv & Hq & Hsret & Hkpt)".
@@ -879,7 +880,7 @@ Section UtDispatch.
       assert (HcsD3 : ut_cs m0 D3)
         by (rewrite /D3; apply ut_cs_insert;
             [vm_compute; reflexivity | exact HcsD2]).
-      iApply (DE.wp_devintr_sconf (un_u N) (un_v N) (un_k N) (un_tk N) (un_s N)
+      iApply (DE.wp_devintr_sconf (fsc_uart) (fsc_disk) (fsc_dlock) (un_tk N) (un_s N)
                 (un_pd N) (un_pav N) (un_pu N)
                 D3 nx 0 false (un_pj N) (DfracOwn 1) sc ∅
                 Hlen ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia)
@@ -1258,7 +1259,7 @@ Section UtSeal.
     iIntros (M V') "%HMsp %HMs1 %HMa0 %HcsM %HuptV Hpc Hcg Hcpu Hclm Hraw Henv Hfr".
     iApply (ut_dispatch N V' pt ksp m M av (av - 4)%nat sepc_v sc_v stval_v
               mie_v menvcfg0
-              (ut_printk (un_pr N) (un_u N) (un_v N)) Hwf Hav
+              (ut_printk (fsc_printk) (fsc_uart) (fsc_disk)) Hwf Hav
               (trap_res_off (av - 4)%nat)
               ltac:(rewrite HuptV Hupt; reflexivity) Hksp Hsp HMsp HMs1 HMa0 HcsM
               Hmiev Hmenvv

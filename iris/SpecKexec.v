@@ -345,8 +345,8 @@ Definition kexec_ok (V V' : pprivate) (r : mword 64)
 Definition fs_fabric
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (gs : list gname) (gu : uart_names) (gd : disk_names) (gk : gname)
-    (pd pav pu : mword 64) (bn : bio_names)
+    (gs : list gname)
+    (pd pav pu : mword 64)
     : iProp Σ :=
   (* THE AMBIENT KERNEL ENVIRONMENT, which every fs contract below this one
      now also asks for by name: the .rodata image the panic literals come
@@ -356,8 +356,8 @@ Definition fs_fabric
      kexec cone's dozen internal lemmas unchanged. *)
   (kernel_data ∗
    panic_env ∗
-   bio_ctx bn (fs_view fsc_fs gd icfg_dev fsc_cov) ∗
-   log_ctx icfg_log bn fsc_fs fsc_cov fsc_logst icfg_dev ∗
+   bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) ∗
+   log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev ∗
    fs_crash_seam fsc_cov fsc_logst ∗
    gen_cert ∗
    is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev ∗
@@ -374,21 +374,21 @@ Definition fs_fabric
       it, and no block lemma's premise list grows. *)
    ireg_open ∗
    procs_inv gs ∗
-   dev_inv gu gd ∗
-   disk_geom gd pd pav pu ∗
+   dev_inv fsc_uart fsc_disk ∗
+   disk_geom fsc_disk pd pav pu ∗
    (* THE AMBIENT LOG IS NO LONGER A CONJUNCT.  It used to be
       [⌜g = icfg_log⌝] -- the fabric's own tie, LAST so no destructuring
       pattern above it moved -- because kexec write-locks the inode it is
       reading and the escrow parks its transaction at [icfg_log], having no
       [log_names] parameter of its own.  The fabric names the ambient log
       directly now (rank 1c), so there is nothing left to tie. *)
-   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu))%I.
+   is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu))%I.
 
 Global Instance fs_fabric_persistent
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    gs gu gd gk pd pav pu bn :
-  Persistent (fs_fabric gs gu gd gk pd pav pu bn).
+    gs pd pav pu :
+  Persistent (fs_fabric gs pd pav pu).
 Proof. apply _. Qed.
 
 (* ===================================================================== *)
@@ -398,12 +398,9 @@ Definition wp_kexec_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (gs : list gname) (jp : nat) (gl : gname)           (* the running process *)
-    (gu : uart_names) (gd : disk_names) (gk : gname)    (* disk fabric + lock  *)
+    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
-    (bn : bio_names)
-    (ga : gname) (gf : gname)                           (* kalloc, file table  *)
-    (bmapstart : Z)
-    (size : Z)
+ (gf : gname)                           (* kalloc, file table  *)
     (plen : nat) (pfun : nat -> bv 8)                   (* the path buffer     *)
     (na : nat) (avf : nat -> mword 64)                  (* argv[0 .. na]       *)
     (alen : nat -> nat) (aslen : nat -> nat)            (* strlen / owned len  *)
@@ -421,12 +418,12 @@ Definition wp_kexec_sconf_body
   icfg_dev = ROOTDEV ->
   (0 < icfg_nib)%nat ->
   log_geom_ok fsc_cov fsc_logst ->
-  0 < size <= BPB ->
-  0 <= bmapstart ->
-  bmapstart ∈ fsc_cov ->
-  ~ (bmapstart ∈ log_region_set fsc_logst) ->
+  0 < fsc_size <= BPB ->
+  0 <= fsc_bmapstart ->
+  fsc_bmapstart ∈ fsc_cov ->
+  ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
   0 <= icfg_ist ->
-  cov_below fsc_cov size ->
+  cov_below fsc_cov fsc_size ->
   ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
   (* ---- the path ---- *)
   bb_cstr pfun plen ->
@@ -499,15 +496,15 @@ Definition wp_kexec_sconf_body
   trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
-  fs_fabric gs gu gd gk pd pav pu bn
+  fs_fabric gs pd pav pu
  -∗
-  kalloc_env ga None -∗
-  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+  kalloc_env fsc_kalloc None -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   (* THE BLOCK BITMAP'S INVARIANT (BitmapInv.v): persistent; namei's walk
      and the O-arm's iput/iunlockput free into it, and the B2 stage bundle
      [SpecKexecB2.kxc_res] carries it, so this is the row that funds them. *)
-  bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+  bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   (* THE PROCESS'S PRIVATE BLOCK.  p->pid, p->cwd and the cwd reference namei
      needs are all inside it (ProcInv.proc_priv_cwd_pid); so are the p->name
      bytes safestrcpy writes and the trapframe words the commit block writes. *)
@@ -554,9 +551,9 @@ Definition wp_kexec_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-      kalloc_env ga None -∗
+      kalloc_env fsc_kalloc None -∗
       proc_priv gf pj pidv V' -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
       ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
@@ -572,12 +569,8 @@ Module Type KEXEC.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (jp : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (ga : gname) (gf : gname)
-      (bmapstart : Z)
-      (size : Z)
+ (gf : gname)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64)
       (alen aslen : nat -> nat) (afun : nat -> nat -> bv 8)
@@ -585,8 +578,8 @@ Module Type KEXEC.
       (dqb dqs dqa dqpv dqas : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_kexec_sconf_body gs jp gl gu gd gk pd pav pu bn
-                          ga gf bmapstart
-                          size plen pfun na avf alen aslen afun
+      wp_kexec_sconf_body gs jp gl pd pav pu
+ gf
+ plen pfun na avf alen aslen afun
                           pidv V dqb dqs dqa dqpv dqas m K eb b lks.
 End KEXEC.

@@ -227,7 +227,7 @@ Section KforkPrologue.
      4614 B in Delta at every step of that walk
      (optimization.md, fold block continuations). *)
   Definition kfk_pro_exit3
-      (γa : gname) (γk : gname * gname) (γw : gname) (γl : gname) (γf : gname) (γs : list gname) (m : regfile) (lvl : nat) (K : nat) (eb : bool) (pme : mword 64) (b : bool) (pid_p : mword 32) (Vp : pprivate) (R : iProp Σ) (lks : gset string) (sp0 : mword 64) (ra0 : mword 64) (s00 : mword 64) (s10 : mword 64) (s50 : mword 64) (CID : CpuId) : iProp Σ :=
+ (γw : gname) (γl : gname) (γf : gname) (γs : list gname) (m : regfile) (lvl : nat) (K : nat) (eb : bool) (pme : mword 64) (b : bool) (pid_p : mword 32) (Vp : pprivate) (R : iProp Σ) (lks : gset string) (sp0 : mword 64) (ra0 : mword 64) (s00 : mword 64) (s10 : mword 64) (s50 : mword 64) (CID : CpuId) : iProp Σ :=
     (∀ (Mt : regfile) (npa : mword 64) (j : nat) (γl2 : gname)
         (pid_c : mword 32) (ch : mword 64) (Vc' : pprivate)
         (tfsrc tfdst : mword 44),
@@ -299,7 +299,7 @@ Section KforkPrologue.
              (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest)) -∗
         IntrDefs.arm_pay KT1 lvl eb pme -∗
         cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) -∗
-        kalloc_env_at γa γk None -∗
+        kalloc_env_at fsc_kalloc fsc_kpages None -∗
         is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
         is_ftable γl γf -∗
         is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
@@ -311,7 +311,7 @@ Section KforkPrologue.
      2790 B in Delta at every step of that walk
      (optimization.md, fold block continuations). *)
   Definition kfk_pro_exit2
-      (γa : gname) (γk : gname * gname) (γf : gname) (γs : list gname) (m : regfile) (lvl : nat) (K : nat) (eb : bool) (pme : mword 64) (b : bool) (pid_p : mword 32) (Vp : pprivate) (R : iProp Σ) (lks : gset string) (sp0 : mword 64) (ra0 : mword 64) (s00 : mword 64) (s10 : mword 64) (s50 : mword 64) (CID : CpuId) : iProp Σ :=
+ (γf : gname) (γs : list gname) (m : regfile) (lvl : nat) (K : nat) (eb : bool) (pme : mword 64) (b : bool) (pid_p : mword 32) (Vp : pprivate) (R : iProp Σ) (lks : gset string) (sp0 : mword 64) (ra0 : mword 64) (s00 : mword 64) (s10 : mword 64) (s50 : mword 64) (CID : CpuId) : iProp Σ :=
     (∀ (Mt : regfile) (npa : mword 64) (j : nat) (γl2 : gname)
         (pid_c : mword 32) (ch : mword 64) (Vc : pprivate),
         ⌜ Mt !!! Regidx csp_rs1 = pa_stk sp0 8 ⌝ -∗
@@ -358,7 +358,7 @@ Section KforkPrologue.
         ProcDefs.kstack_free npa -∗
         IntrDefs.arm_pay KT1 lvl eb pme -∗
         cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) -∗
-        kalloc_env_at γa γk None -∗
+        kalloc_env_at fsc_kalloc fsc_kpages None -∗
         R -∗
         WP (Loop : expr riscv_lang))%I.
 
@@ -366,7 +366,7 @@ Section KforkPrologue.
      1033 B in Delta at every step of that walk
      (optimization.md, fold block continuations). *)
   Definition kfk_pro_exit1
-      (γa : gname) (γk : gname * gname) (γf : gname) (m : regfile) (lvl : nat) (K : nat) (eb : bool) (pme : mword 64) (on : option nat) (b : bool) (pid_p : mword 32) (Vp : pprivate) (R : iProp Σ) (lks : gset string) (sp0 : mword 64) (ra0 : mword 64) (s00 : mword 64) (s10 : mword 64) (s50 : mword 64) (CID : CpuId) : iProp Σ :=
+ (γf : gname) (m : regfile) (lvl : nat) (K : nat) (eb : bool) (pme : mword 64) (on : option nat) (b : bool) (pid_p : mword 32) (Vp : pprivate) (R : iProp Σ) (lks : gset string) (sp0 : mword 64) (ra0 : mword 64) (s00 : mword 64) (s10 : mword 64) (s50 : mword 64) (CID : CpuId) : iProp Σ :=
     (∀ (Mt : regfile),
         ⌜ Mt !!! Regidx csp_rs1 = pa_stk sp0 8 ⌝ -∗
         ⌜ forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
@@ -382,9 +382,9 @@ Section KforkPrologue.
         pc_is (mword_of_int (KF + 0x10a) : mword 64) -∗
         kfk_frame sp0 ra0 s00 s10 s50 -∗
         proc_priv γf pme pid_p Vp -∗
-        ( kalloc_env_at γa γk on
+        ( kalloc_env_at fsc_kalloc fsc_kpages on
           ∨ (∃ n : nat, ⌜(n <= K_allocproc)%nat /\ avail_zero (avail_sub on n)⌝ ∗
-             kalloc_env_at γa γk None) ) -∗
+             kalloc_env_at fsc_kalloc fsc_kpages None) ) -∗
         R -∗
         WP (Loop : expr riscv_lang))%I.
 
@@ -398,7 +398,7 @@ Section KforkPrologue.
      holds a generic allocator gname -- so the count/seal pair is universally
      quantified, never [fsc_kpages]. *)
   Lemma kfk_prologue
-      (γa : gname) (γk : gname * gname) (γp γw γl γf : gname) (γs : list gname)
+ (γp γw γl γf : gname) (γs : list gname)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
       (on : option nat) (b : bool) (pid_p : mword 32) (Vp : pprivate)
       (R : iProp Σ) (lks : gset string) :
@@ -424,7 +424,7 @@ Section KforkPrologue.
     is_ftable γl γf -∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
     itable_inv -∗
-    kalloc_env_at γa γk on -∗
+    kalloc_env_at fsc_kalloc fsc_kpages on -∗
     (* the proc table's sealed regime -- what allocproc mints the new slot's
        marker out of.  Persistent, so it costs the three continuations
        nothing. *)
@@ -440,7 +440,7 @@ Section KforkPrologue.
        back as its LAST argument. *)
     R -∗
     (* ---- Hcont10a : allocproc found no free slot ---- *)
-    wp_next b pme (fun CID : CpuId => kfk_pro_exit1 γa γk γf m lvl K eb pme on b pid_p Vp R lks sp0 ra0 s00 s10 s50 CID) -∗
+    wp_next b pme (fun CID : CpuId => kfk_pro_exit1 γf m lvl K eb pme on b pid_p Vp R lks sp0 ra0 s00 s10 s50 CID) -∗
     (* ---- Hcont7c : uvmcopy failed ---- *)
     (* [wp_next]'s own reference hart is bound EXPLICITLY (rather than left to
        resolve at this Section's [CID0]): once allocproc's found arm commits
@@ -457,7 +457,7 @@ Section KforkPrologue.
        the leaves run so far -- it was simply never surfaced. *)
     (∀ CIDh : CpuId,
        ⌜ b = false \/ pme = zero_reg -> (CIDh : CPU) = (CID0 : CPU) ⌝ -∗
-       wp_next (CID0 := CIDh) false pme (fun CID : CpuId => kfk_pro_exit2 γa γk γf γs m lvl K eb pme b pid_p Vp R lks sp0 ra0 s00 s10 s50 CID)) -∗
+       wp_next (CID0 := CIDh) false pme (fun CID : CpuId => kfk_pro_exit2 γf γs m lvl K eb pme b pid_p Vp R lks sp0 ra0 s00 s10 s50 CID)) -∗
     (* ---- Hcont4a : uvmcopy succeeded -- the trapframe copy loop's head --- *)
     (* THE CROSSING PREMISE IS NOT OPTIONAL.  Without it this antecedent is
        "prove the continuation at a hart nobody has said anything about":
@@ -468,7 +468,7 @@ Section KforkPrologue.
        the leaves run so far -- it was simply never surfaced. *)
     (∀ CIDh : CpuId,
        ⌜ b = false \/ pme = zero_reg -> (CIDh : CPU) = (CID0 : CPU) ⌝ -∗
-       wp_next (CID0 := CIDh) false pme (fun CID : CpuId => kfk_pro_exit3 γa γk γw γl γf γs m lvl K eb pme b pid_p Vp R lks sp0 ra0 s00 s10 s50 CID)) -∗
+       wp_next (CID0 := CIDh) false pme (fun CID : CpuId => kfk_pro_exit3 γw γl γf γs m lvl K eb pme b pid_p Vp R lks sp0 ra0 s00 s10 s50 CID)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 ra0 s00 s10 s50 HK Hlvl Hbelow.
@@ -675,7 +675,7 @@ Section KforkPrologue.
     assert (HM5ra : M5 !!! Regidx Rra = add_vec_int (mword_of_int (KF + 0x12) : mword 64) 4)
       by (rewrite /M5 upd_eq; reflexivity).
     iDestruct (cpu_own_transport CID8 CID10 lvl eb pme b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Allocproc.wp_allocproc_core γa γk γp γf γs M5 lvl K1 eb pme on None b lks
+    iApply (Allocproc.wp_allocproc_core fsc_kalloc fsc_kpages γp γf γs M5 lvl K1 eb pme on None b lks
               ltac:(lia) ltac:(lia) Hbelow
               with "Hcg Hcpu Htext Hpc Hprocs Hplock Henv Hpav").
     all: try lkbelow.
@@ -973,7 +973,7 @@ Section KforkPrologue.
          for the call and keep the named [kalloc_env_at] -- both are
          persistent at [None] -- for the continuations below. *)
       iDestruct (KvmSpec.kalloc_env_at_env with "Henv'") as "#Henvb".
-      iApply (Uvmcopy.wp_uvmcopy_sconf γa N5p (pv_upt Vp) (pv_upt Vc) (trap_res b + K1)%nat eb pme (S lvl) false
+      iApply (Uvmcopy.wp_uvmcopy_sconf fsc_kalloc N5p (pv_upt Vp) (pv_upt Vc) (trap_res b + K1)%nat eb pme (S lvl) false
                 ({["proc"]} ∪ lks)
                 ltac:(lia) ltac:(lia) HN5ptp HN5pa0 HN5pa1 HszbP
                 ltac:(intros i _; rewrite HCempty; apply lookup_empty)

@@ -211,12 +211,8 @@ Section KexecBBody.
   Lemma kxc_b1
       (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
-      (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names)
-      (ga : gname) (gf : gname)
-      (bmapstart : Z)
-      (size : Z)
+ (gf : gname)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap)
       (gilf gislf : gname) (n2 : nat)
@@ -239,12 +235,12 @@ Section KexecBBody.
       (ef : nat -> bv 8) :
     (K_kexec <= K)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
-    0 < size <= BPB ->
-    0 <= bmapstart ->
-    bmapstart ∈ fsc_cov ->
-    ~ (bmapstart ∈ log_region_set fsc_logst) ->
+    0 < fsc_size <= BPB ->
+    0 <= fsc_bmapstart ->
+    fsc_bmapstart ∈ fsc_cov ->
+    ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
     0 <= icfg_ist ->
-    cov_below fsc_cov size ->
+    cov_below fsc_cov fsc_size ->
     ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
     (jp < NPROC)%nat ->
     gs !! jp = Some gl ->
@@ -266,7 +262,7 @@ Section KexecBBody.
         r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs4 ->
         M90 !!! Regidx r = m !!! Regidx r) ->
     kernel_text -∗
-    fs_fabric gs gu gd gk pd pav pu bn
+    fs_fabric gs pd pav pu
  -∗
     pc_is (mword_of_int (KXB + 0x090) : mword 64) -∗
     sie_cap_gpr KT1 M90 (K - 68)%nat b (proc_addr jp) -∗
@@ -277,11 +273,11 @@ Section KexecBBody.
               gilf gislf -∗
     log_opb icfg_log n2 -∗
     iref_slots 1 -∗
-    sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+    sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-    bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+    bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
     bslots 3 -∗
-    kalloc_env ga None -∗
+    kalloc_env fsc_kalloc None -∗
     proc_priv gf (proc_addr jp) pidv V -∗
     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
     ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
@@ -290,14 +286,14 @@ Section KexecBBody.
     kxc_frameA6x sp0 ra0 s00 s10 s20 pv av (m !!! Regidx Rs4) ef -∗
     (* ---- kexec's OWN continuation: the +0x31c tail closes the -1 arm ---- *)
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-      KexecOkQ.kexec_closer Q gf ga (proc_addr jp) pidv V m (ret_pc ra0) K b
-           eb lks dqb dqs bmapstart na alen plen pv dqpv pfun
+      KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv V m (ret_pc ra0) K b
+           eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
            av dqa avf aslen dqas afun) -∗
     (* ---- OUTPUT 1: [elf.phnum = 0], the loop is skipped ---- *)
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M : regfile) (P : uptd) (w13 w67 : mword 64),
-        kxc_at_1a2 jp bn ga gf bmapstart
- size kf qf sf gyf inumf dnf bmf
+        kxc_at_1a2 jp gf
+ kf qf sf gyf inumf dnf bmf
                    gilf gislf n2
                    plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas
                    m M K sp0 ra0 s00 s10 s20 pv av
@@ -309,15 +305,15 @@ Section KexecBBody.
            +0x31c tail above already owns one copy, so the successor cannot
            be left without one.  durable-notes' "CHAINING TWO HALVES". *)
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
-          KexecOkQ.kexec_closer Q gf ga (proc_addr jp) pidv V m (ret_pc ra0) K b
-               eb lks dqb dqs bmapstart na alen plen pv dqpv
+          KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv V m (ret_pc ra0) K b
+               eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv
                pfun av dqa avf aslen dqas afun) -∗
         WP (Loop : expr riscv_lang)) -∗
     (* ---- OUTPUT 2: the phdr loop's body entry, at [i = 0], [sz = 0] ---- *)
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M : regfile) (P : uptd),
-        kxc_at_12c jp bn ga gf bmapstart
- size kf qf sf gyf inumf dnf bmf
+        kxc_at_12c jp gf
+ kf qf sf gyf inumf dnf bmf
                    gilf gislf n2
                    plen pfun na avf aslen afun pidv V eb dqb dqs dqa dqpv dqas
                    m M K sp0 ra0 s00 s10 s20 pv av
@@ -330,8 +326,8 @@ Section KexecBBody.
            +0x31c tail above already owns one copy, so the successor cannot
            be left without one.  durable-notes' "CHAINING TWO HALVES". *)
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
-          KexecOkQ.kexec_closer Q gf ga (proc_addr jp) pidv V m (ret_pc ra0) K b
-               eb lks dqb dqs bmapstart na alen plen pv dqpv
+          KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv V m (ret_pc ra0) K b
+               eb lks dqb dqs fsc_bmapstart na alen plen pv dqpv
                pfun av dqa avf aslen dqas afun) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -487,9 +483,9 @@ Section KexecBBody.
        supplies.  [Hka] is persistent, so opening it costs nothing. *)
     iPoseProof "Hka" as "Hkadup".
     iDestruct "Hkadup" as (γkx) "[#Hkalk #Hkaav]".
-    iAssert (kalloc_env_at ga γkx None) as "#Hkan".
+    iAssert (kalloc_env_at fsc_kalloc γkx None) as "#Hkan".
     { iApply (kalloc_env_at_intro with "Hkalk Hkaav"). }
-    iApply (PPT.wp_proc_pagetable_core ga γkx G2 tfr (DfracOwn (1/4)) 0%nat
+    iApply (PPT.wp_proc_pagetable_core fsc_kalloc γkx G2 tfr (DfracOwn (1/4)) 0%nat
               (K - 68)%nat eb (proc_addr jp) None eb lks
               kxc_lvl0 ltac:(lia)
               (kxc_tf_align tfr Hpvtf) (kxc_tf_bound tfr Hpvtf)
@@ -1234,8 +1230,8 @@ Section KexecBBody.
                      (CID8 : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_retarget CID0 CID8 true (proc_addr jp) _ Hcr8
                    with "Hcont") as "Hcont".
-      iApply (A.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn
-                gilf gislf ga gf bmapstart size
+      iApply (A.kxc_bad64 Q gs jp gl pd pav pu
+                gilf gislf gf
  kf qf sf gyf inumf dnf bmf n2
                 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
                 m B1 K eb lks sp0 ra0 s00 s10 s20 pv av
