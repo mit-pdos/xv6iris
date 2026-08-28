@@ -186,7 +186,7 @@ live directory, unique names).  There is NO cross-inode pure clause:
   id so no freshness of the transaction is needed — a walk that has
   parked shares in escrows can still arm).  Only `create`'s mkdir child (`nlink = 1`
   flushed before its dot entries) needs it in this kernel.  `ftop_inv`'s
-  row "every unarmed inum's node is `inode_local`" plus an empty `γtx`
+  row "every unarmed inum's node is `inode_local`" plus an empty `ln_tx`
   authority yields `snap_local` of the abstract state
   (`IregClean.ireg_snap_local_acc`/`_of_ops`).  A read-locker cannot move
   a record because `ireg_write_au` takes the exclusive proxy `dinode_at`
@@ -274,11 +274,12 @@ refuted, §8), and every such state
 belongs to an inode that is LOCKED.  So the commit RECONSTRUCTS it from
 the file system's own invariants at the one moment they are all clean:
 
-- **No inode is write-locked and no inode is armed** — at commit the
-  WAL's `γtx` authority is empty, so no share of any transaction id
-  exists: no escrow "out for writing" arm (it parks a share,
-  `IcacheEscrow.ic_out_no_write_arm`) and no armed entry (it parks a
-  share, `IregClean.ireg_snap_local_acc`).  Every inode is either unlocked or
+- **No inode is write-locked and no inode is armed** — at commit the WAL's
+  `ln_tx` authority is EMPTY, so no share of any transaction id exists, and
+  every park in the file system is a share of one (`TxPin.tx_pin`, refuted
+  wholesale by `tx_pin_no_ops`/`_o_no_ops`/`tx_pins_no_ops`): no escrow
+  "out for writing" arm, no armed entry, no in-transit pool row, no corpse.
+  Every inode is either unlocked or
   read-locked, and every node of the abstract map is `inode_local`
   (`IregClean`).
 - **Every inode's validity predicate is inside the invariants.**  An
@@ -299,26 +300,30 @@ the file system's own invariants at the one moment they are all clean:
   lookups) has withdrawn only a ¼ FRACTION of its byte elements; the
   escrow keeps ¾ and the rest of the bundle.  A transactional `ilock`
   withdraws everything.
-- **Collected, they ARE `fs_state` over `L`.**  Opening those invariants
-  at the commit's ghost step and ∗-ing the bundles gives, against the
-  byte authority in `fs_bytes_inv`: the bytes at every record slot and
-  data block by AGREEMENT (any fraction suffices), the used set and the
-  free blocks' bytes off `bitmap_inv`, `inode_local` of every inode off
-  its bundle, and cross-inode block DISJOINTNESS from separation logic —
-  two full elements at one address are inconsistent, and so are two ¾
-  elements (¾ + ¾ > 1), which is why the reader's share is ¼ and not ½.
-  That is `snap_ok S L` for the abstract `S` the `ftop_inv` authority
-  holds; the allocator clones it.  The same collection lemma is what
-  §5's boot mint runs in the other direction.
+- **Collected, they ARE `fs_state (fs_gamma_L γfs) (DfracOwn ¾) S`.**
+  Opening those invariants at the commit's ghost step and ∗-ing the bundles
+  gives exactly the transport's source at ¾ — the records and the metadata
+  objects shed a quarter, the read arms have already kept theirs — and
+  `FsCollectAll.col_bodies_acc` is that, AS AN ACCESSOR: it yields the
+  predicate beside a closing wand that rebuilds every one of the six
+  invariant bodies.  The accessor shape is forced by the transport's `q >
+  1/2`: a transport takes more than half of every byte, so a collection
+  that feeds it cannot also keep the bodies unless it takes its source back
+  out — which the transport returns unchanged.  ¾ and not ½ for the same
+  arithmetic (¾ + ¾ > 1 refutes two owners; ½ + ½ does not), which is also
+  why a read-locker's share is ¼.
 
 There is NO cross-inode pure clause anywhere and no obligation on any
-writer beyond owning the bytes it writes.  `FsDurSnap.snap_bytes` still
-STATES its used-set coupling clauses (`sk_own_used`, `sk_disj`) and its
-three cut clauses, because the VALUE-FIRST allocator
-(`FsDurAlloc.fs_state_of_ledger`, `blk_ledger_cut`, `ledger_carve`) needs
-them to SPLIT a linear ledger, and era 0 has nothing else.  NOTHING CARRIES
-THEM: at a commit they are read off the era's ∗, at a snapshot off the
-epoch's own (`FsDurSnap.fs_snap_read_ok`).
+writer beyond owning the bytes it writes.  **NOTHING PURE ABOUT THE STATE
+CROSSES AT A COMMIT**: two rows travel and neither is about disjointness —
+`snap_shape` (the one clause no resource pins) and "the source's byte map
+lies inside the committed view's flattening" (`col_auth_dbytes`), which is
+where the epoch's identity comes from.  `FsDurSnap.snap_bytes` still STATES
+its used-set coupling (`sk_own_used`, `sk_disj`) and its cut clauses,
+because the VALUE-FIRST allocator (`FsDurAlloc.fs_state_of_ledger`,
+`blk_ledger_cut`, `ledger_carve`) needs them to SPLIT a linear ledger and
+era 0 has nothing else; every other consumer READS them off resources
+(`FsDurSnap.fs_snap_read_ok`) and none of them is ever maintained.
 
 **THE VALUE-FIRST ALLOCATOR IS A MISTAKE, AND THE TRANSPORT THAT REPLACES
 IT IS BUILT (lane H, `iris/FsDurXfer.v`).**  The carve is an artifact of
