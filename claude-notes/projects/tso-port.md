@@ -4159,3 +4159,16 @@ stays TLB-only until the de-conflation pass.  Paper form: EVERY
 persistent fact about memory is context-relative under TSO —
 "persistent" says it will not be invalidated, not that it is free to
 whoever finds it.
+
+### 0.37′ OWNER RULING (2026-08-28): Q4 (the U-mode context-token home) is
+DEFERRED
+
+"the whole user-mode WP machinery is changing around this area on main,
+and we will have a more clear place to put context ownership once those
+changes land."  So the U-mode token question is not resolved in the
+current tree's state: UptWalkPt and UserMemPt stay red DELIBERATELY, the
+upt_res_pt embedding (measured sound by A6.107's travel measurement —
+trampoline-confined, provably unparkable, SIE=false windows) is NOT
+taken now, and the decision waits for main's user-mode WP rework to
+land.  The A6.107 measurement is preserved as the input to that future
+decision.
