@@ -225,4 +225,105 @@ Section KptPublish.
     by iApply view_lb_llb.
   Qed.
 
+  (* ================================================================== *)
+  (* §6 THE DRAIN-FREE GATE, AT THE LOG TOP (A6.106).                     *)
+  (*                                                                     *)
+  (* §5's premise has no site: [main]'s only barrier is `fence rw,w`      *)
+  (* ([Barrier_RISCV_rw_w], [fence_drains] FALSE) -- see                  *)
+  (* [CtxPinMint]'s §3b for the measurement.  This arm publishes at the   *)
+  (* LOG TOP instead, which the mint obligation is happy with and which   *)
+  (* costs no premise at all.                                            *)
+  (*                                                                     *)
+  (* WHAT IT DOES NOT HAND BACK is [hart_view_lb]: the publisher's own    *)
+  (* view is behind its own buffered stores and no fence moves it.  The   *)
+  (* [llb] still comes out ([TsoCtx.tso_interp_loglen_llb], A6.105), so   *)
+  (* [KptShare.kpt_inv_alloc]'s premise is met and [kpt_bound B] is shot; *)
+  (* what defers is the [view_lb] half of [KptShare.kpt_creds].          *)
+  (*                                                                     *)
+  (* [pt_kids_publish] is REUSED VERBATIM -- it is P/Q-generic and its     *)
+  (* [own_context] thread is inert, which is why this arm keeps the token *)
+  (* in its telescope even though the byte mint no longer wants it.       *)
+  (* ================================================================== *)
+  Lemma pt_slots_publish_top (g : gstate) (xi : CtxId)
+      (l : list Z) (F : Z -> Arch.pa) (W : Z -> mword 64) :
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗ own_context xi -∗
+    ([∗ list] i ∈ l, pt_slot_own (UTier xi) (F i) (DfracOwn 1) (W i)) ==∗
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
+    tso_interp_at riscv_eraGS g ∗ own_context xi ∗
+    ([∗ list] i ∈ l, pt_slot_own (KTier (length g.(glog))) (F i) (DfracOwn 1) (W i)).
+  Proof.
+    induction l as [|i l IH].
+    - iIntros "Hgh Hint Hrun Hl". iModIntro. iFrame "Hgh Hint Hrun".
+      iExact "Hl".
+    - rewrite !big_sepL_cons.
+      iIntros "Hgh Hint Hrun [Hs Hl]".
+      rewrite (pt_slot_own_ctx (UTier xi) xi (F i) (DfracOwn 1) (W i) eq_refl).
+      iMod (ctx_phys_word_pin_mint_top g xi (F i) (W i) (pte_slot_set (W i))
+              (fun j (_ : (j < 8)%nat) => pte_slot_set_self (W i) j)
+              with "Hgh Hint Hrun Hs") as "(Hgh & Hint & Hrun & Hs)".
+      iMod (IH with "Hgh Hint Hrun Hl") as "(Hgh & Hint & Hrun & Hl)".
+      iModIntro. iFrame "Hgh Hint Hrun Hl".
+      rewrite (pt_slot_own_ker (KTier (length g.(glog))) (length g.(glog))
+                 (F i) (DfracOwn 1) (W i) eq_refl).
+      iExact "Hs".
+  Qed.
+
+  Lemma pt_page_publish_top (g : gstate) (xi : CtxId) (t : ptree) :
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗ own_context xi -∗
+    pt_page_own_at (UTier xi) (DfracOwn 1) t ==∗
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
+    tso_interp_at riscv_eraGS g ∗ own_context xi ∗
+    pt_page_own_at (KTier (length g.(glog))) (DfracOwn 1) t.
+  Proof.
+    iIntros "Hgh Hint Hrun [#Hcl Hs]".
+    iMod (pt_slots_publish_top g xi (seqZ 0 512)
+            (fun i => u_pte_addr (pt_base t) (mword_of_int i))
+            (fun i => pt_ents t (mword_of_int i)) with "Hgh Hint Hrun Hs")
+      as "(Hgh & Hint & Hrun & Hs)".
+    iModIntro. iFrame "Hgh Hint Hrun". rewrite /pt_page_own_at.
+    iFrame "Hcl Hs".
+  Qed.
+
+  Lemma ptree_own_publish_top (g : gstate) (xi : CtxId) (lvl : nat) (t : ptree) :
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗ own_context xi -∗
+    ptree_own_at (UTier xi) lvl (DfracOwn 1) t ==∗
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
+    tso_interp_at riscv_eraGS g ∗ own_context xi ∗
+    ptree_own_at (KTier (length g.(glog))) lvl (DfracOwn 1) t.
+  Proof.
+    revert t. induction lvl as [|lvl IH]; intros t.
+    - iIntros "Hgh Hint Hrun [Hp _]".
+      iMod (pt_page_publish_top g xi t with "Hgh Hint Hrun Hp")
+        as "(Hgh & Hint & Hrun & Hp)".
+      iModIntro. iFrame "Hgh Hint Hrun Hp".
+    - iIntros "Hgh Hint Hrun [Hp Hk]".
+      iMod (pt_page_publish_top g xi t with "Hgh Hint Hrun Hp")
+        as "(Hgh & Hint & Hrun & Hp)".
+      iMod (pt_kids_publish g xi
+              (fun c => ptree_own_at (UTier xi) lvl (DfracOwn 1) c)
+              (fun c => ptree_own_at (KTier (length g.(glog))) lvl (DfracOwn 1) c)
+              (seqZ 0 512) (fun i => pt_kids t (mword_of_int i)) IH
+              with "Hgh Hint Hrun Hk") as "(Hgh & Hint & Hrun & Hk)".
+      iModIntro. iFrame "Hgh Hint Hrun Hp Hk".
+  Qed.
+
+  Lemma kptree_publish_top (g : gstate) (xi : CtxId) (lvl : nat) (t : ptree) :
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗ own_context xi -∗
+    ptree_own_at (UTier xi) lvl (DfracOwn 1) t ==∗
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
+    tso_interp_at riscv_eraGS g ∗ own_context xi ∗
+    ptree_own_at (KTier (length g.(glog))) lvl (DfracOwn 1) t ∗
+    llb loglen_name (length g.(glog)).
+  Proof.
+    iIntros "Hgh Hint Hrun Ht".
+    iDestruct (tso_interp_loglen_llb g with "Hint") as "[Hint #Hllb]".
+    iMod (ptree_own_publish_top g xi lvl t with "Hgh Hint Hrun Ht")
+      as "(Hgh & Hint & Hrun & Ht)".
+    iModIntro. iFrame "Hgh Hint Hrun Ht Hllb".
+  Qed.
+
 End KptPublish.

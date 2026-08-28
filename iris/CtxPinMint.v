@@ -222,6 +222,106 @@ Section CtxPinMint.
                  Sf Hal).
   Qed.
 
+  (* ================================================================== *)
+  (* §3b THE DRAIN-FREE MINT, AT THE LOG TOP (A6.106).                    *)
+  (*                                                                     *)
+  (* MEASURED: the drain premise above has NO SITE on hart 0's boot path. *)
+  (* A6.72 recorded that [WpSconfFencePub.wp_fence_pub_s_sconf] made one, *)
+  (* and it does -- for `fence rw,rw`.  The instruction actually in the   *)
+  (* kernel image at [main+0xac] is `fence rw,w`                          *)
+  (* ([ProofMain.mn_grp_started]: pred = 3, succ = 1), whose barrier kind *)
+  (* is [Barrier_RISCV_rw_w] and whose [RiscvLang.fence_drains] is FALSE. *)
+  (* Nothing else on the boot arm fences at all.  So a publisher in       *)
+  (* [main] can never exhibit [own_pub h glog <= gtv h].                  *)
+  (*                                                                     *)
+  (* THE HEADER ALREADY SAID WHAT TO DO: "the caller's only real premise  *)
+  (* is that [B] is AT OR ABOVE THE LOG TOP".  The drain was one way to   *)
+  (* get such a [B] *with a view receipt*; the log top itself is another, *)
+  (* and it needs no premise at all -- §1's [tso_interp_ts_le] is exactly *)
+  (* [t <= length glog] and it is true of every element in the map.  So    *)
+  (* this arm mints at [length g.(glog)] and asks for NOTHING: no drain,  *)
+  (* no [own_context], no fence.                                          *)
+  (*                                                                     *)
+  (* WHAT IT COSTS, and it is the whole of §0.36′'s remaining question:   *)
+  (* the publisher gets [kpt_bound B] but NOT [view_lb … B], because its  *)
+  (* own view is behind its own buffered stores.  A secondary buys the    *)
+  (* receipt off the [started] flag read (ruling §0.36′ clause 2, already *)
+  (* a premise at [SpecMainSecondary]); hart 0 needs the own-write arm at *)
+  (* the ONE gate the whole walk funnels through                          *)
+  (* ([HartSKpt.kpt_path_obl] -> [kpt_slot_bytes_pin] ->                  *)
+  (* [TsoCtx.ledger_read_pin_ok]).                                        *)
+  (* ================================================================== *)
+  Lemma ctx_phys_pin_mint_top `{CID : CpuId} (g : gstate) (xi : CtxId)
+      (a : Arch.pa) (v : bv 8) (Sv : TsoMemPa.byteset) :
+    v ∈ Sv ->
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗
+    ctx_phys_pointsto xi a (DfracOwn 1) v ==∗
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
+    tso_interp_at riscv_eraGS g ∗
+    ∃ t : nat, phys_ledger_pin a (DfracOwn 1) v t (length g.(glog)) Sv.
+  Proof.
+    iIntros (Hv) "Hgh Hint Hb".
+    rewrite ctx_phys_pointsto_unseal /ctx_phys_pointsto_def.
+    iDestruct "Hb" as (t) "(Hpt & Hts & Hbit)".
+    iDestruct (tso_interp_ts_le g a (DfracOwn 1)
+                 ((t, TsoMemPa.ts_pay_none) : TsoMemPa.ts_elem)
+                 with "Hint Hts") as %Htb.
+    cbn in Htb.
+    iMod (ledger_pin_mint g a v t (length g.(glog)) Sv Htb Hv
+            with "Hgh Hint [$Hpt $Hts]") as "(Hgh & Hint & Hpin)".
+    iModIntro. iFrame "Hgh Hint". iExists t. iExact "Hpin".
+  Qed.
+
+  (* the byte run, [own_context] threaded but never touched -- kept in the
+     telescope so [KptPublish]'s generic child fold ([pt_kids_publish],
+     which is already P/Q-generic) is reused verbatim by the top arm. *)
+  Lemma ctx_phys_bytes_pin_mint_top `{CID : CpuId} (g : gstate) (xi : CtxId)
+      (a : Arch.pa) (n : nat) (f : nat -> bv 8)
+      (Sf : nat -> TsoMemPa.byteset) :
+    (forall j : nat, (j < n)%nat -> f j ∈ Sf j) ->
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗ own_context xi -∗
+    ([∗ list] j ∈ seq 0 n, ctx_phys_pointsto xi (pa_add a j) (DfracOwn 1) (f j))
+    ==∗
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
+    tso_interp_at riscv_eraGS g ∗ own_context xi ∗
+    ([∗ list] j ∈ seq 0 n, ∃ t : nat,
+       phys_ledger_pin (pa_add a j) (DfracOwn 1) (f j) t (length g.(glog)) (Sf j)).
+  Proof.
+    induction n as [|n IH]; intros Hf.
+    - iIntros "Hgh Hint Hrun Hl". iModIntro. iFrame "Hgh Hint Hrun".
+      iExact "Hl".
+    - rewrite seq_S !big_sepL_app /=.
+      iIntros "Hgh Hint Hrun [Hb [Hlast _]]".
+      iMod (IH ltac:(intros j Hj; apply Hf; lia) with "Hgh Hint Hrun Hb")
+        as "(Hgh & Hint & Hrun & Hb)".
+      iMod (ctx_phys_pin_mint_top g xi (pa_add a n) (f n) (Sf n)
+              (Hf n ltac:(lia)) with "Hgh Hint Hlast")
+        as "(Hgh & Hint & Hlast)".
+      iModIntro. iFrame "Hgh Hint Hrun Hb Hlast".
+  Qed.
+
+  Lemma ctx_phys_word_pin_mint_top `{CID : CpuId} (g : gstate) (xi : CtxId)
+      (a : Arch.pa) (w : bv 64) (Sf : nat -> TsoMemPa.byteset) :
+    (forall j : nat, (j < 8)%nat -> nth_byte w j ∈ Sf j) ->
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗ own_context xi -∗
+    ctx_phys_word_pointsto xi a (DfracOwn 1) w ==∗
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
+    tso_interp_at riscv_eraGS g ∗ own_context xi ∗
+    phys_ledger_word_pin a (DfracOwn 1) w (length g.(glog)) Sf.
+  Proof.
+    iIntros (HS) "Hgh Hint Hrun Hw".
+    iDestruct (ctx_phys_word_pointsto_aligned_p with "Hw") as %Hal.
+    iDestruct (ctx_phys_word_pointsto_bytes with "Hw") as "Hb".
+    iMod (ctx_phys_bytes_pin_mint_top g xi a 8 (nth_byte w) Sf HS
+            with "Hgh Hint Hrun Hb") as "(Hgh & Hint & Hrun & Hb)".
+    iModIntro. iFrame "Hgh Hint Hrun".
+    by iApply (phys_ledger_word_pin_intro a (DfracOwn 1) w (length g.(glog))
+                 Sf Hal).
+  Qed.
+
   (* ------------------------------------------------------------------ *)
   (* §4 THE RECEIPT, AT THE CURRENT VIEW.  [TsoCtx.hart_view_lb_get] asks *)
   (* for the at-the-top premise only to COMPARE a stamp against the view; *)
