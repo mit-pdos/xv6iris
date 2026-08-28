@@ -4188,3 +4188,31 @@ arm.  This resolves the generalized creator bootstrap (A6.101/A6.105:
 a hart's own store never advances its own view, and no AMO stands
 between initlock's store and newlock — for ANY lock, boot or dynamic).
 0.35′ stands otherwise unchanged.
+
+### 0.39′ OWNER RULING (2026-08-28): the kernelvec handler contract is
+CONTEXT-DEPENDENT — Q2 resolves on is_lock's pattern, no layering change
+
+"state the kernelvec contract as being context-dependent, still build up
+and prove this persistent contract statement on the primary CPU at boot,
+but then to use this contract, you must supply a context that's
+sufficiently fresh.  we have that, of course, because the other cores
+get this contract through the [started] barrier, which ensures those
+CPUs have a sufficiently fresh context."
+
+This supersedes both surfaced options (the ∀-caps parameter in the
+entry package; the layer hoist) — neither is taken.  The closure stays
+in SpecKernelvec (caps proven at boot, once, persistent); the contract
+gains a freshness demand at USE (the consumer supplies a context whose
+bound dominates the caps' publication stamp T — statable at the
+IntrDefs tier because own_context/ctx_floor live below it; the entry
+package already carries the trapping thread's context token inside the
+sie capability).  The ▷ blocker dissolves because NOTHING MORPHS: the
+boot proof establishes the ∀-fresh-ξ form with the caps stated at the
+consumer's ξ from the start, derived from the started deposit's
+transportable rows + freshness — the derivation ProofMainSecondary
+already performs green on the real-TSO tree, done once under the ∀.
+Hart 0's instance is the author arm (its own publication, trivially
+fresh — §0.36′(a)'s pattern).  Fourth persistent fact to take the
+context-relative treatment (is_lock, is_pipe, the KPT fact, now the
+handler contract); the pattern is uniform system-wide.  Target:
+ProofKernelvec.
