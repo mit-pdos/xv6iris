@@ -4871,6 +4871,17 @@ the rows below and in `design/fs-ghost-state.md`).
     `FsStateInode.vo` makes every sibling `.vo` inconsistent — and the
     import they gained is the probe measured above, 0.01 s).  Every one
     is an order of magnitude under the five-minute red flag.
+- [ ] **EV-X — `fs_state` is share-aware, and the transport is real**
+  (owner ruling, 2026-08-28, after EV5's wall): `fs_state` takes a
+  `dfrac`; the transport reads
+  `fs_state Γ (DfracOwn q) S ==∗ ∃ Γ', fs_state Γ (DfracOwn q) S ∗ fs_state Γ' (DfracOwn 1) S`
+  for every `q > 1/2`.  The `q > 1/2` premise is the whole point: it is
+  what makes "the mint meets the same block twice" a contradiction from
+  OWNERSHIP (two shares of one block summing past 1), so the new era's
+  `gmap_auth` is allocated without any pure disjointness fact.  The commit
+  collects each inode at 1 or ¾ (EV5's `fs_footprint_q`), so it hands the
+  transport `fs_state Γ (DfracOwn ¾) S` (splitting the whole ones); the
+  transport is the mint's caller and `fs_state_mint_runs` retires there.
 - [ ] **Rank 5 — one uniform per-inum transaction pin** (absorbs `DepTx`'s
   and `DepFrz`'s `(t,q)`, `ic_pin_*`, `ireg_cpin`/`ireg_fpin`, the transit
   ledger, `CrpPre`; ten `_no_ops` → one): APPROVED (owner, 2026-08-27),
