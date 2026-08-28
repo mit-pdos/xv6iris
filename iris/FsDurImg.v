@@ -1661,7 +1661,7 @@ Qed.
 (*      (durable-disk lane H5)                                             *)
 (*                                                                        *)
 (*  Every other snapshot in the tree is MINTED off a source instance's own *)
-(*  readings ([FsDurXfer.fs_state_mint_runs] over [FsDurSnap.snap_mint]).  *)
+(*  own resources ([FsDurSnap.P_dur_alloc_xfer] over the transport).       *)
 (*  Era 0 has no source instance -- the first file system exists only as   *)
 (*  BYTES -- so exactly here, and nowhere else, a byte map is CARVED into  *)
 (*  an [FsState.fs_state] by [FsDurSnap.snap_ok]'s disjointness clauses    *)

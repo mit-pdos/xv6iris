@@ -35,9 +35,10 @@
    with no source instance to mint from -- so the carve lives in
    [FsDurAlloc.v], above this file, and its single caller is
    [FsDurImg.img_P_dur_alloc].  What is left here is the REGISTRY: the
-   epoch's shape ([fs_snap], [P_dur]), the mint off readings
-   ([snap_mint], [fs_snap_alloc_mint], [P_dur_alloc_mint]), the reading
-   back out ([fs_snap_read_ok]) and the commit's swap ([dsnap_step_xfer]).
+   epoch's shape ([fs_snap], [P_dur]), the mint off a SOURCE INSTANCE
+   ([P_dur_alloc_xfer], EV-Y: the transport is the caller and no pure
+   disjointness fact is materialised), the reading back out
+   ([fs_snap_read_ok]) and the commit's swap ([dsnap_step_xfer]).
 
    [FsStateDefs.phi_excl] HOLDS AT THE SNAPSHOT ([snap_gamma_excl]), so
    [FsStateBitmap.free_pool_used] -- hence xv6's "freeing free block"
@@ -811,73 +812,6 @@ Section Snap.
   Proof. rewrite /P_dur. apply _. Qed.
 
 
-  (* ================================================================== *)
-  (*  6a.  THE MINT'S PREMISE (durable-disk lane H4)                     *)
-  (*                                                                    *)
-  (*  WHAT A PRODUCER WITH NO SOURCE INSTANCE OWES, and it is NOT        *)
-  (*  [snap_ok].  Four of the five rows are read off the producer's own  *)
-  (*  resources and nothing accumulates them: the superblock's parse and *)
-  (*  every inode's local clauses come off the collected payloads, the   *)
-  (*  link family's slacked validity off [FsState.fs_links_valid_tok],   *)
-  (*  and the RUNS row -- the shape of the byte legs, their pairwise     *)
-  (*  DISJOINTNESS and the fact that their union sits inside the         *)
-  (*  committed view's own flattening -- off                             *)
-  (*  [FsDurXfer.phi_runs_q_disj] / [phi_runs_q_in], which are           *)
-  (*  [FsStateDefs.phi_excl] and one [ghost_map_lookup] and nothing      *)
-  (*  else.  The fifth is the GEOMETRY, which no resource pins -- an     *)
-  (*  authority may hold entries no fragment names.                      *)
-  (*                                                                    *)
-  (*  WHAT IS NOT HERE is the whole expensive half of [snap_bytes]: no   *)
-  (*  byte tie, no used-set coupling, no [sk_disj], no cut clause.  The  *)
-  (*  disjointness a linear ledger had to be CARVED by is now the shape  *)
-  (*  of a [∗], read where the [∗] is.                                   *)
-  (* ================================================================== *)
-  Record snap_mint (S : fs_state_rec) (D : gmap Z (list (bv 8))) : Prop :=
-    MkSnapMint {
-    sm_shape : snap_shape S D;
-    sm_geom  : fs_geom S;
-    sm_local : snap_local S;
-    sm_parse : fs_parse_sb (fun _ => fss_sbb S) = Some (fss_sb S);
-    sm_links : exists (f : link_choice) (v : ity),
-                 link_elem_ok (fss_inodes S) f
-                 /\ ✓ (link_elem (fss_inodes S) f ⋅ link_tok_elem ROOTINO v);
-    sm_runs  : exists PM : gmap Z (list (bv 8)),
-                 xf_shape S PM /\ xr_disj (xr_fs S PM)
-                 /\ xr_union (xr_fs S PM) ⊆ fs_dbytes D;
-  }.
-
-  Global Arguments sm_shape {_ _} _.
-  Global Arguments sm_geom {_ _} _.
-  Global Arguments sm_local {_ _} _.
-  Global Arguments sm_parse {_ _} _.
-  Global Arguments sm_links {_ _} _.
-  Global Arguments sm_runs {_ _} _.
-
-  Theorem fs_snap_alloc_mint S D :
-    snap_mint S D ->
-    ⊢ |==> ∃ g gl gt : gname,
-        fs_snap (snap_gamma g gl gt) g D S.
-  Proof.
-    intros Hm.
-    destruct (sm_links Hm) as (f & v & Hfok & Hfv).
-    destruct (sm_runs Hm) as (PM & Hshape & Hdisj & Hin).
-    iMod (fs_state_mint_runs S PM f v Hshape Hdisj (sm_parse Hm) (sm_local Hm)
-            (sm_geom Hm) Hfok Hfv) as (g gl gt) "(Hba & Hta & Htf & HS & Ht)".
-    iModIntro. iExists g, gl, gt.
-    rewrite /fs_snap /snap_auth.
-    iSplitL "Hba"; [iExists (xr_union (xr_fs S PM)); iFrame "Hba";
-                    by iPureIntro |].
-    iFrame "Hta Htf HS".
-    iSplitL "Ht"; [by iExists v |].
-    iPureIntro. exact (sm_shape Hm).
-  Qed.
-
-  Lemma P_dur_alloc_mint S D : snap_mint S D -> ⊢ |==> P_dur D.
-  Proof.
-    intros Hm.
-    iMod (fs_snap_alloc_mint S D Hm) as (g gl gt) "Hsnap".
-    iModIntro. iExists g, gl, gt, S. iExact "Hsnap".
-  Qed.
 
   (* ================================================================== *)
   (*  6b.  THE EPOCH OFF AN INSTANCE (durable-disk EV-Y)                 *)
@@ -931,9 +865,9 @@ Section Snap.
   (*  consumed -- every conclusion below is PURE, which is what lets the *)
   (*  proofmode hand the resources back -- and nothing is supplied but   *)
   (*  the geometry.  The COMMIT does not go through this reading at all: *)
-  (*  it mints its epoch off [snap_mint] (section 6a), where the very     *)
-  (*  same split into "resources" and "geometry" appears at the ERA's     *)
-  (*  view -- which is why the commit pays nothing new for it.            *)
+  (*  it mints its epoch off the collected instance (section 6b), where   *)
+  (*  the very same split into "resources" and "geometry" appears at the  *)
+  (*  ERA's view -- which is why the commit pays nothing new for it.      *)
   (* ================================================================== *)
 
   (* ---- the block legs of one inode ---- *)

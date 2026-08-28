@@ -272,7 +272,7 @@
 (*                                                                        *)
 (*  NONE of these is visible from inside this file, which is the point of  *)
 (*  stating [col_hand] as a named predicate: the collection is CLOSED      *)
-(*  (see [col_hand_mint] in [FsCollectAll]), and what remains is exactly   *)
+(*  (see [col_bodies_acc] in [FsCollectAll]), and what remains is exactly  *)
 (*  its suppliers.                                                         *)
 (* ====================================================================== *)
 
@@ -436,14 +436,6 @@ Section Collect.
     split; [exact Hhome |]. rewrite /dv_of_D Hbsi /=. exact Hbe.
   Qed.
 
-  Lemma col_blk_full γfs Lb C home (b : Z) (bs : list (bv 8)) :
-    col_auth γfs Lb C home -∗
-    blk_owned (fs_gamma_L γfs) b bs -∗
-    ⌜b ∈ home /\ col_view C home !! b = Some bs⌝.
-  Proof.
-    rewrite blk_owned_1. iApply (col_blk γfs Lb C home (DfracOwn 1) b bs).
-  Qed.
-
   (* ==================================================================== *)
   (*  ...AND WHAT LETS THE FREE POOL BE PUT BACK (durable-disk EV-Y)       *)
   (*                                                                      *)
@@ -605,8 +597,9 @@ Section Collect.
         accounted for by nothing else.  Gathered with the family's own
         elements it is [FsDurSnap.sk_links], the SLACKED validity the boot
         mint allocates from.  The collection already PRODUCES it at every
-        inum ([col_link_of]'s second conjunct, dropped until now); this row
-        is the one at the root being kept. *)
+        inum ([col_link_of_acc]'s second conjunct); this row is the one at
+        the root being kept, and the transport carries it across
+        ([FsDurXfer.fs_state_xfer_tok]'s spare fragment). *)
      (∃ kv : ity, ireg_keep γfs ireg_root kv) ∗
      (* THE THREE DIRECTORY CLAUSES, PER INODE (durable-disk lane
         E-clauses).  [IcacheEscrow.ic_loaded] and [ipool_alloc] carry them
@@ -705,20 +698,22 @@ Section Collect.
      (durable-disk lane H4).  They materialised [FsDurSnap.snap_ok] at the
      commit so that the VALUE-FIRST allocator could carve a freshly
      allocated byte map by its disjointness clauses; the commit now mints
-     its epoch off [snap_mint] instead (section 6), where the disjointness
-     is the shape of the collected [∗] and is read where the [∗] is.  The
-     value-first allocator keeps its ONE caller, era 0's image
-     ([FsDurImg]). *)
+     its epoch off the collected [FsState.fs_state] instead (EV-Y), where
+     the disjointness is the shape of the [∗] and is read inside the
+     transport.  The value-first allocator keeps its ONE caller, era 0's
+     image ([FsDurImg]). *)
 
   (* ==================================================================== *)
-  (*  6.  WHAT THE MINT TAKES (durable-disk lane H4)                       *)
+  (*  6.  WHAT THE MINT TAKES (durable-disk lane H4, EV-Y)                 *)
   (*                                                                      *)
-  (*  [FsDurSnap.snap_mint] and nothing else: the GEOMETRY, the local      *)
-  (*  clauses, the superblock's parse, the link family's slacked validity, *)
-  (*  and the RUNS row.  Not one byte tie, no used-set coupling, no        *)
-  (*  [sk_disj], no cut clause -- the disjointness a linear ledger had to  *)
-  (*  be carved by is read off [FsStateDefs.phi_excl] where the [∗] is,    *)
-  (*  share-generically ([FsDurXfer.phi_runs_q_disj]).                     *)
+  (*  THE PREDICATE ITSELF, and one pure row beside it.  Since EV-Y the    *)
+  (*  epoch is minted by [FsDurSnap.P_dur_alloc_xfer] off the collected    *)
+  (*  [FsState.fs_state] at three quarters, so not one byte tie, no        *)
+  (*  used-set coupling, no [sk_disj] and no cut clause is materialised    *)
+  (*  anywhere: the disjointness a linear ledger had to be carved by is    *)
+  (*  read off [FsStateDefs.phi_excl] INSIDE the transport.  What the      *)
+  (*  collection still owes is [FsDurSnap.snap_shape], the one clause no   *)
+  (*  resource pins, and the byte bound below.                             *)
   (* ==================================================================== *)
 
   (* THE LOGGED BYTE MAP IS THE COMMITTED VIEW'S FLATTENING, one direction.
@@ -861,31 +856,6 @@ Section Collect.
     pose proof (bv_unsigned_in_range _ inum) as [Hlo Hhi].
     assert (H32 : bv_modulus 32 = (2 ^ 32)%Z) by (vm_compute; reflexivity).
     rewrite H32 in Hhi. lia.
-  Qed.
-
-  (* THE RECORD COMES DOWN TO THE BUNDLE'S SHARE (durable-disk EV-X).  The
-     region holds every record at fraction 1 and never lets one go
-     (fs-state.md section 7, ruling (i)); what the transport takes is
-     [FsState.fs_state] at ONE uniform share, so the collection sheds the
-     record's quarter here and drops it.  Nothing region-side moves: the
-     collection is destructive and [FsCollectAll.pure_keep] hands the
-     invariant back whole. *)
-  Lemma col_bundle_phi γfs γi (sb : fs_sb) (i : Z) (n : fs_node) :
-    rec_owned_at (fs_gamma_L γfs) (sb_inodestart sb) i (fn_rec n) -∗
-    col_bundle γfs γi i n -∗
-    inode_phi (gamma_q (fs_gamma_L γfs) (DfracOwn (3/4))) sb i n.
-  Proof.
-    iIntros "Hrec Hb".
-    iAssert (⌜0 <= i < 2 ^ 32⌝ ∧ col_bundle γfs γi i n)%I
-      with "[Hb]" as "[%Hi Hb]".
-    { iSplit; [iApply (col_bundle_inum with "Hb") | iExact "Hb"]. }
-    iDestruct "Hb" as (inum Hbv) "H".
-    rewrite /inode_owned_era_q. iDestruct "H" as "(_ & Hd & _ & _)".
-    iDestruct (rec_owned_at_shed_to _ (fs_gamma_L_frac γfs) with "Hrec")
-      as "[Hrec _]".
-    rewrite gamma_q_inode_phi
-            (rec_owned_sb_q (fs_gamma_L γfs) (DfracOwn (3/4)) sb i (fn_rec n) Hi).
-    iFrame "Hrec Hd".
   Qed.
 
   (* ...AND THE SAME STEP AS AN ACCESSOR (durable-disk EV-Y).  The record
@@ -1387,38 +1357,6 @@ Section Collect.
     rewrite /ireg_slot. iIntros "(Harm & Hep & Hlnk)".
     iFrame "Hlnk". iIntros "Hlnk". iFrame "Harm Hep Hlnk".
   Qed.
-
-  (* ...AND THE PACK: the region's authority at the node's own count beside
-     the payload's tokens IS the collection's link element
-     ([FsStateInode.inode_link_iff]).  The count matches because the bundle's
-     record proxy and the region's slot name ONE record -- which is what
-     [col_bundle_rec]'s agreement establishes at the assembly. *)
-  Lemma col_link_of γfs (i : Z) (n : fs_node) (d : dinode) :
-    fn_rec n = d ->
-    ireg_lnk γfs i d -∗
-    ent_toks_x (fs_gamma_L γfs) i n -∗
-      fs_link_node (fs_link γfs) i n ∗ ∃ kv : ity, ireg_keep γfs i kv.
-  Proof.
-    intros Hrec.
-    iIntros "Hlnk Hte".
-    iDestruct "Hlnk" as (v) "(%Hok & Hla & Hkp)".
-    iSplitR "Hkp"; [| by iExists v].
-    iApply (inode_link_iff (fs_gamma_L γfs) i n).
-    iSplitL "Hla"; [| iExact "Hte"].
-    iExists v.
-    assert (Hdty : ireg_dir_ty = DirView.T_DIR_z)
-      by (vm_compute; reflexivity).
-    iSplitR.
-    { iPureIntro. rewrite /fn_ity_ok /ireg_reg_ok /fn_is_dir /fn_type -Hrec
-        in Hok |- *.
-      destruct v.
-      - apply bool_decide_eq_false_2. rewrite Hdty in Hok. exact Hok.
-      - apply bool_decide_eq_true_2. rewrite Hdty in Hok. exact Hok. }
-    rewrite /ireg_mult /ireg_mult_at /ireg_nl /fn_mult /fn_nlink /fn_orphan
-      /fn_is_dir /fn_type -Hrec Hdty.
-    iExact "Hla".
-  Qed.
-
   (* ...AND THE PACK IS REVERSIBLE (durable-disk EV-Y).  The collection
      hands [FsState.fs_links] to the transport inside [FsState.fs_state]
      and takes it back unchanged, so what it owes the region afterwards is
@@ -1482,106 +1420,6 @@ Section Collect.
   Proof.
     iIntros "H". iExists inum. iSplitR; [done |]. iExact "H".
   Qed.
-
-  (* [col_region_quiesce_acc], the ACCESSOR twin of
-     [col_region_quiesce_take] below, is DELETED (durable-disk EV stage 5).
-     It had no caller and could not acquire one: the collection's
-     conclusion is pure, so [FsCollectAll.pure_keep] gives every invariant
-     back and there is nothing for a closing wand to do -- and the
-     authority the [fs_links] leg needs is a conjunct of the very slot the
-     marker arm's reading consumes, which no accessor can yield beside the
-     bundle. *)
-
-  (* ==================================================================== *)
-  (*  THE DESTRUCTIVE TWINS (durable-disk C-8)                             *)
-  (*                                                                      *)
-  (*  The assembly's conclusion is PURE, so it hands every invariant back  *)
-  (*  by [FsCollectAll.pure_keep] rather than by a closing wand -- and at  *)
-  (*  one inum it therefore need not re-park the slot.  That is what lets  *)
-  (*  it take the link AUTHORITY out BESIDE the bundle: [InodeRegion.      *)
-  (*  ireg_lnk] is a conjunct of the very slot the marker arm's reading    *)
-  (*  consumes, so no accessor can yield both.  [FsState.fs_links] is the  *)
-  (*  leg that needs the pair -- the authority here, the entry tokens off  *)
-  (*  the payload ([col_side]'s bundle arm).                              *)
-  Lemma col_region_slot_take γfs (γi : gname) (inum : bv 32) (d : dinode) :
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
-    ireg_slot γfs γi (bv_unsigned inum) d -∗
-      ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
-      ∗ ireg_lnk γfs (bv_unsigned inum) d
-      ∗ (imark γi (bv_unsigned inum)
-         ∨ (⌜bv_unsigned (di_type d) = 0⌝
-            ∗ inode_owned_era γfs γi inum (free_node d))).
-  Proof.
-    iIntros "Hauth Hslot".
-    iDestruct "Hslot" as "[(%rl & %cl & %fz & %cnt & Hla & %Hlok &
-                            #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp &
-                            Harm) [Hep Hlnk]]".
-    iDestruct (ireg_shp_split with "Hfdisj") as "[Hfsh Hcpin]".
-    iDestruct (ireg_cpin_no_ops cl fz d Hclm with "Hauth Hcpin") as %Hc0.
-    iFrame "Hauth Hlnk".
-    iDestruct "Harm" as "[[Harm Hrf] | Hpend]".
-    - iDestruct "Harm" as "[[%Hin1 [Hfr Hpk]] | [%Ht2 Hmk]]".
-      + assert (Ht0 : bv_unsigned (di_type d) = 0)
-          by exact (ireg_in_quiesce cl d Hc0 Hin1).
-        assert (Hnl : bv_unsigned (di_nlink d) = 0)
-          by exact (proj1 Hlok Ht0).
-        iDestruct (ireg_top_park_open γfs (bv_unsigned inum) d Ht0 with "Hpk")
-          as "[%Hb Htop]".
-        iRight. iSplitR; [iPureIntro; exact Ht0 |].
-        iApply (inode_owned_era_free γfs γi inum d Hb Hnl Ht0 with "Hfr Htop").
-      + iLeft. iExact "Hmk".
-    - iDestruct "Hpend" as "(%Htp & Hfr & Hrh & Hrp & Hpk)".
-      assert (Hnl : bv_unsigned (di_nlink d) = 0)
-        by exact (proj1 Hlok Htp).
-      iDestruct (ireg_top_park_open γfs (bv_unsigned inum) d Htp with "Hpk")
-        as "[%Hb Htop]".
-      iRight. iSplitR; [iPureIntro; exact Htp |].
-      iApply (inode_owned_era_free γfs γi inum d Hb Hnl Htp with "Hfr Htop").
-  Qed.
-
-  (* ...and the door itself, destructively: whichever of the two the pool
-     and the escrows hand this inum, the region's slot turns it into ONE
-     bundle at a share whose double is invalid, this inode's entry tokens,
-     and the region's link authority. *)
-  Lemma col_region_quiesce_take γfs (γi : gname) (inum : bv 32) (d : dinode) :
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
-    col_side γfs γi inum -∗
-    ireg_slot γfs γi (bv_unsigned inum) d -∗
-      ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
-      ∗ ireg_lnk γfs (bv_unsigned inum) d
-      ∗ ∃ n : fs_node,
-          ⌜node_dir_local (bv_unsigned inum) icfg_nib n⌝
-          ∗ ic_inode_leg γfs (DfracOwn (3/4)) γi inum n.
-  Proof.
-    iIntros "Hauth Hside Hslot".
-    iDestruct (col_region_slot_take γfs γi inum d with "Hauth Hslot")
-      as "(Hauth & Hlnk & Harm)".
-    iFrame "Hauth Hlnk".
-    iDestruct "Hside" as "[Hmk | (%n & %Hdl & Hleg)]".
-    - (* THE MARKER: the pool's marker refutes the region's own marked arm,
-         so the slot's free bundle is what is left.  A type-0 record is no
-         directory, so its three directory clauses are vacuous, and its
-         entry tokens are free ([col_free_ent_toks]) -- which is what turns
-         the region's bare bundle into a whole leg. *)
-      iDestruct "Harm" as "[Hmk' | (%Ht0 & Hown)]".
-      { iExFalso. iApply (imark_excl with "Hmk Hmk'"). }
-      iExists (free_node d).
-      iSplitR.
-      { iPureIntro. apply node_dir_local_free.
-        rewrite free_node_rec. exact Ht0. }
-      (* [inode_owned_era] IS the bundle at [DfracOwn 1]
-         ([inode_owned_era_1] is [reflexivity]); the collection's uniform
-         share is three quarters, so the leg is built whole and SHED
-         (durable-disk EV-X). *)
-      iDestruct (ic_inode_leg_intro γfs (DfracOwn 1) γi inum (free_node d)
-                   with "[] Hown") as "Hleg".
-      { iApply (col_free_ent_toks γfs (bv_unsigned inum) d Ht0). }
-      iDestruct (ic_inode_leg_shed_to with "Hleg") as "[$ _]".
-    - (* A CACHED OR ALLOCATED INUM: the leg is already in hand. *)
-      iExists n.
-      iSplitR; [iPureIntro; exact Hdl |]. iExact "Hleg".
-  Qed.
-
   (* ==================================================================== *)
   (*  A SUPPLIER'S ROW, WITH ITS OWN WAY BACK (durable-disk EV-Y)           *)
   (*                                                                      *)
@@ -1617,26 +1455,6 @@ Section Collect.
      supplier's whole row, and a bare [iFrame] rebuilding one would unfold
      its way into it at every one of the collection's inums. *)
   Global Typeclasses Opaque col_row.
-
-  Lemma col_row_intro_mark γfs (γi : gname) (inum : bv 32) (F Q : iProp Σ) :
-    imark γi (bv_unsigned inum) -∗ F -∗
-    (imark γi (bv_unsigned inum) -∗ F -∗ Q) -∗
-    col_row γfs γi inum Q.
-  Proof.
-    iIntros "Hmk HF Hw". rewrite /col_row. iLeft. iExists F. iFrame.
-  Qed.
-
-  Lemma col_row_intro_leg γfs (γi : gname) (inum : bv 32) (n : fs_node)
-      (F Q : iProp Σ) :
-    node_dir_local (bv_unsigned inum) icfg_nib n ->
-    ic_inode_leg γfs (DfracOwn (3/4)) γi inum n -∗ F -∗
-    (ic_inode_leg γfs (DfracOwn (3/4)) γi inum n -∗ F -∗ Q) -∗
-    col_row γfs γi inum Q.
-  Proof.
-    intros Hdl. iIntros "Hleg HF Hw". rewrite /col_row. iRight.
-    iExists n, F. iSplitR; [iPureIntro; exact Hdl |]. iFrame.
-  Qed.
-
   (* the two structural moves on a row: park more of the supplier beside
      what it already keeps, and re-read the whole row afterwards.  Together
      they are how a supplier whose row is a tower ([IcacheEscrow.ipool_ord],
@@ -1747,51 +1565,6 @@ Section Collect.
       iSplitL "Hleg HF Hw"; [iApply ("Hw" with "Hleg HF") |].
       iApply ("Hback" with "Hlnk").
   Qed.
-
-  (* ==================================================================== *)
-  (*  ...AND WHAT ONE SLOT HANDS THE COLLECTION, IN ONE STEP               *)
-  (*  (durable-disk EV stage 5)                                            *)
-  (*                                                                      *)
-  (*  The leg is everything a slot holds of this inode; what the REGION    *)
-  (*  kept is the record (as bytes, region-side at fraction 1) and the     *)
-  (*  record's link AUTHORITY.  Together they are the collection's own two *)
-  (*  per-inum legs -- [col_hand]'s [col_bundle] and its                    *)
-  (*  [FsState.fs_links] element -- plus [InodeRegion.ireg_keep], which is *)
-  (*  [emp] at every inum but the ROOT and is RESIDUE there                *)
-  (*  (durable-fs-plan.md section 4: it is the slack in                    *)
-  (*  [FsDurSnap.sk_links], never spent).                                  *)
-  (*                                                                      *)
-  (*  THE TWO AUTHORITIES ARE PREMISES, not because the step needs to      *)
-  (*  update either -- it reads both -- but because the record the bundle  *)
-  (*  names must be shown to BE the region's ([col_bundle_rec], which is   *)
-  (*  what discharges [col_link_of]'s multiplicity bridge) and the node    *)
-  (*  the leg carries to be the abstract map's ([col_bundle_top]).         *)
-  (* ==================================================================== *)
-  Lemma col_leg_bundle γfs (γi : gname) (inum : bv 32) (n : fs_node)
-      (d : dinode) (m : gmap Z dinode) (I : gmap Z fs_node) :
-    m !! bv_unsigned inum = Some d ->
-    ghost_map_auth γi 1 m -∗
-    ghost_map_auth (fs_top γfs) 1 I -∗
-    ireg_lnk γfs (bv_unsigned inum) d -∗
-    ic_inode_leg γfs (DfracOwn (3/4)) γi inum n -∗
-      ghost_map_auth γi 1 m
-      ∗ ghost_map_auth (fs_top γfs) 1 I
-      ∗ ⌜I !! bv_unsigned inum = Some n⌝
-      ∗ col_bundle γfs γi (bv_unsigned inum) n
-      ∗ fs_link_node (fs_link γfs) (bv_unsigned inum) n
-      ∗ ∃ kv : ity, ireg_keep γfs (bv_unsigned inum) kv.
-  Proof.
-    intros Hmd. iIntros "Hma Hia Hlnk Hleg".
-    iDestruct (ic_inode_leg_open with "Hleg") as "[Hte Hown]".
-    iDestruct (col_bundle_of_side γfs γi inum n with "Hown") as "Hb".
-    iDestruct (col_bundle_top with "Hia Hb") as %HIz.
-    iDestruct (col_bundle_rec with "Hma Hb") as %Hmz.
-    rewrite Hmd in Hmz. injection Hmz as Hrec.
-    iDestruct (col_link_of γfs (bv_unsigned inum) n d (eq_sym Hrec)
-                 with "Hlnk Hte") as "[Hle Hkp]".
-    iFrame "Hma Hia Hb Hle Hkp". iPureIntro. exact HIz.
-  Qed.
-
   (* ...AND THE SAME STEP AS AN ACCESSOR (durable-disk EV-Y).  Both
      authorities are still read-only; what is new is that the two legs the
      step produces come back.  [col_bundle] existentialises the inum, and

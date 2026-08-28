@@ -37,8 +37,8 @@
 (*    1.  A RUN is a (block, offset, bytes) triple; [xr_map] is its flat   *)
 (*        byte map and [phi_runs] the [∗] of the runs at a view.           *)
 (*    2.  [phi_runs_disj]: the runs' maps are pairwise disjoint, off       *)
-(*        [phi_excl] alone.  It is a PURE conclusion, so reading it costs  *)
-(*        nothing (the affine [pure_keep] device, one level down).         *)
+(*        [phi_excl] alone.  It is a PURE conclusion, so reading it        *)
+(*        consumes nothing and is never materialised outside this file.    *)
 (*    3.  [phi_runs_union]: with that disjointness the [∗] of the runs IS  *)
 (*        the [∗] of ONE map -- in both directions, and Gamma-generically. *)
 (* ====================================================================== *)
@@ -1048,48 +1048,6 @@ Section Xfer.
     iApply (fs_footprint_of_runs (snap_gamma g gl gt) S PM Hshape).
     rewrite (phi_runs_union (snap_gamma g gl gt) _ Hdisj).
     rewrite /phi_map /snap_gamma /=. iExact "Hbe".
-  Qed.
-
-  (* ...AND THE WHOLE INSTANCE, over the same facts plus the ghost half's:
-     the superblock's parse, every inode's local clauses, and the link
-     family's own validity WITH the root's keep-alive slack.  Not one of
-     them is computed: at a commit each is read off the era's resources,
-     at era 0 each comes off the image. *)
-  Lemma fs_state_mint_runs (S : fs_state_rec) (PM : gmap Z (list (bv 8)))
-      (f : link_choice) (v : ity) :
-    xf_shape S PM -> xr_disj (xr_fs S PM) ->
-    fs_parse_sb (fun _ => fss_sbb S) = Some (fss_sb S) ->
-    (forall i n, fss_inodes S !! i = Some n -> inode_local i n) ->
-    (* THE MAP'S OWN GEOMETRY (durable-disk lane H5): the superblock's
-       layout and the region's inum column, domain and directory clauses.
-       It is [fs_state]'s last conjunct, so a mint owes it exactly as it
-       owes the parse; both producers read it off their own source
-       ([FsDurSnap.fs_geom_of_ok] at the image, [FsCollect.col_fs_geom] at
-       a commit). *)
-    fs_geom S ->
-    link_elem_ok (fss_inodes S) f ->
-    ✓ (link_elem (fss_inodes S) f ⋅ link_tok_elem ROOTINO v) ->
-    ⊢ |==> ∃ g gl gt : gname,
-        ghost_map_auth g 1 (xr_union (xr_fs S PM))
-        ∗ ghost_map_auth gt 1 (fss_inodes S)
-        ∗ ([∗ map] i ↦ n ∈ fss_inodes S, top_frag (snap_gamma g gl gt) i n)
-        ∗ fs_state (snap_gamma g gl gt) (DfracOwn 1) S
-        ∗ own gl (link_tok_elem ROOTINO v).
-  Proof.
-    intros Hshape Hdisj Hparse Hloc Hgeo Hfok Hfv.
-    iMod (fs_boot_alloc_root_slack (fss_inodes S) f ROOTINO v Hfok Hfv)
-      as (gl gt) "(Hta & Htf & Hl & Ht)".
-    iMod (fs_footprint_mint S PM gl gt Hshape Hdisj) as (g) "[Hba Hf]".
-    iModIntro. iExists g, gl, gt. iFrame "Hba Hta".
-    iSplitL "Htf".
-    { rewrite /top_frag /snap_gamma /=. iExact "Htf". }
-    iSplitR "Ht"; [| rewrite /snap_gamma /=; iExact "Ht"].
-    rewrite fs_state_split fs_ghost_split. iFrame "Hf".
-    iSplitL "Hl"; [rewrite /snap_gamma /=; iExact "Hl" |].
-    rewrite /fs_pure. iSplitR; [by iPureIntro |].
-    iSplitR; [| by iPureIntro].
-    iApply big_sepM_intro. iIntros "!>" (i n Hi).
-    iPureIntro. exact (Hloc i n Hi).
   Qed.
 
   (* ---------------------------------------------------------------- *)

@@ -367,7 +367,7 @@ Section FsState.
      at ONE uniform share (three quarters: every escrow arm can supply it
      and every fraction-1 owner can shed to it) and what quiescence yields
      is [fs_footprint Γ (DfracOwn (3/4)) S] on the nose
-     ([FsCollectAll.col_hand_footprint]).  With it went
+     ([FsCollectAll.col_hand_footprint_acc]).  With it went
      [FsStateInode.inode_phi_q] and [FsDurXfer]'s whole per-run share
      vocabulary ([phi_runs_ex] and friends). *)
 

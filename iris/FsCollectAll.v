@@ -4,30 +4,32 @@
 (*   quiescence"; FsCollect.v does the ARITHMETIC, this file finds the     *)
 (*   pieces)                                                              *)
 (*                                                                        *)
-(*  [col_hand_mint] below reads [FsDurSnap.snap_mint] -- what the epoch's  *)
-(*  mint takes, and NOT [snap_ok] -- off [FsCollect.col_hand], the era's   *)
-(*  pieces AS ALREADY COLLECTED.  This                                     *)
-(*  file COLLECTS them, at ONE ghost step with the WAL's [LogDefs.ln_tx]   *)
+(*  [fs_collect_dur] below builds the era's DURABLE SNAPSHOT out of the    *)
+(*  era's own pieces, at ONE ghost step with the WAL's [LogDefs.ln_tx]     *)
 (*  authority empty: the abstract map off [InodeRegion.ftop_inv], the      *)
 (*  records off [InodeRegion.ireg_inv], the used set and the free blocks   *)
 (*  off [BitmapInv.bitmap_inv], block 1 off [SbPark.sb_park], and one      *)
 (*  bundle per region inum off the pool ([IcacheEscrow.ipool_quiesce_acc]) *)
 (*  and the fifty slot escrows ([IcacheEscrow.ic_escrow_body_cover_all]).  *)
 (*                                                                        *)
-(*  THE CONCLUSION IS PURE, AND THAT IS WHAT MAKES THE ASSEMBLY POSSIBLE.  *)
-(*  IT STAYS PURE UNDER LANE H4, which is why the collection never had to  *)
-(*  become an ACCESSOR: what the epoch's mint takes is a package of        *)
-(*  READINGS ([snap_mint]) and no resource at all, so the allocation runs  *)
-(*  AFTER every invariant has closed.                                      *)
-(*  [pure_keep] below is the whole trick: an entailment [R |- <pure phi>]  *)
-(*  yields [R |- <pure phi> * R], because a pure proposition is persistent *)
-(*  and this logic is affine.  So the collection itself may be entirely    *)
-(*  DESTRUCTIVE -- it may drop the overlap of two index sets, forget a     *)
-(*  frame, existentially close a share -- and the caller still hands every *)
-(*  invariant back untouched.  Without it every step below would owe a     *)
-(*  closing wand, and the three index sets (the pool's ordinary rows, the  *)
-(*  corpse ledger's markers, the fifty slots) are NOT provably disjoint:   *)
-(*  the partition row is a UNION.                                         *)
+(*  THE COLLECTION IS AN ACCESSOR (durable-disk EV-Y), and that is what    *)
+(*  lets the TRANSPORT be the mint's caller.  What comes out of            *)
+(*  [col_bodies_acc] is [FsState.fs_state (fs_gamma_L γfs) (DfracOwn ¾) S] *)
+(*  -- exactly [FsDurXfer.fs_state_xfer_tok]'s source -- beside a closing  *)
+(*  wand; the transport RETURNS its source, so every one of the six        *)
+(*  invariant families closes with the body it was opened with.  Nothing   *)
+(*  pure about the state is materialised on the way: the runs' pairwise    *)
+(*  disjointness is read off [FsStateDefs.phi_excl] at a share above a     *)
+(*  half, inside the transport, and the ONE pure row that still travels is *)
+(*  [FsDurSnap.snap_shape]'s, which no resource pins.                      *)
+(*                                                                        *)
+(*  IT USED TO BE DESTRUCTIVE, and the device was [pure_keep]: an          *)
+(*  entailment [R |- <pure phi>] yields [R |- <pure phi> * R] in an affine *)
+(*  logic, so a collection whose conclusion is PURE may drop whatever it   *)
+(*  likes.  Two things made the accessor possible instead -- the           *)
+(*  partition's three index sets ARE disjoint ([col_sidez_disj], off the   *)
+(*  region's own slots), and a supplier's row can be lent with its own way *)
+(*  back ([FsCollect.col_row]).                                            *)
 (*                                                                        *)
 (*  THE ONE NON-RESOURCE PREMISE is [FsCollect.col_geom] -- the boot       *)
 (*  configuration's own arithmetic, witnessed at the real instance by      *)
@@ -78,31 +80,6 @@ Require Import FsCollect.
 Require Import LogSnapLaw.      (* [snap_law] -- what [log_ctx] parks *)
 
 Local Open Scope Z_scope.
-
-(* ====================================================================== *)
-(*  0.  A PURE CONCLUSION IS FREE                                          *)
-(*                                                                        *)
-(*  The lemma the whole file rests on: reading a PURE fact off a bundle    *)
-(*  costs nothing, because [<pure phi>] is persistent and [iProp] is       *)
-(*  affine.  Stated at the entailment level and not as a wand -- the wand  *)
-(*  form is false, since applying it would spend the bundle.               *)
-(* ====================================================================== *)
-
-Lemma pure_keep {Σ : gFunctors} (R : iProp Σ) (φ : Prop) :
-  (R ⊢ ⌜φ⌝) -> (R ⊢ ⌜φ⌝ ∗ R).
-Proof.
-  intros H. iIntros "R".
-  iAssert (⌜φ⌝ ∧ R)%I with "[R]" as "[%Hphi HR]".
-  { iSplit; [iApply (H with "R") | iExact "R"]. }
-  iFrame "HR". iPureIntro. exact Hphi.
-Qed.
-
-(* ...and the wand form the proof mode applies, the entailment staying a
-   COQ hypothesis: the iProp-level [(R -∗ ⌜φ⌝) -∗ R -∗ ⌜φ⌝ ∗ R] is FALSE,
-   since applying the wand spends the bundle. *)
-Lemma pure_keep_wand {Σ : gFunctors} (R : iProp Σ) (φ : Prop) :
-  (R ⊢ ⌜φ⌝) -> R -∗ ⌜φ⌝ ∗ R.
-Proof. intros H. iIntros "R". iApply (pure_keep R φ H with "R"). Qed.
 
 (* ====================================================================== *)
 (*  0a. BIG-OP PLUMBING, all in the DESTRUCTIVE direction                  *)
@@ -320,7 +297,7 @@ Section CollectAll.
   (*  conclusion is pure, so the caller keeps every row.                   *)
   (* ==================================================================== *)
   (* the refutation at an inum named as a NUMBER, exactly as
-     [col_region_quiesce_take_z] is for the door *)
+     [col_row_slot_acc] is for the door *)
   Lemma col_side_slot_excl_z (γfs : fs_names) (γi : gname) (z : Z)
       (w : mword 32) (d : dinode) :
     bv_unsigned w = z ->
@@ -449,23 +426,6 @@ Section CollectAll.
     - iLeft. iExact "Hmk".
   Qed.
 
-  Lemma ipool_ord_side (γfs : fs_names) (γi : gname) (cov : gset Z)
-      (ls : Z) (w : mword 32) :
-    ipool_ord γfs γi cov ls w ⊢ col_side γfs γi w.
-  Proof.
-    rewrite /ipool_ord. iIntros "(_ & _ & Hnp & _)".
-    iApply (ipool_shape_np_side with "Hnp").
-  Qed.
-
-  Lemma ipool_rows_side (γfs : fs_names) (γi : gname) (cov : gset Z)
-      (ls : Z) (O : gset Z) :
-    ipool_rows γfs γi cov ls O ⊢ [∗ set] z ∈ O, col_sidez γfs γi z.
-  Proof.
-    rewrite /ipool_rows. iIntros "H".
-    iApply (big_sepS_impl with "H"). iIntros "!>" (z Hz) "Hr".
-    rewrite /col_sidez. iApply (ipool_ord_side with "Hr").
-  Qed.
-
   (* ==================================================================== *)
   (*  ...AND THE SAME THREE AS ROWS WITH A WAY BACK (durable-disk EV-Y)    *)
   (* ==================================================================== *)
@@ -573,16 +533,6 @@ Section CollectAll.
               (moi_unsigned_z z (Hr z Hz)) with "Hm").
   Qed.
 
-  Lemma imarks_side (γfs : fs_names) (γi : gname) (X : gset Z) :
-    (forall z : Z, z ∈ X -> 0 <= z < 2 ^ 32) ->
-    ([∗ set] z ∈ X, imark γi z) ⊢ [∗ set] z ∈ X, col_sidez γfs γi z.
-  Proof.
-    intros Hr. iIntros "H".
-    iApply (big_sepS_impl with "H"). iIntros "!>" (z Hz) "Hm".
-    rewrite /col_sidez /col_side. iLeft.
-    rewrite (moi_unsigned_z z (Hr z Hz)). iExact "Hm".
-  Qed.
-
 
   (* ---- the fifty slot escrows --------------------------------------- *)
 
@@ -591,7 +541,10 @@ Section CollectAll.
      cell ([IcacheEscrow.ic_id_agree] -- the slot cannot be dead and live at
      once), and the other two ARE the two arms of [FsCollect.col_side].  The
      lend's frame and its closing wand are dropped: the collection is
-     destructive and [pure_keep] gives the escrow back regardless. *)
+     destructive, and it is spent only where the conclusion is [False]
+     (the duplicate refutation inside [esc_covers_got_acc]); the ACCESSOR
+     twin, which keeps the lend's frame and its closing wand, is
+     [ic_cover_row]. *)
   Lemma ic_slot_cover_side (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (ls : Z) (k : nat) (dev inum : mword 32) :
     ic_id cn k (1/4) true dev inum -∗
@@ -740,7 +693,7 @@ Section CollectAll.
   (*  WHAT ONE INUM HANDS THE COLLECTION, AND HOW IT GOES BACK             *)
   (*  (durable-disk EV-Y)                                                  *)
   (*                                                                      *)
-  (*  [col_got] is [col_sides_bundles]' per-inum output with the           *)
+  (*  [col_got] is the collection's per-inum output with the               *)
   (*  keep-alive fragment folded in.  It is SELF-DESCRIBING, which is what *)
   (*  makes the closing wand possible: the node is pinned by the abstract  *)
   (*  map's own value at this inum, so the [fs_state] the transport gives  *)
@@ -750,7 +703,7 @@ Section CollectAll.
   (*  [FsStateLink.link_auth_tok_agree] against the link element.          *)
   (* ==================================================================== *)
   (* THE KEEP-ALIVE FRAGMENT RIDES OUTSIDE THE EXISTENTIAL, exactly as it
-     does in [col_sides_bundles]' output and for the same reason:
+     did in the destructive collection's output and for the same reason:
      [big_sepS_sep] splits it off as its own column, which is what
      [col_keeps_root_acc] takes the root's out of. *)
   Definition col_got (γfs : fs_names) (γi : gname) (I : gmap Z fs_node)
@@ -1004,121 +957,6 @@ Section CollectAll.
 
   (* ---- one inum's bundle, and the fifty-fold threading --------------- *)
 
-  (* the door at an inum named as a NUMBER: the region and the abstract map
-     are keyed by [Z], the cache by [mword 32], and the equation between
-     them is what the collection carries ([moi_unsigned_z] at every region
-     inum, by [FsCollect.cg_wide]). *)
-  Lemma col_region_quiesce_take_z (γfs : fs_names) (γi : gname) (z : Z)
-      (w : mword 32) (d : dinode) :
-    bv_unsigned w = z ->
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
-    col_side γfs γi w -∗
-    ireg_slot γfs γi z d -∗
-      ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
-      ∗ ireg_lnk γfs z d
-      ∗ ∃ n : fs_node,
-          ⌜node_dir_local z icfg_nib n⌝
-          ∗ ic_inode_leg γfs (DfracOwn (3/4)) γi w n.
-  Proof.
-    intros <-. iIntros "Ht Hs Hr".
-    iApply (col_region_quiesce_take with "Ht Hs Hr").
-  Qed.
-
-  (* ...and the SLOT'S OWN HAND, at an inum named as a number
-     (durable-disk EV stage 5).  [FsCollect.col_leg_bundle] takes the leg
-     the door hands out beside what the REGION kept and yields the
-     collection's own two per-inum legs; this is it at the cache's
-     currency, exactly as [col_region_quiesce_take_z] is for the door. *)
-  Lemma col_leg_bundle_z (γfs : fs_names) (γi : gname) (z : Z)
-      (w : mword 32) (n : fs_node) (d : dinode)
-      (m : gmap Z dinode) (I : gmap Z fs_node) :
-    bv_unsigned w = z ->
-    m !! z = Some d ->
-    ghost_map_auth γi 1 m -∗
-    ghost_map_auth (fs_top γfs) 1 I -∗
-    ireg_lnk γfs z d -∗
-    ic_inode_leg γfs (DfracOwn (3/4)) γi w n -∗
-      ghost_map_auth γi 1 m
-      ∗ ghost_map_auth (fs_top γfs) 1 I
-      ∗ ⌜I !! z = Some n⌝
-      ∗ col_bundle γfs γi z n
-      ∗ fs_link_node (fs_link γfs) z n
-      ∗ ∃ kv : ity, ireg_keep γfs z kv.
-  Proof.
-    intros <- Hmd.
-    exact (col_leg_bundle γfs γi w n d m I Hmd).
-  Qed.
-
-  Lemma col_sides_bundles (γfs : fs_names) (γi : gname)
-      (m : gmap Z dinode) (I : gmap Z fs_node) (Rs : gset Z) :
-    (forall z : Z, z ∈ Rs -> 0 <= z < 2 ^ 32) ->
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
-    ghost_map_auth γi 1 m -∗
-    ghost_map_auth (fs_top γfs) 1 I -∗
-    ([∗ set] z ∈ Rs, (col_sidez γfs γi z
-                      ∗ ∃ d : dinode, ⌜m !! z = Some d⌝
-                                      ∗ ireg_slot γfs γi z d)) -∗
-      ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
-      ∗ ghost_map_auth γi 1 m
-      ∗ ghost_map_auth (fs_top γfs) 1 I
-      ∗ ([∗ set] z ∈ Rs,
-           (∃ n : fs_node,
-              ⌜I !! z = Some n⌝
-              ∗ ⌜node_dir_local z icfg_nib n⌝
-              ∗ col_bundle γfs γi z n
-              ∗ fs_link_node (fs_link γfs) z n)
-           (* the region's keep-alive token, [emp] everywhere but the root
-              (durable-disk lane E-clauses).  [FsCollect.col_link_of] has
-              always produced it; KEEPING it is what supplies
-              [FsCollect.col_hand]'s last row, hence the SLACK in
-              [FsDurSnap.sk_links].  It rides OUTSIDE the existential so
-              that [big_sepS_sep] splits it off as its own column. *)
-           ∗ ∃ kv : ity, ireg_keep γfs z kv).
-  Proof.
-    induction Rs as [| z Rs Hnz IH] using set_ind_L; intros Hr.
-    - iIntros "Ht Hm Hi _". rewrite !big_sepS_empty.
-      iFrame "Ht Hm Hi"; try done.
-    - iIntros "Ht Hm Hi H".
-      rewrite !big_sepS_insert; [| exact Hnz | exact Hnz].
-      iDestruct "H" as "[[Hside (%d & %Hmd & Hslot)] Hrest]".
-      iDestruct (IH with "Ht Hm Hi Hrest") as "(Ht & Hm & Hi & Hrest)".
-      { intros y Hy. apply Hr. set_solver. }
-      iFrame "Hrest".
-      assert (Hzr : 0 <= z < 2 ^ 32) by (apply Hr; set_solver).
-      pose proof (moi_unsigned_z z Hzr) as Hmoi.
-      rewrite /col_sidez.
-      iDestruct (col_region_quiesce_take_z γfs γi z (mword_of_int z) d Hmoi
-                   with "Ht Hside Hslot") as
-        "(Ht & Hlnk & %n & %Hdl & Hleg)".
-      iFrame "Ht".
-      (* ONE STEP (durable-disk EV stage 5): the slot's whole per-inode leg
-         beside what the region kept IS the bundle, the [FsState.fs_links]
-         element and the keep-alive fragment.  The two agreements the step
-         rests on -- the abstract map's value at this inum IS the leg's
-         node, and the record the leg names IS the region's -- are inside
-         [FsCollect.col_leg_bundle]. *)
-      iDestruct (col_leg_bundle_z γfs γi z (mword_of_int z) n d m I Hmoi
-                   Hmd with "Hm Hi Hlnk Hleg")
-        as "(Hm & Hi & %HIz & Hb & Hle & Hkp)".
-      iFrame "Hm Hi".
-      iSplitR "Hkp"; [| iExact "Hkp"].
-      iExists n. iSplitR; [iPureIntro; exact HIz |].
-      iSplitR; [iPureIntro; exact Hdl |]. iFrame "Hb Hle".
-  Qed.
-
-  (* ...and the ONE token that survives the collection: [ireg_keep] is [emp]
-     at every inum but the root, so the column's whole content is the root's
-     keep-alive fragment (durable-disk lane E-clauses). *)
-  Lemma col_keeps_root (γfs : fs_names) (nib : nat) :
-    ireg_root ∈ region_inums nib ->
-    ([∗ set] z ∈ region_inums nib, ∃ kv : ity, ireg_keep γfs z kv) -∗
-    ∃ kv : ity, ireg_keep γfs ireg_root kv.
-  Proof.
-    intros Hin. iIntros "H".
-    rewrite (big_sepS_delete _ (region_inums nib) ireg_root Hin).
-    iDestruct "H" as "[$ _]".
-  Qed.
-
 
   (* THE ABSTRACT MAP, RESTRICTED TO THE REGION.  [InodeRegion.ftop_body]
      carries no domain row, so "the map names exactly the region's inums" is
@@ -1209,7 +1047,7 @@ Section CollectAll.
 
   (* THE REGION-INDEXED COLUMN AND THE HAND'S TWO MAP-INDEXED ONES, both
      ways (durable-disk EV-Y).  The forward direction is what
-     [col_bodies_mint] does inline; the reverse is what the accessor's
+     [col_bodies_acc] does inline; the reverse is what its closing
      closing wand walks, and it needs the per-inum directory clauses --
      which the hand carries as its last row -- because they sit under the
      column's existential and not under the map's. *)
@@ -1275,7 +1113,7 @@ Section CollectAll.
   (*  -- and everything the transport wants is read off them              *)
   (*  ([FsDurXfer.phi_runs_q_disj] off [phi_excl], [phi_runs_q_in] off the *)
   (*  era's own authority).  What the collection ASSEMBLES beside that is  *)
-  (*  the whole predicate at that share ([col_hand_state]).                *)
+  (*  the whole predicate at that share ([col_hand_state_acc]).            *)
   (* ==================================================================== *)
 
   (* the region's records, re-indexed from (block, slot) to INUM.  The
@@ -1352,101 +1190,6 @@ Section CollectAll.
     iDestruct "Hs" as (d Hd) "Hs".
     rewrite (Hcpl q Hlt2) in Hd. apply (inj Some) in Hd. subst d.
     iExact "Hs".
-  Qed.
-
-  (* ==================================================================== *)
-  (*  THE ASSEMBLY (durable-disk EV stage 5)                               *)
-  (*                                                                      *)
-  (*  [col_hand] MINUS THE ERA'S OWN RESIDUE IS AN                         *)
-  (*  [FsState.fs_footprint] AT THREE QUARTERS (durable-disk EV-X).  The   *)
-  (*  share is uniform now: the inode legs arrive at 3/4 out of the        *)
-  (*  escrows and the pool ([FsCollect.col_bundle]), and the three things  *)
-  (*  the collection meets at fraction 1 -- block 1, the bitmap block and  *)
-  (*  the free pool -- are SHED down to it here, exactly as the region's   *)
-  (*  records are inside [FsCollect.col_bundle_phi].  EV stage 5's         *)
-  (*  [fs_footprint_q], with a share bound existentially per inode, is     *)
-  (*  deleted with the per-run vocabulary it fed.                          *)
-  (*                                                                      *)
-  (*  WHAT IS DROPPED HERE, by name, and none of it is part of a file      *)
-  (*  system: the era's record PROXY [InodeRegion.dinode_at] and its       *)
-  (*  abstract fragment [FsState.top_frag_q] (the two the era carries and  *)
-  (*  the collection consumes neither of), the region's proxy AUTHORITY    *)
-  (*  [ghost_map_auth γi 1 m] (spent on the agreement "the record a bundle *)
-  (*  names IS the region's"), and the hand's pure geometry rows, which a  *)
-  (*  caller reads BEFORE this step by [pure_keep]'s idiom.                *)
-  (*                                                                      *)
-  (*  WHAT COMES OUT BESIDE THE FOOTPRINT is exactly what the ghost half   *)
-  (*  of a mint is read off: the parse, the per-inode local clauses, the   *)
-  (*  byte authority (for [FsDurXfer.phi_runs_q_in]), the link family and  *)
-  (*  the ROOT'S KEEP-ALIVE fragment -- the slack in [FsDurSnap.sk_links], *)
-  (*  never spent.                                                         *)
-  (* ==================================================================== *)
-  Lemma col_hand_footprint (γfs : fs_names) (γi : gname) (nib : nat)
-      (sb : fs_sb) (sbb : list (bv 8)) (used : gset Z) (I : gmap Z fs_node)
-      (m : gmap Z dinode) (Lb : gmap Z (bv 8))
-      (C : gmap Z (list (bv 8))) (home : gset Z) :
-    col_hand γfs γi (FsImg.sb_inodestart sb) nib sb sbb used I m Lb C home
-    ⊢ ⌜fs_parse_sb (fun _ => sbb) = Some sb⌝
-      ∗ ⌜forall i n, I !! i = Some n -> inode_local i n⌝
-      ∗ col_auth γfs Lb C home
-      ∗ fs_links (fs_link γfs) I
-      ∗ (∃ kv : ity, ireg_keep γfs ireg_root kv)
-      ∗ fs_footprint (fs_gamma_L γfs) (DfracOwn (3/4))
-          (col_state sb sbb I used).
-  Proof.
-    iIntros "Hhand".
-    iDestruct "Hhand" as "(%Hg & %Hdi & Hau & Hsb & Hbm & Hrec & Hb & Hlk
-                           & Hkeep & %Hdirloc)".
-    rewrite /sb_owned. iDestruct "Hsb" as "[Hsbb %Hparse]".
-    rewrite /free_bitmap_at. iDestruct "Hbm" as "[Hbmb Hpool]".
-    (* ---- the local clauses, off the bundles ---- *)
-    iAssert (⌜forall i n, I !! i = Some n -> inode_local i n⌝
-             ∧ ([∗ map] i ↦ n ∈ I, col_bundle γfs γi i n))%I
-      with "[Hb]" as "[%Hloc Hb]".
-    { iSplit; [iApply (col_bundles_local with "Hb") | iExact "Hb"]. }
-    (* ---- the records' values, against the region's own authority ---- *)
-    rewrite /col_recs. iDestruct "Hrec" as "[Hma Hrows]".
-    iAssert (⌜forall i n, I !! i = Some n -> m !! i = Some (fn_rec n)⌝
-             ∧ (ghost_map_auth γi 1 m
-                ∗ [∗ map] i ↦ n ∈ I, col_bundle γfs γi i n))%I
-      with "[Hma Hb]" as "[%Hmrec [Hma Hb]]".
-    { iSplit; [| iFrame "Hma Hb"].
-      rewrite bi.pure_forall. iIntros (i).
-      rewrite bi.pure_forall. iIntros (n).
-      rewrite bi.pure_impl. iIntros (Hi).
-      iDestruct (big_sepM_lookup _ _ i n Hi with "Hb") as "Hbi".
-      iApply (col_bundle_rec with "Hma Hbi"). }
-    (* ---- the records, by inum, zipped with the bundles ---- *)
-    iDestruct (col_recs_by_inum γfs γi (FsImg.sb_inodestart sb) nib m
-                 with "Hrows") as "Hrecs".
-    assert (HdomI : dom I = region_inums nib).
-    { apply set_eq. intros z. rewrite region_inums_spec. exact (Hdi z). }
-    rewrite -HdomI -big_sepM_dom.
-    iAssert ([∗ map] i ↦ n ∈ I,
-               rec_owned_at (fs_gamma_L γfs) (FsImg.sb_inodestart sb) i
-                 (fn_rec n))%I with "[Hrecs]" as "Hrecs".
-    { iApply (big_sepM_impl with "Hrecs"). iIntros "!>" (i n Hi) "Hr".
-      iDestruct "Hr" as (d Hd) "Hr".
-      rewrite (Hmrec i n Hi) in Hd. apply (inj Some) in Hd. subst d.
-      iExact "Hr". }
-    iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
-    iFrame "Hau Hlk Hkeep".
-    (* THE THREE METADATA OBJECTS COME DOWN TO THE UNIFORM SHARE
-       (durable-disk EV-X).  Block 1, the bitmap block and the free pool
-       are all at fraction 1 where the collection meets them; the quarter
-       each sheds is dropped, exactly as the region's records' is inside
-       [FsCollect.col_bundle_phi]. *)
-    iDestruct (blk_owned_shed _ _ _ (gamma_shed_34 _ (fs_gamma_L_frac γfs))
-                 with "Hsbb") as "[Hsbb _]".
-    iDestruct (blk_owned_shed _ _ _ (gamma_shed_34 _ (fs_gamma_L_frac γfs))
-                 with "Hbmb") as "[Hbmb _]".
-    iDestruct (free_pool_shed _ _ _ (gamma_shed_34 _ (fs_gamma_L_frac γfs))
-                 with "Hpool") as "[Hpool _]".
-    rewrite /fs_footprint /col_state /=.
-    iFrame "Hsbb Hbmb Hpool".
-    iCombine "Hrecs Hb" as "Hpairs". rewrite -big_sepM_sep.
-    iApply (big_sepM_impl with "Hpairs"). iIntros "!>" (i n Hi) "[Hr Hbi]".
-    iApply (col_bundle_phi γfs γi sb i n with "Hr Hbi").
   Qed.
 
   (* ==================================================================== *)
@@ -1595,58 +1338,6 @@ Section CollectAll.
     iFrame "Hb Hlk Hkeep". by iPureIntro.
   Qed.
 
-  (* ==================================================================== *)
-  (*  ...AND THAT IS AN [FsState.fs_state] AT THREE QUARTERS               *)
-  (*  (durable-disk EV-X, and it is what EV5 measured as impossible at     *)
-  (*  fraction 1)                                                         *)
-  (*                                                                      *)
-  (*  EV5's wall was real and is now GONE, not worked around: a            *)
-  (*  read-locked inode's bundle stands at three quarters and cannot be    *)
-  (*  promoted, so quiescence never yields the FRACTION-1 predicate --     *)
-  (*  but [FsState.fs_state] takes a dfrac now, and three quarters is a    *)
-  (*  share every arm can supply and every metadata owner can shed to.     *)
-  (*  The Φ-FREE half does not divide at all: the link authority and the   *)
-  (*  entry tokens come out WHOLE ([FsCollect.col_hand]'s [fs_links]       *)
-  (*  leg), which is the reason a share works here where a carve did not.  *)
-  (*                                                                      *)
-  (*  It is the exact shape [FsDurXfer.fs_state_xfer] consumes, at         *)
-  (*  [q = 3/4 > 1/2] ([FsDurXfer.qp_half_lt_34]).  WHAT STILL STANDS      *)
-  (*  BETWEEN THIS AND THE TRANSPORT BEING THE COMMIT'S CALLER is not the  *)
-  (*  share: it is that a transport at [q > 1/2] necessarily takes MORE    *)
-  (*  THAN HALF of every byte, so the collection that feeds it can no      *)
-  (*  longer be DESTRUCTIVE -- it has to be an accessor and take its       *)
-  (*  source back out of the transport.  The partition's step is no longer *)
-  (*  one of the obstacles (durable-disk EV-Y: [col_sidez_disj] makes the  *)
-  (*  three index sets disjoint from the region's own slots, so the exact  *)
-  (*  [big_sepS_union] applies); what still drops resource irreversibly is *)
-  (*  [col_keeps_root] and the era's residue in [col_hand_footprint].      *)
-  (* ==================================================================== *)
-  Lemma col_hand_state (γfs : fs_names) (γi : gname) (nib : nat)
-      (sb : fs_sb) (sbb : list (bv 8)) (used : gset Z) (I : gmap Z fs_node)
-      (m : gmap Z dinode) (Lb : gmap Z (bv 8))
-      (C : gmap Z (list (bv 8))) (home : gset Z) :
-    col_hand γfs γi (FsImg.sb_inodestart sb) nib sb sbb used I m Lb C home
-    ⊢ col_auth γfs Lb C home
-      ∗ (∃ kv : ity, ireg_keep γfs ireg_root kv)
-      ∗ fs_state (fs_gamma_L γfs) (DfracOwn (3/4)) (col_state sb sbb I used).
-  Proof.
-    iIntros "Hhand".
-    iAssert (⌜fs_geom (col_state sb sbb I used)⌝
-             ∧ col_hand γfs γi (FsImg.sb_inodestart sb) nib sb sbb used I m
-                 Lb C home)%I with "[Hhand]" as "[%Hgeo Hhand]".
-    { iSplit; [iApply (col_fs_geom with "Hhand") | iExact "Hhand"]. }
-    iDestruct (col_hand_footprint with "Hhand")
-      as "(%Hparse & %Hloc & Hau & Hlk & Hkeep & Hfoot)".
-    iFrame "Hau Hkeep".
-    iApply (fs_state_of (fs_gamma_L γfs) (DfracOwn (3/4))
-              (col_state sb sbb I used) with "Hfoot Hlk").
-    rewrite /fs_pure /col_state /=.
-    iSplitR; [by iPureIntro |].
-    iSplitR; [| by iPureIntro].
-    iApply big_sepM_intro. iIntros "!>" (i n Hi).
-    iPureIntro. exact (Hloc i n Hi).
-  Qed.
-
   (* ...AND THE SAME AT THE WHOLE PREDICATE (durable-disk EV-Y): the exact
      source [FsDurXfer.fs_state_xfer] takes at [q = 3/4], WITH the way
      back.  The transport returns its source unchanged, so this wand is
@@ -1687,241 +1378,6 @@ Section CollectAll.
     iDestruct (fs_state_to with "HS") as "(Hfoot & Hlk & _)".
     iApply ("Hback" with "Hau Hlk Hkeep Hfoot").
   Qed.
-
-  (* ...and the whole of it: [FsDurSnap.snap_mint] off the hand.  ONE
-     reading that keeps the hand ([col_snap_shape], the clause no resource
-     pins), then ONE destructive step to the PREDICATE ([col_hand_state]),
-     off which every ghost row of the mint is read ([fs_state_to] gives the
-     parse, the local clauses and [fs_geom]), and ONE runs walk
-     ([FsDurXfer.fs_footprint_runs_q]) at the uniform share. *)
-  Lemma col_hand_mint (γfs : fs_names) (γi : gname) (nib : nat) (sb : fs_sb)
-      (sbb : list (bv 8)) (used : gset Z) (I : gmap Z fs_node)
-      (m : gmap Z dinode) (Lb : gmap Z (bv 8))
-      (C : gmap Z (list (bv 8))) (home : gset Z) :
-    col_hand γfs γi (FsImg.sb_inodestart sb) nib sb sbb used I m Lb C home
-    ⊢ ⌜snap_mint (col_state sb sbb I used) (col_view C home)⌝.
-  Proof.
-    iIntros "Hhand".
-    (* ---- the GEOMETRY, off the boot configuration ---- *)
-    iAssert (⌜snap_shape (col_state sb sbb I used) (col_view C home)⌝
-             ∧ col_hand γfs γi (FsImg.sb_inodestart sb) nib sb sbb used I m
-                 Lb C home)%I with "[Hhand]" as "[%Hsh Hhand]".
-    { iSplit; [iApply (col_snap_shape with "Hhand") | iExact "Hhand"]. }
-    (* ---- THE ASSEMBLY: an [FsState.fs_state] at three quarters, and
-       every ghost row of the mint is read off IT rather than off the hand
-       (durable-disk EV-X) ---- *)
-    iDestruct (col_hand_state with "Hhand") as "(Hau & Hkeep & HS)".
-    iDestruct (fs_state_to with "HS") as "(Hfoot & Hlk & #Hp)".
-    rewrite /fs_pure. iDestruct "Hp" as "(%Hparse & #Hlocs & %Hgeo)".
-    iAssert (⌜forall i n, I !! i = Some n -> inode_local i n⌝)%I
-      with "[]" as %Hloc.
-    { rewrite bi.pure_forall. iIntros (i).
-      rewrite bi.pure_forall. iIntros (n).
-      rewrite bi.pure_impl. iIntros (Hi).
-      iDestruct (big_sepM_lookup _ (fss_inodes (col_state sb sbb I used))
-                   i n Hi with "Hlocs") as %Hx.
-      by iPureIntro. }
-    (* ---- the link family's own validity, SLACKED AT THE ROOT ---- *)
-    iDestruct "Hkeep" as (kv) "Hkeep".
-    rewrite /ireg_keep (bool_decide_eq_true_2 (ireg_root = ireg_root) eq_refl)
-            /FsStateLink.link_tok /FsStateLink.link_toks
-            /FsStateLink.link_tok_elem /=.
-    iDestruct (fs_links_valid_tok with "Hlk Hkeep") as %Hlinks.
-    (* ---- THE RUN LIST, in one call, at the UNIFORM share ---- *)
-    iDestruct (fs_footprint_runs_q with "Hfoot") as (PM) "[%Hshape Hex]".
-    assert (Hqok : xq_ok (xq_at (DfracOwn (3/4))
-                            (xr_fs (col_state sb sbb I used) PM)))
-      by exact (xq_ok_at _ _ FsStateDefs.dfrac_34_nvalid).
-    assert (Hstr : xq_strip (xq_at (DfracOwn (3/4))
-                               (xr_fs (col_state sb sbb I used) PM))
-                   = xr_fs (col_state sb sbb I used) PM)
-      by exact (xq_strip_at _ _).
-    (* ---- and the two readings off it ---- *)
-    iAssert (⌜xr_disj (xr_fs (col_state sb sbb I used) PM)⌝
-             ∧ phi_runs_q (fs_gamma_L γfs)
-                 (xq_at (DfracOwn (3/4))
-                    (xr_fs (col_state sb sbb I used) PM)))%I
-      with "[Hex]" as "[%Hdisj Hex]".
-    { iSplit; [| iExact "Hex"].
-      iDestruct (phi_runs_q_disj (fs_gamma_L γfs) (fs_gamma_L_excl γfs) _
-                   Hqok with "Hex") as %Hd.
-      iPureIntro. rewrite -Hstr. exact Hd. }
-    iAssert (⌜Lb ⊆ fs_dbytes (col_view C home)⌝
-             ∧ col_auth γfs Lb C home)%I with "[Hau]" as "[%Hle Hau]".
-    { iSplit; [iApply (col_auth_dbytes with "Hau") | iExact "Hau"]. }
-    iDestruct (phi_runs_q_in (fs_gamma_L γfs) (col_auth γfs Lb C home) Lb
-                 (col_agree γfs Lb C home) _ with "Hau Hex") as %Hin0.
-    assert (Hin : xr_union (xr_fs (col_state sb sbb I used) PM)
-                  ⊆ Lb) by (rewrite -Hstr; exact Hin0).
-    iPureIntro. split.
-    - exact Hsh.
-    - exact Hgeo.
-    - rewrite /snap_local /col_state /=. exact Hloc.
-    - rewrite /col_state /=. exact Hparse.
-    - destruct Hlinks as (f & Hfok & Hfv). exists f, kv.
-      split; [exact Hfok |].
-      assert (Hr : ireg_root = FsImg.ROOTINO) by (vm_compute; reflexivity).
-      rewrite -Hr. exact Hfv.
-    - exists PM. split; [| split].
-      + exact Hshape.
-      + exact Hdisj.
-      + exact (transitivity Hin Hle).
-  Qed.
-
-  (* THE CORE.  Everything on the left is CONSUMED -- the caller gets it all
-     back through [pure_keep], because what comes out is pure.  IT STAYS
-     PURE UNDER LANE H4: what the epoch's mint takes is
-     [FsDurSnap.snap_mint], a package of READINGS and not an instance, so
-     the collection never has to become an accessor and the allocation
-     happens after every invariant has closed. *)
-  Lemma col_bodies_mint
-      (cn : ic_names) (γfs : fs_names) (γi : gname) (cov : gset Z) (ls : Z)
-      (nib : nat) (sb : fs_sb) (sbb : list (bv 8)) (used : gset Z)
-      (m : gmap Z dinode) (I : gmap Z fs_node) (O X : gset Z)
-      (ids : list (bool * mword 32 * mword 32))
-      (Lb : gmap Z (bv 8)) (C : gmap Z (list (bv 8))) :
-    col_geom sb (FsImg.sb_inodestart sb) nib (fs_home_set cov ls) ->
-    region_inums nib = O ∪ X ∪ ic_live_inums ids ->
-    length ids = NINODE ->
-    fs_parse_sb (fun _ => sbb) = Some sb ->
-    (ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
-     ∗ col_auth γfs Lb C (fs_home_set cov ls)
-     ∗ ghost_map_auth (fs_top γfs) 1 I
-     ∗ ghost_map_auth γi 1 m
-     ∗ ([∗ list] bi ∈ seq 0%nat nib, ireg_blk γi γfs (FsImg.sb_inodestart sb) m bi)
-     ∗ bitmap_res γfs (FsImg.sb_bmapstart sb) (FsImg.sb_size sb) used
-     ∗ fsblock (fs_bytes γfs) SB_BNO sbb
-     ∗ ipool_rows γfs γi cov ls O
-     ∗ ([∗ set] z ∈ X, imark γi z)
-     ∗ ic_ids cn ids
-     ∗ ([∗ list] k ∈ seq 0%nat NINODE, ic_escrow_body cn γfs γi cov ls k))
-    ⊢ ⌜exists S : fs_state_rec,
-         snap_mint S (col_view C (fs_home_set cov ls))⌝.
-  Proof.
-    intros Hgeom Hrow Hlen Hparse.
-    assert (Hwide : forall z : Z, z ∈ region_inums nib -> 0 <= z < 2 ^ 32).
-    { intros z Hz. apply region_inums_spec in Hz.
-      pose proof (cg_wide Hgeom) as Hw. lia. }
-    iIntros "(Htx & Hauth & Hi & Hm & Hblks & Hbm & Hsbb & Hpool & Hmks
-              & Hids & Hesc)".
-    iDestruct (ireg_blks_collect with "Hblks") as "[Hrecs Hslots]".
-    (* ---- the three suppliers, each a [col_sidez] ---- *)
-    iDestruct (ipool_rows_side with "Hpool") as "HO".
-    iDestruct (imarks_side γfs γi X with "Hmks") as "HX".
-    { intros z Hz. apply Hwide. rewrite Hrow. set_solver. }
-    iDestruct (ic_escrow_body_cover_list with "Htx Hesc") as "[Htx Hcovs]".
-    rewrite -Hlen.
-    iDestruct (big_sepL_seq_of_list ids _ 0%nat with "Hcovs") as "Hcovs".
-    iAssert ([∗ list] k ↦ p ∈ ids,
-               (ic_id cn (0 + k)%nat (1/4) p.1.1 p.1.2 p.2
-                ∗ ic_slot_cover cn γfs γi cov ls (0 + k)%nat))%I
-      with "[Hids Hcovs]" as "Hzip".
-    { rewrite big_sepL_sep. iSplitR "Hcovs"; [| iExact "Hcovs"].
-      iApply (big_sepL_impl with "Hids"). iIntros "!>" (k p Hk) "H".
-      rewrite Nat.add_0_l. iExact "H". }
-    iDestruct (esc_covers_live cn γfs γi cov ls 0%nat ids with "Hzip") as "HL".
-    (* ---- THE PARTITION IS DISJOINT (durable-disk EV-Y), so their union
-       IS the region and nothing is dropped at this boundary.  The three
-       readings ride an [∧] so that the rows they are read off survive
-       them ---- *)
-    assert (HOR : O ⊆ region_inums nib).
-    { rewrite Hrow. intros y Hy.
-      apply elem_of_union. left. apply elem_of_union. by left. }
-    assert (HXR : X ⊆ region_inums nib).
-    { rewrite Hrow. intros y Hy.
-      apply elem_of_union. left. apply elem_of_union. by right. }
-    assert (HLR : ic_live_inums ids ⊆ region_inums nib).
-    { rewrite Hrow. intros y Hy. apply elem_of_union. by right. }
-    iAssert (⌜O ## X⌝ ∧ ⌜O ## ic_live_inums ids⌝
-             ∧ ⌜X ## ic_live_inums ids⌝
-             ∧ (ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit)
-                ∗ ([∗ set] z ∈ region_inums nib,
-                     ∃ d : dinode, ⌜m !! z = Some d⌝
-                                   ∗ ireg_slot γfs γi z d)
-                ∗ ([∗ set] z ∈ O, col_sidez γfs γi z)
-                ∗ ([∗ set] z ∈ X, col_sidez γfs γi z)
-                ∗ ([∗ set] z ∈ ic_live_inums ids, col_sidez γfs γi z)))%I
-      with "[Htx Hslots HO HX HL]"
-      as "(%HdOX & %HdOL & %HdXL & (Htx & Hslots & HO & HX & HL))".
-    { iSplit.
-      { iApply (col_sidez_disj γfs γi m (region_inums nib) O X
-                  HOR HXR Hwide with "Htx Hslots HO HX"). }
-      iSplit.
-      { iApply (col_sidez_disj γfs γi m (region_inums nib) O
-                  (ic_live_inums ids) HOR HLR Hwide with "Htx Hslots HO HL"). }
-      iSplit.
-      { iApply (col_sidez_disj γfs γi m (region_inums nib) X
-                  (ic_live_inums ids) HXR HLR Hwide with "Htx Hslots HX HL"). }
-      iFrame "Htx Hslots HO HX HL". }
-    assert (HdOXL : (O ∪ X) ## ic_live_inums ids)
-      by (apply disjoint_union_l; split; assumption).
-    iAssert ([∗ set] z ∈ O ∪ X, col_sidez γfs γi z)%I
-      with "[HO HX]" as "HOX".
-    { rewrite (big_sepS_union (col_sidez γfs γi) O X HdOX). iFrame "HO HX". }
-    iAssert ([∗ set] z ∈ O ∪ X ∪ ic_live_inums ids, col_sidez γfs γi z)%I
-      with "[HOX HL]" as "HR".
-    { rewrite (big_sepS_union (col_sidez γfs γi) (O ∪ X)
-                 (ic_live_inums ids) HdOXL). iFrame "HOX HL". }
-    rewrite -Hrow.
-    (* ---- zip with the region's slots, and turn each pair into a bundle -- *)
-    iAssert ([∗ set] z ∈ region_inums nib,
-               (col_sidez γfs γi z
-                ∗ ∃ d : dinode, ⌜m !! z = Some d⌝
-                                ∗ ireg_slot γfs γi z d))%I
-      with "[HR Hslots]" as "HR".
-    { rewrite big_sepS_sep. iFrame "HR Hslots". }
-    iDestruct (col_sides_bundles γfs γi m I (region_inums nib) Hwide
-                 with "Htx Hm Hi HR") as "(Htx & Hm & Hi & HB)".
-    (* ---- the keep-alive column comes off, and only the root's is not
-       [emp] (durable-disk lane E-clauses) ---- *)
-    assert (Hrootin : ireg_root ∈ region_inums nib).
-    { apply region_inums_spec.
-      pose proof (sbo_ninodes sb (cg_sbok Hgeom)).
-      pose proof (cg_nin Hgeom).
-      unfold ireg_root, FsImg.ROOTINO in *. lia. }
-    rewrite big_sepS_sep. iDestruct "HB" as "[HB Hkeeps]".
-    iDestruct (col_keeps_root γfs nib Hrootin with "Hkeeps") as "Hkeep".
-    iDestruct (col_bundles_domsub with "HB") as %Hdom.
-    iDestruct (col_bundles_dirloc with "HB") as %Hdirl.
-    (* ---- the abstract state is the map RESTRICTED to the region ---- *)
-    assert (HdomIq : dom (col_reg_map nib I) = region_inums nib)
-      by exact (col_reg_map_dom nib I Hdom).
-    rewrite -HdomIq -big_sepM_dom.
-    iAssert (([∗ map] i ↦ n ∈ col_reg_map nib I, col_bundle γfs γi i n)
-             ∗ fs_links (fs_link γfs) (col_reg_map nib I))%I
-      with "[HB]" as "[Hbund Hlnks]".
-    { rewrite /fs_links -big_sepM_sep.
-      iApply (big_sepM_impl with "HB").
-      iIntros "!>" (i x Hix) "(%n & %Hn & %Hdl & Hb & Hl)".
-      apply col_reg_map_lookup in Hix as [HI _].
-      rewrite HI in Hn. injection Hn as Hnx. subst x.
-      iFrame "Hb Hl". }
-    (* ---- and that IS [FsCollect.col_hand] ---- *)
-    iAssert (col_hand γfs γi (FsImg.sb_inodestart sb) nib sb sbb used
-               (col_reg_map nib I) m Lb C (fs_home_set cov ls))%I
-      with "[Hauth Hsbb Hbm Hm Hrecs Hbund Hlnks Hkeep]" as "Hhand".
-    { rewrite /col_hand.
-      iSplitR; [iPureIntro; exact Hgeom |].
-      iSplitR.
-      { iPureIntro. intros i. rewrite HdomIq. apply region_inums_spec. }
-      iFrame "Hauth".
-      iSplitL "Hsbb".
-      { rewrite /sb_owned gamma_blk_owned.
-        iSplitL "Hsbb"; [iExact "Hsbb" | iPureIntro; exact Hparse]. }
-      iSplitL "Hbm"; [iExact "Hbm" |].
-      iSplitL "Hm Hrecs".
-      { rewrite /col_recs. iFrame "Hm Hrecs". }
-      iFrame "Hbund Hlnks Hkeep".
-      (* the last row: the per-inum directory clauses, at the RESTRICTED
-         map (durable-disk lane E-clauses) *)
-      iPureIntro. intros i n Hi.
-      apply col_reg_map_lookup in Hi as [HI Hz].
-      exact (Hdirl i n Hz HI). }
-    iDestruct (col_hand_mint with "Hhand") as %Hok.
-    iPureIntro.
-    exists (col_state sb sbb (col_reg_map nib I) used). exact Hok.
-  Qed.
-
 
   (* ==================================================================== *)
   (*  THE CORE, AS AN ACCESSOR (durable-disk EV-Y)                          *)
@@ -2305,7 +1761,7 @@ Section CollectAll.
   (*                                                                      *)
   (*  ONE ghost step.  Six invariant families are opened -- [ftopN],       *)
   (*  [iregN], [bitmapN], [sbN], [ipoolN] and the fifty [icEscN .@ k] --   *)
-  (*  the collection runs destructively inside [pure_keep], and every one  *)
+  (*  the collection runs as an ACCESSOR (durable-disk EV-Y) and every one *)
   (*  of them closes with the body it was opened with.  The byte authority *)
   (*  is the CALLER's: [logN] is open at the commit, which is the whole    *)
   (*  reason this lemma takes [col_auth] rather than [fs_bytes_inv].       *)
