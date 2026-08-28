@@ -206,6 +206,40 @@ PARKS' — `ProofUserinit`'s and `ProofSysFork`'s applications of
   with `sp_idx`): the verified-program tier stays out of the kernel-side
   type file's cone.
 
+## The process-state interface the slot stands on (as landed)
+
+- **`proc_priv γf pa pid (U : ustate)`** with
+  `Record ustate := { us_V : pprivate; us_M : gmap Z (bv 8) }` —
+  the user-visible process state as ONE argument (future state — the
+  fd view, the pid — becomes fields, never arity changes).  Lifted
+  updaters (`us_ofile`/`us_sz`/`us_tf`/`us_upt`/`us_exec`/…) keep
+  call sites in the `upd_*` idiom.  `proc_priv_nopt` keeps a bare
+  `V`: the kernel does not own the user bytes across user execution
+  (`proc_priv U ⊣⊢ proc_priv_nopt (us_V U) ∗ proc_ptm (pv_upt (us_V U))
+  (uint (pv_sz (us_V U))) (us_M U)`).
+- **`M` is the LAZY sz-region view** (`proc_ptm`/`umem_lazy`:
+  unbacked pages read as zeros, faults invisible) — the view
+  `SpecVmfault`'s noop theorem is stated at, so vmfault and copyin
+  preserve the image by an existing theorem.  The mapped-domain
+  `proc_pt`/`umem_own` machinery lives at the sub-`proc_priv` tier
+  (`user_pt_inv`, the uservec/userret seams), bridged by
+  `ProcPtOwn` §5c' (a submap is pinned by its domain; includes the
+  read-only `proc_ptm` borrow).  `wp_uvmcopy_sconf` returns the
+  PARENT's image on the nose.
+- **Functions that do not touch user memory return the block at the
+  same `U`** — preservation of the WP's precondition BY SIGNATURE.
+  Memory effects are stated as EQUATIONS on the image where converted
+  (`UserPtTree.umem_wr` windows for readers-into-user-memory, with
+  `umem_wr_app`/`umem_wrote` algebra; `umem_grow` for sbrk-class),
+  same-`M` for writers-from-user-memory; the residual ∃-weakened tier
+  (`proc_pt_any`) is being eliminated bottom-up and then deleted —
+  state and DAG in `projects/user-wp-slot.md` §2.
+- The DESCRIPTOR (`pv_upt`) stays exposed in `ustate`: the trap
+  seams, the phase splits and the table-moving specs are keyed on it.
+  The SLOT's key is ruled to become the actually-user-visible record
+  (`uvis` = trapframe + memory view, table ∀-quantified inside) —
+  specced in `projects/user-wp-slot.md` §1, not yet landed.
+
 ## What is deliberately NOT designed
 
 How a DEPOSITED slot covers the kernel's own writes between deposit and
