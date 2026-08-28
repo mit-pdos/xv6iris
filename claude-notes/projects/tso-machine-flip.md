@@ -11958,3 +11958,120 @@ refreshed.
    `UserMemPt`'s interp, `SpecUserret`'s tier.
 4. Unchanged with the owner: the `notheld` floor channel (now merged with
    §(3)), `intr_handler_spec`'s layering, `ProofMain`'s publication credential.
+
+### A6.93 `ProofUserretClosed` IS GREEN — THE TRAPFRAME CONTRACT MOVES TO THE
+### CTX TIER; AND THE TOKEN TRANCHE'S IN-TREE COST NOTE HAS DRIFTED
+
+Executing the coordinator's two items, one at a time.  **Item (1) landed:
+RED 10 → RED 9.  Item (2) was re-measured and NOT opened** — the in-tree
+note's cascade is wrong in both directions, and what actually costs is a
+design choice the note does not mention.
+
+#### (1) THE TIER FLIP, LANDED — AND IT IS 62 SPELLINGS AND A LOCAL NOTATION
+
+`ProcInv.tf_words` has been `TsoCtx.ctx_phys_word_pointsto` since the M1
+flip; `SpecUserret`'s contract — ABOVE it in the dependency order — still
+asked for the RAW `↦ₚ₈` tower, so every producer had to hand a ctx word to a
+raw premise (`ProofUserretClosed:275`, `ProofUservec:1635`).  A6.92 §(1)
+established that a forget cannot bridge it: `wp_userret_user` hands the words
+BACK through its closer, and a raw cell cannot re-enter the ctx tower without
+a drain (A6.84 §(2)).  **So the CONTRACT moves**, which is the direction the
+M1 flip's own rule gives — live CELLS are context-indexed, only lock
+METADATA stays raw (§0.8′ ruling 2).
+
+| file | change |
+|---|---|
+| `SpecUserret` | local notation `↦ₚ₈c{ dq }`, then 62 slot spellings |
+| `UserretUser` | the same 62, one notation |
+| `ProofUserretClosed` | **nothing** — it was already handing ctx words |
+
+The token is `Local` and spelled `↦ₚ₈c` exactly as `TfPage36` spells it, for
+the reason recorded there: adding it to the kit's notation block rebuilds the
+tree for a display change, and is cutover work.  `UserKernelBridge` and
+`ProcPtOwn` (both green) never mention the slots and did not move; the debt
+lands on `UserretPt` / `UserretAllPt` / `ProofUservec`, all UNREACHED, which
+had the identical mismatch and are now closer rather than further.
+
+> **AND THE MEASUREMENT THAT MADE IT CHEAP WAS THE MODULE STRUCTURE.**
+> `UserretUser` is 269 lines and looked like a proof; it is an ADAPTER over a
+> functor argument `R.wp_userret_pt`, whose type is `SpecUserret`'s Module
+> Type.  So flipping the spec flips the obligation on the (unreached)
+> implementor and costs the green adapter only its own restatement.  *Before
+> pricing a spec change, find out whether the "proof" that consumes it is a
+> proof or a signature.*
+
+#### (2) THE TOKEN TRANCHE: THE IN-TREE NOTE IS WRONG IN BOTH DIRECTIONS
+
+`TrampStepPt.v`'s A6.61 note is the spec the coordinator pointed at:
+*"the measurement says SIX files … and the five `iApply "Htr"` sites BELOW …
+must SUPPLY a token, so that lemma gains an `own_context` premise and the
+cascade runs out through `wp_instr_tramp_pt` / `wp_instr_ktramp_pt_share`
+into the four trap-handler files.  Its own tranche, against a green tree."*
+
+**Re-measured, and both halves have drifted:**
+
+1. **The cascade is SHORTER than the note says.**  The consumers of
+   `wp_instr_tramp_pt` / `wp_instr_ktramp_pt_share` are exactly
+   `UservecExitPt` and `UserretEntryPt` — and both are UNREACHED.
+   `TransPt` mentions them only in comments.  **There are no four
+   trap-handler files downstream**, and of the six named files the only
+   GREEN one is `TrampStepPt` itself (`Pt2WalkPt`, `UptWalkPt`,
+   `UservecExitPt`, `UserretEntryPt` are red/unreached; `TransPt` is green
+   but is not a consumer).  `UptWalkPt` does not require `Pt2WalkPt`, so
+   `TrampStepPt` + `UptWalkPt` alone would green the target.
+2. **The cost is NOT the file count, and the note does not name it.**  The
+   token's ENTRY is easy — one premise on `tramp_tr_obl`'s ∀, which is
+   exactly what `UptWalkPt.swp_translate_upt` already demands.  **Its EXIT
+   has nowhere to go.**  `tramp_run_hart_active_instr_S` concludes at
+   `SmodeCorePt.spt_run_post Df Q Rr Qi`, whose success arm ends in the
+   caller-chosen residue `Rr rs2` — so the run lemma cannot put the token
+   back itself, and the three candidates each cost something different:
+   carry it in `W` (opaque at the five `iApply "Htr"` sites, so it cannot be
+   split out there), add a slot to `spt_run_post` (shared with the S-mode
+   engine — a wide change), or hand it on to `spt_ex_obl`/`spt_disp_obl` as
+   a further premise (another interface, and the consumers instantiate it).
+   **That is a design choice, not threading**, and the note prices it as
+   pass-through.
+
+**Not opened.**  The one green file in the tranche is `TrampStepPt`, and
+opening an interface change there without budget to pick the exit path and
+close it is precisely what the close-or-revert discipline forbids.  Nothing
+was edited.
+
+> **THE CHEAP ALTERNATIVE, CONSIDERED AND REJECTED — AND THE REASON IS
+> A6.92's.**  `Res : type_of_register tlb → iProp Σ` is the obligation's own
+> linear payload slot, threaded in and out; putting `own_context` inside
+> `UptWalkPt.upt_res_pt` would satisfy `swp_translate_upt` with **no change
+> to `TrampStepPt` at all**, and every user of `upt_res_pt` (`UserretPt`,
+> `UservecPt`, `UservecExitPt`, `UserretEntryPt`, `UptWalkPt`) is already
+> red or unreached — **zero green files.**  It is rejected because
+> `own_context` is `CpuId`-INDEXED (A6.64) and `upt_res_pt` travels the
+> uservec → usertrap → userret round trip: embedding a hart-indexed token in
+> a residue that crosses a park is the migration hazard A6.89 §(5) refuted
+> for the `locked` token and A6.92 §(3) refuted again for the lock word.
+> *Surfaced rather than taken*: if the owner rules the window residue
+> hart-pinned for the trampoline's duration, this is a one-file change
+> against a red tree and the whole A6.61 tranche evaporates.
+
+#### (3) THE NUMBER
+
+**1100 of 1296, RED 9** — sentinel-backed (`MAKEEXIT=2`).  **Red-list delta:
+−1 (`ProofUserretClosed`), nothing added**; the remaining nine are
+`ProofForkretPark`, `ProofKernelvec`, `ProofMain`, `ProofSwtch`,
+`ProofVirtioDiskIntr`, `ProofVirtioDiskRwD`, `UptWalkPt`, `UserMemPt`,
+`WpSconfLock`.  `md5sum kernel-rocq/*.v user-rocq/*.v` unchanged
+(`edd91972b6bc1b944fd98a2cc2363815`).  `^Abort` / `^Admitted` / `^Axiom` all
+0.  No green file went red.  Mirror refreshed at this boundary.
+
+#### (4) THE FRONTIER
+
+1. **The token tranche's EXIT PATH** — §(2): a choice between `W`,
+   `spt_run_post`, and the two sub-obligations, or the `Res` shortcut if the
+   residue may be hart-pinned.  Owner-visible; the file count is small and
+   the green surface is one file.
+2. **`UserMemPt`** — deferred by the coordinator this round; still the
+   interp re-do (`udata_own_upd` is gen_heap-only and the file has no
+   `tso_interp_of` at all).
+3. Unchanged with the owner: the merged lock-word/`notheld` ruling,
+   `intr_handler_spec`'s layering, `ProofMain`'s publication credential,
+   `ProofForkretPark`'s re-park hazard, §0.27′'s surface.
