@@ -200,4 +200,109 @@ Section barrier.
     iApply (swp_use _ Φ C HC with "[H HQ] Hcont"). by iApply "H".
   Qed.
 
+  (* ================================================================== *)
+  (* §5 THE NON-DRAINING SIBLING (A6.107, §0.36′ step 4).                 *)
+  (*                                                                     *)
+  (* MEASURED (A6.106): the only barrier on hart 0's boot arm is          *)
+  (* `fence rw,w` at [main+0xac] -- [Barrier_RISCV_rw_w], whose           *)
+  (* [fence_drains] is FALSE -- so §3's leaf does not apply there, and    *)
+  (* the KPT publication has no site.  What the publication actually      *)
+  (* needs from a fence is not the drain: it is ACCESS TO THE LIVE        *)
+  (* INTERP, so that [KptPublish.kptree_publish_top] can mint the pin at  *)
+  (* the log top.  That is strictly less than [pub_step], and this is it. *)
+  (*                                                                     *)
+  (* [ghost_step] is [pub_step] MINUS ITS TWO GIFTS -- the drain fact and *)
+  (* the view receipt -- and nothing else changes: the view still moves   *)
+  (* to [fence_post] (a no-op at a non-draining kind), the state step is  *)
+  (* the same, and the leaf below carries NO premise on [bk] at all.  So  *)
+  (* it serves every barrier the model has, and [pub_step_of_ghost_step]  *)
+  (* lets a draining site keep using §3 unchanged.                       *)
+  (* ================================================================== *)
+  Definition ghost_step (P Q : iProp Σ) : iProp Σ :=
+    (∀ g : gstate,
+       gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+       tso_interp_at riscv_eraGS g -∗ P ==∗
+       gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
+       tso_interp_at riscv_eraGS g ∗ Q)%I.
+
+  Lemma ghost_step_id (P : iProp Σ) : ⊢ ghost_step P P.
+  Proof. iIntros (g) "$ $ $". done. Qed.
+
+  (* a client that wants nothing from the drain may be run by either leaf *)
+  Lemma pub_step_of_ghost_step (P Q : iProp Σ) :
+    ghost_step P Q -∗ pub_step P Q.
+  Proof. iIntros "H" (g) "_ _ Hm Ht HP". iApply ("H" with "Hm Ht HP"). Qed.
+
+  Lemma wp_hart_barrier_gs {X : Type} (C : M X -> M unit) (bk : barrier_kind)
+      (m : M X) (P Q : iProp Σ) :
+    mctx C ->
+    hbar_at m = Some bk ->
+    gen_cert -∗ ghost_step P Q -∗ P -∗
+    ▷ (Q -∗ WP (HartE gen_id cpu_id (C (hbar_resume m)) : expr riscv_lang)) -∗
+    WP (HartE gen_id cpu_id (C m) : expr riscv_lang).
+  Proof.
+    iIntros (HC Hproj) "#Hcert Hpub HP H".
+    destruct (hbar_at_inv _ _ Hproj) as (K & Hm & Hres).
+    assert (Hg : C m = Interface.Next (Interface.Barrier bk) (fun v => C (K v)))
+      by (rewrite Hm; exact (HC _ (Interface.Barrier bk) K eq_refl)).
+    rewrite Hg.
+    iApply (wp_hart_step with "Hcert").
+    { intros oth0 h0 img0 σ0 log0 tv0 r0 m'0 σ'0 log'0 tv'0 r'0 Hs.
+      rewrite /mnode_step in Hs. cbn beta iota in Hs.
+      by destruct Hs as (_ & _ & _ & _ & ->). }
+    iIntros (σ oth rv img log tv V) "%Htv Hσ Htso".
+    iDestruct (tso_interp_of_bound with "Htso") as %Hb.
+    iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
+    assert (Htvlen : (tv <= length log)%nat) by (rewrite -Htv; apply Hb).
+    set (h := hart_agent cpu_id).
+    set (tvn := fence_post h log (fence_drains bk) tv).
+    (* the two bounds, at EITHER kind: [fence_post] is [tv] when the kind
+       does not drain and [max tv (own_pub h log)] when it does. *)
+    assert (Hadv : (V h <= tvn)%nat).
+    { rewrite Htv /tvn /fence_post. destruct (fence_drains bk); lia. }
+    assert (Htop : (tvn <= length log)%nat).
+    { rewrite /tvn /fence_post. destruct (fence_drains bk);
+        [ pose proof (own_pub_le h log); lia | exact Htvlen ]. }
+    iMod (tso_interp_of_advance _ img σ.(mem) log V h tvn
+            (fin_to_nat_lt cpu_id) Hadv Htop with "Htso") as "Htso".
+    assert (Hpin' : forall h', (NCPU <= h')%nat -> vstep h tvn log V h' = length log).
+    { intros h' Hh'. rewrite /vstep. case_decide as Hd.
+      - exfalso. subst h'. rewrite /h /hart_agent in Hh'.
+        pose proof (fin_to_nat_lt cpu_id). lia.
+      - destruct (lt_dec h' NCPU); [lia | reflexivity]. }
+    iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
+    rewrite (tso_interp_of_at_gs riscv_eraGS img σ.(mem) log (vstep h tvn log V)
+               σ.(sregs) σ.(mdev) Hpin').
+    iMod ("Hpub" $! (gs_of img σ.(mem) log (vstep h tvn log V)
+                       σ.(sregs) σ.(mdev))
+            with "Hmem Htso HP") as "(Hmem & Htso & HQ)".
+    rewrite -(tso_interp_of_at_gs riscv_eraGS img σ.(mem) log
+                (vstep h tvn log V) σ.(sregs) σ.(mdev) Hpin').
+    iApply fupd_mask_intro; [set_solver|]. iIntros "Hclose".
+    iExists (C (K tt)), σ, log, tvn, rv.
+    iSplitR.
+    { iPureIntro. rewrite /mnode_step. cbn beta iota. by split_and!. }
+    iNext. iIntros (m' σ' log' tv' rv') "%Hstep".
+    rewrite /mnode_step in Hstep. cbn beta iota in Hstep.
+    destruct Hstep as (-> & -> & -> & -> & ->).
+    iMod "Hclose" as "_". iModIntro.
+    iFrame "Hri Hmem Hdev Htso".
+    rewrite -Hres. iApply ("H" with "HQ").
+  Qed.
+
+  Lemma swp_hart_barrier_gs {X : Type} (bk : barrier_kind) (m : M X)
+      (Φ : X -> iProp Σ) (P Q : iProp Σ) :
+    hbar_at m = Some bk ->
+    gen_cert -∗ ghost_step P Q -∗ P -∗
+    ▷ (Q -∗ swp (hbar_resume m) Φ) -∗
+    swp m Φ.
+  Proof.
+    iIntros (Hproj) "#Hcert Hpub HP H".
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    iApply (wp_hart_barrier_gs C bk m P Q HC Hproj
+              with "Hcert Hpub HP [H Hcont]").
+    iNext. iIntros "HQ".
+    iApply (swp_use _ Φ C HC with "[H HQ] Hcont"). by iApply "H".
+  Qed.
+
 End barrier.

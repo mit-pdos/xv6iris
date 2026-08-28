@@ -50,6 +50,29 @@ Lemma fence_rw_bits (fiom : bool) :
     ('b"11") = true.
 Proof. destruct fiom; vm_compute; reflexivity. Qed.
 
+(* A6.107: the `fence rw,w` dispatch.  Its successor set is [w] (bits 01)
+   whatever FIOM does -- FIOM only folds the I/O bits into the memory ones and
+   [w] has none set -- so the model's nine-way chain falls past the first three
+   arms and lands on [Barrier_RISCV_rw_w].  Three facts because three arms are
+   tested before it; the predecessor's is [fence_rw_bits] above, reused. *)
+Lemma fence_w_bits_11 (fiom : bool) :
+  eq_vec (subrange_vec_dec
+            (effective_fence_set (mword_of_int 1 : mword 4) fiom) 1 0)
+    ('b"11") = false.
+Proof. destruct fiom; vm_compute; reflexivity. Qed.
+
+Lemma fence_w_bits_10 (fiom : bool) :
+  eq_vec (subrange_vec_dec
+            (effective_fence_set (mword_of_int 1 : mword 4) fiom) 1 0)
+    ('b"10") = false.
+Proof. destruct fiom; vm_compute; reflexivity. Qed.
+
+Lemma fence_w_bits_01 (fiom : bool) :
+  eq_vec (subrange_vec_dec
+            (effective_fence_set (mword_of_int 1 : mword 4) fiom) 1 0)
+    ('b"01") = true.
+Proof. destruct fiom; vm_compute; reflexivity. Qed.
+
 Section WpSconfFencePub.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ}.
@@ -149,6 +172,112 @@ Section WpSconfFencePub.
       iApply (swp_mono with
                 "[Hcap Hfile HPC HnPC Hresv Hback] [Hpriv Hmenv Hpub HP]");
         [| iApply (swp_execute_FENCE_pub_S fm rs rd MENVCFG_S P Q
+                     with "Hcert Hpriv Hmenv Hpub HP") ].
+      iIntros (e) "(-> & HQ & Hpriv & Hmenv)". iSplitR; [done|].
+      iDestruct ("Hback" with "Hpriv Hmenv") as "Hsc".
+      iDestruct (sconf_at_priv_open with "Hsc") as (ms') "Hscp".
+      iExists (add_vec_int pc 4), ms', m, n.
+      iFrame "HPC HnPC Hresv Hscp Hcap Hfile HQ". by iPureIntro.
+    - iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & HQ)".
+      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iApply ("Hcont" with "Hcg' Hpc' HQ").
+  Qed.
+
+  (* ================================================================== *)
+  (* §4 THE GHOST-STEP FAMILY -- the same three tiers, at `fence rw,w`    *)
+  (* and without the drain (A6.107; tso-machine-flip.md A6.106 §5 step 4).*)
+  (*                                                                     *)
+  (* WHY IT HAD TO EXIST.  §1--§3 publish at `fence rw,rw` because that   *)
+  (* is [__sync_synchronize] and it drains.  A6.106 measured what is      *)
+  (* actually in the kernel image at [main+0xac] -- the ONE fence on hart *)
+  (* 0's boot arm -- and it is `fence rw,w`, a release barrier            *)
+  (* ([Barrier_RISCV_rw_w]) that [RiscvLang.fence_drains] does not drain. *)
+  (* So the header's "WHY rw,rw AND NOT A GENERIC pred/succ" stands for   *)
+  (* PUBLISHING and is beside the point for what the KPT publication      *)
+  (* needs, which is only the live interp:                               *)
+  (* [KptPublish.kptree_publish_top] (A6.106) mints at the LOG TOP and    *)
+  (* asks for no drain, no receipt and no [own_context] bound.            *)
+  (*                                                                     *)
+  (* [HartBarrier.ghost_step] is [pub_step] minus its two gifts, and      *)
+  (* [wp_hart_barrier_gs] carries NO premise on the barrier kind -- so    *)
+  (* this family would serve any fence; it is stated at rw,w because that *)
+  (* is the instruction with the caller.                                 *)
+  (* ================================================================== *)
+  Lemma swp_barrier_gs (bk : rv64d_types.barrier_kind) (P Q : iProp Σ) :
+    gen_cert -∗ ghost_step P Q -∗ P -∗
+    swp (Defs.bind0 (sail_barrier bk) (returnM RETIRE_SUCCESS))
+      (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗ Q).
+  Proof.
+    iIntros "#Hcert Hpub HP".
+    iApply (swp_hart_barrier_gs (X := ExecutionResult) bk
+              (Defs.bind0 (sail_barrier bk) (returnM RETIRE_SUCCESS)) _ P Q
+              ltac:(reflexivity) with "Hcert Hpub HP").
+    iNext. iIntros "HQ". iApply swp_ret. by iFrame.
+  Qed.
+
+  Lemma swp_execute_FENCE_gs_S (fm : mword 4) (rs rd : regidx)
+      (menv : mword 64) (P Q : iProp Σ) :
+    gen_cert -∗ cur_privilege ↦ᵣ Supervisor -∗ menvcfg ↦ᵣ menv -∗
+    ghost_step P Q -∗ P -∗
+    swp (execute (FENCE (fm, mword_of_int 3 : mword 4, mword_of_int 1 : mword 4,
+                         rs, rd)))
+      (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗ Q ∗
+                cur_privilege ↦ᵣ Supervisor ∗ menvcfg ↦ᵣ menv).
+  Proof.
+    iIntros "#Hcert Hpriv Hmenv Hpub HP".
+    change (execute (FENCE (fm, mword_of_int 3 : mword 4,
+                            mword_of_int 1 : mword 4, rs, rd)))
+      with (execute_FENCE fm (mword_of_int 3 : mword 4)
+              (mword_of_int 1 : mword 4) rs rd).
+    unfold execute_FENCE.
+    iApply (swp_bind_use (is_fiom_active tt) _
+              (fun v => ⌜v = eq_vec (_get_MEnvcfg_FIOM menv) ('b"1")⌝ ∗
+                        cur_privilege ↦ᵣ Supervisor ∗ menvcfg ↦ᵣ menv)%I _
+              with "[Hpriv Hmenv] [-]").
+    { iApply (swp_is_fiom_active_S menv with "Hcert Hpriv Hmenv"). }
+    iIntros (v) "(-> & Hpriv & Hmenv)".
+    cbn match.
+    rewrite (fence_rw_bits (eq_vec (_get_MEnvcfg_FIOM menv) ('b"1"))).
+    rewrite (fence_w_bits_11 (eq_vec (_get_MEnvcfg_FIOM menv) ('b"1"))).
+    rewrite (fence_w_bits_10 (eq_vec (_get_MEnvcfg_FIOM menv) ('b"1"))).
+    rewrite (fence_w_bits_01 (eq_vec (_get_MEnvcfg_FIOM menv) ('b"1"))).
+    cbn match.
+    iApply (swp_mono _ (fun e : ExecutionResult =>
+                          ⌜e = RETIRE_SUCCESS⌝ ∗ Q)%I _
+              with "[Hpriv Hmenv] [Hpub HP]").
+    - iIntros (e) "[-> HQ]". iSplitR; [done|]. iFrame.
+    - iApply (swp_barrier_gs rv64d_types.Barrier_RISCV_rw_w P Q
+                with "Hcert Hpub HP").
+  Qed.
+
+  Lemma wp_fence_gs_s_sconf
+      (pc : mword 64) (fm : mword 4) (rs rd : regidx)
+      (m : regfile) (n : nat) (P Q : iProp Σ) :
+    sie_cap_gpr kt m n false p -∗
+    pc_is pc -∗
+    instr pc false (FENCE (fm, mword_of_int 3 : mword 4,
+                           mword_of_int 1 : mword 4, rs, rd)) -∗
+    ghost_step P Q -∗ P -∗
+    ▷ (sie_cap_gpr kt m n false p -∗
+       pc_is (add_vec_int pc 4) -∗ Q -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros "Hcg Hpc Hinstr Hpub HP Hcont".
+    iApply (wp_instr_s_sconf m n false false pc false
+              (FENCE (fm, mword_of_int 3 : mword 4, mword_of_int 1 : mword 4,
+                      rs, rd))
+              (fun (_ : CpuId) npc _ms' m' n' =>
+                 ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗ Q)%I
+              with "Hcg Hpc Hinstr [Hpub HP Hcont]").
+    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iSplitR "Hcont".
+    - iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
+      iDestruct (sconf_ctl_acc with "Hsc")
+        as "(#Hcert & #Hmisa & Hpriv & Hmenv & Hback)".
+      iApply (swp_mono with
+                "[Hcap Hfile HPC HnPC Hresv Hback] [Hpriv Hmenv Hpub HP]");
+        [| iApply (swp_execute_FENCE_gs_S fm rs rd MENVCFG_S P Q
                      with "Hcert Hpriv Hmenv Hpub HP") ].
       iIntros (e) "(-> & HQ & Hpriv & Hmenv)". iSplitR; [done|].
       iDestruct ("Hback" with "Hpriv Hmenv") as "Hsc".
