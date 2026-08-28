@@ -245,18 +245,6 @@ Section DiskPtsto.
   (* the raw update: the new map holds [bs'] on the range and agrees with the
      old one everywhere else.  [disk_bytes_update] reads the [disk_view]
      transfer off these two clauses. *)
-  Lemma disk_bytes_update_gen (γ : disk_names) (dmap : gmap Z (bv 8))
-      (o : Z) (bs bs' : list (bv 8)) :
-    length bs' = length bs ->
-    ghost_map_auth (dn_img γ) 1 dmap -∗ disk_bytes γ o bs ==∗
-    ∃ dmap' : gmap Z (bv 8),
-      ghost_map_auth (dn_img γ) 1 dmap' ∗ disk_bytes γ o bs' ∗
-      ⌜forall (j : nat) (b : bv 8), bs' !! j = Some b ->
-         dmap' !! (o + Z.of_nat j)%Z = Some b⌝ ∗
-      ⌜forall x : Z,
-         (forall j : nat, (j < length bs')%nat -> (x ≠ o + Z.of_nat j)%Z) ->
-         dmap' !! x = dmap !! x⌝.
-  Proof. exact (disk_img_bytes_update_gen (dn_img γ) dmap o bs bs'). Qed.
 
   Lemma disk_bytes_update (γ : disk_names) (dmap : gmap Z (bv 8))
       (o : Z) (bs bs' : list (bv 8)) :
@@ -270,15 +258,5 @@ Section DiskPtsto.
 
   (* -- minting: fragments for untouched offsets ------------------------- *)
 
-  Lemma disk_bytes_mint (γ : disk_names) (dmap : gmap Z (bv 8))
-      (dk : Z -> bv 8) (o : Z) (n : nat) :
-    disk_view dmap dk ->
-    (forall j : nat, (j < n)%nat -> dmap !! (o + Z.of_nat j) = None) ->
-    ghost_map_auth (dn_img γ) 1 dmap ==∗
-    ∃ dmap' : gmap Z (bv 8),
-      ghost_map_auth (dn_img γ) 1 dmap' ∗
-      disk_bytes γ o (disk_read dk o n) ∗
-      ⌜disk_view dmap' dk⌝.
-  Proof. exact (disk_img_bytes_mint (dn_img γ) dmap dk o n). Qed.
 
 End DiskPtsto.

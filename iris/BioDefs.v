@@ -33,8 +33,6 @@ Definition BSLOTS : nat := 1024%nat.
 Definition BSLOTS_PROC : nat := 192%nat.
 Definition BSLOTS_FS : nat := 832%nat.
 
-Lemma bslots_shares : BSLOTS = (BSLOTS_PROC + BSLOTS_FS)%nat.
-Proof. reflexivity. Qed.
 
 Record bio_names := MkBioNames {
   bn_lk   : gname;                (* the "bcache" spinlock               *)
@@ -74,8 +72,6 @@ Section BioSlots.
 
   Lemma bslots_split a b : bslots (a + b) -∗ bslots a ∗ bslots b.
   Proof. rewrite bslots_op. iIntros "$". Qed.
-  Lemma bslots_combine a b : bslots a -∗ bslots b -∗ bslots (a + b).
-  Proof. iIntros "Ha Hb". rewrite bslots_op. iFrame. Qed.
 
   Lemma bslots_bound n : bslots_auth -∗ bslots n -∗ ⌜(n <= BSLOTS)%nat⌝.
   Proof.

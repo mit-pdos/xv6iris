@@ -1042,15 +1042,6 @@ Section FileInv.
      [FdSlots.FdInode] reports to user space -- is read off the very
      reference being installed, not passed down from namei's caller.  That
      is what makes the field impossible to get wrong. *)
-  Lemma inode_held_shed_gen (v : mword 64) :
-    inode_held v -∗ ∃ (s : Qp) (g : gname) (inum : mword 32),
-      inode_held_short v s ∗ inode_shr_held_gen v s g inum.
-  Proof.
-    iIntros "H".
-    iDestruct (inode_held_shed with "H") as (s) "[Hsh Hs]".
-    iDestruct (inode_shr_held_gen_intro with "Hs") as (g inum) "Hs".
-    iExists s, g, inum. iFrame.
-  Qed.
 
   (* ...and the inverse of the cancel, for whoever PUBLISHES an FD_INODE file
      (sys_open): a shed inode reference plus a TYPE WITNESS becomes a payload
@@ -1535,12 +1526,6 @@ Section FileInv.
   (* THE BRIDGE OUT OF THE QUANTIFIER: what a proof that has to look at the
      file's own cells opens the reference for.  Every [fc_type]-to-[st]
      step in the tree goes through this plus an [fdstate_ok_*] lemma. *)
-  Lemma file_ref_state γ k q st :
-    file_ref γ k q st -∗
-    ∃ (C : fcontent) (inum : mword 32), ⌜fdstate_ok inum C st⌝.
-  Proof.
-    iIntros "(%C & _ & _ & (%pn & %Hst & _) & _)". by iExists C, (fp_inum pn).
-  Qed.
 
   (* ---- the ftable lock's resource ----
 

@@ -394,8 +394,6 @@ Lemma uart_recv_out (u : uart_state) (b : bv 8) : u_out (uart_recv u b) = u_out 
 Proof. reflexivity. Qed.
 Lemma uart_recv_tx (u : uart_state) (b : bv 8) : u_tx (uart_recv u b) = u_tx u.
 Proof. reflexivity. Qed.
-Lemma uart_recv_wire (u : uart_state) (b : bv 8) : u_wire (uart_recv u b) = u_wire u.
-Proof. reflexivity. Qed.
 Lemma uart_recv_lcr (u : uart_state) (b : bv 8) : u_lcr (uart_recv u b) = u_lcr u.
 Proof. reflexivity. Qed.
 

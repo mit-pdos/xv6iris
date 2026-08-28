@@ -854,17 +854,6 @@ Qed.
 
 (* a write is determined, at each address, by the underlying image ONLY
    where it does not itself land a byte *)
-Lemma disk_write_agree (dk dk' : Z -> bv 8) (off : Z) (bs : list (bv 8))
-    (a : Z) :
-  (a < off \/ off + Z.of_nat (length bs) <= a -> dk a = dk' a) ->
-  disk_write dk off bs a = disk_write dk' off bs a.
-Proof.
-  intro H. unfold disk_write. destruct (off <=? a) eqn:E.
-  - destruct (bs !! Z.to_nat (a - off)) eqn:Hb; [reflexivity|].
-    apply H. right. apply lookup_ge_None in Hb.
-    apply Z.leb_le in E. lia.
-  - apply H. left. apply Z.leb_gt in E. lia.
-Qed.
 
 Lemma disk_write_nil (dk : Z -> bv 8) (off : Z) : disk_write dk off [] = dk.
 Proof.
@@ -946,49 +935,6 @@ Lemma wr_fold_cons (w : disk_wr) (i : nat) (l : list nat) (dk : Z -> bv 8) :
   wr_fold w (i :: l) dk = wr_apply (wr_sector w i) (wr_fold w l dk).
 Proof. reflexivity. Qed.
 
-Lemma wr_fold_all (w : disk_wr) (l : list nat) (dk : Z -> bv 8) :
-  (forall i, (i < wr_nsectors w)%nat -> i ∈ l) ->
-  wr_fold w l dk = wr_apply w dk.
-Proof.
-  destruct w as [[off bs]|]; last first.
-  { intros _. induction l as [|i l IH]; [reflexivity|].
-    rewrite wr_fold_cons, IH. reflexivity. }
-  intro Hall. apply functional_extensionality. intro a.
-  cbn [wr_apply fst snd].
-  destruct (decide (off <= a < off + Z.of_nat (length bs))) as [Hin|Hout];
-    last first.
-  { (* outside the whole write: every sector misses, and so does [w] *)
-    rewrite (disk_write_out dk off bs a) by lia.
-    clear Hall. induction l as [|i l IH]; [reflexivity|].
-    rewrite wr_fold_cons, wr_sector_outside; [exact IH | lia]. }
-  (* inside: exactly the sector holding [a] decides the byte, and it is the
-     byte the whole write lands there *)
-  assert (Hoff : off <= a) by lia.
-  assert (Hsx : is_Some (bs !! Z.to_nat (a - off)))
-    by (apply lookup_lt_is_Some_2; lia).
-  destruct Hsx as [x Hx].
-  rewrite (disk_write_in dk off bs a x Hoff Hx).
-  remember (Nat.div (Z.to_nat (a - off)) virtio_sector_bytes) as k eqn:Hkdef.
-  assert (Hk : (k < wr_nsectors (Some (off, bs)))%nat).
-  { cbn [wr_nsectors snd]. rewrite Hkdef. apply sector_count_lt. lia. }
-  specialize (Hall k Hk).
-  pose proof (sector_of_bounds (Z.to_nat (a - off))) as Hdk.
-  rewrite <- Hkdef in Hdk.
-  assert (Hlo : off + virtio_sector_size * Z.of_nat k <= a).
-  { unfold virtio_sector_size, virtio_sector_bytes in *. lia. }
-  assert (Hhi : a < off + virtio_sector_size * (Z.of_nat k + 1)).
-  { unfold virtio_sector_size, virtio_sector_bytes in *. lia. }
-  clear Hk Hin Hdk Hkdef.
-  induction l as [|i l IH]; [by apply elem_of_nil in Hall|].
-  rewrite wr_fold_cons.
-  destruct (decide (i = k)) as [->|Hne].
-  - rewrite (wr_sector_hit off bs k a _ Hlo Hhi).
-    exact (disk_write_in _ off bs a x Hoff Hx).
-  - rewrite wr_sector_miss.
-    + apply IH. apply elem_of_cons in Hall as [->|Hall]; [congruence|exact Hall].
-    + unfold virtio_sector_size in *.
-      destruct (Nat.lt_total i k) as [Hlt|[He|Hgt]]; [right|congruence|left]; lia.
-Qed.
 
 (* The same reassembly, LEFT-folded -- the shape a SEQUENCE of drains has
    ([virtio_drains], section 6b): the device applies the sectors in the order
@@ -997,15 +943,6 @@ Qed.
 Definition wr_foldl (w : disk_wr) (l : list nat) (dk : Z -> bv 8) : Z -> bv 8 :=
   foldl (fun d i => wr_apply (wr_sector w i) d) dk l.
 
-Lemma wr_foldl_rev (w : disk_wr) (l : list nat) (dk : Z -> bv 8) :
-  wr_foldl w l dk = wr_fold w (reverse l) dk.
-Proof.
-  revert dk. induction l as [|i l IH]; intro dk; [reflexivity|].
-  change (wr_foldl w (i :: l) dk)
-    with (wr_foldl w l (wr_apply (wr_sector w i) dk)).
-  rewrite (IH (wr_apply (wr_sector w i) dk)).
-  rewrite reverse_cons. unfold wr_fold. rewrite foldr_app. reflexivity.
-Qed.
 
 
 (* THE BYTES OF ONE SECTOR, as the list a cache entry holds.  [wr_sector]
@@ -1058,18 +995,6 @@ Proof. intro H. unfold cache_view. by rewrite H. Qed.
 (* NOTHING CACHED: the overlay is the durable image, on the nose. *)
 
 (* the sector arithmetic: inside sector [s], the index is the displacement *)
-Lemma sector_div_mod (s a : Z) :
-  virtio_sector_size * s <= a < virtio_sector_size * s + virtio_sector_size ->
-  a / virtio_sector_size = s /\ a `mod` virtio_sector_size = a - virtio_sector_size * s.
-Proof.
-  intro Hb. unfold virtio_sector_size in *.
-  assert (Ha : a = s * 512 + (a - 512 * s)) by lia.
-  split.
-  - rewrite Ha at 1. rewrite Z.div_add_l by lia.
-    rewrite (Z.div_small (a - 512 * s) 512) by lia. lia.
-  - rewrite Ha at 1. rewrite Z.add_comm, Z.mod_add by lia.
-    apply Z.mod_small. lia.
-Qed.
 
 (* A CACHED SECTOR READS AS ITS BYTES. *)
 
@@ -1292,15 +1217,6 @@ Proof. unfold vdist. apply Z.mod_pos_bound. lia. Qed.
 Lemma vdist_refl (a : bv 16) : vdist a a = 0.
 Proof. unfold vdist. rewrite Z.sub_diag. reflexivity. Qed.
 
-Lemma vdist_zero (a b : bv 16) : vdist a b = 0 -> a = b.
-Proof.
-  unfold vdist. intro H.
-  pose proof (bv_unsigned_in_range _ a) as Ha.
-  pose proof (bv_unsigned_in_range _ b) as Hb.
-  unfold bv_modulus in Ha, Hb. cbn in Ha, Hb.
-  apply bv_eq. apply Z.mod_divide in H; [| lia ].
-  destruct H as [k Hk]. lia.
-Qed.
 
 (* a position is determined by its distance from any other *)
 Lemma vdist_inj (a b c : bv 16) : vdist a b = vdist a c -> b = c.
@@ -1331,15 +1247,7 @@ Proof.
   rewrite Zminus_mod_idemp_r, Zminus_mod_idemp_l. f_equal. lia.
 Qed.
 
-Lemma vdist_succ_pos (a b : bv 16) :
-  vdist a b <> 0 -> vdist (bv_add a one16) b = vdist a b - 1.
-Proof.
-  intro H. rewrite vdist_succ. pose proof (vdist_bounds a b).
-  apply Z.mod_small. lia.
-Qed.
 
-Lemma vdist_succ_self (a : bv 16) : vdist (bv_add a one16) a = 65535.
-Proof. rewrite vdist_succ, vdist_refl. reflexivity. Qed.
 
 (* [p] is a position the driver has PUBLISHED and the watermark has not
    passed: strictly inside the window that runs from [lo] to [ai]. *)
@@ -1351,8 +1259,6 @@ Definition vpos_pub (lo ai p : bv 16) : bool := vdist lo p <? vdist lo ai.
    as the driver is ahead by, so "is there anything to serve?" is a fold over
    a list whose length is the outstanding count -- decidable and computable,
    with no scan of [bv 16] anywhere. *)
-Fixpoint vpos_list (n : nat) (lo : bv 16) : list (bv 16) :=
-  match n with O => [] | S k => lo :: vpos_list k (bv_add lo one16) end.
 
 
 
@@ -1468,23 +1374,9 @@ Lemma vreq_cache_of_fst (mv : vmem) (r : vio_req) (is : list nat) :
   = vreq_key r <$> is.
 Proof. rewrite <- list_fmap_compose. reflexivity. Qed.
 
-Lemma vreq_cache_of_dom (mv : vmem) (r : vio_req) (is : list nat) :
-  dom (vreq_cache_of mv r is) = list_to_set (vreq_key r <$> is).
-Proof.
-  unfold vreq_cache_of. rewrite dom_list_to_map_L, vreq_cache_of_fst.
-  reflexivity.
-Qed.
 
 
-Lemma vreq_cache_of_cons (mv : vmem) (r : vio_req) (i : nat) (is : list nat) :
-  vreq_cache_of mv r (i :: is)
-  = <[ vreq_key r i := wr_sector_bytes (vreq_wr mv r) i ]>
-      (vreq_cache_of mv r is).
-Proof. reflexivity. Qed.
 
-Lemma vreq_cache_of_nil (mv : vmem) (r : vio_req) :
-  vreq_cache_of mv r [] = ∅.
-Proof. reflexivity. Qed.
 
 Lemma vreq_sectors_spec (r : vio_req) (s : Z) :
   s ∈ vreq_sectors r <-> exists i, (i < vreq_nsectors r)%nat /\ s = vreq_key r i.
@@ -1569,19 +1461,6 @@ Qed.
 
 (* THE DRAIN'S IMAGE MOVE, in the request's own vocabulary: writing sector
    [i]'s cached bytes at key [vreq_key r i] IS the [wr_sector] piece. *)
-Lemma vreq_sector_write (mv : vmem) (r : vio_req) (i : nat) (dk : Z -> bv 8) :
-  bv_unsigned (vr_type r) = virtio_blk_t_out ->
-  disk_write dk (virtio_sector_size * vreq_key r i)
-    (wr_sector_bytes (vreq_wr mv r) i)
-  = wr_apply (wr_sector (vreq_wr mv r) i) dk.
-Proof.
-  intro Hout. unfold vreq_wr. rewrite Hout, Z.eqb_refl.
-  replace (virtio_sector_size * vreq_key r i)
-    with (bv_unsigned (vr_sector r) * virtio_sector_size
-          + virtio_sector_size * Z.of_nat i)
-    by (unfold vreq_key; lia).
-  exact (wr_sector_write _ _ i dk).
-Qed.
 
 (* Completing ONE parsed request.  The completion touches NEITHER the disk
    image NOR the cache: an OUT request's data was CAPTURED into the cache
@@ -1631,12 +1510,6 @@ Definition virtio_complete (v : virtio_state) (mv : vmem) (r : vio_req)
 (* ...and it does not move the disk image. *)
 
 (* ...and it does not move the CACHE either: the drains own that. *)
-Lemma virtio_complete_cache (v : virtio_state) (mv : vmem) (r : vio_req) (i : bv 16) :
-  v_cache (virtio_complete v mv r i).1 = v_cache v.
-Proof.
-  unfold virtio_complete. cbv zeta.
-  destruct (bv_unsigned (vr_type r) =? virtio_blk_t_in); reflexivity.
-Qed.
 
 (* it does clear the capture flag, so the NEXT request starts untaken *)
 
@@ -1706,10 +1579,6 @@ Qed.
 
 (* the device has work to do: it can pop, or it can answer something it has
    already popped *)
-Definition virtio_pending (v : virtio_state) (mv : vmem) : bool :=
-  virtio_live (v_cfg v)
-  && (negb (bool_decide (v_seen v = avail_idx_at (v_cfg v) mv))
-      || negb (bool_decide (v_inflight v = ∅))).
 
 (* A position may be answered exactly when the device has POPPED it and not
    yet completed it.  Which of those it picks is free -- that is finding 5 --
@@ -2161,11 +2030,6 @@ Definition virtio_wt_inv (v : virtio_state) (S : gset Z) : Prop :=
   dom (v_cache v) ⊆ S /\ (v_taken v = None -> v_cache v = ∅).
 
 (* an empty cache satisfies it whatever the head request is *)
-Lemma virtio_wt_inv_nil (v : virtio_state) (S : gset Z) :
-  v_cache v = ∅ -> virtio_wt_inv v S.
-Proof.
-  intro H. split; [| by intros _]. rewrite H, dom_empty_L. apply empty_subseteq.
-Qed.
 
 (* the invariant is monotone in the sector set it is stated against *)
 
@@ -2206,14 +2070,6 @@ Qed.
 (*    one sector at a time.                                               *)
 (* ---------------------------------------------------------------------- *)
 
-Fixpoint virtio_drains (v : virtio_state) (l : list Z) : option virtio_state :=
-  match l with
-  | [] => Some v
-  | s :: l' => match virtio_drain_step v s with
-               | Some v1 => virtio_drains v1 l'
-               | None => None
-               end
-  end.
 
 (* draining a captured sub-list, one entry at a time *)
 
