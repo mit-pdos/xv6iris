@@ -4453,15 +4453,20 @@ the rows below and in `design/fs-ghost-state.md`).
     `ProofIalloc`/`ProofIreclaim`), or route the term through `constr:`,
     which elaborates with resolution ON.
   - **NOTHING GOT SLOWER, MEASURED** (standalone `rocq compile`, same VM,
-    against the branch's base tree built beside it): `ProofSyscall`
-    43.8 → 39.9 s, `ProofFileclose` 19.1 → 18.4, `ProofCreate`
-    139.6 → 139.2, `ProofSysOpen` 63.7 → 62.5, `ProofSysOpenTails`
-    21.9 → 21.2, `ProofSysUnlink` 131.2 → 130.0; peak RSS flat to −3 %.
-    Every delta is at or below the noise floor, which is the expected
-    answer: dropping a parameter shortens a statement without changing a
-    proof step.  `ProofSyscall` is the one that actually got faster, and
-    that is the bundles: eighteen of its twenty positional destructs lost a
-    row and nine tie `rewrite`s went away.
+    against the branch's BASE TREE BUILT BESIDE IT — `git archive` of the
+    base commit into a sibling directory, so both sets of `.vo`s exist at
+    once and the comparison is one machine, one minute apart):
+    `ProofSyscall` 43.8 → 43.2 s, `ProofFileclose` 19.1 → 19.5,
+    `ProofCreate` 139.6 → 139.1, `ProofSysOpen` 63.7 → 64.2,
+    `ProofSysOpenTails` 21.9 → 22.1, `ProofSysUnlink` 131 → 141 on the
+    first pair and 141 → 130 on the second (three runs a side: base
+    131/141/139, after 141/130/142 — the VM is SHARED and this file's
+    variance is ±8 %, which is larger than any effect here).  **Peak RSS is
+    the reading that is not noisy, and it moves the right way**:
+    `ProofSysUnlink` 3.07 → 2.81 GB (−8 %), `ProofSysOpen` −4 %, the rest
+    flat.  That is the expected answer — dropping a parameter shortens a
+    statement without changing a proof step, and a shorter statement is a
+    smaller term.
   - **WHAT IS LEFT, AND WHERE.**  The tie meter over the whole tree (with
     comments stripped, and reading `<=` as the comparison it is) is 41
     equations and every one is in a sanctioned class: the boot side, where
