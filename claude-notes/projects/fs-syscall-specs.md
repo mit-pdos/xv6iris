@@ -55,16 +55,37 @@ things, and the answer differs:
   (doc §5 principle 3 v3).  `dview` retires inside this campaign, hop
   seam first — see lane A.  Q4 answered earlier (epoch pointer); Q5
   stays option (a).  Residual: owner reads v3.
-- [ ] **D — the durability readings (UNGATED; the first proof lane).**
-  `mknod_durable` and siblings, as PER-NODE PERSISTENCE instances off
-  what the durable campaign left: `FsCrash.fs_commit_receipt` (line
-  2187), `FsDurSnap.P_dur_tie`/`P_dur_node_of_slot`/
-  `snap_dir_entry_of_first`, `SystemAdequacy.fs_boot_pure`.  Definition
-  of done: after the batch containing a mknod's transaction commits, the
-  current snapshot's table at `inum` is the created node and the
-  parent's entries contain `(name ↦ inum)` — stated once in the doc's §5
-  vocabulary, proven by reading; unlink and write's siblings follow the
-  same shape.  This is durable-disk lane D's content, subsumed.
+- [x] **D — the durability readings.**  DONE 2026-08-28 (Opus lane,
+  `iris/FsDurSyscall.v`, 654 lines, zero axioms): `mknod_durable` (+
+  its §7 non-vacuity witness), `unlink_durable`/`unlink_durable_freed`,
+  `write_durable`(`_block`), over pure persistent certificates
+  `snap_holds D` / `dur_sb D sb` / `dur_node D i n` and the determinism
+  theorem `snap_node_det` (snap_ok pins the state per-inum against `D`
+  — discharging durable-fs-plan §8's asserted claim).  Producers:
+  `snap_holds_of_boot_pure` (reaches every reachable state) and
+  `fs_commit_snap_holds` off `fs_commit_receipt`.
+  AS-LANDED NOTES: two of the brief's three FsDurSnap lemma names had
+  been deleted at S2 (plan told the spike to restate; it did — the
+  certificates are restated from `snap_ok` directly).  Certificates are
+  batch-free until durable lane F lands `flushed`; then `dur_at b i a`
+  = `flushed b ∗ ⌜dur_node D_b i n⌝` with nothing here moving.
+  GAPS RECORDED FOR LATER LANES: (1) **`FsCollectAll.fs_collect_mint`
+  discards `S = col_state sb sbb I used`** — the one tie from a
+  client's `top_frag` to the committed snapshot; lane W's AU specs will
+  want it, and the fix is a one-conjunct strengthening of a landed
+  contract (R10 — OWNER'S CALL, queued as decision item below).
+  (2) `fss_used` is NOT determined by `D` above bit `BSIZE*8`; free-
+  block durability must be stated within `[0, sb_size)`.  (3)
+  `sk_regdom` only covers `[0, 16*(ninodes/16+1))`, so determinism is
+  per-inum; no whole-map equality exists.  (4) mirror one-file compile
+  line: `coqc -R . xv6iris -R ../model-xv6iris Riscv -R ../kernel-rocq
+  Kernel -R ../user-rocq User -w -notation-overridden File.v` (the
+  `-arg` rows of _CoqProject are coq_makefile flags, not coqc's).
+- [ ] **DECISION (owner) — strengthen `fs_collect_mint` by one
+  conjunct** (name `col_state` in its conclusion so `fs_snap_law_build`
+  can carry the γtop↔snapshot tie).  Wanted by lane W's AU-to-durable
+  story; an R10 change to a landed contract, so it waits for the
+  owner's word.  Lane D did not need it (determinism route).
 - [ ] **A — the abstract state and carriers (S0 done; ready).**  Four
   pieces, all readings: (i) `abs_of : fs_node → anode` + the carrier
   `i ↦ₐ{q} a := ∃ n, top_frag_q _ q i n ∗ ⌜abs_of n = a⌝` + the
