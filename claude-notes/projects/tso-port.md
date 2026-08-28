@@ -3908,3 +3908,18 @@ flips at every mode crossing (uservec/kernelvec); "installed once"
 refers to the per-CPU interrupt resource carrying the handler's
 spec.  What remains is mechanical: the straggler λ-conversions, the
 two re-homings, the certificate's removal.
+
+0.28′ ADDENDUM (owner, same day): AN INTERRUPT IS NOT A CONTEXT
+CROSSING.  The preempted thread keeps its identity; kernelvec runs on
+the same hart, same stack, same context; its exclusive resources
+(stack_own, the GPR/interrupt capability) arrive in the PRECONDITION
+at that ambient and are BORROWED from the interrupted frame and
+returned at sret — the degenerate, evidence-free case of the
+algebra, unchanged by TSO (same context = same bound-view chain).
+The trap path's complete story: persistent needs are context-free
+invariants (0.28′); exclusive needs are precondition borrows (this
+addendum); the one true crossing — a timer-driven yield that parks —
+departs through sched() under p->lock, which is exactly 0.27′'s
+machinery.  The install-time framing was the red herring: what is
+installed is only the ∀-quantified spec; the resources always come
+from the trapping site.
