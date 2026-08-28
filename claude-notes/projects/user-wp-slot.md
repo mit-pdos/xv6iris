@@ -140,7 +140,7 @@ freeproc, kexit) → delete `proc_pt_any` (and `proc_pt_at_any`).  The
 full per-declaration inventory and DAG is the session sweep log
 §L1-INV; the per-entry M-effect worklist is §B4.
 
-THREE RULES THE CAMPAIGN RUNS ON:
+FIVE RULES THE CAMPAIGN RUNS ON:
 
 - **A leaf's `_mem` form is the PRIMITIVE; its `proc_pt_any` form is a
   five-line corollary** (`ProcPtOwn.proc_pt_ptm` in, `proc_ptm_pt` out —
@@ -148,11 +148,26 @@ THREE RULES THE CAMPAIGN RUNS ON:
   ∃-caller converts, DELETE the corollary rather than keep it.
 - **Re-alting a copy loop to the lazy view is mechanical** once the loop
   names its source bytes: swap `proc_pt_acc_rep0` / `proc_pt_rebuild` /
-  `proc_pt_page_acc(_vmfault)` / `wp_vmfault_sconf` for their `proc_ptm`
+  `proc_pt_page_acc(_vmfault)` for their `proc_ptm`
   twins, and hand the borrowed page over NAMED, rejoining with
   `ByteBuf.bb_join3_fn` rather than the existential `bb_join3` — an
   existential join is what stops a read-only borrow from closing at the
   image it opened at.
+- **A PRECISE POST NAMES THE MOVE, NOT A FRESH IMAGE.**  Where a writer
+  can stop part-way, keep the existential over the PREFIX LENGTH -- a
+  `nat` -- and write the image as a function of it
+  (`umem_wr M dst d src`).  `∃ M', ⌜P M'⌝ ∗ … M'` type-checks and says
+  the same thing, but it is not an equation and a caller cannot rewrite
+  with it.
+- **DROPPING A `∀ M'` FROM A POST BREAKS CALLERS THAT WERE PASSING A
+  DIFFERENT IMAGE, SILENTLY-UNTIL-IT-DOESN'T.**  While the post bound
+  `∀ M'`, a caller could hand the callee `upd_usM U Mx` in place of `U`
+  and the two closers stayed CONVERTIBLE -- the bound `M'` overwrote
+  `Mx` either way.  Same-`M` ends that: the block now really is at
+  `us_M U`, and every such call site has to drop its threaded image
+  (`ProofSysUnlink`'s `su_w1_seam` lost its `Mp` binder for exactly this
+  reason).  The tell is `iSpecialize: cannot instantiate … (upd_usM U Mx)
+  … with … U`.
 - **Converting a callee's post breaks its callers even when their own
   specs do not move, and the fix is a SUBSTITUTION.**  Delete the `M'`
   binder at the `iIntros` and textually replace
@@ -161,20 +176,30 @@ THREE RULES THE CAMPAIGN RUNS ON:
   `M' := us_M U` and needs no edit.  That is what lets one tier convert
   without dragging the tier above it in.
 
-STATE: tiers 0 (vm.c leaves) and 1 (fetch/arg) are DONE.
-`wp_copyinstr_sconf_mem` exists and copyinstr's ∃-twin is deleted;
-`wp_fetchaddr_sconf` / `wp_fetchstr_sconf` / `wp_argstr_sconf` are
-same-`M`.  The frontier is TIER 2, `either_copy` — both its callees are
-converted, its copyIN arm becomes same-`M` and its copyOUT arm becomes
-PRECISE at `umem_write`'s window.  Two entries are ready out of order:
-`ProofUsertrapArms.ut_d0`'s vmfault arm (the last caller of
-`wp_vmfault_sconf`), and the six fs-syscall specs
-(`SpecSysChdir`/`Mkdir`/`Mknod`/`Unlink`/`Link`/`Open`), whose proofs are
-already same-`M` internally, so dropping their `∀ M'` costs no proof
-step.  `SpecUvmclear` and `SpecProcFreepagetable` are the two leaves with
-no `_mem` form; the exec and residue tiers must write them first.
-`SpecUvmunmap.wp_uvmunmap_sconf` has no caller at all and is deletable
-today.
+STATE: tiers 0 (vm.c leaves), 1 (fetch/arg) and 2 (`either_copy`) are
+DONE, and so are the three items that were ready out of order.
+`either_copyin_post` is same-`U`; `either_copyout_post` is the campaign's
+FIRST PRECISE WRITER --
+
+```coq
+∃ (P' : uptd) (d : nat),
+  ⌜uptd_ext (pv_upt (us_V U)) P'⌝ ∗ ⌜either_copyout_ran len r d⌝ ∗
+  proc_priv_core p pid
+    (upd_usM (us_upt U P') (umem_wr (us_M U) dst d src_bytes))
+```
+
+-- the entry image with the copied prefix written at `dst`, an EQUATION
+rather than a fresh binder.  `SpecEitherCopyout.either_copyout_post_any`
+is the one-line forgetting the not-yet-converted tier above uses, and
+every call of it is an entry on the remaining worklist.
+`wp_vmfault_sconf` and `wp_uvmunmap_sconf` are deleted (no callers left);
+the six fs-syscall specs no longer bind `∀ M'`.  `SpecUvmclear` and
+`SpecProcFreepagetable` now have `_mem` forms: uvmclear's is the
+PRIMITIVE and is same-`M` (clearing PTE_U moves neither `ud_um`'s domain
+nor a leaf's ppn, so neither `uva_mapped` nor `uva_pa` moves --
+`ProcPtOwn.umem_lazy_set_same`), proc_freepagetable's is a corollary
+because its post hands nothing back either way.  The frontier is TIER 3,
+the file / pipe / console read-write layer.
 
 ## The ledger
 

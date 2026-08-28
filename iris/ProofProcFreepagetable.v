@@ -935,6 +935,27 @@ Section ProofProcFreepagetable.
               | apply HE4thr; vm_compute; first [reflexivity | discriminate] ].
   Qed.
 
+  (* THE MEMORY-INDEXED FORM, for a caller that holds the block at the lazy
+     view.  It is a corollary and not a refinement: the postcondition hands
+     nothing back either way, so the image is simply forgotten on the way
+     in.  The size the view was taken at plays no part -- [proc_ptm_pt]
+     holds at every size. *)
+  Lemma wp_proc_freepagetable_mem_sconf
+      (γa : gname) (mm : regfile)
+      (P : uptd) (szv : Z) (M : gmap Z (bv 8))
+      (K : nat) (eb : bool) (p : mword 64)
+      (ilvl : nat) (b : bool) (lks : gset string)
+    : wp_proc_freepagetable_mem_sconf_body γa mm P szv M K eb p ilvl b lks.
+  Proof.
+    cbv beta delta [wp_proc_freepagetable_mem_sconf_body].
+    intros pcE sz ret_tgt HK Hilvl Hroot Hbnd Hbelow Hlkbelow.
+    iIntros "Hcg Hcpu #Htext Hpc Hpt #Henv Hcont".
+    iDestruct (proc_ptm_pt P szv M with "Hpt") as "Hpt".
+    iApply (wp_proc_freepagetable_sconf γa mm P K eb p ilvl b lks
+              HK Hilvl Hroot Hbnd Hbelow Hlkbelow
+              with "Hcg Hcpu Htext Hpc Hpt Henv Hcont").
+  Qed.
+
 End ProofProcFreepagetable.
 
 End ProcFreepagetableProof.

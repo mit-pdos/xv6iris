@@ -493,23 +493,6 @@ Section BarePt.
              Hspec).
   Qed.
 
-  Lemma uptg_proc_pt (P : uptd) :
-    upt_acc_wf P.(ud_um) -> page_valid (page_base P.(ud_tfp)) ->
-    uptg (upt_fixed_both P.(ud_tfp)) P.(ud_root) P.(ud_um) ⊢ proc_pt_any P.
-  Proof.
-    intros Hacc Hval. iIntros "H".
-    rewrite proc_pt_any_unfold /uptg /proc_pt_own /pt_frame.
-    iDestruct "H" as "(%Hwf & %Hfx & Ht & Hown)".
-    iDestruct "Ht" as (t) "(%Hspec & Ht)".
-    destruct Hwf as (Hm & Hp & Hi).
-    iSplitR.
-    { iPureIntro. rewrite /proc_pt_wf.
-      split_and!; [exact Hm | exact Hacc | exact Hp | exact Hi | exact Hval]. }
-    iSplitL "Ht"; [| iExact "Hown"].
-    iExists t. iFrame "Ht". iPureIntro.
-    exact (proj1 (uptg_spec_both P.(ud_root) P.(ud_tfp) P.(ud_um) t Hm) Hspec).
-  Qed.
-
   (* ---- the open / close pair uvmunmap's wrapper runs on, at any [fx].
      Both are [ProcPtOwn.proc_pt_acc_rep0] / [_rebuild] with
      [upt_ad_view] replaced by [uptg_view]. ---- *)

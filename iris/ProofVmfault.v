@@ -1717,41 +1717,6 @@ Section ProofVmfault.
     { rewrite /PAY. iLeft. iSplitR; [iPureIntro; reflexivity | iExact "Hpt"]. }
   Qed.
 
-  (* THE [proc_pt]-ALTITUDE COROLLARY.  vmfault's other callers -- usertrap,
-     copyinstr -- say nothing about the process's memory, so they keep the
-     contract that does not name it.  Opening and re-sealing is the whole
-     of the derivation: [ProcPtOwn.proc_pt_ptm] IS the equivalence. *)
-  Lemma wp_vmfault_sconf
-      (γa : gname) (mm : regfile)
-      (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (p : mword 64)
-      (b : bool) (lks : gset string)
-    : wp_vmfault_sconf_body γa mm P szv K lvl eb p b lks.
-  Proof.
-    cbv beta delta [wp_vmfault_sconf_body].
-    intros pcE va va0 ret_tgt HK Htp Hroot Hsza1 Hszb Hlvl Hbelow.
-    iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hcont".
-    iEval (rewrite (proc_pt_ptm P (uint szv))) in "Hpt".
-    iDestruct "Hpt" as (M) "Hpt".
-    iApply (wp_vmfault_sconf_mem γa mm P M szv K lvl eb p b lks
-              HK Htp Hroot Hsza1 Hszb Hlvl Hbelow
-              with "Hcg Hcnt Htext Hpc Hpt Henv").
-    rewrite /wp_next.
-    iIntros (CIDr) "%Hch".
-    iSpecialize ("Hcont" $! CIDr with "[%]"); [exact Hch |].
-    iIntros (mr) "Hcg2 Hcnt2 Hpc2 %Hcs Hpost".
-    iApply ("Hcont" $! mr with "Hcg2 Hcnt2 Hpc2 [%] [Hpost]"); [exact Hcs |].
-    iDestruct "Hpost" as "[(%Hz & Hp) | Hs]".
-    - iLeft. iSplitR; [iPureIntro; exact Hz |].
-      iApply (proc_ptm_pt with "Hp").
-    - iDestruct "Hs" as (r) "(%Hr & %Hv & %Hlt & %Hn & Hp)".
-      iRight. iExists r.
-      iSplitR; [iPureIntro; exact Hr |].
-      iSplitR; [iPureIntro; exact Hv |].
-      iSplitR; [iPureIntro; exact Hlt |].
-      iSplitR; [iPureIntro; exact Hn |].
-      iApply (proc_ptm_pt with "Hp").
-  Qed.
-
 End ProofVmfault.
 
 End VmfaultProof.

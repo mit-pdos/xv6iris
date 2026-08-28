@@ -1808,9 +1808,12 @@ Section ReadiLoop.
                         (rd_delivered data dst_olds off (tot + mm)%nat))%I
         with "[Hpost Hdstrest]" as "Hnorm".
       { rewrite /rd_dst. destruct user.
-        - iDestruct "Hpost" as "(%Hr & Hpp)".
-          iDestruct "Hpp" as (P2 M2) "[%Hx Hpriv]".
-          iExists P2, M2.
+        - (* readi's own post still binds a fresh image, so the window
+             equation either_copyout states is dropped here: the [_] is the
+             moved image, and it is [umem_wr (us_M U) dst dwr src_bytes]. *)
+          iDestruct "Hpost" as (P2 dwr) "(%Hx & %Hran & Hpriv)".
+          pose proof (either_copyout_ran_ret _ _ _ Hran) as Hr.
+          iExists P2, _.
           iSplitR; [iPureIntro; exact (uptd_ext_trans _ _ _ HextI Hx)|].
           iSplitR; [iPureIntro; destruct Hr as [Hr|Hr];
                     [left; exact Hr | right; split; [exact Hr | reflexivity]]|].

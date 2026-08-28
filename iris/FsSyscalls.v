@@ -287,7 +287,7 @@ Definition wp_sys_mkdir_friendly_body
   wp_next true pj (fun (CID : CpuId) =>
   (* the image moves: argstr's fetchstr faults user pages in -- milestone J
      item 1's ∃-weakened staging *)
-  ∀ (mf : regfile) (ns' : nat) (P' : uptd) (M' : gmap Z (bv 8)),
+  ∀ (mf : regfile) (ns' : nat) (P' : uptd),
       ⌜sys_mkdir_ret (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
@@ -296,7 +296,7 @@ Definition wp_sys_mkdir_friendly_body
       cpu_own 0 true pj b lks -∗
       pc_is ret_tgt -∗
       fs_res ns' dqb dqs dqbs dqn -∗
-      proc_priv γf pj pid (upd_usM (us_upt U P') M') -∗
+      proc_priv γf pj pid (us_upt U P') -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -370,12 +370,12 @@ Module FsSysMkdir (M : SYSMKDIR).
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iIntros (CIDn) "%Hgd".
-    iIntros (mf ns' P' M')
+    iIntros (mf ns' P')
       "%Hcs %Hupt Hcg Hown _ _ Hpc Hbsl Hsbn Hsbi Hsbs Hsbb %Hns' Hir
        Hpriv %Hret".
     iDestruct (wp_next_at (CID0 := CID) true (proc_addr j) _ CIDn Hgd
                  with "Hcont") as "Hcont".
-    iApply ("Hcont" $! mf ns' P' M'
+    iApply ("Hcont" $! mf ns' P'
               with "[%] [%] [%] [%] Hcg Hown Hpc
                     [Hbsl Hsbn Hsbi Hsbs Hsbb Hir] Hpriv").
     - exact Hret.
@@ -456,7 +456,7 @@ Definition wp_sys_chdir_friendly_body
   proc_priv γf pj pid U -∗
   wp_next true pj (fun (CID : CpuId) =>
   (* the image moves: argstr's fetchstr faults user pages in *)
-  ∀ (mf : regfile) (P' : uptd) (M' : gmap Z (bv 8)),
+  ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
@@ -464,7 +464,7 @@ Definition wp_sys_chdir_friendly_body
       pc_is ret_tgt -∗
       (* THE LEDGER IS RESTORED AT THE LITERAL 2 -- the composability half *)
       fs_res 2 dqb dqs dqbs dqn -∗
-      sys_chdir_post γf pj pid (upd_usM (us_upt U P') M')
+      sys_chdir_post γf pj pid (us_upt U P')
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -523,11 +523,11 @@ Module FsSysChdir (M : SYSCHDIR).
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iIntros (CIDn) "%Hgd".
-    iIntros (mf P' M')
+    iIntros (mf P')
       "%Hcs %Hupt Hcg Hown _ _ Hpc Hbsl Hsbb Hsbi Hir Hpost".
     iDestruct (wp_next_at (CID0 := CID) true (proc_addr j) _ CIDn Hgd
                  with "Hcont") as "Hcont".
-    iApply ("Hcont" $! mf P' M'
+    iApply ("Hcont" $! mf P'
               with "[%] [%] Hcg Hown Hpc
                     [Hbsl Hsbn Hsbi Hsbs Hsbb Hir] Hpost").
     - exact Hcs.

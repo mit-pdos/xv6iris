@@ -2982,9 +2982,11 @@ Section WriteiLoop.
           with "[Hpost Hsrcrest]" as "Hnorm".
         { destruct user.
           - iDestruct "Hpost" as "(%Hr & Hpp & Hdst)".
-            iDestruct "Hpp" as (P2 M2) "[%Hx Hpriv]".
+            iDestruct "Hpp" as (P2) "[%Hx Hpriv]".
             iDestruct "Hdst" as (gg) "Hw".
-            iExists gg, P2, M2.
+            (* either_copyin is SAME-image now, so the fresh image writei's
+               own post still binds is simply the one it went in at. *)
+            iExists gg, P2, Mim2.
             iSplitR; [iPureIntro; exact (uptd_ext_trans _ _ _ HextI Hx)|].
             iSplitR; [iPureIntro; discriminate|].
             iSplitR; [iPureIntro; destruct Hr as [H0 | Hm1];

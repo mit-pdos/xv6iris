@@ -5178,17 +5178,97 @@ Section ProcPt.
     rewrite (delete_notin _ _ Hl). reflexivity.
   Qed.
 
-  (* THE CLEAR-U STEP owns nothing new and gives nothing back: the page
-     set is unchanged (same ppn), so this is an equality of resources, not
-     a transfer.  Compare [proc_pt_own_shrink], which really does hand a
-     page over. *)
-  Lemma proc_pt_own_set_same (P : uptd) (vpn : mword 27) (w x : mword 64) :
+  (* ---- the CLEAR-U step, at every altitude --------------------------- *)
+  (* WHAT uvmclear DOES TO THE PROCESS'S MEMORY IS NOTHING, and these four
+     lemmas are why.  Clearing PTE_U rewrites a leaf that is ALREADY in
+     [ud_um] at a word with the SAME ppn, so
+       - [uva_mapped] (hence [uva_dom]) reads the map's DOMAIN and does not
+         move: an insert at a key already present changes no domain;
+       - [uva_pa] reads the leaf's PPN and does not move either
+         ([pte_ppn_clear_u]);
+     and the image is therefore literally the same resource at the new
+     descriptor -- at the mapped view and at the lazy one alike.  That the
+     page stops being reachable FROM USER MODE is a fact about
+     [UserPtTree.user_pt_inv], which reads the permission bits; the
+     kernel-side image is keyed on what the table maps and on [p->sz], and
+     neither moved. *)
+  Lemma uva_mapped_set_same (P : uptd) (vpn : mword 27) (w x : mword 64) (va : Z) :
+    P.(ud_um) !! vpn = Some w ->
+    uva_mapped (uptd_set P vpn x) va <-> uva_mapped P va.
+  Proof.
+    intros Hl. unfold uva_mapped, uptd_set. cbn [ud_um]. split.
+    - intros (v0 & w0 & j & Hl0 & Hj & Hva).
+      apply lookup_insert_Some in Hl0 as [(Hv & _) | (Hne & Hl0)].
+      + exists v0, w, j. split_and!; [congruence | exact Hj | exact Hva].
+      + exists v0, w0, j. split_and!; [exact Hl0 | exact Hj | exact Hva].
+    - intros (v0 & w0 & j & Hl0 & Hj & Hva).
+      destruct (decide (v0 = vpn)) as [Hv | Hne].
+      + exists v0, x, j.
+        split_and!; [rewrite Hv; apply lookup_insert | exact Hj | exact Hva].
+      + exists v0, w0, j.
+        split_and!; [rewrite lookup_insert_ne; [exact Hl0 | congruence]
+                    | exact Hj | exact Hva].
+  Qed.
+
+  Lemma uva_dom_set_same (P : uptd) (vpn : mword 27) (w x : mword 64) :
+    P.(ud_um) !! vpn = Some w -> uva_dom (uptd_set P vpn x) = uva_dom P.
+  Proof.
+    intros Hl. apply set_eq. intros va. rewrite !elem_of_uva_dom.
+    exact (uva_mapped_set_same P vpn w x va Hl).
+  Qed.
+
+  Lemma uva_pa_set_same (P : uptd) (vpn : mword 27) (w x : mword 64) (va : Z) :
     P.(ud_um) !! vpn = Some w -> pte_ppn x = pte_ppn w ->
-    proc_pt_own P ⊣⊢ proc_pt_own (uptd_set P vpn x).
+    uva_pa (uptd_set P vpn x) va = uva_pa P va.
+  Proof.
+    intros Hl Hq. unfold uva_pa, uptd_set. cbn [ud_um].
+    destruct (decide (svpn_of (mword_of_int va : mword 64) = vpn)) as [Heq | Hne].
+    - rewrite Heq lookup_insert Hl. apply bv_eq.
+      rewrite !u_walk_pa_unsigned Hq. reflexivity.
+    - rewrite lookup_insert_ne; [reflexivity | congruence].
+  Qed.
+
+  Lemma umem_own_set_same (P : uptd) (vpn : mword 27) (w x : mword 64)
+      (M : gmap Z (bv 8)) :
+    P.(ud_um) !! vpn = Some w -> pte_ppn x = pte_ppn w ->
+    umem_own P M ⊣⊢ umem_own (uptd_set P vpn x) M.
+  Proof.
+    intros Hl Hq. rewrite /umem_own (uva_dom_set_same P vpn w x Hl).
+    assert (Hbs : ([∗ map] va ↦ b ∈ M, (uva_pa P va : Arch.pa) ↦ₚ b)
+                  ⊣⊢ ([∗ map] va ↦ b ∈ M,
+                        (uva_pa (uptd_set P vpn x) va : Arch.pa) ↦ₚ b)).
+    { apply big_sepM_proper. intros k v _.
+      by rewrite (uva_pa_set_same P vpn w x k Hl Hq). }
+    rewrite Hbs. reflexivity.
+  Qed.
+
+  Lemma umem_lazy_set_same (P : uptd) (sz : Z) (M : gmap Z (bv 8))
+      (vpn : mword 27) (w x : mword 64) :
+    P.(ud_um) !! vpn = Some w -> pte_ppn x = pte_ppn w ->
+    umem_lazy P sz M ⊣⊢ umem_lazy (uptd_set P vpn x) sz M.
   Proof.
     intros Hl Hq.
-    rewrite /proc_pt_own /uptd_set /upt_pages_own. cbn [ud_um].
-    rewrite (um_ppns_set_same P.(ud_um) vpn w x Hl Hq). reflexivity.
+    assert (Hmap : forall va, uva_mapped (uptd_set P vpn x) va <-> uva_mapped P va)
+      by (intros va; exact (uva_mapped_set_same P vpn w x va Hl)).
+    rewrite /umem_lazy. iSplit.
+    - iIntros "H". iDestruct "H" as (Mp) "(%H1 & %H2 & %H3 & Hm)".
+      iExists Mp. iSplitR; [iPureIntro; exact H1 |].
+      iSplitR.
+      { iPureIntro. intros va. rewrite (H2 va) (Hmap va). reflexivity. }
+      iSplitR.
+      { iPureIntro. intros va Hnm Hlv. apply H3; [| exact Hlv].
+        intros Hc. apply Hnm. by apply Hmap. }
+      iEval (rewrite (umem_own_set_same P vpn w x Mp Hl Hq)) in "Hm".
+      iExact "Hm".
+    - iIntros "H". iDestruct "H" as (Mp) "(%H1 & %H2 & %H3 & Hm)".
+      iExists Mp. iSplitR; [iPureIntro; exact H1 |].
+      iSplitR.
+      { iPureIntro. intros va. rewrite (H2 va) (Hmap va). reflexivity. }
+      iSplitR.
+      { iPureIntro. intros va Hnm Hlv. apply H3; [| exact Hlv].
+        intros Hc. apply Hnm. by apply Hmap. }
+      iEval (rewrite <- (umem_own_set_same P vpn w x Mp Hl Hq)) in "Hm".
+      iExact "Hm".
   Qed.
 
   Lemma proc_pt_wf_delete (P : uptd) (vpn : mword 27) :

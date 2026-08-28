@@ -112,7 +112,60 @@ Definition wp_proc_freepagetable_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG �
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* ===================================================================== *)
+(*  THE MEMORY-INDEXED CONTRACT.                                          *)
+(* ===================================================================== *)
+(* THE IMAGE IS SURRENDERED, WHOLE, AND THAT IS THE POINT.  Everything
+   else in the sub-[proc_priv] tier hands the process's memory back --
+   unchanged (copyin, vmfault, uvmclear), grown (uvmalloc), shrunk
+   (uvmdealloc) or written (copyout).  proc_freepagetable hands nothing
+   back, because after it there is no address space to have an image OF:
+   every page went to the allocator.  So the memory-indexed form takes
+   [proc_ptm P sz M] and its postcondition is registers only -- the same
+   shape as the [proc_pt] contract above, and for the same reason.
+
+   NOTHING IS GAINED BY NAMING [M] HERE except the ability to CALL this
+   from a caller that holds the block at the lazy view, which is every
+   caller once the ∃-[M] tier is retired.  It is therefore a corollary of
+   the contract above ([ProcPtOwn.proc_ptm_pt] on the way in), not a
+   refinement of it. *)
+Definition wp_proc_freepagetable_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    (γa : gname) (mm : regfile)
+    (P : uptd) (szv : Z) (M : gmap Z (bv 8))
+    (K : nat) (eb : bool) (p : mword 64)
+    (ilvl : nat) (b : bool) (lks : gset string) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.proc_freepagetable in
+  let sz := mm !!! Regidx (mword_of_int 11) in
+  let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
+  (40 <= K)%nat ->
+  (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
+  mm !!! Regidx (mword_of_int 10) = page_base P.(ud_root) ->
+  (uint sz <= uvm_maxsz)%Z ->
+  um_below sz P.(ud_um) ->
+  locks_below lks "kmem" ->
+  sie_cap_gpr KT1 mm K b p -∗
+  cpu_own ilvl eb p b lks -∗
+  kernel_text -∗
+  pc_is pcE -∗
+  proc_ptm P szv M -∗
+  kalloc_env γa None -∗
+  wp_next b p (fun (CID : CpuId) =>
+    ∀ (mr : regfile),
+    sie_cap_gpr KT1 mr K b p -∗
+    cpu_own ilvl eb p b lks -∗
+    pc_is ret_tgt -∗
+    ⌜callee_saved mm mr⌝ -∗
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Module Type PROC_FREEPAGETABLE.
+  Parameter wp_proc_freepagetable_mem_sconf :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+      (γa : gname) (mm : regfile)
+      (P : uptd) (szv : Z) (M : gmap Z (bv 8))
+      (K : nat) (eb : bool) (p : mword 64)
+      (ilvl : nat) (b : bool) (lks : gset string),
+      wp_proc_freepagetable_mem_sconf_body γa mm P szv M K eb p ilvl b lks.
   Parameter wp_proc_freepagetable_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)

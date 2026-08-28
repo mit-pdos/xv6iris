@@ -872,10 +872,12 @@ Section UtD0.
       by (rewrite (ua_pin_lookup M7 Rs1 ltac:(reg_neq)); exact HM7s1).
     assert (HcsP7 : ut_cs m0 (tp_pin M7)) by exact (ua_pin_cs m0 M7 HcsM7).
     iEval (rewrite <- (ua_pin_sie_cap_gpr M7 nx false (un_pj N))) in "Hcg".
-    (* vmfault MAY BACK A PAGE, so what it hands back is a fresh image: the
-       call is at the ∃-weakened [proc_pt_any] and each arm re-names it. *)
-    iDestruct (proc_ptm_pt with "Hppt") as "Hppt".
-    iApply (VM.wp_vmfault_sconf (fsc_kalloc) (tp_pin M7) (pv_upt (us_V U)) (pv_sz (us_V U)) nx
+    (* vmfault MAY BACK A PAGE, BUT IT MOVES NO BYTE: the page it maps was
+       already in the block's view, as a lazy page reading 0, and vmfault
+       zeroes what it maps.  So the call runs at the block's own image and
+       both arms hand it straight back ([wp_vmfault_sconf_mem]). *)
+    iApply (VM.wp_vmfault_sconf_mem (fsc_kalloc) (tp_pin M7) (pv_upt (us_V U)) (us_M U)
+              (pv_sz (us_V U)) nx
               0%nat false (un_pj N) false lks
               ltac:(lia) (rget_tp M7) HP7a0 HP7a1 Hszb
               ltac:(vm_compute; reflexivity)
@@ -930,17 +932,16 @@ Section UtD0.
                           (concat_vec (mword_of_int 1975 : mword 11) ('b"0"))))
                      = mword_of_int (UT + 0x56)) by pcw.
       iEval (rewrite Hp56) in "Hpc".
-      iDestruct (proc_pt_any_ptm with "Hppt") as (Mv) "Hppt".
-      iDestruct ("Hpvback" $! (pv_upt (us_V U)) Mv ltac:(apply uptd_ext_sz_refl)
+      iDestruct ("Hpvback" $! (pv_upt (us_V U)) (us_M U) ltac:(apply uptd_ext_sz_refl)
                    with "Hsz Hpgt Hppt") as "Hpv".
-      rewrite us_upt_id.
-      iDestruct ("Hownback" $! (upd_usM U Mv) with "Hpv Hufr Hsy") as "Hown".
-      iApply (ut_56 Rsys N (upd_usM U Mv) pt ksp m0 mr av nx
+      rewrite us_upt_id upd_usM_id.
+      iDestruct ("Hownback" $! U with "Hpv Hufr Hsy") as "Hown".
+      iApply (ut_56 Rsys N U pt ksp m0 mr av nx
                 mie_v menvcfg0 lks
                 Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp Hmrsp Hmrs1 Hcsmr
                 Hmiev Hmenvv
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
-      iApply (ua_hold_on Rsys N (upd_usM U Mv) with "Hcpu Hcsrs Hclm [-]").
+      iApply (ua_hold_on Rsys N U with "Hcpu Hcsrs Hclm [-]").
       rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].
     - (* ---- vmfault backed a page: the [bnez] is taken, to +0xa6 ---- *)
       iDestruct "Hvs" as (r) "(%Hra0 & %Hrpv & %Hszlt & %Hunone & Hppt)".
@@ -975,20 +976,19 @@ Section UtD0.
         apply svpn_of_pgd_below.
         - rewrite -uint_unsigned. exact Hszb.
         - rewrite -!uint_unsigned. exact Hszlt. }
-      iDestruct (proc_pt_any_ptm with "Hppt") as (Mv) "Hppt".
-      iDestruct ("Hpvback" $! Pd Mv Hextd with "Hsz Hpgt Hppt") as "Hpv".
+      iDestruct ("Hpvback" $! Pd (us_M U) Hextd with "Hsz Hpgt Hppt") as "Hpv".
       set (V' := upd_upt (us_V U) Pd).
       change (upd_upt (us_V U) Pd) with V'.
       assert (HV'tfp : ud_tfp (pv_upt V') = ud_tfp pt).
       { rewrite /V' /Pd. exact Htfpe. }
-      iDestruct ("Hownback" $! (MkUstate V' Mv) with "Hpv Hufr Hsy") as "Hown".
-      iApply (T.ut_a6 Rsys N (MkUstate V' Mv) pt ksp m0 mr av nx false
+      iDestruct ("Hownback" $! (MkUstate V' (us_M U)) with "Hpv Hufr Hsy") as "Hown".
+      iApply (T.ut_a6 Rsys N (MkUstate V' (us_M U)) pt ksp m0 mr av nx false
                 mie_v menvcfg0 lks
                 Hwf' Hav Hnx HV'tfp Hksp Hm0sp Hmrsp Hmrs1 Hcsmr
                 Hmiev Hmenvv
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
       all: try lkbelow.
-      iApply (ua_hold_on Rsys N (MkUstate V' Mv) with "Hcpu Hcsrs Hclm [-]").
+      iApply (ua_hold_on Rsys N (MkUstate V' (us_M U)) with "Hcpu Hcsrs Hclm [-]").
       rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].
   Qed.
 

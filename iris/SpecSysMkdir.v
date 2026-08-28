@@ -277,9 +277,12 @@ Definition wp_sys_mkdir_sconf_body
      argstr's fault path, create and end_op all park), so it can return on
      another hart whatever SIE was doing. *)
   wp_next true pj (fun (CID : CpuId) =>
-  (* the image moves: the copy leaves may fault a page in, and copyout
-     writes user memory -- milestone J item 1's ∃-weakened staging *)
-  ∀ (mf : regfile) (ns' : nat) (P' : uptd) (M' : gmap Z (bv 8)),
+  (* THE IMAGE DOES NOT MOVE.  This syscall only READS user memory (argstr,
+     through fetchstr and copyinstr); the pages it faults in on the way were
+     already in the block's view, as lazy pages reading 0, so vmfault does
+     not move it either.  Only the DESCRIPTOR grows, and the block comes
+     back at the image it was handed. *)
+  ∀ (mf : regfile) (ns' : nat) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       (* the page table may have GROWN: argstr's fetchstr faults user pages
          in.  [uptd_ext] is argstr's own report, relayed. *)
@@ -307,7 +310,7 @@ Definition wp_sys_mkdir_sconf_body
          interval could not support (FsSyscalls.v's note (S3)). *)
       ⌜ns' = ns⌝ -∗
       iref_slots ns' -∗
-      proc_priv γf pj pid (upd_usM (us_upt U P') M') -∗
+      proc_priv γf pj pid (us_upt U P') -∗
       ⌜sys_mkdir_ret (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).

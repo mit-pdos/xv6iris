@@ -1144,7 +1144,9 @@ Section CwBodies.
       iEval (rewrite P4a) in "Hpc".
       rewrite /either_copyin_post.
       iDestruct "Hpost" as "(%Hrv & Hpv & Hb1)".
-      iDestruct "Hpv" as (P1 M1) "(%Hext1 & Hpriv)".
+      (* either_copyin is SAME-image, so the block comes back at [us_M U]
+         and consolewrite's loop carries no moved image at all. *)
+      iDestruct "Hpv" as (P1) "(%Hext1 & Hpriv)".
       iDestruct "Hb1" as (fb') "Hb1".
       iEval (rewrite HB6a0) in "Hb1".
       (* the register shape survives the call *)
@@ -1251,7 +1253,7 @@ Section CwBodies.
         assert (HD3ra : D3 !!! Regidx Rra
                         = add_vec_int (mword_of_int (CW + 0x52) : mword 64) 4)
           by (rewrite /D3 upd_eq; reflexivity).
-        iDestruct (cw_priv_pid pj pid (upd_usM (us_upt U P1) M1) with "Hpriv") as "[Hpid Hpback]".
+        iDestruct (cw_priv_pid pj pid (us_upt U P1) with "Hpriv") as "[Hpid Hpback]".
         iDestruct (cpu_own_transport CIDc7 CIDcb 0%nat eb pj true 
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iApply (Uartwrite.wp_uartwrite_sconf γu γv γs jp γlp γl D3 (av - 16)%nat
@@ -1348,7 +1350,7 @@ Section CwBodies.
           iDestruct (cw_ret_weaken (CID0 := CID0) jp m0 av eb pid U P1 n lks Hext1
                        with "Hcont") as "Hcont".
           iApply (cw_exit_done (CID := CIDce) CID0 jp m0 F1 av eb sp0 pid
-                    (upd_usM (us_upt U P1) M1) n (nn + i)%Z lks
+                    (us_upt U P1) n (nn + i)%Z lks
                     Hm0sp ltac:(destruct HF1regs as (Y1 & _); exact Y1)
                     HF1s1 HF1s11 ltac:(lia) Hav Heb Hal ltac:(wp_next_chain)
                     with "Ht Hcg Hcnt Hpc Hpriv Hsaved Hspill Hbuf Hcont").
@@ -1366,7 +1368,7 @@ Section CwBodies.
           iEval (rewrite Pbk) in "Hpc".
           iDestruct (cw_ret_weaken (CID0 := CID0) jp m0 av eb pid U P1 n _ Hext1
                        with "Hcont") as "Hcont".
-          iApply (IH CIDce F1 (upd_usM (us_upt U P1) M1) (nn + i)%Z
+          iApply (IH CIDce F1 (us_upt U P1) (nn + i)%Z
                     ltac:(lia) ltac:(lia) HF1regs HF1s11 ltac:(wp_next_chain) Hbelow
                     with "Ht Hcg Hcnt Hpc Hpriv Hkenv Hdinv Htxl Hpinv
                           Hsaved Hspill Hbuf Hcont").
@@ -1390,7 +1392,7 @@ Section CwBodies.
         iDestruct (cw_ret_weaken (CID0 := CID0) jp m0 av eb pid U P1 n lks Hext1
                      with "Hcont") as "Hcont".
         iApply (cw_exit_break (CID := CIDc8) CID0 jp m0 mf1 av eb sp0 pid
-                  (upd_usM (us_upt U P1) M1) n i lks
+                  (us_upt U P1) n i lks
                   Hm0sp Csp Cs1 Hs11c ltac:(lia) Hav Heb Hal ltac:(wp_next_chain)
                   with "Ht Hcg Hcnt Hpc Hpriv Hsaved Hspill Hbuf Hcont"). }
     (* ---------------------------------------------------------------- *)
