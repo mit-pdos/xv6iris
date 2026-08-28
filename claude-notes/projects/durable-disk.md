@@ -4485,6 +4485,103 @@ the rows below and in `design/fs-ghost-state.md`).
   lanes; three of the four holders are already predicate-vocabulary; the
   payoff is the commit handing a real `fs_state` to the transport.  Runs
   AFTER rank 1 or before it, never concurrently (same payload bodies).
+  Stages 1 and 2 are LANDED (EV1 below); 3–5 remain.
+
+  **AS LANDED — EV1 (stages 1 and 2).  Whole tree green (zero `Error`,
+  `MAKEEXIT=0`), `tools/dethread_check.py` at "0 declarations out of
+  scope", and `iris/SystemAdequacy.v` / `iris/SystemAssumptions.v`
+  byte-identical to main — neither ever named anything either stage
+  touched.**
+
+  - **STAGE 1 IS `inode_dat_q`, AND IT IS `inode_phi` MINUS ITS RECORD.**
+    `FsStateInode.inode_dat_q Γ dq n` is the block big-op over
+    `blk_owned_q` beside `ind_owned_q`; `inode_dat` is its `DfracOwn 1`
+    reading, CONVERTIBLE to it (`inode_dat_1` is `reflexivity`), and
+    `inode_phi_dat : inode_phi Γ sb i n = rec_owned Γ sb i (fn_rec n) ∗
+    inode_dat Γ n` is `reflexivity` too — `bi_sep` associates to the
+    right, so `inode_phi`'s text did not move and no existing
+    destructuring pattern in the tree moved with it.  Beside it:
+    `inode_phi_at` (the geometry-free `rec_owned_at ∗ inode_dat`, the
+    `free_bitmap_at` pattern), the superblock step `inode_phi_sb` (an
+    `⊣⊢` under `rec_owned_sb`'s real `0 ≤ i < 2^32`), `inode_dat_q_split`,
+    `inode_dat_q_blk_acc`, the three Timeless instances through a
+    `tl_struct` peel, and `inode_ghost_of`.  Sealed
+    `Typeclasses Opaque inode_dat_q inode_dat inode_phi_at`.  150 lines,
+    purely additive: nothing else in the tree changed at stage 1.
+  - **THE CLASS CHECK IS NOT OPTIONAL AND IT PASSED.**  A probe's `About`
+    shows `inode_dat_q` / `inode_dat` / `inode_phi_at` / `inode_phi_sb`
+    quantified over `{Σ}` ALONE — Rocq's section discharge adds only the
+    variables a term USES, so living inside `Section InodeOwned`'s
+    `` `{!fsLinkG Σ} `` costs them nothing — while `inode_ghost_of`
+    correctly carries `fsLinkG` because it genuinely reads the link RA.
+    Stage 3 can therefore name the leg from `InodeInv` without dragging a
+    capacity class into that file's cone.
+  - **STAGE 2 DELETED `inode_bytes_era` RATHER THAN ALIASING IT.**  It was
+    a twin of `inode_dat_q` at the logged view, so `inode_owned_era_q`,
+    `inode_owned_era`, `inode_rd_era` and `inode_owned_era_split` are
+    restated over `inode_dat_q`/`inode_dat` directly and the name is gone.
+    THE PLAN'S COUNT WAS LOW: 20 bare occurrences of the predicate plus 8
+    of its six-member lemma family, on 27 lines — all inside
+    `FsStateEra.v`, as the plan said — and two more PROSE citations
+    outside it (`IcacheEscrow.v`'s `ic_rd_held` header,
+    `InodeRegion.v`'s `free_node` header), both retargeted.
+  - **THREE OF THAT FAMILY HAD NO CALLER AT ALL** and simply died:
+    `inode_bytes_era_split`, `inode_bytes_era_q_split`,
+    `inode_bytes_era_blk_read` (with the local `blk_big_sepM_split` that
+    served them).  Their general forms are stage 1's `inode_dat_q_split` /
+    `inode_dat_q_blk_acc`.  `inode_bytes_era_timeless` became
+    `inode_dat_q_timeless`.  `_to`/`_of` survive, RENAMED
+    `inode_dat_era_to`/`_of`: they are the era's remaining debt to the
+    `InodeInv` vocabulary and stage 3 is what pays it off.
+  - **THE ONE COST IS ONE BRACKET.**  The bundle's data leg is now one
+    conjunct where it was two, so `(Hd & Hb & Hi & Ht & %Hl)` becomes
+    `(Hd & [Hb Hi] & Ht & %Hl)` and a builder unfolds `/inode_dat`
+    alongside `/inode_owned_era`.  Note `rewrite /inode_dat` does NOT
+    re-associate — the flat five-way pattern does not come back and every
+    such site has to move its bracket.  Fourteen proof sites in
+    `FsStateEra.v` and ELEVEN in `FsCollect.v` — nine at an
+    `/inode_owned_era*` unfold, plus the two `iDestruct "Hown"` of a free
+    inum's bundle in `ireg_slot`'s collection arms.  Every other consumer
+    (`IcacheBoot`, `EscrowDeposit`, `FsCollectAll`, `FsCollectImg`,
+    `ProofIlock`, `ProofFileread`, `ProofFilestat`) goes through
+    `_of`/`_to`/`_era_node_*` and did not move at all.
+  - **THE SEAL LIST SHRANK BY ONE AND THAT IS AN IMPROVEMENT, not a
+    weakening.**  `FsStateEra`'s `Global Typeclasses Opaque` is now
+    `inode_owned_era_q inode_rd_era`; the leg carries its own seal at its
+    home, so the UNSEALED `inode_owned_era` that forty payload sites frame
+    through now has a data leg that is ONE sealed atom instead of two
+    conjuncts.  (This is the predicate whose unsealed `Timeless` search
+    once ran nineteen minutes on `IcacheEscrow.ic_rd_arm`, so the seal was
+    not optional.)
+  - **THE PLAN'S "ALREADY PREDICATE-VOCABULARY" CLAIM, CHECKED BY
+    READING.**  Three of the four are exact: `BitmapInv.bitmap_res γfs bms
+    size used = FsStateBitmap.free_bitmap_at (fs_gamma_L γfs) bms size
+    used` (a one-line body); `InodeRegion.ireg_recs` is a `[∗ list]` over
+    `seq 0 16` of `FsStateInode.rec_owned_at` at the region's own
+    numbering; `IcacheEscrow.dlinks γfs self dn bm data =
+    FsStateInode.ent_toks_x (fs_gamma_L γfs) self (era_node dn bm data)`,
+    also a one-line body.  **THE FOURTH IS DRIFT.**
+    `InodeRegion.ireg_lnk_at` is NOT `FsStateLink.link_auth`: it is
+    `∃ v, ⌜ireg_reg_ok ty v⌝ ∗ link_auth (fs_gamma_L γfs) z
+    (ireg_mult_at n ty) v ∗ ireg_keep γfs z v`.  Stage 5 therefore owes
+    two things the plan did not price — the multiplicity bridge
+    `FsCfgSnap.fn_mult_ireg` (`fn_mult n = ireg_mult_at (fn_nlink n)
+    (fn_type n)`) and the ROOT's `ireg_keep`, an unspendable keep-alive
+    `link_tok` that is `emp` at every other inum and must come out as
+    RESIDUE, not be folded into `inode_ghost`.
+  - **WHAT STAGE 3 SHOULD KNOW.**  (a) The leg is class-free, so
+    re-basing `blk_res_q`/`ind_blk_q` on `blk_owned_q` needs no new
+    binder.  (b) The two bridges left in `FsStateEra` are
+    `inode_dat_era_to`/`_of` (via `inode_blocks_era_q` / `ind_res_era_q`,
+    both of which take `inode_local i n`), and they are the whole of what
+    the era still owes `InodeInv` on the data leg — when stage 3 lands,
+    they and their two in-file callers
+    (`inode_rd_era_era_node_to`/`_of`) are what goes away.  (c) The
+    `FsBytesGamma` crossing is still `gamma_blk_owned_q`, untouched.
+    (d) Stage 5 already has `FsCollectAll.col_recs_by_inum` handing
+    `rec_owned_at` PER INUM, so `inode_phi_at` + `inode_phi_sb` is the
+    assembled `inode_phi`, and `inode_ghost_of` the assembled
+    `inode_ghost`; what is missing is the peel of `ireg_lnk_at` above.
 - [ ] **Rank 5 — one uniform per-inum transaction pin** (absorbs `DepTx`'s
   and `DepFrz`'s `(t,q)`, `ic_pin_*`, `ireg_cpin`/`ireg_fpin`, the transit
   ledger, `CrpPre`; ten `_no_ops` → one): APPROVED (owner, 2026-08-27),
