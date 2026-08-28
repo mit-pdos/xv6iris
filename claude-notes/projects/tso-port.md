@@ -4216,3 +4216,20 @@ fresh — §0.36′(a)'s pattern).  Fourth persistent fact to take the
 context-relative treatment (is_lock, is_pipe, the KPT fact, now the
 handler contract); the pattern is uniform system-wide.  Target:
 ProofKernelvec.
+
+### 0.40′ (2026-08-28): the incremental main landing is SPECIFIED —
+claude-notes/projects/main-tso-readiness.md
+
+The owner redirected the main-side work from direct execution to a
+handoff: another agent will land the slices.  The complete brief is
+claude-notes/projects/main-tso-readiness.md (copy at
+/shared/tmp/main-tso-readiness.md): mission = "TSO-ready SC" (statements
+converged over sealed SC bodies, leg C reduced to the below-seal swap),
+four slices (measure; additive context core incl. the buy/carry/cash
+triple; the statement conversion per the tso-flip-replay.md runbook with
+the T-leg's corrected shapes landed directly — λ-payloads, lk_floor,
+context-relative persistent families, the receipt pair, no-migration
+premises, §0.27′'s U, page currencies; audits; seal), the process law
+(measure-first, grep-for-the-law, arity rule, tranche discipline, build
+discipline, the typeclass and stale-.vo gotchas), and completion
+criteria (statement diff against the legs entirely below-seal).
