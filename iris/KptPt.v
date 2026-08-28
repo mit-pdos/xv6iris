@@ -70,11 +70,9 @@ Definition kpt_l0_dram (root : mword 44) (j : Z) : mword 44 := kpt_page root (36
 (* ===================================================================== *)
 
 Definition vpn1_of (vpn : mword 27) : mword 9 := subrange_vec_dec vpn 17 9.
-Definition vpn0_of (vpn : mword 27) : mword 9 := subrange_vec_dec vpn 8 0.
 
 Definition kpt_dram_vpn (vpn : mword 27) : Prop := 0x80000 <= bv_unsigned vpn < 0x88000.
 Definition kpt_dev_vpn  (vpn : mword 27) : Prop := 0xC000 <= bv_unsigned vpn < 0x10002.
-Definition kpt_mapped (vpn : mword 27) : Prop := kpt_dram_vpn vpn \/ kpt_dev_vpn vpn.
 
 (* rwx-kmap: the DRAM range split at etext = 0x80007000 -- text pages
    [0x80000, 0x80007), data pages [0x80007, 0x88000).  (Cross-checked
@@ -83,18 +81,9 @@ Definition kpt_mapped (vpn : mword 27) : Prop := kpt_dram_vpn vpn \/ kpt_dev_vpn
 Definition kpt_text_vpn (vpn : mword 27) : Prop := 0x80000 <= bv_unsigned vpn < 0x80007.
 Definition kpt_data_vpn (vpn : mword 27) : Prop := 0x80007 <= bv_unsigned vpn < 0x88000.
 
-Lemma kpt_dram_vpn_split (vpn : mword 27) :
-  kpt_dram_vpn vpn <-> kpt_text_vpn vpn \/ kpt_data_vpn vpn.
-Proof. unfold kpt_dram_vpn, kpt_text_vpn, kpt_data_vpn. lia. Qed.
 
-Definition kpt_lflags (vpn : mword 27) : Z :=
-  if Z.leb 0x80000 (bv_unsigned vpn) then PTE_RAM else PTE_DEV.
 
 (* the level-0 table page holding [vpn]'s leaf *)
-Definition kpt_l0_of (root : mword 44) (vpn : mword 27) : mword 44 :=
-  if Z.leb 0x80000 (bv_unsigned vpn)
-  then kpt_l0_dram root (bv_unsigned (vpn1_of vpn) )
-  else kpt_l0_dev root (bv_unsigned (vpn1_of vpn) - 96).
 
 Definition kpt_leaf_ppn (vpn : mword 27) : mword 44 := zero_extend' 44 vpn.
 

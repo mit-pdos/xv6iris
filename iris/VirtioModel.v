@@ -931,17 +931,12 @@ Definition wr_fold (w : disk_wr) (l : list nat) (dk : Z -> bv 8) : Z -> bv 8 :=
   foldr (fun i d => wr_apply (wr_sector w i) d) dk l.
 
 
-Lemma wr_fold_cons (w : disk_wr) (i : nat) (l : list nat) (dk : Z -> bv 8) :
-  wr_fold w (i :: l) dk = wr_apply (wr_sector w i) (wr_fold w l dk).
-Proof. reflexivity. Qed.
 
 
 (* The same reassembly, LEFT-folded -- the shape a SEQUENCE of drains has
    ([virtio_drains], section 6b): the device applies the sectors in the order
    it picks them, earliest first.  [wr_fold_all] already tolerates any order
    and any repetition, so this is just the [foldl]/[foldr] bridge. *)
-Definition wr_foldl (w : disk_wr) (l : list nat) (dk : Z -> bv 8) : Z -> bv 8 :=
-  foldl (fun d i => wr_apply (wr_sector w i) d) dk l.
 
 
 
@@ -1214,8 +1209,6 @@ Definition vdist (a b : bv 16) : Z := (bv_unsigned b - bv_unsigned a) `mod` 6553
 Lemma vdist_bounds (a b : bv 16) : 0 <= vdist a b < 65536.
 Proof. unfold vdist. apply Z.mod_pos_bound. lia. Qed.
 
-Lemma vdist_refl (a : bv 16) : vdist a a = 0.
-Proof. unfold vdist. rewrite Z.sub_diag. reflexivity. Qed.
 
 
 (* a position is determined by its distance from any other *)
@@ -1240,12 +1233,6 @@ Lemma bv16_wrap (z : Z) : bv_wrap 16 z = z `mod` 65536.
 Proof. unfold bv_wrap, bv_modulus. f_equal. Qed.
 
 (* the successor position, and what it does to every distance *)
-Lemma vdist_succ (a b : bv 16) :
-  vdist (bv_add a one16) b = (vdist a b - 1) `mod` 65536.
-Proof.
-  unfold vdist. rewrite bv_add_unsigned, bv_unsigned_one16, bv16_wrap.
-  rewrite Zminus_mod_idemp_r, Zminus_mod_idemp_l. f_equal. lia.
-Qed.
 
 
 
@@ -1369,10 +1356,6 @@ Definition vreq_sectors (r : vio_req) : gset Z :=
   list_to_set (vreq_key r <$> seq 0 (vreq_nsectors r)).
 
 
-Lemma vreq_cache_of_fst (mv : vmem) (r : vio_req) (is : list nat) :
-  ((fun i => (vreq_key r i, wr_sector_bytes (vreq_wr mv r) i)) <$> is).*1
-  = vreq_key r <$> is.
-Proof. rewrite <- list_fmap_compose. reflexivity. Qed.
 
 
 

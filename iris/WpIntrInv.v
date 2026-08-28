@@ -2470,28 +2470,6 @@ Definition intr_cb_clock `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId}
 
 (* ...and the CLOCK-FREE reading, for the leaves that never touch a clock
    cell: the same callback with the three cells passed straight through. *)
-Definition intr_cb `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId}
-    (kt : ktier) (m : regfile) (av : nat) (p pc0 : mword 64) (is_rvc : bool)
-    (i : instruction) (b' : bool)
-    (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
-    `{CID : CpuId} : iProp Σ :=
-  ((sconf -∗
-    sie_cap kt m av true p -∗
-    gpr_file (tp_pin m) -∗
-    (R_bitvector_64 PC) ↦ᵣ pc0 -∗
-    (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc0 (if is_rvc then 2 else 4)) -∗
-    resv_any cpu_id -∗
-    swp (execute i)
-      (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
-         ∃ (npc ms' : mword 64) (m' : regfile) (av' : nat),
-           (R_bitvector_64 PC) ↦ᵣ pc0 ∗
-           (R_bitvector_64 nextPC) ↦ᵣ npc ∗
-           resv_any cpu_id ∗
-           sconf_at_priv ms' ∗ sie_cap kt m' av' b' p ∗
-           gpr_file (tp_pin m') ∗ R CID npc ms' m' av'))
-   ∗ (∀ (npc ms' : mword 64) (m' : regfile) (av' : nat),
-        sie_cap_gpr_at kt ms' m' av' b' p -∗ pc_is npc -∗ R CID npc ms' m' av' -∗
-        WP (Loop : expr riscv_lang)))%I.
 
 (* WHAT THE INSTRUCTION HANDS BACK BESIDE THE FRAMES.  The cycle body owes
    [SmodeCorePt.spt_ex_obl] a frame at the file the instruction landed on,
