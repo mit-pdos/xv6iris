@@ -351,7 +351,9 @@ Section FsBytes.
 
      [FsStateDefs] fraction-indexed the ABSTRACT byte points-to; this is the
      CONCRETE twin, and it is what lets a share cross the bridge
-     [FsBytesGamma.gamma_blk_owned_q] into the [InodeInv] vocabulary.  The
+     [FsBytesGamma.gamma_blk_owned_q] -- which since the era-vocabulary
+     unification's stage 3 happens in [InodeInv.blk_res_q_run] /
+     [ind_blk_q_nz] and nowhere else on the inode path.  The
      unsuffixed names above are the [DfracOwn 1] READINGS and their text has
      not moved -- [k ↪[γ] v] IS [k ↪[γ]{DfracOwn 1} v], so each [_1]
      equation below is [reflexivity] and the ~34 files spelling [fsblock]

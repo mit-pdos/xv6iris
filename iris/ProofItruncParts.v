@@ -535,9 +535,7 @@ Section ItruncDefs.
                (fun (_ : nat) (k : nat) => blk_res γfs (blkmap_get bm' k) (data k))
                (seq 0 MAXFILE) i i Hlk).
     iIntros "[Hb Hrest]".
-    rewrite {1}/blk_res.
-    destruct (decide (bv_unsigned (blkmap_get bm i) = 0)) as [Hc|_];
-      [exfalso; exact (Hnz Hc)|].
+    rewrite (blk_res_run γfs (blkmap_get bm i) (data i) Hnz).
     iSplitL "Hb"; [iExact "Hb"|].
     iSplitR.
     { rewrite /blk_res.
@@ -570,9 +568,7 @@ Section ItruncDefs.
     bv_unsigned w <> 0 ->
     blk_res γfs w bs -∗ fsblock (fs_bytes γfs) (bv_unsigned w) bs.
   Proof.
-    intros Hnz. rewrite /blk_res.
-    destruct (decide (bv_unsigned w = 0)) as [Hc|_];
-      [exfalso; exact (Hnz Hc) |]. iIntros "$".
+    intros Hnz. rewrite (blk_res_run γfs w bs Hnz). iIntros "$".
   Qed.
 
   (* bread hands back a handle but no buffer index bound; the handle itself
@@ -595,9 +591,7 @@ Section ItruncDefs.
     ind_res γfs bmx -∗
       fsblock (fs_bytes γfs) (bv_unsigned (bm_ind bmx)) (ind_bytes (bm_ent bmx)).
   Proof.
-    intros Hnz. rewrite /ind_res /ind_blk.
-    destruct (decide (bv_unsigned (bm_ind bmx) = 0)) as [Hc|_];
-      [exfalso; exact (Hnz Hc) |]. iIntros "$".
+    intros Hnz. rewrite /ind_res (ind_blk_nz γfs bmx Hnz). iIntros "$".
   Qed.
 
   (* opened and closed by lemma, for the same IH reason as the direct

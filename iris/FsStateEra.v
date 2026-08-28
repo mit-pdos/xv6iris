@@ -1071,8 +1071,11 @@ Section EraRes.
   (* [InodeInv.inode_blocks] is a 268-element [big_sepL] with [True] at the
      holes; the era's block big-op is a [big_sepM] over the ALLOCATED slots
      only.  They are the same resource: the holes are [emp] in an affine
-     BI, and each allocated slot's [fsblock] IS its [blk_owned] at the
-     logged view ([FsBytesGamma.gamma_blk_owned]). *)
+     BI, and since the era-vocabulary unification's stage 3 an allocated
+     slot's [InodeInv.blk_res] IS its [blk_owned] at the logged view, on
+     the nose.  SO THIS PAIR IS A CHANGE OF GRANULARITY AND NOTHING ELSE
+     -- the [inode_local] premise is what makes the two index sets agree,
+     and it is why the pair cannot collapse to [reflexivity]. *)
   Lemma inode_blocks_era (γfs : fs_names) (i : Z) (n : fs_node) :
     inode_local i n ->
     inode_blocks γfs (bm_of n) (fn_data n)
@@ -1097,7 +1100,7 @@ Section EraRes.
       { apply (inl_blk_dom Hl k ltac:(rewrite -MAXFILE_FS; exact Hk)).
         by exists bs. }
       rewrite (decide_False _ _ Hnz).
-      rewrite /fn_data Hbs gamma_blk_owned //.
+      rewrite /fn_data Hbs //.
     - assert (Hz : fn_naddr n k = 0).
       { destruct (decide (fn_naddr n k = 0)) as [Hz | Hnz]; [exact Hz |].
         exfalso.
@@ -1114,20 +1117,25 @@ Section EraRes.
     (* the two guards are the same proposition but reach the goal through
        two files' [Decision] instances, so they are peeled by [case_decide]
        rather than by a [decide_True] whose instance would have to match
-       (durable-notes: two instance terms that print identically) *)
+       (durable-notes: two instance terms that print identically).  THE
+       NONZERO BRANCH IS NOW [done]: since the era-vocabulary unification's
+       stage 3 [InodeInv.ind_blk] IS [blk_owned] at the logged view, so
+       what is left of this bridge is the guard peel and nothing else. *)
     repeat case_decide; try (exfalso; congruence).
     - rewrite bi.True_emp //.
-    - rewrite gamma_blk_owned //.
+    - done.
   Qed.
 
   (* ---- THE SAME TWO BRIDGES AT A SHARE (lane B''-blk) ---------------- *)
 
   (* THIS IS THE STRUCTURAL UNBLOCK lane B' measured and could not do: the
-     bridges above are stated through [FsBytesGamma.gamma_blk_owned], which
-     ties the two vocabularies at fraction 1 ONLY, so nothing at 3/4 or 1/4
-     could cross into the [InodeInv] vocabulary.  These are the same two
-     proofs over [gamma_blk_owned_q] / [InodeInv.inode_blocks_q] /
-     [ind_res_q], and their [DfracOwn 1] readings are the lemmas above. *)
+     bridges above used to be stated through [FsBytesGamma.gamma_blk_owned],
+     which ties the two vocabularies at fraction 1 ONLY, so nothing at 3/4
+     or 1/4 could cross into the [InodeInv] vocabulary.  These are the same
+     two proofs over [InodeInv.inode_blocks_q] / [ind_res_q], and their
+     [DfracOwn 1] readings are the lemmas above.  (Since stage 3 neither
+     pair names a bridge at all: the crossing moved into [InodeInv]'s own
+     four [_run]/[_nz] lemmas, and what is left here is granularity.) *)
   Lemma inode_blocks_era_q (γfs : fs_names) (dq : dfrac) (i : Z) (n : fs_node) :
     inode_local i n ->
     inode_blocks_q γfs dq (bm_of n) (fn_data n)
@@ -1152,7 +1160,7 @@ Section EraRes.
       { apply (inl_blk_dom Hl k ltac:(rewrite -MAXFILE_FS; exact Hk)).
         by exists bs. }
       rewrite (decide_False _ _ Hnz).
-      rewrite /fn_data Hbs gamma_blk_owned_q //.
+      rewrite /fn_data Hbs //.
     - assert (Hz : fn_naddr n k = 0).
       { destruct (decide (fn_naddr n k = 0)) as [Hz | Hnz]; [exact Hz |].
         exfalso.
@@ -1168,7 +1176,7 @@ Section EraRes.
     rewrite /ind_res_q /ind_blk_q /ind_owned_q bm_of_ind bm_of_ent.
     repeat case_decide; try (exfalso; congruence).
     - rewrite bi.True_emp //.
-    - rewrite gamma_blk_owned_q //.
+    - done.
   Qed.
 
   (* ---- THE BUNDLE ---------------------------------------------------- *)
@@ -1561,14 +1569,14 @@ Section EraRes.
     rewrite (bm_of_slot n k (inl_rec_wf Hl) Hk) in Hnz |- *.
     destruct (decide (k = MAXFILE)) as [-> | Hkm].
     - iEval (rewrite /ind_res /ind_blk bm_of_ind bm_of_ent
-                     (decide_False _ _ Hnz)) in "Hi".
+                     (decide_False _ _ Hnz) gamma_blk_owned) in "Hi".
       iMod (fsblock_home_open E (fs_bytes γfs) (fs_cache γfs) (fs_exc γfs)
               home Xv (fn_indb n) (ind_bytes (fn_ent n)) HE with "Hinv Hi")
         as "[%Hin Hi]".
       iModIntro. iSplitR; [done |].
       iApply (inode_owned_era_of γfs γi inum n Hl with "Hd [Hi] Hb Ht").
       iEval (rewrite /ind_res /ind_blk bm_of_ind bm_of_ent
-                     (decide_False _ _ Hnz)).
+                     (decide_False _ _ Hnz) gamma_blk_owned).
       iExact "Hi".
     - (* the arithmetic is done with the [bv]s cleared out of the context:
          with one in scope [lia] answers "Cannot find witness" *)
@@ -1579,7 +1587,7 @@ Section EraRes.
       iDestruct (big_sepL_lookup_acc _ _ k k Hlk with "Hb")
         as "[Hbk Hback]".
       iEval (rewrite /blk_res (bm_of_get n k (inl_rec_wf Hl) Hklt)
-                     (decide_False _ _ Hnz)) in "Hbk".
+                     (decide_False _ _ Hnz) gamma_blk_owned) in "Hbk".
       iMod (fsblock_home_open E (fs_bytes γfs) (fs_cache γfs) (fs_exc γfs)
               home Xv (fn_naddr n k) (fn_data n k) HE with "Hinv Hbk")
         as "[%Hin Hbk]".
@@ -1587,7 +1595,7 @@ Section EraRes.
       iApply (inode_owned_era_of γfs γi inum n Hl with "Hd Hi [Hbk Hback] Ht").
       iEval (rewrite /inode_blocks). iApply "Hback".
       iEval (rewrite /blk_res (bm_of_get n k (inl_rec_wf Hl) Hklt)
-                     (decide_False _ _ Hnz)).
+                     (decide_False _ _ Hnz) gamma_blk_owned).
       iExact "Hbk".
   Qed.
 
