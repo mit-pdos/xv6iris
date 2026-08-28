@@ -12655,3 +12655,93 @@ A6.97 remain and cost no green file.  `md5sum kernel-rocq/*.v user-rocq/*.v`
 unchanged (`edd91972b6bc1b944fd98a2cc2363815`).  `^Abort` / `^Admitted` /
 `^Axiom` all 0.  Mirror unchanged from A6.97's boundary (the only diff since
 is the reverted file, restored).
+
+### A6.99 TWO MEASUREMENTS THAT RE-ORDER THE MERGED TRANCHE — THE `notheld`
+### READ NEEDS NO ACQUIRE EXPORT, AND THE BOOT LOCKS MAY NEED NO PURCHASE
+
+Before building step (1) of the approved merged order, both of its
+justifications were checked against the tree.  **Neither survives as stated,
+and both fail in the cheap direction.**  Nothing was edited; the boundary is
+A6.98's.
+
+#### (1) THE `notheld` READ DOES NOT NEED `SpecAcquire`'s EXPORT
+
+The merged order put the acquire's strengthened export first on the strength
+of "one piece serves both" — the creators' floor purchase and the `notheld`
+read wanting the same pair.  **Measured, the read does not want it from the
+acquire.**  What the read needs is `view_lb (hart_agent cpu_id) K ∗ ⌜lo ≤ K⌝`,
+and after the surface move it can build both itself:
+
+| ingredient | where it already is |
+|---|---|
+| `own_context cur_ctx` | a conjunct of `IntrDefs.sie_cap_of` — **every lock leaf already holds it** (it takes `sie_cap_gpr`) |
+| `ctx_floor cur_ctx lo` | handed out by `lock_openable`'s open, per the validated surface (A6.98 §(1)) |
+| the pair | `TsoCtx.own_context_floor_view` (A6.96 §(1)), one application |
+
+So **step (5)'s `notheld` half is closable by the surface move ALONE**, with no
+change to `SpecAcquire` and no AMO reasoning at the read site at all.  The
+acquire's export is needed only by the CREATORS, and only by those that cannot
+get a floor another way — which is §(2).
+
+> **THE ECONOMY WAS REAL BUT POINTED THE OTHER WAY.**  "One piece serves both"
+> assumed the read had to be handed its receipt.  It does not: the receipt is
+> derivable from the running token, which the leaf has been carrying since M2
+> (§0.13′ put `own_context` inside `sie_cap` precisely so that memory leaves
+> would not have to be handed one).  *A resource already threaded through
+> every leaf is a resource you do not have to export.*
+
+#### (2) THE BOOT-STATIC LOCKS MAY NEED NO PURCHASE AT ALL
+
+The creators' obligation was priced as the four-step chain (A6.98 §(2)).  That
+price assumed the lock's floor is `initlock`'s store position.  **It need not
+be**: A6.83 §(2) established that there is only ONE mint and the timestamp is
+a PARAMETER —
+
+> *"`t = 0` is A6.79's mint (the era image as the floor, the log empty of
+> writes to the cell); `t = length glog` is the store-then-mint site.  One
+> lemma, two instances, no `.bss` special case anywhere."*
+
+A boot-static lock (`cons.lock`, `kmem.lock`, the 64 proc locks, `tickslock`,
+the bcache/itable/ftable locks…) lives in `.bss`, and its owner cell is an
+ERA-IMAGE byte that nothing has written when `initlock` runs.  Minting its
+window at floor **0** and letting `initlock`'s store FRAME that floor
+(`win_ok1_app_store` frames `tw_lo` — A6.83 §(1)) gives `lo = 0`, and then
+
+```coq
+    TsoCtx.ctx_floor_0 : ⊢ ctx_floor ξ 0
+```
+
+discharges `newlock`'s new premise **for free, at every boot-static site**.
+
+That leaves the purchase chain for the DYNAMIC locks only — the pipe's lock on
+a kalloc'd page, and the sleeplocks — **which is exactly the split §0.35′ draws
+itself** ("boot-static locks already ride the started deposit; dynamic locks
+(pipes) mint at the allocating context and travel the fd-table/fork channels").
+The ruling's two channels turn out to be two different FLOORS, not two
+different distributions of the same one.
+
+**What is not yet measured** is whether the boot carve hands the `.bss` lock
+cells in a shape the floor-0 mint accepts; that is one grep-and-try in
+`BootCarve`/`ProofInitlock`, and it is the first thing the next pass should
+do — because if it holds, step (4) shrinks from ~11 sites to the two or three
+dynamic ones.
+
+#### (3) THE RE-ORDERED TRANCHE
+
+1. **measure the floor-0 mint** for `.bss` lock cells (§(2)) — one experiment.
+2. **`initlock`'s post**: expose `lo`; at floor 0 if §(1) holds, else carry
+   `llb loglen_name lo` for the purchase.
+3. **the surface move** — A6.98 §(1)'s validated text, re-applied verbatim.
+4. **the creators** — free at the boot-static sites; the chain only for the
+   dynamic ones.
+5. **the `notheld` read and the holder read** — the first needs nothing beyond
+   3 (§(1)); the second is the racy-kit redo per §0.35′(iv) case 2, retiring
+   `lk_wex` / `lock_word_ex`'s held arm with A6.92's refutation.
+6. **`SpecAcquire`'s export** — only if step 4's dynamic sites need it.
+7. the DMA leaf + virtio pair; §0.27′ → `ProofSwtch`.
+
+#### (4) THE NUMBER
+
+**1100 of 1296, RED 9 — unchanged**, sentinel-backed at A6.98's round
+(`MAKEEXIT=2`); no source file was edited in this pass.  **Red-list delta: 0.**
+`^Abort` / `^Admitted` / `^Axiom` all 0; mirror in sync.
