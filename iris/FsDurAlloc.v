@@ -52,8 +52,10 @@ Require Import RiscvModelBytes.
 Require Import FsImg.
 Require Import LogDefs.       (* [fs_dbytes] -- the byte flattening       *)
 Require Import Xv6Cameras.
-Require Import FsDurBytes.    (* [fs_dbytes_blocks] -- Gamma-generically  *)
-Require Import FsDurXfer.     (* [snap_gamma] -- the fresh family's record *)
+Require Import FsDurBytes.    (* [fs_dbytes_blocks] -- Gamma-generically;
+                                 [snap_gamma] -- the durable family's record.
+                                 The TRANSPORT is not required here: this
+                                 file names none of it *)
 Require Import FsDurRead.     (* [snap_auth] -- the epoch's IDENTITY       *)
 Require Import RiscvPtsto.
 Require Import FsBlocks.

@@ -2957,7 +2957,18 @@ banner says once rather than 21 times.
     instance-taking entry points; `fs_state_xfer_era` / `fs_state_xfer_snap`
     are the two non-vacuity checks (the era's non-`□`-able full element and
     the snapshot's are both legal sources).  `snap_gamma` /
-    `snap_gamma_gtimeless` / `snap_gamma_excl` moved to `FsDurXfer`.
+    `snap_gamma_gtimeless` / `snap_gamma_excl` are **`FsDurBytes`' section
+    3**, not the transport's: they were `FsDurXfer`'s for one commit, which
+    made `FsDurRead` Require the transport for three lines of record and
+    nothing else.  Both files above instantiate the flattening over that
+    record and NEITHER needs the other, so it belongs at the bottom of the
+    durable stack — and `FsDurBytes` is the only file there that can hold
+    it, because it is the only one with no `ghost_map` class of its own in
+    scope (put `diskImgG` beside `FsBytesGamma.fs_gamma_L`'s `fsLogG` byte
+    map and `ghost_map_auth (fs_bytes γfs) 1 Lb` resolves through the wrong
+    class, which is the trap `fs_bytes_auth`'s section already dodges).
+    `snap_gamma_agree` stayed with the transport: `phi_agree` is the
+    transport's own notion.
   - **WALL — the COMMIT cannot move without editing `LogInv.v`.**
     `LogSnapLaw.snap_law` is `log_ctx`'s last conjunct and its conclusion is
     PURE precisely so it can cross `end_op`'s lock release as a Coq

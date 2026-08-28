@@ -40,7 +40,9 @@ Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import FsImg.
 Require Import Xv6Cameras.
-Require Import FsDurBytes.    (* the byte-map flattening *)
+Require Import FsDurBytes.    (* the byte-map flattening, and [snap_gamma]
+                                 -- the durable family's record, which sits
+                                 there because [FsDurRead] needs it too *)
 Require Export FsState.
 
 Local Open Scope Z_scope.
@@ -1045,29 +1047,12 @@ Section Xfer.
   Implicit Types Γ : fs_view_names Σ.
   Implicit Types S : fs_state_rec.
 
-  (* the FULL element, exactly as the era's [FsBytesGamma.fs_gamma_L] is *)
-  Definition snap_gamma (g gl gt : gname) : fs_view_names Σ :=
-    MkFsView (fun (dq : dfrac) (a : Z) (v : bv 8) => (a ↪[g]{dq} v)%I) gl gt.
-
-  Global Instance snap_gamma_gtimeless g gl gt :
-    GTimeless (snap_gamma g gl gt).
-  Proof. intros dq a v. rewrite /snap_gamma /=. apply _. Qed.
-
-  (* two owners of one byte is [False].  [FsStateDefs.phi_excl]'s consumers
-     -- [FsStateBitmap.free_pool_used], hence xv6's "freeing free block"
-     panic arm, and [FsStateDefs.blk_owned_ne] -- therefore read on the
-     durable side exactly as they do at the era's view. *)
-  Lemma snap_gamma_excl g gl gt : phi_excl (snap_gamma g gl gt).
-  Proof.
-    intros a v w dq1 dq2. rewrite /snap_gamma /=.
-    iIntros "[H1 H2]".
-    iDestruct (ghost_map_elem_valid_2 with "H1 H2") as %[Hv _].
-    done.
-  Qed.
-
-  (* ...and its byte authority IS the [phi_agree] the transport wants, by
-     one [ghost_map_lookup].  So a snapshot is a legal SOURCE with its own
-     identity in hand, which is what the boot mint needs. *)
+  (* [FsDurBytes.snap_gamma] is the durable family's record, and its byte
+     authority IS the [phi_agree] the transport wants, by one
+     [ghost_map_lookup].  So a snapshot is a legal SOURCE with its own
+     identity in hand, which is what the boot mint needs.  This is the one
+     fact about that record the TRANSPORT owns, which is why it stayed
+     here when the record itself moved down. *)
   Lemma snap_gamma_agree (g gl gt : gname) (B : gmap Z (bv 8)) :
     phi_agree (snap_gamma g gl gt) (ghost_map_auth g 1 B) B.
   Proof.

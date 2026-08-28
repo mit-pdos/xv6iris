@@ -104,8 +104,9 @@ Require Import FsDurBytes.
    and kind algebras are gone from the tree altogether -- the pure-kinds
    tie they carried is the REJECTED design (plan section 8), and section
    11's header says what replaced it here. *)
-Require Import FsDurXfer.   (* [snap_gamma] -- the fresh family record era 0's
-                               own allocator names in its conclusion *)
+(* [snap_gamma] -- the durable family record era 0's own allocator names in
+   its conclusion -- comes with [FsDurBytes] above.  The TRANSPORT is not
+   required here: this file names none of it. *)
 Require Import FsDurSnap.
 Require Import FsDurAlloc.   (* THE VALUE-FIRST ALLOCATOR (lane H5):
                                 [P_dur_alloc] / [fs_snap_alloc], whose

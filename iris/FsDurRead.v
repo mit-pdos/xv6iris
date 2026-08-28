@@ -38,9 +38,11 @@ Require Import DiskImg.       (* [diskImgG] -- IMPORTED, not merely required:
                                  Require is inert (durable-notes.md) *)
 Require Import FsImg.         (* [BSIZE_z] *)
 Require Import LogDefs.       (* [fs_dbytes] *)
-Require Import FsDurBytes.    (* [dbytes_ok], [fs_dbytes_lookup] *)
+Require Import FsDurBytes.    (* [dbytes_ok], [fs_dbytes_lookup], and
+                                 [snap_gamma] -- the durable family's record.
+                                 NOT [FsDurXfer]: the transport is not below
+                                 the identity and nothing here uses it *)
 Require Import FsBlocks.      (* [BSZ], [byte_range_q_lookup], [map_seqZ_slice] *)
-Require Import FsDurXfer.     (* [snap_gamma] *)
 Require Export FsState.
 
 Local Open Scope Z_scope.

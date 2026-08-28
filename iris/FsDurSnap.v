@@ -70,8 +70,9 @@ Require Import RiscvModelBytes.  (* [nth_byte] / [bv_eq_of_bytes] *)
 Require Import FsImg.
 Require Import LogDefs.       (* [fs_dbytes] -- the byte flattening       *)
 Require Import Xv6Cameras.
-Require Import FsDurBytes.    (* [fs_dbytes_blocks] -- Gamma-generically  *)
-Require Import FsDurXfer.     (* THE RESOURCE TRANSPORT (lane H): [snap_gamma],
+Require Import FsDurBytes.    (* [fs_dbytes_blocks] -- Gamma-generically;
+                                 [snap_gamma] -- the durable family's record *)
+Require Import FsDurXfer.     (* THE RESOURCE TRANSPORT (lane H):
                                  [fs_state_xfer] -- both ends of a transport
                                  are [fs_state]s and nothing is decoded *)
 Require Import FsDurRead.     (* THE SNAPSHOT'S BYTE IDENTITY (lane H3):
@@ -758,8 +759,9 @@ Section Snap.
   Implicit Types D : gmap Z (list (bv 8)).
 
   (* [snap_gamma], [snap_gamma_gtimeless] and [snap_gamma_excl] are
-     [FsDurXfer]'s: the transport allocates the fresh family, so the family
-     record belongs beside it. *)
+     [FsDurBytes]' section 3, which is BELOW both the transport and the
+     identity -- the two files that instantiate the record over the
+     flattening share nothing else. *)
 
   (* ------------------------------------------------------------------ *)
   (*  7.  THE SNAPSHOT, AND THE EPOCH REGISTRY                            *)
