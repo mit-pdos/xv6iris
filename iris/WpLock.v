@@ -1181,12 +1181,34 @@ Section Lock.
      instead would have moved seventeen further green files for nothing. <<< *)
   Definition lock_openable (γ : gname) (lk : mword 64) (s : string)
       (R : CtxId → iProp Σ) (D : iProp Σ) : iProp Σ :=
-    (□ ∀ (E : coPset) (T : iProp Σ),
-         ⌜↑lockN ⊆ E⌝ -∗ (T -∗ D -∗ False) -∗ T ={E, E ∖ ↑lockN}=∗
-         ∃ lo : nat,
-         ▷ lock_inv γ lk s R lo ∗ lk_floor cur_ctx lo ∗ T ∗
-         ((▷ lock_inv γ lk s R lo ={E ∖ ↑lockN, E}=∗ True)   (* put it back *)
-          ∧ (D ={E ∖ ↑lockN, E}=∗ True)))%I.               (* or destroy it *)
+    (* A6.109: THE FLOOR IS HOISTED OUT OF THE □∀, and it has to be.  With
+       [∃ lo] inside the accessor, two opens of the SAME lock hand out two
+       unrelated witnesses -- so a leaf that gives the owner cell to an
+       atomic update and takes it back cannot close the invariant it opened
+       ([lock_inv … lo] and [lock_inv … lo'] are different propositions).
+       Outside, [lo] is fixed once per consumer, which is also what
+       [is_lock] already does; the arity still does not move. *)
+    (∃ lo : nat,
+       lk_floor cur_ctx lo ∗
+       □ ∀ (E : coPset) (T : iProp Σ),
+           ⌜↑lockN ⊆ E⌝ -∗ (T -∗ D -∗ False) -∗ T ={E, E ∖ ↑lockN}=∗
+           ▷ lock_inv γ lk s R lo ∗ T ∗
+           ((▷ lock_inv γ lk s R lo ={E ∖ ↑lockN, E}=∗ True)   (* put it back *)
+            ∧ (D ={E ∖ ↑lockN, E}=∗ True)))%I.               (* or destroy it *)
+
+  (* A6.109: the projection every leaf uses -- [iDestruct (… with "Hlock")]
+     leaves the intuitionistic handle in place, so a proof that both FORWARDS
+     the opener and opens it itself keeps one name for each. *)
+  Lemma lock_openable_parts γ lk s R D :
+    lock_openable γ lk s R D -∗
+    ∃ lo : nat,
+      lk_floor cur_ctx lo ∗
+      □ ∀ (E : coPset) (T : iProp Σ),
+          ⌜↑lockN ⊆ E⌝ -∗ (T -∗ D -∗ False) -∗ T ={E, E ∖ ↑lockN}=∗
+          ▷ lock_inv γ lk s R lo ∗ T ∗
+          ((▷ lock_inv γ lk s R lo ={E ∖ ↑lockN, E}=∗ True)
+           ∧ (D ={E ∖ ↑lockN, E}=∗ True)).
+  Proof. by iIntros "$". Qed.
 
   Global Instance lock_openable_persistent γ lk s R D :
     Persistent (lock_openable γ lk s R D).
@@ -1198,9 +1220,9 @@ Section Lock.
     inv lockN (lock_inv γ lk s R lo) -∗ lk_floor cur_ctx lo -∗
     lock_openable γ lk s R False.
   Proof.
-    iIntros "#Hi #Hf !>" (E T HE) "_ HT".
+    iIntros "#Hi #Hf". iExists lo. iFrame "Hf". iIntros "!>" (E T HE) "_ HT".
     iMod (inv_acc E lockN with "Hi") as "[Hbody Hclose]"; [done|].
-    iModIntro. iExists lo. iFrame "Hbody Hf HT".
+    iModIntro. iFrame "Hbody HT".
     iSplit; [iExact "Hclose" | iIntros "%Hf0"; destruct Hf0].
   Qed.
 
@@ -1234,11 +1256,11 @@ Section Lock.
     inv lockN (lock_inv γ lk s R lo ∨ D) -∗ lk_floor cur_ctx lo -∗
     lock_openable γ lk s R D.
   Proof.
-    iIntros "#Hi #Hf !>" (E T HE) "Hrefute HT".
+    iIntros "#Hi #Hf". iExists lo. iFrame "Hf". iIntros "!>" (E T HE) "Hrefute HT".
     iMod (inv_acc E lockN with "Hi") as "[Hbody Hclose]"; [done|].
     rewrite bi.later_or. iDestruct "Hbody" as "[Hlive | >Hdead]".
     2:{ iExFalso. iApply ("Hrefute" with "HT Hdead"). }
-    iModIntro. iExists lo. iFrame "Hlive Hf HT".
+    iModIntro. iFrame "Hlive HT".
     iSplit.
     - iIntros "Hb". iApply "Hclose". by iLeft.
     - iIntros "Hd". iApply "Hclose". iRight. by iNext.

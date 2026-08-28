@@ -1777,6 +1777,14 @@ Section WpSconfMem.
        (uint ea < 274877906944)%Z ->
        (bv_unsigned (subrange_vec_dec ea 11 0) + width <= 4096)%Z ->
        ktier_pin ktd ppn ea ->
+       (* A6.109: THE NO-MIGRATION PIN, the store's twin of the one A6.89 put
+          on [wp_load_s_sconf_au_dat].  The obligation's [CIDw] is ∀-bound, so
+          without this an obligation cannot say the stored value is THIS
+          hart's -- which is exactly what the lock's acquire store needs
+          ([lk->cpu = mycpu()] writes the window's [cp] row at the WRITER).
+          [wp_next]'s same-CPU promise supplies it; every existing caller
+          ignores it. *)
+       (b = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
        kmap_at (svpn_of ea) ppn KP_rw -∗
        gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
        tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
@@ -1952,7 +1960,7 @@ Section WpSconfMem.
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
             iMod (fupd_mask_subseteq (⊤ ∖ ↑minstretN)) as "Hb1"; [set_solver|].
             iMod "HAU" as "[Hres Hcl]".
-            iMod (Hwrite CID img sigma log V ppn Hcan Hoff Hid
+            iMod (Hwrite CID img sigma log V ppn Hcan Hoff Hid Hs
                 with "Hk Hmem Htso Hctx Hres")
               as "(Hmem & Htso & Hctx & Hpost)".
             iMod ("Hcl" with "Hpost") as "HPsi".
@@ -2047,7 +2055,7 @@ Section WpSconfMem.
               (wordw_pointsto (KTR := ktd) width ea (DfracOwn 1) sv)
               Hw0 Hw8 Hvw Hwdvd Huintw Hwrite_plain Hsv HkptEm
               with "Hcg Hpc Hinstr Hclaim [HAU] Hcont").
-    { intros CIDw img sigma log V ppn Hcan Hoff Hid.
+    { intros CIDw img sigma log V ppn Hcan Hoff Hid _.
       iIntros "#Hk Hmem Htso Hctx [%vold Hbw]".
       iApply (wordw_pointsto_write_c (KTR := ktd) (CIDw := CIDw) width img sigma log V
                 ea ppn vold sv Hw0 Hcan Hoff with "Hk Hmem Htso Hctx Hbw"). }
@@ -2153,7 +2161,7 @@ Section WpSconfMem.
               (wordw_pointsto (KTR := ktd) width pa (DfracOwn 1) sv)
               Hw0 Hw8 Hvw Hwdvd Huintw Hwrite_plain Hsv
               ltac:(solve_ndisj) with "Hcg Hpc Hinstr Hclaim [Hbytes] [Hcont]").
-    { intros CIDw img sigma log V ppn Hcan Hoff Hid.
+    { intros CIDw img sigma log V ppn Hcan Hoff Hid _.
       iIntros "#Hk Hmem Htso Hctx Hbw".
       iApply (wordw_free_write_c (KTR := ktd) (CIDw := CIDw) width img sigma log V
                 pa ppn sv Hw0 Hcan Hoff with "Hk Hmem Htso Hctx Hbw"). }
@@ -2797,6 +2805,79 @@ Section WpSconfMem.
     iExact "Htso".
   Qed.
 
+  (* >>> A6.109: THE SAME STORE AT BOTH OF THE GATE'S ARMS, and at any
+     stored value.  [word_wpay_frame_store_c] above is this lemma with
+     [vnew := zero_reg] and the LEFT arm chosen; the lock's cpu field needs
+     the RIGHT one too -- acquire writes the hart's own [struct cpu] pointer
+     (the window's [cp] row) and REVOKES its [own] entry, where release
+     writes the clear word and RESTORES it.  Exported because [WpSconfLock]
+     builds its cpu-store family's write obligation out of it directly:
+     that family opens the lock INSIDE the atomic step, so it cannot use
+     the closed leaf below (which wants the window in hand). <<< *)
+  Lemma word_wpay_frame_store_gen_c {CIDw : CpuId}
+      (img : TsoMemPa.bytemap) (σ : mstate) (log : list pwmsg)
+      (V : agent -> nat) (a : Arch.pa) (vold vnew : mword 64)
+      (z : nat -> bv 8) (cp : agent -> nat -> bv 8)
+      (own own' : agent -> option nat) (lo : nat) :
+    ((forall j : nat, (j < 8)%nat -> nth_byte vnew j = z j)
+       /\ own' (hart_agent (@cpu_id CIDw)) = Some (S (length log))
+     \/ (forall j : nat, (j < 8)%nat ->
+            nth_byte vnew j = cp (hart_agent (@cpu_id CIDw)) j)
+       /\ own' (hart_agent (@cpu_id CIDw)) = None) ->
+    (forall h : agent, h <> hart_agent (@cpu_id CIDw) -> own' h = own h) ->
+    gen_heap_interp (hG := riscv_memGS) σ.(mem) -∗
+    tso_interp_of riscv_eraGS img σ.(mem) log V -∗
+    ([∗ list] j ∈ seq 0 8, ∃ t : nat,
+       TsoCtx.phys_ledger_wpay (pa_add a j) (DfracOwn 1) (nth_byte vold j) t
+         (TsoMemPa.TsWin a 8 j z cp own lo)) ==∗
+    gen_heap_interp (hG := riscv_memGS) (write_bytes σ.(mem) a 8 vnew) ∗
+    tso_interp_of riscv_eraGS img (write_bytes σ.(mem) a 8 vnew)
+      (log ++ [PWMsg (snap_of a 8 vnew) (hart_agent (@cpu_id CIDw))])%list
+      (vstep (hart_agent (@cpu_id CIDw)) (V (hart_agent (@cpu_id CIDw)))
+         (log ++ [PWMsg (snap_of a 8 vnew) (hart_agent (@cpu_id CIDw))])%list V) ∗
+    ([∗ list] j ∈ seq 0 8,
+       TsoCtx.phys_ledger_wpay (pa_add a j) (DfracOwn 1) (nth_byte vnew j)
+         (S (length log)) (TsoMemPa.TsWin a 8 j z cp own' lo)).
+  Proof.
+    intros Harm Hoth. iIntros "Hm Htso Hold".
+    iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
+    iDestruct (tso_interp_of_bound with "Htso") as %Hbd.
+    set (log' := (log ++ [PWMsg (snap_of a 8 vnew)
+                            (hart_agent (@cpu_id CIDw))])%list).
+    set (V' := vstep (hart_agent (@cpu_id CIDw))
+                 (V (hart_agent (@cpu_id CIDw))) log' V).
+    assert (Hpin' : forall h, (NCPU <= h)%nat -> V' h = length log').
+    { intros h Hh. rewrite /V' /vstep. case_decide as Hd.
+      - exfalso. subst h. pose proof (fin_to_nat_lt (@cpu_id CIDw)).
+        rewrite /hart_agent in Hh. lia.
+      - destruct (lt_dec h NCPU); [lia | reflexivity]. }
+    assert (Htvc : forall c : CPU, V' (hart_agent c) = V (hart_agent c)).
+    { intros c. rewrite /V' /vstep. case_decide as Hd.
+      - by rewrite Hd.
+      - destruct (lt_dec (hart_agent c) NCPU) as [|Hge]; first reflexivity.
+        exfalso. pose proof (fin_to_nat_lt c). rewrite /hart_agent in Hge. lia. }
+    assert (Htvmono : forall c : CPU, (V (hart_agent c) <= V' (hart_agent c))%nat)
+      by (intros c; rewrite Htvc; lia).
+    assert (Htvtop : forall c : CPU, (V' (hart_agent c) <= length log')%nat).
+    { intros c. rewrite Htvc /log' length_app /=.
+      have := Hbd (hart_agent c). lia. }
+    rewrite (tso_interp_of_at_gs riscv_eraGS img σ.(mem) log V
+               σ.(sregs) σ.(mdev) Hpin).
+    iMod (TsoCtx.ledger_store_win_wpay_ok (CID := CIDw)
+            (gs_of img σ.(mem) log V σ.(sregs) σ.(mdev))
+            (gs_of img (write_bytes σ.(mem) a 8 vnew) log' V'
+               σ.(sregs) σ.(mdev))
+            a 8%N vold vnew lo z cp own own'
+            ltac:(vm_compute; discriminate) Harm Hoth
+            eq_refl eq_refl eq_refl Htvmono Htvtop
+            with "Hm Htso Hold") as "(Hm & Htso & _ & Hnew)".
+    iModIntro. iFrame "Hm Hnew".
+    rewrite -(tso_interp_of_at_gs riscv_eraGS img
+                (write_bytes σ.(mem) a 8 vnew) log' V'
+                σ.(sregs) σ.(mdev) Hpin').
+    iExact "Htso".
+  Qed.
+
   (* >>> A6.104: `sd x0` ON AN ALREADY-MINTED WINDOW.  The twin of
      [wp_sd_zero_wpay_s_sconf]: same instruction, same plumbing, but the
      racy window goes IN at floor [lo] and comes back OUT at [lo], with
@@ -2868,7 +2949,7 @@ Section WpSconfMem.
               with "Hcg Hpc Hinstr Hclaim [Hwin] [Hcont]").
     { (* THE WRITE OBLIGATION: the floor-FRAMING gate, at the physical
          address the tier pin identifies with [ea]. *)
-      intros CIDw img sigma log V ppn Hcan Hoff Hid.
+      intros CIDw img sigma log V ppn Hcan Hoff Hid _.
       iIntros "#Hk Hmem Htso Hctx Hbw".
       rewrite (ktier_pin_id ppn ea Hid).
       iMod (word_wpay_frame_store_c (CIDw := CIDw) img sigma log V ea vold
@@ -2960,7 +3041,7 @@ Section WpSconfMem.
               with "Hcg Hpc Hinstr Hclaim [Hbytes] [Hcont]").
     { (* THE WRITE OBLIGATION: the store-then-mint gate, at the physical
          address the tier pin identifies with [ea]. *)
-      intros CIDw img sigma log V ppn Hcan Hoff Hid.
+      intros CIDw img sigma log V ppn Hcan Hoff Hid _.
       iIntros "#Hk Hmem Htso Hctx Hbw".
       iEval (rewrite (wordw8_ctx (KTR2 := KT0))) in "Hbw".
       iMod (SmodeCorePt.word_pointsto_wpay_mint_c (KTR := KT0) img sigma log V
