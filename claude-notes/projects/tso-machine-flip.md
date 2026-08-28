@@ -14017,3 +14017,117 @@ delta 0**, sentinel-backed at r22.  `WpSconfLock`'s remaining blocker is
 unchanged and is the lemma A6.109 §3 named.  The §3 swap and the §4 premise are
 both in this lane's files (`TsoMemPa`, `TsoCtx`, `WpLock`, `WpSconfLock`) and
 are ready to open on a ruling.
+
+---
+
+## A6.111 — the creator's arm LANDS through the whole pure layer; and acquire's receipt was already exported
+
+*(Amendment A6.111, fliptree lane.  Authorized as the composition of two
+standing rulings — **§0.36′(a)**'s author arm (the creator rides its own write)
+applied at the lock tier, and **§0.38′**'s received-or-wrote reading — with the
+owner informed and holding a veto.  Both are cited in the source, at
+`TsoCtx.ledger_read_racy_ok` and `TsoMemPa.read_down_win_fl`.)*
+
+### §1. THE NUMBER
+
+**RED 9 — unchanged, after 1069 files recompiled.**  Sentinel-backed
+(`MAKEEXIT=2`, round r23).  **Red-list delta 0.**  `TsoMemPa` sits near the root
+of the tree, so this is close to a from-scratch certification of the whole
+build against the weakened premise.
+
+### §2. STEP (1) IS LANDED — THE PREMISE SWAP, EIGHT LEMMAS
+
+The chain, top to bottom, with the premise it now carries:
+
+| lemma | file | premise |
+|---|---|---|
+| `read_down_win_fl` | `TsoMemPa` | `visibleb h tv log Bm = true` *(was `Bm ≤ tv`)* |
+| `racy_read_window_fl` | `TsoMemPa` | same |
+| `racy_read_window_pin_fl_at` | `TsoMemPa` | same |
+| `lkcpu_not_mine_fl_at` | `TsoMemPa` | same |
+| `win_assemble_not_mine` | `TsoMemPa` | `visibleb h tv log lo = true` **+** `(lo ≤ tv) ∨ t = lo` |
+| `ledger_read_racy_ok` | `TsoCtx` | `ledger_vis h K lo` **+** `(lo ≤ K) ∨ t = lo` |
+| `ledger_read_racy_word_ok` | `TsoCtx` | same |
+| `lkcpu_read_not_mine` | `WpLock` | same |
+
+and one new projection, which is where the two arms meet the machine:
+
+```coq
+  Lemma ledger_vis_visibleb (g : gstate) (B t : nat) :          (* TsoCtx *)
+    tso_interp_at riscv_eraGS g -∗ ledger_vis (hart_agent cpu_id) B t -∗
+    ⌜∀ tv, (B ≤ tv)%nat -> visibleb (hart_agent cpu_id) tv g.(glog) t = true⌝.
+```
+
+Its proof is four lines: the left disjunct is `visibleb_below`, the right is
+`visibleb_own` after a `ghost_map_lookup` against the interp's log map — the
+pattern `ctx_phys_load_bytes_ok` already used, lifted out and named.
+
+**The measurement held exactly.**  `Bm ≤ tv` was used in the two floor base
+cases and nowhere else; the step case needed no change; `visibleb_below`
+recovers the old premise, so every existing caller weakens for free
+(`racy_read_window_floor` is the one in-file caller, and it is a two-token
+edit).  The only place the swap is not purely syntactic is
+`win_assemble_not_mine`, whose *anchor* visibility came out of the window's own
+floor-conditioned clause — so it takes the anchor's reachability as a second,
+pure premise, discharged by `lo ≤ tv` in the received case and by `t = lo` in
+the creator's, exactly as A6.110 §3 predicted.
+
+### §3. ROUTE (b) IS RECORDED AS FORBIDDEN, IN PLACE
+
+At `TsoCtx.ledger_read_racy_ok`, beside the ruling citation:
+
+> *"FORBIDDEN REASONING, recorded in place: 'the creator will have taken some
+> other lock in between, and any AMO upgrades every right-arm handle at once'
+> is TRUE (`hart_view_lb_get` does it, and `sys_pipe`'s `filealloc` does in fact
+> intervene) but must never be the story — it makes `initlock`'s contract
+> depend on what its caller does next."*
+
+### §4. THE REQUESTED CONJUNCT ALREADY EXISTS — AND THE KPT LANE CAN CONSUME IT TODAY
+
+The addition asked for — *expose the AMO's receipt in acquire's
+postcondition* — **is already there, at both tiers, and already exported**:
+
+```coq
+  (* SpecAcquire.v:172, wp_acquire_gen_pre_body's post *)
+  (* SpecAcquire.v:229, wp_acquire_pre_body's post     *)
+    (∃ K : nat, hart_view_lb K) -∗
+```
+
+with the comment that put it there: *"THE VIEW RECEIPT (tso-port M2), at the
+hart that WON the lock: persistent, monotone… minted at the AMO under TSO."*
+Both bodies are the ones the `ACQUIRE_GEN` / `ACQUIRE` module types export
+(`SpecAcquire.v:253–269`), the `hart_view_lb` is `TsoCtx`'s sealed one
+(`TsoCtx.v:391`, and `SpecAcquire` imports `TsoCtx` at line 89) — **the same
+predicate `ctx_bound_raise` consumes** — and `ProofAcquire` is green, so it is
+genuinely produced and not merely stated.
+
+> **EIGHTH INSTANCE OF THE LANE'S RECURRING SHAPE.**  `ctx_bound_raise` "has no
+> client that produces its premise" — and its producer has been exported from
+> `SpecAcquire` all along.  *Nothing to build; one `grep` to believe.*
+
+**For the KPT lane:** `kvmmake`'s `kalloc → acquire(kmem.lock)` already returns
+`∃ K, hart_view_lb K` to its caller.  Pair it with `llb loglen_name T` (from
+`ctx_parked_llb`, or from `TsoCtx.tso_interp_loglen_llb` inside a leaf) and
+`hart_view_lb_get` + `ctx_bound_raise` complete the transport with no change to
+this lane's files.
+
+### §5. WHAT (2) STILL NEEDS, PRECISELY
+
+The crossing absorb cannot be done at the *acquiring* AMO for the read that
+needs it, and the reason is the one A6.109 §3 found: `notheld` runs **before**
+this acquire's AMO.  So the upgrade must happen at the crossing where the
+handle *arrived* — i.e. while a payload containing a nested `is_lock` is
+transported.  That is `CtxMorph`'s territory: `R : CtxId → iProp` is already
+re-indexed at every acquire/release, and `lk_floor`'s right→left upgrade rides
+the same step, licensed by the receipt §4 shows is already exported.  Sized but
+not opened.
+
+Meanwhile the creator's arm (§2) covers exactly the case no crossing can:
+`initlock`'s own hart, before its next AMO.  The two together are the
+partition A6.110 §5 recorded, and the first half is now green.
+
+### §6. STATE
+
+Mirror refreshed.  `WpSconfLock` remains the only file this lane is holding
+open; its `notheld` read is now the *first* consumer of the completed kit and
+is next, together with (2) and the cpu-store instances.
