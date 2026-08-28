@@ -102,13 +102,6 @@ Lemma run_MemRead_ram {X} (n : N) (req : Interface.ReadReq.t n)
      /\ run (k (inl (w, None))) s x s').
 Proof. intros Hd. cbn [run]. rewrite Hd. apply iff_refl. Qed.
 
-Lemma run_MemRead_dev {X} (n : N) (req : Interface.ReadReq.t n)
-    (k : bv (8 * n) * option bool + Arch.abort -> M X) s x s' w d' :
-  dev_addr (Interface.ReadReq.pa req) = true ->
-  dev_read s.(mdev) (Interface.ReadReq.pa req) n = Some (w, d') ->
-  run (Interface.Next (Interface.MemRead n req) k) s x s' <->
-  run (k (inl (w, None))) (MState s.(sregs) s.(mem) d') x s'.
-Proof. intros Hd Hr. cbn [run]. rewrite Hd Hr. apply iff_refl. Qed.
 
 Lemma run_MemWrite_ram {X} (n : N) (req : Interface.WriteReq.t n)
     (k : option bool + Arch.abort -> M X) s x s' :
@@ -120,14 +113,6 @@ Lemma run_MemWrite_ram {X} (n : N) (req : Interface.WriteReq.t n)
                       (Interface.WriteReq.value req)) s.(mdev)) x s'.
 Proof. intros Hd. cbn [run]. rewrite Hd. apply iff_refl. Qed.
 
-Lemma run_MemWrite_dev {X} (n : N) (req : Interface.WriteReq.t n)
-    (k : option bool + Arch.abort -> M X) s x s' d' :
-  dev_addr (Interface.WriteReq.pa req) = true ->
-  dev_write s.(mdev) (Interface.WriteReq.pa req) n (Interface.WriteReq.value req)
-    = Some d' ->
-  run (Interface.Next (Interface.MemWrite n req) k) s x s' <->
-  run (k (inl None)) (MState s.(sregs) s.(mem) d') x s'.
-Proof. intros Hd Hw. cbn [run]. rewrite Hd Hw. apply iff_refl. Qed.
 
 (* intro (RHS-to-LHS) forms, [eapply]-friendly: the conclusion is unified
    with the goal FIRST (resolving the request), so the [dev_addr] premise
@@ -143,15 +128,6 @@ Proof.
   intros Hd Hb Hk. apply (proj2 (run_MemRead_ram n req k s x s' Hd)). eauto.
 Qed.
 
-Lemma run_MemWrite_ram_intro {X} (n : N) (req : Interface.WriteReq.t n)
-    (k : option bool + Arch.abort -> M X) s x s' :
-  dev_addr (Interface.WriteReq.pa req) = false ->
-  run (k (inl None))
-      (MState s.(sregs)
-         (write_bytes s.(mem) (Interface.WriteReq.pa req) n
-                      (Interface.WriteReq.value req)) s.(mdev)) x s' ->
-  run (Interface.Next (Interface.MemWrite n req) k) s x s'.
-Proof. intros Hd Hk. apply (proj2 (run_MemWrite_ram n req k s x s' Hd)). exact Hk. Qed.
 
 (* ===== RiscvModelMR ===== *)
 (* ====================================================================== *)
@@ -668,41 +644,6 @@ Section HartActiveProgress.
   Hypothesis Hexec : exec (execute instr) s_pc = Some (resf, s_x).
   Hypothesis Hnotexec : match resf with ExecuteAs _ => False | _ => True end.
 
-  Lemma exec_hart_active_progress :
-    exec (run_hart_active 0) s
-    = Some (Step_Execute (resf, zero_extend' 32 w), s_x).
-  Proof using All.
-    unfold run_hart_active.
-    rewrite exec_catch_early_return.
-    (* read cur_privilege -> Machine *)
-    rewrite execR_bind execR_liftR exec_read_reg Hpriv. cbn match.
-    (* dispatchInterrupt -> None ; the `fun w1 =>` body is
-       (match w1) >> liftR(fetch) >>= fun w2 => ..  =  bind (bind0 MATCH (liftR fetch)) k *)
-    rewrite execR_bind execR_liftR Hdisp. cbn match.
-    (* outer bind; inner bind0 (returnR tt) (liftR fetch) *)
-    rewrite execR_bind. rewrite execR_bind0 execR_returnR. cbn match.
-    rewrite execR_liftR Hfetch. cbn match. cbn match.
-    (* ext_fetch_hook (F_Base w) = F_Base w ; F_Base branch (announce/callback lets) *)
-    unfold ext_fetch_hook. cbn match. cbn beta iota.
-    (* ext_decode w -> instr *)
-    rewrite execR_bind execR_liftR Hdec. cbn match.
-    (* (if print=false then.. else returnR tt) >> and_boolM(..) >>= fun w21 => ..
-       = bind (bind0 (returnR tt) and_boolM) k *)
-    unfold get_config_print_instr. cbn match.
-    rewrite execR_bind. rewrite execR_bind0 execR_returnR. cbn match.
-    (* and_boolM (liftR is_landing_pad) (returnR (not lpad)) -> false (short-circuit) *)
-    unfold and_boolM.
-    rewrite execR_bind execR_liftR exec_is_landing_pad Hlpad. cbn match. cbn match.
-    rewrite execR_returnR. cbn match. cbn match.
-    (* w21 = false -> else: read PC >>= fun w22 => bind0 (write nextPC) (liftR execute) >>= ... *)
-    rewrite execR_bind execR_liftR (exec_read_reg PC) HpcF. cbn match.
-    rewrite execR_bind. rewrite execR_bind0 execR_liftR (exec_write_reg nextPC). cbn match.
-    fold s_pc. rewrite execR_liftR Hexec. cbn match. cbn match.
-    (* (match resf : not ExecuteAs => resf) >>= fun result' => returnR (Step_Execute ..) *)
-    rewrite execR_bind.
-    destruct resf; cbn in Hnotexec; try contradiction;
-      cbn match; rewrite execR_returnR; cbn match; rewrite execR_returnR; reflexivity.
-  Qed.
 
 End HartActiveProgress.
 

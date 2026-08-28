@@ -126,17 +126,6 @@ Section WpSmodeIntr.
     WP (Loop : expr riscv_lang).
   Proof. exact (wp_exec_step_intr_clock pc m n p is_rvc i b' R). Qed.
 
-  Lemma wp_instr_s_intr (m : regfile) (n : nat)
-      (pc : mword 64) (is_rvc : bool) (i : instruction) (b' : bool)
-      (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
-    ret_pc pc = pc ->
-    sie_cap_gpr kt m n true p -∗
-    pc_is pc -∗
-    instr pc is_rvc i -∗
-    ▷ wp_next true p (fun (CID : CpuId) =>
-        intr_cb kt m n p pc is_rvc i b' R (CID := CID)) -∗
-    WP (Loop : expr riscv_lang).
-  Proof. exact (wp_exec_step_intr pc m n p is_rvc i b' R). Qed.
 
   (* =================================================================== *)
   (* §2 THE SIE-AGNOSTIC FUNNEL over [sconf] + [sie_cap]: the capability's *)
@@ -1007,84 +996,6 @@ Section WpSmodeIntr.
   Qed.
 
   (* the 4-byte (base-encoding) variant: pc advances by 4 *)
-  Lemma wp_gpr_write_s_sconf_base
-      (pc : mword 64) (rd rsa rsb : mword 5) (base : instruction) (wval : mword 64)
-      (m : regfile) (n : nat) (b : bool) :
-    uint rd <> 0 ->
-    ops_ok b rd rsa rsb ->
-    (* THE INSTRUCTION'S OWN OBLIGATION, at the [swp] layer.  It replaces the
-       [forall s_pc, <three lookups> -> exec (execute base) s_pc = ...] premise
-       the whole-cycle engine took, and it HAD to: an [exec] fact quantifies
-       over the START state only, while a per-node walk may be interfered with
-       between nodes, so nothing bridges the two.  [WpMmodeSwpBase]'s
-       catalogue is how a caller discharges this in one line per instruction
-       family.
-       IT IS ∀-QUANTIFIED OVER THE HART because the engine delivers
-       [gpr_file (tp_pin m)] at the hart the LAST trap returned to, and
-       [tp_pin] is hart-indexed; away from tp the walk does not see the
-       difference, which is exactly what [ops_ok]'s source guards say. *)
-    (∀ CID : CpuId,
-       gen_cert -∗ gpr_file (tp_pin m) -∗
-       swp (execute base)
-         (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
-                   gpr_file (<[Regidx rd := regval_into_reg wval]> (tp_pin m)))) -∗
-    sie_cap_gpr kt m n b p -∗
-    pc_is pc -∗
-    instr pc false base -∗
-    wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr kt (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
-      pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang)) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    iIntros (Hrd Hops) "Hex Hcg Hpc Hinstr Hcont".
-    pose proof (ops_ok_rd _ _ _ _ Hops) as Hrdok.
-    pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
-    pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
-    assert (Hsp : m !!! Regidx csp_rs1
-                  = <[Regidx rd := regval_into_reg wval]> m !!! Regidx csp_rs1)
-      by (symmetry; apply upd_ne; congruence).
-    iApply (wp_instr_s_sconf m n b b pc false base
-              (fun _ npc ms' m' n' => ⌜npc = add_vec_int pc 4⌝ ∗
-                                ⌜m' = <[Regidx rd := regval_into_reg wval]> m⌝ ∗
-                                ⌜n' = n⌝)%I
-              with "Hcg Hpc Hinstr [Hex Hcont]").
-    iNext.
-    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
-       ordinary context entry inside the proof, so [rename] moves it out of
-       the way -- which the STATEMENT never sees, so every caller that names
-       this leaf's hart as [(CID := ...)] keeps working.  It has to come AFTER
-       the funnel application: inside a Section, a reference to a SIBLING
-       lemma is resolved through the section variables BY NAME. *)
-    rename CID into CID0.
-    iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "Hex".
-    - (* the instruction: hand the walk the file, take the written one back *)
-      iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
-      iDestruct "Hsc" as "(#Hhw & #Hminv & Hsc)".
-      iDestruct (hw_config_cert with "Hhw") as "#Hcert".
-      iDestruct ("Hex" $! CID with "Hcert Hfile") as "Hexx".
-      iApply (swp_mono (CID := CID) with "[Hsc Hcap HPC HnPC Hresv] [Hexx]");
-        [| iExact "Hexx" ].
-      iIntros (e) "(-> & Hfile)".
-      iSplitR; [done|].
-      iAssert (sconf (CID := CID)) with "[Hsc]" as "Hsc2".
-      { rewrite /sconf. iFrame "Hhw Hminv Hsc". }
-      iDestruct (sconf_at_priv_open (CID := CID) with "Hsc2") as (ms') "Hscp".
-      iExists (add_vec_int pc 4), ms',
-              (<[Regidx rd := regval_into_reg wval]> m), n.
-      iFrame "HPC HnPC Hresv Hscp".
-      iSplitL "Hcap".
-      { iApply (sie_cap_retarget m
-                  (<[Regidx rd := regval_into_reg wval]> m) n b Hsp with "Hcap"). }
-      iSplitL "Hfile".
-      { iEval (rewrite (tp_pin_upd m rd (regval_into_reg wval) Hrdtp))
-          in "Hfile". iExact "Hfile". }
-      done.
-    - (* the continuation: the engine resumes on the hart [Hs] names *)
-      iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & ->)".
-      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
-      iApply ("Hcont" $! CID with "[%] Hcg' Hpc'"). exact Hs.
-  Qed.
 
   (* =================================================================== *)
   (* §4 PILOT leaves + the straight-line pilot: the same three chained    *)

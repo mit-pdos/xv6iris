@@ -268,25 +268,7 @@ Section ProofNamexTrMain.
     rewrite seq_app. reflexivity.
   Qed.
 
-  Lemma nx_buf_split (q : mword 64) (g : nat -> bv 8) (l N : nat) :
-    (l <= N)%nat ->
-    ([∗ list] i ∈ seq 0 N, pa_add q i ↦ₘ[KT1] g i) -∗
-    ([∗ list] i ∈ seq 0 l, pa_add q i ↦ₘ[KT1] g i)
-    ∗ ([∗ list] i ∈ seq l (N - l), pa_add q i ↦ₘ[KT1] g i).
-  Proof.
-    intro H. iIntros "Hb". rewrite (nx_seq_split l N H) big_sepL_app.
-    iDestruct "Hb" as "[H1 H2]". iFrame.
-  Qed.
 
-  Lemma nx_buf_join (q : mword 64) (g : nat -> bv 8) (l N : nat) :
-    (l <= N)%nat ->
-    ([∗ list] i ∈ seq 0 l, pa_add q i ↦ₘ[KT1] g i) -∗
-    ([∗ list] i ∈ seq l (N - l), pa_add q i ↦ₘ[KT1] g i) -∗
-    ([∗ list] i ∈ seq 0 N, pa_add q i ↦ₘ[KT1] g i).
-  Proof.
-    intro H. iIntros "H1 H2". rewrite (nx_seq_split l N H) big_sepL_app.
-    iFrame.
-  Qed.
 
   (* the middle window, re-based: [seq a l] IS [(a +) <$> seq 0 l] *)
   Lemma nx_win_shift (q : mword 64) (dqm : dfrac) (g : nat -> bv 8) (a l : nat) :

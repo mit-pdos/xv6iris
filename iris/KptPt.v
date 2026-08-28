@@ -67,9 +67,6 @@ Definition kpt_l1_dram (root : mword 44) : mword 44 := kpt_page root 35.
 Definition kpt_l0_dram (root : mword 44) (j : Z) : mword 44 := kpt_page root (36 + j).
 
 (* the whole PT region sits inside RAM (and hence far from 2^44 wrap). *)
-Definition kpt_ok (root : mword 44) : Prop :=
-  ram_base <= bv_unsigned root * 4096 /\
-  (bv_unsigned root + kpt_pages) * 4096 <= ram_base + ram_size.
 
 (* ===================================================================== *)
 (* 2. Per-vpn geometry: the mapped vpns, their leaf table / flags / PTE.  *)
@@ -210,27 +207,6 @@ Qed.
 
 (* the identity: a RAM va's leaf-ppn re-concatenated with its page offset
    is the va itself.  (4KB analogue of SmodeCore's [ram_ident].) *)
-Lemma ram_ident_4k (a : mword 64) :
-  addr_is_ram a ->
-  zero_extend' 64 (concat_vec (kpt_leaf_ppn (svpn_of a))
-      (subrange_vec_dec (bits_of_virtaddr (Virtaddr a)) (Z.sub pagesize_bits 1) 0)) = a.
-Proof.
-  intros Hram.
-  apply bv_eq.
-  cbn [bits_of_virtaddr].
-  change (Z.sub pagesize_bits 1) with 11.
-  rewrite zext64_concat44_12_unsigned.
-  unfold kpt_leaf_ppn.
-  rewrite zext44_27_unsigned.
-  rewrite (svpn_of_unsigned a Hram).
-  rewrite subrange64_unsigned_11_0.
-  rewrite uint_unsigned.
-  rewrite Z.shiftr_div_pow2 by lia.
-  change (2 ^ 12) with 4096.
-  pose proof (bv_unsigned_in_range _ a) as Ha.
-  pose proof (Z_div_mod_eq_full (bv_unsigned a) 4096) as Hdm.
-  lia.
-Qed.
 
 (* ===================================================================== *)
 (* 6. TLB-entry discrimination: a foreign vpn's 4K entry never matches.   *)
@@ -261,17 +237,6 @@ Qed.
 Definition kpt_slot_in (s : mstate) (a : mword 64) (w : mword 64) : Prop :=
   forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add a j) = Some (nth_byte w j).
 
-Definition kpt_mem (s : mstate) (root : mword 44) : Prop :=
-  kpt_slot_in s (pte_addr_at root (mword_of_int 0)) (mk_pte (kpt_l1_dev root) PTE_PTR)
-  /\ kpt_slot_in s (pte_addr_at root (mword_of_int 2)) (mk_pte (kpt_l1_dram root) PTE_PTR)
-  /\ (forall i : mword 9, 96 <= bv_unsigned i < 129 ->
-        kpt_slot_in s (pte_addr_at (kpt_l1_dev root) i)
-          (mk_pte (kpt_l0_dev root (bv_unsigned i - 96)) PTE_PTR))
-  /\ (forall i : mword 9, bv_unsigned i < 64 ->
-        kpt_slot_in s (pte_addr_at (kpt_l1_dram root) i)
-          (mk_pte (kpt_l0_dram root (bv_unsigned i)) PTE_PTR))
-  /\ (forall vpn : mword 27, kpt_mapped vpn ->
-        kpt_slot_in s (kpt_slot0_pa root vpn) (kpt_leaf_pte vpn)).
 
 
 (* mword_of_int round-trips on the unsigned value (9- and 27-bit). *)
@@ -342,7 +307,6 @@ Definition pma_allows_pte_read (regions : list PMA_Region) : Prop :=
 (* stays ARBITRARY on pages that are only fetched/loaded.                 *)
 (* ===================================================================== *)
 
-Definition kpt_adf : Type := mword 27 -> bool * bool.
 
 (* flag byte: base perms (V|R|W[|X]) + A (bit 6) + D (bit 7) *)
 Definition kpt_ad_bits (ad : bool * bool) : Z :=
@@ -509,14 +473,6 @@ Proof.
     apply Z.leb_le in Hr1; apply Z.ltb_lt in Hr2; [left | right]; lia.
 Qed.
 
-Lemma kmap_static_mapped (vpn : mword 27) (pc : kperm) :
-  kmap_static vpn pc -> kpt_mapped vpn.
-Proof.
-  intros Hc. destruct (kmap_class_cases vpn pc Hc) as [[Ht _] | [Hd _]].
-  - left. apply kpt_dram_vpn_split. left. exact Ht.
-  - destruct Hd as [Hd | Hd]; [left | right; exact Hd].
-    apply kpt_dram_vpn_split. right. exact Hd.
-Qed.
 
 Lemma kpt_mapped_static (vpn : mword 27) :
   kpt_mapped vpn -> exists pc, kmap_static vpn pc.
@@ -529,11 +485,6 @@ Proof.
 Qed.
 
 (* an owned RAM va's vpn is statically classified (text or data) *)
-Lemma ram_svpn_static (a : mword 64) :
-  addr_is_ram a -> exists pc, kmap_static (svpn_of a) pc.
-Proof.
-  intros Hram. apply kpt_mapped_static. left. exact (ram_svpn_range a Hram).
-Qed.
 
 (* address-level regions land in the matching vpn class.  A TRANSLATED
    actor needs no such conversion -- its own [↦ₓ]/[↦ₘ] byte carries the
@@ -637,30 +588,6 @@ Proof.
   lia.
 Qed.
 
-Lemma static_ident_4k (a : mword 64) (pc : kperm) :
-  kmap_static (svpn_of a) pc ->
-  neq_vec (bits_of_virtaddr (Virtaddr a))
-     (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a)) (Z.sub 39 1) 0)) = false ->
-  zero_extend' 64 (concat_vec (kpt_leaf_ppn (svpn_of a))
-      (subrange_vec_dec (bits_of_virtaddr (Virtaddr a)) (Z.sub pagesize_bits 1) 0)) = a.
-Proof.
-  intros Hstat Hcanon.
-  pose proof (static_canon_lo a pc Hstat Hcanon) as Hlt.
-  apply bv_eq.
-  cbn [bits_of_virtaddr].
-  change (Z.sub pagesize_bits 1) with 11.
-  rewrite zext64_concat44_12_unsigned.
-  unfold kpt_leaf_ppn.
-  rewrite zext44_27_unsigned.
-  rewrite (svpn_of_unsigned_lo a Hlt).
-  rewrite subrange64_unsigned_11_0.
-  rewrite uint_unsigned.
-  rewrite Z.shiftr_div_pow2 by lia.
-  change (2 ^ 12) with 4096.
-  pose proof (bv_unsigned_in_range _ a) as Ha.
-  pose proof (Z_div_mod_eq_full (bv_unsigned a) 4096) as Hdm.
-  lia.
-Qed.
 
 Lemma kdata_svpn_class (a : mword 64) :
   addr_is_kdata a -> kmap_static (svpn_of a) KP_rw.
@@ -918,51 +845,6 @@ Proof. intros H j Hj. apply text_svpn_class, H, Hj. Qed.
    window byte.  Guard-compliant: entirely about the PHYSICAL storage address
    [pa], never the translated va.  (Lives here, off the heavy WP files, so the
    plain [lia]s are not broken by the [bitvector.tactics] zify hook.) *)
-Lemma tramp_window_static (pc pa : mword 64) :
-  zero_extend' 64 (concat_vec tramp_ppn
-     (subrange_vec_dec (bits_of_virtaddr (Virtaddr pc)) (Z.sub pagesize_bits 1) 0)) = pa ->
-  zero_extend' 64 (concat_vec tramp_ppn
-     (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int pc 2))) (Z.sub pagesize_bits 1) 0)) = add_vec_int pa 2 ->
-  is_aligned_paddr (Physaddr pa) 2 = true ->
-  forall j, (j < 4)%nat -> kmap_static (svpn_of (pa_add pa j)) KP_rx.
-Proof.
-  intros Hid Hid2 Hal.
-  apply instr_window_static.
-  change (Z.sub pagesize_bits 1) with 11 in Hid, Hid2.
-  pose proof (subrange64_unsigned_11_0 (bits_of_virtaddr (Virtaddr pc))) as Ho1.
-  pose proof (subrange64_unsigned_11_0 (bits_of_virtaddr (Virtaddr (add_vec_int pc 2)))) as Ho2.
-  change (2 ^ 12) with 4096 in Ho1, Ho2.
-  set (o1 := subrange_vec_dec (bits_of_virtaddr (Virtaddr pc)) 11 0) in *.
-  set (o2 := subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int pc 2))) 11 0) in *.
-  pose proof (Z.mod_pos_bound (bv_unsigned (bits_of_virtaddr (Virtaddr pc))) 4096 ltac:(lia)) as Ho1b.
-  pose proof (Z.mod_pos_bound (bv_unsigned (bits_of_virtaddr (Virtaddr (add_vec_int pc 2)))) 4096 ltac:(lia)) as Ho2b.
-  rewrite <- Ho1 in Ho1b. rewrite <- Ho2 in Ho2b.
-  assert (Htp : bv_unsigned tramp_ppn = 524294) by (vm_compute; reflexivity).
-  assert (Hpa : bv_unsigned pa = 2147508224 + bv_unsigned o1).
-  { rewrite <- Hid. rewrite zext64_concat44_12_unsigned. rewrite Htp.
-    change (524294 * 4096) with 2147508224. reflexivity. }
-  assert (Hpa2 : bv_unsigned (add_vec_int pa 2) = 2147508224 + bv_unsigned o2).
-  { rewrite <- Hid2. rewrite zext64_concat44_12_unsigned. rewrite Htp.
-    change (524294 * 4096) with 2147508224. reflexivity. }
-  assert (Hnw : bv_unsigned (add_vec_int pa 2) = bv_unsigned pa + 2).
-  { apply pt_add_vec_int_small; [lia | rewrite Hpa; lia]. }
-  assert (Hle : bv_unsigned o1 <= 4093) by lia.
-  unfold is_aligned_paddr in Hal. apply Z.eqb_eq in Hal.
-  rewrite uint_unsigned in Hal.
-  pose proof (bv_unsigned_in_range _ pa) as [Hpalo _].
-  rewrite Z.rem_mod_nonneg in Hal; [| exact Hpalo | lia].
-  rewrite Hpa in Hal.
-  apply Z.mod_divide in Hal; [| lia]. destruct Hal as [q Hq].
-  assert (Hle2 : bv_unsigned o1 <= 4092) by lia.
-  intros j Hj.
-  unfold addr_is_text.
-  pose proof (Nat2Z.is_nonneg j).
-  assert (Hj3 : Z.of_nat j <= 3) by lia.
-  assert (Hpaj : uint (pa_add pa j) = 2147508224 + bv_unsigned o1 + Z.of_nat j).
-  { unfold pa_add. rewrite uint_unsigned.
-    rewrite pt_add_vec_int_small; [| lia | rewrite Hpa; lia]. rewrite Hpa. lia. }
-  rewrite Hpaj. unfold ram_base, text_end. lia.
-Qed.
 
 (* ===================================================================== *)
 (* WORD-LEVEL ACCESSOR ARITHMETIC (uniform-claims item 1).                *)
@@ -979,22 +861,6 @@ Qed.
 
 (* the low-12 page offset of a within-page shifted address is the base
    offset plus [j] (no carry out of bit 11). *)
-Lemma subrange_11_0_pa_add (a : mword 64) (j : nat) :
-  (uint a < 274877906944)%Z ->
-  (bv_unsigned (subrange_vec_dec a 11 0) + Z.of_nat j < 4096)%Z ->
-  bv_unsigned (subrange_vec_dec (pa_add a j) 11 0)
-  = bv_unsigned (subrange_vec_dec a 11 0) + Z.of_nat j.
-Proof.
-  intros Hcan Hoff. rewrite subrange64_unsigned_11_0 in Hoff |- *.
-  change (2 ^ 12) with 4096 in Hoff |- *.
-  rewrite uint_unsigned in Hcan.
-  pose proof (Z.mod_pos_bound (bv_unsigned a) 4096 ltac:(lia)) as Hm.
-  pose proof (Nat2Z.is_nonneg j) as Hjnn.
-  unfold pa_add.
-  rewrite (pt_add_vec_int_small a (Z.of_nat j) ltac:(lia) ltac:(lia)).
-  rewrite Zplus_mod. rewrite (Zmod_small (Z.of_nat j) 4096) by lia.
-  rewrite Zmod_small; [reflexivity | lia].
-Qed.
 
 (* within a non-straddling window [pa_of] commutes with the byte offset *)
 Lemma pa_of_pa_add (ppn : mword 44) (a : mword 64) (j : nat) :

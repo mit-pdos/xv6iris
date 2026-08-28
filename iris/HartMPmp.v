@@ -607,26 +607,6 @@ Section swp_pmp.
   Qed.
 
   (* the all-OFF PMP at width 8, store and load: the M-mode data accesses *)
-  Lemma swp_pmpCheck_store8_off (Drw Dro : gset register)
-      (Df : register -> dfrac) (rs : regstate)
-      (pcfg : type_of_register pmpcfg_n)
-      (addr : SailStdpp.Values.mword 64) :
-    Drw ## Dro ->
-    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
-    pmp_all_off pcfg ->
-    register_lookup pmpcfg_n rs = pcfg ->
-    gen_cert -∗
-    hreg_frame rs Drw -∗
-    hreg_frame_ro Df rs Dro -∗
-    swp (pmpCheck (Physaddr addr) 8 (Store Data) Machine)
-      (fun r => ⌜r = None⌝ ∗
-                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
-  Proof.
-    intros Hdisj HD Hoff Hpcfg.
-    exact (swp_span Drw Dro Df rs rs _ None Hdisj
-             (mpmp_hval_off (Drw ∪ Dro) Drw pcfg addr rs 8 (Store Data)
-                ltac:(intros ent; eexists; reflexivity) HD Hoff Hpcfg)).
-  Qed.
 
   Lemma swp_pmpCheck_load8_off (Drw Dro : gset register)
       (Df : register -> dfrac) (rs : regstate)
@@ -650,35 +630,6 @@ Section swp_pmp.
   Qed.
 
   (* the TOR grant at width 8, store and load *)
-  Lemma swp_pmpCheck_store8_tor0 (Drw Dro : gset register)
-      (Df : register -> dfrac) (rs : regstate)
-      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
-      (addr : SailStdpp.Values.mword 64) :
-    Drw ## Dro ->
-    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
-    (pmpaddr_n : register) ∈ Drw ∪ Dro ->
-    register_lookup pmpcfg_n rs = pcfg ->
-    register_lookup pmpaddr_n rs = paddr ->
-    pmpAddrMatchType_encdec_backwards
-      (_get_Pmpcfg_ent_A (SailStdpp.Values.vec_access_dec pcfg 0)) = TOR ->
-    pmpLocked (SailStdpp.Values.vec_access_dec pcfg 0) = false ->
-    zopz0zKzJ_u (zeros' 64) (SailStdpp.Values.vec_access_dec paddr 0) = false ->
-    pmpRangeMatch (Z.mul (uint (zeros' 64 : SailStdpp.Values.mword 64)) 4)
-      (Z.mul (uint (SailStdpp.Values.vec_access_dec paddr 0)) 4)
-      (uint addr) (uint (to_bits 64 8)) = PMP_Match ->
-    gen_cert -∗
-    hreg_frame rs Drw -∗
-    hreg_frame_ro Df rs Dro -∗
-    swp (pmpCheck (Physaddr addr) 8 (Store Data) Machine)
-      (fun r => ⌜r = None⌝ ∗
-                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
-  Proof.
-    intros Hdisj HDcfg HDaddr Hpcfg Hpaddr HA Hunl Hord Hrange.
-    exact (swp_span Drw Dro Df rs rs _ None Hdisj
-             (mpmp_hval_tor0 (Drw ∪ Dro) Drw pcfg paddr addr rs 8 (Store Data)
-                ltac:(intros ent; eexists; reflexivity)
-                HDcfg HDaddr Hpcfg Hpaddr HA Hunl Hord Hrange)).
-  Qed.
 
   Lemma swp_pmpCheck_load8_tor0 (Drw Dro : gset register)
       (Df : register -> dfrac) (rs : regstate)

@@ -1186,15 +1186,6 @@ Section SRegimeDef.
          tlb ↦ᵣ tv' -∗ (True : iProp Σ) -∗ bare_inv).
   Proof. iIntros "[] _". Qed.
 
-  Definition bare_regime : s_regime :=
-    SRegime bare_inv kadm_ident (fun _ _ H => H) bare_absorb bare_transform
-            bare_tmode (False%I) _ bare_absorb_wit
-            (fun _ => True%I) bare_swp_side bare_swp_translate
-            bare_swp_translate_wit
-            (fun _ _ => True%I) bare_satp_ok bare_swp_res_agree
-            (False%I) _ bare_slot_reopen bare_slot_acc
-            (fun _ _ H => H) bare_swp_side_ok
-            (fun _ => Bare) bare_swp_mode_ok.
 
 End SRegimeDef.
 
@@ -1713,9 +1704,6 @@ Section SRegimeShared.
             (fun _ _ _ => I) (kpt_swp_side_ok root_ppn)
             (fun _ => Sv39) (kpt_swp_mode_ok root_ppn).
 
-  Lemma kpt_share_regime_inv (root_ppn : mword 44) :
-    sr_inv (kpt_share_regime root_ppn) ⊣⊢ tlb_res_pt root_ppn.
-  Proof. reflexivity. Qed.
 
 End SRegimeShared.
 

@@ -178,11 +178,6 @@ Set Printing Depth 40.
    step lemma true at all: without it a CREDITED level's post admits
    [w = true], i.e. that the level spent the unit the caller had already
    paid, and the invariant cannot be re-established. *)
-Lemma nx_wi_iu (Lr ncur : nat) (wc : bool) :
-  (0 < Lr)%nat ->
-  ((0 < Lr)%nat -> (iput_units + (if wc then 0%nat else 1%nat) <= ncur)%nat) ->
-  (iput_units <= ncur)%nat.
-Proof. intros H1 H2. specialize (H2 H1). destruct wc; lia. Qed.
 
 Lemma nx_wi_need (L n : nat) :
   (walk_need L <= n)%nat -> (0 < L)%nat -> (iput_units + 1 <= n)%nat.
@@ -633,25 +628,7 @@ Section ProofNamexMain.
     rewrite seq_app. reflexivity.
   Qed.
 
-  Lemma nx_buf_split (q : mword 64) (g : nat -> bv 8) (l N : nat) :
-    (l <= N)%nat ->
-    ([∗ list] i ∈ seq 0 N, pa_add q i ↦ₘ[KT1] g i) -∗
-    ([∗ list] i ∈ seq 0 l, pa_add q i ↦ₘ[KT1] g i)
-    ∗ ([∗ list] i ∈ seq l (N - l), pa_add q i ↦ₘ[KT1] g i).
-  Proof.
-    intro H. iIntros "Hb". rewrite (nx_seq_split l N H) big_sepL_app.
-    iDestruct "Hb" as "[H1 H2]". iFrame.
-  Qed.
 
-  Lemma nx_buf_join (q : mword 64) (g : nat -> bv 8) (l N : nat) :
-    (l <= N)%nat ->
-    ([∗ list] i ∈ seq 0 l, pa_add q i ↦ₘ[KT1] g i) -∗
-    ([∗ list] i ∈ seq l (N - l), pa_add q i ↦ₘ[KT1] g i) -∗
-    ([∗ list] i ∈ seq 0 N, pa_add q i ↦ₘ[KT1] g i).
-  Proof.
-    intro H. iIntros "H1 H2". rewrite (nx_seq_split l N H) big_sepL_app.
-    iFrame.
-  Qed.
 
   (* the middle window, re-based: [seq a l] IS [(a +) <$> seq 0 l] *)
   Lemma nx_win_shift (q : mword 64) (dqm : dfrac) (g : nat -> bv 8) (a l : nat) :

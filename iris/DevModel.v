@@ -322,26 +322,11 @@ Proof. reflexivity. Qed.
    REPORTS the transmit interrupt is the acknowledgement of it and clears the
    latch -- so a driver that reads the ISR twice sees the interrupt go away,
    which is what the hardware does and what the level model could not do. *)
-Lemma uart_read_isr_value (u : uart_state) (b : bv 8) (u' : uart_state) :
-  uart_read u 2 = Some (b, u') -> b = uart_isr u.
-Proof.
-  unfold uart_read. cbn [Z.eqb].
-  destruct (uart_isr_thri u); intro H; by injection H as <- _.
-Qed.
 
 (* the read that reports something else -- or nothing -- leaves the device
    alone, which is the form a poll of the ISR uses *)
-Lemma uart_read_isr_quiet (u : uart_state) :
-  uart_isr_thri u = false -> uart_read u 2 = Some (uart_isr u, u).
-Proof. intro H. unfold uart_read. cbn [Z.eqb]. by rewrite H. Qed.
 
 (* ...and the read that DOES report it disarms it *)
-Lemma uart_read_isr_acks (u : uart_state) (b : bv 8) (u' : uart_state) :
-  uart_isr_thri u = true -> uart_read u 2 = Some (b, u') -> u_thri u' = false.
-Proof.
-  intros Hth H. unfold uart_read in H. cbn [Z.eqb] in H.
-  rewrite Hth in H. by injection H as _ <-.
-Qed.
 
 (* -- MMIO totality --
 
