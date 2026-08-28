@@ -4126,10 +4126,11 @@ Section IputFreePath.
                            (* THE ARM's TAIL, DECIDED (A⁗, §3.16 / ZZProbeFrz
                               P2).  The tail is a disjunction since §3.14's
                               DEVIATION 1, widened by A⁗; its FROZEN
-                              alternative is the receipt, and the [false]
-                              mirror half this walk just extracted refutes it
-                              through the region's own receipt clause
-                              ([InodeRegion.ireg_frzown_off_absurd]).  So what
+                              alternative carries a QUARTER of the slot's
+                              freeze SELECTOR, and the positive liveness slice
+                              inside this walk's own [iref_tok] refutes it
+                              straight from the invariant
+                              ([IcacheInv.frz_slot_kill], RULING R-e).  So what
                               comes out is the payload, the inum's UNFROZEN
                               token -- which is exactly what the MINT at +0x50
                               consumes -- and the arm's liveness half. *)
@@ -4162,11 +4163,19 @@ Section IputFreePath.
       destruct vld.
       - (* LOADED: the payload leaves with us; the FULL inum cell stays *)
         rewrite /ic_payload_arm.
-        iDestruct "Hpayl" as "[(Hpayl & Hoff & Hlvh & Hpin) | [Hrc _]]";
+        iDestruct "Hpayl" as "[(Hpayl & Hoff & Hlvh & Hpin) | (_ & Hselt & _)]";
           last first.
-        { iMod (ireg_frzown_off_absurd (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ k))
-                  fsc_ireg fsc_fs icfg_ist icfg_nib inum ltac:(solve_ndisj) Hnib
-                  with "Hireg Hmirf Hrc") as "[]". }
+        { (* RULING R-e, the selector route (rank-6 probe, Stage 1): the
+             frozen alternative carries a QUARTER of the slot's freeze
+             SELECTOR, whose other half sits in [IcacheInv.live_slot]'s
+             frozen alternative beside the slot's WHOLE liveness unit; this
+             walk's own [iref_tok] carries a positive slice of that unit.  A
+             whole unit and a positive slice cannot coexist, so the branch is
+             dead -- no region open, no receipt, no index.  Same one-liner as
+             ProofIlock:2621 and (in its pure flavour) ProofIput:1157. *)
+          iDestruct "Hrtok" as "(_ & Hrlv & _)".
+          iMod (frz_slot_kill (⊤ ∖ ↑minstretN ∖ ↑(icEscN .@ k)) k ((1/2)/2)%Qp q
+                  ltac:(solve_ndisj) Hk with "Hitinv Hselt Hrlv") as "[]". }
         iDestruct "Hrident" as "[Hrd Hrn]".
         iEval (rewrite /islot_rest_at Ert) in "Hrest".
         iDestruct "Hrest" as "[Htd Htn]".
