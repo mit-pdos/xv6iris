@@ -12480,3 +12480,89 @@ cost no green file.  `md5sum kernel-rocq/*.v user-rocq/*.v` unchanged
    is already in place, so its two missing premises are now available.
 3. the DMA AU leaf + both virtio files (A6.95 §(4): ready, needs only the tie).
 4. §0.27′ proper → `ProofSwtch`.
+
+### A6.97 STEP (0) IS LANDED: `ctx_bound_raise` — AND THE SURFACE MOVE
+### RE-DESIGNED TO PRESERVE EVERY ARITY, WHICH CUTS ITS BLAST RADIUS BY ~25 FILES
+
+Green boundary, interim report.  **§0.35′'s mechanism is now complete in
+`TsoCtx` — all three of its moving parts exist and compile** — and the surface
+move that consumes them has a second, much cheaper spelling than the one A6.96
+wrote out.
+
+#### (1) LANDED: THE THIRD PIECE
+
+```coq
+  Lemma ctx_bound_raise `{CID : CpuId} (ξ : CtxId) (K' : nat) :
+    own_context ξ -∗ hart_view_lb K' ==∗ own_context ξ ∗ ctx_floor ξ K'.
+```
+
+The proof is the by-inspection argument, mechanised: the token's `∃ B K W D`
+is re-picked at `(max B K', max K K')`; the CLEAN facts are `llb _ t` with
+`t ≤ B`, untouched; the DIRTY justifications go through `big_sepM_impl`
+because `dirty_ok`'s first arm is `⌜k.1 ≤ B⌝` and only gets easier; the
+receipt at the joined view is a two-case split on `K' ≤ K`; and the raise
+itself is one `mono_nat_own_update`.  **Nothing is invented and no fact is
+strengthened** — the bound is bookkeeping about which facts are *already*
+justified, and the receipt is what pays for moving it.
+
+With `ctx_floor` and `own_context_floor_view` (A6.96 §(1)), §0.35′'s
+mechanism is complete at the ghost tier: **a floor can be BOUGHT (iii), CARRIED
+(i), and CASHED (iv)**, and none of the three names a hart.
+
+> **AND THE CREATOR-SIDE READING IS THE ONE THE OWNER GAVE, written into the
+> lemma's header.**  `initlock`'s store-then-mint floors the lock's window at
+> its own append, which the writer's bound has NOT passed — a plain store is
+> buffered.  *The author's floor is not free; it is bought with a receipt, the
+> same receipt every other hart pays with* (the acquire's AMO, which takes the
+> view to the log top).  What looked in A6.96 like a gap in the ruling is the
+> ruling's own clause (iii) doing exactly what it says.
+
+#### (2) THE SURFACE MOVE, RE-DESIGNED: EVERY ARITY SURVIVES
+
+A6.96 §(2) priced the move at zero churn for `is_lock`'s 136 mention sites but
+wrote `lo` into `lock_openable` and `lock_finisher` as a new parameter — which
+would have moved **~25 further green files** (`lock_openable`/`lock_finisher`
+have 17 consumers; the `newlock` family has ~11).  Measured this pass, and
+**none of that is necessary**: both can take the context AMBIENT, exactly as
+`is_lock` does, and bind `lo` internally.
+
+| definition | old plan | new plan | sites moved |
+|---|---|---|---|
+| `is_lock` | ambient ξ, `∃ lo` inside | unchanged | **0** |
+| `lock_openable` | `+ (lo : nat)` | ambient ξ; the opener HANDS OUT `∃ lo, ▷ lock_inv … lo ∗ ctx_floor cur_ctx lo` | **0** (only the `iMod … as` patterns in the leaves that already move) |
+| `lock_finisher` | `+ (lo : nat)` | `∀ lo` INSIDE the wand; `_destroy`'s `Out` gets `∃ lo, lk_cpu_fresh lo lk` | **0** |
+| `newlock` family | — | one new premise `ctx_floor cur_ctx lo` | ~11, one argument each |
+
+**The rule that makes it work is the same one the M1 flip used**: a fact that
+is ambient at every site does not belong in the arity.  `lo` is not ambient —
+it is the lock's — but it is EXISTENTIAL at every consumer that does not
+discharge a read against it, and the two that do (`WpSconfLock`'s leaves) are
+being rewritten in step (2) anyway.
+
+> *The general lesson, and it is the second time this tranche: before pricing
+> an interface change, ask which of the new parameter's consumers actually
+> NAME it.  Here exactly two of nineteen do.*
+
+#### (3) THE NUMBER
+
+**1100 of 1296, RED 9 — the A6.93 set, held**, sentinel-backed
+(`MAKEEXIT=2`).  **Red-list delta: 0.**  Both `TsoCtx` additions are purely
+additive — no existing statement moved — and cost no green file across a
+whole-tree rebuild.  `md5sum kernel-rocq/*.v user-rocq/*.v` unchanged
+(`edd91972b6bc1b944fd98a2cc2363815`).  `^Abort` / `^Admitted` / `^Axiom` all
+0.  Mirror refreshed.
+
+#### (4) THE REMAINING ORDER, RE-PRICED AGAIN
+
+1. **the surface move**, §(2)'s spelling: `WpLock` (the `lo` threading through
+   `lk_cpu_cell_ex` → `lk_cpu_res` → `lock_body` → `lock_inv`, the three
+   `is_lock_*` projections, `lock_openable`'s hand-out, `lock_finisher`'s
+   `∀ lo`), plus one premise at each `newlock` call site.  The `is_lock`
+   surface itself does not move.
+2. **the holder read + the `notheld` route** — `own_context_floor_view` now
+   supplies both premises A6.89 §(7) stopped at; the holder read is redone on
+   the racy kit per §0.35′(iv) case 2 (value-set `{1}`), retiring `lk_wex` and
+   `lock_word_ex`'s held arm along with A6.92's refutation.
+3. **the DMA leaf + both virtio files** — A6.95 §(4): ready, needed only the
+   tie, which case 3 now gives against `U`.
+4. **§0.27′ proper** → `ProofSwtch` (case 4).
