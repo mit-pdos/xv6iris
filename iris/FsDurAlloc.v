@@ -29,7 +29,8 @@
 (*    2.  [blk_ledger] / [ledger_carve] / [blk_ledger_cut] -- the cut      *)
 (*        itself, and [fs_state_of_ledger], the Gamma-generic core.        *)
 (*    3.  [fs_snap_alloc] / [P_dur_alloc] -- the registry's value-first    *)
-(*        entry points, whose ONE caller is [FsDurImg.img_fs_snap_alloc].  *)
+(*        entry points.  [fs_snap_alloc] is [P_dur_alloc]'s own step, and  *)
+(*        [P_dur_alloc]'s ONE caller is [FsDurImg.img_P_dur_alloc].        *)
 (* ====================================================================== *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list list_numbers bitvector.definitions.

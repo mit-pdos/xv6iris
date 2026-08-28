@@ -2439,25 +2439,6 @@ Section fs_crash.
     - rewrite /fs_receipt /=. iExists []. iExact "Hlb".
   Qed.
 
-  (* The mkfs corollary: a freshly formatted disk has an EMPTY on-disk log,
-     so its committed state is just its home blocks and no recovery
-     hypothesis has to be assumed at all. *)
-  Lemma P_fs_alloc_clean (γsw γreg γst : gname) (dk0 : Z -> bv 8)
-      (cov : gset Z) (logstart : Z) :
-    hdr_n (fs_blocks dk0 (log_hdr_bno logstart)) = 0 ->
-    (⊢ |==> P_dur (fs_restrict (fs_blocks dk0) (fs_home_set cov logstart))) ->
-    mono_nat_auth_own γsw 1 0%nat ⊢ |==> ∃ γs : fs_crash_names,
-      ⌜fcn_swap γs = γsw /\ fcn_reg γs = γreg /\ fcn_start γs = γst⌝ ∗
-      P_fs γs cov logstart dk0 ∗
-      fs_receipt γs (fs_restrict (fs_blocks dk0)
-                       (fs_home_set cov logstart)).
-  Proof.
-    intros Hn Hsnap. iApply P_fs_alloc.
-    - by apply (fs_recovery_clean (fs_blocks dk0) _ cov logstart Hn).
-    - by apply hdr_wf_zero.
-    - exact Hsnap.
-  Qed.
-
 End fs_crash.
 
 (* ====================================================================== *)

@@ -10,8 +10,11 @@
 (* ruling the durable instance is never updated and never handed anyone    *)
 (* else's resource -- it is ALLOCATED from a value and pure facts -- so    *)
 (* the image side of the boot is the ONE pure theorem [img_snap_ok]        *)
-(* (section 11) plus [FsDurSnap.P_dur_alloc], and section 12 is the boot   *)
-(* point.  THE OLDER RESOURCE-MOVING CONVERSION IS GONE (sections 3, 5,    *)
+(* (section 11) plus [FsDurAlloc.P_dur_alloc], which section 12 reads off  *)
+(* the image as [img_P_dur_alloc].  That epoch is ALL the boot point asks  *)
+(* of this file: [SystemAdequacy] mints the crash predicate itself from    *)
+(* it, through [FsCrash.P_fs_alloc].                                       *)
+(* THE OLDER RESOURCE-MOVING CONVERSION IS GONE (sections 3, 5,            *)
 (* 6, 7 and 10): it distributed the image's blocks into an era instance,   *)
 (* which the snapshot ruling made unnecessary, and nothing read it.  What  *)
 (* is left is PURE: the image's decoded state (section 8), the link        *)
@@ -104,14 +107,14 @@ Require Import FsDurBytes.
    and kind algebras are gone from the tree altogether -- the pure-kinds
    tie they carried is the REJECTED design (plan section 8), and section
    11's header says what replaced it here. *)
-(* [snap_gamma] -- the durable family record era 0's own allocator names in
-   its conclusion -- comes with [FsDurBytes] above.  The TRANSPORT is not
+(* [FsDurBytes] above also carries the durable family record [snap_gamma],
+   which [FsDurAlloc]'s conclusion is stated over.  The TRANSPORT is not
    required here: this file names none of it. *)
 Require Import FsDurSnap.
 Require Import FsDurAlloc.   (* THE VALUE-FIRST ALLOCATOR (lane H5):
-                                [P_dur_alloc] / [fs_snap_alloc], whose
-                                ONE caller in the tree is this file's
-                                [img_fs_snap_alloc] below *)
+                                [P_dur_alloc], whose ONE caller in the
+                                tree is this file's [img_P_dur_alloc]
+                                below *)
 
 Local Open Scope Z_scope.
 
@@ -1059,7 +1062,8 @@ Qed.
 (*  decoder sections 8/10 read the image with, so no second decoder       *)
 (*  exists -- and [D] is the clean image's committed home map             *)
 (*  [fs_restrict (fs_blocks dk) (fs_home_set cov logstart)], which is     *)
-(*  exactly the [fr_D] of the record [FsCrash.P_fs_alloc_clean] mints.    *)
+(*  exactly the [fr_D] of the record [FsCrash.P_fs_alloc] mints at a      *)
+(*  clean log.                                                            *)
 (*                                                                        *)
 (*  WHERE EACH CLAUSE COMES FROM.  The three byte ties are the PURE       *)
 (*  halves of what sections 5/6 do with resources: the record from        *)
@@ -1676,25 +1680,6 @@ Qed.
 Section DurImgAlloc.
   Context `{!diskImgG Σ, !fsLinkG Σ, !fsTopG Σ}.
 
-  (* THE IMAGE'S OWN ALLOCATOR: the mkfs image's committed map, carved into
-     the first epoch's instance.  This is [FsDurAlloc.fs_snap_alloc]'s only
-     call site in the tree, and [img_snap_ok] its only [snap_ok] producer. *)
-  Lemma img_fs_snap_alloc (dk : Z -> bv 8) (ndisk : nat) (sb : fs_sb)
-      (nib : nat) (cov : gset Z) :
-    fs_boot_image_wf dk ndisk sb nib cov ->
-    ⊢ |==> ∃ g gl gt : gname,
-        fs_snap (snap_gamma g gl gt) g
-          (fs_restrict (fs_blocks dk)
-             (fs_home_set cov (FsImg.sb_logstart sb)))
-          (img_state (fs_blocks dk) sb nib).
-  Proof.
-    intros Himg.
-    exact (fs_snap_alloc (img_state (fs_blocks dk) sb nib)
-             (fs_restrict (fs_blocks dk)
-                (fs_home_set cov (FsImg.sb_logstart sb)))
-             (img_snap_ok dk ndisk sb nib cov Himg)).
-  Qed.
-
   Lemma img_P_dur_alloc (dk : Z -> bv 8) (ndisk : nat) (sb : fs_sb)
       (nib : nat) (cov : gset Z) :
     fs_boot_image_wf dk ndisk sb nib cov ->
@@ -1709,43 +1694,3 @@ Section DurImgAlloc.
   Qed.
 
 End DurImgAlloc.
-
-Section DurImgSnap.
-  Context `{!riscvGS Σ, !xv6G Σ, !fsCrashG Σ, !lockG Σ}.
-
-  (*  THE BOOT POINT (plan section 5).  [FsCrash.P_fs_alloc_clean] mints
-      the crash predicate of a CLEAN image at
-      [D0 = fs_restrict (fs_blocks dk) (fs_home_set cov logstart)] -- that
-      IS the record's own [fr_D] -- and W2 of [fsimg_wf] is exactly its
-      zero-log-header premise, so the bundle already carries it.
-
-      SINCE LANE CE the durable snapshot is [P_fs]'s own last conjunct, so
-      this lemma no longer hands one out beside it: what it does instead is
-      DISCHARGE [P_fs_alloc_clean]'s one premise -- era 0's epoch itself,
-      as a resource -- off [img_P_dur_alloc], which is the image half of the
-      whole story.  Era 0 is the only place the image decoder is ever read;
-      every later era's boot mints from the previous era's snapshot.  *)
-  Lemma img_boot_P_fs_dur (gsw greg gst : gname)
-      (dk : Z -> bv 8) (ndisk : nat) (sb : fs_sb) (nib : nat)
-      (cov : gset Z) :
-    fs_boot_image_wf dk ndisk sb nib cov ->
-    mono_nat_auth_own gsw 1 0%nat ⊢ |==> ∃ gs : fs_crash_names,
-      ⌜fcn_swap gs = gsw /\ fcn_reg gs = greg /\ fcn_start gs = gst⌝ ∗
-      P_fs gs cov (FsImg.sb_logstart sb) dk ∗
-      fs_receipt gs (fs_restrict (fs_blocks dk)
-                       (fs_home_set cov (FsImg.sb_logstart sb))).
-  Proof.
-    intros Himg.
-    assert (Hclean : hdr_n (fs_blocks dk
-                              (log_hdr_bno (FsImg.sb_logstart sb))) = 0).
-    { rewrite /hdr_n /log_hdr_bno.
-      exact (fsimg_wf_log (fs_blocks dk) sb (proj1 Himg)). }
-    iIntros "H".
-    iMod (P_fs_alloc_clean gsw greg gst dk cov (FsImg.sb_logstart sb)
-            Hclean (img_P_dur_alloc dk ndisk sb nib cov Himg)
-            with "H") as (gs) "(%Heq & HP & Hrc)".
-    iModIntro. iExists gs. iFrame "HP Hrc".
-    iPureIntro. exact Heq.
-  Qed.
-
-End DurImgSnap.

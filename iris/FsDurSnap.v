@@ -34,7 +34,7 @@
    clauses is ERA 0'S BUSINESS AND NOBODY ELSE'S -- it is the one producer
    with no source instance to mint from -- so the carve lives in
    [FsDurAlloc.v], above this file, and its single caller is
-   [FsDurImg.img_fs_snap_alloc].  What is left here is the REGISTRY: the
+   [FsDurImg.img_P_dur_alloc].  What is left here is the REGISTRY: the
    epoch's shape ([fs_snap], [P_dur]), the mint off readings
    ([snap_mint], [fs_snap_alloc_mint], [P_dur_alloc_mint]), the reading
    back out ([fs_snap_read_ok]) and the commit's swap ([dsnap_step_xfer]).

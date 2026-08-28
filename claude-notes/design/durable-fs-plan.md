@@ -340,7 +340,7 @@ onto the instance, so what a mint owes about `D` at all is ONE clause.
 algebra `fp_slot`/`fp_list`/`fp_disj`, `blk_ledger`, `ledger_carve`,
 `blk_ledger_cut`, `fs_state_of_ledger` and the registry's value-first
 entries `fs_snap_alloc`/`P_dur_alloc`.  Its ONE caller is
-`FsDurImg.img_fs_snap_alloc`; `FsCrash.P_fs_alloc` no longer takes a pure
+`FsDurImg.img_P_dur_alloc`; `FsCrash.P_fs_alloc` no longer takes a pure
 tie at all but era 0's EPOCH, as a resource (`⊢ |==> P_dur D0`), so the
 crash predicate does not know how a file system is built out of bytes and
 nothing at or below it takes `snap_ok` as a premise.
