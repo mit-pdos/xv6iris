@@ -1152,7 +1152,7 @@ Section IputTail.
          handed this walk the [false] half ([IcacheRef.frzsel_agree]).  What
          comes out is the payload, the inum's still-unfrozen token and the
          arm's liveness half -- the three the retirement below consumes. *)
-      iDestruct "Harmt" as "[(Hpayl & Hoff & Hlvh & Hpin) | (_ & Hselt & _)]";
+      iDestruct "Harmt" as "[(Hpayl & Hoff & Hlvh & Hpin) | (Hselt & _)]";
         last first.
       { iDestruct (frzsel_agree with "Hself Hselt") as %Hb. discriminate. }
       iDestruct (islot_rest_join k qt icfg_dev inum Hqthalf with "Hrident [Hrest]")
@@ -2615,10 +2615,10 @@ Section IputFreePath.
     iDestruct (word4_pointsto_half_join with "Hvb Hva") as "Hvld".
     iMod (ic_dep_checkout fsc_ic k (DepFrz q icfg_dev inum tid qtx) with "Hictok")
       as "[Hdep Hdepa]".
-    iMod ("Hclose" with "[Hdepa Hfrg Hrident Hrcpt Hsele Htx Hmt Hgida Hpinr]") as "_".
+    iMod ("Hclose" with "[Hdepa Hfrg Hrident Hsele Htx Hmt Hgida Hpinr]") as "_".
     { iApply bi.later_intro.
       iApply (ic_close_out_frz fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k icfg_dev inum q tid qtx
-                with "Hdepa Hfrg Hrident Hrcpt Hsele Htx Hmt Hgida Hpinr"). }
+                with "Hdepa Hfrg Hrident Hsele Htx Hmt Hgida Hpinr"). }
     iModIntro.
     iAssert (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev)
       with "[Hhalf Hiauth Hipool Hslots Hpool]" as "HRres".
@@ -3173,7 +3173,7 @@ Section IputFreePath.
        RECEIPT and nothing else, and the receipt goes home three lines below,
        inside the last close's own phase step. *)
     iDestruct (ic_payload_arm_decide_frz with "Hpre Harmt")
-      as "(Hpre & Hrcpt & Hsele & Hpintx)".
+      as "(Hpre & Hsele & Hpintx)".
     (* the mid-free park's own window closes here: the pin's halves agree and
        the share is home for good (durable-disk B''-tx5) *)
     iMod (ic_pin_exit k tid qtx with "Hhpn Hpintx") as "[Hpinr Htx]".
@@ -3197,8 +3197,8 @@ Section IputFreePath.
            reflexivity |].
         iExact "Haddrs". }
     iMod (ic_close_to_empty_frz fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k vv icfg_dev inum
-            with "Hgida Hgid Hidv Hdh Hinv2 Hvld Hraw Hmt Hpinr Hrcpt")
-      as "(Hbody & Hgidf & Hrcpt)".
+            with "Hgida Hgid Hidv Hdh Hinv2 Hvld Hraw Hmt Hpinr")
+      as "(Hbody & Hgidf)".
     iMod ("Hclose" with "[Hbody]") as "_"; [by iNext |].
     iMod ("Hidback" $! icfg_dev inum with "Hgidf Htx") as "Hgidf".
     iModIntro.
@@ -4163,7 +4163,7 @@ Section IputFreePath.
       destruct vld.
       - (* LOADED: the payload leaves with us; the FULL inum cell stays *)
         rewrite /ic_payload_arm.
-        iDestruct "Hpayl" as "[(Hpayl & Hoff & Hlvh & Hpin) | (_ & Hselt & _)]";
+        iDestruct "Hpayl" as "[(Hpayl & Hoff & Hlvh & Hpin) | (Hselt & _)]";
           last first.
         { (* RULING R-e, the selector route (rank-6 probe, Stage 1): the
              frozen alternative carries a QUARTER of the slot's freeze

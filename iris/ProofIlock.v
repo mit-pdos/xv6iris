@@ -2559,9 +2559,8 @@ Section ProofIlockMain.
                        i_valid (ientry k) ↦₄ valid_word v ∗
                        il_payload d k inum g v))
                    ∨ (ic_tok fsc_ic k ∗ ic_dep_own k d icfg_dev inum ∗
-                      frzown (bv_unsigned inum) ∗ frzsel k ((1/2)/2)%Qp true ∗
-                      (frzown (bv_unsigned inum) -∗
-                       frzsel k ((1/2)/2)%Qp true -∗
+                      frzsel k ((1/2)/2)%Qp true ∗
+                      (frzsel k ((1/2)/2)%Qp true -∗
                          ic_escrow_body fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k))))%I
       with "[Hbody Htok Href Hside]" as ">[Hok | Hfrz]".
     { destruct (ic_dep_rd d) eqn:Hrd.
@@ -2616,7 +2615,7 @@ Section ProofIlockMain.
            positive slice cannot coexist, so the branch is dead -- with NO
            lock, NO licence, NO region open, and NOTHING read off the index,
            which is why the same line serves ClaimK, PlainK and ShotK. ==== *)
-        iDestruct "Hfrz" as "(Htok & Hown & Hrcpt & Hsel & Hwand)".
+        iDestruct "Hfrz" as "(Htok & Hown & Hsel & Hwand)".
         iDestruct (ic_dep_own_live with "Hown") as (s0 g0) "(%Hg0 & Hlv & _)".
         iMod (frz_slot_kill (⊤ ∖ ↑(icEscN .@ k)) k ((1/2)/2)%Qp s0
                 ltac:(solve_ndisj) Hk with "Hitbl Hsel [Hlv]") as "[]".
