@@ -13516,3 +13516,177 @@ Steps (1)–(3) and (5) are measured and mechanical; step (4) is the only piece
 that has to be written rather than found, and it is a deletion from an existing
 proof rather than a new argument.  Not opened: the owner has §0.35′(i), and
 step (2) changes a gate that the same ruling's shape will touch.
+
+---
+
+## A6.107 — §0.36′ step 4 LANDED (the barrier leaf without the drain), and Q4's TRAVEL MEASUREMENT: `upt_res_pt` never leaves the trampoline
+
+*(Amendment A6.107, fliptree lane.  §0.35′(i)'s widening and §0.36′ step 2 both
+remain with the owner; nothing below touches either.)*
+
+### §1. THE NON-DRAINING SIBLING, LANDED AND CERTIFIED
+
+A6.106 §5 called step 4 "the only piece that has to be written rather than
+found, and it is a deletion from an existing proof rather than a new argument."
+That held exactly.  Three tiers, mirroring `pub_step`'s three, all first try:
+
+```coq
+  (* HartBarrier §5 *)
+  Definition ghost_step (P Q : iProp Σ) : iProp Σ :=
+    (∀ g : gstate,
+       gen_heap_interp … g.(gmem) -∗ tso_interp_at riscv_eraGS g -∗ P ==∗
+       gen_heap_interp … g.(gmem) ∗ tso_interp_at riscv_eraGS g ∗ Q)%I.
+
+  Lemma ghost_step_id           (P) : ⊢ ghost_step P P.
+  Lemma pub_step_of_ghost_step  (P Q) : ghost_step P Q -∗ pub_step P Q.
+  Lemma wp_hart_barrier_gs  {X} (C bk m P Q) : mctx C -> hbar_at m = Some bk -> …
+  Lemma swp_hart_barrier_gs {X} (bk m Φ P Q)  : hbar_at m = Some bk -> …
+
+  (* WpSconfFencePub §4, at `fence rw,w` *)
+  Lemma swp_barrier_gs        (bk P Q) …
+  Lemma swp_execute_FENCE_gs_S (fm rs rd menv P Q) …   (* FENCE (fm, 3, 1, rs, rd) *)
+  Lemma wp_fence_gs_s_sconf    (pc fm rs rd m n P Q) …
+```
+
+`ghost_step` is `pub_step` **minus its two gifts** — the drain fact
+`own_pub h glog ≤ gtv h` and the receipt `hart_view_lb (gtv cpu_id)`.  Nothing
+else changed: the view still moves to `fence_post` (a no-op at a non-draining
+kind), the state step is the same node, and the `Hpin'` bookkeeping is
+identical.  Two facts had to be re-proved generically rather than at
+`fence_drains bk = true`:
+
+```coq
+    Hadv : (V h <= tvn)%nat            (* destruct (fence_drains bk); lia *)
+    Htop : (tvn <= length log)%nat     (* the drained arm needs own_pub_le; the other is Hb *)
+```
+
+and with those, **`wp_hart_barrier_gs` carries no premise on `bk` at all** — it
+serves every barrier the model has, and `pub_step_of_ghost_step` leaves every
+draining site on §3 unchanged.  The sconf lift needed the `rw,w` dispatch, which
+is three arms of the model's nine-way chain rather than one
+(`fence_w_bits_11/_10/_01`, each `destruct fiom; vm_compute; reflexivity`): the
+successor set is `w` (bits `01`) at either value of FIOM, because FIOM only
+folds the I/O bits into the memory ones and `w` has none set.
+
+**The publication now has a site.**  `kptree_publish_top` (A6.106) is exactly a
+`ghost_step`, and `wp_fence_gs_s_sconf` is exactly the instruction at
+`main+0xac`.  What remains between here and `kpt_inv_alloc` is §0.36′ steps
+(1)–(3), which wait on the widening.
+
+### §2. THE NUMBER
+
+**1100 .vo, RED 9 — the set held for the fourth consecutive amendment**,
+sentinel-backed (`MAKEEXIT=2`, round r21).  **Red-list delta 0**; both files
+purely additive.  `^Abort` / `^Admitted` / `^Axiom` all 0.  Mirror refreshed.
+
+---
+
+### §3. Q4's TRAVEL MEASUREMENT — REPORT ONLY, NOTHING OPENED
+
+**The answer is the cheap one: `upt_res_pt` is trampoline-confined.  It is torn
+down before control reaches C and re-minted on the way back out.  It never
+crosses `usertrap`, never crosses `yield`, and cannot be parked.**
+
+#### (a) The whole-file fact, first
+
+`upt_res_pt` occurs in **exactly five files**, all of them trampoline/page-walk
+files: `UptWalkPt.v`, `UservecPt.v`, `UservecExitPt.v`, `UserretPt.v`,
+`UserretEntryPt.v`.  **Zero** occurrences in `SpecUsertrap.v`,
+`ProofUsertrap.v`, `UsertrapRes.v`, `SpecUservec.v`, `ProofUservec.v`,
+`SpecUserret.v`, `UserretUser.v`, `ProofSwtch.v`, `ProofForkret.v`,
+`ProofForkretPark.v`, `ProcPtOwn.v`.  `ProofSwtch.v` has no occurrence of
+`res_pt` at all.
+
+#### (b) The object, and its one constructor/destructor pair
+
+`UptWalkPt.v:155`.  Five conjuncts: `∃ t : ptree`; `tlb_ok_pt 0 t tlbv`;
+`upt_tree_spec uroot tfp um t`; `upt_map_wf um`; `ptree_own 2 (DfracOwn 1) t`.
+It holds **no cells** — `satp`, `tlb`, `pmpcfg_n`, `pmpaddr_n` are held beside it
+by whoever opened the seal, which is why it is a residue and not an invariant
+(`UptWalkPt.v:136`).  The sealed form that owns the cells is
+`UptTree.utlb_inv_pt` (`UptTree.v:627`).
+
+| | lemma | file:line |
+|---|---|---|
+| destructor | `upt_swp_open` | `UptWalkPt.v:163` |
+| constructor | `upt_swp_close` | `UptWalkPt.v:187` |
+
+Everything else that names it — `swp_translate_upt` (`:244`), `utramp_tr_obl`
+(`:648`), `utramp_fetch_tr` (`:751`), `wp_instr_u_pt` (`:805`),
+`wp_instr_u_pt_user` (`:922`), `utf_translate` (`:1083`), and the six
+per-instruction leaves in `UservecPt.v` / `UserretPt.v` — **opens and reseals
+inside one lemma**, premise `utlb_inv_pt` and conclusion `utlb_inv_pt`.  Those
+are borrows, not travel.
+
+#### (c) The crossing, in control-flow order
+
+| point | file:line | what exists |
+|---|---|---|
+| user runs | — | `utlb_inv_pt` (seal = residue + 4 cells) |
+| uservec exit switch | `UservecExitPt.v:315` | `upt_swp_open` — **the teardown** |
+| the two-table window | `UservecExitPt.v:412` | dissolved into `tlb_inv_pt2_kcur` |
+| window exit | `UservecExitPt.v:431`, `:216` | `pt_frame` + `tlb_res_pt kroot` — **`upt_res_pt` is gone** |
+| all of C: `usertrap`, `yield`, `swtch`, sleep, `exec` | `SpecUsertrap.v:359`; `UsertrapRes.v:1228/1248` | `proc_pt` inside `usertrap_res` — cell-free, no TLB fact |
+| userret entry switch | `UserretEntryPt.v:356` | `upt_res_pt` **re-minted**, from `pt2_res_kprev` + the flush's TLB-empty fact (`:415`) |
+| userret entry seal | `UserretEntryPt.v:424` | `upt_swp_close` → `utlb_inv_pt` |
+
+`ProofUservec.v:1548` says it in the tree's own words: *"the exit switch just did
+the one thing that converts the views: it wrote the KERNEL root into satp, which
+turned the user table from the installed `utlb_inv_pt` into the parked
+`pt_frame`."*  And `usertrap`'s contract confirms it from the other side:
+`wp_usertrap_body` (`SpecUsertrap.v:309`) takes register cells, `kernel_text`,
+`hw_config`, `minstret_inv`, `gpr_file`, and one abstract `R CID pt ksp` — no
+`upt_res_pt`, no `utlb_inv_pt`, no `satp ↦ᵣ`, no `tlb ↦ᵣ`.
+
+The re-mint is at a **different table**: `ProofUservec.v:1587` — *"THE TABLE
+USERRET INSTALLS IS `pt'`, NOT `pt`.  usertrap may have replaced the address
+space wholesale (exec does)."*  `SpecUserret.v:122` takes `tlb_res_pt kroot` and
+`pt_frame`, never `upt_res_pt`, and hands `utlb_inv_pt` out at `:165`.
+
+#### (d) The positive argument — it is not merely absent from the park, it is IMPOSSIBLE there
+
+`UsertrapRes.v:202`:
+
+```coq
+    strans_inv ∗ kpt_on cpu_id ∗ utlb_inv_pt _ _ _ ⊢ False
+```
+
+`utlb_inv_pt` owns `satp` at the **user** root and the parked kernel bundle owns
+it at the **kernel** root, so a consumer holding both is vacuous.  The park
+therefore drops the translation slot outright (`ut_trap_parked`,
+`UsertrapRes.v:213`) and the user side is stored cell-free as `proc_pt`.  This is
+not an accident of the current proof — it is a stated invariant of the park.
+
+#### (e) Confinement premises, and they are literal premises
+
+Both windows carry `_get_Mstatus_SIE mstatus0 = false` as a premise —
+`UservecExitPt.v:178` and `UserretEntryPt.v:79`.  Interrupts off, no call, hart
+pinned, for the whole life of the object.
+
+#### (f) The kernel twin, for contrast — and it is the one that DOES travel
+
+`KptShare.tlb_res_pt` (`KptShare.v:171`, nine conjuncts including a **full**
+`satp ↦ᵣ`, `tlb ↦ᵣ`, `pmp_config`, `kpt_inv` and `kpt_creds`) rides through C
+inside `ut_trap`'s `strans_inv` conjunct (`UsertrapRes.v:154`/`:160`) with a
+close/open pair built for exactly that: `ut_trap_tlb_close`/`_open`
+(`UsertrapRes.v:226`/`:235`) → `ut_res_tlb_close`/`_open` (`:978`/`:1001`) →
+`usertrap_res_tlb_close`/`_open` (`ProofUsertrap.v:1152`).  Its per-instruction
+face is `SmodeCorePt.spt_res_pt` (`SmodeCorePt.v:4676`), which lives for **one
+instruction** under the same open/reseal discipline `upt_res_pt` uses.
+`spt_run_post` (`SmodeCorePt.v:2794`, notations at `:3245`/`:4798`) is a WP
+postcondition shape parameterised by `(Q, Rr, Qi)` — it carries no table
+ownership and is not a residue at all.
+
+#### (g) What this decides
+
+The owner's Q4 asked between the **cheap `upt_res_pt` embedding** and the
+**`spt_run_post` slot**.  The measurement removes the reason the second was ever
+on the table: the second exists to give a fact somewhere to live *while the
+process is parked*, and `upt_res_pt` is never alive then.  Anything embedded in
+it is born after the userret entry switch and dead before the uservec exit
+switch completes — inside a window with interrupts off, no call, and the hart
+pinned.  A ξ-indexed fact embedded there never has to cross a park, never meets
+the parked continuation's ∀-quantified resumer ξ′ (the A6.104 handoff's first
+design problem), and never needs `CtxMorph` transport.
+
+Recorded as a measurement.  Nothing opened.
