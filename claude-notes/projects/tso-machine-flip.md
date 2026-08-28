@@ -14299,3 +14299,95 @@ landings stand — the `_exv` no-migration pin is needed either way, and
 `lock_openable_c` is exactly (2)'s target shape; only its `_inv_0` producer is
 idle, and it is three lines, kept because floor-0 locks become reachable again
 the moment the era-image mint is wired for any reason.
+
+---
+
+## A6.114 — OPTION 1 PRICES OUT, in a better form than stated: the anchor becomes free for EVERY hart, and it is `ledger_vis` again
+
+*(Amendment A6.114, fliptree lane.  Pricing + the first brick, at a green
+boundary.  Opening (2) on this.)*
+
+### §1. THE NUMBER
+
+**RED 9 — unchanged, 284 files recompiled**, sentinel-backed (`MAKEEXIT=2`,
+round r25).  **Red-list delta 0.**
+
+### §2. OPTION 1 WORKS — AND THE CORRECT FORM IS NOT THE ONE PROPOSED
+
+The proposal was: strengthen `lk_own_ok` to *"every agent's record is the floor
+unless it is the holder or has released."*  Measured, that predicate is **not
+preserved** — after `h` releases, its record is the release position and
+"has released" is not recordable in a pure `Prop` without new state.
+
+The form that IS preserved says the same thing without the escape clause:
+
+```coq
+    ∀ h t, own h = Some t  →  t = lo  ∨  h authored the message at t
+```
+
+and **that is `TsoCtx.ledger_vis h lo t`, verbatim** — its left disjunct is
+`t ≤ lo`, which with `win_ok1`'s `lo ≤ t` collapses to `t = lo`, and its right
+disjunct is authorship.  Preservation, checked against all three transitions:
+
+| transition | the writer's new record | discharged by |
+|---|---|---|
+| the mint (`initlock`) | `own = fun _ => Some lo` | `ledger_vis_below` — `t = lo`, free |
+| acquire (arm B) | `own' i = None` | nothing to prove; others unmoved |
+| release (arm A) | `own' i = Some (S (length log))` | `ledger_vis_own` on the store's own-message fragment |
+
+and both store arms move only the writer's entry
+(`ledger_store_win_wpay_ok`'s `Hoth`), so every other agent's obligation is
+carried across untouched.
+
+**Ninth instance of the lane's recurring shape.**  The invariant option 1 asks
+for is an existing predicate applied at a new pair of arguments.
+
+### §3. WHY IT IS WORTH MORE THAN THE CREATOR CASE
+
+With the cell carrying `∀ h t, ⌜own h = Some t⌝ -∗ ledger_vis h lo t`, the
+racy read's ANCHOR premise is discharged **for every hart, not just the
+creator**:
+
+* left disjunct ⇒ `t = lo` ⇒ the anchor *is* the floor, so the floor's own
+  evidence covers it;
+* right disjunct ⇒ authorship ⇒ `visibleb` unconditionally, at any view.
+
+So the pure side-condition `(lo ≤ K) ∨ t = lo` that A6.111 threaded through
+eight lemmas **disappears**, and `win_assemble_not_mine`'s second premise
+becomes the direct `visibleb h tv log t = true`.  What is left of the reader's
+obligation is the FLOOR alone — which is exactly `lk_floor`'s two arms, and
+exactly what (2) installs.  The two halves of A6.110 §5 stop being two
+different arguments and become one.
+
+### §4. THE FIRST BRICK, LANDED
+
+`WpSconfMem.word_wpay_frame_store_gen_c` now **keeps the store's own-message
+fragment** instead of dropping it:
+
+```coq
+    TsoCtx.ledger_msg_at (length log)
+      (PWMsg (snap_of a 8 vnew) (hart_agent (@cpu_id CIDw))) ∗
+```
+
+It is `ledger_vis_own`'s input, i.e. what the release arm needs to re-establish
+§2's invariant, and it was already produced by the gate underneath — A6.109
+threw it away with an `_`.  Additive; the zero-store leaf is untouched.
+
+### §5. THE BUILD (2) NOW IS
+
+1. `WpLock.lk_cpu_cell_ex` gains the `ledger_vis h lo t` component; the three
+   `lk_cpu_res_*` laws and `ProofInitlock`'s mint re-establish it (free, §2).
+2. The cpu-store instances re-establish it at the release arm off §4's
+   fragment.
+3. `TsoMemPa.win_assemble_not_mine`: second premise ⇝ `visibleb h tv log t`.
+4. `TsoCtx.ledger_read_racy_ok` / `_word_ok` and `WpLock.lkcpu_read_not_mine`:
+   drop the pure disjunction, take the anchor's `ledger_vis` instead.
+5. Then the crossing upgrade proper — `lock_openable` ⇝ `lock_openable_c` at
+   acquire's AMO — and the `SpecAcquire` threading.
+
+(1)–(4) are the invariant; (5) is the floor.  They are separable, and (1)–(4)
+do not touch `SpecAcquire`'s ~40 callers at all.
+
+### §6. STATE
+
+Mirror refreshed at r25.  Nothing outside this lane's files touched.
