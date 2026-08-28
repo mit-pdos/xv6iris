@@ -1303,7 +1303,7 @@ Section SysExecHead.
               sx_arg0_lt ltac:(rewrite HM10a0; reflexivity) Harg0 sx_noff0 Kar
               ltac:(rewrite HM10a2; reflexivity) sx_maxpath_lt Hlb
               with "Hcg Hcnt Htext Hdata Hpc Hpriv Hka Hbuf").
-    iIntros (CID13 Hq13 M11 P' Mas bnew) "%Hcs11 %Hext Hcg Hcnt Hpc Hpriv Hbuf %Hret".
+    iIntros (CID13 Hq13 M11 P' bnew) "%Hcs11 %Hext Hcg Hcnt Hpc Hpriv Hbuf %Hret".
     iEval (rewrite HM10a1) in "Hbuf".
     assert (Hpc020 : ret_pc (M10 !!! Regidx Rra : mword 64)
                      = mword_of_int (SX + 0x20))
@@ -1385,7 +1385,7 @@ Section SysExecHead.
       iDestruct (cpu_own_transport CID13 CID16 0%nat eb (proc_addr jp) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iSpecialize ("Hout" $! CID16 with "[%]"); [wp_next_chain |].
-      iApply ("Hout" $! M13 P' Mas k bnew (fun j => bnew (S k + j)%nat) v1 u60).
+      iApply ("Hout" $! M13 P' (us_M U) k bnew (fun j => bnew (S k + j)%nat) v1 u60).
       iRight.
       iSplitR; [iPureIntro; split_and!;
         [ exact HM13sp | exact HM13s0 | exact HM13thr | exact Hext
@@ -1442,7 +1442,7 @@ Section SysExecHead.
       iDestruct (cpu_own_transport CID13 CID17 0%nat eb (proc_addr jp) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iSpecialize ("Hout" $! CID17 with "[%]"); [wp_next_chain |].
-      iApply ("Hout" $! mf P' Mas 0%nat bnew bnew v1 u60). iLeft.
+      iApply ("Hout" $! mf P' (us_M U) 0%nat bnew bnew v1 u60). iLeft.
       iSplitR; [iPureIntro; split_and!;
         [ exact Hcsf | exact Hext | rewrite Hfa0; exact HM13a0 ] |].
       iSplitL "Hcg"; [iExact "Hcg" |]. iSplitL "Hcnt"; [iExact "Hcnt" |].
@@ -3178,7 +3178,7 @@ Section SysExecStep.
     iApply (Fetchaddr.wp_fetchaddr_sconf fsc_kalloc γf N5 (K - 60)%nat eb (proc_addr jp)
               pid (us_upt U P) u0 b lks Kfa
               with "Hcg Hcnt Htext Hpc Hpriv Hka F60").
-    iIntros (CID6 Hq6 mf Pa Mfa) "%Hcsa %Hexta Hcg Hcnt Hpc Hpriv Hfa".
+    iIntros (CID6 Hq6 mf Pa) "%Hcsa %Hexta Hcg Hcnt Hpc Hpriv Hfa".
     assert (Hupa : us_upt (us_upt U P) Pa = us_upt U Pa) by reflexivity.
     iEval (rewrite Hupa) in "Hpriv".
     assert (Hexta' : uptd_ext (pv_upt (us_V U)) Pa)
@@ -3209,8 +3209,8 @@ Section SysExecStep.
       iSpecialize ("Hout" $! CID7 with "[%]"); [wp_next_chain |].
       iDestruct (cpu_own_transport CID6 CID7 0%nat eb (proc_addr jp) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply ("Hout" $! mf Pa Mfa i pg alen afun). iRight. iRight.
-      iApply (sx_bad_intro (CID0 := CID7) γf jp pid (upd_usM U Mfa) K eb b lks sp0 m plen pfun rest uav
+      iApply ("Hout" $! mf Pa (us_M U) i pg alen afun). iRight. iRight.
+      iApply (sx_bad_intro (CID0 := CID7) γf jp pid (U) K eb b lks sp0 m plen pfun rest uav
                 mf Pa i pg afun ltac:(lia) Hexta'
                 (sx_ok_pgok pg alen afun i Hok) (sx_regs_bregs sp0 m mf i HR6)
                 with "Hpc Hcg Hcnt Hpriv Hcarry F59 [F60] Harr Hpgs").
@@ -3232,8 +3232,8 @@ Section SysExecStep.
       iSpecialize ("Hout" $! CID7 with "[%]"); [wp_next_chain |].
       iDestruct (cpu_own_transport CID6 CID7 0%nat eb (proc_addr jp) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply ("Hout" $! mf Pa Mfa i pg alen afun). iRight. iRight.
-      iApply (sx_bad_intro (CID0 := CID7) γf jp pid (upd_usM U Mfa) K eb b lks sp0 m plen pfun rest uav
+      iApply ("Hout" $! mf Pa (us_M U) i pg alen afun). iRight. iRight.
+      iApply (sx_bad_intro (CID0 := CID7) γf jp pid (U) K eb b lks sp0 m plen pfun rest uav
                 mf Pa i pg afun ltac:(lia) Hexta'
                 (sx_ok_pgok pg alen afun i Hok) (sx_regs_bregs sp0 m mf i HR6)
                 with "Hpc Hcg Hcnt Hpriv Hcarry F59 [F60] Harr Hpgs").
@@ -3293,8 +3293,8 @@ Section SysExecStep.
       iSpecialize ("Hout" $! CID9 with "[%]"); [wp_next_chain |].
       iDestruct (cpu_own_transport CID6 CID9 0%nat eb (proc_addr jp) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply ("Hout" $! Q1 Pa Mfa i pg alen afun). iRight. iLeft.
-      iApply (sx_body_intro (CID0 := CID9) γf jp pid (upd_usM U Mfa) K eb b lks sp0 m plen pfun rest uav
+      iApply ("Hout" $! Q1 Pa (us_M U) i pg alen afun). iRight. iLeft.
+      iApply (sx_body_intro (CID0 := CID9) γf jp pid (U) K eb b lks sp0 m plen pfun rest uav
                 Q1 Pa i pg alen afun (mword_of_int (SX + 0xb6) : mword 64)
                 Hi32 Hexta' Hok HRq1
                 with "Hpc Hcg Hcnt Hpriv Hcarry F59 [F60] Harr Hpgs").
@@ -3402,8 +3402,8 @@ Section SysExecStep.
       iSpecialize ("Hout" $! CID14 with "[%]"); [wp_next_chain |].
       iDestruct (cpu_own_transport CID11 CID14 0%nat eb (proc_addr jp) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply ("Hout" $! Q3 Pa Mfa i pg alen afun). iRight. iRight.
-      iApply (sx_bad_intro (CID0 := CID14) γf jp pid (upd_usM U Mfa) K eb b lks sp0 m plen pfun rest uav
+      iApply ("Hout" $! Q3 Pa (us_M U) i pg alen afun). iRight. iRight.
+      iApply (sx_bad_intro (CID0 := CID14) γf jp pid (U) K eb b lks sp0 m plen pfun rest uav
                 Q3 Pa i pg afun ltac:(lia) Hexta'
                 (sx_ok_pgok pg alen afun i Hok) (sx_regs_bregs sp0 m Q3 i HRq3)
                 with "Hpc Hcg Hcnt Hpriv Hcarry F59 [F60] Harr Hpgs").
@@ -3496,12 +3496,11 @@ Section SysExecStep.
     iDestruct (cpu_own_transport CID11 CID17 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Fetchstr.wp_fetchstr_sconf KT0 fsc_kalloc γf Q6 (K - 60)%nat 0%nat eb
-              (proc_addr jp) pid (upd_usM (us_upt U Pa) Mfa) 4096%nat fpg b lks
+              (proc_addr jp) pid (us_upt U Pa) 4096%nat fpg b lks
               sx_noff0 Kfs HQ6a2 sx_pgsize_lt Hlb
               with "Hcg Hcnt Htext Hpc Hpriv Hka Hpg").
-    iIntros (CID18 Hq18 mg Ps Mfs bnew) "%Hcsg %Hexts Hcg Hcnt Hpc Hpriv Hpg %Hfr".
-    assert (Hups : upd_usM (us_upt (upd_usM (us_upt U Pa) Mfa) Ps) Mfs
-                   = upd_usM (us_upt U Ps) Mfs)
+    iIntros (CID18 Hq18 mg Ps bnew) "%Hcsg %Hexts Hcg Hcnt Hpc Hpriv Hpg %Hfr".
+    assert (Hups : us_upt (us_upt U Pa) Ps = us_upt U Ps)
       by (destruct U as [Vx Mx]; destruct Vx; reflexivity).
     iEval (rewrite Hups) in "Hpriv".
     assert (Hexts' : uptd_ext (pv_upt (us_V U)) Ps)
@@ -3550,8 +3549,8 @@ Section SysExecStep.
       iSpecialize ("Hout" $! CID19 with "[%]"); [wp_next_chain |].
       iDestruct (cpu_own_transport CID18 CID19 0%nat eb (proc_addr jp) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply ("Hout" $! mg Ps Mfs (S i) pg' alen afun'). iRight. iRight.
-      iApply (sx_bad_intro (CID0 := CID19) γf jp pid (upd_usM U Mfs) K eb b lks sp0 m plen pfun rest uav
+      iApply ("Hout" $! mg Ps (us_M U) (S i) pg' alen afun'). iRight. iRight.
+      iApply (sx_bad_intro (CID0 := CID19) γf jp pid (U) K eb b lks sp0 m plen pfun rest uav
                 mg Ps (S i) pg' afun' ltac:(lia) Hexts'
                 (sx_pgok_push pg i (mr !!! Regidx Ra0 : mword 64)
                    (sx_ok_pgok pg alen afun i Hok) Hpnz Hpv)
@@ -3658,9 +3657,9 @@ Section SysExecStep.
       iSpecialize ("Hout" $! CID22 with "[%]"); [wp_next_chain |].
       iDestruct (cpu_own_transport CID18 CID22 0%nat eb (proc_addr jp) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply ("Hout" $! R2 Ps Mfs (S i) pg' (sx_upd alen i kk) afun').
+      iApply ("Hout" $! R2 Ps (us_M U) (S i) pg' (sx_upd alen i kk) afun').
       iRight. iRight.
-      iApply (sx_bad_intro (CID0 := CID22) γf jp pid (upd_usM U Mfs) K eb b lks sp0 m plen pfun rest uav
+      iApply (sx_bad_intro (CID0 := CID22) γf jp pid (U) K eb b lks sp0 m plen pfun rest uav
                 R2 Ps (S i) pg' afun' ltac:(lia) Hexts'
                 (sx_ok_pgok pg' (sx_upd alen i kk) afun' (S i) Hokpush)
                 (sx_regs_bregs sp0 m R2 (S i) HRR)
@@ -3683,9 +3682,9 @@ Section SysExecStep.
     iSpecialize ("Hout" $! CID22 with "[%]"); [wp_next_chain |].
     iDestruct (cpu_own_transport CID18 CID22 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply ("Hout" $! R2 Ps Mfs (S i) pg' (sx_upd alen i kk) afun').
+    iApply ("Hout" $! R2 Ps (us_M U) (S i) pg' (sx_upd alen i kk) afun').
     iLeft. iSplitR; [iPureIntro; reflexivity |].
-    iApply (sx_body_intro (CID0 := CID22) γf jp pid (upd_usM U Mfs) K eb b lks sp0 m plen pfun rest uav
+    iApply (sx_body_intro (CID0 := CID22) γf jp pid (U) K eb b lks sp0 m plen pfun rest uav
               R2 Ps (S i) pg' (sx_upd alen i kk) afun'
               (mword_of_int (SX + 0x56) : mword 64)
               ltac:(lia) Hexts' Hokpush HRR

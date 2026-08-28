@@ -35,8 +35,8 @@
 
    The postcondition is fetchstr's verbatim -- [FS.fetchstr_ret max new r]:
    either the buffer holds a NUL-terminated string of length [k < max] and
-   [r = k], or [r = -1].  [proc_priv] comes back untouched, because nothing
-   in the cone faults a page in. *)
+   [r = k], or [r = -1].  [proc_priv] comes back at the image it went in at;
+   only its DESCRIPTOR grows, by whatever copyinstr faulted in. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -99,15 +99,16 @@ Definition wp_argstr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG 
   kalloc_env γa None -∗
   ([∗ list] j ∈ seq 0 maxn, (pa_add buf j) ↦ₘ[KT1] buf_olds j) -∗
   wp_next b p (fun (CID : CpuId) =>
-    (* the image moves: the copy leaf may fault a page in, and copyout
-       writes user memory -- milestone J item 1's ∃-weakened staging *)
-    ∀ (mf : regfile) (P' : uptd) (M' : gmap Z (bv 8)) (buf_new : nat -> bv 8),
+    (* THE IMAGE DOES NOT MOVE: the whole cone below argstr only READS user
+       memory, and the pages copyinstr faults in were already in the block's
+       lazy view (SpecFetchstr.v).  Only the DESCRIPTOR grows. *)
+    ∀ (mf : regfile) (P' : uptd) (buf_new : nat -> bv 8),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf p pid (upd_usM (us_upt U P') M') -∗
+      proc_priv γf p pid (us_upt U P') -∗
       ([∗ list] j ∈ seq 0 maxn, (pa_add buf j) ↦ₘ[KT1] buf_new j) -∗
       ⌜fetchstr_ret maxn buf_new (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       WP (Loop : expr riscv_lang)) -∗

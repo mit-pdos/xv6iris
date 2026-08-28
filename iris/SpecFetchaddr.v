@@ -123,16 +123,19 @@ Definition wp_fetchaddr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
   kalloc_env γa None -∗
   ip ↦₈[KT1] oldv -∗
   wp_next b p (fun (CID : CpuId) =>
-    (* THE IMAGE MOVES: the copy leaf may fault a page in (and, for the
-       copyout direction, writes user memory), so the block comes back at a
-       fresh [M'] -- milestone J item 1's ∃-weakened staging. *)
-    ∀ (mf : regfile) (P' : uptd) (M' : gmap Z (bv 8)),
+    (* THE IMAGE DOES NOT MOVE.  fetchaddr READS eight bytes of user memory
+       through copyin; the pages copyin faults in on the way were already in
+       the block's view -- as lazy pages reading 0 -- so vmfault does not move
+       it either ([SpecCopyin.wp_copyin_sconf_mem] is same-[M]).  Only the
+       DESCRIPTOR grows, and the block comes back at the image it was
+       handed. *)
+    ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf av b p -∗
       cpu_own 0%nat eb p b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf p pid (upd_usM (us_upt U P') M') -∗
+      proc_priv γf p pid (us_upt U P') -∗
       fetchaddr_post ip oldv addr (pv_sz (us_V U))
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗

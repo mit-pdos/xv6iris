@@ -39,7 +39,8 @@
      holds.  So no SIZE PREMISE enters this contract, even though a size now
      reaches the machine.
 
-   *** [proc_priv] NO LONGER COMES BACK UNCHANGED. ***  It used to: copyinstr
+   *** [proc_priv]'s DESCRIPTOR NO LONGER COMES BACK UNCHANGED (its IMAGE
+   does). ***  It used to: copyinstr
    did not fault pages in, so the descriptor that went into
    [ProcInv.proc_priv_copy] was the descriptor that came out, and fetchstr was
    the one member of the fetch* family whose contract left the process block
@@ -126,16 +127,19 @@ Definition wp_fetchstr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
   kalloc_env γa None -∗
   ([∗ list] j ∈ seq 0 maxn, (pa_add buf j) ↦ₘ[ktb] buf_olds j) -∗
   wp_next b p (fun (CID : CpuId) =>
-  (* THE IMAGE MOVES: the copy leaf may fault a page in (and copyout writes
-     user memory), so the block comes back at a fresh [M'] -- milestone J
-     item 1's ∃-weakened staging. *)
-    ∀ (mf : regfile) (P' : uptd) (M' : gmap Z (bv 8)) (buf_new : nat -> bv 8),
+  (* THE IMAGE DOES NOT MOVE.  fetchstr READS user memory; the pages
+     copyinstr faults in on the way were already in the block's view -- as
+     lazy pages reading 0 -- so vmfault does not move it either
+     ([SpecCopyinstr.wp_copyinstr_sconf_mem] is same-[M] on both arms).  Only
+     the DESCRIPTOR grows, and the block comes back at the image it was
+     handed. *)
+    ∀ (mf : regfile) (P' : uptd) (buf_new : nat -> bv 8),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf p pid (upd_usM (us_upt U P') M') -∗
+      proc_priv γf p pid (us_upt U P') -∗
       ([∗ list] j ∈ seq 0 maxn, (pa_add buf j) ↦ₘ[ktb] buf_new j) -∗
       ⌜fetchstr_ret maxn buf_new (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       WP (Loop : expr riscv_lang)) -∗

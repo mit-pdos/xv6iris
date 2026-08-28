@@ -635,7 +635,6 @@ Section ProofFetchstr.
     (* ---- the ONE borrow out of [proc_priv] ---- *)
     iDestruct (proc_priv_sz_bound with "Hpriv") as %Hszb.
     iDestruct (proc_priv_copy with "Hpriv") as "(Hszc & Hptc & Hpt & Hpback)".
-    iDestruct (proc_ptm_pt with "Hpt") as "Hpt".
     (* ---- +0x18: c.mv a4,s2 -- a4 := max (the psz shifted every argument
        down one register, xv6 4f2fc8b) ---- *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.fetchstr + 0x18))
@@ -782,13 +781,15 @@ Section ProofFetchstr.
       by (apply fs_z_31_64; [apply Nat2Z.is_nonneg | exact Hmax31]).
     iEval (rewrite -HA5a2) in "Hbuf".
     (* ---- copyinstr(p->pagetable, p->sz, buf, addr, max) ----
-       *** THIS IS WHERE SpecFetchstr.v IS STALE (see the file header). ***
-       [wp_copyinstr_sconf] now takes the whole vmfault tier: a [γa] with
-       [kalloc_env γa None], a [cpu_own], K = 50 rather than 20, and it hands
-       back a descriptor P' EXTENDING the one it was given.  None of the four
-       can be supplied from [wp_fetchstr_sconf_body] as it stands. *)
+       copyinstr carries the whole vmfault tier (a [γa] with
+       [kalloc_env γa None], a [cpu_own], K = 50) and hands back a descriptor
+       P' EXTENDING the one it was given.  It is taken at its MEMORY-INDEXED
+       contract, at the block's own image: copyinstr writes no user memory
+       and the pages it faults in were already in the lazy view, so [us_M U]
+       comes back on the nose and the block re-closes at it. *)
     iDestruct (cpu_own_transport CID12 CID17 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Copyinstr.wp_copyinstr_sconf ktb γa A5 (pv_upt (us_V U)) (pv_sz (us_V U)) maxn buf_olds
+    iApply (Copyinstr.wp_copyinstr_sconf_mem ktb γa A5 (pv_upt (us_V U)) (us_M U)
+              (pv_sz (us_V U)) maxn buf_olds
               (av - 6)%nat n eb p b lks
               HK50 HA5a0 HA5a1 HA5a4 Hmax64 Hszb Hn
               with "Hcg Hcpu Htext Hpc Hpt Henv Hbuf").
@@ -808,13 +809,12 @@ Section ProofFetchstr.
     { intros r Hr Ncsp N8 N9 N18 N19.
       rewrite (callee_saved_lookup Hcsr r Hr). apply HthrA5; assumption. }
     (* close the [proc_priv] borrow.  copyinstr FAULTS PAGES IN now, so the
-       descriptor that comes back is [P'], not [pv_upt V]; [fs_upd_upt_id] is
-       dead and the postcondition has to carry [upd_upt V P'] -- which
-       SpecFetchstr.v does not yet offer. *)
+       descriptor that comes back is [P'], not [pv_upt V] ([fs_upd_upt_id] is
+       dead) -- but the IMAGE is [us_M U] still, so the block closes at
+       [us_upt U P'] and the postcondition needs no existential. *)
     iAssert (⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝)%I as "#Hxr";
       [iPureIntro; exact Hext|].
-    iDestruct (proc_pt_any_ptm with "Hpt") as (Mo) "Hpt".
-    iDestruct ("Hpback" $! P' Mo with "Hxr Hszc Hptc Hpt") as "Hpriv".
+    iDestruct ("Hpback" $! P' (us_M U) with "Hxr Hszc Hptc Hpt") as "Hpriv".
     (* ---- +0x24: bltz a0 -- copyinstr's answer decides the branch ---- *)
     destruct Hret as [[H0 (k & Hkmax & Hcstr)] | Hm1].
     - (* ======= copyinstr returned 0: fall through to strlen ======= *)
@@ -909,7 +909,7 @@ Section ProofFetchstr.
          [Hcont]. *)
       iDestruct (cpu_own_transport CID18 CID23 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID23 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mf P' Mo dst_new with "[%] [%] Hcg Hcpu Hpc Hpriv Hbuf [%]").
+      iApply ("Hcont" $! mf P' dst_new with "[%] [%] Hcg Hcpu Hpc Hpriv Hbuf [%]").
       { exact Hcsf. }
       { exact (uptd_ext_sz_ext _ _ _ Hext). }
       left. exists k. split; [exact Hkmax|]. split; [exact Hcstr | exact Hfa0].
@@ -970,7 +970,7 @@ Section ProofFetchstr.
       iIntros (CID22 Hk22 mf) "[%Hcsf %Hfa0] Hcg Hpc".
       iDestruct (cpu_own_transport CID18 CID22 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID22 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mf P' Mo dst_new with "[%] [%] Hcg Hcpu Hpc Hpriv Hbuf [%]").
+      iApply ("Hcont" $! mf P' dst_new with "[%] [%] Hcg Hcpu Hpc Hpriv Hbuf [%]").
       { exact Hcsf. }
       { exact (uptd_ext_sz_ext _ _ _ Hext). }
       right. exact Hfa0.

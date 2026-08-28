@@ -3962,7 +3962,7 @@ Section ProofSysOpenBody.
               (Hlb "kmem"%string)
               with "Hcg Hown Htext Hdata Hpc Hpriv Hkenv [Hbuf]").
     { iEval (rewrite HM9a1). iExact "Hbuf". }
-    iIntros (CID13 Hq13 mas P' Mas bf) "%Hcsas %Hupt Hcg Hown Hpc Hpriv Hbuf %Hfsr".
+    iIntros (CID13 Hq13 mas P' bf) "%Hcsas %Hupt Hcg Hown Hpc Hpriv Hbuf %Hfsr".
     iEval (rewrite HM9a1) in "Hbuf".
     assert (Hpc20 : ret_pc (M9 !!! Regidx Rra : mword 64)
                     = mword_of_int (SO + 0x20)) by (rewrite HM9ra; pcw).
@@ -4119,13 +4119,13 @@ Section ProofSysOpenBody.
     assert (HR3thr : so_thr m R3).
     { intros c Hc N2 N8b N9 N18 N19. rewrite /R3 upd_ne; [| regne].
       exact (HR2thr c Hc N2 N8b N9 N18 N19). }
-    iDestruct (proc_priv_bare_acc gf (proc_addr j) pid (upd_usM (us_upt U P') Mas) with "Hpriv")
+    iDestruct (proc_priv_bare_acc gf (proc_addr j) pid (us_upt U P') with "Hpriv")
       as "[Hpbare Hpback0]".
     iDestruct (cpu_own_transport CID13 CID18 0 eb (proc_addr j) b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iApply (BeginOp.wp_begin_op_sconf (CID := CID18) gs j gl fsc_bio icfg_log fsc_fs fsc_cov
               fsc_logst icfg_dev pid (DfracOwn (1/4)) R3 (K - 24)%nat eb b lks
-              (upd_usM (us_upt U P') Mas) HKbo Hj Hgl (Hlb "log"%string)
+              (us_upt U P') HKbo Hj Hgl (Hlb "log"%string)
               with "Hcg Hown [] [] Htext Hpc Hlog Hpbare Hprocs").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
@@ -4207,7 +4207,7 @@ Section ProofSysOpenBody.
     iAssert (wp_next (CID0 := CID21) true (proc_addr j)
                (so_cont0 gf
  ns dqb dqs dqbs dqn (proc_addr j) pid
-                         (upd_usM (us_upt U P') Mas) m K eb b lks))
+                         (us_upt U P') m K eb b lks))
       with "[Hcont]" as "Hcont0".
     { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
       iEval (rewrite /so_cont0). iIntros (mf ns2) "%Hcsf %Hns2".
@@ -4243,7 +4243,7 @@ Section ProofSysOpenBody.
       iApply (so_entry_n (CID0 := CID22) gfl gf gs j gl pd pav
                 pu
  pk bf (arg_int32 vom) (word_lo u23) ns Sb0
-                pid dqb dqs dqbs dqn (upd_usM (us_upt U P') Mas) m S2 sp0 K eb b lks
+                pid dqb dqs dqbs dqn (us_upt U P') m S2 sp0 K eb b lks
                 u4 u5 u6 u24
                 HKfull HdevR Hnib0 Hgeom Hsize Hbm0
                 Hbmcov Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hpcstr Hpk Hni1 Hni2
@@ -4274,7 +4274,7 @@ Section ProofSysOpenBody.
     iApply (so_entry_c (CID0 := CID22) gfl gf gs j gl pd pav
               pu
  pk bf (arg_int32 vom) (word_lo u23) ns Sb0
-              pid dqb dqs dqbs dqn (upd_usM (us_upt U P') Mas) m S2 sp0 K eb b lks
+              pid dqb dqs dqbs dqn (us_upt U P') m S2 sp0 K eb b lks
               u4 u5 u6 u24
               HKfull HdevR Hnib0 Hgeom Hsize Hbm0
               Hbmcov Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hpcstr Hpk Hni1 Hni2
