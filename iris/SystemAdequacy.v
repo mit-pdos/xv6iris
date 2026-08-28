@@ -281,7 +281,12 @@ Section SystemBoot.
      MINTS both inside the era fupd, off the era's own disk, and hands the
      class back existentially; only the camera ([fileGpreS]) is a functor
      constraint. *)
-  Lemma xv6_boot_era (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z) :
+  (* [Rb] IS THE RESOURCE THE POWER ARM LENDS THIS BOOT (durable-disk
+     BT-1), a parameter rather than a constant: this era only carries it to
+     [boot_shared_alloc], which drops it for now.  BT-3 is where the boot
+     mint starts reading the epoch off it. *)
+  Lemma xv6_boot_era (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z)
+      (Rb : (Z -> bv 8) -> iProp Σ) :
     boot_facts g ->
     (* THE PROJECTION THE POWER THEOREM PROVES AT THIS ERA, AND IT IS THE
        WHOLE OF WHAT THIS BOOT KNOWS ABOUT ITS DISK (durable-disk lane
@@ -313,7 +318,7 @@ Section SystemBoot.
        from it below and rides [first_tok] to forkret's first arm. *)
     riscv_crash_pred = P_fs_any cov (FsImg.sb_logstart sb) ->
     power_boot_res riscv_eraGS gen_id boot_D NPROC XV6_DISK_BYTES
-      (fun dk => mirror_of (fs_blocks dk)) g
+      (fun dk => mirror_of (fs_blocks dk)) Rb g
     ={⊤}=∗
       ([∗ list] c ∈ enum CPU,
          WP (LoopE gen_id c : expr riscv_lang) @ ⊤) ∗
@@ -374,7 +379,7 @@ Section SystemBoot.
     { rewrite Hlseq /fs_crash_seam. iModIntro.
       rewrite Hcp. iSplitL; iIntros "H"; iExact "H". }
     iMod (boot_shared_alloc g XV6_DISK_BYTES (fss_sb S) (fs_nib S) cov
-            S Pb Hbf Hbundle with "Hres")
+            S Pb Rb Hbf Hbundle with "Hres")
       as (Hfd Hir Hpav Hbs HF γd γv Rspent)
       "(%Hdimg & #Htext & #Hdata & #Hstarted & #Hdev & #Hwinv &
         #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hmdata & Hpark & Hpst & Hpavail & Huart &
@@ -598,9 +603,35 @@ Proof.
               variable in the same fupd, so the era boots already holding a
               true picture and the swap receipt. *)
            (fun dk => mirror_of (fs_blocks dk))
+           (* THE LENT RESOURCE (durable-disk BT-1): NOTHING YET.  The
+              channel is open -- [Hswap] is the one hook that runs with
+              [crashN] open and the fixed disk auth in hand, so it is the
+              only place a resource can leave the crash predicate for a
+              boot -- but this stage instantiates it at [emp] and the era
+              drops it, so the transport's shape lands on its own.  BT-2
+              fills it with [∃ D, ⌜fs_recovery …⌝ ∗ P_dur D], cloned off
+              the crash predicate's own epoch. *)
+           (fun _ => emp)%I
+           (* NO [iFrame] IN HERE, AND THAT IS NOT STYLE (durable-notes.md,
+              "[iFrame] resolves its instances up to delta").  One conjunct
+              of this post is [▷ P_fs_named …], whose body owns
+              [DiskImg.disk_img_bytes γd 0 (disk_read dk0 0 XV6_DISK_BYTES)]
+              -- a 2,048,000-element [big_sepL] behind a [Definition].  A
+              bare [iFrame] unfolds it looking for a frame and the file goes
+              from 7 s to unbounded at 32 GB (MEASURED).  Every conjunct is
+              placed by name instead. *)
            ltac:(intros γd γsw γreg γst Er gen dk;
-                 exact (P_fs_swap γd XV6_DISK_BYTES γsw γreg γst cov
-                          (FsImg.sb_logstart sb) dk Er gen))
+                 iIntros "Hreg Hlb Hsa Ha HM HP";
+                 iMod (P_fs_swap γd XV6_DISK_BYTES γsw γreg γst cov
+                         (FsImg.sb_logstart sb) dk Er gen
+                         with "Hreg Hlb Hsa Ha HM HP")
+                   as ">(Hsa & Ha & HP & HM & Hswlb)";
+                 iModIntro; iModIntro;
+                 iSplitL "Hsa"; [iExact "Hsa" |];
+                 iSplitL "Ha"; [iExact "Ha" |];
+                 iSplitL "HP"; [iExact "HP" |];
+                 iSplitL "HM"; [iExact "HM" |];
+                 iSplitL "Hswlb"; [iExact "Hswlb" | done])
            (* THE TRACE HOOK, threaded straight through: this layer fixes the
               crash predicate but says nothing about what the client reads off
               it, so [phi]/[Hphi] pass down unexamined. *)
@@ -619,8 +650,8 @@ Proof.
   destruct Hshape as (Hi & Gg & Gs & Gr & Gt & Gsw & ->).
   (* one [_] fewer since durable-disk 2b-inode-3: [fsTopG] is an [xv6G]
      member now, so the section generalises one class less. *)
-  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ gen g' sb nib cov Hbf
-            Hpure Hcovin Hlogsub Hls2 _).
+  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ gen g' sb nib cov _
+            Hbf Hpure Hcovin Hlogsub Hls2 _).
   reflexivity.
 Qed.
 

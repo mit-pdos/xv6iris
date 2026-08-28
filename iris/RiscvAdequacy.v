@@ -882,7 +882,24 @@ Section power.
          the FS layer's business ([FsCrash.mirror_of ∘ FsCrash.fs_blocks]),
          and no FS constant may appear this far down, so it arrives as this
          function parameter. *)
-      (Mof : (Z -> bv 8) -> log_mirror) (g' : gstate) : iProp Σ :=
+      (Mof : (Z -> bv 8) -> log_mirror)
+      (* THE CLIENT'S OWN BOOT RESOURCE, AT THE ERA'S DISK (durable-disk
+         BT-1).  [Mof] above is the client's picture of a disk image, a
+         VALUE; this is its resource twin -- an arbitrary client-chosen
+         [iProp] indexed by the era's own disk bytes, produced by [Hswap]
+         at the PowerOn arm and delivered here.
+
+         WHY IT HAS TO EXIST.  [Hproj]'s output is a [Prop], so nothing
+         resource-shaped can leave it, and the boot fupd's own hook
+         ([Hboot]) sees only [riscv_crash_pred], an opaque field: an era
+         can never identify the predicate's own existentially-closed disk
+         image with the machine's, because no era holds the fixed auth.
+         The PowerOn arm is the ONE point that holds both, so a resource
+         the boot is LENT out of the crash predicate has to cross here.
+         No FS constant appears -- [Rb] is exactly as abstract as [Mof]
+         already is, and this layer never looks inside it. *)
+      (Rb : (Z -> bv 8) -> iProp Σ)
+      (g' : gstate) : iProp Σ :=
     (([∗ list] c ∈ enum CPU, [∗ set] r ∈ D c,
         ghost_map_elem (era_reg_name HE c) r (DfracOwn 1)
           (existT r (register_lookup r (g'.(gregs) c)))) ∗
@@ -948,6 +965,12 @@ Section power.
         it is what a WAL fupd curries to prove the arm is still its own. *)
      ghost_var (era_mirror_name HE) (1/2) (Mof (v_disk (g'.(gdev).(dvirtio)))) ∗
      swap_lb (S gen) ∗
+     (* THE CLIENT'S LENT RESOURCE (durable-disk BT-1).  It sits HERE, at
+        the end of the era's own mint and before the fixed-layer rows,
+        because [BootShared.power_boot_res_unpack] spells the last three as
+        the single bundle [gen_cert]: appending after that bundle would
+        re-associate it, and the unpack must stay pure conversion. *)
+     Rb (v_disk (g'.(gdev).(dvirtio))) ∗
      (* the crash-spanning invariant: FIXED-layer, so every boot gets the
         SAME one -- which is the whole point (the durability property is what
         survives the power cycle).  The boot client threads it to
@@ -974,6 +997,8 @@ Section power.
            ◇ (disk_fixed_auth dk ∗ ▷ riscv_crash_pred ∗ ⌜Ppure dk⌝))
       (* the client's picture of a disk image (see [power_boot_res]) *)
       (Mof : (Z -> bv 8) -> log_mirror)
+      (* ...and the resource it is lent beside it (see [power_boot_res]) *)
+      (Rb : (Z -> bv 8) -> iProp Σ)
       (* THE CUSTODY HOOK (durable-disk 1a), the second client hook and the
          reason the era's mirror can be BORN TRUE.  A born-true value alone
          is not enough: a later WAL permit's disk image is ∀-bound, so the
@@ -1004,7 +1029,14 @@ Section power.
              ◇ (start_auth (gen + 1)%nat ∗ disk_fixed_auth dk ∗
                 ▷ riscv_crash_pred ∗
                 ghost_var (era_mirror_name HE) (1/2) (Mof dk) ∗
-                swap_lb (S gen)))
+                swap_lb (S gen) ∗
+                (* ...AND THE CLIENT'S LENT RESOURCE (durable-disk BT-1).
+                   This hook already runs with [crashN] open and the fixed
+                   auth in hand, and it is a plain [==∗], which is all a
+                   transport needs; so it is where a resource comes OUT of
+                   the crash predicate, not just where the mirror's other
+                   half goes in. *)
+                Rb dk))
       (* the boot client is handed the WHOLE fact set a reset machine has
          ([RiscvLang.boot_facts]: RAM total and holding the loaded image, the
          per-hart reset registers, the reset devices, power on) -- everything
@@ -1015,7 +1047,7 @@ Section power.
       (Hboot : forall (HE : riscvEraGS) (gen : nat) (g' : gstate),
          boot_facts g' ->
          Ppure (v_disk (g'.(gdev).(dvirtio))) ->
-         ⊢ power_boot_res HE gen D nproc ndisk Mof g' ={⊤}=∗
+         ⊢ power_boot_res HE gen D nproc ndisk Mof Rb g' ={⊤}=∗
             ([∗ list] c ∈ enum CPU,
                WP (LoopE gen c : expr riscv_lang) @ ⊤) ∗
             WP (UartLoopE gen : expr riscv_lang) @ ⊤ ∗
@@ -1191,11 +1223,11 @@ Section power.
       iInv "Hcinv" as "HPsw" "Hclosesw".
       iMod (Hswap HE g.(ggen) (v_disk (g2.(gdev).(dvirtio)))
               with "HRelem Hgst Hsauth Htie Hmir HPsw")
-        as ">(Hsauth & Htie & HPsw & Hmir & #Hswlb)".
+        as ">(Hsauth & Htie & HPsw & Hmir & #Hswlb & HRb)".
       iMod ("Hclosesw" with "HPsw") as "_".
       iMod (Hboot HE g.(ggen) g2 Hbf Hpure with
               "[Helems Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hspp Hspie Hlks Hpark Hpst HuF HpF HvF
-                Hdfrags Hmir Hresvfrags]")
+                Hdfrags Hmir Hresvfrags HRb]")
         as "(Hwps & Hwpu & Hwpd & Hwpp)".
       { rewrite /power_boot_res.
         iFrame "Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hspp Hspie Hlks Hpark Hpst HuF HpF HvF Hdfrags Hmir Hswlb".
@@ -1204,6 +1236,9 @@ Section power.
         { destruct Hbf as (_ & _ & _ & _ & _ & _ & _ & Hnone).
           rewrite (resv_map_none _ Hnone) big_sepM_gset_to_gmap.
           iExact "Hresvfrags". }
+        (* the client's lent resource, at the RESET machine's disk --
+           which is the disk [Hswap] just ran at ([Hdk2]) *)
+        iSplitL "HRb"; [iExact "HRb"|].
         iSplitR; [iExact "Hcinv"|].
         iSplitR; [iExact "Hbornlb"|].
         iSplitR; [|iExact "HRelem"].
@@ -1448,6 +1483,12 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        started auth, the durable auth and the predicate all come straight
        back. *)
     (Mof : (Z -> bv 8) -> log_mirror)
+    (* THE LENT RESOURCE (durable-disk BT-1), stated at the same raw gnames
+       as everything else here and for the same reason.  [Hswap] below
+       produces it out of [Pc] and [power_boot_res] delivers it to [Hboot];
+       this layer never looks inside it.  A client with nothing to lend
+       instantiates it at [emp]. *)
+    (Rb : (Z -> bv 8) -> iProp Σ)
     (Hswap : forall (γdisk γsw γreg γst : gname)
                     (E : riscvEraGS)
                     (gen : nat) (dk : Z -> bv 8),
@@ -1461,7 +1502,9 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
               disk_img_auth_sized γdisk ndisk dk ∗
               ▷ Pc γdisk γsw γreg γst ∗
               ghost_var (era_mirror_name E) (1/2) (Mof dk) ∗
-              mono_nat_lb_own γsw (S gen)))
+              mono_nat_lb_own γsw (S gen) ∗
+              (* ...and the client's lent resource (durable-disk BT-1) *)
+              Rb dk))
     (* THE TRACE INVARIANT (the strengthening of this theorem's conclusion).
        [Ppure]/[Hproj] above extract a pure fact from [Pc] and feed it INTO a
        boot; these two export one OUT of the whole execution.
@@ -1539,7 +1582,7 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        (exists (Hinv : invGS Σ) (γgen γstart γreg γdisk γswap : gname),
           F = boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γswap
                 (Pc γdisk γswap γreg γstart)) ->
-       ⊢ power_boot_res HE gen D nproc ndisk Mof g' ={⊤}=∗
+       ⊢ power_boot_res HE gen D nproc ndisk Mof Rb g' ={⊤}=∗
           ([∗ list] c ∈ enum CPU,
              WP (LoopE gen c : expr riscv_lang) @ ⊤) ∗
           WP (UartLoopE gen : expr riscv_lang) @ ⊤ ∗
@@ -1623,7 +1666,7 @@ Proof.
       by (exists Hinv, γgen, γstart, γreg, γfdisk, γswap; reflexivity).
     iApply (@wp_power_loop Σ F _ D nproc ndisk Ppure
               (Hproj γfdisk γswap γreg γstart)
-              Mof (Hswap γfdisk γswap γreg γstart)
+              Mof Rb (Hswap γfdisk γswap γreg γstart)
               (fun HE gen g' Hbf Hp => Hboot F HE gen g' Hbf Hp Hshape)
               with "Hcinv"). }
   (* THE FINAL OBSERVATION, AND IT IS NOW TWO FACTS.
