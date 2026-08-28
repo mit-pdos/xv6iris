@@ -790,7 +790,7 @@ Section Snap.
     (snap_auth g D
      ∗ ghost_map_auth (γtop Γ) 1 (fss_inodes S)
      ∗ ([∗ map] i ↦ n ∈ fss_inodes S, top_frag Γ i n)
-     ∗ fs_state Γ S
+     ∗ fs_state Γ (DfracOwn 1) S
      ∗ (∃ kv : ity, own (γlink Γ) (link_tok_elem ROOTINO kv))
      ∗ ⌜snap_shape S D⌝)%I.
 
@@ -1239,7 +1239,7 @@ Section Snap.
       rewrite bi.pure_impl. iIntros (Hi).
       iDestruct (big_sepM_lookup _ _ i n Hi with "Hlocs") as %Hx.
       by iPureIntro. }
-    rewrite /fs_footprint. iDestruct "Hfp" as "(Hsbb & Hin & Hbmb & Hpool)".
+    rewrite fs_footprint_1. iDestruct "Hfp" as "(Hsbb & Hin & Hbmb & Hpool)".
     (* ---- the byte ties, by agreement with the epoch's own authority ---- *)
     iDestruct (snap_blk_read_full g gl gt D SB_BNO (fss_sbb S) Hf
                  with "Hau Hsbb") as %Hsbv.

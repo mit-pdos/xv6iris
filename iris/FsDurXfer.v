@@ -412,27 +412,12 @@ Section RunsQ.
   Context {Σ : gFunctors}.
   Implicit Types Γ : fs_view_names Σ.
 
-  (* THE CONSTANT-SHARE VIEW.  Its [fsΦ] discards the dfrac it is given, so
-     every full-share shape read at it IS the corresponding [_q] shape at
-     [dq].  Nothing else about [Γ] moves. *)
-  Definition gamma_q Γ (dq : dfrac) : fs_view_names Σ :=
-    MkFsView (fun (_ : dfrac) (a : Z) (v : bv 8) => fsΦ Γ dq a v)
-             (γlink Γ) (γtop Γ).
-
-  Lemma gamma_q_byte_range Γ dq b off bs :
-    byte_range (gamma_q Γ dq) b off bs ⊣⊢ byte_range_q Γ dq b off bs.
-  Proof. rewrite /byte_range /byte_range_q /gamma_q //. Qed.
-
-  Lemma gamma_q_blk_owned Γ dq b bs :
-    blk_owned (gamma_q Γ dq) b bs ⊣⊢ blk_owned_q Γ dq b bs.
-  Proof. rewrite /blk_owned /blk_owned_q gamma_q_byte_range //. Qed.
-
-  Lemma gamma_q_ind_owned Γ dq n :
-    ind_owned (gamma_q Γ dq) n ⊣⊢ ind_owned_q Γ dq n.
-  Proof.
-    rewrite /ind_owned /ind_owned_q. case_decide as Hz; [done |].
-    apply gamma_q_blk_owned.
-  Qed.
+  (* [gamma_q] AND ITS FOUR READINGS MOVED DOWN AT EV-X: the constant-share
+     view is what [FsState.fs_state]'s dfrac argument is written at, so it
+     lives in [FsStateDefs] now ([gamma_q], [gamma_q_byte_range],
+     [gamma_q_blk_owned]) and its inode-shaped readings in [FsStateInode]
+     ([gamma_q_ind_owned], [gamma_q_inode_dat], [gamma_q_inode_phi],
+     [gamma_q_inode_ghost]). *)
 
   Definition phi_map_q Γ (dq : dfrac) (M : gmap Z (bv 8)) : iProp Σ :=
     ([∗ map] a ↦ v ∈ M, fsΦ Γ dq a v)%I.
@@ -811,14 +796,6 @@ Section FsRuns.
   (*  [inode_dat] AT that view IS [inode_dat_q Γ dq].                   *)
   (* ---------------------------------------------------------------- *)
 
-  Lemma gamma_q_inode_dat Γ dq n :
-    inode_dat (gamma_q Γ dq) n ⊣⊢ inode_dat_q Γ dq n.
-  Proof.
-    rewrite /inode_dat /inode_dat_q gamma_q_ind_owned.
-    apply bi.sep_proper; [| done].
-    apply big_sepM_proper. intros k bs _. apply gamma_q_blk_owned.
-  Qed.
-
   Lemma inode_phi_q_runs Γ dq (sb : fs_sb) (i : Z) (n : fs_node) :
     ~ ✓ (dq ⋅ dq) ->
     inode_phi_q Γ dq sb i n
@@ -1048,9 +1025,10 @@ Section FsFoot.
   Proof. rewrite /phi_runs big_sepL_cons //. Qed.
 
   Lemma fs_footprint_runs Γ S :
-    fs_footprint Γ S ⊢ ∃ PM, ⌜xf_shape S PM⌝ ∗ phi_runs Γ (xr_fs S PM).
+    fs_footprint Γ (DfracOwn 1) S
+    ⊢ ∃ PM, ⌜xf_shape S PM⌝ ∗ phi_runs Γ (xr_fs S PM).
   Proof.
-    rewrite /fs_footprint. iIntros "(Hsb & Hin & Hbm & Hpool)".
+    rewrite fs_footprint_1. iIntros "(Hsb & Hin & Hbm & Hpool)".
     iDestruct (fs_inodes_phi_runs with "Hin") as "[%Hlens Hin]".
     iDestruct (free_pool_runs with "Hpool") as (PM) "[%Hpm Hpool]".
     iAssert (⌜length (fss_sbb S) = BSIZE⌝)%I with "[Hsb]" as %Hsbl.
@@ -1064,13 +1042,13 @@ Section FsFoot.
   Qed.
 
   Lemma fs_footprint_of_runs Γ S PM :
-    xf_shape S PM -> phi_runs Γ (xr_fs S PM) ⊢ fs_footprint Γ S.
+    xf_shape S PM -> phi_runs Γ (xr_fs S PM) ⊢ fs_footprint Γ (DfracOwn 1) S.
   Proof.
     intros (Hsbl & Hlens & Hpm).
     rewrite /xr_fs !phi_runs_cons_range phi_runs_app.
     rewrite /xr_blk /xr_off /xr_bs /=.
     iIntros "(Hsb & Hbm & Hin & Hpool)".
-    rewrite /fs_footprint /blk_owned.
+    rewrite fs_footprint_1 /blk_owned.
     iSplitL "Hsb"; [by iFrame |].
     iSplitL "Hin"; [by iApply (fs_inodes_phi_of_runs Γ _ _ Hlens with "Hin") |].
     iSplitL "Hbm".
@@ -1179,7 +1157,7 @@ Section Xfer.
     xf_shape S PM -> xr_disj (xr_fs S PM) ->
     ⊢ |==> ∃ g : gname,
         ghost_map_auth g 1 (xr_union (xr_fs S PM))
-        ∗ fs_footprint (snap_gamma g gl gt) S.
+        ∗ fs_footprint (snap_gamma g gl gt) (DfracOwn 1) S.
   Proof.
     intros Hshape Hdisj.
     iMod (ghost_map_alloc (xr_union (xr_fs S PM))) as (g) "[Hba Hbe]".
@@ -1212,7 +1190,7 @@ Section Xfer.
         ghost_map_auth g 1 (xr_union (xr_fs S PM))
         ∗ ghost_map_auth gt 1 (fss_inodes S)
         ∗ ([∗ map] i ↦ n ∈ fss_inodes S, top_frag (snap_gamma g gl gt) i n)
-        ∗ fs_state (snap_gamma g gl gt) S
+        ∗ fs_state (snap_gamma g gl gt) (DfracOwn 1) S
         ∗ own gl (link_tok_elem ROOTINO v).
   Proof.
     intros Hshape Hdisj Hparse Hloc Hgeo Hfok Hfv.
@@ -1243,10 +1221,10 @@ Section Xfer.
      computed from [S] and no value is decoded. *)
   Lemma fs_footprint_xfer Γ (Hex : phi_excl Γ) (A : iProp Σ)
       (M : gmap Z (bv 8)) (Hag : phi_agree Γ A M) S (gl gt : gname) :
-    A -∗ fs_footprint Γ S ==∗
+    A -∗ fs_footprint Γ (DfracOwn 1) S ==∗
       ∃ (g : gname) (B : gmap Z (bv 8)),
-        ⌜B ⊆ M⌝ ∗ A ∗ fs_footprint Γ S ∗ ghost_map_auth g 1 B
-        ∗ fs_footprint (snap_gamma g gl gt) S.
+        ⌜B ⊆ M⌝ ∗ A ∗ fs_footprint Γ (DfracOwn 1) S ∗ ghost_map_auth g 1 B
+        ∗ fs_footprint (snap_gamma g gl gt) (DfracOwn 1) S.
   Proof.
     iIntros "HA Hf".
     iDestruct (fs_footprint_runs with "Hf") as (PM) "[%Hshape Hr]".
@@ -1271,15 +1249,15 @@ Section Xfer.
 
   Theorem fs_state_xfer Γ (Hex : phi_excl Γ) (A : iProp Σ)
       (M : gmap Z (bv 8)) (Hag : phi_agree Γ A M) S :
-    A -∗ fs_state Γ S ==∗
+    A -∗ fs_state Γ (DfracOwn 1) S ==∗
       ∃ (g gl gt : gname) (B : gmap Z (bv 8)),
         ⌜B ⊆ M⌝
         ∗ A
-        ∗ fs_state Γ S
+        ∗ fs_state Γ (DfracOwn 1) S
         ∗ ghost_map_auth g 1 B
         ∗ ghost_map_auth gt 1 (fss_inodes S)
         ∗ ([∗ map] i ↦ n ∈ fss_inodes S, top_frag (snap_gamma g gl gt) i n)
-        ∗ fs_state (snap_gamma g gl gt) S.
+        ∗ fs_state (snap_gamma g gl gt) (DfracOwn 1) S.
   Proof.
     iIntros "HA HS". iEval (rewrite fs_state_split fs_ghost_split) in "HS".
     iDestruct "HS" as "(Hf & Hl & #Hp)".
@@ -1311,15 +1289,15 @@ Section Xfer.
      which is why the slack is never a pure clause of anything. *)
   Theorem fs_state_xfer_tok Γ (Hex : phi_excl Γ) (A : iProp Σ)
       (M : gmap Z (bv 8)) (Hag : phi_agree Γ A M) S (r : Z) (v : ity) :
-    A -∗ fs_state Γ S -∗ own (γlink Γ) (link_tok_elem r v) ==∗
+    A -∗ fs_state Γ (DfracOwn 1) S -∗ own (γlink Γ) (link_tok_elem r v) ==∗
       ∃ (g gl gt : gname) (B : gmap Z (bv 8)),
         ⌜B ⊆ M⌝
         ∗ A
-        ∗ fs_state Γ S ∗ own (γlink Γ) (link_tok_elem r v)
+        ∗ fs_state Γ (DfracOwn 1) S ∗ own (γlink Γ) (link_tok_elem r v)
         ∗ ghost_map_auth g 1 B
         ∗ ghost_map_auth gt 1 (fss_inodes S)
         ∗ ([∗ map] i ↦ n ∈ fss_inodes S, top_frag (snap_gamma g gl gt) i n)
-        ∗ fs_state (snap_gamma g gl gt) S
+        ∗ fs_state (snap_gamma g gl gt) (DfracOwn 1) S
         ∗ own gl (link_tok_elem r v).
   Proof.
     iIntros "HA HS Ht". iEval (rewrite fs_state_split fs_ghost_split) in "HS".

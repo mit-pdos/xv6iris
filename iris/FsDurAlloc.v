@@ -818,7 +818,8 @@ Section Ledger.
 
   Lemma fs_state_of_ledger Γ S D :
     snap_ok S D ->
-    blk_ledger Γ D -∗ fs_links (γlink Γ) (fss_inodes S) -∗ fs_state Γ S.
+    blk_ledger Γ D -∗ fs_links (γlink Γ) (fss_inodes S) -∗
+    fs_state Γ (DfracOwn 1) S.
   Proof.
     intros [Hok Hloc]. iIntros "Hled Hlinks".
     iDestruct (blk_ledger_cut Γ S D Hok with "Hled") as "H".
@@ -831,7 +832,7 @@ Section Ledger.
     iEval (rewrite big_sepL_fmap big_sepL_elements_dom) in "Hind".
     iEval (rewrite big_sepL_fmap) in "Hpool".
     (* ---- assemble ---- *)
-    rewrite /fs_state. iSplitL "Hsb"; last iSplitR "Hbm Hpool".
+    rewrite fs_state_1. iSplitL "Hsb"; last iSplitR "Hbm Hpool".
     - (* the superblock *)
       rewrite /sb_owned. iSplitL; [| iPureIntro; exact (sk_parse Hok)].
       iEval (rewrite fp_sb_blk fp_sb_off (fp_sb_bs S D)) in "Hsb".

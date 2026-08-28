@@ -260,6 +260,22 @@ Section Bitmap.
       rewrite /pool_elt (bool_decide_eq_true_2 _ Hin). done.
   Qed.
 
+  (* SHEDDING A SHARE, AT THE POOL ([FsStateDefs.view_shed]; durable-disk
+     EV-X).  ONE DIRECTION: a free row's bytes are existential, so the two
+     halves cannot be rejoined without an agreement law and nothing needs
+     to -- the transport returns its source. *)
+  Lemma free_pool_shed Γ Γ1 Γ2 (Hs : view_shed Γ Γ1 Γ2) nb u :
+    free_pool Γ nb u ⊢ free_pool Γ1 nb u ∗ free_pool Γ2 nb u.
+  Proof.
+    rewrite /free_pool -big_sepL_sep.
+    apply big_sepL_mono. intros k b _.
+    rewrite /pool_elt. case_bool_decide.
+    - iIntros "_". iSplitR; done.
+    - iIntros "H". iDestruct "H" as (bs) "H".
+      iDestruct (blk_owned_shed Γ Γ1 Γ2 Hs with "H") as "[H1 H2]".
+      iSplitL "H1"; by iExists bs.
+  Qed.
+
   (* ---------------------------------------------------------------- *)
   (*  The two movers, at the whole predicate                           *)
   (* ---------------------------------------------------------------- *)
