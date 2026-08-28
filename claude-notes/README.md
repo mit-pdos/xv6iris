@@ -184,14 +184,6 @@ when four more moved to [`completed/`](completed/).
   `design/durable-fs-plan.md` for the design; the stub is worth opening
   only for what is left (Rank 4 parked, BT-4/5 priced and not run, three
   design-level items nobody has proposed, four cosmetic leftovers).
-- **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4, and
-  ONE item is left of the four: **`sys_sync`'s postcondition**, which is
-  empty and honestly so (`SpecSysSync.v` says why).  Real `n > 0` recovery,
-  the boot composition and the D2 permit are all closed by the durable-disk
-  lanes; the body's live-sounding passages about them are history and the
-  banner says so.  What the receipt needs is named: a partial slot record on
-  `LogInv.log_mirror_at`, and a faithful commit counter with the committer's
-  receipt deposited beside it.
 - **[`sp-migration.md`](projects/sp-migration.md)** — owning memory at a
   NON-IDENTITY kernel va: the settled design (ktier-indexed `↦ₘ[kt]`,
   `kpt_on` witness, `KtierLe` inference) and the KSTACK campaign are
@@ -347,3 +339,6 @@ carrying were lifted into
 [`design/code-organization.md`](design/code-organization.md) first, under
 "Cleanups inherited from finished projects", so they did not go into the
 archive with them.
+- **[`fs-log-stage4.md`](completed/fs-log-stage4.md)** — the log layer's
+  crash-side worklist: recovery, boot composition and the D2 permit closed
+  by durable-disk; `sys_sync`'s postcondition moved to fs-syscall-specs.
