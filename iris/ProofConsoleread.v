@@ -1430,8 +1430,10 @@ Section ProofConsoleread.
                    = (mword_of_int (CR + 0xac) : mword 64)) by pcw.
     iEval (rewrite Hpac) in "Hpc".
     iEval (rewrite HG5a2; cbn [seq]; rewrite big_sepL_singleton pa_add_0) in "Hbuf".
-    rewrite /either_copyout_post.
-    iDestruct "Hpost" as "[%Hret Hpp]".
+    (* consoleread's own post still binds a fresh image, so the window
+       equation either_copyout now states is dropped here -- see
+       [either_copyout_post_any]. *)
+    iDestruct (either_copyout_post_any with "Hpost") as "[%Hret Hpp]".
     iDestruct "Hpp" as (P'' M'') "[%Hext2 Hpriv]".
     assert (Hextc : uptd_ext (pv_upt (us_V U)) P'') by exact (uptd_ext_trans _ P' _ Hext Hext2).
     assert (HthrG : forall r : mword 5, is_cs_idx r = true -> r <> Rs5 ->

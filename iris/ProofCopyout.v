@@ -418,7 +418,8 @@ Section ProofCopyout.
   Qed.
 
   (* ------------------------------------------------------------------ *)
-  (* [Vmfault.wp_vmfault_sconf] still carries a raw-map tp entry premise  *)
+  (* [Vmfault.wp_vmfault_sconf_mem] still carries a raw-map tp entry      *)
+  (* premise                                                              *)
   (* ([mm !!! Regidx Rtp = cid_word]) that its own (as yet unported)      *)
   (* proof has not shed -- unlike every other callee here.  Nothing in    *)
   (* [SpecCopyout]'s contract hands us that fact about our OWN entry map, *)

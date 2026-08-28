@@ -67,57 +67,6 @@ From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 
-Definition wp_vmfault_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (mm : regfile)
-    (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (p : mword 64)
-    (b : bool) (lks : gset string) :=
-  let pcE : mword 64 := mword_of_int KernelSyms.vmfault in
-  (* a0 = pagetable, a1 = psz, a2 = va, a3 = read *)
-  let va := mm !!! Regidx (mword_of_int 12) in
-  let va0 : mword 64 := and_vec va (mword_of_int (-4096)) in
-  let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
-  (38 <= K)%nat ->
-  (* the kalloc/mappages chain runs on the ambient CPU (push_off cid
-     convention) *)
-  mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
-  (* the pagetable argument is the table [proc_pt P] describes -- and that is
-     now the WHOLE requirement.  It used to have to be [p->pagetable] as well,
-     because the mappages went there regardless; it does not any more. *)
-  mm !!! Regidx (mword_of_int 10) = page_base P.(ud_root) ->
-  (* the size argument, in a1 *)
-  mm !!! Regidx (mword_of_int 11) = szv ->
-  (* it respects MAXVA *)
-  (uint szv <= 2 ^ 38)%Z ->
-  (* kalloc's acquire keeps the transient noff increment in int range;
-     [lvl] is otherwise generic -- vmfault runs at whatever nesting its
-     caller holds (usertrap at 0, pipewrite/piperead's copies at 1) *)
-  (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
-  (* vmfault's whole cone bottoms out at "kmem" (13): the kalloc for the new
-     page and, on the mappages-failure arm, the kfree that undoes it.
-     ismapped/mappages take no lock, so one premise covers everything. *)
-  locks_below lks "kmem" ->
-  sie_cap_gpr KT1 mm K b p -∗
-  cpu_own lvl eb p b lks -∗
-  kernel_text -∗
-  pc_is pcE -∗
-  proc_pt_any P -∗
-  kalloc_env γa None -∗
-  wp_next b p (fun (CID : CpuId) =>
-    ∀ (mr : regfile),
-    sie_cap_gpr KT1 mr K b p -∗
-    cpu_own lvl eb p b lks -∗
-    pc_is ret_tgt -∗
-    ⌜callee_saved mm mr⌝ -∗
-    ( (⌜mr !!! Regidx (mword_of_int 10) = mword_of_int 0⌝ ∗ proc_pt_any P)
-      ∨ (∃ r : mword 64,
-           ⌜mr !!! Regidx (mword_of_int 10) = r⌝ ∗
-           ⌜page_valid r⌝ ∗
-           ⌜(uint va < uint szv)%Z⌝ ∗
-           ⌜P.(ud_um) !! svpn_of va0 = None⌝ ∗
-           proc_pt_any (uptd_insert P (svpn_of va0) r)) ) -∗
-    WP (Loop : expr riscv_lang)) -∗
-  WP (Loop : expr riscv_lang).
-
 (* ===================================================================== *)
 (* THE MEMORY-INDEXED CONTRACT.                                          *)
 (*                                                                       *)
@@ -138,9 +87,11 @@ Definition wp_vmfault_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID :
 (* MID-COPY, and a contract that only said "M grows" would leave the     *)
 (* prefix they have already copied saying nothing after the first fault. *)
 (*                                                                       *)
-(* [wp_vmfault_sconf] (above) is the [proc_pt]-altitude COROLLARY, kept  *)
-(* so that vmfault's other callers -- usertrap, copyinstr -- do not have *)
-(* to name a memory they say nothing about.                              *)
+(* THIS IS THE ONLY CONTRACT.  There used to be a [proc_pt]-altitude    *)
+(* corollary beside it, for the callers that said nothing about the      *)
+(* process's memory; every one of them now names it, so the corollary is *)
+(* gone.  [ProofCopyin.wp_copyin_sconf] is the recipe if one is ever     *)
+(* wanted back: [ProcPtOwn.proc_pt_ptm] IS the equivalence.              *)
 (* ===================================================================== *)
 Definition wp_vmfault_sconf_mem_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (mm : regfile)
@@ -187,10 +138,4 @@ Module Type VMFAULT.
       (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (K lvl : nat) (eb : bool)
       (p : mword 64) (b : bool) (lks : gset string),
       wp_vmfault_sconf_mem_body γa mm P M szv K lvl eb p b lks.
-  Parameter wp_vmfault_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile)
-      (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (p : mword 64)
-      (b : bool) (lks : gset string),
-      wp_vmfault_sconf_body γa mm P szv K lvl eb p b lks.
 End VMFAULT.

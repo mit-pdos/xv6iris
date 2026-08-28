@@ -698,7 +698,7 @@ Section ProofSysUnlinkBody.
  (dqb : dfrac)
       (dqs : dfrac) (dqbs : dfrac) (pid : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
-      (Ms : regfile) (P1 : uptd) (Mp : gmap Z (bv 8))
+      (Ms : regfile) (P1 : uptd)
       (n1 : nat) (Sb1 : gset Z) (w1 : bool)
       (dpv : mword 64) (nf : nat -> bv 8) (bp1 : nat -> bv 8)
       (bnm0 : nat -> bv 8) (bd0 : nat -> bv 8) (be0 : nat -> bv 8)
@@ -726,7 +726,7 @@ Section ProofSysUnlinkBody.
        sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
        sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
        sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
-       proc_priv gf (proc_addr jx) pid (upd_usM (us_upt U P1) Mp) -∗
+       proc_priv gf (proc_addr jx) pid (us_upt U P1) -∗
        iref_slots 1 -∗
        inode_held_ty dpv T_DIR -∗
        log_opS icfg_log n1 Sb1 -∗
@@ -809,13 +809,13 @@ Section ProofSysUnlinkBody.
     iref_slots SpecSysUnlink.sys_unlink_slots -∗
     proc_priv gf (proc_addr jx) pid U -∗
     (* ---- THE SEAM: the fall-through, at +0x30 with [dp] resolved ---- *)
-    (∀ (CIDs : CpuId) (Ms : regfile) (P1 : uptd) (Mp : gmap Z (bv 8))
+    (∀ (CIDs : CpuId) (Ms : regfile) (P1 : uptd)
        (n1 : nat) (Sb1 : gset Z) (w1 : bool) (dpv : mword 64)
        (nf bp1 bnm0 bd0 be0 : nat -> bv 8)
        (w4 w5 w6 w27 w30 : mword 64),
        su_w1_seam (CIDs := CIDs)
           gf jx dqb dqs dqbs pid U
-          m K eb b lks Ms P1 Mp n1 Sb1 w1 dpv nf bp1 bnm0 bd0 be0 w4 w5 w6 w27
+          m K eb b lks Ms P1 n1 Sb1 w1 dpv nf bp1 bnm0 bd0 be0 w4 w5 w6 w27
           w30) -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
       SpecSysUnlink.sys_unlink_closer (CID := CIDx) gf (proc_addr jx) pid U m
@@ -1280,7 +1280,7 @@ Section ProofSysUnlinkBody.
         iDestruct (cpu_own_transport CID17 CID19 0 eb (proc_addr jx) b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         rewrite (proj1 Hnp) in HN4regs.
-        iApply ("Hseamk" $! CID19 N4 P1 (us_M U) n1 Sb1 w1 dpv nf bpf bnm0 bd0 be0
+        iApply ("Hseamk" $! CID19 N4 P1 n1 Sb1 w1 dpv nf bpf bnm0 bd0 be0
                   u4 u5 u6 u27 u30 with "[%] [%] [%] [%] [%] [%] [%]
                   Hcg Hown Hpc Hseam Hgen Hbsl Hsbb Hsbi Hsbs Hpriv
                   Hir1 Hhelddp HopS Htx Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2
@@ -8111,7 +8111,7 @@ Section ProofSysUnlinkBody.
               with "Hcg Hown Htext Hdata Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows Hslks Hireg Hropen
                     Hsbb Hsbi Hsbs Hbmres Hkenv Hprocs Hir Hpriv [] Hcont").
-    iIntros (CIDa Ms P1 Mp1 n1 Sb1 w1 dpv nf bp bnm0 bd be w4 w5 w6 w27 w30).
+    iIntros (CIDa Ms P1 n1 Sb1 w1 dpv nf bp bnm0 bd be w4 w5 w6 w27 w30).
     iIntros "%Hal %Hregs1 %Hma01 %Hupt1 %Hn1 %Hw1 %Hdpvnz
              Hcg Hown Hpc Hseam Hgen Hbsl Hsbb Hsbi Hsbs Hpriv Hir
              Hheld HopS Htx Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27 HbE
@@ -8120,7 +8120,7 @@ Section ProofSysUnlinkBody.
        dirlookup ---- *)
     iApply (su_w2 gf gs jx gl pd pav pu
  dqb dqs dqbs
-              pid (upd_usM U Mp1) P1 n1 Sb1 w1 dpv nf bnm0 bp bd be w4 w5 w6 w27 w30
+              pid U P1 n1 Sb1 w1 dpv nf bnm0 bp bd be w4 w5 w6 w27 w30
               m Ms (m !!! Regidx csp_rs1 : mword 64) K eb b lks
               HK Hnib0 Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hist0 Hcovb Hiregb Hj Hgl Heb eq_refl Hal Hregs1 Hma01 Hn1
@@ -8144,7 +8144,7 @@ Section ProofSysUnlinkBody.
     iPoseProof (printk_env_panic with "Hprenv") as "#Hpetop".
     iApply (su_w3 gf gs jx gl pd pav pu
  dqb dqs dqbs
-              pid (upd_usM U Mp1) P1 n1 Sb1 w1 kd ks kk gild gisld gyd qdi sd qs
+              pid U P1 n1 Sb1 w1 kd ks kk gild gisld gyd qdi sd qs
               dinum dnd bmd datd lo nf bnm0 bp bd be w5 w6 w30
               m M2 (m !!! Regidx csp_rs1 : mword 64) K eb b lks t
               HK Hnib0 Hgeom Hsize Hbm0 Hbmcov Hbmlog
@@ -8177,7 +8177,7 @@ Section ProofSysUnlinkBody.
     - destruct Hisd as (Htyzi & Hdots & Hdead).
       iApply (su_w5_dir gf gs jx gl pd pav pu
 
-                dqb dqs dqbs pid (upd_usM U Mp1) P1 n1 Sb1 w1 kd ks kk gild gisld gyd
+                dqb dqs dqbs pid U P1 n1 Sb1 w1 kd ks kk gild gisld gyd
                 qdi sd qs dinum dnd bmd datd lo nf bnm0 bp bd bex w6 w30
                 gili gisli gyi si qsi dni bmi dati
                 m M3 (m !!! Regidx csp_rs1 : mword 64) s3x K eb b lks t
@@ -8199,7 +8199,7 @@ Section ProofSysUnlinkBody.
                       HbE H30 Hcont").
     - iApply (su_w5_file gf gs jx gl pd pav pu
 
-                dqb dqs dqbs pid (upd_usM U Mp1) P1 n1 Sb1 w1 kd ks kk gild gisld gyd
+                dqb dqs dqbs pid U P1 n1 Sb1 w1 kd ks kk gild gisld gyd
                 qdi sd qs dinum dnd bmd datd lo nf bnm0 bp bd bex w6 w30
                 gili gisli gyi si qsi dni bmi dati
                 m M3 (m !!! Regidx csp_rs1 : mword 64) s3x K eb b lks t

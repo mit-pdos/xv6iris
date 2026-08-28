@@ -32,8 +32,9 @@
      statement on both of copyin's exits (SpecCopyin.v).  A caller that
      needs to constrain what it read must validate it.
    - the SOURCE is a user virtual address on the user arm ([proc_priv], the
-     descriptor coming back EXTENDED) and a kernel buffer on the kernel arm
-     (returned unchanged). *)
+     descriptor coming back EXTENDED at the SAME memory image -- see
+     [either_copyin_post]) and a kernel buffer on the kernel arm (returned
+     unchanged). *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -81,14 +82,15 @@ Section SpecEitherCopyin.
       (src_bytes : nat -> bv 8) (r : mword 64) : iProp Σ :=
     (if user
      then ⌜r = (mword_of_int 0 : mword 64) \/ r = (mword_of_int (-1) : mword 64)⌝ ∗
-     (* THE IMAGE MOVES.  copyin/copyout walk the process's page table and
-        may FAULT a page in on the way, which extends the va-keyed image
-        ([UserPtTree.umem_own] pins [dom M = uva_dom P]); and copyout writes
-        user memory outright.  So the block comes back at a FRESH [M'] --
-        milestone J item 1's ∃-weakened staging, beside the ∃ [P'] that was
-        already here.  The precise window is win-2 work. *)
-          (∃ (P' : uptd) (M' : gmap Z (bv 8)),
-             ⌜uptd_ext (pv_upt (us_V U)) P'⌝ ∗ proc_priv_core p pid (upd_usM (us_upt U P') M')) ∗
+     (* THE IMAGE DOES NOT MOVE.  either_copyin only READS user memory, and
+        the pages copyin faults in on the way were ALREADY in the block's
+        view -- as lazy pages reading 0 -- so vmfault does not move it
+        either ([SpecVmfault]'s contract is a noop on [M], and
+        [SpecCopyin.wp_copyin_sconf_mem] relays that).  What grows is the
+        DESCRIPTOR, and only that: the block comes back at the image it
+        was handed. *)
+          (∃ P' : uptd,
+             ⌜uptd_ext (pv_upt (us_V U)) P'⌝ ∗ proc_priv_core p pid (us_upt U P')) ∗
           (∃ dst_new : nat -> bv 8,
              [∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ[ktb] dst_new j)
      else ⌜r = (mword_of_int 0 : mword 64)⌝ ∗

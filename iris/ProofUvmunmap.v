@@ -2120,49 +2120,6 @@ Section SealUvmunmap.
               with "Hpt Hm").
   Qed.
 
-  (* [proc_pt] IS the [upt_fixed_both] instance; the round trip owes [uptg] the two
-     conjuncts it does not carry -- [upt_acc_wf] (preserved along the run
-     by [upt_acc_wf_del_run]) and the trapframe page's [page_valid], which
-     the loop never touches. *)
-  Lemma wp_uvmunmap_sconf
-      (γa : gname) (mm : regfile)
-      (P : uptd) (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-      (ilvl : nat) (b : bool) (lks : gset string)
-    : wp_uvmunmap_sconf_body γa mm P npages K eb p ilvl b lks.
-  Proof.
-    cbv beta delta [wp_uvmunmap_sconf_body].
-    intros pcE va vpn0 ret_tgt HK Hilvl Hroot Hval Hnpr Hdf Hrange Hbelow.
-    iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hcont".
-    assert (Hrz : (bv_unsigned va + Z.of_nat npages * 4096 <= 274877898752)%Z).
-    { unfold uvm_maxsz in Hrange. rewrite uint_unsigned in Hrange.
-      change (2 ^ 38 - 8192)%Z with 274877898752%Z in Hrange. exact Hrange. }
-    iDestruct (proc_pt_any_wf_get P with "Hpt") as %Hwf.
-    destruct Hwf as (_ & Hacc & _ & _ & Htfv).
-    iDestruct (proc_pt_uptg P with "Hpt") as "Hpt".
-    iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
-    iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
-      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb & _)".
-    iDestruct (uptg_wf_get (upt_fixed_both P.(ud_tfp)) P.(ud_root) P.(ud_um)
-                 with "Hpt") as %[Hgwf _].
-    iDestruct (uu_pages_laws true P.(ud_um) vpn0 npages Hgwf
-                 (uu_side_user va npages Hrz) with "Hkmapb") as "[#HPEEL #HSKIP]".
-    iEval (rewrite uptg_split) in "Hpt".
-    iDestruct "Hpt" as "[Hpt Hown]".
-    iApply (Core.wp_uvmunmap_gen γa mm (upt_fixed_both P.(ud_tfp)) P.(ud_root)
-              P.(ud_um) (fun k => upt_pages_own (uu_um true P.(ud_um) vpn0 k))
-              npages K eb p ilvl b true lks HK Hilvl Hroot Hval Hnpr Hdf
-              (uu_range_wide va npages Hrange) (uu_side_user va npages Hrz) Hbelow
-              with "HPEEL HSKIP Hcg Hcnt Htext Hpc Hpt Hown Henv").
-    iIntros (CID1 Hs1 mr) "Hcg Hcnt Hpc %Hcs Hpt Hown".
-    iDestruct (uptg_join with "Hpt Hown") as "Hpt".
-    iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! mr with "Hcg Hcnt Hpc [%] [Hpt]").
-    { exact Hcs. }
-    iApply (uptg_proc_pt (uptd_del_run P vpn0 npages)
-              (upt_acc_wf_del_run P.(ud_um) vpn0 npages Hacc) Htfv).
-    iExact "Hpt".
-  Qed.
-
 End SealUvmunmap.
 
 End UvmunmapProof.

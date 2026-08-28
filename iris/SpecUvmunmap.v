@@ -13,13 +13,15 @@
        }
      }
 
-   STATED AT THE [proc_pt] ALTITUDE, like vmfault / copyin / copyout: this is
-   the one function that takes pages OUT of the valid-user-page-table
-   predicate.  It hands back [proc_pt (uptd_del_run P vpn0 npages)] -- the
-   SAME predicate at the user map with the [npages]-long vpn run starting at
-   [vpn0] deleted -- and the pages those entries named have gone back to
-   kalloc.  Nothing else moves: same root, same trapframe, same tree modulo
-   the cleared leaves.
+   STATED AT THE [proc_ptm] ALTITUDE, like vmfault / copyin / copyout: this
+   is the one function that takes pages OUT of the valid-user-page-table
+   predicate.  It hands back [proc_ptm (uptd_del_run P vpn0 npages) _ _] --
+   the SAME predicate at the user map with the [npages]-long vpn run
+   starting at [vpn0] deleted -- and the pages those entries named have gone
+   back to kalloc.  Nothing else moves: same root, same trapframe, same tree
+   modulo the cleared leaves.  There are TWO contracts and they differ only
+   in what happens to the process's IMAGE (see each one's header); there is
+   no ∃-[M] form any more, because no caller wants one.
 
    THREE THINGS THE CONTRACT DELIBERATELY DOES NOT SAY.
 
@@ -71,50 +73,6 @@ From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
-
-Definition wp_uvmunmap_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (mm : regfile)
-    (P : uptd) (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-    (ilvl : nat) (b : bool) (lks : gset string) :=
-  let pcE : mword 64 := mword_of_int KernelSyms.uvmunmap in
-  let va := mm !!! Regidx (mword_of_int 11) in
-  let vpn0 := svpn_of va in
-  let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
-  (* 8-slot frame + kfree's 14 (the no-alloc walk needs only 8) *)
-  (22 <= K)%nat ->
-  (* [ilvl] is the interrupt nesting level: kfree's acquire/release keep the
-     transient noff increment in int range.  It used to be pinned at 0 --
-     an artifact of the boot-time callers. *)
-  (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
-  (* the pagetable argument is the table [proc_pt P] describes *)
-  mm !!! Regidx (mword_of_int 10) = page_base P.(ud_root) ->
-  (* va is page-aligned: the panic arm is dead *)
-  subrange_vec_dec va 11 0 = (zeros' 12 : mword 12) ->
-  mm !!! Regidx (mword_of_int 12) = (mword_of_int (Z.of_nat npages) : mword 64) ->
-  (* do_free != 0 -- see the header *)
-  mm !!! Regidx (mword_of_int 13) <> (mword_of_int 0 : mword 64) ->
-  (* the whole run lies in the USER region, i.e. strictly below TRAPFRAME.
-     This is what keeps every vpn it clears different from [tramp_vpn] and
-     [tf_vpn], so the tree spec survives. *)
-  (uint va + Z.of_nat npages * 4096 <= uvm_maxsz)%Z ->
-  (* [do_free != 0] here, so every iteration's kfree bounds this call at
-     "kmem" (13); nothing else in the cone touches a lock. *)
-  locks_below lks "kmem" ->
-  sie_cap_gpr KT1 mm K b p -∗
-  cpu_own ilvl eb p b lks -∗
-  kernel_text -∗
-  pc_is pcE -∗
-  proc_pt_any P -∗
-  kalloc_env γa None -∗
-  wp_next b p (fun (CID : CpuId) =>
-    ∀ (mr : regfile),
-    sie_cap_gpr KT1 mr K b p -∗
-    cpu_own ilvl eb p b lks -∗
-    pc_is ret_tgt -∗
-    ⌜callee_saved mm mr⌝ -∗
-    proc_pt_any (uptd_del_run P vpn0 npages) -∗
-    WP (Loop : expr riscv_lang)) -∗
-  WP (Loop : expr riscv_lang).
 
 (* ===================================================================== *)
 (*  THE MEMORY-INDEXED CONTRACT.                                          *)
@@ -238,12 +196,6 @@ Module Type UVMUNMAP.
       (npages : nat) (K : nat) (eb : bool) (p : mword 64)
       (ilvl : nat) (b : bool) (lks : gset string),
       wp_uvmunmap_mem_sconf_body γa mm P sz szn M npages K eb p ilvl b lks.
-  Parameter wp_uvmunmap_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile)
-      (P : uptd) (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-      (ilvl : nat) (b : bool) (lks : gset string),
-      wp_uvmunmap_sconf_body γa mm P npages K eb p ilvl b lks.
 End UVMUNMAP.
 
 (* --------------------------------------------------------------------- *)
@@ -321,8 +273,8 @@ End UVMUNMAP_BARE.
 (* precisely what it destroys; what survives is [uptg_wf], the "still      *)
 (* well-formed enough to be torn down" tier (BarePt.v's header).           *)
 (*                                                                        *)
-(* THE RANGE PREMISE IS GONE, NOT RELAXED.  [wp_uvmunmap_sconf]'s          *)
-(* [uint va + npages*4096 <= uvm_maxsz] exists to prove that no vpn the    *)
+(* THE RANGE PREMISE IS GONE, NOT RELAXED.  The user contracts' [uint va   *)
+(* + npages*4096 <= uvm_maxsz] exists to prove that no vpn the             *)
 (* loop clears is a fixed leaf.  This instance wants the exact opposite,   *)
 (* so it names the leaf instead ([v = tramp_vpn \/ v = tf_vpn]).  What     *)
 (* both need -- that the cursor does not wrap and stays inside the Sv39    *)

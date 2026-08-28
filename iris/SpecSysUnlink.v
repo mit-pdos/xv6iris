@@ -292,9 +292,12 @@ Definition sys_unlink_closer
     (m : regfile) (ret_tgt : mword 64) (K : nat) (eb b : bool)
     (lks : gset string) (dqb dqs dqbs : dfrac)
  : iProp Σ :=
-  (* the image moves: argstr's fetchstr faults user pages in -- milestone J
-     item 1's ∃-weakened staging *)
-  (∀ (mf : regfile) (P' : uptd) (M' : gmap Z (bv 8)),
+  (* THE IMAGE DOES NOT MOVE.  This syscall only READS user memory (argstr,
+     through fetchstr and copyinstr); the pages it faults in on the way were
+     already in the block's view, as lazy pages reading 0, so vmfault does
+     not move it either.  Only the DESCRIPTOR grows, and the block comes
+     back at the image it was handed. *)
+  (∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       (* the page table may have GROWN: argstr's fetchstr faults user pages
          in.  [uptd_ext] is argstr's own report, relayed. *)
@@ -313,7 +316,7 @@ Definition sys_unlink_closer
       (* the allowance, whole: see the header's reference ledger *)
       iref_slots sys_unlink_slots -∗
       (* the process block, at the same everything but the page table *)
-      proc_priv gf pj pid (upd_usM (us_upt U P') M') -∗
+      proc_priv gf pj pid (us_upt U P') -∗
       ⌜sys_unlink_ret (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       WP (Loop : expr riscv_lang))%I.
 

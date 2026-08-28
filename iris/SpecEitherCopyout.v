@@ -40,10 +40,11 @@
    unchanged on both, which is what makes it the one conjunct outside the
    [if].  On the kernel arm the caller additionally learns the destination
    now holds [src_bytes] -- memmove's guarantee, carried through verbatim.
-   On the user arm nothing is said about what the process will read back:
-   [proc_pt] owns the user pages with existential contents, so there is no
-   resource in this contract that could record the bytes that crossed (the
-   altitude decision, SpecCopyout.v).
+   On the user arm the caller learns what the PROCESS will read back
+   instead: the block's image comes back as the image it went in at with
+   the copied prefix written at [dst] ([either_copyout_post] below).  That
+   is an EQUATION on the image, not a one-sided promise -- it pins the
+   untouched bytes as firmly as the written ones.
 
    TWO PREMISES ARE ALSO KEYED ON THE FLAG, for one reason each:
    - the length bound.  copyout takes any [len < 2^64], but the kernel arm
@@ -93,6 +94,22 @@ Local Open Scope Z_scope.
    and their budget stayed 50 -- which is why [either_copyin_stack] is
    correctly still 56 while this one is 58. *)
 Notation either_copyout_stack := (58%nat) (only parsing).
+
+(* HOW MUCH OF THE SOURCE REACHED THE PROCESS, as a pure fact about the
+   returned a0.  copyout writes page by page and can give up on a later
+   page (bad va, no backing, a read-only leaf), so a -1 means SOME prefix
+   crossed and the length of it is not observable from the return value;
+   a 0 means all of it did.  This is the ONLY existential left in the user
+   arm's memory story -- a prefix LENGTH, not an image. *)
+Definition either_copyout_ran (len : nat) (r : mword 64) (d : nat) : Prop :=
+  (r = (mword_of_int 0 : mword 64) /\ d = len)
+  \/ (r = (mword_of_int (-1) : mword 64) /\ (d <= len)%nat).
+
+Lemma either_copyout_ran_ret (len : nat) (r : mword 64) (d : nat) :
+  either_copyout_ran len r d ->
+  r = (mword_of_int 0 : mword 64) \/ r = (mword_of_int (-1) : mword 64).
+Proof. intros [[Hr _] | [Hr _]]; [by left | by right]. Qed.
+
 Section SpecEitherCopyout.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
   (* [GenId], for [ProcInv.proc_priv]'s own index: the private block now
@@ -107,17 +124,51 @@ Section SpecEitherCopyout.
       (pid : mword 32) (U : ustate) (dst : mword 64) (len : nat)
       (src_bytes : nat -> bv 8) (r : mword 64) : iProp Σ :=
     (if user
-     then ⌜r = (mword_of_int 0 : mword 64) \/ r = (mword_of_int (-1) : mword 64)⌝ ∗
-     (* THE IMAGE MOVES.  copyin/copyout walk the process's page table and
-        may FAULT a page in on the way, which extends the va-keyed image
-        ([UserPtTree.umem_own] pins [dom M = uva_dom P]); and copyout writes
-        user memory outright.  So the block comes back at a FRESH [M'] --
-        milestone J item 1's ∃-weakened staging, beside the ∃ [P'] that was
-        already here.  The precise window is win-2 work. *)
-          ∃ (P' : uptd) (M' : gmap Z (bv 8)),
-            ⌜uptd_ext (pv_upt (us_V U)) P'⌝ ∗ proc_priv_core p pid (upd_usM (us_upt U P') M')
+     then
+     (* WHAT THE PROCESS'S MEMORY ENDS UP HOLDING, AS AN EQUATION.  The
+        block comes back at [umem_wr (us_M U) dst d src_bytes]: the image
+        it went in at, with the source buffer written at user va
+        [dst + j] for every [j < d].  [UserPtTree.umem_wr] is keyed by the
+        64-bit va rather than by an integer base precisely so this
+        statement need not promise that [dst + len] does not wrap; a
+        caller that knows it does not reads individual bytes back out with
+        [umem_wr_lookup_in] and untouched ones with [umem_wr_lookup_out].
+        [d] is pinned by the return value ([either_copyout_ran]).
+
+        THE VMFAULT INSIDE THE COPY MOVES NOTHING: the pages it backs were
+        already in the view, as lazy pages reading 0.  So the memmove is
+        the only thing that touches [M], and this equation pins both what
+        changed and what did not.  The DESCRIPTOR still grows, which is
+        what the ∃ [P'] and [uptd_ext] are. *)
+          ∃ (P' : uptd) (d : nat),
+            ⌜uptd_ext (pv_upt (us_V U)) P'⌝ ∗
+            ⌜either_copyout_ran len r d⌝ ∗
+            proc_priv_core p pid
+              (upd_usM (us_upt U P') (umem_wr (us_M U) dst d src_bytes))
      else ⌜r = (mword_of_int 0 : mword 64)⌝ ∗
           [∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ[ktb] src_bytes j)%I.
+
+  (* THE ∃-WEAKENED READING OF THE USER ARM, for a caller whose OWN
+     postcondition still binds a fresh image (readi, consoleread, and the
+     file / pipe / syscall tiers above them).  This is exactly where the
+     precision the contract just gained is thrown away, so every use of it
+     is an entry on the remaining worklist -- it says nothing about
+     copyout, only about how far the conversion has got. *)
+  Lemma either_copyout_post_any (ktb : ktier) (γf : gname) (p : mword 64)
+      (pid : mword 32) (U : ustate) (dst : mword 64) (len : nat)
+      (src_bytes : nat -> bv 8) (r : mword 64) :
+    either_copyout_post ktb true γf p pid U dst len src_bytes r -∗
+    ⌜r = (mword_of_int 0 : mword 64) \/ r = (mword_of_int (-1) : mword 64)⌝ ∗
+    ∃ (P' : uptd) (M' : gmap Z (bv 8)),
+      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ ∗
+      proc_priv_core p pid (upd_usM (us_upt U P') M').
+  Proof.
+    rewrite /either_copyout_post. iIntros "H".
+    iDestruct "H" as (P' d) "(%Hext & %Hran & Hpv)".
+    iSplitR; [iPureIntro; exact (either_copyout_ran_ret len r d Hran) |].
+    iExists P', (umem_wr (us_M U) dst d src_bytes).
+    iSplitR; [iPureIntro; exact Hext |]. iExact "Hpv".
+  Qed.
 
 End SpecEitherCopyout.
 

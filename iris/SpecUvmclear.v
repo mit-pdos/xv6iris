@@ -11,7 +11,8 @@
        *pte &= ~PTE_U;
      }
 
-   STATED AT THE [proc_pt] ALTITUDE.  uvmclear is the one function that
+   STATED AT THE [proc_ptm] ALTITUDE, with the [proc_pt] one below it as a
+   corollary.  uvmclear is the one function that
    changes a user leaf's CLASSIFICATION without changing what the table
    maps: the page stays mapped, stays owned, keeps its ppn -- it just stops
    being reachable from user mode.  So the postcondition is [proc_pt] at the
@@ -97,7 +98,64 @@ Definition wp_uvmclear_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* ===================================================================== *)
+(*  THE MEMORY-INDEXED CONTRACT.                                          *)
+(* ===================================================================== *)
+(* WHAT uvmclear DOES TO THE PROCESS'S MEMORY: NOTHING.  [M] is the same
+   map on both sides, at the same [sz].
+
+   That is not an approximation, it is what [ProcPtOwn.proc_ptm]
+   ([UserPtTree.umem_lazy]) SAYS.  Its domain is the union of the vas the
+   table MAPS and the vas below [p->sz] rounded up; the first half reads
+   [ud_um]'s DOMAIN, which an insert at a key already present does not
+   move, and the second half does not mention the table at all.  Its
+   ownership is one byte per mapped va, at [uva_pa], which reads the
+   leaf's PPN -- and clearing PTE_U leaves the PPN alone
+   ([ProcPtOwn.pte_ppn_clear_u]).  So neither the domain nor a single
+   byte's location moves, and the image comes back on the nose.
+
+   THE GUARD PAGE'S BYTES STAY IN THE VIEW, and that is correct.  What
+   uvmclear takes away is REACHABILITY FROM USER MODE, which lives in
+   [UserPtTree.user_pt_inv] -- the predicate the satp window is stated
+   over, and the one that reads the permission bits.  The kernel-side
+   image is keyed on what the table maps and on [p->sz]; a page the
+   kernel can still reach through its identity map, and whose bytes it
+   still owns, does not leave it because the user may no longer load
+   from it.
+
+   THIS IS THE PRIMITIVE, and [wp_uvmclear_sconf] above is its
+   five-line ∃-[M] corollary (ProofUvmclear.v). *)
+Definition wp_uvmclear_mem_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile)
+    (P : uptd) (sz : Z) (M : gmap Z (bv 8))
+    (w : mword 64) (K : nat) (b : bool) (p : mword 64) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.uvmclear in
+  let va := mm !!! Regidx (mword_of_int 11) in
+  let vpn := svpn_of va in
+  let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
+  (10 <= K)%nat ->
+  mm !!! Regidx (mword_of_int 10) = page_base P.(ud_root) ->
+  (uint va < 2 ^ 38)%Z ->
+  P.(ud_um) !! vpn = Some w ->
+  uvm_perm_ok (Z.land (pte_flags10 w) 1007) ->
+  sie_cap_gpr KT1 mm K b p -∗
+  kernel_text -∗
+  pc_is pcE -∗
+  proc_ptm P sz M -∗
+  wp_next b p (fun (CID : CpuId) =>
+    ∀ (mr : regfile),
+    sie_cap_gpr KT1 mr K b p -∗
+    pc_is ret_tgt -∗
+    ⌜callee_saved mm mr⌝ -∗
+    proc_ptm (uptd_set P vpn (pte_clear_u w)) sz M -∗
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Module Type UVMCLEAR.
+  Parameter wp_uvmclear_mem_sconf :
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile)
+      (P : uptd) (sz : Z) (M : gmap Z (bv 8))
+      (w : mword 64) (K : nat) (b : bool) (p : mword 64),
+      wp_uvmclear_mem_sconf_body mm P sz M w K b p.
   Parameter wp_uvmclear_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile)
       (P : uptd) (w : mword 64) (K : nat) (b : bool) (p : mword 64),

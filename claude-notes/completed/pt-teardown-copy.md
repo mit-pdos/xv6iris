@@ -171,9 +171,10 @@ and returns verbatim; the child grows by the pages the parent had mapped.
 The one function that changes a user leaf's CLASSIFICATION without changing
 what the table maps: same ppn, same page, same ownership — the page just stops
 being reachable from user mode (exec's stack guard page). So the post is
-`proc_pt (uptd_set P vpn (pte_clear_u w))`, and **`proc_pt_own` is literally
-the same resource** (`um_ppns` is unchanged — `proc_pt_own_set_same` is a
-`reflexivity` after one rewrite, not a transfer).
+`proc_ptm (uptd_set P vpn (pte_clear_u w)) sz M` at the SAME `M`, and the
+ownership is **literally the same resource** (`um_ppns` is unchanged, and so
+are `uva_dom` and `uva_pa` — `umem_lazy_set_same` is a chain of rewrites,
+not a transfer).
 
 - **The panic arm is dead, and proving it is the interesting step.** The vpn is
   mapped (a premise), so the no-alloc walk reaches level 0 and returns a slot

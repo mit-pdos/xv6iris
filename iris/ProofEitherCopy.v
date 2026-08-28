@@ -63,6 +63,18 @@
      [destruct user] rather than before it -- which is what lets the
      precondition be [if user then proc_priv else the destination buffer].
 
+   * THE USER ARM RUNS AT THE MEMORY-INDEXED COPY CONTRACTS, and the borrow
+     is what makes that free: [proc_priv_core_copy] already hands out
+     [proc_ptm P (uint p->sz) (us_M U)] and takes back [proc_ptm P' _ M'],
+     so calling [wp_copyin_sconf_mem] / [wp_copyout_sconf_mem] instead of
+     their ∃-[M] corollaries removes two lines rather than adding any.
+     copyIN gives the image straight back; copyOUT reports
+     [SpecCopyout.copyout_wrote], which this proof reads as "some prefix of
+     length [dwr] crossed" and republishes as
+     [SpecEitherCopyout.either_copyout_ran] beside the window equation
+     [umem_wr (us_M U) dst dwr src_bytes].  The one new register fact the
+     window needs is [HU5a2] -- that a2 still holds [dst] at the call.
+
    [Set Printing Depth 40] is mandatory in any file proving over
    [proc_priv]: without it a one-line mistake prints a 4096-conjunct goal
    and reads as a hang (durable-notes). *)
@@ -740,9 +752,9 @@ Section ProofEitherCopyout.
       (* the ONE borrow out of [proc_priv] *)
       iDestruct (proc_priv_core_sz_bound with "Hres") as %Hszb.
       iDestruct (proc_priv_core_copy with "Hres") as "(Hszc & Hptc & Hpt & Hpback)".
-      (* copyin/copyout are stated at the ∃-weakened image (they may fault a
-         page in, and copyout writes); the block is rebuilt at what returns. *)
-      iDestruct (proc_ptm_pt with "Hpt") as "Hpt".
+      (* THE BLOCK'S OWN IMAGE GOES DOWN AND A NAMED MOVE OF IT COMES BACK:
+         copyout is called at its memory-indexed contract, so what it did to
+         the process's memory is the window equation [copyout_wrote]. *)
       (* ---- +0x1e: c.mv a4,s2 -- len (the psz shifted every argument down) ---- *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.either_copyout + 0x1e)) Ra4 Rs2 Am (av - 6)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -843,6 +855,11 @@ Section ProofEitherCopyout.
         rewrite /Uz upd_ne; [| reg_neq].
         rewrite /U3 upd_ne; [| reg_neq]. rewrite /U2 upd_eq.
         rewrite /U1 upd_ne; [| reg_neq]. rewrite HAs3. apply add_vec_zero_l. }
+      assert (HU5a2 : U5 !!! Regidx Ra2 = dst).
+      { rewrite /U5 upd_ne; [| reg_neq]. rewrite /U4 upd_ne; [| reg_neq].
+        rewrite /Uz upd_ne; [| reg_neq]. rewrite /U3 upd_eq.
+        rewrite /U2 upd_ne; [| reg_neq].
+        rewrite /U1 upd_ne; [| reg_neq]. rewrite HAs4. apply add_vec_zero_l. }
       assert (HU5a4 : U5 !!! Regidx Ra4 = (mword_of_int (Z.of_nat len) : mword 64)).
       { rewrite /U5 upd_ne; [| reg_neq]. rewrite /U4 upd_ne; [| reg_neq].
         rewrite /Uz upd_ne; [| reg_neq].
@@ -883,19 +900,30 @@ Section ProofEitherCopyout.
       (* [Hcpu] rode through untouched since myproc handed it back at [CID14];
          re-anchor it at [CID20] before crossing into copyout. *)
       iDestruct (cpu_own_transport CID14 CID20 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iApply (Copyout.wp_copyout_sconf kts γa U5 (pv_upt (us_V U)) (pv_sz (us_V U)) len src_bytes (DfracOwn 1)
+      iApply (Copyout.wp_copyout_sconf_mem kts γa U5 (pv_upt (us_V U)) (us_M U)
+                (pv_sz (us_V U)) len src_bytes (DfracOwn 1)
                 (av - 6)%nat lvl eb p b
                 _ HK52 HU5a0 HU5a1 HU5a4 Hlen Hszb Hlvl
                 with "Hcg Hcpu Htext Hpc Hpt Henv Hsrc").
       all: try lkbelow.
-      iIntros (CID21 Hs21 mr P') "Hcg Hcpu Hpc Hpt Hsrc %Hcsr %Hext %Hret".
+      iIntros (CID21 Hs21 mr P' Mo) "Hcg Hcpu Hpc Hpt Hsrc %Hcsr %Hext %Hwrote".
+      (* the window equation, with the prefix length named: on the 0 arm the
+         whole buffer crossed, on the -1 arm some prefix of it did. *)
+      rewrite HU5a2 in Hwrote.
+      assert (Hran : exists d : nat,
+                either_copyout_ran len (mr !!! Regidx Ra0) d
+                /\ Mo = umem_wr (us_M U) dst d src_bytes).
+      { destruct Hwrote as [(Hr & HM) | (Hr & d & Hd & HM)].
+        - exists len. split; [left; split; [exact Hr | reflexivity] | exact HM].
+        - exists d. split; [right; split; [exact Hr | exact Hd] | exact HM]. }
+      destruct Hran as (dwr & Hran & HMo). subst Mo.
       assert (Hpc2c : ret_pc (U5 !!! Regidx Rra) = mword_of_int (KernelSyms.either_copyout + 0x2c))
         by (rewrite HU5ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc2c) in "Hpc".
       iEval (rewrite HU5a3) in "Hsrc".
       iAssert (⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝)%I as "#Hxe"; [iPureIntro; exact Hext|].
-      iDestruct (proc_pt_any_ptm with "Hpt") as (Mo) "Hpt".
-      iDestruct ("Hpback" $! P' Mo with "Hxe Hszc Hptc Hpt") as "Hres".
+      iDestruct ("Hpback" $! P' (umem_wr (us_M U) dst dwr src_bytes)
+                   with "Hxe Hszc Hptc Hpt") as "Hres".
       assert (Hrsp : mr !!! Regidx csp_rs1 = pa_stk sp0 6)
         by (rewrite (callee_saved_lookup Hcsr csp_rs1 ltac:(vm_compute; reflexivity)); exact HU5sp).
       assert (Hthrr : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
@@ -928,8 +956,9 @@ Section ProofEitherCopyout.
       iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc Hsrc [Hres]").
       { exact Hcsf. }
       rewrite /either_copyout_post. rewrite Hfa0.
-      iSplitR; [iPureIntro; exact Hret|].
-      iExists P', Mo. iSplitR; [iPureIntro; exact (uptd_ext_sz_ext _ _ _ Hext)|]. iExact "Hres".
+      iExists P', dwr.
+      iSplitR; [iPureIntro; exact (uptd_ext_sz_ext _ _ _ Hext)|].
+      iSplitR; [iPureIntro; exact Hran|]. iExact "Hres".
     - (* ================= user_dst == 0: memmove ================= *)
       assert (Hz : eq_vec (Am !!! Regidx Rs1) zero_reg = true)
         by (rewrite HAs1; exact Hflag).
@@ -1473,9 +1502,9 @@ Section ProofEitherCopyin.
       iEval (rewrite Hpp1e) in "Hpc".
       iDestruct (proc_priv_core_sz_bound with "Hres") as %Hszb.
       iDestruct (proc_priv_core_copy with "Hres") as "(Hszc & Hptc & Hpt & Hpback)".
-      (* copyin/copyout are stated at the ∃-weakened image (they may fault a
-         page in, and copyout writes); the block is rebuilt at what returns. *)
-      iDestruct (proc_ptm_pt with "Hpt") as "Hpt".
+      (* THE BLOCK'S OWN IMAGE GOES DOWN AND COMES BACK UNMOVED: copyin is
+         called at its memory-indexed contract, which is same-[M] on both
+         arms (the pages it faults in were already in the lazy view). *)
       (* ---- +0x1e: c.mv a4,s2 -- len (the psz shifted every argument down) ---- *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.either_copyin + 0x1e)) Ra4 Rs2 Am (av - 6)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1613,19 +1642,25 @@ Section ProofEitherCopyin.
       (* [Hcpu] rode through untouched since myproc handed it back at [CID14];
          re-anchor it at [CID20] before crossing into copyin. *)
       iDestruct (cpu_own_transport CID14 CID20 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iApply (Copyin.wp_copyin_sconf ktb γa U5 (pv_upt (us_V U)) (pv_sz (us_V U)) len dst_olds
+      iApply (Copyin.wp_copyin_sconf_mem ktb γa U5 (pv_upt (us_V U)) (us_M U)
+                (pv_sz (us_V U)) len dst_olds
                 (av - 6)%nat lvl eb p b
                 _ HK50 HU5a0 HU5a1 HU5a4 Hlen Hszb Hlvl
                 with "Hcg Hcpu Htext Hpc Hpt Henv Hdst").
       all: try lkbelow.
-      iIntros (CID21 Hs21 mr P' dst_new) "Hcg Hcpu Hpc Hpt Hdst %Hcsr %Hext %Hret".
+      iIntros (CID21 Hs21 mr P' dst_new) "Hcg Hcpu Hpc Hpt Hdst %Hcsr %Hext %Hgot".
+      (* the memory-indexed contract additionally names the bytes it read;
+         this contract does not relay them (its caller owns no user memory
+         to state them against), so only the return value survives. *)
+      assert (Hret : mr !!! Regidx Ra0 = (mword_of_int 0 : mword 64)
+                     \/ mr !!! Regidx Ra0 = (mword_of_int (-1) : mword 64))
+        by (destruct Hgot as [(Hz & _) | Hm]; [by left | by right]).
       assert (Hpc2c : ret_pc (U5 !!! Regidx Rra) = mword_of_int (KernelSyms.either_copyin + 0x2c))
         by (rewrite HU5ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc2c) in "Hpc".
       iEval (rewrite HU5a2) in "Hdst".
       iAssert (⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝)%I as "#Hxe"; [iPureIntro; exact Hext|].
-      iDestruct (proc_pt_any_ptm with "Hpt") as (Mo) "Hpt".
-      iDestruct ("Hpback" $! P' Mo with "Hxe Hszc Hptc Hpt") as "Hres".
+      iDestruct ("Hpback" $! P' (us_M U) with "Hxe Hszc Hptc Hpt") as "Hres".
       assert (Hrsp : mr !!! Regidx csp_rs1 = pa_stk sp0 6)
         by (rewrite (callee_saved_lookup Hcsr csp_rs1 ltac:(vm_compute; reflexivity)); exact HU5sp).
       assert (Hthrr : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
@@ -1660,7 +1695,7 @@ Section ProofEitherCopyin.
       rewrite /either_copyin_post. rewrite Hfa0.
       iSplitR; [iPureIntro; exact Hret|].
       iSplitL "Hres".
-      { iExists P', Mo. iSplitR; [iPureIntro; exact (uptd_ext_sz_ext _ _ _ Hext)|]. iExact "Hres". }
+      { iExists P'. iSplitR; [iPureIntro; exact (uptd_ext_sz_ext _ _ _ Hext)|]. iExact "Hres". }
       iExists dst_new. iExact "Hdst".
     - (* ================= user_src == 0: memmove ================= *)
       assert (Hz : eq_vec (Am !!! Regidx Rs1) zero_reg = true)

@@ -22,14 +22,17 @@
    returned is not NULL" would not be provable at all.)
 
    THE RESOURCE DANCE mirrors ProofVmfault / ProofUvmcopy:
-   [proc_pt_acc_rep0] opens [proc_pt P] to (tree, exact map, view, wf);
+   [proc_ptm_acc_rep0] opens [proc_ptm P sz M] to (tree, exact map, view, wf);
    WALK_NOALLOC runs read-only over the tree; [ptree_own_level0_upd] lends
    the slot and takes back the updated tree; [KptTree.pt_slot_{phys_to_mem,
    mem_to_phys}] bridge the physical slot to the VA tier the S-mode load and
    store go through; and [pt_rep0_insert] / [upt_ad_view_set] /
-   [proc_pt_wf_clear_u] / [proc_pt_own_set_same] / [proc_pt_rebuild] close
-   the invariant at [uptd_set P vpn (pte_clear_u w)].  The page set does not
-   move (same ppn), so the ownership conjunct is literally unchanged. *)
+   [proc_pt_wf_clear_u] / [umem_lazy_set_same] / [proc_ptm_rebuild] close
+   the invariant at [uptd_set P vpn (pte_clear_u w)].  Neither the page set
+   nor a single byte's address moves (same ppn, same map domain), so the
+   process's IMAGE comes back on the nose -- which is why the contract
+   proved here is the MEMORY-INDEXED one and [wp_uvmclear_sconf] is its
+   ∃-[M] corollary. *)
 Set Printing Depth 40.
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
@@ -105,11 +108,12 @@ Section ProofUvmclear.
     pt_node_claim b ⊢ ⌜page_valid (page_base b)⌝.
   Proof. iIntros "(_ & Hpv & _)". iExact "Hpv". Qed.
 
-  Lemma wp_uvmclear_sconf (mm : regfile)
-      (P : uptd) (w : mword 64) (K : nat) (b : bool) (p : mword 64)
-    : wp_uvmclear_sconf_body mm P w K b p.
+  Lemma wp_uvmclear_mem_sconf (mm : regfile)
+      (P : uptd) (sz : Z) (M : gmap Z (bv 8))
+      (w : mword 64) (K : nat) (b : bool) (p : mword 64)
+    : wp_uvmclear_mem_sconf_body mm P sz M w K b p.
   Proof.
-    cbv beta delta [wp_uvmclear_sconf_body].
+    cbv beta delta [wp_uvmclear_mem_sconf_body].
     intros pcE va vpn ret_tgt HK Hroot Hvab Hum Hperm.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
@@ -117,7 +121,7 @@ Section ProofUvmclear.
         (add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> mm).
     iIntros "Hcg #Htext Hpc Hpt Hcont".
     (* ---- OPEN the user page table ---- *)
-    iDestruct (proc_pt_acc_rep0 P with "Hpt") as (t m_ad)
+    iDestruct (proc_ptm_acc_rep0 P sz M with "Hpt") as (t m_ad)
       "(%Hrep & %Hview & %Hbase & %Hwf & Hptree & Hown)".
     assert (Hmapwf : upt_map_wf P.(ud_um)) by exact (proj1 Hwf).
     pose proof (upt_map_wf_not_tramp _ _ _ Hmapwf Hum) as Hntr.
@@ -362,9 +366,9 @@ Section ProofUvmclear.
     assert (Hbase' : pt_base (ptree_set_leaf t vpn (pte_set_ad (pte_clear_u w) a d))
                      = (uptd_set P vpn (pte_clear_u w)).(ud_root)).
     { rewrite ptree_set_leaf_base HPnroot. exact Hbase. }
-    iDestruct ((proc_pt_own_set_same P vpn w (pte_clear_u w) Hum (pte_ppn_clear_u w))
-                 with "Hown") as "Hown".
-    iDestruct (proc_pt_rebuild (uptd_set P vpn (pte_clear_u w))
+    iEval (rewrite (umem_lazy_set_same P sz M vpn w (pte_clear_u w)
+                      Hum (pte_ppn_clear_u w))) in "Hown".
+    iDestruct (proc_ptm_rebuild (uptd_set P vpn (pte_clear_u w)) sz M
                  (ptree_set_leaf t vpn (pte_set_ad (pte_clear_u w) a d))
                  (<[vpn := pte_set_ad (pte_clear_u w) a d]> m_ad)
                  Hwf' Hview' Hrep' Hbase' with "Hptree Hown") as "Hpt".
@@ -479,6 +483,27 @@ Section ProofUvmclear.
     - apply HE3peel; [vm_compute; reflexivity | vm_compute; discriminate | vm_compute; discriminate].
     - apply HE3peel; [vm_compute; reflexivity | vm_compute; discriminate | vm_compute; discriminate].
     - apply HE3peel; [vm_compute; reflexivity | vm_compute; discriminate | vm_compute; discriminate].
+  Qed.
+
+  (* THE ∃-[M] COROLLARY, for the caller that says nothing about the bytes
+     (kexec's stack-guard call).  [proc_pt_ptm] holds at EVERY size, so the
+     size the view is taken at is arbitrary here -- 0 is as good as any. *)
+  Lemma wp_uvmclear_sconf (mm : regfile)
+      (P : uptd) (w : mword 64) (K : nat) (b : bool) (p : mword 64)
+    : wp_uvmclear_sconf_body mm P w K b p.
+  Proof.
+    cbv beta delta [wp_uvmclear_sconf_body].
+    intros pcE va vpn ret_tgt HK Hroot Hvab Hum Hperm.
+    iIntros "Hcg #Htext Hpc Hpt Hcont".
+    iEval (rewrite (proc_pt_ptm P 0)) in "Hpt".
+    iDestruct "Hpt" as (M) "Hpt".
+    iApply (wp_uvmclear_mem_sconf mm P 0 M w K b p HK Hroot Hvab Hum Hperm
+              with "Hcg Htext Hpc Hpt").
+    rewrite /wp_next. iIntros (CIDr) "%Hch".
+    iSpecialize ("Hcont" $! CIDr with "[%]"); [exact Hch |].
+    iIntros (mr) "Hcg2 Hpc2 %Hcs Hpt2".
+    iApply ("Hcont" $! mr with "Hcg2 Hpc2 [%] [Hpt2]"); [exact Hcs |].
+    iApply (proc_ptm_pt with "Hpt2").
   Qed.
 
 End ProofUvmclear.

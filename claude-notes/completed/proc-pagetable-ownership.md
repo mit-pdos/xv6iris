@@ -178,10 +178,12 @@ exactly the size their view is relative to.
   `proc_ptm_fault` is the step, `umem_lazy_fault` its memory half, and
   `uva_live_page` the arithmetic that says the whole PAGE of a va below
   `p->sz` is below `pgroundup sz`.
-  `wp_vmfault_sconf` survives as the `proc_pt`-altitude COROLLARY, derived
-  in ten lines, so vmfault's other callers (usertrap, copyinstr) are
-  untouched. **Do this for copyin/copyout too**: a strengthened contract of
-  record plus a derived weak one keeps the ~15 call sites off the diff.
+  A `proc_pt`-altitude COROLLARY derived in ten lines kept vmfault's other
+  callers off the diff while they still spoke `proc_pt_any`; it is gone now
+  that every one of them names the image. **Do this for copyin/copyout
+  too**: a strengthened contract of record plus a derived weak one keeps
+  the ~15 call sites off the diff until they convert, and the weak one is
+  deleted when the last of them does.
 - **`SpecMemsetPage.wp_memset_page_val_sconf`** — the value-preserving form
   of the page memset. The old one weakens the written page back to
   `page_own`, contents existential, which is right for kalloc/kfree (whose
