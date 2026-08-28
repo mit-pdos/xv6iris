@@ -5115,12 +5115,79 @@ the rows below and in `design/fs-ghost-state.md`).
     `FsCollect.v:108`'s banner still names `ipool_transit_no_ops` in prose —
     that file was off-limits to this lane (concurrent EV work), and it is a
     comment, not a reference.
-- [ ] **Small leftovers** (APPROVED, one lane after rank 5): `FsDurBytes`'s
-  three dead lemmas and `inode_link_tok_nz`; the caller-less
-  `img_fs_snap_alloc`/`img_boot_P_fs_dur`; `eo_minst`/`lm_install`
-  unification; iput's double-parked window; prose retirement of
-  `fs-state.md` §4½–§4⁹ and the `crash.md` narrative.  NOT the five
-  off-build pinned-`/init` files — owner: do nothing about them.
+- [x] **Small leftovers** (APPROVED, one lane after rank 5): four of the
+  five landed; iput's double-parked window is RULED NOT REDUNDANT and
+  nothing was done to it.  NOT the five off-build pinned-`/init` files —
+  owner: do nothing about them.
+
+  **AS LANDED — L1.  Whole tree green at each of the four commits (zero
+  `Error`, `MAKEEXIT=0`); `SystemAdequacy.v` / `SystemAssumptions.v`
+  byte-identical to main — no deletion was in the audited theorem's
+  cone.**
+
+  - **DEAD CODE.**  `FsDurBytes.fs_dbytes_dom`, `fs_dbytes_union` and
+    `dbytes_ok_insert_2` (the union's only consumer) are gone, and so is
+    `FsStateInode.inode_link_tok_nz` with its now-empty section banner.  No
+    cascade: `dbytes_ok_head`, `fs_dbytes_insert`,
+    `FsStateLink.link_auth_zero_no_tok` and `fn_mult_zero` all keep other
+    consumers.
+  - **THE BOOT POINT'S TWO DEAD ENTRY POINTS**, plus what only they
+    supported: `FsDurImg.img_fs_snap_alloc`, `img_boot_P_fs_dur` (with the
+    now-empty `DurImgSnap` section) and `FsCrash.P_fs_alloc_clean`.
+    `SystemAdequacy` mints era 0 through `P_fs_alloc` off
+    `img_P_dur_alloc`, which is the whole live route.  `FsDurAlloc.
+    fs_snap_alloc` STAYS — it is `P_dur_alloc`'s own step, not a second
+    entry point.
+  - **ONE INSTALLATION STEP.**  `ProofEndOp.eo_minst` was
+    `LogDefs.lm_install` at `Ws = map uint W` with its three readings
+    re-proved by induction; the fixpoint and the inductions are gone.  The
+    commit tail names `lm_install` directly and `eo_install_miss` / `_hdr` /
+    `_hit` are three short derivations of `lm_install_miss` / `_hdr` /
+    `_hit` in the tail's vocabulary (a WORD write set whose
+    duplicate-freedom is a `NoDup`, not the injectivity `lm_install_hit`
+    takes).  No published contract moved — all three are local to
+    `ProofEndOp` — and the file still compiles in 42 s.
+  - **IPUT'S TWO PARKS ARE NOT ONE PARK, and the reason is that they
+    refute DISJOINT windows.**  `IcacheEscrow.ic_pin_tx k` (slot-keyed,
+    re-identified by the `hpn_h` half the walk holds) sits in
+    `ic_payload_arm`'s FROZEN alternative and refutes the MID-FREE PARK,
+    +0x70..+0x8a, inside `ic_escrow_body_cover`.
+    `InodeRegion.ireg_fpin rg` (inum-keyed, re-identified by the freeze
+    INDEX `rg` the `ifreeze_pre`/`_post` fragment already carries) sits in
+    `ireg_fsh (FrzPre/FrzPost rg)` and refutes the CORPSE — the marked slot
+    from the +0x8a eviction to the +0xba deposit, at which the inum has no
+    bundle anywhere — inside `ireg_fsh_no_ops` / `FsCollect.
+    col_corpse_no_ops`.  The two parks overlap in TIME (the region's runs
+    from the +0x50 mint to the +0xba deposit, so it contains the escrow's)
+    and cover different HOLES: at +0x8a..+0xba the escrow has no arm at
+    all, and at +0x70..+0x8a the escrow's arm is what the per-slot cover
+    walks.  Neither refutation reaches the other's window.
+    WHAT A REMOVAL WOULD COST, measured: both cover lemmas take exactly one
+    resource besides their own body — `ghost_map_auth (ln_tx icfg_log) 1 ∅`
+    — so an arm can only be refuted from its own conjuncts.  Dropping the
+    escrow's copy means `ic_escrow_body_cover` / `_all` (lane C's entry)
+    must additionally take the region's f-column verdict AT THE ARM'S INUM,
+    which `ic_parked` binds existentially: the premise has to be the whole
+    `∀ inum` region verdict, hoisted above the fifty-slot cover, which is a
+    statement change on both cover lemmas AND an ordering coupling between
+    two invariant walks that are independent today (`ic_escrow_ns_disjoint`
+    is what lets all fifty be held open at one ghost step).  Dropping the
+    region's copy instead leaves the corpse un-refutable outright.  So this
+    is the brief's "contract change or re-identification redesign" case and
+    nothing was done.
+  - **PROSE.**  `fs-state.md` §4½–§4⁹ (1132 lines of superseded rulings and
+    their as-built reports) is ONE paragraph saying the durable instance is
+    a snapshot and pointing at `durable-fs-plan.md`; the same for
+    `crash.md`'s `P_disk`/`P_wf` narrative, whose split-predicate ruling
+    above it now states today's shape instead of `P_wf` / `fs_durable_wf` /
+    `end_op`'s vanished FS-facing premise.  Trimmed on the way past, same
+    reason: `fs-state.md` §4's debt paragraphs (`Dbt`, `fs_dstep_rebase`)
+    and §7's "3a: `P_wf`'s body".  `README.md` and the plan's header drop
+    their pointers to the retired sections; the archive carries one banner.
+  - **LEFTOVER FOR WHOEVER PASSES NEXT.**  `fs-state.md` §5's Ψ/debt half
+    (`log_psi_step`, `log_psi_commit`, `fs_dstep`, `log_ctx_at Ψ`) is the
+    same kind of drift and was out of this lane's brief: `log_ctx` carries
+    no Ψ today and none of those names exists in the tree.
 - [ ] Ranks 6/7 (`frzown`; `icnt` into the reference columns): read-only
   probes AFTER the leftovers land, then lanes only if the probes pay.
 - [ ] **Rank 4 — the `dview`/`fview` ghosts and the pinned-lookup island**:
