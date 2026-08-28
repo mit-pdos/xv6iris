@@ -823,6 +823,67 @@ Section KexecABody.
       + exact Hcs2.
       + exact Hok.
   Qed.
+  (* exit continuation 1 of [kxc_a2], named: inline it was
+     2959 B in Delta at every step of that walk
+     (optimization.md, fold block continuations). *)
+  Definition kxc_a2_exit1
+      (jp : nat) (g : log_names) (ga : gname) (gf : gname) (bmapstart : Z) (inodestart : Z) (nib : nat) (size : Z) (dev : mword 32) (plen : nat) (pfun : nat -> bv 8) (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat) (afun : nat -> nat -> bv 8) (pidv : mword 32) (V : pprivate) (dqb : dfrac) (dqs : dfrac) (dqa : dfrac) (dqpv : dfrac) (dqas : dfrac) (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (sp0 : mword 64) (ra0 : mword 64) (s00 : mword 64) (s10 : mword 64) (s20 : mword 64) (pv : mword 64) (av : mword 64) (HD : option (nat -> bv 8)) (XCH : iProp Σ) (KEX : CpuId -> iProp Σ) (CID : CpuId) : iProp Σ :=
+    (∀ (M90 : regfile) (kf : nat) (qf sf : Qp) (inumf : mword 32)
+        (dnf : dinode) (bmf : blkmap) (gilf gislf gyf : gname)
+        (n2 : nat) (ef : nat -> bv 8),
+        ⌜ M90 !!! Regidx csp_rs1 = pa_stk sp0 68 /\
+          M90 !!! Regidx Rs0 = sp0 /\
+          M90 !!! Regidx Rs1 = proc_addr jp /\
+          M90 !!! Regidx Rs2 = pv /\
+          M90 !!! Regidx Rs4 = ientry kf /\
+          (kf < NINODE)%nat /\
+          bv_unsigned inumf < 16 * Z.of_nat nib /\
+          (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
+             r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs4 ->
+             M90 !!! Regidx r = m !!! Regidx r) ⌝ -∗
+        ⌜ (iput_units <= n2)%nat ⌝ -∗
+        pc_is (mword_of_int (KXA + 0x090) : mword 64) -∗
+        sie_cap_gpr KT1 M90 (K - 68)%nat b (proc_addr jp) -∗
+        cpu_own 0 eb (proc_addr jp) b lks -∗
+        trap_csrs_ext KT1 eb -∗
+        cpu_claim_ext eb (proc_addr jp) -∗
+        is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string
+                     (ic_tok fsc_ic kf) (slh_tok (icfg_isl kf)) -∗
+        sleeplocked_q gislf sf (i_lock (ientry kf)) pidv -∗
+        ic_tx_dep fsc_ic kf sf dev inumf gyf -∗
+        i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev -∗
+        i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
+        i_valid (ientry kf) ↦₄ valid_word true -∗
+        ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kf inumf dnf bmf -∗
+        (* SpecIlock v5's additive type witness, at the generation the
+           share names -- what SpecIunlockput now needs at +0x064. *)
+        ity_shot gyf (di_type dnf) -∗
+        (* the payload's freeze token (§3.9, RULING A-prime) *)
+        ifreeze_off (bv_unsigned inumf) -∗
+        inode_ref_short kf (qf + sf)%Qp qf dev inumf -∗
+        (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
+        runit_any (bv_unsigned inumf) -∗
+        log_opb g n2 -∗
+        iref_slots 1 -∗
+        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+        sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+        bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
+        bslots 3 -∗
+        kalloc_env ga None -∗
+        proc_priv gf (proc_addr jp) pidv V -∗
+        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
+        ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
+        ([∗ list] i ∈ seq 0 na,
+           [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
+        (* the ELF HEADER, NAMED (N-5.2B): the eight slots readi just wrote
+           cross the seam carrying their bytes instead of being re-carved
+           out of an existential [stack_own] by phase B. *)
+        □ (⌜kxq_hdr_ok HD ef⌝ ∨ XCH) -∗
+        kxc_frameA6x sp0 ra0 s00 s10 s20 pv av (m !!! Regidx Rs4) ef -∗
+        (* THE EXIT, HANDED BACK -- see [kxc_phaseA]'s copy below. *)
+        wp_next (CID0 := CID) true (proc_addr jp) KEX -∗
+        WP (Loop : expr riscv_lang))%I.
+
 
   (* =================================================================== *)
   (*  +0x032 .. +0x08e, PLUS the short-read / bad-magic tail at +0x064.   *)
@@ -936,62 +997,7 @@ Section KexecABody.
            eb lks dqb dqs bmapstart inodestart na alen plen pv dqpv pfun
            av dqa avf aslen dqas afun) -∗
     (* ---- and the FALL-THROUGH: the state at +0x090, phase B's entry ---- *)
-    wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-      ∀ (M90 : regfile) (kf : nat) (qf sf : Qp) (inumf : mword 32)
-        (dnf : dinode) (bmf : blkmap) (gilf gislf gyf : gname)
-        (n2 : nat) (ef : nat -> bv 8),
-        ⌜ M90 !!! Regidx csp_rs1 = pa_stk sp0 68 /\
-          M90 !!! Regidx Rs0 = sp0 /\
-          M90 !!! Regidx Rs1 = proc_addr jp /\
-          M90 !!! Regidx Rs2 = pv /\
-          M90 !!! Regidx Rs4 = ientry kf /\
-          (kf < NINODE)%nat /\
-          bv_unsigned inumf < 16 * Z.of_nat nib /\
-          (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
-             r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs4 ->
-             M90 !!! Regidx r = m !!! Regidx r) ⌝ -∗
-        ⌜ (iput_units <= n2)%nat ⌝ -∗
-        pc_is (mword_of_int (KXA + 0x090) : mword 64) -∗
-        sie_cap_gpr KT1 M90 (K - 68)%nat b (proc_addr jp) -∗
-        cpu_own 0 eb (proc_addr jp) b lks -∗
-        trap_csrs_ext KT1 eb -∗
-        cpu_claim_ext eb (proc_addr jp) -∗
-        is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string
-                     (ic_tok fsc_ic kf) (slh_tok (icfg_isl kf)) -∗
-        sleeplocked_q gislf sf (i_lock (ientry kf)) pidv -∗
-        ic_tx_dep fsc_ic kf sf dev inumf gyf -∗
-        i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev -∗
-        i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
-        i_valid (ientry kf) ↦₄ valid_word true -∗
-        ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kf inumf dnf bmf -∗
-        (* SpecIlock v5's additive type witness, at the generation the
-           share names -- what SpecIunlockput now needs at +0x064. *)
-        ity_shot gyf (di_type dnf) -∗
-        (* the payload's freeze token (§3.9, RULING A-prime) *)
-        ifreeze_off (bv_unsigned inumf) -∗
-        inode_ref_short kf (qf + sf)%Qp qf dev inumf -∗
-        (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
-        runit_any (bv_unsigned inumf) -∗
-        log_opb g n2 -∗
-        iref_slots 1 -∗
-        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-        sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        bitmap_inv fsc_fs bmapstart fsc_cov fsc_logst size -∗
-        bslots 3 -∗
-        kalloc_env ga None -∗
-        proc_priv gf (proc_addr jp) pidv V -∗
-        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
-        ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
-        ([∗ list] i ∈ seq 0 na,
-           [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-        (* the ELF HEADER, NAMED (N-5.2B): the eight slots readi just wrote
-           cross the seam carrying their bytes instead of being re-carved
-           out of an existential [stack_own] by phase B. *)
-        □ (⌜kxq_hdr_ok HD ef⌝ ∨ XCH) -∗
-        kxc_frameA6x sp0 ra0 s00 s10 s20 pv av (m !!! Regidx Rs4) ef -∗
-        (* THE EXIT, HANDED BACK -- see [kxc_phaseA]'s copy below. *)
-        wp_next (CID0 := CID) true (proc_addr jp) KEX -∗
-        WP (Loop : expr riscv_lang)) -∗
+    wp_next true (proc_addr jp) (fun CID : CpuId => kxc_a2_exit1 jp g ga gf bmapstart inodestart nib size dev plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas m K eb b lks sp0 ra0 s00 s10 s20 pv av HD XCH KEX CID) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
