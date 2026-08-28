@@ -94,7 +94,7 @@ Section SpecFreeproc.
     match opt with
     | None   => p_pagetable pa ↦₈ (zero_reg : mword 64)
     | Some P => (p_pagetable pa ↦₈ page_base P.(ud_root) ∗
-                 proc_pt_any P ∗
+                 (∃ M : gmap Z (bv 8), proc_pt P M) ∗
                  ⌜um_below szv P.(ud_um) /\ (uint szv <= uvm_maxsz)%Z⌝)
     end%I.
 
@@ -201,17 +201,17 @@ Section SpecFreeproc.
     iExists V, pid.
     (* both [page_valid]s come out of the table: the trapframe's from
        [proc_pt_wf], the root's from the tree's node claim. *)
-    rewrite /proc_pt_at_any /proc_pt_at.
+    rewrite /proc_pt_at.
     iDestruct "Hpt" as (Mz) "(Hpg & Htf & Hpt)".
     iDestruct (proc_pt_wf_get with "Hpt") as %Hwf.
     iDestruct (proc_pt_root_valid with "Hpt") as %Hroot.
-    iDestruct (proc_pt_forget with "Hpt") as "Hpt".
     rewrite /fp_rest /fp_pt /fp_tf.
     iSplitL "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hctx".
     { iFrame "Hpid Hf Hof Hu Hsp Hir Hbs Hkst Hctx". iPureIntro. exact Hpure. }
     iSplitL "Hpg Hpt".
-    { iFrame "Hpg Hpt". iPureIntro.
-      split; [exact Hbel | exact (proj2 (proj2 Hpure))]. }
+    { iFrame "Hpg". iSplitL "Hpt".
+      { iExists Mz. iExact "Hpt". }
+      iPureIntro. split; [exact Hbel | exact (proj2 (proj2 Hpure))]. }
     cbn [fst snd]. iFrame "Htf Htfp". iPureIntro.
     exact (proj2 (proj2 (proj2 (proj2 Hwf)))).
   Qed.

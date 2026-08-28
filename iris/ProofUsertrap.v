@@ -1166,18 +1166,17 @@ Definition usertrap_res_bare
 
 Lemma usertrap_res_pt_close
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
-  usertrap_res_bare pt ksp -∗ proc_pt_any pt -∗ usertrap_res_parked pt ksp.
+  usertrap_res_bare pt ksp -∗ (∃ M : gmap Z (bv 8), proc_pt pt M) -∗ usertrap_res_parked pt ksp.
 Proof.
   (* the closer names the image it re-parks; the public wrapper stays
      ∃-weakened, so the name is introduced here. *)
-  iIntros "Hb Hpt". iEval (rewrite /proc_pt_any) in "Hpt".
-  iDestruct "Hpt" as (M) "Hpt".
+  iIntros "Hb Hpt". iDestruct "Hpt" as (M) "Hpt".
   iApply (ut_res_pt_close SY.syscall_env pt ksp M with "Hb Hpt").
 Qed.
 
 Lemma usertrap_res_pt_open
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
-  usertrap_res_parked pt ksp -∗ proc_pt_any pt ∗ usertrap_res_bare pt ksp.
+  usertrap_res_parked pt ksp -∗ (∃ M : gmap Z (bv 8), proc_pt pt M) ∗ usertrap_res_bare pt ksp.
 Proof. exact (ut_res_pt_open SY.syscall_env pt ksp). Qed.
 
 Lemma usertrap_res_bare_norm

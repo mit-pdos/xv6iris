@@ -121,10 +121,13 @@ Definition wp_pipewrite_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
   (* the running-thread bundle (SpecSleep.v) *)
   procs_inv γs -∗
   wp_next b pj (fun (CID : CpuId) =>
-  (* THE IMAGE MOVES: the copy leaf may fault a page in (and copyout writes
-     user memory), so the block comes back at a fresh [M'] -- milestone J
-     item 1's ∃-weakened staging. *)
-  ∀ (mf : regfile) (P' : uptd) (M' : gmap Z (bv 8)),
+  (* THE IMAGE DOES NOT MOVE.  pipewrite only READS user memory (one byte
+     per round, through copyin), and at the lazy view a fault inside the
+     copy backs a page already in the view reading 0.  So the block comes
+     back at the caller's own [us_M U]; only the DESCRIPTOR grows.
+     (image campaign, tier 3: the loop calls
+     [SpecCopyin.wp_copyin_sconf_mem].) *)
+  ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       ⌜pipe_rw_ret n (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
@@ -132,7 +135,7 @@ Definition wp_pipewrite_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       pipe_ref γp w q -∗
-      proc_priv_core pj pid (upd_usM (us_upt U P') M') -∗
+      proc_priv_core pj pid (us_upt U P') -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

@@ -2388,7 +2388,7 @@ Section ProofDirlinkMain.
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         iIntros (CIDwi Hswi mwi tot bm' data' dn' dn0' nn wrote dist dstb P'
-                 Mwi Sbw)
+                 Sbw)
           "%Hcswi %Hwf' %Hholes' %Haddrs' %Hsz' %Hcov' %Hcap' %Hsized'
            %Hdistb %Hdist0
            %Hdistk %Hrange %Htie %Harm %Hbud %Hsbw %Hwi16 %Hwiany %Hwiat %Hupt
@@ -3006,7 +3006,7 @@ Section ProofDirlinkMain.
           all: try lkbelow.
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
-          iIntros (CIDrd Hsrd mrd tot P' Mrd)
+          iIntros (CIDrd Hsrd mrd tot P')
             "%Hcsrd %Hupt %Htotcl %Hrdret Hcg Hcnt _ _ Hpc Hidev Hmeta Hmap Hblocks
              Hdst2 Hbs1".
           iDestruct (inode_map_q_1_of _ _ _ _ eq_refl with "Hmap") as "Hmap".

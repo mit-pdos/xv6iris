@@ -1573,6 +1573,11 @@ Section SyscallVocab.
          dispatch reaches entries that write user memory. *)
       (∀ (mf : regfile) (U' : ustate),
         ⌜ callee_saved m mf ⌝ -∗
+        (* ...and which user bytes moved, exactly as [SpecSyscall]'s
+           [sysc_mem_ok] says by table index: sixteen of the twenty-two
+           entries touch no user memory, and this reads [us_M U' = us_M U]
+           for them -- see [SpecSyscall.v]'s own note. *)
+        ⌜ sysc_mem_ok (us_V U) (us_V U') (us_M U) (us_M U') ⌝ -∗
         ⌜ ud_tfp (pv_upt (us_V U')) = ud_tfp (pv_upt (us_V U)) ⌝ -∗
         (* ...and the fd-state ghost name -- see SpecSyscall.v's note: no
            syscall reassigns a live process's [pv_fdg], so the bundle is
@@ -1685,6 +1690,11 @@ Section SyscallVocab.
     (K_syscall <= av)%nat ->
     (* the tie [syscall_env]'s indices cannot reach -- SpecSyscall.v's note *)
     fcn_pid fn = pid ->
+    (* the arm's OWN table index, as [sysc_mem_ok] reads it off the entry
+       trapframe -- an arm cannot select its branch of [sysc_mem_ok] without
+       knowing its own number, and the dispatch already has the fact
+       ([sysc_arm_dispatch] supplies it by [reflexivity] at its own [k]). *)
+    sysc_num (us_V U) = Z.of_nat k ->
     sysc_arm_pre γf pj γs fn dqi ip pid U lks (av - 4)%nat M (mword_of_int (sysc_target k)) -∗
     word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
     word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
@@ -1721,6 +1731,9 @@ Section SyscallVocab.
        r <> csp_rs1 -> r <> Rs0 -> r <> Rs1 -> r <> Rs2 ->
        E !!! Regidx r = m !!! Regidx r) ->
     (4 <= av)%nat ->
+    (* which user bytes moved -- [sysc_hcont_ty]'s own clause, supplied to
+       [Hcont] right after [callee_saved]. *)
+    sysc_mem_ok (us_V U) (us_V U') (us_M U) (us_M U') ->
     ud_tfp (pv_upt (us_V U')) = ud_tfp (pv_upt (us_V U)) ->
     (* ...and the fd-state ghost name, which no syscall moves *)
     pv_fdg (us_V U') = pv_fdg (us_V U) ->
@@ -1740,7 +1753,7 @@ Section SyscallVocab.
     sysc_hcont_ty γf pj fn dqi ip pid U lks av m (ret_pc (m !!! Regidx Rra)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HEsp Hrest Hav4 Hud Hfg.
+    intros HEsp Hrest Hav4 Hmem Hud Hfg.
     set (sp0 := m !!! Regidx csp_rs1).
     iIntros "Hcg Hcpu #Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc Hcont".
     assert (Hb1 : pa_stk sp0 1 = add_vec (pa_stk sp0 4) (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))))
@@ -1886,7 +1899,7 @@ Section SyscallVocab.
       rewrite (Hst6 (or_intror Hgood)) (Hst5 (or_intror Hgood)) (Hst4 (or_intror Hgood))
               (Hst3 (or_intror Hgood)) (Hst2 (or_intror Hgood)) (Hst1 (or_intror Hgood)).
       reflexivity. }
-    iApply ("Hcont" $! T5 U' with "[%] [%] [%] Hcg Hcpu Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc").
+    iApply ("Hcont" $! T5 U' with "[%] [%] [%] [%] Hcg Hcpu Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc").
     { unfold callee_saved.
       split_and!.
       - exact HT5sp.
@@ -1902,6 +1915,7 @@ Section SyscallVocab.
       - rewrite Hthr; [(apply Hrest; vm_compute; first [reflexivity | discriminate]) | vm_compute; reflexivity | vm_compute; discriminate | vm_compute; discriminate | vm_compute; discriminate | vm_compute; discriminate].
       - rewrite Hthr; [(apply Hrest; vm_compute; first [reflexivity | discriminate]) | vm_compute; reflexivity | vm_compute; discriminate | vm_compute; discriminate | vm_compute; discriminate | vm_compute; discriminate].
       - rewrite Hthr; [(apply Hrest; vm_compute; first [reflexivity | discriminate]) | vm_compute; reflexivity | vm_compute; discriminate | vm_compute; discriminate | vm_compute; discriminate | vm_compute; discriminate]. }
+    { exact Hmem. }
     { exact Hud. }
     exact Hfg.
   Qed.
@@ -2379,6 +2393,9 @@ Section SyscallRet.
        r <> csp_rs1 -> r <> Rs0 -> r <> Rs1 -> r <> Rs2 ->
        E !!! Regidx r = m !!! Regidx r) ->
     (4 <= av)%nat ->
+    (* which user bytes moved -- [sysc_hcont_ty]'s own clause, supplied to
+       [Hcont] right after [callee_saved]. *)
+    sysc_mem_ok (us_V U) (us_V U') (us_M U) (us_M U') ->
     ud_tfp (pv_upt (us_V U')) = ud_tfp (pv_upt (us_V U)) ->
     (* ...and the fd-state ghost name, which no syscall moves *)
     pv_fdg (us_V U') = pv_fdg (us_V U) ->
@@ -2398,7 +2415,7 @@ Section SyscallRet.
     sysc_hcont_ty γf pj fn dqi ip pid U lks av m (ret_pc (m !!! Regidx Rra)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HEsp HEs2 Hrest Hav4 Hud Hfg.
+    intros HEsp HEs2 Hrest Hav4 Hmem Hud Hfg.
     iIntros "Hcg Hcpu #Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc Hcont".
     set (tfp := ud_tfp (pv_upt (us_V U'))).
     (* the trapframe page, opened for WRITING out of [proc_priv] *)
@@ -2449,7 +2466,12 @@ Section SyscallRet.
     iDestruct (cpu_own_transport CID CIDb 0%nat true pj true Hcrb with "Hcpu") as "Hcpu".
     iApply (sysc_epilogue_tail (CID := CIDb) γf pj fn dqi ip pid U
               (us_tf U' (<[tf_arg_idx 0 := rget E Ra0]> (pv_tf (us_V U'))))
-              lks av m E HEsp Hrest Hav4 Hud
+              lks av m E HEsp Hrest Hav4
+              (* the a0 store only ever touches [pv_tf], and [sysc_mem_ok]
+                 reads [us_M]/[pv_sz] of its outgoing state, neither of which
+                 [us_tf]/[upd_tf] moves -- so [Hmem] transports on the nose. *)
+              ltac:(cbn [us_M us_tf upd_usV upd_tf pv_sz]; exact Hmem)
+              Hud
               ltac:(cbn [pv_fdg upd_tf]; exact Hfg)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc Hcont").
   Qed.
@@ -2467,6 +2489,69 @@ Section SyscallArms.
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  (* THE SIXTEEN QUIET ARMS' SHARED DISCHARGE.  [sysc_mem_ok]'s decision is
+     driven entirely by its FIRST argument ([sysc_num V], the entry's own
+     number) -- [V'] only shows up at all in the sbrk branch, as [pv_sz V'],
+     and every branch's PAYLOAD is trivially true at [M' = M]: [exec] is
+     [True] unconditionally, [sbrk]'s [sysc_sbrk_img] takes its left "nothing
+     moved" disjunct, a window's [∃ d bs, M = umem_wr M _ d bs] is witnessed
+     by the zero-length round, and the remaining (no-window) branch is
+     [M = M] on the nose.  So the fact holds for ANY [V], [V'] provided the
+     image itself did not move -- no [sysc_num]/[Hnum] premise needed here at
+     all, only at the call site where [M' = M] itself has to be established. *)
+  Lemma sysc_mem_ok_quiet (V V' : pprivate) (M M' : gmap Z (bv 8)) :
+    M' = M -> sysc_mem_ok V V' M M'.
+  Proof.
+    intros ->. unfold sysc_mem_ok.
+    destruct (decide (sysc_num V = 7)) as [_ | _]; [done |].
+    destruct (decide (sysc_num V = 12)) as [_ | _]; [left; reflexivity |].
+    destruct (sysc_window (sysc_num V)) as [i |]; [| reflexivity].
+    exists 0%nat, (fun _ => bv_0 8). reflexivity.
+  Qed.
+
+  (* [sys_exec]'s ARM: at [k = 7], [sysc_mem_ok]'s [exec] branch is [True]
+     unconditionally -- the image is [SpecKexec]'s to pin, not this
+     predicate's, so no fact about [M]/[M'] is needed at all. *)
+  Lemma sysc_mem_ok_exec (V V' : pprivate) (M M' : gmap Z (bv 8)) :
+    sysc_num V = Z.of_nat 7 -> sysc_mem_ok V V' M M'.
+  Proof.
+    intro Hn. unfold sysc_mem_ok. rewrite Hn.
+    destruct (decide (Z.of_nat 7 = 7)) as [_ | Hf]; [done | exfalso; lia].
+  Qed.
+
+  (* THE FOUR WINDOW ARMS, IN ONE LEMMA.  wait (3), pipe (4), read (5) and
+     fstat (8) all end in a copyout into a buffer the syscall was HANDED, so
+     each one's obligation is the same shape at a different argument index --
+     which is exactly what [sysc_window] is a table of.  The arm supplies its
+     own number, the two disequalities that rule out the address-space
+     movers (by [lia] at a literal), the table entry (by [vm_compute]), and
+     the window its callee's own post already handed back. *)
+  Lemma sysc_mem_ok_window (V V' : pprivate) (M M' : gmap Z (bv 8))
+      (n : Z) (i d : nat) (bs : nat -> bv 8) :
+    sysc_num V = n -> n <> 7 -> n <> 12 ->
+    sysc_window n = Some i ->
+    M' = umem_wr M (pv_tf V !!! tf_arg_idx i) d bs ->
+    sysc_mem_ok V V' M M'.
+  Proof.
+    intros Hn H7 H12 Hw Hm. unfold sysc_mem_ok. rewrite Hn.
+    destruct (decide (n = 7)) as [Hc | _]; [exfalso; exact (H7 Hc) |].
+    destruct (decide (n = 12)) as [Hc | _]; [exfalso; exact (H12 Hc) |].
+    rewrite Hw. exists d, bs. exact Hm.
+  Qed.
+
+  (* [sys_sbrk]'s ARM: at [k = 12] the address space itself moves, so the
+     branch is [sysc_sbrk_img] rather than a window -- and its three arms are
+     exactly the three [SpecSysSbrk.sys_sbrk_ok] offers (nothing moved, the
+     lazy/eager growth, the shrink). *)
+  Lemma sysc_mem_ok_sbrk (V V' : pprivate) (M M' : gmap Z (bv 8)) :
+    sysc_num V = Z.of_nat 12 ->
+    sysc_sbrk_img M M' (pv_sz V') ->
+    sysc_mem_ok V V' M M'.
+  Proof.
+    intros Hn Him. unfold sysc_mem_ok. rewrite Hn.
+    destruct (decide (Z.of_nat 12 = 7)) as [Hc | _]; [exfalso; lia |].
+    destruct (decide (Z.of_nat 12 = 12)) as [_ | Hc]; [exact Him | exfalso; lia].
+  Qed.
 
   (* ------------------------------------------------------------------- *)
   (* THE FIRST REAL ARM: k = 11, [sys_getpid].  It is the entry that needs
@@ -2482,7 +2567,7 @@ Section SyscallArms.
     sysc_arm_goal 11 γf pj γs j γl fn dqi ip pid U lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
-    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     assert (Hav82 : (82 <= av)%nat)
       by (lia).
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag)".
@@ -2518,7 +2603,7 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true pj _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid U U lks av m mf
-              Hmfsp Hmfs2 Hmfrest ltac:(lia) eq_refl eq_refl
+              Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl) eq_refl eq_refl
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -2530,8 +2615,8 @@ Section SyscallArms.
      and, on the eager path, the page-table descriptor), which is why the
      trapframe page's immobility has to be extracted from [sys_sbrk_ok]. *)
   Lemma sysc_sbrk_tfp (V : pprivate) (v0 v1 : mword 64)
-      (P' : uptd) (szv' r : mword 64) :
-    sys_sbrk_ok V v0 v1 P' szv' r -> ud_tfp P' = ud_tfp (pv_upt V).
+      (P' : uptd) (szv' r : mword 64) (M M' : gmap Z (bv 8)) :
+    sys_sbrk_ok V v0 v1 P' szv' r M M' -> ud_tfp P' = ud_tfp (pv_upt V).
   Proof.
     intro Hok.
     destruct Hok as [ (_ & HP & _) | (_ & [ (_ & Hg) | (_ & _ & HP & _ & _) ]) ].
@@ -2546,6 +2631,41 @@ Section SyscallArms.
     - rewrite HP. reflexivity.
   Qed.
 
+  (* ...and what it did to the process's MEMORY, in the shape
+     [SpecSyscall.sysc_mem_ok]'s sbrk branch asks for.  Every arm of
+     [sys_sbrk_ok] lands in one of [sysc_sbrk_img]'s three: the failure and
+     [n = 0] arms move nothing, both growth paths (eager and lazy) are
+     [umem_grow] at the size the process ends at, and the real shrink is
+     [umem_del] at PGROUNDUP of it.  The one arm that needs an argument is
+     the shrink's WRAP sub-case ([sz <= sz + n], where uvmdealloc did nothing
+     and returned the old size): there [uvmd_np]'s guard is false, so the run
+     is empty and [umem_del M _ 0] is [M] by that fixpoint's own [O] case. *)
+  Lemma sysc_sbrk_img_of_ok (V : pprivate) (v0 v1 : mword 64)
+      (P' : uptd) (szv' r : mword 64) (M M' : gmap Z (bv 8)) :
+    sys_sbrk_ok V v0 v1 P' szv' r M M' -> sysc_sbrk_img M M' szv'.
+  Proof.
+    intro Hok. unfold sysc_sbrk_img.
+    destruct Hok as [ (_ & _ & _ & Hm) | (_ & [ (_ & Hg) | Hlz ]) ].
+    - left; exact Hm.
+    - destruct Hg as [ (_ & _ & _ & Hm)
+                     | [ (_ & _ & _ & _ & _ & _ & Hm)
+                       | [ (_ & _ & _ & _ & Hm)
+                         | (_ & _ & _ & Hsub & Hm) ] ] ].
+      + left; exact Hm.
+      + right; left; exact Hm.
+      + left; exact Hm.
+      + destruct Hsub as [ (_ & Hsz) | (Hge & Hsz) ].
+        * right; right.
+          exists (uvmd_np (pv_sz V) (add_vec (pv_sz V) (sbrk_arg v0))).
+          rewrite Hsz. exact Hm.
+        * left.
+          assert (Hz : uvmd_np (pv_sz V) (add_vec (pv_sz V) (sbrk_arg v0)) = 0%nat).
+          { unfold uvmd_np. rewrite bool_decide_eq_false_2; [reflexivity |].
+            rewrite <- !uint_unsigned. lia. }
+          rewrite Hm Hz Nat.mul_0_r. reflexivity.
+    - destruct Hlz as (_ & _ & _ & _ & _ & Hm). right; left; exact Hm.
+  Qed.
+
   Lemma sysc_arm_sbrk (γf : gname) (pj : mword 64)
       (γs : list gname) (j : nat) (γl : gname) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (U : ustate) (lks : gset string) (av : nat)
@@ -2553,7 +2673,7 @@ Section SyscallArms.
     sysc_arm_goal 12 γf pj γs j γl fn dqi ip pid U lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
-    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     assert (Hav82 : (82 <= av)%nat)
       by (lia).
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag)".
@@ -2583,7 +2703,8 @@ Section SyscallArms.
               with "Hcg Hcpu Htext Hdata Hpc Hpriv Hkalloc").
     iIntros (CIDy Hsy mf P' szv' M') "%Hcs %Hok Hcg Hcpu Hpc Hpriv".
     assert (Htfp' : ud_tfp P' = ud_tfp (pv_upt (us_V U)))
-      by exact (sysc_sbrk_tfp (us_V U) v0 v1 P' szv' (mf !!! Regidx Ra0) Hok).
+      by exact (sysc_sbrk_tfp (us_V U) v0 v1 P' szv' (mf !!! Regidx Ra0)
+                  (us_M U) M' Hok).
     (* ---- what the shared tail needs of the returned register file ---- *)
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
@@ -2603,9 +2724,18 @@ Section SyscallArms.
     assert (Hcry : true = false \/ pj = zero_reg -> (CIDy : CPU) = (CID : CPU))
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true pj _ Hcry with "Hcont") as "Hcont".
+    (* sbrk is one of the two entries [sysc_mem_ok] does not state as a
+       window -- the address space itself moved -- so its branch is
+       [sysc_sbrk_img], read straight off [sys_sbrk_ok] by
+       [sysc_sbrk_img_of_ok] above. *)
     iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid U
               (upd_usM (upd_usV U (upd_sz (upd_upt (us_V U) P') szv')) M') lks av m mf
-              Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' ltac:(reflexivity)
+              Hmfsp Hmfs2 Hmfrest ltac:(lia)
+              ltac:(apply (sysc_mem_ok_sbrk (us_V U)
+                             (upd_sz (upd_upt (us_V U) P') szv') (us_M U) M' Hnum);
+                    exact (sysc_sbrk_img_of_ok (us_V U) v0 v1 P' szv'
+                             (mf !!! Regidx Ra0) (us_M U) M' Hok))
+              Htfp' ltac:(reflexivity)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -2625,7 +2755,7 @@ Section SyscallArms.
     sysc_arm_goal 3 γf pj γs j γl fn dqi ip pid U lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
-    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     assert (Hav82 : (82 <= av)%nat)
       by (lia).
     subst pj.
@@ -2650,7 +2780,7 @@ Section SyscallArms.
     iApply (SysWait.wp_sys_wait_sconf fsc_kalloc γf γw γs j γl M (av - 4)%nat true true lks pid U v0
               Hj Hgamma Hv0 ltac:(lia) eq_refl
               with "Hcg Hcpu Htext Hdata Hpc Hprocs Hwaitlk Hkalloc Hpriv").
-    iIntros (CIDy Hsy mf P' rv M') "%Hcs %Hext Hcg Hcpu Hpc Hpriv".
+    iIntros (CIDy Hsy mf P' rv dw bsw) "%Hcs %Hext %Hdwle Hcg Hcpu Hpc Hpriv".
     destruct Hcs as [Hcs _].
     assert (Htfp' : ud_tfp P' = ud_tfp (pv_upt (us_V U))).
     { destruct (uptd_ext_sz_ext (pv_sz (us_V U)) (pv_upt (us_V U)) P' Hext) as (_ & Htf & _).
@@ -2673,8 +2803,16 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
-              (upd_usM (us_upt U P') M') lks av m mf
-              Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' ltac:(reflexivity)
+              (upd_usM (us_upt U P') (umem_wr (us_M U) v0 dw bsw)) lks av m mf
+              Hmfsp Hmfs2 Hmfrest ltac:(lia)
+              ltac:(assert (Hv0t : pv_tf (us_V U) !!! tf_arg_idx 0 = v0)
+                      by (apply list_lookup_total_correct, Hv0);
+                    apply (sysc_mem_ok_window (us_V U) (upd_upt (us_V U) P') (us_M U)
+                             (umem_wr (us_M U) v0 dw bsw) (Z.of_nat 3) 0%nat dw bsw
+                             Hnum ltac:(lia) ltac:(lia)
+                             ltac:(vm_compute; reflexivity));
+                    rewrite Hv0t; reflexivity)
+              Htfp' ltac:(reflexivity)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -2706,7 +2844,7 @@ Section SyscallArms.
     sysc_arm_goal 14 γf pj γs j γl fn dqi ip pid U lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
-    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     assert (Hav82 : (82 <= av)%nat)
       by (lia).
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag)".
@@ -2743,7 +2881,7 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true pj _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid U U ∅ av m mf
-              Hmfsp Hmfs2 Hmfrest ltac:(lia) eq_refl eq_refl
+              Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl) eq_refl eq_refl
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -2763,7 +2901,7 @@ Section SyscallArms.
     sysc_arm_goal 6 γf pj γs j γl fn dqi ip pid U lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
-    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     assert (Hav82 : (82 <= av)%nat)
       by (lia).
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag)".
@@ -2806,7 +2944,7 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true pj _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid U U ∅ av m mf
-              Hmfsp Hmfs2 Hmfrest ltac:(lia) eq_refl eq_refl
+              Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl) eq_refl eq_refl
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -2824,7 +2962,7 @@ Section SyscallArms.
     sysc_arm_goal 13 γf pj γs j γl fn dqi ip pid U lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
-    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     assert (Hav82 : (82 <= av)%nat)
       by (lia).
     subst pj.
@@ -2869,7 +3007,7 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U U ∅ av m mf
-              Hmfsp Hmfs2 Hmfrest ltac:(lia) eq_refl eq_refl
+              Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl) eq_refl eq_refl
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -2912,7 +3050,7 @@ Section SyscallArms.
     sysc_arm_goal 10 γf pj γs j γl fn dqi ip pid U lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
-    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     assert (Hav82 : (82 <= av)%nat)
       by (lia).
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag)".
@@ -2955,7 +3093,7 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true pj _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid U (upd_usV U V') ∅ av m mf
-              Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' Hfg'
+              Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl) Htfp' Hfg'
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -2974,7 +3112,7 @@ Section SyscallArms.
     sysc_arm_goal 1 γf pj γs j γl fn dqi ip pid U lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
-    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     assert (Hav82 : (82 <= av)%nat)
       by (lia).
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag)".
@@ -3038,7 +3176,7 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true pj _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid U U ∅ av m mf
-              Hmfsp Hmfs2 Hmfrest ltac:(lia) eq_refl eq_refl
+              Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl) eq_refl eq_refl
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -3102,7 +3240,7 @@ Section SyscallArms.
     sysc_arm_goal 7 γf pj γs j γl fn dqi ip pid U lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
-    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     assert (Hav82 : (82 <= av)%nat)
       by (lia).
     subst pj.
@@ -3191,7 +3329,9 @@ Section SyscallArms.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U (MkUstate V' Mk)
               lks av m mf
-              Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' Hfg'
+              Hmfsp Hmfs2 Hmfrest ltac:(lia)
+              (sysc_mem_ok_exec (us_V U) V' (us_M U) Mk Hnum)
+              Htfp' Hfg'
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -3233,7 +3373,7 @@ Section SyscallArms.
     sysc_arm_goal 2 γf pj γs j γl fn dqi ip pid U lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
-    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
     assert (Hpce : (mword_of_int (sysc_target 2) : mword 64)
@@ -3310,7 +3450,7 @@ Section SyscallArms.
     sysc_arm_goal 22 γf pj γs j γl fn dqi ip pid U lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
-    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
@@ -3349,7 +3489,7 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U U
-              ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) eq_refl eq_refl
+              ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl) eq_refl eq_refl
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -3372,7 +3512,7 @@ Section SyscallArms.
     sysc_arm_goal 16 γf pj γs j γl fn dqi ip pid U lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
-    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
@@ -3434,7 +3574,7 @@ Section SyscallArms.
               (ex_intro _ v1 Hv1) Hv2 eq_refl eq_refl eq_refl
               with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hkalloc Hprocs
                     Hfse Hcaps Htbl").
-    iIntros (CIDy Hsy mf r P' M') "%Hcs %Hext %Hret' %Hmfa0 Hcg Hcpu Hpc Hpriv _ Hout".
+    iIntros (CIDy Hsy mf r P') "%Hcs %Hext %Hret' %Hmfa0 Hcg Hcpu Hpc Hpriv _ Hout".
     (* NOTHING ABOUT THE BITMAP COMES BACK any more -- filewrite's FD_INODE
        arm ballocs, and the pool it draws from is an invariant now, so the
        postcondition says nothing about which blocks are in use.  The three
@@ -3462,7 +3602,7 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
-              (upd_usM (us_upt U P') M') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' ltac:(reflexivity)
+              (us_upt U P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl) Htfp' ltac:(reflexivity)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -3474,7 +3614,7 @@ Section SyscallArms.
     sysc_arm_goal 5 γf pj γs j γl fn dqi ip pid U lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
-    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
@@ -3511,11 +3651,11 @@ Section SyscallArms.
     iDestruct (sysc_fileread_env γf γc (proc_addr j) fn with "Hfsenv Hsl")
       as "[Hfse Hback]".
     iApply (SysRead.wp_sys_read_sconf γf γs j γl (sysc_fread_names γc fn)
-              pid U v0 v2 M (av - 4)%nat true true ∅
-              ltac:(lia) Hj Hgamma Hlen Hv0 (ex_intro _ v1 Hv1) Hv2
+              pid U v0 v1 v2 M (av - 4)%nat true true ∅
+              ltac:(lia) Hj Hgamma Hlen Hv0 Hv1 Hv2
               eq_refl eq_refl eq_refl
               with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hkalloc Hprocs Hfse Hci").
-    iIntros (CIDy Hsy mf r P' M') "%Hcs %Hext %Hret' %Hmfa0 Hcg Hcpu Hpc Hpriv _ Hout".
+    iIntros (CIDy Hsy mf r P' dw bsw) "%Hcs %Hext %Hret' %Hdwle %Hmfa0 Hcg Hcpu Hpc Hpriv _ Hout".
     iDestruct ("Hback" with "Hout") as "Hsl".
     iDestruct (sysc_bslot_join with "Hsl Hbs2") as "Hbs".
     assert (Htfp' : ud_tfp (pv_upt (upd_upt (us_V U) P')) = ud_tfp (pv_upt (us_V U))).
@@ -3538,7 +3678,16 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
-              (upd_usM (us_upt U P') M') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' ltac:(reflexivity)
+              (upd_usM (us_upt U P') (umem_wr (us_M U) v1 dw bsw)) ∅ av m mf
+              Hmfsp Hmfs2 Hmfrest ltac:(lia)
+              ltac:(assert (Hv1t : pv_tf (us_V U) !!! tf_arg_idx 1 = v1)
+                      by (apply list_lookup_total_correct, Hv1);
+                    apply (sysc_mem_ok_window (us_V U) (upd_upt (us_V U) P') (us_M U)
+                             (umem_wr (us_M U) v1 dw bsw) (Z.of_nat 5) 1%nat dw bsw
+                             Hnum ltac:(lia) ltac:(lia)
+                             ltac:(vm_compute; reflexivity));
+                    rewrite Hv1t; reflexivity)
+              Htfp' ltac:(reflexivity)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -3550,7 +3699,7 @@ Section SyscallArms.
     sysc_arm_goal 8 γf pj γs j γl fn dqi ip pid U lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
-    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
@@ -3578,10 +3727,10 @@ Section SyscallArms.
     iDestruct (sysc_filestat_env (proc_addr j) fn with "Hfsenv Hsl")
       as "[Hfse Hback]".
     iApply (SysFstat.wp_sys_fstat_sconf γf γs j γl (sysc_fstat_names fn)
-              pid U v0 M (av - 4)%nat true true ∅
-              ltac:(lia) Hj Hgamma Hlen Hv0 (ex_intro _ v1 Hv1) eq_refl
+              pid U v0 v1 M (av - 4)%nat true true ∅
+              ltac:(lia) Hj Hgamma Hlen Hv0 Hv1 eq_refl
               with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hkalloc Hprocs Hfse").
-    iIntros (CIDy Hsy mf r P' M') "%Hcs %Hext %Hret' %Hmfa0 Hcg Hcpu Hpc Hpriv _ Hout".
+    iIntros (CIDy Hsy mf r P' dw bsw) "%Hcs %Hext %Hret' %Hdwle %Hmfa0 Hcg Hcpu Hpc Hpriv _ Hout".
     iDestruct ("Hback" with "Hout") as "Hsl".
     iDestruct (sysc_bslot_join with "Hsl Hbs2") as "Hbs".
     assert (Htfp' : ud_tfp (pv_upt (upd_upt (us_V U) P')) = ud_tfp (pv_upt (us_V U))).
@@ -3604,7 +3753,16 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
-              (upd_usM (us_upt U P') M') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' ltac:(reflexivity)
+              (upd_usM (us_upt U P') (umem_wr (us_M U) v1 dw bsw)) ∅ av m mf
+              Hmfsp Hmfs2 Hmfrest ltac:(lia)
+              ltac:(assert (Hv1t : pv_tf (us_V U) !!! tf_arg_idx 1 = v1)
+                      by (apply list_lookup_total_correct, Hv1);
+                    apply (sysc_mem_ok_window (us_V U) (upd_upt (us_V U) P') (us_M U)
+                             (umem_wr (us_M U) v1 dw bsw) (Z.of_nat 8) 1%nat dw bsw
+                             Hnum ltac:(lia) ltac:(lia)
+                             ltac:(vm_compute; reflexivity));
+                    rewrite Hv1t; reflexivity)
+              Htfp' ltac:(reflexivity)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -3624,7 +3782,7 @@ Section SyscallArms.
     sysc_arm_goal 9 γf pj γs j γl fn dqi ip pid U lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
-    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
@@ -3700,7 +3858,7 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U (MkUstate V' (us_M U))
-              ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' Hfg'
+              ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl) Htfp' Hfg'
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -3729,7 +3887,7 @@ Section SyscallArms.
     sysc_arm_goal 18 γf pj γs j γl fn dqi ip pid U lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
-    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
@@ -3794,7 +3952,7 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
-              (us_upt U P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' ltac:(reflexivity)
+              (us_upt U P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl) Htfp' ltac:(reflexivity)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -3807,7 +3965,7 @@ Section SyscallArms.
     sysc_arm_goal 19 γf pj γs j γl fn dqi ip pid U lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
-    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
@@ -3874,7 +4032,7 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
-              (us_upt U P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' ltac:(reflexivity)
+              (us_upt U P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl) Htfp' ltac:(reflexivity)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -3895,7 +4053,7 @@ Section SyscallArms.
     sysc_arm_goal 21 γf pj γs j γl fn dqi ip pid U lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
-    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
@@ -3964,7 +4122,7 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U (upd_usV U V')
-              ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' Hfg'
+              ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl) Htfp' Hfg'
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd [Hir Hiru] Henv Hpriv Hufrag Hpc Hcont").
     iApply (sysc_iref_join3 with "Hir Hiru").
   Qed.
@@ -4000,7 +4158,7 @@ Section SyscallArms.
     sysc_arm_goal 4 γf pj γs j γl fn dqi ip pid U lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
-    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
@@ -4041,7 +4199,8 @@ Section SyscallArms.
               Hpidt (sct_dq _ _ T)
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpanic Hftable Hkalloc
                     Hpriv Hufrag Hfd0 Hfd1 Hiru Hpenv Hfenv").
-    iIntros (CIDy Hsy mf P' M') "%Hcs %Hupt Hcg Hcpu _ _ Hpc Hpost Hiru Hpe' Hfe'".
+    iIntros (CIDy Hsy mf P' dw bsw) "%Hcs %Hupt %Hdwle Hcg Hcpu _ _ Hpc Hpost Hiru Hpe' Hfe'".
+    set (M' := umem_wr (us_M U) v0 dw bsw).
     (* the three block slots, back out of the nopid bundle.  THE BITMAP DOES
        NOT COME WITH THEM any more -- it is an invariant, so the bundle never
        had to give it back and the post no longer quantifies a used-set. *)
@@ -4088,7 +4247,15 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U (MkUstate V' M')
-              ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' Hfg'
+              ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia)
+              ltac:(assert (Hv0t : pv_tf (us_V U) !!! tf_arg_idx 0 = v0)
+                      by (apply list_lookup_total_correct, Hv0);
+                    apply (sysc_mem_ok_window (us_V U) V' (us_M U) M'
+                             (Z.of_nat 4) 0%nat dw bsw
+                             Hnum ltac:(lia) ltac:(lia)
+                             ltac:(vm_compute; reflexivity));
+                    rewrite Hv0t; reflexivity)
+              Htfp' Hfg'
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd [Hir Hiru] Henv Hpriv Hufrag Hpc Hcont").
     iApply (sysc_iref_join3 with "Hir Hiru").
   Qed.
@@ -4129,7 +4296,7 @@ Section SyscallArms.
     sysc_arm_goal 20 γf pj γs j γl fn dqi ip pid U lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
-    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
@@ -4199,7 +4366,7 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
-              (us_upt U P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' ltac:(reflexivity)
+              (us_upt U P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl) Htfp' ltac:(reflexivity)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -4218,7 +4385,7 @@ Section SyscallArms.
     sysc_arm_goal 17 γf pj γs j γl fn dqi ip pid U lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
-    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
@@ -4292,7 +4459,7 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
-              (us_upt U P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' ltac:(reflexivity)
+              (us_upt U P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl) Htfp' ltac:(reflexivity)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -4324,7 +4491,7 @@ Section SyscallArms.
     sysc_arm_goal 15 γf pj γs j γl fn dqi ip pid U lks av m M.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
-    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
@@ -4417,7 +4584,7 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U (MkUstate V' (us_M U))
-              ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp' Hfg'
+              ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl) Htfp' Hfg'
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -4525,6 +4692,10 @@ Section SyscallArms.
        r <> csp_rs1 -> r <> Rs0 -> r <> Rs1 -> r <> Rs2 ->
        M !!! Regidx r = m !!! Regidx r) ->
     (K_syscall <= av)%nat ->
+    (* the dispatch reaches this arm exactly when the number is OUT OF
+       RANGE -- [sysc_arm_dispatch]'s own [(1 <= k <= 22)%nat] range, read
+       back at [Z] since [sysc_num]/[sysc_mem_ok] live there. *)
+    ~ (1 <= sysc_num (us_V U) <= 22)%Z ->
     sysc_arm_pre γf pj γs fn dqi ip pid U lks (av - 4)%nat M
       (mword_of_int (KernelSyms.syscall + 0x40) : mword 64) -∗
     word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
@@ -4535,7 +4706,7 @@ Section SyscallArms.
     sysc_hcont_ty γf pj fn dqi ip pid U lks av m (ret_pc (m !!! Regidx Rra)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hj Hpj HMsp HMs1 HMother Hav.
+    intros Hj Hpj HMsp HMs1 HMother Hav Hrange.
     assert (Hav82 : (82 <= av)%nat)
       by (lia).
     subst pj.
@@ -4802,7 +4973,9 @@ Section SyscallArms.
                  with "Hcpu") as "Hcpu".
     iApply (sysc_epilogue_tail (CID := CIDi) γf (proc_addr j) fn dqi ip pid U
               (us_tf U (<[tf_arg_idx 0 := rget G1 Ra4]> (pv_tf (us_V U))))
-              ∅ av m G1 HG1sp HG1rest ltac:(lia) eq_refl eq_refl
+              ∅ av m G1 HG1sp HG1rest ltac:(lia)
+              (sysc_mem_ok_quiet _ _ _ _ eq_refl)
+              eq_refl eq_refl
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -5101,6 +5274,18 @@ Section SyscallMain.
       assert (Hk : (1 <= k <= 22)%nat) by (unfold k; lia).
       assert (Hzk : Z.of_nat k = bv_signed a3num) by (unfold k; lia).
       assert (Ha3k : a3num = mword_of_int (Z.of_nat k)) by (rewrite Hzk; exact (sysc_a3_val a3num Hrange)).
+      (* [sysc_num (us_V U)]'s OWN reading of [a7] agrees with [k]: [a7] is
+         trapframe word 21 ([tf_arg_idx 7]), the same [RAWNUM] the +0x16 [ld]
+         above read, and [a3num] is its sign-extension to 32 then back to 64
+         bits -- [bv_sign_extend_signed] is what lets a WIDER sign-extension
+         see through a narrower one, exactly as at [Ha3sig] below. *)
+      assert (Hsysc_num : sysc_num (us_V U) = Z.of_nat k).
+      { unfold sysc_num.
+        assert (Htfidx7 : tf_arg_idx 7 = 21%nat) by (unfold tf_arg_idx; reflexivity).
+        assert (Htf21tot : pv_tf (us_V U) !!! tf_arg_idx 7 = RAWNUM).
+        { rewrite Htfidx7. apply list_lookup_total_correct, Htf21. }
+        rewrite Htf21tot Hzk. unfold a3num.
+        rewrite bv_sign_extend_signed; [reflexivity | apply N.leb_le; vm_compute; reflexivity]. }
       (* ---- +0x26: slli a4,a3,3 ---- *)
       iApply (wp_slli_s_sconf (mword_of_int (KernelSyms.syscall + 0x26)) Ra4 Ra3 (mword_of_int 3 : mword 6)
                 (shift_bits_left (B5 !!! Regidx Ra3) (subrange_vec_dec (mword_of_int 3 : mword 6) (Z.sub log2_xlen 1) 0))
@@ -5290,7 +5475,7 @@ Section SyscallMain.
         by wp_next_chain.
       iDestruct (cpu_own_transport CID8 CID22 0%nat true pj true Hcr8_22 with "Hcpu") as "Hcpu".
       iApply (sysc_arm_dispatch (CID := CID22) k γf pj γs j γl fn dqi ip pid U lks av m D0 Hk
-                Hj Hgamma eq_refl HD0armsp HD0s2 HD0ra HD0other HD0avb Hpidt
+                Hj Hgamma eq_refl HD0armsp HD0s2 HD0ra HD0other HD0avb Hpidt Hsysc_num
                 with "[Hpc Hcg Hcpu Htext Hprocs HR Hbs Hip Hfd Hir Hpriv Hufrag] Hr24 Hr16 Hr8 Hr0 Hdata Hcont").
       { iApply (sysc_arm_pre_intro with
           "Hpc Hcg Hcpu Htext Hprocs HR Hbs Hip Hfd Hir Hpriv Hufrag"). }
@@ -5370,8 +5555,20 @@ Section SyscallMain.
       assert (Hcr8_15 : true = false \/ pj = zero_reg -> (CID15 : CPU) = (CID8 : CPU))
         by wp_next_chain.
       iDestruct (cpu_own_transport CID8 CID15 0%nat true pj true Hcr8_15 with "Hcpu") as "Hcpu".
+      (* [sysc_num (us_V U)] is [a3num]'s signed value, the same bridge as
+         [Hsysc_num] on the in-range side; [Hrange] here is its NEGATION, so
+         the fallback's own range premise falls out by rewriting. *)
+      assert (Hsysc_num2 : sysc_num (us_V U) = bv_signed a3num).
+      { unfold sysc_num.
+        assert (Htfidx7 : tf_arg_idx 7 = 21%nat) by (unfold tf_arg_idx; reflexivity).
+        assert (Htf21tot : pv_tf (us_V U) !!! tf_arg_idx 7 = RAWNUM).
+        { rewrite Htfidx7. apply list_lookup_total_correct, Htf21. }
+        rewrite Htf21tot. unfold a3num.
+        rewrite bv_sign_extend_signed; [reflexivity | apply N.leb_le; vm_compute; reflexivity]. }
+      assert (Hrange' : ~ (1 <= sysc_num (us_V U) <= 22)%Z)
+        by (rewrite Hsysc_num2; exact Hrange).
       iApply (sysc_fallback (CID := CID15) γf pj γs j fn dqi ip pid U lks av m B5
-                Hj eq_refl HB5armsp HB5s1 HB5other HB5avb
+                Hj eq_refl HB5armsp HB5s1 HB5other HB5avb Hrange'
                 with "[Hpc Hcg Hcpu Htext Hprocs HR Hbs Hip Hfd Hir Hpriv Hufrag] Hr24 Hr16 Hr8 Hr0 Hdata Hcont").
       { iApply (sysc_arm_pre_intro with
           "Hpc Hcg Hcpu Htext Hprocs HR Hbs Hip Hfd Hir Hpriv Hufrag"). }

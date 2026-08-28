@@ -4,7 +4,7 @@ History of the durable-disk project from ruling 3 (2026-08-23) to the
 snapshot-commit ruling (2026-08-25): every lane's spec and as-landed
 report, every refutation, every ruling and addendum.  NOT current
 guidance.  The design of record is `design/durable-fs-plan.md`; the live
-worklist is `projects/durable-disk.md`.
+worklist is `completed/durable-disk.md`.
 
 EVERY REFUTATION FILE NAMED BELOW IS DELETED — `iris/FsDurRefute.v`,
 `FsDurDefer.v`, `FsDurTrunc.v`, `FsDurXferWall.v`, `FsDurQuiesce.v`,

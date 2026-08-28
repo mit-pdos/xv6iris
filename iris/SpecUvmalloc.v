@@ -17,14 +17,17 @@
        return newsz;
      }
 
-   STATED AT THE [proc_pt] ALTITUDE: uvmalloc PRESERVES the valid-user-page-
-   table predicate, growing the user map by exactly the run of pages
-   [PGROUNDUP(oldsz) .. newsz).
+   STATED AT THE MEMORY-INDEXED [proc_ptm] ALTITUDE, and at that one only:
+   uvmalloc PRESERVES the valid-user-page-table predicate, growing the user
+   map by exactly the run of pages [PGROUNDUP(oldsz) .. newsz), and NAMES
+   what the process's memory view becomes.  The ∃-[M] corollary this file
+   used to carry beside it is gone -- every caller names the image it hands
+   in.
 
-   THE FAILURE ARM RESTORES [proc_pt P] EXACTLY.  This is the whole point of
-   the uvmdealloc call in the C code, and the spec says it: out of memory,
-   the caller gets back the descriptor it passed in -- not a weaker one, not
-   an existential.  It is provable because the pages the loop had already
+   THE FAILURE ARM RESTORES THE VIEW IT WAS HANDED, EXACTLY.  This is the
+   whole point of the uvmdealloc call in the C code, and the spec says it:
+   out of memory, the caller gets back the descriptor AND the bytes it
+   passed in -- not a weaker one, not an existential.  It is provable because the pages the loop had already
    mapped are precisely the ones uvmdealloc unmaps, and the run was fresh in
    [ud_um] to begin with ([ProcPtOwn.um_del_run_restore]).
 
@@ -72,108 +75,6 @@ From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
-
-Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (mm : regfile)
-    (P : uptd) (xperm : Z) (K : nat) (eb : bool) (p : mword 64)
-    (b : bool) (lks : gset string) :=
-  let pcE : mword 64 := mword_of_int KernelSyms.uvmalloc in
-  let oldsz := mm !!! Regidx (mword_of_int 11) in
-  let newsz := mm !!! Regidx (mword_of_int 12) in
-  let vpn0 := svpn_of (pgroundup oldsz) in
-  let n := uvma_np oldsz newsz in
-  let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
-  (* 10-slot frame + mappages' 32 (kalloc 14, uvmdealloc 26, memset less) *)
-  (42 <= K)%nat ->
-  mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
-  mm !!! Regidx (mword_of_int 10) = page_base P.(ud_root) ->
-  (* the permission: [ori s6,a3,18] makes the mappages perm [xperm | 18] *)
-  mm !!! Regidx (mword_of_int 13) = (mword_of_int xperm : mword 64) ->
-  (0 <= xperm < 512)%Z ->
-  uvm_perm_ok (Z.lor xperm 18) ->
-  (* every page the loop maps lies in the user region, below TRAPFRAME.  The
-     bound is [<= uvm_maxsz], not [+ 4096 <=]: the last page the loop maps
-     starts at PGROUNDUP(newsz) - 4096, so a size equal to TRAPFRAME is
-     exactly legal -- and it is the size growproc's own check
-     ([sz + n > TRAPFRAME] returns -1) lets through. *)
-  (uint oldsz <= uvm_maxsz)%Z ->
-  (* THE SAME BOUND ON [newsz] -- *OR* THE COVERAGE THAT IMPLIES IT.
-     Testing is what growproc does and what every caller here used to do; the
-     one caller that cannot test is kexec, whose [newsz] is
-     [ph.vaddr + ph.memsz] read out of an untrusted ELF.  It does not have to:
-     for this loop to march its
-     [a] up to TRAPFRAME it must first MAP every page below it, one kalloc
-     per page, and physical memory holds nowhere near that many -- so kalloc
-     fails first and the [rv = 0] arm fires.  [UmCovered.v] is that argument,
-     and [um_covered oldsz] -- every page below [oldsz] already mapped -- is
-     what a caller supplies to invoke it.  Note the right disjunct is FALSE
-     for a lazily-grown process (sbrk raises [p->sz] and maps nothing), which
-     is exactly why this is a disjunction and not a replacement. *)
-  ((uint newsz <= uvm_maxsz)%Z \/ um_covered oldsz P.(ud_um)) ->
-  (* THE RUN IS UNMAPPED TO BEGIN WITH -- mappages panics on a remap, and
-     this is also what makes the failure arm's rollback exact.  GUARDED BY
-     THE ADDRESS BOUND, for the same reason SpecReadi's sum premise is
-     guarded by the size test: asked outright it is UNPAYABLE by kexec.
-       [vpn_at] wraps at 2^27 entries, so for a run longer than that the
-     unguarded claim is not merely hard, it is FALSE -- the run comes back
-     round and lands on a page the caller really has mapped.  growproc never
-     gets there because it tests ([sz + n > TRAPFRAME] returns -1); kexec
-     cannot, because its [newsz] is [ph.vaddr + ph.memsz] out of an
-     untrusted file and may be anywhere below 2^64.
-       What the loop actually needs is freshness at the iterations it
-     REACHES, and it reaches iteration [i] only after mapping [i] pages --
-     which, by the counting argument in [UmCovered.v], bounds the address it
-     is about to map.  That bound is exactly this guard, it is already
-     derived inside ProofUvmalloc (as [Habi], from whichever disjunct of the
-     premise above the caller holds), and it is what
-     [ProcPtOwn.um_below_run_fresh] asks for.  So a caller discharges this
-     by [intros i Hi Hbnd; apply um_below_run_fresh] with [n := S i] and
-     needs no bound on the untrusted field at all.
-       Every existing caller pays it by ignoring the guard. *)
-  (forall i, (i < n)%nat ->
-     (bv_unsigned (pgroundup oldsz) + 4096 * Z.of_nat i + 4096 <= uvm_maxsz)%Z ->
-     P.(ud_um) !! vpn_at vpn0 i = None) ->
-  (* every loop iteration's kalloc (success) and kfree (mappages-failure
-     rollback) are both bound at "kmem" (13); nothing else uvmalloc touches
-     ranks lower.  One premise covers the whole cone. *)
-  locks_below lks "kmem" ->
-  sie_cap_gpr KT1 mm K b p -∗
-  cpu_own 0%nat eb p b lks -∗
-  kernel_text -∗
-  pc_is pcE -∗
-  proc_pt_any P -∗
-  kalloc_env γa None -∗
-  wp_next b p (fun (CID : CpuId) =>
-    ∀ (mr : regfile),
-    sie_cap_gpr KT1 mr K b p -∗
-    cpu_own 0%nat eb p b lks -∗
-    pc_is ret_tgt -∗
-    ⌜callee_saved mm mr⌝ -∗
-    ( (* out of memory: rolled back to exactly the table we were given *)
-      (⌜mr !!! Regidx (mword_of_int 10) = (mword_of_int 0 : mword 64)⌝ ∗
-       proc_pt_any P)
-      ∨ (* the map gained precisely the run, at precisely the permission *)
-      (∃ P' : uptd,
-         ⌜uptd_ext P P'⌝ ∗
-         ⌜dom P'.(ud_um) = dom P.(ud_um) ∪ vpn_run vpn0 n⌝ ∗
-         (* WHAT THE NEW LEAVES ARE.  The domain is enough for a caller that
-            only wants to know the run is mapped; it is NOT enough for one
-            that then EDITS a leaf -- exec calls uvmclear on the stack guard
-            page, and [SpecUvmclear]'s permission premise is about that
-            leaf's flag byte.  mappages writes [uvm_pte (xperm|18) r] and
-            sets no A/D bit, so this is what it wrote.  (The zero FILL is
-            still not exposed: that is the [proc_pt] tier's limitation, and
-            a different question from what the PTE says.) *)
-         ⌜forall v : mword 27, v ∈ vpn_run vpn0 n ->
-            ∃ r : mword 64,
-              P'.(ud_um) !! v = Some (uvm_pte (Z.lor xperm 18) r)⌝ ∗
-         ⌜ ((uint newsz < uint oldsz)%Z /\
-            mr !!! Regidx (mword_of_int 10) = oldsz)
-           \/ ((uint oldsz <= uint newsz)%Z /\
-               mr !!! Regidx (mword_of_int 10) = newsz) ⌝ ∗
-         proc_pt_any P') ) -∗
-    WP (Loop : expr riscv_lang)) -∗
-  WP (Loop : expr riscv_lang).
 
 (* ===================================================================== *)
 (*  THE MEMORY-INDEXED CONTRACT.                                          *)
@@ -250,10 +151,4 @@ Module Type UVMALLOC.
       (P : uptd) (M : gmap Z (bv 8)) (xperm : Z) (K : nat) (eb : bool)
       (p : mword 64) (b : bool) (lks : gset string),
       wp_uvmalloc_mem_sconf_body γa mm P M xperm K eb p b lks.
-  Parameter wp_uvmalloc_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile)
-      (P : uptd) (xperm : Z) (K : nat) (eb : bool) (p : mword 64)
-      (b : bool) (lks : gset string),
-      wp_uvmalloc_sconf_body γa mm P xperm K eb p b lks.
 End UVMALLOC.

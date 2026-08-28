@@ -27,14 +27,14 @@
    one functional guarantee this contract makes, and the one a caller needs
    (it still owns, and can still read, what it asked to be copied out).
 
-   WHAT THE USER PAGES END UP HOLDING is stated by the MEMORY-INDEXED form
-   below, [wp_copyout_sconf_mem]: it runs at [proc_ptm P (uint szv) M],
-   the contents-indexed refinement of [proc_pt] (ProcPtOwn.v §5c), and says
-   the process's memory view ends up at [umem_wr M dstva len src_bytes] --
-   the given view with the source buffer written at [dstva + j].  That is
-   an EQUATION, not a one-sided promise: it pins both what changed and
-   what did not.  [wp_copyout_sconf] is the existential-[M] corollary,
-   which is what every current caller still speaks.
+   WHAT THE USER PAGES END UP HOLDING is what the contract says, and it is
+   an EQUATION.  [wp_copyout_sconf_mem] runs at [proc_ptm P (uint szv) M],
+   the contents-indexed refinement of [proc_pt] (ProcPtOwn.v §5c), and its
+   post pins the process's memory view at [umem_wr M dstva len src_bytes] --
+   the given view with the source buffer written at [dstva + j].  It pins
+   both what changed and what did not.  This is the ONLY contract copyout
+   has: the ∃-[M] corollary every caller used to speak is GONE, because
+   every caller now names the image it hands in.
 
    THE FAILURE ARM IS HONEST ABOUT THE PREFIX.  copyout writes page by page
    and can fail on a later page (bad va, no backing, read-only leaf), so
@@ -130,61 +130,6 @@ Import Defs.
    leaves have: this function's kernel buffer is a FRAME local at [KT1] for
    one caller and a KT0 page/bio window for the next, and one shared tier
    cannot state both.  See SpecMemmove.v's note. *)
-Definition wp_copyout_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
-    (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
-    (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
-    (dqsrc : dfrac)
-    (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :=
-  let pcE : mword 64 := mword_of_int KernelSyms.copyout in
-  (* a0 = pagetable, a1 = psz, a2 = dstva, a3 = src, a4 = len *)
-  let src := mm !!! Regidx (mword_of_int 13) in
-  let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
-  (* 14-slot frame + vmfault's 38 (walkaddr needs 10, walk 8, memmove 2).
-     COPYOUT'S FRAME GREW AND ITS SIBLINGS' DID NOT, so this is 52 where
-     SpecCopyin / SpecCopyinstr are still 50.  [psz] has to survive the
-     walkaddr / vmfault / memmove calls in the loop, so gcc keeps it in s11 --
-     which means s11 is now SAVED: `addi sp,sp,-112` (13 saved registers + one
-     pad slot), against `-96` for copyin and copyinstr, whose extra argument
-     dies before the first call.  Getting this wrong is not a soundness hole,
-     it is an unsatisfiable premise: at 50 the body would run at 50 - 14 = 36
-     and vmfault demands 38. *)
-  (52 <= K)%nat ->
-  (* the pagetable argument is the table [proc_pt P] describes -- and that is
-     now the WHOLE requirement; it need not be the running process's. *)
-  mm !!! Regidx (mword_of_int 10) = page_base P.(ud_root) ->
-  (* the size argument, in a1 *)
-  mm !!! Regidx (mword_of_int 11) = szv ->
-  mm !!! Regidx (mword_of_int 14) = (mword_of_int (Z.of_nat len) : mword 64) ->
-  (Z.of_nat len < 2 ^ 64)%Z ->
-  (* it respects MAXVA (vmfault's premise) *)
-  (uint szv <= 2 ^ 38)%Z ->
-  (* vmfault's kalloc keeps its transient noff increment in int range;
-     [lvl] is otherwise generic (usertrap calls at 0, the pipe loops at 1) *)
-  (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
-  (* copyout -> walkaddr -> walk; [walk] states its bound at "kmem" whether or
-     not the alloc arm is taken *)
-  locks_below lks "kmem" ->
-  sie_cap_gpr KT1 mm K b p -∗
-  cpu_own lvl eb p b lks -∗
-  kernel_text -∗
-  pc_is pcE -∗
-  proc_pt_any P -∗
-  kalloc_env γa None -∗
-  ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb]{dqsrc} src_bytes j) -∗
-  wp_next b p (fun (CID : CpuId) =>
-    ∀ (mr : regfile) (P' : uptd),
-    sie_cap_gpr KT1 mr K b p -∗
-    cpu_own lvl eb p b lks -∗
-    pc_is ret_tgt -∗
-    proc_pt_any P' -∗
-    ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb]{dqsrc} src_bytes j) -∗
-    ⌜callee_saved mm mr⌝ -∗
-    ⌜uptd_ext_sz szv P P'⌝ -∗
-    ⌜ mr !!! Regidx (mword_of_int 10) = mword_of_int 0
-      \/ mr !!! Regidx (mword_of_int 10) = mword_of_int (-1) ⌝ -∗
-    WP (Loop : expr riscv_lang)) -∗
-  WP (Loop : expr riscv_lang).
-
 (* ===================================================================== *)
 (*  THE MEMORY-INDEXED CONTRACT.                                          *)
 (* ===================================================================== *)
@@ -258,11 +203,4 @@ Module Type COPYOUT.
       (src_bytes : nat -> bv 8) (dqsrc : dfrac)
       (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),
       wp_copyout_sconf_mem_body ktb γa mm P M szv len src_bytes dqsrc K lvl eb p b lks.
-  Parameter wp_copyout_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
-      (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
-      (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
-      (dqsrc : dfrac)
-      (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),
-      wp_copyout_sconf_body ktb γa mm P szv len src_bytes dqsrc K lvl eb p b lks.
 End COPYOUT.

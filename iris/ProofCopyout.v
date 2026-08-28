@@ -2748,38 +2748,6 @@ Section ProofCopyout.
               with "Hcg Hcnt Htext Hpc Hpt Henv Hsrc Hepi").
   Qed.
 
-  (* ------------------------------------------------------------------ *)
-  (* ...and the EXISTENTIAL-[M] corollary, which is what every current    *)
-  (* caller speaks.  [proc_pt_ptm] is the whole of it: the table alone    *)
-  (* determines nothing about the bytes, so a caller that does not name   *)
-  (* [M] can pick one and throw the result away.                          *)
-  (* ------------------------------------------------------------------ *)
-  Lemma wp_copyout_sconf
-      (γa : gname) (mm : regfile)
-      (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
-      (dqsrc : dfrac)
-      (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string)
-    : wp_copyout_sconf_body ktb γa mm P szv len src_bytes dqsrc K lvl eb p b lks.
-  Proof.
-    cbv beta delta [wp_copyout_sconf_body].
-    intros pcE src ret_tgt HK Hroot Hsza1 Hlenr Hlen64 Hszb Hlvl Hlkbelow.
-    iIntros "Hcg Hcnt #Htext Hpc Hpt #Henv Hsrc Hcont".
-    iEval (rewrite (proc_pt_ptm P (uint szv))) in "Hpt".
-    iDestruct "Hpt" as (Mu) "Hpt".
-    iApply (wp_copyout_sconf_mem γa mm P Mu szv len src_bytes dqsrc K lvl eb p b lks
-              HK Hroot Hsza1 Hlenr Hlen64 Hszb Hlvl Hlkbelow
-              with "Hcg Hcnt Htext Hpc Hpt Henv Hsrc").
-    rewrite /wp_next. iIntros (CIDx) "%Hsx".
-    iSpecialize ("Hcont" $! CIDx with "[]"); [iPureIntro; exact Hsx|].
-    iIntros (mr P' Mu') "Hcg Hcnt Hpc Hpt Hsrc %Hcs %Hext %Hres".
-    iApply ("Hcont" $! mr P' with "Hcg Hcnt Hpc [Hpt] Hsrc [%] [%] [%]").
-    - iApply (proc_ptm_pt with "Hpt").
-    - exact Hcs.
-    - exact Hext.
-    - destruct Hres as [(H0 & _) | (H1 & _)];
-        [ left; exact H0 | right; exact H1 ].
-  Qed.
-
 
 End ProofCopyout.
 

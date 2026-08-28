@@ -31,8 +31,7 @@
    the invariant at [uptd_set P vpn (pte_clear_u w)].  Neither the page set
    nor a single byte's address moves (same ppn, same map domain), so the
    process's IMAGE comes back on the nose -- which is why the contract
-   proved here is the MEMORY-INDEXED one and [wp_uvmclear_sconf] is its
-   ∃-[M] corollary. *)
+   proved here is the MEMORY-INDEXED one. *)
 Set Printing Depth 40.
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
@@ -483,27 +482,6 @@ Section ProofUvmclear.
     - apply HE3peel; [vm_compute; reflexivity | vm_compute; discriminate | vm_compute; discriminate].
     - apply HE3peel; [vm_compute; reflexivity | vm_compute; discriminate | vm_compute; discriminate].
     - apply HE3peel; [vm_compute; reflexivity | vm_compute; discriminate | vm_compute; discriminate].
-  Qed.
-
-  (* THE ∃-[M] COROLLARY, for the caller that says nothing about the bytes
-     (kexec's stack-guard call).  [proc_pt_ptm] holds at EVERY size, so the
-     size the view is taken at is arbitrary here -- 0 is as good as any. *)
-  Lemma wp_uvmclear_sconf (mm : regfile)
-      (P : uptd) (w : mword 64) (K : nat) (b : bool) (p : mword 64)
-    : wp_uvmclear_sconf_body mm P w K b p.
-  Proof.
-    cbv beta delta [wp_uvmclear_sconf_body].
-    intros pcE va vpn ret_tgt HK Hroot Hvab Hum Hperm.
-    iIntros "Hcg #Htext Hpc Hpt Hcont".
-    iEval (rewrite (proc_pt_ptm P 0)) in "Hpt".
-    iDestruct "Hpt" as (M) "Hpt".
-    iApply (wp_uvmclear_mem_sconf mm P 0 M w K b p HK Hroot Hvab Hum Hperm
-              with "Hcg Htext Hpc Hpt").
-    rewrite /wp_next. iIntros (CIDr) "%Hch".
-    iSpecialize ("Hcont" $! CIDr with "[%]"); [exact Hch |].
-    iIntros (mr) "Hcg2 Hpc2 %Hcs Hpt2".
-    iApply ("Hcont" $! mr with "Hcg2 Hpc2 [%] [Hpt2]"); [exact Hcs |].
-    iApply (proc_ptm_pt with "Hpt2").
   Qed.
 
 End ProofUvmclear.

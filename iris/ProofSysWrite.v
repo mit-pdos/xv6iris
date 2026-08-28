@@ -812,13 +812,13 @@ Section ProofSysWrite.
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID21 with "[%]"); [wp_next_chain|].
       (* nothing ran, so the page table is its own extension *)
-      iApply ("Hcont" $! mf (mword_of_int (-1) : mword 64) (pv_upt (us_V U)) (us_M U)
+      iApply ("Hcont" $! mf (mword_of_int (-1) : mword 64) (pv_upt (us_V U))
                 with "[%] [%] [%] [%] Hcg Hcpu Hpc [Hpriv] Hkenv [Henv]").
       { exact Hcsf. }
       { apply uptd_ext_refl. }
       { left. split; [reflexivity | exact Hnone]. }
       { exact Hmfa0. }
-      { rewrite us_upt_id upd_usM_id. iExact "Hpriv". }
+      { rewrite us_upt_id. iExact "Hpriv". }
       { iApply (filewrite_fs_env_out with "Henv"). }
     - (* ================= SUCCESS: the descriptor resolved ============= *)
       iDestruct "Hsucc" as (fd fv) "([%Hr %Hsome] & _ & Hfcell)".
@@ -950,7 +950,7 @@ Section ProofSysWrite.
                 Hfj Hfprocs HS4a0' HS4a2 Hnrange Heb
                 with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv").
       all: try lkbelow.
-      iIntros (CID25 Hs25 mf rv P' M')
+      iIntros (CID25 Hs25 mf rv P')
         "%Hcsf %Hupt %Hrvok %Hrva Hcg Hcpu Hpc Href Hcore Hfout".
       iDestruct ("Hfback" with "Hfout") as "[Henv _]".
       (* SETTLE THE LOAN.  [pv_ofile (upd_upt V P') = pv_ofile V] by [cbn], so
@@ -963,7 +963,7 @@ Section ProofSysWrite.
                    ltac:(apply not_elem_of_empty) Hlkk Hkk Hty
                    with "[Howe] Href Hauth") as "Howe".
       { rewrite (union_empty_r_L {[fd]}). iExact "Howe". }
-      iDestruct (proc_priv_join γf pj pidv (upd_usM (us_upt U P') M') with "[Hcore] [Howe]")
+      iDestruct (proc_priv_join γf pj pidv (us_upt U P') with "[Hcore] [Howe]")
         as "Hpriv".
       { iExact "Hcore". }
       { cbn [upd_upt pv_ofile pv_fdg]. iExact "Howe". }

@@ -700,10 +700,13 @@ Definition wp_writei_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (tot : nat) (bm' : blkmap) (data' : nat -> list (bv 8))
     (dn' dn0' : dinode) (n' : nat)
-    (* the image moves: the copy leaf may fault a page in -- milestone J
-       item 1's ∃-weakened staging *)
-    (wrote : nat -> bv 8) (dist : nat) (dstb : nat -> bv 8) (P' : uptd)
-    (M' : gmap Z (bv 8)),
+    (* THE IMAGE DOES NOT MOVE.  writei only ever READS user memory
+       (either_copyin), and at the lazy view a fault inside the copy backs a
+       page that was already in the view reading 0 -- so the block comes
+       back at the caller's own [us_M U].  Only the DESCRIPTOR grows, which
+       is what the ∃ [P'] and [uptd_ext] are.  (image campaign, tier 3;
+       [SpecEitherCopyin.either_copyin_post] is same-[U].) *)
+    (wrote : nat -> bv 8) (dist : nat) (dstb : nat -> bv 8) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       (* THE ALLOCATOR NEVER UN-MARKS: [used] only grows, across every bmap
          the loop performs. *)
@@ -769,7 +772,7 @@ Definition wp_writei_sconf_body
       (* the source goes back the way it came -- with the kernel arm's
          buffer, or inside the user arm's block *)
       (if user
-       then proc_priv_core pj pidv (upd_usM (us_upt U P') M')
+       then proc_priv_core pj pidv (us_upt U P')
        else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ[ktb] src_bytes i) ∗
             proc_priv_bare pj pidv U) -∗
       bslots 3 -∗
@@ -969,8 +972,9 @@ Definition wp_writei_gen_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (tot : nat) (bm' : blkmap) (data' : nat -> list (bv 8))
     (dn' dn0' : dinode) (n' : nat)
+    (* same-[M]: see the counted form above *)
     (wrote : nat -> bv 8) (dist : nat) (dstb : nat -> bv 8) (P' : uptd)
-    (M' : gmap Z (bv 8)) (Sb' : gset Z),
+    (Sb' : gset Z),
       ⌜callee_saved m mf⌝ -∗
       (* THE ALLOCATOR NEVER UN-MARKS: [used] only grows, across every bmap
          the loop performs. *)
@@ -1047,7 +1051,7 @@ Definition wp_writei_gen_body
       (* the source goes back the way it came -- with the kernel arm's
          buffer, or inside the user arm's block *)
       (if user
-       then proc_priv_core pj pidv (upd_usM (us_upt U P') M')
+       then proc_priv_core pj pidv (us_upt U P')
        else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ[ktb] src_bytes i) ∗
             proc_priv_bare pj pidv U) -∗
       bslots 3 -∗

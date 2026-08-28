@@ -1096,7 +1096,7 @@ Section KexecB3Body.
                     Hblocks [Hphb Hppid] Hprocs Hdevi Hdgeom Hdlock Hbs1").
     all: try lkbelow.
     { iSplitL "Hphb"; [iExact "Hphb" | iExact "Hppid"]. }
-    iIntros (CIDrd Hsrd M2 tot Pr Mrd) "%Hcsrd %Huptr %Htotb %Hret Hcg Hcnt Hextc Hclmc Hpc
+    iIntros (CIDrd Hsrd M2 tot Pr) "%Hcsrd %Huptr %Htotb %Hret Hcg Hcnt Hextc Hclmc Hpc
              Hidev Hmeta Hmap Hblocks [Hphb Hppid] Hbs1".
     iDestruct (inode_map_q_1_of _ _ _ _ eq_refl with "Hmap") as "Hmap".
     iDestruct (inode_blocks_q_1_of _ _ _ _ eq_refl with "Hblocks") as "Hblocks".
@@ -2007,7 +2007,14 @@ Section KexecB3Body.
                 iDestruct (cpu_own_transport CIDrd CIDz7 0%nat eb
                              (proc_addr jp) eb ltac:(wp_next_chain)
                              with "Hcnt") as "Hcnt".
-                iApply (Uvmalloc.wp_uvmalloc_sconf fsc_kalloc Y P xp (K - 68)%nat eb
+                (* the ∃-weakened tier holds at every size; open it at
+                   exactly the size uvmalloc's own [oldsz] argument reads
+                   (= [szv], the loop invariant's index), so the [_mem]
+                   contract's premise closes without a rewrite. *)
+                iEval (rewrite (proc_pt_ptm P (uint (Y !!! Regidx Ra1)))) in "Hpt".
+                iDestruct "Hpt" as (Mb) "Hpt".
+                iApply (Uvmalloc.wp_uvmalloc_mem_sconf fsc_kalloc Y P Mb xp
+                          (K - 68)%nat eb
                           (proc_addr jp) eb ∅ ltac:(lia) HYtp HYa0 HYa3
                           ltac:(rewrite /xp; apply f2p_range)
                           ltac:(destruct (f2p_cases (U15 !!! Regidx Ra0))
@@ -2078,14 +2085,25 @@ Section KexecB3Body.
                                um_covered szv P4.(ud_um))⌝ ∗
                            proc_pt_any P4)%I
                   with "[Hpost]" as "Hstep".
-                { iDestruct "Hpost" as "[[%Hz Hpt] | (%P4 & %Hext & %Hdom &
-                                                      %Hleaf & %Harm & Hpt)]".
-                  - iExists P. iSplitR; [| iExact "Hpt"]. iPureIntro.
+                { iDestruct "Hpost" as "[[%Hz Hpt] | (%P4 & %rsz & %Hext &
+                                                      %Hdom & %Hleaf & %Harm &
+                                                      %Hmr & Hpt)]".
+                  - (* out of memory: the [_mem] failure arm gave back the
+                       same image it was handed; forget it again -- this
+                       call site still hands its result back existentially. *)
+                    iDestruct (proc_ptm_pt with "Hpt") as "Hpt".
+                    iExists P. iSplitR; [| iExact "Hpt"]. iPureIntro.
                     split_and!; [reflexivity | reflexivity | | ].
                     + intro Hne. exfalso. apply Hne. rewrite Hz.
                       vm_compute. reflexivity.
                     + intros _. split; [exact Hbelow | exact Hcov].
-                  - iDestruct (proc_pt_any_wf_get with "Hpt") as %Hwf4.
+                  - (* the table grew: the [_mem] arm named the new size as
+                       [rsz], with [mr]'s a0 pinned to it separately; fold
+                       that back so [Harm] reads exactly at [M4]'s a0, as
+                       every fact below expects. *)
+                    subst rsz.
+                    iDestruct (proc_ptm_pt with "Hpt") as "Hpt".
+                    iDestruct (proc_pt_any_wf_get with "Hpt") as %Hwf4.
                     rewrite HYa1 HYa2 !uint_unsigned in Harm.
                     pose proof (kxc_grow_inv P P4 szv nsz (M4 !!! Regidx Ra0)
                                   Hwf Hwf4 Hbelow Hcov Hext

@@ -229,6 +229,14 @@ Proof.
   rewrite Hhm. lia.
 Qed.
 
+(* the [c.addi s3,s3,1] immediate, as the literal the cursor arithmetic
+   wants: [StackBytes.pa_add_S] is stated at a bare [mword_of_int 1], so the
+   encoded immediate has to be brought to exactly that form. *)
+Lemma pr_addi1_imm :
+  sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))
+  = (mword_of_int 1 : mword 64).
+Proof. apply bv_eq; vm_compute; reflexivity. Qed.
+
 (* ---- the [c.addiw rd,rd,1] increments ---- *)
 
 (* the loop counter [i]: [s3] stays the literal [i] *)
@@ -456,6 +464,28 @@ Section ProofPiperead.
      disappears once both are left inline.  Per the file's fallback rule,
      both are left as their original inline [pose]/[iAssert] here. *)
 
+  (* THE ACCUMULATED WINDOW, as a pure side condition on the image the
+     block travels at.  piperead's copy loop writes ONE byte per round at
+     [addr + i], so after [i] rounds the image is the entry image with the
+     run [addr .. addr+i) overwritten by bytes the contract cannot name
+     ([UserPtTree.umem_wrote]).  [pr_win] is what the exits carry: SOME such
+     run, no longer than the requested count.
+
+     THIS IS THE ∃ THAT SURVIVES, AND IT IS A LENGTH PLUS A BYTE FUNCTION,
+     NOT AN IMAGE -- the image itself is pinned by the equation inside
+     [umem_wrote], which is what lets a caller read every untouched byte
+     back. *)
+  Definition pr_win (U : ustate) (Mo : gmap Z (bv 8)) (addrv : mword 64)
+      (n : Z) : Prop :=
+    exists d : nat, (Z.of_nat d <= Z.max 0 n)%Z /\ umem_wrote (us_M U) Mo addrv d.
+
+  Lemma pr_win_0 (U : ustate) (addrv : mword 64) (n : Z) :
+    pr_win U (us_M U) addrv n.
+  Proof.
+    exists 0%nat. split; [rewrite Z.max_le_iff; left; reflexivity |].
+    apply umem_wrote_0.
+  Qed.
+
   Definition pr_epi_body
       (sp0 spr vra vs0 vs1 vs2 vs3 vs4 vs5 vs6 vs7 vs8 : mword 64)
       (m : regfile) (av : nat) (pj : mword 64)
@@ -473,6 +503,7 @@ Section ProofPiperead.
        /\ M !!! Regidx Rs11 = m !!! Regidx Rs11 ⌝ -∗
      ⌜ uptd_ext (pv_upt (us_V U)) P' ⌝ -∗
      ⌜ pipe_rw_ret n rv ⌝ -∗
+     ⌜ pr_win U Mo (m !!! Regidx Ra1) n ⌝ -∗
      sie_cap_gpr KT1 M (av - 12)%nat true pj -∗
      pc_is (mword_of_int (KernelSyms.piperead + 0xe8) : mword 64) -∗
      cpu_own 0%nat true pj true lks -∗
@@ -535,6 +566,7 @@ Section ProofPiperead.
        /\ M !!! Regidx Rs11 = m !!! Regidx Rs11 ⌝ -∗
      ⌜ uptd_ext (pv_upt (us_V U)) P' ⌝ -∗
      ⌜ pipe_rw_ret n rv ⌝ -∗
+     ⌜ pr_win U Mo (m !!! Regidx Ra1) n ⌝ -∗
      sie_cap_gpr KT1 M (av - 12)%nat true pj -∗
      pc_is (mword_of_int (KernelSyms.piperead + 0xe8) : mword 64) -∗
      cpu_own 0%nat true pj true lks -∗
@@ -578,7 +610,7 @@ Section ProofPiperead.
     : wp_piperead_sconf_body γa γf γs j γlp γl γp w q m av eb pid U n b lks.
   Proof.
     cbv beta delta [wp_piperead_sconf_body].
-    intros pcE pj pi ret_tgt Hj Hjl Hlen Ha2 Hnrng Hav Heb Hbelow. subst eb.
+    intros pcE pj pi addr ret_tgt Hj Hjl Hlen Ha2 Hnrng Hav Heb Hbelow. subst eb.
     
     (* piperead's own cone bottoms out at "pipe" (7); killed/sleep_prepare/
        sleep/wakeup all sit at "proc" (11), strictly higher, so this ONE
@@ -777,7 +809,12 @@ Section ProofPiperead.
                  m av pj γp w q pid U n CIDe lks) : iProp Σ)).
     iAssert EPIP with "[Hcont]" as "EPI".
     { rewrite /EPIP.
-      iIntros (CIDe Hse M P' Mo rv) "%Hrg %Hext %Hret Hcg Hpc Hown Href Hpriv Hg1 Hg2 Hg3 Hg4 Hg5 Hg6 Hg7 Hg8 Hg9 Hg10 Hg11 Hg12".
+      iIntros (CIDe Hse M P' Mo rv) "%Hrg %Hext %Hret %Hwin Hcg Hpc Hown Href Hpriv Hg1 Hg2 Hg3 Hg4 Hg5 Hg6 Hg7 Hg8 Hg9 Hg10 Hg11 Hg12".
+      (* THE WINDOW, SPELLED AS THE CONTRACT SPELLS IT: [pr_win] is the
+         predicate form of the post's [∃ d bs]; opening it here is where the
+         image binder [Mo] disappears from the statement handed to the
+         caller. *)
+      destruct Hwin as (dw & Hdwle & bsw & Hmoeq). subst Mo.
       destruct Hrg as (Hcsp & Hrv & HMs6 & HMs7 & HMs8 & HMs9 & HMs10 & HMs11).
       (* 0xe8 c.mv a0,s4 *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.piperead + 0xe8)) Ra0 Rs4
@@ -956,7 +993,7 @@ Section ProofPiperead.
       iEval (rewrite Hrafin) in "Hpc".
       clear Hrafin.
       iSpecialize ("Hcont" $! CIDp18 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! F8 P' Mo with "[%] [%] [%] Hcg Hown Hpc Href Hpriv").
+      iApply ("Hcont" $! F8 P' dw bsw with "[%] [%] [%] [%] Hcg Hown Hpc Href Hpriv").
       { unfold callee_saved. split_and!.
         - exact HF8sp.
         - rewrite /F8 upd_ne; [| reg_neq]. rewrite /F7 upd_ne; [| reg_neq].
@@ -993,6 +1030,7 @@ Section ProofPiperead.
                      ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq)).
           exact HMs11. }
       { exact Hext. }
+      { exact Hdwle. }
       { rewrite HF8a0. exact Hret. } }
     (* ============ 0x10: c.addi4spn s0,sp,96 ============ *)
     iApply (wp_caddi4spn_s_sconf (mword_of_int (KernelSyms.piperead + 0x10)) (Cregidx (mword_of_int 0))
@@ -1296,13 +1334,14 @@ Section ProofPiperead.
     iAssert ((EPIC ∧ CPP)%I) with "[EPI Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7]" as "EXITS".
     { iSplit.
       { rewrite /EPIC. iEval (rewrite /EPIP) in "EPI".
-        iIntros (CIDx Hsx M P' Mo rv) "%Hrg %Hext %Hret Hcg Hpc Hown Href Hpriv Hz8 Hz9 Hz10 Hz11 Hz12".
+        iIntros (CIDx Hsx M P' Mo rv) "%Hrg %Hext %Hret %Hwin Hcg Hpc Hown Href Hpriv Hz8 Hz9 Hz10 Hz11 Hz12".
         iSpecialize ("EPI" $! CIDx with "[%]"); [wp_next_chain|].
-        iApply ("EPI" $! M P' Mo rv with "[%] [%] [%] Hcg Hpc Hown Href Hpriv
+        iApply ("EPI" $! M P' Mo rv with "[%] [%] [%] [%] Hcg Hpc Hown Href Hpriv
                   Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hz8 Hz9 Hz10 Hz11 Hz12").
         { exact Hrg. }
         { exact Hext. }
-        { exact Hret. } }
+        { exact Hret. }
+        { exact Hwin. } }
       rewrite /CPP.
       iIntros (CIDc Hsc M) "%Hrg Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hc8 Hc9 Hc10 Hq11 Hq12".
       destruct Hrg as (HMcsp & HMs0 & HMs1 & HMs2 & HMs4 & HMs5 & HMs9 & HMs10 & HMs11).
@@ -1412,6 +1451,7 @@ Section ProofPiperead.
             /\ M2 !!! Regidx Rs11 = m !!! Regidx Rs11 ⌝ -∗
           ⌜ uptd_ext (pv_upt (us_V U)) P' ⌝ -∗
           ⌜ pipe_rw_ret n rv ⌝ -∗
+          ⌜ pr_win U Mo addrv n ⌝ -∗
           sie_cap_gpr KT1 M2 (trap_res true + (av - 12))%nat false pj -∗
           pc_is (mword_of_int (KernelSyms.piperead + 0xd4) : mword 64) -∗
           cpu_own 1%nat true pj false ({["pipe"]} ∪ lks) -∗
@@ -1424,7 +1464,7 @@ Section ProofPiperead.
           WP (Loop : expr riscv_lang))%I : iProp Σ)).
       iAssert WXP with "[EPI Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hc8 Hc9 Hc10 Hq12 Hchback]" as "HWX".
       { rewrite /WXP. iEval (rewrite /EPIP) in "EPI".
-        iIntros (M2 P' Mo rv) "%Hxg %Hxext %Hxret Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hchx".
+        iIntros (M2 P' Mo rv) "%Hxg %Hxext %Hxret %Hxwin Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hchx".
         destruct Hxg as (HXcsp & HXs1 & HXs3 & HXs9 & HXs10 & HXs11).
         (* 0xd4 addi a0,s1,540 *)
         iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.piperead + 0xd4)) Ra0 Rs1 (mword_of_int 540 : mword 12)
@@ -1586,7 +1626,7 @@ Section ProofPiperead.
         iSpecialize ("EPI" $! CIDp29 with "[%]"); [wp_next_chain|].
         iEval (rewrite Hlkempty) in "EPI".
         iEval (rewrite Hlkempty locks_union_empty locks_self_del) in "Hown".
-        iApply ("EPI" $! X7 P' Mo rv with "[%] [%] [%] Hcg Hpc Hown Href Hpriv
+        iApply ("EPI" $! X7 P' Mo rv with "[%] [%] [%] [%] Hcg Hpc Hown Href Hpriv
                   Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 [Hc8] [Hc9] [Hc10] [Hc11] Hq12").
         { split_and!.
           - rewrite (HthrX7 csp_rs1 ltac:(vm_compute; reflexivity) ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq)).
@@ -1605,6 +1645,7 @@ Section ProofPiperead.
             exact HXs11. }
         { exact Hxext. }
         { exact Hxret. }
+        { exact Hxwin. }
         { by iExists vs6. }
         { by iExists vs7. }
         { by iExists vs8. }
@@ -1631,10 +1672,11 @@ Section ProofPiperead.
         iAssert (∃ b : bv 8, chaddr ↦ₘ[KT1] b)%I with "[Hch]" as "Hchx"; [by iExists chb0|].
         iEval (rewrite /WXP) in "HWX".
         iApply ("HWX" $! G3 (pv_upt (us_V U)) (us_M U) (mword_of_int 0 : mword 64)
-                  with "[%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hchx").
+                  with "[%] [%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hchx").
         { split_and!; try assumption. }
         { apply uptd_ext_refl. }
-        { apply pr_ret_cnt. split; [lia | apply Z.le_max_l]. } }
+        { apply pr_ret_cnt. split; [lia | apply Z.le_max_l]. }
+        { apply pr_win_0. } }
       (* ---- n > 0: run the bounded copy loop ---- *)
       assert (Hnpos : (0 < n)%Z).
       { rewrite Z.geb_leb in Hbz. apply Z.leb_gt in Hbz. lia. }
@@ -1669,6 +1711,13 @@ Section ProofPiperead.
             /\ M3 !!! Regidx Rs10 = m !!! Regidx Rs10
             /\ M3 !!! Regidx Rs11 = m !!! Regidx Rs11 ⌝ -∗
           ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
+          (* THE LOOP'S TWO WINDOW FACTS.  The cursor IS the entry address
+             advanced by the round count -- that is the [c.addi s3,s3,1] at
+             +0xce, and stating it is what lets the round's copyout be
+             composed onto the run already written.  [Mc] is then the entry
+             image with exactly that run overwritten. *)
+          ⌜ cur = pa_add addrv i ⌝ -∗
+          ⌜ umem_wrote (us_M U) Mc addrv i ⌝ -∗
           WXP -∗
           sie_cap_gpr KT1 M3 (trap_res true + (av - 12))%nat false pj -∗
           pc_is (mword_of_int (KernelSyms.piperead + 0x92) : mword 64) -∗
@@ -1690,9 +1739,9 @@ Section ProofPiperead.
           chaddr ↦ₘ[KT1] chb -∗
           WP (Loop : expr riscv_lang))%I with "[]" as "CLOOP".
       { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
-        { iIntros (i cur M3 P' Mc chb) "%Hfu %Hi %Hrg3 %Hex3 HWX Hcg Hpc Hown Hpay Hlocked Hres Href Hszc Hptc Hpt Hpback Hch".
+        { iIntros (i cur M3 P' Mc chb) "%Hfu %Hi %Hrg3 %Hex3 %Hcur %Hwr3 HWX Hcg Hpc Hown Hpay Hlocked Hres Href Hszc Hptc Hpt Hpback Hch".
           exfalso. lia. }
-        iIntros (i cur M3 P' Mc chb) "%Hfu %Hi %Hrg3 %Hex3 HWX Hcg Hpc Hown Hpay Hlocked Hres Href Hszc Hptc Hpt Hpback Hch".
+        iIntros (i cur M3 P' Mc chb) "%Hfu %Hi %Hrg3 %Hex3 %Hcur %Hwr3 HWX Hcg Hpc Hown Hpay Hlocked Hres Href Hszc Hptc Hpt Hpback Hch".
         destruct Hrg3 as (H3csp & H3s0 & H3s1 & H3s2 & H3s3 & H3s4 & H3s5 & H3s6 & H3s7 & H3s8 & H3s9 & H3s10 & H3s11).
         assert (HZi : (0 <= Z.of_nat i < n)%Z) by lia.
         assert (Hroot : ud_root P' = ud_root (pv_upt (us_V U)))
@@ -1758,7 +1807,7 @@ Section ProofPiperead.
           iAssert (∃ b : bv 8, chaddr ↦ₘ[KT1] b)%I with "[Hch]" as "Hchx"; [by iExists chb|].
           iEval (rewrite /WXP) in "HWX".
           iApply ("HWX" $! K2 P' Mc (mword_of_int (Z.of_nat i))
-                    with "[%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hchx").
+                    with "[%] [%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hchx").
           { split_and!.
             - rewrite (HthrK2 csp_rs1 ltac:(vm_compute; reflexivity)). exact H3csp.
             - rewrite (HthrK2 Rs1 ltac:(vm_compute; reflexivity)). exact H3s1.
@@ -1767,7 +1816,10 @@ Section ProofPiperead.
             - rewrite (HthrK2 Rs10 ltac:(vm_compute; reflexivity)). exact H3s10.
             - rewrite (HthrK2 Rs11 ltac:(vm_compute; reflexivity)). exact H3s11. }
           { exact (uptd_ext_sz_ext _ _ _ Hex3). }
-          { apply pr_ret_cnt. rewrite Z.max_r; [| lia]. lia. } }
+          { apply pr_ret_cnt. rewrite Z.max_r; [| lia]. lia. }
+          { (* nothing was copied on this arm, so the run is the [i] bytes
+               the earlier rounds wrote *)
+            exists i. split; [rewrite Z.max_r; lia | exact Hwr3]. } }
         (* the pipe is NOT empty: nr <> nw *)
         assert (Hne : nr <> nw) by (apply (pr_sext_neq nw nr); exact Hemp).
         iApply (wp_beq_fall_s_sconf (mword_of_int (KernelSyms.piperead + 0x9a)) (mword_of_int 58 : mword 13)
@@ -1978,11 +2030,19 @@ Section ProofPiperead.
            it keeps [psz] in s11 across its callees, so s11 is saved. *)
         assert (HK52 : (52 <= trap_res true + (av - 12))%nat)
           by (assert (trap_res true = 90%nat) as -> by reflexivity; lia).
-        (* copyout's contract is at the ∃-weakened tier, so the round's named
-           image goes in anonymously and a FRESH one comes back out: the write
-           into the user buffer is exactly what moves it. *)
-        iDestruct (proc_ptm_pt with "Hpt") as "Hpt".
-        iApply (Copyout.wp_copyout_sconf KT1 γa K10 P' (pv_sz (us_V U)) 1%nat
+        (* THE ROUND'S DESTINATION, brought back to the entry address: the
+           window equation below is keyed on [addrv], not on the cursor. *)
+        assert (HK10a2 : K10 !!! Regidx Ra2 = cur).
+        { rewrite /K10 upd_ne; [| reg_neq]. rewrite /K9 upd_ne; [| reg_neq].
+          rewrite /K8b upd_ne; [| reg_neq]. rewrite /K8 upd_eq.
+          unfold regval_into_reg.
+          rewrite (_ : K7 !!! Regidx Rs3 = cur); [apply add_vec_zero_l |].
+          rewrite /K7 upd_ne; [| reg_neq]. rewrite /K6 upd_ne; [| reg_neq].
+          rewrite (HthrK5 Rs3 ltac:(vm_compute; reflexivity)). exact H3s2. }
+        (* copyout's MEMORY-INDEXED contract NAMES the window it writes, so
+           the round's image stays named: [copyout_wrote] below is what the
+           loop composes onto the run written so far. *)
+        iApply (Copyout.wp_copyout_sconf_mem KT1 γa K10 P' Mc (pv_sz (us_V U)) 1%nat
                   (fun _ => trunc8 (K5 !!! Regidx Ra5)) (DfracOwn 1)
                   (trap_res true + (av - 12))%nat 1%nat true pj
                   false ({["pipe"]} ∪ lks)
@@ -1990,8 +2050,38 @@ Section ProofPiperead.
                   with "Hcg Hown Htext Hpc Hpt Henv [Hch]").
         all: try lkbelow.
         { rgall. iEval (rewrite HK10a3). iApply pr_buf1_intro. iExact "Hch". }
-        iApply wp_next_off_intro. iIntros (mrc P'') "Hcg Hown Hpc Hpt Hbuf %Hcsr %Hext2 %Hret". rgall.
-        iDestruct (proc_pt_any_ptm with "Hpt") as (Mc') "Hpt".
+        iApply wp_next_off_intro. iIntros (mrc P'' Mc') "Hcg Hown Hpc Hpt Hbuf %Hcsr %Hext2 %Hwrote". rgall.
+        rewrite HK10a2 in Hwrote.
+        (* THE ROUND'S WINDOW, COMPOSED ONTO THE RUN THE EARLIER ROUNDS
+           WROTE.  The chunk starts exactly where the run stops
+           ([Hcur]), so [umem_wrote_app] applies with no no-wrap side
+           condition.  Two readings are needed: on the SUCCESS arm the run
+           grows by exactly one byte (the loop goes round at [S i]); on the
+           failure arm it grows by AT MOST one, which is all the exits ask. *)
+        assert (Hret : (mrc !!! Regidx Ra0 : mword 64) = (mword_of_int 0 : mword 64)
+                       \/ (mrc !!! Regidx Ra0 : mword 64)
+                          = (mword_of_int (-1) : mword 64)).
+        { destruct Hwrote as [[Hr _] | [Hr _]]; [by left | by right]. }
+        assert (Hwsucc : (mrc !!! Regidx Ra0 : mword 64) = (mword_of_int 0 : mword 64) ->
+                         umem_wrote (us_M U) Mc' addrv (S i)).
+        { intros H0. rewrite <- Nat.add_1_r.
+          destruct Hwrote as [[_ Hm] | [Hr _]].
+          - apply (umem_wrote_app (us_M U) Mc Mc' addrv i 1
+                     (fun _ => trunc8 (K5 !!! Regidx Ra5)) Hwr3).
+            rewrite Hm Hcur. reflexivity.
+          - exfalso. rewrite Hr in H0.
+            apply (f_equal bv_unsigned) in H0. by vm_compute in H0. }
+        assert (Hwany : exists d : nat, (d <= S i)%nat
+                        /\ umem_wrote (us_M U) Mc' addrv d).
+        { destruct Hwrote as [[_ Hm] | [_ (dd & Hdd & Hm)]].
+          - exists (S i). split; [lia |]. rewrite <- Nat.add_1_r.
+            apply (umem_wrote_app (us_M U) Mc Mc' addrv i 1
+                     (fun _ => trunc8 (K5 !!! Regidx Ra5)) Hwr3).
+            rewrite Hm Hcur. reflexivity.
+          - exists (i + dd)%nat. split; [lia |].
+            apply (umem_wrote_app (us_M U) Mc Mc' addrv i dd
+                     (fun _ => trunc8 (K5 !!! Regidx Ra5)) Hwr3).
+            rewrite Hm Hcur. reflexivity. }
         iEval (rewrite HK10a3) in "Hbuf".
         iDestruct (pr_buf1_elim with "Hbuf") as "Hch".
         iEval (rewrite Hroot) in "Hptc".
@@ -2159,7 +2249,7 @@ Section ProofPiperead.
               [by iExists (trunc8 (K5 !!! Regidx Ra5))|].
             iEval (rewrite /WXP) in "HWX".
             iApply ("HWX" $! D4 P'' Mc' (mword_of_int (Z.of_nat (S i)))
-                      with "[%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hchx").
+                      with "[%] [%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hchx").
             { split_and!.
               - rewrite (HthrD csp_rs1 ltac:(vm_compute; reflexivity) ltac:(reg_neq) ltac:(reg_neq)). exact H3csp.
               - rewrite (HthrD Rs1 ltac:(vm_compute; reflexivity) ltac:(reg_neq) ltac:(reg_neq)). exact H3s1.
@@ -2169,6 +2259,7 @@ Section ProofPiperead.
               - rewrite (HthrD Rs11 ltac:(vm_compute; reflexivity) ltac:(reg_neq) ltac:(reg_neq)). exact H3s11. }
             { exact (uptd_ext_sz_ext _ _ _ Hext'). }
             { apply pr_ret_cnt. rewrite Z.max_r; [| lia]. lia. }
+            { exists (S i). split; [rewrite Z.max_r; lia | exact (Hwsucc Hr0)]. }
           - (* i+1 < n: the back edge *)
             assert (HSilt : (S i < Nn)%nat) by lia.
             assert (HZs : (Z.of_nat (S i) < n)%Z) by lia.
@@ -2186,7 +2277,7 @@ Section ProofPiperead.
             clear Hbk.
             iApply ("IHf" $! (S i) (add_vec cur (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))
                       D4 P'' Mc' (trunc8 (K5 !!! Regidx Ra5))
-                      with "[%] [%] [%] [%] HWX Hcg Hpc Hown Hpay Hlocked Hres Href Hszc Hptc Hpt Hpback Hch").
+                      with "[%] [%] [%] [%] [%] [%] HWX Hcg Hpc Hown Hpay Hlocked Hres Href Hszc Hptc Hpt Hpback Hch").
             { lia. }
             { exact HSilt. }
             { split_and!.
@@ -2203,7 +2294,12 @@ Section ProofPiperead.
               - rewrite (HthrD Rs9 ltac:(vm_compute; reflexivity) ltac:(reg_neq) ltac:(reg_neq)). exact H3s9.
               - rewrite (HthrD Rs10 ltac:(vm_compute; reflexivity) ltac:(reg_neq) ltac:(reg_neq)). exact H3s10.
               - rewrite (HthrD Rs11 ltac:(vm_compute; reflexivity) ltac:(reg_neq) ltac:(reg_neq)). exact H3s11. }
-            { exact Hext'. } }
+            { exact Hext'. }
+            { (* THE CURSOR BUMP IS THE RUN'S: [addr + i] + 1 = [addr + S i],
+                 [StackBytes.pa_add_S] with the [c.addi] immediate reduced
+                 to the literal 1. *)
+              rewrite Hcur pr_addi1_imm. apply pa_add_S. }
+            { exact (Hwsucc Hr0). } }
         (* copyout FAILED: break, returning -1 only if nothing was copied *)
         iApply (wp_beq_taken_s_sconf (mword_of_int (KernelSyms.piperead + 0xbe)) (mword_of_int 62 : mword 13)
                   Rs6 Ra0 mrc (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(nz)
@@ -2260,7 +2356,7 @@ Section ProofPiperead.
           iEval (rewrite Hjfe) in "Hpc".
           clear Hjfe.
           iApply ("HWX" $! E1 P'' Mc' (mword_of_int (-1))
-                    with "[%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hchx").
+                    with "[%] [%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hchx").
           { split_and!.
             - rewrite /E1 upd_ne; [| reg_neq].
               rewrite (HthrMr csp_rs1 ltac:(vm_compute; reflexivity)). exact H3csp.
@@ -2274,7 +2370,9 @@ Section ProofPiperead.
             - rewrite /E1 upd_ne; [| reg_neq].
               rewrite (HthrMr Rs11 ltac:(vm_compute; reflexivity)). exact H3s11. }
           { exact (uptd_ext_sz_ext _ _ _ Hext'). }
-          { apply pr_ret_neg1. } }
+          { apply pr_ret_neg1. }
+          { destruct Hwany as (dd & Hdd & Hw). exists dd.
+            split; [rewrite Z.max_r; lia | exact Hw]. } }
         (* something WAS copied: keep the partial count *)
         iApply (wp_bnez_x0_taken_s_sconf (mword_of_int (KernelSyms.piperead + 0xfc)) (mword_of_int 8152 : mword 13)
                   Rs4 mrc (trap_res true + (av - 12))%nat false ltac:(nz)
@@ -2288,7 +2386,7 @@ Section ProofPiperead.
         iEval (rewrite Hjeba) in "Hpc".
         clear Hjeba.
         iApply ("HWX" $! mrc P'' Mc' (mword_of_int (Z.of_nat i))
-                  with "[%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hchx").
+                  with "[%] [%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hchx").
         { split_and!.
           - rewrite (HthrMr csp_rs1 ltac:(vm_compute; reflexivity)). exact H3csp.
           - rewrite (HthrMr Rs1 ltac:(vm_compute; reflexivity)). exact H3s1.
@@ -2297,14 +2395,19 @@ Section ProofPiperead.
           - rewrite (HthrMr Rs10 ltac:(vm_compute; reflexivity)). exact H3s10.
           - rewrite (HthrMr Rs11 ltac:(vm_compute; reflexivity)). exact H3s11. }
         { exact (uptd_ext_sz_ext _ _ _ Hext'). }
-        { apply pr_ret_cnt. rewrite Z.max_r; [| lia]. lia. } }
-      (* enter the copy loop at i = 0 *)
+        { apply pr_ret_cnt. rewrite Z.max_r; [| lia]. lia. }
+        { destruct Hwany as (dd & Hdd & Hw). exists dd.
+          split; [rewrite Z.max_r; lia | exact Hw]. } }
+      (* enter the copy loop at i = 0: the cursor IS the entry address and
+         nothing has been written yet *)
       iApply ("CLOOP" $! Nn 0%nat addrv G3 (pv_upt (us_V U)) (us_M U) chb0
-                with "[%] [%] [%] [%] HWX Hcg Hpc Hown Hpay Hlocked Hres Href Hszc Hptc Hpt Hpback Hch").
+                with "[%] [%] [%] [%] [%] [%] HWX Hcg Hpc Hown Hpay Hlocked Hres Href Hszc Hptc Hpt Hpback Hch").
       { lia. }
       { lia. }
       { split_and!; try assumption. }
-      { apply uptd_ext_sz_refl. } }
+      { apply uptd_ext_sz_refl. }
+      { symmetry. apply pa_add_0. }
+      { apply umem_wrote_0. } }
     (* ================= the WAIT LOOP (iLöb) from +0x34 ================= *)
     iAssert (wp_next (CID0 := CID) true pj (fun (CIDl : CpuId) =>
       pr_wloop_body W0 av pj γl pi γp w q pid U sp0 EPIC CPP CIDl lks))%I
@@ -2593,7 +2696,7 @@ Section ProofPiperead.
         iEval (rewrite Hlkempty locks_union_empty locks_self_del -Hlkempty) in "Hown".
         iSpecialize ("HEPI" $! CIDp31 with "[%]"); [wp_next_chain|].
         iApply ("HEPI" $! N3 (pv_upt (us_V U)) (us_M U) (mword_of_int (-1))
-                  with "[%] [%] [%] Hcg Hpc Hown Href Hpriv
+                  with "[%] [%] [%] [%] Hcg Hpc Hown Href Hpriv
                        Hq8 Hq9 Hq10 Hq11 Hq12").
         { split_and!.
           - rewrite /N3 upd_ne; [| reg_neq].
@@ -2612,7 +2715,9 @@ Section ProofPiperead.
           - rewrite /N3 upd_ne; [| reg_neq].
             rewrite (callee_saved_lookup HcsMmrl Rs11 ltac:(vm_compute; reflexivity)). exact HMs11. }
         { apply uptd_ext_refl. }
-        { apply pr_ret_neg1. } }
+        { apply pr_ret_neg1. }
+        { (* the killed arm never reaches the copy phase *)
+          apply pr_win_0. } }
       (* ==== NOT killed: sleep on &pi->nread ==== *)
       iApply (wp_cbnez_fall_s_sconf (mword_of_int (KernelSyms.piperead + 0x40)) (mword_of_int 26 : mword 8)
                 (Cregidx (mword_of_int 2)) Ra0 mk (trap_res true + (av - 12))%nat false

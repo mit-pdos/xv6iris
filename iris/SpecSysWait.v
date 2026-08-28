@@ -42,13 +42,21 @@
 
    WHAT IT SAYS ABOUT THE RESULT is kwait's verbatim -- SOME sign-extended
    [int] -- and for kwait's reason: nothing in the tree ties a pid to a
-   slot.  [v0] does not appear in the postcondition either: it is the
-   address the exit status is copied to, and copyout's failure arm returns
-   -1 just as a missing child does, so no resource distinguishes them.
+   slot.  [v0] DOES appear in the postcondition, as the base of the write
+   window below; copyout's failure arm still returns -1 just as a missing
+   child does, so no resource distinguishes them.
 
    THE PRIVATE BLOCK GOES IN AND COMES BACK AT AN EXTENDED DESCRIPTOR
    ([uptd_ext_sz]), which is kwait's copyout, unchanged: argaddr touches no
-   user page. *)
+   user page.
+
+   WHAT STAYS EXISTENTIAL IS A LENGTH AND THE BYTES, NOT AN IMAGE, again
+   kwait's verbatim: the post carries [umem_wr (us_M U) v0 d bs] for some
+   [d <= 4] and some [bs], based at [v0] -- the syscall's own argument 0,
+   the address argaddr fetched and kwait's [addr].  [v0 = 0], the no-zombie-
+   child arm, and copyout's own failure prefix all move nothing ([d = 0],
+   and [umem_wr M v0 0 bs = M] on the nose).  A caller reads its own
+   untouched bytes back with [UserPtTree.umem_wr_lookup_out]. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -107,16 +115,18 @@ Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
   kalloc_env γa None -∗
   proc_priv γf pj pid U -∗
   wp_next b pj (fun (CID : CpuId) =>
-  (* the image moves: the copy leaves may fault a page in, and copyout
-     writes user memory -- milestone J item 1's ∃-weakened staging *)
-    ∀ (mf : regfile) (P' : uptd) (rv : mword 32) (M' : gmap Z (bv 8)),
+  (* kwait's window, verbatim: the only write is copyout's four-byte
+     [xstate] at [v0], the syscall's own argument 0, and only when
+     [v0 <> 0].  See SpecKwait.v's header. *)
+    ∀ (mf : regfile) (P' : uptd) (rv : mword 32) (d : nat) (bs : nat -> bv 8),
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 rv ⌝ -∗
       ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
+      ⌜ (d <= 4)%nat ⌝ -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf pj pid (upd_usM (us_upt U P') M') -∗
+      proc_priv γf pj pid (upd_usM (us_upt U P') (umem_wr (us_M U) v0 d bs)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

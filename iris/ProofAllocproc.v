@@ -2014,10 +2014,10 @@ Section ProofAllocproc.
            re-viewed at [p->sz] before it goes in.  The image is anonymous
            here and that is right: a fresh table maps nothing, so every va
            below the size reads as the 0 the lazy view records, and
-           [ProcPtOwn.proc_pt_at_ptm] is exactly that re-viewing. *)
-        iDestruct (proc_pt_at_forget with "Hptat") as "Hptat".
-        iEval (rewrite (proc_pt_at_ptm _ _ (uint (pv_sz V)))) in "Hptat".
-        iDestruct "Hptat" as (M0) "Hptat".
+           [ProcPtOwn.proc_ptm_at_of_pt_at] is exactly that re-viewing. *)
+        iDestruct (proc_ptm_at_of_pt_at (proc_addr k) (upt_desc (pt_base t) tfp)
+                     (uint (pv_sz V)) ∅ with "Hptat") as "[_ Hptat]".
+        iDestruct "Hptat" as (M0) "[_ Hptat]".
         iDestruct (proc_priv_nocwd_intro γf (proc_addr k) pidn (MkUstate V M0) (upt_desc (pt_base t) tfp) tfws
                      Hszb (um_below_empty (pv_sz V))
                      with "Hpidown Hfields Hptat [Htfpage] Hofiles") as "Hpriv".

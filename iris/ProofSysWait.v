@@ -289,14 +289,20 @@ Section ProofSysWait.
     assert (HB2sp : B2 !!! Regidx csp_rs1 = pa_stk sp0 4).
     { rewrite /B2 upd_ne; [| vm_compute; discriminate].
       rewrite /B1 upd_ne; [| vm_compute; discriminate]. exact HAisp. }
+    (* kwait's own a0 argument -- the address the exit status window is
+       based at -- is exactly [v0]: [B1] set it, and the [ra] insert into
+       [B2] does not touch it. *)
+    assert (HB2a0 : B2 !!! Regidx Ra0 = v0).
+    { rewrite /B2 upd_ne; [| vm_compute; discriminate]. rewrite /B1 upd_eq. reflexivity. }
     (* ===================== kwait(p) ===================== *)
     iDestruct (cpu_own_transport CID8 CID10 0%nat eb pj b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Kwait.wp_kwait_sconf γa γf γw γs j γl B2 (av - 4)%nat eb b pid U lks
               Hj Hgl (sw_Kkw av Hav) Heb
               with "Hcg Hcpu Htext Hpc Hprocs Hlk Henv Hpriv").
     all: try lkbelow.
-    iIntros (CID11 Hk11 Mkw P' rv M') "%Hkw %Hext Hcg Hcpu Hpc Hpriv".
+    iIntros (CID11 Hk11 Mkw P' rv d bs) "%Hkw %Hext %Hdle Hcg Hcpu Hpc Hpriv".
     destruct Hkw as (HcsKw & HKwa0).
+    iEval (rewrite HB2a0) in "Hpriv".
     assert (Hpp1a : ret_pc (B2 !!! Regidx Rra) = mword_of_int (SW + 0x1a))
       by (rewrite HB2ra; pcstep).
     iEval (rewrite Hpp1a) in "Hpc".
@@ -413,13 +419,14 @@ Section ProofSysWait.
       rewrite /M1 upd_ne; [| congruence]. reflexivity. }
     iDestruct (cpu_own_transport CID11 CID15 0%nat eb pj b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iSpecialize ("Hcont" $! CID15 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! E2 P' rv M' with "[%] [%] Hcg Hcpu Hpc Hpriv").
+    iApply ("Hcont" $! E2 P' rv d bs with "[%] [%] [%] Hcg Hcpu Hpc Hpriv").
     { split; [| exact HE2a0].
       unfold callee_saved.
       split; [exact HE2sp|]. split; [exact HE2s0|].
       repeat (split; [apply Hthr; vm_compute; first [reflexivity | discriminate]|]).
       apply Hthr; vm_compute; first [reflexivity | discriminate]. }
     { exact Hext. }
+    { exact Hdle. }
   Qed.
 
 End ProofSysWait.

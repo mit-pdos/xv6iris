@@ -148,28 +148,6 @@ Section SpecEitherCopyout.
      else ⌜r = (mword_of_int 0 : mword 64)⌝ ∗
           [∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ[ktb] src_bytes j)%I.
 
-  (* THE ∃-WEAKENED READING OF THE USER ARM, for a caller whose OWN
-     postcondition still binds a fresh image (readi, consoleread, and the
-     file / pipe / syscall tiers above them).  This is exactly where the
-     precision the contract just gained is thrown away, so every use of it
-     is an entry on the remaining worklist -- it says nothing about
-     copyout, only about how far the conversion has got. *)
-  Lemma either_copyout_post_any (ktb : ktier) (γf : gname) (p : mword 64)
-      (pid : mword 32) (U : ustate) (dst : mword 64) (len : nat)
-      (src_bytes : nat -> bv 8) (r : mword 64) :
-    either_copyout_post ktb true γf p pid U dst len src_bytes r -∗
-    ⌜r = (mword_of_int 0 : mword 64) \/ r = (mword_of_int (-1) : mword 64)⌝ ∗
-    ∃ (P' : uptd) (M' : gmap Z (bv 8)),
-      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ ∗
-      proc_priv_core p pid (upd_usM (us_upt U P') M').
-  Proof.
-    rewrite /either_copyout_post. iIntros "H".
-    iDestruct "H" as (P' d) "(%Hext & %Hran & Hpv)".
-    iSplitR; [iPureIntro; exact (either_copyout_ran_ret len r d Hran) |].
-    iExists P', (umem_wr (us_M U) dst d src_bytes).
-    iSplitR; [iPureIntro; exact Hext |]. iExact "Hpv".
-  Qed.
-
 End SpecEitherCopyout.
 
 (* THE BUFFER CARRIES ITS OWN TIER [ktb], below the hart's regime [KT1].

@@ -1479,7 +1479,8 @@ Section KexecDCommit.
        callees below [proc_pt] speak the ∃-weakened form, and the closer
        ([ProcInv.proc_priv_newspace]) takes the moved image beside the
        moved descriptor -- so it is named here, at the commit. *)
-    iDestruct (proc_pt_any_ptm with "Hpt") as (Mx) "Hpt".
+    iEval (rewrite (proc_pt_ptm P (uint sz1))) in "Hpt".
+    iDestruct "Hpt" as (Mx) "Hpt".
     iSpecialize ("Hprivback" $! P sz1
                    (<[kxc_tf_sp_idx
                       := (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64)]>

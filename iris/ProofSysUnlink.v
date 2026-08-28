@@ -2923,7 +2923,7 @@ Section ProofSysUnlinkBody.
     { rewrite Heb /cpu_claim_ext. done. }
     { iSplitL "Hbuf"; [| iExact "Hpidq"].
       iEval (rewrite HN6a2). iExact "Hbuf". }
-    iIntros (CID7 Hq7 mrd tot P' Mrd)
+    iIntros (CID7 Hq7 mrd tot P')
       "%Hcsrd %Hupt' %Htotle %Harm Hcg Hown _ _ Hpc Hidev Hmeta Hmap Hblocks
        [Hbuf Hpidq] Hbslot".
     iDestruct (inode_map_q_1_of _ _ _ _ eq_refl with "Hmap") as "Hmap".
@@ -4832,7 +4832,7 @@ Section ProofSysUnlinkBody.
     { iSplitL "HbD"; [| iExact "Hpidq"].
       iEval (rewrite HB6a2). iExact "HbD". }
     iIntros (D13 Hd13 mfw tot bm' data' dnW dn0W nw wrote dist dstb Pw
-             Mw Sbw)
+             Sbw)
       "%Hcsw %Hwf' %Hhz' %Haddr' %Hszlt' %Hcov' %Hcapp %Hszp %Hdistle
        %Hdisttot %Hdist0f %Hrng %Hwr %Harm %Hspend %Hsbsub %Hpost16 %Hspendany
        %Hatomic %Hupw Hcg Hown _ _ Hpc Hidevd Hiinumd Hmetad Hmapd Hblocksd
@@ -6466,7 +6466,7 @@ Section ProofSysUnlinkBody.
     { iSplitL "HbD"; [| iExact "Hpidq"].
       iEval (rewrite HB6a2). iExact "HbD". }
     iIntros (D13 Hd13 mfw tot bm' data' dnW dn0W nw wrote dist dstb Pw
-             Mw Sbw)
+             Sbw)
       "%Hcsw %Hwf' %Hhz' %Haddr' %Hszlt' %Hcov' %Hcapp %Hszp %Hdistle
        %Hdisttot %Hdist0f %Hrng %Hwr %Harm %Hspend %Hsbsub %Hpost16 %Hspendany
        %Hatomic %Hupw Hcg Hown _ _ Hpc Hidevd Hiinumd Hmetad Hmapd Hblocksd

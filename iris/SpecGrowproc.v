@@ -93,37 +93,57 @@ Notation growproc_stack := (46%nat) (only parsing).
 (*   [szv] / [P] are the size and descriptor on entry, [szv'] / [P'] the
    ones on exit, and [r] the returned a0.  Four arms, one per path through
    the C; the [P' = P] ones say the table is untouched down to the
-   descriptor RECORD, not merely up to [proc_pt]. *)
-Definition growproc_ok (szv n : mword 64) (P P' : uptd) (szv' r : mword 64) : Prop :=
+   descriptor RECORD, not merely up to [proc_pt].
+
+   THE IMAGE, [M] IN AND [M'] OUT, IS A FUNCTION OF THE SIZE CHANGE ALONE.
+   At the LAZY [proc_ptm] view (ProcDefs.v's "THE MEMORY CONJUNCT IS THE
+   LAZY VIEW": a page the process has not faulted in yet already reads as
+   zero in [M], so no kalloc'd page ever shows through, and vmfault is a
+   noop on [M]) growproc's whole effect on memory is [p->sz] moving:
+   growth exposes more already-zero bytes ([UserPtTree.umem_grow], the same
+   equation [SpecUvmalloc.wp_uvmalloc_mem_sconf] states at [uvmalloc]'s own
+   altitude), a shrink drops the run above [PGROUNDUP(sz+n)]
+   ([UserPtTree.umem_del], [SpecUvmdealloc.wp_uvmdealloc_mem_sconf]'s own
+   equation), and the failed and unchanged arms move nothing.  So each of
+   the four arms below pins [M'] exactly as it already pins [P'] and
+   [szv']. *)
+Definition growproc_ok (szv n : mword 64) (P P' : uptd) (szv' r : mword 64)
+    (M M' : gmap Z (bv 8)) : Prop :=
   (* (1) FAILED -- either the range test or uvmalloc.  Nothing moved: the
      range test runs before any call, and uvmalloc's OOM arm restores the
      descriptor it was handed exactly (SpecUvmalloc.v). *)
-  (r = (mword_of_int (-1) : mword 64) /\ P' = P /\ szv' = szv)
+  (r = (mword_of_int (-1) : mword 64) /\ P' = P /\ szv' = szv /\ M' = M)
   \/
   (* (2) GREW -- n > 0 and the new size fits under TRAPFRAME.  The map
      gained precisely the run [PGROUNDUP(sz) .. sz+n); which pages kalloc
      returned is not determined, so [P'] is pinned by extension + domain,
-     exactly as uvmalloc's own success arm pins it. *)
+     exactly as uvmalloc's own success arm pins it.  The image gained
+     exactly the zeros that became readable at the new size. *)
   (r = (mword_of_int 0 : mword 64) /\ (0 < sint n)%Z /\
    (uint (add_vec szv n) <= uvm_maxsz)%Z /\
    szv' = add_vec szv n /\
    uptd_ext P P' /\
    dom (ud_um P') = dom (ud_um P)
-                    ∪ vpn_run (svpn_of (pgroundup szv)) (uvma_np szv (add_vec szv n)))
+                    ∪ vpn_run (svpn_of (pgroundup szv)) (uvma_np szv (add_vec szv n)) /\
+   M' = umem_grow M (uint szv'))
   \/
   (* (3) UNCHANGED -- n = 0.  The C stores [sz] back over itself. *)
-  (r = (mword_of_int 0 : mword 64) /\ sint n = 0 /\ P' = P /\ szv' = szv)
+  (r = (mword_of_int 0 : mword 64) /\ sint n = 0 /\ P' = P /\ szv' = szv /\ M' = M)
   \/
   (* (4) SHRANK -- n < 0.  The map lost the run above PGROUNDUP(sz+n) and
      the pages went back to kalloc.  The size is [sz + n] unless that
      WRAPPED past [sz], in which case uvmdealloc did nothing and returned
      the old size -- one disjunct, and the only place [n]'s unboundedness
-     shows through. *)
+     shows through.  [uvmd_np] is 0 on the wrap sub-case (its guard is
+     [add_vec szv n < szv], which fails there) and [umem_del M _ 0 = M]
+     definitionally, so the one image equation covers both sub-cases. *)
   (r = (mword_of_int 0 : mword 64) /\ (sint n < 0)%Z /\
    P' = uptd_del_run P (svpn_of (pgroundup (add_vec szv n)))
                        (uvmd_np szv (add_vec szv n)) /\
    ( ((uint (add_vec szv n) < uint szv)%Z /\ szv' = add_vec szv n)
-     \/ ((uint szv <= uint (add_vec szv n))%Z /\ szv' = szv) )).
+     \/ ((uint szv <= uint (add_vec szv n))%Z /\ szv' = szv) ) /\
+   M' = umem_del M (uint (pgroundup (add_vec szv n)))
+                   (4096 * uvmd_np szv (add_vec szv n))).
 
 Definition wp_growproc_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γf : gname)
@@ -140,13 +160,13 @@ Definition wp_growproc_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
   proc_priv γf p pid U -∗
   kalloc_env γa None -∗
   wp_next b p (fun (CID : CpuId) =>
-    (* growproc WRITES user memory (uvmalloc's fresh pages), so the block
-       comes back at a fresh image -- milestone J item 1's ∃-weakened
-       staging; the precise effect is win-2 work. *)
+    (* growproc's whole effect on user memory is [p->sz] moving; see
+       [growproc_ok]'s header for why the lazy view makes this an
+       equation rather than an existential. *)
     ∀ (mf : regfile) (P' : uptd) (szv' : mword 64) (M' : gmap Z (bv 8)),
       ⌜callee_saved m mf⌝ -∗
       ⌜growproc_ok (pv_sz (us_V U)) n (pv_upt (us_V U)) P' szv'
-         (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
+         (mf !!! Regidx (mword_of_int 10 : mword 5)) (us_M U) M'⌝ -∗
       sie_cap_gpr KT1 mf av b p -∗
       cpu_own 0%nat eb p b lks -∗
       pc_is ret_tgt -∗

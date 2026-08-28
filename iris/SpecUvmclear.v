@@ -11,14 +11,14 @@
        *pte &= ~PTE_U;
      }
 
-   STATED AT THE [proc_ptm] ALTITUDE, with the [proc_pt] one below it as a
-   corollary.  uvmclear is the one function that
+   STATED AT THE [proc_ptm] ALTITUDE.  uvmclear is the one function that
    changes a user leaf's CLASSIFICATION without changing what the table
    maps: the page stays mapped, stays owned, keeps its ppn -- it just stops
-   being reachable from user mode.  So the postcondition is [proc_pt] at the
-   map with that one entry's U bit cleared, and NOTHING else moves: same
-   root, same trapframe, same page set ([um_ppns] is unchanged, which is why
-   the ownership conjunct is literally the same resource).
+   being reachable from user mode.  So the postcondition is [proc_ptm] at
+   the same map, size and image with that one entry's U bit cleared, and
+   NOTHING else moves: same root, same trapframe, same page set ([um_ppns]
+   is unchanged, which is why the ownership conjunct is literally the same
+   resource).
 
    THE PANIC ARM IS DEAD, not discharged by a panic credential.  The vpn is mapped
    (a precondition), so the no-alloc walk reaches level 0 and returns a slot
@@ -69,35 +69,6 @@ From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
-
-Definition wp_uvmclear_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile)
-    (P : uptd) (w : mword 64) (K : nat) (b : bool) (p : mword 64) :=
-  let pcE : mword 64 := mword_of_int KernelSyms.uvmclear in
-  let va := mm !!! Regidx (mword_of_int 11) in
-  let vpn := svpn_of va in
-  let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
-  (* 2-slot frame + the no-alloc walk's 8 *)
-  (10 <= K)%nat ->
-  mm !!! Regidx (mword_of_int 10) = page_base P.(ud_root) ->
-  (* the walk's canonicality premise *)
-  (uint va < 2 ^ 38)%Z ->
-  (* the vpn IS mapped: what makes the panic arm dead *)
-  P.(ud_um) !! vpn = Some w ->
-  (* the cleared flag byte is a legal user leaf.  1007 = 1023 - PTE_U *)
-  uvm_perm_ok (Z.land (pte_flags10 w) 1007) ->
-  sie_cap_gpr KT1 mm K b p -∗
-  kernel_text -∗
-  pc_is pcE -∗
-  proc_pt_any P -∗
-  wp_next b p (fun (CID : CpuId) =>
-    ∀ (mr : regfile),
-    sie_cap_gpr KT1 mr K b p -∗
-    pc_is ret_tgt -∗
-    ⌜callee_saved mm mr⌝ -∗
-    proc_pt_any (uptd_set P vpn (pte_clear_u w)) -∗
-    WP (Loop : expr riscv_lang)) -∗
-  WP (Loop : expr riscv_lang).
-
 (* ===================================================================== *)
 (*  THE MEMORY-INDEXED CONTRACT.                                          *)
 (* ===================================================================== *)
@@ -121,10 +92,7 @@ Definition wp_uvmclear_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
    image is keyed on what the table maps and on [p->sz]; a page the
    kernel can still reach through its identity map, and whose bytes it
    still owns, does not leave it because the user may no longer load
-   from it.
-
-   THIS IS THE PRIMITIVE, and [wp_uvmclear_sconf] above is its
-   five-line ∃-[M] corollary (ProofUvmclear.v). *)
+   from it. *)
 Definition wp_uvmclear_mem_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile)
     (P : uptd) (sz : Z) (M : gmap Z (bv 8))
     (w : mword 64) (K : nat) (b : bool) (p : mword 64) :=
@@ -156,8 +124,4 @@ Module Type UVMCLEAR.
       (P : uptd) (sz : Z) (M : gmap Z (bv 8))
       (w : mword 64) (K : nat) (b : bool) (p : mword 64),
       wp_uvmclear_mem_sconf_body mm P sz M w K b p.
-  Parameter wp_uvmclear_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile)
-      (P : uptd) (w : mword 64) (K : nat) (b : bool) (p : mword 64),
-      wp_uvmclear_sconf_body mm P w K b p.
 End UVMCLEAR.

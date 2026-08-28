@@ -499,10 +499,13 @@ Section UtSysBlock.
           assert (Hdep : (trap_res true + n2)%nat = (av - 4)%nat)
             by (rewrite Hn2; unfold trap_res in *; lia).
           rewrite Hdep HS4sp. iExact "Hkcl4". }
-      (* THE IMAGE THE DISPATCH RETURNED.  [SpecSyscall]'s post is
-         ∃-weakened in it (an entry that copies into the user buffer moves
-         it), so the residue is rebuilt at [M2], not at the entry image. *)
-      iIntros (CID2 Hk2 mg U2) "%Hcsg %Htfg %Hfgg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hpc".
+      (* THE IMAGE THE DISPATCH RETURNED.  An entry that copies into the
+         user buffer moves it, so the residue is rebuilt at [M2] rather than
+         at the entry image; [SpecSyscall.sysc_mem_ok] says WHICH bytes can
+         have moved, by table index, and usertrap frames that fact rather
+         than reading it -- the trap loop's own invariant is indifferent to
+         the user image, and the fact is the CALLER's to consume. *)
+      iIntros (CID2 Hk2 mg U2) "%Hcsg %Hmemg %Htfg %Hfgg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hpc".
       destruct U2 as [V2 M2].
       assert (Hreta6 : ret_pc (S4 !!! Regidx Rra) = mword_of_int (UT + 0xa6))
         by (rewrite HS4ra; pcw).

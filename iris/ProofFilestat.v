@@ -201,7 +201,7 @@ Section ProofFilestat.
     : wp_filestat_sconf_body γf γs j γlp k q st fn pidv U m K eb b lks.
   Proof.
     cbv beta delta [wp_filestat_sconf_body].
-    intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Ha0 Heb Hbelow.
+    intros pcE pj addr ret_tgt HK Hk Hj Hgs Hlens Ha0 Heb Hbelow.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv Href Hpriv Hkenv #Hprocs Henv Hcont".
     (* PIN THE INDEX.  This contract still carries [eb = true ->], and at
@@ -1095,8 +1095,10 @@ Section ProofFilestat.
       iEval (rewrite Hpp42) in "Hpc".
       (* the copy accessor, taken once and closed once *)
       iDestruct (proc_priv_core_sz_bound with "Hpriv") as %Hszb.
+      (* THE BORROW STAYS AT THE LAZY VIEW: tier 3 calls copyout's
+          MEMORY-INDEXED contract, which NAMES the window it writes, so the
+          image never goes anonymous. *)
       iDestruct (proc_priv_core_copy with "Hpriv") as "(Hszc & Hptc & Hpt & Hpback)".
-      iDestruct (proc_ptm_pt with "Hpt") as "Hpt".
       (* +0x42 ld a1,72(s2) -- a1 := p->sz, copyout's NEW [psz] argument.
          The two cells are read HERE and nowhere else: the contract itself no
          longer mentions [p_sz] / [p_pagetable] (SpecCopyout.v's header), so
@@ -1199,14 +1201,37 @@ Section ProofFilestat.
       iEval (rewrite -HU6a3) in "Hbuf".
       iDestruct (cpu_own_transport CIDiu CID31 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iApply (Copyout.wp_copyout_sconf KT1 fsc_kalloc U6 (pv_upt (us_V U)) (pv_sz (us_V U)) 24%nat fbytes (DfracOwn 1)
+      assert (HU6a2 : U6 !!! Regidx Ra2 = m !!! Regidx Ra1).
+      { rewrite /U6 upd_ne; [| vm_compute; discriminate].
+        rewrite /U5 upd_ne; [| vm_compute; discriminate].
+        rewrite /U4 upd_ne; [| vm_compute; discriminate].
+        rewrite /U3 upd_eq. unfold regval_into_reg.
+        rewrite (_ : U2 !!! Regidx Rs4 = m !!! Regidx Ra1);
+          [apply add_vec_zero_l |].
+        rewrite /U2 upd_ne; [| vm_compute; discriminate].
+        rewrite /U1 upd_ne; [exact Hmius4 | vm_compute; discriminate]. }
+      iApply (Copyout.wp_copyout_sconf_mem KT1 fsc_kalloc U6 (pv_upt (us_V U)) (us_M U) (pv_sz (us_V U)) 24%nat fbytes (DfracOwn 1)
                 (K - 10)%nat 0%nat eb pj b lks
                 (fst_av_copyout K HK) HU6a0 HU6a1 HU6a4 fst_len24 Hszb fst_noff0
                 with "Hcg Hcnt Htext Hpc Hpt Hkenv Hbuf").
       all: try lkbelow.
-      iIntros (CID32 Hs32 mco P') "Hcg Hcnt Hpc Hpt Hbuf %Hcsco %Hext %Hret".
+      iIntros (CID32 Hs32 mco P' Mo) "Hcg Hcnt Hpc Hpt Hbuf %Hcsco %Hext %Hwrote".
       iEval (rewrite HU6a3) in "Hbuf".
-      iDestruct (proc_pt_any_ptm with "Hpt") as (Mo) "Hpt".
+      (* WHAT THE WINDOW IS: copyout's own disjunction, read as "a prefix of
+         the 24 struct bytes landed at [addr]" plus the return value.  The
+         [d] is the campaign's surviving existential -- a length, not an
+         image (SpecEitherCopyout.v's shape). *)
+      rewrite HU6a2 in Hwrote.
+      assert (Hdw : exists d : nat, (d <= 24)%nat
+                    /\ Mo = umem_wr (us_M U) addr d fbytes).
+      { destruct Hwrote as [[_ Hm] | [_ (d & Hd & Hm)]].
+        - exists 24%nat. split; [lia | exact Hm].
+        - exists d. split; [exact Hd | exact Hm]. }
+      assert (Hret : (mco !!! Regidx Ra0 : mword 64) = (mword_of_int 0 : mword 64)
+                     \/ (mco !!! Regidx Ra0 : mword 64)
+                        = (mword_of_int (-1) : mword 64)).
+      { destruct Hwrote as [[Hr _] | [Hr _]]; [by left | by right]. }
+      destruct Hdw as (dwr & Hdwle & Hmo).
       iDestruct ("Hpback" $! P' Mo ltac:(exact Hext) with "Hszc Hptc Hpt") as "Hpriv".
       assert (Hpc4e : ret_pc (U6 !!! Regidx Rra) = mword_of_int (FST + 0x4e)).
       { rewrite HU6ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1326,16 +1351,19 @@ Section ProofFilestat.
       iDestruct (cpu_own_transport CID32 CIDe 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
-      iApply ("Hcont" $! mfin RV P' with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
-                [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv] Hpriv
+      iApply ("Hcont" $! mfin RV P' dwr fbytes
+                with "[%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
+                [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv] [Hpriv]
                 [Hsb Hbslot]").
       { exact Hcsf. }
       { exact (uptd_ext_sz_ext _ _ _ Hext). }
       { exact Hrvok. }
+      { exact Hdwle. }
       { exact Hrv. }
       { iEval (rewrite /ret_tgt). iExact "Hpc". }
       { rewrite /file_ref /file_fields.
         iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
+      { rewrite -Hmo. iExact "Hpriv". }
       { iApply (fst_env_out_in fn st Hin'). rewrite /filestat_fs_out.
         iFrame "Hsb Hbslot". }
     - (* =============== NEITHER: the c.li a0,-1 arm ==================== *)
@@ -1404,20 +1432,24 @@ Section ProofFilestat.
       iDestruct (cpu_own_transport CID10 CIDe 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
+      (* this arm never reaches copyout, so the window is EMPTY and the
+         image is the one it came in at *)
       assert (HVid : upd_usM (us_upt U (pv_upt (us_V U))) (us_M U) = U)
           by (rewrite us_upt_id; apply upd_usM_id).
-      iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt (us_V U)) (us_M U)
-                with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
+      iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt (us_V U)) 0%nat
+                (fun _ => bv_0 8)
+                with "[%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
                       [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                       [Hpriv] [Henv]").
       { exact Hcsf. }
       { apply uptd_ext_refl. }
       { exact fst_ret_m1. }
+      { lia. }
       { exact Hrv. }
       { iEval (rewrite /ret_tgt). iExact "Hpc". }
       { rewrite /file_ref /file_fields.
         iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
-      { rewrite HVid. iExact "Hpriv". }
+      { cbn [umem_wr]. rewrite HVid. iExact "Hpriv". }
       { by iApply filestat_env_out_of_env. }
   Qed.
 

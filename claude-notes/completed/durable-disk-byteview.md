@@ -6,7 +6,7 @@ kept for its history and its two surveys' findings.  Ruling 3
 stages E–I: no byte-level committed view, no `fs_durable_wf`, no per-op
 preservation lemmas, no object ledger.  Stages A, B, D and H0 (the
 crash-layer mechanics) stand.  The live worklist is
-`projects/durable-disk.md`.  Nothing below is current guidance.
+`completed/durable-disk.md`.  Nothing below is current guidance.
 
 ---
 

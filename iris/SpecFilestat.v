@@ -463,6 +463,8 @@ Definition wp_filestat_sconf_body
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.filestat in
   let pj := proc_addr j in
+  (* a1 = addr, the user destination the stat struct is copied to *)
+  let addr := m !!! Regidx (mword_of_int 11 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (filestat_stack <= K)%nat ->
   (k < NFILE)%nat ->
@@ -499,19 +501,33 @@ Definition wp_filestat_sconf_body
      crossing has nothing to do with SIE.  Spelled [b] the two coincide at
      the only instance the [eb = true] premise admits. *)
   wp_next true pj (fun (CID : CpuId) =>
-  (* THE IMAGE MOVES: the copy leaf may fault a page in (and copyout writes
-     user memory), so the block comes back at a fresh [M'] -- milestone J
-     item 1's ∃-weakened staging. *)
-  ∀ (mf : regfile) (r : mword 64) (P' : uptd) (M' : gmap Z (bv 8)),
+  (* THE IMAGE MOVES, AND THE MOVE IS A WINDOW.  filestat's only write to
+     user memory is the one copyout of the 24-byte stat struct at [addr], so
+     the block comes back at the image it went in at WITH THAT RUN WRITTEN
+     and nothing else touched: [umem_wr (us_M U) addr d bs].  What is left
+     existential is a prefix LENGTH [d <= 24] (copyout can fault part-way)
+     and the struct's BYTES [bs] -- NOT an image.  A caller reads its own
+     untouched bytes back with [UserPtTree.umem_wr_lookup_out].
+
+     WHY THE BYTES ARE EXISTENTIAL AND NOT THE STRUCT'S FIELDS: the proof
+     names the source run with [fst_bytes_name24], i.e. it borrows the
+     already-built frame buffer rather than re-deriving the little-endian
+     encoding of dev/ino/type/nlink/size.  Pinning [bs] to those fields is a
+     strictly stronger contract than filestat has ever had (the old post
+     said nothing at all about the destination) and is left to whoever wants
+     it. *)
+  ∀ (mf : regfile) (r : mword 64) (P' : uptd) (d : nat) (bs : nat -> bv 8),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       ⌜filestat_ret r⌝ -∗
+      ⌜(d <= 24)%nat⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       file_ref γf k q st -∗
-      proc_priv_core pj pidv (upd_usM (us_upt U P') M') -∗
+      proc_priv_core pj pidv
+        (upd_usM (us_upt U P') (umem_wr (us_M U) addr d bs)) -∗
       filestat_env_out fn st -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).

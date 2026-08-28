@@ -1564,6 +1564,7 @@ Section UservecAllPt.
     iAssert (proc_pt_any pt) with "[Hufr Hdata]" as "Hpt".
     { rewrite proc_pt_split. iFrame "Hdata". iSplitR; [iPureIntro; exact Hptwf|].
       iExact "Hufr". }
+    iEval (rewrite /proc_pt_any) in "Hpt".
     iDestruct (usertrap_res_pt_close pt vksp with "Hures' Hpt") as "Hures'".
     (* THE TRANSLATION SLOT, INJECTED.  [Hkres] is the [tlb_res_pt kroot]
        the exit switch just produced by writing the kernel root into satp --
@@ -1600,6 +1601,8 @@ Section UservecAllPt.
       as (kroot2) "[Hkres2 Hures2]".
     iDestruct (UT.usertrap_res_pt_open (CID:=CID2) pt' vksp with "Hures2")
       as "[Hpt' Hures2]".
+    iDestruct "Hpt'" as (Mpt') "Hpt'".
+    iDestruct (proc_pt_forget with "Hpt'") as "Hpt'".
     iEval (rewrite proc_pt_split) in "Hpt'".
     iDestruct "Hpt'" as "[(%Hptwf' & Hufr') Hdata']".
     iDestruct (UT.usertrap_res_tf_open (CID:=CID2) pt' vksp with "Hures2") as (kroot1 ws1)

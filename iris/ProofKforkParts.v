@@ -702,6 +702,7 @@ Section KforkFreeproc.
          block's conjunct is the lazy view, and [proc_ptm_pt] is the
          crossing (see ProcPtOwn §5c'). *)
       iDestruct (proc_ptm_pt with "Hptt") as "Hptt".
+      iEval (rewrite /proc_pt_any) in "Hptt".
       iFrame "Hpg Hptt". iPureIntro. split; [exact Hbel | exact Hszb]. }
     iFrame "Htfc Htfp". iPureIntro. exact Hpv.
   Qed.

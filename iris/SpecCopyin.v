@@ -37,7 +37,7 @@
    lazily-backed pages a fault may add are already in the view
    (SpecVmfault.v), so the promise can be stated against the INPUT [M].
 
-   [wp_copyin_sconf] is the existential-[M] corollary, in which [dst_new] is
+   There WAS an existential-[M] corollary beside it, in which [dst_new] is
    simply universally quantified -- the caller learns only that it still
    owns [len] bytes at [dst].  That is what every current caller speaks, and
    for most of them it is the right altitude: the bytes copyin copies come
@@ -96,53 +96,6 @@ Import Defs.
    leaves have: this function's kernel buffer is a FRAME local at [KT1] for
    one caller and a KT0 page/bio window for the next, and one shared tier
    cannot state both.  See SpecMemmove.v's note. *)
-Definition wp_copyin_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
-    (P : uptd) (szv : mword 64) (len : nat) (dst_olds : nat -> bv 8)
-    (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :=
-  let pcE : mword 64 := mword_of_int KernelSyms.copyin in
-  (* a0 = pagetable, a1 = psz, a2 = dst, a3 = srcva, a4 = len *)
-  let dst := mm !!! Regidx (mword_of_int 12) in
-  let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
-  (* 12-slot frame + vmfault's 38 (walkaddr needs 10, memmove 2) *)
-  (50 <= K)%nat ->
-  (* the pagetable argument is the table [proc_pt P] describes -- and that is
-     now the WHOLE requirement.  It used to have to be [p->pagetable] as
-     well, because the vmfault beneath mapped there regardless; it does not
-     any more (SpecVmfault.v). *)
-  mm !!! Regidx (mword_of_int 10) = page_base P.(ud_root) ->
-  (* the size argument, in a1 *)
-  mm !!! Regidx (mword_of_int 11) = szv ->
-  mm !!! Regidx (mword_of_int 14) = (mword_of_int (Z.of_nat len) : mword 64) ->
-  (Z.of_nat len < 2 ^ 64)%Z ->
-  (* it respects MAXVA (vmfault's premise) *)
-  (uint szv <= 2 ^ 38)%Z ->
-  (* vmfault's kalloc keeps its transient noff increment in int range;
-     [lvl] is otherwise generic (usertrap calls at 0, the pipe loops at 1) *)
-  (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
-  (* order premise at the lowest rank this cone reaches. *)
-  locks_below lks "kmem" ->
-  sie_cap_gpr KT1 mm K b p -∗
-  cpu_own lvl eb p b lks -∗
-  kernel_text -∗
-  pc_is pcE -∗
-  proc_pt_any P -∗
-  kalloc_env γa None -∗
-  ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ[ktb] dst_olds j) -∗
-  wp_next b p (fun (CID : CpuId) =>
-    ∀ (mr : regfile) (P' : uptd) (dst_new : nat -> bv 8),
-    sie_cap_gpr KT1 mr K b p -∗
-    cpu_own lvl eb p b lks -∗
-    pc_is ret_tgt -∗
-    proc_pt_any P' -∗
-    ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ[ktb] dst_new j) -∗
-    ⌜callee_saved mm mr⌝ -∗
-    ⌜uptd_ext_sz szv P P'⌝ -∗
-    ⌜ mr !!! Regidx (mword_of_int 10) = mword_of_int 0
-      \/ mr !!! Regidx (mword_of_int 10) = mword_of_int (-1) ⌝ -∗
-    WP (Loop : expr riscv_lang)) -∗
-  WP (Loop : expr riscv_lang).
-
 (* ===================================================================== *)
 (* THE MEMORY-INDEXED CONTRACT: WHAT THE DESTINATION BUFFER GETS.        *)
 (*                                                                       *)
@@ -165,9 +118,13 @@ Definition wp_copyin_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : G
 (* part-way has copied a prefix, and which prefix is not observable from *)
 (* the return value.                                                     *)
 (*                                                                       *)
-(* [wp_copyin_sconf] stays as the [proc_pt]-altitude COROLLARY, so the   *)
-(* callers that say nothing about the bytes do not have to name a        *)
-(* memory.                                                               *)
+(* THE ∃-[M] COROLLARY IS GONE.  It was the [proc_pt]-altitude form for  *)
+(* callers that say nothing about the bytes; its last one (piperead)     *)
+(* switched to this contract with tier 3 of the image campaign,          *)
+(* and a leaf whose last ∃-caller converts loses the corollary rather    *)
+(* than keeping it "in case" (see SpecCopyinstr.v's note).  The recipe   *)
+(* for re-deriving one is four lines: [ProcPtOwn.proc_pt_ptm] in and     *)
+(* [proc_ptm_pt] on the way out.                                         *)
 (* ===================================================================== *)
 
 (* byte [j] of the destination is the process's byte at [srcva + j] *)
@@ -223,10 +180,4 @@ Module Type COPYIN.
       (dst_olds : nat -> bv 8)
       (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),
       wp_copyin_sconf_mem_body ktb γa mm P M szv len dst_olds K lvl eb p b lks.
-  Parameter wp_copyin_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
-      (P : uptd) (szv : mword 64) (len : nat) (dst_olds : nat -> bv 8)
-      (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),
-      wp_copyin_sconf_body ktb γa mm P szv len dst_olds K lvl eb p b lks.
 End COPYIN.
