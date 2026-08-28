@@ -1163,6 +1163,29 @@ Section ctx.
     by iApply (ctx_pointsto_agree with "Hc1 Hc2").
   Qed.
 
+  (* >>> A6.91: THE BYTE'S AND THE 4-BYTE WORD'S [ktier]-TYPED TWINS, and
+     they were the two the family was missing.  [Class CurKtier :=
+     cur_ktier : ktier] is NOT declared transparent to typeclass
+     unification (unlike [CurCtx], which is -- see the note at
+     [Typeclasses Transparent CurCtx]), so an instance stated at
+     [(KTR : CurKtier)] does not fire on a goal whose tier argument is
+     [ktier]-typed.  Every OTHER tower in this file and in [RiscvPtsto]
+     already carries the twin ([ctx_string_pointsto_discarded_persistent'],
+     [word4_pointsto_discarded_persistent']); the byte and the word4 did
+     not, and the symptom is remote and unhelpful --
+     [iMod … as "#H"] on a freshly discarded cell failing with
+     "not persistent" at a file that has the instance in scope
+     (ProofForkret's [first_done] seal). <<< *)
+  Global Instance ctx_pointsto_discarded_persistent' (ktr : ktier) (ξ : CtxId)
+      (a : Arch.pa) (v : bv 8) :
+    Persistent (ctx_pointsto (KTR := ktr) ξ a DfracDiscarded v).
+  Proof. exact (ctx_pointsto_discarded_persistent ktr ξ a v). Qed.
+
+  Global Instance ctx_word4_pointsto_discarded_persistent' (ktr : ktier)
+      (ξ : CtxId) (a : Arch.pa) (w : mword 32) :
+    Persistent (ctx_word4_pointsto (KTR := ktr) ξ a DfracDiscarded w).
+  Proof. exact (ctx_word4_pointsto_discarded_persistent (KTR := ktr) ξ a w). Qed.
+
   (* the [ktier]-typed twins, for the same reason as the word towers' *)
   Global Instance ctx_string_pointsto_timeless' (ktr : ktier) (ξ : CtxId)
       (a : Arch.pa) (dq : dfrac) (s : string) :
