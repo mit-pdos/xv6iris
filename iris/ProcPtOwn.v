@@ -3308,16 +3308,36 @@ Section ProcPt.
      resource the anonymous form owned (the reindexing is
      [proc_pt_own_umem], and both of its premises are conjuncts of
      [proc_pt_wf P], so the conversion is available inside the predicate
-     itself).  [proc_pt_any] is the ∃-weakened spelling every consumer
-     below the [proc_priv] tier still uses; see
-     claude-notes/projects/user-wp-slot.md milestone J item 1 for the
-     staging.  Mirrors [UserPtTree.user_pt_inv] / [user_pt_any]
-     exactly, which is what keeps the satp-switch bridge a rename. *)
+     itself).  Mirrors [UserPtTree.user_pt_inv] / [user_pt_any] exactly,
+     which is what keeps the satp-switch bridge a rename. *)
   Definition proc_pt (P : uptd) (M : gmap Z (bv 8)) : iProp Σ :=
     (⌜proc_pt_wf P⌝ ∗
      pt_frame (upt_tree_spec P.(ud_root) P.(ud_tfp) P.(ud_um)) ∗
      umem_own P M)%I.
 
+  (* ---- PROOF-INTERNAL ONLY.  DO NOT STATE A CONTRACT AT THIS. --------
+     [proc_pt_any] is the ∃-weakened spelling, and its whole remaining job
+     is to be a convenient name for an existential INSIDE a proof -- a
+     [wp_*_sconf] crossing that opens the address space, hands it to a
+     [_mem] leaf and closes it again.
+
+     A CONTRACT HOLDING IT CANNOT SAY WHAT HAPPENED TO THE PROCESS STATE,
+     which is the whole reason the elimination campaign
+     (claude-notes/projects/user-wp-slot.md §2) exists.  Every contract in
+     the tree is now either PRECISE -- an equation on the image, [umem_wr]
+     / [umem_grow] / [umem_del] -- or writes its existential out inline
+     where the function really does give the address space away
+     ([SpecFreeproc], [SpecProcFreepagetable], [SpecKexecB2],
+     [SpecUsertrap]'s parked-table pair, [ProcDefs]' dormant ZOMBIE arms).
+     None of them names this predicate, and a new one must not either:
+     state the `_mem` form and let the caller name its own image.
+
+     THE NAME SURVIVES ON PURPOSE.  Deleting it was priced and shelved:
+     ten of the sixteen lemmas around it would come back as the same
+     statement with the ∃ typed out, and the [Typeclasses Opaque] below is
+     load-bearing -- it is what stops [iIntros]/[iDestruct] from silently
+     opening the existential under sixty-odd proofs that never mentioned
+     it.  §2 carries the tally. *)
   Definition proc_pt_any (P : uptd) : iProp Σ :=
     (∃ M : gmap Z (bv 8), proc_pt P M)%I.
 

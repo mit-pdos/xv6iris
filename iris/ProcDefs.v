@@ -433,7 +433,8 @@ Section ProcDefs.
              (* the image is ∃-weakened here: the descriptor itself is
                 existential in this predicate, so there is no [V] for an
                 [M] to be keyed beside (milestone J item 1's staging). *)
-             proc_pt_at_any pa (pv_upt V) ∗ tf_page (ud_tfp (pv_upt V)) (pv_tf V)
+             (∃ M : gmap Z (bv 8), proc_pt_at pa (pv_upt V) M) ∗
+             tf_page (ud_tfp (pv_upt V)) (pv_tf V)
         else p_pagetable pa ↦₈ (zero_reg : mword 64) ∗
              p_trapframe pa ↦₈ (zero_reg : mword 64)))%I.
 
@@ -456,7 +457,8 @@ Section ProcDefs.
              (* the image is ∃-weakened here: the descriptor itself is
                 existential in this predicate, so there is no [V] for an
                 [M] to be keyed beside (milestone J item 1's staging). *)
-             proc_pt_at_any pa (pv_upt V) ∗ tf_page (ud_tfp (pv_upt V)) (pv_tf V)
+             (∃ M : gmap Z (bv 8), proc_pt_at pa (pv_upt V) M) ∗
+             tf_page (ud_tfp (pv_upt V)) (pv_tf V)
         else p_pagetable pa ↦₈ (zero_reg : mword 64) ∗
              p_trapframe pa ↦₈ (zero_reg : mword 64)))%I.
 

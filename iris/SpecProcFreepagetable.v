@@ -101,7 +101,7 @@ Definition wp_proc_freepagetable_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG �
   cpu_own ilvl eb p b lks -∗
   kernel_text -∗
   pc_is pcE -∗
-  proc_pt_any P -∗
+  (∃ M : gmap Z (bv 8), proc_pt P M) -∗
   kalloc_env γa None -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),

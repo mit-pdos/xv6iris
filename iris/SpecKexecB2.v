@@ -304,7 +304,7 @@ Section KexecB2Res.
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) ∗
      bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      bslots 3 ∗
-     proc_pt_any P ∗
+     (∃ M : gmap Z (bv 8), proc_pt P M) ∗
      proc_priv gf (proc_addr jp) pidv U ∗
      ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) ∗
      ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) ∗
@@ -640,7 +640,7 @@ Definition kxc_bad324_body
      this block's [kxc_bad64] runs iunlockput, whose iput frees into it. *)
   bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   kalloc_env fsc_kalloc None -∗
-  proc_pt_any P -∗
+  (∃ M : gmap Z (bv 8), proc_pt P M) -∗
   proc_priv gf (proc_addr jp) pidv U -∗
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
   ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
