@@ -368,6 +368,29 @@ more are `FsState.fs_geom` on the instance, one is the WAL's own row (b),
 and every remaining clause — the byte ties, the used-set coupling, both
 disjointness clauses, the local clauses — is derived where it is needed.
 
+**AND THE COLLECTION'S OWN OUTPUT HAS A NAME AT LAST (stage 5 of the
+era-vocabulary unification): `FsState.fs_footprint_q`.**
+`FsCollectAll.col_hand_footprint` is `col_hand ⊢ … ∗ fs_footprint_q
+(fs_gamma_L γfs) (col_state …)` — the file system's byte footprint with
+each inode's DATA leg at the share its holder actually has (the record at
+fraction 1, region-side) — beside the three things the ghost half is read
+off (`col_auth`, `fs_links`, the root's `ireg_keep`) and two pure rows.
+`FsDurXfer.fs_footprint_q_runs` is then the ONE runs call the mint makes.
+`fs_footprint_q_1 : fs_footprint Γ S ⊢ fs_footprint_q Γ S` witnesses that
+this is a weakening of the real thing and not a new notion.
+
+**AND `fs_state` STILL DOES NOT COME OUT OF A COMMIT — MEASURED, not
+estimated.**  `IcacheEscrow.ic_rd_arm` (a READ-LOCKED inode's arm) lends
+`ic_inode_leg γfs (DfracOwn (3/4)) …` and `FsStateEra.inode_owned_era_q`
+carries `FsState.top_frag_q` at that same share, while
+`FsStateInode.inode_ghost` wants the whole element — so a read-locked inum
+yields neither half of `inode_owned`.  Nothing at a commit refutes a read
+lock: the three windows the commit does refute each park a share of
+`LogDefs.ln_tx`, and a read-locking `ilock` opens no transaction.
+`FsDurXfer.fs_state_xfer`/`_tok` therefore have no caller and cannot
+acquire one; the transport's LIVE half is its allocation half
+(`fs_state_mint_runs`), which takes no resource at all.
+
 **THE COLLECTION IS `FsCollectAll.fs_collect_mint`**, and what makes it
 possible is that its conclusion is PURE: an entailment `R ⊢ ⌜φ⌝` yields
 `R ⊢ ⌜φ⌝ ∗ R` in an affine logic (`FsCollectAll.pure_keep`), so the
@@ -408,6 +431,21 @@ which is what `fs_boot_pure` already carries.  What lane H5 changed
 instead is the PROVENANCE: `snap_ok` is no longer carried by anything, so
 the facts the mint spends are read off the epoch's own resources one level
 up.
+
+**RE-CHECKED AT EV STAGE 5, and the answer did not move.**  The plan's
+stage 7 asked for `fs_cfg_alloc_snap` to become "identity on `fs_state`".
+It cannot be a shape it does not have: the mint's inputs are a BYTE
+FUNCTION `Pb`, `disk_bytes γv` and the PURE `snap_ok S D` — there is no
+source instance anywhere on the boot side — and its output is not an
+`fs_state` either but the era's whole configuration (`ICFG`/`FSC` plus the
+two kits), distributed into region, pool, bitmap and `ftop_inv`.  Nor can
+the `snap_ok` premise be dropped: the proof spends `sk_bytes` (the decode
+bridge `snap_rec_decode`), `sk_local`, `sk_own_used`/`sk_meta_used` (every
+peel of the boot ledger, `snap_names_cov`), `sk_sbok`, `sk_regdom` and
+`sk_links` — and its supplier is a value-first allocation at era 0
+(`FsDurAlloc`/`FsDurImg`), which is the one caller of the carve.  Turning
+that around is a boot-side lane about where the era's byte AUTHORITY is
+minted (reason (i) above), not a stage of the era-vocabulary campaign.
 
 **Ghost-wise recovery is a NO-OP, and the mint runs AT POWERON (RULING,
 corrected by lane E-mint).**  `D` is a pure function of the raw disk —

@@ -4492,11 +4492,16 @@ the rows below and in `design/fs-ghost-state.md`).
     the pinned corner ports across 1a–1d together.  **Not one tie is left
     on the fs contract surface.**  `tools/dethread_check.py` reports
     `0 declarations out of scope`.
-- [ ] **EV — the era-vocabulary unification** (approved): five staged
-  lanes; three of the four holders are already predicate-vocabulary; the
-  payoff is the commit handing a real `fs_state` to the transport.  Runs
-  AFTER rank 1 or before it, never concurrently (same payload bodies).
-  Stages 1, 2 (EV1), 3 (EV3) and 4 (EV4) are LANDED; 5 remains.
+- [x] **EV — the era-vocabulary unification** (approved): five staged
+  lanes; three of the four holders were already predicate-vocabulary.
+  ALL FIVE STAGES ARE LANDED (EV1 = 1 and 2, EV3 = 3, EV4 = 4, EV5 = 5).
+  The payoff was stated as "the commit hands a real `fs_state` to the
+  transport"; EV5 REFUTED that half — a read-locked inode's bundle stands
+  at three quarters and nothing at a commit refutes a read lock, so the
+  strongest true form is `FsState.fs_footprint_q`, which is what the
+  assembly now names.  The stage-7 follow-on (the boot mint as the same
+  transport) is answered in EV5's paragraph and is a BOOT-SIDE lane, not
+  a stage of this campaign.
 
   **AS LANDED — EV1 (stages 1 and 2).  Whole tree green (zero `Error`,
   `MAKEEXIT=0`), `tools/dethread_check.py` at "0 declarations out of
@@ -4762,6 +4767,110 @@ the rows below and in `design/fs-ghost-state.md`).
     holder's `ic_rd_held` has it — `ic_inode_leg_shed_of` is the join, but
     at a commit no read-locker is standing, so the quarter arrives through
     the share condition and not through a resource.
+
+  **AS LANDED — EV5 (stage 5, and the stage-7 follow-on ANSWERED rather
+  than built).  Whole tree green (zero `Error`, `MAKEEXIT=0`),
+  `tools/dethread_check.py` at "0 declarations out of scope", and
+  `iris/SystemAdequacy.v` / `iris/SystemAssumptions.v` byte-identical to
+  main.**
+
+  - **(a) `FsCollect.col_side` IS `IcacheEscrow.ic_inode_leg`**, so the
+    two `ic_inode_leg_open`s EV4 left at the `FsCollectAll` boundary
+    (`ic_slot_cover_side`, `ipool_shape_np_side`) are gone and all three
+    suppliers hand the collection ONE predicate.  `FsCollect` pays a
+    `Require IcacheEscrow` for it — **five files on a 90-file cone, and
+    measured free**: two probe files carrying only the old and the new
+    Require lists compile in 1.08/1.09 s at 650/653 MB peak, twice each.
+    The file's LEAF claim is about the BOOT chain (`FsCfgBoot`,
+    `FsDurImg`), which stays out; the header says so now.
+    `ic_inode_leg`'s seal went `Local` → `Global`, because a
+    `Typeclasses Opaque` seal does not travel and `col_side` is a second
+    consumer.
+  - **THE SLOT'S HAND IS ONE STEP: `FsCollect.col_leg_bundle`** (with
+    `FsCollectAll.col_leg_bundle_z` at the cache's currency).  The leg
+    beside what the REGION kept — the record's `ireg_lnk` — yields
+    `col_bundle`, the `FsState.fs_links` element and the root's
+    `ireg_keep`, with both agreements (the map's node, the region's
+    record) inside.  `col_sides_bundles` is that step and nothing else.
+    `col_region_quiesce_acc`, the caller-less ACCESSOR twin, is DELETED:
+    the collection's conclusion is pure, so `pure_keep` hands the
+    invariants back and no closing wand has work to do.
+  - **(b) THE ASSEMBLY IS `FsCollectAll.col_hand_footprint`, AND ITS
+    TARGET IS `FsState.fs_footprint_q` — NOT `fs_state`.**
+    `fs_footprint_q Γ S` is `fs_footprint` with the inode column at a
+    share per inode (`∃ dq, ⌜¬ ✓ (dq ⋅ dq)⌝ ∗ inode_phi_q Γ dq (fss_sb S)
+    i n`: the record at fraction 1, region-side, beside `inode_dat_q Γ dq
+    n`).  The lemma is
+    `col_hand … ⊢ ⌜parse⌝ ∗ ⌜inode_local⌝ ∗ col_auth ∗ fs_links ∗ (∃ kv,
+    ireg_keep γfs ireg_root kv) ∗ fs_footprint_q (fs_gamma_L γfs)
+    (col_state …)`, and what it DROPS is named in its header:
+    `InodeRegion.dinode_at`, `FsState.top_frag_q` (at the bundle's
+    share), the region's proxy authority `ghost_map_auth γi 1 m` (spent
+    on the record agreement), and the pure rows a caller reads first.
+    New beside it: `FsStateInode.inode_phi_q` / `inode_phi_at_q` /
+    `inode_phi_sb_q` (EV1's family at a share; `inode_phi_q_1` and
+    `inode_phi_at_q_1` are `reflexivity`, both sealed) and
+    `FsState.fs_footprint_q_1`, the full-share reading that witnesses the
+    weakening is one.
+  - **`col_hand_mint` FACTORS THROUGH ONE RUNS CALL.**
+    `FsDurXfer.fs_footprint_q_runs` is `fs_footprint_runs`'
+    share-generic twin, over `inode_phi_q_runs`, `fs_inodes_phi_q_runs`
+    and the one-line `gamma_q_inode_dat` (`inode_dat (gamma_q Γ dq) n ⊣⊢
+    inode_dat_q Γ dq n`).  `FsCollect.col_bundle_dats`, `col_inode_runs`
+    and `col_bundles_lens` are DELETED — replaced by the three-line
+    `col_bundle_phi` — and `col_hand_mint` is now two pure readings that
+    keep the hand, the assembly step, that one runs call, and
+    `phi_runs_ex_disj`/`phi_runs_ex_in`: sixty lines shorter, with no run
+    arithmetic anywhere in the collection.
+  - **(c) `FsDurXfer.fs_state_xfer` DOES NOT GET A CALLER, AND THE
+    REASON IS A THEOREM ABOUT THIS KERNEL, not about the proof.**  The
+    plan's stage 5 asked for one; three lines of the tree refute it.
+    `IcacheEscrow.ic_rd_arm_lend_owned` lends `ic_inode_leg γfs (DfracOwn
+    (3/4)) γi inum n` at a READ-LOCKED inode (`IcacheEscrow.v:4032`), and
+    `FsStateEra.inode_owned_era_q` (`FsStateEra.v:1206`) carries
+    `FsState.top_frag_q Γ dq` at THAT SAME `dq`, while
+    `FsStateInode.inode_ghost` wants the whole element — so a read-locked
+    inum yields neither `inode_phi` nor `inode_ghost`, hence no
+    `inode_owned` and no `fs_state`.  And nothing at a commit refutes the
+    arm: the three windows the commit DOES refute each park a positive
+    share of `LogDefs.ln_tx` (`ic_out_no_write_arm`, `ic_pin_tx_no_ops`,
+    `ic_out_frz_no_ops`), and a read-locking `ilock` opens no transaction
+    — which is exactly why `ic_slot_cover`'s bundle alternative is stated
+    at a share at all.  This is lane H2's ruling re-derived at the
+    vocabulary the campaign built, and `fs_footprint_q` is the strongest
+    true form of what the plan asked for.  `fs_state_xfer`/`_tok` and
+    `fs_snap_alloc_xfer`/`P_dur_alloc_xfer` stay as they are: the
+    transport's live half is its ALLOCATION half, which takes no resource
+    at all.
+  - **(d) THE BOOT MINT CANNOT BECOME THE SAME TRANSPORT EITHER, and it
+    is not a matter of effort.**  `FsCfgSnap.fs_cfg_alloc_snap` has no
+    `fs_state` on EITHER side: its inputs are a byte function `Pb`,
+    `disk_bytes γv` and the PURE `snap_ok S D` (there is no source
+    instance anywhere on the boot side — `RiscvAdequacy`'s `Hproj` is a
+    pure projection), and its output is the era's whole configuration
+    (`ICFG`/`FSC` and the two kits), distributed into region, pool,
+    bitmap and `ftop_inv`.  "Identity on `fs_state`" is not a shape it
+    has.  Nor can the `snap_ok` premise be dropped here: the proof spends
+    `sk_bytes` (the decode bridge `snap_rec_decode`), `sk_local`,
+    `sk_own_used`/`sk_meta_used` (every peel of the boot ledger,
+    `snap_names_cov`), `sk_sbok`, `sk_regdom` and `sk_links`, and its
+    supplier at era 0 is the value-first allocation in `FsDurAlloc` /
+    `FsDurImg`.  WHAT REMAINS is therefore a BOOT-SIDE lane, not a stage
+    of this campaign: lane H5's reason (i) — the era's byte AUTHORITY is
+    minted at the WHOLE home map (`FsBoot.fs_boot_ghosts`, which the
+    WAL's `fs_bytes_inv` row demands), so its elements arrive as one flat
+    `∗` and have to be split by pure facts whatever the mint does — and
+    reason (ii), that the region wants WHOLE BLOCKS while `fs_state`
+    holds a record as a 64-byte run.
+  - **NOTHING GOT SLOWER, measured standalone on the same VM**
+    (`rocq compile`, wall and peak RSS): `FsStateInode` 4.96 → 5.00 s
+    (713 → 715 MB), `FsState` 8.38 → 8.44 s (1168 → 1166 MB),
+    `FsDurXfer` 4.81 → 5.18 s (718 → 722 MB, and the +0.37 s is the four
+    new lemmas), `FsCollect` 7.76 s and `FsCollectAll` 6.14 s after (the
+    base pair could not be timed in place — recompiling the base
+    `FsStateInode.vo` makes every sibling `.vo` inconsistent — and the
+    import they gained is the probe measured above, 0.01 s).  Every one
+    is an order of magnitude under the five-minute red flag.
 - [ ] **Rank 5 — one uniform per-inum transaction pin** (absorbs `DepTx`'s
   and `DepFrz`'s `(t,q)`, `ic_pin_*`, `ireg_cpin`/`ireg_fpin`, the transit
   ledger, `CrpPre`; ten `_no_ops` → one): APPROVED (owner, 2026-08-27),

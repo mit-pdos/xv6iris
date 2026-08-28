@@ -488,7 +488,9 @@ separate rewrite and still consumes `snap_ok`: `FsCfgSnap.fs_cfg_alloc_snap`
 never builds `fs_state (fs_gamma_L γfs) S` at all (which is why
 `fs_state_of_ledger_era` has no caller); it distributes the pieces straight
 into region/bitmap/escrow/pool off the pure tie.  `fs_state_xfer`/`_tok`
-and `fs_snap_alloc_xfer`/`P_dur_alloc_xfer` remain caller-less.
+and `fs_snap_alloc_xfer`/`P_dur_alloc_xfer` remain caller-less, and EV
+stage 5 established that they must: see "AND `fs_state` IS NOT DERIVABLE
+FROM IT" below.
 
 **THE VALUE-FIRST ALLOCATOR TAKES A LINEAR LEDGER.**  `fs_state_of_ledger Γ S D` is the
 Γ-generic core — `snap_ok S D` plus the ledger of `D`'s byte elements in,
@@ -574,11 +576,13 @@ directory rows),
 committed view's flattening, off `bytes_tie`/`bytes_dom`/`dom C = home`),
 `col_agree` (the era's authority AS the transport's `phi_agree`, stated in
 `FsCollect` so element and authority are elaborated at one `ghost_mapG`
-path), `col_bundle_dats`/`col_bundle_inum`/`col_inode_runs` (one inode's
-runs: its record out of the REGION at fraction 1, its block legs out of its
-own bundle at the bundle's share) and `col_recs_by_inum` (the region's
-records re-indexed from (block, slot) to INUM — the resource does not move,
-`ireg_recs` IS the sixteen record runs).  `FsCollect.v` is a LEAF over the predicate layer on purpose (the
+path), `col_bundle_phi` (one inode's footprint: its record out of the
+REGION at fraction 1, its data leg out of its own bundle at the bundle's
+share — `FsStateInode.inode_phi_q`, EV stage 5) and `col_recs_by_inum` (the
+region's records re-indexed from (block, slot) to INUM — the resource does
+not move, `ireg_recs` IS the sixteen record runs).  The per-inode RUN
+arithmetic `col_bundle_dats`/`col_bundle_inum`/`col_inode_runs` used to do
+by hand is Γ-generic and moved to `FsDurXfer` (stage 5, below).  `FsCollect.v` is a LEAF over the predicate layer on purpose (the
 commit's cone must not acquire the boot chain), and every conclusion is
 PURE, so nothing is consumed and a caller hands all fifty escrows back
 untouched.  The block map is `col_view C home = fs_restrict (dv_of_D C)
@@ -604,6 +608,59 @@ nothing on it is outstanding.  At one ghost step it opens `ftopN`, `iregN`,
 one of them with the body it opened.  Its ONE non-resource premise is
 `col_geom`.
 
+**WHAT THE HAND *IS*, MINUS THE ERA'S RESIDUE: `FsState.fs_footprint_q`**
+(EV stage 5).  `FsCollectAll.col_hand_footprint` is the assembly named at
+last, and its statement is the honest one:
+
+```
+col_hand … ⊢ ⌜fs_parse_sb …⌝ ∗ ⌜∀ i n, I !! i = Some n → inode_local i n⌝
+            ∗ col_auth γfs Lb C home
+            ∗ fs_links (fs_link γfs) I
+            ∗ (∃ kv, ireg_keep γfs ireg_root kv)
+            ∗ fs_footprint_q (fs_gamma_L γfs) (col_state sb sbb I used)
+```
+
+`fs_footprint_q Γ S` is `fs_footprint Γ S` with the inode column at a share
+PER INODE — `∃ dq, ⌜¬ ✓ (dq ⋅ dq)⌝ ∗ inode_phi_q Γ dq (fss_sb S) i n`, the
+record at fraction 1 (records park region-side always) beside
+`inode_dat_q Γ dq n`.  `fs_footprint_q_1` is the full-share reading, so the
+weakening is witnessed non-vacuous; `FsStateInode.inode_phi_q`,
+`inode_phi_at_q`, `inode_phi_sb_q` are EV1's `inode_phi`/`inode_phi_at`
+family at a share, and `inode_phi_q_1` / `inode_phi_at_q_1` are
+`reflexivity`.  What `col_hand_footprint` DROPS is named in its header and
+none of it is part of a file system: `InodeRegion.dinode_at` (the era's
+record proxy), `FsState.top_frag_q` (at the bundle's share), the region's
+proxy authority `ghost_map_auth γi 1 m` (spent on "the record a bundle
+names IS the region's"), and the hand's pure rows, which the caller reads
+first by `pure_keep`'s idiom.
+
+**AND `fs_state` IS NOT DERIVABLE FROM IT, WHICH IS WHY `fs_state_xfer`
+STILL HAS NO CALLER** (measured at EV stage 5; the plan's stage 5 asked for
+one and this is the answer).  Three lines of Coq say it:
+`IcacheEscrow.ic_rd_arm` — a READ-LOCKED inode's escrow arm — lends
+`ic_inode_leg γfs (DfracOwn (3/4)) γi inum n` (`ic_rd_arm_lend_owned`), and
+`FsStateEra.inode_owned_era_q` carries `top_frag_q Γ dq` at THAT SAME `dq`,
+while `FsStateInode.inode_ghost` wants the whole `top_frag`.  So a
+read-locked inum yields neither `inode_phi` nor `inode_ghost`, hence no
+`inode_owned` and no `fs_state`.  Nothing at a commit refutes the arm: the
+three windows the commit does refute each park a positive share of
+`LogDefs.ln_tx` (`ic_out_no_write_arm`, `ic_pin_tx_no_ops`,
+`ic_out_frz_no_ops`), and a read-locking `ilock` opens no transaction —
+which is exactly why `ic_slot_cover`'s bundle alternative is stated at a
+share in the first place.  `fs_state_xfer`/`_tok` and
+`fs_snap_alloc_xfer`/`P_dur_alloc_xfer` therefore stay as they are: the
+transport's LIVE half is its allocation half, which takes no resource at
+all.
+
+**THE RUNS WALK IS ONE CALL NOW.**  `FsDurXfer.fs_footprint_q_runs` is
+`fs_footprint_runs`' share-generic twin (`fs_footprint_q Γ S ⊢ ∃ PM,
+⌜xf_shape S PM⌝ ∗ phi_runs_ex Γ (xr_fs S PM)`), over `inode_phi_q_runs` /
+`fs_inodes_phi_q_runs` and the one-line `gamma_q_inode_dat`
+(`inode_dat (gamma_q Γ dq) n ⊣⊢ inode_dat_q Γ dq n`).  `col_hand_mint` is
+now two pure readings that keep the hand, that one assembly step, that one
+runs call, and `phi_runs_ex_disj` / `phi_runs_ex_in` — no per-object
+cons/concat anywhere in the collection.
+
 **A PURE CONCLUSION IS FREE, AND THAT IS WHAT MAKES THE ASSEMBLY POSSIBLE**
 (`FsCollectAll.pure_keep`): an ENTAILMENT `R ⊢ ⌜φ⌝` yields `R ⊢ ⌜φ⌝ ∗ R`,
 because a pure proposition is persistent and `iProp` is affine.  So the
@@ -624,17 +681,24 @@ allocation happens after they have all closed.
 `fs_links` is the region's per-inum AUTHORITY beside this inode's entry
 TOKENS.  So the cover's bundle alternative lends the pair, `col_side`
 carries it on its bundle arm, and `FsCollect.col_region_quiesce_take` — the
-DESTRUCTIVE twin of `col_region_quiesce_acc` — hands the authority out
-BESIDE the bundle.  No accessor can do both: `ireg_lnk` is a conjunct of
-the very slot the marker arm's reading consumes.
+DESTRUCTIVE door — hands the authority out BESIDE the bundle.  No accessor
+can do both: `ireg_lnk` is a conjunct of the very slot the marker arm's
+reading consumes, which is why the accessor twin is gone.
 
 **THE PAIR IS ONE CONJUNCT AT THE SLOT** (`IcacheEscrow.ic_inode_leg`,
 the era-vocabulary unification's stage 4): the cover's bundle alternative,
 `ic_loaded_lend_owned` and `ic_rd_arm_lend_owned` all lend `ic_inode_leg
 γfs dq γi inum n` rather than the two conjuncts, so the collection takes
-the whole of what a slot holds of one inode in one step and
-`FsCollectAll.ic_slot_cover_side` / `ipool_shape_np_side` open it once at
-the `col_side` boundary.
+the whole of what a slot holds of one inode in one step.  **AND
+`FsCollect.col_side` IS THAT CONJUNCT** (stage 5), so
+`FsCollectAll.ic_slot_cover_side` / `ipool_shape_np_side` are
+pass-throughs and the two `ic_inode_leg_open`s that used to sit at that
+boundary are gone; `FsCollect` pays one `Require IcacheEscrow` for it
+(five files on a 90-file cone, measured free — 1.08 s / 650 MB against
+1.09 s / 653 MB on a probe carrying only the two Require lists), and
+`ic_inode_leg`'s seal moved `Local` → `Global` because a seal does not
+travel.  `col_region_quiesce_acc`, the accessor twin, is DELETED: it had
+no caller and could not acquire one.
 
 **AND `FsStateInode.inode_ghost_of` IS THE STEP THAT PUTS THE PAIR BACK.**
 It takes `link_auth Γ i (fn_mult n) v` and `ent_toks_x Γ i n` — the two
