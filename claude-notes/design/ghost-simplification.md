@@ -1,9 +1,11 @@
 # Post-campaign ghost-state redundancy review — can the proof be simplified?
 
-STATUS: ASSESSMENT ONLY (2026-08-19, coordinator review; nothing executed).
-Verified against `main` @ `874cb5e7` (= the pushed FINAL-GATE tree).  Every
-verdict below rests on a consumer enumeration run against the sources; the
-two machine-checked verdicts cite the campaign's own probes (recorded in
+STATUS: the standing list of what may still be simplified, and — more
+usefully — of what has been PROBED AND REFUSED, so nobody re-opens it.
+SIMP-1 landed, SIMP-2's `fs_ready` half landed (§5.3a), SIMP-4 is refused
+(H2), and SIMP-3 (`gd`) is the one item still open.  Every verdict rests on
+a consumer enumeration run against the sources; the machine-checked ones
+cite the campaign's own probes (recorded in
 [`../completed/iclaim-ledger.md`](../completed/iclaim-ledger.md) §5⁗″/§5⁗⁗).
 Ranking metric, per the user's refinement: **contract-surface reduction
 first** — a candidate that deletes Spec clauses at moderate internal cost
@@ -67,18 +69,23 @@ everything the escrow's frozen arms are decided by (`frzsel`,
 *freezer* `cnt2 = 1` at the +0x82 re-read — that is the icnt agreement's
 `icnt_freeze_forces_one`, B1's actual payout.  Both earn their place.
 
-**H2 — icnt vs the r/rc columns: PLAUSIBLE (internal, mid-cost).**  Two
-count-shaped ghosts move at every ref-word store: the ½-½ `icnt` agreement
-(exact count) and the unit counters (`r + rc ≤ n` pin).  Post-7a′ every
-reference carries a unit (all five mint rows mint; idup copies; iput
-spends), so `r + rc = n` is plausibly an invariant — in which case `icnt`
-(gname `icfg_icnt`, the pool/slot halves, the boot `CM` argument) is a
-second copy of a derivable quantity.  Merge = the ledger's unit columns
-become THE count; the AU family re-proves; pool bundles and `islot2` drop
-their `icnt_half`; the freeze pin reads `r + rc`.  No Spec surface changes
-(the region handle stays for the unit mint), so this ranks below SIMP-A/B
-despite being the largest pure-ghost deletion.  Risk: the exactness
-invariant must survive boot and the conversion — probe first.
+**H2 — icnt vs the r/rc columns: PROBED AND REFUSED.**  Two count-shaped
+ghosts move at every ref-word store — the ½-½ `icnt` agreement (exact
+count) and the unit counters (`r + rc ≤ n` pin) — and the merge looked like
+the largest pure-ghost deletion available.  It is not available.  **`icnt`
+is the ONLY resource held on both sides of the slot↔inum / lock↔region
+wall**: it transports the C-level `ip->ref` word into the inum-keyed ledger
+across iput's lock release (+0x5e..+0x82).  The r/rc columns are an
+`auth nat` whose fragments give LOWER BOUNDS only and whose authority is
+region-side, so no lock-side party can read `r + rc` at all.  The fold
+breaks three live facts at independent sites — `cnt2 = 1` at iput+0x82
+(`icnt_freeze_forces_one`), the token-free `count ≥ 2` freeze refutation on
+iput's non-last close (`ireg_frz_ok_ge2_any`), and `n = 0 ⟹ r = rc = 0` at
+the deposit — and buys ZERO contract surface (`icnt` appears in no
+`Spec*.v`).  The only sound variants RE-HOME it (a fifth `linkElemUR`
+column, or a merge with `frzm` into `dfrac_agree (nat * bool)`), and each
+touches `Xv6Cameras.v` — cone 897, against a recorded RA-depth performance
+ruling.
 
 **H3 — kill `rc` via a claim-implies-counted clause: REFUTED,
 machine-checked.**  `c ≠ None ⟹ 1 ≤ n` is false at the claim mint itself
@@ -142,9 +149,16 @@ Gated increments, each ending at the full three-tops/standing-six gate:
    SpecIget/SpecIput/SpecIunlockput/SpecIdup/SpecIalloc + the ilkc arms.
    The big contract shortening.
 3. **SIMP-3 (gname diet, probe-first):** `gd` retirement (H4).  `icfg`
-   shrinks 9 → 8 gnames.  Internal.
-4. **SIMP-4 (optional, largest):** the H2 icnt-into-ledger merge —
-   worthwhile only if the exactness probe is clean; otherwise skip.
+   shrinks 9 → 8 gnames.  Internal.  **The one item of this list still
+   open**, and never proposed to the owner.
+4. ~~**SIMP-4: the icnt-into-ledger merge**~~ — REFUSED (H2 above): `icnt`
+   is the only resource crossing the lock↔region wall, and every sound
+   variant re-homes it into `Xv6Cameras.v`.  Do not re-open.
+
+**One deletion this list did not predict** and that did land: the freeze
+RECEIPT (`frzown`) is gone from the tree, camera and all.  It bought one
+fact at one program point, which the freeze pin already gives; a receipt
+whose content is a second copy of a pin's is the shape to look for next.
 
 ## 4. Leave it alone (accreted, but load-bearing)
 

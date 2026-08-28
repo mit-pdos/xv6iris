@@ -11,6 +11,21 @@ WORK is authorized from this file yet: execution is sequenced AFTER the
 sysfile cone per the approved plan.  When the fragment campaign opens,
 it starts here.
 
+> **THE LINK LEDGER THIS FILE VERIFIES AGAINST IS GONE.**  `DirLinks.v`,
+> `dir_links`/`dir_link_at`, the `wl`/`wdu`/`wdt`/`g`/`p` columns and the
+> `ilink`/`igrey`/`iparent` fragments are DELETED.  Link counts and types
+> are now ONE counting RA per inode (`Xv6Cameras.fsLinkUR`, an
+> `auth (gmultiset ity)` with `ity := TFile | TDir p`), a directory's
+> entries hold fragments of their TARGET's register inside
+> `FsStateInode.ent_toks_x`, and an orphan's `".."` is TOKENLESS by
+> construction — the design of record for that layer is
+> [`fs-state.md`](fs-state.md) §6½.  Read every `DirLinks` citation below
+> as naming the SHAPE the ruling above it is about, not a live definition:
+> the rulings R1–R12 are what this file is read for, and they are about the
+> tree layer, which the register did not change.  The out-edge multiset R6
+> asks for IS the entry tokens, and the dangling edge the report formalises
+> as a grey disjunct is the tokenless `".."`.
+
 ## 0. RULINGS (coordinator, 2026-08-14)
 
 R1. **The tree type is adopted as reported** (§1.1): an inum-keyed node

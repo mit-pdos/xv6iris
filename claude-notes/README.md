@@ -61,30 +61,35 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   phasing (the tree is red across the port — read §6 before starting).
 - **[`adequacy.md`](design/adequacy.md)** — whole-system adequacy, and the TRACE INVARIANT hook `Hphi`: how a pure consequence of any Iris invariant is exported to every state of the CSL-free execution, which conjunct of `state_interp` each kind of fact comes from, and what `wp_strong_adequacy` still leaves on the table.
 - **[`durable-fs-plan.md`](design/durable-fs-plan.md)** — THE DESIGN OF
-  RECORD for the durable file system, in one place: the three disk
-  views, the file-system predicate at two instances, the WAL's
-  client-facing contracts (`begin_op`/`end_op` with a transaction token,
-  ONE `ilock` with a write arm parking a share of it and a read arm
-  keeping ¾ of the bytes, `log_write` owing nothing but its bytes), the
-  commit that COLLECTS the predicate over `L` from the FS invariants at
-  quiescence and allocates a fresh snapshot from it, boot as the same
-  allocator's second call site, and why every earlier mechanism died —
-  including the per-write payload.
-- **[`fs-state.md`](design/fs-state.md)** — the PREDICATE itself: the view
-  record `Γ`, byte-level ownership on both the durable and logged sides,
-  `inode_owned`/`free_bitmap`/`fs_state` as nested predicates
-  with link TOKENS and no whole-state pure clauses, "in flight, not
-  inconsistent", the log's FS-agnostic interface (§0–§2, §7).  The durable
-  side's design is `durable-fs-plan.md`'s.
+  RECORD for the durable file system, in one place: the three disk views,
+  the share-taking predicate at two instances, the WAL's client-facing
+  contracts (`begin_op`/`end_op` with a transaction token, ONE `ilock`
+  with a write arm parking a share of it and a read arm keeping ¾ of the
+  bytes, `log_write` owing nothing but its bytes), the commit that
+  COLLECTS the predicate at quiescence as an ACCESSOR and hands it to the
+  RESOURCE TRANSPORT, boot as that same transport's second call site (the
+  epoch is lent out of the crash predicate at the PowerOn arm), and §8's
+  list of what was refuted.
+- **[`fs-state.md`](design/fs-state.md)** — the PREDICATE itself:
+  `fs_state Γ dq S` (every byte at `dq`, the authority column whole), the
+  view record `Γ`, `inode_owned`/`free_bitmap` as nested predicates with
+  link TOKENS and no whole-state pure clauses, the ONE transport that
+  reaches a fresh instance from an old one, "in flight, not inconsistent",
+  the link/type register (§6½), and the log's FS-facing interface (§5).
+  The durable side's design is `durable-fs-plan.md`'s.
 - **[`fs-ghost-state.md`](design/fs-ghost-state.md)** — the reference
   INVENTORY of every file-system ghost: per piece its RA, its HOME, what a
-  fragment means, who mints/spends it — the log's transaction token and
-  block-1 park, the region's armed registry, the pool split and its
-  partition, the per-slot escrows' write/read arms, the durable snapshot
-  and what the commit collects.
-- **[`crash.md`](design/crash.md)** — power, crashes and generations: the ghost
-  power thread, generation-indexed loop expressions, the fixed/era `riscvGS`
-  split, the crash-spanning disk invariant.
+  fragment means, who mints/spends it — the log's transaction token and the
+  ONE pin atom (`TxPin`) every park is an instance of, block 1's park, the
+  region's armed registry, the pool split and its partition, the per-slot
+  escrows' write/read arms, the durable snapshot, what the commit collects
+  and what the boot is lent.
+- **[`crash.md`](design/crash.md)** — power, crashes and generations: the
+  ghost power thread, generation-indexed loop expressions, the fixed/era
+  `riscvGS` split, the crash-spanning disk invariant, and the PowerOn arm's
+  two client hooks — `Hproj` (a pure fact into each boot) and `Hswap`,
+  which also carries a RESOURCE out, the durable epoch the next era's file
+  system is re-founded from.
 - **[`device.md`](design/device.md)** — the memory-mapped device model (16550
   UART + PLIC + virtio-mmio disk), the device ghosts, the bus-master/DMA-lease
   story, the S-mode instruction-level UART access layer.
@@ -123,9 +128,11 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   predicate, the two-ended fractional reference algebra, `PageFields.v` (carving
   a kalloc'd page into typed struct fields — reusable), and page reclamation.
 - **[`fs-log.md`](design/fs-log.md)** — the FS block layer: the three
-  block-content states, the `γL` logged-view ghost and its commit discipline,
-  the Ψ-parametric bio escrow, the bread/bwrite/brelse contracts, `log_res` and
-  the begin_op/end_op/log_write specs, and the stage-4 crash plan.
+  block-content states, the logged byte view and its commit discipline, the
+  view-record-parametric bio escrow, the bread/bwrite/brelse contracts,
+  `log_res` and the begin_op/end_op/log_write specs, and the WAL's four
+  FS-facing rows — the byte view, block 1's park, the commit law, and the
+  exception set that makes recovery need no clean image.
 - **[`fs-inode.md`](design/fs-inode.md)** — the inode layer: `struct inode`'s
   geometry read off `bmap`'s instructions, the pure `blkmap` model, the two
   resources (`inode_map`, `inode_blocks`) and why `balloc`'s fresh block is
@@ -144,6 +151,10 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 - **[`fs-friendly.md`](design/fs-friendly.md)** — the friendly, client-facing
   file-system layer above the syscall proofs: what a caller should be able to
   say, and the staging that gets there.
+- **[`ghost-simplification.md`](design/ghost-simplification.md)** — the
+  standing list of what the file-system ghost state may still shed, and —
+  more usefully — of what has been PROBED AND REFUSED, so nobody re-opens
+  it.  One item is open (`gd`, SIMP-3).
 - **[`fs-fragments.md`](design/fs-fragments.md)** — the fragment algebra and
   the tree layer, the DESIGN OF RECORD for F1/F1.5: rulings R1–R12 (including
   the standing constraint that (L6) must NEVER be stated) over a verification
