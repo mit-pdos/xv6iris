@@ -86,16 +86,36 @@ things, and the answer differs:
   can carry the γtop↔snapshot tie).  Wanted by lane W's AU-to-durable
   story; an R10 change to a landed contract, so it waits for the
   owner's word.  Lane D did not need it (determinism route).
-- [ ] **A — the abstract state and carriers (S0 done; ready).**  Four
-  pieces, all readings: (i) `abs_of : fs_node → anode` + the carrier
-  `i ↦ₐ{q} a := ∃ n, top_frag_q _ q i n ∗ ⌜abs_of n = a⌝` + the
-  `state av` accessor off `fs_view`; (ii) `path_at` off the ghost trace
-  (the salvaged `DirViewPin` statement over the new carrier); (iii) THE
-  DVIEW RETIREMENT: re-fire `nx_hop` off the payload's `top_frag`
-  (`dv_lookup_found` restated over `dir_entries`), then take the
-  `dv_*` column off the payloads — hop seam FIRST, column second (the
-  reverse re-pays N-1); (iv) price the offset seam for the fd row (the
-  one datum with no ghost — lives in `fcontent` behind `file_ref`).
+- [~] **A — the abstract state and carriers.**  Items (i)+(ii) DONE
+  2026-08-28 (Opus lane, `iris/FsAbs.v`, 699 lines, zero axioms):
+  `absnode`/`anode`/`abs_of` off the landed readings; `nview(_dq)` =
+  `top_frag_q`'s `abs_of` reading with agreement / split (⊣⊢, both
+  directions) / fractional / timeless; `astate Γ av` with
+  `fs_view_astate : fs_view Γ ⊣⊢ ∃ av, astate Γ av` (Q3 as an
+  EQUIVALENCE, no new invariant) and `astate_nview` (held share reads
+  the authority's row); `apath_at` (NAMED so — `FsTree.path_at` is in
+  the cone; `apath_at_tree` proves they are one function, inheriting
+  FsTree §7's algebra); `arun` (the visited-inum walk, total + converse
+  forms); the DirViewPin statement restated as `ax_hop`/`ax_hops_from`
+  (= `nx_hop`/`nx_hops_from` with the lent fragment ABSTRACTED —
+  machine-checked `reflexivity` receipts quoted in the header) and the
+  pinned-walk package `apn_walk`, with NO divergence arm (a
+  `top_frag_q` share is not a cancellable lend — the v3 stability
+  story cashed out).
+  AS-LANDED GOTCHAS: `aview` must stay a NOTATION (a Definition splits
+  the `lookup` elaboration and `abs_tree_ent` stops closing); no
+  `T_DEVICE_z : Z` exists (ADev is the else arm; sharpen `abs_of_dev`
+  if one lands); `apn_pins` is Typeclasses Opaque — consumers
+  `Require Import FsAbs` directly.
+  REMAINING: (iii) THE DVIEW RETIREMENT — the one gate on
+  instantiating `apn_walk` against `wp_namei_tr`.  Suggested seam
+  (from the lane): `dv_half d dq ents ∗ top_frag_q Γ dq' d n ⊢
+  ⌜ents = dir_entries n⌝`, proved ONCE where both live in the payload
+  (escrow/region); then `lend_agrees Γ dv_half` is immediate and
+  `apn_hop`/`apn_walk` apply UNCHANGED at `F := dv_half`.  Hop seam
+  first, `dv_*` column off the payloads second.  (iv) the offset seam
+  for the fd row; plus the §2 leftovers (`root_is` — `FsImg.ROOTINO`
+  is reachable from FsAbs — and the fd/cwd carrier readings).
 - [ ] **W — the first increment's AU specs (after A).**  mknod →
   unlink → write, in that order (§9 Q6: spike-adjacent first, hardest
   in-memory arm second, per-chunk honesty third).  open/read/close/
