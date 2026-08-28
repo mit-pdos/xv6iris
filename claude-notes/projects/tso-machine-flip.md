@@ -10876,19 +10876,329 @@ carrying two contracts it could not carry this morning.
    (the tie `⌜T ≤ t_rel⌝` is at the lock word's own ledger element
    timestamp, which exists only now), so it comes after item 1.  Expected to
    green `ProofSwtch` and unblock the scheduler chain.
-3. **§0.28′ + §0.29′ — the trap-handler capability problem DISSOLVES**
-   (`acf8d0f4`, `ff8082dc`, `2109f288`).  No transport is to be built.  The
-   pass is: finish the M3 λ-conversion on the straggler payloads
-   (`cons_res` is the real one), re-home the naked discarded cell families
-   (virtio ring pointers INTO `vdisk_lock`'s payload; `devsw` as ROWS OF THE
-   STARTED DEPOSIT at `main_deposit`'s named context `ξd`, NOT behind
-   `fs_ready`), retire `caps_morph`, and check that `ProofKernelvec`'s
-   remaining error dies with no new machinery.  Sweep for the whole class
-   while there — every boot-published read-only fact (everything hart 0
-   writes before the started flag) distributes through the started deposit —
-   and record the per-fact channel assignments, because *every persistent
-   fact names the barrier that distributes it*.  The virtio pair likely
-   follows from the same re-homing.
+3. **§0.28′ — the trap-handler capability problem DISSOLVES** (`acf8d0f4`,
+   `ff8082dc`).  No transport is to be built.  The pass is: finish the M3
+   λ-conversion on the straggler payloads (`cons_res` is the real one),
+   re-home the virtio ring pointers INTO `vdisk_lock`'s payload, retire
+   `caps_morph`, and align `kernelvec` to take `devintr_caps` from
+   DEPOSIT-DESCENDED resources rather than boot-captured ones — the M-leg's
+   `main_deposit` already routes `console_caps` as a deposit row, so the fix
+   direction is unchanged and the row it needs already exists.
+   > **§0.29′'s devsw item is CANCELLED — §0.33′ (`98f92ca64`), refutation
+   > by MEASUREMENT.**  `devsw` was never invariant-distributed: despite the
+   > name, `console_inv` is a plain persistent bundle passed BY VALUE, and
+   > both extraction sites (`ProofSyscall:3479`, `SpecFileread:402`) project
+   > from a bundle the consumer already holds out of `syscall_env`.  The
+   > channel is the PARK CHAIN, which this tree already proves (§0.16′'s
+   > `CtxMorph` transport IS that crossing).  **Do NOT move `devsw_table`
+   > into the started deposit and do NOT touch `ConsoleInv` membership**;
+   > `main_deposit`'s nine rows are already the correct membership.  What
+   > survives of the started work is only the producer wiring already queued
+   > separately — `ProofMain`'s publication (the third `strans_res_at` /
+   > `kpt_res_at` arm) and the flag-write leaf.
+   > *The membership test is CONSUMER-side ("does every consumer's ancestry
+   > already pass through a fence-bearing channel?"), not writer-side: devsw
+   > passes the writer-side test and fails the consumer-side test's premise.
+   > And the proof had ALREADY obeyed the principle before it was stated —
+   > §0.16′'s transportability demand forced every persistent fact in-band —
+   > which is why measurement refuted the exemplar and confirmed the rule.*
 4. `ProofForkret`'s mechanical threading of `SpecForkret`'s new premises
    (A6.90's note), and the two U-mode files (`UserMemPt`, `UptWalkPt`) under
    §0.24′'s generic/binary split.
+
+### A6.87 THE INVARIANT RESHAPE IS DONE AND THE FREE-PATH READ OWNS NOTHING —
+### BUT `WpSconfLock` IS NOT A RESHAPE, IT IS THE M4 UNIT'S SECOND HALF
+
+Executing the coordinator's item (1).  **The reshape A6.86 §(6) called "the
+single thing between here and the 160-file cone" was the first of two things,
+and this entry is the correction.**  The reshape is landed and green; the
+cone does NOT open, because behind it sits the per-leaf TIER CONTENT of the
+M4 unit — ten leaves whose reads and writes now go to a ledger cell — and one
+of those leaves needs a design step that does not exist yet.
+
+#### (1) LANDED: THE RESHAPE, AND IT IS A ONE-LINER PER SITE
+
+`WpLock` names the body (`lock_body`) and `lock_inv` is `lock_body ∗
+lk_addr_claim lk 4 ∗ lk_addr_claim (lock_cpu lk) 8`, with `lock_inv_open` /
+`lock_inv_close` as its two halves.  Every leaf peels the claims once
+(`iDestruct "Hbody" as "(Hbody & >#Hcl4 & >#Hcl8)"`) and hands them back at
+the close (`rewrite /lock_inv /lock_body. iFrame "Hcl4 Hcl8"`), and
+**everything between is the pre-flip text, unchanged** — 8 opens, 8 closes,
+two lines each.  `WpLock` is green with it.
+
+#### (2) LANDED, AND IT IS THE WORKED EXAMPLE: THE READ THAT OWNS NOTHING
+
+`wp_clw_lockopen_s_sconf` — `holding()`'s free-path word read, "any value, no
+evidence in or out" — **no longer opens the lock at all.**  A6.78 §(2)
+predicted it and the M4 flip is what makes it true: at the ledger tier the
+word carries no context, so a read that promises its caller nothing about the
+value needs no resource from the invariant.  The obligation is discharged
+from RAM-ness and the interp through `TsoCtx.ledger_read_any_word_ok`, on the
+value-UNKNOWN AU (`wp_load_s_sconf_au_exv`, A6.78) at `Res := emp`.
+
+Two things this cost, both small and both now in the kit:
+
+- **`lk_addr_claim` carries its per-byte half, RAM-ness included.**
+  `ledger_read_any_word_ok` wants RAM at every byte of the window, and
+  `TsoCtx.mem_free` (the free page's byte, A6.85) wants the mapping at every
+  byte.  Both come free at the producer — A6.86's rule again: the claim is
+  read off the ctx word before the cell leaves the tower, and a ctx word is
+  ctx BYTES.  `lk_addr_claim_ram` is the pure projection.
+- **`lock_claims` exports the `lk_addr_claim`s, not the `wordw_claim`s**, and
+  the four translation premises project with `lk_addr_claim_wordw`.  The
+  strong form is what the leaves need; the weak one is one line away.
+
+> **AND A PROOF-MODE FACT WORTH THE LINE, because it cost three builds.**
+> The AU's load obligation is a COQ premise, and an `_` for it is SHELVED,
+> not opened as a goal — `3:{`/`4:{` both fail, one with "No such goal".  It
+> has to be passed BY NAME, so the obligation becomes its own `Local Lemma`
+> with the pure side conditions (`Hram`) in front of the telescope the AU
+> fixes.  *A premise you cannot focus is a premise you must name.*
+
+#### (3) WHAT IS ACTUALLY LEFT, LEAF BY LEAF — AND IT IS NOT MECHANICAL
+
+| leaf | what it touches | state |
+|---|---|---|
+| `wp_clw_lockopen_s_sconf` | word, concludes nothing | **GREEN** (§(2)) |
+| `wp_clw_lockopen_locked_s_sconf` | word, HOLDER concludes ≠ 0 | **BLOCKED — see §(4)** |
+| `wp_sw_zero_lockfin_s_sconf` | word, release's `sw x0` | ledger store gate, mechanical |
+| `wp_amoswap_lockopen_s_sconf` | word, the AMO | needs the ledger AMO gate |
+| the seven `lkcpu` leaves | the owner cell | the wpay kit A6.84 built is exactly for these |
+
+So the unit is ~10 leaves of TIER CONTENT behind a reshape that took an
+afternoon.  **A6.86 §(6) called the whole of `WpSconfLock` "mechanical"; that
+was true of the reshape and false of the file**, and the mistake is the same
+shape as A6.84 §(5)'s price estimate — *counting the edit and not the
+obligation.*
+
+#### (4) THE ONE DESIGN ITEM, STATED ONCE
+
+`wp_clw_lockopen_locked_s_sconf` is the HOLDER reading `lk->locked` and
+concluding it is non-zero (§0.25′'s case (1), the holder's own-write read).
+The invariant's held arm says the CURRENT value is non-zero; under TSO the
+load may return an older one, and nothing in `lock_word`'s present shape
+excludes it.  The honest fix is the one A6.84 already applied ONE FIELD OVER:
+**the held arm must carry the holder's own-write receipt.**  `lk_cpu_pay_vis`
+puts a `ledger_vis` fragment beside every byte of the owner cell and that is
+what makes the holder's read of the cell it wrote EXACT
+(`TsoCtx.ledger_read_wpay_vis_ok`); the lock WORD has no such arm, so
+`lock_word` needs its `_vis` twin, minted by the AMO at acquire and dropped
+at release.
+
+> **THE HELD ARM CARRIES MORE THAN THE OTHER TWO — TWICE, AND THE SECOND TIME
+> WAS PREDICTABLE.**  A6.78 §(2) said it about `lk_cpu_res` and A6.84
+> implemented it there.  The lock WORD is read by its holder for exactly the
+> same reason (`holding()` reads both fields), so it wants exactly the same
+> asymmetry.  *When one field of a racy pair needs an own-write receipt, ask
+> immediately whether the other one does — the code reads them together.*
+
+Scope: this is the M4 unit's remaining tranche (`lock_word_vis` + the AMO's
+mint + release's drop + the four word leaves).  **§(7) below is what happened
+when it was built** — the resource went in green and the LEAF found a design
+question that is not the wpay kit's shape after all.
+
+#### (5) THE NUMBER, AND THE BOUNDARY IS HELD
+
+`WpLock` green; `WpSconfLock` red, as at baseline, on §(3)'s tier content
+rather than on the reshape.  Everything landed this pass is strictly forward:
+the reshape, the free-path read, `lk_addr_claim`'s per-byte half.
+**No green file went red.**
+
+#### (6) CONSEQUENCE FOR THE COORDINATOR'S QUEUE
+
+The cone stays closed, so item (1) is NOT complete and §0.27′ (item 2) cannot
+start — it is explicitly the lock/scheduler tier and rides on these same
+files.  **§0.28′ + §0.29′ (item 3) do NOT depend on any of this**:
+`ProofKernelvec`'s cone is the M3 λ-stragglers (`cons_res` the real one), the
+virtio ring pointers into `vdisk_lock`'s payload, `devsw` as rows of the
+STARTED DEPOSIT (§0.29′ correcting §0.28′(2)'s `fs_ready` placement), and
+`caps_morph`'s retirement.  **That is the next thing to pick up, and it is
+independent of the lock tier** — a fresh lane can run it in parallel with the
+M4 unit's second half.
+
+#### (7) THE HELD ARM IS BUILT AND GREEN — AND IT NAMES A NEW DESIGN CLASS:
+#### AN AUTHOR RECEIPT IS HART-RELATIVE, THE CTX TOWER'S EXACTNESS WAS NOT
+
+§(4)'s tranche was built and the RESOURCE half went in first try:
+
+| where | what |
+|---|---|
+| `TsoCtx.phys_ledger_word4_vis h B a dq w` | the word carrier with a `ledger_vis` beside every byte |
+| `phys_ledger_word4_vis_forget` | the held arm drops its receipt (release's exit) |
+| `ledger_read_word4_vis_ok` | the holder's EXACT read, at `B := 0` via `view_lb_0` |
+| `phys_ledger_word4_vis_of_store` | the mint, off `ledger_store_win_at_ok`'s own message fragment |
+| `WpLock.lock_word_ex ex lk v` | the STATE selects the arm — `lk_cpu_cell_ex`'s shape, one field over |
+
+`lock_body`'s word slot is `lock_word_ex (lk_ex st) lk v`, and **`WpLock` is
+green with it, creators and finishers included** — they are all at `st = None`,
+where `lock_word_ex None` is `lock_word` definitionally, so not one creator
+moved.  Underneath, nothing new was needed: the store gate already hands the
+append's own message fragment back and `ledger_read_bytes_vis_ok` already
+consumes exactly this shape.  A6.84 built both for the owner cell.
+
+**THEN THE LEAF REFUSED, AND THE REASON IS THE FINDING.**
+`ledger_vis h B t`'s author arm says *the message at `t-1` was written by
+agent `h`*, and `TsoMemPa.visibleb` turns that into an exact read only for a
+reader that IS `h`.  So the holder's read needs
+
+  `hart_agent (@cpu_id CIDw) = hart_agent h0`
+
+where `h0` is the ENTRY hart bound by `locked γl h0` and `CIDw` is the hart
+the instruction obligation binds (A6.63'' / §0.20′'s re-park: it is a FRESH
+`CpuId`, and the two print identically).  **The leaf has no such fact.**
+
+> **AND THIS IS A CLASS, NOT A LEAF: AT THE CTX TOWER EXACTNESS WAS
+> CONTEXT-RELATIVE AND THEREFORE MIGRATION-SAFE; AT THE LEDGER TIER WITH AN
+> AUTHOR RECEIPT IT IS HART-RELATIVE AND IS NOT.**  `ctx_load_ok` reads
+> through `own_context ξ`, and a thread's context token travels with the
+> thread across harts — which is exactly why the pre-flip leaf needed no hart
+> identity at all and read `Hwnz` straight off the invariant.  An author
+> receipt names a HART.  The kernel's reason it is sound is real and
+> familiar — `holding()` runs with interrupts off under `push_off`, so the
+> thread cannot migrate while it holds the lock — but that is a fact about
+> the SCHEDULER, and no leaf in this file has it in hand.
+>
+> **THE SAME QUESTION IS OWED BY A6.84's `lk_cpu_pay_vis`**, which is the
+> owner cell's held arm and was landed on the same "the holder's read of the
+> cell it wrote is EXACT" sentence.  It has not been exercised by a leaf yet;
+> when the seven `lkcpu` leaves are written it will ask the identical
+> question.  *One design item, two fields — do not pay for it twice.*
+
+**WHAT THE ANSWER PROBABLY IS, for whoever picks this up.**  Either (a) the
+no-migration fact becomes a conjunct the lock kit carries — `locked γl h0`
+strengthened to tie `h0` to the ambient hart for as long as it is held, which
+is what `push_off` buys and what `sie_cap_gpr`'s hart-pinning already almost
+says; or (b) the receipt is made context-relative rather than hart-relative,
+i.e. the held arm carries a CONTEXT-indexed dirty bit instead of a
+`ledger_vis` — which is the ctx tower again and is what the M4 flip removed
+on purpose.  **(a) is almost certainly right** and it belongs beside §0.27′,
+which is the other place the scheduler's discipline has to become a stated
+fact.  This is a genuinely new design class; per the standing rule it is
+characterized and stopped here rather than guessed at.
+
+**BOUNDARY:** `TsoCtx` and `WpLock` green with the whole held-arm family;
+`WpSconfLock` red exactly where it was, on §(3)'s remaining leaves.  Nothing
+landed this pass is speculative — the resource is proved, the gates are
+proved, and only the leaf that consumes them is blocked.
+
+> **PROCESS, AGAIN, AND IT IS THE SAME ONE.**  A `--sync-only` was issued
+> while round 10 was still building, which is A6.86 §(7)'s trap wearing a
+> different hat: the sources changed under a live round, so its number had to
+> be thrown away and the round killed.  *Do not sync a tree that is being
+> built — the lock you need is on the TREE, not on the ssh.*
+
+### A6.88 §0.32′ IS LANDED — `byte_any` IS THE VISIBILITY-FREE BYTE, THE
+### SPLIT NAMES ARE GONE, AND THE FORWARD DIRECTION MOVED ONTO THE WRITE
+
+(The owner asked for this at A6.87; that number was already taken by this
+session's earlier tranche, so it is filed here.  Ruling: `tso-port.md`
+§0.32′, `5f845a780`.)
+
+A6.85 introduced a SECOND page tier for kfree and kept `byte_any` at the
+registered one.  §0.32′ drops the second name: **`byte_any` and `page_own`
+themselves redefine to the visibility-free bodies**, both still sealed, and
+`kfree_pre` reverts to `⌜page_valid p⌝ ∗ page_own p` — the same text it had
+before A6.85, now meaning what §0.26′ says it should.
+
+> **WHAT LICENSES THE COLLAPSE IS THE AUDIT, and it is worth stating as the
+> principle.**  A6.85 §(3) swept every kalloc client and found that NONE
+> reads a fresh page before writing it — xv6's kalloc memsets the page it
+> returns, so the only reader of allocator storage is the allocator.  Once
+> no client can read an unwritten byte, `∃ x, a ↦ x` and "the future half of
+> the ownership of `a`" have exactly the same set of customers, and
+> **preserving the stronger one was a distinction without a difference.**
+> The audit is cited in `KallocInv`'s header, because it is the licence.
+
+#### (1) WHAT DIED, AND IT IS ALL SUBTRACTION
+
+`byte_free`, `page_free`, `byte_any_free`, `page_own_free`,
+`kfree_pre_of_own`, `bwin_free_split`, `bwin_any_free`, `bwin_free_rebase`,
+`bb_page_named`, `page_own_to_phys`, `page_own_pipe_raw`, and BOTH `_free_`
+memset-page forms (`wp_memset_page_free_{val_,}sconf`) — the last because
+`page_own` IS the free page now, so A6.85's pair collapsed into the two
+originals.  **The nine A6.85 call-site coercions deleted and the callers'
+pre-A6.85 text works again through the sealed name**, exactly as the ruling
+predicted; verified by reversion at all nine.
+
+> **AND THE `CtxMorph` OBLIGATIONS COLLAPSED TOO, which nothing predicted.**
+> `TsoCtx.mem_free` is not ξ-indexed, so `byte_any` and `page_rest` became
+> CONTEXT-FREE and their M3 transport instances degenerate to the identity
+> (`iIntros; iModIntro; iFrame`).  *A byte nobody may read has no context to
+> be registered to* — the ruling's collapse showing up one tier down, and
+> free.
+
+#### (2) WHAT MOVED: THE FORWARD DIRECTION IS OFF THE WRITE
+
+Every lemma that read a determinate word or a named run OUT of a page
+window is exactly the claim the ruling removes, and every one of them moves
+onto a run the caller has WRITTEN:
+
+| was | is | who holds it |
+|---|---|---|
+| `page_head8_word_at` | `filled_head8_word_at` | kfree, off its own memset |
+| `bytes_word4/8`, `page_field4/8`, `page_words8`, `bwin_bytes_list` | the `_named` twins | any caller after its write |
+| `bb_page_named` | `page_filled_named` / `bb_any_named` | kalloc's clients |
+| `page_own_pipe_raw` | `page_filled_pipe_raw` | pipealloc |
+| `page_own_to_phys` | `page_filled_to_phys` | the PT tier |
+| `kstack_own_intro`, `tf_page_of_page_own`, `proc_pt_grow{,_uvm}`, `kxc_page_take` | `page_filled` / named premises | their kalloc'd pages |
+
+**And `kalloc_post` carries the VALUED run** (`page_filled r kalloc_junk`),
+which is strictly more informative and is what keeps `allocproc`'s trapframe
+honest — the first process's `userret` restores GPRs from slots only that
+memset ever wrote.  Clients that wanted only ownership downgrade with one
+`page_own_of_filled`; `kalloc_post_success` keeps its old type (downgrading
+inside) so its own callers did not move at all.
+
+> **THE ONE SHAPE THAT IS NEITHER: A *BORROWED* PAGE IS NAMED, NOT FILLED.**
+> `proc_pt_page_acc` hands a MAPPED page out to be READ (copyin/copyinstr/
+> exec) and takes any run back.  `page_filled` (one constant) is too strong
+> for it and `page_own` is now too weak, so `ProcPtOwn.page_named` — the
+> pointwise `∃b` run — is the third currency.  *Three page shapes, and each
+> names who wrote it: nobody (`page_own`), me (`page_filled`), somebody
+> (`page_named`).*
+
+#### (3) THE LEDGER
+
+Files touched: `KallocInv`, `PageFields`, `ByteBuf`, `PipeInv`, `ProcPtOwn`,
+`ProcInv`, `KstackOwn`, `SpecMemsetPage`, `ProofMemsetPage`, `ProofKalloc`,
+`ProofKfree`, `ProofWalk`, `ProofUvmcreate`, `ProofUvmalloc`, `ProofUvmcopy`,
+`ProofVmfault`, `ProofKvmmake`, `ProofVirtioDiskInit`, `ProofPipealloc`,
+`ProofAllocproc`, `ProofCopyinstr`, `ProofSysExec`, `SpecKexecB2`,
+`ProofKexecB2`, `BootCarveMain`, plus the nine reverted call sites.  **~25
+files, and all but the six statement moves in §(2) are one or two lines.**
+
+**FOR THE MAIN MERGE: NOTHING IS OWED.**  On SC the old and new bodies
+coincide, so this refactoring has no SC-provable content; the cutover swaps
+`byte_any`'s body and nothing above it moves.  The owner has withdrawn it
+from the main design doc (§0.32′), which is the second refactoring to be
+withdrawn from main this week — see §0.33′ for the first.
+
+#### (4) THE NUMBER, AND THE BOUNDARY IS HELD AGAIN
+
+**1098 of 1296, RED 11 — the baseline set, file for file**
+(`ProofForkret`, `ProofForkretPark`, `ProofKernelvec`, `ProofMain`,
+`ProofSwtch`, `ProofUserretClosed`, `ProofVirtioDiskIntr`,
+`ProofVirtioDiskRwD`, `UptWalkPt`, `UserMemPt`, `WpSconfLock`).
+`Abort` 0, `Admitted` 0, `Axiom` 0.  **No green file went red** across the
+whole ~25-file collapse.
+
+> **HONEST QUALIFIER:** this is a full incremental `-k` round over a tree
+> whose `KallocInv` changed, so effectively everything downstream rebuilt;
+> it is NOT a `rm -f *.vo` round.  A6.38's clean-round rule bites after a
+> MACHINE change and none happened here, but the next lane should still
+> open with one.
+
+#### (5) THE FRONTIER, RESTATED AFTER THIS SESSION
+
+1. **`WpSconfLock`'s leaves** — A6.87 §(3)'s table, and A6.87 §(7)'s design
+   item is the gate: the holder's own-write receipt is HART-relative while
+   the ctx tower's exactness was CONTEXT-relative, so the leaf needs a
+   no-migration-while-holding fact the lock kit does not yet carry.  The
+   resource half (`lock_word_ex` + the whole `phys_ledger_word4_vis` family)
+   is BUILT AND GREEN; only the leaf that consumes it is blocked.  This is
+   still the only thing between here and the 160-file cone.
+2. **§0.27′** — the p->lock resume tie; rides on the same files.
+3. **§0.28′** — the trap-handler dissolution, with §0.29′'s devsw item
+   CANCELLED by §0.33′ (see A6.87's frontier, corrected).
+4. `ProofMain`'s publication wiring, `ProofForkret`'s threading, the virtio
+   pair, and the two U-mode files under §0.24′.
