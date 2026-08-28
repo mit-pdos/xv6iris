@@ -11204,3 +11204,287 @@ whole ~25-file collapse.
    CANCELLED by §0.33′ (see A6.87's frontier, corrected).
 4. `ProofMain`'s publication wiring, `ProofForkret`'s threading, the virtio
    pair, and the two U-mode files under §0.24′.
+
+### A6.89 THE HART-RELATIVE EXACTNESS CLASS IS CLOSED — THE NO-MIGRATION FACT
+### IS `wp_next`'s OWN PROMISE, AND THE OWNER'S SPELLING (a) IS REFUTED BY THE
+### BUILD
+
+Executing the coordinator's queue in the fliptree
+(`/tmp/claude-0/-shared-xv6iris-3/861bc642-…/scratchpad/fliptree`; all numbers
+from the GCP VM under `flock /tmp/claude-gcp.lock`, per-subtree
+`coq_makefile` recipe).  **A6.87 §(7)'s design class is CLOSED and both of
+its two fields are exercised and green.**  The rest of `WpSconfLock` is not,
+and §(7) below names the one NEW blocker that stands between here and the
+160-file cone.
+
+#### (0) THE CLEAN ROUND, FIRST, AND THE BASELINE IS HONEST
+
+`rm -f iris/*.vo iris/*.vok iris/*.vos iris/*.glob iris/.*.aux` then one full
+`-j180 -k` round: **`MAKEEXIT=2`, 1098 of 1296, RED 11 — the baseline set,
+file for file** (`ProofForkret`, `ProofForkretPark`, `ProofKernelvec`,
+`ProofMain`, `ProofSwtch`, `ProofUserretClosed`, `ProofVirtioDiskIntr`,
+`ProofVirtioDiskRwD`, `UptWalkPt`, `UserMemPt`, `WpSconfLock`).  A6.88 §(4)'s
+qualifier is discharged: the number was an incremental one, and the clean
+round agrees with it exactly.  `md5sum kernel-rocq/*.v user-rocq/*.v`
+recorded and re-checked unchanged after every round
+(`edd91972b6bc1b944fd98a2cc2363815`).  Disk on `/mnt/rocq`: 873 G free.
+
+#### (1) THE FIX, AND IT IS ONE PREMISE AND ONE ARGUMENT
+
+A6.87 §(7)'s leaf needed `hart_agent (@cpu_id CIDw) = hart_agent h0`, where
+`CIDw` is the FRESH `CpuId` the instruction obligation binds.  **The fact
+already exists in the tree and had simply never been handed down.**
+`WpNext.wp_next b p K` is
+
+```coq
+  ∀ CID : CpuId, ⌜ b = false \/ p = zero_reg -> (CID : CPU) = (CID0 : CPU) ⌝ -∗ K CID
+```
+
+and `wp_load_s_sconf_au_dat`'s proof introduces exactly that binder pair
+(`rename CID into CID0; iIntros (CID Hs)`) and then applies its `Hload`
+obligation AT THAT `CID` — with `Hs` in scope and unused.  So the change is:
+
+| where | what |
+|---|---|
+| `WpSconfMem.wp_load_s_sconf_au_dat` | `Hload` gains the premise `b = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)`, discharged at the application site by `Hs` |
+| `WpSconfMem.wp_load_s_sconf_au` | its ctx-tower supplier takes one more `_` (the ctx tower is CONTEXT-relative and wants nothing from it) |
+| the two lock leaves | gain the premise `b = false \/ p = zero_reg`, discharged at their ONE call site by `or_introl eq_refl` |
+
+**`holding()` is already stated at the LITERAL `b = false`** (`SpecHolding.v`
+says so in three places, and `ProofHolding` passes `false` positionally), so
+the premise cost the call sites nothing.  That is the owner's chain, verbatim
+and already in the tree: `push_off` → `sie_cap_gpr` at `b = false` →
+`wp_next`'s same-CPU promise → the reader IS the author.
+
+> **THE SPELLING TRAP, AND IT COST ONE ROUND.**  Writing the premise as
+> `(CIDw : CPU) = (cpu_id : CPU)` does NOT unify with `Hs`: the proof has
+> renamed the section variable to `CID0`, and `cpu_id` elaborates to
+> `@cpu_id CID0`, which Coq will not unify with `CID0` even though `Class
+> CpuId := cpu_id : CPU` makes them convertible (`cannot unify "CID = CID0"
+> and "CID = cpu_id"`).  **Spell the premise with the SECTION VARIABLE
+> itself.**  Same family as A6.63''`s re-park hazard, one level up.
+
+#### (2) BOTH FIELDS, AS THE OWNER ASKED — "one item, two fields"
+
+| leaf | tier | state |
+|---|---|---|
+| `wp_clw_lockopen_locked_s_sconf` | `_dat` + `lock_word_ex (Some h0)` + `ledger_read_word4_vis_ok` | **GREEN** |
+| `wp_cld_lkcpu_lockopen_locked_s_sconf` | `_dat` + `lk_cpu_cell_ex lk c (Some h0)` + `ledger_read_wpay_bytes_vis_ok` | **GREEN** |
+| `wp_cld_lkcpu_lockopen_s_sconf` (no evidence) | `_exv` at `Res := emp`, `ledger_read_any_word_ok` at width 8 — **the lock is never opened** | **GREEN** |
+| `wp_sw_zero_lockfin_s_sconf` (release's `sw x0`) | `_dat` store + `lock_word_store_plain` | **GREEN** |
+
+`lk_cpu_pay_vis` (A6.84) is therefore EXERCISED, and it asked the identical
+question and took the identical answer — A6.87 §(7)'s "do not pay for it
+twice" held.  Both obligations are `Local Lemma`s for A6.87's reason (an `_`
+for an AU obligation is SHELVED, not opened), and both are ~12 lines: the
+pin, `tso_interp_of_at_gs`, `ktier_pin_id`, the gate.
+
+#### (3) A REAL BUG THE FLIP FOUND: THE WORD'S OWN-WRITE SELECTOR IS NOT THE
+#### CELL'S, AND IT DIFFERS BY EXACTLY ONE STATE
+
+A6.88 gave `lock_body`'s word slot the arm `lock_word_ex (lk_ex st)`.
+**`lk_ex` is the OWNER CELL's selector and is wrong for the word.**  The
+cell's author is the acquirer's `lk->cpu = mycpu()` store, so the cell has an
+author only while HELD (`Some (i,true)`).  The WORD's author is the AMO,
+which fires one instruction EARLIER, and its authorship survives until
+release's `sw x0` — so it covers BOTH `Some (i,false)` windows (acquire's,
+before the cpu field is set; release's, after it is cleared) as well as
+`Some (i,true)`:
+
+```coq
+  Definition lk_wex (st : lock_state) : option CPU :=
+    match st with Some (i, _) => Some i | None => None end.
+```
+
+**It is not a soundness hole, it is an unprovable FRAME**, and that is how it
+surfaced: the two cpu-field stores do not touch the word, so the word's arm
+must be invariant across them — with `lk_ex` it flips at exactly those two
+instructions and `iFrame` refuses (`cannot frame (lock_word_ex (lk_ex st) lk
+w)`).  *When a state machine's resource is selected by the state, check the
+selector at every transition that does NOT touch the resource — those are
+where a wrong selector is caught, not the ones that do.*
+
+#### (4) `lock_word_fresh`: THE FINISHER'S WORD SLOT FOLLOWS THE CELL'S
+
+`lock_finisher`'s word slot was `lk ↦₄ 0` — a CTX word.  After the M4 flip
+release's store leaves a LEDGER word and the ctx tower cannot take it back
+(that needs a drain, A6.84 §(2)), so the slot is now `lock_word_fresh lk :=
+lk_addr_claim lk 4 ∗ lock_word lk 0` — **exactly `lk_cpu_fresh`'s shape, one
+field over**, with `lock_word_fresh_free` as its `lk_cpu_fresh_free` twin for
+the destroy path.  `lock_finisher_close` loses two lines; `lock_finisher_destroy`'s
+`Out` follows.  **The CREATORS are untouched** (`initlock` genuinely holds a
+ctx word and converts it once, one-way, through `lock_word_intro`): only the
+EXIT moves.  `WpLock` is green with all of §(3) and §(4), and so are the four
+green files that consume the finisher abstractly.
+
+#### (5) §0.34′'s CARRIER IS REFUTED BY THE BUILD — ITS SEMANTICS ARE WHAT
+#### §(1) IMPLEMENTS
+
+**§0.34′ (`f1c3c7639`) is right about the chain and wrong only about where it
+rides.**  The ruling's semantic content — *acquire calls `push_off`, which
+returns `sie_cap_gpr` at `b = false`, and under that condition `wp_next`
+promises the thread stays on the same CPU* — **is exactly what §(1) above
+implements**, verbatim, and it is what makes both holder reads green.  What
+the ruling additionally chose is the CARRIER: that the premise "travels IN
+`locked`", sealed.  That was implemented as ruled and **the build refuses
+it.**
+
+```coq
+  Definition locked `{CID : CpuId} (γ : gname) (i : CPU) : iProp Σ :=
+    (lock_frag γ (Some (i, true)) ∗ ⌜(cpu_id : CPU) = i⌝)%I.
+```
+
+`WpLock` COMPILES with it (the six kit lemmas take their own `CpuId` binder;
+`locked_pre` takes the pin too so `lock_setcpu`/`lock_clrcpu`/`lock_give`
+inherit it, and `lock_take` gains one premise).  **It dies at the first
+CONSUMER, and the reason is structural:**
+
+```
+  WpSconfLock.v:414
+  Error: iSpecialize: cannot instantiate
+    (locked γl h0 -∗ sie_cap_gpr … -∗ pc_is … -∗ WP Loop)%I with (locked γl h0)
+```
+
+Every lock leaf hands the token THROUGH its instruction step, and the token
+inside the `wp_next` continuation is elaborated at the `CpuId` that lambda
+binds — the RESUMING hart — while the one in hand is at the entry hart.  The
+two print identically and do not unify.  **A hart-indexed token cannot cross
+a `wp_next`, and `locked` crosses one at every instruction of acquire,
+release and holding**; it also travels through b-GENERIC contracts
+(`SpecAcquire`, the syscall path, the park chain — `grep` measures **69 files**
+mentioning `locked`/`locked_pre`), where the equality is not available at all.
+
+> **AND THE LINT §0.34′ WANTED IS ALREADY THERE.**  `locked γ i` ALREADY
+> names the author hart — it is the argument `i` — and every lock leaf
+> already demands `locked γl cpu_id`, so a token sent across harts is
+> already unusable at every consumer: the ruling's "any proof that tried to
+> send `locked` where the capability cannot follow" is refused today, by the
+> leaves.  What the strengthening additionally wanted, the no-migration
+> evidence, **is not a property of the token at all: it is a property of the
+> STEP**, and it is delivered where the step is.  The
+> experiment is reverted; the refutation is recorded in `WpLock.v` beside
+> `locked`, in full, so nobody re-tries it.  **§0.34′'s paper tidbit stands
+> unchanged** — TSO did force "same context" apart from "same hart", and the
+> lock IS where a scheduler fact enters a memory-tier leaf; it enters as the
+> leaf's `b = false` premise rather than inside the token.
+>
+> *The general form, worth the paper: a fact about "which hart am I on" can
+> live in a resource only if that resource never crosses a hart-quantified
+> continuation.  Under a scheduler, almost nothing qualifies.*
+
+#### (6) WHAT LANDED, FILE BY FILE
+
+`WpSconfMem` (the pin), `WpLock` (`lk_wex`, `lock_word_fresh`,
+`lock_word_fresh_free`, the finisher's slot), `WpSconfLock` (two obligation
+helpers for the word, two for the cell, the four leaves of §(2), the release
+store), `ProofHolding` (one `or_introl eq_refl`).  **Six files.**
+
+#### (7) THE NEW BLOCKER, AND IT IS NOT THE ONE THAT WAS CLOSED:
+#### THE FLOOR RECEIPT HAS NO CHANNEL
+
+`WpSconfLock` is still RED, now at `wp_ld_lkcpu_lockopen_gen` — the `notheld`
+route, which is `holding()`'s read of `lk->cpu` by a hart that provably does
+not hold the lock, and the thing that makes `acquire`'s `if(holding(lk))
+panic` arm dead code.  Its gate is A6.84's `lkcpu_read_not_mine`, whose
+premises are `own (hart_agent cpu_id) = Some t`, **`⌜lo ≤ K⌝` and
+`view_lb (hart_agent cpu_id) K`** — *the reader's view has passed the owner
+cell's MINT FLOOR*.
+
+Two facts, both measured:
+
+1. **The premise is load-bearing and cannot be dropped.**
+   `TsoMemPa.read_down_win_fl` uses `Bm ≤ tv` in its two base cases to make
+   the floor's own message visible (`visibleb_below`); without it the read
+   descends BELOW the floor, where `win_ok_fl` constrains nothing.  The
+   tempting escape — "the reader owns a record at `t ≥ Bm`, and one's own
+   message is visible at any view, so the descent stops at `t`" — **does not
+   work**: `own h = Some t` is an UPPER BOUND on h's writes at or above the
+   floor (`own_last_fl`), not a claim that h wrote at `t`; at the mint every
+   agent's entry is `Some lo` and nobody has written at all.
+2. **The premise is not statable at the current surface.**  `lo` is
+   EXISTENTIAL inside `lk_cpu_cell_ex`, so no leaf premise can mention it,
+   and exposing it would move `is_lock`'s exported type — which A6.84's
+   ACCEPTANCE forbids.
+
+**THE FIX DIRECTION, for the owner, and it is §0.29′'s principle in its
+second instance.**  The floor is initlock's store position; every hart that
+may take the lock descends from a claim that dominated it (the started
+deposit's flag write is after every `initlock` in `main`).  So the missing
+thing is a BOUND-RELATION, exactly §0.26′'s idiom: the invariant should
+carry `⌜lo ≤ Bpub⌝` against a published stamp every post-boot context's own
+bound dominates, and the leaf should take the reader's `own_context` receipt
+at that stamp.  That keeps `lo` existential, keeps the handle ξ-free, and
+does not move the exported surface.  **Characterized and stopped here** per
+the standing rule; it is a genuinely new item, not a restatement of A6.87
+§(7).
+
+Behind it, still owed and now priced: the cpu-field STORE tranche
+(`wp_sd_lkcpu_lockopen_gen` plus its two exchanges `lkcpu_take_exchange` /
+`lkcpu_give_exchange`, which still trade in `lock_cpu lk ↦₈ _` and must move
+to `ledger_store_wpay_ok`), and `wp_amoswap_lockopen_s_sconf` (the ledger AMO
+gate, which has no generic twin).  **`lk_wex` is what those two will frame
+against, so §(3) is a prerequisite that is now paid.**
+
+#### (8) QUEUE ITEM (1), §0.28′: MEASURED, AND THE RULING'S STRAGGLER LIST IS
+#### INCOMPLETE — THE BLOCKER IS `proc_lock_res`, NOT `cons_res`
+
+`ProofKernelvec:1704` cannot hand `devintr_caps` to `kerneltrap` because the
+handler contract is `□ ∀ XIc, …` and the bundle is `XI`-indexed.  §0.28′(1)
+prescribes finishing the M3 λ-conversion on "the straggler payloads
+(console/uart/ticks)".  **Measured with `About` (probe file, deleted), member
+by member:**
+
+| member | `CurCtx`-indexed? |
+|---|---|
+| `dev_inv` | **NO** — invariants only, already context-free |
+| `timer_cap` | **NO** (`CpuId` only) |
+| `console_caps` | YES — §0.28′'s straggler (`cons_res`, `tx_res`) |
+| `disk_geom` | YES — three `↦₈□` cells |
+| `is_lock … disk_res` | YES |
+| `tick_keeper` | YES (`is_tickslock` → `ticks_res`, and `procs_inv`) |
+| `procs_inv` | YES — and this is the one |
+
+`procs_inv` carries `is_lock γl (proc_addr i) "proc" <{ proc_lock_res γl
+(proc_addr i) }>`, and `proc_lock_res` is `{… XI}`-indexed (measured).
+**It cannot be λ-converted**: `SchedCtx.proc_slots` puts `▷ proc_ctx pa`
+under its `needs_ctx` guard, and `CtxMorph R` is
+`ctx_dom ξ ξ' -∗ R ξ ==∗ ctx_dom ξ ξ' ∗ R ξ'` — a BASIC update, which cannot
+cross a `▷`.  So the λ-route makes `console_caps`, `disk_geom`, `disk_res`
+and `ticks_res` context-free and still leaves `devintr_caps` indexed.
+
+> **THIS IS THE SAME OBJECT AS THE CHECKPOINT'S DESIGN PROBLEM 1** (the
+> parked continuation's `is_lock`-handle bundle at the parker's ξ vs the
+> ∀-quantified resumer's), reached from the other end.  §0.28′'s ADDENDUM
+> already says the answer — *"what is installed is only the ∀-quantified
+> spec; the resources always come from the trapping site"* — and the
+> checkpoint's own fix direction for problem 2 says it operationally: **the
+> caps premise moves INSIDE `intr_handler_spec`'s ∀, supplied by the
+> trapping thread**, which holds them at its own ξ out of `ut_caps` /
+> `park_world` (§0.33′'s inventory: they descend from the park chain and the
+> started deposit).  That is a change to `IntrDefs`' entry package and it is
+> a layering question (`IntrDefs` is below `SpecDevintr`), so it is
+> surfaced, not guessed.  **No code was written for item (1)**; what this
+> lane contributes is the measurement that kills the cheap reading of
+> §0.28′(1).
+
+#### (9) THE NUMBER, AND THE BOUNDARY IS HELD
+
+**1098 of 1296, RED 11 — the baseline set, file for file**, from a
+sentinel-backed `MAKEEXIT=2` round over the whole six-file change (and the
+same from the intermediate round after §(4)'s finisher move, which is the one
+that could have cost green files and did not).  `^Abort` / `^Admitted` /
+`^Axiom` all 0 (the two `Fail set_solver. Abort.` in
+`FastSetSolverTests.v` are pre-existing negative tests).  **No green file went
+red.**  The durable mirror `/shared/xv6iris-3-fliptree-backup` was refreshed
+at this boundary.
+
+#### (10) THE FRONTIER, RESTATED
+
+1. **`WpSconfLock`'s remaining leaves** — §(7): the floor receipt's channel
+   (design, owner), then the cpu-store tranche and the AMO gate.  Still the
+   only thing between here and the 160-file cone.
+2. **§0.27′** — the p->lock resume tie; same files.
+3. **§0.28′** — item (1) as re-measured in §(8): the caps premise moves
+   inside the handler contract's ∀; the λ-conversion alone does not close it.
+4. `ProofMain`'s publication wiring, `ProofForkret`'s threading, the virtio
+   pair, and the two U-mode files under §0.24′.
