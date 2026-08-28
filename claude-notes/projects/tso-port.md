@@ -3841,3 +3841,15 @@ is designed separately; (iv) a kalloc client that reads a fresh page
 before writing it now owes a visibility justification, which is the
 model being honest about allocator junk.  This supersedes the
 drain-evidence reclaim-gate design for the free path.
+
+0.26′ ADDENDA (owner, same day): (a) THE INVARIANT PRINCIPLE, stated
+as the standing rule it has become — invariants speak in STAMPS AND
+BOUND-RELATIONS, never ambient identities: an invariant stores data
+beside a stamp/floor and states claimability as "any context whose
+bound can be raised past this stamp, given view evidence, may take
+these facts"; a context appears in an invariant body only as the
+parked-record idiom (the token as authority over a bound).  Every
+capture bug in the port's history violated this; every fix restored
+it.  (b) READ-BEFORE-WRITE KALLOC CLIENTS ARE KERNEL BUGS: the 0.26′
+sweep FLAGS any such client rather than proving around it — none are
+expected to exist.
