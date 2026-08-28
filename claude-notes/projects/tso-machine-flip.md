@@ -13139,3 +13139,211 @@ surface verbatim → four static callers' exposing-combinator routing + two
 dynamic callers' purchase chain → `newlock`'s premise → `notheld` + holder
 reads (racy-kit redo, `lk_wex` retired) → `WpSconfLock`'s cpu-store family on
 the same leaf → close `WpSconfLock`, sweep the cone.
+
+---
+
+## A6.105 — STAGE B: THE FLOOR'S SECOND ARM. The creator cannot buy its own floor either, and the fix is the ruling's own §0.35′(iii)
+
+*(Amendment A6.105, fliptree lane, following A6.104's Stage A landing and the
+owner's "STAGE B: GO".)*
+
+### §1. WHAT WAS BUILT, AND THE ONE PLACE THE APPROVED SHAPE REFUSED
+
+Stage B's head went in as approved and each piece compiled on its own:
+
+1. **`WpLock`** — the twice-validated §0.35′(i) surface, plus `lk_cpu_at lo lk v`
+   and `lk_cpu_fresh lo lk := lk_cpu_at lo lk zero_reg`.
+2. **`SpecInitlock` / `ProofInitlock`** — floor-parametric, on Stage A's
+   floor-framing leaf, with the caller supplying the already-minted window.
+3. The ten-file consumer sweep the change fell out into.
+
+Then the chain hit its wall, and the wall is A6.101's bootstrap **one level up**:
+
+> **THE CREATOR OF A LOCK CANNOT CERTIFY ITS OWN LOCK'S FLOOR.**  `ctx_floor ξ lo`
+> is bought with `ctx_bound_raise`, which wants `hart_view_lb lo`.  The floor of
+> a freshly-made lock is the position of `initlock`'s own `sd x0` — and under
+> TSO **a hart's own store is buffered, so it never advances that hart's own
+> view**.  No fence and no AMO stands between `initlock`'s store and the point
+> where `newlock` seals the handle.  A6.101 said the FIRST acquire of the FIRST
+> lock cannot buy its floor because `acquire` *is* the AMO; this says the
+> CREATOR of ANY lock cannot buy the floor its own store just made.  Same
+> mechanism, one tier up, and it is not special to boot.
+
+### §2. THE MEASURED REFUSAL OF THE APPROVED ROUTE, IN FULL
+
+The approved route was: callers mint the window, static ones at floor 0 off the
+era image, dynamic ones at the memset's floor with a purchase chain.  Measured,
+end to end, it does not close, and here is the whole ledger:
+
+* **The static half is buildable but far larger than priced.**  The minting
+  lemma is `TsoCtx.ledger_wpay_mint g base n t f cp`, whose window is
+  `TsWin base n j f cp (fun _ => Some t) t` — **floor `t` = the mint's own
+  timestamp**, so `t = 0` really does give floor 0, and
+  `BootCarve.boot_cran_ledger_at0_word` (A6.80's exposed exit, still with **no
+  client**) really does hand out the timestamp-0 cells.  But `ledger_wpay_mint`
+  takes `gen_heap_interp` and `tso_interp_at`: **the mint needs the
+  interpretation**, so it can only run inside a WP step, i.e. inside the boot
+  carve.  Routing it means threading a new resource from `BootCarveMain`
+  through `ProofMain` into **twelve** `initlock` call sites (`grep` on
+  `wp_initlock_sconf`: Kinit, Uartinit, Procinit ×3, Consoleinit, Trapinit,
+  Printkinit, Binit, Iinit, Fileinit, Initlog, VirtioDiskInit) plus the three
+  wrapper users — not the "four static callers" the plan priced.
+* **The dynamic half does not close at all.**  A kalloc'd page's owner cell has
+  `kfree`'s memset in its past, so its image byte is not the value: `win_ok1`
+  fails at floor 0 and the window must be minted at the memset's position.  The
+  creating hart's view does not reach that position either (same buffering
+  argument), so `ProofPipealloc` and `ProofInitsleeplock` — **both green
+  today** — would go red and stay red.
+* **Floor lowering is unsound and cannot paper over it.**  A window's floor is
+  what a reader must PASS to read exactly; lowering it lets MORE readers
+  conclude exactness, so `lo' ≤ lo` weakening is a strengthening of the read
+  law, not a weakening of the resource.  There is no free direction.
+
+### §3. THE FIX, AND IT IS THE RULING'S OWN THIRD CLAUSE
+
+§0.35′ has four clauses, and clause **(iii)** already says *"acquire = AMO
+log-top receipt + ABSORB of the context bound"*.  The wall in §1 is what
+happens when the floor is bought by the WRITER; clause (iii) says buy it at the
+READER.  So the handle's floor certificate gets a second arm:
+
+```coq
+  Definition lk_floor (ξ : CtxId) (lo : nat) : iProp Σ :=
+    (TsoCtx.ctx_floor ξ lo ∨ TsoGhost.llb loglen_name lo)%I.
+```
+
+* **Left arm** — the ruling's, unchanged: "this context's bound has passed
+  `lo`".  Free at `lo = 0`, so every boot-static handle still gets it for
+  nothing, and the handle stays ξ-indexed, so §0.16′'s crossing discipline is
+  untouched.
+* **Right arm** — "`lo` is a real log position".  This is the receipt a WRITER
+  can actually take off the interpretation, and it converts to the left arm at
+  any AMO: `TsoCtx.hart_view_lb_get` (interp + `llb loglen_name T` + the AMO's
+  log-top view ⇒ `hart_view_lb (gtv cpu_id) ∗ ⌜T ≤ gtv cpu_id⌝`) then
+  `ctx_bound_raise`.  **Both of those lemmas already exist**: `hart_view_lb_get`
+  is the parked stamp's own view-receipt mint, written for `ctx_resume`.
+
+> **FIFTH INSTANCE OF THE LANE'S RECURRING SHAPE.**  The absorb the dynamic
+> floor needs is `hart_view_lb_get`, and it has been in `TsoCtx` since the park
+> protocol — stated for the parked context's `T`, working verbatim for a
+> lock's `lo`.  *Again the law was built and the client was missing.*
+
+### §4. WHAT IT COST, AND WHY EVERY CALLER STAYED GREEN
+
+The plumbing is three small additions and one revert:
+
+```coq
+  (* TsoGhost *)   Lemma llb_get γll n :
+                     mono_nat_auth_own γll 1 n -∗
+                     mono_nat_auth_own γll 1 n ∗ llb γll n.
+  (* RiscvExec *)  Lemma tso_interp_of_loglen_llb E img mem log V :
+                     tso_interp_of E img mem log V -∗
+                     tso_interp_of E img mem log V ∗ llb (era_loglen_name E) (length log).
+  (* SmodeCorePt *) word_pointsto_wpay_mint_c  -- post gains  llb loglen_name (S (length log))
+  (* WpSconfMem *)  wp_sd_zero_wpay_s_sconf    -- post gains it beside the window
+```
+
+and then **`SpecInitlock`'s premise goes back to the ctx word it always had**
+(`c_cpu ↦₈ vcpu`), `ProofInitlock` goes back to the store-then-MINT leaf it
+always used, and its post hands back
+
+```coq
+  Definition lk_cpu_ready_at lk v := (∃ lo, lk_cpu_at lo lk v ∗ lk_floor cur_ctx lo)%I.
+  Definition lk_cpu_ready lk := lk_cpu_ready_at lk zero_reg.
+```
+
+with the RIGHT arm, straight off the leaf.  Because the floor and the cell
+travel **bundled and existentially**, no spec in the tree gains a parameter:
+every consumer that said `lk_cpu_fresh lk` says `lk_cpu_ready lk`, a one-word
+rename, and **all twelve `initlock` call sites are untouched**.
+
+> **A6.97'S RULE FOR THE THIRD TIME, AND IT IS THE LOAD-BEARING ONE:** *a
+> parameter no consumer NAMES does not belong in the arity.*  The first shape of
+> this tranche threaded `lo` through `lk_cpu_fresh`, `SpecInitlock`,
+> `SpecInitlockWrapper` and every caller; bundling it under an existential beside
+> the floor certificate collapsed a twelve-file cascade to zero.
+
+Stage A's floor-framing leaf `wp_sd_zero_wpay_frame_s_sconf` stays landed and is
+now **unused at `initlock`** — it is still exactly what `WpSconfLock`'s cpu-store
+family wants (A6.104 §(3)), which was always its second and larger client.
+
+### §5. THE SWEEP THE SURFACE FELL OUT INTO
+
+`is_lock`/`lock_inv`/`lock_openable`/`newlock` going floor-carrying broke ten
+green files; all ten are closed:
+
+| file | what it needed |
+|---|---|
+| `WpLockAt` | `newlock_at` unbundles the ready cell, `inv … lo`, floor to `is_lock_intro` |
+| `PipeInvDefs` | `is_pipe` carries `∃ lo, inv … lo ∗ lk_floor cur_ctx lo`; arity unchanged |
+| `PipeInv` | `new_pipe` unbundles, `newlock_d E lo pi`, rebuilds `is_pipe` |
+| `SleepLock`, `TicksInv`, `SpecRelease`, `SpecInitlockWrapper`, `SpecPrintkinit`, `SpecTrapinit`, `SpecFileinit`, `SpecVirtioDiskInit` | the `lk_cpu_ready` rename |
+
+`is_pipe` is the second handle in the tree to take the ruling's treatment, and
+it takes it the same way `is_lock` does — the floor existential inside, the
+arity outside.
+
+### §6. WHAT THIS COSTS THE READS (the honest debt)
+
+The right arm is weaker than the left **at the moment of the read**: a reader
+holding only `llb loglen_name lo` must run the absorb before it can read the
+owner cell exactly, and the absorb needs an AMO's log-top view — i.e. it is
+available **inside the critical section and not outside it**.  That is exactly
+where §0.35′(iv) puts the two read classes:
+
+* holder reads and `notheld`, taken OUTSIDE the section, are the **racy kit**
+  reads that get a value set rather than a value — they never wanted the floor;
+* every read INSIDE the section has the acquire's receipt and can buy the left
+  arm on the spot.
+
+So no read that exists today loses anything, and the absorb is the next
+tranche's first step rather than a new obligation.  **This is a widening of the
+ruling, not a departure from it** — but it IS a change to §0.35′'s clause (i),
+so it is flagged here for the owner rather than assumed.
+
+### §7. THE NUMBER
+
+**1100 .vo, RED 9 — the A6.104 set, EXACTLY**, sentinel-backed (`MAKEEXIT=2`,
+round r19 of a five-round convergence over a whole-tree rebuild: `TsoGhost` is
+the deepest file the lane has ever touched).  The red set is
+
+> `ProofForkretPark`, `ProofKernelvec`, `ProofMain`, `ProofSwtch`,
+> `ProofVirtioDiskIntr`, `ProofVirtioDiskRwD`, `UptWalkPt`, `UserMemPt`,
+> `WpSconfLock`
+
+— **red-list delta 0**, character for character, after a change that moved
+`is_lock`, `lock_inv`, `lock_openable`, `lock_finisher`, `newlock`,
+`newlock_at`, `newlock_d`, `newlock_delayed`, `is_pipe` and nineteen consumer
+files.  `^Abort` / `^Admitted` / `^Axiom` all 0.  `kernel-rocq` + `user-rocq`
+untouched.  Mirror refreshed at this boundary.
+
+The convergence, for the record — each round found the next layer of the same
+one-word rename, and nothing else:
+
+| round | new reds | what they were |
+|---|---|---|
+| r14 | 3 | `lk_floor` defined below its first use (ordering) |
+| r15 | 7 | `BioInv`, `IcacheBoot`, `ProofPipeclose`, `SleepLockAt`, `SpecBinit`, `SpecIinit`, `SpecInitsleeplock` |
+| r16 | 2 | `BioInitAt`, `FsBoot` |
+| r17 | 1 | `SpecProcinit` |
+| r18 | 2 | `SpecConsoleinit`, `UsertrapRes` (the latter needed `is_lock (XI := ξ)` — the handle is ξ-indexed now, and `park_globals` is the one place that says so explicitly) |
+| r19 | 0 | **boundary** |
+
+### §8. WHAT IS OWED, AND THE ONE THING THE OWNER MUST RULE
+
+The tranche closed everything it could close without touching a read:
+
+* **DONE** — the two-armed floor, the whole `newlock` family on it, the
+  `lk_cpu_ready` bundle, `is_pipe`'s floor, and the nineteen-file sweep.
+* **NEXT, and unblocked** — `WpSconfLock`'s cpu-store family on Stage A's
+  floor-framing leaf (still landed, still unused, still exactly right for it);
+  then `notheld` + the holder reads on the racy kit, with `lk_wex` retired
+  against A6.92; then close `WpSconfLock` and sweep its cone.
+* **OWNER DECISION** — §6's widening of ruling §0.35′(i).  The handle no longer
+  guarantees `ctx_floor ξ lo` outright; it guarantees it *or* the log-position
+  receipt that an AMO turns into it.  The lane believes this IS the ruling
+  (clause (iii) says the absorb happens at acquire), but clause (i) as written
+  says the handle carries the floor, and a reader that wants exactness outside
+  a critical section now has strictly less than clause (i) promised.  **The
+  alternative was measured and refused** (§2): writer-side floors close only
+  for boot-static locks, at the price of an interp-needing mint threaded
+  through twelve call sites, and never close for the two dynamic ones.
