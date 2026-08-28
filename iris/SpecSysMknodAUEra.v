@@ -38,26 +38,27 @@
    why the [astate]-shaped ones cannot be discharged against
    [InodeRegion.ftop_body] at all).
 
-   ==== (3) THE ret-0 ARM CARRIES AN ESCAPE, AND THE REASON IS SCOPED ====
+   ==== (3) THE ret-0 ESCAPE IS RETIRED (lane A-iii, 2026-08-28) ========
 
-   The era walk is ABSOLUTE-PATHS-ONLY ([SpecNparEra]'s header: the
-   relative start is a contract-shape change, not an arm, and it is that
-   lane's recorded REMAINING item).  sys_mknod reads its path from USER
-   memory and no premise can pin it (SpecFetchstr: "they came from user
-   memory"), so on a fetched path that does not begin with SLASH this
-   proof has no AU-carrying create contract to call -- it calls the LANDED
-   [SpecCreate.wp_create_sconf] instead and the caller's bundle comes back
-   UNSPENT.
+   This arm used to read [mknod_post_ok_era ∨ mknod_au_pre_era], and the
+   escape was the era walk's absolute-path scope: sys_mknod reads its path
+   from USER memory and no premise can pin it (SpecFetchstr: "they came
+   from user memory"), so on a fetched string that did not begin with
+   SLASH this proof had no AU-carrying create to call and handed the
+   bundle back unspent.
 
-   At [ret = -1] that costs nothing: [mknod_post_fail_era]'s first
-   disjunct IS "the whole bundle back", exactly as the frozen form's is.
-   At [ret = 0] it is visible, and it is stated rather than hidden: the
-   arm is [mknod_post_ok_era ∨ mknod_au_pre_era].  A client that knows its
-   own path is absolute cannot yet discharge the escape -- no user-memory
-   tie exists at this altitude -- so what the escape really records is
-   that THE RELATIVE START IS THE ONE THING BETWEEN THIS CONTRACT AND THE
-   FROZEN ARMS.  When the era walk grows its relative arm the disjunct
-   comes off and nothing else here moves.
+   The relative-start walk removed the reason, and with it the disjunct.
+   [SpecCreateAU] now takes [FsAbsStart.ep_start] -- the trace deferred in
+   the START INUM -- and has no absolute-path premise at all, so the proof
+   calls ONE create contract for every fetched string; the [destruct] on
+   the first byte and the 300-line landed-create branch under it are gone
+   from [ProofSysMknodAU].  A [ret = 0] is now a RECEIPT unconditionally,
+   which is what makes the theorem say anything about init's "console" and
+   "sh" (relative, cwd = ROOTINO).
+
+   [mknod_post_fail_era]'s first disjunct still IS "the whole bundle
+   back", and it is still reachable and still honest: that is the argstr
+   failure, where nothing fs-visible happened.
 
    ==== WHAT IS UNCHANGED ==============================================
 
@@ -162,16 +163,16 @@ Section SysMknodAUEra.
      ∨ (∃ pl : list (bv 8),
           cau_fail Γ γfs ma mi P Pmiss Φok Φex pl))%I.
 
-  (* the armed disjunction the continuation receives, keyed on a0.  The
-     escape on the [ret = 0] arm is the era walk's absolute-path scope;
-     see the header. *)
+  (* the armed disjunction the continuation receives, keyed on a0.  NO
+     ESCAPE on the [ret = 0] arm since lane A-iii: the walk takes the
+     relative start, so a success is a RECEIPT whatever the fetched string
+     looked like.  See the header. *)
   Definition mknod_arms_era Γ (γfs : fs_names) (ma mi : Z)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
       (r : mword 64) : iProp Σ :=
     ((⌜r = (zero_reg : mword 64)⌝
-      ∗ (mknod_post_ok_era Γ ma mi P Φok Φex
-         ∨ mknod_au_pre_era Γ γfs ma mi P Pmiss Φok Φex))
+      ∗ mknod_post_ok_era Γ ma mi P Φok Φex)
      ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
         ∗ mknod_post_fail_era Γ γfs ma mi P Pmiss Φok Φex))%I.
 

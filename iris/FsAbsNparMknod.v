@@ -58,6 +58,7 @@ Require Import Xv6G.
 Require Import SpecSysMknodAU.  (* [mknod_parent_elems] *)
 Require Import FsAbsEra.
 Require Import FsAbsNpar.       (* [np_elems], [ep_hops_from], [np_dead] *)
+Require Import FsAbsStart.      (* [ep_start]: the DEFERRED start        *)
 Require Import FsAbsEraMknod.   (* [mknod_walk_pre_era], [mknod_walk_dead_era] *)
 Require Import FsAbs.           (* LAST (FsAbs's own rule) *)
 
@@ -89,6 +90,21 @@ Section NparMknod.
   (* ------------------------------------------------------------------ *)
   (*  (2) lane W's one-shot supplies the walk's two trace premises       *)
   (* ------------------------------------------------------------------ *)
+
+  (* THE FORM THE WALK ACTUALLY TAKES SINCE LANE A-iii: no firing at all,
+     because the START INUM is the walk's to choose ([FsAbsStart]'s
+     header).  [ep_start] at a fixed [pl] IS [mknod_walk_pre_era]
+     specialized to that [pl] -- same quantifier, same tie, same family --
+     so this is a rename plus the two ROOTINOs agreeing. *)
+  Lemma np_start_of_mknod (γfs : fs_names) (P Pmiss : nat -> Z -> iProp Σ)
+      (pl : list (bv 8)) :
+    mknod_walk_pre_era γfs P Pmiss -∗ ep_start γfs P Pmiss pl.
+  Proof.
+    iIntros "Hpre". rewrite /ep_start. iIntros (r Hr).
+    rewrite /mknod_walk_pre_era.
+    iMod ("Hpre" $! pl r with "[%]") as "[$ $]"; [| done].
+    intros Hsl. rewrite -np_rootino_agree. exact (Hr Hsl).
+  Qed.
 
   Lemma np_pre_of_mknod (γfs : fs_names) (P Pmiss : nat -> Z -> iProp Σ)
       (pl : list (bv 8)) :
