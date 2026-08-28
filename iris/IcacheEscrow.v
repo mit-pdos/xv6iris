@@ -1434,15 +1434,9 @@ Section IcacheEscrow.
      an arm inside one of iput's two windows holds a POSITIVE share of some
      transaction's [ln_tx] element, so at a commit -- where the WAL's
      authority for that map is EMPTY -- neither window can be standing.
-     [ic_dep_own_tx_no_ops]'s line, at the pin instead of the descriptor. *)
-  Lemma ic_pin_tx_no_ops k :
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
-    ic_pin_tx k -∗ False.
-  Proof.
-    iIntros "Ha Hpin". rewrite /ic_pin_tx.
-    iDestruct "Hpin" as (t q) "[_ Htx]".
-    iApply (tx_pin_no_ops with "Ha Htx").
-  Qed.
+     NO NAMED LEMMA: the two consumers ([ic_escrow_body_cover]'s mid-free
+     park and its held arm) open the pin's existential and call the generic
+     [TxPin.tx_pin_no_ops] on the share inside. *)
 
   (* THE PIN'S OWN MOVERS, as the two windows use them.  ENTER: the arm at
      rest hands out the WHOLE cell, the walk names its transaction and its
@@ -1643,8 +1637,8 @@ Section IcacheEscrow.
        [end_op] consumes the WHOLE [ln_tx] element, so it cannot run while
        any inode of the transaction is checked out for writing, and at a
        commit (where the authority is empty) this arm is refuted outright
-       ([ic_dep_own_tx_no_ops]).  The descriptor names [(t, q)], so the park
-       gives back exactly the share the checkout took. *)
+       ([TxPin.tx_pin_no_ops] at the share).  The descriptor names [(t, q)],
+       so the park gives back exactly the share the checkout took. *)
     | DepTx s dv nu g t q =>
         (⌜dv = dev /\ nu = inum⌝ ∗ inode_shr_gen_bare k s dev inum g ∗
          tx_pin icfg_log t q)%I
@@ -1913,7 +1907,7 @@ Section IcacheEscrow.
          frzsel k ((1/2)/2)%Qp true ∗
          (* THE PARKED TRANSACTION SHARE (durable-disk B''-tx5), [DepTx]'s
             conjunct at the window that carries no ordinary deposit: it is
-            what makes the commit refute this arm ([ic_out_frz_no_ops]) and
+            what makes the commit refute this arm ([TxPin.tx_pin_no_ops]) and
             the descriptor is what pins it to the share the freer must get
             back.  LAST, so no destructuring pattern above moved. *)
          tx_pin icfg_log t qt)%I
@@ -1924,18 +1918,11 @@ Section IcacheEscrow.
     Timeless (ic_out_frz k d dev inum).
   Proof. rewrite /ic_out_frz /inode_ident. destruct d; tl_struct. Qed.
 
-  (* ...and the refutation the commit reads off it ([ic_dep_own_tx_no_ops]'s
-     line at the freeze window): a [DepFrz] arm holds a positive share of an
-     open transaction's element, so at an empty authority it cannot stand. *)
-  Lemma ic_out_frz_no_ops k (qf : Qp) (dv nu : mword 32) (t : nat) (qt : Qp)
-      (dev inum : mword 32) :
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
-    ic_out_frz k (DepFrz qf dv nu t qt) dev inum -∗ False.
-  Proof.
-    iIntros "Ha Hfrz". rewrite /ic_out_frz.
-    iDestruct "Hfrz" as "(_ & _ & _ & _ & _ & Htx)".
-    iApply (tx_pin_no_ops with "Ha Htx").
-  Qed.
+  (* ...and the refutation the commit reads off it, at the freeze window: a
+     [DepFrz] arm holds a positive share of an open transaction's element, so
+     at an empty authority it cannot stand.  NO NAMED LEMMA -- the one
+     consumer ([ic_escrow_body_cover]'s frozen alternative) takes the share
+     out of the arm and calls [TxPin.tx_pin_no_ops]. *)
 
   (* WHAT THE ARM KEEPS BESIDE THE CREDENTIAL, keyed by the descriptor: the
      READ arm's three quarters at [DepRd], and nothing at all at every other
@@ -3887,16 +3874,8 @@ Section IcacheEscrow.
      escrow can be write-armed.  This is the escrow-side twin of
      [InodeRegion.ireg_clean_acc]; together they are "no inode is
      write-locked and no inum is armed", durable-fs-plan.md section 4's
-     first bullet. *)
-  Lemma ic_dep_own_tx_no_ops k (s : Qp) (dv nu : mword 32) (g : gname)
-      (t : nat) (q : Qp) (dev inum : mword 32) :
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
-    ic_dep_own k (DepTx s dv nu g t q) dev inum -∗ False.
-  Proof.
-    iIntros "Ha Hown". rewrite /ic_dep_own.
-    iDestruct "Hown" as "[_ [_ Htx]]".
-    iApply (tx_pin_no_ops with "Ha Htx").
-  Qed.
+     first bullet.  NO NAMED LEMMA: [ic_escrow_body_cover] opens the arm and
+     calls [TxPin.tx_pin_no_ops] on the parked share. *)
 
   (* ...as the collection meets it: the OUT arm beside a write-armed
      deposit is refuted outright at an empty authority. *)
@@ -3972,18 +3951,19 @@ Section IcacheEscrow.
      authority is EMPTY -- none of them can be standing:
 
        * [DepFrz] carries [(t, qt)] as CONSTRUCTOR FIELDS and the share rides
-         in [ic_out_frz] ([ic_out_frz_no_ops]), exactly as [DepTx]'s does in
-         [ic_dep_own];
+         in [ic_out_frz], exactly as [DepTx]'s does in [ic_dep_own];
        * the other two carry no descriptor at all, so they name the share
-         through the per-slot pin [IcacheRef.hpn_h] instead -- [ic_pin_tx],
-         refuted by [ic_pin_tx_no_ops].
+         through the per-slot pin [IcacheRef.hpn_h] instead -- [ic_pin_tx].
+
+     ALL THREE ARE ONE REFUTATION, [TxPin.tx_pin_no_ops], applied to the
+     share the arm parks; [ic_escrow_body_cover] calls it in place.
 
      LANE C READS THIS THROUGH [ic_escrow_body_cover_all], and there is now
      nothing per-slot that it cannot close.
 
      THE WRITE ARM IS REFUTED FOR THE SAME REASON, and that is what the
      [ln_tx] authority buys: a [DepTx] arm holds a positive share of an open
-     transaction's element ([ic_dep_own_tx_no_ops]).  Together with
+     transaction's element.  Together with
      [IregClean.ireg_snap_local_acc] (nothing is armed) this is plan section
      4's FIRST bullet, per slot. *)
   Definition ic_slot_cover (cn : ic_names) (γfs : fs_names) (γi : gname)
@@ -4159,7 +4139,8 @@ Section IcacheEscrow.
       + (* iput's MID-FREE PARK: A WINDOW, and the pin it carries names the
            open transaction whose share it parked (durable-disk B''-tx5). *)
         iExFalso. iDestruct "Hfrz" as "(_ & _ & Hpin)".
-        iApply (ic_pin_tx_no_ops with "Ha Hpin").
+        rewrite /ic_pin_tx. iDestruct "Hpin" as (tp qp) "[_ Hp]".
+        iApply (tx_pin_no_ops with "Ha Hp").
     - (* OUT: the write arm is refuted, the read arm gives three quarters,
          the other three are the residue *)
       iDestruct "Hout" as (d dev inum) "(Hdep & Hres & Hmt & Hgid & Hrd & Hpin)".
@@ -4168,8 +4149,9 @@ Section IcacheEscrow.
         * rewrite /ic_dep_res /ic_dep_own. iDestruct "Hres" as "[[] _]".
         * rewrite /ic_dep_res /ic_dep_own. iDestruct "Hres" as "[[] _]".
         * (* THE WRITE ARM: REFUTED at an empty authority *)
-          rewrite /ic_dep_res. iDestruct "Hres" as "[Hown _]".
-          iExFalso. iApply (ic_dep_own_tx_no_ops with "Ha Hown").
+          rewrite /ic_dep_res /ic_dep_own. iDestruct "Hres" as "[Hown _]".
+          iDestruct "Hown" as "[_ [_ Hp]]".
+          iExFalso. iApply (tx_pin_no_ops with "Ha Hp").
         * (* THE READ ARM: three quarters are inside *)
           iFrame "Ha". iExists dev, inum.
           cbn [ic_out_rd].
@@ -4197,7 +4179,9 @@ Section IcacheEscrow.
            parks its transaction's share in its own fields (B''-tx5) *)
         destruct d as [| qf dv nu tf qtf | s dv nu g t q | s dv nu g];
           try (rewrite /ic_out_frz; iDestruct "Hfrz" as "[]").
-        iExFalso. iApply (ic_out_frz_no_ops with "Ha Hfrz").
+        iExFalso. rewrite /ic_out_frz.
+        iDestruct "Hfrz" as "(_ & _ & _ & _ & _ & Hp)".
+        iApply (tx_pin_no_ops with "Ha Hp").
     - (* MID: the recycle window holds a POOL row *)
       iDestruct "Hmid" as (dev inum w) "(Hidd & Hidn & Hvld & Hun & Hgid & Hpin)".
       rewrite /ic_unloaded. iDestruct "Hun" as "[Hraw Hpool]".
@@ -4234,7 +4218,8 @@ Section IcacheEscrow.
     - (* HELD: iput's authority-side window -- A WINDOW, refuted by the pin
          it parks (durable-disk B''-tx5). *)
       iDestruct "Hhd" as (dev inum w) "(_ & _ & _ & _ & _ & Hpin)".
-      iExFalso. iApply (ic_pin_tx_no_ops with "Ha Hpin").
+      iExFalso. rewrite /ic_pin_tx. iDestruct "Hpin" as (tp qp) "[_ Hp]".
+      iApply (tx_pin_no_ops with "Ha Hp").
   Qed.
 
   (* ...AND OVER THE FIFTY SLOTS.  The escrows are at pairwise disjoint
@@ -4695,7 +4680,7 @@ Section IcacheEscrow.
   (*  opposite: that window is INSIDE one transaction (iput holds a share  *)
   (*  of its caller's token, durable-disk B''-tx5), so the row can park    *)
   (*  one and the commit refutes it exactly as it refutes iput's three     *)
-  (*  windows ([ic_pin_tx_no_ops]).                                       *)
+  (*  windows, at [TxPin.tx_pin_no_ops]'s line.                            *)
   (*                                                                      *)
   (*  SO THE TRANSIT PART GETS ITS OWN KEY, and the share must sit in      *)
   (*  [ipool_body] -- not under the itable lock -- because the commit's    *)
@@ -4723,15 +4708,9 @@ Section IcacheEscrow.
   (* THE REFUTATION THE COMMIT READS, and the whole reason the ledger exists:
      every inum in transit has a POSITIVE share of some transaction's [ln_tx]
      element parked for it, so at a commit -- where the WAL's authority for
-     that map is EMPTY -- nothing is in transit.  [ic_pin_tx_no_ops]'s line,
-     at the pool's ledger instead of a slot's pin. *)
-  Lemma ipool_transit_no_ops (T : gmap Z (nat * Qp)) :
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
-    ipool_transit T -∗ ⌜T = ∅⌝.
-  Proof.
-    iIntros "Ha HT". rewrite /ipool_transit.
-    iApply (tx_pins_no_ops with "Ha HT").
-  Qed.
+     that map is EMPTY -- nothing is in transit.  NO NAMED LEMMA: the ledger
+     IS a [TxPin.tx_pins], so its one consumer ([ipool_quiesce_acc]) calls
+     [TxPin.tx_pins_no_ops] on it directly. *)
 
   (* ==================================================================== *)
   (*  5c''.  THE CORPSE LEDGER (durable-disk lane C-7, plan section 4)     *)
@@ -4751,8 +4730,8 @@ Section IcacheEscrow.
   (*                                                                      *)
   (*    [CrpPre t q] -- the deposit has not run, and the row parks the     *)
   (*      freeing transaction's share, so a commit refutes the state       *)
-  (*      outright ([ipool_corpse_no_ops], [ipool_transit_no_ops]'s line   *)
-  (*      at the corpse ledger).  The share is the very one the transit    *)
+  (*      outright ([ipool_corpse_no_ops], whose row is a                  *)
+  (*      [TxPin.tx_pin_no_ops]).  The share is the very one the transit   *)
   (*      ledger returns at [ipool_put_corpse]: iput parks it and the      *)
   (*      deposit hands it back.                                          *)
   (*    [CrpDep] -- the deposit HAS run, and the row parks                 *)
@@ -4797,22 +4776,14 @@ Section IcacheEscrow.
   Global Instance ipool_ckey_timeless K : Timeless (ipool_ckey K).
   Proof. rewrite /ipool_ckey. tl_struct. Qed.
 
-  (* ONE ROW, REFUTED: a corpse whose deposit has not run parks a POSITIVE
-     share of the freeing transaction's element, and at a commit the WAL's
-     authority for that map is empty. *)
-  Lemma crp_row_no_ops γi z v :
-    ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
-    crp_row γi z v -∗ ⌜v = CrpDep⌝.
-  Proof.
-    iIntros "Ha Hrow". destruct v as [t q |]; [| done].
-    rewrite /crp_row. iDestruct (tx_pin_no_ops with "Ha Hrow") as %[].
-  Qed.
-
-  (* ...AND THE WHOLE LEDGER: at a commit every corpse has been deposited,
-     so every row is an [imark] and the collection reaches every [X] inum.
-     [ipool_transit_no_ops]'s line, at the ledger the pending/await rows
-     needed and the transit set could not supply (durable-disk C-4's second
-     finding). *)
+  (* THE WHOLE LEDGER, REFUTED ROW BY ROW: a corpse whose deposit has not
+     run parks a POSITIVE share of the freeing transaction's element, and at
+     a commit the WAL's authority for that map is empty -- so every row is an
+     [imark] and the collection reaches every [X] inum.  The ledger the
+     pending/await rows needed and the transit set could not supply
+     (durable-disk C-4's second finding).  The row's own refutation is
+     [TxPin.tx_pin_no_ops] and gets no name of its own; the induction stays
+     because the conclusion is a [map_Forall], not [K = ∅]. *)
   Lemma ipool_corpse_no_ops γi (K : gmap Z icorpse) :
     ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit) -∗
     ipool_corpse γi K -∗ ⌜map_Forall (fun _ v => v = CrpDep) K⌝.
@@ -4822,7 +4793,8 @@ Section IcacheEscrow.
     { iIntros "_ _". iPureIntro. apply map_Forall_empty. }
     iIntros "Ha HK". rewrite big_sepM_insert; [| exact Hz].
     iDestruct "HK" as "[Hrow HK]".
-    iDestruct (crp_row_no_ops with "Ha Hrow") as %->.
+    destruct v as [t q |].
+    { rewrite /crp_row. iDestruct (tx_pin_no_ops with "Ha Hrow") as %[]. }
     iDestruct ("IH" with "Ha HK") as %HF.
     iPureIntro. by apply map_Forall_insert_2.
   Qed.
@@ -5695,7 +5667,8 @@ Section IcacheEscrow.
      holding; this says what the POOL is, and together they exhaust
      [region_inums nib] -- which is the whole point of C-3b's partition.
 
-     [T = ∅] is read off the parked shares ([ipool_transit_no_ops]): a walk
+     [T = ∅] is read off the parked shares ([TxPin.tx_pins_no_ops] at the
+     transit ledger, which IS a [tx_pins]): a walk
      between an eviction's identity flip and its deposit is inside iput,
      hence inside its caller's transaction, and at a commit the WAL's
      [ln_tx] authority is empty.  So the row comes out in B''-join's own
@@ -5730,7 +5703,7 @@ Section IcacheEscrow.
     iIntros (HE) "#Hinv Htxa".
     iMod (ipool_inv_acc E cn γfs γi cov logstart nib HE with "Hinv")
       as (O X T ids K) "(%Hlen & %Hrow & %Hdk & Hrows & Hids & Htr & Hcrp & Hback)".
-    iDestruct (ipool_transit_no_ops T with "Htxa Htr") as %->.
+    iDestruct (tx_pins_no_ops _ T with "Htxa Htr") as %->.
     iDestruct (ipool_corpse_no_ops γi K with "Htxa Hcrp") as %HF.
     iEval (rewrite (ipool_corpse_marks γi K HF) Hdk) in "Hcrp".
     iModIntro. iExists O, X, ids.

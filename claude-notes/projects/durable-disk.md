@@ -5031,10 +5031,14 @@ the rows below and in `design/fs-ghost-state.md`).
     was fixed mechanically (a `pose (dq := DfracOwn (3/4))` at each
     destructuring) rather than deleted; deleting them is a two-hunk
     change once someone confirms nothing off-tree names them.
-- [ ] **Rank 5 — one uniform per-inum transaction pin** (absorbs `DepTx`'s
+- [x] **Rank 5 — one uniform per-inum transaction pin** (absorbs `DepTx`'s
   and `DepFrz`'s `(t,q)`, `ic_pin_*`, `ireg_cpin`/`ireg_fpin`, the transit
   ledger, `CrpPre`; ten `_no_ops` → one): APPROVED (owner, 2026-08-27),
-  runs AFTER EV completes (EV stage 4 rewrites the same escrow bodies).
+  ran AFTER EV.  **DONE** at R5a (stages 0–4) + R5b (stage 5).  FINAL METER:
+  the tree's eleven refutation sites go through ONE core fact and its three
+  forms (`TxPin.tx_pin_no_ops` / `tx_pin_o_no_ops` / `tx_pins_no_ops`); five
+  named per-park wrappers deleted, five kept because they say strictly more
+  than the pin.
   - **Rank 5 — as landed (R5a, stages 0–4).**  **THE PER-INUM SINGLE PIN
     IS REFUTED**, and the counterexamples are machine-visible in the tree:
     two pins stand at ONE inum at ONE moment three times over —
@@ -5091,12 +5095,26 @@ the rows below and in `design/fs-ghost-state.md`).
     `IcacheEscrow` 24.98 → 23.74 s (1148 → 1148 MB), `InodeRegion`
     20.12 → 17.71 s (1109 → 1113 MB), `TxPin` 1.0 s.  Whole tree green at
     every stage; `SystemAdequacy.v`/`SystemAssumptions.v` byte-identical.
-  - **STAGE 5 IS NOT LANDED** (it overlaps EV-X at `FsCollectAll`): delete
-    `ic_pin_tx_no_ops`, `ic_out_frz_no_ops`, `ic_dep_own_tx_no_ops`,
-    `crp_row_no_ops` and `ipool_transit_no_ops`, and call the generic forms
-    at their consumers (`ic_escrow_body_cover`, `ipool_corpse_no_ops`,
-    `ipool_quiesce_acc`).  The five bodies are already one line each, so
-    the deletion is mechanical.
+  - **Rank 5 — as landed (R5b, stage 5: THE COLLAPSE).**  The five wrappers
+    whose body had become a single generic call are DELETED and their
+    consumers call the form in place, all inside `IcacheEscrow.v`:
+    `ic_pin_tx_no_ops`, `ic_dep_own_tx_no_ops` and `ic_out_frz_no_ops` at
+    `ic_escrow_body_cover`'s four refuted arms (the mid-free park and the
+    held arm open `ic_pin_tx`'s existential, the write arm and the frozen
+    alternative take the share out of the descriptor's conjuncts, then
+    `tx_pin_no_ops`); `crp_row_no_ops` inside `ipool_corpse_no_ops`, where
+    the `map_ind`'s step now does `destruct v` itself; `ipool_transit_no_ops`
+    at `ipool_quiesce_acc`, which calls `tx_pins_no_ops` on the ledger
+    directly (`ipool_transit` IS a `tx_pins`, so unification unfolds it).
+    KEPT, because each says strictly more than the pin: `ipool_corpse_no_ops`
+    (`map_Forall (= CrpDep)`, not `= ∅`), `ireg_cpin_no_ops` / `ireg_fsh_no_ops`
+    (their pure premises kill the `ExclBot` arm), `col_claim_box_no_ops` /
+    `col_corpse_no_ops`.  No statement changed; the prose mentions of the
+    dead names were retouched in `IcacheEscrow.v`, `InodeRegion.v`,
+    `ProofIput.v` and `fs-ghost-state.md` §2c/§2b/§5a/§5b.  LEFTOVER:
+    `FsCollect.v:108`'s banner still names `ipool_transit_no_ops` in prose —
+    that file was off-limits to this lane (concurrent EV work), and it is a
+    comment, not a reference.
 - [ ] **Small leftovers** (APPROVED, one lane after rank 5): `FsDurBytes`'s
   three dead lemmas and `inode_link_tok_nz`; the caller-less
   `img_fs_snap_alloc`/`img_boot_P_fs_dur`; `eo_minst`/`lm_install`

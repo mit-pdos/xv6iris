@@ -1133,7 +1133,8 @@ Section IputTail.
          of its caller's transaction, so it parks one for the window and
          [ipool_put] hands it straight back at the same [(tid, qtx)] -- which
          is what makes the transit part of the partition REFUTABLE at a
-         commit ([IcacheEscrow.ipool_transit_no_ops]). *)
+         commit ([IcacheEscrow.ipool_quiesce_acc], through
+         [TxPin.tx_pins_no_ops]). *)
       iMod (ipool_evict_lend ⊤ fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib
               (region_inums icfg_nib ∖ ci_inums ci) k (bv_unsigned inum) icfg_dev inum
               tid qtx

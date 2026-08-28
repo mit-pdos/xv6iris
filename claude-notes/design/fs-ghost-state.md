@@ -297,7 +297,13 @@ instance of one of three laws:
 | `tx_pins γ (M : gmap K (nat * Qp))` | `[∗ map] p ∈ M, tx_pin γ p.1 p.2` | a LEDGER of parks — `ipool_transit` over the in-transit inums, the armed registry's rows over the arm ids (at `fst <$> A`). |
 
 `tx_pin_no_ops` / `tx_pin_o_no_ops` / `tx_pins_no_ops` are the three
-refutations (`... -∗ False`, `⌜o = None⌝`, `⌜M = ∅⌝`).  Beside them:
+refutations (`... -∗ False`, `⌜o = None⌝`, `⌜M = ∅⌝`), and every one of the
+eleven per-park refutation sites in the tree is a call to one of them.  Five
+named per-park wrappers whose body had become a single such call are GONE
+(`ic_pin_tx_no_ops`, `ic_dep_own_tx_no_ops`, `ic_out_frz_no_ops`,
+`crp_row_no_ops`, `ipool_transit_no_ops`): their consumers open the park and
+call the generic form in place.  The five that remain remain because they say
+strictly more than the pin does (below).  Beside them:
 `tx_pin_split` / `tx_pin_join_q` (`LogInv.log_tx_split` / `log_tx_join_q` at
 the new name), `tx_pin_elem` (the bridge to the raw element, for handing one
 to a `LogInv` lemma), and three explicit `Timeless` instances.
@@ -743,8 +749,8 @@ while `FsStateInode.inode_ghost` wants the whole `top_frag`.  So a
 read-locked inum yields neither `inode_phi` nor `inode_ghost` at fraction 1.
 Nothing at a commit refutes the arm: the three windows the commit does
 refute each park a positive share of `LogDefs.ln_tx`
-(`ic_out_no_write_arm`, `ic_pin_tx_no_ops`, `ic_out_frz_no_ops`), and a
-read-locking `ilock` opens no transaction.  **What EV-X changed is the
+(`ic_out_no_write_arm`, and `TxPin.tx_pin_no_ops` at each window's parked
+share), and a read-locking `ilock` opens no transaction.  **What EV-X changed is the
 TARGET, not the arm**: `fs_state Γ (DfracOwn (3/4)) S` IS derivable
 (`col_hand_state`), and `top_frag` is not part of `fs_state` at all — the
 abstract fragment rides with the escrow arm and with `fs_snap`, never inside
@@ -1202,7 +1208,7 @@ the transit set under its own key) before it can state anything:
   BUILT, C-4.  The ledger is grown only by `ipool_evict_lend`, which iput
   calls holding a share of its caller's open transaction (§6), so the row
   parks one and a commit refutes it exactly as it refutes iput's three
-  windows (§5b): `ipool_transit_no_ops`.  The share sits in `ipool_body`,
+  windows (§5b), at `TxPin.tx_pins_no_ops`.  The share sits in `ipool_body`,
   not under the itable lock, which is what lets the commit see it, and it
   is PAID AT `ipool_evict_lend`'s CLOSING STEP rather than its opening —
   forced, because the free path's evicting walk has its share parked in the
@@ -1349,7 +1355,7 @@ a proof that OPENS a specific slot names `icEscN .@ k` — which it knows.
 | piece | meaning |
 |---|---|
 | `ic_escrow_body cn γfs γi cov ls k` | five arms: `ic_parked` / `ic_out` / `ic_mid_arm` / `ic_empty_arm` / `ic_held`.  **EVERY ARM CARRIES THE LOCK-WINDOW PIN as its last conjunct** (§5c's `icfg_hpn`): `ic_pin_rest k = hpn_full k None` in `ic_out` / `ic_mid_arm` / `ic_empty_arm` / `ic_payload_arm`'s LEFT alternative, `ic_pin_tx k = ∃ t q, hpn_h k (Some (t, q)) ∗ t ↪[ln_tx icfg_log]{#q} tt` in `ic_held` and in `ic_payload_arm`'s FROZEN alternative. |
-| `ic_pin_rest k` / `ic_pin_tx k` | the pin, per arm.  It sits INSIDE the arms and not beside the disjunction, and that is the whole placement argument: a body-level `ic_pin_rest ∨ ic_pin_tx` is refutable at an empty `ln_tx` authority too, but it says nothing about WHICH arm is standing, so it does not refute `ic_held`.  `ic_pin_tx_no_ops` is the refutation; `ic_pin_enter` / `ic_pin_exit` are the two movers, and the exit's `hpn_agree` is what hands the share back AT THE `(t, q)` THE ARM NAMED. |
+| `ic_pin_rest k` / `ic_pin_tx k` | the pin, per arm.  It sits INSIDE the arms and not beside the disjunction, and that is the whole placement argument: a body-level `ic_pin_rest ∨ ic_pin_tx` is refutable at an empty `ln_tx` authority too, but it says nothing about WHICH arm is standing, so it does not refute `ic_held`.  `TxPin.tx_pin_no_ops` under the pin's existential is the refutation; `ic_pin_enter` / `ic_pin_exit` are the two movers, and the exit's `hpn_agree` is what hands the share back AT THE `(t, q)` THE ARM NAMED. |
 | `ic_payload_arm` | the parked payload, and **the whole TAIL is the disjunction, not just a token slot** (A⁗, iclaim-ledger.md §3.16): LEFT is `ic_payload_np ∗ ifreeze_off inum ∗ live_gen k (1/2) g ∗ ic_pin_rest k` (no free in flight), FROZEN is `frzown inum ∗ frzsel k ((1/2)/2) true ∗ ic_pin_tx k` (a freezer is mid-window, and the selector's quarter beside the receipt is what closes `IcacheInv.frz_slot_kill` in one line).  The freer's own phase fragment decides which (`ic_payload_arm_decide_frz`).  `ic_payload` is the checked-out form and `ic_loaded` the loaded bundle, holding the per-inode leg `IcacheEscrow.ic_inode_leg` at fraction 1. |
 | `ic_out cn γfs γi cov ls k` | the checked-out arm: the descriptor `ic_deposit cn k d`, the credential (`ic_dep_res` or the frozen `ic_out_frz`), `ic_mid`, HALF of `ic_id`, and — its LAST conjunct — `ic_out_rd`, which is `ic_rd_arm` at `DepRd` and `emp` at every other descriptor (`ic_out_rd_none`).  Nothing outside `IcacheEscrow.v` names `ic_out`. |
 | `ic_out_frz k d dev inum` | the OUT arm's frozen alternative (the +0x5e window exit): named count fragment + identity fraction + `frzown`, carried by the `DepFrz` constructor. |
@@ -1368,10 +1374,10 @@ a descriptor the commit meets is one of these.
 
 | constructor | what it is |
 |---|---|
-| `DepTx s dev inum g t q` | **THE WRITE ARM.**  The caller's generation-named credential plus the transaction whose write lock this is: the OUT arm PARKS the share `t ↪[ln_tx icfg_log]{#q} tt`, so `end_op` — which consumes the whole element — cannot run while any inode of the transaction is write-locked, and a commit refutes the arm outright at an empty `ln_tx` authority (`ic_out_no_write_arm`, core `ic_dep_own_tx_no_ops`).  `(t, q)` are FIELDS: `ic_deposit` is a `ghost_var` whose other half the holder carries, so the descriptor pins the arm's transaction and share to the holder's and the park hands back exactly what the checkout parked (an existentially-keyed share could not: two halves of one element are not the whole). |
+| `DepTx s dev inum g t q` | **THE WRITE ARM.**  The caller's generation-named credential plus the transaction whose write lock this is: the OUT arm PARKS the share `t ↪[ln_tx icfg_log]{#q} tt`, so `end_op` — which consumes the whole element — cannot run while any inode of the transaction is write-locked, and a commit refutes the arm outright at an empty `ln_tx` authority (`ic_out_no_write_arm`, core `TxPin.tx_pin_no_ops`).  `(t, q)` are FIELDS: `ic_deposit` is a `ghost_var` whose other half the holder carries, so the descriptor pins the arm's transaction and share to the holder's and the park hands back exactly what the checkout parked (an existentially-keyed share could not: two halves of one element are not the whole). |
 | `IcacheEscrow.ic_tx_dep cn k s dev inum g` | the ½/½ BUNDLE a converted walk actually carries: `∃ t, ic_deposit cn k (DepTx s dev inum g t (1/2)) ∗ t ↪[ln_tx icfg_log]{#(1/2)} tt`.  It stands exactly where a bare `ic_deposit cn k d` stands, at the same arguments, so the walk-stage conjuncts are position-stable and no stage lemma gained a binder; the id is DETERMINED by the residue the holder keeps, which is what lets it be closed existentially at both ends.  **It cannot be used twice at one transaction**: its invariant is "the arm holds `q` and the holder holds `q` beside it", which forces `q = ½` for the two to rejoin into a whole element, so two of them at one `t` claim 2 and the pair is unsatisfiable — the two walks holding two write locks at once carry two `ic_tx_dep_at` at a QUARTER each instead. |
 | `DepRd s dev inum g` | **THE READ ARM.**  `ic_dep_own` at `DepRd` is the write arm's minus the parked share — the credential does not change — and what distinguishes it is what the escrow KEEPS: `ic_rd_arm` is the five pure clauses, the LEG `IcacheEscrow.ic_inode_leg γfs (DfracOwn (3/4)) γi inum n` (`dlinks` beside `inode_owned_era_q` at three quarters — record proxy `dinode_at` included, so a read-locker cannot move a record, `ireg_write_au` takes it) and the two contents holds, at an existential `(dn, bm, data)`.  `ic_inode_leg_shed_to`/`_shed_of` are the leg's own two directions of the reader's quarter, and `ic_inode_leg_rd_agree` the re-identification (the tokens do not split — they are the Φ-free half and stay whole on the arm).  The HOLDER carries `ic_rd_held`: `inode_ok`, `inode_local`, the metadata and addrs CELLS at fraction 1 (the design keeps in-memory cells there) and `FsStateEra.inode_rd_era γfs (DfracOwn (1/4)) inum n`.  `ic_loaded_shed`/`ic_rd_join` are the two directions.  Its two users are `fileread` and `filestat` — the only `ilock` callers holding no transaction. |
-| `DepFrz q dev inum t qt` | iput's freeze window (+0x5e..+0x70), the one checked-out arm that carries no ordinary deposit at all: what it holds is `ic_out_frz` — the reference's count fragment, its identity fraction, the freeze receipt AND the parked share `t ↪[ln_tx icfg_log]{#qt} tt`.  `(t, qt)` are FIELDS for `DepTx`'s reason verbatim (the descriptor is in iput's hand across that window), and the share is what makes `ic_out_frz_no_ops` refute the arm at a commit. |
+| `DepFrz q dev inum t qt` | iput's freeze window (+0x5e..+0x70), the one checked-out arm that carries no ordinary deposit at all: what it holds is `ic_out_frz` — the reference's count fragment, its identity fraction, the freeze receipt AND the parked share `t ↪[ln_tx icfg_log]{#qt} tt`.  `(t, qt)` are FIELDS for `DepTx`'s reason verbatim (the descriptor is in iput's hand across that window), and the share is what makes `TxPin.tx_pin_no_ops` refute the arm at a commit. |
 
 **THE RE-IDENTIFICATION IS THE WHOLE DIFFERENCE BETWEEN THE LOCK ARMS.**  A
 transaction's id is determined by nothing the escrow holds (and two halves
@@ -1422,8 +1428,9 @@ park (`ic_payload_arm`'s frozen alternative, +0x70) and the authority-side
 window `ic_held` (+0x3c).  Each of the three now parks a positive share of
 its transaction's `ln_tx` element, so at an empty authority none can be
 standing: `DepFrz` names `(t, qt)` in the CONSTRUCTOR and parks in
-`ic_out_frz` (`ic_out_frz_no_ops`); the other two carry no descriptor and
-name the share through the per-slot pin instead (`ic_pin_tx_no_ops`).
+`ic_out_frz`; the other two carry no descriptor and name the share through
+the per-slot pin instead.  All three are `TxPin.tx_pin_no_ops` at the share
+the arm parks, called in place by `ic_escrow_body_cover`.
 
 It moves no resource — the authority comes straight back and each
 alternative carries its own closing wand (`ic_lend`, whose frame is

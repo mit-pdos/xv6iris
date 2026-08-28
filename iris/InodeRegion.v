@@ -2591,7 +2591,7 @@ Section InodeRegion.
   (* THE REFUTATION THE COMMIT READS.  A standing claim holds a positive
      share of an open transaction's element, so at a commit -- where the
      WAL's authority for that map is empty -- no claim can be standing.
-     [IcacheEscrow.ic_pin_tx_no_ops]'s line, at the c column; the
+     [TxPin.tx_pin_o_no_ops]'s line, at the c column; the
      [ExclBot] arm is refuted by the slot's own claim pin, which is why the
      lemma takes it. *)
   Lemma ireg_cpin_no_ops (c : ctyUR) (f : frzUR) (d : dinode) :
