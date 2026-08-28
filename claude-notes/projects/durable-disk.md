@@ -4965,7 +4965,9 @@ the rows below and in `design/fs-ghost-state.md`).
     `fs_footprint_q_runs`.  `xqrun`/`xq_at`/`xq_ok`/`xq_strip`/
     `phi_runs_q`/`phi_runs_q_disj`/`phi_runs_q_in` SURVIVE: they are what
     the transport reads.
-  - **THE WALL, AND IT IS NOT ABOUT SHARES.**  The ruling's third item —
+  - **THE WALL, AND IT IS NOT ABOUT SHARES** (SUPERSEDED by EV-Y below,
+    which turned the collection around; the diagnosis was right about the
+    shape and wrong about "no accessor can do both").  The ruling's third item —
     "the transport is the mint's caller" — is NOT landed, and the reason
     is a theorem about the collection, not about the proof.  A transport
     at `q > 1/2` takes MORE THAN HALF of every byte, so a collection that
@@ -5031,6 +5033,110 @@ the rows below and in `design/fs-ghost-state.md`).
     was fixed mechanically (a `pose (dq := DfracOwn (3/4))` at each
     destructuring) rather than deleted; deleting them is a two-hunk
     change once someone confirms nothing off-tree names them.
+  **AS LANDED — EV-Y.  Whole tree green (zero `Error`, `MAKEEXIT=0`),
+  `tools/dethread_check.py` at "0 declarations out of scope", and
+  `iris/SystemAdequacy.v` / `iris/SystemAssumptions.v` byte-identical to
+  main.  Three commits.  THE RULING'S THIRD ITEM IS LANDED: the commit
+  COLLECTS `fs_state (fs_gamma_L γfs) (DfracOwn (3/4)) S` out of the
+  invariants and hands it to `FsDurXfer.fs_state_xfer_tok`, which returns
+  it; nothing pure about the state is materialised anywhere on that path.
+  `IcacheEscrow.v` is NOT touched.**
+
+  - **(1) THE PARTITION IS DISJOINT, FROM SEPARATION LOGIC.**
+    `IcacheEscrow.ipool_quiesce_acc` states its three index sets as a
+    UNION and nothing pure says they do not overlap.  They do not: two
+    `col_side`s at one inum are two owners of one exclusive `ghost_map`
+    element, and the witness that decides which is the REGION's own slot
+    (`FsCollect.col_side_slot_excl` — a bundle arm carries
+    `InodeRegion.dinode_at` at FULL fraction, a marker arm carries
+    `imark` at the mirrored key, so the two arms do not refute each
+    OTHER and `col_region_slot_acc` supplies the third party).
+    `FsCollectAll.col_sidez_disj` is that over a set, and the collection
+    now joins its three columns with the EXACT `big_sepS_union`;
+    `big_sepS_union_weak` is deleted.  **DELETED with it**, all
+    caller-less since lane H4 dropped `col_snap_bytes`:
+    `FsCollect.col_bundles_disj` (which MATERIALISED cross-inode block
+    disjointness as a pure fact), `col_bundles_used`, `col_bundles_blk`,
+    `col_bundles_ind`, `col_bundles_slot`, `col_bundles_not_meta`,
+    `col_meta_used`, `col_rec_tie`, `col_auth_pure`, `col_view_len`,
+    `col_pool_dom`, `col_bundle_owns`, `col_bundle_slot`,
+    `col_bundle_data`, `col_bundle_ind`, `col_recs_blk`,
+    `col_used_of_blk`, `col_blk_full`; and `FsDurXfer`'s `xq_ok_app`,
+    `xq_strip_app`, `phi_runs_q_app`, `phi_runs_q_nil`.
+  - **(2) THE COLLECTION IS AN ACCESSOR.**  `FsCollectAll.col_bodies_acc`
+    yields the transport's source beside a closing wand that rebuilds
+    every one of the six invariant bodies.  What it took, in order:
+    * **A SUPPLIER'S ROW WITH ITS OWN WAY BACK.** `FsCollect.col_row`
+      (`col_row_side`, `col_row_mark`, `col_row_frame`, `col_row_mono`) is
+      the accessor form of `col_side`, in `IcacheEscrow.ic_lend`'s shape.
+      It is parameterised by the ROW and not by `col_side`, because the
+      marker supplier cannot be closed from a disjunction that has
+      forgotten which arm it is.  The three suppliers are
+      `FsCollectAll.ipool_shape_np_row`/`ipool_ord_row`/`ipool_rows_rows`,
+      `imarks_rows` and `ic_cover_row`.
+    * **THE DOOR HANDS `ireg_lnk` OUT BESIDE THE BUNDLE.**  EV stage 5
+      recorded that no accessor could, `InodeRegion.ireg_lnk` being a
+      conjunct of the very slot the marker arm's reading consumes.  It
+      can — the pair comes out of ONE destructuring
+      (`col_region_slot_lnk_acc`, `col_free_slot_lnk_acc`,
+      `col_row_slot_acc`).  `col_link_of_acc` and `col_leg_bundle_acc`
+      are the reversible packs; the root's keep-alive value is pinned by
+      `FsStateLink.link_auth_tok_agree`, so the wand takes any `kv`.
+    * **THE COLUMNS MERGE AND RE-SPLIT EXACTLY.**  `col_got` is the
+      per-inum output, SELF-DESCRIBING so the wand can match it (the node
+      pinned by the abstract map, the keep-alive under its own
+      existential).  `col_row_got`/`col_rows_got_acc` serve the pool and
+      the corpse ledger; `esc_covers_got_acc` serves the fifty slots and
+      REFUTES the duplicate inum inside its own induction, so no `NoDup`
+      side condition is carried anywhere.  A cover is a body
+      (`ic_slot_cover_body`) — `ic_lend` already carries the way back.
+    * **NOTHING IS DROPPED AT THE FOOTPRINT.**
+      `col_hand_footprint_acc`/`col_hand_state_acc` keep `dinode_at`,
+      `top_frag_q`, the region's proxy authority and the quarter each
+      metadata object sheds.  Three of the four rejoin by an `⊣⊢`
+      (`blk_owned_split_34`, `rec_owned_at_split_34`); the FREE POOL
+      needs an agreement, because its rows hide their bytes under an
+      existential, and the agreement is the byte authority the collection
+      holds anyway (`col_free_pool_join`, `col_pool_join_list`,
+      `blk_owned_join_34`).  The records and the region's slots cross
+      back with no choice to make, the per-block `ds` being determined by
+      `m` (`col_recs_pure`, `col_recs_of_inum`, `ireg_blks_collect_of`,
+      `nested_of_set`, `big_sepS_of_list_nodup`,
+      `big_sepL_seq_of_list_of`).
+  - **(3) THE CALLER.**  `FsDurSnap.P_dur_alloc_xfer` over
+    `fs_state_xfer_tok`, and `FsCollectAll.fs_collect_dur` (which REPLACES
+    `fs_collect_mint`) runs it between the opening and the closing;
+    `fs_snap_law_build` is unchanged apart from the call.  **RETIRED with
+    it**: `pure_keep`/`pure_keep_wand` and the whole destructive chain
+    (`col_bodies_mint`, `col_hand_mint`, `col_hand_state`,
+    `col_hand_footprint`, `ipool_ord_side`, `ipool_rows_side`,
+    `imarks_side`, `col_region_quiesce_take_z`, `col_leg_bundle_z`,
+    `col_sides_bundles`, `col_keeps_root`, `col_region_quiesce_take`,
+    `col_region_slot_take`, `col_leg_bundle`, `col_link_of`,
+    `col_bundle_phi`), and the READINGS-ONLY MINT: `FsDurSnap.snap_mint`
+    (with `sm_runs`, the pure `xr_disj` the ruling wanted gone),
+    `fs_snap_alloc_mint`, `P_dur_alloc_mint` and
+    `FsDurXfer.fs_state_mint_runs`.  `fs_footprint_mint` stays —
+    `fs_footprint_xfer` is its caller — and era 0's image keeps the
+    value-first allocator, so `snap_ok` is handed IN nowhere else.
+  - **WHAT STILL CROSSES THE BOUNDARY AS A PURE FACT, and neither is
+    about disjointness**: `FsDurSnap.snap_shape` (the ONE clause no
+    resource pins — an authority may hold entries no fragment names) and
+    "the source's byte map is inside the committed view's flattening"
+    (`col_auth_dbytes`), which is where the epoch's IDENTITY comes from.
+  - **THE BOOT SIDE IS UNCHANGED**, and EV-X's reading of it stands: for
+    `FsCfgSnap.fs_cfg_alloc_snap` to call the same transport it would need
+    an `fs_state` on its INPUT side, and `RiscvAdequacy`'s `Hproj` is a
+    pure projection.  That is a change to the boot fupd, not to this
+    predicate.
+  - **COSTS.**  Measured standalone on the VM after the landing (wall /
+    peak RSS): `FsDurXfer` 4.71 s / 0.68 GB, `FsDurSnap` 4.26 s / 0.66 GB,
+    `FsCollect` 8.21 s / 0.73 GB, `FsCollectAll` 13.35 s / 0.89 GB,
+    `IcacheEscrow` 25.25 s / 1.10 GB.  `FsCollectAll` roughly doubled
+    (6.27 s at EV-X): the accessor's inductions carry a wand at every
+    step.  Every file is two orders of magnitude under the five-minute
+    red flag and no proof grew a typeclass search.
+
 - [x] **Rank 5 — one uniform per-inum transaction pin** (absorbs `DepTx`'s
   and `DepFrz`'s `(t,q)`, `ic_pin_*`, `ireg_cpin`/`ireg_fpin`, the transit
   ledger, `CrpPre`; ten `_no_ops` → one): APPROVED (owner, 2026-08-27),
