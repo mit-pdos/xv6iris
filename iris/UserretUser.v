@@ -55,6 +55,25 @@ Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
+(* >>> A6.93: THE TRAPFRAME SLOTS ARE CONTEXT-INDEXED.  [ProcInv.tf_words]
+   -- BELOW this file in the dependency order -- has been the flipped
+   [TsoCtx.ctx_phys_word_pointsto] since the M1 flip, while this contract
+   still asked for the RAW tower, so every producer had to hand a ctx word
+   to a raw premise ([ProofUserretClosed:275], [ProofUservec:1635]).  A
+   forget will not bridge it: [wp_userret_user] hands the words BACK
+   through its closer, and a raw cell cannot re-enter the ctx tower without
+   a drain (A6.84 §(2)).  So the CONTRACT moves, which is the direction the
+   M1 flip's own rule gives -- live CELLS are context-indexed; only lock
+   METADATA stays raw (§0.8′ ruling 2).
+
+   The token is LOCAL and spelled [↦ₚ₈c], exactly as [TfPage36] spells it
+   and for the reason recorded there: adding it to the kit's notation block
+   rebuilds the tree for a display change, and is cutover work. <<< *)
+Local Notation "a ↦ₚ₈c{ dq } w" :=
+  (TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a dq w)
+  (at level 20, format "a  ↦ₚ₈c{ dq }  w") : bi_scope.
+
+
 Module UserretUser (R : USERRET) (U : USER).
 Section UserretUser.
   Context `{!riscvGS Σ, !xv6G Σ}.
@@ -118,37 +137,37 @@ Section UserretUser.
     pt_frame (upt_tree_spec (ud_root pt) (ud_tfp pt) (ud_um pt)) -∗
     pc_is (uva 0x9c) -∗
     gpr_file m -∗
-    tf_pa (ud_tfp pt) 40 ↦ₚ₈{ dqm } vra -∗
-    tf_pa (ud_tfp pt) 48 ↦ₚ₈{ dqm } vsp -∗
-    tf_pa (ud_tfp pt) 56 ↦ₚ₈{ dqm } vgp -∗
-    tf_pa (ud_tfp pt) 64 ↦ₚ₈{ dqm } vtp -∗
-    tf_pa (ud_tfp pt) 72 ↦ₚ₈{ dqm } vt0 -∗
-    tf_pa (ud_tfp pt) 80 ↦ₚ₈{ dqm } vt1 -∗
-    tf_pa (ud_tfp pt) 88 ↦ₚ₈{ dqm } vt2 -∗
-    tf_pa (ud_tfp pt) 96 ↦ₚ₈{ dqm } vs0 -∗
-    tf_pa (ud_tfp pt) 104 ↦ₚ₈{ dqm } vs1 -∗
-    tf_pa (ud_tfp pt) 120 ↦ₚ₈{ dqm } va1 -∗
-    tf_pa (ud_tfp pt) 128 ↦ₚ₈{ dqm } va2 -∗
-    tf_pa (ud_tfp pt) 136 ↦ₚ₈{ dqm } va3 -∗
-    tf_pa (ud_tfp pt) 144 ↦ₚ₈{ dqm } va4 -∗
-    tf_pa (ud_tfp pt) 152 ↦ₚ₈{ dqm } va5 -∗
-    tf_pa (ud_tfp pt) 160 ↦ₚ₈{ dqm } va6 -∗
-    tf_pa (ud_tfp pt) 168 ↦ₚ₈{ dqm } va7 -∗
-    tf_pa (ud_tfp pt) 176 ↦ₚ₈{ dqm } vs2 -∗
-    tf_pa (ud_tfp pt) 184 ↦ₚ₈{ dqm } vs3 -∗
-    tf_pa (ud_tfp pt) 192 ↦ₚ₈{ dqm } vs4 -∗
-    tf_pa (ud_tfp pt) 200 ↦ₚ₈{ dqm } vs5 -∗
-    tf_pa (ud_tfp pt) 208 ↦ₚ₈{ dqm } vs6 -∗
-    tf_pa (ud_tfp pt) 216 ↦ₚ₈{ dqm } vs7 -∗
-    tf_pa (ud_tfp pt) 224 ↦ₚ₈{ dqm } vs8 -∗
-    tf_pa (ud_tfp pt) 232 ↦ₚ₈{ dqm } vs9 -∗
-    tf_pa (ud_tfp pt) 240 ↦ₚ₈{ dqm } vs10 -∗
-    tf_pa (ud_tfp pt) 248 ↦ₚ₈{ dqm } vs11 -∗
-    tf_pa (ud_tfp pt) 256 ↦ₚ₈{ dqm } vt3 -∗
-    tf_pa (ud_tfp pt) 264 ↦ₚ₈{ dqm } vt4 -∗
-    tf_pa (ud_tfp pt) 272 ↦ₚ₈{ dqm } vt5 -∗
-    tf_pa (ud_tfp pt) 280 ↦ₚ₈{ dqm } vt6 -∗
-    tf_pa (ud_tfp pt) 112 ↦ₚ₈{ dqm } va0f -∗
+    tf_pa (ud_tfp pt) 40 ↦ₚ₈c{ dqm } vra -∗
+    tf_pa (ud_tfp pt) 48 ↦ₚ₈c{ dqm } vsp -∗
+    tf_pa (ud_tfp pt) 56 ↦ₚ₈c{ dqm } vgp -∗
+    tf_pa (ud_tfp pt) 64 ↦ₚ₈c{ dqm } vtp -∗
+    tf_pa (ud_tfp pt) 72 ↦ₚ₈c{ dqm } vt0 -∗
+    tf_pa (ud_tfp pt) 80 ↦ₚ₈c{ dqm } vt1 -∗
+    tf_pa (ud_tfp pt) 88 ↦ₚ₈c{ dqm } vt2 -∗
+    tf_pa (ud_tfp pt) 96 ↦ₚ₈c{ dqm } vs0 -∗
+    tf_pa (ud_tfp pt) 104 ↦ₚ₈c{ dqm } vs1 -∗
+    tf_pa (ud_tfp pt) 120 ↦ₚ₈c{ dqm } va1 -∗
+    tf_pa (ud_tfp pt) 128 ↦ₚ₈c{ dqm } va2 -∗
+    tf_pa (ud_tfp pt) 136 ↦ₚ₈c{ dqm } va3 -∗
+    tf_pa (ud_tfp pt) 144 ↦ₚ₈c{ dqm } va4 -∗
+    tf_pa (ud_tfp pt) 152 ↦ₚ₈c{ dqm } va5 -∗
+    tf_pa (ud_tfp pt) 160 ↦ₚ₈c{ dqm } va6 -∗
+    tf_pa (ud_tfp pt) 168 ↦ₚ₈c{ dqm } va7 -∗
+    tf_pa (ud_tfp pt) 176 ↦ₚ₈c{ dqm } vs2 -∗
+    tf_pa (ud_tfp pt) 184 ↦ₚ₈c{ dqm } vs3 -∗
+    tf_pa (ud_tfp pt) 192 ↦ₚ₈c{ dqm } vs4 -∗
+    tf_pa (ud_tfp pt) 200 ↦ₚ₈c{ dqm } vs5 -∗
+    tf_pa (ud_tfp pt) 208 ↦ₚ₈c{ dqm } vs6 -∗
+    tf_pa (ud_tfp pt) 216 ↦ₚ₈c{ dqm } vs7 -∗
+    tf_pa (ud_tfp pt) 224 ↦ₚ₈c{ dqm } vs8 -∗
+    tf_pa (ud_tfp pt) 232 ↦ₚ₈c{ dqm } vs9 -∗
+    tf_pa (ud_tfp pt) 240 ↦ₚ₈c{ dqm } vs10 -∗
+    tf_pa (ud_tfp pt) 248 ↦ₚ₈c{ dqm } vs11 -∗
+    tf_pa (ud_tfp pt) 256 ↦ₚ₈c{ dqm } vt3 -∗
+    tf_pa (ud_tfp pt) 264 ↦ₚ₈c{ dqm } vt4 -∗
+    tf_pa (ud_tfp pt) 272 ↦ₚ₈c{ dqm } vt5 -∗
+    tf_pa (ud_tfp pt) 280 ↦ₚ₈c{ dqm } vt6 -∗
+    tf_pa (ud_tfp pt) 112 ↦ₚ₈c{ dqm } va0f -∗
     (* ---- the cells userret never touches, needed by the bridge ---- *)
     scause ↦ᵣ sc_v -∗
     stval ↦ᵣ stval_v -∗
@@ -173,37 +192,37 @@ Section UserretUser.
        in hand, which is after userret's continuation and before the user
        WP.  The values are userret's own, unchanged: it restores registers
        FROM the trapframe and writes none of it. *)
-    (tf_pa (ud_tfp pt) 40 ↦ₚ₈{ dqm } vra -∗
-       tf_pa (ud_tfp pt) 48 ↦ₚ₈{ dqm } vsp -∗
-       tf_pa (ud_tfp pt) 56 ↦ₚ₈{ dqm } vgp -∗
-       tf_pa (ud_tfp pt) 64 ↦ₚ₈{ dqm } vtp -∗
-       tf_pa (ud_tfp pt) 72 ↦ₚ₈{ dqm } vt0 -∗
-       tf_pa (ud_tfp pt) 80 ↦ₚ₈{ dqm } vt1 -∗
-       tf_pa (ud_tfp pt) 88 ↦ₚ₈{ dqm } vt2 -∗
-       tf_pa (ud_tfp pt) 96 ↦ₚ₈{ dqm } vs0 -∗
-       tf_pa (ud_tfp pt) 104 ↦ₚ₈{ dqm } vs1 -∗
-       tf_pa (ud_tfp pt) 120 ↦ₚ₈{ dqm } va1 -∗
-       tf_pa (ud_tfp pt) 128 ↦ₚ₈{ dqm } va2 -∗
-       tf_pa (ud_tfp pt) 136 ↦ₚ₈{ dqm } va3 -∗
-       tf_pa (ud_tfp pt) 144 ↦ₚ₈{ dqm } va4 -∗
-       tf_pa (ud_tfp pt) 152 ↦ₚ₈{ dqm } va5 -∗
-       tf_pa (ud_tfp pt) 160 ↦ₚ₈{ dqm } va6 -∗
-       tf_pa (ud_tfp pt) 168 ↦ₚ₈{ dqm } va7 -∗
-       tf_pa (ud_tfp pt) 176 ↦ₚ₈{ dqm } vs2 -∗
-       tf_pa (ud_tfp pt) 184 ↦ₚ₈{ dqm } vs3 -∗
-       tf_pa (ud_tfp pt) 192 ↦ₚ₈{ dqm } vs4 -∗
-       tf_pa (ud_tfp pt) 200 ↦ₚ₈{ dqm } vs5 -∗
-       tf_pa (ud_tfp pt) 208 ↦ₚ₈{ dqm } vs6 -∗
-       tf_pa (ud_tfp pt) 216 ↦ₚ₈{ dqm } vs7 -∗
-       tf_pa (ud_tfp pt) 224 ↦ₚ₈{ dqm } vs8 -∗
-       tf_pa (ud_tfp pt) 232 ↦ₚ₈{ dqm } vs9 -∗
-       tf_pa (ud_tfp pt) 240 ↦ₚ₈{ dqm } vs10 -∗
-       tf_pa (ud_tfp pt) 248 ↦ₚ₈{ dqm } vs11 -∗
-       tf_pa (ud_tfp pt) 256 ↦ₚ₈{ dqm } vt3 -∗
-       tf_pa (ud_tfp pt) 264 ↦ₚ₈{ dqm } vt4 -∗
-       tf_pa (ud_tfp pt) 272 ↦ₚ₈{ dqm } vt5 -∗
-       tf_pa (ud_tfp pt) 280 ↦ₚ₈{ dqm } vt6 -∗
-       tf_pa (ud_tfp pt) 112 ↦ₚ₈{ dqm } va0f -∗
+    (tf_pa (ud_tfp pt) 40 ↦ₚ₈c{ dqm } vra -∗
+       tf_pa (ud_tfp pt) 48 ↦ₚ₈c{ dqm } vsp -∗
+       tf_pa (ud_tfp pt) 56 ↦ₚ₈c{ dqm } vgp -∗
+       tf_pa (ud_tfp pt) 64 ↦ₚ₈c{ dqm } vtp -∗
+       tf_pa (ud_tfp pt) 72 ↦ₚ₈c{ dqm } vt0 -∗
+       tf_pa (ud_tfp pt) 80 ↦ₚ₈c{ dqm } vt1 -∗
+       tf_pa (ud_tfp pt) 88 ↦ₚ₈c{ dqm } vt2 -∗
+       tf_pa (ud_tfp pt) 96 ↦ₚ₈c{ dqm } vs0 -∗
+       tf_pa (ud_tfp pt) 104 ↦ₚ₈c{ dqm } vs1 -∗
+       tf_pa (ud_tfp pt) 120 ↦ₚ₈c{ dqm } va1 -∗
+       tf_pa (ud_tfp pt) 128 ↦ₚ₈c{ dqm } va2 -∗
+       tf_pa (ud_tfp pt) 136 ↦ₚ₈c{ dqm } va3 -∗
+       tf_pa (ud_tfp pt) 144 ↦ₚ₈c{ dqm } va4 -∗
+       tf_pa (ud_tfp pt) 152 ↦ₚ₈c{ dqm } va5 -∗
+       tf_pa (ud_tfp pt) 160 ↦ₚ₈c{ dqm } va6 -∗
+       tf_pa (ud_tfp pt) 168 ↦ₚ₈c{ dqm } va7 -∗
+       tf_pa (ud_tfp pt) 176 ↦ₚ₈c{ dqm } vs2 -∗
+       tf_pa (ud_tfp pt) 184 ↦ₚ₈c{ dqm } vs3 -∗
+       tf_pa (ud_tfp pt) 192 ↦ₚ₈c{ dqm } vs4 -∗
+       tf_pa (ud_tfp pt) 200 ↦ₚ₈c{ dqm } vs5 -∗
+       tf_pa (ud_tfp pt) 208 ↦ₚ₈c{ dqm } vs6 -∗
+       tf_pa (ud_tfp pt) 216 ↦ₚ₈c{ dqm } vs7 -∗
+       tf_pa (ud_tfp pt) 224 ↦ₚ₈c{ dqm } vs8 -∗
+       tf_pa (ud_tfp pt) 232 ↦ₚ₈c{ dqm } vs9 -∗
+       tf_pa (ud_tfp pt) 240 ↦ₚ₈c{ dqm } vs10 -∗
+       tf_pa (ud_tfp pt) 248 ↦ₚ₈c{ dqm } vs11 -∗
+       tf_pa (ud_tfp pt) 256 ↦ₚ₈c{ dqm } vt3 -∗
+       tf_pa (ud_tfp pt) 264 ↦ₚ₈c{ dqm } vt4 -∗
+       tf_pa (ud_tfp pt) 272 ↦ₚ₈c{ dqm } vt5 -∗
+       tf_pa (ud_tfp pt) 280 ↦ₚ₈c{ dqm } vt6 -∗
+       tf_pa (ud_tfp pt) 112 ↦ₚ₈c{ dqm } va0f -∗
      Rut pt) -∗
     (* ---- the (still assumed) kernel re-entry contract ---- *)
     ▷ stvec_handler_wp C pt Rut -∗

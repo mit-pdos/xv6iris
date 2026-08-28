@@ -47,6 +47,25 @@ Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
+(* >>> A6.93: THE TRAPFRAME SLOTS ARE CONTEXT-INDEXED.  [ProcInv.tf_words]
+   -- BELOW this file in the dependency order -- has been the flipped
+   [TsoCtx.ctx_phys_word_pointsto] since the M1 flip, while this contract
+   still asked for the RAW tower, so every producer had to hand a ctx word
+   to a raw premise ([ProofUserretClosed:275], [ProofUservec:1635]).  A
+   forget will not bridge it: [wp_userret_user] hands the words BACK
+   through its closer, and a raw cell cannot re-enter the ctx tower without
+   a drain (A6.84 §(2)).  So the CONTRACT moves, which is the direction the
+   M1 flip's own rule gives -- live CELLS are context-indexed; only lock
+   METADATA stays raw (§0.8′ ruling 2).
+
+   The token is LOCAL and spelled [↦ₚ₈c], exactly as [TfPage36] spells it
+   and for the reason recorded there: adding it to the kit's notation block
+   rebuilds the tree for a display change, and is cutover work. <<< *)
+Local Notation "a ↦ₚ₈c{ dq } w" :=
+  (TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx a dq w)
+  (at level 20, format "a  ↦ₚ₈c{ dq }  w") : bi_scope.
+
+
 (* [tf_pa] itself now lives in TrampPt.v (re-exported below) so
    [ProcInv.tf_page] -- below this file in the dependency order -- can
    share the exact same address family. *)
@@ -104,37 +123,37 @@ Definition wp_userret_pt_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : Cp
   pt_frame (upt_tree_spec uroot tfp um) -∗
   pc_is (uva 0x9c) -∗
   gpr_file m -∗
-  tf_pa tfp 40 ↦ₚ₈{ dqm } vra -∗
-  tf_pa tfp 48 ↦ₚ₈{ dqm } vsp -∗
-  tf_pa tfp 56 ↦ₚ₈{ dqm } vgp -∗
-  tf_pa tfp 64 ↦ₚ₈{ dqm } vtp -∗
-  tf_pa tfp 72 ↦ₚ₈{ dqm } vt0 -∗
-  tf_pa tfp 80 ↦ₚ₈{ dqm } vt1 -∗
-  tf_pa tfp 88 ↦ₚ₈{ dqm } vt2 -∗
-  tf_pa tfp 96 ↦ₚ₈{ dqm } vs0 -∗
-  tf_pa tfp 104 ↦ₚ₈{ dqm } vs1 -∗
-  tf_pa tfp 120 ↦ₚ₈{ dqm } va1 -∗
-  tf_pa tfp 128 ↦ₚ₈{ dqm } va2 -∗
-  tf_pa tfp 136 ↦ₚ₈{ dqm } va3 -∗
-  tf_pa tfp 144 ↦ₚ₈{ dqm } va4 -∗
-  tf_pa tfp 152 ↦ₚ₈{ dqm } va5 -∗
-  tf_pa tfp 160 ↦ₚ₈{ dqm } va6 -∗
-  tf_pa tfp 168 ↦ₚ₈{ dqm } va7 -∗
-  tf_pa tfp 176 ↦ₚ₈{ dqm } vs2 -∗
-  tf_pa tfp 184 ↦ₚ₈{ dqm } vs3 -∗
-  tf_pa tfp 192 ↦ₚ₈{ dqm } vs4 -∗
-  tf_pa tfp 200 ↦ₚ₈{ dqm } vs5 -∗
-  tf_pa tfp 208 ↦ₚ₈{ dqm } vs6 -∗
-  tf_pa tfp 216 ↦ₚ₈{ dqm } vs7 -∗
-  tf_pa tfp 224 ↦ₚ₈{ dqm } vs8 -∗
-  tf_pa tfp 232 ↦ₚ₈{ dqm } vs9 -∗
-  tf_pa tfp 240 ↦ₚ₈{ dqm } vs10 -∗
-  tf_pa tfp 248 ↦ₚ₈{ dqm } vs11 -∗
-  tf_pa tfp 256 ↦ₚ₈{ dqm } vt3 -∗
-  tf_pa tfp 264 ↦ₚ₈{ dqm } vt4 -∗
-  tf_pa tfp 272 ↦ₚ₈{ dqm } vt5 -∗
-  tf_pa tfp 280 ↦ₚ₈{ dqm } vt6 -∗
-  tf_pa tfp 112 ↦ₚ₈{ dqm } va0f -∗
+  tf_pa tfp 40 ↦ₚ₈c{ dqm } vra -∗
+  tf_pa tfp 48 ↦ₚ₈c{ dqm } vsp -∗
+  tf_pa tfp 56 ↦ₚ₈c{ dqm } vgp -∗
+  tf_pa tfp 64 ↦ₚ₈c{ dqm } vtp -∗
+  tf_pa tfp 72 ↦ₚ₈c{ dqm } vt0 -∗
+  tf_pa tfp 80 ↦ₚ₈c{ dqm } vt1 -∗
+  tf_pa tfp 88 ↦ₚ₈c{ dqm } vt2 -∗
+  tf_pa tfp 96 ↦ₚ₈c{ dqm } vs0 -∗
+  tf_pa tfp 104 ↦ₚ₈c{ dqm } vs1 -∗
+  tf_pa tfp 120 ↦ₚ₈c{ dqm } va1 -∗
+  tf_pa tfp 128 ↦ₚ₈c{ dqm } va2 -∗
+  tf_pa tfp 136 ↦ₚ₈c{ dqm } va3 -∗
+  tf_pa tfp 144 ↦ₚ₈c{ dqm } va4 -∗
+  tf_pa tfp 152 ↦ₚ₈c{ dqm } va5 -∗
+  tf_pa tfp 160 ↦ₚ₈c{ dqm } va6 -∗
+  tf_pa tfp 168 ↦ₚ₈c{ dqm } va7 -∗
+  tf_pa tfp 176 ↦ₚ₈c{ dqm } vs2 -∗
+  tf_pa tfp 184 ↦ₚ₈c{ dqm } vs3 -∗
+  tf_pa tfp 192 ↦ₚ₈c{ dqm } vs4 -∗
+  tf_pa tfp 200 ↦ₚ₈c{ dqm } vs5 -∗
+  tf_pa tfp 208 ↦ₚ₈c{ dqm } vs6 -∗
+  tf_pa tfp 216 ↦ₚ₈c{ dqm } vs7 -∗
+  tf_pa tfp 224 ↦ₚ₈c{ dqm } vs8 -∗
+  tf_pa tfp 232 ↦ₚ₈c{ dqm } vs9 -∗
+  tf_pa tfp 240 ↦ₚ₈c{ dqm } vs10 -∗
+  tf_pa tfp 248 ↦ₚ₈c{ dqm } vs11 -∗
+  tf_pa tfp 256 ↦ₚ₈c{ dqm } vt3 -∗
+  tf_pa tfp 264 ↦ₚ₈c{ dqm } vt4 -∗
+  tf_pa tfp 272 ↦ₚ₈c{ dqm } vt5 -∗
+  tf_pa tfp 280 ↦ₚ₈c{ dqm } vt6 -∗
+  tf_pa tfp 112 ↦ₚ₈c{ dqm } va0f -∗
   ( hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ User -∗
     mstatus ↦ᵣ sret_ms5 mstatus0 -∗
@@ -148,37 +167,37 @@ Definition wp_userret_pt_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : Cp
     gpr_file (userret_gpr m vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2 va3
                 va4 va5 va6 va7 vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10 vs11
                 vt3 vt4 vt5 vt6 va0f) -∗
-    tf_pa tfp 40 ↦ₚ₈{ dqm } vra -∗
-    tf_pa tfp 48 ↦ₚ₈{ dqm } vsp -∗
-    tf_pa tfp 56 ↦ₚ₈{ dqm } vgp -∗
-    tf_pa tfp 64 ↦ₚ₈{ dqm } vtp -∗
-    tf_pa tfp 72 ↦ₚ₈{ dqm } vt0 -∗
-    tf_pa tfp 80 ↦ₚ₈{ dqm } vt1 -∗
-    tf_pa tfp 88 ↦ₚ₈{ dqm } vt2 -∗
-    tf_pa tfp 96 ↦ₚ₈{ dqm } vs0 -∗
-    tf_pa tfp 104 ↦ₚ₈{ dqm } vs1 -∗
-    tf_pa tfp 120 ↦ₚ₈{ dqm } va1 -∗
-    tf_pa tfp 128 ↦ₚ₈{ dqm } va2 -∗
-    tf_pa tfp 136 ↦ₚ₈{ dqm } va3 -∗
-    tf_pa tfp 144 ↦ₚ₈{ dqm } va4 -∗
-    tf_pa tfp 152 ↦ₚ₈{ dqm } va5 -∗
-    tf_pa tfp 160 ↦ₚ₈{ dqm } va6 -∗
-    tf_pa tfp 168 ↦ₚ₈{ dqm } va7 -∗
-    tf_pa tfp 176 ↦ₚ₈{ dqm } vs2 -∗
-    tf_pa tfp 184 ↦ₚ₈{ dqm } vs3 -∗
-    tf_pa tfp 192 ↦ₚ₈{ dqm } vs4 -∗
-    tf_pa tfp 200 ↦ₚ₈{ dqm } vs5 -∗
-    tf_pa tfp 208 ↦ₚ₈{ dqm } vs6 -∗
-    tf_pa tfp 216 ↦ₚ₈{ dqm } vs7 -∗
-    tf_pa tfp 224 ↦ₚ₈{ dqm } vs8 -∗
-    tf_pa tfp 232 ↦ₚ₈{ dqm } vs9 -∗
-    tf_pa tfp 240 ↦ₚ₈{ dqm } vs10 -∗
-    tf_pa tfp 248 ↦ₚ₈{ dqm } vs11 -∗
-    tf_pa tfp 256 ↦ₚ₈{ dqm } vt3 -∗
-    tf_pa tfp 264 ↦ₚ₈{ dqm } vt4 -∗
-    tf_pa tfp 272 ↦ₚ₈{ dqm } vt5 -∗
-    tf_pa tfp 280 ↦ₚ₈{ dqm } vt6 -∗
-    tf_pa tfp 112 ↦ₚ₈{ dqm } va0f -∗
+    tf_pa tfp 40 ↦ₚ₈c{ dqm } vra -∗
+    tf_pa tfp 48 ↦ₚ₈c{ dqm } vsp -∗
+    tf_pa tfp 56 ↦ₚ₈c{ dqm } vgp -∗
+    tf_pa tfp 64 ↦ₚ₈c{ dqm } vtp -∗
+    tf_pa tfp 72 ↦ₚ₈c{ dqm } vt0 -∗
+    tf_pa tfp 80 ↦ₚ₈c{ dqm } vt1 -∗
+    tf_pa tfp 88 ↦ₚ₈c{ dqm } vt2 -∗
+    tf_pa tfp 96 ↦ₚ₈c{ dqm } vs0 -∗
+    tf_pa tfp 104 ↦ₚ₈c{ dqm } vs1 -∗
+    tf_pa tfp 120 ↦ₚ₈c{ dqm } va1 -∗
+    tf_pa tfp 128 ↦ₚ₈c{ dqm } va2 -∗
+    tf_pa tfp 136 ↦ₚ₈c{ dqm } va3 -∗
+    tf_pa tfp 144 ↦ₚ₈c{ dqm } va4 -∗
+    tf_pa tfp 152 ↦ₚ₈c{ dqm } va5 -∗
+    tf_pa tfp 160 ↦ₚ₈c{ dqm } va6 -∗
+    tf_pa tfp 168 ↦ₚ₈c{ dqm } va7 -∗
+    tf_pa tfp 176 ↦ₚ₈c{ dqm } vs2 -∗
+    tf_pa tfp 184 ↦ₚ₈c{ dqm } vs3 -∗
+    tf_pa tfp 192 ↦ₚ₈c{ dqm } vs4 -∗
+    tf_pa tfp 200 ↦ₚ₈c{ dqm } vs5 -∗
+    tf_pa tfp 208 ↦ₚ₈c{ dqm } vs6 -∗
+    tf_pa tfp 216 ↦ₚ₈c{ dqm } vs7 -∗
+    tf_pa tfp 224 ↦ₚ₈c{ dqm } vs8 -∗
+    tf_pa tfp 232 ↦ₚ₈c{ dqm } vs9 -∗
+    tf_pa tfp 240 ↦ₚ₈c{ dqm } vs10 -∗
+    tf_pa tfp 248 ↦ₚ₈c{ dqm } vs11 -∗
+    tf_pa tfp 256 ↦ₚ₈c{ dqm } vt3 -∗
+    tf_pa tfp 264 ↦ₚ₈c{ dqm } vt4 -∗
+    tf_pa tfp 272 ↦ₚ₈c{ dqm } vt5 -∗
+    tf_pa tfp 280 ↦ₚ₈c{ dqm } vt6 -∗
+    tf_pa tfp 112 ↦ₚ₈c{ dqm } va0f -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
