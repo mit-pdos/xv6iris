@@ -32,6 +32,22 @@ parts file, and both pairs are readings of ONE equation —
 handler one `rewrite`. Four lemmas became one plus two corollaries. The import
 problem was the symptom; the special-casing was the cause.
 
+**A BLOCK LEMMA THAT NAMES ITS SYSCALL'S POSTCONDITION CANNOT BE REUSED BY
+A PARALLEL PROOF; ONE THAT TAKES AN ABSTRACT CONTINUATION CAN.** A big
+function proved as block lemmas that hand each other an exit continuation
+gets a second proof — the same walk carrying extra resources, an
+atomic-update bundle say — for the price of only the blocks that actually
+touch the new resource, PROVIDED the other blocks' continuations are
+resource-generic. The worked instance: sys_open's seven failure tails
+(`ProofSysOpenTails`) conclude with `wp_next … (fun CIDx => ∀ mf, … -∗ WP
+Loop)` promising registers, pc and the process block and NOT
+`sys_open_post`, so the AU walk reuses all seven verbatim and frames its
+residue through them; its parts layer (`ProofSysOpenParts`) is reusable for
+the same reason. The blocks that had to be re-derived are exactly the ones
+that fire a commit or mint the success post. So when writing a block
+lemma, take the post as a parameter or promise only what the block itself
+produces — never spell the syscall's own contract in a block's exit.
+
 ## Orchestration: model roles and division of labor
 
 The **top-level agent runs on a powerful model and owns the high-level thinking**

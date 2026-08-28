@@ -1375,3 +1375,13 @@ FsInitPin.v
 SpecSysOpenAU.v
 FsAbsStart.v
 FsAbsOpenFire.v
+ProofSysOpenAUBits.v
+ProofSysOpenAUParts.v
+ProofSysOpenAUPub.v
+ProofSysOpenAUStores.v
+ProofSysOpenAUAlloc.v
+ProofSysOpenAUJoin.v
+ProofSysOpenAUWalk.v
+SpecSysOpenAUPlain.v
+ProofSysOpenAU.v
+LinkSysOpenAU.v
