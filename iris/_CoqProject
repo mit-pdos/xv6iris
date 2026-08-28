@@ -223,6 +223,8 @@ CommonWalk.v
 DecodeTotalU.v
 DecodeSetU.v
 UserExec.v
+UexecWp.v
+UexecSlot.v
 UserStep.v
 UserTrap.v
 UserTranslate.v
@@ -244,6 +246,8 @@ WpUmodeLoad.v
 USpecSync.v
 UCodeSync.v
 UProofSync.v
+UmodeKernelTie.v
+USyncKernel.v
 UCodeEcho.v
 USpecEcho.v
 UCodeSh.v
@@ -285,6 +289,7 @@ UserMemClassifyAmo.v
 SpecUser.v
 UserActiveClass.v
 ProofUser.v
+ProofUexecWp.v
 UserKernelBridge.v
 IntrDefs.v
 LockRank.v

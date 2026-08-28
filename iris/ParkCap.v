@@ -52,6 +52,7 @@ Require Import FdSlots IrefSlots FileInvDefs.
 Require Import FirstTok TimerCap.
 Require Import UserPtTree ProcPtOwn.   (* [uptd] / [ud_data] / [ud_pas] / [proc_pt_wf] *)
 Require Import UsertrapRes.
+Require Import UexecWp.   (* [uexec_wp] -- the child's WP, the channel's last row *)
 From Kernel Require KernelSyms.
 Require Import Xv6G.
 Local Open Scope Z_scope.
@@ -144,6 +145,12 @@ Section ParkCap.
              fd_slots FDSPARE -∗
              iref_slots IREFSPARE -∗
              fd_frags_any (pv_fdg V') -∗
+             (* ...and the child's user-execution WP, mirroring
+                [UsertrapRes.ut_park_intro_body] row for row.  Like the fd
+                fragments above it, it is CAPTURED AT THE PARK
+                ([park_token_park] below) rather than supplied by the
+                resumer, so it does not appear in [park_pkg]'s closer. *)
+             uexec_wp -∗
              URB h pt' (add_vec (un_ks N) (mword_of_int 4096)))))%I.
 
   (* THE TOKEN: some residue, its cap and its channel, both at [W := the
@@ -192,10 +199,17 @@ Section ParkCap.
        them to [UsertrapRes.ut_own], re-keyed by the closer's own
        [pv_fdg V' = pv_fdg V] premise. *)
     fd_frags_any (pv_fdg V) -∗
+    (* THE CHILD'S USER-EXECUTION WP, on the fd fragments' route exactly:
+       not part of [park_child] (that bundle goes straight to the cap) but
+       captured by the package's RESUME closer, built here, and spent by
+       [UsertrapRes.ut_res_bare_park] when the record resumes.  LINEAR: the
+       parker has to own one, which is what makes a WP enter the world only
+       at the two mint sites (userinit's park and sys_fork's kfork call). *)
+    uexec_wp -∗
     park_child (un_s N) (un_f N) (un_pj N) (un_ks N) rest (un_pid N) V -∗
     |==> ▷ proc_ctx (un_s N) (un_pj N).
   Proof.
-    iIntros (Hwf Hrest) "#Htok #Htext #Hwire #Hkmap #Hslot Hstack #Henv Hown Hfrag Hchild".
+    iIntros (Hwf Hrest) "#Htok #Htext #Hwire #Hkmap #Hslot Hstack #Henv Hown Hfrag Huwp Hchild".
     assert (Hkav : (K_usertrap <= KSTACK_AV)%nat) by (vm_compute; lia).
     iPoseProof "Htok" as "Htok'".
     iEval (rewrite park_token_unfold /park_token_F) in "Htok'".
@@ -205,7 +219,7 @@ Section ParkCap.
     iDestruct ("Hchan" $! N KSTACK_AV with "[%] [%] [%]") as "Hclose";
       [reflexivity | exact Hwf | exact Hkav |].
     iApply ("Hcap" $! (un_f N) (un_pj N) (un_ks N) rest (un_pid N) V KSTACK_AV
-              with "[%] [%] [%] [Hstack Hown Hclose Hfrag] [] Hchild").
+              with "[%] [%] [%] [Hstack Hown Hclose Hfrag Huwp] [] Hchild").
     - exact Hrest.
     - destruct Hwf as (Hj & _). exists (un_j N). split; [reflexivity | exact Hj].
     - exact Hkav.
@@ -217,7 +231,7 @@ Section ParkCap.
       (* the parked bundle, re-keyed onto the resumed record *)
       iEval (rewrite -Hfg) in "Hfrag".
       iApply ("Hclose'" $! h pt' V'
-                with "[%] Htfk Hdone HW Htc Htrap Hpriv Hfd Hiref Hfrag").
+                with "[%] Htfk Hdone HW Htc Htrap Hpriv Hfd Hiref Hfrag Huwp").
       exact Hupt.
     - iNext. iExact "Htok".
   Qed.

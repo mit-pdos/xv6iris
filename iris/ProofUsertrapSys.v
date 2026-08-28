@@ -52,6 +52,10 @@ Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom.
 Require Import UserPtTree ProcPtOwn.
+(* [uexec_wp] -- REQUIRED DIRECTLY because this proof holds a slot in the
+   proof-mode context across the [jal syscall]: [Typeclasses Opaque] does not
+   travel through a re-export (durable-notes). *)
+Require Import UexecWp.
 Require Import KptTree TrampPt.
 Require Import WpUart LogInv.
 Require Import IrefSlots.
@@ -287,7 +291,11 @@ Section UtSysBlock.
          more of [ut_own]'s conjuncts than that accessor hands out --
          [SpecSyscall.v]'s header on why the five families ride through
          [syscall()] on this same channel rather than inside [Hsy]. *)
-      iDestruct "Hown" as "(Hbs & Hip & Hfd & Hir & Hpv & Hufr & Hsy)".
+      (* [Huwp] -- the user-execution WP slot ([UsertrapRes.ut_own]'s last
+         conjunct) -- is not one of the pieces syscall() takes: it simply
+         rides the frame across the call and goes back in at the rebuild
+         below.  See claude-notes/projects/user-wp-slot.md. *)
+      iDestruct "Hown" as "(Hbs & Hip & Hfd & Hir & Hpv & Hufr & Hsy & Huwp)".
       (* the epc word EXISTS -- read off the page's own length invariant while
          the block is still whole, because [ut_epc_exists] is a pure read and
          [proc_priv_tf_upd] below consumes the block. *)
@@ -511,7 +519,7 @@ Section UtSysBlock.
          dispatcher's own statement that no syscall moves [pv_fdg]. *)
       iEval (rewrite -Hfgg) in "Hufr".
       iPoseProof (ut_own_rebuild SY.syscall_env N V2
-                    with "Hbs Hip Hfd Hir Hpv Hufr Hsy") as "Hown".
+                    with "Hbs Hip Hfd Hir Hpv Hufr Hsy Huwp") as "Hown".
       assert (Hmgsp : mg !!! Regidx csp_rs1 = pa_stk ksp 4)
         by (rewrite (callee_saved_lookup Hcsg csp_rs1
                        ltac:(vm_compute; reflexivity)); exact HS4sp).

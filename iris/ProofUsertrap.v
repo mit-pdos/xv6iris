@@ -77,6 +77,7 @@ Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom.
 Require Import UserPtTree.
+Require Import UexecWp.   (* [uexec_wp] -- named by the slot accessor's type *)
 Require Import KptTree.
 Require Import TrampPt.
 Require Import DiskPtsto WpUart LogInv.
@@ -1209,6 +1210,13 @@ Lemma usertrap_res_sstc
   usertrap_res_bare pt ksp -∗ sstc_enabled ∗ usertrap_res_bare pt ksp.
 Proof. exact (ut_res_bare_sstc SY.syscall_env pt ksp). Qed.
 
+(* the user-execution WP slot's seam -- see [SpecUsertrap]'s Parameter *)
+Lemma usertrap_res_uwp_acc
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
+  usertrap_res_bare pt ksp -∗
+  uexec_wp ∗ (uexec_wp -∗ usertrap_res_bare pt ksp).
+Proof. exact (ut_res_bare_uwp_acc SY.syscall_env pt ksp). Qed.
+
 Lemma usertrap_res_tf_csrs_open
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
   usertrap_res_bare pt ksp -∗
@@ -1219,6 +1227,19 @@ Lemma usertrap_res_tf_csrs_open
        ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗ hart_csrs -∗
        usertrap_res_bare pt ksp).
 Proof. exact (ut_res_bare_tf_csrs_open SY.syscall_env pt ksp). Qed.
+
+(* slot-out and trapframe-borrow from ONE opener, closer holed -- see
+   [SpecUsertrap]'s Parameter *)
+Lemma usertrap_res_run_open
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
+  usertrap_res_bare pt ksp -∗
+  uexec_wp ∗
+  ∃ (kroot : mword 44) (ws : list (mword 64)),
+    kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
+    (∀ ws' : list (mword 64),
+       ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗
+       (uexec_wp -∗ usertrap_res_bare pt ksp)).
+Proof. exact (ut_res_bare_run_open SY.syscall_env pt ksp). Qed.
 
 Section UtSeal.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.

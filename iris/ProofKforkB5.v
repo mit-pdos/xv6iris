@@ -81,6 +81,7 @@ Require Import SpecProcinit.
 Require Import SpecForkretPark.
 Require Import ParkCap.   (* [park_token] / [park_token_park] -- the park, as a resource *)
 Require Import UsertrapRes SyscParkEnv FsReady FileInv FirstTok DiskInv ProcDefs FsCfg.   (* the park's vocabulary *)
+Require Import UexecWp.   (* [uexec_wp] -- the child's WP, captured at the park *)
 Require Import SpecAcquire SpecRelease.
 Require Import CodeKfork.
 From Kernel Require KernelSyms.
@@ -189,6 +190,12 @@ Section ProofKforkB5.
     (* the child's descriptor-state fragments, minted with its block by
        allocproc; the park captures them into the resume closer. *)
     FdSlots.fd_frags_any (ProcDefs.pv_fdg Vc) -∗
+    (* ...and the child's user-execution WP, on the very same route: kfork's
+       caller supplies it ([SpecKfork]'s contract) and the park captures it
+       into the resume closer, where [UsertrapRes.ut_res_bare_park] spends
+       it on the child's residue.  LINEAR -- see
+       claude-notes/design/user-wp-slot.md. *)
+    uexec_wp -∗
     (* the slot's ALLOCATION MARKER, minted by allocproc and carried here
        through kfork's body: every non-UNUSED arm of the lock invariant
        holds it, so both releases below need it ([ProcAvail.v]).
@@ -213,7 +220,7 @@ Section ProofKforkB5.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hlvl Hj Hgl Hrest Hb Hm20 Hm21 Hm9 Hfresh.
-    iIntros "Hcg Hown Hpay #Htext Hpc #Hpinv #Hwl #Hft #Hworld #Htoken #Hfdone Hheld Hhart Hpriv Hfrag #Hmk
+    iIntros "Hcg Hown Hpay #Htext Hpc #Hpinv #Hwl #Hft #Hworld #Htoken #Hfdone Hheld Hhart Hpriv Hfrag Huwp #Hmk
              Hfd Hirsp Hbsl Hkfree #Hks Hctx Hcont".
     (* -------------------------------------------------------------- *)
     (* MOVE 1a: build [proc_lock_res γs γl (proc_addr j)] at USED, via the *)
@@ -255,7 +262,7 @@ Section ProofKforkB5.
     { rewrite /park_own. iFrame "Hbsl". iExact "Hip1". }
     iDestruct (ProcDefs.kstack_free_at with "Hks Hkfree") as "Hstack".
     iMod (park_token_park N rest Vc Hwf Hrest
-            with "Htoken Htext Hwire Htramp Hmk Hstack Henv Hown_park Hfrag
+            with "Htoken Htext Hwire Htramp Hmk Hstack Henv Hown_park Hfrag Huwp
                   [Hks Hctx Hpriv Hfd Hirsp]")
       as "Hpctx".
     { rewrite /park_child. iFrame "Hks Hpriv Hfd Hirsp".

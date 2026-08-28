@@ -24,6 +24,15 @@ Require Import LinkAllocproc.
 Require Import LinkNameiRootBoot.
 Require Import LinkRelease.
 Require Import LinkForkretParkPaid.
+Require Import ProofUser ProofUexecWp.
 Require Import ProofUserinit.
 
-Module Userinit := UserinitProof Allocproc NameiRootBoot Release ForkretParkPaid.
+(* THE GENERIC USER-EXECUTION WP, at the real user-safety theorem.  userinit
+   PARKS the first process, and parking one consumes a WP for it
+   ([UexecWp.uexec_wp], a linear row of the park channel) -- so this is one
+   of the tree's two mint sites, [LinkSysFork]'s being the other.
+   [UexecGen] is a repackaging of [ProofUser.UserProof.wp_user_exec_closed]
+   and nothing more, so this application adds no assumption. *)
+Module UG := UexecGen UserProof.
+
+Module Userinit := UserinitProof Allocproc NameiRootBoot Release ForkretParkPaid UG.

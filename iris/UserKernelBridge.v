@@ -3,8 +3,14 @@
 
    This file bridges the postcondition of [wp_userret_pt] (UserretAllPt.v)
    -- the machine state the kernel's userret trampoline leaves once it has
-   sret'd into User mode -- into [user_inv C pt] (UserExec.v), the loop
-   invariant the user-execution capstone [wp_user_exec] consumes.
+   sret'd into User mode -- into the CONCRETE resume state the trap loop
+   feeds to the user-execution WP it holds ([UexecWp.uexec_wp], extracted
+   from the kernel residue; see claude-notes/projects/user-wp-slot.md).
+   That is [userret_to_user_state]: a [u_regs] bundle at the post-sret
+   state, [user_pt_inv] at a delivered image, and [user_cfg].  It used to
+   deliver the PACKED [user_inv C pt] instead; the packing now happens
+   inside the generic slot's own proof (ProofUexecWp.v), because a verified
+   program's WP needs the state concrete.
 
    THE OBSERVATION.  [wp_userret_pt]'s continuation already hands back
    EXACTLY [utlb_inv_pt uroot tfp um] -- the very same installed-table
@@ -98,9 +104,28 @@ Section UserKernelBridge.
   (* full ([uc_dqc C = DfracOwn 1]) -- at userret's join the kernel owns    *)
   (* every config cell outright on this hart, and it hands the whole cell   *)
   (* to [user_cfg].                                                         *)
+  (*                                                                        *)
+  (* WHAT IT DELIVERS, AND WHY UNPACKED.  It used to build [user_inv C pt   *)
+  (* Rut] -- the packed loop invariant, with the resume state hidden under  *)
+  (* eight existentials.  The user-execution WP the loop runs is now a      *)
+  (* RESOURCE it pulls out of the kernel residue ([UexecWp.uexec_wp]; see   *)
+  (* claude-notes/projects/user-wp-slot.md), and that slot takes the resume *)
+  (* state CONCRETE, because a VERIFIED program's WP cannot start from      *)
+  (* existentials.  So the bridge hands back the triple the slot consumes   *)
+  (* -- the [u_regs] bundle at the post-sret state, [user_pt_inv] at a      *)
+  (* delivered image, [user_cfg] -- and the packing into [user_inv] happens *)
+  (* where it belongs: inside the GENERIC inhabitant's proof               *)
+  (* (ProofUexecWp.v).  [Rut] is no longer taken: the caller hands the      *)
+  (* parked residue straight to the slot.                                   *)
+  (*                                                                        *)
+  (* [M] IS DELIVERED, NOT TAKEN.  The caller holds [umem_any pt] (the      *)
+  (* process's pages with contents unconstrained -- the userret path never  *)
+  (* pins them), so the image comes out existentially quantified here.  A   *)
+  (* caller that knows its image passes [umem_own pt M] to [user_pt_inv]    *)
+  (* itself and does not need this lemma's memory row at all.              *)
   (* -------------------------------------------------------------------- *)
-  Lemma userret_to_user_inv
-      (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+  Lemma userret_to_user_state
+      (C : ucfg) (pt : uptd)
       (mstatus0 sepc0 sc_v stval_v mie_v mdv0 menvcfg0 senvcfg0 : mword 64)
       (stv medeleg_v : mword 64)
       (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
@@ -175,40 +200,42 @@ Section UserKernelBridge.
     (* ---- the process's memory (contents quantified: the bridge says
            nothing about the bytes, only that the process owns them) ---- *)
     umem_any pt -∗
-    (* ---- the exclusive usertrap-residue conjunct [user_inv] now carries ---- *)
-    Rut pt -∗
-    user_inv C pt Rut.
+    (* ---- THE UNPACKED RESUME STATE, exactly the triple [UexecWp.uexec_wp]
+           consumes, at [ms_v := sret_ms5 mstatus0], the stale [sc_v]/
+           [stval_v], [sepc_v := sepc0] and pc = nextPC = [ret_pc sepc0] ---- *)
+    ∃ M : gmap Z (bv 8),
+      ⌜user_mstatus_ok (sret_ms5 mstatus0)⌝ ∗
+      u_regs (HART_ACTIVE tt) (sret_ms5 mstatus0) sc_v stval_v sepc0
+             (ret_pc sepc0) (ret_pc sepc0) g ∗
+      user_pt_inv pt M ∗
+      user_cfg C.
   Proof.
     intros HSXL HMXR HFS HVS HTVM HTSR HXS HSD HMPP HSPIE Hdqc Hstvec Hmie Hmdl Hmedl
       Hroot Htfp Hum Hmenv Hsenv Hmse Hsse Hinj Hacc.
     subst menvcfg0 senvcfg0 mstateen0v sstateen0v.
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb Hpc Hgpr
-             Hsc Hstval Hstvec Hmedl Hmse Hsse Hmcen Hscen Hhpm Hdata Hrut".
-    unfold user_inv.
-    iExists (HART_ACTIVE tt), (sret_ms5 mstatus0), sc_v, stval_v, sepc0,
-            (ret_pc sepc0), (ret_pc sepc0), g.
-    (* user_hart_ok *)
-    iSplitR; [iPureIntro; exact I |].
-    (* user_mstatus_ok *)
+             Hsc Hstval Hstvec Hmedl Hmse Hsse Hmcen Hscen Hhpm Hdata".
+    (* the image the pages happen to hold: unconstrained on this path, and
+       the ONE ingredient the trapframe does not determine *)
+    rewrite /umem_any. iDestruct "Hdata" as (M) "Hmem".
+    iExists M.
+    (* the pure mstatus obligation, carried along so the caller need not
+       restate the ten pins to re-derive it *)
     iSplitR; [iPureIntro; exact (user_mstatus_ok_sret_ms5 mstatus0 HSXL HMXR HFS HVS HTVM HTSR HXS HSD HMPP HSPIE) |].
-    (* lock-step va' = va *)
-    iSplitR; [iPureIntro; intros u _; reflexivity |].
     iSplitL "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr".
-    { (* [user_regs] IS [UserFrame.u_regs], and the three riders it now
-         carries -- [minstret_res], [clock_res], [resv_any] -- are exactly
-         the three [pc_is] bundles beside PC/nextPC.  So the bridge does NOT
-         take [pc_is] APART any more: [u_regs_pc_is] is the whole step, and
-         it is what makes the entry boundary free. *)
-      unfold user_regs. rewrite u_regs_pc_is.
+    { (* the three riders [u_regs] now carries -- [minstret_res],
+         [clock_res], [resv_any] -- are exactly what [pc_is] bundles beside
+         PC/nextPC.  So the bridge does NOT take [pc_is] APART: [u_regs_pc_is]
+         is the whole step, and it is what makes the entry boundary free. *)
+      rewrite u_regs_pc_is.
       iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr". }
-    iSplitL "Hutlb Hdata".
-    { (* user_pt_any *)
-      rewrite user_pt_any_unfold.
+    iSplitL "Hutlb Hmem".
+    { (* user_pt_inv, at the delivered image *)
+      rewrite /user_pt_inv.
       rewrite Hroot Htfp Hum.
-      iFrame "Hutlb Hdata".
+      iFrame "Hutlb Hmem".
       rewrite Hum in Hacc.
       iPureIntro. split; [exact Hinj | exact Hacc]. }
-    iSplitL "Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse Hmcen Hscen Hhpm".
     { (* user_cfg *)
       unfold user_cfg.
       rewrite Hdqc Hstvec Hmie Hmdl Hmedl.
@@ -216,8 +243,6 @@ Section UserKernelBridge.
       iSplitL "Hmcen Hscen".
       - iExists mcounteren_v, scounteren_v. iFrame "Hmcen Hscen".
       - iExists mhpmcounter_v. iFrame "Hhpm". }
-    (* Rut pt *)
-    iFrame "Hrut".
   Qed.
 
   (* -------------------------------------------------------------------- *)

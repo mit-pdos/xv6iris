@@ -115,6 +115,8 @@ Section Res.
   Definition usertrap_res_bare_norm := FR.usertrap_res_bare_norm.
   Definition usertrap_res_csrs_open := FR.usertrap_res_csrs_open.
   Definition usertrap_res_sstc := FR.usertrap_res_sstc.
+  Definition usertrap_res_uwp_acc := FR.usertrap_res_uwp_acc.
+  Definition usertrap_res_run_open := FR.usertrap_res_run_open.
   Definition usertrap_res_tf_csrs_open := FR.usertrap_res_tf_csrs_open.
   Definition usertrap_res_tf_open := FR.usertrap_res_tf_open.
   (* ...and the park's one producer-side entry, threaded like the rest.

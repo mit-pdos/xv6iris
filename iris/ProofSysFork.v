@@ -43,6 +43,7 @@ Require Import IrefSlots.
 Require Import IcacheEscrow.
 Require Import SpecKfork.
 Require Import SpecSysFork.
+Require Import UexecWp.   (* [UEXEC_GEN] / [uexec_wp] -- the child's WP *)
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -75,7 +76,18 @@ Proof.
   rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
 Qed.
 
-Module SysForkProof (Kfork : KFORK) : SYSFORK.
+(* [UG] -- THE GENERIC USER-EXECUTION WP, as a functor argument, and the
+   SECOND (and last) mint site in the tree; userinit's park is the other.
+   kfork's contract takes the CHILD'S WP as a linear premise -- parking a
+   process consumes one, and nothing persistent carries a copy any more --
+   so sys_fork, kfork's one caller, has to pay it.  It pays with the generic
+   inhabitant, which is what a process forked by an unverified parent gets;
+   when the parent is verified the very same premise is where its own
+   fork-continuation deposit will go instead.  A [box] proposition proved
+   from no linear hypothesis, so the argument costs the composition exactly
+   one application: [LinkSysFork.v] passes [UexecGen UserProof].  See
+   claude-notes/design/user-wp-slot.md. *)
+Module SysForkProof (Kfork : KFORK) (UG : UEXEC_GEN) : SYSFORK.
 
 Section ProofSysFork.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ,
@@ -178,12 +190,16 @@ Section ProofSysFork.
     (* the pair arrives NAMED (rank 1d): [fsc_kpages] is a [FsCfg.fscfg]
        field, so there is no existential left to open. *)
     iPoseProof "Henv" as "#Henvn".
+    (* THE MINT.  kfork consumes a WP for the child it parks; the [box] is
+       eliminated once, here, into the LINEAR resource the contract wants. *)
+    iAssert (uexec_wp) as "Huwp".
+    { iPoseProof UG.uexec_wp_gen as "#Hgen". iExact "Hgen". }
     iApply (Kfork.wp_kfork_sconf γp γw γl γf γs
 
               Bj lvl (av - 2)%nat eb p b pid V lks
               ltac:(lia) Hlvl ltac:(lkbelow)
               with "Hcg Hcpu Htext Hpc Hprocs Hplock Hwlock Hftbl
-                    Hitbl Hitinv Hireg Henvn Hpav Hworld Htoken Hfdone Hpriv").
+                    Hitbl Hitinv Hireg Henvn Hpav Hworld Htoken Huwp Hfdone Hpriv").
     iIntros (CID6 Hs6 MF) "%HcsMF Hpc Hpost".
     iDestruct "Hpost" as "(Hcg & Hcpu & Hpriv & #Henv & %Hrv)".
     assert (Hpc0c : ret_pc (Bj !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_fork + 0x0c))

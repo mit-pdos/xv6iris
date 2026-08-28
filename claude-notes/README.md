@@ -93,6 +93,12 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 - **[`tlb-translation.md`](design/tlb-translation.md)** — the kvmmake-faithful
   all-4KB kernel page table, TLB/page-walk/translation, userret/trampoline/user
   page table, the `CommonWalk.v` walk technique.
+- **[`user-wp-slot.md`](design/user-wp-slot.md)** — the per-process
+  user-execution WP as a RESIDUE-RESIDENT RESOURCE: the two WP forms
+  (`uexec_wp` / the trapframe-keyed `uexec_slot V M`), where the slot
+  lives and how it travels, the two run sites, the seal discipline, and
+  the sync entry-deposit constructor.  Read before touching the trap
+  loop's user-WP seam.
 - **[`elf.md`](design/elf.md)** — ELF file semantics: the file-side
   `ElfFile.v` layer vs `ElfEnc.v`'s code-side readers, the PrimString import
   vehicle for whole binaries, the kernel-dump consistency theorem
@@ -145,8 +151,16 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 
 ## `projects/` — ongoing worklists & plans (one per effort)
 
-Seven remain open; each file's top banner says precisely what is left (the
+Eight remain open; each file's top banner says precisely what is left (the
 first four were audited against the tree 2026-08-22):
+
+- **[`user-wp-slot.md`](projects/user-wp-slot.md)** — the PER-PROCESS
+  user-execution WP slot, step 3: making a verified process run IN PLACE
+  of the generic-safety WP.  Steps 1–2 are landed (the slot machinery and
+  `sync`'s entry deposit — design of record:
+  `design/user-wp-slot.md`); the file is the six-item ledger, including
+  the two rulings to get before the residue re-key and the deliberately
+  undesigned deposit-covering formulation.
 
 - **[`xv6-rev-7d258aa.md`](projects/xv6-rev-7d258aa.md)** — the `XV6_REV` bump
   31f115a -> 7d258aa: DONE and green, awaiting a rebase onto main.  The
