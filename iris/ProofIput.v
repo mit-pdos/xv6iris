@@ -2149,6 +2149,72 @@ Section IputFreePath.
       split; [| exact Hk2].
       intros ->. apply Hz. rewrite Hk in Hk2. injection Hk2 as <-. reflexivity.
   Qed.
+  (* exit continuation 1 of [ip_free_locked], named: inline it was
+     3855 B in Delta at every step of that walk
+     (optimization.md, fold block continuations). *)
+  Definition ip_locked_exit1 `{GEN : GenId}
+      (bmapstart : Z) (u : nat) (Sb : gset Z) (crb : bool) (cru : bool) (crz : bool) (tid : nat) (qtx : Qp) (pidv : mword 32) (dqb : dfrac) (dqs : dfrac) (sp0 : mword 64) (vra : mword 64) (vs0 : mword 64) (vs1 : mword 64) (vs2 : mword 64) (vs3 : mword 64) (vs4 : mword 64) (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) (rg : frzidx) (pj : mword 64) (CID : CpuId) : iProp Σ :=
+    (∀ (mf : regfile) (n'' : nat) (Sb'' : gset Z) (w : bool),
+        (* the register threading is [ipo_thr]'s, not [callee_saved]:
+           s1 holds the off-lock tail's [bp] and is restored by the epilogue
+           AFTER 0x30, so nothing at 0x30 may claim it back. *)
+        ⌜ipo_thr m mf /\ mf !!! Regidx csp_rs1 = sp0
+          /\ mf !!! Regidx Rs2 = vs2 /\ mf !!! Regidx Rs3 = vs3
+          /\ mf !!! Regidx Rs4 = vs4⌝ -∗
+        sie_cap_gpr (CID := CID) KT1 mf (K - 6)%nat eb pj -∗
+        cpu_own (CID := CID) 0 eb pj eb lks -∗
+        trap_csrs_ext (CID := CID) KT1 eb -∗
+        cpu_claim_ext (CID := CID) eb pj -∗
+        pc_is (CID := CID) (mword_of_int (KernelSyms.iput + 0x30) : mword 64) -∗
+        proc_priv_bare pj pidv Vpr -∗
+        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+        sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
+        (* NO POOL ROW HERE (IVd).  Under the REORDER the itable lock goes
+           at +0x94, BEFORE the +0xba deposit, and [IcacheEscrow.ic_ci_wf]'s
+           [dom ci = dom M] then forces the evicted inum's pool entry into the
+           itable's own free pool AT THAT RELEASE -- the entry is parked on the
+           AWAIT arm ([ipool_shape_await]), which is exactly what that arm's
+           header describes ("the entry a FREER has parked ON ITS WAY TO the
+           off-lock deposit").  There is only one [icnt_half .. 0] and one
+           [frzm_h .. false] in existence, so nothing pool-shaped can leave
+           this lemma. *)
+        bslots 3 -∗
+        ⌜Sb ⊆ Sb''⌝ -∗
+        ⌜w = true -> bmapstart ∈ Sb''⌝ -∗
+        ⌜crb = true -> w = false⌝ -∗
+        (* THE BUDGET CLAUSE, which this post used to be missing outright and
+           without which [wp_iput_gen]'s own post cannot be stated.  The figure
+           is [SpecIput.ip_spend_w]'s: the bitmap unit if this run logged it,
+           plus ITRUNC's tail flush unless one of the two credits paid for it.
+           The off-lock flush is NOT in it -- see the [true] handed to
+           [ip_free_offlock] below. *)
+        ⌜((u - ip_spend_w w cru crz)%nat <= n'')%nat /\ (n'' <= u)%nat⌝ -∗
+        log_opS icfg_log n'' Sb'' -∗
+        (* the share, home for good: the +0x8a eviction took it out of the
+           mid-free park at the [(t, qt)] that park NAMED (durable-disk
+           B''-tx5). *)
+        tid ↪[ln_tx icfg_log]{#qtx} () -∗
+        iref_slot -∗
+        (* RULING G's RETURN LEG (iclaim-ledger.md §6′): the regime the caller
+           lent at the +0x50 mint, handed back by the +0xba deposit. *)
+        ireg_regime rg.1 -∗
+        (* ...AND THE CORPSE WINDOW'S SHARE WITH IT (durable-disk C-6).  The
+           mint parked [rg]'s own [(t, q)] in the region slot's freeze clause
+           so that the window this block closes -- the MARKED slot from the
+           +0x8a eviction to the +0xba deposit, at which the inum has no
+           bundle anywhere -- is refuted at a commit
+           ([InodeRegion.ireg_fsh_no_ops]).  The deposit returns it beside the
+           regime and the caller rejoins it with the window's half above. *)
+        ireg_fpin rg -∗
+        (* frame ra/s0/s1 slots, still saved, for the epilogue *)
+        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))) ↦₈[KT1] vra -∗
+        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000"))) ↦₈[KT1] vs0 -∗
+        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) ↦₈[KT1] vs1 -∗
+        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) ↦₈[KT1] vs2 -∗
+        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) ↦₈[KT1] vs3 -∗
+        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) ↦₈[KT1] vs4 -∗
+        WP (Loop : expr riscv_lang))%I.
+
 
   (* ==========================================================================
      DRAFT STATEMENT.  Entry at iput+0x5a with itable.lock HELD and the inode
@@ -2410,67 +2476,7 @@ Section IputFreePath.
     add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) ↦₈[KT1] vs3 -∗
     add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) ↦₈[KT1] vs4 -∗
     (* THE CALLER'S CONTINUATION at 0x30 (iput's real post; ip_tail's shape) *)
-    wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
-      ∀ (mf : regfile) (n'' : nat) (Sb'' : gset Z) (w : bool),
-        (* the register threading is [ipo_thr]'s, not [callee_saved]:
-           s1 holds the off-lock tail's [bp] and is restored by the epilogue
-           AFTER 0x30, so nothing at 0x30 may claim it back. *)
-        ⌜ipo_thr m mf /\ mf !!! Regidx csp_rs1 = sp0
-          /\ mf !!! Regidx Rs2 = vs2 /\ mf !!! Regidx Rs3 = vs3
-          /\ mf !!! Regidx Rs4 = vs4⌝ -∗
-        sie_cap_gpr (CID := CID) KT1 mf (K - 6)%nat eb pj -∗
-        cpu_own (CID := CID) 0 eb pj eb lks -∗
-        trap_csrs_ext (CID := CID) KT1 eb -∗
-        cpu_claim_ext (CID := CID) eb pj -∗
-        pc_is (CID := CID) (mword_of_int (KernelSyms.iput + 0x30) : mword 64) -∗
-        proc_priv_bare pj pidv Vpr -∗
-        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-        sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-        (* NO POOL ROW HERE (IVd).  Under the REORDER the itable lock goes
-           at +0x94, BEFORE the +0xba deposit, and [IcacheEscrow.ic_ci_wf]'s
-           [dom ci = dom M] then forces the evicted inum's pool entry into the
-           itable's own free pool AT THAT RELEASE -- the entry is parked on the
-           AWAIT arm ([ipool_shape_await]), which is exactly what that arm's
-           header describes ("the entry a FREER has parked ON ITS WAY TO the
-           off-lock deposit").  There is only one [icnt_half .. 0] and one
-           [frzm_h .. false] in existence, so nothing pool-shaped can leave
-           this lemma. *)
-        bslots 3 -∗
-        ⌜Sb ⊆ Sb''⌝ -∗
-        ⌜w = true -> bmapstart ∈ Sb''⌝ -∗
-        ⌜crb = true -> w = false⌝ -∗
-        (* THE BUDGET CLAUSE, which this post used to be missing outright and
-           without which [wp_iput_gen]'s own post cannot be stated.  The figure
-           is [SpecIput.ip_spend_w]'s: the bitmap unit if this run logged it,
-           plus ITRUNC's tail flush unless one of the two credits paid for it.
-           The off-lock flush is NOT in it -- see the [true] handed to
-           [ip_free_offlock] below. *)
-        ⌜((u - ip_spend_w w cru crz)%nat <= n'')%nat /\ (n'' <= u)%nat⌝ -∗
-        log_opS icfg_log n'' Sb'' -∗
-        (* the share, home for good: the +0x8a eviction took it out of the
-           mid-free park at the [(t, qt)] that park NAMED (durable-disk
-           B''-tx5). *)
-        tid ↪[ln_tx icfg_log]{#qtx} () -∗
-        iref_slot -∗
-        (* RULING G's RETURN LEG (iclaim-ledger.md §6′): the regime the caller
-           lent at the +0x50 mint, handed back by the +0xba deposit. *)
-        ireg_regime rg.1 -∗
-        (* ...AND THE CORPSE WINDOW'S SHARE WITH IT (durable-disk C-6).  The
-           mint parked [rg]'s own [(t, q)] in the region slot's freeze clause
-           so that the window this block closes -- the MARKED slot from the
-           +0x8a eviction to the +0xba deposit, at which the inum has no
-           bundle anywhere -- is refuted at a commit
-           ([InodeRegion.ireg_fsh_no_ops]).  The deposit returns it beside the
-           regime and the caller rejoins it with the window's half above. *)
-        ireg_fpin rg -∗
-        (* frame ra/s0/s1 slots, still saved, for the epilogue *)
-        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))) ↦₈[KT1] vra -∗
-        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000"))) ↦₈[KT1] vs0 -∗
-        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) ↦₈[KT1] vs1 -∗
-        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000"))) ↦₈[KT1] vs2 -∗
-        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) ↦₈[KT1] vs3 -∗
-        add_vec sp0 (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) ↦₈[KT1] vs4 -∗
-        WP (Loop : expr riscv_lang)) -∗
+    wp_next (CID0 := CID0) true pj (fun CID : CpuId => ip_locked_exit1 bmapstart u Sb crb cru crz tid qtx pidv dqb dqs sp0 vra vs0 vs1 vs2 vs3 vs4 m K eb b lks Vpr rg pj CID) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros ip pj HK HKit Hk Hu2 Hcrb Hgeom Hsize Hbmpos Hbmcov Hbmlog Histpos Hicov Hilog
