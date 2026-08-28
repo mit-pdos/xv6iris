@@ -505,3 +505,19 @@ has `auto-delete=NO`, so deleting the instance costs only the boot disk. To
 change the machine image, delete the instance and re-run `provision-gcp.sh` —
 switches and trees come back attached. To change only the size, stop it and
 `gcloud compute instances set-machine-type`, which keeps the boot disk too.
+
+## Gotcha: leaked rocqworkers (2026-08-28)
+
+A `coqc`/`rocq` invocation spawns `rocqworker` processes that can outlive
+an interrupted parent — a killed lane, an aborted probe, a Ctrl-C'd round
+— and spin forever at 100% CPU (measured: the owner had to hand-kill a
+batch on the host).  Rules:
+- Prefer VM rounds via `run-on-gcp` (workers die with the round's shell).
+- Any LOCAL `coqc` probe must be wrapped: `timeout 600 coqc …`, and the
+  probe's cleanup runs `pkill -P $$` (children only — NEVER a broad
+  pkill by name, which kills other lanes' builds).
+- On lane shutdown/kill, the coordinator or the next lane checks
+  `ps -eo pid,etime,pcpu,args | grep rocqworker` on BOTH the host and
+  the VM and reaps anything orphaned (etime large, parent dead) —
+  distinguish from a LIVE build (flock held, fresh etime) and leave
+  that alone.
