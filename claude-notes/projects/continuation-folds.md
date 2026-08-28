@@ -111,6 +111,19 @@ cost, so hoisting them into a shared file is a tidiness change with no
 measurable win. Do not read a cross-file span match as a fold opportunity
 without checking whether both sides are already named.
 
+## A CONTRACT's continuation is NOT worth folding (measured)
+
+Naming the 4.1 kB exit continuation in `SpecIlock`'s two contract bodies —
+999 s of consumer build across fifteen files that apply them — moved the
+consumers' `.vo` by **−0.06 % and −0.10 %** and their wall not at all
+(`ProofIlock` −0.8 %, `ProofSysLink` +2.2 %, both noise). Reverted.
+
+The reason generalises to every `Spec*.v` on the candidate list: a contract's
+continuation is INTRO'D AT THE CALL and consumed, not carried across the
+caller's walk, so it never sits in Δ for the many steps that make the fold pay.
+Fold continuations that a proof CARRIES (block seams, exits handed between
+blocks), not ones it immediately takes apart.
+
 ## Not instances — do not go looking here
 
 The most expensive files in the tree mostly do NOT have this shape, and that
