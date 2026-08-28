@@ -5363,6 +5363,26 @@ the rows below and in `design/fs-ghost-state.md`).
   `frzm` into `dfrac_agree (nat * bool)`), each touching
   `Xv6Cameras.v` (cone 897) against a recorded RA-depth performance
   ruling — the trade rank 5 refused for the same file.
+- [ ] **BT — the boot-side transport** (owner, 2026-08-28: "probe first,
+  and if it's looking clean, do it"; probed CLEAN).  Commit and boot are
+  the SAME transport: the crash predicate's `P_dur D` is LENT at the
+  PowerOn arm — the one point holding both the fixed disk auth and
+  `crashN` — through `RiscvAdequacy`'s `Hswap`/`power_boot_res` (one
+  client-chosen conjunct `Rb dk`), cloned by `FsCrash.P_fs_dur_acc` +
+  `FsDurSnap.P_dur_alloc_xfer` (both caller-less until now), pinned to
+  the era's `D` by `fs_recovery_det`; `fs_cfg_alloc_snap` takes the
+  epoch and READS `snap_ok` off it (`P_dur_tie_keep`); the era's flat
+  home map is split by `FsDurXfer.phi_runs_union`'s `⊣⊢` at a map value
+  the source determines (`fs_footprint_install`), not by a pure
+  geometric fact; the region glues by `InodeRegion.ireg_recs_blk`.
+  Era 0 unchanged (`img_P_dur_alloc` already yields the resource); real
+  recovery does not interact.  THE THEOREM STATEMENT and
+  `SystemAssumptions.v` stay byte-identical; `SystemAdequacy.v`'s BODY
+  and the private `xv6_boot_era` change — the cone changes in kind, so
+  this is the campaign's one lane where `make audit-only` runs (by name,
+  thirteen entries).  Stages BT-0..BT-5 per the probe; BT-6 (dropping
+  `snap_ok` from `fs_boot_snap_wf`) NOT run — a derived pure export
+  carried to `FirstTok` is exactly what the ruling permits.
 - [ ] **Rank 4 — the `dview`/`fview` ghosts and the pinned-lookup island**:
   PARKED (owner: leave for now; the fs-syscall-specs port decides).
 
