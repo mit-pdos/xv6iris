@@ -13731,3 +13731,145 @@ rebuild it:
 | `ghost_step` + `wp_fence_gs_s_sconf` | `HartBarrier` §5, `WpSconfFencePub` §4 | the same |
 
 Holding for the next ruling.
+
+---
+
+## A6.109 — the cpu-store family's SUBSTRATE lands; and `notheld` names the third occurrence of the bootstrap
+
+*(Amendment A6.109, fliptree lane, on §0.38′'s ratification of `lk_floor`.
+Interim report at a green boundary — the queue's item (1) is structurally done
+and item (2) has surfaced one question before it can close.  File-ownership
+contract of 2026-08-28 observed throughout: nothing below touches `HartSKpt`,
+`SRegime`, `KptPublish`, `CtxPinMint`, `KptShare`, `SpecKvminithart`,
+`ProofMain`, `ProofMainSecondary`.)*
+
+> **Ownership note for the second lane:** A6.106's additions
+> (`ctx_phys_{pin,bytes_pin,word_pin}_mint_top`, `kptree_publish_top`) sit in
+> `CtxPinMint.v` §3b and `KptPublish.v` §6 — now *their* files.  They were
+> committed before the contract; this lane will not touch them again.
+
+### §1. THE NUMBER, FIRST
+
+**RED 9 — the same nine, after 557 files recompiled.**  Sentinel-backed
+(`MAKEEXIT=2`, round r22).  **Red-list delta 0**, and that is the load-bearing
+number: this pass changed `wp_store_s_sconf_au_dat`'s obligation (every store
+leaf in the tree goes through it) and the *shape* of `WpLock.lock_openable`
+(every lock client), and **not one green file moved**.
+
+### §2. WHAT LANDED
+
+**(a) The store's no-migration pin** — `WpSconfMem.wp_store_s_sconf_au_dat`'s
+write obligation gains
+
+```coq
+       (b = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
+```
+
+the exact twin of what A6.89 put on the *load*, discharged from `Hs` (already in
+scope in that proof) and ignored by all five existing callers.  It is what lets
+an obligation say *"the value being stored is THIS hart's"* — which the acquire
+store needs, because `lk->cpu = mycpu()` writes the window's `cp` row **at the
+writer**.
+
+**(b) The gate's second arm, exported** —
+`WpSconfMem.word_wpay_frame_store_gen_c`: `word_wpay_frame_store_c`
+generalised over the stored value and over `own'`, with
+`ledger_store_win_wpay_ok`'s disjunction passed through rather than fixed to
+`left`.  The two arms are exactly the lock's two transitions, and the match is
+not a coincidence:
+
+| store | value | arm | `own'` at the writer | `lk_own_ok` after |
+|---|---|---|---|---|
+| acquire `sd a0,16(lk)` | `cpus_ptr i` = the window's `cp` row | **right** | `None` | `ex = Some i`, and the writer is the one agent allowed to be `None` |
+| release `sd x0,16(lk)` | `0` = the window's `z` row | **left** | `Some (S (length log))` | `ex = None`, and every agent again has a record |
+
+`WpLock`'s own comment predicted this pairing ("acquire's store writes the
+author's own word and REVOKES its entry; release's writes the clear word and
+RESTORES it") and it is now cashed.  Exported because the lock family opens the
+invariant **inside** the atomic step and so cannot use A6.104's closed leaf,
+which wants the window in hand.
+
+**(c) `lock_openable`'s floor is HOISTED OUT OF THE `□∀`** — and this one is a
+correctness fix, not tidying:
+
+```coq
+  Definition lock_openable γ lk s R D : iProp Σ :=
+    (∃ lo : nat, lk_floor cur_ctx lo ∗ □ ∀ E T, … ▷ lock_inv γ lk s R lo ∗ T ∗ (close ∧ destroy))%I.
+```
+
+With `∃ lo` *inside* the accessor, two opens of the same lock hand out two
+unrelated witnesses — so a leaf that gives the owner cell to an atomic update
+and takes it back **cannot close the invariant it opened**: `lock_inv … lo` and
+`lock_inv … lo'` are different propositions.  Measured the hard way (three
+successive `iExact` failures, each one lo apart).  Outside, `lo` is fixed once
+per consumer, which is what `is_lock` already did.  Arity unchanged; the
+projection `lock_openable_parts` lets a proof that both *forwards* the opener
+and *opens* it keep one name for each.
+
+**(d) `lock_cell_read_vis` on the pinned floor**, and the seven open sites in
+`WpSconfLock` re-cut onto the hoisted shape.
+
+### §3. THE QUESTION `notheld` RAISES — AND IT IS A6.101, A THIRD TIME
+
+`WpSconfLock.wp_ld_lkcpu_lockopen_gen` is the pre-flip generic that concludes
+`⌜phi c⌝` about the *loaded* value from a pure premise about the *ghost* state
+`st`.  Post-flip that is exactly what A6.92 refuted — the read is racy — so it
+must be redone on the racy kit, and the kit is already built:
+
+```coq
+  Lemma lkcpu_read_not_mine (g lk dq f ts own lo t K) :        (* WpLock.v:645 *)
+    own (hart_agent cpu_id) = Some t ->
+    (lo <= K)%nat ->                                            (* ◄── THE FLOOR *)
+    tso_interp_at riscv_eraGS g -∗ view_lb … (hart_agent cpu_id) K -∗
+    (the window at [lo]) -∗
+    ⌜∀ tv ≥ g.(gtv) cpu_id, ∀ w, tso_read_bytes … w -> w <> cpus_ptr cpu_id⌝.
+```
+
+**The floor premise `lo ≤ K` is discharged by `lk_floor`'s LEFT arm and only by
+the left arm.**  Left: `ctx_floor cur_ctx lo` + the `own_context` the read
+obligation already hands over ⇒ `own_context_floor_view` ⇒ `K` with `lo ≤ K`.
+Right (`llb loglen_name lo`): the absorb needs an AMO's log-top view, and
+**`holding()` runs BEFORE `acquire`'s AMO** — `push_off(); if(holding(lk))
+panic; while(__sync_lock_test_and_set(…))`.  `hart_view_lb_now` gives the
+current view for free but says nothing about `lo ≤ gtv`.
+
+So: **a lock whose handle carries only the right arm cannot have its
+`holding()` proved dead at its own first acquire.**  Boot-static locks are
+unaffected (floor 0: `ctx_floor_0` and `view_lb_0`, both free).  This is
+A6.101's bootstrap for the third time — the writer could not buy its floor
+(A6.105), the KPT publisher could not buy its view (A6.106), and now the first
+acquirer cannot buy it before the read that needs it.
+
+**The fix direction the lane believes is right, NOT taken pending a ruling:**
+do the absorb **at the crossing, not at the read**.  §0.16′ already says the
+handle is distributed only through real crossings, and every crossing is an
+acquire or release — i.e. an AMO.  A hart that has *received* `is_lock` for a
+dynamic lock therefore already holds a receipt at a view ≥ the crossing
+position ≥ the lock's floor, because the lock was created before it was
+published.  So `is_lock` keeps `lk_floor` (creation still works — that is what
+§0.38′ ratified) and the *crossing* upgrades the right arm to the left one
+once, after which `lock_openable` carries `ctx_floor` and every read discharges
+as §0.35′(iv) always said.  That change lives in `SpecAcquire`/`SpecRelease` —
+this lane's files — so it is buildable here as soon as it is ruled.
+
+Two cheaper alternatives, both measured and both rejected:
+
+* *Make the racy law not need the floor.*  Refused: below the floor the window
+  says nothing about the cell's value, and "the pre-window value was 0" is true
+  of every lock in xv6 (`.bss` zeros; `kfree`'s memset) but is **not recorded
+  anywhere** — reinstating it means a second window field, i.e. a bigger change
+  than the crossing absorb.
+* *Give the notheld leaf `ctx_floor cur_ctx lo` as a premise.*  Refused: `lo`
+  is existential inside `lock_openable`, so no caller can name it.
+
+### §4. STATE, AND WHAT IS NEXT
+
+`WpSconfLock` is still red — it was red at the baseline and it is red now, at a
+strictly later point: everything up to and including the holder's exact read
+compiles, and the file's single remaining blocker is the one lemma §3 names.
+Items (1) and (2) of the queue are entangled in this one file, so item (1)
+cannot be *certified* green until §3 is settled; its substrate — (a), (b), (c),
+(d) above — is landed and green, and cost nothing.
+
+Mirror refreshed at this boundary.  Holding item (2) for a ruling on §3;
+continuing to prepare the cpu-store family's two instances on (b) meanwhile.
