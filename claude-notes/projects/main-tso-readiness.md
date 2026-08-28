@@ -25,6 +25,19 @@ semantics; every slice is SC-provable.
   guessed.  Refutations of this document get recorded in place.
 - Verify EVERY claim this document makes about main against main's
   actual HEAD before editing (see Slice 0 and "The two no-ops").
+- **THE SPELLING RULE (added after an owner audit caught this document
+  carrying superseded intermediate designs — the §0.27′ `U` parameter,
+  a floor-parametric `initlock`, era-image floor-0 locks, a stale
+  `kpt_creds` formula):** this document is authoritative for
+  PRINCIPLES, ORDER, and PROCESS ONLY.  For any concrete definition,
+  statement, or lemma shape, the AUTHORITATIVE SOURCE IS THE TREE — the
+  current `tso-flip` tip (plus the kpttree files named in
+  tso-handoff-current.md) for T-leg shapes, `tso` for M-leg statements
+  — read at execution time.  Where this document writes a formula, it
+  is illustration; if it disagrees with the tree, the tree wins and the
+  discrepancy is recorded.  The port's history is a graveyard of
+  ruling-era sketches reshaped by the build (four shapes for one lock
+  word); do not land a sketch.
 
 ---
 
@@ -140,6 +153,9 @@ first draft lacked (the T-leg had to retrofit them — A6.96/A6.97):
   hart_view_lb K ==∗ own_context ξ ∗ ctx_floor ξ K`).
 - `own_context_floor_view` — cash a floor into the receipt pair
   (`∃K, view_lb K ∗ ⌜lo ≤ K⌝`).
+- `ctx_floor_le` (monotone weakening) and `ctx_floor_dom` (a floor the
+  sender can discharge is one the receiver can discharge — free
+  transport across crossings; ten lines on the T-leg, A6.117).
 On SC all three have trivial bodies (define `hart_view_lb`/`view_lb` as
 `True`-like sealed props or vacuous bounds), but they must EXIST with
 these exact interfaces: the T-leg measured that every tier of the proof
@@ -206,11 +222,19 @@ trivial; land the SHAPE: floor existential INSIDE the handle (never in
 `is_lock`'s exported arity), hoisted so that open and close witness ONE
 `lo` (the A6.109 bug: `∃lo` inside a `□∀` accessor hands unrelated
 witnesses to two opens — three iExact failures each one lo apart).
-`initlock`'s spec is floor-parametric (the mint is the caller's side;
-the store frames the floor) — A6.101/A6.103: the creator bootstrap is
-structural (`holding()` runs BEFORE acquire's AMO), so the two floor
-sources (era-image 0 for .bss locks; the install store's position for
-dynamic ones) are two different FLOORS, not two distributions (A6.100).
+**AUDIT CORRECTION (verified against the T-leg tree):** two earlier
+sub-claims here were intermediate designs the T-leg later superseded —
+`initlock` is NOT floor-parametric (that plan, A6.101/A6.103, was
+replaced: `initlock` keeps its store-then-mint order, the floor is the
+store's own position for EVERY lock, and the certificate is `lk_floor`'s
+right arm — SpecInitlock.v's header on the T-leg states this
+explicitly), and there are NO era-image floor-0 locks (A6.113:
+`ctx_floor_0` is a correct lemma with no client; the boot-static vs
+dynamic distinction is about DISTRIBUTION CHANNELS, not floors).  The
+creator bootstrap (`holding()` runs BEFORE acquire's AMO) is answered by
+the disjunction plus the crossing/AMO conversion.  Take the whole story
+from the T-leg's WpLock.v + SpecInitlock.v as they stand at execution
+time.
 
 **(c) [LANDED for is_lock/is_pipe/KPT; RULED-ONLY for the handler
 contract] The context-relative treatment for ALL persistent memory-fact
@@ -220,10 +244,13 @@ finds it — every persistent fact about memory carries a context axis and
 is distributed only through channels (crossings that raise the
 receiver's bound).  The four families with rulings: `is_lock` (b above),
 `is_pipe` (second handle, same treatment — A6.105), the kernel-page-table
-fact (§0.36′: `kpt_creds := ∃B, kpt_bound B ∗ ctx_floor cur_ctx B`; the
-walker gate two-armed via the context tower's own clean/own-write
-disjunction; reference implementation in tso-kpt-lane.md K10–K11 and the
-kpttree's `PhysSeen.v`/`KptCtxTravel.v`), and the trap-handler contract
+fact (§0.36′ — but the LANDED form is NOT the ruling-era `∃B,
+kpt_bound B ∗ ctx_floor` sketch: K12 built it as the table at the
+per-hart SEEN tier — "the credential stopped being a receipt about a
+bound and became the table, at the tier this hart can see it" — still
+persistent, still arity-free, NOT ξ-indexed; take the spelling from the
+kpttree's `KptShare.v`/`PhysSeen.v`/`KptCtxTravel.v` and the K10–K15
+notes, never from a formula written here), and the trap-handler contract
 (§0.39′: proven once at boot, persistent, but USE requires a
 sufficiently fresh context; the arity-preserving spelling — freshness
 bundled inside `intr_handler_spec`, stamp under the existing `▷`, zero
@@ -274,7 +301,8 @@ its spelling verbatim.  Depends on (a) for the p->lock payload's
 bodies coincide with today's — the SEALING is what lands); `kalloc`'s
 success post is the VALUED run of the allocator's own memset
 (`page_filled … kalloc_junk`), downgradable to `page_own`; a borrowed
-page is `page_named` (pointwise ∃).  Kernel stacks travel FILLED through
+page is `page_named` (pointwise ∃ — lives in ProcPtOwn.v on the T-leg,
+not KallocInv.v).  Kernel stacks travel FILLED through
 the boot chain (A6.90 §"kstack"; five files on the T-leg).  The
 read-before-write audit rides along: no kalloc client may read a byte it
 has not written (§0.32′; audit was completed once on `tso` — re-run on

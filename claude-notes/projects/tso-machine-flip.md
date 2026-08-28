@@ -14752,3 +14752,82 @@ makes `lock_word_amo_mint` its own client at last.
 So the unit stands as itemised in §3, with step (1) now precisely: re-cut the
 AMO leaf's write node onto `lock_word_amo_mint`, and hang the `ctx_floor`
 export off the view fact that node already establishes.
+
+---
+
+## A6.119-pre — the lock word's fourth and final shape: design settled, cut pending
+
+*(Working notes for the in-flight unit; the amendment proper lands at the
+file's close.  Recorded now because the design took four measurements to
+settle and a fresh context should not have to re-derive them.)*
+
+### §1. THE AU RULE, COMPLETED
+
+Three instances were already recorded (the `lo`-hoist out of `lock_openable`'s
+`□∀`; the read carrying `lock_body` whole; the store pinning the old face).
+The word's holder read adds the fourth and states the rule's limit:
+
+> **Carry-whole across an atomic update fixes WITNESS IDENTITY, but it cannot
+> manufacture EVIDENCE ABOUT THE READER.**
+
+`ledger_read_pin_ok` wants `view_lb … B` at *the pin's own* `B`.  Inside the
+step the obligation can take `hart_view_lb (gtv cpu_id)` free off the interp
+and `own_context`'s bound — but not `B ≤ gtv cpu_id`.  That fact is TRUE (the
+holder's view passed `B` at its own AMO, and views are monotone) and is
+recorded NOWHERE: the interp knows `gtv` but not who acquired when, and
+`pin_ok` is a statement about the log, not about any hart's view.  So the
+carry-whole route (option 3) is out on its own terms, not for awkwardness.
+
+### §2. THE TWO RACY KITS ARE NOT INTERCHANGEABLE — the instrument note
+
+This word disambiguated them, so it is recorded once, here:
+
+> **PIN for same-value-many-writers; TsWin for distinct-values-per-writer.**
+> `ledger_read_pin_ok` concludes VALUE-SET MEMBERSHIP (`b ∈ Sv`) and its store
+> gate's premise is "the stored value stays in the set" — which is the spinner
+> argument verbatim.  `ledger_read_racy_word_ok` concludes a NEGATIVE
+> (`w ≠ cpw`) off per-agent-DISTINCT words — exactly the cpu cell's structure
+> (each hart writes its own `cpus_ptr`) and exactly not the lock word's, where
+> every agent writes the same `1` and the injectivity premise is unprovable.
+
+### §3. WHAT IS SETTLED FOR THE CUT
+
+* **Definition**: `lock_word_pin B lk v := [∗ list] j ∈ seq 0 4, ∃ t,
+  phys_ledger_pin (pa_add lk j) (DfracOwn 1) (nth_byte v j) t B (lkw_set j)`
+  with `lkw_set j = {[ nth_byte (mword_of_int 1 : mword 32) j ]}`.
+  Cite A6.92 and §0.35′(iv) case 2 at it, with §2's instrument note.
+* **Arm-shaped by the state**, `st = None` vs `st ≠ None` — the word is `1`
+  from the WINNING amoswap until release's `sw x0`, spanning both
+  `Some (i,false)` and `Some (i,true)`.  That is `lk_wex`'s domain used as the
+  pure state function it was demoted to: a tidy confirmation of the demotion.
+* **Mint** at the AMO (`lock_word_amo_mint`, log top as `B`); **preservation**
+  across every spinner store (`ledger_store_win_pin_ok`); **discharge** at
+  release's zero-store (A6.89's leaf).  `B` does NOT move during the held
+  interval — the preservation gate keeps the original floor — so it is the
+  acquirer's own AMO position throughout.
+
+### §4. THE TIE, AND WHERE ITS GHOST LIVES
+
+The holder must AGREE with the invariant on `B`.  Option (1) (grow
+`lock_state` to carry the position) works but ripples through `lock_auth`,
+`locked`, `lk_cpu_val`, `lk_ex`, `lk_wex`, `lk_cpu_frag`, the three ghost
+steps and both exchanges — all currently green.  **(1′) is the arity law
+applied to ghost state**: the position is a fact two parties must agree on,
+not a component every consumer of `lock_state` must see.
+
+The home question that (1′) raises — `is_lock` carries ONE `γ`, so where does
+the second half live? — resolves without any arity moving:
+
+> Make the lock's CMRA a PRODUCT, and have **both** halves hide `B`
+> existentially: `lock_auth γ st` and `locked γ i` keep their present arities,
+> each carrying `∃ B` internally, and the ghost AGREEMENT supplies the
+> equation at the point of use.  Nothing outside the ghost block changes
+> shape, and the green ghost steps stay green — which is the tell that the
+> factoring is right.
+
+### §5. REJECTED, so nobody re-proposes it
+
+* **The cell's floor cannot serve as the word's.**  A pin at `lo` (initlock's
+  store position) claiming `{1}` is FALSE on `[lo, t_acq)` — the word is `0`
+  before the AMO.  The word's floor is the acquire's position and nothing
+  earlier.
