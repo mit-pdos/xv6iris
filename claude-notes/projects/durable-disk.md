@@ -5294,8 +5294,42 @@ the rows below and in `design/fs-ghost-state.md`).
     (`log_psi_step`, `log_psi_commit`, `fs_dstep`, `log_ctx_at Ψ`) is the
     same kind of drift and was out of this lane's brief: `log_ctx` carries
     no Ψ today and none of those names exists in the tree.
-- [ ] Ranks 6/7 (`frzown`; `icnt` into the reference columns): read-only
-  probes AFTER the leftovers land, then lanes only if the probes pay.
+- [ ] **Rank 6 — the `frzown` receipt** (probed 2026-08-28: PAYS, form
+  C1 = delete it outright; owner: go).  `frzown_excl` had ONE caller
+  (`ireg_frzown_off_absurd`), which had ONE caller (iput's +0x3a read,
+  `ProofIput.v`), and ruling R-e's selector quarter in the same arm
+  already decides it (`frz_slot_kill`).  Stage 1 (the gate) LANDED at
+  `99ef185a`: the +0x3a refutation runs on the selector, same mask,
+  `solve_ndisj` unaided, +1 s on `ProofIput`; the receipt is inert.
+  Stages 2–5: delete the two lemmas; strip the conjunct from
+  `ic_payload_arm`'s frozen alternative and `ic_out_frz`; `ireg_frzc`'s
+  first conjunct, `ireg_freeze_au`'s output #4, the `frz_rcpt` family;
+  then the ghost (`frzown`, `frzo_boot_*`, `icfg_frzo`, `icfg_alloc`'s
+  `FM`, `frzoUR`/`icache_frzoG`/its `GFunctor` in `xv6Σ`).  Ten files,
+  ~110 mechanical touch points, zero `Spec*.v` changes.  Refuted
+  alternatives: fold into the mirror `frzm` (a ½-½ agreement cannot
+  make an arm absurd), fold `DepFrz` into `DepTx` (kills eight
+  one-line `discriminate` refutations), drop the freeze index (its
+  `.1` is in `SpecIput`, its `.2` is `ireg_fpin`, the corpse's only
+  refuter).
+- [x] **Rank 7 — `icnt` into the reference columns: PROBED AND REFUSED**
+  (2026-08-28, owner agreed).  `icnt` is not a copy of the r/rc
+  columns: it is the ONLY resource held on both sides of the
+  slot↔inum / lock↔region wall, transporting the C-level `ip->ref`
+  word into the inum-keyed ledger across iput's lock release
+  (+0x5e..+0x82).  The r/rc columns are an `auth nat` whose fragments
+  give lower bounds only and whose authority is region-side, so no
+  lock-side party can read `r + rc`.  The fold breaks three live facts
+  at independent sites — `cnt2 = 1` at iput+0x82
+  (`icnt_freeze_forces_one`, `ProofIput.v`), the token-free
+  `count ≥ 2` freeze refutation on iput's non-last close
+  (`ireg_frz_ok_ge2_any`, `IcacheInv.v`), and (R1)'s `n = 0 ⟹ r = rc = 0`
+  at the deposit that keeps (R2)/(R3) preservable — and buys zero
+  contract surface (`icnt` is in no `Spec*.v`).  The only sound
+  variants re-home it (a fifth `linkElemUR` column, or a merge with
+  `frzm` into `dfrac_agree (nat * bool)`), each touching
+  `Xv6Cameras.v` (cone 897) against a recorded RA-depth performance
+  ruling — the trade rank 5 refused for the same file.
 - [ ] **Rank 4 — the `dview`/`fview` ghosts and the pinned-lookup island**:
   PARKED (owner: leave for now; the fs-syscall-specs port decides).
 
