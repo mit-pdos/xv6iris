@@ -12978,3 +12978,90 @@ callers are unaffected and keep the purchase chain.
 (`MAKEEXIT=2`); no source edited this pass.  **Red-list delta: 0.**
 `^Abort` / `^Admitted` / `^Axiom` all 0; mirror in sync; the twice-validated
 surface text still parked at `…/scratchpad/WpLock.v.surface-move`.
+
+### A6.103 STEP (2) IS GATED ON ONE UNWIRED LEAF — AND `ledger_store_wpay_ok`
+### WAS BUILT FOR EXACTLY THESE TWO STORES AND HAS NEVER HAD A CLIENT
+
+Starting the continuous run at step (2).  It stops immediately on a missing
+artifact, and the artifact is precisely specified by a gate that has been in
+`TsoCtx` since the M4 unit and has **no leaf using it anywhere in the tree**.
+Nothing edited; boundary held.
+
+#### (1) WHY `initlock` CANNOT SIMPLY MINT AT 0
+
+`ProofInitlock` drives `WpSconfMem.wp_sd_zero_wpay_s_sconf` — the
+**store-then-MINT** leaf.  Its post is
+
+```coq
+    (∃ lo : nat, [∗ list] j ∈ seq 0 8,
+       phys_ledger_wpay (pa_add ea j) (DfracOwn 1) (z8 j) lo
+         (TsWin ea 8 j z8 cp (fun _ => Some lo) lo))
+```
+
+and the `lo` is the STORE's own position, fixed inside the leaf.  Minting at
+`0` afterwards is impossible (`win_ok1_of_latest` at `t = 0` asks that nothing
+in the log wrote the cell, and the store just did), and minting at `0` before
+the store needs a store that FRAMES the floor rather than setting it.  So the
+floor-0 route needs the leaf's twin:
+
+> **`wp_sd_zero_wpay_frame_s_sconf`** — same instruction, but it TAKES an
+> already-minted window at floor `lo` and gives it back at `lo`, with only
+> `own` moved.
+
+#### (2) THE GATE IT WOULD BE BUILT ON EXISTS, AND ITS ARMS ARE THESE TWO STORES
+
+`TsoCtx.ledger_store_wpay_ok` (M4 unit), whose header reads *"THE FLOOR IS
+FRAMED: both arms keep `lo`, exactly as they keep `z` and `cp`.  Only `own`
+moves"*, and whose two arms are:
+
+| arm | writes | `own'` | which store |
+|---|---|---|---|
+| first | the clear word `z` | `Some (S (length glog))` | **`initlock`'s `sd x0`** and **release's `lk->cpu = 0`** |
+| second | `cp auth` | `None` | acquire's `lk->cpu = mycpu()` |
+
+`WpLock`'s own comment names the pairing: *"acquire's store writes the author's
+own word and REVOKES its entry (`ledger_store_wpay_ok`'s second arm); release's
+writes the clear word and RESTORES it (the first)."*
+
+**And `grep` finds no client**: outside `TsoCtx` itself the lemma is mentioned
+only in that comment.  It was built for the lock's cpu-field stores and has
+been waiting for a leaf ever since.
+
+#### (3) SO ONE LEAF UNBLOCKS TWO TRANCHES
+
+The same artifact is what `WpSconfLock`'s cpu-store family needs — A6.92 left
+`wp_sd_lkcpu_lockopen_gen` and its two exchanges at the pre-flip text
+(`lock_cpu lk ↦₈ _`), and the reason they cannot move is that no leaf exposes
+`ledger_store_wpay_ok`.  So:
+
+- **step (2)** (`initlock`'s floor-0 store) and
+- **step (6)'s cpu-store half** (`wp_csd_lkcpu_…` / `wp_sd_zero_lkcpu_…`)
+
+are the same missing leaf, in its two arms.  *Third time this lane has found
+one piece serving two tranches* (A6.97's `ctx_bound_raise` served three; A6.99's
+`own_context_floor_view` served the read and the creator).
+
+#### (4) THE ARTIFACT, SPECIFIED
+
+Additive, buildable on its own like `ctx_bound_raise` was, and modelled on two
+things already in the tree: `wp_sd_zero_wpay_s_sconf` for the leaf plumbing
+(the `wp_store_s_sconf_au_dat` call, the x0 premise, the claim hand-back) and
+`WpSconfLock.lock_word_store_plain` (A6.89) for the interp bookkeeping
+(`tso_interp_of_at_gs`, the `vstep` monotonicity triple, `tso_interp_of_pin`).
+Roughly eighty lines, no new machinery, no ruling needed.
+
+#### (5) THE NUMBER
+
+**1100 of 1296, RED 9 — unchanged**, sentinel-backed at A6.101's round
+(`MAKEEXIT=2`); no source edited.  **Red-list delta: 0.**  `^Abort` /
+`^Admitted` / `^Axiom` all 0; mirror in sync; surface text parked.
+
+> **PROCESS NOTE, OWED TO THE COORDINATOR.**  This tranche has now taken
+> several passes that each ended in a measurement rather than a landing
+> (A6.98 through A6.103).  That is not drift: each pass removed a real
+> unknown — the surface spelling (validated twice), the ordering, the
+> bootstrap, the gate, and now the missing leaf — and the tranche is
+> correspondingly better specified than when it opened.  But the remaining
+> work is a single long dependent chain (leaf → `initlock` → surface → six
+> callers → `newlock` → the two reads), and it wants one uninterrupted run
+> rather than another pass that opens it and closes it back.
