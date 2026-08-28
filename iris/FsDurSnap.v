@@ -1552,3 +1552,86 @@ Proof.
     apply (sk_dombelow Hb b).
     exists (P b). apply fs_restrict_lookup_Some. split; [exact Hh | reflexivity].
 Qed.
+
+(* ===================================================================== *)
+(*  9b. THE ERA'S HOME BLOCKS, AS THE INSTALL'S INPUT (durable-disk BT-0) *)
+(*                                                                       *)
+(*  THE BOOT-SIDE TRANSPORT'S ONE NEW BRIDGE.  [FsBoot.fs_boot_ghosts]    *)
+(*  hands the era [[∗ set] b ∈ home, fsblock (fs_bytes γfs) b (Dv b)] --  *)
+(*  the era's byte authority is minted at the WHOLE home map -- while     *)
+(*  [FsDurXfer.fs_footprint_install] wants ONE FLAT [gmap] of bytes.      *)
+(*  They are the same resource: [FsDurBytes.fs_dbytes_set_blocks] is the  *)
+(*  flattening ([LogDefs.fs_restrict]'s domain IS [home]) and             *)
+(*  [FsBytesGamma.gamma_blk_owned] the vocabulary.                        *)
+(*                                                                       *)
+(*  ITS OWN SECTION, WITH THE ERA'S CLASSES AND NOT [diskImgG].  The two  *)
+(*  [ghost_mapG Σ Z (bv 8)] instance paths must never be resolved in one  *)
+(*  binder group ([FsDurBytes]' header): everything above binds           *)
+(*  [diskImgG] for the SNAPSHOT's byte map, this binds [fsLogG] for the   *)
+(*  ERA's.  Nothing here names both, and neither predicate sends          *)
+(*  typeclass search anywhere -- [fsblock] and [fs_gamma_L] each fix      *)
+(*  their class at their own definition.                                  *)
+(*                                                                       *)
+(*  NON-VACUITY: the length premise is verbatim [fs_boot_ghosts]' third   *)
+(*  hypothesis, so the era cannot exist without it, and                   *)
+(*  [FsDurBytes.fs_dbytes_set_blocks_cover] says the flattening really    *)
+(*  covers each home block (neither side is [emp] for a non-empty home).  *)
+(* ===================================================================== *)
+
+Section EraHome.
+  (* the ERA's classes, and deliberately NOT [diskImgG]; [fsLinkG] is
+     [fs_ghost]'s, for the link family the state carries. *)
+  Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ, !fsLinkG Σ}.
+
+  Lemma fs_home_blocks_phi_map (γfs : fs_names) (Pb : Z -> list (bv 8))
+      (home : gset Z) :
+    (forall b, b ∈ home -> length (Pb b) = BSIZE) ->
+    ([∗ set] b ∈ home, fsblock (fs_bytes γfs) b (Pb b))
+    ⊣⊢ phi_map (fs_gamma_L γfs) (fs_dbytes (fs_restrict Pb home)).
+  Proof.
+    intros Hlen.
+    rewrite (phi_map_set_blocks (fs_gamma_L γfs) Pb home Hlen).
+    apply big_sepS_proper. intros b Hb.
+    symmetry. exact (gamma_blk_owned γfs b (Pb b)).
+  Qed.
+
+  (* THE COMPOSITE THE BOOT MINT CALLS, and the witness that BT-0's two
+     halves fit: the era's home blocks in; the file system's whole byte
+     footprint at the era's own view, plus the bytes the file system does
+     not claim, out.  Nothing is allocated and nothing is carved -- the
+     split is at [xr_union (xr_fs S PM)], a map value the DURABLE source
+     determines and whose three pure inputs that source supplies
+     ([FsDurXfer.fs_footprint_install_facts]). *)
+  Lemma fs_home_install_era (γfs : fs_names) (Pb : Z -> list (bv 8))
+      (home : gset Z) (S : fs_state_rec) (PM : gmap Z (list (bv 8))) :
+    (forall b, b ∈ home -> length (Pb b) = BSIZE) ->
+    xf_shape S PM -> xr_disj (xr_fs S PM) ->
+    xr_union (xr_fs S PM) ⊆ fs_dbytes (fs_restrict Pb home) ->
+    ([∗ set] b ∈ home, fsblock (fs_bytes γfs) b (Pb b))
+    ⊢ fs_footprint (fs_gamma_L γfs) (DfracOwn 1) S
+      ∗ phi_map (fs_gamma_L γfs)
+          (fs_dbytes (fs_restrict Pb home) ∖ xr_union (xr_fs S PM)).
+  Proof.
+    intros Hlen Hshape Hdisj Hsub.
+    rewrite (fs_home_blocks_phi_map γfs Pb home Hlen).
+    exact (fs_footprint_install (fs_gamma_L γfs) S PM _ Hshape Hdisj Hsub).
+  Qed.
+
+  (* ...and the whole instance, with the ghost half handed in. *)
+  Lemma fs_state_install_era (γfs : fs_names) (Pb : Z -> list (bv 8))
+      (home : gset Z) (S : fs_state_rec) (PM : gmap Z (list (bv 8))) :
+    (forall b, b ∈ home -> length (Pb b) = BSIZE) ->
+    xf_shape S PM -> xr_disj (xr_fs S PM) ->
+    xr_union (xr_fs S PM) ⊆ fs_dbytes (fs_restrict Pb home) ->
+    ([∗ set] b ∈ home, fsblock (fs_bytes γfs) b (Pb b))
+    ∗ fs_ghost (fs_gamma_L γfs) S
+    ⊢ fs_state (fs_gamma_L γfs) (DfracOwn 1) S
+      ∗ phi_map (fs_gamma_L γfs)
+          (fs_dbytes (fs_restrict Pb home) ∖ xr_union (xr_fs S PM)).
+  Proof.
+    intros Hlen Hshape Hdisj Hsub.
+    rewrite (fs_home_blocks_phi_map γfs Pb home Hlen).
+    exact (fs_state_install (fs_gamma_L γfs) S PM _ Hshape Hdisj Hsub).
+  Qed.
+
+End EraHome.

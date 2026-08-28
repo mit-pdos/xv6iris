@@ -286,6 +286,64 @@ Section DbytesGen.
       rewrite big_sepM_insert; [reflexivity | exact Hb].
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (*  THE SAME OVER A HOME SET (durable-disk BT-0, the boot-side           *)
+  (*  transport's one new bridge).                                        *)
+  (*                                                                      *)
+  (*  THE ERA'S BYTE HALF IS NOT A BLOCK MAP.  [FsBoot.fs_boot_ghosts]     *)
+  (*  hands the era [[∗ set] b ∈ home, fsblock (fs_bytes γfs) b (Dv b)] -- *)
+  (*  a big-op over a SET at a TOTAL block view -- while everything on the *)
+  (*  durable side is indexed by the [gmap] [LogDefs.fs_restrict Pb home]. *)
+  (*  The two are THE SAME RESOURCE and the proof says why in one line:    *)
+  (*  the restriction's domain IS [home] ([fs_restrict_dom]) and its value *)
+  (*  at [b] IS [Pb b] ([fs_restrict_lookup_Some]), so once the body no    *)
+  (*  longer reads the map's value the block-map big-op collapses onto the *)
+  (*  set's by [big_sepM_dom].  Nothing is carved and no disjointness is   *)
+  (*  stated: the flattening's injectivity is already [fs_dbytes_blocks]'. *)
+  (*                                                                      *)
+  (*  THE LENGTH PREMISE IS VERBATIM [fs_boot_ghosts]' THIRD HYPOTHESIS,   *)
+  (*  which is where the non-vacuity comes from -- the era cannot be       *)
+  (*  allocated without it. *)
+  Theorem fs_dbytes_set_blocks Γ (Pb : Z -> list (bv 8)) (home : gset Z) :
+    (forall b, b ∈ home -> length (Pb b) = BSIZE) ->
+    ([∗ map] a ↦ v ∈ fs_dbytes (fs_restrict Pb home), fsΦ Γ (DfracOwn 1) a v)
+    ⊣⊢ ([∗ set] b ∈ home, blk_owned Γ b (Pb b)).
+  Proof.
+    intros Hlen.
+    assert (Hml : forall b bs,
+               fs_restrict Pb home !! b = Some bs -> length bs = BSIZE).
+    { intros b bs Hb.
+      apply fs_restrict_lookup_Some in Hb as [Hin ->]. exact (Hlen b Hin). }
+    rewrite (fs_dbytes_blocks Γ (fs_restrict Pb home) Hml).
+    rewrite (big_sepM_proper
+               (fun (b : Z) (bs : list (bv 8)) => blk_owned Γ b bs)%I
+               (fun (b : Z) (_ : list (bv 8)) => blk_owned Γ b (Pb b))%I);
+      last first.
+    { intros b bs Hb.
+      apply fs_restrict_lookup_Some in Hb as [_ ->]. reflexivity. }
+    rewrite (big_sepM_dom (fun b : Z => blk_owned Γ b (Pb b))).
+    rewrite fs_restrict_dom //.
+  Qed.
+
+  (* NON-VACUITY: the flattening actually COVERS every home block, so a
+     non-empty [home] gives a non-empty byte map on the left and the
+     equation above is not two [emp]s.  (One byte of one block suffices;
+     [BSIZE] is [1024], so block [b]'s first byte is at [b * 1024].) *)
+  Lemma fs_dbytes_set_blocks_cover (Pb : Z -> list (bv 8)) (home : gset Z)
+      (b : Z) (k : nat) (v : bv 8) :
+    (forall c, c ∈ home -> length (Pb c) = BSIZE) ->
+    b ∈ home -> Pb b !! k = Some v ->
+    fs_dbytes (fs_restrict Pb home) !! (b * Z.of_nat BSIZE + Z.of_nat k)
+    = Some v.
+  Proof.
+    intros Hlen Hb Hk.
+    apply (fs_dbytes_lookup _ b (Pb b) k v).
+    - apply dbytes_ok_full. intros c cs Hc.
+      apply fs_restrict_lookup_Some in Hc as [Hin ->]. exact (Hlen c Hin).
+    - by apply fs_restrict_lookup_Some.
+    - exact Hk.
+  Qed.
+
 End DbytesGen.
 
 (* ===================================================================== *)
