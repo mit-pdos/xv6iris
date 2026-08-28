@@ -456,7 +456,7 @@ Definition ireg_bare (d : dinode) : Prop :=
    non-record clauses are exactly "no entries, no blocks", so a bare record
    leaves the node no freedom at all -- which is why the tie below needs no
    existential and why the collection's [FsCollect.col_bundle] legs
-   ([FsStateEra.inode_bytes_era]'s two big-ops) are [emp] there. *)
+   ([FsStateInode.inode_dat]'s two big-ops) are [emp] there. *)
 Definition free_node (d : dinode) : fs_node :=
   MkNode d (replicate FsImg.FS_NINDIRECT (bv_0 32)) ∅.
 

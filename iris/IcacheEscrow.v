@@ -901,7 +901,7 @@ Section IcacheEscrow.
   (* ...and what the READ-LOCKING HOLDER carries in its place.  [inode_ok] is
      restated here (it is pure, so both sides keep it) because the holder
      needs it to call [readi]; [inode_local] of the node is what
-     [FsStateEra.inode_bytes_era_to] takes to turn the quarter into
+     [FsStateEra.inode_dat_era_to] takes to turn the quarter into
      [readi]'s [inode_map_q] / [inode_blocks_q] pair. *)
   Definition ic_rd_held (γfs : fs_names) (cov : gset Z) (logstart : Z)
       (k : nat) (inum : mword 32) (dn : dinode) (bm : blkmap) : iProp Σ :=

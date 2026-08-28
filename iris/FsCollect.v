@@ -562,8 +562,8 @@ Section Collect.
   Proof.
     intros Howns. iIntros "H".
     iDestruct "H" as (dq inum Hbv Hnv) "H".
-    rewrite /inode_owned_era_q.
-    iDestruct "H" as "(_ & Hblk & Hind & _ & _)".
+    rewrite /inode_owned_era_q /inode_dat_q.
+    iDestruct "H" as "(_ & [Hblk Hind] & _ & _)".
     destruct Howns as [(k & [bs Hbs] & Hk) | [Hnz Hind]].
     - iExists dq, bs. iSplitR; [iPureIntro; exact Hnv |].
       rewrite (big_sepM_lookup _ _ k bs Hbs). rewrite Hk. iExact "Hblk".
@@ -577,8 +577,8 @@ Section Collect.
     col_bundle γfs γi i n -∗ ⌜inode_local i n⌝.
   Proof.
     iIntros "H". iDestruct "H" as (dq inum Hbv Hnv) "H".
-    rewrite /inode_owned_era_q.
-    iDestruct "H" as "(_ & _ & _ & _ & %Hloc)".
+    rewrite /inode_owned_era_q /inode_dat_q.
+    iDestruct "H" as "(_ & _ & _ & %Hloc)".
     iPureIntro. rewrite -Hbv. exact Hloc.
   Qed.
 
@@ -601,7 +601,7 @@ Section Collect.
     ⌜I !! i = Some n⌝.
   Proof.
     iIntros "Ha H". iDestruct "H" as (dq inum Hbv Hnv) "H".
-    rewrite /inode_owned_era_q. iDestruct "H" as "(_ & _ & _ & Htf & _)".
+    rewrite /inode_owned_era_q. iDestruct "H" as "(_ & _ & Htf & _)".
     rewrite /top_frag_q /= Hbv.
     iApply (ghost_map_lookup with "Ha Htf").
   Qed.
@@ -630,8 +630,8 @@ Section Collect.
                blk_owned_q (fs_gamma_L γfs) dq (fn_slot n j) bs2)%I
       with "[H]" as (dq bs1 bs2 Hnv) "[H1 H2]".
     { iDestruct "H" as (dq inum Hbv Hnv) "H".
-      rewrite /inode_owned_era_q.
-      iDestruct "H" as "(_ & Hblk & Hind & _ & _)".
+      rewrite /inode_owned_era_q /inode_dat_q.
+      iDestruct "H" as "(_ & [Hblk Hind] & _ & _)".
       iExists dq.
       (* slot [FS_MAXFILE] is the indirect block; the others are data *)
       destruct (decide (k = FS_MAXFILE)) as [-> | HkD].
@@ -729,8 +729,8 @@ Section Collect.
     ∃ dq : dfrac, blk_owned_q (fs_gamma_L γfs) dq (fn_naddr n k) bs.
   Proof.
     intros Hbs. iIntros "H". iDestruct "H" as (dq inum Hbv Hnv) "H".
-    rewrite /inode_owned_era_q.
-    iDestruct "H" as "(_ & Hblk & _ & _ & _)".
+    rewrite /inode_owned_era_q /inode_dat_q.
+    iDestruct "H" as "(_ & [Hblk _] & _ & _)".
     iExists dq. rewrite (big_sepM_lookup _ _ k bs Hbs). iExact "Hblk".
   Qed.
 
@@ -741,8 +741,8 @@ Section Collect.
       blk_owned_q (fs_gamma_L γfs) dq (fn_indb n) (ind_bytes (fn_ent n)).
   Proof.
     intros Hnz. iIntros "H". iDestruct "H" as (dq inum Hbv Hnv) "H".
-    rewrite /inode_owned_era_q.
-    iDestruct "H" as "(_ & _ & Hind & _ & _)".
+    rewrite /inode_owned_era_q /inode_dat_q.
+    iDestruct "H" as "(_ & [_ Hind] & _ & _)".
     iExists dq. rewrite /ind_owned_q (decide_False _ _ Hnz). iExact "Hind".
   Qed.
 
@@ -1209,8 +1209,8 @@ Section Collect.
     ⊢ ⌜node_lens n⌝ ∗ phi_runs_ex (fs_gamma_L γfs) (xr_dats n).
   Proof.
     iIntros "H". iDestruct "H" as (dq inum Hbv Hnv) "H".
-    rewrite /inode_owned_era_q.
-    iDestruct "H" as "(_ & Hblk & Hind & _ & _)".
+    rewrite /inode_owned_era_q /inode_dat_q.
+    iDestruct "H" as "(_ & [Hblk Hind] & _ & _)".
     iAssert (([∗ map] k ↦ bs ∈ fn_blk n,
                 blk_owned (gamma_q (fs_gamma_L γfs) dq) (fn_naddr n k) bs)
              ∗ ind_owned (gamma_q (fs_gamma_L γfs) dq) n)%I
@@ -1298,14 +1298,13 @@ Section Collect.
     inode_owned_era γfs γi inum (free_node d).
   Proof.
     intros Hb Hnl Ht0. iIntros "Hdn Htop".
-    rewrite /inode_owned_era /free_node /=.
+    rewrite /inode_owned_era /inode_dat /free_node /=.
     iSplitL "Hdn"; [iExact "Hdn" |].
-    rewrite big_sepM_empty.
-    iSplitR; [done |].
-    rewrite /ind_owned decide_True; last first.
-    { rewrite /fn_indb /= (proj2 Hb) lookup_total_replicate_2;
+    iSplitR "Htop".
+    { rewrite big_sepM_empty. iSplitR; [done |].
+      rewrite /ind_owned decide_True; [done |].
+      rewrite /fn_indb /= (proj2 Hb) lookup_total_replicate_2;
         [by change (bv_unsigned (bv_0 32)) with 0 | rewrite /FS_NDIRECT; lia]. }
-    iSplitR; [done |].
     iSplitL "Htop"; [iExact "Htop" |].
     iPureIntro. exact (inode_local_free_node (bv_unsigned inum) d Hb Hnl Ht0).
   Qed.
@@ -1427,7 +1426,7 @@ Section Collect.
         { iApply (inode_owned_era_free γfs γi inum d Hb Hnl Ht0
                     with "Hfr Htop"). }
         iIntros "Hown".
-        iDestruct "Hown" as "(Hfr & _ & _ & Htop & _)".
+        iDestruct "Hown" as "(Hfr & _ & Htop & _)".
         iDestruct (ireg_top_park_free γfs (bv_unsigned inum) d Hb with "Htop")
           as "Hpk".
         iApply (ireg_slot_intro γfs γi (bv_unsigned inum) d cl rl fz cn Hlok Hclm Hfrz
@@ -1452,7 +1451,7 @@ Section Collect.
       iSplitL "Hfr Htop".
       { iApply (inode_owned_era_free γfs γi inum d Hb Hnl Htp with "Hfr Htop"). }
       iIntros "Hown".
-      iDestruct "Hown" as "(Hfr & _ & _ & Htop & _)".
+      iDestruct "Hown" as "(Hfr & _ & Htop & _)".
       iDestruct (ireg_top_park_free γfs (bv_unsigned inum) d Hb with "Htop")
         as "Hpk".
       iApply (ireg_slot_intro γfs γi (bv_unsigned inum) d cl rl fz cn Hlok Hclm Hfrz
