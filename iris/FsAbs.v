@@ -22,9 +22,49 @@
                 node.  That is why there is no cancellation arm anywhere
                 below -- contrast [DirViewPin.dvp_lost], which exists because
                 a [dv_pin] is a CANCELLABLE lend.
-     [astate]   is [FsState.fs_view] with its authority's map read through
-                [abs_of] ([abs_view]).  [fs_view_astate] is the equivalence:
-                no new invariant, no [aviewN] (section 9 Q3, ruled).
+     [astate]   is THE γtop AUTHORITY ITSELF, read through [abs_of]
+                ([abs_view]): [astate Γ av] is [ghost_map_auth (γtop Γ) 1 I]
+                for the [I] whose reading is [av].  No new invariant, no
+                [aviewN] (section 9 Q3, ruled) -- and, since durable-disk EV,
+                no [fs_state] leg either (see below).
+
+   WHERE THE AUTHORITY LIVES, AND WHY [fs_view] IS GONE (durable-disk EV).
+   The EV campaign deleted [FsState.fs_view] -- the old
+   [∃ S, ghost_map_auth (γtop Γ) 1 (fss_inodes S) ∗ fs_state Γ S] bundle --
+   and put the live γtop authority in ITS OWN invariant,
+   [InodeRegion.ftop_inv γfs = inv ftopN (ftop_body γfs)], whose body holds
+   the RAW map [I : gmap Z fs_node] beside the arming registry [icfg_lk] and
+   the row [ftop_clean I A].  [FsState.fs_state] also grew a [dfrac].  Two
+   consequences for this file, and they are the only two:
+
+     (1) [astate] DROPPED THE [fs_state] CONJUNCT.  No lemma here ever used
+         the byte legs or [fs_geom] -- [astate_nview_dq] needs the authority
+         and nothing else -- so the state predicate was dead weight that only
+         served to name an [S].  [abs_view] is correspondingly restated over
+         the RAW MAP ([abs_of <$> I]) rather than over [fss_inodes S]: that is
+         the form [ftop_body] hands out, it is the same function on the nose
+         at [I := fss_inodes S], and it keeps [abs_view_lookup] and
+         [astate_nview_dq] byte-identical in shape.  [astate_timeless] lost
+         its [GTimeless Γ] premise with the byte legs (strictly weaker
+         hypothesis, same name).
+
+     (2) [fs_view_astate], the old equivalence, is replaced by an ACCESSOR
+         against the authority's real home: [astate_intro]/[astate_elim] are
+         the (trivial) intro and elim against a raw [ghost_map_auth], and
+         [ftop_astate_acc] / [ftop_astate_ro] in section 5 borrow [astate]
+         out of [ftop_body] -- the shape an AU proof uses after opening
+         [ftopN].  The live Γ is [FsBytesGamma.fs_gamma_L γfs] and the gname
+         tie IS DEFINITIONAL: [fs_gamma_L] is
+         [MkFsView _ (fs_link γfs) (fs_top γfs)], so
+         [γtop (fs_gamma_L γfs) = fs_top γfs] by [reflexivity]
+         ([ftop_gamma_top] states it).  Section 5 is LAST IN THE FILE and its
+         [Require Import InodeRegion] sits immediately above it, so the
+         region's cone cannot shadow a name any earlier section resolves.
+         The give-back wand carries the ROW ([inode_local] at every entry of
+         the returned map), because [ftop_body]'s [ftop_clean] is not
+         recoverable from an abstract [av]: [abs_of] forgets the record.
+         That is the same obligation [InodeRegion.ireg_top_retag] already
+         charges every mover, so nothing new is asked of a caller.
 
    SECTION 3's PATH LAYER.  [apath_at] is the hop-by-hop first-match lookup
    the design names [path_at]; it is spelled [apath_at] because
@@ -454,45 +494,48 @@ Section FsAbsCarrier.
   Proof. split; [reflexivity | apply _]. Qed.
 
   (* ------------------------------------------------------------------ *)
-  (*  3a.  [state av]: [fs_view]'s authority, read through [abs_of]       *)
+  (*  3a.  [astate av]: the γtop AUTHORITY, read through [abs_of]         *)
   (* ------------------------------------------------------------------ *)
 
-  Definition abs_view S : aview := abs_of <$> fss_inodes S.
+  (* OVER THE RAW MAP since durable-disk EV (header, consequence (1)): it is
+     the form [InodeRegion.ftop_body] holds, and at [I := fss_inodes S] it is
+     the old function on the nose. *)
+  Definition abs_view (I : gmap Z fs_node) : aview := abs_of <$> I.
 
-  Lemma abs_view_lookup S i n :
-    fss_inodes S !! i = Some n -> abs_view S !! i = Some (abs_of n).
+  Lemma abs_view_lookup I i n :
+    I !! i = Some n -> abs_view I !! i = Some (abs_of n).
   Proof. intros Hi. by rewrite /abs_view lookup_fmap Hi. Qed.
 
   (* The pure conjunct goes LAST (durable-notes) even in a new definition:
-     every consumer destructures the authority and the state first. *)
+     every consumer destructures the authority first. *)
   Definition astate Γ (av : aview) : iProp Σ :=
-    (∃ S, ghost_map_auth (γtop Γ) 1 (fss_inodes S) ∗ fs_state Γ S
-          ∗ ⌜av = abs_view S⌝)%I.
+    (∃ I, ghost_map_auth (γtop Γ) 1 I ∗ ⌜av = abs_view I⌝)%I.
 
-  Global Instance astate_timeless `{!GTimeless Γ} av : Timeless (astate Γ av).
+  Global Instance astate_timeless Γ av : Timeless (astate Γ av).
   Proof. rewrite /astate. apply _. Qed.
 
-  (* THE ACCESSOR, AND IT IS AN EQUIVALENCE: no new invariant is introduced
-     and no state is minted -- [astate] is [fs_view] with the authority's map
-     named at the abstract level (section 9 Q3). *)
-  Lemma fs_view_astate Γ : fs_view Γ ⊣⊢ ∃ av, astate Γ av.
-  Proof.
-    rewrite /fs_view /astate. iSplit.
-    - iIntros "H". iDestruct "H" as (S) "[Ha Hs]".
-      iExists (abs_view S), S. by iFrame.
-    - iIntros "H". iDestruct "H" as (av S) "(Ha & Hs & _)".
-      iExists S. iFrame.
-  Qed.
+  (* INTRO AND ELIM AGAINST THE AUTHORITY.  This is all that is left of the
+     old [fs_view_astate] equivalence once the authority moved into
+     [InodeRegion.ftop_inv]: [astate] is a READING of [ghost_map_auth], so
+     both directions are the definition.  The borrow off [ftop_body] itself
+     is [ftop_astate_acc] (section 5). *)
+  Lemma astate_intro Γ I :
+    ghost_map_auth (γtop Γ) 1 I ⊢ astate Γ (abs_view I).
+  Proof. iIntros "Ha". iExists I. by iFrame. Qed.
+
+  Lemma astate_elim Γ av :
+    astate Γ av ⊢ ∃ I, ghost_map_auth (γtop Γ) 1 I ∗ ⌜av = abs_view I⌝.
+  Proof. by iIntros "H". Qed.
 
   (* A HELD FRAGMENT AGREES WITH THE AUTHORITY'S ROW. *)
   Lemma astate_nview_dq Γ av dq i a :
     astate Γ av -∗ nview_dq Γ dq i a -∗ ⌜av !! i = Some a⌝.
   Proof.
     rewrite /astate /nview_dq /top_frag_q.
-    iIntros "Hst Hn". iDestruct "Hst" as (S) "(Ha & _ & %Hav)".
+    iIntros "Hst Hn". iDestruct "Hst" as (I) "(Ha & %Hav)".
     iDestruct "Hn" as (n) "[Hf %Han]".
     iDestruct (ghost_map_lookup with "Ha Hf") as %Hl.
-    iPureIntro. subst av. by rewrite (abs_view_lookup S i n Hl) Han.
+    iPureIntro. subst av. by rewrite (abs_view_lookup I i n Hl) Han.
   Qed.
 
   Lemma astate_nview Γ av q i a :
@@ -697,3 +740,89 @@ End FsAbsWalk.
 (* [apn_pins] is a big-op behind a [Definition]: seal it, or an [iFrame]
    near it resolves its instances through the whole list (durable-notes). *)
 Global Typeclasses Opaque apn_pins.
+
+(* ===================================================================== *)
+(*  5.  THE BORROW: [astate] OUT OF [InodeRegion.ftop_body]               *)
+(* ===================================================================== *)
+
+(* LAST IN THE FILE, AND THE REQUIRE SITS RIGHT HERE, for the reason the
+   header gives: the region's cone is large and nothing above this line may
+   have a name of it resolved by accident.  Everything sections 1-4 state is
+   already elaborated when this is read. *)
+Require Import RiscvPtsto.     (* [riscvGS], a member of the binder list    *)
+Require Import FsBlocks.       (* [fs_names] / [fs_top]: the era's gnames   *)
+Require Import FsBytesGamma.   (* [fs_gamma_L]: the LIVE Γ                  *)
+Require Import InodeRegion.    (* [ftop_body]/[ftop_clean]: its real home   *)
+
+Section FsAbsFtop.
+  (* InodeRegion's own binder list, verbatim (it binds MEMBERS, not the
+     [Xv6G.xv6G] bundle -- durable-notes, "ONE BUNDLE PER GHOST CLASS"). *)
+  Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !icacheG Σ,
+            !logG Σ, !fsTopG Σ, !fsLinkG Σ}.
+  Context `{ICFG : icfg}.
+
+  (* THE TIE, AND IT IS DEFINITIONAL: [fs_gamma_L γfs] is
+     [MkFsView _ (fs_link γfs) (fs_top γfs)], so the abstract map [astate]
+     reads at the live Γ and the map [ftop_body] holds the authority of are
+     ONE GNAME.  Stated so a downstream [rewrite] has a name to cite; the
+     proof is [reflexivity]. *)
+  Lemma ftop_gamma_top (γfs : fs_names) : γtop (fs_gamma_L γfs) = fs_top γfs.
+  Proof. reflexivity. Qed.
+
+  (* THE ACCESSOR THAT REPLACES [fs_view_astate].  An AU proof opens [ftopN],
+     lands on [ftop_body], and takes this: it gets the abstract state at the
+     live Γ, and owes back an authority whose every entry is well-formed.
+
+     WHY THE ROW IS ON THE GIVE-BACK.  [ftop_body]'s [ftop_clean I A] is a
+     statement about the RECORDS, and [abs_of] forgets them, so no [av] can
+     pay for it; the mover re-establishes [inode_local] anyway ([ireg_top_retag]
+     charges exactly this, and [FsStateEra.inode_local_of_ok_rec] is the one
+     line that assembles it).  The obligation is stated at the STRONGER,
+     A-free form -- every entry local -- which implies [ftop_clean I' A] for
+     the [A] the body happens to carry, so the caller never has to see the
+     arming registry.  A caller that suspends the row instead ([ireg_arm])
+     is not this accessor's customer: it moves the map through
+     [ireg_top_retag_armed] and never opens [ftopN] itself.
+
+     WHY THE GIVE-BACK NAMES THE MAP AND NOT JUST [astate].  [abs_view] is
+     not injective (again: [abs_of] forgets the record), so "an [astate] at
+     some [av']" does not say WHICH map the caller is returning, and the row
+     cannot be charged for a map nobody named.  The caller therefore hands
+     back the authority itself -- which is exactly what [astate_elim] gives
+     it, at [γtop (fs_gamma_L γfs)] = [fs_top γfs] ([ftop_gamma_top], and it
+     is [reflexivity], so the two spellings are interchangeable with no
+     rewrite. *)
+  Lemma ftop_astate_acc (γfs : fs_names) :
+    ftop_body γfs -∗
+      ∃ av, astate (fs_gamma_L γfs) av
+          ∗ (∀ I' : gmap Z fs_node,
+               ⌜forall i n, I' !! i = Some n -> inode_local i n⌝ -∗
+               ghost_map_auth (fs_top γfs) 1 I' -∗ ftop_body γfs).
+  Proof.
+    iIntros "Hb". rewrite /ftop_body.
+    iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
+    iExists (abs_view I).
+    iSplitL "Hta".
+    { iApply astate_intro. iExact "Hta". }
+    iIntros (I' Hloc) "Hta".
+    iExists I', A. iFrame "Hta Hla Hpark". iPureIntro.
+    intros i n Hi _. exact (Hloc i n Hi).
+  Qed.
+
+  (* THE READ-ONLY BORROW: the caller that only LOOKS at the map (a spec
+     whose atomic step is an observation) hands the SAME authority back and
+     owes no row at all -- [ftop_clean] is the one the body came with. *)
+  Lemma ftop_astate_ro (γfs : fs_names) :
+    ftop_body γfs -∗
+      ∃ I : gmap Z fs_node,
+        astate (fs_gamma_L γfs) (abs_view I)
+        ∗ (ghost_map_auth (fs_top γfs) 1 I -∗ ftop_body γfs).
+  Proof.
+    iIntros "Hb". rewrite /ftop_body.
+    iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
+    iExists I. iSplitL "Hta".
+    { iApply astate_intro. iExact "Hta". }
+    iIntros "Hta". iExists I, A. by iFrame.
+  Qed.
+
+End FsAbsFtop.
