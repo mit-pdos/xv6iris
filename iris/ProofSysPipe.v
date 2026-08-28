@@ -1560,9 +1560,9 @@ Section ProofSysPipe.
     iDestruct "Hpipe" as (k0 k1) "(%Hklt & Hb6 & Hb7 & Href0 & Href1)".
     destruct Hklt as [Hk0lt Hk1lt].
     (* Nothing about the pipe appears from here on, and that is the point:
-       each end rides INSIDE its file's [FileInv.file_ref] as the payload
-       [pipe_file] pins, so installing a descriptor installs the reference to
-       the pipe with it.  (Before the payload link this proof had to DROP the
+       each end rides INSIDE its file's [FileInv.file_ref], in the payload
+       [file_core]'s pipe arm holds, so installing a descriptor installs the
+       reference to the pipe with it.  (Before the payload link this proof had to DROP the
        two ends here -- affine, so it typechecked, and it meant sys_pipe's
        descriptors were not connected to the pipe in the model.) *)
     assert (HW1a0' : W1 !!! Regidx Ra0 = (zero_reg : mword 64))

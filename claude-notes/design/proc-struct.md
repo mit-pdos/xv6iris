@@ -1212,13 +1212,14 @@ What made this work rather than merely typecheck is that the four
 (sys_read, sys_write, sys_fstat, sys_close, kexit) never have to name a
 content.
 
-**The one exception, and why it is one.**  `ProofFilewrite.fw_ref` is the
-reference held OPEN — `fref_tok ∗ file_fields k q Cf ∗ file_pay_st … Cf st ∗
-flive_tok` — because filewrite's loop branches on `f->writable` on the INODE
-arm, and the write mode of an inode file is not something `fdstate` tracks.
-It is `Local`, nothing outside that file holds it, and the caller re-seals
-into `file_ref` at the loop's exit.  Putting a `writable` bit on `FdInode`
-(the way `FdPipe` has one) would delete it.
+**There is no exception.**  `ProofFilewrite.fw_loop` briefly held the
+reference open, because it branches on `f->writable` and the mode was not yet
+in the state; once `FdOpen` carried the flags it went back to taking
+`file_ref gf kx qx stx` with a single premise, `stx = FdOpen rx true (FdInode
+nx)`.  The loop opens the reference per iteration and re-derives the two field
+equations it works with (`fc_type Cf = FD_INODE`, `fc_wbool Cf = true`) from
+`fdstate_ok` — whatever content the reference happens to carry that round.
+Every place in the tree that holds a `struct file *` now holds `file_ref`.
 
 ### The loan window
 

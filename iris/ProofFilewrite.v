@@ -1434,22 +1434,9 @@ Section ProofFilewrite.
   (*  resources the contract returns -- which is why the exit needs no   *)
   (*  re-assembly beyond [fw_env_out_fs].                                *)
   (* =================================================================== *)
-  (* THE REFERENCE, OPENED.  filewrite's loop reads [f->type] AND
-     [f->writable] off the field cells, and the second is a MODE -- something
-     [FdSlots.fdstate] does not track -- so the loop cannot work from the
-     state alone the way its environment does.  It therefore carries the
-     reference in pieces, with its [fcontent] named, and the caller (which
-     opened it to run the type and mode tests in the first place) re-packs it
-     on the way out.  This is a LOCAL shape, not a second currency: nothing
-     outside this file holds it. *)
-  Local Definition fw_ref (gf : gname) (kx : nat) (qx : Qp)
-      (Cf : fcontent) (stx : fdstate) : iProp Σ :=
-    (fref_tok gf kx qx ∗ file_fields kx qx Cf ∗
-     file_pay_st gf kx qx Cf stx ∗ flive_tok gf kx)%I.
-
   Local Lemma fw_loop `{CID0 : CpuId}
       (ga gf : gname) (gs : list gname) (jx : nat) (glp : gname)
-      (kx : nat) (qx : Qp) (stx : fdstate) (Cf : fcontent) (inumx : mword 32)
+      (kx : nat) (qx : Qp) (stx : fdstate) (rx : bool) (nx : Z)
       (fn : fwrite_names)
       (pidv : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool)
@@ -1464,14 +1451,12 @@ Section ProofFilewrite.
     fwn_procs fn = gs ->
     (0 <= n < 2 ^ 31)%Z ->
     eb = true ->
-    (* [Cf] and [inumx] are the reference's OWN, opened by the caller: the
-       loop reads [f->type] and [f->writable] off the field cells, and
-       neither the type nor the mode is something [stx] alone can say -- the
-       mode is not tracked by [FdSlots.fdstate] at all.  [fdstate_ok] is what
-       keeps the two in step. *)
-    fdstate_ok inumx Cf stx ->
-    fc_type Cf = FD_INODE ->
-    fc_wbool Cf = true ->
+    (* THE DESCRIPTOR IS OPEN ON AN INODE AND WRITABLE, and that is the whole
+       of what the loop needs to know about the file.  Both used to be
+       premises about an [fcontent] the caller had to open and hand down;
+       both are facts about the STATE now, and the loop re-derives the field
+       equations it works with from [fdstate_ok] each iteration. *)
+    stx = FdOpen rx true (FdInode nx) ->
     m !!! Regidx csp_rs1 = sp0 ->
     pj = proc_addr jx ->
     (* ---- [filewrite_fs_env]'s ten PURE fields.  Pure, hence free: they
@@ -1532,7 +1517,7 @@ Section ProofFilewrite.
     word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) (m !!! Regidx Rs8) -∗
     word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) (m !!! Regidx Rs9) -∗
     word_pointsto (KTR := KT1) (pa_stk sp0 12) (DfracOwn 1) w12 -∗
-    fw_ref gf kx qx Cf stx -∗
+    file_ref gf kx qx stx -∗
     proc_priv_core pj pidv (upd_upt V PI) -∗
     KvmSpec.kalloc_env ga None -∗
     (* ---- the PERSISTENT half of [filewrite_fs_env] ---- *)
@@ -1573,13 +1558,13 @@ Section ProofFilewrite.
         sie_cap_gpr KT1 mf K b pj -∗
         cpu_own 0%nat eb pj b lks -∗
         InstrBytes.pc_is (ret_pc (m !!! Regidx Rra)) -∗
-        fw_ref gf kx qx Cf stx -∗
+        file_ref gf kx qx stx -∗
         proc_priv_core pj pidv (upd_upt V P') -∗
         filewrite_env_out fn stx -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hkf Hjp Hgsj Hlens Hfnj Hfnps Hn Heb Hokx Htyi Hwb Hspm Hpjeq.
+    intros HK Hkf Hjp Hgsj Hlens Hfnj Hfnps Hn Heb Hstx Hspm Hpjeq.
     intros P1 P2 P3q P4q P6 P7.
     (* [pj] is the CALLER's let-bound local and every callee contract below
        states its resources at [proc_addr jx]; the two are the same word and
@@ -1595,9 +1580,21 @@ Section ProofFilewrite.
       exfalso. lia. }
     iIntros "Hcg Hcnt #Htext Hpc #Hprocs
              Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
-             (Hrtok & Hrfields & Hrpay & Hrlv) Hpriv #Hkenv
+             Href Hpriv #Hkenv
              #Hbio #Hlog #Hcrash #Hgc #Hkd #Hpk #Hit #Hescs #Hireg
              #Hslks #Hdev #Hgeo #Hdlk #Hbm Hout Hcont".
+    (* ---- THE REFERENCE, OPENED, AND THE TWO FIELD FACTS OFF THE STATE ----
+       The loop reads [f->type] and [f->writable] off the field cells, so it
+       needs equations about the [fcontent] the reference carries -- but not
+       from its caller: [Hstx] plus [fdstate_ok] gives both, per iteration,
+       whatever content the reference happens to hold this time round. *)
+    iDestruct "Href" as (Cf) "(Hrtok & Hrfields & Hrpay & Hrlv)".
+    iDestruct (file_pay_st_ok with "Hrpay") as "[%Hex Hrpay]".
+    destruct Hex as (inumx & Hokx).
+    pose proof Hokx as Hokc. rewrite Hstx in Hokc.
+    destruct Hokc as (Hrdc & Hwrc & Htyi & Hnxeq).
+    assert (Hwb : fc_wbool Cf = true).
+    { rewrite /fc_wbool Hwrc. by vm_compute. }
     iPoseProof (SpecPrintk.printk_env_panic with "Hpk") as "#Hpenv".
     (* PIN THE INDEX.  Same one-liner as the contract's own proof below, and
        needed for the same reason: the body calls THREE [true]-crossing
@@ -2458,9 +2455,9 @@ Section ProofFilewrite.
       by (rewrite (Heocs csp_rs1 ltac:(vm_compute; reflexivity)
                      ltac:(vm_compute; discriminate)); exact HB0sp).
     (* THE REFERENCE, back whole -- nothing below this point touches it *)
-    iAssert (fw_ref gf kx qx Cf stx)
+    iAssert (file_ref gf kx qx stx)
       with "[Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]" as "Href".
-    { rewrite /fw_ref /file_fields.
+    { rewrite /file_ref /file_fields. iExists Cf.
       iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
     (* THE EXCLUSIVE HALF, back at the set the chunk reached *)
     iAssert (filewrite_fs_out fn)
@@ -4293,9 +4290,23 @@ Section ProofFilewrite.
                     One transport, exactly as the -1 exit does before [Hcont]. *)
                  iDestruct (cpu_own_transport CID CID28 0%nat eb pj b
                               ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-                 iApply (fw_loop (CID0 := CID28) γa γf γs j γlp k q st Cf inumx fn pidv V
+                 (* THE LOOP TAKES THE STATE, NOT THE CONTENT.  Both facts it
+                    used to be handed -- the type and the write mode -- are
+                    read off [st] here and re-derived from [fdstate_ok] inside
+                    the loop, so the reference crosses packed. *)
+                 destruct (fdstate_ok_inode inumx Cf st Hok Htyi)
+                   as (rx & wx & Hstx).
+                 assert (Hwx : wx = true).
+                 { destruct (fdstate_ok_rw inumx Cf rx wx
+                               (FdInode (bv_unsigned inumx))
+                               ltac:(rewrite -Hstx; exact Hok)) as [_ Hwrc].
+                   destruct wx; [reflexivity|]. exfalso.
+                   rewrite /fc_wbool Hwrc in Hwb. by vm_compute in Hwb. }
+                 subst wx.
+                 iApply (fw_loop (CID0 := CID28) γa γf γs j γlp k q st rx
+                           (bv_unsigned inumx) fn pidv V
                            m K eb n b sp0 w12 pj lks
-                           HK Hk Hj Hgs Hlens Hfnj Hfnps Hn01 Heb Hok Htyi Hwb Hspm
+                           HK Hk Hj Hgs Hlens Hfnj Hfnps Hn01 Heb Hstx Hspm
                            ltac:(reflexivity)
                            E1 E2 E3 E4 E5 E6
                            (Z.to_nat n) 0%Z (pv_upt V) L7
@@ -4312,18 +4323,13 @@ Section ProofFilewrite.
                                  [Hpriv] Hkenv
                                  E8 E9 E10 E11 E12 E13 E14 E15 E16 E17
                                  E22 E23 E24 E21 [E18 E19 E20 E25]").
-                 { rewrite /fw_ref /file_fields.
+                 { rewrite /file_ref /file_fields. iExists Cf.
                    iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
                  { rewrite HVid. iExact "Hpriv". }
                  { rewrite /filewrite_fs_out.
                    iFrame "E18 E19 E20 E25". }
                  iIntros (CIDx Hsx mf rv P')
                    "%Hcs %Hup %Hret %Hra Hcg Hcnt Hpc Href Hpriv Henvo".
-                 (* the loop hands the reference back OPENED; the contract
-                    promised it packed, so seal it over the content it has
-                    carried unchanged throughout *)
-                 iAssert (file_ref γf k q st) with "[Href]" as "Href".
-                 { rewrite /file_ref /fw_ref. iExists Cf. iExact "Href". }
                  iSpecialize ("Hcont" $! CIDx with "[]"); [iPureIntro; wp_next_chain|].
                  iApply ("Hcont" $! mf rv P'
                            with "[%] [%] [%] [%] Hcg Hcnt Hpc Href Hpriv Henvo").
