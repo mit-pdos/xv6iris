@@ -3923,3 +3923,25 @@ departs through sched() under p->lock, which is exactly 0.27′'s
 machinery.  The install-time framing was the red herring: what is
 installed is only the ∀-quantified spec; the resources always come
 from the trapping site.
+
+### 0.29′ OWNER RULING (2026-08-27): AN INVARIANT IS A CONTAINER, NOT A
+CHANNEL — boot-published read-only facts distribute through the
+started barrier
+
+The principle: under TSO a persistent fact still carries its
+visibility condition, and an invariant can STORE it but cannot
+DISTRIBUTE it — distribution needs a barrier whose receipt the
+reader holds.  For boot-populated read-only data (devsw the
+exemplar; the class = everything written on hart 0 before the
+started flag), the channel is the STARTED DEPOSIT: the population
+writes precede the flag write, so their stamps are dominated by the
+flag position; the per-hart flag-read receipt claims them; every
+post-boot context inherits by ancestry (its stamp chain passes
+through a claim that dominated the flag), so no per-site evidence
+ever recurs.  This CORRECTS 0.28′(2)'s devsw placement (fs_ready is
+the wrong barrier — later, and a different publication): devsw's
+entries become ROWS OF THE STARTED DEPOSIT, machinery already built
+and green (the named-context parked record + per-hart absorb).  The
+general rule for the paper: every persistent fact in the system must
+name the barrier that distributes it; "it's in an invariant" is not
+an answer under weak memory.
