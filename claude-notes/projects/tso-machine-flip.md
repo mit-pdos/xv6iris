@@ -12745,3 +12745,83 @@ dynamic ones.
 **1100 of 1296, RED 9 — unchanged**, sentinel-backed at A6.98's round
 (`MAKEEXIT=2`); no source file was edited in this pass.  **Red-list delta: 0.**
 `^Abort` / `^Admitted` / `^Axiom` all 0; mirror in sync.
+
+### A6.100 STEP 1 MEASURED: THE FLOOR-0 ROUTE IS AVAILABLE, AND BOTH GATES IT
+### NEEDS ALREADY EXIST — THE COST IS ONE PREMISE AND ONE GATE SWAP IN INITLOCK
+
+Executing step 1 of the re-ordered tranche (A6.99 §(3)): *does the boot carve
+hand the `.bss` lock cells in a shape the floor-0 mint accepts?*  **Measured,
+and the answer is yes with one named condition.**  Nothing edited; boundary
+unchanged.
+
+#### (1) THE STANDING READING, RECORDED AS ASKED
+
+> **§0.35′'s TWO CHANNELS ARE TWO DIFFERENT FLOORS, NOT TWO DISTRIBUTIONS OF
+> THE SAME ONE.**  A boot-static lock's owner cell is an ERA-IMAGE byte, so its
+> window's floor is `0` and its handle's `ctx_floor ξ 0` is free
+> (`TsoCtx.ctx_floor_0`).  A dynamic lock's cell is a kalloc'd page, minted at
+> its own store's position, so its handle's floor must be BOUGHT.  The ruling's
+> "boot locks ride the started deposit / dynamic locks mint at the allocating
+> context and travel the fd-fork channels" is that distinction seen from the
+> distribution side.
+
+#### (2) WHAT THE ROUTE NEEDS, AND WHAT IS ALREADY THERE
+
+The floor stays at `0` across `initlock` iff the cell is minted at the era
+image BEFORE the store and the store then FRAMES the floor.  Both halves
+exist:
+
+| half | status |
+|---|---|
+| an era-initial element at `t = 0` | `TsoCtx`'s `pristine_byte` / `ledger_elem0` block — *"the boot carve has to be able to turn its raw bytes into ledger ones"* |
+| a mint at a PARAMETRIC timestamp, `t = 0` being the image instance | `ledger_wpay_mint` (A6.83 §(2): one lemma, two instances) |
+| a store that KEEPS the floor | `TsoCtx.ledger_store_wpay_ok`, whose own comment is *"THE FLOOR IS FRAMED: both arms keep `lo`, exactly as they keep `z` and `cp`.  Only `own` moves."* |
+
+**So no new machinery is needed anywhere.**
+
+#### (3) THE ONE CONDITION, AND IT IS A PREMISE `SpecInitlock` DOES NOT YET MAKE
+
+`SpecInitlock`'s precondition takes the owner field as a CTX WORD —
+`c_cpu ↦₈ vcpu` — and a ctx word HIDES its element's timestamp.  `ProofInitlock`
+then drives `wp_sd_zero_wpay_s_sconf`, the **store-then-MINT** leaf, which
+mints at its own store position `S (length glog)`; that is where today's
+non-zero floor comes from, and it is invisible in the spec.
+
+So the route costs exactly two things, both in the file step 2 touches anyway:
+
+1. **`SpecInitlock`'s pre exposes the cells at `t = 0`** — i.e. the boot carve
+   hands `.bss` lock cells as era-image ledger bytes rather than as an
+   opaque ctx word.  (A `.bss` lock's owner field is untouched until
+   `initlock` runs, so this is true; it is only unSTATED.)
+2. **`ProofInitlock` swaps the store-then-mint gate for the mint-then-store
+   pair** — mint the window at `0` off the image, then `ledger_store_wpay_ok`
+   for the `sd x0`, which frames the floor.
+
+`newlock`'s new premise is then discharged by `ctx_floor_0` at every
+boot-static site, and the four-step purchase chain (A6.98 §(2)) is needed only
+by the dynamic locks — the pipe lock and the sleeplocks.
+
+> **AND THE SHAPE OF THE FINDING IS THE SAME ONE THIS LANE KEEPS PRODUCING.**
+> The expensive-looking obligation was expensive only because a spec was
+> hiding the fact that would discharge it — `lo` was existential inside the
+> cell (A6.98), the timestamp is hidden inside the ctx word (here).  *When a
+> proof cannot pay a premise, look first for the fact the type is hiding.*
+
+#### (4) §0.36′ IS READ AND QUEUED AS ITEM 8
+
+Q3's ruling is the same pattern one tier up and supersedes A6.90's three
+directions — in particular **direction 2 is NOT taken: `sfence.vma` stays
+TLB-only.**  The KPT fact goes ξ-relative; hart 0's boot context rides the ctx
+tower's EXISTING own-write/dirty arm (no publication, no machine change); the
+secondaries buy their floor with the flag-read receipt + `ctx_bound_raise` +
+monotonicity — *the same buy/carry/cash chain as `newlock`'s floor*, which is
+why `ctx_bound_raise` (A6.97) now serves three tranches.  `TransPt`'s gates
+become two-armed through the ctx tower's own disjunction.  Not started; queued
+after §0.27′ per the coordinator.
+
+#### (5) THE NUMBER
+
+**1100 of 1296, RED 9 — unchanged**, sentinel-backed at A6.98's round
+(`MAKEEXIT=2`); no source edited this pass.  **Red-list delta: 0.**
+`^Abort` / `^Admitted` / `^Axiom` all 0; mirror in sync.  The validated
+surface text remains parked at `…/scratchpad/WpLock.v.surface-move` for step 3.
