@@ -2841,6 +2841,13 @@ Section WpSconfMem.
       (log ++ [PWMsg (snap_of a 8 vnew) (hart_agent (@cpu_id CIDw))])%list
       (vstep (hart_agent (@cpu_id CIDw)) (V (hart_agent (@cpu_id CIDw)))
          (log ++ [PWMsg (snap_of a 8 vnew) (hart_agent (@cpu_id CIDw))])%list V) ∗
+    (* A6.114: the store's OWN-MESSAGE FRAGMENT, kept rather than dropped.
+       [TsoCtx.ledger_vis_own] turns it into "the write at [S (length log)] is
+       mine", which is what the owner cell's per-agent record needs in order to
+       stay discharge-able after a release (option 1: every agent's record is
+       the floor OR its own message). *)
+    TsoCtx.ledger_msg_at (length log)
+      (PWMsg (snap_of a 8 vnew) (hart_agent (@cpu_id CIDw))) ∗
     ([∗ list] j ∈ seq 0 8,
        TsoCtx.phys_ledger_wpay (pa_add a j) (DfracOwn 1) (nth_byte vnew j)
          (S (length log)) (TsoMemPa.TsWin a 8 j z cp own' lo)).
@@ -2876,8 +2883,8 @@ Section WpSconfMem.
             a 8%N vold vnew lo z cp own own'
             ltac:(vm_compute; discriminate) Harm Hoth
             eq_refl eq_refl eq_refl Htvmono Htvtop
-            with "Hm Htso Hold") as "(Hm & Htso & _ & Hnew)".
-    iModIntro. iFrame "Hm Hnew".
+            with "Hm Htso Hold") as "(Hm & Htso & #Hmsg & Hnew)".
+    iModIntro. iFrame "Hm Hmsg Hnew".
     rewrite -(tso_interp_of_at_gs riscv_eraGS img
                 (write_bytes σ.(mem) a 8 vnew) log' V'
                 σ.(sregs) σ.(mdev) Hpin').
