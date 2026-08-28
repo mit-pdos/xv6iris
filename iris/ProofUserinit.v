@@ -422,9 +422,10 @@ Section ProofUserinit.
         destruct Hnb as (nb & Hon & Hnbgt). subst on.
         rewrite avail_sub_Some in Hz0. unfold avail_zero in Hz0.
         exfalso. lia. }
-    iDestruct "Hgot" as (j γl ch pid V root tfp ks rest nc)
+    iDestruct "Hgot" as (j γl ch pid U root tfp ks rest nc)
       "(%Hfacts & Hheld & Hhart & Hpriv & Hfrag & #Hmk & Hfd & Hirs & Hbsl & Hks & Hkfree
         & Hctx & Hcg & Hcpu & Hpay & Hkenv & Hpav)".
+    destruct U as [V M].
     destruct Hfacts as (Hrv & Hj & Hgl & _ & _ & Hcwd0 & Hrest & Hnc).
     (* [Hkfree] is KEPT: the paid park is anchored on the child's free
        kernel stack ([ProcDefs.kstack_free_at] spells it at [ks] below). *)
@@ -564,7 +565,7 @@ Section ProofUserinit.
     { rewrite (callee_saved_lookup Hcsnm Rs1 ltac:(vm_compute; reflexivity)).
       exact HR8s1. }
     (* ===== +0x24 sd a0,336(s1) : p->cwd = ip ===== *)
-    iDestruct (proc_priv_nocwd_cwd_pid γf (proc_addr j) pid V with "Hpriv")
+    iDestruct (proc_priv_nocwd_cwd_pid γf (proc_addr j) pid (MkUstate V M) with "Hpriv")
       as "(Hcwd & Hpid4 & Hback)".
     assert (Hcwdaddr : add_vec (rget mr2 Rs1)
                          (sign_extend' 64 (mword_of_int 336 : mword 12))
@@ -677,7 +678,7 @@ Section ProofUserinit.
     iDestruct (kalloc_env_at_avail with "Hkenv") as "#Hkav".
     iDestruct (first_tok_boot with "Hfirst Hpersist Hkav Hfsinit")
       as "Hftok".
-    iAssert (proc_priv γf (proc_addr j) pid (upd_cwd V ipv))
+    iAssert (proc_priv γf (proc_addr j) pid (MkUstate (upd_cwd V ipv) M))
       with "[Hpnc Hcref Hftok]" as "Hpriv".
     { rewrite proc_priv_split_cwd. iFrame "Hpnc".
       iSplitL "Hcref"; [cbn [upd_cwd pv_cwd pv_fdg]; iExact "Hcref" |].
@@ -758,7 +759,7 @@ Section ProofUserinit.
        a WP any more (claude-notes/design/user-wp-slot.md). *)
     iAssert (uexec_wp) as "Huwp".
     { iPoseProof UG.uexec_wp_gen as "#Hgen". iExact "Hgen". }
-    iMod (park_token_park N rest (upd_cwd V ipv) Hwf Hrest
+    iMod (park_token_park N rest (MkUstate (upd_cwd V ipv) M) Hwf Hrest
             with "Htoken Htext Hwire Htramp Hmk Hstack Henv Hown Hfrag Huwp
                   [Hks Hctx Hpriv Hfd Hirs]")
       as "Hpctx".

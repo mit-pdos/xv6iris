@@ -214,7 +214,7 @@ Definition forkret_park_paid_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (URes : CpuId -> uptd -> mword 64 -> iProp Σ) (W : iProp Σ)
     (γs : list gname) (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
-    (pid : mword 32) (V : pprivate) (av : nat) : Prop :=
+    (pid : mword 32) (U : ustate) (av : nat) : Prop :=
   (length rest = 12%nat) ->
   (* the record is stored in [procs_inv]'s slot for [pa], so [pa] is one of
      the NPROC slots -- [SpecAllocproc]'s postcondition says which.  It is
@@ -238,11 +238,11 @@ Definition forkret_park_paid_body
      lets [ParkCap.park_token] -- whose cap this is -- be a guarded
      fixpoint: the package's closer names the token, and a parker holds the
      token only under a later. *)
-  ⊢ ▷ forkret_park_pkg URes W γs γf pa ks (pv_fdg V) pid av -∗
+  ⊢ ▷ forkret_park_pkg URes W γs γf pa ks (pv_fdg (us_V U)) pid av -∗
     ▷ W -∗
     is_kstack pa ks -∗
     ctx_cells (p_context pa) (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) -∗
-    proc_priv γf pa pid V -∗
+    proc_priv γf pa pid U -∗
     fd_slots FDSPARE -∗
     iref_slots IREFSPARE -∗
     |==> ▷ proc_ctx γs pa.
@@ -260,9 +260,9 @@ Module Type FORKRET_PARK_PAID.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (W : iProp Σ)
       (γs : list gname) (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
-      (pid : mword 32) (V : pprivate) (av : nat),
+      (pid : mword 32) (U : ustate) (av : nat),
       forkret_park_paid_body (fun h : CpuId => usertrap_res_bare (CID := h)) W
-        γs γf pa ks rest pid V av.
+        γs γf pa ks rest pid U av.
   (* ...AND THE TOKEN, which is the park as every parker sees it
      ([ParkCap.park_token]): the cap above at [W := the token] plus the
      residue's channel, tied into the fixpoint.  This is the one entry the

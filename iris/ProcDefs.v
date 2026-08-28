@@ -48,6 +48,61 @@ Definition upd_cwd (V : pprivate) (v : mword 64) : pprivate :=
 Lemma upd_cwd_id (V : pprivate) : upd_cwd V (pv_cwd V) = V.
 Proof. destruct V; reflexivity. Qed.
 
+(* ===================================================================== *)
+(* THE PROCESS'S USER-VISIBLE STATE, AS ONE RECORD.                       *)
+(*                                                                       *)
+(* [ProcInv.proc_priv] used to take the private block [V : pprivate] and  *)
+(* (since milestone J item 1) the page image [M] as two ARGUMENTS.  They  *)
+(* are now one: [ustate].  The reason is arity stability -- 216 files     *)
+(* mention [proc_priv], and every future piece of user-visible state that *)
+(* the user-execution WP has to name (the descriptor view, the pid, the   *)
+(* slot's own key) would otherwise be one more argument in all of them.   *)
+(* As a FIELD it is free.  See                                           *)
+(* claude-notes/projects/user-wp-slot.md, milestone J item 1 and the      *)
+(* ledger's item-4 ruling.                                                *)
+(*                                                                       *)
+(* WHY [M] IS NOT A FIELD OF [pprivate] INSTEAD.  [pprivate] is the       *)
+(* [struct proc] CELLS -- everything in it is a machine word the kernel   *)
+(* stores somewhere (plus the descriptor ghost).  The image is not stored *)
+(* anywhere; it is the CONTENTS of the address space [pv_upt] describes.  *)
+(* The two travel together and separate at exactly one seam               *)
+(* ([ProcInv.proc_priv_split_pt], where the address space leaves for user *)
+(* execution and the block does not), and a record with the block in one  *)
+(* field and the image in the other is what makes that seam a projection  *)
+(* rather than a reshuffle.                                               *)
+(*                                                                       *)
+(* [pid] STAYS AN ARGUMENT of [proc_priv] for now (owner's word): it is   *)
+(* half-owned ([p_pid] at [1/2]) and paired with the scheduler's other    *)
+(* half, so moving it inside would have to move that pairing too.         *)
+(* ===================================================================== *)
+Record ustate := MkUstate {
+  us_V : pprivate;
+  us_M : gmap Z (bv 8);
+}.
+
+Definition upd_usV (U : ustate) (V : pprivate) : ustate := MkUstate V (us_M U).
+Definition upd_usM (U : ustate) (M : gmap Z (bv 8)) : ustate := MkUstate (us_V U) M.
+
+Lemma upd_usV_id (U : ustate) : upd_usV U (us_V U) = U.
+Proof. destruct U; reflexivity. Qed.
+Lemma upd_usM_id (U : ustate) : upd_usM U (us_M U) = U.
+Proof. destruct U; reflexivity. Qed.
+
+(* ---- THE LIFTED UPDATERS ------------------------------------------
+   One per [pprivate] updater that appears in a swept POSTCONDITION, so
+   that a call site keeps reading like the field write it is
+   ([proc_priv … (us_cwd U v')] rather than
+   [proc_priv … (upd_usV U (upd_cwd (us_V U) v'))]).  The rest of the
+   family lives in ProcInv.v, beside the [upd_*] each lifts.
+     Every one of them is a [MkUstate] applied to projections, so the
+   field equations a closer needs ([us_V (us_cwd U v) = upd_cwd (us_V U) v],
+   [us_M (us_cwd U v) = us_M U]) hold by [reflexivity]. *)
+Definition us_cwd (U : ustate) (v : mword 64) : ustate :=
+  upd_usV U (upd_cwd (us_V U) v).
+
+Lemma us_cwd_id (U : ustate) : us_cwd U (pv_cwd (us_V U)) = U.
+Proof. destruct U as [V M]. rewrite /us_cwd /upd_usV /=. by rewrite upd_cwd_id. Qed.
+
 Section ProcDefs.
   Context `{!riscvGS Σ}.
 
@@ -262,22 +317,41 @@ Section ProcDefs.
      [proc_priv] therefore hands the chain THIS and keeps [cwd_ref] and its
      descriptor array in hand -- one iff, no borrow, no closer, no
      fractions. *)
+  (* ---- THE MEMORY CONJUNCT IS THE **LAZY** VIEW ----------------------
+     [ProcPtOwn.proc_ptm P sz M] rather than [proc_pt P M]: the image is
+     the process's OWN view of its memory -- one byte per user virtual
+     address below [p->sz] (rounded up), reading 0 wherever the table has
+     no leaf yet, because that is what the process will read there once
+     vmfault has done its work ([UserPtTree.umem_lazy]).
+       WHY.  At the mapped-domain view a page FAULT extends [M], so
+     copyin -- which faults pages in mid-copy -- could only promise "the
+     image grew", which says nothing about the prefix it had already
+     copied.  At this view vmfault is a NOOP on [M]
+     ([SpecVmfault.wp_vmfault_sconf_mem]: same [M] on both arms), so
+     copyin and every fault-only path preserve the block's state exactly.
+     That is the whole reason [proc_priv] names the image at all.
+       The size index is [p->sz], which is already a field of [V], so
+     this adds no argument.  The MAPPED view does not go away: it is what
+     the user-facing seam ([UserPtTree.user_pt_inv], uservec/userret) and
+     the sub-[proc_priv] copy cone keep speaking, and the crossing is
+     [ProcPtOwn.proc_ptm_at_of_pt_at] / [proc_pt_at_of_ptm_at] (a submap
+     is pinned by its domain, so the round trip is lossless). *)
   Definition proc_priv_bare (pa : mword 64) (pid : mword 32)
-      (V : pprivate) : iProp Σ :=
-    (⌜uint (pv_sz V) <= uvm_maxsz⌝ ∗
-     ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝ ∗
+      (U : ustate) : iProp Σ :=
+    (⌜uint (pv_sz (us_V U)) <= uvm_maxsz⌝ ∗
+     ⌜um_below (pv_sz (us_V U)) (ud_um (pv_upt (us_V U)))⌝ ∗
      p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
-     proc_fields pa (DfracOwn 1) V ∗
-     proc_pt_at pa (pv_upt V) ∗
-     tf_page (ud_tfp (pv_upt V)) (pv_tf V))%I.
+     proc_fields pa (DfracOwn 1) (us_V U) ∗
+     proc_ptm_at pa (pv_upt (us_V U)) (uint (pv_sz (us_V U))) (us_M U) ∗
+     tf_page (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)))%I.
 
   (* the one field the chain actually reads, borrowed out of it.  Callees do
      their own borrowing now, so this is used INSIDE acquiresleep and
      holdingsleep rather than by anyone above them. *)
-  Lemma proc_priv_bare_pid (pa : mword 64) (pid : mword 32) (V : pprivate) :
-    proc_priv_bare pa pid V -∗
+  Lemma proc_priv_bare_pid (pa : mword 64) (pid : mword 32) (U : ustate) :
+    proc_priv_bare pa pid U -∗
     p_pid pa ↦₄{DfracOwn (1/4)} pid ∗
-    (p_pid pa ↦₄{DfracOwn (1/4)} pid -∗ proc_priv_bare pa pid V).
+    (p_pid pa ↦₄{DfracOwn (1/4)} pid -∗ proc_priv_bare pa pid U).
   Proof.
     iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp)".
     assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
@@ -294,25 +368,26 @@ Section ProcDefs.
      walk.  Compare [proc_priv_nocwd_cwd_pid], which is the same move for a
      caller that also wanted a quarter of [p->pid]; nothing wants that any
      more, so this one lends the cell alone. *)
-  Lemma proc_priv_bare_cwd (pa : mword 64) (pid : mword 32) (V : pprivate) :
-    proc_priv_bare pa pid V -∗
-    p_cwd pa ↦₈ pv_cwd V ∗
+  Lemma proc_priv_bare_cwd (pa : mword 64) (pid : mword 32) (U : ustate) :
+    proc_priv_bare pa pid U -∗
+    p_cwd pa ↦₈ pv_cwd (us_V U) ∗
     (∀ v' : mword 64,
-       p_cwd pa ↦₈ v' -∗ proc_priv_bare pa pid (upd_cwd V v')).
+       p_cwd pa ↦₈ v' -∗ proc_priv_bare pa pid (us_cwd U v')).
   Proof.
     iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp)".
     rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
     iFrame "Hcwd". iIntros (v') "Hcwd".
     rewrite /proc_priv_bare /proc_fields.
-    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
+    cbn [us_cwd upd_usV us_V us_M upd_cwd
+         pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
     iSplitR; [done|]. iSplitR; [done|]. iFrame "Hpid".
     iSplitL "Hsz Hcwd Hnm".
     { iFrame "Hsz Hcwd Hnm". iPureIntro; exact Hnl. }
     iFrame.
   Qed.
 
-  Lemma proc_priv_bare_sz (pa : mword 64) (pid : mword 32) (V : pprivate) :
-    proc_priv_bare pa pid V -∗ ⌜uint (pv_sz V) <= uvm_maxsz⌝.
+  Lemma proc_priv_bare_sz (pa : mword 64) (pid : mword 32) (U : ustate) :
+    proc_priv_bare pa pid U -∗ ⌜uint (pv_sz (us_V U)) <= uvm_maxsz⌝.
   Proof. iIntros "($ & _)". Qed.
 
   Definition proc_dormant (pa : mword 64) (st : mword 32) : iProp Σ :=
@@ -355,7 +430,10 @@ Section ProcDefs.
        own_ctx (p_context pa) ∗
        (if bool_decide (st = ZOMBIE)
         then ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝ ∗
-             proc_pt_at pa (pv_upt V) ∗ tf_page (ud_tfp (pv_upt V)) (pv_tf V)
+             (* the image is ∃-weakened here: the descriptor itself is
+                existential in this predicate, so there is no [V] for an
+                [M] to be keyed beside (milestone J item 1's staging). *)
+             proc_pt_at_any pa (pv_upt V) ∗ tf_page (ud_tfp (pv_upt V)) (pv_tf V)
         else p_pagetable pa ↦₈ (zero_reg : mword 64) ∗
              p_trapframe pa ↦₈ (zero_reg : mword 64)))%I.
 
@@ -375,7 +453,10 @@ Section ProcDefs.
        kstack_free pa ∗
        (if bool_decide (st = ZOMBIE)
         then ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝ ∗
-             proc_pt_at pa (pv_upt V) ∗ tf_page (ud_tfp (pv_upt V)) (pv_tf V)
+             (* the image is ∃-weakened here: the descriptor itself is
+                existential in this predicate, so there is no [V] for an
+                [M] to be keyed beside (milestone J item 1's staging). *)
+             proc_pt_at_any pa (pv_upt V) ∗ tf_page (ud_tfp (pv_upt V)) (pv_tf V)
         else p_pagetable pa ↦₈ (zero_reg : mword 64) ∗
              p_trapframe pa ↦₈ (zero_reg : mword 64)))%I.
 

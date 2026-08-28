@@ -94,7 +94,7 @@ Definition wp_nameiparent_sconf_body
     (n : nat)
     (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.nameiparent in
   let pj := proc_addr j in
   let pv := m !!! Regidx (mword_of_int 10 : mword 5) in   (* a0 = path *)
@@ -155,8 +155,8 @@ Definition wp_nameiparent_sconf_body
   sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
-  proc_priv_bare pj pidv Vpr -∗
-  inode_held (pv_cwd Vpr) -∗
+  proc_priv_bare pj pidv Upr -∗
+  inode_held (pv_cwd (us_V Upr)) -∗
   (* ---- THE PATH RIDES THE CALLER'S FRACTION [dqpv]; THE NAME BUFFER STAYS
      WHOLE.  The rule the tree follows: a byte run the callee only READS takes
      the caller's dfrac, a run it WRITES stays at [DfracOwn 1].  The walk only
@@ -189,8 +189,8 @@ Definition wp_nameiparent_sconf_body
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-      proc_priv_bare pj pidv Vpr -∗
-      inode_held (pv_cwd Vpr) -∗
+      proc_priv_bare pj pidv Upr -∗
+      inode_held (pv_cwd (us_V Upr)) -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nf i) -∗
       bslots 3 -∗
@@ -225,7 +225,7 @@ Definition wp_nameiparent_gen_body
     (n : nat) (Sb : gset Z)
     (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.nameiparent in
   let pj := proc_addr j in
   let pv := m !!! Regidx (mword_of_int 10 : mword 5) in   (* a0 = path *)
@@ -288,8 +288,8 @@ Definition wp_nameiparent_gen_body
   sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
-  proc_priv_bare pj pidv Vpr -∗
-  inode_held (pv_cwd Vpr) -∗
+  proc_priv_bare pj pidv Upr -∗
+  inode_held (pv_cwd (us_V Upr)) -∗
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
   ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nfun i) -∗
   bslots 3 -∗
@@ -314,8 +314,8 @@ Definition wp_nameiparent_gen_body
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-      proc_priv_bare pj pidv Vpr -∗
-      inode_held (pv_cwd Vpr) -∗
+      proc_priv_bare pj pidv Upr -∗
+      inode_held (pv_cwd (us_V Upr)) -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nf i) -∗
       bslots 3 -∗
@@ -358,11 +358,11 @@ Module Type NAMEIPARENT.
       (n : nat)
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Upr : ustate),
       wp_nameiparent_sconf_body gs j gl pd pav pu
  gf
  plen pfun nfun n
-                                pidv dq dqb dqs dqpv m K eb b lks Vpr.
+                                pidv dq dqb dqs dqpv m K eb b lks Upr.
   (* the set-form contract; the counted one is this at the [log_op]
      existential's own witness. *)
   Parameter wp_nameiparent_gen :
@@ -376,9 +376,9 @@ Module Type NAMEIPARENT.
       (n : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Upr : ustate),
       wp_nameiparent_gen_body gs j gl pd pav pu
  gf
  plen pfun nfun n Sb
-                                pidv dq dqb dqs dqpv m K eb b lks Vpr.
+                                pidv dq dqb dqs dqpv m K eb b lks Upr.
 End NAMEIPARENT.

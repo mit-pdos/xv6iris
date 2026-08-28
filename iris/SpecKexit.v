@@ -156,7 +156,7 @@ Definition wp_kexit_sconf_body
                (* kmem.lock, kalloc   *)
     (on : option nat) (fn : fclose_names)
     (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-    (pid : mword 32) (V : pprivate) :=
+    (pid : mword 32) (U : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kexit in
   let pj := proc_addr j in
   (* [fn] is not an extra degree of freedom: it is exactly kexit's own ghosts,
@@ -257,12 +257,12 @@ Definition wp_kexit_sconf_body
      [ld a0,336(s3)].  The two rejoin into the [1 + IREFSPARE] the ZOMBIE
      block parks. *)
   iref_slots IREFSPARE -∗
-  proc_priv γf pj pid V -∗
+  proc_priv γf pj pid U -∗
   (* THE fd-STATE FRAGMENT BUNDLE.  kexit closes every descriptor, and after
      [ProcInv]'s auth/frag split a close is a retype that needs both halves.
      It is NOT given back: the process is ending, and the bundle dies with
      the incarnation whose name it is keyed on (FdSlots.v). *)
-  fd_frags_any (pv_fdg V) -∗
+  fd_frags_any (pv_fdg (us_V U)) -∗
   (* NO continuation: kexit does not return.  See the header. *)
   WP (Loop : expr riscv_lang).
 
@@ -283,10 +283,10 @@ Section KexitSeals.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma kexit_park_pay (γf : gname) (j : nat) (pid : mword 32) (V : pprivate) :
-    pv_ofile V = replicate NOFILE (zero_reg : mword 64) ->
-    pv_cwd V = (zero_reg : mword 64) ->
-    proc_priv_nocwd γf (proc_addr j) pid V -∗ fd_slots FDSPARE -∗
+  Lemma kexit_park_pay (γf : gname) (j : nat) (pid : mword 32) (U : ustate) :
+    pv_ofile (us_V U) = replicate NOFILE (zero_reg : mword 64) ->
+    pv_cwd (us_V U) = (zero_reg : mword 64) ->
+    proc_priv_nocwd γf (proc_addr j) pid U -∗ fd_slots FDSPARE -∗
     iref_slots (1 + IREFSPARE) -∗
     (* AND THE BIO ALLOWANCE, on exactly the same argument as the stack
        below: a dormant slot owns three units, allocproc hands them to the
@@ -306,7 +306,7 @@ Section KexitSeals.
   Proof.
     intros Hof Hcwd. rewrite /park_pay inv_dormant_ZOMBIE.
     iIntros "Hpriv Hsp Hir Hbs Hkst".
-    iApply (proc_priv_to_dormant_zombie γf (proc_addr j) pid V Hof Hcwd
+    iApply (proc_priv_to_dormant_zombie γf (proc_addr j) pid U Hof Hcwd
               with "Hpriv Hsp Hir Hbs Hkst").
   Qed.
 
@@ -321,9 +321,9 @@ Module Type KEXIT.
       (ip : mword 64) (dqi : dfrac)
         (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
-      (pid : mword 32) (V : pprivate),
+      (pid : mword 32) (U : ustate),
       wp_kexit_sconf_body γft γf γw γs j γl pd pav pu
  ip dqi
 
-                          on fn m av eb b lks pid V.
+                          on fn m av eb b lks pid U.
 End KEXIT.

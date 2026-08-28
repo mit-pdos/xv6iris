@@ -938,7 +938,7 @@ Section ProofCopyinstr.
     cpu_own lvl eb pcur b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.copyinstr + 0x7c) : mword 64) -∗
-    proc_pt Pc -∗
+    proc_pt_any Pc -∗
     kalloc_env γa None -∗
     ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[ktb] f j) -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
@@ -952,7 +952,7 @@ Section ProofCopyinstr.
       sie_cap_gpr KT1 mj (K - 12)%nat b pcur -∗
       cpu_own lvl eb pcur b lks -∗
       pc_is (mword_of_int (KernelSyms.copyinstr + 0x4e) : mword 64) -∗
-      proc_pt P' -∗
+      proc_pt_any P' -∗
       ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[ktb] g j) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -982,7 +982,7 @@ Section ProofCopyinstr.
       sie_cap_gpr KT1 mj (K - 12)%nat b pcur -∗
       cpu_own lvl eb pcur b lks -∗
       pc_is (mword_of_int (KernelSyms.copyinstr + 0x4e) : mword 64) -∗
-      proc_pt P' -∗
+      proc_pt_any P' -∗
       ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[ktb] g j) -∗
       WP (Loop : expr riscv_lang)))%I).
     (* the cursor, its page and its offset inside that page *)
@@ -1120,7 +1120,7 @@ Section ProofCopyinstr.
         cpu_own lvl eb pcur b lks -∗
         pc_is (mword_of_int (KernelSyms.copyinstr + 0x8a) : mword 64) -∗
         page_own pa0 -∗
-        (page_own pa0 -∗ proc_pt Pd) -∗
+        (page_own pa0 -∗ proc_pt_any Pd) -∗
         ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ[ktb] f j) -∗
         EXIT -∗
         WP (Loop : expr riscv_lang))%I with "[]" as "CHUNK".

@@ -679,13 +679,21 @@ Section KexecDCommit.
     = upd_exec V szv P' ws3 ns.
   Proof. by destruct V. Qed.
 
+  (* AT THE RECORD.  The four field writes the commit block does arrive as
+     the lifted updaters ([us_tf], [us_name]) with the NEW IMAGE spelled by
+     [upd_usM] on the outside -- kexec replaces the address space, so its
+     image is the one uvmalloc/loadseg built and not the entry's.  Both
+     sides are [MkUstate] applications once the record is a constructor, so
+     one [destruct] does it. *)
   Lemma kxd_priv_exec (gf : gname) (pa : mword 64) (pid : mword 32)
-      (V : pprivate) (ws1 ws3 : list (mword 64)) (ns : list (bv 8))
-      (P' : uptd) (szv : mword 64) :
+      (U : ustate) (ws1 ws3 : list (mword 64)) (ns : list (bv 8))
+      (P' : uptd) (szv : mword 64) (Mx : gmap Z (bv 8)) :
     proc_priv gf pa pid
-      (upd_sz (upd_pt (upd_name (upd_tf V ws1) ns) P' ws3) szv) -∗
-    proc_priv gf pa pid (upd_exec V szv P' ws3 ns).
-  Proof. rewrite kxd_upd_compose. iIntros "H". iExact "H". Qed.
+      (upd_usM (upd_usV (us_name (us_tf U ws1) ns)
+                  (upd_sz (upd_pt (us_V (us_name (us_tf U ws1) ns)) P' ws3) szv))
+               Mx) -∗
+    proc_priv gf pa pid (upd_usM (us_exec U szv P' ws3 ns) Mx).
+  Proof. destruct U as [V M]; destruct V. iIntros "H". iExact "H". Qed.
 
   (* the two trapframe words the commit writes SECOND and THIRD are at
      distinct indices, so the order the block happens to write them in is
@@ -704,9 +712,9 @@ Section KexecDCommit.
   (* ...at the RESOURCE, because [iEval (rewrite ...)] on a [pprivate]
      equation inside [proc_priv] finds no relation to rewrite. *)
   Lemma kxd_priv_close_tf (gf : gname) (pa : mword 64) (pid : mword 32)
-      (V : pprivate) (ws : list (mword 64)) :
-    proc_priv gf pa pid (upd_sz (upd_pt V (pv_upt V) ws) (pv_sz V)) -∗
-    proc_priv gf pa pid (upd_tf V ws).
+      (U : ustate) (ws : list (mword 64)) :
+    proc_priv gf pa pid (upd_usV U (upd_sz (upd_pt (us_V U) (pv_upt (us_V U)) ws) (pv_sz (us_V U)))) -∗
+    proc_priv gf pa pid (us_tf U ws).
   Proof. rewrite kxd_close_tf. iIntros "H". iExact "H". Qed.
 
   (* THE EXIT'S OWN [kexec_ok], assembled.  Stated separately because the
@@ -756,7 +764,7 @@ Section KexecDCommit.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (Vc : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
+      (pidv : mword 32) (Uc : ustate) (dqb dqs dqa dqpv dqas : dfrac)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (c : nat) (last : mword 64) : iProp Σ :=
@@ -765,8 +773,8 @@ Section KexecDCommit.
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) ∗
      bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      bslots 3 ∗
-     proc_pt P ∗
-     proc_priv gf (proc_addr jp) pidv Vc ∗
+     proc_pt_any P ∗
+     proc_priv gf (proc_addr jp) pidv Uc ∗
      ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) ∗
      ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) ∗
      ([∗ list] k ∈ seq 0 na,
@@ -878,7 +886,7 @@ Section KexecDCommit.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
+      (pidv : mword 32) (U : ustate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
@@ -896,7 +904,7 @@ Section KexecDCommit.
     (8192 <= uint sz1)%Z ->
     c = na ->
     kxc_stack_ok (uint sz1) (uint sz1 - 4096) alen na ->
-    ud_tfp P = ud_tfp (pv_upt V) ->
+    ud_tfp P = ud_tfp (pv_upt (us_V U)) ->
     um_below sz1 P.(ud_um) -> um_covered sz1 P.(ud_um) ->
     (forall i, (i < 8)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (54 - i))) 8 = true) ->
@@ -915,7 +923,7 @@ Section KexecDCommit.
     M !!! Regidx Rs6 = page_base P.(ud_root) ->
     (* the epilogue no longer reloads s11 (XV6_REV 7d258aa) *)
     M !!! Regidx Rs11 = m !!! Regidx Rs11 ->
-    M !!! Regidx Rs5 = pv_sz V ->
+    M !!! Regidx Rs5 = pv_sz (us_V U) ->
     kernel_text -∗
     pc_is (mword_of_int (KXD + 0x2ce) : mword 64) -∗
     sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) -∗
@@ -925,13 +933,13 @@ Section KexecDCommit.
     kalloc_env fsc_kalloc None -∗
     kxd_res jp gf
             plen pfun na avf aslen afun pidv
-            (upd_tf V (<[tf_arg_idx 1
+            (us_tf U (<[tf_arg_idx 1
                          := (mword_of_int (kxc_sp_final (uint sz1) alen c)
-                             : mword 64)]> (pv_tf V)))
+                             : mword 64)]> (pv_tf (us_V U))))
             dqb dqs dqa dqpv dqas sp0 ra0 s00 s10 s20 pv av
             w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P c (pa_add pv q) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv V m (ret_pc ra0) K
+    KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
          eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
          av dqa avf aslen dqas afun) -∗
     WP (Loop : expr riscv_lang).
@@ -981,7 +989,7 @@ Section KexecDCommit.
       by (rewrite /E1 upd_ne; [exact HMs6 | nz]).
     assert (HE1s11 : E1 !!! Regidx Rs11 = m !!! Regidx Rs11)
       by (rewrite /E1 upd_ne; [exact HMs11 | nz]).
-    assert (HE1s10 : E1 !!! Regidx Rs5 = pv_sz V)
+    assert (HE1s10 : E1 !!! Regidx Rs5 = pv_sz (us_V U))
       by (rewrite /E1 upd_ne; [exact HMs10 | nz]).
     assert (Hpp2d0 : add_vec_int (mword_of_int (KXD + 0x2ce) : mword 64) 2
                      = mword_of_int (KXD + 0x2d0)) by pcw.
@@ -1019,7 +1027,7 @@ Section KexecDCommit.
       by (rewrite /E2 upd_ne; [exact HE1s6 | nz]).
     assert (HE2s11 : E2 !!! Regidx Rs11 = m !!! Regidx Rs11)
       by (rewrite /E2 upd_ne; [exact HE1s11 | nz]).
-    assert (HE2s10 : E2 !!! Regidx Rs5 = pv_sz V)
+    assert (HE2s10 : E2 !!! Regidx Rs5 = pv_sz (us_V U))
       by (rewrite /E2 upd_ne; [exact HE1s10 | nz]).
     assert (Hpp2d4 : add_vec_int (mword_of_int (KXD + 0x2d0) : mword 64) 4
                      = mword_of_int (KXD + 0x2d4)) by pcw.
@@ -1057,7 +1065,7 @@ Section KexecDCommit.
       by (rewrite /E3 upd_ne; [exact HE2s6 | nz]).
     assert (HE3s11 : E3 !!! Regidx Rs11 = m !!! Regidx Rs11)
       by (rewrite /E3 upd_ne; [exact HE2s11 | nz]).
-    assert (HE3s10 : E3 !!! Regidx Rs5 = pv_sz V)
+    assert (HE3s10 : E3 !!! Regidx Rs5 = pv_sz (us_V U))
       by (rewrite /E3 upd_ne; [exact HE2s10 | nz]).
     assert (Hpp2d8 : add_vec_int (mword_of_int (KXD + 0x2d4) : mword 64) 4
                      = mword_of_int (KXD + 0x2d8)) by pcw.
@@ -1101,7 +1109,7 @@ Section KexecDCommit.
       by (rewrite /E4 upd_ne; [exact HE3s6 | nz]).
     assert (HE4s11 : E4 !!! Regidx Rs11 = m !!! Regidx Rs11)
       by (rewrite /E4 upd_ne; [exact HE3s11 | nz]).
-    assert (HE4s10 : E4 !!! Regidx Rs5 = pv_sz V)
+    assert (HE4s10 : E4 !!! Regidx Rs5 = pv_sz (us_V U))
       by (rewrite /E4 upd_ne; [exact HE3s10 | nz]).
     (* ---- the two buffers safestrcpy wants: [p->name]'s sixteen cells out
        of the process block, and the path RE-BASED at [last]. ---- *)
@@ -1110,11 +1118,11 @@ Section KexecDCommit.
        discarded and the outgoing one comes from safestrcpy's post below. *)
     iDestruct (pname_cells_open with "Hnm") as "(_ & Hnm)".
     iDestruct (kfk_pname_bytes (proc_addr jp) (DfracOwn 1)
-                 (pv_name (upd_tf V
+                 (pv_name (upd_tf (us_V U)
                     (<[tf_arg_idx 1
                        := (mword_of_int (kxc_sp_final (uint sz1) alen c)
-                           : mword 64)]> (pv_tf V))))
-                 (kxd_name_fn (pv_name V))
+                           : mword 64)]> (pv_tf (us_V U)))))
+                 (kxd_name_fn (pv_name (us_V U)))
                  ltac:(intros i Hi; apply kxd_name_fn_spec; exact Hi)
                  with "Hnm") as "Hnmseq".
     iEval (rewrite Hnl) in "Hnmseq".
@@ -1131,7 +1139,7 @@ Section KexecDCommit.
       assert (Hqp : (q + (plen - q))%nat = plen) by lia.
       rewrite Hqp. exact Hnul. }
     iApply (SS.wp_safestrcpy_sconf KT0 KT1 E4 PNAMELEN (S plen - q)%nat
-              (fun j => pfun (q + j)%nat) (kxd_name_fn (pv_name V))
+              (fun j => pfun (q + j)%nat) (kxd_name_fn (pv_name (us_V U)))
               (K - 68)%nat dqpv eb (proc_addr jp)
               ltac:(unfold PNAMELEN; lia)
               ltac:(rewrite HE4a2; apply bv_eq; vm_compute; reflexivity)
@@ -1187,7 +1195,7 @@ Section KexecDCommit.
     assert (HF0s11 : mr !!! Regidx Rs11 = m !!! Regidx Rs11).
     { rewrite (callee_saved_lookup Hcsn Rs11 ltac:(vm_compute; reflexivity)).
       exact HE4s11. }
-    assert (HF0s10 : mr !!! Regidx Rs5 = pv_sz V).
+    assert (HF0s10 : mr !!! Regidx Rs5 = pv_sz (us_V U)).
     { rewrite (callee_saved_lookup Hcsn Rs5 ltac:(vm_compute; reflexivity)).
       exact HE4s10. }
     (* [pt_node_claim], off [hw_config] (peeled from [Hcg] persistently) and
@@ -1202,7 +1210,7 @@ Section KexecDCommit.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
         %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb & _)".
-    iPoseProof (pt_node_claim_from_static (ud_tfp (pv_upt V)) Hpv_valid with "Hkmapb") as "#Hptc".
+    iPoseProof (pt_node_claim_from_static (ud_tfp (pv_upt (us_V U))) Hpv_valid with "Hkmapb") as "#Hptc".
     (* ---- the process block, opened for the COMMIT's own three writes ---- *)
     iDestruct (proc_priv_newspace with "Hpriv")
       as "(%Hszmax & %Hbelold & Hpsz & Hppt & Hptf & Hptold & Htfp & Hprivback)".
@@ -1215,13 +1223,13 @@ Section KexecDCommit.
     iEval (rewrite -Hppaddr) in "Hppt".
     iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2dc)) Ra0 Rs3
               (mword_of_int 80 : mword 12) mr (K - 68)%nat
-              (page_base (ud_root (pv_upt V))) eb
+              (page_base (ud_root (pv_upt (us_V U)))) eb
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hppt").
     { iApply (kxc_2dc with "Htext"). }
     iIntros (CID6 Hs6) "Hcg Hpc Hppt". iEval (rewrite Hppaddr) in "Hppt".
     pose (F1 := <[Regidx Ra0 := regval_into_reg
-                   (page_base (ud_root (pv_upt V)))]> mr).
-    assert (HF1a0 : F1 !!! Regidx Ra0 = page_base (ud_root (pv_upt V)))
+                   (page_base (ud_root (pv_upt (us_V U))))]> mr).
+    assert (HF1a0 : F1 !!! Regidx Ra0 = page_base (ud_root (pv_upt (us_V U))))
       by (rewrite /F1; apply upd_eq).
     assert (HF1sp : F1 !!! Regidx csp_rs1 = pa_stk sp0 68)
       by (rewrite /F1 upd_ne; [exact HF0sp | nz]).
@@ -1240,7 +1248,7 @@ Section KexecDCommit.
       by (rewrite /F1 upd_ne; [exact HF0s6 | nz]).
     assert (HF1s11 : F1 !!! Regidx Rs11 = m !!! Regidx Rs11)
       by (rewrite /F1 upd_ne; [exact HF0s11 | nz]).
-    assert (HF1s10 : F1 !!! Regidx Rs5 = pv_sz V)
+    assert (HF1s10 : F1 !!! Regidx Rs5 = pv_sz (us_V U))
       by (rewrite /F1 upd_ne; [exact HF0s10 | nz]).
     assert (Hpp2e0 : add_vec_int (mword_of_int (KXD + 0x2dc) : mword 64) 4
                      = mword_of_int (KXD + 0x2e0)) by pcw.
@@ -1253,7 +1261,7 @@ Section KexecDCommit.
     iEval (rewrite -Hppaddr1) in "Hppt".
     iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2e0)) Rs6 Rs3
               (mword_of_int 80 : mword 12) F1 (K - 68)%nat
-              (page_base (ud_root (pv_upt V))) eb
+              (page_base (ud_root (pv_upt (us_V U)))) eb
               with "Hcg Hpc [] Hppt").
     { iApply (kxc_2e0 with "Htext"). }
     iIntros (CID7 Hs7) "Hcg Hpc Hppt". iEval (rewrite Hppaddr1) in "Hppt".
@@ -1268,7 +1276,7 @@ Section KexecDCommit.
       by (rewrite HF1s5; reflexivity).
     iEval (rewrite -Hszaddr) in "Hpsz".
     iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2e4)) Rs2 Rs3
-              (mword_of_int 72 : mword 12) F1 (K - 68)%nat (pv_sz V) eb
+              (mword_of_int 72 : mword 12) F1 (K - 68)%nat (pv_sz (us_V U)) eb
               with "Hcg Hpc [] Hpsz").
     { iApply (kxc_2e4 with "Htext"). }
     iIntros (CID8 Hs8) "Hcg Hpc Hpsz". iEval (rewrite Hszaddr) in "Hpsz".
@@ -1284,15 +1292,15 @@ Section KexecDCommit.
     iEval (rewrite -Htfaddr) in "Hptf".
     iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2e8)) Ra5 Rs3
               (mword_of_int 88 : mword 12) F1 (K - 68)%nat
-              (page_base (ud_tfp (pv_upt V))) eb
+              (page_base (ud_tfp (pv_upt (us_V U)))) eb
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hptf").
     { iApply (kxc_2e8 with "Htext"). }
     iIntros (CID9 Hs9) "Hcg Hpc Hptf". iEval (rewrite Htfaddr) in "Hptf".
     pose (F2 := <[Regidx Ra5 := regval_into_reg
-                   (page_base (ud_tfp (pv_upt V)))]> F1).
-    assert (HF2a5 : F2 !!! Regidx Ra5 = page_base (ud_tfp (pv_upt V)))
+                   (page_base (ud_tfp (pv_upt (us_V U))))]> F1).
+    assert (HF2a5 : F2 !!! Regidx Ra5 = page_base (ud_tfp (pv_upt (us_V U))))
       by (rewrite /F2; apply upd_eq).
-    assert (HF2a0 : F2 !!! Regidx Ra0 = page_base (ud_root (pv_upt V)))
+    assert (HF2a0 : F2 !!! Regidx Ra0 = page_base (ud_root (pv_upt (us_V U))))
       by (rewrite /F2 upd_ne; [exact HF1a0 | nz]).
     assert (HF2sp : F2 !!! Regidx csp_rs1 = pa_stk sp0 68)
       by (rewrite /F2 upd_ne; [exact HF1sp | nz]).
@@ -1311,7 +1319,7 @@ Section KexecDCommit.
       by (rewrite /F2 upd_ne; [exact HF1s6 | nz]).
     assert (HF2s11 : F2 !!! Regidx Rs11 = m !!! Regidx Rs11)
       by (rewrite /F2 upd_ne; [exact HF1s11 | nz]).
-    assert (HF2s10 : F2 !!! Regidx Rs5 = pv_sz V)
+    assert (HF2s10 : F2 !!! Regidx Rs5 = pv_sz (us_V U))
       by (rewrite /F2 upd_ne; [exact HF1s10 | nz]).
     assert (Hpp2ec : add_vec_int (mword_of_int (KXD + 0x2e8) : mword 64) 4
                      = mword_of_int (KXD + 0x2ec)) by pcw.
@@ -1341,9 +1349,9 @@ Section KexecDCommit.
                    (Z_to_bv 64 (le_at ef 24 8) : mword 64)]> F2).
     assert (HF3a4 : F3 !!! Regidx Ra4 = (Z_to_bv 64 (le_at ef 24 8) : mword 64))
       by (rewrite /F3; apply upd_eq).
-    assert (HF3a5 : F3 !!! Regidx Ra5 = page_base (ud_tfp (pv_upt V)))
+    assert (HF3a5 : F3 !!! Regidx Ra5 = page_base (ud_tfp (pv_upt (us_V U))))
       by (rewrite /F3 upd_ne; [exact HF2a5 | nz]).
-    assert (HF3a0 : F3 !!! Regidx Ra0 = page_base (ud_root (pv_upt V)))
+    assert (HF3a0 : F3 !!! Regidx Ra0 = page_base (ud_root (pv_upt (us_V U))))
       by (rewrite /F3 upd_ne; [exact HF2a0 | nz]).
     assert (HF3sp : F3 !!! Regidx csp_rs1 = pa_stk sp0 68)
       by (rewrite /F3 upd_ne; [exact HF2sp | nz]).
@@ -1362,7 +1370,7 @@ Section KexecDCommit.
       by (rewrite /F3 upd_ne; [exact HF2s6 | nz]).
     assert (HF3s11 : F3 !!! Regidx Rs11 = m !!! Regidx Rs11)
       by (rewrite /F3 upd_ne; [exact HF2s11 | nz]).
-    assert (HF3s10 : F3 !!! Regidx Rs5 = pv_sz V)
+    assert (HF3s10 : F3 !!! Regidx Rs5 = pv_sz (us_V U))
       by (rewrite /F3 upd_ne; [exact HF2s10 | nz]).
     assert (Hpp2f0 : add_vec_int (mword_of_int (KXD + 0x2ec) : mword 64) 4
                      = mword_of_int (KXD + 0x2f0)) by pcw.
@@ -1371,7 +1379,7 @@ Section KexecDCommit.
     assert (Hw3 : exists u3,
               (<[tf_arg_idx 1
                  := (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64)]>
-                 (pv_tf V)) !! tf_epc_idx = Some u3).
+                 (pv_tf (us_V U))) !! tf_epc_idx = Some u3).
     { apply lookup_lt_is_Some_2. rewrite Htflen.
       unfold TFWORDS, tf_epc_idx. lia. }
     destruct Hw3 as [u3 Hu3].
@@ -1380,7 +1388,7 @@ Section KexecDCommit.
       as "(Hword3 & Htfback3)".
     assert (Haddr24 : add_vec (F3 !!! Regidx Ra5)
                         (sign_extend' 64 (mword_of_int 24 : mword 12))
-                      = tf_pa (ud_tfp (pv_upt V)) (8 * Z.of_nat tf_epc_idx)).
+                      = tf_pa (ud_tfp (pv_upt (us_V U))) (8 * Z.of_nat tf_epc_idx)).
     { rewrite HF3a5. apply kxd_tf_addr.
       { unfold tf_epc_idx. lia. }
       unfold tf_epc_idx. apply bv_eq; vm_compute; reflexivity. }
@@ -1403,15 +1411,15 @@ Section KexecDCommit.
     iEval (rewrite -Htfaddr2) in "Hptf".
     iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2f2)) Ra5 Rs3
               (mword_of_int 88 : mword 12) F3 (K - 68)%nat
-              (page_base (ud_tfp (pv_upt V))) eb
+              (page_base (ud_tfp (pv_upt (us_V U)))) eb
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hptf").
     { iApply (kxc_2f2 with "Htext"). }
     iIntros (CID12 Hs12) "Hcg Hpc Hptf". iEval (rewrite Htfaddr2) in "Hptf".
     pose (F4 := <[Regidx Ra5 := regval_into_reg
-                   (page_base (ud_tfp (pv_upt V)))]> F3).
-    assert (HF4a5 : F4 !!! Regidx Ra5 = page_base (ud_tfp (pv_upt V)))
+                   (page_base (ud_tfp (pv_upt (us_V U))))]> F3).
+    assert (HF4a5 : F4 !!! Regidx Ra5 = page_base (ud_tfp (pv_upt (us_V U))))
       by (rewrite /F4; apply upd_eq).
-    assert (HF4a0 : F4 !!! Regidx Ra0 = page_base (ud_root (pv_upt V)))
+    assert (HF4a0 : F4 !!! Regidx Ra0 = page_base (ud_root (pv_upt (us_V U))))
       by (rewrite /F4 upd_ne; [exact HF3a0 | nz]).
     assert (HF4sp : F4 !!! Regidx csp_rs1 = pa_stk sp0 68)
       by (rewrite /F4 upd_ne; [exact HF3sp | nz]).
@@ -1430,7 +1438,7 @@ Section KexecDCommit.
       by (rewrite /F4 upd_ne; [exact HF3s6 | nz]).
     assert (HF4s11 : F4 !!! Regidx Rs11 = m !!! Regidx Rs11)
       by (rewrite /F4 upd_ne; [exact HF3s11 | nz]).
-    assert (HF4s10 : F4 !!! Regidx Rs5 = pv_sz V)
+    assert (HF4s10 : F4 !!! Regidx Rs5 = pv_sz (us_V U))
       by (rewrite /F4 upd_ne; [exact HF3s10 | nz]).
     assert (Hpp2f6 : add_vec_int (mword_of_int (KXD + 0x2f2) : mword 64) 4
                      = mword_of_int (KXD + 0x2f6)) by pcw.
@@ -1440,7 +1448,7 @@ Section KexecDCommit.
               (<[tf_epc_idx := (Z_to_bv 64 (le_at ef 24 8) : mword 64)]>
                  (<[tf_arg_idx 1
                     := (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64)]>
-                    (pv_tf V))) !! kxc_tf_sp_idx = Some u6).
+                    (pv_tf (us_V U)))) !! kxc_tf_sp_idx = Some u6).
     { apply lookup_lt_is_Some_2. rewrite length_insert Htflen.
       unfold TFWORDS, kxc_tf_sp_idx. lia. }
     destruct Hw6 as [u6 Hu6].
@@ -1449,7 +1457,7 @@ Section KexecDCommit.
       as "(Hword6 & Htfback6)".
     assert (Haddr48 : add_vec (F4 !!! Regidx Ra5)
                         (sign_extend' 64 (mword_of_int 48 : mword 12))
-                      = tf_pa (ud_tfp (pv_upt V)) (8 * Z.of_nat kxc_tf_sp_idx)).
+                      = tf_pa (ud_tfp (pv_upt (us_V U))) (8 * Z.of_nat kxc_tf_sp_idx)).
     { rewrite HF4a5. apply kxd_tf_addr.
       { unfold kxc_tf_sp_idx. lia. }
       unfold kxc_tf_sp_idx. apply bv_eq; vm_compute; reflexivity. }
@@ -1464,15 +1472,21 @@ Section KexecDCommit.
     (* ---- the process block CLOSES here, at the new table and size: this is
        the commit.  [upd_exec_compose] is what turns the three successive
        accessor closes into the contract's own one-shot move. ---- *)
-    iDestruct (proc_pt_wf_get with "Hpt") as %Hwf.
+    iDestruct (proc_pt_any_wf_get with "Hpt") as %Hwf.
     pose proof (proc_pt_covered_maxsz P sz1 Hwf Hcov) as Hmaxsz1.
+    (* THE NEW ADDRESS SPACE'S IMAGE.  kexec loaded the program into the
+       table it built, so what the commit installs is a FRESH image; the
+       callees below [proc_pt] speak the ∃-weakened form, and the closer
+       ([ProcInv.proc_priv_newspace]) takes the moved image beside the
+       moved descriptor -- so it is named here, at the commit. *)
+    iDestruct (proc_pt_any_ptm with "Hpt") as (Mx) "Hpt".
     iSpecialize ("Hprivback" $! P sz1
                    (<[kxc_tf_sp_idx
                       := (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64)]>
                       (<[tf_epc_idx := (Z_to_bv 64 (le_at ef 24 8) : mword 64)]>
                          (<[tf_arg_idx 1
                             := (mword_of_int (kxc_sp_final (uint sz1) alen c)
-                                : mword 64)]> (pv_tf V))))).
+                                : mword 64)]> (pv_tf (us_V U))))) Mx).
     iSpecialize ("Hprivback" with "[%]"); [exact HPtfp |].
     iSpecialize ("Hprivback" with "[%]");
       [rewrite uint_unsigned; exact Hmaxsz1 |].
@@ -1493,9 +1507,9 @@ Section KexecDCommit.
     iIntros (CID14 Hs14) "Hcg Hpc". iEval (rgne) in "Hcg".
     pose (F5 := <[Regidx Ra1 := regval_into_reg
                    (add_vec zero_reg (F4 !!! Regidx Rs5))]> F4).
-    assert (HF5a1 : F5 !!! Regidx Ra1 = pv_sz V).
+    assert (HF5a1 : F5 !!! Regidx Ra1 = pv_sz (us_V U)).
     { rewrite /F5 upd_eq HF4s10. apply add_vec_zero_l. }
-    assert (HF5a0 : F5 !!! Regidx Ra0 = page_base (ud_root (pv_upt V)))
+    assert (HF5a0 : F5 !!! Regidx Ra0 = page_base (ud_root (pv_upt (us_V U))))
       by (rewrite /F5 upd_ne; [exact HF4a0 | nz]).
     assert (HF5sp : F5 !!! Regidx csp_rs1 = pa_stk sp0 68)
       by (rewrite /F5 upd_ne; [exact HF4sp | nz]).
@@ -1524,9 +1538,9 @@ Section KexecDCommit.
     assert (HF6ra : F6 !!! Regidx Rra
                     = add_vec_int (mword_of_int (KXD + 0x2fc) : mword 64) 4)
       by (rewrite /F6; apply upd_eq).
-    assert (HF6a0 : F6 !!! Regidx Ra0 = page_base (ud_root (pv_upt V)))
+    assert (HF6a0 : F6 !!! Regidx Ra0 = page_base (ud_root (pv_upt (us_V U))))
       by (rewrite /F6 upd_ne; [exact HF5a0 | nz]).
-    assert (HF6a1 : F6 !!! Regidx Ra1 = pv_sz V)
+    assert (HF6a1 : F6 !!! Regidx Ra1 = pv_sz (us_V U))
       by (rewrite /F6 upd_ne; [exact HF5a1 | nz]).
     assert (HF6sp : F6 !!! Regidx csp_rs1 = pa_stk sp0 68)
       by (rewrite /F6 upd_ne; [exact HF5sp | nz]).
@@ -1545,7 +1559,10 @@ Section KexecDCommit.
                  ltac:(wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID0 CID15 eb (proc_addr jp)
                  ltac:(wp_next_chain) with "Hclmc") as "Hclmc".
-    iApply (PFP.wp_proc_freepagetable_sconf fsc_kalloc F6 (pv_upt V) (K - 68)%nat eb
+    (* proc_freepagetable is at the ∃-weakened tier ([proc_pt_any]): it
+       consumes the table, so naming its image buys nothing. *)
+    iDestruct (proc_ptm_pt with "Hptold") as "Hptold".
+    iApply (PFP.wp_proc_freepagetable_sconf fsc_kalloc F6 (pv_upt (us_V U)) (K - 68)%nat eb
               (proc_addr jp) 0%nat eb ∅
               ltac:(lia) ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia)
               HF6a0 ltac:(rewrite HF6a1; exact Hszmax)
@@ -1804,14 +1821,14 @@ Section KexecDCommit.
       change (bv_modulus 64) with 18446744073709551616%Z. exact Hspfin_range. }
     iSpecialize ("Hcont" $! CIDe with "[%]"); [wp_next_chain |].
     iSpecialize ("Hcont" $! mf
-              (upd_exec V sz1 P
+              (upd_usM (us_exec U sz1 P
                  (<[kxc_tf_sp_idx
                     := (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64)]>
                     (<[tf_epc_idx := (Z_to_bv 64 (le_at ef 24 8) : mword 64)]>
                        (<[tf_arg_idx 1
                           := (mword_of_int (kxc_sp_final (uint sz1) alen c)
-                              : mword 64)]> (pv_tf V))))
-                 (h <$> seq 0 PNAMELEN))
+                              : mword 64)]> (pv_tf (us_V U)))))
+                 (h <$> seq 0 PNAMELEN)) Mx)
               (Z_to_bv 64 (le_at ef 24 8) : mword 64)
               (mword_of_int (kxc_sp_final (uint sz1) alen c)) sz1).
     iApply ("Hcont" with "[%] [%] Hcg Hcnt Hextc Hclmc Hpc Hbm Hins Hka Hpriv Hpath
@@ -1895,7 +1912,7 @@ Section KexecDMain.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
+      (pidv : mword 32) (U : ustate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
@@ -1920,11 +1937,11 @@ Section KexecDMain.
     m !!! Regidx Rs9 = w11 -> m !!! Regidx Rs10 = w12 ->
     kernel_text -∗
     kxc_at_2a6 jp gf
-               plen pfun na avf alen aslen afun pidv V eb dqb dqs dqa dqpv dqas
+               plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
                M K sp0 ra0 s00 s10 s20 pv av
-               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P (pv_sz V) sz1 (m !!! Regidx Rs11) c -∗
+               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P (pv_sz (us_V U)) sz1 (m !!! Regidx Rs11) c -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv V m (ret_pc ra0) K
+    KexecOkQ.kexec_closer Q gf fsc_kalloc (proc_addr jp) pidv U m (ret_pc ra0) K
          eb eb ∅ dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
          av dqa avf aslen dqas afun) -∗
     WP (Loop : expr riscv_lang).
@@ -1959,7 +1976,7 @@ Section KexecDMain.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
         %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb & _)".
-    iPoseProof (pt_node_claim_from_static (ud_tfp (pv_upt V)) Hpv_valid with "Hkmapb") as "#Hptc".
+    iPoseProof (pt_node_claim_from_static (ud_tfp (pv_upt (us_V U))) Hpv_valid with "Hkmapb") as "#Hptc".
     (* ---- the process block, opened for the FIRST trapframe write ---- *)
     iDestruct (proc_priv_newspace with "Hpriv")
       as "(%Hszmax & %Hbelold & Hpsz & Hppt & Hptf & Hptold & Htfp & Hprivback)".
@@ -1972,13 +1989,13 @@ Section KexecDMain.
     iEval (rewrite -Htfaddr) in "Hptf".
     iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x29c)) Ra5 Rs3
               (mword_of_int 88 : mword 12) M (K - 68)%nat
-              (page_base (ud_tfp (pv_upt V))) eb
+              (page_base (ud_tfp (pv_upt (us_V U)))) eb
               ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hptf").
     { iApply (kxc_29c with "Htext"). }
     iIntros (CID1 Hs1) "Hcg Hpc Hptf". iEval (rewrite Htfaddr) in "Hptf".
     pose (D1 := <[Regidx Ra5 := regval_into_reg
-                   (page_base (ud_tfp (pv_upt V)))]> M).
-    assert (HD1a5 : D1 !!! Regidx Ra5 = page_base (ud_tfp (pv_upt V)))
+                   (page_base (ud_tfp (pv_upt (us_V U))))]> M).
+    assert (HD1a5 : D1 !!! Regidx Ra5 = page_base (ud_tfp (pv_upt (us_V U))))
       by (rewrite /D1; apply upd_eq).
     assert (HD1sp : D1 !!! Regidx csp_rs1 = pa_stk sp0 68)
       by (rewrite /D1 upd_ne; [exact HMsp | nz]).
@@ -1997,13 +2014,13 @@ Section KexecDMain.
       by (rewrite /D1 upd_ne; [exact HMs6 | nz]).
     assert (HD1s11 : D1 !!! Regidx Rs11 = m !!! Regidx Rs11)
       by (rewrite /D1 upd_ne; [exact HMs11 | nz]).
-    assert (HD1s10 : D1 !!! Regidx Rs5 = pv_sz V)
+    assert (HD1s10 : D1 !!! Regidx Rs5 = pv_sz (us_V U))
       by (rewrite /D1 upd_ne; [exact HMs10 | nz]).
     assert (Hpp2a0 : add_vec_int (mword_of_int (KXD + 0x29c) : mword 64) 4
                      = mword_of_int (KXD + 0x2a0)) by pcw.
     iEval (rewrite Hpp2a0) in "Hpc".
     (* ---- +0x2aa: sd s2,120(a5) -- trapframe->a1 = sp ---- *)
-    assert (Hw15 : exists u15, pv_tf V !! tf_arg_idx 1 = Some u15).
+    assert (Hw15 : exists u15, pv_tf (us_V U) !! tf_arg_idx 1 = Some u15).
     { apply lookup_lt_is_Some_2. rewrite Htflen. unfold TFWORDS, tf_arg_idx. lia. }
     destruct Hw15 as [u15 Hu15].
     iDestruct (tf_page_word_upd_mem _ _ (tf_arg_idx 1) u15
@@ -2011,7 +2028,7 @@ Section KexecDMain.
       as "(Hword & Htfback)".
     assert (Haddr120 : add_vec (D1 !!! Regidx Ra5)
                          (sign_extend' 64 (mword_of_int 120 : mword 12))
-                       = tf_pa (ud_tfp (pv_upt V)) (8 * Z.of_nat (tf_arg_idx 1))).
+                       = tf_pa (ud_tfp (pv_upt (us_V U))) (8 * Z.of_nat (tf_arg_idx 1))).
     { rewrite HD1a5. apply kxd_tf_addr.
       { unfold tf_arg_idx. lia. }
       unfold tf_arg_idx. apply bv_eq; vm_compute; reflexivity. }
@@ -2027,10 +2044,10 @@ Section KexecDMain.
     (* close at the SAME table and size: only the trapframe words moved *)
     (* the accessor's three side conditions are IRIS wands over pure props,
        not Coq arrows, so they go in one [iSpecialize] each. *)
-    iSpecialize ("Hprivback" $! (pv_upt V) (pv_sz V)
+    iSpecialize ("Hprivback" $! (pv_upt (us_V U)) (pv_sz (us_V U))
                    (<[tf_arg_idx 1
                       := (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64)]>
-                      (pv_tf V))).
+                      (pv_tf (us_V U))) (us_M U)).
     iSpecialize ("Hprivback" with "[%]"); [reflexivity |].
     iSpecialize ("Hprivback" with "[%]"); [exact Hszmax |].
     iSpecialize ("Hprivback" with "[%]"); [exact Hbelold |].
@@ -2069,7 +2086,7 @@ Section KexecDMain.
       by (rewrite /D2 upd_ne; [exact HD1s6 | nz]).
     assert (HD2s11 : D2 !!! Regidx Rs11 = m !!! Regidx Rs11)
       by (rewrite /D2 upd_ne; [exact HD1s11 | nz]).
-    assert (HD2s10 : D2 !!! Regidx Rs5 = pv_sz V)
+    assert (HD2s10 : D2 !!! Regidx Rs5 = pv_sz (us_V U))
       by (rewrite /D2 upd_ne; [exact HD1s10 | nz]).
     assert (Hpp2a8 : add_vec_int (mword_of_int (KXD + 0x2a4) : mword 64) 4
                      = mword_of_int (KXD + 0x2a8)) by pcw.
@@ -2113,7 +2130,7 @@ Section KexecDMain.
       by (rewrite /D3 upd_ne; [exact HD2s6 | nz]).
     assert (HD3s11 : D3 !!! Regidx Rs11 = m !!! Regidx Rs11)
       by (rewrite /D3 upd_ne; [exact HD2s11 | nz]).
-    assert (HD3s10 : D3 !!! Regidx Rs5 = pv_sz V)
+    assert (HD3s10 : D3 !!! Regidx Rs5 = pv_sz (us_V U))
       by (rewrite /D3 upd_ne; [exact HD2s10 | nz]).
     (* the resource bundle the commit takes, assembled once and used by both
        arms of the [beqz] below *)
@@ -2122,10 +2139,10 @@ Section KexecDMain.
                ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) -∗
                kxd_res jp gf
                        plen pfun na avf aslen afun pidv
-                       (upd_tf V (<[tf_arg_idx 1
+                       (us_tf U (<[tf_arg_idx 1
                                     := (mword_of_int
                                           (kxc_sp_final (uint sz1) alen c)
-                                        : mword 64)]> (pv_tf V)))
+                                        : mword 64)]> (pv_tf (us_V U))))
                        dqb dqs dqa dqpv dqas sp0 ra0 s00 s10 s20 pv av
                        w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P c last)%I
       with "[Hirs Hbm Hins Hbits Hbs Hpt Hpriv Hargv Hargs Helf
@@ -2180,7 +2197,7 @@ Section KexecDMain.
       iDestruct (wp_next_retarget CID0 CID5 true (proc_addr jp) _ Hcr5
                    with "Hcont") as "Hcont".
       iApply (kxd_commit (CID0 := CID5) Q jp gf
- plen pfun na avf alen aslen afun pidv V eb
+ plen pfun na avf alen aslen afun pidv U eb
                 dqb dqs dqa dqpv dqas m D3 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P sz1 c 0%nat
                 HQe ltac:(lia) Hcstr ltac:(lia) Hnamax Hsz1ge Hceq
@@ -2244,7 +2261,7 @@ Section KexecDMain.
         by (rewrite /D4 upd_ne; [exact HD3s6 | nz]).
       assert (HD4s11 : D4 !!! Regidx Rs11 = m !!! Regidx Rs11)
         by (rewrite /D4 upd_ne; [exact HD3s11 | nz]).
-      assert (HD4s10 : D4 !!! Regidx Rs5 = pv_sz V)
+      assert (HD4s10 : D4 !!! Regidx Rs5 = pv_sz (us_V U))
         by (rewrite /D4 upd_ne; [exact HD3s10 | nz]).
       assert (Hpp2b0 : add_vec_int (mword_of_int (KXD + 0x2ae) : mword 64) 2
                        = mword_of_int (KXD + 0x2b0)) by pcw.
@@ -2283,7 +2300,7 @@ Section KexecDMain.
         by (rewrite /D5 upd_ne; [exact HD4s6 | nz]).
       assert (HD5s11 : D5 !!! Regidx Rs11 = m !!! Regidx Rs11)
         by (rewrite /D5 upd_ne; [exact HD4s11 | nz]).
-      assert (HD5s10 : D5 !!! Regidx Rs5 = pv_sz V)
+      assert (HD5s10 : D5 !!! Regidx Rs5 = pv_sz (us_V U))
         by (rewrite /D5 upd_ne; [exact HD4s10 | nz]).
       assert (Hpp2b4 : add_vec_int (mword_of_int (KXD + 0x2b0) : mword 64) 4
                        = mword_of_int (KXD + 0x2b4)) by pcw.
@@ -2306,7 +2323,7 @@ Section KexecDMain.
                 plen pfun dqpv sp0 pv (pa_stk sp0 68)
                 (mword_of_int (Z.of_nat c) : mword 64)
                 (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64)
-                sz1 (proc_addr jp) (page_base P.(ud_root)) (pv_sz V) (m !!! Regidx Rs11)
+                sz1 (proc_addr jp) (page_base P.(ud_root)) (pv_sz (us_V U)) (m !!! Regidx Rs11)
                 Hcstr plen D5 0%nat 0%nat ltac:(lia) H0plen ltac:(lia)
                 HD5sp HD5s0 HD5s1 HD5s2 HD5s4 HD5s5 HD5s6 HD5s10 HD5s11
                 HD5a3 HD5a4 HD5a5
@@ -2325,7 +2342,7 @@ Section KexecDMain.
       iDestruct (wp_next_retarget CID0 CID9 true (proc_addr jp) _ Hcr9
                    with "Hcont") as "Hcont".
       iApply (kxd_commit (CID0 := CID9) Q jp gf
- plen pfun na avf alen aslen afun pidv V eb
+ plen pfun na avf alen aslen afun pidv U eb
                 dqb dqs dqa dqpv dqas m Mf K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P sz1 c q'
                 HQe ltac:(lia) Hcstr Hq' Hnamax Hsz1ge Hceq

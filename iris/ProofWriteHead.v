@@ -468,7 +468,7 @@ Section WriteHeadDefs.
       (γfs : fs_names) (bn : bio_names) (logstart : Z) (n : nat)
       (W : list (mword 32)) (L : gmap Z (list (bv 8)))
       (pidv : mword 32) (dq : dfrac) (j : nat)
-      (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate)
+      (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Upr : ustate)
       (Q : list (bv 8) -> iProp Σ) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bs' : list (bv 8)),
@@ -478,7 +478,7 @@ Section WriteHeadDefs.
         trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        proc_priv_bare (proc_addr j) pidv Vpr -∗
+        proc_priv_bare (proc_addr j) pidv Upr -∗
         lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
         ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) -∗
         ghost_map_auth (fs_cache γfs) 1 (<[log_hdr_bno logstart := bs']> L) -∗
@@ -529,7 +529,7 @@ Section WriteHeadBlocks.
       (pidv : mword 32) (dq : dfrac)
       (k : nat) (bno : mword 32) (bsh bs0 bsd0 : list (bv 8)) (d0 : bool)
       (f : nat -> bv 8)
-      (m M : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) (Q : list (bv 8) -> iProp Σ) :
+      (m M : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Upr : ustate) (Q : list (bv 8) -> iProp Σ) :
     (K_write_head <= K)%nat ->
     (uint bno < 2147483648)%Z ->
     uint bno = logstart ->
@@ -557,7 +557,7 @@ Section WriteHeadBlocks.
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.write_head + 0x46) : mword 64) -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
-    proc_priv_bare (proc_addr j) pidv Vpr -∗
+    proc_priv_bare (proc_addr j) pidv Upr -∗
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
@@ -574,7 +574,7 @@ Section WriteHeadBlocks.
     (∀ bs' : list (bv 8), ⌜length bs' = 1024%nat⌝ -∗ ⌜hdr_n bs' = Z.of_nat n⌝ -∗
        ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
        disk_seq_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) (Q bs')) -∗
-    wh_cont (CID0 := CID0)  γfs bn logstart n W L pidv dq j m K eb b lks Vpr Q -∗
+    wh_cont (CID0 := CID0)  γfs bn logstart n W L pidv dq j m K eb b lks Upr Q -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hbnolt Hbnou Hj Hgl HnW HnB Hk Hf4 Henc Hregs HMs1 Hbelow.
@@ -669,7 +669,7 @@ Section WriteHeadBlocks.
     iApply (BW.wp_bwrite_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) k pidv dev bno dq T2 (K - 4)%nat eb
               (f <$> seq 0 1024) bsd0 b (Q (f <$> seq 0 1024))
-              _ Vpr HKbw Hbnolt eq_refl Hj Hgl Hk HT2a0
+              _ Upr HKbw Hbnolt eq_refl Hj Hgl Hk HT2a0
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hhold [Hperm]").
     all: try lkbelow.
@@ -780,7 +780,7 @@ Section WriteHeadBlocks.
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) k pidv dev bno dq
               T4 (K - 4)%nat eb (proc_addr j)
               (f <$> seq 0 1024) (f <$> seq 0 1024) d0 b
-              _ Vpr HKbl Hk HT4a0 Hbelow
+              _ Upr HKbl Hk HT4a0 Hbelow
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
     iIntros (CID6 Hs6 mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hslot".
@@ -1034,7 +1034,7 @@ Section WriteHeadBlocks.
       (n : nat) (W : list (mword 32)) (L : gmap Z (list (bv 8)))
       (pidv : mword 32) (dq : dfrac)
       (kk : nat) (bno : mword 32) (bsh bs0 bsd0 : list (bv 8)) (d0 : bool)
-      (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) (fuel : nat)
+      (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Upr : ustate) (fuel : nat)
       (Q : list (bv 8) -> iProp Σ) :
     (K_write_head <= K)%nat ->
     (uint bno < 2147483648)%Z ->
@@ -1068,7 +1068,7 @@ Section WriteHeadBlocks.
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.write_head + 0x3a) : mword 64) -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
-    proc_priv_bare (proc_addr j) pidv Vpr -∗
+    proc_priv_bare (proc_addr j) pidv Upr -∗
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
@@ -1085,7 +1085,7 @@ Section WriteHeadBlocks.
     (∀ bs' : list (bv 8), ⌜length bs' = 1024%nat⌝ -∗ ⌜hdr_n bs' = Z.of_nat n⌝ -∗
        ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
        disk_seq_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) (Q bs')) -∗
-    wh_cont (CID0 := CID0)  γfs bn logstart n W L pidv dq j m K eb b lks Vpr Q -∗
+    wh_cont (CID0 := CID0)  γfs bn logstart n W L pidv dq j m K eb b lks Upr Q -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hbnolt Hbnou Hj Hgl HnW HnB Hk Hbelow.
@@ -1274,7 +1274,7 @@ Section WriteHeadBlocks.
       iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID5) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
       iApply (wh_tail (CID0 := CID5)  γs j γl γu γd γk pd pav pu bn γfs cov logstart
-                dev n W L pidv dq kk bno bsh bs0 bsd0 d0 f' m S3 K eb b lks Vpr Q
+                dev n W L pidv dq kk bno bsh bs0 bsd0 d0 f' m S3 K eb b lks Upr Q
                 HK Hbnolt Hbnou Hj Hgl HnW HnB Hk Hf4'
                 ltac:(intros i' jj Hi' Hjj; exact (Henc' i' jj ltac:(lia) Hjj))
                 HS3regs HS3s1 Hbelow
@@ -1334,9 +1334,9 @@ Section ProofWriteHead.
       (n : nat) (W : list (mword 32)) (L : gmap Z (list (bv 8)))
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (Q : list (bv 8) -> iProp Σ) (lks : gset string) (Vpr : pprivate)
+      (b : bool) (Q : list (bv 8) -> iProp Σ) (lks : gset string) (Upr : ustate)
     : wp_write_head_sconf_body γs j γl γu γd γk pd pav pu bn γfs
-                               cov logstart dev n W L pidv dq m K eb b Q lks Vpr.
+                               cov logstart dev n W L pidv dq m K eb b Q lks Upr.
   Proof.
     cbv beta delta [wp_write_head_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hj Hgl Hbatch Hbelow.
@@ -1364,7 +1364,7 @@ Section ProofWriteHead.
     assert (Hcovin : uint (mword_of_int logstart : mword 32)
                      ∈ bv_cov (fs_view γfs γd dev cov))
       by (rewrite Huint; exact Hhdrcov).
-    iAssert (wh_cont (CID0 := CID)  γfs bn logstart n W L pidv dq j m K eb b lks Vpr Q)%I
+    iAssert (wh_cont (CID0 := CID)  γfs bn logstart n W L pidv dq j m K eb b lks Upr Q)%I
       with "[Hcont]" as "Hcont"; [rewrite /wh_cont; iExact "Hcont"|].
     (* ===== PROLOGUE ===== *)
     set (R1 := <[Regidx csp_rs1 := regval_into_reg
@@ -1608,7 +1608,7 @@ Section ProofWriteHead.
     assert (HKbr : (K_bread <= K - 4)%nat) by (lia).
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev (mword_of_int logstart : mword 32) dq
-              mA (K - 4)%nat eb b lks Vpr
+              mA (K - 4)%nat eb b lks Upr
               HKbr Hbnolt eq_refl Hcovin eq_refl Hj Hgl HmAa0 HmAa1 Hbelow
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hslot").
@@ -1770,7 +1770,7 @@ Section ProofWriteHead.
                  with "Hcont") as "Hcont".
       iApply (wh_tail (CID0 := CID16)  γs j γl γu γd γk pd pav pu bn γfs cov logstart
                 dev 0%nat W L pidv dq kk (mword_of_int logstart : mword 32)
-                bsh bs0 bsd0 d0 f1 m B2 K eb b lks Vpr Q
+                bsh bs0 bsd0 d0 f1 m B2 K eb b lks Upr Q
                 HK Hbnolt Huint Hj Hgl HnW HnB HA Hf14
                 ltac:(intros i' jj Hi' Hjj; exfalso; lia)
                 HB2regs HB2s1 Hbelow
@@ -1936,7 +1936,7 @@ Section ProofWriteHead.
                  with "Hcont") as "Hcont".
       iApply (wh_loop (CID0 := CID21)  γs j γl γu γd γk pd pav pu bn γfs cov logstart
                 dev (S n') W L pidv dq kk (mword_of_int logstart : mword 32)
-                bsh bs0 bsd0 d0 m K eb b lks Vpr (S n') Q
+                bsh bs0 bsd0 d0 m K eb b lks Upr (S n') Q
                 HK Hbnolt Huint Hj Hgl HnW HnB HA Hbelow 0%nat B7 f1
                 ltac:(lia) ltac:(lia) Hf14
                 ltac:(intros i' jj Hi' Hjj; exfalso; lia)

@@ -1561,7 +1561,7 @@ Section UservecAllPt.
     assert (Hinj0 : um_inj (ud_um pt))
       by (destruct Hptwf as (_ & _ & _ & H4 & _); exact H4).
     iEval (rewrite -(proc_pt_own_umem pt Hmwf0 Hinj0)) in "Hdata".
-    iAssert (proc_pt pt) with "[Hufr Hdata]" as "Hpt".
+    iAssert (proc_pt_any pt) with "[Hufr Hdata]" as "Hpt".
     { rewrite proc_pt_split. iFrame "Hdata". iSplitR; [iPureIntro; exact Hptwf|].
       iExact "Hufr". }
     iDestruct (usertrap_res_pt_close pt vksp with "Hures' Hpt") as "Hures'".

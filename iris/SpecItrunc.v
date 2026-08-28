@@ -314,7 +314,7 @@ Definition wp_itrunc_sconf_body
     (u : nat)
     (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.itrunc in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -427,7 +427,7 @@ Definition wp_itrunc_sconf_body
   ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   dinode_at fsc_ireg inum dn0 -∗
   (* the caller's own pid cell *)
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
   (* the disk fabric *)
@@ -460,7 +460,7 @@ Definition wp_itrunc_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       i_dev ip ↦₄{dqd} icfg_dev -∗
       i_inum ip ↦₄{dqn} inum -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
@@ -518,7 +518,7 @@ Definition wp_itrunc_gen_body
     (u : nat) (Sb : gset Z) (crb cru : bool) (e0 : nat)
     (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.itrunc in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -571,7 +571,7 @@ Definition wp_itrunc_gen_body
   bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
   ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   dinode_at fsc_ireg inum dn0 -∗
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   procs_inv γs -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
@@ -602,7 +602,7 @@ Definition wp_itrunc_gen_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       i_dev ip ↦₄{dqd} icfg_dev -∗
       i_inum ip ↦₄{dqn} inum -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
@@ -648,11 +648,11 @@ Module Type ITRUNC.
       (u : nat)
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Upr : ustate),
       wp_itrunc_sconf_body γs j γl pd pav pu
 
                            ip inum dn dn0 bm data u
-                           pidv dq dqd dqn dqb dqs m K eb b lks Vpr.
+                           pidv dq dqd dqn dqb dqs m K eb b lks Upr.
   (* the credited set-form contract; [wp_itrunc_sconf] is this at
      [crb := cru := false], derived at the [log_op] existential's own
      witness. *)
@@ -666,9 +666,9 @@ Module Type ITRUNC.
       (u : nat) (Sb : gset Z) (crb cru : bool) (e0 : nat)
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Upr : ustate),
       wp_itrunc_gen_body γs j γl pd pav pu
 
                          ip inum dn dn0 bm data u Sb crb cru e0
-                         pidv dq dqd dqn dqb dqs m K eb b lks Vpr.
+                         pidv dq dqd dqn dqb dqs m K eb b lks Upr.
 End ITRUNC.

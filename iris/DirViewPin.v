@@ -280,7 +280,7 @@ Definition wp_namei_pinned_body
     (hops : list (fname * Z))                          (* the expected chain *)
     (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.namei in
   let pj := proc_addr j in
   let pv := m !!! Regidx (mword_of_int 10 : mword 5) in
@@ -334,8 +334,8 @@ Definition wp_namei_pinned_body
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   bitmap_inv gfs bmapstart cov logstart size -∗
-  proc_priv_bare pj pidv Vpr -∗
-  inode_held (pv_cwd Vpr) -∗
+  proc_priv_bare pj pidv Upr -∗
+  inode_held (pv_cwd (us_V Upr)) -∗
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
   bslots 3 -∗
   iref_slots 2 -∗
@@ -354,8 +354,8 @@ Definition wp_namei_pinned_body
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-      proc_priv_bare pj pidv Vpr -∗
-      inode_held (pv_cwd Vpr) -∗
+      proc_priv_bare pj pidv Upr -∗
+      inode_held (pv_cwd (us_V Upr)) -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
       bslots 3 -∗
       ⌜Sb ⊆ Sb'⌝ -∗
@@ -398,11 +398,11 @@ Module NameiPinnedProof (NT : NAMEI_TR).
     (hops : list (fname * Z))
     (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :
+    (b : bool) (lks : gset string) (Upr : ustate) :
     wp_namei_pinned_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                          ga gf cov logstart bmapstart inodestart nib
                          size dev plen pfun n Sb hops
-                         pidv dq dqb dqs dqpv m K eb b lks Vpr.
+                         pidv dq dqb dqs dqpv m K eb b lks Upr.
   Proof.
     rewrite /wp_namei_pinned_body.
     intros HK Hdev Hnib Hg His Hrd Hnib0 Hlg Hsz Hbm0 Hbmc Hbml His0 Hcb
@@ -415,7 +415,7 @@ Module NameiPinnedProof (NT : NAMEI_TR).
               n Sb
               (dvp_P (bv_unsigned ROOTINO) hops)
               (dvp_Pmiss (bv_unsigned ROOTINO) hops)
-              pidv dq dqb dqs dqpv m K eb b lks Vpr
+              pidv dq dqb dqs dqpv m K eb b lks (us_V Upr)
               HK Hdev Hnib Hg His Hrd Hnib0 Hlg Hsz Hbm0 Hbmc Hbml His0 Hcb
               Hireg Hcstr Hplen Hslash Hwalk Hjn Hgl
             with "Hsie Hcpu Htcsr Hclm Hkt Hkd Hpc Hpanic Hbio Hlog Hkal

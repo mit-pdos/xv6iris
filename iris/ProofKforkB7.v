@@ -101,14 +101,14 @@ Section KforkB7.
   (* =================================================================== *)
   (*  THE BLOCK.                                                          *)
   (* =================================================================== *)
-  Lemma kfk_b7 (γf : gname) (npa pme : mword 64) (pid_c : mword 32) (V : pprivate)
+  Lemma kfk_b7 (γf : gname) (npa pme : mword 64) (pid_c : mword 32) (U : ustate)
       (M : regfile) (n : nat) (p : mword 64) :
     M !!! Regidx Rs4 = npa ->
     M !!! Regidx Rs5 = pme ->
     sie_cap_gpr KT1 M n false p -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x66) : mword 64) -∗
-    proc_priv_nocwd γf npa pid_c V -∗
+    proc_priv_nocwd γf npa pid_c U -∗
     wp_next false p (fun (CID : CpuId) =>
       ∀ Mx : regfile,
         ⌜ Mx !!! Regidx Rs1 = p_ofile pme 0 /\ Mx !!! Regidx Rs2 = p_ofile npa 0 /\
@@ -118,7 +118,7 @@ Section KforkB7.
               r <> Rs1 -> r <> Rs2 -> r <> Rs3 -> Mx !!! Regidx r = M !!! Regidx r) ⌝ -∗
         sie_cap_gpr KT1 Mx n false p -∗
         pc_is (mword_of_int (KF + 0x96) : mword 64) -∗
-        proc_priv_nocwd γf npa pid_c (upd_pt V (pv_upt V) (<[(14%nat) := zero_reg]> (pv_tf V))) -∗
+        proc_priv_nocwd γf npa pid_c (us_pt U (pv_upt (us_V U)) (<[(14%nat) := zero_reg]> (pv_tf (us_V U)))) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -128,8 +128,8 @@ Section KforkB7.
     iDestruct (proc_priv_nocwd_tfp_valid with "Hpv") as %Hpv_valid.
     iDestruct (proc_priv_nocwd_tf_upd with "Hpv") as "(Htf & Htfp & Hclose)".
     iDestruct (kfkb7_tf_len with "Htfp") as %Hlen14.
-    assert (Hidx14 : (14 < length (pv_tf V))%nat) by (rewrite Hlen14; unfold TFWORDS; lia).
-    destruct (lookup_lt_is_Some_2 (pv_tf V) (14%nat) Hidx14) as [w14 Hw14].
+    assert (Hidx14 : (14 < length (pv_tf (us_V U)))%nat) by (rewrite Hlen14; unfold TFWORDS; lia).
+    destruct (lookup_lt_is_Some_2 (pv_tf (us_V U)) (14%nat) Hidx14) as [w14 Hw14].
     (* [pt_node_claim], off [hw_config] (peeled from [Hcg] persistently) and
        [Hpv_valid] -- the mem-tier convenience wrapper is what a VA-tier
        [sd]/[ld] through the kernel identity map needs (ProcInv.v's header
@@ -139,23 +139,23 @@ Section KforkB7.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
         %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb & _)".
-    iPoseProof (pt_node_claim_from_static (ud_tfp (pv_upt V)) Hpv_valid with "Hkmapb") as "#Hptc".
-    iDestruct (tf_page_word_upd_mem (ud_tfp (pv_upt V)) (pv_tf V) (14%nat) w14
+    iPoseProof (pt_node_claim_from_static (ud_tfp (pv_upt (us_V U))) Hpv_valid with "Hkmapb") as "#Hptc".
+    iDestruct (tf_page_word_upd_mem (ud_tfp (pv_upt (us_V U))) (pv_tf (us_V U)) (14%nat) w14
                  ltac:(vm_compute; lia) Hw14 with "Hptc Htfp")
       as "[Hcell Hback]".
     (* ---- +0x66: ld a5,88(s4) ---- *)
     assert (Htgt66 : add_vec (M !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 88 : mword 12))
                      = p_trapframe npa) by (rewrite HM4; reflexivity).
     iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0x66) : mword 64) Ra5 Rs4 (mword_of_int 88 : mword 12)
-              M n (page_base (ud_tfp (pv_upt V))) false (dqm := DfracOwn 1)
+              M n (page_base (ud_tfp (pv_upt (us_V U)))) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] [Htf]").
     { iApply (kfk_066 with "Htext"). }
     { iEval (rgne; rewrite Htgt66). iExact "Htf". }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Htf". iEval (rgne; rewrite Htgt66) in "Htf".
-    set (T1 := <[Regidx Ra5 := regval_into_reg (page_base (ud_tfp (pv_upt V)))]> M).
-    assert (HT1a5 : T1 !!! Regidx Ra5 = page_base (ud_tfp (pv_upt V)))
+    set (T1 := <[Regidx Ra5 := regval_into_reg (page_base (ud_tfp (pv_upt (us_V U))))]> M).
+    assert (HT1a5 : T1 !!! Regidx Ra5 = page_base (ud_tfp (pv_upt (us_V U))))
       by (rewrite /T1 upd_eq; reflexivity).
     assert (HT1s4 : T1 !!! Regidx Rs4 = npa)
       by (rewrite /T1 upd_ne; [exact HM4 | vm_compute; discriminate]).
@@ -166,7 +166,7 @@ Section KforkB7.
     iEval (rewrite Hpp06a) in "Hpc".
     (* ---- +0x6a: sd zero,112(a5) ---- *)
     assert (Htgt6a : add_vec (T1 !!! Regidx Ra5) (sign_extend' 64 (mword_of_int 112 : mword 12))
-                     = tf_pa (ud_tfp (pv_upt V)) (8 * Z.of_nat 14))
+                     = tf_pa (ud_tfp (pv_upt (us_V U))) (8 * Z.of_nat 14))
       by (rewrite HT1a5; apply kfkb7_tf14_addr).
     iApply (wp_sd_zero_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0x6a) : mword 64) Ra5 (mword_of_int 112 : mword 12)
               T1 n w14 false
@@ -180,7 +180,7 @@ Section KforkB7.
     iEval (rewrite Hpp06e) in "Hpc".
     (* ---- close the child's proc_priv back up, at word 14 zeroed ---- *)
     iDestruct ("Hback" $! (zero_reg : mword 64) with "Hcell") as "Htfp".
-    iDestruct ("Hclose" $! (<[(14%nat) := zero_reg]> (pv_tf V)) with "Htf Htfp") as "Hpv".
+    iDestruct ("Hclose" $! (<[(14%nat) := zero_reg]> (pv_tf (us_V U))) with "Htf Htfp") as "Hpv".
     (* ---- +0x6e: addi s1,s5,208 ---- *)
     iApply (wp_addi4_s_sconf (mword_of_int (KF + 0x6e) : mword 64) Rs1 Rs5 (mword_of_int 208 : mword 12)
               T1 n false

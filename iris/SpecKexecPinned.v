@@ -330,7 +330,7 @@ Definition wp_kexec_pinned_body
     (na : nat) (avf : nat -> mword 64)                  (* argv[0 .. na]       *)
     (alen : nat -> nat) (aslen : nat -> nat)            (* strlen / owned len  *)
     (afun : nat -> nat -> bv 8)                         (* the argument bytes  *)
-    (pidv : mword 32) (V : pprivate)
+    (pidv : mword 32) (U : ustate)
     (dqb dqs dqa dqpv dqas : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
@@ -450,7 +450,7 @@ Definition wp_kexec_pinned_body
   (* THE PROCESS'S PRIVATE BLOCK.  p->pid, p->cwd and the cwd reference namei
      needs are all inside it (ProcInv.proc_priv_cwd_pid); so are the p->name
      bytes safestrcpy writes and the trapframe words the commit block writes. *)
-  proc_priv gf pj pidv V -∗
+  proc_priv gf pj pidv U -∗
   (* EVERY BYTE RUN KEXEC IS HANDED IS FRACTIONAL, because kexec only READS
      all three of them.  That is the tree's rule -- a byte run the callee only
      READS takes the caller's fraction, a run it WRITES stays whole -- and here
@@ -494,7 +494,7 @@ Definition wp_kexec_pinned_body
      has nothing to do with SIE.  Spelled [b] the two coincided at the only
      instance the deleted [b = true] premise admitted. *)
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (V' : pprivate)
+  ∀ (mf : regfile) (U' : ustate)
     (entry spv szv' : mword 64),
       ⌜callee_saved m mf⌝ -∗
       (* ==== THE RESULT RELATION, ON THE TWO ARMS THE PINS ADMIT ========
@@ -526,10 +526,10 @@ Definition wp_kexec_pinned_body
          arm does not return the dv pin either.  The receipt arm keeps
          [kxp_lost], which is PERSISTENT and therefore free to duplicate
          into the closure. *)
-      (⌜kexec_ok_q kxp_entry_ok V V'
+      (⌜kexec_ok_q kxp_entry_ok (us_V U) (us_V U')
            (mf !!! Regidx (mword_of_int 10 : mword 5))
            entry spv szv' na alen⌝
-       ∨ (⌜kexec_ok V V' (mf !!! Regidx (mword_of_int 10 : mword 5))
+       ∨ (⌜kexec_ok (us_V U) (us_V U') (mf !!! Regidx (mword_of_int 10 : mword 5))
                     entry spv szv' na alen⌝ ∗ kxp_lost)) -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
@@ -539,7 +539,7 @@ Definition wp_kexec_pinned_body
       BitmapInv.sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       InodeInv.sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       kalloc_env ga None -∗
-      proc_priv gf pj pidv V' -∗
+      proc_priv gf pj pidv U' -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
       ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
       ([∗ list] i ∈ seq 0 na,
@@ -570,12 +570,12 @@ Module Type KEXEC_PINNED.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64)
       (alen aslen : nat -> nat) (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate)
+      (pidv : mword 32) (U : ustate)
       (dqb dqs dqa dqpv dqas : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_kexec_pinned_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
                            ga gf cov logstart bmapstart inodestart nib
                            size dev plen pfun na avf alen aslen afun
-                           pidv V dqb dqs dqa dqpv dqas m K eb b lks.
+                           pidv U dqb dqs dqa dqpv dqas m K eb b lks.
 End KEXEC_PINNED.

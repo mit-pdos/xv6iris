@@ -108,7 +108,7 @@ End SpecFetchaddr.
 Definition wp_fetchaddr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γf : gname)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64)
-    (pid : mword 32) (V : pprivate) (oldv : mword 64) (b : bool) (lks : gset string) :=
+    (pid : mword 32) (U : ustate) (oldv : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fetchaddr in
   let addr := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ip := m !!! Regidx (mword_of_int 11 : mword 5) in
@@ -119,18 +119,21 @@ Definition wp_fetchaddr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
      interrupts un-pushed (SpecCopyin.v) *)
   cpu_own 0%nat eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  proc_priv γf p pid V -∗
+  proc_priv γf p pid U -∗
   kalloc_env γa None -∗
   ip ↦₈[KT1] oldv -∗
   wp_next b p (fun (CID : CpuId) =>
-    ∀ (mf : regfile) (P' : uptd),
+    (* THE IMAGE MOVES: the copy leaf may fault a page in (and, for the
+       copyout direction, writes user memory), so the block comes back at a
+       fresh [M'] -- milestone J item 1's ∃-weakened staging. *)
+    ∀ (mf : regfile) (P' : uptd) (M' : gmap Z (bv 8)),
       ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt V) P'⌝ -∗
+      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf av b p -∗
       cpu_own 0%nat eb p b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf p pid (upd_upt V P') -∗
-      fetchaddr_post ip oldv addr (pv_sz V)
+      proc_priv γf p pid (upd_usM (us_upt U P') M') -∗
+      fetchaddr_post ip oldv addr (pv_sz (us_V U))
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -139,6 +142,6 @@ Module Type FETCHADDR.
   Parameter wp_fetchaddr_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γf : gname) (m : regfile) (av : nat) (eb : bool) (p : mword 64)
-      (pid : mword 32) (V : pprivate) (oldv : mword 64) (b : bool) (lks : gset string),
-      wp_fetchaddr_sconf_body γa γf m av eb p pid V oldv b lks.
+      (pid : mword 32) (U : ustate) (oldv : mword 64) (b : bool) (lks : gset string),
+      wp_fetchaddr_sconf_body γa γf m av eb p pid U oldv b lks.
 End FETCHADDR.

@@ -167,10 +167,10 @@ Section SpecSysExec.
      page-table growth -- the caller reads it as [upd_upt V P']. *)
   Definition sys_exec_post (γf : gname) (pa : mword 64) (pid : mword 32)
       (V : pprivate) (r : mword 64) : iProp Σ :=
-    (∃ (V' : pprivate) (na : nat) (alen : nat -> nat)
+    (∃ (U' : ustate) (na : nat) (alen : nat -> nat)
        (entry spv szv' : mword 64),
-       ⌜kexec_ok V V' r entry spv szv' na alen⌝ ∗
-       proc_priv γf pa pid V')%I.
+       ⌜kexec_ok V (us_V U') r entry spv szv' na alen⌝ ∗
+       proc_priv γf pa pid U')%I.
 
 End SpecSysExec.
 
@@ -183,7 +183,7 @@ Definition wp_sys_exec_sconf_body
     (pd pav pu : mword 64)
     (dqb dqs : dfrac)
     (v0 v1 : mword 64)                        (* syscall arguments 0 and 1 *)
-    (pid : mword 32) (V : pprivate)
+    (pid : mword 32) (U : ustate)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_exec in
@@ -210,8 +210,8 @@ Definition wp_sys_exec_sconf_body
   eb = true ->
   (* argaddr / argstr read syscall arguments 1 and 0 out of the trapframe
      page [proc_priv] carries *)
-  pv_tf V !! tf_arg_idx 0 = Some v0 ->
-  pv_tf V !! tf_arg_idx 1 = Some v1 ->
+  pv_tf (us_V U) !! tf_arg_idx 0 = Some v0 ->
+  pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
   sie_cap_gpr KT1 m K b pj -∗
   (* ENTERED WITH NO LOCK HELD: the depth is pinned at ZERO, so
      [CpuOwn.cpu_own_zero_empty] DERIVES [lks = ∅] and every order goal the
@@ -236,16 +236,18 @@ Definition wp_sys_exec_sconf_body
   kalloc_env fsc_kalloc None -∗
   (* ---- the process, and the reference allowance kexec's walk needs ---- *)
   iref_slots 2 -∗
-  proc_priv γf pj pid V -∗
+  proc_priv γf pj pid U -∗
   (* THE CROSSING IS THE LITERAL [true]: this function sleeps in kexec (and
      in argstr's page faults), so it can return on another hart. *)
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (P' : uptd),
+  (* the image moves: the copies fault user pages in and write them --
+     milestone J item 1's ∃-weakened staging *)
+  ∀ (mf : regfile) (P' : uptd) (M' : gmap Z (bv 8)),
       ⌜callee_saved m mf⌝ -∗
       (* the page table may have GROWN before kexec ran: argstr's and each
          fetchstr's copy-in faults user pages in.  [uptd_ext] is their own
          report, relayed. *)
-      ⌜uptd_ext (pv_upt V) P'⌝ -∗
+      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗
@@ -258,7 +260,7 @@ Definition wp_sys_exec_sconf_body
       kalloc_env fsc_kalloc None -∗
       (* the allowance, whole: kexec gives back what it took *)
       iref_slots 2 -∗
-      sys_exec_post γf pj pid (upd_upt V P')
+      sys_exec_post γf pj pid (upd_upt (us_V U) P')
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -271,10 +273,10 @@ Module Type SYSEXEC.
       (pd pav pu : mword 64)
       (dqb dqs : dfrac)
       (v0 v1 : mword 64)
-      (pid : mword 32) (V : pprivate)
+      (pid : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_sys_exec_sconf_body γf gs j gl pd pav pu
 
- dqb dqs v0 v1 pid V m K eb b lks.
+ dqb dqs v0 v1 pid U m K eb b lks.
 End SYSEXEC.

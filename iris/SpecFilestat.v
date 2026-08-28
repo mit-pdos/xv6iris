@@ -459,7 +459,7 @@ Definition wp_filestat_sconf_body
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
     (k : nat) (q : Qp) (st : fdstate)            (* the borrowed reference  *)
     (fn : fstat_names)                           (* the inode arm's ghosts  *)
-    (pidv : mword 32) (V : pprivate)
+    (pidv : mword 32) (U : ustate)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.filestat in
   let pj := proc_addr j in
@@ -489,7 +489,7 @@ Definition wp_filestat_sconf_body
   (* the borrowed reference -- at an ARBITRARY fraction, and given back *)
   file_ref γf k q st -∗
   (* ambient: myproc runs first, and the surviving arm copies out *)
-  proc_priv_core pj pidv V -∗
+  proc_priv_core pj pidv U -∗
   kalloc_env fsc_kalloc None -∗
   procs_inv γs -∗
   (* ...and what the file's TYPE selects *)
@@ -499,16 +499,19 @@ Definition wp_filestat_sconf_body
      crossing has nothing to do with SIE.  Spelled [b] the two coincide at
      the only instance the [eb = true] premise admits. *)
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (r : mword 64) (P' : uptd),
+  (* THE IMAGE MOVES: the copy leaf may fault a page in (and copyout writes
+     user memory), so the block comes back at a fresh [M'] -- milestone J
+     item 1's ∃-weakened staging. *)
+  ∀ (mf : regfile) (r : mword 64) (P' : uptd) (M' : gmap Z (bv 8)),
       ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt V) P'⌝ -∗
+      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       ⌜filestat_ret r⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       file_ref γf k q st -∗
-      proc_priv_core pj pidv (upd_upt V P') -∗
+      proc_priv_core pj pidv (upd_usM (us_upt U P') M') -∗
       filestat_env_out fn st -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -521,7 +524,7 @@ Module Type FILESTAT.
       (γs : list gname) (j : nat) (γlp : gname)
       (k : nat) (q : Qp) (st : fdstate)
       (fn : fstat_names)
-      (pidv : mword 32) (V : pprivate)
+      (pidv : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string),
-      wp_filestat_sconf_body γf γs j γlp k q st fn pidv V m K eb b lks.
+      wp_filestat_sconf_body γf γs j γlp k q st fn pidv U m K eb b lks.
 End FILESTAT.

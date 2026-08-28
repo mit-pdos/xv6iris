@@ -190,7 +190,7 @@ Definition wp_sys_mkdir_sconf_body
     (ns : nat)                                          (* the iref ledger     *)
     (dqb dqs dqbs dqn : dfrac)
     (v : mword 64)                                      (* syscall argument 0  *)
-    (pid : mword 32) (V : pprivate)
+    (pid : mword 32) (U : ustate)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_mkdir in
@@ -224,7 +224,7 @@ Definition wp_sys_mkdir_sconf_body
   eb = true ->
   (* argstr reads syscall argument 0 out of the trapframe page [proc_priv]
      carries *)
-  pv_tf V !! tf_arg_idx 0 = Some v ->
+  pv_tf (us_V U) !! tf_arg_idx 0 = Some v ->
   sie_cap_gpr KT1 m K b pj -∗
   (* ENTERED WITH NO LOCK HELD, exactly as sys_chdir: the depth is pinned at
      ZERO, so [CpuOwn.cpu_own_zero_empty] DERIVES [lks = ∅] and every order
@@ -272,16 +272,18 @@ Definition wp_sys_mkdir_sconf_body
   procs_inv gs -∗
   (* ---- the process, whole, and the reference allowance ---- *)
   iref_slots ns -∗
-  proc_priv γf pj pid V -∗
+  proc_priv γf pj pid U -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b]: sys_mkdir sleeps (begin_op,
      argstr's fault path, create and end_op all park), so it can return on
      another hart whatever SIE was doing. *)
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (ns' : nat) (P' : uptd),
+  (* the image moves: the copy leaves may fault a page in, and copyout
+     writes user memory -- milestone J item 1's ∃-weakened staging *)
+  ∀ (mf : regfile) (ns' : nat) (P' : uptd) (M' : gmap Z (bv 8)),
       ⌜callee_saved m mf⌝ -∗
       (* the page table may have GROWN: argstr's fetchstr faults user pages
          in.  [uptd_ext] is argstr's own report, relayed. *)
-      ⌜uptd_ext (pv_upt V) P'⌝ -∗
+      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗
@@ -305,7 +307,7 @@ Definition wp_sys_mkdir_sconf_body
          interval could not support (FsSyscalls.v's note (S3)). *)
       ⌜ns' = ns⌝ -∗
       iref_slots ns' -∗
-      proc_priv γf pj pid (upd_upt V P') -∗
+      proc_priv γf pj pid (upd_usM (us_upt U P') M') -∗
       ⌜sys_mkdir_ret (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -319,11 +321,11 @@ Module Type SYSMKDIR.
       (ns : nat)
       (dqb dqs dqbs dqn : dfrac)
       (v : mword 64)
-      (pid : mword 32) (V : pprivate)
+      (pid : mword 32) (U : ustate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_sys_mkdir_sconf_body γf gs j gl pd pav pu
 
  ns dqb dqs dqbs dqn v
-                              pid V m K eb b lks.
+                              pid U m K eb b lks.
 End SYSMKDIR.

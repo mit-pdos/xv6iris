@@ -104,7 +104,7 @@ Definition wp_uvmunmap_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN :
   cpu_own ilvl eb p b lks -∗
   kernel_text -∗
   pc_is pcE -∗
-  proc_pt P -∗
+  proc_pt_any P -∗
   kalloc_env γa None -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
@@ -112,7 +112,7 @@ Definition wp_uvmunmap_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN :
     cpu_own ilvl eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
-    proc_pt (uptd_del_run P vpn0 npages) -∗
+    proc_pt_any (uptd_del_run P vpn0 npages) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

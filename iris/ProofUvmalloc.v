@@ -380,13 +380,13 @@ Section ProofUvmalloc.
     uptd_ext P Pi ->
     dom Pi.(ud_um) = dom P.(ud_um) ∪ vpn_run vpn0 i ->
     (forall j : nat, (j < i)%nat -> P.(ud_um) !! vpn_at vpn0 j = None) ->
-    proc_pt (uptd_del_run Pi vpn0 i) ⊢ proc_pt P.
+    proc_pt_any (uptd_del_run Pi vpn0 i) ⊢ proc_pt_any P.
   Proof.
     intros (Hr & Ht & Hsub) Hdom Hfr.
     assert (Hum : um_del_run Pi.(ud_um) vpn0 i = P.(ud_um))
       by exact (um_del_run_restore P.(ud_um) Pi.(ud_um) vpn0 i Hsub Hdom Hfr).
-    assert (Heq : proc_pt (uptd_del_run Pi vpn0 i) ⊣⊢ proc_pt P).
-    { apply proc_pt_data_irrel; unfold uptd_del_run;
+    assert (Heq : proc_pt_any (uptd_del_run Pi vpn0 i) ⊣⊢ proc_pt_any P).
+    { apply proc_pt_any_data_irrel; unfold uptd_del_run;
         cbn [ud_root ud_tfp ud_um]; assumption. }
     rewrite Heq. reflexivity.
   Qed.

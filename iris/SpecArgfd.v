@@ -188,7 +188,7 @@ End SpecArgfd.
 Definition wp_argfd_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (γf : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
     (i : nat) (v : mword 64)
-    (pid : mword 32) (V : pprivate) (oldfd : mword 32) (oldf : mword 64) (b : bool) (lks : gset string) :=
+    (pid : mword 32) (U : ustate) (oldfd : mword 32) (oldf : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.argfd in
   let pfd := m !!! Regidx (mword_of_int 11 : mword 5) in
   let pf := m !!! Regidx (mword_of_int 12 : mword 5) in
@@ -198,7 +198,7 @@ Definition wp_argfd_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG �
   m !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int (Z.of_nat i) ->
   (* the argument itself: word [tf_arg_idx i] of this proc's trapframe page,
      which [proc_priv] carries (so argfd needs no separate resource for it) *)
-  pv_tf V !! tf_arg_idx i = Some v ->
+  pv_tf (us_V U) !! tf_arg_idx i = Some v ->
   (* [pf] is not null (see [ofd_out] above: [pfd] may be) *)
   pf <> (zero_reg : mword 64) ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
@@ -206,7 +206,7 @@ Definition wp_argfd_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG �
   sie_cap_gpr KT1 m av b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  proc_priv γf p pid V -∗
+  proc_priv γf p pid U -∗
   ofd_out pfd oldfd -∗
   pf ↦₈[KT1] oldf -∗
   wp_next b p (fun (CID : CpuId) =>
@@ -215,8 +215,8 @@ Definition wp_argfd_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG �
       sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf p pid V -∗
-      argfd_post pfd pf oldfd oldf v (pv_ofile V)
+      proc_priv γf p pid U -∗
+      argfd_post pfd pf oldfd oldf v (pv_ofile (us_V U))
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -226,6 +226,6 @@ Module Type ARGFD.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (i : nat) (v : mword 64)
-      (pid : mword 32) (V : pprivate) (oldfd : mword 32) (oldf : mword 64) (b : bool) (lks : gset string),
-      wp_argfd_sconf_body γf m av n eb p i v pid V oldfd oldf b lks.
+      (pid : mword 32) (U : ustate) (oldfd : mword 32) (oldf : mword 64) (b : bool) (lks : gset string),
+      wp_argfd_sconf_body γf m av n eb p i v pid U oldfd oldf b lks.
 End ARGFD.

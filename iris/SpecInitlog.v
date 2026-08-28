@@ -200,7 +200,7 @@ Definition wp_initlog_sconf_body
     (v_start v_dev v_nc v_n : mword 32)
     (pidv : mword 32) (dq dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate)
+    (b : bool) (lks : gset string) (Upr : ustate)
     (* ---- block 1, on its way into [log_ctx] (durable-disk lane C-3a) ---- *)
     (bs_sb : list (bv 8)) (sbrec : fs_sb) :=
   let pcE : mword 64 := mword_of_int KernelSyms.initlog in
@@ -309,7 +309,7 @@ Definition wp_initlog_sconf_body
      [log_res], and the lock's free ghost state is what [WpLockAt.newlock_at]
      seals the "log" spinlock with. *)
   log_free_tok γ -∗
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
   (* the disk fabric *)
@@ -404,7 +404,7 @@ Definition wp_initlog_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       (* the superblock fraction, untouched *)
       pa_add sb 20 ↦₄{dqs} (mword_of_int logstart : mword 32) -∗
       (* only initlog's own working pair: the other 32 are the batch's pool *)
@@ -437,10 +437,10 @@ Module Type INITLOG.
       (v_start v_dev v_nc v_n : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate)
+      (b : bool) (lks : gset string) (Upr : ustate)
       (bs_sb : list (bv 8)) (sbrec : fs_sb),
       wp_initlog_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γpr
                             cov logstart dev sb bs_hdr Xv M L D
                             vlock vname vcpu v_start v_dev v_nc v_n
-                            pidv dq dqs m K eb b lks Vpr bs_sb sbrec.
+                            pidv dq dqs m K eb b lks Upr bs_sb sbrec.
 End INITLOG.

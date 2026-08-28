@@ -114,7 +114,7 @@ Section ProofUsertrapTail.
      and environment all go with the dying process.  [Rsys] is the one member
      kexit does not want, and dropping it is right -- the syscalls' footprint
      belongs to a process that is going to run one. *)
-  Lemma ut_kexit (N : ut_names) (V : pprivate) (m : regfile) (nx : nat)
+  Lemma ut_kexit (N : ut_names) (U : ustate) (m : regfile) (nx : nat)
       (b : bool) (lks : gset string) :
     ut_wf N ->
     (K_kexit <= nx)%nat ->
@@ -132,7 +132,7 @@ Section ProofUsertrapTail.
        [ut_caps]' [is_kstack] and usertrap's own frame; see
        [ProcDefs.kstack_closer_top]. *)
     kstack_closer (un_pj N) (m !!! Regidx csp_rs1) (trap_res b + nx)%nat -∗
-    ut_hold Rsys N V b lks -∗
+    ut_hold Rsys N U b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hwf Hnx Hbelow. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -148,8 +148,7 @@ Section ProofUsertrapTail.
               (un_ip N) (un_dqi N)
 
 
-              None (un_fn N) m nx b b _ (un_pid N) V
-              eq_refl Hj Hjl Hnx Hlg Hbelow
+              None (un_fn N) m nx b b _ (un_pid N) (upd_usM U _) eq_refl Hj Hjl Hnx Hlg Hbelow
               with "Hcg Hcl Hcpu Hcsrs Hclm Htext Hkd Hpc Hpi Hpe Hw Hft Hkm Hav
                     Hbio Hlog Hseam Hgc Hdev Hgeom Hdk Hbs Hfsr Hip Hfd Hir Hpv Hufr").
     all: try lkbelow.
@@ -176,14 +175,14 @@ Section UtRet2.
      durable-notes' "the chaining lemma needs its OWN section": stated here,
      the ambient [CID] IS the post-crossing hart and not one annotation is
      needed.  [ut_ret] below applies it at [(CID := CIDp)]. *)
-  Lemma ut_ret2 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
+  Lemma ut_ret2 (N : ut_names) (U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 mf : regfile) (av nx : nat) (b : bool)
       (uepc : mword 64) (vb : mword 1)
       (mie_v menvcfg0 : mword 64) (lks : gset string) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
-    ud_tfp (pv_upt V) = ud_tfp pt ->
+    ud_tfp (pv_upt (us_V U)) = ud_tfp pt ->
     add_vec (un_ks N) (mword_of_int 4096) = ksp ->
     m0 !!! Regidx csp_rs1 = ksp ->
     mf !!! Regidx csp_rs1 = pa_stk ksp 4 ->
@@ -211,8 +210,8 @@ Section UtRet2.
     kpt_on cpu_id -∗
     (* the four kernel words prepare_return just wrote, as the residue
        states them -- see [UsertrapRes.ut_tfk] *)
-    ut_tfk ksp V -∗
-    ut_env Rsys N V -∗
+    ut_tfk ksp (us_V U) -∗
+    ut_env Rsys N U -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
@@ -273,7 +272,7 @@ Section UtRet2.
        CONSUMES the name -- which the exit needs to hand [ut_env] back. *)
     (* ---- +0xb2 .. +0xba: MAKE_SATP(p->pagetable) ---- *)
     iDestruct (proc_priv_copy with "Hpv") as "(Hsz & Hpgt & Hppt & Hpvback)".
-    iDestruct (proc_pt_wf_get with "Hppt") as %Hptwf.
+    iDestruct (proc_ptm_wf with "Hppt") as %Hptwf.
     assert (Hc2 : creg2reg_idx (Cregidx (mword_of_int 2)) = Regidx Ra0)
       by (vm_compute; reflexivity).
     assert (Hc7 : creg2reg_idx (Cregidx (mword_of_int 7)) = Regidx Ra5)
@@ -285,15 +284,15 @@ Section UtRet2.
     iEval (rewrite -Haddrpg) in "Hpgt".
     iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (UT + 0xb2)) Ra0 Rs1
               (mword_of_int 80 : mword 12) mf (trap_res b + nx)%nat
-              (page_base (ud_root (pv_upt V))) false
+              (page_base (ud_root (pv_upt (us_V U)))) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hpgt [-]").
     { iApply (uti_0b2 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hpgt".
     set (S0 := <[Regidx Ra0 := regval_into_reg
-                   (page_base (ud_root (pv_upt V)))]> mf).
+                   (page_base (ud_root (pv_upt (us_V U))))]> mf).
     change (<[Regidx Ra0 := regval_into_reg
-               (page_base (ud_root (pv_upt V)))]> mf) with S0.
+               (page_base (ud_root (pv_upt (us_V U))))]> mf) with S0.
     assert (Hpb4 : add_vec_int (mword_of_int (UT + 0xb2) : mword 64) 2
                    = mword_of_int (UT + 0xb4)) by pcw.
     iEval (rewrite Hpb4) in "Hpc".
@@ -357,10 +356,10 @@ Section UtRet2.
        its three field facts ([kvi_satp_mode] / [_asid] / [_ppn]) serve
        verbatim -- which is the whole of [satp_rooted]. *)
     assert (Hor : or_vec (rget S3 Ra0) (rget S3 Ra5)
-                  = kvi_satp_word (ud_root (pv_upt V))).
+                  = kvi_satp_word (ud_root (pv_upt (us_V U)))).
     { assert (HS3a0 : rget S3 Ra0
                 = shift_bits_right
-                    (zero_extend' 64 (concat_vec (ud_root (pv_upt V))
+                    (zero_extend' 64 (concat_vec (ud_root (pv_upt (us_V U)))
                                         (zeros' 12 : mword 12)))
                     (subrange_vec_dec (mword_of_int 12 : mword 6)
                        (Z.sub log2_xlen 1) 0)).
@@ -375,24 +374,24 @@ Section UtRet2.
       { rgne. rewrite /S3 upd_eq. rgne. rewrite /S2 upd_eq. reflexivity. }
       rewrite HS3a0 HS3a5. unfold kvi_satp_word. reflexivity. }
     iApply (wp_cor_s_sconf (mword_of_int (UT + 0xba)) Ra0 Ra0 Ra5
-              (kvi_satp_word (ud_root (pv_upt V))) S3 (trap_res b + nx)%nat false
+              (kvi_satp_word (ud_root (pv_upt (us_V U)))) S3 (trap_res b + nx)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) Hor
               with "Hcg Hpc [] [-]").
     { iEval (rewrite -Hc2 -Hc7). iApply (uti_0ba with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (S4 := <[Regidx Ra0 := regval_into_reg
-                   (kvi_satp_word (ud_root (pv_upt V)))]> S3).
+                   (kvi_satp_word (ud_root (pv_upt (us_V U))))]> S3).
     change (<[Regidx Ra0 := regval_into_reg
-               (kvi_satp_word (ud_root (pv_upt V)))]> S3) with S4.
+               (kvi_satp_word (ud_root (pv_upt (us_V U))))]> S3) with S4.
     assert (Hpbc : add_vec_int (mword_of_int (UT + 0xba) : mword 64) 2
                    = mword_of_int (UT + 0xbc)) by pcw.
     iEval (rewrite Hpbc) in "Hpc".
     (* the cell back in the block's own spelling -- the load left it in the
        leaf's [add_vec (rget ...) imm] form *)
     iEval (rewrite Haddrpg) in "Hpgt".
-    iDestruct ("Hpvback" $! (pv_upt V) ltac:(apply uptd_ext_sz_refl)
+    iDestruct ("Hpvback" $! (pv_upt (us_V U)) (us_M U) ltac:(apply uptd_ext_sz_refl)
                  with "Hsz Hpgt Hppt") as "Hpv".
-    rewrite upd_upt_id.
+    rewrite us_upt_id upd_usM_id.
     (* ---- +0xbc .. +0xc2: the four restores ---- *)
     iDestruct "Hframe" as "(Hbra & Hbs0 & Hbs1 & Hbs2)".
     assert (HS4sp : S4 !!! Regidx csp_rs1 = pa_stk ksp 4).
@@ -573,7 +572,7 @@ Section UtRet2.
     assert (Htpid : tp_pin S9 !!! Regidx Rtp = cid_word)
       by (rewrite /tp_pin upd_eq; reflexivity).
     assert (Hmfa0 : tp_pin S9 !!! Regidx Ra0
-                    = kvi_satp_word (ud_root (pv_upt V))).
+                    = kvi_satp_word (ud_root (pv_upt (us_V U)))).
     { rewrite /tp_pin upd_ne; [| reg_neq]. rewrite /S9 upd_ne; [| reg_neq].
       rewrite /S8 upd_ne; [| reg_neq]. rewrite /S7 upd_ne; [| reg_neq].
       rewrite /S6 upd_ne; [| reg_neq]. rewrite /S5 upd_ne; [| reg_neq].
@@ -582,9 +581,9 @@ Section UtRet2.
     iDestruct "Hscause" as (scv) "Hscause".
     iDestruct "Hstval" as (stv) "Hstval".
     iSpecialize ("Hcont" $! CID with "[%]"); [intros _; reflexivity|].
-    iDestruct ("Hownback" $! V with "Hpv Hufr Hsy") as "Hown".
-    iApply ("Hcont" $! (pv_upt V) (tp_pin S9) msg
-              (kvi_satp_word (ud_root (pv_upt V))) (mepc_val uepc) scv stv mdv0
+    iDestruct ("Hownback" $! U with "Hpv Hufr Hsy") as "Hown".
+    iApply ("Hcont" $! (pv_upt (us_V U)) (tp_pin S9) msg
+              (kvi_satp_word (ud_root (pv_upt (us_V U)))) (mepc_val uepc) scv stv mdv0
               with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                     Hhs Hpriv Hms Hscause Hstval Hsepc [Hstvec] Hpc [Hfile]
                     Hmie Hmdl Hmenv Hhw Hmin [-]").
@@ -604,7 +603,7 @@ Section UtRet2.
          is what [sie_cap_gpr] was holding all along -- no [tp_pin_id] step. *)
       iExact "Hfile".
     - (* [ut_res] rebuilt at the exit hart *)
-      iExists N, V, av.
+      iExists N, U, av.
       iSplitR; [iPureIntro; reflexivity|].
       iSplitR; [iPureIntro; exact Hksp|].
       iSplitR; [iPureIntro; exact (conj Hj (conj Hjl (conj Hlen Hlg)))|].
@@ -640,13 +639,13 @@ Section UtRet.
   (* ==================================================================== *)
   (* +0xae: jal prepare_return, then the second half at ITS hart.          *)
   (* ==================================================================== *)
-  Lemma ut_ret (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
+  Lemma ut_ret (N : ut_names) (U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat) (b : bool)
       (mie_v menvcfg0 : mword 64) (lks : gset string) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
-    ud_tfp (pv_upt V) = ud_tfp pt ->
+    ud_tfp (pv_upt (us_V U)) = ud_tfp pt ->
     add_vec (un_ks N) (mword_of_int 4096) = ksp ->
     m0 !!! Regidx csp_rs1 = ksp ->
     m !!! Regidx csp_rs1 = pa_stk ksp 4 ->
@@ -657,7 +656,7 @@ Section UtRet.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xae)) -∗
     sie_cap_gpr KT1 m nx b (un_pj N) -∗
-    ut_hold Rsys N V b lks -∗
+    ut_hold Rsys N U b lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
@@ -704,7 +703,7 @@ Section UtRet.
                  ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iDestruct (trap_csrs_ext_transport CID CID1 b (un_pj N)
                  ltac:(wp_next_chain) with "Hcsrs") as "Hcsrs".
-    iApply (PR.wp_prepare_return_sconf (un_f N) (un_ks N) (un_pid N) V
+    iApply (PR.wp_prepare_return_sconf (un_f N) (un_ks N) (un_pid N) U
               M1 nx (un_pj N) uepc b lks ltac:(lia) Hepc
               with "Hcg Hcpu Hcsrs Htext Hpc Hkst Hpv [-]").
     iIntros (CIDp Hkp mf ksat kroot vb)
@@ -723,21 +722,21 @@ Section UtRet.
       iSplitL "Hclmpay"; [iExact "Hclmpay" | iExact "Hclm"]. }
     iDestruct (wp_next_retarget CID CIDp true (un_pj N) _
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    set (Vr := upd_tf V (prepare_return_tf (pv_tf V) ksat
+    set (Vr := upd_tf (us_V U) (prepare_return_tf (pv_tf (us_V U)) ksat
                            (add_vec (un_ks N) (mword_of_int 4096)) (cid_word (CID := CIDp)))).
-    change (upd_tf V (prepare_return_tf (pv_tf V) ksat
+    change (upd_tf (us_V U) (prepare_return_tf (pv_tf (us_V U)) ksat
               (add_vec (un_ks N) (mword_of_int 4096)) (cid_word (CID := CIDp)))) with Vr.
-    assert (HVrupt : pv_upt Vr = pv_upt V) by (rewrite /Vr; destruct V; reflexivity).
+    assert (HVrupt : pv_upt Vr = pv_upt (us_V U)) by (rewrite /Vr; destruct (us_V U); reflexivity).
     (* THE KERNEL WORDS, sealed: [Vr]'s trapframe is [prepare_return_tf] of
        the old one, whose four inserts are exactly [tf_kernel_words_ok] at
        the root the satp read returned, at THIS hart. *)
     iDestruct (ut_tfk_intro (CID := CIDp) (add_vec (un_ks N) (mword_of_int 4096)) Vr kroot
-                 (prepare_return_tf_kernel_words_ok (CID := CIDp) (pv_tf V) ksat
+                 (prepare_return_tf_kernel_words_ok (CID := CIDp) (pv_tf (us_V U)) ksat
                     (add_vec (un_ks N) (mword_of_int 4096)) kroot Htflen Hmode Hasid Hppn)
                  with "Hkinv") as "#Htfk".
     iEval (rewrite Hksp) in "Htfk".
-    iDestruct ("Hownback" $! Vr with "Hpv Hufr Hsy") as "Hown".
-    iApply (ut_ret2 (CID := CIDp) Rsys N Vr pt ksp m0 mf av nx b uepc vb
+    iDestruct ("Hownback" $! (MkUstate Vr (us_M U)) with "Hpv Hufr Hsy") as "Hown".
+    iApply (ut_ret2 (CID := CIDp) Rsys N (MkUstate Vr _) pt ksp m0 mf av nx b uepc vb
               mie_v menvcfg0 lks
               Hwf' Hav Hnx ltac:(rewrite HVrupt; exact Htfpe) Hksp Hm0sp
               ltac:(rewrite (callee_saved_lookup Hcspr csp_rs1
@@ -766,13 +765,13 @@ Section UtA6.
      [b = false] from the other three.  [which_dev = 0] before the kexit is
      dead code in the resource sense -- kexit never returns -- so the [c.li
      s2,0] is stepped and its value never read again. *)
-  Lemma ut_a6 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
+  Lemma ut_a6 (N : ut_names) (U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat) (b : bool)
       (mie_v menvcfg0 : mword 64) (lks : gset string) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
-    ud_tfp (pv_upt V) = ud_tfp pt ->
+    ud_tfp (pv_upt (us_V U)) = ud_tfp pt ->
     add_vec (un_ks N) (mword_of_int 4096) = ksp ->
     m0 !!! Regidx csp_rs1 = ksp ->
     m !!! Regidx csp_rs1 = pa_stk ksp 4 ->
@@ -788,7 +787,7 @@ Section UtA6.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xa6)) -∗
     sie_cap_gpr KT1 m nx b (un_pj N) -∗
-    ut_hold Rsys N V b lks -∗
+    ut_hold Rsys N U b lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
@@ -973,7 +972,7 @@ Section UtA6.
       iDestruct (kstack_closer_frame (un_pj N) ksp av 4 ltac:(lia)
                    with "Hkcl Hfr") as "Hkcl4".
       iEval (rewrite -Hnx -HKsp) in "Hkcl4".
-      iApply (ut_kexit (CID := CID7) Rsys N V
+      iApply (ut_kexit (CID := CID7) Rsys N U
                 (<[Regidx Rra := regval_into_reg
                      (add_vec_int (mword_of_int (UT + 0xf8) : mword 64) 4)]> K2)
                 nx b lks Hwf' ltac:(lia) ltac:(lkbelow)
@@ -1001,7 +1000,7 @@ Section UtA6.
                    ltac:(wp_next_chain) with "Hclm") as "Hclm".
       iDestruct (wp_next_retarget CID3 CID4 true (un_pj N) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
-      iApply (ut_ret (CID := CID4) Rsys N V pt ksp m0 mf av nx b
+      iApply (ut_ret (CID := CID4) Rsys N U pt ksp m0 mf av nx b
                 mie_v menvcfg0 lks
                 Hwf' Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv
@@ -1027,13 +1026,13 @@ Section UtFa.
      callee here that takes the trap-CSR set and the running claim and gives
      them BACK -- it parks and resumes, so its crossing is real and everything
      has to be re-anchored on the far side. *)
-  Lemma ut_fa (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
+  Lemma ut_fa (N : ut_names) (U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat) (b : bool)
       (mie_v menvcfg0 : mword 64) (lks : gset string) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
-    ud_tfp (pv_upt V) = ud_tfp pt ->
+    ud_tfp (pv_upt (us_V U)) = ud_tfp pt ->
     add_vec (un_ks N) (mword_of_int 4096) = ksp ->
     m0 !!! Regidx csp_rs1 = ksp ->
     m !!! Regidx csp_rs1 = pa_stk ksp 4 ->
@@ -1044,7 +1043,7 @@ Section UtFa.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xfc)) -∗
     sie_cap_gpr KT1 m nx b (un_pj N) -∗
-    ut_hold Rsys N V b lks -∗
+    ut_hold Rsys N U b lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
@@ -1109,7 +1108,7 @@ Section UtFa.
                    ltac:(wp_next_chain) with "Hclm") as "Hclm".
       iDestruct (wp_next_retarget CID CID2 true (un_pj N) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
-      iApply (ut_ret (CID := CID2) Rsys N V pt ksp m0 M1 av nx b
+      iApply (ut_ret (CID := CID2) Rsys N U pt ksp m0 M1 av nx b
                 mie_v menvcfg0 lks
                 Hwf' Hav Hnx Htfpe Hksp Hm0sp HM1sp HM1s1 HcsM1
                 Hmiev Hmenvv
@@ -1197,7 +1196,7 @@ Section UtFa.
                    ltac:(wp_next_chain) with "Hclm") as "Hclm".
       iDestruct (wp_next_retarget CID4 CID5 true (un_pj N) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
-      iApply (ut_ret (CID := CID5) Rsys N V pt ksp m0 mf av nx b
+      iApply (ut_ret (CID := CID5) Rsys N U pt ksp m0 mf av nx b
                 mie_v menvcfg0 lks
                 Hwf' Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv

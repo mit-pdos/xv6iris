@@ -181,14 +181,14 @@ Qed.
 
 Definition wp_prepare_return_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γf : gname) (ks : mword 64) (pid : mword 32) (V : pprivate)
+    (γf : gname) (ks : mword 64) (pid : mword 32) (U : ustate)
     (m : regfile) (av : nat) (p : mword 64)
     (epc : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.prepare_return in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_prepare_return <= av)%nat ->
   (* the user pc the trapframe is holding, which the [csrw sepc] restores *)
-  pv_tf V !! tf_epc_idx = Some epc ->
+  pv_tf (us_V U) !! tf_epc_idx = Some epc ->
   (* ENTERED AT PUSH_OFF LEVEL 0, AT EITHER SIE INDEX -- see the header.
      [cpu_own]'s base-enable is [b] because at level 0 the two agree
      ([CpuOwn.cpu_own_eb_agree]); writing anything else would be vacuous. *)
@@ -200,7 +200,7 @@ Definition wp_prepare_return_sconf_body
   kernel_text -∗ pc_is pcE -∗
   (* the process: [p] is what myproc() returns, i.e. [cpus[cid].proc] *)
   is_kstack p ks -∗
-  proc_priv γf p pid V -∗
+  proc_priv γf p pid U -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mf : regfile) (ksat : mword 64) (root : mword 44) (vb : mword 1),
       ⌜ callee_saved m mf ⌝ -∗
@@ -261,7 +261,7 @@ Definition wp_prepare_return_sconf_body
       kpt_on cpu_id -∗
       (* the process block, with the four kernel words re-armed *)
       proc_priv γf p pid
-        (upd_tf V (prepare_return_tf (pv_tf V) ksat
+        (us_tf U (prepare_return_tf (pv_tf (us_V U)) ksat
                      (add_vec ks (mword_of_int 4096)) cid_word)) -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -270,8 +270,8 @@ Definition wp_prepare_return_sconf_body
 Module Type PREPARE_RETURN.
   Parameter wp_prepare_return_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γf : gname) (ks : mword 64) (pid : mword 32) (V : pprivate)
+      (γf : gname) (ks : mword 64) (pid : mword 32) (U : ustate)
       (m : regfile) (av : nat) (p : mword 64)
       (epc : mword 64) (b : bool) (lks : gset string),
-      wp_prepare_return_sconf_body γf ks pid V m av p epc b lks.
+      wp_prepare_return_sconf_body γf ks pid U m av p epc b lks.
 End PREPARE_RETURN.

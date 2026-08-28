@@ -324,8 +324,8 @@ Section ProofSysClose.
   Lemma wp_sys_close_sconf  (γl γf : gname)
       (fn : fclose_names) (on : option nat)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
-      (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string)
-    : wp_sys_close_sconf_body γl γf fn on m av n eb p v pid V b lks.
+      (v : mword 64) (pid : mword 32) (U : ustate) (b : bool) (lks : gset string)
+    : wp_sys_close_sconf_body γl γf fn on m av n eb p v pid U b lks.
   Proof.
     cbv beta delta [wp_sys_close_sconf_body].
     intros pcE ret_tgt Harg Hn Hav Hbelow Hfpid Hfdq.
@@ -529,7 +529,7 @@ Section ProofSysClose.
     (* ---- argfd(0, &fd, &f) ---- *)
     iDestruct (cpu_own_transport CID CID8 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Argfd.wp_argfd_sconf γf M6 (av - 4)%nat n eb p 0%nat v
-              pid V (word_hi w3) w4 b lks
+              pid U (word_hi w3) w4 b lks
               ltac:(unfold NARG; lia) HM6a0 Harg Hnzf Hn
               ltac:(lia)
               with "Hcg Hcpu Htext Hdata Hpc Hpriv [Hs3hi] Hs4").
@@ -634,7 +634,7 @@ Section ProofSysClose.
     - (* ================= SUCCESS: fd names a live file ================= *)
       iDestruct "Hsucc" as (fd fv) "([%Hr %Hsome] & Hfdcell & Hfcell)".
       iDestruct (ofd_out_elim _ _ Hnzfd with "Hfdcell") as "Hfdcell".
-      pose proof (arg_fd_lookup v (pv_ofile V) fd fv Hsome) as (Hfdlt & Hlk & Hfvnz & Hsext).
+      pose proof (arg_fd_lookup v (pv_ofile (us_V U)) fd fv Hsome) as (Hfdlt & Hlk & Hfvnz & Hsext).
       assert (HA7a0' : A7 !!! Regidx (mword_of_int 10 : mword 5) = (zero_reg : mword 64))
         by (rewrite HA7a0; exact Hr).
       iApply (wp_blt_x0_fall_s_sconf (mword_of_int (KernelSyms.sys_close + 0x18))
@@ -773,7 +773,7 @@ Section ProofSysClose.
          block needs: the store below empties [p->ofile[fd]] and the
          fileclose after it wants the quarter (SpecSysClose.v's note on why
          the quarter cannot come from the CALLER). *)
-      iDestruct (proc_priv_bare_ofile γf p pid V fd fv Hlk with "Hpriv")
+      iDestruct (proc_priv_bare_ofile γf p pid U fd fv Hlk with "Hpriv")
         as "(Hpbare & Hslot & Hback)".
       iDestruct "Hslot" as "[Hcell [[%Hz _] | Href]]"; [by exfalso; apply Hfvnz|].
       iDestruct "Href" as (k q stf) "((%Hfv & %Hklt & %Hty) & Href & Hst)".
@@ -854,7 +854,7 @@ Section ProofSysClose.
          remaining tie premise is for *)
       iDestruct (fileclose_loop_open fn on n eb p stf with "Hpenv Hfenv")
         as "[Hfcenv Hfcback]".
-      iApply (Fileclose.wp_fileclose_sconf γl γf k q stf fn on D n eb p (av - 4)%nat b lks pid V
+      iApply (Fileclose.wp_fileclose_sconf γl γf k q stf fn on D n eb p (av - 4)%nat b lks pid U
                 ltac:(lia) Hn HDa0
                 Hbelow
                 with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpe Href Hpbare Hiru Hfcenv").
@@ -886,7 +886,7 @@ Section ProofSysClose.
          matching fragment comes out of the bundle, and [fd_st_move] joins
          them.  This is the one step in sys_close that could not be taken
          after [ProcInv]'s auth/frag split without holding [fd_frags_any]. *)
-      iDestruct (fd_frags_any_acc (pv_fdg V) fd Hfdlt with "Hfrag")
+      iDestruct (fd_frags_any_acc (pv_fdg (us_V U)) fd Hfdlt with "Hfrag")
         as (stq) "[Hfr Hfrback]".
       iMod (fd_st_move _ fd stf stq FdClosed with "Hst Hfr")
         as "[Hst Hfr]".

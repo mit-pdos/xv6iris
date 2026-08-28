@@ -146,7 +146,7 @@ Section ProofKforkB5.
   Lemma kfk_b5 `{GEN : GenId} `{CID0 : CpuId}
       (γs : list gname) (γf γw γft γl : gname) (j : nat)
       (Mt : regfile) (K lvl : nat) (eb b : bool)
-      (pme ks : mword 64) (pid_c : mword 32) (Vc : pprivate)
+      (pme ks : mword 64) (pid_c : mword 32) (Uc : ustate)
       (ch : mword 64) (rest : list (mword 64)) (rv : mword 64)
       (lks : gset string) :
     (18 <= K)%nat ->
@@ -186,10 +186,10 @@ Section ProofKforkB5.
     FirstTok.first_done -∗
     SchedCtx.proc_held cpu_id j γl USED ch -∗
     ProcGeom.hart_at_any (ProcGeom.proc_addr j) -∗
-    ProcInv.proc_priv γf (ProcGeom.proc_addr j) pid_c Vc -∗
+    ProcInv.proc_priv γf (ProcGeom.proc_addr j) pid_c Uc -∗
     (* the child's descriptor-state fragments, minted with its block by
        allocproc; the park captures them into the resume closer. *)
-    FdSlots.fd_frags_any (ProcDefs.pv_fdg Vc) -∗
+    FdSlots.fd_frags_any (ProcDefs.pv_fdg (us_V Uc)) -∗
     (* ...and the child's user-execution WP, on the very same route: kfork's
        caller supplies it ([SpecKfork]'s contract) and the park captures it
        into the resume closer, where [UsertrapRes.ut_res_bare_park] spends
@@ -261,7 +261,7 @@ Section ProofKforkB5.
     iAssert (park_own N) with "[Hbsl]" as "Hown_park".
     { rewrite /park_own. iFrame "Hbsl". iExact "Hip1". }
     iDestruct (ProcDefs.kstack_free_at with "Hks Hkfree") as "Hstack".
-    iMod (park_token_park N rest Vc Hwf Hrest
+    iMod (park_token_park N rest Uc Hwf Hrest
             with "Htoken Htext Hwire Htramp Hmk Hstack Henv Hown_park Hfrag Huwp
                   [Hks Hctx Hpriv Hfd Hirsp]")
       as "Hpctx".

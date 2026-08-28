@@ -423,8 +423,8 @@ Section ProofFdalloc.
   Lemma wp_fdalloc_sconf
       (γf : gname) (k : nat) (D : gset nat)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
-      (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string)
-    : wp_fdalloc_sconf_body γf k D m av n eb p pid V b lks.
+      (pid : mword 32) (U : ustate) (b : bool) (lks : gset string)
+    : wp_fdalloc_sconf_body γf k D m av n eb p pid U b lks.
   Proof.
     cbv beta delta [wp_fdalloc_sconf_body].
     intros pcE ret_tgt Ha0 Hk Hn Hav.
@@ -684,7 +684,7 @@ Section ProofFdalloc.
     iAssert (∀ (fuel fd : nat) `(CID0 : CpuId) (M : regfile),
       ⌜(NOFILE - fd <= fuel)%nat⌝ -∗
       ⌜(fd < NOFILE)%nat⌝ -∗
-      ⌜(forall j w, (j < fd)%nat -> pv_ofile V !! j = Some w -> w <> (zero_reg : mword 64))⌝ -∗
+      ⌜(forall j w, (j < fd)%nat -> pv_ofile (us_V U) !! j = Some w -> w <> (zero_reg : mword 64))⌝ -∗
       ⌜ M !!! Regidx Ra0 = mword_of_int (Z.of_nat fd)
         /\ M !!! Regidx Ra2 = p
         /\ M !!! Regidx Ra3 = (mword_of_int 16 : mword 64)
@@ -697,8 +697,8 @@ Section ProofFdalloc.
       sie_cap_gpr KT1 (CID:=CID0) M (av - 4)%nat b p -∗
       cpu_own (CID:=CID0) n eb p b lks -∗
       pc_is (CID:=CID0) (mword_of_int (KernelSyms.fdalloc + 0x1a) : mword 64) -∗
-      proc_priv_core p pid V -∗
-      proc_ofiles_owe γf (pv_fdg V) p (pv_ofile V) D -∗
+      proc_priv_core p pid U -∗
+      proc_ofiles_owe γf (pv_fdg (us_V U)) p (pv_ofile (us_V U)) D -∗
       (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
       (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
       (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
@@ -709,8 +709,8 @@ Section ProofFdalloc.
           sie_cap_gpr KT1 mf av b p -∗
           cpu_own n eb p b lks -∗
           pc_is ret_tgt -∗
-          proc_priv_core p pid V -∗
-          fdalloc_post γf p V D k (mf !!! Regidx Ra0) -∗
+          proc_priv_core p pid U -∗
+          fdalloc_post γf p (us_V U) D k (mf !!! Regidx Ra0) -∗
           WP (Loop : expr riscv_lang)) -∗
       WP (Loop : expr riscv_lang))%I
       with "[]" as "Hloop".
@@ -720,7 +720,7 @@ Section ProofFdalloc.
       iIntros (fd CID0 M) "%Hfuel %Hfd %Hpre %Hinv Hcg Hcpu Hpc Hcore Hpv Hc1 Hc2 Hc3 Hc4 Hcont".
       destruct Hinv as (HMa0 & HMa2 & HMa3 & HMa5 & HMs1 & HMsp & HMcs).
       (* the descriptor this iteration reads *)
-      assert (Hlk : exists w, pv_ofile V !! fd = Some w).
+      assert (Hlk : exists w, pv_ofile (us_V U) !! fd = Some w).
       { apply lookup_lt_is_Some. rewrite Hlen. exact Hfd. }
       destruct Hlk as [w Hw].
       (* ---- +0x1a: c.ld a4,0(a5) -- a4 := p->ofile[fd] ---- *)
@@ -950,7 +950,7 @@ Section ProofFdalloc.
           rewrite /N2 upd_ne; [| congruence]. rewrite /N1 upd_ne; [| congruence].
           apply HL1cs; assumption. }
         (* the extended "every earlier descriptor is busy" fact *)
-        assert (Hpre' : forall j v, (j < S fd)%nat -> pv_ofile V !! j = Some v ->
+        assert (Hpre' : forall j v, (j < S fd)%nat -> pv_ofile (us_V U) !! j = Some v ->
                           v <> (zero_reg : mword 64)).
         { intros j v Hj Hjv.
           destruct (decide (j = fd)) as [-> | Hne].

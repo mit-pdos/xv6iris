@@ -153,7 +153,7 @@ Definition wp_balloc_sconf_body
     (u : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.balloc in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -203,7 +203,7 @@ Definition wp_balloc_sconf_body
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   (* the two superblock fields, read at +0x0a and +0xa0 and never written *)
   sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -237,7 +237,7 @@ Definition wp_balloc_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       bslots 2 -∗
@@ -303,7 +303,7 @@ Definition wp_balloc_gen_body
     (u : nat) (cr : bool) (Sb : gset Z)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.balloc in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -340,7 +340,7 @@ Definition wp_balloc_gen_body
   printk_env γpr γu γd -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   bitmap_inv γfs bmapstart cov logstart size -∗
@@ -362,7 +362,7 @@ Definition wp_balloc_gen_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       bslots 2 -∗
@@ -402,10 +402,10 @@ Module Type BALLOC.
       (u : nat) (cr : bool) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Upr : ustate),
       wp_balloc_gen_body γs j γl γu γd γk pd pav pu bn γ γfs
                          cov logstart bmapstart size dev γpr u cr Sb
-                         pidv dq dqb dqs m K eb b lks Vpr.
+                         pidv dq dqb dqs m K eb b lks Upr.
 
   Parameter wp_balloc_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
@@ -420,8 +420,8 @@ Module Type BALLOC.
       (u : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Upr : ustate),
       wp_balloc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
                            cov logstart bmapstart size dev γpr u
-                           pidv dq dqb dqs m K eb b lks Vpr.
+                           pidv dq dqb dqs m K eb b lks Upr.
 End BALLOC.

@@ -74,7 +74,7 @@ Import Defs.
 Definition wp_acquiresleep_gen_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat)
     (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
-    (m : regfile) (pidv : mword 32) (Vpr : pprivate) (av : nat) (eb : bool) (b : bool) (lks : gset string) :=
+    (m : regfile) (pidv : mword 32) (Upr : ustate) (av : nat) (eb : bool) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.acquiresleep in
   let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let pj := proc_addr j in
@@ -116,7 +116,7 @@ Definition wp_acquiresleep_gen_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ,
      file layer into the binder list of every contract from here up -- fifty
      files that have no business knowing what a working directory is.
      [ProcInv.proc_priv_core_bare] is the [⊣⊢] a caller splits with. *)
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   procs_inv γs -∗
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
@@ -131,7 +131,7 @@ Definition wp_acquiresleep_gen_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ,
          [sleeplocked_q_pid], so what a holder walks away with is one row. *)
       sleeplocked_q γsl q slk pidv -∗
       R -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -139,7 +139,7 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fd
     
     (γs : list gname) (j : nat)
     (γl γsl : gname) (s : string) (R : iProp Σ)
-    (m : regfile) (pidv : mword 32) (Vpr : pprivate) (av : nat) (eb : bool) (b : bool) (lks : gset string) :=
+    (m : regfile) (pidv : mword 32) (Upr : ustate) (av : nat) (eb : bool) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.acquiresleep in
   let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let pj := proc_addr j in
@@ -168,7 +168,7 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fd
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock γl γsl slk s R -∗
   (* the caller's own pid (read-only fraction) *)
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   (* the running-thread bundle threaded through to sleep() *)
   procs_inv γs -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  acquiresleep PARKS (its
@@ -189,7 +189,7 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fd
       (* the lock is now HELD: the token (pid field inside it) + R *)
       sleeplocked γsl slk pidv -∗
       R -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -251,7 +251,7 @@ Definition wp_acquiresleep_nb_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
        keys it by the inode SLOT ([IcacheRef.icfg_isl k]) so that a reference
        can carry it -- and the refutation only ever looks at this one. *)
     (γt : gname) (q : Qp)
-    (m : regfile) (pidv : mword 32) (Vpr : pprivate) (av : nat) (eb : bool)
+    (m : regfile) (pidv : mword 32) (Upr : ustate) (av : nat) (eb : bool)
     (n : nat) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.acquiresleep in
   let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
@@ -267,7 +267,7 @@ Definition wp_acquiresleep_nb_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
   is_sleeplock_gen γl γsl slk s R (slh_tok γt) -∗
   (* THE EVIDENCE THAT THE LOCK IS FREE *)
   slh_auth γt None -∗
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   wp_next false pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜ callee_saved m mf ⌝ -∗
@@ -277,7 +277,7 @@ Definition wp_acquiresleep_nb_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
       sleeplocked_q γsl q slk pidv -∗
       slh_auth γt (Some q) -∗
       R -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -286,20 +286,20 @@ Module Type ACQUIRESLEEP.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat)
       (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
-      (m : regfile) (pidv : mword 32) (Vpr : pprivate) (av : nat) (eb : bool) (b : bool) (lks : gset string),
-      wp_acquiresleep_gen_sconf_body γs j γl γsl s R H q m pidv Vpr av eb b lks.
+      (m : regfile) (pidv : mword 32) (Upr : ustate) (av : nat) (eb : bool) (b : bool) (lks : gset string),
+      wp_acquiresleep_gen_sconf_body γs j γl γsl s R H q m pidv Upr av eb b lks.
   Parameter wp_acquiresleep_nb_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (j : nat)
       (γl γsl : gname) (s : string) (R : iProp Σ) (γt : gname) (q : Qp)
-      (m : regfile) (pidv : mword 32) (Vpr : pprivate) (av : nat) (eb : bool)
+      (m : regfile) (pidv : mword 32) (Upr : ustate) (av : nat) (eb : bool)
       (n : nat) (lks : gset string),
-      wp_acquiresleep_nb_body j γl γsl s R γt q m pidv Vpr av eb n lks.
+      wp_acquiresleep_nb_body j γl γsl s R γt q m pidv Upr av eb n lks.
   Parameter wp_acquiresleep_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname) (j : nat)
       (γl γsl : gname) (s : string) (R : iProp Σ)
-      (m : regfile) (pidv : mword 32) (Vpr : pprivate) (av : nat) (eb : bool) (b : bool) (lks : gset string),
-      wp_acquiresleep_sconf_body γs j γl γsl s R m pidv Vpr av eb b lks.
+      (m : regfile) (pidv : mword 32) (Upr : ustate) (av : nat) (eb : bool) (b : bool) (lks : gset string),
+      wp_acquiresleep_sconf_body γs j γl γsl s R m pidv Upr av eb b lks.
 End ACQUIRESLEEP.

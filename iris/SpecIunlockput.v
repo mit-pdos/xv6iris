@@ -157,7 +157,7 @@ Definition wp_iunlockput_dep_sconf_body
     (n : nat) (tid : nat) (qtx : Qp)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iunlockput in
   let ip : mword 64 := ientry k in
   let pj := proc_addr j in
@@ -256,7 +256,7 @@ Definition wp_iunlockput_dep_sconf_body
   sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   procs_inv gs -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
@@ -278,7 +278,7 @@ Definition wp_iunlockput_dep_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       bslots 3 -∗
@@ -303,7 +303,7 @@ Definition wp_iunlockput_dep_gen_body
     (tid : nat) (qtx : Qp)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iunlockput in
   let ip : mword 64 := ientry k in
   let pj := proc_addr j in
@@ -405,7 +405,7 @@ Definition wp_iunlockput_dep_gen_body
   sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   procs_inv gs -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
@@ -428,7 +428,7 @@ Definition wp_iunlockput_dep_gen_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       bslots 3 -∗
@@ -467,7 +467,7 @@ Definition wp_iunlockput_tx_sconf_body
     (n : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iunlockput in
   let ip : mword 64 := ientry k in
   let pj := proc_addr j in
@@ -556,7 +556,7 @@ Definition wp_iunlockput_tx_sconf_body
   sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   procs_inv gs -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
@@ -577,7 +577,7 @@ Definition wp_iunlockput_tx_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       bslots 3 -∗
@@ -597,7 +597,7 @@ Definition wp_iunlockput_tx_gen_body
     (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iunlockput in
   let ip : mword 64 := ientry k in
   let pj := proc_addr j in
@@ -689,7 +689,7 @@ Definition wp_iunlockput_tx_gen_body
   sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   procs_inv gs -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
@@ -712,7 +712,7 @@ Definition wp_iunlockput_tx_gen_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
       bslots 3 -∗
@@ -750,17 +750,17 @@ Section IunlockputOfDep.
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate) :
+      (b : bool) (lks : gset string) (Upr : ustate) :
     (forall (d : ic_dep) (tid : nat) (qtx : Qp),
        wp_iunlockput_dep_sconf_body gs j gl pd pav pu
                                     gil gisl
  k qi s gy d inum
                                     dn' bm' n tid qtx pidv dq dqb dqs m K eb b lks
-                                    Vpr) ->
+                                    Upr) ->
     wp_iunlockput_tx_sconf_body gs j gl pd pav pu
                                 gil gisl
  k qi s gy inum dn' bm' n
-                                pidv dq dqb dqs m K eb b lks Vpr.
+                                pidv dq dqb dqs m K eb b lks Upr.
   Proof.
     cbv beta delta [wp_iunlockput_tx_sconf_body wp_iunlockput_dep_sconf_body].
     intros Hgen pcE ip pj ret_tgt HK Hk Hgeom Hsz Hbm0 Hbmc Hbml Hist Hcov
@@ -798,17 +798,17 @@ Section IunlockputOfDep.
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate) :
+      (b : bool) (lks : gset string) (Upr : ustate) :
     (forall (d : ic_dep) (tid : nat) (qtx : Qp),
        wp_iunlockput_dep_gen_body gs j gl pd pav pu
                                   gil gisl
  k qi s gy d inum
                                   dn' bm' n Sb crb cru crz e0 tid qtx
-                                  pidv dq dqb dqs m K eb b lks Vpr) ->
+                                  pidv dq dqb dqs m K eb b lks Upr) ->
     wp_iunlockput_tx_gen_body gs j gl pd pav pu
                               gil gisl
  k qi s gy inum dn' bm' n Sb crb cru
-                              crz e0 pidv dq dqb dqs m K eb b lks Vpr.
+                              crz e0 pidv dq dqb dqs m K eb b lks Upr.
   Proof.
     cbv beta delta [wp_iunlockput_tx_gen_body wp_iunlockput_dep_gen_body].
     intros Hgen pcE ip pj ret_tgt HK Hk Hcrb0 Hcru0 Hgeom Hsz Hbm0 Hbmc Hbml
@@ -857,12 +857,12 @@ Module Type IUNLOCKPUT.
       (tid : nat) (qtx : Qp)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Upr : ustate),
       wp_iunlockput_dep_gen_body gs j gl pd pav pu
                                  gil gisl
  k qi s gy d inum dn' bm' n Sb
                                  crb cru crz e0 tid qtx pidv dq dqb dqs m K eb b lks
-                                 Vpr.
+                                 Upr.
   (* the two TRANSACTIONAL forms (durable-disk B''-tx); [ProofIunlockput]
      defines them by [wp_iunlockput_tx_of_sconf] / [_of_gen]. *)
   Parameter wp_iunlockput_tx_sconf :
@@ -875,11 +875,11 @@ Module Type IUNLOCKPUT.
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Upr : ustate),
       wp_iunlockput_tx_sconf_body gs j gl pd pav pu
                                   gil gisl
  k qi s gy inum dn' bm' n
-                                  pidv dq dqb dqs m K eb b lks Vpr.
+                                  pidv dq dqb dqs m K eb b lks Upr.
   Parameter wp_iunlockput_tx_gen :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
@@ -890,9 +890,9 @@ Module Type IUNLOCKPUT.
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Upr : ustate),
       wp_iunlockput_tx_gen_body gs j gl pd pav pu
                                 gil gisl
  k qi s gy inum dn' bm' n Sb crb cru
-                                crz e0 pidv dq dqb dqs m K eb b lks Vpr.
+                                crz e0 pidv dq dqb dqs m K eb b lks Upr.
 End IUNLOCKPUT.

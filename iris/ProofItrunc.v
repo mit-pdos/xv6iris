@@ -91,7 +91,7 @@ Section ItruncCont.
       (ip : mword 64) (inum : mword 32) (dn : dinode) (bm : blkmap)
       (u : nat) (Sbf : gset Z)
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac) (j : nat)
-      (m : regfile) (K : nat) (b : bool) (eb : bool) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
+      (m : regfile) (K : nat) (b : bool) (eb : bool) (lks : gset string) (Upr : ustate) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
@@ -100,7 +100,7 @@ Section ItruncCont.
         trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        proc_priv_bare (proc_addr j) pidv Vpr -∗
+        proc_priv_bare (proc_addr j) pidv Upr -∗
         i_dev ip ↦₄{dqd} icfg_dev -∗
         i_inum ip ↦₄{dqn} inum -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
@@ -195,7 +195,7 @@ Section ItruncTail.
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat) (Sb0 : gset Z) (cru : bool) (e0 : nat)
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
-      (m M : regfile) (K : nat) (b : bool) (eb : bool) (lks : gset string) (Vpr : pprivate) :
+      (m M : regfile) (K : nat) (b : bool) (eb : bool) (lks : gset string) (Upr : ustate) :
     (K_itrunc <= K)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
     0 <= icfg_ist ->
@@ -225,7 +225,7 @@ Section ItruncTail.
     log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
     procs_inv γs -∗
     it_frame m -∗
-    proc_priv_bare (proc_addr j) pidv Vpr -∗
+    proc_priv_bare (proc_addr j) pidv Upr -∗
     i_dev ip ↦₄{dqd} icfg_dev -∗
     i_inum ip ↦₄{dqn} inum -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
@@ -246,7 +246,7 @@ Section ItruncTail.
     it_cont (CID0 := CID0)
  ip inum dn bm (if cru then S u else u)
             (Sb0 ∪ {[IBLOCK inum icfg_ist]})
-            pidv dq dqd dqn dqb dqs j m K b eb lks Vpr -∗
+            pidv dq dqd dqn dqb dqs j m K b eb lks Upr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hj Hgl Hsp Hthr Hs3 Hlkbelow.
@@ -361,7 +361,7 @@ Section ItruncTail.
  ip inum (di_trunc dn) dn0
               bm_empty u Sb0 cru e0 0%nat
               pidv dq dqd dqn dqs T1 (K - 6)%nat eb b
-              _ Vpr HKiu Hgeom Hist Hicov Hilog Hnib
+              _ Upr HKiu Hgeom Hist Hicov Hilog Hnib
               (* §19.6 Part 1: [di_trunc] keeps the type, so itrunc's own
                  [Hstab] about [dn] vs [dn0] is exactly what iupdate wants. *)
               Hstab Hnlk
@@ -672,7 +672,7 @@ Section ItruncDLoop.
       (data : nat -> list (bv 8))
       (pidv : mword 32) (dq dqd dqb : dfrac) (j : nat)
       (crb : bool) (Sb : gset Z) (e0 : nat) (w : nat)
-      (m : regfile) (K : nat) (b : bool) (eb : bool) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
+      (m : regfile) (K : nat) (b : bool) (eb : bool) (lks : gset string) (Upr : ustate) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ Mx : regfile,
         ⌜it_sp m Mx⌝ -∗ ⌜it_thr m Mx⌝ -∗ ⌜Mx !!! Regidx Rs3 = ip⌝ -∗
@@ -681,7 +681,7 @@ Section ItruncDLoop.
         trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (mword_of_int (IT + 0x32) : mword 64) -∗
-        proc_priv_bare (proc_addr j) pidv Vpr -∗
+        proc_priv_bare (proc_addr j) pidv Upr -∗
         i_dev ip ↦₄{dqd} icfg_dev -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
         bslots 2 -∗
@@ -696,7 +696,7 @@ Section ItruncDLoop.
       (data : nat -> list (bv 8))
       (pidv : mword 32) (dq dqd dqb : dfrac) (crb : bool) (Sb : gset Z) (e0 : nat)
       (w : nat)
-      (m : regfile) (K : nat) (b : bool) (eb : bool) (fuel : nat) (lks : gset string) (Vpr : pprivate) :
+      (m : regfile) (K : nat) (b : bool) (eb : bool) (fuel : nat) (lks : gset string) (Upr : ustate) :
     (K_itrunc <= K)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
     0 < fsc_size <= BPB ->
@@ -730,7 +730,7 @@ Section ItruncDLoop.
     bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
     log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
     procs_inv γs -∗
-    proc_priv_bare (proc_addr jx) pidv Vpr -∗
+    proc_priv_bare (proc_addr jx) pidv Upr -∗
     i_dev ip ↦₄{dqd} icfg_dev -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     (* THE BITMAP'S INVARIANT: persistent, so the loop carries nothing
@@ -742,7 +742,7 @@ Section ItruncDLoop.
     bslots 2 -∗
     it_dir_state fsc_fs ip bm data fsc_cov fsc_logst crb Sb e0 w k -∗
     it_dexit (CID0 := CID0)
-             ip bm data pidv dq dqd dqb jx crb Sb e0 w m K b eb lks Vpr -∗
+             ip bm data pidv dq dqd dqb jx crb Sb e0 w m K b eb lks Upr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hwf Hrange Hblen Hj Hgl.
@@ -1052,7 +1052,7 @@ Section ItruncDLoop.
                 fsc_cov fsc_logst fsc_bmapstart fsc_size icfg_dev
                 (bm_dir bm !!! k : mword 32) (data k) u' cr Sq e0
                 pidv dq dqb L3 (K - 6)%nat eb b
-                _ Vpr HKbf Hgeom Hsize Hbm0 Hbmcov Hbmlog
+                _ Upr HKbf Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 ltac:(destruct (bv_unsigned_in_range 32 (bm_dir bm !!! k))
                         as [Hlo _]; split; [exact Hlo | exact Hklt])
                 (Hblen k ltac:(unfold MAXFILE, NDIRECT in *; lia))
@@ -1239,7 +1239,7 @@ Section ItruncELoop.
       (data : nat -> list (bv 8)) (kk : nat) (dsk : mword 32)
       (pidv : mword 32) (dq dqd dqb : dfrac) (j : nat)
       (crb : bool) (Sb : gset Z) (e0 : nat) (w : nat)
-      (m : regfile) (K : nat) (b : bool) (eb : bool) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
+      (m : regfile) (K : nat) (b : bool) (eb : bool) (lks : gset string) (Upr : ustate) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ Mx : regfile,
         ⌜it_sp m Mx⌝ -∗ ⌜it_thr4 m Mx⌝ -∗ ⌜Mx !!! Regidx Rs3 = ip⌝ -∗
@@ -1249,7 +1249,7 @@ Section ItruncELoop.
         trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (mword_of_int (IT + 0x7a) : mword 64) -∗
-        proc_priv_bare (proc_addr j) pidv Vpr -∗
+        proc_priv_bare (proc_addr j) pidv Upr -∗
         i_dev ip ↦₄{dqd} icfg_dev -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
         bslots 2 -∗
@@ -1265,7 +1265,7 @@ Section ItruncELoop.
       (data : nat -> list (bv 8)) (kk : nat) (dsk : mword 32)
       (pidv : mword 32) (dq dqd dqb : dfrac) (crb : bool) (Sb : gset Z) (e0 : nat)
       (w : nat)
-      (m : regfile) (K : nat) (b : bool) (eb : bool) (fuel : nat) (lks : gset string) (Vpr : pprivate) :
+      (m : regfile) (K : nat) (b : bool) (eb : bool) (fuel : nat) (lks : gset string) (Upr : ustate) :
     (K_itrunc <= K)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
     0 < fsc_size <= BPB ->
@@ -1301,7 +1301,7 @@ Section ItruncELoop.
     bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
     log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
     procs_inv γs -∗
-    proc_priv_bare (proc_addr jx) pidv Vpr -∗
+    proc_priv_bare (proc_addr jx) pidv Upr -∗
     i_dev ip ↦₄{dqd} icfg_dev -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     (* THE BITMAP'S INVARIANT: persistent; see [it_dloop] *)
@@ -1313,7 +1313,7 @@ Section ItruncELoop.
     buf_own (bpa kk) (bm_ind bm) dsk (ind_bytes (bm_ent bm)) -∗
     it_ent_state fsc_fs bm data fsc_cov fsc_logst crb Sb e0 w q -∗
     it_eexit (CID0 := CID0)
-             ip bm data kk dsk pidv dq dqd dqb jx crb Sb e0 w m K b eb lks Vpr -∗
+             ip bm data kk dsk pidv dq dqd dqb jx crb Sb e0 w m K b eb lks Upr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hwf Hrange Hblen Hkk Hj Hgl.
@@ -1604,7 +1604,7 @@ Section ItruncELoop.
                 fsc_cov fsc_logst fsc_bmapstart fsc_size icfg_dev
                 (bm_ent bm !!! q : mword 32) (data (NDIRECT + q)%nat) u' cr Sq e0
                 pidv dq dqb E3 (K - 6)%nat eb b
-                _ Vpr HKbf Hgeom Hsize Hbm0 Hbmcov Hbmlog
+                _ Upr HKbf Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 ltac:(destruct (bv_unsigned_in_range 32 (bm_ent bm !!! q))
                         as [Hlo _]; split; [exact Hlo | exact Hqlt])
                 (Hblen (NDIRECT + q)%nat
@@ -1768,7 +1768,7 @@ Section ItruncIArm.
  (ip : mword 64) (bm : blkmap)
       (pidv : mword 32) (dq dqd dqb : dfrac) (j : nat)
       (crb : bool) (Sb : gset Z) (e0 : nat) (w : nat)
-      (m : regfile) (K : nat) (b : bool) (eb : bool) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
+      (m : regfile) (K : nat) (b : bool) (eb : bool) (lks : gset string) (Upr : ustate) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ Mx : regfile,
         ⌜it_sp m Mx⌝ -∗ ⌜it_thr m Mx⌝ -∗ ⌜Mx !!! Regidx Rs3 = ip⌝ -∗
@@ -1777,7 +1777,7 @@ Section ItruncIArm.
         trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (mword_of_int (IT + 0x38) : mword 64) -∗
-        proc_priv_bare (proc_addr j) pidv Vpr -∗
+        proc_priv_bare (proc_addr j) pidv Upr -∗
         i_dev ip ↦₄{dqd} icfg_dev -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
         (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[KT1] v) -∗
@@ -1793,7 +1793,7 @@ Section ItruncIArm.
       (data : nat -> list (bv 8))
       (pidv : mword 32) (dq dqd dqb : dfrac) (crb : bool) (Sb : gset Z) (e0 : nat)
       (w : nat)
-      (m M : regfile) (K : nat) (b : bool) (eb : bool) (lks : gset string) (Vpr : pprivate) :
+      (m M : regfile) (K : nat) (b : bool) (eb : bool) (lks : gset string) (Upr : ustate) :
     (K_itrunc <= K)%nat ->
     log_geom_ok fsc_cov fsc_logst ->
     0 < fsc_size <= BPB ->
@@ -1827,7 +1827,7 @@ Section ItruncIArm.
     bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
     log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
     procs_inv γs -∗
-    proc_priv_bare (proc_addr jx) pidv Vpr -∗
+    proc_priv_bare (proc_addr jx) pidv Upr -∗
     i_dev ip ↦₄{dqd} icfg_dev -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     (* THE BITMAP'S INVARIANT: persistent; see [it_dloop] *)
@@ -1842,7 +1842,7 @@ Section ItruncIArm.
     it_ent_res fsc_fs bm data 0 -∗
     bm_paidS crb w Sb e0 -∗
     it_armexit (CID0 := CID0)
-               ip bm pidv dq dqd dqb jx crb Sb e0 w m K b eb lks Vpr -∗
+               ip bm pidv dq dqd dqb jx crb Sb e0 w m K b eb lks Upr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hwf Hrange Hblen Hindnz Hj Hgl
@@ -1977,7 +1977,7 @@ Section ItruncIArm.
                  ltac:(wp_next_chain) with "Hexit") as "Hexit".
     iApply (BR.wp_bread_sconf γs jx γl fsc_uart fsc_disk fsc_dlock pd pav pu fsc_bio
               (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) pidv icfg_dev (bm_ind bm : mword 32) dq
-              A1 (K - 6)%nat eb b lks Vpr
+              A1 (K - 6)%nat eb b lks Upr
               HKbr
               ltac:(rewrite Huc;
                     change (2 ^ 31)%Z with 2147483648%Z in Hilt; exact Hilt)
@@ -2133,7 +2133,7 @@ Section ItruncIArm.
     iApply (it_eloop (CID0 := CID8) γs jx γl pd pav pu
  ip bm data kk
               (mword_of_int 0 : mword 32) pidv dq dqd dqb crb Sb e0 w m K b eb NINDIRECT lks
-              Vpr HK ltac:(split; [exact Hcovok | exact Hlogsub]) Hsize Hbm0
+              Upr HK ltac:(split; [exact Hcovok | exact Hlogsub]) Hsize Hbm0
               Hbmcov Hbmlog Hwf Hrange Hblen
               Hkk Hj Hgl
               0%nat A4 ltac:(unfold NINDIRECT; lia) ltac:(lia)
@@ -2210,7 +2210,7 @@ Section ItruncIArm.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (BL.wp_brelse_sconf γs fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) kk
               pidv icfg_dev (bm_ind bm : mword 32) dq B1 (K - 6)%nat eb
-              (proc_addr jx) (ind_bytes (bm_ent bm)) bsd0 d0 b lks Vpr
+              (proc_addr jx) (ind_bytes (bm_ent bm)) bsd0 d0 b lks Upr
               HKbl Hkk HB1a0
               (* brelse's bound is "bcache"(4); it_iarm's own is "log"(3),
                  and [locks_below_mono] weakens it. *)
@@ -2346,7 +2346,7 @@ Section ItruncIArm.
     iApply (BF.wp_bfree_gen γs jx γl fsc_uart fsc_disk fsc_dlock pd pav pu fsc_bio icfg_log fsc_fs
               fsc_cov fsc_logst fsc_bmapstart fsc_size icfg_dev
               (bm_ind bm : mword 32) (ind_bytes (bm_ent bm)) u' cr Sq e0
-              pidv dq dqb C2 (K - 6)%nat eb b lks Vpr
+              pidv dq dqb C2 (K - 6)%nat eb b lks Upr
               HKbf2 ltac:(split; [exact Hcovok | exact Hlogsub]) Hsize Hbm0
               Hbmcov Hbmlog
               ltac:(destruct (bv_unsigned_in_range 32 (bm_ind bm))
@@ -2499,11 +2499,11 @@ Section ItruncMain.
       (data : nat -> list (bv 8)) (u : nat) (Sb : gset Z) (crb cru : bool)
       (e0 : nat)
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate)
+      (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Upr : ustate)
     : wp_itrunc_gen_body γs j γl pd pav pu
 
                          ip inum dn dn0 bm data u Sb crb cru e0
-                         pidv dq dqd dqn dqb dqs m K eb b lks Vpr.
+                         pidv dq dqd dqn dqb dqs m K eb b lks Upr.
   Proof.
     cbv beta delta [wp_itrunc_gen_body].
     intros pcE pj ret_tgt HK Hcrb Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
@@ -2772,7 +2772,7 @@ Section ItruncMain.
     iApply (it_dloop (CID0 := CID11x) γs j γl pd pav pu
  ip bm data
               pidv dq dqd dqb crb Sb e0 u m K b eb NDIRECT lks
-              Vpr HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hwf Hrange Hblen Hj Hgl
+              Upr HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hwf Hrange Hblen Hj Hgl
               0%nat Q3 ltac:(unfold NDIRECT; lia) ltac:(lia)
               HQ3sp HQ3thr HQ3s1 HQ3s2 HQ3s3 Hlkbelow
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hprocs
@@ -2875,7 +2875,7 @@ Section ItruncMain.
  ip inum
                 dn dn0 bm
                 n1 Sq cru e0 pidv dq dqd dqn dqb dqs m R0 K b eb lks
-                Vpr HK
+                Upr HK
                 Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hj Hgl HR0sp HR0thr HR0s3
                 Hlkbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hprocs
@@ -2939,7 +2939,7 @@ Section ItruncMain.
       iApply (it_iarm (CID0 := CID14y) γs j γl pd pav pu
  ip bm data
                 pidv dq dqd dqb crb Sb e0 u m R0 K b eb lks
-                Vpr HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hwf Hrange Hblen Hyesind
+                Upr HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hwf Hrange Hblen Hyesind
                 Hj Hgl HR0sp HR0thr HR0s3 HR0a1 Hlkbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hprocs
                       Hppid Hidev Hsbb Hbmi Hdevi Hdgeom Hdlock [Hf6]
@@ -2962,7 +2962,7 @@ Section ItruncMain.
  ip inum
                 dn dn0 bm
                 n3 Sr cru e0 pidv dq dqd dqn dqb dqs m Mz K b eb lks
-                Vpr HK
+                Upr HK
                 Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hj Hgl HMzsp HMzthr HMzs3
                 Hlkbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hprocs
@@ -3009,11 +3009,11 @@ Section ItruncMain.
       (dn dn0 : dinode) (bm : blkmap)
       (data : nat -> list (bv 8)) (u : nat)
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate)
+      (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Upr : ustate)
     : wp_itrunc_sconf_body γs j γl pd pav pu
 
                            ip inum dn dn0 bm data u
-                           pidv dq dqd dqn dqb dqs m K eb b lks Vpr.
+                           pidv dq dqd dqn dqb dqs m K eb b lks Upr.
   Proof.
     cbv beta delta [wp_itrunc_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
@@ -3033,7 +3033,7 @@ Section ItruncMain.
 
               ip inum dn dn0 bm data u Sb0 false false e0
               pidv dq dqd dqn dqb dqs m K eb b lks
-              Vpr HK ltac:(discriminate)
+              Upr HK ltac:(discriminate)
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
               Hnib Hdtnz Hstab Hnlk Hwf Hbelow Hblen Hadr Hj Hgl Ha0 Hlkbelow
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hidev Hinum Hmeta Hmap

@@ -291,7 +291,7 @@ Definition wp_forkret_gen_body
        package cannot carry it outright; see ParkCap.v. *)
     (W : iProp Σ)
     (j : nat) (γs : list gname) (γl γf : gname)
-    (pid : mword 32) (V : pprivate)
+    (pid : mword 32) (U : ustate)
     (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.forkret in
   let p   : mword 64 := proc_addr j in
@@ -331,11 +331,11 @@ Definition wp_forkret_gen_body
   proc_lock_res γs γl p -∗
   (* ---- the process ---- *)
   is_kstack p ks -∗
-  proc_priv γf p pid V -∗
+  proc_priv γf p pid U -∗
   W -∗
   (* ---- the residue closer -- see the header, and [forkret_closer] above
      for why it is a name rather than the wand spelled out ---- *)
-  forkret_closer URes W γf p ksp (pv_fdg V) pid av -∗
+  forkret_closer URes W γf p ksp (pv_fdg (us_V U)) pid av -∗
   WP (Loop : expr riscv_lang).
 
 (* The residue is the module-type parameter it is everywhere else: forkret's
@@ -353,8 +353,8 @@ Module Type FORKRET.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (W : iProp Σ)
       (j : nat) (γs : list gname) (γl γf : gname)
-      (pid : mword 32) (V : pprivate)
+      (pid : mword 32) (U : ustate)
       (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool),
       wp_forkret_gen_body (fun h : CpuId => usertrap_res_bare (CID := h)) W
-        j γs γl γf pid V ks m av av2 eb.
+        j γs γl γf pid U ks m av av2 eb.
 End FORKRET.

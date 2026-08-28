@@ -148,12 +148,12 @@ Section KforkB4Res.
      same shape (open [proc_fields], hand out the one field, take back a
      REPLACEMENT of the same length), and every future name-writer (there is
      only kfork today) would want it. *)
-  Lemma kfk_name_open (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
-    proc_priv γf pa pid V -∗
-    pname_cells pa (DfracOwn 1) (pv_name V) ∗
-    ⌜length (pv_name V) = PNAMELEN⌝ ∗
+  Lemma kfk_name_open (γf : gname) (pa : mword 64) (pid : mword 32) (U : ustate) :
+    proc_priv γf pa pid U -∗
+    pname_cells pa (DfracOwn 1) (pv_name (us_V U)) ∗
+    ⌜length (pv_name (us_V U)) = PNAMELEN⌝ ∗
     (∀ ns : list (bv 8), ⌜length ns = PNAMELEN⌝ -∗ pname_cells pa (DfracOwn 1) ns -∗
-       proc_priv γf pa pid (MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V) ns)).
+       proc_priv γf pa pid (upd_usV U (MkPPriv (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_tf (us_V U)) (pv_ofile (us_V U)) (pv_fdg (us_V U)) (pv_cwd (us_V U)) ns))).
   Proof.
     iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
     rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
@@ -216,7 +216,7 @@ Section KforkB4Proof.
      and [ProofKforkB3.kfkb3_fd_loop]. *)
   Lemma kfk_b4
       (γf : gname)
-      (pid_p pid_c : mword 32) (Vp Vc : pprivate)
+      (pid_p pid_c : mword 32) (Up Uc : ustate)
       (pme npa : mword 64)
       (m : regfile) (rsv K lvl : nat) (eb : bool) (lks : gset string) :
     (22 <= K)%nat ->
@@ -250,7 +250,7 @@ Section KforkB4Proof.
     (* the child's iref units: the [1] is what [idup] spends here, and
        [IREFSPARE] rides through to the park. *)
     iref_slots (1 + IREFSPARE) -∗
-    proc_priv γf pme pid_p Vp -∗
+    proc_priv γf pme pid_p Up -∗
     (* THE CHILD'S TOKEN'S SOURCE.  The parent's [FirstTok.first_tok] is
        inside its own block and may be the EXCLUSIVE boot arm, so it cannot
        be copied; [first_done] is the steady arm alone, persistent, and
@@ -259,7 +259,7 @@ Section KforkB4Proof.
     (* THE CHILD IS STILL IN THE CONSTRUCTION WINDOW: allocproc left
        [np->cwd] at 0 and nothing has set it, so there is no [proc_priv] at
        this [Vc].  The [sd a0,336(s4)] below is what closes the window. *)
-    proc_priv_nocwd γf npa pid_c Vc -∗
+    proc_priv_nocwd γf npa pid_c Uc -∗
     wp_next false pme (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜(forall r : mword 5, is_cs_idx r = true -> r <> Rs1 ->
@@ -268,13 +268,13 @@ Section KforkB4Proof.
         sie_cap_gpr KT1 mf (rsv + (K - 8))%nat false pme -∗
         cpu_own lvl eb pme false lks -∗
         pc_is (mword_of_int (KF + 0xc2) : mword 64) -∗
-        proc_priv γf pme pid_p Vp -∗
+        proc_priv γf pme pid_p Up -∗
         (∃ Vc' : pprivate,
-           ⌜pv_sz Vc' = pv_sz Vc /\ pv_upt Vc' = pv_upt Vc /\
-            pv_tf Vc' = pv_tf Vc /\ pv_ofile Vc' = pv_ofile Vc /\
-            pv_cwd Vc' = pv_cwd Vp /\ pv_fdg Vc' = pv_fdg Vc /\
+           ⌜pv_sz Vc' = pv_sz (us_V Uc) /\ pv_upt Vc' = pv_upt (us_V Uc) /\
+            pv_tf Vc' = pv_tf (us_V Uc) /\ pv_ofile Vc' = pv_ofile (us_V Uc) /\
+            pv_cwd Vc' = pv_cwd (us_V Up) /\ pv_fdg Vc' = pv_fdg (us_V Uc) /\
             length (pv_name Vc') = PNAMELEN⌝ ∗
-           proc_priv γf npa pid_c Vc') -∗
+           proc_priv γf npa pid_c (MkUstate Vc' ((us_M Uc)))) -∗
         iref_slots IREFSPARE -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -291,13 +291,13 @@ Section KforkB4Proof.
        existentially and [IcacheInv.ientry_inj] is what makes hiding them
        lossless -- so [pv_cwd Vp = ientry ck] is now DERIVED here rather
        than premised on the caller. *)
-    iDestruct (proc_priv_cwd γf pme pid_p Vp with "Hparent") as "(Hpcwd & Hpcref & Hpback)".
+    iDestruct (proc_priv_cwd γf pme pid_p Up with "Hparent") as "(Hpcwd & Hpcref & Hpback)".
     (* the LIVE arm, picked out by the premise, and its three hidden data:
        the slot, the retained fraction and the inum.  The DEVICE is not
        hidden -- it is the cache's [icfg_dev] (design §13.11's
        single-device pin), which is what lets the itable this block holds
        the lock for be named without a coherence premise. *)
-    iDestruct (cwd_ref_held (pv_cwd Vp) with "Hpcref") as "Hpcref".
+    iDestruct (cwd_ref_held (pv_cwd (us_V Up)) with "Hpcref") as "Hpcref".
     (* SIMP-2: the three hidden data are still read off the package -- the
        SLOT is what [a0] is set to and the two pure facts are what the
        child's [cwd_ref] wants back -- but the package itself now travels
@@ -319,7 +319,7 @@ Section KforkB4Proof.
     { rewrite (rget_ne m Rs5 ltac:(vm_compute; discriminate)) Hms5. apply p_cwd_sext. }
     iEval (rewrite -Hpa0a4) in "Hpcwd".
     iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0xa4)) Ra0 Rs5 (mword_of_int 336 : mword 12)
-              m (rsv + (K - 8))%nat (pv_cwd Vp) false (dqm := DfracOwn 1)
+              m (rsv + (K - 8))%nat (pv_cwd (us_V Up)) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hpcwd").
     { iApply (kfk_0a4 with "Htext"). }
@@ -328,8 +328,8 @@ Section KforkB4Proof.
     (* the parent's block cannot close yet: its reference is on its way
        into idup.  It closes at [Hparent2] below, around idup's FIRST half
        -- the cell never changed, only the fraction, which [cwd_ref] hides. *)
-    set (M0 := <[Regidx Ra0 := regval_into_reg (pv_cwd Vp)]> m).
-    change (<[Regidx Ra0 := regval_into_reg (pv_cwd Vp)]> m) with M0.
+    set (M0 := <[Regidx Ra0 := regval_into_reg (pv_cwd (us_V Up))]> m).
+    change (<[Regidx Ra0 := regval_into_reg (pv_cwd (us_V Up))]> m) with M0.
     assert (HM0a0 : M0 !!! Regidx Ra0 = ientry ck) by (rewrite /M0 upd_eq; exact Hcwd).
     assert (HM0s4 : M0 !!! Regidx Rs4 = npa)
       by (rewrite /M0 upd_ne; [exact Hms4 | vm_compute; discriminate]).
@@ -381,8 +381,8 @@ Section KforkB4Proof.
        back into its block. *)
     iDestruct (cwd_ref_of_held (ientry ck) with "Hpheld1") as "Hpcref1".
     iEval (rewrite -Hcwd) in "Hpcref1".
-    iDestruct ("Hpback" $! (pv_cwd Vp) with "Hpcwd Hpcref1") as "Hparent2".
-    iEval (rewrite upd_cwd_id) in "Hparent2".
+    iDestruct ("Hpback" $! (pv_cwd (us_V Up)) with "Hpcwd Hpcref1") as "Hparent2".
+    iEval (rewrite us_cwd_id) in "Hparent2".
     destruct Hidup_post as [Hcs_idup Hidup_a0].
     assert (Hpc0ac : ret_pc (M1 !!! Regidx Rra) = mword_of_int (KF + 0xac)).
     { rewrite HM1ra. apply bv_eq; vm_compute; reflexivity. }
@@ -394,13 +394,13 @@ Section KforkB4Proof.
     (* ------------------------------------------------------------- *)
     (* +0xac: sd a0,336(s4) -- np->cwd := a0 (= ientry ck).           *)
     (* ------------------------------------------------------------- *)
-    iDestruct (proc_priv_nocwd_cwd γf npa pid_c Vc with "Hchild") as "(Hccwd & Hcback)".
+    iDestruct (proc_priv_nocwd_cwd γf npa pid_c Uc with "Hchild") as "(Hccwd & Hcback)".
     assert (Hpa0ac : add_vec (rget mr Rs4) (sign_extend' 64 (mword_of_int 336 : mword 12))
                      = p_cwd npa).
     { rewrite (rget_ne mr Rs4 ltac:(vm_compute; discriminate)) Hmrs4. apply p_cwd_sext. }
     iEval (rewrite -Hpa0ac) in "Hccwd".
     iApply (wp_sd_s_sconf (mword_of_int (KF + 0xac)) Ra0 Rs4 (mword_of_int 336 : mword 12)
-              mr (rsv + (K - 8))%nat (pv_cwd Vc) false
+              mr (rsv + (K - 8))%nat (pv_cwd (us_V Uc)) false
               with "Hcg Hpc [] Hccwd").
     { iApply (kfk_0ac with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hccwd".
@@ -411,14 +411,14 @@ Section KforkB4Proof.
     iDestruct (cwd_ref_of_held (ientry ck) with "Hpheld2") as "Hccref2".
     iDestruct ("Hcback" $! (ientry ck) with "Hccwd") as "Hchild2".
     (* THE WINDOW CLOSES HERE: cell + reference = the real block. *)
-    iAssert (proc_priv γf npa pid_c (upd_cwd Vc (ientry ck))) with "[Hchild2 Hccref2]"
+    iAssert (proc_priv γf npa pid_c (us_cwd Uc (ientry ck))) with "[Hchild2 Hccref2]"
       as "Hchild2".
     { iApply proc_priv_split_cwd. iFrame "Hchild2".
       iSplitL "Hccref2"; [by cbn [upd_cwd pv_cwd pv_fdg] |].
       (* THE MINT.  The child's token is the steady arm of the disjunction,
          built from the persistent [first_done] the caller threaded in. *)
       iApply (first_tok_of_done with "Hfdone"). }
-    set (Vc2 := upd_cwd Vc (ientry ck)).
+    set (Vc2 := upd_cwd (us_V Uc) (ientry ck)).
     (* the store touches no register *)
     set (M2 := mr).
     assert (HM2a1 : M2 !!! Regidx Ra1 = M2 !!! Regidx Ra1) by reflexivity.
@@ -519,15 +519,15 @@ Section KforkB4Proof.
     assert (HM6s5 : M6 !!! Regidx Rs5 = pme)
       by (rewrite /M6 upd_ne; [exact HM3s5 | vm_compute; discriminate]).
     (* open both name buffers *)
-    iDestruct (kfk_name_open γf pme pid_p Vp with "Hparent2") as "(HnmP & %HnlP & HnmPback)".
-    iDestruct (kfk_name_open γf npa pid_c Vc2 with "Hchild2") as "(HnmC & %HnlC & HnmCback)".
+    iDestruct (kfk_name_open γf pme pid_p Up with "Hparent2") as "(HnmP & %HnlP & HnmPback)".
+    iDestruct (kfk_name_open γf npa pid_c (MkUstate Vc2 _) with "Hchild2") as "(HnmC & %HnlC & HnmCback)".
     (* past [pname_wf]: the parent's is carried through untouched (safestrcpy
        only READS it), the child's is re-derived below from the call's own
        postcondition. *)
     iDestruct (pname_cells_open with "HnmP") as "(%HwfP & HnmP)".
     iDestruct (pname_cells_open with "HnmC") as "(_ & HnmC)".
-    iDestruct (kfk_pname_bytes pme (DfracOwn 1) (pv_name Vp) (kfk_name_fn (pv_name Vp))
-                 (kfk_name_fn_spec (pv_name Vp)) with "HnmP") as "HnmPseq".
+    iDestruct (kfk_pname_bytes pme (DfracOwn 1) (pv_name (us_V Up)) (kfk_name_fn (pv_name (us_V Up)))
+                 (kfk_name_fn_spec (pv_name (us_V Up))) with "HnmP") as "HnmPseq".
     iDestruct (kfk_pname_bytes npa (DfracOwn 1) (pv_name Vc2) (kfk_name_fn (pv_name Vc2))
                  (kfk_name_fn_spec (pv_name Vc2)) with "HnmC") as "HnmCseq".
     iEval (rewrite HnlP) in "HnmPseq".
@@ -543,7 +543,7 @@ Section KforkB4Proof.
     (* [ns := n = 16]: kfork owns all sixteen bytes of [p->name], so the
        source-ownership premise is [ssc_src_ok]'s first (budget) disjunct. *)
     iApply (SS.wp_safestrcpy_sconf KT0 KT0 M6 16%nat 16%nat
-              (kfk_name_fn (pv_name Vp)) (kfk_name_fn (pv_name Vc2))
+              (kfk_name_fn (pv_name (us_V Up))) (kfk_name_fn (pv_name Vc2))
               (rsv + (K - 8))%nat (DfracOwn 1) false pme
               ltac:(etransitivity; [exact (kfk_b4_stack_ss K HK) | lia]) HM6a2' Hn31
               (SpecSafestrcpy.ssc_src_ok_full _ _)
@@ -559,15 +559,15 @@ Section KforkB4Proof.
     { rewrite (callee_saved_lookup Hcs_ss Rs5 ltac:(vm_compute; reflexivity)). exact HM6s5. }
     (* re-fold the parent's name bytes back to EXACTLY [pv_name Vp] *)
     iEval (rewrite HM6a1) in "HnmPseq'".
-    iDestruct (kfk_bytes_pname pme (DfracOwn 1) 16%nat (kfk_name_fn (pv_name Vp))
+    iDestruct (kfk_bytes_pname pme (DfracOwn 1) 16%nat (kfk_name_fn (pv_name (us_V Up)))
                  with "HnmPseq'") as "HnmPfold".
-    assert (Hpname_eq : (kfk_name_fn (pv_name Vp)) <$> seq 0 16%nat = pv_name Vp).
-    { pose proof (kfk_list_of_fn (pv_name Vp) (kfk_name_fn (pv_name Vp))
-                    (kfk_name_fn_spec (pv_name Vp))) as Heq.
+    assert (Hpname_eq : (kfk_name_fn (pv_name (us_V Up))) <$> seq 0 16%nat = pv_name (us_V Up)).
+    { pose proof (kfk_list_of_fn (pv_name (us_V Up)) (kfk_name_fn (pv_name (us_V Up)))
+                    (kfk_name_fn_spec (pv_name (us_V Up)))) as Heq.
       rewrite HnlP in Heq. symmetry. exact Heq. }
     iEval (rewrite Hpname_eq) in "HnmPfold".
     iDestruct (pname_cells_intro _ _ _ HwfP with "HnmPfold") as "HnmPfold".
-    iDestruct ("HnmPback" $! (pv_name Vp) HnlP with "HnmPfold") as "Hparent3".
+    iDestruct ("HnmPback" $! (pv_name (us_V Up)) HnlP with "HnmPfold") as "Hparent3".
     iEval (rewrite pprivate_eta) in "Hparent3".
     (* fold the child's new name bytes and close, at the EXISTENTIAL [Vc'] *)
     iEval (rewrite HM6a0) in "HnmCseq'".
@@ -578,7 +578,7 @@ Section KforkB4Proof.
        to be dropped here; carrying it is what retires the [p->name]
        assumption at syscall()'s fallback. *)
     iDestruct (pname_cells_intro _ _ _
-                 (kfk_name_wf 16%nat (kfk_name_fn (pv_name Vp))
+                 (kfk_name_wf 16%nat (kfk_name_fn (pv_name (us_V Up)))
                     (kfk_name_fn (pv_name Vc2)) h ltac:(lia) Hpostdisj)
                  with "HnmCfold") as "HnmCfold".
     iDestruct ("HnmCback" $! (h <$> seq 0 16%nat) Hlen_hn with "HnmCfold") as "Hchild3".
@@ -587,7 +587,7 @@ Section KforkB4Proof.
     (* ------------------------------------------------------------- *)
     (* +0xbe: lw s1,48(s4) -- s1 := np->pid, THE RETURN VALUE.        *)
     (* ------------------------------------------------------------- *)
-    iDestruct (proc_priv_pid γf npa pid_c Vc3 with "Hchild3") as "[Hcpid Hcpidback]".
+    iDestruct (proc_priv_pid γf npa pid_c (MkUstate Vc3 _) with "Hchild3") as "[Hcpid Hcpidback]".
     iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0xbe)) Rs1 Rs4 (mword_of_int 48 : mword 12)
               mr2 (rsv + (K - 8))%nat pid_c false (dqm := DfracOwn (1/4))
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -624,11 +624,11 @@ Section KforkB4Proof.
     (* Package the child's final block as the existential [Vc'].     *)
     (* ------------------------------------------------------------- *)
     iAssert (∃ Vc' : pprivate,
-               ⌜pv_sz Vc' = pv_sz Vc /\ pv_upt Vc' = pv_upt Vc /\
-                pv_tf Vc' = pv_tf Vc /\ pv_ofile Vc' = pv_ofile Vc /\
-                pv_cwd Vc' = pv_cwd Vp /\ pv_fdg Vc' = pv_fdg Vc /\
+               ⌜pv_sz Vc' = pv_sz (us_V Uc) /\ pv_upt Vc' = pv_upt (us_V Uc) /\
+                pv_tf Vc' = pv_tf (us_V Uc) /\ pv_ofile Vc' = pv_ofile (us_V Uc) /\
+                pv_cwd Vc' = pv_cwd (us_V Up) /\ pv_fdg Vc' = pv_fdg (us_V Uc) /\
                 length (pv_name Vc') = PNAMELEN⌝ ∗
-               proc_priv γf npa pid_c Vc')%I
+               proc_priv γf npa pid_c (MkUstate Vc' ((us_M Uc))))%I
       with "[Hchild4]" as "HchildFinal".
     { iExists Vc3.
       iSplitR.

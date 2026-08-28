@@ -102,7 +102,7 @@ Definition wp_sys_exit_sconf_body
                (* kmem.lock, kalloc   *)
     (on : option nat) (fn : fclose_names)
     (m : regfile) (av : nat) (eb : bool) (b : bool)
-    (pid : mword 32) (V : pprivate) (v0 : mword 64) (lks : gset string) :=
+    (pid : mword 32) (U : ustate) (v0 : mword 64) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_exit in
   let pj := proc_addr j in
   fn = MkFCloseNames γs j γl pd pav pu
@@ -110,7 +110,7 @@ Definition wp_sys_exit_sconf_body
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* the syscall argument, out of the trapframe page [proc_priv] carries *)
-  pv_tf V !! tf_arg_idx 0 = Some v0 ->
+  pv_tf (us_V U) !! tf_arg_idx 0 = Some v0 ->
   (K_sys_exit <= av)%nat ->
   (* the covered range's block-number bounds, and the log's own storage *)
   log_geom_ok fsc_cov fsc_logst ->
@@ -171,12 +171,12 @@ Definition wp_sys_exit_sconf_body
   (* ... and its iref allowance, which kexit rejoins with the cwd unit iput
      hands back to build the ZOMBIE block *)
   iref_slots IREFSPARE -∗
-  proc_priv γf pj pid V -∗
+  proc_priv γf pj pid U -∗
   (* THE fd-STATE FRAGMENT BUNDLE, and it does not come back: sys_exit runs
      kexit, which closes every descriptor (a retype, so it needs both halves)
      and then parks the process as a ZOMBIE.  The bundle dies with the
      incarnation whose name it is keyed on (FdSlots.v). *)
-  fd_frags_any (pv_fdg V) -∗
+  fd_frags_any (pv_fdg (us_V U)) -∗
   (* NO continuation: sys_exit does not return.  See the header. *)
   WP (Loop : expr riscv_lang).
 
@@ -189,9 +189,9 @@ Module Type SYSEXIT.
       (ip : mword 64) (dqi : dfrac)
         (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (b : bool)
-      (pid : mword 32) (V : pprivate) (v0 : mword 64) (lks : gset string),
+      (pid : mword 32) (U : ustate) (v0 : mword 64) (lks : gset string),
       wp_sys_exit_sconf_body γft γf γw γs j γl pd pav pu
  ip dqi
 
-                             on fn m av eb b pid V v0 lks.
+                             on fn m av eb b pid U v0 lks.
 End SYSEXIT.

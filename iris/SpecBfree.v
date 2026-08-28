@@ -112,7 +112,7 @@ Definition wp_bfree_gen_body
     (u : nat) (cr : bool) (Sb : gset Z) (e0 : nat)
     (pidv : mword 32) (dq dqb : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bfree in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -170,7 +170,7 @@ Definition wp_bfree_gen_body
      makes the panic dead. *)
   fsblock (fs_bytes γfs) (bv_unsigned bno) bs -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
   (* the disk fabric *)
@@ -217,7 +217,7 @@ Definition wp_bfree_gen_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       bslots 2 -∗
       log_opSe γ (if cr then S u else u) (Sb ∪ {[bmapstart]}) e0 -∗
@@ -237,7 +237,7 @@ Definition wp_bfree_sconf_body
     (u : nat)
     (pidv : mword 32) (dq dqb : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :=
+    (b : bool) (lks : gset string) (Upr : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bfree in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -295,7 +295,7 @@ Definition wp_bfree_sconf_body
      makes the panic dead. *)
   fsblock (fs_bytes γfs) (bv_unsigned bno) bs -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
-  proc_priv_bare pj pidv Vpr -∗
+  proc_priv_bare pj pidv Upr -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
   (* the disk fabric *)
@@ -323,7 +323,7 @@ Definition wp_bfree_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      proc_priv_bare pj pidv Vpr -∗
+      proc_priv_bare pj pidv Upr -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       bslots 2 -∗
       log_op γ u -∗
@@ -347,10 +347,10 @@ Module Type BFREE.
       (u : nat) (cr : bool) (Sb : gset Z) (e0 : nat)
       (pidv : mword 32) (dq dqb : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Upr : ustate),
       wp_bfree_gen_body γs j γl γu γd γk pd pav pu bn γ γfs
                         cov logstart bmapstart size dev bno bs u cr Sb e0
-                        pidv dq dqb m K eb b lks Vpr.
+                        pidv dq dqb m K eb b lks Upr.
 
   Parameter wp_bfree_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
@@ -365,8 +365,8 @@ Module Type BFREE.
       (u : nat)
       (pidv : mword 32) (dq dqb : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
+      (b : bool) (lks : gset string) (Upr : ustate),
       wp_bfree_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
                           cov logstart bmapstart size dev bno bs u
-                          pidv dq dqb m K eb b lks Vpr.
+                          pidv dq dqb m K eb b lks Upr.
 End BFREE.

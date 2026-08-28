@@ -338,8 +338,8 @@ Section ProofSysDup.
   (* =================================================================== *)
   Lemma wp_sys_dup_sconf (γl γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
-      (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string)
-    : wp_sys_dup_sconf_body γl γf m av n eb p v pid V b lks.
+      (v : mword 64) (pid : mword 32) (U : ustate) (b : bool) (lks : gset string)
+    : wp_sys_dup_sconf_body γl γf m av n eb p v pid U b lks.
   Proof.
     cbv beta delta [wp_sys_dup_sconf_body].
     intros pcE ret_tgt Harg Hn Hav Hftno.
@@ -536,7 +536,7 @@ Section ProofSysDup.
     iEval (rewrite -HM6a2) in "Hs5".
     iDestruct (cpu_own_transport CID CID8 n eb p b ltac:(wp_next_chain) with "Hcpu")
       as "Hcpu".
-    iApply (Argfd.wp_argfd_sconf γf M6 (av - 6)%nat n eb p 0%nat v pid V
+    iApply (Argfd.wp_argfd_sconf γf M6 (av - 6)%nat n eb p 0%nat v pid U
               (word_lo w5) w5 b lks
               ltac:(unfold NARG; lia) HM6a0' Harg Hs5nz Hn
               ltac:(lia)
@@ -617,7 +617,7 @@ Section ProofSysDup.
     (* ===================== argfd found the descriptor ===================== *)
     iDestruct "Hsucc" as (fd0 fv) "([%Hrv0 %Hsome] & _ & Hs5)".
     iEval (rewrite HM6a2) in "Hs5".
-    destruct (arg_fd_lookup v (pv_ofile V) fd0 fv Hsome) as (Hfd0lt & Hlk0 & Hfvnz & _).
+    destruct (arg_fd_lookup v (pv_ofile (us_V U)) fd0 fv Hsome) as (Hfd0lt & Hlk0 & Hfvnz & _).
     iApply (wp_blt_x0_fall_s_sconf (mword_of_int (KernelSyms.sys_dup + 0x16))
               (mword_of_int 38 : mword 13) Ra0 B1 (av - 6)%nat b
               ltac:(vm_compute; discriminate)
@@ -731,11 +731,11 @@ Section ProofSysDup.
        fdalloc wants the block, and filedup will want THIS descriptor's
        reference, so the reference comes out first and the array goes in
        holed. *)
-    iDestruct (proc_priv_lend γf p pid V fd0 fv Hlk0 Hfvnz with "Hpriv")
+    iDestruct (proc_priv_lend γf p pid U fd0 fv Hlk0 Hfvnz with "Hpriv")
       as (k q stf) "((%Hfvk & %Hklt & %Hty) & Href & Hauth0 & Hcore & Hof)".
     iDestruct (cpu_own_transport CID9 CID16 n eb p b ltac:(wp_next_chain) with "Hcpu")
       as "Hcpu".
-    iApply (Fdalloc.wp_fdalloc_sconf γf k {[fd0]} B4 (av - 6)%nat n eb p pid V b lks
+    iApply (Fdalloc.wp_fdalloc_sconf γf k {[fd0]} B4 (av - 6)%nat n eb p pid (upd_usM U _) b lks
               ltac:(rewrite HB4a0 Hfvk; reflexivity) Hklt Hn
               ltac:(lia)
               with "Hcg Hcpu Htext Hdata Hpc Hcore Hof").
@@ -825,7 +825,7 @@ Section ProofSysDup.
       (* NOT [set_solver]: it runs naive_solver over the WHOLE context, which
          here is ~200 hypotheses of large mword terms -- 106 s for [fd0 not in
          {}].  See claude-notes/optimization.md. *)
-      iDestruct (proc_ofiles_repay γf (pv_fdg V) p (pv_ofile V) ∅ fd0 k q stf
+      iDestruct (proc_ofiles_repay γf (pv_fdg (us_V U)) p (pv_ofile (us_V U)) ∅ fd0 k q stf
                    ltac:(apply not_elem_of_empty)
                    ltac:(rewrite Hlk0 Hfvk; reflexivity) Hklt Hty
                    with "[Hof] Href Hauth0") as "Hof".
@@ -922,10 +922,10 @@ Section ProofSysDup.
       iPureIntro. split; [exact HFa0|]. split; [exact Hsome | exact Hnone2]. }
     (* ============ the descriptor was allocated: duplicate ============ *)
     iDestruct "Hs2ok" as (fd1 l) "([%Hr2 %Hfr1] & Hof & Hunit & Hauth1)".
-    pose proof (fd_frees_head_lt (pv_ofile V) fd1 l Hfr1) as Hfd1len.
+    pose proof (fd_frees_head_lt (pv_ofile (us_V U)) fd1 l Hfr1) as Hfd1len.
     assert (Hfd1N : (fd1 < NOFILE)%nat) by (rewrite -Hoflen; exact Hfd1len).
-    assert (Hfree1 : pv_ofile V !! fd1 = Some (zero_reg : mword 64))
-      by exact (fd_frees_head (pv_ofile V) fd1 l Hfr1).
+    assert (Hfree1 : pv_ofile (us_V U) !! fd1 = Some (zero_reg : mword 64))
+      by exact (fd_frees_head (pv_ofile (us_V U)) fd1 l Hfr1).
     (* THE TWO DESCRIPTORS ARE DISTINCT: fd0's entry is non-null, fd1's is *)
     assert (Hne01 : fd1 <> fd0).
     { intro He. rewrite He Hlk0 in Hfree1. injection Hfree1 as He2.
@@ -1011,30 +1011,31 @@ Section ProofSysDup.
     (* ===================== THE TWO REPAYMENTS =====================
        filedup handed back two halves; one settles the destination descriptor
        fdalloc filled, the other the source we borrowed from. *)
-    assert (Hlk1 : pv_ofile (upd_ofile V fd1 (fnode k)) !! fd1 = Some (fnode k)).
+    assert (Hlk1 : pv_ofile (upd_ofile (us_V U) fd1 (fnode k)) !! fd1 = Some (fnode k)).
     { cbn [upd_ofile pv_ofile pv_fdg]. apply list_lookup_insert. rewrite Hoflen. exact Hfd1N. }
-    assert (Hlk0' : pv_ofile (upd_ofile V fd1 (fnode k)) !! fd0 = Some (fnode k)).
+    assert (Hlk0' : pv_ofile (upd_ofile (us_V U) fd1 (fnode k)) !! fd0 = Some (fnode k)).
     { cbn [upd_ofile pv_ofile pv_fdg]. rewrite list_lookup_insert_ne; [| exact Hne01].
       rewrite Hlk0 Hfvk. reflexivity. }
     (* THE DESTINATION IS THE ONE THAT CHANGES STATE.  fdalloc handed out its
        authority at [FdClosed]; it has to arrive at the source file's type,
        and that move is what this syscall spends the fragment bundle on. *)
-    iDestruct (fd_frags_any_acc (pv_fdg V) fd1 Hfd1N with "Hfrag")
+    iDestruct (fd_frags_any_acc (pv_fdg (us_V U)) fd1 Hfd1N with "Hfrag")
       as (stq) "[Hfr Hfrback]".
     iMod (fd_st_move _ fd1 FdClosed stq stf with "Hauth1 Hfr")
       as "[Hauth1 Hfr]".
     iDestruct ("Hfrback" with "Hfr") as "Hfrag".
-    iDestruct (proc_ofiles_repay γf (pv_fdg V) p (pv_ofile (upd_ofile V fd1 (fnode k)))
+    iDestruct (proc_ofiles_repay γf (pv_fdg (us_V U)) p (pv_ofile (upd_ofile (us_V U) fd1 (fnode k)))
                  {[fd0]} fd1 k (q/2)%Qp stf
                  ltac:(apply not_elem_of_singleton_2; exact Hne01)
                  Hlk1 Hklt Hty with "Hof Href0 Hauth1") as "Hof".
     (* the SOURCE keeps its state: the authority the loan took out goes back
        exactly as it came, so no second bundle access is needed. *)
-    iDestruct (proc_ofiles_repay γf (pv_fdg V) p (pv_ofile (upd_ofile V fd1 (fnode k)))
+    iDestruct (proc_ofiles_repay γf (pv_fdg (us_V U)) p (pv_ofile (upd_ofile (us_V U) fd1 (fnode k)))
                  ∅ fd0 k (q/2)%Qp stf ltac:(apply not_elem_of_empty) Hlk0' Hklt Hty
                  with "[Hof] Href1 Hauth0") as "Hof".
     { rewrite (union_empty_r_L {[fd0]}). iExact "Hof". }
-    iDestruct (proc_priv_join with "[Hcore] Hof") as "Hpriv".
+    iDestruct (proc_priv_join γf p pid (us_ofile U fd1 (fnode k))
+                 with "[Hcore] Hof") as "Hpriv".
     { rewrite proc_priv_core_upd_ofile. iExact "Hcore". }
     (* ---- +0x36: c.mv a5,s2 -- the return value ---- *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.sys_dup + 0x36)) Ra5 Rs2 G3 (av - 6)%nat b

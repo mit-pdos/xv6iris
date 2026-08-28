@@ -72,7 +72,7 @@ Definition wp_uvmdealloc_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN
   cpu_own 0%nat eb p b lks -∗
   kernel_text -∗
   pc_is pcE -∗
-  proc_pt P -∗
+  proc_pt_any P -∗
   kalloc_env γa None -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
@@ -84,7 +84,7 @@ Definition wp_uvmdealloc_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN
         mr !!! Regidx (mword_of_int 10) = oldsz)
       \/ ((uint newsz < uint oldsz)%Z /\
           mr !!! Regidx (mword_of_int 10) = newsz) ⌝ -∗
-    proc_pt (uptd_del_run P (svpn_of (pgroundup newsz)) (uvmd_np oldsz newsz)) -∗
+    proc_pt_any (uptd_del_run P (svpn_of (pgroundup newsz)) (uvmd_np oldsz newsz)) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

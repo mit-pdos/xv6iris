@@ -517,7 +517,7 @@ Definition wp_writei_sconf_body
     (bm : blkmap) (data : nat -> list (bv 8))
     (dn dn0 : dinode)
     (user : bool) (off n : nat) (src_bytes : nat -> bv 8)
-    (V : pprivate) (ncount : nat)
+    (U : ustate) (ncount : nat)
     (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
@@ -677,9 +677,9 @@ Definition wp_writei_sconf_body
      user-arm caller, is what forced the repair.  [SpecReadi.v]:244-267 is
      the same fix, made one stage earlier by fileread.) *)
   (if user
-   then proc_priv_core pj pidv V
+   then proc_priv_core pj pidv U
    else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ[ktb] src_bytes i) ∗
-        proc_priv_bare pj pidv V) -∗
+        proc_priv_bare pj pidv U) -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
   (* the disk fabric *)
@@ -700,7 +700,10 @@ Definition wp_writei_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (tot : nat) (bm' : blkmap) (data' : nat -> list (bv 8))
     (dn' dn0' : dinode) (n' : nat)
-    (wrote : nat -> bv 8) (dist : nat) (dstb : nat -> bv 8) (P' : uptd),
+    (* the image moves: the copy leaf may fault a page in -- milestone J
+       item 1's ∃-weakened staging *)
+    (wrote : nat -> bv 8) (dist : nat) (dstb : nat -> bv 8) (P' : uptd)
+    (M' : gmap Z (bv 8)),
       ⌜callee_saved m mf⌝ -∗
       (* THE ALLOCATOR NEVER UN-MARKS: [used] only grows, across every bmap
          the loop performs. *)
@@ -748,7 +751,7 @@ Definition wp_writei_sconf_body
            /\ dn0' = dn')⌝ -∗
       (* at most [wi_cost_bmonly off n] units gone, and none gained *)
       ⌜((ncount - wi_cost_bmonly off n)%nat <= n')%nat /\ (n' <= ncount)%nat⌝ -∗
-      ⌜uptd_ext (pv_upt V) P'⌝ -∗
+      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗
@@ -766,9 +769,9 @@ Definition wp_writei_sconf_body
       (* the source goes back the way it came -- with the kernel arm's
          buffer, or inside the user arm's block *)
       (if user
-       then proc_priv_core pj pidv (upd_upt V P')
+       then proc_priv_core pj pidv (upd_usM (us_upt U P') M')
        else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ[ktb] src_bytes i) ∗
-            proc_priv_bare pj pidv V) -∗
+            proc_priv_bare pj pidv U) -∗
       bslots 3 -∗
       log_op icfg_log n' -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -795,7 +798,7 @@ Definition wp_writei_gen_body
     (bm : blkmap) (data : nat -> list (bv 8))
     (dn dn0 : dinode)
     (user : bool) (off n : nat) (src_bytes : nat -> bv 8)
-    (V : pprivate) (ncount : nat) (Sb : gset Z)
+    (U : ustate) (ncount : nat) (Sb : gset Z)
     (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
@@ -945,9 +948,9 @@ Definition wp_writei_gen_body
      user-arm caller, is what forced the repair.  [SpecReadi.v]:244-267 is
      the same fix, made one stage earlier by fileread.) *)
   (if user
-   then proc_priv_core pj pidv V
+   then proc_priv_core pj pidv U
    else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ[ktb] src_bytes i) ∗
-        proc_priv_bare pj pidv V) -∗
+        proc_priv_bare pj pidv U) -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
   (* the disk fabric *)
@@ -967,7 +970,7 @@ Definition wp_writei_gen_body
   ∀ (mf : regfile) (tot : nat) (bm' : blkmap) (data' : nat -> list (bv 8))
     (dn' dn0' : dinode) (n' : nat)
     (wrote : nat -> bv 8) (dist : nat) (dstb : nat -> bv 8) (P' : uptd)
-    (Sb' : gset Z),
+    (M' : gmap Z (bv 8)) (Sb' : gset Z),
       ⌜callee_saved m mf⌝ -∗
       (* THE ALLOCATOR NEVER UN-MARKS: [used] only grows, across every bmap
          the loop performs. *)
@@ -1026,7 +1029,7 @@ Definition wp_writei_gen_body
          [wi16_spend_any] / [wi16_atomic]. *)
       ⌜wi16_spend_any fsc_bmapstart inum icfg_ist ncount n' off n bm bm' Sb⌝ -∗
       ⌜wi16_atomic off n tot⌝ -∗
-      ⌜uptd_ext (pv_upt V) P'⌝ -∗
+      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗
@@ -1044,9 +1047,9 @@ Definition wp_writei_gen_body
       (* the source goes back the way it came -- with the kernel arm's
          buffer, or inside the user arm's block *)
       (if user
-       then proc_priv_core pj pidv (upd_upt V P')
+       then proc_priv_core pj pidv (upd_usM (us_upt U P') M')
        else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ[ktb] src_bytes i) ∗
-            proc_priv_bare pj pidv V) -∗
+            proc_priv_bare pj pidv U) -∗
       bslots 3 -∗
       log_opS icfg_log n' Sb' -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -1062,14 +1065,14 @@ Module Type WRITEI.
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn dn0 : dinode)
       (user : bool) (off n : nat) (src_bytes : nat -> bv 8)
-      (V : pprivate) (ncount : nat)
+      (U : ustate) (ncount : nat)
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_writei_sconf_body ktb γs j γl pd pav pu γf
 
                            ip inum bm data dn dn0
-                           user off n src_bytes V ncount
+                           user off n src_bytes U ncount
                            pidv dq dqd dqn dqs dqb dqbs m K eb b lks.
 
   (* the SET-FORM contract; [wp_writei_sconf] above is its instance with the
@@ -1084,13 +1087,13 @@ Module Type WRITEI.
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn dn0 : dinode)
       (user : bool) (off n : nat) (src_bytes : nat -> bv 8)
-      (V : pprivate) (ncount : nat) (Sb : gset Z)
+      (U : ustate) (ncount : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_writei_gen_body ktb γs j γl pd pav pu γf
 
                          ip inum bm data dn dn0
-                         user off n src_bytes V ncount Sb
+                         user off n src_bytes U ncount Sb
                          pidv dq dqd dqn dqs dqb dqbs m K eb b lks.
 End WRITEI.

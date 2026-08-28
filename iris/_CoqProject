@@ -248,6 +248,7 @@ UCodeSync.v
 UProofSync.v
 UmodeKernelTie.v
 USyncKernel.v
+UexecCond.v
 UCodeEcho.v
 USpecEcho.v
 UCodeSh.v

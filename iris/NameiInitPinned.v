@@ -320,7 +320,7 @@ Section NameiInitPinnedBody.
     (n : nat) (Sb : gset Z)
     (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Vpr : pprivate) :
+    (b : bool) (lks : gset string) (Upr : ustate) :
     (K_namei <= K)%nat ->
     dev = icfg_dev ->
     nib = icfg_nib ->
@@ -370,8 +370,8 @@ Section NameiInitPinnedBody.
     BitmapInv.sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     InodeInv.sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_inv gfs bmapstart cov logstart size -∗
-    proc_priv_bare (proc_addr j) pidv Vpr -∗
-    inode_held (pv_cwd Vpr) -∗
+    proc_priv_bare (proc_addr j) pidv Upr -∗
+    inode_held (pv_cwd (us_V Upr)) -∗
     ([∗ list] i ∈ seq 0 (S plen),
        pa_add (m !!! Regidx (mword_of_int 10 : mword 5)) i
          ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -394,8 +394,8 @@ Section NameiInitPinnedBody.
         pc_is (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
         BitmapInv.sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         InodeInv.sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        proc_priv_bare (proc_addr j) pidv Vpr -∗
-        inode_held (pv_cwd Vpr) -∗
+        proc_priv_bare (proc_addr j) pidv Upr -∗
+        inode_held (pv_cwd (us_V Upr)) -∗
         ([∗ list] i ∈ seq 0 (S plen),
            pa_add (m !!! Regidx (mword_of_int 10 : mword 5)) i
              ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -433,7 +433,7 @@ Section NameiInitPinnedBody.
       by (rewrite Hpe; reflexivity).
     iApply (NP.wp_namei_pinned gs j gl gu gd gk pd pav pu bn g gfs
               gi cn gtl ga gf cov logstart bmapstart inodestart nib size dev
-              plen pfun n Sb init_hops pidv dq dqb dqs dqpv m K eb b lks Vpr
+              plen pfun n Sb init_hops pidv dq dqb dqs dqpv m K eb b lks Upr
               HK Hdev Hnib Hg His Hrd Hnib0 Hlg Hsz Hbm0 Hbmc Hbml His0 Hcb
               Hireg Hcstr Hplen Hslash Hwalk Hjn Hgl Hpe'
             with "Hsie Hcpu Htcsr Hclm Hkt Hkd Hpc Hpanic Hbio Hlog Hkal

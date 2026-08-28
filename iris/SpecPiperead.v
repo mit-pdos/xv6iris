@@ -72,7 +72,7 @@ Definition wp_piperead_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
     (γs : list gname) (j : nat) (γlp : gname)
     (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
     (m : regfile) (av : nat) (eb : bool)
-    (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset string) :=
+    (pid : mword 32) (U : ustate) (n : Z) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.piperead in
   let pj := proc_addr j in
   let pi := m !!! Regidx (mword_of_int 10 : mword 5) in
@@ -101,20 +101,23 @@ Definition wp_piperead_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
   is_pipe γl γp pi -∗
   pipe_ref γp w q -∗
   (* the process block (copyout's tier is reached via proc_priv_copy) *)
-  proc_priv_core pj pid V -∗
+  proc_priv_core pj pid U -∗
   kalloc_env γa None -∗
   (* the running-thread bundle (SpecSleep.v) *)
   procs_inv γs -∗
   wp_next b pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (P' : uptd),
+  (* THE IMAGE MOVES: the copy leaf may fault a page in (and copyout writes
+     user memory), so the block comes back at a fresh [M'] -- milestone J
+     item 1's ∃-weakened staging, exactly as [SpecPipewrite]'s post. *)
+  ∀ (mf : regfile) (P' : uptd) (M' : gmap Z (bv 8)),
       ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt V) P'⌝ -∗
+      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       ⌜pipe_rw_ret n (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       pipe_ref γp w q -∗
-      proc_priv_core pj pid (upd_upt V P') -∗
+      proc_priv_core pj pid (upd_usM (us_upt U P') M') -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -124,6 +127,6 @@ Module Type PIPEREAD.
       (γa : gname) (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
       (m : regfile) (av : nat) (eb : bool)
-      (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset string),
-      wp_piperead_sconf_body γa γf γs j γlp γl γp w q m av eb pid V n b lks.
+      (pid : mword 32) (U : ustate) (n : Z) (b : bool) (lks : gset string),
+      wp_piperead_sconf_body γa γf γs j γlp γl γp w q m av eb pid U n b lks.
 End PIPEREAD.
