@@ -259,14 +259,131 @@ PARKS' — `ProofUserinit`'s and `ProofSysFork`'s applications of
   The SLOT's key is the user-visible `uvis` (above); `uvis_of` is the
   seam between the two.
 
-## What is deliberately NOT designed
+## The ruled design for the user/kernel trap contract (2026-08-28, owner-ruled)
 
-How a DEPOSITED slot covers the kernel's own writes between deposit and
-resume — a syscall's `tf->a0 := ret` / `epc += 4`, read() filling the
-`(a1, a2)` buffer window of `M`, a vmfault's zero page.  It cannot be a
-pure predicate on `uvis` records (read()'s widening relates the delivered
-bytes to file-system state — an iProp-level fact); it will be an
-iProp-based, universally-quantified shape, designed against the first
-concrete proof obligation that needs it — inside the `uv_cap` discharge.
-The raw material is the process side's protocol arms (`usys_ret`'s
-`∀ ret`; `uv_intr_wp`'s resume wand).  See `projects/user-wp-slot.md`.
+Vocabulary: "user execution" is the machine running in U-mode between an
+`sret` in userret and the next trap into uservec; "the kernel's trap loop"
+is `ProofUserretClosed.stvec_handler_loop`, one iteration being
+uservec → usertrap → userret → sret.  A user-execution WP is a `WP Loop`
+whose precondition describes a user-mode machine state: `uexec_wp`
+covers EVERY state (only the generic user-safety theorem inhabits it),
+`uexec_slot W` covers the one state `W : uvis` records.
+
+**The defect being fixed.**  The last premise of both WPs is the whole
+kernel contract user execution sees:
+`▷ (user_trap_frame C pt Rut ∗ uexec_wp -∗ WP Loop)`.  Two facts about
+it make a verified program unable to use it: (F1) `user_trap_frame`
+existentially hides cause, tval, sepc and the register file, so the
+kernel is never told WHICH state trapped; (F2) the successor the process
+must hand back is typed at `uexec_wp` — "safe from any state" — which a
+verified program cannot produce.  Consistently, the loop's own posts
+(`usertrap_post` / `uservec_post`) say nothing about the resume state.
+`UmodeCap.uv_cap` (the U-mode tier's `□ uv_intr_wp ∗ uv_sys_wp Ψ`) is
+the INVERSE shape — the kernel promising to resume the process at an
+exact state — which is why `sync_uexec_slot` takes it as an assumption
+and never uses the premise above.  The reconciling observation:
+`UmodeSyscall.usys_ret g va M` (sync's own after-the-syscall
+continuation, `∀ CID ret, resume at (g[a0:=ret], M, va+4) -∗ WP Loop`)
+IS `uexec_slot` at the bumped key, ∀-bound over `ret`.  So no kernel
+promise is needed; the contract's two premises are re-typed.
+
+**(A) `uexec_ret sc W : iProp`** — what user execution hands back at a
+trap of cause `sc` from user-visible state `W`.  An iProp (a
+conjunction / universal over `uexec_slot`s) whose CASE ANALYSIS is by
+pure data (`sc`, the a7 word of `W`) and whose only hypothesis under the
+universal is a `Prop`:
+
+    bump W r M' := ⟨ tf[epc := epc+4][a0 := r], M' ⟩
+    uexec_ret sc W :=
+      if sc is ecall-from-U then
+        let n := a7 of W in
+        if n = SYS_exit then emp                                   -- never resumed
+        else if n = SYS_fork then
+             (∀ r, ⌜r ≠ 0⌝ -∗ uexec_slot (bump W r M))               -- the parent's
+           ∗ uexec_slot (bump W 0 M)                                 -- the child's
+        else ∀ r M', ⌜usys_mem_ok n (tf of W) M M'⌝ -∗ uexec_slot (bump W r M')
+      else uexec_slot W        -- interrupt / timer / page fault: transparent
+
+`usys_mem_ok n tf M M'` is `SpecSyscall.sysc_mem_ok` ("which user bytes
+syscall `n` may have written": `M' = M` for sixteen; a `umem_wr` window
+at the buffer argument for read/fstat/pipe/wait; sbrk's three arms)
+restated on the trapframe word list so a file below the kernel proofs
+can import it; exec's entry is the FAILURE arm only (`r = -1 ∧ M' = M`).
+Page faults are transparent because `M` is the lazy view.  The
+"deposit-covering formulation" that was left undesigned resolves here:
+on the PROCESS side the constraint is pure (be safe for any bytes the
+kernel may put in the window); the file-system relation of read()'s
+bytes is the kernel's to choose, and a later refinement adds an iProp
+premise under the same ∀ (`⌜…⌝ -∗ Φ -∗ uexec_slot …`) without changing
+the shape.  EXEC'S SUCCESS ARM IS A KERNEL MINT: the new program's WP is
+built by exec from the new trapframe/image (`cond_entry_slot_gated`,
+generic today), so the mint sites become userinit, fork's child, and
+exec-success, and `exit` returns nothing.
+
+**(B) The kernel obligation, as user execution holds it** — the last
+premise of both WPs becomes `ukont C pt Rut`, the process instantiating
+(it is the one trapping):
+
+    ukont C pt Rut :=
+      ▷ (∀ (W' : uvis) (sc stval : mword 64),
+           trapped_machine C pt Rut sc stval W'    -- privilege S, pc = stvec, sepc = W'.pc,
+                                                    -- gpr_file = W'.regs, pages at W'.M, Rut pt
+           ∗ uexec_ret sc W'
+           -∗ WP Loop)
+
+`trapped_machine` is today's `user_trap_frame` with cause/tval/sepc/
+registers as PARAMETERS (the U-mode tier's `uv_trap_frame` plus `Rut`).
+`□ uexec_wp` still inhabits the new shape: `uexec_wp -∗ uexec_ret sc W`
+for every `sc, W` is `uexec_wp_slot` per arm.
+
+**(C) The U-mode ambient bundle** — the moral `sie_cap_gpr`: everything
+user execution owns while it runs, keyed on the NATURAL user-space
+state (register file, pc, image), never on the 36-word list:
+
+    uvb C pt Rut M m pc :=
+      uv_amb ∗ uv_regs ∗ user_pt_inv pt M ∗ user_cfg C
+      ∗ gpr_file m ∗ pc_is pc ∗ Rut pt ∗ ukont C pt Rut
+
+It says: this hart's GPRs are exactly `m`, the pc is `pc`, the process
+owns its page table with the user pages at exactly `M` (the KERNEL's
+own `user_pt_inv`, so its three pure facts ride in the bundle and the
+one-directional `UmodeKernelTie` weakening disappears).  Every U-mode
+leaf (`WpUmodeLeaf/Load/Store/Branch/Fetch`, `UmodeIo`, the program
+proofs) is stated against `uvb`, naming registers and memory through
+its `m`/`M`/`pc`, with the update idioms unchanged (`<[Regidx rd := v]> m`,
+`add_vec_int pc 4`, `<[va := b]> M`).  `uv_cap`, `uv_cap_gpr`, `uv_lin`
+and `uv_run` die.  Then
+
+    uexec_slot W := ∀ h C pt Rut, ⌜loop_ok C pt⌝ -∗
+                    uvb C pt Rut (uvis_M W) (tf_resume_gpr (uvis_tf W)) (tf_resume_pc (uvis_tf W)) -∗ WP Loop
+
+is literally "safe given the bundle at W's state", and `uexec_ret`'s
+transparent case is the program's own induction hypothesis at its
+current bundle.  The `uvis` conversion lives at the boundary only: trap
+OUT (`WpUmodeStep`'s two trap arms) keys the returned WP at
+`uvis_of_run m pc M := ⟨tf_of m pc, M⟩` (what uservec saves); resume IN
+is the slot's definition above.  The one lemma between them is the
+round trip `tf_resume_gpr (tf_of m pc) = m` / `tf_resume_pc (tf_of m pc) = pc`
+(x0: the `HartTp.tp_pin` idiom, or the ∀-bound dead base stays inside
+`uvb` if `WpGpr` does not ignore x0 the way it ignores tp — to be
+checked by the lane).
+
+**Staging.**  (1) `uvis` — landed.  (2) `uexec_ret`, `ukont`, `uvb`, the
+re-keyed `uexec_slot` and `usys_mem_ok` as NEW definitions beside the
+existing ones (R10: nothing kernel-side moves; the existing
+`uexec_wp`/`uexec_slot` keep building).  (3) The U-mode lane: leaves
+re-stated on `uvb` (mechanical), `WpUmodeStep`'s trap arms and the
+program-level IH rewritten to produce `uexec_ret`, sync re-proved →
+`USyncKernel.sync_uexec_slot` with NO assumption.  Independent of the
+kernel.  (4) Milestone J: the loop, `usertrap_post`, `uservec_post` and
+the mint sites switch to `ukont`'s shape — the loop receives
+`trapped_machine … W'` and `uexec_ret sc W'` and must APPLY the returned
+slot at the actual resume state (resume tf = `bump`'d on the ecall arm
+with `usys_mem_ok`, which the dispatcher already carries as a pure
+premise; = `W'` on the transparent arms); the old definitions and
+`Rut_hole` are deleted.  (5) Exec's success arm is where sync's
+constructor is tried.
+
+Open decisions the owner has not yet ruled: `uexec_ret` with the precise
+`usys_mem_ok` table vs. a coarse `∀ r M'` first cut; whether `uvis_tf`
+shrinks to the 32 user-visible words.

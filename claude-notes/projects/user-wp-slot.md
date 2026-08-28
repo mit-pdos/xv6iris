@@ -189,84 +189,54 @@ by re-spelling, and the tally above should be re-taken.
    `proc_pt_ptm` holds at EVERY `sz`, so the index is free — pick the
    callee's own term and the unification is definitional.
 
-## §3 After the campaign: the road to a verified process in SystemAdequacy
+## §3 The road to a verified process in SystemAdequacy (re-cut 2026-08-28)
 
-All owner-ruled; chronological intent:
+The design of record is `../design/user-wp-slot.md` §"The ruled design
+for the user/kernel trap contract": `uexec_ret` (A), `ukont` (B), the
+U-mode bundle `uvb` (C), and the five-step staging.  Lanes, in order:
 
-1. **Milestone J — boundary-row circulation** (plan in §4): the slot
-   becomes STORAGE-FREE (never a conjunct of `proc_priv` or
-   `ut_own`); explicit rows on the trap-chain boundaries; usertrap's
-   precondition carries the CAUSE-INDEXED shape
-   (`uexec_ret sc_v … := if sc = ecall then uexec_slot_sc else
-   uexec_slot`, coupled to the `sc_v` the boundary already names);
-   `ut_own`'s current slot row and accessors are DELETED then.
-2. **The syscall shape**: at an ecall the u-mode side returns
-   `uexec_slot_sc := ∀ r, uexec_slot ⟨tf[epc := epc+4][a0 := r], M⟩`
-   (universal over the return register, everything else exact, over
-   the BUMPED trapframe); buffer syscalls later add region-universals
-   over `M` windows.  Transparent traps (device interrupt) return the
-   precise slot.  Sync fits entirely (sync = the sc shape; exit's
-   return is never consumed).  During the excursion the cause-shaped
-   WP travels in usertrap's PROOF CONTEXT (mid-syscall parks capture
-   it in the closure); the deposit lands where the shape turns
-   precise — immediately on the transparent arm, at
-   instantiation-at-ret on the syscall arm.
-3. **The fork clause**: fork's spec takes TWO deposited WPs — child
-   (`a0 = 0`) and parent (`a0 ∈ {pid, −1}`, the failure arm consumes
-   no child WP) — same va-keyed `M`, `V_child` = parent's modulo a0
-   plus fresh table (the `uvis` key with the table ∀-bound inside makes
-   this work: the parent's slot applies to the child verbatim);
-   kfork's existing "parking consumes a WP" premise takes the child
-   half, replacing today's generic mint in `ProofSysFork`.  The park
-   channel needs a `pv_tf` preservation equation beside its existing
-   `pv_fdg` one (`uexec_slot_congr` is already in-tree; the table needs
-   none).
-4. **Boundary exposure** (blocks keyed-slot runs): the round's post
-   (`wp_uservec_pt`/`uservec_post`) must expose BOTH agreement halves
-   — userret's RESTORE (`mf = tf_resume_gpr b V'`,
-   `ret_pc uepc = tf_resume_pc V'`; already stated at
-   `wp_userret_pt`'s own level, existentially hidden in the
-   composition) and uservec's SAVE (the post-trap `V'` records the
-   trapped registers) — against slotted residue variants whose
-   binders name `V'`/`M'`.
-5. **Discharge `uv_cap`** (turns `sync_uexec_slot`'s one assumption
-   into a theorem): reshape the Umode tier's trap exits onto the
-   paired return channel; the tier's frames (`uv_trap_frame`,
-   `uv_run`) gain a `Rut` conjunct (the `□`-cap vs linear-residue
-   tension); the DEPOSIT-COVERING formulation is deliberately
-   undesigned — it cannot be pure (read()'s widening relates
-   delivered bytes to FS state) and gets designed against the first
-   concrete obligation HERE.  Also owed: the reverse `UmodeKernelTie`
-   movers re-supplying `user_pt_inv`'s three pure facts
-   (`dom`/`uva_pa_inj`/`upt_acc_wf`) from the table on the way back.
-6. **The probe cycle** (owner's method): the userinit conditional
-   mint (`UexecCond.cond_entry_slot_gated`, in-tree) is the standing
-   forcing function — apply as an uncommitted patch, find the next
-   precise obligation, land the fix green, re-apply.  Userinit is
-   PLUMBING-ONLY (its process's user map is empty — no uvmfirst in
-   this userinit); the semantic sync-branch forcing arrives with
-   exec, whose image identification eventually connects to the
-   ELF/namei story (`namei-pinned-lookup.md`, gated on the owner).
-   Gate `sync_layout`-first so the dumped literal is never reduced
-   (a bare `simpl`/`cbn` on goals MENTIONING it hangs — fs-img.md's
-   first trap bullet).
-7. **Representation notes**: `wp_uvmcopy_sconf` already returns the
-   parent's image on the nose; `wp_copyinstr_sconf_mem` exists; the
-   old "vmfault representation wart" is RESOLVED by the lazy view.
+1. **[x] `uvis`** — landed (`351f8dbf7`).
+2. **[ ] The U-mode lane** (IN FLIGHT): new definitions beside the old
+   (`usys_mem_ok` on the word list, `uexec_ret`, `ukont`,
+   `trapped_machine`, `uvb`, the `uvb`-keyed `uexec_slot`), every
+   U-mode leaf re-stated on `uvb`, `WpUmodeStep`'s trap arms and the
+   program-level IH producing `uexec_ret`, sync re-proved,
+   `USyncKernel.sync_uexec_slot` assumption-free; `uv_cap`/`uv_cap_gpr`/
+   `uv_lin`/`uv_run`/`UmodeKernelTie` retired.  Kernel proofs untouched.
+3. **[ ] Milestone J** (§4): the kernel side switches to `ukont`'s
+   shape.  Boundary exposure (the round's post names the resume
+   trapframe and image: `bump`'d on the ecall arm with `usys_mem_ok`,
+   unchanged on interrupt/vmfault) is PART of this lane, not a
+   separate item.  Mint sites: userinit (generic), fork's child (the
+   parent's `uexec_ret` fork half — kfork's "parking consumes a WP"
+   premise takes it; the park channel needs a `pv_tf` equation beside
+   its `pv_fdg` one), exec-success (`cond_entry_slot_gated`).  `exit`
+   consumes nothing.  `Rut_hole` and the old forms are deleted.
+4. **[ ] Exec-site forcing function**: apply sync's constructor at
+   exec's success arm; the first obligation will be exec's post
+   saying what image/table it built (today `∃ U'` with `kexec_ok`
+   pinning only the trapframe and size) — genuinely open until file
+   content is tracked (`namei-pinned-lookup.md` / fs-syscall-specs
+   lane P are NOT integrated).  Gate `sync_layout`-first so the
+   dumped literal is never reduced (a bare `simpl`/`cbn` on goals
+   MENTIONING it hangs).
 
-## §4 Milestone J plan (as specced, unchanged)
+Representation notes still true: `wp_uvmcopy_sconf` returns the
+parent's image on the nose; `wp_copyinstr_sconf_mem` exists; the old
+"vmfault representation wart" is RESOLVED by the lazy view.
 
-`uexec_wp` keeps its fixpoint/return channel.  The slot travels only
-through boundary rows: slotted residue VARIANTS
+## §4 Milestone J plan (as specced; re-read against §3.3)
+
+`uexec_wp` keeps its fixpoint; its trap premise becomes `ukont`.  The
+slot travels only through boundary rows: slotted residue VARIANTS
 (`∃ N V av M, ⟨rows⟩ ∗ S V M`, the shape functional `S` chosen by the
-boundary); usertrap's pre takes `S := uexec_ret sc_v`; the arms'
-posts and the composed round's post carry the PRECISE slot at the
-final key plus the §3.4 agreement equations; the loop applies the
-keyed slot from the round's post; the park channel's closer row goes
-keyed under the binders it already receives (`V'` is an argument;
-`M'` joins).  `Rut` returns to the plain bare form (the hole trick
-dies).  The generic inhabitant remains a Löb proof returning itself;
-mints stay creation-only.
+boundary); usertrap's pre takes `S := uexec_ret sc_v`; the arms' posts
+and the composed round's post carry the PRECISE slot at the final key;
+the loop applies the keyed slot from the round's post; the park
+channel's closer row goes keyed under the binders it already receives.
+`Rut` returns to the plain bare form (the hole trick dies).  The
+generic inhabitant remains a Löb proof returning itself; mints stay
+creation-only.
 
 ## §5 Session-local artifacts (durable parts lifted into this file)
 
