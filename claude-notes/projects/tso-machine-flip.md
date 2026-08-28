@@ -14391,3 +14391,88 @@ do not touch `SpecAcquire`'s ~40 callers at all.
 ### §6. STATE
 
 Mirror refreshed at r25.  Nothing outside this lane's files touched.
+
+---
+
+## A6.115 — UNITS (1)–(4) LAND: the cell carries its own anchor, and the racy read's pure side-condition is GONE
+
+*(Amendment A6.115, fliptree lane, on A6.114's approved pricing.  The invariant
+half of (2); the floor half — the crossing upgrade — is next and separate.)*
+
+### §1. THE NUMBER
+
+**RED 9 — unchanged, 1069 files recompiled**, sentinel-backed (`MAKEEXIT=2`,
+round r26).  **Red-list delta 0.**  `TsoMemPa` again, so this is close to a
+whole-tree re-certification.
+
+### §2. WHAT LANDED
+
+**(1) The cell's per-agent anchor** — `WpLock`:
+
+```coq
+  Definition lk_own_anchored (lo : nat) (own : agent -> option nat) : iProp Σ :=
+    (∀ (h : agent) (t : nat), ⌜own h = Some t⌝ -∗ TsoCtx.ledger_vis h lo t)%I.
+
+  Lemma lk_own_anchored_mint (lo : nat) : ⊢ lk_own_anchored lo (fun _ => Some lo).
+```
+
+now a conjunct of `lk_cpu_cell_ex`.  Persistent, so it costs the three
+`lk_cpu_res_*` laws nothing — they are still `⊣⊢` by `reflexivity`.
+
+**(2) The mint re-establishes it for free** — `ProofInitlock`, one line
+(`lk_own_anchored_mint`), because the mint's own map is `fun _ => Some lo` and
+`ledger_vis_below` closes `lo ≤ lo`.  The release arm's discharge is
+`ledger_vis_own` on the message fragment A6.114 §4 stopped dropping; it lands
+with the cpu-store instances.
+
+**(3) The anchor premise, swapped** — `TsoMemPa.win_assemble_not_mine`:
+
+```coq
+    ((t <= lo)%nat \/ (forall tv' : nat, visibleb h tv' log t = true)) ->
+```
+
+**and it no longer mentions the reader's view at all.**  Its proof shrank: the
+left arm gives `t = lo` against `win_ok1`'s `lo ≤ t`, so the floor's own
+visibility covers the anchor; the right arm is unconditional.
+
+**(4) The read lemmas drop the pure disjunction** — `ledger_read_racy_ok`,
+`ledger_read_racy_word_ok`, `lkcpu_read_not_mine` all lose
+`((lo ≤ K) ∨ t = lo)` and take the anchor as a **resource** instead, with one
+new projection beside A6.111's:
+
+```coq
+  Lemma ledger_vis_anchor (g : gstate) (B t : nat) :
+    tso_interp_at riscv_eraGS g -∗ ledger_vis (hart_agent cpu_id) B t -∗
+    ⌜(t ≤ B)%nat \/ ∀ tv, visibleb (hart_agent cpu_id) tv g.(glog) t = true⌝.
+```
+
+`ledger_vis` is now read two ways — `ledger_vis_visibleb` for the floor,
+`ledger_vis_anchor` for the anchor — and that is the whole of A6.110 §5's two
+arguments, consolidated.
+
+### §3. WHAT THE READER STILL OWES
+
+Exactly one thing: **the floor**, `ledger_vis (hart_agent cpu_id) K lo` beside
+`view_lb … K`.  That is `lk_floor`'s two arms and nothing else.  Which is (5),
+the crossing upgrade, now genuinely the last piece before the reads close.
+
+### §4. NEW QUEUE ITEMS RECEIVED (intr lane)
+
+Both acknowledged, neither started:
+
+* **The stale-`.vo` gotcha.**  Does not bite this lane's flow: `cq` compiles on
+  the VM against the tree `--sync-only` just refreshed, and every number in
+  these amendments is from a `MAKEEXIT`-sentinelled `make` in that same tree,
+  never from a local `About`/`coqc` probe.  Recorded so nobody assumes
+  otherwise.
+* **The M3 λ-conversion of the four trap-path payloads** (`proc_lock_res`,
+  `disk_res`, `ticks_res`, `cons_res`) and **the freshpack `TsoCtx` lemma**.
+  Queued after `WpSconfLock` closes and sweeps, before/with §0.27′ — which is
+  right, because the λ-conversion is the gate on §0.27′'s park crossing and I
+  would otherwise hit it there anyway.  The `TsoCtx` lemma lands with the next
+  `TsoCtx` boundary.
+
+### §5. STATE
+
+Mirror refreshed at r26.  `WpSconfLock` unchanged in status; its two reads now
+need only the floor.
