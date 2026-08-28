@@ -11,7 +11,7 @@ and non-vacuous, the audit is at thirteen entries by name, and the design
 of record is [`../design/durable-fs-plan.md`](../design/durable-fs-plan.md)
 — which states what is BUILT and is the only file to read for it.  The
 residue that outlived this worklist is a short stub,
-[`../projects/durable-disk.md`](../projects/durable-disk.md).
+[`durable-disk.md`](durable-disk.md).
 
 The earlier history is in
 [`durable-disk-2026-08-23-to-25.md`](durable-disk-2026-08-23-to-25.md)
@@ -196,7 +196,7 @@ Re-measure before believing this; the standing rule is that a comment names
 a live MECHANISM, not a deleted file.  `ipool_shape` is still the notes'
 vocabulary for a pool
 entry in `design/fs-icache.md` (21), `design/fs-fragments.md` (7) and
-`projects/durable-disk.md` (5); the definition is gone and the rows are
+`completed/durable-disk.md` (5); the definition is gone and the rows are
 `IcacheEscrow.ipool_ord`/`ipool_ext`, which `design/fs-icache.md`'s new
 banner says once rather than 21 times.
 

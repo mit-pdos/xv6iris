@@ -72,7 +72,7 @@ two-view ghost state this layer rests on), [`fs-fragments.md`](fs-fragments.md)
 (§1.1 inum-keyed store, §1.4 custody theorem),
 [`fs-friendly.md`](fs-friendly.md) (the 2026-08-15 direction sketch),
 `projects/namei-pinned-lookup.md` (the `dview` carrier and the
-ghost-trace lookup spec), `projects/durable-disk.md` stage 3 (the mknod
+ghost-trace lookup spec), `completed/durable-disk.md` stage 3 (the mknod
 spike whose end theorem is this layer's adequacy instance).
 
 ## 0. The one-sentence design

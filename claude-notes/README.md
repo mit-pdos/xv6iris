@@ -162,9 +162,11 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 
 ## `projects/` — ongoing worklists & plans (one per effort)
 
-Six are open and one is a finished project's residue stub; each file's top
-banner says precisely what is left.  Audited against the tree 2026-08-28,
-when four more moved to [`completed/`](completed/).
+Four are open; each file's top banner says precisely what is left.
+Audited against the tree 2026-08-28, when six moved to
+[`completed/`](completed/) — the last two of them `durable-disk.md`
+(finished) and `sp-migration.md` (archived by the owner with work still
+outstanding; see the `completed/` section below).
 
 - **[`user-wp-slot.md`](projects/user-wp-slot.md)** — the PER-PROCESS
   user-execution WP slot, step 3: making a verified process run IN PLACE
@@ -174,22 +176,6 @@ when four more moved to [`completed/`](completed/).
   the two rulings to get before the residue re-key and the deliberately
   undesigned deposit-covering formulation.
 
-- **[`durable-disk.md`](projects/durable-disk.md)** — FINISHED; the file is
-  a 76-line stub carrying only the residue.  xv6 is correct across crashes
-  including FS consistency: `SystemAdequacy.xv6_power_adequacy` assumes the
-  image at `g`'s own disk ONCE and nothing about any later era, and its two
-  corollaries discharge that at the literal mkfs image and conclude, at
-  EVERY reachable state of every power cycle, that the physical disk still
-  recovers to a committed view that IS a file system.  Read
-  `design/durable-fs-plan.md` for the design; the stub is worth opening
-  only for what is left (Rank 4 parked, BT-4/5 priced and not run, three
-  design-level items nobody has proposed, four cosmetic leftovers).
-- **[`sp-migration.md`](projects/sp-migration.md)** — owning memory at a
-  NON-IDENTITY kernel va: the settled design (ktier-indexed `↦ₘ[kt]`,
-  `kpt_on` witness, `KtierLe` inference) and the KSTACK campaign are
-  LANDED (K4 via `ParkCap.v`); what is NEXT is the `instr` ktier sweep
-  (~330 statement-identical files) and the uservec/userret trampoline-fetch
-  project that consumes `TrampText.tramp_text_mint`.
 - **[`fs-syscall-specs.md`](projects/fs-syscall-specs.md)** — the
   file-system BEHAVIOUR specification: what each syscall does to the
   abstract state.  Design: `design/fs-syscall-specs.md`.  It is what
@@ -221,14 +207,33 @@ when four more moved to [`completed/`](completed/).
 
 ## `completed/` — finished projects, archived for reference
 
-Three files carry the durable-disk project's history, oldest first:
-`durable-disk-byteview.md` (the byte-view attempt),
+**[`durable-disk.md`](completed/durable-disk.md)** is the close-out:
+xv6 is correct across crashes including FS consistency
+(`SystemAdequacy.xv6_power_adequacy` and its two corollaries), and the
+file's "what is left" is residue nobody rehomed — Rank 4 parked, BT-4/5
+priced and not run (which is why `FsDurSnap.fs_home_install_era` /
+`fs_state_install_era` are caller-less), three design-level items and
+four stale comments.  Three more files carry the project's history,
+oldest first: `durable-disk-byteview.md` (the byte-view attempt),
 `durable-disk-2026-08-23-to-25.md` (the SL redesign's rulings and
 refutations) and `durable-disk-2026-08-26-to-28.md` (the lanes, the
 simplification campaign and the boot-side transport, to the finish).  Read
 a lane's spec THROUGH its "AS LANDED" paragraph — several specs were
 refuted by the lane that ran them.  The design is
 `design/durable-fs-plan.md`.
+
+**[`sp-migration.md`](completed/sp-migration.md)** was archived on
+2026-08-28 by the owner WITH WORK OUTSTANDING, so it is the one file here
+that is not a finished project.  Its settled design has no `design/` home
+— the ktier-indexed `↦ₘ[kt]` datum, the `kpt_on` witness and `KtierLe`
+inference are written up in its §"THE SETTLED DESIGN" and nowhere else,
+and `design/tlb-translation.md`'s "non-identity kernel memory is NOT a
+`↦ₘ`" paragraph predates it.  Phases A–D, K1–K3a, F1–F3, K4 (via
+`ParkCap.v`) and K5 (the text tier) are LANDED and `main` is GREEN; what
+was NEVER done is the `instr` ktier sweep (statement-identical, 284
+`Code*.v` files) and the uservec/userret trampoline-fetch project that
+consumes `TrampText.tramp_text_mint`.  Anyone picking either up starts
+from this file.
 
 Kept for their durable design notes, gotchas and reusable recipes; `ls` them.
 **Nobody reads these for current guidance**, so they are the one place a

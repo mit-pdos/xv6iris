@@ -1,5 +1,17 @@
 # Project: sp-migration — owning memory at a NON-IDENTITY kernel va
 
+> **ARCHIVED 2026-08-28 BY THE OWNER WITH WORK OUTSTANDING** — this is not a
+> finished project, and it is the only file in `completed/` that is not.
+> Landed: phases A–D, K1–K3a, F1–F3, K4 (by a different mechanism,
+> `iris/ParkCap.v`) and K5 (the text tier); `main` is GREEN.  Never done:
+> the `instr` ktier sweep (statement-identical, 284 `Code*.v` files) and the
+> uservec/userret trampoline-fetch project that consumes
+> `TrampText.tramp_text_mint`.  §"State" at the end is the accurate summary;
+> the K5 checkbox in the KSTACK worklist is stale (K5 landed).  The settled
+> design below has NO `design/` home — it is written up here and nowhere
+> else, so read §"THE SETTLED DESIGN" before touching `↦ₘ[kt]`, `kpt_on` or
+> `KtierLe`.
+
 The gate on the process kernel stack (`proc-struct-resources.md`: a slot cannot
 own its stack, so a fresh process cannot be parked without an unpayable
 premise). A KSTACK va is not identity-mapped, and nothing in the tree can own
