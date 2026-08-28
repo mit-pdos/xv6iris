@@ -29,9 +29,9 @@ Require Import SpecAcquire.
 Require Import ProcGeom.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require Import TsoCtxShim.   (* [ctx_dom_sc]/[hart_view_lb_any]: the SC-only
-   transport evidence and view receipt behind the context-shaped spec,
-   until the cutover kit mints them from the AMO (TsoCtxTwin2.v) *)
+(* A6.86: [TsoCtxShim] is RETIRED -- its last live use died with the M4
+   contract flip.  See its tombstone. *)
+Require Import SieCapCtx.
 Import Defs.
 
 (* ---- the sext.w round-trip on the amoswap result (acquire +0x20) ---- *)

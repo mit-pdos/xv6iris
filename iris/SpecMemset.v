@@ -44,6 +44,40 @@ Import Defs.
    [wp_next], [CID] rebinds -- memset can be preempted and resume on any
    hart -- and [cur_ctx] does NOT: the window in the continuation names
    the same ξ.  At SC that is cosmetic; at cutover it is the theorem. *)
+(* §0.26′ / A6.85: THE PRIMITIVE FORM -- the buffer goes in VISIBILITY-FREE
+   (fraction + timestamp element, no claim about its contents) and comes
+   back REGISTERED at the ambient context, filled.  memset never reads
+   what it overwrites, so this is the contract the code actually has; the
+   [↦c]-in form below is its corollary, and no existing client moves.
+   THE CONSUMER IS kfree: a page whose lock another CPU just released has
+   no value well-known to the freer (tso-port.md §0.26′). *)
+Definition wp_memset_free_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    (kt ktb : ktier) `{!KtierLe ktb kt} (m0 : regfile) (n : nat) (len : nat) (cval : mword 64) (b : bool) (pcur : mword 64) :=
+  let a0_idx : mword 5 := mword_of_int 10 in
+  let a1_idx : mword 5 := mword_of_int 11 in
+  let a2_idx : mword 5 := mword_of_int 12 in
+  let pcE := mword_of_int KernelSyms.memset in
+  let ra0 := m0 !!! Regidx (mword_of_int 1 : mword 5) in
+  let p := m0 !!! Regidx a0_idx in
+  let ret_tgt := ret_pc ra0 in
+  let cbyte := nth_byte (autocast (T := mword) (subrange_vec_dec cval (Z.sub (Z.mul 1 8) 1) 0) : mword 8) 0 in
+  (2 <= n)%nat ->
+  (Z.of_nat len < 2 ^ 32)%Z ->
+  m0 !!! Regidx a1_idx = cval ->
+  m0 !!! Regidx a2_idx = (mword_of_int (Z.of_nat len) : mword 64) ->
+  sie_cap_gpr kt m0 n b pcur -∗
+  kernel_text -∗ pc_is pcE -∗
+  ([∗ list] j ∈ seq 0 len,
+     TsoCtx.mem_free (KTR := ktb) (pa_add p j) (DfracOwn 1)) -∗
+  wp_next b pcur (fun (CID : CpuId) =>
+    ∀ mfin,
+    sie_cap_gpr kt mfin n b pcur -∗
+    pc_is ret_tgt -∗
+    ([∗ list] j ∈ seq 0 len, (pa_add p j) ↦c[ktb] cbyte) -∗
+    ⌜ callee_saved m0 mfin ⌝ -∗
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Definition wp_memset_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (kt ktb : ktier) `{!KtierLe ktb kt} (m0 : regfile) (n : nat) (len : nat) (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64) :=
   let a0_idx : mword 5 := mword_of_int 10 in
@@ -71,6 +105,9 @@ Definition wp_memset_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : 
   WP (Loop : expr riscv_lang).
 
 Module Type MEMSET.
+  Parameter wp_memset_free_sconf :
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt ktb : ktier) `{!KtierLe ktb kt} (m0 : regfile) (n : nat) (len : nat) (cval : mword 64) (b : bool) (pcur : mword 64),
+      wp_memset_free_sconf_body kt ktb m0 n len cval b pcur.
   Parameter wp_memset_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt ktb : ktier) `{!KtierLe ktb kt} (m0 : regfile) (n : nat) (len : nat) (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64),
       wp_memset_sconf_body kt ktb m0 n len cval olds b pcur.

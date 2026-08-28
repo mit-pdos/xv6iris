@@ -345,6 +345,8 @@ Section PtFreeIris.
     intros Hv. iIntros "#Hb Hs".
     iDestruct (pt_slots_any_phys with "Hs") as "Hph".
     rewrite /kfree_pre. iSplitR; [done |].
+    (* §0.26′: the freer owes only the future of the page *)
+    iApply page_own_free.
     iApply (phys_to_page_own b Hv with "Hb Hph").
   Qed.
 

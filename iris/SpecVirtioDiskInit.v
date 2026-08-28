@@ -172,7 +172,7 @@ Definition vdi_post
     (* the name field is written once and then DISCARDED: what comes back is
        the persistent [lock_name], ready to be sealed into [is_lock]. *)
     lock_name disk_lock "virtio_disk"%string -∗
-    c_cpu ↦₈ (zero_reg : mword 64) -∗
+    WpLock.lk_cpu_fresh disk_lock -∗
     WP (Loop : expr riscv_lang))%I.
 Global Typeclasses Opaque vdi_post.
 

@@ -109,6 +109,7 @@ Require Import SpecNameiRootBoot.
 Require Import SpecRelease.
 Require Import SpecForkretPark.
 Require Import SpecForkretParkPaid.   (* [FORKRET_PARK_PAID] -- [park_token_intro] *)
+Require Import SieCapCtx.             (* [sie_cap_gpr_own_ctx_acc]: the park's token borrow *)
 Require Import ParkCap.               (* [park_token_park] *)
 Require Import UsertrapRes.           (* [ut_names], [park_env], [park_own] *)
 Require Import SyscParkEnv.           (* [sysc_park_extra] *)
@@ -222,6 +223,32 @@ Local Ltac namidx := first [ vm_compute; reflexivity | vm_compute; discriminate 
 Section ProofUserinit.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+
+  (* A DISCARDED CTX WORD IS PERSISTENT, and instance search will not find
+     it on its own: [TsoCtx.ctx_word_pointsto] is a bare Definition over the
+     sealed byte, so the byte-level [ctx_pointsto_discarded_persistent] is
+     one delta step away and search stops at the tower.  Stated LOCALLY
+     rather than added to the kit -- the kit's own [Section ctx_word] is the
+     right home and this file must not reach into it. *)
+  (* A DISCARDED CTX WORD IS DUPLICABLE, and neither a [Persistent]
+     instance nor [iMod ... as "#H"] finds it: [TsoCtx.ctx_word_pointsto] is
+     a bare Definition over the sealed byte, so the byte-level
+     [ctx_pointsto_discarded_persistent] sits one delta step below the head
+     instance search stops at.  MEASURED: the instance IS provable in
+     isolation ([apply _] closes it in a probe file) and STILL does not fire
+     at the use site below, so the duplication is done by an explicit wand
+     instead.  KIT GAP, FLAGGED: the right home is [TsoCtx.v]'s own
+     [Section ctx_word], beside [ctx_word_pointsto_persist], as a
+     [Global Instance]; it is not added here because [TsoCtx.v] is under the
+     whole tree and is the other lane's live file. *)
+  Local Lemma uin_ctx_word_discarded_dup (KTR : CurKtier)
+      (xi : CtxId) (a : mword 64) (w : bv 64) :
+    ctx_word_pointsto (KTR := KTR) xi a DfracDiscarded w -∗
+    □ ctx_word_pointsto (KTR := KTR) xi a DfracDiscarded w.
+  Proof.
+    rewrite /ctx_word_pointsto. iIntros "[#Hal H]".
+    iDestruct "H" as "#H". iModIntro. iFrame "Hal H".
+  Qed.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -467,7 +494,16 @@ Section ProofUserinit.
        there for free, whereas an exclusive one would have to be carried past
        the park and could not be shared with the parked process at all.
        See [iris/ForkretParkClose.v] and projects/forkret-park.md. *)
-    iMod (word_pointsto_persist with "Hinitproc") as "#Hinitproc".
+    (* THE PERSIST IS THE CTX TOWER'S OWN LAW.  The cell is the flipped
+       [↦₈] since M1, so [RiscvPtsto.word_pointsto_persist] no longer
+       applies to it -- and this tree has no shim to cross to the raw fact
+       and back (TsoCtxShim's SC equivalences are gone at the machine flip).
+       [TsoCtx.ctx_word_pointsto_persist] is the honest replacement; the
+       [Persistent] instance for the DISCARDED word is derived locally
+       because the tower is a bare Definition over the sealed byte and
+       instance search stops at it (main's note, same site). *)
+    iMod (ctx_word_pointsto_persist with "Hinitproc") as "Hinitproc0".
+    iDestruct (uin_ctx_word_discarded_dup with "Hinitproc0") as "#Hinitproc".
     assert (Hpp18 : add_vec_int (mword_of_int (UI + 0x14) : mword 64) 4
                     = mword_of_int (UI + 0x18)) by pcw.
     iEval (rewrite Hpp18) in "Hpc".
@@ -708,39 +744,55 @@ Section ProofUserinit.
                  fsc_bmapstart icfg_ist icfg_nib fsc_size ks pid).
     assert (Hwf : ut_wf N).
     { split_and!; [exact Hj | exact Hgl | exact Hnproc | exact (fgo_loggeom Hgeomok)]. }
+    (* THE RECORD-CARRIED HALF ONLY (the M2 split, UsertrapRes.v "THE
+       RESUMER'S HALF"): three pure ties, three context-FREE resources and
+       the three pins.  Everything ξ-dependent -- [procs_inv], the wait
+       lock, [is_ftable], the console rows, the ticks and nextpid locks --
+       is the RESUMER's to supply and goes into [park_globals] below. *)
     iAssert (park_env N) as "#Henv".
     { iAssert (disk_geom fsc_disk pd pav pu ∗ is_tickslock γtl)%I as "[#Hgeom #Htl]".
       { iDestruct "Hdcaps" as "(_ & _ & $ & _ & $ & _)". }
-      rewrite /park_env /ut_park_caps /sysc_park_extra.
-      iSplitL.
-      { iSplitR; [iPureIntro; constructor; reflexivity|].
-        iSplitR; [iPureIntro; reflexivity|].
-        iSplitR; [iExact "Hpinv"|].
-        iSplitR; [iExact "Hks"|].
-        iSplitR; [iExact "Hdcaps"|].
-        iSplitR; [iExact "Hwaitlk"|].
-        iSplitR; [iExact "Hftable"|].
-        iSplitR; [iExact "Hgeom"|].
-        (* the world a child's park will need, handed down from here *)
-        rewrite /park_world. iExists γtl, pd, pav, pu.
-        iDestruct "Hdcaps" as "(#Hd1 & #Hd2 & #Hd3 & #Hd4 & #Hd5 & #Hd6)".
-        iFrame "Hd1 Hd2 Hd3 Hd4 Hd5 Hd6 Hcready Hwire Htramp Hpav".
-        iSplitR; [iExists γp; iExact "Hlpid"|].
-        iExists iv1. iExact "Hip1". }
-      iSplitR; [iExists γp; iExact "Hlpid"|].
+      rewrite /park_env /ut_park_caps.
+      iSplitR; [iPureIntro; constructor; reflexivity|].
+      iSplitR; [iPureIntro; reflexivity|].
+      iSplitR; [iPureIntro; reflexivity|].
       iSplitR; [iExact "Hpav"|].
+      iSplitR; [iExact "Hwire"|].
+      iSplitR; [iExact "Htramp"|].
+      iSplitR; [iExact "Hks"|].
+      iSplitR; [iExact "Hgeom"|].
+      iExact "Hip1". }
+    (* ...and the resumer-supplied half, which userinit happens to hold at
+       its own context: it is what it just built the file system out of. *)
+    iAssert (park_globals cur_ctx γs γw γft γf γtl) as "#Hglobp".
+    { iAssert (is_tickslock γtl) as "#Htl".
+      { iDestruct "Hdcaps" as "(_ & _ & _ & _ & $ & _)". }
+      iAssert (SpecConsoleintr.console_caps fsc_uart) as "#Hcc".
+      { iDestruct "Hdcaps" as "(_ & $ & _)". }
+      rewrite /park_globals.
+      iSplitR; [iExact "Hpinv"|].
+      iSplitR; [iExact "Hwaitlk"|].
+      iSplitR; [iExact "Hftable"|].
+      iSplitR; [iExact "Hcc"|].
+      iSplitR; [iExact "Hcready"|].
       iSplitR; [iExact "Htl"|].
-      iExact "Hcready". }
+      iSplitR; [iExists γp; iExact "Hlpid"|].
+      iExists iv1. iExact "Hip1". }
     iAssert (park_own N) with "[Hbsl]" as "Hown".
-    { rewrite /park_own. iFrame "Hbsl". iExact "Hip1". }
+    { rewrite /park_own. iExact "Hbsl". }
     iDestruct (kstack_free_at with "Hks Hkfree") as "Hstack".
     (* THE TOKEN: the park, proved once at the top ([FP.park_token_intro])
        and from here on a resource every process hands its children. *)
     iPoseProof (FP.park_token_intro γs) as "#Htoken".
+    (* THE PARKER'S OWN THREAD-OF-CONTROL TOKEN, peeled out of the bundle
+       that carries it and put straight back: the park's cap consumes one
+       ([TsoCtx.ctx_deposit]'s first premise; tso-port.md §0.16′ step (ii)). *)
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrunpk Hcgpk]".
     iMod (park_token_park N rest (upd_cwd V ipv) Hwf Hrest
-            with "Htoken Htext Hwire Htramp Hmk Hstack Henv Hown [Hks Hctx Hpriv Hfd Hirs]")
-      as "Hpctx".
+            with "Hrunpk Htoken Htext Hwire Htramp Hpinv Hglobp Hmk Hstack Henv Hown [Hks Hctx Hpriv Hfd Hirs]")
+      as "[Hrunpk Hpctx]".
     { rewrite /park_child. iFrame "Hks Hpriv Hfd Hirs". iExact "Hctx". }
+    iDestruct ("Hcgpk" with "Hrunpk") as "Hcg".
     iMod (pstate_whole_update (proc_addr j) USED RUNNABLE with "Hpwhole")
       as "Hpwhole".
     iEval (rewrite uin_pwhole_runnable) in "Hpwhole".

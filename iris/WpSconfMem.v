@@ -182,6 +182,60 @@ Section WpSconfMem.
     iSplitR; [done|]. iApply (mem_pointsto_claim with "Hb0").
   Qed.
 
+  (* ------------------------------------------------------------------- *)
+  (* §0.26′ / A6.85: THE VISIBILITY-FREE WINDOW.  [wordw_pointsto] with    *)
+  (* every byte at [TsoCtx.mem_free] -- the fraction and the timestamp     *)
+  (* element, no justification.  A window in this shape may be STORED to   *)
+  (* and may not be LOADED from, which is exactly a free page's contract   *)
+  (* (tso-port.md §0.26′): the freer holds no value determinate at its own *)
+  (* view, and does not need one.                                         *)
+  (* ------------------------------------------------------------------- *)
+  Definition wordw_free `{KTR : !CurKtier} (width : Z) (a : Arch.pa) : iProp Σ :=
+    (⌜is_aligned_paddr (Physaddr a) width = true⌝ ∗
+     [∗ list] j ∈ seq 0 (Z.to_nat width),
+        TsoCtx.mem_free (pa_add a j) (DfracOwn 1))%I.
+
+  Lemma mem_free_claim `{KTR : !CurKtier} (a : Arch.pa) (dq : dfrac) :
+    TsoCtx.mem_free a dq -∗ mem_claim a.
+  Proof.
+    rewrite /TsoCtx.mem_free /mem_claim.
+    iIntros "(%ppn & #Hk & %Hc & %Hp & Hb)".
+    iDestruct (TsoCtx.phys_free_ram with "Hb") as %Hram.
+    iExists ppn. iFrame "Hk". done.
+  Qed.
+
+  Lemma wordw_free_claim `{KTR : !CurKtier} (width : Z) (a : Arch.pa) :
+    0 < width -> wordw_free width a -∗ wordw_claim width a.
+  Proof.
+    intros Hw0. iIntros "[%Hal Hb]".
+    iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hb") as "[Hb0 _]".
+    { rewrite lookup_seq_lt; [reflexivity | lia]. }
+    iEval (rewrite pa_add_0) in "Hb0".
+    iSplitR; [done|]. iApply (mem_free_claim with "Hb0").
+  Qed.
+
+  (* the width-1 free window IS one free byte, the twin of [wordw1_byte] *)
+  Lemma wordw1_free `{KTR : !CurKtier} (a : Arch.pa) :
+    wordw_free 1 a ⊣⊢ TsoCtx.mem_free a (DfracOwn 1).
+  Proof.
+    rewrite /wordw_free. change (Z.to_nat 1) with 1%nat.
+    rewrite big_sepL_singleton pa_add_0.
+    iSplit; [ iIntros "[_ $]"
+            | iIntros "$"; iPureIntro;
+              unfold is_aligned_paddr, is_aligned_vaddr; cbn [bits_of_physaddr];
+              rewrite Z.rem_1_r; reflexivity ].
+  Qed.
+
+  (* a REGISTERED window forgets to a free one, per byte *)
+  Lemma wordw_pointsto_free `{KTR : !CurKtier} (width : Z) (a : Arch.pa)
+      (w : mword (8*width)) :
+    wordw_pointsto width a (DfracOwn 1) w ⊢ wordw_free width a.
+  Proof.
+    rewrite /wordw_pointsto /wordw_free. iIntros "[$ Hb]".
+    iApply (big_sepL_mono with "Hb"). iIntros (k j _) "H".
+    by iApply TsoCtx.ctx_pointsto_free.
+  Qed.
+
   Local Lemma write_bytes_1 (mm : _) (pa : Arch.pa) (v : bv 8) :
     write_bytes mm pa 1 v = <[pa := nth_byte v 0]> mm.
   Proof. unfold write_bytes. change (N.to_nat 1) with 1%nat. cbn [seq foldr]. rewrite pa_add_0. reflexivity. Qed.
@@ -261,6 +315,59 @@ Section WpSconfMem.
       by apply Z_N_nat.
     iEval (rewrite -Hwn) in "Hb".
     iMod (wordw_win_store_c (CID := CIDw) (Z.to_N width) img σ log V a ppn vold vnew
+            ltac:(pose proof (bv_unsigned_in_range _
+                    (subrange_vec_dec a 11 0)) as [Hlo0 _];
+                  rewrite Hwn; lia) Hcan
+            ltac:(rewrite Hwn; apply Forall_forall; intros j Hj;
+                  apply elem_of_list_In, elem_of_seq in Hj;
+                  destruct Hj as [_ Hjw];
+                  assert (Hjz : Z.of_nat j < width) by
+                    (rewrite <- (Z2Nat.id width) by lia;
+                     apply Nat2Z.inj_lt; exact Hjw);
+                  lia)
+            with "Hk Hm Htso Hrun Hb") as "(Hm & Htso & Hrun & Hb)".
+    iModIntro. iFrame "Hm Htso Hrun".
+    iEval (rewrite Hwn) in "Hb". iFrame "Hb". iPureIntro. exact Hal.
+  Qed.
+
+  (* §0.26′: THE WRITE HELPER AT THE VISIBILITY-FREE TIER.  Identical to
+     the above with [wordw_win_store_free_c] underneath: the window goes
+     in owning only its future and comes back REGISTERED at the writer's
+     own context.  THE MINT LIVES HERE, and it is the only place it can
+     live -- the interp is in hand exactly inside a leaf (A6.68). *)
+  Local Lemma wordw_free_write_c `{KTR : !CurKtier} {CIDw : CpuId}
+      (width : Z)
+      (img : bytemap) (σ : mstate) (log : list pwmsg)
+      (V : agent -> nat) (a : mword 64)
+      (ppn : mword 44) (vnew : mword (8*width)) :
+    0 < width ->
+    (uint a < 274877906944)%Z ->
+    (bv_unsigned (subrange_vec_dec a 11 0) + width <= 4096)%Z ->
+    kmap_at (svpn_of a) ppn KP_rw -∗
+    gen_heap_interp (hG:=riscv_memGS) σ.(mem) -∗
+    tso_interp_of riscv_eraGS img σ.(mem) log V -∗
+    TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
+    wordw_free width a ==∗
+    gen_heap_interp (hG:=riscv_memGS)
+      (write_bytes σ.(mem) (pa_of ppn a) (Z.to_N width) vnew) ∗
+    tso_interp_of riscv_eraGS img
+      (write_bytes σ.(mem) (pa_of ppn a) (Z.to_N width) vnew)
+      (log ++ [PWMsg (snap_of (pa_of ppn a) (Z.to_N width) vnew)
+                 (hart_agent (@cpu_id CIDw))])%list
+      (vstep (hart_agent (@cpu_id CIDw)) (V (hart_agent (@cpu_id CIDw)))
+         (log ++ [PWMsg (snap_of (pa_of ppn a) (Z.to_N width) vnew)
+                    (hart_agent (@cpu_id CIDw))])%list V) ∗
+    TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx ∗
+    wordw_pointsto width a (DfracOwn 1) vnew.
+  Proof.
+    intros Hw0 Hcan Hoff. iIntros "#Hk Hm Htso Hrun Hw".
+    rewrite /wordw_free /wordw_pointsto.
+    iDestruct "Hw" as "(%Hal & Hb)".
+    assert (Hwn : N.to_nat (Z.to_N width) = Z.to_nat width)
+      by apply Z_N_nat.
+    iEval (rewrite -Hwn) in "Hb".
+    iMod (wordw_win_store_free_c (CID := CIDw) (Z.to_N width) img σ log V a ppn
+            vnew
             ltac:(pose proof (bv_unsigned_in_range _
                     (subrange_vec_dec a 11 0)) as [Hlo0 _];
                   rewrite Hwn; lia) Hcan
@@ -468,9 +575,15 @@ Section WpSconfMem.
     (forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg)
             (V : agent -> nat) (ppn : mword 44) (v : mword (8*width)),
        (* the address facts the CLAIM yields inside the leaf, handed on so a
-          supplier that needs them (the ctx tower's does) has them *)
+          supplier that needs them (the ctx tower's does) has them.
+          A6.84 (archived residue, re-applied): the TIER PIN is one of
+          them -- without it the obligation cannot identify [pa_of ppn ea]
+          with [ea], which is the only bridge from the leaf's VA-keyed
+          claim to a [phys_ledger_*] cell.  The STORE form already has it;
+          the leaf has it in scope as [%Hid]. *)
        (uint ea < 274877906944)%Z ->
        (bv_unsigned (subrange_vec_dec ea 11 0) + width <= 4096)%Z ->
+       ktier_pin ktd ppn ea ->
        kmap_at (svpn_of ea) ppn KP_rw -∗
        gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
        tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
@@ -703,7 +816,7 @@ Section WpSconfMem.
             iAssert (⌜forall tvr : nat, (V (hart_agent (@cpu_id CID)) <= tvr)%nat ->
                        tso_read_bytes img log (hart_agent (@cpu_id CID)) tvr
                          (pa_of ppn ea) (Z.to_N width) v⌝)%I as %Hrb.
-            { iApply (Hload CID img sigma log V ppn v Hcan Hoff
+            { iApply (Hload CID img sigma log V ppn v Hcan Hoff Hid
                         with "Hk Hmem Htso Hctx Hbw"). }
             iMod ("Hcl" with "Hbw") as "HPsi".
             iMod "Hb1" as "_".
@@ -820,7 +933,7 @@ Section WpSconfMem.
     exact (wp_load_s_sconf_au_dat (ktd := ktd) width c uns pc rd rs1 imm m n ext Ψ Em b
              (wordw_pointsto (KTR := ktd) width ea dqm)
              Hw0 Hw8 Hvw Hwdvd Huintw Hread_plain Hext Hrd Hrdok HkptEm
-             (fun CIDw img sigma log V ppn v Hcan Hoff =>
+             (fun CIDw img sigma log V ppn v Hcan Hoff _Hid =>
                 wordw_pointsto_load_c (KTR := ktd) (CIDw := CIDw) width img sigma
                   log V ea ppn v dqm Hw0 Hcan Hoff)).
   Qed.
@@ -892,9 +1005,15 @@ Section WpSconfMem.
     (forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg)
             (V : agent -> nat) (ppn : mword 44),
        (* the address facts the CLAIM yields inside the leaf, handed on so a
-          supplier that needs them (the ctx tower's does) has them *)
+          supplier that needs them (the ctx tower's does) has them.
+          A6.84 (archived residue, re-applied): the TIER PIN is one of
+          them -- without it the obligation cannot identify [pa_of ppn ea]
+          with [ea], which is the only bridge from the leaf's VA-keyed
+          claim to a [phys_ledger_*] cell.  The STORE form already has it;
+          the leaf has it in scope as [%Hid]. *)
        (uint ea < 274877906944)%Z ->
        (bv_unsigned (subrange_vec_dec ea 11 0) + width <= 4096)%Z ->
+       ktier_pin ktd ppn ea ->
        kmap_at (svpn_of ea) ppn KP_rw -∗
        gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
        tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
@@ -1101,7 +1220,7 @@ Section WpSconfMem.
                        exists v : mword (8*width),
                          tso_read_bytes img log (hart_agent (@cpu_id CID)) tvr
                            (pa_of ppn ea) (Z.to_N width) v /\ P v⌝)%I as %Hrb.
-            { iApply (Hload CID img sigma log V ppn Hcan Hoff
+            { iApply (Hload CID img sigma log V ppn Hcan Hoff Hid
                         with "Hk Hmem Htso Hctx Hbw"). }
             iMod ("Hcl" with "Hbw") as "HT".
             iMod "Hb1" as "_".
@@ -1970,6 +2089,62 @@ Section WpSconfMem.
     iPureIntro. exact Hs1.
   Qed.
 
+  (* §0.26′: THE NON-ATOMIC STORE FROM A VISIBILITY-FREE WINDOW.  Same
+     shape as [wp_store_s_sconf_gen]: the caller owns the cell throughout,
+     but on the way IN it owns only the future of it.  On the way out the
+     cell is REGISTERED -- the write re-minted determinacy, with no
+     receipt, no drain, no evidence. *)
+  Lemma wp_store_s_sconf_free_gen {ktd : ktier} (width : Z) (c : bool)
+      (pc : mword 64) (rs2 rs1 : mword 5)
+      `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
+      (m : regfile) (n : nat) (sv : mword (8*width))
+      (b : bool) `{!KtierLe ktd kt} :
+    0 < width -> width <= 8 -> vmem_width width ->
+    (width | 4096) -> uint (to_bits 64 width) = width ->
+    (forall (addr : mword 64) (data : mword (8*width)) s,
+       dev_addr addr = false ->
+       exec (write_ram rv64d_types.Write_plain (Physaddr addr) width data tt) s
+         = Some (true, MState s.(sregs) (write_bytes s.(mem) addr (Z.to_N width) data) s.(mdev))) ->
+    (autocast (T := mword) (subrange_vec_dec (rget m rs2) (width*8-1) 0)
+     : mword (8*width)) = sv ->
+    let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗
+    instr pc c (STORE (imm, Regidx rs2, Regidx rs1, width)) -∗
+    wordw_free (KTR := ktd) width pa -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt m n b p -∗
+      pc_is (add_vec_int pc (if c then 2 else 4)) -∗
+      wordw_pointsto (KTR := ktd) width pa (DfracOwn 1) sv -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hw0 Hw8 Hvw Hwdvd Huintw Hwrite_plain Hsv pa.
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
+    assert (Hsv_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
+      by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
+    iIntros "Hcg Hpc #Hinstr Hbytes Hcont".
+    iDestruct (wordw_free_claim (KTR := ktd) width pa Hw0
+                 with "Hbytes") as "#Hclaim".
+    iApply (wp_store_s_sconf_au_dat (ktd := ktd) width c pc rs2 rs1 imm m n sv
+              (wordw_pointsto (KTR := ktd) width pa (DfracOwn 1) sv)
+              (⊤ ∖ ↑minstretN) b
+              (wordw_free (KTR := ktd) width pa)
+              (wordw_pointsto (KTR := ktd) width pa (DfracOwn 1) sv)
+              Hw0 Hw8 Hvw Hwdvd Huintw Hwrite_plain Hsv
+              ltac:(solve_ndisj) with "Hcg Hpc Hinstr Hclaim [Hbytes] [Hcont]").
+    { intros CIDw img sigma log V ppn Hcan Hoff Hid.
+      iIntros "#Hk Hmem Htso Hctx Hbw".
+      iApply (wordw_free_write_c (KTR := ktd) (CIDw := CIDw) width img sigma log V
+                pa ppn sv Hw0 Hcan Hoff with "Hk Hmem Htso Hctx Hbw"). }
+    { iModIntro. iFrame "Hbytes". iIntros "Hb". by iModIntro. }
+    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
+    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
+    iPureIntro. exact Hs1.
+  Qed.
+
   Lemma store_ext_8 (r : mword 64) :
     (autocast (T := mword) (subrange_vec_dec r (8*8-1) 0) : mword (8*8)) = r.
   Proof. apply (subrange_full_gen_cast 64 r ltac:(lia)). Qed.
@@ -2281,6 +2456,46 @@ Section WpSconfMem.
     iExact "Hbw".
   Qed.
 
+  (* §0.26′: the byte store from a VISIBILITY-FREE cell.  This is the leaf
+     [memset] runs on a page it is poisoning -- kfree's, and every other
+     write to memory whose contents nobody may claim to know.  It is
+     [wp_sb_s_sconf] with the input weakened and the output unchanged. *)
+  Lemma wp_sb_free_s_sconf {ktd : ktier}
+      (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
+      (m : regfile) (n : nat) (b : bool) `{!KtierLe ktd kt} :
+    let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    let storeval := trunc8 (rget m rs2) in
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗
+    instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 1)) -∗
+    TsoCtx.mem_free (KTR := ktd) ea (DfracOwn 1) -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt m n b p -∗
+      pc_is (add_vec_int pc 4) -∗
+      ea ↦ₘ[ktd] storeval -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros ea storeval.
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = ea)
+      by (intros hh; unfold ea; by rewrite (src_ok_rget_indep m rs1 hh CID)).
+    assert (Hsv_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
+      by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
+    iIntros "Hcg Hpc Hinstr Hbyte Hcont".
+    iApply (wp_store_s_sconf_free_gen (ktd := ktd) 1 false pc rs2 rs1 imm m n
+              storeval b
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia)
+              ltac:(exists 4096; reflexivity) ltac:(vm_compute; reflexivity)
+              exec_write_ram_plain_1 eq_refl
+              with "Hcg Hpc Hinstr [Hbyte] [Hcont]").
+    { iApply (wordw1_free (KTR := ktd) ea). iExact "Hbyte". }
+    iIntros (CID1 Hs1) "Hcg Hpc Hbw".
+    iApply ("Hcont" $! CID1 with "[%] Hcg Hpc [Hbw]"); [ exact Hs1 | ].
+    iEval (rewrite (wordw1_byte (KTR := ktd) ea (DfracOwn 1) storeval)) in "Hbw".
+    iExact "Hbw".
+  Qed.
+
   (* ------------------------------------------------------------------- *)
   (* c.ldsp / c.sdsp -- the sp-relative immediate forms, bridged onto     *)
   (* the c.ld / c.sd leaves by [sext9_12_64] (pure immediate rewrite).    *)
@@ -2449,6 +2664,111 @@ Section WpSconfMem.
     iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hbw").
     iPureIntro. exact Hs1.
   Qed.
+
+  (* ==================================================================== *)
+  (* [sd zero, imm(rs1)] THAT MINTS THE RACY WINDOW PAYLOAD                *)
+  (* (tso-machine-flip.md A6.82 §(4), the STORE-THEN-MINT order).           *)
+  (*                                                                      *)
+  (* [wp_sd_zero_s_sconf] with the ctx cell handed back as the LEDGER      *)
+  (* window payload instead: the clear word goes down and the payload is   *)
+  (* minted at THAT STORE'S OWN POSITION, in one node, because the floor   *)
+  (* is the store's position and cannot be named before the store has      *)
+  (* happened.  This is the leaf [initlock]'s [lk->cpu = 0] takes, and the  *)
+  (* one place in the tree where a cell crosses from the ctx tower to the   *)
+  (* racy ledger payload.                                                  *)
+  (*                                                                      *)
+  (* [KT0] IS NOT A CHOICE: the payload is keyed by PHYSICAL address and    *)
+  (* the leaf's cell by VA, and [ktier_pin_id] -- [pa_of ppn ea = ea] at    *)
+  (* KT0 -- is the only bridge between them (A6.81 §(3)).  The lock's       *)
+  (* cells are KT0 throughout ([WpSconfLock] states every leaf at it).      *)
+  (*                                                                      *)
+  (* [lo] IS EXISTENTIAL IN THE POST and that is the honest statement: the  *)
+  (* floor is a log position, which no caller can name.  What the READER    *)
+  (* needs is not its value but a receipt dominating it, and the payload    *)
+  (* itself carries [tw_lo <= length glog] ([win_ok1] conjunct (2b)).       *)
+  (* ==================================================================== *)
+  Lemma wp_sd_zero_wpay_s_sconf
+      (pc : mword 64) (rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
+      (m : regfile) (n : nat) (vold : mword 64) (b : bool) `{!KtierLe KT0 kt}
+      (cp : agent -> nat -> bv 8) :
+    let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    let z8 := nth_byte (zero_reg : mword 64) in
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗
+    instr pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 8)) -∗
+    ea ↦₈[KT0] vold -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr kt m n b p -∗
+      pc_is (add_vec_int pc 4) -∗
+      (* A6.84 (archived residue, re-applied): the leaf hands the address
+         claim BACK.  A ledger cell carries no mapping, so [ProofInitlock]
+         has no other source for [lk_addr_claim]; the leaf already holds
+         it as ["Hclaim"] and it is persistent, so this costs nothing. *)
+      wordw_claim (KTR := KT0) 8 ea -∗
+      (∃ lo : nat, [∗ list] j ∈ seq 0 8,
+         TsoCtx.phys_ledger_wpay (pa_add ea j) (DfracOwn 1) (z8 j) lo
+           (TsoMemPa.TsWin ea 8 j z8 cp (fun _ => Some lo) lo)) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros ea z8.
+    (* the class, consumed at [rs1] -- the wiring check; see the family note. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = ea)
+      by (intros hh; unfold ea; by rewrite (src_ok_rget_indep m rs1 hh CID)).
+    iIntros "Hcg Hpc #Hinstr Hbytes Hcont".
+    (* A PREMISE ABOUT AN x0 OPERAND CANNOT BE PURE (see [wp_sd_zero_s_sconf]). *)
+    iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
+    iDestruct (gpr_file_x0 (tp_pin m) (mword_of_int 0 : mword 5)
+                 ltac:(vm_compute; reflexivity) with "Hfile") as "[%Hx0 Hfile]".
+    iDestruct (sie_cap_gpr_join with "Hhs Hsc Hcap Hfile") as "Hcg".
+    assert (Hsv : (autocast (T := mword)
+              (subrange_vec_dec (rget m (mword_of_int 0 : mword 5)) (8*8-1) 0)
+              : mword (8*8)) = (zero_reg : mword 64)).
+    { unfold rget. rewrite Hx0. exact (store_ext_8 zero_reg). }
+    iEval (rewrite -(wordw8_ctx (KTR2 := KT0))) in "Hbytes".
+    iDestruct (wordw_claim_of (KTR := KT0) 8 ea (DfracOwn 1) vold ltac:(lia)
+                 with "Hbytes") as "#Hclaim".
+    (* THE POST CARRIES THE ADDRESS IT WAS MINTED AT.  [ppn] is bound inside
+       the write obligation, so the payload cannot be STATED at [ea] there;
+       it is stated at the translated address plus the equation [ktier_pin_id]
+       gives, and this leaf discharges the equation before its own
+       continuation sees it. *)
+    iApply (wp_store_s_sconf_au_dat (ktd := KT0) 8 false pc
+              (mword_of_int 0 : mword 5) rs1 imm m n (zero_reg : mword 64)
+              (∃ (pl : Arch.pa) (lo : nat), ⌜pl = ea⌝ ∗
+                 [∗ list] j ∈ seq 0 8,
+                   TsoCtx.phys_ledger_wpay (pa_add pl j) (DfracOwn 1) (z8 j) lo
+                     (TsoMemPa.TsWin pl 8 j z8 cp (fun _ => Some lo) lo))%I
+              (⊤ ∖ ↑minstretN) b
+              (wordw_pointsto (KTR := KT0) 8 ea (DfracOwn 1) vold)
+              (∃ (pl : Arch.pa) (lo : nat), ⌜pl = ea⌝ ∗
+                 [∗ list] j ∈ seq 0 8,
+                   TsoCtx.phys_ledger_wpay (pa_add pl j) (DfracOwn 1) (z8 j) lo
+                     (TsoMemPa.TsWin pl 8 j z8 cp (fun _ => Some lo) lo))%I
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia)
+              ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
+              exec_write_ram_plain_8 Hsv ltac:(solve_ndisj)
+              with "Hcg Hpc Hinstr Hclaim [Hbytes] [Hcont]").
+    { (* THE WRITE OBLIGATION: the store-then-mint gate, at the physical
+         address the tier pin identifies with [ea]. *)
+      intros CIDw img sigma log V ppn Hcan Hoff Hid.
+      iIntros "#Hk Hmem Htso Hctx Hbw".
+      iEval (rewrite (wordw8_ctx (KTR2 := KT0))) in "Hbw".
+      iMod (SmodeCorePt.word_pointsto_wpay_mint_c (KTR := KT0) img sigma log V
+              ea ppn vold (zero_reg : mword 64) cp Hcan Hoff
+              with "Hk Hmem Htso Hbw") as "(Hmem & Htso & Hpay)".
+      iModIntro. iFrame "Hmem Htso Hctx".
+      iExists (pa_of ppn ea), (S (length log)).
+      iSplitR; [ iPureIntro; exact (ktier_pin_id ppn ea Hid) | iExact "Hpay" ]. }
+    { iModIntro. iFrame "Hbytes". iIntros "Hp". by iModIntro. }
+    iIntros (CID1 Hs1) "Hcg Hpc Hp".
+    iDestruct "Hp" as (pl lo) "[-> Hp]".
+    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hclaim [Hp]").
+    { iPureIntro. exact Hs1. }
+    { iExists lo. iExact "Hp". }
+  Qed.
+
 
   (* c.sw x0 store (width-4 sibling of wp_sd_zero_s_sconf); moved here from
      ProofInitlock.v -- a store leaf belongs in the leaf file. *)

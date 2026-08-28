@@ -69,7 +69,7 @@ Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `
     (* both name fields are written once and DISCARDED: what comes back are
        the persistent [lock_name]/[sl_name], ready for [new_sleeplock]. *)
     lock_name (sl_lk slk) "sleep lock"%string -∗
-    sl_lkcpu slk ↦₈ (zero_reg : mword 64) -∗
+    WpLock.lk_cpu_fresh (sl_lk slk) -∗
     sl_name slk s -∗
     sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗
     WP (Loop : expr riscv_lang)) -∗

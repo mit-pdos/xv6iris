@@ -64,7 +64,7 @@ Section TicksInv.
     lock_name a_tickslock "time"%string -∗
     own_context cur_ctx -∗
     a_tickslock ↦₄ (mword_of_int 0 : mword 32) -∗
-    lock_cpu a_tickslock ↦₈ (zero_reg : mword 64) -∗
+    WpLock.lk_cpu_fresh a_tickslock -∗
     a_ticks ↦₄ t ={E}=∗ own_context cur_ctx ∗ ∃ γl : gname, is_tickslock γl.
   Proof.
     iIntros "#Hnm Hrun Hlkw Hcpu Hticks".

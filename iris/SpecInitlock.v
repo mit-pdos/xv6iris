@@ -56,7 +56,7 @@ Definition wp_initlock_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
        whose lock is static seals it with [lock_name_intro] and forgets it;
        one that will free the object keeps it. *)
     c_name ↦₈ name -∗
-    c_cpu ↦₈ (zero_reg : mword 64) -∗
+    WpLock.lk_cpu_fresh lk -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

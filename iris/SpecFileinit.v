@@ -55,7 +55,7 @@ Definition wp_fileinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
     ⌜ callee_saved m mr ⌝ -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_name lk "ftable"%string -∗
-    c_cpu ↦₈ (zero_reg : mword 64) -∗
+    WpLock.lk_cpu_fresh lk -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

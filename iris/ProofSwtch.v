@@ -56,8 +56,8 @@ From Kernel Require KernelSyms.
 Require Import CodeSwtch.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require Import TsoCtxShim.   (* [hart_view_lb_any]: the SC-only resume
-   receipt, until M2 threads the honest one out of the p->lock acquire *)
+(* A6.86: [TsoCtxShim] is RETIRED -- its last live use died with the M4
+   contract flip.  See its tombstone. *)
 Local Open Scope Z_scope.
 Import Defs.
 

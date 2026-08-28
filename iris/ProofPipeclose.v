@@ -745,8 +745,12 @@ Section ProofPipeclose.
                 ltac:(lkbelow)
                 with "Hcg Hown Htext Hpc Hkmem [Hword Hcpu Hbytes] Havail").
       all: try lkbelow.
+      (* §0.26′ / A6.85: THE SITE THAT FORCED THE RULING.  A lock on a
+         kalloc'd page must be able to DIE; after the M4 flip its owner
+         word is a ledger cell that cannot re-enter the ctx tower, and it
+         does not have to -- kfree wants only the page's FUTURE. *)
       { rewrite /kfree_pre. iEval (rewrite Ha0K4). iSplitR; [done|].
-        iApply (pipe_bytes_page_own with "Hword Hcpu Hbytes"). }
+        iApply (pipe_bytes_page_free with "Hword Hcpu Hbytes"). }
       iIntros (CIDkf Hskf mk) "Hcg Hown Hpc %Hcsk Havail".
       assert (HraK4 : K4 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.pipeclose + 0x58) : mword 64) 4)
         by (rewrite /K4; apply upd_eq).

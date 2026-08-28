@@ -1601,8 +1601,9 @@ Section ProofUvmalloc.
     all: try lkbelow.
     { rewrite /kfree_pre HF2a0.
       iSplitR; [iPureIntro; exact Hpv |].
-      (* kfree is contents-blind: forget the zeros again *)
-      rewrite /page_own /byte_any.
+      (* kfree is contents-blind AND view-blind (§0.26′): forget the
+         zeros, then forget that they were ever determinate *)
+      iApply page_own_free. rewrite /page_own /byte_any.
       iApply (big_sepL_impl with "Hpage"). iIntros "!>" (kk x Hx) "Hj".
       iExists _. iExact "Hj". }
     iIntros (CIDu38 Hsu38 mfk) "Hcg Hcnt Hpc %Hfcs _".

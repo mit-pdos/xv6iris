@@ -33,9 +33,9 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecRelease.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require Import TsoCtxShim.   (* [ctx_dom_sc]: the SC-only transport evidence
-   behind the context-shaped spec, until the cutover kit mints it from the
-   machine (TsoCtxTwin2.v) *)
+(* A6.86: [TsoCtxShim] is RETIRED -- its last live use died with the M4
+   contract flip.  See its tombstone. *)
+Require Import SieCapCtx.
 Import Defs.
 
 
@@ -562,7 +562,7 @@ Section CancelOfGen.
     intros pcE lk0 ret_tgt. cbv zeta. intros Hlka Hav Href Hrefpre.
     iIntros "Hcg #Htext Hpc #Hlock Htoken HR Hbuild Hown Hpay Hcont".
     iApply (G.wp_release_gen_sconf kt γl lka s R D
-              (lka ↦₄ (mword_of_int 0 : mword 32) ∗ lock_cpu lka ↦₈ (zero_reg : mword 64) ∗ Out)%I
+              (lka ↦₄ (mword_of_int 0 : mword 32) ∗ WpLock.lk_cpu_fresh lka ∗ Out)%I
               m n eb p av lks
               Hlka Hav Href Hrefpre
               with "Hcg Htext Hpc Hlock Htoken HR [Hbuild] Hown Hpay").

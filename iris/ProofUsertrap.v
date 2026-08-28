@@ -1192,7 +1192,7 @@ Proof. exact (ut_res_bare_tf_open SY.syscall_env pt ksp). Qed.
 (* THE PARK'S PRODUCER, re-exported off the fit check.  See [Module Fits]
    above: it is proved under the same [SY], so this is a rename. *)
 Definition usertrap_res_bare_park
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
     (N : ut_names) (av : nat)
   : ut_park_intro_body
       (fun (h : CpuId) (Xc : CurCtx) => Fits.usertrap_res_bare (CID := h) (XI := Xc))

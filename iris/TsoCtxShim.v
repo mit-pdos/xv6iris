@@ -1,43 +1,40 @@
-(* TsoCtxShim.v -- THE ONE-TIME MIGRATION SHIM, POST-FLIP RESIDUE.
+(* TsoCtxShim.v -- TOMBSTONE.  The one-time migration shim is RETIRED
+   (tso-machine-flip.md A6.86).
 
-   Before the machine flip this file stated the SC-only equivalences
-   (`ctx_pointsto ξ ⊣⊢ mem_pointsto`, the word/eslot/buf forms, the
-   conjured `hart_view_lb_any`/`ctx_dom_sc`).  THE MACHINE IS NOW Ztso
-   (tso-machine-flip.md) and every one of those statements is FALSE, so
-   they are GONE: each compile error at a former use site is one entry
-   of the honest remaining worklist --
-     - a `ctx_*_of/to_mem` use marks a leaf/kit boundary that needs its
-       real re-proof against the log machine (the (iii) worklist);
-     - a `hart_view_lb_any` use marks the M2 receipt threading
-       (SpecAcquire's AMO mint, `TsoCtx.hart_view_lb_get`);
-     - a `ctx_dom_sc` use marks a lock-kit transport that must be minted
-       from real synchronization evidence (`TsoCtx.ctx_dom_to_parked` /
-       `ctx_dom_of_parked`).
+   WHAT IT WAS.  Before the machine flip this file stated the SC-only
+   equivalences that let the sweep convert file by file:
+   `ctx_pointsto ξ ⊣⊢ mem_pointsto` and its word / eslot / buf forms, plus
+   the two conjured receipts `hart_view_lb_any` and `ctx_dom_sc`.  Every one
+   of those statements is FALSE at Ztso, and they were deleted at the flip
+   (A6.8): a `ctx_*_of_mem` cannot exist because the timestamp element is a
+   `ghost_map` fragment handed out once, and a conjured view receipt is
+   exactly the evidence the port exists to demand.
 
-   THE ONE SURVIVOR is the sweep-era caller mint below: a conjured
-   running context is still SOUND under the real construction
-   ([TsoCtxTwin2.twin_run_alloc]: a context born at bound 0 with an
-   empty dirty set claims nothing any hart could not honour) -- it is
-   just USELESS for reading anything younger than the boot image, which
-   is why each use site is still a caller whose own conversion is the
-   remaining work. *)
-From Stdlib Require Import ZArith Lia.
-From stdpp Require Import bitvector.definitions gmap.
-From iris.proofmode Require Import proofmode.
-From iris.algebra Require Import dfrac.
-From iris.base_logic.lib Require Import ghost_var.
-Require Import SailStdpp.Values.
-Require Import Riscv.rv64d_types.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto Ktier.
-Require Import TsoCtx.
+   HOW IT DIED, and it took three tranches:
+     - the `_to_mem` (forgetting) directions became `TsoCtx`'s own
+       `ctx_pointsto_forget` family -- one-way and lossy, and priced there;
+     - the boot-side `_of_mem` (minting) directions became
+       `BootCarve.boot_ctx_of_mem_{byte,word,word4}`, which build the honest
+       cell out of the carve's own timestamp-0 receipts (A6.80/A6.81);
+     - the LAST LIVE USE was `WpSconfLock.lock_claims`, which forgot the
+       lock's owner cell to a raw word in order to read an ADDRESS claim off
+       it and then had to cross back.  The M4 contract flip put that cell at
+       the ledger tier, where it carries no mapping at all, so the invariant
+       holds the two `lk_addr_claim`s explicitly and `lock_claims` became a
+       peek that closes with what it opened.  Nothing to cross, nothing to
+       forget, no shim (A6.84 §(1) predicted exactly this; A6.86 landed it).
 
-Section shim.
-  Context `{!riscvGS Σ}.
+   THE ONE SURVIVING LEMMA, `own_context_alloc`, is gone too: it was a
+   re-export of `TsoCtx.own_context_boot` under a name that marked
+   sweep-era call sites, and it had no callers left.  Note that the
+   CONTEXT-FREE reading of its name is REFUTED --
+   `TsoCtxRehearsal.no_own_context_alloc` -- which is why nothing should
+   ever reintroduce it.
 
-  (* THE SWEEP-ERA THROWAWAY MINT (see the header).  Same mint as
-     [TsoCtx.own_context_boot]; licensed here by NAME so the boot-site
-     rule ("boot mints, fork mints parked, swtch exchanges") keeps its
-     grep-able meaning. *)
-  Lemma own_context_alloc `{CID : CpuId} : ⊢ |==> ∃ ξ : CtxId, own_context ξ.
-  Proof. apply own_context_boot. Qed.
-End shim.
+   THE FILE IS KEPT, EMPTY, ON PURPOSE.  Its rows in `_CoqProject` and in
+   the dependency graph cost nothing, and a grep for `TsoCtxShim` that lands
+   here reads the history instead of returning nothing.  If you are looking
+   for a crossing this file used to provide, the answer is in one of the
+   three bullets above; if none of them fits, the crossing you want is
+   unsound. *)
+From Stdlib Require Import ZArith.

@@ -1704,7 +1704,7 @@ Section IcacheBootTable.
        sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) -∗
     itable_lock ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_name itable_lock "itable"%string -∗
-    lock_cpu itable_lock ↦₈ (zero_reg : mword 64) -∗
+    WpLock.lk_cpu_fresh itable_lock -∗
     ([∗ list] k ∈ seq 0 NINODE, sl_fresh (i_lock (ientry k)) "inode"%string) -∗
     ([∗ list] k ∈ seq 0 NINODE, ientry_raw k) -∗
     iref_slots_auth -∗
@@ -1856,7 +1856,7 @@ Section IcacheBootTable.
        sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) -∗
     itable_lock ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_name itable_lock "itable"%string -∗
-    lock_cpu itable_lock ↦₈ (zero_reg : mword 64) -∗
+    WpLock.lk_cpu_fresh itable_lock -∗
     ([∗ list] k ∈ seq 0 NINODE, sl_fresh (i_lock (ientry k)) "inode"%string) -∗
     ([∗ list] k ∈ seq 0 NINODE, ientry_raw k) -∗
     iref_slots_auth -∗

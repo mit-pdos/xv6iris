@@ -101,7 +101,8 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 (* the WaitInv parent table is still the RAW word fact; the named
    crossings below are its shim seams (stage-2 worklist). *)
-Require Import TsoCtxShim.
+(* A6.86: [TsoCtxShim] is RETIRED -- its last live use died with the M4
+   contract flip.  See its tombstone. *)
 Require Import ByteBuf.  (* A6.58: the CONTEXT tower's 8<->4 halving
                             ([ctx_word_pointsto_split4]/[_join4]) and the
                             window forget ([ctx_buf_forget]) live here --

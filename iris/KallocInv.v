@@ -48,7 +48,7 @@
           ∨ (page_valid r ∗ page_own r ∗ kalloc_avail γk (avail_dec on))
      {{ is_kmem γ γk lk fl ∗ kfree_pre p ∗ kalloc_avail γk on }}
          kfree(p)  {{ kalloc_avail γk (avail_inc on) }}
-        kfree_pre p := page_valid p ∗ page_own p
+        kfree_pre p := page_valid p ∗ page_free p    (* §0.26′ *)
    i.e. kalloc hands back full ownership of a fresh 4KB page (or null -- but
    only when the count is unknown or exactly 0), decrementing the count; kfree
    absorbs the page and increments it.  Boot code threads [Some n]; after
@@ -143,6 +143,77 @@ Section Kalloc.
      sent [iFrame] crawling through the 4088 conjuncts -- the same class of
      degeneracy as the ProofKfree/157GB lesson, caught by [coqc -time]. *)
   Global Typeclasses Opaque byte_any word_at page_head8 page_rest page_own run_page.
+
+  (* ================================================================== *)
+  (* §0.26′ / A6.85: THE FREER'S PAGE.                                   *)
+  (*                                                                   *)
+  (* [kfree]'s precondition is NOT [page_own].  The owner's ruling:      *)
+  (* [exists x, a |-> x] asserts the freer holds a value DETERMINATE AT  *)
+  (* ITS OWN CPU VIEW, and under TSO that is surplus -- a page whose     *)
+  (* lock another CPU just released has no value well-known to the       *)
+  (* freer, and freeing must not require one.  What kfree needs is the   *)
+  (* FUTURE half of ownership: exclusivity plus the timestamp element    *)
+  (* any future write must pay.  [page_free] is that, and nothing else.  *)
+  (*                                                                   *)
+  (* THE ASYMMETRY IS THE DESIGN, and it is why the client cascade is    *)
+  (* one line per free SITE and zero lines everywhere else:              *)
+  (*   - [kfree_pre] is [page_free]   -- the freer owes only the future; *)
+  (*   - [kalloc_post] is [page_own]  -- because kalloc MEMSETS the page *)
+  (*     it returns (xv6 memsets it with 5 before returning), and that   *)
+  (*     store RE-MINTS determinacy with no evidence at all.  So every   *)
+  (*     kalloc client keeps exactly the resource it has today.          *)
+  (*                                                                   *)
+  (* AND THE FREE LIST STAYS REGISTERED.  kfree memsets BEFORE it pushes *)
+  (* (memset with 1, then the r->next store), so every page on the       *)
+  (* list was written by its freer after the mint: [run_page] /          *)
+  (* [freelist_chain] / [kmem_res] are untouched, and so is kalloc's own *)
+  (* read of r->next -- which is the allocator's own protocol under      *)
+  (* the kmem lock, not a client reading allocator junk.                 *)
+  (* ================================================================== *)
+  (* NO ∃ HERE: [TsoCtx.mem_free] already hides the value, and re-adding
+     it would be re-introducing exactly the thing the tier exists to
+     drop.  A free byte is a fraction and a timestamp element; that is
+     the whole of it. *)
+  Definition byte_free (a : Arch.pa) : iProp Σ :=
+    TsoCtx.mem_free a (DfracOwn 1).
+  Definition page_free (p : mword 64) : iProp Σ :=
+    ([∗ list] j ∈ seq 0 4096, byte_free (pa_add p j))%I.
+
+  Global Typeclasses Opaque byte_free page_free.
+
+  Lemma byte_any_free a : byte_any a ⊢ byte_free a.
+  Proof.
+    rewrite /byte_any /byte_free. iIntros "(%b & H)".
+    by iApply TsoCtx.ctx_pointsto_free.
+  Qed.
+
+  (* THE ONE LINE EVERY [kfree] CALL SITE NEEDS.  A caller that holds the
+     page registered to its own context owns strictly more than kfree
+     asks -- so this is where the ruling costs its clients anything at
+     all, and it costs them this. *)
+  Lemma page_own_free p : page_own p ⊢ page_free p.
+  Proof.
+    rewrite /page_own /page_free. apply big_sepL_mono.
+    intros ? ? _. apply byte_any_free.
+  Qed.
+
+  (* ...and the same for a caller holding the bytes NAMED (the shape the
+     post-memset / post-copy free sites are in). *)
+  Lemma page_free_of_named p (f : nat -> bv 8) :
+    ([∗ list] j ∈ seq 0 4096, (pa_add p j) ↦ₘ (f j)) ⊢ page_free p.
+  Proof.
+    rewrite /page_free. apply big_sepL_mono. intros k j _.
+    rewrite /byte_free. iIntros "H".
+    by iApply TsoCtx.ctx_pointsto_free.
+  Qed.
+
+  Lemma page_free_of_named_ex p (f : nat -> bv 8) :
+    ([∗ list] j ∈ seq 0 4096, ∃ b : bv 8, (pa_add p j) ↦ₘ b) ⊢ page_free p.
+  Proof.
+    rewrite /page_free. apply big_sepL_mono. intros k j _.
+    rewrite /byte_free. iIntros "(%b & H)".
+    by iApply TsoCtx.ctx_pointsto_free.
+  Qed.
 
   Lemma page_own_split p : page_own p ⊣⊢ page_head8 p ∗ page_rest p.
   Proof.
@@ -351,8 +422,17 @@ Section Kalloc.
   Definition kalloc_post (γk : gname * gname) (on : option nat) (r : mword 64) : iProp Σ :=
     ((⌜r = nullp⌝ ∗ ⌜avail_zero on⌝ ∗ kalloc_avail γk on)
      ∨ (⌜page_valid r⌝ ∗ page_own r ∗ kalloc_avail γk (avail_dec on)))%I.
+  (* §0.26′: THE FREER OWES ONLY THE FUTURE.  See the [page_free] block
+     above for the ruling; [kfree_pre_of_own] is the one line a caller
+     that holds the page registered has to add. *)
   Definition kfree_pre (p : mword 64) : iProp Σ :=
-    (⌜page_valid p⌝ ∗ page_own p)%I.
+    (⌜page_valid p⌝ ∗ page_free p)%I.
+
+  Lemma kfree_pre_of_own p : ⌜page_valid p⌝ -∗ page_own p -∗ kfree_pre p.
+  Proof.
+    iIntros (Hv) "H". rewrite /kfree_pre. iSplitR; [done|].
+    by iApply page_own_free.
+  Qed.
 
   (* boot-mode corollary: with a positive exact count, kalloc CANNOT fail *)
   Lemma kalloc_post_success γk k r :

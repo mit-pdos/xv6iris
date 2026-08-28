@@ -1126,6 +1126,529 @@ Section window.
 End window.
 
 (* ===================================================================== *)
+(* §12d  THE FLOOR (tso-machine-flip.md A6.82, owner-ruled).             *)
+(*                                                                       *)
+(* §12/§12b's claims quantify over the WHOLE log, so a cell can only      *)
+(* carry them if its whole past is the kit's to constrain -- which is     *)
+(* true of a .bss cell and FALSE of a kalloc'd one, whose page was        *)
+(* memset by [kfree] before it was ever a lock.  That is what refuted     *)
+(* the mint's site at [initlock]'s dynamic caller (A6.81).                *)
+(*                                                                       *)
+(* THE RULING: every claim gains a FLOOR [Bm] -- the position of the      *)
+(* MINT STORE itself -- and constrains only messages AT OR ABOVE it; the  *)
+(* reader pays with a monotone receipt [Bm <= tv].  WHY THAT IS ENOUGH IS *)
+(* ONE FACT, and it is [read_down_shadow] below: the mint store TOUCHED   *)
+(* the cell and is visible at every view past it, so [read_down]'s scan   *)
+(* is stopped at or above the floor and the pre-mint past is never        *)
+(* consulted.                                                            *)
+(*                                                                       *)
+(* THE DESIGN RHYME, and it is the third instance: this is the canon      *)
+(* pin's bound [B] and the parked record's stamp again.  EVERY            *)
+(* HISTORY-SHAPED CLAIM IN THIS PORT CARRIES A FLOOR AND IS CLAIMED       *)
+(* AGAINST A MONOTONE RECEIPT -- [pin_ok]'s [B] with [hart_view_lb],      *)
+(* [ctx_parked]'s [T] with the resume receipt, and now the window's       *)
+(* [Bm].  A history claim with no floor is a claim about a past nobody    *)
+(* owns.                                                                 *)
+(*                                                                       *)
+(* THIS SECTION IS ADDITIVE: [own_last] / [writer_pin] / [win_ok] are     *)
+(* the [Bm = 0] instances (proved as [iff]s below), so nothing that       *)
+(* consumes them moves.  What is still owed above it is [ts_win]'s floor  *)
+(* FIELD and [win_ok1]'s relativisation.                                  *)
+(* ===================================================================== *)
+(* ===================================================================== *)
+(* §12d.1  AT ONE BYTE.                                                  *)
+(* ===================================================================== *)
+
+Section floor_byte.
+  Variable img : gmap Arch.pa (bv 8).
+  Variable log : list pwmsg.
+
+  (* "among the messages AT OR ABOVE the floor, h's last write to [a] is
+     at most [t]".  [own_last] is the [Bm = 0] case -- every timestamp is
+     at or above 0 -- so nothing below this file has to move. *)
+  Definition own_last_fl (Bm : nat) (h : agent) (a : Arch.pa) (t : nat) : Prop :=
+    forall i m, (Bm <= S i)%nat -> log !! i = Some m -> pm_tid m = h ->
+      is_Some (msg_byte m a) -> (S i <= t)%nat.
+
+  Definition writer_pin_fl (Bm : nat) (a : Arch.pa)
+      (Sf : agent -> bv 8 -> Prop) : Prop :=
+    forall i m c, (Bm <= S i)%nat -> log !! i = Some m ->
+      msg_byte m a = Some c -> Sf (pm_tid m) c.
+
+  (* the unrelativised forms ARE the floor-0 instances *)
+  Lemma own_last_fl_0 (h : agent) (a : Arch.pa) (t : nat) :
+    own_last log h a t <-> own_last_fl 0 h a t.
+  Proof.
+    split.
+    - move => Ho i m _ Hlk Htid Hs. exact (Ho i m Hlk Htid Hs).
+    - move => Ho i m Hlk Htid Hs. exact (Ho i m ltac:(lia) Hlk Htid Hs).
+  Qed.
+
+  Lemma writer_pin_fl_0 (a : Arch.pa) (Sf : agent -> bv 8 -> Prop) :
+    writer_pin log a Sf <-> writer_pin_fl 0 a Sf.
+  Proof.
+    split.
+    - move => Hw i m c _ Hlk Hb. exact (Hw i m c Hlk Hb).
+    - move => Hw i m c Hlk Hb. exact (Hw i m c ltac:(lia) Hlk Hb).
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* (1) THE SHADOW.  A view past the floor cannot resolve below it --    *)
+  (* the floor message is visible there ([visibleb_below]) and it WRITES  *)
+  (* the byte, so [read_down]'s scan is stopped at or above it.  This is  *)
+  (* the whole content of the ruling, and it is [read_down_latest] at     *)
+  (* [t' := Bm].                                                          *)
+  (* ------------------------------------------------------------------ *)
+  Lemma read_down_shadow (h : agent) (tv Bm : nat) (a : Arch.pa) (bm : bv 8) :
+    (Bm <= tv)%nat -> (Bm <= length log)%nat ->
+    log_byte img log Bm a = Some bm ->
+    exists (T : nat) (v : bv 8),
+      (Bm <= T)%nat
+      /\ tso_read img log h tv a = Some v
+      /\ visibleb h tv log T = true
+      /\ log_byte img log T a = Some v.
+  Proof.
+    move => Htv Hlen Hbm.
+    have Hvis : visibleb h tv log Bm = true by (apply visibleb_below; lia).
+    have [T [v [Hge [Hrd [Hv Hb]]]]] :=
+      read_down_latest img log h tv a (length log) Bm bm Hlen Hvis Hbm.
+    exists T, v. by rewrite /tso_read.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* (2) [racy_read_split] RELATIVISED.  Same statement, same proof, one  *)
+  (* extra [lia] at each of the two uses: the timestamp the read settles  *)
+  (* on is >= the ANCHOR [t], and the anchor is >= the floor, so both     *)
+  (* gates apply to it.                                                   *)
+  (* ------------------------------------------------------------------ *)
+  Lemma racy_read_split_fl (h : agent) (a : Arch.pa) (tv Bm t : nat)
+      (v b : bv 8) (Sf : agent -> bv 8 -> Prop) :
+    (Bm <= t)%nat ->
+    (t <= length log)%nat ->
+    visibleb h tv log t = true ->
+    log_byte img log t a = Some v ->
+    own_last_fl Bm h a t ->
+    writer_pin_fl Bm a Sf ->
+    tso_read img log h tv a = Some b ->
+    b = v \/ exists h', h' <> h /\ Sf h' b.
+  Proof.
+    move => Hfl Hlen Hvis Hb Ho Hw Hrd.
+    destruct (read_down_latest img log h tv a (length log) t v Hlen Hvis Hb)
+      as (t'' & v'' & Hle & Hrd'' & Hvis'' & Hb'').
+    rewrite /tso_read Hrd'' in Hrd. injection Hrd as <-.
+    destruct (decide (t'' = t)) as [->|Hne].
+    { left. rewrite Hb'' in Hb. by injection Hb as <-. }
+    right.
+    destruct t'' as [|i]; first lia.
+    rewrite /log_byte in Hb''.
+    destruct (log !! i) as [m|] eqn:Hlk; last done.
+    exists (pm_tid m). split.
+    - move => Htid.
+      have := Ho i m ltac:(lia) Hlk Htid ltac:(by eexists). lia.
+    - exact (Hw i m _ ltac:(lia) Hlk Hb'').
+  Qed.
+
+  (* the ANCHOR a non-writer supplies: it never wrote at or above the
+     floor, so its own-last IS the floor.  This is the premise the
+     [notheld] reader can actually hold, and the one the unrelativised
+     kit could not give it (A6.81 §(4)). *)
+  Lemma own_last_fl_anchor (Bm : nat) (h : agent) (a : Arch.pa) :
+    (forall i m, (Bm <= S i)%nat -> log !! i = Some m -> pm_tid m = h ->
+       msg_byte m a = None) ->
+    own_last_fl Bm h a Bm.
+  Proof.
+    move => Hno i m Hge Hlk Htid Hs.
+    rewrite /is_Some (Hno i m Hge Hlk Htid) in Hs. by destruct Hs as [? ?].
+  Qed.
+
+  (* ---- MAINTENANCE: the frame arms are the unrelativised ones with a
+     hypothesis DROPPED, which is why nothing above this file moves. ---- *)
+  Lemma own_last_fl_app_frame (Bm : nat) (m : pwmsg) (h : agent)
+      (a : Arch.pa) (t : nat) :
+    own_last_fl Bm h a t ->
+    (pm_tid m = h -> msg_byte m a = None) ->
+    (forall i m0, (Bm <= S i)%nat -> (log ++ [m]) !! i = Some m0 ->
+       pm_tid m0 = h -> is_Some (msg_byte m0 a) -> (S i <= t)%nat).
+  Proof.
+    move => Ho Hfr i m0 Hge Hlk Htid Hs.
+    apply lookup_app_Some in Hlk. destruct Hlk as [Hlk | [Hge2 Hlk]].
+    - exact (Ho i m0 Hge Hlk Htid Hs).
+    - destruct (i - length log)%nat as [|k] eqn:Hk; cbn in Hlk; last done.
+      injection Hlk as <-. rewrite /is_Some (Hfr Htid) in Hs.
+      by destruct Hs as [? ?].
+  Qed.
+
+  Lemma writer_pin_fl_app (Bm : nat) (m : pwmsg) (a : Arch.pa)
+      (Sf : agent -> bv 8 -> Prop) :
+    writer_pin_fl Bm a Sf ->
+    (forall c, msg_byte m a = Some c -> Sf (pm_tid m) c) ->
+    (forall i m0 c, (Bm <= S i)%nat -> (log ++ [m]) !! i = Some m0 ->
+       msg_byte m0 a = Some c -> Sf (pm_tid m0) c).
+  Proof.
+    move => Hw Hm i m0 c Hge Hlk Hb.
+    apply lookup_app_Some in Hlk. destruct Hlk as [Hlk | [Hge2 Hlk]].
+    - exact (Hw i m0 c Hge Hlk Hb).
+    - destruct (i - length log)%nat as [|k] eqn:Hk; cbn in Hlk;
+        [ injection Hlk as <-; by apply Hm | done ].
+  Qed.
+
+End floor_byte.
+
+(* ===================================================================== *)
+(* §12d.2  AT THE WINDOW -- the shape the lock's owner cell needs.        *)
+(* ===================================================================== *)
+
+Section floor_window.
+  Variable img : gmap Arch.pa (bv 8).
+  Variable log : list pwmsg.
+  Variable a : Arch.pa.
+  Variable n : nat.
+  Hypothesis Hn : (0 < n)%nat.
+
+  Local Notation find_top := (find_top img log a).
+
+  (* ================================================================== *)
+  (* [win_ok] MUST BE RELATIVISED TOO, AND THAT IS THE PART THE RULING's *)
+  (* SKETCH DOES NOT COVER.                                             *)
+  (*                                                                    *)
+  (* [TsoMemPa.read_down_win] -- the reassembly that makes ONE timestamp *)
+  (* serve every byte of the window -- takes [win_ok] at EVERY           *)
+  (* timestamp, and below the floor that is FALSE for exactly the cell   *)
+  (* this whole ruling exists for: xv6's [memset] is a BYTE LOOP         *)
+  (* ([string.c]: [for (i = 0; i < n; i++) cdst[i] = c;]), so [kfree]'s  *)
+  (* [memset(pa, 1, PGSIZE)] appends PGSIZE one-byte messages and every  *)
+  (* one of them writes a PROPER SUBSET of the window.  A floor that     *)
+  (* relativised only [wpin] and [own_last] would leave the reassembly   *)
+  (* unprovable, so the floor has to reach [win_ok] as well.             *)
+  (*                                                                    *)
+  (* THAT IT STILL GOES THROUGH IS THE SECOND HALF OF THIS PROBE, and    *)
+  (* the reason is the same shadow: the scan never descends below the    *)
+  (* floor, so it only ever compares timestamps the relativised          *)
+  (* [win_ok_fl] speaks about.                                           *)
+  (* ================================================================== *)
+  Definition win_ok_fl (Bm : nat) : Prop :=
+    forall t : nat, (Bm <= t)%nat ->
+      (forall j, (j < n)%nat -> is_Some (log_byte img log t (pa_add a j)))
+      \/ (forall j, (j < n)%nat -> log_byte img log t (pa_add a j) = None).
+
+  Lemma win_ok_fl_0 : win_ok img log a n <-> win_ok_fl 0.
+  Proof.
+    split.
+    - move => Hw t _. exact (Hw t).
+    - move => Hw t. exact (Hw t ltac:(lia)).
+  Qed.
+
+  (* THE RELATIVISED REASSEMBLY.  [read_down_win]'s proof, with the
+     induction stopped at the floor: at [t = Bm] the floor message is
+     visible ([Bm <= tv]) and writes every byte, so the scan halts there
+     and never asks [win_ok] about anything below. *)
+  Lemma read_down_win_fl (h : agent) (tv Bm t j : nat) :
+    win_ok_fl Bm -> (j < n)%nat -> (Bm <= tv)%nat -> (Bm <= t)%nat ->
+    (forall k, (k < n)%nat -> is_Some (log_byte img log Bm (pa_add a k))) ->
+    read_down img log h tv (pa_add a j) t
+    = match find_top h tv t with
+      | Some T => log_byte img log T (pa_add a j)
+      | None => None
+      end.
+  Proof.
+    move => Hw Hj Htv. elim: t => [|t IH] Hge Hfl.
+    - (* t = 0, so the floor is 0 and the image writes the window *)
+      have HB : Bm = 0%nat by lia.
+      rewrite HB in Hfl.
+      rewrite read_down_0 find_top_0.
+      have Hv : visibleb h tv log 0 = true by (apply visibleb_below; lia).
+      rewrite Hv.
+      have [b0 Hb0] := Hfl 0%nat ltac:(lia).
+      rewrite Hb0. move: Hb0. rewrite /log_byte. by move => _.
+    - case: (decide (Bm = S t)) => [HB|Hne].
+      + (* the floor itself: it is visible and it writes every byte *)
+        rewrite read_down_S find_top_S.
+        have Hv : visibleb h tv log (S t) = true
+          by (apply visibleb_below; lia).
+        rewrite Hv.
+        rewrite HB in Hfl.
+        have [b0 Hb0] := Hfl 0%nat ltac:(lia).
+        have [bj Hbj] := Hfl j Hj.
+        by rewrite Hb0 Hbj.
+      + (* above the floor: [read_down_win]'s step, verbatim *)
+        have Hge' : (Bm <= t)%nat by lia.
+        rewrite read_down_S find_top_S.
+        case Ev : (visibleb h tv log (S t)); last by rewrite (IH Hge' Hfl).
+        case E0 : (log_byte img log (S t) (pa_add a 0)) => [b0|].
+        * case: (Hw (S t) ltac:(lia)) => Hall.
+          -- have [bj Hbj] := Hall j Hj. by rewrite Hbj.
+          -- have := Hall 0%nat ltac:(lia). by rewrite E0.
+        * case: (Hw (S t) ltac:(lia)) => Hall.
+          -- have := Hall 0%nat ltac:(lia). rewrite E0. by move => [? ?].
+          -- have := Hall j Hj => ->. by rewrite (IH Hge' Hfl).
+  Qed.
+
+  Definition wpin_fl (Bm : nat)
+      (Wf : agent -> (nat -> option (bv 8)) -> Prop) : Prop :=
+    forall i m, (Bm <= S i)%nat -> log !! i = Some m ->
+      is_Some (msg_byte m (pa_add a 0)) ->
+      Wf (pm_tid m) (fun j => msg_byte m (pa_add a j)).
+
+  (* ------------------------------------------------------------------ *)
+  (* THE THEOREM, RELATIVISED.  [racy_read_window]'s proof verbatim, with *)
+  (* the [own_last] use carrying the floor bound the anchor supplies.     *)
+  (* ------------------------------------------------------------------ *)
+  Lemma racy_read_window_fl (h : agent) (tv Bm t : nat) :
+    win_ok_fl Bm ->
+    (Bm <= tv)%nat ->
+    (forall k, (k < n)%nat -> is_Some (log_byte img log Bm (pa_add a k))) ->
+    (Bm <= t)%nat ->
+    (t <= length log)%nat ->
+    visibleb h tv log t = true ->
+    (forall j, (j < n)%nat -> is_Some (log_byte img log t (pa_add a j))) ->
+    (forall j, (j < n)%nat -> own_last_fl log Bm h (pa_add a j) t) ->
+    exists T : nat,
+      (t <= T)%nat
+      /\ (forall j, (j < n)%nat ->
+            tso_read img log h tv (pa_add a j) = log_byte img log T (pa_add a j))
+      /\ (T = t \/ exists i m, T = S i /\ log !! i = Some m /\ pm_tid m <> h
+                            /\ (Bm <= S i)%nat
+                            /\ is_Some (msg_byte m (pa_add a 0))).
+  Proof.
+    move => Hw Htv Hcov Hfl Hlen Hvis Hsome Ho.
+    have [T [HT Hge]] :=
+      find_top_max img log a n Hn h tv (length log) t Hlen Hvis (Hsome 0%nat ltac:(lia)).
+    exists T. split; first done.
+    split.
+    { move => j Hj.
+      rewrite /tso_read
+        (read_down_win_fl h tv Bm (length log) j Hw Hj Htv ltac:(lia) Hcov) HT //. }
+    case: (decide (T = t)) => [->|Hne]; first by left.
+    right.
+    have [Hle [Hv [b0 Hb0]]] := find_top_spec img log a n Hn h tv (length log) T HT.
+    case ET : T => [|i]; first lia.
+    move: Hb0. rewrite ET /log_byte.
+    case El : (log !! i) => [m|]; last by [].
+    move => Hb0. exists i, m. split_and!; [done|done| |lia|by eexists].
+    move => Htid.
+    have := Ho 0%nat ltac:(lia) i m ltac:(lia) El Htid ltac:(by eexists).
+    lia.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE GATE-MEDIATED FORM AT AN ANCHOR THE READER OWNS.  This is the    *)
+  (* shape [win_ok1]'s conjunct (3) hands over -- "my own last write to    *)
+  (* this window, at or above the floor, is at [t] and left the clear      *)
+  (* word there" -- and it is what makes the AUTHOR of the mint store no   *)
+  (* special case: it satisfies [own_last_fl Bm h a Bm] by the equality    *)
+  (* [S i = Bm], where the never-wrote form below would be too strong.     *)
+  (* ------------------------------------------------------------------ *)
+  Lemma racy_read_window_pin_fl_at (h : agent) (tv Bm t : nat)
+      (Wf : agent -> (nat -> option (bv 8)) -> Prop) :
+    win_ok_fl Bm -> wpin_fl Bm Wf ->
+    (Bm <= tv)%nat -> (Bm <= t)%nat -> (t <= length log)%nat ->
+    visibleb h tv log t = true ->
+    (forall j, (j < n)%nat -> is_Some (log_byte img log Bm (pa_add a j))) ->
+    (forall j, (j < n)%nat -> is_Some (log_byte img log t (pa_add a j))) ->
+    (forall j, (j < n)%nat -> own_last_fl log Bm h (pa_add a j) t) ->
+    (forall j, (j < n)%nat ->
+       tso_read img log h tv (pa_add a j) = log_byte img log t (pa_add a j))
+    \/ (exists (h' : agent) (m : pwmsg),
+          h' <> h /\ pm_tid m = h'
+          /\ Wf h' (fun j => msg_byte m (pa_add a j))
+          /\ forall j, (j < n)%nat ->
+               tso_read img log h tv (pa_add a j) = msg_byte m (pa_add a j)).
+  Proof.
+    move => Hw Hp Htv Hge Hlen Hvis Hcov Hsome Ho.
+    have [T [HgeT [Hrd Harm]]] :=
+      racy_read_window_fl h tv Bm t Hw Htv Hcov Hge Hlen Hvis Hsome Ho.
+    case: Harm => [HTeq|[i [m [HTeq [El [Htid [Hge2 Hb0]]]]]]].
+    - left. move => j Hj. rewrite (Hrd j Hj) HTeq //.
+    - right. exists (pm_tid m), m. split_and!.
+      + by move => ?; apply Htid.
+      + done.
+      + exact (Hp i m Hge2 El Hb0).
+      + move => j Hj. rewrite (Hrd j Hj) HTeq /log_byte El //.
+  Qed.
+
+  (* ...and its consumer.  Compare [lkcpu_not_mine_fl] below: there the
+     anchor is the mint store itself and the reader must never have
+     touched the cell; here the reader brings its OWN anchor, which is
+     what [win_ok1]'s per-agent record is. *)
+  Lemma lkcpu_not_mine_fl_at (h : agent) (tv Bm t : nat)
+      (z : nat -> bv 8) (cp : agent -> nat -> bv 8) :
+    win_ok_fl Bm ->
+    wpin_fl Bm
+      (fun j f => (forall k, (k < n)%nat -> f k = Some (z k))
+               \/ (forall k, (k < n)%nat -> f k = Some (cp j k))) ->
+    (Bm <= tv)%nat -> (Bm <= t)%nat -> (t <= length log)%nat ->
+    visibleb h tv log t = true ->
+    (forall j, (j < n)%nat -> is_Some (log_byte img log Bm (pa_add a j))) ->
+    (forall j, (j < n)%nat -> log_byte img log t (pa_add a j) = Some (z j)) ->
+    (forall j, (j < n)%nat -> own_last_fl log Bm h (pa_add a j) t) ->
+    (exists k, (k < n)%nat /\ z k <> cp h k) ->
+    (forall h', h' <> h -> exists k, (k < n)%nat /\ cp h' k <> cp h k) ->
+    exists k, (k < n)%nat /\ tso_read img log h tv (pa_add a k) <> Some (cp h k).
+  Proof.
+    move => Hw Hp Htv Hge Hlen Hvis Hcov Hz Ho [k0 [Hk0 Hzk]] Hinj.
+    have Hsome : forall j, (j < n)%nat -> is_Some (log_byte img log t (pa_add a j))
+      by move => j Hj; rewrite (Hz j Hj); by eexists.
+    destruct (racy_read_window_pin_fl_at h tv Bm t _ Hw Hp Htv Hge Hlen Hvis
+                Hcov Hsome Ho)
+      as [Hown | (h' & m & Hne & Htid & HW & Hrd)].
+    - exists k0. split; first done.
+      rewrite (Hown k0 Hk0) (Hz k0 Hk0). move => [Heq]. exact (Hzk Heq).
+    - case: HW => [Hcl | Hme].
+      + exists k0. split; first done.
+        rewrite (Hrd k0 Hk0) (Hcl k0 Hk0). move => [Heq]. exact (Hzk Heq).
+      + have [k [Hk Hd]] := Hinj h' Hne.
+        exists k. split; first done.
+        rewrite (Hrd k Hk) (Hme k Hk). move => [Heq]. exact (Hd Heq).
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE READER'S OWN ANCHOR IS THE FLOOR ITSELF, and this is the step    *)
+  (* the ruling turns on: the MINT STORE wrote the whole window at [Bm],  *)
+  (* a reader whose view has passed [Bm] sees it, and a reader that never *)
+  (* wrote at or above the floor therefore resolves EXACTLY at [Bm]       *)
+  (* unless someone else wrote above it.  No premise about the cell's     *)
+  (* history BELOW the floor appears anywhere.                            *)
+  (* ------------------------------------------------------------------ *)
+  Lemma racy_read_window_floor (h : agent) (tv Bm : nat) :
+    win_ok_fl Bm ->
+    (Bm <= tv)%nat ->
+    (Bm <= length log)%nat ->
+    (forall j, (j < n)%nat -> is_Some (log_byte img log Bm (pa_add a j))) ->
+    (forall i m, (Bm <= S i)%nat -> log !! i = Some m -> pm_tid m = h ->
+       msg_byte m (pa_add a 0) = None) ->
+    exists T : nat,
+      (Bm <= T)%nat
+      /\ (forall j, (j < n)%nat ->
+            tso_read img log h tv (pa_add a j) = log_byte img log T (pa_add a j))
+      /\ (T = Bm \/ exists i m, T = S i /\ log !! i = Some m /\ pm_tid m <> h
+                             /\ (Bm <= S i)%nat
+                             /\ is_Some (msg_byte m (pa_add a 0))).
+  Proof.
+    move => Hw Htv Hlen Hsome Hno.
+    apply (racy_read_window_fl h tv Bm Bm Hw Htv Hsome ltac:(lia) Hlen
+             ltac:(apply visibleb_below; lia) Hsome).
+    (* the anchor: [own_last_fl] at [Bm] for every byte of the window.
+       [win_ok] carries "writes byte 0" to "writes byte j", so the ONE
+       hypothesis about byte 0 serves the whole window. *)
+    move => j Hj i m Hge Hlk Htid Hs.
+    exfalso.
+    have Hb0 : msg_byte m (pa_add a 0) = None by exact (Hno i m Hge Hlk Htid).
+    case: (Hw (S i) ltac:(lia)) => Hall.
+    - have := Hall 0%nat ltac:(lia). rewrite /log_byte Hlk Hb0. by move => [? ?].
+    - have := Hall j Hj. rewrite /log_byte Hlk.
+      move => Heq. rewrite Heq in Hs. by destruct Hs as [? ?].
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE GATE-MEDIATED FORM, at the floor: whatever the read settles on is *)
+  (* either the MINT STORE's own word or a message by someone else that    *)
+  (* the RELATIVISED [wpin] speaks about.  Nothing below [Bm] appears.     *)
+  (* ------------------------------------------------------------------ *)
+  Lemma racy_read_window_pin_fl (h : agent) (tv Bm : nat)
+      (Wf : agent -> (nat -> option (bv 8)) -> Prop) :
+    win_ok_fl Bm -> wpin_fl Bm Wf ->
+    (Bm <= tv)%nat ->
+    (Bm <= length log)%nat ->
+    (forall j, (j < n)%nat -> is_Some (log_byte img log Bm (pa_add a j))) ->
+    (forall i m, (Bm <= S i)%nat -> log !! i = Some m -> pm_tid m = h ->
+       msg_byte m (pa_add a 0) = None) ->
+    (forall j, (j < n)%nat ->
+       tso_read img log h tv (pa_add a j) = log_byte img log Bm (pa_add a j))
+    \/ (exists (h' : agent) (m : pwmsg),
+          h' <> h /\ pm_tid m = h'
+          /\ Wf h' (fun j => msg_byte m (pa_add a j))
+          /\ forall j, (j < n)%nat ->
+               tso_read img log h tv (pa_add a j) = msg_byte m (pa_add a j)).
+  Proof.
+    move => Hw Hp Htv Hlen Hsome Hno.
+    have [T [Hge [Hrd Harm]]] :=
+      racy_read_window_floor h tv Bm Hw Htv Hlen Hsome Hno.
+    case: Harm => [HTeq|[i [m [HTeq [El [Htid [Hge2 Hb0]]]]]]].
+    - left. move => j Hj. rewrite (Hrd j Hj) HTeq //.
+    - right. exists (pm_tid m), m. split_and!.
+      + by move => ?; apply Htid.
+      + done.
+      + exact (Hp i m Hge2 El Hb0).
+      + move => j Hj. rewrite (Hrd j Hj) HTeq /log_byte El //.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE CONSUMER: [lkcpu_not_mine] AT A FLOOR.  A hart that has not      *)
+  (* touched the lock since the mint, and whose view has passed the mint, *)
+  (* provably does not read its OWN cpus_ptr -- the answer [holding()]    *)
+  (* answer and the whole reason the racy kit exists.  Compare the        *)
+  (* unrelativised [TsoMemPa.lkcpu_not_mine]: the premise                 *)
+  (* [log_byte img log t] is the clear word at an anchor [t] the reader   *)
+  (* itself wrote -- is replaced by: the MINT STORE wrote it at [Bm], plus *)
+  (* the receipt [Bm <= tv] -- and THAT is the premise a hart which has   *)
+  (* never touched the lock can hold.                                    *)
+  (* ------------------------------------------------------------------ *)
+  Lemma lkcpu_not_mine_fl (h : agent) (tv Bm : nat)
+      (z : nat -> bv 8) (cp : agent -> nat -> bv 8) :
+    win_ok_fl Bm ->
+    wpin_fl Bm
+      (fun j f => (forall k, (k < n)%nat -> f k = Some (z k))
+               \/ (forall k, (k < n)%nat -> f k = Some (cp j k))) ->
+    (Bm <= tv)%nat ->
+    (Bm <= length log)%nat ->
+    (* the MINT STORE wrote the clear word over the whole window *)
+    (forall j, (j < n)%nat -> log_byte img log Bm (pa_add a j) = Some (z j)) ->
+    (* the reader has not written the cell since *)
+    (forall i m, (Bm <= S i)%nat -> log !! i = Some m -> pm_tid m = h ->
+       msg_byte m (pa_add a 0) = None) ->
+    (exists k, (k < n)%nat /\ z k <> cp h k) ->
+    (forall h', h' <> h -> exists k, (k < n)%nat /\ cp h' k <> cp h k) ->
+    exists k, (k < n)%nat /\ tso_read img log h tv (pa_add a k) <> Some (cp h k).
+  Proof.
+    move => Hw Hp Htv Hlen Hz Hno [k0 [Hk0 Hzk]] Hinj.
+    have Hsome : forall j, (j < n)%nat -> is_Some (log_byte img log Bm (pa_add a j))
+      by move => j Hj; rewrite (Hz j Hj); by eexists.
+    destruct (racy_read_window_pin_fl h tv Bm _ Hw Hp Htv Hlen Hsome Hno)
+      as [Hown | (h' & m & Hne & Htid & HW & Hrd)].
+    - exists k0. split; first done.
+      rewrite (Hown k0 Hk0) (Hz k0 Hk0). move => [Heq]. exact (Hzk Heq).
+    - case: HW => [Hcl | Hme].
+      + exists k0. split; first done.
+        rewrite (Hrd k0 Hk0) (Hcl k0 Hk0). move => [Heq]. exact (Hzk Heq).
+      + have [k [Hk Hd]] := Hinj h' Hne.
+        exists k. split; first done.
+        rewrite (Hrd k Hk) (Hme k Hk). move => [Heq]. exact (Hd Heq).
+  Qed.
+
+End floor_window.
+
+(* ===================================================================== *)
+(* §12d.3 THE DEGENERATE CASE: the floor-0 instance IS the boot mint, and *)
+(* its receipt is free ([TsoGhost.view_lb_0] in Iris; [0 <= tv] here).    *)
+(* So the eight .bss callers pay nothing for the relativisation.          *)
+(* ===================================================================== *)
+
+Lemma lkcpu_not_mine_floor0 (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
+    (a : Arch.pa) (n : nat) (h : agent) (tv : nat)
+    (z : nat -> bv 8) (cp : agent -> nat -> bv 8) :
+  (0 < n)%nat ->
+  win_ok img log a n ->
+  wpin_fl log a 0
+    (fun j f => (forall k, (k < n)%nat -> f k = Some (z k))
+             \/ (forall k, (k < n)%nat -> f k = Some (cp j k))) ->
+  (forall j, (j < n)%nat -> img !! (pa_add a j) = Some (z j)) ->
+  (forall i m, log !! i = Some m -> pm_tid m = h ->
+     msg_byte m (pa_add a 0) = None) ->
+  (exists k, (k < n)%nat /\ z k <> cp h k) ->
+  (forall h', h' <> h -> exists k, (k < n)%nat /\ cp h' k <> cp h k) ->
+  exists k, (k < n)%nat /\ tso_read img log h tv (pa_add a k) <> Some (cp h k).
+Proof.
+  move => Hn Hw Hp Hz Hno Hzk Hinj.
+  apply (lkcpu_not_mine_fl img log a n Hn h tv 0 z cp
+           ltac:(by apply (win_ok_fl_0 img log a n)) Hp
+           ltac:(lia) ltac:(lia)
+           ltac:(move => j Hj; rewrite /log_byte; exact (Hz j Hj))
+           ltac:(move => i m _ Hlk Htid; exact (Hno i m Hlk Htid))
+           Hzk Hinj).
+Qed.
+
+
+(* ===================================================================== *)
 (* §12c  THE WINDOW PAYLOAD, PER BYTE -- AND WHY IT IS NOT ON BYTE 0.      *)
 (*                                                                       *)
 (* [tso-m4-memo.md] ruling 3 puts all three coverage claims "in ONE        *)
@@ -1170,18 +1693,29 @@ Record ts_win : Type := TsWin {
   tw_z    : nat -> bv 8;           (* the CLEAR word, byte-wise *)
   tw_cp   : agent -> nat -> bv 8;  (* each author's own word, byte-wise *)
   tw_own  : agent -> option nat;   (* per-agent own-last index into the log *)
+  tw_lo   : nat;                   (* §12d's FLOOR: the mint store's position *)
 }.
 
-(* the per-BYTE claim.  Every conjunct's frame arm is [msg_byte m a = None]
-   or free. *)
+(* the per-BYTE claim, AT A FLOOR (§12d; A6.82 §(4)).  Every conjunct's
+   frame arm is [msg_byte m a = None] or free, and every HISTORY conjunct
+   speaks only about messages at or above [tw_lo].
+
+   THE FLOOR IS THE MINT STORE'S OWN POSITION, and conjunct (2b) is what
+   says so: the timestamp [tw_lo] wrote the CLEAR word over the whole
+   window.  That is the message [read_down]'s scan is stopped at
+   ([TsoMemPa.read_down_shadow]), and it is why the cell's pre-mint past
+   -- a [kfree] memset, for a lock inside a [kalloc]'d page -- is never
+   consulted and needs no constraint. *)
 Definition win_ok1 (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
     (a : Arch.pa) (W : ts_win) : Prop :=
   a = pa_add (tw_base W) (tw_j W)
   /\ (tw_j W < tw_n W)%nat
-  (* (1) ANY message touching THIS byte writes the WHOLE window, with a word
-     allowed for its author.  This is what makes a partial write impossible
-     and therefore what makes [win_ok] a theorem below. *)
-  /\ (forall i m, log !! i = Some m -> is_Some (msg_byte m a) ->
+  (* (1) ANY message AT OR ABOVE THE FLOOR touching THIS byte writes the
+     WHOLE window, with a word allowed for its author.  This is what makes
+     a partial write impossible and therefore what makes [win_ok_fl] a
+     theorem below. *)
+  /\ (forall i m, (tw_lo W <= S i)%nat -> log !! i = Some m ->
+        is_Some (msg_byte m a) ->
         (forall k, (k < tw_n W)%nat ->
            msg_byte m (pa_add (tw_base W) k) = Some (tw_z W k))
         \/ (forall k, (k < tw_n W)%nat ->
@@ -1189,14 +1723,21 @@ Definition win_ok1 (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
   (* (2) the era image covers the window: [win_ok]'s [t = 0] arm.  Free at
      the lock, whose cell is RAM. *)
   /\ (forall k, (k < tw_n W)%nat -> is_Some (img !! pa_add (tw_base W) k))
-  (* (3) per agent, AT THIS BYTE: where its own last write to this byte is,
-     that it is visible to it at every view, and that it left the CLEAR
-     value there. *)
+  (* (2b) THE FLOOR ITSELF is a legal log position and wrote the whole
+     window with the clear word.  This is what the reader's anchor and
+     [win_ok_fl]'s base case both consume. *)
+  /\ (tw_lo W <= length log)%nat
+  /\ (forall k, (k < tw_n W)%nat ->
+        log_byte img log (tw_lo W) (pa_add (tw_base W) k) = Some (tw_z W k))
+  (* (3) per agent, AT THIS BYTE and AT OR ABOVE THE FLOOR: where its own
+     last write to this byte is, that it is visible to it at every view
+     PAST THE FLOOR, and that it left the CLEAR value there. *)
   /\ (forall h t, tw_own W h = Some t ->
-        (t <= length log)%nat
-        /\ (forall tv, visibleb h tv log t = true)
+        (tw_lo W <= t)%nat
+        /\ (t <= length log)%nat
+        /\ (forall tv, (tw_lo W <= tv)%nat -> visibleb h tv log t = true)
         /\ log_byte img log t a = Some (tw_z W (tw_j W))
-        /\ own_last log h a t).
+        /\ own_last_fl log (tw_lo W) h a t).
 
 (* THE FRAME ARM, AND IT IS DEFINITIONAL -- which is the whole point of
    §12c's correction.  An append that misses THIS BYTE preserves the claim,
@@ -1217,20 +1758,23 @@ Lemma win_ok1_app_frame img log m a W :
   win_ok1 img log a W -> msg_byte m a = None ->
   win_ok1 img (log ++ [m]) a W.
 Proof.
-  move => [Ha [Hj [H1 [H2 H3]]]] Hm.
-  split_and!; [ exact Ha | exact Hj | | exact H2 | ].
-  - move => i m0 Hlk Hs.
-    apply lookup_app_Some in Hlk. destruct Hlk as [Hlk | [Hge Hlk]].
-    + exact (H1 i m0 Hlk Hs).
+  move => [Ha [Hj [H1 [H2 [Hlo [Hfl H3]]]]]] Hm.
+  split_and!; [ exact Ha | exact Hj | | exact H2 | | | ].
+  - move => i m0 Hge Hlk Hs.
+    apply lookup_app_Some in Hlk. destruct Hlk as [Hlk | [Hge2 Hlk]].
+    + exact (H1 i m0 Hge Hlk Hs).
     + destruct (i - length log)%nat as [|k] eqn:Hk; cbn in Hlk; last done.
       injection Hlk as <-. rewrite /is_Some Hm in Hs. by destruct Hs as [? ?].
+  - rewrite length_app /=. lia.
+  - move => k Hk. rewrite (log_byte_app_le _ _ _ _ _ Hlo). exact (Hfl k Hk).
   - move => h t Hown.
-    have [Hlen [Hvis [Hlb Hol]]] := H3 h t Hown.
+    have [Hge [Hlen [Hvis [Hlb Hol]]]] := H3 h t Hown.
     split_and!.
+    + exact Hge.
     + rewrite length_app /=. lia.
-    + move => tv. by apply visibleb_app.
+    + move => tv Htv. by apply visibleb_app, Hvis.
     + by rewrite (log_byte_app_le _ _ _ _ _ Hlen).
-    + apply own_last_app_frame; [exact Hol | move => _; exact Hm].
+    + exact (own_last_fl_app_frame log (tw_lo W) m h a t Hol (fun _ => Hm)).
 Qed.
 
 (* the appended message sits at index [length log] *)
@@ -1250,45 +1794,114 @@ Proof. move => i m Hlk _ _. apply lookup_lt_Some in Hlk. lia. Qed.
    lock's two stores: release writes the clear (and the author may then read
    "not mine" again), acquire writes [cp auth] (and the author is excluded
    until it releases).  Every OTHER agent's entry is untouched and frames. *)
-Lemma win_ok1_app_store img log msg base n j
+Lemma win_ok1_app_store img log msg base n j (lo : nat)
     (z : nat -> bv 8) (cp : agent -> nat -> bv 8) (own own' : agent -> option nat) :
-  win_ok1 img log (pa_add base j) (TsWin base n j z cp own) ->
+  win_ok1 img log (pa_add base j) (TsWin base n j z cp own lo) ->
   ((forall k, (k < n)%nat -> msg_byte msg (pa_add base k) = Some (z k))
      /\ own' (pm_tid msg) = Some (S (length log))
    \/ (forall k, (k < n)%nat -> msg_byte msg (pa_add base k)
                                = Some (cp (pm_tid msg) k))
      /\ own' (pm_tid msg) = None) ->
   (forall h, h <> pm_tid msg -> own' h = own h) ->
-  win_ok1 img (log ++ [msg]) (pa_add base j) (TsWin base n j z cp own').
+  win_ok1 img (log ++ [msg]) (pa_add base j) (TsWin base n j z cp own' lo).
 Proof.
-  move => [Ha [Hj [H1 [H2 H3]]]] Hnew Hoth.
+  move => [Ha [Hj [H1 [H2 [Hlo [Hfl H3]]]]]] Hnew Hoth.
   have Hlk_top : (log ++ [msg]) !! length log = Some msg
     by (apply lookup_app_r_Some_eq).
-  split_and!; [ exact Ha | exact Hj | | exact H2 | ].
-  - move => i m Hlk Hs.
-    apply lookup_app_Some in Hlk. destruct Hlk as [Hlk | [Hge Hlk]].
-    + exact (H1 i m Hlk Hs).
+  cbn [tw_lo] in Hlo, Hfl, H1, H3 |- *.
+  split_and!; [ exact Ha | exact Hj | | exact H2 | | | ].
+  - move => i m Hge Hlk Hs.
+    apply lookup_app_Some in Hlk. destruct Hlk as [Hlk | [Hge2 Hlk]].
+    + exact (H1 i m Hge Hlk Hs).
     + destruct (i - length log)%nat as [|k] eqn:Hk; cbn in Hlk; last done.
       injection Hlk as <-. cbn [tw_base tw_n tw_z tw_cp].
       case: Hnew => [[Hcl _] | [Hme _]]; [ by left | by right ].
-  - move => h t Hown. cbn [tw_base tw_n tw_j tw_z tw_cp tw_own] in Hown |- *.
+  - rewrite length_app /=. lia.
+  - move => k Hk. cbn [tw_base tw_n tw_z].
+    rewrite (log_byte_app_le _ _ _ _ _ Hlo). exact (Hfl k Hk).
+  - move => h t Hown.
+    cbn [tw_base tw_n tw_j tw_z tw_cp tw_own tw_lo] in Hown |- *.
     (* NOTE: ssreflect's [->] intro pattern rewrites the GOAL only, and
        [Hown] mentions [h] -- hence the explicit [subst]. *)
     case: (decide (h = pm_tid msg)) => [Heq|Hne]; first subst h.
     + case: Hnew => [[Hcl Ho] | [_ Ho]]; last by rewrite Ho in Hown.
       rewrite Ho in Hown. injection Hown as <-.
       split_and!.
+      * lia.
       * rewrite length_app /=. lia.
-      * move => tv. exact (visibleb_own _ _ _ _ _ Hlk_top eq_refl).
+      * move => tv _. exact (visibleb_own _ _ _ _ _ Hlk_top eq_refl).
       * rewrite log_byte_top. exact (Hcl j Hj).
-      * apply own_last_app_self; [reflexivity | apply own_last_top].
+      * move => i m0 Hge Hlk _ _.
+        apply lookup_lt_Some in Hlk. rewrite length_app /= in Hlk. lia.
     + rewrite (Hoth h Hne) in Hown.
-      have [Hlen [Hvis [Hlb Hol]]] := H3 h t Hown.
+      have [Hge [Hlen [Hvis [Hlb Hol]]]] := H3 h t Hown.
       split_and!.
+      * exact Hge.
       * rewrite length_app /=. lia.
-      * move => tv. by apply visibleb_app.
+      * move => tv Htv. by apply visibleb_app, Hvis.
       * by rewrite (log_byte_app_le _ _ _ _ _ Hlen).
-      * apply own_last_app_frame; [exact Hol | by move => Heq; congruence].
+      * have Hfr : pm_tid msg = h -> msg_byte msg (pa_add base j) = None
+          by move => Heq; congruence.
+        exact (own_last_fl_app_frame log lo msg h (pa_add base j) t Hol Hfr).
+Qed.
+
+(* ===================================================================== *)
+(* THE MINT'S PURE CONTENT, AND IT IS THE STORE-THEN-MINT ORDER          *)
+(* (A6.82 §(4)).                                                         *)
+(*                                                                       *)
+(* [n] adjacent cells that are ALL LATEST AT THE SAME TIMESTAMP [t]      *)
+(* carry the window claim at floor [t] outright, and every conjunct      *)
+(* falls out of the ONE fact [latest] gives twice over: the timestamp    *)
+(* [t] wrote the byte, and NOTHING ABOVE [t] did.  So conjunct (1) is    *)
+(* about the message at [t] alone -- which wrote every byte of the       *)
+(* window, since every byte's own [latest] names the same [t] -- and     *)
+(* (2b) is that message read as the FLOOR.                               *)
+(*                                                                       *)
+(* THAT IS WHY THE ORDER INVERTS.  A6.79 minted BEFORE the store         *)
+(* because the unrelativised claim needed an unwritten cell; with a      *)
+(* floor the mint runs AFTER, on the cells the store just moved to the   *)
+(* top, and [t] is the store's own position.  Minting first would name   *)
+(* a floor message that does not exist yet.  The old [e.1 = 0] mint is   *)
+(* the instance at [t = 0] -- the era image as the floor -- so the .bss  *)
+(* case is not a separate lemma, only a separate value of [t].           *)
+(* ===================================================================== *)
+Lemma win_ok1_of_latest img log base n j (t : nat)
+    (f : nat -> bv 8) (cp : agent -> nat -> bv 8) :
+  (j < n)%nat ->
+  (forall k, (k < n)%nat -> latest img log (pa_add base k) t (f k)) ->
+  (forall k, (k < n)%nat -> is_Some (img !! pa_add base k)) ->
+  win_ok1 img log (pa_add base j) (TsWin base n j f cp (fun _ => Some t) t).
+Proof.
+  move => Hj Hlat Hcov.
+  have Hlen : (t <= length log)%nat.
+  { have [Hb _] := Hlat j Hj. exact (log_byte_some_le _ _ _ _ _ Hb). }
+  (* the ONE step: a message at or above the floor that touches the window
+     IS the floor's message, because nothing above [t] writes the byte *)
+  have Hat : forall i m k, (t <= S i)%nat -> log !! i = Some m ->
+      (k < n)%nat -> is_Some (msg_byte m (pa_add base k)) -> S i = t.
+  { move => i m k Hge Hlk Hk Hs.
+    case: (decide (S i = t)) => [//|Hne].
+    exfalso. have [_ Habove] := Hlat k Hk.
+    have := Habove (S i) ltac:(lia). rewrite /log_byte Hlk.
+    move => Hn0. rewrite /is_Some Hn0 in Hs. by destruct Hs as [? ?]. }
+  split_and!; cbn [tw_base tw_n tw_j tw_z tw_cp tw_own tw_lo].
+  - done.
+  - exact Hj.
+  - move => i m Hge Hlk Hs. left.
+    have Heq : S i = t := Hat i m j Hge Hlk Hj Hs.
+    move => k Hk. have [Hb _] := Hlat k Hk.
+    move: Hb. rewrite -Heq /log_byte Hlk //.
+  - exact Hcov.
+  - exact Hlen.
+  - move => k Hk. by have [Hb _] := Hlat k Hk.
+  - move => h t' Ht'. injection Ht' as <-.
+    split_and!.
+    + lia.
+    + exact Hlen.
+    + move => tv Htv. by apply visibleb_below.
+    + by have [Hb _] := Hlat j Hj.
+    + move => i m Hge Hlk _ Hs.
+      have Heq : S i = t := Hat i m j Hge Hlk Hj Hs. lia.
 Qed.
 
 (* ---- THE ASSEMBLY: [n] agreeing per-byte copies give the WINDOW facts ---- *)
@@ -1300,78 +1913,100 @@ Section assemble.
   Variable z : nat -> bv 8.
   Variable cp : agent -> nat -> bv 8.
   Variable own : agent -> option nat.
+  Variable lo : nat.
   Hypothesis Hn : (0 < n)%nat.
 
-  Definition win_at (j : nat) : ts_win := TsWin base n j z cp own.
+  Definition win_at (j : nat) : ts_win := TsWin base n j z cp own lo.
 
   (* what the READER holds: one copy per byte, all naming the same window *)
   Hypothesis Hcov :
     forall j, (j < n)%nat -> win_ok1 img log (pa_add base j) (win_at j).
 
-  (* a message that touches ANY byte of the window writes ALL of it *)
+  (* a message AT OR ABOVE THE FLOOR that touches ANY byte of the window
+     writes ALL of it *)
   Lemma win_msg_all (i : nat) (m : pwmsg) (k : nat) :
+    (lo <= S i)%nat ->
     log !! i = Some m -> (k < n)%nat -> is_Some (msg_byte m (pa_add base k)) ->
     (forall j, (j < n)%nat -> msg_byte m (pa_add base j) = Some (z j))
     \/ (forall j, (j < n)%nat -> msg_byte m (pa_add base j) = Some (cp (pm_tid m) j)).
   Proof.
-    move => Hlk Hk Hs.
+    move => Hge Hlk Hk Hs.
     have [_ [_ [H1 _]]] := Hcov k Hk.
-    exact (H1 i m Hlk Hs).
+    exact (H1 i m Hge Hlk Hs).
   Qed.
 
-  Lemma win_assemble_win_ok : win_ok img log base n.
+  Lemma win_assemble_win_ok : win_ok_fl img log base n lo.
   Proof.
-    move => t. case: t => [|i].
+    move => t Hge. case: t Hge => [|i] Hge.
     - left. move => j Hj.
       have [_ [_ [_ [H2 _]]]] := Hcov 0%nat Hn.
       have := H2 j Hj. by rewrite /log_byte.
     - rewrite /log_byte. case El : (log !! i) => [m|]; last by right.
       case E0 : (msg_byte m (pa_add base 0%nat)) => [b0|].
-      + case: (win_msg_all i m 0%nat El Hn ltac:(by rewrite E0)) => Hall;
+      + case: (win_msg_all i m 0%nat Hge El Hn ltac:(by rewrite E0)) => Hall;
           left; move => j Hj; rewrite (Hall j Hj); by eexists.
       + right. move => j Hj.
         case Ej : (msg_byte m (pa_add base j)) => [bj|]; last done.
         exfalso.
-        case: (win_msg_all i m j El Hj ltac:(by rewrite Ej)) => Hall;
+        case: (win_msg_all i m j Hge El Hj ltac:(by rewrite Ej)) => Hall;
           have := Hall 0%nat Hn; by rewrite E0.
   Qed.
 
-  (* [wpin] mentions neither [img] nor [n] in its body, so the section
+  (* [wpin_fl] mentions neither [img] nor [n] in its body, so the section
      closes it over [log] and [base] only -- the arity is not the same as
-     [win_ok]'s and the mismatch reports as a TYPE error on [img]. *)
+     [win_ok_fl]'s and the mismatch reports as a TYPE error on [img]. *)
   Lemma win_assemble_wpin :
-    wpin log base
+    wpin_fl log base lo
       (fun j f => (forall k, (k < n)%nat -> f k = Some (z k))
                \/ (forall k, (k < n)%nat -> f k = Some (cp j k))).
   Proof.
-    move => i m Hlk Hs. exact (win_msg_all i m 0%nat Hlk Hn Hs).
+    move => i m Hge Hlk Hs. exact (win_msg_all i m 0%nat Hge Hlk Hn Hs).
+  Qed.
+
+  (* conjunct (2b), read off any one byte: the FLOOR wrote the clear word
+     over the whole window *)
+  Lemma win_assemble_floor :
+    forall k, (k < n)%nat -> log_byte img log lo (pa_add base k) = Some (z k).
+  Proof.
+    move => k Hk. have [_ [_ [_ [_ [_ [Hfl _]]]]]] := Hcov 0%nat Hn.
+    exact (Hfl k Hk).
   Qed.
 
   (* THE READER'S CONCLUSION.  [own h = Some t] is the agent's own-last
-     record; the two final premises are WORD-level and both true of the lock
-     ([cpus_ptr] injective and never 0). *)
+     record AT OR ABOVE THE FLOOR; [lo <= tv] is the reader's receipt, and
+     it is the only thing the relativisation costs it.  The two final
+     premises are WORD-level and both true of the lock ([cpus_ptr]
+     injective and never 0). *)
   Lemma win_assemble_not_mine (h : agent) (t tv : nat) :
     own h = Some t ->
+    (lo <= tv)%nat ->
     (exists k, (k < n)%nat /\ z k <> cp h k) ->
     (forall h', h' <> h -> exists k, (k < n)%nat /\ cp h' k <> cp h k) ->
     exists k, (k < n)%nat /\ tso_read img log h tv (pa_add base k) <> Some (cp h k).
   Proof.
-    move => Hown Hzk Hinj.
-    have Hlen : (t <= length log)%nat
-      by (have [_ [_ [_ [_ H3]]]] := Hcov 0%nat Hn;
+    move => Hown Htv Hzk Hinj.
+    have Hge : (lo <= t)%nat
+      by (have [_ [_ [_ [_ [_ [_ H3]]]]]] := Hcov 0%nat Hn;
           by have [? _] := H3 h t Hown).
+    have Hlen : (t <= length log)%nat
+      by (have [_ [_ [_ [_ [_ [_ H3]]]]]] := Hcov 0%nat Hn;
+          by have [_ [? _]] := H3 h t Hown).
     have Hvis : visibleb h tv log t = true
-      by (have [_ [_ [_ [_ H3]]]] := Hcov 0%nat Hn;
-          have [_ [Hv _]] := H3 h t Hown; exact (Hv tv)).
+      by (have [_ [_ [_ [_ [_ [_ H3]]]]]] := Hcov 0%nat Hn;
+          have [_ [_ [Hv _]]] := H3 h t Hown; exact (Hv tv Htv)).
     have Hz : forall j, (j < n)%nat ->
                 log_byte img log t (pa_add base j) = Some (z j).
-    { move => j Hj. have [_ [_ [_ [_ H3]]]] := Hcov j Hj.
-      by have [_ [_ [Hl _]]] := H3 h t Hown. }
-    have Ho : forall j, (j < n)%nat -> own_last log h (pa_add base j) t.
-    { move => j Hj. have [_ [_ [_ [_ H3]]]] := Hcov j Hj.
-      by have [_ [_ [_ Hol]]] := H3 h t Hown. }
-    exact (lkcpu_not_mine img log base n Hn h tv t z cp
-             win_assemble_win_ok win_assemble_wpin Hlen Hvis Hz Ho Hzk Hinj).
+    { move => j Hj. have [_ [_ [_ [_ [_ [_ H3]]]]]] := Hcov j Hj.
+      by have [_ [_ [_ [Hl _]]]] := H3 h t Hown. }
+    have Ho : forall j, (j < n)%nat -> own_last_fl log lo h (pa_add base j) t.
+    { move => j Hj. have [_ [_ [_ [_ [_ [_ H3]]]]]] := Hcov j Hj.
+      by have [_ [_ [_ [_ Hol]]]] := H3 h t Hown. }
+    have Hsome : forall j, (j < n)%nat ->
+                   is_Some (log_byte img log lo (pa_add base j))
+      by move => j Hj; rewrite (win_assemble_floor j Hj); by eexists.
+    exact (lkcpu_not_mine_fl_at img log base n Hn h tv lo t z cp
+             win_assemble_win_ok win_assemble_wpin Htv Hge Hlen Hvis
+             Hsome Hz Ho Hzk Hinj).
   Qed.
 End assemble.
 

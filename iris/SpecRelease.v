@@ -196,7 +196,7 @@ Definition wp_release_cancel_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} 
   wp_next outb p (fun (CID : CpuId) =>
     ∀ mr,
     lka ↦₄ (mword_of_int 0 : mword 32) -∗
-    lock_cpu lka ↦₈ (zero_reg : mword 64) -∗
+    WpLock.lk_cpu_fresh lka -∗
     Out -∗
     sie_cap_gpr kt mr av outb p -∗
     pc_is ret_tgt -∗

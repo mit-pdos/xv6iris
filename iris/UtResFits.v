@@ -24,6 +24,7 @@ Require Import ProcPtOwn UserPtTree ProcGeom TimerCap.
 Require Import IntrDefs KptShare.
 Require Import UsertrapRes.
 Require Import ParkCap.
+Require Import SyscParkEnv.   (* [sysc_park_extra] -- the producer's first premise *)
 Require Import SpecSyscall.
 Require Import SpecUsertrap.
 Require Import Xv6G.
@@ -164,15 +165,40 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES_PARK.
     intros Hwf Hav.
     pose proof Hwf as Hwf2.
     destruct Hwf2 as (Hj & Hplock & _ & _).
-    iIntros "#Henv Hown".
-    iDestruct "Henv" as "[#Hcaps #Hextra]".
-    iApply (ut_res_bare_park (SY.syscall_env) (park_token (un_s N)) N av Hwf Hav
-            with "Hcaps [] Hown").
-    iIntros "#Hdone #Htok".
-    iDestruct "Hcaps" as "(%Hties & _ & #Hprocs & _ & _ & #Hwl & #Hft & #Hdg & #Hpw)".
-    iApply (SY.syscall_env_park (un_f N) (un_w N) (un_ft N) (un_tk N)
+    iIntros (ξp) "#Henv Hown".
+    (* THE PRODUCER, ASSEMBLED, and the seam between the two halves is the
+       whole reason it is provable: [ut_res_bare_park] turns the record's
+       [ut_park_caps] plus the RESUMER's [park_globals] plus
+       [FirstTok.first_done] into [ut_caps] at the resumer's context
+       ([ut_caps_of_park]), and takes the environment as a WAND -- and
+       [SY.syscall_env_park] is that wand, now built per-[Xc] because
+       [usertrap_res_bare]'s one binder re-indexes the environment with the
+       residue (tso-port.md §0.12′). *)
+    iPoseProof (ut_res_bare_park (fun Xc : CurCtx => SY.syscall_env (XI := Xc))
+                  (park_token (un_s N)) N av Hwf Hav ξp with "Henv Hown")
+      as "Hclose".
+    iIntros (h Xc pt' V') "%Hupt #Hglob #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
+    iApply ("Hclose" $! h Xc pt' V'
+              with "[%] Hglob [] Htfk Hdone HW Htc Htrap Hpriv Hfd Hiref").
+    { exact Hupt. }
+    (* ---- the environment's producer, at [Xc] ---- *)
+    iIntros "#Hdone2 #Htok".
+    iPoseProof "Hdone2" as "Hd2". iDestruct "Hd2" as "[_ #Hrdy]".
+    (* the two rows [syscall_env_park] wants that only the join can give at
+       the resumer's context: the disk geometry AT THIS RECORD'S PAGES (the
+       pins' whole purpose) and the child's park world *)
+    iDestruct (ut_caps_of_park (XI := ξp) Xc N Hwf with "Henv Hglob Hrdy")
+      as "#Hcaps".
+    iDestruct "Hcaps" as
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hdg & _ & _ & _ & #Hpw)".
+    iDestruct "Henv" as "(%Hties & _ & _ & #Hpav & _ & _ & _ & _ & _)".
+    iDestruct "Hglob" as "(#Hprocs & #Hwl & #Hft & _ & #Hcr & #Htl & #Hnp & _)".
+    iApply (SY.syscall_env_park (XI := Xc) (un_f N) (un_w N) (un_ft N) (un_tk N)
               (un_fn N) Hties Hj Hplock eq_refl
-            with "Hextra Hwl Hft Hprocs Hdg Hdone Hpw Htok").
+            with "[] Hwl Hft Hprocs Hdg Hdone2 Hpw Htok").
+    (* [sysc_park_extra] at [Xc]: [procs_avail] off the record (context-free)
+       and the other three out of the resumer's globals *)
+    rewrite /sysc_park_extra. iFrame "Hnp Hpav Htl Hcr".
   Qed.
 
 End UtResFits.

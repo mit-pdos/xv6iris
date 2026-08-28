@@ -117,8 +117,9 @@ Require Import SpecIalloc.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
-   leg M); this caller is not yet -- the shim marks the open seam *)
+Require Import TsoCtx.
+(* A6.86: [TsoCtxShim] is RETIRED -- its last live use died with the M4
+   contract flip.  See its tombstone. *)
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error

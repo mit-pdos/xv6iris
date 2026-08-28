@@ -1528,8 +1528,8 @@ Section ProofVmfault.
       all: try lkbelow.
       { rewrite /kfree_pre HF2a0.
         iSplitR; [iPureIntro; exact Hpv |].
-        (* kfree wants the page contents-existential; forget the zeros *)
-        rewrite /page_own /byte_any.
+        (* §0.26′: contents-existential AND visibility-free *)
+        iApply page_own_free. rewrite /page_own /byte_any.
         iApply (big_sepL_impl with "Hzpage"). iIntros "!>" (k x Hx) "Hj".
         iExists _. iExact "Hj". }
       iIntros (Cfr Hsfr mfk) "Hcg Hcnt Hpc %Hfcs _".

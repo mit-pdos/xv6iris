@@ -69,17 +69,22 @@ Section LockAt.
     lock_name lk s -∗
     own_context cur_ctx -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
-    lock_cpu lk ↦₈ (zero_reg : mword 64) -∗
+    WpLock.lk_cpu_fresh lk -∗
     R cur_ctx ={E}=∗ own_context cur_ctx ∗ is_lock γ lk s R.
   Proof.
     iIntros "[Ha Hf] #Hnm Hrun Hword Hcpu HR".
     iMod (lock_pay_intro R with "Hrun HR") as "[Hrun HR]".
     iFrame "Hrun".
+    iDestruct (WpLock.lk_addr_claim_of4 lk (DfracOwn 1) (mword_of_int 0 : mword 32)
+                 with "Hword") as "#Hc4".
+    iDestruct "Hcpu" as "[#Hc8 Hcell]".
     iMod (inv_alloc lockN E (lock_inv γ lk s R)
-            with "[Hword Hcpu Ha Hf HR]") as "#Hinv".
-    { iNext. iExists (mword_of_int 0 : mword 32), None.
+            with "[Hword Hcell Ha Hf HR]") as "#Hinv".
+    { iNext. rewrite /lock_inv. iFrame "Hc4 Hc8".
+      iExists (mword_of_int 0 : mword 32), None.
       iDestruct (lock_word_intro with "Hword") as "Hword".
-      rewrite lk_cpu_res_free. iFrame "Hword Hcpu Ha".
+      rewrite lk_cpu_res_free. iFrame "Hword Ha".
+      iSplitL "Hcell"; [ iExact "Hcell" | ].
       iLeft. iFrame "Hf HR". done. }
     iModIntro. iApply (is_lock_intro with "Hnm Hinv").
   Qed.

@@ -130,6 +130,29 @@ Section PageFields.
     ([∗ list] j ∈ seq (o + a) b, byte_any (pa_add p j)).
   Proof. by rewrite seq_app big_sepL_app. Qed.
 
+  (* §0.26′ / A6.86: the same two equations at the VISIBILITY-FREE tier.
+     [page_free] is [page_own]'s big-op at a WEAKER per-byte predicate, so
+     every structural window law has an exact twin whose proof is the same
+     word; only the two the free page's reassembly needs are stated. *)
+  Lemma bwin_free_split (p : mword 64) (o a b : nat) :
+    ([∗ list] j ∈ seq o (a + b), byte_free (pa_add p j)) ⊣⊢
+    ([∗ list] j ∈ seq o a, byte_free (pa_add p j)) ∗
+    ([∗ list] j ∈ seq (o + a) b, byte_free (pa_add p j)).
+  Proof. by rewrite seq_app big_sepL_app. Qed.
+
+  Lemma bwin_any_free (p : mword 64) (o n : nat) :
+    ([∗ list] j ∈ seq o n, byte_any (pa_add p j)) ⊢
+    ([∗ list] j ∈ seq o n, byte_free (pa_add p j)).
+  Proof. apply big_sepL_mono. intros ? ? _. apply byte_any_free. Qed.
+
+  Lemma bwin_free_rebase (p : mword 64) (o n : nat) :
+    ([∗ list] j ∈ seq o n, byte_free (pa_add p j)) ⊣⊢
+    ([∗ list] j ∈ seq 0 n, byte_free (pa_add (pa_add p o) j)).
+  Proof.
+    rewrite -{1}(Nat.add_0_r o) -fmap_add_seq big_sepL_fmap.
+    apply big_sepL_proper. intros k j _. by rewrite pa_add_add.
+  Qed.
+
   Lemma bwin_rebase (p : mword 64) (o n : nat) :
     ([∗ list] j ∈ seq o n, byte_any (pa_add p j)) ⊣⊢
     ([∗ list] j ∈ seq 0 n, byte_any (pa_add (pa_add p o) j)).

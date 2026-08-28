@@ -95,7 +95,8 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 (* the WaitInv parent table is still the RAW word fact; the named
    crossings below are its shim seams (stage-2 worklist). *)
-Require Import TsoCtxShim.
+(* A6.86: [TsoCtxShim] is RETIRED -- its last live use died with the M4
+   contract flip.  See its tombstone. *)
 Import Defs.
 Local Open Scope Z_scope.
 (* a failing tactic in a whole-function WP over [proc_priv] otherwise spends

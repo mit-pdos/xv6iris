@@ -131,15 +131,20 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.   (* [CurCtx]: the residue owns a thread token *)
 Local Open Scope Z_scope.
 
+(* [XI] IS SPELLED, not left to generalization: the package's rows
+   ([procs_inv], [stack_own], and the closer's [ut_tfk] / [first_done]) are
+   context-indexed since the M1 flip, so the definition needs an ambient one
+   -- and an implicitly generalized binder would land in a DIFFERENT position
+   than the module signatures below expect (tso-port.md §0.8′ rule 3). *)
 Definition forkret_park_pkg
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
     (* the trap loop's kernel-side bundle, abstract exactly as [SpecForkret]
        takes it *)
     (URes : CpuId -> CurCtx -> uptd -> mword 64 -> iProp Σ)
     (* what the closer is handed at the resume beside [first_done] -- the
        park token, abstract here; see [SpecForkret] and ParkCap.v *)
     (W : iProp Σ)
-    (γs : list gname) (γf : gname) (pa ks : mword 64)
+    (γs : list gname) (γw γft γf γtl : gname) (pa ks : mword 64)
     (pid : mword 32) (av : nat) : iProp Σ :=
   (* [ksp] is spelled out rather than [let]-bound: this bundle is DESTRUCTED
      by its consumer, and a [let] survives [rewrite /forkret_park_pkg]. *)
@@ -148,6 +153,9 @@ Definition forkret_park_pkg
    wire_inv ∗
    kmap_at tramp_vpn tramp_ppn KP_rx ∗
    procs_inv γs ∗
+   (* ...and the rest of the ξ-dependent globals the residue wants, which
+      forkret hands to the closer at its tail (UsertrapRes.park_globals). *)
+   UsertrapRes.park_globals cur_ctx γs γw γft γf γtl ∗
    pslot_used_at pa ∗
    (* ---- the child's kernel stack, free below its top ---- *)
    stack_own (KTR := KT1) (add_vec ks (mword_of_int 4096)) av ∗
@@ -176,12 +184,24 @@ Definition forkret_park_pkg
           forkret pays both instead (SpecForkret.v, "...AND THE CLOSER IS
           HANDED [first_done]") and the builder here owes only the
           persistent rows neither supplies. *)
-   (∀ (h : CpuId) (Xc : CurCtx) (pt' : uptd) (V' : pprivate),
+   (* THE LATER IS ON THIS ROW ALONE (tso-port.md §0.16′ step (ii)): this
+      package's rows are where the child-context deposit would run,
+      [TsoCtx.ctx_deposit] is an update whose [CtxMorph] wants its [ctx_dom]
+      AT THE TOP LEVEL, and [ctx_dom] is not persistent, so NOTHING UNDER A
+      [▷] CAN BE DEPOSITED.  Only the CLOSER needs the later, and for the
+      FIXPOINT's sake rather than the proof's: it is the only row that names
+      [W] (= [ParkCap.park_token]), so it is the only row
+      [park_token_F_contractive] needs guarded. *)
+   ▷ (∀ (h : CpuId) (Xc : CurCtx) (pt' : uptd) (V' : pprivate),
       ⌜pv_upt V' = pt'⌝ -∗
       ⌜ud_data pt' = ud_pas pt'⌝ -∗
       ⌜proc_pt_wf pt'⌝ -∗
+      (* THE RESUMER'S OWN GLOBALS, at ITS context: the ξ-dependent half of
+         what the trap residue needs, which a record cannot carry across a
+         park (UsertrapRes.v, "THE RESUMER'S HALF"). *)
+      UsertrapRes.park_globals Xc γs γw γft γf γtl -∗
       UsertrapRes.ut_tfk (CID := h) (add_vec ks (mword_of_int 4096)) V' -∗
-      FirstTok.first_done -∗
+      FirstTok.first_done (XI := Xc) -∗
       W -∗
  (* THE RESUMING HART'S TIMER CAPABILITY.  It is a conjunct of
     [IntrDefs.sie_cap] now (see the note there), so the residue cannot
@@ -201,7 +221,7 @@ Definition forkret_park_paid_body
     (* [URes] takes the thread beside the hart: this cap describes a CHILD
        (see [ParkCap.park_pkg]'s note), so both are ∀-quantified below. *)
     (URes : CpuId -> CurCtx -> uptd -> mword 64 -> iProp Σ) (W : iProp Σ)
-    (γs : list gname) (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
+    (γs : list gname) (γw γft γf γtl : gname) (pa ks : mword 64) (rest : list (mword 64))
     (pid : mword 32) (V : pprivate) (av : nat) : Prop :=
   (length rest = 12%nat) ->
   (* the record is stored in [procs_inv]'s slot for [pa], so [pa] is one of
@@ -221,19 +241,28 @@ Definition forkret_park_paid_body
        [KSTACK_AV = 342] too, which is not a coincidence: a caller that
      hands over a whole free kernel stack satisfies this exactly. *)
   (K_usertrap <= av)%nat ->
-  (* THE PACKAGE IS TAKEN UNDER A LATER.  The proof uses none of it before
-     the context's own [▷] ([ProofForkretPark]'s [iNext]), and that is what
-     lets [ParkCap.park_token] -- whose cap this is -- be a guarded
-     fixpoint: the package's closer names the token, and a parker holds the
-     token only under a later. *)
-  ⊢ ▷ forkret_park_pkg URes W γs γf pa ks pid av -∗
+  (* THE PACKAGE IS NO LONGER TAKEN UNDER A LATER -- its CLOSER ROW is
+     (see [forkret_park_pkg] above), which is all the fixpoint ever needed.
+     Since the [XIp] reshape a parked record's rows are the PARKED thread's
+     own ([SwtchCtx.valid_context_pre]), so this proof is the site that must
+     hand rows over at the child's freshly minted [XIc] with
+     [TsoCtx.ctx_deposit] -- and a deposit runs at the top level or not at
+     all.
+     THE PARKER'S OWN [own_context] IS THE OTHER HALF OF THAT.  It is
+     [ctx_deposit]'s first premise and no persistent surrogate can replace
+     it: the depositor's authority over its own context is exactly what
+     bounds the deposited facts' timestamps.  Both parkers hold one inside
+     their [sie_cap_gpr] ([SieCapCtx.sie_cap_gpr_own_ctx_acc]); it is
+     BORROWED and handed straight back, so nothing downstream changes. *)
+  ⊢ own_context cur_ctx -∗
+    forkret_park_pkg URes W γs γw γft γf γtl pa ks pid av -∗
     ▷ W -∗
     is_kstack pa ks -∗
     ctx_cells (p_context pa) (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) -∗
     proc_priv γf pa pid V -∗
     fd_slots FDSPARE -∗
     iref_slots IREFSPARE -∗
-    |==> ▷ proc_ctx γs pa.
+    |==> own_context cur_ctx ∗ ▷ proc_ctx γs pa.
 
 Module Type FORKRET_PARK_PAID.
   (* the residue is the module-type parameter it is everywhere else *)
@@ -247,17 +276,17 @@ Module Type FORKRET_PARK_PAID.
   Parameter forkret_park_paid :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (W : iProp Σ)
-      (γs : list gname) (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
+      (γs : list gname) (γw γft γf γtl : gname) (pa ks : mword 64) (rest : list (mword 64))
       (pid : mword 32) (V : pprivate) (av : nat),
       forkret_park_paid_body
         (fun (h : CpuId) (Xc : CurCtx) => usertrap_res_bare (CID := h) (XI := Xc)) W
-        γs γf pa ks rest pid V av.
+        γs γw γft γf γtl pa ks rest pid V av.
   (* ...AND THE TOKEN, which is the park as every parker sees it
      ([ParkCap.park_token]): the cap above at [W := the token] plus the
      residue's channel, tied into the fixpoint.  This is the one entry the
      parkers use; the statement above is its proof. *)
   Parameter park_token_intro :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
       (γs : list gname),
       ⊢ park_token γs.
 End FORKRET_PARK_PAID.

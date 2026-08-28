@@ -33,22 +33,28 @@
      Some (i, false) -- held by i, lk->cpu = 0 (acquire's window; release's
                         window between its cpu clear and its word clear)
      Some (i, true)  -- held by i, lk->cpu = cpus_ptr i                     *)
+From stdpp Require Import bitvector.definitions.  (* [bv 8]: the M4 owner-cell kit is stated per byte *)
 From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import excl gmap auth ufrac.
 From iris.algebra.lib Require Import excl_auth.
 From iris.base_logic.lib Require Import invariants cancelable_invariants own.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d.
+Require Import Riscv.rv64d_types.  (* A6.84: the ledger word's carrier types *)
 Require Import RiscvPtsto RiscvLang.
 (* EXPORTED: [lock_cpu] (the +16 owner-field address) lives there, because the
    per-cpu held-lock set is stated over it, and the ~40 files that reach
    [lock_cpu] through this one keep working. *)
 Require Export LockSet.
 Require Import ProcGeom.
+Require Import RiscvModelBytes.  (* [nth_byte] / [bv_eq_of_bytes]: the M4 owner-cell kit below is stated per BYTE *)
+Require Import TsoMemPa.  (* [agent]: the racy owner-cell kit quantifies over the log's authors *)
 Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
 (* the context axis (tso-port M3): the PAYLOAD of every lock is a function
    of the thread of control that holds its facts -- see the block above
    [lock_inv]. *)
+Require Import Ktier KMap RiscvExtras.  (* A6.84: [ktier_pin] / [kmap_at] --
+   a ledger cell carries no MAPPING, so [lk_addr_claim] states one here *)
 Require Import TsoCtx.
 (* [lock_name_intro] mints the deliberately-RAW name-field metadata
    (tso-port.md §0.8' ruling 2) out of a context-indexed store result, so it
@@ -94,6 +100,11 @@ Section Lock.
     | Some (i, true) => cpus_ptr i
     | _ => (zero_reg : mword 64)
     end.
+
+  (* the one agent that may be missing an own-last record in each state:
+     the HOLDER, and nobody else (see [lk_own_ok] below). *)
+  Definition lk_ex (st : lock_state) : option CPU :=
+    match st with Some (i, true) => Some i | _ => None end.
 
   Lemma lk_cpu_val_none : lk_cpu_val None = (zero_reg : mword 64).
   Proof. reflexivity. Qed.
@@ -259,13 +270,29 @@ Section Lock.
      no load at ours.  That direction is the M4 racy-owner-cell entry
      ([WpSconfLock]'s [wp_ld_lkcpu_lockopen_gen] is its twin one field
      over), and it is deliberately absent until the M4 memo lands. <<< *)
-  Definition lock_word (lk : mword 64) (v : mword 32) : iProp Σ :=
-    (∃ ξ : CtxId, ctx_word4_pointsto ξ lk (DfracOwn 1) v)%I.
+  (* >>> A6.84: THE ∃ IS GONE, AND WHAT REPLACED IT IS BETTER.  The ∃ξ
+     closed [is_lock]'s term at the cost of an existential nothing could
+     eliminate -- "a cell at an unknown ξ licenses no load at ours" -- so
+     the two lock leaves that READ the word were unprovable.  At the
+     LEDGER tier the cell has no ξ AT ALL: [phys_ledger_word4] is the
+     eight-byte carrier's four-byte twin, ξ-free BY CONSTRUCTION, and the
+     store gates over it are context-free ([ledger_store_win_at_ok]), so
+     release's clear and the AMO's write need no [own_context] either.
+     [is_lock] is a closed term for the reason §0.19′ wanted and with no
+     residual existential.
 
-  (* the INTRODUCTION leg, which is all the creators need *)
+     WHAT IT COSTS is the address's MAPPING, which a ledger cell does not
+     carry: the invariant keeps the two [lk_addr_claim]s instead.  They
+     are PERSISTENT and about the ADDRESS, not the value, so one peek
+     serves every leaf ([WpSconfLock.lock_claims]).  <<< *)
+  Definition lock_word (lk : mword 64) (v : mword 32) : iProp Σ :=
+    TsoCtx.phys_ledger_word4 lk (DfracOwn 1) v.
+
+  (* the INTRODUCTION leg, which is all the creators need.  ONE-WAY, and
+     deliberately: the lock's word never goes back to the ctx tower. *)
   Lemma lock_word_intro (lk : mword 64) (v : mword 32) :
     lk ↦₄ v ⊢ lock_word lk v.
-  Proof. iIntros "H". iExists cur_ctx. iExact "H". Qed.
+  Proof. rewrite /lock_word. iIntros "H". by iApply TsoCtx.ctx_word4_ledger_kt0. Qed.
 
   (* ===================================================================
      THE OWNER FIELD, AND THE HELD-SET FRAGMENT BESIDE IT.
@@ -315,10 +342,357 @@ Section Lock.
      stored it.  The window lemmas below keep the ∃ ([lk_cpu_cell]); the
      SC-era trade for the acting hart's ambient form died with the shim,
      and recovering it is the M4 racy-kit entry spelled out there. *)
+  (* THE ADDRESS CLAIM a ledger cell does not carry.  Character for
+     character [WpSconfMem.mem_claim] under its alignment -- that file
+     sits ABOVE this one, so the content is restated here and
+     [WpSconfLock.lock_claims] is the one line that converts (they are
+     convertible at [KT0], which is the only tier a lock lives at). *)
+  (* THE ADDRESS CLAIM A LEDGER CELL DOES NOT CARRY.
+     PER BYTE, not merely at the base (A6.86).  The base form is what the
+     translation engines want ([WpSconfMem.mem_claim] under its alignment),
+     but the PAGE that reclaims the cell wants one per byte -- a free page's
+     bytes are [TsoCtx.mem_free], and [mem_free] is the kmap claim over the
+     visibility-free byte.  Both readings are here because the producer has
+     both for free: every creator pays this claim off a CTX WORD it still
+     holds, and a ctx word is ctx BYTES, each carrying its own mapping.
+     *That* is why the arithmetic never appears: the claim is read off the
+     tower before the cell leaves it, not reconstructed after. *)
+  Definition lk_addr_claim (a : Arch.pa) (width : Z) : iProp Σ :=
+    (⌜is_aligned_paddr (Physaddr a) width = true⌝ ∗
+     ∃ ppn : mword 44,
+       kmap_at (svpn_of a) ppn KP_rw ∗
+       ⌜(uint a < 274877906944)%Z⌝ ∗
+       ⌜addr_is_ram (pa_of ppn a)⌝ ∗
+       ⌜ktier_pin KT0 ppn a⌝ ∗
+       ([∗ list] j ∈ seq 0 (Z.to_nat width),
+          ∃ ppj : mword 44,
+            kmap_at (svpn_of (pa_add a j)) ppj KP_rw ∗
+            ⌜(uint (pa_add a j) < 274877906944)%Z⌝ ∗
+            ⌜ktier_pin KT0 ppj (pa_add a j)⌝))%I.
+
+  Global Instance lk_addr_claim_persistent a width :
+    Persistent (lk_addr_claim a width).
+  Proof. rewrite /lk_addr_claim. apply _. Qed.
+
+  (* the per-byte half, which is what a free page's bytes are keyed by *)
+  Lemma lk_addr_claim_bytes (a : Arch.pa) (width : Z) :
+    lk_addr_claim a width ⊢
+    [∗ list] j ∈ seq 0 (Z.to_nat width),
+      ∃ ppj : mword 44,
+        kmap_at (svpn_of (pa_add a j)) ppj KP_rw ∗
+        ⌜(uint (pa_add a j) < 274877906944)%Z⌝ ∗
+        ⌜ktier_pin KT0 ppj (pa_add a j)⌝.
+  Proof. rewrite /lk_addr_claim. by iIntros "(_ & % & _ & _ & _ & _ & $)". Qed.
+
+  (* the generic producer: a ctx WORD of any width carries its own claim --
+     the base one off byte 0, the per-byte ones off each byte. *)
+  Local Lemma lk_addr_claim_of_bytes (a : Arch.pa) (dq : dfrac) (w : Z)
+      (f : nat -> bv 8) :
+    (0 < w)%Z ->
+    is_aligned_paddr (Physaddr a) w = true ->
+    ([∗ list] j ∈ seq 0 (Z.to_nat w),
+       ctx_pointsto (KTR := KT0) cur_ctx (pa_add a j) dq (f j))
+    ⊢ lk_addr_claim a w.
+  Proof.
+    intros Hw Hal. iIntros "Hb".
+    iAssert ([∗ list] j ∈ seq 0 (Z.to_nat w),
+               ∃ ppj : mword 44,
+                 kmap_at (svpn_of (pa_add a j)) ppj KP_rw ∗
+                 ⌜(uint (pa_add a j) < 274877906944)%Z⌝ ∗
+                 ⌜ktier_pin KT0 ppj (pa_add a j)⌝)%I as "#Hbytes".
+    { iApply (big_sepL_impl with "Hb"). iIntros "!>" (k j _) "H".
+      iEval (rewrite (ctx_pointsto_phys (KTR := KT0))) in "H".
+      iDestruct "H" as (ppj) "(#Hk & %Hc & %Hp & _)".
+      iExists ppj. iFrame "Hk". by iPureIntro. }
+    iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hb") as "Hb0".
+    { rewrite lookup_seq_lt; [reflexivity | lia]. }
+    iEval (rewrite pa_add_0) in "Hb0".
+    iEval (rewrite (ctx_pointsto_phys (KTR := KT0))) in "Hb0".
+    iDestruct "Hb0" as (ppn) "(#Hk & %Hc & %Hp & Hph)".
+    iDestruct (ctx_phys_pointsto_ram with "Hph") as %Hram.
+    rewrite /lk_addr_claim.
+    iSplitR; [done|]. iExists ppn. iFrame "Hk Hbytes". iPureIntro. split_and!; done.
+  Qed.
+
+  (* a ctx word carries its own claim, which is how the creators pay it *)
+  Lemma lk_addr_claim_of4 (lk : mword 64) (dq : dfrac) (v : mword 32) :
+    ctx_word4_pointsto (KTR := KT0) cur_ctx lk dq v ⊢ lk_addr_claim lk 4.
+  Proof.
+    rewrite ctx_word4_pointsto_unfold. iIntros "[%Hal Hb]".
+    iApply (lk_addr_claim_of_bytes lk dq 4 (nth_byte v) ltac:(lia) Hal).
+    iExact "Hb".
+  Qed.
+
+  (* ...and the EIGHT-byte one, which is how [initlock] pays for the owner
+     cell's claim BEFORE the store that takes the cell out of the tower. *)
+  Lemma lk_addr_claim_of8 (a : Arch.pa) (dq : dfrac) (v : mword 64) :
+    ctx_word_pointsto (KTR := KT0) cur_ctx a dq v ⊢ lk_addr_claim a 8.
+  Proof.
+    rewrite ctx_word_pointsto_unfold. iIntros "[%Hal Hb]".
+    iApply (lk_addr_claim_of_bytes a dq 8 (nth_byte v) ltac:(lia) Hal).
+    iExact "Hb".
+  Qed.
+
+
+  (* ---- THE OWNER CELL AT THE LEDGER TIER, WITH THE RACY PAYLOAD ----
+
+     [lk->cpu] is the one cell in the tree that is READ RACILY, by a hart
+     that does not hold the lock, and what it must conclude is an
+     EXCLUSION ("the recorded owner is not me").  That is a claim about
+     the READER'S OWN WRITE HISTORY, so it rides in the ledger element's
+     window payload (TsoMemPa §12c/§12d) and NOT in this invariant --
+     tso-pin-memo.md §3's rule, and the reason the cell cannot stay in
+     the ctx tower. *)
+  (* >>> A6.84 (re-applied): THE RACY KIT MOVES UP.  [lk_cpu_pay]
+     below is stated at [lkcpu_z] / [lkcpu_cp], so the kit that
+     defines them has to precede it; nothing in the block depends on
+     the physical fields, so this is a pure reordering. <<< *)
+
+  (* ================================================================== *)
+  (* THE RACY OWNER-CELL KIT AT THE LOCK'S OWN PARAMETERS                *)
+  (* (tso-m4-memo.md §3/§8; tso-machine-flip.md A6.82).                   *)
+  (*                                                                    *)
+  (* This is what [holding()]'s [notheld] read cashes, and it is stated   *)
+  (* here -- beside [lk_cpu_val] -- because its two side conditions are   *)
+  (* facts about [cpus_ptr] and nothing else: the pointer is INJECTIVE    *)
+  (* and never NULL.  The kit asks for them per BYTE, and the memo's      *)
+  (* layout computation (§3) is why that is not the same request: for     *)
+  (* harts 1..6 there is NO single byte offset separating them from every *)
+  (* other hart, so a byte-keyed kit is defeated here and the WINDOW      *)
+  (* form -- one timestamp resolving all eight bytes -- is what closes    *)
+  (* the gap.  [nth_byte_ne] below is the whole bridge: two words that    *)
+  (* differ differ AT SOME BYTE, which is all the window form needs.      *)
+  (*                                                                    *)
+  (* [agent] is [nat] and covers the DMA agents as well as the harts.     *)
+  (* They never write a lock, and giving them [zero_reg] as their "own    *)
+  (* word" is exactly what makes the per-agent distinguishing premise     *)
+  (* true of them too -- by the same [cpus_ptr] nonzeroness a free lock   *)
+  (* uses.                                                               *)
+  (* ================================================================== *)
+
+  (* two words that differ, differ at a byte *)
+  Lemma nth_byte_ne (w1 w2 : mword 64) :
+    w1 <> w2 -> exists k, (k < 8)%nat /\ nth_byte w1 k <> nth_byte w2 k.
+  Proof.
+    intros Hne.
+    assert (H : forall l : list nat,
+              (exists k, k ∈ l /\ nth_byte w1 k <> nth_byte w2 k)
+              \/ (forall k, k ∈ l -> nth_byte w1 k = nth_byte w2 k)).
+    { induction l as [|x xs IH].
+      - right. intros k Hk. by apply elem_of_nil in Hk.
+      - destruct (decide (nth_byte w1 x = nth_byte w2 x)) as [He|Hnee].
+        + destruct IH as [(k & Hk & Hkk) | Hall].
+          * left. exists k. split; [ by apply elem_of_cons; right | done ].
+          * right. intros k Hk. apply elem_of_cons in Hk as [->|Hk];
+              [ done | by apply Hall ].
+        + left. exists x. split; [ by apply elem_of_cons; left | done ]. }
+    destruct (H (seq 0 8)) as [(k & Hk & Hkk) | Hall].
+    - exists k. apply elem_of_seq in Hk. split; [lia | done].
+    - exfalso. apply Hne. apply (bv_eq_of_bytes (n := 8) w1 w2).
+      intros j Hj. apply Hall, elem_of_seq. lia.
+  Qed.
+
+  (* a hart's [struct cpu] pointer is not the clear word *)
+  Lemma cpus_ptr_ne_zero (i : CPU) : (zero_reg : mword 64) <> cpus_ptr i.
+  Proof.
+    intros Heq. pose proof (cpus_ptr_nonzero i) as Hne.
+    rewrite -Heq in Hne.
+    assert (Ht : eq_vec (zero_reg : mword 64) (zero_reg : mword 64) = true)
+      by (apply eq_vec_true_iff; reflexivity).
+    rewrite Ht in Hne. discriminate.
+  Qed.
+
+  (* the owner word of an arbitrary AGENT: a hart's [struct cpu] pointer,
+     and the clear word for everything that is not a hart. *)
+  Definition agent_cpus_ptr (h : agent) : mword 64 :=
+    match decide (h < NCPU)%nat with
+    | left Hh => cpus_ptr (nat_to_fin Hh)
+    | right _ => (zero_reg : mword 64)
+    end.
+
+  Lemma agent_cpus_ptr_hart (c : CPU) : agent_cpus_ptr (hart_agent c) = cpus_ptr c.
+  Proof.
+    rewrite /agent_cpus_ptr. case_decide as Hh.
+    - f_equal. apply fin_to_nat_inj. by rewrite fin_to_nat_to_fin.
+    - exfalso. pose proof (fin_to_nat_lt c). rewrite /hart_agent in Hh. lia.
+  Qed.
+
+  Lemma agent_cpus_ptr_ne (h : agent) (c : CPU) :
+    h <> hart_agent c -> agent_cpus_ptr h <> cpus_ptr c.
+  Proof.
+    intros Hne. rewrite /agent_cpus_ptr. case_decide as Hh.
+    - intros Heq. apply cpus_ptr_inj in Heq. apply Hne.
+      rewrite /hart_agent -Heq fin_to_nat_to_fin //.
+    - exact (cpus_ptr_ne_zero c).
+  Qed.
+
+  (* THE TWO BYTE FUNCTIONS the owner cell's window payload is stated at:
+     the CLEAR word a free lock holds, and each author's own word. *)
+  Definition lkcpu_z : nat -> bv 8 := nth_byte (zero_reg : mword 64).
+  Definition lkcpu_cp (h : agent) : nat -> bv 8 := nth_byte (agent_cpus_ptr h).
+
+  (* THE [notheld] READ, DISCHARGED.  A hart whose own-last record for the
+     window is [Some t] -- which every hart has from the mint until it
+     acquires, and again from its own release -- and whose receipt has
+     passed the floor, provably does not read its OWN [struct cpu] pointer
+     out of [lk->cpu], AT EVERY view it can reach.  That is the whole
+     content of [SpecAcquire]'s dead panic arm. *)
+  Lemma lkcpu_read_not_mine `{CID : CpuId} (g : gstate) (lk : mword 64)
+      (dq : dfrac) (f : nat -> bv 8) (ts : nat -> nat)
+      (own : agent -> option nat) (lo t K : nat) :
+    own (hart_agent cpu_id) = Some t ->
+    (lo <= K)%nat ->
+    tso_interp_at riscv_eraGS g -∗
+    TsoGhost.view_lb view_name loglen_name (hart_agent cpu_id) K -∗
+    ([∗ list] j ∈ seq 0 8,
+       TsoCtx.phys_ledger_wpay (pa_add (lock_cpu lk) j) dq (f j) (ts j)
+         (TsoMemPa.TsWin (lock_cpu lk) 8 j lkcpu_z lkcpu_cp own lo)) -∗
+    ⌜forall (tv : nat), (g.(gtv) cpu_id <= tv)%nat -> forall w : mword 64,
+       tso_read_bytes g.(gimg) g.(glog) (hart_agent cpu_id) tv (lock_cpu lk)
+         (N.of_nat 8) w -> w <> cpus_ptr cpu_id⌝.
+  Proof.
+    intros Hown HloK.
+    assert (Hcpw : forall k, (k < 8)%nat ->
+              nth_byte (cpus_ptr cpu_id) k = lkcpu_cp (hart_agent cpu_id) k).
+    { intros k Hk. by rewrite /lkcpu_cp agent_cpus_ptr_hart. }
+    assert (Hzk : exists k, (k < 8)%nat /\
+              lkcpu_z k <> lkcpu_cp (hart_agent cpu_id) k).
+    { rewrite /lkcpu_z /lkcpu_cp agent_cpus_ptr_hart.
+      apply nth_byte_ne. exact (cpus_ptr_ne_zero cpu_id). }
+    assert (Hinj : forall h', h' <> hart_agent cpu_id ->
+              exists k, (k < 8)%nat /\
+                lkcpu_cp h' k <> lkcpu_cp (hart_agent cpu_id) k).
+    { intros h' Hne. rewrite /lkcpu_cp (agent_cpus_ptr_hart cpu_id).
+      apply nth_byte_ne. exact (agent_cpus_ptr_ne h' cpu_id Hne). }
+    iIntros "Hint #HK Hb".
+    iApply (TsoCtx.ledger_read_racy_word_ok g (lock_cpu lk) 8%nat dq f ts
+              lkcpu_z lkcpu_cp own lo t K (m := 64) (cpus_ptr cpu_id)
+              ltac:(lia) Hown HloK Hcpw Hzk Hinj with "Hint HK Hb").
+  Qed.
+
+  (* [s] -- the lock's NAME -- rather than a bare rank: [is_lock] already
+     carries it, so instantiating with [lock_rank s] leaves no second degree
+     of freedom that could disagree with the name in [lock_name]. *)
+  (* THE PAYLOAD IS A FUNCTION OF THE CONTEXT (tso-port M3).  A lock's
+     facts belong, at any moment, to a THREAD OF CONTROL: the depositor's
+     until release re-indexes them, the lock's own while parked here, the
+     acquirer's after its AMO.  A fixed [iProp] payload cannot say that --
+     whichever context its facts were elaborated at, every OTHER thread's
+     acquire would receive them at the wrong index.  So [R : CtxId →
+     iProp]; clients write payloads with the ambient spellings under
+     [TsoCtx]'s [<{ P }>] wrapper and owe [CtxMorph R] at acquire/release
+     (SpecAcquire.v / SpecRelease.v) -- a payload that fails it
+     structurally is a real TSO bug found early.
+
+
+     AT SC the parked payload is the ∃-closure below: the index is
+     phantom under the seal, so "some context's facts" is as strong as
+     anyone's, and the acquire-side re-indexing is a [CtxMorph] step
+     against the shim's [ctx_dom_sc].  AT CUTOVER this free arm instead
+     holds [R ξ_L] beside the lock's own internal context token
+     ([TsoCtxTwin2]'s parked shape: release deposits by
+     [ctx_dom_to_parked]-transport, acquire withdraws by
+     [ctx_dom_of_parked] against its AMO-at-the-top evidence); the
+     statement list above this definition is what stays. *)
+
+  Definition lk_cpu_pay (lk : mword 64) (v : mword 64)
+      (own : agent -> option nat) (lo : nat) : iProp Σ :=
+    ([∗ list] j ∈ seq 0 8, ∃ t : nat,
+       TsoCtx.phys_ledger_wpay (pa_add (lock_cpu lk) j) (DfracOwn 1)
+         (nth_byte v j) t
+         (TsoMemPa.TsWin (lock_cpu lk) 8 j lkcpu_z lkcpu_cp own lo))%I.
+
+  (* the AUTHOR's form: the same window with the store's own message
+     fragment beside every byte.  That is what makes the HOLDER's read of
+     the cell IT wrote exact ([TsoCtx.ledger_read_wpay_vis_ok]) -- and it
+     is why the held arm carries more than the free one, which A6.78 §(2)
+     named and nothing before it did. *)
+  Definition lk_cpu_pay_vis (h : agent) (lk : mword 64) (v : mword 64)
+      (own : agent -> option nat) (lo : nat) : iProp Σ :=
+    ([∗ list] j ∈ seq 0 8, ∃ t : nat,
+       TsoCtx.ledger_vis h 0 t ∗
+       TsoCtx.phys_ledger_wpay (pa_add (lock_cpu lk) j) (DfracOwn 1)
+         (nth_byte v j) t
+         (TsoMemPa.TsWin (lock_cpu lk) 8 j lkcpu_z lkcpu_cp own lo))%I.
+
+  Lemma lk_cpu_pay_vis_forget h lk v own lo :
+    lk_cpu_pay_vis h lk v own lo ⊢ lk_cpu_pay lk v own lo.
+  Proof.
+    rewrite /lk_cpu_pay_vis /lk_cpu_pay.
+    iIntros "H". iApply (big_sepL_impl with "H").
+    iIntros "!>" (k j _) "(%t & _ & H)". by iExists t.
+  Qed.
+
+  Global Instance lk_cpu_pay_timeless lk v own lo :
+    Timeless (lk_cpu_pay lk v own lo).
+  Proof. rewrite /lk_cpu_pay. apply _. Qed.
+  Global Instance lk_cpu_pay_vis_timeless h lk v own lo :
+    Timeless (lk_cpu_pay_vis h lk v own lo).
+  Proof. rewrite /lk_cpu_pay_vis. apply _. Qed.
+
+  (* >>> THE OWN-INVARIANT, AND IT IS ONE SENTENCE: the ONLY agent that
+     may be missing an own-last record is the HOLDER.  Acquire's store
+     writes the author's own word and REVOKES its entry
+     ([ledger_store_wpay_ok]'s second arm); release's writes the clear
+     word and RESTORES it (the first).  Every other agent's entry frames.
+     A [notheld] reader is a non-holder by definition, so this is exactly
+     the premise [lkcpu_read_not_mine] consumes. <<< *)
+  Definition lk_own_ok (ex : option CPU) (own : agent -> option nat) : Prop :=
+    forall h : agent, own h = None -> exists i : CPU, ex = Some i /\ h = hart_agent i.
+
+  Definition lk_cpu_cell_ex (lk : mword 64) (v : mword 64)
+      (ex : option CPU) : iProp Σ :=
+    (∃ (own : agent -> option nat) (lo : nat),
+       ⌜lk_own_ok ex own⌝ ∗
+       match ex with
+       | Some i => lk_cpu_pay_vis (hart_agent i) lk v own lo
+       | None => lk_cpu_pay lk v own lo
+       end)%I.
+
+  Definition lk_cpu_cell (lk : mword 64) (v : mword 64) : iProp Σ :=
+    lk_cpu_cell_ex lk v None.
+
+  (* the held cell forgets its author fragment and becomes an ordinary
+     one, at the cost of the exactness the holder had *)
+  Lemma lk_cpu_cell_ex_forget lk v ex :
+    lk_cpu_cell_ex lk v ex ⊢ lk_cpu_cell lk v ∨ ⌜is_Some ex⌝.
+  Proof.
+    iIntros "(%own & %lo & %Hok & Hb)". destruct ex as [i|].
+    - iRight. iPureIntro. by eexists.
+    - iLeft. iExists own, lo. by iFrame "Hb".
+  Qed.
+
+  (* what [initlock]'s post hands over and every creator takes: the
+     window payload at the CLEAR word, plus the address claim the ledger
+     cells do not carry. *)
+  Definition lk_cpu_fresh (lk : mword 64) : iProp Σ :=
+    (lk_addr_claim (lock_cpu lk) 8 ∗ lk_cpu_cell lk (zero_reg : mword 64))%I.
+
+  (* THE RECLAMATION, AND IT IS THE WHOLE POINT (tso-port.md §0.26′).
+     A lock on a kalloc'd page must be able to DIE.  Its owner word is a
+     ledger cell and cannot re-enter the ctx tower -- that needs a drain
+     (A6.84 §(2)) -- but it does not have to: [kfree] wants only the page's
+     FUTURE, and a wpay cell has one.  The claim supplies the mapping the
+     cell dropped; the payload supplies the fraction and the element. *)
+  Lemma lk_cpu_fresh_free (lk : mword 64) :
+    lk_cpu_fresh lk ⊢
+    [∗ list] j ∈ seq 0 8,
+      TsoCtx.mem_free (KTR := KT0) (pa_add (lock_cpu lk) j) (DfracOwn 1).
+  Proof.
+    rewrite /lk_cpu_fresh /lk_cpu_cell /lk_cpu_cell_ex /lk_cpu_pay.
+    iIntros "[#Hcl (%own & %lo & _ & Hp)]".
+    iDestruct (lk_addr_claim_bytes with "Hcl") as "#Hb".
+    change (Z.to_nat 8) with 8%nat.
+    iApply (big_sepL_impl with "Hp"). iIntros "!>" (k j Hk) "(%t & Hw)".
+    iDestruct (big_sepL_lookup _ _ k j Hk with "Hb") as (ppj) "(#Hkj & %Hcj & %Hpj)".
+    rewrite /TsoCtx.mem_free. iExists ppj. iFrame "Hkj".
+    iSplitR; [done|]. iSplitR; [done|].
+    rewrite (ktier_pin_id ppj (pa_add (lock_cpu lk) j) Hpj).
+    by iApply TsoCtx.phys_ledger_wpay_free.
+  Qed.
+
   Definition lk_cpu_res (st : lock_state) (lk : mword 64) (r : string) : iProp Σ :=
-    ((∃ ξ : CtxId,
-        ctx_word_pointsto ξ (lock_cpu lk) (DfracOwn 1) (lk_cpu_val st)) ∗
-     lk_cpu_frag st r)%I.
+    (lk_cpu_cell_ex lk (lk_cpu_val st) (lk_ex st) ∗ lk_cpu_frag st r)%I.
 
   (* the leaves strip this under [>] inside the step engine's callback, and
      [st] is a VARIABLE there, so the match is stuck and the structural
@@ -346,13 +720,6 @@ Section Lock.
      would drag a context into the persistent [is_lock] handle).  The
      failures at the leaves that read and write this cell
      ([WpSconfLock]) are that entry. *)
-  Definition lk_cpu_cell (lk : mword 64) (v : mword 64) : iProp Σ :=
-    (∃ ξ : CtxId, ctx_word_pointsto ξ (lock_cpu lk) (DfracOwn 1) v)%I.
-
-  Lemma lk_cpu_cell_intro (lk : mword 64) (v : mword 64) :
-    lock_cpu lk ↦₈ v ⊢ lk_cpu_cell lk v.
-  Proof. iIntros "H". iExists cur_ctx. iExact "H". Qed.
-
   (* the free / window form: the whole cell at 0 and no fragment. *)
   Lemma lk_cpu_res_free (lk : mword 64) (r : string) :
     lk_cpu_res None lk r ⊣⊢ lk_cpu_cell lk (zero_reg : mword 64).
@@ -360,34 +727,15 @@ Section Lock.
   Lemma lk_cpu_res_win (i : CPU) (lk : mword 64) (r : string) :
     lk_cpu_res (Some (i, false)) lk r ⊣⊢ lk_cpu_cell lk (zero_reg : mword 64).
   Proof. rewrite /lk_cpu_res /lk_cpu_cell /=. apply bi.sep_emp. Qed.
+  (* THE HELD FORM CARRIES MORE THAN THE OTHER TWO, and that is the
+     author-fragment point (A6.78 §(2)): the holder's own read of the
+     cell must be EXACT, so the held cell keeps the store's message
+     fragment beside every byte. *)
   Lemma lk_cpu_res_held (i : CPU) (lk : mword 64) (r : string) :
     lk_cpu_res (Some (i, true)) lk r ⊣⊢
-    lk_cpu_cell lk (cpus_ptr i) ∗ lk_in i r.
-  Proof. rewrite /lk_cpu_res /lk_cpu_cell /=. reflexivity. Qed.
+    lk_cpu_cell_ex lk (cpus_ptr i) (Some i) ∗ lk_in i r.
+  Proof. rewrite /lk_cpu_res /=. reflexivity. Qed.
 
-  (* [s] -- the lock's NAME -- rather than a bare rank: [is_lock] already
-     carries it, so instantiating with [lock_rank s] leaves no second degree
-     of freedom that could disagree with the name in [lock_name]. *)
-  (* THE PAYLOAD IS A FUNCTION OF THE CONTEXT (tso-port M3).  A lock's
-     facts belong, at any moment, to a THREAD OF CONTROL: the depositor's
-     until release re-indexes them, the lock's own while parked here, the
-     acquirer's after its AMO.  A fixed [iProp] payload cannot say that --
-     whichever context its facts were elaborated at, every OTHER thread's
-     acquire would receive them at the wrong index.  So [R : CtxId →
-     iProp]; clients write payloads with the ambient spellings under
-     [TsoCtx]'s [<{ P }>] wrapper and owe [CtxMorph R] at acquire/release
-     (SpecAcquire.v / SpecRelease.v) -- a payload that fails it
-     structurally is a real TSO bug found early.
-
-     AT SC the parked payload is the ∃-closure below: the index is
-     phantom under the seal, so "some context's facts" is as strong as
-     anyone's, and the acquire-side re-indexing is a [CtxMorph] step
-     against the shim's [ctx_dom_sc].  AT CUTOVER this free arm instead
-     holds [R ξ_L] beside the lock's own internal context token
-     ([TsoCtxTwin2]'s parked shape: release deposits by
-     [ctx_dom_to_parked]-transport, acquire withdraws by
-     [ctx_dom_of_parked] against its AMO-at-the-top evidence); the
-     statement list above this definition is what stays. *)
   (* A6.66 THE PARKED-RECORD FREE ARM (tso-port.md §0.18′, ported from the
      main tree's landed shape).  The free arm holds the payload's facts
      BESIDE the record's own context token, so release deposits into a
@@ -427,15 +775,23 @@ Section Lock.
     iModIntro. iFrame "Hrun". iExists ξc, T'. iFrame "Hpk HR".
   Qed.
 
+  (* THE TWO ADDRESS CLAIMS RIDE HERE, LAST, and outside the ∃: they are
+     about the ADDRESSES, so no state mentions them, and they are
+     persistent, so one peek serves every leaf.  They are what the ledger
+     tier costs (a ledger cell carries no mapping) and they are cheaper
+     than what they replaced -- [lock_claims] used to have to take the
+     cell APART to read a claim off it, and that is where the last live
+     [TsoCtxShim] use lived. *)
   Definition lock_inv (γ : gname) (lk : mword 64) (s : string)
       (R : CtxId → iProp Σ) : iProp Σ :=
-    (∃ (v : mword 32) (st : lock_state),
-       lock_word lk v ∗
-       lk_cpu_res st lk s ∗
-       lock_auth γ st ∗
-       (⌜st = None⌝ ∗ ⌜v = (mword_of_int 0 : mword 32)⌝ ∗ lock_frag γ None ∗
-          lock_pay R
-        ∨ ⌜st ≠ None⌝ ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝))%I.
+    ((∃ (v : mword 32) (st : lock_state),
+        lock_word lk v ∗
+        lk_cpu_res st lk s ∗
+        lock_auth γ st ∗
+        (⌜st = None⌝ ∗ ⌜v = (mword_of_int 0 : mword 32)⌝ ∗ lock_frag γ None ∗
+           lock_pay R
+         ∨ ⌜st ≠ None⌝ ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝)) ∗
+     lk_addr_claim lk 4 ∗ lk_addr_claim (lock_cpu lk) 8)%I.
 
   (* the lock's NAME: [lk->name] (the 8-byte pointer field at +8) holds the
      address of a NUL-terminated string [s].  initlock writes the field once
@@ -628,7 +984,7 @@ Section Lock.
        ∧ (D ={E ∖ ↑lockN, E}=∗ True)) -∗
       lock_auth γ None -∗ lock_frag γ None -∗
       lk ↦₄ (mword_of_int 0 : mword 32) -∗
-      lock_cpu lk ↦₈ (zero_reg : mword 64) -∗
+      lk_cpu_fresh lk -∗
       lock_pay R -∗
       |={E ∖ ↑lockN, E}=> Out)%I.
 
@@ -636,9 +992,11 @@ Section Lock.
      merely still has other holders -- [D] is not used, only not taken. *)
   Lemma lock_finisher_close γ lk s R D E : ⊢ lock_finisher γ lk s R D emp E.
   Proof.
-    iIntros "[Hclose _] Hauth Hfrag Hword Hcpu HR".
+    iIntros "[Hclose _] Hauth Hfrag Hword [#Hc8 Hcpu] HR".
+    iDestruct (lk_addr_claim_of4 with "Hword") as "#Hc4".
     iMod ("Hclose" with "[Hauth Hfrag Hword Hcpu HR]") as "_"; [| by iModIntro].
-    iNext. iExists (mword_of_int 0 : mword 32), None.
+    iNext. rewrite /lock_inv. iFrame "Hc4 Hc8".
+    iExists (mword_of_int 0 : mword 32), None.
     iDestruct (lock_word_intro with "Hword") as "Hword".
     rewrite lk_cpu_res_free. iFrame "Hword Hcpu Hauth".
     iLeft. by iFrame "Hfrag HR".
@@ -653,7 +1011,7 @@ Section Lock.
   Lemma lock_finisher_destroy γ lk s R D Out E :
     (lock_frag γ None -∗ lock_pay R ==∗ D ∗ Out) -∗
     lock_finisher γ lk s R D
-      (lk ↦₄ (mword_of_int 0 : mword 32) ∗ lock_cpu lk ↦₈ (zero_reg : mword 64) ∗ Out) E.
+      (lk ↦₄ (mword_of_int 0 : mword 32) ∗ lk_cpu_fresh lk ∗ Out) E.
   Proof.
     iIntros "Hcomplete [_ Hdispose] Hauth Hfrag Hword Hcpu HR".
     iMod ("Hcomplete" with "Hfrag HR") as "[HD HOut]".
@@ -681,16 +1039,17 @@ Section Lock.
       (R : CtxId → iProp Σ) `{!CtxMorph R} :
     own_context cur_ctx -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
-    lock_cpu lk ↦₈ (zero_reg : mword 64) -∗
+    lk_cpu_fresh lk -∗
     R cur_ctx ==∗ own_context cur_ctx ∗ ∃ γ : gname, lock_inv γ lk s R.
   Proof.
-    iIntros "Hrun Hword Hcpu HR".
+    iIntros "Hrun Hword [#Hc8 Hcpu] HR".
+    iDestruct (lk_addr_claim_of4 with "Hword") as "#Hc4".
     iMod (lock_pay_intro R with "Hrun HR") as "[Hrun HR]".
     iFrame "Hrun".
     iMod (own_alloc ((●E (None : leibnizO lock_state) ⋅ ◯E (None : leibnizO lock_state))
                      : lockUR)) as (γ) "H"; [ apply excl_auth_valid | ].
     iDestruct (own_op with "H") as "[Ha Hf]".
-    iModIntro. iExists γ.
+    iModIntro. iExists γ. rewrite /lock_inv. iFrame "Hc4 Hc8".
     iExists (mword_of_int 0 : mword 32), None.
     iDestruct (lock_word_intro with "Hword") as "Hword".
     rewrite lk_cpu_res_free. iFrame "Hword Hcpu Ha".
@@ -704,12 +1063,13 @@ Section Lock.
      fragment (PipeInv.pipe_dead). *)
   Lemma newlock_d `{CID : CpuId} E (lk : mword 64) (s : string) :
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
-    lock_cpu lk ↦₈ (zero_reg : mword 64) ==∗
+    lk_cpu_fresh lk ==∗
     ∃ γ : gname, ∀ (R : CtxId → iProp Σ) (D : iProp Σ),
       ⌜CtxMorph R⌝ -∗ own_context cur_ctx -∗
       R cur_ctx ={E}=∗ own_context cur_ctx ∗ inv lockN (lock_inv γ lk s R ∨ D).
   Proof.
-    iIntros "Hword Hcpu".
+    iIntros "Hword [#Hc8 Hcpu]".
+    iDestruct (lk_addr_claim_of4 with "Hword") as "#Hc4".
     iMod (own_alloc ((●E (None : leibnizO lock_state) ⋅ ◯E (None : leibnizO lock_state))
                      : lockUR)) as (γ) "H"; [ apply excl_auth_valid | ].
     iDestruct (own_op with "H") as "[Ha Hf]".
@@ -717,7 +1077,7 @@ Section Lock.
     iMod (lock_pay_intro (CtxMorph0 := HmR) R with "Hrun HR") as "[Hrun HR]".
     iFrame "Hrun".
     iApply (inv_alloc lockN E (lock_inv γ lk s R ∨ D)).
-    iNext. iLeft. iExists (mword_of_int 0 : mword 32), None.
+    iNext. iLeft. rewrite /lock_inv. iFrame "Hc4 Hc8". iExists (mword_of_int 0 : mword 32), None.
     iDestruct (lock_word_intro with "Hword") as "Hword".
     rewrite lk_cpu_res_free. iFrame "Hword Hcpu Ha".
     iLeft. iFrame "Hf HR". done.
@@ -730,7 +1090,7 @@ Section Lock.
     lock_name lk s -∗
     own_context cur_ctx -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
-    lock_cpu lk ↦₈ (zero_reg : mword 64) -∗
+    lk_cpu_fresh lk -∗
     R cur_ctx ={E}=∗ own_context cur_ctx ∗ ∃ γ : gname, is_lock γ lk s R.
   Proof.
     iIntros "#Hnm Hrun Hword Hcpu HR".
@@ -756,12 +1116,13 @@ Section Lock.
   Lemma newlock_delayed `{CID : CpuId} E (lk : mword 64) (s : string) :
     lock_name lk s -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
-    lock_cpu lk ↦₈ (zero_reg : mword 64) ==∗
+    lk_cpu_fresh lk ==∗
     ∃ γ : gname, ∀ R : CtxId → iProp Σ,
       ⌜CtxMorph R⌝ -∗ own_context cur_ctx -∗
       R cur_ctx ={E}=∗ own_context cur_ctx ∗ is_lock γ lk s R.
   Proof.
-    iIntros "#Hnm Hword Hcpu".
+    iIntros "#Hnm Hword [#Hc8 Hcpu]".
+    iDestruct (lk_addr_claim_of4 with "Hword") as "#Hc4".
     iMod (own_alloc ((●E (None : leibnizO lock_state) ⋅ ◯E (None : leibnizO lock_state))
                      : lockUR)) as (γ) "H"; [ apply excl_auth_valid | ].
     iDestruct (own_op with "H") as "[Ha Hf]".
@@ -769,7 +1130,7 @@ Section Lock.
     iMod (lock_pay_intro (CtxMorph0 := HmR) R with "Hrun HR") as "[Hrun HR]".
     iFrame "Hrun".
     iMod (inv_alloc lockN E (lock_inv γ lk s R) with "[Hword Hcpu Ha Hf HR]") as "#Hinv".
-    { iNext. iExists (mword_of_int 0 : mword 32), None.
+    { iNext. rewrite /lock_inv. iFrame "Hc4 Hc8". iExists (mword_of_int 0 : mword 32), None.
       iDestruct (lock_word_intro with "Hword") as "Hword".
     rewrite lk_cpu_res_free. iFrame "Hword Hcpu Ha".
       iLeft. iFrame "Hf HR". done. }

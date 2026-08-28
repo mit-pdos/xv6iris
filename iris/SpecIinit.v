@@ -99,7 +99,7 @@ Definition wp_iinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : C
     ⌜ callee_saved m mr ⌝ -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_name lk "itable"%string -∗
-    c_cpu ↦₈ (zero_reg : mword 64) -∗
+    WpLock.lk_cpu_fresh lk -∗
     ([∗ list] i ∈ seq 0 NINODE, sl_fresh (inode_lock i) "inode"%string) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).

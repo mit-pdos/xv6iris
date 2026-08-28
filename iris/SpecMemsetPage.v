@@ -53,6 +53,70 @@ Definition wp_memset_page_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
    whole contribution to the process's memory is that the page it maps reads
    as ZERO.  This form hands the bytes back NAMED; the form above is derived
    from it by forgetting them. *)
+(* ================================================================== *)
+(* §0.26′ / A6.85: THE FREE-PAGE FORMS.  kfree's `memset(pa,1,PGSIZE)`  *)
+(* runs on a page it owns only the FUTURE of: the freer holds no value  *)
+(* determinate at its own view and does not need one.  These two are    *)
+(* the PRIMITIVES; the [page_own]-in forms below are their corollaries  *)
+(* (one [KallocInv.page_own_free]) so no existing caller moves.         *)
+(*                                                                    *)
+(* AND THE OUTPUT IS REGISTERED, WHICH IS THE WHOLE RULING: the store   *)
+(* re-mints determinacy with no evidence, so kalloc's own memset is     *)
+(* what lets [kalloc_post] stay [page_own] and every kalloc client stay *)
+(* exactly as it is.                                                   *)
+(* ================================================================== *)
+Definition wp_memset_page_free_val_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64) :=
+  let a0_idx : mword 5 := mword_of_int 10 in
+  let a1_idx : mword 5 := mword_of_int 11 in
+  let a2_idx : mword 5 := mword_of_int 12 in
+  let pcE := mword_of_int KernelSyms.memset in
+  let ra0 := m0 !!! Regidx (mword_of_int 1 : mword 5) in
+  let p := m0 !!! Regidx a0_idx in
+  let ret_tgt := ret_pc ra0 in
+  let cbyte := nth_byte (autocast (T := mword)
+                 (subrange_vec_dec cval (Z.sub (Z.mul 1 8) 1) 0) : mword 8) 0 in
+  (2 <= n)%nat ->
+  page_valid p ->
+  m0 !!! Regidx a1_idx = cval ->
+  m0 !!! Regidx a2_idx = (mword_of_int 4096 : mword 64) ->
+  sie_cap_gpr kt m0 n b pcur -∗
+  kernel_text -∗ pc_is pcE -∗
+  page_free p -∗
+  wp_next b pcur (fun (CID : CpuId) =>
+    ∀ mfin,
+    sie_cap_gpr kt mfin n b pcur -∗
+    pc_is ret_tgt -∗
+    ([∗ list] j ∈ seq 0 4096, (pa_add p j) ↦ₘ cbyte) -∗
+    ⌜ callee_saved m0 mfin ⌝ -∗
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
+Definition wp_memset_page_free_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64) :=
+  let a0_idx : mword 5 := mword_of_int 10 in
+  let a1_idx : mword 5 := mword_of_int 11 in
+  let a2_idx : mword 5 := mword_of_int 12 in
+  let pcE := mword_of_int KernelSyms.memset in
+  let ra0 := m0 !!! Regidx (mword_of_int 1 : mword 5) in
+  let p := m0 !!! Regidx a0_idx in
+  let ret_tgt := ret_pc ra0 in
+  let cbyte := nth_byte (autocast (T := mword)
+                 (subrange_vec_dec cval (Z.sub (Z.mul 1 8) 1) 0) : mword 8) 0 in
+  (2 <= n)%nat ->
+  page_valid p ->
+  m0 !!! Regidx a1_idx = cval ->
+  m0 !!! Regidx a2_idx = (mword_of_int 4096 : mword 64) ->
+  sie_cap_gpr kt m0 n b pcur -∗
+  kernel_text -∗ pc_is pcE -∗
+  page_free p -∗
+  wp_next b pcur (fun (CID : CpuId) =>
+    ∀ mfin,
+    sie_cap_gpr kt mfin n b pcur -∗
+    pc_is ret_tgt -∗
+    page_own p -∗
+    ⌜ callee_saved m0 mfin ⌝ -∗
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Definition wp_memset_page_val_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64) :=
   let a0_idx : mword 5 := mword_of_int 10 in
   let a1_idx : mword 5 := mword_of_int 11 in
@@ -80,6 +144,14 @@ Definition wp_memset_page_val_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId}
   WP (Loop : expr riscv_lang).
 
 Module Type MEMSETPAGE.
+  Parameter wp_memset_page_free_val_sconf :
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier)
+      (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64),
+      wp_memset_page_free_val_sconf_body kt m0 n cval b pcur.
+  Parameter wp_memset_page_free_sconf :
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier)
+      (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64),
+      wp_memset_page_free_sconf_body kt m0 n cval b pcur.
   Parameter wp_memset_page_val_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier)
       (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64),

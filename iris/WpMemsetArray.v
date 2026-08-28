@@ -33,8 +33,9 @@ From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Require Import Riscv.rv64d.
 Require Import SpecMemset.
-Require Import TsoCtx TsoCtxShim.   (* converted spec; shim = the interior
-   seam to the UNCONVERTED parts (SpecMemsetParts) this proof composes *)
+Require Import TsoCtx.
+(* A6.86: [TsoCtxShim] is RETIRED -- its last live use died with the M4
+   contract flip.  See its tombstone. *)
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
@@ -54,10 +55,10 @@ Section WpMemsetArray.
   (*  untouched.                                                          *)
   (* ------------------------------------------------------------------ *)
   Lemma wp_memset_sconf_zero
-      (m0 : regfile) (n : nat) (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64)
-    : wp_memset_sconf_body kt ktb m0 n 0 cval olds b pcur.
+      (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64)
+    : wp_memset_free_sconf_body kt ktb m0 n 0 cval b pcur.
   Proof.
-    cbv beta delta [wp_memset_sconf_body].
+    cbv beta delta [wp_memset_free_sconf_body].
     intros a0_idx a1_idx a2_idx pcE ra0 p ret_tgt cbyte Hn Hlen32 Hcval Ha2.
     pose (sp0 := (m0 !!! Regidx csp_rs1 : mword 64)).
     set (ra_idx := (mword_of_int 1 : mword 5)).
@@ -125,11 +126,11 @@ Section WpMemsetArray.
   (*  and the byte-fill loop.                                             *)
   (* ------------------------------------------------------------------ *)
   Lemma wp_memset_sconf_pos
-      (m0 : regfile) (n : nat) (len : nat) (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64)
-    : (0 < len)%nat -> wp_memset_sconf_body kt ktb m0 n len cval olds b pcur.
+      (m0 : regfile) (n : nat) (len : nat) (cval : mword 64) (b : bool) (pcur : mword 64)
+    : (0 < len)%nat -> wp_memset_free_sconf_body kt ktb m0 n len cval b pcur.
   Proof.
     intro Hlen0.
-    cbv beta delta [wp_memset_sconf_body].
+    cbv beta delta [wp_memset_free_sconf_body].
     intros a0_idx a1_idx a2_idx pcE ra0 p ret_tgt cbyte Hn Hlen32 Hcval Ha2.
   pose (sp0 := (m0 !!! Regidx csp_rs1 : mword 64)).
     set (ra_idx := (mword_of_int 1 : mword 5)).
@@ -160,7 +161,8 @@ Section WpMemsetArray.
       unfold bv_modulus; simpl. split; [ lia | apply (Z.lt_trans _ (2 ^ 32)); [ lia | vm_compute; reflexivity ] ]. }
     iIntros "Hcg #Htext Hpc Hbuf0 Hcont".
     (* --- bridge the [pa_add]-indexed buffer to memset's [ms_pa (ms_addr)] one --- *)
-    iAssert ([∗ list] j ∈ seq 0 len, (ms_pa (ms_addr p j)) ↦ₘ[ktb] olds j)%I
+    iAssert ([∗ list] j ∈ seq 0 len,
+               TsoCtx.mem_free (KTR := ktb) (ms_pa (ms_addr p j)) (DfracOwn 1))%I
       with "[Hbuf0]" as "Hbuf".
     { iApply (big_sepL_impl with "Hbuf0"). iIntros "!>" (k j _) "H".
       rewrite ms_pa_ms_addr. iExact "H". }
@@ -233,8 +235,8 @@ Section WpMemsetArray.
       repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       rewrite -Hcval. reflexivity. }
     (* --- LOOP: 0x14..0x1a --- *)
-    iApply (Memset.wp_memset_loop_sconf kt ktb len p wval_add cval a1_idx a4_idx a5_idx imm_bne
-              olds (n - 2)%nat b pcur
+    iApply (Memset.wp_memset_loop_free_sconf kt ktb len p wval_add cval a1_idx a4_idx a5_idx imm_bne
+              (n - 2)%nat b pcur
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(intros j; exact (ms_incr_step p j))
@@ -298,13 +300,28 @@ Section WpMemsetArray.
   Qed.
 
   (* the two count arms, dispatched on [len]. *)
-  Lemma wp_memset_sconf
-      (m0 : regfile) (n : nat) (len : nat) (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64)
-    : wp_memset_sconf_body kt ktb m0 n len cval olds b pcur.
+  Lemma wp_memset_free_sconf
+      (m0 : regfile) (n : nat) (len : nat) (cval : mword 64) (b : bool) (pcur : mword 64)
+    : wp_memset_free_sconf_body kt ktb m0 n len cval b pcur.
   Proof.
     destruct len as [| len' ].
     - apply (wp_memset_sconf_zero).
     - apply (wp_memset_sconf_pos). lia.
+  Qed.
+
+  (* THE REGISTERED FORM: one [TsoCtx.ctx_pointsto_free] per byte on the
+     way in, and every client of [wp_memset_sconf] is textually unmoved. *)
+  Lemma wp_memset_sconf
+      (m0 : regfile) (n : nat) (len : nat) (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64)
+    : wp_memset_sconf_body kt ktb m0 n len cval olds b pcur.
+  Proof.
+    cbv beta delta [wp_memset_sconf_body].
+    intros a0_idx a1_idx a2_idx pcE ra0 p ret_tgt cbyte Hn Hlen32 Hcval Ha2.
+    iIntros "Hcg #Htext Hpc Hbuf Hcont".
+    iApply (wp_memset_free_sconf m0 n len cval b pcur Hn Hlen32 Hcval Ha2
+              with "Hcg Htext Hpc [Hbuf] Hcont").
+    iApply (big_sepL_mono with "Hbuf"). iIntros (k j _) "H".
+    by iApply (TsoCtx.ctx_pointsto_free (KTR := ktb)).
   Qed.
 
 End WpMemsetArray.

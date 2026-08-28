@@ -91,8 +91,9 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import KernelRvcDecode.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
-   leg M); this caller is not yet -- the shim marks the open seam *)
+Require Import TsoCtx.
+(* A6.86: [TsoCtxShim] is RETIRED -- its last live use died with the M4
+   contract flip.  See its tombstone. *)
 Import Defs.
 Local Open Scope Z_scope.
 Set Printing Depth 40.

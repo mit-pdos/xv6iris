@@ -116,6 +116,53 @@ Definition wp_memset_setup_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{
    keeps this file spelling the condition the same way the ~2173 leaf
    references do.  Costless for the real caller either way: memset's operands
    are a1 / a4 / a5. *)
+(* §0.26′ / A6.85: THE LOOP AT THE VISIBILITY-FREE INPUT TIER.  memset
+   never READS the buffer it fills, so what it needs of a byte is the
+   right to store it, not a claim about its value.  The PRIMITIVE form
+   is therefore this one -- pending bytes at [TsoCtx.mem_free], filled
+   bytes REGISTERED to the caller's own context, the mint paid by the
+   [sb] leaf itself ([WpSconfMem.wp_sb_free_s_sconf]).  The registered
+   form below is its corollary and every existing client is unmoved. *)
+Definition wp_memset_loop_free_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt ktb : ktier) `{!KtierLe ktb kt} (N : nat) (p e cval : mword 64) (ra1 ra4 ra5 : mword 5) `{!SrcOk ra1, !SrcOk ra4, !SrcOk ra5} (imm_bne : mword 13) (n : nat) (b : bool) (pcur : mword 64) :=
+  let pc0 := mword_of_int (KernelSyms.memset + 0x14) in
+  let pc4 := add_vec_int pc0 4 in
+  let pc6 := add_vec_int pc0 6 in
+  let cbyte := nth_byte (autocast (T := mword) (subrange_vec_dec cval (Z.sub (Z.mul 1 8) 1) 0) : mword 8) 0 in
+  (* register indices distinct from x0 *)
+  uint ra1 <> 0 -> uint ra4 <> 0 -> uint ra5 <> 0 ->
+  (* fetch: TLB slot 5 + geometry for each of the three instructions *)
+  (* bne target = loop top pc0; only 2-alignment is needed (the C extension
+     legalizes the bit1 = 1 target in the relocated image). *)
+  add_vec pc6 (sign_extend' 64 imm_bne) = pc0 ->
+  eq_vec (access_vec_dec pc0 0) ('b"0") = true ->
+  (* store geometry (svpn := svpn_of a8) is derived internally at [wp_sb_s_pt]. *)
+  (* pointer arithmetic: c.addi advances offset; bne compares a5+1 vs a4=e *)
+  (forall j : nat, add_vec (ms_addr p j) ms_incr1 = ms_addr p (S j)) ->
+  (forall j : nat, (j < N)%nat -> neq_vec (ms_addr p (S j)) e = negb (Nat.eqb (S j) N)) ->
+  (* register indices of a1/a4 are distinct from a5 (so c.addi a5 leaves them) *)
+  Regidx ra4 <> Regidx ra5 -> Regidx ra1 <> Regidx ra5 ->
+  ra5 <> csp_rs1 ->
+  (* the three loop instructions, fetched fresh each iteration from kernel_text *)
+  (⊢ kernel_text -∗ instr pc0 false (STORE (mword_of_int 0, Regidx ra1, Regidx ra5, 1))) ->
+  (⊢ kernel_text -∗ instr pc4 true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), Regidx ra5, Regidx ra5, ADDI))) ->
+  (⊢ kernel_text -∗ instr pc6 false (BTYPE (imm_bne, Regidx ra4, Regidx ra5, BNE))) ->
+  forall (rem off : nat) (m : regfile),
+  (off + rem = N)%nat -> (1 <= rem)%nat ->
+  m !!! Regidx ra5 = ms_addr p off ->
+  m !!! Regidx ra4 = e ->
+  m !!! Regidx ra1 = cval ->
+  sie_cap_gpr kt m n b pcur -∗
+  kernel_text -∗
+  pc_is pc0 -∗
+  ([∗ list] j ∈ seq off rem,
+     TsoCtx.mem_free (KTR := ktb) (ms_pa (ms_addr p j)) (DfracOwn 1)) -∗
+  wp_next b pcur (fun (CID : CpuId) =>
+    sie_cap_gpr kt (<[Regidx ra5 := regval_into_reg (ms_addr p N)]> m) n b pcur -∗
+    pc_is (add_vec_int pc6 4) -∗
+    ([∗ list] j ∈ seq off rem, (ms_pa (ms_addr p j)) ↦ₘ[ktb] cbyte) -∗
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Definition wp_memset_loop_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt ktb : ktier) `{!KtierLe ktb kt} (N : nat) (p e cval : mword 64) (ra1 ra4 ra5 : mword 5) `{!SrcOk ra1, !SrcOk ra4, !SrcOk ra5} (imm_bne : mword 13) (olds : nat -> bv 8) (n : nat) (b : bool) (pcur : mword 64) :=
   let pc0 := mword_of_int (KernelSyms.memset + 0x14) in
   let pc4 := add_vec_int pc0 4 in
@@ -187,6 +234,9 @@ Module Type MEMSET_PARTS.
   Parameter wp_memset_setup_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (M : regfile) (n : nat) (shamt_l shamt_r : mword 6) (imm8_beqz : mword 8) (wval_add : mword 64) (b : bool) (pcur : mword 64),
       wp_memset_setup_sconf_body kt M n shamt_l shamt_r imm8_beqz wval_add b pcur.
+  Parameter wp_memset_loop_free_sconf :
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt ktb : ktier) `{!KtierLe ktb kt} (N : nat) (p e cval : mword 64) (ra1 ra4 ra5 : mword 5) `{!SrcOk ra1, !SrcOk ra4, !SrcOk ra5} (imm_bne : mword 13) (n : nat) (b : bool) (pcur : mword 64),
+      wp_memset_loop_free_sconf_body kt ktb N p e cval ra1 ra4 ra5 imm_bne n b pcur.
   Parameter wp_memset_loop_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt ktb : ktier) `{!KtierLe ktb kt} (N : nat) (p e cval : mword 64) (ra1 ra4 ra5 : mword 5) `{!SrcOk ra1, !SrcOk ra4, !SrcOk ra5} (imm_bne : mword 13) (olds : nat -> bv 8) (n : nat) (b : bool) (pcur : mword 64),
       wp_memset_loop_sconf_body kt ktb N p e cval ra1 ra4 ra5 imm_bne olds n b pcur.

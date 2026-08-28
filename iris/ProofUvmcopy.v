@@ -1833,8 +1833,8 @@ Section ProofUvmcopy.
     all: try lkbelow.
     { rewrite /kfree_pre HF2a0.
       iSplitR; [iPureIntro; exact Hpv |].
-      (* kfree is contents-blind: forget the copied bytes again *)
-      rewrite /page_own /byte_any.
+      (* §0.26′: contents-blind AND view-blind *)
+      iApply page_own_free. rewrite /page_own /byte_any.
       iApply (big_sepL_impl with "Hpage"). iIntros "!>" (kk x Hx) "Hj".
       iExists _. iExact "Hj". }
     iIntros (CIDl30 Hsl30 mf) "Hcg Hcnt Hpc %Hfcs _".

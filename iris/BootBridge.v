@@ -105,7 +105,8 @@ Require Import RiscvExtras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import CtxKMap.   (* A6.69: the identity re-entry AT THE TOWER *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* the boot-side phys→ctx word mint *)
+(* A6.86: [TsoCtxShim] is RETIRED -- its last live use died with the M4
+   contract flip.  See its tombstone. *)
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)

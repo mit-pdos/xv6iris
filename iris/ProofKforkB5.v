@@ -79,6 +79,7 @@ Require Import SchedCtx.
 Require Import WaitInv.
 Require Import SpecProcinit.
 Require Import SpecForkretPark.
+Require Import SieCapCtx.
 Require Import ParkCap.   (* [park_token] / [park_token_park] -- the park, as a resource *)
 Require Import UsertrapRes SyscParkEnv FsReady FileInv FirstTok DiskInv ProcDefs FsCfg.   (* the park's vocabulary *)
 Require Import SpecAcquire SpecRelease.
@@ -89,7 +90,8 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 (* the WaitInv parent table is still the RAW word fact; the named
    crossings below are its shim seams (stage-2 worklist). *)
-Require Import TsoCtxShim.
+(* A6.86: [TsoCtxShim] is RETIRED -- its last live use died with the M4
+   contract flip.  See its tombstone. *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -237,29 +239,50 @@ Section ProofKforkB5.
                  fsc_bmapstart icfg_ist icfg_nib fsc_size ks pid_c).
     assert (Hwf : ut_wf N).
     { split_and!; [exact Hj | exact Hgl | exact Hnproc | exact (FsReady.fgo_loggeom Hgeomok)]. }
+    (* THE RECORD-CARRIED HALF ONLY (the M2 split, UsertrapRes.v "THE
+       RESUMER'S HALF"); everything ξ-dependent goes into [park_globals]. *)
     iAssert (park_env N) as "#Henv".
     { iAssert (disk_geom fsc_disk pd pav pu) as "#Hgeom".
       { iDestruct "Hdcaps" as "(_ & _ & $ & _)". }
+      iAssert (ProcAvail.procs_avail None) as "#Hpav".
+      { iDestruct "Hextra" as "(_ & $ & _)". }
       rewrite /park_env /ut_park_caps.
-      iSplitL; [| iExact "Hextra"].
       iSplitR; [iPureIntro; constructor; reflexivity|].
       iSplitR; [iPureIntro; reflexivity|].
-      iSplitR; [iExact "Hpinv"|].
+      iSplitR; [iPureIntro; reflexivity|].
+      iSplitR; [iExact "Hpav"|].
+      iSplitR; [iExact "Hwire"|].
+      iSplitR; [iExact "Htramp"|].
       iSplitR; [iExact "Hks"|].
-      iSplitR; [iExact "Hdcaps"|].
+      iSplitR; [iExact "Hgeom"|].
+      iExact "Hip1". }
+    (* ...and the resumer-supplied half, at the PARENT's own context: every
+       row of it came out of the world the parent was handed. *)
+    iAssert (park_globals cur_ctx γs γw γft γf γtl) as "#Hglobp".
+    { iAssert (SpecConsoleintr.console_caps fsc_uart) as "#Hcc".
+      { iDestruct "Hdcaps" as "(_ & $ & _)". }
+      iDestruct "Hextra" as "(#Hnp & _ & #Htl & #Hcr)".
+      rewrite /park_globals.
+      iSplitR; [iExact "Hpinv"|].
       iSplitR; [iExact "Hwl"|].
       iSplitR; [iExact "Hft"|].
-      iSplitR; [iExact "Hgeom"|].
-      iExact "Hworld". }
+      iSplitR; [iExact "Hcc"|].
+      iSplitR; [iExact "Hcr"|].
+      iSplitR; [iExact "Htl"|].
+      iSplitR; [iExact "Hnp"|].
+      iExists iv1. iExact "Hip1". }
     iAssert (park_own N) with "[Hbsl]" as "Hown_park".
-    { rewrite /park_own. iFrame "Hbsl". iExact "Hip1". }
+    { rewrite /park_own. iExact "Hbsl". }
     iDestruct (ProcDefs.kstack_free_at with "Hks Hkfree") as "Hstack".
+    (* the parker's own thread-of-control token, borrowed and handed back *)
+    iDestruct (SieCapCtx.sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrunpk Hcgpk]".
     iMod (park_token_park N rest Vc Hwf Hrest
-            with "Htoken Htext Hwire Htramp Hmk Hstack Henv Hown_park [Hks Hctx Hpriv Hfd Hirsp]")
-      as "Hpctx".
+            with "Hrunpk Htoken Htext Hwire Htramp Hpinv Hglobp Hmk Hstack Henv Hown_park [Hks Hctx Hpriv Hfd Hirsp]")
+      as "[Hrunpk Hpctx]".
     { rewrite /park_child. iFrame "Hks Hpriv Hfd Hirsp".
       (* the two files each define forkret's entry; the constants are equal *)
       iExact "Hctx". }
+    iDestruct ("Hcgpk" with "Hrunpk") as "Hcg".
     iDestruct "Hheld" as "(Htok & Hpstcell & Hpwhole & Hpchan & Hppub)".
     iEval (rewrite kfkb5_pwhole_used) in "Hpwhole".
     iDestruct "Hpwhole" as "[Hplock Hpclaim]".

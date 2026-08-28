@@ -389,7 +389,10 @@ Section ProofKfree.
     { rewrite /Mms upd_eq. apply bv_eq; vm_compute; reflexivity. }
     assert (HMmssp : Mms !!! Regidx csp_rs1 = spr)
       by (rewrite /Mms upd_ne; [ exact Hsp_14 | vm_compute; discriminate ]).
-    iApply (MemsetPage.wp_memset_page_sconf kt Mms (K - 4)%nat (mword_of_int 1 : mword 64) b pcur
+    (* §0.26′: the page arrives VISIBILITY-FREE, so the memset that
+       poisons it runs on [page_free] -- and its store is what re-mints
+       determinacy, which is why everything from here on is unchanged. *)
+    iApply (MemsetPage.wp_memset_page_free_sconf kt Mms (K - 4)%nat (mword_of_int 1 : mword 64) b pcur
               ltac:(lia)
               ltac:(rewrite HMmsa0; exact Hpv) HMmsa1 HMmsa2
               with "Hcg Htext Hpc [Hpown]").

@@ -222,6 +222,75 @@ Section PipeInv.
     by iApply (page_field4_back pi 548).
   Qed.
 
+  (* §0.26′ / A6.86: THE SAME REASSEMBLY AT THE FREE TIER, and it is the
+     site that forced the whole ruling (A6.84 §(2)).  After the M4 flip the
+     owner window is eight LEDGER cells; they cannot re-enter the ctx tower
+     (that needs a drain) and they do not have to -- [kfree_pre] is
+     [page_free] now, so the page came down to meet the cell.  The proof is
+     [pipe_raw_page_own]'s, window for window, with [bwin_free_split] and a
+     [bwin_any_free] on each REGISTERED window; the owner window is already
+     free bytes ([WpLock.lk_cpu_fresh_free]). *)
+  Lemma pipe_bytes_page_free (pi : mword 64) (v : mword 32) :
+    pi ↦₄ v -∗ WpLock.lk_cpu_fresh pi -∗ pipe_bytes pi -∗ page_free pi.
+  Proof.
+    iIntros "Hw Hcpu Hb".
+    iDestruct "Hb" as (vname nr nw ro wo bs) "(Hnm & Hnr & Hnw & Hro & Hwo & %Hlen & Hdat & Hslack)".
+    iDestruct (WpLock.lk_cpu_fresh_free with "Hcpu") as "Hcpu".
+    rewrite /page_free /pipe_slack.
+    replace 4096%nat with (4 + 4092)%nat by lia.
+    rewrite (bwin_free_split pi 0 4 4092). replace (0 + 4)%nat with 4%nat by lia.
+    replace 4092%nat with (4 + 4088)%nat by lia.
+    rewrite (bwin_free_split pi 4 4 4088). replace (4 + 4)%nat with 8%nat by lia.
+    replace 4088%nat with (8 + 4080)%nat by lia.
+    rewrite (bwin_free_split pi 8 8 4080). replace (8 + 8)%nat with 16%nat by lia.
+    replace 4080%nat with (8 + 4072)%nat by lia.
+    rewrite (bwin_free_split pi 16 8 4072). replace (16 + 8)%nat with 24%nat by lia.
+    replace 4072%nat with (512 + 3560)%nat by lia.
+    rewrite (bwin_free_split pi 24 512 3560). replace (24 + 512)%nat with 536%nat by lia.
+    replace 3560%nat with (4 + 3556)%nat by lia.
+    rewrite (bwin_free_split pi 536 4 3556). replace (536 + 4)%nat with 540%nat by lia.
+    replace 3556%nat with (4 + 3552)%nat by lia.
+    rewrite (bwin_free_split pi 540 4 3552). replace (540 + 4)%nat with 544%nat by lia.
+    replace 3552%nat with (4 + 3548)%nat by lia.
+    rewrite (bwin_free_split pi 544 4 3548). replace (544 + 4)%nat with 548%nat by lia.
+    replace 3548%nat with (4 + 3544)%nat by lia.
+    rewrite (bwin_free_split pi 548 4 3544). replace (548 + 4)%nat with 552%nat by lia.
+    iDestruct "Hslack" as "[Hpad Htail]".
+    iSplitL "Hw".
+    { iApply bwin_any_free. by iApply word4_bwin. }
+    iSplitL "Hpad"; [ iApply bwin_any_free; iExact "Hpad" | ].
+    iSplitL "Hnm".
+    { iApply bwin_any_free.
+      iEval (rewrite -(pa_pipe_name pi)) in "Hnm".
+      by iApply (page_field8_back pi 8). }
+    iSplitL "Hcpu".
+    { rewrite (bwin_free_rebase pi 16 8).
+      iEval (rewrite (pa_pipe_cpu pi)). iExact "Hcpu". }
+    iSplitL "Hdat".
+    { iApply bwin_any_free.
+      iEval (rewrite -pipe_data_rebase) in "Hdat".
+      rewrite (bwin_rebase pi 24 512).
+      iPoseProof (bytes_list_bwin (pa_add pi pipe_data_off) bs with "Hdat") as "Hdat".
+      rewrite Hlen. iExact "Hdat". }
+    iSplitL "Hnr".
+    { iApply bwin_any_free.
+      iEval (rewrite -(pa_pipe_nread pi)) in "Hnr".
+      by iApply (page_field4_back pi 536). }
+    iSplitL "Hnw".
+    { iApply bwin_any_free.
+      iEval (rewrite -(pa_pipe_nwrite pi)) in "Hnw".
+      by iApply (page_field4_back pi 540). }
+    iSplitL "Hro".
+    { iApply bwin_any_free.
+      iEval (rewrite -(pa_pipe_ro pi)) in "Hro".
+      by iApply (page_field4_back pi 544). }
+    iSplitL "Hwo".
+    { iApply bwin_any_free.
+      iEval (rewrite -(pa_pipe_wo pi)) in "Hwo".
+      by iApply (page_field4_back pi 548). }
+    iApply bwin_any_free. iExact "Htail".
+  Qed.
+
   (* what release hands back, reassembled into what kfree wants.  This is the
      last link of the chain: [pipe_res_dead] (the dead arm established) ->
      two lock words + pipe_bytes -> pipe_raw -> page_own. *)
@@ -274,7 +343,7 @@ Section PipeInv.
     length bs = PIPESIZE ->
     lock_name_field pi ↦₈ vname -∗
     pi ↦₄ (mword_of_int 0 : mword 32) -∗
-    lock_cpu pi ↦₈ (zero_reg : mword 64) -∗
+    WpLock.lk_cpu_fresh pi -∗
     a_pnread pi ↦₄ (mword_of_int 0 : mword 32) -∗
     a_pnwrite pi ↦₄ (mword_of_int 0 : mword 32) -∗
     a_popen pi false ↦₄ (mword_of_int 1 : mword 32) -∗

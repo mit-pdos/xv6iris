@@ -50,7 +50,7 @@ Section SleepLockAt.
     lock_name (sl_lk slk) "sleep lock"%string -∗
     sl_name slk s -∗
     sl_lk slk ↦₄ (mword_of_int 0 : mword 32) -∗
-    sl_lkcpu slk ↦₈ (zero_reg : mword 64) -∗
+    WpLock.lk_cpu_fresh (sl_lk slk) -∗
     slk ↦₄ (mword_of_int 0 : mword 32) -∗
     sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗
     own_context cur_ctx -∗

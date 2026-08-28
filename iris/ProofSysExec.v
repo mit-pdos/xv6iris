@@ -121,8 +121,9 @@ Require Import SpecSysExec.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
-   leg M); this caller is not yet -- the shim marks the open seam *)
+Require Import TsoCtx.
+(* A6.86: [TsoCtxShim] is RETIRED -- its last live use died with the M4
+   contract flip.  See its tombstone. *)
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -2430,7 +2431,8 @@ Section SysExecFree.
               (mword_of_int (KernelSyms.kmem + 24)) M2 None 0%nat eb pj
               (K - 60)%nat b lks K14 eq_refl eq_refl sx_noff0 Hlb
               with "Hcg Hcnt Htext Hpc Hlk [Hpage] Hav").
-    { rewrite /kfree_pre HM2a0. iSplitR; [iPureIntro; exact Hpgv |]. iExact "Hpage". }
+    { rewrite /kfree_pre HM2a0. iSplitR; [iPureIntro; exact Hpgv |].
+      (* §0.26′ *) iApply (page_own_free with "Hpage"). }
     iIntros (CID4 Hq4 Mk) "Hcg Hcnt Hpc %Hcsk Hav2".
     iEval (rewrite HM2ra Hret) in "Hpc".
     (* ===== +base+8 c.addi s1,8 ===== *)

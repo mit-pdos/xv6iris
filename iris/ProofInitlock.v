@@ -187,13 +187,39 @@ Section ProofInitlock.
     assert (Hea_cpu : forall (CID' : CpuId),
               add_vec (rget (CID := CID') R2 (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0x10 : mword 12)) = c_cpu).
     { intros CID'. rgne. rewrite HR2a0. reflexivity. }
-    iApply (wp_sd_zero_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.initlock + 0x0e)) (mword_of_int 10 : mword 5)
+    (* A6.84 / A6.86: THE MINT SITE.  This one store is where the owner
+       cell LEAVES the ctx tower for good: [wp_sd_zero_wpay_s_sconf]
+       stores the clear word and mints the window payload in the same
+       leaf (store-THEN-mint, A6.82's forced order, the floor being the
+       store's own position), and hands the address claim back because a
+       ledger cell carries no mapping. *)
+    (* THE CLAIM IS PAID OFF THE TOWER, BEFORE THE CELL LEAVES IT (A6.86).
+       A ledger cell carries no mapping, and reconstructing one after the
+       fact is address arithmetic; but the ctx word we are ABOUT to store
+       through is ctx BYTES, each carrying its own.  So read the claim here
+       -- it is persistent -- and the store may then take the cell out of
+       the tower for good. *)
+    iDestruct (WpLock.lk_addr_claim_of8 c_cpu (DfracOwn 1) vcpu with "Hcpu")
+      as "#Hcclaim".
+    iApply (wp_sd_zero_wpay_s_sconf (kt := kt) (mword_of_int (KernelSyms.initlock + 0x0e)) (mword_of_int 10 : mword 5)
               (mword_of_int 0x10 : mword 12) R2 (K - 2)%nat vcpu b
+              WpLock.lkcpu_cp
               with "Hcg Hpc [] [Hcpu]").
     { iApply (ini_0e with "Htext"). }
     { iEval (rewrite Hea_cpu). iExact "Hcpu". }
-    iIntros (CID7 Hs7) "Hcg Hpc Hcpu".
-    iEval (rewrite Hea_cpu) in "Hcpu".
+    iIntros (CID7 Hs7) "Hcg Hpc #Hleafclaim Hcpay".
+    iEval (rewrite Hea_cpu) in "Hcpay".
+    (* assemble the creators' resource: the claim beside the payload *)
+    iAssert (WpLock.lk_cpu_fresh lk) with "[Hcpay]" as "Hcpu".
+    { rewrite /WpLock.lk_cpu_fresh /WpLock.lk_cpu_cell /WpLock.lk_cpu_cell_ex.
+      iSplitR; [ iExact "Hcclaim" | ].
+      iDestruct "Hcpay" as (lo) "Hp".
+      iExists (fun _ => Some lo), lo.
+      iSplitR.
+      { iPureIntro. intros h Hh. discriminate. }
+      rewrite /WpLock.lk_cpu_pay.
+      iApply (big_sepL_mono with "Hp"). iIntros (kk j _) "H".
+      iExists lo. iExact "H". }
     assert (Hpp12 : add_vec_int (mword_of_int (KernelSyms.initlock + 0x0e) : mword 64) 4 = mword_of_int (KernelSyms.initlock + 0x12)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp12) in "Hpc".
     (* ===== EPILOGUE: restore ra/s0, frame trade back, ret ===== *)

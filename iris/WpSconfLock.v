@@ -54,7 +54,8 @@ Require Import WpSconfMem.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* the owner cell against the raw window machinery *)
+(* A6.86: [TsoCtxShim] is RETIRED -- its last live use died with the M4
+   contract flip.  See its tombstone. *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -121,6 +122,17 @@ Section WpSconfLock.
   (* [lock_openable] is PERSISTENT, so one open-peek-close delivers both    *)
   (* fields' claims and hands the caller's credential straight back.        *)
   (* ==================================================================== *)
+  (* A6.86: [lk_addr_claim] carries the PER-BYTE claims too (the free page's
+     bytes are keyed by them), so it is no longer convertible with
+     [wordw_claim] -- it is strictly stronger, and this is the projection. *)
+  Local Lemma lk_addr_claim_wordw (a : Arch.pa) (w : Z) :
+    WpLock.lk_addr_claim a w ⊢ wordw_claim (KTR := KT0) w a.
+  Proof.
+    rewrite /WpLock.lk_addr_claim /wordw_claim /mem_claim.
+    iIntros "(%Hal & %ppn & #Hk & %Hc & %Hr & %Hp & _)".
+    iSplitR; [done|]. iExists ppn. iFrame "Hk". by iPureIntro.
+  Qed.
+
   Lemma lock_claims (γl : gname) (lk : mword 64) (str : string)
       (R : CtxId → iProp Σ) (T Dc : iProp Σ) (E : coPset) :
     ↑lockN ⊆ E ->
@@ -128,23 +140,24 @@ Section WpSconfLock.
     lock_openable γl lk str R Dc -∗ T ={E}=∗
       wordw_claim (KTR := KT0) 4 lk ∗
       wordw_claim (KTR := KT0) 8 (lock_cpu lk) ∗ T.
+  (* A6.86: IT IS A PEEK NOW, AND NOTHING COMES OUT OF THE BODY.  A ledger
+     cell carries no MAPPING, so after the M4 flip the invariant holds the
+     two [lk_addr_claim]s explicitly -- persistent, about the ADDRESS -- and
+     this lemma reads them off and closes with what it opened.  The old
+     text had to FORGET the owner cell to a raw word to read a claim off it
+     and then cross BACK through [TsoCtxShim.ctx_word_of_mem]; that was the
+     shim's last live use in the tree, and it dies here. *)
   Proof.
     intros HE Href. iIntros "#Hlock HT".
     iMod ("Hlock" $! E T with "[%] [] HT")
       as "(Hbody & HT & [Hclose _])"; [ exact HE | iApply Href | ].
-    iDestruct "Hbody" as (w st) "(>Hword & >Hcpu & >Hg & Hbr)".
-    iDestruct (wordw_claim_of (KTR := KT0) 4 lk (DfracOwn 1) w ltac:(lia)
-                 with "Hword") as "#Hc4".
-    iEval (rewrite /lk_cpu_res) in "Hcpu". iDestruct "Hcpu" as "[Hcell Hfr]".
-    iEval (rewrite lk_cpu_cell_acc) in "Hcell".
-    iDestruct (TsoCtx.ctx_word_pointsto_forget with "Hcell") as "Hcell".
-    iDestruct (wordw_claim_of (KTR := KT0) 8 (lock_cpu lk) (DfracOwn 1)
-                 (lk_cpu_val st) ltac:(lia) with "Hcell") as "#Hc8".
-    iMod ("Hclose" with "[Hword Hcell Hfr Hg Hbr]") as "_".
-    { iNext. iExists w, st. iFrame "Hword Hg Hbr".
-      rewrite /lk_cpu_res. iFrame "Hfr". rewrite lk_cpu_cell_acc.
-      iApply (TsoCtxShim.ctx_word_of_mem with "Hcell"). }
-    iModIntro. iFrame "Hc4 Hc8 HT".
+    rewrite /lock_inv.
+    iDestruct "Hbody" as "(Hcore & >#Hcl4 & >#Hcl8)".
+    iMod ("Hclose" with "[Hcore]") as "_".
+    { iNext. rewrite /lock_inv. iFrame "Hcore Hcl4 Hcl8". }
+    iModIntro. iFrame "HT".
+    iSplitL; [ iApply (lk_addr_claim_wordw with "Hcl4")
+             | iApply (lk_addr_claim_wordw with "Hcl8") ].
   Qed.
 
   (* ------------------------------------------------------------------- *)

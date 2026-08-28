@@ -77,7 +77,7 @@ Definition wp_binit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : C
     ⌜ callee_saved m mr ⌝ -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_name lk "bcache"%string -∗
-    c_cpu ↦₈ (zero_reg : mword 64) -∗
+    WpLock.lk_cpu_fresh lk -∗
     ([∗ list] k ∈ seq 0 NBUF, sl_fresh (buf_lock (bnode k)) "buffer"%string) -∗
     bcache_lru bhead (blist 0 NBUF) -∗
     WP (Loop : expr riscv_lang)) -∗
