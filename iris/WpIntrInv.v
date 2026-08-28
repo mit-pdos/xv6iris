@@ -3049,32 +3049,4 @@ Qed.
    which is what every leaf that does not name one wants -- and it is what
    keeps the 68 call sites of the funnel unchanged.                        *)
 (* ===================================================================== *)
-Lemma wp_exec_step_intr `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID0 : CpuId}
-    {kt : ktier} (pc0 : mword 64) (m : regfile) (av : nat) (p : mword 64)
-    (is_rvc : bool) (i : instruction) (b' : bool)
-    (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
-  ret_pc pc0 = pc0 ->
-  sie_cap_gpr kt m av true p -∗
-  pc_is pc0 -∗
-  instr pc0 is_rvc i -∗
-  ▷ wp_next true p (fun CID => intr_cb kt m av p pc0 is_rvc i b' R (CID := CID)) -∗
-  WP (Loop : expr riscv_lang).
-Proof.
-  intros Hpc0. iIntros "Hcg Hpc Hinstr Hbody".
-  iApply (wp_exec_step_intr_clock pc0 m av p is_rvc i b' R Hpc0
-            with "Hcg Hpc Hinstr [Hbody]").
-  iNext. iIntros (CID Hs).
-  iDestruct (wp_next_at true p _ CID Hs with "Hbody") as "Hb".
-  iEval (rewrite /intr_cb) in "Hb".
-  iDestruct "Hb" as "[Hobl Hcont]".
-  rewrite /intr_cb_clock.
-  iSplitR "Hcont"; [| iExact "Hcont" ].
-  iIntros "Hsc Hcap Hfile HPC HnPC Hresv Hclk".
-  iApply (swp_mono (CID := CID) with "[Hclk] [-]");
-    [| iApply ("Hobl" with "Hsc Hcap Hfile HPC HnPC Hresv") ].
-  iIntros (e) "(-> & Hres)".
-  iDestruct "Hres" as (npc ms' m' av')
-    "(HPC & HnPC & Hresv2 & Hsc' & Hcap' & Hfile' & HRv)".
-  iSplitR; [done|]. iExists npc, ms', m', av'. iFrame.
-Qed.
 

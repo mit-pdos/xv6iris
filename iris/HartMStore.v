@@ -1229,68 +1229,6 @@ Section store.
   (* the ORIGINAL form, for callers at concrete register indices (the pilot):
      the address stretch is a computed walk, so [swp_hfrun] discharges the
      obligation and [Q] is [emp]. *)
-  Lemma swp_vmem_write (Drw Dro : gset register) (Df : register -> dfrac)
-      (rs : regstate) (base : regidx) (offset : SailStdpp.Values.mword 64)
-      (pa : SailStdpp.Values.mword 64) (v : SailStdpp.Values.mword 32)
-      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
-      (R : iProp Σ) (rr : option resv) :
-    Drw ## Dro ->
-    (mstatus : register) ∈ Drw ∪ Dro ->
-    (cur_privilege : register) ∈ Drw ∪ Dro ->
-    (pma_regions : register) ∈ Drw ∪ Dro ->
-    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
-    (htif_tohost_base : register) ∈ Drw ∪ Dro ->
-    register_lookup cur_privilege rs = Machine ->
-    register_lookup pma_regions rs = pmar0 ->
-    register_lookup pmpcfg_n rs = pcfg ->
-    register_lookup htif_tohost_base rs = None ->
-    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus rs))
-      (MachineWord.MachineWord.N_to_word 1 1%N) = false ->
-    (forall i, pmpLocked (SailStdpp.Values.vec_access_dec pcfg i) = false) ->
-    pma_allows_ram pmar0 ->
-    addr_is_ram pa ->
-    is_aligned_vaddr (Virtaddr pa) 4 = true ->
-    is_aligned_paddr (Physaddr pa) 4 = true ->
-    split_on_page_boundary (bits_of_virtaddr (Virtaddr pa)) 4
-      = returnM (4, 0) ->
-    hfrun 8 (Drw ∪ Dro) Drw rs
-      (get_transformed_data_addr base offset (Store Data) 4)
-      = Some (Ext_DataAddr_OK (Virtaddr pa), rs) ->
-    gen_cert -∗
-    resv_frag cpu_id rr -∗
-    hreg_frame rs Drw -∗
-    hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ▷ (|={∅,⊤}=> mstate_interp
-             (MState σ.(sregs)
-                (write_bytes σ.(mem) pa 4
-                   (Interface.WriteReq.value (mwrite_req pa v)))
-                σ.(mdev)) ∗ R)) -∗
-    swp (vmem_write base offset 4 v (Store Data) false false false)
-      (fun r => ⌜r = Values.Ok true⌝ ∗
-                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R ∗
-                resv_frag cpu_id None).
-  Proof.
-    intros Hdisj HDmst HDpriv HDpma HDcfg HDhtif Hpriv Hpma Hpcfg Hhtif
-      Hmprv Hunlock Hpallow Hram Hva Hpa Hsplit Hgta.
-    iIntros "#Hcert Hfrag Hrw Hro Hmem".
-    iAssert (emp -∗ hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
-             swp (get_transformed_data_addr base offset (Store Data) 4)
-               (fun r => ⌜r = Ext_DataAddr_OK (Virtaddr pa)⌝ ∗ emp ∗
-                         hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro))%I
-      as "Hgtaobl".
-    { iIntros "_ Hrw Hro".
-      iApply (swp_mono with "[] [-]");
-        [| iApply (swp_hfrun 8 Drw Dro Df rs rs _ _ Hdisj Hgta
-                     with "Hcert Hrw Hro") ].
-      iIntros (r) "(-> & Hrw & Hro)". by iFrame. }
-    iApply (swp_mono with "[] [-]");
-      [| iApply (swp_vmem_write_gen Drw Dro Df rs base offset pa v pmar0 pcfg
-                   R emp%I rr Hdisj HDmst HDpriv HDpma HDcfg HDhtif Hpriv Hpma
-                   Hpcfg Hhtif Hmprv Hunlock Hpallow Hram Hva Hpa Hsplit
-                   with "Hcert Hfrag Hrw Hro [//] Hgtaobl Hmem") ].
-    iIntros (r) "(-> & _ & Hrw & Hro & HR & Hfrag)". by iFrame.
-  Qed.
 
 
   (* ---- the width-8 outer wrappers ---- *)
@@ -1357,65 +1295,6 @@ Section store.
     iApply ("Hcont" $! (Values.Ok true)). by iFrame.
   Qed.
 
-  Lemma swp_vmem_write8 (Drw Dro : gset register) (Df : register -> dfrac)
-      (rs : regstate) (base : regidx) (offset : SailStdpp.Values.mword 64)
-      (pa : SailStdpp.Values.mword 64) (v : SailStdpp.Values.mword 64)
-      (pmar0 : list PMA_Region)
-      (R : iProp Σ) (rr : option resv) :
-    Drw ## Dro ->
-    (mstatus : register) ∈ Drw ∪ Dro ->
-    (cur_privilege : register) ∈ Drw ∪ Dro ->
-    (pma_regions : register) ∈ Drw ∪ Dro ->
-    (htif_tohost_base : register) ∈ Drw ∪ Dro ->
-    register_lookup cur_privilege rs = Machine ->
-    register_lookup pma_regions rs = pmar0 ->
-    register_lookup htif_tohost_base rs = None ->
-    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus rs))
-      (MachineWord.MachineWord.N_to_word 1 1%N) = false ->
-    hval (Drw ∪ Dro) Drw rs
-      (pmpCheck (Physaddr pa) 8 (Store Data) Machine) None rs ->
-    pma_allows_ram pmar0 ->
-    addr_is_ram pa ->
-    is_aligned_vaddr (Virtaddr pa) 8 = true ->
-    is_aligned_paddr (Physaddr pa) 8 = true ->
-    hfrun 8 (Drw ∪ Dro) Drw rs
-      (get_transformed_data_addr base offset (Store Data) 8)
-      = Some (Ext_DataAddr_OK (Virtaddr pa), rs) ->
-    gen_cert -∗
-    resv_frag cpu_id rr -∗
-    hreg_frame rs Drw -∗
-    hreg_frame_ro Df rs Dro -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ▷ (|={∅,⊤}=> mstate_interp
-             (MState σ.(sregs)
-                (write_bytes σ.(mem) pa 8
-                   (Interface.WriteReq.value (mwrite_req8 pa v)))
-                σ.(mdev)) ∗ R)) -∗
-    swp (vmem_write base offset 8 v (Store Data) false false false)
-      (fun r => ⌜r = Values.Ok true⌝ ∗
-                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R ∗
-                resv_frag cpu_id None).
-  Proof.
-    intros Hdisj HDmst HDpriv HDpma HDhtif Hpriv Hpma Hhtif
-      Hmprv Hpmp Hpallow Hram Hva Hpa Hgta.
-    iIntros "#Hcert Hfrag Hrw Hro Hmem".
-    iAssert (emp -∗ hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
-             swp (get_transformed_data_addr base offset (Store Data) 8)
-               (fun r => ⌜r = Ext_DataAddr_OK (Virtaddr pa)⌝ ∗ emp ∗
-                         hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro))%I
-      as "Hgtaobl".
-    { iIntros "_ Hrw Hro".
-      iApply (swp_mono with "[] [-]");
-        [| iApply (swp_hfrun 8 Drw Dro Df rs rs _ _ Hdisj Hgta
-                     with "Hcert Hrw Hro") ].
-      iIntros (r) "(-> & Hrw & Hro)". by iFrame. }
-    iApply (swp_mono with "[] [-]");
-      [| iApply (swp_vmem_write_gen8 Drw Dro Df rs base offset pa v pmar0
-                   R emp%I rr Hdisj HDmst HDpriv HDpma HDhtif Hpriv Hpma
-                   Hhtif Hmprv Hpmp Hpallow Hram Hva Hpa
-                   with "Hcert Hfrag Hrw Hro [//] Hgtaobl Hmem") ].
-    iIntros (r) "(-> & _ & Hrw & Hro & HR & Hfrag)". by iFrame.
-  Qed.
 
 
 End store.

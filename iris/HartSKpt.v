@@ -58,23 +58,6 @@ Local Open Scope Z_scope.
 (* is what the walk's no-write-back arms need, and it is the ONLY A/D     *)
 (* shape for which they hold: see the note at the end of this file.       *)
 (* ===================================================================== *)
-Lemma kpt_noupd (ppn : mword 44) (pc : kperm)
-    (acc : MemoryAccessType mem_payload) :
-  update_PTE_Bits (mk_pte ppn (kperm_flags pc) : mword 64) acc = None.
-Proof.
-  unfold update_PTE_Bits. cbv zeta.
-  rewrite (mk_pte_flags ppn (kperm_flags pc)
-             (kperm_flags_ad_bound pc (true, true))).
-  assert (HD : eq_vec (_get_PTE_Flags_D
-                 (Mk_PTE_Flags (mword_of_int (kperm_flags pc) : mword 8)))
-                 ('b"0") = false)
-    by (destruct pc; vm_compute; reflexivity).
-  assert (HA : eq_vec (_get_PTE_Flags_A
-                 (Mk_PTE_Flags (mword_of_int (kperm_flags pc) : mword 8)))
-                 ('b"0") = false)
-    by (destruct pc; vm_compute; reflexivity).
-  rewrite HD HA. cbn [andb orb]. reflexivity.
-Qed.
 
 (* the same, as the A/D VARIANT the tree layer actually speaks of *)
 

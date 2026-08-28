@@ -89,18 +89,6 @@ Import Defs.
    trapped mstatus.  Preserved by the trap+SRET round trip
    ([intr_ms_facts_roundtrip]; the SIE=1 restoration is the headline
    [roundtrip_SIE_true]). *)
-Definition intr_ms_facts (ms : mword 64) : Prop :=
-  eq_vec (_get_Mstatus_SIE ms) ('b"1") = true /\
-  eq_vec (_get_Mstatus_MPRV ms) ('b"1") = false /\
-  _get_Mstatus_SXL ms = 'b"10" /\
-  eq_vec (_get_Mstatus_MXR ms) ('b"0") = true /\
-  eq_vec (_get_Mstatus_TSR ms) ('b"1") = false /\
-  _get_Mstatus_XS ms = extStatus_map_forwards Off /\
-  _get_Mstatus_FS ms = extStatus_map_forwards Off /\
-  _get_Mstatus_VS ms = extStatus_map_forwards Off /\
-  _get_Mstatus_SD ms = 'b"0" /\
-  WpGprCsrwCommon.have_nom_val (_get_Mstatus_MPP ms) = true /\
-  eq_vec (_get_Mstatus_TVM ms) ('b"1") = false.
 
 
 (* ===================================================================== *)

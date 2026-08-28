@@ -336,12 +336,6 @@ Inductive mobs :=
 (* the OUTPUT bytes of an observation list -- [uart_step_wire]'s currency.
    A direct Fixpoint (not stdpp's [omap] instance method) so [cbn] reduces
    it on literal lists without unfolding through the typeclass. *)
-Fixpoint obs_wire (κ : list mobs) : list (bv 8) :=
-  match κ with
-  | [] => []
-  | ObsUartOut b :: κ' => b :: obs_wire κ'
-  | _ :: κ' => obs_wire κ'
-  end.
 
 (* ---------------------------------------------------------------------- *)
 (* 3c. The device execution contexts -- THREE of them, one per device.      *)
@@ -1459,15 +1453,6 @@ Proof.
     exists i. split_and!; [apply elem_of_list_further, Hi|done|done].
 Qed.
 
-Local Lemma foldr_ins_dom (l : list nat) (pa : Arch.pa) (f : nat -> bv 8)
-    (mm : gmap Arch.pa (bv 8)) :
-  dom (foldr (fun j acc => <[pa_add pa j := f j]> acc) mm l)
-  = list_to_set (pa_add pa <$> l) ∪ dom mm.
-Proof.
-  induction l as [|j l IH].
-  - cbn [foldr fmap list_fmap list_to_set]. set_solver.
-  - cbn [foldr fmap list_fmap list_to_set]. rewrite dom_insert_L IH. set_solver.
-Qed.
 
 (* a store leaves every byte OUTSIDE its footprint alone *)
 Lemma write_bytes_lookup_notin {w : N} (mm : gmap Arch.pa (bv 8))

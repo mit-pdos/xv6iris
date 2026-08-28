@@ -268,10 +268,6 @@ Qed.
    only ever enough for the one-region idealization of the table.  The
    arithmetic is packaged over plain [Z] because [lia] is unusable on a goal
    mentioning [bv_unsigned]. *)
-Lemma pte_addr_no_wrap_Z (b i n : Z) :
-  0 <= b < 17592186044416 -> 0 <= i < 512 -> n <= 4096 ->
-  b * 4096 + i * 8 + n < 18446744073709551616.
-Proof. lia. Qed.
 
 
 (* the 4KB page base of ppn [base], as walk/mappages arguments spell it *)

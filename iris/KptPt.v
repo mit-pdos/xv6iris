@@ -56,14 +56,11 @@ Import Defs.
 Definition PTE_RAM : Z := 0xCF.   (* D A - - X W R V *)
 Definition PTE_DEV : Z := 0xC7.   (* D A - - - W R V *)
 
-Definition kpt_pages : Z := 100.
 
 Definition kpt_page (root : mword 44) (k : Z) : mword 44 :=
   add_vec root (mword_of_int k).
 
-Definition kpt_l1_dev  (root : mword 44) : mword 44 := kpt_page root 1.
 Definition kpt_l0_dev  (root : mword 44) (k : Z) : mword 44 := kpt_page root (2 + k).
-Definition kpt_l1_dram (root : mword 44) : mword 44 := kpt_page root 35.
 Definition kpt_l0_dram (root : mword 44) (j : Z) : mword 44 := kpt_page root (36 + j).
 
 (* the whole PT region sits inside RAM (and hence far from 2^44 wrap). *)
@@ -100,10 +97,6 @@ Definition kpt_l0_of (root : mword 44) (vpn : mword 27) : mword 44 :=
   else kpt_l0_dev root (bv_unsigned (vpn1_of vpn) - 96).
 
 Definition kpt_leaf_ppn (vpn : mword 27) : mword 44 := zero_extend' 44 vpn.
-Definition kpt_leaf_pte (vpn : mword 27) : mword 64 :=
-  mk_pte (kpt_leaf_ppn vpn) (kpt_lflags vpn).
-Definition kpt_slot0_pa (root : mword 44) (vpn : mword 27) : mword 64 :=
-  pte_addr_at (kpt_l0_of root vpn) (vpn0_of vpn).
 
 (* the TLB entry the walk of a mapped [vpn] installs *)
 
@@ -234,8 +227,6 @@ Qed.
 (*    walk consumes it.)                                                  *)
 (* ===================================================================== *)
 
-Definition kpt_slot_in (s : mstate) (a : mword 64) (w : mword 64) : Prop :=
-  forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add a j) = Some (nth_byte w j).
 
 
 
@@ -474,15 +465,6 @@ Proof.
 Qed.
 
 
-Lemma kpt_mapped_static (vpn : mword 27) :
-  kpt_mapped vpn -> exists pc, kmap_static vpn pc.
-Proof.
-  intros [Hd | Hd].
-  - apply kpt_dram_vpn_split in Hd. destruct Hd as [Hd | Hd].
-    + exists KP_rx. apply kmap_class_text. exact Hd.
-    + exists KP_rw. apply kmap_class_rw. left. exact Hd.
-  - exists KP_rw. apply kmap_class_rw. right. exact Hd.
-Qed.
 
 (* an owned RAM va's vpn is statically classified (text or data) *)
 

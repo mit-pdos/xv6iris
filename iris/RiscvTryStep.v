@@ -103,15 +103,6 @@ Lemma run_MemRead_ram {X} (n : N) (req : Interface.ReadReq.t n)
 Proof. intros Hd. cbn [run]. rewrite Hd. apply iff_refl. Qed.
 
 
-Lemma run_MemWrite_ram {X} (n : N) (req : Interface.WriteReq.t n)
-    (k : option bool + Arch.abort -> M X) s x s' :
-  dev_addr (Interface.WriteReq.pa req) = false ->
-  run (Interface.Next (Interface.MemWrite n req) k) s x s' <->
-  run (k (inl None))
-      (MState s.(sregs)
-         (write_bytes s.(mem) (Interface.WriteReq.pa req) n
-                      (Interface.WriteReq.value req)) s.(mdev)) x s'.
-Proof. intros Hd. cbn [run]. rewrite Hd. apply iff_refl. Qed.
 
 
 (* intro (RHS-to-LHS) forms, [eapply]-friendly: the conclusion is unified
