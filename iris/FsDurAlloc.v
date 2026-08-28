@@ -46,9 +46,6 @@ Require Import DiskImg.       (* [diskImgG] -- the byte map's capacity class;
 Require Import BitmapEnc.
 Require Import BlockWords.
 Require Import DinodeEnc.
-Require Import DirView.
-Require Import FsTree.
-Require Import InodeDefs.
 Require Import RiscvModelBytes.
 Require Import FsImg.
 Require Import LogDefs.       (* [fs_dbytes] -- the byte flattening       *)
@@ -59,8 +56,7 @@ Require Import FsDurBytes.    (* [fs_dbytes_blocks] -- Gamma-generically;
                                  file names none of it *)
 Require Import FsDurRead.     (* [snap_auth] -- the epoch's IDENTITY       *)
 Require Import RiscvPtsto.
-Require Import FsBlocks.
-Require Import FsBytesGamma.
+Require Import FsStateDefs.
 Require Import FsDurSnap.     (* [snap_ok], [fs_snap], [P_dur] -- the
                                  registry this file is the value-first
                                  entry point at *)

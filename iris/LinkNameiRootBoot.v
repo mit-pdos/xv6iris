@@ -32,7 +32,8 @@ Require Import RegFile.
 (* the classes the binder list generalizes over: [Require Import
    SpecNameiRootBoot] does not put them in scope transitively, and backtick
    generalization then silently invents fresh binders with those names. *)
-Require Import IrefSlots IcacheRef ProcAvail FileInvDefs FsCfg.
+Require Import IrefSlots ProcAvail FileInvDefs.
+Require Import Xv6Cameras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import SpecNameiRootBoot.
 Require Import ProcDefs UserPtTree ProcGeom.  (* the dead-binder dummy: MkPPriv/UPTD/NOFILE *)

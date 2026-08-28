@@ -116,13 +116,12 @@ Require Import WpLock.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import WpUart.
-Require Import IcacheEscrow.
 Require Import ElfEnc.
 Require Import PageGeom.
 Require Import ProcGeom.
-Require Import DiskPtsto.
+Require Import Xv6Cameras.
 Require Import BioDefs.
-Require Import FsBlocks LogInv.
+Require Import LogInv.
 Require Import BitmapInv.
 Require Import InodeInv.
 Require Import IrefSlots.

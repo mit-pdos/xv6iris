@@ -117,34 +117,25 @@ Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import RegFile.
 Require Import RiscvExtras.
-Require Import CalleeSaved KernelText KernelDataInv.
+Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import WpNext.
-Require Import WpLock.
+Require Import Xv6Cameras.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
-Require Import WpUart.
-Require Import DiskPtsto DiskInv.
-Require Import BioInv.
-Require Import FsBlocks LogInv.
-Require Import FsCrash.
+Require Import BioDefs.
 Require Import BitmapInv.
 Require Import InodeInv.
-Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
-Require Import IcacheInv.
-Require Import IcacheEscrow.
-Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import ProcInv.
 Require Import SpecPrintk.
-Require Import SpecDirlink.
 Require Import SpecCreate.
 Require Import SpecSysMkdir.
 Require Import SpecSysChdir.

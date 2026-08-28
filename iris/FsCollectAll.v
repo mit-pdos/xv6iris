@@ -57,7 +57,7 @@ Require Import RiscvLang.       (* [GenId] *)
 Require Import RiscvPtsto.
 Require Import RiscvExtras.     (* [moi32_unsigned] *)
 Require Import Xv6G.
-Require Import BioDefs.
+Require Import Xv6Cameras.
 Require Import FsImg.
 Require Import DinodeEnc.      (* [dinode], [diblk_wf] *)
 Require Import BitmapEnc.

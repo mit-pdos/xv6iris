@@ -52,7 +52,8 @@ Require Import ElfEnc.
 Require Import PageGeom.
 Require Import ProcGeom.
 Require Import BioDefs.
-Require Import FsBlocks LogInv.
+Require Import LogInv.
+Require Import Xv6Cameras.
 Require Import BitmapInv.
 Require Import InodeInv.
 Require Import IrefSlots.

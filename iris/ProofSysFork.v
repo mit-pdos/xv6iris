@@ -38,9 +38,8 @@ Require Import CpuOwn.
 Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import ProcInv.
-Require Import FsBlocks.
+Require Import Xv6Cameras.
 Require Import IrefSlots.
-Require Import IcacheEscrow.
 Require Import SpecKfork.
 Require Import SpecSysFork.
 Require Import UexecWp.   (* [UEXEC_GEN] / [uexec_wp] -- the child's WP *)
@@ -52,7 +51,6 @@ Require Import ProcAvail.
 Require Import LogInv.  (* [logG]: [ireg_inv]'s own instance argument *)
 Import Defs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import KvmSpec.   (* [kalloc_env_at] -- kfork names the pair *)
 Local Open Scope Z_scope.
 
 (* sys_fork's balanced 16-byte frame: entry [addi sp,-16] and exit

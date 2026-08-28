@@ -75,20 +75,17 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import SleepLock.   (* [is_sleeplock]: the nightly dead-import sweep re-pointed the chain that used to carry it *)
 Require Import WpLock.
-Require Import KernelDataInv.
-Require Import SpecPanic.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import WpUart.
-Require Import FsCrash.
-Require Import InodeRegion.
+Require Import BioDefs.
+Require Import LogDefs.
 Require Import IcacheEscrow.
 Require Import ByteBuf.
 Require Import ElfEnc.
 Require Import ProcGeom.
-Require Import DiskPtsto.
-Require Import BioInv.
-Require Import FsBlocks LogInv.
+Require Import Xv6Cameras.
+Require Import LogInv.
 Require Import BitmapInv.
 Require Import InodeInv.
 Require Import IrefSlots.
@@ -100,7 +97,6 @@ Require Import ProcInv.
 (* Names the nightly dead-import sweep stopped delivering transitively. *)
 Require Import DinodeEnc.
 Require Import InodeLock.
-Require Import SchedCtx.
 Require Import DiskInv.
 Require Import UserPtTree.
 Require Import ProcPtOwn.

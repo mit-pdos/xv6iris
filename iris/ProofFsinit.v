@@ -74,7 +74,7 @@ Require Import VcGen.
 Require Import IntrDefs WpSmodeIntr.
 Require Import CpuOwn.
 Require Import ProcDefs.  (* [proc_priv_bare] *)
-Require Import DiskPtsto.
+Require Import Xv6Cameras.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import ByteBuf.

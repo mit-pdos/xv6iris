@@ -100,8 +100,6 @@ Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
 Require Import SmodeCore.
 Require Import KptPt UserBits.
-Require Import KptGhost.   (* kptN: named in the mask premise *)
-Require Import KptShare.   (* tlb_res_pt: the shared-table residue *)
 Require Import KptGoodb.  (* the fetch probes' footprint certificates *)
 Require Import SRegime.
 Require Import HartSwp HartLift HartSpan HartSpanChar HartSFrame.
@@ -109,7 +107,7 @@ Require Import HartEvents HartMCycle HartStepAny HartRunGen.
 Require Import HartMFetch PtTreeAdue.
 Require Import WpDecodeBridge WpIntrCore CommonWalk HartGoodb.
 Require Import WpInstrRun WpSFrames.
-Require Import SmodePte RiscvExtras.
+Require Import RiscvExtras.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.

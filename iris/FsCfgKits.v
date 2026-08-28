@@ -37,47 +37,31 @@ From iris.algebra Require Import auth gmap frac excl.
 From iris.base_logic.lib Require Import invariants own ghost_map ghost_var mono_nat.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvPtsto RiscvModelBytes.
+Require Import RiscvPtsto.
 (* THE ERA'S FILE-SYSTEM-STATE GHOSTS (durable-disk 2b-A / B3).  Required
    HERE, ahead of everything else, on purpose: [FsState] exports four names
    that collide with live ones ([fs_view] with [FsBlocks]', [link_auth]
    with [IcacheRef]'s ten-argument ledger, [byte_range]/[blk_owned] with
    [FsBlocks]'), and an earlier [Require Import] is exactly what lets the
    later ones win -- fs-state.md section 7's last two bullets. *)
-Require Import FsState.
 (* the four name records [fscfg] carries and this file must be able to spell *)
-Require Import WpUart.         (* [uart_names]  *)
-Require Import DiskPtsto.      (* [disk_names]  *)
+Require Import Xv6Cameras.         (* [uart_names]  *)
 Require Import FsBlocks.
-Require Import DinodeEnc.
-Require Import DirView.
-Require Import FsTree.        (* [dir_wins] / [dir_entry] -- the view is an [omap] *)
-Require Import FsCrash.
 Require Import LogDefs.
-Require Import LogInv.
 (* the era fupd's gname-only mints: the four spinlock ghosts, the buffer
    cache's whole ghost record, the page allocator's count/seal pair *)
 Require Import WpLockAt.
 Require Import SleepLock.      (* [sl_free_tok] / [slh_auth]: [icfg_isl]'s pair *)
 Require Import BioInitAt.
 Require Import KallocInv.
-Require Import InodeInv.
-Require Import InodeLock.   (* [inode_ok] -- the image node's readings, moved down here *)
+Require Import IcacheRef.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheEscrow.
-Require Import FsBoot.
 (* debt (D): the bitmap block's resource and the free pool.  [BioDefs] for
    [BSIZE] (the block size [bitmap_bytes] and [fs_bmap_set] are taken at),
    [BitmapEnc] for the encoder the equation is stated over. *)
-Require Import BioDefs.
-Require Import BitmapEnc.
 Require Import BitmapInv.
-Require Import FsStateBitmap.
-Require Import FsBytesGamma.
-Require Import FsImg.
-Require Import FsImgBridge.
-Require Import FsStateEra.     (* [era_node] / [inode_rec_local] -- the era node *)
 Require Import FsCfg.          (* the record this file finally gives a value *)
 Require Import Xv6G.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

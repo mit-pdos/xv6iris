@@ -57,7 +57,7 @@ Require Import ProcGeom.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import WpUart LogInv.
-Require Import BioDefs.
+Require Import Xv6Cameras.
 Require Import SpecFileclose.
 Require Import IrefSlots.
 Require Import FdSlots ProcInv.

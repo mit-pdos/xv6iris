@@ -105,7 +105,7 @@ Require Import CpuOwn.
 Require Import ProcGeom.
 Require Import IcacheRef.
 Require Import WpUart.
-Require Import DiskPtsto.
+Require Import Xv6Cameras.
 (* THE PAYLOAD'S OWN VOCABULARY (durable-disk 2b-inode-3).  IMPORTED
    BEFORE [FsBlocks] on purpose: the [FsState*] stack exports [fs_view] and
    [byte_range], both of which have live twins below, and the LAST import

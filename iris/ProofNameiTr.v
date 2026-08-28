@@ -50,12 +50,9 @@ Require Import ByteBuf.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import WpUart.
-Require Import DiskPtsto.
-Require Import BioDefs.
-Require Import FsBlocks LogInv.
-Require Import IcacheEscrow.
+Require Import Xv6Cameras.
+Require Import LogInv.
 Require Import FileInvDefs.
-Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import CodeNamei.
 Require Import SpecNameiTr.

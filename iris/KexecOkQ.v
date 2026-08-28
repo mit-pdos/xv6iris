@@ -61,7 +61,6 @@ Require Import RiscvPtsto.      (* the [↦₄]/[↦₈]/[↦ₘ] notations     
 Require Import InstrBytes.      (* [pc_is]                              *)
 Require Import IntrDefs.        (* [sie_cap_gpr], [trap_csrs_ext], ...  *)
 Require Import CpuOwn.          (* [cpu_own]                            *)
-Require Import WpNext.          (* [wp_next], [ret_pc]                  *)
 Require Import CalleeSaved.     (* [callee_saved]                       *)
 Require Import BioDefs.         (* [bslots]                             *)
 Require Import IrefSlots.       (* [iref_slots]                         *)
@@ -71,7 +70,6 @@ Require Import KvmSpec.         (* [kalloc_env]                         *)
 Require Import Xv6G.            (* [xv6G]                               *)
 Require Import FdSlots.         (* [fdslotG]                            *)
 Require Import FileInvDefs.     (* [fileG]                              *)
-Require Import ProcAvail.       (* [pavG]                               *)
 
 Local Open Scope Z_scope.
 

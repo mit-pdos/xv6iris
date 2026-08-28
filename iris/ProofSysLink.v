@@ -88,7 +88,8 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import FdSlots.
 Require Import WpUart.
-Require Import DiskPtsto DiskInv.
+Require Import DiskInv.
+Require Import Xv6Cameras.
 Require Import BioDefs.
 (* THE PAYLOAD'S OWN VOCABULARY (durable-disk 2b-inode-3): [top_frag],
    [fs_gamma_L], [era_node] / [inode_rec_local].  IMPORTED BEFORE
@@ -98,7 +99,7 @@ Require Import BioDefs.
 Require Import FsStateInode.
 Require Import FsBytesGamma.
 Require Import FsStateEra.
-Require Import FsBlocks LogInv.
+Require Import LogInv.
 Require Import BitmapInv.
 Require Import DinodeEnc.
 Require Import DirentEnc.

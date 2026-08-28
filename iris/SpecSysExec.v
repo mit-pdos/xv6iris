@@ -115,16 +115,14 @@ Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
-Require Import WpUart.
-Require Import DiskPtsto.
+Require Import Xv6Cameras.
 Require Import BioDefs.
-Require Import FsBlocks LogInv.
+Require Import LogInv.
 Require Import BitmapInv.
 Require Import InodeInv.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
-Require Import IcacheEscrow.
 Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import UserPtTree.

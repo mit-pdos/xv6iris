@@ -30,13 +30,12 @@ Require Import CalleeSaved.
 Require Import VcGen.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import DiskPtsto.
+Require Import Xv6Cameras.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import FdSlots.
 Require Import WpUart.
-Require Import BioDefs.
-Require Import FsBlocks LogInv.
+Require Import LogInv.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import IcacheRef.

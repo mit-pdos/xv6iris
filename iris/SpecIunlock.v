@@ -81,7 +81,7 @@ Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import SleepLock.
-Require Import FsBlocks.
+Require Import Xv6Cameras.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeLock.

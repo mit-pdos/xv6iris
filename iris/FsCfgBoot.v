@@ -50,22 +50,17 @@ Require Import FsState.
 (* the four name records [fscfg] carries and this file must be able to spell *)
 Require Import WpUart.         (* [uart_names]  *)
 Require Import DiskPtsto.      (* [disk_names]  *)
-Require Import FsBlocks.
+Require Import Xv6Cameras.
 Require Import DinodeEnc.
 Require Import DirView.
-Require Import FsTree.        (* [dir_wins] / [dir_entry] -- the view is an [omap] *)
 Require Import FsCrash.
 Require Import LogDefs.
 Require Import LogInv.
 (* the era fupd's gname-only mints: the four spinlock ghosts, the buffer
    cache's whole ghost record, the page allocator's count/seal pair *)
-Require Import WpLockAt.
-Require Import SleepLock.      (* [sl_free_tok] / [slh_auth]: [icfg_isl]'s pair *)
-Require Import BioInitAt.
-Require Import KallocInv.
 Require Import InodeInv.
 Require Import InodeLock.   (* [inode_ok] -- the image node's readings, moved down here *)
-Require Import InodeRegion.
+Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import IcacheEscrow.
 Require Import IcacheBoot.
@@ -82,7 +77,6 @@ Require Import BioDefs.
 Require Import BitmapEnc.
 Require Import BitmapInv.
 Require Import FsStateBitmap.
-Require Import FsBytesGamma.
 Require Import FsImg.
 Require Import FsImgBridge.
 Require Import FsStateEra.     (* [era_node] / [inode_rec_local] -- the era node *)

@@ -87,20 +87,15 @@ Require Import InodeInv.
 Require Import Xv6Cameras.
 Require Import IcacheEscrow.    (* [region_inums] *)
 Require Import IcacheBoot.      (* [diblk_bytes_surj] *)
-Require Import FsBlocks.
 Require Import FsBoot.          (* [big_sepS_carve] / [big_sepS_split_sub] *)
 Require Import FsCrash.
 Require Import LogDefs.
 Require Import FsImg.
 Require Import FsImgBridge.
-Require Import FsStateBitmap.
 Require Import FsStateEra.
-Require Import FsBytesGamma.
 Require Import FsCfgBoot.       (* [img_nodes] / [fs_boot_image_wf] *)
-Require Import Xv6G.
 (* LAST: it re-exports [FsStateDefs], whose [byte_range]/[blk_owned] must
    win over the block layer's twins. *)
-Require Import FsDurBytes.
 (* THE DURABLE SIDE, AND IT IS THE SNAPSHOT ONE (durable-disk lane C):
    [snap_ok] / [P_dur] / [P_dur_alloc].  It re-exports [FsState], so it
    comes after [FsDurBytes] for the same collision reason.  The 3b' object

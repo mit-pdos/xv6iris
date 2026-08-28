@@ -34,10 +34,10 @@ Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import FsBlocks LogInv.
+Require Import LogInv.
+Require Import Xv6Cameras.
 Require Import IrefSlots.
 Require Import IcacheRef.
-Require Import IcacheEscrow.
 Require Import CodeNamei.
 Require Import WpUart.
 Require Import SpecNamex.

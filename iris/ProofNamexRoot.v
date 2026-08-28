@@ -63,7 +63,8 @@ Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import FsBlocks LogInv.
+Require Import LogInv.
+Require Import Xv6Cameras.
 Require Import DirentEnc.
 Require Import PathElems.
 Require Import InodeInv.
@@ -71,7 +72,6 @@ Require Import IregLinkNz.
 Require Import IgetLic.
 Require Import IrefSlots.
 Require Import IcacheRef.
-Require Import IcacheEscrow.
 Require Import ProofDirlookupParts.
 Require Import ProofNamexParts.
 Require Import CodeNamex.
