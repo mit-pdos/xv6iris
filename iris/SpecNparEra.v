@@ -55,16 +55,22 @@
        the prefix, because dirlookup is reached only after the walk has
        decided the element is not the last one.
 
-   SCOPE: ABSOLUTE PATHS ONLY, as the landed era contract is.  [pfun 0 =
-   SLASH] sends the entry test at +0x22 down the [iget(ROOTDEV, ROOTINO)]
-   arm and the caller's [P 0] is supplied there.  THE RELATIVE START IS
-   OUT OF SCOPE AND THE REASON IS NOT LAZINESS: a relative walk starts at
-   [p->cwd], whose inum no landed reading exposes ([inode_held] hides it
-   existentially and [SpecNameiTr]'s Q-c records the gap), so the trace
-   premise would have to become a fupd universally quantified over the
-   start inum -- lane W's [mknod_walk_pre_era] is already shaped that way,
-   but the CONTRACT here is not, and changing it is a contract-shape
-   change, not an arm.  See the lane report. *)
+   (e) BOTH STARTS ARE IN SCOPE (lane A-iii, 2026-08-28).  The [pfun 0 =
+   SLASH] premise is GONE: the entry test at +0x22 decides the arm, and
+   the trace premise is [FsAbsStart.ep_start] -- a one shot universally
+   quantified over the START INUM, tied to ROOTINO only when the path
+   begins with SLASH.  That is lane W's [mknod_walk_pre_era] on the nose,
+   which is why the consumer side needed no invention.
+
+   The recorded blocker (the cwd's inum is unexposed -- [inode_held] hides
+   it existentially, [SpecNameiTr]'s Q-c) turned out not to be one: the
+   caller never has to NAME the start.  idup's postcondition hands the
+   WALK a package whose own witness is the slot's inum, so the proof reads
+   it there and fires the caller's one shot at that value
+   ([ProofNparEra]'s relative arm, restored from [ProofNamex]'s).  No new
+   reading of [ProcInv.cwd_ref] exists or is needed, and the absolute
+   contract this file used to state is derivable from this one
+   ([FsAbsStart.ep_start_of_pair]). *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -112,6 +118,7 @@ Require Import SpecNamex.      (* K_namex, walk_need / walk_spend, ROOT* *)
 Require Import SpecNameiTr.    (* [inode_held_at] ONLY -- the pinned package *)
 Require Import FsAbsEra.       (* [elend] *)
 Require Import FsAbsNpar.      (* [np_elems], [ep_hops_from], [np_dead] *)
+Require Import FsAbsStart.     (* [ep_start]: the DEFERRED start (lane A-iii) *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -275,10 +282,6 @@ Definition wp_npar_era_body
   ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
   bb_cstr pfun plen ->
   (Z.of_nat plen < 2 ^ 31)%Z ->
-  (* ABSOLUTE PATHS ONLY: the walk starts at the root and the cursor is
-     supplied there.  See the header for why the relative start is a
-     contract-shape change and not an arm. *)
-  pfun 0%nat = SLASH ->
   (walk_need L <= n)%nat ->
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
@@ -316,11 +319,11 @@ Definition wp_npar_era_body
   bslots 3 -∗
   iref_slots 2 -∗
   log_opSt icfg_log n Sb -∗
-  (* ---- THE TRACE (the two new resource premises), OVER THE PARENT
-     PREFIX.  This is exactly what [FsAbsEraMknod.mknod_walk_pre_era]
-     produces ([FsAbsNparMknod.np_pre_of_mknod]). ---- *)
-  P 0%nat (bv_unsigned ROOTINO) -∗
-  ep_hops_from fsc_fs P Pmiss pl 0%nat -∗
+  (* ---- THE TRACE (ONE premise, DEFERRED IN THE START), OVER THE
+     PARENT PREFIX.  [FsAbsStart.ep_start] at this walk's own [pl] IS
+     [FsAbsEraMknod.mknod_walk_pre_era] -- same quantifier, same tie, same
+     family ([FsAbsNparMknod.np_start_of_mknod], one [iMod]). ---- *)
+  ep_start fsc_fs P Pmiss pl -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b] -- namex parks. *)
   wp_next true pj (fun (CIDc : CpuId) =>
     npar_era_post (CID := CIDc) pj pv nb ret_tgt pl m K b eb lks

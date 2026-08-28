@@ -33,10 +33,14 @@
    [SpecNameiTr]'s and is imported; the hop family is [FsAbsEra]'s.  This
    file adds one contract and one canonical instantiation and nothing else.
 
-   SCOPE, UNCHANGED: ABSOLUTE PATHS ONLY ([pfun 0 = SLASH]), namei side.
-   The nameiparent variant is the lane's remaining item and is a question
-   about namex's npar exits, not about the lend (see [ProofNamexEra]'s
-   header). *)
+   SCOPE: namei side, BOTH STARTS (lane A-iii, 2026-08-28).  The
+   [pfun 0 = SLASH] premise is gone and the two trace premises are one --
+   [FsAbsStart.ex_start], the cursor and the family at whatever inum the
+   walk begins at.  This file relays it and nothing else; where the start
+   is read on the relative arm is [ProofNamexEra]'s business (idup's own
+   package, see its header).  A caller that knows its path is absolute
+   builds the premise from the landed pair by
+   [FsAbsStart.ex_start_of_pair]. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -84,6 +88,7 @@ Require Import SpecNamex.
 Require Import SpecNamei.      (* K_namei, and the landed body this shadows *)
 Require Import SpecNameiTr.    (* [inode_held_at]: the RULED pin, imported *)
 Require Import FsAbsEra.       (* [ex_hops_from]: the ERA lend's hop family *)
+Require Import FsAbsStart.     (* [ex_start]: the DEFERRED start (lane A-iii) *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -141,10 +146,6 @@ Definition wp_namei_era_body
   ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
   bb_cstr pfun plen ->
   (Z.of_nat plen < 2 ^ 31)%Z ->
-  (* ABSOLUTE PATHS ONLY (ruling Q-c): the walk starts at the root and the
-     cursor is supplied there.  The relative form waits for an inum-exposed
-     cwd. *)
-  pfun 0%nat = SLASH ->
   (walk_need L <= n)%nat ->
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
@@ -179,9 +180,8 @@ Definition wp_namei_era_body
      the write arm (durable-disk B''-tx), and the pair rides in the set
      form's own position so no stage lemma moved *)
   log_opSt icfg_log n Sb -∗
-  (* ---- THE TRACE (the two new resource premises) ---- *)
-  P 0%nat (bv_unsigned ROOTINO) -∗
-  ex_hops_from fsc_fs P Pmiss pl 0%nat -∗
+  (* ---- THE TRACE (ONE premise, DEFERRED IN THE START) ---- *)
+  ex_start fsc_fs P Pmiss pl -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (n' : nat) (Sb' : gset Z)
     (ok : bool) (ipv : mword 64) (w : bool),

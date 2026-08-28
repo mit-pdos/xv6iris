@@ -36,14 +36,22 @@
    [dv_*] column comes off the payloads.  Until then the two contracts
    stand side by side and the diff IS the review.
 
-   SCOPE, UNCHANGED FROM THE FROZEN CONTRACT: ABSOLUTE PATHS ONLY, namei
-   side only.  [pfun 0 = SLASH] sends the entry test at +0x22 down the
-   [iget(ROOTDEV, ROOTINO)] arm, so the walk starts at the root and the
-   caller's [P 0] is supplied there; [a1 = 0] kills the nameiparent arms at
-   +0xd4 and +0x140.  THE NAMEIPARENT SIDE IS NOT IN THIS FILE and is the
-   lane's remaining item: it is not a question about the LEND (the fire is
-   shared by both sides of the [a1] test) but about proving namex's two
-   npar exits, which the frozen trace proof refutes rather than proves.
+   SCOPE: namei side only ([a1 = 0] kills the nameiparent arms at +0xd4
+   and +0x140; that side is [SpecNparEra]).  BOTH STARTS ARE IN SCOPE as
+   of the relative-start walk (lane A-iii): the [pfun 0 = SLASH] premise
+   is GONE, the entry test at +0x22 decides the arm, and the trace premise
+   is [FsAbsStart.ex_start] -- one shot, universally quantified over the
+   start inum, tied to ROOTINO only when the path begins with SLASH.  The
+   absolute contract this file used to state is derivable from it
+   ([FsAbsStart.ex_start_of_pair]), so no consumer weakened.
+
+   WHY THE Q-c GAP WAS NOT A GAP IN THE CWD's READING.  A relative walk
+   starts at [idup(p->cwd)] and the recorded blocker was that
+   [IcacheRef.inode_held] hides the cwd's inum existentially, so a caller
+   cannot write [P 0 <that inum>].  It never has to: idup's post hands the
+   walk a package whose own witness is the slot's inum, so the PROOF reads
+   it there and fires the caller's one shot at that value.  No new reading
+   of [ProcInv.cwd_ref] exists or is needed.
 
    THE FIRE POINT (what the proof owes, recorded here so the contract can
    be read against it).  namex holds the locked directory's payload from
@@ -108,6 +116,7 @@ Require Import SpecNameiTr.    (* [inode_held_at] ONLY -- the pinned package.
 Require Import FsAbsEra.       (* [ex_hop]/[ex_hops_from]: [FsAbs.ax_hop] at
                                   the ERA lend, which is the one difference
                                   between this contract and [SpecNamexTr] *)
+Require Import FsAbsStart.     (* [ex_start]: the DEFERRED start (lane A-iii) *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -225,9 +234,10 @@ Definition wp_namex_era_body
   ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
   bb_cstr pfun plen ->
   (Z.of_nat plen < 2 ^ 31)%Z ->
-  (* ABSOLUTE PATHS ONLY (ruling Q-c): the walk starts at the root and the
-     cursor is supplied there. *)
-  pfun 0%nat = SLASH ->
+  (* NO ABSOLUTE-PATH PREMISE (the RELATIVE START, lane A-iii): both arms
+     of the [beq] at +0x22 are proven, and which one runs is decided by
+     the buffer, not by a premise.  The start inum travels in the trace
+     premise below. *)
   (walk_need L <= n)%nat ->
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
@@ -266,9 +276,14 @@ Definition wp_namex_era_body
   iref_slots 2 -∗
   (* the set form beside the transaction's token (durable-disk B''-tx) *)
   log_opSt icfg_log n Sb -∗
-  (* ---- THE TRACE (the two new resource premises) ---- *)
-  P 0%nat (bv_unsigned ROOTINO) -∗
-  ex_hops_from fsc_fs P Pmiss pl 0%nat -∗
+  (* ---- THE TRACE (ONE resource premise, DEFERRED IN THE START) ----
+     [FsAbsStart.ex_start]: the cursor and the family, at whatever inum
+     the walk begins at -- ROOTINO on the absolute arm, and idup's own
+     package's inum on the relative one, which is where the Q-c gap
+     actually closes (that file's header).  A caller that knows its path
+     is absolute builds this from the landed pair and loses nothing
+     ([FsAbsStart.ex_start_of_pair]). *)
+  ex_start fsc_fs P Pmiss pl -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b] -- namex parks; see
      [SpecNamex.wp_namex_gen_body]'s note. *)
   wp_next true pj (fun (CIDc : CpuId) =>
