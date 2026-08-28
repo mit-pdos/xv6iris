@@ -12825,3 +12825,100 @@ after §0.27′ per the coordinator.
 (`MAKEEXIT=2`); no source edited this pass.  **Red-list delta: 0.**
 `^Abort` / `^Admitted` / `^Axiom` all 0; mirror in sync.  The validated
 surface text remains parked at `…/scratchpad/WpLock.v.surface-move` for step 3.
+
+### A6.101 THE FLOOR-0 ROUTE IS NECESSARY, NOT MERELY CHEAPER — THERE IS A
+### BOOTSTRAP, AND IT PUTS §0.35′'s TWO-CHANNEL SPLIT INSIDE `initlock`'s SPEC
+
+Executing steps (2)–(3).  The parked surface text was re-applied and **`WpLock`
+compiles again** (second independent confirmation of A6.98 §(1)); step (2) then
+turned up a fact that changes why the floor-0 route matters.  Reverted to green;
+boundary held.
+
+#### (1) THE BOOTSTRAP
+
+A6.100 priced floor-0 as an optimisation — free at boot-static sites, purchase
+chain only for the dynamic ones.  **Measured, the boot sites cannot use the
+purchase chain at all**, so floor-0 is not a saving but the only way in:
+
+- the floor is consumed by the reads inside `acquire` — `holding()`'s
+  `notheld` read runs on EVERY acquire, including the first;
+- so the handle, floor included, must exist BEFORE the first acquire;
+- but the purchase chain's second step is `hart_view_lb_get` **at an AMO**
+  (A6.98 §(2)), and an AMO is what `acquire` *is*;
+- and a boot hart has no earlier AMO to borrow: `kinit` runs
+  `initlock(&kmem.lock)` and the very next thing that touches the lock is
+  `kfree`'s `acquire(&kmem.lock)`.
+
+**The first acquire of the first lock cannot buy its own floor.**  Only a
+floor the handle can claim for free — `lo = 0`, `TsoCtx.ctx_floor_0` — breaks
+it.  That is the bootstrap, and it is why §0.35′'s boot channel has to be a
+different FLOOR and not a different distribution (A6.100 §(1)): a boot lock
+whose floor were its own store position would be unusable by its creator.
+
+#### (2) WHAT THAT MAKES `initlock`'s SPEC
+
+`SpecInitlock`'s precondition takes the owner field as a CTX WORD
+(`c_cpu ↦₈ vcpu`), which hides the element's timestamp, and `ProofInitlock`
+drives the store-then-MINT leaf, which mints at its own store's position.  To
+let a static caller reach floor 0 the mint has to move OUT of `initlock` and
+the floor become a parameter:
+
+```
+    wp_initlock_sconf … (lo : nat) …
+      pre : the eight owner bytes as a WINDOW ALREADY MINTED at floor [lo]
+      post: WpLock.lk_cpu_fresh lo lk        (the store FRAMES lo --
+                                              TsoCtx.ledger_store_wpay_ok)
+```
+
+and then the two channels appear a third time, now inside one spec:
+
+| caller | cells | floor |
+|---|---|---|
+| `ProofKinit`, `ProofUartinit`, `ProofProcinit`, consoleinit | `.bss`, era-image, never written | **0**, minted off the image; handle free by `ctx_floor_0` |
+| `ProofPipealloc`, `ProofInitsleeplock` | a `kalloc`'d page, written by kalloc's memset | the memset's position; handle BOUGHT through the chain |
+
+**Measured cost**: `SpecInitlock` + `ProofInitlock` + those five callers (all
+GREEN), plus exposing the era-image timestamp for `.bss` lock cells in the boot
+carve — which is the one piece not yet measured.
+
+> **AND THE SPLIT IS NOW APPEARING AT EVERY TIER, WHICH IS THE PAPER POINT.**
+> §0.35′ drew it for distribution (started deposit vs fd/fork), A6.100 found it
+> was really about the FLOOR, and here it lands in the creator's own contract.
+> *A static lock and a dynamic lock are not the same object with different
+> owners; they are objects whose histories start at different times, and every
+> tier that mentions history has to say which.*
+
+#### (3) WHY THIS PASS DID NOT LAND IT
+
+The change is well-defined but it is a seven-file tranche over green code whose
+first step (the boot carve's era-image exposure) is unmeasured, and steps (4)
+and (5) sit behind it.  Opening it without budget to close it is what the
+close-or-revert discipline forbids, so `WpLock` was restored byte-identical
+(verified by `diff`) and the surface text re-parked at
+`…/scratchpad/WpLock.v.surface-move`.  **It has now compiled twice from that
+file, so the spelling is not in question — only its consumers' obligations
+are.**
+
+#### (4) THE NEXT PASS, IN ONE LINE EACH
+
+1. measure the boot carve: can a `.bss` lock's owner bytes be handed as
+   era-image ledger cells at `t = 0`?  (`pristine_byte` / `ledger_elem0`
+   exist; the question is only whether the carve's static resources expose
+   them at that tier.)
+2. `SpecInitlock`: floor-parametric pre (window pre-minted at `lo`), post
+   `lk_cpu_fresh lo lk`; `ProofInitlock`: store-then-mint → floor-framing
+   store.
+3. the parked surface text, verbatim.
+4. the five initlock callers: `lo := 0` off the image at the four static
+   ones; the memset's floor at the two dynamic ones.
+5. `newlock`'s premise: `ctx_floor_0` at static sites; the chain at dynamic
+   ones (and only then, if needed, `SpecAcquire`'s export).
+6. `notheld` + holder reads; DMA leaf + virtio pair; §0.27′; §0.36′.
+
+#### (5) THE NUMBER
+
+**1100 of 1296, RED 9 — the A6.93 set, held**, sentinel-backed
+(`MAKEEXIT=2`).  **Red-list delta: 0.**  `md5sum kernel-rocq/*.v user-rocq/*.v`
+unchanged (`edd91972b6bc1b944fd98a2cc2363815`).  `^Abort` / `^Admitted` /
+`^Axiom` all 0.  The three `TsoCtx` additions (A6.96, A6.97) remain green and
+untouched.
