@@ -2082,20 +2082,6 @@ Section InodeOwned.
   Lemma fn_orphan_set_blk n k bs : fn_orphan (fn_set_blk n k bs) = fn_orphan n.
   Proof. done. Qed.
 
-  (* ---------------------------------------------------------------- *)
-  (*  10. The link reading of an owned inode                           *)
-  (* ---------------------------------------------------------------- *)
-
-  (* the direction safety uses: at [nlink = 0] no entry points here *)
-  Lemma inode_link_tok_nz Γ sb i n ty :
-    inode_owned Γ sb i n -∗ link_tok Γ i ty -∗ ⌜fn_nlink n <> 0%nat⌝.
-  Proof.
-    iIntros "[_ (%v & _ & Ha & _ & _)] Ht".
-    destruct (decide (fn_nlink n = 0%nat)) as [Hz | Hnz]; [| done].
-    rewrite (fn_mult_zero n Hz).
-    iDestruct (link_auth_zero_no_tok with "Ha Ht") as "[]".
-  Qed.
-
 End InodeOwned.
 
 (* [iFrame] resolves its instances up to delta, so a big-op behind a

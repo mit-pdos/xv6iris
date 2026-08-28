@@ -99,14 +99,6 @@ Lemma dbytes_ok_head (D : gmap Z (list (bv 8))) (b : Z) (bs : list (bv 8)) :
   dbytes_ok (<[b := bs]> D) -> (length bs <= BSIZE)%nat.
 Proof. intros Hok. apply (Hok b bs). apply lookup_insert. Qed.
 
-Lemma dbytes_ok_insert_2 (D : gmap Z (list (bv 8))) (b : Z) (bs : list (bv 8)) :
-  dbytes_ok D -> (length bs <= BSIZE)%nat -> dbytes_ok (<[b := bs]> D).
-Proof.
-  intros Hok Hl c cs Hc.
-  apply lookup_insert_Some in Hc as [[_ Heq] | [_ Hc]];
-    [rewrite -Heq; exact Hl | exact (Hok c cs Hc)].
-Qed.
-
 (* TWO BLOCKS' BYTE RANGES ARE DISJOINT.  The whole content of the length
    premise: a block starts at a multiple of the stride and is no longer
    than it, so the ranges of [b1] and [b2 <> b1] cannot meet. *)
@@ -215,59 +207,6 @@ Lemma fs_dbytes_lookup (D : gmap Z (list (bv 8))) (b : Z) (bs : list (bv 8))
 Proof.
   intros Hok Hb Hk. apply (proj2 (fs_dbytes_lookup_Some D _ v Hok)).
   by exists b, bs, k.
-Qed.
-
-(* THE DOMAIN, as the union of the blocks' byte RANGES.  Stated pointwise
-   ([is_Some] of the lookup) rather than as a [dom] equation: a [dom] fact
-   over a [gset Z] is reached by [elem_of_dom] and the lookup laws, never by
-   [dom_union_L] and [set_solver] (durable-notes.md). *)
-Lemma fs_dbytes_dom (D : gmap Z (list (bv 8))) (a : Z) :
-  dbytes_ok D ->
-  is_Some (fs_dbytes D !! a)
-  <-> exists (b : Z) (bs : list (bv 8)),
-        D !! b = Some bs
-        /\ b * Z.of_nat BSIZE <= a < b * Z.of_nat BSIZE + Z.of_nat (length bs).
-Proof.
-  intros Hok. split.
-  - intros [v Hv].
-    apply (proj1 (fs_dbytes_lookup_Some D a v Hok))
-      in Hv as (b & bs & k & Hb & Hk & ->).
-    exists b, bs. split; [exact Hb |].
-    apply lookup_lt_Some in Hk. lia.
-  - intros (b & bs & Hb & Hlo & Hhi).
-    assert (Hk : (Z.to_nat (a - b * Z.of_nat BSIZE) < length bs)%nat) by lia.
-    destruct (lookup_lt_is_Some_2 bs _ Hk) as [v Hv].
-    exists v. apply (fs_dbytes_lookup D b bs _ v Hok Hb) in Hv.
-    rewrite Z2Nat.id in Hv; [| lia].
-    assert (Hz : b * Z.of_nat BSIZE + (a - b * Z.of_nat BSIZE) = a) by lia.
-    rewrite Hz in Hv. exact Hv.
-Qed.
-
-(* the residual split the tie needs: [D] cut in two is its flattening cut
-   in two, and the two halves' byte maps are disjoint *)
-Lemma fs_dbytes_union (D1 D2 : gmap Z (list (bv 8))) :
-  dbytes_ok (D1 ∪ D2) -> D1 ##ₘ D2 ->
-  fs_dbytes (D1 ∪ D2) = fs_dbytes D1 ∪ fs_dbytes D2.
-Proof.
-  revert D2.
-  induction D1 as [| b bs D1 Hb IH] using map_ind; intros D2 Hok Hdisj.
-  - rewrite left_id_L fs_dbytes_empty left_id_L //.
-  - apply map_disjoint_insert_l in Hdisj as [Hb2 Hdisj].
-    assert (Hbu : (D1 ∪ D2) !! b = None)
-      by (rewrite lookup_union_None; split; [exact Hb | exact Hb2]).
-    assert (Hoku : dbytes_ok (<[b := bs]> (D1 ∪ D2)))
-      by (rewrite insert_union_l; exact Hok).
-    assert (HokD : dbytes_ok (D1 ∪ D2))
-      by exact (dbytes_ok_insert (D1 ∪ D2) b bs Hbu Hoku).
-    assert (HokD1 : dbytes_ok D1).
-    { intros c cs Hc. apply (HokD c cs). by apply lookup_union_Some_l. }
-    assert (Hlb : (length bs <= BSIZE)%nat)
-      by exact (dbytes_ok_head (D1 ∪ D2) b bs Hoku).
-    rewrite -insert_union_l.
-    rewrite (fs_dbytes_insert (D1 ∪ D2) b bs Hoku Hbu).
-    rewrite (fs_dbytes_insert D1 b bs
-               (dbytes_ok_insert_2 D1 b bs HokD1 Hlb) Hb).
-    rewrite (IH D2 HokD Hdisj) assoc_L //.
 Qed.
 
 (* ===================================================================== *)
