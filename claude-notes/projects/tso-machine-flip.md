@@ -9856,6 +9856,238 @@ the payload rather than at the gate.
    A6.81 §(5).
 
 
+### A6.83 THE FLOOR IS LANDED AT THE IRIS TIER — AND THE MINT STOPPED
+### BEING A .bss LEMMA: ITS PREMISE IS "n CELLS AT ONE TIMESTAMP"
+
+Executing A6.82's handoff items 1 and 2 in the flip workspace.  **Item 1
+is landed whole; item 2's MACHINERY is landed whole and ADDITIVELY, and
+its contract flip is deliberately not started** — it is the first half of
+the M4 atomic unit and the standing discipline forbids opening it without
+budget to close it.  A third piece that A6.82 did not name is landed
+beside them: the `notheld` read's discharge AT THE LOCK'S OWN
+PARAMETERS.
+
+**1091 of 1296, RED 9 — UNCHANGED**, measured on the GCP VM (see §(6)):
+`UserMemPt`, `UptWalkPt`, `ProofSwtch`, `WpSconfLock`, `ProofKernelvec`,
+`ProofVirtioDiskRwD`, `ProofVirtioDiskIntr`, `ProofMain`, `UtResFits` —
+the same nine, across two whole-tree rounds (one cold, one over the
+`TsoCtx` cone).  No `Admitted`, no `admit`, no `Axiom`; the one `Abort`
+is still `UsertrapRes.ut_res_bare_park`.  The shim ledger is unchanged at
+**one live use** (`WpSconfLock:146`, `lock_claims`).
+
+#### (1) ITEM 1, LANDED: `tw_lo` AND THE RELATIVISED `win_ok1`
+
+`ts_win` gains `tw_lo : nat` (LAST field, so every `TsWin` application
+grew one argument and nothing reordered), and `win_ok1` is A6.82 §(4)
+verbatim: conjunct (1) at `tw_lo ≤ S i`, the new (2b) pair
+(`tw_lo ≤ length log` and the floor wrote the CLEAR word across the whole
+window), conjunct (3) with `tw_lo ≤ t` and the visibility clause
+relativised to `∀ tv ≥ tw_lo`.  `win_ok1_app_frame` / `win_ok1_app_store`
+are the originals with the floor FRAMED — both arms keep `tw_lo` exactly
+as they keep `tw_z` and `tw_cp` — and the store gate
+(`ledger_store_wpay_ok`) grew one parameter and one argument at its
+`win_ok1_app_store` call.  **The store gates' frame arms did not move**,
+as A6.82 §(3) predicted.
+
+`TsoMemPa` needed one structural change and it is worth naming for the
+next reader: **§12d's two floor sections now sit ABOVE §12c**, because
+`win_ok1` conjunct (3) mentions `own_last_fl`, which is defined in
+`Section floor_byte`.  The file's order is now
+racy → window → **floor_byte → floor_window → floor-0** → `ts_win` /
+`win_ok1` / assemble → `ts_pay` / `ts_ok`.  Nothing else moved.
+
+**Two lemmas were added to `Section floor_window` and they are the shape
+the READ gate consumes**: `racy_read_window_pin_fl_at` and
+`lkcpu_not_mine_fl_at` — `racy_read_window_pin_fl` / `lkcpu_not_mine_fl`
+at an ANCHOR the reader owns rather than at the floor itself.  A6.82's
+closing paragraph is why: conjunct (3) hands over *"my own last write at
+or above the floor is at `t`"*, and that form makes the MINT'S AUTHOR no
+special case (it satisfies `own_last_fl Bm h a Bm` by the equality
+`S i = Bm`), where the never-wrote wrapper would be too strong for it.
+
+The read gates are `ledger_read_pin_ok`'s shape now, exactly as the
+handoff asked: `ledger_read_racy_ok` / `ledger_read_racy_word_ok` take
+`view_lb view_name loglen_name (hart_agent cpu_id) K` and `⌜lo ≤ K⌝`, and
+conclude `∀ tv ≥ g.(gtv) cpu_id, …`.  **The design rhyme is now literal
+at both tiers** — every history-shaped claim in this port carries a floor
+and is claimed against a monotone receipt.
+
+#### (2) THE MEASUREMENT THAT CHANGED ITEM 2's SHAPE: THE MINT'S PREMISE
+#### IS `n` CELLS AT ONE TIMESTAMP, AND `.bss` IS ITS `t = 0` INSTANCE
+
+A6.79's mint needed `e.1 = 0`; A6.82 replaced its ORDER but left the
+impression that the floor-0 mint survives beside a floored one.  Measured,
+**there is only one mint and the old one is its instance.**
+
+```coq
+  (* TsoMemPa *)
+  Lemma win_ok1_of_latest img log base n j (t : nat) (f : nat -> bv 8) cp :
+    (j < n)%nat ->
+    (forall k, (k < n)%nat -> latest img log (pa_add base k) t (f k)) ->
+    (forall k, (k < n)%nat -> is_Some (img !! pa_add base k)) ->
+    win_ok1 img log (pa_add base j) (TsWin base n j f cp (fun _ => Some t) t).
+```
+
+`latest img log a t v` says *`t` wrote the byte AND NOTHING ABOVE `t`
+DID*.  At floor `t`, conjunct (1) is therefore about the message at `t`
+ALONE — and that message wrote the WHOLE window, because every byte's own
+element names the SAME `t`.  Conjunct (2b) is that message read as the
+floor; conjunct (3) at `own := fun _ => Some t` is `visibleb_below` plus
+the same one-message argument.  **`t = 0` is A6.79's mint** (the era image
+as the floor, the log empty of writes to the cell); `t = length glog` is
+the store-then-mint site.  One lemma, two instances, no `.bss` special
+case anywhere.
+
+So `TsoCtx.ledger_wpay_mint` now takes the timestamp as a parameter and
+its premise is the `n` cells at it; `ledger_wpay_mint1` was split into
+the GHOST STEP alone (it takes the pure `win_ok1` as a premise), because
+the window claim is about all `n` bytes and no single byte's cell can
+establish it.  The extraction is one `iAssert (⌜_⌝)` over the cells —
+the pattern the file already used for image coverage, which keeps the
+spatial context intact.  Two new projections pay for it:
+`ledger_latest_ok` (the interp's tie, projected) and
+`ledger_wpay_floor_le` (`tw_lo ≤ length glog`, which is the fact a reader
+compares its receipt against).
+
+#### (3) ITEM 2's MACHINERY, LANDED ADDITIVELY — THE STORE-THEN-MINT LEAF
+#### EXISTS AND IS GREEN
+
+Three lemmas, one per tier, each a copy of its neighbour with the gate
+swapped:
+
+| where | name | what it is |
+|---|---|---|
+| `TsoCtx` | `ledger_store_win_wpay_mint_ok` | `ledger_store_win_at_ok` then `ledger_wpay_mint` at the store's own timestamp |
+| `SmodeCorePt` | `word_pointsto_wpay_mint_c` | `word_pointsto_write_c` with the ledger gate swapped; the ctx word goes IN, the payload comes OUT |
+| `WpSconfMem` | `wp_sd_zero_wpay_s_sconf` | `wp_sd_zero_s_sconf` on `wp_store_s_sconf_au_dat`, mint inside the one `==∗` |
+
+**All three compiled first try**, which is A6.77/A6.81's measurement
+again: the datum-parametric AUs and the `_win_` gate family are the
+abstraction, and a new payer is a re-parameterisation rather than a copy.
+
+> **THE ONE THING THE LEAF HAD TO INVENT, and it generalises.**  The
+> payload is keyed by PHYSICAL address; the leaf's cell by VA; and `ppn`
+> is bound INSIDE the write obligation, so the post cannot be STATED at
+> `ea` there.  The fix is to state it at the translated address and carry
+> the equation: `Post := ∃ pl lo, ⌜pl = ea⌝ ∗ …`, with `ktier_pin_id`
+> discharging it inside the obligation and the leaf itself destructing it
+> before its own continuation sees it.  **Any future leaf that hands back
+> a ledger-tier resource owes this trick**, because `ktier_pin ktd ppn ea`
+> is the only bridge and it lives inside the obligation.
+
+`lo` is EXISTENTIAL in the leaf's post and that is the honest statement:
+the floor is a log position no caller can name.  What a reader needs is
+not its value but a receipt dominating it, and `ledger_wpay_floor_le`
+plus the AMO's `hart_view_lb_get` is that comparison.
+
+#### (4) LANDED BESIDE THEM: THE `notheld` READ, DISCHARGED AT `cpus_ptr`
+
+`WpLock.lkcpu_read_not_mine` — the M4 memo's whole reason for existing,
+now a green lemma:
+
+```coq
+  Lemma lkcpu_read_not_mine `{CID : CpuId} (g : gstate) (lk : mword 64)
+      (dq : dfrac) (f : nat -> bv 8) (ts : nat -> nat)
+      (own : agent -> option nat) (lo t K : nat) :
+    own (hart_agent cpu_id) = Some t -> (lo <= K)%nat ->
+    tso_interp_at riscv_eraGS g -∗
+    TsoGhost.view_lb view_name loglen_name (hart_agent cpu_id) K -∗
+    ([∗ list] j ∈ seq 0 8,
+       TsoCtx.phys_ledger_wpay (pa_add (lock_cpu lk) j) dq (f j) (ts j)
+         (TsoMemPa.TsWin (lock_cpu lk) 8 j lkcpu_z lkcpu_cp own lo)) -∗
+    ⌜forall tv, (g.(gtv) cpu_id <= tv)%nat -> forall w : mword 64,
+       tso_read_bytes g.(gimg) g.(glog) (hart_agent cpu_id) tv (lock_cpu lk)
+         (N.of_nat 8) w -> w <> cpus_ptr cpu_id⌝.
+```
+
+with the payload's two byte functions FIXED here, beside `lk_cpu_val`:
+
+```coq
+  Definition agent_cpus_ptr (h : agent) : mword 64 :=      (* h < NCPU ? cpus_ptr h : 0 *)
+  Definition lkcpu_z  : nat -> bv 8         := nth_byte (zero_reg : mword 64).
+  Definition lkcpu_cp (h : agent) : nat -> bv 8 := nth_byte (agent_cpus_ptr h).
+```
+
+> **THE DMA AGENTS ARE NOT A GAP, THEY ARE FREE.**  `agent` is `nat` and
+> includes the non-hart agents; giving them the CLEAR word as their "own
+> word" makes the kit's per-agent distinguishing premise true of them by
+> the same `cpus_ptr_nonzero` a free lock uses.  A DMA agent that wrote
+> the cell would falsify conjunct (1), not this.
+
+The bridge from the word-level facts (`cpus_ptr_inj`,
+`cpus_ptr_nonzero`) to the kit's per-byte premises is `nth_byte_ne`
+(*two words that differ, differ at a byte*, off `bv_eq_of_bytes`) — four
+lines, and it is exactly the step the memo §3's layout computation says a
+byte-keyed kit cannot take in the other direction.
+
+#### (5) THE M4 ATOMIC UNIT'S SURFACE, RE-MEASURED — IT IS SMALLER THAN
+#### A6.78's LIST READS, AND THE REASON IS WHERE THE RED LINE FALLS
+
+| symbol | mentions | files | status |
+|---|---|---|---|
+| `lk_cpu_res` | 41 | `WpLock`, `WpLockAt`, `WpSconfLock` (+1 comment in `WpSconfMem`) | 1 green line outside `WpLock` |
+| `lk_cpu_cell` | — | `WpLock`, `WpSconfLock` | — |
+| `lk_fresh` | 49 | 13 | applications, per A6.80 |
+
+**`WpLockAt:82` is the ONLY green line outside `WpLock` that destructures
+the owner cell** (`rewrite lk_cpu_res_free`).  `ProofAcquire`,
+`ProofRelease`, `ProofHolding` and `WpSconfLock` are all RED already, so
+the reshape cannot regress them.  What the unit still owes, in order:
+
+1. `WpLock`: `lk_cpu_res` at `phys_ledger_word` + the eight
+   `phys_ledger_wpay` fragments, its four unfold lemmas, and the
+   per-state constraint on `own` — **the one piece of design left**, and
+   it is: *every non-holder's entry is `Some _`* (the holder's is
+   revoked by its own acquire store, which is `ledger_store_wpay_ok`'s
+   second arm).  A `notheld` reader is a non-holder by definition, so
+   that invariant is exactly what `lkcpu_read_not_mine`'s first premise
+   consumes.
+2. `lock_inv_alloc` / the `newlock` family's `lock_cpu lk ↦₈ 0`
+   conjunct becomes the payload; `SpecProcinit.lk_fresh` and
+   `SpecInitlock`'s post follow it; `ProofInitlock` swaps
+   `wp_sd_zero_s_sconf` for §(3)'s leaf at its `+0x0e` site (ONE call).
+3. `WpSconfLock`'s leaves (A6.78's corrected list), `ProofHolding`'s 2
+   sites, and `lock_claims`' shim ref — the shim hits zero here.
+
+**ACCEPTANCE unchanged**: the exported lock surface does not move and the
+160-file cone opens.
+
+#### (6) THE BUILD MOVED TO THE GCP VM, AND THE NUMBERS BELOW ARE ITS
+
+Owner instruction, mid-tranche: this workspace builds on the shared VM
+now (`remote-build-gcp.md`'s non-main-tree recipe, from the fliptree
+root, always under `flock /tmp/claude-gcp.lock`).  Measured here: the
+cold first round is **~9 minutes** for 1125 files at `-j180` (it carried
+§(1)'s `TsoMemPa`), and the second -- 1019 files, the whole `TsoCtx`
+cone, carrying §(2)-§(4) -- was of the same order, against ~35 minutes
+for the same cone locally.  **Both rounds report the same nine**, which
+is A6.73's two-consecutive-rounds check.  `md5sum kernel-rocq/*.v user-rocq/*.v` verified
+unchanged after both rounds.
+
+> **AND IT ALREADY PAID FOR ITSELF IN A WAY WORTH RECORDING.**  The local
+> round this replaced DIED OF `ENOSPC` — `/tmp` is a 13 GB tmpfs shared
+> with every other session on the box, and two targets failed with
+> `System error: "No space left on device"`, which `make -k` reports in
+> exactly the shape a real proof failure has.  **A local red list is not
+> trustworthy without a disk check.**  Local `coqc` stays for `-time`
+> diagnostics; all numbers come from the VM.
+
+#### HANDOFF
+
+1. **The M4 unit, per §(5)** — everything below it is landed and green:
+   the floor at both tiers, the store-then-mint leaf, the `notheld`
+   discharge at `cpus_ptr`, all four read gates, both store gates.  The
+   only open design is §(5) item 1's `own` invariant, and it is one
+   sentence.
+2. **The 19 dead `Require Import TsoCtxShim` lines** (A6.81 §(6)) are
+   now CHEAP — each was one green file's cone at 35 min and is one
+   `-j180` round at 6 min.  Sweep them with the next tranche that
+   touches the tree, not on their own.
+3. Unchanged and queued: `ProofSwtch`'s stamp tie, `ProofKernelvec`'s
+   payload ξ-functions (A6.81 §(5)), the virtio pair, the two U-mode
+   files, `ProofMain`'s last mile.
+
+
 ## 7. Order of work
 
 1. `iris/TsoMemPa.v` — the pure machine at machine types (NEW, no
