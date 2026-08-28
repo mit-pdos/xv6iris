@@ -126,6 +126,43 @@ things, and the answer differs:
   first, `dv_*` column off the payloads second.  (iv) the offset seam
   for the fd row; plus the §2 leftovers (`root_is` — `FsImg.ROOTINO`
   is reachable from FsAbs — and the fd/cwd carrier readings).
+  ITEM (iii) ATTEMPTED 2026-08-28 (Opus lane, `iris/FsAbsSeam.v`, zero
+  axioms, EC2-green) AND IT DOES NOT CLOSE AS SCHEDULED.  Three findings,
+  all machine-checked:
+  1. **The tie is real, pure, and already landed.**  Every payload arm
+     (`ic_loaded` via `ic_loaded_flat_body`, `ic_rd_arm`, `ipool_alloc`)
+     carries `dv_ride z (dv_of dn data)` and `top_frag … (era_node dn bm
+     data)` side by side, and `FsStateEra.dir_entries_era_node` already
+     says the two readings are ONE function.  `FsAbsSeam.dv_of_dir_entries`
+     / `abs_of_era_dir` / `dv_top_seam` are the seam, at ANY pair of shares.
+  2. **`lend_agrees` is the wrong law.**  It asks the lend to prove the
+     pinned node is a DIRECTORY, which no arm can: `dv_half` rides a file
+     too.  `FsAbs.lend_reads` (directory-ness supplied by `arun` instead)
+     is what a payload discharges, and FsAbs §4a' re-proves the package at
+     it (`apn_hop_rd`/`apn_hops_rd`/`apn_walk_rd`, statements of the
+     landed trio untouched).
+  3. **THE ACTUAL BLOCKER: no client can hold `nview` while the walk
+     runs.**  `ic_loaded` and `ipool_alloc` hold the era leg at
+     `DfracOwn 1`, i.e. `top_frag` WHOLE, so `apn_pin` against a live inum
+     is REFUTED (`ic_loaded_nview_excl`, `ipool_alloc_nview_excl`,
+     `apn_pin_loaded_excl`).  The only producer of a client share in the
+     tree is a read-locking `ilock`'s quarter (`inode_rd_era_nview`), and
+     namex's `ilock` takes the WRITE arm — so at the fire instant not even
+     the read arm's 3/4 residue is in the escrow to open.  `nx_hop` (R10-
+     frozen) passes only `dv_half` through the caller's fupd, so a client
+     hop learns nothing about γtop.  Where a share IS legitimately
+     outstanding the whole thing composes: `dv_lend_arm_reads` discharges
+     `lend_reads` for a concrete lend and `apn_walk_arm` is the package
+     fired at it.
+  WHAT (iii) NEEDS NEXT — an OWNER decision, because both routes are
+  payload-side: (a) `ic_loaded`/`ipool_alloc` carry the leg at 3/4 with a
+  client quarter outstanding — but a share blocks every `ireg_top_retag`,
+  so that lend must be CANCELLABLE, which is the `DirViewLend` machinery
+  the column was to retire and the divergence arm v3 ruled out; or (b) a
+  second walk that lends the era fragment beside the contents (a new
+  Spec/Proof/Link triple over ProofNamexTr's 4990 lines).  Until one is
+  taken, the `dv_*` column CANNOT retire and the pinned walk over `nview`
+  is instantiable only against a read-locked directory.
 - [ ] **W — the first increment's AU specs (after A).**  mknod →
   unlink → write, in that order (§9 Q6: spike-adjacent first, hardest
   in-memory arm second, per-chunk honesty third).  open/read/close/

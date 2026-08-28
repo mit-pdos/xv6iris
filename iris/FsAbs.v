@@ -105,6 +105,33 @@
    the [dv_*] column comes off the payloads"); when it lands, this file's
    theorem applies unchanged with [F := dv_half].
 
+   ...AND WHAT THE SEAM ATTEMPT FOUND (lane A (iii), [FsAbsSeam.v]).  The tie
+   is REAL and it is one landed pure lemma
+   ([FsStateEra.dir_entries_era_node]: [dir_entries (era_node dn bm data)] IS
+   [dv_of dn data] at a directory), but it lives BESIDE the two ghosts INSIDE
+   the payload -- and the payload is in the WALK's hand at the fire instant.
+   Two consequences, both machine-checked in [FsAbsSeam.v]:
+
+     (1) [lend_agrees Gamma dv_half] is not merely unproven here, it is the
+         WRONG law: no arm can prove the pinned node is a DIRECTORY, since
+         [dv_half] rides a file too ("of a file the value is determined
+         garbage", DirViewG's header).  [lend_reads] below is the law a
+         payload discharges, and section 4a' re-proves the whole package at
+         it ([apn_hop_rd] .. [apn_walk_rd]).
+     (2) A CLIENT CANNOT HOLD [nview] AT ALL TODAY.  [IcacheEscrow.ic_loaded]
+         and [IcacheEscrow.ipool_alloc] carry [FsState.top_frag] at
+         [DfracOwn 1], so an [apn_pin] against a live inum is REFUTED
+         ([FsAbsSeam.ic_loaded_nview_excl], [FsAbsSeam.apn_pin_loaded_excl];
+         [top_frag_1_nview_excl] below is the ghost half of it).  The one arm
+         that sheds is the READ arm ([ic_rd_arm], at 3/4) -- and there
+         [lend_reads] IS discharged ([FsAbsSeam.dv_lend_arm_reads]), so the
+         package instantiates at a real top_frag-agreeing lend
+         ([FsAbsSeam.apn_walk_arm]).  What namei lends at its fire is
+         [dv_half] ALONE, without that arm; closing the seam therefore needs
+         a producer of a client-held [top_frag_q] share that survives a
+         WRITE-arm checkout, which is a payload change and not a spec-layer
+         one.
+
    BINDERS.  [fsLinkG]/[fsTopG] are [Xv6G.xv6G] MEMBERS, so this file binds
    the members and never the bundle -- FsState.v's own binder list, verbatim
    (durable-notes, "ONE BUNDLE PER GHOST CLASS").  [Xv6Cameras] is IMPORTED,
@@ -177,6 +204,18 @@ Proof. reflexivity. Qed.
 Lemma abs_of_dir (n : fs_node) :
   fn_is_dir n = true -> an_node (abs_of n) = ADir (dir_entries n).
 Proof. intros Hd. rewrite /abs_of /abs_node /= Hd //. Qed.
+
+(* ...AND ITS INVERSE, which is what a LEND-side law needs: only a directory
+   reads as [ADir], and the map it reads as is [dir_entries].  Stated as an
+   inversion rather than as an [iff] because the two conclusions are used
+   together at exactly one place ([FsAbsSeam.dv_top_seam]). *)
+Lemma abs_of_dir_inv (n : fs_node) (e : gmap fname Z) :
+  an_node (abs_of n) = ADir e -> fn_is_dir n = true /\ e = dir_entries n.
+Proof.
+  rewrite /abs_of /abs_node /=. destruct (fn_is_dir n) eqn:Hd.
+  - intros He. injection He as He. split; [reflexivity | by rewrite He].
+  - destruct (decide (fn_type n = T_FILE_z)); intros He; discriminate.
+Qed.
 
 Lemma abs_of_file (n : fs_node) :
   fn_is_dir n = false -> fn_type n = T_FILE_z ->
@@ -470,6 +509,23 @@ Section FsAbsCarrier.
     by iDestruct (ghost_map_elem_valid with "H") as %?.
   Qed.
 
+  (* THE WHOLE ELEMENT ADMITS NO CLIENT SHARE, and this is the law lane A's
+     seam runs into: every arm of the fs payload -- [IcacheEscrow.ic_loaded],
+     [IcacheEscrow.ipool_alloc] -- carries [FsState.top_frag] at [DfracOwn 1],
+     so a client holding ANY [nview] share of that inum is refuted outright
+     ([FsAbsSeam.ic_loaded_nview_excl] is this lemma, one payload down).  The
+     read arm ([ic_rd_arm], at 3/4) is the one place a share is legitimately
+     outstanding. *)
+  Lemma top_frag_1_nview_excl Γ i n q a :
+    top_frag_q Γ (DfracOwn 1) i n -∗ nview Γ q i a -∗ False.
+  Proof.
+    rewrite /nview /nview_dq /top_frag_q. iIntros "H1 H2".
+    iDestruct "H2" as (n2) "[H2 _]".
+    iDestruct (ghost_map_elem_valid_2 with "H1 H2") as %[Hv _].
+    iPureIntro. rewrite dfrac_op_own in Hv. apply dfrac_valid_own in Hv.
+    exact (Qp.not_add_le_l 1%Qp q Hv).
+  Qed.
+
   (* SPLIT / JOIN, off [top_frag_q_split]: the [abs_of] equation rides along
      both ways -- forward it is copied, backward the two nodes are identified
      by agreement first. *)
@@ -592,6 +648,32 @@ Section FsAbsWalk.
     iDestruct (nview_dq_agree with "Hl Hn") as %<-. by iPureIntro.
   Qed.
 
+  (* ...AND THE WEAKER LAW A PAYLOAD CAN ACTUALLY DISCHARGE.  [lend_agrees]
+     asks the lend to prove the pinned node IS a directory; no payload arm
+     can, because [dv_half] is carried at a FILE too ("of a file the value is
+     determined garbage", DirViewG's header) and the abstract node's arm is
+     the one thing the entry map does not say.  [lend_reads] asks only what
+     the chain lemma actually consumes -- IF the pinned node reads as a
+     directory THEN its entry map is the lent one -- and the walk supplies
+     the directory-ness itself, out of [arun].  Everything below is proven
+     at this weaker hypothesis ([apn_hop_rd] ... [apn_walk_rd]); the
+     [lend_agrees] forms are kept verbatim (R10) and are the special case
+     ([lend_agrees_reads]). *)
+  Definition lend_reads Γ (F : Z -> dfrac -> gmap fname Z -> iProp Σ) : Prop :=
+    forall (d : Z) (dq : dfrac) (ents : gmap fname Z) (q : Qp) (a : anode)
+           (e : gmap fname Z),
+      ⊢ F d dq ents -∗ nview Γ q d a -∗ ⌜an_node a = ADir e -> e = ents⌝.
+
+  Lemma lend_agrees_reads Γ F : lend_agrees Γ F -> lend_reads Γ F.
+  Proof.
+    intros Hag d dq ents q a e. iIntros "HF Hn".
+    iDestruct (Hag d dq ents q a with "HF Hn") as %Ha.
+    iPureIntro. intros He. rewrite Ha in He. by simplify_eq.
+  Qed.
+
+  Lemma alend_reads Γ : lend_reads Γ (alend Γ).
+  Proof. apply lend_agrees_reads, alend_agrees. Qed.
+
   (* ------------------------------------------------------------------ *)
   (*  4a.  The pins, the cursor, and the hop discharged from a pin        *)
   (* ------------------------------------------------------------------ *)
@@ -703,6 +785,73 @@ Section FsAbsWalk.
     iDestruct (apn_P_start Γ q av root ps ds Hr with "Hp") as "HP".
     iFrame "HP". iSplitR.
     - by iApply (apn_hops Γ q av F root ps ds 0%nat).
+    - iIntros (iL) "HP". by iApply (apn_P_final Γ q av root ps ds iL Hr).
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  4a'.  THE SAME THREE, AT [lend_reads]                               *)
+  (*                                                                      *)
+  (*  The directory-ness the [lend_agrees] forms took from the LEND comes  *)
+  (*  from the RUN instead: [arun]'s step at hop [k] is an [astep], which  *)
+  (*  is a [bind] through [anode_ents], so it cannot be [Some] unless the  *)
+  (*  pinned node's arm is [ADir].  That is the whole difference; the      *)
+  (*  three proofs are otherwise their neighbours' above, line for line.   *)
+  (* ------------------------------------------------------------------ *)
+
+  Lemma apn_hop_rd Γ (q : Qp) (av : aview)
+      (F : Z -> dfrac -> gmap fname Z -> iProp Σ)
+      (root : Z) (ps : list fname) (ds : list Z) (k : nat) (s : fname) :
+    lend_reads Γ F ->
+    arun av root ps ds ->
+    ps !! k = Some s ->
+    ⊢ ax_hop F (apn_P Γ q av ds ps) apn_Pmiss k s.
+  Proof.
+    intros Hrd Hr Hk. rewrite /ax_hop {2}/apn_P.
+    iIntros (d ents dqv) "[%Hd Hpins] HF". subst d.
+    rewrite {1}/apn_pins (drop_S _ _ _ Hk) big_sepL_cons Nat.add_0_r.
+    iDestruct "Hpins" as "[Hpin Htl]".
+    iDestruct "Hpin" as (a) "[%Hav Hn]".
+    pose proof (arun_step_tot av root ps ds k s Hr Hk) as Hst.
+    rewrite /astep /aents Hav /= /anode_ents in Hst.
+    destruct (an_node a) as [bs | e | mj mi] eqn:Hna;
+      [discriminate Hst | | discriminate Hst].
+    simpl in Hst.
+    iDestruct (Hrd (ds !!! k) dqv ents q a e with "HF Hn") as %Hee.
+    rewrite (Hee Hna) in Hst.
+    rewrite Hst. iModIntro. iFrame "HF".
+    rewrite /apn_P /apn_pins. iSplitR; [by iPureIntro |].
+    iApply (big_sepL_mono with "Htl").
+    intros jj y _. by rewrite Nat.add_succ_r Nat.add_succ_l.
+  Qed.
+
+  Lemma apn_hops_rd Γ (q : Qp) (av : aview)
+      (F : Z -> dfrac -> gmap fname Z -> iProp Σ)
+      (root : Z) (ps : list fname) (ds : list Z) (n : nat) :
+    lend_reads Γ F ->
+    arun av root ps ds ->
+    ⊢ ax_hops_from F (apn_P Γ q av ds ps) apn_Pmiss ps n.
+  Proof.
+    intros Hrd Hr. rewrite /ax_hops_from.
+    iApply big_sepL_intro. iIntros "!>" (j s Hj).
+    rewrite lookup_drop in Hj.
+    by iApply (apn_hop_rd Γ q av F root ps ds (n + j)%nat s).
+  Qed.
+
+  Lemma apn_walk_rd Γ (q : Qp) (av : aview)
+      (F : Z -> dfrac -> gmap fname Z -> iProp Σ)
+      (root : Z) (ps : list fname) (ds : list Z) :
+    lend_reads Γ F ->
+    arun av root ps ds ->
+    apn_pins Γ q av ds ps 0%nat -∗
+      apn_P Γ q av ds ps 0%nat root
+      ∗ ax_hops_from F (apn_P Γ q av ds ps) apn_Pmiss ps 0%nat
+      ∗ (∀ iL : Z, apn_P Γ q av ds ps (length ps) iL -∗
+                     ⌜apath_at av root ps = Some iL⌝).
+  Proof.
+    intros Hrd Hr. iIntros "Hp".
+    iDestruct (apn_P_start Γ q av root ps ds Hr with "Hp") as "HP".
+    iFrame "HP". iSplitR.
+    - by iApply (apn_hops_rd Γ q av F root ps ds 0%nat).
     - iIntros (iL) "HP". by iApply (apn_P_final Γ q av root ps ds iL Hr).
   Qed.
 
