@@ -163,10 +163,44 @@ things, and the answer differs:
   Spec/Proof/Link triple over ProofNamexTr's 4990 lines).  Until one is
   taken, the `dv_*` column CANNOT retire and the pinned walk over `nview`
   is instantiable only against a read-locked directory.
-- [ ] **W — the first increment's AU specs (after A).**  mknod →
-  unlink → write, in that order (§9 Q6: spike-adjacent first, hardest
-  in-memory arm second, per-chunk honesty third).  open/read/close/
-  fstat/chdir after, mechanical.  NOTE (2026-08-27): the fd-state ghost
+  **RULED (user, 2026-08-28): OPTION (b).**  Cross-syscall stability is
+  the tree layer's exclusivity fact, not an in-logic cancellable share;
+  the campaign builds the era-fragment walk — new parallel
+  Spec/Proof/Link beside the frozen trio, per-hop lend = the era leg
+  (`lend_reads` is the law it discharges; `apn_walk_rd` applies
+  unchanged).  The `dv_*` column retires when the new walk replaces the
+  dv-firing one as the consumed form.  This is now lane A-iii's work
+  item, Opus-sized (the proof follows ProofNamexTr's structure).
+- [~] **W — the first increment's AU specs.**  mknod STATEMENT DONE
+  2026-08-28 (Fable lane, `iris/SpecSysMknodAU.v`, 856 lines, green,
+  zero admits — a statement file; the proof is a later Opus lane):
+  `delta_create` (type-parameterized, `acre_bump` fuses mkdir's
+  parent bump) with its row algebra and the `create_made` bridge
+  `abs_of_create_dev`; `acre_commit` (TWO-PHASE, shaped for
+  `ftop_astate_acc`: lend pre-state, then lend the delta applied, one
+  ftopN critical section) and `dlookup_commit` (read-only sibling,
+  reusable by unlink/open); trace via `ax_hop dv_half` over
+  `mknod_parent_elems`; arms replace `⌜sys_mknod_ret⌝` in a frame
+  copying SpecSysMknod's premises verbatim (R10 parallel form).
+  DELIBERATE DEVIATIONS from doc §4 (recorded in the header):
+  `∃ i ∉ dom av` UNSTATABLE over the landed astate (the authority rows
+  the whole region) — replaced by the minted-orphan observation; the
+  path is EXISTENTIAL (kernel contracts say nothing about user bytes);
+  the stable corollary pins the CHAIN, never the parent (a held parent
+  share would make the success retag impossible), and is partially
+  vacuous until the (b) walk lands.
+  PROVER OWES: the two fire points (dirlookup via `ftop_astate_ro`,
+  dirlink's two phases around the parent-row `ghost_map_update` +
+  `inode_local` give-back); the written-record `dir_entries` bridge; a
+  nameiparent-side trace walk (NONE LANDED — fold into the (b) walk);
+  the halfword `major` tie.  OWNER QUESTIONS (header): two-instant
+  freshness (observe the mint) at the cost of a rollback-honest FAIL
+  arm?; mask floor `∅` ok?; pin-returning refinement scheduled with
+  the tree layer or waits for a cross-syscall pin producer?
+  Gotchas: `FsImg` must be `Require`d not `Import`ed at syscall
+  altitude; stdpp `last` = `list_basics.last` in this import mix.
+  REMAINING: unlink → write AUs (same mold), then open/read/close/
+  fstat/chdir, mechanical.  NOTE (2026-08-27): the fd-state ghost
   landed upstream (`FdSlots.fd_frags` beside `ut_own`; `fdstate` =
   open-or-closed + `fdtype`, two-halves algebra, commits 28d707dc +
   3199a1b6; `FdInode` carries its INUM as of d1411776, riding on
