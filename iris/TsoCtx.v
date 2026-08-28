@@ -407,6 +407,64 @@ Section ctx.
     rewrite !hart_view_lb_unseal /hart_view_lb_def. apply view_lb_le.
   Qed.
 
+  (* ================================================================== *)
+  (* §0.35′(iii): THE ABSORB OF THE CONTEXT BOUND -- "B_ξ rises to K".    *)
+  (*                                                                      *)
+  (* The ruling's third clause, as a law.  A thread that holds a view      *)
+  (* receipt may RAISE ITS OWN CONTEXT'S BOUND to it, and what it gets     *)
+  (* back is the floor claim a lock handle carries ([ctx_floor]).  This is *)
+  (* the primitive A6.96 §(3) found missing: [TsoCtxAbsorbLb.ctx_absorb_lb]*)
+  (* transports a PAYLOAD between contexts and never touches the bound.    *)
+  (*                                                                      *)
+  (* WHY IT IS SOUND, and the argument is by inspection of the token:      *)
+  (*   - the CLEAN facts are [llb _ t] with [t ≤ B ≤ K], so raising B      *)
+  (*     past them changes nothing they claim;                             *)
+  (*   - the DIRTY entries' justification [dirty_ok _ _ B k] is MONOTONE   *)
+  (*     in [B] -- its two arms are "[k.1 ≤ B]" and "my own message", and  *)
+  (*     the first only gets easier;                                       *)
+  (*   - the token's own invariant [B ≤ K] is re-established at the new    *)
+  (*     pair [(max B K', max K K')].                                      *)
+  (* One [mono_nat_own_update]; nothing is invented and no fact is         *)
+  (* strengthened -- the bound is bookkeeping about which facts are        *)
+  (* already justified, and the receipt is what pays for moving it.        *)
+  (*                                                                      *)
+  (* THE AUTHOR'S FLOOR IS NOT FREE, IT IS BOUGHT WITH A RECEIPT, and that *)
+  (* is the point of the creator-side use: [initlock]'s store-then-mint    *)
+  (* leaves the lock's window floored at its own append, which the writer's*)
+  (* bound has NOT passed (a plain store is buffered).  Hart 0 buys it at  *)
+  (* its next acquire, whose AMO takes the view to the log top -- the same *)
+  (* receipt every other hart pays with.                                   *)
+  (* ================================================================== *)
+  Lemma ctx_bound_raise `{CID : CpuId} (ξ : CtxId) (K' : nat) :
+    own_context ξ -∗ hart_view_lb K' ==∗ own_context ξ ∗ ctx_floor ξ K'.
+  Proof.
+    iIntros "Hrun #HK'".
+    iEval (rewrite own_context_unseal /own_context_def) in "Hrun".
+    iDestruct "Hrun" as (B K W D) "([Hb Hd] & #HK & %HBK & #HW & %HDW & #Hoks)".
+    iMod (mono_nat_own_update (Nat.max B K') with "Hb") as "[Hb #Hlb]"; first lia.
+    (* the receipt at the joined view: whichever of the two is larger *)
+    iAssert (view_lb view_name loglen_name (hart_agent cpu_id) (Nat.max K K'))%I
+      as "#HKm".
+    { destruct (decide (K' <= K)%nat) as [Hle|Hgt].
+      - replace (Nat.max K K') with K by lia. iExact "HK".
+      - replace (Nat.max K K') with K' by lia.
+        iEval (rewrite hart_view_lb_unseal /hart_view_lb_def) in "HK'".
+        iExact "HK'". }
+    (* the dirty justifications, at the raised bound *)
+    iAssert ([∗ map] k ↦ _ ∈ D,
+               dirty_ok logm_name (hart_agent cpu_id) (Nat.max B K') k)%I
+      as "#Hoks'".
+    { iApply (big_sepM_impl with "Hoks"). iIntros "!>" (k x _) "Hok".
+      iDestruct "Hok" as "[%Hle | Hown]"; [ iLeft; iPureIntro; lia | by iRight ]. }
+    iModIntro.
+    iSplitL "Hb Hd".
+    - iEval (rewrite own_context_unseal /own_context_def).
+      iExists (Nat.max B K'), (Nat.max K K'), W, D.
+      iFrame "Hb Hd HKm HW Hoks'". iPureIntro. split; [ lia | exact HDW ].
+    - rewrite /ctx_floor /llb. iLeft.
+      iApply (mono_nat_lb_own_le with "Hlb"). lia.
+  Qed.
+
   (* Exclusivity, in all three pairings: one bound authority per context,
      one token.  ([TsoCtxTwin2.own_context_excl] / [ctx_parked_excl] /
      [own_context_parked_excl]; the running form holds across DIFFERENT
