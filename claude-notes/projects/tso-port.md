@@ -4089,3 +4089,38 @@ is hart-relative, and the spinlock's holding() is the one place the
 difference is load-bearing — the sound reason is the scheduler's
 (push_off), so the lock token is what imports a scheduler fact into
 a memory-tier leaf.
+
+### 0.35′ OWNER RULING (2026-08-28): is_lock is CONTEXT-RELATIVE — the
+bound-relation question (Q1) resolves, all four instances
+
+"[is_lock] needs to be context-relative... you need to have stable
+visibility, from your current CPU, that this memory location really
+does correspond to a spinlock... your CPU's timestamp is above
+whatever that [lo] value is... [is_lock] needs to be still
+persistent, but it's not context-free.  we'll pass around knowledge
+of [is_lock] in some way that ensures that any core that's trying to
+grab a lock is necessarily above [lo]."  The pipe case is the
+soundness argument: another core cannot just DISCOVER is_lock for a
+freshly kalloc'd pipe page and lock it — it might still see
+pre-initialization garbage; it must RECEIVE the handle through a
+crossing.
+
+The composite mechanism (this ruling + 0.27′'s U), one piece each:
+(i) is_lock ξ-INDEXED, carrying lo ≤ B_ξ internally (lo never
+exposed in the type), distributed only through the existing §0.16′
+stamp/receipt channels — boot-static locks already ride the started
+deposit (every initlock precedes the flag write), dynamic locks
+(pipes) mint at the allocating context and travel the fd-table/fork
+channels; (ii) lock payloads floored against the relational bound U,
+instantiated by the free arm at the release element's timestamp;
+(iii) acquire = the AMO's log-top receipt + an ABSORB of the
+context bound (B_ξ rises to K = log top — "my context has passed my
+acquire" travels with the thread, no hart identity anywhere: this is
+what dodges both the A6.89 and A6.92 refutations); (iv) every read
+discharges its floor against own_context: holding()'s lock-free read
+against lo (case 1, from is_lock itself), the holder's locked-word
+read against t_acq with value-set {1} (case 2), the virtio protocol
+floors against U with the range-shaped post absorbing post-release
+device appends (case 3), the parked stamp T ≤ U at swtch (case 4 =
+0.27′ proper).  Unlocks WpSconfLock's cone, ProofSwtch, and both
+virtio files.
