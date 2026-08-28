@@ -91,10 +91,10 @@
 
    The descriptor premise is the LANDED fd-state vocabulary, nothing
    minted (worklist note of 2026-08-27): the caller holds the per-process
-   fragment [FdSlots.fd_st (pv_fdg V) fd (FdOpen rb true (FdInode i))] --
+   fragment [FdSlots.fd_st (pv_fdg (us_V U)) fd (FdOpen rb true (FdInode i))] --
    open, WRITABLE, an inode descriptor naming inum [i] (the inum rides
    the constructor since d1411776) -- plus the pure premise
-   [arg_fd v (pv_ofile V) = Some (fd, fv)] tying syscall argument 0 to
+   [arg_fd v (pv_ofile (us_V U)) = Some (fd, fv)] tying syscall argument 0 to
    that slot of the caller's own private block.  The fragment is returned
    UNCHANGED in the continuation: a write moves the offset and the file
    bytes, never the descriptor's state.  Two consequences:
@@ -658,7 +658,7 @@ Definition wp_sys_write_au_frame
     (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process    *)
     (fn : fwrite_names)                          (* the fs ghosts          *)
-    (pidv : mword 32) (V : pprivate)
+    (pidv : mword 32) (U : ustate)
     (v v2 : mword 64)                            (* syscall args 0, 2      *)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
     (fd : nat) (fv : mword 64)                   (* the descriptor's slot  *)
@@ -673,20 +673,20 @@ Definition wp_sys_write_au_frame
   length γs = NPROC ->
   fwn_j fn = j ->
   fwn_procs fn = γs ->
-  pv_tf V !! tf_arg_idx 0 = Some v ->
-  (exists v1 : mword 64, pv_tf V !! tf_arg_idx 1 = Some v1) ->
-  pv_tf V !! tf_arg_idx 2 = Some v2 ->
+  pv_tf (us_V U) !! tf_arg_idx 0 = Some v ->
+  (exists v1 : mword 64, pv_tf (us_V U) !! tf_arg_idx 1 = Some v1) ->
+  pv_tf (us_V U) !! tf_arg_idx 2 = Some v2 ->
   fwn_wp fn = ConsoleInv.devsw_write_val ->
   fwn_dqv fn = (fun _ => DfracDiscarded) ->
   eb = true ->
   (* THE FD SIDE's pure half: argument 0 names slot [fd] of the caller's
      own table, and the cell holds [fv] (non-zero by [arg_fd]'s shape) *)
-  arg_fd v (pv_ofile V) = Some (fd, fv) ->
+  arg_fd v (pv_ofile (us_V U)) = Some (fd, fv) ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
-  proc_priv γf pj pidv V -∗
+  proc_priv γf pj pidv U -∗
   kalloc_env fsc_kalloc None -∗
   procs_inv γs -∗
   filewrite_fs_env γf fn -∗
@@ -694,23 +694,23 @@ Definition wp_sys_write_au_frame
   ConsoleInv.devsw_table -∗
   (* THE FD SIDE's resource half: the caller's own fragment -- open,
      WRITABLE, an inode descriptor at inum [i] *)
-  fd_st (pv_fdg V) fd (FdOpen rb true (FdInode i)) -∗
+  fd_st (pv_fdg (us_V U)) fd (FdOpen rb true (FdInode i)) -∗
   (* ---- THE AU SIDE (the one addition to the landed premise list) ---- *)
   EXTRA -∗
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile) (r : mword 64) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt V) P'⌝ -∗
+      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf pj pidv (upd_upt V P') -∗
+      proc_priv γf pj pidv (us_upt U P') -∗
       kalloc_env fsc_kalloc None -∗
       filewrite_fs_out fn -∗
       (* the descriptor's state does not move: a write advances the
          offset and the bytes, never the fd table *)
-      fd_st (pv_fdg V) fd (FdOpen rb true (FdInode i)) -∗
+      fd_st (pv_fdg (us_V U)) fd (FdOpen rb true (FdInode i)) -∗
       (* the armed post on the returned a0 (implies [sys_write_ret]) *)
       ARMS r -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -728,14 +728,14 @@ Definition wp_sys_write_au_body
     (γf : gname)
     (γs : list gname) (j : nat) (γlp : gname)
     (fn : fwrite_names)
-    (pidv : mword 32) (V : pprivate)
+    (pidv : mword 32) (U : ustate)
     (v v2 : mword 64)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
     (fd : nat) (fv : mword 64) (rb : bool) (i : Z)
     (Φw : nat -> aview -> nat -> list (bv 8) -> iProp Σ) :=
   let Γfs := fs_gamma_L fsc_fs in
   let n := sys_rw_count v2 in
-  wp_sys_write_au_frame γf γs j γlp fn pidv V v v2 m K eb b lks
+  wp_sys_write_au_frame γf γs j γlp fn pidv U v v2 m K eb b lks
     fd fv rb i
     (awrite_commits Γfs ∅ i Φw 0%nat (wchunks n))
     (write_arms Γfs i n Φw).
@@ -756,7 +756,7 @@ Definition wp_sys_write_au_stable_body
     (γf : gname)
     (γs : list gname) (j : nat) (γlp : gname)
     (fn : fwrite_names)
-    (pidv : mword 32) (V : pprivate)
+    (pidv : mword 32) (U : ustate)
     (v v2 : mword 64)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
     (fd : nat) (fv : mword 64) (rb : bool) (i : Z)
@@ -764,7 +764,7 @@ Definition wp_sys_write_au_stable_body
     (Φw : nat -> aview -> nat -> list (bv 8) -> iProp Σ) :=
   let Γfs := fs_gamma_L fsc_fs in
   let n := sys_rw_count v2 in
-  wp_sys_write_au_frame γf γs j γlp fn pidv V v v2 m K eb b lks
+  wp_sys_write_au_frame γf γs j γlp fn pidv U v v2 m K eb b lks
     fd fv rb i
     (nview Γfs q i (MkAnode (AFile bs0) nl)
      ∗ awrite_commits Γfs ∅ i Φw 0%nat (wchunks n))%I
@@ -781,12 +781,12 @@ Module Type SYSWRITE_AU.
       (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fwrite_names)
-      (pidv : mword 32) (V : pprivate)
+      (pidv : mword 32) (U : ustate)
       (v v2 : mword 64)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (fd : nat) (fv : mword 64) (rb : bool) (i : Z)
       (Φw : nat -> aview -> nat -> list (bv 8) -> iProp Σ),
-      wp_sys_write_au_body γf γs j γlp fn pidv V v v2 m K eb b lks
+      wp_sys_write_au_body γf γs j γlp fn pidv U v v2 m K eb b lks
         fd fv rb i Φw.
 
   (* owed as a DERIVATION from [wp_sys_write_au] + the agreement seed
@@ -798,12 +798,12 @@ Module Type SYSWRITE_AU.
       (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fwrite_names)
-      (pidv : mword 32) (V : pprivate)
+      (pidv : mword 32) (U : ustate)
       (v v2 : mword 64)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (fd : nat) (fv : mword 64) (rb : bool) (i : Z)
       (q : Qp) (bs0 : list (bv 8)) (nl : nat)
       (Φw : nat -> aview -> nat -> list (bv 8) -> iProp Σ),
-      wp_sys_write_au_stable_body γf γs j γlp fn pidv V v v2 m K eb b
+      wp_sys_write_au_stable_body γf γs j γlp fn pidv U v v2 m K eb b
         lks fd fv rb i q bs0 nl Φw.
 End SYSWRITE_AU.
