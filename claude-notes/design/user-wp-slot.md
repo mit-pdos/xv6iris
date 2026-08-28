@@ -43,21 +43,33 @@ work (real per-process linkage) is `projects/user-wp-slot.md`.
   `rewrite`: a bare one rewrites the whole proofmode goal and would unfold
   the `uexec_wp` inside the handler premise / the Löb hypothesis, which is
   the type the RETURNED WP is stated at and must stay folded.
-- **`UexecSlot.uexec_slot V M`** — the TRAPFRAME-KEYED form ("trapframe"
-  always means trapframe + memory-view, the `(V, M)` pair): same shape,
-  but the table is `pv_upt V`, the pc is
-  `tf_resume_pc V = ret_pc (tf_w V tf_epc_idx)`, and the register file is
-  `tf_resume_gpr b V = userret_gpr b ⟨the 31 words of pv_tf V⟩` at a
-  ∀-BOUND dead base `b`.  The ∀ on `b` is load-bearing: `userret_gpr`
-  overwrites x1..x31, so `b` survives only at the architecturally-zero
-  x0, and the loop can only ever supply the base it happens to hold — ∀
-  is the only form a discharge can meet.  The slot's precondition is thus
-  the state its OWN trapframe and image record; nothing free-standing is
-  ever discharged at resume.  `tf_w` is stdpp total lookup on `pv_tf`;
-  the word-index map (epc = 3, ra..t6 = 5..35, a0 = `tf_arg_idx 0` = 14,
-  sp = `tf_sp_idx` = 6) is `ProcGeom.v`'s, corroborated there.
-- **`UexecSlot.uexec_wp_slot : uexec_wp -∗ uexec_slot V M`** — "plug in
-  the generic WP", for processes with no exact U-mode WP.
+- **`UexecSlot.uexec_slot W`** — the TRAPFRAME-KEYED form, keyed on the
+  USER-VISIBLE record `Record uvis := { uvis_tf : list (mword 64);
+  uvis_M : gmap Z (bv 8) }` (the full 36-word trapframe — kernel words
+  0/1/2/4 are dead weight in the key, epc = word 3 is user-visible — and
+  the va-keyed image; `uvis_of : ustate -> uvis` projects the kernel's
+  process state onto it).  Same shape as `uexec_wp`, but the pc is
+  `tf_resume_pc (uvis_tf W) = ret_pc (tf_w tf tf_epc_idx)` and the register
+  file is `tf_resume_gpr b (uvis_tf W) = userret_gpr b ⟨the 31 words⟩` at a
+  ∀-BOUND dead base `b`, and THE TABLE IS NOT IN THE KEY: the realizing
+  descriptor `P` is ∀-bound inside the slot, guarded by `⌜loop_ok C P⌝`
+  (`user_pt_inv P (uvis_M W)`, `Rut P`, `user_trap_frame C P Rut`).  A
+  process observes its registers and its va-keyed bytes, never PPNs, so
+  the key is what it can observe and nothing else; the ∀ on `P` is exactly
+  parallel to the ∀ on `b` — the loop can only supply the table (resp.
+  base) it happens to hold, so ∀ is the only form a discharge can meet —
+  and it is the shape the fork clause needs for the child (same `M`,
+  fresh table: the parent's slot applies verbatim).  The slot's
+  precondition is thus the state its OWN trapframe and image record;
+  nothing free-standing is ever discharged at resume.  `tf_w` is stdpp
+  total lookup on the word list; the word-index map (epc = 3, ra..t6 =
+  5..35, a0 = `tf_arg_idx 0` = 14, sp = `tf_sp_idx` = 6) is `ProcGeom.v`'s,
+  corroborated there.  `UexecCond.uexec_slot_congr` re-keys a slot across
+  two `ustate`s from `pv_tf` equality and `us_M` equality alone — the
+  table needs no equation.
+- **`UexecSlot.uexec_wp_slot : uexec_wp -∗ uexec_slot W`** — "plug in
+  the generic WP", for processes with no exact U-mode WP (a
+  re-instantiation: the generic WP is ∀-state, table included).
   Its handler premise is PAIRED like `uexec_wp`'s, and the WP it returns is
   typed at the GENERAL `uexec_wp` — a verified process may hand back any
   successor.  So `uexec_slot` stays a plain definition, not a fixpoint of
@@ -190,17 +202,25 @@ PARKS' — `ProofUserinit`'s and `ProofSysFork`'s applications of
   `upt_acc_wf`) are dropped on the way in and must be re-supplied from
   the table on any way back (a step-3 obligation).
 - **`USyncKernel.sync_uexec_slot`** — sync's ENTRY DEPOSIT: from
-  `tf_resume_pc V0 = start`, `sync_layout (pv_upt V0)`,
-  `uimg_sub sync_bytes M0`, `uv_stack … (tf_w V0 tf_sp_idx) 32`, and
-  `□ (∀ C, ⌜loop_ok C (pv_upt V0)⌝ -∗ uv_cap C (pv_upt V0) (xv6_sys_protocol …))`,
-  conclude `uexec_slot V0 M0`.  `Hsp` is discharged by
-  `tf_resume_gpr_sp` — the payoff of trapframe keying.  `Rut` and the
-  handler are received and retained unused (affine): with `uv_cap` still
-  an assumption, sync's traps are absorbed by the assumed round-trip
-  contracts, and `uv_cap` is visibly the one gap.  Establishing the
-  entry conditions — arranging the trapframe/image so a program's
-  constructor applies, or falling back to `uexec_wp_slot` of the generic
-  — is the INITIALIZER's job (exec, forkret's park).
+  `tf_resume_pc (uvis_tf W) = start`, `uimg_sub sync_bytes (uvis_M W)`
+  (the two conditions about the KEY alone; both decidable, which is what
+  `UexecCond.cond_entry_slot`/`_gated` decide), the table-dependent pair
+  guarded under the slot's own ∀ as the pure
+  `sync_entry_tbl M sp := ∀ C P, loop_ok C P -> sync_layout P ∧
+  uv_stack P M sp 32` at `sp = tf_w (uvis_tf W) tf_sp_idx`, and
+  `□ (∀ C P, ⌜loop_ok C P⌝ -∗ uv_cap C P (xv6_sys_protocol C P))`,
+  conclude `uexec_slot W`.  The guard is a `Prop`, not an iProp wand:
+  both conjuncts are `Prop`s `wp_sync_start` consumes as Rocq
+  hypotheses.  `Hsp` is discharged by `tf_resume_gpr_sp` — the payoff of
+  trapframe keying.  `Rut` and the handler are received and retained
+  unused (affine): with `uv_cap` still an assumption, sync's traps are
+  absorbed by the assumed round-trip contracts, and `uv_cap` is visibly
+  the one gap.  Establishing the entry conditions — arranging the
+  trapframe/image so a program's constructor applies, or falling back to
+  `uexec_wp_slot` of the generic — is the INITIALIZER's job (exec,
+  forkret's park).  Note the ∀-table guard is owed at EVERY `loop_ok`
+  table, not just the one the process holds, so a mint site that wants
+  to owe the sync side nothing refutes the gate on the DECIDED facts.
 - `UexecSlot.v` deliberately does not import `UmodeAbi`
   (`tf_resume_gpr_sp` is stated at `Regidx (mword_of_int 2)`, convertible
   with `sp_idx`): the verified-program tier stays out of the kernel-side
@@ -236,16 +256,15 @@ PARKS' — `ProofUserinit`'s and `ProofSysFork`'s applications of
   state and DAG in `projects/user-wp-slot.md` §2.
 - The DESCRIPTOR (`pv_upt`) stays exposed in `ustate`: the trap
   seams, the phase splits and the table-moving specs are keyed on it.
-  The SLOT's key is ruled to become the actually-user-visible record
-  (`uvis` = trapframe + memory view, table ∀-quantified inside) —
-  specced in `projects/user-wp-slot.md` §1, not yet landed.
+  The SLOT's key is the user-visible `uvis` (above); `uvis_of` is the
+  seam between the two.
 
 ## What is deliberately NOT designed
 
 How a DEPOSITED slot covers the kernel's own writes between deposit and
 resume — a syscall's `tf->a0 := ret` / `epc += 4`, read() filling the
 `(a1, a2)` buffer window of `M`, a vmfault's zero page.  It cannot be a
-pure predicate on `(V, M)` pairs (read()'s widening relates the delivered
+pure predicate on `uvis` records (read()'s widening relates the delivered
 bytes to file-system state — an iProp-level fact); it will be an
 iProp-based, universally-quantified shape, designed against the first
 concrete proof obligation that needs it — inside the `uv_cap` discharge.

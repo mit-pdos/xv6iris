@@ -90,40 +90,38 @@ Qed.
 (* ===================================================================== *)
 (* SS3 THE CONDITIONAL CONSTRUCTOR.                                        *)
 (*                                                                         *)
-(* The two conditions that HAVE a [Decision] are decided here; the two      *)
-(* that do not ([sync_layout], [uv_stack] -- both bottom out in            *)
-(* [UserPtTree.uleaf_ok], a forall over (mword 1)^2 x bool^2 of the Sail    *)
-(* [pte_check_ok], for which no decider exists) are taken as a PURE         *)
-(* premise, CONDITIONED on the two decided ones so the generic branch owes  *)
-(* nothing.  And [uv_cap] is not a [Prop] at all -- it is an iProp premise, *)
-(* which is the headline wart: supplying it at a mint site is an ASSUMPTION *)
-(* entering the composition.                                                *)
+(* The two conditions that HAVE a [Decision] -- both about the KEY [W]     *)
+(* alone -- are decided here; the two that do not ([sync_layout],          *)
+(* [uv_stack] -- both bottom out in [UserPtTree.uleaf_ok], a forall over   *)
+(* (mword 1)^2 x bool^2 of the Sail [pte_check_ok], for which no decider   *)
+(* exists) are ALSO the two about the TABLE, which the slot binds inside;  *)
+(* they are taken as [USyncKernel.sync_entry_tbl], a PURE premise guarded  *)
+(* under the slot's own [∀ (C, P), loop_ok C P], and CONDITIONED on the two *)
+(* decided ones so the generic branch owes nothing.  And [uv_cap] is not a  *)
+(* [Prop] at all -- it is an iProp premise, which is the headline wart:     *)
+(* supplying it at a mint site is an ASSUMPTION entering the composition.   *)
 (* ===================================================================== *)
-Definition sync_entry_pure (U : ustate) : Prop :=
-  sync_layout (pv_upt (us_V U))
-  /\ uv_stack (pv_upt (us_V U)) (us_M U) (tf_w (us_V U) tf_sp_idx) 32.
-
 Section UexecCond.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
 
-  Lemma cond_entry_slot (U : ustate) :
-    (text_region_eq (us_M U) ->
-     tf_resume_pc (us_V U) = (mword_of_int SyncSyms.start : mword 64) ->
-     sync_entry_pure U) ->
-    □ (∀ C : ucfg, ⌜loop_ok C (pv_upt (us_V U))⌝ -∗
-         uv_cap C (pv_upt (us_V U)) (xv6_sys_protocol C (pv_upt (us_V U)))) -∗
+  Lemma cond_entry_slot (W : uvis) :
+    (text_region_eq (uvis_M W) ->
+     tf_resume_pc (uvis_tf W) = (mword_of_int SyncSyms.start : mword 64) ->
+     sync_entry_tbl (uvis_M W) (tf_w (uvis_tf W) tf_sp_idx)) ->
+    □ (∀ (C : ucfg) (P : uptd), ⌜loop_ok C P⌝ -∗
+         uv_cap C P (xv6_sys_protocol C P)) -∗
     uexec_wp -∗
-    uexec_slot U.
+    uexec_slot W.
   Proof.
-    intros Hpure. iIntros "#Hcap Hgen".
-    destruct (decide (text_region_eq (us_M U))) as [Hteq | _]; last first.
-    { iApply (uexec_wp_slot U with "Hgen"). }
-    destruct (decide (tf_resume_pc (us_V U) = (mword_of_int SyncSyms.start : mword 64)))
+    intros Htbl. iIntros "#Hcap Hgen".
+    destruct (decide (text_region_eq (uvis_M W))) as [Hteq | _]; last first.
+    { iApply (uexec_wp_slot W with "Hgen"). }
+    destruct (decide (tf_resume_pc (uvis_tf W) = (mword_of_int SyncSyms.start : mword 64)))
       as [Hpc | _]; last first.
-    { iApply (uexec_wp_slot U with "Hgen"). }
-    destruct (Hpure Hteq Hpc) as [Hlay Hst].
-    iApply (sync_uexec_slot U Hpc Hlay (text_region_eq_uimg_sub (us_M U) Hteq) Hst).
+    { iApply (uexec_wp_slot W with "Hgen"). }
+    iApply (sync_uexec_slot W Hpc (text_region_eq_uimg_sub (uvis_M W) Hteq)
+              (Htbl Hteq Hpc)).
     iExact "Hcap".
   Qed.
 
@@ -132,30 +130,27 @@ End UexecCond.
 (* ===================================================================== *)
 (* SS4 THE RE-KEY LEMMA the park channel needs.                            *)
 (*                                                                         *)
-(* [uexec_slot V M] reads [V] ONLY through [pv_upt V] (the table) and       *)
-(* [pv_tf V] (via [tf_resume_pc] / [tf_resume_gpr]).  So a slot minted at   *)
-(* the descriptor a PARKER holds can be spent at the descriptor a RESUMER   *)
-(* produces, given those two equations -- which is exactly the gap in       *)
-(* [ParkCap.park_token_park]: the captured [fd_frags_any (pv_fdg V)] row is *)
-(* re-keyed onto the closer's own [∀ V'] by [rewrite -Hfg] off the closer's *)
-(* [⌜pv_fdg V' = pv_fdg V⌝], and there is NO analogous premise for the      *)
-(* table or the trapframe.  With this lemma, adding                        *)
-(* [⌜pv_upt V' = pv_upt V⌝ ∗ ⌜pv_tf V' = pv_tf V⌝] to the package's resume  *)
-(* closer is all a keyed row costs.                                        *)
+(* [uexec_slot (uvis_of U)] reads [U] ONLY through [pv_tf (us_V U)] and     *)
+(* [us_M U] -- the table is forall-bound inside the slot and never read     *)
+(* from [U].  So a slot minted at the state a PARKER holds can be spent at  *)
+(* the state a RESUMER produces, given those two equations -- which is      *)
+(* exactly the gap in [ParkCap.park_token_park]: the captured               *)
+(* [fd_frags_any (pv_fdg V)] row is re-keyed onto the closer's own [∀ V']  *)
+(* by [rewrite -Hfg] off the closer's [⌜pv_fdg V' = pv_fdg V⌝], and there  *)
+(* is NO analogous premise for the trapframe.  With this lemma, adding      *)
+(* [⌜pv_tf V' = pv_tf V⌝] to the package's resume closer is all a keyed row *)
+(* costs: a fresh TABLE (fork's child) costs nothing.                       *)
 (* ===================================================================== *)
 Section UexecCondCongr.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
 
   Lemma uexec_slot_congr (U1 U2 : ustate) :
-    pv_upt (us_V U1) = pv_upt (us_V U2) ->
     pv_tf (us_V U1) = pv_tf (us_V U2) ->
     us_M U1 = us_M U2 ->
-    uexec_slot U1 -∗ uexec_slot U2.
+    uexec_slot (uvis_of U1) -∗ uexec_slot (uvis_of U2).
   Proof.
-    intros Hupt Htf Hm.
-    rewrite /uexec_slot /tf_resume_pc /tf_resume_gpr /tf_w Hupt Htf Hm.
-    iIntros "H". iExact "H".
+    intros Htf Hm. rewrite /uvis_of Htf Hm. iIntros "H". iExact "H".
   Qed.
 
 End UexecCondCongr.
@@ -174,25 +169,24 @@ Section UexecCondGated.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
 
-  Lemma cond_entry_slot_gated (U : ustate) :
-    (⌜text_region_eq (us_M U)⌝ -∗
-     ⌜tf_resume_pc (us_V U) = (mword_of_int SyncSyms.start : mword 64)⌝ -∗
-     ⌜sync_entry_pure U⌝ ∗
-     □ (∀ C : ucfg, ⌜loop_ok C (pv_upt (us_V U))⌝ -∗
-          uv_cap C (pv_upt (us_V U)) (xv6_sys_protocol C (pv_upt (us_V U))))) -∗
+  Lemma cond_entry_slot_gated (W : uvis) :
+    (⌜text_region_eq (uvis_M W)⌝ -∗
+     ⌜tf_resume_pc (uvis_tf W) = (mword_of_int SyncSyms.start : mword 64)⌝ -∗
+     ⌜sync_entry_tbl (uvis_M W) (tf_w (uvis_tf W) tf_sp_idx)⌝ ∗
+     □ (∀ (C : ucfg) (P : uptd), ⌜loop_ok C P⌝ -∗
+          uv_cap C P (xv6_sys_protocol C P))) -∗
     uexec_wp -∗
-    uexec_slot U.
+    uexec_slot W.
   Proof.
     iIntros "Hsync Hgen".
-    destruct (decide (text_region_eq (us_M U))) as [Hteq | _]; last first.
-    { iApply (uexec_wp_slot U with "Hgen"). }
-    destruct (decide (tf_resume_pc (us_V U) = (mword_of_int SyncSyms.start : mword 64)))
+    destruct (decide (text_region_eq (uvis_M W))) as [Hteq | _]; last first.
+    { iApply (uexec_wp_slot W with "Hgen"). }
+    destruct (decide (tf_resume_pc (uvis_tf W) = (mword_of_int SyncSyms.start : mword 64)))
       as [Hpc | _]; last first.
-    { iApply (uexec_wp_slot U with "Hgen"). }
-    iDestruct ("Hsync" with "[%] [%]") as "[%Hpure #Hcap]";
+    { iApply (uexec_wp_slot W with "Hgen"). }
+    iDestruct ("Hsync" with "[%] [%]") as "[%Htbl #Hcap]";
       [exact Hteq | exact Hpc |].
-    destruct Hpure as [Hlay Hst].
-    iApply (sync_uexec_slot U Hpc Hlay (text_region_eq_uimg_sub (us_M U) Hteq) Hst).
+    iApply (sync_uexec_slot W Hpc (text_region_eq_uimg_sub (uvis_M W) Hteq) Htbl).
     iExact "Hcap".
   Qed.
 
@@ -203,7 +197,10 @@ End UexecCondGated.
    [pv_upt V = ProcPtOwn.upt_desc root tfp] and
    [upt_desc root tfp = UPTD root tfp emptyset (um_pas emptyset)] -- so the
    SYNC BRANCH IS REFUTABLE THERE, with no computation over the byte
-   literal at all: *)
+   literal at all -- though note that with the table forall-bound inside
+   the slot, [sync_entry_tbl]'s obligation is at EVERY [loop_ok] table,
+   not at the one the process holds; refuting the gate on the DECIDED
+   facts is the route that owes nothing: *)
 Lemma sync_layout_upt_desc (root tfp : mword 44) :
   ~ sync_layout (upt_desc root tfp).
 Proof.

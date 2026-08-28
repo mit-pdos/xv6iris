@@ -23,7 +23,8 @@ at the sanctioned 13 assumptions, tracked dumps unchanged):
   `M` by `SpecVmfault`'s `proc_ptm` theorem).  Preservation of the WP's
   precondition BY SIGNATURE for functions that do not touch user
   memory.
-- The trapframe-keyed slot `uexec_slot` + the conditional-mint probe
+- The trapframe-keyed slot `uexec_slot (W : uvis)` (table ∀-bound
+  inside) + the conditional-mint probe
   machinery (`UexecCond.v`: decidable `text_region_eq`,
   `cond_entry_slot`/`_gated` choosing generic-vs-sync by
   `destruct (decide …)`) and `USyncKernel.sync_uexec_slot` (sync's
@@ -65,25 +66,11 @@ at the sanctioned 13 assumptions, tracked dumps unchanged):
   the OWNER rules on design questions — when asking, explain the
   issue, considerations, constraints, not just the question.
 
-## §1 NEXT LANE, fully specced: the `uvis` re-key (owner-ruled)
+## §1 The `uvis` re-key — landed
 
-The slot must be keyed on the ACTUALLY-user-visible state — a process
-observes its va-keyed memory and registers, never PPNs.  New record
-`uvis := { uvis_tf : list (mword 64); uvis_M : gmap Z (bv 8) }` with
-`uvis_of : ustate -> uvis`; `uexec_slot (W : uvis)` UNIVERSALLY
-QUANTIFIES the realizing descriptor inside
-(`∀ P, ⌜loop_ok C P⌝ -∗ … user_pt_inv P (uvis_M W) … Rut P …`),
-exactly parallel to its ∀-dead register-file base — and exactly the
-∀-descriptor form the fork clause needs for the child (same `M`, fresh
-table).  `tf_resume_*` read `uvis_tf`; `uexec_slot_congr` collapses to
-tf/M equality; `sync_uexec_slot`'s table-dependent entry conditions
-(`sync_layout P`, stack facts) move inside the `∀ P` as guards.
-SMALL BY CONSTRUCTION: no kernel proof consumes `uexec_slot` yet, so
-this touches `UexecSlot.v`/`UexecCond.v`/`USyncKernel.v` only.
-`ustate`/`proc_priv` keep the descriptor exposed — the trap seams,
-phase splits and table-moving specs are keyed on it.  `uvis_tf` keeps
-the full 36-word list (kernel words 0/1/2/4 are dead weight in the
-key; epc, word 3, is user-visible); a later refinement may restrict.
+The slot is keyed on the user-visible `uvis` record (trapframe words +
+image), the realizing table ∀-bound inside under `loop_ok`; described
+in `../design/user-wp-slot.md` §"The two WP forms".  Nothing remains.
 
 ## §2 The `proc_pt_any` elimination campaign (owner-ruled) — landed
 
@@ -214,7 +201,7 @@ All owner-ruled; chronological intent:
    uexec_slot`, coupled to the `sc_v` the boundary already names);
    `ut_own`'s current slot row and accessors are DELETED then.
 2. **The syscall shape**: at an ecall the u-mode side returns
-   `uexec_slot_sc := ∀ r, uexec_slot ⟨V[epc := epc+4][a0 := r]⟩ M`
+   `uexec_slot_sc := ∀ r, uexec_slot ⟨tf[epc := epc+4][a0 := r], M⟩`
    (universal over the return register, everything else exact, over
    the BUMPED trapframe); buffer syscalls later add region-universals
    over `M` windows.  Transparent traps (device interrupt) return the
@@ -227,11 +214,13 @@ All owner-ruled; chronological intent:
 3. **The fork clause**: fork's spec takes TWO deposited WPs — child
    (`a0 = 0`) and parent (`a0 ∈ {pid, −1}`, the failure arm consumes
    no child WP) — same va-keyed `M`, `V_child` = parent's modulo a0
-   plus fresh table (the `uvis`/∀-descriptor keying makes this work);
+   plus fresh table (the `uvis` key with the table ∀-bound inside makes
+   this work: the parent's slot applies to the child verbatim);
    kfork's existing "parking consumes a WP" premise takes the child
    half, replacing today's generic mint in `ProofSysFork`.  The park
-   channel needs `pv_upt`/`pv_tf` preservation equations beside its
-   existing `pv_fdg` one (`uexec_slot_congr` is already in-tree).
+   channel needs a `pv_tf` preservation equation beside its existing
+   `pv_fdg` one (`uexec_slot_congr` is already in-tree; the table needs
+   none).
 4. **Boundary exposure** (blocks keyed-slot runs): the round's post
    (`wp_uservec_pt`/`uservec_post`) must expose BOTH agreement halves
    — userret's RESTORE (`mf = tf_resume_gpr b V'`,
