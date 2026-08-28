@@ -1,3 +1,18 @@
+# ARCHIVED 2026-08-28 — the FS block layer, stage 4 (crash instantiation)
+
+Worklist of the log layer's crash-side work.  Items (1), (3) and (4) —
+real `n > 0` recovery through the WAL exception set, the boot composition,
+and the D2 permit (superseded: `fr_D` never re-bases) — were closed by the
+durable-disk lanes; see
+[`durable-disk-2026-08-26-to-28.md`](durable-disk-2026-08-26-to-28.md) and
+the design of record [`../design/durable-fs-plan.md`](../design/durable-fs-plan.md).
+Item (2), `sys_sync`'s postcondition, does NOT belong to the log layer:
+owner ruling (2026-08-28) — it is done under the fs-syscall-specs banner
+([`../projects/fs-syscall-specs.md`](../projects/fs-syscall-specs.md), row Y).
+NOT current guidance; the passages naming deleted mechanisms are history.
+
+---
+
 # Project: the FS block layer — stage 4, the crash instantiation
 
 > **SUPERSEDED IN PART by `durable-disk.md` lane 1a (2026-08-23).** The
