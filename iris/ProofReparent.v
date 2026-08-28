@@ -354,7 +354,7 @@ Section ProofReparentEnds.
               with "Hcg Hpc []").
     { iApply (rpi_2a with "Htext"). }
     iIntros (CID16 Hst16).
-    iNext. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htgtj : add_vec (mword_of_int (KernelSyms.reparent + 0x2a) : mword 64) (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 5 : mword 11) ('b"0")))) = mword_of_int (KernelSyms.reparent + 0x34))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtj) in "Hpc".
@@ -716,7 +716,7 @@ Section ProofReparentLoop.
                     Hcmpr ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (rpi_30 with "Htext"). }
-          iNext. iIntros (CIDt2 Hst2) "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDt2 Hst2) "Hcg Hpc".
           assert (Htgt46 : add_vec (mword_of_int (KernelSyms.reparent + 0x30) : mword 64)
                              (sign_extend' 64 (mword_of_int 22 : mword 13)) = mword_of_int (KernelSyms.reparent + 0x46))
             by (apply bv_eq; vm_compute; reflexivity).
@@ -935,7 +935,7 @@ Section ProofReparentLoop.
                   with "Hcg Hpc []").
         { iApply (rpi_44 with "Htext"). }
         iIntros (CIDr Hsr).
-        iNext. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iIntros "Hcg Hpc".
         assert (Htgt2c : add_vec (mword_of_int (KernelSyms.reparent + 0x44) : mword 64)
                            (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2036 : mword 11) ('b"0"))))
                          = mword_of_int (KernelSyms.reparent + 0x2c))
@@ -1018,7 +1018,7 @@ Section ProofReparentLoop.
                   Htaken ltac:(rewrite Htgt2c; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (rpi_36 with "Htext"). }
-        iNext. iIntros (CIDm Hsm) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDm Hsm) "Hcg Hpc".
         iEval (rewrite Htgt2c) in "Hpc".
         (* the cell goes back unchanged, and [rp_slot pv ip v = v] *)
         iDestruct ("Hback" $! v with "Hcell") as "Hpar".

@@ -2125,7 +2125,7 @@ Section KexecCBad.
               ltac:(rewrite Htgt72; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kxc_1f0 with "Htext"). }
-    iIntros (CIDj Hscj). iNext. iIntros "Hcg Hpc".
+    iIntros (CIDj Hscj). iApply bi.later_intro. iIntros "Hcg Hpc".
     iEval (rewrite Htgt72) in "Hpc".
     (* ---- the threading clause: all NINE slots came back from THIS block's
        own reload, not from an external premise -- [kxc_cs_cases9] lands the

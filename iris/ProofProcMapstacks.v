@@ -999,7 +999,7 @@ Section ProofPMS.
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (pmsi_7c with "Htext"). }
-    iNext. iIntros (CIDb2 Hsb2) "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CIDb2 Hsb2) "Hcg Hpc".
     assert (Htgt52 : add_vec (mword_of_int (KernelSyms.proc_mapstacks + 0x7c) : mword 64) (sign_extend' 64 (mword_of_int 8150 : mword 13)) = mword_of_int (KernelSyms.proc_mapstacks + 0x52)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgt52) in "Hpc".
     (* recurse via IH at i+1, on the hart THIS iteration ended up on *)

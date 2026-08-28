@@ -716,7 +716,7 @@ Section KforkPrologue.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kfk_016 with "Htext"). }
-      iNext. iIntros (CID12 Hs12) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID12 Hs12) "Hcg Hpc".
       (* [cpu_own] is the one bundle no leaf re-anchors: it came out of
          [allocproc_post] at CID11 and the continuation is at CID12, and the
          two print IDENTICALLY.  durable-notes' rule. *)
@@ -1011,7 +1011,7 @@ Section KforkPrologue.
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kfk_02c with "Htext"). }
-        iNext. iIntros (CID20 Hs20) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID20 Hs20) "Hcg Hpc".
         (* [proc_held]/[arm_pay] name the AMBIENT hart explicitly ([cpu_id]),
            unlike [sie_cap_gpr]/[pc_is]/etc which are re-quantified fresh by
            every leaf: bring them from CID11 (where allocproc's found arm
@@ -1342,7 +1342,7 @@ Section KforkPrologue.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (kfk_016 with "Htext"). }
-      iNext. iIntros (CID12 Hs12) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID12 Hs12) "Hcg Hpc".
       (* [cpu_own] is the one bundle no leaf re-anchors: it came out of
          [allocproc_post] at CID11 and the continuation is at CID12, and the
          two print IDENTICALLY.  durable-notes' rule. *)

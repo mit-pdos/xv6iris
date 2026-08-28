@@ -2643,7 +2643,7 @@ Section ProofFilewrite.
                 ltac:(rewrite Htgtea; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (fwri_0c8 with "Htext"). }
-      iNext. iIntros (CIDc2 Hsc2) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDc2 Hsc2) "Hcg Hpc".
       iEval (rewrite Htgtea) in "Hpc".
       assert (Heothr2 : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
                 r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs3 -> r <> Rs4 ->

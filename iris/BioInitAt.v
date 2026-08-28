@@ -200,7 +200,7 @@ Section BioInitAt.
       iSplitR "Hrc Hdev2 Hbno2".
       - rewrite /buf_escrow.
         iApply (inv_alloc bioN E (buf_escrow_body bn V k)).
-        iNext. iLeft. rewrite /buf_parked.
+        iApply bi.later_intro. iLeft. rewrite /buf_parked.
         iExists false, (mword_of_int 0 : mword 32),
                 (mword_of_int 0 : mword 32), bs.
         rewrite Hpay0. cbv iota.

@@ -959,12 +959,20 @@ and it did not move.
 - **Strip only the GOAL's later with `iApply bi.later_intro`** — and this is
 worth SWEEPING, not just applying to new proofs. Converting `ProofKexecB3`'s
 fifteen `iNext`s measured **74.4 s → 64.8 s (−13.0 %)**, `.vo` −1.7 %, peak
-RSS −6.8 %: **0.64 s per call**, with no other change. There are 477 `iNext`
-calls left in files ≥10 s across 111 files, and almost none of those files use
-the cheap form; the per-call cost scales with `|Δ|`, so the big-context proofs
-are where it pays. `iNext` is only replaceable where the proof does not need
-its hypothesis-side later-stripping — `coqc` says so per file, so the sweep is
-safe with a per-file fallback.; reach for `iNext`
+RSS −6.8 %: **0.64 s per call**, with no other change. **THE SWEEP IS DONE (2026-08-27): 420 sites in 139 files.** A sample
+re-measured isolated — `ProofSysOpen` 63.1 → 55.3 s, `ProofDirlookup` 40.5 →
+38.2 s, `ProofKexecB2` 31.3 → 28.4 s — is **−13.0 s over 29 sites, 0.45 s per
+site**, matching the 0.64 s/site on `ProofKexecB3`. The converted files span
+2177 s of build, so the whole sweep is worth on the order of a minute and a
+half of tree time.
+
+**Where it is NOT replaceable, `coqc` says so**, which is what makes the sweep
+safe: ~90 files rejected it and were reverted, and they are almost all the
+engine/leaf layer (`WpSmode*`, `UserStep*`, `HartStep*`, `ParkCap`,
+`TrampStepPt`, `UptWalkPt`, `SchedCtx`, `FsCrash`, `InodeRegion`) — i.e. the
+Löb back edges, where `iNext` genuinely has to strip the hypothesis-side
+later. Reverting on failure takes ~14 build rounds because each round only
+surfaces the next dependency layer.; reach for `iNext`
   only at a genuine Löb back edge. `iNext` is `iModIntro` at `▷`, so it runs
   `MaybeIntoLaterN` over every hypothesis in both environments: ~1.1 s per call
   in a whole-function proof against ~0.06 s for the same effect. The tell that a

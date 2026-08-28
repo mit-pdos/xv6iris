@@ -191,7 +191,7 @@ Proof.
                (⌜npc = add_vec_int pc (if is_rvc then 2 else 4)⌝ ∗
                 ⌜m' = m⌝ ∗ ⌜n' = n⌝)%I)
             with "Hcg Hpc Hinstr [Hcont]").
-  iNext.
+  iApply bi.later_intro.
   (* FREE THE NAME [CID] FOR THE REBOUND HART -- see the templates in
      WpSconfMem.v.  At [b = false] the two harts coincide, but the obligation
      is stated hart-generically, so the body is annotated all the same. *)
@@ -332,14 +332,14 @@ Proof.
           iMod (dev_interp_update_plic sigma.(mdev) pl pl'
                   with "[$Hua $Hpldev $Hvdev] Hplf") as "[Hdev' Hp']".
           iMod ("Hdclose" with "[Hp']") as "_".
-          { iNext. iExists pl'. iFrame "Hp'". iPureIntro. exact Hpok'. }
+          { iApply bi.later_intro. iExists pl'. iFrame "Hp'". iPureIntro. exact Hpok'. }
           iMod (fupd_mask_subseteq ∅) as "Hb2"; [set_solver|].
           iModIntro. iExists (set_dplic sigma.(mdev) pl').
           iSplitR.
           { iPureIntro. rewrite Hpaid.
             apply (dev_write_plic sigma.(mdev) ea storeword pl' Hrange).
             rewrite <- Hpeq. exact Hpw. }
-          iNext. iMod "Hb2" as "_". iModIntro.
+          iApply bi.later_intro. iMod "Hb2" as "_". iModIntro.
           iFrame "Hreg Hmem Hdev'". }
     (* ---- the post ---- *)
     iIntros (e) "(-> & Hfile & Hland)".
@@ -499,7 +499,7 @@ Proof.
                   ⌜m' = <[Regidx rd := regval_into_reg (ldval v)]> m⌝ ∗
                   ⌜n' = n⌝ ∗ ⌜P v⌝)%I)
             with "Hcg Hpc Hinstr [Hcont]").
-  iNext.
+  iApply bi.later_intro.
   rename CID into CID0.
   iIntros (CID Hs). rewrite /sconf_step_obl. iSplitR "Hcont".
   - (* ---------------- THE INSTRUCTION ---------------- *)
@@ -636,14 +636,14 @@ Proof.
           iMod (dev_interp_update_plic sigma.(mdev) pl pl'
                   with "[$Hua $Hpldev $Hvdev] Hplf") as "[Hdev' Hp']".
           iMod ("Hdclose" with "[Hp']") as "_".
-          { iNext. iExists pl'. iFrame "Hp'". iPureIntro. exact Hpok'. }
+          { iApply bi.later_intro. iExists pl'. iFrame "Hp'". iPureIntro. exact Hpok'. }
           iMod (fupd_mask_subseteq ∅) as "Hb2"; [set_solver|].
           iModIntro. iExists v, (set_dplic sigma.(mdev) pl').
           iSplitR.
           { iPureIntro. rewrite Hpaid.
             apply (dev_read_plic sigma.(mdev) ea v pl' Hrange).
             rewrite <- Hpeq. exact Hpr. }
-          iNext. iMod "Hb2" as "_". iModIntro.
+          iApply bi.later_intro. iMod "Hb2" as "_". iModIntro.
           iFrame "Hreg Hmem Hdev'". iPureIntro. exact HPv. }
     (* ---- the post ---- *)
     iIntros (e) "(-> & Hpost)".

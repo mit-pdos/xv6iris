@@ -1031,7 +1031,7 @@ Section InstallTransBlocks.
                 ltac:(vm_compute; discriminate) Hnz
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (iti_6c with "Htext"). }
-      iNext. iIntros (CIDh1 Hsh1) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDh1 Hsh1) "Hcg Hpc".
       assert (Htgt46 : add_vec (mword_of_int (KernelSyms.install_trans + 0x6c) : mword 64)
                          (sign_extend' 64 (mword_of_int 8154 : mword 13))
                        = mword_of_int (KernelSyms.install_trans + 0x46))
@@ -1228,7 +1228,7 @@ Section InstallTransBlocks.
                 ltac:(vm_compute; discriminate) Hnz
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (iti_a6 with "Htext"). }
-      iNext. iIntros (CIDk1 Hsk1) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDk1 Hsk1) "Hcg Hpc".
       assert (Htgt54 : add_vec (mword_of_int (KernelSyms.install_trans + 0xa6) : mword 64)
                          (sign_extend' 64 (mword_of_int 8110 : mword 13))
                        = mword_of_int (KernelSyms.install_trans + 0x54))
@@ -2643,7 +2643,7 @@ Section InstallTransBlocks.
                 ltac:(rewrite Hgeq; exact (it_geb_eq t n Hend))
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (iti_68 with "Htext"). }
-      iNext. iIntros (CIDa30 Hsa30) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDa30 Hsa30) "Hcg Hpc".
       assert (Htgtb2 : add_vec (mword_of_int (KernelSyms.install_trans + 0x68) : mword 64)
                          (sign_extend' 64 (mword_of_int 74 : mword 13))
                        = mword_of_int (KernelSyms.install_trans + 0xb2))
@@ -2789,7 +2789,7 @@ Section ProofInstallTrans.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (iti_08 with "Htext"). }
-      iNext. iIntros (CID3 Hs3) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID3 Hs3) "Hcg Hpc".
       assert (Htgtca : add_vec (mword_of_int (KernelSyms.install_trans + 0x08) : mword 64)
                          (sign_extend' 64 (mword_of_int 194 : mword 13))
                        = mword_of_int (KernelSyms.install_trans + 0xca))

@@ -2347,7 +2347,7 @@ Section ProofSysLinkBody.
                                ltac:(rewrite Htge6_88; vm_compute; reflexivity)
                                with "Hcg Hpc []").
                      { iApply (slki_88 with "Htext"). }
-                     iIntros (CIDg1 Hqg1). iNext. iIntros "Hcg Hpc".
+                     iIntros (CIDg1 Hqg1). iApply bi.later_intro. iIntros "Hcg Hpc".
                      iEval (rewrite Htge6_88) in "Hpc".
                      (* the parent's record, handed back whole: the guard READ
                         the halfword and wrote nothing. *)

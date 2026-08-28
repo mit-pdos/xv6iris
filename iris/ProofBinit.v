@@ -1114,7 +1114,7 @@ Section ProofBinit.
                   ltac:(rewrite Htgt50; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (bii_72 with "Htext"). }
-        iNext. iIntros (CIDtaken Hstaken) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDtaken Hstaken) "Hcg Hpc".
         iEval (rewrite Htgt50) in "Hpc".
         assert (Hshiftrec : b = false \/ pcur = zero_reg -> (CIDtaken : CPU) = (CID0 : CPU)) by wp_next_chain.
         iDestruct (wp_next_shift Hshiftrec with "Hpost") as "Hpost".

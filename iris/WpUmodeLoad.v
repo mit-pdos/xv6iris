@@ -1353,7 +1353,7 @@ Section WpUmodeLoad.
     iApply (wp_uv_load_later Ψ M m pc is_rvc i o imm rs1 rd is_unsigned k
               w_ld va wval Hkw Hui Hred Hg1 Hlpad Hexp Hrd Hva Hl Hchk Hcanon
               Hpg Hal HMb Hwval with "Hcg Hpc [Hcont]").
-    iNext. iExact "Hcont".
+    iApply bi.later_intro. iExact "Hcont".
   Qed.
 
   (* ------------------------------------------------------------------- *)

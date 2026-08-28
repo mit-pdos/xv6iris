@@ -444,7 +444,7 @@ Section ProofIunlockMain.
                  ltac:(lia) with "Hcellp") as "#Hclaim0".
     iMod ("Hclp" with "Hcellp") as "[%Hbp Hlvp]".
     iMod ("Hclosep" with "[Hbbackp Hlvp]") as "_".
-    { iNext. iApply ("Hbbackp" with "Hlvp"). }
+    { iApply bi.later_intro. iApply ("Hbbackp" with "Hlvp"). }
     iModIntro.
     iApply (wp_lw_au_s_sconf true (mword_of_int (KernelSyms.iunlock + 0x1c)) Ra5 Rs1
               (mword_of_int 8 : mword 12) mH (K - 4)%nat
@@ -471,7 +471,7 @@ Section ProofIunlockMain.
       iModIntro. iExists v. iFrame "Hcell". iIntros "Hcell".
       iMod ("Hcl" with "Hcell") as "[%Hb Hlv]".
       iMod ("Hclose" with "[Hbback Hlv]") as "_".
-      { iNext. iApply ("Hbback" with "Hlv"). }
+      { iApply bi.later_intro. iApply ("Hbback" with "Hlv"). }
       iModIntro. iFrame "Hvalid Hdep". iPureIntro. exact Hb. }
     iIntros (refv CID14 Hq14) "Hcg Hpc (%Href & Hvalid & Hdep)".
     set (R7 := <[Regidx Ra5 := regval_into_reg (sign_extend' 64 refv)]> mH).

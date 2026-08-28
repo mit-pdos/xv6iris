@@ -771,7 +771,7 @@ Section ProofSysRead.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (sri_2c with "Htext"). }
-      iNext. iIntros (CID20 Hs20) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID20 Hs20) "Hcg Hpc".
       assert (Htgt40 : add_vec (mword_of_int (KernelSyms.sys_read + 0x2c) : mword 64)
                 (sign_extend' 64 (mword_of_int 20 : mword 13))
                 = mword_of_int (KernelSyms.sys_read + 0x40))

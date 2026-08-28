@@ -133,7 +133,7 @@ Section FileOff.
     { iExFalso. iApply (word4_pointsto_excl with "Hmk Hmk'"). }
     iDestruct "Hres" as (v) "[Hc %Hwf]".
     iMod ("Hclose" with "[Hip' Hmk Hlv]") as "_".
-    { iNext. iExists ip. iFrame "Hip'". iRight. iFrame. }
+    { iApply bi.later_intro. iExists ip. iFrame "Hip'". iRight. iFrame. }
     iModIntro. iFrame "Hinv Hoc Hip". iExists v. iFrame. done.
   Qed.
 
@@ -156,7 +156,7 @@ Section FileOff.
     { iDestruct "Hres" as (v') "[Hc' _]".
       iExFalso. iApply (word4_pointsto_excl with "Hc Hc'"). }
     iMod ("Hclose" with "[Hip' Hc]") as "_".
-    { iNext. iExists ip. iFrame "Hip'". iLeft. iExists v. iFrame. done. }
+    { iApply bi.later_intro. iExists ip. iFrame "Hip'". iLeft. iExists v. iFrame. done. }
     iModIntro. iFrame "Hinv Hoc". iFrame.
   Qed.
 

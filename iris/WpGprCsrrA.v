@@ -383,7 +383,7 @@ Section WpCsrrMhartidGpr.
         iIntros (x) "(-> & Hrw & Hro)".
         rewrite (cw_rs_r (R_bitvector_64 mhartid) mhartid_in).
         iSplitR; [done|]. iFrame.
-    - iNext. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hmh')".
+    - iApply bi.later_intro. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hmh')".
       iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
       iCombine "Hpmpc' Hpmpc_k'" as "Hpmpc''".
       iApply ("Hcont" with "Hmm'' Hpmpc'' Hpc' Hf' Hmh'").
@@ -502,7 +502,7 @@ Section WpCsrrGprA.
         iIntros (x) "(-> & Hrw & Hro)".
         rewrite (cw_rs_r (R_bitvector_64 mstatus) mstatus_in).
         iSplitR; [done|]. iFrame.
-    - iNext. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hcsr')".
+    - iApply bi.later_intro. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hcsr')".
       iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
       iCombine "Hpmpc' Hpmpc_k'" as "Hpmpc''".
       iApply ("Hcont" with "Hmm'' Hpmpc'' Hpc' Hf' Hcsr'").
@@ -607,7 +607,7 @@ Section WpCsrrGprA.
         iIntros (x) "(-> & Hrw & Hro)".
         rewrite (cw_rs_r (R_bitvector_32 mcounteren) mcen_in).
         iSplitR; [done|]. iFrame.
-    - iNext. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hcsr')".
+    - iApply bi.later_intro. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hcsr')".
       iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
       iCombine "Hpmpc' Hpmpc_k'" as "Hpmpc''".
       iApply ("Hcont" with "Hmm'' Hpmpc'' Hpc' Hf' Hcsr'").

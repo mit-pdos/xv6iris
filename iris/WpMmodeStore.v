@@ -439,7 +439,7 @@ Section WpStoreGpr.
               (pmp_all_off_allows_all _ Hpmp) Hstat
               with "Hmm_wp Hpmpc_wp Hpc Hfile Hinstr
                     [Hhs_k Hpriv_k Hms_k Hpmpc_k Hbytes] [Hcont]").
-    2:{ iNext. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hbw')".
+    2:{ iApply bi.later_intro. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hbw')".
         iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
         iCombine "Hpmpc' Hpmpc_k'" as "Hpmpc''".
         iApply ("Hcont" with "Hmm'' Hpmpc'' Hpc' Hf' Hbw'"). }
@@ -513,7 +513,7 @@ Section WpStoreGpr.
         iIntros (sg) "Hsg". rewrite /mstate_interp.
         iDestruct "Hsg" as "(Hri & Hmem & Hdev)".
         iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
-        iNext. iMod "Hmask" as "_".
+        iApply bi.later_intro. iMod "Hmask" as "_".
         iMod (upd_window_8 sg.(mem) ea (m !!! Regidx rs2) vold
                 with "Hmem Hbytes") as "[Hmem Hbytes]".
         iModIntro. rewrite st_write_value. by iFrame. }
@@ -585,7 +585,7 @@ Section MmodeStoreTor.
               with "Hmm_wp Hpmpc_wp Hpc Hfile Hinstr
                     [Hhs_k Hpriv_k Hms_k Hpmpc_k Hpaddr_f Hbytes]
                     [Hcont Hpaddr_k]").
-    2:{ iNext. iIntros "Hmm' Hpmpc' Hpc' Hf'
+    2:{ iApply bi.later_intro. iIntros "Hmm' Hpmpc' Hpc' Hf'
                         (Hmm_k' & Hpmpc_k' & Hpaddr_f' & Hbw')".
         iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
         iCombine "Hpmpc' Hpmpc_k'" as "Hpmpc''".
@@ -661,7 +661,7 @@ Section MmodeStoreTor.
       - iIntros (sg) "Hsg". rewrite /mstate_interp.
         iDestruct "Hsg" as "(Hri & Hmem & Hdev)".
         iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
-        iNext. iMod "Hmask" as "_".
+        iApply bi.later_intro. iMod "Hmask" as "_".
         iMod (upd_window_8 sg.(mem) ea (m !!! Regidx rs2) vold
                 with "Hmem Hbytes") as "[Hmem Hbytes]".
         iModIntro. rewrite st_write_value. by iFrame. }

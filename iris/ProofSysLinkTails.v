@@ -294,7 +294,7 @@ Section ProofSysLinkTails.
               P2 (K - 38)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (slki_c4 with "Htext"). }
-    iIntros (CID5 Hq5). iNext. iIntros "Hcg Hpc".
+    iIntros (CID5 Hq5). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htg : add_vec (mword_of_int (SL + 0xc4) : mword 64)
                     (sign_extend' 64
                        (sign_extend' 21 (concat_vec (mword_of_int 43 : mword 11) ('b"0"))))
@@ -630,7 +630,7 @@ Section ProofSysLinkTails.
               P2 (K - 38)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (slki_d4 with "Htext"). }
-    iIntros (CID8 Hq8). iNext. iIntros "Hcg Hpc".
+    iIntros (CID8 Hq8). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htg : add_vec (mword_of_int (SL + 0xd4) : mword 64)
                     (sign_extend' 64
                        (sign_extend' 21 (concat_vec (mword_of_int 35 : mword 11) ('b"0"))))
@@ -955,7 +955,7 @@ Section ProofSysLinkTails.
               P2 (K - 38)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (slki_e4 with "Htext"). }
-    iIntros (CID8 Hq8). iNext. iIntros "Hcg Hpc".
+    iIntros (CID8 Hq8). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htg : add_vec (mword_of_int (SL + 0xe4) : mword 64)
                     (sign_extend' 64
                        (sign_extend' 21 (concat_vec (mword_of_int 27 : mword 11) ('b"0"))))
@@ -2191,7 +2191,7 @@ Section ProofSysLinkTails.
               mup (K - 38)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (slki_ec with "Htext"). }
-    iIntros (CID4 Hq4). iNext. iIntros "Hcg Hpc".
+    iIntros (CID4 Hq4). iApply bi.later_intro. iIntros "Hcg Hpc".
     iEval (rewrite Htgf4) in "Hpc".
     iDestruct (cpu_own_transport CID3 CID4 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".

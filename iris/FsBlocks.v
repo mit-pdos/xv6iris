@@ -978,7 +978,7 @@ Section FsBytes.
       ">(Ha & HC & Hxa & %Hdom & %Hlens & %Htie & %Hdm & %Hxs & %Hxv)".
     iDestruct (fsblock_home gL L home b bs Hdm with "Ha Hfb") as %Hb.
     iMod ("Hclose" with "[Ha HC Hxa]") as "_".
-    { iNext. iExists L, C, X. by iFrame. }
+    { iApply bi.later_intro. iExists L, C, X. by iFrame. }
     iModIntro. by iFrame.
   Qed.
 
@@ -1016,7 +1016,7 @@ Section FsBytes.
       - rewrite Hlb (Hlens b bsi Hbsi) //.
       - exact (Htie b bsi Hbsi ltac:(set_solver)). }
     iMod ("Hclose" with "[Ha Hback Hi Hxa]") as "_".
-    { iNext. iExists L, C, ∅. iFrame "Ha Hxa". iSplitL; [by iApply "Hback" |].
+    { iApply bi.later_intro. iExists L, C, ∅. iFrame "Ha Hxa". iSplitL; [by iApply "Hback" |].
       iPureIntro. auto 10. }
     iModIntro. iFrame "Hm". rewrite /fsblock. iFrame "Hr".
     iSplit; [iPureIntro; congruence | done].
@@ -1053,7 +1053,7 @@ Section FsBytes.
       - rewrite Hlb (Hlens b bsi Hbsi) //.
       - exact (Htie b bsi Hbsi Hnin). }
     iMod ("Hclose" with "[Ha Hback Hi Hxa]") as "_".
-    { iNext. iExists L, C, X. iFrame "Ha Hxa". iSplitL; [by iApply "Hback" |].
+    { iApply bi.later_intro. iExists L, C, X. iFrame "Ha Hxa". iSplitL; [by iApply "Hback" |].
       iPureIntro. auto 10. }
     iModIntro. iFrame "Hm Hxo". rewrite /fsblock. iFrame "Hr".
     iSplit; [iPureIntro; congruence | done].
@@ -1110,7 +1110,7 @@ Section FsBytes.
       ">(Ha & HC & Hxa & %Hdom & %Hlens & %Htie & %Hdm & %Hxs & %Hxv)".
     iDestruct (fsblock_q_home gL dq L home b bs Hdm with "Ha Hfb") as %Hb.
     iMod ("Hclose" with "[Ha HC Hxa]") as "_".
-    { iNext. iExists L, C, X. by iFrame. }
+    { iApply bi.later_intro. iExists L, C, X. by iFrame. }
     iModIntro. by iFrame.
   Qed.
 
@@ -1145,7 +1145,7 @@ Section FsBytes.
       - rewrite Hlb (Hlens b bsi Hbsi) //.
       - exact (Htie b bsi Hbsi ltac:(set_solver)). }
     iMod ("Hclose" with "[Ha Hback Hi Hxa]") as "_".
-    { iNext. iExists L, C, ∅. iFrame "Ha Hxa". iSplitL; [by iApply "Hback" |].
+    { iApply bi.later_intro. iExists L, C, ∅. iFrame "Ha Hxa". iSplitL; [by iApply "Hback" |].
       iPureIntro. auto 10. }
     iModIntro. iFrame "Hm". rewrite /fsblock_q. iFrame "Hr".
     iSplit; [iPureIntro; congruence | done].
@@ -1271,7 +1271,7 @@ Section FsBytes.
           apply (Hs (Htie b bs_old Hbsi) a v).
           apply lookup_map_seqZ_Some. split; [lia | exact Hbsl]. }
     iMod ("Hclose" with "[Ha Hback Hi Hxa]") as "_".
-    { iNext.
+    { iApply bi.later_intro.
       iExists ((map_seqZ (b * BSZ + Z.of_nat off) sub_new : gmap Z (bv 8)) ∪ L),
               (<[b := blk_splice off sub_new bs_old]> C0), ∅.
       iFrame "Ha Hxa".
@@ -1389,7 +1389,7 @@ Section FsBytes.
     iDestruct "He" as "[Hm Hi]".
     iMod (exc_update gX X (X ∖ {[b]}) with "Hxa Hxo") as "[Hxa Hxo]".
     iMod ("Hclose" with "[Ha Hback Hi Hxa]") as "_".
-    { iNext. iExists L, (<[b := Xv b]> C0), (X ∖ {[b]}).
+    { iApply bi.later_intro. iExists L, (<[b := Xv b]> C0), (X ∖ {[b]}).
       iFrame "Ha Hxa".
       iSplitL. { iApply ("Hback" with "Hi"). }
       iPureIntro. split; [| split; [| split; [| split; [| split]]]].
@@ -1545,7 +1545,7 @@ Section FsBytes.
     iMod (exc_alloc X) as (gX) "[Hxa Hxo]".
     iMod (inv_alloc fsbN E (fs_bytes_body gL gc gX (dom C) Bv)
             with "[Ha HC Hxa]") as "#Hinv".
-    { iNext. iExists L, C, X. iFrame "Ha HC Hxa". iPureIntro.
+    { iApply bi.later_intro. iExists L, C, X. iFrame "Ha HC Hxa". iPureIntro.
       split; [done |]. split; [exact Hlen |].
       split; [| split; [exact Hdm | split; [exact HXsub |]]].
       - intros b bs Hb Hnin.

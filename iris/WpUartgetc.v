@@ -190,7 +190,7 @@ Section WpUartgetc.
                 ltac:(rewrite Hlk; exact Hempty)
                 ltac:(rewrite HNo; exact Hal)
                 with "Hcg Hpc HiB [-]").
-      iNext. iIntros (CID3 Hs3) "Hcg Hpc". iEval (rewrite HNo) in "Hpc".
+      iApply bi.later_intro. iIntros (CID3 Hs3) "Hcg Hpc". iEval (rewrite HNo) in "Hpc".
       iSpecialize ("Hk" $! CID3 with "[%]"); [wp_next_chain|].
       iDestruct "Hk" as "[Hno _]".
       iApply ("Hno" $! bt with "[%] Hcg Hpc"). exact Hempty.

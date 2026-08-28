@@ -175,7 +175,7 @@ Section UserretEntryPt.
       iExists mstatus0, mdv0, _.
       iFrame "Hms Hmdl HPC HnPC".
       iSplitR; [iPureIntro; exact Hva00 |]. iSplitR; [done|]. done. }
-    iNext. iIntros (npc0 ms10 mdv10)
+    iApply bi.later_intro. iIntros (npc0 ms10 mdv10)
       "Hhs Hpriv Hms Hmie Hmdl Hmenv Hktlb Hpc (-> & -> & ->)".
     (* ============ STEP 1: sfence.vma under the kernel invariant ======== *)
     iApply (wp_instr_ktramp_pt_share kroot (uva 0xa0) (upa 0xa0) false ai_sfence
@@ -235,7 +235,7 @@ Section UserretEntryPt.
       iExists mstatus0, mdv0, _.
       iFrame "Hms Hmdl HPC HnPC".
       iSplitR; [iPureIntro; exact Hva01 |]. iSplitR; [done|]. done. }
-    iNext. iIntros (npc1 ms11 mdv11)
+    iApply bi.later_intro. iIntros (npc1 ms11 mdv11)
       "Hhs Hpriv Hms Hmie Hmdl Hmenv Hktlb Hpc (-> & -> & ->)".
     (* ============ STEP 2: csrw satp,a0 -- ENTER the window =============
        The kernel residue does not mention satp, so this is an ORDINARY
@@ -329,7 +329,7 @@ Section UserretEntryPt.
       iFrame "Hms Hmdl HPC HnPC".
       iSplitR; [iPureIntro; exact Hva02 |]. iSplitR; [done|]. iSplitR; [done|].
       iExact "Hfmap". }
-    iNext. iIntros (npc2 ms12 mdv12 tv2)
+    iApply bi.later_intro. iIntros (npc2 ms12 mdv12 tv2)
       "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc HRes Hpc
        (-> & -> & -> & Hfmap)".
     (* dissolve the kernel residue into the two-table window; the kernel
@@ -417,7 +417,7 @@ Section UserretEntryPt.
       iExists mstatus0, mdv0, _.
       iFrame "Hms Hmdl HPC HnPC".
       iSplitR; [iPureIntro; exact Hva03 |]. iSplitR; [done|]. done. }
-    iNext. iIntros (npc3 ms13 mdv13 tv3)
+    iApply bi.later_intro. iIntros (npc3 ms13 mdv13 tv3)
       "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc HRes Hpc
        (-> & -> & ->)".
     iDestruct (upt_swp_close uroot tfp um satp3 tv3 pcfg3 paddr3 Hsok3 Hpok3

@@ -821,7 +821,7 @@ Section ProofSysOpenBody.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (soi_0ac with "Htext"). }
-      iIntros (CID10 Hq10). iNext. iIntros "Hcg Hpc".
+      iIntros (CID10 Hq10). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Htgac : add_vec (mword_of_int (SO + 0xac) : mword 64)
                         (sign_extend' 64
                            (sign_extend' 13 (concat_vec (mword_of_int 6 : mword 8) ('b"0"))))
@@ -956,7 +956,7 @@ Section ProofSysOpenBody.
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (soi_0b4 with "Htext"). }
-    iIntros (CID13 Hq13). iNext. iIntros "Hcg Hpc".
+    iIntros (CID13 Hq13). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htgb4 : add_vec (mword_of_int (SO + 0xb4) : mword 64)
                       (sign_extend' 64 (mword_of_int 154 : mword 13))
                     = mword_of_int (SO + 0x14e)) by pcw.
@@ -1119,7 +1119,7 @@ Section ProofSysOpenBody.
               mit (K - 24)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (soi_154 with "Htext"). }
-    iIntros (CID17 Hq17). iNext. iIntros "Hcg Hpc".
+    iIntros (CID17 Hq17). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htg154 : add_vec (mword_of_int (SO + 0x154) : mword 64)
                        (sign_extend' 64
                           (sign_extend' 21 (concat_vec (mword_of_int 1970 : mword 11) ('b"0"))))
@@ -1412,7 +1412,7 @@ Section ProofSysOpenBody.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (soi_066 with "Htext"). }
-      iIntros (CID5 Hq5). iNext. iIntros "Hcg Hpc".
+      iIntros (CID5 Hq5). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Htg66 : add_vec (mword_of_int (SO + 0x66) : mword 64)
                         (sign_extend' 64
                            (sign_extend' 13 (concat_vec (mword_of_int 100 : mword 8) ('b"0"))))
@@ -1587,7 +1587,7 @@ Section ProofSysOpenBody.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (soi_070 with "Htext"). }
-      iIntros (CID10 Hq10). iNext. iIntros "Hcg Hpc".
+      iIntros (CID10 Hq10). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Htg70 : add_vec (mword_of_int (SO + 0x70) : mword 64)
                         (sign_extend' 64 (mword_of_int 182 : mword 13))
                       = mword_of_int (SO + 0x126)) by pcw.
@@ -1727,7 +1727,7 @@ Section ProofSysOpenBody.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (soi_07a with "Htext"). }
-      iIntros (CID13 Hq13). iNext. iIntros "Hcg Hpc".
+      iIntros (CID13 Hq13). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Htg7a : add_vec (mword_of_int (SO + 0x7a) : mword 64)
                         (sign_extend' 64 (mword_of_int 198 : mword 13))
                       = mword_of_int (SO + 0x140)) by pcw.
@@ -1811,7 +1811,7 @@ Section ProofSysOpenBody.
                 M7 (K - 24)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (soi_14c with "Htext"). }
-      iIntros (CID17 Hq17). iNext. iIntros "Hcg Hpc".
+      iIntros (CID17 Hq17). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Htg14c : add_vec (mword_of_int (SO + 0x14c) : mword 64)
                          (sign_extend' 64
                             (sign_extend' 21 (concat_vec (mword_of_int 1950 : mword 11) ('b"0"))))
@@ -2145,7 +2145,7 @@ Section ProofSysOpenBody.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (soi_050 with "Htext"). }
-      iIntros (CID3 Hq3). iNext. iIntros "Hcg Hpc".
+      iIntros (CID3 Hq3). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Htg50 : add_vec (mword_of_int (SO + 0x50) : mword 64)
                         (sign_extend' 64 (mword_of_int 14 : mword 13))
                       = mword_of_int (SO + 0x5e)) by pcw.
@@ -2248,7 +2248,7 @@ Section ProofSysOpenBody.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (soi_05a with "Htext"). }
-      iIntros (CID6 Hq6). iNext. iIntros "Hcg Hpc".
+      iIntros (CID6 Hq6). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Htg5a : add_vec (mword_of_int (SO + 0x5a) : mword 64)
                         (sign_extend' 64 (mword_of_int 188 : mword 13))
                       = mword_of_int (SO + 0x116)) by pcw.
@@ -2746,7 +2746,7 @@ Section ProofSysOpenBody.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (soi_048 with "Htext"). }
-      iIntros (CID8 Hq8). iNext. iIntros "Hcg Hpc".
+      iIntros (CID8 Hq8). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Htg48 : add_vec (mword_of_int (SO + 0x48) : mword 64)
                         (sign_extend' 64
                            (sign_extend' 13 (concat_vec (mword_of_int 69 : mword 8) ('b"0"))))
@@ -3144,7 +3144,7 @@ Section ProofSysOpenBody.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (soi_0e6 with "Htext"). }
-      iIntros (CID5 Hq5). iNext. iIntros "Hcg Hpc".
+      iIntros (CID5 Hq5). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Htge6 : add_vec (mword_of_int (SO + 0xe6) : mword 64)
                         (sign_extend' 64
                            (sign_extend' 13 (concat_vec (mword_of_int 19 : mword 8) ('b"0"))))
@@ -3381,7 +3381,7 @@ Section ProofSysOpenBody.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (soi_0f2 with "Htext"). }
-      iIntros (CID10 Hq10). iNext. iIntros "Hcg Hpc".
+      iIntros (CID10 Hq10). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Htgf2 : add_vec (mword_of_int (SO + 0xf2) : mword 64)
                         (sign_extend' 64 (mword_of_int 8024 : mword 13))
                       = mword_of_int (SO + 0x4a)) by pcw.
@@ -3473,7 +3473,7 @@ Section ProofSysOpenBody.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (soi_0fa with "Htext"). }
-      iIntros (CID12 Hq12). iNext. iIntros "Hcg Hpc".
+      iIntros (CID12 Hq12). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Htgfa : add_vec (mword_of_int (SO + 0xfa) : mword 64)
                         (sign_extend' 64
                            (sign_extend' 13 (concat_vec (mword_of_int 178 : mword 8) ('b"0"))))
@@ -4259,7 +4259,7 @@ Section ProofSysOpenBody.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (soi_036 with "Htext"). }
-      iIntros (CID22 Hq22). iNext. iIntros "Hcg Hpc".
+      iIntros (CID22 Hq22). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Htg36 : add_vec (mword_of_int (SO + 0x36) : mword 64)
                         (sign_extend' 64
                            (sign_extend' 13 (concat_vec (mword_of_int 83 : mword 8) ('b"0"))))

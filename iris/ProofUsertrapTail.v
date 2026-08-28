@@ -893,7 +893,7 @@ Section UtA6.
                 ltac:(rewrite Hrgmf; exact Hnz) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc [] [-]").
       { iApply (uti_0ac with "Htext"). }
-      iNext. iIntros (CID4 Hk4) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID4 Hk4) "Hcg Hpc".
       assert (Hpf4 : add_vec (mword_of_int (UT + 0xac) : mword 64)
                        (sign_extend' 64 (sign_extend' 13
                           (concat_vec (mword_of_int 36 : mword 8) ('b"0"))))
@@ -1096,7 +1096,7 @@ Section UtFa.
                 Hne ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc [] [-]").
       { iApply (uti_0fe with "Htext"). }
-      iNext. iIntros (CID2 Hk2) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID2 Hk2) "Hcg Hpc".
       assert (Hpae : add_vec (mword_of_int (UT + 0xfe) : mword 64)
                        (sign_extend' 64 (mword_of_int 8112 : mword 13))
                      = mword_of_int (UT + 0xae)) by pcw.
@@ -1175,7 +1175,7 @@ Section UtFa.
                 mf nx b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc [] [-]").
       { iApply (uti_106 with "Htext"). }
-      iIntros (CID5 Hk5). iNext. iIntros "Hcg Hpc".
+      iIntros (CID5 Hk5). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Hpae2 : add_vec (mword_of_int (UT + 0x106) : mword 64)
                         (sign_extend' 64 (sign_extend' 21
                            (concat_vec (mword_of_int 2004 : mword 11) ('b"0"))))

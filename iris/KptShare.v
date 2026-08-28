@@ -90,7 +90,7 @@ Section KptShare.
     intros Hspec. iIntros "Ht HM Hunset".
     iMod (kpt_shoot t with "Hunset") as "#Hlb".
     iMod (inv_alloc kptN _ (kpt_body root_ppn) with "[Ht HM]") as "#Hinv".
-    { iNext. iExists t, M. iFrame "Ht HM Hlb". iPureIntro. exact Hspec. }
+    { iApply bi.later_intro. iExists t, M. iFrame "Ht HM Hlb". iPureIntro. exact Hspec. }
     iModIntro. iFrame "Hinv Hlb".
   Qed.
 
@@ -110,7 +110,7 @@ Section KptShare.
     iMod (inv_acc E kptN with "Hinv") as "[>Hbody Hclose]"; [ exact HE | ].
     iDestruct "Hbody" as (t M) "(Ht & #Hlb & HM & %Hspec)".
     iMod ("Hclose" with "[Ht HM]") as "_".
-    { iNext. iExists t, M. iFrame "Ht HM Hlb". iPureIntro. exact Hspec. }
+    { iApply bi.later_intro. iExists t, M. iFrame "Ht HM Hlb". iPureIntro. exact Hspec. }
     iModIntro. iExists t. iExact "Hlb".
   Qed.
 
@@ -353,7 +353,7 @@ Section KptShareTranslate.
                Hspec Hmaps HMlk).
       exists a0, d0. rewrite Hlf. reflexivity. }
     iMod ("Hclose" with "[Ht HM]") as "_".
-    { iNext. iExists t', M. iFrame "Ht HM Hlb'". iPureIntro. exact Hspec'. }
+    { iApply bi.later_intro. iExists t', M. iFrame "Ht HM Hlb'". iPureIntro. exact Hspec'. }
     iModIntro. iExists σ'.
     iSplit; [iPureIntro; exact Htrans |].
     iSplit; [iPureIntro; exact Hmdev |].

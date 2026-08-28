@@ -293,7 +293,7 @@ Section ProofSysUnlinkTails.
               M1 (K - 30)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (suli_172 with "Htext"). }
-    iIntros (CID2 Hq2). iNext. iIntros "Hcg Hpc".
+    iIntros (CID2 Hq2). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htg : add_vec (mword_of_int (SU + 0x172) : mword 64)
                     (sign_extend' 64
                        (sign_extend' 21 (concat_vec (mword_of_int 2043 : mword 11) ('b"0"))))
@@ -704,7 +704,7 @@ Section ProofSysUnlinkTails.
               P2 (K - 30)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (suli_0ea with "Htext"). }
-    iIntros (CID5 Hq5). iNext. iIntros "Hcg Hpc".
+    iIntros (CID5 Hq5). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htg : add_vec (mword_of_int (SU + 0xea) : mword 64)
                     (sign_extend' 64
                        (sign_extend' 21 (concat_vec (mword_of_int 63 : mword 11) ('b"0"))))
@@ -1583,7 +1583,7 @@ Section ProofSysUnlinkTails.
               P2 (K - 30)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (suli_17e with "Htext"). }
-    iIntros (CID6 Hq6). iNext. iIntros "Hcg Hpc".
+    iIntros (CID6 Hq6). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htg : add_vec (mword_of_int (SU + 0x17e) : mword 64)
                     (sign_extend' 64
                        (sign_extend' 21 (concat_vec (mword_of_int 2030 : mword 11) ('b"0"))))

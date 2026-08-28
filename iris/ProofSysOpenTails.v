@@ -313,7 +313,7 @@ Section ProofSysOpenTails.
               P2 (K - 24)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (soi_0da with "Htext"). }
-    iIntros (CID5 Hq5). iNext. iIntros "Hcg Hpc".
+    iIntros (CID5 Hq5). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htg : add_vec (mword_of_int (SO + 0xda) : mword 64)
                     (sign_extend' 64
                        (sign_extend' 21 (concat_vec (mword_of_int 2040 : mword 11) ('b"0"))))
@@ -523,7 +523,7 @@ Section ProofSysOpenTails.
               P2 (K - 24)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (soi_114 with "Htext"). }
-    iIntros (CID5 Hq5). iNext. iIntros "Hcg Hpc".
+    iIntros (CID5 Hq5). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htg : add_vec (mword_of_int (SO + 0x114) : mword 64)
                     (sign_extend' 64
                        (sign_extend' 21 (concat_vec (mword_of_int 2011 : mword 11) ('b"0"))))
@@ -884,7 +884,7 @@ Section ProofSysOpenTails.
               P2 (K - 24)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (soi_10a with "Htext"). }
-    iIntros (CID8 Hq8). iNext. iIntros "Hcg Hpc".
+    iIntros (CID8 Hq8). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htg : add_vec (mword_of_int (SO + 0x10a) : mword 64)
                     (sign_extend' 64
                        (sign_extend' 21 (concat_vec (mword_of_int 2016 : mword 11) ('b"0"))))
@@ -1234,7 +1234,7 @@ Section ProofSysOpenTails.
               P2 (K - 24)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (soi_124 with "Htext"). }
-    iIntros (CID8 Hq8). iNext. iIntros "Hcg Hpc".
+    iIntros (CID8 Hq8). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htg : add_vec (mword_of_int (SO + 0x124) : mword 64)
                     (sign_extend' 64
                        (sign_extend' 21 (concat_vec (mword_of_int 2003 : mword 11) ('b"0"))))
@@ -1600,7 +1600,7 @@ Section ProofSysOpenTails.
               P3 (K - 24)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (soi_13e with "Htext"). }
-    iIntros (CID8 Hq8). iNext. iIntros "Hcg Hpc".
+    iIntros (CID8 Hq8). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htg : add_vec (mword_of_int (SO + 0x13e) : mword 64)
                     (sign_extend' 64
                        (sign_extend' 21 (concat_vec (mword_of_int 1990 : mword 11) ('b"0"))))

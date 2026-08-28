@@ -1015,7 +1015,7 @@ Section csrw.
     { cbn [hregread_at]. apply bool_decide_eq_true_2. reflexivity. }
     iIntros (σ) "Hsi".
     iApply fupd_mask_intro; [apply empty_subseteq|].
-    iIntros "Hcl". iNext. iMod "Hcl" as "_". iModIntro. iFrame "Hsi".
+    iIntros "Hcl". iApply bi.later_intro. iMod "Hcl" as "_". iModIntro. iFrame "Hsi".
     rewrite hregread_resume_red.
     iApply swp_ret. iApply "HΦ".
   Qed.

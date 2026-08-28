@@ -339,8 +339,8 @@ Section WpLdGpr.
         iDestruct (phys_word_read_bytes sg ea v dq with "Hmem Hbw") as %Hrb.
         iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hcl".
         iSplitR; [iPureIntro; exact Hrb|].
-        iNext. iMod "Hcl" as "_". iModIntro. iFrame "Hreg Hmem Hdev Hbw".
-    - iNext. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hbw')".
+        iApply bi.later_intro. iMod "Hcl" as "_". iModIntro. iFrame "Hreg Hmem Hdev Hbw".
+    - iApply bi.later_intro. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hbw')".
       iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
       iCombine "Hpmpc' Hpmpc_k'" as "Hpmpc''".
       iApply ("Hcont" with "Hmm'' Hpmpc'' Hpc' Hf' Hbw'").
@@ -451,8 +451,8 @@ Section MmodeLoadTor.
         iDestruct (phys_word_read_bytes sg ea v dq with "Hmem Hbytes") as %Hrb.
         iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hcl".
         iSplitR; [iPureIntro; exact Hrb|].
-        iNext. iMod "Hcl" as "_". iModIntro. iFrame "Hreg Hmem Hdev Hbytes".
-    - iNext.
+        iApply bi.later_intro. iMod "Hcl" as "_". iModIntro. iFrame "Hreg Hmem Hdev Hbytes".
+    - iApply bi.later_intro.
       iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hpaddr' & Hbw')".
       iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
       iCombine "Hpmpc' Hpmpc_k'" as "Hpmpc''".

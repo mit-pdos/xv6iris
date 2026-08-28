@@ -613,7 +613,7 @@ Section WpCsrrGprB.
         { iApply (swp_read_reg_any (R_bitvector_64 mtime) with "Hcert").
           iIntros (v). iFrame. }
         iIntros (tv) "[Hrw Hro]". iApply swp_ret. iFrame.
-    - iNext. iIntros (mf) "Hmm' Hpmpc' Hpc' Hf' H".
+    - iApply bi.later_intro. iIntros (mf) "Hmm' Hpmpc' Hpc' Hf' H".
       iDestruct "H" as (tv) "(-> & Hmm_k' & Hpmpc_k')".
       iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
       iCombine "Hpmpc' Hpmpc_k'" as "Hpmpc''".
@@ -715,7 +715,7 @@ Section WpCsrrGprB.
         iIntros (x) "(-> & Hrw & Hro)".
         rewrite (cw_rs_r (R_bitvector_64 menvcfg) menvcfg_in).
         iSplitR; [done|]. iFrame.
-    - iNext. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hcsr')".
+    - iApply bi.later_intro. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hcsr')".
       iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
       iCombine "Hpmpc' Hpmpc_k'" as "Hpmpc''".
       iApply ("Hcont" with "Hmm'' Hpmpc'' Hpc' Hf' Hcsr'").
@@ -808,7 +808,7 @@ Section WpCsrrGprB.
         iIntros (x) "(-> & Hrw & Hro)".
         rewrite (sie_rs_mie mie_in mideleg_in) (sie_rs_mdl mie_in mideleg_in).
         iSplitR; [done|]. iFrame.
-    - iNext. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hmie' & Hmdl')".
+    - iApply bi.later_intro. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hmie' & Hmdl')".
       iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
       iCombine "Hpmpc' Hpmpc_k'" as "Hpmpc''".
       iApply ("Hcont" with "Hmm'' Hpmpc'' Hpc' Hf' Hmie' Hmdl'").

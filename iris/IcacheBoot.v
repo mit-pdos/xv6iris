@@ -1715,7 +1715,7 @@ Section IcacheBootTable.
     iMod (live_pool_empty with "Hlive") as "Hpool0".
     iMod (inv_alloc icacheN E itable_body
             with "[HhalfI Href Hpool0]") as "#Hitinv".
-    { iNext. iExists ∅. iFrame "HhalfI". iSplitR; [iPureIntro; exact icM_wf_empty |].
+    { iApply bi.later_intro. iExists ∅. iFrame "HhalfI". iSplitR; [iPureIntro; exact icM_wf_empty |].
       iSplitL "Href"; [iApply iref_cells_boot; iExact "Href" |].
       iExact "Hpool0". }
     (* ---- the fifty escrows, at the EMPTY arm, and the table's shares ---- *)
@@ -1744,7 +1744,7 @@ Section IcacheBootTable.
       iDestruct (word4_pointsto_half_split with "Hn") as "[Hn1 Hn2]".
       iMod (inv_alloc (icEscN .@ k) E (ic_escrow_body cn γfs γi cov logstart k)
               with "[Hd Hn1 Hv Hmir Hmd Hgd1 Hpin]") as "#Hinv".
-      { iNext. rewrite /ic_escrow_body. iRight. iRight. iRight. iLeft.
+      { iApply bi.later_intro. rewrite /ic_escrow_body. iRight. iRight. iRight. iLeft.
         rewrite /ic_empty_arm. iExists (dvs k).1, (dvs k).2, w. iFrame. }
       iModIntro. iFrame "Hinv". iSplitR "Hgd3"; [| iExact "Hgd3"].
       rewrite /islot_empty. iExists (dvs k).1, (dvs k).2. iFrame. }

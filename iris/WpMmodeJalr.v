@@ -84,7 +84,7 @@ Section RvcRet.
       iSplitL "Hhs_k Hpriv_k Hmst_k".
       { iFrame "Hhw Hhs_k Hpriv_k Hmst_k". }
       iFrame "Hpmpc_k".
-    - iNext. iIntros "Hmm' Hpmpc' Hpc' Hf' [Hmm_k' Hpmpc_k']".
+    - iApply bi.later_intro. iIntros "Hmm' Hpmpc' Hpc' Hf' [Hmm_k' Hpmpc_k']".
       iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
       iCombine "Hpmpc' Hpmpc_k'" as "Hpmpc''".
       iApply ("Hcont" with "Hmm'' Hpmpc'' Hpc' Hf'").

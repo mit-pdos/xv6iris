@@ -825,7 +825,7 @@ Section ProofSysChdirM1Tail.
               P1 (K - 20)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (schdi_6e with "Htext"). }
-    iIntros (CID4 Hq4). iNext. iIntros "Hcg Hpc".
+    iIntros (CID4 Hq4). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htg5c : add_vec (mword_of_int (SC + 0x6e) : mword 64)
                       (sign_extend' 64
                          (sign_extend' 21 (concat_vec (mword_of_int 2039 : mword 11) ('b"0"))))
@@ -2226,7 +2226,7 @@ iExact "Hrefnew". }
                     Q4 (K - 20)%nat b ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (schdi_7e with "Htext"). }
-          iIntros (CID35 Hq35). iNext. iIntros "Hcg Hpc".
+          iIntros (CID35 Hq35). iApply bi.later_intro. iIntros "Hcg Hpc".
           assert (Htg5c : add_vec (mword_of_int (SC + 0x7e) : mword 64)
                             (sign_extend' 64
                                (sign_extend' 21 (concat_vec (mword_of_int 2031 : mword 11) ('b"0"))))

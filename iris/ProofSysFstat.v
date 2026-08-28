@@ -688,7 +688,7 @@ Section ProofSysFstat.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (sfsi_22 with "Htext"). }
-      iNext. iIntros (CID16 Hs16) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID16 Hs16) "Hcg Hpc".
       assert (Htgt32 : add_vec (mword_of_int (KernelSyms.sys_fstat + 0x22) : mword 64)
                 (sign_extend' 64 (mword_of_int 16 : mword 13))
                 = mword_of_int (KernelSyms.sys_fstat + 0x32))

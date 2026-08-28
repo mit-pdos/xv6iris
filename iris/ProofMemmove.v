@@ -505,7 +505,7 @@ Section ProofMemmove.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (minstr_mm_24 with "Htext"). }
-      iNext. iIntros (CID5 Hs5) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID5 Hs5) "Hcg Hpc".
       assert (Hback18 : add_vec (mword_of_int (KernelSyms.memmove + 0x24) : mword 64)
                           (sign_extend' 64 (mword_of_int 0x1ff4 : mword 13))
                         = mword_of_int (KernelSyms.memmove + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
@@ -831,7 +831,7 @@ Section ProofMemmove.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (minstr_mm_08 with "Htext"). }
-      iNext. iIntros (CID5 Hs5) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID5 Hs5) "Hcg Hpc".
       assert (Hpsuf : add_vec (mword_of_int (KernelSyms.memmove + 0x08) : mword 64)
                         (sign_extend' 64 (sign_extend' 13 (concat_vec imm8_beqz ('b"0"))))
                       = mword_of_int (KernelSyms.memmove + 0x28)) by (apply bv_eq; vm_compute; reflexivity).
@@ -869,7 +869,7 @@ Section ProofMemmove.
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (minstr_mm_0a with "Htext"). }
-        iNext. iIntros (CID6 Hs6) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID6 Hs6) "Hcg Hpc".
         assert (Hp30 : add_vec (mword_of_int (KernelSyms.memmove + 0x0a) : mword 64)
                          (sign_extend' 64 (mword_of_int 0x26 : mword 13))
                        = mword_of_int (KernelSyms.memmove + 0x30)) by (apply bv_eq; vm_compute; reflexivity).
@@ -961,7 +961,7 @@ Section ProofMemmove.
                     ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (minstr_mm_3a with "Htext"). }
-          iNext. iIntros (CID10 Hs10) "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CID10 Hs10) "Hcg Hpc".
           assert (Hp0e : add_vec (mword_of_int (KernelSyms.memmove + 0x3a) : mword 64)
                            (sign_extend' 64 (mword_of_int 0x1fd4 : mword 13))
                          = mword_of_int (KernelSyms.memmove + 0x0e))

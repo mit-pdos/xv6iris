@@ -435,7 +435,7 @@ Section Lock.
     iModIntro. iFrame "Hlive HT".
     iSplit.
     - iIntros "Hb". iApply "Hclose". by iLeft.
-    - iIntros "Hd". iApply "Hclose". iRight. by iNext.
+    - iIntros "Hd". iApply "Hclose". iRight. by iApply bi.later_intro.
   Qed.
 
   (* ---- THE FINISHING INTERFACE ---------------------------------------
@@ -467,7 +467,7 @@ Section Lock.
   Proof.
     iIntros "[Hclose _] Hauth Hfrag Hword Hcpu HR".
     iMod ("Hclose" with "[Hauth Hfrag Hword Hcpu HR]") as "_"; [| by iModIntro].
-    iNext. iExists (mword_of_int 0 : mword 32), None.
+    iApply bi.later_intro. iExists (mword_of_int 0 : mword 32), None.
     rewrite /lock_word lk_cpu_res_free. iFrame "Hword Hcpu Hauth".
     iLeft. by iFrame "Hfrag HR".
   Qed.
@@ -534,7 +534,7 @@ Section Lock.
     iDestruct (own_op with "H") as "[Ha Hf]".
     iModIntro. iExists γ. iIntros (R D) "HR".
     iApply (inv_alloc lockN E (lock_inv γ lk s R ∨ D)).
-    iNext. iLeft. iExists (mword_of_int 0 : mword 32), None.
+    iApply bi.later_intro. iLeft. iExists (mword_of_int 0 : mword 32), None.
     rewrite /lock_word lk_cpu_res_free. iFrame "Hword Hcpu Ha".
     iLeft. iFrame "Hf HR". done.
   Qed.
@@ -577,7 +577,7 @@ Section Lock.
     iDestruct (own_op with "H") as "[Ha Hf]".
     iModIntro. iExists γ. iIntros (R) "HR".
     iMod (inv_alloc lockN E (lock_inv γ lk s R) with "[Hword Hcpu Ha Hf HR]") as "#Hinv".
-    { iNext. iExists (mword_of_int 0 : mword 32), None.
+    { iApply bi.later_intro. iExists (mword_of_int 0 : mword 32), None.
       rewrite /lock_word lk_cpu_res_free. iFrame "Hword Hcpu Ha".
       iLeft. iFrame "Hf HR". done. }
     iModIntro. iApply (is_lock_intro with "Hnm Hinv").

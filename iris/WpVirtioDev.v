@@ -296,7 +296,7 @@ Proof.
                  ⌜m' = <[Regidx rd := regval_into_reg (ldval w)]> m⌝ ∗
                  ⌜n' = n⌝ ∗ S w)%I
             with "Hcg Hpc Hinstr [HR Hacc Hcont]").
-  iNext.
+  iApply bi.later_intro.
   rename CID into CID0.
   iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "HR Hacc".
   - (* ---------------- THE INSTRUCTION ---------------- *)
@@ -429,14 +429,14 @@ Proof.
           iDestruct (dev_interp_agree_virtio with "Hdev Hvf") as %Hveq.
           iMod ("Hacc" $! vst Hvok with "Hproto HR") as (w) "(%Hrd_v & Hproto & HS)".
           iMod ("Hdclose" with "[Hvf Hproto]") as "_".
-          { iNext. iExists vst. iFrame. iPureIntro. exact Hvok. }
+          { iApply bi.later_intro. iExists vst. iFrame. iPureIntro. exact Hvok. }
           iMod (fupd_mask_subseteq ∅) as "Hb2"; [set_solver|].
           iModIntro. iExists w, sigma.(mdev).
           iSplitR.
           { iPureIntro. rewrite Hpaid.
             apply (dev_read_virtio sigma.(mdev) a8 w Hrange).
             rewrite Hveq. exact Hrd_v. }
-          iNext. iMod "Hb2" as "_". iModIntro.
+          iApply bi.later_intro. iMod "Hb2" as "_". iModIntro.
           destruct sigma as [srx mmx ddx]; cbn [mdev sregs mem].
           iFrame "Hreg Hmem Hdev HS". }
     (* ---- the post ---- *)
@@ -570,7 +570,7 @@ Proof.
                (⌜npc = add_vec_int pc (if is_rvc then 2 else 4)⌝ ∗
                 ⌜m' = m⌝ ∗ ⌜n' = n⌝ ∗ S)%I)
             with "Hcg Hpc Hinstr [HR Hacc Hcont]").
-  iNext.
+  iApply bi.later_intro.
   rename CID into CID0.
   iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "HR Hacc".
   - (* ---------------- THE INSTRUCTION ---------------- *)
@@ -710,14 +710,14 @@ Proof.
           iMod (dev_interp_update_virtio sigma.(mdev) vst vst'
                   with "Hdev Hvf") as "[Hdev' Hvf']".
           iMod ("Hdclose" with "[Hvf' Hproto]") as "_".
-          { iNext. iExists vst'. iFrame. iPureIntro. exact Hvok'. }
+          { iApply bi.later_intro. iExists vst'. iFrame. iPureIntro. exact Hvok'. }
           iMod (fupd_mask_subseteq ∅) as "Hb2"; [set_solver|].
           iModIntro. iExists (set_dvirtio sigma.(mdev) vst').
           iSplitR.
           { iPureIntro. rewrite Hpaid.
             apply (dev_write_virtio sigma.(mdev) a8 storeword vst' Hrange).
             rewrite Hveq. exact Hvw. }
-          iNext. iMod "Hb2" as "_". iModIntro.
+          iApply bi.later_intro. iMod "Hb2" as "_". iModIntro.
           destruct sigma as [srx mmx ddx]; cbn [mdev sregs mem].
           iFrame "Hreg Hmem Hdev' HS". }
     (* ---- the post ---- *)

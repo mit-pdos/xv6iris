@@ -1520,7 +1520,7 @@ Section ProofIget.
             iDestruct (wordw_claim_of (KTR := KT0) 4 (i_valid (ientry e))
                          (DfracOwn 1) wvp ltac:(lia) with "Hvldp") as "#Hclaim4".
             iMod ("Hclosep" with "[Hd1p Hincellp Hvldp Hpayp Hgid1p Hpinp]") as "_".
-            { iNext. iApply (ic_close_mid fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst e).
+            { iApply bi.later_intro. iApply (ic_close_mid fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst e).
               (* NAMED, in the goal's conjunct order (optimization.md,
                  "Never bare iFrame in a large context"): [ic_mid_arm]'s
                  fourth conjunct is [ic_unloaded], whose pool bundle is an ∃

@@ -4806,7 +4806,7 @@ Section IcacheEscrow.
       rewrite Qp.half_half. iExact "Htkey". }
     iMod (inv_alloc ipoolN E (ipool_body cn γfs γi cov logstart nib)
             with "[Hk1 Hx1 Ht1 Hckey Hids Hrows]") as "#Hinv".
-    { iNext. rewrite /ipool_body. iExists (region_inums nib), ∅, ∅, ids, ∅.
+    { iApply bi.later_intro. rewrite /ipool_body. iExists (region_inums nib), ∅, ∅, ids, ∅.
       iSplitR; [iPureIntro; exact Hlen |].
       iSplitR; [iPureIntro; rewrite Hlive dom_empty_L; set_solver |].
       iSplitR; [iPureIntro; exact dom_empty_L |].
@@ -4946,7 +4946,7 @@ Section IcacheEscrow.
       iDestruct (ic_id_quarters_split with "Hhalf") as "[Hq1 Hq2]".
       iDestruct ("Hidsback" $! true dv1 nu1 with "Hq2") as "Hids".
       iMod ("Hclose" with "[Hk1 Hx1 Ht1 Htr Hids Hrows Hck Hcrp]") as "_".
-      { iNext. rewrite /ipool_body.
+      { iApply bi.later_intro. rewrite /ipool_body.
         iExists (O ∖ {[bv_unsigned inum]}), (P ∖ O), ∅,
           (<[k := (true, dv1, nu1)]> ids), K.
         iSplitR; [iPureIntro; rewrite length_insert; exact Hlen |].
@@ -5020,7 +5020,7 @@ Section IcacheEscrow.
       iDestruct (ic_id_quarters_split with "Hhalf") as "[Hq1 Hq2]".
       iDestruct ("Hidsback" $! true dv1 nu1 with "Hq2") as "Hids".
       iMod ("Hclose" with "[Hk1 Hx1 Ht1 Htr Hids Hrows Hck Hcrp]") as "_".
-      { iNext. rewrite /ipool_body.
+      { iApply bi.later_intro. rewrite /ipool_body.
         iExists O, ((P ∖ O) ∖ {[bv_unsigned inum]}), ∅,
           (<[k := (true, dv1, nu1)]> ids), (delete (bv_unsigned inum) K).
         iSplitR; [iPureIntro; rewrite length_insert; exact Hlen |].
@@ -5092,7 +5092,7 @@ Section IcacheEscrow.
     iDestruct (ic_id_quarters_split with "Hhalf") as "[Hq1 Hq2]".
     iDestruct ("Hidsback" $! false dv1 nu1 with "Hq2") as "Hids".
     iMod ("Hclose" with "[Hk1 Hx1 Ht1 Htr Htx Hids Hrows Hck Hcrp]") as "_".
-    { iNext. rewrite /ipool_body.
+    { iApply bi.later_intro. rewrite /ipool_body.
       iExists O, (P ∖ O), {[z := (t, q)]}, (<[k := (false, dv1, nu1)]> ids), K.
       iSplitR; [iPureIntro; rewrite length_insert; exact Hlen |].
       iSplitR.
@@ -5145,7 +5145,7 @@ Section IcacheEscrow.
     iDestruct (ic_id_quarters_split with "Hhalf") as "[Hq1 Hq2]".
     iDestruct ("Hidsback" $! false dv1 nu1 with "Hq2") as "Hids".
     iMod ("Hclose" with "[Hk1 Hx1 Ht1 Htr Hids Hrows Hck Hcrp]") as "_".
-    { iNext. rewrite /ipool_body.
+    { iApply bi.later_intro. rewrite /ipool_body.
       iExists O, X, T, (<[k := (false, dv1, nu1)]> ids), K.
       iSplitR; [iPureIntro; rewrite length_insert; exact Hlen |].
       iSplitR;
@@ -5195,7 +5195,7 @@ Section IcacheEscrow.
     iMod (ghost_var_update_halves ({[z]} ∪ O) with "Hk1 Hkey")
       as "[Hk1 Hkey]".
     iMod ("Hclose" with "[Hk1 Hx1 Ht1 Hids Hrows Hrow Hck Hcrp]") as "_".
-    { iNext. rewrite /ipool_body. iExists ({[z]} ∪ O), (P ∖ O), ∅, ids, K.
+    { iApply bi.later_intro. rewrite /ipool_body. iExists ({[z]} ∪ O), (P ∖ O), ∅, ids, K.
       iSplitR; [iPureIntro; exact Hlen |].
       iSplitR;
         [iPureIntro; rewrite dom_empty_L Hrow; clear Hrow; set_solver |].
@@ -5256,7 +5256,7 @@ Section IcacheEscrow.
     { apply not_elem_of_dom. rewrite Hdk. set_solver. }
     iMod (ghost_map_insert z (CrpPre t q) HKz with "Hck") as "[Hck Hel]".
     iMod ("Hclose" with "[Hk1 Hx1 Ht1 Hids Hrows Hck Hcrp Htr]") as "_".
-    { iNext. rewrite /ipool_body.
+    { iApply bi.later_intro. rewrite /ipool_body.
       iExists O, ({[z]} ∪ (P ∖ O)), ∅, ids, (<[z := CrpPre t q]> K).
       iSplitR; [iPureIntro; exact Hlen |].
       iSplitR;
@@ -5307,7 +5307,7 @@ Section IcacheEscrow.
     iEval (rewrite /crp_row) in "Hshare".
     iMod (ghost_map_update CrpDep with "Hck Hel") as "[Hck Hel]".
     iMod ("Hclose" with "[Hk1 Hx1 Ht1 Htr Hids Hrows Hck Hcrp Hmk]") as "_".
-    { iNext. rewrite /ipool_body.
+    { iApply bi.later_intro. rewrite /ipool_body.
       iExists O, X, T, ids, (<[z := CrpDep]> K).
       iSplitR; [iPureIntro; exact Hlen |].
       iSplitR; [iPureIntro; exact Hrow |].
@@ -5407,7 +5407,7 @@ Section IcacheEscrow.
     iSplitR; [iPureIntro; exact Hrow |].
     iSplitR; [iPureIntro; exact Hdk |].
     iFrame "Hrows Hids Htr Hcrp".
-    iIntros "(Hrows & Hids & Htr & Hcrp)". iApply "Hclose". iNext.
+    iIntros "(Hrows & Hids & Htr & Hcrp)". iApply "Hclose". iApply bi.later_intro.
     rewrite /ipool_body. iExists O, X, T, ids, K.
     iSplitR; [iPureIntro; exact Hlen |].
     iSplitR; [iPureIntro; exact Hrow |].

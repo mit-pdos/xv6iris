@@ -151,7 +151,7 @@ Section Wp_slli.
                (fun a => shift_bits_left a (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))
                eq_refl Hrd with "Hcert Hf") ].
       iIntros (e) "[-> Hf]". iSplitR; [done|]. iFrame "Hf HPC HnPC".
-    - iNext. iIntros "Hmm Hpmpc Hpc Hf _".
+    - iApply bi.later_intro. iIntros "Hmm Hpmpc Hpc Hf _".
       iApply ("Hcont" with "Hmm Hpmpc Hpc Hf").
   Qed.
 End Wp_slli.
@@ -195,7 +195,7 @@ Section Wp_srli.
                (fun a => shift_bits_right a (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))
                eq_refl Hrd with "Hcert Hf") ].
       iIntros (e) "[-> Hf]". iSplitR; [done|]. iFrame "Hf HPC HnPC".
-    - iNext. iIntros "Hmm Hpmpc Hpc Hf _".
+    - iApply bi.later_intro. iIntros "Hmm Hpmpc Hpc Hf _".
       iApply ("Hcont" with "Hmm Hpmpc Hpc Hf").
   Qed.
 End Wp_srli.

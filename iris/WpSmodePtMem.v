@@ -1192,7 +1192,7 @@ Section WpSmodePtMemLeaves.
             iMod (fupd_mask_subseteq ∅) as "Hclose"; [set_solver|].
             iModIntro. iSplitR.
             { iPureIntro. intros j Hj. apply Hbf. exact Hj. }
-            iNext. iMod "Hclose" as "_". iModIntro.
+            iApply bi.later_intro. iMod "Hclose" as "_". iModIntro.
             iFrame "Hreg Hmem Hdev".
             rewrite /word4_pointsto. iFrame "Hbytes". iPureIntro. exact Hpalign4. }
       iIntros (e) "(-> & Hfile & Hland)".
@@ -1238,7 +1238,7 @@ Section WpSmodePtMemLeaves.
       iFrame "Hms Hmdl HPC HnPC".
       iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
       rewrite Hev. iFrame "Hfile Hword".
-    - iNext. iIntros (npc ms1 mdv1)
+    - iApply bi.later_intro. iIntros (npc ms1 mdv1)
         "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc
          (-> & -> & -> & Hfile & Hword)".
       iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile
@@ -1502,7 +1502,7 @@ Section WpSmodePtMemLeaves.
             iMod (fupd_mask_subseteq ∅) as "Hclose"; [set_solver|].
             iModIntro. iSplitR.
             { iPureIntro. intros j Hj. apply Hbf. exact Hj. }
-            iNext. iMod "Hclose" as "_". iModIntro.
+            iApply bi.later_intro. iMod "Hclose" as "_". iModIntro.
             iFrame "Hreg Hmem Hdev".
             rewrite /word_pointsto. iFrame "Hbytes". iPureIntro. exact Hpalign4. }
       iIntros (e) "(-> & Hfile & Hland)".
@@ -1548,7 +1548,7 @@ Section WpSmodePtMemLeaves.
       iFrame "Hms Hmdl HPC HnPC".
       iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
       rewrite Hev. iFrame "Hfile Hword".
-    - iNext. iIntros (npc ms1 mdv1)
+    - iApply bi.later_intro. iIntros (npc ms1 mdv1)
         "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc
          (-> & -> & -> & Hfile & Hword)".
       iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile
@@ -1807,7 +1807,7 @@ Section WpSmodePtMemLeaves.
                     vold (trunc32 (m !!! Regidx rs2)) Hcan Hoff
                     with "Hk Hmem Hword") as "[Hmem Hword]".
             iMod (fupd_mask_subseteq ∅) as "Hclose"; [set_solver|].
-            iModIntro. iNext. iMod "Hclose" as "_". iModIntro.
+            iModIntro. iApply bi.later_intro. iMod "Hclose" as "_". iModIntro.
             iFrame "Hreg Hmem Hdev Hword". }
       iIntros (e) "(-> & Hfile & Hland)".
       iDestruct "Hland" as (rsf) "(%Hshape & Hrw & Hro & HRes & Hword & Hfrag)".
@@ -1851,7 +1851,7 @@ Section WpSmodePtMemLeaves.
       iFrame "Hms Hmdl HPC HnPC".
       iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
       iFrame "Hfile Hword".
-    - iNext. iIntros (npc ms1 mdv1)
+    - iApply bi.later_intro. iIntros (npc ms1 mdv1)
         "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc
          (-> & -> & -> & Hfile & Hword)".
       iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile
@@ -2110,7 +2110,7 @@ Section WpSmodePtMemLeaves.
                     vold (m !!! Regidx rs2) Hcan Hoff
                     with "Hk Hmem Hword") as "[Hmem Hword]".
             iMod (fupd_mask_subseteq ∅) as "Hclose"; [set_solver|].
-            iModIntro. iNext. iMod "Hclose" as "_". iModIntro.
+            iModIntro. iApply bi.later_intro. iMod "Hclose" as "_". iModIntro.
             iFrame "Hreg Hmem Hdev Hword". }
       iIntros (e) "(-> & Hfile & Hland)".
       iDestruct "Hland" as (rsf) "(%Hshape & Hrw & Hro & HRes & Hword & Hfrag)".
@@ -2154,7 +2154,7 @@ Section WpSmodePtMemLeaves.
       iFrame "Hms Hmdl HPC HnPC".
       iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
       iFrame "Hfile Hword".
-    - iNext. iIntros (npc ms1 mdv1)
+    - iApply bi.later_intro. iIntros (npc ms1 mdv1)
         "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc
          (-> & -> & -> & Hfile & Hword)".
       iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile

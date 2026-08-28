@@ -50,7 +50,7 @@ Section WireInv.
     ={E}=∗ wire_inv.
   Proof.
     iIntros "Hwires".
-    iApply inv_alloc. iNext. rewrite /wire_inv_body.
+    iApply inv_alloc. iApply bi.later_intro. rewrite /wire_inv_body.
     iExists seip, meip. iFrame.
   Qed.
 End WireInv.

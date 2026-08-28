@@ -1353,7 +1353,7 @@ Section ProofFilestat.
                 Hcmp ltac:(rewrite Htgt62; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (fsti_1a with "Htext"). }
-      iIntros (CID14 Hs14). iNext. iIntros "Hcg Hpc".
+      iIntros (CID14 Hs14). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt62) in "Hpc".
       (* +0x62 c.li a0,-1 *)
       iApply (wp_cli_s_sconf (mword_of_int (FST + 0x62)) Ra0 (mword_of_int 63 : mword 6)
@@ -1388,7 +1388,7 @@ Section ProofFilestat.
                 ltac:(rewrite Htgt56; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (fsti_64 with "Htext"). }
-      iIntros (CID16 Hs16). iNext. iIntros "Hcg Hpc".
+      iIntros (CID16 Hs16). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgt56) in "Hpc".
       (* ---- the shared epilogue ---- *)
       iApply (fst_epi (CID0 := CID16) m E1 K sp0 (m !!! Regidx Rra)

@@ -594,7 +594,7 @@ Section ProofFlags2perm.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (fpi_12 with "Htext"). }
-      iNext.
+      iApply bi.later_intro.
       iIntros (CID9 Hs9) "Hcg Hpc".
       assert (Htgt18 : add_vec (mword_of_int (KernelSyms.flags2perm + 0x12) : mword 64)
                          (sign_extend' 64 (sign_extend' 13

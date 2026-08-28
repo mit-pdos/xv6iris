@@ -921,7 +921,7 @@ Section ProofProcinit.
                 ltac:(rewrite Htgt78; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (pii_9e with "Htext"). }
-      iNext. iIntros (CID66 Hs66) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID66 Hs66) "Hcg Hpc".
       iEval (rewrite Htgt78) in "Hpc".
       (* recurse at the hart THIS iteration ended on: re-anchor [Hpost] there
          first, exactly as the exit arm does. *)

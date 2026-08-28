@@ -210,7 +210,7 @@ Section ProofMemset.
                 with "Hcg [Hpc] []").
       { unfold pc6. iExact "Hpc". }
       { iApply (Hext6 with "Htext"). }
-      iNext.
+      iApply bi.later_intro.
       iIntros (CID3 Hs3) "Hcg Hpc".
       rewrite Hback.
       iApply (IH CID3 (S off) m' ltac:(lia) ltac:(lia) Hm'a5 Hm'a4 Hm'a1
@@ -399,7 +399,7 @@ Section ProofMemset.
     iApply (wp_cbeqz_taken_s_sconf (add_vec_int pcE 8) imm8_beqz (Cregidx (mword_of_int 4)) a2_idx M n b
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) Hz' Hal
               with "Hcg Hpc Hi08").
-    iNext.
+    iApply bi.later_intro.
     iIntros (CID1 Hs1) "Hcg Hpc".
     iEval (rewrite Htgt) in "Hpc".
     iApply ("Hcont" $! CID1 with "[%] Hcg Hpc").

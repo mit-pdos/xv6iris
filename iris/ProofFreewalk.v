@@ -743,7 +743,7 @@ Section ProofFreewalk.
                   Hcmp ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (fwi_26 with "Htext"). }
-        iNext. iIntros (CIDt2 Hst2) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CIDt2 Hst2) "Hcg Hpc".
         assert (Htgt48 : add_vec (mword_of_int (KernelSyms.freewalk + 0x26) : mword 64)
                   (sign_extend' 64 (mword_of_int 34 : mword 13))
                 = mword_of_int (KernelSyms.freewalk + 0x48)) by (apply bv_eq; vm_compute; reflexivity).
@@ -854,7 +854,7 @@ Section ProofFreewalk.
                 Hbz ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (fwi_30 with "Htext"). }
-      iNext. iIntros (CIDb3 Hsb3) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CIDb3 Hsb3) "Hcg Hpc".
       iEval (rewrite Htgt24) in "Hpc".
       iDestruct (pt_slot_mem_to_phys (pt_base t) (mword_of_int d) (DfracOwn 1)
                    (pt_ents t (mword_of_int d)) with "Hcl Hcell") as "Hslot".
@@ -1033,7 +1033,7 @@ Section ProofFreewalk.
               mr (K - 6) b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (fwi_46 with "Htext"). }
-    iIntros (CIDb11 Hsb11). iNext. iIntros "Hcg Hpc".
+    iIntros (CIDb11 Hsb11). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htgt24' : add_vec (mword_of_int (KernelSyms.freewalk + 0x46) : mword 64)
               (sign_extend' 64 (sign_extend' 21
                  (concat_vec (mword_of_int 2031 : mword 11) ('b"0"))))
@@ -1246,7 +1246,7 @@ Section ProofFreewalk.
               R6 (K - 6) b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (fwi_16 with "Htext"). }
-    iIntros (CID12 Hs12). iNext. iIntros "Hcg Hpc".
+    iIntros (CID12 Hs12). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htgt2a : add_vec (mword_of_int (KernelSyms.freewalk + 0x16) : mword 64)
               (sign_extend' 64 (sign_extend' 21
                  (concat_vec (mword_of_int 10 : mword 11) ('b"0"))))

@@ -1691,7 +1691,7 @@ Section EraRes.
         iApply (fsblock_home (fs_bytes γfs) L home (fn_naddr n k) bs Hdm
                   with "Ha Hbk"). }
     iMod ("Hclose" with "[Ha HC Hxa]") as "_".
-    { iNext. iExists L, C, X. by iFrame. }
+    { iApply bi.later_intro. iExists L, C, X. by iFrame. }
     iModIntro. iSplitR; [done |].
     rewrite /inode_owned_era. iFrame. done.
   Qed.

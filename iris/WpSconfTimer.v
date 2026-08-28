@@ -804,7 +804,7 @@ Section WpSconfTimer.
                  ⌜∃ tv : mword 64,
                     m' = <[Regidx rd := regval_into_reg tv]> m⌝)%I
               with "Hcg Hpc Hinstr [Hcont]").
-    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iApply bi.later_intro. iApply wp_next_off_intro. rewrite /sconf_step_obl.
     iSplitR "Hcont".
     - (* ---- the instruction ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
@@ -930,7 +930,7 @@ Section WpSconfTimer.
               (fun (_ : CpuId) npc ms' m' n' =>
                  ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝)%I
               with "Hcg Hpc Hinstr [Hcont]").
-    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl_clock.
+    iApply bi.later_intro. iApply wp_next_off_intro. rewrite /sconf_step_obl_clock.
     iSplitR "Hcont".
     - (* ---- the instruction ---- *)
       iIntros "Hsc Hcap Hfile HPC HnPC Hresv Hclk".

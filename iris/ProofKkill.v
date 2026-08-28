@@ -348,7 +348,7 @@ Section ProofKkill.
                   Hcmp28r ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kki_28 with "Htext"). }
-        iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
         assert (Htgt3e : add_vec (mword_of_int (KernelSyms.kkill + 0x28) : mword 64)
                            (sign_extend' 64 (mword_of_int 22 : mword 13)) = mword_of_int (KernelSyms.kkill + 0x3e))
           by (apply bv_eq; vm_compute; reflexivity).
@@ -554,7 +554,7 @@ Section ProofKkill.
                     Hcmp46r ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (kki_46 with "Htext"). }
-          iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+          iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
           assert (Htgt60 : add_vec (mword_of_int (KernelSyms.kkill + 0x46) : mword 64)
                              (sign_extend' 64 (mword_of_int 26 : mword 13)) = mword_of_int (KernelSyms.kkill + 0x60))
             by (apply bv_eq; vm_compute; reflexivity).
@@ -616,7 +616,7 @@ Section ProofKkill.
                     M60 (trap_res b + av)%nat false ltac:(rewrite Htgt4a; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (kki_64 with "Htext"). }
-          iApply wp_next_off_intro. iNext. iIntros "Hcg Hpc".
+          iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc".
           iEval (rewrite Htgt4a) in "Hpc".
           iApply ("Hret0" $! M60 with "[%] Hcg Hpc Htok HR").
           split; [exact HE9|]. split; [exact HEsp|]. exact HEcs.
@@ -771,7 +771,7 @@ Section ProofKkill.
                     Hcmp36r ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (kki_36 with "Htext"). }
-          iNext. iIntros (CIDj Hsj) "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDj Hsj) "Hcg Hpc".
           assert (Htgt20 : add_vec (mword_of_int (KernelSyms.kkill + 0x36) : mword 64)
                              (sign_extend' 64 (mword_of_int 8170 : mword 13)) = mword_of_int (KernelSyms.kkill + 0x20))
             by (apply bv_eq; vm_compute; reflexivity).
@@ -827,7 +827,7 @@ Section ProofKkill.
                     M3a av b ltac:(rewrite Htgt52; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (kki_3c with "Htext"). }
-          iIntros (CIDm Hsm). iNext. iIntros "Hcg Hpc".
+          iIntros (CIDm Hsm). iApply bi.later_intro. iIntros "Hcg Hpc".
           iEval (rewrite Htgt52) in "Hpc".
           iDestruct (cpu_own_transport CIDg CIDm lvl eb pme b ltac:(wp_next_chain)
                        with "Hown") as "Hown".

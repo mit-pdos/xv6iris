@@ -602,7 +602,7 @@ Section ProofSysClose.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (sci_18 with "Htext"). }
-      iNext. iIntros (CID11 Hs11) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID11 Hs11) "Hcg Hpc".
       assert (Hbtgt : add_vec (mword_of_int (KernelSyms.sys_close + 0x18) : mword 64)
                         (sign_extend' 64 (mword_of_int 34 : mword 13))
                       = mword_of_int (KernelSyms.sys_close + 0x3a))

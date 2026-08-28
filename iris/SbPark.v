@@ -111,7 +111,7 @@ Section SbPark.
   Proof.
     intros Hparse. iIntros "Hb".
     iMod (inv_alloc sbN E (sb_park_body γfs sb) with "[Hb]") as "#Hi".
-    { iNext. rewrite /sb_park_body. iExists bs.
+    { iApply bi.later_intro. rewrite /sb_park_body. iExists bs.
       iSplitR; [iPureIntro; exact Hparse |]. iExact "Hb". }
     iModIntro. rewrite /sb_park. iExact "Hi".
   Qed.
@@ -146,7 +146,7 @@ Section SbPark.
     iModIntro. iExists bs. iSplitR; [iPureIntro; exact Hparse |].
     iFrame "Hb". iIntros "Hb".
     iMod ("Hclose" with "[Hb]") as "_".
-    { iNext. rewrite /sb_park_body. iExists bs.
+    { iApply bi.later_intro. rewrite /sb_park_body. iExists bs.
       iSplitR; [iPureIntro; exact Hparse |]. iExact "Hb". }
     by iModIntro.
   Qed.

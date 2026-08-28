@@ -5387,7 +5387,7 @@ Section SyscallMain.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (syci_22 with "Htext"). }
-      iNext.
+      iApply bi.later_intro.
       iIntros (CID15 Hs15) "Hcg Hpc".
       assert (Hp40 : add_vec (mword_of_int (KernelSyms.syscall + 0x22) : mword 64) (sign_extend' 64 (mword_of_int 30 : mword 13)) = mword_of_int (KernelSyms.syscall + 0x40)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp40) in "Hpc".

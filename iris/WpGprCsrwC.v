@@ -953,7 +953,7 @@ Section WpCsrwGprNewC.
         iSplitR; [done|]. iFrame "Hpriv Hms Hpmpc Hf HPC HnPC".
       + iApply (swp_write_CSR_mstatus (DfracOwn 1) ms0 (m !!! Regidx rs1)
                   Hfresh with "Hcert").
-    - iNext. iIntros "Hhs' Hpriv' Hms' Hpmpc' Hpc' Hf' _".
+    - iApply bi.later_intro. iIntros "Hhs' Hpriv' Hms' Hpmpc' Hpc' Hf' _".
       iApply ("Hcont" with "Hhs' Hpriv' Hms' Hpmpc' Hpc' Hf'").
   Qed.
 
@@ -1050,7 +1050,7 @@ Section WpCsrwGprNewC.
                         (cw_set_agree pmpcfg_n pmpcfg0 _ Hfresh)) with "Hro")
           as "Hro".
         iSplitR; [done|]. iFrame.
-    - iNext. iIntros "Hhs' Hpriv' Hms' Hpmpc' Hpc' Hf' _".
+    - iApply bi.later_intro. iIntros "Hhs' Hpriv' Hms' Hpmpc' Hpc' Hf' _".
       iApply ("Hcont" with "Hhs' Hpriv' Hms' Hpmpc' Hpc' Hf'").
   Qed.
 

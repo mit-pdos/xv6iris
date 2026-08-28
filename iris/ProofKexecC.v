@@ -1500,7 +1500,7 @@ Section KexecCSetup.
                   ltac:(rewrite Htgt268; vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (kxc_2ba with "Htext"). }
-        iIntros (CID32c Hs32c). iNext. iIntros "Hcg Hpc".
+        iIntros (CID32c Hs32c). iApply bi.later_intro. iIntros "Hcg Hpc".
         iEval (rewrite Htgt268) in "Hpc".
         iDestruct (cpu_own_transport CID22 CID32c 0%nat eb (proc_addr jp) eb
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".

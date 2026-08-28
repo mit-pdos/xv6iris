@@ -1100,11 +1100,11 @@ Section CollectAll.
     iMod ("Hclp" with "[$Hrows $Hids $Hmks]") as "_".
     iMod ("Hclsb" with "Hsbb") as "_".
     iMod ("Hclbm" with "[Hbres]") as "_".
-    { iNext. rewrite /bitmap_body. iExists used. iExact "Hbres". }
+    { iApply bi.later_intro. rewrite /bitmap_body. iExists used. iExact "Hbres". }
     iMod ("Hclir" with "[Hma Hblks Hreg]") as "_".
-    { iNext. rewrite /ireg_body. iExists m. iFrame "Hma Hblks Hreg". }
+    { iApply bi.later_intro. rewrite /ireg_body. iExists m. iFrame "Hma Hblks Hreg". }
     iMod ("Hclft" with "[Hta Hlk Hpk]") as "_".
-    { iNext. rewrite /ftop_body. iExists I, A. iFrame "Hta Hlk Hpk".
+    { iApply bi.later_intro. rewrite /ftop_body. iExists I, A. iFrame "Hta Hlk Hpk".
       iPureIntro. exact Hclean. }
     iModIntro. iFrame "Hauth Htx". iPureIntro. exact Hok.
   Qed.

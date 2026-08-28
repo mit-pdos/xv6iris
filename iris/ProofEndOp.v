@@ -868,7 +868,7 @@ Section EndOpDefs.
             Hsz Hom Hdom Hlens Htie Hdm with "Hctx Hba Ht")
       as "(Hlaw & Hba & Ht)".
     iMod ("Hclose" with "[Hba HC Hxa]") as "_".
-    { iNext. iExists Lb, C, ∅. by iFrame. }
+    { iApply bi.later_intro. iExists Lb, C, ∅. by iFrame. }
     iModIntro. iFrame "HcL Ht".
     rewrite /snap_law_out.
     rewrite -(eo_restrict_of_sub C L (fs_home_set cov logstart) Hdom Hsub).
@@ -2323,7 +2323,7 @@ Section EndOpBlocks.
                 ltac:(exact (proj1 (proj2 (Hwok w (eo_lookup_elem W i w Hwi)))))
                 ltac:(apply HMihdr; apply lookup_lt_Some in Hwi; lia)
                 with "Hseam Hregc Hswlb"). }
-    { iNext. iExact "Hmirc". }
+    { iApply bi.later_intro. iExact "Hmirc". }
     iIntros (CIDb2 Hsb2 mf2) "%Hcs2 Hcg Hcnt Hextc Hextm Hpc Hppid
                               Hncell HW HauthL HauthD _ Hent Hu2 >Hmirc".
     assert (Hpc10e : ret_pc (A3 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0x10e)).

@@ -667,7 +667,7 @@ Section ProofUvmfree.
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (ufi_0c with "Htext"). }
-    iNext. iIntros (CID7 Hs7) "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID7 Hs7) "Hcg Hpc".
     assert (Htgt1e : add_vec (mword_of_int (KernelSyms.uvmfree + 0x0c) : mword 64)
                        (sign_extend' 64 (sign_extend' 13
                           (concat_vec (mword_of_int 9 : mword 8) ('b"0"))))
@@ -893,7 +893,7 @@ Section ProofUvmfree.
               mr (K - 4)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (ufi_30 with "Htext"). }
-    iIntros (CID16 Hs16). iNext. iIntros "Hcg Hpc".
+    iIntros (CID16 Hs16). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htgt0e : add_vec (mword_of_int (KernelSyms.uvmfree + 0x30) : mword 64)
                        (sign_extend' 64 (sign_extend' 21
                           (concat_vec (mword_of_int 2031 : mword 11) ('b"0"))))

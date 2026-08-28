@@ -958,7 +958,7 @@ Section LogWriteBlocks.
               with "Hcg Hpc []").
     { iApply (lwi_7a with "Htext"). }
     iApply wp_next_off_intro.
-    iNext. iIntros "Hcg Hpc".
+    iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htgtae : add_vec (mword_of_int (KernelSyms.log_write + 0x7a) : mword 64)
                        (sign_extend' 64 (sign_extend' 21
                           (concat_vec (mword_of_int 26 : mword 11) ('b"0"))))
@@ -1227,7 +1227,7 @@ Section LogWriteBlocks.
                 Hcmp ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (lwi_aa with "Htext"). }
-      iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
       assert (Htgt66 : add_vec (mword_of_int (KernelSyms.log_write + 0xaa) : mword 64)
                          (sign_extend' 64 (mword_of_int 8124 : mword 13))
                        = mword_of_int (KernelSyms.log_write + 0x66))
@@ -1588,7 +1588,7 @@ Section LogWriteBlocks.
                 Hcmp ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (lwi_46 with "Htext"). }
-      iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
       assert (Htgt94 : add_vec (mword_of_int (KernelSyms.log_write + 0x46) : mword 64)
                          (sign_extend' 64 (mword_of_int 78 : mword 13))
                        = mword_of_int (KernelSyms.log_write + 0x94))
@@ -1744,7 +1744,7 @@ Section LogWriteBlocks.
                   Hcmp2 ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (lwi_4e with "Htext"). }
-        iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
         assert (Htgt44 : add_vec (mword_of_int (KernelSyms.log_write + 0x4e) : mword 64)
                            (sign_extend' 64 (mword_of_int 8182 : mword 13))
                          = mword_of_int (KernelSyms.log_write + 0x44))
@@ -2689,7 +2689,7 @@ Section ProofLogWrite.
                 Ra2 T6 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate)
                 Hcmp ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
       { iApply (lwi_34 with "Htext"). }
-      iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
       assert (Htgt94 : add_vec (mword_of_int (KernelSyms.log_write + 0x34) : mword 64)
                          (sign_extend' 64 (mword_of_int 96 : mword 13))
                        = mword_of_int (KernelSyms.log_write + 0x94))

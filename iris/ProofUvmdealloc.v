@@ -543,7 +543,7 @@ Section ProofUvmdealloc.
                 Hcmp1' ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (udi_0c with "Htext"). }
-      iNext. iIntros (CID7a Hs7a) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID7a Hs7a) "Hcg Hpc".
       assert (Htgt26 : add_vec (mword_of_int (KernelSyms.uvmdealloc + 0x0c) : mword 64)
                          (sign_extend' 64 (mword_of_int 26 : mword 13))
                        = mword_of_int (KernelSyms.uvmdealloc + 0x26))
@@ -880,7 +880,7 @@ Section ProofUvmdealloc.
               Hcmp2' ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (udi_22 with "Htext"). }
-    iNext. iIntros (CID17 Hs17) "Hcg Hpc".
+    iApply bi.later_intro. iIntros (CID17 Hs17) "Hcg Hpc".
     assert (Htgt32 : add_vec (mword_of_int (KernelSyms.uvmdealloc + 0x22) : mword 64)
                        (sign_extend' 64 (mword_of_int 16 : mword 13))
                      = mword_of_int (KernelSyms.uvmdealloc + 0x32))
@@ -1149,7 +1149,7 @@ Section ProofUvmdealloc.
               mr (K - 4)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (udi_42 with "Htext"). }
-    iIntros (CID25 Hs25). iNext. iIntros "Hcg Hpc".
+    iIntros (CID25 Hs25). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htgt26' : add_vec (mword_of_int (KernelSyms.uvmdealloc + 0x42) : mword 64)
                        (sign_extend' 64 (sign_extend' 21
                           (concat_vec (mword_of_int 2034 : mword 11) ('b"0"))))

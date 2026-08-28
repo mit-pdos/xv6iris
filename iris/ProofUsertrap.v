@@ -830,7 +830,7 @@ Section UtDispatch.
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 Hsys ltac:(vm_compute; reflexivity) with "Hcg Hpc [] [-]").
       { iApply (uti_036 with "Htext"). }
-      iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
       assert (Hj90 : add_vec (mword_of_int (UT + 0x36) : mword 64)
                        (sign_extend' 64 (mword_of_int 90 : mword 13))
                      = mword_of_int (UT + 0x90)) by pcw.
@@ -929,7 +929,7 @@ Section UtDispatch.
                   ltac:(vm_compute; discriminate) Hdev
                   ltac:(vm_compute; reflexivity) with "Hcg Hpc [] [-]").
         { iApply (uti_040 with "Htext"). }
-        iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
         assert (Hjea : add_vec (mword_of_int (UT + 0x40) : mword 64)
                          (sign_extend' 64 (sign_extend' 13
                             (concat_vec (mword_of_int 85 : mword 8) ('b"0"))))
@@ -1006,7 +1006,7 @@ Section UtDispatch.
                     ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                     Hf15 ltac:(vm_compute; reflexivity) with "Hcg Hpc [] [-]").
         { iApply (uti_048 with "Htext"). }
-          iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+          iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
           assert (Hjd0 : add_vec (mword_of_int (UT + 0x48) : mword 64)
                            (sign_extend' 64 (mword_of_int 136 : mword 13))
                          = mword_of_int (UT + 0xd0)) by pcw.
@@ -1084,7 +1084,7 @@ Section UtDispatch.
                        Hf13 ltac:(vm_compute; reflexivity)
                        with "Hcg Hpc [] [-]").
           { iApply (uti_052 with "Htext"). }
-             iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+             iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
              assert (Hjd0' : add_vec (mword_of_int (UT + 0x52) : mword 64)
                               (sign_extend' 64 (mword_of_int 126 : mword 13))
                             = mword_of_int (UT + 0xd0)) by pcw.

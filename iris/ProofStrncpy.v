@@ -528,7 +528,7 @@ Qed.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (sncp_3a with "Htext"). }
-      iNext. iIntros (CID4 Hs4) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID4 Hs4) "Hcg Hpc".
       assert (Hback : add_vec (mword_of_int (KernelSyms.strncpy + 0x3a) : mword 64)
                        (sign_extend' 64 (mword_of_int 8182 : mword 13))
                      = mword_of_int (KernelSyms.strncpy + 0x30))
@@ -601,7 +601,7 @@ Qed.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (sncp_0e with "Htext"). }
-      iNext. iIntros (CID1 Hs1) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID1 Hs1) "Hcg Hpc".
       assert (Hpc3e : add_vec (mword_of_int (KernelSyms.strncpy + 0x0e) : mword 64)
                        (sign_extend' 64 (mword_of_int 48 : mword 13))
                      = mword_of_int (KernelSyms.strncpy + 0x3e))
@@ -845,7 +845,7 @@ Qed.
                     ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (sncp_28 with "Htext"). }
-          iNext. iIntros (CID10 Hs10) "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CID10 Hs10) "Hcg Hpc".
           assert (Hto3e : add_vec (mword_of_int (KernelSyms.strncpy + 0x28) : mword 64)
                             (sign_extend' 64 (mword_of_int 22 : mword 13))
                           = mword_of_int (KernelSyms.strncpy + 0x3e))
@@ -938,7 +938,7 @@ Qed.
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (sncp_24 with "Htext"). }
-        iNext. iIntros (CID8 Hs8) "Hcg Hpc".
+        iApply bi.later_intro. iIntros (CID8 Hs8) "Hcg Hpc".
         assert (Hback0c : add_vec (mword_of_int (KernelSyms.strncpy + 0x24) : mword 64)
                            (sign_extend' 64
                              (sign_extend' 13
@@ -1120,7 +1120,7 @@ Qed.
               R3 (K - 2)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (sncp_0a with "Htext"). }
-    iIntros (CID6 Hs6). iNext. iIntros "Hcg Hpc".
+    iIntros (CID6 Hs6). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Ht0e : add_vec (mword_of_int (KernelSyms.strncpy + 0x0a) : mword 64)
                      (sign_extend' 64
                        (sign_extend' 21
@@ -1138,7 +1138,7 @@ Qed.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (sncp_0e with "Htext"). }
-      iNext. iIntros (CID7 Hs7) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID7 Hs7) "Hcg Hpc".
       assert (Ht3e : add_vec (mword_of_int (KernelSyms.strncpy + 0x0e) : mword 64)
                        (sign_extend' 64 (mword_of_int 48 : mword 13))
                      = mword_of_int (KernelSyms.strncpy + 0x3e))

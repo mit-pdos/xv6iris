@@ -466,7 +466,7 @@ Section ProofUvmcreate.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (uvci_10 with "Htext"). }
-      iNext. iIntros (CID9 Hs9) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID9 Hs9) "Hcg Hpc".
       assert (Htgt1a : add_vec (mword_of_int (KernelSyms.uvmcreate + 0x10) : mword 64)
                          (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 5 : mword 8) ('b"0"))))
                        = mword_of_int (KernelSyms.uvmcreate + 0x1a))

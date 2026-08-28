@@ -476,7 +476,7 @@ Section ProofFreerange.
                 ltac:(rewrite Htgt3e; vm_compute; reflexivity)
                 with "Hcg Hpc []").
       { iApply (fri_1a with "Htext"). }
-      iNext. iIntros (CID12 Hs12) "Hcg Hpc".
+      iApply bi.later_intro. iIntros (CID12 Hs12) "Hcg Hpc".
       iEval (rewrite Htgt3e) in "Hpc".
       (* [Hcnt]/["Hcont"] were last anchored at CID11 (the prologue's own
          shift point); the taken branch moved one hart further, to CID12. *)
@@ -825,7 +825,7 @@ Section ProofFreerange.
                     ltac:(rewrite Htgt2a; vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (fri_34 with "Htext"). }
-          iNext. iIntros (CIDb4 Hsb4) "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDb4 Hsb4) "Hcg Hpc".
           iEval (rewrite Htgt2a) in "Hpc".
           assert (Hshiftrec : b = false \/ pcur = zero_reg -> (CIDb4 : CPU) = (CID0 : CPU)) by wp_next_chain.
           iDestruct (wp_next_shift Hshiftrec with "Hcont") as "Hcont".

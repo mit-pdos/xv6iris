@@ -688,7 +688,7 @@ Section WpMretGpr.
       iDestruct (mr_frames_out with "[$Hrw $Hro]")
         as "(Hms & Hpriv & HnPC & _ & Hmenv & Hmepc)".
       iSplitR; [done|]. iFrame.
-    - iNext. iIntros "Hhs Hpriv Hms Hpmpc Hpc Hfile [Hmenv Hmepc]".
+    - iApply bi.later_intro. iIntros "Hhs Hpriv Hms Hpmpc Hpc Hfile [Hmenv Hmepc]".
       iApply ("Hcont" with "Hhs Hpriv Hms Hpmpc Hmenv Hpc Hfile Hmepc").
   Qed.
 

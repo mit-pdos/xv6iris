@@ -207,7 +207,7 @@ Section UtSysBlock.
                 ltac:(rewrite Hrgmf; exact Hnz) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc [] [-]").
       { iApply (uti_094 with "Htext"). }
-      iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+      iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
       assert (Hpc8 : add_vec (mword_of_int (UT + 0x94) : mword 64)
                        (sign_extend' 64 (sign_extend' 13
                           (concat_vec (mword_of_int 26 : mword 8) ('b"0"))))

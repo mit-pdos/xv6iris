@@ -1061,7 +1061,7 @@ Section FileInv.
     iIntros (Hwr) "Hsh Hs #Hty".
     iMod (cinv_alloc E fileipN (inode_held_short v Q) with "[Hsh]")
       as (γx) "[#Hi Hown]".
-    { by iNext. }
+    { by iApply bi.later_intro. }
     iModIntro. iExists γx. rewrite /inode_pay Qp.mul_1_l.
     iFrame "Hi Hown Hs". iExists ty. iFrame "Hty". iPureIntro. exact Hwr.
   Qed.
@@ -1241,7 +1241,7 @@ Section FileInv.
     iIntros "Hraw". rewrite /off_hold.
     iMod (cinv_alloc E (offN .@ k) (off_content γ k armed) with "[Hraw]")
       as (γx) "[#Hi Hown]".
-    { iNext. rewrite /off_content. destruct armed; [| iExact "Hraw"].
+    { iApply bi.later_intro. rewrite /off_content. destruct armed; [| iExact "Hraw"].
       by iApply off_raw_body. }
     iModIntro. iExists γx. iFrame "Hi Hown".
   Qed.

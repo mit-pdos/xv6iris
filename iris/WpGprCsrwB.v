@@ -1159,7 +1159,7 @@ Section WpCsrwGprNewB.
         iFrame "Hpmpc_k Hcsr".
       + iApply (swp_write_CSR_mideleg (DfracOwn (q/2)) mideleg0
                   (m !!! Regidx rs1) Hfresh with "Hcert").
-    - iNext. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hcsr')".
+    - iApply bi.later_intro. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hcsr')".
       iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
       iCombine "Hpmpc' Hpmpc_k'" as "Hpmpc''".
       iApply ("Hcont" with "Hmm'' Hpmpc'' Hpc' Hf' Hcsr'").
@@ -1270,7 +1270,7 @@ Section WpCsrwGprNewB.
                         (cw2_set_agree mie mie0 _ mideleg mideleg0 Hok))
                      with "Hro") as "Hro".
         iSplitR; [done|]. iFrame.
-    - iNext. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hmie' & Hmdl')".
+    - iApply bi.later_intro. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hmie' & Hmdl')".
       iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
       iCombine "Hpmpc' Hpmpc_k'" as "Hpmpc''".
       iApply ("Hcont" with "Hmm'' Hpmpc'' Hpc' Hf' Hmie' Hmdl'").
@@ -1517,7 +1517,7 @@ Section WpCsrwGprNewB.
         iFrame "Hpmpc_k Hcsr".
       + iApply (swp_write_CSR_satp (DfracOwn (q/2)) (DfracOwn (q/2)) satp0 ms0
                   (m !!! Regidx rs1) Hok HSXL with "Hcert").
-    - iNext. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hcsr')".
+    - iApply bi.later_intro. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hcsr')".
       iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
       iCombine "Hpmpc' Hpmpc_k'" as "Hpmpc''".
       iApply ("Hcont" with "Hmm'' Hpmpc'' Hpc' Hf' Hcsr'").
@@ -1634,7 +1634,7 @@ Section WpCsrwGprNewB.
                         (cw2_set_agree pmpaddr_n pmpaddr0 _ pmpcfg_n pmpcfg0
                            Hok)) with "Hro") as "Hro".
         iSplitR; [done|]. iFrame.
-    - iNext. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hcsr')".
+    - iApply bi.later_intro. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hcsr')".
       iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
       iCombine "Hpmpc' Hpmpc_k'" as "Hpmpc''".
       iApply ("Hcont" with "Hmm'' Hpmpc'' Hpc' Hf' Hcsr'").

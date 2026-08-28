@@ -387,7 +387,7 @@ Section KforkB1Proof.
               ltac:(rewrite Htgt8c; vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (kfk_08c with "Htext"). }
-    iIntros (CIDs3 Hss3). iNext. iIntros "Hcg Hpc".
+    iIntros (CIDs3 Hss3). iApply bi.later_intro. iIntros "Hcg Hpc".
     iEval (rewrite Htgt8c) in "Hpc".
     (* ---- fall into the shared epilogue ---- *)
     iAssert (kfk_frame sp0 ra0 s00 s10 s50) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8]" as "Hframe".

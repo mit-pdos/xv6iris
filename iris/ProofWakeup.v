@@ -299,7 +299,7 @@ Section ProofWakeup.
                     Hcmpr ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (wki_34 with "Htext"). }
-          iNext. iIntros (CIDt2 Hst2) "Hcg Hpc".
+          iApply bi.later_intro. iIntros (CIDt2 Hst2) "Hcg Hpc".
           assert (Htgt54 : add_vec (mword_of_int (KernelSyms.wakeup + 0x34) : mword 64)
                              (sign_extend' 64 (mword_of_int 32 : mword 13)) = mword_of_int (KernelSyms.wakeup + 0x54))
             by (apply bv_eq; vm_compute; reflexivity).
@@ -648,7 +648,7 @@ Section ProofWakeup.
                   Hcmp40r ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
         { iApply (wki_40 with "Htext"). }
-        iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+        iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
         assert (H40tgt : add_vec (mword_of_int (KernelSyms.wakeup + 0x40) : mword 64)
                           (sign_extend' 64 (mword_of_int 8170 : mword 13))
                         = mword_of_int (KernelSyms.wakeup + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
@@ -760,7 +760,7 @@ Section ProofWakeup.
                     Hcmp4ar ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
           { iApply (wki_4a with "Htext"). }
-          iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
+          iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
           assert (H4atgt : add_vec (mword_of_int (KernelSyms.wakeup + 0x4a) : mword 64)
                             (sign_extend' 64 (mword_of_int 8160 : mword 13))
                           = mword_of_int (KernelSyms.wakeup + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
@@ -830,7 +830,7 @@ Section ProofWakeup.
                     with "Hcg Hpc []").
           { iApply (wki_52 with "Htext"). }
           iApply wp_next_off_intro.
-          iNext. iIntros "Hcg Hpc".
+          iApply bi.later_intro. iIntros "Hcg Hpc".
           iEval (rewrite H52tgt) in "Hpc".
           iApply ("Hrel" $! M48 with "[%] Hcg Hpc Htok HR").
           repeat split; [exact HM48_9 | exact HM48_2 | exact HM48_18

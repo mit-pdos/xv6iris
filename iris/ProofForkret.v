@@ -1927,7 +1927,7 @@ Proof.
             ltac:(vm_compute; discriminate) HT4a5 fkr_beqz_align
             with "Hcg Hpc []").
   { iApply (fkr_24 with "Htext"). }
-  iNext. iIntros (CID6 Hk6) "Hcg Hpc".
+  iApply bi.later_intro. iIntros (CID6 Hk6) "Hcg Hpc".
   iEval (rewrite fkr_beqz_tgt) in "Hpc".
   
   assert (HT4sp : T4 !!! Regidx csp_rs1 = pa_stk ksp 6).

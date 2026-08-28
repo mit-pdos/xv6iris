@@ -292,7 +292,7 @@ Section SfenceLeaf.
                    ⌜forall i, 0 <= i < 64 -> vec_access_dec tv i = None⌝ ∗
                    tlb ↦ᵣ tv)%I
               with "Hcg Hpc Hinstr [Htlb Hcont]").
-    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iApply bi.later_intro. iApply wp_next_off_intro. rewrite /sconf_step_obl.
     iSplitL "Htlb".
     - iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
@@ -381,7 +381,7 @@ Section SfenceLeaf.
               (fun (_ : CpuId) npc ms' m' n' =>
                  ⌜npc = add_vec_int pc 4⌝ ∗ ⌜m' = m⌝ ∗ ⌜n' = n⌝)%I
               with "Hcg Hpc Hinstr [Hcont]").
-    iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
+    iApply bi.later_intro. iApply wp_next_off_intro. rewrite /sconf_step_obl.
     iSplitR "Hcont".
     - iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
       iDestruct "Hcap" as "(Hstk & Htr & Harm & #Htc & #Hwit)".

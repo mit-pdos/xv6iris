@@ -926,7 +926,7 @@ Section ProofSysMknodM1Tail.
               P1 (K - 20)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc []").
     { iApply (smni_5e with "Htext"). }
-    iIntros (CID4 Hq4). iNext. iIntros "Hcg Hpc".
+    iIntros (CID4 Hq4). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htg50 : add_vec (mword_of_int (MN + 0x5e) : mword 64)
                       (sign_extend' 64
                          (sign_extend' 21 (concat_vec (mword_of_int 2041 : mword 11) ('b"0"))))
