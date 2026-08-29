@@ -1411,3 +1411,5 @@ LinkSysOpenAU.v
 FsInitPinBoot.v
 SpecSysUnlinkAU.v
 FsAbsWriteFire.v
+SpecSysWriteAUEra.v
+SpecFilewriteAU.v
