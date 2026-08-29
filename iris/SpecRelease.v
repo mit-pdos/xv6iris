@@ -88,7 +88,7 @@ Definition wp_release_gen_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
      entry count [trap_res outb + av >= av]. *)
   sie_cap_gpr kt m (trap_res outb + av)%nat false p -∗
   kernel_text -∗ pc_is pcE -∗
-  lock_openable γl lka s R Dc -∗
+  lock_openable_c γl lka s R Dc -∗
   locked γl cpu_id -∗
   (* the deposit, AT THE CALLER'S OWN CONTEXT (tso-port M3) *)
   R cur_ctx -∗
@@ -184,7 +184,7 @@ Definition wp_release_cancel_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} 
      entry count [trap_res outb + av >= av]. *)
   sie_cap_gpr kt m (trap_res outb + av)%nat false p -∗
   kernel_text -∗ pc_is pcE -∗
-  lock_openable γl lka s R D -∗
+  lock_openable_c γl lka s R D -∗
   locked γl cpu_id -∗
   (* the deposit, AT THE CALLER'S OWN CONTEXT (tso-port M3) *)
   R cur_ctx -∗

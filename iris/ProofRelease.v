@@ -252,7 +252,7 @@ Section ProofRelease.
     iDestruct (cpu_own_locks_swap with "Hown") as "[Hlks [%Hsz Hownback]]".
     iApply (wp_sd_zero_lkcpu_lockopen_s_sconf (CID:=CID) γl lka s R Dc (mword_of_int (KernelSyms.release + 0x12))
               (mword_of_int 9 : mword 5) (mword_of_int 16 : mword 12) mh (trap_res outb + (av - 4))%nat false lks
-              ltac:(rgne; exact Hacpu) Href
+              ltac:(rgne; exact Hacpu) ltac:(left; reflexivity) Href
               with "Hcg Hpc [] Hlock Htoken Hlks").
     { iApply (rli_12 with "Htext"). }
     iApply wp_next_off_intro.
