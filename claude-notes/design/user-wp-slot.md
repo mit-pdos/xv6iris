@@ -201,26 +201,20 @@ PARKS' — `ProofUserinit`'s and `ProofSysFork`'s applications of
   ONE-DIRECTIONAL: `user_pt_inv`'s three pure facts (`dom`, `uva_pa_inj`,
   `upt_acc_wf`) are dropped on the way in and must be re-supplied from
   the table on any way back (a step-3 obligation).
-- **`USyncKernel.sync_uexec_slot`** — sync's ENTRY DEPOSIT: from
-  `tf_resume_pc (uvis_tf W) = start`, `uimg_sub sync_bytes (uvis_M W)`
-  (the two conditions about the KEY alone; both decidable, which is what
-  `UexecCond.cond_entry_slot`/`_gated` decide), the table-dependent pair
-  guarded under the slot's own ∀ as the pure
-  `sync_entry_tbl M sp := ∀ C P, loop_ok C P -> sync_layout P ∧
-  uv_stack P M sp 32` at `sp = tf_w (uvis_tf W) tf_sp_idx`, and
-  `□ (∀ C P, ⌜loop_ok C P⌝ -∗ uv_cap C P (xv6_sys_protocol C P))`,
-  conclude `uexec_slot W`.  The guard is a `Prop`, not an iProp wand:
-  both conjuncts are `Prop`s `wp_sync_start` consumes as Rocq
-  hypotheses.  `Hsp` is discharged by `tf_resume_gpr_sp` — the payoff of
-  trapframe keying.  `Rut` and the handler are received and retained
-  unused (affine): with `uv_cap` still an assumption, sync's traps are
-  absorbed by the assumed round-trip contracts, and `uv_cap` is visibly
-  the one gap.  Establishing the entry conditions — arranging the
+- **`USyncKernel.sync_uexec_slot`** — sync's ENTRY DEPOSIT, as re-cut on
+  the user-mode-on-kernel engine: from `tf_resume_pc (uvis_tf W) = start`,
+  `uimg_sub sync_bytes (uvis_M W)`, `uk_xpage (uvis_perm W) 0` (page 0 is
+  an X page of the key) and `uk_stack (uvis_perm W) (uvis_M W) sp 32` at
+  `sp = tf_w (uvis_tf W) tf_sp_idx` — four facts about the KEY, all
+  decidable — conclude `⊢ uslot W`, with NO assumption.  `Hsp` is
+  discharged by `tf_resume_gpr_sp` — the payoff of trapframe keying.  The
+  proof is `uslot_ukc` plus `UkSync.wp_ksync_start`.  (The earlier form
+  took the table facts under a ∀-table guard and `uv_cap` as an
+  assumption; see "Stage 3, as landed" for why that guard was
+  unsatisfiable.)  Establishing the entry conditions — arranging the
   trapframe/image so a program's constructor applies, or falling back to
-  `uexec_wp_slot` of the generic — is the INITIALIZER's job (exec,
-  forkret's park).  Note the ∀-table guard is owed at EVERY `loop_ok`
-  table, not just the one the process holds, so a mint site that wants
-  to owe the sync side nothing refutes the gate on the DECIDED facts.
+  the generic — is the INITIALIZER's job (exec, forkret's park), and
+  `UexecCond.cond_entry_slot` is the one lemma that decides it.
 - `UexecSlot.v` deliberately does not import `UmodeAbi`
   (`tf_resume_gpr_sp` is stated at `Regidx (mword_of_int 2)`, convertible
   with `sp_idx`): the verified-program tier stays out of the kernel-side
@@ -431,17 +425,35 @@ constructor is tried.
   channel returns is dropped).  It needs the `□`: fork's arm hands back
   two slots.
 
-**Stage 3 is BLOCKED on an owner ruling about the key** (detail and the
-options in `projects/user-wp-slot.md` §3 item 2): with the table ∀-bound
-inside `uslot`, EVERY U-mode continuation re-binds the table, and the
-table facts a program runs on (its text page fetch-permitted, its stack
-page writable) are not functions of anything the key carries — the image
-domain pins which pages are mapped, `upt_acc_wf` only says each leaf is
-ok-or-denied per access.  `UexecCond.sync_entry_tbl_refuted` is the
-witness: the existing ∀-table guard is unsatisfiable (the empty table is
-`loop_ok`), so `sync_uexec_slot` / `cond_entry_slot(_gated)` are vacuous
-as stated.
+**Stage 3, as landed** (the owner's ruling on the key, and the
+user-mode-on-kernel engine — the full account is
+[`uk-engine.md`](uk-engine.md)):
 
-Open decisions the owner has not yet ruled: whether `uvis_tf` shrinks to
-the 32 user-visible words; the per-page permission view in the key (the
-stage-3 blocker above).  The precise `usys_mem_ok` table is what landed.
+- **The key carries the per-page permission map, as a PROJECTION.**
+  `Record uvis := { uvis_tf; uvis_M; uvis_perm : gmap (mword 27) uperm }`
+  with `Record uperm := { up_X; up_W }` (`UserPerm.v`); `uvis_of U`
+  computes `uvis_perm := perm_of (ud_um (pv_upt V)) (uint (pv_sz V))` —
+  the U leaves reduced to their X/W bits, with the LIVE-BUT-UNMAPPED pages
+  filled in at `{X := false; W := true}` (what `vmfault` will map).  The
+  fill is what keeps the page-fault arm transparent: neither the lazy
+  image nor the map moves under `vmfault`.  The page-table STRUCTURE
+  stays hidden.  `uslot`'s guard is `∀ h C pt Rut sz, ⌜loop_ok C pt⌝ -∗
+  ⌜perm_of (ud_um pt) sz = uvis_perm W⌝ -∗ uvb … -∗ WP`, an equation the
+  loop meets by computation; `ukont C pt Rut π` pins the trapped key's map
+  to `π`.  `bump W r M' π'`; `usys_mem_ok n tf r M π M' π'`'s rows say
+  how the map moves (sbrk: `usys_sbrk_perm`).
+- **The old ∀-table guard was unsatisfiable, and this is its replacement.**
+  `sync_entry_tbl M sp := ∀ C P, loop_ok C P -> sync_layout P ∧ uv_stack P M sp 32`
+  was owed at EVERY `loop_ok` table, the empty table is one, and
+  `UexecCond.sync_entry_tbl_refuted` proved it — so `sync_uexec_slot` and
+  both `cond_entry_slot` forms were vacuous (durable-notes' GAP-premise
+  trap, in the tree).  Both are DELETED: sync's table facts are now facts
+  about the key (`UkSync.uk_xpage`, `uk_stack`), decidable, and
+  `UexecCond.cond_entry_slot : □ uexec_wp -∗ uslot W` decides the whole
+  `sync_gate W` with no assumption on either branch.
+- **The U-mode engine on the kernel's contract** (`UkStep.v`, `UkLeaf.v`,
+  `UkStore.v`) and **sync on it** (`UkSync.v`, `USyncKernel.sync_uexec_slot`
+  with NO capability premise).  The existing engine and the sh/echo/init
+  proofs are untouched; `uv_cap` and `UmodeKernelTie` therefore survive
+  for them.  Loads and branches are not yet ported (sync needs neither).
+- Still open: whether `uvis_tf` shrinks to the 32 user-visible words.

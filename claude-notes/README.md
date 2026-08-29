@@ -104,6 +104,11 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   lives and how it travels, the two run sites, the seal discipline, and
   the sync entry-deposit constructor.  Read before touching the trap
   loop's user-WP seam.
+- **[`uk-engine.md`](design/uk-engine.md)** — the user-mode-on-kernel
+  engine: the per-page PERMISSION MAP in the slot's key (a projection of
+  the table and size, lazy pages filled RW, and why), the `Uk*.v` engine
+  stated against the kernel's trap contract, sync on it, and what
+  milestone J owes.
 - **[`elf.md`](design/elf.md)** — ELF file semantics: the file-side
   `ElfFile.v` layer vs `ElfEnc.v`'s code-side readers, the PrimString import
   vehicle for whole binaries, the kernel-dump consistency theorem

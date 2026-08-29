@@ -196,71 +196,24 @@ for the user/kernel trap contract": `uexec_ret` (A), `ukont` (B), the
 U-mode bundle `uvb` (C), and the five-step staging.  Lanes, in order:
 
 1. **[x] `uvis`** — landed (`351f8dbf7`).
-2. **[~] The U-mode lane.**  STAGE 2 LANDED (`UsysMemOk.v`,
-   `UsysMemOkSpec.v`, `UmodeRegs.v`, `UexecRet.v`: `usys_mem_ok`,
-   `bump_tf`, `trapped_machine`, the fixpoint `uslot` with
-   `uexec_ret`/`ukont`/`uvb`, `uvis_of_run` and the round trips, x0
-   pinned, the generic inhabitant `uexec_wp_uslot` — design file,
-   "Stage 2, as landed").  STAGE 3 (leaves on `uvb`, `WpUmodeStep`'s
-   trap arms, sync, retiring `uv_cap`) is STOPPED on two owner
-   decisions:
-
-   **(a) THE KEY MUST CARRY THE PER-PAGE PERMISSIONS, or every U-mode
-   continuation is unprovable.**  `uslot W` ∀-binds the table inside
-   under `loop_ok`, so `uexec_ret`'s transparent arm and every returned
-   slot re-bind `(C, pt)` at EVERY trap — an interrupt before any
-   instruction included — and so every leaf continuation and the engine's
-   Löb IH must be `∀ h C pt Rut`.  A program's table facts (`sync_layout
-   pt`: text page mapped with a fetch-ok leaf; `uv_stack pt M sp n`'s
-   `us_leaf`: stack page load/store-ok) then have to be re-derived at the
-   fresh `pt` from what the bundle gives — `loop_ok C pt`, `dom M =
-   uva_dom pt`, `uva_pa_inj`, `upt_acc_wf` — and they CANNOT be:
-   `upt_acc_wf` says each leaf is ok-or-denied per access, never which.
-   The only premise shape available is the existing `sync_entry_tbl`'s
-   `∀ C P, loop_ok C P -> layout P`, and that is UNSATISFIABLE
-   (`UexecCond.sync_entry_tbl_refuted`: the empty table is `loop_ok`, and
-   a table mapping page 0 without X is too), so `sync_uexec_slot` and both
-   `cond_entry_slot` forms are vacuous today — durable-notes' GAP-premise
-   trap, already in the tree.  A verified program OBSERVES permissions
-   (a store to a read-only page faults), so by the key's own principle
-   they belong in it.  Recommended ruling: `uvis` gains the permission
-   view — `ud_um` with the PPNs erased, e.g. `uvis_perm : gmap (mword 27)
-   (bv 8)` (the leaf flag byte, A/D masked) — and `uslot`'s guard pins
-   `⌜uperm pt = uvis_perm W⌝` beside `loop_ok`.  Then `sync_layout` /
-   `uv_stack`'s leaf clauses become DECIDABLE facts about the key
-   (`UexecCond`'s gate decides everything on the key and
-   `sync_entry_tbl` dies), the program tier's layout premises become
-   facts about `π` that are invariant across a program's life (only sbrk
-   and exec move `π`), and the leaf sweep is mechanical: `uv_cap_gpr C pt
-   Ψ M m ∗ pc_is pc` → `uvb C pt Rut π M m pc`, `iIntros (CIDk) "Hcg Hpc"`
-   → `iIntros (hk Ck ptk Rutk) "%Hlok Hb"` (~870 sites).  The kernel side
-   (J) then tracks `π` through the residue: same on the sixteen quiet
-   entries and the windows, grown/shrunk by sbrk (a `umem_grow` twin),
-   copied by uvmcopy, rebuilt by exec.  Alternatives priced: (i) fix the
-   table for a process's life (∀ pt only at the outer slot, `uexec_ret`
-   at the SAME `(C, pt)` inside, fork's child and sbrk returning outer-∀
-   slots) — sbrk then loses every table fact, which is the same
-   unsatisfiable premise for sh's malloc; (ii) leaves with a fault arm on
-   every access (no table facts at all; the page-fault arm is
-   transparent) — a rebuild of every leaf, and the tier stops saying
-   anything functional.
-
-   **(b) sh / echo / init.**  `uv_cap`/`uv_cap_gpr` are held by 20 files
-   (`grep -l uv_cap iris/U*.v iris/WpUmode*.v`), and sh's and init's
-   protocols (`UmodeIo.xv6_io_protocol`, `UmodeInitIo.xv6_init_protocol`:
-   input observers, `fork ≠ -1`, wait/exec arms) are RICHER than
-   `uexec_ret`'s fixed contract; porting them is a functional-content
-   loss (the design's later `Φ` refinement under the same ∀ is where
-   that content returns) plus new proofs (fork's `-1` path).  Either they
-   stay on the old engine+leaves (so `uv_cap`, `uv_cap_gpr`, `uv_lin`,
-   `uv_run` and `UmodeKernelTie` CANNOT be deleted yet, and the leaves
-   exist in both shapes until they are ported), or they are ported to the
-   coarse contract as safety-only proofs.  Owner's call; sync alone is
-   ~1k lines either way.
-
-   Also noted: `usys_mem_ok`'s sbrk row is at an existential size (the
-   kernel's table has no return-value relation to offer); the precise
-   `r + a0` tie is `sys_sbrk_ok`'s to add at J.
+2. **[x] The U-mode lane** — LANDED (design: `../design/uk-engine.md`;
+   "Stage 3, as landed" in `../design/user-wp-slot.md`).  The owner ruled
+   (a) the key carries the per-page permission map as a projection
+   (`UserPerm.perm_of`, lazy pages filled RW — the lane's decision, argued
+   in `UserPerm.v`'s header), and (b) the existing engine and sh/echo/init
+   stay as they are, with a NEW engine beside them (`UkStep.v`, `UkLeaf.v`,
+   `UkStore.v`) against `uvb`/`ukont`/`uexec_ret`; `sync` is re-proved on
+   it (`UkSync.v`) and `USyncKernel.sync_uexec_slot` has no assumption.
+   `sync_entry_tbl` / `sync_entry_tbl_refuted` are gone;
+   `UexecCond.cond_entry_slot : □ uexec_wp -∗ uslot W` decides the gate.
+   NOT ported (sync needs neither, the rewrite is mechanical):
+   `WpUmodeLoad.v` → `UkLoad.v`, `WpUmodeBranch.v` → `UkBranch.v`.
+   `usys_mem_ok`'s sbrk row: the image half at an existential size, the
+   permission half `usys_sbrk_perm` (unchanged / grown by a page set at
+   RW / shrunk by a page set); `UsysMemOkSpec.perm_of_grow` proves the
+   grow shape from the kernel's facts, the SHRINK bridge is a premise
+   (`sysc_mem_ok_usys_sbrk`) until `growproc_ok`'s shrink arm exposes the
+   vpn run `uvmdealloc` drops.
 3. **[ ] Milestone J** (§4): the kernel side switches to `ukont`'s
    shape.  Boundary exposure (the round's post names the resume
    trapframe and image: `bump`'d on the ecall arm with `usys_mem_ok`,

@@ -1334,6 +1334,15 @@ splice a closer into argument position.
 
 ## Conversion and `Qed`
 
+- **A check that grows past a few hundred MB / minutes on a small file is a
+  DEGENERATE PROOF, not something to wait out** (user-wp-slot lane,
+  2026-08-28).  The two culprits that session: any reduction/unification
+  that touches the dumped literal `SyncInstrs.sync_bytes` (`cbn [fst]` on a
+  goal mentioning it, `decide` on a symbolic image `M` — keep the literal
+  behind opaque lemmas and gate `sync_layout`-first), and ssr
+  `rewrite`/`iFrame` against the 32-insert `userret_gpr` chain (enumerate
+  the 32 `mword 5` indices and peel per case; an insert-chain `rewrite`
+  unifies the `Insert` instance up to delta and does not terminate).
 - **`vm_compute; reflexivity` is rechecked by the kernel's LAZY conversion at
   `Qed`** — the VM's speed does not carry over, and on model code that is a
   different order of magnitude (one such equation over the cold-boot chain
