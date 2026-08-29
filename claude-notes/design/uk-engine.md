@@ -71,13 +71,35 @@ each quiet/window arm's `P' = P`, `sz' = sz` to show at J.
 
 `UexecRet.v`, as landed:
 
-- `ukb C pt Rut π` — the kernel obligation's LATER-FREE body:
-  `∀ W' sc stv, ⌜uvis_perm W' = π⌝ -∗ trapped_machine … W' ∗ uexec_ret sc W' -∗ WP`;
-  `ukont C pt Rut π := ▷ ukb …` (`ukont_unfold`).  The pure premise pins
+- `ukb C pt Rut sz π` — the kernel obligation's LATER-FREE body:
+  `∀ W' sc stv, ⌜uvis_perm W' = π⌝ -∗ trapped_machine … sz … W' ∗ uexec_ret sc W' -∗ WP`;
+  `ukont C pt Rut sz π := ▷ ukb …` (`ukont_unfold`).  The pure premise pins
   the trapped key's map to the one the kernel resumed the process under
   (user execution never changes it), which is what lets J re-apply the
-  returned slot at the same table.
-- `uvb C pt Rut π M m pc` carries `ukont C pt Rut π` last.
+  returned slot at the same table; `sz` rides beside `π` for the same
+  reason (the lazy image is sz-indexed).
+- `uvb C pt Rut sz π M m pc` carries `ukont C pt Rut sz π` last.
+  **THE IMAGE CONJUNCT IS THE LAZY VIEW** (owner-ruled 2026-08-28: the
+  process cannot observe lazy allocation, so the abstraction must not
+  distinguish lazy vs allocated): `user_ptm_inv pt sz M`
+  (`UserPtTree.v`) — `utlb_inv_pt` with `umem_lazy pt sz M` where
+  `user_pt_inv` had the dom-pinned `umem_own`.  (The literal `proc_ptm`
+  would not do: it carries the PARKED tree and owns neither satp nor
+  the TLB, so it cannot back an executing bundle;
+  `user_ptm_inv : user_pt_inv :: proc_ptm : proc_pt`.)  The bundle also
+  pins `⌜usz_ok sz⌝` (xv6's `p->sz` bound) — load-bearing: it keeps
+  `perm_of`'s lazy fill away from the trampoline/trapframe vpns, which
+  is what makes the store's fault arm true.  The engine runs the
+  machine on the MAPPED sub-image `Mp` (`uk_pt_pure pt sz M Mp`;
+  `uk_instr_mapped` transports the fetch fact), and the STORE leaf has
+  a SECOND ARM: a store to a live-but-unmapped page takes the
+  page-fault trap and hands back `uexec_ret`'s transparent arm at the
+  SAME key (pc still at the store; the lazy image and filled map stand
+  still; the continuation is the program's own Löb hypothesis —
+  `uk_step_obl` went persistent and the payload carries `Kc ∧ ukc` so a
+  non-retiring trap can return the current key's slot).  Loads get the
+  same second arm when they port (`perm_of_unmapped_lt` /
+  `uk_fault_pair` at `Load Data` are already the pieces).
 - `uslot W := ∀ h C pt Rut sz, ⌜loop_ok C pt⌝ -∗ ⌜perm_of (ud_um pt) sz = uvis_perm W⌝ -∗ uvb … -∗ WP`.
 - `ukc π M m pc` — THE U-MODE CONTINUATION at a natural state, the same ∀
   over the bundle at `(π, M, m, pc)`; `uslot_ukc` says the slot is the

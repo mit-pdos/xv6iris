@@ -213,9 +213,61 @@ U-mode bundle `uvb` (C), and the five-step staging.  Lanes, in order:
    RW / shrunk by a page set); `UsysMemOkSpec.perm_of_grow` proves the
    grow shape from the kernel's facts, the SHRINK bridge is a premise
    (`sysc_mem_ok_usys_sbrk`) until `growproc_ok`'s shrink arm exposes the
-   vpn run `uvmdealloc` drops.
+   vpn run `uvmdealloc` drops.  The proc_ptm ruling LANDED (`cf70e89c0`)
+   as `user_ptm_inv pt sz M` — see `../design/uk-engine.md` for why the
+   literal `proc_ptm` could not back an executing bundle — with the
+   store leaf's transparent fault arm built from the generic tier's own
+   fault machinery.  NEW J OBLIGATION from the landing: the loop must
+   discharge `usz_ok (uint (pv_sz V))` at resume — find or add the
+   kernel-side invariant that pins `p->sz` below the trampoline region
+   (growproc's own bound check is the likely source).
 3. **[ ] Milestone J** (§4): the kernel side switches to `ukont`'s
-   shape.  Boundary exposure (the round's post names the resume
+   shape.  **THE KEY'S IMAGE VIEW IS RULED (owner, 2026-08-28): option
+   (A), the `proc_ptm` re-key** — the owner's principle, verbatim: the
+   user process cannot tell what is going on under lazy allocation, so
+   the abstraction must NOT distinguish lazy vs allocated; the key's
+   image is ALWAYS the lazy view.  Accordingly
+   `uvb`/`trapped_machine`'s image conjunct becomes `proc_ptm pt sz M`
+   (`sz` travels beside `π`).  Found while cutting J's stages; the old
+   `UexecSlot.v` §3 header deferred exactly this to J.  The landed `UexecRet.v` is
+   two-minded about `uvis_M`: `uexec_ret`'s ecall arm feeds it to
+   `usys_mem_ok`, whose rows are LAZY-view facts (`sysc_mem_ok` verbatim;
+   vmfault/copyin are noops on it, copyout to a lazy page is a pure
+   window), while `trapped_machine`/`uvb` feed the same `uvis_M` to
+   `user_pt_inv`, whose `umem_own` pins `dom M = uva_dom pt` — the
+   MAPPED view.  On the lazy reading the kernel can NEVER supply
+   `uvb`'s `user_pt_inv pt (uvis_M W)` for a genuinely lazy process
+   (the GAP-premise trap, one tier up from `sync_entry_tbl`); on the
+   mapped reading the vmfault arm is NOT transparent (the mapped image
+   gains the zero page vmfault maps) and the window rows are false
+   (copyout to a lazy page grows the dom by a page, `umem_wr` says
+   only the window moved).  §3.3/§4's own wording — the image
+   "unchanged on interrupt/vmfault" — is the lazy reading.  Options
+   priced:
+   - **(A) RULED: re-key `uvb`/`trapped_machine`'s image conjunct
+     to `proc_ptm pt sz M`** (the lazy-view resource; `sz` is already
+     `uslot`'s guard binder).  `SpecVmfault`'s theorem is literally
+     `proc_ptm P sz M -∗ … proc_ptm (uptd_insert P …) sz M`, so the
+     transparent arm is the existing theorem's shape; the residue seam
+     becomes trivial (`proc_priv U ⊣⊢ proc_priv_nopt … ∗ proc_ptm …`).
+     Engine cost: the leaves convert `proc_ptm` to the walker resources
+     for the MAPPED submap via `ProcPtOwn` §5c'; the STORE leaf gains a
+     transparent-fault arm (store to a live-unmapped page traps, the
+     continuation is the program's own IH at the SAME key — the lazy
+     image and the filled `perm_of` don't move; guardedness pays for
+     the re-execution), and the same treatment covers loads when they
+     port.  No new entry facts owed by sync's constructor.
+   - (B) The old §3-header form: `uvb` ∀-binds `Mm ⊆ uvis_M W` with
+     `⌜dom Mm = uva_dom pt⌝ -∗ user_pt_inv pt Mm`.  Same semantics as
+     (A) spelled through `user_pt_inv`; keeps two image vocabularies
+     alive in the bundle and still needs the store fault arm.
+   - (C) Mapped key: `uexec_ret` gains an explicit page-fault arm at
+     the grown key and `usys_mem_ok`'s window rows get "∪ the zero
+     pages copyout mapped".  Transparency dies; contradicts §3.3/§4's
+     wording; every row uglier.  Not recommended.
+   The re-key runs as its own green-gated lane BEFORE the residue/loop
+   stages; the BOUNDARY EXPOSURE is ruling-independent and proceeds
+   beside it.  Boundary exposure (the round's post names the resume
    trapframe and image: `bump`'d on the ecall arm with `usys_mem_ok`,
    unchanged on interrupt/vmfault) is PART of this lane, not a
    separate item.  Mint sites: userinit (generic), fork's child (the
@@ -248,6 +300,79 @@ channel's closer row goes keyed under the binders it already receives.
 `Rut` returns to the plain bare form (the hole trick dies).  The
 generic inhabitant remains a Löb proof returning itself; mints stay
 creation-only.
+
+## §4a J1a — boundary exposure, planned 2026-08-28 (execute in this order)
+
+The trap round's posts must NAME the resume user-visible state.  Planned
+against the tree at `1e08893ae`; the full draft (exact statements, all
+twelve composition sites with provenance) was a session artifact — the
+durable content is here.
+
+- **The enabler is an INDEX on the residue**: `usertrap_res` /
+  `_parked` / `_bare` gain one trailing `(U : ustate)` (the ∃ V M
+  narrows to the index; `pt` stays).  A ∀-bound datum with only a pure
+  premise is contentless — the relation must anchor to a resource, and
+  the indexed residue is that resource.  The nine arm sites mention the
+  residue only partially applied, so they do not change; ~240
+  one-token edits over 14 files.
+- **The round relation** `uround_ok sc tf M π tf' M' π'` (new
+  `UexecRound.v`), keyed by `decide (sc = uecall_scause)` — the same
+  test the dispatch's `c.li a5,8; bne` performs: ecall →
+  `usys_num tf = USYS_exec ∨ ∃ r, uround_bump_ok tf tf' r ∧ usys_mem_ok …`;
+  everything else → `uround_id_ok tf tf' ∧ M' = M ∧ π' = π`.  The bump
+  is stated on the RESUME PROJECTIONS (`tf_resume_gpr0`/`tf_resume_pc`),
+  not `tf' = bump_tf tf r`: the actual list differs in the four kernel
+  words `prepare_return` re-arms, so the projection form is what is
+  provable.  `tf_ueq` (new `TfUser.v`: equality at epc + words 5..35)
+  with congruences is the vocabulary that crosses `prepare_return`.
+- **Facts that exist NOWHERE today** (each a lower-spec obligation):
+  (R2) the dispatcher pins nothing about `pv_tf (us_V U')` — each of
+  the 22 arms owes `pv_tf` unchanged (the a0/epc writeback is AFTER the
+  dispatcher, in `sysc_ret_tail`), exec escaping; (R3) same for
+  `pv_upt`/`pv_sz` on the 20 non-sbrk non-exec arms (`uk-engine.md`
+  already owed this); (R4) `perm_of` under `uptd_insert` (vmfault's
+  fill-transparency) is argued in `uk-engine.md` but UNPROVED, and
+  `SpecVmfault` may not pin the inserted leaf's flags; (R5) sbrk's
+  shrink permission bridge still premises on `growproc_ok` exposing the
+  dropped vpn run; (R6) one `bv` lemma tying the code's sign-extended
+  `+4` to `add_vec_int`; (R7) `ret_pc` and `mepc_val` are the same term
+  under two names — `ret_pc_idem` wanted.
+- **Stages, each green-gated**: S1 pure vocabulary (`TfUser.v`,
+  projection congruences); S2 `UexecRound.v`; S3 `user_trap_frame_at`
+  (parameterized frame, additive); S4 the residue index (the long
+  pole, pure re-typing); S5 = R2+R3 through `SpecSyscall` /
+  `ProofSyscall` / the 22 arms — PRICED 2026-08-28, CHEAP (~120-140
+  mechanical lines, proof-side only, NO spec strengthening) with the
+  clauses RESTATED to what is true: (i) literal `pv_tf` equality is
+  FALSE — `sysc_ret_tail`'s own `sd a0,112(s2)` is the writeback — the
+  provable clause is `∃ w, pv_tf (us_V U') = <[tf_arg_idx 0 := w]>
+  (pv_tf (us_V U))`, and the a0-tied variant (w = the return value) is
+  NOT needed: `uexec_ret`'s ecall arm ∀-binds r, the kernel
+  instantiates at the stored word, and only exec's row constrains it
+  (kexec's failure arm already pins -1); (ii) literal `pv_upt`
+  equality is FALSE on the 11 buffer-touching arms — copyin/copyout
+  lazy faults grow `ud_um` — the true clause is `uptd_ext`, and π' = π
+  then follows from R4's lemma stated ONCE over RW-leaf extensions
+  (serving the vmfault arm and the syscall arms alike); (iii) `pv_sz`
+  verbatim, free on all 20.  Every parking arm (wait/pause/pipe)
+  already states its post at a syntactic updater of the entry U, so
+  the parked reacquisition is pre-pinned; fork's parent returns the
+  literal U; exec and sbrk escape by `sysc_num` guards discharged off
+  `sysc_arm_goal`'s own `Hnum`; 16 arms are eq_refl one-tokeners, 5
+  need ~6-line iAssert widenings, fallback included.
+  S6 = R4 (state the lemma over RW-leaf `uptd_ext`, not just one
+  `uptd_insert` — see S5's (ii)); S7 the transparent arms with a temporary ecall escape;
+  S8 the ecall arm (route the framed `sysc_mem_ok` at
+  `ProofUsertrapSys.v` ~:502-528 through `UsysMemOkSpec`); S9 the
+  register-file/pc tie in `uservec_post` (the residue's 36 peeled tf
+  words ARE `pv_tf (us_V U')` under the index, and `userret_gpr` at
+  them is `tf_resume_gpr` DEFINITIONALLY) and the loop's new intros.
+  S5/S6 are independent lanes; S4 waits for S5's price.
+- The image half of `uround_ok` is stated at the LAZY tier (the
+  residue's `us_M`), which the proc_ptm ruling made the key's view —
+  the plan neither depends on nor duplicates the re-key lane's work;
+  `uservec_post`'s `user_pt_any pt'` conjunct is NOT touched at J1a
+  (it re-cuts with `uvb` when the loop switches).
 
 ## §5 Session-local artifacts (durable parts lifted into this file)
 
