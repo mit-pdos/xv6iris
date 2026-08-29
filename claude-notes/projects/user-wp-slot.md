@@ -249,7 +249,15 @@ U-mode bundle `uvb` (C), and the five-step staging.  Lanes, in order:
    (ProcInv), `uvm_maxsz = 2^38 - 8192` is exactly `usz_ok`'s
    page-aligned bound, and `pgroundup` preserves a page-aligned bound;
    one three-line bridging lemma at J.
-3. **[ ] Milestone J** (§4): the kernel side switches to `ukont`'s
+3. **[ ] S8b — sbrk's permission row.**  The last escape in
+   `ut_round`/`uv_round`.  Needs (i) a `perm_of`-under-`uvmdealloc`
+   SHRINK lemma (the grow half is `perm_of_grow`; the shrink page set is
+   `uvmdealloc`'s run) and (ii) `growproc_ok`'s shrink arm to expose which
+   vpns it dropped — today it says `M' = umem_del …` and `uptd`-level
+   facts the kernel holds but `sysc_mem_ok` does not carry.  With those,
+   `usys_sbrk_perm`'s three arms are dischargeable and the escape is
+   deleted outright.
+4. **[ ] Milestone J** (§4): the kernel side switches to `ukont`'s
    shape.  **THE KEY'S IMAGE VIEW IS RULED (owner, 2026-08-28): option
    (A), the `proc_ptm` re-key** — the owner's principle, verbatim: the
    user process cannot tell what is going on under lazy allocation, so
@@ -437,7 +445,21 @@ S1-S3, S5, S6, S6b, S7, S9 are in; S8 is partial.  What a successor needs:
   `user_ptm_inv_close`, `user_ptm_inv_any` on the consumer side).  It
   lands with J proper, when the loop switches to `uvb` and names the
   image by construction.
-- **S8's remaining twenty rows are owed by A CLAUSE I WEAKENED.**  S5
+- **THE SWEEP LANDED (2026-08-29) AND S8 IS CLOSED except sbrk.**  All
+  thirty-one contracts now state `uptd_ext_sz`, `ut_90` proves the real
+  row for all twenty-one non-sbrk entries, and the escape is
+  `usys_num tf0 = USYS_sbrk` alone.  New `UsysMemOk.usys_mem_ok_epc` (the
+  table is blind to the epc word — `tf_ueq` cannot say this, because the
+  epc IS the word the trapped and dispatched trapframes differ in).
+  `FsSyscalls`' two descriptor clauses were an unlisted relay and moved
+  too; the AU family did NOT — a dependency trace put
+  `SpecSysOpenAU`/`MknodAU`/`UnlinkAU` off the dispatcher's path and in the
+  fs lane's cone, so those edits were reverted and absorbed locally.
+  ONLY the descriptor clause moved anywhere; the data half of those posts
+  was untouched and stays existential.  The history below is kept because
+  it records WHY the weaker form could not work.
+
+- **[historical] S8's remaining twenty rows were owed by A CLAUSE I WEAKENED.**  S5
   states the dispatcher's resume clause (ii) as
   `uptd_ext (pv_upt (us_V U)) (pv_upt (us_V U'))` (`SpecSyscall.v` ~:345).
   `uptd_ext` is same-root/same-tfp/submap and says nothing about a gained
