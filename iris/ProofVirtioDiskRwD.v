@@ -568,6 +568,47 @@ Section VdrwdMaps.
       iApply (IH Hokl with "Hl").
   Qed.
 
+  (* A6.125 step 4: the same over PIN OFFERS (VirtioProto.pin_offer) -- the
+     publisher's cells go into the lease with their memory at 1 and half
+     their stamp, so ownership still proves the regions pairwise disjoint *)
+  Definition po_list (l : list _) : iProp Σ :=
+    ([∗ list] m ∈ l, pin_offer m)%I.
+
+  Lemma po_union (l : list _) :
+    po_list l -∗
+    pin_offer (foldr union ∅ l) ∗ ⌜pm_ok l⌝ ∗
+    ⌜forall m, m ∈ l -> m ⊆ foldr union ∅ l⌝.
+  Proof.
+    induction l as [|m l IH].
+    - iIntros "_". rewrite /pin_offer big_sepM_empty. iSplitR; [done|].
+      iSplitR; [iPureIntro; exact I|].
+      iPureIntro. intros m Hm. exfalso. exact (not_elem_of_nil m Hm).
+    - rewrite /po_list. iIntros "[Hm Hl]".
+      iDestruct (IH with "Hl") as "(Hu & %Hokl & %Hsub)".
+      iDestruct (pin_offer_disj with "Hm Hu") as %Hd.
+      iSplitL "Hm Hu".
+      { cbn [foldr]. rewrite (pin_offer_union m (foldr union ∅ l) Hd). iFrame. }
+      iSplitR; [iPureIntro; exact (conj Hd Hokl)|].
+      iPureIntro. intros m' Hm'. cbn [foldr].
+      apply elem_of_cons in Hm' as [->|Hm'].
+      + apply map_union_subseteq_l.
+      + apply (transitivity (Hsub m' Hm')). apply map_union_subseteq_r. exact Hd.
+  Qed.
+
+  (* the kept halves follow the same list, joined by the pure disjointness *)
+  Definition kp_list (ξ : CtxId) (l : list _) : iProp Σ :=
+    ([∗ list] m ∈ l, keep_map ξ m)%I.
+
+  Lemma kp_union (ξ : CtxId) (l : list _) :
+    pm_ok l -> kp_list ξ l -∗ keep_map ξ (foldr union ∅ l).
+  Proof.
+    induction l as [|m l IH]; intro Hok.
+    - iIntros "_". rewrite keep_map_empty. done.
+    - destruct Hok as [Hd Hokl]. rewrite /kp_list. iIntros "[Hm Hl]".
+      cbn [foldr]. rewrite (keep_map_union ξ m (foldr union ∅ l) Hd).
+      iFrame "Hm". iApply (IH Hokl with "Hl").
+  Qed.
+
   (* the byte-window resources, all in the ONE [phys_map (range_map ...)]
      shape [pm_union] consumes *)
   Lemma vdrwd_pw8_map (a : Arch.pa) (w : bv 64) :
@@ -863,12 +904,12 @@ Section VdrwdLeaves.
     sie_cap_gpr KT1 m n false pme -∗ pc_is pc -∗
     instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 2)) -∗
     dev_inv γu γd -∗ disk_geom γd pd pav pu -∗
-    disk_pub γd np -∗ avail_half pav np -∗ phys_map pin -∗ phys_map wrb -∗
+    disk_pub γd np -∗ avail_half pav np -∗ pin_offer pin -∗ phys_map wrb -∗
     slot_pend_res γd (vs_all sl) sl -∗
     ( sie_cap_gpr KT1 m n false pme -∗
       pc_is (add_vec_int pc 4) -∗
       disk_pub γd (S np) -∗ disk_receipt γd np sl pin -∗
-      avail_half pav (S np) -∗
+      avail_half pav (S np) -∗ pin_back pin -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -897,7 +938,8 @@ Section VdrwdLeaves.
     iDestruct (vdrwd_avail_claim pav np Halign Hst2 Hcan2 with "Hkm Havh") as "#Hcl".
     iApply (wp_store_s_sconf_au_dat (kt := KT1) (ktd := KT0) 2 false pc rs2 rs1 imm m n
               (wrap16 (S np) : SailStdpp.Values.mword 16)
-              (disk_pub γd (S np) ∗ disk_receipt γd np sl pin ∗ avail_half pav (S np))%I
+              (disk_pub γd (S np) ∗ disk_receipt γd np sl pin ∗ avail_half pav (S np) ∗
+               pin_back pin)%I
               (⊤ ∖ ↑minstretN ∖ ↑diskN) false
               ([∗ list] j ∈ seq 0 2, phys_ledger (pa_add (pa_add pav 2%nat) j) (DfracOwn 1)
                                        (nth_byte (wrap16 np) j))%I
@@ -925,10 +967,9 @@ Section VdrwdLeaves.
       iDestruct ("Hback" with "Hah") as "[Hproto Hpub]".
       assert (Haddr : avail_idx_pa (v_cfg vst) = pa_add pav 2%nat)
         by (rewrite Hceq; reflexivity).
-      (* A6.125 step 2: the pin is OFFERED (memory at 1, stamp at ½); the
-         lease keeps a sealed half and hands the other half of memory back,
-         which this interim caller drops (step 4 keeps the ctx halves) *)
-      iDestruct (phys_map_offer with "Hpin") as "Hpin".
+      (* A6.125: the pin is OFFERED (memory at 1, stamp at ½); the lease keeps
+         a sealed half and hands the other half of memory back to the caller,
+         whose kept halves make it a half ctx cell again *)
       iDestruct (virtio_proto_publish_acc γd vst np sl pin wrb
                    ltac:(rgall; rewrite Hceq; exact Hpinok) Hwrbdom Hwrpin
                    with "Hproto Hpub Hpin Hwrb Hpend") as "(_ & _ & Hah & Hclose)".
@@ -954,12 +995,12 @@ Section VdrwdLeaves.
         iEval (rewrite phys_ledger_at_halves) in "Hc". iDestruct "Hc" as "[H1 H2]".
         iSplitL "H1"; [by iApply phys_ledger_at_ledger|].
         iExists t. iFrame "H2". by iApply (lk_floor_of_wrote with "Hw"). }
-      iMod ("Hclose" with "Hah") as "(Hproto & Hpub & Hrcpt & _)".
+      iMod ("Hclose" with "Hah") as "(Hproto & Hpub & Hrcpt & Hpb)".
       iMod ("Hdclose" with "[Hvf Hproto]") as "_".
       { iNext. iExists vst. iFrame. iPureIntro. exact Hvok. }
-      iModIntro. iFrame "Hpub Hrcpt Havh". }
-    iApply wp_next_off_intro. iIntros "Hcg Hpc (Hpub & Hrcpt & Havh)". rgall.
-    iApply ("Hcont" with "Hcg Hpc Hpub Hrcpt Havh").
+      iModIntro. iFrame "Hpub Hrcpt Havh Hpb". }
+    iApply wp_next_off_intro. iIntros "Hcg Hpc (Hpub & Hrcpt & Havh & Hpb)". rgall.
+    iApply ("Hcont" with "Hcg Hpc Hpub Hrcpt Havh Hpb").
   Qed.
 
 End VdrwdLeaves.
@@ -1155,6 +1196,60 @@ Section VdrwdPinRes.
     iApply (word8_to_phys a w Hs with "Hb H").
   Qed.
 
+  (* A6.125 step 4: the OFFER forms -- the word leaves as (memory at 1,
+     stamp at ½) and its kept halves stay with the publisher *)
+  Lemma vdrwd_o2 (a : Arch.pa) (w : bv 16) :
+    (forall j, (j < 2)%nat -> kmap_static (svpn_of (pa_add a j)) KP_rw) ->
+    kmap_static_claims -∗ a ↦₂ w -∗
+    pin_offer (range_map a 2 (nth_byte w)) ∗ keep_map cur_ctx (range_map a 2 (nth_byte w)).
+  Proof.
+    iIntros (Hs) "#Hb [_ H]".
+    iApply (ctx_win_offer a 2 (nth_byte w) ltac:(lia) Hs with "Hb H").
+  Qed.
+
+  Lemma vdrwd_o4 (a : Arch.pa) (w : bv 32) :
+    (forall j, (j < 4)%nat -> kmap_static (svpn_of (pa_add a j)) KP_rw) ->
+    kmap_static_claims -∗ a ↦₄ w -∗
+    pin_offer (range_map a 4 (nth_byte w)) ∗ keep_map cur_ctx (range_map a 4 (nth_byte w)).
+  Proof.
+    iIntros (Hs) "#Hb [_ H]".
+    iApply (ctx_win_offer a 4 (nth_byte w) ltac:(lia) Hs with "Hb H").
+  Qed.
+
+  Lemma vdrwd_o8 (a : Arch.pa) (w : bv 64) :
+    (forall j, (j < 8)%nat -> kmap_static (svpn_of (pa_add a j)) KP_rw) ->
+    kmap_static_claims -∗ a ↦₈ w -∗
+    pin_offer (range_map a 8 (nth_byte w)) ∗ keep_map cur_ctx (range_map a 8 (nth_byte w)).
+  Proof.
+    iIntros (Hs) "#Hb [_ H]".
+    iApply (ctx_win_offer a 8 (nth_byte w) ltac:(lia) Hs with "Hb H").
+  Qed.
+
+  Lemma vdrwd_ctx_bytes_of_fun (a : Arch.pa) (n : nat) (g : nat -> bv 8)
+      (bs : list (bv 8)) :
+    bs = g <$> seq 0 n ->
+    ([∗ list] j ↦ x ∈ bs, pa_add a j ↦ₘ x)
+    ⊣⊢ ([∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ g j).
+  Proof.
+    intros ->. rewrite big_sepL_fmap.
+    apply big_sepL_proper. intros k y Hk.
+    apply lookup_seq in Hk as [Hy _].
+    assert (Hyk : y = k) by lia. rewrite Hyk. reflexivity.
+  Qed.
+
+  Lemma vdrwd_buf_offer (a : Arch.pa) (bs : list (bv 8)) :
+    (Z.of_nat (length bs) < 18446744073709551616)%Z ->
+    (forall j, (j < length bs)%nat -> kmap_static (svpn_of (pa_add a j)) KP_rw) ->
+    kmap_static_claims -∗ ([∗ list] j ↦ x ∈ bs, pa_add a j ↦ₘ x) -∗
+    pin_offer (range_map a (length bs) (fun j => bs !!! j)) ∗
+    keep_map cur_ctx (range_map a (length bs) (fun j => bs !!! j)).
+  Proof.
+    iIntros (Hn Hs) "#Hb H".
+    iEval (rewrite (vdrwd_ctx_bytes_of_fun a (length bs) (fun j => bs !!! j) bs
+                      (list_eq_total bs))) in "H".
+    iApply (ctx_win_offer a (length bs) (fun j => bs !!! j) Hn Hs with "Hb H").
+  Qed.
+
   Lemma vdrwd_buf_to_phys (a : Arch.pa) (bs : list (bv 8)) :
     (forall j, (j < length bs)%nat -> kmap_static (svpn_of (pa_add a j)) KP_rw) ->
     kmap_static_claims -∗ ([∗ list] j ↦ x ∈ bs, pa_add a j ↦ₘ x) -∗ phys_list a bs.
@@ -1191,6 +1286,30 @@ Section VdrwdPinRes.
     iDestruct (big_sepL_lookup _ bs j x Hx with "Hl") as "Hb".
     (* A6.124: the list's cells are ledger cells now; the address fact is
        read off the forgotten points-to (never compiled before this unit) *)
+    iDestruct (TsoCtx.phys_ledger_forget with "Hb") as "Hb".
+    rewrite /phys_pointsto.
+    iDestruct "Hs" as "[Hs _]". iDestruct "Hb" as "[Hb _]".
+    iDestruct (pointsto_ne with "Hs Hb") as %Hne.
+    destruct (Hne eq_refl).
+  Qed.
+
+  (* the same, read off the buffer's ctx bytes before they split *)
+  Lemma vdrwd_stat_out_ctx (sts a : Arch.pa) (v : bv 8) (bs : list (bv 8)) :
+    length bs = 1024%nat ->
+    (forall j, (j < length bs)%nat -> kmap_static (svpn_of (pa_add a j)) KP_rw) ->
+    kmap_static_claims -∗
+    phys_ledger sts (DfracOwn 1) v -∗ ([∗ list] j ↦ x ∈ bs, pa_add a j ↦ₘ x) -∗
+    ⌜sts ∉ pa_range a 1024⌝.
+  Proof.
+    iIntros (Hlen Hs) "#Hkm Hs Hl".
+    iDestruct (TsoCtx.phys_ledger_forget with "Hs") as "Hs".
+    destruct (decide (sts ∈ pa_range a 1024)) as [Hin|Hout]; [| iPureIntro; exact Hout ].
+    apply pa_range_elim in Hin as (j & Hj & ->).
+    assert (Hb : is_Some (bs !! j)) by (apply lookup_lt_is_Some; lia).
+    destruct Hb as [x Hx].
+    iDestruct (big_sepL_lookup _ bs j x Hx with "Hl") as "Hb".
+    assert (Hj' : (j < length bs)%nat) by lia.
+    iDestruct (ctx_ident_ledger (pa_add a j) (DfracOwn 1) x (Hs j Hj') with "Hkm Hb") as "Hb".
     iDestruct (TsoCtx.phys_ledger_forget with "Hb") as "Hb".
     rewrite /phys_pointsto.
     iDestruct "Hs" as "[Hs _]". iDestruct "Hb" as "[Hb _]".
@@ -1235,7 +1354,7 @@ Section VdrwdPinBuild.
                            (vdrwd_bufwin b wr bs))
        /\ pm_ok (vdrwd_pinr_regions pd b h m2 t wr sector
                    (vdrwd_bufwin b wr bs))⌝ ∗
-      phys_map pin ∗ phys_map wrb ∗
+      pin_offer pin ∗ keep_map cur_ctx pin ∗ phys_map wrb ∗
       d_info_b h ↦₈ (b : SailStdpp.Values.mword 64) ∗
       b_disk b ↦₄ (SailStdpp.Values.mword_of_int (len := 32) 1) ∗
       vdrw_slot_rest m2 ∗ vdrw_slot_rest t.
@@ -1246,78 +1365,82 @@ Section VdrwdPinBuild.
     iDestruct "Hchain" as "(Hops0 & Hops1 & Hops2 & Hda0 & Hdl0 & Hdf0 & Hdn0 &
                             Hda1 & Hdl1 & Hdf1 & Hdn1 & Hda2 & Hdl2 & Hdf2 & Hdn2 &
                             Hst & Hib & Hbd & Hrm & Hrt)".
-    (* ---- every window into the [phys_map (range_map ...)] shape ---- *)
-    iDestruct (vdrwd_w2 (d_ring pav (np `mod` 8)) (Z_to_bv 16 (Z.of_nat h))
+    (* ---- every window into its OFFER and its KEPT halves ---- *)
+    iDestruct (vdrwd_o2 (d_ring pav (np `mod` 8)) (Z_to_bv 16 (Z.of_nat h))
                  ltac:(apply (vdrwd_off_static pav _ (4 + 2 * (np `mod` 8))%nat 2 eq_refl
                                 ltac:(pose proof (Nat.mod_upper_bound np 8 ltac:(lia)); lia) Hspav))
-                 with "Hkm Hring") as "Hring".
-    iDestruct (vdrwd_w8 (d_desc pd h) (d_ops h : SailStdpp.Values.mword 64)
+                 with "Hkm Hring") as "[Hring Kring]".
+    iDestruct (vdrwd_o8 (d_desc pd h) (d_ops h : SailStdpp.Values.mword 64)
                  ltac:(apply (vdrwd_off_static pd _ (16 * h)%nat 8 eq_refl ltac:(lia) Hspd))
-                 with "Hkm Hda0") as "Hda0".
-    iDestruct (vdrwd_w4 (pa_add pd (16 * h + 8)) (Z_to_bv 32 16)
+                 with "Hkm Hda0") as "[Hda0 Kda0]".
+    iDestruct (vdrwd_o4 (pa_add pd (16 * h + 8)) (Z_to_bv 32 16)
                  ltac:(apply (vdrwd_off_static pd _ (16 * h + 8)%nat 4 eq_refl ltac:(lia) Hspd))
-                 with "Hkm Hdl0") as "Hdl0".
-    iDestruct (vdrwd_w2 (pa_add pd (16 * h + 12)) (Z_to_bv 16 1)
+                 with "Hkm Hdl0") as "[Hdl0 Kdl0]".
+    iDestruct (vdrwd_o2 (pa_add pd (16 * h + 12)) (Z_to_bv 16 1)
                  ltac:(apply (vdrwd_off_static pd _ (16 * h + 12)%nat 2 eq_refl ltac:(lia) Hspd))
-                 with "Hkm Hdf0") as "Hdf0".
-    iDestruct (vdrwd_w2 (pa_add pd (16 * h + 14)) (Z_to_bv 16 (Z.of_nat m2))
+                 with "Hkm Hdf0") as "[Hdf0 Kdf0]".
+    iDestruct (vdrwd_o2 (pa_add pd (16 * h + 14)) (Z_to_bv 16 (Z.of_nat m2))
                  ltac:(apply (vdrwd_off_static pd _ (16 * h + 14)%nat 2 eq_refl ltac:(lia) Hspd))
-                 with "Hkm Hdn0") as "Hdn0".
-    iDestruct (vdrwd_w8 (d_desc pd m2) (b_data b : SailStdpp.Values.mword 64)
+                 with "Hkm Hdn0") as "[Hdn0 Kdn0]".
+    iDestruct (vdrwd_o8 (d_desc pd m2) (b_data b : SailStdpp.Values.mword 64)
                  ltac:(apply (vdrwd_off_static pd _ (16 * m2)%nat 8 eq_refl ltac:(lia) Hspd))
-                 with "Hkm Hda1") as "Hda1".
-    iDestruct (vdrwd_w4 (pa_add pd (16 * m2 + 8)) (Z_to_bv 32 1024)
+                 with "Hkm Hda1") as "[Hda1 Kda1]".
+    iDestruct (vdrwd_o4 (pa_add pd (16 * m2 + 8)) (Z_to_bv 32 1024)
                  ltac:(apply (vdrwd_off_static pd _ (16 * m2 + 8)%nat 4 eq_refl ltac:(lia) Hspd))
-                 with "Hkm Hdl1") as "Hdl1".
-    iDestruct (vdrwd_w2 (pa_add pd (16 * m2 + 12)) (vdrw_flags wr)
+                 with "Hkm Hdl1") as "[Hdl1 Kdl1]".
+    iDestruct (vdrwd_o2 (pa_add pd (16 * m2 + 12)) (vdrw_flags wr)
                  ltac:(apply (vdrwd_off_static pd _ (16 * m2 + 12)%nat 2 eq_refl ltac:(lia) Hspd))
-                 with "Hkm Hdf1") as "Hdf1".
-    iDestruct (vdrwd_w2 (pa_add pd (16 * m2 + 14)) (Z_to_bv 16 (Z.of_nat t))
+                 with "Hkm Hdf1") as "[Hdf1 Kdf1]".
+    iDestruct (vdrwd_o2 (pa_add pd (16 * m2 + 14)) (Z_to_bv 16 (Z.of_nat t))
                  ltac:(apply (vdrwd_off_static pd _ (16 * m2 + 14)%nat 2 eq_refl ltac:(lia) Hspd))
-                 with "Hkm Hdn1") as "Hdn1".
-    iDestruct (vdrwd_w8 (d_desc pd t) (d_info_status h : SailStdpp.Values.mword 64)
+                 with "Hkm Hdn1") as "[Hdn1 Kdn1]".
+    iDestruct (vdrwd_o8 (d_desc pd t) (d_info_status h : SailStdpp.Values.mword 64)
                  ltac:(apply (vdrwd_off_static pd _ (16 * t)%nat 8 eq_refl ltac:(lia) Hspd))
-                 with "Hkm Hda2") as "Hda2".
-    iDestruct (vdrwd_w4 (pa_add pd (16 * t + 8)) (Z_to_bv 32 1)
+                 with "Hkm Hda2") as "[Hda2 Kda2]".
+    iDestruct (vdrwd_o4 (pa_add pd (16 * t + 8)) (Z_to_bv 32 1)
                  ltac:(apply (vdrwd_off_static pd _ (16 * t + 8)%nat 4 eq_refl ltac:(lia) Hspd))
-                 with "Hkm Hdl2") as "Hdl2".
-    iDestruct (vdrwd_w2 (pa_add pd (16 * t + 12)) (Z_to_bv 16 2)
+                 with "Hkm Hdl2") as "[Hdl2 Kdl2]".
+    iDestruct (vdrwd_o2 (pa_add pd (16 * t + 12)) (Z_to_bv 16 2)
                  ltac:(apply (vdrwd_off_static pd _ (16 * t + 12)%nat 2 eq_refl ltac:(lia) Hspd))
-                 with "Hkm Hdf2") as "Hdf2".
-    iDestruct (vdrwd_w2 (pa_add pd (16 * t + 14)) (Z_to_bv 16 0)
+                 with "Hkm Hdf2") as "[Hdf2 Kdf2]".
+    iDestruct (vdrwd_o2 (pa_add pd (16 * t + 14)) (Z_to_bv 16 0)
                  ltac:(apply (vdrwd_off_static pd _ (16 * t + 14)%nat 2 eq_refl ltac:(lia) Hspd))
-                 with "Hkm Hdn2") as "Hdn2".
-    iDestruct (vdrwd_w4 (d_ops h) (vdrw_ty wr)
+                 with "Hkm Hdn2") as "[Hdn2 Kdn2]".
+    iDestruct (vdrwd_o4 (d_ops h) (vdrw_ty wr)
                  ltac:(apply (vdrwd_off_static disk_base _ (168 + 16 * h)%nat 4 eq_refl
                                 ltac:(lia) vdrwd_disk_static))
-                 with "Hkm Hops0") as "Hops0".
-    iDestruct (vdrwd_w4 (pa_add disk_base (168 + 16 * h + 4))
+                 with "Hkm Hops0") as "[Hops0 Kops0]".
+    iDestruct (vdrwd_o4 (pa_add disk_base (168 + 16 * h + 4))
                  (SailStdpp.Values.mword_of_int (len := 32) 0)
                  ltac:(apply (vdrwd_off_static disk_base _ (168 + 16 * h + 4)%nat 4 eq_refl
                                 ltac:(lia) vdrwd_disk_static))
-                 with "Hkm Hops1") as "Hops1".
-    iDestruct (vdrwd_w8 (pa_add disk_base (168 + 16 * h + 8)) sector
+                 with "Hkm Hops1") as "[Hops1 Kops1]".
+    iDestruct (vdrwd_o8 (pa_add disk_base (168 + 16 * h + 8)) sector
                  ltac:(apply (vdrwd_off_static disk_base _ (168 + 16 * h + 8)%nat 8 eq_refl
                                 ltac:(lia) vdrwd_disk_static))
-                 with "Hkm Hops2") as "Hops2".
+                 with "Hkm Hops2") as "[Hops2 Kops2]".
     (* ---- the status byte and the buffer, still in their own tiers ---- *)
     iDestruct (byte_to_phys (d_info_status h) (Z_to_bv 8 255)
                  ltac:(unfold d_info_status; apply vdrwd_disk_static; lia)
                  with "Hkm Hst") as "Hst".
-    iDestruct (vdrwd_buf_to_phys (b_data b) bs
-                 ltac:(rgall; rewrite Hlen; exact Hsbuf) with "Hkm Hbuf") as "Hbuf".
-    iDestruct (vdrwd_stat_out (d_info_status h) (b_data b) (Z_to_bv 8 255) bs Hlen
-                 with "Hst Hbuf") as %Hstat.
+    iDestruct (vdrwd_stat_out_ctx (d_info_status h) (b_data b) (Z_to_bv 8 255) bs Hlen
+                 ltac:(rgall; rewrite Hlen; exact Hsbuf) with "Hkm Hst Hbuf") as %Hstat.
     iEval (rewrite vdrwd_pb_map) in "Hst".
-    iDestruct (vdrwd_plist_map (b_data b) bs ltac:(lia) with "Hbuf") as "Hbuf".
-    iEval (rewrite Hlen) in "Hbuf".
     (* ---- the sixteen fixed windows, as a function of the last one ---- *)
-    iAssert (∀ mm, phys_map mm -∗
-               pm_list (vdrwd_regions pd pav b np h m2 t wr sector mm))%I
+    iAssert (∀ mm, keep_map cur_ctx mm -∗
+               kp_list cur_ctx (vdrwd_regions pd pav b np h m2 t wr sector mm))%I
+      with "[Kring Kda0 Kdl0 Kdf0 Kdn0 Kda1 Kdl1 Kdf1 Kdn1 Kda2 Kdl2 Kdf2 Kdn2
+             Kops0 Kops1 Kops2]" as "Hkl".
+    { iIntros (mm) "Hmm".
+      rewrite /kp_list /vdrwd_regions /vdrwd_pinr_regions.
+      iFrame "Kring Kda0 Kdl0 Kdf0 Kdn0 Kda1 Kdl1 Kdf1 Kdn1 Kda2 Kdl2 Kdf2 Kdn2
+              Kops0 Kops1 Kops2 Hmm". done. }
+    iAssert (∀ mm, pin_offer mm -∗
+               po_list (vdrwd_regions pd pav b np h m2 t wr sector mm))%I
       with "[Hring Hda0 Hdl0 Hdf0 Hdn0 Hda1 Hdl1 Hdf1 Hdn1 Hda2 Hdl2 Hdf2 Hdn2
              Hops0 Hops1 Hops2]" as "Hpl".
     { iIntros (mm) "Hmm".
-      rewrite /pm_list /vdrwd_regions /vdrwd_pinr_regions.
+      rewrite /po_list /vdrwd_regions /vdrwd_pinr_regions.
       iSplitL "Hring"; [iExact "Hring"|].
       iSplitL "Hda0"; [iExact "Hda0"|].
       iSplitL "Hdl0"; [iExact "Hdl0"|].
@@ -1340,13 +1463,18 @@ Section VdrwdPinBuild.
     destruct (bv_unsigned (vdrw_ty wr) =? virtio_blk_t_out) eqn:Hout.
     - (* OUT *)
       assert (Hbe : bsl = bs) by (apply Hbsl; unfold vdrwd_out; exact Hout).
+      iDestruct (vdrwd_buf_offer (b_data b) bs ltac:(rewrite Hlen; lia)
+                   ltac:(rgall; rewrite Hlen; exact Hsbuf) with "Hkm Hbuf") as "[Hbuf Kbuf]".
+      iEval (rewrite Hlen) in "Hbuf". iEval (rewrite Hlen) in "Kbuf".
       iDestruct ("Hpl" with "Hbuf") as "Hpl".
-      iDestruct (pm_union with "Hpl") as "(Hpin & %Hpmok & %Hsub)".
+      iDestruct (po_union with "Hpl") as "(Hpin & %Hpmok & %Hsub)".
+      iDestruct ("Hkl" with "Kbuf") as "Hkl".
+      iDestruct (kp_union _ _ Hpmok with "Hkl") as "Kpin".
       iExists (foldr union ∅ (vdrwd_regions pd pav b np h m2 t wr sector
                  (range_map (b_data b) 1024 (fun j => bs !!! j)))),
               {[ d_info_status h := Z_to_bv 8 255 ]}.
-      iDestruct (phys_map_disj with "Hpin Hst") as %Hpw.
-      iFrame "Hpin Hst Hib Hbd Hrm Hrt".
+      iDestruct (pin_offer_full_disj with "Hst Hpin") as %Hpw.
+      iFrame "Hpin Kpin Hst Hib Hbd Hrm Hrt".
       destruct Hpmok as [Hdring Hpmok'].
       iPureIntro. split_and!.
       + apply (vdrwd_mk_pin kq pd pav pu b np h m2 t wr sector bsl _
@@ -1366,18 +1494,26 @@ Section VdrwdPinBuild.
         assert (Hd : dom ({[ d_info_status h := Z_to_bv 8 255 ]} : gmap _ _)
                      ## dom (foldr union ∅ (vdrwd_regions pd pav b np h m2 t wr sector
                                (range_map (b_data b) 1024 (fun j => bs !!! j)))))
-          by (apply map_disjoint_dom; symmetry; exact Hpw).
+          by (apply gset_disj_sym; exact Hpw).
         rewrite dom_singleton_L in Hd. rewrite union_empty_r_L. exact Hd.
       + rewrite /vdrwd_bufwin Hout.
         cbn [vdrwd_regions foldr] in Hdring |- *.
         apply map_union_diff_l. exact Hdring.
       + rewrite /vdrwd_bufwin Hout. exact Hpmok'.
     - (* IN *)
+      iDestruct (vdrwd_buf_to_phys (b_data b) bs
+                   ltac:(rgall; rewrite Hlen; exact Hsbuf) with "Hkm Hbuf") as "Hbuf".
+      iDestruct (vdrwd_plist_map (b_data b) bs ltac:(lia) with "Hbuf") as "Hbuf".
+      iEval (rewrite Hlen) in "Hbuf".
       iDestruct (phys_map_disj with "Hst Hbuf") as %Hsb.
-      iAssert (phys_map ∅)%I as "Hemp".
-      { rewrite /phys_map big_sepM_empty. done. }
+      iAssert (pin_offer ∅)%I as "Hemp".
+      { rewrite pin_offer_empty. done. }
+      iAssert (keep_map cur_ctx ∅)%I as "Kemp".
+      { rewrite keep_map_empty. done. }
       iDestruct ("Hpl" $! ∅ with "Hemp") as "Hpl".
-      iDestruct (pm_union with "Hpl") as "(Hpin & %Hpmok & %Hsub)".
+      iDestruct (po_union with "Hpl") as "(Hpin & %Hpmok & %Hsub)".
+      iDestruct ("Hkl" $! ∅ with "Kemp") as "Hkl".
+      iDestruct (kp_union _ _ Hpmok with "Hkl") as "Kpin".
       iExists (foldr union ∅ (vdrwd_regions pd pav b np h m2 t wr sector ∅)),
               ({[ d_info_status h := Z_to_bv 8 255 ]}
                  ∪ range_map (b_data b) 1024 (fun j => bs !!! j)).
@@ -1385,8 +1521,8 @@ Section VdrwdPinBuild.
                  ∪ range_map (b_data b) 1024 (fun j => bs !!! j)))
         with "[Hst Hbuf]" as "Hwrb".
       { rewrite (phys_map_union _ _ Hsb). iFrame. }
-      iDestruct (phys_map_disj with "Hpin Hwrb") as %Hpw.
-      iFrame "Hpin Hwrb Hib Hbd Hrm Hrt".
+      iDestruct (pin_offer_full_disj with "Hwrb Hpin") as %Hpw.
+      iFrame "Hpin Kpin Hwrb Hib Hbd Hrm Hrt".
       destruct Hpmok as [Hdring Hpmok'].
       iPureIntro. split_and!.
       + apply (vdrwd_mk_pin kq pd pav pu b np h m2 t wr sector bsl _ ∅
@@ -1402,7 +1538,7 @@ Section VdrwdPinBuild.
                             ∪ range_map (b_data b) 1024 (fun j => bs !!! j))
                      ## dom (foldr union ∅
                                (vdrwd_regions pd pav b np h m2 t wr sector ∅)))
-          by (apply map_disjoint_dom; symmetry; exact Hpw).
+          by (apply gset_disj_sym; exact Hpw).
         rewrite dom_union_L dom_singleton_L range_map_dom in Hd.
         unfold slot_wr, vdrwd_slot, vs_is_out, vs_len.
         cbn [rw_slot vs_req vr_type vr_status vr_buf vr_len].
@@ -1942,7 +2078,7 @@ Section VdrwdP4.
                  (vdrwd_sldata wr bs_buf bs_disk)
                  Hh8 Hm8 Ht8 Hlenbuf Hlensl Hbsl Hspd Hspav Hsbuf
                  with "Hkm Hcell Hchain Hbuf") as
-      (pin wrb) "(%Hpinok & %Hwrbdom & %Hwrpin & %Hpinr & Hpin & Hwrb & Hib & Hbd & Hrm & Hrt)".
+      (pin wrb) "(%Hpinok & %Hwrbdom & %Hwrpin & %Hpinr & Hpin & Kpin & Hwrb & Hib & Hbd & Hrm & Hrt)".
     (* ---- +0x192  sh a5,2(a4)  -- THE PUBLISH ---- *)
     assert (Hidxa3 : add_vec (rget N8 Ra4)
                        (sign_extend' 64 (mword_of_int 2 : mword 12))
@@ -1977,7 +2113,11 @@ Section VdrwdP4.
             rewrite /vs_all.
             rewrite (vdrwd_slot_wr kq b h wr sector bs_buf bs_disk sec_off Hoff).
             iExact "Hpend". }
-    iIntros "Hcg Hpc Hpub Hrcpt Havh".
+    iIntros "Hcg Hpc Hpub Hrcpt Havh Hpb".
+    (* A6.125 step 4: the publisher's kept halves plus the lease's memory half
+       are the pin's half ctx cells (step 3 parks them in [flight_res]) *)
+    iDestruct (keep_map_back with "Kpin Hpb") as "Hhc".
+    iClear "Hhc".
     assert (Hp182 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x192) : mword 64) 4
                     = mword_of_int (KernelSyms.virtio_disk_rw + 0x196)) by pcstep.
     iEval (rewrite Hp182) in "Hpc".

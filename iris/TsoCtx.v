@@ -3364,6 +3364,69 @@ Section ctx.
     iApply (mono_nat_lb_own_le with "Hlb'"). lia.
   Qed.
 
+  (* >>> A6.125 step 4: THE OFFER/KEEP SPLIT of a ctx cell (VirtioProto's
+     PIN OFFER, A6.125's step-2 entry).  What goes out is the cell's memory
+     at 1 with HALF its stamp: a raw ½ points-to plus a sealed ½ ledger cell
+     -- enough for the lease to prove the new pin exclusive against its own
+     ½ cells.  What stays is the other half of the stamp with the ARM
+     ([ctx_cell_keep]); it transports like a ctx cell, and with the memory
+     half the lease hands back ([pin_back]) it is exactly
+     [ctx_phys_pointsto_h] again. <<< *)
+  Definition ctx_cell_keep (ξ : CtxId) (a : Arch.pa) : iProp Σ :=
+    (∃ t : nat,
+       a ↪[ts_name]{DfracOwn (1/2)} (t, TsoMemPa.ts_pay_none) ∗
+       (llb (ctx_bound_name ξ) t ∨ (t, a) ↪[ctx_dirty_name ξ] ()))%I.
+
+  Lemma ctx_phys_pointsto_offer_split (ξ : CtxId) (a : Arch.pa) (v : bv 8) :
+    ctx_phys_pointsto ξ a (DfracOwn 1) v ⊢
+    (phys_pointsto a (DfracOwn (1/2)) v ∗ phys_ledger a (DfracOwn (1/2)) v) ∗
+    ctx_cell_keep ξ a.
+  Proof.
+    rewrite ctx_phys_pointsto_unseal /ctx_phys_pointsto_def /ctx_cell_keep
+            phys_ledger_unseal /phys_ledger_def /phys_pointsto.
+    iIntros "(%t & [Hp %Hr] & Hts & Harm)".
+    iEval (rewrite (fractional_half (pointsto (L := Arch.pa) (V := bv 8) a (DfracOwn 1) v)))
+      in "Hp".
+    iEval (rewrite (fractional_half (a ↪[ts_name] (t, TsoMemPa.ts_pay_none)))) in "Hts".
+    iDestruct "Hp" as "[Hp1 Hp2]". iDestruct "Hts" as "[Ht1 Ht2]".
+    iSplitR "Ht2 Harm".
+    { iSplitL "Hp1"; [ iFrame "Hp1"; by iPureIntro |].
+      iExists t. iFrame "Ht1 Hp2". by iPureIntro. }
+    iExists t. iFrame "Ht2 Harm".
+  Qed.
+
+  Lemma ctx_cell_keep_back (ξ : CtxId) (a : Arch.pa) (v : bv 8) :
+    ctx_cell_keep ξ a -∗ phys_pointsto a (DfracOwn (1/2)) v -∗
+    ctx_phys_pointsto_h ξ a v.
+  Proof.
+    rewrite /ctx_cell_keep /ctx_phys_pointsto_h.
+    iIntros "(%t & Ht & Harm) Hp". iExists t. iFrame.
+  Qed.
+
+  Global Instance ctx_morph_cell_keep (a : Arch.pa) :
+    CtxMorph (λ ξ, ctx_cell_keep ξ a).
+  Proof.
+    iIntros (ξ ξ') "Hd HP".
+    rewrite ctx_dom_unseal /ctx_dom_def /ctx_cell_keep.
+    iDestruct "Hd" as
+      "(%B & %W & %B' & %D & [Hb Hdm] & %HDW & %HBB' & %HWB' & #Hlb')".
+    iDestruct "HP" as "(%t & Hts & Hbit)".
+    iAssert (⌜(t ≤ B')%nat⌝)%I as %HtB'.
+    { iDestruct "Hbit" as "[Hcl | Hdt]".
+      - iDestruct (llb_valid_q with "Hb Hcl") as %HtB.
+        iPureIntro. lia.
+      - iDestruct (ghost_map_lookup with "Hdm Hdt") as %HDt.
+        have HtW : ((t, a).1 ≤ W)%nat
+          by apply HDW; eapply elem_of_dom_2.
+        simpl in HtW. iPureIntro. lia. }
+    iClear "Hbit". iModIntro.
+    iSplitL "Hb Hdm".
+    { iExists B, W, B', D. iFrame "Hb Hdm Hlb'". by iPureIntro. }
+    iExists t. iFrame "Hts".
+    iLeft. rewrite /llb. iLeft.
+    iApply (mono_nat_lb_own_le with "Hlb'"). lia.
+  Qed.
+
   (* exclusivity at the REGISTERED physical tier, the companion of
      [phys_ledger_ne] one tier up: two owned bytes cannot name the same
      address.  A6.49's user-memory flip needs it -- [UmodeMem.umem_inj]

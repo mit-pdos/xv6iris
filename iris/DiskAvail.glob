@@ -1,4 +1,4 @@
-DIGEST e9130bfb8fe472b9d50c3582faf720ec
+DIGEST d6a42abf61c43f208ad6a9b5ec49012d
 Fxv6iris.DiskAvail
 R1364:1369 Stdlib.ZArith.ZArith <> <> lib
 R1371:1373 Stdlib.micromega.Lia <> <> lib
@@ -8,468 +8,1064 @@ R1412:1432 stdpp.bitvector.definitions <> <> lib
 R1470:1478 iris.proofmode.proofmode <> <> lib
 R1521:1528 iris.base_logic.lib.gen_heap <> <> lib
 R1530:1538 iris.base_logic.lib.ghost_map <> <> lib
-R1556:1585 SailStdpp.ConcurrencyInterface <> <> lib
-R1587:1624 SailStdpp.ConcurrencyInterfaceBuiltins <> <> lib
-R1626:1660 SailStdpp.ConcurrencyInterfaceTypes <> <> lib
-R1662:1687 SailStdpp.Operators_mwords <> <> lib
-R1705:1718 SailStdpp.Base <> <> lib
-R1720:1738 SailStdpp.TypeCasts <> <> lib
-R1740:1755 SailStdpp.Values <> <> lib
-R1757:1777 SailStdpp.MachineWord <> <> lib
-R1795:1811 Riscv.rv64d_types <> <> lib
-R1813:1823 Riscv.rv64d <> <> lib
-R1841:1855 xv6iris.RiscvModelBytes <> <> lib
-R1857:1865 xv6iris.RiscvLang <> <> lib
-R1867:1876 xv6iris.RiscvPtsto <> <> lib
-R1878:1886 xv6iris.RiscvExec <> <> lib
-R1888:1898 xv6iris.RiscvExtras <> <> lib
-R1916:1923 xv6iris.TsoMemPa <> <> lib
-R1925:1932 xv6iris.TsoGhost <> <> lib
-R1934:1939 xv6iris.TsoCtx <> <> lib
-R1941:1951 xv6iris.CtxMorphTac <> <> lib
-R1969:1973 xv6iris.KptPt <> <> lib
-R1975:1978 xv6iris.KMap <> <> lib
-R1996:2006 xv6iris.VirtioModel <> <> lib
-R2008:2018 xv6iris.VirtioQueue <> <> lib
-R2020:2027 xv6iris.WpVirtio <> <> lib
-R2029:2039 xv6iris.VirtioProto <> <> lib
-R2057:2062 xv6iris.WpLock <> <> lib
-sec 2100:2108 <> DiskAvail
-R2124:2130 xv6iris.RiscvPtsto <> riscvGS class
-var  2149:2150 DiskAvail XI
-R2154:2159 xv6iris.TsoCtx <> CurCtx class
-def 2300:2309 <> avail_half
-R2318:2322 SailStdpp.Values <> mword def
-binder 2312:2314 <> pav:4
-R2334:2336 Corelib.Init.Datatypes <> nat ind
-binder 2329:2330 <> np:5
-R2341:2345 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R2347:2348 xv6iris.DiskAvail <> DiskAvail.Σ var
-R2358:2368 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
-R2370:2374 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
-R2382:2383 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
-binder 2369:2369 <> j:6
-binder 2369:2369 <> j:7
-R2384:2387 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R2395:2403 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R2392:2394 Corelib.Init.Datatypes <> nat ind
-binder 2388:2388 <> t:8
-R2501:2512 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R2404:2417 xv6iris.TsoCtx <> phys_ledger_at def
-R2420:2425 xv6iris.RiscvModelBytes <> pa_add def
-R2428:2433 xv6iris.RiscvModelBytes <> pa_add def
-R2435:2437 xv6iris.DiskAvail <> pav:4 var
-R2446:2446 xv6iris.DiskAvail <> j:6 var
-R2450:2457 iris.algebra.dfrac <> DfracOwn constr
-R2461:2461 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
-R2476:2483 xv6iris.RiscvModelBytes <> nth_byte def
-R2497:2497 xv6iris.DiskAvail <> j:6 var
-R2486:2491 xv6iris.VirtioQueue <> wrap16 def
-R2493:2494 xv6iris.DiskAvail <> np:5 var
-R2500:2500 xv6iris.DiskAvail <> t:8 var
-R2513:2520 xv6iris.WpLock <> lk_floor def
-R2522:2528 xv6iris.TsoCtx <> cur_ctx def
-R2530:2530 xv6iris.DiskAvail <> t:8 var
-R2375:2377 Corelib.Lists.ListDef <> seq def
-prf 2545:2558 <> avail_half_ram
-R2567:2571 SailStdpp.Values <> mword def
-binder 2561:2563 <> pav:9
-R2583:2585 Corelib.Init.Datatypes <> nat ind
-binder 2578:2579 <> np:10
-R2611:2616 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R2594:2603 xv6iris.DiskAvail <> avail_half def
-R2605:2607 xv6iris.DiskAvail <> pav:9 var
-R2609:2610 xv6iris.DiskAvail <> np:10 var
-R2617:2619 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R2650:2652 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R2620:2630 xv6iris.RiscvPtsto <> addr_is_ram def
-R2633:2638 xv6iris.RiscvModelBytes <> pa_add def
-R2640:2642 xv6iris.DiskAvail <> pav:9 var
-R2677:2686 xv6iris.DiskAvail <> avail_half def
-R2677:2686 xv6iris.DiskAvail <> avail_half def
-R2677:2686 xv6iris.DiskAvail <> avail_half def
-R2701:2703 Corelib.Lists.ListDef <> seq def
-R2752:2765 xv6iris.TsoCtx <> phys_ledger_at def
-R2768:2780 xv6iris.RiscvPtsto <> phys_pointsto def
-R2782:2789 xv6iris.RiscvExtras <> pa_add_0 thm
-R2752:2765 xv6iris.TsoCtx <> phys_ledger_at def
-R2752:2765 xv6iris.TsoCtx <> phys_ledger_at def
-R2768:2780 xv6iris.RiscvPtsto <> phys_pointsto def
-R2768:2780 xv6iris.RiscvPtsto <> phys_pointsto def
-R2782:2789 xv6iris.RiscvExtras <> pa_add_0 thm
-R2782:2789 xv6iris.RiscvExtras <> pa_add_0 thm
-prf 3004:3021 <> avail_half_read_ok
-R3031:3035 xv6iris.RiscvLang <> CpuId class
-binder 3025:3027 <> CID:11
-R3043:3048 xv6iris.RiscvLang <> gstate rec
-binder 3039:3039 <> g:12
-R3058:3062 SailStdpp.Values <> mword def
-binder 3052:3054 <> pav:13
-R3074:3076 Corelib.Init.Datatypes <> nat ind
-binder 3069:3070 <> np:14
-R3129:3138 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R3085:3099 iris.base_logic.lib.gen_heap <> gen_heap_interp def
-R3124:3127 xv6iris.RiscvLang <> gmem proj
-R3121:3121 xv6iris.DiskAvail <> g:12 var
-R3108:3118 xv6iris.RiscvPtsto <> riscv_memGS inst
-R3166:3175 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R3139:3151 xv6iris.RiscvPtsto <> tso_interp_at def
-R3165:3165 xv6iris.DiskAvail <> g:12 var
-R3153:3163 xv6iris.RiscvPtsto <> riscv_eraGS meth
-R3195:3204 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R3176:3186 xv6iris.TsoCtx <> own_context def
-R3188:3194 xv6iris.TsoCtx <> cur_ctx def
-R3222:3231 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R3205:3214 xv6iris.DiskAvail <> avail_half def
-R3216:3218 xv6iris.DiskAvail <> pav:13 var
-R3220:3221 xv6iris.DiskAvail <> np:14 var
-R3232:3234 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R3389:3391 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R3235:3241 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-R3251:3252 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-R3248:3250 Corelib.Init.Datatypes <> nat ind
-binder 3242:3244 <> tvr:15
-R3280:3290 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R3268:3271 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
-R3257:3259 xv6iris.RiscvLang <> gtv proj
-R3254:3254 xv6iris.DiskAvail <> g:12 var
-R3262:3267 xv6iris.RiscvLang <> cpu_id def
-R3272:3274 xv6iris.DiskAvail <> tvr:15 var
-R3291:3304 xv6iris.TsoMemPa <> tso_read_bytes def
-R3379:3384 xv6iris.VirtioQueue <> wrap16 def
-R3386:3387 xv6iris.DiskAvail <> np:14 var
-R3358:3363 xv6iris.RiscvModelBytes <> pa_add def
-R3365:3367 xv6iris.DiskAvail <> pav:13 var
-R3344:3346 xv6iris.DiskAvail <> tvr:15 var
-R3325:3334 xv6iris.RiscvLang <> hart_agent def
-R3336:3341 xv6iris.RiscvLang <> cpu_id def
-R3318:3321 xv6iris.RiscvLang <> glog proj
-R3315:3315 xv6iris.DiskAvail <> g:12 var
-R3309:3312 xv6iris.RiscvLang <> gimg proj
-R3306:3306 xv6iris.DiskAvail <> g:12 var
-R3447:3449 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R3662:3664 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R3450:3456 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-R3458:3459 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-binder 3457:3457 <> j:16
-R3471:3474 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R3462:3464 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
-R3461:3461 xv6iris.DiskAvail <> j:16 var
-R3475:3481 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-R3485:3486 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-binder 3482:3484 <> tvr:17
-R3514:3532 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R3502:3505 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
-R3491:3493 xv6iris.RiscvLang <> gtv proj
-R3496:3501 xv6iris.RiscvLang <> cpu_id def
-R3506:3508 xv6iris.DiskAvail <> tvr:17 var
-R3630:3632 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R3533:3540 xv6iris.TsoMemPa <> tso_read def
-R3545:3548 xv6iris.RiscvLang <> gimg proj
-R3554:3557 xv6iris.RiscvLang <> glog proj
-R3561:3570 xv6iris.RiscvLang <> hart_agent def
-R3572:3577 xv6iris.RiscvLang <> cpu_id def
-R3580:3582 xv6iris.DiskAvail <> tvr:17 var
-R3602:3607 xv6iris.RiscvModelBytes <> pa_add def
-R3610:3615 xv6iris.RiscvModelBytes <> pa_add def
-R3628:3628 xv6iris.DiskAvail <> j:16 var
-R3633:3636 Corelib.Init.Datatypes <> Some constr
-R3639:3646 xv6iris.RiscvModelBytes <> nth_byte def
-R3660:3660 xv6iris.DiskAvail <> j:16 var
-R3649:3654 xv6iris.VirtioQueue <> wrap16 def
-R3447:3449 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R3662:3664 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R3450:3456 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-R3458:3459 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-binder 3457:3457 <> j:18
-R3471:3474 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R3462:3464 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
-R3461:3461 xv6iris.DiskAvail <> j:18 var
-R3475:3481 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-R3485:3486 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-binder 3482:3484 <> tvr:19
-R3514:3532 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R3502:3505 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
-R3491:3493 xv6iris.RiscvLang <> gtv proj
-R3496:3501 xv6iris.RiscvLang <> cpu_id def
-R3506:3508 xv6iris.DiskAvail <> tvr:19 var
-R3630:3632 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R3533:3540 xv6iris.TsoMemPa <> tso_read def
-R3545:3548 xv6iris.RiscvLang <> gimg proj
-R3554:3557 xv6iris.RiscvLang <> glog proj
-R3561:3570 xv6iris.RiscvLang <> hart_agent def
-R3572:3577 xv6iris.RiscvLang <> cpu_id def
-R3580:3582 xv6iris.DiskAvail <> tvr:19 var
-R3602:3607 xv6iris.RiscvModelBytes <> pa_add def
-R3610:3615 xv6iris.RiscvModelBytes <> pa_add def
-R3628:3628 xv6iris.DiskAvail <> j:18 var
-R3633:3636 Corelib.Init.Datatypes <> Some constr
-R3639:3646 xv6iris.RiscvModelBytes <> nth_byte def
-R3660:3660 xv6iris.DiskAvail <> j:18 var
-R3649:3654 xv6iris.VirtioQueue <> wrap16 def
-R3722:3735 iris.bi.derived_laws bi pure_forall thm
-R3722:3735 iris.bi.derived_laws bi pure_forall thm
-R3722:3735 iris.bi.derived_laws bi pure_forall thm
-R3759:3770 iris.bi.derived_laws bi pure_impl thm
-R3759:3770 iris.bi.derived_laws bi pure_impl thm
-R3759:3770 iris.bi.derived_laws bi pure_impl thm
-R3803:3803 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3827:3832 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3836:3836 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3804:3818 iris.bi.big_op <> big_sepL_lookup thm
-R3873:3882 stdpp.list_numbers <> lookup_seq thm
-R3803:3803 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3827:3832 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3836:3836 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3804:3818 iris.bi.big_op <> big_sepL_lookup thm
-R3873:3882 stdpp.list_numbers <> lookup_seq thm
-R3915:3915 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3928:3933 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3944:3944 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3916:3927 xv6iris.WpLock <> lk_floor_vis thm
-R3915:3915 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3928:3933 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3944:3944 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3916:3927 xv6iris.WpLock <> lk_floor_vis thm
-R3991:3991 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R4013:4018 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R4040:4040 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3992:4012 xv6iris.TsoCtx <> ledger_read_at_vis_ok thm
-R3991:3991 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R4013:4018 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R4040:4040 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3992:4012 xv6iris.TsoCtx <> ledger_read_at_vis_ok thm
-prf 4275:4290 <> avail_split_init
-R4305:4309 SailStdpp.Values <> mword def
-binder 4293:4294 <> pd:20
-binder 4296:4298 <> pav:21
-binder 4300:4301 <> pu:22
-R4321:4321 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R4404:4412 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R4322:4328 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-R4330:4331 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-binder 4329:4329 <> j:23
-R4343:4346 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R4334:4336 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
-R4333:4333 xv6iris.DiskAvail <> j:23 var
-R4347:4357 xv6iris.KptPt <> kmap_static def
-R4360:4366 xv6iris.RiscvPtsto <> svpn_of def
-R4369:4374 xv6iris.RiscvModelBytes <> pa_add def
-R4377:4382 xv6iris.RiscvModelBytes <> pa_add def
-R4384:4386 xv6iris.DiskAvail <> pav:21 var
-R4395:4395 xv6iris.DiskAvail <> j:23 var
-R4399:4403 xv6iris.RiscvPtsto <> KP_rw constr
-R4431:4440 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R4413:4430 xv6iris.KMap <> kmap_static_claims def
-R4441:4441 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
-R4537:4548 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
-R4442:4452 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
-R4454:4458 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
-R4466:4474 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
-binder 4453:4453 <> j:24
-binder 4453:4453 <> j:25
-R4475:4475 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ'_x not
-R4503:4511 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ'_x not
-R4476:4481 xv6iris.RiscvModelBytes <> pa_add def
-R4484:4489 xv6iris.RiscvModelBytes <> pa_add def
-R4491:4493 xv6iris.DiskAvail <> pav:21 var
-R4502:4502 xv6iris.DiskAvail <> j:24 var
-R4512:4519 xv6iris.RiscvModelBytes <> nth_byte def
-R4536:4536 xv6iris.DiskAvail <> j:24 var
-R4522:4527 xv6iris.VirtioQueue <> wrap16 def
-R4459:4461 Corelib.Lists.ListDef <> seq def
-R4595:4599 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R4549:4564 xv6iris.VirtioProto <> avail_lease_half def
-R4567:4581 xv6iris.VirtioModel <> virtio_init_cfg def
-R4583:4584 xv6iris.DiskAvail <> pd:20 var
-R4586:4588 xv6iris.DiskAvail <> pav:21 var
-R4590:4591 xv6iris.DiskAvail <> pu:22 var
-R4600:4609 xv6iris.DiskAvail <> avail_half def
-R4611:4613 xv6iris.DiskAvail <> pav:21 var
-R4713:4715 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R4673:4684 xv6iris.VirtioQueue <> avail_idx_pa def
-R4687:4701 xv6iris.VirtioModel <> virtio_init_cfg def
-R4716:4721 xv6iris.RiscvModelBytes <> pa_add def
-R4713:4715 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R4673:4684 xv6iris.VirtioQueue <> avail_idx_pa def
-R4687:4701 xv6iris.VirtioModel <> virtio_init_cfg def
-R4716:4721 xv6iris.RiscvModelBytes <> pa_add def
-R4769:4784 xv6iris.VirtioProto <> avail_lease_half def
-R4787:4796 xv6iris.DiskAvail <> avail_half def
-R4769:4784 xv6iris.VirtioProto <> avail_lease_half def
-R4769:4784 xv6iris.VirtioProto <> avail_lease_half def
-R4787:4796 xv6iris.DiskAvail <> avail_half def
-R4787:4796 xv6iris.DiskAvail <> avail_half def
-R4817:4821 iris.bi.updates <> ::bi_scope:'|==>'_x not
-R4822:4832 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
-R4834:4838 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
-R4846:4854 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
-binder 4833:4833 <> j:26
-binder 4833:4833 <> j:27
-R4950:4961 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R4855:4865 xv6iris.TsoCtx <> phys_ledger def
-R4868:4873 xv6iris.RiscvModelBytes <> pa_add def
-R4876:4881 xv6iris.RiscvModelBytes <> pa_add def
-R4894:4894 xv6iris.DiskAvail <> j:26 var
-R4898:4905 iris.algebra.dfrac <> DfracOwn constr
-R4909:4909 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
-R4924:4931 xv6iris.RiscvModelBytes <> nth_byte def
-R4948:4948 xv6iris.DiskAvail <> j:26 var
-R4934:4939 xv6iris.VirtioQueue <> wrap16 def
-R4962:4965 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R4973:4983 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R4970:4972 Corelib.Init.Datatypes <> nat ind
-binder 4966:4966 <> t:28
-R5086:5090 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R4984:4997 xv6iris.TsoCtx <> phys_ledger_at def
-R5000:5005 xv6iris.RiscvModelBytes <> pa_add def
-R5008:5013 xv6iris.RiscvModelBytes <> pa_add def
-R5026:5026 xv6iris.DiskAvail <> j:26 var
-R5030:5037 iris.algebra.dfrac <> DfracOwn constr
-R5041:5041 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
-R5058:5065 xv6iris.RiscvModelBytes <> nth_byte def
-R5082:5082 xv6iris.DiskAvail <> j:26 var
-R5068:5073 xv6iris.VirtioQueue <> wrap16 def
-R5085:5085 xv6iris.DiskAvail <> t:28 var
-R5091:5098 xv6iris.WpLock <> lk_floor def
-R5100:5106 xv6iris.TsoCtx <> cur_ctx def
-R5108:5108 xv6iris.DiskAvail <> t:28 var
-R4839:4841 Corelib.Lists.ListDef <> seq def
-R4817:4821 iris.bi.updates <> ::bi_scope:'|==>'_x not
-R4822:4832 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
-R4834:4838 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
-R4846:4854 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
-binder 4833:4833 <> j:29
-binder 4833:4833 <> j:30
-R4950:4961 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R4855:4865 xv6iris.TsoCtx <> phys_ledger def
-R4868:4873 xv6iris.RiscvModelBytes <> pa_add def
-R4876:4881 xv6iris.RiscvModelBytes <> pa_add def
-R4894:4894 xv6iris.DiskAvail <> j:29 var
-R4898:4905 iris.algebra.dfrac <> DfracOwn constr
-R4909:4909 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
-R4924:4931 xv6iris.RiscvModelBytes <> nth_byte def
-R4948:4948 xv6iris.DiskAvail <> j:29 var
-R4934:4939 xv6iris.VirtioQueue <> wrap16 def
-R4962:4965 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R4973:4983 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R4970:4972 Corelib.Init.Datatypes <> nat ind
-binder 4966:4966 <> t:31
-R5086:5090 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R4984:4997 xv6iris.TsoCtx <> phys_ledger_at def
-R5000:5005 xv6iris.RiscvModelBytes <> pa_add def
-R5008:5013 xv6iris.RiscvModelBytes <> pa_add def
-R5026:5026 xv6iris.DiskAvail <> j:29 var
-R5030:5037 iris.algebra.dfrac <> DfracOwn constr
-R5041:5041 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
-R5058:5065 xv6iris.RiscvModelBytes <> nth_byte def
-R5082:5082 xv6iris.DiskAvail <> j:29 var
-R5068:5073 xv6iris.VirtioQueue <> wrap16 def
-R5085:5085 xv6iris.DiskAvail <> t:31 var
-R5091:5098 xv6iris.WpLock <> lk_floor def
-R5100:5106 xv6iris.TsoCtx <> cur_ctx def
-R5108:5108 xv6iris.DiskAvail <> t:31 var
-R4839:4841 Corelib.Lists.ListDef <> seq def
-R5152:5164 iris.bi.updates <> big_sepL_bupd thm
-R5152:5164 iris.bi.updates <> big_sepL_bupd thm
-R5174:5174 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5188:5193 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5197:5197 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5175:5187 iris.bi.big_op <> big_sepL_impl thm
-R5174:5174 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5188:5193 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5197:5197 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5175:5187 iris.bi.big_op <> big_sepL_impl thm
-R5246:5255 stdpp.list_numbers <> lookup_seq thm
-R5246:5255 stdpp.list_numbers <> lookup_seq thm
-R5305:5305 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5328:5333 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5338:5338 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5306:5327 xv6iris.TsoCtx <> ctx_pointsto_canonical thm
-R5305:5305 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5328:5333 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5338:5338 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5306:5327 xv6iris.TsoCtx <> ctx_pointsto_canonical thm
-R5374:5376 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
-R5370:5372 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
-R5374:5376 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
-R5370:5372 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
-R5409:5409 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5517:5522 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5528:5528 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5410:5430 xv6iris.KMap <> kmap_static_claims_at thm
-R5433:5439 xv6iris.RiscvPtsto <> svpn_of def
-R5442:5447 xv6iris.RiscvModelBytes <> pa_add def
-R5450:5455 xv6iris.RiscvModelBytes <> pa_add def
-R5470:5472 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
-R5501:5505 xv6iris.RiscvPtsto <> KP_rw constr
-R5409:5409 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5517:5522 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5528:5528 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5410:5430 xv6iris.KMap <> kmap_static_claims_at thm
-R5433:5439 xv6iris.RiscvPtsto <> svpn_of def
-R5442:5447 xv6iris.RiscvModelBytes <> pa_add def
-R5450:5455 xv6iris.RiscvModelBytes <> pa_add def
-R5470:5472 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
-R5501:5505 xv6iris.RiscvPtsto <> KP_rw constr
-R5557:5557 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5667:5691 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5700:5700 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5558:5577 xv6iris.TsoCtx <> ctx_pointsto_to_phys thm
-R5615:5622 xv6iris.KptPt <> pa_of_id thm
-R5625:5630 xv6iris.RiscvModelBytes <> pa_add def
-R5633:5638 xv6iris.RiscvModelBytes <> pa_add def
-R5653:5655 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
-R5579:5585 xv6iris.TsoCtx <> cur_ctx def
-R5557:5557 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5667:5691 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5700:5700 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5558:5577 xv6iris.TsoCtx <> ctx_pointsto_to_phys thm
-R5615:5622 xv6iris.KptPt <> pa_of_id thm
-R5625:5630 xv6iris.RiscvModelBytes <> pa_add def
-R5633:5638 xv6iris.RiscvModelBytes <> pa_add def
-R5653:5655 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
-R5579:5585 xv6iris.TsoCtx <> cur_ctx def
-R5722:5722 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5753:5758 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5763:5763 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5723:5752 xv6iris.TsoCtx <> ctx_phys_pointsto_forget_floor thm
-R5722:5722 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5753:5758 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5763:5763 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R5723:5752 xv6iris.TsoCtx <> ctx_phys_pointsto_forget_floor thm
-R5806:5826 xv6iris.VirtioProto <> phys_ledger_at_halves thm
-R5806:5826 xv6iris.VirtioProto <> phys_ledger_at_halves thm
-R5806:5826 xv6iris.VirtioProto <> phys_ledger_at_halves thm
-R5912:5932 xv6iris.TsoCtx <> phys_ledger_at_ledger thm
-R5912:5932 xv6iris.TsoCtx <> phys_ledger_at_ledger thm
-R6029:6043 xv6iris.WpLock <> lk_floor_of_ctx thm
-R6057:6073 xv6iris.WpLock <> lk_floor_of_wrote thm
-R6029:6043 xv6iris.WpLock <> lk_floor_of_ctx thm
-R6057:6073 xv6iris.WpLock <> lk_floor_of_wrote thm
-R6103:6114 iris.bi.big_op <> big_sepL_sep thm
-R6103:6114 iris.bi.big_op <> big_sepL_sep thm
-R6103:6114 iris.bi.big_op <> big_sepL_sep thm
-R6154:6162 xv6iris.DiskAvail DiskAvail <> sec
-sec 6174:6187 <> DiskAvailMorph
-R6203:6209 xv6iris.RiscvPtsto <> riscvGS class
-inst 6234:6249 <> avail_half_morph
-R6258:6262 SailStdpp.Values <> mword def
-binder 6252:6254 <> pav:34
-R6274:6276 Corelib.Init.Datatypes <> nat ind
-binder 6269:6270 <> np:35
-R6285:6292 xv6iris.TsoCtx <> CtxMorph class
-R6295:6297 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R6300:6301 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 6298:6299 <> ξ:36
-R6302:6311 xv6iris.DiskAvail <> avail_half def
-R6324:6326 xv6iris.DiskAvail <> pav:34 var
-R6328:6329 xv6iris.DiskAvail <> np:35 var
-R6320:6321 xv6iris.DiskAvail <> ξ:36 var
-R6351:6360 xv6iris.DiskAvail <> avail_half def
-R6351:6360 xv6iris.DiskAvail <> avail_half def
-R6351:6360 xv6iris.DiskAvail <> avail_half def
-R6391:6404 xv6iris.WpLock <> lk_floor_morph inst
-R6391:6404 xv6iris.WpLock <> lk_floor_morph inst
-R6391:6404 xv6iris.WpLock <> lk_floor_morph inst
-R6416:6429 xv6iris.DiskAvail DiskAvailMorph <> sec
+R1769:1794 SailStdpp.Operators_mwords <> <> lib
+R1812:1828 Riscv.rv64d_types <> <> lib
+R1830:1840 Riscv.rv64d <> <> lib
+R1858:1872 xv6iris.RiscvModelBytes <> <> lib
+R1874:1882 xv6iris.RiscvLang <> <> lib
+R1884:1893 xv6iris.RiscvPtsto <> <> lib
+R1895:1903 xv6iris.RiscvExec <> <> lib
+R1905:1915 xv6iris.RiscvExtras <> <> lib
+R1933:1940 xv6iris.TsoMemPa <> <> lib
+R1942:1949 xv6iris.TsoGhost <> <> lib
+R1951:1956 xv6iris.TsoCtx <> <> lib
+R1958:1968 xv6iris.CtxMorphTac <> <> lib
+R1986:1990 xv6iris.KptPt <> <> lib
+R1992:1995 xv6iris.KMap <> <> lib
+R2013:2023 xv6iris.VirtioModel <> <> lib
+R2025:2035 xv6iris.VirtioQueue <> <> lib
+R2037:2044 xv6iris.WpVirtio <> <> lib
+R2046:2056 xv6iris.VirtioProto <> <> lib
+R2074:2079 xv6iris.WpLock <> <> lib
+sec 2117:2125 <> DiskAvail
+R2141:2147 xv6iris.RiscvPtsto <> riscvGS class
+var  2166:2167 DiskAvail XI
+R2171:2176 xv6iris.TsoCtx <> CurCtx class
+def 2317:2326 <> avail_half
+R2335:2356 SailStdpp.Values <> mword def
+binder 2329:2331 <> pav:4
+R2368:2370 Corelib.Init.Datatypes <> nat ind
+binder 2363:2364 <> np:5
+R2375:2379 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R2381:2382 xv6iris.DiskAvail <> DiskAvail.Σ var
+R2392:2402 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R2404:2408 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R2416:2417 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 2403:2403 <> j:6
+binder 2403:2403 <> j:7
+R2418:2421 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R2429:2437 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R2426:2428 Corelib.Init.Datatypes <> nat ind
+binder 2422:2422 <> t:8
+R2535:2546 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R2438:2451 xv6iris.TsoCtx <> phys_ledger_at def
+R2454:2459 xv6iris.RiscvModelBytes <> pa_add def
+R2462:2467 xv6iris.RiscvModelBytes <> pa_add def
+R2469:2471 xv6iris.DiskAvail <> pav:4 var
+R2480:2480 xv6iris.DiskAvail <> j:6 var
+R2484:2491 iris.algebra.dfrac <> DfracOwn constr
+R2495:2495 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R2510:2517 xv6iris.RiscvModelBytes <> nth_byte def
+R2531:2531 xv6iris.DiskAvail <> j:6 var
+R2520:2525 xv6iris.VirtioQueue <> wrap16 def
+R2527:2528 xv6iris.DiskAvail <> np:5 var
+R2534:2534 xv6iris.DiskAvail <> t:8 var
+R2547:2554 xv6iris.WpLock <> lk_floor def
+R2556:2562 xv6iris.TsoCtx <> cur_ctx def
+R2564:2564 xv6iris.DiskAvail <> t:8 var
+R2409:2411 Corelib.Lists.ListDef <> seq def
+prf 2579:2592 <> avail_half_ram
+R2601:2622 SailStdpp.Values <> mword def
+binder 2595:2597 <> pav:9
+R2634:2636 Corelib.Init.Datatypes <> nat ind
+binder 2629:2630 <> np:10
+R2662:2667 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R2645:2654 xv6iris.DiskAvail <> avail_half def
+R2656:2658 xv6iris.DiskAvail <> pav:9 var
+R2660:2661 xv6iris.DiskAvail <> np:10 var
+R2668:2670 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R2701:2703 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R2671:2681 xv6iris.RiscvPtsto <> addr_is_ram def
+R2684:2689 xv6iris.RiscvModelBytes <> pa_add def
+R2691:2693 xv6iris.DiskAvail <> pav:9 var
+R2728:2737 xv6iris.DiskAvail <> avail_half def
+R2728:2737 xv6iris.DiskAvail <> avail_half def
+R2728:2737 xv6iris.DiskAvail <> avail_half def
+R2752:2754 Corelib.Lists.ListDef <> seq def
+R2803:2816 xv6iris.TsoCtx <> phys_ledger_at def
+R2819:2831 xv6iris.RiscvPtsto <> phys_pointsto def
+R2833:2840 xv6iris.RiscvExtras <> pa_add_0 thm
+R2803:2816 xv6iris.TsoCtx <> phys_ledger_at def
+R2803:2816 xv6iris.TsoCtx <> phys_ledger_at def
+R2819:2831 xv6iris.RiscvPtsto <> phys_pointsto def
+R2819:2831 xv6iris.RiscvPtsto <> phys_pointsto def
+R2833:2840 xv6iris.RiscvExtras <> pa_add_0 thm
+R2833:2840 xv6iris.RiscvExtras <> pa_add_0 thm
+prf 3055:3072 <> avail_half_read_ok
+R3082:3086 xv6iris.RiscvLang <> CpuId class
+binder 3076:3078 <> CID:11
+R3094:3099 xv6iris.RiscvLang <> gstate rec
+binder 3090:3090 <> g:12
+R3109:3130 SailStdpp.Values <> mword def
+binder 3103:3105 <> pav:13
+R3142:3144 Corelib.Init.Datatypes <> nat ind
+binder 3137:3138 <> np:14
+R3197:3206 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R3153:3167 iris.base_logic.lib.gen_heap <> gen_heap_interp def
+R3192:3195 xv6iris.RiscvLang <> gmem proj
+R3189:3189 xv6iris.DiskAvail <> g:12 var
+R3176:3186 xv6iris.RiscvPtsto <> riscv_memGS inst
+R3234:3243 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R3207:3219 xv6iris.RiscvPtsto <> tso_interp_at def
+R3233:3233 xv6iris.DiskAvail <> g:12 var
+R3221:3231 xv6iris.RiscvPtsto <> riscv_eraGS meth
+R3263:3272 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R3244:3254 xv6iris.TsoCtx <> own_context def
+R3256:3262 xv6iris.TsoCtx <> cur_ctx def
+R3290:3299 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R3273:3282 xv6iris.DiskAvail <> avail_half def
+R3284:3286 xv6iris.DiskAvail <> pav:13 var
+R3288:3289 xv6iris.DiskAvail <> np:14 var
+R3300:3302 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R3457:3459 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R3303:3309 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R3319:3320 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R3316:3318 Corelib.Init.Datatypes <> nat ind
+binder 3310:3312 <> tvr:15
+R3348:3358 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3336:3339 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R3325:3327 xv6iris.RiscvLang <> gtv proj
+R3322:3322 xv6iris.DiskAvail <> g:12 var
+R3330:3335 xv6iris.RiscvLang <> cpu_id def
+R3340:3342 xv6iris.DiskAvail <> tvr:15 var
+R3359:3372 xv6iris.TsoMemPa <> tso_read_bytes def
+R3447:3452 xv6iris.VirtioQueue <> wrap16 def
+R3454:3455 xv6iris.DiskAvail <> np:14 var
+R3426:3431 xv6iris.RiscvModelBytes <> pa_add def
+R3433:3435 xv6iris.DiskAvail <> pav:13 var
+R3412:3414 xv6iris.DiskAvail <> tvr:15 var
+R3393:3402 xv6iris.RiscvLang <> hart_agent def
+R3404:3409 xv6iris.RiscvLang <> cpu_id def
+R3386:3389 xv6iris.RiscvLang <> glog proj
+R3383:3383 xv6iris.DiskAvail <> g:12 var
+R3377:3380 xv6iris.RiscvLang <> gimg proj
+R3374:3374 xv6iris.DiskAvail <> g:12 var
+R3515:3517 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R3730:3732 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R3518:3524 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R3526:3527 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 3525:3525 <> j:16
+R3539:3542 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3530:3532 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R3529:3529 xv6iris.DiskAvail <> j:16 var
+R3543:3549 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R3553:3554 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 3550:3552 <> tvr:17
+R3582:3600 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3570:3573 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R3559:3561 xv6iris.RiscvLang <> gtv proj
+R3564:3569 xv6iris.RiscvLang <> cpu_id def
+R3574:3576 xv6iris.DiskAvail <> tvr:17 var
+R3698:3700 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3601:3608 xv6iris.TsoMemPa <> tso_read def
+R3613:3616 xv6iris.RiscvLang <> gimg proj
+R3622:3625 xv6iris.RiscvLang <> glog proj
+R3629:3638 xv6iris.RiscvLang <> hart_agent def
+R3640:3645 xv6iris.RiscvLang <> cpu_id def
+R3648:3650 xv6iris.DiskAvail <> tvr:17 var
+R3670:3675 xv6iris.RiscvModelBytes <> pa_add def
+R3678:3683 xv6iris.RiscvModelBytes <> pa_add def
+R3696:3696 xv6iris.DiskAvail <> j:16 var
+R3701:3704 Corelib.Init.Datatypes <> Some constr
+R3707:3714 xv6iris.RiscvModelBytes <> nth_byte def
+R3728:3728 xv6iris.DiskAvail <> j:16 var
+R3717:3722 xv6iris.VirtioQueue <> wrap16 def
+R3515:3517 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R3730:3732 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R3518:3524 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R3526:3527 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 3525:3525 <> j:18
+R3539:3542 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3530:3532 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R3529:3529 xv6iris.DiskAvail <> j:18 var
+R3543:3549 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R3553:3554 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 3550:3552 <> tvr:19
+R3582:3600 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3570:3573 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R3559:3561 xv6iris.RiscvLang <> gtv proj
+R3564:3569 xv6iris.RiscvLang <> cpu_id def
+R3574:3576 xv6iris.DiskAvail <> tvr:19 var
+R3698:3700 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R3601:3608 xv6iris.TsoMemPa <> tso_read def
+R3613:3616 xv6iris.RiscvLang <> gimg proj
+R3622:3625 xv6iris.RiscvLang <> glog proj
+R3629:3638 xv6iris.RiscvLang <> hart_agent def
+R3640:3645 xv6iris.RiscvLang <> cpu_id def
+R3648:3650 xv6iris.DiskAvail <> tvr:19 var
+R3670:3675 xv6iris.RiscvModelBytes <> pa_add def
+R3678:3683 xv6iris.RiscvModelBytes <> pa_add def
+R3696:3696 xv6iris.DiskAvail <> j:18 var
+R3701:3704 Corelib.Init.Datatypes <> Some constr
+R3707:3714 xv6iris.RiscvModelBytes <> nth_byte def
+R3728:3728 xv6iris.DiskAvail <> j:18 var
+R3717:3722 xv6iris.VirtioQueue <> wrap16 def
+R3790:3803 iris.bi.derived_laws bi pure_forall thm
+R3790:3803 iris.bi.derived_laws bi pure_forall thm
+R3790:3803 iris.bi.derived_laws bi pure_forall thm
+R3827:3838 iris.bi.derived_laws bi pure_impl thm
+R3827:3838 iris.bi.derived_laws bi pure_impl thm
+R3827:3838 iris.bi.derived_laws bi pure_impl thm
+R3871:3871 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3895:3900 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3904:3904 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3872:3886 iris.bi.big_op <> big_sepL_lookup thm
+R3941:3950 stdpp.list_numbers <> lookup_seq thm
+R3871:3871 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3895:3900 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3904:3904 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3872:3886 iris.bi.big_op <> big_sepL_lookup thm
+R3941:3950 stdpp.list_numbers <> lookup_seq thm
+R3983:3983 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3996:4001 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4012:4012 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3984:3995 xv6iris.WpLock <> lk_floor_vis thm
+R3983:3983 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3996:4001 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4012:4012 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3984:3995 xv6iris.WpLock <> lk_floor_vis thm
+R4059:4059 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4081:4086 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4108:4108 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4060:4080 xv6iris.TsoCtx <> ledger_read_at_vis_ok thm
+R4059:4059 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4081:4086 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4108:4108 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R4060:4080 xv6iris.TsoCtx <> ledger_read_at_vis_ok thm
+prf 4343:4358 <> avail_split_init
+R4373:4394 SailStdpp.Values <> mword def
+binder 4361:4362 <> pd:20
+binder 4364:4366 <> pav:21
+binder 4368:4369 <> pu:22
+R4406:4406 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4489:4497 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4407:4413 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R4415:4416 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 4414:4414 <> j:23
+R4428:4431 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4419:4421 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R4418:4418 xv6iris.DiskAvail <> j:23 var
+R4432:4442 xv6iris.KptPt <> kmap_static def
+R4445:4451 xv6iris.RiscvPtsto <> svpn_of def
+R4454:4459 xv6iris.RiscvModelBytes <> pa_add def
+R4462:4467 xv6iris.RiscvModelBytes <> pa_add def
+R4469:4471 xv6iris.DiskAvail <> pav:21 var
+R4480:4480 xv6iris.DiskAvail <> j:23 var
+R4484:4488 xv6iris.RiscvPtsto <> KP_rw constr
+R4516:4525 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R4498:4515 xv6iris.KMap <> kmap_static_claims def
+R4526:4526 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R4622:4633 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R4527:4537 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R4539:4543 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R4551:4559 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 4538:4538 <> j:24
+binder 4538:4538 <> j:25
+R4560:4560 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ'_x not
+R4588:4596 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ'_x not
+R4561:4566 xv6iris.RiscvModelBytes <> pa_add def
+R4569:4574 xv6iris.RiscvModelBytes <> pa_add def
+R4576:4578 xv6iris.DiskAvail <> pav:21 var
+R4587:4587 xv6iris.DiskAvail <> j:24 var
+R4597:4604 xv6iris.RiscvModelBytes <> nth_byte def
+R4621:4621 xv6iris.DiskAvail <> j:24 var
+R4607:4612 xv6iris.VirtioQueue <> wrap16 def
+R4544:4546 Corelib.Lists.ListDef <> seq def
+R4680:4684 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4634:4649 xv6iris.VirtioProto <> avail_lease_half def
+R4652:4666 xv6iris.VirtioModel <> virtio_init_cfg def
+R4668:4669 xv6iris.DiskAvail <> pd:20 var
+R4671:4673 xv6iris.DiskAvail <> pav:21 var
+R4675:4676 xv6iris.DiskAvail <> pu:22 var
+R4685:4694 xv6iris.DiskAvail <> avail_half def
+R4696:4698 xv6iris.DiskAvail <> pav:21 var
+R4798:4800 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4758:4769 xv6iris.VirtioQueue <> avail_idx_pa def
+R4772:4786 xv6iris.VirtioModel <> virtio_init_cfg def
+R4801:4806 xv6iris.RiscvModelBytes <> pa_add def
+R4798:4800 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R4758:4769 xv6iris.VirtioQueue <> avail_idx_pa def
+R4772:4786 xv6iris.VirtioModel <> virtio_init_cfg def
+R4801:4806 xv6iris.RiscvModelBytes <> pa_add def
+R4854:4869 xv6iris.VirtioProto <> avail_lease_half def
+R4872:4881 xv6iris.DiskAvail <> avail_half def
+R4854:4869 xv6iris.VirtioProto <> avail_lease_half def
+R4854:4869 xv6iris.VirtioProto <> avail_lease_half def
+R4872:4881 xv6iris.DiskAvail <> avail_half def
+R4872:4881 xv6iris.DiskAvail <> avail_half def
+R4902:4906 iris.bi.updates <> ::bi_scope:'|==>'_x not
+R4907:4917 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R4919:4923 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R4931:4939 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 4918:4918 <> j:26
+binder 4918:4918 <> j:27
+R5035:5046 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4940:4950 xv6iris.TsoCtx <> phys_ledger def
+R4953:4958 xv6iris.RiscvModelBytes <> pa_add def
+R4961:4966 xv6iris.RiscvModelBytes <> pa_add def
+R4979:4979 xv6iris.DiskAvail <> j:26 var
+R4983:4990 iris.algebra.dfrac <> DfracOwn constr
+R4994:4994 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R5009:5016 xv6iris.RiscvModelBytes <> nth_byte def
+R5033:5033 xv6iris.DiskAvail <> j:26 var
+R5019:5024 xv6iris.VirtioQueue <> wrap16 def
+R5047:5050 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R5058:5068 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R5055:5057 Corelib.Init.Datatypes <> nat ind
+binder 5051:5051 <> t:28
+R5171:5175 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5069:5082 xv6iris.TsoCtx <> phys_ledger_at def
+R5085:5090 xv6iris.RiscvModelBytes <> pa_add def
+R5093:5098 xv6iris.RiscvModelBytes <> pa_add def
+R5111:5111 xv6iris.DiskAvail <> j:26 var
+R5115:5122 iris.algebra.dfrac <> DfracOwn constr
+R5126:5126 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R5143:5150 xv6iris.RiscvModelBytes <> nth_byte def
+R5167:5167 xv6iris.DiskAvail <> j:26 var
+R5153:5158 xv6iris.VirtioQueue <> wrap16 def
+R5170:5170 xv6iris.DiskAvail <> t:28 var
+R5176:5183 xv6iris.WpLock <> lk_floor def
+R5185:5191 xv6iris.TsoCtx <> cur_ctx def
+R5193:5193 xv6iris.DiskAvail <> t:28 var
+R4924:4926 Corelib.Lists.ListDef <> seq def
+R4902:4906 iris.bi.updates <> ::bi_scope:'|==>'_x not
+R4907:4917 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R4919:4923 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R4931:4939 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 4918:4918 <> j:29
+binder 4918:4918 <> j:30
+R5035:5046 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4940:4950 xv6iris.TsoCtx <> phys_ledger def
+R4953:4958 xv6iris.RiscvModelBytes <> pa_add def
+R4961:4966 xv6iris.RiscvModelBytes <> pa_add def
+R4979:4979 xv6iris.DiskAvail <> j:29 var
+R4983:4990 iris.algebra.dfrac <> DfracOwn constr
+R4994:4994 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R5009:5016 xv6iris.RiscvModelBytes <> nth_byte def
+R5033:5033 xv6iris.DiskAvail <> j:29 var
+R5019:5024 xv6iris.VirtioQueue <> wrap16 def
+R5047:5050 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R5058:5068 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R5055:5057 Corelib.Init.Datatypes <> nat ind
+binder 5051:5051 <> t:31
+R5171:5175 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5069:5082 xv6iris.TsoCtx <> phys_ledger_at def
+R5085:5090 xv6iris.RiscvModelBytes <> pa_add def
+R5093:5098 xv6iris.RiscvModelBytes <> pa_add def
+R5111:5111 xv6iris.DiskAvail <> j:29 var
+R5115:5122 iris.algebra.dfrac <> DfracOwn constr
+R5126:5126 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R5143:5150 xv6iris.RiscvModelBytes <> nth_byte def
+R5167:5167 xv6iris.DiskAvail <> j:29 var
+R5153:5158 xv6iris.VirtioQueue <> wrap16 def
+R5170:5170 xv6iris.DiskAvail <> t:31 var
+R5176:5183 xv6iris.WpLock <> lk_floor def
+R5185:5191 xv6iris.TsoCtx <> cur_ctx def
+R5193:5193 xv6iris.DiskAvail <> t:31 var
+R4924:4926 Corelib.Lists.ListDef <> seq def
+R5237:5249 iris.bi.updates <> big_sepL_bupd thm
+R5237:5249 iris.bi.updates <> big_sepL_bupd thm
+R5259:5259 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5273:5278 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5282:5282 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5260:5272 iris.bi.big_op <> big_sepL_impl thm
+R5259:5259 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5273:5278 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5282:5282 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5260:5272 iris.bi.big_op <> big_sepL_impl thm
+R5331:5340 stdpp.list_numbers <> lookup_seq thm
+R5331:5340 stdpp.list_numbers <> lookup_seq thm
+R5390:5390 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5413:5418 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5423:5423 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5391:5412 xv6iris.TsoCtx <> ctx_pointsto_canonical thm
+R5390:5390 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5413:5418 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5423:5423 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5391:5412 xv6iris.TsoCtx <> ctx_pointsto_canonical thm
+R5459:5461 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R5455:5457 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R5459:5461 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R5455:5457 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R5494:5494 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5602:5607 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5613:5613 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5495:5515 xv6iris.KMap <> kmap_static_claims_at thm
+R5518:5524 xv6iris.RiscvPtsto <> svpn_of def
+R5527:5532 xv6iris.RiscvModelBytes <> pa_add def
+R5535:5540 xv6iris.RiscvModelBytes <> pa_add def
+R5555:5557 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R5586:5590 xv6iris.RiscvPtsto <> KP_rw constr
+R5494:5494 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5602:5607 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5613:5613 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5495:5515 xv6iris.KMap <> kmap_static_claims_at thm
+R5518:5524 xv6iris.RiscvPtsto <> svpn_of def
+R5527:5532 xv6iris.RiscvModelBytes <> pa_add def
+R5535:5540 xv6iris.RiscvModelBytes <> pa_add def
+R5555:5557 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R5586:5590 xv6iris.RiscvPtsto <> KP_rw constr
+R5642:5642 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5752:5776 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5785:5785 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5643:5662 xv6iris.TsoCtx <> ctx_pointsto_to_phys thm
+R5700:5707 xv6iris.KptPt <> pa_of_id thm
+R5710:5715 xv6iris.RiscvModelBytes <> pa_add def
+R5718:5723 xv6iris.RiscvModelBytes <> pa_add def
+R5738:5740 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R5664:5670 xv6iris.TsoCtx <> cur_ctx def
+R5642:5642 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5752:5776 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5785:5785 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5643:5662 xv6iris.TsoCtx <> ctx_pointsto_to_phys thm
+R5700:5707 xv6iris.KptPt <> pa_of_id thm
+R5710:5715 xv6iris.RiscvModelBytes <> pa_add def
+R5718:5723 xv6iris.RiscvModelBytes <> pa_add def
+R5738:5740 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R5664:5670 xv6iris.TsoCtx <> cur_ctx def
+R5807:5807 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5838:5843 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5848:5848 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5808:5837 xv6iris.TsoCtx <> ctx_phys_pointsto_forget_floor thm
+R5807:5807 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5838:5843 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5848:5848 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5808:5837 xv6iris.TsoCtx <> ctx_phys_pointsto_forget_floor thm
+R5891:5911 xv6iris.VirtioProto <> phys_ledger_at_halves thm
+R5891:5911 xv6iris.VirtioProto <> phys_ledger_at_halves thm
+R5891:5911 xv6iris.VirtioProto <> phys_ledger_at_halves thm
+R5997:6017 xv6iris.TsoCtx <> phys_ledger_at_ledger thm
+R5997:6017 xv6iris.TsoCtx <> phys_ledger_at_ledger thm
+R6114:6128 xv6iris.WpLock <> lk_floor_of_ctx thm
+R6142:6158 xv6iris.WpLock <> lk_floor_of_wrote thm
+R6114:6128 xv6iris.WpLock <> lk_floor_of_ctx thm
+R6142:6158 xv6iris.WpLock <> lk_floor_of_wrote thm
+R6188:6199 iris.bi.big_op <> big_sepL_sep thm
+R6188:6199 iris.bi.big_op <> big_sepL_sep thm
+R6188:6199 iris.bi.big_op <> big_sepL_sep thm
+def 6858:6865 <> keep_map
+R6873:6877 xv6iris.TsoCtx <> CtxId rec
+binder 6868:6869 <> ξ:32
+R6885:6888 stdpp.gmap <> gmap rec
+R6899:6900 stdpp.bitvector.definitions <> bv rec
+R6890:6896 Riscv.rv64d_types Arch pa def
+binder 6881:6881 <> m:33
+R6908:6912 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R6914:6915 xv6iris.DiskAvail <> DiskAvail.Σ var
+R6925:6934 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R6936:6940 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R6942:6946 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R6948:6949 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+binder 6935:6935 <> a:34
+binder 6935:6935 <> a:35
+binder 6941:6941 <> pat:36
+R6950:6962 xv6iris.TsoCtx <> ctx_cell_keep def
+R6964:6965 xv6iris.DiskAvail <> ξ:32 var
+R6967:6967 xv6iris.DiskAvail <> a:34 var
+R6947:6947 xv6iris.DiskAvail <> m:33 var
+def 6986:6994 <> hcell_map
+R7002:7006 xv6iris.TsoCtx <> CtxId rec
+binder 6997:6998 <> ξ:37
+R7014:7017 stdpp.gmap <> gmap rec
+R7028:7029 stdpp.bitvector.definitions <> bv rec
+R7019:7025 Riscv.rv64d_types Arch pa def
+binder 7010:7010 <> m:38
+R7037:7041 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R7043:7044 xv6iris.DiskAvail <> DiskAvail.Σ var
+R7054:7063 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R7065:7069 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R7071:7075 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R7077:7078 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+binder 7064:7064 <> a:39
+binder 7064:7064 <> a:40
+binder 7070:7070 <> b:41
+binder 7070:7070 <> b:42
+R7079:7097 xv6iris.TsoCtx <> ctx_phys_pointsto_h def
+R7099:7100 xv6iris.DiskAvail <> ξ:37 var
+R7102:7102 xv6iris.DiskAvail <> a:39 var
+R7104:7104 xv6iris.DiskAvail <> b:41 var
+R7076:7076 xv6iris.DiskAvail <> m:38 var
+def 7123:7131 <> ccell_map
+R7139:7143 xv6iris.TsoCtx <> CtxId rec
+binder 7134:7135 <> ξ:43
+R7151:7154 stdpp.gmap <> gmap rec
+R7165:7166 stdpp.bitvector.definitions <> bv rec
+R7156:7162 Riscv.rv64d_types Arch pa def
+binder 7147:7147 <> m:44
+R7174:7178 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R7180:7181 xv6iris.DiskAvail <> DiskAvail.Σ var
+R7191:7200 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R7202:7206 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R7208:7212 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R7214:7215 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+binder 7201:7201 <> a:45
+binder 7201:7201 <> a:46
+binder 7207:7207 <> b:47
+binder 7207:7207 <> b:48
+R7216:7232 xv6iris.TsoCtx <> ctx_phys_pointsto def
+R7234:7235 xv6iris.DiskAvail <> ξ:43 var
+R7237:7237 xv6iris.DiskAvail <> a:45 var
+R7240:7247 iris.algebra.dfrac <> DfracOwn constr
+R7252:7252 xv6iris.DiskAvail <> b:47 var
+R7213:7213 xv6iris.DiskAvail <> m:44 var
+prf 7267:7280 <> keep_map_union
+R7288:7292 xv6iris.TsoCtx <> CtxId rec
+binder 7283:7284 <> ξ:49
+R7304:7307 stdpp.gmap <> gmap rec
+R7318:7319 stdpp.bitvector.definitions <> bv rec
+R7309:7315 Riscv.rv64d_types Arch pa def
+binder 7296:7297 <> m1:50
+binder 7299:7300 <> m2:51
+R7342:7345 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7333:7339 stdpp.fin_maps <> ::stdpp_scope:x_'##ₘ'_x not
+R7331:7332 xv6iris.DiskAvail <> m1:50 var
+R7340:7341 xv6iris.DiskAvail <> m2:51 var
+R7369:7376 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R7346:7353 xv6iris.DiskAvail <> keep_map def
+R7355:7356 xv6iris.DiskAvail <> ξ:49 var
+R7361:7365 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R7359:7360 xv6iris.DiskAvail <> m1:50 var
+R7366:7367 xv6iris.DiskAvail <> m2:51 var
+R7391:7395 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R7377:7384 xv6iris.DiskAvail <> keep_map def
+R7386:7387 xv6iris.DiskAvail <> ξ:49 var
+R7389:7390 xv6iris.DiskAvail <> m1:50 var
+R7396:7403 xv6iris.DiskAvail <> keep_map def
+R7405:7406 xv6iris.DiskAvail <> ξ:49 var
+R7408:7409 xv6iris.DiskAvail <> m2:51 var
+R7439:7446 xv6iris.DiskAvail <> keep_map def
+R7439:7446 xv6iris.DiskAvail <> keep_map def
+R7439:7446 xv6iris.DiskAvail <> keep_map def
+R7458:7471 iris.bi.big_op <> big_sepM_union thm
+R7458:7471 iris.bi.big_op <> big_sepM_union thm
+prf 7488:7501 <> keep_map_empty
+R7509:7513 xv6iris.TsoCtx <> CtxId rec
+binder 7504:7505 <> ξ:52
+R7533:7540 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R7518:7525 xv6iris.DiskAvail <> keep_map def
+R7527:7528 xv6iris.DiskAvail <> ξ:52 var
+R7530:7532 stdpp.base <> ::stdpp_scope:'∅' not
+R7541:7543 iris.bi.interface <> ::bi_scope:'emp' not
+R7564:7571 xv6iris.DiskAvail <> keep_map def
+R7564:7571 xv6iris.DiskAvail <> keep_map def
+R7564:7571 xv6iris.DiskAvail <> keep_map def
+R7580:7593 iris.bi.big_op <> big_sepM_empty thm
+R7580:7593 iris.bi.big_op <> big_sepM_empty thm
+prf 7610:7622 <> keep_map_back
+R7630:7634 xv6iris.TsoCtx <> CtxId rec
+binder 7625:7626 <> ξ:53
+R7642:7645 stdpp.gmap <> gmap rec
+R7656:7657 stdpp.bitvector.definitions <> bv rec
+R7647:7653 Riscv.rv64d_types Arch pa def
+binder 7638:7638 <> m:54
+R7682:7687 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R7669:7676 xv6iris.DiskAvail <> keep_map def
+R7678:7679 xv6iris.DiskAvail <> ξ:53 var
+R7681:7681 xv6iris.DiskAvail <> m:54 var
+R7698:7703 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7688:7695 xv6iris.VirtioProto <> pin_back def
+R7697:7697 xv6iris.DiskAvail <> m:54 var
+R7704:7712 xv6iris.DiskAvail <> hcell_map def
+R7714:7715 xv6iris.DiskAvail <> ξ:53 var
+R7717:7717 xv6iris.DiskAvail <> m:54 var
+R7742:7749 xv6iris.DiskAvail <> keep_map def
+R7752:7759 xv6iris.VirtioProto <> pin_back def
+R7762:7770 xv6iris.DiskAvail <> hcell_map def
+R7742:7749 xv6iris.DiskAvail <> keep_map def
+R7742:7749 xv6iris.DiskAvail <> keep_map def
+R7752:7759 xv6iris.VirtioProto <> pin_back def
+R7752:7759 xv6iris.VirtioProto <> pin_back def
+R7762:7770 xv6iris.DiskAvail <> hcell_map def
+R7762:7770 xv6iris.DiskAvail <> hcell_map def
+R7804:7804 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7819:7824 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7832:7832 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7805:7818 iris.bi.big_op <> big_sepM_sep_2 thm
+R7804:7804 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7819:7824 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7832:7832 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7805:7818 iris.bi.big_op <> big_sepM_sep_2 thm
+R7853:7853 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7867:7872 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7876:7876 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7854:7866 iris.bi.big_op <> big_sepM_mono thm
+R7853:7853 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7867:7872 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7876:7876 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7854:7866 iris.bi.big_op <> big_sepM_mono thm
+R7923:7923 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7942:7947 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7955:7955 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7924:7941 xv6iris.TsoCtx <> ctx_cell_keep_back thm
+R7923:7923 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7942:7947 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7955:7955 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7924:7941 xv6iris.TsoCtx <> ctx_cell_keep_back thm
+prf 7974:7987 <> hcell_map_join
+R7995:7999 xv6iris.TsoCtx <> CtxId rec
+binder 7990:7991 <> ξ:55
+R8007:8010 stdpp.gmap <> gmap rec
+R8021:8022 stdpp.bitvector.definitions <> bv rec
+R8012:8018 Riscv.rv64d_types Arch pa def
+binder 8003:8003 <> m:56
+R8048:8053 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R8034:8042 xv6iris.DiskAvail <> hcell_map def
+R8044:8045 xv6iris.DiskAvail <> ξ:55 var
+R8047:8047 xv6iris.DiskAvail <> m:56 var
+R8064:8069 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8054:8061 xv6iris.VirtioProto <> half_map def
+R8063:8063 xv6iris.DiskAvail <> m:56 var
+R8070:8078 xv6iris.DiskAvail <> ccell_map def
+R8080:8081 xv6iris.DiskAvail <> ξ:55 var
+R8083:8083 xv6iris.DiskAvail <> m:56 var
+R8108:8116 xv6iris.DiskAvail <> hcell_map def
+R8119:8126 xv6iris.VirtioProto <> half_map def
+R8129:8137 xv6iris.DiskAvail <> ccell_map def
+R8108:8116 xv6iris.DiskAvail <> hcell_map def
+R8108:8116 xv6iris.DiskAvail <> hcell_map def
+R8119:8126 xv6iris.VirtioProto <> half_map def
+R8119:8126 xv6iris.VirtioProto <> half_map def
+R8129:8137 xv6iris.DiskAvail <> ccell_map def
+R8129:8137 xv6iris.DiskAvail <> ccell_map def
+R8171:8171 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8186:8191 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8199:8199 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8172:8185 iris.bi.big_op <> big_sepM_sep_2 thm
+R8171:8171 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8186:8191 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8199:8199 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8172:8185 iris.bi.big_op <> big_sepM_sep_2 thm
+R8220:8220 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8234:8239 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8243:8243 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8221:8233 iris.bi.big_op <> big_sepM_mono thm
+R8220:8220 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8234:8239 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8243:8243 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8221:8233 iris.bi.big_op <> big_sepM_mono thm
+R8293:8293 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8316:8321 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8329:8329 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8294:8315 xv6iris.TsoCtx <> ctx_phys_pointsto_join thm
+R8293:8293 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8316:8321 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8329:8329 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8294:8315 xv6iris.TsoCtx <> ctx_phys_pointsto_join thm
+prf 8502:8515 <> ctx_ident_phys
+R8522:8528 Riscv.rv64d_types Arch pa def
+binder 8518:8518 <> a:57
+R8537:8541 iris.algebra.dfrac <> dfrac ind
+binder 8532:8533 <> dq:58
+R8549:8550 stdpp.bitvector.definitions <> bv rec
+binder 8545:8545 <> b:59
+R8590:8597 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8561:8571 xv6iris.KptPt <> kmap_static def
+R8574:8580 xv6iris.RiscvPtsto <> svpn_of def
+R8582:8582 xv6iris.DiskAvail <> a:57 var
+R8585:8589 xv6iris.RiscvPtsto <> KP_rw constr
+R8616:8621 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R8598:8615 xv6iris.KMap <> kmap_static_claims def
+R8636:8641 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8623:8630 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ{'_x_'}'_x not
+R8633:8634 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ{'_x_'}'_x not
+R8622:8622 xv6iris.DiskAvail <> a:57 var
+R8631:8632 xv6iris.DiskAvail <> dq:58 var
+R8635:8635 xv6iris.DiskAvail <> b:59 var
+R8642:8658 xv6iris.TsoCtx <> ctx_phys_pointsto def
+R8660:8666 xv6iris.TsoCtx <> cur_ctx def
+R8668:8668 xv6iris.DiskAvail <> a:57 var
+R8670:8671 xv6iris.DiskAvail <> dq:58 var
+R8673:8673 xv6iris.DiskAvail <> b:59 var
+R8726:8726 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8749:8754 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8758:8758 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8727:8748 xv6iris.TsoCtx <> ctx_pointsto_canonical thm
+R8726:8726 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8749:8754 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8758:8758 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8727:8748 xv6iris.TsoCtx <> ctx_pointsto_canonical thm
+R8782:8782 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8825:8830 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8836:8836 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8783:8803 xv6iris.KMap <> kmap_static_claims_at thm
+R8806:8812 xv6iris.RiscvPtsto <> svpn_of def
+R8817:8821 xv6iris.RiscvPtsto <> KP_rw constr
+R8782:8782 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8825:8830 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8836:8836 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8783:8803 xv6iris.KMap <> kmap_static_claims_at thm
+R8806:8812 xv6iris.RiscvPtsto <> svpn_of def
+R8817:8821 xv6iris.RiscvPtsto <> KP_rw constr
+R8860:8860 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8953:8958 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8966:8966 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8861:8880 xv6iris.TsoCtx <> ctx_pointsto_to_phys thm
+R8939:8946 xv6iris.KptPt <> pa_of_id thm
+R8891:8902 xv6iris.KptPt <> kpt_leaf_ppn def
+R8905:8911 xv6iris.RiscvPtsto <> svpn_of def
+R8882:8888 xv6iris.TsoCtx <> cur_ctx def
+R8860:8860 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8953:8958 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8966:8966 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8861:8880 xv6iris.TsoCtx <> ctx_pointsto_to_phys thm
+R8939:8946 xv6iris.KptPt <> pa_of_id thm
+R8891:8902 xv6iris.KptPt <> kpt_leaf_ppn def
+R8905:8911 xv6iris.RiscvPtsto <> svpn_of def
+R8882:8888 xv6iris.TsoCtx <> cur_ctx def
+prf 9057:9069 <> ctx_win_offer
+R9076:9082 Riscv.rv64d_types Arch pa def
+binder 9072:9072 <> a:60
+R9090:9092 Corelib.Init.Datatypes <> nat ind
+binder 9086:9086 <> n:61
+R9103:9106 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9100:9102 Corelib.Init.Datatypes <> nat ind
+R9107:9108 stdpp.bitvector.definitions <> bv rec
+binder 9096:9096 <> f:62
+R9152:9159 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9129:9131 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R9119:9126 Stdlib.ZArith.BinInt Z of_nat def
+R9128:9128 xv6iris.DiskAvail <> n:61 var
+R9160:9160 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9226:9234 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9161:9167 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R9169:9170 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 9168:9168 <> j:63
+R9182:9185 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R9173:9175 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R9172:9172 xv6iris.DiskAvail <> j:63 var
+R9176:9176 xv6iris.DiskAvail <> n:61 var
+R9186:9196 xv6iris.KptPt <> kmap_static def
+R9199:9205 xv6iris.RiscvPtsto <> svpn_of def
+R9208:9213 xv6iris.RiscvModelBytes <> pa_add def
+R9215:9215 xv6iris.DiskAvail <> a:60 var
+R9217:9217 xv6iris.DiskAvail <> j:63 var
+R9221:9225 xv6iris.RiscvPtsto <> KP_rw constr
+R9253:9262 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R9235:9252 xv6iris.KMap <> kmap_static_claims def
+R9263:9263 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9313:9323 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9264:9274 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R9276:9280 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R9288:9289 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 9275:9275 <> j:64
+binder 9275:9275 <> j:65
+R9290:9290 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ'_x not
+R9301:9309 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ'_x not
+R9291:9296 xv6iris.RiscvModelBytes <> pa_add def
+R9298:9298 xv6iris.DiskAvail <> a:60 var
+R9300:9300 xv6iris.DiskAvail <> j:64 var
+R9310:9310 xv6iris.DiskAvail <> f:62 var
+R9312:9312 xv6iris.DiskAvail <> j:64 var
+R9281:9283 Corelib.Lists.ListDef <> seq def
+R9287:9287 xv6iris.DiskAvail <> n:61 var
+R9351:9355 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R9324:9332 xv6iris.VirtioProto <> pin_offer def
+R9335:9343 xv6iris.VirtioProto <> range_map def
+R9345:9345 xv6iris.DiskAvail <> a:60 var
+R9347:9347 xv6iris.DiskAvail <> n:61 var
+R9349:9349 xv6iris.DiskAvail <> f:62 var
+R9356:9363 xv6iris.DiskAvail <> keep_map def
+R9365:9371 xv6iris.TsoCtx <> cur_ctx def
+R9374:9382 xv6iris.VirtioProto <> range_map def
+R9384:9384 xv6iris.DiskAvail <> a:60 var
+R9386:9386 xv6iris.DiskAvail <> n:61 var
+R9388:9388 xv6iris.DiskAvail <> f:62 var
+R9444:9452 xv6iris.VirtioProto <> pin_offer def
+R9455:9462 xv6iris.DiskAvail <> keep_map def
+R9477:9494 xv6iris.VirtioProto <> range_map_big_sepM thm
+binder 9501:9501 <> x:66
+binder 9503:9503 <> b:67
+R9543:9592 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R9509:9521 xv6iris.RiscvPtsto <> phys_pointsto def
+R9542:9542 xv6iris.DiskAvail <> b:67 var
+R9526:9533 iris.algebra.dfrac <> DfracOwn constr
+R9537:9537 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R9523:9523 xv6iris.DiskAvail <> x:66 var
+R9593:9603 xv6iris.TsoCtx <> phys_ledger def
+R9605:9605 xv6iris.DiskAvail <> x:66 var
+R9608:9615 iris.algebra.dfrac <> DfracOwn constr
+R9619:9619 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R9624:9624 xv6iris.DiskAvail <> b:67 var
+R9653:9670 xv6iris.VirtioProto <> range_map_big_sepM thm
+binder 9677:9677 <> x:68
+R9684:9696 xv6iris.TsoCtx <> ctx_cell_keep def
+R9698:9704 xv6iris.TsoCtx <> cur_ctx def
+R9706:9706 xv6iris.DiskAvail <> x:68 var
+R9732:9743 iris.bi.big_op <> big_sepL_sep thm
+R9444:9452 xv6iris.VirtioProto <> pin_offer def
+R9444:9452 xv6iris.VirtioProto <> pin_offer def
+R9455:9462 xv6iris.DiskAvail <> keep_map def
+R9455:9462 xv6iris.DiskAvail <> keep_map def
+R9477:9494 xv6iris.VirtioProto <> range_map_big_sepM thm
+binder 9501:9501 <> x:69
+binder 9503:9503 <> b:70
+R9543:9592 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R9509:9521 xv6iris.RiscvPtsto <> phys_pointsto def
+R9542:9542 xv6iris.DiskAvail <> b:70 var
+R9526:9533 iris.algebra.dfrac <> DfracOwn constr
+R9537:9537 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R9523:9523 xv6iris.DiskAvail <> x:69 var
+R9593:9603 xv6iris.TsoCtx <> phys_ledger def
+R9605:9605 xv6iris.DiskAvail <> x:69 var
+R9608:9615 iris.algebra.dfrac <> DfracOwn constr
+R9619:9619 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R9624:9624 xv6iris.DiskAvail <> b:70 var
+R9477:9494 xv6iris.VirtioProto <> range_map_big_sepM thm
+binder 9501:9501 <> x:71
+binder 9503:9503 <> b:72
+R9543:9592 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R9509:9521 xv6iris.RiscvPtsto <> phys_pointsto def
+R9542:9542 xv6iris.DiskAvail <> b:72 var
+R9526:9533 iris.algebra.dfrac <> DfracOwn constr
+R9537:9537 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R9523:9523 xv6iris.DiskAvail <> x:71 var
+R9593:9603 xv6iris.TsoCtx <> phys_ledger def
+R9605:9605 xv6iris.DiskAvail <> x:71 var
+R9608:9615 iris.algebra.dfrac <> DfracOwn constr
+R9619:9619 stdpp.numbers Qp.notations ::Qp_scope:x_'/'_x not
+R9624:9624 xv6iris.DiskAvail <> b:72 var
+R9653:9670 xv6iris.VirtioProto <> range_map_big_sepM thm
+binder 9677:9677 <> x:73
+R9684:9696 xv6iris.TsoCtx <> ctx_cell_keep def
+R9698:9704 xv6iris.TsoCtx <> cur_ctx def
+R9706:9706 xv6iris.DiskAvail <> x:73 var
+R9653:9670 xv6iris.VirtioProto <> range_map_big_sepM thm
+binder 9677:9677 <> x:74
+R9684:9696 xv6iris.TsoCtx <> ctx_cell_keep def
+R9698:9704 xv6iris.TsoCtx <> cur_ctx def
+R9706:9706 xv6iris.DiskAvail <> x:74 var
+R9732:9743 iris.bi.big_op <> big_sepL_sep thm
+R9732:9743 iris.bi.big_op <> big_sepL_sep thm
+R9757:9757 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9771:9776 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9780:9780 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9758:9770 iris.bi.big_op <> big_sepL_impl thm
+R9757:9757 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9771:9776 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9780:9780 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9758:9770 iris.bi.big_op <> big_sepL_impl thm
+R9821:9830 stdpp.list_numbers <> lookup_seq thm
+R9821:9830 stdpp.list_numbers <> lookup_seq thm
+R9888:9890 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R9884:9886 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R9888:9890 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R9884:9886 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R9921:9921 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9953:9958 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9967:9967 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9922:9935 xv6iris.DiskAvail <> ctx_ident_phys thm
+R9921:9921 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9953:9958 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9967:9967 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R9922:9935 xv6iris.DiskAvail <> ctx_ident_phys thm
+R9989:10017 xv6iris.TsoCtx <> ctx_phys_pointsto_offer_split thm
+R9989:10017 xv6iris.TsoCtx <> ctx_phys_pointsto_offer_split thm
+prf 10112:10127 <> ctx_win_of_ccell
+R10134:10140 Riscv.rv64d_types Arch pa def
+binder 10130:10130 <> a:75
+R10148:10150 Corelib.Init.Datatypes <> nat ind
+binder 10144:10144 <> n:76
+R10161:10164 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10158:10160 Corelib.Init.Datatypes <> nat ind
+R10165:10166 stdpp.bitvector.definitions <> bv rec
+binder 10154:10154 <> f:77
+R10210:10217 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10187:10189 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R10177:10184 Stdlib.ZArith.BinInt Z of_nat def
+R10186:10186 xv6iris.DiskAvail <> n:76 var
+R10218:10218 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10284:10292 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10219:10225 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R10227:10228 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 10226:10226 <> j:78
+R10240:10243 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10231:10233 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R10230:10230 xv6iris.DiskAvail <> j:78 var
+R10234:10234 xv6iris.DiskAvail <> n:76 var
+R10244:10254 xv6iris.KptPt <> kmap_static def
+R10257:10263 xv6iris.RiscvPtsto <> svpn_of def
+R10266:10271 xv6iris.RiscvModelBytes <> pa_add def
+R10273:10273 xv6iris.DiskAvail <> a:75 var
+R10275:10275 xv6iris.DiskAvail <> j:78 var
+R10279:10283 xv6iris.RiscvPtsto <> KP_rw constr
+R10293:10293 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10390:10398 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10294:10300 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R10302:10303 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 10301:10301 <> j:79
+R10315:10325 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10306:10308 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R10305:10305 xv6iris.DiskAvail <> j:79 var
+R10309:10309 xv6iris.DiskAvail <> n:76 var
+R10372:10374 Stdlib.ZArith.BinInt <> ::Z_scope:x_'<'_x not
+R10327:10330 SailStdpp.Operators_mwords <> uint def
+R10346:10367 SailStdpp.Values <> mword def
+R10333:10338 xv6iris.RiscvModelBytes <> pa_add def
+R10340:10340 xv6iris.DiskAvail <> a:75 var
+R10342:10342 xv6iris.DiskAvail <> j:79 var
+R10417:10426 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R10399:10416 xv6iris.KMap <> kmap_static_claims def
+R10462:10472 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10522:10522 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10427:10435 xv6iris.DiskAvail <> ccell_map def
+R10437:10443 xv6iris.TsoCtx <> cur_ctx def
+R10446:10454 xv6iris.VirtioProto <> range_map def
+R10456:10456 xv6iris.DiskAvail <> a:75 var
+R10458:10458 xv6iris.DiskAvail <> n:76 var
+R10460:10460 xv6iris.DiskAvail <> f:77 var
+R10473:10483 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R10485:10489 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R10497:10498 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 10484:10484 <> j:80
+binder 10484:10484 <> j:81
+R10499:10499 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ'_x not
+R10510:10518 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ'_x not
+R10500:10505 xv6iris.RiscvModelBytes <> pa_add def
+R10507:10507 xv6iris.DiskAvail <> a:75 var
+R10509:10509 xv6iris.DiskAvail <> j:80 var
+R10519:10519 xv6iris.DiskAvail <> f:77 var
+R10521:10521 xv6iris.DiskAvail <> j:80 var
+R10490:10492 Corelib.Lists.ListDef <> seq def
+R10496:10496 xv6iris.DiskAvail <> n:76 var
+R10580:10588 xv6iris.DiskAvail <> ccell_map def
+R10603:10620 xv6iris.VirtioProto <> range_map_big_sepM thm
+binder 10627:10627 <> x:82
+binder 10629:10629 <> b:83
+R10634:10650 xv6iris.TsoCtx <> ctx_phys_pointsto def
+R10652:10658 xv6iris.TsoCtx <> cur_ctx def
+R10660:10660 xv6iris.DiskAvail <> x:82 var
+R10663:10670 iris.algebra.dfrac <> DfracOwn constr
+R10675:10675 xv6iris.DiskAvail <> b:83 var
+R10580:10588 xv6iris.DiskAvail <> ccell_map def
+R10580:10588 xv6iris.DiskAvail <> ccell_map def
+R10603:10620 xv6iris.VirtioProto <> range_map_big_sepM thm
+binder 10627:10627 <> x:84
+binder 10629:10629 <> b:85
+R10634:10650 xv6iris.TsoCtx <> ctx_phys_pointsto def
+R10652:10658 xv6iris.TsoCtx <> cur_ctx def
+R10660:10660 xv6iris.DiskAvail <> x:84 var
+R10663:10670 iris.algebra.dfrac <> DfracOwn constr
+R10675:10675 xv6iris.DiskAvail <> b:85 var
+R10603:10620 xv6iris.VirtioProto <> range_map_big_sepM thm
+binder 10627:10627 <> x:86
+binder 10629:10629 <> b:87
+R10634:10650 xv6iris.TsoCtx <> ctx_phys_pointsto def
+R10652:10658 xv6iris.TsoCtx <> cur_ctx def
+R10660:10660 xv6iris.DiskAvail <> x:86 var
+R10663:10670 iris.algebra.dfrac <> DfracOwn constr
+R10675:10675 xv6iris.DiskAvail <> b:87 var
+R10700:10700 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10714:10719 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10723:10723 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10701:10713 iris.bi.big_op <> big_sepL_impl thm
+R10700:10700 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10714:10719 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10723:10723 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10701:10713 iris.bi.big_op <> big_sepL_impl thm
+R10764:10773 stdpp.list_numbers <> lookup_seq thm
+R10764:10773 stdpp.list_numbers <> lookup_seq thm
+R10831:10833 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R10827:10829 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R10831:10833 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R10827:10829 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R10864:10864 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10936:10958 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10964:10964 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10865:10885 xv6iris.KMap <> kmap_static_claims_at thm
+R10888:10894 xv6iris.RiscvPtsto <> svpn_of def
+R10897:10902 xv6iris.RiscvModelBytes <> pa_add def
+R10908:10910 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R10920:10924 xv6iris.RiscvPtsto <> KP_rw constr
+R10864:10864 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10936:10958 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10964:10964 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10865:10885 xv6iris.KMap <> kmap_static_claims_at thm
+R10888:10894 xv6iris.RiscvPtsto <> svpn_of def
+R10897:10902 xv6iris.RiscvModelBytes <> pa_add def
+R10908:10910 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R10920:10924 xv6iris.RiscvPtsto <> KP_rw constr
+R10988:10988 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11182:11187 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11196:11196 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10989:11008 xv6iris.TsoCtx <> ctx_pointsto_of_phys thm
+R11136:11150 xv6iris.RiscvPtsto <> ktier_pin_of_id thm
+R11159:11166 xv6iris.KptPt <> pa_of_id thm
+R11087:11094 xv6iris.KptPt <> pa_of_id thm
+R11019:11030 xv6iris.KptPt <> kpt_leaf_ppn def
+R11033:11039 xv6iris.RiscvPtsto <> svpn_of def
+R11042:11047 xv6iris.RiscvModelBytes <> pa_add def
+R11053:11055 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R11010:11016 xv6iris.TsoCtx <> cur_ctx def
+R10988:10988 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11182:11187 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11196:11196 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10989:11008 xv6iris.TsoCtx <> ctx_pointsto_of_phys thm
+R11136:11150 xv6iris.RiscvPtsto <> ktier_pin_of_id thm
+R11159:11166 xv6iris.KptPt <> pa_of_id thm
+R11087:11094 xv6iris.KptPt <> pa_of_id thm
+R11019:11030 xv6iris.KptPt <> kpt_leaf_ppn def
+R11033:11039 xv6iris.RiscvPtsto <> svpn_of def
+R11042:11047 xv6iris.RiscvModelBytes <> pa_add def
+R11053:11055 Corelib.Init.Peano <> ::nat_scope:x_'+'_x not
+R11010:11016 xv6iris.TsoCtx <> cur_ctx def
+R11210:11218 xv6iris.DiskAvail DiskAvail <> sec
+sec 11230:11243 <> DiskAvailMorph
+R11259:11265 xv6iris.RiscvPtsto <> riscvGS class
+inst 11290:11305 <> avail_half_morph
+R11314:11335 SailStdpp.Values <> mword def
+binder 11308:11310 <> pav:90
+R11347:11349 Corelib.Init.Datatypes <> nat ind
+binder 11342:11343 <> np:91
+R11358:11365 xv6iris.TsoCtx <> CtxMorph class
+R11368:11370 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R11373:11374 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 11371:11372 <> ξ:92
+R11375:11384 xv6iris.DiskAvail <> avail_half def
+R11397:11399 xv6iris.DiskAvail <> pav:90 var
+R11401:11402 xv6iris.DiskAvail <> np:91 var
+R11393:11394 xv6iris.DiskAvail <> ξ:92 var
+R11424:11433 xv6iris.DiskAvail <> avail_half def
+R11424:11433 xv6iris.DiskAvail <> avail_half def
+R11424:11433 xv6iris.DiskAvail <> avail_half def
+R11464:11477 xv6iris.WpLock <> lk_floor_morph inst
+R11464:11477 xv6iris.WpLock <> lk_floor_morph inst
+R11464:11477 xv6iris.WpLock <> lk_floor_morph inst
+inst 11579:11592 <> keep_map_morph
+R11599:11602 stdpp.gmap <> gmap rec
+R11613:11614 stdpp.bitvector.definitions <> bv rec
+R11604:11610 Riscv.rv64d_types Arch pa def
+binder 11595:11595 <> m:93
+R11626:11633 xv6iris.TsoCtx <> CtxMorph class
+R11636:11638 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R11641:11642 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 11639:11640 <> ξ:94
+R11643:11650 xv6iris.DiskAvail <> keep_map def
+R11652:11653 xv6iris.DiskAvail <> ξ:94 var
+R11655:11655 xv6iris.DiskAvail <> m:93 var
+R11681:11688 xv6iris.DiskAvail <> keep_map def
+R11681:11688 xv6iris.DiskAvail <> keep_map def
+R11681:11688 xv6iris.DiskAvail <> keep_map def
+R11697:11714 xv6iris.TsoCtx <> ctx_morph_big_sepM inst
+R11697:11714 xv6iris.TsoCtx <> ctx_morph_big_sepM inst
+R11735:11753 xv6iris.TsoCtx <> ctx_morph_cell_keep inst
+R11735:11753 xv6iris.TsoCtx <> ctx_morph_cell_keep inst
+inst 11782:11796 <> hcell_map_morph
+R11803:11806 stdpp.gmap <> gmap rec
+R11817:11818 stdpp.bitvector.definitions <> bv rec
+R11808:11814 Riscv.rv64d_types Arch pa def
+binder 11799:11799 <> m:95
+R11830:11837 xv6iris.TsoCtx <> CtxMorph class
+R11840:11842 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R11845:11846 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 11843:11844 <> ξ:96
+R11847:11855 xv6iris.DiskAvail <> hcell_map def
+R11857:11858 xv6iris.DiskAvail <> ξ:96 var
+R11860:11860 xv6iris.DiskAvail <> m:95 var
+R11886:11894 xv6iris.DiskAvail <> hcell_map def
+R11886:11894 xv6iris.DiskAvail <> hcell_map def
+R11886:11894 xv6iris.DiskAvail <> hcell_map def
+R11903:11920 xv6iris.TsoCtx <> ctx_morph_big_sepM inst
+R11903:11920 xv6iris.TsoCtx <> ctx_morph_big_sepM inst
+R11945:11969 xv6iris.TsoCtx <> ctx_morph_phys_pointsto_h inst
+R11945:11969 xv6iris.TsoCtx <> ctx_morph_phys_pointsto_h inst
+R11983:11996 xv6iris.DiskAvail DiskAvailMorph <> sec

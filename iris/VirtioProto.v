@@ -1479,6 +1479,38 @@ Section VirtioProto.
       apply IH; [ exact Hnd | intros j Hj; apply Hb, elem_of_list_further, Hj ].
   Qed.
 
+  (* the predicate-generic form: any per-cell predicate over a range map *)
+  Lemma range_map_big_sepM (Φ : Arch.pa -> bv 8 -> iProp Σ) (a : Arch.pa) (n : nat)
+      (f : nat -> bv 8) :
+    Z.of_nat n < 18446744073709551616 ->
+    ([∗ map] x ↦ b ∈ range_map a n f, Φ x b)
+    ⊣⊢ ([∗ list] j ∈ seq 0 n, Φ (pa_add a j) (f j)).
+  Proof.
+    intro Hn. rewrite /range_map.
+    assert (Hnd : NoDup (seq 0 n)) by apply NoDup_seq.
+    assert (Hb : forall j, j ∈ seq 0 n -> Z.of_nat j < 18446744073709551616)
+      by (intros j Hj; apply elem_of_seq in Hj; lia).
+    revert Hnd Hb. generalize (seq 0 n) as l. clear n Hn.
+    induction l as [|i l IH]; intros Hnd Hb.
+    - rewrite big_sepM_empty big_sepL_nil. reflexivity.
+    - apply NoDup_cons in Hnd as [Hi Hnd].
+      assert (Hnone : foldr (fun j acc => <[ pa_add a j := f j ]> acc)
+                        (∅ : gmap Arch.pa (bv 8)) l !! pa_add a i = None).
+      { rewrite (foldr_ins_lookup_ne (pa_add a) f l
+                   (∅ : gmap Arch.pa (bv 8)) (pa_add a i)).
+        - apply lookup_empty.
+        - intros z Hz Heq. exfalso. apply Hi.
+          assert (Hzi : z = i)
+            by (apply (pa_add_inj a);
+                [ apply Hb, elem_of_list_further, Hz
+                | apply Hb, elem_of_list_here | exact Heq ]).
+          rewrite Hzi in Hz. exact Hz. }
+      cbn [foldr]. rewrite big_sepM_insert; [| exact Hnone ].
+      rewrite big_sepL_cons. cbv beta.
+      apply bi.sep_proper; [reflexivity|].
+      apply IH; [ exact Hnd | intros j Hj; apply Hb, elem_of_list_further, Hj ].
+  Qed.
+
   Lemma half_map_range (a : Arch.pa) (n : nat) (f : nat -> bv 8) :
     Z.of_nat n < 18446744073709551616 ->
     half_map (range_map a n f)
@@ -1695,6 +1727,42 @@ Section VirtioProto.
     rewrite /phys_map /pin_offer. apply big_sepM_mono. intros a b _.
     iIntros "H". iDestruct (phys_ledger_split_half with "H") as "[H1 H2]".
     iDestruct (phys_ledger_forget with "H1") as "H1". iFrame.
+  Qed.
+
+  Lemma pin_offer_union (m1 m2 : gmap Arch.pa (bv 8)) :
+    m1 ##ₘ m2 -> pin_offer (m1 ∪ m2) ⊣⊢ pin_offer m1 ∗ pin_offer m2.
+  Proof. intro H. rewrite /pin_offer. by apply big_sepM_union. Qed.
+
+  Lemma pin_offer_empty : pin_offer ∅ ⊣⊢ emp.
+  Proof. rewrite /pin_offer. apply big_sepM_empty. Qed.
+
+  (* an offered cell is a full memory owner: two offers never overlap *)
+  Lemma pin_offer_full (a : Arch.pa) (b : bv 8) :
+    phys_pointsto a (DfracOwn (1/2)) b ∗ phys_ledger a (DfracOwn (1/2)) b ⊢
+    pointsto (L := Arch.pa) (V := bv 8) a (DfracOwn 1) b.
+  Proof.
+    iIntros "[Hp Hl]". iDestruct (phys_ledger_forget with "Hl") as "Hp'".
+    iEval (rewrite /phys_pointsto) in "Hp". iEval (rewrite /phys_pointsto) in "Hp'".
+    iDestruct "Hp" as "[Hp _]". iDestruct "Hp'" as "[Hp' _]".
+    rewrite (fractional_half (pointsto (L := Arch.pa) (V := bv 8) a (DfracOwn 1) b)).
+    iFrame.
+  Qed.
+
+  Lemma pin_offer_disj (m1 m2 : gmap Arch.pa (bv 8)) :
+    pin_offer m1 -∗ pin_offer m2 -∗ ⌜m1 ##ₘ m2⌝.
+  Proof.
+    iIntros "H1 H2". rewrite /pin_offer.
+    iAssert (⌜forall a, a ∈ dom m1 -> a ∈ dom m2 -> False⌝)%I with "[H1 H2]" as %HH.
+    { rewrite bi.pure_forall. iIntros (a). rewrite !bi.pure_impl. iIntros (Ha Hb).
+      apply elem_of_dom in Ha as [b Hb']. apply elem_of_dom in Hb as [b2 Hb2].
+      iDestruct (big_sepM_lookup _ _ _ _ Hb' with "H1") as "Hc1".
+      iDestruct (big_sepM_lookup _ _ _ _ Hb2 with "H2") as "Hc2".
+      iDestruct (pin_offer_full with "Hc1") as "Hp1".
+      iDestruct (pin_offer_full with "Hc2") as "Hp2".
+      iDestruct (pointsto_valid_2 with "Hp1 Hp2") as %[Hv _].
+      exfalso. rewrite dfrac_op_own dfrac_valid_own in Hv.
+      exact (Qp.not_add_le_l 1 1 Hv). }
+    iPureIntro. apply map_disjoint_dom. rewrite elem_of_disjoint. exact HH.
   Qed.
 
   Lemma pin_offer_full_disj (mm pin : gmap Arch.pa (bv 8)) :
