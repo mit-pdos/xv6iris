@@ -211,43 +211,89 @@ authority; they are written up here because they are what the board found.
 
 | # | what | model | the board | kind | found by |
 |---|------|-------|-----------|------|----------|
-| 27 | **the model's clock never runs** | `mtime` frozen at 0 however many instructions retire; `mcycle` frozen with it | both advance, on QEMU *and* on the board | **UNSOUNDNESS** | `clint_time` |
-| 28 | **the CLINT is not indexed by hart** | only hart 0's registers exist: `clint_load`/`clint_store` compare the offset with `eq_vec` against `MSIP_BASE` = 0 and `MTIMECMP_BASE` = 0x4000, and everything else takes a load access fault | every hart has its own MSIP at `CLINT+4*hartid`, with the semantics the model gets right for hart 0 | **UNSOUNDNESS**, and live in xv6 | `clint_msip` |
-| 29 | `misa` bits 1 (B) and 23 (X) | absent | present (`0x800000000094112F`) | incompleteness | `core_regs_mcsr` |
-| 30 | the UART is a **different chip** | a byte-strided 16550 in an 8-byte window (`DevModel.uart_size = 8`) | Synopsys DW-APB v3.14a, **reg-shift 2**, so LSR is at `0x14` and the whole file lies outside the model's window | board difference, not a model defect | the probe |
+| 27 | **the model's clock never runs** | `mtime` frozen at 0 however many instructions retire; `mcycle`/`cycle` frozen with it | both advance, on QEMU *and* on the board | **UNSOUNDNESS** | `clint_time`, `core_csrprobe` |
+| 28 | **the CLINT is not indexed by hart** | only hart 0's registers exist: `clint_load`/`clint_store` compare the offset with `eq_vec` against `MSIP_BASE` = 0 and `MTIMECMP_BASE` = 0x4000; everything else takes a load access fault | every hart has its own MSIP at `CLINT+4*hartid`, with the semantics the model gets right for hart 0 | **UNSOUNDNESS**, live in xv6 | `clint_msip` |
+| 29 | `misa` — all three machines differ | `0x…14112D` (A C D F I M S U) | board `0x…94112F` adds **B** and **X** and has no H; QEMU `0x…1411AD` adds **H** | incompleteness both ways | `core_csrprobe` |
+| 30 | the UART is a **different chip** | byte-strided 16550 in an 8-byte window (`DevModel.uart_size = 8`) | Synopsys DW-APB v3.14a, **reg-shift 2**: LSR is at `0x14` and the whole file lies outside the model's window | board difference, not a model defect | the probe |
+| 31 | CSRs the **U74 refuses** that both the model and QEMU implement | implemented | `menvcfg`, `mconfigptr`, `senvcfg` (privileged spec 1.12 additions the core predates) and `time` (SiFive leaves `rdtime` to firmware — OpenSBI emulates it) all take an illegal instruction | **model is WIDER than the board** | `core_csrprobe` |
+| 32 | **`csrr mseccfg` has NO TRANSITION in the model** | `exec` returns None → `VStuck`: it neither answers nor refuses | an ordinary illegal-instruction trap, on both machines | a THIRD outcome; same class as finding 25's `sc.w` | `core_csrwide` |
+| 33 | **the machine's identity** | `mvendorid`/`marchid`/`mimpid` all 0 — an anonymous machine (QEMU too) | `0x489` (SiFive's JEDEC id), `0x7`, `0x4210427` | incompleteness | `core_csrprobe` |
 
-**Finding 27 is the largest thing the board has found, and it is not a
-device question.**  `VTest.run_until` steps `riscv_step false` — the
-argument is the clock tick, and the harness never passes `true` — so no
-execution of the model has a moving `mtime`.  `ClintTime.v` states it with
-`minstret` as the control: the counters advance in the model exactly as they
-do on both machines, so the freeze is the *clock* and not "counters are
-unimplemented" or "the program did not run", and `mcycle` freezes with
-`mtime` rather than with `minstret`, which is the clock-derived set exactly.
-The suite already knew the clock did not tick (`README.md`'s rules), but
-knowing it and having no model execution for a hardware run are different
-things, and until `clint_time` nothing had *measured* it.
+### The two that matter most
 
-It is the same shape as finding 24 (the sequentially consistent memory
-model): not a value the model gets wrong but a behaviour it cannot have.
-Unlike 24 it may be cheap — the model has the tick, the harness declines to
-use it — and the honest next step is to find out which.
+**Finding 27 is the largest, and it is not a device question.**
+`VTest.run_until` steps `riscv_step false` — the argument is the clock tick,
+and the harness never passes `true` — so no execution of the model has a
+moving `mtime`.  `ClintTime.v` states it with `minstret` as the control: the
+counters advance in the model exactly as on both machines, so the freeze is
+the *clock* and not "counters are unimplemented", and `mcycle` freezes with
+`mtime` rather than with `minstret`.  `core_csrprobe` reaches the same
+conclusion by a second, independent route — `mcycle` and `cycle` read 0 in
+the model while `minstret` and `instret` are nonzero.  Same shape as finding
+24 (the SC memory model): not a wrong value but a behaviour the model cannot
+have.  Unlike 24 it may be cheap — the model *has* the tick — and finding out
+which is the next thing worth doing.
 
 **Finding 28 is the one only a board could find.**  Every QEMU test runs on
 hart 0, where `4*hartid` is 0 and the gap is invisible; it took a machine
 whose hart 0 cannot run the image at all to address `CLINT+8`.  `ClintMsip.v`
 holds both halves — QEMU on hart 0, where the model's MSIP semantics are
 *right* end to end (including raising and dropping `mip.MSIP`, which a
-"stored but inert" model would fail), and the board on hart 2, where the
-same program completes on the machine and the model takes a load access
-fault at `0x8000006c` with `mtval` = `0x2000008` and trap-loops forever.
-Either half alone would be misread.
+"stored but inert" model would fail as the UART's MCR did in finding 6), and
+the board on hart 2, where the same program completes on the machine and the
+model faults at `0x8000006c` with `mtval = 0x2000008` and trap-loops forever.
+Either half alone would be misread.  It is live: xv6's `start()` stores to
+`CLINT_MTIMECMP(id)` with `id = r_mhartid()`.  Same shape as findings 11/12,
+where the PLIC was indexed by hart instead of by CONTEXT.
 
-It is live: xv6's `start()` stores to `CLINT_MTIMECMP(id)` with
-`id = r_mhartid()`, so on any hart but 0 that store has no model execution.
-It is the same shape as findings 11 and 12, where the PLIC was indexed by
-hart instead of by context and half the register file was simply absent.
+### One row where the board vindicates the model against QEMU
 
+`mideleg`.  QEMU has the hypervisor extension, so VSSIP/VSTIP/VSEIP/SGEIP are
+hardwired into it (`0x1444`, finding 19's consequence).  The board has no H
+and reads 0 — which is what the model reads.  Every other row here has the
+model narrower or wider than the hardware; on this one QEMU is the outlier,
+and it is a reminder that "QEMU-virt is the reference" is an assumption the
+suite makes and not a fact.
+
+### Finding 31 has a live consequence for the `pt_` area
+
+README's rules require a `pt_` program to pin `menvcfg.ADUE` explicitly
+before `satp` (finding 20), because power-on ADUE differs between the model
+and the machine.  **On this board it cannot** — `menvcfg` does not exist —
+so any port of the `pt_` area to this hardware has to decide what to do
+about Svadu first.  That eight of the nine `pt_` tests nonetheless run here
+(see the scoreboard) is because they set ADUE before the first translated
+access and the U74's behaviour happens to match; it is not because the rule
+was satisfied.
+
+### Finding 32 should be settled before README's open decision
+
+README's open decision asks "which machine is the model claiming to be?" and
+leaves findings 19 and 22 unclassified until someone answers it.  Finding 22
+records the model as *"implemented, read successfully"* on its seven CSRs.
+Through this suite's interpreter that is not what happens: `csrr mseccfg`
+has no transition at all.  Whether finding 22's claim was measured some other
+way or has rotted is worth checking, because the decision was framed on the
+belief that the model answers here.
+
+## The board scoreboard, and what it does and does not say
+
+Every non-`disk`, non-`uart` test, run on the VisionFive 2.  **These rows say
+only whether the program set the DONE flag on the board** — they are not
+model comparisons, and nothing is claimed from a row until a capture is taken
+and checked in `vtest-rocq/`.
+
+| area | completes | does not | the reason, where known |
+|---|---|---|---|
+| `pt_` | 8 of 9 | `pt_tlb` | not diagnosed |
+| `core_` | 7 of 10 | `core_regs_mcsr`, `core_regs_scsr`, `core_regs_ctr` | **finding 31**: they read for VALUES, so the U74's refusal of `menvcfg`/`senvcfg`/`time` ends the run.  `core_csrprobe` is the test that answers the same question anyway |
+| `clint_` | 2 of 2 | — | both captured and checked against the model |
+| `plic_` | 2 of 7 | `thresh`, `mask`, `arb`, `tie`, `level` | not diagnosed.  The two that pass only read and write registers; **all five that actually drive an interrupt fail**, which is one cause and not five — most likely firmware still owning the PLIC on hart 1 and claiming sources out from under the test.  A `--takeover` question |
+| `conc_` | 1 of 5 | `lost`, `byte`, `amo`, `sb` | not diagnosed.  Their two-pass rendezvous is tuned for QEMU's TB warm-up, which is not a thing on real harts |
+
+**Checked in and proved against the model so far: `core_smoke`,
+`clint_time`, `clint_msip`, `core_csrprobe`.**  The rest of the "completes"
+column is a triage list, not a result.
 
 ## What is not done
 
@@ -264,3 +310,10 @@ hart instead of by context and half the register file was simply absent.
 - **The `disk` area.**  The JH7110 has no virtio-mmio block device.  Not a
   finding — a device that is not there — and `skip_areas` excludes it.
 - **A hardware reset-value result**, for the reason in §2 above.
+- **Diagnosing the scoreboard's "does not complete" column.**  Three
+  suspected causes for thirteen rows; only the `core_regs_*` three are
+  actually explained (finding 31).
+- **`trap_m` and `trap_s`** — dedicated M- and S-mode trap-handler tests.
+  What `core_csrprobe`'s control establishes is only the narrowest case: one
+  illegal instruction, M-mode, no delegation.  `trap.S` is the foundation; a
+  delegated test needs an S-mode handler beside it.

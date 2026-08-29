@@ -40,7 +40,12 @@
  * -march=rv64gc where the assembler compresses freely.
  *
  * RESULT layout (mirrored in vtest-rocq/CoreCsrprobe.v):
- *   +8 + 4*i   CSR i of the list below: 1 if reading it TRAPPED, else 0
+ *   +8 + 4*i     CSR i of the list below: 1 if reading it TRAPPED, else 0
+ *   +0x100 + 4*i  the low 32 bits of what the read RETURNED, or 0xffffffff
+ *                 if it trapped.  This is what lets a value comparison --
+ *                 core_regs_mcsr's job -- be made on a machine that refuses
+ *                 one of the registers partway through the list, which is
+ *                 something core_regs_mcsr itself cannot do.
  *   +8 + 4*36  THE CONTROL: an all-zeros (illegal) instruction word.  Must
  *              be 1 on every machine and in the model; if it is 0, the
  *              handler was never reached and the whole table is worthless.
@@ -50,6 +55,10 @@
 /* vtest: repeat=1 */
     .option norvc
 #include "abi.h"
+
+/* the VALUE table, beside the trap table.  Test-local, not in abi.h: only
+   this test has a reason for it. */
+#define RES_VALS  0x100
 
 /* Probe one CSR.  The trap COUNT before and after is the oracle: if the
    read trapped, trap.S incremented it and stepped over the csrr.
@@ -61,21 +70,27 @@
    does not assemble. */
 .macro PROBE csr, slot
     lw   s2, 0(s9)
+    li   t2, -1                 /* poison: a read that TRAPPED leaves this,
+                                   so a trapped slot is visibly 0xffffffff
+                                   and not a plausible zero */
     csrr t2, \csr
     lw   s3, 0(s9)
     xor  s4, s2, s3
     snez s4, s4
     sw   s4, (RES_PAYLOAD + 4 * \slot)(s11)
+    sw   t2, (RES_VALS    + 4 * \slot)(s11)
 .endm
 
 /* the same, for a raw instruction word rather than a CSR read */
 .macro PROBEINSN word, slot
     lw   s2, 0(s9)
+    li   t2, -1
     .word \word
     lw   s3, 0(s9)
     xor  s4, s2, s3
     snez s4, s4
     sw   s4, (RES_PAYLOAD + 4 * \slot)(s11)
+    sw   t2, (RES_VALS    + 4 * \slot)(s11)
 .endm
 
     .globl _vtest_body

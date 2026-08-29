@@ -309,7 +309,7 @@ does not exist).
 
 ### Findings from REAL HARDWARE
 
-Six more, from running the suite on a StarFive VisionFive 2 over JTAG.
+Seven more, from running the suite on a StarFive VisionFive 2 over JTAG.
 [`README-hw.md`](README-hw.md) is where they are written up, what a board
 run claims (it is narrower than a QEMU run), and how the rig works; this
 table stays the authority for the numbers.
@@ -322,11 +322,28 @@ hart 0, and the harness's clock never ticks.
 |---|------|-------|-----------|------|----------|
 | 27 | **the model's clock never runs** | `mtime` frozen at 0 however many instructions retire, and `mcycle` frozen with it | both advance -- on the board AND on QEMU | **UNSOUNDNESS** | `clint_time` |
 | 28 | **the CLINT is not indexed by hart** | only hart 0's registers exist -- `clint_load`/`clint_store` compare the offset with `eq_vec` against `MSIP_BASE` = 0 and `MTIMECMP_BASE` = 0x4000, and every other hart's access takes a load access fault | every hart has its own MSIP at `CLINT+4*hartid`, with exactly the semantics the model gets right for hart 0 | **UNSOUNDNESS**, and live in xv6's `start()` | `clint_msip` |
-| 29 | `misa` bits 1 (B) and 23 (X) | absent (`MISA_C` = `0x800000000014112D`) | present (`0x800000000094112F`) | incompleteness | `core_regs_mcsr` |
+| 29 | `misa`, all three different | model `0x…14112D` (A C D F I M S U) | QEMU adds **H** (`0x…1411AD`, finding 19); the board adds **B** and **X** and has no H (`0x…94112F`) | incompleteness both ways | `core_csrprobe` |
 | 30 | the UART is a **different chip** on this board | a byte-strided 16550 in an 8-byte window (`DevModel.uart_size` = 8) | Synopsys DW-APB v3.14a, **reg-shift 2** -- LSR is at `0x14`, and the whole register file lies outside the model's window | board difference, not a model defect | the probe |
 
 | 31 | CSRs the **U74** refuses that the model and QEMU both implement: `menvcfg`, `mconfigptr`, `senvcfg` (privileged spec 1.12 additions the core predates) and `time` (SiFive leaves `rdtime` to firmware to emulate, which is what OpenSBI does on this board) | implemented, read successfully | implemented | illegal instruction | **model is WIDER than the board** | `core_csrprobe` |
 | 32 | **`csrr mseccfg` has NO TRANSITION in the model.**  Finding 22 records these seven CSRs as "implemented, read successfully"; under this suite's interpreter the model neither answers nor refuses -- `exec` returns None and the harness reports `VStuck`, so the run stops and the other six go unasked | `VStuck` | illegal instruction | illegal instruction | a THIRD outcome; same class of limit as finding 25's `sc.w` | `core_csrwide` |
+
+| 33 | **the machine's identity**: `mvendorid`, `marchid`, `mimpid` | `0, 0, 0` -- an anonymous machine | QEMU also `0, 0, 0`; the board answers `0x489` (SiFive's JEDEC id), `0x7`, `0x4210427` | incompleteness | `core_csrprobe` |
+
+**Finding 29 was previously attributed to `core_regs_mcsr`, and that was
+wrong**: that test does not complete on the board at all (it reads for
+values, so the U74's refusal of `menvcfg` ends its run seven registers in).
+The board's `misa` was known only from a JTAG read, and **a JTAG read is not
+this question** -- see "Treating a trap as DATA" above.  `core_csrprobe`
+establishes both that `misa` is `csrr`-readable on the U74 and what it
+answers, so the row is now a measurement.
+
+**One row where the board vindicates the MODEL against QEMU**, and it is the
+first: `mideleg`.  QEMU has the hypervisor extension, so VSSIP/VSTIP/VSEIP/
+SGEIP are hardwired into it (`0x1444`, finding 19's consequence).  The board
+has no H and reads 0 -- which is what the model reads.  Every other row in
+this table has the model narrower or wider than the hardware; here QEMU is
+the outlier.
 
 **Finding 31 has a live consequence.**  README's rules require a `pt_`
 program to pin `menvcfg.ADUE` explicitly before `satp` (finding 20).  On this

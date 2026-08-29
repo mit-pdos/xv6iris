@@ -36,9 +36,22 @@ The two new tests split the CSR question the way the owner asked: the half
 every machine can be asked, and the half only QEMU can.
 
 - **`core_csrprobe`** (board + QEMU): 36 CSRs plus an all-zeros
-  instruction word as the CONTROL.  Model and QEMU implement all 36; the
-  U74 refuses FOUR — `menvcfg`, `mconfigptr`, `senvcfg` (priv 1.12) and
-  `time` (SiFive leaves `rdtime` to firmware).  **Finding 31.**
+  instruction word as the CONTROL.  It records both WHETHER each read
+  trapped and WHAT IT RETURNED, which is what lets a value comparison be
+  made on a machine that refuses a register partway through the list —
+  something `core_regs_mcsr` structurally cannot do.  Model and QEMU
+  implement all 36; the U74 refuses FOUR — `menvcfg`, `mconfigptr`,
+  `senvcfg` (priv 1.12) and `time` (SiFive leaves `rdtime` to firmware).
+  **Finding 31.**  Two more came out of the value table: **finding 33**,
+  the model is an ANONYMOUS machine (`mvendorid`/`marchid`/`mimpid` all 0,
+  as is QEMU; the board answers with real SiFive ids), and a corrected
+  **finding 29** — `misa` differs three ways and the board's value had only
+  ever been read over JTAG, which is not the same question.
+
+  **`mideleg` is the one row where the board vindicates the MODEL against
+  QEMU**: QEMU has H so VSSIP/VSTIP/VSEIP/SGEIP are hardwired in (0x1444),
+  and the board reads 0, which is what the model reads.  A reminder that
+  "QEMU-virt is the reference" is an assumption the suite makes, not a fact.
 - **`core_csrwide`** (`machines=qemu`): finding 22's seven.  QEMU refuses
   all seven; **the model has NO TRANSITION for `csrr mseccfg` — `exec`
   returns None, `VStuck` — where finding 22 records it as "implemented,
