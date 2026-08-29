@@ -387,6 +387,85 @@ things, and the answer differs:
   exposure vs a stream commit; keep the sealed stable form or wait for
   exclusivity; sharper −1 tie?; lane A(iv) offset seam is now
   CONSUMER-MOTIVATED (first consumer = this contract).
+  **THE WRITE AU PROVER LANE, 2026-08-29** (Opus lane; six new files, all
+  EC2-green, zero `Admitted`).  The syscall shell and the corollary are
+  SEALED; the chunk loop is the one open piece and its design is now
+  discharged rather than sketched.  Files:
+  - `iris/FsAbsWriteFire.v` — the per-chunk fire.  `awrite_commit_at`
+    (authority-shaped, two-phase), `wrf_awrite_fire` (fused with the
+    `ireg_top_retag` filewrite performs between writei's return and its
+    `iunlock` — ProofFilewrite.v:2285, and that ONE line is the whole
+    seam), the splice bridge `wrf_write_row` /
+    `wrf_file_bytes_splice` (writei's range clause + `wi_dinode`'s
+    `max` size IS `blk_splice`), and the instant-count arithmetic
+    (`wri_count_lt`/`_step`/`_done`).  `Print Assumptions`: **Closed
+    under the global context** — no axiom, not even funext.
+  - `iris/SpecSysWriteAUEra.v` — `SYSWRITE_AU_ERA` (+ `_STABLE`), which
+    is `SpecSysWriteAU` with ONE substitution.
+    `wp_sys_write_au_frame` is REUSED VERBATIM (unlike
+    `SpecSysMknodAU`'s, whose continuation the ustate sweep made
+    unprovable: write does not move the image, so no `M'` binder
+    arises), and so are `wri_receipts`/`wri_receipts_chained`.
+  - `iris/SpecFilewriteAU.v` — `FILEWRITE_AU`, plus the loop's carried
+    state `fw_au_raw` and its four moves (`_init`, `_take`, `_ok`,
+    `_fail`, `_nofile`).
+  - `iris/ProofSysWriteAU.v` — SEALS `SYSWRITE_AU_ERA` over
+    `FILEWRITE_AU`; ProofSysWrite's walk instruction for instruction,
+    15 s, first try.
+  - `iris/ProofSysWriteAUStable.v` — `SYSWRITE_AU_ERA -> …_STABLE`, 14
+    lines, lands in the escape disjunct at `off0 := 0`.
+  AS-LANDED FINDINGS:
+  1. **The astate-shaped commit is not dischargeable — again.**
+     `FsAbsMknodFire`'s first finding repeats verbatim at the write
+     delta: `abs_view` is not injective, so a client's fupd may return
+     an authority at a map with the right READING and no `inode_local`,
+     and `ftop_body` cannot be closed.  R10 keeps `SpecSysWriteAU`
+     byte-identical; the era form carries the `_at` pair.
+  2. **The peel sys_open needed is NOT needed here, and the short chunk
+     must not fire.**  Open shares one `bs0` across an existential
+     reseal; write's chunks each RE-LOCK, so the pre-row phase 1 sees is
+     read off the same `top_frag` the fire retags, inside one critical
+     section — the payload travels sealed.  And writei's DISTURBED tail
+     (`dist`, up to one block, visible whenever the file was already
+     longer) is not the splice, so a short chunk carries no receipt; it
+     costs nothing, because `tot = n -> dist = 0` and the loop breaks on
+     `r <> n1`, so every chunk that continues the loop is full and clean
+     and the one that ends it is simply absent from `bss`.  That is the
+     slack the fail arm's "total < n" leaves.
+  3. **OWNER QUESTION 1 (new, and it gates the arm shape):
+     `wri_pre`'s "the row is an `AFile`" is NOT derivable at filewrite's
+     inode arm.**  The fd payload's entire type witness is
+     `FileInvDefs.inode_pay`'s `⌜wr = true -> ty <> T_DIR_z⌝` — a
+     DIRECTORY is excluded and nothing else — and `inode_pay` does not
+     even take the descriptor's `fc_type` as a parameter.  So a
+     T_DEVICE inode behind an FD_INODE descriptor is not refutable.  It
+     is unreachable in xv6 (sys_open writes `FD_DEVICE` exactly when
+     `ip->type == T_DEVICE`) and closing it is a one-conjunct
+     strengthening at `FileInvDefs.file_payload`'s inode arm
+     (`fc_type Cf = FD_INODE -> bv_unsigned ty = T_FILE_z`), discharged
+     where that very test is — an R10 edit to a landed file that
+     ripples through the file layer, hence the OWNER's.  Until then
+     `write_arms_at` carries a THIRD arm: on such a row `abs_node`
+     reads `ADev major minor`, fields writei never moves, so the
+     abstract view does not move at all and every chunk's `delta_write`
+     is the IDENTITY (which is what its totality was for); the arm
+     delivers the fired PREFIX, refunds the rest, and says nothing
+     about totals.  If the owner rules, the arm, the loop's `clean`
+     flag and that whole branch go away together.
+  REMAINING — **`ProofFilewriteAU.v`, the chunk loop, and nothing else.**
+  ProofFilewrite.v compiles in 44 s, so the copy is affordable; the
+  design is fixed by `fw_au_raw`.  `fw_loop` gains three ordinary
+  binders (`t : Z`, `p : nat`, `clean : bool`), one premise
+  (`clean = true -> t = iz /\ iz = FW_MAX * Z.of_nat p`) and one wand
+  (`fw_au_raw Γfs i n Φw t p`); the fire replaces line 2285's
+  `ireg_top_retag`, keyed on `di_type dnl = T_FILE_z` AND on
+  `rz = c` (both known there — writei has returned); the three exits
+  are `fw_au_raw_ok` at `iz + c = n`, `fw_au_raw_fail` at the
+  short-write break, `fw_au_raw_nofile` when `clean = false`; the back
+  edge passes `iz + c`, `S p`, `clean` and re-proves the tie from
+  `c = FW_MAX` (which holds because the chunk was not the last).  The
+  capstone's non-inode arms are dead by the `st = FdOpen rb true
+  (FdInode i)` premise.
   **OPEN'S PLAIN ARM IS PROVEN** (Opus lane): `SpecSysOpenAUPlain.v` seals
   `SYSOPEN_AU_PLAIN` — `SpecSysOpenAU.wp_sys_open_au_plain_body` byte for
   byte, the O_CREATE parameter split off — and `LinkSysOpenAU.v`
