@@ -56,7 +56,7 @@ Require Import RiscvExtras.
 (* it.  See FastSetSolver.v.                                              *)
 Require Export FastSetSolver.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import TsoCtx.
+Require Import TsoCtx CtxMorphTac.
 (* THE PHYS TIER AND THE UNFLIPPED ↦₂/↦₄ TOWERS CROSS THE SEAM HERE, and
    after the machine flip the two directions are no longer symmetric
    (tso-machine-flip.md §6 amendment A6.8/A6.9) -- see the block above
@@ -866,6 +866,54 @@ Section DiskInv.
   Qed.
 
 End DiskInv.
+
+(* >>> A6.121 (the M3 λ-conversion): THE DISK PAYLOAD OVER AN EXPLICIT
+   CONTEXT.  [disk_res_at γ pd pav pu] is [disk_res] with the section's
+   ambient context made the argument -- the [CtxId → iProp] the lock surface
+   takes -- so [vdisk_lock]'s free arm holds the driver's cells at the PARKED
+   record's context and acquire's absorb re-indexes them by a REAL transport
+   proof: [CtxMorph], built from the structural instances through every
+   component below.  Nothing a consumer reads changes: [R cur_ctx] is
+   [disk_res] at the consumer's own context by β.  The constant embedding
+   [(disk_res_at …)] it replaces froze the payload at whichever context
+   spelled it, which is what kept a handle minted at one context unusable at
+   another (tso-intr-lane.md I4) and the virtio floors (§0.35′(iv) case 3)
+   uncarriable. <<< *)
+Section DiskResAt.
+  Context `{!riscvGS Σ, !xv6G Σ}.
+
+  Global Instance desc_entry_own_morph pd i :
+    CtxMorph (λ ξ, desc_entry_own (XI := ξ) pd i).
+  Proof. rewrite /desc_entry_own. ctx_morph_solve. Qed.
+  Global Instance ops_own_morph i : CtxMorph (λ ξ, ops_own (XI := ξ) i).
+  Proof. rewrite /ops_own. ctx_morph_solve. Qed.
+  Global Instance free_slot_res_morph pd i :
+    CtxMorph (λ ξ, free_slot_res (XI := ξ) pd i).
+  Proof.
+    rewrite /free_slot_res. ctx_morph_solve.
+    all: first [ apply desc_entry_own_morph | apply ops_own_morph ].
+  Qed.
+  Global Instance flight_res_morph γ p v :
+    CtxMorph (λ ξ, flight_res (XI := ξ) γ p v).
+  Proof. rewrite /flight_res. ctx_morph_solve. Qed.
+  Global Instance parked_res_morph γ pav p v :
+    CtxMorph (λ ξ, parked_res (XI := ξ) γ pav p v).
+  Proof. rewrite /parked_res. ctx_morph_solve. Qed.
+  Global Instance ring_slots_res_morph pav occ :
+    CtxMorph (λ ξ, ring_slots_res (XI := ξ) pav occ).
+  Proof. rewrite /ring_slots_res. ctx_morph_solve. Qed.
+
+  Definition disk_res_at (γ : disk_names)
+      (pd pav pu : SailStdpp.Values.mword 64) : CtxId → iProp Σ :=
+    λ ξ, disk_res (XI := ξ) γ pd pav pu.
+  Global Instance disk_res_at_morph γ pd pav pu :
+    CtxMorph (disk_res_at γ pd pav pu).
+  Proof.
+    rewrite /disk_res_at /disk_res. ctx_morph_solve.
+    all: first [ apply flight_res_morph | apply parked_res_morph
+               | apply free_slot_res_morph | apply ring_slots_res_morph ].
+  Qed.
+End DiskResAt.
 
 (* ====================================================================== *)
 (* The descriptor-triple counting argument (pure).                        *)

@@ -1,0 +1,15 @@
+DIGEST c677622bcc3ead4c61989be57eebfee4
+Fxv6iris.CtxMorphTac
+R1194:1202 iris.proofmode.proofmode <> <> lib
+R1220:1225 xv6iris.TsoCtx <> <> lib
+R1268:1285 xv6iris.TsoCtx <> ctx_morph_pointsto inst
+R1303:1316 xv6iris.TsoCtx <> ctx_morph_word inst
+R1334:1348 xv6iris.TsoCtx <> ctx_morph_word2 inst
+R1366:1380 xv6iris.TsoCtx <> ctx_morph_word4 inst
+R1398:1412 xv6iris.TsoCtx <> ctx_morph_const inst
+R1457:1463 xv6iris.TsoCtx <> cur_ctx def
+R1503:1517 xv6iris.TsoCtx <> ctx_morph_exist inst
+R1541:1553 xv6iris.TsoCtx <> ctx_morph_sep inst
+R1567:1584 xv6iris.TsoCtx <> ctx_morph_big_sepL inst
+R1610:1627 xv6iris.TsoCtx <> ctx_morph_big_sepM inst
+R1653:1664 xv6iris.TsoCtx <> ctx_morph_if inst

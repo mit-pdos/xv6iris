@@ -1521,6 +1521,28 @@ Section ctx.
       iModIntro. iFrame.
   Qed.
 
+  (* A6.121 (the M3 λ-conversion): two more structural instances the
+     straggler payloads need -- a finite map of transportable parts, and a
+     boolean branch between two transportable parts (the payloads' state-
+     indexed [if]s and [bool_decide]s). *)
+  Global Instance ctx_morph_big_sepM `{Countable K} {A} (m : gmap K A)
+      (Φ : K → A → CtxId → iProp Σ) :
+    (∀ k x, CtxMorph (Φ k x)) →
+    CtxMorph (λ ξ, [∗ map] k ↦ x ∈ m, Φ k x ξ)%I.
+  Proof.
+    intros HΦ. induction m as [|k x m Hk IH] using map_ind.
+    - iIntros (ξ ξ') "Hd _ !>". rewrite big_sepM_empty. by iFrame.
+    - iIntros (ξ ξ') "Hd HR".
+      iDestruct (big_sepM_insert _ _ _ _ Hk with "HR") as "[HR HRs]".
+      iMod (ctx_morph with "Hd HR") as "[Hd HR]".
+      iMod (IH ξ ξ' with "Hd HRs") as "[Hd HRs]".
+      iModIntro. iFrame "Hd". rewrite (big_sepM_insert _ _ _ _ Hk). iFrame.
+  Qed.
+
+  Global Instance ctx_morph_if (b : bool) (R1 R2 : CtxId → iProp Σ) :
+    CtxMorph R1 → CtxMorph R2 → CtxMorph (λ ξ, if b then R1 ξ else R2 ξ)%I.
+  Proof. intros H1 H2. destruct b; [exact H1 | exact H2]. Qed.
+
   (* the word cell's transport obligation, once for every payload *)
   Global Instance ctx_morph_word (kt : ktier) a dq w :
     CtxMorph (λ ξ, ctx_word_pointsto (KTR := kt) ξ a dq w).

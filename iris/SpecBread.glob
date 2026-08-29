@@ -1,4 +1,4 @@
-DIGEST 615f90913c3b096a82de14155c31a73c
+DIGEST e189ac04274f4cdc43bf8e103a019d0e
 Fxv6iris.SpecBread
 R1779:1784 Stdlib.ZArith.ZArith <> <> lib
 R1786:1788 Stdlib.micromega.Lia <> <> lib
@@ -240,197 +240,195 @@ R6685:6687 xv6iris.SpecBread <> γd:15 var
 R6689:6690 xv6iris.SpecBread <> pd:17 var
 R6692:6694 xv6iris.SpecBread <> pav:18 var
 R6696:6697 xv6iris.SpecBread <> pu:19 var
-R6774:6829 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R6773:6828 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
 R6706:6712 xv6iris.WpLock <> is_lock def
 R6714:6716 xv6iris.SpecBread <> γk:16 var
 R6718:6723 xv6iris.DiskInv <> d_lock def
-R6746:6748 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
-R6771:6773 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
-R6749:6756 xv6iris.DiskInv <> disk_res def
-R6758:6760 xv6iris.SpecBread <> γd:15 var
-R6762:6763 xv6iris.SpecBread <> pd:17 var
-R6765:6767 xv6iris.SpecBread <> pav:18 var
-R6769:6770 xv6iris.SpecBread <> pu:19 var
-R6835:7331 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R6830:6834 xv6iris.BioDefs <> bslot def
-R7952:7959 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7332:7338 xv6iris.WpNext <> wp_next def
-R7360:7364 xv6iris.RiscvLang <> CpuId class
-binder 7354:7356 <> CID:35
-R7372:7376 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
-R7433:7441 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
-R7382:7388 xv6iris.RegFile <> regfile def
-binder 7377:7378 <> mf:36
-R7396:7398 Corelib.Init.Datatypes <> nat ind
-binder 7392:7392 <> k:37
-R7411:7414 Corelib.Init.Datatypes <> list ind
-R7417:7418 stdpp.bitvector.definitions <> bv rec
-binder 7402:7403 <> bs:38
-R7411:7414 Corelib.Init.Datatypes <> list ind
-R7417:7418 stdpp.bitvector.definitions <> bv rec
-binder 7405:7407 <> bsd:39
-R7429:7432 Corelib.Init.Datatypes <> bool ind
-binder 7425:7425 <> d:40
-R7527:7538 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7442:7444 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R7524:7526 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R7462:7472 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
-R7445:7456 xv6iris.CalleeSaved <> callee_saved def
-R7458:7458 xv6iris.SpecBread <> m:26 var
-R7460:7461 xv6iris.SpecBread <> mf:36 var
-R7514:7516 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R7475:7479 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
-R7480:7485 Riscv.rv64d_types <> Regidx constr
-R7506:7510 SailStdpp.Values <> mword def
-R7488:7499 SailStdpp.Values <> mword_of_int def
-R7473:7474 xv6iris.SpecBread <> mf:36 var
-R7517:7521 xv6iris.BcacheInv <> bnode def
-R7523:7523 xv6iris.SpecBread <> k:37 var
-R7564:7575 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7539:7549 xv6iris.IntrDefs <> sie_cap_gpr def
-R7551:7553 xv6iris.Ktier <> KT1 constr
-R7555:7556 xv6iris.SpecBread <> mf:36 var
-R7558:7558 xv6iris.SpecBread <> K:27 var
-R7560:7560 xv6iris.SpecBread <> b:29 var
-R7562:7563 xv6iris.SpecBread <> pj:33 var
-R7597:7608 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7576:7582 xv6iris.CpuOwn <> cpu_own def
-R7586:7587 xv6iris.SpecBread <> eb:28 var
-R7589:7590 xv6iris.SpecBread <> pj:33 var
-R7592:7592 xv6iris.SpecBread <> b:29 var
-R7594:7596 xv6iris.SpecBread <> lks:30 var
-R7629:7640 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7609:7621 xv6iris.IntrDefs <> trap_csrs_ext def
-R7623:7625 xv6iris.Ktier <> KT1 constr
-R7627:7628 xv6iris.SpecBread <> eb:28 var
-R7660:7671 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7641:7653 xv6iris.IntrDefs <> cpu_claim_ext def
-R7655:7656 xv6iris.SpecBread <> eb:28 var
-R7658:7659 xv6iris.SpecBread <> pj:33 var
-R7685:7696 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7672:7676 xv6iris.InstrBytes <> pc_is def
-R7678:7684 xv6iris.SpecBread <> ret_tgt:34 var
-R7723:7872 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7697:7710 xv6iris.ProcDefs <> proc_priv_bare def
-R7712:7713 xv6iris.SpecBread <> pj:33 var
-R7715:7718 xv6iris.SpecBread <> pidv:22 var
-R7720:7722 xv6iris.SpecBread <> Vpr:31 var
-R7912:7923 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7873:7882 xv6iris.BioInv <> bio_locked def
-R7884:7885 xv6iris.SpecBread <> bn:20 var
-R7887:7887 xv6iris.SpecBread <> V:21 var
-R7889:7889 xv6iris.SpecBread <> k:37 var
-R7891:7894 xv6iris.SpecBread <> pidv:22 var
-R7896:7898 xv6iris.SpecBread <> dev:23 var
-R7900:7902 xv6iris.SpecBread <> bno:24 var
-R7904:7905 xv6iris.SpecBread <> bs:38 var
-R7907:7909 xv6iris.SpecBread <> bsd:39 var
-R7911:7911 xv6iris.SpecBread <> d:40 var
-R7924:7927 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
-R7950:7950 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
-R7935:7938 iris.program_logic.language <> expr proj
-R7940:7949 xv6iris.RiscvLang <> riscv_lang def
-R7928:7931 xv6iris.RiscvLang <> Loop abbrev
-R7345:7346 xv6iris.SpecBread <> pj:33 var
-R7340:7343 Corelib.Init.Datatypes <> true constr
-R7960:7963 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
-R7986:7986 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
-R7971:7974 iris.program_logic.language <> expr proj
-R7976:7985 xv6iris.RiscvLang <> riscv_lang def
-R7964:7967 xv6iris.RiscvLang <> Loop abbrev
-modtype 8002:8006 <> BREAD
-ax 8021:8034 BREAD wp_bread_sconf
-R8042:8050 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-R8494:8502 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-R8052:8058 xv6iris.RiscvPtsto <> riscvGS class
-binder 8060:8061 <> Σ:41
-binder 8051:8061 <> riscvGS0:42
-R8065:8068 xv6iris.Xv6G <> xv6G class
-R8070:8071 xv6iris.SpecBread <> Σ:41 var
-binder 8064:8071 <> xv6G0:43
-R8075:8082 xv6iris.Xv6Cameras <> bioslotG class
-R8084:8085 xv6iris.SpecBread <> Σ:41 var
-binder 8074:8085 <> bioslotG0:44
-R8089:8095 xv6iris.FdSlots <> fdslotG class
-R8097:8098 xv6iris.SpecBread <> Σ:41 var
-binder 8088:8098 <> fdslotG0:45
-R8102:8110 xv6iris.IrefSlots <> irefslotG class
-R8112:8113 xv6iris.SpecBread <> Σ:41 var
-binder 8101:8113 <> irefslotG0:46
-R8117:8120 xv6iris.ProcAvail <> pavG class
-R8122:8123 xv6iris.SpecBread <> Σ:41 var
-binder 8116:8123 <> pavG0:47
-R8134:8138 xv6iris.RiscvLang <> GenId class
-binder 8128:8130 <> GEN:48
-R8149:8153 xv6iris.RiscvLang <> CpuId class
-binder 8143:8145 <> CID:49
-R8163:8168 xv6iris.TsoCtx <> CurCtx class
-binder 8158:8159 <> XI:50
-R8191:8194 Corelib.Init.Datatypes <> list ind
-R8196:8200 iris.base_logic.lib.iprop <> gname def
-binder 8185:8187 <> γs:51
-R8208:8210 Corelib.Init.Datatypes <> nat ind
-binder 8204:8204 <> j:52
-R8220:8224 iris.base_logic.lib.iprop <> gname def
-binder 8214:8216 <> γl:53
-R8240:8249 xv6iris.WpUart <> uart_names rec
-binder 8234:8236 <> γu:54
-R8259:8268 xv6iris.DiskPtsto <> disk_names rec
-binder 8253:8255 <> γd:55
-R8278:8282 iris.base_logic.lib.iprop <> gname def
-binder 8272:8274 <> γk:56
-R8304:8308 SailStdpp.Values <> mword def
-binder 8292:8293 <> pd:57
-R8304:8308 SailStdpp.Values <> mword def
-binder 8295:8297 <> pav:58
-R8304:8308 SailStdpp.Values <> mword def
-binder 8299:8300 <> pu:59
-R8326:8334 xv6iris.BioDefs <> bio_names rec
-binder 8321:8322 <> bn:60
-R8342:8349 xv6iris.BioDefs <> bio_view rec
-R8351:8352 xv6iris.SpecBread <> Σ:41 var
-binder 8338:8338 <> V:61
-R8377:8381 SailStdpp.Values <> mword def
-binder 8362:8365 <> pidv:62
-R8377:8381 SailStdpp.Values <> mword def
-binder 8367:8369 <> dev:63
-R8377:8381 SailStdpp.Values <> mword def
-binder 8371:8373 <> bno:64
-R8393:8397 iris.algebra.dfrac <> dfrac ind
-binder 8388:8389 <> dq:65
-R8411:8417 xv6iris.RegFile <> regfile def
-binder 8407:8407 <> m:66
-R8425:8427 Corelib.Init.Datatypes <> nat ind
-binder 8421:8421 <> K:67
-R8436:8439 Corelib.Init.Datatypes <> bool ind
-binder 8431:8432 <> eb:68
-R8453:8456 Corelib.Init.Datatypes <> bool ind
-binder 8449:8449 <> b:69
-R8466:8469 stdpp.gmap <> gset def
-R8471:8476 Stdlib.Strings.String <> string ind
-binder 8460:8462 <> lks:70
-R8486:8493 xv6iris.ProcDefs <> pprivate rec
-binder 8480:8482 <> Vpr:71
-R8503:8521 xv6iris.SpecBread <> wp_bread_sconf_body def
-R8615:8617 xv6iris.SpecBread <> Vpr:71 var
-R8611:8613 xv6iris.SpecBread <> lks:70 var
-R8609:8609 xv6iris.SpecBread <> b:69 var
-R8606:8607 xv6iris.SpecBread <> eb:68 var
-R8604:8604 xv6iris.SpecBread <> K:67 var
-R8602:8602 xv6iris.SpecBread <> m:66 var
-R8599:8600 xv6iris.SpecBread <> dq:65 var
-R8595:8597 xv6iris.SpecBread <> bno:64 var
-R8591:8593 xv6iris.SpecBread <> dev:63 var
-R8586:8589 xv6iris.SpecBread <> pidv:62 var
-R8558:8558 xv6iris.SpecBread <> V:61 var
-R8555:8556 xv6iris.SpecBread <> bn:60 var
-R8552:8553 xv6iris.SpecBread <> pu:59 var
-R8548:8550 xv6iris.SpecBread <> pav:58 var
-R8545:8546 xv6iris.SpecBread <> pd:57 var
-R8541:8543 xv6iris.SpecBread <> γk:56 var
-R8537:8539 xv6iris.SpecBread <> γd:55 var
-R8533:8535 xv6iris.SpecBread <> γu:54 var
-R8529:8531 xv6iris.SpecBread <> γl:53 var
-R8527:8527 xv6iris.SpecBread <> j:52 var
-R8523:8525 xv6iris.SpecBread <> γs:51 var
-R8624:8628 xv6iris.SpecBread BREAD <> modtype
+R6747:6757 xv6iris.DiskInv <> disk_res_at def
+R6759:6761 xv6iris.SpecBread <> γd:15 var
+R6763:6764 xv6iris.SpecBread <> pd:17 var
+R6766:6768 xv6iris.SpecBread <> pav:18 var
+R6770:6771 xv6iris.SpecBread <> pu:19 var
+R6834:7330 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R6829:6833 xv6iris.BioDefs <> bslot def
+R7951:7958 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7331:7337 xv6iris.WpNext <> wp_next def
+R7359:7363 xv6iris.RiscvLang <> CpuId class
+binder 7353:7355 <> CID:35
+R7371:7375 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R7432:7440 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R7381:7387 xv6iris.RegFile <> regfile def
+binder 7376:7377 <> mf:36
+R7395:7397 Corelib.Init.Datatypes <> nat ind
+binder 7391:7391 <> k:37
+R7410:7413 Corelib.Init.Datatypes <> list ind
+R7416:7417 stdpp.bitvector.definitions <> bv rec
+binder 7401:7402 <> bs:38
+R7410:7413 Corelib.Init.Datatypes <> list ind
+R7416:7417 stdpp.bitvector.definitions <> bv rec
+binder 7404:7406 <> bsd:39
+R7428:7431 Corelib.Init.Datatypes <> bool ind
+binder 7424:7424 <> d:40
+R7526:7537 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7441:7443 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R7523:7525 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R7461:7471 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R7444:7455 xv6iris.CalleeSaved <> callee_saved def
+R7457:7457 xv6iris.SpecBread <> m:26 var
+R7459:7460 xv6iris.SpecBread <> mf:36 var
+R7513:7515 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7474:7478 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R7479:7484 Riscv.rv64d_types <> Regidx constr
+R7505:7509 SailStdpp.Values <> mword def
+R7487:7498 SailStdpp.Values <> mword_of_int def
+R7472:7473 xv6iris.SpecBread <> mf:36 var
+R7516:7520 xv6iris.BcacheInv <> bnode def
+R7522:7522 xv6iris.SpecBread <> k:37 var
+R7563:7574 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7538:7548 xv6iris.IntrDefs <> sie_cap_gpr def
+R7550:7552 xv6iris.Ktier <> KT1 constr
+R7554:7555 xv6iris.SpecBread <> mf:36 var
+R7557:7557 xv6iris.SpecBread <> K:27 var
+R7559:7559 xv6iris.SpecBread <> b:29 var
+R7561:7562 xv6iris.SpecBread <> pj:33 var
+R7596:7607 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7575:7581 xv6iris.CpuOwn <> cpu_own def
+R7585:7586 xv6iris.SpecBread <> eb:28 var
+R7588:7589 xv6iris.SpecBread <> pj:33 var
+R7591:7591 xv6iris.SpecBread <> b:29 var
+R7593:7595 xv6iris.SpecBread <> lks:30 var
+R7628:7639 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7608:7620 xv6iris.IntrDefs <> trap_csrs_ext def
+R7622:7624 xv6iris.Ktier <> KT1 constr
+R7626:7627 xv6iris.SpecBread <> eb:28 var
+R7659:7670 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7640:7652 xv6iris.IntrDefs <> cpu_claim_ext def
+R7654:7655 xv6iris.SpecBread <> eb:28 var
+R7657:7658 xv6iris.SpecBread <> pj:33 var
+R7684:7695 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7671:7675 xv6iris.InstrBytes <> pc_is def
+R7677:7683 xv6iris.SpecBread <> ret_tgt:34 var
+R7722:7871 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7696:7709 xv6iris.ProcDefs <> proc_priv_bare def
+R7711:7712 xv6iris.SpecBread <> pj:33 var
+R7714:7717 xv6iris.SpecBread <> pidv:22 var
+R7719:7721 xv6iris.SpecBread <> Vpr:31 var
+R7911:7922 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7872:7881 xv6iris.BioInv <> bio_locked def
+R7883:7884 xv6iris.SpecBread <> bn:20 var
+R7886:7886 xv6iris.SpecBread <> V:21 var
+R7888:7888 xv6iris.SpecBread <> k:37 var
+R7890:7893 xv6iris.SpecBread <> pidv:22 var
+R7895:7897 xv6iris.SpecBread <> dev:23 var
+R7899:7901 xv6iris.SpecBread <> bno:24 var
+R7903:7904 xv6iris.SpecBread <> bs:38 var
+R7906:7908 xv6iris.SpecBread <> bsd:39 var
+R7910:7910 xv6iris.SpecBread <> d:40 var
+R7923:7926 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R7949:7949 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R7934:7937 iris.program_logic.language <> expr proj
+R7939:7948 xv6iris.RiscvLang <> riscv_lang def
+R7927:7930 xv6iris.RiscvLang <> Loop abbrev
+R7344:7345 xv6iris.SpecBread <> pj:33 var
+R7339:7342 Corelib.Init.Datatypes <> true constr
+R7959:7962 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R7985:7985 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R7970:7973 iris.program_logic.language <> expr proj
+R7975:7984 xv6iris.RiscvLang <> riscv_lang def
+R7963:7966 xv6iris.RiscvLang <> Loop abbrev
+modtype 8001:8005 <> BREAD
+ax 8020:8033 BREAD wp_bread_sconf
+R8041:8049 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R8493:8501 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R8051:8057 xv6iris.RiscvPtsto <> riscvGS class
+binder 8059:8060 <> Σ:41
+binder 8050:8060 <> riscvGS0:42
+R8064:8067 xv6iris.Xv6G <> xv6G class
+R8069:8070 xv6iris.SpecBread <> Σ:41 var
+binder 8063:8070 <> xv6G0:43
+R8074:8081 xv6iris.Xv6Cameras <> bioslotG class
+R8083:8084 xv6iris.SpecBread <> Σ:41 var
+binder 8073:8084 <> bioslotG0:44
+R8088:8094 xv6iris.FdSlots <> fdslotG class
+R8096:8097 xv6iris.SpecBread <> Σ:41 var
+binder 8087:8097 <> fdslotG0:45
+R8101:8109 xv6iris.IrefSlots <> irefslotG class
+R8111:8112 xv6iris.SpecBread <> Σ:41 var
+binder 8100:8112 <> irefslotG0:46
+R8116:8119 xv6iris.ProcAvail <> pavG class
+R8121:8122 xv6iris.SpecBread <> Σ:41 var
+binder 8115:8122 <> pavG0:47
+R8133:8137 xv6iris.RiscvLang <> GenId class
+binder 8127:8129 <> GEN:48
+R8148:8152 xv6iris.RiscvLang <> CpuId class
+binder 8142:8144 <> CID:49
+R8162:8167 xv6iris.TsoCtx <> CurCtx class
+binder 8157:8158 <> XI:50
+R8190:8193 Corelib.Init.Datatypes <> list ind
+R8195:8199 iris.base_logic.lib.iprop <> gname def
+binder 8184:8186 <> γs:51
+R8207:8209 Corelib.Init.Datatypes <> nat ind
+binder 8203:8203 <> j:52
+R8219:8223 iris.base_logic.lib.iprop <> gname def
+binder 8213:8215 <> γl:53
+R8239:8248 xv6iris.WpUart <> uart_names rec
+binder 8233:8235 <> γu:54
+R8258:8267 xv6iris.DiskPtsto <> disk_names rec
+binder 8252:8254 <> γd:55
+R8277:8281 iris.base_logic.lib.iprop <> gname def
+binder 8271:8273 <> γk:56
+R8303:8307 SailStdpp.Values <> mword def
+binder 8291:8292 <> pd:57
+R8303:8307 SailStdpp.Values <> mword def
+binder 8294:8296 <> pav:58
+R8303:8307 SailStdpp.Values <> mword def
+binder 8298:8299 <> pu:59
+R8325:8333 xv6iris.BioDefs <> bio_names rec
+binder 8320:8321 <> bn:60
+R8341:8348 xv6iris.BioDefs <> bio_view rec
+R8350:8351 xv6iris.SpecBread <> Σ:41 var
+binder 8337:8337 <> V:61
+R8376:8380 SailStdpp.Values <> mword def
+binder 8361:8364 <> pidv:62
+R8376:8380 SailStdpp.Values <> mword def
+binder 8366:8368 <> dev:63
+R8376:8380 SailStdpp.Values <> mword def
+binder 8370:8372 <> bno:64
+R8392:8396 iris.algebra.dfrac <> dfrac ind
+binder 8387:8388 <> dq:65
+R8410:8416 xv6iris.RegFile <> regfile def
+binder 8406:8406 <> m:66
+R8424:8426 Corelib.Init.Datatypes <> nat ind
+binder 8420:8420 <> K:67
+R8435:8438 Corelib.Init.Datatypes <> bool ind
+binder 8430:8431 <> eb:68
+R8452:8455 Corelib.Init.Datatypes <> bool ind
+binder 8448:8448 <> b:69
+R8465:8468 stdpp.gmap <> gset def
+R8470:8475 Stdlib.Strings.String <> string ind
+binder 8459:8461 <> lks:70
+R8485:8492 xv6iris.ProcDefs <> pprivate rec
+binder 8479:8481 <> Vpr:71
+R8502:8520 xv6iris.SpecBread <> wp_bread_sconf_body def
+R8614:8616 xv6iris.SpecBread <> Vpr:71 var
+R8610:8612 xv6iris.SpecBread <> lks:70 var
+R8608:8608 xv6iris.SpecBread <> b:69 var
+R8605:8606 xv6iris.SpecBread <> eb:68 var
+R8603:8603 xv6iris.SpecBread <> K:67 var
+R8601:8601 xv6iris.SpecBread <> m:66 var
+R8598:8599 xv6iris.SpecBread <> dq:65 var
+R8594:8596 xv6iris.SpecBread <> bno:64 var
+R8590:8592 xv6iris.SpecBread <> dev:63 var
+R8585:8588 xv6iris.SpecBread <> pidv:62 var
+R8557:8557 xv6iris.SpecBread <> V:61 var
+R8554:8555 xv6iris.SpecBread <> bn:60 var
+R8551:8552 xv6iris.SpecBread <> pu:59 var
+R8547:8549 xv6iris.SpecBread <> pav:58 var
+R8544:8545 xv6iris.SpecBread <> pd:57 var
+R8540:8542 xv6iris.SpecBread <> γk:56 var
+R8536:8538 xv6iris.SpecBread <> γd:55 var
+R8532:8534 xv6iris.SpecBread <> γu:54 var
+R8528:8530 xv6iris.SpecBread <> γl:53 var
+R8526:8526 xv6iris.SpecBread <> j:52 var
+R8522:8524 xv6iris.SpecBread <> γs:51 var
+R8623:8627 xv6iris.SpecBread BREAD <> modtype

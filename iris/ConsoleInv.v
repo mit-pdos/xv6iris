@@ -80,7 +80,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes.
 Require Import RiscvPtsto RiscvExtras.
 Require Import WpLock.
-Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
+Require Import TsoCtx CtxMorphTac.   (* the lock payload's context axis; [<{ }>] *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -213,10 +213,33 @@ Section ConsoleInv.
   Global Instance cons_res_timeless : Timeless cons_res.
   Proof. apply _. Qed.
 
+  (* >>> A6.121 (the M3 λ-conversion): the payload over an EXPLICIT context.
+     [cons_res_at ξ] is the same body with the context spelled out -- it is
+     [cons_res] at [cur_ctx] by [reflexivity] -- and it is what the lock
+     surface takes as its [CtxId → iProp], so the invariant's free arm holds
+     the console cells at the PARKED record's context and acquire's absorb
+     re-indexes them by a REAL transport ([CtxMorph], the structural
+     instances) instead of the constant embedding [<{ }>].  Every consumer
+     keeps reading and writing [cons_res]. <<< *)
+  Definition cons_data_at (ξ : CtxId) (bs : list (bv 8)) : iProp Σ :=
+    ([∗ list] j ↦ b ∈ bs,
+       ctx_pointsto ξ (pa_add a_cons (cons_buf_off + j)) (DfracOwn 1) b)%I.
+  Definition cons_res_at (ξ : CtxId) : iProp Σ :=
+    (∃ (r w e : mword 32) (bs : list (bv 8)),
+       ctx_word4_pointsto ξ a_cons_r (DfracOwn 1) r ∗
+       ctx_word4_pointsto ξ a_cons_w (DfracOwn 1) w ∗
+       ctx_word4_pointsto ξ a_cons_e (DfracOwn 1) e ∗
+       ⌜length bs = INPUT_BUF_SIZE⌝ ∗
+       cons_data_at ξ bs)%I.
+  Lemma cons_res_at_cur : cons_res_at cur_ctx = cons_res.
+  Proof. reflexivity. Qed.
+  Global Instance cons_res_at_morph : CtxMorph cons_res_at.
+  Proof. rewrite /cons_res_at /cons_data_at. ctx_morph_solve. Qed.
+
   (* THE WHOLE CREDENTIAL.  Persistent, singleton, and taken by value: a
      caller of consoleread passes this and nothing else about the console. *)
   Definition is_conslock (γ : gname) : iProp Σ :=
-    is_lock γ a_cons "cons"%string <{ cons_res }>.
+    is_lock γ a_cons "cons"%string cons_res_at.
 
   Global Instance is_conslock_persistent γ : Persistent (is_conslock γ).
   Proof. apply _. Qed.

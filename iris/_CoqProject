@@ -61,6 +61,7 @@ PtreeType.v
 Ktier.v
 RiscvPtsto.v
 TsoCtx.v
+CtxMorphTac.v
 TsoCtxShim.v
 TsoCtxAbsorbLb.v
 CtxKMap.v

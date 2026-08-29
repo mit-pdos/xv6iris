@@ -1,0 +1,109 @@
+DIGEST e6a61e934bc5233280db1868db161fb3
+FZZmorphtest
+R35:43 iris.proofmode.proofmode <> <> lib
+R79:82 iris.algebra.excl <> <> lib
+R84:88 iris.algebra.dfrac <> <> lib
+R131:140 iris.base_logic.lib.invariants <> <> lib
+R142:144 iris.base_logic.lib.own <> <> lib
+R146:153 iris.base_logic.lib.gen_heap <> <> lib
+R155:163 iris.base_logic.lib.ghost_map <> <> lib
+R181:194 SailStdpp.Base <> <> lib
+R196:221 SailStdpp.Operators_mwords <> <> lib
+R239:249 Riscv.rv64d <> <> lib
+R267:276 xv6iris.RiscvPtsto <> <> lib
+R278:283 xv6iris.WpLock <> <> lib
+R285:290 xv6iris.TsoCtx <> <> lib
+R313:322 Kernel.KernelSyms <> <> lib
+R340:343 xv6iris.Xv6G <> <> lib
+R345:352 xv6iris.TicksInv <> <> lib
+sec 389:389 <> A
+R405:411 xv6iris.RiscvPtsto <> riscvGS class
+R418:421 xv6iris.Xv6G <> xv6G class
+R423:424 ZZmorphtest <> Σ:1 var
+def 441:443 <> trA
+R451:455 xv6iris.TsoCtx <> CtxId rec
+binder 446:447 <> ξ:4
+R460:464 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R466:467 ZZmorphtest <> A.Σ var
+R473:476 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R489:490 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R481:485 SailStdpp.Values <> mword def
+binder 477:477 <> t:5
+R491:508 xv6iris.TsoCtx <> ctx_word4_pointsto def
+R534:534 ZZmorphtest <> t:5 var
+R522:529 iris.algebra.dfrac <> DfracOwn constr
+R513:519 xv6iris.TicksInv <> a_ticks def
+R510:511 ZZmorphtest <> ξ:4 var
+inst 558:559 <> iA
+R563:570 xv6iris.TsoCtx <> CtxMorph class
+R572:574 ZZmorphtest <> trA def
+R593:595 ZZmorphtest <> trA def
+R593:595 ZZmorphtest <> trA def
+R593:595 ZZmorphtest <> trA def
+R616:616 ZZmorphtest A <> sec
+sec 627:627 <> B
+R643:649 xv6iris.RiscvPtsto <> riscvGS class
+R656:659 xv6iris.Xv6G <> xv6G class
+R661:662 ZZmorphtest <> Σ:6 var
+var  678:679 B XI
+R683:688 xv6iris.TsoCtx <> CurCtx class
+prf 700:701 <> lB
+R705:712 xv6iris.TsoCtx <> CtxMorph class
+R714:725 xv6iris.TicksInv <> ticks_res_at def
+R744:755 xv6iris.TicksInv <> ticks_res_at def
+R744:755 xv6iris.TicksInv <> ticks_res_at def
+R744:755 xv6iris.TicksInv <> ticks_res_at def
+def 785:787 <> trB
+R795:799 xv6iris.TsoCtx <> CtxId rec
+binder 790:791 <> ξ:10
+R804:808 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R810:811 ZZmorphtest <> B.Σ var
+R817:820 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R833:834 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R825:829 SailStdpp.Values <> mword def
+binder 821:821 <> t:11
+R835:852 xv6iris.TsoCtx <> ctx_word4_pointsto def
+R878:878 ZZmorphtest <> t:11 var
+R866:873 iris.algebra.dfrac <> DfracOwn constr
+R857:863 xv6iris.TicksInv <> a_ticks def
+R854:855 ZZmorphtest <> ξ:10 var
+inst 902:903 <> iB
+R907:914 xv6iris.TsoCtx <> CtxMorph class
+R916:918 ZZmorphtest <> trB def
+R937:939 ZZmorphtest <> trB def
+R937:939 ZZmorphtest <> trB def
+R937:939 ZZmorphtest <> trB def
+R960:960 ZZmorphtest B <> sec
+sec 971:971 <> D
+R987:993 xv6iris.RiscvPtsto <> riscvGS class
+R1000:1003 xv6iris.Xv6G <> xv6G class
+R1005:1006 ZZmorphtest <> Σ:12 var
+def 1023:1024 <> dD
+R1033:1038 xv6iris.TsoCtx <> CurCtx class
+binder 1028:1029 <> XI:15
+R1046:1050 SailStdpp.Values <> mword def
+binder 1042:1042 <> a:16
+R1058:1062 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R1064:1065 ZZmorphtest <> D.Σ var
+R1071:1074 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R1087:1088 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R1079:1083 SailStdpp.Values <> mword def
+binder 1075:1075 <> t:17
+R1090:1097 xv6iris.TsoCtx <> ::bi_scope:x_'↦₄'_x not
+R1089:1089 ZZmorphtest <> a:16 var
+R1098:1098 ZZmorphtest <> t:17 var
+prf 1112:1114 <> lD1
+binder 1116:1116 <> a:18
+R1120:1127 xv6iris.TsoCtx <> CtxMorph class
+R1130:1132 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R1135:1136 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 1133:1134 <> ξ:19
+R1137:1138 ZZmorphtest <> dD def
+R1151:1151 ZZmorphtest <> a:18 var
+R1147:1148 ZZmorphtest <> ξ:19 var
+R1171:1172 ZZmorphtest <> dD def
+R1175:1181 xv6iris.TsoCtx <> cur_ctx def
+R1171:1172 ZZmorphtest <> dD def
+R1171:1172 ZZmorphtest <> dD def
+R1175:1181 xv6iris.TsoCtx <> cur_ctx def
+R1175:1181 xv6iris.TsoCtx <> cur_ctx def
