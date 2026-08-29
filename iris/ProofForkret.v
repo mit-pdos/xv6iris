@@ -143,8 +143,6 @@ Section Res.
   Definition usertrap_res_csrs_open := UC.usertrap_res_csrs_open.
   Definition usertrap_res_sstc := UC.usertrap_res_sstc.
   Definition usertrap_res_bare_sz := UC.usertrap_res_bare_sz.
-  Definition usertrap_res_uwp_acc := UC.usertrap_res_uwp_acc.
-  Definition usertrap_res_run_open := UC.usertrap_res_run_open.
   Definition usertrap_res_tf_csrs_open := UC.usertrap_res_tf_csrs_open.
   Definition usertrap_res_tf_open := UC.usertrap_res_tf_open.
   (* ...and the park's one producer-side entry, threaded like the rest.

@@ -42,7 +42,7 @@ Require Import Xv6Cameras.
 Require Import IrefSlots.
 Require Import SpecKfork.
 Require Import SpecSysFork.
-Require Import UexecWp.   (* [UEXEC_GEN] / [uexec_wp] -- the child's WP *)
+Require Import UexecWp.   (* [UEXEC_GEN] -- the mint's [box] *)
 Require Import UexecSlot. (* [uvis] *)
 Require Import UexecRet.  (* [uslot] -- DIRECT, the seal does not travel *)
 Require Import UexecCond. (* [cond_entry_slot] -- the conditional mint *)
@@ -193,11 +193,9 @@ Section ProofSysFork.
     (* the pair arrives NAMED (rank 1d): [fsc_kpages] is a [FsCfg.fscfg]
        field, so there is no existential left to open. *)
     iPoseProof "Henv" as "#Henvn".
-    (* THE MINT.  kfork consumes a WP for the child it parks; the [box] is
-       eliminated once, here, into the LINEAR resource the contract wants. *)
-    iAssert (uexec_wp) as "Huwp".
-    { iPoseProof UG.uexec_wp_gen as "#Hgen". iExact "Hgen". }
-    (* ...AND THE GENERIC SLOT FAMILY, minted from the SAME [box].  Via
+    (* THE MINT.  kfork consumes a slot family for the child it parks; the
+       [box] is eliminated once, here, into the LINEAR resource the contract
+       wants.  Via
        [UexecCond.cond_entry_slot] rather than the bare generic inhabitant
        [uexec_wp_uslot]: a process whose key qualifies picks up sync's own
        constructor instead, which is the whole point of the conditional
@@ -211,7 +209,7 @@ Section ProofSysFork.
               Bj lvl (av - 2)%nat eb p b pid U lks
               ltac:(lia) Hlvl ltac:(lkbelow)
               with "Hcg Hcpu Htext Hpc Hprocs Hplock Hwlock Hftbl
-                    Hitbl Hitinv Hireg Henvn Hpav Hworld Htoken Huwp Hjslot Hfdone Hpriv").
+                    Hitbl Hitinv Hireg Henvn Hpav Hworld Htoken Hjslot Hfdone Hpriv").
     iIntros (CID6 Hs6 MF) "%HcsMF Hpc Hpost".
     iDestruct "Hpost" as "(Hcg & Hcpu & Hpriv & #Henv & %Hrv)".
     assert (Hpc0c : ret_pc (Bj !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_fork + 0x0c))

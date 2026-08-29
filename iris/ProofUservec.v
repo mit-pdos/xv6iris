@@ -87,8 +87,6 @@ Section UservecAllPt.
   Definition usertrap_res_csrs_open := UT.usertrap_res_csrs_open.
   Definition usertrap_res_sstc := UT.usertrap_res_sstc.
   Definition usertrap_res_bare_sz := UT.usertrap_res_bare_sz.
-  Definition usertrap_res_uwp_acc := UT.usertrap_res_uwp_acc.
-  Definition usertrap_res_run_open := UT.usertrap_res_run_open.
   Definition usertrap_res_tf_csrs_open := UT.usertrap_res_tf_csrs_open.
   Definition usertrap_res_tlb_close := UT.usertrap_res_tlb_close.
   Definition usertrap_res_tlb_open := UT.usertrap_res_tlb_open.
@@ -133,11 +131,12 @@ Section UservecAllPt.
     (* AT NAMED DATA (milestone J1a).  [user_trap_frame] is definitionally the
        ∃ over [user_trap_frame_at], so this is the same premise with its five
        data given names -- which is what lets the post say WHICH state the
-       round started from.  Unpacked by hand exactly as
-       [UserKernelBridge.user_trap_frame_open] does it (that opener re-binds
-       the five, which would lose the tie to this lemma's own binders); the
-       three counter-permission cells are dropped here for the same reason it
-       drops them -- whoever built the frame keeps its own copies. *)
+       round started from.  Unpacked by hand rather than through an opener
+       lemma: an opener re-binds the five, which would lose the tie to this
+       lemma's own binders.  (That is why the old
+       [UserKernelBridge.user_trap_frame_open] went caller-less and was
+       deleted at S6.)  The three counter-permission cells are dropped here
+       -- whoever built the frame keeps its own copies. *)
     rewrite /user_trap_frame_atm.
     iDestruct "Hframe" as
       "(%Hok & Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpc & Hfile &

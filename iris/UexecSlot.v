@@ -1,42 +1,45 @@
 (* ===================================================================== *)
-(* UexecSlot.v -- THE TRAPFRAME-KEYED user-execution WP: the per-process    *)
-(* form of UexecWp.v's slot, whose precondition is fixed to the state THIS  *)
-(* process's own trapframe + memory-view record.                           *)
+(* UexecSlot.v -- THE SLOT'S KEY, and the trapframe word readers built on   *)
+(* it.  [uvis] is the USER-VISIBLE record a per-process user-execution      *)
+(* contract is keyed on -- the trapframe words userret rebuilds the         *)
+(* register file and pc out of, the va-keyed image, and the per-page        *)
+(* permission view -- with [uvis_of] the projection from the kernel's       *)
+(* [ProcDefs.ustate].  Everything below SS2 reads a resume state out of     *)
+(* those words: [tf_resume_pc], [tf_resume_gpr], and their peels.           *)
 (*                                                                         *)
-(* See claude-notes/design/user-wp-slot.md.  [uexec_wp] is the forall-     *)
-(* STATE form -- happy with any resume state, which is what the generic     *)
-(* safety theorem proves.  [uexec_slot W] is the SAME SHAPE with the resume *)
-(* state SPECIALIZED to the USER-VISIBLE record [W : uvis]: the trapframe   *)
-(* words userret rebuilds the register file and pc out of, and the va-keyed *)
-(* image.  Nothing free-standing is left for anyone to discharge at resume  *)
-(* -- userret BUILDS the resume state from the residue's trapframe and      *)
-(* pages, so the agreement with the residue's data IS the type.            *)
+(* WHAT USED TO BE HERE.  SS3/SS4 held [uexec_slot W] -- UexecWp.v's        *)
+(* forall-state WP with the resume state specialized to [W] -- and the      *)
+(* mover [uexec_wp_slot].  Milestone J replaced that channel outright: the  *)
+(* trap loop runs the KEYED contract of UexecRet.v ([uslot] / [uexec_ret] / *)
+(* [ukont] / [uvb]) and the generic [UexecWp.uexec_wp] now enters only      *)
+(* through [UexecCond.cond_entry_slot] at the two mint sites.  The KEY and  *)
+(* the readers stayed, because UexecRet.v, UexecRound.v, UexecApply.v,      *)
+(* SpecUservec.v, TfUser.v and the whole [Uk*] engine are stated on them.   *)
 (*                                                                         *)
 (* THE KEY IS WHAT THE PROCESS CAN OBSERVE, AND NOTHING ELSE.  A user       *)
 (* program sees its registers and its va-keyed bytes; it never sees a page  *)
-(* table.  So the REALIZING DESCRIPTOR [P] is NOT in the key: it is         *)
-(* forall-BOUND INSIDE the slot (with [loop_ok C P] as its guard), exactly  *)
-(* parallel to the dead register-file base below -- the loop supplies       *)
-(* whatever table currently realizes the image, and forall is the only form *)
-(* a discharge can meet.  This is also the shape the fork clause needs for  *)
-(* the child: same [M], fresh table, the parent's slot applies verbatim.    *)
-(* The descriptor stays exposed in [ProcDefs.ustate] / [proc_priv] -- the   *)
-(* trap seams and the table-moving specs are keyed on it -- and [uvis_of]   *)
-(* is the projection from that state to this key.                           *)
+(* table.  So the REALIZING DESCRIPTOR is NOT in the key -- a contract       *)
+(* stated on [uvis] forall-binds whatever table currently realizes the      *)
+(* image, and forall is the only form a discharge can meet.  This is also   *)
+(* the shape the fork clause needs for the child: same [M], fresh table,    *)
+(* the parent's contract applies verbatim.  The descriptor stays exposed in *)
+(* [ProcDefs.ustate] / [proc_priv] -- the trap seams and the table-moving   *)
+(* specs are keyed on it -- and [uvis_of] is the projection from that state *)
+(* to this key.                                                             *)
 (*                                                                         *)
 (* THE REGISTER FILE TAKES A DEAD BASE.  [regfile] is a TOTAL function and  *)
 (* [userret_gpr b <31 words>] overwrites x1..x31, so [b] survives only at   *)
 (* x0 -- which the model treats as architecturally zero.  There is          *)
-(* therefore no canonical base to pick and no funext to prove: the base is  *)
-(* forall-BOUND IN THE SLOT ([forall b : regfile] below), which says        *)
-(* exactly: at whatever the loop happens to hold, since only x0 can         *)
-(* differ.                                                                  *)
+(* therefore no canonical base to pick and no funext to prove: [b] stays a  *)
+(* PARAMETER of [tf_resume_gpr] and every consumer forall-binds it, which   *)
+(* says exactly: at whatever the loop happens to hold, since only x0 can    *)
+(* differ.  ([UexecRet.tf_resume_gpr0] pins it at the zero file.)           *)
 (*                                                                         *)
 (* THE RESUME PC is [ret_pc] of the trapframe's epc word: prepare_return    *)
 (* loads sepc from tf->epc and the sret lands at [ret_pc sepc0]             *)
 (* (RiscvExtras.v: bit 0 cleared).                                          *)
 (*                                                                         *)
-(* NO Umode-tier import here.  This is the KERNEL-side type; the movers     *)
+(* NO Umode-tier import here.  These are KERNEL-side types; the movers     *)
 (* into the verified-execution vocabulary are UmodeKernelTie.v and the      *)
 (* per-program constructors (USyncKernel.v) are above both.  That is also   *)
 (* why [tf_resume_gpr_sp] is stated at the literal register index rather    *)
@@ -65,7 +68,6 @@ Require Import UserExec.     (* [ucfg] / [user_cfg] / [user_mstatus_ok] /
 Require Import SpecUserret.  (* [userret_gpr] -- the 31-insert register file *)
 Require Import ProcDefs.     (* [pprivate] / [ustate] / [pv_tf] *)
 Require Import UserPerm.     (* [uperm] / [perm_of] -- the permission view *)
-Require Import UexecWp.      (* [loop_ok] and the forall-state slot *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -199,82 +201,4 @@ Proof.
   unfold tf_resume_gpr, userret_gpr.
   repeat (apply tf_upd_ne; [ vm_compute; discriminate | ]).
   exact (upd_eq _ (Regidx (mword_of_int 2)) _).
-Qed.
-
-(* ===================================================================== *)
-(* SS3 THE SLOT.                                                           *)
-(*                                                                         *)
-(* [uexec_wp]'s shape with [g := tf_resume_gpr b (uvis_tf W)],             *)
-(* [va := tf_resume_pc (uvis_tf W)] and [M := uvis_M W].  [h] / [C] / [P]  *)
-(* / [Rut] / the stale trap CSRs stay forall-bound exactly as in the        *)
-(* generic form (the process may resume on any hart, under any table that  *)
-(* realizes its image, the parked residue is opaque, and mstatus and the    *)
-(* stale CSRs are not program-visible state); [b] joins them for the        *)
-(* reason in the header.  NOT inside a [CpuId] section: the hart is the    *)
-(* FIRST forall.                                                            *)
-(*                                                                         *)
-(* THE IMAGE AT THIS TIER IS THE **MAPPED** ONE ([UserPtTree.user_pt_inv]   *)
-(* pins [dom M = uva_dom P]), while [proc_priv]'s is the LAZY sz-region     *)
-(* view.  The two are the same resource and the mapped map is recoverable   *)
-(* from the lazy one ([ProcPtOwn.proc_pt_of_ptm]: a submap is pinned by its *)
-(* domain), so the seam is a conversion and not a loss -- but it is a       *)
-(* conversion, and where it goes is milestone J's business: NOTHING ties a  *)
-(* slot to a block yet.  When the tie lands, this premise becomes           *)
-(* [∀ Mm, ⌜Mm ⊆ uvis_M W⌝ -∗ ⌜dom Mm = uva_dom P⌝ -∗ user_pt_inv P Mm -∗ …] *)
-(* and the sync constructor owes two new facts (its text and its stack     *)
-(* live on MAPPED pages, so their bytes survive the shrink).               *)
-(* ===================================================================== *)
-Definition uexec_slot `{!riscvGS Σ} `{GEN : GenId}
-    (W : uvis) : iProp Σ :=
-  (∀ (h : CpuId) (C : ucfg) (Rut : uptd -> iProp Σ) (P : uptd) (b : regfile)
-     (ms_v sc_v stval_v sepc_v : mword 64),
-     ⌜loop_ok C P⌝ -∗
-     ⌜user_mstatus_ok ms_v⌝ -∗
-     hw_config (CID := h) -∗ minstret_inv -∗ wire_inv -∗
-     u_regs (CID := h) (HART_ACTIVE tt) ms_v sc_v stval_v sepc_v
-       (tf_resume_pc (uvis_tf W)) (tf_resume_pc (uvis_tf W))
-       (tf_resume_gpr b (uvis_tf W)) -∗
-     user_pt_inv (CID := h) P (uvis_M W) -∗
-     user_cfg (CID := h) C -∗
-     Rut P -∗
-     (* the trap seam, paired as in [uexec_wp] (MILESTONE G): the frame goes
-        to the kernel, the NEXT WP comes back.  The returned one is typed at
-        the GENERAL [uexec_wp], not at another [uexec_slot] -- a verified
-        process may hand back any successor, and that is also why this stays
-        a plain definition rather than a fixpoint of its own: the recursion
-        routes through [uexec_wp]. *)
-     ▷ (user_trap_frame (CID := h) C P Rut ∗ uexec_wp -∗
-        WP (Loop : expr riscv_lang)) -∗
-     WP (Loop : expr riscv_lang))%I.
-
-(* Same seal, same reason, as [uexec_wp]: it wraps [gpr_file] through
-   [u_regs], the [iFrame] landmine class.  The seal does not travel -- a
-   file that puts a slot in the proofmode context must
-   [Require Import UexecSlot] (and UexecWp) directly. *)
-Global Typeclasses Opaque uexec_slot.
-
-(* ===================================================================== *)
-(* SS4 The mover -- plug in the generic WP.                                *)
-(*                                                                         *)
-(* The forall-state form accepts every resume state, so in particular the   *)
-(* one [W] records under whatever table is offered.  This is what an        *)
-(* initializer with no verified program to offer deposits.                 *)
-(* ===================================================================== *)
-Lemma uexec_wp_slot `{!riscvGS Σ} `{GEN : GenId}
-    (W : uvis) :
-  uexec_wp -∗ uexec_slot W.
-Proof.
-  iIntros "H". rewrite /uexec_slot.
-  iIntros (h C Rut P b ms_v sc_v stval_v sepc_v)
-          "%Hlo %Hms Hhw Hmi Hwi Hregs Hpt Hcfg Hrut Hhdl".
-  (* [Typeclasses Opaque uexec_wp] blocks [IntoForall], so the seal comes
-     off by hand before the instantiation (durable-notes / lane A) -- ON THE
-     HYPOTHESIS ONLY: [Hhdl]'s own [uexec_wp] (the returned WP) is what the
-     handler premise is stated at and must stay folded. *)
-  iEval (rewrite uexec_wp_unfold /uexec_F) in "H".
-  iApply ("H" $! h C P Rut (uvis_M W) (tf_resume_gpr b (uvis_tf W))
-            ms_v sc_v stval_v sepc_v (tf_resume_pc (uvis_tf W))
-            with "[] [] Hhw Hmi Hwi Hregs Hpt Hcfg Hrut Hhdl").
-  - iPureIntro. exact Hlo.
-  - iPureIntro. exact Hms.
 Qed.

@@ -77,7 +77,6 @@ Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom.
 Require Import UserPtTree.
-Require Import UexecWp.   (* [uexec_wp] -- named by the slot accessor's type *)
 Require Import KptTree.
 Require Import TrampPt.
 Require Import DiskPtsto WpUart LogInv.
@@ -1267,13 +1266,6 @@ Lemma usertrap_res_bare_sz
   usertrap_res_bare pt ksp U -∗ ⌜uint (pv_sz (us_V U)) <= uvm_maxsz⌝.
 Proof. exact (ut_res_bare_sz SY.syscall_env pt ksp U). Qed.
 
-(* the user-execution WP slot's seam -- see [SpecUsertrap]'s Parameter *)
-Lemma usertrap_res_uwp_acc
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) :
-  usertrap_res_bare pt ksp U -∗
-  uexec_wp ∗ (uexec_wp -∗ usertrap_res_bare pt ksp U).
-Proof. exact (ut_res_bare_uwp_acc SY.syscall_env pt ksp U). Qed.
-
 Lemma usertrap_res_tf_csrs_open
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) :
   usertrap_res_bare pt ksp U -∗
@@ -1284,20 +1276,6 @@ Lemma usertrap_res_tf_csrs_open
        ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗ hart_csrs -∗
        usertrap_res_bare pt ksp (us_tf U ws')).
 Proof. exact (ut_res_bare_tf_csrs_open SY.syscall_env pt ksp U). Qed.
-
-(* slot-out and trapframe-borrow from ONE opener, closer holed -- see
-   [SpecUsertrap]'s Parameter *)
-Lemma usertrap_res_run_open
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) :
-  usertrap_res_bare pt ksp U -∗
-  uexec_wp ∗
-  ∃ kroot : mword 44,
-    kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp (pv_tf (us_V U))⌝ ∗
-    tf_page (ud_tfp pt) (pv_tf (us_V U)) ∗
-    (∀ ws' : list (mword 64),
-       ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗
-       (uexec_wp -∗ usertrap_res_bare pt ksp (us_tf U ws'))).
-Proof. exact (ut_res_bare_run_open SY.syscall_env pt ksp U). Qed.
 
 Section UtSeal.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.

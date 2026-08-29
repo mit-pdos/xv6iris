@@ -97,7 +97,7 @@ Require Import ProcGeom.
 Require Import ProcPtOwn.   (* [proc_pt] / [ud_pas] / [ud_norm] -- the address-space split *)
 Require Import ProcDefs.    (* [ustate] -- the residue's index *)
 Require Import UexecRet.   (* [tf_of] -- the saved 36-word frame of a running machine *)
-Require Import UexecRound. (* [uround_vis_ok] -- the round without the image half *)
+Require Import UexecRound. (* [uround_ok] -- the round, image half included *)
 Require Import UexecSlot.  (* [tf_resume_pc] *)
 Require Import UserPerm.   (* [perm_of] *)
 Require Import UsysMemOk.  (* [uecall_scause] *)
@@ -140,7 +140,7 @@ Definition uservec_gpr (g : regfile) (vksp vkhart vktr vksat : bv 64) : regfile 
 (* THE ROUND AT THIS BOUNDARY -- [SpecUsertrap.ut_round] read at the        *)
 (* MACHINE that trapped (milestone J, S3: the image half is back).         *)
 (*                                                                         *)
-(* It used to drop the image (UexecRound.v SS5's [uround_vis_ok]), and the *)
+(* It used to drop the image (a [uround_vis_ok] deleted at S6), and the    *)
 (* reason is worth keeping: THIS boundary hands back the BARE residue,     *)
 (* whose body never mentions [us_M] at all -- [ut_res_bare pt ksp U] and   *)
 (* [ut_res_bare pt ksp (upd_usM U M')] are literally the same proposition, *)
@@ -213,7 +213,7 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{
   ( ∀ (pt' : uptd) (mf : regfile) (ms' usatp uepc sc' stval' mdv0 : mword 64)
       (U' : ustate),
     (* ---- THE ROUND, IMAGE HALF INCLUDED (milestone J, S3).  It used to be
-       [uround_vis_ok] -- the relation with the image existentially weakened
+       [uround_vis_ok] (deleted at S6) -- the relation with the image weakened
        away -- because the boundary's residue is the BARE one, whose body
        never mentions [us_M], so an image equation stated at ITS index would
        have been a gap premise.  The entry frame now NAMES the image ([M],
