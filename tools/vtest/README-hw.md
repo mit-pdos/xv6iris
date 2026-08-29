@@ -307,6 +307,36 @@ still 0 when the unfenced pass ended, witness 0 out of 20480.  (The FENCED
 pass does interleave, because the fences break the translation block.)  It is
 not that QEMU gives a different answer; it is that it gives no answer.
 
+**THE RAW OBSERVATIONS EXPLAIN THE NULL, and they are why the count alone
+would have been misleading.**  The test logs the first 32 raw `(r1, r2)`
+pairs, and on the board they are:
+
+    iter 0   r1 = Y = 1    r2 = X = 2       X - Y = 1
+    iter 1   r1 = Y = 4    r2 = X = 5       X - Y = 1
+    iter 2   r1 = Y = 5    r2 = X = 6       X - Y = 1
+    ...
+
+`X - Y` is **1 on every single iteration**.  The reader is not catching the
+writer at some random point in a long window; it is catching it exactly
+between two adjacent stores, one sequence number apart, every time.  The two
+harts are running in lockstep at one iteration each, because the two cache
+lines ping-pong between them and each iteration is one round of coherence
+traffic.
+
+That is the regime in which reordering CANNOT occur: both of the writer's
+stores miss, so each must obtain the line before the next proceeds, and they
+are serialised by the coherence protocol rather than by any ordering rule.
+The store buffer never holds two stores at once, so it has nothing to drain
+out of order.  **A 100% witness count is maximal SAMPLING and, here, minimal
+OPPORTUNITY** -- the very coupling that makes the reader always observe the
+pair is what stops the pair from ever being reordered.
+
+So the refinement is not "run it longer".  It is to break the lockstep: the
+writer needs to run AHEAD with several stores in flight, which means X must
+miss while Y hits, which means the reader must not be pulling both lines
+every iteration.  Sampling rarely, or giving the writer a private hot Y,
+is the direction.
+
 **What the board result does and does not say.**  It says that in 81920
 races, every one of which the reader demonstrably observed while the writer
 was between its two stores, the U74 never let the second store be seen

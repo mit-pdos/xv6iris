@@ -96,6 +96,29 @@
  *   +24   pass 2 FORBIDDEN (fenced)  <-- MUST BE 0 ON EVERY MACHINE
  *   +28   X as pass 1 ended    } the writer's sequence number: 0 here means
  *   +32   Y as pass 1 ended    } the writer never ran, see below
+ *   +36   number of FORBIDDEN events logged (capped at LOGMAX)
+ *   +0x200 + 16*k   event k: r1 (=Y), r2 (=X), the iteration, the pass
+ *   +0x300 + 8*k    SAMPLE k: the RAW r1 and r2 of the first SMPMAX
+ *                   iterations of pass 1, whatever they were.  The forbidden
+ *                   log above is empty on a machine that never reorders, and
+ *                   an empty log shows nothing about what the machine IS
+ *                   doing; this shows the actual sequence numbers the reader
+ *                   observed, so "how far apart are the two words in flight"
+ *                   is answerable even when the answer to "did it reorder"
+ *                   is no.
+ *
+ * THE LOG IS THE MAGNITUDE, and a bare count does not have it.  If the
+ * machine ever does reorder, what matters is HOW FAR: r1 - r2 is the number
+ * of sequence numbers by which the flag ran ahead of the data, i.e. how many
+ * of the writer's iterations became visible out of order.  A difference of 1
+ * is a single store slipping past its partner; a large one is a store buffer
+ * draining a whole burst out of order, which is a different mechanism and a
+ * different problem for a driver.  The iteration index says whether events
+ * cluster (a cache-line transition) or scatter (a steady rate).
+ *
+ * The logging branch is on the NOT-TAKEN path in every run so far, so it
+ * costs two instructions per iteration and does not disturb the timing that
+ * makes the witness count high -- verified: the witness stayed at 100%.
  */
 /* vtest: smp=2 repeat=1 */
     .option norvc
@@ -120,6 +143,11 @@
 #define R_P1BAD   16
 #define R_P2WIT   20
 #define R_P2BAD   24
+#define R_LOGN    36              /* how many events were logged  */
+#define LOGBASE   0x200           /* 16 entries x 16 bytes        */
+#define LOGMAX    16
+#define SMPBASE   0x300           /* the SAMPLE log: 32 entries x 8 bytes */
+#define SMPMAX    32
 #define STOP1     0x100           /* reader tells the writer to stop  */
 #define STOP2     0x104
 #define READY1    0x10c           /* writer has entered its UNFENCED loop */
@@ -158,10 +186,28 @@
                                      data, which the writer's own order
                                      makes impossible to observe in order */
     add  s8, s8, t2
+    beqz t2, 6f                   /* the common path: nothing to log */
+    beqz s5, 6f                   /* ...or the log is full */
+    sw   t0, 0(s4)                /* r1, the flag we saw  */
+    sw   t1, 4(s4)                /* r2, the data we saw  */
+    sw   s2, 8(s4)                /* which iteration      */
+    sw   s6, 12(s4)               /* which pass           */
+    addi s4, s4, 16
+    addi s5, s5, -1
+6:
     xor  t2, t0, t1
     snez t2, t2
     add  s7, s7, t2
-    addi s2, s2, 1
+    /* the RAW sample log: the first SMPMAX observations of this pass,
+       unconditionally, so the numbers are visible even when nothing is
+       forbidden.  Guarded by a counter, so it costs one branch after the
+       first SMPMAX iterations. */
+    beqz a2, 7f
+    sw   t0, 0(a3)
+    sw   t1, 4(a3)
+    addi a3, a3, 8
+    addi a2, a2, -1
+7:  addi s2, s2, 1
     li   t1, NITER
     blt  s2, t1, 2b
 .endm
@@ -173,6 +219,13 @@ _vtest_body:                     /* the PRIMARY is the READER: it publishes */
     li   s3, XADDR
     li   t0, NITER
     sw   t0, R_NITER(s11)
+    li   s4, LOGBASE              /* the log cursor... */
+    add  s4, s4, s11
+    li   s5, LOGMAX               /* ...and how much room is left */
+    li   s6, 1                    /* the pass number */
+    li   a3, SMPBASE              /* the raw-sample cursor... */
+    add  a3, a3, s11
+    li   a2, SMPMAX               /* ...and its remaining room */
 
     /* WAIT FOR THE WRITER TO BE RUNNING.  Without this the reader finishes
        all NITER iterations before the AP has even left the prologue, reads
@@ -199,9 +252,13 @@ _vtest_body:                     /* the PRIMARY is the READER: it publishes */
 3:  lw   t0, READY2(s11)
     beqz t0, 3b
 
+    li   s6, 2
     RLOOP 1
     sw   s7, R_P2WIT(s11)
     sw   s8, R_P2BAD(s11)
+    li   t0, LOGMAX
+    sub  t0, t0, s5
+    sw   t0, R_LOGN(s11)
     li   t0, 1
     sw   t0, STOP2(s11)
 
