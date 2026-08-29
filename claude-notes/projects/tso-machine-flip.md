@@ -15572,3 +15572,69 @@ counts stale `.vo`s of files whose recompile failed, so read the red ROOTS
 from the log and certify with a clean round; `--pull-vo` + `ZZchain.sh`
 is the fast local loop (RwD's last three fixes took minutes, not rounds).
 
+
+### A6.125 (lock lane, 2026-08-29): the pin-return crossing, MEASURED -- "half ctx cells"
+
+**The question.**  A6.124 left `ProofVirtioDiskRwF:365` red: the payoff's
+hart-written cells (the 17 formatted descriptor/ops/info cells of
+`vdrw_chain`, the 2 avail-ring-entry bytes, and for OUT requests the 1024
+buffer bytes) go into the DMA lease SEALED at publish (`vdrwd_pin_res`
+forgets the ctx words: `vdrwd_w2/_w4/_w8` → `phys_map pin`) and must come
+back as ctx words (`↦₂/↦₄/↦₈`, `↦ₘ`) at withdraw.  Sealed cells cannot
+become ctx cells (`ctx_phys_pointsto_def` needs the stamp AND an arm).
+
+**The key fact (measured in `TsoCtx.ctx_morph_pointsto`).**  Transport of a
+ctx cell along `ctx_dom ξ ξ'` turns EITHER arm into the receiver's CLEAN arm
+(`t ≤ B'`: clean via `B ≤ B'`, dirty via the key under the watermark
+`W ≤ B'`) and DROPS the dirty fragment.  So the arm is needed at any
+fraction, only until the first transport; and a cell split as
+
+    ctx side:   ½ mem ∗ ½ ts-elem ∗ (clean llb ∨ FULL dirty elem)   ("half ctx cell")
+    lease side: ½ mem ∗ ½ ts-elem                                    (= phys_ledger a ½ v, sealed)
+
+joins back to the full `ctx_phys_pointsto ξ a 1 v` (dirty elem still full,
+or clean after a transport), and the half ctx cell has the same `CtxMorph`
+proof as the full one.  This is the avail unit's split (A6.124) with the
+ctx side keeping its arm instead of a `lk_floor`.
+
+**Shape (b′), sized.**
+1. `TsoCtx`: `ctx_phys_pointsto_h ξ a v` (def as above), `ctx_phys_pointsto_split`
+   (`… 1 v ⊢ _h ∗ phys_ledger a ½ v`), `ctx_phys_pointsto_join`
+   (`_h -∗ phys_ledger a ½ v' -∗ ⌜v' = v⌝ ∗ … 1 v`), `CtxMorph` instance,
+   and word/byte-window wrappers (`ctx_pointsto_of_phys` closes the VA gap
+   as today).  ~120 lines, root file: certify with a round.
+2. `VirtioProto`: the hole generalizes from `avail_idx_dom c` to
+   `avail_idx_dom c ∪ pins_dom pr` (`vp_pin pr` already tracks every
+   in-flight pin) and the lease carries `[∗ map] p ↦ pin ∈ vp_pin pr,
+   half_map pin` beside `avail_lease_half`; `publish_acc` takes the pin at
+   ½ (`half_map pin`), `reclaim_acc` returns it at ½; `step`'s
+   disjointness from `slot_wr sl ## dom pin` (already a law); `lease_agree`
+   generalizes (`avail_half_agree`'s proof).  ~300 lines of accessor
+   surgery; the pure ledger and every pure law untouched (A6.124's rule).
+3. `DiskInv`: `flight_res`/`parked_res` keep the half ctx cells
+   (`vdrw_chain_h pd b h m2 t wr sector` = the 17 cells at ½ with arms; the
+   ring entry's 2 bytes; the OUT buffer's 1024 bytes as a big_sepL) --
+   `CtxMorph` by `ctx_morph_solve` + the new instance; `parked_res`'s
+   `phys_map (dc_pinr …)` becomes the ½ form; the interrupt handler's
+   ring-entry split-off joins instead of carving.
+4. `ProofVirtioDiskRwD.vdrwd_pin_res`: split instead of forget (same 17+2
+   sites, `ctx_phys_pointsto_split` per byte through a window lemma).
+5. `ProofVirtioDiskRwF` §1: the three bridges become joins; the OUT
+   buffer's `vdrwf_plist_mem` likewise.
+   **The IN buffer (device-written `wrb`) is NOT covered**: device-written
+   bytes reach a hart's ctx tower only through a floor above the device's
+   completion message, which is the used-index instrument (A6.122 §4, for
+   the owner).  So RwF turns green only with BOTH; (b′) alone moves its red
+   root from §1 to the IN withdraw.
+6. `ProofVirtioDiskIntr` (red on the used index anyway): its reclaim site
+   takes the ½ form.
+
+**Not chosen.**  (a) "slot cells stay on the ledger" (A6.124's first
+sketch) would convert RwC's 17 formatting stores to `_au_dat` obligations
+(three widths) and redefine `disk_slot`; (b′) leaves RwC untouched and
+keeps `vdrw_chain` as ctx words -- strictly smaller, and it reuses A6.124's
+lease-hole machinery.
+
+**Order for the successor:** 1 (bricks; local compile of `TsoCtx`, then a
+round), 2, 4, 3, 5-OUT, 6; the IN half waits for the ruling.  A6.124 is
+the worked example for every step.

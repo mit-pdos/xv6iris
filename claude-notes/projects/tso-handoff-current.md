@@ -100,8 +100,15 @@ and re-splits.  `ProofVirtioDiskRwD` + `RwE` + `RwDSeam` green.
    `disk_slot`'s cells -- lease ½ sealed, payload ½ exposed + `lk_floor`,
    RwD's formatting stores through `_au_dat` with one obligation per width
    (`vdrwd_avail_store_ok`'s shape), `VdrwdPinBuild` splits instead of
-   forgetting, RwF §1's bridges deleted.  Sized in A6.124.  Greens RwF and
-   `LinkVirtioDiskRw` (the latter also waits on `LinkSleep` ← §0.27′).
+   forgetting, RwF §1's bridges deleted.  Sized in A6.124.  **RE-MEASURED
+   in A6.125: build shape (b′) "half ctx cells" instead** -- the ctx side
+   keeps ½ + its arm (`TsoCtx.ctx_phys_pointsto_h`, transports exactly like
+   the full cell because `ctx_morph_pointsto` drops the dirty fragment),
+   the lease keeps ½ sealed under a generalized hole (`avail_idx_dom ∪
+   pins_dom`); RwC's 17 formatting stores are untouched.  Six steps and
+   their order are in A6.125.  Greens RwF's §1 and the OUT withdraw; the
+   IN buffer (device-written) still needs item 2's instrument, so RwF is
+   green only with both.  `LinkVirtioDiskRw` also waits on `LinkSleep` ← §0.27′.
 2. **FOR THE OWNER (A6.122 §3): the virtio USED index needs a MONOTONE-CELL
    instrument** (a third `ts_pay` arm: since `B`, one author, non-decreasing
    values) — the pin cannot carry a stale reader's lower bound, measured
