@@ -1261,6 +1261,12 @@ Lemma usertrap_res_sstc
   usertrap_res_bare pt ksp U -∗ sstc_enabled ∗ usertrap_res_bare pt ksp U.
 Proof. exact (ut_res_bare_sstc SY.syscall_env pt ksp U). Qed.
 
+(* the [p->sz] bound, off the residue -- see [SpecUsertrap]'s Parameter *)
+Lemma usertrap_res_bare_sz
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) :
+  usertrap_res_bare pt ksp U -∗ ⌜uint (pv_sz (us_V U)) <= uvm_maxsz⌝.
+Proof. exact (ut_res_bare_sz SY.syscall_env pt ksp U). Qed.
+
 (* the user-execution WP slot's seam -- see [SpecUsertrap]'s Parameter *)
 Lemma usertrap_res_uwp_acc
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) :

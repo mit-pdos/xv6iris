@@ -46,7 +46,7 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto RiscvFetchExec RiscvExtras.
 Require Import RegFile.
 Require Import MinstretInv InstrBytes WireInv.
 Require Import WpGpr.
@@ -68,6 +68,12 @@ Require Import UtResFits.  (* [USERTRAP_RES_PARK] -- the residue plus its produc
    seeing [loop_ok] under the same name from the same place
    (claude-notes/projects/user-wp-slot.md SS1.1). *)
 Require Export UexecWp.
+Require Import UserPerm.   (* [perm_of] -- the key's permission projection *)
+Require Import UexecSlot.  (* [tf_resume_gpr0] lives beside the key *)
+Require Import UexecRet.   (* [ukc] -- the U-mode continuation the entry runs.
+                              REQUIRED DIRECTLY: [ukc]'s body is the sealed
+                              [uvb], and the seal does not travel through a
+                              re-export (durable-notes). *)
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.   (* [CurCtx]: the residue owns a thread token *)
@@ -175,6 +181,17 @@ Definition wp_userret_closed_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN :
   umem_lazy pt (uint (pv_sz (us_V U))) (us_M U) -∗
   pc_is (uva 0x9c) -∗
   gpr_file m -∗
+  (* ---- THE CONTINUATION THE FIRST ROUND RUNS (milestone J, stage S5).
+         The loop MINTS nothing at its entry: what runs is the per-process
+         slot the park deposited, read at the natural state userret is about
+         to resume it at -- the file the trapframe restores, the sret'd pc,
+         the record's own image and the permission map this table and size
+         project to.  [UexecRet.ukc] is [UexecRet.uslot] at a natural state
+         ([uslot_ukc]), so a caller holding [uslot (uvis_of U)] re-keys with
+         that one lemma plus the equation between its own [sepc] value and
+         the trapframe's epc word. ---- *)
+  ukc (perm_of (ud_um pt) (uint (pv_sz (us_V U)))) (us_M U)
+      (tf_resume_gpr0 (pv_tf (us_V U))) (ret_pc sepc0) -∗
   (* ---- the kernel-side bundle, at THIS hart ---- *)
   URes CID pt ksp U -∗
   WP (Loop : expr riscv_lang).

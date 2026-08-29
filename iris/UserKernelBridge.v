@@ -247,6 +247,103 @@ Section UserKernelBridge.
   Qed.
 
   (* -------------------------------------------------------------------- *)
+  (* THE SAME BRIDGE AT THE NAMED LAZY IMAGE (milestone J, stage S5).       *)
+  (*                                                                        *)
+  (* [userret_to_user_state] delivers [UserPtTree.user_pt_inv] -- the        *)
+  (* MAPPED bundle at an image it invents out of [umem_any] -- which is what *)
+  (* the GENERIC slot ([UexecWp.uexec_wp]) consumes.  [UexecRet.uvb]'s image *)
+  (* conjunct is [user_ptm_inv pt sz M], the LAZY sz-region view at a NAMED  *)
+  (* image: the key's own, which the loop must hand on unchanged.  So the    *)
+  (* one row that differs takes the named resource and gives the named       *)
+  (* bundle; every other row, and the whole proof, is the twin above.        *)
+  (* -------------------------------------------------------------------- *)
+  Lemma userret_to_user_state_ptm
+      (C : ucfg) (pt : uptd) (sz : Z) (Mim : gmap Z (bv 8))
+      (mstatus0 sepc0 sc_v stval_v mie_v mdv0 menvcfg0 senvcfg0 : mword 64)
+      (stv medeleg_v : mword 64)
+      (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
+      (mstateen0v : mword 64) (sstateen0v : mword 32)
+      (mcounteren_v scounteren_v : mword 32)
+      (mhpmcounter_v : type_of_register mhpmcounter)
+      (g : regfile) :
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
+    eq_vec (_get_Mstatus_FS mstatus0) ('b"00") = true ->
+    eq_vec (_get_Mstatus_VS mstatus0) ('b"00") = true ->
+    eq_vec (_get_Mstatus_TVM mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_TSR mstatus0) ('b"1") = false ->
+    _get_Mstatus_XS mstatus0 = extStatus_map_forwards Off ->
+    _get_Mstatus_SD mstatus0 = ('b"0" : mword 1) ->
+    eq_vec (_get_Mstatus_MPP mstatus0) ('b"10") = false ->
+    _get_Mstatus_SPIE mstatus0 = ('b"1" : mword 1) ->
+    uc_dqc C = DfracOwn 1 ->
+    uc_stvec C = stv ->
+    uc_mie C = mie_v ->
+    uc_mideleg C = mdv0 ->
+    uc_medeleg C = medeleg_v ->
+    ud_root pt = uroot ->
+    ud_tfp pt = tfp ->
+    ud_um pt = um ->
+    menvcfg0 = MENVCFG_S ->
+    senvcfg0 = (mword_of_int 0 : mword 64) ->
+    mstateen0v = (mword_of_int 0 : mword 64) ->
+    sstateen0v = (mword_of_int 0 : mword 32) ->
+    uva_pa_inj pt ->
+    upt_acc_wf pt.(ud_um) ->
+    hart_state ↦ᵣ HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ User -∗
+    mstatus ↦ᵣ sret_ms5 mstatus0 -∗
+    mie ↦ᵣ mie_v -∗
+    mideleg ↦ᵣ mdv0 -∗
+    menvcfg ↦ᵣ menvcfg0 -∗
+    senvcfg ↦ᵣ□ senvcfg0 -∗
+    sepc ↦ᵣ sepc0 -∗
+    utlb_inv_pt uroot tfp um -∗
+    pc_is (ret_pc sepc0) -∗
+    gpr_file g -∗
+    scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗
+    stvec ↦ᵣ stv -∗
+    medeleg ↦ᵣ□ medeleg_v -∗
+    mstateen0 ↦ᵣ□ mstateen0v -∗
+    sstateen0 ↦ᵣ□ sstateen0v -∗
+    (R_bitvector_32 mcounteren) ↦ᵣ□ mcounteren_v -∗
+    (R_bitvector_32 scounteren) ↦ᵣ□ scounteren_v -∗
+    mhpmcounter ↦ᵣ□ mhpmcounter_v -∗
+    (* ---- the process's memory, NAMED, at the lazy sz-region view ---- *)
+    umem_lazy pt sz Mim -∗
+    ⌜user_mstatus_ok (sret_ms5 mstatus0)⌝ ∗
+    u_regs (HART_ACTIVE tt) (sret_ms5 mstatus0) sc_v stval_v sepc0
+           (ret_pc sepc0) (ret_pc sepc0) g ∗
+    user_ptm_inv pt sz Mim ∗
+    user_cfg C.
+  Proof.
+    intros HSXL HMXR HFS HVS HTVM HTSR HXS HSD HMPP HSPIE Hdqc Hstvec Hmie Hmdl Hmedl
+      Hroot Htfp Hum Hmenv Hsenv Hmse Hsse Hinj Hacc.
+    subst menvcfg0 senvcfg0 mstateen0v sstateen0v.
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb Hpc Hgpr
+             Hsc Hstval Hstvec Hmedl Hmse Hsse Hmcen Hscen Hhpm Hmem".
+    iSplitR; [iPureIntro; exact (user_mstatus_ok_sret_ms5 mstatus0 HSXL HMXR HFS HVS HTVM HTSR HXS HSD HMPP HSPIE) |].
+    iSplitL "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr".
+    { rewrite u_regs_pc_is.
+      iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr". }
+    iSplitL "Hutlb Hmem".
+    { (* user_ptm_inv, at the NAMED lazy image -- row by row *)
+      rewrite /user_ptm_inv.
+      rewrite Hroot Htfp Hum.
+      iSplitL "Hutlb"; [iExact "Hutlb" |].
+      iSplitL "Hmem"; [iExact "Hmem" |].
+      rewrite Hum in Hacc.
+      iPureIntro. split; [exact Hinj | exact Hacc]. }
+    { unfold user_cfg.
+      rewrite Hdqc Hstvec Hmie Hmdl Hmedl.
+      iFrame "Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse".
+      iSplitL "Hmcen Hscen".
+      - iExists mcounteren_v, scounteren_v. iFrame "Hmcen Hscen".
+      - iExists mhpmcounter_v. iFrame "Hhpm". }
+  Qed.
+
+  (* -------------------------------------------------------------------- *)
   (* SUB-GOAL 2 SCAFFOLD: the trap-frame opener.                            *)
   (*                                                                        *)
   (* [stvec_handler_wp C pt Φ = user_trap_frame C pt -∗ WP Loop {{ Φ }}]:   *)

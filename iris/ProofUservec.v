@@ -86,6 +86,7 @@ Section UservecAllPt.
     := UT.usertrap_res_bare_park N av.
   Definition usertrap_res_csrs_open := UT.usertrap_res_csrs_open.
   Definition usertrap_res_sstc := UT.usertrap_res_sstc.
+  Definition usertrap_res_bare_sz := UT.usertrap_res_bare_sz.
   Definition usertrap_res_uwp_acc := UT.usertrap_res_uwp_acc.
   Definition usertrap_res_run_open := UT.usertrap_res_run_open.
   Definition usertrap_res_tf_csrs_open := UT.usertrap_res_tf_csrs_open.

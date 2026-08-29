@@ -1282,6 +1282,26 @@ Section UsertrapRes.
     iSplitL "Htrap"; [iExact "Htrap" | iExact "Henv"].
   Qed.
 
+  (* THE TRAPFRAME BOUND ON [p->sz], READ OFF THE BARE RESIDUE.
+     Milestone J's resume obligation: [UexecRet.uvb] carries
+     [⌜UserPerm.usz_ok sz⌝] and the loop's [sz] is the process's own
+     [p->sz], so the loop has to read xv6's own bound out of something it
+     holds -- and across user execution the only thing it holds about the
+     process is this residue.  [ProcInv.proc_priv_nopt_sz_maxsz] is the
+     conjunct; [UexecApply.usz_ok_of_maxsz] is the last step.
+     PURE CONCLUSION, so [iDestruct .. as %H] keeps the bundle and nothing
+     has to be rebuilt (same idiom as [ProcInv.proc_priv_sz_bound]). *)
+  Lemma ut_res_bare_sz (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
+      (pt : uptd) (ksp : mword 64) (U : ustate) :
+    ut_res_bare Rsys pt ksp U -∗ ⌜uint (pv_sz (us_V U)) <= uvm_maxsz⌝.
+  Proof.
+    iIntros "H".
+    iDestruct "H" as (N av) "(_ & _ & _ & _ & _ & _ & _ & (_ & Hown))".
+    iEval (rewrite /ut_own_nopt) in "Hown".
+    iDestruct "Hown" as "(_ & _ & _ & _ & Hpv & _)".
+    iApply (proc_priv_nopt_sz_maxsz with "Hpv").
+  Qed.
+
   (* THE SLOT'S SEAM: extraction and re-deposit, in one accessor.
      [ut_own]'s last conjunct is the WP this process runs when userret
      resumes it (user-wp-slot.md SS1.3), and the trap loop is its only

@@ -657,6 +657,15 @@ Module Type USERTRAP_RES.
            ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗ hart_csrs -∗
            usertrap_res_bare pt ksp (us_tf U ws')).
 
+  (* THE TRAPFRAME BOUND ON [p->sz], off the residue.  Milestone J's resume
+     obligation ([UexecRet.uvb]'s [⌜UserPerm.usz_ok sz⌝]) is a fact about
+     the process block, and across user execution the loop holds no block
+     -- only this residue.  Pure conclusion, so a caller keeps the bundle.
+     Concrete: [UsertrapRes.ut_res_bare_sz]. *)
+  Parameter usertrap_res_bare_sz :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate),
+      usertrap_res_bare pt ksp U -∗ ⌜uint (pv_sz (us_V U)) <= uvm_maxsz⌝.
+
   (* THE USER-EXECUTION WP, EXTRACTED AND RE-DEPOSITED.  The residue carries
      one more per-process resource than the kernel plumbing above: the WP
      that says what THIS process does when userret resumes it
