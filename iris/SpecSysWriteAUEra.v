@@ -136,12 +136,45 @@ Section SysWriteAUEra.
        awrite_commits_at Γ ∅ i Φ (length bss)
          (wchunks n - length bss)%nat)%I.
 
+  (* THE THIRD ARM, AND IT IS THIS LANE'S THIRD FINDING.  The descriptor
+     may name an inode that does not read as a FILE.  [FsAbs.abs_node]'s
+     third arm is [ADev (fn_major n) (fn_minor n)], and writei moves
+     neither field -- nor [di_nlink] -- so on such a row the abstract view
+     does not move AT ALL: every chunk's [delta_write] is the IDENTITY
+     ([delta_write] is total on purpose, and a non-[AFile] row is its
+     fixpoint).  Nothing this contract can observe happened, so the bundle
+     refunds WHOLE and the return value is whatever filewrite made of the
+     bytes it really did write to the disk blocks.
+
+     THE ARM IS UNREACHABLE IN XV6 AND THE PROOF CANNOT SAY SO.  sys_open
+     sets [f->type = FD_DEVICE] exactly when [ip->type == T_DEVICE], so an
+     FD_INODE descriptor's inode is a regular file -- but no resource in
+     the tree records it.  The fd payload's whole type witness is
+     [FileInvDefs.inode_pay]'s [∃ ty, ity_shot g ty ∗ ⌜wr = true -> ty <>
+     T_DIR_z⌝] (surfaced by [SpecFileread.fileread_pay_carve]), which
+     excludes a DIRECTORY and nothing else, and [inode_pay] does not even
+     take the descriptor's [fc_type] as a parameter.  Closing the arm is a
+     one-conjunct strengthening at [FileInvDefs.file_payload]'s inode arm
+     ([fc_type Cf = FD_INODE -> bv_unsigned ty = T_FILE_z]), discharged at
+     sys_open's publication where the code's own [ip->type == T_DEVICE]
+     test decides which [f->type] is written -- OWNER'S CALL under R10,
+     and it ripples through the file layer's callers.  Recorded as this
+     lane's owner question 1.  Until it lands the arm stays, and a
+     consumer keys on it by exclusion: an ok arm with no receipts and a
+     full refund is the "not a file" answer. *)
+  Definition write_post_nofile_at Γ (i : Z) (n : Z)
+      (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ) : iProp Σ :=
+    (awrite_commits_at Γ ∅ i Φ 0%nat (wchunks n))%I.
+
   Definition write_arms_at Γ (i : Z) (n : Z)
       (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ)
       (r : mword 64) : iProp Σ :=
     ((⌜r = (mword_of_int n : mword 64) /\ 0 <= n⌝ ∗ write_post_ok_at Γ i n Φ)
      ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
-        ∗ write_post_fail_at Γ i n Φ))%I.
+        ∗ write_post_fail_at Γ i n Φ)
+     ∨ (⌜(r = (mword_of_int n : mword 64) /\ 0 <= n)
+         \/ r = (mword_of_int (-1) : mword 64)⌝
+        ∗ write_post_nofile_at Γ i n Φ))%I.
 
   (* the stable corollary's arms, at the same substitution *)
   Definition write_stable_arms_at Γ (i : Z) (n : Z) (q : Qp)
@@ -159,12 +192,21 @@ Section SysWriteAUEra.
            awrite_commits_at Γ ∅ i Φ (length bss)
              (wchunks n - length bss)%nat)
       ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
-         ∗ write_post_fail_at Γ i n Φ)))%I.
+         ∗ write_post_fail_at Γ i n Φ)
+      (* the not-a-file arm rides here too.  A client holding the share
+         BELIEVES the row is a file, and is right -- but the derivation
+         cannot say so: refuting the arm means reading the authority at
+         the instant, which is the AU form's job and not a corollary's.
+         When owner question 1 lands, this disjunct goes with the one it
+         is inherited from. *)
+      ∨ (⌜(r = (mword_of_int n : mword 64) /\ 0 <= n)
+          \/ r = (mword_of_int (-1) : mword 64)⌝
+         ∗ write_post_nofile_at Γ i n Φ)))%I.
 
 End SysWriteAUEra.
 
-Global Typeclasses Opaque write_post_ok_at write_post_fail_at write_arms_at
-  write_stable_arms_at.
+Global Typeclasses Opaque write_post_ok_at write_post_fail_at
+  write_post_nofile_at write_arms_at write_stable_arms_at.
 
 (* ===================================================================== *)
 (*  2.  THE CONTRACT: SpecSysWriteAU's FRAME, at the new bundle           *)
