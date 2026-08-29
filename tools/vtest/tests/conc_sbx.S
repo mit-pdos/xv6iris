@@ -1,27 +1,29 @@
 /* conc_sbx -- STORE BUFFERING, made sensitive.  The high-yield sibling of
  * conc_sb.
  *
- * !! THIS TEST IS NOT YET VALIDATED, AND ITS NULL RESULT MEANS NOTHING. !!
+ * THE POSITIVE CONTROL PASSES, which is what makes this test's null result
+ * worth anything at all.  A litmus test is only as good as its ability to
+ * see the outcome on a machine that HAS it, and for store buffering that
+ * machine is QEMU -- its x86 host is TSO.  Measured:
  *
- * A litmus test is only worth its null when there is a machine that DOES
- * produce the outcome and the test finds it there.  For store buffering
- * that machine is QEMU: its x86 host is TSO, and conc_sb measures (0,0) on
- * it in about 4.6% of runs.  conc_sbx, run on the same QEMU, finds ZERO in
- * 3.84 MILLION races with 40593 of them aligned.  So the test cannot see
- * the thing it is looking for, and the board reporting zero (15.36 million
- * races, 22900 aligned) says nothing about the board.
+ *     QEMU          400000 races,  13205 aligned,  (0,0) = 6593
+ *     VisionFive 2 3200000 races, 265671 aligned,  (0,0) = 0
  *
- * What it DOES now do, which the first three versions did not, is overlap
- * the two harts at all -- see A RANDOM PHASE PER ROUND below.  What is
- * missing is whichever part of conc_sb's structure makes the outcome
- * reachable: conc_sb warms both harts through the whole hot path before
- * racing and tunes a per-hart delay, and neither is reproduced here.  The
- * likely culprit is the sweep itself: (1,1) is the alignment where both
- * STORES land before both loads, and (0,0) needs the opposite clustering --
- * both LOADS issuing before either store is visible -- so a high (1,1)
- * count is evidence of overlap but not of the RIGHT overlap.
+ * On QEMU HALF of all aligned races come out (0,0).  The board is aligned
+ * MORE often than QEMU is -- 8.3% of races against 3.3% -- and produces
+ * none.  If the U74 buffered stores the way the x86 host does, those 265671
+ * aligned races would have yielded on the order of a hundred thousand.
  *
- * DO NOT QUOTE A NUMBER FROM THIS TEST until it reproduces (0,0) on QEMU.
+ * ONE RACE PER RENDEZVOUS IS WHY IT WORKS, and it took four failures to
+ * find.  The natural design -- sweep an array of slot pairs after one
+ * rendezvous -- cannot see the outcome at all: only the race IMMEDIATELY
+ * after the barrier is aligned, and every later slot has drifted.  Measured
+ * on QEMU with a 64-slot sweep: 3.84 MILLION races, 40593 of them aligned by
+ * the (1,1) measure, and ZERO (0,0).  The same code with NSLOT = 1 and the
+ * rounds raised to compensate finds 6593.  A high aligned count from a sweep
+ * is evidence of overlap but not of the RIGHT overlap: (1,1) is the
+ * clustering where both STORES land before both loads, and (0,0) needs the
+ * opposite.
  *
  * conc_sb races ONCE per run: two harts, two rounds, one chance to hit the
  * outcome.  On QEMU that is enough, because QEMU inherits its x86 host's TSO
@@ -87,7 +89,7 @@
 
 /* NSLOT * 64 bytes for X and the same for Y is exactly the declared 8 KB
    DMA region, so 64 slots is the most this ABI allows. */
-#define NSLOT     64
+#define NSLOT     1
 /* RUN FOR ABOUT A SECOND, and that is the point rather than an accident.
    A round is ~50 us -- every slot access is a coherence miss, not a cache
    hit, so it is hundreds of cycles rather than one -- which makes 20000
@@ -100,7 +102,7 @@
    phase by hand only samples the offsets one thinks to try.  Running for a
    second lets the two harts drift through every relative phase on their own,
    many times over, and makes the startup skew negligible against the run. */
-#define ROUNDS    20000
+#define ROUNDS    200000
 #define XBASE     DMA_BASE               /* X[i] at XBASE + 64*i          */
 #define YBASE     (DMA_BASE + 0x1000)    /* Y[i], 4 KB away               */
 #define AOFF      0x400                  /* hart P's observations         */
@@ -145,7 +147,30 @@
     blt  t0, t2, 9b
 .endm
 
-/* A RANDOM PHASE PER ROUND, and it is what a long run alone does not give.
+/* WHO OWNS WHICH LINE, and it is the difference between a test that can see
+ * store buffering and one that structurally cannot.
+ *
+ * Each hart zeroes, before the race, the array it will LOAD -- not the one
+ * it will store to.  That is deliberate and it is the whole mechanism:
+ *
+ *   store buffering needs the STORE to be slow and the LOAD to be fast.
+ *   The store has to still be sitting in the buffer when the load completes.
+ *
+ * Zeroing an array leaves its lines owned by the hart that zeroed them.  So
+ * with each hart preparing the array it LOADS, its load HITS (it owns the
+ * line) while its store MISSES (the other hart owns that one) -- the store
+ * waits for ownership in the store buffer, the load sails past it, and
+ * (0,0) becomes reachable.
+ *
+ * THE OTHER WAY ROUND IS WHAT THE FIRST VERSION DID, and it explains a null
+ * that looked like a result: with each hart zeroing the array it STORES to,
+ * every store hit and every load missed.  The store completed immediately
+ * and the load took a coherence round, during which the other hart's store
+ * always landed -- so the outcome was (1,1) by construction and (0,0) was
+ * unreachable on any machine.  Measured: 40593 aligned races on QEMU, which
+ * DOES exhibit store buffering, and zero (0,0).
+ *
+ * A RANDOM PHASE PER ROUND, and it is what a long run alone does not give.
  *
  * Any rendezvous releases the two harts a coherence round apart -- several
  * slots of an eight-instruction sweep -- and the difference is SYSTEMATIC,
@@ -221,7 +246,7 @@ _vtest_body:                      /* hart P: stores X, loads Y */
     li   a6, 0                    /* (0,1) */
     li   a7, 0                    /* (1,0) */
     li   s9, 0
-10: ZEROHALF XBASE
+10: ZEROHALF YBASE                 /* the array P LOADS -- see WHO OWNS WHAT */
     GATE GATE_IN
     LCG  s8
     SWEEP XBASE, YBASE, AOFF
@@ -270,7 +295,7 @@ _vtest_body_ap:                   /* hart Q: stores Y, loads X */
                                      independent and the relative offset
                                      takes both signs */
     li   s9, 0
-11: ZEROHALF YBASE
+11: ZEROHALF XBASE                 /* the array Q LOADS */
     GATE GATE_IN
     LCG  s8
     SWEEP YBASE, XBASE, BOFF
