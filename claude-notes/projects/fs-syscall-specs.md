@@ -921,6 +921,64 @@ things, and the answer differs:
 
   </details>
 
+- [x] **FILEWRITE-CONS — the console-write syscall seal, CLOSED.**  DONE
+  2026-08-29 (Opus lane; three new files, all EC2-green at 523cc4e8, zero
+  `Admitted`, and the audit is **THE STANDING THREE and nothing else** —
+  `xv6iris_extras.resv_matches`, `xv6iris_extras.resv_is_valid`,
+  `functional_extensionality_dep` — machine-checked on both
+  `FilewriteCons.wp_filewrite_cons` and
+  `SysWriteConsAU.wp_sys_write_cons_au`).  init.c's printf path is proved
+  end to end: `write(1, buf, n)` on the descriptor `mknod("console",1,1)`
+  installed returns `SpecSysWriteConsAU.write_cons_arms`, i.e. the count IS
+  the UART's accepted-byte receipt (or filewrite's own sign guard's −1).
+  - `iris/ProofFilewriteCons.v` (~940 lines) — SEALS
+    `SpecFilewriteCons.FILEWRITE_CONS`.  A copy-adapt of
+    `ProofFilewrite.v`'s walk at `st = FdOpen rb true (FdDevice ma)`,
+    `ma = CONSOLE`.  **THE WHOLE DIFF IS SUBTRACTION: five branches the
+    landed walk PROVES are here REFUTED from the premises**, before the
+    branch instruction is applied — +0x04 the `f->writable == 0` early
+    return (`fdstate_ok` ties the byte the `lbu` read to the state's mode
+    bit); +0x28 FD_PIPE and +0x2e the FD_INODE/panic fall (`fdstate_ok`
+    pins `fc_type Cf = FD_DEVICE`, which is why the FD_INODE loop,
+    `SpecPanic` and seven of the landed functor's eight arguments leave the
+    file); +0x70 the out-of-range major's −1 (`CONSOLE` is 1, the test is
+    `9 < major`); +0x82 the null-`devsw`-slot −1 (the contract's
+    `fwn_wp fn ma = consolewrite` makes `filewrite_dev_env`'s honest
+    disjunction one-sided; `Hwp` is never consulted).  What survives is the
+    sign guard at +0x1c/+0x20 — the NEG arm, and the only −1 this contract
+    admits — and the call.
+  - THE LOCATED WALK'S CALL LANDS AT THE `c.jalr a5` AT **+0x86** (the
+    `c.li a0,1` at +0x84 is unchanged): `ConsolewriteLoc` in place of the
+    landed `Consolewrite`, same binders in the same order plus `tr0` and
+    the seed `uart_sent fsc_uart tr0` in, `cons_sent_cnt fsc_uart tr0 r`
+    out.  The FD_DEVICE arm relays `r` untouched, so at the exit the three
+    bridge lemmas at the bottom of `SpecFilewriteCons.v` do the whole
+    count-to-arms step in ONE line —
+    `write_cons_arms_of_cnt fsc_uart tr0 n r Hn0 Hrn` — with `Hn0` the sign
+    guard's fall-through and `Hrn` the callee's own range fact after
+    `Z.max 0 n` collapses at `0 <= n`.  (`wcons_ok_of_cnt` /
+    `wcons_short_of_cnt` are consumed inside it; the walk never needs to
+    know which of `r = n` / `r < n` it got.)
+  - `iris/LinkFilewriteCons.v` / `iris/LinkSysWriteConsAU.v` — the
+    instances.  `FilewriteConsProof` takes ONE argument where
+    `FilewriteProof` takes eight; `SysWriteConsAUProof` gets the landed
+    `Argaddr`/`Argint`/`Argfd` plus it.
+  - AS-LANDED NOTES.  (1) `FilewriteProof` is sealed with `: FILEWRITE`, so
+    its four `Local Lemma` environment bridges are unreachable —
+    `fw_dev_in`/`fw_dev_in_back` are restated keyed on the MAJOR (this
+    contract names it) and `fw_env_dev`/`fw_env_out_dev` shrink to
+    `intros ->; iIntros "$"`, because a pinned `st` makes
+    `filewrite_env`'s match iota-reduce.  Seven pure preamble facts
+    (`fw_K12`, `fw_av_cons`, `fw_n_range`, `fw_uint_moi`,
+    `fw_major_range`, `fw_bltu9_false`, `fw_ret_pc_cons`) are restated as
+    `fwc_*` rather than imported — the tree does not `Require Import` a
+    proof file, and the alternative is a 4,400-line dependency for 20
+    lines.  (2) The `uptd_ext_sz` continuation forms were already migrated
+    into both contracts by the coordinator; nothing here moved them.
+    (3) `SpecFilewriteCons.v` is BYTE-IDENTICAL (R10): its shape had
+    already been validated by the syscall seal above it, and it needed no
+    edit to be provable.
+
 Sizing: D is spike-sized — the readings exist, the work is assembly and
 statement.  S0 is one design session.  A and W are the campaign's bulk.
 P is contained (two pins).  Y is CLOSED (2026-08-29): machinery, contract,
