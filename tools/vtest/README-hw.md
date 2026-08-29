@@ -163,6 +163,14 @@ nothing and a `targets` that returned the previous command's answer.  Every
 command is therefore framed by an `echo <marker>` sentinel, matched at the
 start of a line so the command's own echo does not end the reply early.
 
+**Do not change the JTAG adapter speed.**  It is 2000 kHz and that is where
+it should stay.  Stepping it to 16 MHz to speed up the region loads corrupted
+a DMI transaction and left the E24 unexaminable (`DMI operation didn't
+complete in 2 seconds`, `Examination failed`), after which OpenOCD's polling
+wedged its own command server and the server had to be restarted.  The
+bulk-load cost is real -- see the Gdb class in `board.py` for what was done
+about it instead -- but this is not the lever.
+
 **Never touch the E24.**  Reading a 64-bit CSR on hart 0 (`$misa`, `$satp`)
 does not merely fail — it *drops the gdb connection*, twice measured.  It is
 in `ignore_harts` and nothing may put it in a thread list.
