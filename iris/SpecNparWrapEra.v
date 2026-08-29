@@ -53,8 +53,7 @@ Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import WpUart.
-Require Import DiskInv.
-Require Import Xv6Cameras.
+Require Import DiskPtsto DiskInv.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import BitmapInv.
@@ -69,10 +68,13 @@ Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import IcacheRef.
 Require Import IrefSlots.
+Require Import SpecIput.
 Require Import SpecDirlookup.
 Require Import SpecDirlink.
 (* [walk_spend] / [walk_need] and the two ties, from the walker itself *)
 Require Import SpecNamex.
+Require Import SpecNameiTr.   (* [inode_held_at] *)
+Require Import FsAbsEra.      (* [elend] *)
 Require Import FsAbsNpar.     (* [np_elems]/[ep_hops_from]/[np_dead] *)
 Require Import FsAbsStart.    (* [ep_start]: the DEFERRED start (lane A-iii) *)
 Require Import SpecNparEra.   (* [inode_held_ty_at]: the typed, pinned parent *)

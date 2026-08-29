@@ -46,11 +46,14 @@ From iris.algebra Require Import auth gmap frac dfrac.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map.
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto.
+Require Import FsTree.
+Require Import PathElems.       (* [path_elems], [SLASH] *)
 Require Import InodeInv.        (* [ROOTINO] : mword 32, namex's own *)
 Require Import FsImg.           (* [ROOTINO] : Z -- REQUIRED, NOT IMPORTED *)
 Require Import FsBlocks.
 Require Import FsBytesGamma.
-Require Import Xv6Cameras.
+Require Import IcacheRef.
+Require Import IcacheEscrow.
 Require Import Xv6G.
 Require Import SpecSysMknodAU.  (* [mknod_parent_elems] *)
 Require Import FsAbsEra.

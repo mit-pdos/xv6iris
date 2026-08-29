@@ -76,6 +76,7 @@ Require Import InodeInv.        (* [MAXFILE]: [FsDurImg.img_node_file_byte]'s
                                    own bound                                *)
 Require Import FsTree.          (* [fname], [file_bytes], [path_at]         *)
 Require Import IcacheEscrow.    (* [region_inums_spec]                      *)
+Require Import FsStateEra.      (* [era_node] and its readings              *)
 Require Import FsCrash.         (* [fs_blocks], [fs_restrict]-side names    *)
 Require Import FsDurSnap.       (* [snap_ok]                                *)
 Require Import FsDurSyscall.    (* [snap_holds], [dur_node], [dur_node_*]   *)

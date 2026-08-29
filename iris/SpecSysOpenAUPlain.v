@@ -26,13 +26,18 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
+Require Import WpNext.
 Require Import FdSlots.
-Require Import Xv6Cameras.
+Require Import BioInv.
 Require Import IrefSlots.
 Require Import FileInvDefs.
 Require Import ProcAvail.
-Require Import ProcDefs.
+Require Import ProcGeom.
+Require Import ProcInv.
+Require Import FsBlocks.
+Require Import FsTree.
 Require Import Xv6G.
+Require Import FsCfg.
 Require Import SpecSysOpenAU.
 Require Import FsAbs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

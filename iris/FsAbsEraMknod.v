@@ -44,7 +44,8 @@ Require Import FsImg.           (* [ROOTINO] -- REQUIRED, NOT IMPORTED (lane W's
                                    gotcha: it shadows at syscall altitude) *)
 Require Import FsBlocks.
 Require Import FsBytesGamma.
-Require Import Xv6Cameras.
+Require Import IcacheRef.
+Require Import IcacheEscrow.
 Require Import Xv6G.
 Require Import SpecSysMknodAU. (* [acre_commit], [dlookup_commit],
                                   [mknod_parent_elems], [cre_pre] *)

@@ -66,9 +66,15 @@ From iris.base_logic.lib Require Import ghost_map ghost_var mono_nat.
 Require Import RiscvPtsto.      (* [riscvEraGS], [log_mirror]              *)
 Require Import DiskImg.         (* [diskImgG]                              *)
 Require Import Xv6Cameras.      (* [fsCrashG], [lockG], [fsLinkG], [fsTopG] *)
+Require Import SystemAdequacy.  (* [fs_boot_pure]                          *)
 Require Import FsCrash.         (* [P_fs], [fs_receipt], [fs_hist_lb]      *)
 
+Require Import BioDefs.
+Require Import BlockWords.
 Require Import DinodeEnc.
+Require Import InodeDefs.
+Require Import DirView.
+Require Import FsTree.
 Require Import FsImg.
 Require Import FsDurSnap.       (* [P_dur], [snap_ok], [P_dur_tie_keep]    *)
 Require Import FsDurSyscall.    (* [snap_holds], [dur_node], [dur_sb], ... *)

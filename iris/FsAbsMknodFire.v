@@ -94,11 +94,14 @@ Require Import RiscvPtsto.
 Require Import DinodeEnc.
 Require Import DirView.          (* [T_DIR_z]                               *)
 Require Import FsTree.           (* [fname]                                 *)
+Require Import PathElems.
 Require Import FsBlocks.         (* [fs_names]                              *)
 Require Import FsBytesGamma.     (* [fs_gamma_L]                            *)
 Require Import InodeInv.
+Require Import InodeLock.
 Require Import IrefSlots.
-Require Import Xv6Cameras.
+Require Import IcacheRef.
+Require Import IcacheEscrow.
 (* the three binder classes [SpecSysMknodAU]'s section list names, IMPORTED
    rather than inherited: [Require Import] does not re-import a required
    file's own imports, and an unbound [fileG] in a [`{! ...}] binder is
@@ -112,6 +115,7 @@ Require Import InodeRegion.      (* [ftop_inv]/[ftop_body]/[ftop_clean]     *)
 Require Import Xv6G.
 Require Import SpecCreate.       (* [create_made], [T_DEVICE]               *)
 Require Import SpecSysMknodAU.   (* the frozen statement this parallels     *)
+Require Import FsAbsEra.
 Require Import FsAbs.            (* LAST (FsAbs's own rule)                 *)
 
 Local Open Scope Z_scope.

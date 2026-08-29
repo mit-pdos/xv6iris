@@ -107,14 +107,14 @@ Require Import ByteCursor.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import WpUart.
-Require Import Xv6Cameras.
+Require Import DiskPtsto.
 Require Import BioDefs.
 (* THE PAYLOAD'S OWN VOCABULARY (durable-disk 2b-inode-3): [top_frag],
    [fs_gamma_L], [era_node] / [inode_rec_local].  IMPORTED BEFORE
    [FsBlocks] on purpose -- the [FsState*] stack exports [fs_view] and
    [byte_range], both of which have live twins below, and the LAST import
    wins (durable-notes, "AND WHERE THAT IMPORT COLLIDES, PUT IT EARLY"). *)
-Require Import LogInv.
+Require Import FsBlocks LogInv.
 Require Import BitmapInv.
 Require Import DinodeEnc.
 Require Import DirentEnc.

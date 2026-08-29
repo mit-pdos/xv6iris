@@ -97,8 +97,7 @@ Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import ProcDefs.
 Require Import WpUart.
-Require Import DiskInv.
-Require Import Xv6Cameras.
+Require Import DiskPtsto DiskInv.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import BitmapInv.
@@ -117,6 +116,7 @@ Require Import SpecDirlink.
 Require Import SpecDirlookup.  (* [T_DIR]: the type the L_par arm carries *)
 Require Import SpecNamex.      (* K_namex, walk_need / walk_spend, ROOT* *)
 Require Import SpecNameiTr.    (* [inode_held_at] ONLY -- the pinned package *)
+Require Import FsAbsEra.       (* [elend] *)
 Require Import FsAbsNpar.      (* [np_elems], [ep_hops_from], [np_dead] *)
 Require Import FsAbsStart.     (* [ep_start]: the DEFERRED start (lane A-iii) *)
 From Kernel Require KernelSyms.

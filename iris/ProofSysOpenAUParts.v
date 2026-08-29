@@ -41,38 +41,79 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
-Require Import RegFile.
+Require Import ByteBuf.
+Require Import RegFile HartTp WpNext.
+Require Import WpMmodeLeafBase.
 Require Import RiscvExtras.
-Require Import CalleeSaved.
+Require Import StackOwn.
+Require Import CalleeSaved KernelText KernelDataInv.
+Require Import WpLock.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
+Require Import WpSmodeIntr WpSmodeHalf.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import FdSlots.
+Require Import ProcGeom.
+Require Import SchedCtx.
+Require Import SpecPanic.
 Require Import WpUart.
 Require Import DiskInv.
 Require Import Xv6Cameras.
-Require Import BioDefs.
+Require Import BioInv.
 (* the payload's own vocabulary, IMPORTED BEFORE [FsBlocks] on purpose --
    ProofSysOpen's rule, and its reason (the last import wins). *)
 Require Import FsStateEra.
-Require Import LogInv.
+Require Import FsBlocks LogInv.
+Require Import FsCrash.
 Require Import BitmapInv.
 Require Import DinodeEnc.
+Require Import DinodeSlot.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import SleepLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
+Require Import IcacheInv.
 Require Import IcacheEscrow.
+Require Import KvmSpec.
 Require Import DirView.
 Require Import FileInvDefs.
+Require Import FileInv.
+Require Import UserPtTree.
 Require Import ProcInv.
+Require Import SpecArgint.
+Require Import SpecArgstr.
+Require Import SpecBeginOp.
+Require Import SpecEndOp.
+Require Import SpecIput.
+Require Import SpecIlock.
+Require Import SpecIunlock.
+Require Import SpecIunlockput.
+Require Import SpecFileclose.
+Require Import SpecFilealloc.
+Require Import SpecFdalloc.
 Require Import SpecItrunc.
+Require Import SpecPrintk.
+Require Import SpecDirlink.
+Require Import SpecNamex.
+Require Import SpecNamei.
+Require Import SpecCreate.
 Require Import ConsoleInv.
+Require Import CodeSysOpen.
+Require Import SpecSysOpen.
+Require Import SysOpenBudget.
+Require Import ProofKforkParts.
+Require Import ProofSysOpenParts.
+Require Import ProofSysOpenTails.
+Require Import ProofSysOpenAUBits.
 Require Import PathElems.
 Require Import FsTree.
 Require Import FsBytesGamma.
+Require Import SpecSysMknodAU.
 Require Import SpecSysOpenAU.
+Require Import FsAbsEra.
+Require Import FsAbsStart.
 Require Import FsAbsOpenFire.
 Require Import FsAbs.            (* LAST (FsAbs's own rule) *)
 From Kernel Require KernelSyms.

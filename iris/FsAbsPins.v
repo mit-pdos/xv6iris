@@ -59,7 +59,9 @@ From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import gmap dfrac.
 From iris.base_logic.lib Require Import iprop own ghost_map fancy_updates.
+Require Import DirView.
 Require Import FsTree.
+Require Import FsImg.
 Require Import Xv6Cameras.
 Require Import FsAbs.
 

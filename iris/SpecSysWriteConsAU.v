@@ -248,8 +248,7 @@ Require Import FileInvDefs.
 Require Import SpecArgfd.      (* [arg_fd]                                  *)
 Require Import SpecSysRead.    (* [sys_rw_count]                            *)
 Require Import ConsoleInv.     (* [CONSOLE], [devsw_table]                  *)
-Require Import WpUart.  (* [uart_names], [uart_sent]              *)
-Require Import Xv6Cameras.
+Require Import DiskPtsto WpUart.  (* [uart_names], [uart_sent]              *)
 Require Import UartTxInv.      (* [uart_sent_sub] -- the landed sublist
                                   receipt this file's located form refines *)
 Require Import PipeInvDefs.    (* [pipe_rw_ret], under [filewrite_ret]      *)

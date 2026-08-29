@@ -82,8 +82,9 @@ From iris.base_logic.lib Require Import iprop own ghost_map.
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto.      (* [riscvGS]                                  *)
 Require Import DinodeEnc.       (* [dinode], [di_type], [di_size]             *)
+Require Import DirView.         (* [T_DIR_z], [dir_nrec]                      *)
 Require Import FsTree.          (* [fname], [dir_view]                        *)
-Require Import Xv6Cameras.
+Require Import BioDefs.
 Require Import InodeInv.        (* [blkmap]                                   *)
 Require Import InodeLock.       (* [inode_ok]                                 *)
 Require Import IrefSlots.       (* [irefslotG]                                *)

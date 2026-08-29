@@ -251,8 +251,7 @@ Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import WpUart.
-Require Import DiskInv.
-Require Import Xv6Cameras.
+Require Import DiskPtsto DiskInv.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
@@ -275,6 +274,7 @@ Require Import SpecSysMknod.    (* K_sys_mknod; the landed contract this
                                    file states a parallel form beside *)
 Require Import PathElems.       (* [path_elems], [SLASH] *)
 Require Import FsTree.          (* [fname] *)
+Require DirView.                (* [T_DIR_z] (in FsAbs's cone) *)
 Require FsImg.                  (* [FsImg.ROOTINO : Z] -- Require, NOT
                                    Import: [FsImg]'s [fs_sb] field readers
                                    ([sb_ninodes] : fs_sb -> Z) would shadow
