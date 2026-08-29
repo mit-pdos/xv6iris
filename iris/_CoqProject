@@ -1435,3 +1435,22 @@ SpecSysWriteAUEra.v
 SpecFilewriteAU.v
 ProofSysWriteAU.v
 ProofSysWriteAUStable.v
+# fs-syscall-specs, THE CONSOLE-WRITE LANE: init.c's printf path, and the
+# campaign's last device-side gap on init.  The observable is ACCEPTANCE --
+# the bytes reached the UART transmitter, in order, after a seed the caller
+# holds (SpecSysWriteConsAU.v's header says why not the wire) -- and it is
+# carried by a LOCATED receipt, which is what makes per-write() receipts
+# concatenate into one for a whole printf.
+#   UartSentLoc is that receipt at the transmitter invariant, where its
+# PRODUCERS live; the four *Loc files are the landed uartwrite and
+# consolewrite walks with the receipt threaded through (copy-adapts, R10:
+# SpecUartwrite / SpecConsolewrite / SpecFilewrite / SpecSysWrite and their
+# proofs are untouched); SpecFilewriteCons is the device arm's dispatch
+# contract and ProofSysWriteConsAU seals SpecSysWriteConsAU over it.
+UartSentLoc.v
+SpecUartwriteLoc.v
+ProofUartwriteLoc.v
+SpecConsolewriteLoc.v
+ProofConsolewriteLoc.v
+SpecFilewriteCons.v
+ProofSysWriteConsAU.v
