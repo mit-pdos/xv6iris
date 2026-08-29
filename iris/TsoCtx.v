@@ -5322,6 +5322,289 @@ Section ctx.
   (* ---------------------------------------------------------------- *)
   (* (4) THE RACY GATE (tso-m4-memo.md §3; the kit is TsoMemPa §12/§12c). *)
   (*                                                                    *)
+  (* ================================================================= *)
+  (* §0.41′ / A6.126: THE RELEASE ARM'S CELLS.  A [phys_ledger_rpay]      *)
+  (* cell carries [TsoMemPa.ts_pay_rel R]: since the floor, every message *)
+  (* touching it is a recorded history position writing the whole        *)
+  (* window.  The mint (at n cells sharing a stamp), the drop, the        *)
+  (* AUTHOR's store (drop, store through the generic gate, re-mint with   *)
+  (* the history extended by the store's own position -- so no map-level *)
+  (* gate clone is needed) and the read gate ([TsoMemPa.rel_read] against *)
+  (* the reader's floor receipt).                                         *)
+  (* ================================================================= *)
+  Definition phys_ledger_rpay (a : Arch.pa) (dq : dfrac) (v : bv 8) (t : nat)
+      (R : ts_rel) : iProp Σ :=
+    (phys_pointsto a dq v ∗ a ↪[ts_name]{dq} (t, ts_pay_rel R))%I.
+
+  Global Instance phys_ledger_rpay_timeless a dq v t R :
+    Timeless (phys_ledger_rpay a dq v t R).
+  Proof. rewrite /phys_ledger_rpay. apply _. Qed.
+
+  Lemma phys_ledger_rpay_forget a dq v t R :
+    phys_ledger_rpay a dq v t R ⊢ phys_pointsto a dq v.
+  Proof. by iIntros "[$ _]". Qed.
+
+  Lemma ledger_rpay_ok (g : gstate) (a : Arch.pa) (dq : dfrac) (v : bv 8)
+      (t : nat) (R : ts_rel) :
+    tso_interp_at riscv_eraGS g -∗ phys_ledger_rpay a dq v t R -∗
+    ⌜rel_ok1 g.(gimg) g.(glog) a R⌝.
+  Proof.
+    iIntros "Hint [_ Hts]".
+    iDestruct "Hint"
+      as "(%TM & %LM & Hauth & %Hdom & %Htie & Hm & %HLM & Hlen & Hvw & %Hmm)".
+    iDestruct (ghost_map_lookup with "Hauth Hts") as %HTM.
+    iPureIntro. exact (ts_ok_rel _ _ _ _ _ _ (Htie _ _ HTM) eq_refl).
+  Qed.
+
+  Lemma ledger_rpay_mint1 (g : gstate) (a : Arch.pa) (v : bv 8) (t : nat)
+      (R : ts_rel) :
+    rel_ok1 g.(gimg) g.(glog) a R ->
+    tso_interp_at riscv_eraGS g -∗
+    phys_ledger_at a (DfracOwn 1) v t ==∗
+    tso_interp_at riscv_eraGS g ∗
+    phys_ledger_rpay a (DfracOwn 1) v t R.
+  Proof.
+    iIntros (Hr) "Hint [Hpt Hts]".
+    iDestruct "Hint"
+      as "(%TM & %LM & Hauth & %Hdom & %Htie & Hm & %HLM & Hlen & Hvw & %Hmm)".
+    iDestruct (ghost_map_lookup with "Hauth Hts") as %HTM.
+    destruct (ts_ok_latest _ _ _ _ _ (Htie _ _ HTM)) as (v0 & Hgm0 & Hlat).
+    cbn in Hlat.
+    iMod (ghost_map_update ((t, ts_pay_rel R) : ts_elem) with "Hauth Hts")
+      as "[Hauth Hts]".
+    iModIntro.
+    iSplitR "Hpt Hts"; last (rewrite /phys_ledger_rpay; iFrame "Hpt Hts").
+    iExists (<[a := ((t, ts_pay_rel R) : ts_elem)]> TM), LM.
+    iFrame "Hauth Hm Hlen Hvw".
+    iSplitR.
+    { iPureIntro. rewrite dom_insert_L Hdom.
+      assert (Ha' : a ∈ dom g.(gmem)) by (by eapply elem_of_dom_2).
+      set_solver. }
+    iSplitR; last (iPureIntro; split; [exact HLM | exact Hmm]).
+    iPureIntro. intros a' e Hlk.
+    destruct (decide (a' = a)) as [->|Hne].
+    - rewrite lookup_insert in Hlk. injection Hlk as <-.
+      split_and!.
+      + exists v0. split; [exact Hgm0 | exact Hlat].
+      + move => Sv' B' Heq. discriminate Heq.
+      + by move => W0 HW0.
+      + move => R0 HR0. cbn in HR0. injection HR0 as <-. exact Hr.
+    - rewrite lookup_insert_ne in Hlk; last done. exact (Htie _ _ Hlk).
+  Qed.
+
+  Lemma ledger_rpay_drop (g : gstate) (a : Arch.pa) (v : bv 8) (t : nat)
+      (R : ts_rel) :
+    tso_interp_at riscv_eraGS g -∗
+    phys_ledger_rpay a (DfracOwn 1) v t R ==∗
+    tso_interp_at riscv_eraGS g ∗ phys_ledger_at a (DfracOwn 1) v t.
+  Proof.
+    iIntros "Hint [Hpt Hts]".
+    iDestruct "Hint"
+      as "(%TM & %LM & Hauth & %Hdom & %Htie & Hm & %HLM & Hlen & Hvw & %Hmm)".
+    iDestruct (ghost_map_lookup with "Hauth Hts") as %HTM.
+    destruct (ts_ok_latest _ _ _ _ _ (Htie _ _ HTM)) as (v0 & Hgm0 & Hlat).
+    cbn in Hlat.
+    iMod (ghost_map_update ((t, ts_pay_none) : ts_elem) with "Hauth Hts")
+      as "[Hauth Hts]".
+    iModIntro. iFrame "Hpt Hts".
+    iExists (<[a := ((t, ts_pay_none) : ts_elem)]> TM), LM.
+    iFrame "Hauth Hm Hlen Hvw".
+    iSplitR.
+    { iPureIntro. rewrite dom_insert_L Hdom.
+      assert (Ha' : a ∈ dom g.(gmem)) by (by eapply elem_of_dom_2).
+      set_solver. }
+    iSplitR; last (iPureIntro; split; [exact HLM | exact Hmm]).
+    iPureIntro. intros a' e Hlk.
+    destruct (decide (a' = a)) as [->|Hne].
+    - rewrite lookup_insert in Hlk. injection Hlk as <-.
+      split_and!.
+      + exists v0. split; [exact Hgm0 | exact Hlat].
+      + by move => Sv' B' Heq.
+      + by move => W0 HW0.
+      + by move => R0 HR0.
+    - rewrite lookup_insert_ne in Hlk; last done. exact (Htie _ _ Hlk).
+  Qed.
+
+  (* the runs over a list of offsets *)
+  Local Lemma ledger_rpay_mint_run (g : gstate) (base : Arch.pa) (n : nat)
+      (f : nat -> bv 8) (tf : nat -> nat) (Rf : nat -> ts_rel) (l : list nat) :
+    (forall j, j ∈ l -> rel_ok1 g.(gimg) g.(glog) (pa_add base j) (Rf j)) ->
+    tso_interp_at riscv_eraGS g -∗
+    ([∗ list] j ∈ l, phys_ledger_at (pa_add base j) (DfracOwn 1) (f j) (tf j)) ==∗
+    tso_interp_at riscv_eraGS g ∗
+    ([∗ list] j ∈ l, phys_ledger_rpay (pa_add base j) (DfracOwn 1) (f j) (tf j) (Rf j)).
+  Proof.
+    induction l as [|j l IH]; intros Hok.
+    - iIntros "Hint _". iModIntro. iFrame "Hint". done.
+    - iIntros "Hint Hb".
+      rewrite !big_sepL_cons. iDestruct "Hb" as "[Hbj Hbl]".
+      assert (Hj : j ∈ j :: l) by set_solver.
+      iMod (ledger_rpay_mint1 g (pa_add base j) (f j) (tf j) (Rf j) (Hok j Hj)
+              with "Hint Hbj") as "(Hint & Hbj)".
+      assert (Hok' : forall k, k ∈ l -> rel_ok1 g.(gimg) g.(glog) (pa_add base k) (Rf k))
+        by (intros k Hk; apply Hok; set_solver).
+      iMod (IH Hok' with "Hint Hbl") as "(Hint & Hbl)".
+      iModIntro. iFrame "Hint Hbj Hbl".
+  Qed.
+
+  Local Lemma ledger_rpay_drop_run (g : gstate) (base : Arch.pa)
+      (f : nat -> bv 8) (Rf : nat -> ts_rel) (l : list nat) :
+    tso_interp_at riscv_eraGS g -∗
+    ([∗ list] j ∈ l, ∃ t : nat, phys_ledger_rpay (pa_add base j) (DfracOwn 1) (f j) t (Rf j)) ==∗
+    tso_interp_at riscv_eraGS g ∗
+    ([∗ list] j ∈ l, phys_ledger (pa_add base j) (DfracOwn 1) (f j)).
+  Proof.
+    induction l as [|j l IH].
+    - iIntros "Hint _". iModIntro. iFrame "Hint". done.
+    - iIntros "Hint Hb".
+      rewrite !big_sepL_cons. iDestruct "Hb" as "[(%t & Hbj) Hbl]".
+      iMod (ledger_rpay_drop g (pa_add base j) (f j) t (Rf j) with "Hint Hbj")
+        as "(Hint & Hbj)".
+      iMod (IH with "Hint Hbl") as "(Hint & Hbl)".
+      iModIntro. iFrame "Hint Hbl". by iApply phys_ledger_at_ledger.
+  Qed.
+
+  (* THE MINT: n cells at a shared latest stamp become a release window with
+     floor = that stamp and an empty history *)
+  Lemma ledger_rpay_mint (g : gstate) (base : Arch.pa) (n t : nat)
+      (f : nat -> bv 8) :
+    (0 < n)%nat ->
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗
+    ([∗ list] j ∈ seq 0 n,
+       phys_ledger_at (pa_add base j) (DfracOwn 1) (f j) t) ==∗
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
+    tso_interp_at riscv_eraGS g ∗
+    ([∗ list] j ∈ seq 0 n,
+       phys_ledger_rpay (pa_add base j) (DfracOwn 1) (f j) t
+         (TsRel base n j t [])).
+  Proof.
+    iIntros (Hn) "Hgh Hint Hb".
+    iAssert (⌜forall k, (k < n)%nat -> is_Some (g.(gimg) !! pa_add base k)⌝)%I
+      as %Hcov.
+    { rewrite bi.pure_forall. iIntros (k). rewrite bi.pure_impl. iIntros (Hk).
+      iDestruct (big_sepL_lookup _ (seq 0 n) k k with "Hb") as "Hbk".
+      { rewrite lookup_seq_lt; [reflexivity|lia]. }
+      iDestruct (phys_ledger_at_ledger with "Hbk") as "Hbk".
+      iDestruct (phys_ledger_ram with "Hbk") as %Hram.
+      iApply (ledger_img_cover g (pa_add base k) Hram with "Hint"). }
+    iAssert (⌜forall k, (k < n)%nat ->
+               latest g.(gimg) g.(glog) (pa_add base k) t (f k)⌝)%I as %Hlat.
+    { rewrite bi.pure_forall. iIntros (k). rewrite bi.pure_impl. iIntros (Hk).
+      iDestruct (big_sepL_lookup _ (seq 0 n) k k with "Hb") as "Hbk".
+      { rewrite lookup_seq_lt; [reflexivity|lia]. }
+      iApply (ledger_latest_ok g (pa_add base k) (DfracOwn 1) (f k) t
+                with "Hgh Hint Hbk"). }
+    iFrame "Hgh".
+    iApply (ledger_rpay_mint_run g base n f (fun _ => t) (fun j => TsRel base n j t [])
+              (seq 0 n) with "Hint Hb").
+    intros j Hj. apply elem_of_seq in Hj.
+    exact (rel_ok1_of_latest g.(gimg) g.(glog) base n j t f ltac:(lia) Hlat Hcov).
+  Qed.
+
+  (* THE AUTHOR'S STORE, agent-generic: the window's cells are re-written
+     as ONE message and keep their arm with the history extended by this
+     store's position.  Drop, store through [ledger_store_ok], re-mint at
+     the appended log with [rel_ok1_app_store]. *)
+  Lemma ledger_store_rel_ok (g g' : gstate) (auth : agent)
+      (base : Arch.pa) (n : N) {m : N} (vold vnew : bv m) (lo : nat)
+      (hist : list nat) :
+    (Z.of_nat (N.to_nat n) <= 18446744073709551616)%Z ->
+    g'.(gimg) = g.(gimg) ->
+    g'.(glog) = (g.(glog) ++ [PWMsg (snap_of base n vnew) auth])%list ->
+    g'.(gmem) = write_bytes g.(gmem) base n vnew ->
+    (forall c : CPU, (g.(gtv) c <= g'.(gtv) c)%nat) ->
+    (forall c : CPU, (g'.(gtv) c <= length g'.(glog))%nat) ->
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗
+    ([∗ list] j ∈ seq 0 (N.to_nat n), ∃ t : nat,
+       phys_ledger_rpay (pa_add base j) (DfracOwn 1) (nth_byte vold j) t
+         (TsRel base (N.to_nat n) j lo hist)) ==∗
+    gen_heap_interp (hG := riscv_memGS) g'.(gmem) ∗
+    tso_interp_at riscv_eraGS g' ∗
+    ledger_msg_at (length g.(glog)) (PWMsg (snap_of base n vnew) auth) ∗
+    ([∗ list] j ∈ seq 0 (N.to_nat n),
+       phys_ledger_rpay (pa_add base j) (DfracOwn 1) (nth_byte vnew j)
+         (S (length g.(glog)))
+         (TsRel base (N.to_nat n) j lo (hist ++ [S (length g.(glog))]))).
+  Proof.
+    iIntros (Hn Himg Hlog Hmem Htv Htvok') "Hgh Hint Hold".
+    (* the arms, as pure facts about the OLD log, before anything moves *)
+    iAssert (⌜forall j, (j < N.to_nat n)%nat ->
+               rel_ok1 g.(gimg) g.(glog) (pa_add base j)
+                 (TsRel base (N.to_nat n) j lo hist)⌝)%I as %Hcov.
+    { rewrite bi.pure_forall. iIntros (j). rewrite bi.pure_impl. iIntros (Hj).
+      iDestruct (big_sepL_lookup _ (seq 0 (N.to_nat n)) j j with "Hold") as (tj) "Hej".
+      { rewrite lookup_seq_lt; [reflexivity|lia]. }
+      iApply (ledger_rpay_ok with "Hint Hej"). }
+    assert (Hsnap : forall j : nat, (j < N.to_nat n)%nat ->
+              is_Some (msg_byte (PWMsg (snap_of base n vnew) auth) (pa_add base j))).
+    { intros j Hj. rewrite /msg_byte /=.
+      assert (Hin : pa_add base j ∈ dom (snap_of base n vnew)).
+      { rewrite dom_snap_of. apply elem_of_footprint. exists j.
+        split; [lia | reflexivity]. }
+      apply elem_of_dom in Hin. exact Hin. }
+    iMod (ledger_rpay_drop_run g base (nth_byte vold)
+            (fun j => TsRel base (N.to_nat n) j lo hist) (seq 0 (N.to_nat n))
+            with "Hint Hold") as "(Hint & Hold)".
+    rewrite (phys_ledger_win_map base n vold _ Hn).
+    iMod (ledger_store_ok g g' auth
+            (snap_of base n vold) (snap_of base n vnew)
+            ltac:(by rewrite !dom_snap_of) Himg Hlog
+            ltac:(by rewrite Hmem write_bytes_union) Htv Htvok'
+            with "Hgh Hint Hold") as "($ & Hint & $ & Hnew)".
+    rewrite -(phys_ledger_at_win_map base n vnew _ _ Hn).
+    iApply (ledger_rpay_mint_run g' base (N.to_nat n) (nth_byte vnew)
+              (fun _ => S (length g.(glog)))
+              (fun j => TsRel base (N.to_nat n) j lo (hist ++ [S (length g.(glog))]))
+              (seq 0 (N.to_nat n)) with "Hint Hnew").
+    intros j Hj. apply elem_of_seq in Hj.
+    rewrite Hlog Himg.
+    exact (rel_ok1_app_store g.(gimg) g.(glog) (PWMsg (snap_of base n vnew) auth)
+             base (N.to_nat n) j lo hist (Hcov j ltac:(lia)) Hsnap).
+  Qed.
+
+  (* THE READ GATE: a reader whose receipt passed the floor settles on ONE
+     history position (or the floor) and reads every byte from it *)
+  Lemma ledger_read_rel_ok `{CID : CpuId} (g : gstate)
+      (base : Arch.pa) (n : nat) (dq : dfrac) (f : nat -> bv 8)
+      (lo K : nat) (hist : list nat) :
+    (0 < n)%nat ->
+    tso_interp_at riscv_eraGS g -∗
+    view_lb view_name loglen_name (hart_agent cpu_id) K -∗
+    ledger_vis (hart_agent cpu_id) K lo -∗
+    ([∗ list] j ∈ seq 0 n, ∃ tj : nat,
+       phys_ledger_rpay (pa_add base j) dq (f j) tj (TsRel base n j lo hist)) -∗
+    ⌜forall tv : nat, (g.(gtv) cpu_id <= tv)%nat ->
+       exists T, (lo <= T)%nat /\ (T <= length g.(glog))%nat
+         /\ visibleb (hart_agent cpu_id) tv g.(glog) T = true
+         /\ (forall j, (j < n)%nat ->
+               tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv (pa_add base j)
+               = log_byte g.(gimg) g.(glog) T (pa_add base j))
+         /\ (forall j, (j < n)%nat -> is_Some (log_byte g.(gimg) g.(glog) T (pa_add base j)))
+         /\ (T = lo \/ (T ∈ hist /\ exists i m, T = S i /\ g.(glog) !! i = Some m))⌝.
+  Proof.
+    iIntros (Hn) "Hint #HK #Hfv Hb".
+    iDestruct "Hint"
+      as "(%TM & %LM & Hauth & %Hdom & %Htie & Hm & %HLM & Hlen & Hvw & %Hmm)".
+    iDestruct (view_auth_valid with "Hvw HK") as %HKtvs.
+    rewrite avf_hart in HKtvs.
+    iAssert (⌜forall j : nat, (j < n)%nat ->
+               rel_ok1 g.(gimg) g.(glog) (pa_add base j) (TsRel base n j lo hist)⌝)%I
+      as %Hcov.
+    { rewrite bi.pure_forall. iIntros (j). rewrite bi.pure_impl. iIntros (Hj).
+      iDestruct (big_sepL_lookup _ (seq 0 n) j j with "Hb") as (tj) "[_ Hej]".
+      { rewrite lookup_seq_lt; [reflexivity|lia]. }
+      iDestruct (ghost_map_lookup with "Hauth Hej") as %HTMj.
+      iPureIntro.
+      exact (ts_ok_rel _ _ _ _ _ _ (Htie _ _ HTMj) eq_refl). }
+    iDestruct (ledger_vis_visibleb g K lo with "[$Hauth $Hm $Hlen $Hvw //] Hfv")
+      as %Hfvis.
+    iPureIntro. intros tv Htv.
+    exact (rel_read g.(gimg) g.(glog) base n lo hist Hn Hcov (hart_agent cpu_id) tv
+             (Hfvis tv ltac:(lia))).
+  Qed.
+
   (* The one read in the tree with NO receipt and NO synchronisation:    *)
   (* [holding()]'s [ld a5,16(a0)] of [lk->cpu] by a hart that does not    *)
   (* hold the lock.  It cannot conclude a VALUE -- the pin's shape --     *)
