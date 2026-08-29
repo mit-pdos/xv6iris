@@ -229,6 +229,12 @@ context id inside the one lemma that hands a verified program to the
 kernel is exactly what would have to be unpicked when the U tier's
 ownership home is decided.
 
+**OWNER-SCOPED 2026-08-29: THE TWO EFFORTS STAY SEPARATE.**  The U-mode
+context question gets settled on its own, later; do NOT fold it into the
+user-wp-slot work, and do not convert this tier toward context ownership
+while passing through.  The ambient binder above is the whole of what this
+effort does about `CurCtx` — it is threading, not a position.
+
 **STILL THE OWNER'S, AND UNPREJUDICED BY THE ABOVE**: whether the U-mode
 bundle should itself OWN a context (an `own_context cur_ctx` conjunct in
 `uvb`, the way `sie_cap_gpr` carries one kernel-side — TsoCtx ruling 2).
