@@ -123,8 +123,8 @@ Section UserretClosed.
      fills it with the returned WP -- before any kernel excursion, so every
      syscall park sees a whole residue.  Nothing on this path mints. *)
   Definition Rut_hole (h : CpuId) : uptd -> iProp Σ :=
-    fun p => (∃ ksp : mword 64,
-                (uexec_wp -∗ UV.usertrap_res_bare (CID := h) p ksp))%I.
+    fun p => (∃ (ksp : mword 64) (U : ustate),
+                (uexec_wp -∗ UV.usertrap_res_bare (CID := h) p ksp U))%I.
 
   Lemma stvec_handler_loop (j : nat) :
     (j < NPROC)%nat ->
@@ -156,7 +156,7 @@ Section UserretClosed.
         #Hsenvc & #Hmsec & #Hssec & Hrut)".
     (* ---- and DEPOSIT: the hole, filled with the WP that just came back, is
            the whole residue again.  This is the trap-entry seam. ---- *)
-    iDestruct "Hrut" as (ksp) "Hhole".
+    iDestruct "Hrut" as (ksp Ur) "Hhole".
     iDestruct ("Hhole" with "Hnext") as "Hures".
     (* the three counter-permission cells [user_cfg] carries.  The opener
        does not hand them back (they are [box] and the builder keeps its own
@@ -165,7 +165,7 @@ Section UserretClosed.
        [UsertrapRes.ut_res_bare_sstc] for why the third cannot ride
        [hw_config] too. *)
     iDestruct (hw_config_counters with "Hhw") as (scen hpm) "[#Hscen #Hhpm]".
-    iDestruct (UV.usertrap_res_sstc pt ksp with "Hures") as "[Hsstc Hures]".
+    iDestruct (UV.usertrap_res_sstc pt ksp Ur with "Hures") as "[Hsstc Hures]".
     iDestruct "Hsstc" as (mcen) "[#Hmcen _]".
     (* ---- and rebuild it for uservec at the EMPTY residue ---- *)
     iDestruct (user_trap_frame_intro C pt (fun _ : uptd => emp%I)
@@ -179,24 +179,24 @@ Section UserretClosed.
       iSplitR; [iExists mcen, scen; iFrame "Hmcen Hscen" | iExists hpm; iFrame "Hhpm"]. }
     { done. }
     (* ---- one round ---- *)
-    iApply (UV.wp_uservec_pt C pt (fun _ : uptd => emp%I) j ksp
+    iApply (UV.wp_uservec_pt C pt (fun _ : uptd => emp%I) j ksp Ur
               Hstv Hdqc Hmie Hj Hnorm Hptwf
               with "Hkt Hhw Hmin Hclaim Hframe Hures [-]").
     iApply wp_next_intro. iIntros (CID').
     rewrite /uservec_post.
-    iIntros (pt' mf ms' usatp uepc sc' stval' mdv0)
+    iIntros (pt' mf ms' usatp uepc sc' stval' mdv0 U2)
       "%Hpttf %Hmapwf %Hsatpr %Hnorm' %Hptwf' %Hmm %Hretms %Hacc'
        Hhs' Hpriv' Hms' Hmie' Hmdl' Hmenv' Hstvec' #Hsenv' Hsc' Hstval' Hsepc'
        Hupt' Hpc' Hgpr' Hures' #Hhw' #Hmin'".
     (* the three frozen CSRs, duplicated out of the residue for [user_cfg] *)
-    iDestruct (UV.usertrap_res_csrs_open (CID := CID') pt' ksp with "Hures'")
+    iDestruct (UV.usertrap_res_csrs_open (CID := CID') pt' ksp U2 with "Hures'")
       as "[Hcsrs Hcback]".
     iDestruct "Hcsrs" as "(Hssc' & #Hmedl' & #Hmse' & #Hsse')".
     iDestruct ("Hcback" with "[Hssc']") as "Hures'".
     { iFrame "Hssc' Hmedl' Hmse' Hsse'". }
     (* the same three, at the hart the round LANDED on *)
     iDestruct (hw_config_counters with "Hhw'") as (scen' hpm') "[#Hscen' #Hhpm']".
-    iDestruct (UV.usertrap_res_sstc pt' ksp with "Hures'") as "[Hsstc' Hures']".
+    iDestruct (UV.usertrap_res_sstc pt' ksp U2 with "Hures'") as "[Hsstc' Hures']".
     iDestruct "Hsstc'" as (mcen') "[#Hmcen' _]".
     (* ---- THE SLOT: OUT of the residue, AND NOTHING BACK IN.  [Hback] --
            the accessor's closer, a plain wand -- is not discarded and is not
@@ -205,7 +205,7 @@ Section UserretClosed.
            execution returns at the next trap.  That is the circulation
            (MILESTONE G): the loop is now a pure conduit for a resource it
            never creates. ---- *)
-    iDestruct (UV.usertrap_res_uwp_acc (CID := CID') pt' ksp with "Hures'")
+    iDestruct (UV.usertrap_res_uwp_acc (CID := CID') pt' ksp U2 with "Hures'")
       as "[Huwp Hback]".
     (* the resume state, ROW BY ROW: the slot takes it CONCRETE (that is what
        a verified program's WP needs), so the [user_inv] packing that used to
@@ -243,7 +243,7 @@ Section UserretClosed.
                HXS HSD HMPP HSPIE).
     - (* [Rut] at the resuming hart: the residue MINUS the WP, i.e. the
          accessor's closer, waiting for what user execution returns *)
-      iExists ksp. iExact "Hback".
+      iExists ksp, U2. iExact "Hback".
     - (* the next round's contract, under the later the slot takes it at --
          which is exactly the shape of the Löb hypothesis, return channel
          and all *)
@@ -303,9 +303,9 @@ End Res.
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (C : ucfg) (pt : uptd)
       (kroot : mword 44) (j : nat) (ksp : mword 64)
-      (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64) :
+      (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64) (U : ustate) :
       wp_userret_closed_body (fun h : CpuId => usertrap_res_bare (CID := h))
-        C pt kroot j ksp m usatp mstatus0 sepc0 sc_v stval_v.
+        C pt kroot j ksp m usatp mstatus0 sepc0 sc_v stval_v U.
   Proof.
     cbv beta delta [wp_userret_closed_body].
     intros Hok Hj Hretms Hwf Ha0 Hsatpr Hinj Hacc.
@@ -334,7 +334,7 @@ End Res.
        capability.  All three are [↦ᵣ□], so nothing is spent and nothing has
        to come back. *)
     iDestruct (hw_config_counters with "Hhw") as (scen hpm) "[#Hscen #Hhpm]".
-    iDestruct (usertrap_res_sstc pt ksp with "Hures") as "[Hsstc Hures]".
+    iDestruct (usertrap_res_sstc pt ksp U with "Hures") as "[Hsstc Hures]".
     iDestruct "Hsstc" as (mcen) "[#Hmcen _]".
     (* THE SLOT THE FIRST ROUND RUNS, out of the residue this entry parks,
        AND the trapframe words userret is about to read -- from ONE opener.
@@ -344,8 +344,11 @@ End Res.
        opener hands back is the HOLED closer, [uexec_wp -∗ bare], and that
        is exactly [LP.Rut_hole CID pt] -- the residue this entry parks,
        waiting for the WP user execution returns at its first trap. *)
-    iDestruct (usertrap_res_run_open pt ksp with "Hures") as "[Huwp Hopen]".
-    iDestruct "Hopen" as (kroot' ws) "(#Hkpt' & %Hokws & Htfp & Hclose)".
+    iDestruct (usertrap_res_run_open pt ksp U with "Hures") as "[Huwp Hopen]".
+    iDestruct "Hopen" as (kroot') "(#Hkpt' & %Hokws & Htfp & Hclose)".
+    (* the borrowed words ARE the residue index's -- named so the open below
+       substitutes a variable, exactly as it did before the re-key *)
+    remember (pv_tf (us_V U)) as ws eqn:Hws.
     iDestruct (tf_page_length with "Htfp") as %Hlenws.
     iDestruct (tf_page_open36 (ud_tfp pt) ws Hlenws with "Htfp") as
       (u0 u1 u2 u3 u4 u40 u48 u56 u64 u72 u80 u88 u96 u104 u112 u120 u128 u136 u144 u152 u160 u168 u176 u184 u192 u200 u208 u216 u224 u232 u240 u248 u256 u264 u272 u280) "(-> & Hu0 & Hu8 & Hu16 & Hu24 & Hu32 & Htf40 & Htf48 & Htf56 & Htf64 & Htf72 & Htf80 & Htf88 & Htf96 & Htf104 & Htf112 & Htf120 & Htf128 & Htf136 & Htf144 & Htf152 & Htf160 & Htf168 & Htf176 & Htf184 & Htf192 & Htf200 & Htf208 & Htf216 & Htf224 & Htf232 & Htf240 & Htf248 & Htf256 & Htf264 & Htf272 & Htf280 & Htail)".
@@ -364,7 +367,7 @@ End Res.
          completed by the words userret gives back -- and landing in the
          HOLED form, since the WP is out too *)
       iIntros "K40 K48 K56 K64 K72 K80 K88 K96 K104 K120 K128 K136 K144 K152 K160 K168 K176 K184 K192 K200 K208 K216 K224 K232 K240 K248 K256 K264 K272 K280 K112".
-      iExists ksp.
+      iExists ksp, _.
       iDestruct (tf_page_close36 (ud_tfp pt) u0 u1 u2 u3 u4 u40 u48 u56 u64 u72 u80 u88 u96 u104 u112 u120 u128 u136 u144 u152 u160 u168 u176 u184 u192 u200 u208 u216 u224 u232 u240 u248 u256 u264 u272 u280
                 with "Hu0 Hu8 Hu16 Hu24 Hu32 K40 K48 K56 K64 K72 K80 K88 K96 K104 K112 K120 K128 K136 K144 K152 K160 K168 K176 K184 K192 K200 K208 K216 K224 K232 K240 K248 K256 K264 K272 K280 Htail") as "Htfp'".
       (* the kernel words are untouched: userret only READ the page *)

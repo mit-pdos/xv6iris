@@ -106,14 +106,14 @@ Section UservecAllPt.
 
 
   Lemma wp_uservec_pt (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
-      (j : nat) (vksp : mword 64) :
+      (j : nat) (vksp : mword 64) (U : ustate) :
     (* [UT.]-qualified, not the section alias: inside a section that FIXES
        [CID], the alias has no [CID] implicit left to instantiate (section
        variables are discharged only at [End]).  The module-type parameter
        still does, and the two are convertible, so the [: USERVEC] check
        accepts it. *)
     wp_uservec_pt_body (fun h : CpuId => UT.usertrap_res_bare (CID := h))
-      C pt Rut j vksp.
+      C pt Rut j vksp U.
   Proof.
     cbv beta zeta delta [wp_uservec_pt_body].
     (* [tf_pa] deliberately NOT unfolded here: its 35 trapframe cells ride in
@@ -155,8 +155,11 @@ Section UservecAllPt.
        sealed, so one opener hands out both. *)
     (* ... and with them the KERNEL ROOT the residue's kernel_satp names,
        with its [kpt_inv]: this is the [kroot] the exit switch installs. *)
-    iDestruct (usertrap_res_tf_csrs_open pt vksp with "Hures") as (kroot ws0)
+    iDestruct (usertrap_res_tf_csrs_open pt vksp U with "Hures") as (kroot)
       "(#Hkfr & %Hok0 & Htf0 & Hcsrs0 & Hclose0)".
+    (* the borrowed words ARE the residue's index's, named so the open below
+       substitutes a variable exactly as it did before the re-key *)
+    remember (pv_tf (us_V U)) as ws0 eqn:Hws0.
     pose proof Hok0 as Hok0k.
     iDestruct "Hcsrs0" as "(Hssc0 & Hmdlc & Hmsec & Hssec)".
     iDestruct "Hssc0" as (sscr0) "Hsscr".
@@ -1565,7 +1568,7 @@ Section UservecAllPt.
     { rewrite proc_pt_split. iFrame "Hdata". iSplitR; [iPureIntro; exact Hptwf|].
       iExact "Hufr". }
     iEval (rewrite /proc_pt_any) in "Hpt".
-    iDestruct (usertrap_res_pt_close pt vksp with "Hures' Hpt") as "Hures'".
+    iDestruct (usertrap_res_pt_close with "Hures' Hpt") as (Mz) "Hures'".
     (* THE TRANSLATION SLOT, INJECTED.  [Hkres] is the [tlb_res_pt kroot]
        the exit switch just produced by writing the kernel root into satp --
        and it is exactly the piece the PARKED residue is missing.  usertrap
@@ -1574,15 +1577,15 @@ Section UservecAllPt.
        [Hkres] across the call would leave usertrap's own [sie_cap_gpr]
        without a translation slot on one side and double-own satp on the
        other. *)
-    iDestruct (usertrap_res_tlb_close pt vksp kroot with "Hures' Hkres") as "Hures'".
+    iDestruct (usertrap_res_tlb_close with "Hures' Hkres") as "Hures'".
     iEval (rewrite Hstvec) in "Hstvec".
     iApply (UT.wp_usertrap pt j (<[Regidx (mword_of_int 1) := regval_into_reg (uva 0x9c)]> M7)
-              ms_v sc_v stval_v sepc_v vksp (uc_mie C) (uc_mideleg C) MENVCFG_S
+              ms_v sc_v stval_v sepc_v vksp (uc_mie C) (uc_mideleg C) MENVCFG_S _
               Hums Hjlt Hspv' Htpv' Hmie Hmm Hmenvval0
               with "Hkt Hpc Hhw Hinv Hhs Hpriv Hms Hsc Hstval Hsepc Hstvec Hmie Hmdl Hmenv Hfile Hures'").
     iApply wp_next_intro. iIntros (CID2).
     iEval (rewrite /usertrap_post).
-    iIntros (pt' mf ms' usatp uepc sc' stval' mdv0)
+    iIntros (pt' mf ms' usatp uepc sc' stval' mdv0 U2)
       "%Hmask %Hpttf %Haccwf %Hmapwf %Hretms %Hsconf2 %Hcalleesaved %Htpcid %Ha0usatp %Hsatprooted
        Hhs2 Hpriv2 Hms2 Hsc2 Hstval2 Hsepc2 Hstvec2 Hpc2 Hfile2 Hmie3 Hmdl3 Hmenv3 #Hhw2 #Hmin2 Hures2".
     (* ============ open usertrap_res A SECOND TIME, for userret ========== *)
@@ -1597,16 +1600,17 @@ Section UservecAllPt.
        whatever usertrap left there.  That is the whole reason the residue
        carries the address space across the kernel excursion instead of
        uservec framing it. *)
-    iDestruct (UT.usertrap_res_tlb_open (CID:=CID2) pt' vksp with "Hures2")
+    iDestruct (UT.usertrap_res_tlb_open (CID:=CID2) pt' vksp U2 with "Hures2")
       as (kroot2) "[Hkres2 Hures2]".
-    iDestruct (UT.usertrap_res_pt_open (CID:=CID2) pt' vksp with "Hures2")
+    iDestruct (UT.usertrap_res_pt_open (CID:=CID2) pt' vksp U2 with "Hures2")
       as "[Hpt' Hures2]".
     iDestruct "Hpt'" as (Mpt') "Hpt'".
     iDestruct (proc_pt_forget with "Hpt'") as "Hpt'".
     iEval (rewrite proc_pt_split) in "Hpt'".
     iDestruct "Hpt'" as "[(%Hptwf' & Hufr') Hdata']".
-    iDestruct (UT.usertrap_res_tf_open (CID:=CID2) pt' vksp with "Hures2") as (kroot1 ws1)
+    iDestruct (UT.usertrap_res_tf_open (CID:=CID2) pt' vksp U2 with "Hures2") as (kroot1)
       "(#Hinv1 & %Hok1 & Htf1 & Hclose1)".
+    remember (pv_tf (us_V U2)) as ws1 eqn:Hws1.
     iDestruct (tf_page_length with "Htf1") as %Hlen1.
     iDestruct (tf_page_open36 (ud_tfp pt') ws1 Hlen1 with "Htf1") as
       (u0 u1 u2 u3 u4
@@ -1691,7 +1695,7 @@ Section UservecAllPt.
          After this the post holds the user address space EXACTLY ONCE, in
        the user's view, beside a residue that holds none of it. *)
     iDestruct (user_pt_inv_close pt' Hptwf' with "Hutlb3 Hdata'") as "Hupt3".
-    iDestruct (UT.usertrap_res_bare_norm (CID:=CID2) pt' vksp with "Hures3") as "Hures3".
+    iDestruct (UT.usertrap_res_bare_norm (CID:=CID2) pt' vksp _ with "Hures3") as "Hures3".
     (* THE CONTINUATION LANDS AT THE RESUMING HART.  [Hcont] is a [wp_next]
        over the hart usertrap came back on; at a real proc the pinning
        condition is refutable ([proc_addr j <> zero_reg] from [Hjlt]), so it
@@ -1706,7 +1710,7 @@ Section UservecAllPt.
     iApply ("Hcont" $! (ud_norm pt') (userret_gpr mf u40 u48 u56 u64 u72 u80 u88 u96 u104 u120 u128
                               u136 u144 u152 u160 u168 u176 u184 u192 u200 u208 u216 u224 u232
                               u240 u248 u256 u264 u272 u280 u112)
-             ms' usatp uepc sc' stval' mdv0
+             ms' usatp uepc sc' stval' mdv0 _
              with "[%] [%] [%] [%] [%] [%] [%] [%] Hhs3 Hpriv3 Hms3 Hmie4 Hmdl4 Hmenv4 Hstvec2 Hsenv3 Hsc2 Hstval2 Hsepc3
                     Hupt3 Hpc3 Hfile3 Hures3 Hhw2 Hmin2").
     - exact Hpttf.

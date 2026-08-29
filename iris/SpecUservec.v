@@ -95,6 +95,7 @@ Require Import UserPtTree UserExec.
 Require Import MstatusBits.
 Require Import ProcGeom.
 Require Import ProcPtOwn.   (* [proc_pt] / [ud_pas] / [ud_norm] -- the address-space split *)
+Require Import ProcDefs.    (* [ustate] -- the residue's index *)
 Require Import Xv6Cameras.
 (* [usertrap_res]'s own signature (SpecUsertrap.v/USERTRAP_RES) is stated
    over these fourteen classes; unqualified [lockG]/[fdslotG]/... below
@@ -142,9 +143,10 @@ Definition uservec_gpr (g : regfile) (vksp vkhart vktr vksat : bv 64) : regfile 
    [wp_uservec_pt], via [Include USERTRAP_RES]) to supply, not for this
    definition to re-demand. *)
 Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (URes : uptd -> mword 64 -> iProp Σ)
+    (URes : uptd -> mword 64 -> ustate -> iProp Σ)
     (C : ucfg) (pt : uptd) (vksp : mword 64) : iProp Σ :=
-  ( ∀ (pt' : uptd) (mf : regfile) (ms' usatp uepc sc' stval' mdv0 : mword 64),
+  ( ∀ (pt' : uptd) (mf : regfile) (ms' usatp uepc sc' stval' mdv0 : mword 64)
+      (U' : ustate),
     ⌜ud_tfp pt' = ud_tfp pt⌝ -∗
     ⌜upt_map_wf (ud_um pt')⌝ -∗
     ⌜satp_rooted usatp (ud_root pt')⌝ -∗
@@ -206,7 +208,7 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{
        same as at entry -- see the header and
        claude-notes/completed/usertrap.md.  Folding this bundle into the
        user-mode loop is USER-module work, not this spec's. *)
-    URes pt' vksp -∗
+    URes pt' vksp U' -∗
     (* THE TWO AMBIENT-HART PERSISTENT BUNDLES, AT THE RESUMING HART.  Both
        are per-hart -- [hw_config]'s cells and the body of [minstret_inv]'s
        invariant are this hart's -- so a caller's pre-crossing copy is a
@@ -228,9 +230,9 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : Gen
        (SpecUsertrap.v's own [wp_next true pj] crossing), so everything
        after that call -- the residue included -- is a resource AT WHATEVER
        HART RESUMED.  Same shape, same reason, as [wp_usertrap_body]'s [R]. *)
-    (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
+    (URes : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ)
     (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
-    (j : nat) (vksp : mword 64) :=
+    (j : nat) (vksp : mword 64) (U : ustate) :=
   (* stvec points at the trampoline base *)
   uc_stvec C = mword_of_int TRAMPOLINE ->
   (* the kernel owns the config cells outright at this join (same fact the
@@ -297,7 +299,7 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : Gen
      unrelated to [Rut] (which stays fully abstract: uservec's own proof
      never opens it, exactly like [mie]/[mideleg]/[menvcfg] ride through
      [user_cfg] untouched). *)
-  URes CID pt vksp -∗
+  URes CID pt vksp U -∗
   (* THE CONTINUATION, ACROSS THE CROSSING.  userret's own exit shape plus
      the leftover bare residue -- but at whatever hart usertrap resumed on,
      not the one uservec entered at.  Everything in [uservec_post] is
@@ -324,7 +326,7 @@ Module Type USERVEC.
   Parameter wp_uservec_pt :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
-      (j : nat) (vksp : mword 64),
+      (j : nat) (vksp : mword 64) (U : ustate),
       (* THE BARE RESIDUE, not [usertrap_res] and not even the parked form.
          [usertrap_res] and this spec's own [user_trap_frame] premise claim
          THE SAME FOUR RESOURCES -- satp/tlb, the user page-table tree, the
@@ -339,5 +341,5 @@ Module Type USERVEC.
          the same two moves in reverse.  See
          claude-notes/projects/uservec.md. *)
       wp_uservec_pt_body (fun h : CpuId => usertrap_res_bare (CID := h))
-        C pt Rut j vksp.
+        C pt Rut j vksp U.
 End USERVEC.

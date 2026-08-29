@@ -668,12 +668,12 @@ Proof.
   { rewrite /forkret_yield.
     iSplitL "Hparked"; [iExact "Hparked" | iExact "Hpnopt"]. }
   iDestruct (ut_tfk_upd_upt (CID := CIDf) ksp V' pt with "Htfk") as "#Htfk'".
-  iDestruct ("Hyield" $! CIDf pt (upd_upt V' pt)
+  iDestruct ("Hyield" $! CIDf pt (MkUstate (upd_upt V' pt) (us_M U))
                with "[%] [%] [%] [%] Htfk' Hdone HW Htc Hyld")
     as "Hures"; [reflexivity | exact Hnorm | exact Hptwf | | ].
   (* the resumed record names the parked process's fd-state ghost: forkret
      moved only [pv_upt], and [upd_upt] does not touch [pv_fdg]. *)
-  { cbn [pv_fdg upd_upt]. exact Hfg. }
+  { exact Hfg. }
   (* ---- the config record for this round ---- *)
   assert (HSEa0 : tp_pin SE !!! Regidx (mword_of_int 10)
                   = kvi_satp_word (ud_root pt)).
@@ -681,7 +681,7 @@ Proof.
     rewrite /SD upd_eq HuptV'. reflexivity. }
   iApply (UC.wp_userret_closed (CID := CIDf)
             (loop_ucfg mdv0 Hmask) pt kroot j ksp (tp_pin SE)
-            (kvi_satp_word (ud_root pt)) msg (mepc_val epc) scv stv
+            (kvi_satp_word (ud_root pt)) msg (mepc_val epc) scv stv _
             (loop_ok_loop_ucfg mdv0 Hmask pt Hnorm Hptwf)
             Hjlt
             Hretms Hmapwf HSEa0

@@ -584,7 +584,7 @@ Section UtRet2.
     iSpecialize ("Hcont" $! CID with "[%]"); [intros _; reflexivity|].
     iDestruct ("Hownback" $! U with "Hpv Hufr Hsy") as "Hown".
     iApply ("Hcont" $! (pv_upt (us_V U)) (tp_pin S9) msg
-              (kvi_satp_word (ud_root (pv_upt (us_V U)))) (mepc_val uepc) scv stv mdv0
+              (kvi_satp_word (ud_root (pv_upt (us_V U)))) (mepc_val uepc) scv stv mdv0 U
               with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                     Hhs Hpriv Hms Hscause Hstval Hsepc [Hstvec] Hpc [Hfile]
                     Hmie Hmdl Hmenv Hhw Hmin [-]").
@@ -604,7 +604,7 @@ Section UtRet2.
          is what [sie_cap_gpr] was holding all along -- no [tp_pin_id] step. *)
       iExact "Hfile".
     - (* [ut_res] rebuilt at the exit hart *)
-      iExists N, U, av.
+      iExists N, av.
       iSplitR; [iPureIntro; reflexivity|].
       iSplitR; [iPureIntro; exact Hksp|].
       iSplitR; [iPureIntro; exact (conj Hj (conj Hjl (conj Hlen Hlg)))|].

@@ -135,7 +135,7 @@ Definition forkret_park_pkg
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
     (* the trap loop's kernel-side bundle, abstract exactly as [SpecForkret]
        takes it *)
-    (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
+    (URes : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ)
     (* what the closer is handed at the resume beside [first_done] -- the
        park token, abstract here; see [SpecForkret] and ParkCap.v *)
     (W : iProp Σ)
@@ -184,8 +184,8 @@ Definition forkret_park_pkg
           forkret pays both instead (SpecForkret.v, "...AND THE CLOSER IS
           HANDED [first_done]") and the builder here owes only the
           persistent rows neither supplies. *)
-   (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
-      ⌜pv_upt V' = pt'⌝ -∗
+   (∀ (h : CpuId) (pt' : uptd) (U' : ustate),
+      ⌜pv_upt (us_V U') = pt'⌝ -∗
       ⌜ud_data pt' = ud_pas pt'⌝ -∗
       ⌜proc_pt_wf pt'⌝ -∗
       (* THE fd-STATE GHOST NAME IS THE PARKED ONE.  The bundle the parker
@@ -194,8 +194,8 @@ Definition forkret_park_pkg
          reassigns a live process's descriptor ghost (only allocproc chooses
          one).  Saying so here is what lets the closed-over bundle be handed
          to the residue at [V']. *)
-      ⌜pv_fdg V' = g⌝ -∗
-      UsertrapRes.ut_tfk (CID := h) (add_vec ks (mword_of_int 4096)) V' -∗
+      ⌜pv_fdg (us_V U') = g⌝ -∗
+      UsertrapRes.ut_tfk (CID := h) (add_vec ks (mword_of_int 4096)) (us_V U') -∗
       FirstTok.first_done -∗
       W -∗
  (* THE RESUMING HART'S TIMER CAPABILITY.  It is a conjunct of
@@ -206,14 +206,14 @@ Definition forkret_park_pkg
     could not hold it.  forkret has one, out of the very capability it
     is about to hand back. *)
       TimerCap.timer_cap (CID := h) -∗
-      forkret_yield (CID := h) γf pa (add_vec ks (mword_of_int 4096)) pid av V' -∗
+      forkret_yield (CID := h) γf pa (add_vec ks (mword_of_int 4096)) pid av (us_V U') -∗
       fd_slots FDSPARE -∗
       iref_slots IREFSPARE -∗
-      URes h pt' (add_vec ks (mword_of_int 4096))))%I.
+      URes h pt' (add_vec ks (mword_of_int 4096)) U'))%I.
 
 Definition forkret_park_paid_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (URes : CpuId -> uptd -> mword 64 -> iProp Σ) (W : iProp Σ)
+    (URes : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ) (W : iProp Σ)
     (γs : list gname) (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
     (pid : mword 32) (U : ustate) (av : nat) : Prop :=
   (length rest = 12%nat) ->

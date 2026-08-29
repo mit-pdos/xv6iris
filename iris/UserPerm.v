@@ -63,6 +63,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExtras RiscvFetchExec.
 Require Import WpDecodeBridge.  (* [dstate] -- one concrete machine state to refute a denial at *)
 Require Import PtAdBits PtTree Pt4kWalk UptTree.
+Require Import PtBuild.  (* [mappages_pte] -- vmfault's leaf, whose bits §8 reads *)
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -630,4 +631,172 @@ Proof.
   destruct Hs as [b' Hb'].
   pose proof (lookup_weaken _ _ _ _ Hb' Hsub) as H1.
   rewrite Hb in H1. injection H1 as ->. exact Hb'.
+Qed.
+
+(* ===================================================================== *)
+(* §8 THE FILL IS TRANSPARENT UNDER AN RW EXTENSION (milestone J, R4).    *)
+(*                                                                         *)
+(* [vmfault] maps a first-touched page PTE_R|PTE_W|PTE_U -- which is       *)
+(* EXACTLY what the fill already said about it -- so the PROJECTION DOES   *)
+(* NOT MOVE when the table gains such a leaf inside the live region.  That *)
+(* is what makes the page-fault arm of the trap contract transparent       *)
+(* ([UexecRet.uexec_ret] hands the slot back at the same key), and, stated *)
+(* over an EXTENSION rather than a single insert, it is the same fact the  *)
+(* buffer-touching syscall arms need: their descriptors grow by exactly    *)
+(* these faults, one per page copyin/copyout/copyinstr touches.            *)
+(*                                                                         *)
+(* THE TWO PREMISES ARE WHAT A GAINED LEAF MUST SATISFY, and both are      *)
+(* necessary: a gained leaf OUTSIDE the live region adds an entry the fill *)
+(* did not have, and a gained leaf that is not exactly RW-user either adds *)
+(* X (moving the entry) or drops U/R (removing the fill's own entry).      *)
+(* Neither is derivable from [ProcPtOwn.uptd_ext] (same root/tfp, submap)  *)
+(* nor from [uptd_ext_sz], which pins the gained VPN's range and says      *)
+(* nothing about its bits; a caller supplies them.  At the trap round's    *)
+(* vmfault arm both come for free -- [SpecVmfault]'s success arm returns   *)
+(* the literal [uptd_insert], and [perm_of_uptd_insert] below is that      *)
+(* instance.                                                               *)
+(* ===================================================================== *)
+
+(* vmfault's leaf, PROJECTED.  [uptd_insert] inserts [uvm_pte 22 r], and
+   22 = PTE_U|PTE_W|PTE_R with no X (mappages ors in PTE_V), so the six flag
+   bits are 0b010111 and the projection is [uperm_rw] -- the very value the
+   fill gives an unmapped live page.  Computed on the FLAG POSITIONS only:
+   the ppn stays symbolic. *)
+Lemma perm_leaf_uvm_pte22 (r : mword 64) :
+  perm_leaf (uvm_pte 22 r) = Some uperm_rw.
+Proof.
+  assert (Hlow : forall a b k : Z, 0 <= b < 1024 -> 0 <= k < 10 ->
+                   Z.testbit (a * 1024 + b) k = Z.testbit b k).
+  { intros a b k Hb Hk.
+    replace (a * 1024 + b) with (b + a * 1024) by lia.
+    rewrite <- (Z.mod_pow2_bits_low (b + a * 1024) 10 k); [| lia].
+    change (2 ^ 10) with 1024.
+    rewrite Z_mod_plus_full, (Z.mod_small b 1024 Hb). reflexivity. }
+  unfold uvm_pte, mappages_pte.
+  change (Z.lor 22 1) with 23.
+  unfold perm_leaf, perm_bits, pte_bit, uperm_rw.
+  rewrite (mk_pte_unsigned _ 23 ltac:(lia)).
+  rewrite (Hlow _ 23 4 ltac:(lia) ltac:(lia)).
+  rewrite (Hlow _ 23 1 ltac:(lia) ltac:(lia)).
+  rewrite (Hlow _ 23 3 ltac:(lia) ltac:(lia)).
+  rewrite (Hlow _ 23 2 ltac:(lia) ltac:(lia)).
+  reflexivity.
+Qed.
+
+(* the projection at one page, in one equation: the leaf's bits if the table
+   maps it, the fill's [uperm_rw] if the page is live, nothing otherwise *)
+Lemma perm_of_lookup (um : gmap (mword 27) (mword 64)) (sz : Z) (p : mword 27) :
+  perm_of um sz !! p
+  = match um !! p with
+    | Some w => perm_leaf w
+    | None => if bool_decide (p ∈ live_pages sz) then Some uperm_rw else None
+    end.
+Proof.
+  unfold perm_of, perm_fill.
+  destruct (um !! p) as [w |] eqn:Hp.
+  - destruct (perm_leaf w) as [q |] eqn:Hq.
+    + apply lookup_union_Some_l. rewrite lookup_omap, Hp. exact Hq.
+    + apply lookup_union_None. split.
+      * rewrite lookup_omap, Hp. exact Hq.
+      * apply lookup_gset_to_gmap_None. intros Hin.
+        apply elem_of_difference in Hin as [_ Hnd].
+        apply Hnd, elem_of_dom. exists w. exact Hp.
+  - rewrite lookup_union_r; [| rewrite lookup_omap, Hp; reflexivity ].
+    destruct (bool_decide (p ∈ live_pages sz)) eqn:Hb.
+    + apply bool_decide_eq_true in Hb.
+      apply lookup_gset_to_gmap_Some. split; [| reflexivity ].
+      apply elem_of_difference. split; [ exact Hb |].
+      apply not_elem_of_dom. exact Hp.
+    + apply bool_decide_eq_false in Hb.
+      apply lookup_gset_to_gmap_None. intros Hin.
+      apply elem_of_difference in Hin as [Hl _]. exact (Hb Hl).
+Qed.
+
+(* THE LEMMA (R4), stated over an extension by RW-user leaves inside the
+   live region.  The vmfault arm and the buffer-touching syscall arms are
+   both instances; see the section header for why neither premise can be
+   dropped. *)
+Lemma perm_of_ext_rw (um um' : gmap (mword 27) (mword 64)) (sz : Z) :
+  um ⊆ um' ->
+  (forall (p : mword 27) (w : mword 64),
+     um !! p = None -> um' !! p = Some w ->
+     p ∈ live_pages sz /\ perm_leaf w = Some uperm_rw) ->
+  perm_of um' sz = perm_of um sz.
+Proof.
+  intros Hsub Hnew. apply map_eq. intros p.
+  rewrite !perm_of_lookup.
+  destruct (um !! p) as [w |] eqn:Hp.
+  - rewrite (lookup_weaken _ _ _ _ Hp Hsub). reflexivity.
+  - destruct (um' !! p) as [w' |] eqn:Hp'.
+    + destruct (Hnew p w' Hp Hp') as [Hl Hq].
+      rewrite Hq, (bool_decide_eq_true_2 _ Hl). reflexivity.
+    + reflexivity.
+Qed.
+
+(* ...at the descriptor tier, which is the vocabulary the kernel's own
+   [uptd_ext] facts are stated in *)
+Lemma perm_of_uptd_ext_rw (P P' : uptd) (sz : Z) :
+  uptd_ext P P' ->
+  (forall (p : mword 27) (w : mword 64),
+     ud_um P !! p = None -> ud_um P' !! p = Some w ->
+     p ∈ live_pages sz /\ perm_leaf w = Some uperm_rw) ->
+  perm_of (ud_um P') sz = perm_of (ud_um P) sz.
+Proof. intros (_ & _ & Hsub) Hnew. exact (perm_of_ext_rw _ _ sz Hsub Hnew). Qed.
+
+(* the live region, as the membership the fill is indexed by *)
+Lemma pgroundup_ge (x : Z) : 0 <= x -> x <= UserPtTree.pgroundup x.
+Proof.
+  intros Hx. unfold UserPtTree.pgroundup.
+  pose proof (Z_div_mod_eq_full (x + 4095) 4096) as Hd.
+  pose proof (Z.mod_pos_bound (x + 4095) 4096 ltac:(lia)) as Hm.
+  lia.
+Qed.
+
+Lemma live_pages_mem (sz : Z) (p : mword 27) :
+  bv_unsigned p * 4096 < UserPtTree.pgroundup sz -> p ∈ live_pages sz.
+Proof.
+  intros Hlt. unfold live_pages.
+  apply elem_of_list_to_set, elem_of_list_fmap.
+  exists (bv_unsigned p).
+  split; [ symmetry; apply Z_to_bv_bv_unsigned | ].
+  apply elem_of_seqZ.
+  pose proof (proj1 (bv_unsigned_in_range _ p)) as Hp0.
+  assert (Hq : UserPtTree.pgroundup sz / 4096 = (sz + 4095) / 4096)
+    by (unfold UserPtTree.pgroundup; apply Z.div_mul; lia).
+  rewrite Hq. unfold UserPtTree.pgroundup in Hlt. lia.
+Qed.
+
+(* THE VMFAULT ARM, discharged: [SpecVmfault]'s success arm returns exactly
+   [uptd_insert P (svpn_of va0) r] with [ud_um P !! svpn_of va0 = None] and
+   [uint va < uint szv], and [ProcPtOwn.svpn_of_below] turns the latter into
+   this lemma's range premise. *)
+Lemma perm_of_uptd_insert (P : uptd) (sz : Z) (vpn : mword 27) (r : mword 64) :
+  ud_um P !! vpn = None ->
+  bv_unsigned vpn * 4096 < UserPtTree.pgroundup sz ->
+  perm_of (ud_um (uptd_insert P vpn r)) sz = perm_of (ud_um P) sz.
+Proof.
+  intros Hn Hlt.
+  unfold uptd_insert, uptd_insert_perm. cbn [ud_um].
+  apply perm_of_ext_rw; [ apply insert_subseteq; exact Hn | ].
+  intros p w Hp Hp'.
+  destruct (decide (p = vpn)) as [-> | Hne].
+  - rewrite lookup_insert in Hp'. injection Hp' as <-.
+    split; [ exact (live_pages_mem sz vpn Hlt) | apply perm_leaf_uvm_pte22 ].
+  - rewrite lookup_insert_ne in Hp'; [| congruence ].
+    rewrite Hp in Hp'. discriminate Hp'.
+Qed.
+
+(* ...at the size the kernel actually carries ([p->sz] as a word) *)
+Lemma perm_of_uptd_insert_sz (P : uptd) (szv : mword 64) (vpn : mword 27)
+    (r : mword 64) :
+  ud_um P !! vpn = None ->
+  bv_unsigned vpn * 4096 < bv_unsigned szv ->
+  perm_of (ud_um (uptd_insert P vpn r)) (uint szv)
+  = perm_of (ud_um P) (uint szv).
+Proof.
+  intros Hn Hlt. apply (perm_of_uptd_insert P (uint szv) vpn r Hn).
+  rewrite uint_unsigned.
+  pose proof (pgroundup_ge (bv_unsigned szv)
+                (proj1 (bv_unsigned_in_range _ szv))) as Hge.
+  lia.
 Qed.

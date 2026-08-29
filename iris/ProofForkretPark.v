@@ -195,23 +195,23 @@ Proof.
   (* the child's two allowances are captured HERE, at the build, and fed
      to the closer at the resume: they are the record's, not the resuming
      hart's, and forkret itself never sees them. *)
-  iAssert (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
-             ⌜pv_upt V' = pt'⌝ -∗
+  iAssert (∀ (h : CpuId) (pt' : uptd) (U' : ustate),
+             ⌜pv_upt (us_V U') = pt'⌝ -∗
              ⌜ud_data pt' = ud_pas pt'⌝ -∗
              ⌜proc_pt_wf pt'⌝ -∗
              (* the resumed record names the same fd-state ghost the parked
                 one did -- see [SpecForkretParkPaid.forkret_park_pkg] *)
-             ⌜pv_fdg V' = pv_fdg (us_V U)⌝ -∗
-             UsertrapRes.ut_tfk (CID := h) (add_vec ks (mword_of_int 4096)) V' -∗
+             ⌜pv_fdg (us_V U') = pv_fdg (us_V U)⌝ -∗
+             UsertrapRes.ut_tfk (CID := h) (add_vec ks (mword_of_int 4096)) (us_V U') -∗
              first_done -∗
              W -∗
              TimerCap.timer_cap (CID := h) -∗
              forkret_yield (CID := h) γf (proc_addr j)
-               (add_vec ks (mword_of_int 4096)) pid av V' -∗
+               (add_vec ks (mword_of_int 4096)) pid av (us_V U') -∗
              FR.usertrap_res_bare (CID := h) pt'
-               (add_vec ks (mword_of_int 4096)))%I
+               (add_vec ks (mword_of_int 4096)) U')%I
     with "[Hclose Hfd Hirsp]" as "Hclose".
-  { iIntros (h pt' V') "%HV %Hnorm %Hptwf %Hfg #Htfk Hdone HW #Htc Hy".
+  { iIntros (h pt' U') "%HV %Hnorm %Hptwf %Hfg #Htfk Hdone HW #Htc Hy".
     iApply ("Hclose" with "[%] [%] [%] [%] Htfk Hdone HW Htc Hy Hfd Hirsp");
       [exact HV | exact Hnorm | exact Hptwf | exact Hfg]. }
   iIntros (h m eb') "%Hadm %Himg Hcg Hcpu Hpc Hcells Hpay".
@@ -295,8 +295,8 @@ Proof.
   iNext. iEval (rewrite /park_pkg) in "Hpkg". iEval (rewrite /forkret_park_pkg).
   iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hmk & Hstk & Hclose)".
   iFrame "Htext Hwire Hkmap Hpinv Hmk Hstk".
-  iIntros (h pt' V') "%HV %Hnorm %Hptwf %Hfg #Htfk Hdone HW #Htc [Htrap Hpv] Hfd Hirsp".
-  iApply ("Hclose" $! h pt' V'
+  iIntros (h pt' U') "%HV %Hnorm %Hptwf %Hfg #Htfk Hdone HW #Htc [Htrap Hpv] Hfd Hirsp".
+  iApply ("Hclose" $! h pt' U'
             with "[%] [%] [%] [%] Htfk Hdone HW Htc Htrap Hpv Hfd Hirsp");
     [exact HV | exact Hnorm | exact Hptwf | exact Hfg].
 Qed.

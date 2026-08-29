@@ -72,7 +72,7 @@ Section ParkCap.
      is this, verbatim).  [W] is what the residue closer is handed at the
      resume beside [first_done] and the timer capability. *)
   Definition park_pkg
-      (URB : CpuId -> uptd -> mword 64 -> iProp Σ) (W : iProp Σ)
+      (URB : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ) (W : iProp Σ)
       (γs : list gname) (γf : gname) (pa ks : mword 64)
       (* the parked process's fd-state ghost name -- see
          [SpecForkretParkPaid.forkret_park_pkg], which is this verbatim *)
@@ -84,21 +84,21 @@ Section ParkCap.
      procs_inv γs ∗
      pslot_used_at pa ∗
      stack_own (KTR := KT1) (add_vec ks (mword_of_int 4096)) av ∗
-     (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
-        ⌜pv_upt V' = pt'⌝ -∗
+     (∀ (h : CpuId) (pt' : uptd) (U' : ustate),
+        ⌜pv_upt (us_V U') = pt'⌝ -∗
         ⌜ud_data pt' = ud_pas pt'⌝ -∗
         ⌜proc_pt_wf pt'⌝ -∗
         (* the resumed record names the parked process's fd-state ghost *)
-        ⌜pv_fdg V' = g⌝ -∗
-        ut_tfk (CID := h) (add_vec ks (mword_of_int 4096)) V' -∗
+        ⌜pv_fdg (us_V U') = g⌝ -∗
+        ut_tfk (CID := h) (add_vec ks (mword_of_int 4096)) (us_V U') -∗
         first_done -∗
         W -∗
         timer_cap (CID := h) -∗
         ut_trap_parked (CID := h) pa (add_vec ks (mword_of_int 4096)) av ∅ -∗
-        proc_priv_nopt γf pa pid V' -∗
+        proc_priv_nopt γf pa pid (us_V U') -∗
         fd_slots FDSPARE -∗
         iref_slots IREFSPARE -∗
-        URB h pt' (add_vec ks (mword_of_int 4096))))%I.
+        URB h pt' (add_vec ks (mword_of_int 4096)) U'))%I.
 
   (* the child's own rows, the ones the park spends *)
   Definition park_child (γs : list gname) (γf : gname) (pa ks : mword 64)
@@ -112,7 +112,7 @@ Section ParkCap.
   (* THE CAP, at a given [W]: the statement of
      [SpecForkretParkPaid.forkret_park_paid_body], as a [□] wand *)
   Definition park_cap
-      (URB : CpuId -> uptd -> mword 64 -> iProp Σ) (W : iProp Σ)
+      (URB : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ) (W : iProp Σ)
       (γs : list gname) : iProp Σ :=
     (□ ∀ (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
          (pid : mword 32) (U : ustate) (av : nat),
@@ -130,35 +130,35 @@ Section ParkCap.
      the records of THIS table ([un_s N = γs]), which is all the token for
      [γs] ever parks *)
   Definition park_chan
-      (URB : CpuId -> uptd -> mword 64 -> iProp Σ) (W : iProp Σ)
+      (URB : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ) (W : iProp Σ)
       (γs : list gname) : iProp Σ :=
     (□ ∀ (N : ut_names) (av : nat),
        ⌜un_s N = γs⌝ -∗ ⌜ut_wf N⌝ -∗ ⌜(K_usertrap <= av)%nat⌝ -∗
        ▷ (park_env N -∗ park_own N -∗
-          (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
-             ⌜pv_upt V' = pt'⌝ -∗
-             ut_tfk (CID := h) (add_vec (un_ks N) (mword_of_int 4096)) V' -∗
+          (∀ (h : CpuId) (pt' : uptd) (U' : ustate),
+             ⌜pv_upt (us_V U') = pt'⌝ -∗
+             ut_tfk (CID := h) (add_vec (un_ks N) (mword_of_int 4096)) (us_V U') -∗
              first_done -∗
              W -∗
              timer_cap (CID := h) -∗
              ut_trap_parked (CID := h) (un_pj N)
                (add_vec (un_ks N) (mword_of_int 4096)) av ∅ -∗
-             proc_priv_nopt (un_f N) (un_pj N) (un_pid N) V' -∗
+             proc_priv_nopt (un_f N) (un_pj N) (un_pid N) (us_V U') -∗
              fd_slots FDSPARE -∗
              iref_slots IREFSPARE -∗
-             fd_frags_any (pv_fdg V') -∗
+             fd_frags_any (pv_fdg (us_V U')) -∗
              (* ...and the child's user-execution WP, mirroring
                 [UsertrapRes.ut_park_intro_body] row for row.  Like the fd
                 fragments above it, it is CAPTURED AT THE PARK
                 ([park_token_park] below) rather than supplied by the
                 resumer, so it does not appear in [park_pkg]'s closer. *)
              uexec_wp -∗
-             URB h pt' (add_vec (un_ks N) (mword_of_int 4096)))))%I.
+             URB h pt' (add_vec (un_ks N) (mword_of_int 4096)) U')))%I.
 
   (* THE TOKEN: some residue, its cap and its channel, both at [W := the
      token itself] *)
   Definition park_token_F (γs : list gname) (X : iProp Σ) : iProp Σ :=
-    (∃ URB : CpuId -> uptd -> mword 64 -> iProp Σ,
+    (∃ URB : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ,
        park_cap URB X γs ∗ park_chan URB X γs)%I.
 
   Local Instance park_token_F_contractive γs : Contractive (park_token_F γs).
@@ -229,10 +229,10 @@ Section ParkCap.
       iNext.
       iFrame "Htext Hwire Hkmap Hprocs Hslot Hstack".
       iDestruct ("Hclose" with "Henv Hown") as "Hclose'".
-      iIntros (h pt' V') "%Hupt %Hnorm %Hptwf %Hfg #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
+      iIntros (h pt' U') "%Hupt %Hnorm %Hptwf %Hfg #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
       (* the parked bundle, re-keyed onto the resumed record *)
       iEval (rewrite -Hfg) in "Hfrag".
-      iApply ("Hclose'" $! h pt' V'
+      iApply ("Hclose'" $! h pt' U'
                 with "[%] Htfk Hdone HW Htc Htrap Hpriv Hfd Hiref Hfrag Huwp").
       exact Hupt.
     - iNext. iExact "Htok".
@@ -245,7 +245,7 @@ Section ParkCap.
   (* [usertrap_res_bare_park], both at [URB := usertrap_res_bare].          *)
   (* ------------------------------------------------------------------- *)
   Lemma park_token_intro_of
-      (URB : CpuId -> uptd -> mword 64 -> iProp Σ) (γs : list gname) :
+      (URB : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ) (γs : list gname) :
     (forall N av, ut_park_intro_body URB (park_token (un_s N)) N av) ->
     park_cap URB (park_token γs) γs -∗
     park_token γs.
