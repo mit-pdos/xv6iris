@@ -181,6 +181,7 @@ outstanding; see the `completed/` section below).
   port's measured mistakes — followed by AMENDMENT 1, Slice 0's inventory of
   today's main, which corrects the brief in three places.
 
+- **[`user-wp-slot-checkpoint.md`](projects/user-wp-slot-checkpoint.md)** — coordinator checkpoint 2026-08-28: the session's rulings, in-flight (possibly ungated) state, and how to resume.  Read FIRST if resuming user-wp-slot.
 - **[`user-wp-slot.md`](projects/user-wp-slot.md)** — the PER-PROCESS
   user-execution WP slot, step 3: making a verified process run IN PLACE
   of the generic-safety WP.  Steps 1–2 are landed (the slot machinery and
