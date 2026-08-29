@@ -55,45 +55,53 @@
    is NO termination claim here and none is intended; the WP is the same
    parking WP the landed contract has.
 
-   ======================= WHAT IS STILL OWED ==========================
+   ==================== THE BANK, LANDED (owner ruling) =================
 
-   THIS MODULE TYPE HAS NO IMPLEMENTING FUNCTOR YET, deliberately, and
-   nothing in the tree instantiates it (there is no [LinkSysSyncFlush]).
-   What stands between it and a proof is ONE conjunct of [LogInv.log_res]:
+   THE RECEIPT NOW HAS A CLIENT-REACHABLE PRODUCER, and it is
+   [flushed_sync_of_res] below: with the "log" spinlock held and the
+   caller's witness in hand, [LogInv.log_res] yields [flushed_sync γ e] and
+   closes UNCHANGED.  That is the whole of this contract's item (iii).
 
-     THE BANK.  The committer already HOLDS the receipt this contract
-     returns -- it is [FsCrash.fs_commit_L_seq_permit]'s residual, which
-     [ProofEndOp] takes at the [write_head] call and drops one line later
-     ("the receipt is dropped: nothing in this stage consumes a durability
-     receipt -- sys_sync is phase D's").  It must instead be carried to the
-     re-deposit at the end of the commit, where the same proof bumps the
-     batch counter ([LogInv.log_epoch_bump], ProofEndOp's [Hommt] step), and
-     deposited there as [log_flushed_bank] below.  Being PERSISTENT, it
-     costs the invariant nothing to hand back out: every later opener of the
-     log lock -- sys_sync's three reads of the cells included -- takes a
-     copy and closes with the invariant unchanged.
+   What made it reachable is the owner-ruled conjunct of [LogInv.log_res]:
+   [LogInv.log_flushed_bank γ E], last before the committing arm.  Its two
+   deposits are the two places the log's batch counter is ever SET:
 
-   [log_flushed_bank] is spelled below as a real definition, so that the
-   owner's decision is a diff against something that type-checks rather
-   than against prose, and [flushed_sync_of_bank] PROVES that the bank is
-   enough for this contract on BOTH arms.  What the decision costs is
-   measured in lane Y's report: the conjunct re-elaborates [LogInv.v] and
-   therefore the whole proof tree, and it breaks the positional patterns at
-   ~14 sites in ProofBeginOp / ProofEndOp / ProofLogWrite / ProofInitlog
-   (ProofSysSync's own three openers survive it -- they close with
-   [iExact "Hrest"]).  It changes NO arity: not [log_ctx]'s, not
-   [wp_end_op]'s, not [log_names]'.
+     - [ProofEndOp]'s [eo_tail], where [log_epoch_bump] runs.  The copy is
+       the one [FsCrash.fs_rec_permit_bank] takes at the commit's LAST disk
+       write -- the preserving CLEAR that follows the install -- so it is
+       the state THAT batch made durable, on either sector order.  On the
+       empty-log path, where no commit body runs at all, the invariant's own
+       copy is recycled, which is the literal truth there: nothing was made
+       durable because nothing needed to be.
+     - [ProofInitlog]'s seal, at genesis (E = 1).  Same copy, off the same
+       clear -- the one write [initlog] makes after recovery has caught the
+       home blocks up -- so the bank is full from the first instant the log
+       exists and sys_sync has an answer before any transaction has run.
 
-   A SECOND, SMALLER DEBT lives beside it and is named here because a
-   prover will meet it first: [log_res] binds the [log.ncommit] CELL
+   It changed NO arity: not [log_ctx]'s, not [wp_end_op]'s, not
+   [log_names]'.  What it did cost is recorded in lane Y's row of the
+   worklist.
+
+   ========================= AND IT IS PROVED ==========================
+
+   [ProofSysSync.SysSyncProof] IMPLEMENTS THIS MODULE TYPE, and
+   [LinkSysSync] derives the landed [SYS_SYNC] from it through
+   [SysSyncFlushWeaken] below -- so nothing was re-proved and no caller
+   moved.  The walk is the landed one instruction for instruction: the
+   receipt is minted ONCE, at the first acquire, by [flushed_sync_of_res],
+   and rides the intuitionistic context out at the tail.
+
+   THE WAIT LOOP NEEDED NOTHING, and it is worth saying why, because the
+   opposite was expected.  [log_res] binds the [log.ncommit] CELL
    existentially and says nothing about its value ([LogInv.v]'s
-   [l_ncommit ↦₄ nc]), and [ProofSysSync]'s wait loop accordingly carries
-   no [nc] binder at all -- each iteration re-reads an unrelated value and
-   the back edge is discharged by a raw case split.  Proving that the WAIT
-   ends at a LATER batch than it started needs the cell tied to the ghost
-   counter ([⌜uint nc = Z.of_nat E⌝] or its off-by-one) and the loop
-   invariant re-stated over that tie.  The FAST path needs neither: it
-   reads the bank and returns.
+   [l_ncommit ↦₄ nc]), so [ProofSysSync]'s wait loop carries no [nc] binder
+   and its back edge is a raw case split -- and that is still true.  It does
+   not matter here: the post asks for a bank at some [e' >= e] and NOT for a
+   strict increase (see the last section), the counter only grows, so a copy
+   taken at the FIRST acquire already answers on every path.  The tie
+   [⌜uint nc = Z.of_nat E⌝] would only be needed by a contract that claimed
+   the wait ENDED at a later batch than it started -- which this one
+   deliberately does not claim, and no consumer of the receipt asks for.
 
    ==================== WHY THE BOUND IS NOT [S e] =====================
 
@@ -134,8 +142,16 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.
-Require Import FsDurSyscall. (* [snap_holds] -- the commit's own certificate *)
-Require Import FsFlushed.   (* [flushed], [dur_at]; the receipt itself      *)
+(* THE RECEIPT AT ITS LOW ALTITUDE, and this is load-bearing: the obvious
+   imports here are [FsDurSyscall] and [FsFlushed], and BOTH sit above
+   [SystemAdequacy] -- i.e. above the whole proof tree, [ProofSysSync]
+   included -- so a contract stated over them could never be PROVED.  The
+   same two names come out of the leaves ([FsDurSnap.snap_holds],
+   [FsFlushedCore.flushed]), and nothing in this file needs anything else
+   from either: [FsFlushed.dur_at] is named in comments only, as the thing a
+   CONSUMER of the receipt composes with. *)
+Require Import FsDurSnap.      (* [snap_holds] -- the commit's certificate *)
+Require Import FsFlushedCore.  (* [flushed] -- the receipt itself          *)
 Require Import SpecSysSync. (* the landed empty contract, UNCHANGED       *)
 Import Defs.
 
@@ -147,26 +163,26 @@ Section sys_sync_flush.
   (*  THE RECEIPT, AT THE WAL'S OWN BATCH SCALE                           *)
   (* ------------------------------------------------------------------ *)
 
-  (* WHAT THE LOG INVARIANT MUST CARRY (the bank; see the header).  Read
-     it as: THE BATCH COUNTER STANDS AT [e], AND THE STATE THE LAST COMMIT
-     MADE DURABLE IS [D] -- the [b]-th committed state, and a file system.
+  (* THE BANK IS LANDED, AND IT LIVES IN [LogInv] (owner ruling, executed).
+     It was spelled here while it was still a proposal; it is now
+     [LogInv.log_flushed_bank], the last non-arm conjunct of
+     [LogInv.log_res], with the same statement it had here:
 
-     Both conjuncts are landed resources and both are persistent, so the
-     bank is free to copy out of the invariant and free to leave in it.
-     Their JOINT reading -- that [D] is the state as of batch [e] and not
-     some older one -- is established where the two are minted TOGETHER,
-     which is the one place it can be: the commit's re-deposit, which bumps
-     the counter with the commit's own receipt in hand.  Nothing weaker
-     would do, and nothing stronger is needed: a consumer never compares
-     [e] with [b], it reads [D]'s rows ([FsFlushed.dur_at]) and orders its
-     receipts by [b] ([FsFlushed.flushed_earlier]). *)
-  Definition log_flushed_bank (γ : log_names) (e : nat) : iProp Σ :=
-    (∃ (b : nat) (D : gmap Z (list (bv 8))),
-       log_epoch_lb γ e ∗ flushed b D ∗ ⌜snap_holds D⌝)%I.
+       log_flushed_bank γ e :=
+         ∃ b D, log_epoch_lb γ e ∗ flushed b D ∗ ⌜snap_holds D⌝
 
-  Global Instance log_flushed_bank_persistent γ e :
-    Persistent (log_flushed_bank γ e).
-  Proof. rewrite /log_flushed_bank. apply _. Qed.
+     Read it as: THE BATCH COUNTER STANDS AT [e], AND THE STATE THE LAST
+     WRITE MADE DURABLE IS [D] -- the [b]-th committed state, and a file
+     system.  Both conjuncts are persistent, so the bank is free to copy out
+     of the invariant and free to leave in it.  Their JOINT reading -- that
+     [D] is the state as of batch [e] and not some older one -- is
+     established where the two are minted TOGETHER, and that is where the
+     deposits are: [ProofEndOp]'s [eo_tail], which runs [log_epoch_bump]
+     with the commit's own copy in hand, and [ProofInitlog]'s seal at
+     genesis, which takes its copy off the header CLEAR that ends recovery.
+     A consumer never compares [e] with [b]: it reads [D]'s rows
+     ([FsFlushed.dur_at]) and orders its receipts by [b]
+     ([FsFlushedCore.flushed_earlier]). *)
 
   (* THE POSTCONDITION.  "By the time this call returned, the batch counter
      had reached some [e'] at or past the caller's own [e], and here is the
@@ -211,6 +227,57 @@ Section sys_sync_flush.
      costs nothing: a client with no operation history takes it at zero. *)
   Lemma sync_witness_0 (γ : log_names) : ⊢ |==> log_epoch_lb γ 0.
   Proof. iApply log_epoch_lb_0. Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  THE PRODUCER -- the gap lane Y reported, closed                    *)
+  (* ------------------------------------------------------------------ *)
+
+  (* WHAT SYS_SYNC ACTUALLY DOES, in the logic, on BOTH arms.  With the
+     "log" spinlock held and the caller's invocation-time batch witness in
+     hand, the lock's resource yields this contract's postcondition and
+     CLOSES UNCHANGED -- no fupd, no disk write, no operation token, nothing
+     given up, because everything handed out is persistent.
+
+     THIS IS THE WHOLE OF THE DERIVATION CHAIN's item (iii), and it is now
+     one line.  Before the banking there was no way to get here at all:
+     [FsFlushedCore.P_fs_flushed_now] needs the crash predicate OPEN, which
+     is a disk write's own fupd, and sys_sync writes no block.  The clause
+     the owner ruled in is what a reader can see instead.
+
+     BOTH ARMS REACH IT.  The FAST path (the guard false: nothing
+     committing, nothing outstanding) reads it at the [E] it finds, which
+     [LogInv.log_res_flushed] proves is at or past the caller's [e] off the
+     counter's own auth.  The SLOW path re-enters the critical section at a
+     LATER counter value and reads it there -- the same lemma, no extra
+     premise, because the post below asks for [e <= e'] and not for a
+     strict increase (see the header's last section for why that is the
+     honest bound and not slack). *)
+  Lemma flushed_sync_of_res (γ : log_names) (bn : bio_names)
+      (γfs : fs_names) (cov : gset Z) (logstart : Z) (e : nat) :
+    log_epoch_lb γ e -∗ log_res γ bn γfs cov logstart -∗
+      flushed_sync γ e ∗ log_res γ bn γfs cov logstart.
+  Proof.
+    iIntros "#Hlb Hres".
+    iDestruct (log_res_flushed γ bn γfs cov logstart e with "Hlb Hres")
+      as "[Hb Hres]".
+    rewrite /flushed_sync. iSplitL "Hb"; [iExact "Hb" | iExact "Hres"].
+  Qed.
+
+  (* ...and the same reading straight through to the certificate a consumer
+     composes with [FsFlushed.dur_at]: the durable state the log stands at,
+     off nothing but the lock's resource and a witness that costs nothing. *)
+  Lemma log_res_receipt (γ : log_names) (bn : bio_names) (γfs : fs_names)
+      (cov : gset Z) (logstart : Z) (e : nat) :
+    log_epoch_lb γ e -∗ log_res γ bn γfs cov logstart -∗
+      (∃ (b : nat) (D : gmap Z (list (bv 8))),
+         flushed b D ∗ ⌜snap_holds D⌝) ∗ log_res γ bn γfs cov logstart.
+  Proof.
+    iIntros "#Hlb Hres".
+    iDestruct (flushed_sync_of_res with "Hlb Hres") as "[Hs Hres]".
+    iDestruct (flushed_sync_receipt with "Hs") as (b D) "[Hf %Hh]".
+    iSplitR "Hres"; [| iExact "Hres"].
+    iExists b, D. iSplitL; [iExact "Hf" | by iPureIntro].
+  Qed.
 End sys_sync_flush.
 
 (* ====================================================================== *)

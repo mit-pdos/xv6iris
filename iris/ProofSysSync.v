@@ -86,6 +86,15 @@ Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import SpecAcquire SpecRelease SpecSleepPrepare SpecSleep.
 Require Import SpecSysSync.
+(* THE DURABILITY FORM (fs-syscall-specs lane Y, owner-ruled banking).  This
+   file now proves [SYS_SYNC_FLUSH] and the LANDED [SYS_SYNC] is derived
+   from it by [SpecSysSyncFlush.SysSyncFlushWeaken] at the link site -- so
+   [SpecSysSync.v] is byte-identical, [ProofSyscall]'s arm 22 is unchanged,
+   and "the postcondition only grows" stayed a theorem rather than becoming
+   an edit.  [SpecSysSyncFlush] is importable HERE only because its receipt
+   is taken at the leaf ([FsFlushedCore]) rather than at [FsFlushed], which
+   sits above the whole tree. *)
+Require Import SpecSysSyncFlush.
 Require Import CodeSysSync.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -365,7 +374,8 @@ End SsProps.
 (* ===================================================================== *)
 
 Module SysSyncProof (Acquire : ACQUIRE) (Release : RELEASE)
-                    (SleepPrepare : SLEEP_PREPARE) (Sleep : SLEEP) : SYS_SYNC.
+                    (SleepPrepare : SLEEP_PREPARE) (Sleep : SLEEP)
+                    : SYS_SYNC_FLUSH.
 
 Local Ltac reg_neq :=
   lazymatch goal with |- ?a <> ?b =>
@@ -1136,20 +1146,39 @@ Section ProofSysSync.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_sys_sync_sconf
+  (* THE DURABILITY FORM (fs-syscall-specs lane Y).  Two things are added to
+     the landed statement and nothing is removed: the caller's
+     invocation-time batch witness [log_epoch_lb γ e] in, and the receipt
+     [flushed_sync γ e] out.  The WALK IS THE LANDED ONE, INSTRUCTION FOR
+     INSTRUCTION -- the receipt is minted ONCE, at the first acquire, off
+     [LogInv.log_res] itself ([SpecSysSyncFlush.flushed_sync_of_res]), and
+     being persistent it rides the intuitionistic context past the guard,
+     through the Löb-closed wait loop and out at the tail.
+
+     WHY THAT IS ENOUGH FOR BOTH ARMS, and why the wait loop needed no new
+     invariant.  The post asks for a bank at some [e' >= e] and NOT for a
+     strict increase (SpecSysSyncFlush's header argues at length that [S e]
+     would be unprovable on the fast path and would make no consumer
+     stronger).  So the receipt does not have to be taken at the LAST
+     acquire: the counter only grows, so a copy taken at the FIRST one
+     already satisfies the post on every path through the function.  That is
+     what keeps the loop's raw case split -- the [log.ncommit] cell's value
+     is still unconstrained by [log_res], and this proof still never needs
+     it. *)
+  Lemma wp_sys_sync_flush_sconf
       (γs : list gname) (j : nat) (γl : gname)
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string)
-    : wp_sys_sync_sconf_body γs j γl bn γ γfs cov logstart dev m K eb b lks.
+      (b : bool) (lks : gset string) (e : nat)
+    : wp_sys_sync_flush_sconf_body γs j γl bn γ γfs cov logstart dev m K eb b lks e.
   Proof.
-    cbv beta delta [wp_sys_sync_sconf_body].
+    cbv beta delta [wp_sys_sync_flush_sconf_body].
     intros pcE pj ret_tgt HK Hj Hjl Hbelow.
     set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
-    iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hlogx #Hpinv Hcont".
+    iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hlogx #Hlbe #Hpinv Hcont".
     iPoseProof "Hlogx" as "#Hlog".
     iPoseProof "Hlog" as "#Hlogc".
     iDestruct "Hlogc" as "(#Hislock & #Hldev & #Hlstart & _)".
@@ -1315,12 +1344,29 @@ Section ProofSysSync.
         first [ exact Hacq_csp
               | apply Hacq_rest; [vm_compute; reflexivity | reg_neq..] ]. }
     (* ============ the anchored TAIL and the Löb-closed WAIT LOOP ========= *)
+    (* ===== THE RECEIPT, MINTED ONCE (fs-syscall-specs lane Y) =====
+       The lock is held and [Hres] is the invariant's own resource, so the
+       bank the committer left there is readable right here -- and [Hres]
+       comes back untouched, because everything the bank hands out is
+       persistent.  This is the whole of the design's derivation-chain item
+       (iii), and it happens before the guard is even read. *)
+    iDestruct (flushed_sync_of_res γ bn γfs cov logstart e with "Hlbe Hres")
+      as "[#Hflush Hres]".
     iAssert (ss_exit CID j γ bn γfs cov logstart m K eb lks spd sp0) with "[Hcont]" as "Hexit".
     { rewrite /ss_exit.
       iIntros (CIDx Hsx Mx) "%HssE Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc".
       iApply (ss_tail_body (CID := CIDx) CID j γ bn γfs cov logstart dev m Mx K eb lks spd sp0
                 HK Hsx Hspd Hsp0 HssE Hbelow
-                with "Htext Hlog Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc Hcont"). }
+                with "Htext Hlog Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc [Hcont]").
+      (* the tail wants the LANDED continuation; this is
+         [SysSyncFlushWeaken]'s step, run here with the receipt in hand
+         rather than thrown away *)
+      iIntros (CIDret) "%Hgret". iIntros (mfret) "%Hcsret %Ha0ret Hcgf Hcntf Hextcf Hextmf Hpcf".
+      iDestruct ("Hcont" $! CIDret with "[%]") as "Hc"; [exact Hgret |].
+      iSpecialize ("Hc" $! mfret).
+      iSpecialize ("Hc" with "[%]"); [exact Hcsret |].
+      iSpecialize ("Hc" with "[%]"); [exact Ha0ret |].
+      iApply ("Hc" with "Hcgf Hcntf Hextcf Hextmf Hflush Hpcf"). }
     iAssert (ss_loop CID j γ bn γfs cov logstart m K eb lks spd sp0) with "[]" as "Hloop".
     { iLöb as "IH". rewrite /ss_loop.
       iIntros (CIDy Hsy My) "%HssL Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc Hexit".

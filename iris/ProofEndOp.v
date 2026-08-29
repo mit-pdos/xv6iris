@@ -1437,6 +1437,14 @@ Section EndOpBlocks.
     eo_frame4 m -∗
     eo_frameJ m -∗
     log_state bn γfs cov logstart 0 ∅ ∅ -∗
+    (* THE COMMIT'S DURABILITY COPY (fs-syscall-specs lane Y, owner-ruled).
+       [eo_commit] takes it off the CLEAR -- the last write of the commit --
+       and this is where it is BANKED: the re-deposit below runs
+       [log_epoch_bump] and the two are minted into [LogInv.log_flushed_bank]
+       together, which is what makes the bank's joint reading ("the durable
+       state as of THIS batch") true.  Persistent, so it costs the caller
+       nothing to hand over and nothing to keep. *)
+    fs_bank -∗
     eo_cont (CID0 := CID0)  j pidv dq m K eb eb lks Upr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1444,7 +1452,7 @@ Section EndOpBlocks.
     pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     pose proof Hregs as (Hsp & Hthr).
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hlctx #Hprocs Hppid
-              Hframe Hjunk Hbatch Hcont".
+              Hframe Hjunk Hbatch #Hnewbank Hcont".
     iDestruct "Hlctx" as "(#Hlock & #Hdevc & #Hstc & _)".
     iDestruct (procs_inv_len γs with "Hprocs") as %Hlen.
     (* ===== +0x42 auipc s1,0x1e ===== *)
@@ -1583,7 +1591,7 @@ Section EndOpBlocks.
     (* ================= THE CRITICAL SECTION ================= *)
     rewrite /log_res.
     iDestruct "HRres" as (out cmt nc om Ep Xr Tx)
-      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Htxa & %Hszt & Hrest)".
+      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Htxa & %Hszt & #Hbank & Hrest)".
     (* committing IS still set: the committer holds the batch's fs_cache
        AUTHORITY, and log_res's cmt = false arm holds one too. *)
     destruct cmt.
@@ -1813,6 +1821,15 @@ Section EndOpBlocks.
        DEAD: it can no longer equal [S Ep], so [log_use_group] can never
        fire on it again.  Nothing is revoked; the index simply moves on. *)
     iMod (log_epoch_bump γ Ep with "Hepa") as "Hepa".
+    (* ---- AND THE BANK MOVES WITH IT (fs-syscall-specs lane Y) ----
+       The counter has just reached [S Ep] and the copy [eo_commit] took off
+       the clear is the state THAT batch made durable, so this is the one
+       instant at which the two can be minted together -- which is exactly
+       what [LogInv.log_flushed_bank]'s joint reading asks for.  The auth
+       comes straight back; the bank at the OLD epoch ([Hbank], read out of
+       [log_res] at the re-acquire above) is simply superseded. *)
+    iDestruct (log_flushed_bank_mk γ (S Ep) with "Hepa Hnewbank")
+      as "[Hepa #Hbank2]".
     iAssert (log_res γ bn γfs cov logstart)
       with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa Htxa Hbatch]" as "HRres".
     { rewrite /log_res. iExists out, false, nc', om, (S Ep), Xr, Tx.
@@ -1836,6 +1853,8 @@ Section EndOpBlocks.
       { iPureIntro. intros e' b' Hin. pose proof (Hcap e' b' Hin). lia. }
       iSplitL "Htxa"; [iExact "Htxa"|].
       iSplitR; [iPureIntro; exact Hszt|].
+      (* the bank goes in at the BUMPED counter *)
+      iSplitR; [iExact "Hbank2"|].
       iExists 0%nat, (∅ : gset Z). iSplitR; [iPureIntro; exact Hsum|].
       iSplitR.
       { iPureIntro. intros i e Hi. rewrite Hommt lookup_empty in Hi.
@@ -2420,7 +2439,14 @@ Section EndOpBlocks.
                  log_mirror_half (lm_upd
                     (lm_install (lm_upd Mc (log_hdr_bno logstart) bs1)
                        (map uint W) Lw n)
-                    (log_hdr_bno logstart) bs')) lks (upd_usM Upr _)
+                    (log_hdr_bno logstart) bs')
+                 (* THE BANK (fs-syscall-specs lane Y, owner-ruled).  THIS
+                    write -- the preserving CLEAR -- is the LAST one the
+                    commit makes, so the copy it takes off the crash record
+                    is this commit's own durable state, on either sector
+                    order.  It is carried to [eo_tail], which deposits it in
+                    [log_res] in the same breath as the epoch bump. *)
+                 ∗ fs_bank)%I lks (upd_usM Upr _)
               ltac:(pose proof (eo_Kwh K HK); lia) Hgeom Hj Hgl Hshape0
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell [] HauthL [Hhdr] Hu3
                     [Hmirc]").
@@ -2441,7 +2467,12 @@ Section EndOpBlocks.
                 Hn30 (HMihdr n ltac:(lia)) (fun _ _ => eq_refl) Hcaught
                 with "Hseam Hregc Hswlb Hmirc"). }
     iIntros (CIDb3 Hsb3 mf3 bs2) "%Hcs3 Hcg Hcnt Hextc Hextm Hpc Hppid
-                                  Hncell _ HauthL Hhdr %Hhdrn2 %Hhdec2 Hu3 >Hmirc".
+                                  Hncell _ HauthL Hhdr %Hhdrn2 %Hhdec2 Hu3
+                                  [>Hmirc Hbk1]".
+    (* the commit's DURABILITY COPY, off the clear's own permit.  Persistent
+       and timeless, so it strips its later here and rides the intuitionistic
+       context all the way to [eo_tail]'s re-deposit. *)
+    iMod "Hbk1" as "#Hnewbank".
     assert (Hpc11a : ret_pc (A5 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0x11a)).
     { rewrite HA5ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc11a) in "Hpc".
@@ -2701,7 +2732,7 @@ Section EndOpBlocks.
     iApply (eo_tail (CID0 := CIDa10)  γs j γl bn γ γfs cov logstart dev pidv dq
               m B3 K eb lks Upr HK HB3regsE Hbelow
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hlctx Hprocs Hppid
-                    Hframe Hjunk2 Hbatch Hcont").
+                    Hframe Hjunk2 Hbatch Hnewbank Hcont").
   Qed.
 
 
@@ -4605,7 +4636,7 @@ Section ProofEndOp.
     (* ================= THE ACCOUNTING CRITICAL SECTION ================= *)
     rewrite /log_res.
     iDestruct "HRres" as (out cmt nc om Ep Xr Tx)
-      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Htxa & %Hszt & Hrest)".
+      "(Houtc & Hcmtc & Hncc & Hoauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Htxa & %Hszt & #Hbank & Hrest)".
     iDestruct (log_op_positive with "Hoauth Hop") as %Hpos.
     (* the "log.committing" PANIC IS DEAD: an op token forces out >= 1, and
        log_res's own conjunct then refutes committing. *)
@@ -4929,7 +4960,10 @@ Section ProofEndOp.
         iSplitR; [iPureIntro; exact Hlived|].
         iSplitR; [iPureIntro; exact Hcap|].
         iSplitL "Htxa"; [iExact "Htxa"|].
-        iSplitR; [iPureIntro; exact Hsztd|]. done. }
+        iSplitR; [iPureIntro; exact Hsztd|].
+        (* the batch is checked out but nothing has committed yet, so the
+           bank goes back at the epoch it was read at *)
+        iSplitR; [iExact "Hbank"|]. done. }
       assert (Hpp36 : add_vec_int (mword_of_int (KernelSyms.end_op + 0x34) : mword 64) 2
                       = mword_of_int (KernelSyms.end_op + 0x36))
         by (apply bv_eq; vm_compute; reflexivity).
@@ -5094,10 +5128,18 @@ Section ProofEndOp.
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
         iDestruct (eo_open_to_batch bn γfs cov logstart L Dd (fun _ => []) ∅ M0
                      HM0hdr HM0row with "Hmirc Hopen") as "Hbatch".
+        (* THE EMPTY-LOG PATH BANKS THE COPY IT ALREADY HAD (lane Y).  No
+           commit body runs here -- [lh.n] was zero, so there is no disk
+           write and nothing new became durable -- but [eo_tail] still bumps
+           the counter (the C code increments [log.ncommit] on this path
+           too), so the bank has to be restated at the new index.  The
+           invariant's own copy, recycled, is exactly right: the durable
+           state did not move. *)
+        iDestruct (log_flushed_bank_recycle with "Hbank") as "#Hnewbank".
         iApply (eo_tail (CID0 := CIDs2)  γs j γl bn γ γfs cov logstart dev pidv dq
                   m V1 K eb lks Upr HK HV1regsE Hbelow
                   with "Hcg Hcnt Hextc Hextm Htext Hpc Hlctx Hprocs Hppid
-                        Hframe Hjunk Hbatch Hcont").
+                        Hframe Hjunk Hbatch Hnewbank Hcont").
       + (* n > 0: save s3/s4/s5, set up the cursors, and run the copy loop *)
         assert (Hcmp : zopz0zI_s (zero_reg : mword 64) (rget V1 Ra5) = true).
         { rgne. rewrite HV1a5 (eo_lt_s0 (Z.of_nat nl) (eo_n_small nl Hn30)).
@@ -5307,6 +5349,8 @@ Section ProofEndOp.
         iSplitR; [iPureIntro; exact Hcap|].
         iSplitL "Htxa"; [iExact "Htxa"|].
         iSplitR; [iPureIntro; exact Hsztd|].
+        (* the FAST path does not commit, so the bank stands too *)
+        iSplitR; [iExact "Hbank"|].
         iExists nl, LB. iSplitR; [iPureIntro; exact Hsumd|].
         iSplitR; [iPureIntro; exact Hsubd|].
         iSplitR; [iPureIntro; exact Hreg|].

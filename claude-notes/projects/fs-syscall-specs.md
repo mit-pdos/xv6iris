@@ -546,10 +546,91 @@ things, and the answer differs:
   quadratic in the file size.  Prove `Some (NFile b) = Some (NFile b')
   -> b = b'` AT VARIABLES and close the instance by transitivity through
   `node_at`.  That one change took the file from >15 min to 5.5 s.
-- [ ] **Y — sys_sync.**  The `flushed` receipt (persistent snapshot
-  certificate copy, plan 4⁹.3) + the `wp_sys_sync` parallel form (R10),
-  per doc §5 principle 2's derivation chain — items (ii) and (iii);
-  item (i) is DONE (the commit concludes something real).
+- [x] **Y — sys_sync.  DONE 2026-08-29 (banking landed, contract PROVED).**
+  The `flushed` receipt (persistent snapshot certificate copy, plan 4⁹.3)
+  + the `wp_sys_sync` parallel form (R10), per doc §5 principle 2's
+  derivation chain — items (i), (ii) and (iii) all closed.
+
+  **THE BANKING (owner-ruled 2026-08-28, executed 2026-08-29).**  The
+  receipt now has a client-reachable producer and `SYS_SYNC_FLUSH` has an
+  implementing functor.  Whole tree green on the mirror; ZERO `Admitted`;
+  no arity moved (`log_ctx`, `wp_end_op`, `log_names` all stand) and no
+  landed contract statement moved (`SpecSysSync.v` byte-identical,
+  `SpecSysSyncFlush`'s Module Type byte-identical, `ProofSyscall` arm 22
+  untouched).
+
+  - **THE CONJUNCT.**  `LogInv.log_flushed_bank γ e := ∃ b D,
+    log_epoch_lb γ e ∗ flushed b D ∗ ⌜snap_holds D⌝` — the lane's prepared
+    definition verbatim — added to `LogInv.log_res` as the LAST conjunct
+    BEFORE the `if cmt` arm, not after it.  That is the position `log_res`'s
+    own comment already argues for (the arm is what every opener
+    destructures further, so a conjunct after it costs each of them a
+    restructuring rather than one name in a pattern), and it is what keeps
+    `ProofSysSync`'s three cell-accessors intact: their pattern ends at
+    `%Hcap` and closes with `iExact "Hrest"`, so the bank rides inside
+    `Hrest`.  Verified against every site, not assumed.
+  - **THE ONE STRUCTURAL COST, and it was not in the estimate: the receipt
+    had to MOVE DOWN.**  `FsFlushed.v` is a leaf over `FsDurSyscall`, whose
+    cone contains `SystemAdequacy` and therefore the whole proof tree,
+    `LogInv` included — so a conjunct of `log_res` could not be *stated*
+    over it.  §§1–2 moved verbatim into a new `iris/FsFlushedCore.v`, a leaf
+    over `FsCrash` + `FsDurSnap` (`FsCrash`'s cone is 48 files and does not
+    contain `LogInv`; `FsDurSnap` was already in `LogInv`'s cone through
+    `LogSnapLaw`).  `FsFlushed.v` re-exports it and keeps §3 `dur_at`
+    unchanged, so no importer moved.  `snap_holds` moved one line under
+    `snap_ok` in `FsDurSnap` for the same reason (4 referencing files;
+    `FsDurSyscall` re-exports).  `LogInv` gains `!fsCrashG Σ` — an `xv6G`
+    member, exactly the precedent its own section header records for
+    `fsLinkG`/`fsTopG` — so no consumer of `log_ctx` gained a binder.
+    **`SpecSysSyncFlush` was retargeted to `FsFlushedCore`/`FsDurSnap` too,
+    and that is what made the contract provable at all**: stated over
+    `FsFlushed` it sat above `ProofSysSync`.
+  - **THE PRODUCER SIDE (`FsCrash`).**  `P_fs_bank` (the record's own
+    receipt + `snap_holds`, non-destructive), `fs_bank := ∃ D,
+    fs_receipt_any D ∗ ⌜snap_holds D⌝`, and `fs_rec_permit_bank : fs_rec_permit
+    … Q -∗ fs_rec_permit … (Q ∗ fs_bank)` — a premise-free strengthening
+    available at ANY WAL write, because the permit already has the record
+    open at the post-write image.  Only `fs_clear_keep_seq_permit` uses it
+    (two lines, one per sector order); `fs_commit_L_seq_permit` is
+    unchanged.
+  - **THE TWO DEPOSITS, both at a counter SET.**  `ProofEndOp.eo_tail` (new
+    `fs_bank` premise, banked in the same breath as `log_epoch_bump`) with
+    the copy taken at the commit's LAST write — the preserving CLEAR after
+    the install, so it is that batch's own durable state on either sector
+    order; and `ProofInitlog`'s seal at genesis (E = 1), off the same clear,
+    which is the one write `initlog` makes and is why the bank is never
+    empty.  `end_op`'s empty-log path (no commit body, but `ncommit` still
+    increments) recycles the invariant's own copy through
+    `log_flushed_bank_recycle` — the literal truth there, nothing was made
+    durable because nothing needed to be.
+  - **BROKEN SITES: 14 measured, 14 actual** — ProofBeginOp 4 (3 rebuilds +
+    the one site that restates `log_res`'s body verbatim), ProofEndOp 5,
+    ProofLogWrite 3, ProofInitlog 1, ProofSysSync 0 (both its openers and
+    its rebuild survived, as predicted).  Every one was `& #Hbank &` in the
+    pattern and one `iSplitR; [iExact "Hbank"|]` in the rebuild.
+  - **THE PAYOFF, PROVED.**  `LogInv.log_res_flushed` /
+    `SpecSysSyncFlush.flushed_sync_of_res`: with the "log" lock held and the
+    caller's `log_epoch_lb γ e`, `log_res` yields `flushed_sync γ e` and
+    closes UNCHANGED (everything handed out is persistent).  That is item
+    (iii) in one lemma.  And the FULL SEAL closed:
+    `ProofSysSync.SysSyncProof` now implements `SYS_SYNC_FLUSH` and
+    `LinkSysSync` derives the landed `SYS_SYNC` from it through the already-
+    proved `SysSyncFlushWeaken`, so R10's "the postcondition only grows"
+    stayed a theorem rather than becoming an edit.
+  - **THE SECOND DEBT TURNED OUT NOT TO BIND, and this is the finding worth
+    keeping.**  The `ncommit`↔epoch tie is still absent — `log_res` binds
+    the cell existentially, the wait loop carries no `nc` binder, the back
+    edge is still a raw case split — and the contract does not need it.  The
+    post asks for a bank at some `e' ≥ e`, not for a strict increase, so the
+    receipt can be minted ONCE at the FIRST acquire and ride the
+    intuitionistic context through the guard, the Löb-closed loop and out at
+    the tail.  The walk is the landed one instruction for instruction.  The
+    tie would only be needed by a contract claiming the WAIT ended at a
+    later batch — which §5's own argument says would be unprovable on the
+    fast path and would make no consumer stronger.
+
+  <details><summary>as landed 2026-08-28 (the machinery, before the
+  banking)</summary>
 
   **AS LANDED 2026-08-28 — the machinery, the composition and the
   contract; what is left is ONE OWNER DECISION and the wait loop.**  Two
@@ -620,10 +701,13 @@ things, and the answer differs:
     and a caller whose witness was taken in the current batch finds the
     log empty exactly when that batch is empty; demanding `S e` would
     make the contract unprovable there without making any consumer
-    stronger.  The receipt is what consumers use.
+    stronger.  The receipt is what consumers use.  (This turned out to be
+    the load-bearing decision: it is exactly why the banking's seal did not
+    need the wait loop's counter tie.)
+
+  </details>
 
 Sizing: D is spike-sized — the readings exist, the work is assembly and
 statement.  S0 is one design session.  A and W are the campaign's bulk.
-P is contained (two pins).  Y's machinery and contract are LANDED
-(2026-08-28); what is left of it is the owner's `log_res` conjunct and,
-for the slow path only, the ncommit tie.
+P is contained (two pins).  Y is CLOSED (2026-08-29): machinery, contract,
+banking and seal.

@@ -2195,6 +2195,44 @@ Section fs_crash.
     iExists r. iFrame "Hh Harm Hdur". iPureIntro. exact Hwf.
   Qed.
 
+  (* ...AND THE SAME READING WITH THE RECEIPT ATTACHED (fs-syscall-specs
+     lane Y's banking).  [fs_commit_receipt] hands out the two PURE facts;
+     this hands out the RESOURCE that names the map they are about, so that
+     a holder of the pair can carry it away from the fupd that produced it.
+     Everything below is a snapshot of what [P_fs] already owns -- the
+     history's lower bound at its own last element, which [fs_rec_wf]'s
+     middle clause says is the committed map -- so this is PURE and
+     NON-DESTRUCTIVE: the predicate comes back untouched and every piece
+     handed out is persistent.
+
+     THIS IS THE BANK'S SOURCE.  The receipt has no client-reachable
+     producer otherwise: the crash predicate is open only inside a disk
+     write's own fupd, so what a later reader (sys_sync) can hold is a COPY
+     the committer left behind in [LogInv.log_res].  [fs_rec_permit_bank]
+     below is the wrapper that takes this copy at every WAL write, and
+     [FsFlushedCore.flushed_of_bank] is where its index is named. *)
+  Lemma P_fs_bank (γs : fs_crash_names) (cov : gset Z) (ls : Z)
+      (dk : Z -> bv 8) :
+    P_fs γs cov ls dk -∗
+      ∃ D : gmap Z (list (bv 8)),
+        fs_receipt γs D ∗ ⌜snap_holds D⌝ ∗ P_fs γs cov ls dk.
+  Proof.
+    rewrite {1}/P_fs. iIntros "Hp".
+    iDestruct "Hp" as (r) "(Hauth & %Hwf & Harm & Hdur)".
+    iDestruct (P_dur_tie_keep (fr_D r)
+                 (fs_recovery_blocks_full dk (fr_D r) cov ls (proj1 Hwf))
+                 with "Hdur") as (S Hok) "Hdur".
+    iDestruct (fs_hist_snapshot with "Hauth") as "[Hauth #Hlb]".
+    destruct Hwf as (Hrec & Hlast & Hhdr).
+    destruct (proj1 (last_Some (fr_hist r) (fr_D r)) Hlast) as [l Hl].
+    iExists (fr_D r).
+    iSplitR.
+    { rewrite /fs_receipt. iExists l. rewrite -Hl. iExact "Hlb". }
+    iSplitR; [iPureIntro; exists S; exact Hok |].
+    rewrite /P_fs. iExists r. iFrame "Hauth Harm Hdur". iPureIntro.
+    split_and!; [exact Hrec | exact Hlast | exact Hhdr].
+  Qed.
+
   (* ...and the ACCESSOR the boot mint (plan section 5, stage 4) takes: the
      snapshot itself, lent out of the crash predicate with the record's own
      recovery fact beside it, and a wand that puts it back.  This is the
@@ -2601,6 +2639,52 @@ Section fs_crash_seam.
 
   Global Instance fs_receipt_any_persistent D : Persistent (fs_receipt_any D).
   Proof. rewrite /fs_receipt_any. apply _. Qed.
+
+  (* ==================================================================== *)
+  (* (5b) THE BANK (fs-syscall-specs lane Y, owner-ruled)                  *)
+  (*                                                                      *)
+  (*  WHAT A WAL WRITE CAN LEAVE BEHIND FOR A LATER READER.  A receipt is  *)
+  (*  only obtainable where the crash predicate is open, which is inside a *)
+  (*  disk write's own fupd and nowhere else -- so a function that writes  *)
+  (*  NO block (sys_sync) can never mint one.  What it can do is read a    *)
+  (*  COPY some earlier writer deposited, and this is the shape of that    *)
+  (*  copy: a durable map together with the one word that says it really   *)
+  (*  is a file system.  The map is EXISTENTIAL because no caller of the   *)
+  (*  permit knows it -- and no consumer needs to: the certificates are    *)
+  (*  read off [D]'s own rows ([FsFlushedCore]/[FsFlushed.dur_at]).        *)
+  (*                                                                      *)
+  (*  PERSISTENT, so banking it costs the invariant that holds it nothing  *)
+  (*  and every opener takes a copy and closes unchanged.                  *)
+  (* ==================================================================== *)
+  Definition fs_bank : iProp Σ :=
+    (∃ D : gmap Z (list (bv 8)), fs_receipt_any D ∗ ⌜snap_holds D⌝)%I.
+
+  Global Instance fs_bank_persistent : Persistent fs_bank.
+  Proof. rewrite /fs_bank. apply _. Qed.
+
+  (* EVERY RECORD-LEVEL PERMIT CAN BANK, FOR FREE.  The permit already has
+     the record open at the POST-write image -- that is what it is -- and
+     [P_fs_bank] reads the copy off it without moving anything, so this is
+     a pure strengthening available at any WAL write with no premise at all.
+     Reading it at the LAST landing of a chain is what makes the copy the
+     write's own outcome: for the commit, the record's committed map has
+     already moved by then, on both sector orders. *)
+  Lemma fs_rec_permit_bank (cov : gset Z) (ls : Z) (gd : nat) (w : disk_wr)
+      (Q : iProp Σ) :
+    fs_rec_permit cov ls gd w Q -∗ fs_rec_permit cov ls gd w (Q ∗ fs_bank).
+  Proof.
+    iIntros "Hp". rewrite /fs_rec_permit. iIntros (dk n) "Hsa %Hn HP".
+    iMod ("Hp" $! dk n with "Hsa [//] HP") as "(HP & Hsa & HQ)".
+    iMod "HP". rewrite /P_fs_rec /P_fs_rec_named.
+    iDestruct "HP" as (γs) "[%Hseam HPfs]".
+    iDestruct (P_fs_bank with "HPfs") as (D) "(#Hrc & %Hh & HPfs)".
+    iModIntro. iSplitL "HPfs".
+    { iNext. iExists γs. iSplitR; [by iPureIntro |]. iExact "HPfs". }
+    iFrame "Hsa HQ". rewrite /fs_bank. iExists D.
+    iSplitR; [| by iPureIntro].
+    rewrite /fs_receipt_any. iExists γs.
+    iSplitR; [by iPureIntro | iExact "Hrc"].
+  Qed.
 
   (* ==================================================================== *)
   (* (6) THE SEQUENTIAL PERMITS' SHARED PIECE (sector-atomic-disk.md §6e). *)
@@ -3339,6 +3423,12 @@ Section fs_crash_seam.
     disk_seq_permit gen_id (Some ((1024 * log_hdr_bno ls)%Z, bs))
       (log_mirror_half (lm_upd M0 (log_hdr_bno ls) bs)
        ∗ fs_receipt_any (fs_restrict (dv_of_D L) (fs_home_set cov ls))).
+  (* NO BANK HERE, deliberately (fs-syscall-specs lane Y).  The committer
+     does not need one at THIS write: [end_op] runs a second [write_head] --
+     the preserving CLEAR below -- after the install, and that one is the
+     last write of the whole commit, so the copy it takes is this commit's
+     own outcome and is fresher.  Banking here as well would only mean two
+     copies to carry through the same proof. *)
   Proof.
     intros Hlen Hdec Hnn Hnd Hin Hinsb HM0 Hoff Hrow Hslot.
     iIntros "#Hseam #Hreg #Hswlb Hmir Hepoch".
@@ -3454,7 +3544,17 @@ Section fs_crash_seam.
     swap_lb (S gen_id) -∗
     log_mirror_half M0 -∗
     disk_seq_permit gen_id (Some ((1024 * log_hdr_bno ls)%Z, bs))
-      (log_mirror_half (lm_upd M0 (log_hdr_bno ls) bs)).
+      (log_mirror_half (lm_upd M0 (log_hdr_bno ls) bs)
+       (* THE BANK AT GENESIS (fs-syscall-specs lane Y, owner-ruled).  This
+          is the ONLY write [initlog] makes after recovery has caught the
+          home blocks up, so it is the one instant at which the boot chain
+          can see the crash predicate -- and [LogInv.log_res]'s banked
+          receipt has to exist from the moment the "log" spinlock is sealed,
+          or sys_sync would have a genesis arm with nothing in it.  Nothing
+          moves in this permit ([fr_D] is preserved, which is the whole
+          point of the CLEAR), so the copy is the disk's current durable
+          state exactly. *)
+       ∗ fs_bank).
   Proof.
     intros Hlen Hn0 Hnn HM0 Hoff Hcaught. iIntros "#Hseam #Hreg #Hswlb Hmir".
     assert (Hext : log_hdr_bno ls ∈ cov ∪ log_region_set ls)
@@ -3481,19 +3581,23 @@ Section fs_crash_seam.
       { iIntros "[Hm _]".
         iApply (fs_permit_of_rec with "Hseam").
         iApply (fs_rec_permit_mono cov ls gen_id _
-                  (log_mirror_half (lm_upd
+                  ((log_mirror_half (lm_upd
                       (lm_upd M0 (log_hdr_bno ls)
                          (blk_sec0 (lm_view M0 (log_hdr_bno ls)) bs))
                       (log_hdr_bno ls)
                       (blk_sec1 (lm_view (lm_upd M0 (log_hdr_bno ls)
                          (blk_sec0 (lm_view M0 (log_hdr_bno ls)) bs))
                          (log_hdr_bno ls)) bs))
-                   ∗ ⌜length (lm_view (lm_upd M0 (log_hdr_bno ls)
-                        (blk_sec0 (lm_view M0 (log_hdr_bno ls)) bs))
-                        (log_hdr_bno ls)) = BSIZE⌝)%I _
+                    ∗ ⌜length (lm_view (lm_upd M0 (log_hdr_bno ls)
+                         (blk_sec0 (lm_view M0 (log_hdr_bno ls)) bs))
+                         (log_hdr_bno ls)) = BSIZE⌝)
+                   ∗ fs_bank)%I _
                   with "[] [Hm]").
-        { iIntros "[Hm2 _]". iApply disk_write_permit_intro.
-          rewrite -(lm_upd_sec_01 M0 (log_hdr_bno ls) bs Hlen). iExact "Hm2". }
+        { iIntros "[[Hm2 _] #Hbk]". iApply disk_write_permit_intro.
+          iSplitL "Hm2".
+          { rewrite -(lm_upd_sec_01 M0 (log_hdr_bno ls) bs Hlen). iExact "Hm2". }
+          iExact "Hbk". }
+        iApply fs_rec_permit_bank.
         iApply (fs_v_sector1_rec cov ls (log_hdr_bno ls) bs _ Hlen Hext
                   (Hwfh _) with "Hreg Hswlb [Hm]").
         iNext. iExact "Hm". }
@@ -3521,19 +3625,23 @@ Section fs_crash_seam.
           rewrite (lm_upd_view_ne M0 (log_hdr_bno ls) c _ Hc). exact (Hoff c Hc). }
         iApply (fs_permit_of_rec with "Hseam").
         iApply (fs_rec_permit_mono cov ls gen_id _
-                  (log_mirror_half (lm_upd
+                  ((log_mirror_half (lm_upd
                       (lm_upd M0 (log_hdr_bno ls)
                          (blk_sec1 (lm_view M0 (log_hdr_bno ls)) bs))
                       (log_hdr_bno ls)
                       (blk_sec0 (lm_view (lm_upd M0 (log_hdr_bno ls)
                          (blk_sec1 (lm_view M0 (log_hdr_bno ls)) bs))
                          (log_hdr_bno ls)) bs))
-                   ∗ ⌜length (lm_view (lm_upd M0 (log_hdr_bno ls)
-                        (blk_sec1 (lm_view M0 (log_hdr_bno ls)) bs))
-                        (log_hdr_bno ls)) = BSIZE⌝)%I _
+                    ∗ ⌜length (lm_view (lm_upd M0 (log_hdr_bno ls)
+                         (blk_sec1 (lm_view M0 (log_hdr_bno ls)) bs))
+                         (log_hdr_bno ls)) = BSIZE⌝)
+                   ∗ fs_bank)%I _
                   with "[] [Hm]").
-        { iIntros "[Hm2 _]". iApply disk_write_permit_intro.
-          rewrite -(lm_upd_sec_10 M0 (log_hdr_bno ls) bs Hlold). iExact "Hm2". }
+        { iIntros "[[Hm2 _] #Hbk]". iApply disk_write_permit_intro.
+          iSplitL "Hm2".
+          { rewrite -(lm_upd_sec_10 M0 (log_hdr_bno ls) bs Hlold). iExact "Hm2". }
+          iExact "Hbk". }
+        iApply fs_rec_permit_bank.
         iApply (fs_clear_v_sector0_rec cov ls _ V nn Ws bs Hlen Hn0 HM1 HoffM1
                   Hcaught with "Hreg Hswlb [Hm]").
         iNext. iExact "Hm". }
