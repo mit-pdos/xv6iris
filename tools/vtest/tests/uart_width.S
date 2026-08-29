@@ -50,35 +50,35 @@ _vtest_body:
 
 /* ---- the byte-wide baseline, so the wide reads have something to be
  * compared against ---- */
-    lbu  t0, 5(s0)
+    lbu  t0, UART_REG(5)(s0)
     sw   t0, R_LSR(s11)
     li   t0, 0x5a
-    sb   t0, 7(s0)                   /* SCRATCH */
-    lbu  t0, 7(s0)
+    sb   t0, UART_REG(7)(s0)                   /* SCRATCH */
+    lbu  t0, UART_REG(7)(s0)
     sw   t0, R_SCR(s11)
     li   t0, 0x03
-    sb   t0, 4(s0)                   /* MCR = DTR|RTS */
+    sb   t0, UART_REG(4)(s0)                   /* MCR = DTR|RTS */
     li   t0, 1
     sw   t0, RES_STATUS(s11)
 
 /* ---- wide READS.  If the bus gathered, +16 would carry the SCRATCH byte
  * this program just stored at +7; it does not. ---- */
-    lw   t0, 4(s0)
+    lw   t0, UART_REG(4)(s0)
     sw   t0, R_W4(s11)
-    lhu  t0, 6(s0)
+    lhu  t0, UART_REG(6)(s0)
     sw   t0, R_H6(s11)
-    lhu  t0, 4(s0)
+    lhu  t0, UART_REG(4)(s0)
     sw   t0, R_H4(s11)
 
     li   t0, 0x80
-    sb   t0, 3(s0)                   /* LCR: DLAB, so offset 0 is DLL */
+    sb   t0, UART_REG(3)(s0)                   /* LCR: DLAB, so offset 0 is DLL */
     li   t0, 0x33
-    sb   t0, 0(s0)                   /* DLL = 0x33 */
+    sb   t0, UART_REG(0)(s0)                   /* DLL = 0x33 */
     li   t0, 0x44
-    sb   t0, 1(s0)                   /* DLM = 0x44 */
-    lw   t0, 0(s0)
+    sb   t0, UART_REG(1)(s0)                   /* DLM = 0x44 */
+    lw   t0, UART_REG(0)(s0)
     sw   t0, R_W0(s11)
-    ld   t0, 0(s0)                   /* eight bytes, one register */
+    ld   t0, UART_REG(0)(s0)                   /* eight bytes, one register */
     sw   t0, R_D0LO(s11)
     srli t0, t0, 32
     sw   t0, R_D0HI(s11)
@@ -87,16 +87,16 @@ _vtest_body:
 
 /* ---- wide WRITES: the low byte lands, the rest is dropped ---- */
     li   t0, 0xbeef
-    sh   t0, 0(s0)                   /* 2-byte store to DLL */
-    lbu  t0, 0(s0)
+    sh   t0, UART_REG(0)(s0)                   /* 2-byte store to DLL */
+    lbu  t0, UART_REG(0)(s0)
     sw   t0, R_DLLW(s11)
-    lbu  t0, 1(s0)                   /* DLM: untouched by it */
+    lbu  t0, UART_REG(1)(s0)                   /* DLM: untouched by it */
     sw   t0, R_DLMW(s11)
-    sb   zero, 3(s0)                 /* LCR = 0: DLAB clear again */
+    sb   zero, UART_REG(3)(s0)                 /* LCR = 0: DLAB clear again */
 
     li   t0, 0x11223344
-    sw   t0, 4(s0)                   /* 4-byte store to MCR */
-    lbu  t0, 4(s0)
+    sw   t0, UART_REG(4)(s0)                   /* 4-byte store to MCR */
+    lbu  t0, UART_REG(4)(s0)
     sw   t0, R_MCRW(s11)
     li   t0, 3
     sw   t0, RES_STATUS(s11)

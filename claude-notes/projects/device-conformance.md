@@ -1,4 +1,63 @@
-# Project: device conformance — the semantics, differentially tested against QEMU
+# Project: device conformance — the semantics, differentially tested against QEMU (and now against real hardware)
+
+## STATUS ADDENDUM (2026-08-29): A SECOND MACHINE
+
+The suite now runs on a **StarFive VisionFive 2** (JH7110) over JTAG, beside
+QEMU.  `tools/vtest/board.py` is `vtest.py`'s sibling — same question, same
+test sources, same ABI, same model side — and it writes
+`vtest-rocq/<Name>HwGen.v` beside `<Name>Gen.v`, so the SAME
+`vtest-rocq/<Name>.v` checks the model against both captures.  Targets:
+`make hwtest-probe`, `make hwtest-gen`, `make hwtest`.  `make vtest-check`
+checks hardware captures like any other, because they are checked-in
+literals; nothing new needs the board attached.
+
+**READ [`tools/vtest/README-hw.md`](../../tools/vtest/README-hw.md) BEFORE
+TOUCHING ANY OF IT.**  A board run claims something NARROWER than a QEMU run
+and the reasons are not obvious: it is not the same binary (three `abi.h`
+macros differ — the primary hart, the UART stride, and a leading `fence.i`),
+the board's power-on register file is not reachable over JTAG at all
+(`reset_config trst_only`, and `reset halt` does not reset the cores), and
+firmware is still running on another hart unless `--takeover` is used.  The
+QEMU images are byte-identical to what they were — checked mechanically
+against all 56 checked-in `<name>_text` captures.
+
+**IT HAS ALREADY FOUND TWO UNSOUNDNESSES, and both are things a QEMU image
+structurally could not have found**, because every QEMU test runs on hart 0
+and the harness's clock never ticks:
+
+- **Finding 27: the model's clock never runs.**  `mtime` is frozen at 0
+  however many instructions retire, and `mcycle` with it; both machines
+  advance.  `ClintTime.v` states it with `minstret` as the CONTROL — the
+  counters advance in the model exactly as on both machines, so the freeze
+  is the clock and not "counters are unimplemented".  Same shape as finding
+  24 (SC memory): not a wrong value but a behaviour the model cannot have.
+  Unlike 24 it may be cheap — `VTest.run_until` steps `riscv_step false` and
+  the model HAS the tick — and **finding out which is the next thing worth
+  doing in this project**.
+- **Finding 28: the CLINT is not indexed by hart.**  `clint_load` /
+  `clint_store` in `rv64d.v` compare the offset with `eq_vec` against
+  `MSIP_BASE` = 0 and `MTIMECMP_BASE` = 0x4000 — single addresses, not
+  ranges — so only hart 0's registers exist and every other hart's access
+  takes a load access fault.  Same shape as findings 11/12 (the PLIC indexed
+  by hart instead of by CONTEXT).  **It is live in xv6**: `start()` stores to
+  `CLINT_MTIMECMP(id)` with `id = r_mhartid()`, so on any hart but 0 that
+  store has no model execution.  `ClintMsip.v` carries both halves — QEMU on
+  hart 0, where the semantics are RIGHT end to end, and the board on hart 2,
+  where the machine completes and the model trap-loops.
+
+Two more rows (29: `misa` B and X; 30: the board's UART is a Synopsys DW-APB
+with reg-shift 2, so its register file lies outside the model's 8-byte
+window) are in the README's table.
+
+**THE CLINT WAS UNEXPLORED GROUND BEFORE THIS.**  It is dispatched inside
+the Sail model (`DevModel.v`'s header, `within_mmio_readable`) rather than
+through `DevModel`'s fabric, so no QEMU test had ever addressed it; the new
+`clint` area is the first.  What is NOT done: the `uart` area needs its
+sources converted to `UART_REG(n)` before it means anything on this board,
+the board's serial line is not exposed to the runner yet (so
+`<name>_hw_serial` is always `[]` = *not observed*), and `disk` is excluded
+because the JH7110 has no virtio-mmio device.
+
 
 ## STATUS (2026-08-24)
 

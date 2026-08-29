@@ -55,14 +55,20 @@ def config(name):
                 cfg[k] = int(v) if k in ("repeat", "smp") else v
     return cfg
 
-def build(name):
+def build(name, defines=(), march="rv64imafd", tag=""):
+    """[defines]/[march]/[tag] are for a BOARD PROFILE (tools/vtest/board.py)
+    and default to exactly what the QEMU suite has always built: no -D, the
+    same -march, and the same output filenames.  A profile passes its own
+    -D list and a [tag] so the two machines' images sit side by side in
+    build/ instead of overwriting each other."""
     src = os.path.join(TESTDIR, name + ".S")
     if not os.path.exists(src): sys.exit(f"no such test: {src}")
     os.makedirs(BUILDDIR, exist_ok=True)
-    elf = os.path.join(BUILDDIR, name + ".elf")
-    binf = os.path.join(BUILDDIR, name + ".bin")
-    subprocess.run([CC, "-march=rv64imafd", "-mabi=lp64d", "-nostdlib",
+    elf = os.path.join(BUILDDIR, name + tag + ".elf")
+    binf = os.path.join(BUILDDIR, name + tag + ".bin")
+    subprocess.run([CC, f"-march={march}", "-mabi=lp64d", "-nostdlib",
                     "-nostartfiles", "-static", f"-I{HERE}",
+                    *[f"-D{d}" for d in defines],
                     f"-Wl,-Ttext=0x{ABI['TEXT_BASE']:x}",
                     "-o", elf, os.path.join(HERE, "vtest.S"), src], check=True)
     # -j .text, never plain -O binary: that pads from address 0 and produces a

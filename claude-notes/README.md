@@ -207,7 +207,15 @@ outstanding; see the `completed/` section below).
   the port of `namei-pinned-lookup.md`'s results (its lane P).
 
 - **[`device-conformance.md`](projects/device-conformance.md)** — the
-  device semantics differentially tested against QEMU: one bare-metal image
+  device semantics differentially tested against QEMU **and, since
+  2026-08-29, against a real VisionFive 2 board over JTAG**
+  (`tools/vtest/board.py`, `make hwtest`; read
+  [`tools/vtest/README-hw.md`](../tools/vtest/README-hw.md) first — a board
+  run claims something narrower than a QEMU run).  The board has already
+  found TWO UNSOUNDNESSES that a QEMU image could not have — the model's
+  clock never runs, and the CLINT is not indexed by hart (live in xv6's
+  `start()`) — because every QEMU test runs on hart 0 and the harness's
+  clock never ticks.  The QEMU half: one bare-metal image
   run on both machines, the model side EXHIBITING one execution by
   `vm_compute` (no WP, no Iris, ~8 ms/instruction).  Landed and green
   (`make vtest`); it has already found FIVE divergences, one of them an

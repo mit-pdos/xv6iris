@@ -7,6 +7,7 @@
 VSched.v
 VTest.v
 CoreSmokeGen.v
+CoreSmokeHwGen.v
 CoreSmoke.v
 DiskRwGen.v
 DiskRw.v
@@ -121,3 +122,9 @@ PtResvGen.v
 PtResv.v
 PtSuperGen.v
 PtSuper.v
+ClintTimeGen.v
+ClintTimeHwGen.v
+ClintTime.v
+ClintMsipGen.v
+ClintMsipHwGen.v
+ClintMsip.v

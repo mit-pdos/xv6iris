@@ -211,6 +211,49 @@ does not exist).
 | 24 | **THE MEMORY MODEL: the model is sequentially consistent** | one shared `gmem`, a store is global the instant it retires -- (0,0) unreachable | store-buffering gives **(0,0) in a few percent of runs**, which RVWMO permits | **UNSOUNDNESS** | `conc_sb` |
 | 25 | `sc.w` does not evaluate | `vm_compute` does not return (110 s+), so a test containing one cannot be COMPILED | executes | **out of scope: LR/SC is not supported** | `conc_amo` |
 
+### Findings from REAL HARDWARE
+
+Four more, from running the suite on a StarFive VisionFive 2 over JTAG.
+[`README-hw.md`](README-hw.md) is where they are written up, what a board
+run claims (it is narrower than a QEMU run), and how the rig works; this
+table stays the authority for the numbers.
+
+**Two of the first three questions asked of a board produced findings that
+QEMU testing structurally could not have found**: every QEMU test runs on
+hart 0, and the harness's clock never ticks.
+
+| # | what | model | the board | kind | found by |
+|---|------|-------|-----------|------|----------|
+| 27 | **the model's clock never runs** | `mtime` frozen at 0 however many instructions retire, and `mcycle` frozen with it | both advance -- on the board AND on QEMU | **UNSOUNDNESS** | `clint_time` |
+| 28 | **the CLINT is not indexed by hart** | only hart 0's registers exist -- `clint_load`/`clint_store` compare the offset with `eq_vec` against `MSIP_BASE` = 0 and `MTIMECMP_BASE` = 0x4000, and every other hart's access takes a load access fault | every hart has its own MSIP at `CLINT+4*hartid`, with exactly the semantics the model gets right for hart 0 | **UNSOUNDNESS**, and live in xv6's `start()` | `clint_msip` |
+| 29 | `misa` bits 1 (B) and 23 (X) | absent (`MISA_C` = `0x800000000014112D`) | present (`0x800000000094112F`) | incompleteness | `core_regs_mcsr` |
+| 30 | the UART is a **different chip** on this board | a byte-strided 16550 in an 8-byte window (`DevModel.uart_size` = 8) | Synopsys DW-APB v3.14a, **reg-shift 2** -- LSR is at `0x14`, and the whole register file lies outside the model's window | board difference, not a model defect | the probe |
+
+**Finding 27 is the largest of the four and is not a device question.**
+`VTest.run_until` steps `riscv_step false` -- the argument is the CLOCK TICK
+and the harness never passes `true` -- so no execution of the model has a
+moving `mtime`.  The suite already knew the clock did not tick (it is in the
+rules above); what was missing was a measurement, and the difference between
+"we chose not to tick it" and "a hardware run has no model execution" is the
+whole point of this exercise.  `ClintTime.v` states it with `minstret` as
+the control -- the counters advance in the model exactly as on both machines,
+so the freeze is the CLOCK and not "counters are unimplemented", and
+`mcycle` freezes with `mtime` rather than with `minstret`, which is the
+clock-derived set exactly.  Same shape as finding 24: not a wrong value but
+a behaviour the model cannot have.  Unlike 24 it may be cheap -- the model
+HAS the tick and the harness declines to use it -- and finding out which is
+the next thing worth doing.
+
+**Finding 28 is the one only a board could find.**  `ClintMsip.v` carries
+both halves, and either alone would be misread: on QEMU's hart 0 the model's
+MSIP semantics are RIGHT end to end -- including raising and dropping
+`mip.MSIP`, which a "stored but inert" model would fail exactly as the
+UART's MCR did in finding 6 -- and on the board's hart 2 the same program
+completes on the machine while the model takes a load access fault at
+`0x8000006c` with `mtval` = `0x2000008` and trap-loops forever.  It is the
+same shape as findings 11 and 12, where the PLIC was indexed by hart instead
+of by CONTEXT and half the register file was simply absent.
+
 <a id="findings-fixed"></a>
 ## Findings fixed
 

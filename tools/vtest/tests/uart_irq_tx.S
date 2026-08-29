@@ -94,14 +94,14 @@ _vtest_body:
     add  s3, s2, s3                  /* s3 = claim/complete */
 
 /* ---- (1) IER = 0: the UART drives nothing ---- */
-    lbu  t0, 5(s0)
+    lbu  t0, UART_REG(5)(s0)
     sw   t0, R_LSR0(s11)
     lw   t0, 0(s1)
     sw   t0, R_PEND0(s11)
     csrr t0, mip
     andi t0, t0, 0x200
     sw   t0, R_MIP0(s11)
-    lbu  t0, 2(s0)
+    lbu  t0, UART_REG(2)(s0)
     sw   t0, R_ISR0(s11)
     li   t0, 1
     sw   t0, RES_STATUS(s11)
@@ -109,7 +109,7 @@ _vtest_body:
 /* ---- (2) enable the THRE interrupt: the FIFO is empty, so the line goes
  * high at once.  SPIN: the latch and the wire are separate device steps. ---- */
     li   t0, 0x02
-    sb   t0, 1(s0)                   /* IER = THRE interrupt enable */
+    sb   t0, UART_REG(1)(s0)                   /* IER = THRE interrupt enable */
 1:  lw   t0, 0(s1)
     andi t0, t0, SRC10
     beqz t0, 1b
@@ -120,7 +120,7 @@ _vtest_body:
     sw   t0, R_MIP1(s11)
 
 /* ---- (3) the ISR identifies the cause ---- */
-    lbu  t0, 2(s0)
+    lbu  t0, UART_REG(2)(s0)
     sw   t0, R_ISR1(s11)
     andi t2, t0, 0x0f
     sw   t2, R_CAUSE1(s11)
@@ -137,7 +137,7 @@ _vtest_body:
     sw   t0, R_MIP2(s11)
 
 /* ---- (5,6) remove the condition, then complete ---- */
-    sb   zero, 1(s0)                 /* IER = 0: the line drops */
+    sb   zero, UART_REG(1)(s0)                 /* IER = 0: the line drops */
     li   t0, 10
     sw   t0, 0(s3)                   /* PLIC complete, source 10 */
     lw   t0, 0(s1)
@@ -152,13 +152,13 @@ _vtest_body:
  * chain above.  The transmit interrupt is a LATCH and the ISR read that
  * reports it is what clears it, so these two reads must differ. ---- */
     li   t0, 0x02
-    sb   t0, 1(s0)
+    sb   t0, UART_REG(1)(s0)
 2:  lw   t0, 0(s1)
     andi t0, t0, SRC10
     beqz t0, 2b
-    lbu  t0, 2(s0)
+    lbu  t0, UART_REG(2)(s0)
     sw   t0, R_ISR3(s11)
-    lbu  t0, 2(s0)
+    lbu  t0, UART_REG(2)(s0)
     sw   t0, R_ISR4(s11)
     lw   t0, 0(s1)
     sw   t0, R_PEND4(s11)
