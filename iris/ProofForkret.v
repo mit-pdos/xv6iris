@@ -83,6 +83,10 @@ Require Import SpecUserretClosed.
 Require Import ParkCap.   (* [park_token] *)
 Require Import UsertrapRes.
 Require Import SpecForkret ProofForkretParts ProofPrepareReturnParts.
+Require Import UexecSlot. (* [uvis_of] *)
+Require Import UexecRet.  (* [uslot] -- the closer's second output lands in
+                             the proofmode context here, so this Require is
+                             DIRECT (durable-notes) *)
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -673,9 +677,17 @@ Proof.
   { rewrite /forkret_yield.
     iSplitL "Hparked"; [iExact "Hparked" | iExact "Hpnopt"]. }
   iDestruct (ut_tfk_upd_upt (CID := CIDf) ksp V' pt with "Htfk") as "#Htfk'".
+  (* THE CLOSER NOW YIELDS TWO THINGS: the residue, and a slot keyed at the
+     record forkret actually resumes with ([SpecForkret.forkret_closer]).
+     S5 IS THE CONSUMER of the second -- the trap loop's own rewrite, where
+     [SpecUserretClosed.wp_userret_closed_body] grows a slot premise and the
+     residue loses its [uexec_wp] conjunct (projects/user-wp-slot.md SS4c,
+     R-a/R-c).  Until then this arm drops it: adding the premise here would
+     be S5's edit to [wp_userret_closed]'s statement, made in the wrong
+     lane. *)
   iDestruct ("Hyield" $! CIDf pt (MkUstate (upd_upt V' pt) (us_M U))
                with "[%] [%] [%] [%] Htfk' Hdone HW Htc Hyld")
-    as "Hures"; [reflexivity | exact Hnorm | exact Hptwf | | ].
+    as "[Hures _]"; [reflexivity | exact Hnorm | exact Hptwf | | ].
   (* the resumed record names the parked process's fd-state ghost: forkret
      moved only [pv_upt], and [upd_upt] does not touch [pv_fdg]. *)
   { exact Hfg. }

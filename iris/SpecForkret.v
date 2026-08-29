@@ -201,6 +201,9 @@ Require Import IrefSlots ProcAvail.
 Require Import SpecKexec.
 Require Import UsertrapRes UtResFits.
 Require Import FirstTok.   (* [first_done] -- the one thing the closer takes, see the header *)
+Require Import UexecSlot.  (* [uvis] / [uvis_of] *)
+Require Import UexecRet.   (* [uslot] -- the closer's new second output.
+                              Required DIRECTLY: the seal does not travel. *)
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
@@ -273,7 +276,12 @@ Definition forkret_closer
         is about to hand back. *)
      TimerCap.timer_cap (CID := h) -∗
      forkret_yield (CID := h) γf p ksp pid av (us_V U') -∗
-     URes h pt' ksp U')%I.
+     (* THE RESIDUE, AND THE SLOT FOR THE RECORD THIS RESUME LANDS ON.  The
+        parker captured the GENERIC family and the closer instantiates it
+        here -- see [ParkCap.park_pkg], of which this is the forkret-side
+        spelling, and projects/user-wp-slot.md SS4c (R-b) for why the key
+        cannot be the parked one (the boot arm's kexec moves it). *)
+     (URes h pt' ksp U' ∗ uslot (uvis_of U')))%I.
 
 
 (* THE CONTRACT.  One statement, no [first] premise and no [first] reading:

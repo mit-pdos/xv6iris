@@ -174,6 +174,9 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import SyscParkEnv ParkCap.   (* [park_world] / [park_token] *)
 Require Import UexecWp.   (* [uexec_wp] -- the child's WP, spent by the park *)
+Require Import UexecSlot. (* [uvis] -- the slot's key *)
+Require Import UexecRet.  (* [uslot] -- the generic family kfork hands the
+                             park.  Required DIRECTLY (durable-notes). *)
 Require Import Xv6Cameras.  (* [logG]: [ireg_inv]'s own instance argument *)
 Local Open Scope Z_scope.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -279,6 +282,16 @@ Definition wp_kfork_sconf_body
      parent's own fork-continuation deposit rather than from the generic
      theorem.  See claude-notes/design/user-wp-slot.md. *)
   uexec_wp -∗
+  (* ...AND THE GENERIC SLOT FAMILY FOR THE CHILD, on exactly the same route
+     and for exactly the same reason: [ParkCap.park_token_park] captures it
+     and the package's resume closer instantiates it at the record the child
+     is resumed with.  KFORK INSTANTIATES NOTHING -- it hands the family
+     straight to the park, which is what keeps the child's key out of this
+     contract: a key chosen here would be stale by the time forkret's boot
+     arm has run kexec("/init") (projects/user-wp-slot.md SS4c, R-b).  When
+     the parent is verified, this premise takes the parent's own
+     fork-continuation deposit instead of the generic inhabitant. *)
+  (∀ W : uvis, uslot W) -∗
   (* THE STEADY ARM OF [FirstTok.first_tok], and the ONE thing fork cannot
      take out of the parent's block: the parent's token may be the EXCLUSIVE
      boot arm, and the child needs a token of its own.  [first_done] is

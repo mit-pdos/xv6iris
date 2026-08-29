@@ -142,6 +142,9 @@ Require Import SpecIdup.
 Require Import SpecSafestrcpy.
 Require Import SyscParkEnv ParkCap.
 Require Import UexecWp.   (* [uexec_wp] -- the child's WP, threaded to [B5] *)
+Require Import UexecSlot. (* [uvis] *)
+Require Import UexecRet.  (* [uslot] -- the generic family, threaded to [B5]
+                             beside the WP.  Required DIRECTLY. *)
 Require Import SpecKfork.
 Require Import ProofKforkParts.
 Require Import ProofKfork.
@@ -511,6 +514,10 @@ Section KforkArms.
        [B5.kfk_b5], where the park captures it.  LINEAR, unlike the two
        rows above it: see [SpecKfork]'s premise of the same name. *)
     uexec_wp -∗
+    (* ...and the child's GENERIC SLOT FAMILY, also straight through to
+       [B5.kfk_b5], where the park captures it.  LINEAR, like the WP above:
+       see [SpecKfork]'s premise of the same name. *)
+    (∀ W : uvis, uslot W) -∗
     wp_next b pme (fun (CID : CpuId) =>
       ∀ mr : regfile,
         ⌜ callee_saved m mr ⌝ -∗
@@ -526,7 +533,7 @@ Section KforkArms.
     subst tfsrc tfdst.
     iIntros "#Htext #Hprocs Hcg Hcpu Hpc Hframe Hpv HCpriv Hcfrag #Hmk
              Hheld Hhart Hfd Hbsl Hkst Hctxex Hpay Hkalloc #Hwlock #Hft
-             Hitb Hitinv #Hireg Hirs #Hfdone #Hworld #Htoken Huwp Hcont".
+             Hitb Hitinv #Hireg Hirs #Hfdone #Hworld #Htoken Huwp Hjslot Hcont".
     iDestruct "Hctxex" as (ks rest) "(%Hrestlen & Hks & Hkctx)".
     rewrite /kfk_frame_at.
     iDestruct "Hframe" as "(Hb1 & Hb2 & Hb3 & Hb4 & Hb5 & Hb6 & Hb7 & Hb8)".
@@ -601,7 +608,7 @@ Section KforkArms.
     iSpecialize ("Hb3app" with "Htext Hft").
     iSpecialize ("Hb3app" $! 0%nat Mx
       with "[%] [%] [Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
-                     Hheld Hhart Hfd Hbsl Hkst Hpay Hkalloc Hwlock Hitb Hitinv Hirs Hks Hkctx Huwp Hcont]
+                     Hheld Hhart Hfd Hbsl Hkst Hpay Hkalloc Hwlock Hitb Hitinv Hirs Hks Hkctx Huwp Hjslot Hcont]
             Hcg Hcpu Hpc Hpv [HCpriv] Hcfrag").
     - unfold NOFILE. lia.
     - split_and!.
@@ -656,7 +663,7 @@ Section KforkArms.
                 pme ks pid_c (MkUstate Vc4 ((us_M Uc'))) ch rest (sign_extend' 64 pid_c) lks
                 ltac:(lia) ltac:(lia) HjN Hgamma Hrestlen (eq_sym Hbeq) Hmf4s4 Hmf4s5 Hpid4
                 with "Hsc4 Hown4 Hpay Htext Hpc4 Hprocs Hwlock Hft Hworld Htoken Hfdone
-                      Hheld Hhart Hpvcx4 Hcfrag Huwp Hmk Hfd Hirsp Hbsl Hkst Hks Hkctx").
+                      Hheld Hhart Hpvcx4 Hcfrag Huwp Hjslot Hmk Hfd Hirsp Hbsl Hkst Hks Hkctx").
       all: try lkbelow.
       (* [b] is symbolic here (B5's own exit index): an ordinary crossing,
          not [wp_next_off_intro] -- the brief's correction (a). *)
@@ -739,7 +746,7 @@ Section KforkMain.
     cbv beta delta [wp_kfork_sconf_body]. cbn zeta.
     intros HK Hlvl Hbelow.
     iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hplock #Hwlock #Hftbl
-             #Hitbl #Hitinv #Hireg Henv #Hpav #Hworld #Htoken Huwp #Hfdone Hpv Hcont".
+             #Hitbl #Hitinv #Hireg Henv #Hpav #Hworld #Htoken Huwp Hjslot #Hfdone Hpv Hcont".
     (* the SIE index the two lock-holding exits come back at *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbeq.
     (* [B6.kfk_prologue] is still generic in the allocator's count; kfork
@@ -757,7 +764,7 @@ Section KforkMain.
                     WP (Loop : expr riscv_lang))%I)) lks
               HK Hlvl
               with "Hcg Hcpu Htext Hpc Hprocs Hplock Hwlock Hftbl
-                    Hitbl Hitinv Henv Hpav Hpv Hcont [] [] [Huwp]").
+                    Hitbl Hitinv Henv Hpav Hpv Hcont [] [] [Huwp Hjslot]").
     all: try lkbelow.
     - (* ---- arm 1: allocproc found no free slot, +0x10a ---- *)
       iIntros (CID1 Hx1 Mt) "%HMtsp %HMtthr Hcg Hcpu #Ht Hpc Hframe Hpv Hke HR".
@@ -816,7 +823,7 @@ Section KforkMain.
                 HMtsp HMts4 HMts5 HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr
                 Hnpa HjN Hgamma Hofn Hcwdn ltac:(lkbelow)
                 with "Ht Hprocs Hcg Hcpu Hpc Hframe Hpv HCp Hcfrag Hmk Hheld Hhart
-                      Hfd Hbsl Hkst Hctx Hpay Hke Hwl Hft Hit Hiti Hireg Hirs Hfdone Hworld Htoken Huwp
+                      Hfd Hbsl Hkst Hctx Hpay Hke Hwl Hft Hit Hiti Hireg Hirs Hfdone Hworld Htoken Huwp Hjslot
                       [HR]").
       (* the crossing fact by NAME, never as an inline [ltac:] in argument
          position: the hole's expected type is still an evar there, which is

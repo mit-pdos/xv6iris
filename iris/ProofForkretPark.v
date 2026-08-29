@@ -93,6 +93,9 @@ Require Import SpecForkret.
 Require Import FirstTok.
 Require Import UserPtTree ProcPtOwn.
 Require Import SpecForkretPark SpecForkretParkPaid ParkCap.
+Require Import UexecSlot. (* [uvis_of] *)
+Require Import UexecRet.  (* [uslot] -- in the proofmode context below, so
+                             required DIRECTLY (durable-notes) *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -219,8 +222,9 @@ Proof.
              TimerCap.timer_cap (CID := h) -∗
              forkret_yield (CID := h) γf (proc_addr j)
                (add_vec ks (mword_of_int 4096)) pid av (us_V U') -∗
-             FR.usertrap_res_bare (CID := h) pt'
-               (add_vec ks (mword_of_int 4096)) U')%I
+             (FR.usertrap_res_bare (CID := h) pt'
+                (add_vec ks (mword_of_int 4096)) U'
+              ∗ uslot (uvis_of U')))%I
     with "[Hclose Hfd Hirsp]" as "Hclose".
   { iIntros (h pt' U') "%HV %Hnorm %Hptwf %Hfg #Htfk Hdone HW #Htc Hy".
     iApply ("Hclose" with "[%] [%] [%] [%] Htfk Hdone HW Htc Hy Hfd Hirsp");

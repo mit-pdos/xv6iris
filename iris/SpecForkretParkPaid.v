@@ -125,6 +125,9 @@ Require Import FirstTok.
 Require Import SpecForkret.
 Require Import SpecForkretPark.
 Require Import ParkCap.   (* [park_token] *)
+Require Import UexecSlot. (* [uvis] / [uvis_of] *)
+Require Import UexecRet.  (* [uslot] -- required DIRECTLY, the seal does not
+                             travel through a re-export (durable-notes) *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -209,7 +212,11 @@ Definition forkret_park_pkg
       forkret_yield (CID := h) γf pa (add_vec ks (mword_of_int 4096)) pid av (us_V U') -∗
       fd_slots FDSPARE -∗
       iref_slots IREFSPARE -∗
-      URes h pt' (add_vec ks (mword_of_int 4096)) U'))%I.
+      (* ...AND IT YIELDS A SLOT KEYED AT THE RECORD IT RESUMES WITH, beside
+         the residue.  [ParkCap.park_pkg] is this verbatim; the note there
+         says why the key is [uvis_of U'] and not the parked one. *)
+      (URes h pt' (add_vec ks (mword_of_int 4096)) U'
+       ∗ uslot (uvis_of U'))))%I.
 
 Definition forkret_park_paid_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
