@@ -449,6 +449,19 @@ worth 20× on individual files.
     `VirtioQueue.v`, `ip_*`/`ig_*`/`it_*`/`nx_*`/`bm_used_*`, …) are
     retirable — they are correct, just no longer necessary. Retire them
     opportunistically when you are in the file anyway, not as a sweep.
+  - **THE OVERRIDE NEEDS *IMPORT*, AND A LEAF CAN MISS IT.** It is a
+    `Tactic Notation`, so it reaches a file only through an unbroken
+    `Require Export` chain (`BitmapEnc` exports `FastSetSolver`; every
+    intermediate that merely `Require Import`s it breaks the chain).
+    `iris/FsInitPinBoot.v` — an `FsImgCheck`-consumer leaf — got stdpp's
+    upstream one, and ONE `set_solver` closing `b ∉ ∅` with
+    `b ∈ fs_home_set fsimg_cov …` in the context (`fsimg_cov` is a
+    1,999-element `list_to_set` literal) cost **3 m 45 s of a 3.2 s file**.
+    `Print Ltac set_solver.` answering *"set_solver is not a user defined
+    tactic"* is the check: the override is not in scope. Then either
+    `Require Import FastSetSolver` or close the goal by hand
+    (`exact (not_elem_of_empty b)`) — in a deliberate leaf, prefer the
+    second and leave the cone alone.
   - **Measured on a REAL site, not a synthetic:** `ProofSysDup.v:836`'s
     workaround (`ltac:(apply not_elem_of_empty)`, written because `set_solver`
     there cost 106 s) put back to `ltac:(set_solver)` now costs **0.73 s**

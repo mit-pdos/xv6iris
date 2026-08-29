@@ -1395,3 +1395,9 @@ ProofSysOpenAUWalk.v
 SpecSysOpenAUPlain.v
 ProofSysOpenAU.v
 LinkSysOpenAU.v
+
+# fs-syscall-specs lane P, transport half: the era-0 identification that
+# closes lane P GAP (1) -- the map the boot mint founds the era at IS
+# era0_D, at the one era-0 premise (this era's disk is mkfs's image).  Also
+# a LEAF: its import cone is FsInitPin's own and nothing requires it.
+FsInitPinBoot.v

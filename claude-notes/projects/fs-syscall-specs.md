@@ -479,6 +479,66 @@ things, and the answer differs:
   `fs_recovery_det` + `fsimg_snap_ok` identifying that epoch's map with
   `era0_D`.  BT-3 also removed the `Rb` slot as a delivery channel (`Rb`
   is now named at `FsCrash.P_fs_lend`).
+
+  **GAP (1) CLOSED 2026-08-29** — `iris/FsInitPinBoot.v`, EC2-green in
+  **3.2 s**, zero `Admitted`, and `Print Assumptions` on all thirteen
+  artifacts is EMPTY (only Rocq's `PrimInt63`/`PrimString` primitives, so
+  the transport carries no logical axiom either).  A SECOND LEAF, not an
+  appendix to `FsInitPin`: its import cone is `FsInitPin`'s own — every
+  module it requires, `FsInitPin` already requires — so hygiene forced
+  nothing and the split is on ALTITUDE (a fact about a boot's premises,
+  which computes nothing, beside a fact about a gmap, which computes the
+  image), keeping `FsInitPin`'s landed text and empty audit untouched.
+  THE ERA-0 PREMISE at the boot altitude, exact landed spelling: there is
+  no era COUNTER there and cannot be one (`xv6_boot_era` runs at every
+  power-on and knows only `FsCrash.P_fs_project`'s reading of its disk),
+  so era 0 is an equation about the DISK — the one hypothesis
+  `SystemAdequacy.xv6_power_adequacy_xv6Σ` takes,
+  `Hdisk : v_disk (g.(gdev).(dvirtio)) = FsImgDisk.fsimg_dk`, read at the
+  block view as `FsCrash.fs_blocks dk = FsImgDisk.fsimg_P` — plus
+  `cov = fsimg_cov` (the crash predicate fixes `cov` for the whole
+  execution).  The LOG START is NOT assumed: `sk_sbok`→`FsImg.sbo_logstart`
+  pins the era's at 2 and `FsImgCheck.fsimg_sb_logstart` checks the image's
+  at 2 (`era0_logstart` — this is `xv6_boot_era`'s own `Hlseq`).
+  TWO ROUTES, because the boot uses both:
+  - (A) off the mint's own bundle `FsCfgBoot.fs_boot_snap_wf` —
+    `era0_boot_map : … → fs_restrict Pb (fs_home_set cov (sb_logstart sb))
+    = era0_D`, hence `era0_boot_snap_ok : … → snap_ok S era0_D` and
+    `era0_boot_pins : … → era0_pins (abs_view (fss_inodes S))`.  The step
+    is bundle conjunct (6) (`Pb` = raw disk off the header write set) plus
+    `era0_hdr_wset : hdr_wset fsimg_P (sb_logstart fsimg_sb) = ∅`, off
+    `FsImgCheck.fsimg_wf_log_clean` — mkfs leaves a clean log.
+  - (B) off the crash predicate's epoch — `era0_recovery_D : fs_recovery
+    fsimg_P D fsimg_cov (sb_logstart fsimg_sb) → D = era0_D` (by
+    `fs_recovery_clean` at the same clean log), its converse
+    `era0_recovery`, `era0_lend_D` (`fs_recovery_det` + the disk equation:
+    the lent epoch's map IS `era0_D`), and `era0_recovery_pins`.
+  `era0_pins av` is the three conclusions as one `Prop` (path pin, content
+  pin, and the `arun` walk `[ROOTINO; INIT_INO]`).
+  CRASH-BEFORE-/init, and it was free: `era0_reboot_pins` — `fs_recovery`
+  is a function of the PHYSICAL disk, so "nothing committed" is spelled as
+  "the re-boot's disk still carries the image's bytes", and
+  `fs_recovery_det` gives `D' = D = era0_D` and the same pins.  None of the
+  recovery cone is dragged in: what PROVES an uncommitted era leaves the
+  durable extent alone is the WAL's own argument, consumed here as the
+  hypothesis.
+  RESOURCE FORMS: `fs_snap_era0_pins` (off the lent epoch, snapshot handed
+  back — `fs_snap_read_ok_keep` composed with the pins, premise
+  `era0_dblk_full` discharged here) and, at the founded authority,
+  `astate_era0_boot_pins` / `nview_era0_boot_init` — `FsInitPin` §6 with
+  its `snap_ok` premise replaced by the boot's bundle, so a consumer
+  (ProofForkret's pinned-kexec gate) owes only the era-0 disk equation.
+  MEASURED GOTCHA, and it is about the LEAF RULE, not about `set_solver`:
+  one `set_solver` closing `b ∉ ∅` — with `b ∈ fs_home_set fsimg_cov …` in
+  the CONTEXT, `fsimg_cov` being a 1,999-element `list_to_set` literal —
+  took the file from **3.2 s to 3 m 49 s**.  The reason is that
+  `FastSetSolver`'s override is a `Tactic Notation` and therefore needs
+  IMPORT: the chain that carries it (`BitmapEnc` `Require Export`s it) is
+  broken by every intermediate that only `Require Import`s, so in an
+  `FsImgCheck`-consumer leaf `set_solver` is UPSTREAM's, and
+  optimization.md's "set_solver at capstone altitude is now fine" does not
+  apply.  Either `Require Import FastSetSolver` or, as here, close the goal
+  by hand (`exact (not_elem_of_empty b)`) and keep the cone unchanged.
   MEASURED GOTCHA, recorded in optimization.md and in the file's §3
   header: `injection`/`exact` against an equation carrying the
   35,976-byte `init_elf` literal DOES NOT FINISH (>15 min, both
