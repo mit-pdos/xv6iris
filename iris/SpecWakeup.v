@@ -24,6 +24,7 @@ Require Import SchedCtx.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 (* THE SCAN NO LONGER SKIPS THE RUNNING PROCESS.  xv6's wakeup used to guard
    the whole body with [if (p != myproc())]; it now acquires every slot's
@@ -31,7 +32,6 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
    because the field is the wakeup FLAG the split sleep protocol
    (SpecSleep.v) reads, so a registered-but-not-yet-parked waiter has to be
    signalled too, and the caller may BE that waiter.
-Require Import TsoCtx.
 
    Two premises went with the guard: the [myproc()] call is gone from the
    code, so [a0f] (&cpus[tp], the value it returned) and the [a0f <> 0]

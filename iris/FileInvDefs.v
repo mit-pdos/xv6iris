@@ -89,6 +89,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import IrefSlots.  (* [iref_frac]: an ftable entry holds one unit.
      NO CYCLE -- IrefSlots reaches only ProcGeom and FdSlots, which is exactly
      why [NFILE] was moved to FdSlots (see the note below). *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 
@@ -744,6 +745,7 @@ Global Instance word_pointsto_timeless'' `{!riscvGS Σ} (ktr : ktier) (a : Arch.
 Proof. exact (word_pointsto_timeless' ktr a dq w). Qed.
 
 Section FileInv.
+  Context `{XI : TsoCtx.CurCtx}.
   (* [icacheG]/[pipeG]/[cinvG] are bound HERE rather than reached through
      [fileG], since they left that class (see its note).  This file is
      BELOW [Xv6G.v] -- it is one of the files the bundle is built out of --
@@ -1124,17 +1126,17 @@ Section FileInv.
   (* ------------------------------------------------------------------ *)
 
   (* ---- full ownership of a word is EXCLUSIVE ----
-     [mem_pointsto_ne] at one address is a contradiction; that is all this
+     [ctx_pointsto_ne] at one address is a contradiction; that is all this
      is, and it is what refutes a stale marker / a stale resident cell. *)
   Lemma word4_pointsto_excl (a : Arch.pa) (dq : dfrac) (w1 w2 : bv 32) :
     a ↦₄ w1 -∗ a ↦₄{dq} w2 -∗ False.
   Proof.
     iIntros "H1 H2".
-    rewrite !word4_pointsto_unfold.
+    rewrite !ctx_word4_pointsto_unfold.
     iDestruct "H1" as "[_ H1]". iDestruct "H2" as "[_ H2]".
     change (seq 0 4) with ([0; 1; 2; 3]%nat).
     iDestruct "H1" as "[Hb1 _]". iDestruct "H2" as "[Hb2 _]".
-    iDestruct (mem_pointsto_ne with "Hb1 Hb2") as %Hne.
+    iDestruct (ctx_pointsto_ne with "Hb1 Hb2") as %Hne.
     iPureIntro. exact (Hne eq_refl).
   Qed.
 
@@ -1149,6 +1151,12 @@ Section FileInv.
      it parked.  See FileOff.v's header for the full argument. *)
   Definition off_mark (ip : mword 64) : iProp Σ :=
     (i_valid ip ↦₄ (mword_of_int 1 : mword 32))%I.
+
+  (* [tso FileInvDefs.v:1071]: the marker's accessor.  On main the marker is
+     the ambient cell itself, so this is definitional. *)
+  Lemma off_mark_acc (ip : mword 64) :
+    off_mark ip ⊣⊢ i_valid ip ↦₄ (mword_of_int 1 : mword 32).
+  Proof. reflexivity. Qed.
 
   (* THE BODY.  It holds, for the life of the invariant, HALF OF THE [f->ip]
      CELL -- which is how it knows WHICH INODE governs this slot's offset, and

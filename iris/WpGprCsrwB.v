@@ -17,6 +17,7 @@ Require Import MinstretInv.   (* exec_clint_dispatch_false: writing stimecmp ref
 Require Import HartSwp HartLift HartRegNode HartSpan HartSpanChar HartMCycle
         HartMFrame HartGoodb WpDecodeBridge WpMmodeJump WpMmodeCsrSwp.
 Require Import WpGprCsrrCommon.   (* drive_csr_term *)
+Require Import TsoCtx.
 
 (* ===================================================================== *)
 (* MONADIC-LEGALIZE REDUCTION LAYER.  Each legalize_* chains             *)
@@ -26,7 +27,6 @@ Require Import WpGprCsrrCommon.   (* drive_csr_term *)
 (* ===================================================================== *)
 
 Lemma exec_hartSupports_Sscofpmf s : exec (hartSupports Ext_Sscofpmf) s = Some (true, s).
-Require Import TsoCtx.
 Proof.
   unfold hartSupports. destruct (Defs.Zwf_guarded _).
   cbn [_rec_hartSupports]. unfold Defs.assert_exp'.

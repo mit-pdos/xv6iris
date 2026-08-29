@@ -30,8 +30,8 @@ Require Import InstrBytes WpGpr RegFile HartTp WpNext.
 Require Import WpSconfEngine.
 Require Import IntrDefs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 
 (* THE EXEC-SIDE BRIDGES ARE GONE.  This file used to carry a [rvv] helper
    and fourteen [exec_execute_BTYPE_*_{fall,taken_zca}] lemmas, because a

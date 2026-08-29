@@ -58,6 +58,7 @@ Require Import ProcInv.
 Require Import SpecWritei.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -377,6 +378,7 @@ Qed.
    lemmas that split the bio block window (static, KT0). *)
 Section WriteiBytes.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{XI : CurCtx}.
   Context `{KTR : !CurKtier}.
 
   (* --- three conversion wands over ByteBuf's [⊣⊢]s.  Stated as wands so
@@ -428,6 +430,7 @@ End WriteiBytes.
 
 Section WriteiRes.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{XI : CurCtx}.
 
   (* A [len]-byte WINDOW of a checked-out buffer's data area, borrowed at
      offset [o] and taken back at whatever the copy left there.  The window

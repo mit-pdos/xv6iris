@@ -22,10 +22,10 @@ Require Import CpuOwn.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 
 Definition PGSIZEv : mword 64 := mword_of_int 4096.
-Require Import TsoCtx.
 Definition negPGSIZEv : mword 64 := mword_of_int (-4096).   (* the ~0xfff page mask *)
 
 (* [avail_inc] applied [k] times -- the page-count token after freeing [k]
@@ -60,7 +60,7 @@ Definition wp_freerange_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID
   sie_cap_gpr KT0 m K b pcur -∗
   cpu_own ncnt eb pcur b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  is_lock γl lk "kmem"%string <{ kmem_res γk fl }> -∗
+  is_lock γl lk "kmem"%string (λ ξ : CtxId, kmem_res (XIk := ξ) γk fl) -∗
   ([∗ list] p ∈ ps, page_own p) -∗
   kalloc_avail γk (Some 0%nat) -∗
   wp_next b pcur (fun (CID : CpuId) =>

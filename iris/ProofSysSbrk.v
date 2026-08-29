@@ -52,6 +52,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Require Import TsoCtx.
+Require TsoCtxShim.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -115,7 +116,7 @@ Section ProofSysSbrk.
   (*   [c.mv a0,s1] then the 48-byte pop.  The return value is whatever s1
      holds -- [addr] on the three success paths, -1 on the two failures --
      which is why the two failure tails write s1 and not a0. *)
-  Lemma ss_tail `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma ss_tail `{CID0 : CpuId}
       (m Mt : regfile) (av : nat) (b : bool) (p : mword 64) (rv : mword 64)
       (sp0 ra0 s00 s10 w4 w5 w6 : mword 64) :
     (6 <= av)%nat ->
@@ -130,12 +131,12 @@ Section ProofSysSbrk.
     sie_cap_gpr KT1 Mt (av - 6)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.sys_sbrk + 0x64) : mword 64) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) w4 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) w6 -∗
     wp_next b p (fun (CID1 : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
@@ -312,7 +313,7 @@ Section ProofSysSbrk.
      have consumed the epilogue block one of them still needs. *)
   (* A DECOMPOSED helper (porting guide): its own fresh `{CID0} binder, its
      own [(b : bool)], and its continuation wrapped in [wp_next]. *)
-  Local Lemma ss_eager `{CID0 : CpuId} `{XI : CurCtx} (γa γf : gname)
+  Local Lemma ss_eager `{CID0 : CpuId} (γa γf : gname)
       (m Me : regfile) (av : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (U : ustate) (sp0 : mword 64) (nw : mword 32) (b : bool) (lks : gset string) :
     (52 <= av)%nat ->
@@ -327,7 +328,7 @@ Section ProofSysSbrk.
     pc_is (mword_of_int (KernelSyms.sys_sbrk + 0x58) : mword 64) -∗
     proc_priv γf p pid U -∗
     kalloc_env γa None -∗
-    word4_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) nw -∗
+    ctx_word4_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) nw -∗
     wp_next (CID0 := CID0) b p (fun (CID1 : CpuId) =>
       (* growproc's whole effect on user memory is [p->sz] moving; the
          image equation is [growproc_ok]'s, forwarded on the nose. *)
@@ -345,7 +346,7 @@ Section ProofSysSbrk.
         cpu_own 0%nat eb p b lks -∗
         pc_is (mword_of_int (KernelSyms.sys_sbrk + 0x64) : mword 64) -∗
         proc_priv γf p pid (upd_usM (upd_usV U (upd_sz (upd_upt (us_V U) P') szv')) M') -∗
-        word4_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) nw -∗
+        ctx_word4_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) nw -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -608,8 +609,8 @@ Section ProofSysSbrk.
     assert (HM2sp : M2 !!! Regidx csp_rs1 = pa_stk sp0 6)
       by (rewrite /M2 upd_ne; [exact HM1sp | reg_neq]).
     (* the two [int] locals: the two halves of slot 5 *)
-    iDestruct (word_pointsto_aligned_p with "Hs5") as %Hal5.
-    iDestruct (word_pointsto_split4 with "Hs5") as "[Hs5lo Hs5hi]".
+    iDestruct (ctx_word_pointsto_aligned_p with "Hs5") as %Hal5.
+    iDestruct (ctx_word_pointsto_split4 with "Hs5") as "[Hs5lo Hs5hi]".
     (* ---- +0x0a: addi a1,s0,-40 -- a1 := &n ---- *)
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.sys_sbrk + 0x0a))
               Ra1 Rs0 (mword_of_int 0xfd8 : mword 12) M2 (av - 6)%nat b
@@ -941,7 +942,7 @@ Section ProofSysSbrk.
         cpu_own (CID := CIDx) 0%nat eb p b lks -∗
         pc_is (mword_of_int (KernelSyms.sys_sbrk + 0x64) : mword 64) -∗
         proc_priv γf p pid (upd_usM (upd_usV U (upd_sz (upd_upt (us_V U) P') szv')) M') -∗
-        (∃ w5 : mword 64, word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5) -∗
+        (∃ w5 : mword 64, ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) w5) -∗
         WP (Loop : expr riscv_lang))%I
       with "[Hcont Hs1 Hs2 Hs3 Hs4 Hs6]" as "EXIT".
     { iIntros (CIDx Mf P' M' szv' rv) "%Hsx %Hfsp %Hfs1 %Hfthr %Hok Hcg Hcpu Hpc Hpriv Hw5".
@@ -991,7 +992,7 @@ Section ProofSysSbrk.
         + right. split; [exact Hrv |]. left. split; [left; exact Heager | exact Hgok].
         + left. split; [exact Hrv | split; [exact Hp | split; [exact Hs | exact Hm']]].
       - iExists (word_of_words (trunc32 v0) (trunc32 v1)).
-        iApply (word_pointsto_join4 _ _ _ _ Hal5 with "Hs5lo Hs5hi"). }
+        iApply (ctx_word_pointsto_join4 _ _ _ _ Hal5 with "Hs5lo Hs5hi"). }
     (* ---- t <> SBRK_EAGER: look at the sign of n ---- *)
     assert (Hnoteager : ~ sbrk_eager v1).
     { unfold sbrk_eager. intro He.
@@ -1075,7 +1076,7 @@ Section ProofSysSbrk.
         + right. split; [exact Hrv |]. left. split; [right; exact Hnneg | exact Hgok].
         + left. split; [exact Hrv | split; [exact Hp | split; [exact Hs | exact Hm']]].
       - iExists (word_of_words (trunc32 v0) (trunc32 v1)).
-        iApply (word_pointsto_join4 _ _ _ _ Hal5 with "Hs5lo Hs5hi"). }
+        iApply (ctx_word_pointsto_join4 _ _ _ _ Hal5 with "Hs5lo Hs5hi"). }
     (* ================================================================= *)
     (*  THE LAZY PATH: n >= 0 and t <> SBRK_EAGER.                        *)
     (* ================================================================= *)
@@ -1231,7 +1232,7 @@ Section ProofSysSbrk.
         rewrite /Y1 upd_ne; [| congruence]. apply HthrL4; assumption.
       - left. repeat split; reflexivity.
       - iExists (word_of_words (trunc32 v0) (trunc32 v1)).
-        iApply (word_pointsto_join4 _ _ _ _ Hal5 with "Hs5lo Hs5hi"). }
+        iApply (ctx_word_pointsto_join4 _ _ _ _ Hal5 with "Hs5lo Hs5hi"). }
     (* ---- it fits ---- *)
     assert (Hfits : (bv_unsigned (add_vec (pv_sz (us_V U)) (sbrk_arg v0)) <= 274877898752)%Z).
     { rewrite HL4a4 HL4a5 in Hbltu1. unfold zopz0zI_u in Hbltu1.
@@ -1455,7 +1456,7 @@ Section ProofSysSbrk.
       split; [| split; [reflexivity | reflexivity]].
       rewrite uint_unsigned uvm_maxsz_val. rewrite -Hsum. exact Hfits.
     - iExists (word_of_words (trunc32 v0) (trunc32 v1)).
-      iApply (word_pointsto_join4 _ _ _ _ Hal5 with "Hs5lo Hs5hi").
+      iApply (ctx_word_pointsto_join4 _ _ _ _ Hal5 with "Hs5lo Hs5hi").
   Qed.
 
 End ProofSysSbrk.

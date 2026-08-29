@@ -729,7 +729,6 @@ Section UvStorePure.
   Context (Hk : 0 < k) (Hk8 : k <= 8) (Hkdvd : (k | 4096)).
   Context (Huintk : uint (to_bits 64 k) = k).
   Context (Hwrite_plain : forall (addr : mword 64) (data : mword (8 * k)) (s : mstate),
-  Context `{XI : CurCtx}.
       dev_addr addr = false ->
       exec (write_ram rv64d_types.Write_plain (Physaddr addr) k data tt) s
       = Some (true, MState s.(sregs) (write_bytes s.(mem) addr (Z.to_N k) data) s.(mdev))).

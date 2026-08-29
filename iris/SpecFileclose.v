@@ -197,7 +197,7 @@ Section SpecFileclose.
     (⌜(Z.of_nat n + 2 < 2 ^ 31)%Z⌝ ∗
      procs_inv (fcn_procs fn) ∗
      is_lock (fsc_kalloc) (mword_of_int KernelSyms.kmem) "kmem"%string
-       <{ kmem_res (fsc_kpages) (mword_of_int (KernelSyms.kmem + 24)) }> ∗
+       (λ ξ : CtxId, kmem_res (XIk := ξ) (fsc_kpages) (mword_of_int (KernelSyms.kmem + 24))) ∗
      kalloc_avail (fsc_kpages) on)%I.
 
   (* the page came back iff this was the pipe's LAST end; the caller cannot

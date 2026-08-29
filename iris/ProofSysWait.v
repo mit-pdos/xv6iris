@@ -49,8 +49,8 @@ From Kernel Require KernelInstrs KernelSyms.
 Require Import CodeSysWait.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 Local Open Scope Z_scope.
 (* a failing tactic in a WP over [proc_priv] otherwise spends tens of
    minutes FORMATTING the goal -- see claude-notes/durable-notes.md. *)

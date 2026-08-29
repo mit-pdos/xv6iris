@@ -100,6 +100,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Require Import TsoCtx.
+Require TsoCtxShim.
 Local Open Scope Z_scope.
 (* a failing tactic in a whole-function WP over [proc_priv] otherwise spends
    tens of minutes FORMATTING the goal -- see durable-notes. *)
@@ -118,28 +119,28 @@ Ltac reg_neq_top :=
 (* ------------------------------------------------------------------ *)
 
 (* the five field displacements the scan and the found arm use *)
-Lemma kw_state_off (X : mword 64) :
+Lemma kw_state_off `{XI : CurCtx} (X : mword 64) :
   add_vec X (sign_extend' 64 (mword_of_int 24 : mword 12)) = p_state X.
 Proof. rewrite /p_state /state_off. f_equal; apply bv_eq; vm_compute; reflexivity. Qed.
 
-Lemma kw_xstate_off (X : mword 64) :
+Lemma kw_xstate_off `{XI : CurCtx} (X : mword 64) :
   add_vec X (sign_extend' 64 (mword_of_int 44 : mword 12)) = p_xstate X.
 Proof. rewrite /p_xstate. f_equal; apply bv_eq; vm_compute; reflexivity. Qed.
 
-Lemma kw_pid_off (X : mword 64) :
+Lemma kw_pid_off `{XI : CurCtx} (X : mword 64) :
   add_vec X (sign_extend' 64 (mword_of_int 48 : mword 12)) = p_pid X.
 Proof. reflexivity. Qed.
 
-Lemma kw_parent_off (X : mword 64) :
+Lemma kw_parent_off `{XI : CurCtx} (X : mword 64) :
   add_vec X (sign_extend' 64 (mword_of_int 56 : mword 12)) = p_parent X.
 Proof. exact (p_parent_sext X). Qed.
 
-Lemma kw_pagetable_off (X : mword 64) :
+Lemma kw_pagetable_off `{XI : CurCtx} (X : mword 64) :
   add_vec X (sign_extend' 64 (mword_of_int 80 : mword 12)) = p_pagetable X.
 Proof. rewrite /p_pagetable. f_equal; apply bv_eq; vm_compute; reflexivity. Qed.
 
 (* a state cell whose 64-bit sign extension is 5 is ZOMBIE *)
-Lemma kw_sext_zombie (st : mword 32) :
+Lemma kw_sext_zombie `{XI : CurCtx} (st : mword 32) :
   (mword_of_int 5 : mword 64) = sign_extend' 64 st -> st = ZOMBIE.
 Proof.
   intro H.
@@ -151,35 +152,35 @@ Qed.
 
 (* writing back the descriptor that is already there is a no-op -- what the
    arms that never call copyout need to close the block's [upd_upt]. *)
-Lemma upd_upt_id (V : pprivate) : upd_upt V (pv_upt V) = V.
+Lemma upd_upt_id `{XI : CurCtx} (V : pprivate) : upd_upt V (pv_upt V) = V.
 Proof. by destruct V. Qed.
 
 (* The stack-budget and nesting side conditions, as NAMED lemmas with only
    [nat]/[Z] in scope.  Inside these blocks the context is full of
    [bv_unsigned]s, so an inline [ltac:(lia)] answers "Cannot find witness" --
    the zify-hook rule in durable-notes, hit at every call site. *)
-Lemma kw_K10 (K : nat) : (K_kwait <= K)%nat -> (10 <= K - 10)%nat.
+Lemma kw_K10 `{XI : CurCtx} (K : nat) : (K_kwait <= K)%nat -> (10 <= K - 10)%nat.
 Proof. lia. Qed.
-Lemma kw_K10K (K : nat) : (K_kwait <= K)%nat -> (10 <= K)%nat.
+Lemma kw_K10K `{XI : CurCtx} (K : nat) : (K_kwait <= K)%nat -> (10 <= K)%nat.
 Proof. lia. Qed.
-Lemma kw_K14 (K : nat) : (K_kwait <= K)%nat -> (14 <= K - 10)%nat.
+Lemma kw_K14 `{XI : CurCtx} (K : nat) : (K_kwait <= K)%nat -> (14 <= K - 10)%nat.
 Proof. lia. Qed.
-Lemma kw_K22 (K : nat) : (K_kwait <= K)%nat -> (22 <= K - 10)%nat.
+Lemma kw_K22 `{XI : CurCtx} (K : nat) : (K_kwait <= K)%nat -> (22 <= K - 10)%nat.
 Proof. lia. Qed.
-Lemma kw_K44 (K : nat) : (K_kwait <= K)%nat -> (44 <= K - 10)%nat.
+Lemma kw_K44 `{XI : CurCtx} (K : nat) : (K_kwait <= K)%nat -> (44 <= K - 10)%nat.
 Proof. lia. Qed.
-Lemma kw_K52 (K : nat) : (K_kwait <= K)%nat -> (52 <= K - 10)%nat.
+Lemma kw_K52 `{XI : CurCtx} (K : nat) : (K_kwait <= K)%nat -> (52 <= K - 10)%nat.
 Proof. lia. Qed.
-Lemma kw_ilvl0 : (Z.of_nat 0 + 1 < 2 ^ 31)%Z.
+Lemma kw_ilvl0 `{XI : CurCtx} : (Z.of_nat 0 + 1 < 2 ^ 31)%Z.
 Proof. vm_compute. reflexivity. Qed.
-Lemma kw_ilvl1 : (Z.of_nat 1 + 1 < 2 ^ 31)%Z.
+Lemma kw_ilvl1 `{XI : CurCtx} : (Z.of_nat 1 + 1 < 2 ^ 31)%Z.
 Proof. vm_compute. reflexivity. Qed.
-Lemma kw_ilvl2 : (Z.of_nat 2 + 1 < 2 ^ 31)%Z.
+Lemma kw_ilvl2 `{XI : CurCtx} : (Z.of_nat 2 + 1 < 2 ^ 31)%Z.
 Proof. vm_compute. reflexivity. Qed.
-Lemma kw_len4 : (Z.of_nat 4 < 2 ^ 64)%Z.
+Lemma kw_len4 `{XI : CurCtx} : (Z.of_nat 4 < 2 ^ 64)%Z.
 Proof. vm_compute. reflexivity. Qed.
 
-Lemma kw_eq_vec_refl {n} (x : mword n) : eq_vec x x = true.
+Lemma kw_eq_vec_refl `{XI : CurCtx} {n} (x : mword n) : eq_vec x x = true.
 Proof. apply eq_vec_true_iff. reflexivity. Qed.
 
 (* ------------------------------------------------------------------ *)
@@ -191,7 +192,7 @@ Proof. apply eq_vec_true_iff. reflexivity. Qed.
    cashes it in for the four matching conjuncts of the final
    [callee_saved].  Spelled with [csp_rs1] (not [mword_of_int 2]) per
    durable-notes: [congruence] cannot bridge the two. *)
-Definition kw_cs_rest (M mb : regfile) : Prop :=
+Definition kw_cs_rest `{XI : CurCtx} (M mb : regfile) : Prop :=
   forall r : mword 5, is_cs_idx r = true ->
     r <> csp_rs1 ->
     r <> (mword_of_int 8 : mword 5) -> r <> (mword_of_int 9 : mword 5) ->
@@ -200,7 +201,7 @@ Definition kw_cs_rest (M mb : regfile) : Prop :=
     r <> (mword_of_int 22 : mword 5) -> r <> (mword_of_int 23 : mword 5) ->
     M !!! Regidx r = mb !!! Regidx r.
 
-Lemma kw_cs_rest_cs (M M' mb : regfile) :
+Lemma kw_cs_rest_cs `{XI : CurCtx} (M M' mb : regfile) :
   callee_saved M M' -> kw_cs_rest M mb -> kw_cs_rest M' mb.
 Proof.
   intros Hcs H r Hr N2 N8 N9 N18 N19 N20 N21 N22 N23.
@@ -208,7 +209,7 @@ Proof.
 Qed.
 
 (* an insert at a NON-callee-saved register (a0..a5, ra) *)
-Lemma kw_cs_rest_ncs (M mb : regfile) (rr : mword 5) (v : mword 64) :
+Lemma kw_cs_rest_ncs `{XI : CurCtx} (M mb : regfile) (rr : mword 5) (v : mword 64) :
   is_cs_idx rr = false -> kw_cs_rest M mb -> kw_cs_rest (<[Regidx rr := v]> M) mb.
 Proof.
   intros Hn H r Hr N2 N8 N9 N18 N19 N20 N21 N22 N23.
@@ -219,35 +220,35 @@ Qed.
 (* ... and at each of the nine registers that ARE callee-saved but are
    excluded by the predicate's own premises.  One lemma apiece: the generic
    [kw_cs_rest_ncs] does NOT apply to them (durable-notes / kkill). *)
-Lemma kw_cs_rest_sp (M mb : regfile) (v : mword 64) :
+Lemma kw_cs_rest_sp `{XI : CurCtx} (M mb : regfile) (v : mword 64) :
   kw_cs_rest M mb -> kw_cs_rest (<[Regidx csp_rs1 := v]> M) mb.
 Proof. intros H r Hr N2 N8 N9 N18 N19 N20 N21 N22 N23. rewrite upd_ne; [by apply H | congruence]. Qed.
-Lemma kw_cs_rest_s0 (M mb : regfile) (v : mword 64) :
+Lemma kw_cs_rest_s0 `{XI : CurCtx} (M mb : regfile) (v : mword 64) :
   kw_cs_rest M mb -> kw_cs_rest (<[Regidx (mword_of_int 8 : mword 5) := v]> M) mb.
 Proof. intros H r Hr N2 N8 N9 N18 N19 N20 N21 N22 N23. rewrite upd_ne; [by apply H | congruence]. Qed.
-Lemma kw_cs_rest_s1 (M mb : regfile) (v : mword 64) :
+Lemma kw_cs_rest_s1 `{XI : CurCtx} (M mb : regfile) (v : mword 64) :
   kw_cs_rest M mb -> kw_cs_rest (<[Regidx (mword_of_int 9 : mword 5) := v]> M) mb.
 Proof. intros H r Hr N2 N8 N9 N18 N19 N20 N21 N22 N23. rewrite upd_ne; [by apply H | congruence]. Qed.
-Lemma kw_cs_rest_s2 (M mb : regfile) (v : mword 64) :
+Lemma kw_cs_rest_s2 `{XI : CurCtx} (M mb : regfile) (v : mword 64) :
   kw_cs_rest M mb -> kw_cs_rest (<[Regidx (mword_of_int 18 : mword 5) := v]> M) mb.
 Proof. intros H r Hr N2 N8 N9 N18 N19 N20 N21 N22 N23. rewrite upd_ne; [by apply H | congruence]. Qed.
-Lemma kw_cs_rest_s3 (M mb : regfile) (v : mword 64) :
+Lemma kw_cs_rest_s3 `{XI : CurCtx} (M mb : regfile) (v : mword 64) :
   kw_cs_rest M mb -> kw_cs_rest (<[Regidx (mword_of_int 19 : mword 5) := v]> M) mb.
 Proof. intros H r Hr N2 N8 N9 N18 N19 N20 N21 N22 N23. rewrite upd_ne; [by apply H | congruence]. Qed.
-Lemma kw_cs_rest_s4 (M mb : regfile) (v : mword 64) :
+Lemma kw_cs_rest_s4 `{XI : CurCtx} (M mb : regfile) (v : mword 64) :
   kw_cs_rest M mb -> kw_cs_rest (<[Regidx (mword_of_int 20 : mword 5) := v]> M) mb.
 Proof. intros H r Hr N2 N8 N9 N18 N19 N20 N21 N22 N23. rewrite upd_ne; [by apply H | congruence]. Qed.
-Lemma kw_cs_rest_s5 (M mb : regfile) (v : mword 64) :
+Lemma kw_cs_rest_s5 `{XI : CurCtx} (M mb : regfile) (v : mword 64) :
   kw_cs_rest M mb -> kw_cs_rest (<[Regidx (mword_of_int 21 : mword 5) := v]> M) mb.
 Proof. intros H r Hr N2 N8 N9 N18 N19 N20 N21 N22 N23. rewrite upd_ne; [by apply H | congruence]. Qed.
-Lemma kw_cs_rest_s6 (M mb : regfile) (v : mword 64) :
+Lemma kw_cs_rest_s6 `{XI : CurCtx} (M mb : regfile) (v : mword 64) :
   kw_cs_rest M mb -> kw_cs_rest (<[Regidx (mword_of_int 22 : mword 5) := v]> M) mb.
 Proof. intros H r Hr N2 N8 N9 N18 N19 N20 N21 N22 N23. rewrite upd_ne; [by apply H | congruence]. Qed.
-Lemma kw_cs_rest_s7 (M mb : regfile) (v : mword 64) :
+Lemma kw_cs_rest_s7 `{XI : CurCtx} (M mb : regfile) (v : mword 64) :
   kw_cs_rest M mb -> kw_cs_rest (<[Regidx (mword_of_int 23 : mword 5) := v]> M) mb.
 Proof. intros H r Hr N2 N8 N9 N18 N19 N20 N21 N22 N23. rewrite upd_ne; [by apply H | congruence]. Qed.
 
-Lemma kw_cs_rest_refl (M : regfile) : kw_cs_rest M M.
+Lemma kw_cs_rest_refl `{XI : CurCtx} (M : regfile) : kw_cs_rest M M.
 Proof. intros r _ _ _ _ _ _ _ _ _ _. reflexivity. Qed.
 
 (* ------------------------------------------------------------------ *)
@@ -259,7 +260,7 @@ Proof. intros r _ _ _ _ _ _ _ _ _ _. reflexivity. Qed.
    all.  It rides beside this predicate as a separate equation, asserted
    only at the points where it is genuinely live (the loop head, the
    pp++/test tail, and the scan's exit). *)
-Definition kw_scan_regs (M mm : regfile) (pme addr : mword 64) (kk : nat) : Prop :=
+Definition kw_scan_regs `{XI : CurCtx} (M mm : regfile) (pme addr : mword 64) (kk : nat) : Prop :=
   M !!! Regidx csp_rs1
     = add_vec (mm !!! Regidx csp_rs1)
         (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))) /\
@@ -273,7 +274,7 @@ Definition kw_scan_regs (M mm : regfile) (pme addr : mword 64) (kk : nat) : Prop
   kw_cs_rest M mm.
 
 (* the scan's exit test, [beq s1,s3], as the index comparison *)
-Lemma kw_neq_end (i : nat) :
+Lemma kw_neq_end `{XI : CurCtx} (i : nat) :
   (i <= NPROC)%nat ->
   neq_vec (proc_addr i) (proc_addr NPROC) = negb (Nat.eqb i NPROC).
 Proof.
@@ -282,7 +283,7 @@ Proof.
            proc_base_nonneg proc_size_pos proc_end_fits Hi).
 Qed.
 
-Lemma kw_end_lt (i : nat) : (i < NPROC)%nat -> eq_vec (proc_addr i) (proc_addr NPROC) = false.
+Lemma kw_end_lt `{XI : CurCtx} (i : nat) : (i < NPROC)%nat -> eq_vec (proc_addr i) (proc_addr NPROC) = false.
 Proof.
   intro Hi.
   assert (Hn : neq_vec (proc_addr i) (proc_addr NPROC) = true).
@@ -291,7 +292,7 @@ Proof.
   unfold neq_vec in Hn. by apply negb_true_iff in Hn.
 Qed.
 
-Lemma kw_fuel0 (kk : nat) : (NPROC - kk <= 0)%nat -> (kk < NPROC)%nat -> False.
+Lemma kw_fuel0 `{XI : CurCtx} (kk : nat) : (NPROC - kk <= 0)%nat -> (kk < NPROC)%nat -> False.
 Proof. unfold NPROC. lia. Qed.
 
 (* The three MOVES of the scan's register invariant, as named lemmas with
@@ -301,7 +302,7 @@ Proof. unfold NPROC. lia. Qed.
    runs, which is durable-notes' "a tactic in an argument position whose
    expected type is still an evar can DIVERGE" -- it looks exactly like a
    slow file (measured here: no return in two minutes). *)
-Lemma kw_scan_regs_cs (M M' mm : regfile) (pme addr : mword 64) (kk : nat) :
+Lemma kw_scan_regs_cs `{XI : CurCtx} (M M' mm : regfile) (pme addr : mword 64) (kk : nat) :
   callee_saved M M' -> kw_scan_regs M mm pme addr kk -> kw_scan_regs M' mm pme addr kk.
 Proof.
   intros Hcs (A1 & A2 & A3 & A4 & A5 & A6 & A7 & A8 & A9).
@@ -317,7 +318,7 @@ Proof.
   - eapply kw_cs_rest_cs; [exact Hcs | exact A9].
 Qed.
 
-Lemma kw_scan_regs_ncs (M mm : regfile) (pme addr : mword 64) (kk : nat)
+Lemma kw_scan_regs_ncs `{XI : CurCtx} (M mm : regfile) (pme addr : mword 64) (kk : nat)
     (rr : mword 5) (v : mword 64) :
   is_cs_idx rr = false ->
   kw_scan_regs M mm pme addr kk ->
@@ -345,7 +346,7 @@ Qed.
    [auipc]/[addi] pair -- so the round head cannot carry the [s1] conjunct
    and the scan's predicate cannot serve.  Everything else is the same,
    which is what the two bridges below say. *)
-Definition kw_round_regs (M mm : regfile) (pme addr : mword 64) : Prop :=
+Definition kw_round_regs `{XI : CurCtx} (M mm : regfile) (pme addr : mword 64) : Prop :=
   M !!! Regidx csp_rs1
     = add_vec (mm !!! Regidx csp_rs1)
         (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))) /\
@@ -357,14 +358,14 @@ Definition kw_round_regs (M mm : regfile) (pme addr : mword 64) : Prop :=
   M !!! Regidx (mword_of_int 23 : mword 5) = addr /\
   kw_cs_rest M mm.
 
-Lemma kw_round_regs_of_scan (M mm : regfile) (pme addr : mword 64) (kk : nat) :
+Lemma kw_round_regs_of_scan `{XI : CurCtx} (M mm : regfile) (pme addr : mword 64) (kk : nat) :
   kw_scan_regs M mm pme addr kk -> kw_round_regs M mm pme addr.
 Proof.
   intros (A1 & _ & A3 & A4 & A5 & A6 & A7 & A8 & A9).
   rewrite /kw_round_regs. split_and!; assumption.
 Qed.
 
-Lemma kw_scan_regs_of_round (M mm : regfile) (pme addr : mword 64) :
+Lemma kw_scan_regs_of_round `{XI : CurCtx} (M mm : regfile) (pme addr : mword 64) :
   kw_round_regs M mm pme addr ->
   M !!! Regidx (mword_of_int 9 : mword 5) = proc_addr 0 ->
   kw_scan_regs M mm pme addr 0.
@@ -373,7 +374,7 @@ Proof.
   rewrite /kw_scan_regs. split_and!; assumption.
 Qed.
 
-Lemma kw_round_regs_cs (M M' mm : regfile) (pme addr : mword 64) :
+Lemma kw_round_regs_cs `{XI : CurCtx} (M M' mm : regfile) (pme addr : mword 64) :
   callee_saved M M' -> kw_round_regs M mm pme addr -> kw_round_regs M' mm pme addr.
 Proof.
   intros Hcs (A1 & A3 & A4 & A5 & A6 & A7 & A8 & A9).
@@ -388,7 +389,7 @@ Proof.
   - eapply kw_cs_rest_cs; [exact Hcs | exact A9].
 Qed.
 
-Lemma kw_round_regs_ncs (M mm : regfile) (pme addr : mword 64)
+Lemma kw_round_regs_ncs `{XI : CurCtx} (M mm : regfile) (pme addr : mword 64)
     (rr : mword 5) (v : mword 64) :
   is_cs_idx rr = false ->
   kw_round_regs M mm pme addr ->
@@ -411,7 +412,7 @@ Qed.
 (* [s1] is not a conjunct of the round's predicate, so the cursor's
    reconstruction is invisible to it -- but [s1] IS excluded by
    [kw_cs_rest], so the write still needs its own lemma. *)
-Lemma kw_round_regs_s1w (M mm : regfile) (pme addr : mword 64) (v : mword 64) :
+Lemma kw_round_regs_s1w `{XI : CurCtx} (M mm : regfile) (pme addr : mword 64) (v : mword 64) :
   kw_round_regs M mm pme addr ->
   kw_round_regs (<[Regidx (mword_of_int 9 : mword 5) := v]> M) mm pme addr.
 Proof.
@@ -432,20 +433,20 @@ Qed.
    because [wp_next_chain]'s [specialize] cannot bridge the two spellings,
    and because [eb] must NOT be substituted inside a body that runs [iNext]
    over [cpu_own] (durable-notes / sp_post_sleep_body). *)
-Lemma kw_chain_eb (eb : bool) (pv : mword 64) (A B : CPU) :
+Lemma kw_chain_eb `{XI : CurCtx} (eb : bool) (pv : mword 64) (A B : CPU) :
   eb = true ->
   (true = false \/ pv = zero_reg -> A = B) ->
   (eb = false \/ pv = zero_reg -> A = B).
 Proof. intros He H. by rewrite He. Qed.
 
-Lemma kw_chain_true (eb : bool) (pv : mword 64) (A B : CPU) :
+Lemma kw_chain_true `{XI : CurCtx} (eb : bool) (pv : mword 64) (A B : CPU) :
   eb = true ->
   (eb = false \/ pv = zero_reg -> A = B) ->
   (true = false \/ pv = zero_reg -> A = B).
 Proof. intros He H. by rewrite He in H. Qed.
 
 (* the cursor bump: the ONLY write to a callee-saved register the scan makes *)
-Lemma kw_scan_regs_s1 (M mm : regfile) (pme addr : mword 64) (kk : nat) :
+Lemma kw_scan_regs_s1 `{XI : CurCtx} (M mm : regfile) (pme addr : mword 64) (kk : nat) :
   kw_scan_regs M mm pme addr kk ->
   kw_scan_regs (<[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (proc_addr (S kk))]> M)
     mm pme addr (S kk).
@@ -494,7 +495,7 @@ Section ProofKwait.
      is just a guarded [forall CID], so the move is one composition of the
      two conditional equalities -- the resource-side [cpu_own_transport] of
      the continuation side. *)
-  Lemma kw_next_reanchor `{GEN : GenId} (CID0 CID1 : CpuId)
+  Lemma kw_next_reanchor `{XI : CurCtx} `{GEN : GenId} (CID0 CID1 : CpuId)
       (b : bool) (pv : mword 64) (K : forall (CID : CpuId), iProp Σ) :
     (b = false \/ pv = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
     wp_next (CID0 := CID0) b pv K -∗ wp_next (CID0 := CID1) b pv K.
@@ -522,7 +523,7 @@ Section ProofKwait.
   (* The nine callee-saved cells kwait's prologue pushes, plus the padding
      slot 10 the code never touches.  Bundled so that every block lemma
      carries the frame as ONE hypothesis instead of ten. *)
-  Definition kw_frame (sp0 : mword 64) (mm : regfile) : iProp Σ :=
+  Definition kw_frame `{XI : CurCtx} (sp0 : mword 64) (mm : regfile) : iProp Σ :=
     (pa_stk sp0 1  ↦₈[KT1] (mm !!! Regidx Rra) ∗
      pa_stk sp0 2  ↦₈[KT1] (mm !!! Regidx Rs0) ∗
      pa_stk sp0 3  ↦₈[KT1] (mm !!! Regidx Rs1) ∗
@@ -959,7 +960,7 @@ Section ProofKwait.
       by (rewrite HT2a0; apply addv_sext0).
     (* ---- release(&wait_lock): level 1 -> 0, so the exit index is [eb] ---- *)
     iApply (Release.wp_release_sconf KT1 γw wait_lock_addr "wait_lock"%string
-              wait_res T2 0%nat eb pme (K - 10)%nat _ Hlka ltac:(pose proof (kw_K10 K HK); lia)
+              <{ wait_res }> T2 0%nat eb pme (K - 10)%nat _ Hlka ltac:(pose proof (kw_K10 K HK); lia)
               with "Hcg Htext Hpc Hlk Htok Hres Hown Hpay").
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hcsr Hown".
     iEval (rewrite (locks_add_del_below "wait_lock" lks Hbelow)) in "Hown".
@@ -1104,7 +1105,7 @@ Section ProofKwait.
       by (rewrite HU1a0; apply addv_sext0).
     (* ---- release(&pp->lock): level 2 -> 1, exit index still [false] ---- *)
     iApply (Release.wp_release_sconf KT1 γk (proc_addr k) "proc"%string
-              (proc_lock_res γs γk (proc_addr k)) U1 1%nat eb pme (trap_res eb + (K - 10))%nat _
+              <{ proc_lock_res γs γk (proc_addr k) }> U1 1%nat eb pme (trap_res eb + (K - 10))%nat _
               Hlkk ltac:(pose proof (kw_K10 K HK); lia)
               with "Hcg Htext Hpc Hlkk Htokk HRk Hown Hpay1").
     (* the exit index of a release at level 1 is [false], so the hart is
@@ -1185,7 +1186,7 @@ Section ProofKwait.
                      (sign_extend' 64 (mword_of_int 0 : mword 12)) = wait_lock_addr)
       by (rewrite HU4a0; apply addv_sext0).
     iApply (Release.wp_release_sconf KT1 γw wait_lock_addr "wait_lock"%string
-              wait_res U4 0%nat eb pme (K - 10)%nat _ Hlkw ltac:(pose proof (kw_K10 K HK); lia)
+              <{ wait_res }> U4 0%nat eb pme (K - 10)%nat _ Hlkw ltac:(pose proof (kw_K10 K HK); lia)
               with "Hcg Htext Hpc Hlk Htok Hres Hown Hpay0").
     iIntros (CIDr2 Hsr2 mr) "Hcg Hpc %Hcsr Hown".
     iEval (rewrite (locks_add_del_below "wait_lock" lks Hbelow)) in "Hown".
@@ -1321,9 +1322,10 @@ Section ProofKwait.
               (mword_of_int 56 : mword 12) Mr (trap_res eb + (K - 10))%nat pv false
               with "Hcg Hpc [] [Hcell]").
     { iApply (kwi_60 with "Htext"). }
-    { iEval (rewrite Hea60). iExact "Hcell". }
+    { iEval (rewrite Hea60). iApply (TsoCtxShim.ctx_word_of_mem with "Hcell"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hcell".
     iEval (rewrite Hea60 Hsv60) in "Hcell".
+    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hcell") as "Hcell".
     iDestruct ("Hback" $! (zero_reg : mword 64) with "Hcell") as "Hps".
     assert (Hp64 : add_vec_int (mword_of_int (KW + 0x60) : mword 64) 4 = mword_of_int (KW + 0x64))
       by (apply bv_eq; vm_compute; reflexivity).
@@ -1458,7 +1460,7 @@ Section ProofKwait.
                 with "Hstate Hpsg Hchan Hpub [Hdorm Hpark]").
       iApply (proc_slots_unused_intro γs (proc_addr k) with "Hdorm Hpark"). }
     iApply (Release.wp_release_sconf KT1 γk (proc_addr k) "proc"%string
-              (proc_lock_res γs γk (proc_addr k)) R3 1%nat eb pme (trap_res eb + (K - 10))%nat _
+              <{ proc_lock_res γs γk (proc_addr k) }> R3 1%nat eb pme (trap_res eb + (K - 10))%nat _
               Hlkk2 ltac:(pose proof (kw_K10 K HK); lia)
               with "Hcg Htext Hpc Hlkk Htokk HRk Hown Hpay1").
     (* level 1 -> 1: pinned hart, so collapse rather than re-anchor *)
@@ -1541,7 +1543,7 @@ Section ProofKwait.
                      (sign_extend' 64 (mword_of_int 0 : mword 12)) = wait_lock_addr)
       by (rewrite HR6a0; apply addv_sext0).
     iApply (Release.wp_release_sconf KT1 γw wait_lock_addr "wait_lock"%string
-              wait_res R6 0%nat eb pme (K - 10)%nat _ Hlkw ltac:(pose proof (kw_K10 K HK); lia)
+              <{ wait_res }> R6 0%nat eb pme (K - 10)%nat _ Hlkw ltac:(pose proof (kw_K10 K HK); lia)
               with "Hcg Htext Hpc Hlk Htok [Hps] Hown Hpay0").
     { iExists (<[k := (zero_reg : mword 64)]> ps). iExact "Hps". }
     iIntros (CIDr2 Hsr2 mr) "Hcg Hpc %Hcsr Hown".
@@ -1882,9 +1884,9 @@ Section ProofKwait.
       (* the four source bytes: the child's [xstate] cell, as a byte buffer *)
       (* the alignment fact has to come out BEFORE the split: the four bytes
          no longer carry it, and the rebuild needs it (durable-notes). *)
-      iDestruct (word4_pointsto_aligned_p (p_xstate (proc_addr k)) (DfracOwn 1) xs
+      iDestruct (ctx_word4_pointsto_aligned_p cur_ctx (p_xstate (proc_addr k)) (DfracOwn 1) xs
                    with "Hxstate") as %Halx.
-      iDestruct (word4_pointsto_bytes (p_xstate (proc_addr k)) (DfracOwn 1) xs
+      iDestruct (ctx_word4_pointsto_bytes cur_ctx (p_xstate (proc_addr k)) (DfracOwn 1) xs
                    with "Hxstate") as "Hbytes".
       iApply (Copyout.wp_copyout_sconf_mem KT0 γa F6 (pv_upt (us_V U)) (us_M U) (pv_sz (us_V U)) 4%nat
                 (fun i => nth_byte xs i) (DfracOwn 1)
@@ -1902,7 +1904,7 @@ Section ProofKwait.
         by (rewrite HF6ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp5c) in "Hpc".
       iEval (rewrite HF6a3) in "Hbytes".
-      iDestruct (word4_pointsto_intro (p_xstate (proc_addr k)) (DfracOwn 1) xs Halx
+      iDestruct (ctx_word4_pointsto_intro cur_ctx (p_xstate (proc_addr k)) (DfracOwn 1) xs Halx
                    with "Hbytes") as "Hxstate".
       rewrite HF6a2 in Hwrote.
       (* THE WINDOW, collapsed to one (d, bs) regardless of which arm of
@@ -2183,8 +2185,9 @@ Section ProofKwait.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc [] [Hcell]").
       { iApply (kwi_b2 with "Htext"). }
-      { iEval (rewrite Heab2). iExact "Hcell". }
+      { iEval (rewrite Heab2). iApply (TsoCtxShim.ctx_word_of_mem with "Hcell"). }
       iApply wp_next_off_intro. iIntros "Hcg Hpc Hcell".
+      iDestruct (TsoCtxShim.ctx_word_to_mem with "Hcell") as "Hcell".
       iEval (rewrite Heab2) in "Hcell".
       iDestruct ("Hback" with "Hcell") as "Hps".
       set (S0 := <[Regidx Ra5 := regval_into_reg pv]> M).
@@ -2274,14 +2277,14 @@ Section ProofKwait.
           by (rewrite /S2; apply kw_scan_regs_ncs;
               [vm_compute; reflexivity | exact HS1]).
         iApply (Acquire.wp_acquire_sconf KT1 γk "proc"%string
-                  (proc_lock_res γs γk (proc_addr kk)) S2 1%nat eb pme (trap_res eb + (K - 10))%nat false
+                  <{ proc_lock_res γs γk (proc_addr kk) }> S2 1%nat eb pme (trap_res eb + (K - 10))%nat false
                   ({["wait_lock"]} ∪ lks)
                   kw_ilvl1 ltac:(pose proof (kw_K10 K HK); lia) Hfresh_proc
                   with "Hcg Hown Htext Hpc [Hlkk]").
         all: try lkbelow.
         { iEval (rewrite HS2a0). iExact "Hlkk". }
         iApply wp_next_off_intro.
-        iIntros (ms Macq) "%Hms Hcg Hpc %Hpins Htokk HRk Hown Hpay1".
+        iIntros (ms Macq) "%Hms Hcg Hpc %Hpins Htokk HRk _ Hown Hpay1".
         assert (Hpbe : ret_pc (S2 !!! Regidx Rra) = mword_of_int (KW + 0xbe))
           by (rewrite HS2ra; apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpbe) in "Hpc".
@@ -2412,7 +2415,7 @@ Section ProofKwait.
           { iApply (proc_lock_res_intro γs γk (proc_addr kk) st ch
                       with "Hstate Hpsg Hchan Hpub Hslots"). }
           iApply (Release.wp_release_sconf KT1 γk (proc_addr kk) "proc"%string
-                    (proc_lock_res γs γk (proc_addr kk)) S5 1%nat eb pme (trap_res eb + (K - 10))%nat _
+                    <{ proc_lock_res γs γk (proc_addr kk) }> S5 1%nat eb pme (trap_res eb + (K - 10))%nat _
                     Hlkc ltac:(pose proof (kw_K10 K HK); lia)
                     with "Hcg Htext Hpc Hlkk Htokk HRk Hown Hpay1").
           iApply wp_next_off_intro. iIntros (mrel) "Hcg Hpc %Hcsrel Hown".
@@ -2790,7 +2793,7 @@ Section ProofKwait.
           by (rewrite HT5a0; apply addv_sext0).
         (* -------------------- release(&wait_lock) -------------------- *)
         iApply (Release.wp_release_sconf KT1 γw wait_lock_addr "wait_lock"%string
-                  wait_res T5 0%nat eb (proc_addr jj) (K - 10)%nat _ Hlka
+                  <{ wait_res }> T5 0%nat eb (proc_addr jj) (K - 10)%nat _ Hlka
                   ltac:(pose proof (kw_K10 K HK); lia)
                   with "Hcg Htext Hpc Hlk Htok [Hps] Hown Hpay").
         { rewrite /wait_res. iExists px. iExact "Hps". }
@@ -2887,13 +2890,13 @@ Section ProofKwait.
         (* -------------------- acquire(&wait_lock) -------------------- *)
         iDestruct (cpu_own_transport CIDs CIDn 0 eb (proc_addr jj) eb
                      ltac:(wp_next_chain) with "Hown") as "Hown".
-        iApply (Acquire.wp_acquire_sconf KT1 γw "wait_lock"%string wait_res T8
+        iApply (Acquire.wp_acquire_sconf KT1 γw "wait_lock"%string <{ wait_res }> T8
                   0%nat eb (proc_addr jj) (K - 10)%nat eb lks
                   kw_ilvl0 ltac:(pose proof (kw_K10 K HK); lia) Hbelow
                   with "Hcg Hown Htext Hpc []").
         all: try lkbelow.
         { iEval (rewrite HT8a0). iExact "Hlk". }
-        iIntros (CIDa Hsa msA mfa) "%HmsA Hcg Hpc %Hacs Htok Hres Hown Hpay".
+        iIntros (CIDa Hsa msA mfa) "%HmsA Hcg Hpc %Hacs Htok Hres _ Hown Hpay".
         assert (Hpee : ret_pc (T8 !!! Regidx Rra) = mword_of_int (KW + 0xee))
           by (rewrite HT8ra; pcstep).
         iEval (rewrite Hpee) in "Hpc".
@@ -3433,12 +3436,12 @@ Section ProofKwaitMain.
       by (rewrite /P7; apply kw_cs_rest_ncs; [vm_compute; reflexivity | exact HP6cs]).
     iDestruct (cpu_own_transport CID14 CID18 0%nat eb pj eb ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Acquire.wp_acquire_sconf KT1 γw "wait_lock"%string wait_res P7 0%nat eb pj
+    iApply (Acquire.wp_acquire_sconf KT1 γw "wait_lock"%string <{ wait_res }> P7 0%nat eb pj
               (av - 10)%nat eb lks kw_ilvl0 ltac:(pose proof (kw_K10 av Hav); lia) Hbelow
               with "Hcg Hown Htext Hpc [Hlk]").
     all: try lkbelow.
     { iEval (rewrite HP7a0). iExact "Hlk". }
-    iIntros (CID19 Hs19 msa Macq) "%Hmsa Hcg Hpc %Hacs Htok Hres Hown Hpay".
+    iIntros (CID19 Hs19 msa Macq) "%Hmsa Hcg Hpc %Hacs Htok Hres _ Hown Hpay".
     assert (Hp2a : ret_pc (P7 !!! Regidx Rra) = mword_of_int (KW + 0x2a))
       by (rewrite HP7ra; pcstep).
     iEval (rewrite Hp2a) in "Hpc".

@@ -66,12 +66,12 @@ Require Import CpuOwn.
 Require Import UartTxInv.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 
 (* printint's own frame is 8 slots ([c.addi16sp sp,-64] at 0x80000474), over
    consputc's 16. *)
 Notation printint_stack := (24%nat) (only parsing).
-Require Import TsoCtx.
 Definition wp_printint_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (kt : ktier) (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
     (bs : list (bv 8)) (n : nat) (eb : bool) (b : bool) (p : mword 64) (lks : gset string) :=

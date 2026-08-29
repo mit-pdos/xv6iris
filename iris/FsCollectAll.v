@@ -78,6 +78,7 @@ Require Import FsDurXfer.       (* the run vocabulary: [xr_fs], [xf_shape] *)
 Require Import FsDurSnap.
 Require Import FsCollect.
 Require Import LogSnapLaw.      (* [snap_law] -- what [log_ctx] parks *)
+Require TsoCtx.   (* qualified: the class only, no notation flip *)
 
 Local Open Scope Z_scope.
 
@@ -87,6 +88,7 @@ Local Open Scope Z_scope.
 
 Section BigOps.
   Context {Σ : gFunctors}.
+  Context `{XI : TsoCtx.CurCtx}.
 
   (* a list's big-op covers its set: duplicates are simply dropped, which
      an affine logic allows and which is what makes the three overlapping
@@ -157,6 +159,7 @@ Qed.
 
 Section BigOpsRegion.
   Context {Σ : gFunctors}.
+  Context `{XI : TsoCtx.CurCtx}.
 
   Lemma nested_to_set (Ψ : Z -> iProp Σ) (nib : nat) :
     ([∗ list] bi ∈ seq 0%nat nib,
@@ -273,6 +276,7 @@ Section CollectAll.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId}.
   Context `{ICFG : icfg}.
+  Context `{XI : TsoCtx.CurCtx}.
 
   (* the inum-as-a-number reading of the region's currency; the region and
      the abstract map speak [Z], the cache speaks [mword 32] *)

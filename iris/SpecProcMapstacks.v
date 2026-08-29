@@ -23,13 +23,13 @@ Require Import PtTree.
 Require Import PtBuild KvmMap KvmSpec.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 
 (* proc_mapstacks(kpgtbl=a0): kalloc a page for each of the 64 process kernel
    stacks and kvmmap it at KSTACK(i) (RW, one page).  The stack pas are
    kalloc-chosen -- existential (as a FUNCTION [nat -> mword 44]) in the post --
    and the represented map gains the 64 kstack entries [kvm_stacks pas 64 m].
-Require Import TsoCtx.
    COUNTED-ONLY (premise ⌜on = Some nb ∧ 64 + kstacks_missing t < nb⌝):
    proc_mapstacks is boot-only (kvmmake its sole caller), and its failure path is
    panic("kvminit") on a kalloc-null, so a None mode is meaningless here -- a

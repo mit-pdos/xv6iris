@@ -45,6 +45,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import WpLock.        (* [is_lock] *)
+Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Require Import SpecAllocpid.  (* [alp_pid_lock] / [nextpid_res] *)
 Require Import ProcAvail.     (* [procs_avail] *)
 Require Import TicksInv.      (* [is_tickslock] *)
@@ -62,7 +63,6 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
-Require Import TsoCtx.
 
 Section SyscParkEnv.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !pavG Σ}.

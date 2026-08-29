@@ -35,8 +35,8 @@ Require Import HartSwp.
 Require Import WpSconfEngine.
 Require Import IntrDefs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 
 (* THE EXEC-SIDE BRIDGES ARE GONE, and with them the [WpSmodePtCtl] import.
    This file used to carry local copies of [exec_execute_JAL_{zreg,gpr}_zca]

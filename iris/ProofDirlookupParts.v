@@ -385,8 +385,11 @@ Section DlkBuf.
                (fun j Hj => eq_sym (dlk_half_bytes_eq data i j Hj))).
     iSplit.
     - iIntros "H".
-      iApply (word2_pointsto_intro a (DfracOwn 1) (dir_inum data i) Hal). iExact "H".
-    - iIntros "H". iApply (word2_pointsto_bytes with "H").
+      (* M1 STAGE 2 PAYOFF: both crossings here are GONE. *)
+      iApply (ctx_word2_pointsto_intro _ a (DfracOwn 1) (dir_inum data i) Hal).
+      iExact "H".
+    - iIntros "H".
+      iDestruct (ctx_word2_pointsto_bytes with "H") as "H". iExact "H".
   Qed.
 
   Lemma dlk_name_acc (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :

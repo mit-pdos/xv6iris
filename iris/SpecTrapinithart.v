@@ -29,11 +29,11 @@ Require Import CalleeSaved.
 Require Import IntrDefs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 
 (* trapinithart(): install kernelvec as the S-mode trap vector.  See the
    header.  [tv0] is the arbitrary word the cell held on entry.
-Require Import TsoCtx.
 
    BOOT-ONLY: trapinithart runs strictly before interrupts are ever enabled
    (main()'s boot sequence, on every hart, always before scheduler()'s

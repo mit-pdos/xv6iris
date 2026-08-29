@@ -122,8 +122,8 @@ Require Import FirstTok.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 
 
 (* userinit's own frame is 32 bytes (4 slots); its deepest callee is [namei]

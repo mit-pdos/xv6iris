@@ -59,6 +59,7 @@ Ltac rgall := repeat (rewrite rget_ne; [| vm_compute; discriminate]).
 Require Import VirtioDiskRwDefs.
 Require Import ProofVirtioDiskRwC.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 
 (* ===================================================================== *)
@@ -72,7 +73,6 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Module VirtioDiskRwRestC (Acquire : ACQUIRE) (Release : RELEASE)
                          (SleepPrepare : SLEEP_PREPARE) (Sleep : SLEEP) (FreeDesc : FREEDESC).
-Require Import TsoCtx.
 
 Module P2 := VirtioDiskRwRest Acquire Release SleepPrepare Sleep FreeDesc.
 
@@ -95,7 +95,7 @@ Section ProofVirtioDiskRwCSeam.
   (* P4/P5 still read are pinned: a0 = the head index, a1 = 1, a5 = &disk. *)
   (* The ORIGINAL [fr] facts still travel with the triple.                *)
   (* ------------------------------------------------------------------- *)
-  Definition vdrw_p3_exit `{XI : CurCtx} (CID0 : CPU) (γk : gname) 
+  Definition vdrw_p3_exit (CID0 : CPU) (γk : gname) 
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)

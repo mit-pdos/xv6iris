@@ -42,8 +42,8 @@ Require Import CodeStati.
 Require Import SpecStati.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 
 Set Printing Depth 40.
 

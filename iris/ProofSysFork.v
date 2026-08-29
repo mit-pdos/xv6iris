@@ -51,8 +51,9 @@ Require Import ProcAvail.
 Require Import LogInv.  (* [logG]: [ireg_inv]'s own instance argument *)
 Import Defs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Local Open Scope Z_scope.
+Require Import KvmSpec.   (* [kalloc_env_at] -- kfork names the pair *)
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 
 (* sys_fork's balanced 16-byte frame: entry [addi sp,-16] and exit
    [addi sp,+16] cancel (identical to sys_getpid's / cpuid's). *)

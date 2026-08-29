@@ -32,8 +32,13 @@ Require Import CodeRelease.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecRelease.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Require Import TsoCtxShim.   (* [ctx_dom_sc]: SC-only transport evidence, and
+   after the §0.18′ convergence it is used at ONE site in this file -- the
+   CANCELLING instance's return trip, which is cashed inside the word-clear
+   store's atomic update where no [own_context] is in scope.  The ordinary
+   release path is an honest [TsoCtx.ctx_deposit]. *)
+Import Defs.
 
 
 
@@ -54,7 +59,7 @@ Section ProofRelease.
         intro H1; injection H1 as H2; vm_compute in H2; congruence ].
 
   Lemma wp_release_gen_sconf
-      (γl : gname) (lka : mword 64) (s : string) (R Dc Out : iProp Σ)
+      (γl : gname) (lka : mword 64) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R} (Dc Out : iProp Σ)
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string)
     : wp_release_gen_sconf_body kt γl lka s R Dc Out m n eb p av lks.
@@ -72,6 +77,21 @@ Section ProofRelease.
     pose (outb := match n with O => eb | S _ => false end).
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg #Htext Hpc #Hlock Htoken HR Hfin Hown Hpay Hcont".
+    (* THE DEPOSIT (tso-port §0.18′).  The payload arrives at the caller's
+       own context and is PUBLISHED as a parked record: mint a fresh
+       context ([TsoCtx.ctx_parked_alloc], pure) and hand the facts to it
+       with [TsoCtx.ctx_deposit], which raises the record's stamp to cover
+       them.  The releaser's own running token is borrowed out of
+       [sie_cap_gpr]'s fourth conjunct and put straight back
+       ([SieCapCtx]).  No shim, no [ctx_dom]: at cutover this IS the
+       release transport ([TsoCtxTwin2.twin_deposit]).
+       THE STAMP TIE, recorded because it is load-bearing at cutover:
+       [ctx_deposit] returns some [T'] with [0 <= T'], and what makes the
+       record claimable is [T' <= t_release] -- every fact deposited here
+       was written before release's word clear, and the acquirer's AMO
+       receipt dominates that store.  A record is minted PER RELEASE, so
+       [T'] covers exactly this publication; see WpLock.v's [lock_pay]. *)
+    iMod (lock_pay_intro R with "HR") as "HR".
     (* ---- 0x00: c.addi sp,-32 -- the frame trade (k := 4) ---- *)
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     set (R0 := <[Regidx csp_rs1 := regval_into_reg
@@ -508,7 +528,7 @@ Section OfGen.
 
   Context {kt : ktier}.
   Lemma wp_release_sconf
-      (γl : gname) (lka : mword 64) (s : string) (R : iProp Σ)
+      (γl : gname) (lka : mword 64) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R}
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (av : nat)
       (lks : gset string)
@@ -544,7 +564,7 @@ Section CancelOfGen.
 
   Context {kt : ktier}.
   Lemma wp_release_cancel_sconf
-      (γl : gname) (lka : mword 64) (s : string) (R D Out : iProp Σ)
+      (γl : gname) (lka : mword 64) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R} (D Out : iProp Σ)
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (av : nat)
       (lks : gset string)
@@ -558,7 +578,21 @@ Section CancelOfGen.
               m n eb p av lks
               Hlka Hav Href Hrefpre
               with "Hcg Htext Hpc Hlock Htoken HR [Hbuild] Hown Hpay").
-    { iApply (lock_finisher_destroy with "Hbuild"). }
+    { (* THE ONE SHIM USE THE CONVERGENCE DOES NOT RETIRE (§0.18′).  The
+         destroyer's completion wand speaks at ITS context, and the
+         invariant hands it the parked record; the honest transport is an
+         [ctx_absorb], but this wand is cashed INSIDE the word-clear
+         store's atomic update ([WpSconfLock.wp_sw_zero_lockfin_s_sconf]),
+         where the thread's [own_context] has already been consumed by the
+         WP leaf -- §0.17′'s measured rule, met again.  So the return trip
+         stays a [ctx_dom_sc] bridge (and the record's token is dropped:
+         the lock is being DESTROYED, so nothing will ever claim it).  At
+         cutover this is a lock-kit worklist entry, not a client one. *)
+      iApply lock_finisher_destroy.
+      iIntros "Hfrag HRx". iDestruct "HRx" as (ξ0 T0) "[_ HRx]".
+      iPoseProof (ctx_dom_sc ξ0 cur_ctx) as "Hdom".
+      iDestruct (ctx_morph ξ0 cur_ctx with "Hdom HRx") as "[_ HRx]".
+      iApply ("Hbuild" with "Hfrag HRx"). }
     iIntros (CIDg Hsg mr) "(Hword & Hcpu & HOut) Hcg Hpc %Hcs Hown".
     iSpecialize ("Hcont" $! CIDg with "[%]"); [exact Hsg|].
     iApply ("Hcont" $! mr with "Hword Hcpu HOut Hcg Hpc [//] Hown").

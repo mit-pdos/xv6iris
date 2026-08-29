@@ -58,8 +58,8 @@ Require Import IntrDefs.
 Require Import DirentEnc.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 Local Open Scope Z_scope.
 
 (* namecmp's own frame is 16 bytes (2 slots); its only callee is strncmp,

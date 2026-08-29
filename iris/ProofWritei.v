@@ -197,25 +197,25 @@ Local Ltac widx := first [ vm_compute; reflexivity | vm_compute; discriminate ].
 (*  four shapes, so each is proved once here and applied BY NAME.         *)
 (*  NEVER write [set_solver] inside a function-proof lemma in this file.  *)
 (* ===================================================================== *)
-Lemma wiset_add_r (A D : gset Z) : A ⊆ A ∪ D.
+Lemma wiset_add_r `{XI : CurCtx} (A D : gset Z) : A ⊆ A ∪ D.
 Proof. set_solver. Qed.
 
 (* monotonicity through one more union: what every call that grows the op's
    set needs in order to keep the public [Sb ⊆ Sb'] promise *)
-Lemma wiset_sub_add_r (A B D : gset Z) : A ⊆ B -> A ⊆ B ∪ D.
+Lemma wiset_sub_add_r `{XI : CurCtx} (A B D : gset Z) : A ⊆ B -> A ⊆ B ∪ D.
 Proof. set_solver. Qed.
 
 (* the bitmap block is in the set once anything has allocated -- carried
    forward across the rest of the loop, which only ever grows the set *)
-Lemma wiset_in_add_r (x : Z) (B D : gset Z) : x ∈ B -> x ∈ B ∪ D.
+Lemma wiset_in_add_r `{XI : CurCtx} (x : Z) (B D : gset Z) : x ∈ B -> x ∈ B ∪ D.
 Proof. set_solver. Qed.
 
-Lemma wiset_in_sing_r (x : Z) (B : gset Z) : x ∈ B ∪ {[x]}.
+Lemma wiset_in_sing_r `{XI : CurCtx} (x : Z) (B : gset Z) : x ∈ B ∪ {[x]}.
 Proof. set_solver. Qed.
 
 (* membership travels along an inclusion -- the one shape the sixteen-byte
    receipt needs that the four above do not give *)
-Lemma wiset_in_mono (x : Z) (A B : gset Z) : A ⊆ B -> x ∈ A -> x ∈ B.
+Lemma wiset_in_mono `{XI : CurCtx} (x : Z) (A B : gset Z) : A ⊆ B -> x ∈ A -> x ∈ B.
 Proof. set_solver. Qed.
 
 (* ===================================================================== *)
@@ -266,7 +266,7 @@ Definition wi16_fresh (off n tot ncount nI : nat) (bm bmI : blkmap)
    inode block was already in the op's set and [u] otherwise, and the
    entry-set [cru] of [wi16_spend] is FALSE whenever the running set's is
    -- which is the only direction the arithmetic needs. *)
-Lemma wi16_pre_spend (bms : Z) (inum : mword 32) (inodestart : Z)
+Lemma wi16_pre_spend `{XI : CurCtx} (bms : Z) (inum : mword 32) (inodestart : Z)
     (ncount u off n tot : nat) (bm bm' : blkmap) (Sb Sc : gset Z) :
   Sb ⊆ Sc ->
   wi16_pre bms ncount (S u) off n tot bm bm' Sb Sc ->
@@ -295,7 +295,7 @@ Qed.
 
 (* the granularity fact is carried by the receipt itself and crosses the
    flush untouched -- neither the count nor the set appears in it *)
-Lemma wi16_pre_atomic (bms : Z) (ncount ucur off n tot : nat)
+Lemma wi16_pre_atomic `{XI : CurCtx} (bms : Z) (ncount ucur off n tot : nat)
     (bm bm' : blkmap) (Sb Sc : gset Z) :
   wi16_pre bms ncount ucur off n tot bm bm' Sb Sc ->
   wi16_atomic off n tot.
@@ -304,7 +304,7 @@ Proof.
   destruct Hpre as (_ & H & _). exact H.
 Qed.
 
-Lemma wi16_pre_join (bms : Z) (inum : mword 32) (inodestart : Z)
+Lemma wi16_pre_join `{XI : CurCtx} (bms : Z) (inum : mword 32) (inodestart : Z)
     (ncount u off n tot : nat) (bm bm' : blkmap) (Sb Sc : gset Z) :
   Sb ⊆ Sc ->
   wi16_pre bms ncount (S u) off n tot bm bm' Sb Sc ->
@@ -331,7 +331,7 @@ Qed.
    [crlw] is the boolean log_write actually ran at, and the third premise
    is the honesty fact that it fired whenever the figure charges nothing
    for it (SpecBmap clause (d), through clause (e) on the direct path). *)
-Lemma wi16_spend_step (ncount nB nL BC : nat) (al crd crlw : bool) :
+Lemma wi16_spend_step `{XI : CurCtx} (ncount nB nL BC : nat) (al crd crlw : bool) :
   (ncount <= nB + BC)%nat ->
   (nB <= nL + (if crlw then 0 else 1))%nat ->
   ((al || crd)%bool = true -> crlw = true) ->
@@ -346,7 +346,7 @@ Qed.
    allocate the data block, because an absent indirect block forces the
    entry to zero).  On the direct path the same reading is a frame fact
    about the indirect slot, which is what [SpecBmap]'s clause (e) states. *)
-Lemma wi_ad_of_alloced_dir (bm bm' : blkmap) (fbn : nat) :
+Lemma wi_ad_of_alloced_dir `{XI : CurCtx} (bm bm' : blkmap) (fbn : nat) :
   bm_ind bm' = bm_ind bm ->
   bmap_alloced bm bm' fbn = true ->
   bmap_ad bm bm' fbn = true.
@@ -359,7 +359,7 @@ Proof.
 Qed.
 
 (* ...and the two paths as one, which is what the seam actually applies *)
-Lemma wi_ad_of_alloced_any (cov : gset Z) (logstart : Z) (bm bm' : blkmap)
+Lemma wi_ad_of_alloced_any `{XI : CurCtx} (cov : gset Z) (logstart : Z) (bm bm' : blkmap)
     (fbn : nat) :
   blkmap_wf cov logstart bm ->
   (fbn < MAXFILE)%nat ->
@@ -402,7 +402,7 @@ Section WriteiDefs.
   (* the SEVEN unconditional saves (+0x008..+0x014), which is all the join
      at +0xd6 may assume: the other seven slots are written only on the
      paths that got that far. *)
-  Definition wi_fr7 (m : regfile) : iProp Σ :=
+  Definition wi_fr7 `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
      (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] v) ∗
@@ -419,7 +419,7 @@ Section WriteiDefs.
      (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 14 ↦₈[KT1] v))%I.
 
   (* ...plus s3's slot, pinned from +0x032 to the [c.ldsp s3] at +0xd4 *)
-  Definition wi_fr8 (m : regfile) : iProp Σ :=
+  Definition wi_fr8 `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
      (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] v) ∗
@@ -436,7 +436,7 @@ Section WriteiDefs.
      (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 14 ↦₈[KT1] v))%I.
 
   (* ...and all thirteen, which is what the loop holds (+0x038..+0x040) *)
-  Definition wi_fr13 (m : regfile) : iProp Σ :=
+  Definition wi_fr13 `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
@@ -452,7 +452,7 @@ Section WriteiDefs.
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 13 ↦₈[KT1] (m !!! Regidx Rs11 : mword 64) ∗
      (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 14 ↦₈[KT1] v))%I.
 
-  Lemma wi_fr7_of8 (m : regfile) : wi_fr8 m -∗ wi_fr7 m.
+  Lemma wi_fr7_of8 `{XI : CurCtx} (m : regfile) : wi_fr8 m -∗ wi_fr7 m.
   Proof.
     rewrite /wi_fr8 /wi_fr7.
     iIntros "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & HA & HB & HC & HD & HE)".
@@ -482,7 +482,7 @@ Section WriteiDefs.
   Definition wi_q (user : bool) (dq : dfrac) : dfrac :=
     if user then DfracOwn (1/4) else dq.
 
-  Lemma wi_src_bare (γf : gname) (j : nat) (pidv : mword 32) (dq : dfrac)
+  Lemma wi_src_bare `{XI : CurCtx} (γf : gname) (j : nat) (pidv : mword 32) (dq : dfrac)
       (* TWO pprivate slots, one per arm: the user arm comes back at a page
          table copyin may have GROWN, the kernel arm -- memmove, not copyin --
          at the [V] it went in at.  Same shape as readi's [rd_dst]. *)

@@ -111,8 +111,8 @@ Require Import UtResFits.  (* [USERTRAP_RES_PARK] -- the residue plus its produc
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.   (* [CurCtx]: the residue owns a thread token *)
 Local Open Scope Z_scope.
-Require Import TsoCtx.
 Import Defs.
 
 (* the register file uservec leaves for usertrap (insert order = execution

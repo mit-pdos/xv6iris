@@ -65,6 +65,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsBytesGamma.
+Require Import TsoCtx.
   (* [fs_gamma_L] and [FsStateDefs.blk_owned_q]: THE BLOCK-INDEXED VIEWS
      BELOW ARE THE ABSTRACT ONES AT THE LOGGED VIEW (durable-disk EV
      stage 3).  [blk_res]/[ind_blk] used to be spelled over
@@ -753,6 +754,7 @@ Qed.
 
 Section InodeRes.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.
 
   (* --- inode_map: the thirteen addrs cells, plus the indirect block --- *)
 
@@ -833,9 +835,7 @@ Section InodeRes.
   Lemma ind_blk_run (γfs : fs_names) (bm : blkmap) (bi : Z) :
     bv_unsigned (bm_ind bm) <> 0 -> bi = bv_unsigned (bm_ind bm) ->
     fsblock (fs_bytes γfs) bi (ind_bytes (bm_ent bm)) ⊣⊢ ind_blk γfs bm.
-  Proof.
-    intros Hnz ->. rewrite /ind_blk (decide_False _ _ Hnz) gamma_blk_owned //.
-  Qed.
+  Proof. intros Hnz ->. rewrite /ind_blk (decide_False _ _ Hnz) //. Qed.
 
   Definition inode_map (γfs : fs_names) (ip : mword 64) (bm : blkmap) : iProp Σ :=
     (inode_addrs ip (bm_cells bm) ∗ ind_res γfs bm)%I.
@@ -1085,9 +1085,7 @@ Section InodeRes.
       rewrite /blk_res (decide_True _ _ Hz). done.
     - intros i Hi Hnz. apply elem_of_seq in Hi.
       assert (Hi' : (i < MAXFILE)%nat) by lia.
-      cbv beta.
-      rewrite (blk_res_run γfs (blkmap_get bm i) (data i) Hnz)
-              (Hdata i Hi' Hnz).
+      cbv beta. rewrite /blk_res (decide_False _ _ Hnz) (Hdata i Hi' Hnz).
       done.
   Qed.
 
@@ -1160,7 +1158,7 @@ Section InodeRes.
       iIntros "[Hi Hrest]". iSplitR "Hi".
       { iApply (inode_blocks_of_slots γfs bm (U ∖ {[bv_unsigned (bm_ind bm)]})
                   ct data Hinj2 Hmem3 Hdata). iExact "Hrest". }
-      rewrite /ind_res (ind_blk_nz γfs bm Hnz) (Hib Hnz). iExact "Hi".
+      rewrite /ind_res /ind_blk (decide_False _ _ Hnz) (Hib Hnz). iExact "Hi".
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -1319,14 +1317,18 @@ Section InodeRes.
                (fun (_ : nat) (k : nat) => blk_res γfs (blkmap_get bm k) (data k))
                (seq 0 MAXFILE) i i Hlk).
     iIntros "[Hb Hrest]".
-    rewrite (blk_res_run γfs (blkmap_get bm i) (data i) Hnz).
+    rewrite /blk_res.
+    destruct (decide (bv_unsigned (blkmap_get bm i) = 0)) as [Hz|_];
+      [exfalso; exact (Hnz Hz)|].
     iSplitL "Hb"; [iExact "Hb"|]. iIntros (bs) "Hbs".
     rewrite (big_sepL_delete
                (fun (_ : nat) (k : nat) =>
                   blk_res γfs (blkmap_get bm k) ((<[i := bs]> data) k))
                (seq 0 MAXFILE) i i Hlk).
     iSplitL "Hbs".
-    { rewrite fn_lookup_insert (blk_res_run γfs (blkmap_get bm i) bs Hnz).
+    { rewrite /blk_res fn_lookup_insert.
+      destruct (decide (bv_unsigned (blkmap_get bm i) = 0)) as [Hz|_];
+        [exfalso; exact (Hnz Hz)|].
       iExact "Hbs". }
     iApply (big_sepL_mono with "Hrest").
     intros k y Hky.
@@ -1361,10 +1363,9 @@ Section InodeRes.
                (seq 0 MAXFILE) bn bn Hlk).
     iIntros "[_ Hrest] Hfs".
     iSplitL "Hfs".
-    { rewrite Hb fn_lookup_insert.
-      destruct (decide (bv_unsigned b = 0)) as [Hz0|Hnz0].
-      { rewrite /blk_res (decide_True _ _ Hz0). done. }
-      rewrite (blk_res_run γfs b bs Hnz0). iExact "Hfs". }
+    { rewrite /blk_res Hb fn_lookup_insert.
+      destruct (decide (bv_unsigned b = 0)); [done|].
+      iExact "Hfs". }
     iApply (big_sepL_mono with "Hrest").
     intros k y Hky.
     apply lookup_seq in Hky as [Hy Hk].
@@ -1490,7 +1491,9 @@ Section InodeRes.
     intros Hi Hnz. iIntros "Ho Ht Hd".
     destruct (decide (i = MAXFILE)) as [->|Hne].
     - rewrite bm_slot_top. rewrite bm_slot_top in Hnz.
-      rewrite (ind_blk_nz γfs bm Hnz).
+      rewrite /ind_blk.
+      destruct (decide (bv_unsigned (bm_ind bm) = 0)) as [Hz|_];
+        [exfalso; exact (Hnz Hz)|].
       iApply (fsblock_ne with "Ht Ho").
     - assert (Hlt : (i < MAXFILE)%nat) by lia.
       rewrite (bm_slot_lt bm i Hlt).
@@ -1499,7 +1502,9 @@ Section InodeRes.
       iDestruct (big_sepL_lookup
                    (fun (_ : nat) (k : nat) => blk_res γfs (blkmap_get bm k) (data k))
                    (seq 0 MAXFILE) i i (seq_maxfile_lookup i Hlt) with "Hd") as "Hb".
-      rewrite (blk_res_run γfs (blkmap_get bm i) (data i) Hnz).
+      rewrite /blk_res.
+      destruct (decide (bv_unsigned (blkmap_get bm i) = 0)) as [Hz|_];
+        [exfalso; exact (Hnz Hz)|].
       iApply (fsblock_ne with "Hb Ho").
   Qed.
 
@@ -1632,10 +1637,13 @@ Section InodeRes.
         { pose proof (Hal 0%nat ltac:(simpl; lia)) as Hz.
           rewrite Nat.mul_0_r pa_add_0 in Hz. exact Hz. }
         rewrite Nat.mul_0_r pa_add_0.
-        rewrite /word4_pointsto (bi.pure_True _ Ha0) bi.True_sep.
+        rewrite /ctx_word4_pointsto (bi.pure_True _ Ha0) bi.True_sep.
         apply big_sepL_proper. intros i jj Hj.
         apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
-        rewrite (ind_bytes_cons_lo w l i Hlt). reflexivity.
+        rewrite (ind_bytes_cons_lo w l i Hlt).
+        (* M1 STAGE 2 PAYOFF: the tower's bytes and [↦ₘ] are the same family
+           now, so the hermetic-seal crossing that used to sit here is gone. *)
+        reflexivity.
       + (* the tail, at base [a + 4] *)
         transitivity ([∗ list] j ∈ seq 0 (4 * length l)%nat,
                         pa_add (pa_add a 4%nat) j ↦ₘ (ind_bytes l !!! j))%I.
@@ -1658,7 +1666,7 @@ Section InodeRes.
     iDestruct (big_sepL_lookup
                  (fun (k : nat) (a : bv 32) => (i_addr ip k ↦₄ a)%I) l j (l !!! j)
                  (list_lookup_lookup_total_lt l j Hj) with "H") as "Hc".
-    iApply (word4_pointsto_aligned_p with "Hc").
+    iApply (ctx_word4_pointsto_aligned_p with "Hc").
   Qed.
 
   Lemma inode_addrs_aligned_all (ip : mword 64) (l : list (bv 32)) :
@@ -1701,6 +1709,36 @@ Section InodeRes.
   Qed.
 
 End InodeRes.
+
+(* [tso InodeInv.v:1365]: the inode rows' transport. *)
+Section InodeResMorph.
+  Context `{!riscvGS Σ, !xv6G Σ}.
+
+  Global Instance inode_meta_morph (ip : mword 64) (d : dinode) :
+    CtxMorph (λ ξ : CtxId, inode_meta (XI := ξ) ip d).
+  Proof.
+    iIntros (ξ ξ') "Hd (Ht & Hmj & Hmi & Hnl & Hsz)". rewrite /inode_meta.
+    iDestruct (ctx_morph_word2 _ _ _ _ ξ ξ' with "Hd Ht") as "[Hd Ht]".
+    iDestruct (ctx_morph_word2 _ _ _ _ ξ ξ' with "Hd Hmj") as "[Hd Hmj]".
+    iDestruct (ctx_morph_word2 _ _ _ _ ξ ξ' with "Hd Hmi") as "[Hd Hmi]".
+    iDestruct (ctx_morph_word2 _ _ _ _ ξ ξ' with "Hd Hnl") as "[Hd Hnl]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hsz") as "[Hd Hsz]".
+    iFrame.
+  Qed.
+
+  Global Instance inode_addrs_morph (ip : mword 64) (l : list (bv 32)) :
+    CtxMorph (λ ξ : CtxId, inode_addrs (XI := ξ) ip l).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /inode_addrs.
+    iApply (ctx_morph_big_sepL l
+              (λ (j : nat) (a : bv 32) (ξ0 : CtxId),
+                 ctx_word4_pointsto ξ0 (i_addr ip j) (DfracOwn 1) a)
+              (λ j a, ctx_morph_word4 _ _ _ _)
+              ξ ξ' with "Hd H").
+  Qed.
+
+End InodeResMorph.
+
 
 (*  THE 268-ELEMENT BIG-OP MUST NEVER BE UNFOLDED BY INSTANCE SEARCH.
     [inode_blocks] is a [big_sepL] over [seq 0 MAXFILE], and [iFrame]'s

@@ -19,8 +19,8 @@ Require Import WpSmodePtFetch.
 Require Import HartSwp WpSmodePtEngine.
 Require Import RegFile.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 
 (* helper: exec_execute_JAL_gpr_zca *)
 Local Lemma exec_execute_JAL_gpr_zca (imm : mword 21) (rd : mword 5) s :

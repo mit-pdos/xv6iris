@@ -59,6 +59,8 @@ Require Export FastSetSolver.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Local Open Scope Z_scope.
+Require Import TsoCtx.
+Require TsoCtxShim.   (* the phys tier crosses the seam *)
 
 (* ---------------------------------------------------------------------- *)
 (* geometry                                                                *)
@@ -185,6 +187,7 @@ Local Typeclasses Transparent word_pointsto word4_pointsto.
 
 Section DiskInv.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.
 
   (* -- the immutable page pointers (persistent after boot wiring) ------- *)
 
@@ -423,6 +426,7 @@ Section DiskInv.
     iApply (big_sepL_impl with "Hbytes").
     iIntros "!>" (k x Hk) "H".
     apply lookup_seq in Hk. destruct Hk as [-> Hlt].
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "H") as "H".
     iApply (mem_ident_phys (pa_add p (0 + k)%nat) dq (f (0 + k)%nat)
               (Hstat (0 + k)%nat ltac:(lia)) with "Hb H").
   Qed.
@@ -440,6 +444,7 @@ Section DiskInv.
     iIntros "!>" (k x Hk) "H".
     apply lookup_seq in Hk. destruct Hk as [-> Hlt].
     iDestruct (phys_pointsto_ram with "H") as %Hram.
+    iApply TsoCtxShim.ctx_pointsto_of_mem.
     iApply (phys_ident_mem (pa_add p (0 + k)%nat) dq (f (0 + k)%nat)
               (Hstat (0 + k)%nat ltac:(lia)) Hram (Hcan (0 + k)%nat ltac:(lia))
               with "Hb H").
@@ -456,6 +461,7 @@ Section DiskInv.
     iIntros (Hj) "Hbytes".
     iDestruct (big_sepL_lookup _ (seq 0 n) j j with "Hbytes") as "Hb".
     { rewrite lookup_seq_lt; [reflexivity | exact Hj]. }
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hb") as "Hb".
     iApply (mem_canonical with "Hb").
   Qed.
 
@@ -542,7 +548,11 @@ Section DiskInv.
   Lemma byte_to_phys (a : Arch.pa) (b : bv 8) :
     kmap_static (svpn_of a) KP_rw ->
     kmap_static_claims -∗ a ↦ₘ b -∗ phys_pointsto a (DfracOwn 1) b.
-  Proof. iIntros (Hs) "#Hb H". iApply (mem_ident_phys a (DfracOwn 1) b Hs with "Hb H"). Qed.
+  Proof.
+    iIntros (Hs) "#Hb H".
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "H") as "H".
+    iApply (mem_ident_phys a (DfracOwn 1) b Hs with "Hb H").
+  Qed.
 
   Lemma phys_to_byte (a : Arch.pa) (b : bv 8) :
     kmap_static (svpn_of a) KP_rw ->
@@ -551,6 +561,7 @@ Section DiskInv.
   Proof.
     iIntros (Hs Hc) "#Hb H".
     iDestruct (phys_pointsto_ram with "H") as %Hram.
+    iApply TsoCtxShim.ctx_pointsto_of_mem.
     iApply (phys_ident_mem a (DfracOwn 1) b Hs Hram Hc with "Hb H").
   Qed.
 
@@ -657,6 +668,24 @@ Section DiskInv.
   Qed.
 
 End DiskInv.
+
+(* [tso DiskInv.v:920]: the geometry's transport (three discarded pointer
+   words + pure facts + the ghost cfg). *)
+Section DiskGeomMorph.
+  Context `{!riscvGS Σ, !xv6G Σ}.
+
+  Global Instance disk_geom_morph (γ : disk_names)
+      (pd pav pu : SailStdpp.Values.mword 64) :
+    CtxMorph (λ ξ0 : CtxId, disk_geom (XI := ξ0) γ pd pav pu).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /disk_geom.
+    iDestruct "H" as "(H1 & H2 & H3 & %Hal & Hcfg & %Hk1 & %Hk2 & %Hk3)".
+    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H1") as "[Hd H1]".
+    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H2") as "[Hd H2]".
+    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H3") as "[Hd H3]".
+    iFrame "Hd H1 H2 H3 Hcfg". iPureIntro. auto.
+  Qed.
+End DiskGeomMorph.
 
 (* ====================================================================== *)
 (* Building [slot_pin_ok] for the three-descriptor chain rw formats.       *)

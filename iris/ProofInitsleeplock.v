@@ -35,8 +35,9 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecInitsleeplock.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Require TsoCtxShim.   (* [sl_name] is raw metadata; its bytes arrive ctx *)
+Local Open Scope Z_scope.
 Import Defs.
 
 (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the
@@ -334,8 +335,10 @@ Section ProofInitsleeplock.
     iEval (rgne; rewrite Hmils1) in "Hpid".
     assert (Hpc2a : add_vec_int (mword_of_int (KernelSyms.initsleeplock + 0x26) : mword 64) 4 = mword_of_int (KernelSyms.initsleeplock + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2a) in "Hpc".
-    (* persist the name field, pairing with the caller's [name ↦ₛ□ s] -> sl_name *)
+    (* persist the name field, pairing with the caller's ∀-context string
+       ([TsoCtx.ctx_string_all]) -> sl_name *)
     iApply fupd_wp.
+    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hnamefield") as "Hnamefield".
     iMod (word_pointsto_persist (KTR := KT0) with "Hnamefield") as "#Hnamefield".
     iModIntro.
     iAssert (sl_name slk s) as "#Hslname".

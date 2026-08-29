@@ -63,16 +63,44 @@ Require Import ProcDefs.
 Require Import SwtchCtx.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 
 (* the context-slot payload while nobody is parked in it: the raw
    14-word save area (boot; and while the scheduler itself runs).
    (Here rather than CpuOwn.v: it names [ctx_cells], and SwtchCtx now
    sits above CpuOwn so the ambient-bundle wand can mention [cpu_own].) *)
+(* NO [CurCtx] BINDER, deliberately.  The slot is the raw 14 words at this
+   hart's [a_cpu_ctx] -- pure per-cpu memory geometry, with no thread of
+   control in it (that is the whole meaning of "free": nobody is parked
+   here).  An inline binder that the body never mentions is a PHANTOM: it
+   cannot be inferred, so every consumer inherits an evar.  It broke
+   adequacy concretely -- [BootChain.boot_hart_res] picked the context up
+   through this conjunct alone, and [BootShared.boot_shared_alloc] mints
+   all eight harts' bundles under ONE ambient context, which the primary /
+   secondary boot lemmas then try to pin to eight DIFFERENT contexts. *)
 Definition cpu_ctx_free `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} : iProp Σ :=
-  (∃ vs : list (mword 64),
-     ⌜ length vs = 14%nat ⌝ ∗ ctx_cells (a_cpu_ctx cid_word) vs)%I.
+  (* the save-area cells belong to NO thread while free, so their context is
+     ∃-quantified (an ambient binder here is the eight-hart adequacy trap
+     this file's header records; the scheduler's park/resume proofs trade
+     the ∃ for their own ambient through the shim -- the M2 seam). *)
+  (* A6.68: IT IS A PARKED RECORD NOW, not a bare ∃.  The scheduler that
+     finds the area free has to move its 14 cells into ITS OWN context, and
+     at the real machine nothing dominates a bare ∃ξ -- the SC-era trade
+     was the shim's [ctx_dom_sc] and it is gone.  What makes the move
+     honest is the lock kit's own idiom one tier up (tso-port.md §0.18′):
+     the slot carries the record's TOKEN and, beside it, THIS HART's
+     receipt that its view has passed the record's stamp.  The absorb is
+     then [TsoCtxAbsorbLb.ctx_dom_of_parked_lb] at [T ≤ T], reflexivity.
+     At boot the stamp is 0 and [TsoGhost.view_lb_0] gives the receipt for
+     nothing; every later publication (a park into this slot) stamps at a
+     position its own hart has already passed. *)
+  (* main-tso-readiness: the parked token + receipt are DEFERRED with the
+     rest of the M2 threading; the slot is the bare ∃-context cell run and
+     the claim goes through the shim ([ctx_dom_sc]). *)
+  (∃ (vs : list (mword 64)) (ξ : CtxId),
+     ⌜ length vs = 14%nat ⌝ ∗
+     ctx_cells (XI := ξ) (a_cpu_ctx cid_word) vs)%I.
 
 (* [cpus[h].proc = 0] and [cpus[h].proc = &proc[j]] are the two live values
    of the field, and they are DISJOINT: proc[] does not start at address 0. *)
@@ -90,7 +118,7 @@ Qed.
 
 Section SchedCtx.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   (* the NPROC per-proc lock gnames. *)
   Context (γs : list gname).
 
@@ -111,7 +139,7 @@ Section SchedCtx.
      killed and xstate (mutable under p->lock, read by kill / wait), and the
      invariant's permanent HALF of the pid cell -- the other half rides with
      the running process in [ProcInv.proc_priv], and the two agree for free by
-     [word4_pointsto_agree].  Bundled EXISTENTIALLY so that growing the
+     [ctx_word4_pointsto_agree].  Bundled EXISTENTIALLY so that growing the
      invariant by these three cells costs every existing caller one opaque
      conjunct instead of three new spec parameters. *)
   Definition proc_pub (pa : mword 64) : iProp Σ :=
@@ -570,7 +598,7 @@ Section SchedCtx.
   Lemma proc_ctx_cells (pa : mword 64) : proc_ctx pa -∗ own_ctx (p_context pa).
   Proof.
     rewrite /proc_ctx valid_context_unfold /valid_context_pre.
-    iIntros "(%vs & %av & %Hlen & _ & Hcells & _)".
+    iIntros "(%vs & %av & %XIp & %Tp & %Hlen & _ & Hcells & _)".
     iExists vs. by iFrame "Hcells".
   Qed.
 

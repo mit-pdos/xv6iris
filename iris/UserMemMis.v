@@ -1371,7 +1371,6 @@ Section MisPhys.
   Context (HWpos : 0 < W) (HWle : W <= 8).
   Context (HA : pmpAddrMatchType_encdec_backwards
                   (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR).
-  Context `{XI : CurCtx}.
   Context (Hord : zopz0zKzJ_u (zeros' 64)
                     (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false).
   Context (Hcovp : (ram_base + ram_size

@@ -604,7 +604,7 @@ Section UsertrapRes.
      is_lock (un_w N) wait_lock_addr "wait_lock"%string <{ wait_res }> ∗
      is_ftable (un_ft N) (un_f N) ∗
      is_lock (fsc_kalloc) (mword_of_int KernelSyms.kmem) "kmem"%string
-       <{ kmem_res (fsc_kpages) (mword_of_int (KernelSyms.kmem + 24)) }> ∗
+       (λ ξ : CtxId, kmem_res (XIk := ξ) (fsc_kpages) (mword_of_int (KernelSyms.kmem + 24))) ∗
      is_lock (fsc_dlock) d_lock "virtio_disk"%string
        <{ disk_res (fsc_disk) (un_pd N) (un_pav N) (un_pu N) }> ∗
      bio_ctx (fsc_bio) (fs_view fsc_fs (fsc_disk) icfg_dev fsc_cov) ∗
@@ -1781,13 +1781,13 @@ End UsertrapRes.
    [Rsys] half is the syscall table's, which only [SpecSyscall.SYSCALL] can
    produce ([syscall_env_park]). *)
 Definition park_env `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-                      !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+                      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
     (N : ut_names) : iProp Σ :=
   (ut_park_caps N ∗ sysc_park_extra (un_tk N))%I.
 
 Global Instance park_env_persistent
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} (N : ut_names) :
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx} (N : ut_names) :
   Persistent (park_env N).
 Proof. rewrite /park_env. apply _. Qed.
 
@@ -1797,7 +1797,7 @@ Proof. rewrite /park_env. apply _. Qed.
    abstractly; here it is whatever the instantiation's is. *)
 Definition ut_park_intro_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
     (URB : CpuId -> uptd -> mword 64 -> iProp Σ)
     (* WHAT THE SYSCALL ENVIRONMENT WANTS BESIDE THE FILE SYSTEM, supplied
        at the RESUME like [first_done] and the timer capability: an abstract
@@ -1849,7 +1849,7 @@ Definition ut_park_intro_body
 
 Lemma ut_res_bare_park
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
     (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
     (W : iProp Σ)
     (N : ut_names) (av : nat) :
@@ -1957,7 +1957,7 @@ Proof.
 Qed.
 
 Lemma ut_hold_transport
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
     (CID0 CID1 : CpuId) (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
     (N : ut_names) (U : ustate) (b : bool) (lks : gset string) :
   (b = false \/ un_pj N = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->

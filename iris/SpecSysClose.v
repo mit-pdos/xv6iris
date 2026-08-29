@@ -91,7 +91,7 @@ Section SpecSysClose.
      [ProcInv]'s auth/frag split that is a step the array cannot take on its
      own ([FdSlots.fd_st_move] needs both halves).  The failure arm hands it
      straight back untouched -- it closed nothing. *)
-  Definition sys_close_post (γf : gname) (p : mword 64) (pid : mword 32)
+  Definition sys_close_post `{XI : CurCtx} (γf : gname) (p : mword 64) (pid : mword 32)
       (U : ustate) (v : mword 64) (r : mword 64) : iProp Σ :=
     (⌜r = (mword_of_int (-1) : mword 64) /\ arg_fd v (pv_ofile (us_V U)) = None⌝ ∗
        proc_priv γf p pid U ∗ fd_frags_any (pv_fdg (us_V U))

@@ -21,8 +21,8 @@ Require Import IntrDefs.
 Require Import WpMemsetS.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 
 
 (* HEAD (memset+0x00..+0x06): the 2-slot frame alloc (c.addi sp,-16, a push

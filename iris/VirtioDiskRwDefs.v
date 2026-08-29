@@ -34,6 +34,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 (* [ghost_map]'s element notation: a free descriptor carries its receipt
    fragment now (finding 5), and this section names it. *)
 From iris.base_logic.lib Require Import ghost_map.
+Require Import TsoCtx.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -553,13 +554,23 @@ Section VdrwbDefs.
     is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true ->
     vdrw_idx (KTR := KTR) sp0 v0 v1 v2 -∗ vdrw_scratch (KTR := KTR) sp0.
   Proof.
+  Proof.
     intros Hal11 Hal12. iIntros "(Hx0 & Hx1 & Hx2 & Hxp)".
     iDestruct "Hxp" as (vp) "Hxp".
+    (* M1 stage 2: [word_pointsto_join4] is InstrBytes' RAW law, so the four
+       flipped halves leave the ledger for the join and the doubleword comes
+       back through [ctx_word_of_mem] below. *)
+    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hx0") as "Hx0".
+    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hx1") as "Hx1".
+    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hx2") as "Hx2".
+    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hxp") as "Hxp".
     iDestruct (word_pointsto_join4 (pa_stk sp0 12) (DfracOwn 1) v0 v1 Hal12
                  with "Hx0 Hx1") as "H12".
     iDestruct (word_pointsto_join4 (pa_stk sp0 11) (DfracOwn 1) v2 vp Hal11
                  with "Hx2 Hxp") as "H11".
     rewrite /vdrw_scratch. iExists (word_of_words v2 vp), (word_of_words v0 v1).
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "H11") as "H11".
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "H12") as "H12".
     iFrame "H11 H12".
   Qed.
 
@@ -570,7 +581,6 @@ End VdrwbDefs.
 (* ---- from ProofVirtioDiskRwC.v ---- *)
 
 Require Import WpSmodeHalf.
-Require Import TsoCtx.
 Import Defs.
 
 Local Open Scope Z_scope.

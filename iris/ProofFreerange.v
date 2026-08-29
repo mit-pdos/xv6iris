@@ -59,8 +59,8 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecFreerange.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 Import Defs.
 
 
@@ -97,10 +97,10 @@ Section ProofFreerange.
   (* freerange's epilogue (0x3e..0x46): restore ra/s0/s1, frame trade back (move_up
      6), ret.  Factored as a top-level lemma so its call sites can hand it
      ["Hcont"] re-anchored at whichever hart they reached (a DECOMPOSED
-     helper: its own fresh `{CID0 : CpuId} `{XI : CurCtx}` binder, per the porting guide,
+     helper: its own fresh `{CID0 : CpuId}` binder, per the porting guide,
      rather than the section's ambient one, which callers have long since
      migrated away from). *)
-  Lemma frepi `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma frepi `{CID0 : CpuId}
       (m Me : regfile) (K ncnt : nat) (eb b : bool) (pcur : mword 64)
       (γl : gname) (γk : gname * gname) (onf : option nat) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in

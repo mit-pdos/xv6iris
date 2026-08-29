@@ -29,8 +29,8 @@ Require Import UserPtTree UserExec.
 Require Import UmodeMem UmodeCap UmodeAbi UmodeSyscall UmodeIo UCodeSh.
 Require User.ShSyms User.ShInstrs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 Import Defs.
 
 (* ===================================================================== *)

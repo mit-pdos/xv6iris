@@ -1198,7 +1198,7 @@ Proof. exact (ut_res_bare_tf_open SY.syscall_env pt ksp). Qed.
 (* THE PARK'S PRODUCER, re-exported off the fit check.  See [Module Fits]
    above: it is proved under the same [SY], so this is a rename. *)
 Definition usertrap_res_bare_park
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
     (N : ut_names) (av : nat)
   : ut_park_intro_body
       (fun h : CpuId => Fits.usertrap_res_bare (CID := h))
@@ -1256,8 +1256,8 @@ Section UtSeal.
   Local Lemma ut_printk (γpr : gname) (γd : uart_names) (γv : disk_names) :
     printk_gen_contract (kt := KT1) γpr γd γv.
   Proof.
-    intros CIDp m0 K eb pj dqf f descs b lks.
-    exact (PK.wp_printk_gen_sconf KT1 (CID := CIDp) γpr γd γv m0 K eb pj
+    intros CIDp XIp m0 K eb pj dqf f descs b lks.
+    exact (PK.wp_printk_gen_sconf KT1 (CID := CIDp) (XI := XIp) γpr γd γv m0 K eb pj
              (dqf := dqf) f descs b lks).
   Qed.
 

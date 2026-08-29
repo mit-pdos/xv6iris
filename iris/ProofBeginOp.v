@@ -365,6 +365,7 @@ Qed.
 
 Section BoProps.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   (* the log lock's batch, opened just for its [lh.n] cell *)
   Lemma bo_batch_lhn (bn : bio_names) (γfs : fs_names) (cov : gset Z)
@@ -395,7 +396,7 @@ Section BoProps.
      closed).  Both are [wp_next]s ANCHORED at the function's entry hart
      [CID0]: the park inside the loop means either can be entered at a hart
      nobody knew about when it was established. *)
-  Definition bo_exit `{GEN : GenId} `{XI : CurCtx} (CID0 : CPU)
+  Definition bo_exit `{GEN : GenId} (CID0 : CPU)
       (j : nat)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z)
@@ -424,7 +425,7 @@ Section BoProps.
       pc_is (mword_of_int (KernelSyms.begin_op + 0x74)) -∗
       WP (Loop : expr riscv_lang)))%I.
 
-  Definition bo_loop `{GEN : GenId} `{XI : CurCtx} (CID0 : CPU)
+  Definition bo_loop `{GEN : GenId} (CID0 : CPU)
       (j : nat)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z)
@@ -463,9 +464,10 @@ Local Ltac reg_neq :=
 
 Section BoBodies.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   (* ---- the exit path: +0x58 (a0 := &log) .. +0x6e (c.ret) ---- *)
-  Lemma bo_exit_body `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
+  Lemma bo_exit_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
       (j : nat)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -590,7 +592,7 @@ Section BoBodies.
        the caller, which is what makes this contract index-generic. *)
     iDestruct (arm_pay_ext_split eb _ with "Htc Hclm") as "[Hpay Hext]".
     iApply (Release.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string
-              (log_res γ bn γfs cov logstart) X3 0%nat eb pj (K - 4)%nat
+              <{ log_res γ bn γfs cov logstart }> X3 0%nat eb pj (K - 4)%nat
               ({["log"]} ∪ lks)
               Hrel_lka ltac:(lia)
               with "Hcg Htext Hpc Hislock Htok Hres Hown Hpay").
@@ -751,7 +753,7 @@ Section BoBodies.
      straight into the loop test at +0x2c.  Entered from the taken
      [c.bnez] at +0x2e, whose later has already been stripped, so the Löb
      hypothesis arrives here WITHOUT its [▷]. ---- *)
-  Lemma bo_armA_body `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
+  Lemma bo_armA_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
       (γs : list gname) (j : nat) (γl : gname)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -901,7 +903,7 @@ Section BoBodies.
       by (rewrite HA3a0; apply addv_sext0).
     (* -------------------- release(&log.lock) -------------------- *)
     iApply (Release.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string
-              (log_res γ bn γfs cov logstart) A3 0%nat eb pj (K - 4)%nat
+              <{ log_res γ bn γfs cov logstart }> A3 0%nat eb pj (K - 4)%nat
               ({["log"]} ∪ lks)
               HArel_lka ltac:(pose proof (bo_K10 K HK); lia)
               with "Hcg Htext Hpc Hislock Htok Hres Hown Hpay").
@@ -996,12 +998,12 @@ Section BoBodies.
     (* -------------------- acquire(&log.lock) -------------------- *)
     iDestruct (cpu_own_transport CIDAs CIDAn 0 eb pj eb ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Acquire.wp_acquire_sconf KT1 (ln_lk γ) "log"%string
-              (log_res γ bn γfs cov logstart) A6 0%nat eb pj (K - 4)%nat eb lks
+              <{ log_res γ bn γfs cov logstart }> A6 0%nat eb pj (K - 4)%nat eb lks
               bo_noff1 ltac:(pose proof (bo_K10 K HK); lia) Hbelow
               with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HA6a0). iExact "Hislock". }
-    iIntros (CIDAa HAsa msA mfa) "%HAms Hcg Hpc %HAacs Htok Hres Hown Hpay".
+    iIntros (CIDAa HAsa msA mfa) "%HAms Hcg Hpc %HAacs Htok Hres _ Hown Hpay".
     assert (HAp8 : ret_pc (A6 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x3a))
       by (rewrite HA6ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite HAp8) in "Hpc".
@@ -1021,7 +1023,7 @@ Section BoBodies.
      +0x4e whose [c.j] closes the back edge to +0x2c.  Entered from the
      FALLING [bge] at +0x42, which carries no later, so the Löb hypothesis
      arrives WITH its [▷] and is stripped at that [c.j]. ---- *)
-  Lemma bo_armB_body `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
+  Lemma bo_armB_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
       (γs : list gname) (j : nat) (γl : gname)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -1166,7 +1168,7 @@ Section BoBodies.
       by (rewrite HB3a0; apply addv_sext0).
     (* -------------------- release(&log.lock) -------------------- *)
     iApply (Release.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string
-              (log_res γ bn γfs cov logstart) B3 0%nat eb pj (K - 4)%nat
+              <{ log_res γ bn γfs cov logstart }> B3 0%nat eb pj (K - 4)%nat
               ({["log"]} ∪ lks)
               HBrel_lka ltac:(pose proof (bo_K10 K HK); lia)
               with "Hcg Htext Hpc Hislock Htok Hres Hown Hpay").
@@ -1257,12 +1259,12 @@ Section BoBodies.
     (* -------------------- acquire(&log.lock) -------------------- *)
     iDestruct (cpu_own_transport CIDBs CIDBn 0 eb pj eb ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Acquire.wp_acquire_sconf KT1 (ln_lk γ) "log"%string
-              (log_res γ bn γfs cov logstart) B6 0%nat eb pj (K - 4)%nat eb lks
+              <{ log_res γ bn γfs cov logstart }> B6 0%nat eb pj (K - 4)%nat eb lks
               bo_noff1 ltac:(pose proof (bo_K10 K HK); lia) Hbelow
               with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HB6a0). iExact "Hislock". }
-    iIntros (CIDBa HBsa msA mfa) "%HBms Hcg Hpc %HBacs Htok Hres Hown Hpay".
+    iIntros (CIDBa HBsa msA mfa) "%HBms Hcg Hpc %HBacs Htok Hres _ Hown Hpay".
     assert (HBp8 : ret_pc (B6 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x6a))
       by (rewrite HB6ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite HBp8) in "Hpc".
@@ -1296,7 +1298,7 @@ Section BoBodies.
      three-way dispatch (committing arm / no-space arm / the grant tail
      +0x50..+0x54 that mints the reservation and hands control to
      [bo_exit]). ---- *)
-  Lemma bo_loop_body `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
+  Lemma bo_loop_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
       (γs : list gname) (j : nat) (γl : gname)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -1998,13 +2000,13 @@ Section ProofBeginOp.
     (* ===================== acquire(&log.lock) ===================== *)
     iDestruct (cpu_own_transport CID CID9 0 eb pj eb ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Acquire.wp_acquire_sconf KT1 (ln_lk γ) "log"%string (log_res γ bn γfs cov logstart) Maq
+    iApply (Acquire.wp_acquire_sconf KT1 (ln_lk γ) "log"%string <{ log_res γ bn γfs cov logstart }> Maq
               0%nat eb pj (K - 4)%nat eb lks
               bo_noff1 ltac:(pose proof (bo_K10 K HK); lia) Hbelow
               with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HMaqa0). iExact "Hislock". }
-    iIntros (CIDa Hsa ms Macq) "%Hmsf Hcg Hpc %Hcsacq Htok Hres Hown Hpay".
+    iIntros (CIDa Hsa ms Macq) "%Hmsf Hcg Hpc %Hcsacq Htok Hres _ Hown Hpay".
     (* JOIN AT THE INDEX: the acquire's push_off freed the pair at
        [eb = true] and nothing at [eb = false], where the caller brought it.
        From here the loop carries [trap_csrs ∗ cpu_claim pj] index-free.

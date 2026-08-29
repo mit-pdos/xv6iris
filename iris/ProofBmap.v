@@ -163,6 +163,7 @@ Set Printing Depth 40.
 Section BmapKit.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.   (* [log_ctx] carries the swap receipt's gen id *)
+  Context `{XI : CurCtx}.
 
   (* balloc's out-of-blocks arm calls the GENERAL printk path.  Everything it
      needs is PERSISTENT (the contract is a [Prop]; [kernel_data] and
@@ -544,6 +545,7 @@ Local Ltac bmidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 (* ===================================================================== *)
 Section BmapDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   (* bmap's 48-byte frame: ra@40 s0@32 s1@24 s2@16 s3@8, and slot 0 --
      s4's home -- held ANONYMOUSLY, because the direct arm never writes it
@@ -578,7 +580,7 @@ Section BmapDefs.
 
   (* THE CONTINUATION, named so it is not re-traversed by every proofmode
      split (claude-notes/optimization.md). *)
-  Definition bm_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+  Definition bm_cont `{GEN : GenId} `{CID0 : CpuId}
       (γfs : fs_names) (bn : bio_names) (ak : option bm_alloc)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8))
@@ -641,8 +643,9 @@ Definition bm_sp (m M : regfile) : Prop :=
 (* ===================================================================== *)
 Section BmapEpilogue.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
-  Local Lemma bm_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
+  Local Lemma bm_epilogue `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (γfs : fs_names) (bn : bio_names) (ak : option bm_alloc)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (ip : mword 64) (bm bm' : blkmap) (data data' : nat -> list (bv 8))
@@ -975,8 +978,9 @@ End BmapEpilogue.
 (* ===================================================================== *)
 Section BmapRelease.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
-  Local Lemma bm_release `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
+  Local Lemma bm_release `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat)
       (γfs : fs_names) (γd : disk_names) (bn : bio_names) (ak : option bm_alloc)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -1167,8 +1171,9 @@ End BmapRelease.
 (* ===================================================================== *)
 Section BmapTail.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
-  Local Lemma bm_indirect_tail `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
+  Local Lemma bm_indirect_tail `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)

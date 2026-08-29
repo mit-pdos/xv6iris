@@ -56,8 +56,8 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import IrefSlots.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 
 Local Open Scope Z_scope.
 
@@ -215,7 +215,7 @@ Section ProofFreeDesc.
   (* A DECOMPOSED helper (porting guide): its OWN fresh [CID0] binder, so it
      can be applied at whatever hart the prologue's last step delivered, and
      its continuation wrapped in [wp_next b]. *)
-  Lemma wp_fd_clear `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma wp_fd_clear `{CID0 : CpuId}
       (pd : mword 64) (i : nat) (M : regfile) (n : nat) (pme : mword 64)
       (b0 : bv 8) (va : mword 64) (vl : mword 32) (vf vn : mword 16) (b : bool) :
     (i < 8)%nat ->

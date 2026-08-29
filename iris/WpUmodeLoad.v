@@ -399,7 +399,6 @@ Section UvLoadPure.
   Context (Hk : 0 < k) (Hk8 : k <= 8) (Hkdvd : (k | 4096)).
   Context (Huintk : uint (to_bits 64 k) = k).
   Context (Hread_plain : forall (addr : mword 64) (w : mword (8 * k)) (s : mstate),
-  Context `{XI : CurCtx}.
       dev_addr addr = false ->
       (forall j : nat, (N.of_nat j < Z.to_N k)%N ->
          s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->

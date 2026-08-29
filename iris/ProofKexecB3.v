@@ -141,12 +141,12 @@ Notation KXB := KernelSyms.kexec (only parsing).
    type@0, flags@4, off@8, vaddr@16, filesz@32 and memsz@40 out of it.  Every
    one of those but [flags] lands on a slot boundary; [flags] is the upper
    half of slot 61, which is what [InstrBytes.aligned8_aligned4_hi] is for. *)
-Lemma kxc_ph_o0 (X : mword 64) : pa_add (pa_stk X 61) 0 = pa_stk X 61.
+Lemma kxc_ph_o0 `{XI : CurCtx} (X : mword 64) : pa_add (pa_stk X 61) 0 = pa_stk X 61.
 Proof. unfold pa_add, pa_stk. rewrite avi_assoc. f_equal; lia. Qed.
 
 (* ...and the one field that is NOT slot-aligned: [flags] is the upper half
    of slot 61, so its address is stated against [pa_add] directly. *)
-Lemma kxc_ph_o4 (X : mword 64) :
+Lemma kxc_ph_o4 `{XI : CurCtx} (X : mword 64) :
   add_vec X (sign_extend' 64 (mword_of_int 3612 : mword 12))
   = pa_add (pa_stk X 61) 4.
 Proof.
@@ -156,20 +156,20 @@ Proof.
   rewrite Hv. unfold pa_add, pa_stk. rewrite avi_assoc. reflexivity.
 Qed.
 
-Lemma kxc_ph_o8 (X : mword 64) : pa_add (pa_stk X 61) 8 = pa_stk X 60.
+Lemma kxc_ph_o8 `{XI : CurCtx} (X : mword 64) : pa_add (pa_stk X 61) 8 = pa_stk X 60.
 Proof. unfold pa_add, pa_stk. rewrite avi_assoc. f_equal; lia. Qed.
 
-Lemma kxc_ph_o16 (X : mword 64) : pa_add (pa_stk X 61) 16 = pa_stk X 59.
+Lemma kxc_ph_o16 `{XI : CurCtx} (X : mword 64) : pa_add (pa_stk X 61) 16 = pa_stk X 59.
 Proof. unfold pa_add, pa_stk. rewrite avi_assoc. f_equal; lia. Qed.
 
-Lemma kxc_ph_o32 (X : mword 64) : pa_add (pa_stk X 61) 32 = pa_stk X 57.
+Lemma kxc_ph_o32 `{XI : CurCtx} (X : mword 64) : pa_add (pa_stk X 61) 32 = pa_stk X 57.
 Proof. unfold pa_add, pa_stk. rewrite avi_assoc. f_equal; lia. Qed.
 
-Lemma kxc_ph_o40 (X : mword 64) : pa_add (pa_stk X 61) 40 = pa_stk X 56.
+Lemma kxc_ph_o40 `{XI : CurCtx} (X : mword 64) : pa_add (pa_stk X 61) 40 = pa_stk X 56.
 Proof. unfold pa_add, pa_stk. rewrite avi_assoc. f_equal; lia. Qed.
 
 (* [w32_uarg] at zero -- the loadseg loop's entry guard is stated over it. *)
-Lemma kxc_uarg0 : w32_uarg 0 = 0.
+Lemma kxc_uarg0 `{XI : CurCtx} : w32_uarg 0 = 0.
 Proof.
   unfold w32_uarg. case_decide as Hd; [reflexivity |].
   exfalso. change (2 ^ 31)%Z with 2147483648%Z in Hd. lia.
@@ -189,8 +189,8 @@ Section KexecB3Ph.
   Lemma kxc_ph8_of_stack (sp0 : mword 64) :
     stack_own (KTR := KT1) (pa_stk sp0 54) 8 ⊢
     ([∗ list] i ∈ seq 0 7,
-       ∃ w : mword 64, word_pointsto (KTR := KT1) (pa_stk sp0 (61 - i)) (DfracOwn 1) w) ∗
-    (∃ w : mword 64, word_pointsto (KTR := KT1) (pa_stk sp0 62) (DfracOwn 1) w).
+       ∃ w : mword 64, ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 (61 - i)) (DfracOwn 1) w) ∗
+    (∃ w : mword 64, ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 62) (DfracOwn 1) w).
   Proof.
     rewrite (kxc_slots_asc sp0 8 54). cbn [seq big_opL].
     iIntros "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & _)".
@@ -201,8 +201,8 @@ Section KexecB3Ph.
 
   Lemma kxc_stack8_of_ph (sp0 : mword 64) (w62 : mword 64) :
     ([∗ list] i ∈ seq 0 7,
-       ∃ w : mword 64, word_pointsto (KTR := KT1) (pa_stk sp0 (61 - i)) (DfracOwn 1) w) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 62) (DfracOwn 1) w62 -∗
+       ∃ w : mword 64, ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 (61 - i)) (DfracOwn 1) w) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 62) (DfracOwn 1) w62 -∗
     stack_own (KTR := KT1) (pa_stk sp0 54) 8.
   Proof.
     iIntros "H A".
@@ -216,27 +216,27 @@ Section KexecB3Ph.
      same names. *)
   Lemma kxc_pin_intro (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w63 w65 w67 w68 : mword 64) :
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) s20 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) w7 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) w8 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) w9 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) w10 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) w11 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 12) (DfracOwn 1) w12 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 13) (DfracOwn 1) w13 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 7) (DfracOwn 1) w7 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 8) (DfracOwn 1) w8 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 9) (DfracOwn 1) w9 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 10) (DfracOwn 1) w10 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 11) (DfracOwn 1) w11 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 12) (DfracOwn 1) w12 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 13) (DfracOwn 1) w13 -∗
     stack_own (KTR := KT1) (pa_stk sp0 13) 33 -∗
     stack_own (KTR := KT1) (pa_stk sp0 54) 8 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 63) (DfracOwn 1) w63 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 64) (DfracOwn 1) av -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 65) (DfracOwn 1) w65 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) pv -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 67) (DfracOwn 1) w67 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 68) (DfracOwn 1) w68 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 63) (DfracOwn 1) w63 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 64) (DfracOwn 1) av -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 65) (DfracOwn 1) w65 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 66) (DfracOwn 1) pv -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 67) (DfracOwn 1) w67 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 68) (DfracOwn 1) w68 -∗
     kxc_frameBpin sp0 ra0 s00 s10 s20 pv av
                   w5 w6 w7 w8 w9 w10 w11 w12 w13 w63 w65 w67.
   Proof.
@@ -386,7 +386,7 @@ Section KexecB3Incr.
   Local Ltac ipcw := apply bv_eq; vm_compute; reflexivity.
   Local Ltac is0slot := apply stk_push; apply bv_eq; vm_compute; reflexivity.
 
-  Lemma kxc_incr `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma kxc_incr `{XI : CurCtx} `{CID0 : CpuId}
       (jp : nat)
       (gf : gname)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)

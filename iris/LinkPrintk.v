@@ -34,9 +34,9 @@ Require Import WpLock DiskPtsto WpUart.
 Require Import LinkConsputc LinkPrintint LinkAcquire LinkRelease ProofPrintk.
 Require Import SpecPrintk.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 Module Printk := PrintkProof Consputc Printint Acquire Release.
-Require Import TsoCtx.
 
 Module PrintkGen : PRINTK_GEN.
   Lemma wp_printk_gen_sconf `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}

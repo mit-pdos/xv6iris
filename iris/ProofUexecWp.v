@@ -45,6 +45,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import UserPtTree UserExec.
 Require Import UexecWp.
 Require Import SpecUser.
+Require TsoCtx.   (* qualified: the class only, no notation flip *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -93,6 +94,15 @@ Section ProofUexecWp.
     iSplitL "Hpt"; [ iApply (user_pt_any_intro pt M with "Hpt") | ].
     iSplitL "Hcfg"; [ iExact "Hcfg" | ].
     iExact "Hrut".
+    (* THE U-MODE BOUNDARY, held OUT of context-awareness on purpose.
+       §0.37' defers the U-mode context-token question entirely (the
+       user-mode WP machinery is still moving on main), so this proof does
+       not thread a context: the [TsoCtx.CurCtx] the flipped vocabulary demands is
+       discharged at a CONCRETE throwaway identity, which is the runbook's
+       kernel_data_string idiom for a proof that uses [TsoCtx.cur_ctx] under a
+       statement that does not quantify it.  When U-mode gets its real
+       context home this instantiation is the single site that names it. *)
+    Unshelve. exact (TsoCtx.MkCtxId inhabitant inhabitant).
   Qed.
 
 End ProofUexecWp.

@@ -26,8 +26,8 @@ Require Import SpecPushOff.
 Require Import ProcGeom.
 Require WpGprCsrwC.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 
 (* SIE=0 (folded into smode_config) gives pop_off's interrupt-off fact
    [sstatus & 2 = 0] with mstatus0 hidden.  [mword1_zero_of_ne_one] is the
@@ -258,7 +258,7 @@ Section ProofPushOff.
      to cross the flip instruction itself; at [b = true] there are none, and
      at [b = false] the hart is pinned.  Same two-arm argument as
      [CpuOwn.cpu_own_transport]. *)
-  Lemma po_cells_transport (CID0 CID1 : CpuId) (k : nat) (ebx : bool)
+  Lemma po_cells_transport `{XI : CurCtx} (CID0 CID1 : CpuId) (k : nat) (ebx : bool)
       (px : mword 64) (bx : bool) (lks : gset string) :
     (bx = false \/ px = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
     (if bx then emp else cpu_priv (CID := CID0) k ebx px lks) -∗

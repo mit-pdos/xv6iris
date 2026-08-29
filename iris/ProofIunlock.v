@@ -120,7 +120,7 @@ Section ProofIunlockMain.
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈[KT1] (m !!! Regidx Rs2 : mword 64))%I.
 
-  Definition iul_cont `{CID0 : CpuId} `{XI : CurCtx}
+  Definition iul_cont `{CID0 : CpuId}
       (k : nat) (s : Qp) (g : gname) (d : ic_dep)
       (dev inum : mword 32)
       (pidv : mword 32) (dq : dfrac)
@@ -441,7 +441,7 @@ Section ProofIunlockMain.
     iDestruct "Hborp" as (sbp) "[Hlvp Hbbackp]".
     iMod (iref_live_load_au (⊤ ∖ ↑(icEscN .@ k)) k sbp
             ltac:(solve_ndisj) Hk with "Hitbl Hlvp") as (vp) "[Hcellp Hclp]".
-    iDestruct (wordw_claim_of (KTR := KT0) 4 (i_ref (ientry k)) (DfracOwn 1) vp
+    iDestruct (ctx_word4_claim (KTR2 := KT0) (i_ref (ientry k)) (DfracOwn 1) vp
                  ltac:(lia) with "Hcellp") as "#Hclaim0".
     iMod ("Hclp" with "Hcellp") as "[%Hbp Hlvp]".
     iMod ("Hclosep" with "[Hbbackp Hlvp]") as "_".

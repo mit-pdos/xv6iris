@@ -51,8 +51,8 @@ Require Import SpecPanic.
 Require Import CodePanic.
 From Kernel Require KernelInstrs KernelData KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 Local Open Scope Z_scope.
 
 Notation PA := KernelSyms.panic.
@@ -90,6 +90,9 @@ Proof. vm_compute; reflexivity. Qed.
 Section PanicData.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
+  (* M1 stage 3: [↦ₛ] is context-indexed, and a rodata message extracted
+     from [kernel_data] lands at the READING thread's context. *)
+  Context `{XI : CurCtx}.
 
   Lemma pn_hdr_bytes :
     forall j b, cstring_bytes pn_hdr !! j = Some b ->
@@ -139,7 +142,7 @@ End PanicData.
 (* ===================================================================== *)
 Section PanicSpin.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId}.
+  Context `{GEN : GenId} `{XI : CurCtx}.
 
   Context {kt : ktier}.
   (* [h] is bound as a [CpuId], not as a [CPU]: [Loop] itself is

@@ -67,8 +67,8 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 Local Open Scope Z_scope.
 
 (* a failing tactic in a whole-function WP over [proc_priv] otherwise spends
@@ -141,7 +141,7 @@ Section ProofSysFstat.
 
   (* THE CARVE THIS READS IS ARM-DEPENDENT, hence the [0 < k] premise --
      [ProofSysClose.sc_sp_bounds]'s note verbatim. *)
-  Lemma sfs_sp_bounds `{CID0 : CpuId} `{XI : CurCtx} (mm : regfile) (kk : nat)
+  Lemma sfs_sp_bounds `{CID0 : CpuId} (mm : regfile) (kk : nat)
       (b : bool) (pp : mword 64) :
     (0 < kk)%nat ->
     sie_cap_gpr KT1 mm kk b pp -∗
@@ -181,7 +181,7 @@ Section ProofSysFstat.
      is entered at a MIGRATED hart -- its own [b] and [pp], and its
      continuation wrapped in [wp_next].  It does NOT carry [cpu_own]: the
      epilogue never touches it, so the caller transports it afterwards. *)
-  Lemma sfs_tail `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma sfs_tail `{CID0 : CpuId}
       (m Mt : regfile) (av : nat) (rv : mword 64)
       (sp0 ra0 s00 : mword 64) (w3 w4 : bv 64) (b : bool) (pp : mword 64) :
     (4 <= av)%nat ->
@@ -195,10 +195,10 @@ Section ProofSysFstat.
     sie_cap_gpr KT1 Mt (av - 4)%nat b pp -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.sys_fstat + 0x32) : mword 64) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) w3 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) w3 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) w4 -∗
     wp_next (CID0 := CID0) b pp (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗

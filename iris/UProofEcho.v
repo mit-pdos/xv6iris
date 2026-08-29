@@ -29,6 +29,7 @@ Require Import UmodeMem UmodeCap UmodeAbi UmodeArith UmodeSyscall.
 Require Import WpUmodeLeaf WpUmodeBranch WpUmodeStore WpUmodeLoad.
 Require Import UCodeEcho USpecEcho UProofEchoA.
 Require User.EchoSyms User.EchoInstrs User.EchoData.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 Set Printing Depth 40.
@@ -156,6 +157,9 @@ Proof. intro H. rewrite (upd_eq f kk v). exact H. Qed.
 Section UProofEcho.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
+  (* user code runs AS the thread: ambient context, and a
+     reschedule moves the hart, never the context. *)
+  Context `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   Local Notation Ysxv6 := (xv6_sys_protocol C pt).

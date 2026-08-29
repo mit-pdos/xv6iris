@@ -68,6 +68,7 @@ Require Import IntrDefs.
 Require Import KptShare.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 
 (* kvminithart(): the Bare->Sv39 kernel-page-table switch.  See the header. *)
@@ -98,7 +99,6 @@ Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
     (∃ v : mword 64, stvec ↦ᵣ v) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
-Require Import TsoCtx.
 
 Module Type KVMINITHART.
   Parameter wp_kvminithart_sconf :

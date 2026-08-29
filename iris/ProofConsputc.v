@@ -57,8 +57,8 @@ Require Import SpecUartPutc SpecConsputc.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 Import Defs.
 
 (* clean-context (mword-free) nat bounds, so [lia] never sees a bv.
@@ -97,7 +97,7 @@ Section ProofConsputc.
      steps), not necessarily the section's original entry hart -- the same
      rule as ProofConsoleinit.v's [wp_initlock]/[wp_uartinit] Hypotheses and
      durable-notes' "post-resume half needs CID as a binder". *)
-  Lemma wp_consputc_epi `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma wp_consputc_epi `{CID0 : CpuId}
       (m mc : regfile) (K : nat) (b : bool) (p : mword 64) :
     (2 <= K)%nat ->
     mc !!! Regidx csp_rs1
@@ -206,7 +206,7 @@ Section ProofConsputc.
      whichever hart that turns out to be -- same reasoning as
      ProofConsoleinit.v's [wp_initlock]/[wp_uartinit]. *)
   Hypothesis wp_uartputc :
-    forall `{CID : CpuId} `{XI : CurCtx} (γl : gname) (γd : uart_names) (γv : disk_names)
+    forall `{CID : CpuId} (γl : gname) (γd : uart_names) (γv : disk_names)
       (m0 : regfile) (K : nat) (bs : list (bv 8)) (n : nat) (eb : bool)
       (b : bool) (p : mword 64) (lks : gset string),
       wp_uartputc_sconf_body kt γl γd γv m0 K bs n eb b p lks.

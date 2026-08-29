@@ -20,13 +20,13 @@ Require Import WpLock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 
 (* The address of the string literal "ftable" that fileinit passes as initlock's
    [name] argument.  It sits in .rodata just past etext and has no ELF symbol of
    its own, so it is spelled out here (see kernel.asm: 80007570 <etext+0x570>). *)
 Definition ftable_name_str : Z := 0x80007578%Z.
-Require Import TsoCtx.
 
 (* fileinit() = initlock(&ftable.lock, "ftable").  The lock is the FIRST member
    of [struct ftable], so &ftable.lock = &ftable.  It takes no arguments and

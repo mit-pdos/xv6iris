@@ -238,7 +238,7 @@ End SpecForkret.
    an opaque one (claude-notes/optimization.md, "Fold block continuations
    into named definitions"). *)
 Definition forkret_closer
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
     (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
     (W : iProp Σ) (γf : gname) (p ksp : mword 64)
     (* the parked process's fd-state ghost name *)

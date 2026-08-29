@@ -37,8 +37,8 @@ Require Import SRegime SmodeCorePt.
 Require Import KptPt.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 Import Defs.
 
 (* the walk's reference footprint: exactly the two cells [sr_swp_side_ok]

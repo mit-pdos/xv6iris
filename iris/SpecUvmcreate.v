@@ -23,11 +23,11 @@ Require Import PtTree.
 Require Import PtBuild KvmSpec.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 
 (* uvmcreate(): kalloc one page, memset it to zero, return it as an empty
    root page table (a0 = the page's byte address; 0 on allocation failure).
-Require Import TsoCtx.
 
    COUNTED-ONLY (premise ⌜on = Some nb ∧ 0 < nb⌝), as kvmmake is: with a
    positive page budget kalloc cannot fail, so the null return is dead and

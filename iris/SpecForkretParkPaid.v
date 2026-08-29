@@ -132,7 +132,7 @@ Local Open Scope Z_scope.
 Require Import TsoCtx.
 
 Definition forkret_park_pkg
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
     (* the trap loop's kernel-side bundle, abstract exactly as [SpecForkret]
        takes it *)
     (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
@@ -269,7 +269,7 @@ Module Type FORKRET_PARK_PAID.
      residue's channel, tied into the fixpoint.  This is the one entry the
      parkers use; the statement above is its proof. *)
   Parameter park_token_intro :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
       (γs : list gname),
       ⊢ park_token γs.
 End FORKRET_PARK_PAID.

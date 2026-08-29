@@ -458,7 +458,7 @@ Qed.
 
 (* ENTRY: the gate span promises [callee_saved] EVERYWHERE BUT s3 and
    reports s3's own value per arm, so [cr_regs] in gives [cr_regs3] out. *)
-Lemma cr_regs3_of_span (m : regfile) (sp0 dpv ansv s3v : mword 64)
+Lemma cr_regs3_of_span `{XI : CurCtx} (m : regfile) (sp0 dpv ansv s3v : mword 64)
     (ty mj mn : mword 16) (Ma Mo : regfile) :
   cr_cs_but_s3 Ma Mo ->
   (Mo !!! Regidx Rs3 : mword 64) = s3v ->
@@ -5006,8 +5006,8 @@ Section ProofCreateMain.
               pidv (DfracOwn (1/4)) dqs dqn Ma (K - 10)%nat eb b lks (upd_usM U _)
               ltac:(exact HKia) ltac:(exact HKil) Hlg Hist0 Hiregb Hni1 Hni2
               Hni3 Htynz Htyk Hpkc Hj Hgs Hroot A20 A9 Hkdlt Heb ltac:(lkbelow)
-              (fun CIDx : CpuId => IA.wp_ialloc_gen (CID := CIDx))
-              (fun CIDx : CpuId => IL.wp_ilock_dep_sconf (CID := CIDx))
+              (fun (CIDx : CpuId) (XIx : CurCtx) => IA.wp_ialloc_gen (CID := CIDx) (XI := XIx))
+              (fun (CIDx : CpuId) (XIx : CurCtx) => IL.wp_ilock_dep_sconf (CID := CIDx) (XI := XIx))
               with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlogc Hitb2 Hitbl
                     Hesc Hslks Hiregi Hiopen Hprocs Hdevi Hgeom Hdlk Hsbn Hsbi
                     Hppid Hbsl Hisl1 Hidev Htp Htcl Hop").
@@ -10626,8 +10626,8 @@ Section ProofCreateMain.
     iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hfr".
     iDestruct "Hfr" as "(_ & _ & _ & _ & _ & _ & _ & _ & S9 & S10 & _)".
     iDestruct "S9" as (w9) "H9". iDestruct "S10" as (w10) "H10".
-    iDestruct (word_pointsto_aligned_p with "H9") as %Ha9.
-    iDestruct (word_pointsto_aligned_p with "H10") as %Ha10.
+    iDestruct (ctx_word_pointsto_aligned_p with "H9") as %Ha9.
+    iDestruct (ctx_word_pointsto_aligned_p with "H10") as %Ha10.
     iPureIntro. split; [exact Ha10 | exact Ha9].
   Qed.
 

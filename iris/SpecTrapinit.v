@@ -20,13 +20,13 @@ Require Import WpLock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 
 (* The address of the string literal "time" that trapinit passes as initlock's
    [name] argument.  It sits in .rodata just past etext and has no ELF symbol of
    its own, so it is spelled out here (see kernel.asm: 80007260 <etext+0x260>). *)
 Definition time_name_str : Z := 0x80007268%Z.
-Require Import TsoCtx.
 
 (* trapinit() = initlock(&tickslock, "time").  It takes no arguments and
    touches no state beyond the three fields of the global [tickslock]: the

@@ -40,8 +40,8 @@ Require Import DiskPtsto DiskInv.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 
 (* intr's own frame is 32 bytes (4 slots); its deepest callee is wakeup (18) *)
 Notation K_virtio_disk_intr := (22%nat) (only parsing).

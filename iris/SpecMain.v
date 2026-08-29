@@ -189,7 +189,6 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
    [K_virtio_disk_init] = 18, binit/iinit 12, procinit 10, consoleinit 6,
    plicinithart 4 -- and scheduler needs 20 available at the depth main calls
    it from, which 50 covers.
-Require Import TsoCtx.
 
    THE SCHEDULER'S TRAP RESERVE IS WHAT SETS THIS, NOT THE kvminit CONE.
    main's last act is [jal scheduler], which never returns, and scheduler()
@@ -201,6 +200,8 @@ Require Import TsoCtx.
    init cone needs.  The boot bridge hands out [kv_frame_slots + K_main]
    ([BootBridge.boot_stack_slots]), i.e. 180 slots = 1440 bytes of the
    4096-byte per-hart stack, so nothing upstream has to change. *)
+Require Import TsoCtx.
+
 Notation K_main := (122%nat) (only parsing).
 Section SpecMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.

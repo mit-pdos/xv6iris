@@ -47,8 +47,7 @@
    in [SpecProcinit.v]'s vocabulary: [lk_raw] in (three cells, 24 bytes),
    [lk_fresh] out.  Those are exactly [WpLock.newlock]'s premises minus the
    resource, so the caller's ghost step
-   [lk_fresh a_tx_lock "uart" ∗ tx_res γd ==∗ is_lock … a_tx_lock "uart"
-   <{ tx_res γd }>] plus the [uart_dlab_off] below is [UartTxInv.is_txlock] --
+   [lk_fresh a_tx_lock "uart" ∗ tx_res γd ==∗ is_lock … a_tx_lock "uart" <{ tx_res γd }>] plus the [uart_dlab_off] below is [UartTxInv.is_txlock] --
    what a boot assembly feeds to [WpLock.newlock].
 
    ProofUartinit.v proves it by running each of the seven writes through the
@@ -80,6 +79,7 @@ Require Import RegFile.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 
 (* NOTE: there is deliberately no [uartinit_post] naming the concrete UART state
@@ -134,7 +134,6 @@ Definition wp_uartinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
        [cpu] and writes [name], which is then DISCARDED in favour of the
        persistent [lock_name a_tx_lock "uart"] -- tx_lock is a static global
        that is never freed, so nothing needs the field back owned.
-Require Import TsoCtx.
        [WpLock.newlock] seals the bundle into [is_lock … a_tx_lock "uart" R]
        for the caller's choice of R ([UartTxInv.tx_res γd] is the one the
        driver wants). *)

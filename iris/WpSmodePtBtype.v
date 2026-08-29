@@ -16,8 +16,8 @@ Require Import SmodeCore.
 Require Import WpSmodePtFetch.
 Require Import HartSwp WpSmodePtEngine.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 
 (* ---- Local helpers copied from WpSmodeBtype.v ---- *)
 Local Definition rvv (r : mword 5) (s : mstate) : mword 64 :=

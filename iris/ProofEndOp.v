@@ -584,6 +584,7 @@ Proof. reflexivity. Qed.
 (* the two directions memmove's contract needs, applied (not rewritten) *)
 Section EoData.
   Context `{!riscvGS Σ}.
+  Context `{XI : CurCtx}.
 
   Lemma eo_seq_index (P : nat -> bv 8 -> iProp Σ) (bs : list (bv 8)) :
     ([∗ list] j ↦ x ∈ bs, P j x) ⊣⊢
@@ -722,10 +723,11 @@ Local Ltac eoidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 (* ===================================================================== *)
 Section EndOpDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   (* end_op's own [wp_next] obligation, NAMED and anchored at an explicit
      hart (durable-notes: a whole-function post must not be spelled inline). *)
-  Definition eo_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
+  Definition eo_cont `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Upr : ustate) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
@@ -739,7 +741,7 @@ Section EndOpDefs.
         proc_priv_bare (proc_addr j) pidv Upr -∗
         WP (Loop : expr riscv_lang))%I.
 
-  Lemma eo_cont_shift `{GEN : GenId} `{CIDa : CpuId} `{CIDb : CpuId} `{XI : CurCtx}
+  Lemma eo_cont_shift `{GEN : GenId} `{CIDa : CpuId} `{CIDb : CpuId}
        (j : nat) (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Upr : ustate) :
     (* the guard is at the LITERAL [true] now, matching eo_cont's own index *)
@@ -1155,6 +1157,7 @@ End EndOpDefs.
 (* ===================================================================== *)
 Section EndOpBlocks.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   (* ================================================================== *)
   (*  +0x92 .. +0x9c : the four-register epilogue and the return.        *)
@@ -1163,7 +1166,7 @@ Section EndOpBlocks.
   (*  values on BOTH arms -- the commit arm restored them at +0x11a and  *)
   (*  the fast arm never wrote them.                                     *)
   (* ================================================================== *)
-  Local Lemma eo_epi `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
+  Local Lemma eo_epi `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (pidv : mword 32) (dq : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Upr : ustate) :
     (K_end_op <= K)%nat ->
@@ -1414,7 +1417,7 @@ Section EndOpBlocks.
   (*  [c.j] at +0x120, from the commit body -- in both cases holding the *)
   (*  batch re-formed at n = 0.                                          *)
   (* ================================================================== *)
-  Local Lemma eo_tail `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
+  Local Lemma eo_tail `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
       (bn : bio_names) (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -1549,13 +1552,13 @@ Section EndOpBlocks.
     iDestruct (eo_cont_shift (CIDa := CID0) (CIDb := CIDa4)  j pidv dq m K eb eb lks Upr
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (Acq.wp_acquire_sconf KT1 (ln_lk γ) "log"%string
-              (log_res γ bn γfs cov logstart) E4 0%nat eb (proc_addr j)
+              <{ log_res γ bn γfs cov logstart }> E4 0%nat eb (proc_addr j)
               (K - 8)%nat eb lks eo_noff0 ltac:(pose proof (eo_Klk K HK); lia)
               Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HE4a0). iExact "Hlock". }
-    iIntros (CIDb1 Hsb1 ms macq) "%Hmsfacts Hcg Hpc %Hacq Htok HRres Hcnt Hpay".
+    iIntros (CIDb1 Hsb1 ms macq) "%Hmsfacts Hcg Hpc %Hacq Htok HRres _ Hcnt Hpay".
     assert (Hpc50 : ret_pc (E4 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0x50)).
     { rewrite HE4ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc50) in "Hpc".
@@ -1855,7 +1858,7 @@ Section EndOpBlocks.
         by (rewrite Hommt; exact op_pending_empty).
       rewrite Hpe. iExact "Hbatch". }
     iApply (Rel.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string
-              (log_res γ bn γfs cov logstart) G2 0%nat eb (proc_addr j)
+              <{ log_res γ bn γfs cov logstart }> G2 0%nat eb (proc_addr j)
               (K - 8)%nat
               ({["log"]} ∪ lks)
               ltac:(rewrite HG2a0; rewrite /log_addr; apply bv_eq; vm_compute; reflexivity)
@@ -1962,7 +1965,7 @@ Section EndOpBlocks.
   (*  write_head, restore s3/s4/s5, and the [c.j] that rejoins the tail.  *)
   (*  Entered by falling out of the copy loop with the cursor at n.       *)
   (* ================================================================== *)
-  Local Lemma eo_commit `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
+  Local Lemma eo_commit `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -4044,7 +4047,7 @@ Section EndOpBlocks.
   (*  +0x7a .. +0x8e : the FAST path -- wakeup(&log) with the lock still  *)
   (*  held, then release, falling straight into the epilogue at +0x92.    *)
   (* ================================================================== *)
-  Local Lemma eo_fast `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
+  Local Lemma eo_fast `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
       (bn : bio_names) (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -4244,7 +4247,7 @@ Section EndOpBlocks.
     { intros c Hcs N2 N8 N9 N18.
       rewrite /G3 upd_ne; [| regne]. exact (HG2thr c Hcs N2 N8 N9 N18). }
     iApply (Rel.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string
-              (log_res γ bn γfs cov logstart) G3 0%nat eb (proc_addr j)
+              <{ log_res γ bn γfs cov logstart }> G3 0%nat eb (proc_addr j)
               (K - 8)%nat
               ({["log"]} ∪ lks)
               ltac:(rewrite HG3a0; rewrite /log_addr; apply bv_eq; vm_compute; reflexivity)
@@ -4576,13 +4579,13 @@ Section ProofEndOp.
     iDestruct (eo_cont_shift (CIDa := CID) (CIDb := CID10)  j pidv dq m K eb eb lks Upr
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (Acq.wp_acquire_sconf KT1 (ln_lk γ) "log"%string
-              (log_res γ bn γfs cov logstart) R6 0%nat eb (proc_addr j)
+              <{ log_res γ bn γfs cov logstart }> R6 0%nat eb (proc_addr j)
               (K - 8)%nat eb lks eo_noff0 ltac:(pose proof (eo_Klk K HK); lia)
               Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HR6a0). iExact "Hlock". }
-    iIntros (CIDq Hsq ms macq) "%Hmsfacts Hcg Hpc %Hacq Htok HRres Hcnt Hpay".
+    iIntros (CIDq Hsq ms macq) "%Hmsfacts Hcg Hpc %Hacq Htok HRres _ Hcnt Hpay".
     assert (Hpc1a : ret_pc (R6 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0x1a)).
     { rewrite HR6ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc1a) in "Hpc".
@@ -4993,7 +4996,7 @@ Section ProofEndOp.
       { intros c Hcs N2 N8 N9 N18.
         rewrite /U5 upd_ne; [| regne]. exact (HU4thr c Hcs N2 N8 N9 N18). }
       iApply (Rel.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string
-                (log_res γ bn γfs cov logstart) U5 0%nat eb (proc_addr j) (K - 8)%nat
+                <{ log_res γ bn γfs cov logstart }> U5 0%nat eb (proc_addr j) (K - 8)%nat
                 ({["log"]} ∪ lks)
                 ltac:(rewrite HU5a0; rewrite /log_addr; apply bv_eq; vm_compute; reflexivity)
                 ltac:(pose proof (eo_Klk K HK); lia)

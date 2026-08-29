@@ -136,8 +136,8 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 
 (* initlog's own frame is 6 slots ([c.addi16sp sp,-48] at +0x00); its
    deepest callee is install_trans (50).  write_head wants 44, bread 40,

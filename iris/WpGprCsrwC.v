@@ -34,8 +34,8 @@ Require Import HartSwp HartLift HartRegNode HartSpan HartSpanChar HartMCycle
         HartMFrame HartGoodb WpDecodeBridge WpMmodeJump WpMmodeCsrSwp.
 Require Import WpGprCsrrCommon.   (* drive_csr_term *)
 Require Import WpInstrConfig.     (* wp_instr_config: the raw-cell wrapper *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 
 (* ====================================================================== *)
 (* Generic bit-window facts about [MachineWord.update_slice] (the stdpp-bv  *)

@@ -27,8 +27,8 @@ Require Import WpMemsetS.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecMemsetParts.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 
 
 (* the epilogue +16 cancels a pa_stk 2 re-anchor (closed offsets). *)

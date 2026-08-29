@@ -336,10 +336,11 @@ Section ProofMainSecondary.
     iApply fupd_wp.
     iMod (inv_acc ⊤ startedN with "Hsinv") as "[Hbody Hclose]"; [ solve_ndisj | ].
     iDestruct "Hbody" as (vpk) "[>Hword Hrest]".
-    iDestruct (wordw_claim_of (KTR := KT0) 4 started_addr (DfracOwn 1) vpk
+    iEval (rewrite started_cell_acc) in "Hword".
+    iDestruct (ctx_word4_claim (KTR2 := KT0) started_addr (DfracOwn 1) vpk
                  ltac:(lia) with "Hword") as "#Hstcl".
     iMod ("Hclose" with "[Hword Hrest]") as "_".
-    { iNext. iExists vpk. iFrame "Hword Hrest". }
+    { iNext. iExists vpk. rewrite started_cell_acc. iFrame "Hword Hrest". }
     iModIntro.
     iApply (wp_load_s_sconf_au (kt := KT0) (ktd := KT0) 4 true false (mword_of_int (KernelSyms.main + 0x16))
               (mword_of_int 15 : mword 5) (mword_of_int 14 : mword 5)
@@ -354,8 +355,14 @@ Section ProofMainSecondary.
     { iApply (mni_16 with "Htext"). }
     { rewrite Ha4. iExact "Hstcl". }
     { rewrite Ha4.
-      iApply (started_inv_load_au (⊤ ∖ ↑minstretN) (main_deposit γd γv)
-                ltac:(solve_ndisj) with "Hsinv"). }
+      (* the AU's window is the engine's RAW word; [started_inv_load_au]
+         speaks the flipped [↦₄] -- one named crossing each way *)
+      iMod (started_inv_load_au (⊤ ∖ ↑minstretN) (main_deposit γd γv)
+              ltac:(solve_ndisj) with "Hsinv") as (v) "[Hw Hclose]".
+      iModIntro. iExists v.
+      iEval (rewrite -(wordw4_ctx (KTR2 := KT0))) in "Hw". iFrame "Hw".
+      iIntros "Hw". iEval (rewrite (wordw4_ctx (KTR2 := KT0))) in "Hw".
+      iApply ("Hclose" with "Hw"). }
     iIntros (v).
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc HPsi".

@@ -31,8 +31,8 @@ Require Import SpecKvmmake SpecKvminit.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 Import Defs.
 
 (* clean-context (mword-free) nat bounds, so [lia] never sees a bv. *)
@@ -63,7 +63,7 @@ Section KvminitBody.
      apply its OWN lemmas at a migrated hart, and then make CID an implicit
      per-lemma binder" -- exactly this situation. *)
   Hypothesis wp_kvmmake :
-    forall `{CID : CpuId} `{XI : CurCtx} (γa : gname) (γk : gname * gname) (mm : regfile) (lvl K : nat)
+    forall `{CID : CpuId} (γa : gname) (γk : gname * gname) (mm : regfile) (lvl K : nat)
       (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
       wp_kvmmake_sconf_body γa γk mm lvl K eb p on b lks.
 

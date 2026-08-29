@@ -60,8 +60,8 @@ Require Import DiskPtsto VirtioProto WpUart.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import WpVirtioExec.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 
 Local Open Scope Z_scope.
 
@@ -372,6 +372,9 @@ Proof.
               (add_vec (tp_pin (CID := CID) m !!! Regidx rs1)
                  (sign_extend' 64 imm))) 4 = true)
       by (rewrite Hea; exact Halign).
+    (* [Hctx] -- the thread-of-control token -- travels with the rest of
+       the capability into the POST side of the [swp_mono], which is where
+       [sie_cap] is rebuilt; the [swp] side never touches it. *)
     iApply (swp_mono (CID := CID)
               with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm Hclose] [-]").
     2:{ iApply (swp_execute_LOAD_dev_S4_ex (CID := CID)
@@ -652,6 +655,9 @@ Proof.
               (subrange_vec_dec (tp_pin (CID := CID) m !!! Regidx rs2)
                  (Z.sub (Z.mul 4 8) 1) 0) = storeword)
       by (rewrite Lpin_rs2; reflexivity).
+    (* [Hctx] -- the thread-of-control token -- travels with the rest of
+       the capability into the POST side of the [swp_mono], which is where
+       [sie_cap] is rebuilt; the [swp] side never touches it. *)
     iApply (swp_mono (CID := CID)
               with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm Hclose] [-]").
     2:{ iApply (swp_execute_STORE_dev_S4 (CID := CID)

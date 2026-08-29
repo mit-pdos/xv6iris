@@ -111,6 +111,7 @@ Local Open Scope Z_scope.
 Section NameiTrDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   (* ONE caller-supplied atomic step.  The walk applies it at hop [k]'s
      linearization instant with [d] its current inum and [ents] the locked
@@ -313,6 +314,7 @@ End NAMEI_TR.
 Section NameiTrCursor.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
   Context `{!ghost_varG Σ (nat * Z)}.
 
   (* [P k d := γw ↦ half (k, d)]: the client keeps the other half, so the

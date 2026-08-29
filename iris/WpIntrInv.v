@@ -2445,7 +2445,7 @@ Definition intr_Q (flag : bool) (rs2 : regstate) : Prop :=
    cycle boundary, not inside it -- so lending them costs the engine
    nothing, and [csrr time] / [csrr sip] / [csrw stimecmp] cannot be
    written without them. *)
-Definition intr_cb_clock `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId}
+Definition intr_cb_clock `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{XI : CurCtx}
     (kt : ktier) (m : regfile) (av : nat) (p pc0 : mword 64) (is_rvc : bool)
     (i : instruction) (b' : bool)
     (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)

@@ -37,8 +37,8 @@ Require Import KernelRvcDecode.
 Require Import ProcGeom.
 Require Import KernelConsts.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 
 (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the
    one-line bridge from a leaf's [rget] to the register-map facts a

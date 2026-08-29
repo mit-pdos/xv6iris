@@ -23,6 +23,7 @@ Require Import PtBuild KvmSpec.
 Require Import Riscv.riscv_extras.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 
 Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
@@ -53,7 +54,6 @@ Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : 
      tree already supplies [Some nb] here (kvmmake's six per-region calls,
      proc_mapstacks' boot-only call), and [nb] always dominates the missing
      nodes, so the kalloc-null / mappages-fail branch is DEAD -- NO panic.
-Require Import TsoCtx.
      [on] stays [option nat] in the signature only so it keeps matching the
      dual-mode calling convention shared by [kalloc_env] and the sibling
      specs in this cone. *)

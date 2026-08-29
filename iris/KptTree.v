@@ -52,7 +52,8 @@ Require Import KptExecMap.
 Require Import KMap.
 Require Import Pt4kWalk.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import TsoCtx TsoCtxShim.
+Require Import TsoCtx.
+Require TsoCtxShim.   (* the ↦ₚ₈/↦₈ bridge crosses the ctx/mem seam *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -394,6 +395,9 @@ Qed.
 
 Section PtSlotBridge.
   Context `{!riscvGS Σ}.
+  (* the ↦₈ side of the bridge is context-indexed since the M1 flip; the
+     ↦ₚ₈ side (the physical claim tier) is not.  The crossing is licensed
+     by the shim until the cutover kit re-proves it against the machine. *)
   Context `{XI : CurCtx}.
 
   (* svpn of a within-page address is its ppn field: [x = b*4096 + r],
@@ -477,11 +481,7 @@ Section PtSlotBridge.
     destruct (u_pte_slot_facts b idx (0 + k)%nat Hkd ltac:(lia)) as (Hid & Hram & Hcan & Hsvpn).
     iAssert (kmap_at (svpn_of (pa_add (u_pte_addr b idx) (0 + k))) b KP_rw) as "#Hk'".
     { rewrite Hsvpn. iExact "Hk". }
-    (* [phys_to_mem_claim] lives in RiscvPtsto, which ctx_convert blacklists,
-       so its conclusion is the RAW points-to while this file's goal is the
-       flipped one.  That boundary is exactly what TsoCtxShim is for, and the
-       import here is one entry in the tree's live seam inventory. *)
-    iApply ctx_pointsto_of_mem.
+    iApply TsoCtxShim.ctx_pointsto_of_mem.
     iApply (phys_to_mem_claim (pa_add (u_pte_addr b idx) (0 + k)) b dq (nth_byte w (0 + k))
               Hid Hram Hcan with "Hk' Hp").
   Qed.
@@ -502,9 +502,7 @@ Section PtSlotBridge.
     destruct (u_pte_slot_facts b idx (0 + k)%nat Hkd ltac:(lia)) as (Hid & _ & _ & Hsvpn).
     iAssert (kmap_at (svpn_of (pa_add (u_pte_addr b idx) (0 + k))) b KP_rw) as "#Hk'".
     { rewrite Hsvpn. iExact "Hk". }
-    (* the other direction across the same RiscvPtsto seam: [Hp] is the
-       flipped points-to, [mem_to_phys_claim] wants the raw one. *)
-    iDestruct (ctx_pointsto_to_mem with "Hp") as "Hp".
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hp") as "Hp".
     iApply (mem_to_phys_claim (pa_add (u_pte_addr b idx) (0 + k)) b dq (nth_byte w (0 + k))
               Hid with "Hk' Hp").
   Qed.

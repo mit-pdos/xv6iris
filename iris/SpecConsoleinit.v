@@ -68,6 +68,7 @@ Require Import ConsoleInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 
 (* The address of the string literal "cons" that consoleinit passes as
@@ -75,7 +76,6 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
    itself, and has no ELF symbol of its own, so it is spelled out here (see
    kernel.asm: 80007000 <etext>). *)
 Definition cons_name_str : Z := 0x80007000%Z.
-Require Import TsoCtx.
 
 (* devsw[CONSOLE].  CONSOLE = 1 and a [struct devsw] is two function pointers,
    so the entry starts at devsw + 16, its [.read] field at +0 and [.write] at

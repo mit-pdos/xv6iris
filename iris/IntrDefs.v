@@ -270,7 +270,7 @@ Section IntrDefsBase.
      ghost argument at all, and what lets a step's continuation (WpNext.v)
      rebind the ghost by rebinding [CID] alone.
 
-     (Written without an explicit [`{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}] binder because the section
+     (Written without an explicit [`{GEN : GenId} `{CID : CpuId}] binder because the section
      already fixes one and Rocq refuses to rebind a section variable's name;
      the section closes it over exactly [riscvGS] and [CpuId] regardless.) *)
   Definition sie_gname : gname := sie_name cpu_id.
@@ -2105,7 +2105,7 @@ Section IntrDefs.
      and its [MIE_S] pin, the menvcfg pin), which is what makes the statement
      this short.  [av] is the handler's usable stack budget; the reserve it
      runs in is the enabled index's, re-indexed. *)
-  Definition ihs_body_of (kt : ktier) (R : CPU -d> iPropO Σ) `{CIDb : CpuId} `{XI : CurCtx}
+  Definition ihs_body_of (kt : ktier) (R : CPU -d> iPropO Σ) `{CIDb : CpuId}
       (handler : mword 64) : iProp Σ :=
     (□ ∀ (m : regfile) (av : nat) (p pc0 sc tv : mword 64),
         ihs_trap_of (CID := CIDb) kt R m av p pc0 sc tv handler
@@ -3307,6 +3307,7 @@ End IntrDefs.
 (* with [wp_next_chain] and apply this once, exactly as for [cpu_own].    *)
 (* ===================================================================== *)
 Lemma trap_csrs_ext_transport `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId}
+    `{XI : TsoCtx.CurCtx}
     {kt : ktier} (CID0 CID1 : CpuId) (eb : bool) (p : mword 64) :
   (eb = false \/ p = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
   trap_csrs_ext (CID := CID0) kt eb -∗ trap_csrs_ext (CID := CID1) kt eb.

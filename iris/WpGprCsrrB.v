@@ -16,11 +16,11 @@ Require Import HartSwp HartLift HartRegNode HartSpan HartSpanChar HartGoodb
         WpDecodeBridge.
 Require Import WpMmodeJump.     (* cw_Drw / cw_Dro *)
 Require Import WpMmodeCsrSwp.   (* swp_execute_CSRReg_csrr + the cr_* footprint *)
+Require Import TsoCtx.
 
 Lemma exec_read_CSR_menvcfg s :
   exec (read_CSR (Ox"30A")) s
     = Some (subrange_vec_dec (register_lookup menvcfg s.(sregs)) (Z.sub xlen 1) 0, s).
-Require Import TsoCtx.
 Proof. drive_csr. rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg menvcfg s)). apply exec_returnM. Qed.
 
 Lemma exec_read_CSR_sie s :

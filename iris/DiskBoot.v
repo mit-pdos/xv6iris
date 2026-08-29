@@ -59,6 +59,7 @@ Require Import RiscvExtras.
 (* it.  See FastSetSolver.v.                                              *)
 Require Export FastSetSolver.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -99,6 +100,7 @@ Qed.
 
 Section DiskBoot.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.
 
   (* ==================================================================== *)
   (* §1  ZEROED BYTE WINDOWS.                                             *)
@@ -154,7 +156,7 @@ Section DiskBoot.
     { intros j _. symmetry. apply nth_byte_of_zero. vm_compute. reflexivity. }
     rewrite (bb_ext a 8 (fun _ => byte_zero)
                (fun j => nth_byte (mword_of_int 0 : mword 64) j) Hfg).
-    apply (word_pointsto_intro a (DfracOwn 1) _ Hal).
+    apply (ctx_word_pointsto_intro _ a (DfracOwn 1) _ Hal).
   Qed.
 
   Local Lemma zbytes_word4 (a : Arch.pa) :
@@ -168,7 +170,8 @@ Section DiskBoot.
     { intros j _. symmetry. apply nth_byte_of_zero. vm_compute. reflexivity. }
     rewrite (bb_ext a 4 (fun _ => byte_zero)
                (fun j => nth_byte (mword_of_int 0 : mword 32) j) Hfg).
-    apply (word4_pointsto_intro a (DfracOwn 1) _ Hal).
+    iIntros "H".
+    iApply (ctx_word4_pointsto_intro _ a (DfracOwn 1) _ Hal). iExact "H".
   Qed.
 
   Local Lemma zbytes_word2 (a : Arch.pa) :
@@ -182,7 +185,8 @@ Section DiskBoot.
     { intros j _. symmetry. apply nth_byte_of_zero. vm_compute. reflexivity. }
     rewrite (bb_ext a 2 (fun _ => byte_zero)
                (fun j => nth_byte (mword_of_int 0 : mword 16) j) Hfg).
-    apply (word2_pointsto_intro a (DfracOwn 1) _ Hal).
+    iIntros "H".
+    iApply (ctx_word2_pointsto_intro _ a (DfracOwn 1) _ Hal). iExact "H".
   Qed.
 
   (* ==================================================================== *)

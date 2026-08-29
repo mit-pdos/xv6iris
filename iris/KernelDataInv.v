@@ -25,6 +25,11 @@ Require Import RiscvLang RiscvPtsto.
 Require Import KernelText.
 From Kernel Require KernelData KernelSyms.
 Require Import TsoCtx.
+(* NO SHIM.  This file used to hold the tree's one "flip ↦ₛ" seam marker --
+   [kernel_data_string]'s conclusion was the raw string tower, so its bytes
+   crossed the ctx/mem boundary here.  Stage 3 (tso-port.md §0.21′/§0.22′)
+   flipped [↦ₛ], and the crossing simply ceased to exist: [kernel_data] is
+   ∀-context and [kernel_data_string_all] hands the ∀ straight through. *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -91,8 +96,16 @@ Section KernelDataInv.
      remaining byte resides at its physical address as a DfracDiscarded
      (`↦ₘ□`) points-to -- hence persistent and duplicable, like
      [kernel_text]. *)
+  (* EVERY-CONTEXT, not ambient-context: the image bytes predate every
+     thread, so each context can hold them (they sit below every context's
+     bound -- the timestamp-0 story, same ruling as kernel text).  The ∀
+     keeps [kernel_data] a CLOSED iProp: the one persistent fact minted at
+     boot serves every consumer at ITS OWN ambient context, and no mention
+     site anywhere in the tree changes spelling. *)
   Definition kernel_data : iProp Σ :=
-    ([∗ map] a↦b ∈ kdata_ro, (mword_of_int a : Arch.pa) ↦ₘ□ b)%I.
+    (∀ ξ : CtxId,
+       [∗ map] a↦b ∈ kdata_ro,
+         ctx_pointsto ξ (mword_of_int a : Arch.pa) DfracDiscarded b)%I.
 
   Global Instance kernel_data_persistent : Persistent kernel_data.
   Proof. apply _. Qed.
@@ -112,10 +125,12 @@ Section KernelDataInv.
        KernelData.kernel_data !! (A + Z.of_nat j)%Z = Some (f j)) ->
     kernel_data -∗ ([∗ list] j ∈ seq 0 W, (pa_add a j) ↦ₘ□ f j).
   Proof.
-    iIntros (-> HA HR Hbytes) "#Hd". iApply big_sepL_intro. iIntros "!>" (k j Hk).
+    iIntros (-> HA HR Hbytes) "#Hd".
+    iDestruct ("Hd" $! cur_ctx) as "#Hd'".
+    iApply big_sepL_intro. iIntros "!>" (k j Hk).
     apply lookup_seq in Hk. destruct Hk as [-> Hlt]. simpl.
     rewrite pa_add_mword.
-    iApply (big_sepM_lookup _ _ (A + Z.of_nat k)%Z (f k) with "Hd").
+    iApply (big_sepM_lookup _ _ (A + Z.of_nat k)%Z (f k) with "Hd'").
     apply kdata_ro_lookup; [apply Hbytes; exact Hlt | lia | lia].
   Qed.
 
@@ -131,12 +146,44 @@ Section KernelDataInv.
     ([∗ list] j ∈ seq 0 W, (pa_add a j) ↦ₘ□ nth_byte w j).
   Proof. exact (kernel_data_bytes A W (nth_byte w) a). Qed.
 
-  (* Extract a NUL-terminated STRING literal from the image: the string
-     points-to [↦ₛ□] whose bytes the image holds at [A .. A+|s|].  The
-     read-only-globals analogue of [kernel_data_window] for the one kind of
-     global whose length is not a machine word -- a C string constant (the
+  (* Extract a NUL-terminated STRING literal from the image, AT EVERY
+     CONTEXT: [TsoCtx.ctx_string_all], the derived context-free form of
+     [↦ₛ] (tso-port.md §0.21′).  This is the honest producer of that form
+     and the reason it costs nothing: [kernel_data] is itself ∀-context, so
+     the ∀ just comes along.  It is what the persistent lock handles
+     ([WpLock.lock_name] / [SleepLock.sl_name]) carry, and what
+     [SpecInitlock]/[SpecInitsleeplock] ask their callers for -- a rodata
+     literal's timestamp-0 provenance JUSTIFIES the derived fact rather than
+     defining the tier.
+
+     The read-only-globals analogue of [kernel_data_window] for the one kind
+     of global whose length is not a machine word -- a C string constant (the
      names the kernel passes to [initlock], say).  Persistent, so the string
      never has to be threaded. *)
+  Lemma kernel_data_string_all (A : Z) (s : string) (a : mword 64) :
+    a = mword_of_int A ->
+    text_end <= A ->
+    A + Z.of_nat (S (String.length s)) <= rodata_end ->
+    (forall j b, cstring_bytes s !! j = Some b ->
+       KernelData.kernel_data !! (A + Z.of_nat j)%Z = Some b) ->
+    kernel_data -∗ ctx_string_all a DfracDiscarded s.
+  Proof.
+    iIntros (-> HA HR Hbytes) "#Hd". iIntros (ξ).
+    iDestruct ("Hd" $! ξ) as "#Hd'".
+    rewrite /ctx_string_pointsto.
+    iApply big_sepL_intro. iIntros "!>" (j b Hj).
+    rewrite pa_add_mword.
+    (* the index is inside the NUL-terminated byte list, so [A + j] is inside
+       the window the caller's [HR] bounds *)
+    assert (Hjlt : (j < S (String.length s))%nat)
+      by (rewrite <- cstring_bytes_length; eapply lookup_lt_Some, Hj).
+    iApply (big_sepM_lookup _ _ (A + Z.of_nat j)%Z b with "Hd'").
+    apply kdata_ro_lookup; [by apply Hbytes | lia | lia].
+  Qed.
+
+  (* ...and the same literal at THIS context, the form every printk-style
+     consumer wants.  One instantiation of the ∀; the statement is
+     character-identical to what it was before [↦ₛ] flipped. *)
   Lemma kernel_data_string (A : Z) (s : string) (a : mword 64) :
     a = mword_of_int A ->
     text_end <= A ->
@@ -145,15 +192,9 @@ Section KernelDataInv.
        KernelData.kernel_data !! (A + Z.of_nat j)%Z = Some b) ->
     kernel_data -∗ a ↦ₛ□ s.
   Proof.
-    iIntros (-> HA HR Hbytes) "#Hd". rewrite /string_pointsto.
-    iApply big_sepL_intro. iIntros "!>" (j b Hj).
-    rewrite pa_add_mword.
-    (* the index is inside the NUL-terminated byte list, so [A + j] is inside
-       the window the caller's [HR] bounds *)
-    assert (Hjlt : (j < S (String.length s))%nat)
-      by (rewrite <- cstring_bytes_length; eapply lookup_lt_Some, Hj).
-    iApply (big_sepM_lookup _ _ (A + Z.of_nat j)%Z b with "Hd").
-    apply kdata_ro_lookup; [by apply Hbytes | lia | lia].
+    iIntros (H1 H2 H3 H4) "Hd".
+    iApply (ctx_string_all_elim cur_ctx).
+    by iApply (kernel_data_string_all A s a H1 H2 H3 H4 with "Hd").
   Qed.
 
   (* ================================================================== *)

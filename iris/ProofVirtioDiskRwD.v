@@ -66,8 +66,11 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 (* it.  See FastSetSolver.v.                                              *)
 Require Export FastSetSolver.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Require TsoCtxShim.
+Require TsoCtxShim.   (* ↦ₚ has not flipped (M1 stage 2): ctx bytes cross into
+                         the raw physical-identity laws *)
+Import Defs.
 
 Local Open Scope Z_scope.
 
@@ -644,7 +647,7 @@ Section VdrwdLeaves.
     iEval (rewrite Haddrp) in "Hw2p".
     iDestruct (phys_to_word2 (pa_add pav 2%nat) (wrap16 np) Halign Hst2 Hcan2
                  with "Hkm Hw2p") as "Hcellp".
-    iDestruct (wordw_claim_of (KTR := KT0) 2 (pa_add pav 2%nat) (DfracOwn 1)
+    iDestruct (ctx_word2_claim (KTR2 := KT0) (pa_add pav 2%nat) (DfracOwn 1)
                  (wrap16 np : SailStdpp.Values.mword 16) ltac:(lia)
                  with "Hcellp") as "#Hcl".
     iDestruct (word2_to_phys (pa_add pav 2%nat) (wrap16 np) Hst2
@@ -676,8 +679,8 @@ Section VdrwdLeaves.
                    with "Hkm Hw2") as "Hcell".
       iModIntro. iExists (wrap16 np : SailStdpp.Values.mword 16).
       iSplitL "Hcell".
-      { rewrite Hea. iExact "Hcell". }
-      iIntros "Hcell". iEval (rewrite Hea) in "Hcell".
+      { rewrite Hea -(wordw2_ctx (KTR2 := KT0)). iExact "Hcell". }
+      iIntros "Hcell". iEval (rewrite (wordw2_ctx (KTR2 := KT0)) Hea) in "Hcell".
       iDestruct (word2_to_phys (pa_add pav 2%nat) (wrap16 np) Hst2 with "Hkm Hcell") as "Hw2".
       iEval (rewrite -Haddr) in "Hw2".
       iDestruct ("Hback" with "Hw2") as "[Hproto Hpub]".
@@ -761,7 +764,7 @@ Section VdrwdLeaves.
     iEval (rewrite Haddrp) in "Hw2p".
     iDestruct (phys_to_word2 (d_ring pav (np `mod` 8)) w0 Halign Hst2 Hcan2
                  with "Hkm Hw2p") as "Hcellp".
-    iDestruct (wordw_claim_of (KTR := KT0) 2 (d_ring pav (np `mod` 8)) (DfracOwn 1)
+    iDestruct (ctx_word2_claim (KTR2 := KT0) (d_ring pav (np `mod` 8)) (DfracOwn 1)
                  (w0 : SailStdpp.Values.mword 16) ltac:(lia)
                  with "Hcellp") as "#Hcl".
     iDestruct (word2_to_phys (d_ring pav (np `mod` 8)) w0 Hst2
@@ -798,8 +801,8 @@ Section VdrwdLeaves.
                    with "Hkm Hw2") as "Hcell".
       iModIntro. iExists (w1 : SailStdpp.Values.mword 16).
       iSplitL "Hcell".
-      { rewrite Hea. iExact "Hcell". }
-      iIntros "Hcell". iEval (rewrite Hea) in "Hcell".
+      { rewrite Hea. iEval (rewrite -(wordw2_ctx (KTR2 := KT0))) in "Hcell". iExact "Hcell". }
+      iIntros "Hcell". iEval (rewrite Hea (wordw2_ctx (KTR2 := KT0))) in "Hcell".
       iDestruct (word2_to_phys (d_ring pav (np `mod` 8)) h Hst2
                    with "Hkm Hcell") as "Hw2".
       iEval (rewrite -Haddr) in "Hw2".
@@ -893,7 +896,7 @@ Section VdrwdLeaves.
     iEval (rewrite Haddrp) in "Hw2p".
     iDestruct (phys_to_word2 (pa_add pav 2%nat) (wrap16 np) Halign Hst2 Hcan2
                  with "Hkm Hw2p") as "Hcellp".
-    iDestruct (wordw_claim_of (KTR := KT0) 2 (pa_add pav 2%nat) (DfracOwn 1)
+    iDestruct (ctx_word2_claim (KTR2 := KT0) (pa_add pav 2%nat) (DfracOwn 1)
                  (wrap16 np : SailStdpp.Values.mword 16) ltac:(lia)
                  with "Hcellp") as "#Hcl".
     iDestruct (word2_to_phys (pa_add pav 2%nat) (wrap16 np) Hst2
@@ -927,6 +930,10 @@ Section VdrwdLeaves.
       iDestruct ("Hback" with "Hw2") as "[Hproto Hpub]".
       assert (Haddr : avail_idx_pa (v_cfg vst) = pa_add pav 2%nat)
         by (rewrite Hceq; reflexivity).
+      (* [VirtioProto] is a RAW-tier file (all three legs); the info word came
+         out of the flipped [disk_res], so it crosses through the shim. *)
+      iDestruct (TsoCtxShim.ctx_word_to_mem with "Hinfo") as "Hinfo".
+      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hbd") as "Hbd".
       iDestruct (virtio_proto_publish_acc γd vst np sl dc pin wrb
                    ltac:(rgall; rewrite Hceq; exact Hpinok)
                    Hdcsl Hdcpos Hdcpin Hwrbdom Hwrpin
@@ -937,8 +944,8 @@ Section VdrwdLeaves.
                    with "Hkm Hw2") as "Hcell".
       iModIntro. iExists (wrap16 np : SailStdpp.Values.mword 16).
       iSplitL "Hcell".
-      { rewrite Hea. iExact "Hcell". }
-      iIntros "Hcell". iEval (rewrite Hea) in "Hcell".
+      { rewrite Hea -(wordw2_ctx (KTR2 := KT0)). iExact "Hcell". }
+      iIntros "Hcell". iEval (rewrite (wordw2_ctx (KTR2 := KT0)) Hea) in "Hcell".
       iDestruct (word2_to_phys (pa_add pav 2%nat) (wrap16 (S np)) Hst2
                    with "Hkm Hcell") as "Hw2".
       iEval (rewrite -Haddr) in "Hw2".
@@ -1150,6 +1157,9 @@ Section VdrwdPinRes.
     iIntros (Hs) "#Hb H". rewrite /phys_list.
     iApply (big_sepL_impl with "H").
     iIntros "!>" (k x Hk) "Hx".
+    (* [↦ₚ] has not flipped (M1 stage 2): the ctx byte crosses into the raw
+       disassembly law *)
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hx") as "Hx".
     iApply (mem_ident_phys (pa_add a k) (DfracOwn 1) x
               (Hs k ltac:(apply lookup_lt_Some in Hk; lia)) with "Hb Hx").
   Qed.

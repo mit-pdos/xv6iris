@@ -38,8 +38,8 @@ Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 
 (* memmove(dst, src, len): copies [len] bytes from [src] to [dst] and returns
    [dst] in a0.  As with memset, [len] need only fit in 32 bits (the C source

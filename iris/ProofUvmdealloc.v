@@ -72,8 +72,8 @@ Require Import SpecUvmdealloc.
 Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 Import Defs.
 
 (* ===================================================================== *)
@@ -115,7 +115,7 @@ Section ProofUvmdealloc.
      tie, or the post-uvmunmap-and-cj join), never necessarily the section's
      own entry hart -- same reasoning as ProofConsputc.v's
      [wp_consputc_epi]. *)
-  Lemma wp_uvmdealloc_epi `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma wp_uvmdealloc_epi `{CID0 : CpuId}
       (mm mj : regfile) (P : uptd) (Res : iProp Σ)
       (K : nat) (eb : bool) (p : mword 64)
       (b : bool) (oldsz newsz res ret_tgt : mword 64) (lks : gset string) :

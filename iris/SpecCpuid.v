@@ -30,8 +30,8 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import RiscvExtras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 
 
 (* the [int]-truncated hart id returned by cpuid: sign-extend tp's low 32. *)

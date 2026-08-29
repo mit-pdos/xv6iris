@@ -42,8 +42,8 @@ Require Import ProofProcdumpParts.
 Require Import ProofProcdumpLoop.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 Local Open Scope Z_scope.
 
 (* the numeric side conditions, mword-free and passed by name *)
@@ -117,7 +117,7 @@ Section ProofProcdumpMain.
     iPoseProof (pd_nl_str with "Hkdata") as "Hnlstr".
     iDestruct (cpu_own_transport CID CID2 0%nat eb p b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Hpk CID2 M1 (K - 10)%nat eb p DfracDiscarded pd_nl [] b lks
+    iApply (Hpk CID2 cur_ctx M1 (K - 10)%nat eb p DfracDiscarded pd_nl [] b lks
               (pd_K48 K HK) pd_nl_len pd_nl_nonul
               ltac:(rewrite pd_nl_kinds; reflexivity)
               ltac:(cbn [length]; lia)

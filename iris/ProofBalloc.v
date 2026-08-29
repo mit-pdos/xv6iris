@@ -123,8 +123,9 @@ Require Import SpecBalloc.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.   (* memset's spec is CONVERTED (tso-port leg M) and
+   so is this caller's buffer (the M1 flip): the seam closed, so no shim *)
 Local Open Scope Z_scope.
-Require Import TsoCtx.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
    printable (claude-notes/durable-notes.md) *)
@@ -202,7 +203,7 @@ Section BallocDefs.
   (* balloc's 80-byte frame: ra@72 s0@64 s1@56 s2@48 s3@40 s4@32 s5@24
      s6@16 s7@8 s8@0.  [pa_stk sp j] counts DOWN from the entry sp, so slot
      j holds the register saved at (newsp + 80 - 8j). *)
-  Definition ba_frame (m : regfile) : iProp Σ :=
+  Definition ba_frame `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
@@ -266,7 +267,7 @@ Section BallocDefs.
   
   (* ONE BYTE of a buffer's data area, borrowed and given back at a new byte
      list -- [ByteBuf.bb_byte_acc] over [buf_own]'s list form. *)
-  Lemma ba_buf_byte (pb : mword 64) (bno dsk : mword 32)
+  Lemma ba_buf_byte `{XI : CurCtx} (pb : mword 64) (bno dsk : mword 32)
       (l : list (bv 8)) (d : nat) :
     length l = 1024%nat -> (d < 1024)%nat ->
     buf_own pb bno dsk l -∗
@@ -298,7 +299,7 @@ Section BallocDefs.
 
   (* THE WHOLE data area, in the [∗ list] shape [SpecMemset] takes and
      gives back -- the inlined bzero's window. *)
-  Lemma ba_buf_all (pb : mword 64) (bno dsk : mword 32) (l : list (bv 8)) :
+  Lemma ba_buf_all `{XI : CurCtx} (pb : mword 64) (bno dsk : mword 32) (l : list (bv 8)) :
     length l = 1024%nat ->
     buf_own pb bno dsk l -∗
       ([∗ list] jj ∈ seq 0 1024, pa_add (b_data pb) jj ↦ₘ (l !!! jj)) ∗
@@ -904,7 +905,7 @@ Section BallocOut.
     (* the panic tail runs at depth 0, so the held set is forced empty and
        printk's order premise ("pr", 14) needs no hypothesis here. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
-    iApply (Hpk CID10 QA (K - 10)%nat eb (proc_addr j)
+    iApply (Hpk CID10 cur_ctx QA (K - 10)%nat eb (proc_addr j)
               DfracDiscarded ba_msg [] b _
               ltac:(lia) Hlmsg Hnmsg ltac:(rewrite Hkmsg; reflexivity)
               ltac:(cbn [length]; lia)
@@ -1819,6 +1820,9 @@ Section BallocBzero.
       rewrite /Z7 upd_ne; [| regne].
       exact (HZ6thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22 N23 N24). }
     iEval (rewrite -HZ7a0) in "Hby".
+    (* memset's contract is context-indexed AND so is this caller's buffer
+       (the M1 flip): both sides are [ctx_pointsto] now, so the sweep-era
+       shim crossing that used to sit here is gone. *)
     iApply (MS.wp_memset_sconf KT1 KT0 Z7 (K - 10)%nat 1024%nat
               (mword_of_int 0 : mword 64) (fun jj => bsD !!! jj) b (proc_addr j)
               ltac:(lia) ltac:(vm_compute; reflexivity) HZ7a1 HZ7a2
@@ -2516,7 +2520,7 @@ End BallocAlloc.
 Section BallocScan.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma ba_scan `{GEN : GenId} 
+  Local Lemma ba_scan `{GEN : GenId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)

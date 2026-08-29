@@ -573,6 +573,19 @@ Section ctx.
     Qed.
   End ctx_word.
 
+  (* the ktier-EXPLICIT twins, as the word2/word4/string towers have: with
+     the tier in the term (a leaf's [↦₈[KT1]□]) instance search wants the
+     tier as a unifiable argument, not a [CurKtier] resolution. *)
+  Global Instance ctx_word_pointsto_timeless' (ktr : ktier)
+      (ξ : CtxId) (a : Arch.pa) (dq : dfrac) (w : bv 64) :
+    Timeless (ctx_word_pointsto (KTR := ktr) ξ a dq w).
+  Proof. exact (ctx_word_pointsto_timeless (KTR := ktr) ξ a dq w). Qed.
+
+  Global Instance ctx_word_pointsto_discarded_persistent' (ktr : ktier)
+      (ξ : CtxId) (a : Arch.pa) (w : bv 64) :
+    Persistent (ctx_word_pointsto (KTR := ktr) ξ a DfracDiscarded w).
+  Proof. exact (ctx_word_pointsto_discarded_persistent (KTR := ktr) ξ a w). Qed.
+
   Lemma ctx_word_pointsto_agree {kt1 kt2 : ktier} (ξ1 ξ2 : CtxId) a dq1 w1 dq2 w2 :
     ctx_word_pointsto (KTR := kt1) ξ1 a dq1 w1 -∗
     ctx_word_pointsto (KTR := kt2) ξ2 a dq2 w2 -∗ ⌜w1 = w2⌝.

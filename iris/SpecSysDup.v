@@ -94,7 +94,7 @@ Section SpecSysDup.
      type ([ProcInv.proc_priv_settle]).  The SOURCE descriptor's state does
      not change and its authority round-trips through the loan, which is why
      one bundle access is enough for a two-descriptor syscall. *)
-  Definition sys_dup_post (γf : gname) (p : mword 64) (pid : mword 32)
+  Definition sys_dup_post `{XI : CurCtx} (γf : gname) (p : mword 64) (pid : mword 32)
       (U : ustate) (v : mword 64) (r : mword 64) : iProp Σ :=
     ((* argfd said no: the argument is not an open descriptor *)
      ⌜r = (mword_of_int (-1) : mword 64) /\ arg_fd v (pv_ofile (us_V U)) = None⌝ ∗

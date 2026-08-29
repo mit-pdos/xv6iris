@@ -37,6 +37,7 @@ Require Import ProofSysOpenParts.    (* [so_omv], [so_and], [so_rd_word],
                                         [so_wr_word], [so_and1_01]         *)
 Require Import SpecSysOpenAU.        (* [om_arg] and the four bit readings *)
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require TsoCtx.   (* qualified: the class only, no notation flip *)
 
 Local Open Scope Z_scope.
 
@@ -46,7 +47,7 @@ Local Open Scope Z_scope.
 
 (* [DinodeSlot.iu_sext_mod16]'s argument, at any modulus dividing 2^32:
    the sign extension changes the value only by a multiple of 2^32. *)
-Lemma soau_sext_mod (w : mword 32) (M : Z) :
+Lemma soau_sext_mod `{XI : TsoCtx.CurCtx} (w : mword 32) (M : Z) :
   0 < M -> (M | 2 ^ 32) ->
   bv_unsigned (sign_extend' 64 w : mword 64) `mod` M = bv_unsigned w `mod` M.
 Proof.
@@ -74,14 +75,14 @@ Proof.
   f_equal. lia.
 Qed.
 
-Lemma soau_pow2_divide (k : Z) : 0 <= k < 32 -> (2 ^ (k + 1) | 2 ^ 32).
+Lemma soau_pow2_divide `{XI : TsoCtx.CurCtx} (k : Z) : 0 <= k < 32 -> (2 ^ (k + 1) | 2 ^ 32).
 Proof.
   intros Hk. exists (2 ^ (32 - (k + 1))).
   rewrite -Z.pow_add_r; [| lia | lia]. f_equal. lia.
 Qed.
 
 (* THE ONE FACT THE CHAIN NEEDS. *)
-Lemma soau_testbit_low (w : mword 32) (k : Z) :
+Lemma soau_testbit_low `{XI : TsoCtx.CurCtx} (w : mword 32) (k : Z) :
   0 <= k < 32 ->
   Z.testbit (bv_unsigned (so_omv w)) k = Z.testbit (bv_unsigned w) k.
 Proof.
@@ -94,7 +95,7 @@ Qed.
 
 (* ---- masks -------------------------------------------------------- *)
 
-Lemma soau_land_pow2 (x k : Z) :
+Lemma soau_land_pow2 `{XI : TsoCtx.CurCtx} (x k : Z) :
   0 <= k -> (Z.land x (2 ^ k) = 0 <-> Z.testbit x k = false).
 Proof.
   intros Hk. split.
@@ -109,7 +110,7 @@ Proof.
     + rewrite (proj2 (Z.eqb_neq k n) Hne). apply andb_false_r.
 Qed.
 
-Lemma soau_land3 (x : Z) :
+Lemma soau_land3 `{XI : TsoCtx.CurCtx} (x : Z) :
   Z.land x 3 = 0 <-> (Z.testbit x 0 = false /\ Z.testbit x 1 = false).
 Proof.
   split.
@@ -141,7 +142,7 @@ Qed.
 (* ===================================================================== *)
 
 (* the argint'd word IS the contract's [om_arg] *)
-Lemma soau_om_arg (vom : mword 64) :
+Lemma soau_om_arg `{XI : TsoCtx.CurCtx} (vom : mword 64) :
   bv_unsigned (arg_int32 vom) = om_arg vom.
 Proof.
   rewrite trunc32_unsigned /om_arg /bv_wrap /bv_modulus.
@@ -149,7 +150,7 @@ Proof.
 Qed.
 
 (* the general single-bit mask, at a literal the [andi] carries *)
-Lemma soau_and_pow2_zero (om : mword 32) (k n : Z) :
+Lemma soau_and_pow2_zero `{XI : TsoCtx.CurCtx} (om : mword 32) (k n : Z) :
   0 <= k < 32 -> n = 2 ^ k ->
   bv_unsigned (sign_extend' 64 (mword_of_int n : mword 12) : mword 64) = n ->
   (so_and om n = (mword_of_int 0 : mword 64)
@@ -169,7 +170,7 @@ Proof.
 Qed.
 
 (* O_CREATE (bit 9) -- the +0x32 [andi a5,a5,512] and its [c.beqz] *)
-Lemma soau_create_zero (vom : mword 64) :
+Lemma soau_create_zero `{XI : TsoCtx.CurCtx} (vom : mword 64) :
   om_create vom = false ->
   so_and (arg_int32 vom) 512 = (mword_of_int 0 : mword 64).
 Proof.
@@ -180,7 +181,7 @@ Proof.
   rewrite soau_om_arg. exact Hc.
 Qed.
 
-Lemma soau_create_nonzero (vom : mword 64) :
+Lemma soau_create_nonzero `{XI : TsoCtx.CurCtx} (vom : mword 64) :
   so_and (arg_int32 vom) 512 <> (mword_of_int 0 : mword 64) ->
   om_create vom = true.
 Proof.
@@ -190,7 +191,7 @@ Proof.
 Qed.
 
 (* O_TRUNC (bit 10) -- the +0xac [andi a5,a5,1024] *)
-Lemma soau_trunc_zero_iff (vom : mword 64) :
+Lemma soau_trunc_zero_iff `{XI : TsoCtx.CurCtx} (vom : mword 64) :
   so_and (arg_int32 vom) 1024 = (mword_of_int 0 : mword 64)
   <-> om_trunc vom = false.
 Proof.
@@ -203,7 +204,7 @@ Qed.
 (* ---- the two mode BYTES ------------------------------------------- *)
 
 (* [f->readable = !(omode & O_WRONLY)]: [andi a4,a5,1 ; xori a4,a4,1] *)
-Lemma soau_rd_byte (vom : mword 64) :
+Lemma soau_rd_byte `{XI : TsoCtx.CurCtx} (vom : mword 64) :
   trunc8 (so_rd_word (arg_int32 vom))
   = ((if om_readable vom then mword_of_int 1 else mword_of_int 0) : mword 8).
 Proof.
@@ -229,7 +230,7 @@ Qed.
 
 (* [f->writable = (omode & O_WRONLY) || (omode & O_RDWR)]: the [snez] on
    the merged mask 3 *)
-Lemma soau_wr_byte (vom : mword 64) :
+Lemma soau_wr_byte `{XI : TsoCtx.CurCtx} (vom : mword 64) :
   trunc8 (so_wr_word (arg_int32 vom))
   = ((if om_writable vom then mword_of_int 1 else mword_of_int 0) : mword 8).
 Proof.
@@ -284,7 +285,7 @@ Qed.
 (* ...and the two READINGS a publication needs: [so_publish]'s [rb]/[wb]
    come out of [so_rd_byte_bool] / [so_wr_byte_bool] as bare booleans, and
    these say which ones they are. *)
-Lemma soau_rb_is (vom : mword 64) (rb : bool) :
+Lemma soau_rb_is `{XI : TsoCtx.CurCtx} (vom : mword 64) (rb : bool) :
   trunc8 (so_rd_word (arg_int32 vom))
   = ((if rb then mword_of_int 1 else mword_of_int 0) : mword 8) ->
   rb = om_readable vom.
@@ -295,7 +296,7 @@ Proof.
   - apply soau_rd_byte.
 Qed.
 
-Lemma soau_wb_is (vom : mword 64) (wb : bool) :
+Lemma soau_wb_is `{XI : TsoCtx.CurCtx} (vom : mword 64) (wb : bool) :
   trunc8 (so_wr_word (arg_int32 vom))
   = ((if wb then mword_of_int 1 else mword_of_int 0) : mword 8) ->
   wb = om_writable vom.
@@ -313,7 +314,7 @@ Qed.
 (* [ProofSysOpenParts.so_major_out] is the branch fact ([bltu] not taken
    means the halfword is at most 9); the contract asks for it at
    [ConsoleInv.NDEV_max].  One reading, so the arms never spell 9. *)
-Lemma soau_major_bound (h : mword 16) :
+Lemma soau_major_bound `{XI : TsoCtx.CurCtx} (h : mword 16) :
   ~ (9 < bv_unsigned h) -> 0 <= bv_unsigned h <= ConsoleInv.NDEV_max.
 Proof.
   intros Hle.

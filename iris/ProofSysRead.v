@@ -71,8 +71,9 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Require TsoCtxShim.   (* the raw [WpSconfMem] word towers cross the seam here *)
+Import Defs.
 Local Open Scope Z_scope.
 
 (* a failing tactic in a whole-function WP over [proc_priv] otherwise spends
@@ -139,7 +140,7 @@ Section ProofSysRead.
 
   (* THE CARVE THIS READS IS ARM-DEPENDENT, hence the [0 < k] premise --
      [ProofSysFstat.sfs_sp_bounds] verbatim. *)
-  Lemma sr_sp_bounds `{CID0 : CpuId} `{XI : CurCtx} (mm : regfile) (kk : nat)
+  Lemma sr_sp_bounds `{CID0 : CpuId} (mm : regfile) (kk : nat)
       (bb : bool) (pp : mword 64) :
     (0 < kk)%nat ->
     sie_cap_gpr KT1 mm kk bb pp -∗
@@ -157,7 +158,7 @@ Section ProofSysRead.
      is entered at a MIGRATED hart -- its own [b] and [pp], and its
      continuation wrapped in [wp_next].  It does NOT carry [cpu_own]: the
      epilogue never touches it, so the caller transports it afterwards. *)
-  Lemma sr_tail `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma sr_tail `{CID0 : CpuId}
       (m Mt : regfile) (av : nat) (rv : mword 64)
       (sp0 ra0 s00 : mword 64) (w3 w4 w5 w6 : bv 64) (b : bool) (pp : mword 64) :
     (6 <= av)%nat ->
@@ -171,12 +172,12 @@ Section ProofSysRead.
     sie_cap_gpr KT1 Mt (av - 6)%nat b pp -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.sys_read + 0x40) : mword 64) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) w3 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) w3 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) w4 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) w6 -∗
     wp_next (CID0 := CID0) b pp (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
@@ -423,8 +424,13 @@ Section ProofSysRead.
       by (rewrite /M2 upd_ne; [exact HM1sp | reg_neq]).
     (* THE [int n] IS THE UPPER HALF OF SLOT 4: carve it now, take the
        8-alignment fact out FIRST (the halves no longer carry it). *)
+    (* ↦₄ has not flipped (M1 stage 2): the ctx word crosses to the raw
+       4-byte tower through the shim, and each join crosses back. *)
+    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hs4") as "Hs4".
     iDestruct (word_pointsto_aligned_p with "Hs4") as %Hal4.
     iDestruct (word_pointsto_split4 with "Hs4") as "[Hs4lo Hs4hi]".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ cur_ctx with "Hs4lo") as "Hs4lo".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ cur_ctx with "Hs4hi") as "Hs4hi".
     (* ---- +0x08: addi a1,s0,-40 -- a1 := &p ---- *)
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.sys_read + 0x08))
               Ra1 Rs0 (mword_of_int 0xfd8 : mword 12) M2 (av - 6)%nat b
@@ -779,7 +785,10 @@ Section ProofSysRead.
       iEval (rewrite Htgt40) in "Hpc".
       iEval (rewrite HN4a2) in "Hfcell".
       (* slot 4 goes back together: both halves are dead from here on *)
+      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs4lo") as "Hs4lo".
+      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs4hi") as "Hs4hi".
       iDestruct (word_pointsto_join4 _ _ _ _ Hal4 with "Hs4lo Hs4hi") as "Hs4".
+      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hs4") as "Hs4".
       iApply (sr_tail (CID0 := CID20) m A3 av (mword_of_int (-1) : mword 64)
                 sp0 ra0 s00 _ _ _ _ b pj
                 ltac:(lia) eq_refl eq_refl eq_refl HA3sp HA3a0 HthrA
@@ -983,7 +992,10 @@ Section ProofSysRead.
         rewrite /S2 upd_ne; [| congruence].
         rewrite /S1 upd_ne; [| congruence].
         apply HthrA; assumption. }
+      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs4lo") as "Hs4lo".
+      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs4hi") as "Hs4hi".
       iDestruct (word_pointsto_join4 _ _ _ _ Hal4 with "Hs4lo Hs4hi") as "Hs4".
+      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hs4") as "Hs4".
       iApply (sr_tail (CID0 := CID25) m mf av rv sp0 ra0 s00 _ _ _ _ b pj
                 ltac:(lia) eq_refl eq_refl eq_refl HMfsp Hrva HthrF
                 with "Hcg Htext Hpc Hs1 Hs2 Hfcell Hs4 Hs5 Hs6").

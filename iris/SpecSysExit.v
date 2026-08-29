@@ -150,7 +150,7 @@ Definition wp_sys_exit_sconf_body
   is_ftable γft γf -∗
   (* ...and closing one can free a pipe's page *)
   is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
-    <{ kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24)) }> -∗
+    (λ ξ : CtxId, kmem_res (XIk := ξ) fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) -∗
   kalloc_avail fsc_kpages on -∗
   (* the file system, for [begin_op(); iput(p->cwd); end_op();] inside kexit *)
   bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗

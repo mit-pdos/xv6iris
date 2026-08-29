@@ -77,8 +77,8 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecUartinit.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 Import Defs.
 
 Module UartinitProof (Uart : UART) (Initlock : INITLOCK) : UARTINIT.
@@ -156,7 +156,7 @@ Section ProofUartinit.
       do 5 (destruct j as [|j];
             [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string uart_name_str "uart"%string name_uart eq_refl
+    iPoseProof (kernel_data_string_all uart_name_str "uart"%string name_uart eq_refl
                   ltac:(unfold text_end, uart_name_str; lia)
                   ltac:(vm_compute; discriminate) Huartstr
                   with "Hkdata") as "#Hstr_uart".

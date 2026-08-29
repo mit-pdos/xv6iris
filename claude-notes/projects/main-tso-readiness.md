@@ -813,3 +813,107 @@ Neither is an invention, but both are choices this file made:
 
 `MAKEEXIT=0`, 0 `Error`, 780 files recompiled, dumps unchanged,
 `audit-only` = the sanctioned 13.
+
+# AMENDMENT 5 (2026-08-29) — SLICE 2 CLOSED GREEN: the wave, and what was deferred
+
+The tree is green at this checkpoint: full `-k` build `MAKEEXIT=0`,
+`audit-only` = the sanctioned 13, `kernel-rocq/`/`user-rocq/` byte-identical
+to `a4fe91a78`.  63 local commits over `a4fe91a78` (the `wip: hNN fixes`
+series is the build-round log; squash at the push if wanted).  Nothing has
+been pushed.
+
+## 5.1 What landed — the propagation, by method
+
+1. **Tree-wide 3-way merge of the M-leg** (`origin/tso`) with base
+   `e1292b382`, ours `a4fe91a78`: 1119 files merged clean and were
+   installed wholesale (385 differed from the checkpoint); ~165 conflicted
+   (main moved in the same hunk) and kept the script-converted checkpoint
+   version, then got the M-leg's edits back by line-pick where the line
+   still existed (the acquire continuation's receipt `_`, binders).  71
+   main-only files (`FsAbs*`, `FsCollect*`, `*AU`, `Uexec*`, …) have no
+   M-leg twin and were converted by hand as they surfaced.
+2. **T-leg shapes for the propagated APIs**, per the rule "T-leg for
+   API/spec shapes, M-leg for SC shortcuts": `SpecAcquire` exports the
+   `(∃ K, hart_view_lb K)` receipt (minted by `hart_view_lb_any`); the
+   swtch cluster (`SwtchCtx`/`SpecSwtch`/`ProofSwtch`/`ProofSched`/
+   `ProofScheduler`/`SchedCtx`) is the T-leg's — `P` takes NO `CtxId`, no
+   `CtxMorph` premise on swtch, the record's resume wand is at `XIp` for
+   the bundle only; the trap tier (`SpecKernelvec`/`SpecKerneltrap`/
+   `SpecConsoleintr`/`SpecUartintr`/`SpecDevintr`/`SpecClockintr` and
+   their proofs) is the T-leg's (no `caps_fam`); `FsReady`/`FirstTok`/
+   `TicksInv`/`SpecPanic`/`SpecPrintk`/`SpecUserinit`/`SyscParkEnv` are
+   the T-leg's.  **Lock payload spelling follows the T-leg:** const
+   embedding `<{ R }>` for `proc_lock_res`, `pipe_res`, `bcache_res`,
+   `disk_res`, `log_res`, `itable_res2`, `ticks_res`, `nextpid_res`,
+   `ftable_res`, `cons_res`, `sl_res(_gen)`, `wait_res`, `pr_res`,
+   `tx_res`; the λ form `(λ ξ, kmem_res (XIk := ξ) …)` ONLY for `kmem_res`
+   (T-leg: 27 λ uses, 0 const).  The M-leg's `CtxMorph` instance sections
+   that exist only to serve λ payloads were dropped where the T-leg has
+   none (`ConsoleInv.console_inv_morph`, `ProcInv`'s section, `FileInv`'s
+   `ftable_res_morph`, `SchedCtx`'s, `SpecAllocpid`'s, `FsReady`'s).
+3. **`lock_name` is the closed term both legs have** (raw discarded word
+   + `ctx_string_all`); `lock_name_intro` takes `ctx_string_all`, and the
+   boot string minter is `KernelDataInv.kernel_data_string_all`.
+4. **Binders.**  Section-level `Context `{XI : CurCtx}` in the
+   Spec/Inv files (a section variable attaches only where used); inline
+   `` `{GEN} `{CID} `{XI} `` in the Proof-tier files whose lemmas
+   implement Module Type fields (the order must match the signature —
+   XI last, after CID; `Parameter`s carry it INSIDE the `forall`).  Files
+   that do not `Import TsoCtx` spell the class `TsoCtx.CurCtx`
+   (unqualified `CurCtx` there silently generalises a `CurCtx : Type` —
+   the trap §1.7 recorded; it bit four more times).
+
+## 5.2 DEFERRED — the M2 threading, exactly (each with its SC stand-in)
+
+The user's ruling (2026-08-28): "if that complicates things, defer it for
+now, we'll thread it through later. it would be good to land this giant
+change first."  Every deferral is an SC-only stand-in that dies at the
+shim burn; each is marked `main-tso-readiness` in the source.
+
+| deferred | where the M/T-legs have it | the stand-in on main |
+|---|---|---|
+| `own_context cur_ctx` in `sie_cap` (+`SieCapCtx`) | both legs | absent; `sie_cap` patterns are 5-conjunct everywhere |
+| acquire-side `ctx_absorb` | `ProofAcquire` | `ctx_dom_sc` + `ctx_morph` (the T-leg's own SC form) |
+| release-side `ctx_deposit` | `ProofRelease` | `WpLock.lock_pay_intro` (M-leg SC form) |
+| swtch `ctx_park`/`ctx_resume`/`ctx_deposit`; `ctx_parked XIp Tp` in `valid_context_pre` | `ProofSwtch`, `SwtchCtx` | conjunct dropped (binders kept for arity); `ctx_dom_sc` + `stack_own_reindex` / `ctx_cells_reindex` |
+| `cpu_ctx_free`'s parked record + receipt | T-leg `SchedCtx` | bare `∃ vs ξ` cell run; `ProofScheduler` claims via `ctx_dom_sc` |
+| bcache escrow as a parked record (`buf_escrow_rec`, `escrow_absorb/deposit`) | M-leg `BioInv`/`ProofBrelse`/`ProofBread(Parts)` | main's `buf_escrow`; the LRU link words stay RAW and cross at the accessor (`ctx_word_of_mem`/`to_mem` pairs, the M-leg's own idiom) |
+| the boot deposit's named context (`xid`, `CtxRecord.ctx_parked_inv`, `own_context_boot` per hart) | M-leg `BootShared`/`SpecMainSecondary`/`SystemAdequacy` | `main_deposit γd γv` (2 args); `SystemAdequacy` pins ONE dummy `ξ0 := MkCtxId inhabitant inhabitant` for all eight harts |
+| `boot_hart_res` rows at `∀ ξ` | M-leg `BootChain` | ambient rows; `BootShared` crosses `proc`/`noff`/`intena` at `cur_ctx` |
+| the `caps_fam`/`caps_morph` credential family in `intr_res` | M-leg only | absent (T-leg shape) |
+| `KptShare.kpt_creds`, `TsoCtxAbsorbLb` | T-leg only | absent |
+
+## 5.3 SC-ONLY LEMMAS ADDED ON MAIN — flagged, because §4.2 says "do not invent"
+
+These are shim-class (each is FALSE at TSO and says so in its comment),
+introduced because a main-only consumer needed them.  Review candidates:
+
+- `WpLock.is_lock_reindex` / `lock_inv_reindex` (the floor is re-minted
+  from `log_lb_any`; `inv_iff` re-indexes the invariant) — used by
+  `ConsoleInv`'s and `SchedCtx`'s (now removed) morphs; may be dead.
+- `WpLock.lock_openable_parts` (T-leg projection; not SC-only).
+- `WpSconfMem.ctx_word_claim` (8-byte twin of `ctx_word4_claim`),
+  `ctx_word_pointsto_split4` / `_join4` (the 8↔4 carve at the flipped
+  spelling, through the shim).
+- `StackOwn.stack_own_reindex` (T-leg statement, `ctx_morph` proof).
+- `SwtchCtx.ctx_cells_morph` / `own_ctx_morph` (M-leg), `DiskInv.
+  disk_geom_morph` (M-leg), `InodeInv`'s `InodeResMorph` section (M-leg),
+  `FileInvDefs.off_mark_acc` (M-leg name; definitional on main).
+- `TsoCtx.ctx_word_pointsto_timeless'` / `_discarded_persistent'` (the
+  ktier-explicit twins the 2/4/string towers already had; neither leg has
+  them for 8 bytes).
+
+## 5.4 Process notes for the successor
+
+- Round-trip: `./gcp-rocq/run-on-gcp … make -f CoqMakefile -j180 -k` from
+  the REPO ROOT (a backgrounded Bash chain loses `cd`; three rounds were
+  wasted on `run-on-gcp: No such file`).  ~5 min per incremental round,
+  ~10 min when `TsoCtx.v` changes (whole tree).
+- The classifier/fixers live in the session scratchpad only
+  (`autofix.py` = error triage + `bind2.py` binder insertion,
+  `secbind_all.py`, `inlinebind_all.py`, `linepick.py`, `m3.sh`); they are
+  one-offs, not tools — the reusable ones are `tools/ctx_convert.py` and
+  `tools/lock_ctx_sweep.py` from `tso`.
+- A stale `.vo` can mask a red file until its deps change: `BootShared`
+  was red for ~40 rounds behind an up-to-date `.vo`.  Before calling a
+  tree green, a full rebuild (touch `TsoCtx.v`) is the honest gate.

@@ -18,8 +18,8 @@ Require Import WpNext.
 Require Import CpuOwn.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 
 
 (* push_off DISABLES interrupts, so it is entered with them in WHATEVER state

@@ -45,8 +45,8 @@ Require Import CpuOwn.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 
 
 (* the two globals allocpid touches *)
@@ -55,12 +55,20 @@ Definition alp_nextpid  : mword 64 := mword_of_int KernelSyms.nextpid.
 
 Section SpecAllocpid.
   Context `{!riscvGS Σ}.
+  (* M1 flip, STAGE 2: the counter cell is [↦₄], so this payload names a
+     context.  Its lock handle is therefore spelled with the λ-CONVERTED
+     payload at every mention site (§0.7′ recipe rule 1) rather than under
+     [<{ }>] -- which is what keeps [is_lock γp alp_pid_lock "nextpid" …] a
+     CLOSED TERM, and hence carryable in tso-port.md §0.12′'s park record
+     across a ∀-quantified resume context. *)
+  Context `{XI : CurCtx}.
 
   (* everything <pid_lock> protects: the counter, value unconstrained. *)
   Definition nextpid_res : iProp Σ :=
     (∃ v : mword 32, alp_nextpid ↦₄ v)%I.
 
 End SpecAllocpid.
+
 
 Definition wp_allocpid_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γp : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :=

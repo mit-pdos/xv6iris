@@ -27,8 +27,8 @@ Require Import WpNext.
 Require Import CpuOwn.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 
 
 (* myproc() does its OWN push_off/pop_off around the [tp]-read inside

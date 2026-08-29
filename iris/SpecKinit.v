@@ -25,10 +25,10 @@ Require Import SpecFreerange.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 
 (* THE TWO GHOST NAMES ARE THE CALLER'S (fs-cfg-boot.md stage (e), debt E).
-Require Import TsoCtx.
    [γl] is the "kmem" spinlock's own gname and [γk] the free-list count/seal
    pair its resource is keyed by; both used to be chosen HERE, by an
    [own_alloc] and a [WpLock.newlock] at WP time, and returned

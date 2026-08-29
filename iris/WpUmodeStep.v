@@ -1079,7 +1079,6 @@ Section UvObl.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
   Context (C : ucfg) (pt : uptd).
-  Context `{XI : CurCtx}.
 
   (* ---- THE OBLIGATION: fetch-onward.  The engine has already taken the
      dispatch's [None] branch, so what is left to say is what the machine
@@ -1555,9 +1554,12 @@ Qed.
 
 Section UvStepEngine.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId}.
+  (* NO section [CpuId] (the Loeb induction binds the hart inside), but the
+     CONTEXT IS AMBIENT: a user excursion is not a change of thread, so the
+     hart may migrate under the engine while [cur_ctx] does not move
+     (tso-port.md, "A USER EXCURSION IS NOT A CHANGE OF THREAD"). *)
+  Context `{GEN : GenId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
-  Context `{XI : CurCtx}.
 
   (* THE ENGINE, in the hart-quantified form the Loeb induction needs: only
      [CID] is bound inside the entailment, everything else is a lemma

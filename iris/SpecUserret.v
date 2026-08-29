@@ -43,8 +43,8 @@ Require Import PtTree.
 Require Import TrampPt UptTree KptShare UserretDefs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 Import Defs.
 
 (* [tf_pa] itself now lives in TrampPt.v (re-exported below) so

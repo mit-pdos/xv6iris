@@ -217,6 +217,7 @@ Qed.
 
 Section IlockParts.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, FSC : fscfg}.
+  Context `{XI : CurCtx}.
 
   (* THE WRITE-DIRECTION TWIN of [InodeInv.inode_addrs_buf].  memmove's
      DESTINATION is the thirteen [i_addr] cells viewed as 52 contiguous
@@ -283,6 +284,7 @@ Qed.
 Section IlockMsg.
   Context `{!riscvGS Σ, FSC : fscfg}.
   Context `{GEN : GenId}.
+  Context `{XI : CurCtx}.
 
   Lemma il_msg_str :
     (kernel_data : iProp Σ) -∗ (mword_of_int il_msg_a : mword 64) ↦ₛ□ il_msg.
@@ -338,6 +340,7 @@ Definition il_sp (m M : regfile) : Prop :=
 
 Section IlockDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   (* ilock's 32-byte frame: ra@24 s0@16 s1@8, and slot 4 (s2's) held
      ANONYMOUSLY -- the cached arm never writes it. *)
@@ -381,7 +384,7 @@ Section IlockDefs.
   (* [fsc_ic] and [s] are here for ONE resource: the other half of the entry
      sleeplock's checkout descriptor (§14.8).  SpecIlock v3 hands it to the
      caller, so both arms of the function have to carry it to the join. *)
-  Definition il_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
+  Definition il_cont `{GEN : GenId} `{CID0 : CpuId} 
       (gisl : gname)
       (s : Qp) (g : gname) (d : ic_dep) (o : ilkc)
       (k : nat) (ip : mword 64) (inum : mword 32)
@@ -433,8 +436,9 @@ End IlockDefs.
 (* ===================================================================== *)
 Section IlockEpilogue.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
-  Local Lemma il_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
+  Local Lemma il_epilogue `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (gisl : gname)
       (s : Qp) (g : gname) (d : ic_dep) (o : ilkc)
       (k : nat) (ip : mword 64) (inum : mword 32)
@@ -684,6 +688,7 @@ End IlockEpilogue.
 (* ===================================================================== *)
 Section IlockLoad.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)
   (*  A CLAIMED INODE'S BUNDLE, OUT OF NOTHING (§16.4's fill sub-arm)     *)
@@ -717,7 +722,7 @@ Section IlockLoad.
       [done | exfalso; apply Hc; reflexivity].
   Qed.
 
-  Local Lemma il_load `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+  Local Lemma il_load `{GEN : GenId} `{CID0 : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)
  (gisl : gname)
@@ -2408,7 +2413,7 @@ Section ProofIlockMain.
     iApply fupd_wp.
     iMod (iref_live_gen_load_au ⊤ k s g ltac:(solve_ndisj) Hk
             with "Hitbl Hrt") as (vp) "[Hcellp Hbackp]".
-    iDestruct (wordw_claim_of (KTR := KT0) 4 (i_ref (ientry k))
+    iDestruct (ctx_word4_claim (KTR2 := KT0) (i_ref (ientry k))
                  (DfracOwn 1) vp ltac:(lia) with "Hcellp") as "#Hclaim0".
     iMod ("Hbackp" with "Hcellp") as "[%Hbp Hrt]".
     iModIntro.

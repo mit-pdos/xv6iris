@@ -64,6 +64,7 @@ Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 From Kernel Require KernelSyms.
+Require Import TsoCtx.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 
@@ -131,7 +132,6 @@ Definition wp_vmfault_sconf_mem_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
            proc_ptm (uptd_insert P (svpn_of va0) r) (uint szv) M) ) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
-Require Import TsoCtx.
 
 Module Type VMFAULT.
   Parameter wp_vmfault_sconf_mem :

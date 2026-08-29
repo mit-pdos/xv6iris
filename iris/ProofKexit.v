@@ -95,6 +95,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Require Import TsoCtx.
+Require TsoCtxShim.
 Local Open Scope Z_scope.
 (* a failing tactic in a whole-function WP over [proc_priv] otherwise spends
    tens of minutes FORMATTING the goal -- see durable-notes. *)
@@ -116,7 +117,7 @@ Local Ltac rgne :=
 (* ---------------------------------------------------------------------- *)
 
 (* the [c.li a5,5] value truncated to 32 bits is ZOMBIE. *)
-Lemma kx_zombie :
+Lemma kx_zombie `{XI : CurCtx} :
   trunc32 (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 5 : mword 6))) : mword 64)
   = (mword_of_int 5 : mword 32).
 Proof. vm_compute. reflexivity. Qed.
@@ -127,20 +128,20 @@ Proof. vm_compute. reflexivity. Qed.
    the (non-null) pointer the caller promised, and the loop runs between the
    promise and the use.  It costs nothing -- the loop only ever writes
    [p->ofile[fd]] -- but nothing else in scope says so. *)
-Definition kx_nulled (cwdv : mword 64) (fd : nat) (V : pprivate) : Prop :=
+Definition kx_nulled `{XI : CurCtx} (cwdv : mword 64) (fd : nat) (V : pprivate) : Prop :=
   pv_cwd V = cwdv /\
   forall i, (i < fd)%nat -> pv_ofile V !! i = Some (zero_reg : mword 64).
 
-Lemma kx_nulled_0 (V : pprivate) : kx_nulled (pv_cwd V) 0 V.
+Lemma kx_nulled_0 `{XI : CurCtx} (V : pprivate) : kx_nulled (pv_cwd V) 0 V.
 Proof. split; [reflexivity|]. intros i Hi. exfalso. lia. Qed.
 
-Lemma kx_nulled_cwd (cwdv : mword 64) (fd : nat) (V : pprivate) :
+Lemma kx_nulled_cwd `{XI : CurCtx} (cwdv : mword 64) (fd : nat) (V : pprivate) :
   kx_nulled cwdv fd V -> pv_cwd V = cwdv.
 Proof. by intros [H _]. Qed.
 
 (* ... and at [fd = NOFILE] that IS the [replicate] the ZOMBIE park wants
    ([ProcInv.proc_priv_to_dormant_zombie]). *)
-Lemma kx_nulled_all (cwdv : mword 64) (V : pprivate) :
+Lemma kx_nulled_all `{XI : CurCtx} (cwdv : mword 64) (V : pprivate) :
   length (pv_ofile V) = NOFILE ->
   kx_nulled cwdv NOFILE V ->
   pv_ofile V = replicate NOFILE (zero_reg : mword 64).
@@ -152,7 +153,7 @@ Proof.
     symmetry. apply lookup_ge_None_2. rewrite length_replicate. lia.
 Qed.
 
-Lemma kx_nulled_skip (cwdv : mword 64) (fd : nat) (V : pprivate) :
+Lemma kx_nulled_skip `{XI : CurCtx} (cwdv : mword 64) (fd : nat) (V : pprivate) :
   kx_nulled cwdv fd V -> pv_ofile V !! fd = Some (zero_reg : mword 64) ->
   kx_nulled cwdv (S fd) V.
 Proof.
@@ -161,7 +162,7 @@ Proof.
   apply Hn. lia.
 Qed.
 
-Lemma kx_nulled_close (cwdv : mword 64) (fd : nat) (V : pprivate) :
+Lemma kx_nulled_close `{XI : CurCtx} (cwdv : mword 64) (fd : nat) (V : pprivate) :
   kx_nulled cwdv fd V -> (fd < length (pv_ofile V))%nat ->
   kx_nulled cwdv (S fd) (upd_ofile V fd (zero_reg : mword 64)).
 Proof.
@@ -175,7 +176,7 @@ Qed.
 (* the exit test, as an index fact: the cursor has walked off the array
    exactly when its index is NOFILE.  Stated here so the loop body never
    runs [lia] with a [bv_unsigned] in context. *)
-Lemma kx_end_of_eq (i fd : nat) :
+Lemma kx_end_of_eq `{XI : CurCtx} (i fd : nat) :
   (i < NPROC)%nat -> (fd < NOFILE)%nat ->
   p_ofile (proc_addr i) (S fd) = p_cwd (proc_addr i) -> S fd = NOFILE.
 Proof. intros Hi Hfd Heq. apply (p_ofile_end_inj i (S fd) Hi ltac:(lia) Heq). Qed.
@@ -184,10 +185,10 @@ Proof. intros Hi Hfd Heq. apply (p_ofile_end_inj i (S fd) Hi ltac:(lia) Heq). Qe
 (* The frame.  EXISTENTIAL in the saved values: kexit never returns, so     *)
 (* nothing ever reloads them and no caller has to be told what they were.   *)
 (* ---------------------------------------------------------------------- *)
-Definition kx_fcell (spF : mword 64) (u : Z) : mword 64 :=
+Definition kx_fcell `{XI : CurCtx} (spF : mword 64) (u : Z) : mword 64 :=
   add_vec spF (zero_extend' 64 (concat_vec (mword_of_int u : mword 6) ('b"000"))).
 
-Definition kx_frame `{!riscvGS Σ, FSC : fscfg} (spF : mword 64) : iProp Σ :=
+Definition kx_frame `{!riscvGS Σ, FSC : fscfg} `{XI : CurCtx} (spF : mword 64) : iProp Σ :=
   (∃ v5 v4 v3 v2 v1 v0 : mword 64,
      kx_fcell spF 5 ↦₈[KT1] v5 ∗ kx_fcell spF 4 ↦₈[KT1] v4 ∗ kx_fcell spF 3 ↦₈[KT1] v3 ∗
      kx_fcell spF 2 ↦₈[KT1] v2 ∗ kx_fcell spF 1 ↦₈[KT1] v1 ∗ kx_fcell spF 0 ↦₈[KT1] v0)%I.
@@ -195,7 +196,7 @@ Definition kx_frame `{!riscvGS Σ, FSC : fscfg} (spF : mword 64) : iProp Σ :=
 (* the [c.addi16sp sp,-48] the prologue runs, as a [pa_stk] carve.  Named
    because BOTH the prologue and its caller need it: the caller has to spell
    the post-prologue sp to wrap its stack closer around the frame. *)
-Lemma kx_spF6 (sp0 : mword 64) :
+Lemma kx_spF6 `{XI : CurCtx} (sp0 : mword 64) :
   add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))
   = pa_stk sp0 6.
 Proof.
@@ -206,7 +207,7 @@ Qed.
    saved cells are dead the moment the swtch happens and they belong to the
    page the dying thread donates -- this is [kstack_closer_frame]'s argument
    at the prologue.  Existential contents are exactly what [stack_own] is. *)
-Lemma kx_frame_stack `{!riscvGS Σ, FSC : fscfg} (sp0 : mword 64) :
+Lemma kx_frame_stack `{!riscvGS Σ, FSC : fscfg} `{XI : CurCtx} (sp0 : mword 64) :
   kx_frame (pa_stk sp0 6) ⊢ stack_own (KTR := KT1) sp0 6.
 Proof.
   assert (Hb5 : kx_fcell (pa_stk sp0 6) 5 = pa_stk sp0 1).
@@ -239,7 +240,7 @@ Qed.
 (* the register shape the fd loop threads: the cursor, its end pointer, the
    process and the exit status.  s0 is dead after the prologue and s5..s11
    are never touched, so -- there being no epilogue -- neither appears. *)
-Definition kxl_regs (M : regfile) (pj sv spF : mword 64) (fd : nat) : Prop :=
+Definition kxl_regs `{XI : CurCtx} (M : regfile) (pj sv spF : mword 64) (fd : nat) : Prop :=
   M !!! Regidx (mword_of_int 9)  = p_ofile pj fd /\
   M !!! Regidx (mword_of_int 18) = p_cwd pj /\
   M !!! Regidx (mword_of_int 19) = pj /\
@@ -255,7 +256,7 @@ Definition kxl_regs (M : regfile) (pj sv spF : mword 64) (fd : nat) : Prop :=
 
 (* ... and what survives past the loop: everything below +0x4c reads only
    s3 (the process) and s4 (the status). *)
-Definition kxt_regs (M : regfile) (pj sv spF : mword 64) : Prop :=
+Definition kxt_regs `{XI : CurCtx} (M : regfile) (pj sv spF : mword 64) : Prop :=
   M !!! Regidx (mword_of_int 19) = pj /\
   M !!! Regidx (mword_of_int 20) = sv /\
   M !!! Regidx csp_rs1 = spF /\
@@ -267,26 +268,26 @@ Definition kxt_regs (M : regfile) (pj sv spF : mword 64) : Prop :=
 (*  .rodata, twelve characters and a NUL.  NAMED pure lemmas, not inline  *)
 (*  [ltac:] -- see optimization.md and the panic recipe.                  *)
 (* ===================================================================== *)
-Definition kx_msg_a : Z := 0x80007200.
-Definition kx_msg : string := "init exiting".
+Definition kx_msg_a `{XI : CurCtx} : Z := 0x80007200.
+Definition kx_msg `{XI : CurCtx} : string := "init exiting".
 
-Lemma kx_panic_K (av : nat) : (K_kexit <= av)%nat -> (panic_stack <= av - 6)%nat.
+Lemma kx_panic_K `{XI : CurCtx} (av : nat) : (K_kexit <= av)%nat -> (panic_stack <= av - 6)%nat.
 Proof. lia. Qed.
 
-Lemma kx_panic_noff : (Z.of_nat 0 + 2 < 2 ^ 31)%Z.
+Lemma kx_panic_noff `{XI : CurCtx} : (Z.of_nat 0 + 2 < 2 ^ 31)%Z.
 Proof. lia. Qed.
 
-Lemma kx_panic_below (lks : gset string) :
+Lemma kx_panic_below `{XI : CurCtx} (lks : gset string) :
   locks_below lks "log" -> locks_below lks "pr".
 Proof. intros H. apply (locks_below_mono lks "log" "pr" H). vm_compute; lia. Qed.
 
-Lemma kx_msg_nz : eq_vec (mword_of_int kx_msg_a : mword 64) zero_reg = false.
+Lemma kx_msg_nz `{XI : CurCtx} : eq_vec (mword_of_int kx_msg_a : mword 64) zero_reg = false.
 Proof. vm_compute; reflexivity. Qed.
 
-Lemma kx_msg_nonul : PrintkFmt.nonul kx_msg = true.
+Lemma kx_msg_nonul `{XI : CurCtx} : PrintkFmt.nonul kx_msg = true.
 Proof. vm_compute; reflexivity. Qed.
 
-Lemma kx_msg_bytes :
+Lemma kx_msg_bytes `{XI : CurCtx} :
   forall j b, cstring_bytes kx_msg !! j = Some b ->
     KernelData.kernel_data !! (kx_msg_a + Z.of_nat j)%Z = Some b.
 Proof.
@@ -298,6 +299,7 @@ Qed.
 Section KexitMsg.
   Context `{!riscvGS Σ, FSC : fscfg}.
   Context `{GEN : GenId}.
+  Context `{XI : CurCtx}.
 
   Lemma kx_msg_str :
     (kernel_data : iProp Σ) -∗ (mword_of_int kx_msg_a : mword 64) ↦ₛ□ kx_msg.
@@ -1058,14 +1060,14 @@ Section KexitPark.
       rewrite /P0 upd_ne; [exact Hs4 | vm_compute; discriminate]. }
     iDestruct (cpu_own_transport CID0 CIDw 0 eb pj b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Acquire.wp_acquire_sconf KT1 (CID := CIDw) γw "wait_lock"%string wait_res
+    iApply (Acquire.wp_acquire_sconf KT1 (CID := CIDw) γw "wait_lock"%string <{ wait_res }>
               P2 0 eb pj av b lks ltac:(lia) ltac:(lia)
               Hfresh
               with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HP2a0). iExact "Hwl". }
     (* FROM HERE TO THE RELEASE THE LOCK IS HELD: index [false] throughout. *)
-    iIntros (CIDa Hsa msa macq) "%Hmsfa Hcg Hpc %Hcsa Hlkw Hres Hown Hpay".
+    iIntros (CIDa Hsa msa macq) "%Hmsfa Hcg Hpc %Hcsa Hlkw Hres _ Hown Hpay".
     (* ONE WIDE HOP: acquire does not thread the complement, so it is moved
        across the whole prologue-plus-acquire stretch at once, from where it
        came in to the hart the lock was won on. *)
@@ -1178,8 +1180,9 @@ Section KexitPark.
               Mrp (trap_res b + av)%nat w false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] [Hpcell]").
     { iApply (kxi_72 with "Htext"). }
-    { iEval (rewrite Hrgr19 Hrp_s3 p_parent_sext). iExact "Hpcell". }
+    { iEval (rewrite Hrgr19 Hrp_s3 p_parent_sext). iApply (TsoCtxShim.ctx_word_of_mem with "Hpcell"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hpcell".
+    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hpcell") as "Hpcell".
     iEval (rewrite Hrgr19 Hrp_s3 p_parent_sext) in "Hpcell".
     iDestruct ("Hpback" with "Hpcell") as "Hpar".
     set (P5 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg w]> Mrp).
@@ -1289,7 +1292,7 @@ Section KexitPark.
     (* [Hfresh_proc], derived above for wakeup's own call, is exactly what
        this nested acquire needs too. *)
     iApply (Acquire.wp_acquire_sconf KT1 (CID := CIDa) γl "proc"%string
-              (proc_lock_res γs γl pj) P8 1%nat eb pj (trap_res b + av)%nat false
+              <{ proc_lock_res γs γl pj }> P8 1%nat eb pj (trap_res b + av)%nat false
               ({["wait_lock"]} ∪ lks)
               ltac:(lia) ltac:(lia)
               Hfresh_proc
@@ -1297,7 +1300,7 @@ Section KexitPark.
     all: try lkbelow.
     { iEval (rewrite HP8a0). iExact "Hislock". }
     iApply wp_next_off_intro.
-    iIntros (msb mlk) "%Hmsfb Hcg Hpc %Hcsl Hlkp HR Hown Hpay2".
+    iIntros (msb mlk) "%Hmsfb Hcg Hpc %Hcsl Hlkp HR _ Hown Hpay2".
     assert (Hpc80 : ret_pc (P8 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KX + 0x80))
       by (rewrite HP8ra; apply bv_eq; vm_compute; reflexivity).
@@ -1450,7 +1453,7 @@ Section KexitPark.
                  [av].  Level 2 -> 1 is itself carve-neutral ([trap_res false]
                  on entry), so both sides of this call sit at
                  [trap_res b + av]. *)
-              wait_res PC 1%nat eb pj (trap_res b + av)%nat
+              <{ wait_res }> PC 1%nat eb pj (trap_res b + av)%nat
               ({["proc"]} ∪ ({["wait_lock"]} ∪ lks))
               ltac:(rewrite HPCa0; apply addv_sext0) ltac:(lia)
               with "Hcg Htext Hpc Hwl Hlkw [Hpar] Hown Hpay2").

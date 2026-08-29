@@ -45,8 +45,8 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 
 
 Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
@@ -84,7 +84,7 @@ Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
   is_pipe γl γp pi -∗
   pipe_ref γp w 1 -∗
   (* kfree's resources: the kmem lock and the page count *)
-  is_lock γkl klk "kmem"%string <{ kmem_res γk kfl }> -∗
+  is_lock γkl klk "kmem"%string (λ ξ : CtxId, kmem_res (XIk := ξ) γk kfl) -∗
   kalloc_avail γk on -∗
   (* wakeup's *)
   procs_inv γs -∗

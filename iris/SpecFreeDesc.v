@@ -36,8 +36,8 @@ Require Import DiskAddrs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 
 (* free_desc's own frame is 16 bytes (2 slots); its only callee is wakeup (18) *)
 Notation K_free_desc := (20%nat) (only parsing).

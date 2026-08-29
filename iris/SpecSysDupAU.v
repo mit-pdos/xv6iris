@@ -286,7 +286,7 @@ Section SpecSysDupAU.
      premise (header, THE ARMS).  Which arm runs is a function of
      [fd_frees] over the caller's own array -- the landed determinism,
      kept. *)
-  Definition sys_dup_au_post (γf : gname) (p : mword 64) (pid : mword 32)
+  Definition sys_dup_au_post `{XI : CurCtx} (γf : gname) (p : mword 64) (pid : mword 32)
       (U : ustate) (fd0 : nat) (fv : mword 64)
       (rb wb : bool) (t : fdtype) (sts : list fdstate)
       (r : mword 64) : iProp Σ :=
@@ -313,7 +313,7 @@ Section SpecSysDupAU.
      [sys_dup_post] -- the parallel form never contradicts the landed
      contract (arm 1 there is unreachable, arms 2/3 are these two with
      the bundle weakened through [dup_fd_frags_any]). *)
-  Lemma sys_dup_au_post_sound (γf : gname) (p : mword 64) (pid : mword 32)
+  Lemma sys_dup_au_post_sound `{XI : CurCtx} (γf : gname) (p : mword 64) (pid : mword 32)
       (U : ustate) (v fv : mword 64) (fd0 : nat)
       (rb wb : bool) (t : fdtype) (sts : list fdstate) (r : mword 64) :
     arg_fd v (pv_ofile (us_V U)) = Some (fd0, fv) ->

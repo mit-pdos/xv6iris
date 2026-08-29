@@ -52,8 +52,8 @@ From Kernel Require KernelSyms.
 Require Import SpecWalk.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 Local Open Scope Z_scope.
 
 
@@ -175,7 +175,7 @@ Section ProofWalkNoalloc.
   (* ================================================================= *)
   (* THE SHARED EPILOGUE (+0x52..+0x64).                                *)
   (* ================================================================= *)
-  Local Lemma wp_wkn_epilogue `{CID0 : CpuId} `{XI : CurCtx} 
+  Local Lemma wp_wkn_epilogue `{CID0 : CpuId} 
       (mm Mf : regfile) (t : ptree) (m : gmap (mword 27) (mword 64))
       (K : nat) (dq : dfrac) (b : bool) (p : mword 64) :
     let va := mm !!! Regidx (mword_of_int 11) in
@@ -440,7 +440,7 @@ Section ProofWalkNoalloc.
   (* ================================================================= *)
   (* THE alloc = 0 ARM (+0x72 -> +0x96 -> +0x98 -> the epilogue).        *)
   (* ================================================================= *)
-  Local Lemma wp_wkn_fail `{CID0 : CpuId} `{XI : CurCtx} 
+  Local Lemma wp_wkn_fail `{CID0 : CpuId} 
       (mm Mf : regfile) (t : ptree) (m : gmap (mword 27) (mword 64))
       (K : nat) (dq : dfrac) (b : bool) (p : mword 64) :
     let va := mm !!! Regidx (mword_of_int 11) in
@@ -552,7 +552,7 @@ Section ProofWalkNoalloc.
   (* ================================================================= *)
   (* THE SHARED TAIL (+0x46..+0x50) then the epilogue.                   *)
   (* ================================================================= *)
-  Local Lemma wp_wkn_tail `{CID0 : CpuId} `{XI : CurCtx} 
+  Local Lemma wp_wkn_tail `{CID0 : CpuId} 
       (mm Mf : regfile) (t : ptree) (m : gmap (mword 27) (mword 64))
       (b0 : mword 44) (K : nat) (dq : dfrac) (b : bool) (p : mword 64) :
     let va := mm !!! Regidx (mword_of_int 11) in
@@ -712,7 +712,7 @@ Section ProofWalkNoalloc.
   (* ================================================================= *)
   (* THE LOOP BODY'S STRAIGHT-LINE CORE (+0x26..+0x36).                 *)
   (* ================================================================= *)
-  Local Lemma wp_wkn_probe `{CID0 : CpuId} `{XI : CurCtx} 
+  Local Lemma wp_wkn_probe `{CID0 : CpuId} 
       (M : regfile) (n : nat) (va shift : mword 64) (slotaddr pte : mword 64) (b : bool) (p : mword 64) {dqm : dfrac} :
     M !!! Regidx (mword_of_int 19 : mword 5) = va ->
     M !!! Regidx (mword_of_int 20 : mword 5) = shift ->

@@ -148,6 +148,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
+Require TsoCtxShim.
 
 (* a failing tactic in a WP over [proc_priv] otherwise spends tens of
    minutes FORMATTING the goal -- see claude-notes/durable-notes.md. *)
@@ -170,10 +171,10 @@ Definition mn_thr (m M : regfile) : Prop :=
     c <> (mword_of_int 8 : mword 5) ->
     M !!! Regidx c = (m !!! Regidx c : mword 64).
 
-Lemma mn_thr_refl (m : regfile) : mn_thr m m.
+Lemma mn_thr_refl `{XI : CurCtx} (m : regfile) : mn_thr m m.
 Proof. intros c _ _ _. reflexivity. Qed.
 
-Lemma mn_thr_trans (m M P : regfile) : mn_thr m M -> mn_thr M P -> mn_thr m P.
+Lemma mn_thr_trans `{XI : CurCtx} (m M P : regfile) : mn_thr m M -> mn_thr M P -> mn_thr m P.
 Proof.
   intros H1 H2 c Hc N2 N8. rewrite (H2 c Hc N2 N8). exact (H1 c Hc N2 N8).
 Qed.
@@ -182,18 +183,18 @@ Definition mn_sp (sp0 : mword 64) (M : regfile) : Prop :=
   M !!! Regidx csp_rs1 = pa_stk sp0 20.
 
 (* -160 / +160, both a [c.addi16sp] (55 is -9 in a 6-bit field, x16). *)
-Lemma mn_push (X : mword 64) :
+Lemma mn_push `{XI : CurCtx} (X : mword 64) :
   add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 54 : mword 6)))
   = pa_stk X 20.
 Proof. apply stk_push. apply bv_eq; vm_compute; reflexivity. Qed.
 
-Lemma mn_pop (X : mword 64) :
+Lemma mn_pop `{XI : CurCtx} (X : mword 64) :
   add_vec (pa_stk X 20) (sign_extend' 64 (caddi16sp_imm (mword_of_int 10 : mword 6)))
   = X.
 Proof. apply stk_pop. apply bv_eq; vm_compute; reflexivity. Qed.
 
 (* [c.addi4spn s0,sp,160] -- the frame pointer, back at the entry sp. *)
-Lemma mn_fp (X : mword 64) :
+Lemma mn_fp `{XI : CurCtx} (X : mword 64) :
   add_vec (pa_stk X 20) (sign_extend' 64 (caddi4spn_imm (mword_of_int 40 : mword 8)))
   = X.
 Proof. apply stk_pop. apply bv_eq; vm_compute; reflexivity. Qed.
@@ -201,7 +202,7 @@ Proof. apply stk_pop. apply bv_eq; vm_compute; reflexivity. Qed.
 (* [addi a1,s0,-144] off the frame pointer (which IS the entry sp) is the
    base of the path buffer -- slot 18, NOT the pushed sp: slot 19 holds the
    two [int] locals and slot 20 is padding. *)
-Lemma mn_buf (X : mword 64) :
+Lemma mn_buf `{XI : CurCtx} (X : mword 64) :
   add_vec X (sign_extend' 64 (mword_of_int 3952 : mword 12)) = pa_stk X 18.
 Proof. apply stk_push. apply bv_eq; vm_compute; reflexivity. Qed.
 
@@ -209,11 +210,11 @@ Proof. apply stk_push. apply bv_eq; vm_compute; reflexivity. Qed.
    is [&major], its HIGH word.  The second is not a slot address at all --
    it is four bytes into one -- so it needs ProofSysExit's [sex_addr_n]
    shape rather than [stk_push]. *)
-Lemma mn_min (X : mword 64) :
+Lemma mn_min `{XI : CurCtx} (X : mword 64) :
   add_vec X (sign_extend' 64 (mword_of_int 3944 : mword 12)) = pa_stk X 19.
 Proof. apply stk_push. apply bv_eq; vm_compute; reflexivity. Qed.
 
-Lemma mn_maj (X : mword 64) :
+Lemma mn_maj `{XI : CurCtx} (X : mword 64) :
   add_vec X (sign_extend' 64 (mword_of_int 3948 : mword 12))
   = pa_add (pa_stk X 19) 4.
 Proof.
@@ -222,7 +223,7 @@ Proof.
 Qed.
 
 (* the c.sdsp / c.ldsp displacements off the pushed sp *)
-Lemma mn_frm (X : mword 64) (u : mword 6) (k : nat) :
+Lemma mn_frm `{XI : CurCtx} (X : mword 64) (u : mword 6) (k : nat) :
   (mword_of_int (bv_wrap 64 (uint (mword_of_int (- (8 * Z.of_nat 20)) : mword 64)
                          + uint (zero_extend' 64 (concat_vec u ('b"000")) : mword 64)))
    : mword 64)
@@ -232,13 +233,13 @@ Proof.
   intro H. unfold pa_stk, add_vec_int. rewrite pa_stk_off2. apply f_equal. exact H.
 Qed.
 
-Lemma mn_frm1 (X : mword 64) :
+Lemma mn_frm1 `{XI : CurCtx} (X : mword 64) :
   add_vec (pa_stk X 20)
     (zero_extend' 64 (concat_vec (mword_of_int 19 : mword 6) ('b"000")))
   = pa_stk X 1.
 Proof. apply mn_frm. apply bv_eq; vm_compute; reflexivity. Qed.
 
-Lemma mn_frm2 (X : mword 64) :
+Lemma mn_frm2 `{XI : CurCtx} (X : mword 64) :
   add_vec (pa_stk X 20)
     (zero_extend' 64 (concat_vec (mword_of_int 18 : mword 6) ('b"000")))
   = pa_stk X 2.
@@ -246,7 +247,7 @@ Proof. apply mn_frm. apply bv_eq; vm_compute; reflexivity. Qed.
 
 (* K_sys_mknod's single premise, turned into every bound the four callees
    and the [sie_cap_gpr] pop want. *)
-Lemma mn_kb (K : nat) : (K_sys_mknod <= K)%nat ->
+Lemma mn_kb `{XI : CurCtx} (K : nat) : (K_sys_mknod <= K)%nat ->
   (K_create <= K - 20)%nat /\ (argstr_stack <= K - 20)%nat /\
   (K_begin_op <= K - 20)%nat /\ (K_end_op <= K - 20)%nat /\
   (K_iunlockput <= K - 20)%nat /\ (18 <= K - 20)%nat /\
@@ -257,25 +258,25 @@ Proof.
 Qed.
 
 (* the syscall argument index is in range, and [i = 0] is what a0 holds *)
-Lemma mn_arg0_lt : (0 < NARG)%nat.
+Lemma mn_arg0_lt `{XI : CurCtx} : (0 < NARG)%nat.
 Proof. unfold NARG. lia. Qed.
 
-Lemma mn_arg1_lt : (1 < NARG)%nat.
+Lemma mn_arg1_lt `{XI : CurCtx} : (1 < NARG)%nat.
 Proof. unfold NARG. lia. Qed.
 
-Lemma mn_arg2_lt : (2 < NARG)%nat.
+Lemma mn_arg2_lt `{XI : CurCtx} : (2 < NARG)%nat.
 Proof. unfold NARG. lia. Qed.
 
-Lemma mn_noff0 : (Z.of_nat 0 + 1 < 2 ^ 31)%Z.
+Lemma mn_noff0 `{XI : CurCtx} : (Z.of_nat 0 + 1 < 2 ^ 31)%Z.
 Proof. lia. Qed.
 
-Lemma mn_maxpath_lt : (Z.of_nat 128 < 2 ^ 31)%Z.
+Lemma mn_maxpath_lt `{XI : CurCtx} : (Z.of_nat 128 < 2 ^ 31)%Z.
 Proof. lia. Qed.
 
-Lemma mn_plen_lt (k : nat) : (k < 128)%nat -> (Z.of_nat k < 2 ^ 31)%Z.
+Lemma mn_plen_lt `{XI : CurCtx} (k : nat) : (k < 128)%nat -> (Z.of_nat k < 2 ^ 31)%Z.
 Proof. intro H. lia. Qed.
 
-Lemma mn_len_range (k : nat) : (k < 128)%nat -> (0 <= Z.of_nat k < 2 ^ 31)%Z.
+Lemma mn_len_range `{XI : CurCtx} (k : nat) : (k < 128)%nat -> (0 <= Z.of_nat k < 2 ^ 31)%Z.
 Proof.
   intro Hk.
   assert (E31 : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity). lia.
@@ -286,7 +287,7 @@ Qed.
    [-1] or a length below 128.  ProofSysChdir's cluster, restated here
    rather than imported (a whole-function proof file is not a dependency
    any other one may take). *)
-Lemma mn_sint_moi (z : Z) : (0 <= z < 2 ^ 31)%Z ->
+Lemma mn_sint_moi `{XI : CurCtx} (z : Z) : (0 <= z < 2 ^ 31)%Z ->
   sint (mword_of_int z : mword 64) = z.
 Proof.
   intro Hz.
@@ -300,7 +301,7 @@ Proof.
   lia.
 Qed.
 
-Lemma mn_nonneg (z : Z) : (0 <= z < 2 ^ 31)%Z ->
+Lemma mn_nonneg `{XI : CurCtx} (z : Z) : (0 <= z < 2 ^ 31)%Z ->
   zopz0zI_s (mword_of_int z : mword 64) (zero_reg : mword 64) = false.
 Proof.
   intro Hz. unfold zopz0zI_s. apply Z.ltb_ge.
@@ -308,12 +309,12 @@ Proof.
   rewrite (mn_sint_moi z Hz). lia.
 Qed.
 
-Lemma mn_m1_neg :
+Lemma mn_m1_neg `{XI : CurCtx} :
   zopz0zI_s (mword_of_int (-1) : mword 64) (zero_reg : mword 64) = true.
 Proof. vm_compute; reflexivity. Qed.
 
 (* create's live type premise at [ty := T_DEVICE] *)
-Lemma mn_tdev_nz : bv_unsigned SpecCreate.T_DEVICE <> 0.
+Lemma mn_tdev_nz `{XI : CurCtx} : bv_unsigned SpecCreate.T_DEVICE <> 0.
 Proof. vm_compute. discriminate. Qed.
 
 (* ===================================================================== *)
@@ -331,7 +332,7 @@ Section ProofSysMknodFrame.
      (the buffer's base, [s0-144]) down to slot 3 -- and the four that are
      not are ra (1), s0 (2), the two [int] locals sharing slot 19, and the
      padding slot 20 (the pushed sp itself, which nothing addresses). *)
-  Lemma mn_frame_carve (sp0 : mword 64) :
+  Lemma mn_frame_carve `{XI : CurCtx} (sp0 : mword 64) :
     stack_own (KTR := KT1) sp0 20 -∗
     ⌜forall i, (i < 16)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (18 - i)%nat)) 8 = true⌝ ∗
@@ -362,7 +363,7 @@ Section ProofSysMknodFrame.
     iFrame "H1 H2 H19 H20 Hb". iPureIntro. exact Hal.
   Qed.
 
-  Lemma mn_frame_join (sp0 : mword 64) (w1 w2 w19 w20 : mword 64) :
+  Lemma mn_frame_join `{XI : CurCtx} (sp0 : mword 64) (w1 w2 w19 w20 : mword 64) :
     (forall i, (i < 16)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (18 - i)%nat)) 8 = true) ->
     (pa_stk sp0 1) ↦₈[KT1] w1 -∗ (pa_stk sp0 2) ↦₈[KT1] w2 -∗
@@ -394,18 +395,18 @@ Section ProofSysMknodFrame.
 
   (* the buffer, as bytes and back: argstr / create both speak the
      [seq]-indexed byte window, not [bytes_own] *)
-  Lemma mn_bytes_name (a : mword 64) (N : nat) :
+  Lemma mn_bytes_name `{XI : CurCtx} (a : mword 64) (N : nat) :
     bytes_own (KTR := KT1) (DfracOwn 1) a N ⊢
     ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[KT1] f j.
   Proof. rewrite /bytes_own. exact (bb_any_named (KTR := KT1) a N). Qed.
 
-  Lemma mn_name_bytes (a : mword 64) (N : nat) (f : nat -> bv 8) :
+  Lemma mn_name_bytes `{XI : CurCtx} (a : mword 64) (N : nat) (f : nat -> bv 8) :
     ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[KT1] f j) ⊢ bytes_own (KTR := KT1) (DfracOwn 1) a N.
   Proof. rewrite /bytes_own. exact (bb_named_any (KTR := KT1) a N f). Qed.
 
   (* 128 = (k+1) + (127-k): create reads the NUL-terminated prefix, the rest
      rides through untouched *)
-  Lemma mn_buf_split (a : mword 64) (f : nat -> bv 8) (k : nat) :
+  Lemma mn_buf_split `{XI : CurCtx} (a : mword 64) (f : nat -> bv 8) (k : nat) :
     (k < 128)%nat ->
     ([∗ list] j ∈ seq 0 128, pa_add a j ↦ₘ[KT1] f j) -∗
     ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ[KT1] f j)
@@ -417,7 +418,7 @@ Section ProofSysMknodFrame.
     rewrite (bb_split a (S k) (127 - k)%nat f). iIntros "[$ $]".
   Qed.
 
-  Lemma mn_buf_join (a : mword 64) (f : nat -> bv 8) (k : nat) :
+  Lemma mn_buf_join `{XI : CurCtx} (a : mword 64) (f : nat -> bv 8) (k : nat) :
     (k < 128)%nat ->
     ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ[KT1] f j) -∗
     ([∗ list] j ∈ seq 0 (127 - k)%nat,
@@ -464,11 +465,11 @@ Definition hw_join (lo hi : mword 16) : mword 32 :=
    abstract child's device number is the trapframe word's low sixteen
    bits, i.e. [SpecSysMknodAU.dev_arg] on the nose.  The arithmetic is
    [FsAbsMknodFire.mkf_dev_arg]; this is it at [hw_lo]'s spelling. *)
-Lemma mn_dev_major (v : mword 64) :
+Lemma mn_dev_major `{XI : CurCtx} (v : mword 64) :
   bv_unsigned (hw_lo (arg_int32 v)) = dev_arg v.
 Proof. rewrite /hw_lo. apply mkf_dev_arg. Qed.
 
-Local Lemma nb_assemble2 (bs : list (bv 8)) (j : nat) :
+Local Lemma nb_assemble2 `{XI : CurCtx} (bs : list (bv 8)) (j : nat) :
   length bs = 2%nat -> (j < 2)%nat ->
   nth_byte (Z_to_bv 16 (assemble_bytes bs) : bv 16) j = bs !!! j.
 Proof.
@@ -476,7 +477,7 @@ Proof.
   change (Z.of_N 16) with 16%Z. change (Z.of_nat 2) with 2%Z. lia.
 Qed.
 
-Local Lemma nb_assemble4' (bs : list (bv 8)) (j : nat) :
+Local Lemma nb_assemble4' `{XI : CurCtx} (bs : list (bv 8)) (j : nat) :
   length bs = 4%nat -> (j < 4)%nat ->
   nth_byte (Z_to_bv 32 (assemble_bytes bs) : bv 32) j = bs !!! j.
 Proof.
@@ -484,28 +485,28 @@ Proof.
   change (Z.of_N 32) with 32%Z. change (Z.of_nat 4) with 4%Z. lia.
 Qed.
 
-Lemma nth_byte_hw_lo (w : mword 32) (j : nat) :
+Lemma nth_byte_hw_lo `{XI : CurCtx} (w : mword 32) (j : nat) :
   (j < 2)%nat -> nth_byte (hw_lo w) j = nth_byte w j.
 Proof.
   intro Hj. unfold hw_lo. rewrite nb_assemble2; [| reflexivity | exact Hj].
   destruct j as [|[|]]; cbn; first [reflexivity | lia].
 Qed.
 
-Lemma nth_byte_hw_hi (w : mword 32) (j : nat) :
+Lemma nth_byte_hw_hi `{XI : CurCtx} (w : mword 32) (j : nat) :
   (j < 2)%nat -> nth_byte (hw_hi w) j = nth_byte w (2 + j).
 Proof.
   intro Hj. unfold hw_hi. rewrite nb_assemble2; [| reflexivity | exact Hj].
   destruct j as [|[|]]; cbn; first [reflexivity | lia].
 Qed.
 
-Lemma nth_byte_hw_join_lo (lo hi : mword 16) (j : nat) :
+Lemma nth_byte_hw_join_lo `{XI : CurCtx} (lo hi : mword 16) (j : nat) :
   (j < 2)%nat -> nth_byte (hw_join lo hi) j = nth_byte lo j.
 Proof.
   intro Hj. unfold hw_join. rewrite nb_assemble4'; [| reflexivity | lia].
   destruct j as [|[|]]; cbn; first [reflexivity | lia].
 Qed.
 
-Lemma nth_byte_hw_join_hi (lo hi : mword 16) (j : nat) :
+Lemma nth_byte_hw_join_hi `{XI : CurCtx} (lo hi : mword 16) (j : nat) :
   (j < 2)%nat -> nth_byte (hw_join lo hi) (2 + j) = nth_byte hi j.
 Proof.
   intro Hj. unfold hw_join. rewrite nb_assemble4'; [| reflexivity | lia].
@@ -513,7 +514,7 @@ Proof.
 Qed.
 
 (* ---- the alignment halves, the 4/2 twins of [aligned8_aligned4] ---- *)
-Local Lemma z_rem4_rem2 (u : Z) : (0 <= u)%Z -> Z.rem u 4 = 0%Z -> Z.rem u 2 = 0%Z.
+Local Lemma z_rem4_rem2 `{XI : CurCtx} (u : Z) : (0 <= u)%Z -> Z.rem u 4 = 0%Z -> Z.rem u 2 = 0%Z.
 Proof.
   intros H0 H4.
   rewrite (Z.rem_mod_nonneg u 4 H0 ltac:(lia)) in H4.
@@ -522,7 +523,7 @@ Proof.
   destruct H4 as [k Hk]. exists (2 * k)%Z. lia.
 Qed.
 
-Local Lemma z_rem4_rem2_hi (u : Z) :
+Local Lemma z_rem4_rem2_hi `{XI : CurCtx} (u : Z) :
   (0 <= u)%Z -> Z.rem u 4 = 0%Z -> Z.rem (u + 2) 2 = 0%Z.
 Proof.
   intros H0 H4.
@@ -532,7 +533,7 @@ Proof.
   destruct H4 as [k Hk]. exists (2 * k + 1)%Z. lia.
 Qed.
 
-Local Lemma z_rem4_no_wrap (u : Z) :
+Local Lemma z_rem4_no_wrap `{XI : CurCtx} (u : Z) :
   (0 <= u < 18446744073709551616)%Z -> Z.rem u 4 = 0%Z ->
   (u + 2 < 18446744073709551616)%Z.
 Proof.
@@ -541,7 +542,7 @@ Proof.
   apply Z.mod_divide in H4; [| lia]. destruct H4 as [k Hk]. lia.
 Qed.
 
-Lemma pa_add_2_unsigned (a : Arch.pa) :
+Lemma pa_add_2_unsigned `{XI : CurCtx} (a : Arch.pa) :
   is_aligned_paddr (Physaddr a) 4 = true ->
   bv_unsigned (pa_add a 2) = (bv_unsigned a + 2)%Z.
 Proof.
@@ -561,7 +562,7 @@ Proof.
   split; [apply Z.add_nonneg_nonneg; [exact Hlo | discriminate] | exact Hnw].
 Qed.
 
-Lemma aligned4_aligned2 (a : Arch.pa) :
+Lemma aligned4_aligned2 `{XI : CurCtx} (a : Arch.pa) :
   is_aligned_paddr (Physaddr a) 4 = true -> is_aligned_paddr (Physaddr a) 2 = true.
 Proof.
   unfold is_aligned_paddr. rewrite !uint_unsigned.
@@ -570,7 +571,7 @@ Proof.
   apply (z_rem4_rem2 _ Hlo H4).
 Qed.
 
-Lemma aligned4_aligned2_hi (a : Arch.pa) :
+Lemma aligned4_aligned2_hi `{XI : CurCtx} (a : Arch.pa) :
   is_aligned_paddr (Physaddr a) 4 = true ->
   is_aligned_paddr (Physaddr (pa_add a 2)) 2 = true.
 Proof.
@@ -585,7 +586,7 @@ Section HalfWords.
   Context `{!riscvGS Σ, FSC : fscfg}.
   Context `{KTR : !CurKtier}.
 
-  Local Lemma big_sepL_seq_shift2 (P : nat -> iProp Σ) (o n : nat) :
+  Local Lemma big_sepL_seq_shift2 `{XI : CurCtx} (P : nat -> iProp Σ) (o n : nat) :
     ([∗ list] jj ∈ seq o n, P jj) ⊣⊢ ([∗ list] jj ∈ seq 0 n, P ((o + jj)%nat)).
   Proof.
     assert (Hf : seq o n = (Nat.add o) <$> seq 0 n).
@@ -593,7 +594,7 @@ Section HalfWords.
     rewrite Hf big_sepL_fmap. reflexivity.
   Qed.
 
-  Lemma word4_pointsto_split2 (a : Arch.pa) (dq : dfrac) (w : mword 32) :
+  Lemma word4_pointsto_split2 `{XI : CurCtx} (a : Arch.pa) (dq : dfrac) (w : mword 32) :
     a ↦₄{dq} w ⊢ a ↦₂{dq} hw_lo w ∗ (pa_add a 2) ↦₂{dq} hw_hi w.
   Proof.
     iIntros "[%Hal Hbs]".
@@ -612,7 +613,7 @@ Section HalfWords.
       rewrite pa_add_add. rewrite nth_byte_hw_hi; [reflexivity | lia].
   Qed.
 
-  Lemma word4_pointsto_join2 (a : Arch.pa) (dq : dfrac) (lo hi : mword 16) :
+  Lemma word4_pointsto_join2 `{XI : CurCtx} (a : Arch.pa) (dq : dfrac) (lo hi : mword 16) :
     is_aligned_paddr (Physaddr a) 4 = true ->
     a ↦₂{dq} lo -∗ (pa_add a 2) ↦₂{dq} hi -∗ a ↦₄{dq} hw_join lo hi.
   Proof.
@@ -1002,7 +1003,7 @@ Section ProofSysMknodBody.
   (* the per-slot projection out of the boot family, at the copy THIS
      contract names ([ic_escrows] is IcacheEscrow's -- see fs-sysfile's
      trap 3 on the four [ic_sleeplocks] copies, which bites the same way). *)
-  Lemma mn_esc_acc
+  Lemma mn_esc_acc `{XI : CurCtx}
       (k : nat) :
     (k < NINODE)%nat ->
     (ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗ ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k
@@ -1081,8 +1082,8 @@ Section ProofSysMknodBody.
     (* slot 19, carved into the two [int] cells.  The 8-alignment comes out
        FIRST -- the halves no longer carry it and the join wants it back
        (durable-notes, "A C LOCAL TAKEN BY ADDRESS"). *)
-    iDestruct (word_pointsto_aligned_p with "Hf19") as %Hal19.
-    iDestruct (word_pointsto_split4 with "Hf19") as "[Hmin Hmaj]".
+    iDestruct (ctx_word_pointsto_aligned_p with "Hf19") as %Hal19.
+    iDestruct (ctx_word_pointsto_split4 with "Hf19") as "[Hmin Hmaj]".
     assert (Hc1 : add_vec (M1 !!! Regidx csp_rs1 : mword 64)
                     (zero_extend' 64 (concat_vec (mword_of_int 19 : mword 6) ('b"000")))
                   = pa_stk sp0 1) by (rewrite HM1sp; apply mn_frm1).
@@ -1589,7 +1590,7 @@ Section ProofSysMknodBody.
                    (aligned8_aligned4 _ Hal19) with "Hminlo Hminhi") as "Hmin".
       iDestruct (word4_pointsto_join2 (KTR := KT1) _ _ _ _
                    (aligned8_aligned4_hi _ Hal19) with "Hmajlo Hmajhi") as "Hmaj".
-      iDestruct (word_pointsto_join4 _ _ _ _ Hal19 with "Hmin Hmaj") as "Hf19".
+      iDestruct (ctx_word_pointsto_join4 _ _ _ _ Hal19 with "Hmin Hmaj") as "Hf19".
       (* ============ +0x3a c.li a1,3 : T_DEVICE ============ *)
       iApply (wp_cli_s_sconf (CID := CID22) (mword_of_int (MN + 0x3a)) Ra1
                 (mword_of_int 3 : mword 6)
@@ -1980,7 +1981,7 @@ Section ProofSysMknodBody.
                         (sign_extend' 64 (mword_of_int 42 : mword 13))
                       = mword_of_int (MN + 0x58)) by pcw.
       iEval (rewrite Htg58) in "Hpc".
-      iDestruct (word_pointsto_join4 _ _ _ _ Hal19 with "Hmin Hmaj") as "Hf19".
+      iDestruct (ctx_word_pointsto_join4 _ _ _ _ Hal19 with "Hmin Hmaj") as "Hf19".
       iDestruct (proc_priv_bare_acc gf pj pid (us_upt U P') with "Hpriv")
         as "[Hpbare Hpback]".
       iDestruct (cpu_own_transport CID19 CID20 0 eb pj b

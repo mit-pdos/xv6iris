@@ -150,7 +150,7 @@ Section ProofGrowproc.
   (* =================================================================== *)
   (*  §2  The epilogue at +0x3c, entered by all five exits.               *)
   (* =================================================================== *)
-  Lemma gp_tail `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma gp_tail `{CID0 : CpuId}
       (m Mt : regfile) (av : nat) (rv : mword 64)
       (sp0 ra0 s00 s10 s20 : mword 64) (b : bool) (p : mword 64) :
     (4 <= av)%nat ->
@@ -166,10 +166,10 @@ Section ProofGrowproc.
     sie_cap_gpr KT1 Mt (av - 4)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.growproc + 0x3c) : mword 64) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) s20 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
@@ -357,7 +357,7 @@ Section ProofGrowproc.
      over the bare CELL rather than [proc_priv]: the block sits inside the
      accessor's window, and the three callers differ only in which
      descriptor and size they are about to close it at. *)
-  Lemma gp_store `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma gp_store `{CID0 : CpuId}
       (Ms : regfile) (av : nat) (p szold szv' : mword 64) (b : bool) :
     Ms !!! Regidx Ra1 = szv' ->
     Ms !!! Regidx Rs2 = p ->
@@ -675,10 +675,10 @@ Section ProofGrowproc.
         p_sz p ↦₈ szv' -∗
         p_pagetable p ↦₈ page_base (ud_root (pv_upt (us_V U))) -∗
         proc_ptm P' (uint szv') M' -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) s20 -∗
         WP (Loop : expr riscv_lang))%I
       with "[Hpback Hcont]" as "EXIT".
     { iIntros (CIDx Mf P' szv' rv M')

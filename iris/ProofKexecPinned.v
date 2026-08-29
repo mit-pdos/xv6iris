@@ -186,7 +186,7 @@ Section KexecPinnedWand.
 
   Notation Ra0 := (mword_of_int 10 : mword 5).
 
-  Lemma kxp_body_wand (Q : mword 64 -> Prop)
+  Lemma kxp_body_wand `{XI : CurCtx} (Q : mword 64 -> Prop)
       (jp : nat) (ga gf : gname) (bmapstart inodestart : Z)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)

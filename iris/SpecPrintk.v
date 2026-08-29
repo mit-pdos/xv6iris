@@ -97,12 +97,12 @@ Require Export PrintkArgs.
 Require Import SpecPanic.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 
 (* [pk_arg_desc] / [pk_desc_kind] / [pk_desc_res] / [pk_vararg] / [pk_pr_lock]
    are the CALLER's vocabulary and live in PrintkArgs.v, which this file
    [Require Export]s -- panic's spec needs them while sitting below this one.
-Require Import TsoCtx.
    Nothing that reached them through SpecPrintk.v has to change. *)
 
 (* printk's own frame is 24 slots ([addi sp,sp,-192] at 0x8000050a), over
@@ -294,10 +294,10 @@ Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CI
    a holder pays nothing beyond the standing platform/stdlib axioms. *)
 Definition printk_gen_contract `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId}
     {kt : ktier} (γpr : gname) (γd : uart_names) (γv : disk_names) : Prop :=
-  forall (CIDp : CpuId)
+  forall (CIDp : CpuId) (XIp : CurCtx)
     (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64)
     (dqf : dfrac) (f : string) (descs : list pk_arg_desc) (b : bool) (lks : gset string),
-    wp_printk_gen_sconf_body kt (CID := CIDp) γpr γd γv m0 K eb pj dqf f descs b lks.
+    wp_printk_gen_sconf_body kt (CID := CIDp) (XI := XIp) γpr γd γv m0 K eb pj dqf f descs b lks.
 
 Module Type PRINTK_GEN.
   Parameter wp_printk_gen_sconf :

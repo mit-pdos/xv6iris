@@ -67,7 +67,7 @@ Section SpecFilealloc.
      used to make ([FileInvDefs.fdstate_ok]), and the caller reads the
      content off the reference when it opens it ([ProofSysOpenParts.
      so_open_slot]) rather than being handed a name for it here. *)
-  Definition filealloc_post (γf : gname) (r : mword 64) : iProp Σ :=
+  Definition filealloc_post `{XI : CurCtx} (γf : gname) (r : mword 64) : iProp Σ :=
     (⌜r = (zero_reg : mword 64)⌝ ∗ fd_slot
      ∨ ∃ k : nat,
          ⌜(k < NFILE)%nat /\ r = fnode k⌝ ∗ file_ref γf k 1 FdClosed)%I.

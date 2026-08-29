@@ -32,10 +32,10 @@ Require Import ExecCommon.
 Require Import WpGprMret.
 Require Import RiscvExtras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 (* sret_ms1..5 / sret_newpriv / ret_pc -- the post-execute CSR tower this
    WP produces -- live with their bit theory in MstatusBits.v. *)
 Local Open Scope Z_scope.
-Require Import TsoCtx.
 Import Defs.
 
 (* ===================================================================== *)

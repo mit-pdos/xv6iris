@@ -388,7 +388,7 @@ Section Ut56.
       by (rewrite /M5 upd_ne; [exact HM4s1 | reg_neq]).
     assert (HcsM5 : ut_cs m0 M5)
       by (rewrite /M5; apply ut_cs_insert; [vm_compute; reflexivity | exact HcsM4]).
-    iApply (Hpk CID M5 nx false (un_pj N) DfracDiscarded ut_fmt1
+    iApply (Hpk CID XI M5 nx false (un_pj N) DfracDiscarded ut_fmt1
               ut_fmt1_descs false lks ltac:(lia) ut_fmt1_len ut_fmt1_nonul
               ut_fmt1_kinds ut_fmt1_ndescs
               with "Hcg Htext Hkd Hpc Hcpu Hpenv [Hf1] []").
@@ -499,7 +499,7 @@ Section Ut56.
       apply ut_cs_insert; [vm_compute; reflexivity |].
       apply ut_cs_insert; [vm_compute; reflexivity |].
       apply ut_cs_insert; [vm_compute; reflexivity | exact HcsP1']. }
-    iApply (Hpk CID MA nx false (un_pj N) DfracDiscarded ut_fmt2
+    iApply (Hpk CID XI MA nx false (un_pj N) DfracDiscarded ut_fmt2
               ut_fmt2_descs false lks ltac:(lia) ut_fmt2_len ut_fmt2_nonul
               ut_fmt2_kinds ut_fmt2_ndescs
               with "Hcg Htext Hkd Hpc Hcpu Hpenv [Hf2] []").

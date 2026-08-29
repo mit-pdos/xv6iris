@@ -60,10 +60,11 @@ Local Open Scope Z_scope.
 Ltac rgall := repeat (rewrite rget_ne; [| vm_compute; discriminate]).
 Require Import VirtioDiskRwDefs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
+Require TsoCtxShim.   (* ↦₄ splits cross the seam *)
 
 Module VirtioDiskRwPhases (Acquire : ACQUIRE) (Release : RELEASE)
                           (Sleep : SLEEP) (FreeDesc : FREEDESC).
-Require Import TsoCtx.
 
 Section ProofVirtioDiskRw.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ}.
@@ -539,13 +540,12 @@ Section ProofVirtioDiskRw.
       by (rewrite /R11; apply upd_eq).
     iDestruct (cpu_own_transport CID CIDp21 0 eb pj eb ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Acquire.wp_acquire_sconf KT1 γk "virtio_disk"%string
-              (disk_res γd pd pav pu) R11 0%nat eb pj (K - 12)%nat eb lks
+    iApply (Acquire.wp_acquire_sconf KT1 γk "virtio_disk"%string <{ disk_res γd pd pav pu }> R11 0%nat eb pj (K - 12)%nat eb lks
               vdrw_noff0 ltac:(pose proof (vdrw_K10 K HK); lia) Hfresh
               with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { rgall. iEval (rewrite HR11a0). iExact "Hlk". }
-    iIntros (CIDaq Hsaq ms M) "_ Hcg Hpc %HcsM Htok HR Hown Hpay".
+    iIntros (CIDaq Hsaq ms M) "_ Hcg Hpc %HcsM Htok HR _ Hown Hpay".
     (* THE COMPLEMENT RIDES ALONG, UNTOUCHED, THROUGH THE WHOLE PROLOGUE --
        transport it to the acquire-return hart in ONE step, using exactly the
        chain of per-instruction guards [cpu_own_transport] above already
@@ -1243,11 +1243,19 @@ Section ProofVirtioDiskRw.
        pa_stk sp0 11 ↦₄[KT1] v2 ∗ pa_add (pa_stk sp0 11) 4 ↦₄[KT1] vp).
   Proof.
     iIntros "H". iDestruct "H" as (w11 w12) "[H11 H12]".
+    iDestruct (TsoCtxShim.ctx_word_to_mem with "H11") as "H11".
+    iDestruct (TsoCtxShim.ctx_word_to_mem with "H12") as "H12".
     iDestruct (word_pointsto_aligned_p with "H11") as %Hal11.
     iDestruct (word_pointsto_aligned_p with "H12") as %Hal12.
     iSplitR; [ iPureIntro; split; [exact Hal11 | exact Hal12] |].
-    rewrite !word_pointsto_split4.
+    iEval (rewrite word_pointsto_split4) in "H11".
+    iEval (rewrite word_pointsto_split4) in "H12".
     iDestruct "H11" as "[H11lo H11hi]". iDestruct "H12" as "[H12lo H12hi]".
+    (* M1 stage 2: the four halves face a flipped 4-byte statement *)
+    iDestruct (TsoCtxShim.ctx_word4_of_mem with "H11lo") as "H11lo".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem with "H11hi") as "H11hi".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem with "H12lo") as "H12lo".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem with "H12hi") as "H12hi".
     iExists (word_lo w12), (word_hi w12), (word_lo w11), (word_hi w11).
     iFrame "H12lo H12hi H11lo H11hi".
   Qed.

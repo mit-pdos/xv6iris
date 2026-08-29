@@ -24,6 +24,7 @@ Require Import PtBuild KvmSpec.
 Require Import ProcPt.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 
 (* [p->trapframe] -- the only field of the process this function reads -- is
@@ -34,7 +35,6 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
    tables the TRAMPOLINE walk builds (TRAPFRAME shares both -- see
    ProcPt.ppt_missing_tf_zero). *)
 Notation K_proc_pagetable := (3%nat) (only parsing).
-Require Import TsoCtx.
 (* WHAT proc_pagetable RETURNS, with the resources that go with it.  [rv] is
    the returned pointer -- a0 at the [ret], and s1 at the +0x4c join where
    all four exits meet (the two error tails both end [li s1,0; j +0x4c], and

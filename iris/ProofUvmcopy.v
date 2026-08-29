@@ -94,8 +94,8 @@ Require Import SpecUvmcopy.
 Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 
 (* ===================================================================== *)
 (* SS1  uvmcopy's OWN pure arithmetic, and the A/D bridge.                *)
@@ -332,7 +332,7 @@ Section UvmcopyDefs.
      resource carrying its OWN entry hart [CID0] (not the section's ambient
      one), re-anchored at each call site via [wp_next_shift] rather than
      being consumed at the hart it was built at. *)
-  Definition uc_exit `{CID0 : CpuId} `{XI : CurCtx} (mm : regfile)
+  Definition uc_exit `{CID0 : CpuId} (mm : regfile)
       (Pold Pnew : uptd) (szold sznew : Z) (Mold Mnew : gmap Z (bv 8))
       (vpn0 : mword 27) (n K : nat) (eb : bool)
       (p : mword 64) (spr : mword 64) (ilvl : nat) (b : bool) (lks : gset string) : iProp Σ :=
@@ -478,7 +478,7 @@ Section ProofUvmcopy.
      at), not the section's ambient one.  [SpecUvmunmap.v]'s entry-side tp
      premise is gone (HartTp.v -- the map's tp slot is IGNORED), so no
      re-tagging is needed before the Uvmunmap call below. *)
-  Local Lemma uc_err `{CID0 : CpuId} `{XI : CurCtx} (γa : gname) (mm : regfile)
+  Local Lemma uc_err `{CID0 : CpuId} (γa : gname) (mm : regfile)
       (Pold Pnew Pj : uptd) (szold sznew : Z)
       (Mold Mnew Mj : gmap Z (bv 8))
       (vpn0 : mword 27) (n j : nat) (K : nat)

@@ -124,8 +124,8 @@ Section WpSconfLock.
   (* [lock_openable] is PERSISTENT, so one open-peek-close delivers both    *)
   (* fields' claims and hands the caller's credential straight back.        *)
   (* ==================================================================== *)
-  Lemma lock_claims `{XI : TsoCtx.CurCtx} (γl : gname) (lk : mword 64) (str : string)
-      (R T Dc : iProp Σ) (E : coPset) :
+  Lemma lock_claims (γl : gname) (lk : mword 64) (str : string)
+      (R : TsoCtx.CtxId -> iProp Σ) (T Dc : iProp Σ) (E : coPset) :
     ↑lockN ⊆ E ->
     (⊢ T -∗ Dc -∗ False) ->
     lock_openable γl lk str R Dc -∗ T ={E}=∗
@@ -133,14 +133,23 @@ Section WpSconfLock.
       wordw_claim (KTR := KT0) 8 (lock_cpu lk) ∗ T.
   Proof.
     intros HE Href. iIntros "#Hlock HT".
-    iMod ("Hlock" $! E T with "[%] [] HT")
+    (* §0.38'/A6.109: the handle's floor is HOISTED out of the accessor, so
+       unbundle it once here and open through the accessor proper. *)
+    iDestruct (WpLock.lock_openable_parts with "Hlock") as (lo) "[#Hfl #Hopen]".
+    iMod ("Hopen" $! E T with "[%] [] HT")
       as "(Hbody & HT & [Hclose _])"; [ exact HE | iApply Href | ].
     iDestruct "Hbody" as (w st) "(>Hword & >Hcpu & >Hg & Hbr)".
+    (* M1: both cells are the flipped towers now; [wordw_claim_of] faces the
+       raw leaf window, so cross with the width bridges. *)
+    iEval (rewrite /lock_word -(wordw4_ctx (KTR2 := KT0))) in "Hword".
     iDestruct (wordw_claim_of (KTR := KT0) 4 lk (DfracOwn 1) w ltac:(lia)
                  with "Hword") as "#Hc4".
+    iEval (rewrite (wordw4_ctx (KTR2 := KT0)) -/lock_word) in "Hword".
     iEval (rewrite /lk_cpu_res) in "Hcpu". iDestruct "Hcpu" as "[Hcell Hfr]".
+    iEval (rewrite -(wordw8_ctx (KTR2 := KT0))) in "Hcell".
     iDestruct (wordw_claim_of (KTR := KT0) 8 (lock_cpu lk) (DfracOwn 1)
                  (lk_cpu_val st) ltac:(lia) with "Hcell") as "#Hc8".
+    iEval (rewrite (wordw8_ctx (KTR2 := KT0))) in "Hcell".
     iMod ("Hclose" with "[Hword Hcell Hfr Hg Hbr]") as "_".
     { iNext. iExists w, st. iFrame "Hword Hg Hbr".
       rewrite /lk_cpu_res. iFrame "Hcell Hfr". }
@@ -193,15 +202,16 @@ Section WpSconfLock.
               ltac:(solve_ndisj) with "Hcg Hpc Hinstr [] [HTc] [Hcont]").
     { replace (add_vec (rget m rs1) (sign_extend' 64 imm)) with lk
         by (symmetry; exact Hpalk). iExact "Hc4". }
-    { iMod ("Hlock" $! (⊤ ∖ ↑minstretN) Tc with "[%] [] HTc")
+    iDestruct (WpLock.lock_openable_parts with "Hlock") as (lo) "[#Hfl #Hopen]".
+    { iMod ("Hopen" $! (⊤ ∖ ↑minstretN) Tc with "[%] [] HTc")
         as "(Hbody & HTc & [Hclose _])"; [solve_ndisj| iApply Href |].
       iDestruct "Hbody" as (w st) "(>Hword & Hrest)".
       iModIntro. iExists w.
-      iSplitL "Hword"; [ rewrite /lock_word -Hpalk; iExact "Hword" | ].
+      iSplitL "Hword"; [ rewrite /lock_word -Hpalk -(wordw4_ctx (KTR2 := KT0)); iExact "Hword" | ].
       iIntros "Hword".
       iMod ("Hclose" with "[Hword Hrest]") as "_".
       { iNext. iExists w, st.
-        iSplitL "Hword"; [ rewrite /lock_word -Hpalk; iExact "Hword" | iExact "Hrest" ]. }
+        iSplitL "Hword"; [ rewrite /lock_word -Hpalk -(wordw4_ctx (KTR2 := KT0)); iExact "Hword" | iExact "Hrest" ]. }
       iModIntro. iExact "HTc". }
     iIntros (v). iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc HTc".
     iApply ("Hcont" $! v CID1 with "[] HTc Hcg Hpc").
@@ -258,17 +268,18 @@ Section WpSconfLock.
               ltac:(solve_ndisj) with "Hcg Hpc Hinstr [] [Htok] [Hcont]").
     { replace (add_vec (rget m rs1) (sign_extend' 64 imm)) with lk
         by (symmetry; exact Hpalk). iExact "Hc4". }
-    { iMod ("Hlock" $! (⊤ ∖ ↑minstretN) (locked γl h0) with "[%] [] Htok")
+    iDestruct (WpLock.lock_openable_parts with "Hlock") as (lo) "[#Hfl #Hopen]".
+    { iMod ("Hopen" $! (⊤ ∖ ↑minstretN) (locked γl h0) with "[%] [] Htok")
         as "(Hbody & Htok & [Hclose _])"; [solve_ndisj| iApply Href |].
       iDestruct "Hbody" as (w st) "(>Hword & >Hcpu & >Hg & Hbr)".
       iDestruct (locked_state with "Hg Htok") as %Hst.
       iDestruct "Hbr" as "[(>%Hnone & _) | (_ & >%Hwnz)]"; [ congruence | ].
       iModIntro. iExists w.
-      iSplitL "Hword"; [ rewrite /lock_word -Hpalk; iExact "Hword" | ].
+      iSplitL "Hword"; [ rewrite /lock_word -Hpalk -(wordw4_ctx (KTR2 := KT0)); iExact "Hword" | ].
       iIntros "Hword".
       iMod ("Hclose" with "[Hword Hcpu Hg]") as "_".
       { iNext. iExists w, st. iFrame "Hcpu Hg".
-        iSplitL "Hword"; [ rewrite /lock_word -Hpalk; iExact "Hword" | ].
+        iSplitL "Hword"; [ rewrite /lock_word -Hpalk -(wordw4_ctx (KTR2 := KT0)); iExact "Hword" | ].
         iRight. iPureIntro. split; [ rewrite Hst; discriminate | exact Hwnz ]. }
       iModIntro. iFrame "Htok". iPureIntro. exact Hwnz. }
     iIntros (v). iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc (%Hvnz & Htok)".
@@ -292,7 +303,7 @@ Section WpSconfLock.
      already dead.  It could not be anything else -- an object's last
      reference has necessarily gone home by the time release runs. *)
   Lemma wp_sw_zero_lockfin_s_sconf
-      (γl : gname) (lk : mword 64) (s : string) (R Dc Out : iProp Σ)
+      (γl : gname) (lk : mword 64) (s : string) (R : TsoCtx.CtxId -> iProp Σ) (Dc Out : iProp Σ)
       (pc : mword 64) (rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -303,7 +314,9 @@ Section WpSconfLock.
     instr pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 4)) -∗
     lock_openable γl lk s R Dc -∗
     locked_pre γl cpu_id -∗
-    R -∗
+    (* the finisher takes the PARKED RECORD (§0.18'); the deposit is the
+       caller's, not this leaf's.  [tso WpSconfLock.v:311]. *)
+    (lock_pay R) -∗
     lock_finisher γl lk s R Dc Out (⊤ ∖ ↑minstretN) -∗
     wp_next b p (fun (CID : CpuId) =>
       Out -∗
@@ -341,7 +354,8 @@ Section WpSconfLock.
               ltac:(solve_ndisj) with "Hcg Hpc Hinstr [] [Htok HRes Hfin] [Hcont]").
     { replace (add_vec (rget m rs1) (sign_extend' 64 imm)) with lk
         by (symmetry; exact Hpalk). iExact "Hc4". }
-    { iMod ("Hlock" $! (⊤ ∖ ↑minstretN) (locked_pre γl cpu_id) with "[%] [] Htok")
+    iDestruct (WpLock.lock_openable_parts with "Hlock") as (lo) "[#Hfl #Hopen]".
+    { iMod ("Hopen" $! (⊤ ∖ ↑minstretN) (locked_pre γl cpu_id) with "[%] [] Htok")
         as "(Hbody & Htok & Hchoice)"; [solve_ndisj| iApply Href |].
       iDestruct "Hbody" as (w st) "(>Hword & >Hcpu & >Hg & Hbr)".
       iMod (lock_give γl st cpu_id with "Hg Htok") as "(%Hst & Hg & Hfrag)".
@@ -351,10 +365,10 @@ Section WpSconfLock.
          at 0 -- the finisher's view of it is unchanged (WpLock.v). *)
       iEval (rewrite lk_cpu_res_win) in "Hcpu".
       iModIntro. iExists w.
-      iSplitL "Hword"; [ rewrite /lock_word -Hpalk; iExact "Hword" | ].
+      iSplitL "Hword"; [ rewrite /lock_word -Hpalk -(wordw4_ctx (KTR2 := KT0)); iExact "Hword" | ].
       iIntros "Hword".
-      iApply ("Hfin" with "Hchoice Hg Hfrag [Hword] Hcpu HRes").
-      rewrite -Hzero -Hpalk. iExact "Hword". }
+      iApply ("Hfin" $! lo with "Hchoice Hg Hfrag [Hword] Hcpu HRes").
+      rewrite -Hzero -Hpalk (wordw4_ctx (KTR2 := KT0)). iExact "Hword". }
     iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc HOut".
     iApply ("Hcont" $! CID1 with "[] HOut Hcg Hpc").
     iPureIntro. exact Hs1.
@@ -420,7 +434,8 @@ Section WpSconfLock.
               ltac:(solve_ndisj) with "Hcg Hpc Hinstr [] [HT] [Hcont]").
     { replace (add_vec (rget m rs1) (sign_extend' 64 imm)) with (lock_cpu lk)
         by (symmetry; exact Hpacpu). iExact "Hc8". }
-    { iMod ("Hlock" $! (⊤ ∖ ↑minstretN) T with "[%] [] HT")
+    iDestruct (WpLock.lock_openable_parts with "Hlock") as (lo) "[#Hfl #Hopen]".
+    { iMod ("Hopen" $! (⊤ ∖ ↑minstretN) T with "[%] [] HT")
         as "(Hbody & HT & [Hclose _])"; [solve_ndisj| iApply Href |].
       iDestruct "Hbody" as (w st) "(>Hword & >Hcpures & >Hg & Hbr)".
       (* the invariant owns the cell WHOLE in every state, so the AU's [dqm],
@@ -431,8 +446,12 @@ Section WpSconfLock.
       iDestruct "Hcpures" as "[Hcpu Hrest]".
       iDestruct (Hview st with "Hg Hrest HT") as %Hphi.
       iModIntro. iExists (lk_cpu_val st).
+      (* the leaf's window is the raw one, the invariant's cell the flipped
+         [↦₈]: one named crossing each way ([WpSconfMem.wordw8_ctx]). *)
+      iEval (rewrite -(wordw8_ctx (KTR2 := KT0))) in "Hcpu".
       iSplitL "Hcpu"; [ rewrite -Hpacpu; iExact "Hcpu" | ].
       iIntros "Hcpu".
+      iEval (rewrite (wordw8_ctx (KTR2 := KT0))) in "Hcpu".
       iMod ("Hclose" with "[Hword Hcpu Hrest Hg Hbr]") as "_".
       { iNext. iExists w, st. iFrame "Hword Hg Hbr".
         rewrite /lk_cpu_res. iFrame "Hrest".
@@ -670,15 +689,20 @@ Section WpSconfLock.
               ltac:(solve_ndisj) with "Hcg Hpc Hinstr [] [HT] [Hcont]").
     { replace (add_vec (rget m rs1) (sign_extend' 64 imm)) with (lock_cpu lk)
         by (symmetry; exact Hpacpu). iExact "Hc8". }
-    { iMod ("Hlock" $! (⊤ ∖ ↑minstretN) T with "[%] [] HT")
+    iDestruct (WpLock.lock_openable_parts with "Hlock") as (lo) "[#Hfl #Hopen]".
+    { iMod ("Hopen" $! (⊤ ∖ ↑minstretN) T with "[%] [] HT")
         as "(Hbody & HT & [Hclose _])"; [solve_ndisj| iApply Href |].
       iDestruct "Hbody" as (w st) "(>Hword & >Hcpures & >Hg & Hbr)".
       iMod (Hupd st with "Hg Hcpures HT")
         as "(%Hstne & %Hstnne & Hg & Hcpu & Hback)".
       iDestruct "Hbr" as "[(>%Hnone & _) | (_ & >%Hwnz)]"; [ congruence | ].
       iModIntro. iExists (lk_cpu_val st).
+      (* the leaf's window is the raw one, the invariant's cell the flipped
+         [↦₈]: one named crossing each way ([WpSconfMem.wordw8_ctx]). *)
+      iEval (rewrite -(wordw8_ctx (KTR2 := KT0))) in "Hcpu".
       iSplitL "Hcpu"; [ rewrite -Hpacpu; iExact "Hcpu" | ].
       iIntros "Hcpu".
+      iEval (rewrite (wordw8_ctx (KTR2 := KT0))) in "Hcpu".
       iMod ("Hback" with "[Hcpu]") as "[Hcpures HT']".
       { rewrite Hsv -Hpacpu. iExact "Hcpu". }
       iMod ("Hclose" with "[Hword Hcpures Hg]") as "_".
@@ -913,7 +937,7 @@ Section WpSconfLock.
         Tc -∗
         sie_cap_gpr kt (<[Regidx rd := regval_into_reg (amoswap_loaded w)]> m) n b p -∗
         pc_is (add_vec_int pc 4) -∗
-        (⌜w = (mword_of_int 0 : mword 32)⌝ ∗ locked_pre γl h0 ∗ R
+        (⌜w = (mword_of_int 0 : mword 32)⌝ ∗ locked_pre γl h0 ∗ (lock_pay R)
          ∨ ⌜neq_vec (sign_extend' 64 w) zero_reg = true⌝) -∗
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
@@ -928,7 +952,7 @@ Section WpSconfLock.
                    ⌜npc = add_vec_int pc 4⌝ ∗
                    ⌜m' = <[Regidx rd := regval_into_reg (amoswap_loaded w)]> m⌝ ∗
                    ⌜n' = n⌝ ∗ Tc ∗
-                   (⌜w = (mword_of_int 0 : mword 32)⌝ ∗ locked_pre γl h0 ∗ R
+                   (⌜w = (mword_of_int 0 : mword 32)⌝ ∗ locked_pre γl h0 ∗ (lock_pay R)
                     ∨ ⌜neq_vec (sign_extend' 64 w) zero_reg = true⌝))%I
               with "Hcg Hpc Hinstr [HTc Hcont]").
     iNext.
@@ -958,7 +982,8 @@ Section WpSconfLock.
       subst misa0.
       (* ---- PEEK: the lock word's own claim, then close again ---- *)
       iApply (swp_fupd (CID := CID)).
-      iMod ("Hlock" $! ⊤ Tc with "[%] [] HTc")
+      iDestruct (WpLock.lock_openable_parts with "Hlock") as (lo) "[#Hfl #Hopen]".
+      iMod ("Hopen" $! ⊤ Tc with "[%] [] HTc")
         as "(Hbody & HTc & [Hclose _])"; [solve_ndisj | iApply Href |].
       iDestruct "Hbody" as (w0 st0) "(>Hw & Hcpu & Hg & Hbr)".
       iEval (rewrite /lock_word -Hpalk) in "Hw".
@@ -968,9 +993,11 @@ Section WpSconfLock.
       iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hb") as "[Hb0 Hbcl]".
       { rewrite lookup_seq_lt; [reflexivity | lia]. }
       iEval (rewrite pa_add_0) in "Hb0".
+      iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hb0") as "Hb0".
       iDestruct (mem_pointsto_acc with "Hb0")
         as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
       iDestruct ("Href0" with "Hp0") as "Hb0".
+      iDestruct (TsoCtxShim.ctx_pointsto_of_mem with "Hb0") as "Hb0".
       iEval (rewrite -(pa_add_0 pa)) in "Hb0".
       iDestruct ("Hbcl" with "Hb0") as "Hb".
       iMod ("Hclose" with "[Hb Hcpu Hg Hbr]") as "_".
@@ -1015,7 +1042,7 @@ Section WpSconfLock.
                     (fun _ => Tc)
                     (fun bytes => Tc ∗
                        (⌜bytes = (mword_of_int 0 : mword 32)⌝ ∗
-                          locked_pre γl h0 ∗ R
+                          locked_pre γl h0 ∗ (lock_pay R)
                         ∨ ⌜neq_vec (sign_extend' 64 bytes) zero_reg = true⌝))%I
                     (sr_swp_res (strans_regime (CID := CID))) rr
                     (sr_swp_mode (strans_regime (CID := CID)) satp0)
@@ -1055,14 +1082,16 @@ Section WpSconfLock.
           - (* the exclusive READ node: open the invariant, read, close *)
             iIntros (sigma) "Hsi".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
-            iMod ("Hlock" $! ⊤ Tc with "[%] [] HTc")
+            iMod ("Hopen" $! ⊤ Tc with "[%] [] HTc")
               as "(Hbody & HTc & [Hcl _])"; [solve_ndisj | iApply Href |].
             iDestruct "Hbody" as (v1 st1) "(>Hw & Hcpu & Hg & Hbr)".
-            iEval (rewrite /lock_word -Hpalk /word4_pointsto) in "Hw".
+            iEval (rewrite /lock_word -Hpalk /ctx_word4_pointsto) in "Hw".
             iDestruct "Hw" as "[%Hal1 Hb]".
+            iDestruct (TsoCtxShim.ctx_buf_to_mem with "Hb") as "Hbm".
             iDestruct (s_mem_chunk sigma pa pa 0 4 4 (nth_byte v1) ppn
                          (DfracOwn 1) ltac:(lia) ltac:(lia) (fun k => eq_refl)
-                         Hoff Hcan with "Hmem Hk Hb") as %(Hbf & _ & _ & _).
+                         Hoff Hcan with "Hmem Hk Hbm") as %(Hbf & _ & _ & _).
+            iDestruct (TsoCtxShim.ctx_buf_of_mem with "Hbm") as "Hb".
             iMod ("Hcl" with "[Hb Hcpu Hg Hbr]") as "_".
             { iNext. iExists v1, st1. iFrame "Hcpu Hg Hbr".
               rewrite /lock_word -Hpalk /word4_pointsto. iFrame "Hb".
@@ -1076,27 +1105,29 @@ Section WpSconfLock.
           - (* the conditional WRITE node *)
             iIntros (bytes) "HTc". iIntros (sigma) "%Hrb Hsi".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
-            iMod ("Hlock" $! ⊤ Tc with "[%] [] HTc")
+            iMod ("Hopen" $! ⊤ Tc with "[%] [] HTc")
               as "(Hbody & HTc & [Hcl _])"; [solve_ndisj | iApply Href |].
             iDestruct "Hbody" as (v2 st2) "(>Hw & >Hcpu & >Hg & Hbr)".
-            iEval (rewrite /lock_word -Hpalk /word4_pointsto) in "Hw".
+            iEval (rewrite /lock_word -Hpalk /ctx_word4_pointsto) in "Hw".
             iDestruct "Hw" as "[%Hal2 Hb]".
+            iDestruct (TsoCtxShim.ctx_buf_to_mem with "Hb") as "Hbm".
             iDestruct (s_mem_chunk sigma pa pa 0 4 4 (nth_byte v2) ppn
                          (DfracOwn 1) ltac:(lia) ltac:(lia) (fun k => eq_refl)
-                         Hoff Hcan with "Hmem Hk Hb") as %(Hbf2 & _ & _ & _).
+                         Hoff Hcan with "Hmem Hk Hbm") as %(Hbf2 & _ & _ & _).
+            iDestruct (TsoCtxShim.ctx_buf_of_mem with "Hbm") as "Hb".
             assert (Hv2 : v2 = bytes).
             { pose proof (read_bytes_of_bytes sigma.(mem) (pa_of ppn pa) 4 v2
                             Hbf2) as Hr2.
               rewrite Hr2 in Hrb. by injection Hrb. }
             subst v2.
-            iDestruct (word4_pointsto_intro pa (DfracOwn 1) bytes Hal2
+            iDestruct (ctx_word4_pointsto_intro cur_ctx pa (DfracOwn 1) bytes Hal2
                          with "Hb") as "Hw".
             iMod (word4_pointsto_write_c sigma.(mem) pa ppn bytes
                     (amoswap_stored (rget m rs2)) Hcan Hoff
                     with "Hk Hmem Hw") as "[Hmem Hw]".
             iAssert (|={⊤ ∖ ↑lockN, ⊤}=>
                        (⌜bytes = (mword_of_int 0 : mword 32)⌝ ∗
-                          locked_pre γl h0 ∗ ▷ R
+                          locked_pre γl h0 ∗ ▷ (lock_pay R)
                         ∨ ⌜neq_vec (sign_extend' 64 bytes) zero_reg = true⌝))%I
               with "[Hw Hcpu Hg Hbr Hcl]" as ">Hpay".
             { iDestruct "Hbr" as "[(>%Hnone & >%Hw0 & >Hfrag2 & HR) |
@@ -1108,7 +1139,7 @@ Section WpSconfLock.
                                  (Some (h0, false)).
                   iFrame "Hg".
                   iSplitL "Hw";
-                    [ rewrite /lock_word -Hpalk; iExact "Hw" | ].
+                    [ rewrite /lock_word -Hpalk -(wordw4_ctx (KTR2 := KT0)); iExact "Hw" | ].
                   iSplitL "Hcpu";
                     [ rewrite lk_cpu_res_win -lk_cpu_res_free; iExact "Hcpu" | ].
                   iRight. iPureIntro. split; [discriminate | exact Hstz]. }
@@ -1117,7 +1148,7 @@ Section WpSconfLock.
                 { iNext. iExists (amoswap_stored (rget m rs2)), st2.
                   iFrame "Hg Hcpu".
                   iSplitL "Hw";
-                    [ rewrite /lock_word -Hpalk; iExact "Hw" | ].
+                    [ rewrite /lock_word -Hpalk -(wordw4_ctx (KTR2 := KT0)); iExact "Hw" | ].
                   iRight. iPureIntro. split; [exact Hsome | exact Hstz]. }
                 iModIntro. iRight. iPureIntro. exact Hwnz. }
             iMod (fupd_mask_subseteq ∅) as "Hclm"; [set_solver|].

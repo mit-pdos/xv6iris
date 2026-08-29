@@ -59,8 +59,9 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Require TsoCtxShim.   (* ↦₄ split/join cross the seam *)
+Import Defs.
 Local Open Scope Z_scope.
 
 (* a failing tactic in a whole-function WP over [proc_priv] otherwise spends
@@ -130,7 +131,7 @@ Section ProofSysClose.
      The premise is local to this helper: every call site sits inside the
      capstone, whose [<fn>_stack <= av] premise is already unfolded, so it is
      a [lia].) *)
-  Lemma sc_sp_bounds `{CID0 : CpuId} `{XI : CurCtx} (m : regfile) (k : nat)
+  Lemma sc_sp_bounds `{CID0 : CpuId} (m : regfile) (k : nat)
       (b : bool) (pp : mword 64) :
     (0 < k)%nat ->
     sie_cap_gpr KT1 m k b pp -∗
@@ -152,7 +153,7 @@ Section ProofSysClose.
      64)] (sie_cap_gpr's explicit process pointer), and its continuation
      wrapped in [wp_next].  It does NOT carry [cpu_own]: the epilogue never
      touches it, so the caller transports it afterwards. *)
-  Lemma sc_tail `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma sc_tail `{CID0 : CpuId}
       (m Mt : regfile) (av : nat) (rv : mword 64)
       (sp0 ra0 s00 : mword 64) (w3 w4 : bv 64) (b : bool) (pp : mword 64) :
     (4 <= av)%nat ->
@@ -166,10 +167,10 @@ Section ProofSysClose.
     sie_cap_gpr KT1 Mt (av - 4)%nat b pp -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.sys_close + 0x3a) : mword 64) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) w3 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) w3 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) w4 -∗
     wp_next (CID0 := CID0) b pp (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx (mword_of_int 10 : mword 5) = rv⌝ -∗
@@ -523,8 +524,12 @@ Section ProofSysClose.
     assert (Hnzfd : M6 !!! Regidx (mword_of_int 11 : mword 5) <> (zero_reg : mword 64)).
     { rewrite HM6a1 sc_addr_fd_base. apply stack_off_nonzero; [exact Hspb | lia]. }
     (* carve the [int fd] cell out of the upper half of frame slot 3 *)
-    iDestruct (word_pointsto_aligned_p with "Hs3") as %Hal3.
+    iDestruct (ctx_word_pointsto_aligned_p with "Hs3") as %Hal3.
+    (* ↦₄ has not flipped (M1 stage 2): the ctx word crosses through the shim *)
+    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hs3") as "Hs3".
     iDestruct (word_pointsto_split4 with "Hs3") as "[Hs3lo Hs3hi]".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ cur_ctx with "Hs3lo") as "Hs3lo".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ cur_ctx with "Hs3hi") as "Hs3hi".
     iEval (rewrite -HM6a1) in "Hs3hi".
     iEval (rewrite -HM6a2) in "Hs4".
     (* ---- argfd(0, &fd, &f) ---- *)
@@ -612,7 +617,10 @@ Section ProofSysClose.
       (* nothing was written: rejoin the two halves of frame slot 3 *)
       iEval (rewrite HM6a1) in "Hfdcell".
       iEval (rewrite HM6a2) in "Hfcell".
+      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs3lo") as "Hs3lo".
+      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hfdcell") as "Hfdcell".
       iDestruct (word_pointsto_join4 _ _ _ _ Hal3 with "Hs3lo Hfdcell") as "Hs3".
+      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hs3") as "Hs3".
       iApply (sc_tail (CID0 := CID11) m A7 av (mword_of_int (-1) : mword 64) sp0 ra0 s00 _ w4 b p
                 ltac:(lia) eq_refl eq_refl eq_refl HA7sp HA7a5 HthrA
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hfcell").
@@ -896,7 +904,10 @@ Section ProofSysClose.
         as "Hpriv".
       { rewrite /ofile_slot. iFrame "Hcell". iLeft. by iFrame "Hfdslot Hst". }
       (* rejoin frame slot 3 *)
+      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs3lo") as "Hs3lo".
+      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hfdcell") as "Hfdcell".
       iDestruct (word_pointsto_join4 _ _ _ _ Hal3 with "Hs3lo Hfdcell") as "Hs3".
+      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hs3") as "Hs3".
       (* the epilogue's register facts *)
       assert (HR8a5 : R8 !!! Regidx (mword_of_int 15 : mword 5) = (zero_reg : mword 64))
         by (rewrite /R8 upd_eq; reflexivity).

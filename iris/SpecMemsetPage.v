@@ -20,6 +20,7 @@ Require Import IntrDefs.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 
 Definition wp_memset_page_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64) :=
@@ -45,7 +46,6 @@ Definition wp_memset_page_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
     ⌜ callee_saved m0 mfin ⌝ -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
-Require Import TsoCtx.
 
 (* THE VALUE-PRESERVING FORM.  [wp_memset_page_sconf] above weakens the
    written page back to [page_own] -- contents EXISTENTIAL -- which is right

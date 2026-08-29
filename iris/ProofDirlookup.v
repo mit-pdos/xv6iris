@@ -152,6 +152,7 @@ Qed.
 Section DirlookupMsg.
   Context `{!riscvGS Σ, FSC : fscfg}.
   Context `{GEN : GenId}.
+  Context `{XI : CurCtx}.
 
   Lemma dlk_msg_str :
     (kernel_data : iProp Σ) -∗ (mword_of_int dlk_msg_a : mword 64) ↦ₛ□ dlk_msg.

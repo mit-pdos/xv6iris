@@ -55,8 +55,8 @@ Require Import ProcdumpAux.
 Require Import CodeProcdump.
 From Kernel Require KernelInstrs KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 Local Open Scope Z_scope.
 (* a failing tactic in a whole-function WP over the proc resources otherwise
    spends tens of minutes FORMATTING the goal -- see durable-notes. *)
@@ -268,6 +268,7 @@ Qed.
 
 Section ProcdumpLoopRes.
   Context `{!riscvGS Σ}.
+  Context `{XI : CurCtx}.   (* M1 stage 2: [SpecProcdump.proc_dump_slot] *)
 
   Lemma pdl_slot_mk (pa : mword 64) (dqs dqp dqn : dfrac)
       (st pid : mword 32) (nm : string) :
@@ -376,7 +377,7 @@ Section ProofProcdumpLoop.
      dirlink/dirlookup/namex families these definitions take them as
      explicit parameters. *)
 
-  Definition pdl_loop_body `{GEN : GenId} (CID0 : CpuId)
+  Definition pdl_loop_body `{GEN : GenId} `{XI : CurCtx} (CID0 : CpuId)
       (spv p : mword 64) (m0 : regfile) (K' : nat) (eb b : bool)
       (lks : gset string) (fuel : nat) (CIDf : CpuId) : iProp Σ :=
     (∀ (j : nat) (M : regfile),
@@ -398,7 +399,7 @@ Section ProofProcdumpLoop.
        ([∗ list] k ∈ seq j (NPROC - j), proc_dump_slot (proc_addr k)) -∗
        WP (Loop : expr riscv_lang))%I.
 
-  Definition pdl_adv_body `{GEN : GenId} (CID0 : CpuId)
+  Definition pdl_adv_body `{GEN : GenId} `{XI : CurCtx} (CID0 : CpuId)
       (spv p : mword 64) (m0 : regfile) (K' : nat) (eb b : bool)
       (lks : gset string) (j : nat) (CIDa : CpuId) : iProp Σ :=
     (∀ (Ma : regfile),
@@ -418,7 +419,7 @@ Section ProofProcdumpLoop.
        ([∗ list] k ∈ seq (S j) (NPROC - S j), proc_dump_slot (proc_addr k)) -∗
        WP (Loop : expr riscv_lang))%I.
 
-  Definition pdl_print_body `{GEN : GenId} (CID0 : CpuId)
+  Definition pdl_print_body `{GEN : GenId} `{XI : CurCtx} (CID0 : CpuId)
       (spv p : mword 64) (m0 : regfile) (K' : nat) (eb b : bool)
       (lks : gset string) (j : nat) (CIDp : CpuId) : iProp Σ :=
     (∀ (Mp : regfile) (sptr : mword 64) (ss nm2 : string)
@@ -696,7 +697,7 @@ Section ProofProcdumpLoop.
         iPoseProof (pd_fmt_str with "Hkd") as "Hfmt".
         iDestruct (cpu_own_transport CIDp CIDq3 0%nat eb p b 
                      ltac:(wp_next_chain) with "Hown") as "Hown".
-        iApply (Hpk CIDq3 P5c K' eb p DfracDiscarded pd_fmt
+        iApply (Hpk CIDq3 cur_ctx P5c K' eb p DfracDiscarded pd_fmt
                   [PkANum; PkAStr DfracDiscarded ss; PkAStr dq3 nm2] b lks
                   ltac:(lia) pd_fmt_len pd_fmt_nonul
                   ltac:(rewrite pd_fmt_kinds; reflexivity)
@@ -773,7 +774,7 @@ Section ProofProcdumpLoop.
         iPoseProof (pd_nl_str with "Hkd") as "Hnlstr".
         iDestruct (cpu_own_transport CIDq4 CIDq6 0%nat eb p b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
-        iApply (Hpk CIDq6 P62 K' eb p DfracDiscarded pd_nl [] b lks
+        iApply (Hpk CIDq6 cur_ctx P62 K' eb p DfracDiscarded pd_nl [] b lks
                   ltac:(lia) pd_nl_len pd_nl_nonul
                   ltac:(rewrite pd_nl_kinds; reflexivity)
                   ltac:(cbn [length]; lia)

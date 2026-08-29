@@ -22,6 +22,7 @@ Require Import PtTree.
 Require Import PtBuild KvmMap KvmSpec.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 
 (* kvminit(): kvmmake() then store its result into the global
@@ -32,7 +33,6 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
    unconditional success, NO panic credential.  This is THE deliverable: the verified
    construction whose post feeds the boot switch [wp_kvminithart] through
    [kvm_bridge].
-Require Import TsoCtx.
    stack_own bound 50 = own 2-slot frame + kvmmake's 48 (PROVISIONAL). *)
 Definition wp_kvminit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (γk : gname * gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (kpt0 : mword 64) (b : bool) (lks : gset string) :=

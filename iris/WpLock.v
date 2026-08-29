@@ -439,8 +439,14 @@ Section Lock.
   Definition lock_name_field (lk : mword 64) : mword 64 :=
     add_vec lk (sign_extend' 64 (mword_of_int 8 : mword 12)).
 
+  (* [tso WpLock.v:472 / tso-flip WpLock.v:1314]: a CLOSED term -- the
+     discarded name-field word is RAW (a discarded byte lives at every
+     context) and the string is [ctx_string_all], the ∀-context form -- so
+     the handle's only ambient dependence is the floor below. *)
   Definition lock_name (lk : mword 64) (s : string) : iProp Σ :=
-    (∃ p : mword 64, lock_name_field lk ↦₈□ p ∗ p ↦ₛ□ s)%I.
+    (∃ p : mword 64,
+       word_pointsto (lock_name_field lk) DfracDiscarded p ∗
+       ctx_string_all p DfracDiscarded s)%I.
 
   Global Instance lock_name_persistent lk s : Persistent (lock_name lk s).
   Proof. apply _. Qed.
@@ -451,10 +457,12 @@ Section Lock.
      static seals it here and forgets it.  A basic update, so this works in
      place inside a WP goal -- no [fupd_wp] needed. *)
   Lemma lock_name_intro (lk p : mword 64) (s : string) :
-    p ↦ₛ□ s -∗ lock_name_field lk ↦₈ p ==∗ lock_name lk s.
+    ctx_string_all p DfracDiscarded s -∗
+    lock_name_field lk ↦₈ p ==∗ lock_name lk s.
   Proof.
     iIntros "#Hs Hf".
-    iMod (ctx_word_pointsto_persist with "Hf") as "#Hfp".
+    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hf") as "Hf".
+    iMod (word_pointsto_persist with "Hf") as "#Hfp".
     iModIntro. iExists p. by iFrame "Hfp Hs".
   Qed.
 
@@ -514,6 +522,7 @@ Section Lock.
     rewrite /is_lock. iIntros "#Hn #Hi #Hf". iExists lo. by iFrame "Hn Hi Hf".
   Qed.
 
+
   (* ---- THE OPENING INTERFACE ------------------------------------------
 
      WpSconfLock.v is the only file in the tree that ever opens a lock, and
@@ -563,6 +572,22 @@ Section Lock.
            ▷ lock_inv γ lk s R lo ∗ T ∗
            ((▷ lock_inv γ lk s R lo ={E ∖ ↑lockN, E}=∗ True) (* put it back *)
             ∧ (D ={E ∖ ↑lockN, E}=∗ True)))%I.             (* or destroy it *)
+
+  (* THE PROJECTION, and consumers must come through it rather than
+     destructing the definition: [lock_openable] carries an existential now
+     (§0.38'/A6.109's hoisted floor), and letting each proof take the raw
+     shape apart leaks the representation into every leaf.  Same discipline
+     as [is_lock]'s three projections.  [tso-flip WpLock.v:1513]. *)
+  Lemma lock_openable_parts γ lk s R D :
+    lock_openable γ lk s R D -∗
+    ∃ lo : nat,
+      lk_floor TsoCtx.cur_ctx lo ∗
+      □ ∀ (E : coPset) (T : iProp Σ),
+          ⌜↑lockN ⊆ E⌝ -∗ (T -∗ D -∗ False) -∗ T ={E, E ∖ ↑lockN}=∗
+          ▷ lock_inv γ lk s R lo ∗ T ∗
+          ((▷ lock_inv γ lk s R lo ={E ∖ ↑lockN, E}=∗ True)
+           ∧ (D ={E ∖ ↑lockN, E}=∗ True)).
+  Proof. by iIntros "$". Qed.
 
   Global Instance lock_openable_persistent γ lk s R D :
     Persistent (lock_openable γ lk s R D).
@@ -836,3 +861,34 @@ Section Lock.
   Qed.
 
 End Lock.
+
+(* RE-INDEXING THE LOCK HANDLE (main-tso-readiness, SC only).  [is_lock]
+   carries the floor at the AMBIENT context; a [CtxMorph] instance for a
+   payload that names [is_lock] (ConsoleInv's [console_inv]) has to move
+   it.  At SC every floor is discharged by the shim's [log_lb_any], so the
+   handle re-indexes freely; under TSO this lemma is FALSE as stated (the
+   floor is real evidence) and dies with the shim -- its uses are a
+   cutover worklist entry, like every other shim consumer. *)
+Lemma lock_inv_reindex `{!riscvGS Σ, !lockG Σ} (xi xi' : TsoCtx.CtxId) γ lk s R lo :
+  lock_inv (XI := xi) γ lk s R lo -∗ lock_inv (XI := xi') γ lk s R lo.
+Proof.
+  rewrite /lock_inv /lock_word /lk_cpu_res.
+  iIntros "(%v & %st & Hw & [Hc Hf] & Hrest)".
+  iExists v, st. iFrame "Hrest Hf".
+  iSplitL "Hw". { iApply (TsoCtxShim.ctx_word4_reindex with "Hw"). }
+  iDestruct (TsoCtxShim.ctx_word_to_mem with "Hc") as "Hc".
+  iApply (TsoCtxShim.ctx_word_of_mem with "Hc").
+Qed.
+
+Lemma is_lock_reindex `{!riscvGS Σ, !lockG Σ} (xi xi' : TsoCtx.CtxId) γ lk s R :
+  is_lock (XI := xi) γ lk s R -∗ is_lock (XI := xi') γ lk s R.
+Proof.
+  iIntros "#H".
+  iDestruct (is_lock_name (XI := xi) with "H") as "#Hn".
+  iDestruct (is_lock_inv (XI := xi) with "H") as (lo) "[#Hi _]".
+  iApply (is_lock_intro (XI := xi') γ lk s R lo).
+  - iExact "Hn".
+  - iApply (inv_iff with "Hi"). iIntros "!> !>".
+    iSplit; iIntros "Hl"; iApply (lock_inv_reindex with "Hl").
+  - iApply lk_floor_of_log. iApply TsoCtxShim.log_lb_any.
+Qed.

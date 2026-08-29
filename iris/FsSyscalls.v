@@ -213,7 +213,7 @@ Section FsBundles.
      [fsc_ninodes] / [icfg_ist] / [fsc_size] / [fsc_bmapstart], and [bn] was
      never read by this bundle at all -- it rode along because every other
      row of the calling convention took it. *)
-  Definition fs_res (ns : nat) (dqb dqs dqbs dqn : dfrac) : iProp Σ :=
+  Definition fs_res `{XI : CurCtx} (ns : nat) (dqb dqs dqbs dqn : dfrac) : iProp Σ :=
     (bslots 3 ∗
      sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) ∗

@@ -34,9 +34,11 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Export PipeInvDefs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Section PipeInv.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)
   (*  Carving kalloc's page into the cells [struct pipe] names            *)
@@ -69,7 +71,8 @@ Section PipeInv.
   Lemma pipe_data_rebase (pi : mword 64) (bs : list (bv 8)) :
     ([∗ list] j ↦ b ∈ bs, pa_add (pa_add pi pipe_data_off) j ↦ₘ b) ⊣⊢ pipe_data pi bs.
   Proof.
-    rewrite /pipe_data. apply big_sepL_proper. intros k b _. by rewrite pa_add_add.
+    rewrite /pipe_data. apply big_sepL_proper. intros k b _. rewrite pa_add_add.
+    reflexivity.
   Qed.
 
   (* the ten windows [struct pipe] divides its page into. *)
@@ -283,10 +286,11 @@ Section PipeInv.
   Proof.
     iIntros (Hpv Hlen) "Hnm Hword Hcpu Hnr Hnw Hro Hwo Hdata Hslack".
     (* the lock's state gname FIRST: [pipe_dead] mentions it. *)
-    iMod (newlock_d E pi with "Hword Hcpu") as (γl) "Hmake".
+    iMod (newlock_d E 0%nat pi with "Hword Hcpu") as (γl) "Hmake".
     iMod pipe_ends_alloc as (γp) "(Hrd & Hwr & Hm0 & Hm1)".
-    iMod ("Hmake" $! (pipe_res γp pi) (pipe_dead γl γp)
-            with "[Hnm Hnr Hnw Hro Hwo Hdata Hslack Hm0 Hm1]") as "#Hlk".
+    iMod ("Hmake" $! <{ pipe_res γp pi }> (pipe_dead γl γp) with "[%]
+            [Hnm Hnr Hnw Hro Hwo Hdata Hslack Hm0 Hm1]") as "#Hlk";
+      [ apply _ | | ].
     { iExists (mword_of_int 0 : mword 32), (mword_of_int 0 : mword 32),
               (mword_of_int 1 : mword 32), (mword_of_int 1 : mword 32), vname, bs.
       iFrame "Hnm Hnr Hnw Hro Hwo Hdata Hslack".
@@ -294,8 +298,12 @@ Section PipeInv.
       iSplitL "Hm1"; [by iApply (pipe_endstate_open_intro _ _ _ pflag_one_open with "Hm1")|].
       iSplit; [iPureIntro; exact pipe_count_ok_00 | done]. }
     iModIntro. iExists γl, γp.
+    (* [is_pipe] carries the floor existential now (§0.38'); the invariant was
+       allocated at [lo = 0] by the [newlock_d] above, and the floor at that
+       position is the shim's SC-only install receipt. *)
     rewrite /is_pipe. iFrame "Hrd Hwr".
-    iSplit; [done|]. iExact "Hlk".
+    iSplit; [done|]. iExists 0%nat. iFrame "Hlk".
+    iApply WpLock.lk_floor_of_log. iApply TsoCtxShim.log_lb_any.
   Qed.
 
 End PipeInv.

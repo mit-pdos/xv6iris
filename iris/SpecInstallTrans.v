@@ -128,8 +128,8 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 
 (* install_trans's own frame is 10 slots ([c.addi sp,sp,-80] at +0x0c); its
    deepest callee is bread (40).  memmove/bwrite/bunpin/brelse want less. *)

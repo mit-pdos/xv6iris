@@ -141,8 +141,9 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import KernelRvcDecode.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Require TsoCtxShim.
+Import Defs.
 
 Local Open Scope Z_scope.
 
@@ -291,7 +292,7 @@ Section SpProps.
 
   (* the scratch slots: 3/4/5 (only spilled on the loop path), 6 and 8 (never
      touched at all).  Slot 7 is the [int n] local and rides separately. *)
-  Definition sp_free (sp0 : mword 64) : iProp Σ :=
+  Definition sp_free `{XI : CurCtx} (sp0 : mword 64) : iProp Σ :=
     ((∃ w : bv 64, pa_stk sp0 3 ↦₈[KT1] w) ∗ (∃ w : bv 64, pa_stk sp0 4 ↦₈[KT1] w) ∗
      (∃ w : bv 64, pa_stk sp0 5 ↦₈[KT1] w) ∗ (∃ w : bv 64, pa_stk sp0 6 ↦₈[KT1] w) ∗
      (∃ w : bv 64, pa_stk sp0 8 ↦₈[KT1] w))%I.
@@ -299,7 +300,7 @@ Section SpProps.
   (* the right to put frame slot 7 back together once the [int n] cell is
      done with -- the lower half plus its 8-alignment, packaged so no join
      predicate has to carry a pure alignment fact. *)
-  Definition sp_join7 (sp0 : mword 64) : iProp Σ :=
+  Definition sp_join7 `{XI : CurCtx} (sp0 : mword 64) : iProp Σ :=
     (∀ nv : mword 32, pa_add (pa_stk sp0 7) 4 ↦₄[KT1] nv -∗ ∃ w : bv 64, pa_stk sp0 7 ↦₈[KT1] w)%I.
 
   (* +0x7e -- the shared epilogue.  [r] is the value already parked in a0. *)
@@ -660,7 +661,7 @@ Section SpBodies.
     { rewrite /X2 upd_ne; [| reg_neq]. rewrite /X1 upd_eq. rewrite /X0 upd_eq.
       rewrite /a_tickslock. apply bv_eq; vm_compute; reflexivity. }
     (* release(&tickslock) *)
-    iApply (Release.wp_release_sconf KT1 γt a_tickslock "time"%string ticks_res X2
+    iApply (Release.wp_release_sconf KT1 γt a_tickslock "time"%string <{ ticks_res }> X2
               0%nat true pj (av - 8)%nat ({["time"]} ∪ lks)
               ltac:(rewrite HX2a0; apply sp_add_vec_0) ltac:(lia)
               with "Hcg Htext Hpc Hlk2 Htok HR Hown Hpay").
@@ -782,7 +783,7 @@ Section SpBodies.
     assert (HK2a0 : K2 !!! Regidx (mword_of_int 10 : mword 5) = a_tickslock).
     { rewrite /K2 upd_ne; [| reg_neq]. rewrite /K1 upd_eq. rewrite /K0 upd_eq.
       rewrite /a_tickslock. apply bv_eq; vm_compute; reflexivity. }
-    iApply (Release.wp_release_sconf KT1 γt a_tickslock "time"%string ticks_res K2
+    iApply (Release.wp_release_sconf KT1 γt a_tickslock "time"%string <{ ticks_res }> K2
               0%nat true pj (av - 8)%nat ({["time"]} ∪ lks)
               ltac:(rewrite HK2a0; apply sp_add_vec_0) ltac:(lia)
               with "Hcg Htext Hpc Hlk2 Htok HR Hown Hpay").
@@ -1380,7 +1381,7 @@ Section SpBodies.
       assert (HL5a0 : L5 !!! Regidx (mword_of_int 10 : mword 5) = a_tickslock).
       { rewrite /L5 upd_ne; [| reg_neq]. rewrite /L4 upd_eq. rewrite Hp9. apply add_vec_zero_l. }
       (* ==================== release(&tickslock) ==================== *)
-      iApply (Release.wp_release_sconf KT1 γt a_tickslock "time"%string ticks_res L5
+      iApply (Release.wp_release_sconf KT1 γt a_tickslock "time"%string <{ ticks_res }> L5
                 0%nat eb (proc_addr j) (av - 8)%nat ({["time"]} ∪ lks)
                 ltac:(rewrite HL5a0; apply sp_add_vec_0) ltac:(lia)
                 with "Hcg Htext Hpc Hlk2 Htok HR Hown Hpay").
@@ -1476,11 +1477,11 @@ Section SpBodies.
       (* ==================== acquire(&tickslock) ==================== *)
       iDestruct (cpu_own_transport CIDs CIDn 0 eb (proc_addr j) eb ltac:(wp_next_chain)
                    with "Hown") as "Hown".
-      iApply (Acquire.wp_acquire_sconf KT1 γt "time"%string ticks_res L8 0%nat eb (proc_addr j)
+      iApply (Acquire.wp_acquire_sconf KT1 γt "time"%string <{ ticks_res }> L8 0%nat eb (proc_addr j)
                 (av - 8)%nat eb lks Hn0 ltac:(lia) Hfresh with "Hcg Hown Htext Hpc []").
       all: try lkbelow.
       { iEval (rewrite HL8a0). iExact "Hlk2". }
-      iIntros (CIDa Hsa msA mfa) "%HmsA Hcg Hpc %Hacs Htok HR Hown Hpay".
+      iIntros (CIDa Hsa msA mfa) "%HmsA Hcg Hpc %Hacs Htok HR _ Hown Hpay".
       assert (Hl6a : ret_pc (L8 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_pause + 0x6a))
         by (rewrite HL8ra; pcstep).
       iEval (rewrite Hl6a) in "Hpc".
@@ -1583,11 +1584,11 @@ Section SpBodies.
     (* ===================== acquire(&tickslock) ===================== *)
     iDestruct (cpu_own_transport CID CIDq3 0 eb pj true ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Acquire.wp_acquire_sconf KT1 γt "time"%string ticks_res Q2 0%nat eb pj (av - 8)%nat true lks
+    iApply (Acquire.wp_acquire_sconf KT1 γt "time"%string <{ ticks_res }> Q2 0%nat eb pj (av - 8)%nat true lks
               Hn0 ltac:(lia) Hfresh with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HQ2a0). iExact "Hlk2". }
-    iIntros (CIDa Hsa msA Macq) "%HmsA Hcg Hpc %HcsQ2 Htok HR Hown Hpay".
+    iIntros (CIDa Hsa msA Macq) "%HmsA Hcg Hpc %HcsQ2 Htok HR _ Hown Hpay".
     assert (Hq26 : ret_pc (Q2 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_pause + 0x26))
       by (rewrite HQ2ra; pcstep).
     iEval (rewrite Hq26) in "Hpc".
@@ -1893,10 +1894,17 @@ Section ProofSysPause.
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & _)".
     iDestruct "S1" as (vw1) "Hs1". iDestruct "S2" as (vw2) "Hs2".
     iDestruct "S7" as (w7) "Hs7".
+    (* ↦₄ has not flipped (M1 stage 2): the ctx word crosses to the raw
+       4-byte tower through the shim, and the join crosses back. *)
+    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hs7") as "Hs7".
     iDestruct (word_pointsto_aligned_p with "Hs7") as %Hal7.
     iDestruct (word_pointsto_split4 with "Hs7") as "[Hs7lo Hs7hi]".
+    (* M1 stage 2: the HI half faces flipped 4-byte statements from here on *)
+    iDestruct (TsoCtxShim.ctx_word4_of_mem with "Hs7hi") as "Hs7hi".
     iAssert (sp_join7 sp0) with "[Hs7lo]" as "Hjoin7".
     { rewrite /sp_join7. iIntros (nv) "Hhi". iExists _.
+      iApply TsoCtxShim.ctx_word_of_mem.
+      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hhi") as "Hhi".
       iApply (word_pointsto_join4 _ _ _ _ Hal7 with "Hs7lo Hhi"). }
     (* +0x02 c.sdsp ra,56(sp) *)
     assert (Hb1 : add_vec (R1 !!! Regidx csp_rs1)
@@ -2128,7 +2136,9 @@ Section ProofSysPause.
       iApply ("Hacq" $! A1 (mword_of_int 0 : mword 32)
                 with "[%] Hs1 Hs2 [S3 S4 S5 S6 S8] Hs7hi Hjoin7 Hcg Hown Hpc Htail").
       { split; [exact HbaseA1 | exact HsavA1]. }
-      { rewrite /sp_free. iFrame "S3 S4 S5 S6 S8". }
+      { rewrite /sp_free.
+        (* [stack_own]'s slots are already context-indexed: no crossing. *)
+        iFrame "S3 S4 S5 S6 S8". }
     - (* n >= 0: fall through to +0x1a *)
       iApply (wp_blt_x0_fall_s_sconf (mword_of_int (KernelSyms.sys_pause + 0x16))
                 (mword_of_int 128 : mword 13) (mword_of_int 15 : mword 5) A1 (av - 8)%nat true

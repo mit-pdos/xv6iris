@@ -31,8 +31,9 @@ Require Import SpecKalloc SpecMemset SpecUvmcreate.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
+   leg M); this caller is not yet -- the shim marks the open seam *)
 Local Open Scope Z_scope.
-Require Import TsoCtx.
 Import Defs.
 
 (* clean-context (mword-free) stack-slot arithmetic, so [lia] never sees a bv *)
@@ -96,7 +97,7 @@ Section ProofUvmcreate.
   (*  ProofStrlen.v's [sl_tail]), so callers never annotate it explicitly:  *)
   (*  it unifies automatically from whichever [sie_cap_gpr]-typed hypothesis*)
   (*  the "with" clause supplies at each call site. *)
-  Local Lemma uvc_htail `{CID0 : CpuId} `{XI : CurCtx}
+  Local Lemma uvc_htail `{CID0 : CpuId}
       (γa : gname) (γk : gname * gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64)
       (on : option nat) (b : bool) (lks : gset string)
       (Mt : regfile) (rv sp0 : mword 64) (v4 : bv 64) :
@@ -548,11 +549,18 @@ Section ProofUvmcreate.
     { rewrite /M4 /M3. repeat (rewrite upd_ne; [| reg_neq]). rewrite /M2 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite /page_own /byte_any) in "Hpage".
     iDestruct (bytes_choose 4096 0 (fun j b => ((pa_add root0 j) ↦ₘ b)%I) with "Hpage") as (olds) "Hbuf".
+    (* memset's contract is context-indexed; this caller is not yet
+       converted -- the buffer crosses through the shim at the ambient
+       context (the bundle carries the thread token). *)
     iApply (MS.wp_memset_sconf KT1 KT0 M4 (K - 4)%nat 4096 (M4 !!! Regidx (mword_of_int 11 : mword 5)) olds b p
               Hc2 ltac:(vm_compute; reflexivity) ltac:(reflexivity) HM4a2
               with "Hcg Htext Hpc [Hbuf]").
-    { iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". rewrite HM4a0. iExact "H". }
+    { (* [page_own]'s bytes are ALREADY context-indexed (KallocInv's [byte_any]
+         flipped with ↦ₘ), so no shim crossing here: only the address form
+         differs. *)
+      iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". rewrite HM4a0. iExact "H". }
     iIntros (CID13 Hs13 mfin) "Hcg Hpc Hbytes %Hmcs".
+    iDestruct (ctx_buf_to_mem with "Hbytes") as "Hbytes".
     assert (Hret1a : ret_pc (M4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.uvmcreate + 0x1a)).
     { rewrite /M4 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret1a) in "Hpc".

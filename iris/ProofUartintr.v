@@ -61,8 +61,8 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 Local Open Scope Z_scope.
 
 Local Notation Rra  := (mword_of_int 1 : mword 5).
@@ -139,7 +139,7 @@ Section UiCont.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* the frame the prologue spilled *)
-  Definition ui_frame (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
+  Definition ui_frame `{XI : CurCtx} (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
     (pa_stk sp0 1 ↦₈[KT1] (m0 !!! Regidx Rra) ∗
      pa_stk sp0 2 ↦₈[KT1] (m0 !!! Regidx Rs0) ∗
      pa_stk sp0 3 ↦₈[KT1] (m0 !!! Regidx Rs1) ∗
@@ -158,7 +158,7 @@ Section UiCont.
 
   (* re-anchor it at a hart reached mid-block.  Through the named definition
      [wp_next_shift]'s direct idiom cannot infer [K], so unfold first. *)
-  Lemma ui_ret_cont_shift `{GEN : GenId} (CIDa CIDb : CpuId)  (m0 : regfile)
+  Lemma ui_ret_cont_shift `{GEN : GenId} `{XI : CurCtx} (CIDa CIDb : CpuId)  (m0 : regfile)
       (av lvl : nat) (eb : bool) (pme : mword 64) (b : bool) (lks : gset string) :
     (b = false \/ pme = zero_reg -> (CIDb : CPU) = (CIDa : CPU)) ->
     ui_ret_cont (CID0 := CIDa)  m0 av lvl eb pme b lks -∗
@@ -188,7 +188,7 @@ Section ProofUartintr.
   (* ------------------------------------------------------------------ *)
   (*  THE EPILOGUE: +0x4c -> return.                                      *)
   (* ------------------------------------------------------------------ *)
-  Lemma ui_tail `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma ui_tail `{CID0 : CpuId}
       (m0 M : regfile) (av lvl : nat) (eb : bool) (pme : mword 64)
       (sp0 : mword 64) (b : bool) (lks : gset string) :
     ui_regs m0 M (pa_stk sp0 4) ->
@@ -481,7 +481,7 @@ Section ProofUartintr.
   (* Both arms of the THRE test arrive here: the arm that found the FIFO
      still busy falls through from +0x20, and the arm that woke the writers
      jumps back from +0x4a. *)
-  Lemma ui_rx_setup `{CID0 : CpuId} `{XI : CurCtx} (γu : uart_names) (γv : disk_names)
+  Lemma ui_rx_setup `{CID0 : CpuId} (γu : uart_names) (γv : disk_names)
        (γs : list gname)
       (m0 M : regfile) (av lvl : nat) (eb : bool) (pme : mword 64)
       (sp0 : mword 64) (b : bool) (lks : gset string) :

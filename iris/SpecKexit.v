@@ -231,7 +231,7 @@ Definition wp_kexit_sconf_body
      too.  The count comes back MOVED -- a descriptor may have held a pipe's
      last end -- which is why the loop carries it existentially. *)
   is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
-    <{ kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24)) }> -∗
+    (λ ξ : CtxId, kmem_res (XIk := ξ) fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) -∗
   kalloc_avail fsc_kpages on -∗
   (* the file system, for [begin_op(); iput(p->cwd); end_op();] *)
   bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗

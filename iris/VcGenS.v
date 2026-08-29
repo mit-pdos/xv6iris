@@ -42,8 +42,8 @@ Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype.
 Require Import WpSmodePtMem WpSmodePtMemWrap.
 From iris.base_logic.lib Require Import invariants.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 
 (* ====================================================================== *)
 (* 1. The S-mode instruction alphabet.                                     *)

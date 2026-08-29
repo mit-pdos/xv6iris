@@ -54,8 +54,8 @@ Require Import SpecInitlock SpecUartinit SpecConsoleinit.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 Import Defs.
 Set Printing Depth 40.
 
@@ -87,12 +87,12 @@ Section ConsoleinitBody.
      own generic [b] hypothesis (it is still callable at any index by other
      callers) but is applied here at [false]. *)
   Hypothesis wp_initlock :
-    forall `{CID : CpuId} `{XI : CurCtx} (m : regfile) (vlock : bv 32)
+    forall `{CID : CpuId} (m : regfile) (vlock : bv 32)
       (vname vcpu : bv 64) (s : string) (K : nat) (b : bool) (p : mword 64),
       wp_initlock_sconf_body KT0 m vlock vname vcpu s K b p.
 
   Hypothesis wp_uartinit :
-    forall `{CID : CpuId} `{XI : CurCtx} (γd : uart_names) (m : regfile) (K : nat)
+    forall `{CID : CpuId} (γd : uart_names) (m : regfile) (K : nat)
       (l : list (bv 8)) (b0 : bool) (p : mword 64),
       wp_uartinit_sconf_body γd m K l b0 p.
 
@@ -119,7 +119,7 @@ Section ConsoleinitBody.
       do 5 (destruct j as [|j];
             [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string cons_name_str "cons"%string name eq_refl
+    iPoseProof (kernel_data_string_all cons_name_str "cons"%string name eq_refl
                   ltac:(unfold text_end, cons_name_str; lia)
                   ltac:(vm_compute; discriminate) Hcons
                   with "Hkdata") as "#Hstr".

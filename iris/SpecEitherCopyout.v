@@ -113,6 +113,7 @@ Proof. intros [[Hr _] | [Hr _]]; [by left | by right]. Qed.
 
 Section SpecEitherCopyout.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
+  Context `{XI : CurCtx}.
   (* [GenId], for [ProcInv.proc_priv]'s own index: the private block now
      carries [FirstTok.first_tok], whose boot arm names [gen_cert].  The
      definitions below mention the block, so the section has to bind it. *)

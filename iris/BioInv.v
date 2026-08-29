@@ -1216,8 +1216,8 @@ Section BioInv.
       (* the split every buffer's dev/blockno cell undergoes exactly once:
          one half into the escrow's parked bundle, one half into the bcache
          resource, forever. *)
-      iDestruct (word4_pointsto_half_split with "Hdev") as "[Hdev1 Hdev2]".
-      iDestruct (word4_pointsto_half_split with "Hbno") as "[Hbno1 Hbno2]".
+      iDestruct (ctx_word4_pointsto_half_split with "Hdev") as "[Hdev1 Hdev2]".
+      iDestruct (ctx_word4_pointsto_half_split with "Hbno") as "[Hbno1 Hbno2]".
       iDestruct "Hdata" as (bs) "[%Hlen Hdata]".
       iSplitR "Hrc Hdev2 Hbno2".
       - rewrite /buf_escrow.
@@ -1245,8 +1245,11 @@ Section BioInv.
           apply Hnc0. rewrite -Hu0. exact Hb. }
       rewrite Hc0. iExact "Hpool". }
     (* and seal the bcache lock over the assembled resource *)
-    iMod ("Hmk" $! (bcache_res bn V) with "[Hauth Hsa Hslots Hlru Hpool]")
-      as "#Hlock".
+    (* [newlock_delayed]'s continuation is now lambda-payloaded and asks for
+       the payload's [CtxMorph] -- discharged by the const embedding's own
+       instance ([TsoCtx.ctx_morph_const_pay]). *)
+    iMod ("Hmk" $! <{ bcache_res bn V }> with "[%] [Hauth Hsa Hslots Hlru Hpool]")
+      as "#Hlock"; [ apply _ | | ].
     { rewrite /bcache_res /bcache_scan.
       iExists ∅, (rev (seq 0 NBUF)),
         (fun _ => (mword_of_int 0 : mword 32)),

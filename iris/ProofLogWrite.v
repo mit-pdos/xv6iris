@@ -313,13 +313,14 @@ Local Ltac regne := reg_ne_side.
 (* ===================================================================== *)
 Section LogWriteDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{XI : CurCtx}.
 
   (* [Fb] is THE CALLER'S RECEIPT for the logged view -- opaque here, and
      threaded through every block exactly like [Bud].  The whole-function
      proof instantiates it with the atomic update's [Φfsb]; the derived
      [wp_log_write_gen] takes [Φfsb := fsblock (fs_bytes γfs) (uint bno) bs],
      the shape this used to be spelled with. *)
-  Definition lw_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+  Definition lw_cont `{GEN : GenId} `{CID0 : CpuId}
       (bn : bio_names) (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (dev : mword 32) (k : nat) (pidv bno : mword 32)
       (bs bsd : list (bv 8)) (Fb Bud : iProp Σ)
@@ -339,7 +340,7 @@ Section LogWriteDefs.
 
   (* re-anchor the continuation from the hart a block was entered at to the
      hart it hands it on at (ProofBread.bd_cont_shift's twin) *)
-  Lemma lw_cont_shift `{GEN : GenId} `{CIDa : CpuId} `{CIDb : CpuId} `{XI : CurCtx}
+  Lemma lw_cont_shift `{GEN : GenId} `{CIDa : CpuId} `{CIDb : CpuId}
       (bn : bio_names) (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (dev : mword 32) (k : nat) (pidv bno : mword 32)
       (bs bsd : list (bv 8)) (Fb Bud : iProp Σ)
@@ -472,12 +473,13 @@ End LogWriteDefs.
 (* ===================================================================== *)
 Section LogWriteBlocks.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{XI : CurCtx}.
 
   (* ================================================================== *)
   (*  +0xae .. +0xc2 : release(&log.lock), the epilogue and the return.  *)
   (*  Both paths converge here with [log_res] already reassembled.       *)
   (* ================================================================== *)
-  Local Lemma lw_rel `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+  Local Lemma lw_rel `{GEN : GenId} `{CID0 : CpuId}
       (bn : bio_names) (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32) (k : nat)
       (pidv bno : mword 32) (bs bsd : list (bv 8)) (Fb Bud : iProp Σ)
@@ -601,7 +603,7 @@ Section LogWriteBlocks.
        the acquire/release pair compose back to [N]. *)
     iEval (rewrite -Hbeq) in "Hcg".
     iApply (Release.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string
-              (log_res γ bn γfs cov logstart) E3 n eb p (K - 4)%nat
+              <{ log_res γ bn γfs cov logstart }> E3 n eb p (K - 4)%nat
               ({["log"]} ∪ lks)
               ltac:(rewrite HE3a0; rewrite /log_addr; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
@@ -756,7 +758,7 @@ Section LogWriteBlocks.
   (*  falling through from +0x64, the absorb copy by the [beq a2,a5] at  *)
   (*  +0xaa when i == n (the n == 0 entry from the +0x34 guard).         *)
   (* ================================================================== *)
-  Local Lemma lw_pin `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+  Local Lemma lw_pin `{GEN : GenId} `{CID0 : CpuId}
       (bn : bio_names) (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32) (k : nat)
       (pidv bno : mword 32) (bs bsd : list (bv 8)) (Fb Bud : iProp Σ) (nl : nat)
@@ -997,7 +999,7 @@ Section LogWriteBlocks.
   (*  bpin block when i == n (the n == 0 entry from the +0x34 guard) and  *)
   (*  otherwise falls through to the release.                            *)
   (* ================================================================== *)
-  Local Lemma lw_blk94 `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+  Local Lemma lw_blk94 `{GEN : GenId} `{CID0 : CpuId}
       (bn : bio_names) (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32) (k : nat)
       (pidv bno : mword 32) (bs bsd : list (bv 8)) (Fb Bud : iProp Σ) (nl i : nat)
@@ -1271,7 +1273,7 @@ Section LogWriteBlocks.
   (*  4*lh.n.  Reached by falling out of the scan with i == n >= 1, and   *)
   (*  falling straight into the bpin block at +0x66.                     *)
   (* ================================================================== *)
-  Local Lemma lw_app52 `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+  Local Lemma lw_app52 `{GEN : GenId} `{CID0 : CpuId}
       (bn : bio_names) (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32) (k : nat)
       (pidv bno : mword 32) (bs bsd : list (bv 8)) (Fb Bud : iProp Σ) (nl : nat)
@@ -1486,7 +1488,7 @@ Section LogWriteBlocks.
   (*  negative fact [forall j < i, W !! j <> Some bno] -- which is what   *)
   (*  turns the fall-out into the append closer's ⌜bno ∉ W⌝ premise.     *)
   (* ================================================================== *)
-  Local Lemma lw_scan `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+  Local Lemma lw_scan `{GEN : GenId} `{CID0 : CpuId}
       (bn : bio_names) (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32) (k : nat)
       (pidv bno : mword 32) (bs bsd : list (bv 8)) (Fb Bud : iProp Σ) (nl : nat)
@@ -1984,12 +1986,12 @@ Section ProofLogWrite.
     iDestruct (lw_cont_shift (CIDa := CID) (CIDb := CID9) bn γ γfs γd cov dev k pidv bno
                  bs bsd Φfsb Bud m K n eb p b lks ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (Acquire.wp_acquire_sconf KT1 (ln_lk γ) "log"%string
-              (log_res γ bn γfs cov logstart) mA n eb p (K - 4)%nat b lks
+              <{ log_res γ bn γfs cov logstart }> mA n eb p (K - 4)%nat b lks
               ltac:(lia) ltac:(lia) Hno
               with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
-    iIntros (CID10 Hs10 ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
+    iIntros (CID10 Hs10 ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
     assert (Hpc18 : ret_pc (mA !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.log_write + 0x18)).
     { rewrite HmAra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc18) in "Hpc".
@@ -2571,8 +2573,8 @@ Section ProofLogWrite.
           as "((%Hdd & %HDlk) & HDauth & HpD & Hcovb)".
         iDestruct "Href" as (q dv bv) "Href".
         rewrite /bref. iDestruct "Href" as "(Hrt & Hrdev & Hrbno)".
-        iDestruct (word4_pointsto_agree with "Hdevh Hrdev") as %Hdveq.
-        iDestruct (word4_pointsto_agree with "Hbnoc Hrbno") as %Hbveq.
+        iDestruct (ctx_word4_pointsto_agree with "Hdevh Hrdev") as %Hdveq.
+        iDestruct (ctx_word4_pointsto_agree with "Hbnoc Hrbno") as %Hbveq.
         subst dv bv.
         (* one pool unit becomes the caller's refund *)
         assert (Hpl : ((LOGBLOCKS - nl) + 2)%nat = (1 + ((LOGBLOCKS - S nl) + 2))%nat)

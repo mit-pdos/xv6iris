@@ -53,8 +53,8 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import CodeArgraw.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 Local Open Scope Z_scope.
 
 Notation ar_ra := (mword_of_int 1 : mword 5).
@@ -248,8 +248,9 @@ Section ProofArgraw.
     assert (Hhi : ar_tbl + 4 * Z.of_nat i + Z.of_nat 4%nat <= rodata_end)
       by (unfold rodata_end, ar_tbl, KernelSyms.states_0, NARG in *; lia).
     pose proof (ar_tbl_bytes i Hi) as Hb.
-    unfold NARG in Hi. iIntros "#Hd". rewrite /word4_pointsto. iSplit.
+    unfold NARG in Hi. iIntros "#Hd". rewrite /ctx_word4_pointsto. iSplit.
     { iPureIntro. destruct i as [|[|[|[|[|[|i']]]]]]; try lia; vm_compute; reflexivity. }
+    (* M1 STAGE 2 PAYOFF: the crossing that sat here is GONE. *)
     iApply (kernel_data_window (ar_tbl + 4 * Z.of_nat i) (ar_entry i) 4%nat _ eq_refl
               Hle Hhi Hb with "Hd").
   Qed.
@@ -270,15 +271,15 @@ Section ProofArgraw.
       f_equal; apply bv_eq; vm_compute; reflexivity.
   Qed.
 
-  Lemma ar_tail `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma ar_tail `{CID0 : CpuId}
       (M : regfile) (sp0 ra0 s00 s10 gapv : mword 64) (k : nat) (b : bool) (p : mword 64) :
     M !!! Regidx csp_rs1 = pa_stk sp0 4 ->
     sie_cap_gpr KT1 M k b p -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.argraw + 0x2c) : mword 64) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) gapv -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) gapv -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ Mf : regfile,
         ⌜ Mf !!! Regidx csp_rs1 = sp0 /\
@@ -462,7 +463,7 @@ Section ProofArgraw.
   Lemma ar_fall0 : (mword_of_int (KernelSyms.argraw + ar_ld_off 0 + 2) : mword 64) = mword_of_int (KernelSyms.argraw + 0x2c).
   Proof. cbn [ar_ld_off]. apply bv_eq; vm_compute; reflexivity. Qed.
 
-  Lemma ar_join `{CID0 : CpuId} `{XI : CurCtx} (M : regfile) (k : nat) (av' : nat) (b : bool) (p : mword 64) :
+  Lemma ar_join `{CID0 : CpuId} (M : regfile) (k : nat) (av' : nat) (b : bool) (p : mword 64) :
     (k < NARG)%nat ->
     kernel_text -∗ sie_cap_gpr KT1 M av' b p -∗
     pc_is (mword_of_int (KernelSyms.argraw + ar_ld_off k + 2) : mword 64) -∗
@@ -507,7 +508,7 @@ Section ProofArgraw.
      74 GB).  Keeping the index CONCRETE also keeps the addresses closed
      terms, so the WP leaves' unification can just compute them -- a symbolic
      [k] there made unification itself blow up (14 GB and climbing). *)
-  Definition ar_arm_body `{CID0 : CpuId} `{XI : CurCtx}
+  Definition ar_arm_body `{CID0 : CpuId}
       (M : regfile) (k : nat) (av' : nat)
       (sp0 ra0 s00 s10 vgap p : mword 64) (tfp : mword 44)
       (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool) : Prop :=
@@ -523,10 +524,10 @@ Section ProofArgraw.
     pc_is (mword_of_int (KernelSyms.argraw + 0x22) : mword 64) -∗
     p_trapframe p ↦₈{dqt} page_base tfp -∗
     tf_page tfp ws -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) vgap -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) vgap -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ Mf : regfile,
         ⌜ Mf !!! Regidx csp_rs1 = sp0 /\
@@ -543,7 +544,7 @@ Section ProofArgraw.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
 
-  Local Lemma ar_arm0 `{CID0 : CpuId} `{XI : CurCtx}
+  Local Lemma ar_arm0 `{CID0 : CpuId}
       (M : regfile) (av' : nat) (sp0 ra0 s00 s10 vgap p : mword 64) (tfp : mword 44)
       (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool) :
     ar_arm_body M 0%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt b.
@@ -663,7 +664,7 @@ Section ProofArgraw.
     rewrite /B5 upd_ne; [reflexivity | congruence].
   Qed.
 
-  Local Lemma ar_arm1 `{CID0 : CpuId} `{XI : CurCtx}
+  Local Lemma ar_arm1 `{CID0 : CpuId}
       (M : regfile) (av' : nat) (sp0 ra0 s00 s10 vgap p : mword 64) (tfp : mword 44)
       (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool) :
     ar_arm_body M 1%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt b.
@@ -783,7 +784,7 @@ Section ProofArgraw.
     rewrite /B5 upd_ne; [reflexivity | congruence].
   Qed.
 
-  Local Lemma ar_arm2 `{CID0 : CpuId} `{XI : CurCtx}
+  Local Lemma ar_arm2 `{CID0 : CpuId}
       (M : regfile) (av' : nat) (sp0 ra0 s00 s10 vgap p : mword 64) (tfp : mword 44)
       (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool) :
     ar_arm_body M 2%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt b.
@@ -903,7 +904,7 @@ Section ProofArgraw.
     rewrite /B5 upd_ne; [reflexivity | congruence].
   Qed.
 
-  Local Lemma ar_arm3 `{CID0 : CpuId} `{XI : CurCtx}
+  Local Lemma ar_arm3 `{CID0 : CpuId}
       (M : regfile) (av' : nat) (sp0 ra0 s00 s10 vgap p : mword 64) (tfp : mword 44)
       (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool) :
     ar_arm_body M 3%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt b.
@@ -1023,7 +1024,7 @@ Section ProofArgraw.
     rewrite /B5 upd_ne; [reflexivity | congruence].
   Qed.
 
-  Local Lemma ar_arm4 `{CID0 : CpuId} `{XI : CurCtx}
+  Local Lemma ar_arm4 `{CID0 : CpuId}
       (M : regfile) (av' : nat) (sp0 ra0 s00 s10 vgap p : mword 64) (tfp : mword 44)
       (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool) :
     ar_arm_body M 4%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt b.
@@ -1143,7 +1144,7 @@ Section ProofArgraw.
     rewrite /B5 upd_ne; [reflexivity | congruence].
   Qed.
 
-  Local Lemma ar_arm5 `{CID0 : CpuId} `{XI : CurCtx}
+  Local Lemma ar_arm5 `{CID0 : CpuId}
       (M : regfile) (av' : nat) (sp0 ra0 s00 s10 vgap p : mword 64) (tfp : mword 44)
       (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool) :
     ar_arm_body M 5%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt b.
@@ -1267,7 +1268,7 @@ Section ProofArgraw.
      so the goal is a closed implication and there is no Iris context to
      duplicate per branch -- which is what made the in-proof six-way split
      cost 81 s and re-typecheck the dependent Sail context six times. *)
-  Lemma ar_arm `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma ar_arm `{CID0 : CpuId}
       (M : regfile) (k : nat) (av' : nat)
       (sp0 ra0 s00 s10 vgap p : mword 64) (tfp : mword 44)
       (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool) :

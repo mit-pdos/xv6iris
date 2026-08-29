@@ -19,6 +19,7 @@ Require Import IntrDefs.
 From Kernel Require KernelSyms.
 Require Import ProcGeom.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 (* wakeup no longer calls myproc at all -- the scan visits every slot,
    including the caller's own (SpecWakeup.v).  Nothing here mentions it. *)
@@ -29,7 +30,6 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
    so the prologue's and the epilogue's cells unify without arithmetic. *)
 Definition wk_fcell (spF : mword 64) (u : Z) : mword 64 :=
   add_vec spF (zero_extend' 64 (concat_vec (mword_of_int u : mword 6) ('b"000"))).
-Require Import TsoCtx.
 
 Definition wp_wakeup_prologue_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (m : regfile) (K : nat) (b : bool) (p : mword 64) :=
   let sp0 : mword 64 := m !!! Regidx csp_rs1 in

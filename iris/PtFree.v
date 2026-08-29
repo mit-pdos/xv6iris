@@ -47,6 +47,7 @@ Require Import KMap.
 Require Import KallocInv.
 Require Import ProcPtOwn.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -327,7 +328,7 @@ Section PtFreeIris.
      description's are gone).  [page_valid] comes out of the node's own
      claim ([PtTree.pt_node_claim]), the tier move from
      [ProcPtOwn.phys_to_page_own]. *)
-  Lemma pt_slots_kfree_pre (b : mword 44) :
+  Lemma pt_slots_kfree_pre `{XI : CurCtx} (b : mword 44) :
     page_valid (page_base b) ->
     kmap_static_claims -∗
     ([∗ list] i ∈ seqZ 0 512, ∃ w : mword 64, u_pte_addr b (mword_of_int i) ↦ₚ₈ w) -∗

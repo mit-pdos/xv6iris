@@ -106,8 +106,8 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 Set Printing Depth 40.
 
 (* MAXFILE*BSIZE as a Z LITERAL: stated at [Z.of_nat …], never as a [nat]
@@ -290,6 +290,9 @@ Qed.
 Section FilereadMsg.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
+  (* M1 stage 3: [↦ₛ] is context-indexed, and a rodata message extracted
+     from [kernel_data] lands at the READING thread's context. *)
+  Context `{XI : CurCtx}.
 
   Lemma fr_msg_str :
     (kernel_data : iProp Σ) -∗ (mword_of_int fr_msg_a : mword 64) ↦ₛ□ fr_msg.
@@ -2145,6 +2148,7 @@ Section ProofFileread.
              { rewrite /inode_map_q. iFrame. }
              (* ---- CHECK OUT the offset cell ---- *)
              iApply fupd_wp.
+             iEval (rewrite -off_mark_acc) in "Hvalid".
              iMod (off_checkout γf γox k q (DfracOwn (q/2)) (fc_ip Cf) ⊤
                      ltac:(solve_ndisj) with "Hoh Hcip Hvalid Hrlv")
                as "(Hoh & Hcip & Hoffc)".
@@ -2460,7 +2464,8 @@ Section ProofFileread.
                    and the escrow re-forms the payload against its own
                    residue; the pure clauses never left the arm. ---- *)
                 iAssert (i_valid (ientry ikk) ↦₄ valid_word true)%I
-                  with "[Hvalid]" as "Hvalid"; [rewrite -Hipk; iExact "Hvalid" |].
+                  with "[Hvalid]" as "Hvalid";
+                  [rewrite -Hipk -off_mark_acc; iExact "Hvalid" |].
                 iEval (rewrite Hipk) in "Hidev".
                 iDestruct "Hmap" as "[Haddrs Hindres]".
                 iEval (rewrite Hipk) in "Haddrs".
@@ -2750,7 +2755,8 @@ Section ProofFileread.
                    and the escrow re-forms the payload against its own
                    residue; the pure clauses never left the arm. ---- *)
                 iAssert (i_valid (ientry ikk) ↦₄ valid_word true)%I
-                  with "[Hvalid]" as "Hvalid"; [rewrite -Hipk; iExact "Hvalid" |].
+                  with "[Hvalid]" as "Hvalid";
+                  [rewrite -Hipk -off_mark_acc; iExact "Hvalid" |].
                 iEval (rewrite Hipk) in "Hidev".
                 iDestruct "Hmap" as "[Haddrs Hindres]".
                 iEval (rewrite Hipk) in "Haddrs".

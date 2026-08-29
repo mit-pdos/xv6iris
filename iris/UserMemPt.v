@@ -992,7 +992,6 @@ Section GenRead.
   Context (k : Z) (Hk : 0 < k) (Hk8 : k <= 8).
   Context (pbmt : page_based_mem_type) (addr : mword 64) (region : PMA_Region).
   Context (w : mword (8 * k)) (s : mstate) (mm : PtBytes.pamap).
-  Context `{XI : CurCtx}.
 
   Hypothesis HDc : Dr pmpcfg_n = true.
   Hypothesis HDa : Dr pmpaddr_n = true.
@@ -1212,7 +1211,6 @@ Section GenWrite.
   Context (k : Z) (Hk : 0 < k) (Hk8 : k <= 8).
   Context (pbmt : page_based_mem_type) (addr : mword 64) (region : PMA_Region).
   Context (data : mword (8 * k)) (s : mstate) (mm : PtBytes.pamap).
-  Context `{XI : CurCtx}.
 
   Hypothesis HDc : Dr pmpcfg_n = true.
   Hypothesis HDa : Dr pmpaddr_n = true.

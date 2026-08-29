@@ -93,9 +93,9 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 Import Defs.
-Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Notation CT := KernelSyms.consoleintr (only parsing).
@@ -147,18 +147,18 @@ Section CtBodies.
   (* ---- the frame, in two pieces ------------------------------------ *)
 
   (* the three the prologue saves unconditionally *)
-  Definition ct_saved (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
+  Definition ct_saved `{XI : CurCtx} (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
     (pa_stk sp0 1 ↦₈[KT1] (m0 !!! Regidx Rra) ∗
      pa_stk sp0 2 ↦₈[KT1] (m0 !!! Regidx Rs0) ∗
      pa_stk sp0 3 ↦₈[KT1] (m0 !!! Regidx Rs1))%I.
 
   (* slots 4 and 5 (s2/s3's shrink-wrap) and slot 6, which nothing writes *)
-  Definition ct_rest (sp0 : mword 64) : iProp Σ :=
+  Definition ct_rest `{XI : CurCtx} (sp0 : mword 64) : iProp Σ :=
     ((∃ w : mword 64, pa_stk sp0 4 ↦₈[KT1] w) ∗
      (∃ w : mword 64, pa_stk sp0 5 ↦₈[KT1] w) ∗
      (∃ w : mword 64, pa_stk sp0 6 ↦₈[KT1] w))%I.
 
-  Lemma ct_frame_back (sp0 : mword 64) (m0 : regfile) :
+  Lemma ct_frame_back `{XI : CurCtx} (sp0 : mword 64) (m0 : regfile) :
     ct_saved sp0 m0 -∗ ct_rest sp0 -∗ stack_own (KTR := KT1) sp0 6.
   Proof.
     iIntros "(H1 & H2 & H3) (H4 & H5 & H6)".
@@ -531,7 +531,7 @@ Section ProofConsoleintr.
   (*  NINE jumps reach it -- every arm of the switch ends here -- so it   *)
   (*  is a continuation and the epilogue is written once.                 *)
   (* =================================================================== *)
-  Definition ct_exit_prop `{CID0 : CpuId} `{XI : CurCtx}
+  Definition ct_exit_prop `{CID0 : CpuId}
       (γc : gname) (pme : mword 64) (m0 : regfile) (K lvl : nat) (eb : bool)
       (b : bool) (sp0 : mword 64) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) b pme (fun (CIDx : CpuId) =>
@@ -618,7 +618,7 @@ Section ProofConsoleintr.
       assert (N10 : r <> Ra0) by (intro He; rewrite He in Hr; vm_compute in Hr; discriminate).
       rewrite /X3 upd_ne; [| congruence]. rewrite /X2 upd_ne; [| congruence].
       rewrite /X1 upd_ne; [| congruence]. reflexivity. }
-    iApply (Release.wp_release_sconf KT1 γc a_cons "cons"%string cons_res X3
+    iApply (Release.wp_release_sconf KT1 γc a_cons "cons"%string <{ cons_res }> X3
               lvl eb pme (K - 6)%nat ({["cons"]} ∪ lks) HX3lka
               ltac:(lia)
               with "Hcg Ht Hpc Hlk Hlocked Hres Hcnt Hpay").
@@ -647,7 +647,7 @@ Section ProofConsoleintr.
   (*  them has already put the new [cons.e] in a2, which is the only      *)
   (*  register this block reads.                                          *)
   (* =================================================================== *)
-  Definition ct_wake_prop `{CID0 : CpuId} `{XI : CurCtx}
+  Definition ct_wake_prop `{CID0 : CpuId}
       (γc : gname) (pme : mword 64) (m0 : regfile)
       (K lvl : nat) (eb : bool) (b : bool) (sp0 : mword 64) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) b pme (fun (CIDw : CpuId) =>
@@ -799,7 +799,7 @@ Section ProofConsoleintr.
      [c.ldsp s2,16(sp)], [c.ldsp s3,8(sp)], [c.j -> +0x104].  It occurs at
      +0x0de, +0x0e4 and +0x0ea -- once per way out of the kill-line loop --
      so it is a lemma over its three pcs rather than three copies. *)
-  Lemma ct_restore23 `{CIDq : CpuId} `{XI : CurCtx}
+  Lemma ct_restore23 `{CIDq : CpuId}
       (γc : gname) (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
       (b : bool) (sp0 : mword 64) (pc1 pc2 pc3 : mword 64)
       (jimm : mword 11) (lks : gset string) :
@@ -892,7 +892,7 @@ Section ProofConsoleintr.
   (*  the Löb IH sits under.  Nothing is returned, so no count has to      *)
   (*  survive the loop.                                                    *)
   (* =================================================================== *)
-  Definition ct_kill_prop `{CID0 : CpuId} `{XI : CurCtx}
+  Definition ct_kill_prop `{CID0 : CpuId}
       (γc : gname)
       (pme : mword 64) (m0 : regfile) (K lvl : nat) (eb : bool)
       (b : bool) (sp0 : mword 64) (lks : gset string) : iProp Σ :=
@@ -1218,7 +1218,7 @@ Section ProofConsoleintr.
   (*  FALL INTO [WAKE].  The only arm that reaches the wake tail without   *)
   (*  a test, because the byte it just stored IS the newline.              *)
   (* =================================================================== *)
-  Lemma ct_cr `{CIDq : CpuId} `{XI : CurCtx}
+  Lemma ct_cr `{CIDq : CpuId}
       (γtx γc : gname) (γu : uart_names) (γv : disk_names)
       (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
       (b : bool) (sp0 : mword 64) (lks : gset string) :
@@ -1464,7 +1464,7 @@ Section ProofConsoleintr.
   (*  is not empty, then leave.  The same [cons.e--] the kill loop makes,  *)
   (*  minus the loop -- and, like it, bounded by nothing.                  *)
   (* =================================================================== *)
-  Lemma ct_bs `{CIDq : CpuId} `{XI : CurCtx}
+  Lemma ct_bs `{CIDq : CpuId}
       (γtx γc : gname) (γu : uart_names) (γv : disk_names)
       (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
       (b : bool) (sp0 : mword 64) (lks : gset string) :
@@ -1688,7 +1688,7 @@ Section ProofConsoleintr.
   (*  &cons, '\n' and BACKSPACE into s1/s2/s3, and then either enters the  *)
   (*  loop or, on an already-empty line, leaves through the restore stub.  *)
   (* =================================================================== *)
-  Lemma ct_kill_pre `{CIDq : CpuId} `{XI : CurCtx}
+  Lemma ct_kill_pre `{CIDq : CpuId}
       (γc : gname) (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
       (b : bool) (sp0 : mword 64) (lks : gset string) :
     M !!! Regidx csp_rs1 = pa_stk sp0 6%nat ->
@@ -1907,7 +1907,7 @@ Section ProofConsoleintr.
   (*  to the ring, and decide whether the line is complete.  THREE ways    *)
   (*  reach [WAKE] from here ('\n', C('D'), a full ring) and one leaves.   *)
   (* =================================================================== *)
-  Lemma ct_store `{CIDq : CpuId} `{XI : CurCtx}
+  Lemma ct_store `{CIDq : CpuId}
       (γtx γc : gname) (γu : uart_names) (γv : disk_names)
       (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
       (b : bool) (sp0 : mword 64) (cv : mword 64) (lks : gset string) :
@@ -2357,7 +2357,7 @@ Section ProofConsoleintr.
   (*  leave without touching anything; '\r' is rewritten to '\n' by the    *)
   (*  arm at +0x12e; everything else falls into [ct_store].                *)
   (* =================================================================== *)
-  Lemma ct_dflt `{CIDq : CpuId} `{XI : CurCtx}
+  Lemma ct_dflt `{CIDq : CpuId}
       (γtx γc : gname) (γu : uart_names) (γv : disk_names)
       (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
       (b : bool) (sp0 : mword 64) (cv : mword 64) (lks : gset string) :
@@ -2765,12 +2765,12 @@ Section ProofConsoleintr.
     (* ---- +0x014 acquire(&cons.lock) ---- *)
     iDestruct (cpu_own_transport CID CIDp9 lvl eb pme b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf KT1 γc "cons"%string cons_res P5 lvl eb pme
+    iApply (Acquire.wp_acquire_sconf KT1 γc "cons"%string <{ cons_res }> P5 lvl eb pme
               (K - 6)%nat b lks ltac:(lia) ltac:(lia) Hbelow
               with "Hcg Hcnt Ht Hpc []").
     all: try lkbelow.
     { iEval (rewrite HP5a0). iExact "Hlk". }
-    iIntros (CIDaq Hsaq ms0 maq) "%Hms0 Hcg Hpc %Hcsaq Hlocked Hres Hcnt Hpay". rgall.
+    iIntros (CIDaq Hsaq ms0 maq) "%Hms0 Hcg Hpc %Hcsaq Hlocked Hres _ Hcnt Hpay". rgall.
     iEval (rewrite HP5ra) in "Hpc".
     assert (Hp018 : ret_pc (add_vec_int (mword_of_int (CT + 0x14) : mword 64) 4)
                     = (mword_of_int (CT + 0x18) : mword 64)) by pcw.

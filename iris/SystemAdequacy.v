@@ -411,7 +411,11 @@ Section SystemBoot.
     iAssert (fs_crash_seam cov (FsImg.sb_logstart (fss_sb S))) as "#Hseam".
     { rewrite Hlseq /fs_crash_seam. iModIntro.
       rewrite Hcp. iSplitL; iIntros "H"; iExact "H". }
-    iMod (boot_shared_alloc g XV6_DISK_BYTES (fss_sb S) (fs_nib S) cov
+    (* main-tso-readiness: the boot context is PINNED (the M-leg mints it
+       with [own_context_boot] -- deferred with the M2 threading); at SC any
+       [CtxId] serves, and one ambient serves all eight harts. *)
+    pose (ξ0 := TsoCtx.MkCtxId inhabitant inhabitant : TsoCtx.CtxId).
+    iMod (boot_shared_alloc (XI := ξ0) g XV6_DISK_BYTES (fss_sb S) (fs_nib S) cov
             S Pb (fun _ => emp)%I gsn gln gtn Hbf Hbundle
             with "Hdursnap Hres")
       as (Hfd Hir Hpav Hbs HF γd γv Rspent)
@@ -471,7 +475,7 @@ Section SystemBoot.
            unify", and the 400 GB divergence the deleted [adequacy_fscfg]
            was written to block). *)
         iDestruct "Hh0" as (iv) "Hh0".
-        iApply (boot_hart_primary (fileG0 := HF) (CID := 0%fin)
+        iApply (boot_hart_primary (fileG0 := HF) (CID := 0%fin) (XI := ξ0)
                   (g.(gregs) 0%fin) iv DfracDiscarded γd γv ps l0 b0 c0
                   (v_disk (g.(gdev).(dvirtio))) (fss_sb S) (fs_nib S) cov
                   XV6_DISK_BYTES S Pb Rspent
@@ -485,7 +489,7 @@ Section SystemBoot.
       iApply (big_sepL_impl with "Hhrest").
       iIntros "!>" (k c _) "Hh".
       iDestruct "Hh" as (iv) "Hh".
-      iApply (boot_hart_secondary (fileG0 := HF) (CID := FS c)
+      iApply (boot_hart_secondary (fileG0 := HF) (CID := FS c) (XI := ξ0)
                 (g.(gregs) (FS c)) iv DfracDiscarded γd γv
                 (boot_regs_of_facts g Hbf (FS c)) (fin_FS_nz c)
                 with "Htext Hdata Hh Hstarted"). }

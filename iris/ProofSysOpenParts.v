@@ -117,7 +117,7 @@ Notation SO := KernelSyms.sys_open (only parsing).
    through, and it is stated POSITIVELY where it matters -- the five
    exceptions are exactly the five the code writes, each accounted for by
    its own equation. *)
-Definition so_thr (m M : regfile) : Prop :=
+Definition so_thr `{XI : CurCtx} (m M : regfile) : Prop :=
   forall c : mword 5, is_cs_idx c = true ->
     c <> csp_rs1 ->
     c <> (mword_of_int 8 : mword 5) ->
@@ -126,16 +126,16 @@ Definition so_thr (m M : regfile) : Prop :=
     c <> (mword_of_int 19 : mword 5) ->
     M !!! Regidx c = (m !!! Regidx c : mword 64).
 
-Lemma so_thr_refl (m : regfile) : so_thr m m.
+Lemma so_thr_refl `{XI : CurCtx} (m : regfile) : so_thr m m.
 Proof. intros c _ _ _ _ _ _. reflexivity. Qed.
 
-Lemma so_thr_trans (m M P : regfile) : so_thr m M -> so_thr M P -> so_thr m P.
+Lemma so_thr_trans `{XI : CurCtx} (m M P : regfile) : so_thr m M -> so_thr M P -> so_thr m P.
 Proof.
   intros H1 H2 c Hc N2 N8 N9 N18 N19.
   rewrite (H2 c Hc N2 N8 N9 N18 N19). exact (H1 c Hc N2 N8 N9 N18 N19).
 Qed.
 
-Definition so_sp (sp0 : mword 64) (M : regfile) : Prop :=
+Definition so_sp `{XI : CurCtx} (sp0 : mword 64) (M : regfile) : Prop :=
   (M !!! Regidx csp_rs1 : mword 64) = pa_stk sp0 24.
 
 (* ===================================================================== *)
@@ -144,31 +144,31 @@ Definition so_sp (sp0 : mword 64) (M : regfile) : Prop :=
 
 (* -192 / +192, both a [c.addi16sp] (52 is -12 in a 6-bit field, x16;
    12 is +12). *)
-Lemma so_push (X : mword 64) :
+Lemma so_push `{XI : CurCtx} (X : mword 64) :
   add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 52 : mword 6)))
   = pa_stk X 24.
 Proof. apply stk_push. apply bv_eq; vm_compute; reflexivity. Qed.
 
-Lemma so_pop (X : mword 64) :
+Lemma so_pop `{XI : CurCtx} (X : mword 64) :
   add_vec (pa_stk X 24) (sign_extend' 64 (caddi16sp_imm (mword_of_int 12 : mword 6)))
   = X.
 Proof. apply stk_pop. apply bv_eq; vm_compute; reflexivity. Qed.
 
 (* [c.addi4spn s0,sp,192] -- the frame pointer, back at the entry sp. *)
-Lemma so_fp (X : mword 64) :
+Lemma so_fp `{XI : CurCtx} (X : mword 64) :
   add_vec (pa_stk X 24) (sign_extend' 64 (caddi4spn_imm (mword_of_int 48 : mword 8)))
   = X.
 Proof. apply stk_pop. apply bv_eq; vm_compute; reflexivity. Qed.
 
 (* [path] at [s0-176] (the frame pointer IS the entry sp), i.e. slots 7..22
    read from the top -- sixteen slots of byte buffer. *)
-Lemma so_bufpath (X : mword 64) :
+Lemma so_bufpath `{XI : CurCtx} (X : mword 64) :
   add_vec X (sign_extend' 64 (mword_of_int 3920 : mword 12)) = pa_stk X 22.
 Proof. apply stk_push. apply bv_eq; vm_compute; reflexivity. Qed.
 
 (* [omode] at [s0-180]: the UPPER WORD of slot 23.  This is the ONLY place
    sys_open needs a 4-byte view of a frame slot. *)
-Lemma so_omode (X : mword 64) :
+Lemma so_omode `{XI : CurCtx} (X : mword 64) :
   add_vec X (sign_extend' 64 (mword_of_int 3916 : mword 12))
   = pa_add (pa_stk X 23) 4.
 Proof.
@@ -182,7 +182,7 @@ Proof.
 Qed.
 
 (* the c.sdsp / c.ldsp displacements off the pushed sp *)
-Lemma so_frm (X : mword 64) (u : mword 6) (k : nat) :
+Lemma so_frm `{XI : CurCtx} (X : mword 64) (u : mword 6) (k : nat) :
   (mword_of_int (bv_wrap 64 (uint (mword_of_int (- (8 * Z.of_nat 24)) : mword 64)
                          + uint (zero_extend' 64 (concat_vec u ('b"000")) : mword 64)))
    : mword 64)
@@ -192,31 +192,31 @@ Proof.
   intro H. unfold pa_stk, add_vec_int. rewrite pa_stk_off2. apply f_equal. exact H.
 Qed.
 
-Lemma so_frm1 (X : mword 64) :
+Lemma so_frm1 `{XI : CurCtx} (X : mword 64) :
   add_vec (pa_stk X 24)
     (zero_extend' 64 (concat_vec (mword_of_int 23 : mword 6) ('b"000")))
   = pa_stk X 1.
 Proof. apply so_frm. apply bv_eq; vm_compute; reflexivity. Qed.
 
-Lemma so_frm2 (X : mword 64) :
+Lemma so_frm2 `{XI : CurCtx} (X : mword 64) :
   add_vec (pa_stk X 24)
     (zero_extend' 64 (concat_vec (mword_of_int 22 : mword 6) ('b"000")))
   = pa_stk X 2.
 Proof. apply so_frm. apply bv_eq; vm_compute; reflexivity. Qed.
 
-Lemma so_frm3 (X : mword 64) :
+Lemma so_frm3 `{XI : CurCtx} (X : mword 64) :
   add_vec (pa_stk X 24)
     (zero_extend' 64 (concat_vec (mword_of_int 21 : mword 6) ('b"000")))
   = pa_stk X 3.
 Proof. apply so_frm. apply bv_eq; vm_compute; reflexivity. Qed.
 
-Lemma so_frm4 (X : mword 64) :
+Lemma so_frm4 `{XI : CurCtx} (X : mword 64) :
   add_vec (pa_stk X 24)
     (zero_extend' 64 (concat_vec (mword_of_int 20 : mword 6) ('b"000")))
   = pa_stk X 4.
 Proof. apply so_frm. apply bv_eq; vm_compute; reflexivity. Qed.
 
-Lemma so_frm5 (X : mword 64) :
+Lemma so_frm5 `{XI : CurCtx} (X : mword 64) :
   add_vec (pa_stk X 24)
     (zero_extend' 64 (concat_vec (mword_of_int 19 : mword 6) ('b"000")))
   = pa_stk X 5.
@@ -224,7 +224,7 @@ Proof. apply so_frm. apply bv_eq; vm_compute; reflexivity. Qed.
 
 (* [K_sys_open]'s single premise, turned into every bound the twelve callees
    and the [sie_cap_gpr] pop want. *)
-Lemma so_kb (K : nat) : (K_sys_open <= K)%nat ->
+Lemma so_kb `{XI : CurCtx} (K : nat) : (K_sys_open <= K)%nat ->
   (K_create <= K - 24)%nat /\ (K_namei <= K - 24)%nat /\
   (18 <= K - 24)%nat /\ (argstr_stack <= K - 24)%nat /\
   (K_begin_op <= K - 24)%nat /\ (K_end_op <= K - 24)%nat /\
@@ -246,7 +246,7 @@ Qed.
 (*  THE SIGN CLUSTER: the two [bltz]s (+0x24 argstr, +0x70 fdalloc)       *)
 (* ===================================================================== *)
 
-Lemma so_sint_moi (z : Z) : (0 <= z < 2 ^ 31)%Z ->
+Lemma so_sint_moi `{XI : CurCtx} (z : Z) : (0 <= z < 2 ^ 31)%Z ->
   sint (mword_of_int z : mword 64) = z.
 Proof.
   intro Hz.
@@ -260,7 +260,7 @@ Proof.
   lia.
 Qed.
 
-Lemma so_nonneg (z : Z) : (0 <= z < 2 ^ 31)%Z ->
+Lemma so_nonneg `{XI : CurCtx} (z : Z) : (0 <= z < 2 ^ 31)%Z ->
   zopz0zI_s (mword_of_int z : mword 64) (zero_reg : mword 64) = false.
 Proof.
   intro Hz. unfold zopz0zI_s. apply Z.ltb_ge.
@@ -268,36 +268,36 @@ Proof.
   rewrite (so_sint_moi z Hz). lia.
 Qed.
 
-Lemma so_m1_neg :
+Lemma so_m1_neg `{XI : CurCtx} :
   zopz0zI_s (mword_of_int (-1) : mword 64) (zero_reg : mword 64) = true.
 Proof. vm_compute; reflexivity. Qed.
 
-Lemma so_zero_nonneg :
+Lemma so_zero_nonneg `{XI : CurCtx} :
   zopz0zI_s (mword_of_int 0 : mword 64) (zero_reg : mword 64) = false.
 Proof. vm_compute; reflexivity. Qed.
 
-Lemma so_len_range (k : nat) : (k < 128)%nat -> (0 <= Z.of_nat k < 2 ^ 31)%Z.
+Lemma so_len_range `{XI : CurCtx} (k : nat) : (k < 128)%nat -> (0 <= Z.of_nat k < 2 ^ 31)%Z.
 Proof.
   intro Hk.
   assert (E31 : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity). lia.
 Qed.
 
-Lemma so_maxpath_lt : (Z.of_nat 128 < 2 ^ 31)%Z.
+Lemma so_maxpath_lt `{XI : CurCtx} : (Z.of_nat 128 < 2 ^ 31)%Z.
 Proof. lia. Qed.
 
-Lemma so_arg0_lt : (0 < NARG)%nat.
+Lemma so_arg0_lt `{XI : CurCtx} : (0 < NARG)%nat.
 Proof. unfold NARG. lia. Qed.
 
-Lemma so_arg1_lt : (1 < NARG)%nat.
+Lemma so_arg1_lt `{XI : CurCtx} : (1 < NARG)%nat.
 Proof. unfold NARG. lia. Qed.
 
-Lemma so_noff0 : (Z.of_nat 0 + 1 < 2 ^ 31)%Z.
+Lemma so_noff0 `{XI : CurCtx} : (Z.of_nat 0 + 1 < 2 ^ 31)%Z.
 Proof. lia. Qed.
 
 (* the descriptor fdalloc returns is in [0, NOFILE), hence signed-nonneg --
    which is what makes the [bltz a0] at +0x70 fall through on the success
    arm and what makes the returned a0 a legal descriptor literal. *)
-Lemma so_fd_range (fd : nat) : (fd < NOFILE)%nat -> (0 <= Z.of_nat fd < 2 ^ 31)%Z.
+Lemma so_fd_range `{XI : CurCtx} (fd : nat) : (fd < NOFILE)%nat -> (0 <= Z.of_nat fd < 2 ^ 31)%Z.
 Proof.
   intro Hk. unfold NOFILE in Hk.
   assert (E31 : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity). lia.
@@ -310,7 +310,7 @@ Qed.
 (*  T_DIR = 1 (+0xf2), T_FILE = 2 (+0xb4), T_DEVICE = 3 (+0x50, +0x7a).    *)
 (* ===================================================================== *)
 
-Lemma so_sext16_inj (x y : mword 16) :
+Lemma so_sext16_inj `{XI : CurCtx} (x y : mword 16) :
   (sign_extend' 64 x : mword 64) = (sign_extend' 64 y : mword 64) -> x = y.
 Proof.
   intros H. apply (f_equal bv_signed) in H.
@@ -321,7 +321,7 @@ Proof.
   apply bv_eq_signed. exact H.
 Qed.
 
-Lemma so_sext_lit (n : Z) : (0 <= n < 32768)%Z ->
+Lemma so_sext_lit `{XI : CurCtx} (n : Z) : (0 <= n < 32768)%Z ->
   (sign_extend' 64 (mword_of_int n : mword 16) : mword 64)
   = (mword_of_int n : mword 64).
 Proof.
@@ -345,7 +345,7 @@ Proof.
   rewrite Hs. rewrite moi64_unsigned. reflexivity.
 Qed.
 
-Lemma so_ty_eq (t : mword 16) (n : Z) : (0 <= n < 32768)%Z ->
+Lemma so_ty_eq `{XI : CurCtx} (t : mword 16) (n : Z) : (0 <= n < 32768)%Z ->
   t = (mword_of_int n : mword 16) ->
   eq_vec (sign_extend' 64 t : mword 64) (mword_of_int n : mword 64) = true.
 Proof.
@@ -353,7 +353,7 @@ Proof.
   exact (proj2 (eq_vec_true_iff _ _) eq_refl).
 Qed.
 
-Lemma so_ty_ne (t : mword 16) (n : Z) : (0 <= n < 32768)%Z ->
+Lemma so_ty_ne `{XI : CurCtx} (t : mword 16) (n : Z) : (0 <= n < 32768)%Z ->
   t <> (mword_of_int n : mword 16) ->
   eq_vec (sign_extend' 64 t : mword 64) (mword_of_int n : mword 64) = false.
 Proof.
@@ -362,9 +362,9 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma so_tdir_range : (0 <= 1 < 32768)%Z. Proof. lia. Qed.
-Lemma so_tfile_range : (0 <= 2 < 32768)%Z. Proof. lia. Qed.
-Lemma so_tdev_range : (0 <= 3 < 32768)%Z. Proof. lia. Qed.
+Lemma so_tdir_range `{XI : CurCtx} : (0 <= 1 < 32768)%Z. Proof. lia. Qed.
+Lemma so_tfile_range `{XI : CurCtx} : (0 <= 2 < 32768)%Z. Proof. lia. Qed.
+Lemma so_tdev_range `{XI : CurCtx} : (0 <= 3 < 32768)%Z. Proof. lia. Qed.
 
 (* ===================================================================== *)
 (*  THE [major] BOUNDS CHECK IS ONE UNSIGNED TEST, NOT TWO                *)
@@ -376,7 +376,7 @@ Lemma so_tdev_range : (0 <= 3 < 32768)%Z. Proof. lia. Qed.
 (*  not a short-circuit pair.                                             *)
 (* ===================================================================== *)
 
-Lemma so_uint_zext16 (h : mword 16) :
+Lemma so_uint_zext16 `{XI : CurCtx} (h : mword 16) :
   uint (zero_extend' 64 h : mword 64) = bv_unsigned h.
 Proof.
   rewrite uint_unsigned.
@@ -390,17 +390,17 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma so_uint9 : uint (mword_of_int 9 : mword 64) = 9%Z.
+Lemma so_uint9 `{XI : CurCtx} : uint (mword_of_int 9 : mword 64) = 9%Z.
 Proof. vm_compute; reflexivity. Qed.
 
-Lemma so_major_in (h : mword 16) : (bv_unsigned h <= 9)%Z ->
+Lemma so_major_in `{XI : CurCtx} (h : mword 16) : (bv_unsigned h <= 9)%Z ->
   zopz0zI_u (mword_of_int 9 : mword 64) (zero_extend' 64 h : mword 64) = false.
 Proof.
   intro Hh. unfold zopz0zI_u. apply Z.ltb_ge.
   rewrite so_uint9 (so_uint_zext16 h). exact Hh.
 Qed.
 
-Lemma so_major_out (h : mword 16) : (9 < bv_unsigned h)%Z ->
+Lemma so_major_out `{XI : CurCtx} (h : mword 16) : (9 < bv_unsigned h)%Z ->
   zopz0zI_u (mword_of_int 9 : mword 64) (zero_extend' 64 h : mword 64) = true.
 Proof.
   intro Hh. unfold zopz0zI_u. apply Z.ltb_lt.
@@ -447,27 +447,27 @@ Qed.
 (* ===================================================================== *)
 
 (* the word the [lw] delivers *)
-Definition so_omv (om : mword 32) : mword 64 := sign_extend' 64 om.
+Definition so_omv `{XI : CurCtx} (om : mword 32) : mword 64 := sign_extend' 64 om.
 
 (* what an [andi <mask>] leaves in its destination *)
-Definition so_and (om : mword 32) (n : Z) : mword 64 :=
+Definition so_and `{XI : CurCtx} (om : mword 32) (n : Z) : mword 64 :=
   and_vec (so_omv om) (sign_extend' 64 (mword_of_int n : mword 12)).
 
 (* +0x90 then +0x94: the register whose low byte [sb a4,8(s2)] stores into
    [f->readable] *)
-Definition so_rd_word (om : mword 32) : mword 64 :=
+Definition so_rd_word `{XI : CurCtx} (om : mword 32) : mword 64 :=
   xor_vec (so_and om 1) (sign_extend' 64 (mword_of_int 1 : mword 12)).
 
 (* +0x9c then +0xa0: the register whose low byte [sb a4,9(s2)] stores into
    [f->writable].  [zero_reg] is the [snez]'s [rs1] -- the leaf reads it out
    of the capability with [sie_cap_gpr_x0]. *)
-Definition so_wr_word (om : mword 32) : mword 64 :=
+Definition so_wr_word `{XI : CurCtx} (om : mword 32) : mword 64 :=
   zero_extend' 64 (bool_to_bit (zopz0zI_u (zero_reg : mword 64) (so_and om 3))).
 
 (* the 32 -> 64 companion of [so_sext16_inj]: the [lw]'s extension is
    injective, which is what turns the [beqz] at +0xf6 into a fact about the
    STORED word rather than about the register. *)
-Lemma so_sext32_inj (x y : mword 32) :
+Lemma so_sext32_inj `{XI : CurCtx} (x y : mword 32) :
   (sign_extend' 64 x : mword 64) = (sign_extend' 64 y : mword 64) -> x = y.
 Proof.
   intros H. apply (f_equal bv_signed) in H.
@@ -478,12 +478,12 @@ Proof.
   apply bv_eq_signed. exact H.
 Qed.
 
-Lemma so_omv_zero : so_omv (mword_of_int 0 : mword 32) = (zero_reg : mword 64).
+Lemma so_omv_zero `{XI : CurCtx} : so_omv (mword_of_int 0 : mword 32) = (zero_reg : mword 64).
 Proof. unfold so_omv. apply bv_eq; vm_compute; reflexivity. Qed.
 
 (* the +0xf6 [beqz a5]: the branch is taken EXACTLY at [omode = O_RDONLY],
    and that is the only thing the T_DIR route learns. *)
-Lemma so_omode_eqz (om : mword 32) :
+Lemma so_omode_eqz `{XI : CurCtx} (om : mword 32) :
   eq_vec (so_omv om) (zero_reg : mword 64) = true ->
   om = (mword_of_int 0 : mword 32).
 Proof.
@@ -494,7 +494,7 @@ Qed.
 (* AT O_RDONLY EVERY MASK IS EMPTY.  Uniform in the mask, so the same lemma
    serves O_CREATE (512), O_WRONLY (1), the merged writable mask (3) and
    O_TRUNC (1024) -- there is nothing mask-specific to prove. *)
-Lemma so_and_rdonly (n : Z) :
+Lemma so_and_rdonly `{XI : CurCtx} (n : Z) :
   so_and (mword_of_int 0 : mword 32) n = (mword_of_int 0 : mword 64).
 Proof.
   unfold so_and, so_omv. apply bv_eq. rewrite and_vec64_unsigned.
@@ -505,17 +505,17 @@ Qed.
 
 (* an empty mask fails its [beqz], i.e. the O_CREATE split takes the [namei]
    arm and the O_TRUNC tail is skipped *)
-Lemma so_eqz_zero : eq_vec (mword_of_int 0 : mword 64) (zero_reg : mword 64) = true.
+Lemma so_eqz_zero `{XI : CurCtx} : eq_vec (mword_of_int 0 : mword 64) (zero_reg : mword 64) = true.
 Proof. apply eq_vec_true_iff. apply bv_eq; vm_compute; reflexivity. Qed.
 
-Lemma so_wr_rdonly :
+Lemma so_wr_rdonly `{XI : CurCtx} :
   so_wr_word (mword_of_int 0 : mword 32) = (mword_of_int 0 : mword 64).
 Proof.
   unfold so_wr_word. rewrite (so_and_rdonly 3).
   apply bv_eq; vm_compute; reflexivity.
 Qed.
 
-Lemma so_wr_byte_rdonly :
+Lemma so_wr_byte_rdonly `{XI : CurCtx} :
   trunc8 (so_wr_word (mword_of_int 0 : mword 32)) = (mword_of_int 0 : mword 8).
 Proof. rewrite so_wr_rdonly. apply bv_eq; vm_compute; reflexivity. Qed.
 
@@ -530,7 +530,7 @@ Proof. rewrite so_wr_rdonly. apply bv_eq; vm_compute; reflexivity. Qed.
 
    The mask is a bit because [Z.land _ 1] is [_ mod 2]; from there the word
    is one of two closed terms and the byte follows by [vm_compute]. *)
-Lemma so_and1_01 (om : mword 32) :
+Lemma so_and1_01 `{XI : CurCtx} (om : mword 32) :
   so_and om 1 = (mword_of_int 0 : mword 64)
   \/ so_and om 1 = (mword_of_int 1 : mword 64).
 Proof.
@@ -548,7 +548,7 @@ Proof.
     rewrite Heq. by vm_compute.
 Qed.
 
-Lemma so_rd_byte_bool (om : mword 32) :
+Lemma so_rd_byte_bool `{XI : CurCtx} (om : mword 32) :
   ∃ b : bool, trunc8 (so_rd_word om)
               = ((if b then mword_of_int 1 else mword_of_int 0) : mword 8).
 Proof.
@@ -557,7 +557,7 @@ Proof.
   - exists false. apply bv_eq; vm_compute; reflexivity.
 Qed.
 
-Lemma so_wr_byte_bool (om : mword 32) :
+Lemma so_wr_byte_bool `{XI : CurCtx} (om : mword 32) :
   ∃ b : bool, trunc8 (so_wr_word om)
               = ((if b then mword_of_int 1 else mword_of_int 0) : mword 8).
 Proof.
@@ -571,7 +571,7 @@ Qed.
    walk never needs its value -- nothing in the file layer is keyed on
    [f->readable] -- but it is the fact that says the published descriptor is
    a legal read fd. *)
-Lemma so_rd_byte_rdonly :
+Lemma so_rd_byte_rdonly `{XI : CurCtx} :
   trunc8 (so_rd_word (mword_of_int 0 : mword 32)) = (mword_of_int 1 : mword 8).
 Proof.
   unfold so_rd_word. rewrite (so_and_rdonly 1).
@@ -581,7 +581,7 @@ Qed.
 (* the sixteen-bit type test, read as the Z-level disequality [DirView] and
    [FileInvDefs] state their T_DIR conditions at.  This is the O_CREATE
    arm's whole witness: create was called with T_FILE. *)
-Lemma so_tdir_zne (t : mword 16) :
+Lemma so_tdir_zne `{XI : CurCtx} (t : mword 16) :
   t <> (mword_of_int 1 : mword 16) -> bv_unsigned t <> T_DIR_z.
 Proof.
   intros Hne Hc. apply Hne. apply bv_eq. rewrite Hc.
@@ -591,7 +591,7 @@ Qed.
 (* ...and its converse direction, which is how the else arm's branch fact
    ("the type test at +0xec fell through, so the +0xf6 test ran") reaches
    [so_pay_witness] in the vocabulary [inode_pay_alloc] speaks. *)
-Lemma so_dir_forced (t : mword 16) (om : mword 32) :
+Lemma so_dir_forced `{XI : CurCtx} (t : mword 16) (om : mword 32) :
   (t = (mword_of_int 1 : mword 16) -> om = (mword_of_int 0 : mword 32)) ->
   (bv_unsigned t = T_DIR_z -> om = (mword_of_int 0 : mword 32)).
 Proof.
@@ -604,7 +604,7 @@ Qed.
    and on a T_DIR inode [omode] was forced to zero -- so a WRITABLE fd is
    never a directory.  Stated in exactly [inode_pay_alloc]'s shape, so the
    walk's discharge is one [apply]. *)
-Lemma so_pay_witness (om : mword 32) (ty : bv 16) (C : fcontent) :
+Lemma so_pay_witness `{XI : CurCtx} (om : mword 32) (ty : bv 16) (C : fcontent) :
   fc_writable C = trunc8 (so_wr_word om) ->
   (bv_unsigned ty = T_DIR_z -> om = (mword_of_int 0 : mword 32)) ->
   (fc_wbool C = true -> bv_unsigned ty <> T_DIR_z).
@@ -663,12 +663,12 @@ Section ProofSysOpenPublish.
      ([RiscvPtsto.word4_pointsto_half]) and nowhere else -- and which the
      [f->ip] cell is the first 8-byte user of, the invariant's half and the
      reference's half being exactly this shape. *)
-  Local Lemma so_word_half_join (a : mword 64) (w : mword 64) :
+  Local Lemma so_word_half_join `{XI : CurCtx} (a : mword 64) (w : mword 64) :
     a ↦₈{DfracOwn (1/2)} w -∗ a ↦₈{DfracOwn (1/2)} w -∗ a ↦₈ w.
   Proof.
     iIntros "H1 H2".
     iDestruct (bi.equiv_entails_1_2 _ _
-                 (word_pointsto_frac_split a (1/2) (1/2) w) with "[H1 H2]")
+                 (ctx_word_pointsto_frac_split _ a (1/2) (1/2) w) with "[H1 H2]")
       as "H"; [iFrame "H1 H2" |].
     iEval (rewrite Qp.div_2) in "H". iExact "H".
   Qed.
@@ -695,7 +695,7 @@ Section ProofSysOpenPublish.
      [fc_type = FD_NONE] ([FileInvDefs.fdstate_ok]).  So the caller no longer
      has to carry filealloc's type fact here -- the state it already holds
      says it. *)
-  Lemma so_open_slot (E : coPset) (gf : gname) (kf : nat) :
+  Lemma so_open_slot `{XI : CurCtx} (E : coPset) (gf : gname) (kf : nat) :
     ↑(offN .@ kf) ⊆ E ->
     file_ref gf kf 1 FdClosed ={E}=∗
     ∃ (Cf : fcontent) (pn : fpnames) (voff : mword 32),
@@ -718,7 +718,7 @@ Section ProofSysOpenPublish.
     iMod (off_hold_cancel_raw E gf kf (fp_ocv pn) HE with "Hoff") as "Hraw".
     iMod "Hraw" as "(%ipold & %voff & Hip2 & Hoffc & %Hwf)".
     iDestruct "Hflds" as "(Hty & Hrd & Hwr & Hpip & Hip1 & Hmaj)".
-    iDestruct (word_pointsto_agree with "Hip2 Hip1") as %->.
+    iDestruct (ctx_word_pointsto_agree with "Hip2 Hip1") as %->.
     iDestruct (so_word_half_join with "Hip1 Hip2") as "Hip".
     iEval (rewrite (file_core_none 1 pn Cf Ht)) in "Hcore".
     iEval (rewrite -iref_slot_frac) in "Hcore".
@@ -728,7 +728,7 @@ Section ProofSysOpenPublish.
     iFrame "Hcore Href Hlive Hnames Hty Hrd Hwr Hpip Hmaj Hip Hoffc".
   Qed.
 
-  Lemma so_publish (E : coPset) (gf : gname) (kf kk : nat) (qi s : Qp)
+  Lemma so_publish `{XI : CurCtx} (E : coPset) (gf : gname) (kf kk : nat) (qi s : Qp)
       (gy : gname) (inum : mword 32) (ty : bv 16) (C : fcontent)
       (pn : fpnames) (om : mword 32) (voff : mword 32) (rb wb : bool) :
     ↑fileipN ⊆ E -> ↑(offN .@ kf) ⊆ E ->
@@ -847,7 +847,7 @@ Section ProofSysOpenPublish.
      ([bm_empty], the all-zero data) discharge the rest.  [di_trunc] keeps
      [type] and [nlink], so the type clause is the caller's premise
      verbatim. *)
-  Lemma so_trunc_ok (dn : dinode) :
+  Lemma so_trunc_ok `{XI : CurCtx} (dn : dinode) :
     bv_unsigned (di_type dn) <> 0 ->
     inode_ok fsc_cov fsc_logst (di_trunc dn) bm_empty
              (fun _ => replicate BSIZE (bv_0 8)).
@@ -871,7 +871,7 @@ Section ProofSysOpenPublish.
      the three record-only facts (durable-disk 2b-inode-3) ride across it:
      the enumeration by the type, the short by the count, and a directory's
      granularity vacuously at size 0. *)
-  Lemma so_trunc_rec_local (dn : dinode) :
+  Lemma so_trunc_rec_local `{XI : CurCtx} (dn : dinode) :
     inode_rec_local dn -> inode_rec_local (di_trunc dn).
   Proof.
     intros Hrl. apply (inode_rec_local_same_type dn (di_trunc dn) Hrl eq_refl).
@@ -882,7 +882,7 @@ Section ProofSysOpenPublish.
 
   (* the open direction, one unfolding: [ic_loaded]'s [inode_addrs ∗
      ind_res] is itrunc's [inode_map]. *)
-  Lemma so_loaded_open
+  Lemma so_loaded_open `{XI : CurCtx}
       (k : nat) (inum : mword 32) (dn : dinode) (bm : blkmap) :
     ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dn bm -∗
     ∃ data : nat -> list (bv 8),
@@ -928,7 +928,7 @@ Section ProofSysOpenPublish.
   Qed.
 
   (* ...and the close direction at itrunc's outputs. *)
-  Lemma so_trunc_loaded
+  Lemma so_trunc_loaded `{XI : CurCtx}
       (k : nat) (inum : mword 32) (dn : dinode) :
     bv_unsigned (di_type dn) <> 0 ->
     bv_unsigned (di_type dn) <> T_DIR_z ->
@@ -980,14 +980,14 @@ End ProofSysOpenPublish.
 (*  the omode slot + two dead ones                                        *)
 (* ===================================================================== *)
 
-Definition so_al (sp0 : mword 64) : Prop :=
+Definition so_al `{XI : CurCtx} (sp0 : mword 64) : Prop :=
   forall i, (i < 16)%nat ->
     is_aligned_paddr (Physaddr (pa_stk sp0 (22 - i)%nat)) 8 = true.
 
 Section ProofSysOpenFrame.
   Context `{!riscvGS Σ, FSC : fscfg}.
 
-  Lemma so_frame_carve (sp0 : mword 64) :
+  Lemma so_frame_carve `{XI : CurCtx} (sp0 : mword 64) :
     stack_own (KTR := KT1) sp0 24 -∗
     ⌜so_al sp0⌝ ∗
     (∃ w : mword 64, (pa_stk sp0 1) ↦₈[KT1] w) ∗
@@ -1021,7 +1021,7 @@ Section ProofSysOpenFrame.
     iFrame "H1 H2 H3 H4 H5 H6 HbP H23 H24". iPureIntro. exact HalP.
   Qed.
 
-  Lemma so_frame_join (sp0 : mword 64)
+  Lemma so_frame_join `{XI : CurCtx} (sp0 : mword 64)
       (w1 w2 w3 w4 w5 w6 w23 w24 : mword 64) :
     so_al sp0 ->
     (pa_stk sp0 1) ↦₈[KT1] w1 -∗ (pa_stk sp0 2) ↦₈[KT1] w2 -∗
@@ -1064,31 +1064,31 @@ Section ProofSysOpenFrame.
   (* THE OMODE CELL, and the only 4-byte view of a frame slot sys_open
      needs.  The lower word of slot 23 is dead (it is the [int fd] gcc never
      spilled); it rides through as an arbitrary word and comes back. *)
-  Lemma so_omode_split (sp0 : mword 64) (w : mword 64) :
+  Lemma so_omode_split `{XI : CurCtx} (sp0 : mword 64) (w : mword 64) :
     (pa_stk sp0 23) ↦₈[KT1] w ⊢
     (pa_stk sp0 23) ↦₄[KT1] word_lo w ∗ (pa_add (pa_stk sp0 23) 4) ↦₄[KT1] word_hi w.
-  Proof. apply word_pointsto_split4. Qed.
+  Proof. apply ctx_word_pointsto_split4. Qed.
 
-  Lemma so_omode_join (sp0 : mword 64) (lo hi : bv 32) :
+  Lemma so_omode_join `{XI : CurCtx} (sp0 : mword 64) (lo hi : bv 32) :
     is_aligned_paddr (Physaddr (pa_stk sp0 23)) 8 = true ->
     (pa_stk sp0 23) ↦₄[KT1] lo -∗ (pa_add (pa_stk sp0 23) 4) ↦₄[KT1] hi -∗
     (pa_stk sp0 23) ↦₈[KT1] word_of_words lo hi.
-  Proof. intro Hal. apply word_pointsto_join4. exact Hal. Qed.
+  Proof. intro Hal. apply ctx_word_pointsto_join4. exact Hal. Qed.
 
   (* the buffer, named as bytes and back: argstr / namei / create all speak
      the [seq]-indexed byte window, not [bytes_own]. *)
-  Lemma so_bytes_name (a : mword 64) (N : nat) :
+  Lemma so_bytes_name `{XI : CurCtx} (a : mword 64) (N : nat) :
     bytes_own (KTR := KT1) (DfracOwn 1) a N ⊢
     ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[KT1] f j.
   Proof. rewrite /bytes_own. exact (bb_any_named (KTR := KT1) a N). Qed.
 
-  Lemma so_name_bytes (a : mword 64) (N : nat) (f : nat -> bv 8) :
+  Lemma so_name_bytes `{XI : CurCtx} (a : mword 64) (N : nat) (f : nat -> bv 8) :
     ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[KT1] f j) ⊢ bytes_own (KTR := KT1) (DfracOwn 1) a N.
   Proof. rewrite /bytes_own. exact (bb_named_any (KTR := KT1) a N f). Qed.
 
   (* 128 = (k+1) + (127-k): the walkers read the NUL-terminated prefix, the
      rest rides through untouched *)
-  Lemma so_buf_split (a : mword 64) (f : nat -> bv 8) (k : nat) :
+  Lemma so_buf_split `{XI : CurCtx} (a : mword 64) (f : nat -> bv 8) (k : nat) :
     (k < 128)%nat ->
     ([∗ list] j ∈ seq 0 128, pa_add a j ↦ₘ[KT1] f j) -∗
     ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ[KT1] f j)
@@ -1100,7 +1100,7 @@ Section ProofSysOpenFrame.
     rewrite (bb_split a (S k) (127 - k)%nat f). iIntros "[$ $]".
   Qed.
 
-  Lemma so_buf_join (a : mword 64) (f : nat -> bv 8) (k : nat) :
+  Lemma so_buf_join `{XI : CurCtx} (a : mword 64) (f : nat -> bv 8) (k : nat) :
     (k < 128)%nat ->
     ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ[KT1] f j) -∗
     ([∗ list] j ∈ seq 0 (127 - k)%nat,

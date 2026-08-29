@@ -943,7 +943,7 @@ Section FsLookupDots.
     unfold bv_modulus in H. cbn in H. lia.
   Qed.
 
-  Lemma ic_loaded_fdir
+  Lemma ic_loaded_fdir `{XI : CurCtx}
       (k : nat) (inum : mword 32) (dn : dinode) (bm : blkmap) :
     bv_unsigned (di_type dn) = T_DIR_z ->
     ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dn bm -∗
@@ -975,7 +975,7 @@ Section FsLookupDots.
   Qed.
 
   (* ...and the [fnode] form, which is what a client of F1b asks for. *)
-  Lemma ic_loaded_fnode
+  Lemma ic_loaded_fnode `{XI : CurCtx}
       (k : nat) (inum : mword 32) (dn : dinode) (bm : blkmap) :
     bv_unsigned (di_type dn) = T_DIR_z ->
     ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dn bm -∗

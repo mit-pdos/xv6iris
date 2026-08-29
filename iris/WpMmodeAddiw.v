@@ -9,8 +9,8 @@ From iris.bi.lib Require Import fractional.
 Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d SailStdpp.Base RiscvLang RiscvPtsto RiscvFetchExec WpGpr RegFile InstrBytes SailStdpp.TypeCasts SailStdpp.MachineWord SailStdpp.Values.
 Require Import WpInstr.   (* wp_instr / mm_cycle, split out of InstrBytes *)
 Require Import HartSwp WpMmodeSwpBase.   (* the [swp] execute catalogue *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 Import Defs.
 
 (* from WpGprAddi.v *)

@@ -232,7 +232,7 @@ Section ProofVirtioDiskRwB.
   (* =================================================================== *)
 
   (* what the loop hands out when all three descriptors are in hand *)
-  Definition vdrw_p2_exit `{XI : CurCtx} (CID0 : CPU) (γk : gname)
+  Definition vdrw_p2_exit (CID0 : CPU) (γk : gname)
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : mword 64) (K : nat) (eb : bool)
       (sp0 b : Arch.pa) (wr sector : mword 64) (m0 : regfile) (lks : gset string) : iProp Σ :=
@@ -261,7 +261,7 @@ Section ProofVirtioDiskRwB.
        WP (Loop : expr riscv_lang)))%I.
 
   (* the loop head at +0x0bc *)
-  Definition vdrw_p2_loop `{XI : CurCtx} (CID0 : CPU) (γk : gname)
+  Definition vdrw_p2_loop (CID0 : CPU) (γk : gname)
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : mword 64) (K : nat) (eb : bool)
       (sp0 b : Arch.pa) (wr sector : mword 64) (m0 : regfile) (lks : gset string) : iProp Σ :=
@@ -708,7 +708,7 @@ Section ProofVirtioDiskRwB.
           as "[Hpay [Hextc Hextm]]".
         (* ==================== release(&disk.vdisk_lock) ==================== *)
         iApply (Release.wp_release_sconf KT1 γk d_lock "virtio_disk"%string
-                  (disk_res γd pd pav pu) C3 0%nat eb (proc_addr j) (K - 12)%nat
+                  <{ disk_res γd pd pav pu }> C3 0%nat eb (proc_addr j) (K - 12)%nat
                   ({["virtio_disk"]} ∪ lks)
                   HC3a0 ltac:(pose proof (vdrw_K10 K HK); lia)
                   with "Hcg Htext Hpc Hlk Htok HR Hown Hpay").
@@ -835,12 +835,12 @@ Section ProofVirtioDiskRwB.
         iDestruct (cpu_own_transport CIDsl CIDd3 0 eb (proc_addr j) eb
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         iApply (Acquire.wp_acquire_sconf KT1 γk "virtio_disk"%string
-                  (disk_res γd pd pav pu) D3 0%nat eb (proc_addr j) (K - 12)%nat eb lks
+                  <{ disk_res γd pd pav pu }> D3 0%nat eb (proc_addr j) (K - 12)%nat eb lks
                   vdrw_noff0 ltac:(pose proof (vdrw_K10 K HK); lia) Hbelow
                   with "Hcg Hown Htext Hpc []").
         all: try lkbelow.
         { iEval (rewrite HD3a0). iExact "Hlk". }
-        iIntros (CIDaq Hsaq msA mfa) "_ Hcg Hpc %Hacs Htok HR Hown Hpay". rgall.
+        iIntros (CIDaq Hsaq msA mfa) "_ Hcg Hpc %Hacs Htok HR _ Hown Hpay". rgall.
         assert (Hr0bc : ret_pc (D3 !!! Regidx Rra)
                         = mword_of_int (KernelSyms.virtio_disk_rw + 0x0bc))
           by (rewrite HD3ra; apply bv_eq; vm_compute; reflexivity).

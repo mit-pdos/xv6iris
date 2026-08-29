@@ -138,9 +138,9 @@
    [wp_writei_sconf_body] and [wp_writei_gen_body].  Inside [ProofWritei.v]
    the borrow is ONE lemma over a [user]-indexed dfrac,
 
-       Definition wi_q (user : bool) (dq : dfrac) : dfrac :=
+       Definition wi_q `{XI : CurCtx} (user : bool) (dq : dfrac) : dfrac :=
          if user then DfracOwn (1/4) else dq.
-       Lemma wi_src_pid … : <the bracket> -∗
+       Lemma wi_src_pid `{XI : CurCtx} … : <the bracket> -∗
          p_pid (proc_addr j) ↦₄{wi_q user dq} pidv ∗
          (p_pid (proc_addr j) ↦₄{wi_q user dq} pidv -∗ <the bracket>).
 
@@ -367,6 +367,7 @@ Require Import SpecConsolewrite.
 Require Import ConsoleInv.  (* [NDEV_max], [a_devsw_write] *)
 Require Import SpecFilewrite.
 From Kernel Require KernelSyms.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -380,39 +381,39 @@ Local Open Scope Z_scope.
 (*  The writei line is an EQUALITY, not slack -- see the header's point 1.  *)
 (* ---------------------------------------------------------------------- *)
 
-Lemma fw_K12 (K : nat) : (filewrite_stack <= K)%nat -> (12 <= K)%nat.
+Lemma fw_K12 `{XI : CurCtx} (K : nat) : (filewrite_stack <= K)%nat -> (12 <= K)%nat.
 Proof. lia. Qed.
 
-Lemma fw_av_writei (K : nat) :
+Lemma fw_av_writei `{XI : CurCtx} (K : nat) :
   (filewrite_stack <= K)%nat -> (K_writei <= K - 12)%nat.
 Proof. lia. Qed.
 
-Lemma fw_av_pipe (K : nat) :
+Lemma fw_av_pipe `{XI : CurCtx} (K : nat) :
   (filewrite_stack <= K)%nat -> (pipewrite_stack <= K - 12)%nat.
 Proof. lia. Qed.
 
-Lemma fw_av_cons (K : nat) :
+Lemma fw_av_cons `{XI : CurCtx} (K : nat) :
   (filewrite_stack <= K)%nat -> (consolewrite_stack <= K - 12)%nat.
 Proof. lia. Qed.
 
-Lemma fw_av_ilock (K : nat) :
+Lemma fw_av_ilock `{XI : CurCtx} (K : nat) :
   (filewrite_stack <= K)%nat -> (K_ilock <= K - 12)%nat.
 Proof. lia. Qed.
 
-Lemma fw_av_iunlock (K : nat) :
+Lemma fw_av_iunlock `{XI : CurCtx} (K : nat) :
   (filewrite_stack <= K)%nat -> (K_iunlock <= K - 12)%nat.
 Proof. lia. Qed.
 
-Lemma fw_av_begin_op (K : nat) :
+Lemma fw_av_begin_op `{XI : CurCtx} (K : nat) :
   (filewrite_stack <= K)%nat -> (K_begin_op <= K - 12)%nat.
 Proof. lia. Qed.
 
-Lemma fw_av_end_op (K : nat) :
+Lemma fw_av_end_op `{XI : CurCtx} (K : nat) :
   (filewrite_stack <= K)%nat -> (K_end_op <= K - 12)%nat.
 Proof. lia. Qed.
 
 (* The frame trade-back, at the arity the epilogue wants. *)
-Lemma fw_K_back (K : nat) :
+Lemma fw_K_back `{XI : CurCtx} (K : nat) :
   (filewrite_stack <= K)%nat -> ((K - 12) + 12)%nat = K.
 Proof. lia. Qed.
 
@@ -426,14 +427,14 @@ Proof. lia. Qed.
 (* ---------------------------------------------------------------------- *)
 
 (* The two [FW_MAX]s, related once.  See the header's SURPRISE. *)
-Lemma fw_max_bridge : Z.of_nat WriteiBudget.FW_MAX = SpecFilewrite.FW_MAX.
+Lemma fw_max_bridge `{XI : CurCtx} : Z.of_nat WriteiBudget.FW_MAX = SpecFilewrite.FW_MAX.
 Proof. vm_compute. reflexivity. Qed.
 
 (* ...and the chunk bound in the shape the WALK has it: the code compares
    [n - i] against the 3072 in s7 with a [bge], so what is in hand at the
    call is a [Z] fact about the register, while the budget lemma wants a
    [nat] one about writei's argument. *)
-Lemma fw_budget_ok (off n1 : nat) :
+Lemma fw_budget_ok `{XI : CurCtx} (off n1 : nat) :
   (Z.of_nat n1 <= SpecFilewrite.FW_MAX) ->
   (wi_cost_bmonly off n1 <= MAXOPBLOCKS)%nat.
 Proof.
@@ -444,7 +445,7 @@ Qed.
 (* The empty-range arm is NOT waved through: S3m's trap check says
    [wi_cost_bmonly 0 0 = 2 > wi_cost 0 0 = 1], so the premise is strictly
    harder there.  It still fits, with eight to spare. *)
-Lemma fw_budget_ok_empty (off : nat) :
+Lemma fw_budget_ok_empty `{XI : CurCtx} (off : nat) :
   (wi_cost_bmonly off 0 <= MAXOPBLOCKS)%nat.
 Proof.
   apply fw_budget_ok. unfold SpecFilewrite.FW_MAX. cbn. lia.
@@ -461,20 +462,20 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 
 (* the [bge] falls: the chunk is the whole remainder *)
-Lemma fw_chunk_rem (n i : Z) :
+Lemma fw_chunk_rem `{XI : CurCtx} (n i : Z) :
   (0 <= i < n) -> (n - i <= SpecFilewrite.FW_MAX) ->
   (0 < n - i <= SpecFilewrite.FW_MAX).
 Proof. lia. Qed.
 
 (* the [bge] is taken: the chunk is the cap itself *)
-Lemma fw_chunk_cap (n i : Z) :
+Lemma fw_chunk_cap `{XI : CurCtx} (n i : Z) :
   (0 <= i < n) -> (SpecFilewrite.FW_MAX < n - i) ->
   (0 < SpecFilewrite.FW_MAX <= SpecFilewrite.FW_MAX).
 Proof. unfold SpecFilewrite.FW_MAX. lia. Qed.
 
 (* ...and either way the chunk is in int range, which is what the
    [sext.w s3,s3] at +0x82 needs ([fw_sextw_moi]'s hypothesis). *)
-Lemma fw_chunk_lt31 (c : Z) :
+Lemma fw_chunk_lt31 `{XI : CurCtx} (c : Z) :
   (0 < c <= SpecFilewrite.FW_MAX) -> (0 <= c < 2 ^ 31).
 Proof. unfold SpecFilewrite.FW_MAX. lia. Qed.
 
@@ -482,12 +483,12 @@ Proof. unfold SpecFilewrite.FW_MAX. lia. Qed.
    returned, and the loop is left when [i >= n].  The fuel is [n - i] and
    this is its step: a continuing iteration returned the FULL chunk (the
    [bne s3,s1] at +0xc0 breaks otherwise), and a full chunk is positive. *)
-Lemma fw_i_advance (n i c : Z) :
+Lemma fw_i_advance `{XI : CurCtx} (n i c : Z) :
   (0 <= i < n) -> (0 < c <= n - i) -> (0 <= i + c <= n) /\ (n - (i + c) < n - i).
 Proof. lia. Qed.
 
 (* the loop-carried [i] stays an int, so [fw_bge_moi] / [fw_neq_moi] apply *)
-Lemma fw_i_lt31 (n i : Z) : (0 <= i <= n) -> (0 <= n < 2 ^ 31) -> (0 <= i < 2 ^ 31).
+Lemma fw_i_lt31 `{XI : CurCtx} (n i : Z) : (0 <= i <= n) -> (0 <= n < 2 ^ 31) -> (0 <= i < 2 ^ 31).
 Proof. lia. Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -500,7 +501,7 @@ Proof. lia. Qed.
 (*  of the joint premise, since the register holds [off] as an int.        *)
 (* ---------------------------------------------------------------------- *)
 
-Lemma fw_off_lt31 (off : nat) :
+Lemma fw_off_lt31 `{XI : CurCtx} (off : nat) :
   (Z.of_nat off <= Z.of_nat MAXFILE * Z.of_nat BSIZE) -> (0 <= Z.of_nat off < 2 ^ 31).
 Proof. unfold MAXFILE, BSIZE, NDIRECT. cbn. lia. Qed.
 
@@ -513,7 +514,7 @@ Proof. unfold MAXFILE, BSIZE, NDIRECT. cbn. lia. Qed.
 (*  invariant back at [fwn_s fn] (header point 3).                         *)
 (* ---------------------------------------------------------------------- *)
 
-Lemma fw_qp_halves (s : Qp) : (s / 2 + s / 2)%Qp = s.
+Lemma fw_qp_halves `{XI : CurCtx} (s : Qp) : (s / 2 + s / 2)%Qp = s.
 Proof. apply Qp.div_2. Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -525,7 +526,7 @@ Proof. apply Qp.div_2. Qed.
 (*  [pipe_rw_ret]); this is the inode arm's join.                          *)
 (* ---------------------------------------------------------------------- *)
 
-Lemma fw_ret_of_tail (n nz iz : Z) (rv : mword 64) :
+Lemma fw_ret_of_tail `{XI : CurCtx} (n nz iz : Z) (rv : mword 64) :
   (0 <= n) -> nz = n ->
   (rv = (mword_of_int (-1) : mword 64)
    \/ (iz = nz /\ rv = (mword_of_int nz : mword 64))) ->
@@ -538,7 +539,7 @@ Qed.
 
 (* the device arm's callee promises [-1 <= r <= n] (SpecConsolewrite's
    deliberately weak bound); that is inside [filewrite_ret]. *)
-Lemma fw_ret_of_dev (n r : Z) (rv : mword 64) :
+Lemma fw_ret_of_dev `{XI : CurCtx} (n r : Z) (rv : mword 64) :
   (0 <= n) -> (-1 <= r <= n) -> rv = (mword_of_int r : mword 64) ->
   filewrite_ret n rv.
 Proof.
@@ -552,7 +553,7 @@ Qed.
    the contract's [0 <= n] that forces [n = 0], and the tail then joins at
    [i = 0 = n] and returns 0.  The five spills never happened, which is
    what [fw_epi]'s arbitrary slots are for. *)
-Lemma fw_zero_trip (n : Z) : (0 <= n) -> (n <= 0) -> n = 0.
+Lemma fw_zero_trip `{XI : CurCtx} (n : Z) : (0 <= n) -> (n <= 0) -> n = 0.
 Proof. lia. Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -571,19 +572,19 @@ Proof. lia. Qed.
    stack (durable-notes).  fileread's [fr_maxfile_bsize], restated here
    because that lemma lives in ProofFileread.v's own preamble and
    [Require Import] does not re-export. *)
-Lemma fw_maxfile_bsize : (Z.of_nat MAXFILE * Z.of_nat BSIZE = 274432)%Z.
+Lemma fw_maxfile_bsize `{XI : CurCtx} : (Z.of_nat MAXFILE * Z.of_nat BSIZE = 274432)%Z.
 Proof. vm_compute. reflexivity. Qed.
 
 (* the count, in the shape pipewrite and consolewrite both ask for.  Note
    what is NOT needed: fileread's [MAXFILE*BSIZE + n < 2^31] premise has no
    counterpart here, because the chunking makes writei's joint premise a
    closed fact ([SpecFilewrite.fw_chunk_joint]). *)
-Lemma fw_n_range (n : Z) : (0 <= n < 2 ^ 31)%Z -> (- 2 ^ 31 <= n < 2 ^ 31)%Z.
+Lemma fw_n_range `{XI : CurCtx} (n : Z) : (0 <= n < 2 ^ 31)%Z -> (- 2 ^ 31 <= n < 2 ^ 31)%Z.
 Proof. change (2 ^ 31)%Z with 2147483648%Z. lia. Qed.
 
 (* the file's recorded size is an [off_wf]-sized number, hence an int:
    writei's premise (14), read off [InodeLock.inode_ok]'s conjunct 5. *)
-Lemma fw_size_lt31 (z : Z) :
+Lemma fw_size_lt31 `{XI : CurCtx} (z : Z) :
   (0 <= z)%Z -> (z <= Z.of_nat MAXFILE * Z.of_nat BSIZE)%Z -> (z < 2 ^ 31)%Z.
 Proof.
   rewrite fw_maxfile_bsize. change (2 ^ 31)%Z with 2147483648%Z. lia.
@@ -591,13 +592,13 @@ Qed.
 
 (* ---- the FD_DEVICE dispatch's two range facts (fileread's, restated) ---- *)
 
-Lemma fw_uint_moi (z : Z) : (0 <= z < 2 ^ 64)%Z ->
+Lemma fw_uint_moi `{XI : CurCtx} (z : Z) : (0 <= z < 2 ^ 64)%Z ->
   uint (mword_of_int z : mword 64) = z.
 Proof. intro H. rewrite uint_unsigned moi64_unsigned. by apply bvw64_small. Qed.
 
 (* a [short] field's unsigned value is below 2^16 -- the range the major's
    zero extension and the [devsw] index arithmetic both need. *)
-Lemma fw_major_range (w : mword 16) : (0 <= bv_unsigned w < 65536)%Z.
+Lemma fw_major_range `{XI : CurCtx} (w : mword 16) : (0 <= bv_unsigned w < 65536)%Z.
 Proof.
   pose proof (bv_unsigned_in_range _ w) as H. unfold bv_modulus in H.
   change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 16))%Z with 65536%Z in H.
@@ -606,7 +607,7 @@ Qed.
 
 (* [bltu a4,a3] at +0x68 with a4 = 9: the NDEV bounds test, on the
    ZERO-extended major.  In range is exactly [major <= 9]. *)
-Lemma fw_bltu9_false (mj : Z) : (0 <= mj)%Z -> (mj <= 9)%Z ->
+Lemma fw_bltu9_false `{XI : CurCtx} (mj : Z) : (0 <= mj)%Z -> (mj <= 9)%Z ->
   zopz0zI_u (mword_of_int 9 : mword 64) (mword_of_int mj : mword 64) = false.
 Proof.
   intros H0 H9. unfold zopz0zI_u. apply Z.ltb_ge.
@@ -615,7 +616,7 @@ Proof.
   lia.
 Qed.
 
-Lemma fw_bltu9_true (mj : Z) : (9 < mj)%Z -> (mj < 65536)%Z ->
+Lemma fw_bltu9_true `{XI : CurCtx} (mj : Z) : (9 < mj)%Z -> (mj < 65536)%Z ->
   zopz0zI_u (mword_of_int 9 : mword 64) (mword_of_int mj : mword 64) = true.
 Proof.
   intros H9 Hb. unfold zopz0zI_u. apply Z.ltb_lt.
@@ -626,7 +627,7 @@ Qed.
 
 (* consolewrite's entry address is even, so the [c.jalr a5] at +0x7e lands
    on it rather than on it-minus-its-low-bit. *)
-Lemma fw_ret_pc_cons :
+Lemma fw_ret_pc_cons `{XI : CurCtx} :
   ret_pc (mword_of_int KernelSyms.consolewrite : mword 64)
   = (mword_of_int KernelSyms.consolewrite : mword 64).
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
@@ -634,13 +635,13 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 (* the record-eta step: the two paths that return WITHOUT calling anything
    -- the pre-prologue [f->writable == 0] exit at +0x10c and the
    out-of-range / null-slot device exits -- leave the page table alone. *)
-Lemma fw_upd_upt_id (V : pprivate) : upd_upt V (pv_upt V) = V.
+Lemma fw_upd_upt_id `{XI : CurCtx} (V : pprivate) : upd_upt V (pv_upt V) = V.
 Proof. destruct V; reflexivity. Qed.
 
 (* three of the four arms produce [pipe_rw_ret] verbatim, and that IS
    [filewrite_ret]; named so the walk does not have to unfold a Definition
    at a call site. *)
-Lemma fw_ret_of_pipe (n : Z) (r : mword 64) :
+Lemma fw_ret_of_pipe `{XI : CurCtx} (n : Z) (r : mword 64) :
   pipe_rw_ret n r -> filewrite_ret n r.
 Proof. exact (fun H => H). Qed.
 
@@ -652,12 +653,12 @@ Proof. exact (fun H => H). Qed.
    [filewrite_fs_env]'s last pure field, so this lemma is what turns "the
    fd is writable" into "the inode is not a directory", five frames down
    from sys_open.  ---------------------------------------------------- *)
-Lemma fw_zext8_zero :
+Lemma fw_zext8_zero `{XI : CurCtx} :
   eq_vec (zero_extend' 64 (mword_of_int 0 : mword 8) : mword 64)
          (zero_reg : mword 64) = true.
 Proof. apply eq_vec_true_iff. apply bv_eq; vm_compute; reflexivity. Qed.
 
-Lemma fw_wbool_of_fall (C : fcontent) :
+Lemma fw_wbool_of_fall `{XI : CurCtx} (C : fcontent) :
   eq_vec (zero_extend' 64 (fc_writable C : mword 8) : mword 64)
          (zero_reg : mword 64) = false ->
   fc_wbool C = true.
@@ -680,7 +681,7 @@ Qed.
    [InodeInv.inode_sized]) as S3i's PRESERVATIONS, whose antecedents are
    the very conjuncts that came in.  Assembling them in one named lemma is
    what keeps the walk's re-park to a single [iPureIntro].  ------------- *)
-Lemma fw_inode_ok_rebuild (cov : gset Z) (logstart : Z) (dn' : dinode)
+Lemma fw_inode_ok_rebuild `{XI : CurCtx} (cov : gset Z) (logstart : Z) (dn' : dinode)
     (bm' : blkmap) (data' : nat -> list (bv 8)) :
   blkmap_wf cov logstart bm' ->
   bm_covers bm' (bv_unsigned (di_size dn')) ->
@@ -700,7 +701,7 @@ Qed.
    [inode_ok]'s conjunct 4 at the new record, [DirView.dir_ok]'s vacuity
    below, and iunlock's [ity_shot g (di_type dn')] being ilock's own
    witness unchanged. *)
-Lemma fw_wi_type (dn : dinode) (bm' : blkmap) (off tot : nat) :
+Lemma fw_wi_type `{XI : CurCtx} (dn : dinode) (bm' : blkmap) (off tot : nat) :
   di_type (wi_dinode dn bm' off tot) = di_type dn.
 Proof. reflexivity. Qed.
 
@@ -708,7 +709,7 @@ Proof. reflexivity. Qed.
    the fd's own [fwn_ty], [filewrite_fs_env]'s last field says a WRITABLE
    fd's type is not [T_DIR], and [DirView.dir_ok] is then vacuous at the
    record writei produced -- which has the same type by [fw_wi_type]. *)
-Lemma fw_dir_ok_wi (nib : nat) (dn : dinode) (bm' : blkmap) (off tot : nat)
+Lemma fw_dir_ok_wi `{XI : CurCtx} (nib : nat) (dn : dinode) (bm' : blkmap) (off tot : nat)
     (data' : nat -> list (bv 8)) :
   bv_unsigned (di_type dn) <> T_DIR_z ->
   dir_ok nib (wi_dinode dn bm' off tot) data'.
@@ -718,7 +719,7 @@ Qed.
 
 (* ...and the shape the -1 arm needs, where writei returns the caller's own
    record untouched ([dn' = dn]). *)
-Lemma fw_dir_ok_same (nib : nat) (dn : dinode) (data' : nat -> list (bv 8)) :
+Lemma fw_dir_ok_same `{XI : CurCtx} (nib : nat) (dn : dinode) (data' : nat -> list (bv 8)) :
   bv_unsigned (di_type dn) <> T_DIR_z -> dir_ok nib dn data'.
 Proof. apply dir_ok_not_dir. Qed.
 
@@ -730,7 +731,7 @@ Proof. apply dir_ok_not_dir. Qed.
 Section FwSlots.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, FSC : fscfg}.
 
-  Lemma fw_bslots3 :
+  Lemma fw_bslots3 `{XI : CurCtx} :
     bslots 3 ⊣⊢ bslot ∗ bslots 2.
   Proof.
     rewrite /bslot. change 3%nat with (1 + 2)%nat. apply bslots_op.
@@ -776,7 +777,7 @@ Section FwWriteiSrc.
      it GETS BACK at +0xa4 (instantiate [V := upd_upt V P']), which is what
      lets the loop re-park [proc_priv] and carry it into the next iteration
      without ever holding [p_pid] itself. *)
-  Lemma fw_writei_src (γf : gname) (j : nat) (pidv : mword 32) (U : ustate)
+  Lemma fw_writei_src `{XI : CurCtx} (γf : gname) (j : nat) (pidv : mword 32) (U : ustate)
       (dq : dfrac) (src : mword 64) (n : nat) (src_bytes : nat -> bv 8) :
     (if true
      then proc_priv_core (proc_addr j) pidv U
@@ -842,7 +843,6 @@ Require Import ProcAvail.
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 
 Set Printing Depth 40.
-Require Import TsoCtx.
 
 (* ---------------------------------------------------------------------- *)
 (*  SEVEN FACTS THE LOOP BODY NEEDS AND THE PREAMBLE ABOVE COULD NOT STATE.*)
@@ -861,7 +861,7 @@ Require Import TsoCtx.
 (*  would duplicate iunlock, end_op, both exits and the back edge.        *)
 (* ---------------------------------------------------------------------- *)
 
-Lemma fw_off_wf_new (u t : Z) : (0 <= u)%Z -> (0 <= t)%Z ->
+Lemma fw_off_wf_new `{XI : CurCtx} (u t : Z) : (0 <= u)%Z -> (0 <= t)%Z ->
   (u + t <= Z.of_nat MAXFILE * Z.of_nat BSIZE)%Z ->
   off_wf (mword_of_int (u + t) : mword 32).
 Proof.
@@ -869,16 +869,16 @@ Proof.
   rewrite moi32_small; [lia | change (2 ^ 32)%Z with 4294967296%Z; lia].
 Qed.
 
-Lemma fw_r_lt63 (o t : Z) : (0 <= o)%Z ->
+Lemma fw_r_lt63 `{XI : CurCtx} (o t : Z) : (0 <= o)%Z ->
   (o + t <= Z.of_nat MAXFILE * Z.of_nat BSIZE)%Z -> (t < 2 ^ 63)%Z.
 Proof.
   rewrite fw_maxfile_bsize. change (2 ^ 63)%Z with 9223372036854775808%Z. lia.
 Qed.
 
-Lemma fw_pv_upt_upd (V : pprivate) (P : uptd) : pv_upt (upd_upt V P) = P.
+Lemma fw_pv_upt_upd `{XI : CurCtx} (V : pprivate) (P : uptd) : pv_upt (upd_upt V P) = P.
 Proof. destruct V; reflexivity. Qed.
 
-Lemma fw_upd_upt_upd (V : pprivate) (P Q : uptd) :
+Lemma fw_upd_upt_upd `{XI : CurCtx} (V : pprivate) (P Q : uptd) :
   upd_upt (upd_upt V P) Q = upd_upt V Q.
 Proof. destruct V; reflexivity. Qed.
 
@@ -889,7 +889,7 @@ Proof. destruct V; reflexivity. Qed.
    So [off + tot] is under the cap because the NEW SIZE is -- which is why
    [SpecFilewrite.fw_off_advance]'s "writei refuses rather than overruns"
    never has to be invoked on the success arm. *)
-Lemma fw_off_tot_bound (dn : dinode) (bm' : blkmap) (off tot : nat) :
+Lemma fw_off_tot_bound `{XI : CurCtx} (dn : dinode) (bm' : blkmap) (off tot : nat) :
   (bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE)%Z ->
   (Z.of_nat off + Z.of_nat tot < 2 ^ 32)%Z ->
   (bv_unsigned (di_size (wi_dinode dn bm' off tot))
@@ -914,7 +914,7 @@ Proof.
   - lia.
 Qed.
 
-Lemma fw_neq_m1 (a : Z) : (0 <= a < 2 ^ 31)%Z ->
+Lemma fw_neq_m1 `{XI : CurCtx} (a : Z) : (0 <= a < 2 ^ 31)%Z ->
   neq_vec (mword_of_int a : mword 64) (mword_of_int (-1) : mword 64) = true.
 Proof.
   intro Ha. change (2 ^ 31)%Z with 2147483648%Z in Ha.
@@ -931,7 +931,7 @@ Proof.
   rewrite Hm in Hce. lia.
 Qed.
 
-Lemma fw_neq_r (a rz : Z) : (0 <= a < 2 ^ 31)%Z -> (-1 <= rz < 2 ^ 31)%Z ->
+Lemma fw_neq_r `{XI : CurCtx} (a rz : Z) : (0 <= a < 2 ^ 31)%Z -> (-1 <= rz < 2 ^ 31)%Z ->
   neq_vec (mword_of_int a : mword 64) (mword_of_int rz : mword 64)
   = negb (Z.eqb a rz).
 Proof.
@@ -949,7 +949,7 @@ Qed.
 
 (* filewrite's ELSE arm reaches [panic("filewrite")] with the frame already
    pushed 12 slots deep; [ProofFilewriteParts.fw_panic] is the whole block. *)
-Lemma fw_panic_K (K : nat) :
+Lemma fw_panic_K `{XI : CurCtx} (K : nat) :
   (filewrite_stack <= K)%nat -> (panic_stack <= K - 12)%nat.
 Proof. lia. Qed.
 
@@ -1086,7 +1086,7 @@ Section ProofFilewrite.
   (*  callee-saved registers, so it needs [sie_cap_gpr] and the text and *)
   (*  nothing else.                                                      *)
   (* =================================================================== *)
-  Local Lemma fw_test `{CID0 : CpuId} `{XI : CurCtx}
+  Local Lemma fw_test `{CID0 : CpuId}
       (M : regfile) (Kn : nat) (nz iz : Z) (p : mword 64) (b : bool) :
     (0 <= iz < nz)%Z -> (nz < 2 ^ 31)%Z ->
     M !!! Regidx Rs4 = (mword_of_int iz : mword 64) ->
@@ -1264,7 +1264,7 @@ Section ProofFilewrite.
   (*  that is all any caller can use: the cell goes straight back into    *)
   (*  [off_inv] and the next iteration re-reads it.                       *)
   (* =================================================================== *)
-  Local Lemma fw_offupd `{CID0 : CpuId} `{XI : CurCtx}
+  Local Lemma fw_offupd `{CID0 : CpuId}
       (Mt : regfile) (Kn : nat) (kx : nat) (v : mword 32) (rz : Z)
       (p : mword 64) (b : bool) :
     Mt !!! Regidx Ra0 = (mword_of_int rz : mword 64) ->
@@ -1435,7 +1435,7 @@ Section ProofFilewrite.
   (*  resources the contract returns -- which is why the exit needs no   *)
   (*  re-assembly beyond [fw_env_out_fs].                                *)
   (* =================================================================== *)
-  Local Lemma fw_loop `{CID0 : CpuId} `{XI : CurCtx}
+  Local Lemma fw_loop `{CID0 : CpuId}
       (gf : gname) (gs : list gname) (jx : nat) (glp : gname)
       (kx : nat) (qx : Qp) (stx : fdstate) (rx : bool) (nx : Z)
       (fn : fwrite_names)
@@ -1508,18 +1508,18 @@ Section ProofFilewrite.
     InstrBytes.pc_is (mword_of_int (FW + 0xd4) : mword 64) -∗
     procs_inv gs -∗
     (* the twelve frame slots, none of which the body touches *)
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) (m !!! Regidx Rs3) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) (m !!! Regidx Rs4) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) (m !!! Regidx Rs5) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) (m !!! Regidx Rs6) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) (m !!! Regidx Rs7) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) (m !!! Regidx Rs8) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) (m !!! Regidx Rs9) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 12) (DfracOwn 1) w12 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) (m !!! Regidx Rs3) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) (m !!! Regidx Rs4) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 7) (DfracOwn 1) (m !!! Regidx Rs5) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 8) (DfracOwn 1) (m !!! Regidx Rs6) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 9) (DfracOwn 1) (m !!! Regidx Rs7) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 10) (DfracOwn 1) (m !!! Regidx Rs8) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 11) (DfracOwn 1) (m !!! Regidx Rs9) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 12) (DfracOwn 1) w12 -∗
     file_ref gf kx qx stx -∗
     proc_priv_core pj pidv (us_upt U PI) -∗
     KvmSpec.kalloc_env fsc_kalloc None -∗

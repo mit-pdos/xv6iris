@@ -255,6 +255,7 @@ Qed.
 
 Section ProofKforkParts.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -276,7 +277,7 @@ Section ProofKforkParts.
   (*  conjuncts therefore come out of [Hthr], the premise about the map    *)
   (*  this block is entered with.                                         *)
   (* =================================================================== *)
-  Lemma kfk_epi `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma kfk_epi `{GEN : GenId} `{CID0 : CpuId}
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s50 rv : mword 64) (w4 w5 w6 w8 : mword 64)
       (p : mword 64) (b : bool) :
@@ -296,14 +297,14 @@ Section ProofKforkParts.
     sie_cap_gpr KT1 Mt (K - 8)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0xfc) : mword 64) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) s50 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) w8 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) w4 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 7) (DfracOwn 1) s50 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 8) (DfracOwn 1) w8 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
@@ -493,6 +494,7 @@ End ProofKforkParts.
 Section KforkRes.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId}.
+  Context `{XI : CurCtx}.
 
   (* [ProcInv.tf_page_word_upd] and [ProcInv.proc_priv_tf_upd] -- the WRITE
      twins of [tf_page_word] / [proc_priv_tf] -- were born here, for the

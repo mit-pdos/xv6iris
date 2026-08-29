@@ -144,8 +144,8 @@ Require Import SpecCopyinstr.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -266,14 +266,14 @@ Section ProofCopyinstr.
     intro H1; injection H1 as H2; vm_compute in H2; congruence.
 
   (* [rget]'s equation with [tp_pin] already unfolded (ProofCopyin.tp_pin_ne) *)
-  Local Lemma tp_pin_ne `{CIDx : CpuId} `{XI : CurCtx} (m : regfile) (k : mword 5) :
+  Local Lemma tp_pin_ne `{CIDx : CpuId} (m : regfile) (k : mword 5) :
     Regidx k <> Regidx Rtp -> tp_pin m !!! Regidx k = m !!! Regidx k.
   Proof. exact (rget_ne m k). Qed.
 
   (* vmfault's contract needs the RAW tp premise; copyinstr's own map carries
      no such invariant, so re-point at its own [tp_pin] image, for which the
      fact holds BY CONSTRUCTION (ProofCopyin.sie_cap_gpr_tp_pin). *)
-  Local Lemma sie_cap_gpr_tp_pin `{CIDx : CpuId} `{XI : CurCtx} (m : regfile) (n : nat) (b : bool) (pcur : mword 64) :
+  Local Lemma sie_cap_gpr_tp_pin `{CIDx : CpuId} (m : regfile) (n : nat) (b : bool) (pcur : mword 64) :
     sie_cap_gpr KT1 m n b pcur -∗ sie_cap_gpr KT1 (tp_pin m) n b pcur.
   Proof.
     rewrite /sie_cap_gpr /sie_cap (tp_pin_sp m).
@@ -291,7 +291,7 @@ Section ProofCopyinstr.
   (* ================================================================== *)
   (*  THE EPILOGUE (+0x4e .. +0x66).  All four frame-holding exits.      *)
   (* ================================================================== *)
-  Local Lemma cs_epilogue `{CID0 : CpuId} `{XI : CurCtx}
+  Local Lemma cs_epilogue `{CID0 : CpuId}
       (m Mt : regfile) (av : nat) (res : mword 64)
       (sp0 ra0 s00 s10 s20 s30 s40 s50 s60 s70 s80 s90 gap : mword 64)
       (b : bool) (pcur : mword 64) :
@@ -315,18 +315,18 @@ Section ProofCopyinstr.
     sie_cap_gpr KT1 Mt (av - 12)%nat b pcur -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.copyinstr + 0x4e) : mword 64) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) s20 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) s30 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) s40 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) s50 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) s60 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) s70 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) s80 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) s90 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 12) (DfracOwn 1) gap -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) s30 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) s40 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 7) (DfracOwn 1) s50 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 8) (DfracOwn 1) s60 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 9) (DfracOwn 1) s70 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 10) (DfracOwn 1) s80 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 11) (DfracOwn 1) s90 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 12) (DfracOwn 1) gap -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = res⌝ -∗
@@ -596,7 +596,7 @@ Section ProofCopyinstr.
   (*  THE RETURN-VALUE TAIL (+0x46 .. +0x4a), shared by the NUL exit     *)
   (*  (which reaches it through +0x40) and the max-exhausted one.        *)
   (* ================================================================== *)
-  Local Lemma cs_ret2c `{CID0 : CpuId} `{XI : CurCtx}
+  Local Lemma cs_ret2c `{CID0 : CpuId}
       (M : regfile) (Kv : nat) (a5v resv : mword 64) (b : bool) (pcur : mword 64) :
     M !!! Regidx Ra5 = a5v ->
     xor_vec a5v (sign_extend' 64 (mword_of_int 1 : mword 12)) = (mword_of_int 0 : mword 64)

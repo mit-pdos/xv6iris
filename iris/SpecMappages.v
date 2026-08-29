@@ -22,6 +22,7 @@ Require Import PtTree.
 Require Import PtBuild KvmSpec.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 
 Definition wp_mappages_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
@@ -74,7 +75,6 @@ Definition wp_mappages_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
           avail_zero (avail_sub on g)) ⌝ -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
-Require Import TsoCtx.
 
 Module Type MAPPAGES.
   Parameter wp_mappages_sconf :

@@ -53,8 +53,8 @@ Require Import KMap.   (* kmap_static_claims, extracted from [hw_config] below *
 From Kernel Require Import KernelInstrs.
 From Kernel Require KernelSyms.
 Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 Import Defs.
 
 (* ===================================================================== *)

@@ -85,8 +85,8 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 
 (* end_op's own frame is 8 slots ([c.addi16sp sp,-64] at +0x00); its deepest
    callee is install_trans (50).  write_head wants 44, bread 40, sleep-free

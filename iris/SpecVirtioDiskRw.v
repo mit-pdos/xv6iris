@@ -46,8 +46,8 @@ Require Import DiskPtsto DiskInv.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 
 (* rw's own frame is 96 bytes (12 slots); its deepest callee is sleep (22). *)
 Notation K_virtio_disk_rw := (34%nat) (only parsing).

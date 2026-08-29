@@ -154,9 +154,9 @@ Require Import PrintkArgs.
 Require Import SpecPanic.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.  (* [fscfg]: the fs configuration is AMBIENT *)
+Require Import TsoCtx.
 
 Notation KXB := KernelSyms.kexec (only parsing).
-Require Import TsoCtx.
 
 (* ===================================================================== *)
 (*  THE PANIC MESSAGE.  kexec's one live arm is loadseg's                 *)
@@ -195,6 +195,9 @@ Qed.
 Section KexecMsg.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
+  (* M1 stage 3: [↦ₛ] is context-indexed, and a rodata message extracted
+     from [kernel_data] lands at the READING thread's context. *)
+  Context `{XI : CurCtx}.
 
   Lemma kxc_msg_str :
     (kernel_data : iProp Σ) -∗ (mword_of_int kxc_msg_a : mword 64) ↦ₛ□ kxc_msg.

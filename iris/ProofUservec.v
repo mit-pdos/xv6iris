@@ -59,8 +59,8 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Require Import ParkCap.   (* [park_token] *)
 Require Import UsertrapRes UtResFits.  (* [ut_park_intro_body] -- the park's producer entry *)
+Require Import TsoCtx.   (* [CurCtx]: the residue owns a thread token *)
 Import Defs.
-Require Import TsoCtx.
 
 Module UservecProof (UT : UtResFits.USERTRAP_PARK) (UR : SpecUserret.USERRET) : USERVEC.
 
@@ -78,7 +78,6 @@ Section UservecAllPt.
      build one (UsertrapRes.v, "THE PARK'S CHANNEL THROUGH THE MODULE
      TYPES"). *)
   Definition usertrap_res_bare_park
-      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
       (N : ut_names) (av : nat)
     : ut_park_intro_body
         (fun h : CpuId => UT.usertrap_res_bare (CID := h))

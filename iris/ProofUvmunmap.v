@@ -85,8 +85,8 @@ Require Import SpecUvmunmap.
 Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 
 (* uvmunmap's arithmetic is all SHARED and lives at its own altitude: the
    run-cursor / PGROUNDUP [Z] facts ([z_run_iter], [z_run_end64],
@@ -205,7 +205,7 @@ Section ProofUvmunmap.
   (*  branch directly and by the loop exit through the [ld s1] at +0x76,  *)
   (*  so slot 3 arrives at existential contents.                          *)
   (* ================================================================== *)
-  Local Lemma uu_epilogue `{CID0 : CpuId} `{XI : CurCtx}
+  Local Lemma uu_epilogue `{CID0 : CpuId}
       (mm mj : regfile) (K : nat) (sp0 : mword 64) (b : bool) (p : mword 64) :
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
     (8 <= K)%nat ->
@@ -476,7 +476,7 @@ Section ProofUvmunmap.
   (*  THE LOOP (+0x50 head, +0x4a tail), by induction on the remaining    *)
   (*  page count.                                                         *)
   (* ================================================================== *)
-  Local Lemma uu_loop `{CID0 : CpuId} `{XI : CurCtx} (γa : gname)
+  Local Lemma uu_loop `{CID0 : CpuId} (γa : gname)
       (mm : regfile) (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
       (um : gmap (mword 27) (mword 64)) (Own : nat -> iProp Σ)
       (npages K : nat) (eb b df : bool)

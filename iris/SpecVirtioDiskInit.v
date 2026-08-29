@@ -104,6 +104,7 @@ Require Import RegFile HartTp.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 
 (* the [struct disk] fields this function touches (kernel/virtio_disk.c):
@@ -113,7 +114,6 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
      +0x018 free[8]   one byte per descriptor, all set to 1 here
      +0x128 vdisk_lock *)
 Definition disk_base : mword 64 := mword_of_int KernelSyms.disk.
-Require Import TsoCtx.
 Definition disk_desc : mword 64 := disk_base.
 Definition disk_avail : mword 64 :=
   add_vec disk_base (sign_extend' 64 (mword_of_int 8 : mword 12)).

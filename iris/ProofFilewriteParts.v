@@ -88,8 +88,10 @@ Require Import CodeFilewrite.
 Require Import ProofFilereadParts.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Require TsoCtxShim.   (* the devsw slot is still a RAW word here; the [c.ld]
+                         leaf takes the ctx one *)
+Local Open Scope Z_scope.
 Set Printing Depth 40.
 
 Notation FW := KernelSyms.filewrite (only parsing).
@@ -131,6 +133,9 @@ Qed.
 Section FilewriteMsg.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
+  (* M1 stage 3: [↦ₛ] is context-indexed, and a rodata message extracted
+     from [kernel_data] lands at the READING thread's context. *)
+  Context `{XI : CurCtx}.
 
   Lemma fw_msg_str :
     (kernel_data : iProp Σ) -∗ (mword_of_int fw_msg_a : mword 64) ↦ₛ□ fw_msg.
@@ -394,6 +399,7 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 Section FwShare.
   Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg}.
+  Context `{XI : CurCtx}.   (* M1 stage 2: [inode_ident]'s two [↦₄] cells *)
 
   Lemma fw_shr_gen_split (k : nat) (s1 s2 : Qp) (dev inum : mword 32) (g : gname) :
     inode_shr_gen k (s1 + s2)%Qp dev inum g ⊣⊢
@@ -476,18 +482,18 @@ Section ProofFilewriteParts.
                 Mr !!! Regidx r = m !!! Regidx r) ⌝ -∗
         sie_cap_gpr KT1 Mr (K - 12)%nat b p -∗
         pc_is (mword_of_int (FW + 0x16) : mword 64) -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) w3 -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) (m !!! Regidx Rs5) -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) (m !!! Regidx Rs6) -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) w9 -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) w10 -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) w11 -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 12) (DfracOwn 1) w12 -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) w3 -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 7) (DfracOwn 1) (m !!! Regidx Rs5) -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 8) (DfracOwn 1) (m !!! Regidx Rs6) -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 9) (DfracOwn 1) w9 -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 10) (DfracOwn 1) w10 -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 11) (DfracOwn 1) w11 -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 12) (DfracOwn 1) w12 -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -641,18 +647,18 @@ Section ProofFilewriteParts.
     sie_cap_gpr KT1 Mt (K - 12)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (FW + 0xf4) : mword 64) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) w3 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) s20 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) s50 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) s60 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) w9 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) w10 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) w11 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 12) (DfracOwn 1) w12 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) w3 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 7) (DfracOwn 1) s50 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 8) (DfracOwn 1) s60 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 9) (DfracOwn 1) w9 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 10) (DfracOwn 1) w10 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 11) (DfracOwn 1) w11 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 12) (DfracOwn 1) w12 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
@@ -890,12 +896,12 @@ Section ProofFilewriteParts.
     instr (mword_of_int zf : mword 64) true
       (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")),
              sp, Regidx Rs9, false, 8)) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) v1 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) v3 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) v4 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) v7 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) v8 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) v9 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) v1 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) v3 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) v4 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 9) (DfracOwn 1) v7 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 10) (DfracOwn 1) v8 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 11) (DfracOwn 1) v9 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ Mr : regfile,
         ⌜ Mr !!! Regidx csp_rs1 = pa_stk sp0 12
@@ -913,12 +919,12 @@ Section ProofFilewriteParts.
                 Mr !!! Regidx r = Mt !!! Regidx r) ⌝ -∗
         sie_cap_gpr KT1 Mr K b p -∗
         pc_is (mword_of_int zg : mword 64) -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) v1 -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) v3 -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) v4 -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) v7 -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) v8 -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) v9 -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) v1 -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) v3 -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) v4 -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 9) (DfracOwn 1) v7 -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 10) (DfracOwn 1) v8 -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 11) (DfracOwn 1) v9 -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1103,7 +1109,7 @@ Section ProofFilewriteParts.
       (LOAD (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 6) ('b"000")),
              sp, Regidx Rs4, false, 8)) -∗
     instr (mword_of_int zc : mword 64) true (JAL (jimm, zreg)) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) v4 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) v4 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ Mr : regfile,
         ⌜ Mr !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)
@@ -1112,7 +1118,7 @@ Section ProofFilewriteParts.
                 Mr !!! Regidx r = Mt !!! Regidx r) ⌝ -∗
         sie_cap_gpr KT1 Mr K b p -∗
         pc_is (mword_of_int (FW + 0xf4) : mword 64) -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) v4 -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) v4 -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1170,7 +1176,7 @@ Section ProofFilewriteParts.
     sie_cap_gpr KT1 Mt K b p -∗
     kernel_text -∗
     pc_is (mword_of_int (FW + 0x74) : mword 64) -∗
-    word_pointsto (mword_of_int (KernelSyms.devsw + 16 * mj + 8)) dq slot -∗
+    ctx_word_pointsto cur_ctx (mword_of_int (KernelSyms.devsw + 16 * mj + 8)) dq slot -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ Mr : regfile,
         ⌜ Mr !!! Regidx Ra5 = slot
@@ -1178,7 +1184,7 @@ Section ProofFilewriteParts.
                 Mr !!! Regidx r = Mt !!! Regidx r) ⌝ -∗
         sie_cap_gpr KT1 Mr K b p -∗
         pc_is (mword_of_int (FW + 0x82) : mword 64) -∗
-        word_pointsto (mword_of_int (KernelSyms.devsw + 16 * mj + 8)) dq slot -∗
+        ctx_word_pointsto cur_ctx (mword_of_int (KernelSyms.devsw + 16 * mj + 8)) dq slot -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1292,7 +1298,10 @@ Section ProofFilewriteParts.
   (*  supplies it from its own [(PN : PANIC)].                             *)
   (* =================================================================== *)
   Section FwPanicArm.
-    Context `{GEN : GenId}.
+    (* [XI] is AMBIENT here, unlike [CID]: panic is called BY THIS THREAD, so
+       the assumed contract is needed at the caller's own context, while the
+       hart is quantified because a trap can move it (tso-port.md 2c). *)
+    Context `{GEN : GenId} `{XI : CurCtx}.
 
     (* CID is EXPLICIT here, unlike [PANIC]'s own [`{CID : CpuId}]: a
        maximally-inserted implicit is instantiated the moment the constant
@@ -1304,7 +1313,7 @@ Section ProofFilewriteParts.
         (dm : pk_arg_desc) (lks : gset string),
         wp_panic_sconf_body KT1 (CID := CID) m K n eb b p dm lks.
 
-  Lemma fw_panic `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma fw_panic `{CID0 : CpuId}
       (Mt : regfile) (K : nat) (sp0 : mword 64)
       (u3 u5 u6 u9 u10 u11 : mword 64) (p : mword 64) (eb b : bool)
       (lks : gset string) :
@@ -1316,12 +1325,12 @@ Section ProofFilewriteParts.
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (FW + 0x102) : mword 64) -∗
     panic_env -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) u3 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) u5 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) u6 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) u9 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) u10 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) u11 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) u3 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) u5 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) u6 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 9) (DfracOwn 1) u9 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 10) (DfracOwn 1) u10 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 11) (DfracOwn 1) u11 -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hmtsp HK Hbelow.
@@ -1527,18 +1536,18 @@ Section ProofFilewriteParts.
     sie_cap_gpr KT1 Mt (K - 12)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (FW + 0xe2) : mword 64) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) cs1 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) s20 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) cs3 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) s40 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) s50 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) s60 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) cs7 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) cs8 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) cs9 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 12) (DfracOwn 1) w12 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) cs1 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) cs3 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) s40 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 7) (DfracOwn 1) s50 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 8) (DfracOwn 1) s60 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 9) (DfracOwn 1) cs7 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 10) (DfracOwn 1) cs8 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 11) (DfracOwn 1) cs9 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 12) (DfracOwn 1) w12 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ (mf : regfile) (rv : mword 64),
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv

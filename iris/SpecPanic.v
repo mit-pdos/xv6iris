@@ -86,8 +86,8 @@ Require Import UartTxInv.
 Require Import PrintkArgs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 Import Defs.
 
 (* panic's own 4-slot frame, over printk's 48 ([SpecPrintk.printk_stack]; not
@@ -96,6 +96,7 @@ Notation panic_stack := (52%nat) (only parsing).
 Section PanicEnv.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId}.
+  Context `{XI : CurCtx}.
 
   (* the three persistent credentials the printk cone needs, as one
      hypothesis.  All hart-free, so this crosses a migration untouched. *)

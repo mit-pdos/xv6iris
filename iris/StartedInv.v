@@ -56,6 +56,7 @@ Require Import Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.
 From Kernel Require KernelSyms.
 Require Import TsoCtx.
+Require TsoCtxShim.   (* [started_cell_acc]: the ∃-context cell's SC-only elim *)
 Local Open Scope Z_scope.
 
 (* the flag's address, and the two values it ever holds *)
@@ -87,9 +88,35 @@ Section StartedInv.
 
   Definition startedN : namespace := nroot .@ "started".
 
+  (* THE FLAG CELL IS ∃-CONTEXT (M1 flip, STAGE 2), and this one is the
+     sharpest instance of the rule.  [started_inv] is a BARE [inv] and the
+     ADEQUACY PROOF hands the SAME persistent handle to every hart, each at
+     its OWN freshly-minted thread identity ([SystemAdequacy]'s
+     [own_context_boot] per secondary).  An ambient index in the body would
+     make that hand-off a FALSE goal -- and it fails by CRAWLING, not by
+     erroring: the measured cost was a 33-MINUTE [iApply] on
+     [boot_hart_secondary], against a 3.6-second file (optimization.md's
+     number).  The ∃ closes the body; the ∃-ELIMINATION is paid inside the
+     two accessors below and is the SC-only step (the same M4 racy-kit entry
+     [WpLock.lk_cpu_res] and [FileInvDefs.off_cell] carry). *)
+  Definition started_cell (v : mword 32) : iProp Σ :=
+    (∃ ξ : CtxId, ctx_word4_pointsto ξ started_addr (DfracOwn 1) v)%I.
+
+  Lemma started_cell_acc (v : mword 32) :
+    started_cell v ⊣⊢ started_addr ↦₄ v.
+  Proof.
+    iSplit.
+    - iIntros "[%ξ H]".
+      iApply (TsoCtxShim.ctx_word4_reindex _ ξ cur_ctx with "H").
+    - iIntros "H". iExists cur_ctx. iExact "H".
+  Qed.
+
+  Global Instance started_cell_timeless v : Timeless (started_cell v).
+  Proof. rewrite /started_cell. apply _. Qed.
+
   Definition started_body (P : iProp Σ) : iProp Σ :=
     (∃ v : mword 32,
-       started_addr ↦₄ v ∗ (⌜v = started_clear⌝ ∨ P))%I.
+       started_cell v ∗ (⌜v = started_clear⌝ ∨ P))%I.
 
   Definition started_inv (P : iProp Σ) : iProp Σ :=
     inv startedN (started_body P).
@@ -109,7 +136,8 @@ Section StartedInv.
     started_addr ↦₄ started_clear ={E}=∗ started_inv P.
   Proof.
     iIntros "Hw".
-    iApply inv_alloc. iNext. iExists started_clear. iFrame "Hw".
+    iApply inv_alloc. iNext. iExists started_clear.
+    rewrite started_cell_acc. iFrame "Hw".
     iLeft. iPureIntro. reflexivity.
   Qed.
 
@@ -136,12 +164,14 @@ Section StartedInv.
     iMod (inv_acc Eo startedN with "Hinv") as "[Hbody Hclose]";
       [ exact HE | ].
     iDestruct "Hbody" as (v) "[>Hword Hrest]".
+    iEval (rewrite started_cell_acc) in "Hword".
     iModIntro. iExists v. iFrame "Hword". iIntros "Hword".
     (* the disjunct is PERSISTENT (a pure fact or a persistent P), so it can
        be handed to the reader AND put back in the invariant. *)
     iDestruct "Hrest" as "#Hrest".
     iMod ("Hclose" with "[Hword]") as "_".
-    { iNext. iExists v. iFrame "Hword". iApply "Hrest". }
+    { iNext. iExists v. rewrite started_cell_acc. iFrame "Hword".
+      iApply "Hrest". }
     iModIntro. iExact "Hrest".
   Qed.
 
@@ -165,9 +195,11 @@ Section StartedInv.
     iMod (inv_acc Eo startedN with "Hinv") as "[Hbody Hclose]";
       [ exact HE | ].
     iDestruct "Hbody" as (vold) "[>Hword _]".
+    iEval (rewrite started_cell_acc) in "Hword".
     iModIntro. iExists vold. iFrame "Hword". iIntros "Hword".
     iMod ("Hclose" with "[Hword HP]") as "_".
-    { iNext. iExists started_set. iFrame "Hword". iRight. iExact "HP". }
+    { iNext. iExists started_set. rewrite started_cell_acc.
+      iFrame "Hword". iRight. iExact "HP". }
     by iModIntro.
   Qed.
 

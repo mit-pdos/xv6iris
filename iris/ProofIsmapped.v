@@ -62,8 +62,8 @@ Require Import SpecIsmapped.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 
 (* ===================================================================== *)
 (* THE WHOLE FUNCTION.                                                    *)

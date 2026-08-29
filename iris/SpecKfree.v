@@ -23,6 +23,7 @@ Require Import CpuOwn.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 
 Definition wp_kfree_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (on : option nat) (n : nat) (eb : bool) (pcur : mword 64) (K : nat) (b : bool) (lks : gset string) :=
@@ -40,7 +41,7 @@ Definition wp_kfree_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : C
   sie_cap_gpr kt m K b pcur -∗
   cpu_own n eb pcur b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  is_lock γl lk "kmem"%string <{ kmem_res γk fl }> -∗
+  is_lock γl lk "kmem"%string (λ ξ : CtxId, kmem_res (XIk := ξ) γk fl) -∗
   kfree_pre p -∗
   kalloc_avail γk on -∗
   wp_next b pcur (fun (CID : CpuId) =>
@@ -52,7 +53,6 @@ Definition wp_kfree_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : C
     kalloc_avail γk (avail_inc on) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
-Require Import TsoCtx.
 
 Module Type KFREE.
   Parameter wp_kfree_sconf :

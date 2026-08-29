@@ -604,6 +604,7 @@ Local Ltac rgne :=
 (* ===================================================================== *)
 Section InstallTransDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   (* install_trans's own [wp_next] obligation, NAMED and anchored at an
      explicit hart (durable-notes: a whole-function post must not be
@@ -640,7 +641,7 @@ Section InstallTransDefs.
     it_exc_rest Xexc W n = Xexc ∖ list_to_set (map uint W).
   Proof. intros ->. rewrite /it_exc_rest take_ge; [done | lia]. Qed.
 
-  Definition it_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+  Definition it_cont `{GEN : GenId} `{CID0 : CpuId}
       (j : nat) (bn : bio_names) (γfs : fs_names) (logstart : Z)
       (recovering : bool)
       (n : nat) (W : list (mword 32)) (Lw : nat -> list (bv 8))
@@ -675,7 +676,7 @@ Section InstallTransDefs.
         ▷ R -∗
         WP (Loop : expr riscv_lang))%I.
 
-  Lemma it_cont_shift `{GEN : GenId} `{CIDa : CpuId} `{CIDb : CpuId} `{XI : CurCtx}
+  Lemma it_cont_shift `{GEN : GenId} `{CIDa : CpuId} `{CIDb : CpuId}
 
       (j : nat) (bn : bio_names) (γfs : fs_names) (logstart : Z)
       (recovering : bool)
@@ -984,6 +985,7 @@ End InstallTransDefs.
 (* ===================================================================== *)
 Section InstallTransBlocks.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   (* ================================================================== *)
   (*  +0x6c -> +0x70 : THE LOOP HEAD (durable-disk stage D2).             *)
@@ -995,7 +997,7 @@ Section InstallTransBlocks.
   (*  downstream is [it_lregs] (the s-registers), which both arms         *)
   (*  preserve -- printk clobbers only caller-saved registers.            *)
   (* ================================================================== *)
-  Local Lemma it_head `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+  Local Lemma it_head `{GEN : GenId} `{CID0 : CpuId}
       (γpr : gname) (γu : uart_names) (γd : disk_names)
       (recovering : bool)
       (j t : nat) (w : mword 32)
@@ -1125,7 +1127,7 @@ Section InstallTransBlocks.
       iDestruct (cpu_own_transport CID0 CIDh5 0%nat eb (proc_addr j) eb
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       pose proof (Hpk eq_refl) as Hpkc.
-      iApply (Hpkc CIDh5 Mh4 (K - 10)%nat eb (proc_addr j) DfracDiscarded
+      iApply (Hpkc CIDh5 XI Mh4 (K - 10)%nat eb (proc_addr j) DfracDiscarded
                 it_fmt_s [PkANum; PkANum] eb lks
                 ltac:(pose proof printk_stack; lia)
                 ltac:(exact (proj2 (proj2 it_fmt_fmt)))
@@ -1188,7 +1190,7 @@ Section InstallTransBlocks.
   (*  the branch jumps straight to the brelse pair at +0x54 -- nothing    *)
   (*  was pinned, nothing comes back.                                     *)
   (* ================================================================== *)
-  Local Lemma it_skip `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+  Local Lemma it_skip `{GEN : GenId} `{CID0 : CpuId}
       (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev w : mword 32) (cov : gset Z)
       (recovering : bool)
@@ -1343,7 +1345,7 @@ Section InstallTransBlocks.
   (* ================================================================== *)
   (*  +0xb2 .. +0xc8 : restore ra/s0..s8, pop the 80-byte frame, return. *)
   (* ================================================================== *)
-  Local Lemma it_epi `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
+  Local Lemma it_epi `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (bn : bio_names) (γfs : fs_names) (logstart : Z)
       (recovering : bool)
       (n : nat) (W : list (mword 32)) (Lw : nat -> list (bv 8))

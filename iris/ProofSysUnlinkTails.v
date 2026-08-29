@@ -174,6 +174,7 @@ Proof. intros ->. lia. Qed.
 Section SuMsgStr.
   Context `{!riscvGS Σ, FSC : fscfg}.
   Context `{GEN : GenId}.
+  Context `{XI : CurCtx}.
 
   Lemma su_nlink_str :
     (kernel_data : iProp Σ) -∗ (mword_of_int su_nlink_a : mword 64) ↦ₛ□ su_nlink_s.
@@ -207,6 +208,7 @@ Module SysUnlinkTails (Iunlockput : IUNLOCKPUT) (EndOp : END_OP) (PN : PANIC).
 
 Section ProofSysUnlinkTails.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -229,7 +231,7 @@ Section ProofSysUnlinkTails.
   (*  Its crossing index is [b], not [true]: two plain instructions and  *)
   (*  the epilogue, and no callee in between.                            *)
   (* ================================================================== *)
-  Lemma su_tail_a `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma su_tail_a `{GEN : GenId} `{CID0 : CpuId}
       (m M : regfile) (sp0 : mword 64) (K : nat) (b : bool) (pj : mword 64)
       (w3 w4 w5 w6 w27 w30 : mword 64) (bd bn bp be : nat -> bv 8) :
     (30 <= K)%nat -> ((K - 30) + 30 = K)%nat ->
@@ -330,7 +332,7 @@ Section ProofSysUnlinkTails.
   (*  the [addi] displacement differs too (1488 / 1446 / 1458, the three  *)
   (*  message strings).                                                   *)
   (* ================================================================== *)
-  Lemma su_panic_nlink `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma su_panic_nlink `{GEN : GenId} `{CID0 : CpuId}
       (M : regfile) (K : nat) (n : nat) (eb b : bool) (pj : mword 64)
       (lks : gset string) :
     (panic_stack <= K)%nat ->
@@ -394,7 +396,7 @@ Section ProofSysUnlinkTails.
       iSplit; [iPureIntro; exact su_nlink_nz|]. iExact "Hstr". }
   Qed.
 
-  Lemma su_panic_readi `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma su_panic_readi `{GEN : GenId} `{CID0 : CpuId}
       (M : regfile) (K : nat) (n : nat) (eb b : bool) (pj : mword 64)
       (lks : gset string) :
     (panic_stack <= K)%nat ->
@@ -458,7 +460,7 @@ Section ProofSysUnlinkTails.
       iSplit; [iPureIntro; exact su_readi_nz|]. iExact "Hstr". }
   Qed.
 
-  Lemma su_panic_writei `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma su_panic_writei `{GEN : GenId} `{CID0 : CpuId}
       (M : regfile) (K : nat) (n : nat) (eb b : bool) (pj : mword 64)
       (lks : gset string) :
     (panic_stack <= K)%nat ->
@@ -532,7 +534,7 @@ Section ProofSysUnlinkTails.
   (*  inode-shaped.  s2 and s3 are untouched -- both spills are below    *)
   (*  the branch at +0x2e -- so slots 4 and 5 ride through as junk.      *)
   (* ================================================================== *)
-  Lemma su_tail_b `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma su_tail_b `{GEN : GenId} `{CID0 : CpuId}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (u : nat) (pidv : mword 32) (dq : dfrac)
@@ -758,7 +760,7 @@ Section ProofSysUnlinkTails.
   (*  by the time this block runs, which is why they are PREMISES and     *)
   (*  their slots ride through at existential words.                      *)
   (* ================================================================== *)
-  Lemma su_tail_bad `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma su_tail_bad `{GEN : GenId} `{CID0 : CpuId}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
@@ -1091,7 +1093,7 @@ Section ProofSysUnlinkTails.
   (*  of the caller's s2 out of the slot the [c.sdsp] at +0x5c filled.    *)
   (*  s3 is untouched: its spill is at +0x72, BELOW this branch.          *)
   (* ================================================================== *)
-  Lemma su_tail_d `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma su_tail_d `{GEN : GenId} `{CID0 : CpuId}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
@@ -1270,7 +1272,7 @@ Section ProofSysUnlinkTails.
   (*  its s2/s3 equations as premises: +0x5c and +0x72 are both above     *)
   (*  the [c.bnez] at +0x120 that reaches this block.                     *)
   (* ================================================================== *)
-  Lemma su_tail_e `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma su_tail_e `{GEN : GenId} `{CID0 : CpuId}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname) (gili gisli : gname)

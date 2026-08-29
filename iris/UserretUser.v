@@ -71,8 +71,8 @@ Require Import UexecWp.   (* [uexec_wp] / [loop_ok] -- the slot this runs.
 Require Import SpecUserret.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 Import Defs.
 
 Module UserretUser (R : USERRET).

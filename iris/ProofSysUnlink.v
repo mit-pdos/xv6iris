@@ -162,14 +162,14 @@ Local Ltac nz := vm_compute; discriminate.
 (*  proof file is not a dependency any other one may take.                *)
 (* ===================================================================== *)
 
-Lemma su_upd_upt_idem (V : pprivate) (P1 P2 : uptd) :
+Lemma su_upd_upt_idem `{XI : CurCtx} (V : pprivate) (P1 P2 : uptd) :
   upd_upt (upd_upt V P1) P2 = upd_upt V P2.
 Proof. reflexivity. Qed.
 
-Lemma su_cwd_upt (V : pprivate) (P : uptd) : pv_cwd (upd_upt V P) = pv_cwd V.
+Lemma su_cwd_upt `{XI : CurCtx} (V : pprivate) (P : uptd) : pv_cwd (upd_upt V P) = pv_cwd V.
 Proof. reflexivity. Qed.
 
-Lemma su_upd_cwd_upt (V : pprivate) (P : uptd) :
+Lemma su_upd_cwd_upt `{XI : CurCtx} (V : pprivate) (P : uptd) :
   upd_cwd (upd_upt V P) (pv_cwd V) = upd_upt V P.
 Proof. destruct V; reflexivity. Qed.
 
@@ -177,11 +177,11 @@ Proof. destruct V; reflexivity. Qed.
    this file imports both, so every mention of the allowance is spelled at
    the CONTRACT's copy and this is the bridge to the literal the callees
    want. *)
-Lemma su_slots2 : SpecSysUnlink.sys_unlink_slots = 2%nat.
+Lemma su_slots2 `{XI : CurCtx} : SpecSysUnlink.sys_unlink_slots = 2%nat.
 Proof. reflexivity. Qed.
 
 (* argstr's [noff] premise at the walk's own depth, which is zero. *)
-Lemma su_noff0 : (Z.of_nat 0 + 1 < 2 ^ 31)%Z.
+Lemma su_noff0 `{XI : CurCtx} : (Z.of_nat 0 + 1 < 2 ^ 31)%Z.
 Proof.
   assert (E : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity). lia.
 Qed.
@@ -189,7 +189,7 @@ Qed.
 (* nameiparent's counter report, read into the ledger's own name.  [ok]
    fixes the second summand at zero, which is the only difference between
    this and [su_u1f]. *)
-Lemma su_cnt_ok (w1 : bool) (n1 : nat) :
+Lemma su_cnt_ok `{XI : CurCtx} (w1 : bool) (n1 : nat) :
   ((MAXOPBLOCKS - (walk_spend w1 + 0))%nat <= n1)%nat -> (su_u1 w1 <= n1)%nat.
 Proof.
   intro H. unfold su_u1, su_u0. rewrite Nat.add_0_r in H. exact H.
@@ -231,22 +231,22 @@ Definition su_dot_f (j : nat) : bv 8 := su_dot_list !!! j.
 Definition su_dotdot_f (j : nat) : bv 8 := su_dotdot_list !!! j.
 
 (* what [namecmp]'s boolean is stated against: the canonical name views *)
-Lemma su_dot_name : bname 14 su_dot_f = dot_name.
+Lemma su_dot_name `{XI : CurCtx} : bname 14 su_dot_f = dot_name.
 Proof. vm_compute. reflexivity. Qed.
 
-Lemma su_dotdot_name : bname 14 su_dotdot_f = dotdot_name.
+Lemma su_dotdot_name `{XI : CurCtx} : bname 14 su_dotdot_f = dotdot_name.
 Proof. vm_compute. reflexivity. Qed.
 
 (* the two [auipc]/[addi] pairs, computed.  CLOSED terms -- no free
    address -- so [vm_compute] is safe here (contrast [su_offcell]). *)
-Lemma su_dotaddr :
+Lemma su_dotaddr `{XI : CurCtx} :
   add_vec (add_vec (mword_of_int (SU + 0x34) : mword 64)
                    (auipc_off (mword_of_int 2 : mword 20)))
           (sign_extend' 64 (mword_of_int 1554 : mword 12))
   = (mword_of_int su_dot_addr : mword 64).
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
-Lemma su_dotdotaddr :
+Lemma su_dotdotaddr `{XI : CurCtx} :
   add_vec (add_vec (mword_of_int (SU + 0x48) : mword 64)
                    (auipc_off (mword_of_int 2 : mword 20)))
           (sign_extend' 64 (mword_of_int 1542 : mword 12))
@@ -257,7 +257,7 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
    equality [DirView] states its type tests at.  The
    [ity_shot] agreement gives the left form and every payload clause wants
    the right one. *)
-Lemma su_tdir_zof (t : mword 16) :
+Lemma su_tdir_zof `{XI : CurCtx} (t : mword 16) :
   t = SpecDirlookup.T_DIR -> bv_unsigned t = T_DIR_z.
 Proof. intros ->. vm_compute. reflexivity. Qed.
 
@@ -269,7 +269,7 @@ Proof. intros ->. vm_compute. reflexivity. Qed.
 (* 8-alignment weakens to the [lhu]'s 2 (ProofDirlookupParts' shape,
    restated: a whole-function proof's parts file is not a dependency this
    one may take). *)
-Lemma su_rem8_2 (x : Z) : 0 <= x -> Z.rem x 8 = 0 -> Z.rem x 2 = 0.
+Lemma su_rem8_2 `{XI : CurCtx} (x : Z) : 0 <= x -> Z.rem x 8 = 0 -> Z.rem x 2 = 0.
 Proof.
   intros H0 H8.
   rewrite Z.rem_mod_nonneg in H8; [| exact H0 | lia].
@@ -279,7 +279,7 @@ Proof.
   destruct H8 as [c Hc]. exists (4 * c). lia.
 Qed.
 
-Lemma su_align_8_2 (a : Arch.pa) :
+Lemma su_align_8_2 `{XI : CurCtx} (a : Arch.pa) :
   is_aligned_paddr (Physaddr a) 8 = true ->
   is_aligned_paddr (Physaddr a) 2 = true.
 Proof.
@@ -292,7 +292,7 @@ Qed.
    whose guards are the kernel's own type test and [blez]), and the scan
    found everything above them dead -- so every live record is a dot, which
    is [DirView.dir_dots_only] verbatim. *)
-Lemma su_dots_only_scan (self : Z) (dn : dinode) (data : nat -> list (bv 8)) :
+Lemma su_dots_only_scan `{XI : CurCtx} (self : Z) (dn : dinode) (data : nat -> list (bv 8)) :
   bv_unsigned (di_type dn) = T_DIR_z ->
   bv_unsigned (di_nlink dn) <> 0 ->
   dir_dots_ix self dn data ->
@@ -310,7 +310,7 @@ Proof.
 Qed.
 
 (* [mword_of_int] of a 32-bit word's own value is the word *)
-Lemma su_moi32_id (w : mword 32) : (mword_of_int (bv_unsigned w) : mword 32) = w.
+Lemma su_moi32_id `{XI : CurCtx} (w : mword 32) : (mword_of_int (bv_unsigned w) : mword 32) = w.
 Proof.
   unfold mword_of_int, MachineWord.MachineWord.Z_to_word.
   change (MachineWord.MachineWord.Z_idx 32) with 32%N.
@@ -318,7 +318,7 @@ Proof.
 Qed.
 
 (* the [lw] of ip->size, read at the literal the loop's compares want *)
-Lemma su_size_sext (w : mword 32) :
+Lemma su_size_sext `{XI : CurCtx} (w : mword 32) :
   bv_unsigned w < 2 ^ 31 ->
   (sign_extend' 64 w : mword 64) = mword_of_int (bv_unsigned w).
 Proof.
@@ -328,17 +328,17 @@ Qed.
 
 (* [rd_clamp] at n = 16: never more; and 16 exactly means the whole record
    sits inside the file *)
-Lemma su_clamp_le16 (szw : bv 32) (off : nat) :
+Lemma su_clamp_le16 `{XI : CurCtx} (szw : bv 32) (off : nat) :
   (rd_clamp szw off 16 <= 16)%nat.
 Proof. unfold rd_clamp. case_decide; lia. Qed.
 
-Lemma su_clamp16_in (szw : bv 32) (off : nat) :
+Lemma su_clamp16_in `{XI : CurCtx} (szw : bv 32) (off : nat) :
   rd_clamp szw off 16 = 16%nat ->
   (off + 16 <= Z.to_nat (bv_unsigned szw))%nat.
 Proof. unfold rd_clamp. case_decide; lia. Qed.
 
 (* [dir_nrec] against the byte bound, both directions *)
-Lemma su_nrec_le (sz : Z) (j : nat) :
+Lemma su_nrec_le `{XI : CurCtx} (sz : Z) (j : nat) :
   0 <= sz -> sz <= 16 * Z.of_nat j -> (dir_nrec sz <= j)%nat.
 Proof.
   intros H0 Hj. unfold dir_nrec.
@@ -346,7 +346,7 @@ Proof.
   lia.
 Qed.
 
-Lemma su_nrec16 (sz : Z) :
+Lemma su_nrec16 `{XI : CurCtx} (sz : Z) :
   0 <= sz -> (16 * dir_nrec sz <= Z.to_nat sz)%nat.
 Proof.
   intro H0. unfold dir_nrec.
@@ -355,17 +355,17 @@ Proof.
 Qed.
 
 (* [neq_vec] off the [eq_vec] facts the parts file states *)
-Lemma su_neq_of_eq_true (x y : mword 64) :
+Lemma su_neq_of_eq_true `{XI : CurCtx} (x y : mword 64) :
   eq_vec x y = true -> neq_vec x y = false.
 Proof. intro H. unfold neq_vec. rewrite H. reflexivity. Qed.
 
-Lemma su_neq_of_eq_false (x y : mword 64) :
+Lemma su_neq_of_eq_false `{XI : CurCtx} (x y : mword 64) :
   eq_vec x y = false -> neq_vec x y = true.
 Proof. intro H. unfold neq_vec. rewrite H. reflexivity. Qed.
 
 (* the two inum bytes of a record, and its fourteen name bytes
    ([ProofDirlookupParts]' shapes, restated) *)
-Lemma su_half_bytes_eq (data : nat -> list (bv 8)) (i j : nat) :
+Lemma su_half_bytes_eq `{XI : CurCtx} (data : nat -> list (bv 8)) (i j : nat) :
   (j < 2)%nat -> nth_byte (dir_inum data i) j = file_byte data (16 * i + j)%nat.
 Proof.
   intro Hj. destruct j as [| [| j]]; [| | exfalso; lia].
@@ -373,13 +373,13 @@ Proof.
   - rewrite dir_inum_byte1. f_equal; lia.
 Qed.
 
-Lemma su_name_shift (data : nat -> list (bv 8)) (i j : nat) :
+Lemma su_name_shift `{XI : CurCtx} (data : nat -> list (bv 8)) (i j : nat) :
   file_byte data (16 * i + (2 + j))%nat = dir_name data i j.
 Proof. unfold dir_name. f_equal; lia. Qed.
 
 (* the [zero_extend' 32] dirlookup's iget wraps the halfword inum in is
    unsigned-transparent -- W3 reads the region bound through it *)
-Lemma su_zext32_unsigned (w : mword 16) :
+Lemma su_zext32_unsigned `{XI : CurCtx} (w : mword 16) :
   bv_unsigned (zero_extend' 32 w : mword 32) = bv_unsigned w.
 Proof.
   exact (bv_zero_extend_unsigned 32 w ltac:(vm_compute; discriminate)).
@@ -397,7 +397,7 @@ Definition su_dummyV : pprivate :=
           [] [] 1%positive (mword_of_int 0) [].
 
 (* readi's delivered byte at [tot = 16] is the file's byte *)
-Lemma su_rdd_eq (data : nat -> list (bv 8)) (olds : nat -> bv 8)
+Lemma su_rdd_eq `{XI : CurCtx} (data : nat -> list (bv 8)) (olds : nat -> bv 8)
     (off jj : nat) :
   (jj < 16)%nat ->
   rd_delivered data olds off 16 jj = file_byte data (off + jj)%nat.
@@ -414,7 +414,7 @@ Qed.
 (* ===================================================================== *)
 
 (* sixteen bytes at a 16-aligned offset straddle exactly ONE block *)
-Lemma su_wi_blocks (k : nat) : wi_blocks (16 * k) 16 = 1%nat.
+Lemma su_wi_blocks `{XI : CurCtx} (k : nat) : wi_blocks (16 * k) 16 = 1%nat.
 Proof.
   unfold wi_blocks.
   assert (HB : BSIZE = 1024%nat) by reflexivity.
@@ -431,22 +431,22 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma su_wi_cost (k : nat) : wi_cost_bmonly (16 * k) 16 = 4%nat.
+Lemma su_wi_cost `{XI : CurCtx} (k : nat) : wi_cost_bmonly (16 * k) 16 = 4%nat.
 Proof. unfold wi_cost_bmonly. rewrite (su_wi_blocks k). reflexivity. Qed.
 
 (* [iunlockput] can report at most one bitmap unit spent on this credited
    call.  Keep that arithmetic out of the whole-function Iris context. *)
-Lemma su_iunlockput_from5 (w : bool) (n n' : nat) :
+Lemma su_iunlockput_from5 `{XI : CurCtx} (w : bool) (n n' : nat) :
   (5 <= n)%nat ->
   ((n - ip_spend_w w true false)%nat <= n')%nat ->
   (4 <= n')%nat.
 Proof. unfold ip_spend_w, ip_bm. destruct w; cbn; lia. Qed.
 
 (* the zero record: its inum field and each of its sixteen bytes *)
-Lemma su_dz_inum : de_inum dirent_zero = bv_0 16.
+Lemma su_dz_inum `{XI : CurCtx} : de_inum dirent_zero = bv_0 16.
 Proof. reflexivity. Qed.
 
-Lemma su_dz_byte (j : nat) :
+Lemma su_dz_byte `{XI : CurCtx} (j : nat) :
   (j < 16)%nat -> dirent_bytes dirent_zero !!! j = NUL.
 Proof.
   intro Hj. rewrite dirent_bytes_zero.
@@ -454,37 +454,37 @@ Proof.
 Qed.
 
 (* the decrement arithmetic, mword-free *)
-Lemma su_decr_pay (x y : Z) (bb : bool) :
+Lemma su_decr_pay `{XI : CurCtx} (x y : Z) (bb : bool) :
   y = x + 1 -> x + (if bb then 1 else 0) <= y.
 Proof. intro H. destruct bb; lia. Qed.
 
 (* the decrement stays short, over plain [Z] (durable-disk 2b-inode-3):
    [lia]'s zify hook does not come back with [bv_unsigned] in the goal. *)
-Lemma su_dec_short (a c : Z) : c = a + 1 -> c <= 32767 -> a <= 32767.
+Lemma su_dec_short `{XI : CurCtx} (a c : Z) : c = a + 1 -> c <= 32767 -> a <= 32767.
 Proof. lia. Qed.
 
-Lemma su_decr_pos (x y z : Z) : y = x + 1 -> y = z -> 2 <= z -> x <> 0.
+Lemma su_decr_pos `{XI : CurCtx} (x y z : Z) : y = x + 1 -> y = z -> 2 <= z -> x <> 0.
 Proof. intros. lia. Qed.
 
-Lemma su_le1_nz_eq1 (x : Z) : 0 <= x -> x <= 1 -> x <> 0 -> x = 1.
+Lemma su_le1_nz_eq1 `{XI : CurCtx} (x : Z) : 0 <= x -> x <= 1 -> x <> 0 -> x = 1.
 Proof. intros. lia. Qed.
 
-Lemma su_decr_zero (x y : Z) : y = x + 1 -> y = 1 -> x = 0.
+Lemma su_decr_zero `{XI : CurCtx} (x y : Z) : y = x + 1 -> y = 1 -> x = 0.
 Proof. intros. lia. Qed.
 
 (* panic's side conditions as CLOSED lemmas over plain nat/gset -- never an
    inline [ltac:] in the application (see claude-notes/projects/panic.md). *)
-Lemma su_pn_K (K : nat) : (K_sys_unlink <= K)%nat -> (panic_stack <= K - 30)%nat.
+Lemma su_pn_K `{XI : CurCtx} (K : nat) : (K_sys_unlink <= K)%nat -> (panic_stack <= K - 30)%nat.
 Proof. lia. Qed.
 
-Lemma su_pn_K_readi (K : nat) :
+Lemma su_pn_K_readi `{XI : CurCtx} (K : nat) :
   (K_readi <= K - 30)%nat -> (panic_stack <= K - 30)%nat.
 Proof. lia. Qed.
 
-Lemma su_pn_noff : (Z.of_nat 0 + 2 < 2 ^ 31)%Z.
+Lemma su_pn_noff `{XI : CurCtx} : (Z.of_nat 0 + 2 < 2 ^ 31)%Z.
 Proof. lia. Qed.
 
-Lemma su_pn_below (lks : gset string) :
+Lemma su_pn_below `{XI : CurCtx} (lks : gset string) :
   locks_below lks "log" -> locks_below lks "pr".
 Proof. intros H. apply (locks_below_mono lks "log" "pr" H). vm_compute; lia. Qed.
 
@@ -519,7 +519,7 @@ Section ProofSysUnlinkBody.
   (* the two per-slot projections out of the boot families, at the copies
      THIS contract names ([ic_escrows] is IcacheEscrow's, [ic_sleeplocks]
      SpecDirlink's). *)
-  Lemma su_esc_acc `{GEN : GenId}
+  Lemma su_esc_acc `{XI : CurCtx} `{GEN : GenId}
       (k : nat) :
     (k < NINODE)%nat ->
     (ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗ ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k
@@ -530,7 +530,7 @@ Section ProofSysUnlinkBody.
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.
 
-  Lemma su_slk_acc `{GEN : GenId} (k : nat) :
+  Lemma su_slk_acc `{XI : CurCtx} `{GEN : GenId} (k : nat) :
     (k < NINODE)%nat ->
     (ic_sleeplocks fsc_ic -∗
      ∃ gil gisl : gname,
@@ -543,7 +543,7 @@ Section ProofSysUnlinkBody.
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.
 
-  Lemma su_bs3 :
+  Lemma su_bs3 `{XI : CurCtx} :
     (bslots 3 : iProp Σ) ⊣⊢ bslot ∗ bslots 2.
   Proof. rewrite /bslot. change 3%nat with (1 + 2)%nat. apply bslots_op. Qed.
 
@@ -554,7 +554,7 @@ Section ProofSysUnlinkBody.
      T_DIR into [di_type dnd = T_DIR] at the record ilock returns.  Pure
      resource algebra; its home is [IcacheRef.v] and it is here for that
      file's rebuild-cone reason. *)
-  Lemma su_carve_gen (k : nat) (q s : Qp) (dv inum : mword 32) (gy : gname) :
+  Lemma su_carve_gen `{XI : CurCtx} (k : nat) (q s : Qp) (dv inum : mword 32) (gy : gname) :
     inode_ref_gen k (q + s)%Qp dv inum gy ⊣⊢
     inode_ref_short_gen k (q + s)%Qp q dv inum gy ∗ inode_shr_gen k s dv inum gy.
   Proof.
@@ -565,7 +565,7 @@ Section ProofSysUnlinkBody.
     - iIntros "[($ & $ & $ & $) ($ & $ & $)]".
   Qed.
 
-  Lemma su_shed_gen (k : nat) (q : Qp) (dv inum : mword 32) (gy : gname) :
+  Lemma su_shed_gen `{XI : CurCtx} (k : nat) (q : Qp) (dv inum : mword 32) (gy : gname) :
     inode_ref_gen k q dv inum gy ⊣⊢
     inode_ref_short_gen k (q/2 + q/2)%Qp (q/2)%Qp dv inum gy ∗
     inode_shr_gen k (q/2)%Qp dv inum gy.
@@ -574,7 +574,7 @@ Section ProofSysUnlinkBody.
     by rewrite {1}(Qp.div_2 q) in Hc.
   Qed.
 
-  Lemma su_dot_window `{GEN : GenId} (a : mword 64) :
+  Lemma su_dot_window `{XI : CurCtx} `{GEN : GenId} (a : mword 64) :
     a = mword_of_int su_dot_addr ->
     kernel_data -∗ ([∗ list] j ∈ seq 0 14, (pa_add a j) ↦ₘ□ su_dot_f j).
   Proof.
@@ -586,7 +586,7 @@ Section ProofSysUnlinkBody.
     exfalso. lia.
   Qed.
 
-  Lemma su_dotdot_window `{GEN : GenId} (a : mword 64) :
+  Lemma su_dotdot_window `{XI : CurCtx} `{GEN : GenId} (a : mword 64) :
     a = mword_of_int su_dotdot_addr ->
     kernel_data -∗ ([∗ list] j ∈ seq 0 14, (pa_add a j) ↦ₘ□ su_dotdot_f j).
   Proof.
@@ -604,13 +604,13 @@ Section ProofSysUnlinkBody.
   (*  for that file's whole-function reason.                             *)
   (* ================================================================== *)
 
-  Lemma su_del_split (a : Arch.pa) (f : nat -> bv 8) :
+  Lemma su_del_split `{XI : CurCtx} (a : Arch.pa) (f : nat -> bv 8) :
     ([∗ list] j ∈ seq 0 16, pa_add a j ↦ₘ[KT1] f j)
     ⊣⊢ ([∗ list] j ∈ seq 0 2, pa_add a j ↦ₘ[KT1] f j)
        ∗ ([∗ list] j ∈ seq 0 14, pa_add (pa_add a 2) j ↦ₘ[KT1] f (2 + j)%nat).
   Proof. exact (bb_split a 2 14 f). Qed.
 
-  Lemma su_half_acc (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
+  Lemma su_half_acc `{XI : CurCtx} (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
     is_aligned_paddr (Physaddr a) 2 = true ->
     ([∗ list] j ∈ seq 0 2, pa_add a j ↦ₘ[KT1] file_byte data (16 * i + j)%nat)
     ⊣⊢ a ↦₂[KT1] dir_inum data i.
@@ -621,12 +621,12 @@ Section ProofSysUnlinkBody.
                (fun j Hj => eq_sym (su_half_bytes_eq data i j Hj))).
     iSplit.
     - iIntros "H".
-      iApply (word2_pointsto_intro (KTR := KT1) a (DfracOwn 1) (dir_inum data i) Hal).
+      iApply (ctx_word2_pointsto_intro (KTR := KT1) cur_ctx a (DfracOwn 1) (dir_inum data i) Hal).
       iExact "H".
-    - iIntros "H". iApply (word2_pointsto_bytes (KTR := KT1) with "H").
+    - iIntros "H". iApply (ctx_word2_pointsto_bytes (KTR := KT1) with "H").
   Qed.
 
-  Lemma su_name_acc (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
+  Lemma su_name_acc `{XI : CurCtx} (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
     ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ[KT1] file_byte data (16 * i + (2 + j))%nat)
     ⊣⊢ ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ[KT1] dir_name data i j).
   Proof.
@@ -636,7 +636,7 @@ Section ProofSysUnlinkBody.
   Qed.
 
   (* the whole record, split for the [lhu] and put back *)
-  Lemma su_de_view (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
+  Lemma su_de_view `{XI : CurCtx} (data : nat -> list (bv 8)) (i : nat) (a : Arch.pa) :
     is_aligned_paddr (Physaddr a) 2 = true ->
     ([∗ list] jj ∈ seq 0 16, pa_add a jj ↦ₘ[KT1] file_byte data (16 * i + jj)%nat)
     ⊣⊢ a ↦₂[KT1] dir_inum data i
@@ -649,7 +649,7 @@ Section ProofSysUnlinkBody.
   Qed.
 
   (* readi's sixteen delivered bytes ARE the record's bytes at [tot = 16] *)
-  Lemma su_rdd_view (data : nat -> list (bv 8)) (olds : nat -> bv 8)
+  Lemma su_rdd_view `{XI : CurCtx} (data : nat -> list (bv 8)) (olds : nat -> bv 8)
       (i : nat) (a : Arch.pa) :
     ([∗ list] jj ∈ seq 0 16,
        pa_add a jj ↦ₘ[KT1] rd_delivered data olds (16 * i)%nat 16 jj)
@@ -1396,7 +1396,7 @@ Section ProofSysUnlinkBody.
      [StackOwn.stack_off_nonzero] applies: slot 27's upper word is
      [sp + 28] once the frame is down.  NEVER [vm_compute] this goal whole
      ([su_offcell]'s warning); compose the shifts symbolically first. *)
-  Lemma su_offcell_sp `{GEN : GenId} (X : mword 64) :
+  Lemma su_offcell_sp `{XI : CurCtx} `{GEN : GenId} (X : mword 64) :
     pa_add (pa_stk X 27) 4 = pa_add (pa_stk X 30) 28.
   Proof.
     unfold pa_add, pa_stk. rewrite !avi_assoc. unfold add_vec_int.
@@ -2247,7 +2247,7 @@ Section ProofSysUnlinkBody.
                         = mword_of_int (SU + 0x5e)) by pcw.
         iEval (rewrite Hpp5e) in "Hpc".
         (* the [off] cell, carved out of slot 27's UPPER word *)
-        iDestruct (word_pointsto_aligned_p with "H27") as %Hal27.
+        iDestruct (ctx_word_pointsto_aligned_p with "H27") as %Hal27.
         iDestruct (su_off_split sp0 w27 with "H27") as "[H27lo H27hi]".
         (* ===== +0x5e addi a2,s0,-212 -- &off ===== *)
         iApply (wp_addi4_s_sconf (CID := CID15) (mword_of_int (SU + 0x5e)) Ra2
@@ -2616,7 +2616,7 @@ Section ProofSysUnlinkBody.
   (* ARM E's continuation: a live record was found, the loop leaves for
      +0x174 with ip's content intact and the answer discarded.  [dp]'s
      bundle and the exit ride in [X]. *)
-  Definition su_w4_exitE `{GEN : GenId}
+  Definition su_w4_exitE `{XI : CurCtx} `{GEN : GenId}
       (jx ki : nat)
  (dni : dinode) (bmi : blkmap)
       (dati : nat -> list (bv 8))
@@ -2641,7 +2641,7 @@ Section ProofSysUnlinkBody.
   (* the EMPTY exit: every record past the dots is dead, and the payload
      clause is [dir_dots_only] -- exactly what W5-DIR's re-park
      ([su_dir_links_orphan]) reads, stated at the loop's own [dati]. *)
-  Definition su_w4_exitD `{GEN : GenId}
+  Definition su_w4_exitD `{XI : CurCtx} `{GEN : GenId}
       (jx ki : nat)
  (dni : dinode) (bmi : blkmap)
       (dati : nat -> list (bv 8))

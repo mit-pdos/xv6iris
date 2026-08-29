@@ -53,7 +53,7 @@
 
      - [γpr] and the two PERSISTENT credentials [kernel_data] and
        [printk_env γpr γu γd] (the format string itself needs no premise:
-       [KernelDataInv.kernel_data_string] mints its persistent [↦ₛ□] out of
+       [KernelDataInv.kernel_data_string_all] mints its persistent string out of
        [kernel_data]);
      - printk's contract as a [Prop] HYPOTHESIS
        ([SpecPrintk.printk_gen_contract]), never as a functor argument.
@@ -132,8 +132,8 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 
 Local Open Scope Z_scope.
 

@@ -359,7 +359,8 @@ Module Type SYSCALL.
      mcounteren/stimecmp -- and which usertrap therefore carries in the
      hart-generic [UsertrapRes.devintr_caps_any] form instead.) *)
   Parameter syscall_env :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+    forall {Σ : gFunctors} `{XI : CurCtx}
+           `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId},
       gname -> mword 64 -> fclose_names -> iProp Σ.
   (* ===================================================================== *)
@@ -398,7 +399,7 @@ Module Type SYSCALL.
      PROCESS half and nothing else. *)
   Parameter syscall_env_park :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
       (γf γw γft γtk : gname) (fn : fclose_names),
       (fcn_j fn < NPROC)%nat ->
       fcn_procs fn !! fcn_j fn = Some (fcn_plock fn) ->
@@ -421,12 +422,12 @@ Module Type SYSCALL.
   (* ...and read back out, for fork's sake *)
   Parameter syscall_env_world :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
       (γf : gname) (pj : mword 64) (fn : fclose_names),
       syscall_env γf pj fn -∗ park_world (fcn_procs fn).
   Parameter syscall_env_token :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
       (γf : gname) (pj : mword 64) (fn : fclose_names),
       syscall_env γf pj fn -∗ park_token (fcn_procs fn).
 

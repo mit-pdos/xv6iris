@@ -64,10 +64,10 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto.
 Require Import DevModel DiskPtsto WpUart.
 Require Import WpLock.
+Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
-Require Import TsoCtx.
 
 (* [◯ML []] is the UNIT of the mono-list resource algebra
    ([mono_listUR A := authUR (max_prefix_listUR A)], and [to_max_prefix_list []]

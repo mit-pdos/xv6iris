@@ -63,8 +63,8 @@ Require Import CodeSysDup.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 Local Open Scope Z_scope.
 
 
@@ -147,7 +147,7 @@ Section ProofSysDup.
      The premise is local to this helper: every call site sits inside the
      capstone, whose [<fn>_stack <= av] premise is already unfolded, so it is
      a [lia].) *)
-  Lemma sd_sp_bounds `{CID0 : CpuId} `{XI : CurCtx} (mm : regfile) (k : nat)
+  Lemma sd_sp_bounds `{CID0 : CpuId} (mm : regfile) (k : nat)
       (bb : bool) (pp : mword 64) :
     (0 < k)%nat ->
     sie_cap_gpr KT1 mm k bb pp -∗
@@ -164,7 +164,7 @@ Section ProofSysDup.
   (* Only ra and s0 are popped here: s1/s2 are handled by whichever arm got
      here (restored, or never touched), which is why they arrive already in
      agreement with [m] and why slots 3..6 are arbitrary. *)
-  Lemma sd_tail `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma sd_tail `{CID0 : CpuId}
       (m Mt : regfile) (av : nat) (rv : mword 64)
       (sp0 ra0 s00 : mword 64) (w3 w4 w5 w6 : bv 64)
       (p : mword 64) (b : bool) :
@@ -179,12 +179,12 @@ Section ProofSysDup.
     sie_cap_gpr KT1 Mt (av - 6)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.sys_dup + 0x3c) : mword 64) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) w3 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) w3 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) w4 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) w6 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗

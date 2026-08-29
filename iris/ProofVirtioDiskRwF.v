@@ -355,6 +355,7 @@ Qed.
 
 Section VdrwfBridges.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{XI : CurCtx}.
 
   Lemma vdrwf_w2b (a : Arch.pa) (w : bv 16) :
     is_aligned_paddr (Physaddr a) 2 = true ->
@@ -498,6 +499,7 @@ Notation Rs8 := (mword_of_int 24 : mword 5).
    section that FIXES [CpuId] (a section variable cannot be instantiated at
    its use site); [CID] is an ordinary binder of the lemma instead. *)
 Section VdrwfP6.
+  Context `{XI : CurCtx}.
   (* [eb] is the literal [true] in the epilogue, so [iNext] would otherwise
      descend through [cpu_own]'s [if b then ⌜…⌝ else …] and strip a later
      that is not ours.  Keep the bundle opaque. *)
@@ -533,7 +535,7 @@ Section VdrwfP6.
   (* s1 = desc[i].flags and s2 = desc[i].next (both callee-saved, so they   *)
   (* survive the call), and descriptor [i] back in the free pool.           *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_vdrwf_iter `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}  (γs : list gname) (γd : disk_names)
+  Lemma wp_vdrwf_iter `{GEN : GenId} `{CID : CpuId}  (γs : list gname) (γd : disk_names)
       (pd : SailStdpp.Values.mword 64) (i : nat) (fr : nat -> bool)
       (va : SailStdpp.Values.mword 64) (vl : SailStdpp.Values.mword 32)
       (vf vn : SailStdpp.Values.mword 16)
@@ -760,7 +762,7 @@ Section VdrwfP6.
   (* level 0 with the saved base [eb] and the epilogue below it runs at     *)
   (* that arm, which is interruptible whenever [eb = true].                 *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_vdrw_p6_seam `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γk : gname)
+  Lemma wp_vdrw_p6_seam `{GEN : GenId} `{CID : CpuId} (γk : gname)
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool)
       (sp0 b : Arch.pa) (m : regfile) (wr sector : SailStdpp.Values.mword 64)
@@ -1373,7 +1375,7 @@ Section VdrwfP6.
     { rewrite /H3 upd_ne; [| reg_neq]. rewrite /H2 upd_ne; [| reg_neq].
       rewrite /H1 upd_ne; [| reg_neq]. exact HG3sp. }
     iApply (Release.wp_release_sconf KT1 (CID := CIDx) γk d_lock "virtio_disk"%string
-              (disk_res γd pd pav pu) H3 0%nat eb (proc_addr j) (K - 12)%nat
+              <{ disk_res γd pd pav pu }> H3 0%nat eb (proc_addr j) (K - 12)%nat
               ({["virtio_disk"]} ∪ lks)
               HH3a0 ltac:(pose proof (vdrw_K10 K HK); lia)
               with "Hcg Htext Hpc Hlk Htok HR Hown Hpay").

@@ -102,8 +102,8 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -138,7 +138,7 @@ Proof. apply bv_add_0_r. vm_compute. reflexivity. Qed.
 (* THE FRAME IS TEN SLOTS ([c.addi16sp sp,-80] at +0x04, [caddi16sp_imm 59]).
    A [c.sdsp]/[c.ldsp] displacement off the pushed sp names slot [10 - imm6]
    counted down from the ENTRY sp; slot 10 is padding and never written. *)
-Lemma uw_slot_bridge (X : mword 64) (o : mword 64) (k : nat) :
+Lemma uw_slot_bridge `{XI : CurCtx} (X : mword 64) (o : mword 64) (k : nat) :
   add_vec (mword_of_int (- (8 * Z.of_nat 10%nat))) o = mword_of_int (- (8 * Z.of_nat k)) ->
   add_vec (pa_stk X 10%nat) o = pa_stk X k.
 Proof.
@@ -342,7 +342,7 @@ Section UwProps.
      n > 0 path only (the [blez] is the function's FIRST instruction, so the
      n = 0 path never builds a frame at all and there is no shrink-wrapping
      to account for). *)
-  Definition uw_saved (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
+  Definition uw_saved `{XI : CurCtx} (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
     (pa_stk sp0 1 ↦₈[KT1] (m0 !!! Regidx Rra) ∗
      pa_stk sp0 2 ↦₈[KT1] (m0 !!! Regidx Rs0) ∗
      pa_stk sp0 3 ↦₈[KT1] (m0 !!! Regidx Rs1) ∗
@@ -354,10 +354,10 @@ Section UwProps.
      pa_stk sp0 9 ↦₈[KT1] (m0 !!! Regidx Rs7))%I.
 
   (* the tenth slot is alignment padding: never written, carried existentially *)
-  Definition uw_slot10 (sp0 : mword 64) : iProp Σ :=
+  Definition uw_slot10 `{XI : CurCtx} (sp0 : mword 64) : iProp Σ :=
     (∃ w : mword 64, pa_stk sp0 10 ↦₈[KT1] w)%I.
 
-  Lemma uw_frame_stack_own sp0 m0 :
+  Lemma uw_frame_stack_own `{XI : CurCtx} sp0 m0 :
     uw_saved sp0 m0 -∗ uw_slot10 sp0 -∗ stack_own (KTR := KT1) sp0 10.
   Proof.
     iIntros "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9) H10".
@@ -369,10 +369,10 @@ Section UwProps.
     iSplitL "H9"; [by iExists _|]. iSplitL "H10"; [by iExact "H10"|]. done.
   Qed.
 
-  Definition uw_buf (buf : mword 64) (dq : dfrac) (f : nat -> bv 8) (n : nat) : iProp Σ :=
+  Definition uw_buf `{XI : CurCtx} (buf : mword 64) (dq : dfrac) (f : nat -> bv 8) (n : nat) : iProp Σ :=
     ([∗ list] k0 ∈ seq 0 n, (pa_add buf k0) ↦ₘ[KT1]{dq} f k0)%I.
 
-  Definition uw_full (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
+  Definition uw_full `{XI : CurCtx} (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
     (uw_saved sp0 m0 ∗ uw_slot10 sp0)%I.
 
   (* ------------------------------------------------------------------ *)
@@ -920,14 +920,14 @@ Section UwBodies.
       { rewrite /Q4. apply callee_saved_insert_r; [vm_compute; reflexivity | exact HcsQ3]. }
       iDestruct (cpu_own_transport CIDp CIDa4 0 true pj true ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iApply (Acquire.wp_acquire_sconf KT1 γl "uart"%string (tx_res γu) Q4
+      iApply (Acquire.wp_acquire_sconf KT1 γl "uart"%string <{ tx_res γu }> Q4
                 0%nat true pj (av - 10)%nat true lks ltac:(lia)
                 ltac:(lia)
                 ltac:(lkbelow)
                 with "Hcg Hcnt Ht Hpc [Hlk]").
       all: try lkbelow.
       { iEval (rewrite HQ4a0). iExact "Hlk". }
-      iIntros (CIDacq Hsacq ms MA) "%Hmsf Hcg Hpc %HcsA Htok HR Hcnt Hpay".
+      iIntros (CIDacq Hsacq ms MA) "%Hmsf Hcg Hpc %HcsA Htok HR _ Hcnt Hpay".
       iEval (rewrite HQ4ra P56) in "Hpc".
       assert (HregsA : uw_loop_regs m0 MA (pa_stk sp0 10) buf n i).
       { apply (uw_loop_regs_cs m0 Q4 MA); [exact HcsA|].
@@ -1010,7 +1010,7 @@ Section UwBodies.
           by (rewrite /K2 upd_eq; reflexivity).
         assert (HcsK2 : callee_saved D2 K2).
         { rewrite /K2. apply callee_saved_insert_r; [vm_compute; reflexivity | exact HcsK1]. }
-        iApply (Release.wp_release_sconf KT1 γl a_tx_lock "uart"%string (tx_res γu) K2
+        iApply (Release.wp_release_sconf KT1 γl a_tx_lock "uart"%string <{ tx_res γu }> K2
                   0%nat true pj (av - 10)%nat ({["uart"]} ∪ lks)
                   ltac:(rewrite HK2a0; apply uw_addv_0)
                   ltac:(lia)
@@ -1177,7 +1177,7 @@ Section UwBodies.
           by (rewrite /G4 upd_eq; reflexivity).
         assert (HcsG4 : callee_saved D2 G4).
         { rewrite /G4. apply callee_saved_insert_r; [vm_compute; reflexivity | exact HcsG3]. }
-        iApply (Release.wp_release_sconf KT1 γl a_tx_lock "uart"%string (tx_res γu) G4
+        iApply (Release.wp_release_sconf KT1 γl a_tx_lock "uart"%string <{ tx_res γu }> G4
                   0%nat true pj (av - 10)%nat ({["uart"]} ∪ lks)
                   ltac:(rewrite HG4a0; apply uw_addv_0)
                   ltac:(lia)

@@ -70,9 +70,9 @@ Require Import KvmSpec.         (* [kalloc_env]                         *)
 Require Import Xv6G.            (* [xv6G]                               *)
 Require Import FdSlots.         (* [fdslotG]                            *)
 Require Import FileInvDefs.     (* [fileG]                              *)
+Require TsoCtx.   (* qualified: the class only, no notation flip *)
 
 Local Open Scope Z_scope.
-Require Import TsoCtx.
 
 (* ===================================================================== *)
 (*  1.  THE RELATION WITH THE HOLE                                        *)
@@ -155,7 +155,7 @@ Proof. intro H. by apply kexec_ok_q_True. Qed.
 
     Kept TRANSPARENT for that reason, and NOT sealed: opacity would break
     the specialisations rather than help them.                            *)
-Definition kexec_closer
+Definition kexec_closer `{XI : TsoCtx.CurCtx}
     (* EXACTLY the classes the rows below need, which is the kexec
        contract's list MINUS [pavG]: [proc_priv] is [ProcInv]'s, and that
        section takes `{!riscvGS, !fileG, !xv6G, !bioslotG, !fdslotG,
@@ -172,7 +172,7 @@ Definition kexec_closer
        before it was killed.  A missing class is not a clean failure here;
        cap the memory when experimenting with this binder list. *)
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}
-    `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    `{GEN : GenId} `{CID : CpuId}
     (Q : mword 64 -> Prop)
     (gf ga : gname) (pj : mword 64) (pidv : mword 32) (U : ustate)
     (m : regfile) (ret_tgt : mword 64) (K : nat) (b eb : bool)

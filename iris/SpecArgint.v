@@ -48,8 +48,8 @@ Require Import PageGeom.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 
 
 (* the [c.sw]'s narrowing IS C's (int) conversion of argraw's uint64 result;

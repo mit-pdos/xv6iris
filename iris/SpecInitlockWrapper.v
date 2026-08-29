@@ -31,8 +31,8 @@ Require Import WpLock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 
 (* The thirteen instructions of a thin initlock wrapper entered at [F].
    [uname]/[iname] are the auipc/addi pair that materializes a1 = the name
@@ -85,8 +85,9 @@ Definition wp_initlock_wrapper_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId
   add_vec (mword_of_int (F + 0x18) : mword 64) (sign_extend' 64 j) = mword_of_int KernelSyms.initlock ->
   sie_cap_gpr kt m K b p -∗
   kernel_text -∗ ilw_code F uname ulk iname ilk j -∗ pc_is (mword_of_int F : mword 64) -∗
-  (* the name string literal: DUPLICABLE, so the member keeps its copy *)
-  name ↦ₛ□ s -∗
+  (* the name string literal, in the ∀-context form ([TsoCtx.ctx_string_all];
+     see SpecInitlock.v): DUPLICABLE, so the member keeps its copy *)
+  ctx_string_all name DfracDiscarded s -∗
   lk ↦₄ vlock -∗
   c_name ↦₈ vname -∗
   c_cpu ↦₈ vcpu -∗

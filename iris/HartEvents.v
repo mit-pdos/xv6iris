@@ -36,8 +36,8 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift.
 Require VirtioQueue.   (* [write_bytes_lookup]: the snapshot's per-byte hits *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 
 (* ---------------------------------------------------------------------- *)
 (* THE SNAPSHOT BRIDGE (design §3a): a reservation whose snapshot still     *)

@@ -75,8 +75,8 @@ Require Import SpecConsputc SpecPrintint.
 From Kernel Require KernelInstrs KernelData.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 Import Defs.
 
 (* clean-context (mword-free) nat bounds.  [printint_stack = 24] is printint's
@@ -120,7 +120,7 @@ Section ProofPrintint.
   (*  THE SHARED EPILOGUE (0x84 .. 0x8c).                                *)
   (* ================================================================== *)
 
-  Lemma wp_printint_epi `{CID0 : CpuId} `{XI : CurCtx}
+  Lemma wp_printint_epi `{CID0 : CpuId}
       (m mc : regfile) (K : nat) (b : bool) (pcur : mword 64) :
     let sp0 := m !!! Regidx csp_rs1 in
     let spd := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
@@ -274,7 +274,7 @@ Section ProofPrintint.
       c <> a4_idx -> c <> a5_idx -> c <> a7_idx -> mf !!! Regidx c = md !!! Regidx c.
 
   (* ---- ONE iteration, 0x22 .. 0x3e, handing over at the back-edge branch --- *)
-  Lemma wp_printint_dbody `{CID0 : CpuId} `{XI : CurCtx} (K : nat)
+  Lemma wp_printint_dbody `{CID0 : CpuId} (K : nat)
       (buf dg : mword 64) (i : nat) (x : mword 64) (md : regfile) (b : bool) (pcur : mword 64) :
     (i < 24)%nat ->
     0 <= Z.of_nat i + 1 < 2^31 ->
@@ -650,7 +650,7 @@ Section ProofPrintint.
   (* ================================================================== *)
 
   Hypothesis wp_consputc :
-    forall `{CID0 : CpuId} `{XI : CurCtx} (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
+    forall `{CID0 : CpuId} `{XI0 : CurCtx} (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
       (bs : list (bv 8)) (n : nat) (eb : bool) (b : bool) (pcur : mword 64) (lks : gset string),
       wp_consputc_sconf_body kt γl γd γv m0 K bs n eb b pcur lks.
 
@@ -812,7 +812,7 @@ Section ProofPrintint.
   (*  lazily-saved s1, and the epilogue.                                 *)
   (* ================================================================== *)
 
-  Lemma wp_printint_tail `{CID0 : CpuId} `{XI : CurCtx} (γl : gname) (γd : uart_names) (γv : disk_names)
+  Lemma wp_printint_tail `{CID0 : CpuId} (γl : gname) (γd : uart_names) (γv : disk_names)
       (m mt : regfile) (K nd : nat) (bs : list (bv 8))
       (n : nat) (eb : bool) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -1045,7 +1045,7 @@ Section ProofPrintint.
   (*  why it takes the map at 0x12 abstractly.                           *)
   (* ================================================================== *)
 
-  Lemma wp_printint_main `{CID0 : CpuId} `{XI : CurCtx} (γl : gname) (γd : uart_names) (γv : disk_names)
+  Lemma wp_printint_main `{CID0 : CpuId} (γl : gname) (γd : uart_names) (γv : disk_names)
       (m mq : regfile) (K : nat) (x : mword 64) (bs : list (bv 8))
       (n : nat) (eb : bool) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in

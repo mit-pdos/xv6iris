@@ -35,8 +35,8 @@ Require Import IntrDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Import Defs.
 Require Import TsoCtx.
+Import Defs.
 
 (* THE TWO BUFFERS CARRY THEIR OWN TIERS.  [kts] is the SOURCE's, [ktw] the
    DESTINATION's, each below the accessing hart's regime [kt] -- the same

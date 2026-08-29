@@ -70,8 +70,8 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Local Open Scope Z_scope.
 Require Import TsoCtx.
+Local Open Scope Z_scope.
 
 (* ===================================================================== *)
 (*  uartputc_sync's device core, as register-file transformers.  One      *)
@@ -184,7 +184,7 @@ Section ProofUartPutc.
   (* =================================================================== *)
   (*  THE THRE POLL LOOP: 0x1e -> 0x28, run under [dev_inv] (Löb).        *)
   (* =================================================================== *)
-  Lemma wp_uartputc_poll_sconf `{CID0 : CpuId} `{XI : CurCtx} (γd : uart_names) (γv : disk_names) (mentry : regfile) (n : nat) (l : list (bv 8)) (b : bool) (p : mword 64) :
+  Lemma wp_uartputc_poll_sconf `{CID0 : CpuId} (γd : uart_names) (γv : disk_names) (mentry : regfile) (n : nat) (l : list (bv 8)) (b : bool) (p : mword 64) :
     mentry !!! Regidx (mword_of_int 14) = uart_pa 5 ->
     sie_cap_gpr kt mentry n b p -∗ kernel_text -∗
     pc_is (mword_of_int (KernelSyms.uartputc_sync + 0x1e)) -∗
@@ -278,7 +278,7 @@ Section ProofUartPutc.
   (* =================================================================== *)
   (*  DEVICE CORE: 0x18 -> 0x34 (lui/addi + poll + zext.b + lui + THR).    *)
   (* =================================================================== *)
-  Lemma wp_uartputc_devcore_sconf `{CID0 : CpuId} `{XI : CurCtx} (γd : uart_names) (γv : disk_names)
+  Lemma wp_uartputc_devcore_sconf `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
       (m : regfile) (n : nat) (l : list (bv 8)) (b : bool) (p : mword 64) :
     let sb : mword 8 := autocast (T := mword)
        (subrange_vec_dec (and_vec (m !!! Regidx (mword_of_int 9))
@@ -502,11 +502,11 @@ Section ProofUartPutc.
     (* ===== acquire(&tx_lock) ===== *)
     iDestruct (cpu_own_transport CID CIDp9 n eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Acquire.wp_acquire_sconf kt γl "uart"%string (tx_res γd) G14 n eb p (K - 4)%nat b lks
+    iApply (Acquire.wp_acquire_sconf kt γl "uart"%string <{ tx_res γd }> G14 n eb p (K - 4)%nat b lks
               Hn Hav Hfresh with "Hcg Hcpu Ht Hpc [Hlk]").
     all: try lkbelow.
     { iEval (rewrite HG14a0). iExact "Hlk". }
-    iIntros (CIDacq Hsacq ms macq) "%Hmsf Hcg Hpc %Hcs_acq Hlocked HR Hcpu Hpay".
+    iIntros (CIDacq Hsacq ms macq) "%Hmsf Hcg Hpc %Hcs_acq Hlocked HR _ Hcpu Hpay".
     assert (Hret14 : ret_pc (G14 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.uartputc_sync + 0x18))
       by (rewrite HG14ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hret14) in "Hpc".
@@ -585,7 +585,7 @@ Section ProofUartPutc.
       apply kv_addv_zero. }
     (* ===== release(&tx_lock) ===== *)
     iEval (rewrite -Hbeq) in "Hcg".
-    iApply (Release.wp_release_sconf kt γl a_tx_lock "uart"%string (tx_res γd) H3c n eb p (K - 4)%nat
+    iApply (Release.wp_release_sconf kt γl a_tx_lock "uart"%string <{ tx_res γd }> H3c n eb p (K - 4)%nat
               ({["uart"]} ∪ lks)
               Hlka Hav with "Hcg Ht Hpc Hlk Hlocked [Hown] Hcpu Hpay").
     { iApply (tx_res_intro γd (l ++ [sb]) with "Hown"). }

@@ -142,6 +142,7 @@ Local Open Scope Z_scope.
 Section NparEraDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   (* [IcacheRef.inode_held_ty] with the inum EXPOSED -- the same one new
      pure tie [SpecNameiTr.inode_held_at] adds to [inode_held], and for the
