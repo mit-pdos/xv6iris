@@ -809,11 +809,78 @@ analogue of `USyncKernel.sync_uexec_slot`, taking `uargv_ok` plus echo's
 text/stack facts about the key.  (6) Only then: the exec seam that
 supplies `uargv_ok` at the mint.
 
-A read-only survey was in flight when this was written (the existing echo
-proof's shape and assumptions; what `kexec_ok` actually pins about the
-argv stack today; the write row; whether any existing U-mode proof calls
-a RETURNING syscall and continues — `sync` does not).  Its findings
-belong here.
+**SURVEY FINDINGS (2026-08-29), and two corrections to the plan above.**
+
+- **WRITE IS EASY, AND THE TEMPLATE ALREADY EXISTS.**  `SYS_write` is 16;
+  `usys_window 16 = None`, so write lands in `usys_mem_ok`'s QUIET row —
+  `M' = M ∧ π' = π`, no window, `r` unconstrained.  That is the same row
+  `SYS_sync` (22) takes, and `UkSync.wp_ksync_sync_stub` is already a
+  returning-syscall stub on the new engine (`c.li a7,N; ecall; c.jr ra`,
+  closing with `usys_mem_ok_quiet` and `uslot_bump_run`).  Echo's write
+  stub differs only in the immediate and the addresses.  **The syscall was
+  never the hard part.**
+- **CORRECTION 1 — the argv ARRAY's null terminator is not what echo
+  needs.**  `UmodeAbi.uargs` (the existing generic predicate) has NO
+  `argv[argc] = 0` clause, and echo never dereferences that slot: its loop
+  compares the cursor against `av + 8*argc`.  What IS load-bearing is the
+  STRINGS' nul-termination (`ucstr M p len`), because that is what makes
+  `strlen` terminate.  So the generic entry predicate wants: 8-alignment,
+  `argc` in range, the pointer array readable, and per `i < argc` a
+  pointer to a readable NUL-TERMINATED run.  Adding `argv[argc] = 0`
+  anyway is defensible (it is true, and another program may read it), but
+  it is not echo's requirement.
+- **CORRECTION 2 — the generic predicate already exists; the work is
+  RE-CUTTING IT ON THE KEY.**  `uargs pt M av argc lo` is stated over the
+  TABLE (`uv_rd pt M …`).  The new tier needs `uk_args π M av argc lo`
+  with the readability clauses becoming "the page is in `π`" via
+  `UserPerm.perm_of_R` — exactly the move `uk_stack` made from
+  `uv_stack`.  That is the reusable artifact the owner asked for, and it
+  belongs in a generic file (`UkAbi.v`), not in echo's.
+- **THE ENTRY SUPPLY IS BLOCKED HARDER THAN EXPECTED.**  `SpecKexec.kexec_ok`'s
+  success arm pins a0 = argc, a1 = sp = the argv base, and sp as an exact
+  arithmetic function of the new size and the argument lengths — but
+  **the image is ENTIRELY existential**: `us_M U'` appears in NO clause,
+  so nothing is pinned about the argv array's contents, the strings, or
+  even THE PROGRAM TEXT.  `entry` is a ∀-bound parameter tied to nothing
+  (not to the ELF's entry, not to a symbol).  `SpecKexec.v`'s own header
+  calls this out and defers it as "win-2 work".  The nul-termination
+  facts that do exist are PREMISES about the kernel-side `char **argv`
+  kexec was handed, not conclusions about user memory.  So `uk_args` is a
+  PREMISE for now, exactly as `uargs` is today, and supplying it at the
+  mint is the exec forcing function.
+- **WHAT THE NEW CONTRACT LOST, and it is worth being deliberate about.**
+  On the old tier `xv6_sys_sem SYS_write = UsysReadsBuf` made "my buffer
+  is readable" a PRECONDITION THE PROGRAM PAYS — which is what forced
+  `strlen`'s answer to be the true length, and is echo's one piece of
+  functional content today.  `uexec_ret`'s ecall arm has no such place:
+  it is `∀ r M' π', ⌜usys_mem_ok …⌝ -∗ uslot (bump …)`, one pure
+  hypothesis and no iProp.  That loss is arguably CORRECT — the old
+  obligation was an artifact of the ASSUMED capability, and in reality a
+  bad buffer just makes the kernel's copyin fail and write return -1,
+  which echo must tolerate anyway — but it means echo's port is
+  safety-only, and `strlen` returning the true length becomes something
+  echo proves internally (or does not state) rather than something the
+  contract extracts.
+- **FUNCTIONAL CONTENT: the hook is designed, the kernel half is blocked
+  elsewhere.**  The refinement is `design/user-wp-slot.md`'s "adds an iProp
+  premise under the same ∀ without changing the shape"; the model to copy
+  is the old tier's `UmodeInitIo.uinit_arm_write` (`∃ bs, ⌜ubuf_at M a1 bs
+  ∧ length bs = a2⌝ ∗ W (uint a0) bs`).  A real output trace exists ONE
+  LAYER DOWN (`UartTxInv.uart_sent_sub` — every byte accepted by the UART,
+  in order), and the break is `SpecConsolewrite`'s deliberate loss: the
+  bytes came through copyin, whose destination is existential, so the
+  kernel cannot say which bytes reached the wire.  Stating "the console
+  prints what echo was given" therefore needs BOTH the U-side `Φ` and
+  copyin's destination named.  Not now; do not conflate with safety.
+- **Sizing.**  `UkSync.v` is 853 lines for a SEVENTEEN-instruction program
+  (~25-30 lines per instruction; §1's key-level lemmas ≈ 330 of those are
+  generic and reusable).  `UCodeEcho.v` carries 73 decode lemmas.  Echo is
+  a substantially bigger walk, and `UkAbi.v` + `UkLoad` + `UkBranch` are
+  all upstream of it.
+- One difference from sync worth carrying into echo's layout facts: echo's
+  two rodata strings (`" "` and `"\n"`) live on the TEXT page and are
+  passed to `write`, so `echo_layout` claims page 0 is fetch-ok AND
+  `Load Data`-ok, where `sync_layout` claims fetch only.
 
 ## §5 Session-local artifacts (durable parts lifted into this file)
 
