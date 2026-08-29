@@ -1409,3 +1409,4 @@ LinkSysOpenAU.v
 # era0_D, at the one era-0 premise (this era's disk is mkfs's image).  Also
 # a LEAF: its import cone is FsInitPin's own and nothing requires it.
 FsInitPinBoot.v
+SpecSysUnlinkAU.v
