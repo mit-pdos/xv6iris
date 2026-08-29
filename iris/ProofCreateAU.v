@@ -173,7 +173,6 @@ Require Import BioInv.
    [byte_range], both of which have live twins below, and the LAST import
    wins (durable-notes, "AND WHERE THAT IMPORT COLLIDES, PUT IT EARLY"). *)
 Require Import FsState.
-Require Import FsBytesGamma.
 Require Import FsStateEra.
 Require Import FsBlocks LogInv.
 Require Import BitmapInv.
@@ -189,7 +188,6 @@ Require Import DirView.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.
-Require Import IregLinkNz.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
@@ -204,15 +202,12 @@ Require Import SpecBmap SpecWritei.
 Require Import SpecIput SpecIalloc SpecIupdate.
 Require Import SpecIlock SpecIunlockput.
 Require Import SpecDirlookup SpecDirlink.
-Require Import SpecNamex SpecNameiparent.
+Require Import SpecNamex.
 Require Import SpecCreate.
 Require Import SpecNparWrapEra.  (* the ERA nameiparent walk            *)
 Require Import FsBytesGamma.
-Require Import FsAbsEra.
-Require Import FsAbsNpar.        (* [np_elems]/[ep_hops_from]/[np_dead] *)
 Require Import FsAbsStart.       (* [ep_start]: the DEFERRED start      *)
 Require Import SpecSysMknodAU.   (* [cre_pre], [mknod_parent_elems]     *)
-Require Import FsAbsEraMknod.
 Require Import FsAbsNparMknod.   (* [np_dead_to_mknod]                  *)
 Require Import FsAbsMknodFire.   (* the commits and the two fires       *)
 Require Import SpecCreateAU.     (* the contract this file seals        *)

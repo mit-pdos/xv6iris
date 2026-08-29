@@ -132,7 +132,7 @@ Require Import WpLock.
 Require Import ByteCursor ByteBuf.
 Require Import PtreeType.
 Require Import CpuOwn.
-Require Import KallocInv.
+Require Import PageGeom.
 Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.

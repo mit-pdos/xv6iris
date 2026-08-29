@@ -109,26 +109,20 @@ Require Import ByteBuf.
 Require Import DinodeEnc.
 Require Import DirentEnc.
 Require Import PathElems.       (* [path_elems], [SLASH], [bview]           *)
-Require Import DirView.
 Require Import FsTree.          (* [fname]                                  *)
 Require Import InodeInv.        (* [ROOTINO] : mword 32                     *)
-Require Import InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
-Require Import SleepLock.
 Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import ProcInv.
-Require Import SpecDirlookup.
 Require Import SpecIput.
 Require Import SpecCreate.      (* the landed contract this parallels       *)
 Require Import FsBytesGamma.    (* [fs_gamma_L]: the live Γ                 *)
 Require Import SpecSysMknodAU.  (* [cre_pre], [mknod_parent_elems]          *)
-Require Import FsAbsEra.
-Require Import FsAbsNpar.       (* [np_elems], [ep_hops_from], [np_dead]    *)
 Require Import FsAbsStart.      (* [ep_start]: the DEFERRED start           *)
 Require Import FsAbsEraMknod.   (* [mknod_walk_dead_era]                    *)
 Require Import FsAbsMknodFire.  (* the authority-shaped commits             *)

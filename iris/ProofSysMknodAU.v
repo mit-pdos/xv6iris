@@ -129,14 +129,9 @@ Require Import SpecArgint.
 Require Import SpecCreate.
 Require Import CodeSysMknod.
 Require Import SpecSysMknod.
-Require Import PathElems.        (* [path_elems], [SLASH]               *)
 Require Import DirentEnc.        (* [bview]                             *)
 Require Import FsTree.
-Require Import FsBytesGamma.
 Require Import SpecSysMknodAU.   (* [dev_arg]                           *)
-Require Import FsAbsEra.
-Require Import FsAbsNpar.
-Require Import FsAbsEraMknod.
 Require Import FsAbsNparMknod.   (* [np_start_of_mknod]                 *)
 Require Import FsAbsMknodFire.   (* the commits and [mkf_dev_arg]       *)
 Require Import SpecCreateAU.     (* [CREATE_AU], [cau_ok] / [cau_fail]  *)
