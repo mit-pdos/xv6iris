@@ -599,6 +599,33 @@ Proof.
   unfold T_DIR_z. vm_compute. reflexivity.
 Qed.
 
+(* ===== THE DEVICE TEST, IN THE PAYLOAD'S VOCABULARY ====================
+   The owner's 2026-08-29 ruling is discharged from the branch fact of the
+   [lh a4,68(s1); c.li a5,3; beq] at +0x76 -- the very test that decides
+   which type word the store writes.  Two directions, one per arm:
+
+   * the FALL-THROUGH (the [beq] was not taken, so [ip->type <> 3]) writes
+     FD_INODE, and this is the register-level disequality read as the
+     Z-level one [FileInvDefs.inode_pay] states its condition at.  The
+     sibling of [so_tdir_zne], one constant over.
+   * the TAKEN arm writes FD_DEVICE, where the implication is vacuous
+     because FD_DEVICE is not FD_INODE -- nothing about the inode is
+     claimed there, which is the whole reason the conjunct is keyed on the
+     FD's type word rather than being unconditional. *)
+Lemma so_tdev_zne `{XI : CurCtx} (t : mword 16) :
+  t <> (mword_of_int 3 : mword 16) -> bv_unsigned t <> FsImg.T_DEVICE_z.
+Proof.
+  intros Hne Hc. apply Hne. apply bv_eq. rewrite Hc.
+  unfold FsImg.T_DEVICE_z. vm_compute. reflexivity.
+Qed.
+
+Lemma so_dev_vac `{XI : CurCtx} (ty : bv 16) :
+  FD_DEVICE = FD_INODE -> bv_unsigned ty <> FsImg.T_DEVICE_z.
+Proof.
+  unfold FD_DEVICE, FD_INODE. intro Hc.
+  apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc.
+Qed.
+
 (* ===== THE THEOREM =====================================================
    The published content's [f->writable] byte is the one the [snez] stored,
    and on a T_DIR inode [omode] was forced to zero -- so a WRITABLE fd is
@@ -747,6 +774,11 @@ Section ProofSysOpenPublish.
     fc_readable C = ((if rb then mword_of_int 1 else mword_of_int 0) : mword 8) ->
     fc_writable C = ((if wb then mword_of_int 1 else mword_of_int 0) : mword 8) ->
     (bv_unsigned ty = T_DIR_z -> om = (mword_of_int 0 : mword 32)) ->
+    (* THE OWNER'S RULING, PAID HERE (2026-08-29): the FD_INODE store runs
+       exactly where the [beq] against T_DEVICE fell through, so the fact is
+       free at the one site that installs the payload.  [so_tdev_zne] on the
+       inode arm, [so_dev_vac] on the device arm. *)
+    (fc_type C = FD_INODE -> bv_unsigned ty <> FsImg.T_DEVICE_z) ->
     off_wf voff ->
     (* the parent the walk kept, short by the share it lent ilock ... *)
     inode_ref_short_gen kk (qi + s)%Qp qi icfg_dev inum gy -∗
@@ -773,7 +805,7 @@ Section ProofSysOpenPublish.
        projection because [fdstate_ok] is a relation -- see its note. *)
     |={E}=> ∃ st : fdstate, ⌜fdstate_ok inum C st⌝ ∗ file_ref gf kf 1 st.
   Proof.
-    intros HEi HEo Hkk Hinb Hip Hty Hwrb Hrdb Hwdb Hdir Hwf.
+    intros HEi HEo Hkk Hinb Hip Hty Hwrb Hrdb Hwdb Hdir Hdvw Hwf.
     iIntros "Hkeep Hru Hshr #Hshot Href Hlive Hflds Hnames Hip Hoff".
     (* ---- the generation: name the returned share and pin it ---- *)
     rewrite inode_shr_gen_intro. iDestruct "Hshr" as (g2) "Hshr".
@@ -791,9 +823,10 @@ Section ProofSysOpenPublish.
       iSplitR; [iPureIntro; reflexivity|].
       iSplitR; [iPureIntro; exact Hkk|].
       iSplitR; [iPureIntro; exact Hinb|]. iExact "Hshr". }
-    (* ---- the FD-type witness, and it is [so_pay_witness] ---- *)
-    iMod (inode_pay_alloc E (ientry kk) s gy inum (fc_wbool C) ty
-            (so_pay_witness om ty C Hwrb Hdir) with "Hsh Hs Hshot")
+    (* ---- the two FD-type witnesses: [so_pay_witness] and the owner's
+       ruling, both discharged by the caller and spent in one [iMod] ---- *)
+    iMod (inode_pay_alloc E (ientry kk) s gy inum (fc_type C) (fc_wbool C) ty
+            (so_pay_witness om ty C Hwrb Hdir) Hdvw with "Hsh Hs Hshot")
       as (gx) "Hpay".
     (* ---- the off cinv, re-armed ---- *)
     iMod (off_hold_alloc E gf kf true with "[Hip Hoff]") as (go) "Hoff".

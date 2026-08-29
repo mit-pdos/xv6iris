@@ -427,7 +427,11 @@ Section SpecFilestat.
        back -- one slot in the pattern and one [iExact]. *)
     iDestruct "Hpl" as "((#Hci & Hown & Hs & Hwt) & Hop)".
     iDestruct "Hs" as (ik) "(%Hipk & %Hik & %Hinb & Hshr)".
-    iDestruct "Hwt" as (ty) "[#Hshot %Hnd]".
+    (* THREE conjuncts under the [∃ ty] now, not two: the owner's FD_INODE
+       "not a device" rides beside the writable-fd "not a directory"
+       ([FileInvDefs.inode_pay]'s fifth).  filestat needs neither -- it
+       carries both across and puts them back. *)
+    iDestruct "Hwt" as (ty) "(#Hshot & %Hnd & %Hdv)".
     iExists ik, (fp_inum pn), (q * fp_iq pn)%Qp, (fp_ig pn), ty.
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
     iSplitR; [iExact "Hshot"|].
@@ -440,7 +444,8 @@ Section SpecFilestat.
     iSplitR "Hop"; [| iExact "Hop"].
     iSplitR; [iExact "Hci"|]. iSplitL "Hown"; [iExact "Hown"|].
     iSplitL "Hshr"; [iExists ik; iFrame "%"; iExact "Hshr"|].
-    iExists ty. iSplitR; [iExact "Hshot"|]. done.
+    iExists ty. iSplitR; [iExact "Hshot"|].
+    iSplit; iPureIntro; [exact Hnd | exact Hdv].
   Qed.
 
   (* A file that carries no inode costs its stat-er nothing. *)

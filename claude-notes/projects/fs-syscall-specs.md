@@ -452,6 +452,80 @@ things, and the answer differs:
      delivers the fired PREFIX, refunds the rest, and says nothing
      about totals.  If the owner rules, the arm, the loop's `clean`
      flag and that whole branch go away together.
+
+  **OWNER QUESTION 1 IS RULED AND PAID — 2026-08-29 (`file_payload`
+  strengthening lane, whole tree green, zero `Admitted`).**  The
+  FD_INODE payload arm now carries the fact; the write and read lanes can
+  refute the device row without touching their contracts.
+  - **THE CONJUNCT.**  `FileInvDefs.inode_pay` gained a PARAMETER
+    (`fdty : mword 32`, sitting between `v` and `wr` exactly as the
+    struct's own field order reads) and one conjunct, LAST inside the
+    existing `∃ ty` block and beside the wr-guard it shares that `ty`
+    with:
+    `⌜fdty = FD_INODE -> bv_unsigned ty <> FsImg.T_DEVICE_z⌝`.
+    Unconditional in `wr` — which is the ruling — and conditional on the
+    FD's own type word, because ONE payload serves both typed arms and on
+    the FD_DEVICE arm the claim is FALSE (the parked inode is precisely a
+    device there).  `file_core` passes `fc_type C`, exactly as it already
+    passed `fc_wbool C`.  It is `T_FILE_z` OR `T_DIR_z` by exclusion, not
+    `= T_FILE_z` as the question guessed: an O_RDONLY *directory* fd is a
+    legal FD_INODE file and read needs it to stay one.
+  - **THE POSITION, and the banking's precedent applied.**  Inside the
+    `∃ ty` block rather than after it, because the two facts must be
+    about the SAME `ty`; last within it, so every opener that takes the
+    block whole (`inode_pay_split`, `_cancel`, `file_core_split`,
+    `file_payload_split`) is untouched — only the three sites that open
+    the block moved.  The `T_DEVICE_z` is `FsImg`'s, QUALIFIED and not
+    restated: FsImg is already in `FileInvDefs`'s cone through `FsCfg`
+    (`FileInvDefs <- FsCfg <- IcacheEscrow <- FsState <- FsImg`), so the
+    constant costs no import — `ProofSysOpenAUStores` spells it the same
+    way.
+  - **THE PAY SITES.**  `inode_pay_alloc` takes a second premise, and the
+    ONE installer in the tree pays it: `ProofSysOpenParts.so_publish`
+    (sys_open's publication, and the only `inode_pay_alloc` call there
+    is).  It is free there — the `lh a4,68(s1); c.li a5,3; beq` at +0x76
+    is the test that decides which type word the store writes — so two
+    one-line lemmas discharge it: `so_tdev_zne` (the fall-through's
+    register disequality read at Z level, `so_tdir_zne`'s sibling one
+    constant over) and `so_dev_vac` (the taken arm's vacuity, FD_DEVICE
+    ≠ FD_INODE).  filealloc/pipealloc install FD_NONE/FD_PIPE and never
+    reach the arm; kfork/filedup/kexit copy through
+    `file_payload_split`, so the conjunct rides along untouched.
+  - **BROKEN SITES: 21 edits across 9 files** (the estimate was the
+    banking's ~13; the banking itself measured 14 across 5).  The arity
+    change bites only where `inode_pay` is *named* or its `∃ ty` block
+    *opened*: `SpecFilestat` 2 (carve open + rebuild), `SpecFileread` 2
+    (same; the grown output is a third, deliberate, edit),
+    `ProofFileclose` 2 (the last closer's `iAssert` + `inode_pay_cancel`
+    argument lists), `ProofFileread` 1 and `ProofFilewrite` 1 (one carve
+    pattern each), `ProofSysOpenParts` 1 (`so_publish`, plus the two new
+    branch lemmas), `ProofSysOpen` 7 (`so_tail_pub` and `so_stores`
+    signatures, 3 tail calls, 2 store calls), `ProofSysOpenAUPub` 1,
+    `ProofSysOpenAUStores` 4 (the derivation + 3 tail calls).  Every
+    other consumer goes through `file_pay`/`file_ref` and did not move:
+    filedup, kfork, kexit and sys_pipe carry the payload opaquely.
+  - **THE AU LANE OWED NOTHING NEW.**  `so_stores_au` already carries
+    `Htd` (`di_type = T_DEVICE_z -> tyw = FD_DEVICE`, forced by the AU's
+    `t`), so the premise is its contrapositive, derived in four lines.
+    Only the LANDED `so_stores` needed a new premise, because its store
+    block ties the type word to nothing.
+  - **THE EXPOSURE.**  `SpecFileread.fileread_pay_carve` — the one lemma
+    both lanes already call — gained a fifth pure output,
+    `⌜fc_type Cf = FD_INODE -> bv_unsigned ty <> FsImg.T_DEVICE_z⌝`,
+    beside the `fc_wbool` one it grew for filewrite.  It has to be the
+    carve and cannot be a `file_pay_st`-level lemma: the fact is keyed on
+    the payload's generation `fp_ig`, which is ∃-bound in `file_pay_st`,
+    so a caller's own `ity_shot` cannot be tied to it from outside.  A
+    consumer joins the carve's `ity_shot g ty` to ilock's copy with
+    `IcacheRef.ity_shot_agree` and reads `di_type dn <> T_DEVICE_z`.
+    `FileInvDefs.inode_pay_not_dev` states the same at the invariant's
+    own altitude (payload + a shot at its generation ⊢ the pure
+    disequality; pure conclusion, so it costs the payload nothing).
+  - **WHAT THE FOLLOW-ON LANES MAY NOW DO** (untouched here, R10 and
+    their business): `SpecSysWriteAUEra`'s third arm
+    (`write_post_nofile_at`) and the `clean` flag of the chunk loop can
+    both go; `SpecSysReadAU`'s owner question 2 can sharpen
+    `ard_ret_tie`'s wildcard to `ADir`.  Neither contract was edited.
   REMAINING — **`ProofFilewriteAU.v`, the chunk loop, and nothing else.**
   ProofFilewrite.v compiles in 44 s, so the copy is affordable; the
   design is fixed by `fw_au_raw`.  `fw_loop` gains three ordinary

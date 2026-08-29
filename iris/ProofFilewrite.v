@@ -1748,7 +1748,7 @@ Section ProofFilewrite.
        them is re-derived on the next one. ---- *)
     iDestruct (fileread_pay_carve gf kx qx Cf _ (or_introl Htyi) with "Hrpay")
       as (ik inum sh g ty γox)
-         "(%P8 & %P9 & %P5 & %P10 & #Hty & Hshr & Hoh & Hpayback)".
+         "(%P8 & %P9 & %P5 & %P10 & %P10d & #Hty & Hshr & Hoh & Hpayback)".
     assert (P3 : IBLOCK inum icfg_ist ∈ fsc_cov)
       by (apply P3q; exact P5).
     assert (P4 : IBLOCK inum icfg_ist

@@ -195,6 +195,12 @@ Section ProofSysOpenAUPub.
        writable one. *)
     fc_readable C = trunc8 (so_rd_word om) ->
     (bv_unsigned (di_type dn) = T_DIR_z -> om = (mword_of_int 0 : mword 32)) ->
+    (* the owner's ruling (2026-08-29), exactly as the landed twin carries
+       it.  On THIS lane the caller does not have to earn it: the store
+       block already ties the type word to the inode's type in both
+       directions ([so_stores_au]'s [Htd]/[Hti]), because the AU's [t] is
+       read off the same test. *)
+    (fc_type C = FD_INODE -> bv_unsigned (di_type dn) <> FsImg.T_DEVICE_z) ->
     off_wf voff ->
     (* ---- the AU side: the omode word IS the caller's argument, and the
        descriptor's type is the one the published content names ---- *)
@@ -291,8 +297,8 @@ Section ProofSysOpenAUPub.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf Hfdlt
-           Hlen Hfrees Hip Htyor Hwrb Hrdw Hdir Hwf Hom Htyt Hsp0 HMsp HMthr HMs1
-           HMs3 Hal.
+           Hlen Hfrees Hip Htyor Hwrb Hrdw Hdir Hdvw Hwf Hom Htyt Hsp0 HMsp HMthr
+           HMs1 HMs3 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitinv #Hesck #Hslkk Hslkd Hdep Hidev Hiinum Hivalid
               Hload #Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfip Hfoff
@@ -327,7 +333,7 @@ Section ProofSysOpenAUPub.
     iMod (so_publish ⊤ gf kf kk qi s gy inum (di_type dn) C pn om voff rb wb
             ltac:(solve_ndisj) ltac:(solve_ndisj) Hkk Hinb Hip Htyor Hwrb
             ltac:(rewrite Hrdw; exact Hrdb) ltac:(rewrite Hwrb; exact Hwdb)
-            Hdir
+            Hdir Hdvw
             Hwf
             with "Hkeep Hru Hshr Hshot Hfref Hflive Hflds Hfpn Hfip Hfoff")
       as (stpub) "[%Hokpub Href]".

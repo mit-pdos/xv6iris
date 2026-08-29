@@ -276,6 +276,11 @@ Section ProofSysOpenBody.
        writable one. *)
     fc_readable C = trunc8 (so_rd_word om) ->
     (bv_unsigned (di_type dn) = T_DIR_z -> om = (mword_of_int 0 : mword 32)) ->
+    (* ...and the owner's ruling (2026-08-29), carried down from the store
+       block: the arm that wrote FD_INODE is the arm on which the +0x76
+       [beq] against T_DEVICE fell through.  [so_publish] pays it into the
+       payload; see [ProofSysOpenParts.so_tdev_zne]. *)
+    (fc_type C = FD_INODE -> bv_unsigned (di_type dn) <> FsImg.T_DEVICE_z) ->
     off_wf voff ->
     sp0 = (m !!! Regidx csp_rs1 : mword 64) ->
     so_sp sp0 M -> so_thr m M ->
@@ -359,7 +364,7 @@ Section ProofSysOpenBody.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf Hfdlt
-           Hlen Hfrees Hip Htyor Hwrb Hrdw Hdir Hwf Hsp0 HMsp HMthr HMs1
+           Hlen Hfrees Hip Htyor Hwrb Hrdw Hdir Hdvw Hwf Hsp0 HMsp HMthr HMs1
            HMs3 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitinv #Hesck #Hslkk Hslkd Hdep Hidev Hiinum Hivalid
@@ -394,7 +399,7 @@ Section ProofSysOpenBody.
     iMod (so_publish ⊤ gf kf kk qi s gy inum (di_type dn) C pn om voff rb wb
             ltac:(solve_ndisj) ltac:(solve_ndisj) Hkk Hinb Hip Htyor Hwrb
             ltac:(rewrite Hrdw; exact Hrdb) ltac:(rewrite Hwrb; exact Hwdb)
-            Hdir
+            Hdir Hdvw
             Hwf
             with "Hkeep Hru Hshr Hshot Hfref Hflive Hflds Hfpn Hfip Hfoff")
       as (stpub) "[%Hokpub Href]".
@@ -518,6 +523,12 @@ Section ProofSysOpenBody.
     fd_frees (pv_ofile (us_V U)) = fd :: l ->
     (tyw = FD_INODE \/ tyw = FD_DEVICE) ->
     (bv_unsigned (di_type dn) = T_DIR_z -> om = (mword_of_int 0 : mword 32)) ->
+    (* THE OWNER'S RULING (2026-08-29), AND IT IS A PARAMETER HERE FOR THE
+       TYPE WORD'S OWN REASON: this block is entered from BOTH stores, so
+       which of them ran is only visible to the caller.  On the FD_INODE
+       fall-through the [beq] at +0x76 was not taken ([so_tdev_zne]); on the
+       FD_DEVICE entry the implication is vacuous ([so_dev_vac]). *)
+    (tyw = FD_INODE -> bv_unsigned (di_type dn) <> FsImg.T_DEVICE_z) ->
     off_wf voff ->
     is_aligned_paddr (Physaddr (pa_stk sp0 23)) 8 = true ->
     sp0 = (m !!! Regidx csp_rs1 : mword 64) ->
@@ -608,7 +619,7 @@ Section ProofSysOpenBody.
   Proof.
     intros HKiu HKeo HKit HK24 Kpop Hkk Hinb Hgeom Hsize Hbm0
            Hbmcov Hbmlog Hist0 Hiblk Hiblog Hcovb Hu2 Hj Hgl Hlkempty Hkf
-           Hfdlt Hlen Hfrees Htyor Hdir Hwf Hal23 Hsp0 HNsp HNthr HNs0 HNs1
+           Hfdlt Hlen Hfrees Htyor Hdir Hdvw Hwf Hal23 Hsp0 HNsp HNthr HNs0 HNs1
            HNs2 HNs3 Hal.
 
     (* [2 <= u] as a SHAPE, not an inequality: itrunc's uncredited entry
@@ -834,7 +845,7 @@ Section ProofSysOpenBody.
                 (S (S u2)) pidv dqb dqs U m N6 sp0 K eb b lks w6
                 (word_of_words lo om) w24 bp
                 HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
-                Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hwf
+                Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hdvw Hwf
                 Hsp0 HN6sp HN6thr HN6s1 HN6s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                       Hitinv Hesck Hslkk Hslkd Hdep Hidev Hiinum Hivalid
@@ -932,7 +943,7 @@ Section ProofSysOpenBody.
                 (S (S u2)) pidv dqb dqs U m N8 sp0 K eb b lks w6
                 (word_of_words lo om) w24 bp
                 HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
-                Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hwf
+                Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hdvw Hwf
                 Hsp0 HN8sp HN8thr HN8s1 HN8s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                       Hitinv Hesck Hslkk Hslkd Hdep Hidev Hiinum Hivalid
@@ -1135,7 +1146,7 @@ Section ProofSysOpenBody.
               om voff nsj u3 pidv dqb dqs U m mit sp0 K
               eb b lks w6 (word_of_words lo om) w24 bp
               HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
-              Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hwf
+              Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hdvw Hwf
               Hsp0 Hitsp Hitthr Hits1 Hits3 Hal
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hitinv Hesck Hslkk Hslkd Hdep Hidev Hiinum Hivalid
@@ -1822,7 +1833,8 @@ Section ProofSysOpenBody.
                 lks w6 w24 bp
                 HKiu HKeo HKit HK24 Kpop Hkk Hinb Hgeom Hsize
                 Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hcovb Hu2 Hj Hgl
-                Hlkempty Hkf Hfdlt Hlen Hfrees (or_intror eq_refl) Hdir Hwf
+                Hlkempty Hkf Hfdlt Hlen Hfrees (or_intror eq_refl) Hdir
+                (so_dev_vac (di_type dn)) Hwf
                 Hal23 Hsp0 HM7sp HM7thr HM7s0 HM7s1 HM7s2 HM7s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                       Hitinv Hesck Hireg Hslkk Hslkd Hdep Hidev Hiinum
@@ -1919,7 +1931,8 @@ Section ProofSysOpenBody.
               dqs U m M8 sp0 K eb b lks w6 w24 bp
               HKiu HKeo HKit HK24 Kpop Hkk Hinb Hgeom Hsize
               Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hcovb Hu2 Hj Hgl Hlkempty
-              Hkf Hfdlt Hlen Hfrees (or_introl eq_refl) Hdir off_wf_zero
+              Hkf Hfdlt Hlen Hfrees (or_introl eq_refl) Hdir
+              (fun _ => so_tdev_zne (di_type dn) Hnd3) off_wf_zero
               Hal23 Hsp0 HM8sp HM8thr HM8s0 HM8s1 HM8s2 HM8s3 Hal
               with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                     Hitinv Hesck Hireg Hslkk Hslkd Hdep Hidev Hiinum

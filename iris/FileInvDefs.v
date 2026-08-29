@@ -242,8 +242,9 @@ Definition frefUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
    §17.6 (5), ratified §17.7), and it is [fp_iq]'s exact status: a per-slot
    CONSTANT fixed when the file is published.  It is what the fd's type
    witness is keyed on -- [inode_pay] carries [IcacheRef.ity_shot fp_ig ty]
-   with "[ty] is not a directory if this fd is writable", and filewrite joins
-   it to ilock's copy with [IcacheRef.ity_shot_agree].  It can be a constant
+   with "[ty] is not a directory if this fd is writable" and "[ty] is not a
+   device if this fd is FD_INODE", and filewrite joins it to ilock's copy
+   with [IcacheRef.ity_shot_agree].  It can be a constant
    because a live reference PINS the generation: a bump needs the slot's
    whole liveness unit, which does not exist while any share is outstanding
    ([IcacheInv.live_slot_alloc] at the recycle, [IcacheInv.live_slot_regen]
@@ -996,6 +997,34 @@ Section FileInv.
      call site in [file_payload], and FD_DEVICE selects this payload too but
      never reaches writei.
 
+     THE FIFTH CONJUNCT: THE FD_INODE ARM'S "NOT A DEVICE" (owner's ruling,
+     2026-08-29).  sys_open writes [f->type = FD_DEVICE] EXACTLY when
+     [ip->type == T_DEVICE] and FD_INODE otherwise, so an FD_INODE
+     descriptor's parked inode is a regular file or a directory -- never a
+     device.  The fact was true of the code and dropped at the store, which
+     left the fourth conjunct as the payload's only type witness: it
+     excludes a DIRECTORY on a writable fd and nothing else.  That gap cost
+     [SpecSysWriteAUEra] a whole spurious third arm (a T_DEVICE inode behind
+     an FD_INODE fd, on which [FsAbs.abs_node] reads [ADev] and writei moves
+     no field the abstract view can see) and blocked read's
+     "FdInode => AFile or ADir" custody tie.  This is where it crosses.
+
+     IT IS KEYED ON THE DESCRIPTOR'S TYPE, WHICH IS WHY [fdty] IS A
+     PARAMETER.  One payload serves both typed arms ([file_core] selects it
+     on FD_INODE or FD_DEVICE), and on the FD_DEVICE arm the claim is FALSE
+     -- the parked inode is precisely a device there.  So the conjunct is
+     unconditional in [wr] (unlike the fourth) and conditional on the FD's
+     own type word, which is [fc_type C] at the call site, exactly as [wr]
+     is [fc_wbool C].  On the device arm the implication is vacuous by
+     [FD_DEVICE <> FD_INODE], which is what its publisher discharges.
+
+     THE NUMBER IS [FsImg.T_DEVICE_z], QUALIFIED AND NOT RESTATED.  FsImg is
+     already in this file's cone (through [FsCfg]), so the constant is
+     nameable without importing the disk-image layer for one integer --
+     [ProofSysOpenAUStores] spells it the same way.  Its sibling [T_DIR_z]
+     is unqualified only because [DirView] is imported here for the fourth
+     conjunct's sake.
+
      Everything here is PERSISTENT except the cinv token and the share, so
      [inode_pay_split]'s distributivity is untouched. *)
   (* [inum] IS NAMED HERE, and that is the only change the fd-state ghost
@@ -1004,14 +1033,15 @@ Section FileInv.
      consumers that do not care nothing -- an [∃ inum] in front of the
      payload is exactly what they used to have. *)
   Definition inode_pay (γx : gname) (Q : Qp) (g : gname) (inum : mword 32)
-      (v : mword 64) (wr : bool) (q : Qp) : iProp Σ :=
+      (v : mword 64) (fdty : mword 32) (wr : bool) (q : Qp) : iProp Σ :=
     (cinv fileipN γx (inode_held_short v Q) ∗ cinv_own γx q ∗
      inode_shr_held_gen v (q * Q)%Qp g inum ∗
-     ∃ ty : bv 16, ity_shot g ty ∗ ⌜wr = true -> bv_unsigned ty <> T_DIR_z⌝)%I.
+     ∃ ty : bv 16, ity_shot g ty ∗ ⌜wr = true -> bv_unsigned ty <> T_DIR_z⌝ ∗
+                   ⌜fdty = FD_INODE -> bv_unsigned ty <> FsImg.T_DEVICE_z⌝)%I.
 
-  Lemma inode_pay_split γx Q g inum v wr q1 q2 :
-    inode_pay γx Q g inum v wr (q1 + q2) ⊣⊢
-    inode_pay γx Q g inum v wr q1 ∗ inode_pay γx Q g inum v wr q2.
+  Lemma inode_pay_split γx Q g inum v fdty wr q1 q2 :
+    inode_pay γx Q g inum v fdty wr (q1 + q2) ⊣⊢
+    inode_pay γx Q g inum v fdty wr q1 ∗ inode_pay γx Q g inum v fdty wr q2.
   Proof.
     rewrite /inode_pay cinv_own_fractional Qp.mul_add_distr_r
             inode_shr_held_gen_split.
@@ -1026,8 +1056,8 @@ Section FileInv.
      makes it a WHOLE one -- the cinv gives back the parent short by [Q] and
      the closer's own arm is [1 * Q], the exact complement. *)
   Lemma inode_pay_cancel (E : coPset) (γx : gname) (Q : Qp) (g : gname)
-      (inum : mword 32) (v : mword 64) (wr : bool) :
-    ↑fileipN ⊆ E -> inode_pay γx Q g inum v wr 1 ={E}=∗ inode_held v.
+      (inum : mword 32) (v : mword 64) (fdty : mword 32) (wr : bool) :
+    ↑fileipN ⊆ E -> inode_pay γx Q g inum v fdty wr 1 ={E}=∗ inode_held v.
   Proof.
     iIntros (HE) "(#Hi & Hown & Hs & _)".
     iMod (cinv_cancel with "Hi Hown") as "H"; [exact HE|].
@@ -1067,18 +1097,54 @@ Section FileInv.
      (T_FILE by construction on the O_CREATE path; O_RDONLY forced on a
      T_DIR inode on the open-existing one), and only then installs the
      names. *)
+  (* THE SECOND PREMISE IS THE OWNER'S RULING, PAID HERE.  sys_open knows it
+     for free: the [lh a4,68(s1); c.li a5,3; beq] at +0x76 is the test that
+     decides which type word the store writes, so on the arm that writes
+     FD_INODE the inode's type is not T_DEVICE and on the arm that writes
+     FD_DEVICE the implication is vacuous.  [ProofSysOpenParts.so_tdev_zne]
+     and [ProofSysOpenParts.so_dev_vac] state the two arms in exactly this
+     shape. *)
   Lemma inode_pay_alloc (E : coPset) (v : mword 64) (Q : Qp) (g : gname)
-      (inum : mword 32) (wr : bool) (ty : bv 16) :
+      (inum : mword 32) (fdty : mword 32) (wr : bool) (ty : bv 16) :
     (wr = true -> bv_unsigned ty <> T_DIR_z) ->
+    (fdty = FD_INODE -> bv_unsigned ty <> FsImg.T_DEVICE_z) ->
     inode_held_short v Q -∗ inode_shr_held_gen v Q g inum -∗ ity_shot g ty
-    ={E}=∗ ∃ γx : gname, inode_pay γx Q g inum v wr 1.
+    ={E}=∗ ∃ γx : gname, inode_pay γx Q g inum v fdty wr 1.
   Proof.
-    iIntros (Hwr) "Hsh Hs #Hty".
+    iIntros (Hwr Hdv) "Hsh Hs #Hty".
     iMod (cinv_alloc E fileipN (inode_held_short v Q) with "[Hsh]")
       as (γx) "[#Hi Hown]".
     { by iApply bi.later_intro. }
     iModIntro. iExists γx. rewrite /inode_pay Qp.mul_1_l.
-    iFrame "Hi Hown Hs". iExists ty. iFrame "Hty". iPureIntro. exact Hwr.
+    iFrame "Hi Hown Hs". iExists ty. iFrame "Hty".
+    iSplit; iPureIntro; [exact Hwr | exact Hdv].
+  Qed.
+
+  (* ---- THE READING THE FD_INODE ARM'S CONSUMERS ASK FOR ----
+
+     The fifth conjunct, surfaced against a caller's OWN copy of the
+     generation's one-shot -- which is what ilock's postcondition hands
+     filewrite and fileread ([IcacheRef.ity_shot_agree] joins the two, the
+     generation seeing at most one fill).  So a function that has locked the
+     inode behind an FD_INODE descriptor can refute the device row outright:
+     [FsAbs.abs_node]'s [ADev] arm is unreachable there, which is what
+     [SpecSysWriteAUEra]'s third arm and [SpecSysReadAU]'s owner question 2
+     were both waiting on.
+
+     PURE CONCLUSION, so it costs the payload nothing: the caller keeps the
+     reference it read the fact off.  A holder of a [file_pay_st] reaches
+     the same fact through [SpecFileread.fileread_pay_carve], which is where
+     the payload's generation is named -- this layer's own statement of it,
+     stated once, is here. *)
+  Lemma inode_pay_not_dev (γx : gname) (Q : Qp) (g : gname) (inum : mword 32)
+      (v : mword 64) (wr : bool) (q : Qp) (ty : bv 16) :
+    inode_pay γx Q g inum v FD_INODE wr q -∗ ity_shot g ty -∗
+    ⌜bv_unsigned ty <> FsImg.T_DEVICE_z⌝.
+  Proof.
+    iIntros "(_ & _ & _ & Hwt) #Hshot".
+    iDestruct "Hwt" as (ty') "(#Hs & _ & %Hdv)".
+    iDestruct (ity_shot_agree with "Hs Hshot") as %<-.
+    iPureIntro. exact (Hdv eq_refl).
   Qed.
 
   (* the per-slot payload-names ghost: fractional, agreeing, and updatable
@@ -1332,7 +1398,7 @@ Section FileInv.
           pipe_ref (fp_pipe pn) (fc_wbool C) q ∗ iref_frac q
      else if bool_decide (fc_type C = FD_INODE) || bool_decide (fc_type C = FD_DEVICE)
      then inode_pay (fp_icv pn) (fp_iq pn) (fp_ig pn) (fp_inum pn) (fc_ip C)
-            (fc_wbool C) q
+            (fc_type C) (fc_wbool C) q
      else iref_frac q)%I.
 
   (* AN UNTYPED SLOT'S PAYLOAD IS EXACTLY ITS IREF UNIT.  What filealloc

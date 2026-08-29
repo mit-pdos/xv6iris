@@ -624,7 +624,19 @@ Section SpecFileread.
 
      fileread uses only the first six outputs; filewrite needs [ty] and the
      [fc_wbool] implication as well, which is why the GROWN form lives here
-     rather than a second, smaller copy living in SpecFilewrite. *)
+     rather than a second, smaller copy living in SpecFilewrite.
+
+     THE FOURTH OUTPUT'S SIBLING IS THE OWNER'S RULING SURFACED (2026-08-29),
+     and this lemma is where the file layer hands it to a syscall.  The
+     payload's fifth conjunct says an FD_INODE fd's inode is not a
+     T_DEVICE; it can only be read HERE, because the generation it is keyed
+     on is the payload's own [fp_ig] and nothing above this carve names it.
+     A caller joins the [ity_shot] output to ilock's copy with
+     [IcacheRef.ity_shot_agree] and the row is a FILE or a DIRECTORY --
+     which is what refutes [FsAbs.abs_node]'s [ADev] arm on a write
+     ([SpecSysWriteAUEra]'s third arm) and gives read its "FdInode => AFile
+     or ADir" tie ([SpecSysReadAU]'s owner question 2).  The invariant-level
+     statement of the same fact is [FileInvDefs.inode_pay_not_dev]. *)
   Lemma fileread_pay_carve (γf : gname) (k : nat) (q : Qp) (Cf : fcontent)
       (st : fdstate) :
     fc_type Cf = FD_INODE \/ fc_type Cf = FD_DEVICE ->
@@ -634,6 +646,7 @@ Section SpecFileread.
       ⌜fc_ip Cf = ientry ik⌝ ∗ ⌜(ik < NINODE)%nat⌝ ∗
       ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
       ⌜fc_wbool Cf = true -> bv_unsigned ty <> T_DIR_z⌝ ∗
+      ⌜fc_type Cf = FD_INODE -> bv_unsigned ty <> FsImg.T_DEVICE_z⌝ ∗
       IcacheRef.ity_shot g ty ∗
       IcacheRef.inode_shr_gen ik s icfg_dev inum g ∗
       off_hold γf k γx true q ∗
@@ -654,9 +667,10 @@ Section SpecFileread.
     rewrite /file_payload /file_core Hnp Hyes Harm /inode_pay.
     iDestruct "Hpl" as "((#Hci & Hown & Hs & Hwt) & Hop)".
     iDestruct "Hs" as (ik) "(%Hipk & %Hik & %Hinb & Hshr)".
-    iDestruct "Hwt" as (ty) "[#Hshot %Hnd]".
+    iDestruct "Hwt" as (ty) "(#Hshot & %Hnd & %Hdv)".
     iExists ik, (fp_inum pn), (q * fp_iq pn)%Qp, (fp_ig pn), ty, (fp_ocv pn).
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+    iSplitR; [done|].
     iSplitR; [iExact "Hshot"|].
     (* [iExact], not [iFrame]: both sides are the same FOLDED
        [IcacheRef.inode_shr_gen] and conversion closes it, while the [Frame]
@@ -668,7 +682,8 @@ Section SpecFileread.
     iSplitR "Hop"; [| iExact "Hop"].
     iSplitR; [iExact "Hci"|]. iSplitL "Hown"; [iExact "Hown"|].
     iSplitL "Hshr"; [iExists ik; iFrame "%"; iExact "Hshr"|].
-    iExists ty. iSplitR; [iExact "Hshot"|]. done.
+    iExists ty. iSplitR; [iExact "Hshot"|].
+    iSplit; iPureIntro; [exact Hnd | exact Hdv].
   Qed.
 
 End SpecFileread.

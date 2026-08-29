@@ -1929,8 +1929,8 @@ Section ProofFileread.
              iDestruct (fileread_pay_carve γf k q Cf _ (or_introl Htyi)
                           with "Hrpay")
                as (ikk inm ssh gsh ty0 γox)
-                  "(%Hipk & %Hik & %Hinlt & %Hnd0 & #Hshot0 & Hshr0 & Hoh &
-                    Hpayback)".
+                  "(%Hipk & %Hik & %Hinlt & %Hnd0 & %Hdv0 & #Hshot0 & Hshr0 &
+                    Hoh & Hpayback)".
              assert (Hibcov : IBLOCK inm icfg_ist ∈ fsc_cov)
                by (apply Hgeo; exact Hinlt).
              iDestruct (ic_escrows_acc2

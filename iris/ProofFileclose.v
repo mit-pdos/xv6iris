@@ -1335,7 +1335,8 @@ Section ProofFileclose.
              cancellable invariant rather than a fraction of the reference
              (which does not exist -- see [FileInv.inode_pay]). *)
           iAssert (inode_pay (fp_icv pn) (fp_iq pn) (fp_ig pn) (fp_inum pn)
-                     (fc_ip Cf) (fc_wbool Cf) 1) with "[Hcore]" as "Hpl".
+                     (fc_ip Cf) (fc_type Cf) (fc_wbool Cf) 1)
+            with "[Hcore]" as "Hpl".
           { rewrite /file_core bool_decide_eq_false_2; [|exact Hnpipe].
             rewrite Hib. iExact "Hcore". }
           iApply fupd_wp.
@@ -1344,7 +1345,8 @@ Section ProofFileclose.
              [1 * fp_iq pn] is the exact complement, so what comes out is
              canonical and iput can spend it. *)
           iMod (inode_pay_cancel ⊤ (fp_icv pn) (fp_iq pn) (fp_ig pn) (fp_inum pn)
-                  (fc_ip Cf) (fc_wbool Cf) ltac:(solve_ndisj) with "Hpl") as "Hheld".
+                  (fc_ip Cf) (fc_type Cf) (fc_wbool Cf) ltac:(solve_ndisj)
+                  with "Hpl") as "Hheld".
           iDestruct "Hheld" as (kk qq inum) "(%Hipe & %Hkk & %Hinumb & Href & Hru)".
           iModIntro.
           rewrite /fileclose_fs_env /fileclose_fs_env_nopid.

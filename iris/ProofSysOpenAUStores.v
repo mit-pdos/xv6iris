@@ -366,6 +366,15 @@ Section ProofSysOpenAUStores.
     assert (Hinob : bv_unsigned (di_type dn) <> FsImg.T_DEVICE_z ->
                     t = FdInode (bv_unsigned inum))
       by (intros Hq; exact (proj2 (Hti Hq))).
+    (* THE OWNER'S RULING (2026-08-29), AND THIS LANE OWES IT NOTHING NEW:
+       [Htd] already says a T_DEVICE inode was stored as FD_DEVICE, so the
+       contrapositive IS the payload's fifth conjunct.  [ProofSysOpen]'s
+       landed twin has to take it as a premise because its store block
+       carries no such tie -- the AU's [t] is what forced one here. *)
+    assert (Hdvw : tyw = FD_INODE ->
+                   bv_unsigned (di_type dn) <> FsImg.T_DEVICE_z).
+    { intros Hi Hq. destruct (Htd Hq) as (Hd & _). rewrite Hi in Hd.
+      apply (f_equal bv_unsigned) in Hd. by vm_compute in Hd. }
     assert (Hdirk : bv_unsigned (di_type dn) = T_DIR_z -> om_arg vom = 0).
     { intros Hq. rewrite -soau_om_arg -Hom (Hdir Hq). vm_compute. reflexivity. }
     (* ===== +0x88 sd s1,24(s2) -- f->ip = ip ===== *)
@@ -603,7 +612,7 @@ Section ProofSysOpenAUStores.
                 (S (S u2)) pidv dqb dqs U m N6 sp0 K eb b lks w6
                 (word_of_words lo om) w24 bp vom P Pmiss Φo Φt t
                 HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
-                Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hwf
+                Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hdvw Hwf
                 Hom Hfdty
                 Hsp0 HN6sp HN6thr HN6s1 HN6s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
@@ -712,7 +721,7 @@ Section ProofSysOpenAUStores.
                 (S (S u2)) pidv dqb dqs U m N8 sp0 K eb b lks w6
                 (word_of_words lo om) w24 bp vom P Pmiss Φo Φt t
                 HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
-                Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hwf
+                Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hdvw Hwf
                 Hom Hfdty
                 Hsp0 HN8sp HN8thr HN8s1 HN8s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
@@ -949,7 +958,7 @@ Section ProofSysOpenAUStores.
               eb b lks w6 (word_of_words lo om) w24 bp
               vom P Pmiss Φo Φt t
               HKiu HKeo HK24 Kpop Hkk Hinb Hgeom Hj Hgl Hlkempty Hkf
-              Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hwf
+              Hfdlt Hlen Hfrees eq_refl Htyor eq_refl eq_refl Hdir Hdvw Hwf
               Hom Hfdty
               Hsp0 Hitsp Hitthr Hits1 Hits3 Hal
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen

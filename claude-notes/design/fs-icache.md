@@ -3636,6 +3636,34 @@ reference, so the lemma now takes `inode_held_short v Q`,
 two.  sys_open therefore sheds, reads `g`, discharges the witness against
 ilock's postcondition, and only then installs the `fpnames`.
 
+**§17.8 — THE FIFTH CONJUNCT (owner's ruling, 2026-08-29).**  The witness
+above excludes a DIRECTORY on a writable fd and nothing else, which left a
+T_DEVICE inode behind an FD_INODE descriptor unrefutable five frames up
+(it cost `SpecSysWriteAUEra` a whole spurious arm and blocked read's
+`FdInode => AFile or ADir` tie).  It is true of the code — sys_open writes
+`f->type = FD_DEVICE` exactly when `ip->type == T_DEVICE` — and was simply
+dropped at the store.  `inode_pay` now takes the FD's TYPE WORD as a
+parameter beside the bool, for the same reason the bool is one, and
+carries the fact at the same `ty`:
+
+    inode_pay γx Q g inum v fdty wr q := … ∗
+      ∃ ty, ity_shot g ty ∗ ⌜wr = true -> bv_unsigned ty <> T_DIR_z⌝
+                          ∗ ⌜fdty = FD_INODE -> bv_unsigned ty <> FsImg.T_DEVICE_z⌝
+
+with `file_core` calling it at `(fc_ip C) (fc_type C) (fc_wbool C)`.  It
+CANNOT be unconditional: one payload serves both typed arms and on the
+FD_DEVICE arm the parked inode is precisely a device.  `inode_pay_alloc`
+takes the second premise; the tree's ONE installer
+(`ProofSysOpenParts.so_publish`) pays it from the `beq` at sys_open +0x76
+that decides the store (`so_tdev_zne` on the fall-through, `so_dev_vac` on
+the taken arm).  Consumers read it through
+`SpecFileread.fileread_pay_carve`'s new fifth output — it has to be the
+carve, because the generation `fp_ig` the fact is keyed on is ∃-bound in
+`file_pay_st` — and join it to ilock's copy with `ity_shot_agree`;
+`FileInvDefs.inode_pay_not_dev` is the same reading at the invariant's own
+altitude.  Ripple: 9 sites, all in the file layer's cone and the sys_open
+publication chain.  Recorded in `projects/fs-syscall-specs.md`.
+
 **THE RIPPLE OF `inode_pay` WAS TWO FILES**, as §17.6.4 predicted for the
 payload and better than it predicted for the consumers: `ProofFileclose`
 (two argument lists) and `ProofPipealloc` (four `MkFPNames`, for the new
