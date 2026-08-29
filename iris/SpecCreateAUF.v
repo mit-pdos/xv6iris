@@ -329,7 +329,7 @@ Definition wp_create_auf_body
   procs_inv γs -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
   bslots 3 -∗
   iref_slots ns -∗
   log_opS icfg_log u Sb -∗

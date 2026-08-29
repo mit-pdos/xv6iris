@@ -74,7 +74,7 @@ Section ProofSysDupAUTail.
   (* the current sp's bounds, out of the stack capability.  THE CARVE THIS
      READS IS ARM-DEPENDENT, hence the [0 < k] premise -- [ProofSysDup]'s
      [sd_sp_bounds]' note verbatim. *)
-  Lemma sda_sp_bounds `{CID0 : CpuId} `{XI0 : CurCtx} (mm : regfile) (k : nat)
+  Lemma sda_sp_bounds `{CID0 : CpuId} (mm : regfile) (k : nat)
       (bb : bool) (pp : mword 64) :
     (0 < k)%nat ->
     sie_cap_gpr KT1 mm k bb pp -∗
@@ -95,7 +95,7 @@ Section ProofSysDupAUTail.
      ABSTRACT CONTINUATION: the exit promises registers, pc and nothing
      about any postcondition, which is exactly what lets both the landed
      walk and the AU walk end here. *)
-  Lemma sda_tail `{CID0 : CpuId} `{XI0 : CurCtx}
+  Lemma sda_tail `{CID0 : CpuId}
       (m Mt : regfile) (av : nat) (rv : mword 64)
       (sp0 ra0 s00 : mword 64) (w3 w4 w5 w6 : bv 64)
       (p : mword 64) (b : bool) :

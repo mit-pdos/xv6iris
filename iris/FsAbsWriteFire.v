@@ -282,7 +282,7 @@ Qed.
    payloads normalise their holes, the size grew to the [max], the range
    clause is writei's own (with [dist = 0], see the header), and the start
    is inside the old bytes. *)
-Lemma wrf_write_row (dn dn' : dinode) (bm bm' : blkmap)
+Lemma wrf_write_row `{XI : TsoCtx.CurCtx} (dn dn' : dinode) (bm bm' : blkmap)
     (data data' : nat -> list (bv 8)) (off tot : nat) (wrote : nat -> bv 8) :
   bv_unsigned (di_type dn) = FsImg.T_FILE_z ->
   di_type dn' = di_type dn ->

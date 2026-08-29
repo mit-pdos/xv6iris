@@ -127,7 +127,7 @@ Section ProofSysWriteAU.
 
   (* THE CARVE THIS READS IS ARM-DEPENDENT, hence the [0 < k] premise --
      [ProofSysFstat.sfs_sp_bounds] verbatim. *)
-  Lemma swau_sp_bounds `{CID0 : CpuId} `{XI0 : CurCtx} (mm : regfile) (kk : nat)
+  Lemma swau_sp_bounds `{CID0 : CpuId} (mm : regfile) (kk : nat)
       (bb : bool) (pp : mword 64) :
     (0 < kk)%nat ->
     sie_cap_gpr KT1 mm kk bb pp -∗
@@ -145,7 +145,7 @@ Section ProofSysWriteAU.
      is entered at a MIGRATED hart -- its own [b] and [pp], and its
      continuation wrapped in [wp_next].  It does NOT carry [cpu_own]: the
      epilogue never touches it, so the caller transports it afterwards. *)
-  Lemma swau_tail `{CID0 : CpuId} `{XI0 : CurCtx}
+  Lemma swau_tail `{CID0 : CpuId}
       (m Mt : regfile) (av : nat) (rv : mword 64)
       (sp0 ra0 s00 : mword 64) (w3 w4 w5 w6 : bv 64) (b : bool) (pp : mword 64) :
     (6 <= av)%nat ->
