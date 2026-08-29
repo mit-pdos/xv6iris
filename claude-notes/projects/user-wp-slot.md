@@ -406,6 +406,64 @@ durable content is here.
   `uservec_post`'s `user_pt_any pt'` conjunct is NOT touched at J1a
   (it re-cuts with `uvb` when the loop switches).
 
+## §4b J1a as LANDED (2026-08-29), and the one row still owed
+
+S1-S3, S5, S6, S6b, S7, S9 are in; S8 is partial.  What a successor needs:
+
+- **WHICH RESIDUE FORM PINS WHAT** (measured; this decides where a
+  boundary fact can honestly be stated).  `ut_res_bare` / `ut_res_parked`
+  read their `ustate` index ONLY through `us_V U`: the trapframe is
+  pinned (`tf_page` at those words), `pv_upt` is pinned (the pure
+  conjunct + `proc_pt_cells`), `pv_sz` is pinned (`proc_fields`) — but
+  `us_M U` appears NOWHERE, and that is by construction:
+  `ut_own_pt_close` is `ut_own_nopt … (us_V U) -∗ proc_ptm … (us_M U) -∗
+  ut_own … U`, i.e. the image is exactly what is ADDED to reach the
+  owning form, because across user execution the kernel does not own the
+  user bytes.  The FULL `ut_res` DOES pin it (`ut_own` holds
+  `proc_priv … U`, hence `proc_ptm … (us_M U)` by `proc_priv_split_pt`).
+- **THIS REFUTES PLAN R1**, which assumed J1a could both leave
+  `user_pt_any` alone and name the lazy image via the index.  It cannot.
+  The landed resolution SPLITS BY POST, each stating what its own
+  residue anchors: `usertrap_post` (carries `ut_res`) states the full
+  `uround_ok`, image half real; `uservec_post` (carries `ut_res_bare`)
+  states `UexecRound.uround_vis_ok`, the same relation with the image
+  existentially weakened away, trapframe and permission halves intact.
+  `uround_vis_of_ok` is the weakener, `uv_round_of_ut` the entry bridge.
+  Naming the image in `uservec_post` was PRICED and deferred: it needs
+  `usertrap_res_pt_open` to hand back `proc_ptm … (us_M U')` instead of
+  `∃ M, proc_pt pt M`, i.e. a new `USERTRAP_RES` Parameter, which forces
+  definitions in `ProofForkret.v`/`ProofForkretPark.v`; everything else
+  about it is cheap (a `ut_res_ptm_open` twin, a local
+  `user_ptm_inv_close`, `user_ptm_inv_any` on the consumer side).  It
+  lands with J proper, when the loop switches to `uvb` and names the
+  image by construction.
+- **S8's remaining twenty rows are owed by A CLAUSE I WEAKENED.**  S5
+  states the dispatcher's resume clause (ii) as
+  `uptd_ext (pv_upt (us_V U)) (pv_upt (us_V U'))` (`SpecSyscall.v` ~:345).
+  `uptd_ext` is same-root/same-tfp/submap and says nothing about a gained
+  leaf's BITS or RANGE, so `perm_of_uptd_ext_rw`'s two premises are both
+  unavailable and π' = π is not derivable — nor from the resource side
+  (`upt_acc_wf` permits R+X user leaves, which text pages genuinely are).
+  The producers ALREADY supply the stronger fact: `SpecCopyin.v:169`,
+  `SpecCopyout.v:193`, `SpecCopyinstr.v:160` all return
+  `uptd_ext_sz szv P P'`, and after S6b that carries both the vpn range
+  and the RW-leaf bits.  THE FIX IS TO UN-WEAKEN IT: clause (ii) becomes
+  `uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt (us_V U'))`,
+  the eleven buffer arms relay what their callee already gave, the other
+  eleven use `uptd_ext_sz_refl`.  Files: `SpecSyscall.v` and the ~9
+  `uptd_ext` sites in `ProofSyscall.v`.  Then `ut_90`'s twenty rows close
+  with `sysc_mem_ok_usys` + `perm_of_uptd_ext_sz` + the size clause, and
+  `uround_bump_ok` is already in reach there (`ut_90` writes `epc += 4`
+  at +0x9a — `addv_sext4` — and `%Hmema0` gives the a0 insert, so
+  `pv_tf (us_V U') = bump_tf tf0 w` on the nose).  DELIVERED at S8: both
+  escapes narrowed to `sc_v = uecall_scause /\ usys_num tf0 <> USYS_exec`,
+  and exec's row proved for real.
+- Also landed: `uptd_ext_sz` gained S6b's RW-leaf conjunct (no contract
+  statement moved — the ~14 posts hold it opaquely) and
+  `uptd_ext_sz_insert_perm` was DELETED as caller-less.  `ut_a6`/`ut_fa`
+  hand on the LITERAL record, so yield's reacquisition needed no new
+  fact.  `user_trap_frame_at` is now what `wp_uservec_pt` takes.
+
 ## §5 Session-local artifacts (durable parts lifted into this file)
 
 The per-lane sweep log (tooling notes, per-file decisions, the raw
