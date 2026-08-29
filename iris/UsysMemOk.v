@@ -49,6 +49,7 @@ Require Import SailStdpp.Base SailStdpp.Values SailStdpp.MachineWord SailStdpp.O
 Require Import Riscv.rv64d_types.
 Require Import RiscvLang.
 Require Import ProcGeom.     (* [tf_arg_idx] / [tf_epc_idx] / [TFWORDS] *)
+Require Import TfUser.       (* [tf_ueq] -- the resume-visible word equality *)
 Require Import UserPtTree.   (* [umem_wr] / [umem_grow] / [umem_del] *)
 Require Import ProcPtOwn.    (* [pgroundup] on words *)
 Require Import UserPerm.     (* [uperm] / [uperm_rw] -- the permission view *)
@@ -187,6 +188,53 @@ Lemma bump_tf_num (tf : list (mword 64)) (r : mword 64) :
 Proof.
   unfold usys_num. rewrite bump_tf_other; [ reflexivity | | ];
     unfold tf_arg_idx, tf_epc_idx; lia.
+Qed.
+
+(* ===================================================================== *)
+(* SS3b THE TABLE IS BLIND TO THE FOUR KERNEL WORDS.                       *)
+(*                                                                         *)
+(* [usys_num] reads word 21 ([tf_arg_idx 7] = a7) and [usys_mem_ok] reads,  *)
+(* besides that number, only [tf !!! tf_arg_idx i] for the [i] the window   *)
+(* table names -- 0 and 1, i.e. words 14 and 15.  All three are inside      *)
+(* [5,35], so [tf_ueq] transports every row.  This is what lets the round   *)
+(* relation (UexecRound.v) be stated at whichever of the two trapframes --  *)
+(* the one the process trapped with, or the one prepare_return re-armed --  *)
+(* the kernel proof happens to hold.                                        *)
+(* ===================================================================== *)
+Lemma tf_ueq_num (tf tf' : list (mword 64)) :
+  tf_ueq tf tf' -> usys_num tf = usys_num tf'.
+Proof.
+  intros [_ Hg].
+  assert (H21 : tf !!! tf_arg_idx 7 = tf' !!! tf_arg_idx 7).
+  { apply Hg. unfold tf_arg_idx. lia. }
+  unfold usys_num. rewrite H21. reflexivity.
+Qed.
+
+(* the window table only ever names argument 0 or argument 1 *)
+Lemma usys_window_idx (n : Z) (i : nat) :
+  usys_window n = Some i -> (i = 0%nat \/ i = 1%nat).
+Proof.
+  unfold usys_window.
+  destruct (decide (n = 3)); [ intros H; injection H as <-; left; reflexivity | ].
+  destruct (decide (n = 4)); [ intros H; injection H as <-; left; reflexivity | ].
+  destruct (decide (n = 5)); [ intros H; injection H as <-; right; reflexivity | ].
+  destruct (decide (n = 8)); [ intros H; injection H as <-; right; reflexivity | ].
+  intros H; discriminate H.
+Qed.
+
+Lemma usys_mem_ok_ueq (n : Z) (tf tf' : list (mword 64)) (r : mword 64)
+    (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) :
+  tf_ueq tf tf' ->
+  usys_mem_ok n tf r M π M' π' -> usys_mem_ok n tf' r M π M' π'.
+Proof.
+  intros Hu H. unfold usys_mem_ok in H |- *.
+  destruct (decide (n = USYS_exec)); [ exact H | ].
+  destruct (decide (n = USYS_sbrk)); [ exact H | ].
+  destruct (usys_window n) as [i | ] eqn:Hw; [ | exact H ].
+  assert (Hi : tf !!! tf_arg_idx i = tf' !!! tf_arg_idx i).
+  { destruct Hu as [_ Hg]. apply Hg.
+    destruct (usys_window_idx n i Hw) as [-> | ->]; unfold tf_arg_idx; lia. }
+  rewrite <- Hi. exact H.
 Qed.
 
 (* ===================================================================== *)

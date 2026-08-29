@@ -104,6 +104,7 @@ Require Import UserExec.     (* [ucfg] / [user_cfg] / [trap_mstatus_ok] / [user_
 Require Import SpecUserret.  (* [userret_gpr] *)
 Require Import UexecWp.      (* [loop_ok] / [uexec_wp] *)
 Require Import UexecSlot.    (* [uvis] / [tf_w] / [tf_resume_gpr] / [tf_resume_pc] *)
+Require Import TfUser.       (* [tf_ueq] *)
 Require Import UsysMemOk.    (* [usys_mem_ok] / [bump_tf] / [uecall_scause] *)
 Require Import UmodeRegs.    (* [uv_regs] / [uv_amb] *)
 Require Import UserPerm.     (* [uperm] / [perm_of] *)
@@ -262,6 +263,44 @@ Proof.
     first [ refine (eq_trans (upd_eq _ _ _) _); reflexivity
           | unfold zero_rf; symmetry; exact Hx0 ].
 Qed.
+
+(* [tf_resume_gpr] reads words 5..35 and nothing else, so [tf_ueq]
+   transports the restored register file.  REWRITE THE LEAVES FIRST, ONE PER
+   WORD -- exactly the shape [bo] below uses for the bump -- so that the only
+   conversion ever asked for is between SYNTACTICALLY IDENTICAL sides and the
+   32-insert chain stays folded ([unfold tf_resume_gpr, tf_w] exposes the
+   lookups, not the chain).
+
+   DO NOT WRITE [f_equal] HERE (measured 2026-08-28: the file was still
+   compiling after 20 minutes and had to be killed).  [f_equal] begins by
+   trying [reflexivity] on the whole goal, and that conversion check
+   delta-unfolds [userret_gpr] into the 31-insert register-file tower on BOTH
+   sides with UNEQUAL leaves ([tf !!! i] against [tf' !!! i]); the kernel then
+   backtracks through ever-deeper unfoldings and does not terminate.  Same
+   divergence class as claude-notes/optimization.md's ssr-rewrite-vs-
+   insert-chain rule: never let reflexivity or unification touch the
+   [userret_gpr] tower while the two sides differ. *)
+Local Ltac ueq_w Hg i :=
+  rewrite (Hg i ltac:(lia)).
+
+Lemma tf_ueq_resume_gpr (b : regfile) (tf tf' : list (mword 64)) :
+  tf_ueq tf tf' -> tf_resume_gpr b tf = tf_resume_gpr b tf'.
+Proof.
+  intros [_ Hg]. unfold tf_resume_gpr, tf_w.
+  ueq_w Hg 5%nat;  ueq_w Hg 6%nat;  ueq_w Hg 7%nat;  ueq_w Hg 8%nat;
+  ueq_w Hg 9%nat;  ueq_w Hg 10%nat; ueq_w Hg 11%nat; ueq_w Hg 12%nat;
+  ueq_w Hg 13%nat; ueq_w Hg 14%nat; ueq_w Hg 15%nat; ueq_w Hg 16%nat;
+  ueq_w Hg 17%nat; ueq_w Hg 18%nat; ueq_w Hg 19%nat; ueq_w Hg 20%nat;
+  ueq_w Hg 21%nat; ueq_w Hg 22%nat; ueq_w Hg 23%nat; ueq_w Hg 24%nat;
+  ueq_w Hg 25%nat; ueq_w Hg 26%nat; ueq_w Hg 27%nat; ueq_w Hg 28%nat;
+  ueq_w Hg 29%nat; ueq_w Hg 30%nat; ueq_w Hg 31%nat; ueq_w Hg 32%nat;
+  ueq_w Hg 33%nat; ueq_w Hg 34%nat; ueq_w Hg 35%nat.
+  reflexivity.
+Qed.
+
+Lemma tf_ueq_resume_gpr0 (tf tf' : list (mword 64)) :
+  tf_ueq tf tf' -> tf_resume_gpr0 tf = tf_resume_gpr0 tf'.
+Proof. intros H. unfold tf_resume_gpr0. exact (tf_ueq_resume_gpr zero_rf tf tf' H). Qed.
 
 (* ------------------------------------------------------------------- *)
 (* The bump, read back: a0 := r on the restored file, epc + 4 as the pc. *)

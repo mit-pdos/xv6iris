@@ -53,9 +53,11 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec RiscvExtras.
+Require Import AlignBits.    (* [jalr_ret_id] -- for [ret_pc_idem] *)
 Require Import RegFile.
 Require Import MinstretInv WireInv.
 Require Import ProcGeom.     (* [tf_epc_idx] / [tf_sp_idx] / [TFWORDS] *)
+Require Import TfUser.       (* [tf_ueq] *)
 Require Import UserPtTree.   (* [uptd] / [user_pt_inv] *)
 Require Import UserFrame.    (* [u_regs] *)
 Require Import UserExec.     (* [ucfg] / [user_cfg] / [user_mstatus_ok] /
@@ -134,6 +136,42 @@ Definition tf_resume_gpr (b : regfile) (tf : list (mword 64)) : regfile :=
     (tf_w tf 30%nat) (tf_w tf 31%nat)
     (tf_w tf 32%nat) (tf_w tf 33%nat) (tf_w tf 34%nat) (tf_w tf 35%nat)
     (tf_w tf 14%nat).
+
+(* ------------------------------------------------------------------- *)
+(* [ret_pc] IS IDEMPOTENT.  It clears bit 0, and a pc with bit 0 already   *)
+(* clear is its own return target ([AlignBits.jalr_ret_id] at the zero     *)
+(* displacement, which [RiscvExtras.add_vec_zeros_r] collapses).  This is  *)
+(* what lets a resume pc be re-read through [tf_resume_pc] any number of   *)
+(* times -- notably at the syscall bump, where the trap round names        *)
+(* [ret_pc (add_vec_int (tf_w tf tf_epc_idx) 4)] and the loop holds the    *)
+(* already-cleared value.  NOTE [WpGprCsrwA.mepc_val] is the SAME term     *)
+(* under another name; nothing is redefined here.                          *)
+(* ------------------------------------------------------------------- *)
+Lemma ret_pc_idem (v : mword 64) : ret_pc (ret_pc v) = ret_pc v.
+Proof.
+  pose proof (jalr_ret_id (ret_pc v) (ret_pc_aligned v)) as H.
+  rewrite add_vec_zeros_r in H. exact H.
+Qed.
+
+(* The +4 the compressed [c.addi] form of "epc += 4" produces, in the
+   [add_vec_int] spelling [UsysMemOk.bump_tf] uses.  The immediate is a
+   6-bit c.addi field, sign-extended to 12 and then to 64. *)
+Lemma addv_sext4 (v : mword 64) :
+  add_vec v (sign_extend' 64 (sign_extend' 12 (mword_of_int 4 : mword 6)))
+  = add_vec_int v 4.
+Proof.
+  assert (H4 : (sign_extend' 64 (sign_extend' 12 (mword_of_int 4 : mword 6)) : mword 64)
+               = mword_of_int 4)
+    by (apply bv_eq; vm_compute; reflexivity).
+  rewrite H4. reflexivity.
+Qed.
+
+(* [tf_resume_pc] reads only the epc word, so [tf_ueq] transports it *)
+Lemma tf_ueq_resume_pc (tf tf' : list (mword 64)) :
+  tf_ueq tf tf' -> tf_resume_pc tf = tf_resume_pc tf'.
+Proof.
+  intros [He _]. unfold tf_resume_pc, tf_w. rewrite He. reflexivity.
+Qed.
 
 (* ===================================================================== *)
 (* SS2 Reading a register back out of the insert chain.                    *)

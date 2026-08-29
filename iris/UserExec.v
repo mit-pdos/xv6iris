@@ -419,10 +419,16 @@ Section UserExec.
   (* step lemmas that produce this frame know them precisely, and a caller *)
   (* needing them can consume those lemmas directly).                      *)
   (* ------------------------------------------------------------------- *)
-  Definition user_trap_frame : iProp Σ :=
-    (∃ (ms_v sc_v stval_v sepc_v : mword 64)
-       (g : regfile),
-      ⌜trap_mstatus_ok ms_v⌝ ∗
+  (* THE SAME FRAME AT NAMED VALUES.  [user_trap_frame] below is this with
+     its five data existentially quantified; a caller that KNOWS which state
+     trapped -- the trap round's own post (UexecRound.v), which has to name
+     the resume trapframe -- keys on this one instead and never has to open
+     and re-close the ∃.  Nothing else changes: [user_trap_frame] is
+     definitionally what it was, so every existing opener/introducer stands
+     and [user_trap_frame_unfold] is [reflexivity]. *)
+  Definition user_trap_frame_at (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : regfile) : iProp Σ :=
+    (⌜trap_mstatus_ok ms_v⌝ ∗
       hart_state ↦ᵣ HART_ACTIVE tt ∗
       cur_privilege ↦ᵣ Supervisor ∗
       mstatus ↦ᵣ ms_v ∗
@@ -434,6 +440,17 @@ Section UserExec.
       user_pt_any pt ∗
       user_cfg ∗
       Rut pt)%I.
+
+  Definition user_trap_frame : iProp Σ :=
+    (∃ (ms_v sc_v stval_v sepc_v : mword 64)
+       (g : regfile),
+      user_trap_frame_at ms_v sc_v stval_v sepc_v g)%I.
+
+  Lemma user_trap_frame_unfold :
+    user_trap_frame ⊣⊢
+    ∃ (ms_v sc_v stval_v sepc_v : mword 64) (g : regfile),
+      user_trap_frame_at ms_v sc_v stval_v sepc_v g.
+  Proof. reflexivity. Qed.
 
   (* assemble the trapped frame from the delivered cells (shared by every
      trap arm -- the values differ, the shape never does) *)
@@ -454,6 +471,7 @@ Section UserExec.
     user_trap_frame.
   Proof.
     iIntros (Hok) "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr Hupt Hcfg Hrut".
+    rewrite /user_trap_frame /user_trap_frame_at.
     iExists ms', sc', stv', sep', g.
     iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hgpr Hupt Hcfg Hrut".
     iSplitR; [ iPureIntro; exact Hok | ].

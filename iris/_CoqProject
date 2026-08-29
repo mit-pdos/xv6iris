@@ -226,6 +226,7 @@ DecodeTotalU.v
 DecodeSetU.v
 UserExec.v
 UserPerm.v
+TfUser.v
 UsysMemOk.v
 UexecWp.v
 UexecSlot.v
@@ -238,6 +239,7 @@ UserStepFull.v
 UmodeMem.v
 UmodeRegs.v
 UexecRet.v
+UexecRound.v
 UmodeCap.v
 UmodeFetch.v
 UmodeAbi.v

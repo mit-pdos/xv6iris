@@ -506,7 +506,13 @@ Section UtSysBlock.
          have moved, by table index, and usertrap frames that fact rather
          than reading it -- the trap loop's own invariant is indifferent to
          the user image, and the fact is the CALLER's to consume. *)
-      iIntros (CID2 Hk2 mg U2) "%Hcsg %Hmemg %Htfg %Hfgg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hpc".
+      (* [Hmema0]/[Hmemupt]/[Hmemsz] are the dispatcher's three RESUME-record
+         clauses (SpecSyscall.v: the trapframe up to the a0 slot, the
+         descriptor up to a lazy-fault extension, the size).  Framed, not
+         read -- like [Hmemg], they are the CALLER's to consume, and the trap
+         loop's own invariant is indifferent to all four. *)
+      iIntros (CID2 Hk2 mg U2)
+        "%Hcsg %Hmemg %Hmema0 %Hmemupt %Hmemsz %Htfg %Hfgg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hpc".
       destruct U2 as [V2 M2].
       assert (Hreta6 : ret_pc (S4 !!! Regidx Rra) = mword_of_int (UT + 0xa6))
         by (rewrite HS4ra; pcw).

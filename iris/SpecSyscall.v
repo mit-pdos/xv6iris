@@ -316,6 +316,35 @@ Definition wp_syscall_sconf_body
          [sysc_mem_ok] above.  Sixteen of the twenty-two entries touch no
          user memory at all and this reads [us_M U' = us_M U] for them. *)
       ⌜ sysc_mem_ok (us_V U) (us_V U') (us_M U) (us_M U') ⌝ -∗
+      (* ...AND THE RESUME RECORD IS PINNED.  The three rows below are what
+         the user-execution slot (milestone J) needs and nothing above says;
+         each is stated to what is TRUE rather than to what would be tidy.
+
+         (i)  THE TRAPFRAME WORDS.  Literal equality is FALSE -- the return
+              value IS written into the a0 slot, by the [sd a0,112(s2)] at
+              [syscall + 0x3a], i.e. AFTER the dispatch returns -- so what
+              holds is that the outgoing list is the entry list with the a0
+              word replaced.  The word itself is not named: [uexec_ret]'s
+              ecall arm forall-binds the return value and the caller
+              instantiates it at whatever was stored.
+         (ii) THE PAGE-TABLE DESCRIPTOR.  Literal equality is FALSE on the
+              eleven buffer-touching entries -- a copyin/copyout lazy fault
+              grows [ud_um] -- so what holds is [ProcPtOwn.uptd_ext]: same
+              root, same trapframe page, a user map that only gained
+              entries.
+         (iii) THE SIZE, verbatim.
+
+         [exec] escapes all three (it replaces the address space, trapframe
+         and all) and [sbrk] escapes (ii) and (iii) (it resizes it).  The
+         escapes are by [sysc_num], which the ENTRY record already
+         determines, so an arm selects its branch exactly as it does for
+         [sysc_mem_ok]. *)
+      ⌜ sysc_num (us_V U) = 7 \/ exists w : mword 64,
+          pv_tf (us_V U') = <[tf_arg_idx 0 := w]> (pv_tf (us_V U)) ⌝ -∗
+      ⌜ sysc_num (us_V U) = 7 \/ sysc_num (us_V U) = 12 \/
+          ProcPtOwn.uptd_ext (pv_upt (us_V U)) (pv_upt (us_V U')) ⌝ -∗
+      ⌜ sysc_num (us_V U) = 7 \/ sysc_num (us_V U) = 12 \/
+          pv_sz (us_V U') = pv_sz (us_V U) ⌝ -∗
       (* THE TRAPFRAME PAGE IS THE ONE THING THAT CANNOT MOVE.  Everything
          else in the record may: [pv_tf] always does (the a0 slot is the
          return value), and sbrk / exec / chdir / open move the rest. *)
