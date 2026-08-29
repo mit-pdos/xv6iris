@@ -64,7 +64,7 @@ Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import CpuOwn SchedCtx FdSlots.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import DiskPtsto VirtioProto DiskInv.
+Require Import DiskPtsto VirtioProto DiskInv DiskAvail.
 Require Import VirtioModel.
 Require Import WpVirtioDev.
 Require Import WpUart.
@@ -328,7 +328,7 @@ Section ProofVirtioDiskRwE.
     - (* IN FLIGHT: the cell reads 1 *)
       iDestruct (big_sepM_lookup_acc (fun p v => flight_res γd p v) fl q V Hf
                    with "Hflm") as "[Hfe Hback]".
-      iDestruct "Hfe" as "(%Hlink & Hrcpt & Hbd & Hib)".
+      iDestruct "Hfe" as "(%Hlink & Hrcpt & Hbd & Hib & Hhc)".
       iExists (SailStdpp.Values.mword_of_int (len := 32) 1).
       iSplitR; [iPureIntro; left; reflexivity|].
       iFrame "Hbd". iIntros "Hbd". iFrame "Hclaim".
@@ -340,12 +340,12 @@ Section ProofVirtioDiskRwE.
       iSplitR; [iPureIntro; exact Htrdj|].
       iSplitR; [iPureIntro; exact Htrfr|].
       iFrame "Hpub Hlb Hcl Huidx Hpkm Hfb Hring Havh".
-      iApply "Hback". iFrame "Hrcpt Hbd Hib". iPureIntro. exact Hlink.
+      iApply "Hback". iFrame "Hrcpt Hbd Hib Hhc". iPureIntro. exact Hlink.
     - (* PARKED: the cell reads 0, and P6 may collect *)
       iDestruct (big_sepM_lookup_acc (fun p v => parked_res γd pav p v) pk q V Hp
                    with "Hpkm") as "[Hpe Hback]".
       rewrite /parked_res.
-      iDestruct "Hpe" as (bs) "(%Hlink & %Hlen & %Hout & Hbd & Hib & Hpinr & Hstat & Hbytes & Hbuf)".
+      iDestruct "Hpe" as (bs) "(%Hlink & %Hlen & %Hout & Hbd & Hib & Hpinr & Hhcr & Hstat & Hbytes & Hbuf)".
       iExists (SailStdpp.Values.mword_of_int (len := 32) 0).
       iSplitR; [iPureIntro; right; split; [reflexivity | exact Hp]|].
       iFrame "Hbd". iIntros "Hbd". iFrame "Hclaim".
@@ -358,7 +358,7 @@ Section ProofVirtioDiskRwE.
       iSplitR; [iPureIntro; exact Htrfr|].
       iFrame "Hpub Hlb Hcl Huidx Hflm Hfb Hring Havh".
       iApply "Hback". iExists bs.
-      iFrame "Hbd Hib Hpinr Hstat Hbytes Hbuf".
+      iFrame "Hbd Hib Hpinr Hhcr Hstat Hbytes Hbuf".
       iPureIntro. split_and!; assumption.
   Qed.
 

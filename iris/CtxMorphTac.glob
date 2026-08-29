@@ -1,4 +1,4 @@
-DIGEST c677622bcc3ead4c61989be57eebfee4
+DIGEST 5371f1134b232b73e13400af10a223d6
 Fxv6iris.CtxMorphTac
 R1194:1202 iris.proofmode.proofmode <> <> lib
 R1220:1225 xv6iris.TsoCtx <> <> lib
@@ -7,9 +7,49 @@ R1303:1316 xv6iris.TsoCtx <> ctx_morph_word inst
 R1334:1348 xv6iris.TsoCtx <> ctx_morph_word2 inst
 R1366:1380 xv6iris.TsoCtx <> ctx_morph_word4 inst
 R1398:1412 xv6iris.TsoCtx <> ctx_morph_const inst
-R1457:1463 xv6iris.TsoCtx <> cur_ctx def
-R1503:1517 xv6iris.TsoCtx <> ctx_morph_exist inst
-R1541:1553 xv6iris.TsoCtx <> ctx_morph_sep inst
-R1567:1584 xv6iris.TsoCtx <> ctx_morph_big_sepL inst
-R1610:1627 xv6iris.TsoCtx <> ctx_morph_big_sepM inst
-R1653:1664 xv6iris.TsoCtx <> ctx_morph_if inst
+R1855:1862 xv6iris.TsoCtx <> CtxMorph class
+binder 1869:1870 <> ξ:1
+R1875:1893 xv6iris.TsoCtx <> ctx_phys_pointsto_h def
+R1895:1896 xv6iris.CtxMorphTac <> ξ:1 var
+R1855:1862 xv6iris.TsoCtx <> CtxMorph class
+binder 1869:1870 <> ξ:2
+R1875:1893 xv6iris.TsoCtx <> ctx_phys_pointsto_h def
+R1895:1896 xv6iris.CtxMorphTac <> ξ:2 var
+R1945:1952 xv6iris.TsoCtx <> CtxMorph class
+binder 1959:1960 <> ξ:3
+R1965:1983 xv6iris.TsoCtx <> ctx_phys_pointsto_h def
+R1987:1993 xv6iris.TsoCtx <> cur_ctx def
+R1995:1996 xv6iris.CtxMorphTac <> ξ:3 var
+R1945:1952 xv6iris.TsoCtx <> CtxMorph class
+binder 1959:1960 <> ξ:4
+R1965:1983 xv6iris.TsoCtx <> ctx_phys_pointsto_h def
+R1987:1993 xv6iris.TsoCtx <> cur_ctx def
+R1995:1996 xv6iris.CtxMorphTac <> ξ:4 var
+R2046:2053 xv6iris.TsoCtx <> CtxMorph class
+binder 2060:2061 <> ξ:5
+R2066:2078 xv6iris.TsoCtx <> ctx_cell_keep def
+R2080:2081 xv6iris.CtxMorphTac <> ξ:5 var
+R2046:2053 xv6iris.TsoCtx <> CtxMorph class
+binder 2060:2061 <> ξ:6
+R2066:2078 xv6iris.TsoCtx <> ctx_cell_keep def
+R2080:2081 xv6iris.CtxMorphTac <> ξ:6 var
+R2122:2129 xv6iris.TsoCtx <> CtxMorph class
+binder 2136:2137 <> ξ:7
+R2142:2154 xv6iris.TsoCtx <> ctx_cell_keep def
+R2158:2164 xv6iris.TsoCtx <> cur_ctx def
+R2166:2167 xv6iris.CtxMorphTac <> ξ:7 var
+R2122:2129 xv6iris.TsoCtx <> CtxMorph class
+binder 2136:2137 <> ξ:8
+R2142:2154 xv6iris.TsoCtx <> ctx_cell_keep def
+R2158:2164 xv6iris.TsoCtx <> cur_ctx def
+R2166:2167 xv6iris.CtxMorphTac <> ξ:8 var
+R2182:2200 xv6iris.TsoCtx <> ctx_morph_cell_keep inst
+R2095:2113 xv6iris.TsoCtx <> ctx_morph_cell_keep inst
+R2013:2037 xv6iris.TsoCtx <> ctx_morph_phys_pointsto_h inst
+R1912:1936 xv6iris.TsoCtx <> ctx_morph_phys_pointsto_h inst
+R2249:2255 xv6iris.TsoCtx <> cur_ctx def
+R2320:2334 xv6iris.TsoCtx <> ctx_morph_exist inst
+R2358:2370 xv6iris.TsoCtx <> ctx_morph_sep inst
+R2384:2401 xv6iris.TsoCtx <> ctx_morph_big_sepL inst
+R2427:2444 xv6iris.TsoCtx <> ctx_morph_big_sepM inst
+R2470:2481 xv6iris.TsoCtx <> ctx_morph_if inst

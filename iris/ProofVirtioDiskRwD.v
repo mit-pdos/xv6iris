@@ -2117,7 +2117,6 @@ Section VdrwdP4.
     (* A6.125 step 4: the publisher's kept halves plus the lease's memory half
        are the pin's half ctx cells (step 3 parks them in [flight_res]) *)
     iDestruct (keep_map_back with "Kpin Hpb") as "Hhc".
-    iClear "Hhc".
     assert (Hp182 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x192) : mword 64) 4
                     = mword_of_int (KernelSyms.virtio_disk_rw + 0x196)) by pcstep.
     iEval (rewrite Hp182) in "Hpc".
@@ -2139,12 +2138,12 @@ Section VdrwdP4.
             with "Hclaim") as "[Hclaim Hfrag]".
     iDestruct (big_sepM_insert (fun p v => flight_res γd p v) fl np V
                  (vdrwd_fl_fresh np nr fl Hle Hdfl)
-                 with "[Hflm Hrcpt Hib Hbd]") as "Hflm".
+                 with "[Hflm Hrcpt Hib Hbd Hhc]") as "Hflm".
     { iSplitR "Hflm"; [| iExact "Hflm"]. rewrite /flight_res /V.
       cbn [dc_buf dc_slot dc_tri dc_pin].
       iSplitR; [iPureIntro;
         exact (vdrwd_slot_link kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk) Hh8)|].
-      iFrame "Hrcpt Hbd".
+      iFrame "Hrcpt Hbd Hhc".
       rewrite (vdrwd_slot_head kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk) Hh8).
       iExact "Hib". }
     iApply ("Hcont" $! N8 pin with "[%] [%] Hcg Hpc [-Hfrag Hrm Hrt] [Hfrag] Hrm Hrt").

@@ -332,7 +332,11 @@ Section DiskInv.
     (⌜slot_buf_link (dc_slot v) (dc_buf v)⌝ ∗
      disk_receipt γ p (dc_slot v) (dc_pin v) ∗
      b_disk (dc_buf v) ↦₄ (SailStdpp.Values.mword_of_int (len := 32) 1) ∗
-     d_info_b (sl_head (dc_slot v)) ↦₈ (dc_buf v : SailStdpp.Values.mword 64))%I.
+     d_info_b (sl_head (dc_slot v)) ↦₈ (dc_buf v : SailStdpp.Values.mword 64) ∗
+     (* A6.125 step 3: the publisher's HALF CTX CELLS of the pin (the arms
+        with half the stamps and half the memory; the lease holds the sealed
+        halves) -- what makes the pin's cells ctx cells again at withdraw *)
+     hcell_map cur_ctx (dc_pin v))%I.
 
   (* processed by the interrupt handler, not yet collected by its publisher:
      the payoff of VirtioProto.virtio_proto_reclaim_acc, parked.  The pin
@@ -356,7 +360,8 @@ Section DiskInv.
        ⌜bs = vs_data (dc_slot v)⌝ ∗
        b_disk (dc_buf v) ↦₄ (SailStdpp.Values.mword_of_int (len := 32) 0) ∗
        d_info_b (sl_head (dc_slot v)) ↦₈ (dc_buf v : SailStdpp.Values.mword 64) ∗
-       phys_map (dc_pinr pav p v) ∗
+       half_map (dc_pinr pav p v) ∗
+       hcell_map cur_ctx (dc_pinr pav p v) ∗
        phys_ledger (vr_status (vs_req (dc_slot v))) (DfracOwn 1) byte_zero ∗
        disk_bytes γ (vs_sector_off (dc_slot v)) bs ∗
        (* THE SPENT CRASH PERMIT's token (PermInv.v).  It is named at the
@@ -901,10 +906,10 @@ Section DiskResAt.
   Qed.
   Global Instance flight_res_morph γ p v :
     CtxMorph (λ ξ, flight_res (XI := ξ) γ p v).
-  Proof. rewrite /flight_res. ctx_morph_solve. Qed.
+  Proof. rewrite /flight_res. ctx_morph_solve. all: apply hcell_map_morph. Qed.
   Global Instance parked_res_morph γ pav p v :
     CtxMorph (λ ξ, parked_res (XI := ξ) γ pav p v).
-  Proof. rewrite /parked_res. ctx_morph_solve. Qed.
+  Proof. rewrite /parked_res. ctx_morph_solve. all: apply hcell_map_morph. Qed.
   Global Instance ring_slots_res_morph pav occ :
     CtxMorph (λ ξ, ring_slots_res (XI := ξ) pav occ).
   Proof. rewrite /ring_slots_res. ctx_morph_solve. Qed.
@@ -918,7 +923,8 @@ Section DiskResAt.
     rewrite /disk_res_at /disk_res. ctx_morph_solve.
     all: first [ apply flight_res_morph | apply parked_res_morph
                | apply free_slot_res_morph | apply ring_slots_res_morph
-               | apply avail_half_morph | apply WpLock.lk_floor_morph ].
+               | apply avail_half_morph | apply WpLock.lk_floor_morph
+               | apply hcell_map_morph | apply keep_map_morph ].
   Qed.
 End DiskResAt.
 

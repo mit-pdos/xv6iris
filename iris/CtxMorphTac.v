@@ -27,10 +27,25 @@ Ltac ctx_morph_leaf :=
         | apply ctx_morph_word4
         | apply ctx_morph_const ].
 
+(* A6.125 step 3: the half ctx cell and the kept arm ARE existentials, so
+   [apply ctx_morph_exist] would unfold them and strand their arm; they are
+   dispatched by a SYNTACTIC match before any decomposition.  (Trying the
+   unification leaves first instead diverges: [apply] against a whole
+   payload conjunction unfolds through it -- measured, two files hung.) *)
+Ltac ctx_morph_leaf_syn :=
+  cbv beta;
+  lazymatch goal with
+  | |- CtxMorph (fun ξ => ctx_phys_pointsto_h ξ _ _) => apply ctx_morph_phys_pointsto_h
+  | |- CtxMorph (fun ξ => ctx_phys_pointsto_h (@cur_ctx ξ) _ _) => apply ctx_morph_phys_pointsto_h
+  | |- CtxMorph (fun ξ => ctx_cell_keep ξ _) => apply ctx_morph_cell_keep
+  | |- CtxMorph (fun ξ => ctx_cell_keep (@cur_ctx ξ) _) => apply ctx_morph_cell_keep
+  end.
+
 Ltac ctx_morph_solve :=
   try rewrite /cur_ctx; cbv beta;
   repeat first
-    [ apply ctx_morph_exist; intros ?
+    [ ctx_morph_leaf_syn
+    | apply ctx_morph_exist; intros ?
     | apply ctx_morph_sep
     | apply ctx_morph_big_sepL; intros ? ?
     | apply ctx_morph_big_sepM; intros ? ?
