@@ -34,10 +34,12 @@
      arms are out of this contract's domain BY PREMISE;
    - the [f->writable == 0] early return cannot fire
      ([FileInvDefs.fdstate_ok] ties the state to the cell the [lbu] reads);
-   - the major-range test and the null-slot test cannot fire: [CONSOLE] is
-     in range and [ConsoleInv.devsw_write_val_console] says the cell holds
-     [consolewrite], which kills the second disjunct of
-     [filewrite_dev_env]'s [fwn_wp] fact;
+   - the major-range test cannot fire ([CONSOLE] is 1 and the test is
+     [9 < major]), and neither can the null-slot test -- but only because
+     the second premise below PINS the cell: [filewrite_dev_env] states the
+     honest disjunction "null or consolewrite", and a null slot returns -1
+     at +0x12a, which no arm here admits.  The pin is discharged at the call
+     site from the devsw table ([ConsoleInv.devsw_write_val_console]);
    - so the ONLY [-1] left is filewrite's own sign guard at +0x1c
      (XV6_REV 31f115a's [srliw a5,a2,0x1f ; c.bnez]), which is the NEG arm
      of [write_cons_arms] -- and the remaining arms are the device path's
@@ -132,9 +134,20 @@ Definition wp_filewrite_cons_body
      premise. *)
   st = FdOpen rb true (FdDevice ma) ->
   (* EDIT 2: THE CONSOLE TIE.  [ma] is the one entry consoleinit fills, which
-     is what routes the dispatch to consolewrite and refutes the
-     major-range / null-slot -1. *)
+     is what routes the dispatch to consolewrite and refutes the major-range
+     -1 ([CONSOLE] is 1, and the test is [9 < major]).
+     THE SECOND HALF IS NOT DECORATION: [filewrite_dev_env] carries the
+     honest DISJUNCTION "the slot is null or it is consolewrite"
+     ([ConsoleInv.devsw_write_val_cases]), and a null slot is a -1 return at
+     +0x12a that no arm of [write_cons_arms] admits.  So the cell's value has
+     to be pinned, and this is where.  A caller discharges it from the table
+     it already owns: [fwn_wp fn = ConsoleInv.devsw_write_val] (the
+     [filewrite_devsw]/[devsw_table] premise every consumer of this cone
+     carries) plus [ma = CONSOLE] plus
+     [ConsoleInv.devsw_write_val_console] -- which is exactly what
+     [ProofSysWriteConsAU] does, in one [assert]. *)
   ma = ConsoleInv.CONSOLE ->
+  fwn_wp fn ma = (mword_of_int KernelSyms.consolewrite : mword 64) ->
   eb = true ->
   locks_below lks "log" ->
   sie_cap_gpr KT1 m K b pj -∗
@@ -235,6 +248,7 @@ Module Type FILEWRITE_CONS.
       (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool)
       (lks : gset string) (rb : bool) (ma : Z)
       (tr0 : list (bv 8)),
+      (* the premise list is the body's; see [wp_filewrite_cons_body] *)
       wp_filewrite_cons_body γf γs j γlp k q st fn pidv U m K eb n b lks
         rb ma tr0.
 End FILEWRITE_CONS.

@@ -340,6 +340,15 @@ Section ProofSysWriteConsAU.
        durable-notes' divergence trap. *)
     assert (Hnrange : - 2 ^ 31 <= sys_rw_count v2 < 2 ^ 31)
       by apply sys_rw_count_range.
+    (* THE DEVSW CELL, PINNED (the callee's second console premise).  The
+       frame already carries the whole table's value function
+       ([fwn_wp fn = ConsoleInv.devsw_write_val], premise [Hwp]); at the
+       console major that value IS consolewrite, so the null-slot -1 at
+       filewrite +0x12a -- the one -1 the arms do not admit -- is refuted
+       here rather than assumed away.  A NAMED fact, not an inline
+       [ltac:] in argument position (durable-notes' divergence trap). *)
+    assert (Hcell : fwn_wp fn ma = (mword_of_int KernelSyms.consolewrite : mword 64)).
+    { rewrite Hwp Hma. apply ConsoleInv.devsw_write_val_console. }
     (* the push_off bound, with [2^31] evaluated by hand: [lia] cannot reduce
        a power (durable-notes.md). *)
     assert (Hnoff : (Z.of_nat 0 + 1 < 2 ^ 31)%Z)
@@ -932,7 +941,7 @@ Section ProofSysWriteConsAU.
       iApply (FilewriteCons.wp_filewrite_cons γf γs j γlp kk qq stf fn pidv U
                 S4 (av - 6)%nat eb (sys_rw_count v2) b lks rb ma tr0
                 ltac:(lia) Hkk Hj Hgs Hlens
-                Hfj Hfprocs HS4a0' HS4a2 Hnrange Hstf Hma Heb
+                Hfj Hfprocs HS4a0' HS4a2 Hnrange Hstf Hma Hcell Heb
                 with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs
                       Hfenv Hseed").
       all: try lkbelow.
