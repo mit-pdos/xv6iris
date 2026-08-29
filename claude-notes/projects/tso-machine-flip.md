@@ -15446,3 +15446,129 @@ publish through `_au_dat` with `ledger_store_ok` + `ctx_wrote_register` +
 of the forget.  Files: `VirtioProto`, `DiskPtsto`, `DiskInv`, `DiskBoot`,
 `SpecVirtioDiskInit`, `ProofVirtioDiskInit`, `VirtioDiskRwDefs`,
 `ProofVirtioDiskRwD`, the four `Spec*` dummies.
+
+### A6.124 (lock lane, 2026-08-29): the avail-index word on the ledger -- lease split + payload half; `ProofVirtioDiskRwD` reached
+
+**What landed.**  The unit A6.123 §3 sized: `struct virtq_avail.idx` leaves the
+ctx tower for the ledger with its two byte cells SPLIT IN HALVES.
+
+1. **Lease side (`VirtioProto.v`).**  The live arm now carries
+   `dma_own_x dma (avail_idx_dom (v_cfg v)) ∗ avail_lease_half (v_cfg v) (vp_np pr)`
+   -- the lease with a HOLE at the index word (`dma_own_x dma D :=
+   dma_own (filter (λ p, p.1 ∉ D) dma)`) plus the word's two cells at
+   `DfracOwn (1/2)`, sealed.  The pure ledger (`dma`) is unchanged, so every
+   pure law (`vproto_ctl … ⊆ dma`, `vslot_writes_dom`, the standing-set
+   facts) is untouched; the holed resource is reached through
+   `dma_own_x_acc / _acc_same / _shrink / _extend / _of_own`, each taking one
+   extra disjointness premise (`… ## avail_idx_dom c`), discharged from
+   `vpo_idx_used` (used page ∩ avail word = ∅) and from
+   `vslot_writes_dom`'s second conjunct (a slot's writes are disjoint from
+   the control words).  Agreement with the interp is `lease_agree` (holed
+   part + halves ⇒ the full `vproto_ctl` is in memory).  `avail_idx_acc`
+   hands out / takes back `avail_lease_half c np`; `publish_acc` hands out
+   the half at `np` and takes back the half at `S np`; the rebuilt lease
+   after a publish is `dma_own_x (pin ∪ (wrb ∪ (range_map … (S np) ∪ dma)))
+   (avail_idx_dom …)` via `map_filter_union_notin/_in` (the pin and
+   write-back maps are disjoint from the word: `phys_map_half_disj`).
+   `virtio_proto_intro` takes `avail_lease_half c 0` in place of the full
+   word.
+
+2. **Payload side (`DiskAvail.v`, new; between `WpLock` and
+   `SpecVirtioDiskInit` in `_CoqProject`).**
+   `avail_half pav np := [∗ list] j ∈ seq 0 2, ∃ t, phys_ledger_at (pa_add
+   (pa_add pav 2) j) (DfracOwn ½) (nth_byte (wrap16 np) j) t ∗ lk_floor
+   cur_ctx t` -- the holder's half with the STAMP EXPOSED and the FLOOR
+   beside it, on either arm (`lk_floor`: clean context bound or own dirty
+   witness, A6.120).  `CtxMorph` instance `avail_half_morph`
+   (`ctx_morph_solve` + `lk_floor_morph`), so it rides `disk_res_at`
+   (A6.121) across release/acquire.  It is `disk_res`'s LAST conjunct
+   (`DiskInv`), and `vdrw_body`'s (`VirtioDiskRwDefs`) -- every
+   destructuring pattern in the tree changed by one trailing name
+   (`ProofVirtioDiskRwB/D/E/F`, `DiskBoot`, `ProofVirtioDiskIntr`'s copy).
+   Three bricks:
+   - `avail_half_read_ok` -- the holder's READ as the datum obligation of
+     `wp_load_s_sconf_au_dat`: per byte `lk_floor_vis` cashes the floor
+     against the running token and `ledger_read_at_vis_ok` gives the exact
+     value at every reader timestamp above it.  **No invariant is opened for
+     the value** (the RwD leaf still peeks the device invariant, but only for
+     the pure `nr ≤ np`).
+   - `avail_split_init` -- the boot creator's arm: the two zeroed ctx bytes
+     go `ctx_pointsto_to_phys` → `ctx_phys_pointsto_forget_floor` (A6.120's
+     forget-with-floor: clean bound OR own dirty witness) →
+     `phys_ledger_at_halves`; the sealed half is the lease's, the exposed one
+     with its floor the payload's.  `ProofVirtioDiskInit` calls it where
+     `vdi_idx_phys` used to run; `vdi_post` (`SpecVirtioDiskInit`) and
+     `DiskBoot.disk_res_boot` carry `avail_half pav 0` through to the
+     payload.
+   - the publish obligation (`ProofVirtioDiskRwD.vdrwd_avail_store_ok`) --
+     the lock-word store's shape (`lock_word_store_plain`) with the
+     REGISTRATION added: `own_context_expose_w` + `tso_interp_llb_valid`
+     BEFORE the append (W ≤ |log|), `ledger_store_win_at_ok` for the 2-byte
+     message, `tso_interp_loglen_llb` for the new length, then
+     `ctx_wrote_register` at key `(S |log|, ea)`; the post is the two fresh
+     full cells at `S |log|` plus `ctx_wrote cur_ctx (S |log|) ea`, which the
+     AU's post wand re-splits: sealed half back through `publish_acc`'s
+     wand, exposed half + `lk_floor_of_wrote` to the payload at `S np`.
+     The leaf's VA claim now comes from the STATIC MAP
+     (`vdrwd_avail_claim`: `kmap_static_claims_at` + `pa_of_id` +
+     `ktier_pin_of_id`, RAM read off the holder's own cell) instead of from
+     a ctx word the tower no longer has.
+
+**Why the read needs no invariant and why that is the §0.35′(iv) shape.**
+The holder's half carries its OWN stamps; `lk_floor` says the holder's
+context is at or above them (or wrote them itself).  So exactness at the
+reader's timestamp is a token fact, not an invariant fact -- the invariant's
+half only certifies to the DEVICE (through `lease_agree`) that the word is
+in memory at the value the ghost count says.
+
+**What this does NOT do (unchanged rulings).**  The used index
+(`ProofVirtioDiskIntr`) still needs the monotone-cell instrument (A6.122
+§4, for the owner); the lease's own half is never READ by a hart, so no
+`vis` fact is needed on it.
+
+**The pin-return crossing, surfaced (the successor's next unit).**  With
+`ProofVirtioDiskRwD` green the compiler reached `ProofVirtioDiskRwF` for the
+first time since the flip, and its §1 bridges (`vdrwf_w2b/_w4b/_w8b`:
+`phys_map` → `a ↦₂ w`) are the LEDGER → CTX direction, which
+`DiskInv.phys_to_word2` cannot supply (its target is the raw
+`word2_pointsto`; `↦₂` is `ctx_word2_pointsto cur_ctx` now).  What comes
+back from the receipt/lease at interrupt time is SEALED (`phys_map pin`),
+and `TsoCtx.ctx_phys_pointsto_def` shows what a ctx cell needs: the stamp
+exposed and, per byte, EITHER the clean bound `llb (ctx_bound_name ξ) t`
+OR the FULL dirty element `(t, a) ↪[ctx_dirty_name ξ]{dq} ()` -- the
+persistent `ctx_wrote` witness does NOT rebuild a dq=1 dirty cell, so the
+forget-with-floor is not reversible on the dirty arm.  Two shapes, sized:
+(a) **the slot cells stay on the ledger** (recommended; §0.35′(iv) case 3
+again, the avail unit's pattern): `disk_slot`'s seventeen formatted cells
+and the per-slot info words become `avail_half`-style halves (lease ½
+sealed for the device's reads, payload ½ exposed + `lk_floor`), the RwD
+formatting stores go through `wp_store_s_sconf_au_dat` with a registration
+(one obligation per width, `vdrwd_avail_store_ok`'s shape), and RwF's
+withdraw needs no bridge at all -- ~3 obligation lemmas, `VdrwdPinBuild`
+(RwD §pin) rewritten to split rather than forget, `DiskPtsto.disk_slot`
+redefined, RwF §1 deleted; (b) keep ctx words and carry the FULL
+`ctx_phys_pointsto` of the publisher's context through the payload
+(`CtxMorph` transports it) with the lease holding only the pure map --
+cheaper in RwF, but the lease's `dma_own` needs the cells' `phys_ledger`
+for `dma_agree`, so it would need a second half-split anyway.  Option (a)
+is the coherent one.  `ProofVirtioDiskRwF:365` is the round's new red root
+until then; `ProofVirtioDiskRwE` and `ProofVirtioDiskRwDSeam` are green.
+
+**Rounds.**  r41 (incremental, after the round-launch gotchas below):
+1183/1298, red roots 8 = {UserMemPt:427, UptWalkPt:679 (§0.37′
+deliberate), ProofSwtch:157, ProofForkretPark:298, ProofKernelvec:1704,
+ProofMain:996, ProofVirtioDiskIntr:1166 (monotone cell, A6.122 §4),
+ProofVirtioDiskRwF:365 (new, above)}; zero admits (the 13 grep hits are
+all comment text).  The clean-round certification is in the handoff note.
+Two never-compiled RwD sites below the old red root were fixed on the way
+(`phys_list` builder → `ctx_ident_ledger`; `vdrwd_stat_out` takes the
+ledger cell and forgets it).
+
+**Round-launch gotchas (durable, also in the handoff note):** the wrapper is
+`/shared/xv6iris-3/gcp-rocq/run-on-gcp` (not in the fliptree); rsync drops
+`ZZbuild.sh`'s exec bit (`bash ./ZZbuild.sh`); a detached `nohup`/`setsid`
+dies with the ssh session -- launch under `tmux new-session -d`; `GREEN=`
+counts stale `.vo`s of files whose recompile failed, so read the red ROOTS
+from the log and certify with a clean round; `--pull-vo` + `ZZchain.sh`
+is the fast local loop (RwD's last three fixes took minutes, not rounds).
+

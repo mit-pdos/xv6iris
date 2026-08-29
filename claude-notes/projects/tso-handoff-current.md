@@ -23,7 +23,7 @@ measured record; `main-tso-readiness.md` is the separate main-side handoff.
    temp-index recipe; `ZZchain.sh <File>…` at the tree root rechecks files
    locally in order against pulled `.vo`).
    Build driver: `ZZbuild.sh` at the tree root (the intr lane's, log names
-   suffixed `.aux` -- see the gotcha).  **Last certified: r40, 1179/1297, RED 8, zero admits (A6.123: the avail side's three bricks landed; the `VirtioProto` lease split is the next unit, sized in A6.123 §3).**
+   suffixed `.aux` -- see the gotcha).  **Last certified: r41 (CLEAN round), 1183 .vo of 1298, red roots 8, zero admits (A6.124: the avail-index word is on the ledger -- lease split + payload half; `ProofVirtioDiskRwD`, `RwE`, `RwDSeam` GREEN; the new red root is `ProofVirtioDiskRwF:365`, the pin-return crossing, characterized and sized in A6.124).**  Snapshot `6168b7303` = r41.
 2. **KPT tree**: `/shared/xv6iris-3-kpttree` — FROZEN mid-K15d, unchanged
    this session EXCEPT one mirrored hunk: `iris/SmodeCorePt.v`'s
    `word_pointsto_wpay_mint_c` gained the trailing own-message fragment
@@ -44,6 +44,20 @@ was asked to fetch.  Measured: a whole round's log lost.  Rule: write remote
 logs under an excluded name (`*.aux` -- `ZZbuild.sh` now writes
 `ZZ-iris.log.aux` / `ZZbuild.out.aux`) and read them with
 `run-on-gcp --no-sync bash -c 'grep … ZZbuild.out.aux'`.
+
+## Round-launch gotchas (2026-08-29, A6.124; cost ~40 min once)
+
+The wrapper is `/shared/xv6iris-3/gcp-rocq/run-on-gcp` (not in the fliptree;
+run it with the fliptree as `$PWD`).  rsync DROPS `ZZbuild.sh`'s exec bit --
+launch as `bash ./ZZbuild.sh`.  A detached `nohup`/`setsid` launch dies with
+the ssh session; launch under tmux:
+`run-on-gcp bash -c 'D=$PWD; tmux kill-session -t zz 2>/dev/null; rm -f ZZbuild.out.aux; tmux new-session -d -s zz "cd $D && bash ./ZZbuild.sh > ZZbuild.out.aux 2>&1"'`
+and poll `run-on-gcp --no-sync bash -c 'grep -q DONE ZZbuild.out.aux'` (a
+warm round is ~5–10 min).  `GREEN=` counts stale `.vo`s of files whose
+recompile FAILED (the old `.vo` survives), so read the red ROOTS from
+`grep -n -B4 "^Error" ZZ-iris.log.aux | grep 'File "'` and certify with a
+clean round.  Fast loop for one file: `run-on-gcp --pull-vo true` then
+`./ZZchain.sh <File>` (both `ZZ*.sh` need `chmod +x` locally after a restore).
 
 ## Lane states and queues
 
@@ -67,15 +81,27 @@ touched, all this lane's, plus the mirrored `SmodeCorePt` hunk (A6.120 §6).
 `proc_lock_res` (44 sites) waits for §0.27′ (its slots hold `▷ proc_ctx`);
 `wait_res` (38 sites) unmeasured.
 
+**A6.124 (r41): the virtio AVAIL side is DONE** -- `VirtioProto`'s lease
+has a hole at the index word and holds its cells at ½ (`dma_own_x`,
+`avail_lease_half`); the payload's ½ with exposed stamps + `lk_floor`s is
+`DiskAvail.avail_half` (new file, `disk_res`/`vdrw_body`'s LAST conjunct,
+`CtxMorph` via `lk_floor_morph`); the holder reads with its own half
+(`avail_half_read_ok`, no invariant for the value), the publisher joins,
+stores through `wp_store_s_sconf_au_dat`, registers (`ctx_wrote_register`)
+and re-splits.  `ProofVirtioDiskRwD` + `RwE` + `RwDSeam` green.
+
 **Next queue (lock lane), in order:**
-1. **The virtio AVAIL side** (A6.122 §2, buildable now): the avail word
-   leaves `dma_own`'s plain map for an exposed-timestamp conjunct of the
-   protocol (`phys_word2_at … t` + the stamp in `dn_np`'s ghost value), the
-   publish store registers its position (A6.120's `ctx_wrote_register`) and
-   the floor rides in `disk_res` as `∃ t, disk_pub_at γ np t ∗ lk_floor cur_ctx t`
-   (a `CtxMorph` instance for `lk_floor` in `WpLock`); the read is
-   `lk_floor_vis` + an exact ledger read gate with the two-armed premise,
-   through `wp_load_s_sconf_au_dat`.  Greens `ProofVirtioDiskRwD` + 3.
+1. **The slot cells on the ledger (the pin-return crossing; A6.124's
+   surfaced item).**  `ProofVirtioDiskRwF:365`: the payoff's formatted
+   descriptor/info cells come back SEALED and `↦₂/↦₄/↦₈` are ctx words;
+   the forget-with-floor is not reversible on the dirty arm (a `ctx_wrote`
+   witness is discarded, `ctx_phys_pointsto_def`'s dirty arm is the FULL
+   element).  Recommended shape (a): the avail unit's pattern for
+   `disk_slot`'s cells -- lease ½ sealed, payload ½ exposed + `lk_floor`,
+   RwD's formatting stores through `_au_dat` with one obligation per width
+   (`vdrwd_avail_store_ok`'s shape), `VdrwdPinBuild` splits instead of
+   forgetting, RwF §1's bridges deleted.  Sized in A6.124.  Greens RwF and
+   `LinkVirtioDiskRw` (the latter also waits on `LinkSleep` ← §0.27′).
 2. **FOR THE OWNER (A6.122 §3): the virtio USED index needs a MONOTONE-CELL
    instrument** (a third `ts_pay` arm: since `B`, one author, non-decreasing
    values) — the pin cannot carry a stale reader's lower bound, measured
@@ -103,9 +129,11 @@ lock consumer the compiler reaches; the only lock-tier text still unreached
 is behind the eight reds above (virtio, swtch, kernelvec, main, the U-mode
 pair).  Case 2 (first/park): unchanged — `ProofSwtch` behind §0.27′,
 `ProofForkretPark` re-measure after.  Case 3 (started): K15d's tail then
-`ProofMain`.  **RED 8**: ProofForkretPark, ProofKernelvec, ProofMain,
-ProofSwtch, ProofVirtioDiskIntr, ProofVirtioDiskRwD, UptWalkPt*, UserMemPt*
-(* = deliberately red, §0.37′ — do not fix).
+`ProofMain`.  **RED ROOTS 8 (r41)**: ProofForkretPark:298, ProofKernelvec:1704,
+ProofMain:996, ProofSwtch:157, ProofVirtioDiskIntr:1166, ProofVirtioDiskRwF:365
+(new; queue item 1), UptWalkPt:679*, UserMemPt:427*
+(* = deliberately red, §0.37′ — do not fix).  `ProofVirtioDiskRwD` is
+green (A6.124).
 
 ## Merge topology (when lanes finish)
 
