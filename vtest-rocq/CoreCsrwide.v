@@ -10,22 +10,32 @@
    column is the MODEL's -- so the board profile skips this test rather than
    reporting it as a failure.
 
-   WHY THEY CANNOT SHARE A TEST WITH ANYTHING ELSE, and this is the finding:
-   in the model `csrr mseccfg` has NO TRANSITION.  [exec] answers None and
-   the harness reports VStuck, so the run stops at the first of the seven
-   and every later probe in the same image goes unasked.  Finding 22 records
-   the model as IMPLEMENTING these CSRs -- "implemented, read successfully"
-   -- and for the interpreter this suite runs, that is not what happens: it
-   neither answers nor refuses.
+   WHY THEY CANNOT SHARE A TEST WITH ANYTHING ELSE: [exec] cannot step
+   `csrr mseccfg`.  It answers None, the harness reports VStuck, and the run
+   stops at the first of the seven so every later probe in the same image
+   goes unasked.
 
-   That is a THIRD outcome, and the suite's vocabulary already has a name
-   for each: a machine that answers, a machine that traps, and a model with
-   no transition.  Compare finding 25, where `sc.w` does not evaluate
-   because [execute_STORECON] goes through opaque platform axioms; this is
-   the same class of limit, in the CSR file.  Whether finding 22's "read
-   successfully" was measured some other way, or has rotted, is worth
-   settling before README.md's open decision is answered -- because the
-   decision was framed on the belief that the model ANSWERS here. *)
+   BUT THAT IS A FACT ABOUT [exec], NOT ABOUT THE MODEL, and an earlier
+   version of this file said otherwise ("the model has NO TRANSITION").
+   [RiscvExec.exec_run_det] runs one way only -- [exec = Some] implies [run]
+   -- and there is no lemma anywhere in the tree of the form
+   [exec m s = None -> no run].  There cannot be a trivial one: [exec]'s own
+   fallback is
+
+     | _ => fun _ => None   (* Choose / GenericFail / Discard / ... *)
+
+   so it bails on [Choose], the Sail monad's NONDETERMINISM.  The relation
+   may well have a transition here that this interpreter declines to pick.
+   Compare finding 25, where `sc.w` does not evaluate because
+   [execute_STORECON] goes through opaque platform axioms -- the same class
+   of limit, and the same care needed in stating it.
+
+   SO WHAT IS OPEN is narrower than it looked, and still worth settling:
+   finding 22 records the model as "implemented, read successfully" on these
+   seven, and this suite cannot confirm that because its interpreter cannot
+   evaluate the read.  Whether the model ANSWERS here -- which is what
+   README.md's open decision was framed on -- needs a route other than
+   [exec]. *)
 From Stdlib Require Import List ZArith.
 Import ListNotations.
 Require Import VTest CoreCsrwideGen.
@@ -64,11 +74,12 @@ Lemma core_csrwide_qemu_traps_eight :
 Proof. reflexivity. Qed.
 
 (* ---------------------------------------------------------------------- *)
-(* 2. THE MODEL HAS NO TRANSITION FOR THE FIRST OF THEM.                   *)
+(* 2. [exec] CANNOT STEP THE FIRST OF THEM.                                *)
 (*                                                                         *)
 (*    Not VBudget (a trap loop eating the budget, which is what an          *)
 (*    illegal-instruction refusal would look like -- see ClintMsip.v) and   *)
-(*    not VDone.  VStuck: [exec] returned None.                             *)
+(*    not VDone.  VStuck: [exec] returned None -- see the header for what   *)
+(*    that does and does not establish.                                     *)
 (*                                                                         *)
 (*    0x80000078 is `csrr t2,0x747`, checked against                        *)
 (*    `riscv64-linux-gnu-objdump -d tools/vtest/build/core_csrwide.elf`,    *)
@@ -76,10 +87,10 @@ Proof. reflexivity. Qed.
 (*    materialising load that left a declared region.                       *)
 (* ---------------------------------------------------------------------- *)
 
-Lemma core_csrwide_model_stuck : run_status 4000 cw_start = VStuck.
+Lemma core_csrwide_exec_stuck : run_status 4000 cw_start = VStuck.
 Proof. vm_cast_no_check (eq_refl VStuck). Qed.
 
-Lemma core_csrwide_model_stuck_at : stuck_pc 4000 cw_start = 0x80000078.
+Lemma core_csrwide_exec_stuck_at : stuck_pc 4000 cw_start = 0x80000078.
 Proof. vm_cast_no_check (eq_refl 0x80000078). Qed.
 
 (* ...so the model publishes nothing at all, where QEMU published a full

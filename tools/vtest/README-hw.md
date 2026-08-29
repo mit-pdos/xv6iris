@@ -219,28 +219,24 @@ authority; they are written up here because they are what the board found.
 
 | # | what | model | the board | kind | found by |
 |---|------|-------|-----------|------|----------|
-| 27 | **the model's clock never runs** | `mtime` frozen at 0 however many instructions retire; `mcycle`/`cycle` frozen with it | both advance, on QEMU *and* on the board | **UNSOUNDNESS** | `clint_time`, `core_csrprobe` |
+| ~~27~~ | ~~the model's clock never runs~~ | **WITHDRAWN.**  The language's boundary rule is `exists tick : bool`; the model allows a moving clock and `ClintTime.v` §4 exhibits one.  `VTest.run_until` had only ever taken the non-ticking branch | | withdrawn | `clint_time` |
 | 28 | **the CLINT is not indexed by hart** | only hart 0's registers exist: `clint_load`/`clint_store` compare the offset with `eq_vec` against `MSIP_BASE` = 0 and `MTIMECMP_BASE` = 0x4000; everything else takes a load access fault | every hart has its own MSIP at `CLINT+4*hartid`, with the semantics the model gets right for hart 0 | **UNSOUNDNESS**, live in xv6 | `clint_msip` |
 | 29 | `misa` — all three machines differ | `0x…14112D` (A C D F I M S U) | board `0x…94112F` adds **B** and **X** and has no H; QEMU `0x…1411AD` adds **H** | incompleteness both ways | `core_csrprobe` |
 | 30 | the UART is a **different chip** | byte-strided 16550 in an 8-byte window (`DevModel.uart_size = 8`) | Synopsys DW-APB v3.14a, **reg-shift 2**: LSR is at `0x14` and the whole file lies outside the model's window | board difference, not a model defect | the probe |
 | 31 | CSRs the **U74 refuses** that both the model and QEMU implement | implemented | `menvcfg`, `mconfigptr`, `senvcfg` (privileged spec 1.12 additions the core predates) and `time` (SiFive leaves `rdtime` to firmware — OpenSBI emulates it) all take an illegal instruction | **model is WIDER than the board** | `core_csrprobe` |
-| 32 | **`csrr mseccfg` has NO TRANSITION in the model** | `exec` returns None → `VStuck`: it neither answers nor refuses | an ordinary illegal-instruction trap, on both machines | a THIRD outcome; same class as finding 25's `sc.w` | `core_csrwide` |
+| 32 | **`exec` cannot step `csrr mseccfg`** | `exec` returns None → `VStuck`.  A fact about the INTERPRETER: there is no `exec = None → no run` lemma, and `exec` bails on `Choose` (the Sail monad's nondeterminism) | an ordinary illegal-instruction trap, on both machines | a limit of `exec`, same class as finding 25's `sc.w` | `core_csrwide` |
 | 33 | **the machine's identity** | `mvendorid`/`marchid`/`mimpid` all 0 — an anonymous machine (QEMU too) | `0x489` (SiFive's JEDEC id), `0x7`, `0x4210427` | incompleteness | `core_csrprobe` |
 
 ### The two that matter most
 
-**Finding 27 is the largest, and it is not a device question.**
-`VTest.run_until` steps `riscv_step false` — the argument is the clock tick,
-and the harness never passes `true` — so no execution of the model has a
-moving `mtime`.  `ClintTime.v` states it with `minstret` as the control: the
-counters advance in the model exactly as on both machines, so the freeze is
-the *clock* and not "counters are unimplemented", and `mcycle` freezes with
-`mtime` rather than with `minstret`.  `core_csrprobe` reaches the same
-conclusion by a second, independent route — `mcycle` and `cycle` read 0 in
-the model while `minstret` and `instret` are nonzero.  Same shape as finding
-24 (the SC memory model): not a wrong value but a behaviour the model cannot
-have.  Unlike 24 it may be cheap — the model *has* the tick — and finding out
-which is the next thing worth doing.
+**FINDING 27 IS WITHDRAWN.**  I reported "the model's clock never runs" off
+`VTest.run_until`, which steps `riscv_step false`.  But `RiscvLang.mnode_step`'s
+instruction-boundary rule is `exists tick : bool`, so a run with a moving
+clock is one the model ALLOWS -- `ClintTime.v` §4 exhibits one, and it
+advances `mtime` and `mcycle` exactly as both machines do.  An absent witness
+was read as an absent execution, which is the suite's one-directional
+question inverted.  The board result stands (`mtime` advances on the board);
+only the conclusion about the model was wrong.
 
 **Finding 28 is the one only a board could find.**  Every QEMU test runs on
 hart 0, where `4*hartid` is 0 and the gap is invisible; it took a machine
@@ -274,15 +270,18 @@ about Svadu first.  That eight of the nine `pt_` tests nonetheless run here
 access and the U74's behaviour happens to match; it is not because the rule
 was satisfied.
 
-### Finding 32 should be settled before README's open decision
+### Finding 32, corrected
 
-README's open decision asks "which machine is the model claiming to be?" and
-leaves findings 19 and 22 unclassified until someone answers it.  Finding 22
-records the model as *"implemented, read successfully"* on its seven CSRs.
-Through this suite's interpreter that is not what happens: `csrr mseccfg`
-has no transition at all.  Whether finding 22's claim was measured some other
-way or has rotted is worth checking, because the decision was framed on the
-belief that the model answers here.
+It was first written as "the model has no transition for `csrr mseccfg`".
+`VStuck` does not establish that: `exec_run_det` runs one way only, there is
+no `exec = None -> no run` lemma anywhere, and `exec` bails on `Choose` --
+the Sail monad's nondeterminism.  **An interpreter that will not answer is
+not a model that has no execution**, which is exactly the error that
+withdrew finding 27, one level down.
+
+What stands: this suite cannot confirm finding 22's *"implemented, read
+successfully"* on those seven CSRs, so README's open decision ("which
+machine is the model claiming to be?") needs a route other than `exec`.
 
 ## The memory model, measured
 

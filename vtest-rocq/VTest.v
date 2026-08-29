@@ -179,6 +179,46 @@ Fixpoint run_until_at (pick : virtio_state -> option Z) (n : nat)
 Definition run_until (n : nat) (s : mstate) : option mstate :=
   run_until_at lowest_head n s.
 
+(* ---------------------------------------------------------------------- *)
+(* 3a. THE SAME RUN, WITH THE CLOCK TICKING.                               *)
+(*                                                                         *)
+(*     [run_until] above steps [riscv_step false], and that is a CHOICE of  *)
+(*     the harness, not a property of the model.  [RiscvLang.mnode_step]'s  *)
+(*     boundary rule is                                                    *)
+(*                                                                         *)
+(*       | Interface.Ret _ => exists tick : bool, m' = riscv_step tick /\ ... *)
+(*                                                                         *)
+(*     -- the language quantifies EXISTENTIALLY over the tick at every      *)
+(*     instruction boundary, which is the sound weakening of the model      *)
+(*     [loop]'s deterministic every-[plat_insns_per_tick] tick.  So an      *)
+(*     execution in which [mtime] and [mcycle] advance is one the model     *)
+(*     ALLOWS; the harness had simply been resolving the choice one way     *)
+(*     every time and never exhibiting the other.                          *)
+(*                                                                         *)
+(*     THAT MATTERS FOR WHAT A TEST CLAIMS.  The suite's question is        *)
+(*     one-directional -- is what the hardware did an execution the model   *)
+(*     ALLOWS? -- so a hardware run with a moving clock needs a TICKING     *)
+(*     witness, and reporting "the model cannot do this" off the            *)
+(*     non-ticking runner alone is a statement about the runner.            *)
+(*                                                                         *)
+(*     Ticking at EVERY boundary is the fastest clock the language permits  *)
+(*     and is what these witnesses use: the tick is free at each boundary,  *)
+(*     so all-ticks is as legal as no-ticks, and it is the cheapest         *)
+(*     execution to exhibit.  A test that needs a particular RATE would     *)
+(*     parameterise this the way [run_until_at] parameterises the disk.     *)
+(* ---------------------------------------------------------------------- *)
+
+Fixpoint run_until_tick (n : nat) (s : mstate) : option mstate :=
+  if flag_set s then Some s else
+  match n with
+  | 0%nat => None
+  | S n' => match exec (riscv_step true) s with
+            | Some (_, s') => run_until_tick n' (settle dev_fuel s')
+            | None => None
+            end
+  end.
+
+
 (* ...and the run in which a LATER request overtakes an earlier one: the same
    machine, the same program, a device that pops both requests (it can only
    pop in order) and then completes the higher head first.  Only
@@ -203,11 +243,26 @@ Fixpoint budget_left (n : nat) (s : mstate) : nat :=
 (* 3b. WHY a run did not finish.                                           *)
 (*                                                                         *)
 (*     [run_until] answers [None] for two very different reasons, and the   *)
-(*     difference is usually the point of the test.  A STUCK machine means  *)
-(*     the model has no transition -- an MMIO offset or access width it     *)
-(*     does not decode, a register write it refuses, an access outside the  *)
-(*     regions the test declared.  That is a FINDING when the hardware      *)
-(*     completes the same program, and a test states it positively:         *)
+(*     difference is usually the point of the test.                         *)
+(*                                                                         *)
+(*     WHAT [VStuck] DOES AND DOES NOT MEAN.  It means [exec] -- the        *)
+(*     DETERMINISTIC interpreter -- could not take a step.  It does NOT     *)
+(*     mean the model has no transition, and this file used to say it did.  *)
+(*     [RiscvExec.exec_run_det] runs one way only ([exec = Some] implies    *)
+(*     [run]); there is NO lemma anywhere in the tree of the form           *)
+(*     [exec m s = None -> no run], and there cannot be a trivial one,      *)
+(*     because [exec]'s own fallback is                                     *)
+(*                                                                         *)
+(*       | _ => fun _ => None   (* Choose / GenericFail / Discard / ... *)  *)
+(*                                                                         *)
+(*     -- it bails on [Choose], which is the Sail monad's NONDETERMINISM.   *)
+(*     So [VStuck] covers both "the model really has no step here" (an      *)
+(*     undecoded MMIO offset, an access outside the declared regions) and   *)
+(*     "the model made a choice this interpreter cannot resolve", and the   *)
+(*     harness cannot tell them apart.                                     *)
+(*                                                                         *)
+(*     A test may therefore state [VStuck] as a FACT ABOUT [exec], which is *)
+(*     what it is, and must not report it as "the model cannot":            *)
 (*                                                                         *)
 (*       Lemma foo_model_stuck : run_status N (start_dma foo_text) = VStuck.*)
 (*       Lemma foo_stuck_at : stuck_pc N (start_dma foo_text) = 0x800000ab. *)
@@ -226,6 +281,18 @@ Fixpoint run_status (n : nat) (s : mstate) : vstatus :=
   | 0%nat => VBudget
   | S n' => match exec (riscv_step false) s with
             | Some (_, s') => run_status n' (settle dev_fuel s')
+            | None => VStuck
+            end
+  end.
+
+(* ...and the same, on the TICKING branch of the boundary's [exists tick] --
+   see section 3a. *)
+Fixpoint run_status_tick (n : nat) (s : mstate) : vstatus :=
+  if flag_set s then VDone else
+  match n with
+  | 0%nat => VBudget
+  | S n' => match exec (riscv_step true) s with
+            | Some (_, s') => run_status_tick n' (settle dev_fuel s')
             | None => VStuck
             end
   end.

@@ -309,7 +309,8 @@ does not exist).
 
 ### Findings from REAL HARDWARE
 
-Seven more, from running the suite on a StarFive VisionFive 2 over JTAG.
+Seven more, from running the suite on a StarFive VisionFive 2 over JTAG --
+though one of them, 27, is withdrawn; see below.
 [`README-hw.md`](README-hw.md) is where they are written up, what a board
 run claims (it is narrower than a QEMU run), and how the rig works; this
 table stays the authority for the numbers.
@@ -320,12 +321,12 @@ hart 0, and the harness's clock never ticks.
 
 | # | what | model | the board | kind | found by |
 |---|------|-------|-----------|------|----------|
-| 27 | **the model's clock never runs** | `mtime` frozen at 0 however many instructions retire, and `mcycle` frozen with it | both advance -- on the board AND on QEMU | **UNSOUNDNESS** | `clint_time` |
+| ~~27~~ | ~~the model's clock never runs~~ | **WITHDRAWN -- IT WAS MY REASONING, NOT THE MODEL.**  `RiscvLang.mnode_step`'s instruction-boundary rule is `exists tick : bool`, so an execution with a moving clock is one the model ALLOWS; `VTest.run_until` steps `riscv_step false` and only ever exhibited one branch.  `ClintTime.v` §4 runs the other one and the model advances `mtime` and `mcycle` exactly as both machines do | | withdrawn | `clint_time` |
 | 28 | **the CLINT is not indexed by hart** | only hart 0's registers exist -- `clint_load`/`clint_store` compare the offset with `eq_vec` against `MSIP_BASE` = 0 and `MTIMECMP_BASE` = 0x4000, and every other hart's access takes a load access fault | every hart has its own MSIP at `CLINT+4*hartid`, with exactly the semantics the model gets right for hart 0 | **UNSOUNDNESS**, and live in xv6's `start()` | `clint_msip` |
 | 29 | `misa`, all three different | model `0x…14112D` (A C D F I M S U) | QEMU adds **H** (`0x…1411AD`, finding 19); the board adds **B** and **X** and has no H (`0x…94112F`) | incompleteness both ways | `core_csrprobe` |
 | 30 | the UART is a **different chip** on this board | a byte-strided 16550 in an 8-byte window (`DevModel.uart_size` = 8) | Synopsys DW-APB v3.14a, **reg-shift 2** -- LSR is at `0x14`, and the whole register file lies outside the model's window | board difference, not a model defect | the probe |
 | 31 | CSRs the **U74** refuses that the model and QEMU both implement: `menvcfg`, `mconfigptr`, `senvcfg` (privileged spec 1.12 additions the core predates) and `time` (SiFive leaves `rdtime` to firmware to emulate, which is what OpenSBI does on this board) | implemented, read successfully | implemented | illegal instruction | **model is WIDER than the board** | `core_csrprobe` |
-| 32 | **`csrr mseccfg` has NO TRANSITION in the model.**  Finding 22 records these seven CSRs as "implemented, read successfully"; under this suite's interpreter the model neither answers nor refuses -- `exec` returns None and the harness reports `VStuck`, so the run stops and the other six go unasked | `VStuck` | illegal instruction | illegal instruction | a THIRD outcome; same class of limit as finding 25's `sc.w` | `core_csrwide` |
+| 32 | **`exec` cannot step `csrr mseccfg`** -- it returns None and the harness reports `VStuck`, so the run stops and the other six go unasked.  **This is a fact about the INTERPRETER, not about the model**: `exec_run_det` runs one way only, there is no `exec = None -> no run` lemma, and `exec`'s fallback bails on `Choose` (the Sail monad's nondeterminism).  What it does establish is that this suite cannot confirm finding 22's "read successfully" | `exec` declines | illegal instruction | illegal instruction | a limit of `exec`, same class as finding 25's `sc.w` | `core_csrwide` |
 | 33 | **the machine's identity**: `mvendorid`, `marchid`, `mimpid` | `0, 0, 0` -- an anonymous machine | QEMU also `0, 0, 0`; the board answers `0x489` (SiFive's JEDEC id), `0x7`, `0x4210427` | incompleteness | `core_csrprobe` |
 
 **Finding 29 was previously attributed to `core_regs_mcsr`, and that was
@@ -348,26 +349,47 @@ program to pin `menvcfg.ADUE` explicitly before `satp` (finding 20).  On this
 board it **cannot** -- the CSR does not exist -- so any port of the `pt_` area
 to this hardware has to deal with that first.
 
-**Finding 32 should be settled before README's open decision is answered**,
-because that decision was framed on the belief that the model ANSWERS on
-these seven.  It does not, at least not through `exec`; whether finding 22's
-"read successfully" was measured some other way or has simply rotted is the
-thing to check.
+**Finding 32 is narrower than first stated, and the correction matters.**
+It was written as "the model has NO TRANSITION", which `VStuck` does not
+establish: `RiscvExec.exec_run_det` runs one way only (`exec = Some` implies
+`run`), there is no lemma anywhere of the form `exec m s = None -> no run`,
+and `exec`'s own fallback is `| _ => fun _ => None  (* Choose / GenericFail
+/ Discard / ... *)` -- so it bails on `Choose`, the Sail monad's
+**nondeterminism**.  The relation may have a transition this interpreter
+declines to pick.  This is the same error as the withdrawn finding 27, one
+level down: **an interpreter that will not answer is not a model that has no
+execution.**  What stands is that this suite cannot confirm finding 22's
+"read successfully" on these seven, and that settling README's open decision
+needs a route other than `exec`.
 
-**Finding 27 is the largest of the four and is not a device question.**
-`VTest.run_until` steps `riscv_step false` -- the argument is the CLOCK TICK
-and the harness never passes `true` -- so no execution of the model has a
-moving `mtime`.  The suite already knew the clock did not tick (it is in the
-rules above); what was missing was a measurement, and the difference between
-"we chose not to tick it" and "a hardware run has no model execution" is the
-whole point of this exercise.  `ClintTime.v` states it with `minstret` as
-the control -- the counters advance in the model exactly as on both machines,
-so the freeze is the CLOCK and not "counters are unimplemented", and
-`mcycle` freezes with `mtime` rather than with `minstret`, which is the
-clock-derived set exactly.  Same shape as finding 24: not a wrong value but
-a behaviour the model cannot have.  Unlike 24 it may be cheap -- the model
-HAS the tick and the harness declines to use it -- and finding out which is
-the next thing worth doing.
+**FINDING 27 IS WITHDRAWN, and the mistake is worth more than the finding
+was.**  I ran the default runner, saw a frozen clock, and reported a
+property of the MODEL.  But `RiscvLang.mnode_step`'s instruction-boundary
+rule is
+
+```coq
+| Interface.Ret _ => exists tick : bool, m' = riscv_step tick /\ ...
+```
+
+-- the language quantifies EXISTENTIALLY over the tick at every boundary
+(the sound weakening of the model `loop`'s deterministic every-
+`plat_insns_per_tick` tick; `plat_insns_per_tick` is 2).  An execution in
+which `mtime` and `mcycle` advance is one the model ALLOWS.  `VTest.run_until`
+steps `riscv_step false` because that is a convenient DEFAULT for tests whose
+subject is not time, not because the other branch is unavailable, and
+`VTest.run_until_tick` takes it: `ClintTime.v` §4 exhibits a run where the
+model advances the clock and reports exactly what both machines reported.
+
+**AN ABSENT WITNESS WAS READ AS AN ABSENT EXECUTION**, in a suite whose
+entire question is whether the model ALLOWS what the hardware did.  That is
+the one-directional framing inverted, and it is available anywhere else the
+language quantifies existentially and a runner resolves the choice: before
+reporting "the model cannot", check whether the harness ever ASKED it to.
+
+What survives is a fact about the default and not about the model: every
+other test here is exhibited on the non-ticking branch, so none of them
+observes elapsed time.  A test that wants to reason about elapsed time asks
+for `run_until_tick`, as `clint_time` now does.
 
 **Finding 28 is the one only a board could find.**  `ClintMsip.v` carries
 both halves, and either alone would be misread: on QEMU's hart 0 the model's

@@ -130,15 +130,25 @@ against all 56 checked-in `<name>_text` captures.
 structurally could not have found**, because every QEMU test runs on hart 0
 and the harness's clock never ticks:
 
-- **Finding 27: the model's clock never runs.**  `mtime` is frozen at 0
-  however many instructions retire, and `mcycle` with it; both machines
-  advance.  `ClintTime.v` states it with `minstret` as the CONTROL — the
-  counters advance in the model exactly as on both machines, so the freeze
-  is the clock and not "counters are unimplemented".  Same shape as finding
-  24 (SC memory): not a wrong value but a behaviour the model cannot have.
-  Unlike 24 it may be cheap — `VTest.run_until` steps `riscv_step false` and
-  the model HAS the tick — and **finding out which is the next thing worth
-  doing in this project**.
+- **Finding 27 is WITHDRAWN, and the mistake is the durable lesson.**  I
+  reported "the model's clock never runs" off `VTest.run_until`, which steps
+  `riscv_step false`.  But `RiscvLang.mnode_step`'s instruction-boundary rule
+  is `exists tick : bool` — the language quantifies EXISTENTIALLY over the
+  tick at every boundary, the sound weakening of the model `loop`'s
+  deterministic every-`plat_insns_per_tick` tick (which is 2).  So a run with
+  a moving clock is one the model ALLOWS.  `VTest.run_until_tick` takes the
+  other branch and `ClintTime.v` §4 exhibits it: the model advances `mtime`
+  and `mcycle` and reports exactly what both machines reported.
+
+  **AN ABSENT WITNESS WAS READ AS AN ABSENT EXECUTION**, in a suite whose
+  entire question is whether the model ALLOWS what the hardware did.  The
+  failure mode generalises: anywhere the language quantifies existentially
+  and a runner resolves the choice, "the model cannot" must be checked
+  against whether the harness ever ASKED.  It is NOT a harness limitation
+  either — a test that wants elapsed time simply asks for the ticking
+  runner; the capability was always there and nothing had needed it.
+  `run_until` steps `riscv_step false` as a convenient DEFAULT for tests
+  whose subject is not time.
 - **Finding 28: the CLINT is not indexed by hart.**  `clint_load` /
   `clint_store` in `rv64d.v` compare the offset with `eq_vec` against
   `MSIP_BASE` = 0 and `MTIMECMP_BASE` = 0x4000 — single addresses, not

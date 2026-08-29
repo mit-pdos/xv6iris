@@ -475,6 +475,37 @@ the record's own encoding and the goal no longer mentions `dinode_bytes d`
 at all (seen in `FsDurImg.diblk_bytes_split`). Apply such lemmas at
 spelled-out arguments (`rewrite (length_app l1 l2)`), never bare.
 
+## AN ABSENT WITNESS IS NOT AN ABSENT EXECUTION
+
+Anywhere the language quantifies EXISTENTIALLY and a runner resolves the
+choice, "the model cannot do X" needs checking against "did anything ever
+ASK it to".  Two findings were recorded off exactly that mistake in the
+device-conformance suite, both retracted (see
+`claude-notes/projects/device-conformance.md`):
+
+- **`RiscvLang.mnode_step`'s instruction boundary is `exists tick : bool`.**
+  `vtest-rocq/VTest.v`'s `run_until` steps `riscv_step false`, so every test
+  in that suite is exhibited on the NON-ticking branch and no test observes
+  elapsed time.  That is a default, not a limit -- `run_until_tick` takes
+  the other branch -- but a frozen `mtime` was written up as "the model's
+  clock never runs", classified as an unsoundness, and it was neither.
+- **`RiscvExec.exec` returns `None` on `Choose`**, the Sail monad's
+  nondeterminism (its fallback clause is
+  `| _ => fun _ => None  (* Choose / GenericFail / Discard / ... *)`).
+  `exec_run_det` runs ONE WAY only -- `exec = Some` implies `run` -- and
+  **there is no lemma anywhere in the tree of the form
+  `exec m s = None -> no run`.**  So `exec` declining to step proves nothing
+  about the relation, and a `VStuck` result conflates "no step exists" with
+  "a choice this interpreter will not make".
+
+THE RULE: a claim that the model CANNOT do something has to come from the
+model's DEFINITIONS, or from a positive wrong transition it does take --
+never from a runner's silence.  The soundly-argued findings in that suite all
+do the former (`ConcSb.v` states the one-`gmem` property off `VConc`;
+`DiskChain.v` states `model_refuses_longer_chains` off `VirtioModel`;
+`ClintMsip.v` reads `clint_load`'s decode and then pins a positive load
+access fault), and that is what distinguishes them.
+
 ## INCONSISTENT PREMISES ARE THE WORST DEFECT, AND NOTHING IN THE BUILD SEES THEM
 
 A hedged conjunct makes a postcondition say nothing. **Contradictory
