@@ -1475,3 +1475,11 @@ ProofConsolewriteLoc.v
 LinkConsolewriteLoc.v
 SpecFilewriteCons.v
 ProofSysWriteConsAU.v
+
+# The era-0 SHELL pins: FsInitPin's /init pair (path pin, content pin,
+# arun walk) and FsInitPinBoot's boot transport, replayed at inum 13 with
+# ElfUser.sh_elf's bytes -- the inputs the pinned-exec statement lane
+# parameterises over for /init's exec("/sh").  A THIRD LEAF over the same
+# cone: it reuses both files' generic layers and restates nothing (R10),
+# so only its own two dinode vm_eq's compute.
+FsShPin.v
