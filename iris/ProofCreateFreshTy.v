@@ -235,7 +235,7 @@ Definition create_fresh_ty_body
   procs_inv γs -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
   sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   proc_priv_bare pj pidv Upr -∗

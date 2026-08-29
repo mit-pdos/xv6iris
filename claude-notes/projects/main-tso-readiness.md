@@ -1032,3 +1032,54 @@ indexed.  Un-deferring needs the caps channel or the M-leg's
 | `cpu_ctx_free`'s parked record + receipt | bare `∃ vs ξ`; `ctx_dom_sc` |
 | `caps_fam`/`caps_morph`; `KptShare.kpt_creds`; `TsoCtxAbsorbLb` | absent |
 | the M-leg's own M2 debt (five `hart_view_lb_any` sites, `ctx_dom_sc` at `lock_pay_intro`/create/destroy) | as on the M-leg |
+
+
+# AMENDMENT 8 (2026-08-29) — SLICE 5 LANDED: the T-leg's post-r37 lock vocabulary, above the seal
+
+Executes Amendment 7 (`main-tso-readiness-A7.md` on `tso`, the lock-lane
+coordinator's review of the port through Amendment 6): every statement the
+T-leg added or changed after r37 that lives ABOVE the seal, copied from
+`tso-flip@2f220f707` with the trivial SC bodies main's seal principle
+prescribes.  Gate, on `origin/main` `5965ff394`: full `-k` build `MAKEEXIT=0` (the
+whole tree recompiled -- `TsoCtx`, `WpLock` and ~230 payload sites moved),
+`audit-only` = the sanctioned 13, `kernel-rocq/`/`user-rocq/` unchanged,
+zero `Admitted`/`Axiom` in `iris/`.  Landed as ONE commit on `main`; the
+per-step build rounds (s5a-s5h on the lock cone, s6/s7 on the tree) are
+squashed.
+
+## 8.1 What landed, per A7 item
+
+| A7 | what | on main |
+|---|---|---|
+| 5.1 FIX | `lk_floor`'s right arm is the context's dirty-write witness | `TsoCtx.ctx_wrote ξ t a` (sealed, body `True`, persistent/timeless); `lk_floor ξ lo := ctx_floor ξ lo ∨ ∃ a, ctx_wrote ξ lo a`; `lk_floor_of_wrote`, `lk_floor_morph` (via `ctx_floor_dom` + new `TsoCtx.ctx_dom_wrote_floor`), `lk_floor_vis` and `TsoCtx.own_context_wrote_vis` stated with `TsoCtx.ctx_vis ξ K t := ⌜t ≤ K⌝ ∨ ∃ a, ctx_wrote ξ t a` — main's above-seal spelling of the T-leg's `ledger_vis` (A7's "receipt pair or authorship" concession). `lk_floor_of_log` and `TsoCtxShim.log_lb_any` are GONE; the creators floor at 0 (`lk_floor_0`, honest) — `lk_cpu_ready_at_intro`, `PipeInv`. `TsoCtx.log_lb` itself stays as the sealed name of `llb loglen_name`, because `ctx_parked_llb` (A7 5.5) is stated with it. |
+| 5.2 FIX | the SC re-indexers go | `WpLock.is_lock_reindex` deleted (the floor no longer comes from a receipt); `WpLock.is_lock_morph` (floor by `lk_floor_morph`) is the law the console rows ride: `ConsoleInv.console_inv_morph` = `is_lock_morph` + `devsw_table_morph`, no payload law once the payload is the closed `cons_res_at` (5.6). DEVIATION: `lock_inv_reindex` STAYS as the body half of `is_lock_morph` — on main the lock's two words are still context cells at the ambient context (pre-M4), so a handle's invariant body re-indexes through the shim's cell laws; the T-leg's ledger words (A6.89) are what make its handle move by the floor alone. Dies with the M4 flip. |
+| 5.3 FIX | `locked`/`locked_pre` carry the holder's floor | `Xv6Cameras.lockUR := prodUR (excl_authUR lock_state) (excl_authUR nat)`; `lock_auth_at`/`lock_frag_at` expose the position, `lock_auth`/`lock_frag` hide it (arities unchanged); `lock_pos_agree`; `locked γ i := ∃ B, lock_frag_at γ (Some (i,true)) B ∗ ctx_floor cur_ctx B`, `locked_pre` likewise; `locked_state_at`/`locked_pre_state_at`; the four transitions take/return the position (`lock_take γ i B` needs the floor at `B`); `lock_inv` binds `B` and holds `lock_auth_at γ st B`. Every opener in `WpSconfLock` destructs `(w st B)`; the two cpu-word exchanges and the two leaf premises (`Hupd`, `Hview`) are stated at `lock_auth_at`. |
+| 5.4 FIX | `lock_finisher` is two-part | `lock_finisher_body … Pay` (the leaf's; takes `lk_floor cur_ctx lo` and `Pay`), `lock_finisher := ∃ Pay, (own_context cur_ctx -∗ R cur_ctx ==∗ own_context cur_ctx ∗ Pay) ∗ body`; `lock_finisher_close` (prelude = the honest `lock_pay_intro` deposit), `lock_finisher_destroy` (Out = `lk ↦₄ 0 ∗ lk_cpu_ready lk ∗ Out`). `ProofRelease` runs the prelude at entry against the borrowed token (its inline deposit is gone); `wp_sw_zero_lockfin_s_sconf` takes `Pay` and the body; `SpecRelease`'s cancel post and `PipeInv.pipe_bytes_page_own` take the bundled owner cell. |
+| 5.5 LAND | the acquire-side laws | `TsoCtxAbsorbLb.v` (`hart_view_lb_max`, `ctx_dom_of_parked_lb`, `ctx_absorb_lb` — statements verbatim, `view_lb_max` omitted as below-seal); `TsoCtx.ctx_parked_llb`; `WpLock.lock_pay_won`; the AMO leaf posts `lock_pay_won` (winner arm: position := the record's stamp, floor from `TsoCtxShim.ctx_floor_any`, new shim lemma standing in for `hart_view_lb_get` + `ctx_bound_raise` at this AMO); `ProofAcquire` absorbs by `own_context_floor_view` + `ctx_absorb_lb` — its `hart_view_lb_any` is gone. `hart_view_lb_get` itself is NOT stated: its statement names `gstate`/`tso_interp_at` (below the seal); the shim's `ctx_floor_any` is its stand-in and is annotated so. |
+| 5.6 LAND | the λ-payload twins and the tactic | `CtxMorphTac.v` (`ctx_morph_leaf`/`ctx_morph_solve` over main's instance names; the T-leg's A6.125 half-cell syntactic branch is empty here — main has no such leaf); `TicksInv.ticks_res_at` (+ `_morph`, `ticks_res := ticks_res_at cur_ctx`), `ConsoleInv.cons_res_at := cons_res (XI := ξ)` (+ `_cur`, `_morph`), `DiskInv.disk_res_at := λ ξ, disk_res (XI := ξ) …` with `desc_entry_own_morph`/`ops_own_morph`/`free_slot_res_morph` over MAIN's bodies; every `<{ ticks_res }>`/`<{ cons_res }>`/`<{ disk_res … }>` site (13 + 10 + 197) became the `_at` twin. |
+| 5.7 | bookkeeping | `TsoCtxShim` now exports `ctx_wrote_any` (creators' witness; cutover producer: `ctx_wrote_register` at the creator's store leaf) and `ctx_floor_any` (the AMO winner's floor; cutover producer: `hart_view_lb_get` + `ctx_bound_raise`), and no longer `log_lb_any`. The remaining live `hart_view_lb_any` sites are FOUR: `ProofBread` (escrow checkout), `ProofBrelse` (escrow park), `ProofMainSecondary` (the started absorb), `ProofSwtch` (resume) — each is the AMO's `hart_view_lb_get` at cutover; `ProofAcquire`'s is gone and its shim import with it. Live `ctx_dom_sc`: `WpLock.lock_pay_intro_sc` (the creators), `SchedCtx`, `SpecAcquire`, `ProofScheduler`, `ProofSwtch`, `ProofMainSecondary`. The seal audit: 15 files import `TsoCtxShim`; no `proj2_sig …_aux` outside `TsoCtx.v`. |
+
+## 8.2 Deviations from A7, all recorded
+
+- `own_context_w` / `own_context_expose_w` / `own_context_w_fold` /
+  `ctx_wrote_register` are NOT stated: their T-leg statements mention
+  `llb`, `ledger_msg_at`, `pwmsg`/`pm_tid` and `hart_agent` (below the
+  seal). A7 5.1's own reading ("on main the registration is a ghost step
+  with a trivial body") is realised as `TsoCtxShim.ctx_wrote_any`.
+- `TsoCtx.log_lb` is kept (A7 said delete): `ctx_parked_llb` (A7 5.5)
+  needs a name for `llb loglen_name`. Its only producer is now the record
+  itself; nothing consumes it.
+- `lock_pay_intro` is the T-leg's honest statement (takes and returns the
+  running token); main's SC mint is renamed `lock_pay_intro_sc` and is what
+  the creators (`WpLock` newlock family, `WpLockAt.newlock_at`) still call —
+  the creator cascade stays deferred (Amendment 5.2).
+- The AMO winner's position is the record's stamp `T` (the T-leg's is the
+  AMO's own log position `S (length log)`, unavailable without a log); the
+  statements agree, only the SC choice of witness differs.
+
+## 8.3 Deferred / open (unchanged from A7's "deliberately not in this slice")
+
+A6.124/A6.125 payload shapes (`avail_half`, `hcell_map`, `keep_map`) and
+A6.126's release arm: below the seal or still moving on the T-leg. §0.27′
+(the forked child's own context), §0.39′, the U tier (§0.37′): the stubs
+of Amendment 6.3 stay.

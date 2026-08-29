@@ -1528,7 +1528,7 @@ Section IputFreePath.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     bslots 2 -∗
     log_epoch_lb icfg_log v -∗
@@ -2438,7 +2438,7 @@ Section IputFreePath.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
     bslots 3 -∗
     (* THE GROUP CREDIT (fs-log.md §G.18's chain, §G.21's tier; [SpecIput]'s
        [wp_iput_gen_body] premise verbatim).  At [crz = false] this is [emp]
@@ -3967,7 +3967,7 @@ Section IputFreePath.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
     bslots 3 -∗
     log_epoch_lb icfg_log v -∗
     log_credit icfg_log cru Sb e0 (IBLOCK inum icfg_ist) -∗

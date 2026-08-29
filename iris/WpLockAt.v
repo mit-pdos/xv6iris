@@ -51,11 +51,13 @@ Section LockAt.
 
   Lemma lock_ghost_alloc : ⊢ |==> ∃ γ : gname, lock_free_tok γ.
   Proof.
-    iMod (own_alloc ((●E (None : leibnizO lock_state) ⋅ ◯E (None : leibnizO lock_state))
-                     : lockUR)) as (γ) "H"; [ apply excl_auth_valid | ].
+    iMod (own_alloc (((●E (None : leibnizO lock_state), ●E (0%nat : leibnizO nat))
+                      ⋅ (◯E (None : leibnizO lock_state), ◯E (0%nat : leibnizO nat)))
+                     : lockUR)) as (γ) "H"; [ split; apply excl_auth_valid | ].
     iDestruct (own_op with "H") as "[Ha Hf]".
     iModIntro. iExists γ.
-    rewrite /lock_free_tok /lock_auth /lock_frag. iFrame "Ha Hf".
+    rewrite /lock_free_tok /lock_auth /lock_frag.
+    iSplitL "Ha"; by iExists 0%nat.
   Qed.
 
   (* [WpLock.newlock] with its [own_alloc] taken out: a free physical lock
@@ -83,10 +85,11 @@ Section LockAt.
     iIntros "[Ha Hf] #Hnm Hword Hready HR".
     rewrite /WpLock.lk_cpu_ready /WpLock.lk_cpu_ready_at.
     iDestruct "Hready" as (lo) "[Hcpu #Hfl]".
-    iMod (lock_pay_intro R with "HR") as "HR".
+    iMod (lock_pay_intro_sc R with "HR") as "HR".
+    iDestruct "Ha" as (B) "Ha".
     iMod (inv_alloc lockN E (lock_inv γ lk s R lo)
             with "[Hword Hcpu Ha Hf HR]") as "#Hinv".
-    { iApply bi.later_intro. iExists (mword_of_int 0 : mword 32), None.
+    { iApply bi.later_intro. iExists (mword_of_int 0 : mword 32), None, B.
       rewrite /lock_word lk_cpu_res_free. iFrame "Hword Hcpu Ha".
       iLeft. iFrame "Hf HR". done. }
     iModIntro. iApply (is_lock_intro with "Hnm Hinv Hfl").

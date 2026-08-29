@@ -765,7 +765,7 @@ Section IlockLoad.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
     il_frame m -∗
     proc_priv_bare (proc_addr j) pidv Upr -∗
     i_dev ip ↦₄{DfracOwn (1/2)} icfg_dev -∗

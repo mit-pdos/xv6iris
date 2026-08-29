@@ -576,7 +576,7 @@ Section ProofMain.
       iSplitR; [iExact "Hdoff" |].
       iSplitR; [iExact "Hdev" |].
       iSplitR; [iExists γtx; iExact "Htxl" | iExact "Hsub0"]. }
-    iMod (newlock ⊤ a_cons "cons"%string <{ cons_res }>
+    iMod (newlock ⊤ a_cons "cons"%string cons_res_at
             with "Hclnm Hclw [Hclcpu] Hring") as (γcl) "#Hconslk".
     { iApply (lk_cpu_ready_intro with "Hclcpu"). }
     iAssert (console_caps γd) as "#Hccaps".
@@ -1155,7 +1155,7 @@ Section ProofMain.
        with [fupd_wp] first (ProofIupdate.v records the same). *)
     iApply fupd_wp.
     iMod (newlock ⊤ (mword_of_int KernelSyms.tickslock : mword 64) "time"%string
-            <{ ticks_res }> with "Htn2 Htw2 [Htc2] [Hticks]") as (γtl) "#Htl".
+            ticks_res_at with "Htn2 Htw2 [Htc2] [Hticks]") as (γtl) "#Htl".
     { iApply (lk_cpu_ready_intro with "Htc2"). }
     { iApply (ticks_res_intro t0 with "Hticks"). }
     iModIntro.
@@ -1411,7 +1411,7 @@ Section ProofMain.
         pc_is (mword_of_int (KernelSyms.main + 0xa2) : mword 64) -∗
         cpu_ctx_free -∗
         cpu_own 0 false p0 false ∅ -∗
-        is_lock γk d_lock "virtio_disk"%string <{ disk_res γv pd pav pu }> -∗
+        is_lock γk d_lock "virtio_disk"%string (disk_res_at γv pd pav pu) -∗
         disk_geom γv pd pav pu -∗
         (* ...AND THE OPEN-FILE TABLE'S LOCK, which is fileinit's output plus
            the resource the carve now hands over.  The two gnames are this
@@ -1691,7 +1691,7 @@ Section ProofMain.
        token [Hdllk] is kit 1's row; everything else is what the old
        [newlock] took, in the same order. *)
     iMod (newlock_at ⊤ fsc_dlock d_lock "virtio_disk"%string
-            <{ disk_res γv pd pav pu }>
+            (disk_res_at γv pd pav pu)
             with "Hdllk Hdlnm Hdlkw [Hdcpu] HRdisk") as "#Hdlock".
     { iApply (lk_cpu_ready_intro with "Hdcpu"). }
     iModIntro.
@@ -1778,7 +1778,7 @@ Section ProofMain.
     iAssert (∃ pd' pav' pu' : mword 64,
                disk_geom fsc_disk pd' pav' pu' ∗
                is_lock fsc_dlock d_lock "virtio_disk"%string
-                       <{ disk_res fsc_disk pd' pav' pu' }>)%I as "#Hdpair".
+                       (disk_res_at fsc_disk pd' pav' pu'))%I as "#Hdpair".
     { rewrite Hdiskq. iExists pd, pav, pu. iFrame "Hgeom Hdlock". }
     (* THE DEVICE COMPLEMENT the park wants, at the ambient names: every
        member is in hand here and none is assumed. *)
@@ -1870,7 +1870,7 @@ Section ProofMain.
          printk_env γpr' γd γv -∗
          procs_inv γs' -∗
          console_caps γd -∗
-         is_lock γk' d_lock "virtio_disk"%string <{ disk_res γv pd' pav' pu' }> -∗
+         is_lock γk' d_lock "virtio_disk"%string (disk_res_at γv pd' pav' pu') -∗
          disk_geom (XI := xid) γv pd' pav' pu' -∗
          kpt_inv root' -∗
          ctx_word_pointsto xid
@@ -1882,7 +1882,7 @@ Section ProofMain.
     printk_env γpr γd γv -∗
     procs_inv γs -∗
     console_caps γd -∗
-    is_lock γk d_lock "virtio_disk"%string <{ disk_res γv pd pav pu }> -∗
+    is_lock γk d_lock "virtio_disk"%string (disk_res_at γv pd pav pu) -∗
     disk_geom γv pd pav pu -∗
     kpt_inv root -∗
     (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□

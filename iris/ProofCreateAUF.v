@@ -2586,7 +2586,7 @@ Section ProofCreateMain.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
     bslots 3 -∗
     iref_slots ns -∗
     log_opS icfg_log u Sb -∗
@@ -4946,7 +4946,7 @@ Section ProofCreateMain.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
     (* ---- ARM FAIL's NON-DIRECTORY ENTRY, PARKED.  The T_DIR sub-branch's
        premise is GONE: at [ty = T_FILE] the +0xca [beq] is never taken. ---- *)
     (∀ (kd : nat) (qd : Qp) (gd γil γisl : gname) (dind : mword 32)
@@ -6637,7 +6637,7 @@ Section ProofCreateMain.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
     wp_next (CID0 := CID) true (proc_addr j) (fun CIDf : CpuId =>
       cr_fail_body γs j γl pd pav pu γf
 

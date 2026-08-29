@@ -528,7 +528,7 @@ Section SpecMain.
          printk_env γpr γd γv -∗
          procs_inv γs -∗
          console_caps γd -∗
-         is_lock γk d_lock "virtio_disk"%string <{ disk_res γv pd pav pu }> -∗
+         is_lock γk d_lock "virtio_disk"%string (disk_res_at γv pd pav pu) -∗
          disk_geom (XI := xid) γv pd pav pu -∗
          kpt_inv root -∗
          ctx_word_pointsto xid

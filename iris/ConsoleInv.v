@@ -81,7 +81,6 @@ Require Import RiscvModelBytes.
 Require Import RiscvPtsto RiscvExtras.
 Require Import WpLock.
 Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
-Require Import TsoCtxShim.   (* [ctx_dom_sc], for the const-payload lock row's reindex *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -244,6 +243,12 @@ Section ConsoleCtx.
     iFrame.
   Qed.
 
+  (* A6.121 (tso-flip ConsoleInv.v:224): the payload over an EXPLICIT
+     context -- [cons_res] at [ξ], what the lock surface takes as its
+     [CtxId → iProp]; every consumer keeps reading and writing [cons_res]. *)
+  Definition cons_res_at (ξ : CtxId) : iProp Σ := cons_res (XI := ξ).
+  Lemma cons_res_at_cur : cons_res_at cur_ctx = cons_res.
+  Proof. reflexivity. Qed.
   Global Instance cons_res_morph : CtxMorph (λ ξ0 : CtxId, cons_res (XI := ξ0)).
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /cons_res.
@@ -255,13 +260,15 @@ Section ConsoleCtx.
     iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd He") as "[Hd He]".
     iFrame "Hd". iExists r, w, e, bs. iFrame.
   Qed.
+  Global Instance cons_res_at_morph : CtxMorph cons_res_at.
+  Proof. rewrite /cons_res_at. apply cons_res_morph. Qed.
 
   (* THE WHOLE CREDENTIAL.  Persistent, singleton, and taken by value: a
      caller of consoleread passes this and nothing else about the console.
      The payload is spelled as a λ that NAMES its context (recipe rule 1):
      the ring re-indexes to whichever context holds the lock. *)
   Definition is_conslock (γ : gname) : iProp Σ :=
-    is_lock γ a_cons "cons"%string <{ cons_res }>.
+    is_lock γ a_cons "cons"%string cons_res_at.
 
   Global Instance is_conslock_persistent γ : Persistent (is_conslock γ).
   Proof. apply _. Qed.
@@ -596,27 +603,17 @@ Section ConsoleMorph.
 
   (* [console_inv] / [console_ready] at another context (tso-port M2: a
      forkret park carries [console_ready] in [UsertrapRes.park_globals]).
-     The cons lock's const payload [<{ cons_res }>] is pinned at the context
-     the row is stated at, so restating the row reindexes the payload too:
-     [is_lock_reindex] for the lock's floor, [is_lock_pay_iff] for the
-     payload, whose two directions are [cons_res_morph] along the SC shim's
-     [TsoCtxShim.ctx_dom_sc].  Dies with the shim. *)
+     The cons lock's payload is the closed [cons_res_at], so the handle
+     moves by [WpLock.is_lock_morph] alone (its floor's transport). *)
   Global Instance console_inv_morph (γ : gname) :
     CtxMorph (λ ξ0 : CtxId, console_inv (XI := ξ0) γ).
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /console_inv /is_conslock.
     iDestruct "H" as "[#Hlk Ht]".
     iDestruct (devsw_table_morph ξ ξ' with "Hd Ht") as "[Hd Ht]".
-    iFrame "Hd Ht".
-    iDestruct (is_lock_reindex ξ ξ' with "Hlk") as "Hlk'".
-    iApply (is_lock_pay_iff with "[] Hlk'").
-    iIntros "!>" (xi). rewrite /const_pay. iSplit.
-    - iIntros "HR".
-      iDestruct (cons_res_morph ξ ξ' with "[] HR") as "[_ $]".
-      iApply TsoCtxShim.ctx_dom_sc.
-    - iIntros "HR".
-      iDestruct (cons_res_morph ξ' ξ with "[] HR") as "[_ $]".
-      iApply TsoCtxShim.ctx_dom_sc.
+    iDestruct (is_lock_morph γ a_cons "cons"%string cons_res_at ξ ξ' with "Hd Hlk")
+      as "[Hd #Hlk']".
+    iFrame "Hd Ht Hlk'".
   Qed.
 
   Global Instance console_ready_morph :

@@ -1542,7 +1542,7 @@ Section ProofFilewrite.
     dev_inv (fsc_uart) (fsc_disk) -∗
     DiskInv.disk_geom (fsc_disk) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn) -∗
     is_lock (fsc_dlock) DiskAddrs.d_lock "virtio_disk"%string
-      <{ DiskInv.disk_res (fsc_disk) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn) }> -∗
+      (DiskInv.disk_res_at (fsc_disk) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)) -∗
     (* THE BITMAP'S INVARIANT -- persistent, so it rides with the rest of
        the persistent half rather than being loop-carried. *)
     BitmapInv.bitmap_inv fsc_fs (fsc_bmapstart) fsc_cov

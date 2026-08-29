@@ -355,7 +355,7 @@ Definition wp_ilock_dep_sconf_body
   (* the disk fabric *)
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
   (* ONE slot unit: bread's reference, which brelse gives back *)
   bslot -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function PARKS (its
@@ -572,7 +572,7 @@ Definition wp_ilock_tx_sconf_body
   (* the disk fabric *)
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
   (* ONE slot unit: bread's reference, which brelse gives back *)
   bslot -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function PARKS (its

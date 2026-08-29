@@ -998,7 +998,7 @@ Section IreclaimOrphan.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
     irc_frame m -∗
     proc_priv_bare (proc_addr j) pidv Upr -∗
     sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
@@ -2311,7 +2311,7 @@ Section IreclaimScan.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
     ∀ fuel : nat,
       irc_loop
                pidv dq dqb dqs dqn j m K eb b lks Upr fuel.

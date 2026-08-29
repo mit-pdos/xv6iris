@@ -53,6 +53,8 @@ Ktier.v
 RiscvPtsto.v
 TsoCtx.v
 TsoCtxShim.v
+TsoCtxAbsorbLb.v
+CtxMorphTac.v
 CtxRecord.v
 PermInv.v
 PageGeom.v

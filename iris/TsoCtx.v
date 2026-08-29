@@ -270,6 +270,42 @@ Section ctx.
   Lemma log_lb_le lo lo' : (lo' <= lo)%nat -> log_lb lo -∗ log_lb lo'.
   Proof. intros. rewrite !log_lb_unseal /log_lb_def. auto. Qed.
 
+  (* A6.120 (tso-flip TsoCtx.v:2889): THE CONTEXT'S OWN DIRTY-WRITE WITNESS --
+     "context [ξ] wrote address [a] at position [t]".  Persistent; on the
+     T-leg it is the discarded element of the token's dirty map, and it is
+     the right arm of [WpLock.lk_floor] ("you received this handle, or you
+     wrote this lock").  Sealed with the trivial SC body, like the rest of
+     this block; the registration step that mints it at a store
+     ([ctx_wrote_register], off the store leaf's ledger message) is below
+     the seal and has no statement here -- main's creators mint the witness
+     through the shim ([TsoCtxShim.ctx_wrote_any]). *)
+  Definition ctx_wrote_def (ξ : CtxId) (t : nat) (a : Arch.pa) : iProp Σ := True%I.
+  Lemma ctx_wrote_aux : { f | f = ctx_wrote_def }.
+  Proof. by eexists. Qed.
+  Definition ctx_wrote (ξ : CtxId) (t : nat) (a : Arch.pa) : iProp Σ :=
+    proj1_sig ctx_wrote_aux ξ t a.
+  Lemma ctx_wrote_unseal (ξ : CtxId) (t : nat) (a : Arch.pa) :
+    ctx_wrote ξ t a = ctx_wrote_def ξ t a.
+  Proof. unfold ctx_wrote. by rewrite (proj2_sig ctx_wrote_aux). Qed.
+  Global Instance ctx_wrote_persistent ξ t a : Persistent (ctx_wrote ξ t a).
+  Proof. rewrite ctx_wrote_unseal /ctx_wrote_def. apply _. Qed.
+  Global Instance ctx_wrote_timeless ξ t a : Timeless (ctx_wrote ξ t a).
+  Proof. rewrite ctx_wrote_unseal /ctx_wrote_def. apply _. Qed.
+
+  (* THE READ LICENCE AT ONE TIMESTAMP, main's above-seal spelling of the
+     T-leg's [ledger_vis h K t] ("[t] is visible to [h] at every view at or
+     above [K]: under the bound, or [h] wrote it"): the authorship arm is the
+     witness itself.  What [own_context_wrote_vis] / [WpLock.lk_floor_vis]
+     hand a racy read. *)
+  Definition ctx_vis (ξ : CtxId) (K t : nat) : iProp Σ :=
+    (⌜(t ≤ K)%nat⌝ ∨ ∃ a : Arch.pa, ctx_wrote ξ t a)%I.
+  Global Instance ctx_vis_persistent ξ K t : Persistent (ctx_vis ξ K t).
+  Proof. rewrite /ctx_vis. apply _. Qed.
+  Lemma ctx_vis_below ξ K t : (t ≤ K)%nat -> ⊢ ctx_vis ξ K t.
+  Proof. iIntros (Hle). iLeft. by iPureIntro. Qed.
+  Lemma ctx_vis_own ξ K t (a : Arch.pa) : ctx_wrote ξ t a -∗ ctx_vis ξ K t.
+  Proof. iIntros "#Hw". iRight. by iExists a. Qed.
+
   (* ------------------------------------------------------------------ *)
   (* BUY -- §0.35'(iii)'s absorb, "B_xi rises to K".                     *)
   (*                                                                    *)
@@ -317,6 +353,18 @@ Section ctx.
   Proof.
     iIntros "Hrun #Hfl". iFrame "Hrun". iExists lo.
     rewrite hart_view_lb_unseal /hart_view_lb_def. auto.
+  Qed.
+
+  (* THE CASH-IN OF THE WITNESS against the running token (tso-flip
+     TsoCtx.v:2960): the two-armed floor premise a racy read wants, on the
+     creator's arm.  SC: the receipt is at 0 and the arm is the witness. *)
+  Lemma own_context_wrote_vis `{CID : CpuId} (ξ : CtxId) (t : nat) (a : Arch.pa) :
+    own_context ξ -∗ ctx_wrote ξ t a -∗
+    own_context ξ ∗ ∃ K : nat, hart_view_lb K ∗ ctx_vis ξ K t.
+  Proof.
+    iIntros "Hrun #Hw". iFrame "Hrun". iExists 0%nat.
+    iSplit; [ rewrite hart_view_lb_unseal /hart_view_lb_def; auto | ].
+    iApply (ctx_vis_own with "Hw").
   Qed.
 
   (* The M-leg's three exclusivity lemmas ([own_context_excl] /
@@ -392,6 +440,11 @@ Section ctx.
     iMod (ctx_resume ξ2 T K HTK with "HK Hpk") as "Hrun".
     iModIntro. iFrame "Hrun". iExists T1. iExact "Hpk1".
   Qed.
+
+  (* a parked record's stamp is a legal log position (tso-flip TsoCtx.v:1677) *)
+  Lemma ctx_parked_llb ξ T :
+    ctx_parked ξ T -∗ ctx_parked ξ T ∗ log_lb T.
+  Proof. iIntros "$". rewrite log_lb_unseal /log_lb_def. done. Qed.
 
   (* ---------------------------------------------------------------- *)
   (* The context-indexed points-to                                     *)
@@ -1024,6 +1077,16 @@ Section ctx.
   Proof.
     rewrite !ctx_floor_unseal /ctx_floor_def.
     iIntros "Hd _". by iFrame "Hd".
+  Qed.
+
+  (* THE TRANSPORT OF THE WITNESS (tso-flip TsoCtx.v:2989): a crossing turns
+     the creator's arm into the receiver's LEFT arm for free -- [ctx_dom]
+     already says the sender's dirty watermark is below the receiver's
+     bound.  What makes [WpLock.lk_floor] a [CtxMorph]. *)
+  Lemma ctx_dom_wrote_floor (ξ ξ' : CtxId) (t : nat) (a : Arch.pa) :
+    ctx_dom ξ ξ' -∗ ctx_wrote ξ t a -∗ ctx_dom ξ ξ' ∗ ctx_floor ξ' t.
+  Proof.
+    iIntros "$ _". rewrite ctx_floor_unseal /ctx_floor_def. done.
   Qed.
 
   (* A context-indexed payload that transports along domination.  This is

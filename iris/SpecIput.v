@@ -245,7 +245,7 @@ Definition wp_iput_sconf_body
   (* the disk fabric *)
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
   (* three buffer slots: itrunc's indirect arm is what forces three *)
   bslots 3 -∗
   (* this operation's reservation *)
@@ -417,7 +417,7 @@ Definition wp_iput_gen_body
   procs_inv gs -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
   bslots 3 -∗
   (* THE GROUP CREDIT (fs-log.md §G.18's chain, §G.21's tier).  At
      [crz = false] this is [emp] and every landed caller passes nothing.

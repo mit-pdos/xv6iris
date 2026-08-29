@@ -475,7 +475,7 @@ Section SpecFileread.
      dev_inv (fsc_uart) (fsc_disk) ∗
      disk_geom (fsc_disk) (frn_pd fn) (frn_pav fn) (frn_pu fn) ∗
      is_lock (fsc_dlock) d_lock "virtio_disk"%string
-       <{ disk_res (fsc_disk) (frn_pd fn) (frn_pav fn) (frn_pu fn) }> ∗
+       (disk_res_at (fsc_disk) (frn_pd fn) (frn_pav fn) (frn_pu fn)) ∗
      (* ONE slot unit: ilock's bread takes it and brelse gives it back;
         readi's does the same, one after the other *)
      bslot)%I.

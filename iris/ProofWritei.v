@@ -1074,7 +1074,7 @@ Section WriteiJoin.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
     wi_fr8 m -∗
     i_dev ip ↦₄{dqd} icfg_dev -∗
     i_inum ip ↦₄{dqn} inum -∗
@@ -1461,7 +1461,7 @@ Section WriteiSize.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
     wi_fr13 m -∗
     i_dev ip ↦₄{dqd} icfg_dev -∗
     i_inum ip ↦₄{dqn} inum -∗
@@ -2114,7 +2114,7 @@ Section WriteiLoop.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
     wi_fr13 m -∗
     i_dev ip ↦₄{dqd} icfg_dev -∗
     i_inum ip ↦₄{dqn} inum -∗

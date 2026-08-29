@@ -226,15 +226,17 @@ Section PipeInv.
   (* what release hands back, reassembled into what kfree wants.  This is the
      last link of the chain: [pipe_res_dead] (the dead arm established) ->
      two lock words + pipe_bytes -> pipe_raw -> page_own. *)
-  Lemma pipe_bytes_page_own (pi : mword 64) (v : mword 32) (u : mword 64) :
-    pi ↦₄ v -∗ lock_cpu pi ↦₈ u -∗ pipe_bytes pi -∗ page_own pi.
+  Lemma pipe_bytes_page_own (pi : mword 64) (v : mword 32) :
+    pi ↦₄ v -∗ WpLock.lk_cpu_ready pi -∗ pipe_bytes pi -∗ page_own pi.
   Proof.
     iIntros "Hw Hcpu Hb".
+    rewrite /WpLock.lk_cpu_ready /WpLock.lk_cpu_ready_at.
+    iDestruct "Hcpu" as (lo) "[Hcpu _]".
     iDestruct "Hb" as (vname nr nw ro wo bs) "(Hnm & Hnr & Hnw & Hro & Hwo & %Hlen & Hdat & Hslack)".
     iApply pipe_raw_page_own. rewrite /pipe_raw.
     iSplitL "Hw"; [ by iExists v | ].
     iSplitL "Hnm"; [ by iExists vname | ].
-    iSplitL "Hcpu"; [ by iExists u | ].
+    iSplitL "Hcpu"; [ by iExists (zero_reg : mword 64) | ].
     iSplitL "Hdat"; [ iExists bs; by iFrame "Hdat" | ].
     iSplitL "Hnr"; [ by iExists nr | ].
     iSplitL "Hnw"; [ by iExists nw | ].
@@ -303,7 +305,7 @@ Section PipeInv.
        position is the shim's SC-only install receipt. *)
     rewrite /is_pipe. iFrame "Hrd Hwr".
     iSplit; [done|]. iExists 0%nat. iFrame "Hlk".
-    iApply WpLock.lk_floor_of_log. iApply TsoCtxShim.log_lb_any.
+    iApply WpLock.lk_floor_0.
   Qed.
 
 End PipeInv.

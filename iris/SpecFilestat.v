@@ -264,7 +264,7 @@ Section SpecFilestat.
      dev_inv (fsc_uart) (fsc_disk) ∗
      disk_geom (fsc_disk) (fsn_pd fn) (fsn_pav fn) (fsn_pu fn) ∗
      is_lock (fsc_dlock) d_lock "virtio_disk"%string
-       <{ disk_res (fsc_disk) (fsn_pd fn) (fsn_pav fn) (fsn_pu fn) }> ∗
+       (disk_res_at (fsc_disk) (fsn_pd fn) (fsn_pav fn) (fsn_pu fn)) ∗
      (* ONE slot unit: ilock's bread takes it and brelse gives it back *)
      bslot)%I.
 

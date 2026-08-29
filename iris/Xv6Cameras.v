@@ -99,7 +99,13 @@ Local Open Scope Z_scope.
    and the fragment cannot be forged. *)
 Definition lock_state : Type := option (CPU * bool).
 
-Definition lockUR : ucmra := excl_authUR (leibnizO lock_state).
+(* A6.119 (tso-flip Xv6Cameras.v:109): the lock's ghost carries, beside the
+   state, the POSITION the invariant minted at the winning AMO -- what the
+   holder token's floor is at ([WpLock.locked]).  Both halves hide it
+   existentially at the [lock_auth]/[lock_frag] level; the [_at] forms in
+   WpLock expose it to the two places that need it. *)
+Definition lockUR : ucmra :=
+  prodUR (excl_authUR (leibnizO lock_state)) (excl_authUR (leibnizO nat)).
 
 (* The SLEEPlock's ghost state, inside [lockG] rather than a class of its
    own: a sleeplock already needs [lockG] for its inner spinlock, so a

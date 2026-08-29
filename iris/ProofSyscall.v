@@ -617,7 +617,7 @@ Section SyscallVocab.
         actually live. *)
      disk_geom (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) ∗
      is_lock (fsc_dlock) d_lock "virtio_disk"%string
-       <{ disk_res (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) }> ∗
+       (disk_res_at (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)) ∗
      FsReady.fs_ready)%I.
 
   (* no explicit binder list here -- unlike the Definition above, an
@@ -744,7 +744,7 @@ Section SyscallVocab.
     dev_inv (fsc_uart) (fsc_disk) ∗
     disk_geom (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) ∗
     is_lock (fsc_dlock) d_lock "virtio_disk"%string
-      <{ disk_res (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) }> ∗
+      (disk_res_at (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)) ∗
     is_lock (fsc_kalloc) (mword_of_int KernelSyms.kmem) "kmem"%string
       (λ ξ : CtxId, kmem_res (XIk := ξ) (fsc_kpages) (mword_of_int (KernelSyms.kmem + 24))) ∗
     kalloc_avail (fsc_kpages) None ∗

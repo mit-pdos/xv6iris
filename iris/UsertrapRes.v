@@ -562,7 +562,7 @@ Section UsertrapRes.
     (dev_inv γu γv ∗
      console_caps γu ∗
      disk_geom γv pd pav pu ∗
-     is_lock γdk d_lock "virtio_disk"%string <{ disk_res γv pd pav pu }> ∗
+     is_lock γdk d_lock "virtio_disk"%string (disk_res_at γv pd pav pu) ∗
      (* the tick keeper's REAL arm, spelled: the left disjunct is
         [⌜tick_hart = false⌝], a statement about a particular hart, and this
         bundle is not allowed to depend on one. *)
@@ -635,7 +635,7 @@ Section UsertrapRes.
      is_lock (fsc_kalloc) (mword_of_int KernelSyms.kmem) "kmem"%string
        (λ ξ : CtxId, kmem_res (XIk := ξ) (fsc_kpages) (mword_of_int (KernelSyms.kmem + 24))) ∗
      is_lock (fsc_dlock) d_lock "virtio_disk"%string
-       <{ disk_res (fsc_disk) (un_pd N) (un_pav N) (un_pu N) }> ∗
+       (disk_res_at (fsc_disk) (un_pd N) (un_pav N) (un_pu N)) ∗
      bio_ctx (fsc_bio) (fs_view fsc_fs (fsc_disk) icfg_dev fsc_cov) ∗
      log_ctx icfg_log (fsc_bio) fsc_fs fsc_cov fsc_logst icfg_dev ∗
      fs_crash_seam fsc_cov fsc_logst ∗

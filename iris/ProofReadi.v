@@ -1155,7 +1155,7 @@ Section ReadiLoop.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
     rd_fr13 m -∗
     i_dev ip ↦₄{dqd} icfg_dev -∗
     inode_meta ip dn -∗
