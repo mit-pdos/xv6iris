@@ -183,8 +183,9 @@ Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 (* idup's own frame is 4 slots (addi sp,sp,-32); acquire/release want 10
    below that -- filedup's [K] budget exactly, and for the same frame. *)
 Notation K_idup := (14%nat) (only parsing).
+Require Import TsoCtx.
 Definition wp_idup_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (k : nat)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64)
     (K : nat) (b : bool) (lks : gset string) :=
@@ -258,7 +259,7 @@ Definition wp_idup_sconf_body
 
 Module Type IDUP.
   Parameter wp_idup_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (k : nat)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),

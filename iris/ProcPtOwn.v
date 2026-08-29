@@ -101,6 +101,7 @@ Require Import PageFields.
 Require Export PageGeom.  (* [page_base] / [page_valid] are named by this file's consumers *)
 Require Import ProcGeom.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -2920,7 +2921,7 @@ Qed.
 
 Section ProcPt.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* one physical byte, contents existential (the [↦ₚ] analogue of
      KallocInv's [byte_any]) *)
@@ -3183,6 +3184,7 @@ Section ProcPt.
     apply lookup_seq in Hk. destruct Hk as [-> Hlt].
     rewrite /byte_any /phys_byte_any. iDestruct "H" as (b) "H".
     iExists b.
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "H") as "H".
     iApply (mem_ident_phys (pa_add (page_base ppn) (0 + k)%nat) (DfracOwn 1) b
               (page_valid_kmap_static ppn (0 + k)%nat Hv ltac:(lia)) with "Hb H").
   Qed.
@@ -3198,6 +3200,7 @@ Section ProcPt.
     apply lookup_seq in Hk. destruct Hk as [-> Hlt].
     rewrite /byte_any /phys_byte_any. iDestruct "H" as (b) "H".
     iExists b.
+    iApply TsoCtxShim.ctx_pointsto_of_mem.
     iApply (phys_ident_mem (pa_add (page_base ppn) (0 + k)%nat) (DfracOwn 1) b
               (page_valid_kmap_static ppn (0 + k)%nat Hv ltac:(lia))
               (page_valid_ram ppn (0 + k)%nat Hv ltac:(lia))
@@ -3545,6 +3548,7 @@ Section ProcPt.
     iIntros "!>" (k x Hx) "Hj".
     apply lookup_seq in Hx as [-> Hlt]. rewrite Nat.add_0_l.
     iEval (rewrite pa_add_add) in "Hj".
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hj") as "Hj".
     iApply (mem_ident_phys (pa_add (page_base ppn) (off + k)%nat) (DfracOwn 1) (f k)
               (page_valid_kmap_static ppn (off + k)%nat Hv ltac:(lia)) with "Hb Hj").
   Qed.
@@ -3795,6 +3799,7 @@ Section ProcPt.
     iIntros "!>" (k x Hx) "Hj".
     apply lookup_seq in Hx as [-> Hlt]. rewrite Nat.add_0_l.
     rewrite pa_add_add.
+    iApply TsoCtxShim.ctx_pointsto_of_mem.
     iApply (phys_ident_mem (pa_add (page_base ppn) (off + k)%nat) (DfracOwn 1) (f k)
               (page_valid_kmap_static ppn (off + k)%nat Hv ltac:(lia))
               (page_valid_ram ppn (off + k)%nat Hv ltac:(lia))
@@ -5493,3 +5498,17 @@ Section ProcPt.
      once. *)
 
 End ProcPt.
+
+(* the descriptor's transport (tso-port M3).  [proc_pt] is the address
+   space itself and lives entirely at the PHYSICAL tier, which does not
+   flip at stage 1 -- so it is already a closed term.  The two [struct
+   proc] words that name it are not, and they are the whole obligation. *)
+Global Instance proc_pt_at_morph `{!riscvGS Σ} (pa : mword 64) (P : uptd) (M : gmap Z (bv 8)) :
+  CtxMorph (fun xi : CtxId => proc_pt_at (XI := xi) pa P M).
+Proof.
+  iIntros (ξ ξ') "Hd H". rewrite /proc_pt_at.
+  iDestruct "H" as "(H1 & H2 & H3)".
+  iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H1") as "[Hd H1]".
+  iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H2") as "[Hd H2]".
+  iFrame.
+Qed.

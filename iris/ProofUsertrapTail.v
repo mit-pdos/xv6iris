@@ -73,6 +73,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -97,7 +98,7 @@ Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 
 Section ProofUsertrapTail.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   (* the syscall environment, an ordinary hart-free parameter here: the tail
      never touches it, it only hands it on.  See SpecSyscall's note. *)
   Context (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ).
@@ -159,7 +160,7 @@ End ProofUsertrapTail.
 
 Section UtRet2.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ).
 
   (* ==================================================================== *)
@@ -633,7 +634,7 @@ End UtRet2.
 
 Section UtRet.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ).
 
   (* ==================================================================== *)
@@ -755,7 +756,7 @@ End UtRet.
 
 Section UtA6.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ).
 
   (* ==================================================================== *)
@@ -1015,7 +1016,7 @@ End UtA6.
 
 Section UtFa.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ).
 
   (* ==================================================================== *)

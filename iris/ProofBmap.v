@@ -119,6 +119,7 @@ Require Export FastSetSolver.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
    printable (claude-notes/durable-notes.md) *)
@@ -162,6 +163,7 @@ Set Printing Depth 40.
 Section BmapKit.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.   (* [log_ctx] carries the swap receipt's gen id *)
+  Context `{XI : CurCtx}.
 
   (* balloc's out-of-blocks arm calls the GENERAL printk path.  Everything it
      needs is PERSISTENT (the contract is a [Prop]; [kernel_data] and
@@ -425,7 +427,7 @@ End BmapKit.
    report keys off that suffix and this is an internal statement, not one of
    bmap's two public interfaces (tools/proof_coverage.py). *)
 Definition bm_gen_stmt
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     
     (γs : list gname) (j : nat) (γl : gname)
     (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -478,7 +480,7 @@ Definition bm_gen_stmt
   procs_inv γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
   (* bread's own unit, held across everything and returned by brelse *)
   bslots 1 -∗
   bm_kit ak bn γfs cov logstart dev n Sb -∗
@@ -543,6 +545,7 @@ Local Ltac bmidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 (* ===================================================================== *)
 Section BmapDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   (* bmap's 48-byte frame: ra@40 s0@32 s1@24 s2@16 s3@8, and slot 0 --
      s4's home -- held ANONYMOUSLY, because the direct arm never writes it
@@ -640,6 +643,7 @@ Definition bm_sp (m M : regfile) : Prop :=
 (* ===================================================================== *)
 Section BmapEpilogue.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   Local Lemma bm_epilogue `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (γfs : fs_names) (bn : bio_names) (ak : option bm_alloc)
@@ -974,6 +978,7 @@ End BmapEpilogue.
 (* ===================================================================== *)
 Section BmapRelease.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   Local Lemma bm_release `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat)
@@ -1166,6 +1171,7 @@ End BmapRelease.
 (* ===================================================================== *)
 Section BmapTail.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   Local Lemma bm_indirect_tail `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
@@ -1253,7 +1259,7 @@ Section BmapTail.
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     bm_frame4 m -∗
     proc_priv_bare (proc_addr j) pidv Upr -∗
     i_dev ip ↦₄{dqd} dev -∗
@@ -2180,7 +2186,7 @@ End BmapTail.
 (* ===================================================================== *)
 Section ProofBmapMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_bmap_gen 
       (γs : list gname) (j : nat) (γl : gname)
@@ -3580,7 +3586,7 @@ Module Core := BmapCore BR BL.
 
 Section BmapSeal.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_bmap_sconf 
       (γs : list gname) (j : nat) (γl : gname)
@@ -3761,7 +3767,7 @@ Module Core := BmapCore BR BL.
 
 Section BmapNoallocSeal.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_bmap_noalloc_sconf 
       (γs : list gname) (j : nat) (γl : gname)

@@ -89,6 +89,7 @@ Require Import ProcAvail.
 Require Import Xv6G.
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -105,7 +106,7 @@ Local Open Scope Z_scope.
    constant and not through an opaque one. *)
 Definition namex_tr_post
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (pj pv nb ret_tgt : mword 64) (pl : list (bv 8))
     (m : regfile) (K : nat) (b eb : bool) (lks : gset string)
     (plen : nat) (pfun : nat -> bv 8)
@@ -167,7 +168,7 @@ Definition namex_tr_post
 
 Definition wp_namex_tr_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -229,7 +230,7 @@ Definition wp_namex_tr_body
   procs_inv gs -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
@@ -255,7 +256,7 @@ Definition wp_namex_tr_body
 Module Type NAMEX_TR.
   Parameter wp_namex_tr :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)
  (gf : gname)

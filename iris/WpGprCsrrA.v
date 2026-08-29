@@ -15,6 +15,7 @@ Local Open Scope Z_scope.
 Require Import WpGprCsrrCommon.
 Require Import WpMmodeCsrSwp.   (* swp_execute_CSRReg_csrr + the cr_* footprint *)
 Require Import HartSwp HartSpan HartSpanChar WpDecodeBridge.
+Require Import TsoCtx.
 
 (* [read_CSR csr_csrr] IS the mhartid read -- the whole 4096-way dispatch
    collapses by conversion at a literal CSR number, which is why
@@ -285,7 +286,7 @@ Proof. unfold mcounteren_rdval; rewrite ?sregs_set_reg.
 (* ====================================================================== *)
 Section WpCsrrMhartidGpr.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_csrr_mhartid_gpr (pc : mword 64) (rd : mword 5)
       (mhartid_in : mword 64) (m : regfile)
@@ -403,7 +404,7 @@ End WpCsrrMhartidGpr.
 (* ====================================================================== *)
 Section WpCsrrGprA.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* mstatus (0x300): machine CSR, no extra gate. *)
   (* [dqm]-generic mstatus cell: mstatus lives INSIDE [mmode_config], so a

@@ -45,6 +45,7 @@ Require Import KptGhost KptShare.
 Require Import HartSwp HartLift HartSpan HartMStore.
 Require Import WpDecodeBridge.
 Require Import CommonWalk HartSTrans.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -63,7 +64,7 @@ Local Open Scope Z_scope.
 
 Section kptnode.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* THE RECONCILIATION, pure: a live tree canonically equal to the snapshot
      maps the same vpn through the same two upper PTEs, and through a leaf

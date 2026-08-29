@@ -73,6 +73,7 @@ Require Import SpecStrlen.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -89,7 +90,7 @@ Module StrlenProof : STRLEN.
 
 Section ProofStrlen.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context {kts : ktier}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -160,8 +161,8 @@ Section ProofStrlen.
     sie_cap_gpr KT1 (CID := CID0) Mt (K - 2)%nat b p -∗
     kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.strlen + 0x20) : mword 64) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
     wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved mm mf /\ mf !!! Regidx Ra0 = rv⌝ -∗

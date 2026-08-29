@@ -39,6 +39,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartRegNode
         HartSpan HartSpanChar HartEvents HartMPmp HartMFetch HartMFrame.
 Require Import RiscvExtras RiscvFetchExec.
 Require Import RegFile WpGpr.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Local Arguments Z.sub _ _ : simpl nomatch.
@@ -271,7 +272,55 @@ Qed.
 
 Section load.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE LOAD OBLIGATION, SPELLED ONCE (the read-side twin of            *)
+  (* [HartMStore.wobl_ram], and the same SHAPE back-ported at its         *)
+  (* SC-degenerate meaning).                                              *)
+  (*                                                                      *)
+  (* At SC a data load reads the flat cache, so what a caller owes is a    *)
+  (* [read_bytes] fact against [σ.(mem)].  Post-flip a plain [Load Data]   *)
+  (* is the ONE access in the tree that does not read the flat cache --    *)
+  (* the hardware may return any byte visible at any view between the      *)
+  (* hart's own [tv] and the log top -- so the same name denotes a         *)
+  (* VIEW-INDEXED family over the era's write log instead.                 *)
+  (*                                                                      *)
+  (* THE WHOLE CHAIN BELOW IS A PASS-THROUGH for it: nothing in this file  *)
+  (* owns a points-to, so no lemma here DISCHARGES the obligation; each    *)
+  (* one takes it as [robl_prem] and hands it down UNOPENED.  That is why  *)
+  (* the premise is a NAMED abbreviation and not inlined five times: the   *)
+  (* cutover changes these two definitions and not one of the five         *)
+  (* exported statements that forward them.                                *)
+  (* ------------------------------------------------------------------ *)
+  (* ------------------------------------------------------------------ *)
+  (* THE LOAD OBLIGATION, SPELLED ONCE (the read-side twin of            *)
+  (* [HartMStore.wobl_ram]).                                              *)
+  (*                                                                      *)
+  (* A data load reads the flat memory, so what a caller owes is a         *)
+  (* [read_bytes] fact against [σ.(mem)].  Under a weak-memory semantics   *)
+  (* a plain [Load Data] is the one access in the tree that does not read  *)
+  (* the flat cache -- the hardware may return any byte visible at any     *)
+  (* view between the hart's own and the write log's top -- so the same    *)
+  (* name would denote a VIEW-INDEXED family instead.  Naming it is what   *)
+  (* keeps that a change to ONE definition body.                           *)
+  (*                                                                      *)
+  (* THE WHOLE CHAIN BELOW IS A PASS-THROUGH for it: nothing in this file  *)
+  (* owns a points-to, so no lemma here DISCHARGES the obligation; each    *)
+  (* one takes it as [robl_prem] and hands it down UNOPENED.  That is why  *)
+  (* the premise is a NAMED abbreviation and not inlined five times.       *)
+  (* ------------------------------------------------------------------ *)
+  Definition robl_ram (mm : gmap Arch.pa (bv 8)) (pa : Arch.pa)
+      (w : bv 64) : Prop :=
+    read_bytes mm pa 8 = Some w.
+
+  (* the callback that owes it.  Unlike the store's, this one hands the
+     machine state straight back: a load moves nothing. *)
+  Definition robl_prem (pa : Arch.pa) (bytes : bv 64)
+      (R : iProp Σ) : iProp Σ :=
+    (∀ σ : mstate, mstate_interp σ ={⊤,∅}=∗
+       ⌜robl_ram σ.(mem) pa bytes⌝ ∗
+       ▷ (|={∅,⊤}=> mstate_interp σ ∗ R))%I.
 
   Lemma swp_checked_mem_read_load8 (Drw Dro : gset register)
       (Df : register -> dfrac) (rs : regstate)
@@ -293,9 +342,7 @@ Section load.
        swp (pmpCheck (Physaddr pa) 8 (Load Data) Machine)
          (fun r => ⌜r = None⌝ ∗
                    hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜read_bytes σ.(mem) pa 8 = Some bytes⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ ∗ R)) -∗
+    robl_prem pa bytes R -∗
     swp (checked_mem_read (Load Data) PBMT_PMA Machine
            (Physaddr pa) 8 false false false false)
       (fun r => ⌜r = Values.Ok (bytes, tt)⌝ ∗
@@ -442,9 +489,7 @@ Section load.
        swp (pmpCheck (Physaddr pa) 8 (Load Data) Machine)
          (fun r => ⌜r = None⌝ ∗
                    hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜read_bytes σ.(mem) pa 8 = Some bytes⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ ∗ R)) -∗
+    robl_prem pa bytes R -∗
     swp (translate_and_read_value (Virtaddr pa) 8 (Load Data) false false false)
       (fun r => ⌜r = Values.Ok (Physaddr pa, bytes)⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R).
@@ -503,9 +548,7 @@ Section load.
        swp (pmpCheck (Physaddr pa) 8 (Load Data) Machine)
          (fun r => ⌜r = None⌝ ∗
                    hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜read_bytes σ.(mem) pa 8 = Some bytes⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ ∗ R)) -∗
+    robl_prem pa bytes R -∗
     swp (vmem_read_addr (Virtaddr pa) 8 (Load Data) false false false)
       (fun r => ⌜r = Values.Ok bytes⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R).
@@ -636,9 +679,7 @@ Section load.
               (Load Data) Machine)
          (fun r => ⌜r = None⌝ ∗
                    hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜read_bytes σ.(mem) (add_vec (m !!! Regidx i) offset) 8 = Some bytes⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ ∗ R)) -∗
+    robl_prem (add_vec (m !!! Regidx i) offset) bytes R -∗
     swp (vmem_read (Regidx i) offset 8 (Load Data) false false false)
       (fun r => ⌜r = Values.Ok bytes⌝ ∗ gpr_file m ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R).
@@ -702,9 +743,7 @@ Section load.
        swp (pmpCheck (Physaddr ea) 8 (Load Data) Machine)
          (fun r => ⌜r = None⌝ ∗
                    hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-        ⌜read_bytes σ.(mem) ea 8 = Some bytes⌝ ∗
-        ▷ (|={∅,⊤}=> mstate_interp σ ∗ R)) -∗
+    robl_prem ea bytes R -∗
     swp (execute_LOAD imm (Regidx rs1) (Regidx rd) is_unsigned 8)
       (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
                 gpr_file (<[Regidx rd := regval_into_reg bytes]> m) ∗

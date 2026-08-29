@@ -26,15 +26,17 @@ Require Import SleepLock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 
 
 (* the "sleep lock" string literal in rodata (the auipc/addi pair at
-   KernelSyms.initsleeplock+0x10 resolves here); the caller extracts the persistent [↦ₛ□] from
-   [kernel_data] via [kernel_data_string]. *)
+   KernelSyms.initsleeplock+0x10 resolves here); the caller extracts the persistent
+   ∀-context string fact ([TsoCtx.ctx_string_all], the derived context-free
+   form of [↦ₛ]) from [kernel_data] via [kernel_data_string_all]. *)
 Definition sl_str_addr : mword 64 := mword_of_int 0x80007568.
 
-Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (m : regfile) (s : string)
     (vlocked vlk vpid : mword 32) (vlkname vcpu vname : mword 64)
     (av : nat) (b : bool) (p : mword 64) :=
@@ -48,8 +50,8 @@ Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `
   kernel_text -∗ pc_is pcE -∗
   (* the two strings: the fixed "sleep lock" literal for the inner spinlock,
      and the caller's own name for the sleeplock (both duplicable). *)
-  sl_str_addr ↦ₛ□ "sleep lock"%string -∗
-  name ↦ₛ□ s -∗
+  ctx_string_all sl_str_addr DfracDiscarded "sleep lock"%string -∗
+  ctx_string_all name DfracDiscarded s -∗
   (* the six struct fields, raw *)
   slk ↦₄ vlocked -∗
   sl_lk slk ↦₄ vlk -∗
@@ -75,7 +77,7 @@ Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `
 
 Module Type INITSLEEPLOCK.
   Parameter wp_initsleeplock_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (s : string)
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (m : regfile) (s : string)
       (vlocked vlk vpid : mword 32) (vlkname vcpu vname : mword 64)
       (av : nat) (b : bool) (p : mword 64),
       wp_initsleeplock_sconf_body m s vlocked vlk vpid vlkname vcpu vname av b p.

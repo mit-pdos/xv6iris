@@ -74,6 +74,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Set Printing Depth 40.
 
@@ -106,7 +107,7 @@ Local Ltac npidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 Section ProofNparWrapEraMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* THE WRAPPER, AT THE TRACE CONTRACT.  [ProofNameiparent]'s eleven
      instructions and its frame carve, verbatim; the two trace rows go

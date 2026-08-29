@@ -192,6 +192,7 @@ Proof. reflexivity. Qed.
 (* the U-mode reference decode state on every register the decoder reads.  *)
 (* ===================================================================== *)
 Require Import WpDecodeBridge DecodeTotalU.
+Require Import TsoCtx.
 
 Lemma agree_u (σ : mstate) :
   register_lookup cur_privilege σ.(sregs) = User ->
@@ -388,7 +389,7 @@ Local Ltac u_notin_clock := apply (bool_decide_unpack _); vm_compute; reflexivit
 
 Section UserStepWaiting.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- reading the landing file back, cell by cell ---- *)
 
@@ -475,7 +476,7 @@ End UserStepWaiting.
 (* ===================================================================== *)
 Section UserWaitClose.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
   Context (Rut : uptd -> iProp Σ).
 
@@ -598,7 +599,7 @@ End UserWaitClose.
 (* ===================================================================== *)
 Section UserStepWaitArm.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
   Context (Rut : uptd -> iProp Σ).
 
@@ -742,7 +743,7 @@ End UserStepWaitArm.
 (* ===================================================================== *)
 Section UserStepObligation.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
   Context (Rut : uptd -> iProp Σ).
 

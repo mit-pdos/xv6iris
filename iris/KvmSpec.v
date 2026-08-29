@@ -89,6 +89,7 @@ Require Import KallocInv WpLock.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -106,7 +107,7 @@ Notation K_kvmmake := (166%nat) (only parsing).
 
 Section KvmSpecs.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* kalloc's ambient resources, bundled so callers can invoke kalloc
      REPEATEDLY: the kmem lock, the count ghost, and panic's contract (which
@@ -122,7 +123,7 @@ Section KvmSpecs.
   Definition kalloc_env (γ : gname) (on : option nat) : iProp Σ :=
     (∃ γk : gname * gname,
       is_lock γ (mword_of_int KernelSyms.kmem) "kmem"%string
-        (kmem_res γk (mword_of_int (KernelSyms.kmem + 24))) ∗
+        (λ ξ : CtxId, kmem_res (XIk := ξ) γk (mword_of_int (KernelSyms.kmem + 24))) ∗
       kalloc_avail γk on)%I.
 
   (* ---- THE SAME BUNDLE WITH THE FREE-LIST PAIR NAMED ------------------
@@ -142,7 +143,7 @@ Section KvmSpecs.
   Definition kalloc_env_at (γ : gname) (γk : gname * gname)
       (on : option nat) : iProp Σ :=
     (is_lock γ (mword_of_int KernelSyms.kmem) "kmem"%string
-       (kmem_res γk (mword_of_int (KernelSyms.kmem + 24))) ∗
+       (λ ξ : CtxId, kmem_res (XIk := ξ) γk (mword_of_int (KernelSyms.kmem + 24))) ∗
      kalloc_avail γk on)%I.
 
   (* Sealed for the reason [WpLock.is_lock] is: without it every
@@ -164,7 +165,7 @@ Section KvmSpecs.
   Lemma kalloc_env_at_lock (γ : gname) (γk : gname * gname) (on : option nat) :
     kalloc_env_at γ γk on -∗
     is_lock γ (mword_of_int KernelSyms.kmem) "kmem"%string
-      (kmem_res γk (mword_of_int (KernelSyms.kmem + 24))).
+      (λ ξ : CtxId, kmem_res (XIk := ξ) γk (mword_of_int (KernelSyms.kmem + 24))).
   Proof. rewrite /kalloc_env_at. by iIntros "[#$ _]". Qed.
 
   Lemma kalloc_env_at_avail (γ : gname) (γk : gname * gname) (on : option nat) :
@@ -173,7 +174,7 @@ Section KvmSpecs.
 
   Lemma kalloc_env_at_intro (γ : gname) (γk : gname * gname) (on : option nat) :
     is_lock γ (mword_of_int KernelSyms.kmem) "kmem"%string
-      (kmem_res γk (mword_of_int (KernelSyms.kmem + 24))) -∗
+      (λ ξ : CtxId, kmem_res (XIk := ξ) γk (mword_of_int (KernelSyms.kmem + 24))) -∗
     kalloc_avail γk on -∗ kalloc_env_at γ γk on.
   Proof. rewrite /kalloc_env_at. iIntros "#Hlk Hav". iFrame "Hlk Hav". Qed.
 

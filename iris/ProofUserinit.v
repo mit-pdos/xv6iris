@@ -121,6 +121,7 @@ Require Import CodeUserinit.
 From Kernel Require KernelSyms.
 From Kernel Require KernelData.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -235,7 +236,7 @@ Local Ltac namidx := first [ vm_compute; reflexivity | vm_compute; discriminate 
 
 Section ProofUserinit.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -482,7 +483,7 @@ Section ProofUserinit.
        there for free, whereas an exclusive one would have to be carried past
        the park and could not be shared with the parked process at all.
        See [iris/ForkretParkClose.v] and projects/forkret-park.md. *)
-    iMod (word_pointsto_persist with "Hinitproc") as "#Hinitproc".
+    iMod (ctx_word_pointsto_persist with "Hinitproc") as "#Hinitproc".
     assert (Hpp18 : add_vec_int (mword_of_int (UI + 0x14) : mword 64) 4
                     = mword_of_int (UI + 0x18)) by pcw.
     iEval (rewrite Hpp18) in "Hpc".
@@ -809,7 +810,7 @@ Section ProofUserinit.
                      (sign_extend' 64 (mword_of_int 0 : mword 12)) = proc_addr j)
       by (rewrite HR11a0; apply addv_sext0).
     iApply (RL.wp_release_sconf KT1 γl (proc_addr j) "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) R11 0%nat b pj (K - 4)%nat
+              <{ proc_lock_res γs γl (proc_addr j) }> R11 0%nat b pj (K - 4)%nat
               ({["proc"]} ∪ lks) Hlka Krl
               with "Hcg Htext Hpc [] Htok HR Hcpu Hpay").
     { iApply (procs_inv_lookup γs j γl Hgl with "Hpinv"). }

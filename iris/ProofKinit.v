@@ -40,6 +40,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecKinit.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -47,7 +48,7 @@ Module KinitProof (Freerange : FREERANGE) (Initlock : INITLOCK) : KINIT.
 
 Section ProofKinit.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Lemma wp_kinit_sconf
@@ -70,7 +71,7 @@ Section ProofKinit.
       do 5 (destruct j as [|j];
             [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string 0x80007040 "kmem"%string _ eq_refl ltac:(unfold text_end; lia)
+    iPoseProof (kernel_data_string_all 0x80007040 "kmem"%string _ eq_refl ltac:(unfold text_end; lia)
                                                                       ltac:(vm_compute; discriminate) Hkmem
                   with "Hkdata") as "#Hstr".
     assert (Hspr2 : spr = pa_stk sp0 2).
@@ -230,8 +231,9 @@ Section ProofKinit.
     iAssert (kmem_res γk fl) with "[Hflw Hauth]" as "HR".
     { iApply (kmem_res_close γk fl nullp []). rewrite /word_at.
       iSplitL "Hflw"; [iExact "Hflw" |]. iSplitR "Hauth"; [iPureIntro; reflexivity | iExact "Hauth"]. }
-    iMod (newlock_at ⊤ γl lk "kmem"%string (kmem_res γk fl)
-            with "Hlkfree Hlnm Hlock Hcpu HR") as "#Hkmem".
+    iMod (newlock_at ⊤ γl lk "kmem"%string (λ ξ : CtxId, kmem_res (XIk := ξ) γk fl)
+            with "Hlkfree Hlnm Hlock [Hcpu] HR") as "#Hkmem".
+    { iApply (lk_cpu_ready_intro with "Hcpu"). }
     iModIntro.
     pose proof Hilcs as Hilcs_full. unfold callee_saved in Hilcs.
     destruct Hilcs as (Hilsp & Hils0 & Hils1 & Hils2 & Hils3 & Hils4 & Hils5 & Hils6 & Hils7 & Hils8 & Hils9 & Hils10 & Hils11).

@@ -289,6 +289,7 @@ Require Import DirViewPin.
 Require Import NameiInitPinned.
 Require Import PathElems.
 Require Import FsImgCheck.
+Require Import TsoCtx.
 
 Module KexecPinnedAProof (Myproc : MYPROC) (BeginOp : BEGIN_OP) (Namei : NAMEI)
                    (Ilock : ILOCK) (Readi : READI) (Iunlockput : IUNLOCKPUT)
@@ -332,7 +333,7 @@ Section KexecPinnedABody.
               [fileG] -- see the header.  A standalone [!icacheG Σ] beside
               [!fileG Σ] is a SECOND instance and [ProcInv.cwd_ref] then does
               not match [SpecNamei]'s [inode_held]. *)
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -935,7 +936,7 @@ Section KexecPinnedABody.
 End KexecPinnedABody.
 Section KexecPinnedAMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).

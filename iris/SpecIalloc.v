@@ -147,6 +147,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -180,7 +181,7 @@ Proof. rewrite /dinode_wf /ialloc_fresh /=. reflexivity. Qed.
 
 Definition wp_ialloc_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-      ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -268,7 +269,7 @@ Definition wp_ialloc_sconf_body
   procs_inv γs -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
   (* TWO slot units: bread's reference is held across log_write, which wants
      one of its own; brelse gives it back *)
   bslots 2 -∗
@@ -374,7 +375,7 @@ Definition wp_ialloc_sconf_body
    inside every [dirlink] on [ip].                                        *)
 Definition wp_ialloc_gen_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-      ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -462,7 +463,7 @@ Definition wp_ialloc_gen_body
   procs_inv γs -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
   (* TWO slot units: bread's reference is held across log_write, which wants
      one of its own; brelse gives it back *)
   bslots 2 -∗
@@ -540,7 +541,7 @@ Module Type IALLOC.
      the sconf form moves. *)
   Parameter wp_ialloc_gen :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
  (ty : mword 16)
@@ -555,7 +556,7 @@ Module Type IALLOC.
 
   Parameter wp_ialloc_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
  (ty : mword 16)

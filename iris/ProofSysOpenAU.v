@@ -148,6 +148,7 @@ Require Import ProofSysOpenAUJoin.
 Require Import ProofSysOpenAUWalk.
 Require Import ProofSysOpen.   (* [so_neq_of_eq] / [so_neq_of_ne] / [so_bud_iput] *)
 Require Import FsAbs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -225,7 +226,7 @@ Section ProofSysOpenAUBody.
   (*  an ordinary [destruct] on the mask's [eq_vec] and no bit lemma is  *)
   (*  spent here.                                                       *)
   (* ================================================================== *)
-  Lemma wp_sys_open_au_plain `{GEN : GenId} `{CID0 : CpuId}
+  Lemma wp_sys_open_au_plain `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gfl gf : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -295,7 +296,7 @@ Section ProofSysOpenAUBody.
     iDestruct (so_frame_carve sp0 with "Hframe")
       as "(%Hal & [%u1 Hf1] & [%u2 Hf2] & [%u3 Hf3] & [%u4 Hf4] & [%u5 Hf5] &
            [%u6 Hf6] & Hbytes & [%u23 H23] & [%u24 H24])".
-    iDestruct (word_pointsto_aligned_p with "H23") as %Hal23.
+    iDestruct (ctx_word_pointsto_aligned_p with "H23") as %Hal23.
     iDestruct (so_omode_split sp0 u23 with "H23") as "[H23lo H23hi]".
     assert (Hc1 : add_vec (M1 !!! Regidx csp_rs1 : mword 64)
                     (zero_extend' 64 (concat_vec (mword_of_int 23 : mword 6) ('b"000")))

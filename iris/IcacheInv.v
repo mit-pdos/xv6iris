@@ -95,6 +95,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* ===================================================================== *)
 (*  1.  THE itable's GEOMETRY, read off the image                         *)
@@ -307,6 +308,7 @@ Proof. intros Hk. apply lookup_seq. split; [lia|exact Hk]. Qed.
 Section IcacheGhost.
   Context `{!xv6G Σ}.
   Context `{ICFG : icfg}.
+  Context `{XI : CurCtx}.
 
   (* [itable_half], [iref_frag], [iref_tok] and [live_frac] are
      [IcacheRef.v]'s. *)
@@ -1319,6 +1321,7 @@ Section IcacheRefInv.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{ICFG : icfg}.
   Context `{GEN : GenId}.
+  Context `{XI : CurCtx}.
 
   Definition icacheN : namespace := nroot .@ "icache".
 
@@ -1915,6 +1918,7 @@ End IcacheRefInv.
        nonzero -- no freeze anywhere) use the same lemma. *)
 
 Section IcacheRefInvReg.
+  Context `{XI : CurCtx}.
   (* [InodeRegion]'s own context plus [lockG] -- and every one of these
      classes has to be IN SCOPE (see the preamble's import note), or the
      backtick generalisation quietly invents a same-named variable instead. *)
@@ -3199,18 +3203,19 @@ Section IcacheTable.
   Context `{!riscvGS Σ, !xv6G Σ, !irefslotG Σ}.
   Context `{ICFG : icfg}.
   Context `{GEN : GenId}.
+  Context `{XI : CurCtx}.
 
   (* [inode_ident] and [inode_ref] are [IcacheRef.v]'s; only the JOIN
      helper below stayed, because [islot_rest_join] uses it. *)
   (* the fraction JOIN for one cell, as a wand.  A bare
-     [rewrite word4_pointsto_frac_split] at a call site rewrites the whole
+     [rewrite ctx_word4_pointsto_frac_split] at a call site rewrites the whole
      [envs_entails] -- hypotheses included -- and silently re-splits the very
      fragments being joined (durable-notes' proofmode rule); inside this
      lemma the two hypotheses' dfracs are bare variables, so the pattern
      matches the goal only. *)
   Local Lemma word4_frac_join (a : Arch.pa) (q1 q2 : Qp) (w : bv 32) :
     a ↦₄{DfracOwn q1} w -∗ a ↦₄{DfracOwn q2} w -∗ a ↦₄{DfracOwn (q1 + q2)} w.
-  Proof. iIntros "H1 H2". rewrite word4_pointsto_frac_split. iFrame. Qed.
+  Proof. iIntros "H1 H2". rewrite ctx_word4_pointsto_frac_split. iFrame. Qed.
 
   (* ---- THE IDENTITY BUDGET (design §13.1b, as corrected by §13.1e) ----
 
@@ -3288,8 +3293,8 @@ Section IcacheTable.
     destruct (1/2 - qt)%Qp as [q'|] eqn:Et.
     - apply Qp.sub_Some in Et.        (* 1/2 = qt + q' *)
       iIntros "[Hd Hn] (%d & %n & [Hd' Hn'])".
-      iDestruct (word4_pointsto_agree with "Hd Hd'") as %->.
-      iDestruct (word4_pointsto_agree with "Hn Hn'") as %->.
+      iDestruct (ctx_word4_pointsto_agree with "Hd Hd'") as %->.
+      iDestruct (ctx_word4_pointsto_agree with "Hn Hn'") as %->.
       iSplitL "Hd Hd'".
       + iDestruct (word4_frac_join with "Hd Hd'") as "H".
         iEval (rewrite -Et) in "H". iExact "H".

@@ -207,8 +207,9 @@ Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
    s0,sp,48] on top); acquire and release want 10 below that, and panic wants
    none.  [K_idup]'s budget for a frame half again as deep. *)
 Notation K_iget := (58%nat) (only parsing).
+Require Import TsoCtx.
 Definition wp_iget_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (inum : mword 32)
     (l : ilic)                                   (* THE LICENCE, §7.1 *)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64)
@@ -282,7 +283,7 @@ Definition wp_iget_sconf_body
 
 Module Type IGET.
   Parameter wp_iget_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (inum : mword 32)
       (l : ilic)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)

@@ -104,6 +104,7 @@ From Kernel Require KernelSyms.
 Require Import RiscvExtras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* ===================================================================== *)
 (* 1. Pure address arithmetic: the stack region below [sp] is kernel data. *)
@@ -153,6 +154,7 @@ Qed.
 
 Section BootStack.
   Context `{!riscvGS Σ}.
+  Context `{XI : CurCtx}.
 
   (* PINNED AT KT0, AND FORCED.  This bridge turns a PHYSICAL stack region
      into a virtual one, which is exactly the boot identity map's own step:
@@ -167,11 +169,12 @@ Section BootStack.
     iIntros (Hkd) "#Hcl Hw".
     iDestruct (phys_word_pointsto_aligned_p with "Hw") as %Hal.
     iDestruct (phys_word_pointsto_bytes with "Hw") as "Hbs".
-    iApply (word_pointsto_intro a dq w Hal).
+    iApply (ctx_word_pointsto_intro cur_ctx a dq w Hal).
     iApply (big_sepL_impl with "Hbs").
     iIntros "!>" (k x Hk) "H".
     apply lookup_seq in Hk. destruct Hk as [-> Hlt].
     pose proof (Hkd (0 + k)%nat ltac:(lia)) as Hka.
+    iApply TsoCtxShim.ctx_pointsto_of_mem.
     iApply (phys_ident_mem (pa_add a (0 + k)%nat) dq (nth_byte w (0 + k)%nat)
               (kdata_svpn_class _ Hka) (addr_is_kdata_ram _ Hka)
               ltac:(unfold addr_is_kdata, text_end, ram_base, ram_size in Hka; lia)
@@ -205,7 +208,7 @@ End BootStack.
 (* ===================================================================== *)
 
 (* the tp/cid convention at the boot hart: start() writes tp = mhartid. *)
-Lemma mb_tpv_cid_boot `{GEN : GenId} `{CID : CpuId} (mh : mword 64) :
+Lemma mb_tpv_cid_boot `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (mh : mword 64) :
   mh = (mword_of_int 0 : mword 64) ->
   cid_word = (zero_reg : mword 64) ->
   mb_tpv mh = cid_word.
@@ -253,7 +256,7 @@ Definition mstatus_reset : mword 64 := mword_of_int 0xA00000000.
 
 Section BootBridge.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* NO [KT0] BINDER: the boot capability is at KT0 by construction
      ([sie_cap_intro_bare]); see the note in [Section BootStack] above. *)

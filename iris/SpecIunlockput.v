@@ -102,6 +102,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -147,7 +148,7 @@ Notation K_iunlockput := (78%nat) (only parsing).
    ([IcacheEscrow.ic_swap_park_dep]).  What the arm parked comes back in the
    post as [IcacheEscrow.ic_dep_side d]. *)
 Definition wp_iunlockput_dep_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -260,7 +261,7 @@ Definition wp_iunlockput_dep_sconf_body
   procs_inv gs -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
   bslots 3 -∗
   (* THE BUDGET HALF ONLY: at a [DepTx] descriptor this caller's transaction
      token is part-parked in the escrow, so it cannot present [log_op]; the
@@ -292,7 +293,7 @@ Definition wp_iunlockput_dep_sconf_body
   WP (Loop : expr riscv_lang).
 
 Definition wp_iunlockput_dep_gen_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -409,7 +410,7 @@ Definition wp_iunlockput_dep_gen_body
   procs_inv gs -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
   bslots 3 -∗
   (* THE GROUP CREDIT, threaded verbatim to iput (SpecIput.v's [crz]):
      [emp] at [crz = false], the walker's [nlz_obs] plus the region's two
@@ -457,7 +458,7 @@ Definition wp_iunlockput_dep_gen_body
    parked comes back in the post and rejoins the caller's residue, so not a
    line of iunlockput's own proof is re-run. *)
 Definition wp_iunlockput_tx_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -560,7 +561,7 @@ Definition wp_iunlockput_tx_sconf_body
   procs_inv gs -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
   bslots 3 -∗
   (* THE BUDGET HALF ONLY: this caller's transaction token is HALF-PARKED
      in the escrow, so it cannot present [log_op]; the disarm re-forms the
@@ -587,7 +588,7 @@ Definition wp_iunlockput_tx_sconf_body
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 Definition wp_iunlockput_tx_gen_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -693,7 +694,7 @@ Definition wp_iunlockput_tx_gen_body
   procs_inv gs -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
   bslots 3 -∗
   (* THE GROUP CREDIT, threaded verbatim to iput (SpecIput.v's [crz]):
      [emp] at [crz = false], the walker's [nlz_obs] plus the region's two
@@ -739,7 +740,7 @@ Definition wp_iunlockput_tx_gen_body
    No disarm fupd stands before the call any more. *)
 Section IunlockputOfDep.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_iunlockput_tx_of_dep_sconf
       (gs : list gname) (j : nat) (gl : gname)
@@ -847,7 +848,7 @@ Module Type IUNLOCKPUT.
      is NOT published: its only application is inside [ProofIunlockput], where
      it is a [Local Lemma] discharging [wp_iunlockput_tx_sconf]. *)
   Parameter wp_iunlockput_dep_gen :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
@@ -866,7 +867,7 @@ Module Type IUNLOCKPUT.
   (* the two TRANSACTIONAL forms (durable-disk B''-tx); [ProofIunlockput]
      defines them by [wp_iunlockput_tx_of_sconf] / [_of_gen]. *)
   Parameter wp_iunlockput_tx_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
@@ -881,7 +882,7 @@ Module Type IUNLOCKPUT.
  k qi s gy inum dn' bm' n
                                   pidv dq dqb dqs m K eb b lks Upr.
   Parameter wp_iunlockput_tx_gen :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)

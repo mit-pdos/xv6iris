@@ -46,6 +46,7 @@ From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import IrefSlots.  (* [iref_frac] rides [file_core] -- FileInvDefs *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 
 Section SpecFilealloc.
@@ -66,14 +67,14 @@ Section SpecFilealloc.
      used to make ([FileInvDefs.fdstate_ok]), and the caller reads the
      content off the reference when it opens it ([ProofSysOpenParts.
      so_open_slot]) rather than being handed a name for it here. *)
-  Definition filealloc_post (γf : gname) (r : mword 64) : iProp Σ :=
+  Definition filealloc_post `{XI : CurCtx} (γf : gname) (r : mword 64) : iProp Σ :=
     (⌜r = (zero_reg : mword 64)⌝ ∗ fd_slot
      ∨ ∃ k : nat,
          ⌜(k < NFILE)%nat /\ r = fnode k⌝ ∗ file_ref γf k 1 FdClosed)%I.
 
 End SpecFilealloc.
 
-Definition wp_filealloc_sconf_body `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} (γl γf : gname) (m : regfile)
+Definition wp_filealloc_sconf_body `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γl γf : gname) (m : regfile)
     (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.filealloc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
@@ -101,7 +102,7 @@ Definition wp_filealloc_sconf_body `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG 
 
 Module Type FILEALLOC.
   Parameter wp_filealloc_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} (γl γf : gname) (m : regfile)
+    forall `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γl γf : gname) (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string),
       wp_filealloc_sconf_body γl γf m n eb p K b lks.
 End FILEALLOC.

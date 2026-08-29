@@ -20,9 +20,10 @@ Require Import RegFile.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 
-Definition wp_initlock_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m : regfile) (vlock : bv 32) (vname vcpu : bv 64) (s : string) (K : nat) (b : bool) (p : mword 64) :=
+Definition wp_initlock_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (m : regfile) (vlock : bv 32) (vname vcpu : bv 64) (s : string) (K : nat) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.initlock in
   let lk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let name := m !!! Regidx (mword_of_int 11 : mword 5) in
@@ -32,9 +33,13 @@ Definition wp_initlock_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
   (2 <= K)%nat ->
   sie_cap_gpr kt m K b p -∗
   kernel_text -∗ pc_is pcE -∗
-  (* the string argument [a1] points at: DUPLICABLE (persistent) ownership,
-     so the caller keeps its copy and initlock can seal it into the lock. *)
-  name ↦ₛ□ s -∗
+  (* the string argument [a1] points at, in the ∀-CONTEXT form
+     ([TsoCtx.ctx_string_all], the derived context-free reading of [↦ₛ] --
+     tso-port.md §0.21′): DUPLICABLE (persistent) ownership, so the caller
+     keeps its copy, and context-free so that the [lock_name] the caller
+     seals with it keeps [is_lock] a closed term.  A rodata literal's
+     producer is [KernelDataInv.kernel_data_string_all]. *)
+  ctx_string_all name DfracDiscarded s -∗
   lk ↦₄ vlock -∗
   c_name ↦₈ vname -∗
   c_cpu ↦₈ vcpu -∗
@@ -57,6 +62,6 @@ Definition wp_initlock_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
 
 Module Type INITLOCK.
   Parameter wp_initlock_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m : regfile) (vlock : bv 32) (vname vcpu : bv 64) (s : string) (K : nat) (b : bool) (p : mword 64),
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (m : regfile) (vlock : bv 32) (vname vcpu : bv 64) (s : string) (K : nat) (b : bool) (p : mword 64),
       wp_initlock_sconf_body kt m vlock vname vcpu s K b p.
 End INITLOCK.

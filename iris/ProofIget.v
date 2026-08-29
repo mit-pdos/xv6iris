@@ -127,6 +127,7 @@ Require Export FastSetSolver.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Set Printing Depth 40.
 
@@ -369,6 +370,7 @@ Qed.
 Section IgetMsg.
   Context `{!riscvGS Σ, FSC : fscfg}.
   Context `{GEN : GenId}.
+  Context `{XI : CurCtx}.
 
   Lemma ig_msg_str :
     (kernel_data : iProp Σ) -∗ (mword_of_int ig_msg_a : mword 64) ↦ₛ□ ig_msg.
@@ -384,7 +386,7 @@ Module IgetProof (Acquire : ACQUIRE) (Release : RELEASE) (PN : PANIC) : IGET.
 
 Section ProofIget.
   Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra  := (mword_of_int 1 : mword 5).
   Notation Rs0  := (mword_of_int 8 : mword 5).
@@ -676,12 +678,12 @@ Section ProofIget.
     iDestruct (cpu_own_transport CID CID13 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf KT1 fsc_itlock "itable"%string
-              (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) mA
+              <{ itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev }> mA
               n eb p (K - 6)%nat b lks ltac:(lia) ltac:(lia) Hfresh
               with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iApply (is_itable2_lock with "Hlock0"). }
-    iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
+    iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
     assert (Hpc20 : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.iget + 0x20)).
     { rewrite HmAra. pcw. }
     iEval (rewrite Hpc20) in "Hpc".
@@ -1271,7 +1273,7 @@ Section ProofIget.
             iInv "Hesc" as ">Hbodyp" "Hclosep".
             iDestruct (ic_open_empty_dev_peek fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst e (1/4)
                          devT inumT with "Hbodyp Hgid") as "(Hcellp & Hgid & Hcbp)".
-            iDestruct (wordw_claim_of (KTR := KT0) 4 (i_dev (ientry e))
+            iDestruct (ctx_word4_claim (KTR2 := KT0) (i_dev (ientry e))
                          (DfracOwn 1) devT ltac:(lia) with "Hcellp") as "#Hclaim1".
             iMod ("Hclosep" with "[Hcbp Hcellp]") as "_";
               [ iApply bi.later_intro; iApply ("Hcbp" with "Hcellp") |].
@@ -1336,7 +1338,7 @@ Section ProofIget.
        VALUE, so a RESTORING peek of the same cell delivers it. *)
     (* Here no peek is needed at all: the caller already OWNS half of the
        inum cell ([HinT]), which is what it is about to put in the update. *)
-            iDestruct (wordw_claim_of (KTR := KT0) 4 (i_inum (ientry e))
+            iDestruct (ctx_word4_claim (KTR2 := KT0) (i_inum (ientry e))
                          (DfracOwn (1/2)) inumT ltac:(lia) with "HinT") as "#Hclaim2".
             iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iget + 0x72)) Rs4 Rs3
                       (mword_of_int 4 : mword 12) N1 (trap_res b + (K - 6))%nat
@@ -1387,7 +1389,7 @@ Section ProofIget.
                       with "Hbody Hgid HinT")
                 as "(Hincell & Hdcell & Hvld & Hraw & Hmt & Hgid1 & Hgid2 & Hpin)".
               iModIntro. iExists inumT. iFrame "Hincell". iIntros "Hincell".
-              iDestruct (word4_pointsto_half_split with "Hdcell") as "[Hd1 Hd2]".
+              iDestruct (ctx_word4_pointsto_half_split with "Hdcell") as "[Hd1 Hd2]".
               iDestruct "Hvld" as (wv) "Hvld".
               iMod ("Hclose2" with "[Hd1 Hincell Hvld Hraw Hbundle Hgid1 Hpin]") as "_".
               { iApply bi.later_intro. iApply ic_close_mid.
@@ -1440,7 +1442,7 @@ Section ProofIget.
             iApply fupd_wp.
             iMod (iref_load_locked_au ⊤ M e ltac:(solve_ndisj) He with "Hinv Hhalf")
               as "[Hcellp Hbackp]".
-            iDestruct (wordw_claim_of (KTR := KT0) 4 (i_ref (ientry e))
+            iDestruct (ctx_word4_claim (KTR2 := KT0) (i_ref (ientry e))
                          (DfracOwn 1) (iref_word M e) ltac:(lia) with "Hcellp")
               as "#Hclaim3".
             iMod ("Hbackp" with "Hcellp") as "Hhalf".
@@ -1517,7 +1519,7 @@ Section ProofIget.
               as "[Hmt Harmp]".
             iDestruct "Harmp" as (devp inump wvp)
               "(Hd1p & Hincellp & Hvldp & Hpayp & Hgid1p & Hpinp)".
-            iDestruct (wordw_claim_of (KTR := KT0) 4 (i_valid (ientry e))
+            iDestruct (ctx_word4_claim (KTR2 := KT0) (i_valid (ientry e))
                          (DfracOwn 1) wvp ltac:(lia) with "Hvldp") as "#Hclaim4".
             iMod ("Hclosep" with "[Hd1p Hincellp Hvldp Hpayp Hgid1p Hpinp]") as "_".
             { iApply bi.later_intro. iApply (ic_close_mid fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst e).
@@ -1686,7 +1688,7 @@ Section ProofIget.
                acquire/release pair compose back to [N]. *)
             iEval (rewrite Houtb) in "Hcg".
             iApply (Release.wp_release_sconf KT1 fsc_itlock itable_lock "itable"%string
-                      (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) V4
+                      <{ itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev }> V4
                       n eb p (K - 6)%nat ({["itable"]} ∪ lks)
                       ltac:(rewrite HV4a0; reflexivity) ltac:(lia)
                       with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
@@ -1753,7 +1755,7 @@ Section ProofIget.
       iApply fupd_wp.
       iMod (iref_load_locked_au ⊤ M j ltac:(solve_ndisj) Hk with "Hinv Hhalf")
         as "[Hcellp Hbackp]".
-      iDestruct (wordw_claim_of (KTR := KT0) 4 (i_ref (ientry j))
+      iDestruct (ctx_word4_claim (KTR2 := KT0) (i_ref (ientry j))
                    (DfracOwn 1) (iref_word M j) ltac:(lia) with "Hcellp")
         as "#Hclaim0".
       iMod ("Hbackp" with "Hcellp") as "Hhalf".
@@ -2044,7 +2046,7 @@ Section ProofIget.
         iApply fupd_wp.
         iMod (iref_load_locked_au ⊤ M j ltac:(solve_ndisj) Hk with "Hinv Hhalf")
           as "[Hcellp Hbackp]".
-        iDestruct (wordw_claim_of (KTR := KT0) 4 (i_ref (ientry j))
+        iDestruct (ctx_word4_claim (KTR2 := KT0) (i_ref (ientry j))
                      (DfracOwn 1) (iref_word M j) ltac:(lia) with "Hcellp")
           as "#Hclaim5".
         iMod ("Hbackp" with "Hcellp") as "Hhalf".
@@ -2185,7 +2187,7 @@ Section ProofIget.
         (* same re-spelling as the HIT arm above. *)
         iEval (rewrite Houtb) in "Hcg".
         iApply (Release.wp_release_sconf KT1 fsc_itlock itable_lock "itable"%string
-                  (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) L7
+                  <{ itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev }> L7
                   n eb p (K - 6)%nat ({["itable"]} ∪ lks)
                   ltac:(rewrite HL7a0; reflexivity) ltac:(lia)
                   with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").

@@ -47,13 +47,14 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 
 (* brelse's own frame is 32 bytes (4 slots); its deepest callee is
    releasesleep (22). *)
 Notation K_brelse := (26%nat) (only parsing).
 Definition wp_brelse_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     
     (γs : list gname)
     (bn : bio_names) (V : bio_view Σ) (k : nat)
@@ -99,7 +100,7 @@ Definition wp_brelse_sconf_body
 
 Module Type BRELSE.
   Parameter wp_brelse_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       
       (γs : list gname)
       (bn : bio_names) (V : bio_view Σ) (k : nat)

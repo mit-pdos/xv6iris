@@ -60,6 +60,7 @@ Require Import IntrDefs.
 Require Import CodeFileread.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -461,7 +462,7 @@ Section ProofFilereadParts.
   (* =================================================================== *)
   (*  +0x58 .. +0x62 -- THE EPILOGUE.  Every exit reaches it.             *)
   (* =================================================================== *)
-  Lemma fr_epi `{GEN : GenId} `{CID0 : CpuId}
+  Lemma fr_epi `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s20 : mword 64) (rv : mword 64) (w3 w5 w6 : mword 64)
       (p : mword 64) (b : bool) :
@@ -480,12 +481,12 @@ Section ProofFilereadParts.
     sie_cap_gpr KT1 Mt (K - 6)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (FR + 0x5e) : mword 64) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) w3 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) s20 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) w3 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) w6 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
@@ -641,7 +642,7 @@ Section ProofFilereadParts.
   (*  [c.ldsp s1,24(sp); c.ldsp s3,8(sp)] -- five copies, one lemma over  *)
   (*  the block's pcs as LITERALS.                                        *)
   (* =================================================================== *)
-  Lemma fr_rest2 `{GEN : GenId} `{CID0 : CpuId}
+  Lemma fr_rest2 `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (Mt : regfile) (K : nat) (sp0 : mword 64) (v1 v3 : mword 64)
       (za zb zc : Z) (p : mword 64) (b : bool) :
     Mt !!! Regidx csp_rs1 = pa_stk sp0 6 ->
@@ -655,8 +656,8 @@ Section ProofFilereadParts.
     instr (mword_of_int zb : mword 64) true
       (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")),
              sp, Regidx Rs3, false, 8)) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) v1 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) v3 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) v1 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) v3 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ Mr : regfile,
         ⌜ Mr !!! Regidx csp_rs1 = pa_stk sp0 6
@@ -665,8 +666,8 @@ Section ProofFilereadParts.
                 r <> Rs1 -> r <> Rs3 -> Mr !!! Regidx r = Mt !!! Regidx r) ⌝ -∗
         sie_cap_gpr KT1 Mr K b p -∗
         pc_is (mword_of_int zc : mword 64) -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) v1 -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) v3 -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) v1 -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) v3 -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -715,7 +716,7 @@ Section ProofFilereadParts.
   (*  FD_DEVICE arm's TWO -1 exits (+0xb0 the out-of-range major, +0xba    *)
   (*  the null devsw slot).  Same block, so one lemma over its five pcs.   *)
   (* =================================================================== *)
-  Lemma fr_m1j `{GEN : GenId} `{CID0 : CpuId}
+  Lemma fr_m1j `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (Mt : regfile) (K : nat) (sp0 : mword 64) (v1 v3 : mword 64)
       (za zb zc zd ze : Z) (jimm : mword 21) (p : mword 64) (b : bool) :
     Mt !!! Regidx csp_rs1 = pa_stk sp0 6 ->
@@ -738,8 +739,8 @@ Section ProofFilereadParts.
       (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")),
              sp, Regidx Rs3, false, 8)) -∗
     instr (mword_of_int ze : mword 64) true (JAL (jimm, zreg)) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) v1 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) v3 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) v1 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) v3 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ Mr : regfile,
         ⌜ Mr !!! Regidx csp_rs1 = pa_stk sp0 6
@@ -749,8 +750,8 @@ Section ProofFilereadParts.
                 r <> Rs1 -> r <> Rs2 -> r <> Rs3 -> Mr !!! Regidx r = Mt !!! Regidx r) ⌝ -∗
         sie_cap_gpr KT1 Mr K b p -∗
         pc_is (mword_of_int (FR + 0x5e) : mword 64) -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) v1 -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) v3 -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) v1 -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) v3 -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.

@@ -36,6 +36,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift.
 Require VirtioQueue.   (* [write_bytes_lookup]: the snapshot's per-byte hits *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ---------------------------------------------------------------------- *)
@@ -73,7 +74,7 @@ Qed.
 
 Section events.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)
   (* RAM READ, the plain one ([ak_excl = false]): never blocked, never    *)

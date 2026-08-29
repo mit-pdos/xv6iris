@@ -101,6 +101,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.
+Require Import TsoCtx.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -245,7 +246,7 @@ Section NameiInitPinned.
       returned register is the [k]th itable entry, and THAT entry's inum is
       literally 7.  Stated so a client (kexec) can quote it without
       unfolding anything.                                                 *)
-  Lemma inode_held_at_inum (v : mword 64) (z : Z) :
+  Lemma inode_held_at_inum `{XI : CurCtx} (v : mword 64) (z : Z) :
     inode_held_at v z -∗
     ∃ (k : nat) (q : Qp) (inum : mword 32),
       ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗ ⌜bv_unsigned inum = z⌝ ∗
@@ -257,7 +258,7 @@ Section NameiInitPinned.
     iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iExact "H".
   Qed.
 
-  Corollary inode_held_at_init (v : mword 64) :
+  Corollary inode_held_at_init `{XI : CurCtx} (v : mword 64) :
     inode_held_at v 7 -∗
     ∃ (k : nat) (q : Qp) (inum : mword 32),
       ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗ ⌜bv_unsigned inum = 7⌝ ∗
@@ -306,7 +307,7 @@ Section NameiInitPinnedBody.
     [hops := init_hops], which is [SpecNameiTr.wp_namei_tr_body]'s ambient
     environment verbatim: this is a corollary, not a new walk.            *)
 
-  Theorem wp_namei_init_pinned `{GEN : GenId} `{CID : CpuId}
+  Theorem wp_namei_init_pinned `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (gs : list gname) (j : nat) (gl : gname)
     (gu : uart_names) (gd : disk_names) (gk : gname)
     (pd pav pu : mword 64)
@@ -366,7 +367,7 @@ Section NameiInitPinnedBody.
     procs_inv gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
-    is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+    is_lock gk d_lock "virtio_disk"%string <{ disk_res gd pd pav pu }> -∗
     BitmapInv.sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     InodeInv.sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_inv gfs bmapstart cov logstart size -∗

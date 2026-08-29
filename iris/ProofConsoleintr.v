@@ -53,7 +53,7 @@
    Löb IH sits under.  Nothing is returned, so no count has to survive.
 
    AFTER THE ENTRY [acquire] THE HART IS FIXED, and that is what makes every
-   arm below a plain lemma over `{CIDq : CpuId} with one chaining premise
+   arm below a plain lemma over `{CIDq : CpuId} `{XI : CurCtx} with one chaining premise
    rather than a [wp_next]-wrapped continuation: the whole critical section
    runs at [b = false], where [wp_next_off_intro] hands the callback back at
    the AMBIENT hart, and neither consputc nor wakeup rebinds one.  Only the
@@ -93,6 +93,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 Import Defs.
 Local Open Scope Z_scope.
@@ -146,18 +147,18 @@ Section CtBodies.
   (* ---- the frame, in two pieces ------------------------------------ *)
 
   (* the three the prologue saves unconditionally *)
-  Definition ct_saved (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
+  Definition ct_saved `{XI : CurCtx} (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
     (pa_stk sp0 1 ↦₈[KT1] (m0 !!! Regidx Rra) ∗
      pa_stk sp0 2 ↦₈[KT1] (m0 !!! Regidx Rs0) ∗
      pa_stk sp0 3 ↦₈[KT1] (m0 !!! Regidx Rs1))%I.
 
   (* slots 4 and 5 (s2/s3's shrink-wrap) and slot 6, which nothing writes *)
-  Definition ct_rest (sp0 : mword 64) : iProp Σ :=
+  Definition ct_rest `{XI : CurCtx} (sp0 : mword 64) : iProp Σ :=
     ((∃ w : mword 64, pa_stk sp0 4 ↦₈[KT1] w) ∗
      (∃ w : mword 64, pa_stk sp0 5 ↦₈[KT1] w) ∗
      (∃ w : mword 64, pa_stk sp0 6 ↦₈[KT1] w))%I.
 
-  Lemma ct_frame_back (sp0 : mword 64) (m0 : regfile) :
+  Lemma ct_frame_back `{XI : CurCtx} (sp0 : mword 64) (m0 : regfile) :
     ct_saved sp0 m0 -∗ ct_rest sp0 -∗ stack_own (KTR := KT1) sp0 6.
   Proof.
     iIntros "(H1 & H2 & H3) (H4 & H5 & H6)".
@@ -364,7 +365,7 @@ Section CtBodies.
   Qed.
 
   (* the function's own exit, as a [wp_next] at the entry hart *)
-  Definition ct_ret `{CID0 : CpuId} (pme : mword 64) (m0 : regfile)
+  Definition ct_ret `{CID0 : CpuId} `{XI : CurCtx} (pme : mword 64) (m0 : regfile)
       (K lvl : nat) (eb : bool) (b : bool) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
        ∀ Mf : regfile,
@@ -377,7 +378,7 @@ Section CtBodies.
   (* =================================================================== *)
   (*  +0x110 .. +0x118 -- THE EPILOGUE.                                   *)
   (* =================================================================== *)
-  Lemma ct_epi `{CID : CpuId} (CID0 : CPU)
+  Lemma ct_epi `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
       (sp0 : mword 64) (b : bool) (lks : gset string) :
     m0 !!! Regidx csp_rs1 = sp0 ->
@@ -520,7 +521,7 @@ Module ConsoleintrProof (Acquire : ACQUIRE) (Consputc : CONSPUTC)
 
 Section ProofConsoleintr.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac rgall := repeat (rewrite rget_ne; [| vm_compute; discriminate]).
   Local Typeclasses Opaque cpu_own.
@@ -617,7 +618,7 @@ Section ProofConsoleintr.
       assert (N10 : r <> Ra0) by (intro He; rewrite He in Hr; vm_compute in Hr; discriminate).
       rewrite /X3 upd_ne; [| congruence]. rewrite /X2 upd_ne; [| congruence].
       rewrite /X1 upd_ne; [| congruence]. reflexivity. }
-    iApply (Release.wp_release_sconf KT1 γc a_cons "cons"%string cons_res X3
+    iApply (Release.wp_release_sconf KT1 γc a_cons "cons"%string <{ cons_res }> X3
               lvl eb pme (K - 6)%nat ({["cons"]} ∪ lks) HX3lka
               ltac:(lia)
               with "Hcg Ht Hpc Hlk Hlocked Hres Hcnt Hpay").
@@ -2764,12 +2765,12 @@ Section ProofConsoleintr.
     (* ---- +0x014 acquire(&cons.lock) ---- *)
     iDestruct (cpu_own_transport CID CIDp9 lvl eb pme b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf KT1 γc "cons"%string cons_res P5 lvl eb pme
+    iApply (Acquire.wp_acquire_sconf KT1 γc "cons"%string <{ cons_res }> P5 lvl eb pme
               (K - 6)%nat b lks ltac:(lia) ltac:(lia) Hbelow
               with "Hcg Hcnt Ht Hpc []").
     all: try lkbelow.
     { iEval (rewrite HP5a0). iExact "Hlk". }
-    iIntros (CIDaq Hsaq ms0 maq) "%Hms0 Hcg Hpc %Hcsaq Hlocked Hres Hcnt Hpay". rgall.
+    iIntros (CIDaq Hsaq ms0 maq) "%Hms0 Hcg Hpc %Hcsaq Hlocked Hres _ Hcnt Hpay". rgall.
     iEval (rewrite HP5ra) in "Hpc".
     assert (Hp018 : ret_pc (add_vec_int (mword_of_int (CT + 0x14) : mword 64) 4)
                     = (mword_of_int (CT + 0x18) : mword 64)) by pcw.

@@ -45,6 +45,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import UserPtTree UserExec.
 Require Import UmodeCap UmodeAbi.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -88,6 +89,9 @@ Inductive usys_sem : Type :=
 Section UmodeSyscall.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
+  (* user code runs AS the thread: ambient context, and a
+     reschedule moves the hart, never the context. *)
+  Context `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   (* the RESUME continuation shared by every returning shape: the hart is

@@ -59,6 +59,7 @@ Ltac rgall := repeat (rewrite rget_ne; [| vm_compute; discriminate]).
 Require Import VirtioDiskRwDefs.
 Require Import ProofVirtioDiskRwC.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 
 (* ===================================================================== *)
@@ -77,7 +78,7 @@ Module P2 := VirtioDiskRwRest Acquire Release SleepPrepare Sleep FreeDesc.
 
 Section ProofVirtioDiskRwCSeam.
   Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Notation Ra0 := (mword_of_int 10 : mword 5).

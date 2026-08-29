@@ -191,6 +191,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -200,7 +201,7 @@ Local Open Scope Z_scope.
    memmove 2. *)
 Notation K_ilock := (62%nat) (only parsing).
 Definition wp_ilock_dep_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -354,7 +355,7 @@ Definition wp_ilock_dep_sconf_body
   (* the disk fabric *)
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
   (* ONE slot unit: bread's reference, which brelse gives back *)
   bslot -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function PARKS (its
@@ -455,7 +456,7 @@ Definition wp_ilock_dep_sconf_body
    ([wp_ilock_tx_of_dep] below); not a line of ilock's own proof is
    re-run. *)
 Definition wp_ilock_tx_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
    (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -571,7 +572,7 @@ Definition wp_ilock_tx_sconf_body
   (* the disk fabric *)
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
   (* ONE slot unit: bread's reference, which brelse gives back *)
   bslot -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function PARKS (its
@@ -689,7 +690,7 @@ Definition wp_ilock_tx_sconf_body
    halves rejoined into [IcacheEscrow.ic_tx_dep] at the post.  The escrow
    holds its half from the checkout on. *)
 Lemma wp_ilock_tx_of_dep
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (gs : list gname) (j : nat) (gl : gname)
     (pd pav pu : mword 64)
     (gil gisl : gname)
@@ -735,7 +736,7 @@ Module Type ILOCK.
      ([fileread], [filestat]) uses it at [DepRd] directly, which is what
      retires [ic_shed_rd] at those two sites. *)
   Parameter wp_ilock_dep_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
@@ -750,7 +751,7 @@ Module Type ILOCK.
      proof; what selects it is whether the caller brings [LogInv.log_tx].
      [ProofIlock] defines it by [wp_ilock_tx_of_dep]. *)
   Parameter wp_ilock_tx_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)

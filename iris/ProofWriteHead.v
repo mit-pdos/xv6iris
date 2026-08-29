@@ -93,6 +93,7 @@ Require Import SpecWriteHead.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -189,7 +190,7 @@ Lemma wh_ptr_eqb (p : SailStdpp.Values.mword 64) (a b : nat) :
 Proof. intros Ha Hb. apply ByteCursor.pa_add_eqb; lia. Qed.
 
 (* the ONE content fact the postcondition states: the header's [n] field *)
-Lemma wh_take4 (f : nat -> bv 8) (nn : SailStdpp.Values.mword 32) :
+Lemma wh_take4 `{XI : CurCtx} (f : nat -> bv 8) (nn : SailStdpp.Values.mword 32) :
   (forall j, (j < 4)%nat -> f j = nth_byte nn j) ->
   hdr_n (f <$> seq 0 1024) = bv_unsigned nn.
 Proof.
@@ -222,7 +223,7 @@ Proof.
 Qed.
 
 (* [wh_take4] at an arbitrary aligned offset *)
-Lemma wh_take4_at (f : nat -> bv 8) (nn : SailStdpp.Values.mword 32) (o : nat) :
+Lemma wh_take4_at `{XI : CurCtx} (f : nat -> bv 8) (nn : SailStdpp.Values.mword 32) (o : nat) :
   (o + 4 <= 1024)%nat ->
   (forall j, (j < 4)%nat -> f (o + j)%nat = nth_byte nn j) ->
   assemble_bytes (take 4 (drop o (f <$> seq 0 1024))) = bv_unsigned nn.
@@ -273,7 +274,7 @@ Qed.
    decodes to exactly the in-memory header [(n, W)].  [Hf4] is the [n] field
    ([wh_take4]'s hypothesis, unchanged) and [Henc] is the loop's strengthened
    invariant: entry [i'] went to the word at byte offset [4 * S i']. *)
-Lemma wh_hdr_dec (f : nat -> bv 8) (n : nat) (W : list (SailStdpp.Values.mword 32)) :
+Lemma wh_hdr_dec `{XI : CurCtx} (f : nat -> bv 8) (n : nat) (W : list (SailStdpp.Values.mword 32)) :
   n = length W -> (n <= LOGBLOCKS)%nat ->
   (forall jj, (jj < 4)%nat ->
      f jj = nth_byte (mword_of_int (Z.of_nat n) : SailStdpp.Values.mword 32) jj) ->
@@ -385,7 +386,7 @@ Section WriteHeadDefs.
   (* ---------------------------------------------------------------- *)
   (*  the payload-less handle, with its bytes in window form            *)
   (* ---------------------------------------------------------------- *)
-  Definition wh_hold (bn : bio_names) (V : bio_view Σ) (k : nat)
+  Definition wh_hold `{XI : CurCtx} (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (f : nat -> bv 8) (bsd : list (bv 8)) : iProp Σ :=
     (⌜(k < NBUF)%nat⌝ ∗
      ⌜uint bno ∈ bv_cov V⌝ ∗
@@ -398,7 +399,7 @@ Section WriteHeadDefs.
      bb_bytes (b_data (bnode k)) 1024 f ∗
      disk_block (bv_gd V) (uint bno) bsd)%I.
 
-  Lemma wh_hold_of (bn : bio_names) (V : bio_view Σ) (k : nat)
+  Lemma wh_hold_of `{XI : CurCtx} (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (bs bsd : list (bv 8)) :
     bio_hold0 bn V k pidv dev bno bs bsd -∗
     wh_hold bn V k pidv dev bno (fun j => bs !!! j) bsd.
@@ -415,7 +416,7 @@ Section WriteHeadDefs.
     iSplitL "Hby"; [iExact "Hby"|]. iExact "H6".
   Qed.
 
-  Lemma wh_hold_to (bn : bio_names) (V : bio_view Σ) (k : nat)
+  Lemma wh_hold_to `{XI : CurCtx} (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (f : nat -> bv 8) (bsd : list (bv 8)) :
     wh_hold bn V k pidv dev bno f bsd -∗
     bio_hold0 bn V k pidv dev bno (f <$> seq 0 1024) bsd.
@@ -435,7 +436,7 @@ Section WriteHeadDefs.
   (* ---------------------------------------------------------------- *)
   (*  the payload, split into pieces that survive the write            *)
   (* ---------------------------------------------------------------- *)
-  Lemma wh_pay_split (bn : bio_names) (γfs : fs_names) (γd : disk_names)
+  Lemma wh_pay_split `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bsl bsd : list (bv 8)) (d : bool) :
     bio_pay bn (fs_view γfs γd dev cov) k dv bno bsl bsd d -∗
@@ -448,7 +449,7 @@ Section WriteHeadDefs.
     - rewrite /fs_mclean. iIntros "[[$ $] _]"; try done.
   Qed.
 
-  Lemma wh_pay_mk (bn : bio_names) (γfs : fs_names) (γd : disk_names)
+  Lemma wh_pay_mk `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (k : nat) (dv bno : mword 32)
       (bs : list (bv 8)) (d : bool) :
     (uint bno ↪[fs_cache γfs]{#(1/2)} bs) -∗
@@ -464,7 +465,7 @@ Section WriteHeadDefs.
   (* ---------------------------------------------------------------- *)
   (*  the continuation, the frame and the register threading            *)
   (* ---------------------------------------------------------------- *)
-  Definition wh_cont `{GEN : GenId} `{CID0 : CpuId} 
+  Definition wh_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γfs : fs_names) (bn : bio_names) (logstart : Z) (n : nat)
       (W : list (mword 32)) (L : gmap Z (list (bv 8)))
       (pidv : mword 32) (dq : dfrac) (j : nat)
@@ -490,7 +491,7 @@ Section WriteHeadDefs.
         WP (Loop : expr riscv_lang))%I.
 
   (* the four frame slots: ra@24, s0@16, s1@8, s2@0 *)
-  Definition wh_frame (m : regfile) : iProp Σ :=
+  Definition wh_frame `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
@@ -519,7 +520,7 @@ Section WriteHeadBlocks.
   (*  +0x46 .. +0x5c : bwrite, the logged-view move, brelse, epilogue.   *)
   (*  Entered from the loop's exit AND from the [blez] shortcut (n = 0). *)
   (* ================================================================== *)
-  Local Lemma wh_tail `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma wh_tail `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -561,7 +562,7 @@ Section WriteHeadBlocks.
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     wh_frame m -∗
     wh_hold bn (fs_view γfs γd dev cov) k pidv dev bno f bsd0 -∗
     (logstart ↪[fs_cache γfs]{#(1/2)} bs0) -∗
@@ -1025,7 +1026,7 @@ Section WriteHeadBlocks.
   (*  A fuel induction on the entries still to copy; the exit test is a  *)
   (*  POINTER compare read back as an index compare.                    *)
   (* ================================================================== *)
-  Local Lemma wh_loop `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma wh_loop `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1072,7 +1073,7 @@ Section WriteHeadBlocks.
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     wh_frame m -∗
     wh_hold bn (fs_view γfs γd dev cov) kk pidv dev bno f bsd0 -∗
     (logstart ↪[fs_cache γfs]{#(1/2)} bs0) -∗
@@ -1322,7 +1323,7 @@ End WriteHeadBlocks.
 
 Section ProofWriteHead.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_write_head_sconf 
       (γs : list gname) (j : nat) (γl : gname)

@@ -9,13 +9,14 @@ From iris.bi.lib Require Import fractional.
 Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d SailStdpp.Base RiscvLang RiscvPtsto RiscvFetchExec WpGpr RegFile InstrBytes SailStdpp.TypeCasts SailStdpp.MachineWord SailStdpp.Values.
 Require Import WpInstr.   (* wp_instr / mm_cycle, split out of InstrBytes *)
 Require Import HartSwp WpMmodeSwpBase.   (* the [swp] execute catalogue *)
+Require Import TsoCtx.
 Import Defs.
 Import Defs.
 
 (* from WpGprAddi.v *)
 Section WpAddiwGpr.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Lemma wp_addiw_gpr (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5) (immv : mword 12)
       (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :

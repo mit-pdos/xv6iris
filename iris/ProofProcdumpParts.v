@@ -38,6 +38,7 @@ Require Import ProcdumpAux.
 Require Import CodeProcdump.
 From Kernel Require KernelInstrs KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 (* a failing tactic in a whole-function WP otherwise spends tens of minutes
@@ -89,7 +90,7 @@ Section ProofProcdumpParts.
   (* +0x00 .. +0x1a -- push the 80-byte frame, save ra/s0/s1..s7, set s0 *)
   (* to the ENTRY sp, and materialise a0 = "\n" for the first printk.    *)
   (* ================================================================== *)
-  Lemma wp_pd_prologue `{GEN : GenId} `{CID0 : CpuId}
+  Lemma wp_pd_prologue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (m : regfile) (K : nat) (b : bool) (p : mword 64) :
     (48 <= K)%nat ->
     sie_cap_gpr KT1 m K b p -∗
@@ -330,7 +331,7 @@ Section ProofProcdumpParts.
   (* +0x22 .. +0x54 -- the seven hoisted constants and the c.j into the  *)
   (* loop head.  Writes s1..s7 and nothing else.                        *)
   (* ================================================================== *)
-  Lemma wp_pd_consts `{GEN : GenId} `{CID0 : CpuId}
+  Lemma wp_pd_consts `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (M : regfile) (K' : nat) (b : bool) (p : mword 64) :
     sie_cap_gpr KT1 M K' b p -∗
     kernel_text -∗
@@ -538,7 +539,7 @@ Section ProofProcdumpParts.
   (* ================================================================== *)
   (* +0x8e .. +0xa2 -- nine c.ldsp restores, the pop, and the ret.       *)
   (* ================================================================== *)
-  Lemma wp_pd_epilogue `{GEN : GenId} `{CID0 : CpuId}
+  Lemma wp_pd_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (m Mx : regfile) (K : nat) (b : bool) (p : mword 64) :
     (10 <= K)%nat ->
     Mx !!! pdR 2 = pa_stk (m !!! pdR 2 : mword 64) 10 ->

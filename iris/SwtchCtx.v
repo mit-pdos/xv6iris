@@ -21,6 +21,7 @@ Require Import StackOwn.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* struct-context field layout: field i (0..13) holds register [ctx_regs !! i]
@@ -92,7 +93,7 @@ Proof. intro H; exact H. Qed.
 Section SwtchCtx.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ================================================================== *)
   (* struct context: ownership of its 14 saved-register cells.           *)
@@ -104,6 +105,7 @@ Section SwtchCtx.
     end.
   Definition ctx_cells (c : mword 64) (vs : list (mword 64)) : iProp Σ :=
     ctx_cells_at c 0 vs.
+
 
   (* 14-slot context-field ownership, contents existential: what a RUNNING
      party holds of its own context field between switches (the resume wand
@@ -220,15 +222,35 @@ Section SwtchCtx.
            mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
       (rec : ctx_adm -d> mword 64 -d> mword 64 -d> iPropO Σ)
       : ctx_adm -d> mword 64 -d> mword 64 -d> iPropO Σ := fun A c p =>
-    (∃ (vs : list (mword 64)) (av : nat),
+    (* THE PARKED RECORD OWNS ITS THREAD TOKEN, IN PARKED FORM (tso-port
+       checkpoint 0.4 item 5).  A parked context IS a thread of control:
+       [XIp] is ITS identity, held here while it is not running, and its
+       resume wand asks for the bundle at THAT identity -- so the facts
+       its closure captured (all indexed by [XIp]) are the facts it wakes
+       up holding.  The token is [ctx_parked], NOT [own_context]: the
+       running token is hart-ambient (at TSO it ties the context's bound
+       to a hart's view), while this record is MIGRATABLE -- the ∀h wand
+       below is resumable at every hart, and a hart-tied token here would
+       pin it.  [Tp] is the parked stamp (the bound a resumer's view must
+       dominate; the resumer's p->lock acquire supplies the receipt --
+       [TsoCtx.hart_view_lb], via [TsoCtx.ctx_resume]).  Both EXISTENTIAL,
+       like the lock's internal context: no consumer of [valid_context]
+       names them, so no arity moves.  swtch is the one place the token is
+       exchanged (ProofSwtch.v): the parker's token parks INTO the record
+       it builds, the target's is resumed OUT of the record it consumes --
+       which is exactly what makes the hart keep running while the THREAD
+       changes. *)
+    (∃ (vs : list (mword 64)) (av : nat) (XIp : CtxId) (Tp : nat),
       ⌜length vs = 14%nat⌝ ∗
       ⌜eq_vec (access_vec_dec (ret_pc (nth 0 vs (mword_of_int 0))) 0) ('b"0") = true⌝ ∗
       ctx_cells c vs ∗
       stack_own (KTR := KT1) (nth 1 vs (mword_of_int 0)) av ∗
+      (* main-tso-readiness: [ctx_parked XIp Tp] DEFERRED (no running token
+         in sie_cap yet); [XIp]/[Tp] keep the T-leg arity. *)
       (∀ (h : CPU) (m : regfile) (eb' : bool),
          ⌜adm A h⌝ -∗
          ⌜callee_img m = vs⌝ -∗
-         sie_cap_gpr KT1 (CID := h) m av false p -∗
+         sie_cap_gpr KT1 (CID := h) (XI := XIp) m av false p -∗
          cpu_own (CID := h) 1 eb' p false {["proc"]} -∗
          pc_is (CID := h) (ret_pc (m !!! Regidx (mword_of_int 1))) -∗
          ctx_cells c vs -∗
@@ -270,9 +292,78 @@ Section SwtchCtx.
 
 End SwtchCtx.
 
+(* THE SAVE AREA'S RE-INDEX, PAID (the machine flip; tso-machine-flip.md
+   §6 amendment A6.58).  OUTSIDE the section, because the section's ambient
+   [XI] fixes the index this must vary.
+
+   WHAT CHANGED AND WHY.  The SC-era body was [ctx_word_to_mem] followed by
+   [ctx_word_of_mem] -- a FREE re-index, and the flip refutes it exactly:
+   a [ctx_pointsto] carries its clean/dirty justification AT ITS OWN
+   CONTEXT ([TsoCtx]'s [llb (ctx_bound_name ξ) t] / dirty fragment), and
+   nothing above the interp can re-mint that elsewhere.  The honest law is
+   already in the kit and this payload is precisely what it is for:
+   [TsoCtx.CtxMorph] transports any structural payload along a
+   [ctx_dom ξ ξ'], and a save area is fourteen word cells and nothing else.
+
+   So the re-index KEEPS ITS NAME AND GAINS ITS PRICE -- one [ctx_dom]
+   token, which the park/resume protocol already mints
+   ([ctx_dom_to_parked] / [ctx_dom_of_parked]).  Its one caller
+   ([ProofScheduler]) is the M2 worklist entry that price creates; it is
+   NOT a quarantine, because the obligation is now stated in the type.
+
+   The morph fact is a plain lemma, not a [Global Instance]: it is applied
+   AS A TERM at the two uses below, which keeps it out of every downstream
+   file's instance search. *)
+Section CtxCellsReindex.
+  Context `{!riscvGS Σ}.
+
+  Lemma ctx_cells_at_morph (c : mword 64) (off : Z) (vs : list (mword 64)) :
+    CtxMorph (λ ξ, ctx_cells_at (XI := ξ) c off vs).
+  Proof.
+    revert off. induction vs as [|v vs IH] => off; iIntros (ξ ξ') "Hd Hc".
+    - iFrame "Hd".
+    - iDestruct "Hc" as "[Hv Hrest]".
+      iDestruct (ctx_morph_word _ (add_vec c (mword_of_int off)) (DfracOwn 1) v
+              ξ ξ' with "Hd Hv") as "[Hd Hv]".
+      iDestruct (IH (off + 8) ξ ξ' with "Hd Hrest") as "[Hd Hrest]".
+      iFrame.
+  Qed.
+
+  Global Instance ctx_cells_morph (c : mword 64) (vs : list (mword 64)) :
+    CtxMorph (λ ξ, ctx_cells (XI := ξ) c vs).
+  Proof.
+    iIntros (ξ ξ') "Hd H".
+    iDestruct (ctx_cells_at_morph c 0 vs ξ ξ' with "Hd H") as "[Hd H]".
+    iFrame.
+  Qed.
+
+  (* [tso SwtchCtx.v:201] *)
+  Global Instance own_ctx_morph (pa : mword 64) :
+    CtxMorph (λ ξ0 : CtxId, own_ctx (XI := ξ0) pa).
+  Proof.
+    iIntros (ξ ξ') "Hd H". iDestruct "H" as (vs) "[%Hl H]".
+    iDestruct (ctx_cells_morph pa vs ξ ξ' with "Hd H") as "[Hd H]".
+    iFrame "Hd". iExists vs. by iFrame.
+  Qed.
+
+  Lemma ctx_cells_at_reindex (ξ ξ' : CtxId) (c : mword 64) (off : Z)
+      (vs : list (mword 64)) :
+    ctx_dom ξ ξ' -∗ ctx_cells_at (XI := ξ) c off vs ==∗
+    ctx_dom ξ ξ' ∗ ctx_cells_at (XI := ξ') c off vs.
+  Proof.
+    iIntros "Hd H". iModIntro. iApply (ctx_cells_at_morph c off vs ξ ξ' with "Hd H").
+  Qed.
+
+  Lemma ctx_cells_reindex (ξ ξ' : CtxId) (c : mword 64)
+      (vs : list (mword 64)) :
+    ctx_dom ξ ξ' -∗ ctx_cells (XI := ξ) c vs ==∗
+    ctx_dom ξ ξ' ∗ ctx_cells (XI := ξ') c vs.
+  Proof. exact (ctx_cells_at_reindex ξ ξ' c 0 vs). Qed.
+End CtxCellsReindex.
+
 Section Swconf.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)
   (* The swtch-crossing configuration bundle: what a scheduler context    *)

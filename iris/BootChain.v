@@ -75,6 +75,7 @@ Require Import ProcAvail.
 Require Import FsCfgBoot IrefSlots LogDefs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* ====================================================================== *)
 (* §1  THE BOOT GEOMETRY.                                                  *)
@@ -261,7 +262,7 @@ Proof. vm_compute. reflexivity. Qed.
 
 Section BootChain.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma boot_entry_pre (E : coPset) (rs : regstate) :
     reset_regs cpu_id rs ->
@@ -393,7 +394,7 @@ End BootChain.
 
 Section BootRun.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ONE BUNDLE for what one hart's boot chain runs on, so §3 and §4 state it
      once: [boot_entry_pre]'s output MINUS the two PLIC wire pins, plus the
@@ -593,7 +594,7 @@ End BootRun.
 
 Section BootSecondary.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma boot_hart_secondary (rs : regstate)
       (iv : mword 32) (dq : dfrac) (γd : uart_names) (γv : disk_names) :
@@ -642,7 +643,7 @@ End BootSecondary.
 
 Section BootPrimary.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma boot_hart_primary (rs : regstate)
       (iv : mword 32) (dq : dfrac) (γd : uart_names) (γv : disk_names)

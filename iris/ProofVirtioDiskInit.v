@@ -131,6 +131,8 @@ Require Import SpecInitlock SpecKalloc SpecMemset SpecVirtioDiskInit.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
+   leg M); this caller is not yet -- the shim marks the open seam *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -386,7 +388,7 @@ Ltac vcr :=
 
 Section VdiLeaves.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* -- a CONFIG-ONLY store ------------------------------------------- *)
   Lemma wp_vdi_sw (γv : disk_names)
@@ -654,6 +656,7 @@ End VdiLeaves.
 
 Section VdiLease.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.
 
   Lemma vdi_page_static (p : mword 64) :
     page_valid p ->
@@ -772,6 +775,12 @@ Section VdiLease.
     iIntros "Hidx Hpu".
     iEval (cbn [seq]) in "Hidx".
     iDestruct "Hidx" as "(Hi0 & Hi1 & _)".
+    (* [mem_bytes_notin] is a RAW law; the lease's bytes are ctx facts, and
+       the conclusion is pure, so the crossing is one-way *)
+    iDestruct (TsoCtxShim.ctx_buf_to_mem _ _ pu 4096 (fun _ : nat => byte_zero)
+                 (DfracOwn 1) with "Hpu") as "Hpu".
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hi0") as "Hi0".
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hi1") as "Hi1".
     iDestruct (mem_bytes_notin pu (pa_add (pa_add pav 2%nat) 0%nat) 0 4096
                  (DfracOwn 1) (fun _ : nat => byte_zero) _ with "Hpu Hi0") as %Hn0.
     iDestruct (mem_bytes_notin pu (pa_add (pa_add pav 2%nat) 1%nat) 0 4096
@@ -799,7 +808,7 @@ End VdiLease.
 Module VirtioDiskInitProof (IL : INITLOCK) (AK : KALLOC) (MS : MEMSET) : VIRTIODISKINIT.
 Section ProofVirtioDiskInit.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Ltac reg_neq :=
@@ -857,7 +866,7 @@ Section ProofVirtioDiskInit.
       do 12 (destruct j as [|j];
              [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string 0x80007650%Z "virtio_disk"%string nmv eq_refl
+    iPoseProof (kernel_data_string_all 0x80007650%Z "virtio_disk"%string nmv eq_refl
                   ltac:(unfold text_end; lia)
                   ltac:(vm_compute; discriminate) Hstrb with "Hkdata") as "#Hstr".
     (* frame-cell address facts (4-slot frame: ra@24, s0@16, s1@8, s2@0) *)
@@ -1973,6 +1982,9 @@ Section ProofVirtioDiskInit.
                      (Z.sub (Z.mul 1 8) 1) 0) : mword 8) 0 = byte_zero) by bvc.
     iEval (rewrite /page_own /byte_any) in "Hpdpg".
     iDestruct (bytes_choose 4096 0 (fun j b => ((pa_add pd j) ↦ₘ b)%I) with "Hpdpg") as (opd) "Hbufd".
+    (* memset's contract is context-indexed and so is [page_own] (KallocInv
+       is converted): the buffer goes in and comes back at the ambient
+       context -- no crossing, no shim. *)
     iApply (MS.wp_memset_sconf KT1 KT0 E7 (K - 4)%nat 4096%nat (mword_of_int 0 : mword 64) opd false pp
               Hc2 ltac:(vm_compute; reflexivity) ltac:(peel; bvc) ltac:(peel; bvc)
               with "Hcg Htext Hpc [Hbufd]").
@@ -2053,6 +2065,9 @@ Section ProofVirtioDiskInit.
     assert (HF6s2 : F6 !!! Regidx (mword_of_int 18 : mword 5) = mword_of_int 11) by (peel; exact Hms1s2).
     iEval (rewrite /page_own /byte_any) in "Hpavpg".
     iDestruct (bytes_choose 4096 0 (fun j b => ((pa_add pav j) ↦ₘ b)%I) with "Hpavpg") as (opav) "Hbufa".
+    (* memset's contract is context-indexed and so is [page_own] (KallocInv
+       is converted): the buffer goes in and comes back at the ambient
+       context -- no crossing, no shim. *)
     iApply (MS.wp_memset_sconf KT1 KT0 F6 (K - 4)%nat 4096%nat (mword_of_int 0 : mword 64) opav false pp
               Hc2 ltac:(vm_compute; reflexivity) ltac:(peel; bvc) ltac:(peel; bvc)
               with "Hcg Htext Hpc [Hbufa]").
@@ -2116,6 +2131,9 @@ Section ProofVirtioDiskInit.
     assert (HG4s2 : G4 !!! Regidx (mword_of_int 18 : mword 5) = mword_of_int 11) by (peel; exact Hms2s2).
     iEval (rewrite /page_own /byte_any) in "Hpupg".
     iDestruct (bytes_choose 4096 0 (fun j b => ((pa_add pu j) ↦ₘ b)%I) with "Hpupg") as (opu) "Hbufu".
+    (* memset's contract is context-indexed and so is [page_own] (KallocInv
+       is converted): the buffer goes in and comes back at the ambient
+       context -- no crossing, no shim. *)
     iApply (MS.wp_memset_sconf KT1 KT0 G4 (K - 4)%nat 4096%nat (mword_of_int 0 : mword 64) opu false pp
               Hc2 ltac:(vm_compute; reflexivity) ltac:(peel; bvc) ltac:(peel; bvc)
               with "Hcg Htext Hpc [Hbufu]").
@@ -2192,8 +2210,14 @@ Section ProofVirtioDiskInit.
     iIntros "Hcg Hpc Hvc".
     assert (Hp118 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_init + 0x116) : mword 64) 2 = mword_of_int (KernelSyms.virtio_disk_init + 0x118)) by pcs.
     iEval (rewrite Hp118) in "Hpc".
-    iDestruct (word_pointsto_aligned_p with "Hdesc") as %Haldesc.
+    iDestruct (ctx_word_pointsto_aligned_p with "Hdesc") as %Haldesc.
+    (* M1 stage 2: [word_pointsto_split4] is InstrBytes' RAW law, so the
+       8-byte cell leaves the ledger for the split and the half that faces
+       the flipped 4-byte leaf comes back through the shim. *)
+    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hdesc") as "Hdesc".
     iDestruct (word_pointsto_split4 with "Hdesc") as "[Hdlo Hdhi]".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem with "Hdlo") as "Hdlo".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem with "Hdhi") as "Hdhi".
     assert (Hdad0 : add_vec (H2 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = disk_desc)
       by (rewrite HH2s1; bvc).
     iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_init + 0x118)) (mword_of_int 14 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 0 : mword 12) H2 (K - 4)%nat (word_lo pd) false
@@ -2231,7 +2255,10 @@ Section ProofVirtioDiskInit.
     assert (HH4a4 : H4 !!! Regidx (mword_of_int 14 : mword 5) = sign_extend' 64 (word_hi pd : mword 32)) by (peel; reflexivity).
     assert (HH4a5 : H4 !!! Regidx (mword_of_int 15 : mword 5) = mword_of_int 0x10001000) by (peel; exact HH3a5).
     assert (HH4s1 : H4 !!! Regidx (mword_of_int 9 : mword 5) = disk_base) by (peel; exact HH3s1).
+    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hdlo") as "Hdlo".
+    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hdhi") as "Hdhi".
     iDestruct (word_pointsto_join4 _ _ _ _ Haldesc with "Hdlo Hdhi") as "Hdesc".
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hdesc") as "Hdesc".
     iEval (rewrite vdi_word_join) in "Hdesc".
     assert (Hp120 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_init + 0x11e) : mword 64) 2 = mword_of_int (KernelSyms.virtio_disk_init + 0x120)) by pcs.
     iEval (rewrite Hp120) in "Hpc".

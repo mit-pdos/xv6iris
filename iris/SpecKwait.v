@@ -136,6 +136,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -150,7 +151,7 @@ Import Defs.
    [psz] has to outlive walkaddr / vmfault / memmove, so gcc gave it a
    callee-saved home in s11 and the frame grew to 14 slots (SpecCopyout.v). *)
 Notation K_kwait := (62%nat) (only parsing).
-Definition wp_kwait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_kwait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa γf γw : gname)  (γs : list gname) (j : nat) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (b : bool)
     (pid : mword 32) (U : ustate) (lks : gset string) :=
@@ -175,7 +176,7 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG �
   procs_inv γs -∗
   (* the running-thread bundle sleep needs *)
   (* wait_lock, and what it protects *)
-  is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+  is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
   (* copyout's lazy faulting and freeproc's kfree chain both live here *)
   kalloc_env γa None -∗
   (* the caller's own private block: copyout reads p->pagetable and p->sz *)
@@ -204,7 +205,7 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG �
 
 Module Type KWAIT.
   Parameter wp_kwait_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (b : bool)
       (pid : mword 32) (U : ustate) (lks : gset string),

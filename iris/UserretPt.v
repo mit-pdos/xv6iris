@@ -33,6 +33,7 @@ Require Import RegFile.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -92,7 +93,7 @@ Qed.
 
 Section WpUldPt.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ld rd, imm(a0) inside userret: instruction on the TRAMPOLINE page,
      data through the user table's TRAPFRAME leaf.  All the walk-PTE cell
@@ -718,7 +719,7 @@ Definition uD_lpe (r : register) : bool :=
 
 Section UsretSwp.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma hval_get_xLPE_U (D Drw : gset register) (rs : regstate) :
     (misa : register) ∈ D -> (menvcfg : register) ∈ D ->
@@ -1142,7 +1143,7 @@ End UsretSwp.
 
 Section WpUaluUsretPt.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* any a0-writing instruction on the trampoline page inside userret:
      register-only, so the leaf is [WpSmodePtLeaves.wp_gpr_write_s_config_regime]'s

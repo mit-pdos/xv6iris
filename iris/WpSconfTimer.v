@@ -76,6 +76,7 @@ Require Import HartSCsr HartSwp HartMFrame HartLift HartSpan HartSpanChar
         WpMmodeCsrSwp WpGprCsrwA.
 Require Import TimerCap WpGprCsrwStimecmp MinstretInv.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -252,7 +253,7 @@ Qed.
 (* ===================================================================== *)
 Section TimeCheck.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Lemma hval_cE_Zicntr (D Drw : gset register) (rs : regstate) :
     (cur_privilege : register) ∈ D -> (mseccfg : register) ∈ D ->
@@ -390,7 +391,7 @@ End TimeCheck.
 (* ===================================================================== *)
 Section StimecmpSwp.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Lemma hval_cE_Sstc_S (D Drw : gset register) (rs : regstate) :
     (cur_privilege : register) ∈ D -> (mseccfg : register) ∈ D ->
@@ -764,7 +765,7 @@ End StimecmpSwp.
 Section WpSconfTimer.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context {kt : ktier}.
   (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
      bundle like the register map.  Implicit, so no call site changes. *)

@@ -108,6 +108,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Set Printing Depth 40.
 
@@ -143,7 +144,7 @@ Section ProofSysOpenTails.
   (*  branch that reaches here), so their agreement is a premise and     *)
   (*  slots 4 and 5 ride through as the caller's junk.                   *)
   (* ================================================================== *)
-  Lemma so_tail_a `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_tail_a `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (u : nat) (pidv : mword 32) (dq : dfrac)
@@ -173,7 +174,7 @@ Section ProofSysOpenTails.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     log_op icfg_log u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
@@ -351,7 +352,7 @@ Section ProofSysOpenTails.
   (*  See ARM A-FAIL's banner for why this is a second lemma rather      *)
   (*  than a second application.                                        *)
   (* ================================================================== *)
-  Lemma so_tail_b `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_tail_b `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (u : nat) (pidv : mword 32) (dq : dfrac)
@@ -381,7 +382,7 @@ Section ProofSysOpenTails.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     log_op icfg_log u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
@@ -571,7 +572,7 @@ Section ProofSysOpenTails.
   (*  it, so what these arms carry is the join's plain count, which       *)
   (*  [SysOpenBudget.so_join_exact] puts at [iput_units] or better.       *)
   (* ================================================================== *)
-  Lemma so_tail_c `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_tail_c `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
@@ -640,7 +641,7 @@ Section ProofSysOpenTails.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     bslots 3 -∗
     log_opb icfg_log u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
@@ -917,7 +918,7 @@ Section ProofSysOpenTails.
      [ProofSysOpenParts]'s [so_major_out]), so this is a single arm and
      not a short-circuit pair.  Same six instructions, same ledger, a
      separate lemma for the reason ARM C-FAIL's banner gives. ---- *)
-  Lemma so_tail_d `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_tail_d `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
@@ -986,7 +987,7 @@ Section ProofSysOpenTails.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     bslots 3 -∗
     log_opb icfg_log u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
@@ -1263,7 +1264,7 @@ Section ProofSysOpenTails.
      is ABOVE this branch and BELOW C's and D's, so this is the one tail
      that EARNS [M s2 = m s2] rather than assuming it, and the one whose
      slot 4 is not caller junk.  ARM F-FAIL falls into it. ---- *)
-  Lemma so_tail_e `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_tail_e `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
@@ -1331,7 +1332,7 @@ Section ProofSysOpenTails.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     bslots 3 -∗
     log_opb icfg_log u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
@@ -1656,7 +1657,7 @@ Section ProofSysOpenTails.
   Qed.
 
 
-  Lemma so_tail_f `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_tail_f `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gfl gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -1731,7 +1732,7 @@ Section ProofSysOpenTails.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     bslots 3 -∗
     (* the unit fileclose borrows for the slot it frees, in and straight
        back out -- see SpecFileclose's own note. *)
@@ -1936,7 +1937,7 @@ Section ProofSysOpenTails.
   (*  arm's [c.li a0,-1] this is a [c.mv a0,s3], so the value is a        *)
   (*  PARAMETER here and the walk supplies fdalloc's literal.             *)
   (* ================================================================== *)
-  Lemma so_tail_s `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_tail_s `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
@@ -1986,7 +1987,7 @@ Section ProofSysOpenTails.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     log_opb icfg_log u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗

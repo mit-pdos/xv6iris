@@ -74,6 +74,8 @@ Require Import SpecNameiparent SpecIlock SpecDirlookup SpecIunlockput
         SpecIupdate SpecDirlink.
 From Kernel Require KernelData.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import TsoCtx.
+Require TsoCtxShim.   (* tier weakening rides the raw law *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -198,7 +200,7 @@ Proof. vm_compute. reflexivity. Qed.
 
 Section CreateParts.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the two instances, at the two rodata addresses the auipc/addi pairs
      at +0xfc..+0x100 and +0x110..+0x114 compute.  Both re-checked against
@@ -242,6 +244,8 @@ Section CreateParts.
     intros ->. iIntros "Hkd".
     iDestruct (cr_dot_window _ eq_refl with "Hkd") as "H".
     iApply (big_sepL_mono with "H"). iIntros (k j _) "H".
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "H") as "H".
+    iApply TsoCtxShim.ctx_pointsto_of_mem.
     iApply (mem_ktier_mono _ KT1 with "H").
   Qed.
 
@@ -252,6 +256,8 @@ Section CreateParts.
     intros ->. iIntros "Hkd".
     iDestruct (cr_dotdot_window _ eq_refl with "Hkd") as "H".
     iApply (big_sepL_mono with "H"). iIntros (k j _) "H".
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "H") as "H".
+    iApply TsoCtxShim.ctx_pointsto_of_mem.
     iApply (mem_ktier_mono _ KT1 with "H").
   Qed.
 

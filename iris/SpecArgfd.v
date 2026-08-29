@@ -86,6 +86,7 @@ Require Import FileInvDefs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -154,28 +155,28 @@ Section SpecArgfd.
      [pfd <> 0] as a premise, and it is what lets sys_dup call argfd at all.
      ([pf] keeps its non-null premise: no landed caller passes 0 there.
      sys_read does, and will want the same treatment.) *)
-  Definition ofd_out (a : mword 64) (w : mword 32) : iProp Σ :=
+  Definition ofd_out `{XI : CurCtx} (a : mword 64) (w : mword 32) : iProp Σ :=
     (if bool_decide (a = (zero_reg : mword 64)) then emp else a ↦₄[KT1] w)%I.
 
   (* wand-shaped, so proofs compose with iDestruct/iPoseProof rather than
      needing a setoid rewrite inside the proofmode context *)
-  Lemma ofd_out_null (a : mword 64) (w : mword 32) :
+  Lemma ofd_out_null `{XI : CurCtx} (a : mword 64) (w : mword 32) :
     a = (zero_reg : mword 64) -> ⊢ ofd_out a w.
   Proof. intro Hz. rewrite /ofd_out bool_decide_true; [|exact Hz]. done. Qed.
 
-  Lemma ofd_out_intro (a : mword 64) (w : mword 32) :
+  Lemma ofd_out_intro `{XI : CurCtx} (a : mword 64) (w : mword 32) :
     a <> (zero_reg : mword 64) -> a ↦₄[KT1] w -∗ ofd_out a w.
   Proof.
     intro Hn. rewrite /ofd_out bool_decide_false; [|exact Hn]. iIntros "$".
   Qed.
 
-  Lemma ofd_out_elim (a : mword 64) (w : mword 32) :
+  Lemma ofd_out_elim `{XI : CurCtx} (a : mword 64) (w : mword 32) :
     a <> (zero_reg : mword 64) -> ofd_out a w -∗ a ↦₄[KT1] w.
   Proof.
     intro Hn. rewrite /ofd_out bool_decide_false; [|exact Hn]. iIntros "$".
   Qed.
 
-  Definition argfd_post (pfd pf : mword 64) (oldfd : mword 32) (oldf : mword 64)
+  Definition argfd_post `{XI : CurCtx} (pfd pf : mword 64) (oldfd : mword 32) (oldf : mword 64)
       (v : mword 64) (fs : list (mword 64)) (r : mword 64) : iProp Σ :=
     (⌜r = (mword_of_int (-1) : mword 64) /\ arg_fd v fs = None⌝ ∗
        ofd_out pfd oldfd ∗ pf ↦₈[KT1] oldf
@@ -185,7 +186,7 @@ Section SpecArgfd.
 
 End SpecArgfd.
 
-Definition wp_argfd_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (γf : gname)
+Definition wp_argfd_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γf : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
     (i : nat) (v : mword 64)
     (pid : mword 32) (U : ustate) (oldfd : mword 32) (oldf : mword 64) (b : bool) (lks : gset string) :=
@@ -223,7 +224,7 @@ Definition wp_argfd_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG �
 
 Module Type ARGFD.
   Parameter wp_argfd_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (γf : gname)
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (i : nat) (v : mword 64)
       (pid : mword 32) (U : ustate) (oldfd : mword 32) (oldf : mword 64) (b : bool) (lks : gset string),

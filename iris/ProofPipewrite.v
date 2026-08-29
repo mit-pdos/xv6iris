@@ -84,6 +84,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -502,7 +503,7 @@ Proof. destruct V; reflexivity. Qed.
 
 Section PwPieces.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* copyin CONSUMES [kalloc_env] and hands nothing back, and the loop calls it
      once per byte -- so the bundle has to be duplicable.  At [on = None] every
@@ -669,7 +670,7 @@ Section PwConts.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
 
   (* +0x58: the common epilogue (mv a0,s2; reload ra/s0..s5; pop; ret). *)
-  Definition pw_epi `{GEN : GenId} (CID0 : CPU) (γf : gname)  (γs : list gname) (j : nat)
+  Definition pw_epi `{GEN : GenId} `{XI : CurCtx} (CID0 : CPU) (γf : gname)  (γs : list gname) (j : nat)
       (γp : pipe_names) (w : bool) (q : Qp)
       (m : regfile) (av : nat) (eb : bool)
       (pid : mword 32) (U : ustate) (n : Z) (sp0 : mword 64) : iProp Σ :=
@@ -690,7 +691,7 @@ Section PwConts.
 
   (* +0x108: wakeup(&pi->nread); release(&pi->lock); jump to the epilogue.  Three
      paths land here: the n <= 0 arm, the loop exit and the copyin failure. *)
-  Definition pw_tail `{GEN : GenId} (CID0 : CPU) (γf : gname)  (γs : list gname) (j : nat)
+  Definition pw_tail `{GEN : GenId} `{XI : CurCtx} (CID0 : CPU) (γf : gname)  (γs : list gname) (j : nat)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
       (m : regfile) (av : nat) (eb : bool) (lks : gset string)
       (pid : mword 32) (U : ustate) (n : Z) (sp0 pi : mword 64) : iProp Σ :=
@@ -715,7 +716,7 @@ Section PwConts.
 
   (* +0x46: release(&pi->lock); i := -1; reload s6..s10; fall into the
      epilogue.  Reached when readopen == 0 or the process was killed. *)
-  Definition pw_minus1 `{GEN : GenId} (CID0 : CPU) (γf : gname)  (γs : list gname) (j : nat)
+  Definition pw_minus1 `{GEN : GenId} `{XI : CurCtx} (CID0 : CPU) (γf : gname)  (γs : list gname) (j : nat)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
       (m : regfile) (av : nat) (eb : bool) (lks : gset string)
       (pid : mword 32) (U : ustate) (n : Z) (sp0 pi : mword 64) : iProp Σ :=
@@ -739,7 +740,7 @@ Section PwConts.
 
   (* exactly ONE of the two is taken, so they are offered as a conjunction and
      SHARE the epilogue closure. *)
-  Definition pw_exits `{GEN : GenId} (CID0 : CPU) (γf : gname) (γs : list gname) (j : nat)
+  Definition pw_exits `{GEN : GenId} `{XI : CurCtx} (CID0 : CPU) (γf : gname) (γs : list gname) (j : nat)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
       (m : regfile) (av : nat) (eb : bool) (lks : gset string)
       (pid : mword 32) (U : ustate) (n : Z) (sp0 pi : mword 64) : iProp Σ :=
@@ -747,7 +748,7 @@ Section PwConts.
      ∧ pw_minus1 CID0 γf γs j γl γp w q m av eb lks pid U n sp0 pi)%I.
 
   (* +0x8c: the loop BODY, entered with 0 <= i < n. *)
-  Definition pw_loop `{GEN : GenId} (CID0 : CPU) (γa γf : gname) (γs : list gname) (j : nat)
+  Definition pw_loop `{GEN : GenId} `{XI : CurCtx} (CID0 : CPU) (γa γf : gname) (γs : list gname) (j : nat)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
       (m : regfile) (av : nat) (eb : bool) (lks : gset string)
       (pid : mword 32) (U : ustate) (n : Z) (sp0 pi addr : mword 64) : iProp Σ :=
@@ -793,7 +794,7 @@ End PwConts.
 (* ===================================================================== *)
 Section PwRestore.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>
@@ -926,7 +927,7 @@ End PwRestore.
 (* ===================================================================== *)
 Section PwGuard.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma pw_stack7_of (m : regfile) (sp0 : mword 64) :
     pw_frame5 m sp0 -∗ pw_chslot sp0 -∗ stack_own (KTR := KT1) (pa_stk sp0 7%nat) 7%nat.
@@ -1062,7 +1063,7 @@ Module PipewriteProof (Myproc : MYPROC) (AcquireGen : ACQUIRE_GEN) (Killed : KIL
 
 Section ProofPipewrite.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>
@@ -1425,7 +1426,7 @@ Section ProofPipewrite.
             by (apply bv_eq; vm_compute; reflexivity).
           apply kv_addv_zero. }
         assert (HavR : (10 <= av - 14)%nat) by lia.
-        iApply (ReleaseGen.wp_release_gen_sconf KT1 γl pi "pipe" (pipe_res γp pi) (pipe_dead γl γp) emp%I
+        iApply (ReleaseGen.wp_release_gen_sconf KT1 γl pi "pipe" <{ pipe_res γp pi }> (pipe_dead γl γp) emp%I
                   T4 0%nat true (proc_addr j) (av - 14)%nat ({["pipe"]} ∪ lks) HlkaT4 HavR
                   ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
                   with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
@@ -1495,7 +1496,7 @@ Section ProofPipewrite.
             by (apply bv_eq; vm_compute; reflexivity).
           apply kv_addv_zero. }
         assert (HavR : (10 <= av - 14)%nat) by lia.
-        iApply (ReleaseGen.wp_release_gen_sconf KT1 γl pi "pipe" (pipe_res γp pi) (pipe_dead γl γp) emp%I
+        iApply (ReleaseGen.wp_release_gen_sconf KT1 γl pi "pipe" <{ pipe_res γp pi }> (pipe_dead γl γp) emp%I
                   Q2 0%nat true (proc_addr j) (av - 14)%nat ({["pipe"]} ∪ lks) HlkaQ2 HavR
                   ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
                   with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
@@ -1823,13 +1824,13 @@ Section ProofPipewrite.
       rewrite /B1 upd_eq. unfold regval_into_reg. rewrite Ha0M0. apply add_vec_zero_l. }
     iDestruct (cpu_own_transport CIDmp CIDp33 0 true pj true ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (AcquireGen.wp_acquire_gen_sconf KT1 γl "pipe" (pipe_res γp pi) (pipe_ref γp w q)
+    iApply (AcquireGen.wp_acquire_gen_sconf KT1 γl "pipe" <{ pipe_res γp pi }> (pipe_ref γp w q)
               (pipe_dead γl γp) B3 0%nat true pj (av - 14)%nat true _ Hlvl0 Hav10 Hbelow
               ltac:(iApply pipe_ref_dead) ltac:(intros ?i; iApply locked_pre_dead)
               with "Hcg Hown Htext Hpc [] Href").
     all: try lkbelow.
     { rgall. iEval (rewrite Ha0B3). iExact "Hopen". }
-    iIntros (CIDaq Hsaq ms2 M1) "%Hms2 Href Hcg Hpc %HcsM1 Hlocked Hres Hown Hpay". rgall.
+    iIntros (CIDaq Hsaq ms2 M1) "%Hms2 Href Hcg Hpc %HcsM1 Hlocked Hres _ Hown Hpay". rgall.
     iEval (rewrite HraB3) in "Hpc".
     assert (Hpp24 : ret_pc (add_vec_int (mword_of_int (KernelSyms.pipewrite + 0x20) : mword 64) 4)
                     = (mword_of_int (KernelSyms.pipewrite + 0x24) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
@@ -2490,7 +2491,7 @@ Section ProofPipewrite.
               { rewrite /G4 /G3.
                 apply callee_saved_insert_r; [vm_compute; reflexivity|].
                 apply callee_saved_insert_r; [vm_compute; reflexivity|]. exact HcsMwMsp. }
-              iApply (ReleaseGen.wp_release_gen_sconf KT1 γl pi "pipe" (pipe_res γp pi) (pipe_dead γl γp) emp%I
+              iApply (ReleaseGen.wp_release_gen_sconf KT1 γl pi "pipe" <{ pipe_res γp pi }> (pipe_dead γl γp) emp%I
                         G4 0%nat true (proc_addr j) (av - 14)%nat ({["pipe"]} ∪ lks) HlkaG4 Hav10
                         ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
                         with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
@@ -2573,13 +2574,13 @@ Section ProofPipewrite.
                 apply callee_saved_insert_r; [vm_compute; reflexivity|]. exact HcsMwMsl. }
               iDestruct (cpu_own_transport CIDsl0 CIDp52 0 true pj true ltac:(wp_next_chain)
                            with "Hown") as "Hown".
-              iApply (AcquireGen.wp_acquire_gen_sconf KT1 γl "pipe" (pipe_res γp pi) (pipe_ref γp w q)
+              iApply (AcquireGen.wp_acquire_gen_sconf KT1 γl "pipe" <{ pipe_res γp pi }> (pipe_ref γp w q)
                         (pipe_dead γl γp) G7 0%nat true pj (av - 14)%nat true _ Hlvl0 Hav10 Hbelow
                         ltac:(iApply pipe_ref_dead) ltac:(intros ?i; iApply locked_pre_dead)
                         with "Hcg Hown Htext Hpc [] Href").
               all: try lkbelow.
               { rgall. iEval (rewrite Ha0G7). iExact "Hopen". }
-              iIntros (CIDsl Hssl ms4 Ms) "%Hms4 Href Hcg Hpc %Hcsaq2 Hlocked Hres Hown Hpay". rgall.
+              iIntros (CIDsl Hssl ms4 Ms) "%Hms4 Href Hcg Hpc %Hcsaq2 Hlocked Hres _ Hown Hpay". rgall.
               iEval (rewrite HraG7) in "Hpc".
               assert (Hpp88 : ret_pc (add_vec_int (mword_of_int (KernelSyms.pipewrite + 0x84) : mword 64) 4)
                               = (mword_of_int (KernelSyms.pipewrite + 0x88) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).

@@ -91,9 +91,10 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
    spilled one more callee-saved for the c->intena reset, so its own prologue
    costs two slots more.) *)
 Notation K_main_secondary := (114%nat) (only parsing).
+Require Import TsoCtx.
 Section SpecMainSecondary.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------- *)
   (* THE DEPOSIT: the canonical instantiation of SpecMain's payload [P].  *)
@@ -112,7 +113,7 @@ Section SpecMainSecondary.
           closes over ([SpecDevintr.devintr_caps]) and which no hart can make
           for itself: both halves are locks over static globals. *)
        console_caps γd ∗
-       is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) ∗
+       is_lock γk d_lock "virtio_disk"%string <{ disk_res γv pd pav pu }> ∗
        disk_geom γv pd pav pu ∗
        kpt_inv root ∗
        (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□
@@ -172,7 +173,7 @@ End SpecMainSecondary.
 
 Module Type MAIN_SECONDARY.
   Parameter wp_main_secondary_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       
       (m : regfile) (K : nat)
       (p0 : mword 64)

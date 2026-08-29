@@ -65,12 +65,14 @@ Require Import BitmapInv.
 Require Import FsCfg.          (* the record this file finally gives a value *)
 Require Import Xv6G.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
 Section FsCfgKits.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId}.
+  Context `{XI : CurCtx}.
 
   (* ==================================================================== *)
   (*  KIT 1 -- WHAT main SPENDS BEFORE +0x9e                               *)

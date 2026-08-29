@@ -62,6 +62,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Module VirtioDiskRwRest (Acquire : ACQUIRE) (Release : RELEASE)
                         (SleepPrepare : SLEEP_PREPARE) (Sleep : SLEEP) (FreeDesc : FREEDESC).
+Require Import TsoCtx.
 
 Module P1 := VirtioDiskRwPhases Acquire Release Sleep FreeDesc.
 
@@ -92,7 +93,7 @@ Section VdrwbFreeAt.
     | |- ?a <> ?b => tryif unify a b then fail else (vm_compute; discriminate)
     end.
 
-  Lemma wp_vdrw_free_at `{GEN : GenId} `{CID : CpuId}  (γd : disk_names) (γs : list gname)
+  Lemma wp_vdrw_free_at `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}  (γd : disk_names) (γs : list gname)
       (pd : mword 64) (i : nat) (fr : nat -> bool)
       (M : regfile) (av : nat) (eb : bool) (pme : mword 64)
       (idxa : Arch.pa) (off : Z) (imm : mword 12) (jimm : mword 21) (lks : gset string) :
@@ -198,7 +199,7 @@ End VdrwbFreeAt.
 
 Section ProofVirtioDiskRwB.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Local Ltac reg_neq :=
@@ -305,7 +306,7 @@ Section ProofVirtioDiskRwB.
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x036) : mword 64) -∗
  procs_inv γs -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     locked γk cpu_id -∗
     disk_res γd pd pav pu -∗
     vdrw_scratch (KTR := KT1) sp0 -∗
@@ -707,7 +708,7 @@ Section ProofVirtioDiskRwB.
           as "[Hpay [Hextc Hextm]]".
         (* ==================== release(&disk.vdisk_lock) ==================== *)
         iApply (Release.wp_release_sconf KT1 γk d_lock "virtio_disk"%string
-                  (disk_res γd pd pav pu) C3 0%nat eb (proc_addr j) (K - 12)%nat
+                  <{ disk_res γd pd pav pu }> C3 0%nat eb (proc_addr j) (K - 12)%nat
                   ({["virtio_disk"]} ∪ lks)
                   HC3a0 ltac:(pose proof (vdrw_K10 K HK); lia)
                   with "Hcg Htext Hpc Hlk Htok HR Hown Hpay").
@@ -834,12 +835,12 @@ Section ProofVirtioDiskRwB.
         iDestruct (cpu_own_transport CIDsl CIDd3 0 eb (proc_addr j) eb
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         iApply (Acquire.wp_acquire_sconf KT1 γk "virtio_disk"%string
-                  (disk_res γd pd pav pu) D3 0%nat eb (proc_addr j) (K - 12)%nat eb lks
+                  <{ disk_res γd pd pav pu }> D3 0%nat eb (proc_addr j) (K - 12)%nat eb lks
                   vdrw_noff0 ltac:(pose proof (vdrw_K10 K HK); lia) Hbelow
                   with "Hcg Hown Htext Hpc []").
         all: try lkbelow.
         { iEval (rewrite HD3a0). iExact "Hlk". }
-        iIntros (CIDaq Hsaq msA mfa) "_ Hcg Hpc %Hacs Htok HR Hown Hpay". rgall.
+        iIntros (CIDaq Hsaq msA mfa) "_ Hcg Hpc %Hacs Htok HR _ Hown Hpay". rgall.
         assert (Hr0bc : ret_pc (D3 !!! Regidx Rra)
                         = mword_of_int (KernelSyms.virtio_disk_rw + 0x0bc))
           by (rewrite HD3ra; apply bv_eq; vm_compute; reflexivity).

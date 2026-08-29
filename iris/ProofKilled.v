@@ -41,6 +41,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import CodeKilled.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -65,7 +66,7 @@ Module KilledProof (Acquire : ACQUIRE) (Release : RELEASE) : KILLED.
 
 Section ProofKilled.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation kl_s0 := (mword_of_int 8 : mword 5).
   Notation kl_s1 := (mword_of_int 9 : mword 5).
@@ -225,14 +226,13 @@ Section ProofKilled.
        at [CID8]. *)
     iDestruct (cpu_own_transport CID CID8 n eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Acquire.wp_acquire_sconf KT1 γl "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) B1 n eb p (av - 4)%nat b lks
+    iApply (Acquire.wp_acquire_sconf KT1 γl "proc"%string <{ proc_lock_res γs γl (proc_addr j) }> B1 n eb p (av - 4)%nat b lks
               Hn ltac:(lia)
               Hfresh
               with "Hcg Hcpu Htext Hpc [Hislock]").
     all: try lkbelow.
     { iEval (rewrite HB1a0). iExact "Hislock". }
-    iIntros (CIDacq Hsacq ms macq) "%Hmsf Hcg Hpc %Hcs_acq Hlocked HR Hcpu Hpay".
+    iIntros (CIDacq Hsacq ms macq) "%Hmsf Hcg Hpc %Hcs_acq Hlocked HR _ Hcpu Hpay".
     assert (Hp12 : ret_pc (B1 !!! Regidx kl_ra) = mword_of_int (KernelSyms.killed + 0x12))
       by (rewrite HB1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp12) in "Hpc".
@@ -323,8 +323,7 @@ Section ProofKilled.
        it -- so this is a pure re-spelling, and it is what makes the
        acquire/release pair compose back to [N]. *)
     iEval (rewrite -Hbeq) in "Hcg".
-    iApply (Release.wp_release_sconf KT1 γl (proc_addr j) "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) C4 n eb p (av - 4)%nat ({["proc"]} ∪ lks)
+    iApply (Release.wp_release_sconf KT1 γl (proc_addr j) "proc"%string <{ proc_lock_res γs γl (proc_addr j) }> C4 n eb p (av - 4)%nat ({["proc"]} ∪ lks)
               Hlka ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu Hpay").
     iIntros (CIDrel Hsrel mrel) "Hcg Hpc %Hcs_rel Hcpu".

@@ -91,6 +91,7 @@ Local Open Scope Z_scope.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import ParkCap.   (* [park_token] *)
 Require Import UsertrapRes.  (* [ut_park_intro_body] -- the park's producer entry *)
+Require Import TsoCtx.   (* [CurCtx]: the residue owns a thread token *)
 Import Defs.
 
 (* ===================================================================== *)
@@ -105,6 +106,9 @@ Module UserretClosed (R : USERRET) (UV : USERVEC).
 Section UserretClosed.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
+  (* userret runs AS the thread, so its residue is at the AMBIENT context
+     (tso-port.md: this-thread sites take the ambient ξ). *)
+  Context `{XI : CurCtx}.
 
   (* [Rut], instantiated: the kernel-side bundle, keyed on the address space
      and hiding the stack top, parked inside [user_inv] across user
@@ -264,7 +268,7 @@ Module UserretClosedProof (R : USERRET) (UV : USERVEC)
 
 Section Res.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the residue is uservec's, re-exported unchanged *)
   Definition usertrap_res := UV.usertrap_res.
@@ -287,7 +291,6 @@ Section Res.
      build one (UsertrapRes.v, "THE PARK'S CHANNEL THROUGH THE MODULE
      TYPES"). *)
   Definition usertrap_res_bare_park
-      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
       (N : ut_names) (av : nat)
     : ut_park_intro_body
         (fun h : CpuId => UV.usertrap_res_bare (CID := h))
@@ -297,7 +300,7 @@ Section Res.
 End Res.
 
   Theorem wp_userret_closed
-      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (C : ucfg) (pt : uptd)
       (kroot : mword 44) (j : nat) (ksp : mword 64)
       (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64) :

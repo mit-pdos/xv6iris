@@ -120,6 +120,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
    printable (claude-notes/durable-notes.md) *)
@@ -135,7 +136,7 @@ Definition ia_msg : string :=
   ("ialloc: no inodes" ++ String (Ascii.ascii_of_nat 10) EmptyString)%string.
 Definition ia_msg_addr : Z := 0x80007450.
 
-Lemma ia_msg_bytes : forall j b, cstring_bytes ia_msg !! j = Some b ->
+Lemma ia_msg_bytes `{XI : CurCtx} : forall j b, cstring_bytes ia_msg !! j = Some b ->
   KernelData.kernel_data !! (ia_msg_addr + Z.of_nat j)%Z = Some b.
 Proof.
   intros j b Hj.
@@ -144,7 +145,7 @@ Proof.
   vm_compute in Hj; discriminate.
 Qed.
 
-Lemma ia_msg_fmt : pk_kinds ia_msg = [] /\ nonul ia_msg = true /\
+Lemma ia_msg_fmt `{XI : CurCtx} : pk_kinds ia_msg = [] /\ nonul ia_msg = true /\
                    (Z.of_nat (String.length ia_msg) < 2147483645)%Z.
 Proof.
   split_and!; [vm_compute; reflexivity | vm_compute; reflexivity
@@ -166,11 +167,11 @@ Definition ia_dzero : dinode :=
   MkDinode (bv_0 16) (bv_0 16) (bv_0 16) (bv_0 16) (bv_0 32)
            (replicate 13 (bv_0 32)).
 
-Lemma ia_dzero_wf : dinode_wf ia_dzero.
+Lemma ia_dzero_wf `{XI : CurCtx} : dinode_wf ia_dzero.
 Proof. rewrite /dinode_wf /ia_dzero /=. reflexivity. Qed.
 
 (* the 64 bytes of the all-zero record ARE 64 zero bytes *)
-Lemma ia_dzero_bytes (j : nat) :
+Lemma ia_dzero_bytes `{XI : CurCtx} (j : nat) :
   (j < 64)%nat -> dinode_bytes ia_dzero !!! j = bv_0 8.
 Proof.
   intros Hj.
@@ -190,7 +191,7 @@ Definition ia_cbyte : bv 8 :=
     (subrange_vec_dec (mword_of_int 0 : mword 64) (Z.sub (Z.mul 1 8) 1) 0)
     : mword 8) 0.
 
-Lemma ia_cbyte_zero : ia_cbyte = bv_0 8.
+Lemma ia_cbyte_zero `{XI : CurCtx} : ia_cbyte = bv_0 8.
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
 (* ===================================================================== *)
@@ -201,7 +202,7 @@ Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 (* [srli a1,s2,4] -- ialloc divides the SIGN-EXTENDED 64-bit inum, where
    iupdate's [srliw] divides the 32-bit one, so [iu_srliw4] does not apply.
    The premise is the contract's [ninodes < 2^31] through [inum < ninodes]. *)
-Lemma ia_sext_small (w : mword 32) :
+Lemma ia_sext_small `{XI : CurCtx} (w : mword 32) :
   bv_unsigned w < 2147483648 -> (sign_extend' 64 w : mword 64)
                                 = mword_of_int (bv_unsigned w).
 Proof.
@@ -212,7 +213,7 @@ Proof.
   apply bvw32_small. change (2^32)%Z with 4294967296%Z. lia.
 Qed.
 
-Lemma ia_srli4 (w : mword 32) :
+Lemma ia_srli4 `{XI : CurCtx} (w : mword 32) :
   bv_unsigned w < 2147483648 ->
   shift_bits_right (sign_extend' 64 w : mword 64)
     (subrange_vec_dec (mword_of_int 4 : mword 6) (Z.sub log2_xlen 1) 0)
@@ -247,11 +248,11 @@ Proof.
   change (2^64)%Z with 18446744073709551616%Z. lia.
 Qed.
 
-Lemma ia_add_vec32_comm (x y : mword 32) : add_vec x y = add_vec y x.
+Lemma ia_add_vec32_comm `{XI : CurCtx} (x y : mword 32) : add_vec x y = add_vec y x.
 Proof. apply bv_eq. rewrite !bv_add_unsigned. f_equal. lia. Qed.
 
 (* [andi a5,s2,15] -- the BASE-encoding twin of [iu_andi15]'s [c.andi] *)
-Lemma ia_andi15 (x : mword 64) :
+Lemma ia_andi15 `{XI : CurCtx} (x : mword 64) :
   and_vec x (sign_extend' 64 (mword_of_int 15 : mword 12) : mword 64)
   = (mword_of_int (bv_unsigned x `mod` 16) : mword 64).
 Proof.
@@ -263,13 +264,13 @@ Qed.
 
 (* the [lh]'s zero test, both ways -- ProofIlock's [il_type_zero] pair,
    inlined because a Proof file must not require another Proof file *)
-Lemma ia_sext64_16_inj (a c : mword 16) :
+Lemma ia_sext64_16_inj `{XI : CurCtx} (a c : mword 16) :
   (sign_extend' 64 a : mword 64) = sign_extend' 64 c -> a = c.
 Proof.
   intro H. rewrite -(trunc16_sext64 a) -(trunc16_sext64 c) H. reflexivity.
 Qed.
 
-Lemma ia_type_zero (w : mword 16) :
+Lemma ia_type_zero `{XI : CurCtx} (w : mword 16) :
   bv_unsigned w = 0 ->
   eq_vec (sign_extend' 64 w : mword 64) (zero_reg : mword 64) = true.
 Proof.
@@ -279,7 +280,7 @@ Proof.
   rewrite Hz. vm_compute. reflexivity.
 Qed.
 
-Lemma ia_type_nonzero (w : mword 16) :
+Lemma ia_type_nonzero `{XI : CurCtx} (w : mword 16) :
   bv_unsigned w <> 0 ->
   eq_vec (sign_extend' 64 w : mword 64) (zero_reg : mword 64) = false.
 Proof.
@@ -291,11 +292,11 @@ Proof.
 Qed.
 
 (* the [bltu] at +0x62, at the two words the code compares *)
-Lemma ia_uint64_moi (z : Z) : 0 <= z < 18446744073709551616 ->
+Lemma ia_uint64_moi `{XI : CurCtx} (z : Z) : 0 <= z < 18446744073709551616 ->
   uint (mword_of_int z : mword 64) = z.
 Proof. intro Hz. rewrite uint_unsigned. apply moi64_small. exact Hz. Qed.
 
-Lemma ia_bgeu_moi (x y : Z) :
+Lemma ia_bgeu_moi `{XI : CurCtx} (x y : Z) :
   0 <= x < 18446744073709551616 -> 0 <= y < 18446744073709551616 ->
   zopz0zKzJ_u (mword_of_int x : mword 64) (mword_of_int y : mword 64) = Z.geb x y.
 Proof.
@@ -303,7 +304,7 @@ Proof.
   rewrite (ia_uint64_moi x Hx) (ia_uint64_moi y Hy). reflexivity.
 Qed.
 
-Lemma ia_bltu_moi (x y : Z) :
+Lemma ia_bltu_moi `{XI : CurCtx} (x y : Z) :
   0 <= x < 18446744073709551616 -> 0 <= y < 18446744073709551616 ->
   zopz0zI_u (mword_of_int x : mword 64) (mword_of_int y : mword 64) = Z.ltb x y.
 Proof.
@@ -313,7 +314,7 @@ Qed.
 
 (* [ialloc_fresh ty] IS [ia_dzero] with the type halfword replaced -- which
    is exactly what the [sh] does to [dislot]'s first cell. *)
-Lemma ia_fresh_of_zero (ty : mword 16) :
+Lemma ia_fresh_of_zero `{XI : CurCtx} (ty : mword 16) :
   ialloc_fresh ty
   = MkDinode ty (di_major ia_dzero) (di_minor ia_dzero) (di_nlink ia_dzero)
              (di_size ia_dzero) (di_addrs ia_dzero).
@@ -321,6 +322,7 @@ Proof. reflexivity. Qed.
 
 Section IallocBytes.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, FSC : fscfg}.
+  Context `{XI : CurCtx}.
 
   (* THE RAW 64-BYTE WINDOW of slot [k], borrowed out of the block's byte
      image and given back AT A NEW RECORD.  [DinodeSlot.diblk_slot_acc] is
@@ -431,7 +433,7 @@ Section IallocDefs.
   (* ialloc's 64-byte frame: ra@56 s0@48 s1@40 s2@32 s3@24 s4@16 s5@8 s6@0.
      [pa_stk sp j] counts DOWN from the entry sp, so slot j holds the
      register saved at (newsp + 64 - 8j). *)
-  Definition ia_frame (m : regfile) : iProp Σ :=
+  Definition ia_frame `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
@@ -455,7 +457,7 @@ Section IallocDefs.
      fresh box's only licence (ClaimL, §2.6's fourth row) and create's fill
      spends it at [ireg_withdraw].  Before this increment the AU's output
      was dropped at the claim site's [iIntros]. *)
-  Definition ia_arms
+  Definition ia_arms `{XI : CurCtx}
  (ty : mword 16) (u : nat)
       (Sb : gset Z) (t : nat) (qt : Qp) (av : mword 64) : iProp Σ :=
     ((* NO INODES: a0 = 0, the iget ledger unit unspent, the reservation
@@ -479,7 +481,7 @@ Section IallocDefs.
 
   (* THE CONTINUATION, named so it is not re-traversed by every proofmode
      split (claude-notes/optimization.md). *)
-  Definition ia_cont `{GEN : GenId} `{CID0 : CpuId}
+  Definition ia_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
  (ty : mword 16)
       (u : nat) (Sb : gset Z) (pidv : mword 32) (dq dqs dqn : dfrac) (j : nat)
       (m : regfile) (K : nat) (b : bool) (lks : gset string) (Upr : ustate)
@@ -544,7 +546,7 @@ Section IallocEpilogue.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma ia_epilogue `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma ia_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (j : nat)
  (ty : mword 16)
       (u : nat) (Sb : gset Z) (t : nat) (qt : Qp)
@@ -770,7 +772,7 @@ Section IallocOut.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma ia_out `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma ia_out `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (j : nat)
  (ty : mword 16)
       (u : nat) (Sb : gset Z) (t : nat) (qt : Qp)
@@ -1038,7 +1040,7 @@ Section IallocOut.
     (* the panic tail runs at depth 0, so the held set is forced empty and
        printk's order premise ("pr", 14) needs no hypothesis here. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
-    iApply (Hpk CID9 Q9 (K - 8)%nat true (proc_addr j)
+    iApply (Hpk CID9 XI Q9 (K - 8)%nat true (proc_addr j)
               DfracDiscarded ia_msg [] b _
               ltac:(lia) Hlmsg Hnmsg ltac:(rewrite Hkmsg; reflexivity)
               ltac:(cbn [length]; lia)
@@ -1108,7 +1110,7 @@ Section IallocClaim.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma ia_claim `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma ia_claim `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
  (ty : mword 16)
@@ -1159,7 +1161,7 @@ Section IallocClaim.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
     itable_inv -∗
     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
@@ -1984,7 +1986,7 @@ Section IallocScan.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma ia_scan `{GEN : GenId} `{CIDe : CpuId}
+  Local Lemma ia_scan `{XI : CurCtx} `{GEN : GenId} `{CIDe : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
  (ty : mword 16) (u : nat) (Sb : gset Z)
@@ -2019,7 +2021,7 @@ Section IallocScan.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
     itable_inv -∗
     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
@@ -2858,7 +2860,7 @@ Section IallocMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
-  Lemma wp_ialloc_gen `{GEN : GenId} `{CID : CpuId}
+  Lemma wp_ialloc_gen `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
  (ty : mword 16)
@@ -3350,7 +3352,7 @@ Section IallocMain.
      each arm's payout with [LogInv.log_opS_op].  Every landed consumer of
      ialloc (there is exactly one shape, and [LinkIalloc] is unmoved) sees
      the same statement it saw before.                                     *)
-  Lemma wp_ialloc_sconf `{GEN : GenId} `{CID : CpuId}
+  Lemma wp_ialloc_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
  (ty : mword 16)

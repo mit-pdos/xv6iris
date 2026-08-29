@@ -97,12 +97,13 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Module ForkretParkProof (FR : FORKRET) : FORKRET_PARK_PAID.
 
 Section Res.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the residue is forkret's, re-exported unchanged *)
   Definition usertrap_res := FR.usertrap_res.
@@ -125,7 +126,6 @@ Section Res.
      build one (UsertrapRes.v, "THE PARK'S CHANNEL THROUGH THE MODULE
      TYPES"). *)
   Definition usertrap_res_bare_park
-      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
       (N : ut_names) (av : nat)
     : ut_park_intro_body
         (fun h : CpuId => FR.usertrap_res_bare (CID := h))
@@ -164,7 +164,7 @@ Lemma fkp_pstate_split `{!riscvGS Σ} (pa : mword 64) :
 Proof. rewrite pstate_whole_split unclaimed_RUNNING. reflexivity. Qed.
 
 Theorem forkret_park_paid
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (W : iProp Σ)
     (γs : list gname) (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
     (pid : mword 32) (U : ustate) (av : nat) :
@@ -184,7 +184,7 @@ Proof.
   rewrite /proc_ctx
           (valid_context_unfold (p_sched γs) None (p_context (proc_addr j)) (proc_addr j))
           /valid_context_pre.
-  iExists (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest), av.
+  iExists (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest), av, cur_ctx, 0%nat.
   iSplit; [iPureIntro; cbn [length]; lia |].
   iSplit; [iPureIntro; apply ret_pc_aligned |].
   iFrame "Hctx".
@@ -280,7 +280,7 @@ Qed.
 (* the knot well-founded: see ParkCap.v.                                   *)
 (* ===================================================================== *)
 Theorem park_token_intro
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
     (γs : list gname) :
     ⊢ park_token γs.
 Proof.

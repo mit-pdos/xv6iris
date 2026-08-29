@@ -29,6 +29,7 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvPtsto.
+Require Import TsoCtx.   (* the M1 flip: [buf_own]'s bytes are context-indexed *)
 
 Local Open Scope Z_scope.
 
@@ -44,7 +45,7 @@ Definition b_data    (b : Arch.pa) : Arch.pa := pa_add b 88.
    [Require SailStdpp.Base/Values] -- they leak typeclass instances that
    change what a [gmap Arch.pa _] binder elaborates to downstream.  [mword]
    is referenced qualified instead (durable-notes). *)
-Definition buf_own `{!riscvGS Σ} (b : Arch.pa)
+Definition buf_own `{!riscvGS Σ} `{XI : CurCtx} (b : Arch.pa)
     (bno : SailStdpp.Values.mword 32)
     (dsk : SailStdpp.Values.mword 32) (bs : list (bv 8)) : iProp Σ :=
   (b_blockno b ↦₄{DfracOwn (1/2)} bno ∗

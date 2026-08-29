@@ -68,6 +68,7 @@ Require Import ProcPtOwn.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 (* ===================================================================== *)
 (*  THE MEMORY-INDEXED CONTRACT.                                          *)
@@ -93,7 +94,7 @@ Import Defs.
    kernel can still reach through its identity map, and whose bytes it
    still owns, does not leave it because the user may no longer load
    from it. *)
-Definition wp_uvmclear_mem_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile)
+Definition wp_uvmclear_mem_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (mm : regfile)
     (P : uptd) (sz : Z) (M : gmap Z (bv 8))
     (w : mword 64) (K : nat) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmclear in
@@ -120,7 +121,7 @@ Definition wp_uvmclear_mem_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{
 
 Module Type UVMCLEAR.
   Parameter wp_uvmclear_mem_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile)
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (mm : regfile)
       (P : uptd) (sz : Z) (M : gmap Z (bv 8))
       (w : mword 64) (K : nat) (b : bool) (p : mword 64),
       wp_uvmclear_mem_sconf_body mm P sz M w K b p.

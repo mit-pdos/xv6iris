@@ -120,6 +120,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 
@@ -141,7 +142,7 @@ Section SpecSysPipe.
      [upd_upt], so this predicate is purely about the DESCRIPTORS).
 
      Both arms hand back the two fd units: see the table in the header. *)
-  Definition sys_pipe_post (γf : gname) (p : mword 64) (pid : mword 32)
+  Definition sys_pipe_post `{XI : CurCtx} (γf : gname) (p : mword 64) (pid : mword 32)
       (UW : ustate) (r : mword 64) : iProp Σ :=
     ((* FAILURE.  Whichever tail ran, the descriptor array is EXACTLY as it
         came in: the two arms that had already installed a descriptor null
@@ -167,7 +168,7 @@ End SpecSysPipe.
 
 Definition wp_sys_pipe_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname)  (γfl γf : gname)
     (fn : fclose_names) (on : option nat)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64)
@@ -296,7 +297,7 @@ Definition wp_sys_pipe_sconf_body
 Module Type SYSPIPE.
   Parameter wp_sys_pipe_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (γfl γf : gname)
       (fn : fclose_names) (on : option nat)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64)

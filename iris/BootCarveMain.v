@@ -60,6 +60,9 @@ Require Import LogDefs LogInv.
 Require Import SpecMain.
 Require Import FileInvDefs.   (* the open-file table's geometry and [fentry_raw] *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+(* [Require] WITHOUT [Import]: this boot file's ↦-statements stay RAW;
+   the shim is named qualified only to hand converted facts across. *)
+Require TsoCtxShim.
 Local Open Scope Z_scope.
 
 (* --- the alignment arithmetic the structured carves need, over plain [Z] --- *)
@@ -486,7 +489,7 @@ Section BootCarveMain.
   (* after their [sign_extend']-ed 12-bit literal offsets reduce by      *)
   (* [vm_compute].                                                      *)
   (* ------------------------------------------------------------------ *)
-  Lemma boot_lk_raw (g : gstate) (A : Z) :
+  Lemma boot_lk_raw `{XI : TsoCtx.CurCtx} (g : gstate) (A : Z) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     text_end <= A -> A + 24 <= ram_hi -> A mod 8 = 0 ->
@@ -519,6 +522,9 @@ Section BootCarveMain.
     iDestruct (boot_ran_cell8 g (A + 16) Hmem ltac:(lia) ltac:(lia) Hal16
                  with "Hcl H2") as (vcpu) "H2".
     rewrite /lk_raw /lock_name_field /lk_cpu E8 E16 !off_of_z.
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "H1") as "H1".
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "H2") as "H2".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H0") as "H0".
     iExists vlock, vname, vcpu. iFrame "H0 H1 H2".
   Qed.
 
@@ -532,7 +538,7 @@ Section BootCarveMain.
   (* lock consoleinit has just initialised.  The four bytes of padding   *)
   (* between the ring's end and [pr] are dropped, as everywhere.         *)
   (* ------------------------------------------------------------------ *)
-  Lemma boot_cons_res (g : gstate) :
+  Lemma boot_cons_res `{XI : TsoCtx.CurCtx} (g : gstate) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     text_end <= KernelSyms.cons ->
@@ -576,6 +582,7 @@ Section BootCarveMain.
               pa_add (pa_of_z (KernelSyms.cons + 24)) j
               = pa_add a_cons (cons_buf_off + j)).
     { intro j. rewrite !pa_add_of_z. f_equal. unfold cons_buf_off. lia. }
+    iDestruct (TsoCtxShim.ctx_buf_of_mem with "Hb") as "Hb".
     iDestruct (cons_data_of_run (fun j => boot_byte (KernelSyms.cons + 24 + Z.of_nat j))
                  (pa_of_z (KernelSyms.cons + 24)) Hbyte with "Hb") as (bs) "[%Hlen Hb]".
     assert (Hcell : forall o : Z,
@@ -586,6 +593,13 @@ Section BootCarveMain.
     iEval (rewrite (Hcell 156 ltac:(apply bv_eq; vm_compute; reflexivity))) in "Hw".
     iEval (rewrite (Hcell 160 ltac:(apply bv_eq; vm_compute; reflexivity))) in "He".
     rewrite /cons_res /a_cons_r /a_cons_w /a_cons_e.
+    (* M1 stage 2: [BootCarve] and this file are BOOT TIER and stay RAW
+       (the eight-hart adequacy trap, tso-flip-replay.md pass 2.3), so the
+       [↦₄]/[↦₂] cells cross into the flipped families here, exactly where
+       the [↦₈] ones already did. *)
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hr") as "Hr".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hw") as "Hw".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "He") as "He".
     iExists rr, ww, ee, bs. iFrame "Hr Hw He Hb". iPureIntro. exact Hlen.
   Qed.
 
@@ -605,7 +619,7 @@ Section BootCarveMain.
      [lk.name ↦₈] at +16, [lk.cpu ↦₈] at +24), then [name ↦₈] at +32 and
      [pid ↦₄] at +40.  Serves every sleeplock in the image: the NBUF buffer
      locks and the NINODE inode locks. *)
-  Lemma boot_sl_raw (g : gstate) (A : Z) :
+  Lemma boot_sl_raw `{XI : TsoCtx.CurCtx} (g : gstate) (A : Z) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     text_end <= A -> A + 44 <= ram_hi -> A mod 8 = 0 ->
@@ -670,13 +684,19 @@ Section BootCarveMain.
       as (vpid) "H5".
     rewrite /sl_raw /sl_lkcpu /sl_name_field /sl_pid /lock_name_field /sl_lk
             E8 E16 E32 E40 !off_of_z En16 En24.
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "H2") as "H2".
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "H3") as "H3".
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "H4") as "H4".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H0") as "H0".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H1") as "H1".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H5") as "H5".
     iExists vlocked, vlk, vpid, vlkname, vcpu, vname.
     iFrame "H0 H1 H2 H3 H4 H5".
   Qed.
 
   (* [BcacheInv.blink_raw]: the LRU link pair, [prev ↦₈] at +72 and
      [next ↦₈] at +80 of a [struct buf]. *)
-  Lemma boot_blink_raw (g : gstate) (A : Z) :
+  Lemma boot_blink_raw `{XI : TsoCtx.CurCtx} (g : gstate) (A : Z) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     text_end <= A -> A + 88 <= ram_hi -> A mod 8 = 0 ->
@@ -769,7 +789,7 @@ Section BootCarveMain.
   Qed.
 
   (* the eight slots, out of the two ranges. *)
-  Lemma boot_disk_slots (g : gstate) :
+  Lemma boot_disk_slots `{XI : TsoCtx.CurCtx} (g : gstate) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     kmap_static_claims -∗
@@ -813,7 +833,18 @@ Section BootCarveMain.
     rewrite /disk_slot_raw /ops_own
             (d_info_b_of_z i) (d_info_status_of_z i) (d_ops_of_z i)
             (d_ops_res_of_z i) (d_ops_sec_of_z i) /dinfo_raw /dops_raw.
-    iDestruct "Hi" as "[Hb Hs]". iFrame "Ho Hs Hb".
+    iDestruct "Hi" as "[Hb Hs]".
+    iDestruct "Ho" as (t r s) "(Ht & Hr & Hos)".
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hos") as "Hos".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Ht") as "Ht".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hr") as "Hr".
+    iDestruct (TsoCtxShim.ctx_eslot_of_mem with "Hb") as "Hb".
+    iDestruct "Hs" as (sb) "Hsb".
+    iDestruct (TsoCtxShim.ctx_pointsto_of_mem with "Hsb") as "Hsb".
+    iSplitR "Hb Hsb"; last iSplitL "Hsb".
+    { iExists t, r, s. iFrame "Ht Hr Hos". }
+    { iExists sb. iExact "Hsb". }
+    iExact "Hb".
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -847,7 +878,7 @@ Section BootCarveMain.
      [BioInitAt.buf_raw k] by conversion ([bpa k] is [bnode k] is
      [pa_of_z (buf_base + buf_stride * k)]), which is what lets the family's
      third half be handed over with no address bridge. *)
-  Local Definition bpay_raw (a : Arch.pa) : iProp Σ :=
+  Local Definition bpay_raw `{XI : TsoCtx.CurCtx} (a : Arch.pa) : iProp Σ :=
     (b_valid a ↦₄ (mword_of_int 0 : mword 32) ∗
      b_disk a ↦₄ (mword_of_int 0 : mword 32) ∗
      b_dev a ↦₄ (mword_of_int 0 : mword 32) ∗
@@ -859,10 +890,10 @@ Section BootCarveMain.
   (* the per-element shape, NAMED: the family's [Φ] is applied to the element
      address, and a LAMBDA there leaves the per-element goal a beta-redex that
      [iApply] will not see through. *)
-  Local Definition bnode_raw (a : Arch.pa) : iProp Σ :=
+  Local Definition bnode_raw `{XI : TsoCtx.CurCtx} (a : Arch.pa) : iProp Σ :=
     (sl_raw (buf_lock a) ∗ blink_raw a ∗ bpay_raw a)%I.
 
-  Lemma boot_buf_node (g : gstate) (A : Z) :
+  Lemma boot_buf_node `{XI : TsoCtx.CurCtx} (g : gstate) (A : Z) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     img_end <= A -> A + 1112 <= ram_hi -> A mod 8 = 0 ->
@@ -961,7 +992,38 @@ Section BootCarveMain.
     iExists bs. iSplitR; [iPureIntro; exact Hbs |]. iExact "Hd".
   Qed.
 
-  Lemma boot_bcache_nodes (g : gstate) :
+  (* THE NAMED BRIDGE [bpay_raw] -> [BioInitAt.buf_raw] (cutover rehearsal).
+     The two bodies are conjunct-for-conjunct identical, and the ADDRESSES
+     agree definitionally ([bpa k] is [bnode k] is
+     [pa_of_z (buf_base + buf_stride * k)], [brefcnt k] is [pa_add _ 64]) --
+     which is why every cell closes by [iExact].  What does NOT agree is the
+     1024-byte data run: this file is BOOT TIER and deliberately does not
+     import TsoCtx (the eight-hart adequacy trap), so its [↦ₘ] is the RAW
+     byte, while [BioInitAt] imports it and reads the same run as CONTEXT
+     facts at its ambient ξ.  Under the permeable seal the whole body
+     converted in one step; hermetically sealed, the run crosses BY NAME,
+     one byte at a time.  SINCE M1 STAGE 2 the five [↦₄] cells cross the
+     same way, for the same reason. *)
+  Lemma bpay_raw_buf_raw `{XI : TsoCtx.CurCtx} (k : nat) :
+    bpay_raw (pa_of_z (buf_base + buf_stride * Z.of_nat k)) ⊢ buf_raw k.
+  Proof.
+    rewrite /bpay_raw /buf_raw.
+    iIntros "(H0 & H1 & H2 & H3 & H4 & Hd)".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H0") as "H0".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H1") as "H1".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H2") as "H2".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H3") as "H3".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H4") as "H4".
+    iSplitL "H0"; [iExact "H0" |]. iSplitL "H1"; [iExact "H1" |].
+    iSplitL "H2"; [iExact "H2" |]. iSplitL "H3"; [iExact "H3" |].
+    iSplitL "H4"; [iExact "H4" |].
+    iDestruct "Hd" as (bs) "[%Hbs Hd]".
+    iExists bs. iSplitR; [iPureIntro; exact Hbs |].
+    iApply (big_sepL_mono with "Hd"). iIntros (j byte _) "H".
+    iApply (TsoCtxShim.ctx_pointsto_of_mem with "H").
+  Qed.
+
+  Lemma boot_bcache_nodes `{XI : TsoCtx.CurCtx} (g : gstate) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     kmap_static_claims -∗
@@ -1003,7 +1065,9 @@ Section BootCarveMain.
       + iApply (big_sepL_mono with "H2"). iIntros (n k _) "Hk".
         rewrite (bnode_of_z k). iExact "Hk".
       + iApply (big_sepL_mono with "H3"). iIntros (n k _) "Hk".
-        iExact "Hk".
+        (* the whole-body conversion the permeable seal used to do; now the
+           named bridge above. *)
+        iApply (bpay_raw_buf_raw k with "Hk").
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -1012,7 +1076,7 @@ Section BootCarveMain.
   (* [mword_of_int (off + 4*j)] spelling -- which IS [InodeInv.i_addr]   *)
   (* at [off = 80], so its consumer needs no address rewriting at all.   *)
   (* ------------------------------------------------------------------ *)
-  Lemma boot_word4_cells (g : gstate) (C : Z) (n : nat) (off : Z) :
+  Lemma boot_word4_cells `{XI : TsoCtx.CurCtx} (g : gstate) (C : Z) (n : nat) (off : Z) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     text_end <= C + off -> C + off + 4 * Z.of_nat n <= ram_hi ->
@@ -1075,10 +1139,10 @@ Section BootCarveMain.
   (* same claim and the precedent.  Everything else is contents-         *)
   (* existential, which is all the cache's boot step needs.              *)
   (* ------------------------------------------------------------------ *)
-  Local Definition inode_node_raw (a : Arch.pa) : iProp Σ :=
+  Local Definition inode_node_raw `{XI : TsoCtx.CurCtx} (a : Arch.pa) : iProp Σ :=
     (sl_raw (i_lock a) ∗ ientry_raw_at a)%I.
 
-  Lemma boot_inode_entry (g : gstate) (A : Z) :
+  Lemma boot_inode_entry `{XI : TsoCtx.CurCtx} (g : gstate) (A : Z) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     img_end <= A -> A + 136 <= ram_hi -> A mod 8 = 0 ->
@@ -1199,6 +1263,15 @@ Section BootCarveMain.
     (* [i_dev]'s displacement is 0, so [off_of_z] leaves [pa_of_z (A + 0)] *)
     rewrite E0 E4 E8 E16 E64 E68 E70 E72 E74 E76 !off_of_z Z.add_0_r.
     iSplitL "Hs"; [iExact "Hs" |].
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H0") as "H0".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H1") as "H1".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H2") as "H2".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H3") as "H3".
+    iDestruct (TsoCtxShim.ctx_word2_of_mem _ TsoCtx.cur_ctx with "H4") as "H4".
+    iDestruct (TsoCtxShim.ctx_word2_of_mem _ TsoCtx.cur_ctx with "H5") as "H5".
+    iDestruct (TsoCtxShim.ctx_word2_of_mem _ TsoCtx.cur_ctx with "H6") as "H6".
+    iDestruct (TsoCtxShim.ctx_word2_of_mem _ TsoCtx.cur_ctx with "H7") as "H7".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H8") as "H8".
     iSplitL "H0"; [iExists vdev; iExact "H0" |].
     iSplitL "H1"; [iExists vinum; iExact "H1" |].
     iSplitL "H2"; [iExact "H2" |].
@@ -1209,14 +1282,16 @@ Section BootCarveMain.
       iSplitL "H4"; [iExact "H4" |]. iSplitL "H5"; [iExact "H5" |].
       iSplitL "H6"; [iExact "H6" |]. iSplitL "H7"; [iExact "H7" |].
       iExact "H8". }
-    iExists l. iSplitR; [iPureIntro; exact Hlen |]. iExact "Hl".
+    iExists l. iSplitR; [iPureIntro; exact Hlen |].
+    iApply (big_sepL_mono with "Hl"). iIntros (j a _) "Ha".
+    iApply (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Ha").
   Qed.
 
   (* the NINODE entries: the family, at the itable's stride and anchored at
      the ENTRY array's own base.  Gives both of [main_globals_raw]'s inode
      conjuncts -- the sleeplocks iinit takes, and the cells [icache_boot]
      takes. *)
-  Lemma boot_inode_entries (g : gstate) :
+  Lemma boot_inode_entries `{XI : TsoCtx.CurCtx} (g : gstate) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     kmap_static_claims -∗
@@ -1389,8 +1464,38 @@ Section BootCarveMain.
     iExists vmaj. iExact "H7".
   Qed.
 
+  (* THE NAMED BRIDGE [file_node_raw] -> [FileInvDefs.fentry_raw], the
+     [bpay_raw_buf_raw] situation exactly: the addresses agree definitionally
+     ([fnode k] is [pa_of_z (file_base + file_stride * k)], and the seven
+     [foff_of] offsets are the [a_f…] names), and the CROSSING is every
+     cell -- the two ↦ₘ bytes, the two ↦₈ slots and (SINCE M1 STAGE 2) the
+     ↦₄/↦₂ ones: raw here (this file does not import TsoCtx),
+     context-indexed in [FileInvDefs] (which does).  Whole-body conversion
+     closed this under the permeable seal; now it is four named shim uses. *)
+  Lemma file_node_raw_fentry `{XI : TsoCtx.CurCtx} (k : nat) :
+    file_node_raw (pa_of_z (file_base + file_stride * Z.of_nat k))
+    ⊢ fentry_raw k.
+  Proof.
+    rewrite /file_node_raw /fentry_raw.
+    iIntros "(H0 & H1 & H2 & H3 & H4 & H5 & H6 & H7)".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H0") as "H0".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H1") as "H1".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "H6") as "H6".
+    iSplitL "H0"; [iExact "H0" |].
+    iSplitL "H1"; [iExact "H1" |].
+    iSplitL "H2"; [ iDestruct "H2" as (r) "H2"; iExists r;
+                    iApply (TsoCtxShim.ctx_pointsto_of_mem with "H2") |].
+    iSplitL "H3"; [ iDestruct "H3" as (w) "H3"; iExists w;
+                    iApply (TsoCtxShim.ctx_pointsto_of_mem with "H3") |].
+    iSplitL "H4"; [ iApply (TsoCtxShim.ctx_eslot_of_mem with "H4") |].
+    iSplitL "H5"; [ iApply (TsoCtxShim.ctx_eslot_of_mem with "H5") |].
+    iSplitL "H6"; [iExact "H6" |].
+    iDestruct "H7" as (mj) "H7". iExists mj.
+    iApply (TsoCtxShim.ctx_word2_of_mem _ TsoCtx.cur_ctx with "H7").
+  Qed.
+
   (* the NFILE entries, as [FileInv.ftable_res_boot] takes them. *)
-  Lemma boot_file_entries (g : gstate) :
+  Lemma boot_file_entries `{XI : TsoCtx.CurCtx} (g : gstate) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     kmap_static_claims -∗
@@ -1419,7 +1524,7 @@ Section BootCarveMain.
                        iApply (boot_file_entry g A Hmem Q1 Q2 Q3 with "Hcl H"))
                  with "Hcl H") as "H".
     iApply (big_sepL_mono with "H"). iIntros (n k _) "Hk".
-    rewrite /fentry_raw. iExact "Hk".
+    iApply (file_node_raw_fentry k with "Hk").
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -1471,7 +1576,7 @@ Section BootCarveMain.
     rewrite pa_add_of_z. f_equal. lia.
   Qed.
 
-  Lemma boot_log_raw (g : gstate) :
+  Lemma boot_log_raw `{XI : TsoCtx.CurCtx} (g : gstate) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     kmap_static_claims -∗
@@ -1574,9 +1679,19 @@ Section BootCarveMain.
     iExists vlock, v_start, v_dev, v_nc, v_n, vname, vcpu.
     rewrite log_nm_of_z log_cpu_of_z l_start_of_z l_out_of_z l_cmt_of_z
             l_dev_of_z l_ncommit_of_z lh_n_of_z log_lk_of_z.
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hn") as "Hn".
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hc") as "Hc".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hw") as "Hw".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hst") as "Hst".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hdv") as "Hdv".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hout") as "Hout".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hcmt") as "Hcmt".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hnc") as "Hnc".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hn2") as "Hn2".
     iFrame "Hw Hn Hc Hst Hdv Hout Hcmt Hnc Hn2".
     iApply (big_sepL_mono with "Hblk"). iIntros (n i _) "Hi".
-    rewrite lh_block_of_z. iExact "Hi".
+    rewrite lh_block_of_z. iDestruct "Hi" as (w) "Hi". iExists w.
+    iApply (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hi").
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -1590,7 +1705,7 @@ Section BootCarveMain.
   (* the order the client's cuts out of the one .bss range must follow   *)
   (* ([main_lock_windows] is that check).                               *)
   (* ------------------------------------------------------------------ *)
-  Lemma boot_main_locks_raw (g : gstate) :
+  Lemma boot_main_locks_raw `{XI : TsoCtx.CurCtx} (g : gstate) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     kmap_static_claims -∗
@@ -1665,7 +1780,7 @@ Section BootCarveMain.
   (* ================================================================== *)
 
   (* the saved-context save area: [n] doublewords from [C + off]. *)
-  Lemma boot_ctx_cells (g : gstate) (C : Z) (n : nat) (off : Z) :
+  Lemma boot_ctx_cells `{XI : TsoCtx.CurCtx} (g : gstate) (C : Z) (n : nat) (off : Z) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     text_end <= C + off -> C + off + 8 * Z.of_nat n <= ram_hi ->
@@ -1697,10 +1812,15 @@ Section BootCarveMain.
                    (C + (off + 8) + 8 * Z.of_nat k) Elo Ehi with "H") as "H".
       iDestruct (IH (off + 8) Hilo Hihi Hial with "Hcl H") as (vs) "[%Hlen Hvs]".
       iExists (v :: vs). iSplitR; [iPureIntro; cbn [length]; by rewrite Hlen |].
-      cbn [ctx_cells_at]. iSplitL "Hc"; [rewrite off_of_z; iExact "Hc" | iExact "Hvs"].
+      cbn [ctx_cells_at].
+      (* [SwtchCtx.ctx_cells_at] is above the seam ([↦₈] there is the CONTEXT
+         word); this file's [↦₈] is raw.  One named crossing per cell. *)
+      iSplitL "Hc";
+        [ rewrite off_of_z; iApply (TsoCtxShim.ctx_word_of_mem with "Hc")
+        | iExact "Hvs" ].
   Qed.
 
-  Lemma boot_own_ctx (g : gstate) (C : Z) :
+  Lemma boot_own_ctx `{XI : TsoCtx.CurCtx} (g : gstate) (C : Z) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     text_end <= C -> C + 112 <= ram_hi -> C mod 8 = 0 ->
@@ -1779,7 +1899,7 @@ Section BootCarveMain.
 
   (* ---- the three runs, in the consumer's own vocabulary ---- *)
 
-  Lemma boot_ofile_cells (g : gstate) (A : Z) :
+  Lemma boot_ofile_cells `{XI : TsoCtx.CurCtx} (g : gstate) (A : Z) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     img_end <= A -> A + 336 <= ram_hi -> A mod 8 = 0 ->
@@ -1790,16 +1910,22 @@ Section BootCarveMain.
     intros Hmem Hbss Hhi Hal.
     assert (Hlo : text_end <= A)
       by exact (z_lo_trans text_end img_end A ltac:(vm_compute; discriminate) Hbss).
+    iIntros "#Hcl H".
+    iDestruct (boot_zero_cells g A NOFILE 208 Hmem ltac:(lia) ltac:(lia)
+                 ltac:(unfold NOFILE; lia) (z_mod_addo 8 A 208 Hal eq_refl)
+                 with "Hcl H") as "H".
+    (* [ProcDefs.ofile_cells] is above the seam; the carve is raw.  One named
+       crossing per slot. *)
     rewrite /ofile_cells.
-    iApply (boot_zero_cells g A NOFILE 208 Hmem ltac:(lia) ltac:(lia)
-              ltac:(unfold NOFILE; lia) (z_mod_addo 8 A 208 Hal eq_refl)).
+    iApply (big_sepL_mono with "H"). iIntros (fd v _) "Hv".
+    iApply (TsoCtxShim.ctx_word_of_mem with "Hv").
   Qed.
 
   (* THE NAME ARRAY BOOTS ZERO, and that is now part of what this hands over:
      [pname_cells] carries [ProcGeom.pname_wf], and sixteen zero bytes have a
      NUL at index 0.  The [∃ bs] shape is kept so no consumer moves; the
      witness is simply concrete now. *)
-  Lemma boot_proc_name (g : gstate) (A : Z) :
+  Lemma boot_proc_name `{XI : TsoCtx.CurCtx} (g : gstate) (A : Z) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     text_end <= A -> img_end <= A -> A + 360 <= ram_hi ->
@@ -1824,7 +1950,12 @@ Section BootCarveMain.
     assert (Hl2 : img_end <= A + 344) by lia.
     assert (Hl3 : A + 344 + Z.of_nat PNAMELEN <= ram_hi)
       by (unfold PNAMELEN; lia).
-    iApply (boot_name_cells g A PNAMELEN 344 Hmem Hl1 Hl2 Hl3 with "Hcl H").
+    iDestruct (boot_name_cells g A PNAMELEN 344 Hmem Hl1 Hl2 Hl3 with "Hcl H")
+      as "H".
+    (* [ProcDefs.pname_bytes] is above the seam; the carve is raw.  One named
+       crossing per byte. *)
+    iApply (big_sepL_mono with "H"). iIntros (i b _) "Hb".
+    iApply (TsoCtxShim.ctx_pointsto_of_mem with "Hb").
   Qed.
 
   (* ---- ONE process slot: everything the image owes about [proc[i]] ----
@@ -1844,14 +1975,14 @@ Section BootCarveMain.
      would cut this in the wrong place and [boot_procs_raw] would hand its
      caller [chan] and [proc_pub ∗ parent] instead of the pair and the
      parent. *)
-  Local Definition proc_slot_raw (a : Arch.pa) : iProp Σ :=
+  Local Definition proc_slot_raw `{XI : TsoCtx.CurCtx} (a : Arch.pa) : iProp Σ :=
     (proc_raw a ∗
      ((∃ ch : SailStdpp.Values.mword 64, p_chan a ↦₈ ch) ∗ proc_pub a) ∗
      (* the parent cell, which belongs to wait_lock rather than to p->lock --
         see the split at +56 below *)
      (∃ pv : SailStdpp.Values.mword 64, p_parent a ↦₈ pv))%I.
 
-  Lemma boot_proc_slot (g : gstate) (A : Z) :
+  Lemma boot_proc_slot `{XI : TsoCtx.CurCtx} (g : gstate) (A : Z) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     img_end <= A -> A + 360 <= ram_hi -> A mod 8 = 0 ->
@@ -1979,6 +2110,15 @@ Section BootCarveMain.
     iDestruct (boot_ran_cell8_bss g (A + 336) (zero_reg : mword 64) Hmem
                  ltac:(lia) ltac:(lia) ltac:(lia) M336 nth_byte_zero8
                  with "Hcl Hcwd") as "Hcwd".
+    (* the five ↦₈ cells whose CONSUMERS are above the seam ([p_kstack] and
+       [proc_fields]' / [proc_dormant_nofd]'s words): named crossings, one
+       each.  [p_chan] and [p_parent] stay RAW -- they are conjuncts of this
+       file's own [proc_slot_raw]. *)
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hks") as "Hks".
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hsz") as "Hsz".
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hcwd") as "Hcwd".
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hpg") as "Hpg".
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "Htf") as "Htf".
     iDestruct (boot_own_ctx g (A + 96) Hmem ltac:(lia) ltac:(lia) M96
                  with "Hcl Hctx") as "Hctx".
     iDestruct (boot_ofile_cells g A Hmem Hbss ltac:(lia) Hal with "Hcl Hof")
@@ -1998,6 +2138,7 @@ Section BootCarveMain.
             E48 E72 E80 E88 !off_of_z.
     iSplitL "Hlk Hst Hks Hpid1 Hsz Hcwd Hnm Hof Hctx Hpg Htf".
     { iExists vst, vks.
+      iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hst") as "Hst".
       iSplitL "Hlk"; [iExact "Hlk" |]. iSplitL "Hst"; [iExact "Hst" |].
       iSplitL "Hks"; [iExact "Hks" |].
       iExists (MkPPriv (zero_reg : mword 64)
@@ -2010,6 +2151,7 @@ Section BootCarveMain.
       cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
       iSplitR; [iPureIntro; split_and!;
                 [reflexivity | reflexivity | vm_compute; discriminate] |].
+      iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hpid1") as "Hpid1".
       iSplitL "Hpid1"; [iExact "Hpid1" |].
       iSplitL "Hsz Hcwd Hnm".
       { iSplitL "Hsz"; [iExact "Hsz" |]. iSplitL "Hcwd"; [iExact "Hcwd" |].
@@ -2019,13 +2161,16 @@ Section BootCarveMain.
     iSplitR "Hpar"; [| iExists vpar; iExact "Hpar"].
     iSplitL "Hch"; [iExists vch; iExact "Hch" |].
     iExists vkl, vxs, vpid.
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hkl") as "Hkl".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hxs") as "Hxs".
     iSplitL "Hkl"; [iExact "Hkl" |]. iSplitL "Hxs"; [iExact "Hxs" |].
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hpid2") as "Hpid2".
     iExact "Hpid2".
   Qed.
 
   (* ...and the 64 slots, out of the one [proc[]] range: ONE family, whose
      per-element carve gives both of [main_globals_raw]'s proc big-ops. *)
-  Lemma boot_procs_raw (g : gstate) :
+  Lemma boot_procs_raw `{XI : TsoCtx.CurCtx} (g : gstate) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     kmap_static_claims -∗
@@ -2075,7 +2220,7 @@ Section BootCarveMain.
   (* one page, out of its own 4096-byte range: [BootCarve.boot_ran_mem_run]
      hands out the bytes already indexed by [pa_add], and [page_own] is that
      run with the contents forgotten. *)
-  Lemma boot_page_own (g : gstate) (lo : Z) :
+  Lemma boot_page_own `{XI : TsoCtx.CurCtx} (g : gstate) (lo : Z) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     text_end <= lo -> lo + 4096 <= ram_hi ->
@@ -2091,12 +2236,15 @@ Section BootCarveMain.
                  eq_refl E with "H") as "H".
     iDestruct (boot_ran_mem_run g lo 4096%nat Hmem Hlo Hhi' with "Hcl H") as "Hbs".
     rewrite /page_own. iApply (big_sepL_mono with "Hbs").
-    iIntros (j x _) "Hb". rewrite /byte_any. iExists _. iExact "Hb".
+    (* [KallocInv.byte_any] is above the seam; the carve is raw.  One named
+       crossing per byte. *)
+    iIntros (j x _) "Hb". rewrite /byte_any. iExists _.
+    iApply (TsoCtxShim.ctx_pointsto_of_mem with "Hb").
   Qed.
 
   (* ...and the whole run, by the same downward induction as §9's stack:
      ONE cut per page, the cursor moving up. *)
-  Lemma boot_pg_run_own (g : gstate) (s1 : mword 64) (n : nat) :
+  Lemma boot_pg_run_own `{XI : TsoCtx.CurCtx} (g : gstate) (s1 : mword 64) (n : nat) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     text_end + 4096 <= uint s1 ->
@@ -2152,7 +2300,7 @@ Section BootCarveMain.
      [K_kvmmake + 64 + 3 < length ps] is about).  The cursor equation
      [uint s1 + 4096*n = uint phystop + 4096] is what pins the run: the
      cursor ends exactly one page past PHYSTOP. *)
-  Lemma boot_kinit_run (g : gstate) (phystop s1 : mword 64) (n : nat) :
+  Lemma boot_kinit_run `{XI : TsoCtx.CurCtx} (g : gstate) (phystop s1 : mword 64) (n : nat) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     uint s1 + 4096 * Z.of_nat n = uint phystop + 4096 ->

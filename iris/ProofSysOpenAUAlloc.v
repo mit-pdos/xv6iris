@@ -115,6 +115,7 @@ Require Import ProofSysOpenAUParts.
 Require Import ProofSysOpenAUPub.
 Require Import ProofSysOpenAUStores.
 Require Import FsAbs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -170,7 +171,7 @@ Section ProofSysOpenAUAlloc.
   (*  hands the whole [file_ref] to [fileclose], so the slot may not be   *)
   (*  broken into cells until the descriptor is installed.                *)
   (* ================================================================== *)
-  Lemma so_alloc_au `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_alloc_au `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gfl gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -257,7 +258,7 @@ Section ProofSysOpenAUAlloc.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     log_opb icfg_log u -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗

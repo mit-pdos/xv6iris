@@ -10,13 +10,14 @@ From iris.bi.lib Require Import fractional.
 Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d SailStdpp.Base RiscvLang RiscvPtsto RiscvFetchExec WpGpr RegFile InstrBytes RiscvExtras SailStdpp.TypeCasts SailStdpp.MachineWord SailStdpp.Values.
 Require Import WpInstr.   (* wp_instr / mm_cycle, split out of InstrBytes *)
 Require Import HartSwp WpMmodeJump.
+Require Import TsoCtx.
 Import Defs.
 Import Defs.
 
 (* from WpGprJalr.v *)
 Section WpJalrGpr.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* [instr]/[mmode_config]-formulated register-generic JALR WP, built on
      [wp_instr].  Like [wp_addi_gpr] it reads rs1 off the [gpr_file] and writes
@@ -29,7 +30,7 @@ End WpJalrGpr.
 (* from WpGprRvc.v *)
 Section RvcRet.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* [wp_cret_gpr] for a c.ret return target.  Under the C extension (misa.C,
      held by [mmode_config]'s [hw_config]) the model's jalr accepts a 2-aligned

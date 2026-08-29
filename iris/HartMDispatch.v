@@ -18,6 +18,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep HartSwp HartLift
         HartRegNode HartSpan HartSpanChar.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -418,7 +419,7 @@ Qed.
 
 Section swp_dispatch.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma swp_dispatchInterrupt_M (Drw Dro : gset register)
       (Df : register -> dfrac) (rs : regstate)

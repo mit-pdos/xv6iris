@@ -24,6 +24,7 @@ From iris.base_logic.lib Require Import invariants.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import CodeTimerinit.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -105,7 +106,7 @@ Ltac boot_static :=
 
 Section WpTimerinit.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* PCs of the 21 instructions. *)
   Definition ti_pc9  : mword 64 := mword_of_int (KernelSyms.timerinit).

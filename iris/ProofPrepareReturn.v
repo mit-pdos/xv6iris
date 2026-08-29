@@ -78,6 +78,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* the push_off depth myproc's contract bounds; [lia] cannot evaluate the
@@ -90,7 +91,7 @@ Module PrepareReturnProof (Myproc : MYPROC) : PREPARE_RETURN.
 
 Section ProofPrepareReturn.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>

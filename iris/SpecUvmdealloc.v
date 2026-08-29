@@ -51,6 +51,7 @@ Require Import ProcPtOwn.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 
 (* ===================================================================== *)
@@ -62,7 +63,7 @@ Import Defs.
    shrank, the old one otherwise).  On the two arms where the C code
    unmaps nothing, [uvmd_np] is 0 and [umem_del M _ 0] is [M], so one
    postcondition covers all three, exactly as at the [proc_pt] altitude. *)
-Definition wp_uvmdealloc_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_uvmdealloc_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (mm : regfile)
     (P : uptd) (M : gmap Z (bv 8)) (K : nat) (eb : bool) (p : mword 64)
     (b : bool) (lks : gset string) :=
@@ -99,7 +100,7 @@ Definition wp_uvmdealloc_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `
 
 Module Type UVMDEALLOC.
   Parameter wp_uvmdealloc_mem_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (mm : regfile)
       (P : uptd) (M : gmap Z (bv 8)) (K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string),

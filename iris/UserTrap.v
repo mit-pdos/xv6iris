@@ -64,6 +64,7 @@ Import Defs.
 (* §3.3, §4.4 item 2), not a twin.                                         *)
 (* ===================================================================== *)
 Require Import HartSwp HartLift HartSpan HartRegNode HartMemRun UserExecFacts.
+Require Import TsoCtx.
 
 
 (* ONE PEEL FOR EVERY BIND SHAPE the generated code produces: [bind0], the
@@ -634,7 +635,7 @@ Section UTrapReduce.
   (* section: [s1] .. [s9] are already [Let]-bound here, so the tail needs  *)
   (* no renaming at all.                                                    *)
   (* ------------------------------------------------------------------- *)
-  Lemma swp_trap_handler_u `{!riscvGS Sig} `{GEN : GenId} `{CID : CpuId}
+  Lemma swp_trap_handler_u `{!riscvGS Sig} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (Dr Dw : register -> bool) (Drw Dro : gset register)
       (Df : register -> dfrac) (rs : regstate) :
     Drw ## Dro ->
@@ -884,7 +885,7 @@ Section UTrapReduce.
       | apply (exec_write_reg (R_bitvector_64 nextPC) v st) ].
   Qed.
 
-  Lemma swp_exception_handler_u `{!riscvGS Sig} `{GEN : GenId} `{CID : CpuId}
+  Lemma swp_exception_handler_u `{!riscvGS Sig} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (Dr Dw : register -> bool) (Drw Dro : gset register)
       (Df : register -> dfrac) (rs : regstate)
       (e : ExceptionType) (xv : mword 64)
@@ -940,7 +941,7 @@ Section UTrapReduce.
               with "Hcert Hany Helpc Hrw Hro").
   Qed.
 
-  Lemma swp_handle_exception_u `{!riscvGS Sig} `{GEN : GenId} `{CID : CpuId}
+  Lemma swp_handle_exception_u `{!riscvGS Sig} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (Dr Dw : register -> bool) (Drw Dro : gset register)
       (Df : register -> dfrac) (rs : regstate)
       (e : ExceptionType) (xv : mword 64)
@@ -1019,7 +1020,7 @@ Section UTrapReduce.
     iExists rs4. iFrame "Hrw Hro Hany". done.
   Qed.
 
-  Lemma swp_handle_interrupt_u `{!riscvGS Sig} `{GEN : GenId} `{CID : CpuId}
+  Lemma swp_handle_interrupt_u `{!riscvGS Sig} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (Dr Dw : register -> bool) (Drw Dro : gset register)
       (Df : register -> dfrac) (rs : regstate) (i : InterruptType)
       (Hc : c = Interrupt i) (Hinfo : info = None) :
@@ -1086,7 +1087,7 @@ Section UTrapReduce.
   (* the EXECUTE-TRAP arm's shape: [swp_try_step_full] hands the tower
      [bind (exception_handler p exc pcx) set_next_pc] directly, without
      [handle_exception]'s two reads (the step already read them). *)
-  Lemma swp_exec_trap_u `{!riscvGS Sig} `{GEN : GenId} `{CID : CpuId}
+  Lemma swp_exec_trap_u `{!riscvGS Sig} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (Dr Dw : register -> bool) (Drw Dro : gset register)
       (Df : register -> dfrac) (rs : regstate)
       (e : ExceptionType) (xv : mword 64)
@@ -1525,7 +1526,7 @@ Qed.
 
 Section UTrapGhost.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma utrap_ghost (s_x : mstate) (c : TrapCause) (info : option (mword 64))
       (pcx ms_v sc_v stval_v sepc_v va va' : mword 64)

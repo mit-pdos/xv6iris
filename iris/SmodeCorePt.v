@@ -110,6 +110,8 @@ Require Import WpInstrRun WpSFrames.
 Require Import RiscvExtras.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
+Require TsoCtxShim.   (* the claim-keyed writes cross the ctx/mem seam *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -201,7 +203,7 @@ Proof. reflexivity. Qed.
 Section SmodeCorePt.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* =================================================================== *)
   (* WINDOW COLLAPSE (uniform-claims): a non-straddling [len]-byte chunk   *)
@@ -365,12 +367,14 @@ Section SmodeCorePt.
       iMod (IH Hxs mm with "Hk Hm Hrest") as "[Hm Hrest]".
       iAssert (kmap_at (svpn_of (pa_add va x)) ppn KP_rw)%I as "#Hkx".
       { rewrite (svpn_of_pa_add va x Hcan Hx). iExact "Hk". }
+      iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Ha") as "Ha".
       iDestruct (mem_pointsto_pin (pa_add va x) (DfracOwn 1) (gold x) ppn with "Hkx Ha")
         as "(%Hc & %Hd & %Hid & Hp & _)".
       simpl foldr.
       rewrite -(pa_of_pa_add ppn va x Hcan Hx).
       iMod (gen_heap_update _ (pa_of ppn (pa_add va x)) (gold x) (gnew x) with "Hm Hp") as "[Hm Hp]".
       iModIntro. iFrame "Hm". simpl. iFrame "Hrest".
+      iApply TsoCtxShim.ctx_pointsto_of_mem.
       iExists ppn. iFrame "Hkx Hp". iPureIntro.
       split; [exact Hc | split; [exact Hd | exact Hid]].
   Qed.
@@ -386,15 +390,16 @@ Section SmodeCorePt.
     gen_heap_interp (hG:=riscv_memGS) (write_bytes mm (pa_of ppn va) 8 vnew) ∗ va ↦₈ vnew.
   Proof.
     intros Hcan Hoff. iIntros "#Hk Hm Hw".
-    iDestruct (word_pointsto_aligned_p with "Hw") as %Hal.
-    iDestruct (word_pointsto_bytes with "Hw") as "Hb".
+    iDestruct (ctx_word_pointsto_aligned_p with "Hw") as %Hal.
+    iDestruct (ctx_word_pointsto_bytes with "Hw") as "Hb".
     iMod (s_win_write va ppn (nth_byte vold) (nth_byte vnew) Hcan (seq 0 8)
             ltac:(apply Forall_forall; intros j Hj; apply elem_of_list_In, elem_of_seq in Hj;
                   destruct Hj as [_ Hj8]; pose proof (Nat2Z.inj_lt j 8) as Hnz;
                   change (Z.of_nat 8) with 8%Z in Hnz; lia)
             mm with "Hk Hm Hb") as "[Hm Hb]".
     iModIntro. unfold write_bytes. change (N.to_nat 8) with 8%nat. iFrame "Hm".
-    iApply word_pointsto_intro; [exact Hal | iExact "Hb"].
+    iApply ctx_word_pointsto_intro; [exact Hal | ].
+    iExact "Hb".
   Qed.
 
   (* 4-byte claim-keyed write (the width-4 analogue). *)
@@ -407,15 +412,15 @@ Section SmodeCorePt.
     gen_heap_interp (hG:=riscv_memGS) (write_bytes mm (pa_of ppn va) 4 vnew) ∗ va ↦₄ vnew.
   Proof.
     intros Hcan Hoff. iIntros "#Hk Hm Hw".
-    iDestruct (word4_pointsto_aligned_p with "Hw") as %Hal.
-    iDestruct (word4_pointsto_bytes with "Hw") as "Hb".
+    iDestruct (ctx_word4_pointsto_aligned_p with "Hw") as %Hal.
+    iDestruct (ctx_word4_pointsto_bytes with "Hw") as "Hb".
     iMod (s_win_write va ppn (nth_byte vold) (nth_byte vnew) Hcan (seq 0 4)
             ltac:(apply Forall_forall; intros j Hj; apply elem_of_list_In, elem_of_seq in Hj;
                   destruct Hj as [_ Hj4]; pose proof (Nat2Z.inj_lt j 4) as Hnz;
                   change (Z.of_nat 4) with 4%Z in Hnz; lia)
             mm with "Hk Hm Hb") as "[Hm Hb]".
     iModIntro. unfold write_bytes. change (N.to_nat 4) with 4%nat. iFrame "Hm".
-    iApply word4_pointsto_intro; [exact Hal | iExact "Hb"].
+    iApply ctx_word4_pointsto_intro; [exact Hal | iExact "Hb"].
   Qed.
 
   (* =================================================================== *)

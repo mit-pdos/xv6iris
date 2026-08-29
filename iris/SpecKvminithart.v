@@ -68,10 +68,11 @@ Require Import IntrDefs.
 Require Import KptShare.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 
 (* kvminithart(): the Bare->Sv39 kernel-page-table switch.  See the header. *)
-Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile) (lvl K : nat)
+Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (mm : regfile) (lvl K : nat)
     (root : mword 44)
     (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kvminithart in
@@ -101,7 +102,7 @@ Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
 
 Module Type KVMINITHART.
   Parameter wp_kvminithart_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile) (lvl K : nat)
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (mm : regfile) (lvl K : nat)
       (root : mword 44)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (p : mword 64),
       wp_kvminithart_sconf_body mm lvl K root tlbvec0 p.

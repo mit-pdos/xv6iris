@@ -52,6 +52,10 @@ From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
+(* the WaitInv parent table is still the RAW word fact; the named
+   crossings below are its shim seams (stage-2 worklist). *)
+Require Import TsoCtxShim.
 Local Open Scope Z_scope.
 
 (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]).  Written
@@ -77,7 +81,7 @@ Proof. intro Hk. apply proc_addr_inj_le; lia. Qed.
 Definition rp_fcell (spF : mword 64) (u : Z) : mword 64 :=
   add_vec spF (zero_extend' 64 (concat_vec (mword_of_int u : mword 6) ('b"000"))).
 
-Definition rp_frame `{!riscvGS Σ} (spF : mword 64)
+Definition rp_frame `{XI : CurCtx} `{!riscvGS Σ} (spF : mword 64)
     (vra vs0 vs1 vs2 vs3 vs4 : mword 64) : iProp Σ :=
   (rp_fcell spF 5 ↦₈[KT1] vra ∗ rp_fcell spF 4 ↦₈[KT1] vs0 ∗ rp_fcell spF 3 ↦₈[KT1] vs1 ∗
    rp_fcell spF 2 ↦₈[KT1] vs2 ∗ rp_fcell spF 1 ↦₈[KT1] vs3 ∗ rp_fcell spF 0 ↦₈[KT1] vs4)%I.
@@ -122,7 +126,7 @@ Module ReparentProof (Wakeup : WAKEUP) : REPARENT.
 (* ===================================================================== *)
 Section ProofReparentEnds.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* +0x00 .. +0x2a: carve the 6-slot frame, save ra/s0/s1..s4, set s0, park
      the argument in s2, materialise &proc[0] / &initproc / &proc[NPROC], and
@@ -598,7 +602,7 @@ End ProofReparentEnds.
 Section ProofReparentLoop.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Lemma rp_loop `{GEN : GenId} `{CID0 : CpuId}
+  Lemma rp_loop `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       
       (γs : list gname) (spF pme pv ip : mword 64)
       (ps : list (mword 64)) (dqi : dfrac)
@@ -797,7 +801,7 @@ Section ProofReparentLoop.
                 M av v b ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc [] [Hcell]").
       { iApply (rpi_34 with "Htext"). }
-      { iEval (rewrite Hrgk9 Hs1 p_parent_sext). iExact "Hcell". }
+      { iEval (rewrite Hrgk9 Hs1 p_parent_sext). iApply (TsoCtxShim.ctx_word_of_mem with "Hcell"). }
       iIntros (CIDl Hsl) "Hcg Hpc Hcell".
       iEval (rewrite Hrgk9 Hs1 p_parent_sext) in "Hcell".
       set (M34 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg v]> M).
@@ -879,6 +883,7 @@ Section ProofReparentLoop.
         iIntros (CIDo Hso) "Hcg Hpc Hcell".
         iEval (rewrite Hrgn9 HM3a_9 p_parent_sext Hrgn10 HM3a_10) in "Hcell".
         (* close the accessor: slot [k] now holds [ip], i.e. [rp_slot pv ip v] *)
+        iDestruct (TsoCtxShim.ctx_word_to_mem with "Hcell") as "Hcell".
         iDestruct ("Hback" $! ip with "Hcell") as "Hpar".
         assert (Hslot : rp_slot pv ip v = ip) by (unfold rp_slot; rewrite Hcmp; reflexivity).
         pose proof (rp_upto_step pv ip k ps v Hv) as Hstep.
@@ -1021,6 +1026,7 @@ Section ProofReparentLoop.
         iApply bi.later_intro. iIntros (CIDm Hsm) "Hcg Hpc".
         iEval (rewrite Htgt2c) in "Hpc".
         (* the cell goes back unchanged, and [rp_slot pv ip v = v] *)
+        iDestruct (TsoCtxShim.ctx_word_to_mem with "Hcell") as "Hcell".
         iDestruct ("Hback" $! v with "Hcell") as "Hpar".
         assert (Hslot : rp_slot pv ip v = v) by (unfold rp_slot; rewrite Hcmp; reflexivity).
         pose proof (rp_upto_step pv ip k ps v Hv) as Hstep.
@@ -1046,7 +1052,7 @@ End ProofReparentLoop.
 Section ProofReparent.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Lemma wp_reparent_sconf `{GEN : GenId} `{CID0 : CpuId}
+  Lemma wp_reparent_sconf `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
        (m : regfile) (γs : list gname) (pme ip : mword 64)
       (ps : list (mword 64)) (dqi : dfrac) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string)
     : wp_reparent_sconf_body m γs pme ip ps dqi lvl K eb b lks.

@@ -70,6 +70,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Set Printing Depth 40.
 
@@ -110,7 +111,7 @@ Definition iul_sp (m M : regfile) : Prop :=
 
 Section ProofIunlockMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* iunlock's 32-byte frame: ra@24 s0@16 s1@8 s2@0 *)
   Definition iul_frame (m : regfile) : iProp Σ :=
@@ -440,7 +441,7 @@ Section ProofIunlockMain.
     iDestruct "Hborp" as (sbp) "[Hlvp Hbbackp]".
     iMod (iref_live_load_au (⊤ ∖ ↑(icEscN .@ k)) k sbp
             ltac:(solve_ndisj) Hk with "Hitbl Hlvp") as (vp) "[Hcellp Hclp]".
-    iDestruct (wordw_claim_of (KTR := KT0) 4 (i_ref (ientry k)) (DfracOwn 1) vp
+    iDestruct (ctx_word4_claim (KTR2 := KT0) (i_ref (ientry k)) (DfracOwn 1) vp
                  ltac:(lia) with "Hcellp") as "#Hclaim0".
     iMod ("Hclp" with "Hcellp") as "[%Hbp Hlvp]".
     iMod ("Hclosep" with "[Hbbackp Hlvp]") as "_".

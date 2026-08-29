@@ -36,6 +36,7 @@ Require Import SpecKalloc SpecKvmmap SpecProcMapstacks.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -115,7 +116,7 @@ Section ProofPMS.
   (* THE SEALED EPILOGUE (+0x80..+0x96): restore the 10-slot frame and  *)
   (* ret, producing the success-only proc_mapstacks post.               *)
   (* ================================================================= *)
-  Lemma wp_proc_mapstacks_epilogue_sconf `{GEN : GenId} `{CID : CpuId} (γa : gname) (γk : gname * gname)
+  Lemma wp_proc_mapstacks_epilogue_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γa : gname) (γk : gname * gname)
       (mm Mf : regfile) (t tf : ptree)
       (m : gmap (mword 27) (mword 64)) (K lvl : nat)
       (eb : bool) (p : mword 64) (on : option nat) (g : nat)
@@ -410,7 +411,7 @@ Section ProofPMS.
   Qed.
 
   (* pas-extension congruence on the accumulated page_own list *)
-  Lemma pms_pages_ext (i : nat) (f g : nat -> mword 44) :
+  Lemma pms_pages_ext `{XI : CurCtx} (i : nat) (f g : nat -> mword 44) :
     (forall j, (j < i)%nat -> f j = g j) ->
     ([∗ list] j ∈ seq 0 i, page_own (zero_extend' 64 (concat_vec (f j) (zeros' 12 : mword 12))))
     ⊢ ([∗ list] j ∈ seq 0 i, page_own (zero_extend' 64 (concat_vec (g j) (zeros' 12 : mword 12)))).
@@ -423,7 +424,7 @@ Section ProofPMS.
   (* ================================================================= *)
   (* THE LOOP (+0x52 entry): fuel induction on [rem], [i + rem = 64].    *)
   (* ================================================================= *)
-  Lemma wp_proc_mapstacks_loop_sconf `{GEN : GenId} `{CID : CpuId} (γa : gname) (γk : gname * gname)
+  Lemma wp_proc_mapstacks_loop_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γa : gname) (γk : gname * gname)
       (mm : regfile) (t : ptree)
       (m0 : gmap (mword 27) (mword 64)) (K lvl : nat)
       (eb : bool) (p : mword 64) (nb : nat) (rem : nat) (b : bool) (lks : gset string) :
@@ -1031,7 +1032,7 @@ Section ProofPMS.
   (* THE PROLOGUE (+0x00..+0x4e) + loop entry: the whole-function spec. *)
   (* ================================================================= *)
   Lemma wp_proc_mapstacks_sconf
-      `{GEN : GenId} `{CID : CpuId} (γa : gname) (γk : gname * gname)
+      `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γa : gname) (γk : gname * gname)
       (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat)
       (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string)
     : wp_proc_mapstacks_sconf_body γa γk mm t m lvl K eb p on b lks.

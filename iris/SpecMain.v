@@ -200,10 +200,12 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
    init cone needs.  The boot bridge hands out [kv_frame_slots + K_main]
    ([BootBridge.boot_stack_slots]), i.e. 180 slots = 1440 bytes of the
    4096-byte per-hart stack, so nothing upstream has to change. *)
+Require Import TsoCtx.
+
 Notation K_main := (122%nat) (only parsing).
 Section SpecMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------- *)
   (* The eleven [struct spinlock]s the init sequence brings up, each as   *)
@@ -520,7 +522,7 @@ Section SpecMain.
          printk_env γpr γd γv -∗
          procs_inv γs -∗
          console_caps γd -∗
-         is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
+         is_lock γk d_lock "virtio_disk"%string <{ disk_res γv pd pav pu }> -∗
          disk_geom γv pd pav pu -∗
          kpt_inv root -∗
          (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□
@@ -540,7 +542,7 @@ Section SpecMain.
        main spends the [nextpid] half immediately: it is the whole of
        [SpecAllocpid.nextpid_res], so the [newlock] on procinit's
        [lk_fresh pid_lock_addr "nextpid"] turns the pair into the
-       [is_lock γp alp_pid_lock "nextpid" nextpid_res] that allocproc -- and
+       [is_lock γp alp_pid_lock "nextpid" <{ nextpid_res }>] that allocproc -- and
        hence kfork, sys_fork and userinit -- takes.  `first` is forkret's;
        main carries it and drops it. *)
     (* PINNED, not existential: forkret's branch is decided by this cell,
@@ -673,7 +675,7 @@ End SpecMain.
 
 Module Type MAIN.
   Parameter wp_main_boot_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       
       (m : regfile) (K : nat)
       (p0 : mword 64)

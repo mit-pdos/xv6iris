@@ -52,6 +52,7 @@ From Kernel Require KernelSyms.
 Require Import SpecWalk.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -136,7 +137,7 @@ Module WalkNoallocProof : WALK_NOALLOC.
 
 Section ProofWalkNoalloc.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Context {kt : ktier}.

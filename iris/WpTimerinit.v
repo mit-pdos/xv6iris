@@ -68,6 +68,7 @@ Require Import MbootVocab.
 (* [mw_prep] / [zn_norm] / [bv_eq_testbit], for [ti_mcen1_TM] below.  Safe at
    this altitude: MstatusBits.v has no intra-[iris] requires at all. *)
 Require Import MstatusBits.
+Require Import TsoCtx.
 (* ===================================================================== *)
 (* Symbolic values of the run (functions of the entry state).             *)
 (* ===================================================================== *)
@@ -238,7 +239,7 @@ Local Ltac ti_unfold :=
 (* ===================================================================== *)
 Section WpTimerinitThm.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* [wp_timerinit]: the whole-function spec over the [stack_own_phys] abstraction. *)
   Lemma wp_timerinit (q : Qp)

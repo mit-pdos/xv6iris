@@ -36,7 +36,7 @@
    actually consumed (before the myproc call, and at the loop's two exits /
    back edge), since none of the ALU/mem/branch leaves touch it themselves.
    [fda_tail], the shared epilogue entered by both of fdalloc's exits, is
-   pulled out to its own fresh `{CID0 : CpuId}` binder (the "decomposed
+   pulled out to its own fresh `{CID0 : CpuId} `{XI : CurCtx}` binder (the "decomposed
    helper" recipe) and wraps its own continuation in [wp_next]; it does NOT
    carry [cpu_own] (fdalloc's epilogue never touches it, exactly as before
    the sweep), so a caller transports ["Hcpu"] AFTER fda_tail, not
@@ -81,6 +81,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -220,7 +221,7 @@ Module FdallocProof (Myproc : MYPROC) : FDALLOC.
 
 Section ProofFdalloc.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>
@@ -260,10 +261,10 @@ Section ProofFdalloc.
     sie_cap_gpr KT1 Mt (av - 4)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.fdalloc + 0x28) : mword 64) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) gapv -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) gapv -∗
     wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗

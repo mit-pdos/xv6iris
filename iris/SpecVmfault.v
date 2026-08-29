@@ -64,6 +64,7 @@ Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 From Kernel Require KernelSyms.
+Require Import TsoCtx.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 
@@ -94,7 +95,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 (* way; [ProcPtOwn.proc_pt_ptm] IS the equivalence and derives one back  *)
 (* in five lines.                                                        *)
 (* ===================================================================== *)
-Definition wp_vmfault_sconf_mem_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_vmfault_sconf_mem_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (mm : regfile)
     (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (K lvl : nat) (eb : bool)
     (p : mword 64) (b : bool) (lks : gset string) :=
@@ -134,7 +135,7 @@ Definition wp_vmfault_sconf_mem_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
 
 Module Type VMFAULT.
   Parameter wp_vmfault_sconf_mem :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (mm : regfile)
       (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (K lvl : nat) (eb : bool)
       (p : mword 64) (b : bool) (lks : gset string),

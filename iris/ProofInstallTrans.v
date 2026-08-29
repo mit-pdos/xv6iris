@@ -102,6 +102,7 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
    printable (claude-notes/durable-notes.md) *)
@@ -603,6 +604,7 @@ Local Ltac rgne :=
 (* ===================================================================== *)
 Section InstallTransDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   (* install_trans's own [wp_next] obligation, NAMED and anchored at an
      explicit hart (durable-notes: a whole-function post must not be
@@ -983,6 +985,7 @@ End InstallTransDefs.
 (* ===================================================================== *)
 Section InstallTransBlocks.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   (* ================================================================== *)
   (*  +0x6c -> +0x70 : THE LOOP HEAD (durable-disk stage D2).             *)
@@ -1124,7 +1127,7 @@ Section InstallTransBlocks.
       iDestruct (cpu_own_transport CID0 CIDh5 0%nat eb (proc_addr j) eb
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       pose proof (Hpk eq_refl) as Hpkc.
-      iApply (Hpkc CIDh5 Mh4 (K - 10)%nat eb (proc_addr j) DfracDiscarded
+      iApply (Hpkc CIDh5 XI Mh4 (K - 10)%nat eb (proc_addr j) DfracDiscarded
                 it_fmt_s [PkANum; PkANum] eb lks
                 ltac:(pose proof printk_stack; lia)
                 ltac:(exact (proj2 (proj2 it_fmt_fmt)))
@@ -1817,7 +1820,7 @@ Section InstallTransBlocks.
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     it_frame m -∗
     lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
     ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) -∗
@@ -2701,7 +2704,7 @@ End InstallTransBlocks.
 
 Section ProofInstallTrans.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_install_trans_sconf 
       (γs : list gname) (j : nat) (γl : gname)

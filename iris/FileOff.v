@@ -103,9 +103,11 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import IrefSlots.  (* [iref_frac] rides [file_core] -- FileInvDefs *)
 
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Section FileOff.
   Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)
   (*  OBLIGATION (a): the borrow, under the inode's lock                  *)
@@ -128,7 +130,7 @@ Section FileOff.
     iIntros (HE) "[#Hinv Hoc] Hip Hmk Hlv".
     iMod (cinv_acc _ _ _ _ _ HE with "Hinv Hoc") as "(>Hbody & Hoc & Hclose)".
     iDestruct "Hbody" as (ip') "[Hip' Hd]".
-    iDestruct (word_pointsto_agree with "Hip Hip'") as %<-.
+    iDestruct (ctx_word_pointsto_agree with "Hip Hip'") as %<-.
     iDestruct "Hd" as "[Hres | [Hmk' _]]"; last first.
     { iExFalso. iApply (word4_pointsto_excl with "Hmk Hmk'"). }
     iDestruct "Hres" as (v) "[Hc %Hwf]".
@@ -151,7 +153,7 @@ Section FileOff.
     iIntros (HE Hwf) "[#Hinv Hoc] Hip Hc".
     iMod (cinv_acc _ _ _ _ _ HE with "Hinv Hoc") as "(>Hbody & Hoc & Hclose)".
     iDestruct "Hbody" as (ip') "[Hip' Hd]".
-    iDestruct (word_pointsto_agree with "Hip Hip'") as %<-.
+    iDestruct (ctx_word_pointsto_agree with "Hip Hip'") as %<-.
     iDestruct "Hd" as "[Hres | [Hmk Hlv]]".
     { iDestruct "Hres" as (v') "[Hc' _]".
       iExFalso. iApply (word4_pointsto_excl with "Hc Hc'"). }

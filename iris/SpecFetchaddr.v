@@ -73,6 +73,7 @@ Require Import FileInvDefs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -98,14 +99,14 @@ Section SpecFetchaddr.
   Context `{!riscvGS Σ}.
 
   (* fetchaddr's result, keyed by the returned a0 (the [argfd_post] shape). *)
-  Definition fetchaddr_post (ip oldv addr szv r : mword 64) : iProp Σ :=
+  Definition fetchaddr_post `{XI : CurCtx} (ip oldv addr szv r : mword 64) : iProp Σ :=
     (⌜r = (mword_of_int (-1) : mword 64) /\ ¬ fetch_ok addr szv⌝ ∗ ip ↦₈[KT1] oldv
      ∨ ⌜(r = (mword_of_int 0 : mword 64) \/ r = (mword_of_int (-1) : mword 64))
         /\ fetch_ok addr szv⌝ ∗ ∃ w : mword 64, ip ↦₈[KT1] w)%I.
 
 End SpecFetchaddr.
 
-Definition wp_fetchaddr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_fetchaddr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (γf : gname)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64)
     (pid : mword 32) (U : ustate) (oldv : mword 64) (b : bool) (lks : gset string) :=
@@ -143,7 +144,7 @@ Definition wp_fetchaddr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
 
 Module Type FETCHADDR.
   Parameter wp_fetchaddr_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (γf : gname) (m : regfile) (av : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (U : ustate) (oldv : mword 64) (b : bool) (lks : gset string),
       wp_fetchaddr_sconf_body γa γf m av eb p pid U oldv b lks.

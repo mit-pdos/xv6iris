@@ -84,6 +84,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Export FastSetSolver.
 Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* ------------------------------------------------------------------ *)
 (*  Geometry (offsets confirmed against kernel-rocq/KernelInstrs.v):    *)
@@ -393,6 +394,7 @@ Proof.
 Qed.
 
 Section LogInv.
+  Context `{XI : CurCtx}.
   (* [fsLinkG]/[fsTopG] are the DURABLE SNAPSHOT's two capacity classes
      (durable-disk lane H2).  [log_ctx]'s last-but-one conjunct is the file
      system's law, and since H2 the law HANDS DOWN the next epoch
@@ -1428,7 +1430,7 @@ Section LogInv.
       (cov : gset Z) (logstart : Z)
       (dev : SailStdpp.Values.mword 32) : iProp Σ :=
     (is_lock (ln_lk γ) log_addr "log"%string
-       (log_res γ bn γfs cov logstart) ∗
+       <{ log_res γ bn γfs cov logstart }> ∗
      l_dev ↦₄□ dev ∗
      l_start ↦₄□ (mword_of_int logstart : mword 32) ∗
      (* THE ERA'S SWAP RECEIPT (phase C2b/D1 stage 3).  [initlog]'s swap
@@ -1483,7 +1485,7 @@ Section LogInv.
 
   Lemma log_ctx_lock γ bn γfs cov logstart dev :
     log_ctx γ bn γfs cov logstart dev -∗
-    is_lock (ln_lk γ) log_addr "log"%string (log_res γ bn γfs cov logstart).
+    is_lock (ln_lk γ) log_addr "log"%string <{ log_res γ bn γfs cov logstart }>.
   Proof. rewrite /log_ctx. iIntros "($ & _)". Qed.
 
   (* THE FROZEN CELLS ALONE -- log_ctx minus the lock.  The COMMITTER-ONLY

@@ -173,6 +173,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -299,7 +300,7 @@ Global Instance fwrite_names_inhabited : Inhabited fwrite_names :=
    [fileG]'s [icfg_dev].  Same edit as SpecFilestat's and SpecFileread's. *)
 Section SpecFilewrite.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- the FD_DEVICE arm's environment ---- *)
 
@@ -487,7 +488,7 @@ Section SpecFilewrite.
      dev_inv (fsc_uart) (fsc_disk) ∗
      disk_geom (fsc_disk) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn) ∗
      is_lock (fsc_dlock) d_lock "virtio_disk"%string
-       (disk_res (fsc_disk) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)) ∗
+       <{ disk_res (fsc_disk) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn) }> ∗
      (* THREE slot units: writei's peak (bmap's, and its own bread held
         across either_copyin and log_write).  ilock's bread and end_op's
         commit borrow from the same three, one transaction at a time. *)
@@ -556,7 +557,7 @@ Section SpecFilewrite.
 End SpecFilewrite.
 
 Definition wp_filewrite_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
  (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
     (k : nat) (q : Qp) (st : fdstate)            (* the borrowed reference  *)
@@ -639,7 +640,7 @@ Definition wp_filewrite_sconf_body
 
 Module Type FILEWRITE.
   Parameter wp_filewrite_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
  (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (k : nat) (q : Qp) (st : fdstate)

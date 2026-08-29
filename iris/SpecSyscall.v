@@ -145,6 +145,7 @@ Require Import ParkCap.     (* [park_token] -- the park, as the resource fork ha
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.  (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 (* ===================================================================== *)
@@ -212,7 +213,7 @@ Definition sysc_mem_ok (V V' : pprivate) (M M' : gmap Z (bv 8)) : Prop :=
 Notation K_syscall := ((4 + K_sys_exec)%nat) (only parsing).
 Definition wp_syscall_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (R : gname -> mword 64 -> fclose_names -> iProp Σ)
     (γf : gname) (γs : list gname) (j : nat) (γl : gname)
     (fn : fclose_names)
@@ -358,7 +359,8 @@ Module Type SYSCALL.
      mcounteren/stimecmp -- and which usertrap therefore carries in the
      hart-generic [UsertrapRes.devintr_caps_any] form instead.) *)
   Parameter syscall_env :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+    forall {Σ : gFunctors} `{XI : CurCtx}
+           `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId},
       gname -> mword 64 -> fclose_names -> iProp Σ.
   (* ===================================================================== *)
@@ -397,13 +399,13 @@ Module Type SYSCALL.
      PROCESS half and nothing else. *)
   Parameter syscall_env_park :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
       (γf γw γft γtk : gname) (fn : fclose_names),
       (fcn_j fn < NPROC)%nat ->
       fcn_procs fn !! fcn_j fn = Some (fcn_plock fn) ->
       fcn_dq fn = DfracOwn (1/4) ->
       sysc_park_extra γtk -∗
-      is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+      is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
       is_ftable γft γf -∗
       procs_inv (fcn_procs fn) -∗
       disk_geom (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) -∗
@@ -420,18 +422,18 @@ Module Type SYSCALL.
   (* ...and read back out, for fork's sake *)
   Parameter syscall_env_world :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
       (γf : gname) (pj : mword 64) (fn : fclose_names),
       syscall_env γf pj fn -∗ park_world (fcn_procs fn).
   Parameter syscall_env_token :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
       (γf : gname) (pj : mword 64) (fn : fclose_names),
       syscall_env γf pj fn -∗ park_token (fcn_procs fn).
 
   Parameter wp_syscall_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γf : gname) (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names)
       (ip : mword 64) (dqi : dfrac)

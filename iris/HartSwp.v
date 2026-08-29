@@ -54,6 +54,7 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -204,7 +205,7 @@ Proof. reflexivity. Qed.
 
 Section swp.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Definition swp {X : Type} (m : M X) (Φ : X -> iProp Σ) : iProp Σ :=
     (∀ C : M X -> M unit,

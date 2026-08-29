@@ -14,7 +14,7 @@
      process (sys_getpid, acquiresleep).  That is FileInv's discipline 2, and
      it takes the same answer: a points-to FRACTION, half resident in the lock
      resource, half travelling with the runner.  Agreement between the halves
-     is [word4_pointsto_agree] -- no ghost algebra.
+     is [ctx_word4_pointsto_agree] -- no ghost algebra.
    * [sz]/[pagetable]/[trapframe]/[ofile]/[cwd]/[name] are written by the
      running process with NO lock held (sys_sbrk's [myproc()->sz += n],
      sys_chdir, fdalloc, exec).  So the invariant can retain no fraction of
@@ -87,6 +87,7 @@ Require Import RiscvExtras.
 (* it.  See FastSetSolver.v.                                              *)
 Require Export FastSetSolver.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -261,6 +262,7 @@ Proof. apply upd_ofile_length. Qed.
 
 Section ProcInv.
   Context `{!riscvGS Σ}.
+  Context `{XI : CurCtx}.
 
   (* =================================================================== *)
   (* The scalar private cells.                                           *)
@@ -911,7 +913,7 @@ Section ProcInv.
     tf_pa tfp (8 * Z.of_nat i) ↦₈{dq} w.
   Proof.
     iIntros (Hi) "(%Hkd & %Hpv & #Hk) Hw".
-    iApply word_pointsto_intro; [exact (tf_pa_aligned8 tfp i Hi) |].
+    iApply ctx_word_pointsto_intro; [exact (tf_pa_aligned8 tfp i Hi) |].
     iDestruct (phys_word_pointsto_bytes with "Hw") as "Hbs".
     iApply (big_sepL_impl with "Hbs").
     iIntros "!>" (k j Hkj) "Hp".
@@ -919,6 +921,7 @@ Section ProcInv.
     destruct (tf_pa_slot_facts tfp i (0 + k)%nat Hkd Hi ltac:(lia)) as (Hid & Hram & Hcan & Hsvpn).
     iAssert (kmap_at (svpn_of (pa_add (tf_pa tfp (8 * Z.of_nat i)) (0 + k))) tfp KP_rw) as "#Hk'".
     { rewrite Hsvpn. iExact "Hk". }
+    iApply TsoCtxShim.ctx_pointsto_of_mem.
     iApply (phys_to_mem_claim (pa_add (tf_pa tfp (8 * Z.of_nat i)) (0 + k)) tfp dq (nth_byte w (0 + k))
               Hid Hram Hcan with "Hk' Hp").
   Qed.
@@ -931,13 +934,14 @@ Section ProcInv.
   Proof.
     iIntros (Hi) "(%Hkd & %Hpv & #Hk) Hw".
     iApply phys_word_pointsto_intro; [exact (tf_pa_aligned8 tfp i Hi) |].
-    iDestruct (word_pointsto_bytes with "Hw") as "Hbs".
+    iDestruct (ctx_word_pointsto_bytes with "Hw") as "Hbs".
     iApply (big_sepL_impl with "Hbs").
     iIntros "!>" (k j Hkj) "Hp".
     apply lookup_seq in Hkj. destruct Hkj as [-> Hjlt].
     destruct (tf_pa_slot_facts tfp i (0 + k)%nat Hkd Hi ltac:(lia)) as (Hid & _ & _ & Hsvpn).
     iAssert (kmap_at (svpn_of (pa_add (tf_pa tfp (8 * Z.of_nat i)) (0 + k))) tfp KP_rw) as "#Hk'".
     { rewrite Hsvpn. iExact "Hk". }
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hp") as "Hp".
     iApply (mem_to_phys_claim (pa_add (tf_pa tfp (8 * Z.of_nat i)) (0 + k)) tfp dq (nth_byte w (0 + k))
               Hid with "Hk' Hp").
   Qed.
@@ -1352,13 +1356,13 @@ Section ProcInv.
     iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho)".
     rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
     assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
-    rewrite Hq word4_pointsto_frac_split.
+    rewrite Hq ctx_word4_pointsto_frac_split.
     iDestruct "Hpid" as "[Hq1 Hq2]".
     iFrame "Hcwd Hq1". iIntros (v') "Hcwd Hq1".
     rewrite /proc_priv_nocwd /proc_fields.
     cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
     iSplitR; [done|]. iSplitR; [done|].
-    rewrite Hq word4_pointsto_frac_split. iFrame "Hq1 Hq2".
+    rewrite Hq ctx_word4_pointsto_frac_split. iFrame "Hq1 Hq2".
     iSplitL "Hsz Hcwd Hnm".
     { iFrame "Hsz Hcwd Hnm". iPureIntro; exact Hnl. }
     iFrame.
@@ -1390,9 +1394,9 @@ Section ProcInv.
   Proof.
     iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho)".
     assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
-    rewrite Hq word4_pointsto_frac_split.
+    rewrite Hq ctx_word4_pointsto_frac_split.
     iDestruct "Hpid" as "[Hq1 Hq2]". iFrame "Hq1".
-    iIntros "Hq1". rewrite /proc_priv_nocwd Hq word4_pointsto_frac_split.
+    iIntros "Hq1". rewrite /proc_priv_nocwd Hq ctx_word4_pointsto_frac_split.
     iSplitR; [done|]. iSplitR; [done|]. iFrame.
   Qed.
 
@@ -1503,9 +1507,9 @@ Section ProcInv.
   Proof.
     iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
     assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
-    rewrite Hq word4_pointsto_frac_split.
+    rewrite Hq ctx_word4_pointsto_frac_split.
     iDestruct "Hpid" as "[Hq1 Hq2]". iFrame "Hq1".
-    iIntros "Hq1". rewrite /proc_priv /proc_priv_core Hq word4_pointsto_frac_split.
+    iIntros "Hq1". rewrite /proc_priv /proc_priv_core Hq ctx_word4_pointsto_frac_split.
     iSplitR "Ho"; [|iFrame "Ho"].
     iSplitR; [done|]. iSplitR; [done|]. iFrame.
   Qed.
@@ -1520,7 +1524,7 @@ Section ProcInv.
     a ↦₈ w ⊣⊢ a ↦₈{DfracOwn (1/4)} w ∗ a ↦₈{DfracOwn (3/4)} w.
   Proof.
     assert (Hq : DfracOwn 1 = DfracOwn (1/4 + 3/4)) by (f_equal; compute_done).
-    rewrite {1}Hq. apply word_pointsto_frac_split.
+    rewrite {1}Hq. apply (ctx_word_pointsto_frac_split cur_ctx).
   Qed.
 
   Local Lemma word_split14 (a w : mword 64) :
@@ -1622,7 +1626,7 @@ Section ProcInv.
     iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
     rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
     assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
-    rewrite Hq word4_pointsto_frac_split.
+    rewrite Hq ctx_word4_pointsto_frac_split.
     iDestruct "Hpid" as "[Hq1 Hq2]".
     iSplitL "Hcwd"; [iExact "Hcwd"|].
     (* [iExact], not [iFrame] -- see [proc_priv_cwd]. *)
@@ -1633,7 +1637,7 @@ Section ProcInv.
     cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
     iSplitR "Ho"; [| iExact "Ho"].
     iSplitR; [done|]. iSplitR; [done|].
-    rewrite Hq word4_pointsto_frac_split. iFrame "Hq1 Hq2".
+    rewrite Hq ctx_word4_pointsto_frac_split. iFrame "Hq1 Hq2".
     iSplitL "Hsz Hcwd Hnm".
     { iFrame "Hsz Hcwd Hnm". iPureIntro; exact Hnl. }
     iSplitL "Hpt"; [iExact "Hpt"|].
@@ -1859,9 +1863,9 @@ Section ProcInv.
   Proof.
     iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft)".
     assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
-    rewrite Hq word4_pointsto_frac_split.
+    rewrite Hq ctx_word4_pointsto_frac_split.
     iDestruct "Hpid" as "[Hq1 Hq2]". iFrame "Hq1".
-    iIntros "Hq1". rewrite /proc_priv_core Hq word4_pointsto_frac_split.
+    iIntros "Hq1". rewrite /proc_priv_core Hq ctx_word4_pointsto_frac_split.
     iSplitR; [done|]. iSplitR; [done|]. iFrame.
   Qed.
 
@@ -2075,7 +2079,7 @@ Section ProcInv.
   Proof.
     iIntros (Hfd) "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) [%Hlen Ho]]".
     assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
-    rewrite Hq word4_pointsto_frac_split.
+    rewrite Hq ctx_word4_pointsto_frac_split.
     iDestruct "Hpid" as "[Hq1 Hq2]". iFrame "Hq1".
     iDestruct (big_sepL_insert_acc with "Ho") as "[$ Hback]"; first exact Hfd.
     iIntros (v') "Hq1 Hslot". iDestruct ("Hback" $! v' with "Hslot") as "Ho".
@@ -2084,7 +2088,7 @@ Section ProcInv.
     iSplitR "Ho".
     { iSplitR; [iPureIntro; exact Hszb|].
       iSplitR; [iPureIntro; exact Hbel|].
-      rewrite Hq word4_pointsto_frac_split.
+      rewrite Hq ctx_word4_pointsto_frac_split.
       iFrame "Hq1 Hq2 Hf Hpt Htfp Hc Hft". }
     iFrame "Ho". iPureIntro. rewrite length_insert. exact Hlen.
   Qed.
@@ -2206,28 +2210,28 @@ Section ProcInv.
     proc_priv γf pa pid U -∗ p_pid pa ↦₄{dq} pid' -∗ ⌜pid = pid'⌝.
   Proof.
     iIntros "[(_ & _ & Hpid & _) _] Hother".
-    iApply (word4_pointsto_agree with "Hpid Hother").
+    iApply (ctx_word4_pointsto_agree with "Hpid Hother").
   Qed.
 
   (* The two halves of [p->pid], joined and split ([RiscvPtsto]'s
-     [word4_pointsto_half] is the 1/2 + 1/2 split itself).  allocproc is the one
+     [ctx_word4_pointsto_half] is the 1/2 + 1/2 split itself).  allocproc is the one
      function that holds BOTH -- the invariant's permanent half out of
      [SchedCtx.proc_pub] and the dormant block's -- and so the one function
      that may WRITE the cell.  Joining first tells it the two halves agree,
-     which is what [word4_pointsto_agree] is for; splitting after the store
+     which is what [ctx_word4_pointsto_agree] is for; splitting after the store
      is what hands one half back to the invariant and one to [proc_priv]. *)
   Lemma p_pid_join (pa : mword 64) (p1 p2 : mword 32) :
     p_pid pa ↦₄{DfracOwn (1/2)} p1 -∗ p_pid pa ↦₄{DfracOwn (1/2)} p2 -∗
     ⌜p1 = p2⌝ ∗ p_pid pa ↦₄ p1.
   Proof.
     iIntros "H1 H2".
-    iDestruct (word4_pointsto_agree with "H1 H2") as %<-.
-    iSplit; [done|]. rewrite word4_pointsto_half. iFrame.
+    iDestruct (ctx_word4_pointsto_agree with "H1 H2") as %<-.
+    iSplit; [done|]. rewrite ctx_word4_pointsto_half. iFrame.
   Qed.
 
   Lemma p_pid_split (pa : mword 64) (v : mword 32) :
     p_pid pa ↦₄ v -∗ p_pid pa ↦₄{DfracOwn (1/2)} v ∗ p_pid pa ↦₄{DfracOwn (1/2)} v.
-  Proof. rewrite word4_pointsto_half. iIntros "$". Qed.
+  Proof. rewrite ctx_word4_pointsto_half. iIntros "$". Qed.
 
   (* =================================================================== *)
   (* The DORMANT shape: what the lock invariant holds at UNUSED/ZOMBIE.   *)
@@ -2244,7 +2248,7 @@ Section ProcInv.
   (* [pid] is existential here rather than an index: the invariant's OWN half
      of the cell is always resident (SchedCtx's [proc_pub]), and two halves of
      the same points-to agree for free, so indexing would only duplicate a
-     fact [word4_pointsto_agree] already gives.  Keeping [st] and [pid] both
+     fact [ctx_word4_pointsto_agree] already gives.  Keeping [st] and [pid] both
      out makes [proc_slots] a function of the state alone, which is what makes
      [proc_slots_recast] hold in BOTH directions within a guard class. *)
   (* ------------------------------------------------------------------- *)
@@ -2589,3 +2593,20 @@ Section ProcInv.
   (* kstack: write-once at procinit, hence persistent.                    *)
   (* =================================================================== *)
 End ProcInv.
+
+(* ====================================================================== *)
+(* THE PRIVATE BLOCK'S TRANSPORT OBLIGATION (tso-port M3 / absorb).        *)
+(*                                                                         *)
+(* This is [ProofForkretPark.forkret_park_paid]'s SIXTH deposit row, and    *)
+(* the last one to close.  §0.15′ measured the chain down to its first      *)
+(* failure -- [proc_priv] -> [proc_priv_core] -> [FirstTok.first_tok] ->    *)
+(* [FsReady.fs_ready] -> [BioInv.bio_ctx] -> [buf_escrow], an [inv] over a  *)
+(* ξ-indexed body, which no transport can cross.  With the escrow a PARKED  *)
+(* RECORD that row is closed, and the rest of the walk is structural:       *)
+(* [ofile_slot]'s disjunction (whence [TsoCtx.ctx_morph_or], the instance   *)
+(* this tranche adds) and one [big_sepL] over the fd array, both applied AS *)
+(* TERMS.                                                                   *)
+(*                                                                         *)
+(* OUTSIDE the section, because each instance quantifies the context the    *)
+(* section fixes.                                                           *)
+(* ====================================================================== *)

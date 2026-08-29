@@ -113,6 +113,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Set Printing Depth 40.
 
@@ -127,10 +128,10 @@ Local Ltac nz := vm_compute; discriminate.
 
 (* [neq_vec] is [negb (eq_vec ...)], so the two BNE premises are the two
    readings of the type cluster's [so_ty_eq] / [so_ty_ne]. *)
-Lemma so_neq_of_eq (x y : mword 64) : eq_vec x y = true -> neq_vec x y = false.
+Lemma so_neq_of_eq `{XI : CurCtx} (x y : mword 64) : eq_vec x y = true -> neq_vec x y = false.
 Proof. unfold neq_vec. intro H. rewrite H. reflexivity. Qed.
 
-Lemma so_neq_of_ne (x y : mword 64) : eq_vec x y = false -> neq_vec x y = true.
+Lemma so_neq_of_ne `{XI : CurCtx} (x y : mword 64) : eq_vec x y = false -> neq_vec x y = true.
 Proof. unfold neq_vec. intro H. rewrite H. reflexivity. Qed.
 
 (* WHAT SURVIVES namei's WALK, in the ledger's own vocabulary.  The SET-form
@@ -139,7 +140,7 @@ Proof. unfold neq_vec. intro H. rewrite H. reflexivity. Qed.
    fact at the exact figures.  Kept as a plain [nat] lemma because a hot
    [lia] inside a syscall-altitude Iris goal is what durable-notes warns
    about. *)
-Lemma so_bud_iput (n' : nat) (w ok : bool) :
+Lemma so_bud_iput `{XI : CurCtx} (n' : nat) (w ok : bool) :
   ((MAXOPBLOCKS - (walk_spend w + (if ok then 0%nat else 1%nat)))%nat <= n')%nat ->
   (iput_units <= n')%nat.
 Proof. unfold walk_spend, iput_units, MAXOPBLOCKS. destruct w, ok; lia. Qed.
@@ -172,12 +173,12 @@ Section ProofSysOpenBody.
   (* the 1/2 + 1/2 SPLIT at [↦₈] -- [ProofSysOpenParts]' [so_word_half_join]
      read backwards, which is what hands [so_publish] the invariant's half of
      [f->ip] after the [sd s1,24(s2)] wrote the cell whole. *)
-  Local Lemma so_ip_split (a w : mword 64) :
+  Local Lemma so_ip_split `{XI : CurCtx} (a w : mword 64) :
     a ↦₈ w -∗ a ↦₈{DfracOwn (1/2)} w ∗ a ↦₈{DfracOwn (1/2)} w.
   Proof.
     iIntros "H".
     iDestruct (bi.equiv_entails_1_1 _ _
-                 (word_pointsto_frac_split a (1/2) (1/2) w) with "[H]")
+                 (ctx_word_pointsto_frac_split _ a (1/2) (1/2) w) with "[H]")
       as "[$ $]".
     { iEval (rewrite Qp.div_2). iExact "H". }
   Qed.
@@ -196,7 +197,7 @@ Section ProofSysOpenBody.
   (* Peel the one unit sys_open holds back for [fileclose]'s loan (see the
      [iref_slots nsj] row on [so_alloc]): the block takes it, and folds it
      back before it returns, so the ledger is an equality either way. *)
-  Local Lemma so_iref_take (n : nat) :
+  Local Lemma so_iref_take `{XI : CurCtx} (n : nat) :
     (1 <= n)%nat -> iref_slots n -∗ iref_slot ∗ iref_slots (n - 1).
   Proof.
     intros Hn. rewrite /iref_slot.
@@ -204,7 +205,7 @@ Section ProofSysOpenBody.
     iIntros "H". iApply (iref_slots_split with "H").
   Qed.
 
-  Definition so_cont `{GEN : GenId}
+  Definition so_cont `{XI : CurCtx} `{GEN : GenId}
       (gf : gname)
       (nsj : nat) (dqb dqs : dfrac)
       (pj : mword 64) (pidv : mword 32) (U : ustate)
@@ -242,7 +243,7 @@ Section ProofSysOpenBody.
   (*  retained parent, and what comes back out is [file_ref gf kf 1] --  *)
   (*  which [ProcInv.proc_priv_settle] turns into the descriptor.         *)
   (* ================================================================== *)
-  Lemma so_tail_pub `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_tail_pub `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -328,7 +329,7 @@ Section ProofSysOpenBody.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     log_opb icfg_log u -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
@@ -430,7 +431,7 @@ Section ProofSysOpenBody.
   (* ---- the two field reads the walk makes into the LOCKED record, as
      accessors: [ic_loaded] is carried whole across the block and opened
      for exactly one halfword at a time. ---- *)
-  Local Lemma so_meta_acc
+  Local Lemma so_meta_acc `{XI : CurCtx}
       (k : nat) (inum : mword 32) (dn : dinode) (bm : blkmap) :
     ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dn bm -∗
     inode_meta (ientry k) dn ∗
@@ -445,7 +446,7 @@ Section ProofSysOpenBody.
               Hdoc Hduq with "Hl Hd Hm Ha Hr Hb Hv Hw Ht").
   Qed.
 
-  Local Lemma so_type_acc (ip : mword 64) (dn : dinode) :
+  Local Lemma so_type_acc `{XI : CurCtx} (ip : mword 64) (dn : dinode) :
     inode_meta ip dn -∗
     i_type ip ↦₂ di_type dn ∗ (i_type ip ↦₂ di_type dn -∗ inode_meta ip dn).
   Proof.
@@ -453,7 +454,7 @@ Section ProofSysOpenBody.
     iIntros "Hty". iFrame "Hty Hmaj Hmin Hnl Hsz".
   Qed.
 
-  Local Lemma so_maj_acc (ip : mword 64) (dn : dinode) :
+  Local Lemma so_maj_acc `{XI : CurCtx} (ip : mword 64) (dn : dinode) :
     inode_meta ip dn -∗
     i_major ip ↦₂ di_major dn ∗ (i_major ip ↦₂ di_major dn -∗ inode_meta ip dn).
   Proof.
@@ -480,7 +481,7 @@ Section ProofSysOpenBody.
   (*  nothing below reads the frame again, and every exit wants slot 23   *)
   (*  whole.                                                             *)
   (* ================================================================== *)
-  Lemma so_stores `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_stores `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -575,7 +576,7 @@ Section ProofSysOpenBody.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     log_opb icfg_log u -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
@@ -1161,7 +1162,7 @@ Section ProofSysOpenBody.
   (*  hands the whole [file_ref] to [fileclose], so the slot may not be   *)
   (*  broken into cells until the descriptor is installed.                *)
   (* ================================================================== *)
-  Lemma so_alloc `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_alloc `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gfl gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -1237,7 +1238,7 @@ Section ProofSysOpenBody.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     log_opb icfg_log u -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
@@ -1944,7 +1945,7 @@ Section ProofSysOpenBody.
   (*  zero-extends, so a negative [short] lands at or above 0x8000 > 9   *)
   (*  and the single [bltu] decides both halves of the C's disjunction.  *)
   (* ================================================================== *)
-  Lemma so_join `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_join `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gfl gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -2020,7 +2021,7 @@ Section ProofSysOpenBody.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     log_opb icfg_log u -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
@@ -2311,7 +2312,7 @@ Section ProofSysOpenBody.
 
   (* the per-slot projection out of the boot family, at the copy the
      syscall's contract names ([ProofSysMkdir.md_esc_acc]'s twin). *)
-  Local Lemma so_esc_acc
+  Local Lemma so_esc_acc `{XI : CurCtx}
       (k : nat) :
     (k < NINODE)%nat ->
     (ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗ ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k
@@ -2326,7 +2327,7 @@ Section ProofSysOpenBody.
      arm never needs either: [create_locked] carries both names itself.  It
      is the else arm, which locks an inode namei merely NAMED, that has to
      project them. *)
-  Local Lemma so_slk_acc (k : nat) :
+  Local Lemma so_slk_acc `{XI : CurCtx} (k : nat) :
     (k < NINODE)%nat ->
     (ic_sleeplocks fsc_ic -∗
      ∃ gil gisl : gname,
@@ -2340,13 +2341,13 @@ Section ProofSysOpenBody.
   Qed.
 
   (* ilock's ONE bread reference, carved out of the syscall's three. *)
-  Local Lemma so_bs3 :
+  Local Lemma so_bs3 `{XI : CurCtx} :
     (bslots 3 : iProp Σ) ⊣⊢ bslot ∗ bslots 2.
   Proof. rewrite /bslot. change 3%nat with (1 + 2)%nat. apply bslots_op. Qed.
 
   (* the cwd goes out to namei and comes back UNCHANGED, so
      [proc_priv_nocwd_cwd_pid]'s functional update is the identity. *)
-  Local Lemma so_upd_cwd_id (V : pprivate) : upd_cwd V (pv_cwd V) = V.
+  Local Lemma so_upd_cwd_id `{XI : CurCtx} (V : pprivate) : upd_cwd V (pv_cwd V) = V.
   Proof. destruct V; reflexivity. Qed.
 
   (* ================================================================== *)
@@ -2355,7 +2356,7 @@ Section ProofSysOpenBody.
   (*  two extra clauses; the adapter that turns this into that is inside  *)
   (*  [so_entry_c] and is three lines of arithmetic.                      *)
   (* ================================================================== *)
-  Definition so_cont0 `{GEN : GenId}
+  Definition so_cont0 `{XI : CurCtx} `{GEN : GenId}
       (gf : gname)
       (ns : nat) (dqb dqs dqbs dqn : dfrac)
       (pj : mword 64) (pidv : mword 32) (U : ustate)
@@ -2403,7 +2404,7 @@ Section ProofSysOpenBody.
       vacuous -- [so_tdir_zne] at a literal.  The else arm is where that
       premise is EARNED.                                                  *)
   (* ================================================================== *)
-  Lemma so_entry_c `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_entry_c `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gfl gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -2469,7 +2470,7 @@ Section ProofSysOpenBody.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     log_opS icfg_log MAXOPBLOCKS Sb -∗
     (* the transaction token, beside the budget: this arm's tail closes the
        operation, and end_op takes the whole [log_op] (durable-disk lane A) *)
@@ -2864,7 +2865,7 @@ Section ProofSysOpenBody.
   (*  [so_dir_forced]'s hypothesis -- and through [so_pay_witness] that   *)
   (*  is what says a WRITABLE fd never names a directory.                 *)
   (* ================================================================== *)
-  Lemma so_entry_n `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_entry_n `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gfl gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -2927,7 +2928,7 @@ Section ProofSysOpenBody.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     log_opS icfg_log MAXOPBLOCKS Sb -∗
     (* the transaction token, beside the budget: this arm's tail closes the
        operation, and end_op takes the whole [log_op] (durable-disk lane A) *)
@@ -3561,7 +3562,7 @@ Section ProofSysOpenBody.
   (*  never spilled, which rides through arbitrary and is rejoined at    *)
   (*  every exit.  [Hal23] -- the split's own alignment side condition,  *)
   (*  which slot 23 is outside [so_al]'s range for -- comes off the      *)
-  (*  carve's points-to itself, [word_pointsto_aligned_p].               *)
+  (*  carve's points-to itself, [ctx_word_pointsto_aligned_p].               *)
   (*                                                                    *)
   (*  THE SHRINK-WRAPPED s1 SAVE IS WHAT MAKES THE CARVE ARM-DEPENDENT:  *)
   (*  [c.sdsp s1,168] is BELOW ARM 0's branch, so ARM 0 leaves slot 3    *)
@@ -3574,7 +3575,7 @@ Section ProofSysOpenBody.
   (*  an ordinary [destruct] on the mask's [eq_vec] and no bit lemma is  *)
   (*  spent here.                                                       *)
   (* ================================================================== *)
-  Lemma wp_sys_open_sconf `{GEN : GenId} `{CID0 : CpuId}
+  Lemma wp_sys_open_sconf `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gfl gf : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -3639,7 +3640,7 @@ Section ProofSysOpenBody.
     iDestruct (so_frame_carve sp0 with "Hframe")
       as "(%Hal & [%u1 Hf1] & [%u2 Hf2] & [%u3 Hf3] & [%u4 Hf4] & [%u5 Hf5] &
            [%u6 Hf6] & Hbytes & [%u23 H23] & [%u24 H24])".
-    iDestruct (word_pointsto_aligned_p with "H23") as %Hal23.
+    iDestruct (ctx_word_pointsto_aligned_p with "H23") as %Hal23.
     iDestruct (so_omode_split sp0 u23 with "H23") as "[H23lo H23hi]".
     assert (Hc1 : add_vec (M1 !!! Regidx csp_rs1 : mword 64)
                     (zero_extend' 64 (concat_vec (mword_of_int 23 : mword 6) ('b"000")))

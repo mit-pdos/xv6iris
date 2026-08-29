@@ -65,6 +65,7 @@ Require Import KernelConsts.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 Module KernelvecProof (Kerneltrap : KERNELTRAP) : KERNELVEC.
@@ -279,7 +280,7 @@ Local Typeclasses Transparent gpr_file.
 
 Section KernelvecCore.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   (* the trap frame kernelvec carves is STACK memory, so its cells ride the
      hart's regime like every other frame slot. *)
 
@@ -1242,7 +1243,7 @@ Proof.
   by apply elem_of_nil in Hi.
 Qed.
 
-Lemma kv_file_restore `{CID : CpuId} (m Me mf : regfile) (spv : mword 64) :
+Lemma kv_file_restore `{CID : CpuId} `{XI : CurCtx} (m Me mf : regfile) (spv : mword 64) :
   (* what kerneltrap promises about the map kernelvec called it with *)
   callee_saved (kv_m2 Me) mf ->
   (* ...and how that map relates to the interrupted one: it is [m] tp-pinned at
@@ -1419,7 +1420,7 @@ Qed.
 (* ===================================================================== *)
 Section KernelvecHandler.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma kernelvec_handler_spec (γu : uart_names) (γv : disk_names)
       (γdk γtl : gname) (γs : list gname) (pd pav pu : mword 64) :

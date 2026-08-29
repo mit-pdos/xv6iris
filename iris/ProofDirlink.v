@@ -113,6 +113,7 @@ Require Import SpecPrintk.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Set Printing Depth 40.
 
@@ -157,6 +158,7 @@ Qed.
 Section DirlinkMsg.
   Context `{!riscvGS Σ, FSC : fscfg}.
   Context `{GEN : GenId}.
+  Context `{XI : CurCtx}.
 
   Lemma dl_msg_str :
     (kernel_data : iProp Σ) -∗ (mword_of_int dl_msg_a : mword 64) ↦ₛ□ dl_msg.
@@ -600,7 +602,7 @@ Qed.
 Section DlBuf.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the two frame slots the [de] occupies (10 and 9), carved into sixteen
      named bytes and put back *)
@@ -646,7 +648,7 @@ Section DlBuf.
   Proof.
     intro Hal. iIntros "H".
     iExists (Z_to_bv (16%N) (assemble_bytes [g 0%nat; g 1%nat])).
-    iApply (word2_pointsto_intro (KTR := KT1) a (DfracOwn 1) _ Hal).
+    iApply (ctx_word2_pointsto_intro (KTR := KT1) cur_ctx a (DfracOwn 1) _ Hal).
     rewrite (bb_ext (KTR := KT1) a 2 g
                (fun j => nth_byte (Z_to_bv (16%N) (assemble_bytes [g 0%nat; g 1%nat])) j)).
     - iExact "H".
@@ -981,7 +983,7 @@ Qed.
 Section ProofDirlinkMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
   Local Ltac nz := vm_compute; discriminate.
@@ -2182,7 +2184,7 @@ Section ProofDirlinkMain.
                         = mword_of_int (DK + 0x80)) by pcw.
         iEval (rewrite Hqq80) in "Hpc".
         (* ---- the sixteen bytes ARE [dirent_bytes (de_of_name inum s)] ---- *)
-        iDestruct (word2_pointsto_bytes (KTR := KT1) with "Hdehi") as "Hdehi".
+        iDestruct (ctx_word2_pointsto_bytes (KTR := KT1) with "Hdehi") as "Hdehi".
         iAssert ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 10) jj
                    ↦ₘ[KT1] (dirent_bytes (de_of_name inum s) !!! jj))%I
           with "[Hdehi Hdenm]" as "Hsrc".

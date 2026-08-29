@@ -54,12 +54,13 @@ Require Import RegFile.   (* [regfile]: the index algebra below names the map *)
 Require Import IntrDefs.
 Require Import ProcGeom.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Section CpuOwn.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Context {kt : ktier}.
   Definition cpu_own (n : nat) (eb : bool) (p : mword 64)
@@ -103,10 +104,10 @@ Section CpuOwn.
     cpu_hart n eb p lks -∗ cpu_hart n' eb' p' lks' -∗ False.
   Proof.
     iIntros "(((_ & Hn & _ & _) & _) & _) (((_ & Hn' & _ & _) & _) & _)".
-    iDestruct (word4_pointsto_bytes with "Hn") as "Hb".
-    iDestruct (word4_pointsto_bytes with "Hn'") as "Hb'".
+    iDestruct (ctx_word4_pointsto_bytes with "Hn") as "Hb".
+    iDestruct (ctx_word4_pointsto_bytes with "Hn'") as "Hb'".
     cbn [seq]. iDestruct "Hb" as "[H0 _]". iDestruct "Hb'" as "[H0' _]".
-    iDestruct (mem_pointsto_ne with "H0 H0'") as %Hne. done.
+    iDestruct (ctx_pointsto_ne with "H0 H0'") as %Hne. done.
   Qed.
 
   Lemma cpu_own_arm_excl (n n' : nat) (eb eb' : bool) (p p' : mword 64)
@@ -324,6 +325,40 @@ Section CpuOwn.
 
 End CpuOwn.
 
+(* THE BUNDLE'S TRANSPORT (tso-port M3).  Everything in [cpu_own] is a
+   [↦₄] cell, a register or a ghost -- context-CONSTANT at stage 1 -- except
+   [ProcGeom.cur_proc], one word cell.  The swtch deposit needs it: a parked
+   record's resume wand asks for [cpu_own] at the RECORD's own context
+   (SwtchCtx.v), and the resumer holds it at its own. *)
+(* NO [GenId] BINDER: [cpu_own] does not take one, so an instance that
+   bound one would leave an unresolvable evar wherever it is applied as a
+   term (measured on [ProcPtOwn.proc_pt_at_morph], which did exactly that). *)
+Global Instance cpu_own_morph `{!riscvGS Σ, !xv6G Σ} `{CID : CpuId}
+    (n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :
+  CtxMorph (fun xi : CtxId => cpu_own (XI := xi) n eb p b lks).
+Proof.
+  iIntros (ξ ξ') "Hd H". rewrite /cpu_own. destruct b; [ by iFrame |].
+  rewrite /cpu_hart /cpu_priv /cpu_cells.
+  iDestruct "H" as "(((%Hb & Hnoff & Hint & Hproc) & Hlks) & Hcnt)".
+  iDestruct (cur_proc_morph p ξ ξ' with "Hd Hproc") as "[Hd Hproc]".
+  (* the two [↦₄] hart cells became ξ-indexed at M1 stage 2 *)
+  iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hnoff") as "[Hd Hnoff]".
+  iAssert (ctx_dom ξ ξ' ∗
+           match n with
+           | O => (∃ iv : mword 32,
+                     ctx_word4_pointsto ξ' (a_cpu_int cid_word) (DfracOwn 1) iv)%I
+           | S _ => ctx_word4_pointsto ξ' (a_cpu_int cid_word) (DfracOwn 1)
+                      (intena_val eb)
+           end)%I with "[Hd Hint]" as "[Hd Hint]".
+  { destruct n.
+    - iDestruct "Hint" as (iv) "Hint".
+      iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hint") as "[Hd Hint]".
+      iFrame "Hd". iExists iv. iExact "Hint".
+    - iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hint") as "[Hd Hint]".
+      iFrame "Hd Hint". }
+  iFrame "Hd Hnoff Hint Hproc Hlks Hcnt". iPureIntro; exact Hb.
+Qed.
+
 (* ===================================================================== *)
 (* THE HART TRANSPORT -- what makes a [b]-GENERIC consumer able to carry  *)
 (* this bundle across an interrupts-possibly-enabled instruction.         *)
@@ -338,7 +373,10 @@ End CpuOwn.
 (* [wp_next]'s conditional equality.  Chain the per-step equalities with   *)
 (* [wp_next_chain] and apply this once. *)
 (* ===================================================================== *)
-Lemma cpu_own_transport `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId}
+(* ONE context however many harts the statement names: the hart may move
+   under a trap, the thread's context does not -- the flip makes that
+   design point a binder. *)
+Lemma cpu_own_transport `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{XI : CurCtx}
     (CID0 CID1 : CpuId) (n : nat) (eb : bool) (p : mword 64)
     (b : bool) {lks : gset string} :
   (b = false \/ p = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->

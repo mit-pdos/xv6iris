@@ -154,6 +154,7 @@ Require Import PrintkArgs.
 Require Import SpecPanic.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.  (* [fscfg]: the fs configuration is AMBIENT *)
+Require Import TsoCtx.
 
 Notation KXB := KernelSyms.kexec (only parsing).
 
@@ -194,6 +195,9 @@ Qed.
 Section KexecMsg.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
+  (* M1 stage 3: [↦ₛ] is context-indexed, and a rodata message extracted
+     from [kernel_data] lands at the READING thread's context. *)
+  Context `{XI : CurCtx}.
 
   Lemma kxc_msg_str :
     (kernel_data : iProp Σ) -∗ (mword_of_int kxc_msg_a : mword 64) ↦ₛ□ kxc_msg.
@@ -236,7 +240,7 @@ Module A := ProofKexecTail.KexecTailProof Myproc BeginOp Namei Ilock Readi
 
 Section KexecB2Body.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -769,7 +773,7 @@ Section KexecB2Loops.
   (*  enormous and never computed; what matters is that it is a [nat] the  *)
   (*  head can always supply.                                              *)
   (* =================================================================== *)
-  Lemma kxc_ls `{CID0 : CpuId}
+  Lemma kxc_ls `{CID0 : CpuId} `{XI : CurCtx}
       (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)

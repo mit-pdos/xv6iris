@@ -137,6 +137,7 @@ Require Import ProofSysOpenAUAlloc.
 Require Import ProofSysOpenAUJoin.
 Require Import ProofSysOpen.   (* [so_neq_of_eq] / [so_neq_of_ne] / [so_bud_iput] *)
 Require Import FsAbs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -212,7 +213,7 @@ Section ProofSysOpenAUWalk.
   (*  [so_dir_forced]'s hypothesis -- and through [so_pay_witness] that   *)
   (*  is what says a WRITABLE fd never names a directory.                 *)
   (* ================================================================== *)
-  Lemma so_entry_n_au `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_entry_n_au `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gfl gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -282,7 +283,7 @@ Section ProofSysOpenAUWalk.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     log_opS icfg_log MAXOPBLOCKS Sb -∗
     (* the transaction token, beside the budget: this arm's tail closes the
        operation, and end_op takes the whole [log_op] (durable-disk lane A) *)

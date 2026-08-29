@@ -95,6 +95,7 @@ Section USyncKernel.
     iApply (wp_sync_start C (pv_upt (us_V U0)) h (us_M U0) (tf_resume_gpr b (us_V U0))
               (tf_w (us_V U0) tf_sp_idx) Hlay Htext (tf_resume_gpr_sp b (us_V U0)) Hst
               with "Hcg Hpc").
+    Unshelve. exact (TsoCtx.MkCtxId inhabitant inhabitant).
   Qed.
 
 End USyncKernel.

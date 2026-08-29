@@ -107,6 +107,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Set Printing Depth 40.
 
@@ -151,6 +152,7 @@ Qed.
 Section DirlookupMsg.
   Context `{!riscvGS Σ, FSC : fscfg}.
   Context `{GEN : GenId}.
+  Context `{XI : CurCtx}.
 
   Lemma dlk_msg_str :
     (kernel_data : iProp Σ) -∗ (mword_of_int dlk_msg_a : mword 64) ↦ₛ□ dlk_msg.
@@ -241,7 +243,7 @@ Qed.
 Section ProofDirlookupMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
   Local Ltac nz := vm_compute; discriminate.

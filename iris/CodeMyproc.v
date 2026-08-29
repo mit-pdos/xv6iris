@@ -30,13 +30,14 @@ Require Import KernelDecode20.
 Require Import KernelDecode21.
 Require Import KernelDecode25.
 Require Import KernelDecode29.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodeMyproc.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- myproc @ KernelSyms.myproc, 50 bytes ---- *)
 

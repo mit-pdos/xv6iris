@@ -86,6 +86,7 @@ Require Import SpecLogWrite.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
    printable (claude-notes/durable-notes.md) *)
@@ -312,6 +313,7 @@ Local Ltac regne := reg_ne_side.
 (* ===================================================================== *)
 Section LogWriteDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{XI : CurCtx}.
 
   (* [Fb] is THE CALLER'S RECEIPT for the logged view -- opaque here, and
      threaded through every block exactly like [Bud].  The whole-function
@@ -471,6 +473,7 @@ End LogWriteDefs.
 (* ===================================================================== *)
 Section LogWriteBlocks.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{XI : CurCtx}.
 
   (* ================================================================== *)
   (*  +0xae .. +0xc2 : release(&log.lock), the epilogue and the return.  *)
@@ -600,7 +603,7 @@ Section LogWriteBlocks.
        the acquire/release pair compose back to [N]. *)
     iEval (rewrite -Hbeq) in "Hcg".
     iApply (Release.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string
-              (log_res γ bn γfs cov logstart) E3 n eb p (K - 4)%nat
+              <{ log_res γ bn γfs cov logstart }> E3 n eb p (K - 4)%nat
               ({["log"]} ∪ lks)
               ltac:(rewrite HE3a0; rewrite /log_addr; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
@@ -1763,7 +1766,7 @@ End LogWriteBlocks.
 
 Section ProofLogWrite.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* THE WHOLE-FUNCTION PROOF, at the most general (byte-range atomic-update)
      contract.  [wp_log_write_au] below is its whole-block instance,
@@ -1983,12 +1986,12 @@ Section ProofLogWrite.
     iDestruct (lw_cont_shift (CIDa := CID) (CIDb := CID9) bn γ γfs γd cov dev k pidv bno
                  bs bsd Φfsb Bud m K n eb p b lks ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (Acquire.wp_acquire_sconf KT1 (ln_lk γ) "log"%string
-              (log_res γ bn γfs cov logstart) mA n eb p (K - 4)%nat b lks
+              <{ log_res γ bn γfs cov logstart }> mA n eb p (K - 4)%nat b lks
               ltac:(lia) ltac:(lia) Hno
               with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
-    iIntros (CID10 Hs10 ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
+    iIntros (CID10 Hs10 ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
     assert (Hpc18 : ret_pc (mA !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.log_write + 0x18)).
     { rewrite HmAra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc18) in "Hpc".
@@ -2573,8 +2576,8 @@ Section ProofLogWrite.
           as "((%Hdd & %HDlk) & HDauth & HpD & Hcovb)".
         iDestruct "Href" as (q dv bv) "Href".
         rewrite /bref. iDestruct "Href" as "(Hrt & Hrdev & Hrbno)".
-        iDestruct (word4_pointsto_agree with "Hdevh Hrdev") as %Hdveq.
-        iDestruct (word4_pointsto_agree with "Hbnoc Hrbno") as %Hbveq.
+        iDestruct (ctx_word4_pointsto_agree with "Hdevh Hrdev") as %Hdveq.
+        iDestruct (ctx_word4_pointsto_agree with "Hbnoc Hrbno") as %Hbveq.
         subst dv bv.
         (* one pool unit becomes the caller's refund *)
         assert (Hpl : ((LOGBLOCKS - nl) + 2)%nat = (1 + ((LOGBLOCKS - S nl) + 2))%nat)

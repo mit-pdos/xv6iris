@@ -68,6 +68,7 @@ Require Import ProofKfork.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -93,7 +94,7 @@ Proof. lia. Qed.
 Module KforkB1 (FP : FREEPROC) (RL : RELEASE).
 Section KforkB1Proof.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -160,17 +161,17 @@ Section KforkB1Proof.
     arm_pay KT1 lvl eb pme -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x7c) : mword 64) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    (∃ w4, word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4) -∗
-    (∃ w5, word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) (m !!! Regidx Rs4) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) s50 -∗
-    (∃ w8, word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) w8) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    (∃ w4, ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) w4) -∗
+    (∃ w5, ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) w5) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) (m !!! Regidx Rs4) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 7) (DfracOwn 1) s50 -∗
+    (∃ w8, ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 8) (DfracOwn 1) w8) -∗
     proc_held cpu_id j γl USED ch -∗
     hart_at_any (proc_addr j) -∗
-    is_lock γl (proc_addr j) "proc"%string (proc_lock_res γs γl (proc_addr j)) -∗
+    is_lock γl (proc_addr j) "proc"%string <{ proc_lock_res γs γl (proc_addr j) }> -∗
     kalloc_env_at γa γk None -∗
     fp_rest (proc_addr j) V pid -∗
     fp_pt (proc_addr j) (pv_sz V) (Some P) -∗
@@ -305,8 +306,7 @@ Section KforkB1Proof.
        with no reserve summand at all (the arm is [b] there), so nothing needs
        undoing afterwards. *)
     iEval (rewrite -Hb) in "Hcg".
-    iApply (RL.wp_release_sconf KT1 γl (proc_addr j) "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) T3 lvl eb pme (K - 8)%nat
+    iApply (RL.wp_release_sconf KT1 γl (proc_addr j) "proc"%string <{ proc_lock_res γs γl (proc_addr j) }> T3 lvl eb pme (K - 8)%nat
               ({["proc"]} ∪ lks)
               Hlka (kfkb1_K10 K HK)
               with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").

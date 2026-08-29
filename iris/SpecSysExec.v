@@ -144,6 +144,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -156,6 +157,7 @@ Notation K_sys_exec := (244%nat) (only parsing).
 Section SpecSysExec.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
   (* [GenId], for [ProcInv.proc_priv]'s own index: the private block now
      carries [FirstTok.first_tok], whose boot arm names [gen_cert].  The
      definitions below mention the block, so the section has to bind it. *)
@@ -176,7 +178,7 @@ End SpecSysExec.
 
 Definition wp_sys_exec_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname)                           (* ftable, kalloc      *)
     (gs : list gname) (j : nat) (gl : gname)            (* the running process *)
     (* disk fabric + lock  *)
@@ -267,7 +269,7 @@ Definition wp_sys_exec_sconf_body
 
 Module Type SYSEXEC.
   Parameter wp_sys_exec_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γf : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)

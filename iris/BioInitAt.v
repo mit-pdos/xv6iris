@@ -40,10 +40,12 @@ Require Export BioInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Section BioInitAt.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{XI : TsoCtx.CurCtx}.
 
   (* ------------------------------------------------------------------ *)
   (*  The free state of a [bio_names] record                              *)
@@ -194,8 +196,8 @@ Section BioInitAt.
     { rewrite -big_sepL_sep. iApply (big_sepL_mono with "Hbm").
       intros i k Hk. rewrite /buf_raw.
       iIntros "[(Hv & Hdk & Hdev & Hbno & Hrc & Hdata) Hmid]".
-      iDestruct (word4_pointsto_half_split with "Hdev") as "[Hdev1 Hdev2]".
-      iDestruct (word4_pointsto_half_split with "Hbno") as "[Hbno1 Hbno2]".
+      iDestruct (ctx_word4_pointsto_half_split with "Hdev") as "[Hdev1 Hdev2]".
+      iDestruct (ctx_word4_pointsto_half_split with "Hbno") as "[Hbno1 Hbno2]".
       iDestruct "Hdata" as (bs) "[%Hlen Hdata]".
       iSplitR "Hrc Hdev2 Hbno2".
       - rewrite /buf_escrow.
@@ -224,9 +226,10 @@ Section BioInitAt.
       rewrite Hc0. iExact "Hpool". }
     (* and seal the bcache lock, at its published gname, over the assembled
        resource *)
-    iMod (newlock_at E (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V)
-            with "Hlkg Hnm Hlkw Hcpu [Hauth Hsa Hslots Hlru Hpool]")
+    iMod (newlock_at E (bn_lk bn) bcache_addr "bcache"%string <{ bcache_res bn V }>
+            with "Hlkg Hnm Hlkw [Hcpu] [Hauth Hsa Hslots Hlru Hpool]")
       as "#Hlock".
+    { iApply (lk_cpu_ready_intro with "Hcpu"). }
     { rewrite /bcache_res /bcache_scan.
       iExists ∅, (rev (seq 0 NBUF)),
         (fun _ => (mword_of_int 0 : mword 32)),

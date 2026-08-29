@@ -7,7 +7,8 @@
 
    Both are ordinary .rodata literals reached by an auipc/addi pair, so all
    this file does is name them, name their addresses, and mint the persistent
-   [↦ₛ□] out of [KernelDataInv.kernel_data].  It is [ProcdumpAux.v] §3
+   [↦ₛ□] out of [KernelDataInv.kernel_data] (at the reading thread's context;
+   [↦ₛ] is context-indexed since M1 stage 3).  It is [ProcdumpAux.v] §3
    verbatim in shape, and for the same recorded reason: the byte premises are
    pure lemmas passed to [kernel_data_string] BY NAME, because an inline
    [ltac:(...)] byte premise is re-elaborated by the proofmode without the
@@ -35,6 +36,7 @@ Require Import PrintkFmt.
 Require Import PrintkArgs.    (* [pk_arg_desc] / [pk_desc_kind] *)
 From Kernel Require KernelSyms.
 From Kernel Require KernelData.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -119,7 +121,7 @@ Qed.
 
 Section UsertrapData.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma ut_fmt1_str : (kernel_data : iProp Σ) -∗ ut_fmt1_p ↦ₛ□ ut_fmt1.
   Proof.

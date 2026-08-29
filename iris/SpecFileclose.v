@@ -135,6 +135,7 @@ Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
 Require Import FsCfg.     (* the ambient fs names [fs_ready] is stated at *)
 Require Import FsReady.   (* [fs_ready], the fs world a closer holds *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 
 (* fileclose's own frame is 8 slots ([addi sp,sp,-64]: ra, s0..s5 saved), and
@@ -185,7 +186,7 @@ Section SpecFileclose.
      two instance paths print identically and do not unify), and iput's
      contract is applied at the one that comes with the file table. *)
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- the FD_PIPE arm's environment: pipeclose's ---- *)
   (* [on] is a PARAMETER rather than a field of [fclose_names], because it is
@@ -196,7 +197,7 @@ Section SpecFileclose.
     (⌜(Z.of_nat n + 2 < 2 ^ 31)%Z⌝ ∗
      procs_inv (fcn_procs fn) ∗
      is_lock (fsc_kalloc) (mword_of_int KernelSyms.kmem) "kmem"%string
-       (kmem_res (fsc_kpages) (mword_of_int (KernelSyms.kmem + 24))) ∗
+       (λ ξ : CtxId, kmem_res (XIk := ξ) (fsc_kpages) (mword_of_int (KernelSyms.kmem + 24))) ∗
      kalloc_avail (fsc_kpages) on)%I.
 
   (* the page came back iff this was the pipe's LAST end; the caller cannot
@@ -493,7 +494,7 @@ End SpecFileclose.
 
 Definition wp_fileclose_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γfl γf : gname)            (* ftable.lock, ftable  *)
     (k : nat) (q : Qp) (st : fdstate)                 (* the reference        *)
     (fn : fclose_names) (on : option nat)              (* the arms' ghosts   *)
@@ -581,7 +582,7 @@ Definition wp_fileclose_sconf_body
 
 Module Type FILECLOSE.
   Parameter wp_fileclose_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γfl γf : gname)
       (k : nat) (q : Qp) (st : fdstate)
       (fn : fclose_names) (on : option nat)

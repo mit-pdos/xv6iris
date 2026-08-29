@@ -77,6 +77,7 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -86,7 +87,7 @@ Module FilecloseProof (Acquire : ACQUIRE) (Release : RELEASE)
 
 Section ProofFileclose.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -322,13 +323,13 @@ Section ProofFileclose.
       rewrite /R1 upd_ne; [reflexivity | regne]. }
     iDestruct (cpu_own_transport CID CID9 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf KT1 γfl "ftable"%string (ftable_res γf) mA
+    iApply (Acquire.wp_acquire_sconf KT1 γfl "ftable"%string <{ ftable_res γf }> mA
               n eb p (K - 8)%nat b lks
               HnZ ltac:(lia) ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
-    iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
+    iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
     assert (Hpc18 : ret_pc (mA !!! Regidx Rra) = mword_of_int (FC + 0x18)).
     { rewrite HmAra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc18) in "Hpc".
@@ -555,8 +556,7 @@ Section ProofFileclose.
          it -- so this is a pure re-spelling, and it is what makes the
          acquire/release pair compose back to [N]. *)
       iEval (rewrite Houtb) in "Hcg".
-      iApply (Release.wp_release_sconf KT1 γfl ftable_addr "ftable"%string
-                (ftable_res γf) E3 n eb p (K - 8)%nat
+      iApply (Release.wp_release_sconf KT1 γfl ftable_addr "ftable"%string <{ ftable_res γf }> E3 n eb p (K - 8)%nat
                 ({["ftable"]} ∪ lks)
                 ltac:(rewrite HE3a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)
@@ -643,8 +643,10 @@ Section ProofFileclose.
              below deletes; and the join above is what makes the cancel token
              whole.  The type is not tested for another two hundred lines, so
              the cancel is uniform in [file_armed] -- an unarmed body has no
-             disjunction to refute.  What comes back are the two cells, which
-             go straight into a FRESH unarmed cinv for the free slot. ---- *)
+             disjunction to refute.  What comes back is the [f->off] cell,
+             which goes straight into a FRESH unarmed cinv for the free slot
+             ([f->ip] is not in the invariant since the off-borrow ruling; it
+             came back with the reference, whole). ---- *)
       iApply fupd_wp.
       iMod (off_hold_cancel ⊤ γf (fp_ocv pn) (file_armed Cf) Mg k q
               ltac:(solve_ndisj) HMk with "Hoh Hauth Hrlv")
@@ -863,7 +865,7 @@ Section ProofFileclose.
          from what it does have. *)
       iAssert (file_pay γf k 1 C0) with "[Hpn Hoh0 Hiru]" as "Hpy0".
       { iExists pn0. iFrame "Hpn".
-        rewrite /file_payload /file_core /C0 /pn0; cbn [fc_type fp_ocv].
+        rewrite /file_payload /file_core /C0 /pn0; cbn [fc_type fc_ip fp_ocv].
         rewrite bool_decide_eq_false_2; [|by vm_compute].
         rewrite bool_decide_eq_false_2; [|by vm_compute].
         rewrite bool_decide_eq_false_2; [|by vm_compute].
@@ -976,8 +978,7 @@ Section ProofFileclose.
          it -- so this is a pure re-spelling, and it is what makes the
          acquire/release pair compose back to [N]. *)
       iEval (rewrite Houtb) in "Hcg".
-      iApply (Release.wp_release_sconf KT1 γfl ftable_addr "ftable"%string
-                (ftable_res γf) G3 n eb p (K - 8)%nat
+      iApply (Release.wp_release_sconf KT1 γfl ftable_addr "ftable"%string <{ ftable_res γf }> G3 n eb p (K - 8)%nat
                 ({["ftable"]} ∪ lks)
                 ltac:(rewrite HG3a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)

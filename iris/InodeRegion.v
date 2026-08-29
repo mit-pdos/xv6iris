@@ -178,6 +178,7 @@ Require Import TxPin.
 Require Import SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvExtras.
 Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
+Require TsoCtx.   (* qualified: the class only, no notation flip *)
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -1271,6 +1272,13 @@ Section InodeRegion.
   Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !icacheG Σ,
             !logG Σ, !fsTopG Σ, !fsLinkG Σ}.
   Context `{ICFG : icfg}.
+  (* M1 flip, STAGE 2: this file states NO points-to of its own (grep: zero
+     [↦] occurrences), but it names [IcacheRef.inode_ref], whose identity
+     cells are [↦₄] and therefore context-indexed since the flip.  The
+     binder is spelled QUALIFIED because this file does not import TsoCtx --
+     an unqualified [TsoCtx.CurCtx] in a no-import file silently generalises a
+     fresh [TsoCtx.CurCtx : Type] (tso-flip-replay.md pass 2.3). *)
+  Context `{XI : TsoCtx.CurCtx}.
 
   (* THE per-inum resource: this inum's on-disk record is [dn].  EXCLUSIVE
      (a full-fraction ghost_map element), keyed by the inum's value; the

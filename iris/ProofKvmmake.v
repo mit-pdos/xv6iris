@@ -42,6 +42,8 @@ Require Import KernelRvcDecode.
 (* it.  See FastSetSolver.v.                                              *)
 Require Export FastSetSolver.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
+   leg M); this caller is not yet -- the shim marks the open seam *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -628,7 +630,7 @@ Proof. lia. Qed.
 
 Section KvmmakeHouse.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Ltac reg_neq :=
@@ -912,7 +914,7 @@ Proof. lia. Qed.
 (* ===================================================================== *)
 Section KvmmakeBody.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   (* Each callee hypothesis is [CID]-GENERIC (its own fresh `{CID} binder,
@@ -929,8 +931,11 @@ Section KvmmakeBody.
       (fl : mword 64) (m : regfile) (on : option nat)
       (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string),
       wp_kalloc_sconf_body KT0 γl γk fl m on n eb p K b lks.
+  (* memset's spec is CONVERTED (tso-port leg M): context-indexed, so this
+     hypothesis is [XI]-generic exactly as it is [CID]-generic -- the call
+     site below mints its own context, this file not being converted yet. *)
   Hypothesis wp_memset :
-    forall `{CID : CpuId} (m0 : regfile) (n : nat) (len : nat)
+    forall `{CID : CpuId} `{XI0 : CurCtx} (m0 : regfile) (n : nat) (len : nat)
       (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64),
       wp_memset_sconf_body KT0 KT0 m0 n len cval olds b pcur.
   Hypothesis wp_kvmmap :
@@ -1150,11 +1155,15 @@ Section KvmmakeBody.
     { rewrite /M4 /M3. repeat (rewrite upd_ne; [| reg_neq]). rewrite /M2 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite /page_own /byte_any) in "Hpage".
     iDestruct (bb_choose 4096 0 (fun j b => ((pa_add root0 j) ↦ₘ b)%I) with "Hpage") as (olds) "Hbuf".
+    (* memset's contract is context-indexed AND so is [page_own] since the M1
+       flip: both sides are the SAME ctx fact, so there is no crossing here
+       any more (only the per-byte tier annotation is re-fixed below). *)
     iApply (wp_memset M4 (K - 4)%nat 4096 (M4 !!! Regidx (mword_of_int 11 : mword 5)) olds b p
               Hc2 ltac:(vm_compute; reflexivity) ltac:(reflexivity) HM4a2
               with "Hcg Htext Hpc [Hbuf]").
     { iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". rewrite HM4a0. iExact "H". }
     iIntros (CID12 Hs12 mfin) "Hcg Hpc Hbytes %Hmcs".
+    iDestruct (ctx_buf_to_mem with "Hbytes") as "Hbytes".
     assert (Hret18 : ret_pc (M4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x18)).
     { rewrite /M4 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret18) in "Hpc".
@@ -2277,12 +2286,12 @@ Module KvmmakeProof (AK : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPSTAC
      BARE, at this [Definition]'s own ambient [CID], implicit-argument
      insertion would silently collapse that genericity (the exact trap
      documented for [ProofKvminit.v]'s [KvminitProof]).  Eta-expand each. *)
-  Definition wp_kvmmake_sconf `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+  Definition wp_kvmmake_sconf `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (γk : gname * gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string)
       : wp_kvmmake_sconf_body γa γk mm lvl K eb p on b lks :=
     wp_kvmmake_sconf_gen
       (fun (CID' : CpuId) => AK.wp_kalloc_sconf KT0 (CID := CID'))
-      (fun (CID' : CpuId) => MS.wp_memset_sconf KT0 KT0 (CID := CID'))
+      (fun (CID' : CpuId) (XI' : CurCtx) => MS.wp_memset_sconf KT0 KT0 (CID := CID') (XI := XI'))
       (fun (CID' : CpuId) => KM.wp_kvmmap_sconf (CID := CID'))
       (fun (CID' : CpuId) => PM.wp_proc_mapstacks_sconf (CID := CID'))
       γa γk mm lvl K eb p on b lks.

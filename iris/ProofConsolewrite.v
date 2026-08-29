@@ -73,6 +73,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* MANDATORY IN ANY FILE THAT PROVES OVER [proc_priv] (durable-notes.md): a
@@ -90,7 +91,7 @@ Notation CW := KernelSyms.consolewrite (only parsing).
 (* THE FRAME IS SIXTEEN SLOTS ([c.addi16sp sp,-128] at +0x00).  A
    [c.sdsp]/[c.ldsp] displacement off the pushed sp names slot [16 - imm6]
    counted down from the ENTRY sp; slots 16..13 are [buf]. *)
-Lemma cw_slot_bridge (X : mword 64) (o : mword 64) (k : nat) :
+Lemma cw_slot_bridge `{XI : CurCtx} (X : mword 64) (o : mword 64) (k : nat) :
   add_vec (mword_of_int (- (8 * Z.of_nat 16%nat))) o = mword_of_int (- (8 * Z.of_nat k)) ->
   add_vec (pa_stk X 16%nat) o = pa_stk X k.
 Proof.
@@ -98,11 +99,11 @@ Proof.
 Qed.
 
 (* the [beq a0,s8] at +0x4a, against the [-1] gcc parked in s8 *)
-Lemma cw_eqv_m1_0 :
+Lemma cw_eqv_m1_0 `{XI : CurCtx} :
   eq_vec (mword_of_int 0 : mword 64) (mword_of_int (-1) : mword 64) = false.
 Proof. vm_compute. reflexivity. Qed.
 
-Lemma cw_eqv_m1_m1 :
+Lemma cw_eqv_m1_m1 `{XI : CurCtx} :
   eq_vec (mword_of_int (-1) : mword 64) (mword_of_int (-1) : mword 64) = true.
 Proof. vm_compute. reflexivity. Qed.
 
@@ -149,13 +150,13 @@ Section CwBodies.
   (* ---- the frame, in three pieces ---------------------------------- *)
 
   (* ra / s0 / s1, saved unconditionally by the prologue *)
-  Definition cw_saved (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
+  Definition cw_saved `{XI : CurCtx} (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
     (pa_stk sp0 1 ↦₈[KT1] (m0 !!! Regidx Rra) ∗
      pa_stk sp0 2 ↦₈[KT1] (m0 !!! Regidx Rs0) ∗
      pa_stk sp0 3 ↦₈[KT1] (m0 !!! Regidx Rs1))%I.
 
   (* s2..s10, saved only on the [n > 0] path (slots 4..12) *)
-  Definition cw_spill (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
+  Definition cw_spill `{XI : CurCtx} (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
     (pa_stk sp0 4  ↦₈[KT1] (m0 !!! Regidx Rs2) ∗
      pa_stk sp0 5  ↦₈[KT1] (m0 !!! Regidx Rs3) ∗
      pa_stk sp0 6  ↦₈[KT1] (m0 !!! Regidx Rs4) ∗
@@ -168,14 +169,14 @@ Section CwBodies.
 
   (* everything below the three unconditional saves, as WORDS -- what the
      pop needs.  Slots 4..16. *)
-  Definition cw_rest (sp0 : mword 64) : iProp Σ :=
+  Definition cw_rest `{XI : CurCtx} (sp0 : mword 64) : iProp Σ :=
     ([∗ list] k ∈ seq 4 13, ∃ w : mword 64, pa_stk sp0 k ↦₈[KT1] w)%I.
 
   (* ...and the same region with its four lowest slots carved into bytes *)
-  Definition cw_buf (sp0 : mword 64) : iProp Σ :=
+  Definition cw_buf `{XI : CurCtx} (sp0 : mword 64) : iProp Σ :=
     bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk sp0 16) 32.
 
-  Lemma cw_frame_back (sp0 : mword 64) (m0 : regfile) :
+  Lemma cw_frame_back `{XI : CurCtx} (sp0 : mword 64) (m0 : regfile) :
     cw_saved sp0 m0 -∗ cw_rest sp0 -∗ stack_own (KTR := KT1) sp0 16.
   Proof.
     iIntros "(H1 & H2 & H3) Hr".
@@ -188,7 +189,7 @@ Section CwBodies.
 
   (* the four buffer slots, as words again -- run BEFORE the epilogue.  The
      alignment facts are the ones the prologue's carve handed out. *)
-  Lemma cw_buf_slots (sp0 : mword 64) :
+  Lemma cw_buf_slots `{XI : CurCtx} (sp0 : mword 64) :
     (forall i, (i < 4)%nat -> is_aligned_paddr (Physaddr (pa_stk sp0 (16 - i))) 8 = true) ->
     cw_buf sp0 ⊢ [∗ list] i ∈ seq 0 4, ∃ w : mword 64, pa_stk sp0 (16 - i) ↦₈[KT1] w.
   Proof.
@@ -211,7 +212,7 @@ Section CwBodies.
     /\ M !!! Regidx Rs9   = (mword_of_int 32 : mword 64)
     /\ M !!! Regidx Rs10  = (mword_of_int 32 : mword 64).
 
-  Lemma cw_regs_cs (M M' : regfile) spd sp0 src n i :
+  Lemma cw_regs_cs `{XI : CurCtx} (M M' : regfile) spd sp0 src n i :
     callee_saved M M' -> cw_regs M spd sp0 src n i -> cw_regs M' spd sp0 src n i.
   Proof.
     intros Hcs (H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10).
@@ -254,7 +255,7 @@ Section CwBodies.
      against it does not terminate in any useful time (measured: > 2 min on
      this one line, with nothing else in the context).  Keeping the tail as
      ONE hypothesis makes the rebuild an [iExact] -- a syntactic check. *)
-  Lemma cw_priv_pid (pa : mword 64) (pid : mword 32) (U : ustate) :
+  Lemma cw_priv_pid `{XI : CurCtx} (pa : mword 64) (pid : mword 32) (U : ustate) :
     proc_priv_core pa pid U ⊢
     p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
     (p_pid pa ↦₄{DfracOwn (1/2)} pid -∗ proc_priv_core pa pid U).
@@ -269,7 +270,7 @@ Section CwBodies.
 
   (* ---- the function's own exit, as a [wp_next] at the entry hart ---- *)
 
-  Definition cw_ret `{CID0 : CpuId} (jp : nat) (m0 : regfile) (av : nat)
+  Definition cw_ret `{CID0 : CpuId} `{XI : CurCtx} (jp : nat) (m0 : regfile) (av : nat)
       (eb : bool) (pid : mword 32) (U : ustate) (n : Z) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr jp) (fun (CID : CpuId) =>
        (* the image does not move: either_copyin is same-[U] *)
@@ -286,7 +287,7 @@ Section CwBodies.
 
   (* the loop re-enters its own continuation at a MOVED descriptor; both the
      extension and the record compose, so the exit weakens along the loop. *)
-  Lemma cw_ret_weaken `{CID0 : CpuId} (jp : nat) (m0 : regfile) (av : nat)
+  Lemma cw_ret_weaken `{CID0 : CpuId} `{XI : CurCtx} (jp : nat) (m0 : regfile) (av : nat)
       (eb : bool) (pid : mword 32) (U : ustate) (P1 : uptd) (n : Z) (lks : gset string) :
     uptd_ext (pv_upt (us_V U)) P1 ->
     cw_ret (CID0 := CID0) jp m0 av eb pid U n lks -∗
@@ -306,7 +307,7 @@ Section CwBodies.
   (* =================================================================== *)
   (*  +0x96 .. +0xa0 -- THE EPILOGUE.  All three exits reach it.          *)
   (* =================================================================== *)
-  Lemma cw_epi `{CID : CpuId} (CID0 : CPU)
+  Lemma cw_epi `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (jp : nat) (m0 M : regfile) (av : nat) (eb : bool)
       (sp0 : mword 64) (pid : mword 32) (U : ustate) (n r : Z) (lks : gset string) :
     let pj := proc_addr jp in
@@ -477,7 +478,7 @@ Section CwBodies.
 
   (* the whole of what the pop needs: the nine spill slots plus the four the
      buffer was carved out of, in slot order. *)
-  Lemma cw_rest_of (sp0 : mword 64) (m0 : regfile) :
+  Lemma cw_rest_of `{XI : CurCtx} (sp0 : mword 64) (m0 : regfile) :
     (forall i, (i < 4)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (16 - i))) 8 = true) ->
     cw_spill sp0 m0 -∗ cw_buf sp0 -∗ cw_rest sp0.
@@ -499,7 +500,7 @@ Section CwBodies.
   (* =================================================================== *)
   (*  +0x6c .. +0x7e -- THE LOOP EXIT: i = n, restore s2..s10 and jump    *)
   (* =================================================================== *)
-  Lemma cw_exit_done `{CID : CpuId} (CID0 : CPU)
+  Lemma cw_exit_done `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (jp : nat) (m0 M : regfile) (av : nat) (eb : bool)
       (sp0 : mword 64) (pid : mword 32) (U : ustate) (n r : Z) (lks : gset string) :
     let pj := proc_addr jp in
@@ -722,7 +723,7 @@ Section CwBodies.
   (* =================================================================== *)
   (*  +0x84 .. +0x94 -- THE COPY-FAILED EXIT: restore s2..s10, fall through *)
   (* =================================================================== *)
-  Lemma cw_exit_break `{CID : CpuId} (CID0 : CPU)
+  Lemma cw_exit_break `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (jp : nat) (m0 M : regfile) (av : nat) (eb : bool)
       (sp0 : mword 64) (pid : mword 32) (U : ustate) (n r : Z) (lks : gset string) :
     let pj := proc_addr jp in
@@ -938,7 +939,7 @@ Section CwBodies.
   (*  bound on it will do.  The base case is vacuous -- the head is only   *)
   (*  ever entered with [i < n].                                          *)
   (* =================================================================== *)
-  Lemma cw_loop (mrem : nat) (CID0 : CPU)
+  Lemma cw_loop (mrem : nat) `{XI : CurCtx} (CID0 : CPU)
       (γa γf : gname) (γs : list gname) (jp : nat) (γlp γl : gname)
       (γu : uart_names) (γv : disk_names)
       (m0 : regfile) (av : nat) (eb : bool)
@@ -1527,7 +1528,7 @@ Section CwBodies.
   (* =================================================================== *)
   (*  +0x00 .. +0x36 -- the prologue, the [n <= 0] exit, and the setup.   *)
   (* =================================================================== *)
-  Lemma wp_consolewrite_sconf `{CID : CpuId}
+  Lemma wp_consolewrite_sconf `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (γf : gname) (γs : list gname) (jp : nat) (γlp : gname)
       (γu : uart_names) (γv : disk_names) (γl : gname)
       (m : regfile) (av : nat) (eb : bool)

@@ -79,6 +79,7 @@ Require Import SailStdpp.Base.
 Require Import RiscvLang RegFile RiscvPtsto RiscvExtras WpGpr.
 Require Import InstrBytes.
 From iris.base_logic.lib Require Import invariants.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -536,7 +537,7 @@ Qed.
 
 Section VcGenIris.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   (* the heap cells are the block's own memory, so they ride the accessing
      hart's tier exactly as its frame slots do (StackOwn.v's KTR discipline). *)
   Context `{KTR : !CurKtier}.

@@ -29,13 +29,14 @@ Require Import KernelDecode19.
 Require Import KernelDecode21.
 Require Import KernelDecode23.
 Require Import KernelDecode29.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodeSleep.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- sleep @ KernelSyms.sleep, 48 bytes ---- *)
 

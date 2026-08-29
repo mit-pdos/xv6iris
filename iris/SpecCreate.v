@@ -356,6 +356,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -457,6 +458,7 @@ Proof. rewrite /dinode_wf /create_made /=. reflexivity. Qed.
 Section CreateSpec.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
   Context `{GEN : GenId}.
 
   (* THE LOCKED-INODE PAYOUT.  Exactly [SpecIunlock]'s / [SpecIunlockput]'s
@@ -535,7 +537,7 @@ End CreateSpec.
 
 Definition wp_create_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -647,7 +649,7 @@ Definition wp_create_sconf_body
   procs_inv γs -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
   bslots 3 -∗
   iref_slots ns -∗
   (* ---- THE OP-WIDE RESERVATION, IN SET FORM (section 18 clause 1) ---- *)
@@ -745,7 +747,7 @@ Definition wp_create_sconf_body
 Module Type CREATE.
   Parameter wp_create_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
  (γf : gname)

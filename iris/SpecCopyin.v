@@ -89,6 +89,7 @@ Require Import ProcPtOwn.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 
 (* THE BUFFER CARRIES ITS OWN TIER [ktb], below the hart's regime [KT1].
@@ -133,7 +134,7 @@ Definition copyin_got (M : gmap Z (bv 8)) (srcva : mword 64) (len : nat)
   forall j : nat, (j < len)%nat ->
     M !! uint (add_vec_int srcva (Z.of_nat j)) = Some (dst_new j).
 
-Definition wp_copyin_sconf_mem_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_copyin_sconf_mem_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
     (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (len : nat)
     (dst_olds : nat -> bv 8)
@@ -174,7 +175,7 @@ Definition wp_copyin_sconf_mem_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN
 
 Module Type COPYIN.
   Parameter wp_copyin_sconf_mem :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
       (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (len : nat)
       (dst_olds : nat -> bv 8)

@@ -27,6 +27,7 @@ Require Import TrampPt.
 From Kernel Require Import KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -631,7 +632,7 @@ Proof. intro HmisaC. rvc_oneshot s HmisaC. Qed.
 
 Section UserretInstrs.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma ui_fencei :
     kernel_text -∗ instr (upa 0x9c) false ai_fencei.

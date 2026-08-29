@@ -39,6 +39,7 @@ Require Import HartLift HartSFrame.
 Require Import HartMCycle.
 (* [smode_config] lives in SmodeCore; its bridge is below *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* the misalignment tests' spelling, as [HartMFetch] and [HartSTrans] use it *)
@@ -46,7 +47,7 @@ Local Open Scope Z_scope.
 Section sframes.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   (* ------------------------------------------------------------------ *)

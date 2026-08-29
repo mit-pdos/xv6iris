@@ -193,6 +193,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 
@@ -285,7 +286,7 @@ Section SpecSysDupAU.
      premise (header, THE ARMS).  Which arm runs is a function of
      [fd_frees] over the caller's own array -- the landed determinism,
      kept. *)
-  Definition sys_dup_au_post (γf : gname) (p : mword 64) (pid : mword 32)
+  Definition sys_dup_au_post `{XI : CurCtx} (γf : gname) (p : mword 64) (pid : mword 32)
       (U : ustate) (fd0 : nat) (fv : mword 64)
       (rb wb : bool) (t : fdtype) (sts : list fdstate)
       (r : mword 64) : iProp Σ :=
@@ -312,7 +313,7 @@ Section SpecSysDupAU.
      [sys_dup_post] -- the parallel form never contradicts the landed
      contract (arm 1 there is unreachable, arms 2/3 are these two with
      the bundle weakened through [dup_fd_frags_any]). *)
-  Lemma sys_dup_au_post_sound (γf : gname) (p : mword 64) (pid : mword 32)
+  Lemma sys_dup_au_post_sound `{XI : CurCtx} (γf : gname) (p : mword 64) (pid : mword 32)
       (U : ustate) (v fv : mword 64) (fd0 : nat)
       (rb wb : bool) (t : fdtype) (sts : list fdstate) (r : mword 64) :
     arg_fd v (pv_ofile (us_V U)) = Some (fd0, fv) ->
@@ -349,7 +350,7 @@ Global Typeclasses Opaque sys_dup_au_post.
    the landed post replaced by the two arms (which imply it,
    [sys_dup_au_post_sound]).  The continuation binds NO [M']/[P']: dup
    copies no user memory, exactly as the landed continuation says. *)
-Definition wp_sys_dup_au_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (γl γf : gname)
+Definition wp_sys_dup_au_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γl γf : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
     (v : mword 64) (pid : mword 32) (U : ustate) (b : bool) (lks : gset string)
     (fd0 : nat) (fv : mword 64) (rb wb : bool) (t : fdtype)
@@ -400,7 +401,7 @@ Definition wp_sys_dup_au_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ
    (header: WHAT IT DELIBERATELY DOES NOT SAY). *)
 Module Type SYSDUP_AU.
   Parameter wp_sys_dup_au :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (γl γf : gname)
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γl γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (v : mword 64) (pid : mword 32) (U : ustate) (b : bool)
       (lks : gset string)

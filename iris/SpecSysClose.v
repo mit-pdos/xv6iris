@@ -68,6 +68,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 
@@ -90,7 +91,7 @@ Section SpecSysClose.
      [ProcInv]'s auth/frag split that is a step the array cannot take on its
      own ([FdSlots.fd_st_move] needs both halves).  The failure arm hands it
      straight back untouched -- it closed nothing. *)
-  Definition sys_close_post (γf : gname) (p : mword 64) (pid : mword 32)
+  Definition sys_close_post `{XI : CurCtx} (γf : gname) (p : mword 64) (pid : mword 32)
       (U : ustate) (v : mword 64) (r : mword 64) : iProp Σ :=
     (⌜r = (mword_of_int (-1) : mword 64) /\ arg_fd v (pv_ofile (us_V U)) = None⌝ ∗
        proc_priv γf p pid U ∗ fd_frags_any (pv_fdg (us_V U))
@@ -103,7 +104,7 @@ End SpecSysClose.
 
 Definition wp_sys_close_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
      (γl γf : gname) (fn : fclose_names) (on : option nat)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
     (v : mword 64) (pid : mword 32) (U : ustate) (b : bool) (lks : gset string) :=
@@ -199,7 +200,7 @@ Definition wp_sys_close_sconf_body
 Module Type SYSCLOSE.
   Parameter wp_sys_close_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
        (γl γf : gname) (fn : fclose_names) (on : option nat)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (v : mword 64) (pid : mword 32) (U : ustate) (b : bool) (lks : gset string),

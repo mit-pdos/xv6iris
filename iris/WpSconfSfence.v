@@ -47,6 +47,7 @@ Require Import IntrDefs WpIntrInv WpSmodeIntr.
 Require Import KptShare PtTree SmodePte.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 (* ====================================================================== *)
@@ -59,7 +60,7 @@ Import Defs.
 
 Section SfenceFrames.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ==================================================================== *)
   (* 1. THE FRAME.  SFENCE.VMA x0,x0 reads cur_privilege and mstatus and   *)
@@ -173,7 +174,7 @@ End SfenceFrames.
 
 Section SfenceLeaf.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (kt : ktier) (p : mword 64).
 
   (* ==================================================================== *)

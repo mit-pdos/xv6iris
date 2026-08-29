@@ -47,6 +47,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartRegNode
         HartSpan HartSpanChar HartRunGen HartEvents HartMCycle HartMDispatch
         HartMPmp HartMFetch.
 Require Import RiscvFetchExec.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Local Notation zerobit :=
@@ -60,7 +61,7 @@ Local Ltac r_glue :=
 
 Section run.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)
   (* THE 4-BYTE PATH.  No [Ext_Zca] gate and no [ExecuteAs] stage: the    *)

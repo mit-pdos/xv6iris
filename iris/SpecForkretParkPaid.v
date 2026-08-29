@@ -129,9 +129,10 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Definition forkret_park_pkg
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
     (* the trap loop's kernel-side bundle, abstract exactly as [SpecForkret]
        takes it *)
     (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
@@ -211,7 +212,7 @@ Definition forkret_park_pkg
       URes h pt' (add_vec ks (mword_of_int 4096))))%I.
 
 Definition forkret_park_paid_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (URes : CpuId -> uptd -> mword 64 -> iProp Σ) (W : iProp Σ)
     (γs : list gname) (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
     (pid : mword 32) (U : ustate) (av : nat) : Prop :=
@@ -257,7 +258,7 @@ Module Type FORKRET_PARK_PAID.
      PARK'S CHANNEL THROUGH THE MODULE TYPES". *)
   Include UtResFits.USERTRAP_RES_PARK.
   Parameter forkret_park_paid :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (W : iProp Σ)
       (γs : list gname) (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
       (pid : mword 32) (U : ustate) (av : nat),
@@ -268,7 +269,7 @@ Module Type FORKRET_PARK_PAID.
      residue's channel, tied into the fixpoint.  This is the one entry the
      parkers use; the statement above is its proof. *)
   Parameter park_token_intro :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
       (γs : list gname),
       ⊢ park_token γs.
 End FORKRET_PARK_PAID.

@@ -25,12 +25,14 @@ Require Import SailStdpp.Base SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d.
 Require Import RiscvPtsto.
 Require Import WpLock.
+Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Section TicksInv.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.
 
   (* ---- geometry.  The lock's own two words ([locked] at +0, [cpu] at +16)
      belong to [lock_inv] (WpLock.v); nothing here names the cpu word. *)
@@ -44,26 +46,28 @@ Section TicksInv.
   Proof. iIntros "H". iExists t. iFrame "H". Qed.
 
   Definition is_tickslock (γl : gname) : iProp Σ :=
-    is_lock γl a_tickslock "time"%string ticks_res.
+    is_lock γl a_tickslock "time"%string <{ ticks_res }>.
 
   Global Instance is_tickslock_persistent γl : Persistent (is_tickslock γl).
   Proof. apply _. Qed.
 
   Lemma is_tickslock_lock γl :
-    is_tickslock γl -∗ is_lock γl a_tickslock "time"%string ticks_res.
+    is_tickslock γl -∗ is_lock γl a_tickslock "time"%string <{ ticks_res }>.
   Proof. iIntros "$". Qed.
 
   (* ---- construction (the "newlock" ghost step): what a caller does with
      trapinit's postcondition -- the freshly zeroed lock word and its
      persistent name, plus the counter cell, become the tickslock. *)
-  Lemma new_tickslock E (t : mword 32) :
+  (* A6.67: the creator's honest deposit (A6.66) wants the running token;
+     it is handed straight back, so a caller that has one loses nothing. *)
+  Lemma new_tickslock `{CID : RiscvLang.CpuId} E (t : mword 32) :
     lock_name a_tickslock "time"%string -∗
     a_tickslock ↦₄ (mword_of_int 0 : mword 32) -∗
-    lock_cpu a_tickslock ↦₈ (zero_reg : mword 64) -∗
+    WpLock.lk_cpu_ready a_tickslock -∗
     a_ticks ↦₄ t ={E}=∗ ∃ γl : gname, is_tickslock γl.
   Proof.
     iIntros "#Hnm Hlkw Hcpu Hticks".
-    iApply (newlock E a_tickslock "time"%string ticks_res
+    iApply (newlock E a_tickslock "time"%string <{ ticks_res }>
               with "Hnm Hlkw Hcpu [Hticks]").
     iApply (ticks_res_intro with "Hticks").
   Qed.

@@ -27,13 +27,14 @@ Require Import KernelDecode15.
 Require Import KernelDecode19.
 Require Import KernelDecode21.
 Require Import KernelDecode27.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodeSysWait.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- sys_wait @ KernelSyms.sys_wait, 34 bytes ---- *)
 

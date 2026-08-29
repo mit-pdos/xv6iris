@@ -76,6 +76,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RegFile RiscvPtsto RiscvExec.
 Require Import HartLift HartSpan.
 Require Import WpGpr MinstretInv InstrBytes.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -409,7 +410,7 @@ Qed.
 
 Section UGprFrame.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the whole file as the per-index run [gpr_file] folds over ([BootConfig.
      gpr_file_of_enum], strengthened to an iff -- the [dom] conjunct is
@@ -653,7 +654,7 @@ Definition u_pins_pt (rs : regstate) (satpv : mword 64)
 
 Section UFrames.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma u_frames_intro (rs : regstate) (dqc : dfrac) (hs : HartState)
       (ms sc stv sep va va' : mword 64) (g : regfile)
@@ -907,7 +908,7 @@ End UFrames.
 
 Section URegs.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Definition u_regs (hs : HartState)
       (ms_v sc_v stval_v sepc_v va va' : mword 64) (g : regfile) : iProp Σ :=

@@ -63,12 +63,13 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 
 
 Section SpecClockintr.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* "this hart keeps time": the branch clockintr tests, [cpuid() == 0]. *)
   Definition tick_hart : bool := eq_vec (cid_word : mword 64) (zero_reg : mword 64).
@@ -105,7 +106,7 @@ End SpecClockintr.
    xv6 agrees on both counts: clockintr runs only from devintr, inside the
    trap handler, with SIE already off.  Stated at the literal [false] there is
    no [wp_next] wrapper at all ([wp_next_off] would collapse it). *)
-Definition wp_clockintr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_clockintr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
      (γl : gname) (γs : list gname)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.clockintr in
@@ -131,7 +132,7 @@ Definition wp_clockintr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
 
 Module Type CLOCKINTR.
   Parameter wp_clockintr_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
        (γl : gname) (γs : list gname)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string),
       wp_clockintr_sconf_body γl γs m n eb p av lks.

@@ -55,12 +55,14 @@ Require Import UsertrapRes.
 Require Import UexecWp.   (* [uexec_wp] -- the child's WP, the channel's last row *)
 From Kernel Require KernelSyms.
 Require Import Xv6G.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 Section ParkCap.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
+  Context `{XI : CurCtx}.
 
   (* the saved-context head the park installs: forkret's entry, and the
      kernel stack's top -- [SpecAllocproc.forkret_pc]'s value *)

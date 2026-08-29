@@ -124,6 +124,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* a failing tactic in a WP over [proc_priv] otherwise spends tens of
    minutes FORMATTING the goal -- see claude-notes/durable-notes.md. *)
@@ -146,10 +147,10 @@ Definition md_thr (m M : regfile) : Prop :=
     c <> (mword_of_int 8 : mword 5) ->
     M !!! Regidx c = (m !!! Regidx c : mword 64).
 
-Lemma md_thr_refl (m : regfile) : md_thr m m.
+Lemma md_thr_refl `{XI : CurCtx} (m : regfile) : md_thr m m.
 Proof. intros c _ _ _. reflexivity. Qed.
 
-Lemma md_thr_trans (m M P : regfile) : md_thr m M -> md_thr M P -> md_thr m P.
+Lemma md_thr_trans `{XI : CurCtx} (m M P : regfile) : md_thr m M -> md_thr M P -> md_thr m P.
 Proof.
   intros H1 H2 c Hc N2 N8. rewrite (H2 c Hc N2 N8). exact (H1 c Hc N2 N8).
 Qed.
@@ -158,30 +159,30 @@ Definition md_sp (sp0 : mword 64) (M : regfile) : Prop :=
   M !!! Regidx csp_rs1 = pa_stk sp0 18.
 
 (* -144 / +144, both a [c.addi16sp] (55 is -9 in a 6-bit field, x16). *)
-Lemma md_push (X : mword 64) :
+Lemma md_push `{XI : CurCtx} (X : mword 64) :
   add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 55 : mword 6)))
   = pa_stk X 18.
 Proof. apply stk_push. apply bv_eq; vm_compute; reflexivity. Qed.
 
-Lemma md_pop (X : mword 64) :
+Lemma md_pop `{XI : CurCtx} (X : mword 64) :
   add_vec (pa_stk X 18) (sign_extend' 64 (caddi16sp_imm (mword_of_int 9 : mword 6)))
   = X.
 Proof. apply stk_pop. apply bv_eq; vm_compute; reflexivity. Qed.
 
 (* [c.addi4spn s0,sp,144] -- the frame pointer, back at the entry sp. *)
-Lemma md_fp (X : mword 64) :
+Lemma md_fp `{XI : CurCtx} (X : mword 64) :
   add_vec (pa_stk X 18) (sign_extend' 64 (caddi4spn_imm (mword_of_int 36 : mword 8)))
   = X.
 Proof. apply stk_pop. apply bv_eq; vm_compute; reflexivity. Qed.
 
 (* [addi aN,s0,-144] off the frame pointer (which IS the entry sp) is the
    base of the path buffer, i.e. the lowest slot of the frame. *)
-Lemma md_buf (X : mword 64) :
+Lemma md_buf `{XI : CurCtx} (X : mword 64) :
   add_vec X (sign_extend' 64 (mword_of_int 3952 : mword 12)) = pa_stk X 18.
 Proof. apply stk_push. apply bv_eq; vm_compute; reflexivity. Qed.
 
 (* the c.sdsp / c.ldsp displacements off the pushed sp *)
-Lemma md_frm (X : mword 64) (u : mword 6) (k : nat) :
+Lemma md_frm `{XI : CurCtx} (X : mword 64) (u : mword 6) (k : nat) :
   (mword_of_int (bv_wrap 64 (uint (mword_of_int (- (8 * Z.of_nat 18)) : mword 64)
                          + uint (zero_extend' 64 (concat_vec u ('b"000")) : mword 64)))
    : mword 64)
@@ -191,13 +192,13 @@ Proof.
   intro H. unfold pa_stk, add_vec_int. rewrite pa_stk_off2. apply f_equal. exact H.
 Qed.
 
-Lemma md_frm1 (X : mword 64) :
+Lemma md_frm1 `{XI : CurCtx} (X : mword 64) :
   add_vec (pa_stk X 18)
     (zero_extend' 64 (concat_vec (mword_of_int 17 : mword 6) ('b"000")))
   = pa_stk X 1.
 Proof. apply md_frm. apply bv_eq; vm_compute; reflexivity. Qed.
 
-Lemma md_frm2 (X : mword 64) :
+Lemma md_frm2 `{XI : CurCtx} (X : mword 64) :
   add_vec (pa_stk X 18)
     (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000")))
   = pa_stk X 2.
@@ -205,7 +206,7 @@ Proof. apply md_frm. apply bv_eq; vm_compute; reflexivity. Qed.
 
 (* K_sys_mkdir's single premise, turned into every bound the four callees
    and the [sie_cap_gpr] pop want. *)
-Lemma md_kb (K : nat) : (K_sys_mkdir <= K)%nat ->
+Lemma md_kb `{XI : CurCtx} (K : nat) : (K_sys_mkdir <= K)%nat ->
   (K_create <= K - 18)%nat /\ (argstr_stack <= K - 18)%nat /\
   (K_begin_op <= K - 18)%nat /\ (K_end_op <= K - 18)%nat /\
   (K_iunlockput <= K - 18)%nat /\
@@ -216,19 +217,19 @@ Proof.
 Qed.
 
 (* the syscall argument index is in range, and [i = 0] is what a0 holds *)
-Lemma md_arg0_lt : (0 < NARG)%nat.
+Lemma md_arg0_lt `{XI : CurCtx} : (0 < NARG)%nat.
 Proof. unfold NARG. lia. Qed.
 
-Lemma md_noff0 : (Z.of_nat 0 + 1 < 2 ^ 31)%Z.
+Lemma md_noff0 `{XI : CurCtx} : (Z.of_nat 0 + 1 < 2 ^ 31)%Z.
 Proof. lia. Qed.
 
-Lemma md_maxpath_lt : (Z.of_nat 128 < 2 ^ 31)%Z.
+Lemma md_maxpath_lt `{XI : CurCtx} : (Z.of_nat 128 < 2 ^ 31)%Z.
 Proof. lia. Qed.
 
-Lemma md_plen_lt (k : nat) : (k < 128)%nat -> (Z.of_nat k < 2 ^ 31)%Z.
+Lemma md_plen_lt `{XI : CurCtx} (k : nat) : (k < 128)%nat -> (Z.of_nat k < 2 ^ 31)%Z.
 Proof. intro H. lia. Qed.
 
-Lemma md_len_range (k : nat) : (k < 128)%nat -> (0 <= Z.of_nat k < 2 ^ 31)%Z.
+Lemma md_len_range `{XI : CurCtx} (k : nat) : (k < 128)%nat -> (0 <= Z.of_nat k < 2 ^ 31)%Z.
 Proof.
   intro Hk.
   assert (E31 : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity). lia.
@@ -239,7 +240,7 @@ Qed.
    [-1] or a length below 128.  ProofSysChdir's cluster, restated here
    rather than imported (a whole-function proof file is not a dependency
    any other one may take). *)
-Lemma md_sint_moi (z : Z) : (0 <= z < 2 ^ 31)%Z ->
+Lemma md_sint_moi `{XI : CurCtx} (z : Z) : (0 <= z < 2 ^ 31)%Z ->
   sint (mword_of_int z : mword 64) = z.
 Proof.
   intro Hz.
@@ -253,7 +254,7 @@ Proof.
   lia.
 Qed.
 
-Lemma md_nonneg (z : Z) : (0 <= z < 2 ^ 31)%Z ->
+Lemma md_nonneg `{XI : CurCtx} (z : Z) : (0 <= z < 2 ^ 31)%Z ->
   zopz0zI_s (mword_of_int z : mword 64) (zero_reg : mword 64) = false.
 Proof.
   intro Hz. unfold zopz0zI_s. apply Z.ltb_ge.
@@ -261,12 +262,12 @@ Proof.
   rewrite (md_sint_moi z Hz). lia.
 Qed.
 
-Lemma md_m1_neg :
+Lemma md_m1_neg `{XI : CurCtx} :
   zopz0zI_s (mword_of_int (-1) : mword 64) (zero_reg : mword 64) = true.
 Proof. vm_compute; reflexivity. Qed.
 
 (* create's live type premise at [ty := T_DIR], and the two zero arguments *)
-Lemma md_tdir_nz : bv_unsigned SpecDirlookup.T_DIR <> 0.
+Lemma md_tdir_nz `{XI : CurCtx} : bv_unsigned SpecDirlookup.T_DIR <> 0.
 Proof. vm_compute. discriminate. Qed.
 
 (* ===================================================================== *)
@@ -276,7 +277,7 @@ Proof. vm_compute. discriminate. Qed.
 Section ProofSysMkdirFrame.
   Context `{!riscvGS Σ, FSC : fscfg}.
 
-  Lemma md_frame_carve (sp0 : mword 64) :
+  Lemma md_frame_carve `{XI : CurCtx} (sp0 : mword 64) :
     stack_own (KTR := KT1) sp0 18 -∗
     ⌜forall i, (i < 16)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (18 - i)%nat)) 8 = true⌝ ∗
@@ -304,7 +305,7 @@ Section ProofSysMkdirFrame.
     iFrame "H1 H2 Hb". iPureIntro. exact Hal.
   Qed.
 
-  Lemma md_frame_join (sp0 : mword 64) (w1 w2 : mword 64) :
+  Lemma md_frame_join `{XI : CurCtx} (sp0 : mword 64) (w1 w2 : mword 64) :
     (forall i, (i < 16)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (18 - i)%nat)) 8 = true) ->
     (pa_stk sp0 1) ↦₈[KT1] w1 -∗ (pa_stk sp0 2) ↦₈[KT1] w2 -∗
@@ -333,18 +334,18 @@ Section ProofSysMkdirFrame.
 
   (* the buffer, as bytes and back: argstr / create both speak the
      [seq]-indexed byte window, not [bytes_own] *)
-  Lemma md_bytes_name (a : mword 64) (N : nat) :
+  Lemma md_bytes_name `{XI : CurCtx} (a : mword 64) (N : nat) :
     bytes_own (KTR := KT1) (DfracOwn 1) a N ⊢
     ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[KT1] f j.
   Proof. rewrite /bytes_own. exact (bb_any_named (KTR := KT1) a N). Qed.
 
-  Lemma md_name_bytes (a : mword 64) (N : nat) (f : nat -> bv 8) :
+  Lemma md_name_bytes `{XI : CurCtx} (a : mword 64) (N : nat) (f : nat -> bv 8) :
     ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[KT1] f j) ⊢ bytes_own (KTR := KT1) (DfracOwn 1) a N.
   Proof. rewrite /bytes_own. exact (bb_named_any (KTR := KT1) a N f). Qed.
 
   (* 128 = (k+1) + (127-k): create reads the NUL-terminated prefix, the rest
      rides through untouched *)
-  Lemma md_buf_split (a : mword 64) (f : nat -> bv 8) (k : nat) :
+  Lemma md_buf_split `{XI : CurCtx} (a : mword 64) (f : nat -> bv 8) (k : nat) :
     (k < 128)%nat ->
     ([∗ list] j ∈ seq 0 128, pa_add a j ↦ₘ[KT1] f j) -∗
     ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ[KT1] f j)
@@ -356,7 +357,7 @@ Section ProofSysMkdirFrame.
     rewrite (bb_split a (S k) (127 - k)%nat f). iIntros "[$ $]".
   Qed.
 
-  Lemma md_buf_join (a : mword 64) (f : nat -> bv 8) (k : nat) :
+  Lemma md_buf_join `{XI : CurCtx} (a : mword 64) (f : nat -> bv 8) (k : nat) :
     (k < 128)%nat ->
     ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ[KT1] f j) -∗
     ([∗ list] j ∈ seq 0 (127 - k)%nat,
@@ -399,7 +400,7 @@ Section ProofSysMkdirEpilogue.
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
 
-  Lemma md_epilogue `{GEN : GenId} `{CID0 : CpuId}
+  Lemma md_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (m M : regfile) (sp0 : mword 64) (K : nat) (b : bool) (pj : mword 64)
       (bf : nat -> bv 8) :
     (18 <= K)%nat -> ((K - 18) + 18 = K)%nat ->
@@ -568,7 +569,7 @@ Section ProofSysMkdirM1Tail.
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
 
-  Lemma md_m1_tail `{GEN : GenId} `{CID0 : CpuId}
+  Lemma md_m1_tail `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
  (gfs : fs_names)
@@ -597,7 +598,7 @@ Section ProofSysMkdirM1Tail.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     log_op icfg_log u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
@@ -735,7 +736,7 @@ Section ProofSysMkdirBody.
   (* the per-slot projection out of the boot family, at the copy THIS
      contract names ([ic_escrows] is IcacheEscrow's -- see fs-sysfile's
      trap 3 on the four [ic_sleeplocks] copies, which bites the same way). *)
-  Lemma md_esc_acc
+  Lemma md_esc_acc `{XI : CurCtx}
       (k : nat) :
     (k < NINODE)%nat ->
     (ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗ ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k
@@ -746,7 +747,7 @@ Section ProofSysMkdirBody.
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.
 
-  Lemma wp_sys_mkdir_sconf `{GEN : GenId} `{CID0 : CpuId}
+  Lemma wp_sys_mkdir_sconf `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gf : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)

@@ -50,6 +50,7 @@ Require Import ProcGeom.
 Require Import PrintkFmt.
 From Kernel Require KernelSyms.
 From Kernel Require KernelData.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -269,7 +270,7 @@ Proof. vm_compute; reflexivity. Qed.
 
 Section ProcdumpData.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* --- the three literals --- *)
   Lemma pd_nl_bytes :
@@ -375,7 +376,7 @@ Section ProcdumpData.
     assert (Hhi : pd_states_a + 8 * Z.of_nat k + Z.of_nat 8%nat <= rodata_end)
       by (unfold rodata_end, pd_states_a, KernelSyms.states_0; lia).
     pose proof (pd_states_bytes k Hk) as Hb.
-    iIntros "#Hd". rewrite /word_pointsto. iSplit.
+    iIntros "#Hd". rewrite /ctx_word_pointsto. iSplit.
     { iPureIntro. unfold pd_states_a, KernelSyms.states_0.
       destruct k as [|[|[|[|[|[|k']]]]]]; try lia; vm_compute; reflexivity. }
     iApply (kernel_data_window (pd_states_a + 8 * Z.of_nat k) (pd_state_p k) 8%nat _ eq_refl
@@ -421,6 +422,7 @@ Definition pd_regs_loop (M : regfile) (spv : mword 64) (j : nat) : Prop :=
 
 Section ProcdumpFrame.
   Context `{!riscvGS Σ}.
+  Context `{XI : CurCtx}.
 
   (* procdump's ten slots: nine named saves and one the code never touches
      (offset 0 -- the 80-byte frame is round, the nine saves are not). *)

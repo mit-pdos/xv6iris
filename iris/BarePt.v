@@ -87,6 +87,7 @@ Require Import ProcPt.
 Require Import ProcPtOwn.
 Require Import PtFree.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -431,6 +432,7 @@ Qed.
 
 Section BarePt.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{XI : CurCtx}.
 
   (* THE PREDICATE, at any [fx].  Compare [ProcPtOwn.proc_pt]: same three
      conjuncts, with the fixed-leaf map exposed and its [fx_wf] carried

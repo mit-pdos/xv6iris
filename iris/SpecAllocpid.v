@@ -45,6 +45,7 @@ Require Import CpuOwn.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 
@@ -54,6 +55,13 @@ Definition alp_nextpid  : mword 64 := mword_of_int KernelSyms.nextpid.
 
 Section SpecAllocpid.
   Context `{!riscvGS Σ}.
+  (* M1 flip, STAGE 2: the counter cell is [↦₄], so this payload names a
+     context.  Its lock handle is therefore spelled with the λ-CONVERTED
+     payload at every mention site (§0.7′ recipe rule 1) rather than under
+     [<{ }>] -- which is what keeps [is_lock γp alp_pid_lock "nextpid" …] a
+     CLOSED TERM, and hence carryable in tso-port.md §0.12′'s park record
+     across a ∀-quantified resume context. *)
+  Context `{XI : CurCtx}.
 
   (* everything <pid_lock> protects: the counter, value unconstrained. *)
   Definition nextpid_res : iProp Σ :=
@@ -61,7 +69,8 @@ Section SpecAllocpid.
 
 End SpecAllocpid.
 
-Definition wp_allocpid_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (γp : gname)
+
+Definition wp_allocpid_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γp : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.allocpid in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -76,7 +85,7 @@ Definition wp_allocpid_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
   sie_cap_gpr KT1 m av b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
+  is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜ callee_saved m mf ⌝ -∗
@@ -88,7 +97,7 @@ Definition wp_allocpid_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
 
 Module Type ALLOCPID.
   Parameter wp_allocpid_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (γp : gname)
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γp : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),
       wp_allocpid_sconf_body γp m av n eb p b lks.
 End ALLOCPID.

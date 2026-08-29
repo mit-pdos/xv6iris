@@ -162,6 +162,8 @@ Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
    printing one takes tens of minutes, so a one-line mistake reads as a hang.
    durable-notes.md's rule. *)
+Require Import TsoCtx.
+
 Set Printing Depth 40.
 
 Notation KF := KernelSyms.kfork (only parsing).
@@ -204,7 +206,7 @@ Module KforkProof (MP : MYPROC) (AP : ALLOCPROC_GEN) (UC : UVMCOPY)
 
 Section KforkArms.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -293,9 +295,9 @@ Section KforkArms.
     iDestruct "Hframe" as (w4 w5) "Hframe".
     rewrite /ProofKfork.kfk_frame_at.
     iDestruct "Hframe" as "(Hb1 & Hb2 & Hb3 & Hb4 & Hb5 & Hb6 & Hb7 & Hb8)".
-    iAssert (∃ w4', word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4')%I with "[Hb4]" as "Hb4x".
+    iAssert (∃ w4', ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) w4')%I with "[Hb4]" as "Hb4x".
     { iExists w4. iExact "Hb4". }
-    iAssert (∃ w5', word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5')%I with "[Hb5]" as "Hb5x".
+    iAssert (∃ w5', ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) w5')%I with "[Hb5]" as "Hb5x".
     { iExists w5. iExact "Hb5". }
     iDestruct (SchedCtx.procs_inv_lookup γs j γl2 Hgamma with "Hprocs") as "#Hislock".
     iDestruct (ProofKforkParts.kfk_of_priv γf (proc_addr j) pid_c Uc Hofnull Hcwdnull
@@ -491,7 +493,7 @@ Section KforkArms.
          (SpecAllocproc.forkret_pc :: add_vec ks (mword_of_int 4096) :: rest)) -∗
     IntrDefs.arm_pay KT1 lvl eb pme -∗
     kalloc_env_at fsc_kalloc fsc_kpages None -∗
-    is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+    is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
     is_ftable γl γf -∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
     itable_inv -∗
@@ -715,7 +717,7 @@ End KforkArms.
 (* =================================================================== *)
 Section KforkMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).

@@ -32,7 +32,7 @@
 
    * THE FROZEN CELLS ARE PERSISTED BEFORE THE FIRST CALLEE.  log.start and
      log.dev are written at +0x2c / +0x30 and then discarded to
-     [DfracDiscarded] ([RiscvPtsto.word4_pointsto_persist]) on the spot --
+     [DfracDiscarded] ([RiscvPtsto.ctx_word4_pointsto_persist]) on the spot --
      which is exactly [LogInv.log_frozen], the context both committer-only
      helpers take (they run with no lock held, and at their call sites there
      is no lock yet).
@@ -106,6 +106,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
    printable (claude-notes/durable-notes.md) *)
@@ -377,6 +378,7 @@ Local Ltac ilidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 
 Section InitlogDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   (* BORROW the block's first word out of its byte list, and give it back.
      The window vocabulary is ByteBuf's ([bb_bytes_of_list] to trade the
@@ -596,6 +598,7 @@ End InitlogDefs.
 (* ===================================================================== *)
 Section InitlogBlocks.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   (* clones of ProofInstallTrans's small arithmetic helpers (a proof file
      may not import a sibling proof file) *)
@@ -1134,7 +1137,7 @@ End InitlogBlocks.
 
 Section ProofInitlog.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_initlog_sconf 
       (γs : list gname) (j : nat) (γl : gname)
@@ -1253,7 +1256,7 @@ Section ProofInitlog.
       do 4 (destruct jj as [|jj];
             [vm_compute in Hjj; injection Hjj as <-; vm_compute; reflexivity |]);
       vm_compute in Hjj; discriminate. }
-    iPoseProof (kernel_data_string log_name_str "log"%string
+    iPoseProof (kernel_data_string_all log_name_str "log"%string
                   (mword_of_int log_name_str : mword 64) eq_refl
                   ltac:(unfold text_end, log_name_str; lia)
                   ltac:(vm_compute; discriminate) Hlogs
@@ -1670,8 +1673,8 @@ Section ProofInitlog.
     { rgne. rewrite HT1s1. apply trunc32_sext64. }
     iEval (rewrite Hsv2) in "Hdevc".
     (* ---- FREEZE: the two cells go persistent, giving [log_frozen] ---- *)
-    iMod (word4_pointsto_persist with "Hstc") as "#Hstp".
-    iMod (word4_pointsto_persist with "Hdevc") as "#Hdvp".
+    iMod (ctx_word4_pointsto_persist with "Hstc") as "#Hstp".
+    iMod (ctx_word4_pointsto_persist with "Hdevc") as "#Hdvp".
     iAssert (log_frozen logstart dev) as "#Hfroz".
     { rewrite /log_frozen. iSplitL; [iExact "Hdvp" | iExact "Hstp"]. }
     assert (Hpp34 : add_vec_int (mword_of_int (KernelSyms.initlog + 0x30) : mword 64) 4
@@ -2733,8 +2736,9 @@ Section ProofInitlog.
        [lock_ghost_alloc] minted it as [ln_lk γ], so this is a FILL, not a
        mint. *)
     iMod (newlock_at ⊤ (ln_lk γ) log_addr "log"%string
-            (log_res γ bn γfs cov logstart)
-            with "Hlkf Hlnm Hlock Hcpu Hres") as "#Hislk".
+            <{ log_res γ bn γfs cov logstart }>
+            with "Hlkf Hlnm Hlock [Hcpu] Hres") as "#Hislk".
+    { iApply (lk_cpu_ready_intro with "Hcpu"). }
     (* BLOCK 1'S PARK, ALLOCATED (durable-disk lane C-3a).  It is minted
        in the same ghost step as the lock's seal, which is the one place in
        this walk where the run is free and the bundle it belongs to is

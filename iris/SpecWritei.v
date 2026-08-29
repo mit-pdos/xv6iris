@@ -311,6 +311,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -508,7 +509,7 @@ Definition wi_dinode (dn : dinode) (bm' : blkmap) (off tot : nat) : dinode :=
    a FRAME local for one caller (dirlookup's [de]) and a KT0 page for the
    next (kexec's segment).  Same shape as SpecMemmove.v's note. *)
 Definition wp_writei_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (ktb : ktier) `{!KtierLe ktb KT1} (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -685,7 +686,7 @@ Definition wp_writei_sconf_body
   (* the disk fabric *)
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
   (* THREE slot units -- bmap's peak; writei's own bread holds one across
      either_copyin and log_write, and log_write wants one of its own *)
   bslots 3 -∗
@@ -792,7 +793,7 @@ Definition wp_writei_sconf_body
    a FRAME local for one caller (dirlookup's [de]) and a KT0 page for the
    next (kexec's segment).  Same shape as SpecMemmove.v's note. *)
 Definition wp_writei_gen_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (ktb : ktier) `{!KtierLe ktb KT1} (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -959,7 +960,7 @@ Definition wp_writei_gen_body
   (* the disk fabric *)
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
   (* THREE slot units -- bmap's peak; writei's own bread holds one across
      either_copyin and log_write, and log_write wants one of its own *)
   bslots 3 -∗
@@ -1061,7 +1062,7 @@ Definition wp_writei_gen_body
 
 Module Type WRITEI.
   Parameter wp_writei_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (ktb : ktier) `{!KtierLe ktb KT1} (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
  (γf : gname)
@@ -1083,7 +1084,7 @@ Module Type WRITEI.
      set forgotten, kept as its own parameter so that every existing caller
      is unchanged (wp_bmap_gen / wp_balloc_gen's pattern) *)
   Parameter wp_writei_gen :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (ktb : ktier) `{!KtierLe ktb KT1} (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
  (γf : gname)

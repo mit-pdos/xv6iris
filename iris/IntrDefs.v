@@ -77,6 +77,7 @@ Require WpGprCsrwCommon.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 (* ===================================================================== *)
@@ -253,7 +254,7 @@ Notation kv_frame_slots := (90%nat) (only parsing).
 Section IntrDefsBase.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* =================================================================== *)
   (* §2 The SIE ghost choreography: 1/2 (live-bit tie) + 1/4 (kernel-code *)
@@ -2050,7 +2051,7 @@ End IntrDefsBase.
 Section IntrDefs.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   (* ================================================================== *)
@@ -3306,6 +3307,7 @@ End IntrDefs.
 (* with [wp_next_chain] and apply this once, exactly as for [cpu_own].    *)
 (* ===================================================================== *)
 Lemma trap_csrs_ext_transport `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId}
+    `{XI : TsoCtx.CurCtx}
     {kt : ktier} (CID0 CID1 : CpuId) (eb : bool) (p : mword 64) :
   (eb = false \/ p = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
   trap_csrs_ext (CID := CID0) kt eb -∗ trap_csrs_ext (CID := CID1) kt eb.

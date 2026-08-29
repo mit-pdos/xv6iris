@@ -46,13 +46,14 @@ Require Import KernelDecode29.
 Require Import KernelDecode30.
 Require Import KernelDecode31.
 Require Import ExecCommon.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodeProcMapstacks.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- proc_mapstacks @ KernelSyms.proc_mapstacks, 164 bytes ---- *)
 

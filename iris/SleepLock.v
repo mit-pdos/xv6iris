@@ -92,10 +92,12 @@ Require Import SailStdpp.Base SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d.
 Require Import RiscvPtsto.
 Require Import WpLock.
+Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Local Open Scope Z_scope.
 
 Section SleepLock.
   Context `{!riscvGS Σ, !lockG Σ}.
+  Context `{XI : CurCtx}.
 
   (* ---- geometry, in the EXACT instruction address forms so the cells
      unify with the leaf and call specs without rewriting:
@@ -114,8 +116,14 @@ Section SleepLock.
 
   (* the sleeplock's own name field (+32), mirroring [lock_name]: written
      once by initsleeplock and then discarded, so persistent. *)
+  (* CONTEXT-FREE, exactly as [WpLock.lock_name] and for its reason: name
+     metadata inside the persistent handle must not drag a context in.  The
+     field is the RAW word; the string is [TsoCtx.ctx_string_all], [↦ₛ]'s
+     ∀-context DERIVED form (tso-port.md §0.21′). *)
   Definition sl_name (slk : mword 64) (s : string) : iProp Σ :=
-    (∃ p : mword 64, sl_name_field slk ↦₈□ p ∗ p ↦ₛ□ s)%I.
+    (∃ p : mword 64,
+       word_pointsto (sl_name_field slk) DfracDiscarded p ∗
+       ctx_string_all p DfracDiscarded s)%I.
 
   Global Instance sl_name_persistent slk s : Persistent (sl_name slk s).
   Proof. apply _. Qed.
@@ -422,13 +430,69 @@ Section SleepLock.
   Definition sl_res (γ : gname) (slk : mword 64) (R : iProp Σ) : iProp Σ :=
     sl_res_gen γ slk R sl_untracked.
 
+End SleepLock.
+
+(* ===================================================================== *)
+(*  THE HANDLE, IN A SECTION THAT BINDS NO [CurCtx].                      *)
+(*                                                                        *)
+(*  [is_sleeplock_gen] is PERSISTENT and shared by every user, so it must  *)
+(*  be a CLOSED TERM -- tso-port.md §0.8′ ruling 2, and the reason         *)
+(*  [BioInv.bio_ctx] (itself in a no-CurCtx section) can name it at all.   *)
+(*  Since M1 stage 2 that is no longer automatic: [sl_res_gen] holds two   *)
+(*  [↦₄] cells, so the payload is spelled as the λ that NAMES its context  *)
+(*  rather than under the constant-embedding wrapper [<{ }>], and the      *)
+(*  section binds no ambient that the λ could accidentally capture         *)
+(*  (§0.8′ rule 3).                                                       *)
+(* ===================================================================== *)
+Section SleepLockHandle.
+  Context `{!riscvGS Σ, !lockG Σ}.
+  Context `{XI : CurCtx}.
+
+  (* ---- THE PAYLOAD'S TRANSPORT (M1 flip, stage 2).  Both of the
+     sleeplock's own cells -- the [locked] word and the [pid] field -- are
+     [↦₄], so [sl_res_gen] stopped being a closed term at the flip.  The
+     lock's payload is therefore λ-CONVERTED (§0.7′ recipe rule 1) and these
+     are its obligation, row by row.  [R] and [H] are plain [iProp]
+     PARAMETERS and so are ξ-constant by typing; only the two cells move. *)
+  Global Instance sleeplocked_q_morph (γ : gname) (q : Qp) (slk : mword 64)
+      (pid : mword 32) :
+    CtxMorph (λ ξ, sleeplocked_q (XI := ξ) γ q slk pid).
+  Proof.
+    iIntros (ξ ξ') "Hd [Htok Hpid]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hpid") as "[Hd Hpid]".
+    iFrame.
+  Qed.
+
+  Global Instance sl_free_hold_morph (γ : gname) (slk : mword 64) :
+    CtxMorph (λ ξ, sl_free_hold (XI := ξ) γ slk).
+  Proof.
+    iIntros (ξ ξ') "Hd [%q [Htok Hha]]".
+    iDestruct (sleeplocked_q_morph γ q slk (mword_of_int 0 : mword 32) ξ ξ'
+                 with "Hd Htok") as "[Hd Htok]".
+    iFrame "Hd". iExists q. iFrame.
+  Qed.
+
+  Global Instance sl_res_gen_morph (γ : gname) (slk : mword 64)
+      (R : iProp Σ) (H : Qp -> iProp Σ) :
+    CtxMorph (λ ξ, sl_res_gen (XI := ξ) γ slk R H).
+  Proof.
+    iIntros (ξ ξ') "Hd [%v [Hw Harm]]".
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hw") as "[Hd Hw]".
+    iDestruct "Harm" as "[(%Hz & Hfree & HR) | [%Hnz Hdep]]".
+    - iDestruct (sl_free_hold_morph γ slk ξ ξ' with "Hd Hfree")
+        as "[Hd Hfree]".
+      iFrame "Hd". iExists v. iFrame "Hw". iLeft. by iFrame.
+    - iFrame "Hd". iExists v. iFrame "Hw". iRight. by iFrame.
+  Qed.
+
+
   (* the whole sleeplock: its name plus the inner spinlock -- named
      "sleep lock", the literal initsleeplock passes to initlock -- over
      [sl_res_gen].  Persistent: every user shares it. *)
   Definition is_sleeplock_gen (γl γ : gname) (slk : mword 64) (s : string)
       (R : iProp Σ) (H : Qp -> iProp Σ) : iProp Σ :=
     (sl_name slk s ∗
-     is_lock γl (sl_lk slk) "sleep lock"%string (sl_res_gen γ slk R H))%I.
+     is_lock γl (sl_lk slk) "sleep lock"%string <{ sl_res_gen γ slk R H }>)%I.
 
   Definition is_sleeplock (γl γ : gname) (slk : mword 64) (s : string)
       (R : iProp Σ) : iProp Σ :=
@@ -456,11 +520,11 @@ Section SleepLock.
   Proof. iIntros "[$ _]". Qed.
   Lemma is_sleeplock_gen_lock γl γ slk s R H :
     is_sleeplock_gen γl γ slk s R H -∗
-    is_lock γl (sl_lk slk) "sleep lock"%string (sl_res_gen γ slk R H).
+    is_lock γl (sl_lk slk) "sleep lock"%string <{ sl_res_gen γ slk R H }>.
   Proof. iIntros "[_ $]". Qed.
   Lemma is_sleeplock_gen_intro γl γ slk s R H :
     sl_name slk s -∗
-    is_lock γl (sl_lk slk) "sleep lock"%string (sl_res_gen γ slk R H) -∗
+    is_lock γl (sl_lk slk) "sleep lock"%string <{ sl_res_gen γ slk R H }> -∗
     is_sleeplock_gen γl γ slk s R H.
   Proof. iIntros "#Hn #Hl". by iFrame "Hn Hl". Qed.
 
@@ -469,13 +533,19 @@ Section SleepLock.
   Proof. apply is_sleeplock_gen_name. Qed.
   Lemma is_sleeplock_lock γl γ slk s R :
     is_sleeplock γl γ slk s R -∗
-    is_lock γl (sl_lk slk) "sleep lock"%string (sl_res γ slk R).
+    is_lock γl (sl_lk slk) "sleep lock"%string <{ sl_res γ slk R }>.
   Proof. apply is_sleeplock_gen_lock. Qed.
   Lemma is_sleeplock_intro γl γ slk s R :
     sl_name slk s -∗
-    is_lock γl (sl_lk slk) "sleep lock"%string (sl_res γ slk R) -∗
+    is_lock γl (sl_lk slk) "sleep lock"%string <{ sl_res γ slk R }> -∗
     is_sleeplock γl γ slk s R.
   Proof. apply is_sleeplock_gen_intro. Qed.
+
+End SleepLockHandle.
+
+Section SleepLockRes.
+  Context `{!riscvGS Σ, !lockG Σ}.
+  Context `{XI : CurCtx}.
 
   (* ---- opening/closing [sl_res_gen] inside the inner critical section -- *)
 
@@ -600,8 +670,9 @@ Section SleepLock.
   Proof.
     iIntros "Hfree #Hlnm #Hsnm Hlkw Hcpu Hw Hpid HR".
     iDestruct (sl_free_hold_intro with "Hfree Hpid") as (q0) "[Htok Hha]".
-    iMod (newlock E (sl_lk slk) "sleep lock"%string (sl_res_gen γ slk R H)
-            with "Hlnm Hlkw Hcpu [Hw Htok Hha HR]") as (γl) "#Hlk".
+    iMod (newlock E (sl_lk slk) "sleep lock"%string <{ sl_res_gen γ slk R H }>
+            with "Hlnm Hlkw [Hcpu] [Hw Htok Hha HR]") as (γl) "#Hlk".
+    { iApply (lk_cpu_ready_intro with "Hcpu"). }
     { iApply (sl_res_close_free with "Hw Htok Hha HR"). }
     iModIntro. iExists γl.
     iApply (is_sleeplock_gen_intro with "Hsnm Hlk").
@@ -624,8 +695,9 @@ Section SleepLock.
     { rewrite -!pair_op !left_id !right_id. apply pair_valid.
       split; [ by apply excl_auth_valid | by apply auth_auth_valid ]. }
     iDestruct "Hg" as "[[Hha Htok] Hauth]".
-    iMod (newlock E (sl_lk slk) "sleep lock"%string (sl_res_gen γ slk R (H γ))
-            with "Hlnm Hlkw Hcpu [Hw Htok Hha Hpid HR]") as (γl) "#Hlk".
+    iMod (newlock E (sl_lk slk) "sleep lock"%string <{ sl_res_gen γ slk R (H γ) }>
+            with "Hlnm Hlkw [Hcpu] [Hw Htok Hha Hpid HR]") as (γl) "#Hlk".
+    { iApply (lk_cpu_ready_intro with "Hcpu"). }
     { iApply (sl_res_close_free with "Hw [Htok Hpid] Hha HR").
       iFrame "Htok Hpid". }
     iModIntro. iExists γl, γ. iFrame "Hauth".
@@ -717,4 +789,4 @@ Section SleepLock.
     ∃ γl γ : gname, is_sleeplock_tok γl γ slk s R ∗ slh_auth γ None.
   Proof. iIntros "Hf HR". iApply (sl_fresh_new_gen E slk s R slh_tok with "Hf HR"). Qed.
 
-End SleepLock.
+End SleepLockRes.

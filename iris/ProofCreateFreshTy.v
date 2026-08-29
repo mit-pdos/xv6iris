@@ -107,6 +107,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -126,7 +127,7 @@ Definition cr_cs_but_s3 (m mf : regfile) : Prop :=
 
 Definition create_fresh_ty_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-      ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γs : list gname) (j : nat) (γl : gname)
     (pd pav pu : mword 64)
  (ty : mword 16)
@@ -187,7 +188,7 @@ Definition create_fresh_ty_body
      [ProofIalloc] and [ProofIlock] load-bearing: the axiom below assumes
      nothing about either function, only about the record identity across
      the two calls. ---- *)
-  (forall `{CIDa : CpuId}
+  (forall `{CIDa : CpuId} `{XI : CurCtx}
      (γs' : list gname) (j' : nat) (γl' : gname)
      (pd' pav' pu' : mword 64)
      (ty' : mword 16) (u' : nat) (Sb' : gset Z)
@@ -199,7 +200,7 @@ Definition create_fresh_ty_body
 
  ty' u' Sb' pidv' dq' dqs' dqn'
                         m' K' eb' b' lks' Upr' t' qt') ->
-  (forall `{CIDl : CpuId}
+  (forall `{CIDl : CpuId} `{XI : CurCtx}
      (γs' : list gname) (j' : nat) (γl' : gname)
      (pd' pav' pu' : mword 64)
      (gil' gisl' : gname)
@@ -234,7 +235,7 @@ Definition create_fresh_ty_body
   procs_inv γs -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
   sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   proc_priv_bare pj pidv Upr -∗
@@ -332,7 +333,7 @@ Definition create_fresh_ty_body
 
 (* "a callee-saved index is not a caller-saved one", in the [Regidx] form
    [RegFile.upd_ne] wants. *)
-Lemma cft_cs_ne (c r : mword 5) :
+Lemma cft_cs_ne `{XI : CurCtx} (c r : mword 5) :
   is_cs_idx c = true -> is_cs_idx r = false -> Regidx c <> Regidx r.
 Proof.
   intros Hc Hr Hcon. assert (Hcr : c = r) by congruence.
@@ -341,7 +342,7 @@ Qed.
 
 (* an entry address is never zero -- [ProofIget.ig_entry_nonzero]'s four
    lines, restated here so this file requires no [Proof*]. *)
-Lemma cft_entry_nonzero (e : nat) :
+Lemma cft_entry_nonzero `{XI : CurCtx} (e : nat) :
   (e <= NINODE)%nat -> eq_vec (ientry e) (zero_reg : mword 64) = false.
 Proof.
   intros He. apply eq_vec_false_iff. intro Hc.
@@ -355,6 +356,7 @@ Qed.
 Section CftHelpers.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
   Context `{GEN : GenId}.
 
   (* the escrow-family accessor and the slot split.  The sleeplock family's
@@ -376,6 +378,7 @@ Section CftHelpers.
 End CftHelpers.
 
 Section CreateFreshTySpan.
+  Context `{XI : CurCtx}.
 
 
 Notation Rra := (mword_of_int 1 : mword 5).
@@ -490,7 +493,7 @@ Proof.
   iDestruct (cft_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
   iDestruct (cpu_own_transport CID CID3 0%nat eb (proc_addr j) b
                ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-  iApply (Hia CID3 γs j γl pd pav pu
+  iApply (Hia CID3 XI γs j γl pd pav pu
             ty u Sb pidv dq dqs dqn A3 K eb b lks Upr
             t qc
             HKia Hlg Hist Hiregb Hn1 Hn2 Hn3 Htynz Htyk Hpkc Hj Hgs HA3a0 HA3a1 Heb
@@ -590,7 +593,7 @@ Proof.
     iDestruct (inode_ref_short_shr_gen_agree with "Hkeep Hshr") as %->.
     iDestruct (cpu_own_transport CID4 CID7 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Hil CID7 γs j γl pd pav pu gilc gislc
+    iApply (Hil CID7 XI γs j γl pd pav pu gilc gislc
               kslot (q/2)%Qp gsh
               (DepTx (q/2)%Qp icfg_dev inum gsh t qt) (ClaimK ty t qc) inum pidv dq dqs
               B1 K eb b lks Upr

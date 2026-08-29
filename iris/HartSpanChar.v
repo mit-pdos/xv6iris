@@ -23,6 +23,7 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartRegNode HartSpan.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -241,7 +242,7 @@ Qed.
    and the whole of the decode story *)
 Section swp_hfrun.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma swp_hfrun {X : Type} (n : nat) (Drw Dro : gset register)
       (Df : register -> dfrac) (rs rs' : regstate) (m : M X) (x : X) :

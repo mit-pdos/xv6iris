@@ -46,6 +46,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecHolding.
 Require Import ProcGeom.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 
 (* seqz on (a - b) is 0 when a <> b (holding +0x1e). *)
@@ -87,11 +88,11 @@ Module HoldingProof (Mycpu : MYCPU) : HOLDING.
 
 Section ProofHolding.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Context {kt : ktier}.
   Lemma wp_holding_lockinv_s_sconf
-      (γl : gname) (lka : mword 64) (s : string) (R Tc Dc : iProp Σ)
+      (γl : gname) (lka : mword 64) (s : string) (R : CtxId → iProp Σ) (Tc Dc : iProp Σ)
       (m : regfile) (n : nat) (p : mword 64) (lks : gset string)
     : wp_holding_lockinv_s_sconf_body kt γl lka s R Tc Dc m n p lks.
   Proof.
@@ -503,7 +504,7 @@ Section ProofHolding.
   Qed.
 
   Lemma wp_holding_lockinv_locked_s_sconf
-      (γl : gname) (lka : mword 64) (s : string) (R Dc : iProp Σ)
+      (γl : gname) (lka : mword 64) (s : string) (R : CtxId → iProp Σ) (Dc : iProp Σ)
       (m : regfile) (n : nat) (p : mword 64)
     : wp_holding_lockinv_locked_s_sconf_body kt γl lka s R Dc m n p.
   Proof.

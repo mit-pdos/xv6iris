@@ -55,6 +55,8 @@ From Kernel Require KernelInstrs KernelSyms.
 Require Import CodeSysExit.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
+Require TsoCtxShim.   (* ↦₄ split/join cross the seam *)
 Import Defs.
 Local Open Scope Z_scope.
 (* a failing tactic in a WP over [proc_priv] otherwise spends tens of
@@ -90,15 +92,17 @@ Proof. unfold NARG. lia. Qed.
    its [jal kexit] is the last thing it does -- so at that call the frame is
    dead and belongs to the page the dying thread donates
    ([ProcDefs.kstack_closer_frame]). *)
-Lemma sex_frame_stack `{!riscvGS Σ} (sp0 w1 w2 w3 w4 : mword 64) :
-  word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) w1 -∗
-  word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) w2 -∗
-  word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) w3 -∗
-  word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4 -∗
+Lemma sex_frame_stack `{XI : CurCtx} `{!riscvGS Σ} (sp0 w1 w2 w3 w4 : mword 64) :
+  ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) w1 -∗
+  ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) w2 -∗
+  ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) w3 -∗
+  ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) w4 -∗
   stack_own (KTR := KT1) sp0 4.
 Proof.
   iIntros "H1 H2 H3 H4". rewrite /stack_own.
-  iExists [w1; w2; w3; w4]. iSplitR; [done|]. simpl. iFrame "H1 H2 H3 H4".
+  iExists [w1; w2; w3; w4]. iSplitR; [done|]. cbn [big_opL].
+  iSplitL "H1"; [iExact "H1"|]. iSplitL "H2"; [iExact "H2"|].
+  iSplitL "H3"; [iExact "H3"|]. iSplitL "H4"; [iExact "H4"|]. done.
 Qed.
 
 Module SysExitProof (Argint : ARGINT) (Kexit : KEXIT) : SYSEXIT.
@@ -106,7 +110,7 @@ Module SysExitProof (Argint : ARGINT) (Kexit : KEXIT) : SYSEXIT.
 Section ProofSysExit.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac pcstep := apply bv_eq; vm_compute; reflexivity.
 
@@ -153,8 +157,12 @@ Section ProofSysExit.
     iDestruct "S1" as (u1) "Hb1". iDestruct "S2" as (u2) "Hb2".
     iDestruct "S3" as (w3) "Hb3". iDestruct "S4" as (u4) "Hb4".
     (* the local [n] is the upper half of slot 3 *)
-    iDestruct (word_pointsto_aligned_p with "Hb3") as %Hal3.
+    iDestruct (ctx_word_pointsto_aligned_p with "Hb3") as %Hal3.
+    (* ↦₄ has not flipped (M1 stage 2): the ctx word crosses through the shim *)
+    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hb3") as "Hb3".
     iDestruct (word_pointsto_split4 with "Hb3") as "[Hb3lo Hb3hi]".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hb3lo") as "Hb3lo".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ TsoCtx.cur_ctx with "Hb3hi") as "Hb3hi".
     (* the two save-slot addresses, as the c.sdsp displacements compute them *)
     assert (Hpa : forall u k : nat, (k + u = 4)%nat -> (u < 4)%nat ->
               add_vec (M1 !!! Regidx csp_rs1)
@@ -312,8 +320,11 @@ Section ProofSysExit.
       rewrite /B1 upd_ne; [| vm_compute; discriminate].
       rewrite (proj1 HcsAi). exact HA4sp. }
     iEval (rewrite Haddrn) in "Hb3hi".
+    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hb3lo") as "Hb3lo".
+    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hb3hi") as "Hb3hi".
     iDestruct (word_pointsto_join4 (pa_stk sp0 3) (DfracOwn 1) _ _ Hal3
                  with "Hb3lo Hb3hi") as "Hb3".
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hb3") as "Hb3".
     iDestruct (sex_frame_stack sp0 _ _ _ _ with "Hb1 Hb2 Hb3 Hb4") as "Hfr".
     iDestruct (kstack_closer_frame pj sp0 (trap_res b + av)%nat 4 ltac:(lia)
                  with "Hcl Hfr") as "Hcl4".

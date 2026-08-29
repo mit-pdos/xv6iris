@@ -65,6 +65,7 @@ Require Import DinodeEnc.
 Require Import InodeInv.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -440,6 +441,7 @@ Qed.
 
 Section IupdateRes.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{XI : CurCtx}.
 
   (* the 64 bytes at [a], read as [dinode_bytes d]: the six pieces the four
      [sh]s, the [sw] and the [memmove] touch, at the offsets those
@@ -515,7 +517,7 @@ Section IupdateRes.
     ([∗ list] j ∈ seq 0 2, pa_add a j ↦ₘ f j) ⊣⊢ a ↦₂ w.
   Proof.
     intros Hal Hf.
-    rewrite /word2_pointsto (bi.pure_True _ Hal) bi.True_sep.
+    rewrite /ctx_word2_pointsto (bi.pure_True _ Hal) bi.True_sep.
     apply big_sepL_proper. intros i jj Hj.
     apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l Hf;
       [reflexivity | lia].
@@ -527,7 +529,7 @@ Section IupdateRes.
     ([∗ list] j ∈ seq 0 4, pa_add a j ↦ₘ f j) ⊣⊢ a ↦₄ w.
   Proof.
     intros Hal Hf.
-    rewrite /word4_pointsto (bi.pure_True _ Hal) bi.True_sep.
+    rewrite /ctx_word4_pointsto (bi.pure_True _ Hal) bi.True_sep.
     apply big_sepL_proper. intros i jj Hj.
     apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l Hf;
       [reflexivity | lia].

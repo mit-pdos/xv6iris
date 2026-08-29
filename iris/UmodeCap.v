@@ -44,6 +44,7 @@ Require Import MinstretInv WireInv.
 Require Import WpIntrCore.
 Require Import UptTree UserPtTree UserExec UserTrap.
 Require Import UmodeMem.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -60,7 +61,7 @@ Definition a7_idx : mword 5 := mword_of_int 17.
 
 Section UmodeFrames.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   (* ------------------------------------------------------------------- *)
@@ -194,7 +195,7 @@ End UmodeCap.
 (* ===================================================================== *)
 Section UmodeCapGpr.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   Definition uv_cap_gpr (Ψ : usys_protocol Σ)

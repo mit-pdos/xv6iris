@@ -78,6 +78,7 @@ Require Export FastSetSolver.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -354,6 +355,7 @@ Qed.
 
 Section VdrwfBridges.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{XI : CurCtx}.
 
   Lemma vdrwf_w2b (a : Arch.pa) (w : bv 16) :
     is_aligned_paddr (Physaddr a) 2 = true ->
@@ -497,6 +499,7 @@ Notation Rs8 := (mword_of_int 24 : mword 5).
    section that FIXES [CpuId] (a section variable cannot be instantiated at
    its use site); [CID] is an ordinary binder of the lemma instead. *)
 Section VdrwfP6.
+  Context `{XI : CurCtx}.
   (* [eb] is the literal [true] in the epilogue, so [iNext] would otherwise
      descend through [cpu_own]'s [if b then ⌜…⌝ else …] and strip a later
      that is not ours.  Keep the bundle opaque. *)
@@ -784,7 +787,7 @@ Section VdrwfP6.
     perm_inv gen_id (dn_perm γd) -∗
     perm_receipt kq.2 Q -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     vdrw_saved (KTR := KT1) sp0 m -∗
     b_blockno b ↦₄{DfracOwn (1/2)} bno -∗
     (* NO caller-held [trap_csrs_pay]: the function is trap-CSR-balanced, so
@@ -1372,7 +1375,7 @@ Section VdrwfP6.
     { rewrite /H3 upd_ne; [| reg_neq]. rewrite /H2 upd_ne; [| reg_neq].
       rewrite /H1 upd_ne; [| reg_neq]. exact HG3sp. }
     iApply (Release.wp_release_sconf KT1 (CID := CIDx) γk d_lock "virtio_disk"%string
-              (disk_res γd pd pav pu) H3 0%nat eb (proc_addr j) (K - 12)%nat
+              <{ disk_res γd pd pav pu }> H3 0%nat eb (proc_addr j) (K - 12)%nat
               ({["virtio_disk"]} ∪ lks)
               HH3a0 ltac:(pose proof (vdrw_K10 K HK); lia)
               with "Hcg Htext Hpc Hlk Htok HR Hown Hpay").
@@ -1775,7 +1778,7 @@ End VdrwfP6.
 
 Section ProofVirtioDiskRwF.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Typeclasses Opaque cpu_own.
 

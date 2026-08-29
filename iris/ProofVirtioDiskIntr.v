@@ -57,6 +57,8 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
+Require TsoCtxShim.   (* [ctx_pointsto_shim]: the byte-window bridge, SC *)
 
 Local Open Scope Z_scope.
 
@@ -96,7 +98,7 @@ Proof. exact (data2_ext_4 w). Qed.
 
 Section VtLeaves.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).
@@ -364,7 +366,7 @@ End VtLeaves.
 Module VtPrologue (Acquire : ACQUIRE).
 Section VtPrologue.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).
@@ -383,7 +385,7 @@ Section VtPrologue.
     sie_cap_gpr KT1 m av b pme -∗
     cpu_own n eb pme b lks -∗
     kernel_text -∗ pc_is (mword_of_int KernelSyms.virtio_disk_intr : mword 64) -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     wp_next b pme (fun (CID : CpuId) =>
       ∀ (MA : regfile) (sp0 : mword 64),
         ⌜ sp0 = m !!! Regidx csp_rs1
@@ -578,12 +580,12 @@ Section VtPrologue.
       rewrite /A5 upd_ne; [| vm_compute; discriminate].
       rewrite /A4 upd_ne; [| vm_compute; discriminate]. exact HA3s1. }
     iDestruct (cpu_own_transport CID CID10 n eb pme b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf KT1 γk "virtio_disk"%string (disk_res γd pd pav pu) A6
+    iApply (Acquire.wp_acquire_sconf KT1 γk "virtio_disk"%string <{ disk_res γd pd pav pu }> A6
               n eb pme (av - 4)%nat b lks ltac:(exact Hn) ltac:(lia) Hfresh
               with "Hcg Hcnt Htext Hpc [Hlk]").
     all: try lkbelow.
     { iEval (rewrite HA6a0). iExact "Hlk". }
-    iIntros (CID11 Hs11 ms MA) "%Hms Hcg Hpc %HcsA Htok HR Hcnt Hpay".
+    iIntros (CID11 Hs11 ms MA) "%Hms Hcg Hpc %HcsA Htok HR _ Hcnt Hpay".
     assert (Hpc1e : ret_pc (A6 !!! Regidx ra_idx) = mword_of_int (KernelSyms.virtio_disk_intr + 0x1e))
       by (rewrite HA6ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc1e) in "Hpc".
@@ -635,7 +637,7 @@ End VtPrologue.
 Module VtEpilogue (Release : RELEASE).
 Section VtEpilogue.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).
@@ -661,7 +663,7 @@ Section VtEpilogue.
     locks_below lks "virtio_disk" ->
     sie_cap_gpr KT1 MB (trap_res b + (av - 4))%nat false pme -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x8a) : mword 64) -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     locked γk cpu_id -∗ disk_res γd pd pav pu -∗
     cpu_own (S n) eb pme false ({["virtio_disk"]} ∪ lks) -∗ arm_pay KT1 n eb pme -∗
     pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx ra_idx) -∗
@@ -753,7 +755,7 @@ Section VtEpilogue.
        what [Hbeq]/[Houtb] records).  Pure re-spelling -- it is what makes
        the acquire/release pair compose back to [N]. *)
     iEval (rewrite -Hbeq) in "Hcg".
-    iApply (Release.wp_release_sconf KT1 γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) E2
+    iApply (Release.wp_release_sconf KT1 γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> E2
               n eb pme (av - 4)%nat ({["virtio_disk"]} ∪ lks)
               ltac:(rewrite HE2a0; apply addv_sext0) ltac:(lia)
               with "Hcg Htext Hpc [Hlk] [Htok] [HR] Hcnt Hpay").
@@ -957,6 +959,7 @@ Proof. exact (pa_add_aligned_in_page p k d). Qed.
 
 Section VtLoopSeam.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{XI : CurCtx}.
 
   (* [DiskInv.disk_res]'s body with the four existentials named. *)
   Definition disk_res_at (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64)
@@ -1029,15 +1032,18 @@ Section VtLoopSeam.
      byte instance; the other two are the definitions side by side) *)
   Lemma vt_byte_wordw (a : Arch.pa) (b : bv 8) :
     wordw_pointsto (KTR := KT0) 1 a (DfracOwn 1) b ⊣⊢ a ↦ₘ b.
-  Proof. exact (wordw1_byte (KTR := KT0) a (DfracOwn 1) b). Qed.
+  Proof.
+    rewrite (wordw1_byte (KTR := KT0)). rewrite TsoCtxShim.ctx_pointsto_shim.
+    reflexivity.
+  Qed.
 
   Lemma vt_word4_wordw (a : Arch.pa) (w : SailStdpp.Values.mword 32) :
     a ↦₄ w ⊣⊢ wordw_pointsto (KTR := KT0) 4 a (DfracOwn 1) w.
-  Proof. rewrite /word4_pointsto /wordw_pointsto. reflexivity. Qed.
+  Proof. rewrite (wordw4_ctx (KTR2 := KT0)). reflexivity. Qed.
 
   Lemma vt_word8_wordw (a : Arch.pa) (w : SailStdpp.Values.mword 64) :
     a ↦₈ w ⊣⊢ wordw_pointsto (KTR := KT0) 8 a (DfracOwn 1) w.
-  Proof. rewrite /word_pointsto /wordw_pointsto. reflexivity. Qed.
+  Proof. rewrite (wordw8_ctx (KTR2 := KT0)). reflexivity. Qed.
 
   (* the width-1 unsigned load's extension, as [wp_load_s_sconf_au] wants
      it ([WpSconfMem]'s own copy is local to that file) *)
@@ -1112,7 +1118,7 @@ Qed.
 
 Section VtDevRam.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the used-ring INDEX read: [lhu a5,2(a5)] at +0x36 and [lhu a4,2(a4)]
      at +0x82.  Drives [virtio_proto_used_idx_acc]; the value is the
@@ -1180,7 +1186,7 @@ Section VtDevRam.
     iEval (rewrite Haddrp) in "Hw2p".
     iDestruct (phys_to_word2 (pa_add pu 2%nat) (wrap16 ncp) Halign Hst2 Hcan2
                  with "Hkm Hw2p") as "Hcellp".
-    iDestruct (wordw_claim_of (KTR := KT0) 2 (pa_add pu 2%nat) (DfracOwn 1)
+    iDestruct (ctx_word2_claim (KTR2 := KT0) (pa_add pu 2%nat) (DfracOwn 1)
                  (wrap16 ncp : SailStdpp.Values.mword 16) ltac:(lia)
                  with "Hcellp") as "#Hcl".
     iDestruct (word2_to_phys (pa_add pu 2%nat) (wrap16 ncp) Hst2
@@ -1214,8 +1220,8 @@ Section VtDevRam.
                    with "Hkm Hw2") as "Hcell".
       iModIntro. iExists (wrap16 nc : SailStdpp.Values.mword 16).
       iSplitL "Hcell".
-      { rewrite Hea. iExact "Hcell". }
-      iIntros "Hcell". iEval (rewrite Hea) in "Hcell".
+      { rewrite Hea -(wordw2_ctx (KTR2 := KT0)). iExact "Hcell". }
+      iIntros "Hcell". iEval (rewrite (wordw2_ctx (KTR2 := KT0)) Hea) in "Hcell".
       iDestruct (word2_to_phys (pa_add pu 2%nat) (wrap16 nc) Hst2 with "Hkm Hcell") as "Hw2".
       iEval (rewrite -Haddr) in "Hw2".
       iDestruct ("Hback" with "Hw2") as "[Hproto Hpub]".
@@ -1330,7 +1336,7 @@ Section VtDevRam.
     iDestruct (phys_to_word4 (used_elem_pa (v_cfg vstp) u)
                  (Z_to_bv 32 (bv_unsigned (vr_head (vs_req (dc_slot dc)))))
                  Halignp Hst4p Hcan4p with "Hkm Hw4p") as "Hcellp".
-    iDestruct (wordw_claim_of (KTR := KT0) 4 (used_elem_pa (v_cfg vstp) u)
+    iDestruct (ctx_word4_claim (KTR2 := KT0) (used_elem_pa (v_cfg vstp) u)
                  (DfracOwn 1) (Z_to_bv 32 (bv_unsigned (vr_head (vs_req (dc_slot dc)))))
                  ltac:(lia) with "Hcellp") as "#Hclaim0".
     iDestruct (word4_to_phys (used_elem_pa (v_cfg vstp) u)
@@ -1365,8 +1371,8 @@ Section VtDevRam.
                    Halign Hst4 Hcan4 with "Hkm Hw4") as "Hcell".
       iModIntro.
       iExists (Z_to_bv 32 (bv_unsigned (vr_head (vs_req (dc_slot dc)))) : SailStdpp.Values.mword 32).
-      iSplitL "Hcell". { rewrite Hea Haddr. iExact "Hcell". }
-      iIntros "Hcell". iEval (rewrite Hea Haddr) in "Hcell".
+      iSplitL "Hcell". { rewrite Hea Haddr -(wordw4_ctx (KTR2 := KT0)). iExact "Hcell". }
+      iIntros "Hcell". iEval (rewrite (wordw4_ctx (KTR2 := KT0)) Hea Haddr) in "Hcell".
       iDestruct (word4_to_phys (used_elem_pa (v_cfg vst) u)
                    (Z_to_bv 32 (bv_unsigned (vr_head (vs_req (dc_slot dc))))) Hst4
                    with "Hkm Hcell") as "Hw4".
@@ -1867,7 +1873,7 @@ Qed.
 
 Section VtBody.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).
@@ -2421,10 +2427,12 @@ Section VtBody.
     iDestruct (virtio_proto_infob_acc γd vstp np p u cm dc Hcm
                  with "Hprotop Hpub Hord Hrd Hauth")
       as "(_ & _ & _ & Hibp & Hbackp)".
-    iEval (rewrite Hidxh vt_word8_wordw) in "Hibp".
-    iDestruct (wordw_claim_of (KTR := KT0) 8 (d_info_b h) (DfracOwn 1)
+    iEval (rewrite Hidxh) in "Hibp".
+    iDestruct (TsoCtxShim.ctx_word_of_mem with "Hibp") as "Hibp".
+    iDestruct (ctx_word_claim (KTR2 := KT0) (d_info_b h) (DfracOwn 1)
                  (dc_buf dc : SailStdpp.Values.mword 64) ltac:(lia) with "Hibp") as "#Hcl8".
-    iEval (rewrite -vt_word8_wordw -Hidxh) in "Hibp".
+    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hibp") as "Hibp".
+    iEval (rewrite -Hidxh) in "Hibp".
     iDestruct ("Hbackp" with "Hibp") as "(Hprotop & Hpub & Hrd & Hauth)".
     iMod ("Hdclosep" with "[Hvfp Hprotop]") as "_".
     { iNext. iExists vstp. iFrame. iPureIntro. exact Hvokp. }
@@ -2448,10 +2456,10 @@ Section VtBody.
       iDestruct (virtio_proto_infob_acc γd vst np p u cm dc Hcm
                    with "Hproto Hpub Hord Hrd Hauth")
         as "(_ & _ & _ & Hib & Hback)".
-      iEval (rewrite Hidxh vt_word8_wordw) in "Hib".
+      iEval (rewrite Hidxh) in "Hib".
       iModIntro. iExists (dc_buf dc : SailStdpp.Values.mword 64).
       iSplitL "Hib". { rewrite Hba. iExact "Hib". }
-      iIntros "Hib". iEval (rewrite Hba -vt_word8_wordw -Hidxh) in "Hib".
+      iIntros "Hib". iEval (rewrite Hba -Hidxh) in "Hib".
       iDestruct ("Hback" with "Hib") as "(Hproto & Hpub & Hrd & Hauth)".
       iMod ("Hdclose" with "[Hvf Hproto]") as "_".
       { iNext. iExists vst. iFrame. iPureIntro. exact Hvok. }
@@ -2482,10 +2490,10 @@ Section VtBody.
     iDestruct "Hdbodyq" as (vstq) "(Hvfq & Hprotoq & %Hvokq)".
     iDestruct (virtio_proto_bdisk_peek γd vstq np p u cm dc Hcm
                  with "Hprotoq Hpub Hord Hrd Hauth") as "(Hbdq & Hbackq)".
-    iEval (rewrite vt_word4_wordw) in "Hbdq".
-    iDestruct (wordw_claim_of (KTR := KT0) 4 (b_disk (dc_buf dc)) (DfracOwn 1)
+    iDestruct (TsoCtxShim.ctx_word4_of_mem with "Hbdq") as "Hbdq".
+    iDestruct (ctx_word4_claim (KTR2 := KT0) (b_disk (dc_buf dc)) (DfracOwn 1)
                  (mword_of_int 1 : mword 32) ltac:(lia) with "Hbdq") as "#Hcl4".
-    iEval (rewrite -vt_word4_wordw) in "Hbdq".
+    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hbdq") as "Hbdq".
     iDestruct ("Hbackq" with "Hbdq") as "(Hprotoq & Hpub & Hrd & Hauth)".
     iMod ("Hdcloseq" with "[Hvfq Hprotoq]") as "_".
     { iNext. iExists vstq. iFrame. iPureIntro. exact Hvokq. }
@@ -2505,8 +2513,9 @@ Section VtBody.
                    with "Hproto Hpub Hord Hrd Hauth")
         as "(_ & _ & _ & _ & Hbd & Hback)".
       iModIntro. iExists (mword_of_int 1 : mword 32).
-      iSplitL "Hbd". { rewrite Hbda. iExact "Hbd". }
-      iIntros "Hbd". iEval (rewrite Hbda Hzero) in "Hbd".
+      iSplitL "Hbd". { rewrite Hbda. iApply (TsoCtxShim.ctx_word4_of_mem with "Hbd"). }
+      iIntros "Hbd". iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hbd") as "Hbd".
+      iEval (rewrite Hbda Hzero) in "Hbd".
       iMod ("Hback" with "Hbd") as "(Hproto & Hpub & #Hlbs & Hrd & Hauth)".
       iMod ("Hdclose" with "[Hvf Hproto]") as "_".
       { iNext. iExists vst. iFrame. iPureIntro. exact Hvok. }
@@ -2740,7 +2749,7 @@ Definition vt_regs_ok (m MB : regfile) (sp0 : mword 64) : Prop :=
 
 Section VtLoopDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Definition vt_exit (γd : disk_names)
       (pd pav pu : mword 64) (m : regfile) (av lvl : nat) (eb : bool)
@@ -2806,7 +2815,7 @@ Qed.
 Module VtLoopProof (Wakeup : WAKEUP).
 Section VtLoopProof.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).
@@ -3022,7 +3031,7 @@ Module Lp  := VtLoopProof Wakeup.
 
 Section ProofVirtioDiskIntr.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).

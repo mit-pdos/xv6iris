@@ -92,6 +92,8 @@ Require Import CodeKexec.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
+Require Import TsoCtx.
+Require TsoCtxShim.
 Local Open Scope Z_scope.
 
 (* durable-notes' rule: a goal over [proc_priv] carries [tf_page]'s
@@ -216,7 +218,7 @@ Section KexecDName.
      where [last] ends up, and the ONLY thing promised about it is that it
      is inside the buffer -- which is all [safestrcpy] needs and all
      [kexec_ok] asks for. *)
-  Definition kxd_scan_out `{CID0 : CpuId}
+  Definition kxd_scan_out `{CID0 : CpuId} `{XI : CurCtx}
       (pj : mword 64) (b : bool) (n : nat)
       (plen : nat) (pfun : nat -> bv 8) (dqpv : dfrac)
       (sp0 pv : mword 64) (vsp v1 v2 v4 v5 v6 v10 v11 : mword 64)
@@ -237,7 +239,7 @@ Section KexecDName.
         ∨ pc_is (mword_of_int (KXD + 0x2ce) : mword 64) ) -∗
         sie_cap_gpr KT1 M' n b pj -∗
         ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q') -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q') -∗
         WP (Loop : expr riscv_lang))%I.
 
   (* ------------------------------------------------------------------- *)
@@ -245,7 +247,7 @@ Section KexecDName.
   (*  On entry [a5 = path + (S i)] and the byte to read is [pfun (S i)];   *)
   (*  the [c.addi] steps [a5] past it and the [lbu -1(a5)] reads it back.  *)
   (* ------------------------------------------------------------------- *)
-  Lemma kxd_scan_tail `{CID0 : CpuId}
+  Lemma kxd_scan_tail `{CID0 : CpuId} `{XI : CurCtx}
       (pj : mword 64) (b : bool) (n : nat)
       (plen : nat) (pfun : nat -> bv 8) (dqpv : dfrac)
       (sp0 pv : mword 64) (vsp v1 v2 v4 v5 v6 v10 v11 : mword 64)
@@ -262,7 +264,7 @@ Section KexecDName.
     pc_is (mword_of_int (KXD + 0x2bc) : mword 64) -∗
     sie_cap_gpr KT1 M n b pj -∗
     ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q) -∗
     kxd_scan_out pj b n plen pfun dqpv sp0 pv vsp v1 v2 v4 v5 v6 v10 v11 i -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -411,7 +413,7 @@ Section KexecDName.
   (*  The only thing the two arms differ in is [q], so the fetch block is  *)
   (*  called rather than written twice.                                   *)
   (* ------------------------------------------------------------------- *)
-  Lemma kxd_name_step `{CID0 : CpuId}
+  Lemma kxd_name_step `{CID0 : CpuId} `{XI : CurCtx}
       (pj : mword 64) (b : bool) (n : nat)
       (plen : nat) (pfun : nat -> bv 8) (dqpv : dfrac)
       (sp0 pv : mword 64) (vsp v1 v2 v4 v5 v6 v10 v11 : mword 64)
@@ -429,7 +431,7 @@ Section KexecDName.
     pc_is (mword_of_int (KXD + 0x2c4) : mword 64) -∗
     sie_cap_gpr KT1 M n b pj -∗
     ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q) -∗
     kxd_scan_out pj b n plen pfun dqpv sp0 pv vsp v1 v2 v4 v5 v6 v10 v11 i -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -519,7 +521,7 @@ Section KexecDName.
   (*  by the head's own [i < plen], carried as a PREMISE for exactly the   *)
   (*  reason ProofKexecC.kxc_argv_loop carries its own.                    *)
   (* ------------------------------------------------------------------- *)
-  Lemma kxd_name_loop `{CID0 : CpuId}
+  Lemma kxd_name_loop `{CID0 : CpuId} `{XI : CurCtx}
       (pj : mword 64) (b : bool) (n : nat)
       (plen : nat) (pfun : nat -> bv 8) (dqpv : dfrac)
       (sp0 pv : mword 64) (vsp v1 v2 v4 v5 v6 v10 v11 : mword 64) :
@@ -538,7 +540,7 @@ Section KexecDName.
     pc_is (mword_of_int (KXD + 0x2c4) : mword 64) -∗
     sie_cap_gpr KT1 M n b pj -∗
     ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q) -∗
     wp_next b pj (fun (CID : CpuId) =>
       ∀ (M' : regfile) (q' : nat),
         ⌜(q' <= plen)%nat /\
@@ -550,7 +552,7 @@ Section KexecDName.
         pc_is (mword_of_int (KXD + 0x2ce) : mword 64) -∗
         sie_cap_gpr KT1 M' n b pj -∗
         ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) -∗
-        word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q') -∗
+        ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q') -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -589,7 +591,7 @@ Module KexecDProof (PFP : PROC_FREEPAGETABLE) (SS : SAFESTRCPY).
 
 Section KexecDCommit.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -659,12 +661,12 @@ Section KexecDCommit.
     rewrite (bb_split3 a o 8 r n f (DfracOwn 1) Hn).
     iIntros "(Hpre & Hmid & Hsuf)".
     iSplitL "Hmid".
-    { iApply (word_pointsto_intro (KTR := KT1) _ _ _ Hal).
+    { iApply (ctx_word_pointsto_intro (KTR := KT1) _ _ _ _ Hal).
       iApply (big_sepL_mono with "Hmid"). intros ii jj Hj.
       apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
       rewrite (le_at_nth_byte 64 f o 8 ii ltac:(lia) Hlt). reflexivity. }
     iIntros "Hw".
-    iDestruct (word_pointsto_bytes with "Hw") as "Hw".
+    iDestruct (ctx_word_pointsto_bytes with "Hw") as "Hw".
     iSplitL "Hpre"; [iExact "Hpre" |]. iSplitR "Hsuf"; [| iExact "Hsuf"].
     iApply (big_sepL_mono with "Hw"). intros ii jj Hj.
     apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
@@ -1832,6 +1834,11 @@ Section KexecDCommit.
                  (h <$> seq 0 PNAMELEN)) Mx)
               (Z_to_bv 64 (le_at ef 24 8) : mword 64)
               (mword_of_int (kxc_sp_final (uint sz1) alen c)) sz1).
+    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hbm") as "Hbm".
+    iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hins") as "Hins".
+    iEval (setoid_rewrite (TsoCtxShim.ctx_pointsto_shim _ cur_ctx)) in "Hpath".
+    iEval (setoid_rewrite (TsoCtxShim.ctx_word_shim _ cur_ctx)) in "Hargv".
+    iEval (setoid_rewrite (TsoCtxShim.ctx_pointsto_shim _ cur_ctx)) in "Hargs".
     iApply ("Hcont" with "[%] [%] Hcg Hcnt Hextc Hclmc Hpc Hbm Hins Hka Hpriv Hpath
                     Hargv Hargs Hbs Hirs").
     - exact Hcs.
@@ -1851,7 +1858,7 @@ End KexecDCommit.
 
 Section KexecDMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -1883,8 +1890,8 @@ Section KexecDMain.
      solved, and fails with "cannot instantiate ?b because pv is not in its
      scope". *)
   Lemma kxd_last_at0 (sp0 pv : mword 64) :
-    word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) pv -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) (pa_add pv 0).
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 66) (DfracOwn 1) pv -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 66) (DfracOwn 1) (pa_add pv 0).
   Proof. rewrite pa_add_0. iIntros "H". iExact "H". Qed.
 
   (* [c.addi a5,a5,1] at +0x2b8 steps [path] to [path + 1] *)
@@ -2136,7 +2143,7 @@ Section KexecDMain.
     (* the resource bundle the commit takes, assembled once and used by both
        arms of the [beqz] below *)
     iAssert (∀ (last : mword 64),
-               word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) last -∗
+               ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 66) (DfracOwn 1) last -∗
                ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) -∗
                kxd_res jp gf
                        plen pfun na avf aslen afun pidv

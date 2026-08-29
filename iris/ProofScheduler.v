@@ -55,6 +55,8 @@ Require Import SpecAcquire SpecRelease SpecSwtch SpecScheduler.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
+Require TsoCtxShim.   (* [ctx_dom_sc]: the claim, while the record token is deferred *)
 Import Defs.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
@@ -220,7 +222,7 @@ Proof. intro H. apply eq_vec_false_iff. exact H. Qed.
    twice per dispatch round: c->proc goes 0 -> proc_addr jj at +0x68 and back
    at +0x76, while [wp_swtch_sconf] wants the bundle and [cpu_own] at the SAME
    index. *)
-Lemma sc_retag_p `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+Lemma sc_retag_p `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (mm : regfile) (n : nat) (px qx : mword 64) :
   sie_cap_gpr KT1 mm n false px ⊣⊢ sie_cap_gpr KT1 mm n false qx.
 Proof. reflexivity. Qed.
@@ -229,7 +231,7 @@ Proof. reflexivity. Qed.
    and it is opened / rebuilt at five points.  Three one-liners rather than
    five hand-rolled destructuring patterns (the bundle is LEFT-nested now:
    [((cells ∗ count) ∗ C)]). *)
-Lemma sc_cpu_own_open `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+Lemma sc_cpu_own_open `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (px : mword 64) (eb : bool) (lks : gset string) :
   cpu_own 0 eb px false lks -∗
   a_cpu_noff cid_word ↦₄ noff_val 0 ∗
@@ -251,7 +253,7 @@ Qed.
    IS "the base enable this bundle carries is [false]".
    Kept here rather than in CpuOwn.v: one caller, and CpuOwn is a 500-file
    rebuild cone. *)
-Lemma sc_cpu_own_clear_int `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+Lemma sc_cpu_own_clear_int `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (k : nat) (eb : bool) (px : mword 64) (lks : gset string) :
   cpu_own (S k) eb px false lks -∗
   a_cpu_int cid_word ↦₄ intena_val eb ∗
@@ -262,7 +264,7 @@ Proof.
   iSplitR; [ iPureIntro; exact Hbound |]. iExact "Hcnt".
 Qed.
 
-Lemma sc_cpu_own_mk `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} (px : mword 64) (lks : gset string) :
+Lemma sc_cpu_own_mk `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (px : mword 64) (lks : gset string) :
   a_cpu_noff cid_word ↦₄ noff_val 0 -∗
   (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) -∗
   intr_count 0 false -∗
@@ -275,7 +277,7 @@ Proof.
   iFrame "Hn Hi Hc Hp Hl Hcs". iPureIntro. vm_compute. reflexivity.
 Qed.
 
-Lemma sc_cpu_own_of_cells `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+Lemma sc_cpu_own_of_cells `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (px : mword 64) (eb : bool) (lks : gset string) :
   cpu_priv 0 eb px lks -∗ intr_count 0 false -∗ cpu_own 0 false px false lks.
 Proof.
@@ -296,7 +298,7 @@ Qed.
    scheduler is the one caller that can meet it -- its loop head, between the
    previous round's release and the next acquire, is precisely where the held
    set is empty. *)
-Lemma sc_flip_pre `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} (px : mword 64) (eb : bool) :
+Lemma sc_flip_pre `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (px : mword 64) (eb : bool) :
   cpu_own 0 eb px eb ∅ -∗
   (if eb then emp else intr_count 0 false) ∗
   (if eb then emp else cpu_priv 0 true px ∅).
@@ -314,7 +316,7 @@ Module SchedulerProof (Acquire : ACQUIRE) (Release : RELEASE) (Swtch : SWTCH) : 
 
 Section ProofScheduler.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* register indices, named once *)
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -502,9 +504,27 @@ Section ProofScheduler.
        arrives as its own premise (SpecScheduler.v hoisted it out of
        [cpu_own]'s slot) rather than out of the bundle. *)
     iDestruct (sc_cpu_own_open with "Hcpu") as "(Hnoff & Hint & Hcnt & Hproc & Hlks & Hhcs)".
-    iDestruct "Hfree" as (ctx0) "[%Hctx0len Hctx0]".
+    (* A6.68: THE M2 TRANSPORT, PAID HONESTLY.  The free save area is a
+       PARKED RECORD now (SchedCtx.cpu_ctx_free) and this proof holds the
+       kernel bundle, so it borrows its own running token
+       ([SieCapCtx.sie_cap_gpr_own_ctx_acc]), mints the domination from the
+       record against the hart's own receipt at [Tfr ≤ Tfr]
+       ([TsoCtxAbsorbLb.ctx_dom_of_parked_lb] -- interp-free, which is the
+       whole reason it can run HERE, outside every WP leaf), and re-indexes
+       the fourteen cells with the price [SwtchCtx.ctx_cells_reindex] was
+       always going to charge.  The record is abandoned after the claim,
+       exactly as the lock's per-publication record is. *)
+    (* main-tso-readiness: the record's token/receipt are DEFERRED; the
+       claim is the shim's [ctx_dom_sc]. *)
+    iDestruct "Hfree" as (ctx0 ξ0) "(%Hctx0len & Hctx0)".
+    iApply fupd_wp.
+    iPoseProof (TsoCtxShim.ctx_dom_sc ξ0 cur_ctx) as "Hdom".
+    iMod (ctx_cells_reindex ξ0 cur_ctx (a_cpu_ctx cid_word) ctx0
+            with "Hdom Hctx0") as "[_ Hctx0]".
+    iModIntro.
     iAssert (own_ctx (a_cpu_ctx cid_word)) with "[Hctx0]" as "Hown".
-    { rewrite /own_ctx. iExists ctx0. iSplit; [iPureIntro; exact Hctx0len | iExact "Hctx0"]. }
+    { rewrite /own_ctx. iExists ctx0. iSplit; [iPureIntro; exact Hctx0len |].
+      iExact "Hctx0". }
     (* ------------------------------------------------------------------ *)
     (* Prologue: 80-byte frame (push 10), save ra/s0..s8.                  *)
     (* ------------------------------------------------------------------ *)
@@ -1101,8 +1121,7 @@ Section ProofScheduler.
          the in-lock carve [av - 12]; its exit is [n], the index the tail owes
          its caller. *)
       iEval (rewrite -Hn) in "Hcg".
-      iApply (Release.wp_release_sconf KT1 γl (proc_addr jj) "proc"%string
-                (proc_lock_res γs γl (proc_addr jj)) T1 0 ebx zero_reg n
+      iApply (Release.wp_release_sconf KT1 γl (proc_addr jj) "proc"%string <{ proc_lock_res γs γl (proc_addr jj) }> T1 0 ebx zero_reg n
                 {["proc"]}
                 Hlka ltac:(pose proof (sc_res_le ebx); lia)
                 with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").
@@ -1258,8 +1277,7 @@ Section ProofScheduler.
          contract all carry. *)
       assert (Hnoproc : locks_below (∅ : gset string) "proc")
         by (exact (locks_below_empty "proc")).
-      iApply (Acquire.wp_acquire_sconf KT1 γl "proc"%string
-                (proc_lock_res γs γl (proc_addr jj)) M1 0 ebc zero_reg n ebc ∅
+      iApply (Acquire.wp_acquire_sconf KT1 γl "proc"%string <{ proc_lock_res γs γl (proc_addr jj) }> M1 0 ebc zero_reg n ebc ∅
                 ltac:(lia) ltac:(pose proof (sc_res_le ebc); lia) Hnoproc
                 with "Hcg Hcpu Htext Hpc [Hislock]").
       all: try lkbelow.
@@ -1267,7 +1285,7 @@ Section ProofScheduler.
       (* acquire's crossing index is its ENTRY [ebc] (a trap can land on its
          first instruction, before push_off disables) -- idle hatch again. *)
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-      iIntros (msq macq) "%Hmsfq Hcg Hpc %Hcsaq Hlocked HR Hcpu Hpay".
+      iIntros (msq macq) "%Hmsfq Hcg Hpc %Hcsaq Hlocked HR _ Hcpu Hpay".
       (* acquire hands back [{[rank "proc"]} ∪ ∅]; normalise it to the literal
          singleton every in-lock site below (and [Tail]) is written at. *)
       assert (Hequn : ({["proc"]} : gset string) ∪ ∅ = {["proc"]})

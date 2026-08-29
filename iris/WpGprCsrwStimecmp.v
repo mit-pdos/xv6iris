@@ -53,6 +53,7 @@ Require Import HartSwp HartLift HartRegNode HartSpan HartSpanChar HartMCycle
         HartMFrame HartGoodb WpDecodeBridge WpMmodeJump WpMmodeCsrSwp.
 Require Import WpGprCsrrCommon.
 Require Import WpGprCsrwB.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* the walker's view of the write: the pruned term, so no goal ever carries
@@ -75,7 +76,7 @@ Qed.
 
 Section WpCsrwStimecmp.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)
   (* The two config gates the CLINT refresh runs, transported from the    *)

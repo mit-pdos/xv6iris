@@ -56,6 +56,7 @@ Require Import SpecMyproc SpecAcquire SpecSched SpecRelease SpecYield.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -114,7 +115,7 @@ Section YieldPostSched.
       | rewrite upd_ne; [| vm_compute; discriminate]
       | lazymatch goal with |- ?M !!! _ = _ => is_var M; progress unfold M end ].
 
-  Lemma yield_post_sched `{GEN : GenId} `{CID0 : CpuId}
+  Lemma yield_post_sched `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
        (γs : list gname)
       (j : nat) (γl : gname) (ch' : mword 64)
       (m msch : regfile) (av : nat) (eb : bool)
@@ -143,7 +144,7 @@ Section YieldPostSched.
        (yield's own [lks] is [∅], so this is [locks_below_empty]) *)
     locks_below lks "proc" ->
     kernel_text -∗
-    is_lock γl (proc_addr j) "proc"%string (proc_lock_res γs γl (proc_addr j)) -∗
+    is_lock γl (proc_addr j) "proc"%string <{ proc_lock_res γs γl (proc_addr j) }> -∗
     sie_cap_gpr KT1 msch (trap_res eb + (av - 4))%nat false pj -∗
     pc_is (mword_of_int (KernelSyms.yield + 0x1c)) -∗
     proc_held cpu_id j γl RUNNING ch' -∗
@@ -274,8 +275,7 @@ Section YieldPostSched.
     iDestruct (cpu_claim_proc j Hj with "Hclm Htagb") as "Hclm".
     iEval (rewrite -(cpu_claim_ext_split eb pj)) in "Hclm".
     iDestruct "Hclm" as "[Hclmp Hclmx]".
-    iApply (Release.wp_release_sconf KT1 γl (proc_addr j) "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) D1 0 eb pj (av - 4)%nat
+    iApply (Release.wp_release_sconf KT1 γl (proc_addr j) "proc"%string <{ proc_lock_res γs γl (proc_addr j) }> D1 0 eb pj (av - 4)%nat
               ({["proc"]} ∪ lks) Hlka
               ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu [$Hpay $Hclmp]").
@@ -464,7 +464,7 @@ End YieldPostSched.
 
 Section ProofYield.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_yield_sconf 
       (γs : list gname) (j : nat) (γl : gname)
@@ -620,8 +620,7 @@ Section ProofYield.
     iPoseProof (procs_inv_lookup γs j γl Hgl with "Hprocs") as "#Hislock".
     iDestruct (cpu_own_transport CID7 CID9 0 eb pj eb ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Acquire.wp_acquire_sconf KT1 γl "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) B1 0 eb pj (av - 4)%nat eb ∅
+    iApply (Acquire.wp_acquire_sconf KT1 γl "proc"%string <{ proc_lock_res γs γl (proc_addr j) }> B1 0 eb pj (av - 4)%nat eb ∅
               ltac:(lia)
               ltac:(lia)
               (locks_below_empty "proc")
@@ -630,7 +629,7 @@ Section ProofYield.
     { iEval (rewrite Ha0_B1). iExact "Hislock". }
     (* FROM HERE TO THE RELEASE THE LOCK IS HELD, so the index is the literal
        [false] and every leaf collapses with [wp_next_off]. *)
-    iIntros (CIDa Hsa ms2 macq) "%Hmsf2 Hcg Hpc %Hcs_acq Hlocked HR Hcpu [Hpay Hclmp]".
+    iIntros (CIDa Hsa ms2 macq) "%Hmsf2 Hcg Hpc %Hcs_acq Hlocked HR _ Hcpu [Hpay Hclmp]".
     assert (Hpc14 : ret_pc (B1 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.yield + 0x14)) by (rewrite HB1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc14) in "Hpc".

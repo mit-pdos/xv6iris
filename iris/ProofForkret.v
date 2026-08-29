@@ -88,6 +88,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -120,7 +121,7 @@ Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 
 Section Res.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the residue is the closed loop's, re-exported unchanged *)
   Definition usertrap_res := UC.usertrap_res.
@@ -143,7 +144,6 @@ Section Res.
      build one (UsertrapRes.v, "THE PARK'S CHANNEL THROUGH THE MODULE
      TYPES"). *)
   Definition usertrap_res_bare_park
-      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
       (N : ut_names) (av : nat)
     : ut_park_intro_body
         (fun h : CpuId => UC.usertrap_res_bare (CID := h))
@@ -183,7 +183,7 @@ End Res.
    arm never spent it, and the boot arm rebuilt it from
    [FirstTok.first_tok_of_done] after persisting the store. *)
 Lemma fkr_tail
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (W : iProp Σ) (j : nat) (γf : gname)
     (pid : mword 32) (U : ustate)
     (ks : mword 64) (mt : regfile) (av av2 : nat) (eb : bool) :
@@ -724,7 +724,7 @@ Qed.
        ([ProofSyscall.sysc_tfp_valid] is the same lemma; restated here so the
        forkret cone does not depend on the syscall proof.) ---- *)
 Lemma fkr_tfp_valid
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname) (pa : mword 64) (pid : mword 32) (U : ustate) :
   proc_priv γf pa pid U -∗ ⌜page_valid (page_base (ud_tfp (pv_upt (us_V U))))⌝.
 Proof.
@@ -749,7 +749,7 @@ Proof.
 Qed.
 
 Lemma fkr_boot
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (W : iProp Σ) (j : nat) (γs : list gname) (γl γf : gname)
     (pid : mword 32) (U : ustate)
     (ks : mword 64) (mr : regfile) (av av2 : nat) (eb : bool) :
@@ -1103,7 +1103,7 @@ Proof.
      process, on its next trip through forkret -- needs the DISCARDED form.
      Discarding here is also what makes the two arms of the token provably
      exclusive from now on ([first_tok_boot_excl]). *)
-  iMod (word4_pointsto_persist with "Hf1") as "#Hfirst0".
+  iMod (ctx_word4_pointsto_persist with "Hf1") as "#Hfirst0".
   assert (Hcp3c : add_vec_int (mword_of_int (FR + 0x38) : mword 64) 4
                   = mword_of_int (FR + 0x3c)) by pcw.
   iEval (rewrite Hcp3c) in "Hpc".
@@ -1113,10 +1113,10 @@ Proof.
   (* the four cells [FsReady.fs_sb_cells] wants are DISCARDED, not owned:
      they are read-only for the lifetime of the boot, and kexec takes its
      two at whatever fraction the caller has. *)
-  iMod (word4_pointsto_persist with "Hni") as "#Hni".
-  iMod (word4_pointsto_persist with "Hist") as "#Hist".
-  iMod (word4_pointsto_persist with "Hsz") as "#Hsz".
-  iMod (word4_pointsto_persist with "Hbms") as "#Hbms".
+  iMod (ctx_word4_pointsto_persist with "Hni") as "#Hni".
+  iMod (ctx_word4_pointsto_persist with "Hist") as "#Hist".
+  iMod (ctx_word4_pointsto_persist with "Hsz") as "#Hsz".
+  iMod (ctx_word4_pointsto_persist with "Hbms") as "#Hbms".
   iAssert (fs_sb_cells) as "#Hsbc".
   { rewrite /fs_sb_cells. iFrame "Hni Hist Hsz Hbms". }
   iDestruct (first_persist_pre with "[] Hka Hlctx Hsbc") as "Hpre".
@@ -1595,7 +1595,7 @@ Proof.
 Qed.
 
 Theorem wp_forkret
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (W : iProp Σ) (j : nat) (γs : list gname) (γl γf : gname)
     (pid : mword 32) (U : ustate)
     (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool) :
@@ -1792,7 +1792,7 @@ Proof.
   (* the arm splits: what release wants and what prepare_return will *)
   iDestruct (arm_pay_ext_split eb p with "Htc Hclm") as "[Hpay [Hext Hcx]]".
   iApply (RL.wp_release_sconf KT1 γl p "proc"%string
-            (proc_lock_res γs γl p) M5 0%nat eb p av2 {["proc"%string]}
+            <{ proc_lock_res γs γl p }> M5 0%nat eb p av2 {["proc"%string]}
             Hlka ltac:(lia) with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").
   iIntros (CIDr Hkr mr) "Hcg Hpc %Hcsr Hcpu".
   assert (Hpc14 : ret_pc (M5 !!! Regidx Rra) = mword_of_int (FR + 0x14))

@@ -75,6 +75,8 @@ Require Import ProofVirtioDiskRwD ProofVirtioDiskRwDSeam.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
+Require TsoCtxShim.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -190,6 +192,7 @@ Proof. vm_compute. reflexivity. Qed.
 Section VdrweLeaves.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{XI : CurCtx}.
 
   (* what one poll leaves behind, by the value it read: 1 keeps the ACTIVE
      fragment, 0 IS the collect *)
@@ -264,12 +267,19 @@ Section VdrweLeaves.
         iDestruct "Hexc" as (w1) "[Hbd Hback]".
         iModIntro. iExists w1.
         iSplitL "Hbd".
-        { rewrite Hea. iExact "Hbd". }
-        iIntros "Hbd". iEval (rewrite Hea) in "Hbd".
+        { rewrite Hea. iApply (TsoCtxShim.ctx_word4_of_mem with "Hbd"). }
+        iIntros "Hbd". iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hbd") as "Hbd".
+        iEval (rewrite Hea) in "Hbd".
         iMod ("Hback" with "Hbd") as "(Hproto & Hpub & Hres)".
         iMod ("Hdclose" with "[Hvf Hproto]") as "_".
         { iNext. iExists vst. iFrame. iPureIntro. exact Hvok. }
-        iModIntro. iFrame "Hpub". iExact "Hres". }
+        iModIntro. iFrame "Hpub".
+        (* [VirtioProto] hands the two words back RAW; the post is flipped *)
+        iDestruct "Hres" as "[Hres | (%Hw1 & Hh & Hpos & Hib & Hbd & Hcb)]".
+        { iLeft. iExact "Hres". }
+        iRight. iDestruct (TsoCtxShim.ctx_word_of_mem with "Hib") as "Hib".
+        iDestruct (TsoCtxShim.ctx_word4_of_mem with "Hbd") as "Hbd".
+        iFrame "Hh Hpos Hib Hbd Hcb". iPureIntro. exact Hw1. }
       iIntros (w). iApply wp_next_off_intro. iIntros "Hcg Hpc [Hpub Hres]".
       iApply ("Hcont" with "Hcg Hpc Hpub Hres").
     - (* collected: the cell is ours, the read is plain *)
@@ -277,9 +287,10 @@ Section VdrweLeaves.
       iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) pc rd rs1 imm m n
                 (SailStdpp.Values.mword_of_int (len := 32) 0) false (dqm := DfracOwn 1)
                 Hrd Hrdok with "Hcg Hpc Hinstr [Hbd]").
-      { rewrite Hea. iExact "Hbd". }
+      { rewrite Hea. iApply (TsoCtxShim.ctx_word4_of_mem with "Hbd"). }
       iApply wp_next_off_intro. iIntros "Hcg Hpc Hbd".
       iEval (rewrite Hea) in "Hbd".
+      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hib") as "Hib".
       iApply ("Hcont" with "Hcg Hpc Hpub [Hfrag Hclaim Hib Hbd Hback]").
       iRight. iFrame "Hfrag Hclaim Hib Hbd Hback". done.
   Qed.
@@ -293,7 +304,7 @@ Module P4 := VirtioDiskRwRestD Acquire Release SleepPrepare Sleep FreeDesc.
 
 Section ProofVirtioDiskRwE.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Notation Rra := (mword_of_int 1  : mword 5).
@@ -429,7 +440,7 @@ Section ProofVirtioDiskRwE.
     kernel_text -∗
     procs_inv γs -∗
     dev_inv γu γd -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     vdrw_p5_exit CID γk γs j γd pd pav pu K eb sp0 b wr sector bs_buf bs_disk
                  m0 kq lks -∗
     P4.vdrw_p4_exit CID γk γs j γd pd pav pu K eb sp0 b wr sector bs_buf
@@ -566,8 +577,7 @@ Section ProofVirtioDiskRwE.
       iDestruct (arm_pay_ext_split eb (proc_addr j) with "Htc Hclm")
         as "[Hpay [Hextc Hextm]]".
       (* ================= release(&disk.vdisk_lock) ================= *)
-      iApply (Release.wp_release_sconf KT1 γk d_lock "virtio_disk"%string
-                (disk_res γd pd pav pu) W4 0%nat eb (proc_addr j) (K - 12)%nat
+      iApply (Release.wp_release_sconf KT1 γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> W4 0%nat eb (proc_addr j) (K - 12)%nat
                 ({["virtio_disk"]} ∪ lks)
                 HW4a0 ltac:(pose proof (vdrw_K10 K HK); lia)
                 with "Hcg Htext Hpc Hlk Htok HR Hown Hpay").
@@ -665,13 +675,12 @@ Section ProofVirtioDiskRwE.
       (* ================= acquire(&disk.vdisk_lock) ================= *)
       iDestruct (cpu_own_transport CIDsl CIDd3 0 eb (proc_addr j) eb
                    ltac:(wp_next_chain) with "Hown") as "Hown".
-      iApply (Acquire.wp_acquire_sconf KT1 γk "virtio_disk"%string
-                (disk_res γd pd pav pu) W7 0%nat eb (proc_addr j) (K - 12)%nat eb lks
+      iApply (Acquire.wp_acquire_sconf KT1 γk "virtio_disk"%string <{ disk_res γd pd pav pu }> W7 0%nat eb (proc_addr j) (K - 12)%nat eb lks
                 vdrw_noff0 ltac:(pose proof (vdrw_K10 K HK); lia)
                 with "Hcg Hown Htext Hpc []").
       all: try lkbelow.
       { iEval (rewrite HW7a0). iExact "Hlk". }
-      iIntros (CIDaq Hsaq msA Mf) "_ Hcg Hpc %Hacs Htok HR Hown Hpay". rgall.
+      iIntros (CIDaq Hsaq msA Mf) "_ Hcg Hpc %Hacs Htok HR _ Hown Hpay". rgall.
       assert (Hret : ret_pc (W7 !!! Regidx Rra) = mword_of_int (KernelSyms.virtio_disk_rw + 0x1ca))
         by (rewrite HW7ra; pcstep).
       iEval (rewrite Hret) in "Hpc".

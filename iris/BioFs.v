@@ -26,9 +26,11 @@ Require Import BioInv.
 Require Import FsBlocks.
 Require Import Riscv.rv64d_types.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 Section BioFs.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.
 
   Lemma bio_held_fs_L (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev : mword 32) (cov : gset Z) (kb : nat) (pidv dv bno : mword 32)

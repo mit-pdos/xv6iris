@@ -55,6 +55,7 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -85,7 +86,7 @@ Notation Ra0 := (mword_of_int 10 : mword 5).
 (* ===================================================================== *)
 Definition kxc_b2_body
       (Q : mword 64 -> Prop)
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
     (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
     (gilf gislf : gname) (gf : gname)
@@ -151,7 +152,7 @@ Definition kxc_b2_body
 (*  copied verbatim from ProofKexecB3.v. *)
 (* ===================================================================== *)
 Definition kxc_b2z_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
     (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
     (gilf gislf : gname) (gf : gname)
@@ -201,7 +202,7 @@ Definition kxc_b2z_body
 
 Module Type KEXECB3.
   Parameter kxc_b2 :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
@@ -222,7 +223,7 @@ Module Type KEXECB3.
       ef P i szv.
 
   Parameter kxc_b2z :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
       (gilf gislf : gname) (gf : gname)

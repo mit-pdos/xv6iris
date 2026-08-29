@@ -83,6 +83,7 @@ From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* A syscall-altitude goal can carry a large [proc_priv]/[proc_pt_at]
    conjunction; durable-notes.md's rule. *)
@@ -140,6 +141,7 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 (* ===================================================================== *)
 Section KforkB4Res.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{XI : CurCtx}.
   (* [ProcInv.proc_priv]'s new index -- the block carries
      [FirstTok.first_tok] and its boot arm names [gen_cert]. *)
   Context `{GEN : GenId}.
@@ -195,7 +197,7 @@ Module KforkB4 (ID : IDUP) (SS : SAFESTRCPY).
 
 Section KforkB4Proof.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).

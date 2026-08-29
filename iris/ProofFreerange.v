@@ -18,7 +18,7 @@
    hart.  [Hcnt] (cpu_own) needs [cpu_own_transport] around each kfree call,
    same as the other two files.  The LOOP additionally needs the "decomposed
    proof" recipe from the porting guide: [frepi] (the shared epilogue) is
-   pulled out of the section's ambient hart with its own `{CID0 : CpuId}`
+   pulled out of the section's ambient hart with its own `{CID0 : CpuId} `{XI : CurCtx}`
    binder, and the fuel induction ("Hloop") carries the entry hart as part of
    the SAME universal as the fuel/map/page-list state, so [iInduction]
    auto-generalizes it; the back-edge recursion and both exits re-anchor the
@@ -59,6 +59,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecFreerange.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -67,7 +68,7 @@ Module FreerangeProof (Kfree : KFREE) : FREERANGE.
 
 Section ProofFreerange.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ================================================================= *)
   (*  §2  The page-run predicate and freerange's whole-function WP.     *)

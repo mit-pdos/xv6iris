@@ -34,6 +34,7 @@ Require Import SpecMyproc.
 Require Import KernelConsts.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -153,7 +154,7 @@ Module MyprocProof (PushOff : PUSHOFF) : MYPROC.
 
 Section ProofMyproc.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_myproc_sconf
       (m : regfile) (av n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string)

@@ -101,6 +101,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -281,6 +282,7 @@ Qed.
 
 Section SsProps.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   (* The log lock's resource, opened for exactly the three cells sys_sync
      reads.  Nothing else in [log_res] is touched, and the closing wand puts
@@ -383,6 +385,7 @@ Local Ltac reg_neq :=
 
 Section SsBodies.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   (* ---- THE SHARED TAIL: +0x5e (a0 := &log) .. +0x72 (c.ret) ---- *)
   Lemma ss_tail_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
@@ -501,7 +504,7 @@ Section SsBodies.
        index-generic. *)
     iDestruct (arm_pay_ext_split eb _ with "Htc Hclm") as "[Hpay Hext]".
     iApply (Release.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string
-              (log_res γ bn γfs cov logstart) X3 0%nat eb pj (K - 4)%nat
+              <{ log_res γ bn γfs cov logstart }> X3 0%nat eb pj (K - 4)%nat
               ({["log"]} ∪ lks)
               Hrel_lka ltac:(pose proof (ss_K10 K HK); lia)
               with "Hcg Htext Hpc Hislock Htok Hres Hown Hpay").
@@ -787,7 +790,7 @@ Section SsBodies.
       by (rewrite HA3a0; apply addv_sext0).
     (* -------------------- release(&log.lock) -------------------- *)
     iApply (Release.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string
-              (log_res γ bn γfs cov logstart) A3 0%nat eb pj (K - 4)%nat
+              <{ log_res γ bn γfs cov logstart }> A3 0%nat eb pj (K - 4)%nat
               ({["log"]} ∪ lks)
               Hrel_lka ltac:(pose proof (ss_K10 K HK); lia)
               with "Hcg Htext Hpc Hislock Htok Hres Hown Hpay").
@@ -871,12 +874,12 @@ Section SsBodies.
     (* -------------------- acquire(&log.lock) -------------------- *)
     iDestruct (cpu_own_transport CIDs CIDn 0 eb pj eb ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Acquire.wp_acquire_sconf KT1 (ln_lk γ) "log"%string
-              (log_res γ bn γfs cov logstart) A6 0%nat eb pj (K - 4)%nat eb lks
+              <{ log_res γ bn γfs cov logstart }> A6 0%nat eb pj (K - 4)%nat eb lks
               ss_noff1 ltac:(pose proof (ss_K10 K HK); lia) Hbelow
               with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HA6a0). iExact "Hislock". }
-    iIntros (CIDa Hsa msA mfa) "%Hmsf Hcg Hpc %Hacs Htok Hres Hown Hpay".
+    iIntros (CIDa Hsa msA mfa) "%Hmsf Hcg Hpc %Hacs Htok Hres _ Hown Hpay".
     assert (Hp54 : ret_pc (A6 !!! Regidx Rra) = mword_of_int (SS + 0x54))
       by (rewrite HA6ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp54) in "Hpc".
@@ -1144,7 +1147,7 @@ End SsBodies.
 
 Section ProofSysSync.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* THE DURABILITY FORM (fs-syscall-specs lane Y).  Two things are added to
      the landed statement and nothing is removed: the caller's
@@ -1317,13 +1320,13 @@ Section ProofSysSync.
     (* ===================== acquire(&log.lock) ===================== *)
     iDestruct (cpu_own_transport CID CID7 0 eb pj eb ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Acquire.wp_acquire_sconf KT1 (ln_lk γ) "log"%string (log_res γ bn γfs cov logstart) Maq
+    iApply (Acquire.wp_acquire_sconf KT1 (ln_lk γ) "log"%string <{ log_res γ bn γfs cov logstart }> Maq
               0%nat eb pj (K - 4)%nat eb lks
               ss_noff1 ltac:(pose proof (ss_K10 K HK); lia) Hbelow
               with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HMaqa0). iExact "Hislock". }
-    iIntros (CIDa Hsa ms Macq) "%Hmsf Hcg Hpc %Hcsacq Htok Hres Hown Hpay".
+    iIntros (CIDa Hsa ms Macq) "%Hmsf Hcg Hpc %Hcsacq Htok Hres _ Hown Hpay".
     iDestruct (trap_csrs_ext_transport CID CIDa eb pj ltac:(wp_next_chain)
                  with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID CIDa eb pj ltac:(wp_next_chain)

@@ -108,6 +108,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
    printable (claude-notes/durable-notes.md) *)
@@ -193,7 +194,7 @@ Section FsinitDefs.
             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
   (* ra@24 s0@16 s1@8 s2@0 off the pushed sp, i.e. slots 1..4 off the entry *)
-  Definition fsi_frame (m : regfile) : iProp Σ :=
+  Definition fsi_frame `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
@@ -202,7 +203,7 @@ Section FsinitDefs.
   (* THE CONTINUATION, named so the proofmode does not re-traverse it at
      every split (claude-notes/optimization.md).  It is the contract's post,
      verbatim. *)
-  Definition fsi_cont `{GEN : GenId} `{CID0 : CpuId}
+  Definition fsi_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (v_magic v_size v_nblocks v_nlog : mword 32)
       (pidv : mword 32) (dq : dfrac) (j : nat)
       (m : regfile) (K : nat) (eb b : bool) (lks : gset string) (Upr : ustate) : iProp Σ :=
@@ -236,7 +237,7 @@ Section FsinitDefs.
   (* THE BUFFER'S DATA BYTES, out of the handle and back.  [ds_held_L]'s *)
   (* twin for the raw window: the whole of what fsinit's memmove wants.  *)
   (* ------------------------------------------------------------------ *)
-  Lemma fsi_data_acc (V : bio_view Σ) (k : nat)
+  Lemma fsi_data_acc `{XI : CurCtx} (V : bio_view Σ) (k : nat)
       (pidv dv bno : mword 32) (bs bsl bsd : list (bv 8)) (d : bool) :
     bio_held fsc_bio V k pidv dv bno bs bsl bsd d -∗
       ⌜length bs = 1024%nat⌝ ∗
@@ -260,7 +261,7 @@ Section FsinitDefs.
   (* [RiscvPtsto.word4_pointsto_bytes]: the alignment is a premise (the   *)
   (* bytes do not carry it) and the naming function is read at [o + jj].  *)
   (* ------------------------------------------------------------------ *)
-  Lemma fsi_word4 (a : mword 64) (o : nat) (w : mword 32) (f : nat -> bv 8) :
+  Lemma fsi_word4 `{XI : CurCtx} (a : mword 64) (o : nat) (w : mword 32) (f : nat -> bv 8) :
     is_aligned_paddr (Physaddr (pa_add a o)) 4 = true ->
     (forall jj, (jj < 4)%nat -> f (o + jj)%nat = nth_byte w jj) ->
     ([∗ list] jj ∈ seq 0 4, pa_add (pa_add a o) jj ↦ₘ f (o + jj)%nat) -∗
@@ -282,7 +283,7 @@ Section FsinitEpilogue.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma fsi_epilogue `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma fsi_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (j : nat)
       (v_magic v_size v_nblocks v_nlog : mword 32)
       (pidv : mword 32) (dq : dfrac)
@@ -527,7 +528,7 @@ Section FsinitMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
-  Lemma wp_fsinit_sconf `{GEN : GenId} `{CID : CpuId}
+  Lemma wp_fsinit_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
       (v_magic v_size v_nblocks v_ninodes v_nlog

@@ -75,6 +75,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecProcinit.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -219,7 +220,7 @@ Section ProofProcinit.
   (* [proc_dormant_prestk], not [proc_dormant]: the slot's stack cannot be
      deposited until [p->kstack] is written AND persisted, and this loop is
      what writes it -- see [ProcInv.proc_dormant_prestk]. *)
-  Definition proc_seal (pa : mword 64) : iProp Σ :=
+  Definition proc_seal `{XI : CurCtx} (pa : mword 64) : iProp Σ :=
     (∃ (vst : mword 32) (vks : mword 64),
        lk_raw pa ∗
        p_state pa ↦₄ vst ∗
@@ -233,7 +234,7 @@ Section ProofProcinit.
      distribution: [BSLOTS = 1024] against [3 * NPROC = 192], so the carve
      fits with room to spare, and from here on every slot owns three at
      every state ([ProcDefs.proc_dormant]'s note has the ledger). *)
-  Lemma proc_seal_list (l : list nat) :
+  Lemma proc_seal_list `{XI : CurCtx} (l : list nat) :
     ([∗ list] i ∈ l, proc_raw (proc_addr i)) -∗
     fd_slots (length l * (NOFILE + FDSPARE)) -∗
     iref_slots (length l * (1 + IREFSPARE)) -∗
@@ -267,7 +268,7 @@ Section ProofProcinit.
   (* [CID0] is its OWN binder here: this "post-resume half" gets applied at
      whichever hart the loop's own leaf steps actually migrated to, not
      necessarily the entry hart of [wp_procinit_sconf]. *)
-  Lemma piepi `{GEN : GenId} `{CID0 : CpuId} (m Me : regfile) (K : nat)
+  Lemma piepi `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} (m Me : regfile) (K : nat)
       (b : bool) (p : mword 64) :
     let sp0 := m !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
@@ -534,7 +535,7 @@ Section ProofProcinit.
       continuation to the hart THIS iteration's leaves migrated to with
       [wp_next_shift] before recursing or handing off to [piepi].       *)
   (* ================================================================= *)
-  Lemma procinit_loop `{GEN : GenId} `{CID : CpuId} (m : regfile)
+  Lemma procinit_loop `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (m : regfile)
       (K : nat) (b : bool) (p : mword 64) (fuel : nat) :
     let sp0 := (m !!! Regidx csp_rs1 : mword 64) in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
@@ -557,7 +558,7 @@ Section ProofProcinit.
        M !!! Regidx c = m !!! Regidx c) ->
     sie_cap_gpr KT1 M (K - 8) b p -∗
     kernel_text -∗
-    name_proc ↦ₛ□ "proc"%string -∗
+    ctx_string_all name_proc DfracDiscarded "proc"%string -∗
     pc_is (mword_of_int (KernelSyms.procinit + 0x78)) -∗
     ([∗ list] i ∈ seq 0 j, proc_ready i) -∗
     ([∗ list] i ∈ seq j (NPROC - j), proc_seal (proc_addr i)) -∗
@@ -935,7 +936,7 @@ Section ProofProcinit.
   (* ================================================================= *)
   (*  procinit's whole-function WP.                                     *)
   (* ================================================================= *)
-  Lemma wp_procinit_sconf `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat)
+  Lemma wp_procinit_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (m : regfile) (K : nat)
       (b : bool) (p : mword 64)
     : wp_procinit_sconf_body m K b p.
   Proof.
@@ -954,7 +955,7 @@ Section ProofProcinit.
       do 8 (destruct j as [|j];
             [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string nextpid_str "nextpid"%string name_nextpid eq_refl ltac:(unfold text_end, nextpid_str; lia)
+    iPoseProof (kernel_data_string_all nextpid_str "nextpid"%string name_nextpid eq_refl ltac:(unfold text_end, nextpid_str; lia)
                                                                                      ltac:(vm_compute; discriminate) Hnextpid
                   with "Hkdata") as "#Hstr_nextpid".
     assert (Hwaitlock : forall j bt, cstring_bytes "wait_lock"%string !! j = Some bt ->
@@ -963,7 +964,7 @@ Section ProofProcinit.
       do 10 (destruct j as [|j];
              [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string waitlock_str "wait_lock"%string name_waitlock eq_refl ltac:(unfold text_end, waitlock_str; lia)
+    iPoseProof (kernel_data_string_all waitlock_str "wait_lock"%string name_waitlock eq_refl ltac:(unfold text_end, waitlock_str; lia)
                                                                                          ltac:(vm_compute; discriminate) Hwaitlock
                   with "Hkdata") as "#Hstr_waitlock".
     assert (Hprocstr : forall j bt, cstring_bytes "proc"%string !! j = Some bt ->
@@ -972,7 +973,7 @@ Section ProofProcinit.
       do 5 (destruct j as [|j];
             [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string proc_str "proc"%string name_proc eq_refl ltac:(unfold text_end, proc_str; lia)
+    iPoseProof (kernel_data_string_all proc_str "proc"%string name_proc eq_refl ltac:(unfold text_end, proc_str; lia)
                                                                             ltac:(vm_compute; discriminate) Hprocstr
                   with "Hkdata") as "#Hstr_proc".
     (* ---- route both supplies, once ---- *)

@@ -30,6 +30,7 @@ Require Export HartTp.   (* cid_word_of / cid_word live here now; EXPORTED so th
                             ~90 existing references through ProcGeom keep working *)
 From Kernel Require KernelSyms.
 Require Import KernelConsts.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 
@@ -198,7 +199,7 @@ Definition tf_sp_idx      : nat := 6%nat.
    round as [UsertrapRes.ut_tfk] (at an existential root, with that root's
    [kpt_inv]); it used to be an undischarged -- and unsatisfiable --
    ∀-premise on the openers (claude-notes/projects/forkret-park.md §4). *)
-Definition tf_kernel_words_ok `{CID : CpuId} (kroot : mword 44) (ksp : mword 64)
+Definition tf_kernel_words_ok `{CID : CpuId} `{XI : CurCtx} (kroot : mword 44) (ksp : mword 64)
     (ws : list (mword 64)) : Prop :=
   (exists ksat : mword 64, ws !! tf_ksatp_idx = Some ksat /\
      _get_Satp64_Mode (Mk_Satp64 ksat) = ('b"1000" : mword 4) /\
@@ -209,7 +210,7 @@ Definition tf_kernel_words_ok `{CID : CpuId} (kroot : mword 44) (ksp : mword 64)
   ws !! tf_khartid_idx = Some cid_word.
 (* the fact looks at indices 0..4 only, so a save walk that rewrites the
    other 31 words keeps it -- this is what uservec's two closers pay with *)
-Lemma tf_kernel_words_ok_tail `{CID : CpuId} (kroot : mword 44)
+Lemma tf_kernel_words_ok_tail `{CID : CpuId} `{XI : CurCtx} (kroot : mword 44)
     (ksp a b c d e : mword 64) (l l' : list (mword 64)) :
   tf_kernel_words_ok kroot ksp (a :: b :: c :: d :: e :: l) ->
   tf_kernel_words_ok kroot ksp (a :: b :: c :: d :: e :: l').
@@ -907,10 +908,10 @@ Proof. apply mycpu_ret_nonzero, tp_ok_cid_of. Qed.
 (* the ambient hart id as a tp-register value.  mycpu()'s return for this
    hart is [mycpu_ret cid_word] = &cpus[cpu_id] = [cpus_ptr cpu_id]. *)
 
-Lemma cpus_ptr_cid `{GEN : GenId} `{CID : CpuId} : cpus_ptr cpu_id = mycpu_ret cid_word.
+Lemma cpus_ptr_cid `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} : cpus_ptr cpu_id = mycpu_ret cid_word.
 Proof. reflexivity. Qed.
 
-Lemma tp_ok_cid `{GEN : GenId} `{CID : CpuId} : tp_ok cid_word.
+Lemma tp_ok_cid `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} : tp_ok cid_word.
 Proof. apply tp_ok_cid_of. Qed.
 
 (* ===================================================================== *)
@@ -932,7 +933,7 @@ Proof. apply tp_ok_cid_of. Qed.
 (* ===================================================================== *)
 Section CurProc.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Definition cur_proc (p : mword 64) : iProp Σ :=
     a_cpu_proc cid_word ↦₈ p.
@@ -940,6 +941,16 @@ Section CurProc.
   Global Instance cur_proc_timeless p : Timeless (cur_proc p).
   Proof. rewrite /cur_proc /word_pointsto /mem_pointsto. apply _. Qed.
 End CurProc.
+
+(* the field's transport (tso-port M3): one word cell, and the only
+   context-indexed row of [CpuOwn.cpu_own] -- which the swtch deposit has
+   to hand to the resumed thread at ITS context (ProofSwtch.v). *)
+Global Instance cur_proc_morph `{!riscvGS Σ} `{CID : CpuId} (p : mword 64) :
+  CtxMorph (fun xi : CtxId => cur_proc (XI := xi) p).
+Proof.
+  iIntros (ξ ξ') "Hd H". rewrite /cur_proc.
+  iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H") as "[Hd H]". iFrame.
+Qed.
 
 (* ===================================================================== *)
 (* THE PER-PROC HART TAG.                                                  *)

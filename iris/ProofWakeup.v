@@ -65,12 +65,13 @@ From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* wakeup's 7-entry callee-save frame, over [SpecWakeupParts.wk_fcell]: ra/s0
    and s1..s5 at spF+56 down to spF+8, written by the prologue and read back
    by the epilogue. *)
-Definition wk_frame `{!riscvGS Σ} (spF : mword 64)
+Definition wk_frame `{XI : CurCtx} `{!riscvGS Σ} (spF : mword 64)
     (vra vs0 vs1 vs2 vs3 vs4 vs5 : mword 64) : iProp Σ :=
   (wk_fcell spF 7 ↦₈[KT1] vra ∗ wk_fcell spF 6 ↦₈[KT1] vs0 ∗ wk_fcell spF 5 ↦₈[KT1] vs1 ∗
    wk_fcell spF 4 ↦₈[KT1] vs2 ∗ wk_fcell spF 3 ↦₈[KT1] vs3 ∗ wk_fcell spF 2 ↦₈[KT1] vs4 ∗
@@ -131,7 +132,7 @@ Section ProofWakeup.
      [wakeup+0x54]: the SAME statement is both the lemma's own [Hqexit]
      hypothesis below and the tail [wk_loop_body] hands [wp_next] on exit
      (both anchored at the lemma's own [CID0], per the file header). *)
-  Definition wk_exit_body `{GEN : GenId}
+  Definition wk_exit_body `{GEN : GenId} `{XI : CurCtx}
       (pme spF : mword 64) (vra vs0 vs1 vs2 vs3 vs4 vs5
        vs6 vs7 vs8 vs9 vs10 vs11 : mword 64)
       (av lvl : nat) (eb : bool) (b : bool) (lks : gset string)
@@ -154,7 +155,7 @@ Section ProofWakeup.
   (* the fuel-indexed scan invariant at the loop head [wakeup+0x38]; the
      [∀ fuel]/[wp_next] wrapper stays at each [iAssert] site (RULE 3), only
      what follows [fun CID : CpuId =>] is named here. *)
-  Definition wk_loop_body `{GEN : GenId}
+  Definition wk_loop_body `{GEN : GenId} `{XI : CurCtx}
       (pme spF chan : mword 64) (vra vs0 vs1 vs2 vs3 vs4 vs5
        vs6 vs7 vs8 vs9 vs10 vs11 : mword 64)
       (av lvl : nat) (eb : bool) (b : bool) (lks : gset string)
@@ -176,7 +177,7 @@ Section ProofWakeup.
      release call runs at the FIXED hart [CID] (a held lock pins
      noff >= 1, file header), so unlike the two definitions above this one
      carries no [wp_next]/hart binder of its own. *)
-  Definition wk_rel_body `{GEN : GenId}
+  Definition wk_rel_body `{GEN : GenId} `{XI : CurCtx}
       (γs : list gname) (γk : gname) (pme spF chan : mword 64)
       (av lvl k : nat) (eb b : bool)
       (vs6 vs7 vs8 vs9 vs10 vs11 : mword 64) (CID : CpuId) : iProp Σ :=
@@ -203,7 +204,7 @@ Section ProofWakeup.
      resumes them, so [proc_lock_res] (SchedCtx.v, whose context slot is the
      ▷-guarded [proc_ctx] over the scheduler swtch chain) is threaded OPAQUELY
      here: the ▷-slot is carried between elim and intro/wakeup, never stripped. *)
-  Lemma wp_wakeup_loop_sconf `{GEN : GenId} `{CID0 : CpuId}
+  Lemma wp_wakeup_loop_sconf `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       
       (γs : list gname) (spF pme chan : mword 64)
       (vra vs0 vs1 vs2 vs3 vs4 vs5 : mword 64)
@@ -402,7 +403,7 @@ Section ProofWakeup.
          here or below needs to know, see the file header. *)
       iDestruct (cpu_own_transport CIDk CIDe lvl eb pme b ltac:(wp_next_chain)
                    with "Hown") as "Hown".
-      iApply (Acquire.wp_acquire_sconf KT1 (CID := CIDe) γk "proc"%string (proc_lock_res γs γk (proc_addr k)) M3a
+      iApply (Acquire.wp_acquire_sconf KT1 (CID := CIDe) γk "proc"%string <{ proc_lock_res γs γk (proc_addr k) }> M3a
                 lvl eb pme av b lks
                 ltac:(lia)
                 ltac:(lia)
@@ -410,7 +411,7 @@ Section ProofWakeup.
                 with "Hcg Hown Htext Hpc [Hlockk]").
       all: try lkbelow.
       { iEval (rewrite HM3a_a0). iExact "Hlockk". }
-      iIntros (CIDf Hsf ms Macq) "%Hms Hcg Hpc %Hpins Htok HR Hown Hpay".
+      iIntros (CIDf Hsf ms Macq) "%Hms Hcg Hpc %Hpins Htok HR _ Hown Hpay".
       (* acquire returned: pc = wakeup+0x3e, cpu_own (S lvl) + trap_csrs_pay lvl eb.
          FROM HERE TO THE RELEASE the index is the literal [false] (a held lock
          pins noff >= 1), so no leaf can migrate and everything stays at CIDf. *)
@@ -512,7 +513,7 @@ Section ProofWakeup.
         (* [b] IS [outb] ([cpu_own] forces it, = [Hbmatch]); pure re-spelling
            so that the acquire/release pair composes back to [av]. *)
         iEval (rewrite Hbmatch) in "Hcg".
-        iApply (Release.wp_release_sconf KT1 (CID := CIDf) γk (proc_addr k) "proc"%string (proc_lock_res γs γk (proc_addr k)) Mr2c
+        iApply (Release.wp_release_sconf KT1 (CID := CIDf) γk (proc_addr k) "proc"%string <{ proc_lock_res γs γk (proc_addr k) }> Mr2c
                   lvl eb pme av ({["proc"]} ∪ lks)
                   Hlka2
                   ltac:(lia)
@@ -852,7 +853,7 @@ Section ProofWakeup.
   (* prologue's 8-slot frame carve) and procs_inv.  proc_lock_res            *)
   (* (SchedCtx.v) is threaded opaquely, ▷-slot untouched.                    *)
   (* ===================================================================== *)
-  Lemma wp_wakeup_sconf `{GEN : GenId} `{CID0 : CpuId}
+  Lemma wp_wakeup_sconf `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       
       (m : regfile) (γs : list gname) (pme : mword 64)
       (lvl K : nat) (eb : bool) (b : bool) (lks : gset string)

@@ -68,6 +68,7 @@ Require Import ProcDefs.
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT -- the era
                            rows name [fsc_fs], which the frozen ones did not *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Set Printing Depth 40.
 
@@ -99,7 +100,7 @@ Local Ltac namidx := first [ vm_compute; reflexivity | vm_compute; discriminate 
 Section ProofNameiTrMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- THE FRAME CARVE: the two low slots ARE [name[14]] ---- *)
 

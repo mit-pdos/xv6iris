@@ -55,21 +55,25 @@ Require Import SpecSwtch.
 From Kernel Require KernelSyms.
 Require Import CodeSwtch.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
+Require TsoCtxShim.   (* [ctx_dom_sc]: the swtch hand-off, while the M2 token is deferred *)
+(* A6.86: [TsoCtxShim] is RETIRED -- its last live use died with the M4
+   contract flip.  See its tombstone. *)
 Local Open Scope Z_scope.
 Import Defs.
 
 Module SwtchProof : SWTCH.
 Section ProofSwtch.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Instance stack_own_timeless_local (sp : mword 64) (n : nat) :
     Timeless (stack_own (KTR := KT1) sp n).
   Proof.
     rewrite /stack_own. apply bi.exist_timeless. intros ws.
     apply bi.sep_timeless; [ apply _ | ].
-    apply big_sepL_timeless. intros ? ?.
-    rewrite /word_pointsto /mem_pointsto. apply _.
+    apply big_sepL_timeless. intros ? ? _.
+    apply ctx_word_pointsto_timeless.
   Qed.
 
   (* Field 1 of a context record is the saved sp.  Proved ONCE over an
@@ -102,6 +106,11 @@ Section ProofSwtch.
        sie_cap into stack + strans_inv + arm ---- *)
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
     iEval (rewrite /sie_cap) in "Hcap".
+    (* THE TOKEN EXCHANGE (tso-port leg M2).  [Hctx] is THIS thread's
+       identity, taken out of the capability here; it goes INTO the record
+       this proof parks (below), while the TARGET record's token comes out
+       and goes into the bundle the resumed thread receives.  The hart keeps
+       running; the thread of control changes -- which is what swtch IS. *)
     iDestruct "Hcap" as "(Hstk & Htr & Hsiearm & #Hwit)".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Hspp & %Hmsf)".
@@ -137,8 +146,14 @@ Section ProofSwtch.
     iApply fupd_wp.
     iEval (rewrite (valid_context_unfold P An newc p)
                    /valid_context_pre !bi.later_exist) in "Hvalidnew".
-    iDestruct "Hvalidnew" as (new_vs av_t) "Hvalidnew".
+    iDestruct "Hvalidnew" as (new_vs av_t XIt Tt) "Hvalidnew".
     iDestruct "Hvalidnew" as "(>%Hlen_new & >%Hal_new & >Hnewcells & >Hstk_t & Hnewwand)".
+    (* RE-CONNECT THE TARGET'S CONTEXT TO THIS CPU (tso-port checkpoint 0.4
+       items 2/5): the record's token is PARKED; resuming it here --
+       [TsoCtx.ctx_resume] -- ties it to this hart against a view receipt
+       dominating the parked stamp.  The receipt is the shim's SC-only
+       intro until the M2 sweep threads the honest one out of the p->lock
+       acquire ([SpecAcquire]); the exchange itself is in its final shape. *)
     iModIntro.
     (* ---- the symbolic environment: 0..31 = [gpr_file]'s ACTUAL map
        [tp_pin m0] (its tp slot, index 4, is [cid_word_of cpu_id] by
@@ -215,6 +230,12 @@ Section ProofSwtch.
        caller's own business, so what crosses is just the CELLS the block
        above wrote -- which is all a slot that will never be resumed can use
        ([SchedCtx.proc_slots] at ZOMBIE wants [own_ctx] and nothing more). *)
+    (* THE PARKER'S HALF OF THE EXCHANGE: this thread's running token,
+       taken out of the capability above, PARKS into the record it leaves
+       behind ([TsoCtx.ctx_park] -- one ghost step, no machine evidence:
+       the stamp is read off the token's own receipts).  In the no-return
+       case the token is dropped instead -- the zombie park is the one
+       place a thread's identity dies. *)
     iAssert (if back then valid_context P Ao oldc p else own_ctx oldc)
       with "[Holdpart Hstk Hwold]" as "Hvoldc".
     { destruct back; last first.
@@ -222,7 +243,7 @@ Section ProofSwtch.
         { iPureIntro. unfold callee_img, ctx_regs; cbn. reflexivity. }
         iExact "Holdpart". }
       rewrite (valid_context_unfold P Ao oldc p) /valid_context_pre.
-      iExists (callee_img m0), av.
+      iExists (callee_img m0), av, cur_ctx, 0%nat.
       iSplit.
       { iPureIntro. unfold callee_img, ctx_regs; cbn. reflexivity. }
       iSplit.
@@ -271,7 +292,8 @@ Section ProofSwtch.
               ltac:(intro Hc0; vm_compute in Hc0; discriminate) Hlpe
               with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Htr
                     Hpc Hfile []
-                    [Hnewwand Hvoldc Hnewpart HP Hhalf Hspp Hq0 Hcpuown Hstk_t]").
+                    [Hnewwand Hvoldc Hnewpart HP Hhalf Hspp Hq0 Hcpuown Hstk_t
+                     ]").
     { iApply (swi_68 with "Ht"). }
     (* ---- the ▷ continuation: iNext strips it AND the record's ▷'d pieces ---- *)
     iNext.
@@ -289,14 +311,19 @@ Section ProofSwtch.
        our own [eb] (eb' := eb) -- no retune, no equation.  [sie_arm false p]
        is [intr_off_tok] by conversion now (an INDEX, not a disjunction), so
        building [sie_cap] at [false] needs no [iLeft]. ---- *)
-    iAssert (sie_cap KT1 (vregs_den rho swtch_regs1) av_t false p) with "[Hstk_t Htr Hq0]" as "Hcap_t".
+    (* the target thread's stack, re-indexed to ITS context: the swtch
+       hand-off is the M2 seam; SC crosses it through the shim. *)
+    iPoseProof (TsoCtxShim.ctx_dom_sc cur_ctx XIt) as "Hdom_t".
+    iMod (stack_own_reindex cur_ctx XIt with "Hdom_t Hstk_t") as "[_ Hstk_t]".
+    iAssert (sie_cap (XI := XIt) KT1 (vregs_den rho swtch_regs1) av_t false p)
+      with "[Hstk_t Htr Hq0]" as "Hcap_t".
     { rewrite /sie_cap Hcsp_t. iFrame "Hstk_t Htr Hwit". iExact "Hq0". }
     (* [Hfile] comes back from the block as the bare [gpr_file (vregs_den
        rho swtch_regs1)] (it went in the same way, via [Hden]); re-fold it
        under [tp_pin] -- a no-op, since that map's own tp slot is ALREADY
        [cid_word_of cpu_id] ([Hm4_raw]) -- to match [sie_cap_gpr]'s shape. *)
     iEval (rewrite -(tp_pin_id (vregs_den rho swtch_regs1) Hm4_raw)) in "Hfile".
-    iDestruct (sie_cap_gpr_join (vregs_den rho swtch_regs1) av_t false p
+    iDestruct (sie_cap_gpr_join (XI := XIt) (vregs_den rho swtch_regs1) av_t false p
                  with "Hhs Hsc Hcap_t Hfile") as "Hcg_t".
     (* the record's wand is [∀ h m eb']; swtch resumes it HERE, so it is
        applied at this hart -- whose SIE ghost is [sie_gname] by

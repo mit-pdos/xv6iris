@@ -20,6 +20,8 @@ Require Import HartLift HartSpan HartSwp HartSMem WpSmodePtEngine KptGoodb Ktier
 Require Import MemAccessGen.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
+Require TsoCtxShim.   (* the S-mode leaf's gen_heap seam *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -986,7 +988,7 @@ Local Typeclasses Transparent word_pointsto word4_pointsto.
 
 Section WpSmodePtMemLeaves.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   (* ==================================================================== *)
@@ -1073,9 +1075,11 @@ Section WpSmodePtMemLeaves.
       as "[Hb0 Hbclose]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hb0") as "Hb0".
     iDestruct (mem_pointsto_acc (KTR := kt') with "Hb0")
       as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
     iDestruct ("Href0" with "Hp0") as "Hb0".
+    iDestruct (TsoCtxShim.ctx_pointsto_of_mem with "Hb0") as "Hb0".
     iEval (rewrite -(pa_add_0
              (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)))) in "Hb0".
     iDestruct ("Hbclose" with "Hb0") as "Hbytes".
@@ -1183,6 +1187,7 @@ Section WpSmodePtMemLeaves.
           - (* THE RAM OBLIGATION, off the word the leaf owns *)
             iIntros (sigma) "Hsi".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
+            iDestruct (TsoCtxShim.ctx_buf_to_mem with "Hbytes") as "Hbytes".
             iDestruct (s_mem_chunk (KTR := kt') sigma
                          (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
                          (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
@@ -1194,7 +1199,8 @@ Section WpSmodePtMemLeaves.
             { iPureIntro. intros j Hj. apply Hbf. exact Hj. }
             iApply bi.later_intro. iMod "Hclose" as "_". iModIntro.
             iFrame "Hreg Hmem Hdev".
-            rewrite /word4_pointsto. iFrame "Hbytes". iPureIntro. exact Hpalign4. }
+            iDestruct (TsoCtxShim.ctx_buf_of_mem with "Hbytes") as "Hbytes".
+            rewrite /ctx_word4_pointsto. iFrame "Hbytes". iPureIntro. exact Hpalign4. }
       iIntros (e) "(-> & Hfile & Hland)".
       iDestruct "Hland" as (rsf) "(%Hshape & Hrw & Hro & HRes & Hany & Hword)".
       (* the landing file back onto the tower, at ITS OWN tlb value *)
@@ -1383,9 +1389,11 @@ Section WpSmodePtMemLeaves.
       as "[Hb0 Hbclose]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hb0") as "Hb0".
     iDestruct (mem_pointsto_acc (KTR := kt') with "Hb0")
       as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
     iDestruct ("Href0" with "Hp0") as "Hb0".
+    iDestruct (TsoCtxShim.ctx_pointsto_of_mem with "Hb0") as "Hb0".
     iEval (rewrite -(pa_add_0
              (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)))) in "Hb0".
     iDestruct ("Hbclose" with "Hb0") as "Hbytes".
@@ -1493,6 +1501,7 @@ Section WpSmodePtMemLeaves.
           - (* THE RAM OBLIGATION, off the word the leaf owns *)
             iIntros (sigma) "Hsi".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
+            iDestruct (TsoCtxShim.ctx_buf_to_mem with "Hbytes") as "Hbytes".
             iDestruct (s_mem_chunk (KTR := kt') sigma
                          (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
                          (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
@@ -1504,7 +1513,8 @@ Section WpSmodePtMemLeaves.
             { iPureIntro. intros j Hj. apply Hbf. exact Hj. }
             iApply bi.later_intro. iMod "Hclose" as "_". iModIntro.
             iFrame "Hreg Hmem Hdev".
-            rewrite /word_pointsto. iFrame "Hbytes". iPureIntro. exact Hpalign4. }
+            iDestruct (TsoCtxShim.ctx_buf_of_mem with "Hbytes") as "Hbytes".
+            rewrite /ctx_word_pointsto. iFrame "Hbytes". iPureIntro. exact Hpalign4. }
       iIntros (e) "(-> & Hfile & Hland)".
       iDestruct "Hland" as (rsf) "(%Hshape & Hrw & Hro & HRes & Hany & Hword)".
       (* the landing file back onto the tower, at ITS OWN tlb value *)
@@ -1669,7 +1679,7 @@ Section WpSmodePtMemLeaves.
     iIntros "#Hwit #Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              Hpc Hfile Hinstr Hbytes Hcont".
     iDestruct (hw_config_cert with "Hhw") as "#Hcert".
-    iDestruct (word4_pointsto_aligned_p (KTR := kt') with "Hbytes")
+    iDestruct (ctx_word4_pointsto_aligned_p (KTR := kt') with "Hbytes")
       as %Hpalign4.
     assert (Halign4 : is_aligned_vaddr
               (Virtaddr (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))) 4
@@ -1685,18 +1695,20 @@ Section WpSmodePtMemLeaves.
         %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     subst misa0.
     (* the window's own claim, off byte 0, then the word refolded *)
-    iDestruct (word4_pointsto_bytes (KTR := kt') with "Hbytes") as "Hbytes".
+    iDestruct (ctx_word4_pointsto_bytes (KTR := kt') with "Hbytes") as "Hbytes".
     iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hbytes")
       as "[Hb0 Hbclose]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hb0") as "Hb0".
     iDestruct (mem_pointsto_acc (KTR := kt') with "Hb0")
       as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
     iDestruct ("Href0" with "Hp0") as "Hb0".
+    iDestruct (TsoCtxShim.ctx_pointsto_of_mem with "Hb0") as "Hb0".
     iEval (rewrite -(pa_add_0
              (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)))) in "Hb0".
     iDestruct ("Hbclose" with "Hb0") as "Hbytes".
-    iDestruct (word4_pointsto_intro (KTR := kt') _ _ _ Hpalign4 with "Hbytes")
+    iDestruct (ctx_word4_pointsto_intro (KTR := kt') _ _ _ _ Hpalign4 with "Hbytes")
       as "Hword".
     iApply (wp_instr_s_config_folded R pc true
               (STORE (imm, Regidx rs2, Regidx rs1, 4))
@@ -1973,7 +1985,7 @@ Section WpSmodePtMemLeaves.
     iIntros "#Hwit #Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              Hpc Hfile Hinstr Hbytes Hcont".
     iDestruct (hw_config_cert with "Hhw") as "#Hcert".
-    iDestruct (word_pointsto_aligned_p (KTR := kt') with "Hbytes")
+    iDestruct (ctx_word_pointsto_aligned_p (KTR := kt') with "Hbytes")
       as %Hpalign4.
     assert (Halign4 : is_aligned_vaddr
               (Virtaddr (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))) 8
@@ -1989,18 +2001,20 @@ Section WpSmodePtMemLeaves.
         %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     subst misa0.
     (* the window's own claim, off byte 0, then the word refolded *)
-    iDestruct (word_pointsto_bytes (KTR := kt') with "Hbytes") as "Hbytes".
+    iDestruct (ctx_word_pointsto_bytes (KTR := kt') with "Hbytes") as "Hbytes".
     iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hbytes")
       as "[Hb0 Hbclose]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
+    iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Hb0") as "Hb0".
     iDestruct (mem_pointsto_acc (KTR := kt') with "Hb0")
       as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
     iDestruct ("Href0" with "Hp0") as "Hb0".
+    iDestruct (TsoCtxShim.ctx_pointsto_of_mem with "Hb0") as "Hb0".
     iEval (rewrite -(pa_add_0
              (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)))) in "Hb0".
     iDestruct ("Hbclose" with "Hb0") as "Hbytes".
-    iDestruct (word_pointsto_intro (KTR := kt') _ _ _ Hpalign4 with "Hbytes")
+    iDestruct (ctx_word_pointsto_intro (KTR := kt') _ _ _ _ Hpalign4 with "Hbytes")
       as "Hword".
     iApply (wp_instr_s_config_folded R pc false
               (STORE (imm, Regidx rs2, Regidx rs1, 8))

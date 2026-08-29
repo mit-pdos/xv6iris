@@ -174,7 +174,9 @@ New ghost names bundle `disk_names` (class `diskGhostG`, wired through
     disk_block bno bs := ⌜length bs = 1024⌝ ∗ disk_bytes (1024 * bno) bs
 
 `virtio_proto γ v` (in `dev_inv_body`, replacing `virtio_lease v`; WpVirtio's
-`dma_own`/`dma_agree`/`dma_update` stay as the base layer):
+`dma_own`/`dma_agree` stay as the base layer, with `dma_acc` the accessor
+over a write set and `phys_map_store` the one store gate — `dma_update` is
+now that gate's engine and nothing else calls it):
 
     ∃ nc np pend done ctl dma dmap,
       dma_own dma ∗ ⌜ctl ⊆ dma⌝ ∗
@@ -260,6 +262,18 @@ inside a `dev_inv`-opening leaf; conclusions ⌜…⌝ mean facts learned):
    an OUT slot + `mono_nat` bump; packaged as `virtio_proto_step`, plus
    `virtio_proto_not_stalled` refuting `DevStepDiskWild`. These two are what
    `WpUart.wp_dev_loop`'s disk case now consumes.
+
+   **`virtio_proto_step` PERFORMS NO MEMORY WRITE.** It is an accessor over
+   the completion's bytes as well as over the permit: it hands the write
+   set's OLD bytes out (`∃ old`, at `dom old = dom w`), takes
+   `gen_heap_interp m` in for `dma_agree`'s pure fact and hands it straight
+   back UNTOUCHED, and its close-wand takes the NEW bytes along with the
+   spent permit. The store itself is `WpVirtio.phys_map_store`, run by
+   `WpUart.wp_disk_loop` — the one caller holding both authorities. The
+   reason is not about which memory model is underneath: a value-changing
+   law may not split two authorities the state interpretation ties
+   together, so the update belongs where both are held. `virtio_lease_acc`
+   (the unkeyed ancestor) has the same shape for the same reason.
 
 MMIO writes the driver performs while live (`QUEUE_NOTIFY`, `INTERRUPT_ACK`)
 are cfg/seen/used-idx-stable, so `virtio_proto` rides through them

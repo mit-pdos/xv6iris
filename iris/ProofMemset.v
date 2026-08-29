@@ -27,6 +27,7 @@ Require Import WpMemsetS.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecMemsetParts.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 
 
@@ -48,7 +49,7 @@ Module MemsetProof : MEMSET_PARTS.
 
 Section ProofMemset.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Context {kt : ktier}.
   Context {ktb : ktier}.

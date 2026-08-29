@@ -36,6 +36,7 @@ Require Import InstrBytes.
 Require Import KallocInv.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvExtras.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ------------------------------------------------------------------ *)
@@ -119,6 +120,7 @@ Proof. intros Hlen Hj. apply nth_byte_assemble_len; lia. Qed.
 
 Section PageFields.
   Context `{!riscvGS Σ}.
+  Context `{XI : CurCtx}.
 
   (* ---- chopping and re-basing byte windows ---- *)
 
@@ -148,6 +150,9 @@ Section PageFields.
       iIntros "[Hpre Hlast]".
       iDestruct (IH with "Hpre") as (bs) "[%Hlen Hbs]".
       rewrite big_sepL_singleton.
+      (* [byte_any] is Global TC-opaque since the flip; open it for the
+         ∃-destruct *)
+      iEval (rewrite /byte_any) in "Hlast".
       iDestruct "Hlast" as (b) "Hb".
       iExists (bs ++ [b])%list.
       iSplit; [iPureIntro; rewrite length_app Hlen; simpl; lia|].
@@ -168,10 +173,13 @@ Section PageFields.
     iIntros "(H0 & H1 & H2 & H3 & _)".
     iDestruct "H0" as (b0) "H0". iDestruct "H1" as (b1) "H1".
     iDestruct "H2" as (b2) "H2". iDestruct "H3" as (b3) "H3".
+    (* M1 STAGE 2 PAYOFF: the four ctx→mem crossings that used to sit here
+       are GONE, not converted -- the bytes and the word are on the same
+       side of the seal now. *)
     set (bs := [b0;b1;b2;b3]).
     set (w := Z_to_bv 32 (assemble_bytes bs) : mword 32).
     iExists w.
-    rewrite /word4_pointsto.
+    rewrite /ctx_word4_pointsto.
     iSplitR; [iPureIntro; exact Hal|].
     assert (E0 : nth_byte w 0%nat = b0) by (subst w bs; apply nth_byte_assemble4; [reflexivity | lia]).
     assert (E1 : nth_byte w 1%nat = b1) by (subst w bs; apply nth_byte_assemble4; [reflexivity | lia]).
@@ -195,7 +203,7 @@ Section PageFields.
     set (bs := [b0;b1;b2;b3;b4;b5;b6;b7]).
     set (w := Z_to_bv 64 (assemble_bytes bs) : mword 64).
     iExists w.
-    rewrite /word_pointsto.
+    rewrite /ctx_word_pointsto.
     iSplitR; [iPureIntro; exact Hal|].
     assert (E0 : nth_byte w 0%nat = b0) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
     assert (E1 : nth_byte w 1%nat = b1) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
@@ -267,14 +275,14 @@ Section PageFields.
   Lemma word4_bwin (a : mword 64) (w : mword 32) :
     a ↦₄ w ⊢ [∗ list] j ∈ seq 0 4, byte_any (pa_add a j).
   Proof.
-    rewrite word4_pointsto_bytes. apply big_sepL_mono.
+    rewrite ctx_word4_pointsto_bytes. apply big_sepL_mono.
     intros k j _. iIntros "H". by iExists (nth_byte w j).
   Qed.
 
   Lemma word8_bwin (a : mword 64) (w : mword 64) :
     a ↦₈ w ⊢ [∗ list] j ∈ seq 0 8, byte_any (pa_add a j).
   Proof.
-    rewrite word_pointsto_bytes. apply big_sepL_mono.
+    rewrite ctx_word_pointsto_bytes. apply big_sepL_mono.
     intros k j _. iIntros "H". by iExists (nth_byte w j).
   Qed.
 

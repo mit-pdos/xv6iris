@@ -66,6 +66,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -87,7 +88,7 @@ Notation IT := KernelSyms.itrunc.
 Section ItruncCont.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg}.
 
-  Definition it_cont `{GEN : GenId} `{CID0 : CpuId}
+  Definition it_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (ip : mword 64) (inum : mword 32) (dn : dinode) (bm : blkmap)
       (u : nat) (Sbf : gset Z)
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac) (j : nat)
@@ -188,7 +189,7 @@ Proof. apply elem_of_union_r, elem_of_singleton_2. reflexivity. Qed.
 Section ItruncTail.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg}.
 
-  Local Lemma it_tail `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma it_tail `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
       (ip : mword 64) (inum : mword 32)
@@ -237,7 +238,7 @@ Section ItruncTail.
     dinode_at fsc_ireg inum dn0 -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     bslots 3 -∗
     (* the tail flush's absorption credit, travelling to iupdate unchanged --
        a RESOURCE at the walk's own birth epoch (fs-log.md §G.20) *)
@@ -667,7 +668,7 @@ Section ItruncDLoop.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg}.
 
   (* what the loop hands on at +0x32, once every direct entry is gone *)
-  Definition it_dexit `{GEN : GenId} `{CID0 : CpuId} 
+  Definition it_dexit `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
  (ip : mword 64) (bm : blkmap)
       (data : nat -> list (bv 8))
       (pidv : mword 32) (dq dqd dqb : dfrac) (j : nat)
@@ -689,7 +690,7 @@ Section ItruncDLoop.
                      crb Sb e0 w NDIRECT -∗
         WP (Loop : expr riscv_lang))%I.
 
-  Local Lemma it_dloop `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma it_dloop `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (jx : nat) (γl : gname)
       (pd pav pu : mword 64)
       (ip : mword 64) (bm : blkmap)
@@ -738,7 +739,7 @@ Section ItruncDLoop.
     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     bslots 2 -∗
     it_dir_state fsc_fs ip bm data fsc_cov fsc_logst crb Sb e0 w k -∗
     it_dexit (CID0 := CID0)
@@ -1234,7 +1235,7 @@ End ItruncDLoop.
 Section ItruncELoop.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg}.
 
-  Definition it_eexit `{GEN : GenId} `{CID0 : CpuId} 
+  Definition it_eexit `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
  (ip : mword 64) (bm : blkmap)
       (data : nat -> list (bv 8)) (kk : nat) (dsk : mword 32)
       (pidv : mword 32) (dq dqd dqb : dfrac) (j : nat)
@@ -1258,7 +1259,7 @@ Section ItruncELoop.
                      crb Sb e0 w NINDIRECT -∗
         WP (Loop : expr riscv_lang))%I.
 
-  Local Lemma it_eloop `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma it_eloop `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (jx : nat) (γl : gname)
       (pd pav pu : mword 64)
       (ip : mword 64) (bm : blkmap)
@@ -1308,7 +1309,7 @@ Section ItruncELoop.
     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     bslots 2 -∗
     buf_own (bpa kk) (bm_ind bm) dsk (ind_bytes (bm_ent bm)) -∗
     it_ent_state fsc_fs bm data fsc_cov fsc_logst crb Sb e0 w q -∗
@@ -1764,7 +1765,7 @@ Section ItruncIArm.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg}.
 
   (* what the arm hands to the tail: the inode names nothing at all *)
-  Definition it_armexit `{GEN : GenId} `{CID0 : CpuId}
+  Definition it_armexit `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
  (ip : mword 64) (bm : blkmap)
       (pidv : mword 32) (dq dqd dqb : dfrac) (j : nat)
       (crb : bool) (Sb : gset Z) (e0 : nat) (w : nat)
@@ -1787,7 +1788,7 @@ Section ItruncIArm.
         bm_paidS crb w Sb e0 -∗
         WP (Loop : expr riscv_lang))%I.
 
-  Local Lemma it_iarm `{GEN : GenId} `{CID0 : CpuId}       (γs : list gname) (jx : nat) (γl : gname)
+  Local Lemma it_iarm `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}       (γs : list gname) (jx : nat) (γl : gname)
       (pd pav pu : mword 64)
       (ip : mword 64) (bm : blkmap)
       (data : nat -> list (bv 8))
@@ -1834,7 +1835,7 @@ Section ItruncIArm.
     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     (* the sixth frame slot -- this arm is the only writer *)
     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[KT1] v) -∗
     bslots 3 -∗
@@ -2492,7 +2493,7 @@ Section ItruncMain.
      cannot be derived outside a walk; it has to BE the walk, and the counted
      contract is the ~20-line seal below, taken at the [log_op]
      existential's own witness. *)
-  Lemma wp_itrunc_gen `{GEN : GenId} `{CID : CpuId}       (γs : list gname) (j : nat) (γl : gname)
+  Lemma wp_itrunc_gen `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
@@ -3003,7 +3004,7 @@ Section ItruncMain.
   (*  are [S (S u) - 2 <= u'] and [u' + 1 <= S (S u)], i.e. the landed       *)
   (*  [u <= u' <= S u].                                                     *)
   (* ===================================================================== *)
-  Lemma wp_itrunc_sconf `{GEN : GenId} `{CID : CpuId}       (γs : list gname) (j : nat) (γl : gname)
+  Lemma wp_itrunc_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)

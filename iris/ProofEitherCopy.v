@@ -107,6 +107,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -135,7 +136,7 @@ Proof. change (2 ^ 31) with 2147483648. lia. Qed.
 (* ===================================================================== *)
 Section EitherCopyEpilogue.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not
      [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
@@ -186,12 +187,12 @@ Section EitherCopyEpilogue.
     instr q36 true (ITYPE (caddi16sp_imm (mword_of_int 3 : mword 6), sp, sp, ADDI)) -∗
     instr q38 true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) -∗
     pc_is q2a -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) s20 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) s30 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) s40 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) s30 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) s40 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
@@ -404,7 +405,7 @@ Module EitherCopyoutProof (Myproc : MYPROC) (Copyout : COPYOUT) (Memmove : MEMMO
 
 Section ProofEitherCopyout.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not
      [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
@@ -1158,7 +1159,7 @@ Module EitherCopyinProof (Myproc : MYPROC) (Copyin : COPYIN) (Memmove : MEMMOVE)
 
 Section ProofEitherCopyin.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not
      [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at

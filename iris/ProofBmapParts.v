@@ -53,6 +53,7 @@ Require Import BlockWords.
 Require Import InodeInv.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -356,6 +357,7 @@ Qed.
 
 Section BmapRes.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{XI : CurCtx}.
 
   (* ONE 4-byte cell of a checked-out buffer's data area, borrowed and put
      back at whatever value the store left there. *)

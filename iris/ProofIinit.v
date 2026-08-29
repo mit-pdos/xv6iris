@@ -40,6 +40,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecIinit.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -71,7 +72,7 @@ Section ProofIinit.
      loop's own leaf steps actually migrated to, not necessarily the entry
      hart of [wp_iinit_sconf] -- the same rule ProofConsputc.wp_consputc_epi
      follows. *)
-  Lemma iiepi `{GEN : GenId} `{CID0 : CpuId} (m Me : regfile) (K : nat) (b : bool) (p : mword 64) :
+  Lemma iiepi `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} (m Me : regfile) (K : nat) (b : bool) (p : mword 64) :
     let sp0 := m !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) in
     let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -279,7 +280,7 @@ Section ProofIinit.
       [wp_next_shift] before recursing or handing off to [iiepi] (worked
       example for both: ProofProcMapstacks.v's loop). *)
   (* ================================================================= *)
-  Lemma iinit_loop `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat) (b : bool) (p : mword 64)
+  Lemma iinit_loop `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (m : regfile) (K : nat) (b : bool) (p : mword 64)
       (fuel : nat) :
     let sp0 := m !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) in
@@ -298,8 +299,8 @@ Section ProofIinit.
        M !!! Regidx c = m !!! Regidx c) ->
     sie_cap_gpr KT1 M (K - 6) b p -∗
     kernel_text -∗
-    sl_str_addr ↦ₛ□ "sleep lock"%string -∗
-    name_inode ↦ₛ□ "inode"%string -∗
+    ctx_string_all sl_str_addr DfracDiscarded "sleep lock"%string -∗
+    ctx_string_all name_inode DfracDiscarded "inode"%string -∗
     pc_is (mword_of_int (KernelSyms.iinit + 0x3a)) -∗
     ([∗ list] i ∈ seq 0 j, sl_fresh (inode_lock i) "inode"%string) -∗
     ([∗ list] i ∈ seq j (NINODE - j), sl_raw (inode_lock i)) -∗
@@ -521,7 +522,7 @@ Section ProofIinit.
   (* ================================================================= *)
   (*  iinit's whole-function WP.                                        *)
   (* ================================================================= *)
-  Lemma wp_iinit_sconf `{GEN : GenId} `{CID : CpuId}
+  Lemma wp_iinit_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (m : regfile) (K : nat)
       (vlock : mword 32) (vname vcpu : mword 64) (b : bool) (p : mword 64)
     : wp_iinit_sconf_body m K vlock vname vcpu b p.
@@ -540,7 +541,7 @@ Section ProofIinit.
       do 7 (destruct j as [|j];
             [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string itable_name_str "itable"%string name_itable eq_refl ltac:(unfold text_end, itable_name_str; lia)
+    iPoseProof (kernel_data_string_all itable_name_str "itable"%string name_itable eq_refl ltac:(unfold text_end, itable_name_str; lia)
                                                                                        ltac:(vm_compute; discriminate) Hitable
                   with "Hkdata") as "#Hstr_itable".
     assert (Hinode : forall j bt, cstring_bytes "inode"%string !! j = Some bt ->
@@ -549,7 +550,7 @@ Section ProofIinit.
       do 6 (destruct j as [|j];
             [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string inode_name_str "inode"%string name_inode eq_refl ltac:(unfold text_end, inode_name_str; lia)
+    iPoseProof (kernel_data_string_all inode_name_str "inode"%string name_inode eq_refl ltac:(unfold text_end, inode_name_str; lia)
                                                                                     ltac:(vm_compute; discriminate) Hinode
                   with "Hkdata") as "#Hstr_inode".
     assert (Hslstr : forall j bt, cstring_bytes "sleep lock"%string !! j = Some bt ->
@@ -558,7 +559,7 @@ Section ProofIinit.
       do 11 (destruct j as [|j];
              [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string 0x80007568 "sleep lock"%string sl_str_addr eq_refl ltac:(unfold text_end; lia)
+    iPoseProof (kernel_data_string_all 0x80007568 "sleep lock"%string sl_str_addr eq_refl ltac:(unfold text_end; lia)
                                                                                       ltac:(vm_compute; discriminate) Hslstr
                   with "Hkdata") as "#Hstr_sl".
     (* ---- the frame geometry ---- *)

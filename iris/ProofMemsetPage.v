@@ -24,6 +24,8 @@ Local Open Scope Z_scope.
 Require Import Riscv.rv64d.
 Require Import SpecMemsetPage.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
+   leg M); this caller is not yet -- the shim marks the open seam *)
 Import Defs.
 
 
@@ -31,7 +33,7 @@ Module MemsetPageProof (MemsetArray : MEMSET) : MEMSETPAGE.
 
 Section ProofMemsetPage.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Context {kt : ktier}.
   Lemma wp_memset_page_val_sconf
@@ -49,6 +51,9 @@ Section ProofMemsetPage.
     assert (Ha2' : m0 !!! Regidx a2_idx = (mword_of_int (Z.of_nat 4096) : mword 64))
       by (rewrite Ha2; f_equal; vm_compute; reflexivity).
     (* --- apply the general memset spec at len = 4096 --- *)
+    (* memset's contract is context-indexed; this caller is not yet
+       converted -- the buffer crosses through the shim at the ambient
+       context (the bundle carries the thread token). *)
     iApply (MemsetArray.wp_memset_sconf kt KT0 m0 n 4096 cval olds b pcur
               Hn ltac:(vm_compute; reflexivity) Hcval Ha2'
               with "Hcg Htext Hpc [Hbuf]").

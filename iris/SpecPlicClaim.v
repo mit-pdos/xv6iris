@@ -48,6 +48,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 
 
@@ -72,7 +73,7 @@ Definition plic_claim_a0_ok (v : mword 64) : Prop :=
    stated at the literal index [false] rather than a generic [b], with no
    [wp_next] wrapper (it would collapse via [wp_next_off] anyway, since the
    hart cannot move). *)
-Definition wp_plic_claim_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_plic_claim_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γd : uart_names) (γv : disk_names) (m0 : regfile) (n : nat) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
@@ -97,7 +98,7 @@ Definition wp_plic_claim_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CI
 
 Module Type PLIC_CLAIM.
   Parameter wp_plic_claim_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γd : uart_names) (γv : disk_names) (m0 : regfile) (n : nat) (p : mword 64),
       wp_plic_claim_sconf_body γd γv m0 n p.
 End PLIC_CLAIM.

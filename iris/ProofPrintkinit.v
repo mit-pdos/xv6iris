@@ -25,12 +25,13 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecPrintkinit.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 Section CodePrintkinitBundle.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* printkinit's thirteen instructions (CodePrintkinit.v), in the
      thin-initlock-wrapper pattern (SpecInitlockWrapper.v) that its
@@ -64,7 +65,7 @@ Module ILW := InitlockWrapperProof Initlock.
 Section ProofPrintkinit.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_printkinit_sconf
       (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64)
@@ -83,7 +84,7 @@ Section ProofPrintkinit.
       do 3 (destruct j as [|j];
             [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string pr_name_str "pr"%string name eq_refl ltac:(unfold text_end, pr_name_str; lia)
+    iPoseProof (kernel_data_string_all pr_name_str "pr"%string name eq_refl ltac:(unfold text_end, pr_name_str; lia)
                                                                         ltac:(vm_compute; discriminate) Hpr
                   with "Hkdata") as "#Hstr".
     iApply (ILW.wp_initlock_wrapper_sconf KT0 m K KernelSyms.printkinit

@@ -16,6 +16,7 @@ Require Import SmodeCore.
 Require Import WpSmodePtFetch.
 Require Import HartSwp WpSmodePtEngine.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 
 (* ---- Local helpers copied from WpSmodeBtype.v ---- *)
@@ -122,7 +123,7 @@ Local Lemma exec_execute_BTYPE_BEQ_taken_zca (imm : mword 13) (rs2 rs1 : mword 5
 
 Section WpSmodePtBtype.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ==================================================================== *)
   (* THE TWO BRANCH ENGINES, per node.  A branch is the one instruction    *)

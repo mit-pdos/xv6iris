@@ -70,6 +70,7 @@ Require Import KvmSpec.         (* [kalloc_env]                         *)
 Require Import Xv6G.            (* [xv6G]                               *)
 Require Import FdSlots.         (* [fdslotG]                            *)
 Require Import FileInvDefs.     (* [fileG]                              *)
+Require TsoCtx.   (* qualified: the class only, no notation flip *)
 
 Local Open Scope Z_scope.
 
@@ -154,7 +155,7 @@ Proof. intro H. by apply kexec_ok_q_True. Qed.
 
     Kept TRANSPARENT for that reason, and NOT sealed: opacity would break
     the specialisations rather than help them.                            *)
-Definition kexec_closer
+Definition kexec_closer `{XI : TsoCtx.CurCtx}
     (* EXACTLY the classes the rows below need, which is the kexec
        contract's list MINUS [pavG]: [proc_priv] is [ProcInv]'s, and that
        section takes `{!riscvGS, !fileG, !xv6G, !bioslotG, !fdslotG,

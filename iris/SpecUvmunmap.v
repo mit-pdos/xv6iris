@@ -72,6 +72,7 @@ Require Import BarePt.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 
 (* ===================================================================== *)
@@ -94,7 +95,7 @@ Import Defs.
 
    uvmfree passes [szn := 0]; uvmdealloc passes the new size; the two
    rollback callers pass the size they had before the growth. *)
-Definition wp_uvmunmap_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_uvmunmap_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (mm : regfile)
     (P : uptd) (sz szn : Z) (M : gmap Z (bv 8))
     (npages : nat) (K : nat) (eb : bool) (p : mword 64)
@@ -144,7 +145,7 @@ Definition wp_uvmunmap_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{G
    generalisation: which one applies is decided by whether the caller is
    shrinking the process ([wp_uvmunmap_mem_sconf]) or undoing a growth
    that never became visible (this one). *)
-Definition wp_uvmunmap_live_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_uvmunmap_live_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (mm : regfile)
     (P : uptd) (sz : Z) (M : gmap Z (bv 8))
     (npages : nat) (K : nat) (eb : bool) (p : mword 64)
@@ -183,14 +184,14 @@ Definition wp_uvmunmap_live_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{
 
 Module Type UVMUNMAP.
   Parameter wp_uvmunmap_live_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (mm : regfile)
       (P : uptd) (sz : Z) (M : gmap Z (bv 8))
       (npages : nat) (K : nat) (eb : bool) (p : mword 64)
       (ilvl : nat) (b : bool) (lks : gset string),
       wp_uvmunmap_live_sconf_body γa mm P sz M npages K eb p ilvl b lks.
   Parameter wp_uvmunmap_mem_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (mm : regfile)
       (P : uptd) (sz szn : Z) (M : gmap Z (bv 8))
       (npages : nat) (K : nat) (eb : bool) (p : mword 64)
@@ -211,7 +212,7 @@ End UVMUNMAP.
 (* the [proc_pt] statement above, unchanged.                              *)
 (* --------------------------------------------------------------------- *)
 
-Definition wp_uvmunmap_bare_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_uvmunmap_bare_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (mm : regfile)
     (uroot : mword 44) (um : gmap (mword 27) (mword 64))
     (npages : nat) (K : nat) (eb : bool) (p : mword 64)
@@ -251,7 +252,7 @@ Definition wp_uvmunmap_bare_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{
 
 Module Type UVMUNMAP_BARE.
   Parameter wp_uvmunmap_bare_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (mm : regfile)
       (uroot : mword 44) (um : gmap (mword 27) (mword 64))
       (npages : nat) (K : nat) (eb : bool) (p : mword 64)
@@ -292,7 +293,7 @@ End UVMUNMAP_BARE.
 (* [ProofUvmunmap.UvmunmapCore] is generic in [do_free] and seals here.    *)
 (* --------------------------------------------------------------------- *)
 
-Definition wp_uvmunmap_fixed_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_uvmunmap_fixed_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (mm : regfile)
     (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
     (um : gmap (mword 27) (mword 64)) (v : mword 27)
@@ -335,7 +336,7 @@ Definition wp_uvmunmap_fixed_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `
 
 Module Type UVMUNMAP_FIXED.
   Parameter wp_uvmunmap_fixed_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (mm : regfile)
       (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
       (um : gmap (mword 27) (mword 64)) (v : mword 27)

@@ -33,6 +33,8 @@ From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Require Import Riscv.rv64d.
 Require Import SpecMemset.
+Require Import TsoCtx TsoCtxShim.   (* converted spec; shim = the interior
+   seam to the UNCONVERTED parts (SpecMemsetParts) this proof composes *)
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
@@ -41,7 +43,7 @@ Module MemsetArrayProof (Memset : MEMSET_PARTS) : MEMSET.
 
 Section WpMemsetArray.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Context {kt : ktier}.
   Context {ktb : ktier}.
@@ -272,7 +274,8 @@ Section WpMemsetArray.
     iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! mfin with "Hcg Hpc [Hbuf] [%]").
     - iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H".
-      iEval (rewrite ms_pa_ms_addr) in "H". iExact "H".
+      iEval (rewrite ms_pa_ms_addr) in "H".
+      iExact "H".
     - (* callee_saved m0 mfin: only sp/s0 moved *)
       assert (Hcatch : forall r : regidx,
                 r <> Regidx (mword_of_int 1 : mword 5) -> r <> Regidx s0_idx -> r <> Regidx csp_rs1 ->

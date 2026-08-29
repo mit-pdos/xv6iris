@@ -59,12 +59,16 @@ Require Import UCodeSh USpecSh.
 Require Import UProofShParse UProofShCmd UProofShMain.
 Require User.ShSyms User.ShInstrs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 Section UProofShEcho.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId}.
+  (* user code runs AS the thread: ambient context, and a
+     reschedule moves the hart, never the context. *)
+  Context `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
   Context (gin gbrk : gname) (hbase hlen : Z).
 

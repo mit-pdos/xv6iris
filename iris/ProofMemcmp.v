@@ -32,7 +32,7 @@
 
    EXPLICIT-CPUID: the whole function threads a generic [b : bool].
    [mc_tail] is a non-recursive fragment, so it takes its own leading
-   (shadowing) hart [`{CID0 : CpuId}`].  [mc_loop] recurses via
+   (shadowing) hart [`{CID0 : CpuId} `{XI : CurCtx}`].  [mc_loop] recurses via
    [induction rem], so it needs TWO harts kept separate: [CIDh] (its
    [Hcont]'s fixed anchor, forwarded unchanged across every recursive call)
    and [CID0] (this iteration's own entry hart). *)
@@ -57,6 +57,7 @@ Require Import SpecMemcmp.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -69,7 +70,7 @@ Module MemcmpProof : MEMCMP.
 
 Section ProofMemcmp.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -183,8 +184,8 @@ Section ProofMemcmp.
     sie_cap_gpr KT1 (CID := CID0) Mt (K - 2)%nat b p -∗
     kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.memcmp + 0x2e) : mword 64) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
     wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved mm mf /\ mf !!! Regidx Ra0 = rv⌝ -∗

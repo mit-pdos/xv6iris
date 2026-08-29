@@ -1,4 +1,5 @@
 (* Ktier.v -- the KERNEL-TRANSLATION TIER of a datum, and the ambient tier
+Require TsoCtx.   (* qualified: the class only, no notation flip *)
    class.  A pure file: no project imports, nothing but the two-point
    lattice, its order class, and the ambient-tier class the notations
    elaborate through (claude-notes/projects/sp-migration.md, design §1/§4/§6).
@@ -31,7 +32,7 @@
    is unchanged.  Explicit-tier statements use the bracket spellings
    ([a ↦ₘ[KT1] v]) or the named argument [(KTR := kt)].
 
-   DELIBERATE DEVIATION from the weak-memory branch's [CurCtx], which has
+   DELIBERATE DEVIATION from the weak-memory branch's [TsoCtx.CurCtx], which has
    ZERO instances by design: [CurKtier] carries a GLOBAL DEFAULT [KT0] at
    LOW priority (100), so any local pin beats it regardless of declaration
    order and the ~430 use-only consumer files need no annotation at all.

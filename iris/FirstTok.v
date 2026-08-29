@@ -45,6 +45,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvModelBytes.
 Require Import KernelText KernelDataInv.
 Require Import WpLock.
+Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Require Import FdSlots.
 Require Import WpUart.
 Require Import DiskInv.
@@ -214,6 +215,7 @@ Section FirstTok.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
   Context `{!xv6G Σ, !bioslotG Σ} `{ICFG : icfg}.
+  Context `{XI : CurCtx}.
 
   (* ================================================================== *)
   (*  1.  THE PERSISTENT HALF -- what main has built by +0x9e             *)
@@ -242,8 +244,7 @@ Section FirstTok.
      dev_inv fsc_uart fsc_disk ∗
      (∃ pd pav pu : mword 64,
         disk_geom fsc_disk pd pav pu ∗
-        is_lock fsc_dlock d_lock "virtio_disk"%string
-                (disk_res fsc_disk pd pav pu)) ∗
+        is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }>) ∗
      is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst
                 icfg_nib icfg_dev ∗
      itable_inv ∗
@@ -252,7 +253,7 @@ Section FirstTok.
      ireg_reg fsc_ireg fsc_fs icfg_ist icfg_nib ∗
      bitmap_reg fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
-       (kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) ∗
+       (λ ξ : CtxId, kmem_res (XIk := ξ) fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) ∗
      ⌜fs_geom_ok⌝)%I.
 
   Global Instance first_boot_persist_persistent : Persistent first_boot_persist.
@@ -611,7 +612,7 @@ Section FirstTok.
     first_addr ↦₄□ (mword_of_int 0 : mword 32) -∗ False.
   Proof.
     iIntros "H1 H2".
-    iDestruct (word4_pointsto_agree with "H1 H2") as %Hv.
+    iDestruct (ctx_word4_pointsto_agree with "H1 H2") as %Hv.
     exfalso. revert Hv. vm_compute. discriminate.
   Qed.
 

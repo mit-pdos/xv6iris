@@ -38,6 +38,8 @@ From Kernel Require KernelSyms.
 Require Import SpecWalk.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx TsoCtxShim.   (* memset's spec is CONVERTED (tso-port
+   leg M); this caller is not yet -- the shim marks the open seam *)
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -75,7 +77,7 @@ Section ProofWalk.
   (* ================================================================= *)
   (* THE SHARED EPILOGUE (+0x52..+0x64) -- sconf mirror.                 *)
   (* ================================================================= *)
-  Lemma wp_walk_epilogue_sconf `{GEN : GenId} `{CID : CpuId} (γa : gname) (γk : gname * gname)
+  Lemma wp_walk_epilogue_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γa : gname) (γk : gname * gname)
       (mm Mf : regfile) (t tf : ptree) (K : nat) (lvl : nat)
       (eb : bool) (p : mword 64) (on : option nat) (q : nat) (b : bool) (lks : gset string) :
     let va := mm !!! Regidx (mword_of_int 11) in
@@ -361,7 +363,7 @@ Section ProofWalk.
   (* ================================================================= *)
   (* THE SHARED TAIL (+0x46..+0x50) -- sconf mirror.                     *)
   (* ================================================================= *)
-  Lemma wp_walk_tail_sconf `{GEN : GenId} `{CID : CpuId} (γa : gname) (γk : gname * gname)
+  Lemma wp_walk_tail_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γa : gname) (γk : gname * gname)
       (mm Mf : regfile) (t tf : ptree) (b0 : mword 44) (K : nat) (lvl : nat)
       (eb : bool) (p : mword 64) (on : option nat) (q : nat) (b : bool) (lks : gset string) :
     let va := mm !!! Regidx (mword_of_int 11) in
@@ -528,7 +530,7 @@ Section ProofWalk.
   (* ================================================================= *)
   (* THE LOOP BODY'S STRAIGHT-LINE CORE (+0x26..+0x36) -- sconf mirror.  *)
   (* ================================================================= *)
-  Lemma wp_walk_probe_sconf `{GEN : GenId} `{CID : CpuId}
+  Lemma wp_walk_probe_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (M : regfile) (n : nat) (va shift : mword 64) (slotaddr pte : mword 64) (b : bool) (p : mword 64) {dqm : dfrac} :
     M !!! Regidx (mword_of_int 19 : mword 5) = va ->
     M !!! Regidx (mword_of_int 20 : mword 5) = shift ->
@@ -648,7 +650,7 @@ Section ProofWalk.
   Qed.
 
   (* ===== memset-zero page wrapper (keeps the zeroed bytes) ===== *)
-  Lemma wp_memset_page_zero_sconf `{GEN : GenId} `{CID : CpuId}
+  Lemma wp_memset_page_zero_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64) :
     let a0_idx : mword 5 := mword_of_int 10 in
     let a1_idx : mword 5 := mword_of_int 11 in
@@ -684,6 +686,9 @@ Section ProofWalk.
       as (olds) "Hbuf".
     assert (Ha2' : m0 !!! Regidx a2_idx = (mword_of_int (Z.of_nat 4096) : mword 64))
       by (rewrite Ha2; f_equal; vm_compute; reflexivity).
+    (* memset's contract is context-indexed AND so is [page_own] since the M1
+       flip: both sides are the SAME ctx fact now, so the crossing is gone --
+       only the tier annotation is re-fixed, per byte. *)
     iApply (MemsetArray.wp_memset_sconf kt KT0 m0 n 4096 cval olds b pcur
               Hn ltac:(vm_compute; reflexivity) Hcval Ha2'
               with "Hcg Htext Hpc [Hbuf]").
@@ -697,7 +702,7 @@ Section ProofWalk.
   (* ================================================================= *)
   (* THE SHARED ALLOCATION ARM (+0x72..+0x94) -- sconf mirror.           *)
   (* ================================================================= *)
-  Lemma wp_walk_alloc_sconf `{GEN : GenId} `{CID : CpuId} (γa : gname) (γk : gname * gname)
+  Lemma wp_walk_alloc_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γa : gname) (γk : gname * gname)
       (mm Mf : regfile) (tf : ptree)
       (tG : mword 44 -> ptree) (N clvl : nat)
       (cellA : mword 64) (w0 : bv 64) (K : nat) (lvl : nat)
@@ -982,6 +987,9 @@ Section ProofWalk.
     iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
     iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
       "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb & _)".
+    (* [KMap] is BELOW the seam -- its [↦ₘ] is the raw byte -- so the memset
+       window crosses out of the context here, by name. *)
+    iDestruct (TsoCtxShim.ctx_buf_to_mem with "Hbytes") as "Hbytes".
     iDestruct (mem_page_to_phys (mr !!! Regidx (mword_of_int 10 : mword 5)) (DfracOwn 1) (mword_of_int 0 : mword 8)
                  ltac:(intros j Hj; apply kdata_svpn_class;
                        apply page_in_range_addr_is_kdata; [exact Hpv | exact Hj])
@@ -1140,7 +1148,7 @@ Section ProofWalk.
      recipe -- drop the leading [gname], thread a trailing [(b : bool)]
      through [sie_cap_gpr]/[cpu_own], wrap every [Hcont]-shaped
      continuation in [wp_next b (fun CID => ...)], give each lemma its
-     OWN implicit `{GEN : GenId} `{CID : CpuId}` binder (they apply each other at a
+     OWN implicit `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}` binder (they apply each other at a
      hart a [wp_next] crossing may have moved to), delete the two
      now-provably-vacuous premises every one of these lemmas carried
      ([Mf !!! Regidx 4 = mm !!! Regidx 4] and [mm !!! Regidx 4 =
@@ -1198,7 +1206,7 @@ Section ProofWalk.
      call rather than silently passing on an incorrect proof. *)
   (* ============================================================= *)
 
-  Lemma wp_walk_loop_sconf `{GEN : GenId} `{CID : CpuId} (γa : gname) (γk : gname * gname)
+  Lemma wp_walk_loop_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γa : gname) (γk : gname * gname)
       (mm Mf : regfile) (t cur : ptree) (L : nat) (w : mword 64) (K : nat) (lvl : nat)
       (eb : bool) (p : mword 64) (on : option nat) (g : nat) (b : bool) (lks : gset string) :
     let va := mm !!! Regidx (mword_of_int 11) in
@@ -1681,7 +1689,7 @@ Section ProofWalk.
                   with "Hcg Hcnt Htext Hpc Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Htf Henv Hcont").
   Qed.
 
-  Lemma wp_walk_sconf `{GEN : GenId} `{CID : CpuId} (γa : gname) (γk : gname * gname)
+  Lemma wp_walk_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γa : gname) (γk : gname * gname)
       (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat)
       (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string)

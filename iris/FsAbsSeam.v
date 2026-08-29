@@ -96,6 +96,7 @@ Require Import DirViewLend.     (* [dv_ride]                                  *)
 Require Import IcacheEscrow.    (* Require Export's DirViewG; the three arms  *)
 Require Import Xv6G.            (* the bundle                                 *)
 Require Import FsAbs.           (* LAST: [nview], [abs_of], [lend_reads]      *)
+Require TsoCtx.   (* qualified: the class only, no notation flip *)
 
 Local Open Scope Z_scope.
 
@@ -135,6 +136,7 @@ Section FsAbsSeam.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId}.
   Context `{ICFG : icfg}.
+  Context `{XI : TsoCtx.CurCtx}.
 
   (* =================================================================== *)
   (*  2.  THE SEAM: the two payload conjuncts against a lent [dv_half]    *)

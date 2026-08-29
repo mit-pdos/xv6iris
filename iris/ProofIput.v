@@ -156,6 +156,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Set Printing Depth 40.
 
@@ -435,6 +436,7 @@ Local Ltac nz  := vm_compute; discriminate.
 
 Section IputCommon.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   Notation Rra  := (mword_of_int 1 : mword 5).
   Notation Rs0  := (mword_of_int 8 : mword 5).
@@ -510,6 +512,7 @@ End IputCommon.
 
 Section IputTail.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   Notation Rra  := (mword_of_int 1 : mword 5).
   Notation Rs0  := (mword_of_int 8 : mword 5).
@@ -843,7 +846,7 @@ Section IputTail.
     assert (HD5sp : D5 !!! Regidx csp_rs1 = spd)
       by (rewrite (HD5thr csp_rs1 ltac:(vm_compute; reflexivity)); exact HDsp).
     iApply (Release.wp_release_sconf KT1 fsc_itlock itable_lock "itable"%string
-              (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) D5
+              <{ itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev }> D5
               0%nat eb pj (K - 6)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HD5a0; reflexivity) ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
@@ -1061,7 +1064,7 @@ Section IputTail.
     iApply fupd_wp.
     iMod (iref_load_locked_au ⊤ Mt k ltac:(solve_ndisj) Hk with "Hinv Hhalf")
       as "[Hcellp Hbackp]".
-    iDestruct (wordw_claim_of (KTR := KT0) 4 (i_ref (ientry k))
+    iDestruct (ctx_word4_claim (KTR2 := KT0) (i_ref (ientry k))
                  (DfracOwn 1) (iref_word Mt k) ltac:(lia) with "Hcellp")
       as "#Hclaim0".
     iMod ("Hbackp" with "Hcellp") as "Hhalf".
@@ -1360,6 +1363,7 @@ End IputTail.
 
 Section IputFreePath.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   Notation Rra  := (mword_of_int 1 : mword 5).
   Notation Rs0  := (mword_of_int 8 : mword 5).
@@ -1524,7 +1528,7 @@ Section IputFreePath.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     bslots 2 -∗
     log_epoch_lb icfg_log v -∗
@@ -2434,7 +2438,7 @@ Section IputFreePath.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     bslots 3 -∗
     (* THE GROUP CREDIT (fs-log.md §G.18's chain, §G.21's tier; [SpecIput]'s
        [wp_iput_gen_body] premise verbatim).  At [crz = false] this is [emp]
@@ -2558,7 +2562,7 @@ Section IputFreePath.
        keeps one half ([Hinh], with [Hidv]) and the SURPLUS half -- which this
        body used to drop on the floor -- is fed to the entry's re-assembly
        wand together with the borrowed [ic_id] and the FROZEN PARK. ---- *)
-    iDestruct (word4_pointsto_half_split with "Hnfull") as "[Hinh Hnsurp]".
+    iDestruct (ctx_word4_pointsto_half_split with "Hnfull") as "[Hinh Hnsurp]".
     iDestruct "Hlvq2" as (gr) "Hlvr".
     iDestruct (live_gen_agree with "Hlvr Hlvh") as %->.
     (* ================================================================
@@ -2607,8 +2611,8 @@ Section IputFreePath.
        park, where the ordinary path enters it too.
        ================================================================ *)
     iDestruct "Hvldx" as (w0) "Hva".
-    iDestruct (word4_pointsto_agree with "Hvb Hva") as %<-.
-    iDestruct (word4_pointsto_half_join with "Hvb Hva") as "Hvld".
+    iDestruct (ctx_word4_pointsto_agree with "Hvb Hva") as %<-.
+    iDestruct (ctx_word4_pointsto_half_join with "Hvb Hva") as "Hvld".
     iMod (ic_dep_checkout fsc_ic k (DepFrz q icfg_dev inum tid qtx) with "Hictok")
       as "[Hdep Hdepa]".
     iMod ("Hclose" with "[Hdepa Hfrg Hrident Hsele Htx Hmt Hgida Hpinr]") as "_".
@@ -2667,7 +2671,7 @@ Section IputFreePath.
     { intros c Hcs. rewrite /H3 upd_ne; [| regne].
       rewrite /H2 upd_ne; [| regne]. rewrite /H1 upd_ne; [reflexivity | regne]. }
     iApply (Release.wp_release_sconf KT1 fsc_itlock itable_lock "itable"%string
-              (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) H3
+              <{ itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev }> H3
               0%nat eb pj (K - 6)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HH3a0; reflexivity) ltac:(lia)
               with "Hcg Htext Hpc [Hitlk] Htok HRres Hcnt Hpay").
@@ -2847,7 +2851,7 @@ Section IputFreePath.
     (* THE ADDRESS CLAIM: no peek at all here -- since IVd the whole valid
        word has been in this thread's hand across [itrunc], so the claim
        comes straight off [Hvld] (persistent, so [Hvld] stays). *)
-    iDestruct (wordw_claim_of (KTR := KT0) 4 (i_valid (ientry k))
+    iDestruct (ctx_word4_claim (KTR2 := KT0) (i_valid (ientry k))
                  (DfracOwn 1) (valid_word true) ltac:(lia) with "Hvld")
       as "#Hclaim70".
     iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iput + 0x70)) Rz Rs1
@@ -2981,12 +2985,12 @@ Section IputFreePath.
     iDestruct (cpu_own_transport CIDrs CIDm9 0%nat eb pj eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf KT1 fsc_itlock "itable"%string
-              (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) J9
+              <{ itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev }> J9
               0%nat eb pj (K - 6)%nat eb lks ltac:(lia) ltac:(lia) Hitbelow
               with "Hcg Hcnt Htext Hpc [Hitlk]").
     all: try lkbelow.
     { iEval (rewrite HJ9a0). iApply (is_itable2_lock with "Hitlk"). }
-    iIntros (CIDac2 Hsac2 ms2 macq2) "%Hmsf2 Hcg Hpc %Hap2 Htok HRres2 Hcnt Hpay".
+    iIntros (CIDac2 Hsac2 ms2 macq2) "%Hmsf2 Hcg Hpc %Hap2 Htok HRres2 _ Hcnt Hpay".
     assert (Hpc86 : ret_pc (J9 !!! Regidx Rra) = mword_of_int (KernelSyms.iput + 0x86))
       by (rewrite HJ9ra; pcw).
     iEval (rewrite Hpc86) in "Hpc".
@@ -3027,7 +3031,7 @@ Section IputFreePath.
     iApply fupd_wp.
     iMod (iref_load_locked_au ⊤ Mt2 k ltac:(solve_ndisj) Hk with "Hitinv Hhalf")
       as "[Hcellp Hbackp]".
-    iDestruct (wordw_claim_of (KTR := KT0) 4 (i_ref (ientry k))
+    iDestruct (ctx_word4_claim (KTR2 := KT0) (i_ref (ientry k))
                  (DfracOwn 1) (iref_word Mt2 k) ltac:(lia) with "Hcellp")
       as "#Hclaim86".
     iMod ("Hbackp" with "Hcellp") as "Hhalf".
@@ -3401,7 +3405,7 @@ Section IputFreePath.
     { intros c Hcs. rewrite /G3 upd_ne; [| regne].
       rewrite /G2 upd_ne; [| regne]. rewrite /G1 upd_ne; [reflexivity | regne]. }
     iApply (Release.wp_release_sconf KT1 fsc_itlock itable_lock "itable"%string
-              (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) G3
+              <{ itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev }> G3
               0%nat eb pj (K - 6)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HG3a0; reflexivity) ltac:(lia)
               with "Hcg Htext Hpc [Hitlk] Htok HRres3 Hcnt Hpay").
@@ -3752,7 +3756,7 @@ Section IputFreePath.
           RE-ASSEMBLY WAND.  [ip_free_locked] re-opens the HELD arm at its
           own 0x76 [ic_open_held] regardless, and that returns [i_inum ↦₄
           inum] WHOLE -- whose surplus half its body TODAY DROPS on the floor
-          (IputFreeLockedDev.v:586, [iDestruct (word4_pointsto_half_split
+          (IputFreeLockedDev.v:586, [iDestruct (ctx_word4_pointsto_half_split
           with "Hnfull") as "[Hinh _]"]).  Feeding that dropped half and the
           borrowed [ic_id] to this wand rebuilds both resources exactly.
           FLAGGED SEAM: ip_free_locked's premise list needs the matching
@@ -3963,7 +3967,7 @@ Section IputFreePath.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     bslots 3 -∗
     log_epoch_lb icfg_log v -∗
     log_credit icfg_log cru Sb e0 (IBLOCK inum icfg_ist) -∗
@@ -4099,7 +4103,7 @@ Section IputFreePath.
             ltac:(solve_ndisj) HMk1 with "Hitinv Hbodyp Hhalf Hrtok Hrident")
       as "(Hhalf & Hrtok & Hrident & Harmp & Hparkp)".
     iDestruct "Harmp" as (vp gap) "(Hidvp & Hinhp & Hvldp & Hpaylp & Hmtp & Hgidap)".
-    iDestruct (wordw_claim_of (KTR := KT0) 4 (i_valid (ientry k))
+    iDestruct (ctx_word4_claim (KTR2 := KT0) (i_valid (ientry k))
                  (DfracOwn 1) (valid_word vp) ltac:(lia) with "Hvldp")
       as "#Hclaim3a".
     iMod ("Hclosep" with "[Hparkp Hidvp Hinhp Hvldp Hpaylp Hmtp Hgidap]") as "_".
@@ -4172,11 +4176,11 @@ Section IputFreePath.
         iDestruct "Hrident" as "[Hrd Hrn]".
         iEval (rewrite /islot_rest_at Ert) in "Hrest".
         iDestruct "Hrest" as "[Htd Htn]".
-        iDestruct (word4_pointsto_frac_split (i_inum (ientry k)) q qr inum) as "[_ Hjn]".
+        iDestruct (ctx_word4_pointsto_frac_split cur_ctx (i_inum (ientry k)) q qr inum) as "[_ Hjn]".
         iDestruct ("Hjn" with "[$Hrn $Htn]") as "Hn2".
         iEval (rewrite -Hsum) in "Hn2".
-        iDestruct (word4_pointsto_half_join with "Hinh Hn2") as "Hnfull".
-        iDestruct (word4_pointsto_half_split with "Hvld") as "[Hva Hvb]".
+        iDestruct (ctx_word4_pointsto_half_join with "Hinh Hn2") as "Hnfull".
+        iDestruct (ctx_word4_pointsto_half_split with "Hvld") as "[Hva Hvb]".
         (* THE WINDOW IS ENTERED HERE (durable-disk B''-tx5): the parked
            arm's pin was at rest, the share is the caller's, and the two go
            into [ic_held] together while this walk keeps the other half. *)
@@ -4409,7 +4413,7 @@ Section IputFreePath.
             with "Hitinv Hbodyp Hhalf Hrfrg Hrlv Hlvh Hgid Hvb Hpayl")
       as "(Hhalf & Hrfrg & Hrlv & Hlvh & Hgid & Hvb & Hpayl & Hidvp & Hnfullp
            & Hvldxp & Hmtp & Hgidap & Hpintxp)".
-    iDestruct (wordw_claim_of (KTR := KT0) 4 (i_inum (ientry k))
+    iDestruct (ctx_word4_claim (KTR2 := KT0) (i_inum (ientry k))
                  (DfracOwn 1) inum ltac:(lia) with "Hnfullp") as "#Hclaim46".
     iDestruct "Hvldxp" as (w0p) "Hvap".
     iMod ("Hclosep" with "[Hidvp Hnfullp Hvap Hmtp Hgidap Hpintxp]") as "_".
@@ -4568,12 +4572,12 @@ Section IputFreePath.
          so does the arm's liveness half (A⁗, §3.16). *)
       iDestruct (ic_payload_at_pack_np with "Hpayl") as "Hpayl".
       iDestruct "Hvldx" as (w0) "Hva".
-      iDestruct (word4_pointsto_agree with "Hvb Hva") as %<-.
-      iDestruct (word4_pointsto_half_join with "Hvb Hva") as "Hvld".
+      iDestruct (ctx_word4_pointsto_agree with "Hvb Hva") as %<-.
+      iDestruct (ctx_word4_pointsto_half_join with "Hvb Hva") as "Hvld".
       (* the FULL inum cell splits back: the arm's half, our q, the table's qr *)
-      iDestruct (word4_pointsto_half_split with "Hnfull") as "[Hinh Hn2]".
+      iDestruct (ctx_word4_pointsto_half_split with "Hnfull") as "[Hinh Hn2]".
       iEval (rewrite Hsum) in "Hn2".
-      iDestruct (word4_pointsto_frac_split (i_inum (ientry k)) q qr inum with "Hn2")
+      iDestruct (ctx_word4_pointsto_frac_split cur_ctx (i_inum (ientry k)) q qr inum with "Hn2")
         as "[Hrn Htn]".
       iMod ("Hclose" with "[Hidv Hinh Hvld Hpayl Hoff Hlvh Hpin Hmt Hgida]") as "_".
       { iApply bi.later_intro. iApply ic_close_parked.
@@ -4799,7 +4803,7 @@ Section IputFreePath.
       with "[Htd Hiu Hback Hrd Hcnt1]" as "Hwand".
     { iIntros "Hn2 Hgid2 Hpk".
       iEval (rewrite Hsum) in "Hn2".
-      iDestruct (word4_pointsto_frac_split (i_inum (ientry k)) q qr inum with "Hn2")
+      iDestruct (ctx_word4_pointsto_frac_split cur_ctx (i_inum (ientry k)) q qr inum with "Hn2")
         as "[Hrn Htn]".
       iDestruct ("Hback" $! Mt ci with "[%] [%] [Htd Htn Hiu Hgid2 Hcnt1 Hpk]") as "Hslots";
         [ intros i Hi; reflexivity | intros i Hi; reflexivity | | ].
@@ -4837,7 +4841,7 @@ End IputFreePath.
 
 Section ProofIput.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra  := (mword_of_int 1 : mword 5).
   Notation Rs0  := (mword_of_int 8 : mword 5).
@@ -5081,14 +5085,14 @@ Section ProofIput.
     iDestruct (cpu_own_transport CID CID9 0%nat eb pj eb ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf KT1 fsc_itlock "itable"%string
-              (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) mA
+              <{ itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev }> mA
               0%nat eb pj (K - 6)%nat eb lks
               ltac:(lia) ltac:(lia)
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc [Hitab]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iApply (is_itable2_lock with "Hitab"). }
-    iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
+    iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
     assert (Hpc18 : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.iput + 0x18)).
     { rewrite HmAra. pcw. }
     iEval (rewrite Hpc18) in "Hpc".
@@ -5127,7 +5131,7 @@ Section ProofIput.
     iApply fupd_wp.
     iMod (iref_load_locked_au ⊤ Mt k ltac:(solve_ndisj) Hk with "Hinv Hhalf")
       as "[Hcellp Hbackp]".
-    iDestruct (wordw_claim_of (KTR := KT0) 4 (i_ref (ientry k))
+    iDestruct (ctx_word4_claim (KTR2 := KT0) (i_ref (ientry k))
                  (DfracOwn 1) (iref_word Mt k) ltac:(lia) with "Hcellp")
       as "#Hclaim18".
     iMod ("Hbackp" with "Hcellp") as "Hhalf".

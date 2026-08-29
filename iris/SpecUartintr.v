@@ -61,12 +61,13 @@ Require Import SpecConsoleintr.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 
 (* uartintr's own frame is 4 slots; the deepest callee is consoleintr at 32
    (wakeup wants 18, acquire and release 10). *)
 Notation uartintr_stack := (36%nat) (only parsing).
-Definition wp_uartintr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_uartintr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γu : uart_names) (γv : disk_names)
      (γs : list gname)
     (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (b : bool) (lks : gset string) :=
@@ -113,7 +114,7 @@ Definition wp_uartintr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
 
 Module Type UARTINTR.
   Parameter wp_uartintr_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γu : uart_names) (γv : disk_names)
       (γs : list gname)
       (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (b : bool) (lks : gset string),

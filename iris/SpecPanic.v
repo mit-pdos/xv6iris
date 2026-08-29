@@ -86,6 +86,7 @@ Require Import UartTxInv.
 Require Import PrintkArgs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -95,12 +96,13 @@ Notation panic_stack := (52%nat) (only parsing).
 Section PanicEnv.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId}.
+  Context `{XI : CurCtx}.
 
   (* the three persistent credentials the printk cone needs, as one
      hypothesis.  All hart-free, so this crosses a migration untouched. *)
   Definition panic_env_at (γpr γl : gname) (γd : uart_names) (γv : disk_names)
     : iProp Σ :=
-    (is_lock γpr pk_pr_lock "pr"%string (emp : iProp Σ) ∗
+    (is_lock γpr pk_pr_lock "pr"%string <{ emp : iProp Σ }> ∗
      dev_inv γd γv ∗
      is_txlock γl γd)%I.
 
@@ -149,7 +151,7 @@ Section PanicEnv.
 
   (* the shape a site actually has in hand: the three credentials loose. *)
   Lemma panic_env_of γpr γl γd γv :
-    is_lock γpr pk_pr_lock "pr"%string (emp : iProp Σ) -∗
+    is_lock γpr pk_pr_lock "pr"%string <{ emp : iProp Σ }> -∗
     dev_inv γd γv -∗ is_txlock γl γd -∗ panic_env.
   Proof.
     iIntros "#Hl #Hd #Ht". iExists γpr, γl, γd, γv.
@@ -158,7 +160,7 @@ Section PanicEnv.
 
 End PanicEnv.
 
-Definition wp_panic_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_panic_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (kt : ktier) (m : regfile) (K : nat)
     (n : nat) (eb : bool) (b : bool) (p : mword 64)
     (dm : pk_arg_desc) (lks : gset string) :=
@@ -182,7 +184,7 @@ Definition wp_panic_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : C
 
 Module Type PANIC.
   Parameter wp_panic_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (kt : ktier) (m : regfile) (K : nat)
       (n : nat) (eb : bool) (b : bool) (p : mword 64)
       (dm : pk_arg_desc) (lks : gset string),

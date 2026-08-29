@@ -130,6 +130,7 @@ Require Export FastSetSolver.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* ===================================================================== *)
 (*  1.  THE PURE DECODE: every 1024-byte block IS sixteen dinodes         *)
@@ -1424,6 +1425,7 @@ Proof. rewrite /ci_inums map_to_list_empty //. Qed.
 Section IcacheBootTable.
   Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, !irefslotG Σ}.
   Context `{GEN : GenId}.
+  Context `{XI : CurCtx}.
 
   (* ONE itable ENTRY'S RAW CELLS -- what the loader leaves and iinit does
      not touch: the two identity words at arbitrary contents, the [valid]
@@ -1735,7 +1737,7 @@ Section IcacheBootTable.
          with [islot_empty] and a quarter goes to the pool's invariant, where
          it is what makes the partition speak about this escrow. *)
       iDestruct (ic_id_quarters_split with "Hgd2") as "[Hgd2 Hgd3]".
-      iDestruct (word4_pointsto_half_split with "Hn") as "[Hn1 Hn2]".
+      iDestruct (ctx_word4_pointsto_half_split with "Hn") as "[Hn1 Hn2]".
       iMod (inv_alloc (icEscN .@ k) E (ic_escrow_body cn γfs γi cov logstart k)
               with "[Hd Hn1 Hv Hmir Hmd Hgd1 Hpin]") as "#Hinv".
       { iApply bi.later_intro. rewrite /ic_escrow_body. iRight. iRight. iRight. iLeft.
@@ -1766,8 +1768,9 @@ Section IcacheBootTable.
         rewrite /islot2 !lookup_empty. done. }
       rewrite ci_inums_empty difference_empty_L. iExact "Hpool". }
     iMod (newlock_at E γl itable_lock "itable"%string
-            (itable_res2 cn γfs γi cov logstart nib dv)
-            with "Hfree Hnm Hlkw Hcpu Hres") as "#Hlock".
+            <{ itable_res2 cn γfs γi cov logstart nib dv }>
+            with "Hfree Hnm Hlkw [Hcpu] Hres") as "#Hlock".
+    { iApply (lk_cpu_ready_intro with "Hcpu"). }
     (* ---- the fifty inode sleeplocks, sealed over the checkout tokens ---- *)
     iDestruct (big_sepL_sep_2 with "Hsl Htok") as "Hsl".
     (* THE DEPOSIT IS KEYED BY THE SLOT, NOT BY THE LOCK.  What a holder

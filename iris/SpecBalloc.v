@@ -53,7 +53,7 @@
 
      - [γpr] and the two PERSISTENT credentials [kernel_data] and
        [printk_env γpr γu γd] (the format string itself needs no premise:
-       [KernelDataInv.kernel_data_string] mints its persistent [↦ₛ□] out of
+       [KernelDataInv.kernel_data_string_all] mints its persistent string out of
        [kernel_data]);
      - printk's contract as a [Prop] HYPOTHESIS
        ([SpecPrintk.printk_gen_contract]), never as a functor argument.
@@ -132,6 +132,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -141,7 +142,7 @@ Local Open Scope Z_scope.
    printk_stack).  bread wants 40, log_write 18 and brelse less. *)
 Notation K_balloc := (68%nat) (only parsing).
 Definition wp_balloc_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
@@ -214,7 +215,7 @@ Definition wp_balloc_sconf_body
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
   (* TWO slot units: the bitmap buffer is bread and log_written (log_write
      wants a free unit for its bpin) before it is brelsed, and bzero then
      does the same for the data block. *)
@@ -291,7 +292,7 @@ Definition wp_balloc_sconf_body
    forgotten, and is unchanged: every existing caller keeps threading
    [log_op]. *)
 Definition wp_balloc_gen_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
@@ -347,7 +348,7 @@ Definition wp_balloc_gen_body
   procs_inv γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
   bslots 2 -∗
   (* THE RESERVATION.  Two units must be in hand either way -- log_write's
      own "a unit in hand" requirement holds on the absorbing arm too. *)
@@ -390,7 +391,7 @@ Module Type BALLOC.
      set-forgetting instance at [cr = false], kept as its own parameter so
      that every existing caller is unchanged. *)
   Parameter wp_balloc_gen :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -408,7 +409,7 @@ Module Type BALLOC.
                          pidv dq dqb dqs m K eb b lks Upr.
 
   Parameter wp_balloc_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)

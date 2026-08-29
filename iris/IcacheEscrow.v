@@ -200,6 +200,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* ===================================================================== *)
 (*  0.  GHOST NAMES                                                       *)
@@ -220,6 +221,7 @@ Section IcacheEscrow.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId}.
   Context `{ICFG : icfg}.
+  Context `{XI : CurCtx}.
 
   (* THE STRUCTURAL Timeless PEELER, and it lives HERE -- at the top of the
      section -- on purpose.  It used to sit ~700 lines down, so every instance
@@ -292,11 +294,11 @@ Section IcacheEscrow.
     a ↦₄ w1 -∗ a ↦₄{dq} w2 -∗ False.
   Proof.
     iIntros "H1 H2".
-    rewrite !word4_pointsto_unfold.
+    rewrite !ctx_word4_pointsto_unfold.
     iDestruct "H1" as "[_ H1]". iDestruct "H2" as "[_ H2]".
     change (seq 0 4) with ([0; 1; 2; 3]%nat).
     iDestruct "H1" as "[Hb1 _]". iDestruct "H2" as "[Hb2 _]".
-    iDestruct (mem_pointsto_ne with "Hb1 Hb2") as %Hne.
+    iDestruct (ctx_pointsto_ne with "Hb1 Hb2") as %Hne.
     iPureIntro. exact (Hne eq_refl).
   Qed.
 
@@ -1870,7 +1872,7 @@ Section IcacheEscrow.
      THE IDENTITY FRACTION IS NOT DECORATION EITHER: the +0x70 park has to
      pin the arm's existentially-bound [dev]/[inum] to the cells it is putting
      back, and on the LEFT that pin is [ic_dep_own_ident]'s.  Here it is this
-     conjunct, read with [word4_pointsto_agree] exactly as there.  It is a
+     conjunct, read with [ctx_word4_pointsto_agree] exactly as there.  It is a
      FRACTION, not the ½ discriminator halves: itrunc keeps those.
 
      AND IT IS STATED AT THE DESCRIPTOR, exactly as [ic_dep_own] is.  The
@@ -2415,8 +2417,8 @@ Section IcacheEscrow.
     iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | [Hvg | Hhd]]]]".
     - iDestruct "Hpk" as (dev' inum' v ga)
         "(Hid & Hin & Hvld & Hpay & Hmid & Hgid)".
-      iDestruct (word4_pointsto_agree with "Hrd Hid") as %<-.
-      iDestruct (word4_pointsto_agree with "Hrn Hin") as %<-.
+      iDestruct (ctx_word4_pointsto_agree with "Hrd Hid") as %<-.
+      iDestruct (ctx_word4_pointsto_agree with "Hrn Hin") as %<-.
       iDestruct ("Hresb" with "[$Hrd $Hrn]") as "Hown".
       rewrite /ic_payload_arm.
       iDestruct "Hpay" as "[(Hpay & Hoff & Hhalf & Hpin) | Hrcpt]"; last first.
@@ -2626,8 +2628,8 @@ Section IcacheEscrow.
           cbn in Hdg. discriminate. }
       iDestruct "Hres" as "[Hown Hhalf]".
       iDestruct (ic_dep_own_ident with "Hown") as (f) "[[Hidc Hinc] Hresb]".
-      iDestruct (word4_pointsto_agree with "Hidc Hid") as %->.
-      iDestruct (word4_pointsto_agree with "Hinc Hin") as %->.
+      iDestruct (ctx_word4_pointsto_agree with "Hidc Hid") as %->.
+      iDestruct (ctx_word4_pointsto_agree with "Hinc Hin") as %->.
       iDestruct ("Hresb" with "[$Hidc $Hinc]") as "Hown".
       iDestruct ("Hpayw" with "Hkept") as "Hpay".
       (* THE PARKED ARM'S 1/2 COMES BACK OUT OF THE DESCRIPTOR (§17.3 (A1)):
@@ -2784,8 +2786,8 @@ Section IcacheEscrow.
     - iDestruct "Hpk" as (dev' inum' v ga)
         "(Hidv & Hin & Hvld & Hpay & Hmidt & Hgid)".
       iDestruct "Hid" as "[Hidd Hidn]".
-      iDestruct (word4_pointsto_agree with "Hidd Hidv") as %<-.
-      iDestruct (word4_pointsto_agree with "Hidn Hin") as %<-.
+      iDestruct (ctx_word4_pointsto_agree with "Hidd Hidv") as %<-.
+      iDestruct (ctx_word4_pointsto_agree with "Hidn Hin") as %<-.
       iModIntro. iFrame "Hhalf Htok Hidd Hidn".
       iSplitR "".
       { iExists v, ga. iFrame. }
@@ -2885,8 +2887,8 @@ Section IcacheEscrow.
     - iDestruct "Hpk" as (dev' inum' v ga)
         "(Hidv & Hin & Hvld & Hpay & Hmidt & Hgid)".
       iDestruct "Hid" as "[Hidd Hidn]".
-      iDestruct (word4_pointsto_agree with "Hidd Hidv") as %<-.
-      iDestruct (word4_pointsto_agree with "Hidn Hin") as %<-.
+      iDestruct (ctx_word4_pointsto_agree with "Hidd Hidv") as %<-.
+      iDestruct (ctx_word4_pointsto_agree with "Hidn Hin") as %<-.
       iModIntro. iFrame "Hhalf Hfrq Hsel Hidd Hidn".
       iSplitR "".
       { iExists v, ga. iFrame. }
@@ -2977,7 +2979,7 @@ Section IcacheEscrow.
     - iDestruct "Hvg" as (devA inum' w)
         "(Hidv & Hin & Hvld & Hraw & Hmidt & Hgf' & Hpin)".
       iDestruct (ic_id_agree with "Hgf Hgf'") as %(_ & <- & <-).
-      iDestruct (word4_pointsto_half_join with "HinT Hin") as "Hin".
+      iDestruct (ctx_word4_pointsto_half_join with "HinT Hin") as "Hin".
       iMod (ic_id_flip cn k false true devT inumT devN inumN with "Hgf Hgf'")
         as "[Hg1 Hg2]".
       iModIntro. iFrame "Hin Hidv Hraw Hmidt Hg1 Hg2 Hpin".
@@ -3150,7 +3152,7 @@ Section IcacheEscrow.
     iIntros "Hg1 Hg2 Hd1 Hd2 Hin Hvld Hpay Hmt Hpin".
     iMod (ic_id_flip cn k true false dev inum dev inum with "Hg1 Hg2")
       as "[Hgf1 Hgf2]".
-    iDestruct (word4_pointsto_half_join with "Hd1 Hd2") as "Hd".
+    iDestruct (ctx_word4_pointsto_half_join with "Hd1 Hd2") as "Hd".
     (* the payload splits into the cells the empty arm keeps and the bundle
        the pool takes back *)
     iAssert (inode_raw (ientry k) ∗ ipool_shape_np γfs γi cov logstart inum)%I
@@ -3287,7 +3289,7 @@ Section IcacheEscrow.
     iIntros "Hg1 Hg2 Hd1 Hd2 Hin Hvld Hraw Hmt Hpin".
     iMod (ic_id_flip cn k true false dev inum dev inum with "Hg1 Hg2")
       as "[Hgf1 Hgf2]".
-    iDestruct (word4_pointsto_half_join with "Hd1 Hd2") as "Hd".
+    iDestruct (ctx_word4_pointsto_half_join with "Hd1 Hd2") as "Hd".
     iModIntro.
     iSplitR "Hgf2"; [| iExact "Hgf2"].
     iApply ic_close_empty. rewrite /ic_empty_arm.
@@ -3420,7 +3422,7 @@ Section IcacheEscrow.
     i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum.
   Proof.
     iIntros "Hmt Hgid Hid Hin Hvld Hpay Hlv Hpend Hoff Hpin".
-    iDestruct (word4_pointsto_half_split with "Hin") as "[Hin1 Hin2]".
+    iDestruct (ctx_word4_pointsto_half_split with "Hin") as "[Hin1 Hin2]".
     iSplitR "Hin2"; [| iExact "Hin2"].
     iLeft. rewrite /ic_parked.
     iExists dev, inum, false, g.
@@ -4228,11 +4230,11 @@ Section IcacheEscrow.
     a ↦₄ w1 -∗ a ↦₄{dq} w2 -∗ False.
   Proof.
     iIntros "H1 H2".
-    rewrite !word4_pointsto_unfold.
+    rewrite !ctx_word4_pointsto_unfold.
     iDestruct "H1" as "[_ H1]". iDestruct "H2" as "[_ H2]".
     change (seq 0 4) with ([0; 1; 2; 3]%nat).
     iDestruct "H1" as "[Hb1 _]". iDestruct "H2" as "[Hb2 _]".
-    iDestruct (mem_pointsto_ne with "Hb1 Hb2") as %Hne.
+    iDestruct (ctx_pointsto_ne with "Hb1 Hb2") as %Hne.
     iPureIntro. exact (Hne eq_refl).
   Qed.
 
@@ -5866,7 +5868,7 @@ Section IcacheEscrow.
       (γi : gname) (cov : gset Z) (logstart : Z) (nib : nat)
       (dv : mword 32) : iProp Σ :=
     (is_lock γl itable_lock "itable"%string
-       (itable_res2 cn γfs γi cov logstart nib dv) ∗
+       <{ itable_res2 cn γfs γi cov logstart nib dv }> ∗
      ipool_inv cn γfs γi cov logstart nib)%I.
 
   Global Instance is_itable2_persistent γl cn γfs γi cov logstart nib dv :
@@ -5876,7 +5878,7 @@ Section IcacheEscrow.
   Lemma is_itable2_lock γl cn γfs γi cov logstart nib dv :
     is_itable2 γl cn γfs γi cov logstart nib dv -∗
     is_lock γl itable_lock "itable"%string
-      (itable_res2 cn γfs γi cov logstart nib dv).
+      <{ itable_res2 cn γfs γi cov logstart nib dv }>.
   Proof. iIntros "[$ _]". Qed.
 
   Lemma is_itable2_pool γl cn γfs γi cov logstart nib dv :

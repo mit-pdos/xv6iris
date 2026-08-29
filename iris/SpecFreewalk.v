@@ -65,10 +65,11 @@ Require Import PtTree KvmSpec.
 Require Import PtFree.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 
 
-Definition wp_freewalk_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_freewalk_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (mm : regfile)
     (t : ptree) (lvl : nat) (K : nat) (eb : bool) (p : mword 64)
     (ilvl : nat) (b : bool) (lks : gset string) :=
@@ -107,7 +108,7 @@ Definition wp_freewalk_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
 
 Module Type FREEWALK.
   Parameter wp_freewalk_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (mm : regfile)
       (t : ptree) (lvl : nat) (K : nat) (eb : bool) (p : mword 64)
       (ilvl : nat) (b : bool) (lks : gset string),

@@ -96,6 +96,7 @@ Require Import SpecBfree.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -464,7 +465,7 @@ Section BfreeDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* bfree's 32-byte frame: ra@24 s0@16 s1@8 s2@0 *)
-  Definition bf_frame (m : regfile) : iProp Σ :=
+  Definition bf_frame `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
@@ -472,7 +473,7 @@ Section BfreeDefs.
 
   (* ONE BYTE of a buffer's data area, borrowed and given back at a new
      byte list -- [ByteBuf.bb_byte_acc] over [buf_own]'s list form. *)
-  Lemma bf_buf_byte (pb : mword 64) (bno dsk : mword 32)
+  Lemma bf_buf_byte `{XI : CurCtx} (pb : mword 64) (bno dsk : mword 32)
       (l : list (bv 8)) (d : nat) :
     length l = 1024%nat -> (d < 1024)%nat ->
     buf_own pb bno dsk l -∗
@@ -505,7 +506,7 @@ Section BfreeDefs.
   
   (* THE CONTINUATION, named so it is not re-traversed by every proofmode
      split (claude-notes/optimization.md). *)
-  Definition bf_cont `{GEN : GenId} `{CID0 : CpuId}
+  Definition bf_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γfs : fs_names) (bn : bio_names) (γ : log_names)
       (cov : gset Z) (logstart bmapstart size : Z)
       (Bud : iProp Σ) (pidv : mword 32) (dq dqb : dfrac) (j : nat)
@@ -547,7 +548,7 @@ Definition bf_sp (m M : regfile) : Prop :=
 Section BfreeTail.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma bf_tail `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma bf_tail `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (j : nat)
       (γfs : fs_names) (γd : disk_names) (bn : bio_names) (γ : log_names)
       (cov : gset Z) (logstart bmapstart size : Z) (dev : mword 32)
@@ -985,7 +986,7 @@ End BfreeTail.
 (* ===================================================================== *)
 Section ProofBfreeMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_bfree_gen 
       (γs : list gname) (j : nat) (γl : gname)

@@ -24,6 +24,7 @@ From Kernel Require KernelSyms.
 Require Import CodeStart.
 Require Import KernelConsts.
 Require Import CodeTimerinitAux.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -158,7 +159,7 @@ Ltac boot_static :=
 
 Section WpStartInstr.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* PCs of the 34 instructions. *)
   Definition st_pc30 : mword 64 := mword_of_int (KernelSyms.start).

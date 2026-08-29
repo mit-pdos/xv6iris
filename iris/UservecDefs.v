@@ -22,6 +22,7 @@ Require Import UserretDefs.
 From Kernel Require Import KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -327,7 +328,7 @@ Proof. intro HmisaC. rvc_oneshot s HmisaC. Qed.
 
 Section UservecInstrs.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma uvi_csrw_sscratch :
     kernel_text -∗ instr (upa 0x00) false uvai_csrw_sscratch.

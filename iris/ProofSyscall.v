@@ -374,6 +374,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 Set Printing Depth 40.
 
@@ -519,7 +520,7 @@ Record sysc_proc_ties `{ICFG : icfg} `{FSC : fscfg}
 Section SyscallVocab.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ===================================================================== *)
   (* syscall_env -- the union of everything the wired entries need
@@ -616,7 +617,7 @@ Section SyscallVocab.
         actually live. *)
      disk_geom (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) ∗
      is_lock (fsc_dlock) d_lock "virtio_disk"%string
-       (disk_res (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)) ∗
+       <{ disk_res (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) }> ∗
      FsReady.fs_ready)%I.
 
   (* no explicit binder list here -- unlike the Definition above, an
@@ -743,9 +744,9 @@ Section SyscallVocab.
     dev_inv (fsc_uart) (fsc_disk) ∗
     disk_geom (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) ∗
     is_lock (fsc_dlock) d_lock "virtio_disk"%string
-      (disk_res (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)) ∗
+      <{ disk_res (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) }> ∗
     is_lock (fsc_kalloc) (mword_of_int KernelSyms.kmem) "kmem"%string
-      (kmem_res (fsc_kpages) (mword_of_int (KernelSyms.kmem + 24))) ∗
+      (λ ξ : CtxId, kmem_res (XIk := ξ) (fsc_kpages) (mword_of_int (KernelSyms.kmem + 24))) ∗
     kalloc_avail (fsc_kpages) None ∗
     (* [sysc_ic_env fn] USED TO BE HERE, between the allocator and
        [ireg_open].  It is [sysc_ic_env_of_ready] now: the icache rows are a
@@ -861,9 +862,9 @@ Section SyscallVocab.
         !irefslotG Σ, !pavG Σ} `{GEN : GenId}
       (γf : gname) : iProp Σ :=
     (∃ (γp γw γft γtk : gname),
-       is_lock γp alp_pid_lock "nextpid"%string nextpid_res ∗
+       is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> ∗
        procs_avail None ∗
-       is_lock γw wait_lock_addr "wait_lock"%string wait_res ∗
+       is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> ∗
        is_ftable γft γf ∗
        is_tickslock γtk)%I.
 
@@ -940,7 +941,7 @@ Section SyscallVocab.
     fcn_procs fn !! fcn_j fn = Some (fcn_plock fn) ->
     fcn_dq fn = DfracOwn (1/4) ->
     sysc_park_extra γtk -∗
-    is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+    is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
     is_ftable γft γf -∗
     procs_inv (fcn_procs fn) -∗
     disk_geom (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) -∗
@@ -1030,9 +1031,9 @@ Section SyscallVocab.
        ftable, ticks) are PROCESS locks and genuinely quantified. *)
     ∃ (γp γw γft γtk : gname),
       kalloc_env fsc_kalloc None ∗
-      is_lock γp alp_pid_lock "nextpid"%string nextpid_res ∗
+      is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> ∗
       procs_avail None ∗
-      is_lock γw wait_lock_addr "wait_lock"%string wait_res ∗
+      is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> ∗
       is_ftable γft γf ∗
       is_tickslock γtk ∗
       printk_env fsc_printk fsc_uart fsc_disk ∗
@@ -1696,10 +1697,10 @@ Section SyscallVocab.
        ([sysc_arm_dispatch] supplies it by [reflexivity] at its own [k]). *)
     sysc_num (us_V U) = Z.of_nat k ->
     sysc_arm_pre γf pj γs fn dqi ip pid U lks (av - 4)%nat M (mword_of_int (sysc_target k)) -∗
-    word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
-    word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
-    word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
-    word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk (m !!! Regidx csp_rs1) 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk (m !!! Regidx csp_rs1) 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk (m !!! Regidx csp_rs1) 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
     kernel_data -∗
     sysc_exit_ty γf pj fn dqi ip pid U lks av m (ret_pc (m !!! Regidx Rra)) -∗
     WP (Loop : expr riscv_lang).
@@ -1740,10 +1741,10 @@ Section SyscallVocab.
     sie_cap_gpr KT1 E (av - 4)%nat true pj -∗
     cpu_own 0%nat true pj true lks -∗
     kernel_text -∗
-    word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
-    word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
-    word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
-    word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk (m !!! Regidx csp_rs1) 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk (m !!! Regidx csp_rs1) 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk (m !!! Regidx csp_rs1) 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
     bslots 3 -∗
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
     fd_slots FDSPARE -∗ iref_slots IREFSPARE -∗
@@ -2376,7 +2377,7 @@ End SyscallVocab.
 Section SyscallRet.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* TWO IMAGES, and the split is the point: [Mu] is the one the caller's
      continuation was built at, [Mo] the one the entry actually returned.
@@ -2402,10 +2403,10 @@ Section SyscallRet.
     sie_cap_gpr KT1 E (av - 4)%nat true pj -∗
     cpu_own 0%nat true pj true lks -∗
     kernel_text -∗
-    word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
-    word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
-    word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
-    word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk (m !!! Regidx csp_rs1) 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk (m !!! Regidx csp_rs1) 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk (m !!! Regidx csp_rs1) 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
     bslots 3 -∗
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
     fd_slots FDSPARE -∗ iref_slots IREFSPARE -∗
@@ -2487,7 +2488,7 @@ End SyscallRet.
 Section SyscallArms.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* THE SIXTEEN QUIET ARMS' SHARED DISCHARGE.  [sysc_mem_ok]'s decision is
      driven entirely by its FIRST argument ([sysc_num V], the entry's own
@@ -4698,10 +4699,10 @@ Section SyscallArms.
     ~ (1 <= sysc_num (us_V U) <= 22)%Z ->
     sysc_arm_pre γf pj γs fn dqi ip pid U lks (av - 4)%nat M
       (mword_of_int (KernelSyms.syscall + 0x40) : mword 64) -∗
-    word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
-    word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
-    word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
-    word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk (m !!! Regidx csp_rs1) 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk (m !!! Regidx csp_rs1) 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk (m !!! Regidx csp_rs1) 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
     kernel_data -∗
     sysc_hcont_ty γf pj fn dqi ip pid U lks av m (ret_pc (m !!! Regidx Rra)) -∗
     WP (Loop : expr riscv_lang).
@@ -4986,7 +4987,7 @@ End SyscallArms.
 Section SyscallMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* CAPSTONE.  The shared scaffolding (`sysc_arm_pre`/`sysc_hcont_ty`/
      `sysc_arm_goal`, the trapframe-extraction/bitvector-bridge lemmas, and

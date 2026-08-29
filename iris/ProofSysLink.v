@@ -141,6 +141,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Set Printing Depth 40.
 
@@ -201,28 +202,28 @@ Definition sl_regs (m : regfile) (sp0 ipv dpv : mword 64) (Mx : regfile)
   /\ Mx !!! Regidx Rs2 = dpv
   /\ sl_thr m Mx.
 
-Lemma sl_regs_sp (m : regfile) (sp0 ipv dpv : mword 64) (Mx : regfile) :
+Lemma sl_regs_sp `{XI : CurCtx} (m : regfile) (sp0 ipv dpv : mword 64) (Mx : regfile) :
   sl_regs m sp0 ipv dpv Mx -> sl_sp sp0 Mx.
 Proof. intros (H & _). exact H. Qed.
 
-Lemma sl_regs_s0 (m : regfile) (sp0 ipv dpv : mword 64) (Mx : regfile) :
+Lemma sl_regs_s0 `{XI : CurCtx} (m : regfile) (sp0 ipv dpv : mword 64) (Mx : regfile) :
   sl_regs m sp0 ipv dpv Mx -> (Mx !!! Regidx Rs0 : mword 64) = sp0.
 Proof. intros (_ & H & _). exact H. Qed.
 
-Lemma sl_regs_s1 (m : regfile) (sp0 ipv dpv : mword 64) (Mx : regfile) :
+Lemma sl_regs_s1 `{XI : CurCtx} (m : regfile) (sp0 ipv dpv : mword 64) (Mx : regfile) :
   sl_regs m sp0 ipv dpv Mx -> (Mx !!! Regidx Rs1 : mword 64) = ipv.
 Proof. intros (_ & _ & H & _). exact H. Qed.
 
-Lemma sl_regs_s2 (m : regfile) (sp0 ipv dpv : mword 64) (Mx : regfile) :
+Lemma sl_regs_s2 `{XI : CurCtx} (m : regfile) (sp0 ipv dpv : mword 64) (Mx : regfile) :
   sl_regs m sp0 ipv dpv Mx -> (Mx !!! Regidx Rs2 : mword 64) = dpv.
 Proof. intros (_ & _ & _ & H & _). exact H. Qed.
 
-Lemma sl_regs_thr (m : regfile) (sp0 ipv dpv : mword 64) (Mx : regfile) :
+Lemma sl_regs_thr `{XI : CurCtx} (m : regfile) (sp0 ipv dpv : mword 64) (Mx : regfile) :
   sl_regs m sp0 ipv dpv Mx -> sl_thr m Mx.
 Proof. intros (_ & _ & _ & _ & H). exact H. Qed.
 
 (* a CALLER-saved write leaves every pinned register alone *)
-Lemma sl_regs_caller (m : regfile) (sp0 ipv dpv : mword 64) (Mx : regfile)
+Lemma sl_regs_caller `{XI : CurCtx} (m : regfile) (sp0 ipv dpv : mword 64) (Mx : regfile)
     (r : mword 5) (v : mword 64) :
   is_cs_idx r = false -> sl_regs m sp0 ipv dpv Mx ->
   sl_regs m sp0 ipv dpv (<[Regidx r := v]> Mx).
@@ -237,7 +238,7 @@ Proof.
 Qed.
 
 (* ...and so does a callee's [callee_saved] report *)
-Lemma sl_regs_cs (m : regfile) (sp0 ipv dpv : mword 64) (Mx My : regfile) :
+Lemma sl_regs_cs `{XI : CurCtx} (m : regfile) (sp0 ipv dpv : mword 64) (Mx My : regfile) :
   callee_saved Mx My -> sl_regs m sp0 ipv dpv Mx -> sl_regs m sp0 ipv dpv My.
 Proof.
   intros Hcs (H2 & H8 & H9 & H18 & Hthr). unfold sl_regs. split_and!.
@@ -254,7 +255,7 @@ Proof.
 Qed.
 
 (* the [c.mv s1,a0] at +0x3e *)
-Lemma sl_regs_wr_s1 (m : regfile) (sp0 ipv ipv' dpv : mword 64)
+Lemma sl_regs_wr_s1 `{XI : CurCtx} (m : regfile) (sp0 ipv ipv' dpv : mword 64)
     (Mx : regfile) (v : mword 64) :
   v = ipv' -> sl_regs m sp0 ipv dpv Mx ->
   sl_regs m sp0 ipv' dpv (<[Regidx Rs1 := v]> Mx).
@@ -269,7 +270,7 @@ Proof.
 Qed.
 
 (* the [c.mv s2,a0] at +0x7c *)
-Lemma sl_regs_wr_s2 (m : regfile) (sp0 ipv dpv dpv' : mword 64)
+Lemma sl_regs_wr_s2 `{XI : CurCtx} (m : regfile) (sp0 ipv dpv dpv' : mword 64)
     (Mx : regfile) (v : mword 64) :
   v = dpv' -> sl_regs m sp0 ipv dpv Mx ->
   sl_regs m sp0 ipv dpv' (<[Regidx Rs2 := v]> Mx).
@@ -291,21 +292,21 @@ Qed.
 (* the cross-device [bne] at +0x92: both cells hold the AMBIENT dev, so the
    branch is refuted by reflexivity (fs-icache.md 13.11's single-device
    itable).  This is why sys_link has EIGHT arms and not nine. *)
-Lemma sl_neq_refl (x : mword 64) : neq_vec x x = false.
+Lemma sl_neq_refl `{XI : CurCtx} (x : mword 64) : neq_vec x x = false.
 Proof. unfold neq_vec. by rewrite (proj2 (eq_vec_true_iff x x) eq_refl). Qed.
 
-Lemma sl_lui8 :
+Lemma sl_lui8 `{XI : CurCtx} :
   luival (sign_extend' 20 (mword_of_int 8 : mword 6)) = (mword_of_int 32768 : mword 64).
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
-Lemma sl_nmax_const :
+Lemma sl_nmax_const `{XI : CurCtx} :
   add_vec (mword_of_int 32768 : mword 64)
     (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))
   = (mword_of_int 32767 : mword 64).
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
 (* the [c.li a5,1] at +0x4a and the [c.li a5,0] at +0xb4 *)
-Lemma sl_li_one : (mword_of_int (Z.of_nat 1) : mword 64) = (mword_of_int 1 : mword 64).
+Lemma sl_li_one `{XI : CurCtx} : (mword_of_int (Z.of_nat 1) : mword 64) = (mword_of_int 1 : mword 64).
 Proof. reflexivity. Qed.
 
 (* the record the [++] at +0x5e / +0x60 commits *)
@@ -315,13 +316,13 @@ Definition sl_incnl (dn : dinode) : dinode :=
 (* the [++]'s arithmetic, over plain [Z]: [lia]'s zify hook does not come
    back with [bv_unsigned] in the goal (durable-notes' trap), so the two
    [bv_unsigned] readings are abstracted before it runs. *)
-Lemma sl_max_div16 (a b : Z) : (16 | a) -> (16 | b) -> (16 | Z.max a b).
+Lemma sl_max_div16 `{XI : CurCtx} (a b : Z) : (16 | a) -> (16 | b) -> (16 | Z.max a b).
 Proof.
   intros Ha Hb. destruct (Z.max_spec a b) as [[_ ->] | [_ ->]];
     [exact Hb | exact Ha].
 Qed.
 
-Lemma sl_bump_short (a c : Z) :
+Lemma sl_bump_short `{XI : CurCtx} (a c : Z) :
   a <= c + 1 -> c <= 32767 -> c <> 32767 -> a <= 32767.
 Proof. lia. Qed.
 
@@ -330,7 +331,7 @@ Proof. lia. Qed.
    new count is short because the +0x58 guard fired the OTHER way, and the
    directory clause is vacuous at a non-directory.  NAMED, not spliced:
    the bound needs three facts and [lia] over [bv_unsigned]. *)
-Lemma sl_incnl_rec_local (dn : dinode) :
+Lemma sl_incnl_rec_local `{XI : CurCtx} (dn : dinode) :
   inode_rec_local dn ->
   di_nlink dn <> (mword_of_int 32767 : mword 16) ->
   bv_unsigned (di_type dn) <> T_DIR_z ->
@@ -354,7 +355,7 @@ Qed.
    whole-function proof file is not a dependency any other one may take). *)
 Definition sl_low16 (v : mword 32) : mword 16 := mword_of_int (bv_unsigned v).
 
-Lemma sl_moi16_unsigned (z : Z) :
+Lemma sl_moi16_unsigned `{XI : CurCtx} (z : Z) :
   bv_unsigned (mword_of_int z : mword 16) = bv_wrap 16 z.
 Proof.
   unfold mword_of_int, SailStdpp.Values.mword_of_int,
@@ -363,7 +364,7 @@ Proof.
   change (MachineWord.MachineWord.Z_idx 16) with 16%N. reflexivity.
 Qed.
 
-Lemma sl_low16_unsigned (v : mword 32) :
+Lemma sl_low16_unsigned `{XI : CurCtx} (v : mword 32) :
   bv_unsigned v < 2 ^ 16 -> bv_unsigned (sl_low16 v) = bv_unsigned v.
 Proof.
   intro Hv. pose proof (bv_unsigned_in_range _ v) as Hlo.
@@ -372,7 +373,7 @@ Proof.
   change (2 ^ Z.of_N 16)%Z with (2^16)%Z. lia.
 Qed.
 
-Lemma sl_zext64_16_unsigned (h : mword 16) :
+Lemma sl_zext64_16_unsigned `{XI : CurCtx} (h : mword 16) :
   bv_unsigned (zero_extend' 64 h : mword 64) = bv_unsigned h.
 Proof.
   cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec
@@ -380,7 +381,7 @@ Proof.
   rewrite bv_zero_extend_unsigned; [ reflexivity | cbn; lia ].
 Qed.
 
-Lemma sl_sext64_32_unsigned (v : mword 32) :
+Lemma sl_sext64_32_unsigned `{XI : CurCtx} (v : mword 32) :
   bv_unsigned v < 2 ^ 31 ->
   bv_unsigned (sign_extend' 64 v : mword 64) = bv_unsigned v.
 Proof.
@@ -396,7 +397,7 @@ Proof.
   rewrite bv_swrap_small; [ apply bvw64_small; lia | rewrite Hhm32; lia ].
 Qed.
 
-Lemma sl_a2_halfword (v : mword 32) (h : mword 16) :
+Lemma sl_a2_halfword `{XI : CurCtx} (v : mword 32) (h : mword 16) :
   bv_unsigned v = bv_unsigned h ->
   (sign_extend' 64 v : mword 64) = (zero_extend' 64 h : mword 64).
 Proof.
@@ -409,7 +410,7 @@ Proof.
   exact Hvh.
 Qed.
 
-Lemma sl_a2_low16 (v : mword 32) :
+Lemma sl_a2_low16 `{XI : CurCtx} (v : mword 32) :
   bv_unsigned v < 2 ^ 16 ->
   (sign_extend' 64 v : mword 64) = (zero_extend' 64 (sl_low16 v) : mword 64).
 Proof.
@@ -418,7 +419,7 @@ Qed.
 
 (* the two record-shape identities the process block needs across the pair
    of [argstr]s and the two walks *)
-Lemma sl_upd_upt_idem (V : pprivate) (P1 P2 : uptd) :
+Lemma sl_upd_upt_idem `{XI : CurCtx} (V : pprivate) (P1 P2 : uptd) :
   upd_upt (upd_upt V P1) P2 = upd_upt V P2.
 Proof. reflexivity. Qed.
 
@@ -426,26 +427,26 @@ Proof. reflexivity. Qed.
    second one was rebuilt at is the one that survives.  [proc_priv]'s
    argument is a [ustate] now, so this is what a caller walking two moves
    needs in order to fold them. *)
-Lemma sl_us_upt_idem (U : ustate) (P1 P2 : uptd) :
+Lemma sl_us_upt_idem `{XI : CurCtx} (U : ustate) (P1 P2 : uptd) :
   us_upt (us_upt U P1) P2 = us_upt U P2.
 Proof. by destruct U as [V M]; destruct V. Qed.
 
-Lemma sl_upd_cwd_id (V : pprivate) : upd_cwd V (pv_cwd V) = V.
+Lemma sl_upd_cwd_id `{XI : CurCtx} (V : pprivate) : upd_cwd V (pv_cwd V) = V.
 Proof. destruct V; reflexivity. Qed.
 
-Lemma sl_upd_cwd_upt (V : pprivate) (P : uptd) :
+Lemma sl_upd_cwd_upt `{XI : CurCtx} (V : pprivate) (P : uptd) :
   upd_cwd (upd_upt V P) (pv_cwd V) = upd_upt V P.
 Proof. destruct V; reflexivity. Qed.
 
 (* THE LOG BUDGET's entry figure: begin_op mints ten and a walk needs at
    most four, whatever the path length ([SpecNamex.walk_need]). *)
-Lemma sl_bud_walk (L : nat) : (walk_need L <= MAXOPBLOCKS)%nat.
+Lemma sl_bud_walk `{XI : CurCtx} (L : nat) : (walk_need L <= MAXOPBLOCKS)%nat.
 Proof. unfold walk_need, iput_units, MAXOPBLOCKS. destruct L; lia. Qed.
 
 (* ...and what is left after it, which is what the two guard arms' own
    [iunlockput] needs.  Both branch ABOVE the mint, so nothing but the
    namei walk has spent anything. *)
-Lemma sl_bud_iput (n' : nat) (w ok : bool) :
+Lemma sl_bud_iput `{XI : CurCtx} (n' : nat) (w ok : bool) :
   ((MAXOPBLOCKS - (walk_spend w + (if ok then 0%nat else 1%nat)))%nat <= n')%nat ->
   (iput_units <= n')%nat.
 Proof. unfold walk_spend, iput_units, MAXOPBLOCKS. destruct w, ok; lia. Qed.
@@ -465,7 +466,7 @@ Proof. unfold walk_spend, iput_units, MAXOPBLOCKS. destruct w, ok; lia. Qed.
 Definition sl_crok (crb w1 w2 : bool) : Prop :=
   crb = false -> w1 = false /\ w2 = false.
 
-Lemma sl_cnt_u1 (w1 : bool) (n1 u1 : nat) :
+Lemma sl_cnt_u1 `{XI : CurCtx} (w1 : bool) (n1 u1 : nat) :
   ((MAXOPBLOCKS - (walk_spend w1 + 0))%nat <= n1)%nat -> n1 = S u1 ->
   (sl_u2 w1 <= u1)%nat.
 Proof.
@@ -474,7 +475,7 @@ Proof.
   destruct w1; lia.
 Qed.
 
-Lemma sl_cnt_u3 (w1 w2 : bool) (u1 n2 : nat) :
+Lemma sl_cnt_u3 `{XI : CurCtx} (w1 w2 : bool) (u1 n2 : nat) :
   (sl_u2 w1 <= u1)%nat -> ((u1 - (walk_spend w2 + 0))%nat <= n2)%nat ->
   (sl_u3 w1 w2 <= n2)%nat.
 Proof.
@@ -483,7 +484,7 @@ Proof.
   destruct w1, w2; lia.
 Qed.
 
-Lemma sl_cnt_u3f (w1 w2 : bool) (u1 n2 : nat) :
+Lemma sl_cnt_u3f `{XI : CurCtx} (w1 w2 : bool) (u1 n2 : nat) :
   (sl_u2 w1 <= u1)%nat -> ((u1 - (walk_spend w2 + 1))%nat <= n2)%nat ->
   (sl_u3f w1 w2 <= n2)%nat.
 Proof.
@@ -493,7 +494,7 @@ Proof.
 Qed.
 
 (* the SECOND walk's need, met with room: the mint leaves at least eight. *)
-Lemma sl_walk2_need (L : nat) (w1 : bool) (u1 : nat) :
+Lemma sl_walk2_need `{XI : CurCtx} (L : nat) (w1 : bool) (u1 : nat) :
   (sl_u2 w1 <= u1)%nat -> (walk_need L <= u1)%nat.
 Proof.
   intro H.
@@ -503,7 +504,7 @@ Proof.
 Qed.
 
 (* ARM E: [bad:] entered from nameiparent returning 0. *)
-Lemma sl_bad_iput (w1 w2 : bool) (n2 : nat) :
+Lemma sl_bad_iput `{XI : CurCtx} (w1 w2 : bool) (n2 : nat) :
   (sl_u3f w1 w2 <= n2)%nat -> (iput_units <= n2)%nat.
 Proof.
   intro H. destruct (sl_bad1_closes w1 w2) as [Ha Hb].
@@ -513,13 +514,13 @@ Qed.
 (* ARM E2: the ORPHAN GUARD's route to [bad:] (xv6 f60ff58).  The count is
    nameiparent's, untouched -- the guard fires before the dirlink -- so both
    figures come off [sl_orphan_closes] with no corner analysis. *)
-Lemma sl_orphan_entry (w1 w2 : bool) (n2 : nat) :
+Lemma sl_orphan_entry `{XI : CurCtx} (w1 w2 : bool) (n2 : nat) :
   (sl_u3 w1 w2 <= n2)%nat -> (iput_units <= n2)%nat.
 Proof.
   intro Hn2. destruct (sl_orphan_closes w1 w2 false) as (Ha & _ & _). lia.
 Qed.
 
-Lemma sl_orphan_close (w1 w2 w : bool) (n2 n' : nat) :
+Lemma sl_orphan_close `{XI : CurCtx} (w1 w2 w : bool) (n2 n' : nat) :
   (sl_u3 w1 w2 <= n2)%nat ->
   ((n2 - ip_spend_w w false false)%nat <= n')%nat ->
   (iput_units <= n')%nat.
@@ -531,7 +532,7 @@ Proof.
 Qed.
 
 (* dirlink's ENTRY requirement. *)
-Lemma sl_dl_need_ok (crb w1 w2 ind : bool) (n2 : nat) :
+Lemma sl_dl_need_ok `{XI : CurCtx} (crb w1 w2 ind : bool) (n2 : nat) :
   sl_crok crb w1 w2 -> (sl_u3 w1 w2 <= n2)%nat -> (dl_need crb ind <= n2)%nat.
 Proof.
   intros Hc Hn. destruct crb.
@@ -541,7 +542,7 @@ Proof.
 Qed.
 
 (* dirlink's [di_size < 2^31] premise, off [inode_ok]'s size cap. *)
-Lemma sl_size_lt (z : Z) :
+Lemma sl_size_lt `{XI : CurCtx} (z : Z) :
   (z <= Z.of_nat MAXFILE * Z.of_nat BSIZE)%Z -> (z < 2 ^ 31)%Z.
 Proof.
   intro H. unfold MAXFILE, NDIRECT, NINDIRECT, BSIZE in H.
@@ -549,7 +550,7 @@ Proof.
 Qed.
 
 (* writei's record: only the size and the addrs move. *)
-Lemma sl_wi_size_max (dn : dinode) (bm' : blkmap) (off tot : nat) :
+Lemma sl_wi_size_max `{XI : CurCtx} (dn : dinode) (bm' : blkmap) (off tot : nat) :
   (Z.of_nat (off + tot) < 2 ^ 32)%Z ->
   bv_unsigned (di_size (wi_dinode dn bm' off tot))
   = Z.max (bv_unsigned (di_size dn)) (Z.of_nat (off + tot)).
@@ -563,7 +564,7 @@ Qed.
 
 (* ...and the window it writes fits a 32-bit size: the append slot is at
    most [dir_nrec (MAXFILE * BSIZE)]. *)
-Lemma sl_off32 (dn : dinode) (data : nat -> list (bv 8)) (tot : nat) :
+Lemma sl_off32 `{XI : CurCtx} (dn : dinode) (data : nat -> list (bv 8)) (tot : nat) :
   (bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE)%Z ->
   (tot <= 16)%nat ->
   (Z.of_nat (16 * dir_slot data (dir_nrec (bv_unsigned (di_size dn))) + tot)
@@ -578,19 +579,19 @@ Proof.
   lia.
 Qed.
 
-Lemma sl_wi_mono (crb crd cru al ind : bool) :
+Lemma sl_wi_mono `{XI : CurCtx} (crb crd cru al ind : bool) :
   (wi16_spend crb crd cru al ind <= wi16_spend crb crd false al ind)%nat.
 Proof. destruct crb, crd, cru, al, ind; vm_compute; lia. Qed.
 
-Lemma sl_sub_le (n k : nat) : (n - k <= n)%nat.
+Lemma sl_sub_le `{XI : CurCtx} (n k : nat) : (n - k <= n)%nat.
 Proof. lia. Qed.
 
-Lemma sl_atomic_lt16 (tot : nat) :
+Lemma sl_atomic_lt16 `{XI : CurCtx} (tot : nat) :
   (tot = 0%nat \/ tot = 16%nat) -> (tot < 16)%nat -> tot = 0%nat.
 Proof. lia. Qed.
 
 (* ARM G, the success append: the parent's free and then [iput(ip)]. *)
-Lemma sl_ok_close (crb crd cru al ind w1 w2 wd : bool) (n2 n3 n4 : nat) :
+Lemma sl_ok_close `{XI : CurCtx} (crb crd cru al ind w1 w2 wd : bool) (n2 n3 n4 : nat) :
   sl_crok crb w1 w2 -> (sl_u3 w1 w2 <= n2)%nat ->
   ((n2 - wi16_spend crb crd cru al ind)%nat <= n3)%nat ->
   ((n3 - ip_spend_w wd true false)%nat <= n4)%nat ->
@@ -608,7 +609,7 @@ Qed.
 
 (* ARM F-0, the EMPTY append: entry, then the closure the [bad:] tail's own
    entry lemma takes as a premise. *)
-Lemma sl_fail0_entry (crb crd cru al ind w1 w2 : bool) (n2 n3 : nat) :
+Lemma sl_fail0_entry `{XI : CurCtx} (crb crd cru al ind w1 w2 : bool) (n2 n3 : nat) :
   sl_crok crb w1 w2 -> (sl_u3 w1 w2 <= n2)%nat ->
   ((n2 - wi16_spend crb crd cru al ind)%nat <= n3)%nat ->
   (iput_units <= n3)%nat.
@@ -621,7 +622,7 @@ Proof.
     lia.
 Qed.
 
-Lemma sl_fail0_close (crb crb3 crd cru al ind w1 w2 w : bool) (n2 n3 n' : nat) :
+Lemma sl_fail0_close `{XI : CurCtx} (crb crb3 crd cru al ind w1 w2 w : bool) (n2 n3 n' : nat) :
   sl_crok crb w1 w2 -> (crb = true -> crb3 = true) ->
   (sl_u3 w1 w2 <= n2)%nat ->
   ((n2 - wi16_spend crb crd cru al ind)%nat <= n3)%nat ->
@@ -643,7 +644,7 @@ Qed.
 
 (* ARM F-FOUND: the arm sys_link cannot refute, paid for by SpecDirlink's
    own found-arm clause. *)
-Lemma sl_found_entry (w1 w2 : bool) (n2 n3 : nat) :
+Lemma sl_found_entry `{XI : CurCtx} (w1 w2 : bool) (n2 n3 : nat) :
   (sl_u3 w1 w2 <= n2)%nat -> ((n2 - iput_units)%nat <= n3)%nat ->
   (iput_units <= n3)%nat.
 Proof.
@@ -652,7 +653,7 @@ Proof.
   lia.
 Qed.
 
-Lemma sl_found_close (crb3 w1 w2 w : bool) (n2 n3 n' : nat) :
+Lemma sl_found_close `{XI : CurCtx} (crb3 w1 w2 w : bool) (n2 n3 n' : nat) :
   sl_crok crb3 w1 w2 -> (sl_u3 w1 w2 <= n2)%nat ->
   ((n2 - iput_units)%nat <= n3)%nat ->
   (crb3 = true -> w = false) ->
@@ -670,15 +671,15 @@ Proof.
     rewrite Hz in Hcc. lia.
 Qed.
 
-Lemma sl_tf_upt (V : pprivate) (P : uptd) : pv_tf (upd_upt V P) = pv_tf V.
+Lemma sl_tf_upt `{XI : CurCtx} (V : pprivate) (P : uptd) : pv_tf (upd_upt V P) = pv_tf V.
 Proof. reflexivity. Qed.
 
-Lemma sl_cwd_upt (V : pprivate) (P : uptd) : pv_cwd (upd_upt V P) = pv_cwd V.
+Lemma sl_cwd_upt `{XI : CurCtx} (V : pprivate) (P : uptd) : pv_cwd (upd_upt V P) = pv_cwd V.
 Proof. reflexivity. Qed.
 
 (* [di_type dn <> T_DIR] at the sixteen-bit width, read as the Z-level
    disequality [DirView] states its type tests at *)
-Lemma sl_tdir_zne (t : mword 16) :
+Lemma sl_tdir_zne `{XI : CurCtx} (t : mword 16) :
   t <> (mword_of_int 1 : mword 16) -> bv_unsigned t <> T_DIR_z.
 Proof.
   intros Hne Hc. apply Hne. apply bv_eq. rewrite Hc.
@@ -703,7 +704,7 @@ Section ProofSysLinkBody.
   (* the escrow-family projection out of the boot families, at the copy
      THIS contract names ([ic_escrows] is IcacheEscrow's).  The sleeplock
      family's projection is [IcacheEscrow.ic_sleeplocks_lookup]. *)
-  Lemma sl_esc_acc
+  Lemma sl_esc_acc `{XI : CurCtx}
       (k : nat) :
     (k < NINODE)%nat ->
     (ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗ ic_escrow fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k
@@ -714,14 +715,14 @@ Section ProofSysLinkBody.
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.
 
-    Lemma sl_bs3 :
+    Lemma sl_bs3 `{XI : CurCtx} :
     (bslots 3 : iProp Σ) ⊣⊢ bslot ∗ bslots 2.
   Proof. rewrite /bslot. change 3%nat with (1 + 2)%nat. apply bslots_op. Qed.
 
   (* the reference allowance, split for the FIRST walk: namei takes two and
      hands one back, and the third is [ip]'s own -- held out here so that
      [nameiparent] can be handed a full two while [ip] is still live. *)
-  Lemma sl_ir3 : (iref_slots 3 : iProp Σ) ⊣⊢ iref_slots 2 ∗ iref_slots 1.
+  Lemma sl_ir3 `{XI : CurCtx} : (iref_slots 3 : iProp Σ) ⊣⊢ iref_slots 2 ∗ iref_slots 1.
   Proof. change 3%nat with (2 + 1)%nat. apply iref_slots_op. Qed.
 
   (* THE GENERATION-NAMED SHED.  [IcacheRef.inode_ref_shed] loses the
@@ -731,7 +732,7 @@ Section ProofSysLinkBody.
      T_DIR into [di_type dnd = T_DIR] at the record ilock returns.  Pure
      resource algebra; its home is [IcacheRef.v] and it is here for that
      file's rebuild-cone reason. *)
-  Lemma sl_carve_gen (k : nat) (q s : Qp) (inum : mword 32) (g : gname) :
+  Lemma sl_carve_gen `{XI : CurCtx} (k : nat) (q s : Qp) (inum : mword 32) (g : gname) :
     inode_ref_gen k (q + s)%Qp icfg_dev inum g ⊣⊢
     inode_ref_short_gen k (q + s)%Qp q icfg_dev inum g ∗ inode_shr_gen k s icfg_dev inum g.
   Proof.
@@ -742,7 +743,7 @@ Section ProofSysLinkBody.
     - iIntros "[($ & $ & $ & $) ($ & $ & $)]".
   Qed.
 
-  Lemma sl_shed_gen (k : nat) (q : Qp) (inum : mword 32) (g : gname) :
+  Lemma sl_shed_gen `{XI : CurCtx} (k : nat) (q : Qp) (inum : mword 32) (g : gname) :
     inode_ref_gen k q icfg_dev inum g ⊣⊢
     inode_ref_short_gen k (q/2 + q/2)%Qp (q/2)%Qp icfg_dev inum g ∗
     inode_shr_gen k (q/2)%Qp icfg_dev inum g.
@@ -751,7 +752,7 @@ Section ProofSysLinkBody.
     by rewrite {1}(Qp.div_2 q) in Hc.
   Qed.
 
-  Lemma wp_sys_link_sconf `{GEN : GenId} `{CID0 : CpuId}
+  Lemma wp_sys_link_sconf `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γf : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)

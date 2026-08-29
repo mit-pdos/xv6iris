@@ -232,6 +232,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* claude-notes/optimization.md "Register maps": the leaves' premises are
    stated over [rget] (see e.g. [cri_*]'s consumers below), so with these
@@ -1492,7 +1493,7 @@ Proof. unfold create_slots. lia. Qed.
 Section ProofCreateMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
   Local Ltac nz := vm_compute; discriminate.
@@ -2565,7 +2566,7 @@ Section ProofCreateMain.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     bslots 3 -∗
     iref_slots ns -∗
     log_opS icfg_log u Sb -∗
@@ -4666,7 +4667,7 @@ Section ProofCreateMain.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     (* ---- ARM FAIL's NON-DIRECTORY ENTRY, PARKED.  The T_DIR sub-branch's
        premise is GONE: at [ty = T_DEVICE] the +0xca [beq] is never taken. ---- *)
     (∀ (kd : nat) (qd : Qp) (gd γil γisl : gname) (dind : mword 32)
@@ -4787,8 +4788,8 @@ Section ProofCreateMain.
               pidv (DfracOwn (1/4)) dqs dqn Ma (K - 10)%nat eb b lks (upd_usM U _)
               ltac:(exact HKia) ltac:(exact HKil) Hlg Hist0 Hiregb Hni1 Hni2
               Hni3 Htynz Htyk Hpkc Hj Hgs Hroot A20 A9 Hkdlt Heb ltac:(lkbelow)
-              (fun CIDx : CpuId => IA.wp_ialloc_gen (CID := CIDx))
-              (fun CIDx : CpuId => IL.wp_ilock_dep_sconf (CID := CIDx))
+              (fun (CIDx : CpuId) (XIx : CurCtx) => IA.wp_ialloc_gen (CID := CIDx) (XI := XIx))
+              (fun (CIDx : CpuId) (XIx : CurCtx) => IL.wp_ilock_dep_sconf (CID := CIDx) (XI := XIx))
               with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlogc Hitb2 Hitbl
                     Hesc Hslks Hiregi Hiopen Hprocs Hdevi Hgeom Hdlk Hsbn Hsbi
                     Hppid Hbsl Hisl1 Hidev Htp Htcl Hop").
@@ -6359,7 +6360,7 @@ Section ProofCreateMain.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     wp_next (CID0 := CID) true (proc_addr j) (fun CIDf : CpuId =>
       cr_fail_body γs j γl pd pav pu γf
 
@@ -7034,8 +7035,8 @@ Section ProofCreateMain.
     iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hfr".
     iDestruct "Hfr" as "(_ & _ & _ & _ & _ & _ & _ & _ & S9 & S10 & _)".
     iDestruct "S9" as (w9) "H9". iDestruct "S10" as (w10) "H10".
-    iDestruct (word_pointsto_aligned_p with "H9") as %Ha9.
-    iDestruct (word_pointsto_aligned_p with "H10") as %Ha10.
+    iDestruct (ctx_word_pointsto_aligned_p with "H9") as %Ha9.
+    iDestruct (ctx_word_pointsto_aligned_p with "H10") as %Ha10.
     iPureIntro. split; [exact Ha10 | exact Ha9].
   Qed.
 

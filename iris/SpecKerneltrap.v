@@ -55,12 +55,13 @@ From Kernel Require KernelSyms.
 Require Import IrefSlots.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 Section KvCell.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   (* the 8-byte stack cell at address [a] currently holding [v]: a
      doubleword points-to, bundling the 8 byte facts with 8-alignment. *)
   Definition kv_cell (a : mword 64) (v : bv 64) : iProp Σ :=
@@ -239,7 +240,7 @@ Lemma kt_carve_fits : (32 + kerneltrap_stack <= kv_frame_slots)%nat.
 Proof. lia. Qed.
 
 Definition wp_kerneltrap_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
     (γs : list gname) (pd pav pu : mword 64)
     (m : regfile) (av : nat) (p : mword 64)
@@ -325,7 +326,7 @@ Definition wp_kerneltrap_sconf_body
 
 Module Type KERNELTRAP.
   Parameter wp_kerneltrap_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
       (γs : list gname) (pd pav pu : mword 64)
       (m : regfile) (av : nat) (p : mword 64)

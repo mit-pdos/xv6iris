@@ -131,6 +131,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -531,7 +532,7 @@ End FsLookup.
    [fdir] and the byte-level bundle. *)
 Definition wp_dirlookup_tree_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -597,7 +598,7 @@ Definition wp_dirlookup_tree_body
   procs_inv γs -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
   bslot -∗
   (* ---- THE ICACHE, exactly as iget takes it ---- *)
   is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
@@ -667,7 +668,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
 
   Lemma wp_dirlookup_tree
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-        !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+        !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
  (γf : gname)
@@ -942,7 +943,7 @@ Section FsLookupDots.
     unfold bv_modulus in H. cbn in H. lia.
   Qed.
 
-  Lemma ic_loaded_fdir
+  Lemma ic_loaded_fdir `{XI : CurCtx}
       (k : nat) (inum : mword 32) (dn : dinode) (bm : blkmap) :
     bv_unsigned (di_type dn) = T_DIR_z ->
     ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dn bm -∗
@@ -974,7 +975,7 @@ Section FsLookupDots.
   Qed.
 
   (* ...and the [fnode] form, which is what a client of F1b asks for. *)
-  Lemma ic_loaded_fnode
+  Lemma ic_loaded_fnode `{XI : CurCtx}
       (k : nat) (inum : mword 32) (dn : dinode) (bm : blkmap) :
     bv_unsigned (di_type dn) = T_DIR_z ->
     ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dn bm -∗

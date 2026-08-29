@@ -89,6 +89,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* MANDATORY IN ANY FILE THAT PROVES OVER [proc_priv] (durable-notes.md), and
@@ -99,7 +100,7 @@ Notation CR := KernelSyms.consoleread (only parsing).
 
 (* THE FRAME IS TWELVE SLOTS.  A [c.sdsp]/[c.ldsp] displacement off the pushed
    sp names slot [12 - imm6] counted down from the ENTRY sp. *)
-Lemma cr_slot_bridge (X : mword 64) (o : mword 64) (k : nat) :
+Lemma cr_slot_bridge `{XI : CurCtx} (X : mword 64) (o : mword 64) (k : nat) :
   add_vec (mword_of_int (- (8 * Z.of_nat 12%nat))) o = mword_of_int (- (8 * Z.of_nat k)) ->
   add_vec (pa_stk X 12%nat) o = pa_stk X k.
 Proof.
@@ -123,7 +124,7 @@ Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 (* [cons.r++]: the [addiw a3,a5,1] / [sw a3,152(a4)] round trip commits
    [r + 1] at width 32.  [ProofPiperead.pr_sw_nread]'s twin, at the
    FOUR-byte immediate spelling. *)
-Lemma cr_sw_r (r : mword 32) :
+Lemma cr_sw_r `{XI : CurCtx} (r : mword 32) :
   trunc32 (sign_extend' 64 (subrange_vec_dec
      (add_vec (sign_extend' 64 r) (sign_extend' 64 (mword_of_int 1 : mword 12))) 31 0))
   = add_vec r (mword_of_int 1 : mword 32).
@@ -139,15 +140,15 @@ Qed.
 (* [V] is its own re-description at the descriptor it already carries --
    what the entry into the loop needs, since every block below speaks
    [upd_upt V P'] and the caller hands in a bare [V]. *)
-Lemma cr_upd_id (V : pprivate) : upd_upt V (pv_upt V) = V.
+Lemma cr_upd_id `{XI : CurCtx} (V : pprivate) : upd_upt V (pv_upt V) = V.
 Proof. destruct V; reflexivity. Qed.
 
 (* the two level bounds every callee wants *)
-Lemma cr_lvl0 : (Z.of_nat 0%nat + 1 < 2 ^ 31)%Z.
+Lemma cr_lvl0 `{XI : CurCtx} : (Z.of_nat 0%nat + 1 < 2 ^ 31)%Z.
 Proof. vm_compute. reflexivity. Qed.
-Lemma cr_lvl1 : (Z.of_nat 1%nat + 1 < 2 ^ 31)%Z.
+Lemma cr_lvl1 `{XI : CurCtx} : (Z.of_nat 1%nat + 1 < 2 ^ 31)%Z.
 Proof. vm_compute. reflexivity. Qed.
-Lemma cr_len1_31 : (Z.of_nat 1%nat < 2 ^ 64)%Z.
+Lemma cr_len1_31 `{XI : CurCtx} : (Z.of_nat 1%nat < 2 ^ 64)%Z.
 Proof. vm_compute. reflexivity. Qed.
 
 (* THE CALLEE-SAVED ROLES gcc gives this function: s1 = &cons, s2 = &cons.r
@@ -187,7 +188,7 @@ Section CrBodies.
   (* ---- the frame, in two pieces ------------------------------------ *)
 
   (* the eight the prologue saves unconditionally *)
-  Definition cr_saved (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
+  Definition cr_saved `{XI : CurCtx} (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
     (pa_stk sp0 1 ↦₈[KT1] (m0 !!! Regidx Rra) ∗
      pa_stk sp0 2 ↦₈[KT1] (m0 !!! Regidx Rs0) ∗
      pa_stk sp0 3 ↦₈[KT1] (m0 !!! Regidx Rs1) ∗
@@ -200,13 +201,13 @@ Section CrBodies.
   (* slot 7 (s5's shrink-wrap) and the three local slots, contents free.
      [cbuf] lives in slot 11 and is written by the [sb] at +0x9a, so the
      locals are carried as WORDS everywhere except across that store. *)
-  Definition cr_rest (sp0 : mword 64) : iProp Σ :=
+  Definition cr_rest `{XI : CurCtx} (sp0 : mword 64) : iProp Σ :=
     ((∃ w : mword 64, pa_stk sp0 7  ↦₈[KT1] w) ∗
      (∃ w : mword 64, pa_stk sp0 10 ↦₈[KT1] w) ∗
      (∃ w : mword 64, pa_stk sp0 11 ↦₈[KT1] w) ∗
      (∃ w : mword 64, pa_stk sp0 12 ↦₈[KT1] w))%I.
 
-  Lemma cr_frame_back (sp0 : mword 64) (m0 : regfile) :
+  Lemma cr_frame_back `{XI : CurCtx} (sp0 : mword 64) (m0 : regfile) :
     cr_saved sp0 m0 -∗ cr_rest sp0 -∗ stack_own (KTR := KT1) sp0 12.
   Proof.
     iIntros "(H1 & H2 & H3 & H4 & H5 & H6 & H8 & H9) (H7 & H10 & H11 & H12)".
@@ -249,7 +250,7 @@ Section CrBodies.
      [Ment] fixed is what makes the shift free. *)
   (* the [c.addi s4,s4,1] immediate, as the literal [StackBytes.pa_add_S]
      wants: the cursor bump has to be brought to exactly that form. *)
-  Lemma cr_addi1_imm :
+  Lemma cr_addi1_imm `{XI : CurCtx} :
     sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))
     = (mword_of_int 1 : mword 64).
   Proof. apply bv_eq; vm_compute; reflexivity. Qed.
@@ -262,7 +263,7 @@ Section CrBodies.
     cur = pa_add dst (Z.to_nat (n - nc))
     /\ umem_wrote Ment Mo dst (Z.to_nat (n - nc)).
 
-  Lemma cr_win_of_run (Ment Mo : gmap Z (bv 8)) (dst cur : mword 64) (n nc : Z) :
+  Lemma cr_win_of_run `{XI : CurCtx} (Ment Mo : gmap Z (bv 8)) (dst cur : mword 64) (n nc : Z) :
     cr_run Ment Mo dst cur n nc -> (0 <= n - nc <= Z.max 0 n)%Z ->
     cr_win Ment Mo dst n.
   Proof.
@@ -271,7 +272,7 @@ Section CrBodies.
   Qed.
 
   (* the function's own exit, as a [wp_next] at the entry hart *)
-  Definition cr_ret `{CID0 : CpuId} (jp : nat) (m0 : regfile) (av : nat)
+  Definition cr_ret `{CID0 : CpuId} `{XI : CurCtx} (jp : nat) (m0 : regfile) (av : nat)
       (eb : bool) (pid : mword 32) (U : ustate) (Ment : gmap Z (bv 8))
       (n : Z) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr jp) (fun (CID : CpuId) =>
@@ -294,7 +295,7 @@ Section CrBodies.
   (*  +0xce .. +0xe0 -- THE EPILOGUE.  All three exits reach it with the  *)
   (*  answer already in a0.                                               *)
   (* =================================================================== *)
-  Lemma cr_epi `{CID : CpuId} (CID0 : CPU)
+  Lemma cr_epi `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (jp : nat) (m0 M : regfile) (av : nat) (eb : bool)
       (sp0 : mword 64) (pid : mword 32) (U : ustate)
       (Ment : gmap Z (bv 8)) (n r : Z) (lks : gset string) :
@@ -630,7 +631,7 @@ Section CrBodies.
   (*  over one at a time -- so what a caller supplies is only the four     *)
   (*  free ones, the answer in a0, and the process block.                  *)
   (* =================================================================== *)
-  Definition cr_epi_prop `{CID0 : CpuId}
+  Definition cr_epi_prop `{CID0 : CpuId} `{XI : CurCtx}
       (jp : nat) (sp0 : mword 64) (m0 : regfile) (av : nat)
       (pid : mword 32) (U : ustate) (n : Z) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr jp) (fun (CIDe : CpuId) =>
@@ -658,7 +659,7 @@ Section CrBodies.
   (* ...and it is free in the IMAGE too: [cr_ret]'s block row is at the
      ∀-bound image now, so the parameter is not read and the shift may
      re-key it as well as the descriptor. *)
-  Lemma cr_ret_shift `{CID0 : CpuId} (jp : nat) (m0 : regfile) (av : nat)
+  Lemma cr_ret_shift `{CID0 : CpuId} `{XI : CurCtx} (jp : nat) (m0 : regfile) (av : nat)
       (pid : mword 32) (U : ustate) (Ment Mo : gmap Z (bv 8)) (P' : uptd)
       (n : Z) (lks : gset string) :
     uptd_ext (pv_upt (us_V U)) P' ->
@@ -676,7 +677,7 @@ Section CrBodies.
     - iExact "Hpriv".
   Qed.
 
-  Lemma cr_mk_epi `{CID : CpuId} (jp : nat) (sp0 : mword 64) (m0 : regfile)
+  Lemma cr_mk_epi `{CID : CpuId} `{XI : CurCtx} (jp : nat) (sp0 : mword 64) (m0 : regfile)
       (av : nat) (pid : mword 32) (U : ustate) (n : Z) (lks : gset string) :
     m0 !!! Regidx csp_rs1 = sp0 ->
     (consoleread_stack <= av)%nat ->
@@ -706,7 +707,7 @@ Module ConsolereadProof (Myproc : MYPROC) (Acquire : ACQUIRE) (Killed : KILLED)
 
 Section ProofConsoleread.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* Normalise every [rget m k] the leaves produce back to [m !!! Regidx k]
      across the WHOLE proofmode goal: away from tp the two are the same
@@ -824,7 +825,7 @@ Section ProofConsoleread.
       assert (N10 : r <> Ra0) by (intro He; rewrite He in Hr; vm_compute in Hr; discriminate).
       rewrite /X3 upd_ne; [| congruence]. rewrite /X2 upd_ne; [| congruence].
       rewrite /X1 upd_ne; [| congruence]. reflexivity. }
-    iApply (Release.wp_release_sconf KT1 γc a_cons "cons"%string cons_res X3
+    iApply (Release.wp_release_sconf KT1 γc a_cons "cons"%string <{ cons_res }> X3
               0%nat true (proc_addr jp) (av - 12)%nat ({["cons"]} ∪ lks) HX3lka
               ltac:(lia)
               with "Hcg Ht Hpc Hlk Hlocked Hres Hcnt Hpay").
@@ -2026,7 +2027,7 @@ Section ProofConsoleread.
         apply callee_saved_insert_r; [vm_compute; reflexivity|].
         apply callee_saved_insert_r; [vm_compute; reflexivity|].
         apply callee_saved_insert_r; [vm_compute; reflexivity | apply callee_saved_refl]. }
-      iApply (Release.wp_release_sconf KT1 γc a_cons "cons"%string cons_res K3
+      iApply (Release.wp_release_sconf KT1 γc a_cons "cons"%string <{ cons_res }> K3
                 0%nat true (proc_addr jp) (av - 12)%nat ({["cons"]} ∪ lks) HK3lka
                 ltac:(lia)
                 with "Hcg Ht Hpc Hlk Hlocked Hres Hcnt Hpay").
@@ -2160,7 +2161,7 @@ Section ProofConsoleread.
     assert (HcsS4 : callee_saved msp S4).
     { rewrite /S4 /S3. apply callee_saved_insert_r; [vm_compute; reflexivity|].
       apply callee_saved_insert_r; [vm_compute; reflexivity | apply callee_saved_refl]. }
-    iApply (Release.wp_release_sconf KT1 γc a_cons "cons"%string cons_res S4
+    iApply (Release.wp_release_sconf KT1 γc a_cons "cons"%string <{ cons_res }> S4
               0%nat true (proc_addr jp) (av - 12)%nat ({["cons"]} ∪ lks) HS4lka
               ltac:(lia)
               with "Hcg Ht Hpc Hlk Hlocked Hres Hcnt Hpay").
@@ -2243,14 +2244,14 @@ Section ProofConsoleread.
       apply callee_saved_insert_r; [vm_compute; reflexivity | apply callee_saved_refl]. }
     iDestruct (cpu_own_transport CIDs1 CIDq1 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf KT1 γc "cons"%string cons_res S7 0%nat true
+    iApply (Acquire.wp_acquire_sconf KT1 γc "cons"%string <{ cons_res }> S7 0%nat true
               (proc_addr jp) (av - 12)%nat true lks cr_lvl0
               ltac:(lia)
               Hbelow
               with "Hcg Hcnt Ht Hpc []").
     all: try lkbelow.
     { iEval (rewrite HS7a0). iExact "Hlk". }
-    iIntros (CIDq2 Hsq2 ms2 maq) "%Hms2 Hcg Hpc %Hcsaq Hlocked Hres Hcnt Hpay". rgall.
+    iIntros (CIDq2 Hsq2 ms2 maq) "%Hms2 Hcg Hpc %Hcsaq Hlocked Hres _ Hcnt Hpay". rgall.
     iEval (rewrite HS7ra) in "Hpc".
     assert (Hp68 : ret_pc (add_vec_int (mword_of_int (CR + 0x64) : mword 64) 4)
                    = (mword_of_int (CR + 0x68) : mword 64)) by pcw.
@@ -2894,13 +2895,13 @@ Section ProofConsoleread.
       rewrite /P6 upd_ne; [| congruence]. reflexivity. }
     iDestruct (cpu_own_transport CID CIDp17 0%nat true pj true ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf KT1 γc "cons"%string cons_res P8 0%nat true pj
+    iApply (Acquire.wp_acquire_sconf KT1 γc "cons"%string <{ cons_res }> P8 0%nat true pj
               (av - 12)%nat true lks cr_lvl0 ltac:(lia)
               Hbelow
               with "Hcg Hcnt Ht Hpc []").
     all: try lkbelow.
     { iEval (rewrite HP8a0). iExact "Hlk". }
-    iIntros (CIDaq Hsaq ms0 maq) "%Hms0 Hcg Hpc %Hcsaq Hlocked Hres Hcnt Hpay". rgall.
+    iIntros (CIDaq Hsaq ms0 maq) "%Hms0 Hcg Hpc %Hcsaq Hlocked Hres _ Hcnt Hpay". rgall.
     iEval (rewrite HP8ra) in "Hpc".
     assert (Hpc28 : ret_pc (add_vec_int (mword_of_int (CR + 0x24) : mword 64) 4)
                     = (mword_of_int (CR + 0x28) : mword 64)) by pcw.

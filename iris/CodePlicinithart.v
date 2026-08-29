@@ -30,13 +30,14 @@ Require Import KernelDecode23.
 Require Import KernelDecode24.
 Require Import KernelDecode28.
 Require Import KernelDecode31.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodePlicinithart.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- plicinithart @ KernelSyms.plicinithart, 52 bytes ---- *)
 

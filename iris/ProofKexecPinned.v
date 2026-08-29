@@ -161,6 +161,7 @@ Require Import SpecKexecPinned.
 Require Import KexecOkQ.
 Require Import DirViewLend.
 Require Import IcacheRef.
+Require Import TsoCtx.
 
 
 (* ===================================================================== *)
@@ -185,7 +186,7 @@ Section KexecPinnedWand.
 
   Notation Ra0 := (mword_of_int 10 : mword 5).
 
-  Lemma kxp_body_wand (Q : mword 64 -> Prop)
+  Lemma kxp_body_wand `{XI : CurCtx} (Q : mword 64 -> Prop)
       (jp : nat) (ga gf : gname) (bmapstart inodestart : Z)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
@@ -328,7 +329,7 @@ Section KexecTail.
   (*  and the [argv[0] = NULL] skip), so it is a lemma rather than two    *)
   (*  copies of the same two [iApply]s.                                   *)
   (* ------------------------------------------------------------------ *)
-  Local Lemma kxc_d_tail `{CID0 : CpuId}
+  Local Lemma kxc_d_tail `{CID0 : CpuId} `{XI : CurCtx}
       (Q : mword 64 -> Prop)
       (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
@@ -393,7 +394,7 @@ Section KexecTail.
   (* ------------------------------------------------------------------ *)
   (*  +0x1ae .. ret -- PHASES C AND D, over phase B's output state.       *)
   (* ------------------------------------------------------------------ *)
-  Local Lemma kxc_cd `{CID0 : CpuId}
+  Local Lemma kxc_cd `{CID0 : CpuId} `{XI : CurCtx}
       (Q : mword 64 -> Prop)
       (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
@@ -516,7 +517,7 @@ Section KexecTail.
 End KexecTail.
 Section KexecPinnedMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).

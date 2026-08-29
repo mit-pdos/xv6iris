@@ -51,6 +51,7 @@ Require Import CodeKerneltrap.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 Set Printing Depth 40.
@@ -72,7 +73,7 @@ Ltac ktne_ra :=
 
 Section ProofKerneltrapParts.
   Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context {p : mword 64}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).

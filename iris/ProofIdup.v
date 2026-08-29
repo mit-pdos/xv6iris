@@ -96,6 +96,8 @@ Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
    imported because [ProofIget] is a proof file and nothing may depend on one.
    If a third caller appears they belong in [IcacheInv] beside
    [iref_upgrade_store_au]. *)
+Require Import TsoCtx.
+
 Lemma id_frac_lt1 (qt qr : Qp) :
   (1/2)%Qp = (qt + qr)%Qp -> (qt + qr/2 < 1/2)%Qp.
 Proof.
@@ -114,7 +116,7 @@ Module IdupProof (Acquire : ACQUIRE) (Release : RELEASE) : IDUP.
 
 Section ProofIdup.
   Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra  := (mword_of_int 1 : mword 5).
   Notation Rs0  := (mword_of_int 8 : mword 5).
@@ -353,14 +355,14 @@ Section ProofIdup.
       by (rewrite /mA; apply upd_eq).
     iDestruct (cpu_own_transport CID CID9 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf KT1 fsc_itlock "itable"%string (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) mA
+    iApply (Acquire.wp_acquire_sconf KT1 fsc_itlock "itable"%string <{ itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev }> mA
               n eb p (K - 4)%nat b lks
               HnZ ltac:(lia)
               Hfresh
               with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iApply (is_itable2_lock with "Hlock"). }
-    iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
+    iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres _ Hcnt Hpay".
     assert (Hpc18 : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.idup + 0x18)).
     { rewrite HmAra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc18) in "Hpc".
@@ -456,7 +458,7 @@ Section ProofIdup.
     iApply fupd_wp.
     iMod (iref_load_locked_au ⊤ M k ltac:(solve_ndisj) Hk with "Hinv Hhalf")
       as "[Hcellp Hbackp]".
-    iDestruct (wordw_claim_of (KTR := KT0) 4 (i_ref (ientry k))
+    iDestruct (ctx_word4_claim (KTR2 := KT0) (i_ref (ientry k))
                  (DfracOwn 1) (iref_word M k) ltac:(lia) with "Hcellp")
       as "#Hclaim0".
     iMod ("Hbackp" with "Hcellp") as "Hhalf".
@@ -661,7 +663,7 @@ Section ProofIdup.
        it -- so this is a pure re-spelling, and it is what makes the
        acquire/release pair compose back to [N]. *)
     iEval (rewrite Houtb) in "Hcg".
-    iApply (Release.wp_release_sconf KT1 fsc_itlock itable_lock "itable"%string (itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev) D5
+    iApply (Release.wp_release_sconf KT1 fsc_itlock itable_lock "itable"%string <{ itable_res2 fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev }> D5
               n eb p (K - 4)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HD5a0; reflexivity)
               ltac:(lia)

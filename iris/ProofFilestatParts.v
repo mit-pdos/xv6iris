@@ -61,6 +61,7 @@ Require Import SpecStati.
 Require Import CodeFilestat.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -207,7 +208,7 @@ Section FilestatParts.
      [struct stat] frame local, and [SpecStati.stat_at] is stated there. *)
   Local Instance fst_ktier : CurKtier := KT1.
 
-  Lemma fst_bytes_w4 (a : Arch.pa) :
+  Lemma fst_bytes_w4 `{XI : CurCtx} (a : Arch.pa) :
     is_aligned_paddr (Physaddr a) 4 = true ->
     bytes_own (DfracOwn 1) a 4 ⊢ ∃ w : bv 32, a ↦₄ w.
   Proof.
@@ -215,6 +216,7 @@ Section FilestatParts.
     iIntros "(H0 & H1 & H2 & H3 & _)".
     iDestruct "H0" as (b0) "H0". iDestruct "H1" as (b1) "H1".
     iDestruct "H2" as (b2) "H2". iDestruct "H3" as (b3) "H3".
+    (* M1 STAGE 2 PAYOFF: the four crossings that sat here are GONE. *)
     set (W := Z_to_bv 32 (assemble_bytes [b0;b1;b2;b3]) : bv 32).
     assert (Hw0 : b0 = nth_byte W 0%nat) by (symmetry; apply fst_nth_byte4; lia).
     assert (Hw1 : b1 = nth_byte W 1%nat) by (symmetry; apply fst_nth_byte4; lia).
@@ -222,22 +224,23 @@ Section FilestatParts.
     assert (Hw3 : b3 = nth_byte W 3%nat) by (symmetry; apply fst_nth_byte4; lia).
     iEval (rewrite Hw0) in "H0". iEval (rewrite Hw1) in "H1".
     iEval (rewrite Hw2) in "H2". iEval (rewrite Hw3) in "H3".
-    iExists W. iApply word4_pointsto_intro; [exact Hal |].
+    iExists W. iApply ctx_word4_pointsto_intro; [exact Hal |].
     cbn [seq]. iFrame "H0 H1 H2 H3". done.
   Qed.
 
-  Lemma fst_bytes_w2 (a : Arch.pa) :
+  Lemma fst_bytes_w2 `{XI : CurCtx} (a : Arch.pa) :
     is_aligned_paddr (Physaddr a) 2 = true ->
     bytes_own (DfracOwn 1) a 2 ⊢ ∃ w : bv 16, a ↦₂ w.
   Proof.
     intro Hal. rewrite /bytes_own. cbn [seq].
     iIntros "(H0 & H1 & _)".
     iDestruct "H0" as (b0) "H0". iDestruct "H1" as (b1) "H1".
+    (* M1 STAGE 2 PAYOFF: the two crossings that sat here are GONE. *)
     set (W := Z_to_bv 16 (assemble_bytes [b0;b1]) : bv 16).
     assert (Hw0 : b0 = nth_byte W 0%nat) by (symmetry; apply fst_nth_byte2; lia).
     assert (Hw1 : b1 = nth_byte W 1%nat) by (symmetry; apply fst_nth_byte2; lia).
     iEval (rewrite Hw0) in "H0". iEval (rewrite Hw1) in "H1".
-    iExists W. iApply word2_pointsto_intro; [exact Hal |].
+    iExists W. iApply ctx_word2_pointsto_intro; [exact Hal |].
     cbn [seq]. iFrame "H0 H1". done.
   Qed.
 
@@ -248,7 +251,7 @@ Section FilestatParts.
      [st+8] and [st+16] are themselves SLOT bases ([pa_stk_next]), which is
      where [st->type]'s and [st->size]'s alignments come from -- not from any
      arithmetic on [st]. *)
-  Lemma fst_bytes_stat (st : mword 64) :
+  Lemma fst_bytes_stat `{XI : CurCtx} (st : mword 64) :
     is_aligned_paddr (Physaddr st) 8 = true ->
     is_aligned_paddr (Physaddr (pa_add st 8)) 8 = true ->
     is_aligned_paddr (Physaddr (pa_add st 16)) 8 = true ->
@@ -316,23 +319,25 @@ Section FilestatParts.
      the join the same [bytes_own_app] chain as the split -- run backwards.
      Naming the 24 bytes explicitly would mean re-anchoring five sub-lists
      from [seq 0 n] onto [seq o n], which buys nothing here. *)
-  Lemma fst_w4_bytes (a : Arch.pa) (w : mword 32) :
+  Lemma fst_w4_bytes `{XI : CurCtx} (a : Arch.pa) (w : mword 32) :
     a ↦₄ w ⊢ bytes_own (DfracOwn 1) a 4.
   Proof.
-    iIntros "Hw". iDestruct (word4_pointsto_bytes with "Hw") as "Hbs".
+    iIntros "Hw". iDestruct (ctx_word4_pointsto_bytes with "Hw") as "Hbs".
     rewrite /bytes_own. iApply (big_sepL_impl with "Hbs").
-    iIntros "!>" (kk jj Hk) "Hb". by iExists (nth_byte w jj).
+    (* M1 STAGE 2 PAYOFF: the crossing that sat here is GONE. *)
+    iIntros "!>" (kk jj Hk) "Hb". iExists (nth_byte w jj). iExact "Hb".
   Qed.
 
-  Lemma fst_w2_bytes (a : Arch.pa) (w : mword 16) :
+  Lemma fst_w2_bytes `{XI : CurCtx} (a : Arch.pa) (w : mword 16) :
     a ↦₂ w ⊢ bytes_own (DfracOwn 1) a 2.
   Proof.
-    iIntros "Hw". iDestruct (word2_pointsto_bytes with "Hw") as "Hbs".
+    iIntros "Hw". iDestruct (ctx_word2_pointsto_bytes with "Hw") as "Hbs".
     rewrite /bytes_own. iApply (big_sepL_impl with "Hbs").
-    iIntros "!>" (kk jj Hk) "Hb". by iExists (nth_byte w jj).
+    (* M1 STAGE 2 PAYOFF: the crossing that sat here is GONE. *)
+    iIntros "!>" (kk jj Hk) "Hb". iExists (nth_byte w jj). iExact "Hb".
   Qed.
 
-  Lemma fst_stat_bytes (st : mword 64) (dev ino : mword 32) (ty nl : mword 16)
+  Lemma fst_stat_bytes `{XI : CurCtx} (st : mword 64) (dev ino : mword 32) (ty nl : mword 16)
       (sz : mword 64) :
     stat_at st dev ino ty nl sz -∗
     bytes_own (DfracOwn 1) (pa_add st 12) 4 -∗
@@ -376,7 +381,7 @@ Section FilestatParts.
   (* ------------------------------------------------------------------ *)
   (* copyout returns the source unchanged, so the run comes back at the same
      naming function; the frame does not care what it holds. *)
-  Lemma fst_bytes_any (st : mword 64) (f : nat -> bv 8) (n : nat) :
+  Lemma fst_bytes_any `{XI : CurCtx} (st : mword 64) (f : nat -> bv 8) (n : nat) :
     ([∗ list] j ∈ seq 0 n, (pa_add st j) ↦ₘ f j) ⊢ bytes_own (DfracOwn 1) st n.
   Proof.
     rewrite /bytes_own. iIntros "H".
@@ -650,7 +655,7 @@ Section ProofFilestatParts.
      naming function.  Since the length is a literal, the cheapest honest
      route is to peel the twenty-four existentials and read the function off
      the resulting list -- no [big_sepL_exist] and no list/function bridge. *)
-  Lemma fst_bytes_name24 (a : Arch.pa) :
+  Lemma fst_bytes_name24 `{XI : CurCtx} (a : Arch.pa) :
     bytes_own (KTR := KT1) (DfracOwn 1) a 24 ⊢
     ∃ f : nat -> bv 8, ([∗ list] j ∈ seq 0 24, (pa_add a j) ↦ₘ[KT1] f j).
   Proof.
@@ -678,7 +683,7 @@ Section ProofFilestatParts.
   (* =================================================================== *)
   (*  +0x56 .. +0x60 -- THE EPILOGUE.  Both exits reach it.               *)
   (* =================================================================== *)
-  Lemma fst_epi `{GEN : GenId} `{CID0 : CpuId}
+  Lemma fst_epi `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s40 : mword 64) (rv : mword 64)
       (w4 w5 w7 w8 w9 w10 : mword 64)
@@ -698,16 +703,16 @@ Section ProofFilestatParts.
     sie_cap_gpr KT1 Mt (K - 10)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (FST + 0x56) : mword 64) -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) s40 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) w7 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) w8 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) w9 -∗
-    word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) w10 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) w4 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) s40 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 7) (DfracOwn 1) w7 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 8) (DfracOwn 1) w8 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 9) (DfracOwn 1) w9 -∗
+    ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 10) (DfracOwn 1) w10 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗

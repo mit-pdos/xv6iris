@@ -45,6 +45,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import WpLock.        (* [is_lock] *)
+Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Require Import SpecAllocpid.  (* [alp_pid_lock] / [nextpid_res] *)
 Require Import ProcAvail.     (* [procs_avail] *)
 Require Import TicksInv.      (* [is_tickslock] *)
@@ -65,12 +66,13 @@ Local Open Scope Z_scope.
 
 Section SyscParkEnv.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   (* the nextpid lock's gname is EXISTENTIAL, exactly as [sysc_proc_env]
      carries it: nothing outside allocpid ever names it, and a parker that
      had to thread it would be threading a name it cannot otherwise use. *)
   Definition sysc_park_extra (γtk : gname) : iProp Σ :=
-    ((∃ γp : gname, is_lock γp alp_pid_lock "nextpid"%string nextpid_res) ∗
+    ((∃ γp : gname, is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }>) ∗
      procs_avail None ∗
      is_tickslock γtk ∗
      console_ready)%I.
@@ -84,6 +86,7 @@ End SyscParkEnv.
 Section ParkWorld.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
+  Context `{XI : CurCtx}.
 
   (* THE PARK'S WORLD, as a process hands it to its children.  A parent that
      forks builds the child's trap-loop environment, and the rows the child
@@ -101,13 +104,13 @@ Section ParkWorld.
        dev_inv fsc_uart fsc_disk ∗
        console_caps fsc_uart ∗
        disk_geom fsc_disk pd pav pu ∗
-       is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) ∗
+       is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> ∗
        is_tickslock γtl ∗
        procs_inv γs ∗
        console_ready ∗
        (* [sysc_park_extra]'s other two rows, so that this bundle covers all
           of it: the nextpid lock and the sealed slot ledger *)
-       (∃ γp : gname, is_lock γp alp_pid_lock "nextpid"%string nextpid_res) ∗
+       (∃ γp : gname, is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }>) ∗
        procs_avail None ∗
        wire_inv ∗
        kmap_at tramp_vpn tramp_ppn KP_rx ∗

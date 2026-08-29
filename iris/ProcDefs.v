@@ -7,14 +7,20 @@ From iris.base_logic.lib Require Import gen_heap invariants own.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvPtsto.
+Require Import InstrBytes.   (* [avi_assoc]: the name field's byte cursor *)
 Require Import PageGeom ProcGeom TrampPt.
 Require Import UserPtTree ProcPtOwn.
 Require Import SwtchCtx.
 Require Import StackOwn.
 Require Import FdSlots IrefSlots.
+(* [bytes_string]/[bytes_string_split]: the pure half of the array->string
+   borrow below -- a fixed-size buffer with a NUL in it DETERMINES the C
+   string it holds. *)
+Require Import CstringInv.
 (* EXPORTED, not merely imported: [proc_dormant] mentions [bslots], so every
    file that unfolds the dormant block needs the vocabulary in scope. *)
 Require Export BioDefs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -105,6 +111,7 @@ Proof. destruct U as [V M]. rewrite /us_cwd /upd_usV /=. by rewrite upd_cwd_id. 
 
 Section ProcDefs.
   Context `{!riscvGS Σ}.
+  Context `{XI : CurCtx}.
 
   (* THE NUL LIVES HERE, not in [proc_fields], and that is deliberate: very
      few places unpack [pname_cells], while [proc_fields] is threaded through
@@ -128,6 +135,96 @@ Section ProcDefs.
   Lemma pname_cells_intro (pa : mword 64) (dq : dfrac) (bs : list (bv 8)) :
     pname_wf bs -> pname_bytes pa dq bs -∗ pname_cells pa dq bs.
   Proof. intro H. iIntros "H". by iFrame. Qed.
+
+  (* ===================================================================== *)
+  (* THE ARRAY -> STRING ACCESSOR (tso-port.md §0.21′ amendment).           *)
+  (*                                                                       *)
+  (* [pname_cells] and [↦ₛ] are DIFFERENT RESOURCES and each keeps its own  *)
+  (* definition.  [p->name] is a FIXED-SIZE ARRAY -- sixteen bytes, always  *)
+  (* all sixteen owned, the length is part of [proc_fields] -- with a C     *)
+  (* string EMBEDDED in it; [pname_wf] is the terminator's existence.  [↦ₛ] *)
+  (* is a string and nothing else: it owns |s|+1 bytes and stops.           *)
+  (*                                                                       *)
+  (* So the bridge is not a conversion, it is a POSITIONAL SPLIT: borrow    *)
+  (* the prefix up to (and including) the NUL as a [↦ₛ] fact, KEEP the tail *)
+  (* bytes behind as [pname_pad], hand the string view to a callee that     *)
+  (* speaks strings, and reassemble on return.  The reassembly takes an     *)
+  (* ARBITRARY string, not the borrowed one, because the callee may have    *)
+  (* written it (safestrcpy does) -- and [pname_wf] comes back for free,    *)
+  (* since a [cstring_bytes] prefix carries its own NUL.                    *)
+  (* ===================================================================== *)
+
+  (* the bytes the borrow leaves behind: everything past the string's NUL,
+     addressed from the FIELD's base so the two halves rejoin positionally *)
+  Definition pname_pad (pa : mword 64) (dq : dfrac) (nm : string)
+      (pad : list (bv 8)) : iProp Σ :=
+    ([∗ list] i ↦ b ∈ pad,
+       p_name pa (length (cstring_bytes nm) + i) ↦ₘ{dq} b)%I.
+
+  (* [p->name]'s bytes as a CURSOR from the field's base -- what
+     [pname_cells]' element-indexed big-op needs before it can meet
+     [ctx_string_pointsto]'s. *)
+  Lemma pname_addr (pa : mword 64) (i : nat) :
+    pa_add (p_name pa 0) i = p_name pa i.
+  Proof.
+    unfold pa_add, p_name.
+    change (add_vec pa (mword_of_int (344 + Z.of_nat 0))) with (add_vec_int pa 344).
+    rewrite avi_assoc. reflexivity.
+  Qed.
+
+  (* THE SPLIT, as an equivalence: both directions of the borrow at once. *)
+  Lemma pname_bytes_split (pa : mword 64) (dq : dfrac) (nm : string)
+      (pad : list (bv 8)) :
+    pname_bytes pa dq (cstring_bytes nm ++ pad) ⊣⊢
+    p_name pa 0 ↦ₛ{dq} nm ∗ pname_pad pa dq nm pad.
+  Proof.
+    rewrite /pname_bytes /pname_pad big_sepL_app
+            ctx_string_pointsto_unfold.
+    apply bi.sep_proper; [| reflexivity].
+    apply big_sepL_proper. intros k x Hk. by rewrite pname_addr.
+  Qed.
+
+  (* a buffer that BEGINS with a C string is well-formed: the string's own
+     terminator is the NUL [pname_wf] asks for. *)
+  Lemma pname_wf_cstring (nm : string) (pad : list (bv 8)) :
+    pname_wf (cstring_bytes nm ++ pad).
+  Proof.
+    rewrite /pname_wf /cstring_bytes -app_assoc.
+    exists (length (string_bytes nm)). split.
+    - rewrite length_app. cbn [length app]. lia.
+    - rewrite lookup_app_r; [| apply Nat.le_refl].
+      rewrite Nat.sub_diag. reflexivity.
+  Qed.
+
+  (* THE BORROW.  Out comes the string the array holds -- determined, not
+     assumed: [pname_wf] gives the NUL and [CstringInv] gives the split --
+     as a [↦ₛ] fact at the field's base, plus the retained tail.  [nonul]
+     rides along because a [%s] consumer needs it and it is free here. *)
+  Lemma pname_cells_borrow (pa : mword 64) (dq : dfrac) (bs : list (bv 8)) :
+    pname_cells pa dq bs -∗
+    ∃ (nm : string) (pad : list (bv 8)),
+      ⌜bs = (cstring_bytes nm ++ pad)%list⌝ ∗ ⌜PrintkFmt.nonul nm = true⌝ ∗
+      p_name pa 0 ↦ₛ{dq} nm ∗ pname_pad pa dq nm pad.
+  Proof.
+    iIntros "H". iDestruct (pname_cells_open with "H") as "[%Hwf H]".
+    destruct (bytes_string_split bs Hwf) as (pad & Hsplit).
+    iExists (bytes_string bs), pad.
+    iSplitR; [by iPureIntro|].
+    iSplitR; [iPureIntro; apply bytes_string_nonul|].
+    rewrite -pname_bytes_split -Hsplit. iExact "H".
+  Qed.
+
+  (* THE REASSEMBLY, at an ARBITRARY string: what a callee that WROTE the
+     field hands back.  [pname_wf] is re-derived, never carried across. *)
+  Lemma pname_cells_return (pa : mword 64) (dq : dfrac) (nm : string)
+      (pad : list (bv 8)) :
+    p_name pa 0 ↦ₛ{dq} nm -∗ pname_pad pa dq nm pad -∗
+    pname_cells pa dq (cstring_bytes nm ++ pad).
+  Proof.
+    iIntros "Hs Hp".
+    iApply (pname_cells_intro _ _ _ (pname_wf_cstring nm pad)).
+    iApply pname_bytes_split. iFrame "Hs Hp".
+  Qed.
 
   Definition proc_fields (pa : mword 64) (dq : dfrac) (V : pprivate) : iProp Σ :=
     (p_sz pa        ↦₈{dq} pv_sz V ∗
@@ -281,7 +378,7 @@ Section ProcDefs.
     stack_own (KTR := KT1) (add_vec ks (mword_of_int 4096)) KSTACK_AV.
   Proof.
     iIntros "#Hks (%ks' & #Hks' & Hstk)".
-    iDestruct (word_pointsto_agree with "Hks Hks'") as %<-.
+    iDestruct (ctx_word_pointsto_agree with "Hks Hks'") as %<-.
     iExact "Hstk".
   Qed.
 
@@ -355,9 +452,9 @@ Section ProcDefs.
   Proof.
     iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp)".
     assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
-    rewrite Hq word4_pointsto_frac_split.
+    rewrite Hq ctx_word4_pointsto_frac_split.
     iDestruct "Hpid" as "[Hq1 Hq2]". iFrame "Hq1".
-    iIntros "Hq1". rewrite /proc_priv_bare Hq word4_pointsto_frac_split.
+    iIntros "Hq1". rewrite /proc_priv_bare Hq ctx_word4_pointsto_frac_split.
     iSplitR; [done|]. iSplitR; [done|]. iFrame.
   Qed.
 
@@ -475,3 +572,115 @@ Section ProcDefs.
   Qed.
 
 End ProcDefs.
+
+(* ===================================================================== *)
+(* THE SLOT'S TRANSPORT (tso-port M3).  [SchedCtx.proc_lock_res] is the   *)
+(* proc lock's payload, and the M3 sweep makes it a CONVERTED payload     *)
+(* (the acquirer re-indexes it to its own context along [ctx_dom]) rather *)
+(* than a constant embedding -- which is what makes the lock HANDLE, and  *)
+(* so [SchedCtx.procs_inv], a closed term.  These are the obligations     *)
+(* that sweep lands on the dormant block.                                 *)
+(*                                                                        *)
+(* OUTSIDE the section, because each names the context the section fixes; *)
+(* and the structural instances are applied AS TERMS throughout, because  *)
+(* the [↦₈]/[↦ₘ] notations put the index under the class projection       *)
+(* [cur_ctx], which instance search will not unfold (M3 recipe rule 3).   *)
+(* ===================================================================== *)
+Section ProcDefsMorph.
+  Context `{!riscvGS Σ}.
+
+  Global Instance pname_cells_morph (pa : mword 64) (dq : dfrac) (bs : list (bv 8)) :
+    CtxMorph (fun xi : CtxId => pname_cells (XI := xi) pa dq bs).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /pname_cells.
+    iDestruct "H" as "[%Hwf H]".
+    iDestruct (ctx_morph_big_sepL bs
+        (fun i b xi => ctx_pointsto xi (p_name pa i) dq b)
+        (fun i x => ctx_morph_pointsto _ _ _ _) ξ ξ' with "Hd H") as "[Hd H]".
+    iFrame "Hd". by iFrame.
+  Qed.
+
+  Global Instance proc_fields_morph (pa : mword 64) (dq : dfrac) (V : pprivate) :
+    CtxMorph (fun xi : CtxId => proc_fields (XI := xi) pa dq V).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /proc_fields.
+    iDestruct "H" as "(H1 & H2 & %Hl & H3)".
+    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H1") as "[Hd H1]".
+    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H2") as "[Hd H2]".
+    iDestruct (pname_cells_morph pa dq (pv_name V) ξ ξ' with "Hd H3") as "[Hd H3]".
+    iFrame. done.
+  Qed.
+
+  Global Instance ofile_cells_morph (pa : mword 64) (fs : list (mword 64)) :
+    CtxMorph (fun xi : CtxId => ofile_cells (XI := xi) pa fs).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /ofile_cells.
+    iDestruct (ctx_morph_big_sepL fs
+        (fun fd v xi => ctx_word_pointsto xi (p_ofile pa fd) (DfracOwn 1) v)
+        (fun i x => ctx_morph_word _ _ _ _) ξ ξ' with "Hd H") as "[Hd H]".
+    iFrame.
+  Qed.
+
+  Global Instance is_kstack_morph (pa ks : mword 64) :
+    CtxMorph (fun xi : CtxId => is_kstack (XI := xi) pa ks).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /is_kstack.
+    iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H") as "[Hd H]". iFrame.
+  Qed.
+
+  Context `{!fdslotG Σ, !irefslotG Σ, !bioslotG Σ}.
+
+  Global Instance kstack_free_morph (pa : mword 64) :
+    CtxMorph (fun xi : CtxId => kstack_free (XI := xi) pa).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /kstack_free.
+    iDestruct "H" as (ks) "[H1 H2]".
+    iDestruct (is_kstack_morph pa ks ξ ξ' with "Hd H1") as "[Hd H1]".
+    iDestruct (stack_own_morph (KTR := KT1) _ _ ξ ξ' with "Hd H2") as "[Hd H2]".
+    iFrame "Hd". iExists ks. iFrame.
+  Qed.
+
+  Global Instance proc_dormant_noctx_morph (pa : mword 64) (st : mword 32) :
+    CtxMorph (fun xi : CtxId => proc_dormant_noctx (XI := xi) pa st).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /proc_dormant_noctx.
+    iDestruct "H" as (V pid)
+      "(%Hf & Hpid & Hfl & Ho & Hs & Hsp & Hir & Hbs & Hkst & Haddr)".
+    (* [p_pid] is [↦₄]: context-indexed since M1 stage 2 *)
+    iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd Hpid") as "[Hd Hpid]".
+    iDestruct (proc_fields_morph pa (DfracOwn 1) V ξ ξ' with "Hd Hfl") as "[Hd Hfl]".
+    iDestruct (ofile_cells_morph pa (pv_ofile V) ξ ξ' with "Hd Ho") as "[Hd Ho]".
+    iDestruct (kstack_free_morph pa ξ ξ' with "Hd Hkst") as "[Hd Hkst]".
+    iAssert (ctx_dom ξ ξ' ∗
+             (if bool_decide (st = ZOMBIE)
+              then ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝ ∗
+                   (∃ M : gmap Z (bv 8), proc_pt_at (XI := ξ') pa (pv_upt V) M) ∗
+                   tf_page (ud_tfp (pv_upt V)) (pv_tf V)
+              else ctx_word_pointsto ξ' (p_pagetable pa) (DfracOwn 1)
+                     (zero_reg : mword 64) ∗
+                   ctx_word_pointsto ξ' (p_trapframe pa) (DfracOwn 1)
+                     (zero_reg : mword 64)))%I
+      with "[Hd Haddr]" as "[Hd Haddr]".
+    { destruct (bool_decide (st = ZOMBIE)).
+      - iDestruct "Haddr" as "(%Hu & (%M & Hpt) & Htf)".
+        iDestruct (proc_pt_at_morph pa (pv_upt V) M ξ ξ' with "Hd Hpt") as "[Hd Hpt]".
+        iFrame "Hd". iSplitR; [iPureIntro; exact Hu|]. iFrame "Htf". iExists M. iFrame.
+      - iDestruct "Haddr" as "[H1 H2]".
+        iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H1") as "[Hd H1]".
+        iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H2") as "[Hd H2]".
+        iFrame. }
+    iFrame "Hd". iExists V, pid.
+    iSplitR; [iPureIntro; exact Hf|]. iFrame.
+  Qed.
+
+  Global Instance proc_dormant_morph (pa : mword 64) (st : mword 32) :
+    CtxMorph (fun xi : CtxId => proc_dormant (XI := xi) pa st).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite proc_dormant_split.
+    iDestruct "H" as "[Hn Hc]".
+    iDestruct (proc_dormant_noctx_morph pa st ξ ξ' with "Hd Hn") as "[Hd Hn]".
+    iDestruct (own_ctx_morph (p_context pa) ξ ξ' with "Hd Hc") as "[Hd Hc]".
+    iFrame "Hd". rewrite proc_dormant_split. iFrame.
+  Qed.
+
+End ProcDefsMorph.

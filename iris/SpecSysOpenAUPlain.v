@@ -41,6 +41,7 @@ Require Import FsCfg.
 Require Import SpecSysOpenAU.
 Require Import FsAbs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import TsoCtx.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -48,7 +49,7 @@ Local Open Scope Z_scope.
 Module Type SYSOPEN_AU_PLAIN.
   Parameter wp_sys_open_au_plain :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γfl γf : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)

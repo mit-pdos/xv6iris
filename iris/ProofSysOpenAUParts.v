@@ -120,6 +120,7 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.
 Require Import FsCfg.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -127,6 +128,7 @@ Set Printing Depth 40.
 
 Section ProofSysOpenAUParts.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
@@ -291,7 +293,7 @@ Section ProofSysOpenAUParts.
   Proof.
     iIntros "H".
     iDestruct (bi.equiv_entails_1_1 _ _
-                 (word_pointsto_frac_split a (1/2) (1/2) w) with "[H]")
+                 (ctx_word_pointsto_frac_split _ a (1/2) (1/2) w) with "[H]")
       as "[$ $]".
     { iEval (rewrite Qp.div_2). iExact "H". }
   Qed.

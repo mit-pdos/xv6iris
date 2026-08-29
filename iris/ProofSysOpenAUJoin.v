@@ -116,6 +116,7 @@ Require Import ProofSysOpenAUStores.
 Require Import ProofSysOpenAUAlloc.
 Require Import ProofSysOpen.   (* [so_neq_of_eq] / [so_neq_of_ne] / [so_bud_iput] *)
 Require Import FsAbs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -171,7 +172,7 @@ Section ProofSysOpenAUJoin.
   (*  zero-extends, so a negative [short] lands at or above 0x8000 > 9   *)
   (*  and the single [bltu] decides both halves of the C's disjunction.  *)
   (* ================================================================== *)
-  Lemma so_join_au `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_join_au `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gfl gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -255,7 +256,7 @@ Section ProofSysOpenAUJoin.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     log_opb icfg_log u -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗

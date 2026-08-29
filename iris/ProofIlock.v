@@ -147,6 +147,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Set Printing Depth 40.
 
@@ -216,6 +217,7 @@ Qed.
 
 Section IlockParts.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, FSC : fscfg}.
+  Context `{XI : CurCtx}.
 
   (* THE WRITE-DIRECTION TWIN of [InodeInv.inode_addrs_buf].  memmove's
      DESTINATION is the thirteen [i_addr] cells viewed as 52 contiguous
@@ -282,6 +284,7 @@ Qed.
 Section IlockMsg.
   Context `{!riscvGS Σ, FSC : fscfg}.
   Context `{GEN : GenId}.
+  Context `{XI : CurCtx}.
 
   Lemma il_msg_str :
     (kernel_data : iProp Σ) -∗ (mword_of_int il_msg_a : mword 64) ↦ₛ□ il_msg.
@@ -337,6 +340,7 @@ Definition il_sp (m M : regfile) : Prop :=
 
 Section IlockDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   (* ilock's 32-byte frame: ra@24 s0@16 s1@8, and slot 4 (s2's) held
      ANONYMOUSLY -- the cached arm never writes it. *)
@@ -432,6 +436,7 @@ End IlockDefs.
 (* ===================================================================== *)
 Section IlockEpilogue.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   Local Lemma il_epilogue `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (gisl : gname)
@@ -683,6 +688,7 @@ End IlockEpilogue.
 (* ===================================================================== *)
 Section IlockLoad.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)
   (*  A CLAIMED INODE'S BUNDLE, OUT OF NOTHING (§16.4's fill sub-arm)     *)
@@ -759,7 +765,7 @@ Section IlockLoad.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     il_frame m -∗
     proc_priv_bare (proc_addr j) pidv Upr -∗
     i_dev ip ↦₄{DfracOwn (1/2)} icfg_dev -∗
@@ -2222,7 +2228,7 @@ End IlockLoad.
 
 Section ProofIlockMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_ilock_dep_sconf
       (gs : list gname) (j : nat) (gl : gname)
@@ -2407,7 +2413,7 @@ Section ProofIlockMain.
     iApply fupd_wp.
     iMod (iref_live_gen_load_au ⊤ k s g ltac:(solve_ndisj) Hk
             with "Hitbl Hrt") as (vp) "[Hcellp Hbackp]".
-    iDestruct (wordw_claim_of (KTR := KT0) 4 (i_ref (ientry k))
+    iDestruct (ctx_word4_claim (KTR2 := KT0) (i_ref (ientry k))
                  (DfracOwn 1) vp ltac:(lia) with "Hcellp") as "#Hclaim0".
     iMod ("Hbackp" with "Hcellp") as "[%Hbp Hrt]".
     iModIntro.
