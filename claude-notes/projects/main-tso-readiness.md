@@ -917,3 +917,118 @@ introduced because a main-only consumer needed them.  Review candidates:
 - A stale `.vo` can mask a red file until its deps change: `BootShared`
   was red for ~40 rounds behind an up-to-date `.vo`.  Before calling a
   tree green, a full rebuild (touch `TsoCtx.v`) is the honest gate.
+
+
+# AMENDMENT 6 (2026-08-29) — THE M2 THREADING LANDED ON THE SC STUB: the running token, parked records, and the two sites the stub carries
+
+Slice 2 shipped with the M2 threading deferred (§5.2).  This amendment
+ports it from the M-leg (`origin/tso`) with the T-leg spec shapes kept
+(owner ruling: "we don't want to back out the real spec shapes from
+T-leg … they're the real deal").  Gate, met twice: on the base `c1227faec`
+(full `-k` build `MAKEEXIT=0`, 1302 files) and again after the rebase onto
+`origin/main` `6285fd1ad` (48 commits of the syscall-tier sweep; `MAKEEXIT=0`,
+1331 files) -- `audit-only` = the sanctioned 13 both times,
+`kernel-rocq/`/`user-rocq/` unchanged, zero `Admitted`/`Axiom` in `iris/`.
+Landed as ONE commit on `main` (the ~40 `wip(M2)` build-round commits are
+squashed; the pre-rebase branch is tag `m2-port-pre-rebase`, local only).
+
+## 6.1 What landed — each §5.2 row, resolved
+
+| §5.2 row | now on main | from |
+|---|---|---|
+| `own_context cur_ctx` in `sie_cap` | the conjunct after `sie_arm`; `SieCapCtx.sie_cap_gpr_own_ctx_acc` borrows it; every `sie_cap` destruct/rebuild carries `Hctx` (the M-leg's "Hctx line twins", applied by line-pick in ~25 files) | M-leg `IntrDefs`/`SieCapCtx`, token hunks only (no `caps_fam`) |
+| acquire-side `ctx_absorb` | `ProofAcquire`: `lock_pay R` opens to `ctx_parked ξ0 T0 ∗ R ξ0`, receipt `hart_view_lb_any T0`, `ctx_absorb R ξ0 cur_ctx`; the `(∃ K, hart_view_lb K)` receipt `SpecAcquire` exports is minted from the same receipt | M-leg |
+| release-side `ctx_deposit` | `ProofRelease`: `ctx_parked_alloc` + `ctx_deposit R cur_ctx ξc 0` rebuild `lock_pay R` (the M-leg's per-publication record) | M-leg |
+| swtch `ctx_park`/`ctx_resume`; `ctx_parked XIp Tp` in `valid_context_pre` | `SwtchCtx`/`ProofSwtch` = the T-leg's files WITH the token; `ProofSwtch` exchanges tokens (`ctx_park` into the record it builds, `ctx_resume` out of the one it consumes, receipt `hart_view_lb_any`) | T-leg shape, M-leg mechanism |
+| `cpu_ctx_free`'s parked record | still the bare `∃ vs ξ` run; `ProofScheduler` claims via `ctx_cells_morph` + `ctx_dom_sc` (the T-leg's `ctx_cells_reindex` is modal on main) | deferred, as before |
+| bcache escrow as a parked record | `BioInv.buf_escrow_rec`, `escrow_absorb`/`escrow_deposit`/`escrow_alloc_seq`; `bio_init_at` takes `own_context cur_ctx`; `ProofBrelse`/`ProofBread(Parts)` absorb/deposit at the escrow | M-leg |
+| the boot deposit's named context | `SpecMainSecondary.main_deposit xid γd γv := ctx_parked_inv xid ∗ main_deposit_rows xid γd γv` (`CtxRecord`); `SpecMain`'s boot body takes `xid` and `ctx_parked_inv xid`; `BootShared` mints `xid`; `own_context_boot` for the boot hart in `SystemAdequacy`; `ProofMain.mn_grp_started` deposits, `ProofMainSecondary` absorbs | M-leg |
+| `boot_hart_res` rows at `∀ ξ` | M-leg `BootChain`; `BootShared` crosses `proc`/`noff`/`intena` under the ∀ | M-leg |
+| forkret's park | the record carries `ctx_parked` (6.3); `UsertrapRes.park_globals` + `ConsoleInv.console_inv_morph`/`console_ready_morph` are on main for the day the child gets its own context, unused by the park today | see 6.3 |
+| `caps_fam`/`caps_morph` | ABSENT (T-leg trap tier) — the reason for 6.3 | — |
+
+## 6.2 Method notes
+
+- Whole-tree `git merge origin/tso` = 263 conflicts; abandoned.  Per-file
+  3-way merges (base `e1292b382`) + a keyword resolver (token hunks from
+  the M-leg, the rest from main, payloads re-normalised to `<{ R }>`);
+  for `IntrDefs`/`WpIntrInv` a hunk applier keyed on `own_context|Hctx`
+  that excludes the `caps_fam` hunks.  Where main and the M-leg had BOTH
+  moved since the base (the usertrap/forkret park cluster: `UsertrapRes`,
+  `ParkCap`, `SpecForkretParkPaid`, `ProofForkretPark`, `ProofKforkB5`,
+  `ProofUserinit`), main's design wins (its consumers — `UtResFits`,
+  `ProofUsertrap*`, `ProofSyscall` — are main-only) and only the token
+  hunk is added.
+- **The const-payload `CtxMorph` hang (§0.15′ again).**
+  `ctx_morph_const_pay` was priority 99: `apply _` on
+  `CtxMorph <{ bcache_res bn V }>` (escrow-bearing now) descends the
+  payload and leaves a term the next tactic never finishes.  Priority 0
+  fixes the `$!`-on-a-hypothesis sites (`[ apply ctx_morph_const_pay | | ]`)
+  but NOT the lemma-argument sites (`newlock_at`, `wp_acquire_sconf`,
+  `wp_release_sconf` with `<{ bcache_res bn V }>`); those take a local
+  instance ahead of the sentence,
+  `pose proof (TsoCtx.ctx_morph_const_pay (bcache_res bn V)) as Hcm_bcN.`
+  Only the `bcache_res` family needs it.  Why priority 0 is not honoured
+  there is recorded, not understood.
+- Diagnosing a hang: kill the worker (filter `ps` by `/proc/<pid>/cwd`),
+  then `timeout 300 rocq compile … -time File.v`; the last printed sentence
+  is the one BEFORE the hang (owner's bound: 5 min is plenty).
+
+## 6.3 THE TWO SITES THE SC STUB CARRIES, and why (owner ruling: "use the shim")
+
+The M-leg models `own_context ξ`/`ctx_parked ξ T` as ONE exclusive ghost
+per context.  On main that is unsatisfiable at exactly two sites, for one
+structural reason:
+
+- a forked child's record (`ProofForkretPark`) must be stated at its
+  PARKER's context (main's `wp_forkret` takes `procs_inv` and the
+  `sie_cap` at one context), and
+- the seven secondary harts must run at the boot carve's context
+  (`SystemAdequacy`; `main_deposit xid γd γv` is not a closed term on main —
+  its `procs_inv`/`console_caps`/disk-lock rows are ambient),
+
+because `procs_inv` cannot be restated at a fresh context: its per-proc
+lock rows reach `valid_context → p_sched → trap_csrs → intr_handler_spec`,
+and only the M-leg's caps channel (`IntrDefs` binding the credential
+family `C` inside `intr_res`) makes that contract a closed term.  Both
+legs' own comments say so (`tso-port.md` §0.11′/§0.12′; the T-leg's
+`ProofForkretPark`).
+
+What the stub does about it (`TsoCtx`, `TsoCtxShim`): the two token
+bodies are TRIVIAL on main, exactly as `hart_view_lb_def` already was
+(`True ∨ ∃ c, ghost_var …` — the dead disjunct only keeps the constants'
+implicit signature), so the shim exports `own_context_any ξ` and
+`ctx_parked_any ξ T` beside `hart_view_lb_any`; the fork record takes its
+token from `ctx_parked_any cur_ctx 0`, the secondaries their running
+token from `own_context_any ξ0`.  Every law statement is unchanged; the
+three exclusivity lemmas the M-leg states (`own_context_excl`,
+`ctx_parked_excl`, `own_context_parked_excl`) are not, because they are
+false for the trivial bodies and no file used them.  At cutover these two
+sites are the fork/boot items of the M2 worklist, beside the five
+`hart_view_lb_any` sites the M-leg itself carries.
+
+The ambient-row corner that goes with it: `procs_inv` stays at the
+ambient context in `main_deposit_rows`, `park_globals`, `ProofMain`'s
+deposit and `ProofForkretPark`'s record (as a `ctx_morph_const` row),
+`proc_priv` likewise; rows with real morphs (`is_kstack`, `ctx_cells`,
+`stack_own`, `disk_geom`, `ctx_word_pointsto`, `console_ready`) are
+indexed.  Un-deferring needs the caps channel or the M-leg's
+`XIp`-pinned `valid_context_pre` — a decision, not a merge.
+
+## 6.4 SC-only lemmas added (§5.3 class, flagged)
+
+`TsoCtxShim.own_context_any` / `ctx_parked_any`; `WpLock.is_lock_pay_iff`
+(an `inv_iff`, not SC-only); `ConsoleInv.console_inv_morph` /
+`console_ready_morph` (via `is_lock_reindex` + `is_lock_pay_iff` +
+`cons_res_morph` along `ctx_dom_sc`); `WpLock.newlock`-side
+`lock_pay_intro` kept (M-leg SC form).
+
+## 6.5 Deferred
+
+| deferred | stand-in |
+|---|---|
+| a fork child's own context; per-hart contexts at boot | the stub tokens (6.3) |
+| `procs_inv`/`proc_priv` rows at the record's context | ambient rows, `ctx_morph_const` |
+| `cpu_ctx_free`'s parked record + receipt | bare `∃ vs ξ`; `ctx_dom_sc` |
+| `caps_fam`/`caps_morph`; `KptShare.kpt_creds`; `TsoCtxAbsorbLb` | absent |
+| the M-leg's own M2 debt (five `hart_view_lb_any` sites, `ctx_dom_sc` at `lock_pay_intro`/create/destroy) | as on the M-leg |

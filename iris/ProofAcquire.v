@@ -29,7 +29,9 @@ Require Import SpecAcquire.
 Require Import ProcGeom.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require Import TsoCtxShim.   (* [hart_view_lb_any] / [ctx_dom_sc]: the SC-only
+Require Import SieCapCtx.    (* [sie_cap_gpr_own_ctx_acc]: the winner's own
+   running token, borrowed out of the bundle for the [ctx_absorb] below *)
+Require Import TsoCtxShim.   (* [hart_view_lb_any]: the SC-only
    receipt and transport evidence behind the context-shaped spec, until the
    cutover kit mints them from the AMO ([TsoCtxTwin2.twin_passed_get]).
    main-tso-readiness: the running token ([SieCapCtx]/[ctx_absorb]) is
@@ -673,11 +675,15 @@ Section ProofAcquire.
        reflexivity.  At cutover the AMO mints the receipt at the log top
        ([TsoCtxTwin2.twin_passed_get]) and the tie becomes the release's
        [T' <= t_release] (WpLock.v's [lock_pay] block). *)
-    iDestruct "HRes" as (ξ0 T0) "[_ HRes]".
-    iPoseProof (ctx_dom_sc ξ0 cur_ctx) as "Hdom".
-    iDestruct (ctx_morph ξ0 cur_ctx with "Hdom HRes") as "[_ HRes]".
-    iAssert (∃ K : nat, hart_view_lb (CID := CIDpo) K)%I as "Hlb".
-    { iExists T0. iApply hart_view_lb_any. }
+    iDestruct "HRes" as (ξ0 T0) "[Hpk0 HRes]".
+    iAssert (hart_view_lb (CID := CIDpo) T0)%I as "#HK0";
+      [ iApply hart_view_lb_any | ].
+    iAssert (∃ K : nat, hart_view_lb (CID := CIDpo) K)%I as "Hlb";
+      [ iExists T0; iExact "HK0" | ].
+    iDestruct (sie_cap_gpr_own_ctx_acc (CID := CIDpo) with "Hcg") as "[Hrun Hcgb]".
+    iMod (ctx_absorb (CID := CIDpo) R ξ0 cur_ctx T0 T0 ltac:(lia)
+            with "Hrun HK0 Hpk0 HRes") as "(Hrun & _ & HRes)".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iSpecialize ("Hcont" $! CIDpo with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! ms E4 with "[%] HTc Hcg Hpc [%] Htok HRes Hlb Hown Hpay").
     { exact Hmsf. }

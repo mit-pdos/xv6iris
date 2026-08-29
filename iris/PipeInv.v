@@ -290,7 +290,7 @@ Section PipeInv.
     iMod pipe_ends_alloc as (γp) "(Hrd & Hwr & Hm0 & Hm1)".
     iMod ("Hmake" $! <{ pipe_res γp pi }> (pipe_dead γl γp) with "[%]
             [Hnm Hnr Hnw Hro Hwo Hdata Hslack Hm0 Hm1]") as "#Hlk";
-      [ apply _ | | ].
+      [ apply ctx_morph_const_pay | | ].
     { iExists (mword_of_int 0 : mword 32), (mword_of_int 0 : mword 32),
               (mword_of_int 1 : mword 32), (mword_of_int 1 : mword 32), vname, bs.
       iFrame "Hnm Hnr Hnw Hro Hwo Hdata Hslack".

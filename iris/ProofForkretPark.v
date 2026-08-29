@@ -98,6 +98,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
+Require Import TsoCtxShim.   (* [ctx_parked_any] -- the record's token, SC stub *)
 
 Module ForkretParkProof (FR : FORKRET) : FORKRET_PARK_PAID.
 
@@ -175,6 +176,13 @@ Proof.
   intros Hrest [j [Hpa Hj]] Hut.
   subst pa.
   iIntros "Hpkg HW #Hks Hctx Hpriv Hfd Hirsp".
+  (* THE CHILD'S RECORD IS STATED AT THE PARKER'S CONTEXT, AND ITS TOKEN IS
+     THE SHIM'S ([TsoCtxShim.ctx_parked_any]; main-tso-readiness Amendment
+     6).  Both legs mint a FRESH context here ([TsoCtx.ctx_parked_alloc])
+     and restate the child's rows at it; main cannot ([procs_inv] has no
+     transport without the caps channel), so the record keeps the parker's
+     context and the SC stub supplies the token. *)
+  iPoseProof (TsoCtxShim.ctx_parked_any cur_ctx 0) as "Hthr".
   (* the package is under a later and is opened only past the context's
      own [▷] -- which is what lets the token it names be a fixpoint *)
   iModIntro. iNext.
@@ -189,6 +197,7 @@ Proof.
   iSplit; [iPureIntro; apply ret_pc_aligned |].
   iFrame "Hctx".
   iSplitL "Hstk"; [cbn [nth]; iExact "Hstk" |].
+  iSplitL "Hthr"; [iExact "Hthr" |].
   (* ================================================================== *)
   (* THE RESUME WAND -- forkret's precondition, assembled.               *)
   (* ================================================================== *)

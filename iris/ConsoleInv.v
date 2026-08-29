@@ -81,6 +81,7 @@ Require Import RiscvModelBytes.
 Require Import RiscvPtsto RiscvExtras.
 Require Import WpLock.
 Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
+Require Import TsoCtxShim.   (* [ctx_dom_sc], for the const-payload lock row's reindex *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -591,6 +592,40 @@ Section ConsoleMorph.
                            (ctx_morph_word _ _ _ _) (ctx_morph_word _ _ _ _))
                  ξ ξ' with "Hd H") as "[Hd H]".
     iFrame.
+  Qed.
+
+  (* [console_inv] / [console_ready] at another context (tso-port M2: a
+     forkret park carries [console_ready] in [UsertrapRes.park_globals]).
+     The cons lock's const payload [<{ cons_res }>] is pinned at the context
+     the row is stated at, so restating the row reindexes the payload too:
+     [is_lock_reindex] for the lock's floor, [is_lock_pay_iff] for the
+     payload, whose two directions are [cons_res_morph] along the SC shim's
+     [TsoCtxShim.ctx_dom_sc].  Dies with the shim. *)
+  Global Instance console_inv_morph (γ : gname) :
+    CtxMorph (λ ξ0 : CtxId, console_inv (XI := ξ0) γ).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /console_inv /is_conslock.
+    iDestruct "H" as "[#Hlk Ht]".
+    iDestruct (devsw_table_morph ξ ξ' with "Hd Ht") as "[Hd Ht]".
+    iFrame "Hd Ht".
+    iDestruct (is_lock_reindex ξ ξ' with "Hlk") as "Hlk'".
+    iApply (is_lock_pay_iff with "[] Hlk'").
+    iIntros "!>" (xi). rewrite /const_pay. iSplit.
+    - iIntros "HR".
+      iDestruct (cons_res_morph ξ ξ' with "[] HR") as "[_ $]".
+      iApply TsoCtxShim.ctx_dom_sc.
+    - iIntros "HR".
+      iDestruct (cons_res_morph ξ' ξ with "[] HR") as "[_ $]".
+      iApply TsoCtxShim.ctx_dom_sc.
+  Qed.
+
+  Global Instance console_ready_morph :
+    CtxMorph (λ ξ0 : CtxId, console_ready (XI := ξ0)).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /console_ready.
+    iDestruct "H" as (γ) "H".
+    iDestruct (console_inv_morph γ ξ ξ' with "Hd H") as "[Hd H]".
+    iFrame "Hd". iExists γ. iExact "H".
   Qed.
 
 

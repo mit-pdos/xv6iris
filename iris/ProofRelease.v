@@ -33,6 +33,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecRelease.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import SieCapCtx.    (* [sie_cap_gpr_own_ctx_acc]: the releaser's own running token *)
 Require Import TsoCtxShim.   (* [ctx_dom_sc]: SC-only transport evidence, and
    after the §0.18′ convergence it is used at ONE site in this file -- the
    CANCELLING instance's return trip, which is cashed inside the word-clear
@@ -91,7 +92,14 @@ Section ProofRelease.
        was written before release's word clear, and the acquirer's AMO
        receipt dominates that store.  A record is minted PER RELEASE, so
        [T'] covers exactly this publication; see WpLock.v's [lock_pay]. *)
-    iMod (lock_pay_intro R with "HR") as "HR".
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+    iMod ctx_parked_alloc as (ξc) "Hpk".
+    iMod (ctx_deposit R cur_ctx ξc 0%nat with "Hrun Hpk HR")
+      as "(Hrun & Hdep)".
+    iDestruct "Hdep" as (T') "(_ & Hpk & HR)".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
+    iAssert (lock_pay R) with "[Hpk HR]" as "HR".
+    { iExists ξc, T'. iFrame "Hpk HR". }
     (* ---- 0x00: c.addi sp,-32 -- the frame trade (k := 4) ---- *)
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     set (R0 := <[Regidx csp_rs1 := regval_into_reg

@@ -892,3 +892,32 @@ Proof.
     iSplit; iIntros "Hl"; iApply (lock_inv_reindex with "Hl").
   - iApply lk_floor_of_log. iApply TsoCtxShim.log_lb_any.
 Qed.
+
+(* THE PAYLOAD'S OWN REINDEX, for a [<{ P }>] whose [P] mentions the ambient
+   context: [is_lock] is proper in its payload up to a persistent
+   equivalence, because the payload only ever sits inside [lock_pay] under
+   the invariant.  Not a shim -- an [inv_iff] -- but it is only ever needed
+   together with [is_lock_reindex] above, to restate a const-payload lock at
+   another context (ConsoleInv.console_inv_morph). *)
+Lemma is_lock_pay_iff `{!riscvGS Σ, !lockG Σ} `{XI : TsoCtx.CurCtx} γ lk s
+    (R R' : TsoCtx.CtxId -> iProp Σ) :
+  □ (∀ xi : TsoCtx.CtxId, R xi ∗-∗ R' xi) -∗ is_lock γ lk s R -∗ is_lock γ lk s R'.
+Proof.
+  iIntros "#HRR #H".
+  iDestruct (is_lock_name with "H") as "#Hn".
+  iDestruct (is_lock_inv with "H") as (lo) "[#Hi #Hf]".
+  iApply (is_lock_intro γ lk s R' lo with "Hn [] Hf").
+  iApply (inv_iff with "Hi"). iIntros "!> !>".
+  rewrite /lock_inv /lock_pay.
+  iSplit.
+  - iIntros "(%v & %st & Hw & Hc & Ha & Hrest)". iExists v, st. iFrame "Hw Hc Ha".
+    iDestruct "Hrest" as "[(%Hst & %Hv & Hfr & (%xi & %T & Hpk & HR)) | Hr]";
+      [| iRight; iExact "Hr"].
+    iLeft. iSplit; [done|]. iSplit; [done|]. iFrame "Hfr". iExists xi, T. iFrame "Hpk".
+    iDestruct ("HRR" $! xi) as "[H1 _]". iApply ("H1" with "HR").
+  - iIntros "(%v & %st & Hw & Hc & Ha & Hrest)". iExists v, st. iFrame "Hw Hc Ha".
+    iDestruct "Hrest" as "[(%Hst & %Hv & Hfr & (%xi & %T & Hpk & HR)) | Hr]";
+      [| iRight; iExact "Hr"].
+    iLeft. iSplit; [done|]. iSplit; [done|]. iFrame "Hfr". iExists xi, T. iFrame "Hpk".
+    iDestruct ("HRR" $! xi) as "[_ H2]". iApply ("H2" with "HR").
+Qed.

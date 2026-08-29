@@ -277,6 +277,7 @@ Section ProofBpin.
     assert (HmAra : mA !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.bpin + 0x14) : mword 64) 4)
       by (rewrite /mA; apply upd_eq).
     iDestruct (cpu_own_transport CID CID9 n eb p b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    pose proof (TsoCtx.ctx_morph_const_pay (bcache_res bn V)) as Hcm_bc1.
     iApply (Acquire.wp_acquire_sconf KT1 (bn_lk bn) "bcache"%string <{ bcache_res bn V }> mA
               n eb p (K - 4)%nat b lks
               Hnoffpos ltac:(lia) Hbelow
@@ -519,6 +520,7 @@ Section ProofBpin.
        it -- so this is a pure re-spelling, and it is what makes the
        acquire/release pair compose back to [N]. *)
     iEval (rewrite -Hbeq) in "Hcg".
+    pose proof (TsoCtx.ctx_morph_const_pay (bcache_res bn V)) as Hcm_bc2.
     iApply (Release.wp_release_sconf KT1 (bn_lk bn) bcache_addr "bcache"%string <{ bcache_res bn V }> D5
               n eb p (K - 4)%nat
               ({["bcache"]} ∪ lks)

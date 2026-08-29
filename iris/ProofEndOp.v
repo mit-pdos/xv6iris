@@ -132,6 +132,7 @@ From Kernel Require KernelSyms.
 Require Export FastSetSolver.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 Require Import TsoCtx.
@@ -727,7 +728,7 @@ Section EndOpDefs.
 
   (* end_op's own [wp_next] obligation, NAMED and anchored at an explicit
      hart (durable-notes: a whole-function post must not be spelled inline). *)
-  Definition eo_cont `{GEN : GenId} `{CID0 : CpuId} 
+  Definition eo_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (j : nat) (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Upr : ustate) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
@@ -758,19 +759,19 @@ Section EndOpDefs.
      UNCONDITIONALLY (slots 1..4); slots 5,6,7 (s3@24, s4@16, s5@8) are
      written only on the two arms that clobber them, and slot 8 (offset 0)
      is never touched at all. *)
-  Definition eo_frame4 (m : regfile) : iProp Σ :=
+  Definition eo_frame4 `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈[KT1] (m !!! Regidx Rs2 : mword 64))%I.
 
-  Definition eo_frameJ (m : regfile) : iProp Σ :=
+  Definition eo_frameJ `{XI : CurCtx} (m : regfile) : iProp Σ :=
     ((∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈[KT1] v) ∗
      (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[KT1] v) ∗
      (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 7 ↦₈[KT1] v) ∗
      (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 8 ↦₈[KT1] v))%I.
 
-  Definition eo_frameS (m : regfile) : iProp Σ :=
+  Definition eo_frameS `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[KT1] (m !!! Regidx Rs4 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 7 ↦₈[KT1] (m !!! Regidx Rs5 : mword 64) ∗
@@ -879,7 +880,7 @@ Section EndOpDefs.
   (* the OPENED batch: log_state taken apart, with the log-region client
      halves SPLIT at the copy loop's cursor [t] (the prefix is at the
      contents the loop has already written, the suffix is still opaque). *)
-  Definition eo_open (bn : bio_names) (γfs : fs_names) (cov : gset Z)
+  Definition eo_open `{XI : CurCtx} (bn : bio_names) (γfs : fs_names) (cov : gset Z)
       (logstart : Z) (n : nat) (W : list (mword 32))
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (Lw : nat -> list (bv 8)) (t : nat) : iProp Σ :=
@@ -2752,7 +2753,7 @@ Section EndOpBlocks.
   (*  the home block's bytes; the home block itself rides through        *)
   (*  untouched, and its bytes are read off the AUTHORITY.               *)
   (* ================================================================== *)
-  Local Lemma eo_loop `{GEN : GenId} 
+  Local Lemma eo_loop `{GEN : GenId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)

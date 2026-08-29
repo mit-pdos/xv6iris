@@ -569,7 +569,7 @@ Proof.
      which the closer would re-park. *)
   iDestruct "Hsc" as "(#Hhw & #Hmin & Hprivc & Hmsx & Hmiex & Hmenvx)".
   iDestruct "Hmsx" as (msg) "(Hms & Hhalf & Htie & %Hmsg)".
-  iDestruct "Hcap" as "(Hstk & Hstr & Harm & #Htc & #Hwit)".
+  iDestruct "Hcap" as "(Hstk & Hstr & Harm & Hctx & #Htc & #Hwit)".
   (* THE QUARTER'S VALUE IS NOT A DEGREE OF FREEDOM.  prepare_return leaves
      it existential because it never reads it; the arm it also hands back is
      at [false], and [sie_arm_half_agree] reads the live SIE off that index,
@@ -616,11 +616,12 @@ Proof.
     iSplitL "Hf16"; [iExact "Hf16" | iExact "Hstk"]. }
   (* ---- the trap-side residue, and the table it hands userret ---- *)
   iAssert (ut_trap p ksp av ∅)
-    with "[Hstack Hstr Harm Hkptr Hhalf Hq4 Htie Hsret Hcpu Hclaim]" as "Htrap".
+    with "[Hstack Hstr Harm Hctx Hkptr Hhalf Hq4 Htie Hsret Hcpu Hclaim]" as "Htrap".
   { rewrite /ut_trap /ut_stack /ut_ghosts.
     iSplitL "Hstack". { iExact "Hstack". }
     iSplitL "Hstr". { iExact "Hstr". }
     iSplitL "Harm". { iExact "Harm". }
+    iSplitL "Hctx". { iExact "Hctx". }
     iSplitL "Hkptr". { iExact "Hkptr". }
     iSplitL "Hhalf Hq4 Htie Hsret".
     { iSplitL "Hhalf". { iExact "Hhalf". }

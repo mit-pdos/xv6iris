@@ -48,6 +48,7 @@ Require Import WpLock.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import SwtchCtx.
+Require Import TsoCtxShim.   (* [ctx_dom_sc]: the SC claim of the free cpu context *)
 Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import CodeScheduler.
@@ -56,7 +57,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* [ctx_dom_sc]: the claim, while the record token is deferred *)
 Import Defs.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
@@ -504,27 +504,13 @@ Section ProofScheduler.
        arrives as its own premise (SpecScheduler.v hoisted it out of
        [cpu_own]'s slot) rather than out of the bundle. *)
     iDestruct (sc_cpu_own_open with "Hcpu") as "(Hnoff & Hint & Hcnt & Hproc & Hlks & Hhcs)".
-    (* A6.68: THE M2 TRANSPORT, PAID HONESTLY.  The free save area is a
-       PARKED RECORD now (SchedCtx.cpu_ctx_free) and this proof holds the
-       kernel bundle, so it borrows its own running token
-       ([SieCapCtx.sie_cap_gpr_own_ctx_acc]), mints the domination from the
-       record against the hart's own receipt at [Tfr ≤ Tfr]
-       ([TsoCtxAbsorbLb.ctx_dom_of_parked_lb] -- interp-free, which is the
-       whole reason it can run HERE, outside every WP leaf), and re-indexes
-       the fourteen cells with the price [SwtchCtx.ctx_cells_reindex] was
-       always going to charge.  The record is abandoned after the claim,
-       exactly as the lock's per-publication record is. *)
-    (* main-tso-readiness: the record's token/receipt are DEFERRED; the
-       claim is the shim's [ctx_dom_sc]. *)
-    iDestruct "Hfree" as (ctx0 ξ0) "(%Hctx0len & Hctx0)".
-    iApply fupd_wp.
-    iPoseProof (TsoCtxShim.ctx_dom_sc ξ0 cur_ctx) as "Hdom".
-    iMod (ctx_cells_reindex ξ0 cur_ctx (a_cpu_ctx cid_word) ctx0
-            with "Hdom Hctx0") as "[_ Hctx0]".
-    iModIntro.
+    iDestruct "Hfree" as (ctx0 ξ0) "[%Hctx0len Hctx0]".
     iAssert (own_ctx (a_cpu_ctx cid_word)) with "[Hctx0]" as "Hown".
     { rewrite /own_ctx. iExists ctx0. iSplit; [iPureIntro; exact Hctx0len |].
-      iExact "Hctx0". }
+      (* [ctx_cells_reindex] is modal on main (T-leg); the claim is the SC
+         shim's, so go through the non-modal [ctx_cells_morph]. *)
+      iDestruct (ctx_cells_morph (a_cpu_ctx cid_word) ctx0 ξ0 cur_ctx with "[] Hctx0")
+        as "[_ Hc]"; [ iApply TsoCtxShim.ctx_dom_sc | iExact "Hc" ]. }
     (* ------------------------------------------------------------------ *)
     (* Prologue: 80-byte frame (push 10), save ra/s0..s8.                  *)
     (* ------------------------------------------------------------------ *)

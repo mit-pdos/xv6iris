@@ -45,11 +45,21 @@ Section shim.
      caller whose own conversion is the remaining work. *)
   Lemma own_context_alloc `{CID : CpuId} : ⊢ |==> ∃ ξ : CtxId, own_context ξ.
   Proof.
-    iMod (ghost_var_alloc (0%fin : CPU)) as (γ) "Hv".
-    iModIntro. iExists (MkCtxId γ inhabitant).
-    rewrite own_context_unseal /own_context_def.
-    iExists (0%fin : CPU). iExact "Hv".
+    iModIntro. iExists inhabitant. rewrite own_context_unseal /own_context_def. by iLeft.
   Qed.
+
+  (* THE TOKENS AT A NAMED CONTEXT -- main's SC stub only (main-tso-readiness
+     Amendment 6; FALSE at TSO, where each context has ONE token).  Two
+     consumers, both structural: a forked child's record is stated at its
+     PARKER's context ([ProofForkretPark], the record's [ctx_parked]), and
+     the seven secondary harts run at the boot carve's context
+     ([SystemAdequacy]).  Both exist because main's T-leg trap tier cannot
+     restate [procs_inv] at a fresh context; at cutover these two sites ARE
+     the fork/boot items of the M2 worklist. *)
+  Lemma own_context_any `{CID : CpuId} (ξ : CtxId) : ⊢@{iPropI Σ} own_context ξ.
+  Proof. rewrite own_context_unseal /own_context_def. by iLeft. Qed.
+  Lemma ctx_parked_any (ξ : CtxId) (T : nat) : ⊢@{iPropI Σ} ctx_parked ξ T.
+  Proof. rewrite ctx_parked_unseal /ctx_parked_def. by iLeft. Qed.
 
   (* THE RESUME-EVIDENCE STOPGAP.  [ctx_resume]/[ctx_exchange] want the
      stable pair "view receipt K, parked stamp ≤ K"; the honest producer

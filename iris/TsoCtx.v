@@ -125,8 +125,20 @@ Section ctx.
      TsoCtxTwin2 swap would produce at the statement level.  Revert this
      block (plain definitions again) to go back to the permeable SC
      seal. *)
+  (* MAIN'S SC STUB (main-tso-readiness Amendment 6): the token bodies are
+     TRIVIAL here, exactly as [hart_view_lb_def] below is.  The M-leg models
+     them as one exclusive ghost per context; on main that exclusivity is
+     unsatisfiable at two sites (a forked child must share its parker's
+     context and eight harts must share the boot carve's), because main's
+     T-leg trap tier cannot restate [procs_inv] at a fresh context.  Every
+     LAW below keeps its statement; the real TsoCtxTwin2 swap replaces
+     these bodies and re-proves the law surface.  What is lost is only the
+     three exclusivity lemmas, which the tree never used.  The dead ghost
+     disjunct is there for ONE reason: it keeps the constant's implicit
+     signature (Σ, riscvGS, CID) identical to the M-leg's, so no call site
+     in the tree has to name Σ. *)
   Definition own_context_def `{CID : CpuId} (ξ : CtxId) : iProp Σ :=
-    (∃ c : CPU, ghost_var (ctx_bound_name ξ) 1 c)%I.
+    (True ∨ ∃ c : CPU, ghost_var (ctx_bound_name ξ) 1 c)%I.
   Lemma own_context_aux : { f | f = @own_context_def }.
   Proof. by eexists. Qed.
   Definition own_context `{CID : CpuId} (ξ : CtxId) : iProp Σ :=
@@ -142,7 +154,7 @@ Section ctx.
      [ProofForkretPark]).  Deliberately NOT hart-ambient: a parked record
      is migratable, and this token is why that is type-correct. *)
   Definition ctx_parked_def (ξ : CtxId) (T : nat) : iProp Σ :=
-    (∃ c : CPU, ghost_var (ctx_bound_name ξ) 1 c)%I.
+    (True ∨ ∃ c : CPU, ghost_var (ctx_bound_name ξ) 1 c)%I.
   Lemma ctx_parked_aux : { f | f = ctx_parked_def }.
   Proof. by eexists. Qed.
   Definition ctx_parked (ξ : CtxId) (T : nat) : iProp Σ :=
@@ -307,36 +319,9 @@ Section ctx.
     rewrite hart_view_lb_unseal /hart_view_lb_def. auto.
   Qed.
 
-  (* Exclusivity, in all three pairings: one bound authority per context,
-     one token.  ([TsoCtxTwin2.own_context_excl] / [ctx_parked_excl] /
-     [own_context_parked_excl]; the running form holds across DIFFERENT
-     ambient harts too, which is the statement here.) *)
-  Lemma own_context_excl {CID1 CID2 : CpuId} (ξ : CtxId) :
-    own_context (CID := CID1) ξ -∗ own_context (CID := CID2) ξ -∗ False.
-  Proof.
-    rewrite !own_context_unseal /own_context_def.
-    iIntros "[%c1 H1] [%c2 H2]".
-    iDestruct (ghost_var_valid_2 with "H1 H2") as %[Hq _].
-    exfalso. by apply (Qp.not_add_le_l 1 1).
-  Qed.
-
-  Lemma ctx_parked_excl (ξ : CtxId) (T1 T2 : nat) :
-    ctx_parked ξ T1 -∗ ctx_parked ξ T2 -∗ False.
-  Proof.
-    rewrite !ctx_parked_unseal /ctx_parked_def.
-    iIntros "[%c1 H1] [%c2 H2]".
-    iDestruct (ghost_var_valid_2 with "H1 H2") as %[Hq _].
-    exfalso. by apply (Qp.not_add_le_l 1 1).
-  Qed.
-
-  Lemma own_context_parked_excl `{CID : CpuId} (ξ : CtxId) (T : nat) :
-    own_context ξ -∗ ctx_parked ξ T -∗ False.
-  Proof.
-    rewrite own_context_unseal /own_context_def ctx_parked_unseal /ctx_parked_def.
-    iIntros "[%c1 H1] [%c2 H2]".
-    iDestruct (ghost_var_valid_2 with "H1 H2") as %[Hq _].
-    exfalso. by apply (Qp.not_add_le_l 1 1).
-  Qed.
+  (* The M-leg's three exclusivity lemmas ([own_context_excl] /
+     [ctx_parked_excl] / [own_context_parked_excl]) are NOT stated here:
+     they are false for the trivial bodies above, and no file used them. *)
 
   Global Instance own_context_timeless `{CID : CpuId} ξ :
     Timeless (own_context ξ).
@@ -356,10 +341,7 @@ Section ctx.
      global-map twin.)  This is [ProofForkretPark]'s mint. *)
   Lemma ctx_parked_alloc : ⊢ |==> ∃ ξc : CtxId, ctx_parked ξc 0.
   Proof.
-    iMod (ghost_var_alloc (0%fin : CPU)) as (γ) "Hv".
-    iModIntro. iExists (MkCtxId γ inhabitant).
-    rewrite ctx_parked_unseal /ctx_parked_def.
-    iExists (0%fin : CPU). iExact "Hv".
+    iModIntro. iExists inhabitant. rewrite ctx_parked_unseal /ctx_parked_def. by iLeft.
   Qed.
 
   (* BOOT'S MINT: a hart's FIRST running token.  One per hart, at
@@ -370,10 +352,7 @@ Section ctx.
      hart could not honour), so this is licensing by NAME, not a lie. *)
   Lemma own_context_boot `{CID : CpuId} : ⊢ |==> ∃ ξ : CtxId, own_context ξ.
   Proof.
-    iMod (ghost_var_alloc (0%fin : CPU)) as (γ) "Hv".
-    iModIntro. iExists (MkCtxId γ inhabitant).
-    rewrite own_context_unseal /own_context_def.
-    iExists (0%fin : CPU). iExact "Hv".
+    iModIntro. iExists inhabitant. rewrite own_context_unseal /own_context_def. by iLeft.
   Qed.
 
   (* PARK: publish and let go of the hart.  One ghost step, no machine
@@ -383,9 +362,8 @@ Section ctx.
     own_context ξ ==∗ ∃ T, ctx_parked ξ T.
   Proof.
     rewrite own_context_unseal /own_context_def.
-    iIntros "[%c H]". iModIntro. iExists 0%nat.
-    rewrite ctx_parked_unseal /ctx_parked_def.
-    iExists c. iExact "H".
+    iIntros "_". iModIntro. iExists 0%nat.
+    rewrite ctx_parked_unseal /ctx_parked_def. by iLeft.
   Qed.
 
   (* RESUME: re-host a parked context on THIS hart.  The premise is the
@@ -397,7 +375,7 @@ Section ctx.
     hart_view_lb K -∗ ctx_parked ξ T ==∗ own_context ξ.
   Proof.
     rewrite ctx_parked_unseal /ctx_parked_def own_context_unseal /own_context_def.
-    iIntros (HTK) "_ [%c H]". iModIntro. iExists c. iExact "H".
+    iIntros (HTK) "_ _". iModIntro. by iLeft.
   Qed.
 
   (* THE SWTCH EXCHANGE: a hart always runs exactly one thread, so the

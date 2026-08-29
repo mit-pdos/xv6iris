@@ -357,15 +357,16 @@ Section UtEntry.
               with "Hcg Hpc [] [-]").
     { iApply (uti_00c with "Htext"). }
     iApply wp_next_off_intro.
-    iIntros (ms1) "%Hms1f Hhs Hscf Htr Hpc Hfile (Hstk & %Hsie1 & Harm & #Htc1 & #Hwit)".
+    iIntros (ms1) "%Hms1f Hhs Hscf Htr Hpc Hfile (Hstk & %Hsie1 & Harm & Hctx & #Htc1 & #Hwit)".
     (* the mstatus the read SAW has the boundary's SPP, off the travelling
        sret mirror's agreement with [sconf]'s stationary tie *)
     iDestruct (sconf_at_sret ms1 ('b"0") ('b"1") with "Hscf Hsret") as %[Hspp1 Hspie1].
     iDestruct (sconf_at_close with "Hscf") as "Hscf".
-    iDestruct (sie_cap_gpr_join with "Hhs Hscf [Hstk Htr Harm] Hfile") as "Hcg".
+    iDestruct (sie_cap_gpr_join with "Hhs Hscf [Hstk Htr Harm Hctx] Hfile") as "Hcg".
     { rewrite /sie_cap. iSplitL "Hstk"; [iExact "Hstk" |].
       iSplitL "Htr"; [iExact "Htr" |].
       iSplitL "Harm"; [iExact "Harm" |].
+      iSplitL "Hctx"; [iExact "Hctx" |].
       iSplitR; [iExact "Htc1" |]. iExact "Hwit". }
     set (M3 := <[Regidx Ra5 := regval_into_reg (sstatus_read ms1)]> M2).
     change (<[Regidx Ra5 := regval_into_reg (sstatus_read ms1)]> M2) with M3.

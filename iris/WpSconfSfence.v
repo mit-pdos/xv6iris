@@ -385,7 +385,7 @@ Section SfenceLeaf.
     iApply bi.later_intro. iApply wp_next_off_intro. rewrite /sconf_step_obl.
     iSplitR "Hcont".
     - iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
-      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Htc & #Hwit)".
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
       iDestruct (strans_inv_acc_kpt with "Hkptr Htr")
         as (root) "(Hres & Htrback)".
       iDestruct (tlb_res_pt_open with "Hres") as (ksatp tlbv)
@@ -399,7 +399,7 @@ Section SfenceLeaf.
                           HMPP & HTVM).
       iDestruct (sf_frames_in ms0 tlbv with "Htlbc Hpriv Hms") as "[Hrw Hro]".
       iApply (swp_mono with
-                "[Hstk Harm Hfile HPC HnPC Hhalf Hspp Hmie Hmdl Hmenv
+                "[Hstk Harm Hctx Hfile HPC HnPC Hhalf Hspp Hmie Hmdl Hmenv
                   Hsatp Hpmp Htrback] [Hrw Hro Hresv]");
         last first.
       { iApply (swp_execute_SFENCE_VMA_S (sf_rs ms0 tlbv)
@@ -431,7 +431,7 @@ Section SfenceLeaf.
       { rewrite /sconf_at_priv. iExists mdv0.
         iFrame "Hhw Hminv Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
         iPureIntro. split; [exact Hmsf | exact Hmm]. }
-      iSplitL "Hstk Htr Harm". { iFrame "Hstk Htr Harm Htc Hwit". }
+      iSplitL "Hstk Htr Harm Hctx". { iFrame "Hstk Htr Harm Hctx Htc Hwit". }
       iFrame "Hfile". iSplitR; [done|]. iSplitR; [done|]. done.
     - iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & ->)".
       iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".

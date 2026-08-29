@@ -201,6 +201,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
    ([BootBridge.boot_stack_slots]), i.e. 180 slots = 1440 bytes of the
    4096-byte per-hart stack, so nothing upstream has to change. *)
 Require Import TsoCtx.
+Require Import CtxRecord.   (* [ctx_parked_inv] -- the boot deposit's record *)
 
 Notation K_main := (122%nat) (only parsing).
 Section SpecMain.
@@ -458,6 +459,10 @@ Section SpecMain.
          [FsCfgBoot.fs_boot_snap_wf] says. *)
       (S : FsState.fs_state_rec) (Pb : Z -> list (bv 8)) (Rspent : gset Z)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
+      (* THE BOOT DEPOSIT'S NAMED CONTEXT (tso-port M2): the record eight harts
+         read the deposit from is at [xid]; main deposits its rows there
+         ([TsoCtx.ctx_deposit], in [ProofMain.mn_grp_started]). *)
+      (xid : CtxId)
       (P : iProp Σ) `{!Persistent P} :=
     let pcE : mword 64 := mword_of_int KernelSyms.main in
     (* the arm is decided by the ambient hart: [beqz a0] at main+0x14 takes
@@ -517,15 +522,17 @@ Section SpecMain.
        main applies this wand at the [started = 1] store, to the [pr] lock, the
        64 proc locks and the vdisk_lock it has just allocated. *)
     started_inv P -∗
+    ctx_parked_inv xid -∗
     □ (∀ (γpr : gname) (γs : list gname) (γk : gname) (pd pav pu : mword 64)
          (root : mword 44) (pas : nat -> mword 44),
          printk_env γpr γd γv -∗
          procs_inv γs -∗
          console_caps γd -∗
          is_lock γk d_lock "virtio_disk"%string <{ disk_res γv pd pav pu }> -∗
-         disk_geom γv pd pav pu -∗
+         disk_geom (XI := xid) γv pd pav pu -∗
          kpt_inv root -∗
-         (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□
+         ctx_word_pointsto xid
+           (mword_of_int KernelSyms.kernel_pagetable : mword 64) DfracDiscarded
            (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) -∗
          kmap_at tramp_vpn tramp_ppn KP_rx -∗
          ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas i) KP_rw) -∗
@@ -686,7 +693,8 @@ Module Type MAIN.
       (ndisk : nat)
       (S : FsState.fs_state_rec) (Pb : Z -> list (bv 8)) (Rspent : gset Z)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
+      (xid : CtxId)
       (P : iProp Σ) `{!Persistent P},
       wp_main_boot_sconf_body m K p0 ps s1entry phystop
-        γd γv l0 b0 c0 dk sb nib cov ndisk S Pb Rspent tlbvec0 P.
+        γd γv l0 b0 c0 dk sb nib cov ndisk S Pb Rspent tlbvec0 xid P.
 End MAIN.

@@ -1442,7 +1442,7 @@ Section KernelvecHandler.
     iEval (rewrite -intr_res_of_eq) in "Hires".
     (* ---- the bundle -> the raw cells the VC tier runs on ---- *)
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
-    iDestruct "Hcap" as "(Hstk & Htr & Hq0 & #Hwit0)".
+    iDestruct "Hcap" as "(Hstk & Htr & Hq0 & Hctx & #Hwit0)".
     iDestruct "Hsc" as "(_ & _ & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Htie & %Hmsf)".
     iDestruct "Hmiex" as (mdv0) "(Hmie & Hmdl & %Hmm)".
@@ -1674,11 +1674,12 @@ Section KernelvecHandler.
       iExists MENVCFG_S. iFrame "Hmenv". iPureIntro.
       repeat split; try assumption; reflexivity. }
     iAssert (sie_cap KT1 (kv_m2 Me) (58 + av) false p)
-      with "[Hdeep Hbit1 Htlbinv Hq0]" as "Hcapn".
+      with "[Hdeep Hbit1 Htlbinv Hq0 Hctx]" as "Hcapn".
     { rewrite /sie_cap. iSplitL "Hdeep". { rewrite Hsp_l. iExact "Hdeep". }
       iSplitL "Hbit1 Htlbinv".
       { iApply (strans_inv_intro root_ppn with "Hbit1 Htlbinv"). }
-      iSplitL "Hq0"; [ iExact "Hq0" |]. iExact "Hwit0". }
+      iSplitL "Hq0"; [ iExact "Hq0" |].
+      iSplitL "Hctx"; [ iExact "Hctx" |]. iExact "Hwit0". }
     iDestruct (sie_cap_gpr_join with "Hhs Hscn Hcapn [Hfile]") as "Hcgk".
     { rewrite Hpin2. iExact "Hfile". }
     iApply (Kerneltrap.wp_kerneltrap_sconf γu γv γdk γtl γs pd pav pu
@@ -1696,7 +1697,7 @@ Section KernelvecHandler.
     iEval (rewrite Hret) in "Hpcf".
     iDestruct (sie_cap_gpr_at_close with "Hcgf") as "Hcgf".
     iDestruct (sie_cap_gpr_split with "Hcgf") as "(Hhsf & Hscf & Hcapf & Hfilef)".
-    iDestruct "Hcapf" as "(Hstkf & Htrf & Hq0f & #Hwitf)".
+    iDestruct "Hcapf" as "(Hstkf & Htrf & Hq0f & Hctxf & #Hwitf)".
     (* THE RESUMING HART'S OWN [hw_config] / [minstret_inv]: both hold that
        hart's register cells, so the section's copies are the wrong ones here. *)
     iDestruct "Hscf" as "(#Hhwf & #Hinvf & Hprivf & Hmsxf & Hmiexf & Hmenvxf)".
@@ -1839,11 +1840,12 @@ Section KernelvecHandler.
       iExists MENVCFG_S. iFrame "Hmenvf". iPureIntro.
       repeat split; try assumption; reflexivity. }
     iAssert (sie_cap KT1 (CID := CIDn) m (trap_res true + av) false p)
-      with "[Hstk Hbit1f Htlbinvf Hq0f]" as "Hcapf".
+      with "[Hstk Hbit1f Htlbinvf Hq0f Hctxf]" as "Hcapf".
     { rewrite /sie_cap. iSplitL "Hstk". { iExact "Hstk". }
       iSplitL "Hbit1f Htlbinvf".
       { iApply (strans_inv_intro (CID := CIDn) root_ppnf with "Hbit1f Htlbinvf"). }
-      iSplitL "Hq0f"; [ iExact "Hq0f" |]. iExact "Hwitf". }
+      iSplitL "Hq0f"; [ iExact "Hq0f" |].
+      iSplitL "Hctxf"; [ iExact "Hctxf" |]. iExact "Hwitf". }
     iDestruct (sie_cap_gpr_join (CID := CIDn) with "Hhsf Hscf Hcapf Hfilef") as "Hcgs".
     iApply (wp_sret_s_sconf (CID := CIDn)
               (mword_of_int (KernelSyms.kernelvec + 0x4c) : mword 64) m av pc0
