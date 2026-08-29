@@ -330,6 +330,19 @@ Definition wp_syscall_sconf_body
          [sysc_mem_ok] above.  Sixteen of the twenty-two entries touch no
          user memory at all and this reads [us_M U' = us_M U] for them. *)
       ⌜ sysc_mem_ok (us_V U) (us_V U') (us_M U) (us_M U') ⌝ -∗
+      (* ...AND THIS ARM RETURNED, WHICH RULES [exit] OUT (milestone J,
+         K1).  [sysc_mem_ok] does NOT: exit falls into the quiet
+         "nothing moved" row, so the table alone cannot tell a returning
+         round from the one that never comes back -- and the
+         user-execution contract hands back [emp] at exit
+         ([UexecRet.uexec_ret]'s own arm), so a loop that could not
+         refute "the process exited and returned nothing" would be
+         stuck.  This clause is the refutation, and it is FREE: it sits
+         in the RETURNING conjunct of the exit slot, which only the
+         twenty-one returning entries ever take -- each off its own
+         table index -- while [sys_exit] takes the divergent conjunct
+         and owes nothing. *)
+      ⌜ sysc_num (us_V U) <> 2 ⌝ -∗
       (* ...AND THE RESUME RECORD IS PINNED.  The three rows below are what
          the user-execution slot (milestone J) needs and nothing above says;
          each is stated to what is TRUE rather than to what would be tidy.

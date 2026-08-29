@@ -390,6 +390,14 @@ Section TrappedMachine.
   Definition trapped_machine (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
       (sz : Z) (sc stv : mword 64) (W : uvis) : iProp Σ :=
     (∃ ms_v : mword 64,
+       (* THE KEY'S TRAPFRAME IS 36 WORDS LONG (milestone J, K3).  Every
+          [tf_resume_gpr0] / [tf_resume_pc] fact that has to survive the
+          BUMP -- [tf_resume_gpr_bump], [tf_resume_pc_bump] -- is guarded on
+          [tf_arg_idx 0 < length tf] / [tf_epc_idx < length tf], and nothing
+          else in the bundle pins the length: [uvis] carries a bare list.
+          Both producers deliver the key at [uvis_of_run], whose list is
+          [tf_of], so the conjunct is [tf_of_length] at both of them. *)
+       ⌜length (uvis_tf W) = TFWORDS⌝ ∗
        ⌜trap_mstatus_ok ms_v⌝ ∗
        hart_state ↦ᵣ HART_ACTIVE tt ∗
        cur_privilege ↦ᵣ Supervisor ∗
@@ -423,7 +431,7 @@ Section TrappedMachine.
     rewrite tf_of_epc (tf_of_resume_gpr g sepc_v Hx0).
     iExists ms_v.
     iFrame "Hhs Hpriv Hms Hsc Hstv Hsep Hpc Hg Hpt Hcfg Hrut".
-    iPureIntro. exact Hto.
+    iPureIntro. exact (conj (tf_of_length g sepc_v) Hto).
   Qed.
 
 End TrappedMachine.

@@ -1579,6 +1579,12 @@ Section SyscallVocab.
            entries touch no user memory, and this reads [us_M U' = us_M U]
            for them -- see [SpecSyscall.v]'s own note. *)
         ⌜ sysc_mem_ok (us_V U) (us_V U') (us_M U) (us_M U') ⌝ -∗
+        (* ...and THIS ARM RETURNED, exactly as [SpecSyscall]'s post says
+           it: [sysc_mem_ok] cannot rule [exit] out (exit is in its quiet
+           row), and the user-execution contract hands back nothing at
+           exit.  Free at all twenty-one returning arms off their own
+           [Hnum]; the exit arm takes the divergent conjunct instead. *)
+        ⌜ sysc_num (us_V U) <> 2 ⌝ -∗
         (* ...and the RESUME RECORD, exactly as [SpecSyscall]'s post pins it:
            the trapframe up to the a0 slot [sysc_ret_tail] itself writes, the
            descriptor up to a lazy-fault extension, the size on the nose --
@@ -1759,6 +1765,12 @@ Section SyscallVocab.
     ud_tfp (pv_upt (us_V U')) = ud_tfp (pv_upt (us_V U)) ->
     (* ...and the fd-state ghost name, which no syscall moves *)
     pv_fdg (us_V U') = pv_fdg (us_V U) ->
+    (* THIS ARM RETURNS, hence is not [exit] (milestone J, K1) -- the last
+       pure premise, so that every call site adds exactly one argument
+       immediately before its [with "..."].  Free at every one of them:
+       a returning arm knows its own table index, and the printk fallback
+       knows its number is out of range. *)
+    sysc_num (us_V U) <> 2 ->
     sie_cap_gpr KT1 E (av - 4)%nat true pj -∗
     cpu_own 0%nat true pj true lks -∗
     kernel_text -∗
@@ -1775,7 +1787,7 @@ Section SyscallVocab.
     sysc_hcont_ty γf pj fn dqi ip pid U lks av m (ret_pc (m !!! Regidx Rra)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HEsp Hrest Hav4 Hmem Ha0 Hupte Hszv Hud Hfg.
+    intros HEsp Hrest Hav4 Hmem Ha0 Hupte Hszv Hud Hfg Hne2.
     set (sp0 := m !!! Regidx csp_rs1).
     iIntros "Hcg Hcpu #Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc Hcont".
     assert (Hb1 : pa_stk sp0 1 = add_vec (pa_stk sp0 4) (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))))
@@ -1921,7 +1933,7 @@ Section SyscallVocab.
       rewrite (Hst6 (or_intror Hgood)) (Hst5 (or_intror Hgood)) (Hst4 (or_intror Hgood))
               (Hst3 (or_intror Hgood)) (Hst2 (or_intror Hgood)) (Hst1 (or_intror Hgood)).
       reflexivity. }
-    iApply ("Hcont" $! T5 U' with "[%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc").
+    iApply ("Hcont" $! T5 U' with "[%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcpu Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc").
     { unfold callee_saved.
       split_and!.
       - exact HT5sp.
@@ -1938,6 +1950,7 @@ Section SyscallVocab.
       - rewrite Hthr; [(apply Hrest; vm_compute; first [reflexivity | discriminate]) | vm_compute; reflexivity | vm_compute; discriminate | vm_compute; discriminate | vm_compute; discriminate | vm_compute; discriminate].
       - rewrite Hthr; [(apply Hrest; vm_compute; first [reflexivity | discriminate]) | vm_compute; reflexivity | vm_compute; discriminate | vm_compute; discriminate | vm_compute; discriminate | vm_compute; discriminate]. }
     { exact Hmem. }
+    { exact Hne2. }
     { exact Ha0. }
     { exact Hupte. }
     { exact Hszv. }
@@ -2434,6 +2447,12 @@ Section SyscallRet.
     ud_tfp (pv_upt (us_V U')) = ud_tfp (pv_upt (us_V U)) ->
     (* ...and the fd-state ghost name, which no syscall moves *)
     pv_fdg (us_V U') = pv_fdg (us_V U) ->
+    (* THIS ARM RETURNS, hence is not [exit] (milestone J, K1) -- the last
+       pure premise, so that every call site adds exactly one argument
+       immediately before its [with "..."].  Free at every one of them:
+       a returning arm knows its own table index, and the printk fallback
+       knows its number is out of range. *)
+    sysc_num (us_V U) <> 2 ->
     sie_cap_gpr KT1 E (av - 4)%nat true pj -∗
     cpu_own 0%nat true pj true lks -∗
     kernel_text -∗
@@ -2450,7 +2469,7 @@ Section SyscallRet.
     sysc_hcont_ty γf pj fn dqi ip pid U lks av m (ret_pc (m !!! Regidx Rra)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HEsp HEs2 Hrest Hav4 Hmem Ha0 Hupte Hszv Hud Hfg.
+    intros HEsp HEs2 Hrest Hav4 Hmem Ha0 Hupte Hszv Hud Hfg Hne2.
     iIntros "Hcg Hcpu #Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc Hcont".
     set (tfp := ud_tfp (pv_upt (us_V U'))).
     (* the trapframe page, opened for WRITING out of [proc_priv] *)
@@ -2518,6 +2537,7 @@ Section SyscallRet.
               ltac:(cbn [us_V us_tf upd_usV upd_tf pv_sz]; exact Hszv)
               Hud
               ltac:(cbn [pv_fdg upd_tf]; exact Hfg)
+              Hne2
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir HR Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -2557,6 +2577,25 @@ Section SyscallArms.
 
   Lemma sysc_num_ne12_range (V : pprivate) :
     ~ (1 <= sysc_num V <= 22)%Z -> sysc_num V <> 12.
+  Proof.
+    intros Hr Hc. apply Hr. rewrite Hc.
+    split; discriminate.
+  Qed.
+
+  (* THE SAME TWO, AT [exit] (milestone J, K1).  [SYS_exit] is 2
+     (kernel/syscall.h; [UsysMemOk.USYS_exit]), so a returning arm reads
+     the clause straight off its own table index and the out-of-range
+     fallback off [Hrange]. *)
+  Lemma sysc_num_ne2 (V : pprivate) (k : nat) :
+    sysc_num V = Z.of_nat k -> Nat.eqb k 2 = false -> sysc_num V <> 2.
+  Proof.
+    intros Hk Hne Hc. rewrite Hk in Hc.
+    change 2%Z with (Z.of_nat 2) in Hc.
+    apply Nat2Z.inj in Hc. rewrite Hc in Hne. discriminate Hne.
+  Qed.
+
+  Lemma sysc_num_ne2_range (V : pprivate) :
+    ~ (1 <= sysc_num V <= 22)%Z -> sysc_num V <> 2.
   Proof.
     intros Hr Hc. apply Hr. rewrite Hc.
     split; discriminate.
@@ -2676,6 +2715,7 @@ Section SyscallArms.
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
+              (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -2873,6 +2913,7 @@ Section SyscallArms.
               ltac:(right; left; rewrite Hnum; reflexivity)
               ltac:(right; left; rewrite Hnum; reflexivity)
               Htfp' ltac:(reflexivity)
+              (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -2953,6 +2994,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hext)
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
+              (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -3027,6 +3069,7 @@ Section SyscallArms.
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
+              (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -3095,6 +3138,7 @@ Section SyscallArms.
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
+              (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -3163,6 +3207,7 @@ Section SyscallArms.
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
+              (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -3261,6 +3306,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hupte')
               ltac:(right; right; exact Hszv')
               Htfp' Hfg'
+              (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -3349,6 +3395,7 @@ Section SyscallArms.
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
+              (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -3507,6 +3554,7 @@ Section SyscallArms.
               ltac:(left; rewrite Hnum; reflexivity)
               ltac:(left; rewrite Hnum; reflexivity)
               Htfp' Hfg'
+              (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -3670,6 +3718,7 @@ Section SyscallArms.
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
+              (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -3793,6 +3842,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
+              (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -3886,6 +3936,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
+              (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -3969,6 +4020,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
+              (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -4077,6 +4129,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hupte')
               ltac:(right; right; exact Hszv')
               Htfp' Hfg'
+              (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -4181,6 +4234,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
+              (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -4271,6 +4325,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
+              (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -4371,6 +4426,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hupte')
               ltac:(right; right; exact Hszv')
               Htfp' Hfg'
+              (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd [Hir Hiru] Henv Hpriv Hufrag Hpc Hcont").
     iApply (sysc_iref_join3 with "Hir Hiru").
   Qed.
@@ -4515,6 +4571,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hupte')
               ltac:(right; right; exact Hszv')
               Htfp' Hfg'
+              (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd [Hir Hiru] Henv Hpriv Hufrag Hpc Hcont").
     iApply (sysc_iref_join3 with "Hir Hiru").
   Qed.
@@ -4637,6 +4694,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
+              (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -4741,6 +4799,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
+              (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -4878,6 +4937,7 @@ Section SyscallArms.
               ltac:(right; right; exact Hupte')
               ltac:(right; right; exact Hszv')
               Htfp' Hfg'
+              (sysc_num_ne2 _ _ Hnum eq_refl)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 
@@ -5273,6 +5333,7 @@ Section SyscallArms.
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
+              (sysc_num_ne2_range _ Hrange)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
   Qed.
 

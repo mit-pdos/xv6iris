@@ -9,10 +9,25 @@
 (*                                                                        *)
 (*   ecall     -- either the entry was [exec] (which never returns to     *)
 (*                this process's WP at all: the new program's slot is     *)
-(*                MINTED, so this row says nothing), or the round bumped  *)
-(*                the trapframe (a0 := some return value, epc += 4) and   *)
-(*                moved the user image/permission map by exactly what     *)
+(*                MINTED, so this row says nothing), or the entry WAS NOT *)
+(*                [exit] and the round bumped the trapframe (a0 := some   *)
+(*                return value, epc += 4) and moved the user              *)
+(*                image/permission map by exactly what                    *)
 (*                [UsysMemOk.usys_mem_ok] allows for the entry's number.  *)
+(*                                                                        *)
+(*                THE [exit] CONJUNCT IS NOT A NICETY (milestone J, K1).  *)
+(*                [UexecRet.uexec_ret]'s ecall arm hands back [emp] at    *)
+(*                [exit] -- a process that exits returns no successor --  *)
+(*                while [usys_mem_ok USYS_exit ...] is SATISFIABLE (exit  *)
+(*                falls into the quiet "nothing moved" row).  Without     *)
+(*                this conjunct the loop reaching a resume would have no  *)
+(*                way to refute the arm where the process handed back     *)
+(*                nothing.  It is FREE on the producing side: the         *)
+(*                dispatcher's returning post now says [sysc_num <> 2]    *)
+(*                ([SpecSyscall]), which all twenty-one returning arms    *)
+(*                read off their own table index and which the exit arm   *)
+(*                owes nothing for, since exit takes the DIVERGENT        *)
+(*                conjunct of [ProofSyscall.sysc_exit_ty].                *)
 (*   anything  -- an interrupt, a page fault, an unexpected scause: the   *)
 (*   else        resume state is the trapped state, on the nose.          *)
 (*                                                                        *)
@@ -67,9 +82,10 @@ Definition uround_ok (sc : mword 64)
     (tf' : list (mword 64)) (M' : gmap Z (bv 8)) (pi' : gmap (mword 27) uperm) : Prop :=
   if decide (sc = uecall_scause) then
     usys_num tf = USYS_exec
-    \/ exists r : mword 64,
-         uround_bump_ok tf tf' r
-         /\ usys_mem_ok (usys_num tf) tf r M pi M' pi'
+    \/ (usys_num tf <> USYS_exit
+        /\ exists r : mword 64,
+             uround_bump_ok tf tf' r
+             /\ usys_mem_ok (usys_num tf) tf r M pi M' pi')
   else uround_id_ok tf tf' /\ M' = M /\ pi' = pi.
 
 (* ===================================================================== *)
@@ -79,9 +95,10 @@ Lemma uround_ok_ecall (tf : list (mword 64)) (M M' : gmap Z (bv 8))
     (pi pi' : gmap (mword 27) uperm) (tf' : list (mword 64)) :
   uround_ok uecall_scause tf M pi tf' M' pi' ->
   usys_num tf = USYS_exec
-  \/ exists r : mword 64,
-       uround_bump_ok tf tf' r
-       /\ usys_mem_ok (usys_num tf) tf r M pi M' pi'.
+  \/ (usys_num tf <> USYS_exit
+      /\ exists r : mword 64,
+           uround_bump_ok tf tf' r
+           /\ usys_mem_ok (usys_num tf) tf r M pi M' pi').
 Proof.
   unfold uround_ok.
   destruct (decide (uecall_scause = uecall_scause)) as [_ | Hne];
@@ -120,9 +137,9 @@ Proof.
   pose proof (tf_ueq_epc tf tfa Hu) as He.
   unfold uround_ok in H |- *.
   destruct (decide (sc = uecall_scause)).
-  - destruct H as [Hx | [r [[Hb1 Hb2] Hm]]].
+  - destruct H as [Hx | [Hnx [r [[Hb1 Hb2] Hm]]]].
     + left. rewrite <- Hn. exact Hx.
-    + right. exists r. split; [ split | ].
+    + right. split; [ rewrite <- Hn; exact Hnx | ]. exists r. split; [ split | ].
       * rewrite <- Hg. exact Hb1.
       * unfold tf_w in Hb2 |- *. rewrite <- He. exact Hb2.
       * rewrite <- Hn. exact (usys_mem_ok_ueq (usys_num tf) tf tfa r M M' pi pi' Hu Hm).
@@ -143,9 +160,9 @@ Proof.
   pose proof (tf_ueq_resume_pc tf' tfa' Hu) as Hp.
   unfold uround_ok in H |- *.
   destruct (decide (sc = uecall_scause)).
-  - destruct H as [Hx | [r [[Hb1 Hb2] Hm]]].
+  - destruct H as [Hx | [Hnx [r [[Hb1 Hb2] Hm]]]].
     + left. exact Hx.
-    + right. exists r. split; [ split | exact Hm ].
+    + right. split; [ exact Hnx | ]. exists r. split; [ split | exact Hm ].
       * rewrite <- Hg. exact Hb1.
       * rewrite <- Hp. exact Hb2.
   - destruct H as [[Hi1 Hi2] Hrest].
@@ -179,9 +196,10 @@ Definition uround_vis_ok (sc : mword 64) (tf : list (mword 64))
     (pi' : gmap (mword 27) uperm) : Prop :=
   if decide (sc = uecall_scause) then
     usys_num tf = USYS_exec
-    \/ exists (r : mword 64) (M M' : gmap Z (bv 8)),
-         uround_bump_ok tf tf' r
-         /\ usys_mem_ok (usys_num tf) tf r M pi M' pi'
+    \/ (usys_num tf <> USYS_exit
+        /\ exists (r : mword 64) (M M' : gmap Z (bv 8)),
+             uround_bump_ok tf tf' r
+             /\ usys_mem_ok (usys_num tf) tf r M pi M' pi')
   else uround_id_ok tf tf' /\ pi' = pi.
 
 Lemma uround_vis_of_ok (sc : mword 64) (tf tf' : list (mword 64))
@@ -190,7 +208,8 @@ Lemma uround_vis_of_ok (sc : mword 64) (tf tf' : list (mword 64))
 Proof.
   unfold uround_ok, uround_vis_ok.
   destruct (decide (sc = uecall_scause)).
-  - intros [Hx | [r [Hb Hm]]]; [ left; exact Hx | ].
-    right. exists r, M, M'. split; [ exact Hb | exact Hm ].
+  - intros [Hx | [Hnx [r [Hb Hm]]]]; [ left; exact Hx | ].
+    right. split; [ exact Hnx | ].
+    exists r, M, M'. split; [ exact Hb | exact Hm ].
   - intros [Hi [_ Hp]]. split; [ exact Hi | exact Hp ].
 Qed.

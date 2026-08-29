@@ -536,7 +536,7 @@ Section UtSysBlock.
          read -- like [Hmemg], they are the CALLER's to consume, and the trap
          loop's own invariant is indifferent to all four. *)
       iIntros (CID2 Hk2 mg U2)
-        "%Hcsg %Hmemg %Hmema0 %Hmemupt %Hmemsz %Htfg %Hfgg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hpc".
+        "%Hcsg %Hmemg %Hmemne2 %Hmema0 %Hmemupt %Hmemsz %Htfg %Hfgg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hpc".
       destruct U2 as [V2 M2].
       assert (Hreta6 : ret_pc (S4 !!! Regidx Rra) = mword_of_int (UT + 0xa6))
         by (rewrite HS4ra; pcw).
@@ -603,7 +603,7 @@ Section UtSysBlock.
       assert (Ha5 : rget S3 Ra5 = add_vec_int (pv_tf (us_V U) !!! tf_epc_idx) 4).
       { rewrite (list_lookup_total_correct _ _ _ Hepc) HS3a5 HS2a5.
         apply addv_sext4. }
-      cbn [us_V us_M] in Hmemg, Hmema0, Hmemupt, Hmemsz.
+      cbn [us_V us_M] in Hmemg, Hmemne2, Hmema0, Hmemupt, Hmemsz.
       (* SBRK'S PERMISSION ROW, out of the dispatcher's own sbrk row.  It is
          no longer a premise anybody has to conjure: [sysc_sbrk_ok] names
          the descriptor's move and uvmdealloc's run, and the two entry facts
@@ -631,6 +631,12 @@ Section UtSysBlock.
         destruct (decide (sysc_num V1 = 7)) as [Hex | Hnex].
         - left. rewrite <- Hnumeq. exact Hex.
         - right.
+          (* THE ARM RETURNED, SO IT WAS NOT [exit] (milestone J, K1).  The
+             dispatcher's returning post now says so outright; without it
+             nothing here could refute the arm where the process handed
+             back no successor, because [usys_mem_ok] at [USYS_exit] is
+             satisfiable (exit is in its quiet row). *)
+          split; [ rewrite <- Hnumeq; exact Hmemne2 | ].
           destruct Hmema0 as [Hc7 | (w & Hw)]; [ contradiction (Hnex Hc7) | ].
           exists w.
           assert (Hbump : pv_tf V2 = bump_tf (pv_tf (us_V U)) w).

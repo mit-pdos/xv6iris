@@ -1233,6 +1233,17 @@ Section ProcInv.
      proc_ofiles γf (pv_fdg V) pa (pv_ofile V) ∗
      first_tok)%I.
 
+  (* THE TRAPFRAME BOUND, off the residue's own half of the block.  Same
+     conjunct [proc_priv_sz_maxsz] reads, at the form the trap loop holds
+     across user execution (the memory conjunct has split off, so
+     [proc_priv] is not available there).  Milestone J's resume obligation
+     [UserPerm.usz_ok] is this plus [pgroundup]'s monotonicity -- see
+     [UexecApply.usz_ok_of_maxsz]. *)
+  Lemma proc_priv_nopt_sz_maxsz (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) :
+    proc_priv_nopt γf pa pid V -∗ ⌜uint (pv_sz V) <= uvm_maxsz⌝.
+  Proof. iIntros "(%Hszb & _)". done. Qed.
+
   (* THE TIER SEAM.  What splits off is the LAZY view -- the block's own
      memory conjunct, verbatim -- and NOT the mapped [proc_pt].  The
      residue's own boundary ([UsertrapRes.ut_res_pt_close] / [_pt_open])

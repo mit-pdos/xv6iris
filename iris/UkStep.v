@@ -418,6 +418,8 @@ Section UkBundle.
     rewrite tf_of_epc (tf_of_resume_gpr m pc Hx0).
     iExists ms_v.
     iFrame "Hhs Hpriv Hmst Hsc Hstv Hsep Hpc Hg Hcfg Hrut".
+    (* the key's length (milestone J, K3): the list IS [tf_of] *)
+    iSplitR; [ iPureIntro; exact (tf_of_length m pc) | ].
     iSplitR; [ iPureIntro; exact Hms | ].
     rewrite /user_ptm_inv /umem_lazy /umem_own. iFrame "Htlb".
     iSplitL; [ | iPureIntro; exact (conj Hinj Hacc) ].

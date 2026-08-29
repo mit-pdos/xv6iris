@@ -243,6 +243,7 @@ UmodeMem.v
 UmodeRegs.v
 UexecRet.v
 UexecRound.v
+UexecApply.v
 UmodeCap.v
 UmodeFetch.v
 UmodeAbi.v
