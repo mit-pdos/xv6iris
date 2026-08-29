@@ -148,6 +148,7 @@ Import Defs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* ====================================================================== *)
 (*  1.  THE PURE SIDE: THERE IS NO RECORD HERE ANY MORE                    *)
@@ -251,7 +252,7 @@ End FsBundles.
     file header. *)
 Definition wp_sys_mkdir_friendly_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname)                                         (* the file table *)
     (γs : list gname) (j : nat) (γl : gname)             (* the running process *)
     (ns : nat)
@@ -307,7 +308,7 @@ Module FsSysMkdir (M : SYSMKDIR).
 
   Lemma wp_sys_mkdir_friendly
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-        !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+        !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γf : gname)
       (γs : list gname) (j : nat) (γl : gname)
       (ns : nat)
@@ -428,7 +429,7 @@ End FsSysMkdir.
     nothing machine-level in it. *)
 Definition wp_sys_chdir_friendly_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname)
     (γs : list gname) (j : nat) (γl : gname)
     (dqb dqs dqbs dqn : dfrac)
@@ -473,7 +474,7 @@ Module FsSysChdir (M : SYSCHDIR).
 
   Lemma wp_sys_chdir_friendly
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-        !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+        !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γf : gname)
       (γs : list gname) (j : nat) (γl : gname)
       (dqb dqs dqbs dqn : dfrac)

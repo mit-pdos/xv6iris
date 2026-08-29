@@ -54,6 +54,7 @@ From Kernel Require Import KernelInstrs.
 From Kernel Require KernelSyms.
 Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 (* ===================================================================== *)
@@ -988,7 +989,7 @@ Definition sie_bit_off : mword 1 := 'b"0".
 
 Section SmodeCoreIris.
   Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* The static kernel-mapping claims (KMap.v), off the ambient config bundle.
      [hw_config] is persistent, so this consumes nothing.  It is THE interface
@@ -1301,7 +1302,7 @@ Qed.
 
 Section SmodeDemo.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Definition kv_pc1 : mword 64 := mword_of_int (KernelSyms.kernelvec).
 

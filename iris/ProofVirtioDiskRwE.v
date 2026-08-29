@@ -76,6 +76,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -189,7 +190,7 @@ Proof. vm_compute. reflexivity. Qed.
 
 Section VdrweLeaves.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* what one poll leaves behind, by the value it read: 1 keeps the ACTIVE
      fragment, 0 IS the collect *)
@@ -293,7 +294,7 @@ Module P4 := VirtioDiskRwRestD Acquire Release SleepPrepare Sleep FreeDesc.
 
 Section ProofVirtioDiskRwE.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Notation Rra := (mword_of_int 1  : mword 5).
@@ -325,7 +326,7 @@ Section ProofVirtioDiskRwE.
   (* Note that s1/s2 are NOT pinned: +0x1d2 reloads [idx[0]] into s2 and   *)
   (* P6 never reads s1 again.                                             *)
   (* ------------------------------------------------------------------- *)
-  Definition vdrw_p5_exit (CID0 : CPU) (γk : gname) 
+  Definition vdrw_p5_exit `{XI : CurCtx} (CID0 : CPU) (γk : gname) 
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
@@ -368,7 +369,7 @@ Section ProofVirtioDiskRwE.
      resource is CLOSED here (sleep takes it as [Rk]); what survives an
      iteration besides the register discipline is the head's ACTIVE fragment
      and the two other descriptors' INACTIVE ones. *)
-  Definition vdrw_p5_loop (CID0 : CPU) (γk : gname)
+  Definition vdrw_p5_loop `{XI : CurCtx} (CID0 : CPU) (γk : gname)
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
@@ -429,7 +430,7 @@ Section ProofVirtioDiskRwE.
     kernel_text -∗
     procs_inv γs -∗
     dev_inv γu γd -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     vdrw_p5_exit CID γk γs j γd pd pav pu K eb sp0 b wr sector bs_buf bs_disk
                  m0 kq lks -∗
     P4.vdrw_p4_exit CID γk γs j γd pd pav pu K eb sp0 b wr sector bs_buf

@@ -84,13 +84,14 @@ Require Import FsBytesGamma.  (* [fs_gamma_L]/[gamma_byte_range]: the record-slo
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* log_write's own frame is 4 slots ([c.addi sp,sp,-32] at +0x00); its
    deepest callee is bpin, which wants 14 (its own 4 plus acquire/release's
    10).  acquire/release directly want only 10. *)
 Notation K_log_write := (18%nat) (only parsing).
 Definition wp_log_write_gen_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names) (γd : disk_names)
     (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -200,7 +201,7 @@ Definition wp_log_write_gen_body
    that is [wp_log_write_gen] below, derived, so no existing caller
    moves. *)
 Definition wp_log_write_au_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names) (γd : disk_names)
     (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -352,7 +353,7 @@ Definition wp_log_write_au_body
 (*  [wp_log_write_au_body]'s, unchanged; see its header for all of it.    *)
 (* ===================================================================== *)
 Definition wp_log_write_au_range_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names) (γd : disk_names)
     (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -561,7 +562,7 @@ Qed.
    applies [LogInv.log_opSe_opS] and is [wp_log_write_gen] again -- which is
    how that contract is derived, so no landed caller moves. *)
 Definition wp_log_write_gene_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names) (γd : disk_names)
     (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -621,7 +622,7 @@ Definition wp_log_write_gene_body
   WP (Loop : expr riscv_lang).
 
 Definition wp_log_write_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names) (γd : disk_names)
     (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -691,7 +692,7 @@ Module Type LOG_WRITE.
      sub-block object -- an inode record, a dirent -- uses THIS one, with
      [lw_au_rec] for the record slot's shape. *)
   Parameter wp_log_write_au_range :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} (bn : bio_names)
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (bn : bio_names)
       (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32)
@@ -711,7 +712,7 @@ Module Type LOG_WRITE.
      credit set on top of that; all of them are kept as their own
      parameters so no existing caller moves. *)
   Parameter wp_log_write_au :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} (bn : bio_names)
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (bn : bio_names)
       (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32)
@@ -727,7 +728,7 @@ Module Type LOG_WRITE.
      atomic-update one at a held [fs_chalf] and the trivial anchor, and it is
      [wp_log_write_gen] that is derived from THIS, by closing the epoch. *)
   Parameter wp_log_write_gene :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} (bn : bio_names)
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (bn : bio_names)
       (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32)
@@ -743,7 +744,7 @@ Module Type LOG_WRITE.
      parameter so that every existing caller -- which threads [log_op] and
      neither knows nor cares which blocks this op has logged -- is unchanged. *)
   Parameter wp_log_write_gen :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} (bn : bio_names)
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (bn : bio_names)
       (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32)
@@ -755,7 +756,7 @@ Module Type LOG_WRITE.
                             bs bsl bsd d u cr Sb m n eb p K b lks.
 
   Parameter wp_log_write_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} (bn : bio_names)
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (bn : bio_names)
       (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32)

@@ -104,6 +104,7 @@ From Kernel Require KernelSyms.
 Require Import RiscvExtras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* ===================================================================== *)
 (* 1. Pure address arithmetic: the stack region below [sp] is kernel data. *)
@@ -205,7 +206,7 @@ End BootStack.
 (* ===================================================================== *)
 
 (* the tp/cid convention at the boot hart: start() writes tp = mhartid. *)
-Lemma mb_tpv_cid_boot `{GEN : GenId} `{CID : CpuId} (mh : mword 64) :
+Lemma mb_tpv_cid_boot `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (mh : mword 64) :
   mh = (mword_of_int 0 : mword 64) ->
   cid_word = (zero_reg : mword 64) ->
   mb_tpv mh = cid_word.
@@ -253,7 +254,7 @@ Definition mstatus_reset : mword 64 := mword_of_int 0xA00000000.
 
 Section BootBridge.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* NO [KT0] BINDER: the boot capability is at KT0 by construction
      ([sie_cap_intro_bare]); see the note in [Section BootStack] above. *)

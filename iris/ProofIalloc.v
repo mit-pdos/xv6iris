@@ -120,6 +120,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
    printable (claude-notes/durable-notes.md) *)
@@ -479,7 +480,7 @@ Section IallocDefs.
 
   (* THE CONTINUATION, named so it is not re-traversed by every proofmode
      split (claude-notes/optimization.md). *)
-  Definition ia_cont `{GEN : GenId} `{CID0 : CpuId}
+  Definition ia_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
  (ty : mword 16)
       (u : nat) (Sb : gset Z) (pidv : mword 32) (dq dqs dqn : dfrac) (j : nat)
       (m : regfile) (K : nat) (b : bool) (lks : gset string) (Upr : ustate)
@@ -544,7 +545,7 @@ Section IallocEpilogue.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma ia_epilogue `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma ia_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (j : nat)
  (ty : mword 16)
       (u : nat) (Sb : gset Z) (t : nat) (qt : Qp)
@@ -770,7 +771,7 @@ Section IallocOut.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma ia_out `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma ia_out `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (j : nat)
  (ty : mword 16)
       (u : nat) (Sb : gset Z) (t : nat) (qt : Qp)
@@ -1108,7 +1109,7 @@ Section IallocClaim.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma ia_claim `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma ia_claim `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
  (ty : mword 16)
@@ -1159,7 +1160,7 @@ Section IallocClaim.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
     itable_inv -∗
     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
@@ -1984,7 +1985,7 @@ Section IallocScan.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma ia_scan `{GEN : GenId} `{CIDe : CpuId}
+  Local Lemma ia_scan `{GEN : GenId} `{CIDe : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
  (ty : mword 16) (u : nat) (Sb : gset Z)
@@ -2019,7 +2020,7 @@ Section IallocScan.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
     itable_inv -∗
     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
@@ -2858,7 +2859,7 @@ Section IallocMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
-  Lemma wp_ialloc_gen `{GEN : GenId} `{CID : CpuId}
+  Lemma wp_ialloc_gen `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
  (ty : mword 16)
@@ -3350,7 +3351,7 @@ Section IallocMain.
      each arm's payout with [LogInv.log_opS_op].  Every landed consumer of
      ialloc (there is exactly one shape, and [LinkIalloc] is unmoved) sees
      the same statement it saw before.                                     *)
-  Lemma wp_ialloc_sconf `{GEN : GenId} `{CID : CpuId}
+  Lemma wp_ialloc_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
  (ty : mword 16)

@@ -36,12 +36,13 @@ Require Import SpecMemset.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 Module MemsetArrayProof (Memset : MEMSET_PARTS) : MEMSET.
 
 Section WpMemsetArray.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Context {kt : ktier}.
   Context {ktb : ktier}.

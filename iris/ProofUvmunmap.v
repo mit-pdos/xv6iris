@@ -86,6 +86,7 @@ Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* uvmunmap's arithmetic is all SHARED and lives at its own altitude: the
    run-cursor / PGROUNDUP [Z] facts ([z_run_iter], [z_run_end64],
@@ -135,7 +136,7 @@ Module UvmunmapCore (WalkNoalloc : WALK_NOALLOC) (Kfree : KFREE).
 
 Section ProofUvmunmap.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rtp := (mword_of_int 4 : mword 5).
@@ -204,7 +205,7 @@ Section ProofUvmunmap.
   (*  branch directly and by the loop exit through the [ld s1] at +0x76,  *)
   (*  so slot 3 arrives at existential contents.                          *)
   (* ================================================================== *)
-  Local Lemma uu_epilogue `{CID0 : CpuId}
+  Local Lemma uu_epilogue `{CID0 : CpuId} `{XI : CurCtx}
       (mm mj : regfile) (K : nat) (sp0 : mword 64) (b : bool) (p : mword 64) :
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
     (8 <= K)%nat ->
@@ -475,7 +476,7 @@ Section ProofUvmunmap.
   (*  THE LOOP (+0x50 head, +0x4a tail), by induction on the remaining    *)
   (*  page count.                                                         *)
   (* ================================================================== *)
-  Local Lemma uu_loop `{CID0 : CpuId} (γa : gname)
+  Local Lemma uu_loop `{CID0 : CpuId} `{XI : CurCtx} (γa : gname)
       (mm : regfile) (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
       (um : gmap (mword 27) (mword 64)) (Own : nat -> iProp Σ)
       (npages K : nat) (eb b df : bool)
@@ -1874,7 +1875,7 @@ Module Core := UvmunmapCore WalkNoalloc Kfree.
 
 Section SealUvmunmap.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)
   (* THE CONTENTS-INDEXED SEAL.  Same machine proof; [Own] is instantiated *)
@@ -2131,7 +2132,7 @@ Module Core := UvmunmapCore WalkNoalloc Kfree.
 
 Section SealUvmunmapBare.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* [bare_pt] IS the [∅] instance, definitionally -- there is nothing
      to owe. *)
@@ -2188,7 +2189,7 @@ Module Core := UvmunmapCore WalkNoalloc Kfree.
 
 Section SealUvmunmapFixed.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_uvmunmap_fixed_sconf
       (γa : gname) (mm : regfile)

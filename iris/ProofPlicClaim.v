@@ -49,6 +49,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import CodePlicClaim.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 (* ---- the decodes used only by plic_claim ---- *)
 
@@ -79,7 +80,7 @@ Module PlicClaimProof (Cpuid : CPUID) : PLIC_CLAIM.
 
 Section ProofPlicClaim.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
 

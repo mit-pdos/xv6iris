@@ -32,6 +32,7 @@ From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 (* clean-context (mword-free) nat bounds, so [lia] never sees a bv. *)
@@ -46,7 +47,7 @@ Proof. lia. Qed.
 (* ===================================================================== *)
 Section KvminitBody.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   (* [CID] is bound HERE, per-hypothesis, rather than reused from the
@@ -62,7 +63,7 @@ Section KvminitBody.
      apply its OWN lemmas at a migrated hart, and then make CID an implicit
      per-lemma binder" -- exactly this situation. *)
   Hypothesis wp_kvmmake :
-    forall `{CID : CpuId} (γa : gname) (γk : gname * gname) (mm : regfile) (lvl K : nat)
+    forall `{CID : CpuId} `{XI : CurCtx} (γa : gname) (γk : gname * gname) (mm : regfile) (lvl K : nat)
       (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
       wp_kvmmake_sconf_body γa γk mm lvl K eb p on b lks.
 
@@ -279,7 +280,7 @@ End KvminitBody.
 (* proven spec, discharging the KVMINIT Module Type.                       *)
 (* ===================================================================== *)
 Module KvminitProof (KMK : KVMMAKE) : KVMINIT.
-  Definition wp_kvminit_sconf `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+  Definition wp_kvminit_sconf `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (γk : gname * gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (kpt0 : mword 64) (b : bool) (lks : gset string)
       : wp_kvminit_sconf_body γa γk mm lvl K eb p on kpt0 b lks :=
     (* eta-expand the module argument: passed bare, implicit-argument

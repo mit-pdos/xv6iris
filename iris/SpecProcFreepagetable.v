@@ -72,9 +72,10 @@ Require Import ProcPtOwn.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 
-Definition wp_proc_freepagetable_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_proc_freepagetable_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (mm : regfile)
     (P : uptd) (K : nat) (eb : bool) (p : mword 64)
     (ilvl : nat) (b : bool) (lks : gset string) :=
@@ -129,7 +130,7 @@ Definition wp_proc_freepagetable_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG �
    caller once the ∃-[M] tier is retired.  It is therefore a corollary of
    the contract above ([ProcPtOwn.proc_ptm_pt] on the way in), not a
    refinement of it. *)
-Definition wp_proc_freepagetable_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_proc_freepagetable_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (mm : regfile)
     (P : uptd) (szv : Z) (M : gmap Z (bv 8))
     (K : nat) (eb : bool) (p : mword 64)
@@ -160,14 +161,14 @@ Definition wp_proc_freepagetable_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslo
 
 Module Type PROC_FREEPAGETABLE.
   Parameter wp_proc_freepagetable_mem_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (mm : regfile)
       (P : uptd) (szv : Z) (M : gmap Z (bv 8))
       (K : nat) (eb : bool) (p : mword 64)
       (ilvl : nat) (b : bool) (lks : gset string),
       wp_proc_freepagetable_mem_sconf_body γa mm P szv M K eb p ilvl b lks.
   Parameter wp_proc_freepagetable_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (mm : regfile)
       (P : uptd) (K : nat) (eb : bool) (p : mword 64)
       (ilvl : nat) (b : bool) (lks : gset string),

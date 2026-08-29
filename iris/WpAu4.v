@@ -49,10 +49,11 @@ Require Import IntrDefs.
 Require Import WpSconfMem.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Section Au4Leaves.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context {p : mword 64}.
 
   Context {kt : ktier}.

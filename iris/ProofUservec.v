@@ -60,12 +60,13 @@ Local Open Scope Z_scope.
 Require Import ParkCap.   (* [park_token] *)
 Require Import UsertrapRes UtResFits.  (* [ut_park_intro_body] -- the park's producer entry *)
 Import Defs.
+Require Import TsoCtx.
 
 Module UservecProof (UT : UtResFits.USERTRAP_PARK) (UR : SpecUserret.USERRET) : USERVEC.
 
 Section UservecAllPt.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Definition usertrap_res := UT.usertrap_res.
   Definition usertrap_res_parked := UT.usertrap_res_parked.

@@ -59,6 +59,13 @@ From iris.program_logic Require Import weakestpre.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvPtsto WpLock.
+(* SLICE 2 chunk 3: the lock payload is now a FUNCTION of the context, so
+   the const embedding is spelled with the [const_pay] COMBINATOR -- never a
+   bare lambda (tso-port.md §0.8': ANY CurCtx-typed binder, even an
+   auto-named [_], is a TC candidate inside P and elaboration picks it
+   site-dependently).  RiscvPtsto is re-imported after TsoCtx so this file's
+   own notations stay raw until the M1 flip. *)
+Require Import TsoCtx.
 Require Export PageGeom.  (* the pure page geometry: page_valid / page_base / nullp *)
 Local Open Scope Z_scope.
 Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
@@ -107,13 +114,17 @@ Qed.
 
 Section Kalloc.
   Context `{!riscvGS Σ, !lockG Σ, !kallocG Σ}.
+  Context `{XI : CurCtx}.
 
 
   Definition byte_any (a : Arch.pa) : iProp Σ := (∃ b : bv 8, a ↦ₘ b)%I.
   (* an 8-byte little-endian word, now expressed via the [word_pointsto]
      abstraction (so it also carries the doubleword-alignment of [a]). *)
+  (* spelled through the NOTATION, not the raw constant: after the M1 flip
+     [a ↦₈ w] is the context-relative word and this definition rides it, which
+     is what keeps [word_at] and [byte_any] on the same side of the seal. *)
   Definition word_at (a : mword 64) (w : mword 64) : iProp Σ :=
-    word_pointsto a (DfracOwn 1) w.
+    a ↦₈ w.
   Definition page_head8 (p : mword 64) : iProp Σ :=
     ([∗ list] j ∈ seq 0 8, byte_any (pa_add p j))%I.
   Definition page_rest (p : mword 64) : iProp Σ :=
@@ -136,7 +147,7 @@ Section Kalloc.
 
   Lemma word_at_head8 p w : word_at p w ⊢ page_head8 p.
   Proof.
-    rewrite /word_at /page_head8 word_pointsto_unfold. iIntros "[_ H]".
+    rewrite /word_at /page_head8 ctx_word_pointsto_unfold. iIntros "[_ H]".
     iApply (big_sepL_mono with "H"). iIntros (k j _) "Hb". iExists _. iExact "Hb".
   Qed.
 
@@ -295,9 +306,16 @@ Section Kalloc.
         kmem_avail_auth γk (length pages))%I.
 
   (* the whole allocator = a spinlock whose resource is [kmem_res].  Persistent. *)
-  Definition is_kmem (γ : gname) (γk : gname * gname) (lk fl : mword 64) : iProp Σ :=
-    is_lock γ lk "kmem"%string (kmem_res γk fl).
-  Global Instance is_kmem_persistent γ γk lk fl : Persistent (is_kmem γ γk lk fl).
+  (* the context index is PER-DECLARATION here, not a section binder: this
+     section also defines [byte_any]/[page_own] and the whole free-list tier,
+     none of which may pick up a [CurCtx] on main (they are raw until the M1
+     flip -- a section binder here generalized them and turned 11 error roots
+     into 39). *)
+  Definition is_kmem
+      (γ : gname) (γk : gname * gname) (lk fl : mword 64) : iProp Σ :=
+    is_lock γ lk "kmem"%string <{ (kmem_res γk fl) }>.
+  Global Instance is_kmem_persistent γ γk lk fl :
+    Persistent (is_kmem γ γk lk fl).
   Proof. apply _. Qed.
 
   Lemma kmem_res_close γk fl head pages :

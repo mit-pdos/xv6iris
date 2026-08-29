@@ -39,7 +39,7 @@ Section SleepLockAt.
 
   (* [SleepLock.new_sleeplock_gen_at] with the inner spinlock's gname given
      as well: nothing is minted here, so the conclusion is not existential. *)
-  Lemma new_sleeplock_gen_at2 E (p : gname * gname) (slk : mword 64)
+  Lemma new_sleeplock_gen_at2 `{XI : TsoCtx.CurCtx} E (p : gname * gname) (slk : mword 64)
       (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) :
     sl_free_pair p -∗
     lock_name (sl_lk slk) "sleep lock"%string -∗

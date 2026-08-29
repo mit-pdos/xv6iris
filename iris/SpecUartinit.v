@@ -48,7 +48,7 @@
    [lk_fresh] out.  Those are exactly [WpLock.newlock]'s premises minus the
    resource, so the caller's ghost step
    [lk_fresh a_tx_lock "uart" ∗ tx_res γd ==∗ is_lock … a_tx_lock "uart"
-   (tx_res γd)] plus the [uart_dlab_off] below is [UartTxInv.is_txlock] --
+   <{ tx_res γd }>] plus the [uart_dlab_off] below is [UartTxInv.is_txlock] --
    what a boot assembly feeds to [WpLock.newlock].
 
    ProofUartinit.v proves it by running each of the seven writes through the
@@ -96,7 +96,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
    contract is stated at the literal index [false] rather than a generic
    [b], with no [wp_next] wrapper at all (it would collapse via
    [wp_next_off] anyway, since the hart cannot move). *)
-Definition wp_uartinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_uartinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γd : uart_names) (m : regfile) (K : nat)
     (l : list (bv 8)) (b0 : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uartinit in
@@ -134,6 +134,7 @@ Definition wp_uartinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
        [cpu] and writes [name], which is then DISCARDED in favour of the
        persistent [lock_name a_tx_lock "uart"] -- tx_lock is a static global
        that is never freed, so nothing needs the field back owned.
+Require Import TsoCtx.
        [WpLock.newlock] seals the bundle into [is_lock … a_tx_lock "uart" R]
        for the caller's choice of R ([UartTxInv.tx_res γd] is the one the
        driver wants). *)
@@ -143,7 +144,7 @@ Definition wp_uartinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
 
 Module Type UARTINIT.
   Parameter wp_uartinit_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γd : uart_names) (m : regfile) (K : nat)
       (l : list (bv 8)) (b0 : bool) (p : mword 64),
       wp_uartinit_sconf_body γd m K l b0 p.

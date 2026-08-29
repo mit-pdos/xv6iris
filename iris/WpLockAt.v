@@ -26,10 +26,14 @@ Require Import SailStdpp.Base SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d.
 Require Import RiscvPtsto.
 Require Export WpLock.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Section LockAt.
   Context `{!riscvGS Σ, !lockG Σ}.
+  (* §0.35': the handle is context-relative; the T-leg binds the index in
+     this section too. *)
+  Context `{XI : TsoCtx.CurCtx}.
 
   (* the free arm's ghost pair.  GHOST-ONLY on purpose (SleepLock's
      [sl_free_tok] makes the same choice and says why): a client that mints
@@ -57,20 +61,35 @@ Section LockAt.
   (* [WpLock.newlock] with its [own_alloc] taken out: a free physical lock
      (word 0, cpu word 0), its name, its resource and the pre-minted ghost
      pair become THE lock at the gname the caller already published. *)
-  Lemma newlock_at E (γ : gname) (lk : mword 64) (s : string) (R : iProp Σ) :
+  (* [tso-flip WpLockAt.v]: the seventh creator, and it pays the same cascade
+     as the newlock family -- the running token in, deposited, straight back
+     out.  A6.105: the floor travels bundled with the cell, so it is unbundled
+     here and handed to [is_lock_intro], which is where the handle's floor
+     lives. *)
+  (* the seventh creator.  PROPAGATED SHAPE: the [lk_cpu_ready] owner cell
+     and the lambda payload are the T-leg's, because they travel to every
+     caller.  INTERNAL: the mint is the M-leg's SC form -- no running token,
+     the transport quarantined in [lock_pay_intro]'s one shim use.  A6.105:
+     the floor travels bundled with the cell, so it is unbundled here and
+     handed to [is_lock_intro], which is where the handle's floor lives. *)
+  Lemma newlock_at E (γ : gname) (lk : mword 64)
+      (s : string) (R : TsoCtx.CtxId -> iProp Σ) `{!TsoCtx.CtxMorph R} :
     lock_free_tok γ -∗
     lock_name lk s -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
-    lock_cpu lk ↦₈ (zero_reg : mword 64) -∗
-    R ={E}=∗ is_lock γ lk s R.
+    WpLock.lk_cpu_ready lk -∗
+    R TsoCtx.cur_ctx ={E}=∗ is_lock γ lk s R.
   Proof.
-    iIntros "[Ha Hf] #Hnm Hword Hcpu HR".
-    iMod (inv_alloc lockN E (lock_inv γ lk s R)
+    iIntros "[Ha Hf] #Hnm Hword Hready HR".
+    rewrite /WpLock.lk_cpu_ready /WpLock.lk_cpu_ready_at.
+    iDestruct "Hready" as (lo) "[Hcpu #Hfl]".
+    iMod (lock_pay_intro R with "HR") as "HR".
+    iMod (inv_alloc lockN E (lock_inv γ lk s R lo)
             with "[Hword Hcpu Ha Hf HR]") as "#Hinv".
     { iApply bi.later_intro. iExists (mword_of_int 0 : mword 32), None.
       rewrite /lock_word lk_cpu_res_free. iFrame "Hword Hcpu Ha".
       iLeft. iFrame "Hf HR". done. }
-    iModIntro. iApply (is_lock_intro with "Hnm Hinv").
+    iModIntro. iApply (is_lock_intro with "Hnm Hinv Hfl").
   Qed.
 
 End LockAt.

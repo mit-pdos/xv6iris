@@ -139,6 +139,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 (* kexit's own six frame slots, plus the deepest callee below it: fileclose
@@ -147,7 +148,7 @@ Import Defs.
 Notation K_kexit := (90%nat) (only parsing).
 Definition wp_kexit_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γft γf γw : gname)                               (* ftable lock, ftable, wait *)
      (γs : list gname) (j : nat) (γl : gname)
   (* disk fabric + lock  *)
@@ -223,14 +224,14 @@ Definition wp_kexit_sconf_body
   panic_env -∗
   (* the running-thread bundle -- consumed: this thread parks forever *)
   (* wait_lock, and what it protects *)
-  is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+  is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
   (* the open-file table: every non-null descriptor is fileclose'd *)
   is_ftable γft γf -∗
   (* ...and closing one can free a pipe's page, so kexit owns kalloc's side
      too.  The count comes back MOVED -- a descriptor may have held a pipe's
      last end -- which is why the loop carries it existentially. *)
   is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
-    (kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) -∗
+    <{ kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24)) }> -∗
   kalloc_avail fsc_kpages on -∗
   (* the file system, for [begin_op(); iput(p->cwd); end_op();] *)
   bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
@@ -239,7 +240,7 @@ Definition wp_kexit_sconf_body
   gen_cert -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
   bslots 3 -∗
   (* THE FILE SYSTEM, as [SpecFileclose] sees it: the ambient [fs_ready]
      and NOTHING pure beside it: [fclose_ties] died with the eight
@@ -281,7 +282,7 @@ Definition wp_kexit_sconf_body
 (* ---------------------------------------------------------------------- *)
 Section KexitSeals.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma kexit_park_pay (γf : gname) (j : nat) (pid : mword 32) (U : ustate) :
     pv_ofile (us_V U) = replicate NOFILE (zero_reg : mword 64) ->
@@ -314,7 +315,7 @@ End KexitSeals.
 
 Module Type KEXIT.
   Parameter wp_kexit_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γft γf γw : gname)
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)

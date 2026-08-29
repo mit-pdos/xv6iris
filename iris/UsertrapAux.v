@@ -35,6 +35,7 @@ Require Import PrintkFmt.
 Require Import PrintkArgs.    (* [pk_arg_desc] / [pk_desc_kind] *)
 From Kernel Require KernelSyms.
 From Kernel Require KernelData.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -119,7 +120,7 @@ Qed.
 
 Section UsertrapData.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma ut_fmt1_str : (kernel_data : iProp Σ) -∗ ut_fmt1_p ↦ₛ□ ut_fmt1.
   Proof.

@@ -55,6 +55,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import CodePlicinit.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 (* A closed [lo <= x < hi] bound over Z.  [lia] is unusable here: the heavy
    bitvector.tactics import installs a zify hook that answers "Cannot find
@@ -80,7 +81,7 @@ Module PlicinitProof : PLICINIT.
 
 Section ProofPlicinit.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
 

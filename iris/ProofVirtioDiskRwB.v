@@ -62,6 +62,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Module VirtioDiskRwRest (Acquire : ACQUIRE) (Release : RELEASE)
                         (SleepPrepare : SLEEP_PREPARE) (Sleep : SLEEP) (FreeDesc : FREEDESC).
+Require Import TsoCtx.
 
 Module P1 := VirtioDiskRwPhases Acquire Release Sleep FreeDesc.
 
@@ -92,7 +93,7 @@ Section VdrwbFreeAt.
     | |- ?a <> ?b => tryif unify a b then fail else (vm_compute; discriminate)
     end.
 
-  Lemma wp_vdrw_free_at `{GEN : GenId} `{CID : CpuId}  (γd : disk_names) (γs : list gname)
+  Lemma wp_vdrw_free_at `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}  (γd : disk_names) (γs : list gname)
       (pd : mword 64) (i : nat) (fr : nat -> bool)
       (M : regfile) (av : nat) (eb : bool) (pme : mword 64)
       (idxa : Arch.pa) (off : Z) (imm : mword 12) (jimm : mword 21) (lks : gset string) :
@@ -198,7 +199,7 @@ End VdrwbFreeAt.
 
 Section ProofVirtioDiskRwB.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Local Ltac reg_neq :=
@@ -231,7 +232,7 @@ Section ProofVirtioDiskRwB.
   (* =================================================================== *)
 
   (* what the loop hands out when all three descriptors are in hand *)
-  Definition vdrw_p2_exit (CID0 : CPU) (γk : gname)
+  Definition vdrw_p2_exit `{XI : CurCtx} (CID0 : CPU) (γk : gname)
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : mword 64) (K : nat) (eb : bool)
       (sp0 b : Arch.pa) (wr sector : mword 64) (m0 : regfile) (lks : gset string) : iProp Σ :=
@@ -260,7 +261,7 @@ Section ProofVirtioDiskRwB.
        WP (Loop : expr riscv_lang)))%I.
 
   (* the loop head at +0x0bc *)
-  Definition vdrw_p2_loop (CID0 : CPU) (γk : gname)
+  Definition vdrw_p2_loop `{XI : CurCtx} (CID0 : CPU) (γk : gname)
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : mword 64) (K : nat) (eb : bool)
       (sp0 b : Arch.pa) (wr sector : mword 64) (m0 : regfile) (lks : gset string) : iProp Σ :=
@@ -305,7 +306,7 @@ Section ProofVirtioDiskRwB.
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x036) : mword 64) -∗
  procs_inv γs -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     locked γk cpu_id -∗
     disk_res γd pd pav pu -∗
     vdrw_scratch (KTR := KT1) sp0 -∗

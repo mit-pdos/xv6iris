@@ -29,6 +29,7 @@ Require Import SpecAcquire.
 Require Import ProcGeom.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 (* ---- the sext.w round-trip on the amoswap result (acquire +0x20) ---- *)
 Lemma aq_wrap_signed (n : N) (b : bv n) : bv_wrap n (bv_signed b) = bv_unsigned b.
@@ -78,7 +79,7 @@ Module AcquireGenProof (Mycpu : MYCPU) (Holding : HOLDING) (PushOff : PUSHOFF) :
 
 Section ProofAcquire.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Context {kt : ktier}.
   (* ------------------------------------------------------------------- *)
@@ -94,7 +95,7 @@ Section ProofAcquire.
      wp_next_off], after which the surviving proof script is BYTE-IDENTICAL
      to the pre-port shape -- the one new line per leaf, per the porting
      guide's "consumer side" recipe. *)
-  Lemma wp_acquire_lock_loop_sconf `{CID0 : CpuId}
+  Lemma wp_acquire_lock_loop_sconf `{CID0 : CpuId} `{XI : CurCtx}
       (γl : gname) (s : string) (R Tc Dc : iProp Σ)
       (M0 : regfile) (n : nat) (a5v lk : mword 64) (p : mword 64) :
     let a4one : mword 64 := add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))) in
@@ -810,7 +811,7 @@ Module AcquireOfGen (G : ACQUIRE_GEN) : ACQUIRE.
 
 Section OfGen.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Context {kt : ktier}.
   (* The [Tc := emp] / [Dc := False] instantiation is PREMISE-AGNOSTIC, so it

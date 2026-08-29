@@ -124,6 +124,7 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
    printable (claude-notes/durable-notes.md) *)
@@ -231,7 +232,7 @@ Section BallocDefs.
 
   (* THE CONTINUATION, named so it is not re-traversed by every proofmode
      split (claude-notes/optimization.md). *)
-  Definition ba_cont `{GEN : GenId} `{CID0 : CpuId}
+  Definition ba_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γfs : fs_names) (bn : bio_names) (γ : log_names)
       (cov : gset Z) (logstart bmapstart size : Z)
       (u : nat) (cr : bool) (Sb : gset Z)
@@ -345,7 +346,7 @@ Definition ba_sp (m M : regfile) : Prop :=
 Section BallocEpilogue.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma ba_epilogue `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma ba_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (j : nat) (γfs : fs_names) (bn : bio_names) (γ : log_names)
       (cov : gset Z) (logstart bmapstart size : Z) (u : nat) (cr : bool) (Sb : gset Z)
       (rv : mword 32)
@@ -611,7 +612,7 @@ End BallocEpilogue.
 Section BallocOut.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma ba_out `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma ba_out `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (j : nat) (γfs : fs_names) (bn : bio_names) (γ : log_names)
       (γpr : gname) (γu : uart_names) (γd : disk_names)
       (cov : gset Z) (logstart bmapstart size : Z) (u : nat) (cr : bool) (Sb : gset Z)
@@ -987,7 +988,7 @@ End BallocOut.
 Section BallocExhaust.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma ba_exhaust `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma ba_exhaust `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (j : nat)
       (γfs : fs_names) (γd : disk_names) (bn : bio_names) (γ : log_names)
       (γpr : gname) (γu : uart_names)
@@ -1215,7 +1216,7 @@ End BallocExhaust.
 Section BallocRestore.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma ba_restore `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma ba_restore `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (j : nat) (γfs : fs_names) (bn : bio_names) (γ : log_names)
       (cov : gset Z) (logstart bmapstart size : Z) (bi : Z)
       (u : nat) (cr : bool) (Sb : gset Z) (rv : mword 32)
@@ -1476,7 +1477,7 @@ End BallocRestore.
 Section BallocBzero.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma ba_bzero `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma ba_bzero `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1517,7 +1518,7 @@ Section BallocBzero.
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     bslots 2 -∗
     log_opS γ (S (if cr then S u else u)) (Sb ∪ {[bmapstart]}) -∗
     fsblock (fs_bytes γfs) bi bsD -∗
@@ -2047,7 +2048,7 @@ End BallocBzero.
 Section BallocAlloc.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma ba_alloc `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma ba_alloc `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -2100,7 +2101,7 @@ Section BallocAlloc.
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     bslots 1 -∗
     log_opS γ (2 + u) Sb -∗
     (* THE BITMAP'S INVARIANT (BitmapInv.v): persistent, and the pool is
@@ -2573,7 +2574,7 @@ Section BallocScan.
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     bslots 1 -∗
     log_opS γ (2 + u) Sb -∗
     bitmap_inv γfs bmapstart cov logstart size -∗
@@ -3368,7 +3369,7 @@ End BallocScan.
 (* ===================================================================== *)
 Section BallocMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* [ba_main] IS THE ONE CORE both top-level lemmas below build on: the
      credited/[cr]/[Sb] shape, eb-generic.  Its statement now coincides
@@ -3425,7 +3426,7 @@ Section BallocMain.
       procs_inv γs -∗
       dev_inv γu γd -∗
       disk_geom γd pd pav pu -∗
-      is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+      is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
       bslots 2 -∗
       log_opS γ (2 + u) Sb -∗
       wp_next true pj (fun (CID : CpuId) =>

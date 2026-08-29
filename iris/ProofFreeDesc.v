@@ -57,6 +57,7 @@ Require Import IrefSlots.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -196,7 +197,7 @@ Module FreeDescProof (Wakeup : WAKEUP) : FREEDESC.
 
 Section ProofFreeDesc.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).
@@ -214,7 +215,7 @@ Section ProofFreeDesc.
   (* A DECOMPOSED helper (porting guide): its OWN fresh [CID0] binder, so it
      can be applied at whatever hart the prologue's last step delivered, and
      its continuation wrapped in [wp_next b]. *)
-  Lemma wp_fd_clear `{CID0 : CpuId}
+  Lemma wp_fd_clear `{CID0 : CpuId} `{XI : CurCtx}
       (pd : mword 64) (i : nat) (M : regfile) (n : nat) (pme : mword 64)
       (b0 : bv 8) (va : mword 64) (vl : mword 32) (vf vn : mword 16) (b : bool) :
     (i < 8)%nat ->

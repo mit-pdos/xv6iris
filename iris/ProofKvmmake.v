@@ -43,6 +43,7 @@ Require Import KernelRvcDecode.
 Require Export FastSetSolver.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 (* ===================================================================== *)
@@ -628,7 +629,7 @@ Proof. lia. Qed.
 
 Section KvmmakeHouse.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Ltac reg_neq :=
@@ -656,7 +657,7 @@ Section KvmmakeHouse.
      stated relative to the whole function's TRUE entry [CID]) -- so THAT
      [wp_next] must be pinned to [CID] explicitly, exactly as
      [ProofUvmdealloc.wp_uvmdealloc_epi] is. *)
-  Lemma wp_kvmmake_epilogue_sconf `{CID0 : CpuId} (γa : gname) (γk : gname * gname)
+  Lemma wp_kvmmake_epilogue_sconf `{CID0 : CpuId} `{XI : CurCtx} (γa : gname) (γk : gname * gname)
       (mm Mf : regfile) (tf : ptree) (pas : nat -> mword 44)
       (K lvl : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
@@ -912,7 +913,7 @@ Proof. lia. Qed.
 (* ===================================================================== *)
 Section KvmmakeBody.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   (* Each callee hypothesis is [CID]-GENERIC (its own fresh `{CID} binder,
@@ -925,21 +926,21 @@ Section KvmmakeBody.
      already held at that point -- no explicit [CID:=...] needed at any
      call site. *)
   Hypothesis wp_kalloc :
-    forall `{CID : CpuId} (γl : gname) (γk : gname * gname)
+    forall `{CID : CpuId} `{XI : CurCtx} (γl : gname) (γk : gname * gname)
       (fl : mword 64) (m : regfile) (on : option nat)
       (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string),
       wp_kalloc_sconf_body KT0 γl γk fl m on n eb p K b lks.
   Hypothesis wp_memset :
-    forall `{CID : CpuId} (m0 : regfile) (n : nat) (len : nat)
+    forall `{CID : CpuId} `{XI : CurCtx} (m0 : regfile) (n : nat) (len : nat)
       (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64),
       wp_memset_sconf_body KT0 KT0 m0 n len cval olds b pcur.
   Hypothesis wp_kvmmap :
-    forall `{CID : CpuId} (γa : gname) (γk : gname * gname) (mm : regfile) (t : ptree)
+    forall `{CID : CpuId} `{XI : CurCtx} (γa : gname) (γk : gname * gname) (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat)
       (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
       wp_kvmmap_sconf_body γa γk mm t m npages perm lvl K eb p on b lks.
   Hypothesis wp_pms :
-    forall `{CID : CpuId} (γa : gname) (γk : gname * gname) (mm : regfile) (t : ptree)
+    forall `{CID : CpuId} `{XI : CurCtx} (γa : gname) (γk : gname * gname) (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (lvl K : nat)
       (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
       wp_proc_mapstacks_sconf_body γa γk mm t m lvl K eb p on b lks.
@@ -955,7 +956,7 @@ Section KvmmakeBody.
       | lazymatch goal with |- ?M !!! _ = _ => is_var M; progress unfold M end ].
   Ltac peel_reg := peel_reg_step; reflexivity.
 
-  Lemma wp_kmk_prologue_node `{CID0 : CpuId}
+  Lemma wp_kmk_prologue_node `{CID0 : CpuId} `{XI : CurCtx}
       (γa : gname) (γk : gname * gname) (mm : regfile) (K : nat)
       (eb : bool) (p : mword 64) (nb : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
@@ -1215,7 +1216,7 @@ Section KvmmakeBody.
   (* REGION 1 -- UART (+0x18..+0x24): li a4,6; lui a3,0x1; lui a2,      *)
   (* 0x10000000; mv a1,a2; mv a0,s1; jal kvmmap.  t0 = pt_empty_node.   *)
   (* ================================================================= *)
-  Lemma wp_kmk_region_uart `{CID0 : CpuId}
+  Lemma wp_kmk_region_uart `{CID0 : CpuId} `{XI : CurCtx}
       (γa : gname) (γk : gname * gname) (mm M : regfile) (bppn : mword 44)
       (K : nat) (eb : bool) (p : mword 64) (nb gsprev : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
@@ -1365,7 +1366,7 @@ Section KvmmakeBody.
   (* ================================================================= *)
   (* REGION 2 -- VIRTIO (+0x28..+0x34).  t in: kvm_m1, out: kvm_m2.     *)
   (* ================================================================= *)
-  Lemma wp_kmk_region_virtio `{CID0 : CpuId}
+  Lemma wp_kmk_region_virtio `{CID0 : CpuId} `{XI : CurCtx}
       (γa : gname) (γk : gname * gname) (mm M : regfile) (bppn : mword 44)
       (t : ptree) (K : nat) (eb : bool) (p : mword 64) (nb gsprev : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
@@ -1500,7 +1501,7 @@ Section KvmmakeBody.
   (* ================================================================= *)
   (* REGION 3 -- PLIC (+0x38..+0x46).  t in: kvm_m2, out: kvm_m3.       *)
   (* ================================================================= *)
-  Lemma wp_kmk_region_plic `{CID0 : CpuId}
+  Lemma wp_kmk_region_plic `{CID0 : CpuId} `{XI : CurCtx}
       (γa : gname) (γk : gname * gname) (mm M : regfile) (bppn : mword 44)
       (t : ptree) (K : nat) (eb : bool) (p : mword 64) (nb gsprev : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
@@ -1635,7 +1636,7 @@ Section KvmmakeBody.
   (* ================================================================= *)
   (* REGION 4 -- text (+0x4a..+0x5c).  t in: kvm_m3, out: kvm_m4.       *)
   (* ================================================================= *)
-  Lemma wp_kmk_region_text `{CID0 : CpuId}
+  Lemma wp_kmk_region_text `{CID0 : CpuId} `{XI : CurCtx}
       (γa : gname) (γk : gname * gname) (mm M : regfile) (bppn : mword 44)
       (t : ptree) (K : nat) (eb : bool) (p : mword 64) (nb gsprev : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
@@ -1786,7 +1787,7 @@ Section KvmmakeBody.
   (* ================================================================= *)
   (* REGION 5 -- data (+0x60..+0x7e).  t in: kvm_m4, out: kvm_m5.       *)
   (* ================================================================= *)
-  Lemma wp_kmk_region_data `{CID0 : CpuId}
+  Lemma wp_kmk_region_data `{CID0 : CpuId} `{XI : CurCtx}
       (γa : gname) (γk : gname * gname) (mm M : regfile) (bppn : mword 44)
       (t : ptree) (K : nat) (eb : bool) (p : mword 64) (nb gsprev : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
@@ -1963,7 +1964,7 @@ Section KvmmakeBody.
   (* ================================================================= *)
   (* REGION 6 -- trampoline (+0x82..+0x98).  t in: kvm_m5, out: kvm_map.*)
   (* ================================================================= *)
-  Lemma wp_kmk_region_tramp `{CID0 : CpuId}
+  Lemma wp_kmk_region_tramp `{CID0 : CpuId} `{XI : CurCtx}
       (γa : gname) (γk : gname * gname) (mm M : regfile) (bppn : mword 44)
       (t : ptree) (K : nat) (eb : bool) (p : mword 64) (nb gsprev : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
@@ -2277,7 +2278,7 @@ Module KvmmakeProof (AK : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPSTAC
      BARE, at this [Definition]'s own ambient [CID], implicit-argument
      insertion would silently collapse that genericity (the exact trap
      documented for [ProofKvminit.v]'s [KvminitProof]).  Eta-expand each. *)
-  Definition wp_kvmmake_sconf `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+  Definition wp_kvmmake_sconf `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (γk : gname * gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string)
       : wp_kvmmake_sconf_body γa γk mm lvl K eb p on b lks :=
     wp_kvmmake_sconf_gen

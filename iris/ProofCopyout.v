@@ -143,6 +143,7 @@ Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 
 (* ===================================================================== *)
@@ -176,7 +177,7 @@ Module CopyoutProof (Walkaddr : WALKADDR) (Vmfault : VMFAULT)
 
 Section ProofCopyout.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not
      [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
@@ -230,7 +231,7 @@ Section ProofCopyout.
   (* The premise [m_ad !! svpn_of va0 <> None] is what makes the missing   *)
   (* null check on walk's result sound.                                   *)
   (* ------------------------------------------------------------------ *)
-  Local Lemma co_walkpt `{CID0 : CpuId}
+  Local Lemma co_walkpt `{CID0 : CpuId} `{XI : CurCtx}
       (t : ptree) (m_ad : gmap (mword 27) (mword 64))
       (M : regfile) (n : nat) (va0 : mword 64) (b : bool) (pcur : mword 64) :
     (8 <= n)%nat ->
@@ -428,7 +429,7 @@ Section ProofCopyout.
   (* [sie_cap_gpr] argument to the pinned map changes nothing observable  *)
   (* ([tp_pin] is idempotent and the pin never touches sp). *)
   (* ------------------------------------------------------------------ *)
-  Local Lemma co_pin_sie_cap_gpr `{CID0 : CpuId} (M : regfile) (avail : nat) (bb : bool) (pp : mword 64) :
+  Local Lemma co_pin_sie_cap_gpr `{CID0 : CpuId} `{XI : CurCtx} (M : regfile) (avail : nat) (bb : bool) (pp : mword 64) :
     sie_cap_gpr KT1 (tp_pin M) avail bb pp = sie_cap_gpr KT1 M avail bb pp.
   Proof.
     unfold sie_cap_gpr, sie_cap.

@@ -53,7 +53,7 @@
    Löb IH sits under.  Nothing is returned, so no count has to survive.
 
    AFTER THE ENTRY [acquire] THE HART IS FIXED, and that is what makes every
-   arm below a plain lemma over `{CIDq : CpuId} with one chaining premise
+   arm below a plain lemma over `{CIDq : CpuId} `{XI : CurCtx} with one chaining premise
    rather than a [wp_next]-wrapped continuation: the whole critical section
    runs at [b = false], where [wp_next_off_intro] hands the callback back at
    the AMBIENT hart, and neither consputc nor wakeup rebinds one.  Only the
@@ -95,6 +95,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Notation CT := KernelSyms.consoleintr (only parsing).
@@ -364,7 +365,7 @@ Section CtBodies.
   Qed.
 
   (* the function's own exit, as a [wp_next] at the entry hart *)
-  Definition ct_ret `{CID0 : CpuId} (pme : mword 64) (m0 : regfile)
+  Definition ct_ret `{CID0 : CpuId} `{XI : CurCtx} (pme : mword 64) (m0 : regfile)
       (K lvl : nat) (eb : bool) (b : bool) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
        ∀ Mf : regfile,
@@ -377,7 +378,7 @@ Section CtBodies.
   (* =================================================================== *)
   (*  +0x110 .. +0x118 -- THE EPILOGUE.                                   *)
   (* =================================================================== *)
-  Lemma ct_epi `{CID : CpuId} (CID0 : CPU)
+  Lemma ct_epi `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
       (sp0 : mword 64) (b : bool) (lks : gset string) :
     m0 !!! Regidx csp_rs1 = sp0 ->
@@ -520,7 +521,7 @@ Module ConsoleintrProof (Acquire : ACQUIRE) (Consputc : CONSPUTC)
 
 Section ProofConsoleintr.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac rgall := repeat (rewrite rget_ne; [| vm_compute; discriminate]).
   Local Typeclasses Opaque cpu_own.
@@ -530,7 +531,7 @@ Section ProofConsoleintr.
   (*  NINE jumps reach it -- every arm of the switch ends here -- so it   *)
   (*  is a continuation and the epilogue is written once.                 *)
   (* =================================================================== *)
-  Definition ct_exit_prop `{CID0 : CpuId}
+  Definition ct_exit_prop `{CID0 : CpuId} `{XI : CurCtx}
       (γc : gname) (pme : mword 64) (m0 : regfile) (K lvl : nat) (eb : bool)
       (b : bool) (sp0 : mword 64) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) b pme (fun (CIDx : CpuId) =>
@@ -646,7 +647,7 @@ Section ProofConsoleintr.
   (*  them has already put the new [cons.e] in a2, which is the only      *)
   (*  register this block reads.                                          *)
   (* =================================================================== *)
-  Definition ct_wake_prop `{CID0 : CpuId}
+  Definition ct_wake_prop `{CID0 : CpuId} `{XI : CurCtx}
       (γc : gname) (pme : mword 64) (m0 : regfile)
       (K lvl : nat) (eb : bool) (b : bool) (sp0 : mword 64) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) b pme (fun (CIDw : CpuId) =>
@@ -798,7 +799,7 @@ Section ProofConsoleintr.
      [c.ldsp s2,16(sp)], [c.ldsp s3,8(sp)], [c.j -> +0x104].  It occurs at
      +0x0de, +0x0e4 and +0x0ea -- once per way out of the kill-line loop --
      so it is a lemma over its three pcs rather than three copies. *)
-  Lemma ct_restore23 `{CIDq : CpuId}
+  Lemma ct_restore23 `{CIDq : CpuId} `{XI : CurCtx}
       (γc : gname) (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
       (b : bool) (sp0 : mword 64) (pc1 pc2 pc3 : mword 64)
       (jimm : mword 11) (lks : gset string) :
@@ -891,7 +892,7 @@ Section ProofConsoleintr.
   (*  the Löb IH sits under.  Nothing is returned, so no count has to      *)
   (*  survive the loop.                                                    *)
   (* =================================================================== *)
-  Definition ct_kill_prop `{CID0 : CpuId}
+  Definition ct_kill_prop `{CID0 : CpuId} `{XI : CurCtx}
       (γc : gname)
       (pme : mword 64) (m0 : regfile) (K lvl : nat) (eb : bool)
       (b : bool) (sp0 : mword 64) (lks : gset string) : iProp Σ :=
@@ -1217,7 +1218,7 @@ Section ProofConsoleintr.
   (*  FALL INTO [WAKE].  The only arm that reaches the wake tail without   *)
   (*  a test, because the byte it just stored IS the newline.              *)
   (* =================================================================== *)
-  Lemma ct_cr `{CIDq : CpuId}
+  Lemma ct_cr `{CIDq : CpuId} `{XI : CurCtx}
       (γtx γc : gname) (γu : uart_names) (γv : disk_names)
       (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
       (b : bool) (sp0 : mword 64) (lks : gset string) :
@@ -1463,7 +1464,7 @@ Section ProofConsoleintr.
   (*  is not empty, then leave.  The same [cons.e--] the kill loop makes,  *)
   (*  minus the loop -- and, like it, bounded by nothing.                  *)
   (* =================================================================== *)
-  Lemma ct_bs `{CIDq : CpuId}
+  Lemma ct_bs `{CIDq : CpuId} `{XI : CurCtx}
       (γtx γc : gname) (γu : uart_names) (γv : disk_names)
       (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
       (b : bool) (sp0 : mword 64) (lks : gset string) :
@@ -1687,7 +1688,7 @@ Section ProofConsoleintr.
   (*  &cons, '\n' and BACKSPACE into s1/s2/s3, and then either enters the  *)
   (*  loop or, on an already-empty line, leaves through the restore stub.  *)
   (* =================================================================== *)
-  Lemma ct_kill_pre `{CIDq : CpuId}
+  Lemma ct_kill_pre `{CIDq : CpuId} `{XI : CurCtx}
       (γc : gname) (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
       (b : bool) (sp0 : mword 64) (lks : gset string) :
     M !!! Regidx csp_rs1 = pa_stk sp0 6%nat ->
@@ -1906,7 +1907,7 @@ Section ProofConsoleintr.
   (*  to the ring, and decide whether the line is complete.  THREE ways    *)
   (*  reach [WAKE] from here ('\n', C('D'), a full ring) and one leaves.   *)
   (* =================================================================== *)
-  Lemma ct_store `{CIDq : CpuId}
+  Lemma ct_store `{CIDq : CpuId} `{XI : CurCtx}
       (γtx γc : gname) (γu : uart_names) (γv : disk_names)
       (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
       (b : bool) (sp0 : mword 64) (cv : mword 64) (lks : gset string) :
@@ -2356,7 +2357,7 @@ Section ProofConsoleintr.
   (*  leave without touching anything; '\r' is rewritten to '\n' by the    *)
   (*  arm at +0x12e; everything else falls into [ct_store].                *)
   (* =================================================================== *)
-  Lemma ct_dflt `{CIDq : CpuId}
+  Lemma ct_dflt `{CIDq : CpuId} `{XI : CurCtx}
       (γtx γc : gname) (γu : uart_names) (γv : disk_names)
       (pme : mword 64) (m0 M : regfile) (K lvl : nat) (eb : bool)
       (b : bool) (sp0 : mword 64) (cv : mword 64) (lks : gset string) :

@@ -200,6 +200,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* ===================================================================== *)
 (*  0.  GHOST NAMES                                                       *)
@@ -220,6 +221,7 @@ Section IcacheEscrow.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId}.
   Context `{ICFG : icfg}.
+  Context `{XI : CurCtx}.
 
   (* THE STRUCTURAL Timeless PEELER, and it lives HERE -- at the top of the
      section -- on purpose.  It used to sit ~700 lines down, so every instance
@@ -5866,7 +5868,7 @@ Section IcacheEscrow.
       (γi : gname) (cov : gset Z) (logstart : Z) (nib : nat)
       (dv : mword 32) : iProp Σ :=
     (is_lock γl itable_lock "itable"%string
-       (itable_res2 cn γfs γi cov logstart nib dv) ∗
+       <{ itable_res2 cn γfs γi cov logstart nib dv }> ∗
      ipool_inv cn γfs γi cov logstart nib)%I.
 
   Global Instance is_itable2_persistent γl cn γfs γi cov logstart nib dv :
@@ -5876,7 +5878,7 @@ Section IcacheEscrow.
   Lemma is_itable2_lock γl cn γfs γi cov logstart nib dv :
     is_itable2 γl cn γfs γi cov logstart nib dv -∗
     is_lock γl itable_lock "itable"%string
-      (itable_res2 cn γfs γi cov logstart nib dv).
+      <{ itable_res2 cn γfs γi cov logstart nib dv }>.
   Proof. iIntros "[$ _]". Qed.
 
   Lemma is_itable2_pool γl cn γfs γi cov logstart nib dv :

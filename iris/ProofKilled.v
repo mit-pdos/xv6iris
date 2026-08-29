@@ -42,6 +42,7 @@ Require Import CodeKilled.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Notation kl_ra := (mword_of_int 1 : mword 5).
@@ -65,7 +66,7 @@ Module KilledProof (Acquire : ACQUIRE) (Release : RELEASE) : KILLED.
 
 Section ProofKilled.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation kl_s0 := (mword_of_int 8 : mword 5).
   Notation kl_s1 := (mword_of_int 9 : mword 5).

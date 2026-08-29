@@ -48,6 +48,7 @@ Require Import SpecCpuid.
 Require Import CodeCpuid.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 
 
@@ -83,7 +84,7 @@ Module CpuidProof : CPUID.
 
 Section ProofCpuid.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
 

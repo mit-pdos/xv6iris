@@ -85,6 +85,7 @@ Require Import CodeKexec.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* ------------------------------------------------------------------ *)
 (*  Closing [ProcInv.proc_priv_cwd_pid] at the value it lent out.       *)
@@ -169,7 +170,7 @@ Proof. lia. Qed.
 
 Section ProofKexecParts.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).

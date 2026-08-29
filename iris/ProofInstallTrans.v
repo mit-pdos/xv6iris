@@ -102,6 +102,7 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
    printable (claude-notes/durable-notes.md) *)
@@ -639,7 +640,7 @@ Section InstallTransDefs.
     it_exc_rest Xexc W n = Xexc ∖ list_to_set (map uint W).
   Proof. intros ->. rewrite /it_exc_rest take_ge; [done | lia]. Qed.
 
-  Definition it_cont `{GEN : GenId} `{CID0 : CpuId}
+  Definition it_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (j : nat) (bn : bio_names) (γfs : fs_names) (logstart : Z)
       (recovering : bool)
       (n : nat) (W : list (mword 32)) (Lw : nat -> list (bv 8))
@@ -674,7 +675,7 @@ Section InstallTransDefs.
         ▷ R -∗
         WP (Loop : expr riscv_lang))%I.
 
-  Lemma it_cont_shift `{GEN : GenId} `{CIDa : CpuId} `{CIDb : CpuId}
+  Lemma it_cont_shift `{GEN : GenId} `{CIDa : CpuId} `{CIDb : CpuId} `{XI : CurCtx}
 
       (j : nat) (bn : bio_names) (γfs : fs_names) (logstart : Z)
       (recovering : bool)
@@ -994,7 +995,7 @@ Section InstallTransBlocks.
   (*  downstream is [it_lregs] (the s-registers), which both arms         *)
   (*  preserve -- printk clobbers only caller-saved registers.            *)
   (* ================================================================== *)
-  Local Lemma it_head `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma it_head `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γpr : gname) (γu : uart_names) (γd : disk_names)
       (recovering : bool)
       (j t : nat) (w : mword 32)
@@ -1187,7 +1188,7 @@ Section InstallTransBlocks.
   (*  the branch jumps straight to the brelse pair at +0x54 -- nothing    *)
   (*  was pinned, nothing comes back.                                     *)
   (* ================================================================== *)
-  Local Lemma it_skip `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma it_skip `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (bn : bio_names) (γfs : fs_names) (γd : disk_names)
       (dev w : mword 32) (cov : gset Z)
       (recovering : bool)
@@ -1342,7 +1343,7 @@ Section InstallTransBlocks.
   (* ================================================================== *)
   (*  +0xb2 .. +0xc8 : restore ra/s0..s8, pop the 80-byte frame, return. *)
   (* ================================================================== *)
-  Local Lemma it_epi `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma it_epi `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (j : nat) (bn : bio_names) (γfs : fs_names) (logstart : Z)
       (recovering : bool)
       (n : nat) (W : list (mword 32)) (Lw : nat -> list (bv 8))
@@ -1817,7 +1818,7 @@ Section InstallTransBlocks.
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     it_frame m -∗
     lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
     ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) -∗
@@ -2701,7 +2702,7 @@ End InstallTransBlocks.
 
 Section ProofInstallTrans.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_install_trans_sconf 
       (γs : list gname) (j : nat) (γl : gname)

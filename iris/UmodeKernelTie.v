@@ -39,12 +39,13 @@ Require Import InstrBytes RegFile WpGpr.
 Require Import MinstretInv WireInv.
 Require Import UptTree UserPtTree UserFrame UserExec.
 Require Import UmodeMem UmodeCap.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 Section UmodeKernelTie.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------- *)
   (* SS1 The page half.                                                    *)

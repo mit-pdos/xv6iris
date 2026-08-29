@@ -38,6 +38,7 @@ Require Import ProcGeom.
 Require Import KernelConsts.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the
    one-line bridge from a leaf's [rget] to the register-map facts a
@@ -52,7 +53,7 @@ Module MycpuProof : MYCPU.
 
 Section ProofMycpu.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Context {kt : ktier}.
   Lemma wp_mycpu_sconf

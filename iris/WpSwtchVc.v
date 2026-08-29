@@ -42,6 +42,7 @@ Require Import SwtchCtx.
 Require Import CodeSwtch.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 (* ====================================================================== *)
@@ -142,7 +143,7 @@ Proof. vm_compute. reflexivity. Qed.
 Section WpSwtchVc.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
 

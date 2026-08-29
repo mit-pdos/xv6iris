@@ -34,12 +34,13 @@ From Kernel Require KernelSyms.
 Require Import CodeEntryAux.
 Require Import CodeStartAux.
 Require Import CodeTimerinitAux.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Module EntryProof : ENTRY.
 Section ProofEntry.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_entry_boot
       (m : regfile) (v_stack0 : bv 64) (mhartid_in : mword 64)

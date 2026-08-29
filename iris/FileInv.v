@@ -32,9 +32,11 @@ Require Export FileInvDefs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import IrefSlots.  (* [iref_frac] -- see FileInvDefs.file_core *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Section FileInv.
   Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{XI : CurCtx}.
 
 
   Definition ftable_res (γ : gname) : iProp Σ :=
@@ -49,7 +51,7 @@ Section FileInv.
   (* the whole table: the spinlock named "ftable" over that resource.
      Persistent, so every core shares it. *)
   Definition is_ftable (γl γ : gname) : iProp Σ :=
-    is_lock γl ftable_addr "ftable"%string (ftable_res γ).
+    is_lock γl ftable_addr "ftable"%string <{ ftable_res γ }>.
 
   Global Instance is_ftable_persistent γl γ : Persistent (is_ftable γl γ).
   Proof. apply _. Qed.
@@ -644,6 +646,7 @@ Qed.
 
 Section FileGhostAlloc.
   Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{XI : CurCtx}.
 
   Lemma fpay_map0_split (γ : gname) (n : nat) :
     own γ ((ε, (fpay_map0 n, ε)) : fileUR) ⊢

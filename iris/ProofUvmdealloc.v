@@ -73,6 +73,7 @@ Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 (* ===================================================================== *)
@@ -83,7 +84,7 @@ Module UvmdeallocProof (Uvmunmap : UVMUNMAP) : UVMDEALLOC.
 
 Section ProofUvmdealloc.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rtp := (mword_of_int 4 : mword 5).
@@ -114,7 +115,7 @@ Section ProofUvmdealloc.
      tie, or the post-uvmunmap-and-cj join), never necessarily the section's
      own entry hart -- same reasoning as ProofConsputc.v's
      [wp_consputc_epi]. *)
-  Lemma wp_uvmdealloc_epi `{CID0 : CpuId}
+  Lemma wp_uvmdealloc_epi `{CID0 : CpuId} `{XI : CurCtx}
       (mm mj : regfile) (P : uptd) (Res : iProp Σ)
       (K : nat) (eb : bool) (p : mword 64)
       (b : bool) (oldsz newsz res ret_tgt : mword 64) (lks : gset string) :

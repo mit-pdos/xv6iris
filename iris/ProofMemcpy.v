@@ -25,7 +25,7 @@
 
    EXPLICIT-CPUID: the whole function threads a generic [b : bool].
    [mcp_tail] is a non-recursive fragment of the whole-function contract, so
-   it takes its own leading (shadowing) hart [`{CID0 : CpuId}`] and its
+   it takes its own leading (shadowing) hart [`{CID0 : CpuId} `{XI : CurCtx}`] and its
    continuation is [wp_next]-wrapped; the caller peels a fresh [(CIDk, Hsk)]
    off its result exactly as for a leaf application. *)
 From Stdlib Require Import ZArith Lia List.
@@ -50,6 +50,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Local Ltac rgne :=
@@ -61,7 +62,7 @@ Module MemcpyProof (MM : MEMMOVE) : MEMCPY.
 
 Section ProofMemcpy.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Context {kt : ktier}.
   (* the source's and the destination's own tiers -- see SpecMemmove.v's note *)
@@ -86,7 +87,7 @@ Section ProofMemcpy.
   Proof. unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. Qed.
 
   (* ---- the epilogue, +0x0c .. +0x12 --------------------------------- *)
-  Local Lemma mcp_tail `{CID0 : CpuId}
+  Local Lemma mcp_tail `{CID0 : CpuId} `{XI : CurCtx}
       (mm Mt : regfile) (K : nat) (rv sp0 ra0 s00 : mword 64) (b : bool) (p : mword 64) :
     (2 <= K)%nat ->
     mm !!! Regidx csp_rs1 = sp0 ->

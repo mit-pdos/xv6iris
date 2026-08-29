@@ -47,6 +47,7 @@ Require Import SpecHolding.
 Require Import ProcGeom.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 (* seqz on (a - b) is 0 when a <> b (holding +0x1e). *)
 Lemma seqz_sub_neq (a b : mword 64) :
@@ -87,7 +88,7 @@ Module HoldingProof (Mycpu : MYCPU) : HOLDING.
 
 Section ProofHolding.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Context {kt : ktier}.
   Lemma wp_holding_lockinv_s_sconf

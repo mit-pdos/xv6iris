@@ -13,6 +13,7 @@ Require Import HartSwp HartLift HartRegNode HartSpan HartSpanChar HartMPmp
         HartMFrame HartMStore.
 Require Import WpInstr.   (* wp_instr / mm_cycle, split out of InstrBytes *)
 Import Defs.
+Require Import TsoCtx.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -195,7 +196,7 @@ Qed.
 
 Section StoreFrame.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma st_frame_empty (rs : regstate) : ⊢ (hreg_frame rs ∅ : iProp Σ).
   Proof. rewrite /hreg_frame big_sepS_empty. auto. Qed.
@@ -383,7 +384,7 @@ Qed.
 (* from WpGprStore.v *)
 Section WpStoreGpr.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* [instr]/[mmode_config]-formulated register-generic 8-byte STORE WP -- the
      write-dual of [wp_ld_gpr].  STORE reads TWO sources: rs1 (base address) and
@@ -536,7 +537,7 @@ End WpStoreGpr.
 (* from WpGprRvcTor.v (RvcTorEngines, store leaves) *)
 Section MmodeStoreTor.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_store_gpr_tor (pc : mword 64) (is_rvc : bool) (rs1 rs2 : mword 5)
       (imm : mword 12) (m : regfile) (vold : bv 64)

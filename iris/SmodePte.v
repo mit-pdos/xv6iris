@@ -14,6 +14,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import WpLoad ExecCommon.
 Require Import RiscvExtras.   (* pma_ok_aligned + the pmaCheck/split peel kit *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 (* ===================================================================== *)
@@ -22,7 +23,7 @@ Import Defs.
 
 Section SmodePmpConfig.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* The raw PMP cells together with the entry-0 facts needed by S-mode
      instruction fetches and page-table walks.  [root_ppn] remains an index

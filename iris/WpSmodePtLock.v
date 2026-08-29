@@ -17,6 +17,7 @@ Require Import WpAmo.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 (* Local width-4 helpers (Local in WpSmodeLoad.v, so re-proved here). *)
@@ -142,7 +143,7 @@ End ExecAmoGS4walkPt.
 
 Section WpSmodePtLock.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
 

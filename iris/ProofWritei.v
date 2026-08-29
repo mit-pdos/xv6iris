@@ -90,6 +90,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
    printable (claude-notes/durable-notes.md) *)
@@ -507,7 +508,7 @@ Section WriteiDefs.
 
   (* THE CONTINUATION, named so it is not re-traversed by every proofmode
      split (claude-notes/optimization.md). *)
-  Definition wi_cont `{CID0 : CpuId}
+  Definition wi_cont `{CID0 : CpuId} `{XI : CurCtx}
       (γf : gname)
       (ip : mword 64) (inum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
@@ -606,7 +607,7 @@ Section WriteiRet.
      datum tier out loud (the blanket [(ktd := KT1)] below). *)
   Context {ktb : ktier}.
   Context `{!KtierLe ktb KT1}.
-  Local Lemma wi_ret `{CID0 : CpuId} 
+  Local Lemma wi_ret `{CID0 : CpuId} `{XI : CurCtx} 
       (γf : gname)
       (ip : mword 64) (inum : mword 32)
       (bm bm' : blkmap) (data data' : nat -> list (bv 8))
@@ -992,7 +993,7 @@ Section WriteiJoin.
      datum tier out loud (the blanket [(ktd := KT1)] below). *)
   Context {ktb : ktier}.
   Context `{!KtierLe ktb KT1}.
-  Local Lemma wi_join `{CID0 : CpuId} 
+  Local Lemma wi_join `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
       (γf : gname)
@@ -1073,7 +1074,7 @@ Section WriteiJoin.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     wi_fr8 m -∗
     i_dev ip ↦₄{dqd} icfg_dev -∗
     i_inum ip ↦₄{dqn} inum -∗
@@ -1386,7 +1387,7 @@ Section WriteiSize.
      datum tier out loud (the blanket [(ktd := KT1)] below). *)
   Context {ktb : ktier}.
   Context `{!KtierLe ktb KT1}.
-  Local Lemma wi_size `{CID0 : CpuId} 
+  Local Lemma wi_size `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
       (γf : gname)
@@ -1460,7 +1461,7 @@ Section WriteiSize.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     wi_fr13 m -∗
     i_dev ip ↦₄{dqd} icfg_dev -∗
     i_inum ip ↦₄{dqn} inum -∗
@@ -2002,7 +2003,7 @@ Section WriteiLoop.
     repeat rewrite add_vec_zero_l;
     first [ reflexivity | assumption ].
 
-  Local Lemma wi_loop `{CID0 : CpuId} 
+  Local Lemma wi_loop `{CID0 : CpuId} `{XI : CurCtx} 
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
       (γf : gname)
@@ -2113,7 +2114,7 @@ Section WriteiLoop.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     wi_fr13 m -∗
     i_dev ip ↦₄{dqd} icfg_dev -∗
     i_inum ip ↦₄{dqn} inum -∗
@@ -3993,7 +3994,7 @@ End WriteiLoop.
 (* ===================================================================== *)
 Section WriteiMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not
      [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at

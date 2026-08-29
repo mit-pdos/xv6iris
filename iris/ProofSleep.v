@@ -83,6 +83,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -138,7 +139,7 @@ Section SleepJoin.
      a lemma sharing an enclosing section's [Context CID] would silently pin
      to the entry hart (porting guide, "a helper lemma sharing the enclosing
      Section's Context"). *)
-  Lemma sleep_join `{GEN : GenId} `{CID0 : CpuId}
+  Lemma sleep_join `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
        (γs : list gname)
       (j : nat) (γl : gname) (ch' : mword 64)
       (m mj : regfile) (av : nat) (eb : bool)
@@ -171,7 +172,7 @@ Section SleepJoin.
     mj !!! Regidx (mword_of_int 26 : mword 5) = m !!! Regidx (mword_of_int 26 : mword 5) ->
     mj !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5) ->
     kernel_text -∗
-    is_lock γl (proc_addr j) "proc"%string (proc_lock_res γs γl (proc_addr j)) -∗
+    is_lock γl (proc_addr j) "proc"%string <{ proc_lock_res γs γl (proc_addr j) }> -∗
     sie_cap_gpr KT1 mj (trap_res eb + (av - 4))%nat false pj -∗
     pc_is (mword_of_int (KernelSyms.sleep + 0x20)) -∗
     proc_held cpu_id j γl RUNNING ch' -∗
@@ -493,7 +494,7 @@ End SleepJoin.
 
 Section ProofSleepBody.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_sleep_sconf
       (γs : list gname) (j : nat) (γl : gname)

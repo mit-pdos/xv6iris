@@ -30,6 +30,7 @@ Require Import SpecWakeupParts.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the
    one-line bridge from a leaf's [rget] to the register-map facts a
@@ -53,7 +54,7 @@ Module WakeupPartsProof : WAKEUPPARTS.
 
 Section ProofWakeupPartsEpi.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   (* wakeup's epilogue over sconf: restore ra/s0/s1..s5 from the 8-slot frame
@@ -240,7 +241,7 @@ End ProofWakeupPartsEpi.
 
 Section ProofWakeupPartsPro.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   (* wakeup's prologue over sconf: c.addi16sp sp,-64 (wp_caddi16sp_push_s_sconf: count K -> K-8, frame handed out),

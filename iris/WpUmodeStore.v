@@ -93,6 +93,7 @@ Require Import UserMemPt UserMemArms UserMemClassify UserMemAccess UserMemMis.
 Require Import UserMemCert UserMemArmsBase UserMemArmsC.
 Require Import UmodeMem UmodeCap UmodeFetch.
 Require Import WpUmodeStep.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 Set Printing Depth 40.
@@ -728,6 +729,7 @@ Section UvStorePure.
   Context (Hk : 0 < k) (Hk8 : k <= 8) (Hkdvd : (k | 4096)).
   Context (Huintk : uint (to_bits 64 k) = k).
   Context (Hwrite_plain : forall (addr : mword 64) (data : mword (8 * k)) (s : mstate),
+  Context `{XI : CurCtx}.
       dev_addr addr = false ->
       exec (write_ram rv64d_types.Write_plain (Physaddr addr) k data tt) s
       = Some (true, MState s.(sregs) (write_bytes s.(mem) addr (Z.to_N k) data) s.(mdev))).
@@ -1070,7 +1072,7 @@ End UmodeStoreExec.
 
 Section UvStoreRes.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* THE RESIDUE AT ANOTHER IMAGE.  [uv_res pt M t] closes back to
      [umem pt M] at the image it was OPENED at; a store's image is a
@@ -1209,7 +1211,7 @@ Qed.
    [uv_obl_*] / [wp_uv_retire] the same way. *)
 Section UvStorePostFetch.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   (* ------------------------------------------------------------------- *)
@@ -1516,7 +1518,7 @@ End UvStorePostFetch.
 
 Section UvStoreObl.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   (* ------------------------------------------------------------------- *)
@@ -1777,7 +1779,7 @@ End UvStoreObl.
 
 Section WpUmodeStore.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   (* ------------------------------------------------------------------- *)

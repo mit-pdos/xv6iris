@@ -53,6 +53,7 @@ Require Import RiscvExtras.
 Require Import CodePlicComplete.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 (* ---- the decodes used only by plic_complete ---- *)
 
@@ -75,7 +76,7 @@ Module PlicCompleteProof (Cpuid : CPUID) : PLIC_COMPLETE.
 
 Section ProofPlicComplete.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
 

@@ -374,6 +374,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 Set Printing Depth 40.
 
@@ -519,7 +520,7 @@ Record sysc_proc_ties `{ICFG : icfg} `{FSC : fscfg}
 Section SyscallVocab.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ===================================================================== *)
   (* syscall_env -- the union of everything the wired entries need
@@ -616,7 +617,7 @@ Section SyscallVocab.
         actually live. *)
      disk_geom (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) ∗
      is_lock (fsc_dlock) d_lock "virtio_disk"%string
-       (disk_res (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)) ∗
+       <{ disk_res (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) }> ∗
      FsReady.fs_ready)%I.
 
   (* no explicit binder list here -- unlike the Definition above, an
@@ -743,9 +744,9 @@ Section SyscallVocab.
     dev_inv (fsc_uart) (fsc_disk) ∗
     disk_geom (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) ∗
     is_lock (fsc_dlock) d_lock "virtio_disk"%string
-      (disk_res (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)) ∗
+      <{ disk_res (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) }> ∗
     is_lock (fsc_kalloc) (mword_of_int KernelSyms.kmem) "kmem"%string
-      (kmem_res (fsc_kpages) (mword_of_int (KernelSyms.kmem + 24))) ∗
+      <{ kmem_res (fsc_kpages) (mword_of_int (KernelSyms.kmem + 24)) }> ∗
     kalloc_avail (fsc_kpages) None ∗
     (* [sysc_ic_env fn] USED TO BE HERE, between the allocator and
        [ireg_open].  It is [sysc_ic_env_of_ready] now: the icache rows are a
@@ -861,9 +862,9 @@ Section SyscallVocab.
         !irefslotG Σ, !pavG Σ} `{GEN : GenId}
       (γf : gname) : iProp Σ :=
     (∃ (γp γw γft γtk : gname),
-       is_lock γp alp_pid_lock "nextpid"%string nextpid_res ∗
+       is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> ∗
        procs_avail None ∗
-       is_lock γw wait_lock_addr "wait_lock"%string wait_res ∗
+       is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> ∗
        is_ftable γft γf ∗
        is_tickslock γtk)%I.
 
@@ -940,7 +941,7 @@ Section SyscallVocab.
     fcn_procs fn !! fcn_j fn = Some (fcn_plock fn) ->
     fcn_dq fn = DfracOwn (1/4) ->
     sysc_park_extra γtk -∗
-    is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+    is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
     is_ftable γft γf -∗
     procs_inv (fcn_procs fn) -∗
     disk_geom (fsc_disk) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) -∗
@@ -1030,9 +1031,9 @@ Section SyscallVocab.
        ftable, ticks) are PROCESS locks and genuinely quantified. *)
     ∃ (γp γw γft γtk : gname),
       kalloc_env fsc_kalloc None ∗
-      is_lock γp alp_pid_lock "nextpid"%string nextpid_res ∗
+      is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> ∗
       procs_avail None ∗
-      is_lock γw wait_lock_addr "wait_lock"%string wait_res ∗
+      is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> ∗
       is_ftable γft γf ∗
       is_tickslock γtk ∗
       printk_env fsc_printk fsc_uart fsc_disk ∗
@@ -1498,7 +1499,7 @@ Section SyscallVocab.
   (* the state a RETURNING arm needs before it can start: [pc_is] at the
      table entry's own known address, plus every resource
      [wp_syscall_sconf_body] threads opaquely through the dispatch. *)
-  Definition sysc_arm_pre `{CIDh : CpuId} (γf : gname) (pj : mword 64) (γs : list gname)
+  Definition sysc_arm_pre `{CIDh : CpuId} `{XI : CurCtx} (γf : gname) (pj : mword 64) (γs : list gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64) (pid : mword 32)
       (U : ustate) (lks : gset string) (av : nat) (M : regfile)
       (tgt : mword 64) :=
@@ -1525,7 +1526,7 @@ Section SyscallVocab.
      the twelve resources being assembled.  In the capstone below, even a
      named [iFrame] searches the goal's conjuncts; its final [proc_priv]
      contains the 4096-word trapframe page, making that search seconds long. *)
-  Lemma sysc_arm_pre_intro `{CIDh : CpuId}
+  Lemma sysc_arm_pre_intro `{CIDh : CpuId} `{XI : CurCtx}
       (γf : gname) (pj : mword 64) (γs : list gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64) (pid : mword 32)
       (U : ustate) (lks : gset string) (av : nat) (M : regfile)
@@ -1564,7 +1565,7 @@ Section SyscallVocab.
      arm/the epilogue can take it as an explicit parameter rather than
      restate it -- [V]/[m] here are the WHOLE FUNCTION's entry values,
      fixed for the whole proof; only [mf]/[V'] vary per return. *)
-  Definition sysc_hcont_ty `{CIDh : CpuId} (γf : gname) (pj : mword 64)
+  Definition sysc_hcont_ty `{CIDh : CpuId} `{XI : CurCtx} (γf : gname) (pj : mword 64)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64) (pid : mword 32)
       (U : ustate) (lks : gset string) (av : nat) (m : regfile)
       (ret_tgt : mword 64) : iProp Σ :=
@@ -1605,7 +1606,7 @@ Section SyscallVocab.
      after which it is written exactly as it was before this slot existed --
      [sysc_ret_tail], [sysc_epilogue_tail] and [sysc_fallback] still take the
      bare [wp_next] and never learn that the conjunction happened. *)
-  Definition sysc_exit_ty `{CIDh : CpuId} (γf : gname) (pj : mword 64)
+  Definition sysc_exit_ty `{CIDh : CpuId} `{XI : CurCtx} (γf : gname) (pj : mword 64)
  (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (U : ustate) (lks : gset string) (av : nat)
       (m : regfile) (ret_tgt : mword 64) : iProp Σ :=
@@ -1663,7 +1664,7 @@ Section SyscallVocab.
      index 2)'s own contract DIVERGES (no continuation at all --
      SpecSysExit.v), so it does not fit this shape and has its own arm at a
      bespoke type. *)
-  Definition sysc_arm_goal `{CIDh : CpuId} (k : nat) (γf : gname) (pj : mword 64)
+  Definition sysc_arm_goal `{CIDh : CpuId} `{XI : CurCtx} (k : nat) (γf : gname) (pj : mword 64)
       (γs : list gname) (j : nat) (γl : gname)
  (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (U : ustate) (lks : gset string) (av : nat)
@@ -2376,7 +2377,7 @@ End SyscallVocab.
 Section SyscallRet.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* TWO IMAGES, and the split is the point: [Mu] is the one the caller's
      continuation was built at, [Mo] the one the entry actually returned.
@@ -2487,7 +2488,7 @@ End SyscallRet.
 Section SyscallArms.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* THE SIXTEEN QUIET ARMS' SHARED DISCHARGE.  [sysc_mem_ok]'s decision is
      driven entirely by its FIRST argument ([sysc_num V], the entry's own
@@ -4986,7 +4987,7 @@ End SyscallArms.
 Section SyscallMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* CAPSTONE.  The shared scaffolding (`sysc_arm_pre`/`sysc_hcont_ty`/
      `sysc_arm_goal`, the trapframe-extraction/bitvector-bridge lemmas, and
@@ -5461,7 +5462,7 @@ Section SyscallMain.
          conclusion is RIGID at the section [CID] and can never meet a goal
          that this proof's own [wp_next] crossings have carried to [CID22]
          (the failure is [iApply: cannot apply (WP Loop)], naming neither
-         hart).  Hence the [`{CIDh : CpuId}] on the arm vocabulary, exactly
+         hart).  Hence the [`{CIDh : CpuId} `{XI : CurCtx}] on the arm vocabulary, exactly
          as [ProofArgraw.ar_join] carries its own -- and the caller's
          continuation, still anchored at [CID], is re-anchored here. *)
       assert (Hcr22 : true = false \/ pj = zero_reg -> (CID22 : CPU) = (CID : CPU))

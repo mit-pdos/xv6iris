@@ -85,6 +85,7 @@ Require Import ProcPtOwn.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 (* ===================================================================== *)
 (*  THE MEMORY-INDEXED CONTRACT.                                          *)
@@ -110,7 +111,7 @@ Import Defs.
    is what they read before the copy put anything there.  That is
    [SpecUvmunmap.wp_uvmunmap_live_sconf], and it is why uvmunmap needs
    two memory-indexed contracts rather than one. *)
-Definition wp_uvmcopy_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_uvmcopy_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (mm : regfile)
     (Pold Pnew : uptd) (szold sznew : Z) (Mold Mnew : gmap Z (bv 8))
     (K : nat) (eb : bool) (p : mword 64)
@@ -169,7 +170,7 @@ Definition wp_uvmcopy_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GE
 
 Module Type UVMCOPY.
   Parameter wp_uvmcopy_mem_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (mm : regfile)
       (Pold Pnew : uptd) (szold sznew : Z) (Mold Mnew : gmap Z (bv 8))
       (K : nat) (eb : bool) (p : mword 64)

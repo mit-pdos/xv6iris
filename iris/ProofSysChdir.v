@@ -136,6 +136,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Set Printing Depth 40.
 
@@ -480,7 +481,7 @@ Section ProofSysChdirEpilogue.
   Notation Rs2 := (mword_of_int 18 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
 
-  Lemma sc_epilogue `{GEN : GenId} `{CID0 : CpuId}
+  Lemma sc_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (m M : regfile) (sp0 : mword 64) (K : nat) (b : bool) (pj : mword 64)
       (w3 : mword 64) (bf : nat -> bv 8) :
     (20 <= K)%nat -> ((K - 20) + 20 = K)%nat ->
@@ -698,7 +699,7 @@ Section ProofSysChdirM1Tail.
   Notation Rs2 := (mword_of_int 18 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
 
-  Lemma sc_m1_tail `{GEN : GenId} `{CID0 : CpuId}
+  Lemma sc_m1_tail `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
  (gfs : fs_names)
@@ -728,7 +729,7 @@ Section ProofSysChdirM1Tail.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     log_op icfg_log u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
@@ -908,7 +909,7 @@ Section ProofSysChdirBody.
     (bslots 3 : iProp Σ) ⊣⊢ bslot ∗ bslots 2.
   Proof. rewrite /bslot. change 3%nat with (1 + 2)%nat. apply bslots_op. Qed.
 
-  Lemma wp_sys_chdir_sconf `{GEN : GenId} `{CID0 : CpuId}
+  Lemma wp_sys_chdir_sconf `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gf : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)

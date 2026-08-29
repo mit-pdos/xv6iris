@@ -27,6 +27,7 @@ Require Import ProcGeom.
 Require WpGprCsrwC.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 (* SIE=0 (folded into smode_config) gives pop_off's interrupt-off fact
    [sstatus & 2 = 0] with mstatus0 hidden.  [mword1_zero_of_ne_one] is the
@@ -115,7 +116,7 @@ Section ProofPushOff.
   (* resource), so it needs a genuine per-lemma CID binder and the full   *)
   (* fresh-hart-per-leaf template, not the M-mode shortcut.               *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_pop_off_epi_sconf `{GEN : GenId} `{CID : CpuId}
+  Lemma wp_pop_off_epi_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (M : regfile) (av : nat) (ra0e s00e : mword 64) (b : bool) (p : mword 64) :
     let spd := M !!! Regidx csp_rs1 in
     let sp0up := add_vec spd (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) in
@@ -236,7 +237,7 @@ Section ProofPushOff.
      retune [cpu_priv_pay true p = cpu_priv 0 true p ∅] to the [cpu_priv k ebx
      px lks] the code after the flip wants.  The middle conjunct pair is what
      [intr_count_pre true k ebx] asks for, so that one is projected out. *)
-  Lemma po_own_split `{GEN : GenId} `{CIDx : CpuId} (k : nat) (ebx : bool)
+  Lemma po_own_split `{GEN : GenId} `{CIDx : CpuId} `{XI : CurCtx} (k : nat) (ebx : bool)
       (px : mword 64) (bx : bool) (lks : gset string) :
     cpu_own k ebx px bx lks -∗
     ⌜ bx = true -> k = 0%nat /\ ebx = true /\ lks = ∅ ⌝ ∗
@@ -280,7 +281,7 @@ Section ProofPushOff.
   (* mycpu() call returns, by [rget_tp], with NO premise at all -- the    *)
   (* whole [Ha0cid]/tp-preservation chain the pre-port code carried       *)
   (* through N1..N8/M1..M7 is gone. *)
-  Lemma wp_push_off_suffix_sconf `{GEN : GenId} `{CID : CpuId}
+  Lemma wp_push_off_suffix_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (ms : regfile) (av : nat)
       (noff : mword 32) (ra0e s00e s10e vgap : mword 64) (p : mword 64)
       :
@@ -613,7 +614,7 @@ Section ProofPushOff.
   (* half and the freed [cpu_priv_pay].  From KernelSyms.push_off+0x0e on, [b] is LITERALLY    *)
   (* false and every [wp_next] collapses by [wp_next_off].                *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_push_off_sconf `{GEN : GenId} `{CID : CpuId}
+  Lemma wp_push_off_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (m : regfile) (av : nat)
       (n : nat) (eb : bool) (p : mword 64) (b : bool)
       (lks : gset string)
@@ -1217,7 +1218,7 @@ Section ProofPushOff.
   (* the first two branches and at literal [true] in the restore branch,  *)
   (* whose own internal [wp_next true] discharge is simply forwarded as   *)
   (* pop_off's OWN [wp_next bexit] obligation ([bexit = true] there). *)
-  Lemma wp_pop_off_sconf `{GEN : GenId} `{CID : CpuId}
+  Lemma wp_pop_off_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (lks : gset string)
     : wp_pop_off_sconf_body kt m av n eb p lks.

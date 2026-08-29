@@ -185,6 +185,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -315,7 +316,7 @@ Global Instance fread_names_inhabited : Inhabited fread_names :=
 Section SpecFileread.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- the FD_DEVICE arm's environment ---- *)
 
@@ -474,7 +475,7 @@ Section SpecFileread.
      dev_inv (fsc_uart) (fsc_disk) ∗
      disk_geom (fsc_disk) (frn_pd fn) (frn_pav fn) (frn_pu fn) ∗
      is_lock (fsc_dlock) d_lock "virtio_disk"%string
-       (disk_res (fsc_disk) (frn_pd fn) (frn_pav fn) (frn_pu fn)) ∗
+       <{ disk_res (fsc_disk) (frn_pd fn) (frn_pav fn) (frn_pu fn) }> ∗
      (* ONE slot unit: ilock's bread takes it and brelse gives it back;
         readi's does the same, one after the other *)
      bslot)%I.
@@ -674,7 +675,7 @@ End SpecFileread.
 
 Definition wp_fileread_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
  (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
     (k : nat) (q : Qp) (st : fdstate)            (* the borrowed reference  *)
@@ -769,7 +770,7 @@ Definition wp_fileread_sconf_body
 Module Type FILEREAD.
   Parameter wp_fileread_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
  (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (k : nat) (q : Qp) (st : fdstate)

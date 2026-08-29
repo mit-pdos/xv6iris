@@ -842,6 +842,7 @@ Require Import ProcAvail.
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 
 Set Printing Depth 40.
+Require Import TsoCtx.
 
 (* ---------------------------------------------------------------------- *)
 (*  SEVEN FACTS THE LOOP BODY NEEDS AND THE PREAMBLE ABOVE COULD NOT STATE.*)
@@ -958,7 +959,7 @@ Module FilewriteProof (Pipewrite : PIPEWRITE) (Ilock : ILOCK) (Writei : WRITEI)
 
 Section ProofFilewrite.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -1085,7 +1086,7 @@ Section ProofFilewrite.
   (*  callee-saved registers, so it needs [sie_cap_gpr] and the text and *)
   (*  nothing else.                                                      *)
   (* =================================================================== *)
-  Local Lemma fw_test `{CID0 : CpuId}
+  Local Lemma fw_test `{CID0 : CpuId} `{XI : CurCtx}
       (M : regfile) (Kn : nat) (nz iz : Z) (p : mword 64) (b : bool) :
     (0 <= iz < nz)%Z -> (nz < 2 ^ 31)%Z ->
     M !!! Regidx Rs4 = (mword_of_int iz : mword 64) ->
@@ -1263,7 +1264,7 @@ Section ProofFilewrite.
   (*  that is all any caller can use: the cell goes straight back into    *)
   (*  [off_inv] and the next iteration re-reads it.                       *)
   (* =================================================================== *)
-  Local Lemma fw_offupd `{CID0 : CpuId}
+  Local Lemma fw_offupd `{CID0 : CpuId} `{XI : CurCtx}
       (Mt : regfile) (Kn : nat) (kx : nat) (v : mword 32) (rz : Z)
       (p : mword 64) (b : bool) :
     Mt !!! Regidx Ra0 = (mword_of_int rz : mword 64) ->
@@ -1434,7 +1435,7 @@ Section ProofFilewrite.
   (*  resources the contract returns -- which is why the exit needs no   *)
   (*  re-assembly beyond [fw_env_out_fs].                                *)
   (* =================================================================== *)
-  Local Lemma fw_loop `{CID0 : CpuId}
+  Local Lemma fw_loop `{CID0 : CpuId} `{XI : CurCtx}
       (gf : gname) (gs : list gname) (jx : nat) (glp : gname)
       (kx : nat) (qx : Qp) (stx : fdstate) (rx : bool) (nx : Z)
       (fn : fwrite_names)
@@ -1541,7 +1542,7 @@ Section ProofFilewrite.
     dev_inv (fsc_uart) (fsc_disk) -∗
     DiskInv.disk_geom (fsc_disk) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn) -∗
     is_lock (fsc_dlock) DiskAddrs.d_lock "virtio_disk"%string
-      (DiskInv.disk_res (fsc_disk) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)) -∗
+      <{ DiskInv.disk_res (fsc_disk) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn) }> -∗
     (* THE BITMAP'S INVARIANT -- persistent, so it rides with the rest of
        the persistent half rather than being loop-carried. *)
     BitmapInv.bitmap_inv fsc_fs (fsc_bmapstart) fsc_cov

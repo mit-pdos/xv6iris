@@ -85,6 +85,7 @@ Require Import UserMemPt UserMemArms UserMemClassify UserMemAccess UserMemMis.
 Require Import UserMemCert UserMemArmsBase UserMemArmsC.
 Require Import UmodeMem UmodeCap UmodeFetch.
 Require Import WpUmodeStep WpUmodeStore.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 Set Printing Depth 40.
@@ -398,6 +399,7 @@ Section UvLoadPure.
   Context (Hk : 0 < k) (Hk8 : k <= 8) (Hkdvd : (k | 4096)).
   Context (Huintk : uint (to_bits 64 k) = k).
   Context (Hread_plain : forall (addr : mword 64) (w : mword (8 * k)) (s : mstate),
+  Context `{XI : CurCtx}.
       dev_addr addr = false ->
       (forall j : nat, (N.of_nat j < Z.to_N k)%N ->
          s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
@@ -650,7 +652,7 @@ End UmodeLoadExec.
 
 Section UvLoadPostFetch.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   (* the load twin of WpUmodeStore's [uv_store_post_fetch]: from the fetched
@@ -932,7 +934,7 @@ End UvLoadPostFetch.
 
 Section UvLoadObl.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   Lemma uv_load_obl_base (R : iProp Σ) (Ψ : usys_protocol Σ)
@@ -1192,7 +1194,7 @@ End UvLoadObl.
 
 Section WpUmodeLoad.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   (* ------------------------------------------------------------------- *)

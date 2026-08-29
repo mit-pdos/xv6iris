@@ -24,6 +24,7 @@ Require Import IntrDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 
 (* memset(p, cval, len): fills [len] bytes at base [p] with [cval]'s low byte.
@@ -34,7 +35,7 @@ Import Defs.
    exactly as the hardware's pointer increment does.  memset saves ra/s0 in a
    2-slot frame, so it needs 2 of the [n] available stack slots and returns
    them (avail [n] preserved). *)
-Definition wp_memset_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_memset_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (kt ktb : ktier) `{!KtierLe ktb kt} (m0 : regfile) (n : nat) (len : nat) (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64) :=
   let a0_idx : mword 5 := mword_of_int 10 in
   let a1_idx : mword 5 := mword_of_int 11 in
@@ -62,6 +63,6 @@ Definition wp_memset_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : 
 
 Module Type MEMSET.
   Parameter wp_memset_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (kt ktb : ktier) `{!KtierLe ktb kt} (m0 : regfile) (n : nat) (len : nat) (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64),
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt ktb : ktier) `{!KtierLe ktb kt} (m0 : regfile) (n : nat) (len : nat) (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64),
       wp_memset_sconf_body kt ktb m0 n len cval olds b pcur.
 End MEMSET.

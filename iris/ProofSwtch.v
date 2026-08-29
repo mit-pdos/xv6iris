@@ -56,12 +56,13 @@ From Kernel Require KernelSyms.
 Require Import CodeSwtch.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 Module SwtchProof : SWTCH.
 Section ProofSwtch.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Instance stack_own_timeless_local (sp : mword 64) (n : nat) :
     Timeless (stack_own (KTR := KT1) sp n).

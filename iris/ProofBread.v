@@ -134,6 +134,7 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* ===================================================================== *)
 (*  Pure helpers, all over VARIABLES so no solver ever runs inside the     *)
@@ -299,7 +300,7 @@ Local Ltac regne := reg_ne_side.
 Section BreadDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Definition bd_cont `{GEN : GenId} `{CID0 : CpuId}
+  Definition bd_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (j : nat) (bn : bio_names) (V : bio_view Σ)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (pj : mword 64) (lks : gset string) (Upr : ustate)
@@ -325,7 +326,7 @@ Section BreadDefs.
      hands the continuation on at.  [WpSconfVc.wp_next_shift] proves exactly
      this, but cannot see [wp_next]'s [K] through the named [Definition]
      (durable-notes), so it is re-proved here at the unfolded body. *)
-  Lemma bd_cont_shift `{GEN : GenId} `{CIDa : CpuId} `{CIDb : CpuId}
+  Lemma bd_cont_shift `{GEN : GenId} `{CIDa : CpuId} `{CIDb : CpuId} `{XI : CurCtx}
       (j : nat) (bn : bio_names) (V : bio_view Σ)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (pj : mword 64) (lks : gset string) (Upr : ustate) :
@@ -376,7 +377,7 @@ Section BreadBlocks.
   (*  THE EPILOGUE (0xb8 .. 0xc6), reached from both arms of the tail.   *)
   (* ================================================================== *)
 
-  Local Lemma bread_epi `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma bread_epi `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (j : nat) (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m M : regfile) (K : nat) (eb : bool)
@@ -626,7 +627,7 @@ Section BreadBlocks.
   (*  that reads b->valid, the valid test, and the disk-read arm.         *)
   (* ================================================================== *)
 
-  Local Lemma bread_tail `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma bread_tail `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -655,7 +656,7 @@ Section BreadBlocks.
     proc_priv_bare (proc_addr j) pidv Upr -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     sleeplocked (snd (bn_slk bn k)) (buf_lock (bnode k)) pidv -∗
     bown bn k -∗
     bref bn k q dev bno -∗
@@ -994,7 +995,7 @@ Section BreadBlocks.
   (*  [false] index, hence at this lemma's own hart.                      *)
   (* ================================================================== *)
 
-  Local Lemma bread_hit `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma bread_hit `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1035,7 +1036,7 @@ Section BreadBlocks.
     proc_priv_bare (proc_addr j) pidv Upr -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) lks Upr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1286,7 +1287,7 @@ Section BreadBlocks.
   (*  0x90..0xa8 hold the bcache lock, hence the literal [false] index.    *)
   (* ================================================================== *)
 
-  Local Lemma bread_recyc `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma bread_recyc `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1329,7 +1330,7 @@ Section BreadBlocks.
     proc_priv_bare (proc_addr j) pidv Upr -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) lks Upr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1671,7 +1672,7 @@ Section BreadBlocks.
   (*  needs re-anchoring.                                                 *)
   (* ================================================================== *)
 
-  Local Lemma bread_bloop `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma bread_bloop `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1717,7 +1718,7 @@ Section BreadBlocks.
     proc_priv_bare (proc_addr j) pidv Upr -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) lks Upr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1977,7 +1978,7 @@ Section BreadBlocks.
   (*  real buffer.  Still inside the critical section: index [false].      *)
   (* ================================================================== *)
 
-  Local Lemma bread_miss `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma bread_miss `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -2018,7 +2019,7 @@ Section BreadBlocks.
     proc_priv_bare (proc_addr j) pidv Upr -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) lks Upr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -2186,7 +2187,7 @@ Section BreadBlocks.
   (*  IH -- stay at this lemma's own hart.                                 *)
   (* ================================================================== *)
 
-  Local Lemma bread_floop `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma bread_floop `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -2238,7 +2239,7 @@ Section BreadBlocks.
     proc_priv_bare (proc_addr j) pidv Upr -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) lks Upr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -2565,7 +2566,7 @@ End BreadBlocks.
 
 Section ProofBread.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_bread_sconf
       (γs : list gname) (j : nat) (γl : gname)

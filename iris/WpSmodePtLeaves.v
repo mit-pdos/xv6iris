@@ -47,11 +47,8 @@ Require Import KptShare KptGoodb.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import MemAccessGen.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-(* SLICE 2 leaf tier: ctx twins below; RiscvPtsto re-imported after
-   TsoCtx so this file's own notations stay raw until the M1 flip. *)
-Require Import TsoCtx TsoCtxShim.
-Require Import RiscvPtsto.
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 (* Opts back out of [RiscvPtsto]'s [word_pointsto] seal: the leaf walk takes page-table words apart byte by byte.
@@ -60,7 +57,7 @@ Local Typeclasses Transparent word_pointsto.
 
 Section WpSmodePtGprEngine.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------- *)
   (* The generic RVC (2-byte) gpr-write engine over [tlb_inv_pt].         *)
@@ -146,7 +143,7 @@ End WpSmodePtGprEngine.
 (* ===================================================================== *)
 Section WpSmodePtItype.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
 
@@ -340,7 +337,7 @@ End ExecLoadGSwalkPt.
 (* ===================================================================== *)
 Section WpSmodePtLoad.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ==================================================================== *)
   (* THE TIER-INDEXED FORM (sp-migration phase D, design §4).  [kt'] is the *)
@@ -586,69 +583,6 @@ Section WpSmodePtLoad.
                             Hword").
   Qed.
 
-
-  (* ------------------------------------------------------------------ *)
-  (* THE CTX TWIN (tso-port.md 2c), and note the IDIOM difference from
-     WpSconfMem's.  There the window is threaded through a [wp_next] and
-     the twin intercepts the continuation; here the continuation is a
-     plain wand chain of ten-odd hypotheses, so naming them all would be
-     brittle for no gain.  Instead the GOAL is rewritten through the
-     shim's [⊣⊢]: both occurrences of the window become raw and the goal
-     is then LITERALLY the original statement, which discharges it.  One
-     rewrite, no hypothesis names, indifferent to the continuation's
-     shape.  Both idioms die at cutover -- the shim's equivalence is
-     exactly what stops being true -- so each twin gets its direct TSO
-     proof with its STATEMENT unchanged. *)
-  Lemma wp_cld_s_r_t_c (R : s_regime) `{XI : !CurCtx} (kt kt' : ktier) `{!KtierLe kt' kt}
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (v : mword 64)
-      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      {dq dqm : dfrac} :
-    let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
-    let a8 := ea in
-    let pa := a8 in
-    uint rd <> 0 ->
-    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    _get_Mstatus_SXL mstatus0 = 'b"10" ->
-    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
-    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
-    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    menvcfg0 = MENVCFG_S ->
-    sr_ktier_wit R kt -∗
-    hw_config -∗
-    minstret_inv -∗
-    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ{ dq } Supervisor -∗
-    mstatus ↦ᵣ{ dq } mstatus0 -∗
-    mie ↦ᵣ{ dq } mie_v -∗
-    mideleg ↦ᵣ{ dq } mdv0 -∗
-    menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    sr_inv R -∗
-    pc_is pc -∗
-    gpr_file m -∗
-    instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
-    ctx_word_pointsto (KTR := kt') cur_ctx pa dqm v -∗
-    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-      cur_privilege ↦ᵣ{ dq } Supervisor -∗
-      mstatus ↦ᵣ{ dq } mstatus0 -∗
-      mie ↦ᵣ{ dq } mie_v -∗
-      mideleg ↦ᵣ{ dq } mdv0 -∗
-      menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      sr_inv R -∗
-      pc_is (add_vec_int pc 2) -∗
-      gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
-      ctx_word_pointsto (KTR := kt') cur_ctx pa dqm v -∗
-      WP (Loop : expr riscv_lang)) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    intros ea a8 pa Hq0 Hq1 Hq2 Hq3 Hq4 Hq5 Hq6 Hq7 Hq8.
-    rewrite !(ctx_word_shim kt' cur_ctx);
-    exact (wp_cld_s_r_t R kt kt' pc rd rs1 imm m v mstatus0 mie_v mdv0 menvcfg0 Hq0 Hq1 Hq2 Hq3 Hq4 Hq5 Hq6 Hq7 Hq8).
-  Qed.
-
-
   (* THE KT0/KT0 COROLLARY -- the pre-phase-D statement, character for
      character (the ambient [↦₈{dqm}] is at the KT0 default, which is
      convertible with the explicit [KT0] above), so every consumer is
@@ -702,56 +636,6 @@ Section WpSmodePtLoad.
               (dq := dq) (dqm := dqm)
               Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 with "Hwit").
   Qed.
-
-  (* ctx twin -- see the first one in this file for the idiom. *)
-  Lemma wp_cld_s_r_c (R : s_regime) `{XI : !CurCtx}
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (v : mword 64)
-      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      {dq dqm : dfrac} :
-    let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
-    let a8 := ea in
-    let pa := a8 in
-    uint rd <> 0 ->
-    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    _get_Mstatus_SXL mstatus0 = 'b"10" ->
-    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
-    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
-    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    menvcfg0 = MENVCFG_S ->
-    hw_config -∗
-    minstret_inv -∗
-    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ{ dq } Supervisor -∗
-    mstatus ↦ᵣ{ dq } mstatus0 -∗
-    mie ↦ᵣ{ dq } mie_v -∗
-    mideleg ↦ᵣ{ dq } mdv0 -∗
-    menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    sr_inv R -∗
-    pc_is pc -∗
-    gpr_file m -∗
-    instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
-    ctx_word_pointsto cur_ctx pa dqm v -∗
-    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-      cur_privilege ↦ᵣ{ dq } Supervisor -∗
-      mstatus ↦ᵣ{ dq } mstatus0 -∗
-      mie ↦ᵣ{ dq } mie_v -∗
-      mideleg ↦ᵣ{ dq } mdv0 -∗
-      menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      sr_inv R -∗
-      pc_is (add_vec_int pc 2) -∗
-      gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
-      ctx_word_pointsto cur_ctx pa dqm v -∗
-      WP (Loop : expr riscv_lang)) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    intros ea a8 pa Hq0 Hq1 Hq2 Hq3 Hq4 Hq5 Hq6 Hq7 Hq8.
-    rewrite !(ctx_word_shim _ cur_ctx);
-    exact (wp_cld_s_r R pc rd rs1 imm m v mstatus0 mie_v mdv0 menvcfg0 Hq0 Hq1 Hq2 Hq3 Hq4 Hq5 Hq6 Hq7 Hq8).
-  Qed.
-
 
 
 End WpSmodePtLoad.
@@ -962,7 +846,7 @@ Qed.
 
 Section WpSmodePtStore.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* THE TIER-INDEXED FORM -- see [wp_cld_s_r_t]'s note for the shape.  The
      STORE is tier-preserving in the same sense: the window is written and
@@ -1193,56 +1077,6 @@ Section WpSmodePtStore.
                             Hword").
   Qed.
 
-  (* ctx twin -- see the first one in this file for the idiom. *)
-  Lemma wp_csd_s_r_t_c (R : s_regime) `{XI : !CurCtx} (kt kt' : ktier) `{!KtierLe kt' kt}
-      (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (vold : mword 64)
-      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      {dq : dfrac} :
-    let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
-    let a8 := ea in
-    let pa := a8 in
-    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    _get_Mstatus_SXL mstatus0 = 'b"10" ->
-    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
-    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
-    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    menvcfg0 = MENVCFG_S ->
-    sr_ktier_wit R kt -∗
-    hw_config -∗
-    minstret_inv -∗
-    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ{ dq } Supervisor -∗
-    mstatus ↦ᵣ{ dq } mstatus0 -∗
-    mie ↦ᵣ{ dq } mie_v -∗
-    mideleg ↦ᵣ{ dq } mdv0 -∗
-    menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    sr_inv R -∗
-    pc_is pc -∗
-    gpr_file m -∗
-    instr pc true (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
-    ctx_word_pointsto (KTR := kt') cur_ctx pa (DfracOwn 1) vold -∗
-    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-      cur_privilege ↦ᵣ{ dq } Supervisor -∗
-      mstatus ↦ᵣ{ dq } mstatus0 -∗
-      mie ↦ᵣ{ dq } mie_v -∗
-      mideleg ↦ᵣ{ dq } mdv0 -∗
-      menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      sr_inv R -∗
-      pc_is (add_vec_int pc 2) -∗
-      gpr_file m -∗
-      pa ↦₈[kt'] (m !!! Regidx rs2) -∗
-      WP (Loop : expr riscv_lang)) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    intros ea a8 pa Hq0 Hq1 Hq2 Hq3 Hq4 Hq5 Hq6 Hq7.
-    rewrite !(ctx_word_shim kt' cur_ctx);
-    exact (wp_csd_s_r_t R kt kt' pc rs2 rs1 imm m vold mstatus0 mie_v mdv0 menvcfg0 Hq0 Hq1 Hq2 Hq3 Hq4 Hq5 Hq6 Hq7).
-  Qed.
-
-
   (* THE KT0/KT0 COROLLARY -- statement character-identical to the
      pre-phase-D one; the [emp] witness is discharged here. *)
   Lemma wp_csd_s_r (R : s_regime)
@@ -1294,62 +1128,13 @@ Section WpSmodePtStore.
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 with "Hwit").
   Qed.
 
-  (* ctx twin -- see the first one in this file for the idiom. *)
-  Lemma wp_csd_s_r_c (R : s_regime) `{XI : !CurCtx}
-      (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (vold : mword 64)
-      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      {dq : dfrac} :
-    let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
-    let a8 := ea in
-    let pa := a8 in
-    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-    _get_Mstatus_SXL mstatus0 = 'b"10" ->
-    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
-    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
-    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
-    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    menvcfg0 = MENVCFG_S ->
-    hw_config -∗
-    minstret_inv -∗
-    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ{ dq } Supervisor -∗
-    mstatus ↦ᵣ{ dq } mstatus0 -∗
-    mie ↦ᵣ{ dq } mie_v -∗
-    mideleg ↦ᵣ{ dq } mdv0 -∗
-    menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-    sr_inv R -∗
-    pc_is pc -∗
-    gpr_file m -∗
-    instr pc true (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
-    ctx_word_pointsto cur_ctx pa (DfracOwn 1) vold -∗
-    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-      cur_privilege ↦ᵣ{ dq } Supervisor -∗
-      mstatus ↦ᵣ{ dq } mstatus0 -∗
-      mie ↦ᵣ{ dq } mie_v -∗
-      mideleg ↦ᵣ{ dq } mdv0 -∗
-      menvcfg ↦ᵣ{ dq } menvcfg0 -∗
-      sr_inv R -∗
-      pc_is (add_vec_int pc 2) -∗
-      gpr_file m -∗
-      pa ↦₈ (m !!! Regidx rs2) -∗
-      WP (Loop : expr riscv_lang)) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    intros ea a8 pa Hq0 Hq1 Hq2 Hq3 Hq4 Hq5 Hq6 Hq7.
-    rewrite !(ctx_word_shim _ cur_ctx);
-    exact (wp_csd_s_r R pc rs2 rs1 imm m vold mstatus0 mie_v mdv0 menvcfg0 Hq0 Hq1 Hq2 Hq3 Hq4 Hq5 Hq6 Hq7).
-  Qed.
-
-
 
 End WpSmodePtStore.
 
 (* the PC-reading 4-byte gpr-write engine (auipc), over [tlb_inv_pt] *)
 Section WpSmodePtGprEnginePc.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
 End WpSmodePtGprEnginePc.
@@ -1358,7 +1143,7 @@ End WpSmodePtGprEnginePc.
    c.addi16sp, jal rd) over [tlb_inv_pt] via [wp_instr_s_tlbinv_pt]. *)
 Section WpSmodePtGprGamma.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* [hw_config] is [smode_config]'s first (persistent) conjunct; a leaf on
      the bundle needs it to pay the fetch translation. *)

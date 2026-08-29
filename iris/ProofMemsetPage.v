@@ -25,13 +25,14 @@ Require Import Riscv.rv64d.
 Require Import SpecMemsetPage.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 
 Module MemsetPageProof (MemsetArray : MEMSET) : MEMSETPAGE.
 
 Section ProofMemsetPage.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Context {kt : ktier}.
   Lemma wp_memset_page_val_sconf

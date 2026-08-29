@@ -263,6 +263,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.  (* [fscfg]: the fs configuration is AMBIENT --
                           [fsc_uart] is the console's ghost bundle        *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -471,7 +472,7 @@ End SysWriteConsAU.
    ([write_cons_arms_ret]), so the blanket is implied. *)
 Definition wp_sys_write_cons_frame
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process    *)
     (fn : fwrite_names)                          (* the fs ghosts          *)
@@ -545,7 +546,7 @@ Definition wp_sys_write_cons_frame
    caller holds ([[]] is free, [uart_sent_nil]). *)
 Definition wp_sys_write_cons_au_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname)
     (γs : list gname) (j : nat) (γlp : gname)
     (fn : fwrite_names)
@@ -567,7 +568,7 @@ Definition wp_sys_write_cons_au_body
 Module Type SYSWRITE_CONS_AU.
   Parameter wp_sys_write_cons_au :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fwrite_names)

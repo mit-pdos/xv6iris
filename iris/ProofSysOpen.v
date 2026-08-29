@@ -113,6 +113,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Set Printing Depth 40.
 
@@ -242,7 +243,7 @@ Section ProofSysOpenBody.
   (*  retained parent, and what comes back out is [file_ref gf kf 1] --  *)
   (*  which [ProcInv.proc_priv_settle] turns into the descriptor.         *)
   (* ================================================================== *)
-  Lemma so_tail_pub `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_tail_pub `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -328,7 +329,7 @@ Section ProofSysOpenBody.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     log_opb icfg_log u -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
@@ -480,7 +481,7 @@ Section ProofSysOpenBody.
   (*  nothing below reads the frame again, and every exit wants slot 23   *)
   (*  whole.                                                             *)
   (* ================================================================== *)
-  Lemma so_stores `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_stores `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -575,7 +576,7 @@ Section ProofSysOpenBody.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     log_opb icfg_log u -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
@@ -1161,7 +1162,7 @@ Section ProofSysOpenBody.
   (*  hands the whole [file_ref] to [fileclose], so the slot may not be   *)
   (*  broken into cells until the descriptor is installed.                *)
   (* ================================================================== *)
-  Lemma so_alloc `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_alloc `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gfl gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -1237,7 +1238,7 @@ Section ProofSysOpenBody.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     log_opb icfg_log u -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
@@ -1944,7 +1945,7 @@ Section ProofSysOpenBody.
   (*  zero-extends, so a negative [short] lands at or above 0x8000 > 9   *)
   (*  and the single [bltu] decides both halves of the C's disjunction.  *)
   (* ================================================================== *)
-  Lemma so_join `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_join `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gfl gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -2020,7 +2021,7 @@ Section ProofSysOpenBody.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     log_opb icfg_log u -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
@@ -2403,7 +2404,7 @@ Section ProofSysOpenBody.
       vacuous -- [so_tdir_zne] at a literal.  The else arm is where that
       premise is EARNED.                                                  *)
   (* ================================================================== *)
-  Lemma so_entry_c `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_entry_c `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gfl gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -2469,7 +2470,7 @@ Section ProofSysOpenBody.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     log_opS icfg_log MAXOPBLOCKS Sb -∗
     (* the transaction token, beside the budget: this arm's tail closes the
        operation, and end_op takes the whole [log_op] (durable-disk lane A) *)
@@ -2864,7 +2865,7 @@ Section ProofSysOpenBody.
   (*  [so_dir_forced]'s hypothesis -- and through [so_pay_witness] that   *)
   (*  is what says a WRITABLE fd never names a directory.                 *)
   (* ================================================================== *)
-  Lemma so_entry_n `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_entry_n `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gfl gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -2927,7 +2928,7 @@ Section ProofSysOpenBody.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     log_opS icfg_log MAXOPBLOCKS Sb -∗
     (* the transaction token, beside the budget: this arm's tail closes the
        operation, and end_op takes the whole [log_op] (durable-disk lane A) *)
@@ -3574,7 +3575,7 @@ Section ProofSysOpenBody.
   (*  an ordinary [destruct] on the mask's [eq_vec] and no bit lemma is  *)
   (*  spent here.                                                       *)
   (* ================================================================== *)
-  Lemma wp_sys_open_sconf `{GEN : GenId} `{CID0 : CpuId}
+  Lemma wp_sys_open_sconf `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gfl gf : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)

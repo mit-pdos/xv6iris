@@ -63,10 +63,11 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Module VirtioDiskRwPhases (Acquire : ACQUIRE) (Release : RELEASE)
                           (Sleep : SLEEP) (FreeDesc : FREEDESC).
+Require Import TsoCtx.
 
 Section ProofVirtioDiskRw.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Notation Rra := (mword_of_int 1  : mword 5).
@@ -137,7 +138,7 @@ Section ProofVirtioDiskRw.
     trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb pj -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x000) : mword 64) -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     b_blockno bp ↦₄{DfracOwn (1/2)} bno -∗
     wp_next (CID0 := CID) true pj (fun (CID : CpuId) =>
       ∀ M : regfile,

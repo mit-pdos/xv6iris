@@ -34,6 +34,7 @@ Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartSpan
         HartRegNode RegFile WpGpr.
 Require Import ColdBoot.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* collapse the closed [Z.eqb] tests of the model's rX/wX cascades *)
@@ -394,7 +395,7 @@ Qed.
 
 Section gpr.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the model's GPR read, at a SYMBOLIC index, against the caller's own
      [gpr_pt] entry.  x0 is the [Ret] case (hardwired zero, nothing owned);

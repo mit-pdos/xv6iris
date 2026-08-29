@@ -39,6 +39,7 @@ Require Import KernelRvcDecode.
 Require Import IrefSlots.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 
@@ -49,7 +50,7 @@ Module ArgaddrProof (Argraw : ARGRAW) : ARGADDR.
 
 Section ProofArgaddr.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>

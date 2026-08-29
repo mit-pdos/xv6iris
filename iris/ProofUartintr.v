@@ -62,6 +62,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Local Notation Rra  := (mword_of_int 1 : mword 5).
@@ -145,7 +146,7 @@ Section UiCont.
      pa_stk sp0 4 ↦₈[KT1] (m0 !!! Regidx Rs2))%I.
 
   (* the caller's continuation, named once *)
-  Definition ui_ret_cont `{GEN : GenId} `{CID0 : CpuId}  (m0 : regfile)
+  Definition ui_ret_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}  (m0 : regfile)
       (av lvl : nat) (eb : bool) (pme : mword 64) (b : bool) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
        ∀ mf : regfile,
@@ -175,7 +176,7 @@ Module UG := UartgetcProof Uart.
 
 Section ProofUartintr.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>
@@ -187,7 +188,7 @@ Section ProofUartintr.
   (* ------------------------------------------------------------------ *)
   (*  THE EPILOGUE: +0x4c -> return.                                      *)
   (* ------------------------------------------------------------------ *)
-  Lemma ui_tail `{CID0 : CpuId}
+  Lemma ui_tail `{CID0 : CpuId} `{XI : CurCtx}
       (m0 M : regfile) (av lvl : nat) (eb : bool) (pme : mword 64)
       (sp0 : mword 64) (b : bool) (lks : gset string) :
     ui_regs m0 M (pa_stk sp0 4) ->
@@ -480,7 +481,7 @@ Section ProofUartintr.
   (* Both arms of the THRE test arrive here: the arm that found the FIFO
      still busy falls through from +0x20, and the arm that woke the writers
      jumps back from +0x4a. *)
-  Lemma ui_rx_setup `{CID0 : CpuId} (γu : uart_names) (γv : disk_names)
+  Lemma ui_rx_setup `{CID0 : CpuId} `{XI : CurCtx} (γu : uart_names) (γv : disk_names)
        (γs : list gname)
       (m0 M : regfile) (av lvl : nat) (eb : bool) (pme : mword 64)
       (sp0 : mword 64) (b : bool) (lks : gset string) :

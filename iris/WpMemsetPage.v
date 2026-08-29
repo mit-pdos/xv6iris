@@ -26,6 +26,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 (* ===================================================================== *)
@@ -71,7 +72,7 @@ Proof. rewrite ms_pa_id. apply ms_addr_pa_add. Qed.
 
 Section WpMemsetPage.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* Choice: a big-sep of per-element existentials over a [seq] yields a single
      witness FUNCTION indexed by the element.  (Elements of a [seq] are

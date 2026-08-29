@@ -108,6 +108,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
    printable (claude-notes/durable-notes.md) *)
@@ -202,7 +203,7 @@ Section FsinitDefs.
   (* THE CONTINUATION, named so the proofmode does not re-traverse it at
      every split (claude-notes/optimization.md).  It is the contract's post,
      verbatim. *)
-  Definition fsi_cont `{GEN : GenId} `{CID0 : CpuId}
+  Definition fsi_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (v_magic v_size v_nblocks v_nlog : mword 32)
       (pidv : mword 32) (dq : dfrac) (j : nat)
       (m : regfile) (K : nat) (eb b : bool) (lks : gset string) (Upr : ustate) : iProp Σ :=
@@ -282,7 +283,7 @@ Section FsinitEpilogue.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma fsi_epilogue `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma fsi_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (j : nat)
       (v_magic v_size v_nblocks v_nlog : mword 32)
       (pidv : mword 32) (dq : dfrac)
@@ -527,7 +528,7 @@ Section FsinitMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
-  Lemma wp_fsinit_sconf `{GEN : GenId} `{CID : CpuId}
+  Lemma wp_fsinit_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
       (v_magic v_size v_nblocks v_ninodes v_nlog

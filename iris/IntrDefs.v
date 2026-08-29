@@ -77,6 +77,7 @@ Require WpGprCsrwCommon.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 (* ===================================================================== *)
@@ -253,7 +254,7 @@ Notation kv_frame_slots := (90%nat) (only parsing).
 Section IntrDefsBase.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* =================================================================== *)
   (* §2 The SIE ghost choreography: 1/2 (live-bit tie) + 1/4 (kernel-code *)
@@ -269,7 +270,7 @@ Section IntrDefsBase.
      ghost argument at all, and what lets a step's continuation (WpNext.v)
      rebind the ghost by rebinding [CID] alone.
 
-     (Written without an explicit [`{GEN : GenId} `{CID : CpuId}] binder because the section
+     (Written without an explicit [`{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}] binder because the section
      already fixes one and Rocq refuses to rebind a section variable's name;
      the section closes it over exactly [riscvGS] and [CpuId] regardless.) *)
   Definition sie_gname : gname := sie_name cpu_id.
@@ -2050,7 +2051,7 @@ End IntrDefsBase.
 Section IntrDefs.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   (* ================================================================== *)
@@ -2104,7 +2105,7 @@ Section IntrDefs.
      and its [MIE_S] pin, the menvcfg pin), which is what makes the statement
      this short.  [av] is the handler's usable stack budget; the reserve it
      runs in is the enabled index's, re-indexed. *)
-  Definition ihs_body_of (kt : ktier) (R : CPU -d> iPropO Σ) `{CIDb : CpuId}
+  Definition ihs_body_of (kt : ktier) (R : CPU -d> iPropO Σ) `{CIDb : CpuId} `{XI : CurCtx}
       (handler : mword 64) : iProp Σ :=
     (□ ∀ (m : regfile) (av : nat) (p pc0 sc tv : mword 64),
         ihs_trap_of (CID := CIDb) kt R m av p pc0 sc tv handler

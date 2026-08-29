@@ -95,6 +95,7 @@ Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* ===================================================================== *)
 (* SS1  uvmcopy's OWN pure arithmetic, and the A/D bridge.                *)
@@ -309,7 +310,7 @@ Local Notation URs7 := (mword_of_int 23 : mword 5).
 
 Section UvmcopyDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* SpecUvmcopy's post disjunction, at an abstract return value *)
   Definition uc_pay (Pold Pnew : uptd) (sznew : Z)
@@ -331,7 +332,7 @@ Section UvmcopyDefs.
      resource carrying its OWN entry hart [CID0] (not the section's ambient
      one), re-anchored at each call site via [wp_next_shift] rather than
      being consumed at the hart it was built at. *)
-  Definition uc_exit `{CID0 : CpuId} (mm : regfile)
+  Definition uc_exit `{CID0 : CpuId} `{XI : CurCtx} (mm : regfile)
       (Pold Pnew : uptd) (szold sznew : Z) (Mold Mnew : gmap Z (bv 8))
       (vpn0 : mword 27) (n K : nat) (eb : bool)
       (p : mword 64) (spr : mword 64) (ilvl : nat) (b : bool) (lks : gset string) : iProp Σ :=
@@ -360,7 +361,7 @@ Module UvmcopyProof (WalkNoalloc : WALK_NOALLOC) (Kalloc : KALLOC)
 
 Section ProofUvmcopy.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := URra.
   Notation Rtp := URtp.
@@ -477,7 +478,7 @@ Section ProofUvmcopy.
      at), not the section's ambient one.  [SpecUvmunmap.v]'s entry-side tp
      premise is gone (HartTp.v -- the map's tp slot is IGNORED), so no
      re-tagging is needed before the Uvmunmap call below. *)
-  Local Lemma uc_err `{CID0 : CpuId} (γa : gname) (mm : regfile)
+  Local Lemma uc_err `{CID0 : CpuId} `{XI : CurCtx} (γa : gname) (mm : regfile)
       (Pold Pnew Pj : uptd) (szold sznew : Z)
       (Mold Mnew Mj : gmap Z (bv 8))
       (vpn0 : mword 27) (n j : nat) (K : nat)

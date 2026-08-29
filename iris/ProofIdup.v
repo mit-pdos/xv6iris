@@ -94,6 +94,7 @@ Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
    [islot_rest_at] must be at the grown [qt].  [ProofIget] states the same two
    facts as [ig_frac_lt1] / [ig_frac_rest]; they are restated here rather than
    imported because [ProofIget] is a proof file and nothing may depend on one.
+Require Import TsoCtx.
    If a third caller appears they belong in [IcacheInv] beside
    [iref_upgrade_store_au]. *)
 Lemma id_frac_lt1 (qt qr : Qp) :
@@ -114,7 +115,7 @@ Module IdupProof (Acquire : ACQUIRE) (Release : RELEASE) : IDUP.
 
 Section ProofIdup.
   Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra  := (mword_of_int 1 : mword 5).
   Notation Rs0  := (mword_of_int 8 : mword 5).

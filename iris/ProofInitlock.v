@@ -35,6 +35,7 @@ Require Import SpecInitlock.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the
@@ -51,7 +52,7 @@ Module InitlockProof : INITLOCK.
 Section ProofInitlock.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Context {kt : ktier}.

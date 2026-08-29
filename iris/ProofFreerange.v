@@ -18,7 +18,7 @@
    hart.  [Hcnt] (cpu_own) needs [cpu_own_transport] around each kfree call,
    same as the other two files.  The LOOP additionally needs the "decomposed
    proof" recipe from the porting guide: [frepi] (the shared epilogue) is
-   pulled out of the section's ambient hart with its own `{CID0 : CpuId}`
+   pulled out of the section's ambient hart with its own `{CID0 : CpuId} `{XI : CurCtx}`
    binder, and the fuel induction ("Hloop") carries the entry hart as part of
    the SAME universal as the fuel/map/page-list state, so [iInduction]
    auto-generalizes it; the back-edge recursion and both exits re-anchor the
@@ -60,6 +60,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecFreerange.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 
@@ -67,7 +68,7 @@ Module FreerangeProof (Kfree : KFREE) : FREERANGE.
 
 Section ProofFreerange.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ================================================================= *)
   (*  §2  The page-run predicate and freerange's whole-function WP.     *)
@@ -96,10 +97,10 @@ Section ProofFreerange.
   (* freerange's epilogue (0x3e..0x46): restore ra/s0/s1, frame trade back (move_up
      6), ret.  Factored as a top-level lemma so its call sites can hand it
      ["Hcont"] re-anchored at whichever hart they reached (a DECOMPOSED
-     helper: its own fresh `{CID0 : CpuId}` binder, per the porting guide,
+     helper: its own fresh `{CID0 : CpuId} `{XI : CurCtx}` binder, per the porting guide,
      rather than the section's ambient one, which callers have long since
      migrated away from). *)
-  Lemma frepi `{CID0 : CpuId}
+  Lemma frepi `{CID0 : CpuId} `{XI : CurCtx}
       (m Me : regfile) (K ncnt : nat) (eb b : bool) (pcur : mword 64)
       (γl : gname) (γk : gname * gname) (onf : option nat) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in

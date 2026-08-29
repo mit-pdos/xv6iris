@@ -278,7 +278,7 @@ Ltac vdrw_hi_peel :=
 
 Section VdrwDefs.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1  : mword 5).
   Notation Rtp := (mword_of_int 4  : mword 5).
@@ -490,6 +490,7 @@ Proof. lia. Qed.
 
 Section VdrwbDefs.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.
 
   (* [free_bundles] only reads [fr] below 8, so a pointwise agreement there
      is all a re-fold needs.  The partial-free tail re-marks the descriptors
@@ -569,6 +570,7 @@ End VdrwbDefs.
 (* ---- from ProofVirtioDiskRwC.v ---- *)
 
 Require Import WpSmodeHalf.
+Require Import TsoCtx.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -983,6 +985,7 @@ Qed.
 
 Section VdrwcDefs.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.
 
   (* the parts of a descriptor slot's bundle P3 does NOT touch: [free_desc]
      wants them back at P6, so they ride through unchanged. *)

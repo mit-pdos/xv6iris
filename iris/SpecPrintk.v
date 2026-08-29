@@ -102,12 +102,13 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 (* [pk_arg_desc] / [pk_desc_kind] / [pk_desc_res] / [pk_vararg] / [pk_pr_lock]
    are the CALLER's vocabulary and live in PrintkArgs.v, which this file
    [Require Export]s -- panic's spec needs them while sitting below this one.
+Require Import TsoCtx.
    Nothing that reached them through SpecPrintk.v has to change. *)
 
 (* printk's own frame is 24 slots ([addi sp,sp,-192] at 0x8000050a), over
    printint's 24. *)
 Notation printk_stack := (48%nat) (only parsing).
-Definition wp_printk_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_printk_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (kt : ktier) (γpr : gname) (γl : gname) (γd : uart_names) (γv : disk_names)
     (m0 : regfile) (K : nat) (bs : list (bv 8))
     (n : nat) (eb : bool) (dqf : dfrac)
@@ -145,7 +146,7 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : 
      mutual exclusion between two harts' format walks -- real, but invisible in
      separation logic, so the resource is [emp] and the acquire is nearly
      free. *)
-  is_lock γpr pk_pr_lock "pr"%string (emp : iProp Σ) -∗
+  is_lock γpr pk_pr_lock "pr"%string <{ emp : iProp Σ }> -∗
   dev_inv γd γv -∗
   is_txlock γl γd -∗
   uart_sent_sub γd bs -∗
@@ -164,7 +165,7 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : 
 
 Module Type PRINTK.
   Parameter wp_printk_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (kt : ktier) (γpr : gname) (γl : gname) (γd : uart_names) (γv : disk_names)
       (m0 : regfile) (K : nat) (bs : list (bv 8))
       (n : nat) (eb : bool) {dqf : dfrac}
@@ -199,7 +200,7 @@ Definition pr_lock : mword 64 := mword_of_int KernelSyms.pr.
 
 Section PrintkGen.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* pr.lock protects NOTHING: d80e61c5 put uartputc_sync's THR write under
      [tx_lock], so the transmitter is [UartTxInv.tx_res]'s and pr.lock is left
@@ -219,7 +220,7 @@ Section PrintkGen.
      has been sent, so the empty sublist is all the corollary below ever
      needs to hand [wp_printk_sconf_body]'s [bs]. *)
   Definition printk_env (γpr : gname) (γd : uart_names) (γv : disk_names) : iProp Σ :=
-    (is_lock γpr pr_lock "pr"%string (pr_res γd) ∗
+    (is_lock γpr pr_lock "pr"%string <{ pr_res γd }> ∗
      uart_dlab_off γd ∗
      dev_inv γd γv ∗
      (∃ γl : gname, is_txlock γl γd) ∗
@@ -244,7 +245,7 @@ Section PrintkGen.
 
 End PrintkGen.
 
-Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (kt : ktier) (γpr : gname) (γd : uart_names) (γv : disk_names)
     (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64)
     (dqf : dfrac) (f : string) (descs : list pk_arg_desc) (b : bool) (lks : gset string) :=
@@ -300,7 +301,7 @@ Definition printk_gen_contract `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId}
 
 Module Type PRINTK_GEN.
   Parameter wp_printk_gen_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (kt : ktier) (γpr : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64)
       {dqf : dfrac} (f : string) (descs : list pk_arg_desc) (b : bool) (lks : gset string),
       wp_printk_gen_sconf_body kt γpr γd γv m0 K eb pj dqf f descs b lks.

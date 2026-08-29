@@ -74,6 +74,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the
@@ -89,7 +90,7 @@ Module StrlenProof : STRLEN.
 
 Section ProofStrlen.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context {kts : ktier}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -147,7 +148,7 @@ Section ProofStrlen.
   (* ================================================================== *)
   (*  THE EPILOGUE (+0x20 .. +0x26), entered by both arms.               *)
   (* ================================================================== *)
-  Local Lemma sl_tail `{CID0 : CpuId}
+  Local Lemma sl_tail `{CID0 : CpuId} `{XI : CurCtx}
       (mm Mt : regfile) (K : nat) (rv sp0 ra0 s00 : mword 64) (b : bool) (p : mword 64) :
     (2 <= K)%nat ->
     mm !!! Regidx csp_rs1 = sp0 ->
@@ -295,7 +296,7 @@ Section ProofStrlen.
   (* ================================================================== *)
   (*  THE PROBE (+0x12 .. +0x16): both arms of the [bnez] run it.         *)
   (* ================================================================== *)
-  Local Lemma sl_probe `{CID0 : CpuId}
+  Local Lemma sl_probe `{CID0 : CpuId} `{XI : CurCtx}
       (M : regfile) (Kv : nat) (dq : dfrac) (s : mword 64) (t : nat) (bt : mword 8) (b : bool) (p : mword 64) :
     M !!! Regidx Ra5 = pa_add s (S t) ->
     sie_cap_gpr KT1 (CID := CID0) M Kv b p -∗

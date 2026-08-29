@@ -135,6 +135,7 @@ Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 
 (* ===================================================================== *)
@@ -169,7 +170,7 @@ Module CopyinProof (Walkaddr : WALKADDR) (Vmfault : VMFAULT) (Memmove : MEMMOVE)
 
 Section ProofCopyin.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not
      [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
@@ -232,7 +233,7 @@ Section ProofCopyin.
      [rewrite]s a goal that already shows [tp_pin m !!! Regidx k] (e.g. after
      [callee_saved_lookup] against a callee invoked at a [tp_pin]ned map)
      without an intervening [rgne]. *)
-  Local Lemma tp_pin_ne `{CIDx : CpuId} (m : regfile) (k : mword 5) :
+  Local Lemma tp_pin_ne `{CIDx : CpuId} `{XI : CurCtx} (m : regfile) (k : mword 5) :
     Regidx k <> Regidx Rtp -> tp_pin m !!! Regidx k = m !!! Regidx k.
   Proof. exact (rget_ne m k). Qed.
 
@@ -245,7 +246,7 @@ Section ProofCopyin.
      [tp_pin] (idempotent, [tp_pin_id] off [rget_tp]) can tell apart -- so a
      caller with no raw-tp fact in hand may simply RE-POINT its map at its own
      [tp_pin] image, for which the raw fact is now true BY CONSTRUCTION. *)
-  Local Lemma sie_cap_gpr_tp_pin `{CIDx : CpuId} (m : regfile) (n : nat) (b : bool) (pcur : mword 64) :
+  Local Lemma sie_cap_gpr_tp_pin `{CIDx : CpuId} `{XI : CurCtx} (m : regfile) (n : nat) (b : bool) (pcur : mword 64) :
     sie_cap_gpr KT1 m n b pcur -∗ sie_cap_gpr KT1 (tp_pin m) n b pcur.
   Proof.
     rewrite /sie_cap_gpr /sie_cap (tp_pin_sp m).
@@ -259,7 +260,7 @@ Section ProofCopyin.
   (*  slot arguments.  All TWELVE slots are live now: the psz bump pushed *)
   (*  vmfault's [read] constant out to s10, which the prologue saves.     *)
   (* ================================================================== *)
-  Local Lemma ci_epilogue `{CID0 : CpuId}
+  Local Lemma ci_epilogue `{CID0 : CpuId} `{XI : CurCtx}
       (mm mj : regfile) (K ncnt : nat) (eb b : bool) (res sp0 pcur : mword 64) (lks : gset string) :
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 58 : mword 6))) in
     (12 <= K)%nat ->
@@ -627,7 +628,7 @@ Section ProofCopyin.
   (* ================================================================== *)
   (*  THE LOOP (+0x56 head, +0x2c body), by induction on FUEL.           *)
   (* ================================================================== *)
-  Local Lemma ci_loop `{CID0 : CpuId} (γa : gname)
+  Local Lemma ci_loop `{CID0 : CpuId} `{XI : CurCtx} (γa : gname)
       (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64)
       (K lvl : nat) (eb : bool) (p : mword 64)
       (dst spr srcva0 : mword 64) (len : nat) (b : bool)

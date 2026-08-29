@@ -147,6 +147,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* a failing tactic in a WP over [proc_priv] otherwise spends tens of
    minutes FORMATTING the goal -- see claude-notes/durable-notes.md. *)
@@ -657,7 +658,7 @@ Section ProofSysMknodEpilogue.
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
 
-  Lemma mn_epilogue `{GEN : GenId} `{CID0 : CpuId}
+  Lemma mn_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (m M : regfile) (sp0 : mword 64) (K : nat) (b : bool) (pj : mword 64)
       (w19 w20 : mword 64) (bf : nat -> bv 8) :
     (20 <= K)%nat -> ((K - 20) + 20 = K)%nat ->
@@ -830,7 +831,7 @@ Section ProofSysMknodM1Tail.
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
 
-  Lemma mn_m1_tail `{GEN : GenId} `{CID0 : CpuId}
+  Lemma mn_m1_tail `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
  (gfs : fs_names)
@@ -860,7 +861,7 @@ Section ProofSysMknodM1Tail.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     log_op icfg_log u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
@@ -1012,7 +1013,7 @@ Section ProofSysMknodBody.
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.
 
-  Lemma wp_sys_mknod_au_era `{GEN : GenId} `{CID0 : CpuId}
+  Lemma wp_sys_mknod_au_era `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gf : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)

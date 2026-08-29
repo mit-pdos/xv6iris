@@ -128,6 +128,7 @@ Require Import FsAbsMknodFire.   (* the authority-shaped commits         *)
 Require Import SpecCreateAU.     (* [cau_ok] / [cau_fail]                *)
 Require Import FsAbs.            (* LAST (FsAbs's own rule)              *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -192,7 +193,7 @@ Global Typeclasses Opaque mknod_au_pre_era mknod_post_ok_era
 
 Definition wp_sys_mknod_au_era_frame
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname)             (* ftable, kalloc, printk *)
     (gs : list gname) (j : nat) (gl : gname)            (* the running process *)
     (* disk fabric + lock  *)
@@ -260,7 +261,7 @@ Definition wp_sys_mknod_au_era_frame
   gen_cert -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
   bslots 3 -∗
   (* ---- the inode cache, and the region ialloc claims out of ---- *)
   is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
@@ -335,7 +336,7 @@ Definition wp_sys_mknod_au_era_frame
    speak about the numbers IT passed. *)
 Definition wp_sys_mknod_au_era_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname)
     (gs : list gname) (j : nat) (gl : gname)
     (pd pav pu : mword 64)
@@ -358,7 +359,7 @@ Definition wp_sys_mknod_au_era_body
 Module Type SYSMKNOD_AU_ERA.
   Parameter wp_sys_mknod_au_era :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γf : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)

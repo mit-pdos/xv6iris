@@ -132,6 +132,7 @@ From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 (* a whole-function goal over the disk invariant prints enormous; see
@@ -386,7 +387,7 @@ Ltac vcr :=
 
 Section VdiLeaves.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* -- a CONFIG-ONLY store ------------------------------------------- *)
   Lemma wp_vdi_sw (γv : disk_names)
@@ -654,6 +655,7 @@ End VdiLeaves.
 
 Section VdiLease.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.
 
   Lemma vdi_page_static (p : mword 64) :
     page_valid p ->
@@ -799,7 +801,7 @@ End VdiLease.
 Module VirtioDiskInitProof (IL : INITLOCK) (AK : KALLOC) (MS : MEMSET) : VIRTIODISKINIT.
 Section ProofVirtioDiskInit.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Ltac reg_neq :=

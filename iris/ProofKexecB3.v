@@ -125,6 +125,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
    printing one takes tens of minutes, so a one-line mistake reads as a hang.
@@ -183,7 +184,7 @@ Qed.
    back edge; [ProofKexecB2]'s pair does the same at nine slots. *)
 Section KexecB3Ph.
   Context `{!riscvGS Σ, FSC : fscfg}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma kxc_ph8_of_stack (sp0 : mword 64) :
     stack_own (KTR := KT1) (pa_stk sp0 54) 8 ⊢
@@ -266,7 +267,7 @@ End KexecB3Ph.
    which is the loop variable. *)
 Section KexecB3Seam.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rs0 := (mword_of_int 8 : mword 5).
   Notation Rs2 := (mword_of_int 18 : mword 5).
@@ -385,7 +386,7 @@ Section KexecB3Incr.
   Local Ltac ipcw := apply bv_eq; vm_compute; reflexivity.
   Local Ltac is0slot := apply stk_push; apply bv_eq; vm_compute; reflexivity.
 
-  Lemma kxc_incr `{CID0 : CpuId}
+  Lemma kxc_incr `{CID0 : CpuId} `{XI : CurCtx}
       (jp : nat)
       (gf : gname)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
@@ -798,7 +799,7 @@ Section KexecB3Body.
   Local Ltac bs0slot := apply stk_push; apply bv_eq; vm_compute; reflexivity.
 
 
-  Lemma kxc_ph_step `{CID0 : CpuId}
+  Lemma kxc_ph_step `{CID0 : CpuId} `{XI : CurCtx}
       (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
@@ -2938,7 +2939,7 @@ Section KexecB3Loop.
   Notation Rs11 := (mword_of_int 27 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
 
-  Lemma kxc_phdr `{CID0 : CpuId}
+  Lemma kxc_phdr `{CID0 : CpuId} `{XI : CurCtx}
       (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
@@ -3075,7 +3076,7 @@ Section KexecB3Close.
   Local Ltac cpcw := apply bv_eq; vm_compute; reflexivity.
 
   (* ---- +0x1a2: c.li s2,0 -- the no-segments path joins at +0x1a4 ---- *)
-  Lemma kxc_seam1a2 `{CID0 : CpuId}
+  Lemma kxc_seam1a2 `{CID0 : CpuId} `{XI : CurCtx}
       (jp : nat)
       (gf : gname)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
@@ -3190,7 +3191,7 @@ Section KexecB3Close.
   (* ---- +0x1a4 .. +0x1ae: mv a0,s4 ; jal iunlockput ; jal end_op ---- *)
   (*  ProofKexecTail's [kxc_bad64] does the same two calls; what differs   *)
   (*  is only where it goes afterwards.                                    *)
-  Lemma kxc_close `{CID0 : CpuId}
+  Lemma kxc_close `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jp : nat) (gl : gname)
  (pd pav pu : mword 64)
       (gilf gislf : gname) (gf : gname)
@@ -3444,7 +3445,7 @@ End KexecB3Close.
    already know about ([kxc_bad324] closes all five inside the loop). *)
 Section KexecB3Main.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).

@@ -73,6 +73,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 
 (* [fnode_nonzero] -- a file slot's address is never null, which is what
@@ -85,7 +86,7 @@ Module PipeallocProof (Filealloc : FILEALLOC) (Kalloc : KALLOC)
 Section ProofPipealloc.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ,
             !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   (* register indices, named once *)

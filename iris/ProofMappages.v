@@ -34,13 +34,14 @@ From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Set Printing Depth 40.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Module MappagesProof (Walk : WALK) : MAPPAGES.
 
 Section ProofMappages.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Context {kt : ktier}.
@@ -71,7 +72,7 @@ Section ProofMappages.
      hart since function entry, so there is in general no provable equality
      between the entry hart's cid and the hart the Walk call actually lands
      on. *)
-  Lemma sie_cap_gpr_settp `{CID0 : CpuId} (m : regfile) (n : nat) (b : bool)
+  Lemma sie_cap_gpr_settp `{CID0 : CpuId} `{XI : CurCtx} (m : regfile) (n : nat) (b : bool)
       (p0 v : mword 64) :
     sie_cap_gpr kt m n b p0 -∗ sie_cap_gpr kt (<[Regidx Rtp := v]> m) n b p0.
   Proof.
@@ -91,7 +92,7 @@ Section ProofMappages.
   (* ================================================================= *)
   (* THE SHARED EPILOGUE (+0x9c..+0xb0) -- sconf mirror.                 *)
   (* ================================================================= *)
-  Lemma wp_mappages_epilogue_sconf `{CID0 : CpuId} (γa : gname) (γk : gname * gname)
+  Lemma wp_mappages_epilogue_sconf `{CID0 : CpuId} `{XI : CurCtx} (γa : gname) (γk : gname * gname)
       (mm Mf : regfile) (t tf : ptree)
       (m : gmap (mword 27) (mword 64)) (npages k : nat) (perm : Z) (K lvl : nat)
       (eb : bool) (p : mword 64) (on : option nat) (q : nat) (b : bool)
@@ -409,7 +410,7 @@ Section ProofMappages.
   (* ================================================================= *)
   (* THE LOOP (+0x3e..+0x68): induction on the REMAINING page count.    *)
   (* ================================================================= *)
-  Lemma wp_mappages_loop_sconf `{CID0 : CpuId} (γa : gname) (γk : gname * gname)
+  Lemma wp_mappages_loop_sconf `{CID0 : CpuId} `{XI : CurCtx} (γa : gname) (γk : gname * gname)
       (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (K lvl : nat)
       (eb : bool) (p : mword 64) (on : option nat)

@@ -68,6 +68,7 @@ Require Import ProcPtOwn.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 
 (* ===================================================================== *)
@@ -157,7 +158,7 @@ Definition copyout_wrote (M : gmap Z (bv 8)) (dstva : mword 64) (len : nat)
   \/ (res = (mword_of_int (-1) : mword 64)
       /\ exists d : nat, (d <= len)%nat /\ M' = umem_wr M dstva d src_bytes).
 
-Definition wp_copyout_sconf_mem_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_copyout_sconf_mem_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
     (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (len : nat)
     (src_bytes : nat -> bv 8) (dqsrc : dfrac)
@@ -197,7 +198,7 @@ Definition wp_copyout_sconf_mem_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
 
 Module Type COPYOUT.
   Parameter wp_copyout_sconf_mem :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
       (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (len : nat)
       (src_bytes : nat -> bv 8) (dqsrc : dfrac)

@@ -51,6 +51,11 @@ Require Import StackOwn.                (* [pa_stk] / [uint_pa_stk] / [stack_own
 Require Import KernelText.             (* the [kernel_text] bundle this produces *)
 Require Import KernelDataInv.          (* ... and the [kernel_data] one *)
 From Kernel Require KernelInstrs KernelData.
+(* boot tier: TsoCtx/TsoCtxShim are required but NEVER imported -- an
+   unqualified import would flip this file's notations, and boot files
+   deliberately stay on the raw side of the seam (the eight-hart adequacy
+   trap).  They talk to the flipped world through qualified shim names. *)
+Require TsoCtx TsoCtxShim.
 Local Open Scope Z_scope.
 
 (* the addresses of the range [lo, lo + n), as a list.  A Fixpoint on the
@@ -521,7 +526,11 @@ Section BootCarve.
      for the writable globals, the typed .bss cells and the page run.
      Nothing is left over that anything wants -- the range's non-[KernelData]
      bytes are padding. *)
-  Lemma kernel_data_intro (g : gstate) :
+  (* boot tier: [ctx_convert]'s AMBIENT_BLACKLIST leaves boot/adequacy files
+     to fail loudly and be bound by hand, because a top-level phantom binder
+     is what breaks adequacy (the SchedCtx/boot lesson).  This one is a
+     LEMMA, not a top-level definition, so the ambient index is safe here. *)
+  Lemma kernel_data_intro `{XI : TsoCtx.CurCtx} (g : gstate) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     ([∗ map] a ↦ b ∈ ran_bytes g text_end rodata_end, a ↦ₘ□ b) -∗ kernel_data.
@@ -534,6 +543,10 @@ Section BootCarve.
     unfold KernelData.kernel_data_lo, KernelData.kernel_data_hi in Hr.
     assert (Hram : ram_lo <= a < ram_hi)
       by (unfold ram_lo, ram_hi, text_end in *; lia).
+    (* [kernel_data] is flipped (KernelDataInv imports TsoCtx); this file is
+       raw.  One qualified shim step crosses it, and this import is one
+       entry in the seam inventory that burns at cutover. *)
+    iApply TsoCtxShim.ctx_pointsto_of_mem.
     iApply (big_sepM_lookup _ _ (pa_of_z a) b with "Hd").
     rewrite /ran_bytes. apply map_lookup_filter_Some_2.
     - rewrite <- (boot_byte_data a b Hge Hlk). exact (Hmem a Hram).

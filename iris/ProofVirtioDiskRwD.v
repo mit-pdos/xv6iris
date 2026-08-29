@@ -67,6 +67,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Export FastSetSolver.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -578,7 +579,7 @@ Qed.
 
 Section VdrwdLeaves.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- the avail-ring INDEX read: [lhu rd,2(rs1)] with rs1 = disk.avail.
      Drives [virtio_proto_avail_idx_acc]: the value is the driver's OWN
@@ -1115,6 +1116,7 @@ Proof. intros -> Hkn Hs j Hj. rewrite pa_add_add. apply Hs. lia. Qed.
 
 Section VdrwdPinRes.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.
 
   (* the three word widths and the byte, straight into the [range_map] shape *)
   Lemma vdrwd_w2 (a : Arch.pa) (w : bv 16) :
@@ -1180,6 +1182,7 @@ End VdrwdPinRes.
 
 Section VdrwdPinBuild.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.
 
   (* THE ownership half: the seventeen formatted cells, the ring cell and the
      caller's buffer become the pin and the writable footprint the publish
@@ -1472,7 +1475,7 @@ Qed.
 
 Section VdrwdP4.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Notation Ra0 := (mword_of_int 10 : mword 5).

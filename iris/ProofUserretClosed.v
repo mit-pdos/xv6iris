@@ -92,6 +92,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import ParkCap.   (* [park_token] *)
 Require Import UsertrapRes.  (* [ut_park_intro_body] -- the park's producer entry *)
 Import Defs.
+Require Import TsoCtx.
 
 (* ===================================================================== *)
 (* §3 THE LOOP.                                                            *)
@@ -264,7 +265,7 @@ Module UserretClosedProof (R : USERRET) (UV : USERVEC)
 
 Section Res.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the residue is uservec's, re-exported unchanged *)
   Definition usertrap_res := UV.usertrap_res.
@@ -297,7 +298,7 @@ Section Res.
 End Res.
 
   Theorem wp_userret_closed
-      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (C : ucfg) (pt : uptd)
       (kroot : mword 44) (j : nat) (ksp : mword 64)
       (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64) :

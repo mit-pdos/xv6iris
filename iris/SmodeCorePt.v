@@ -111,6 +111,7 @@ Require Import RiscvExtras.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx TsoCtxShim.
 Import Defs.
 
 (* every non-tlb register survives a translation step (the absorption
@@ -201,7 +202,7 @@ Proof. reflexivity. Qed.
 Section SmodeCorePt.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* =================================================================== *)
   (* WINDOW COLLAPSE (uniform-claims): a non-straddling [len]-byte chunk   *)
@@ -365,6 +366,9 @@ Section SmodeCorePt.
       iMod (IH Hxs mm with "Hk Hm Hrest") as "[Hm Hrest]".
       iAssert (kmap_at (svpn_of (pa_add va x)) ppn KP_rw)%I as "#Hkx".
       { rewrite (svpn_of_pa_add va x Hcan Hx). iExact "Hk". }
+      (* [mem_pointsto_pin] is a raw RiscvPtsto law with no ctx twin: cross the
+         seam with the shim, then apply it. *)
+      iDestruct (TsoCtxShim.ctx_pointsto_to_mem with "Ha") as "Ha".
       iDestruct (mem_pointsto_pin (pa_add va x) (DfracOwn 1) (gold x) ppn with "Hkx Ha")
         as "(%Hc & %Hd & %Hid & Hp & _)".
       simpl foldr.

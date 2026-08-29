@@ -72,6 +72,7 @@ Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* ===================================================================== *)
 (* §1  uvmalloc's OWN pure [Z] arithmetic -- the loop-trip characterisation *)
@@ -259,7 +260,7 @@ Local Notation URs7 := (mword_of_int 23 : mword 5).
 
 Section UvmallocDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* SpecUvmalloc's post disjunction, at an abstract return value *)
   Definition ua_pay (P : uptd) (M : gmap Z (bv 8))
@@ -288,7 +289,7 @@ Section UvmallocDefs.
      +0x78 at different harts, so [ua_exit] carries its own fresh [CID0]
      binder and wraps its whole body in [wp_next], exactly like [frepi] in
      ProofFreerange. *)
-  Definition ua_exit `{GEN : GenId} `{CID0 : CpuId} (mm : regfile)
+  Definition ua_exit `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} (mm : regfile)
       (P : uptd) (M : gmap Z (bv 8))
       (vpn0 : mword 27) (n : nat) (xperm : Z) (K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string) (sp0 spr oldsz newsz : mword 64) : iProp Σ :=
@@ -321,7 +322,7 @@ Module UvmallocProof (Kalloc : KALLOC) (MemsetPage : MEMSETPAGE)
 
 Section ProofUvmalloc.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := URra.
   Notation Rtp := URtp.

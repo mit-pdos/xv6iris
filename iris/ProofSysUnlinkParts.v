@@ -77,6 +77,7 @@ Require Import SpecSysUnlink.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Set Printing Depth 40.
 
@@ -1073,7 +1074,7 @@ Section ProofSysUnlinkEpilogue.
   Notation Rs3 := (mword_of_int 19 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
 
-  Lemma su_epilogue `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (m M : regfile) (sp0 : mword 64) (K : nat) (b : bool) (pj : mword 64)
       (w3 w4 w5 w6 w27 w30 : mword 64) (bd bn bp be : nat -> bv 8) :
     (30 <= K)%nat -> ((K - 30) + 30 = K)%nat ->

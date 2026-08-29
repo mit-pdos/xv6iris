@@ -93,6 +93,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* the static [int first], at its identity-mapped kernel address.
    [SpecForkret] names the same cell; this is the definition it uses. *)
@@ -214,6 +215,7 @@ Section FirstTok.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
   Context `{!xv6G Σ, !bioslotG Σ} `{ICFG : icfg}.
+  Context `{XI : CurCtx}.
 
   (* ================================================================== *)
   (*  1.  THE PERSISTENT HALF -- what main has built by +0x9e             *)
@@ -243,7 +245,7 @@ Section FirstTok.
      (∃ pd pav pu : mword 64,
         disk_geom fsc_disk pd pav pu ∗
         is_lock fsc_dlock d_lock "virtio_disk"%string
-                (disk_res fsc_disk pd pav pu)) ∗
+                <{ disk_res fsc_disk pd pav pu }>) ∗
      is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst
                 icfg_nib icfg_dev ∗
      itable_inv ∗
@@ -252,7 +254,7 @@ Section FirstTok.
      ireg_reg fsc_ireg fsc_fs icfg_ist icfg_nib ∗
      bitmap_reg fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
-       (kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) ∗
+       <{ kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24)) }> ∗
      ⌜fs_geom_ok⌝)%I.
 
   Global Instance first_boot_persist_persistent : Persistent first_boot_persist.

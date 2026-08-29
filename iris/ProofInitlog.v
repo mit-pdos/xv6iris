@@ -106,6 +106,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
    printable (claude-notes/durable-notes.md) *)
@@ -913,7 +914,7 @@ Section InitlogBlocks.
   (*  cells arrive holding the decoded write set (empty at nh = 0) and    *)
   (*  the junk tail.                                                      *)
   (* ================================================================== *)
-  Local Lemma il_hd `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma il_hd `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (kk nh : nat) (bs_hdr : list (bv 8))
       (pj : SailStdpp.Values.mword 64) (nK : nat) (b : bool)
       (M : regfile) :
@@ -1134,7 +1135,7 @@ End InitlogBlocks.
 
 Section ProofInitlog.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_initlog_sconf 
       (γs : list gname) (j : nat) (γl : gname)

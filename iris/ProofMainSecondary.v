@@ -69,6 +69,7 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 Set Printing Depth 40.
@@ -112,7 +113,7 @@ Module MainSecondaryProof
 
 Section ProofMainSecondary.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Ltac reg_neq :=
     lazymatch goal with
@@ -608,7 +609,7 @@ Section ProofMainSecondary.
        the geometry are the pieces that are not this hart's to make.
        Persistent, so they simply ride in. *)
     console_caps γd -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γv pd pav pu }> -∗
     disk_geom γv pd pav pu -∗
     (* this hart's timer capability, allocated in the boot chain *)
     timer_cap -∗

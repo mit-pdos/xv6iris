@@ -73,6 +73,17 @@ Section shim.
   Lemma ctx_dom_sc (ξ ξ' : CtxId) : ⊢@{iPropI Σ} ctx_dom ξ ξ'.
   Proof. rewrite ctx_dom_unseal /ctx_dom_def. done. Qed.
 
+  (* THE INSTALL RECEIPT AT ANY POSITION -- SC ONLY, and it belongs here for
+     the same reason [hart_view_lb_any] does on the T-leg: at SC a log
+     position is not evidence of anything, so a creator can name one it has
+     not earned.  Under TSO the receipt comes off the store leaf beside the
+     window it wrote ([TsoGhost.llb loglen_name]) and this lemma is FALSE.
+     Its one client is the lock creators' floor (WpLock's newlock family):
+     when the shim burns, each is a compile error naming a creator whose
+     floor must then come from its own store. *)
+  Lemma log_lb_any (lo : nat) : ⊢@{iPropI Σ} log_lb lo.
+  Proof. rewrite log_lb_unseal /log_lb_def. done. Qed.
+
   Lemma ctx_pointsto_shim (KTR : CurKtier) (ξ : CtxId)
       (a : Arch.pa) (dq : dfrac) (v : bv 8) :
     ctx_pointsto (KTR := KTR) ξ a dq v ⊣⊢ mem_pointsto (KTR := KTR) a dq v.

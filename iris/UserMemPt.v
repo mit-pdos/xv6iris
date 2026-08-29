@@ -38,6 +38,7 @@ Require Import WpMmodeLeafBase.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import MemAccessGen.
 Require Import HartMemRun HartMemAsm PtWalkCert.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -403,7 +404,7 @@ Qed.
 
 Section UserMemPtGhost.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma udata_own_upd (data : gset Arch.pa) (l : list nat) (pa : Arch.pa)
         {wd : N} (v : bv wd) (m : _) :
@@ -444,7 +445,7 @@ End UserMemPtGhost.
 
 Section UserMemPtGeneric.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (k : Z).
   Context (Hk : 0 < k) (Hk8 : k <= 8) (Hkdvd : (k | 4096)).
   Context (Huintk : uint (to_bits 64 k) = k).
@@ -991,6 +992,7 @@ Section GenRead.
   Context (k : Z) (Hk : 0 < k) (Hk8 : k <= 8).
   Context (pbmt : page_based_mem_type) (addr : mword 64) (region : PMA_Region).
   Context (w : mword (8 * k)) (s : mstate) (mm : PtBytes.pamap).
+  Context `{XI : CurCtx}.
 
   Hypothesis HDc : Dr pmpcfg_n = true.
   Hypothesis HDa : Dr pmpaddr_n = true.
@@ -1210,6 +1212,7 @@ Section GenWrite.
   Context (k : Z) (Hk : 0 < k) (Hk8 : k <= 8).
   Context (pbmt : page_based_mem_type) (addr : mword 64) (region : PMA_Region).
   Context (data : mword (8 * k)) (s : mstate) (mm : PtBytes.pamap).
+  Context `{XI : CurCtx}.
 
   Hypothesis HDc : Dr pmpcfg_n = true.
   Hypothesis HDa : Dr pmpaddr_n = true.
@@ -1495,7 +1498,7 @@ End GenWrite2.
 
 Section UserMemPtInstances.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
 
@@ -1519,7 +1522,7 @@ End UserMemPtInstances.
 
 Section UserMemPtAmo.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
 End UserMemPtAmo.

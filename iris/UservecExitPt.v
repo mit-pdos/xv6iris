@@ -72,6 +72,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 (* ===================================================================== *)
@@ -95,7 +96,7 @@ Local Notation uve_zerobit :=
 
 Section UveJalr.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma swp_cj_JALR_link (dq : dfrac) (rs1 rd : SailStdpp.Values.mword 5)
       (m : regfile) (npc0 menv0 : SailStdpp.Values.mword 64) :
@@ -167,7 +168,7 @@ End UveJalr.
 
 Section UservecExitPt.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_uservec_exit_pt (kroot uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64))

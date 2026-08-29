@@ -10,6 +10,7 @@ Require Import SailStdpp.Base.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 From iris.base_logic.lib Require Import invariants.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -513,7 +514,7 @@ End ForwardLD.
 
 Section StepLD.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context {dqc : dfrac}.
 
 End StepLD.

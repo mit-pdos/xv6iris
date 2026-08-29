@@ -40,11 +40,12 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep
         RiscvFetchExec.
 Require Import KptPt KMap.
 Require Import InstrBytes.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Section WpInstrRun.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* [decode_ok] survives a nextPC write: the compressed expansion runs AFTER
      the fetch has committed nextPC, so it needs the same regime pins at the

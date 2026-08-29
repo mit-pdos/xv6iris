@@ -70,6 +70,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Set Printing Depth 40.
 
@@ -110,7 +111,7 @@ Definition iul_sp (m M : regfile) : Prop :=
 
 Section ProofIunlockMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* iunlock's 32-byte frame: ra@24 s0@16 s1@8 s2@0 *)
   Definition iul_frame (m : regfile) : iProp Σ :=
@@ -119,7 +120,7 @@ Section ProofIunlockMain.
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈[KT1] (m !!! Regidx Rs2 : mword 64))%I.
 
-  Definition iul_cont `{CID0 : CpuId}
+  Definition iul_cont `{CID0 : CpuId} `{XI : CurCtx}
       (k : nat) (s : Qp) (g : gname) (d : ic_dep)
       (dev inum : mword 32)
       (pidv : mword 32) (dq : dfrac)

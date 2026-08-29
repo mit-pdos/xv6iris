@@ -26,6 +26,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
    [name] argument.  It sits in .rodata just past etext and has no ELF symbol of
    its own, so it is spelled out here (see kernel.asm: 80007028 <etext+0x28>). *)
 Definition pr_name_str : Z := 0x80007028%Z.
+Require Import TsoCtx.
 
 (* printkinit() = initlock(&pr.lock, "pr").  It takes no arguments and touches
    no state beyond the three fields of the global [pr.lock]: the caller hands
@@ -34,7 +35,7 @@ Definition pr_name_str : Z := 0x80007028%Z.
    lock then becomes an [is_lock] over some printk resource is the caller's
    ghost step, not printkinit's -- it need only add the invariant
    ([is_lock_intro]).  The "pr" literal itself is read out of [kernel_data]. *)
-Definition wp_printkinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64) :=
+Definition wp_printkinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.printkinit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   let lk : mword 64 := mword_of_int KernelSyms.pr in
@@ -59,6 +60,6 @@ Definition wp_printkinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CI
 
 Module Type PRINTKINIT.
   Parameter wp_printkinit_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64),
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64),
       wp_printkinit_sconf_body m K vlock vname vcpu b p.
 End PRINTKINIT.

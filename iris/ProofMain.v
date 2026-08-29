@@ -127,6 +127,7 @@ Require Import WaitInv.   (* [wait_res] -- what main finally brings wait_lock up
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 Set Printing Depth 40.
@@ -189,7 +190,7 @@ Module MainProof
 
 Section ProofMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Ltac reg_neq :=
     lazymatch goal with
@@ -859,17 +860,17 @@ Section ProofMain.
            postcondition, forwarded instead of being sealed inside the
            bundle one line up. *)
         is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
-          (kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) -∗
+          <{ kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24)) }> -∗
         procs_inv γs -∗
         (* THE nextpid LOCK, built here out of procinit's [lk_fresh] and the
            cell above.  Persistent.  allocproc takes it, so kfork, sys_fork
            and -- at its real contract -- userinit all do. *)
-        is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
+        is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> -∗
         (* THE wait_lock, built the same way and for the first time.  Every
            consumer in the tree takes it -- kexit, kwait, reparent, the
            syscall environment -- and nothing has ever built one; see
            projects/forkret-park.md E3. *)
-        is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+        is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
         (* the KPT receipt kvminithart minted, on its way to [trap_csrs] *)
         kpt_on cpu_id -∗
         (∃ v : mword 64, stvec ↦ᵣ v) -∗
@@ -1293,7 +1294,7 @@ Section ProofMain.
     console_caps γd -∗
     ConsoleInv.console_ready -∗
     is_tickslock γtl -∗
-    is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+    is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
     (* ---- ...AND ITS FOUR FORWARDED PERSISTENT ROWS.  [printk_env] is
        [mn_grp_printk]'s product and the kmem [is_lock] is [mn_grp_kvm]'s;
        [gen_cert] and [FsCrash.fs_crash_seam] come down the boot chain from
@@ -1301,7 +1302,7 @@ Section ProofMain.
        this group -- they are parked in the boot token at +0x9e. ---- *)
     printk_env fsc_printk fsc_uart fsc_disk -∗
     is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
-      (kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) -∗
+      <{ kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24)) }> -∗
     gen_cert -∗
     FsCrash.fs_crash_seam fsc_cov fsc_logst -∗
     (* ---- `static int first = 1', PINNED (fs-cfg-boot.md (f-2)).  One of
@@ -1328,7 +1329,7 @@ Section ProofMain.
     (* ...and the [nextpid] lock, for the same reason and to the same place:
        userinit's real contract takes it (allocproc's own premise), the weak
        one does not.  Persistent, so carrying it costs a frame. *)
-    is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
+    is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> -∗
     kalloc_env_at fsc_kalloc fsc_kpages (avail_sub (Some (length ps)) K_kvmmake) -∗
     lk_raw bcache_addr -∗
     ([∗ list] k ∈ seq 0 NBUF, sl_raw (buf_lock (bnode k))) -∗
@@ -1401,7 +1402,7 @@ Section ProofMain.
         pc_is (mword_of_int (KernelSyms.main + 0xa2) : mword 64) -∗
         cpu_ctx_free -∗
         cpu_own 0 false p0 false ∅ -∗
-        is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
+        is_lock γk d_lock "virtio_disk"%string <{ disk_res γv pd pav pu }> -∗
         disk_geom γv pd pav pu -∗
         (* ...AND THE OPEN-FILE TABLE'S LOCK, which is fileinit's output plus
            the resource the carve now hands over.  The two gnames are this
@@ -1759,7 +1760,7 @@ Section ProofMain.
     iAssert (∃ pd' pav' pu' : mword 64,
                disk_geom fsc_disk pd' pav' pu' ∗
                is_lock fsc_dlock d_lock "virtio_disk"%string
-                       (disk_res fsc_disk pd' pav' pu'))%I as "#Hdpair".
+                       <{ disk_res fsc_disk pd' pav' pu' }>)%I as "#Hdpair".
     { rewrite Hdiskq. iExists pd, pav, pu. iFrame "Hgeom Hdlock". }
     (* THE DEVICE COMPLEMENT the park wants, at the ambient names: every
        member is in hand here and none is assumed. *)
@@ -1849,7 +1850,7 @@ Section ProofMain.
          printk_env γpr' γd γv -∗
          procs_inv γs' -∗
          console_caps γd -∗
-         is_lock γk' d_lock "virtio_disk"%string (disk_res γv pd' pav' pu') -∗
+         is_lock γk' d_lock "virtio_disk"%string <{ disk_res γv pd' pav' pu' }> -∗
          disk_geom γv pd' pav' pu' -∗
          kpt_inv root' -∗
          (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□
@@ -1860,7 +1861,7 @@ Section ProofMain.
     printk_env γpr γd γv -∗
     procs_inv γs -∗
     console_caps γd -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γv pd pav pu }> -∗
     disk_geom γv pd pav pu -∗
     kpt_inv root -∗
     (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□

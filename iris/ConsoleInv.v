@@ -84,6 +84,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 
 (* ------------------------------------------------------------------ *)
@@ -190,6 +191,7 @@ Proof. intro H. rewrite /devsw_write_val. by case_decide. Qed.
 
 Section ConsoleInv.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{XI : CurCtx}.
 
   (* the ring, byte by byte -- [PipeInvDefs.pipe_data]'s shape.  The contents
      are a list rather than a function so that a single-byte update is a
@@ -214,7 +216,7 @@ Section ConsoleInv.
   (* THE WHOLE CREDENTIAL.  Persistent, singleton, and taken by value: a
      caller of consoleread passes this and nothing else about the console. *)
   Definition is_conslock (γ : gname) : iProp Σ :=
-    is_lock γ a_cons "cons"%string cons_res.
+    is_lock γ a_cons "cons"%string <{ cons_res }>.
 
   Global Instance is_conslock_persistent γ : Persistent (is_conslock γ).
   Proof. apply _. Qed.
@@ -399,8 +401,8 @@ Section ConsoleInv.
     devsw_table.
   Proof.
     iIntros "Hrest Hr Hw".
-    iMod (word_pointsto_persist with "Hr") as "#Hr".
-    iMod (word_pointsto_persist with "Hw") as "#Hw".
+    iMod (ctx_word_pointsto_persist with "Hr") as "#Hr".
+    iMod (ctx_word_pointsto_persist with "Hw") as "#Hw".
     rewrite /devsw_table /devsw_rest.
     iApply big_sepL_bupd.
     (* [big_sepL_impl], NOT [big_sepL_mono]: the latter takes a Coq-level
@@ -417,8 +419,8 @@ Section ConsoleInv.
     - rewrite /devsw_read_val /devsw_write_val.
       rewrite !(decide_False _ _ Hc).
       iDestruct "H" as "[Hzr Hzw]".
-      iMod (word_pointsto_persist with "Hzr") as "$".
-      iMod (word_pointsto_persist with "Hzw") as "$".
+      iMod (ctx_word_pointsto_persist with "Hzr") as "$".
+      iMod (ctx_word_pointsto_persist with "Hzw") as "$".
       by iModIntro.
   Qed.
 
@@ -439,8 +441,8 @@ Section ConsoleInv.
     iApply big_sepL_bupd.
     iApply (big_sepL_mono with "H").
     iIntros (i x Hx) "[Hr Hw]".
-    iMod (word_pointsto_persist with "Hr") as "$".
-    iMod (word_pointsto_persist with "Hw") as "$".
+    iMod (ctx_word_pointsto_persist with "Hr") as "$".
+    iMod (ctx_word_pointsto_persist with "Hw") as "$".
     by iModIntro.
   Qed.
 

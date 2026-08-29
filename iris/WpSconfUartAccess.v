@@ -31,6 +31,7 @@ Require Import WpSmodeUart.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* ===================================================================== *)
 (*  The LSR poll's read value and branch test, as functions of the byte   *)
@@ -107,7 +108,7 @@ Section WpSconfUartAccess.
   (* inside an [iApply] is SHELVED, not reported.                          *)
   (* ==================================================================== *)
 
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
      bundle like the register map.  Implicit, so no call site changes. *)
   Context {p : mword 64}.

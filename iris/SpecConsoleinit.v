@@ -75,6 +75,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
    itself, and has no ELF symbol of its own, so it is spelled out here (see
    kernel.asm: 80007000 <etext>). *)
 Definition cons_name_str : Z := 0x80007000%Z.
+Require Import TsoCtx.
 
 (* devsw[CONSOLE].  CONSOLE = 1 and a [struct devsw] is two function pointers,
    so the entry starts at devsw + 16, its [.read] field at +0 and [.write] at
@@ -91,7 +92,7 @@ Definition devsw_console_write : mword 64 := mword_of_int (KernelSyms.devsw + 24
    only from main() before intr_on(), so it is stated at [false] with no
    [wp_next] wrapper, the same shape as SpecCpuid.v / SpecTrapinithart.v /
    SpecPlicClaim.v. *)
-Definition wp_consoleinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_consoleinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γd : uart_names) (m : regfile) (K : nat)
     (l : list (bv 8)) (b0 : bool)
     (vclock : bv 32) (vcname vccpu : bv 64)
@@ -162,7 +163,7 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
 
 Module Type CONSOLEINIT.
   Parameter wp_consoleinit_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γd : uart_names) (m : regfile) (K : nat)
       (l : list (bv 8)) (b0 : bool)
       (vclock : bv 32) (vcname vccpu : bv 64)

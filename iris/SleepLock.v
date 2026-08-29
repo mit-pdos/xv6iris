@@ -92,10 +92,12 @@ Require Import SailStdpp.Base SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d.
 Require Import RiscvPtsto.
 Require Import WpLock.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Section SleepLock.
   Context `{!riscvGS Σ, !lockG Σ}.
+  Context `{XI : CurCtx}.
 
   (* ---- geometry, in the EXACT instruction address forms so the cells
      unify with the leaf and call specs without rewriting:
@@ -425,10 +427,17 @@ Section SleepLock.
   (* the whole sleeplock: its name plus the inner spinlock -- named
      "sleep lock", the literal initsleeplock passes to initlock -- over
      [sl_res_gen].  Persistent: every user shares it. *)
+  (* PAYLOAD FORM: the const embedding, and it is correct HERE though the
+     M-leg spells this one as a real lambda.  Measured: main's [sl_res_gen]
+     has type [gname -> mword 64 -> iProp -> (Qp -> iProp) -> iProp] -- NO
+     context argument, because its [↦4] has not flipped in this file.  On
+     the M-leg it HAS, so its payload is context-mentioning and the const
+     embedding would be 5.1(a)'s error there.  When this file's word tier
+     flips, this becomes [(fun xi => sl_res_gen (XI := xi) ...)]. *)
   Definition is_sleeplock_gen (γl γ : gname) (slk : mword 64) (s : string)
       (R : iProp Σ) (H : Qp -> iProp Σ) : iProp Σ :=
     (sl_name slk s ∗
-     is_lock γl (sl_lk slk) "sleep lock"%string (sl_res_gen γ slk R H))%I.
+     is_lock γl (sl_lk slk) "sleep lock"%string <{ sl_res_gen γ slk R H }>)%I.
 
   Definition is_sleeplock (γl γ : gname) (slk : mword 64) (s : string)
       (R : iProp Σ) : iProp Σ :=
@@ -456,11 +465,11 @@ Section SleepLock.
   Proof. iIntros "[$ _]". Qed.
   Lemma is_sleeplock_gen_lock γl γ slk s R H :
     is_sleeplock_gen γl γ slk s R H -∗
-    is_lock γl (sl_lk slk) "sleep lock"%string (sl_res_gen γ slk R H).
+    is_lock γl (sl_lk slk) "sleep lock"%string <{ sl_res_gen γ slk R H }>.
   Proof. iIntros "[_ $]". Qed.
   Lemma is_sleeplock_gen_intro γl γ slk s R H :
     sl_name slk s -∗
-    is_lock γl (sl_lk slk) "sleep lock"%string (sl_res_gen γ slk R H) -∗
+    is_lock γl (sl_lk slk) "sleep lock"%string <{ sl_res_gen γ slk R H }> -∗
     is_sleeplock_gen γl γ slk s R H.
   Proof. iIntros "#Hn #Hl". by iFrame "Hn Hl". Qed.
 
@@ -469,11 +478,11 @@ Section SleepLock.
   Proof. apply is_sleeplock_gen_name. Qed.
   Lemma is_sleeplock_lock γl γ slk s R :
     is_sleeplock γl γ slk s R -∗
-    is_lock γl (sl_lk slk) "sleep lock"%string (sl_res γ slk R).
+    is_lock γl (sl_lk slk) "sleep lock"%string <{ sl_res γ slk R }>.
   Proof. apply is_sleeplock_gen_lock. Qed.
   Lemma is_sleeplock_intro γl γ slk s R :
     sl_name slk s -∗
-    is_lock γl (sl_lk slk) "sleep lock"%string (sl_res γ slk R) -∗
+    is_lock γl (sl_lk slk) "sleep lock"%string <{ sl_res γ slk R }> -∗
     is_sleeplock γl γ slk s R.
   Proof. apply is_sleeplock_gen_intro. Qed.
 
@@ -600,8 +609,9 @@ Section SleepLock.
   Proof.
     iIntros "Hfree #Hlnm #Hsnm Hlkw Hcpu Hw Hpid HR".
     iDestruct (sl_free_hold_intro with "Hfree Hpid") as (q0) "[Htok Hha]".
-    iMod (newlock E (sl_lk slk) "sleep lock"%string (sl_res_gen γ slk R H)
-            with "Hlnm Hlkw Hcpu [Hw Htok Hha HR]") as (γl) "#Hlk".
+    iMod (newlock E (sl_lk slk) "sleep lock"%string <{ sl_res_gen γ slk R H }>
+            with "Hlnm Hlkw [Hcpu] [Hw Htok Hha HR]") as (γl) "#Hlk".
+    { iApply (WpLock.lk_cpu_ready_intro with "Hcpu"). }
     { iApply (sl_res_close_free with "Hw Htok Hha HR"). }
     iModIntro. iExists γl.
     iApply (is_sleeplock_gen_intro with "Hsnm Hlk").
@@ -624,8 +634,9 @@ Section SleepLock.
     { rewrite -!pair_op !left_id !right_id. apply pair_valid.
       split; [ by apply excl_auth_valid | by apply auth_auth_valid ]. }
     iDestruct "Hg" as "[[Hha Htok] Hauth]".
-    iMod (newlock E (sl_lk slk) "sleep lock"%string (sl_res_gen γ slk R (H γ))
-            with "Hlnm Hlkw Hcpu [Hw Htok Hha Hpid HR]") as (γl) "#Hlk".
+    iMod (newlock E (sl_lk slk) "sleep lock"%string <{ sl_res_gen γ slk R (H γ) }>
+            with "Hlnm Hlkw [Hcpu] [Hw Htok Hha Hpid HR]") as (γl) "#Hlk".
+    { iApply (WpLock.lk_cpu_ready_intro with "Hcpu"). }
     { iApply (sl_res_close_free with "Hw [Htok Hpid] Hha HR").
       iFrame "Htok Hpid". }
     iModIntro. iExists γl, γ. iFrame "Hauth".

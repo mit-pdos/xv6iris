@@ -147,6 +147,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Set Printing Depth 40.
 
@@ -380,7 +381,7 @@ Section IlockDefs.
   (* [fsc_ic] and [s] are here for ONE resource: the other half of the entry
      sleeplock's checkout descriptor (§14.8).  SpecIlock v3 hands it to the
      caller, so both arms of the function have to carry it to the join. *)
-  Definition il_cont `{GEN : GenId} `{CID0 : CpuId} 
+  Definition il_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (gisl : gname)
       (s : Qp) (g : gname) (d : ic_dep) (o : ilkc)
       (k : nat) (ip : mword 64) (inum : mword 32)
@@ -433,7 +434,7 @@ End IlockDefs.
 Section IlockEpilogue.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma il_epilogue `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma il_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx} 
       (j : nat) (gisl : gname)
       (s : Qp) (g : gname) (d : ic_dep) (o : ilkc)
       (k : nat) (ip : mword 64) (inum : mword 32)
@@ -716,7 +717,7 @@ Section IlockLoad.
       [done | exfalso; apply Hc; reflexivity].
   Qed.
 
-  Local Lemma il_load `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma il_load `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)
  (gisl : gname)
@@ -759,7 +760,7 @@ Section IlockLoad.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     il_frame m -∗
     proc_priv_bare (proc_addr j) pidv Upr -∗
     i_dev ip ↦₄{DfracOwn (1/2)} icfg_dev -∗
@@ -2222,7 +2223,7 @@ End IlockLoad.
 
 Section ProofIlockMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_ilock_dep_sconf
       (gs : list gname) (j : nat) (gl : gname)

@@ -57,7 +57,7 @@
    Three consequences shape the script:
 
    * THE THREE BLOCK LEMMAS ([sp_ofile_null], [sp_close2], [sp_epi]) and the
-     unused-but-kept [sp_sp_bounds] each take their OWN `{CID0 : CpuId}
+     unused-but-kept [sp_sp_bounds] each take their OWN `{CID0 : CpuId} `{XI : CurCtx}
      binder and wrap their continuation in [wp_next b], closing it with
      [iSpecialize ("Hcont" $! CIDn with "[%]"); [wp_next_chain|]].  They are
      applied with the hart PINNED ([sp_close2 (CID0 := CID43) ...]): the
@@ -127,6 +127,7 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 
@@ -444,7 +445,7 @@ Local Typeclasses Transparent word4_pointsto.
 Section ProofSysPipe.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* register indices, named once *)
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -471,7 +472,7 @@ Section ProofSysPipe.
      The premise is local to this helper: every call site sits inside the
      capstone, whose [<fn>_stack <= av] premise is already unfolded, so it is
      a [lia].) *)
-  Lemma sp_sp_bounds `{CID0 : CpuId} (m : regfile) (k : nat)
+  Lemma sp_sp_bounds `{CID0 : CpuId} `{XI : CurCtx} (m : regfile) (k : nat)
       (b : bool) (p : mword 64) :
     (0 < k)%nat ->
     sie_cap_gpr KT1 m k b p -∗
@@ -493,7 +494,7 @@ Section ProofSysPipe.
      afterwards.  The two operands are the same pair either way, so the lemma
      stays ONE, indexed by which of the pair is the destination; the price is
      that the postcondition preserves everything but a5 AND [Rd]. *)
-  Lemma sp_ofile_null `{CID0 : CpuId}
+  Lemma sp_ofile_null `{CID0 : CpuId} `{XI : CurCtx}
       (Mt : regfile) (nav : nat) (p : mword 64) (fd : nat) (Rd Ro : mword 5)
       (za zb zc zd ze : Z) (old : mword 64) (b : bool) :
     (0 <= Z.of_nat fd < 16)%Z ->
@@ -679,7 +680,7 @@ Section ProofSysPipe.
     rewrite fileclose_fs_env_nopid_eq. iExact "Hfe'".
   Qed.
 
-  Lemma sp_close2 `{CID0 : CpuId}  (γfl γf : gname)
+  Lemma sp_close2 `{CID0 : CpuId} `{XI : CurCtx}  (γfl γf : gname)
       (fn : fclose_names) (on : option nat)
       (Mt : regfile) (nav : nat) (eb : bool) (p : mword 64)
       (sp0 : mword 64) (k0 k1 : nat) (q0 q1 : Qp) (st0 st1 : fdstate)
@@ -890,7 +891,7 @@ Section ProofSysPipe.
   (*  +0xda .. +0xe4 -- THE epilogue.  All four exits reach it with the   *)
   (*  return value already in a5, so it is proved once over that value.   *)
   (* =================================================================== *)
-  Lemma sp_epi `{CID0 : CpuId}
+  Lemma sp_epi `{CID0 : CpuId} `{XI : CurCtx}
       (m Mt : regfile) (av : nat) (rv : mword 64)
       (sp0 ra0 s00 s10 : mword 64) (w4 w5 w6 w7 w8 : bv 64)
       (p : mword 64) (b : bool) :

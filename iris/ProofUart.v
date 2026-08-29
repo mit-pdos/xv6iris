@@ -38,12 +38,13 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SpecUart.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 Module UartProof : UART.
 
 Section ProofUart.
 Context `{!riscvGS Σ, !xv6G Σ}.
-Context `{GEN : GenId} `{CID : CpuId}.
+Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Context {kt : ktier}.
   Lemma wp_sb_uart_uinv_s_sconf (γd : uart_names)

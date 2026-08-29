@@ -57,6 +57,7 @@ Require Import HartMemRun PtBytes.
 Require Import PtreeType CommonWalk Pt4kWalk PtTree.
 Require Import RiscvFetchExec PtTreeAdue SmodePte UptTree UserPtTree.
 Require Import UserBits.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -103,6 +104,7 @@ Definition ptree_bytes (lvl : nat) (t : ptree) : pamap := ⋃ (pt_maps lvl t).
 
 Section UserBytesTree.
   Context `{!riscvGS Σ}.
+  Context `{XI : CurCtx}.
 
   (* the node-identity ghosts, which are NOT bytes.  Persistent, so keeping
      them aside across the byte view costs nothing. *)
@@ -755,7 +757,7 @@ Qed.
 
 Section UserBytesData.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* THE PROCESS'S MEMORY AS THE HART'S BYTE MAP.  The CONTENTS survive
      (the two maps hold the same bytes, re-keyed); only the KEYING moves.
@@ -820,7 +822,7 @@ End UserBytesData.
 
 Section UserPtInvBytes.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the register cells [utlb_inv_pt] owns, as one bundle *)
   Definition upt_regs (P : uptd) (usatp : mword 64)

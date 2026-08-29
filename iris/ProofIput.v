@@ -156,6 +156,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Set Printing Depth 40.
 
@@ -449,7 +450,7 @@ Section IputCommon.
 
   (* [ProofIdup.sie_b_agree], verbatim. *)
   Lemma ip_sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool)
-      `{GEN : GenId} `{CID : CpuId} (p : mword 64) (lks : gset string) :
+      `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (p : mword 64) (lks : gset string) :
     sie_cap_gpr KT1 m K0 b p -∗ cpu_own n eb p b lks -∗
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
@@ -538,7 +539,7 @@ Section IputTail.
      / [trap_csrs_ext_transport] under the [wp_next] wrapper below) -- which
      is exactly what [ip_tail_exit] did inline before the factoring, and what
      lets the two callers keep completely different posts. *)
-  Lemma ip_epilogue `{GEN : GenId} `{CID : CpuId}
+  Lemma ip_epilogue `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (j : nat) (D : regfile) (K : nat) (eb : bool)
       (sp0 v1 v2 v3 v4 v5 v6 : mword 64) :
     let pj := proc_addr j in
@@ -694,7 +695,7 @@ Section IputTail.
     rewrite /P1 upd_ne; [reflexivity | regne].
   Qed.
 
-  Lemma ip_tail_exit `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
+  Lemma ip_tail_exit `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (j : nat)
  (Sb Sb' : gset Z)
       (k n n' : nat) (spf : bool -> nat) (wb crb0 : bool)
@@ -905,7 +906,7 @@ Section IputTail.
   Qed.
 
   (* ---- THE TAIL PROPER: +0x20 (the re-read) .. +0x24 (the close) ---- *)
-  Lemma ip_tail `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
+  Lemma ip_tail `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (j : nat)
  (Sb Sb' : gset Z)
       (k : nat) (q : Qp) (inum : mword 32)
@@ -1437,7 +1438,7 @@ Section IputFreePath.
          parked at +0x94);
        - log ledger grown by the inode block; the frame still held.
      ====================================================================== *)
-  Lemma ip_free_offlock `{GEN : GenId} `{CID0 : CpuId}
+  Lemma ip_free_offlock `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
  (inum : mword 32) (dn : dinode)
@@ -1524,7 +1525,7 @@ Section IputFreePath.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
     bslots 2 -∗
     log_epoch_lb icfg_log v -∗
@@ -2240,7 +2241,7 @@ Section IputFreePath.
      the premise site, and the 586 site in the body where the surplus half is
      now fed to the wand instead of dropped).
      ========================================================================== *)
-  Lemma ip_free_locked `{GEN : GenId} `{CID0 : CpuId}
+  Lemma ip_free_locked `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
       (gil gisl g1 : gname)
@@ -2434,7 +2435,7 @@ Section IputFreePath.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     bslots 3 -∗
     (* THE GROUP CREDIT (fs-log.md §G.18's chain, §G.21's tier; [SpecIput]'s
        [wp_iput_gen_body] premise verbatim).  At [crz = false] this is [emp]
@@ -3696,7 +3697,7 @@ Section IputFreePath.
      7568 B carried in Delta at every step of that walk
      (optimization.md, fold block continuations).  The forall stays
      OUTSIDE so the call sites can still instantiate it. *)
-  Definition ip_entry_exit2 `{GEN : GenId} `{CIDa : CpuId}
+  Definition ip_entry_exit2 `{GEN : GenId} `{CIDa : CpuId} `{XI : CurCtx}
  (k : nat) (q : Qp) (inum : mword 32) (Mt : gmap nat (Qp * positive)) (ci : gmap nat (mword 32 * mword 32)) (u : nat) (Sb : gset Z) (cru : bool) (e0 : nat) (v : nat) (tid : nat) (qtx : Qp) (pidv : mword 32) (dqb : dfrac) (dqs : dfrac) (m : regfile) (K : nat) (eb : bool) (lks : gset string) (Upr : ustate) (rg : bool) (ip : mword 64) (pj : mword 64) (sp0 : mword 64) (spd : mword 64) (M5 : regfile) (g1 : gname) (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) : iProp Σ :=
     (⌜bv_unsigned (di_type dn) <> 0⌝ -∗
        ⌜bv_unsigned (di_nlink dn) = 0⌝ -∗
@@ -3824,7 +3825,7 @@ Section IputFreePath.
      1652 B carried in Delta at every step of that walk
      (optimization.md, fold block continuations).  The forall stays
      OUTSIDE so the call sites can still instantiate it. *)
-  Definition ip_entry_exit1 `{GEN : GenId} `{CIDa : CpuId}
+  Definition ip_entry_exit1 `{GEN : GenId} `{CIDa : CpuId} `{XI : CurCtx}
  (k : nat) (q : Qp) (inum : mword 32) (Mt : gmap nat (Qp * positive)) (ci : gmap nat (mword 32 * mword 32)) (u : nat) (Sb : gset Z) (cru : bool) (e0 : nat) (v : nat) (tid : nat) (qtx : Qp) (pidv : mword 32) (dqb : dfrac) (dqs : dfrac) (m : regfile) (K : nat) (eb : bool) (lks : gset string) (Upr : ustate) (rg : bool) (pj : mword 64) (sp0 : mword 64) (spd : mword 64) (M' : regfile) (vg4' : mword 64) (vg5' : mword 64) (vg6' : mword 64) : iProp Σ :=
     (⌜iput_regs m M' spd k⌝ -∗
        ⌜M' !!! Regidx Ra5 = sign_extend' 64 (iref_word Mt k)⌝ -∗
@@ -3870,7 +3871,7 @@ Section IputFreePath.
      frame slots and iput_regs are stated against it, as ip_tail does); [M] is
      the regfile HERE.  Exits: see the header.
      ========================================================================== *)
-  Lemma ip_free_entry `{GEN : GenId} `{CID0 : CpuId}
+  Lemma ip_free_entry `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
@@ -3963,7 +3964,7 @@ Section IputFreePath.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     bslots 3 -∗
     log_epoch_lb icfg_log v -∗
     log_credit icfg_log cru Sb e0 (IBLOCK inum icfg_ist) -∗
@@ -4837,7 +4838,7 @@ End IputFreePath.
 
 Section ProofIput.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra  := (mword_of_int 1 : mword 5).
   Notation Rs0  := (mword_of_int 8 : mword 5).

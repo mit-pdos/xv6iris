@@ -98,6 +98,7 @@ Require Import TimerCap.   (* [sstc_enabled]: the residue's mcounteren pin *)
 Local Open Scope Z_scope.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 (* usertrap's own 32-byte frame is 4 slots; below it the deepest callee is
    syscall (whose own deepest table entry is sys_exit over kexit).  Written
@@ -124,7 +125,7 @@ Import Defs.
 Notation K_usertrap := ((4 + kv_frame_slots + (4 + K_sys_exec))%nat) (only parsing).
 Section UsertrapRes.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------- *)
   (* THE TRAP SIDE.  What Phase A turns into [sie_cap_gpr] + [cpu_own] +   *)
@@ -532,7 +533,7 @@ Section UsertrapRes.
     (dev_inv γu γv ∗
      console_caps γu ∗
      disk_geom γv pd pav pu ∗
-     is_lock γdk d_lock "virtio_disk"%string (disk_res γv pd pav pu) ∗
+     is_lock γdk d_lock "virtio_disk"%string <{ disk_res γv pd pav pu }> ∗
      (* the tick keeper's REAL arm, spelled: the left disjunct is
         [⌜tick_hart = false⌝], a statement about a particular hart, and this
         bundle is not allowed to depend on one. *)
@@ -600,12 +601,12 @@ Section UsertrapRes.
      devintr_caps_any (fsc_uart) (fsc_disk) (fsc_dlock) (un_tk N) (un_s N)
        (un_pd N) (un_pav N) (un_pu N) ∗
      printk_env (fsc_printk) (fsc_uart) (fsc_disk) ∗
-     is_lock (un_w N) wait_lock_addr "wait_lock"%string wait_res ∗
+     is_lock (un_w N) wait_lock_addr "wait_lock"%string <{ wait_res }> ∗
      is_ftable (un_ft N) (un_f N) ∗
      is_lock (fsc_kalloc) (mword_of_int KernelSyms.kmem) "kmem"%string
-       (kmem_res (fsc_kpages) (mword_of_int (KernelSyms.kmem + 24))) ∗
+       <{ kmem_res (fsc_kpages) (mword_of_int (KernelSyms.kmem + 24)) }> ∗
      is_lock (fsc_dlock) d_lock "virtio_disk"%string
-       (disk_res (fsc_disk) (un_pd N) (un_pav N) (un_pu N)) ∗
+       <{ disk_res (fsc_disk) (un_pd N) (un_pav N) (un_pu N) }> ∗
      bio_ctx (fsc_bio) (fs_view fsc_fs (fsc_disk) icfg_dev fsc_cov) ∗
      log_ctx icfg_log (fsc_bio) fsc_fs fsc_cov fsc_logst icfg_dev ∗
      fs_crash_seam fsc_cov fsc_logst ∗
@@ -671,7 +672,7 @@ Section UsertrapRes.
      is_kstack (un_pj N) (un_ks N) ∗
      devintr_caps_any (fsc_uart) (fsc_disk) (fsc_dlock) (un_tk N) (un_s N)
        (un_pd N) (un_pav N) (un_pu N) ∗
-     is_lock (un_w N) wait_lock_addr "wait_lock"%string wait_res ∗
+     is_lock (un_w N) wait_lock_addr "wait_lock"%string <{ wait_res }> ∗
      is_ftable (un_ft N) (un_f N) ∗
      disk_geom (fsc_disk) (un_pd N) (un_pav N) (un_pu N) ∗
      park_world (un_s N))%I.
@@ -1946,7 +1947,7 @@ Qed.
 (* was rejected for the reason the key is [(pt, ksp)] in the first place:   *)
 (* those are the only two things the TRAMPOLINE knows.                      *)
 (* ---------------------------------------------------------------------- *)
-Lemma wp_next_true_swap `{!riscvGS Σ} `{GEN : GenId} `{CID0 : CpuId}
+Lemma wp_next_true_swap `{!riscvGS Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
     (p q : mword 64) (K : forall CID : CpuId, iProp Σ) :
   p <> zero_reg ->
   wp_next true p K -∗ wp_next true q K.

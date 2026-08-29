@@ -63,6 +63,7 @@ Require Import SpecFlags2perm.
 Require Import CodeFlags2perm.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 (* ===================================================================== *)
@@ -181,7 +182,7 @@ Module Flags2permProof : FLAGS2PERM.
 
 Section ProofFlags2perm.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_flags2perm_sconf
       (mm : regfile) (K : nat) (b : bool) (p : mword 64)

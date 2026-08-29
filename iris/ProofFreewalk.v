@@ -89,6 +89,7 @@ Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* ===================================================================== *)
 (* §0  Pure vocabulary and arithmetic (mword-free where [lia] must run).  *)
@@ -391,7 +392,7 @@ Section ProofFreewalk.
   (* ================================================================== *)
   (*  §3  THE EXIT (+0x48 .. +0x5a): kfree(pagetable), then the epilogue. *)
   (* ================================================================== *)
-  Local Lemma fw_epilogue `{CID0 : CpuId} (ilvl : nat) (γa : gname)
+  Local Lemma fw_epilogue `{CID0 : CpuId} `{XI : CurCtx} (ilvl : nat) (γa : gname)
       (mm mj : regfile) (K : nat) (sp0 : mword 64) (bpt : mword 44)
       (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) in
@@ -644,7 +645,7 @@ Section ProofFreewalk.
      before calling it, and TAIL re-anchors ["Hcont"] with [wp_next_shift]
      only at its OWN recurse-via-[IH] exit (the one place a wp_next-shaped
      resource is forwarded, rather than terminally applied). *)
-  Local Lemma fw_loop `{CID : CpuId} (lvl : nat) (REC : forall l, (l < lvl)%nat -> fw_rec l)
+  Local Lemma fw_loop `{CID : CpuId} `{XI : CurCtx} (lvl : nat) (REC : forall l, (l < lvl)%nat -> fw_rec l)
       (γa : gname)
       (mm : regfile) (t : ptree) (K : nat) (eb : bool) (p : mword 64)
       (spr : mword 64) (ilvl : nat) (b : bool) (lks : gset string) :
@@ -1292,7 +1293,7 @@ Section ProofFreewalk.
     - apply fw_body. intros l Hl. apply IHn. lia.
   Qed.
 
-  Lemma wp_freewalk_sconf `{CID : CpuId} (γa : gname) (mm : regfile)
+  Lemma wp_freewalk_sconf `{CID : CpuId} `{XI : CurCtx} (γa : gname) (mm : regfile)
       (t : ptree) (lvl : nat) (K : nat) (eb : bool) (p : mword 64)
       (ilvl : nat) (b : bool) (lks : gset string)
     : wp_freewalk_sconf_body γa mm t lvl K eb p ilvl b lks.

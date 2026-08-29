@@ -32,6 +32,7 @@ From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 (* clean-context (mword-free) stack-slot arithmetic, so [lia] never sees a bv *)
@@ -66,7 +67,7 @@ Module UvmcreateProof (AK : KALLOC) (MS : MEMSET) : UVMCREATE.
 
 Section ProofUvmcreate.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Ltac reg_neq :=
@@ -95,7 +96,7 @@ Section ProofUvmcreate.
   (*  ProofStrlen.v's [sl_tail]), so callers never annotate it explicitly:  *)
   (*  it unifies automatically from whichever [sie_cap_gpr]-typed hypothesis*)
   (*  the "with" clause supplies at each call site. *)
-  Local Lemma uvc_htail `{CID0 : CpuId}
+  Local Lemma uvc_htail `{CID0 : CpuId} `{XI : CurCtx}
       (γa : gname) (γk : gname * gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64)
       (on : option nat) (b : bool) (lks : gset string)
       (Mt : regfile) (rv sp0 : mword 64) (v4 : bv 64) :

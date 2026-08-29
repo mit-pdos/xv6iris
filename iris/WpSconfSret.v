@@ -84,12 +84,13 @@ Require Import WpSmodePtEngine HartSCsr HartSwp HartMFrame HartLift HartSpan
         HartSpanChar HartRegNode HartMCycle HartGoodb WpDecodeBridge.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Section WpSconfSret.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Context {p : mword 64}.
 

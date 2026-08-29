@@ -52,6 +52,7 @@ Require Import LogInv.  (* [logG]: [ireg_inv]'s own instance argument *)
 Import Defs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* sys_fork's balanced 16-byte frame: entry [addi sp,-16] and exit
    [addi sp,+16] cancel (identical to sys_getpid's / cpuid's). *)
@@ -90,7 +91,7 @@ Module SysForkProof (Kfork : KFORK) (UG : UEXEC_GEN) : SYSFORK.
 Section ProofSysFork.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ,
             !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* =================================================================== *)
   (*  THE CAPSTONE.                                                       *)

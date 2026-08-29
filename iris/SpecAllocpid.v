@@ -46,6 +46,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 
 (* the two globals allocpid touches *)
@@ -61,7 +62,7 @@ Section SpecAllocpid.
 
 End SpecAllocpid.
 
-Definition wp_allocpid_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (γp : gname)
+Definition wp_allocpid_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γp : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.allocpid in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -76,7 +77,7 @@ Definition wp_allocpid_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
   sie_cap_gpr KT1 m av b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
+  is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜ callee_saved m mf ⌝ -∗
@@ -88,7 +89,7 @@ Definition wp_allocpid_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
 
 Module Type ALLOCPID.
   Parameter wp_allocpid_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (γp : gname)
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γp : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),
       wp_allocpid_sconf_body γp m av n eb p b lks.
 End ALLOCPID.

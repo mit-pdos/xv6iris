@@ -55,6 +55,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -128,7 +129,7 @@ Module GrowprocProof (Myproc : MYPROC) (Uvmalloc : UVMALLOC)
 
 Section ProofGrowproc.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>
@@ -149,7 +150,7 @@ Section ProofGrowproc.
   (* =================================================================== *)
   (*  §2  The epilogue at +0x3c, entered by all five exits.               *)
   (* =================================================================== *)
-  Lemma gp_tail `{CID0 : CpuId}
+  Lemma gp_tail `{CID0 : CpuId} `{XI : CurCtx}
       (m Mt : regfile) (av : nat) (rv : mword 64)
       (sp0 ra0 s00 s10 s20 : mword 64) (b : bool) (p : mword 64) :
     (4 <= av)%nat ->
@@ -356,7 +357,7 @@ Section ProofGrowproc.
      over the bare CELL rather than [proc_priv]: the block sits inside the
      accessor's window, and the three callers differ only in which
      descriptor and size they are about to close it at. *)
-  Lemma gp_store `{CID0 : CpuId}
+  Lemma gp_store `{CID0 : CpuId} `{XI : CurCtx}
       (Ms : regfile) (av : nat) (p szold szv' : mword 64) (b : bool) :
     Ms !!! Regidx Ra1 = szv' ->
     Ms !!! Regidx Rs2 = p ->

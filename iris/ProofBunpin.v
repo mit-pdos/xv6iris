@@ -71,6 +71,7 @@ Require Import SpecBunpin.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* ------------------------------------------------------------------ *)
 (*  Pure fraction arithmetic (over Qp variables, so no solver ever runs *)
@@ -95,7 +96,7 @@ Module BunpinProof (Acquire : ACQUIRE) (Release : RELEASE) : BUNPIN.
 
 Section ProofBunpin.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Notation Rra  := (mword_of_int 1 : mword 5).

@@ -26,6 +26,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 (* kvmmake(): kalloc a fresh root page, memset it, run the six kvmmap regions
    (UART/VIRTIO/PLIC RW, text RX, data RW, trampoline RX) then proc_mapstacks.
+Require Import TsoCtx.
    Returns (a0) the root page's byte address.  The result table represents
    [kvm_map_full pas] and has exactly 102 table nodes.  COUNTED-ONLY (premise
    ⌜on = Some nb ∧ 166 < nb⌝): kvmmake is boot-only (kvminit its sole caller),
@@ -39,7 +40,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
    unrefutable.
    stack_own bound 48 = own 4-slot frame + proc_mapstacks' 44 (PROVISIONAL,
    pending the decode pass). *)
-Definition wp_kvmmake_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_kvmmake_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γa : gname) (γk : gname * gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   lvl = 0%nat ->
@@ -71,7 +72,7 @@ Definition wp_kvmmake_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID :
 
 Module Type KVMMAKE.
   Parameter wp_kvmmake_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa : gname) (γk : gname * gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
       wp_kvmmake_sconf_body γa γk mm lvl K eb p on b lks.
 End KVMMAKE.

@@ -98,6 +98,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -396,7 +397,7 @@ Module SafestrcpyProof : SAFESTRCPY.
 
 Section ProofSafestrcpy.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context {kts ktt : ktier}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -454,7 +455,7 @@ Section ProofSafestrcpy.
   (* ================================================================== *)
   (*  THE EPILOGUE (+0x2e .. +0x34), entered by all three arms.          *)
   (* ================================================================== *)
-  Local Lemma ssc_tail `{CID0 : CpuId}
+  Local Lemma ssc_tail `{CID0 : CpuId} `{XI : CurCtx}
       (mm Mt : regfile) (K : nat) (rv sp0 ra0 s00 : mword 64) (b : bool) (p : mword 64) :
     (2 <= K)%nat ->
     mm !!! Regidx csp_rs1 = sp0 ->

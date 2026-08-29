@@ -28,6 +28,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 (* seqz on a-b for EQUAL operands: result 1 (twin of CodeHolding.seqz_sub_neq) *)
@@ -49,7 +50,7 @@ Qed.
 
 Section WpHoldingInv.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- [smode_config] leaf wrappers for holding.  All config-preserving
      (holding never touches mstatus), so each just unbundles → raw leaf →

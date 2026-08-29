@@ -1299,7 +1299,7 @@ Notation "a ↦c[ kt ] dq v" := (ctx_pointsto (KTR := kt) cur_ctx a dq v)
    format "a  ↦c[ kt ] dq  v") : bi_scope.
 
 (* THE PAYLOAD WRAPPER (the M3 sweep's client spelling; the `weak-memory`
-   branch's `<{ }>`, adopted with ONE deliberate change).  A lock client
+   branch's `}>`, adopted with ONE deliberate change).  A lock client
    writes its payload as a plain [iProp] with the ambient spellings; this
    turns it into the [CtxId → iProp] the lock surface needs as a CONSTANT
    embedding.
@@ -1316,7 +1316,7 @@ Notation "a ↦c[ kt ] dq v" := (ctx_pointsto (KTR := kt) cur_ctx a dq v)
    applies.  A payload that should genuinely re-index is CONVERTED, not
    wrapped: it is passed as [(λ ξ : CtxId, pay (XI := ξ) ...)] and brings
    its own [CtxMorph] (rule 1's spelling; kmem_res is the reference).
-   THE SPELLING IS [<{ P }>] AND NOT [<[ P ]>]: stdpp's insert notation
+   THE SPELLING IS [<{ P] AND NOT [<[ P ]>]: stdpp's insert notation
    shares the [<[] prefix and Coq reports the two as incompatible
    (measured on the branch; the brace form is free).
 

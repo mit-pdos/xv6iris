@@ -64,6 +64,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 
@@ -125,7 +126,7 @@ Module SysDupProof (Argfd : ARGFD) (Fdalloc : FDALLOC) (Filedup : FILEDUP) : SYS
 
 Section ProofSysDup.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra  := (mword_of_int 1  : mword 5).
   Notation Rs0  := (mword_of_int 8  : mword 5).
@@ -146,7 +147,7 @@ Section ProofSysDup.
      The premise is local to this helper: every call site sits inside the
      capstone, whose [<fn>_stack <= av] premise is already unfolded, so it is
      a [lia].) *)
-  Lemma sd_sp_bounds `{CID0 : CpuId} (mm : regfile) (k : nat)
+  Lemma sd_sp_bounds `{CID0 : CpuId} `{XI : CurCtx} (mm : regfile) (k : nat)
       (bb : bool) (pp : mword 64) :
     (0 < k)%nat ->
     sie_cap_gpr KT1 mm k bb pp -∗
@@ -163,7 +164,7 @@ Section ProofSysDup.
   (* Only ra and s0 are popped here: s1/s2 are handled by whichever arm got
      here (restored, or never touched), which is why they arrive already in
      agreement with [m] and why slots 3..6 are arbitrary. *)
-  Lemma sd_tail `{CID0 : CpuId}
+  Lemma sd_tail `{CID0 : CpuId} `{XI : CurCtx}
       (m Mt : regfile) (av : nat) (rv : mword 64)
       (sp0 ra0 s00 : mword 64) (w3 w4 w5 w6 : bv 64)
       (p : mword 64) (b : bool) :

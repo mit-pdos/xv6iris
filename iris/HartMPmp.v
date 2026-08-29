@@ -20,6 +20,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp RiscvTryStep RiscvFetchExec
         HartLift HartRegNode HartSpan HartSpanChar.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -559,7 +560,7 @@ Qed.
 
 Section swp_pmp.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma swp_pmpCheck_ifetch4 (Drw Dro : gset register)
       (Df : register -> dfrac) (rs : regstate)

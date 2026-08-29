@@ -20,6 +20,7 @@ Require Import WpMmodeCsrSwp.   (* swp_execute_CSRReg_csrr + the cr_* footprint 
 Lemma exec_read_CSR_menvcfg s :
   exec (read_CSR (Ox"30A")) s
     = Some (subrange_vec_dec (register_lookup menvcfg s.(sregs)) (Z.sub xlen 1) 0, s).
+Require Import TsoCtx.
 Proof. drive_csr. rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg menvcfg s)). apply exec_returnM. Qed.
 
 Lemma exec_read_CSR_sie s :
@@ -165,7 +166,7 @@ Proof. sielk. apply (cw_rs_misa (R_bitvector_64 mie) mie_in sie_mie_fresh). Qed.
 
 Section sieframes.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma sie_frames (dqp : dfrac) (mie_in mideleg_in : mword 64) :
     (hreg_frame_ro (sie_Df dqp) (sie_rs mie_in mideleg_in) sie_Dro : iProp Σ)
@@ -335,7 +336,7 @@ Proof. reflexivity. Qed.
 
 Section timecheck.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma hval_check_CSR_result_time (D Drw : gset register) (rs : regstate) :
     hval D Drw rs (check_CSR_result csr_time Machine CSRRead)
@@ -529,7 +530,7 @@ Proof. unfold sie_rdval; rewrite ?sregs_set_reg.
 (* ====================================================================== *)
 Section WpCsrrGprB.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* time (0xC01): Ext_Zicntr-gated, no misa premise needed (holds for any state).
      [mtime] lives in [clock_inv] and advances nondeterministically with the

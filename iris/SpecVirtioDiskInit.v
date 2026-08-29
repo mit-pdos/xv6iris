@@ -113,6 +113,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
      +0x018 free[8]   one byte per descriptor, all set to 1 here
      +0x128 vdisk_lock *)
 Definition disk_base : mword 64 := mword_of_int KernelSyms.disk.
+Require Import TsoCtx.
 Definition disk_desc : mword 64 := disk_base.
 Definition disk_avail : mword 64 :=
   add_vec disk_base (sign_extend' 64 (mword_of_int 8 : mword 12)).
@@ -139,7 +140,7 @@ Notation K_virtio_disk_init := (18%nat) (only parsing).
    [Typeclasses Opaque] (never [Opaque]) so instance search never walks in
    while [rewrite /vdi_post] at the return still does. *)
 Definition vdi_post
-    `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γv : disk_names) (γa : gname) (γk : gname * gname)
     (m : regfile) (K : nat)
     (eb : bool) (pp : mword 64) (on : option nat)
@@ -194,7 +195,7 @@ Global Typeclasses Opaque vdi_post.
    [wp_next_off] anyway, since the hart cannot move); [vdi_post] above drops
    its own [b] parameter for the same reason. *)
 Definition wp_virtio_disk_init_sconf_body
-    `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γv : disk_names) (γa : gname) (γk : gname * gname)
     (m : regfile) (K : nat)
     (eb : bool) (pp : mword 64) (on : option nat)
@@ -242,7 +243,7 @@ Definition wp_virtio_disk_init_sconf_body
 
 Module Type VIRTIODISKINIT.
   Parameter wp_virtio_disk_init_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γv : disk_names) (γa : gname) (γk : gname * gname) (m : regfile) (K : nat)
       (eb : bool) (pp : mword 64) (on : option nat)
       (c0 : virtio_cfg) (vlock : bv 32) (vname vcpu : bv 64)

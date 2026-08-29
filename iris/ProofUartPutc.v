@@ -71,6 +71,7 @@ From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* ===================================================================== *)
 (*  uartputc_sync's device core, as register-file transformers.  One      *)
@@ -167,7 +168,7 @@ Module UAcc := UartAccessProof Uart.
 
 Section ProofUartPutc.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Context {kt : ktier}.
@@ -183,7 +184,7 @@ Section ProofUartPutc.
   (* =================================================================== *)
   (*  THE THRE POLL LOOP: 0x1e -> 0x28, run under [dev_inv] (Löb).        *)
   (* =================================================================== *)
-  Lemma wp_uartputc_poll_sconf `{CID0 : CpuId} (γd : uart_names) (γv : disk_names) (mentry : regfile) (n : nat) (l : list (bv 8)) (b : bool) (p : mword 64) :
+  Lemma wp_uartputc_poll_sconf `{CID0 : CpuId} `{XI : CurCtx} (γd : uart_names) (γv : disk_names) (mentry : regfile) (n : nat) (l : list (bv 8)) (b : bool) (p : mword 64) :
     mentry !!! Regidx (mword_of_int 14) = uart_pa 5 ->
     sie_cap_gpr kt mentry n b p -∗ kernel_text -∗
     pc_is (mword_of_int (KernelSyms.uartputc_sync + 0x1e)) -∗
@@ -277,7 +278,7 @@ Section ProofUartPutc.
   (* =================================================================== *)
   (*  DEVICE CORE: 0x18 -> 0x34 (lui/addi + poll + zext.b + lui + THR).    *)
   (* =================================================================== *)
-  Lemma wp_uartputc_devcore_sconf `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
+  Lemma wp_uartputc_devcore_sconf `{CID0 : CpuId} `{XI : CurCtx} (γd : uart_names) (γv : disk_names)
       (m : regfile) (n : nat) (l : list (bv 8)) (b : bool) (p : mword 64) :
     let sb : mword 8 := autocast (T := mword)
        (subrange_vec_dec (and_vec (m !!! Regidx (mword_of_int 9))

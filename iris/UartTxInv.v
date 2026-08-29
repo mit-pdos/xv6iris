@@ -67,6 +67,7 @@ Require Import WpLock.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* [◯ML []] is the UNIT of the mono-list resource algebra
    ([mono_listUR A := authUR (max_prefix_listUR A)], and [to_max_prefix_list []]
@@ -78,6 +79,7 @@ Proof. done. Qed.
 
 Section UartTxInv.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.
   (* [WpUart.dev_inv] carries the era-local permit channel at the ambient
      generation (PermInv.v), so the two lemmas below that OPEN it are
      [GenId]-indexed too.  Implicit, so no caller changes: every holder of
@@ -126,21 +128,21 @@ Section UartTxInv.
      [uart_sent], because another hart may interleave between two of its
      bytes.  That is what [uart_sent_sub] below is for. *)
   Definition is_txlock (γl : gname) (γu : uart_names) : iProp Σ :=
-    (is_lock γl a_tx_lock "uart"%string (tx_res γu) ∗
+    (is_lock γl a_tx_lock "uart"%string <{ tx_res γu }> ∗
      uart_dlab_off γu)%I.
 
   Global Instance is_txlock_persistent γl γu : Persistent (is_txlock γl γu).
   Proof. apply _. Qed.
 
   Lemma is_txlock_lock γl γu :
-    is_txlock γl γu -∗ is_lock γl a_tx_lock "uart"%string (tx_res γu).
+    is_txlock γl γu -∗ is_lock γl a_tx_lock "uart"%string <{ tx_res γu }>.
   Proof. iIntros "[$ _]". Qed.
 
   Lemma is_txlock_dlab γl γu : is_txlock γl γu -∗ uart_dlab_off γu.
   Proof. iIntros "[_ $]". Qed.
 
   Lemma is_txlock_intro γl γu :
-    is_lock γl a_tx_lock "uart"%string (tx_res γu) -∗
+    is_lock γl a_tx_lock "uart"%string <{ tx_res γu }> -∗
     uart_dlab_off γu -∗ is_txlock γl γu.
   Proof. iIntros "#Hl #Ho". by iFrame "Hl Ho". Qed.
 

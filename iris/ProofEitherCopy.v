@@ -108,6 +108,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -135,7 +136,7 @@ Proof. change (2 ^ 31) with 2147483648. lia. Qed.
 (* ===================================================================== *)
 Section EitherCopyEpilogue.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not
      [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
@@ -155,7 +156,7 @@ Section EitherCopyEpilogue.
   Notation Rs4 := (mword_of_int 20 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
 
-  Lemma ec_epi `{CID0 : CpuId}
+  Lemma ec_epi `{CID0 : CpuId} `{XI : CurCtx}
       (q2a q2c q2e q30 q32 q34 q36 q38 : mword 64)
       (m Mt : regfile) (av : nat) (rv : mword 64)
       (sp0 ra0 s00 s10 s20 s30 s40 : mword 64) (p : mword 64) (b : bool) :
@@ -404,7 +405,7 @@ Module EitherCopyoutProof (Myproc : MYPROC) (Copyout : COPYOUT) (Memmove : MEMMO
 
 Section ProofEitherCopyout.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not
      [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
@@ -1158,7 +1159,7 @@ Module EitherCopyinProof (Myproc : MYPROC) (Copyin : COPYIN) (Memmove : MEMMOVE)
 
 Section ProofEitherCopyin.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not
      [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at

@@ -39,6 +39,7 @@ Require UserTotalU.
 Require Import UserPtTree UserExec.
 Require Import UmodeMem UmodeCap.
 Require Import WpUmodeStep.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 Set Printing Depth 40.
@@ -165,7 +166,7 @@ Qed.
 
 Section WpUmodeLeaf.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   (* =================================================================== *)

@@ -82,6 +82,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -124,7 +125,7 @@ Module FetchaddrProof (Myproc : MYPROC) (Copyin : COPYIN) : FETCHADDR.
 
 Section ProofFetchaddr.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>
@@ -146,7 +147,7 @@ Section ProofFetchaddr.
   (* =================================================================== *)
   (*  The shared tail at +0x36: the epilogue, entered by all three arms.  *)
   (* =================================================================== *)
-  Lemma fa_tail `{CID0 : CpuId}
+  Lemma fa_tail `{CID0 : CpuId} `{XI : CurCtx}
       (m Mt : regfile) (av : nat) (rv : mword 64)
       (sp0 ra0 s00 s10 s20 : mword 64) (p : mword 64) (b : bool) :
     (4 <= av)%nat ->

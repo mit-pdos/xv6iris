@@ -119,6 +119,9 @@ Proof. intros Hlen Hj. apply nth_byte_assemble_len; lia. Qed.
 
 Section PageFields.
   Context `{!riscvGS Σ}.
+  (* §0.35': the lock handle is context-relative, so the index is ambient in
+     this section -- the T-leg binds it here too. *)
+  Context `{XI : TsoCtx.CurCtx}.
 
   (* ---- chopping and re-basing byte windows ---- *)
 

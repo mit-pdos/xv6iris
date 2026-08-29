@@ -28,13 +28,14 @@ Require Import KernelDecode17.
 Require Import KernelDecode19.
 Require Import KernelDecode21.
 Require Import KernelDecode27.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodeSysExit.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- sys_exit @ KernelSyms.sys_exit, 36 bytes ---- *)
 

@@ -94,6 +94,7 @@ Require Import CodeKexit.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 (* a failing tactic in a whole-function WP over [proc_priv] otherwise spends
    tens of minutes FORMATTING the goal -- see durable-notes. *)
@@ -318,7 +319,7 @@ Module KexitProof (Myproc : MYPROC) (Fileclose : FILECLOSE)
 (* ===================================================================== *)
 Section KexitPro.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, FSC : fscfg}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* +0x00 .. +0x10: carve the 6-slot frame, save ra/s0..s4, set s0, and
      park the argument in s4.  Control lands on the [jal myproc]. *)
@@ -474,7 +475,7 @@ End KexitPro.
 Section KexitLoop.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Lemma kx_loop `{GEN : GenId} `{CID0 : CpuId}
+  Lemma kx_loop `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
        (γft γf : gname) (fn : fclose_names)
       (j : nat) (pid : mword 32) (sv : mword 64) (cwdv : mword 64) (spF : mword 64)
       (av : nat) (eb : bool) (b : bool) (lks : gset string) :
@@ -926,7 +927,7 @@ End KexitLoop.
 Section KexitPark.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
 
-  Lemma kx_park `{GEN : GenId} `{CID0 : CpuId}
+  Lemma kx_park `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
        (γf γw : gname) (γs : list gname)
       (j : nat) (γl : gname) (ip sv spF : mword 64) (dqi : dfrac)
       (M : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
@@ -964,7 +965,7 @@ Section KexitPark.
     cpu_claim_ext eb pj -∗
     kernel_text -∗ pc_is (mword_of_int (KX + 0x60)) -∗
     procs_inv γs -∗
-    is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+    is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
     fd_slots FDSPARE -∗
     (* the cwd's unit REJOINED with the allowance: [iput] handed the [1]
@@ -1536,7 +1537,7 @@ Section KexitRest.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
 
-  Lemma kx_rest `{GEN : GenId} `{CID0 : CpuId}
+  Lemma kx_rest `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
        (γf γw : gname) (γs : list gname)
       (j : nat) (γl : gname)
       (pd pav pu : mword 64)
@@ -1578,14 +1579,14 @@ Section KexitRest.
     cpu_claim_ext eb pj -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (KX + 0x4c)) -∗
     procs_inv γs -∗ panic_env -∗
-    is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+    is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
     bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
     log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
     fs_crash_seam fsc_cov fsc_logst -∗
     gen_cert -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     bslots 3 -∗
     (* ---- the inode cache's persistent set, and the two regions ---- *)
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
@@ -1889,7 +1890,7 @@ End KexitRest.
 Section ProofKexit.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
 
-  Lemma wp_kexit_sconf `{GEN : GenId} `{CID0 : CpuId}
+  Lemma wp_kexit_sconf `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γft γf γw : gname)
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)

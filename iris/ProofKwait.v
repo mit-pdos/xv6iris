@@ -99,6 +99,7 @@ Require Import CodeKwait.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 (* a failing tactic in a whole-function WP over [proc_priv] otherwise spends
    tens of minutes FORMATTING the goal -- see durable-notes. *)
@@ -542,7 +543,7 @@ Section ProofKwait.
      rather than packaged into the closure, because the +0xce exit needs
      those very resources for sleep and a closure cannot give them back.
      Nothing is left to carry, so there is no parameter. *)
-  Definition kw_exit_fn `{GEN : GenId} (CID0 : CPU)
+  Definition kw_exit_fn `{GEN : GenId} `{XI : CurCtx} (CID0 : CPU)
       (γf : gname) (mm : regfile) (pme addr : mword 64) (K : nat) (eb : bool)
       (pid : mword 32) (U : ustate) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) eb pme (fun (CID : CpuId) =>
@@ -568,7 +569,7 @@ Section ProofKwait.
      is anchored at the TURN's own hart rather than at [CID0]: sleep hands
      the thread back on an arbitrary hart, and a [wp_next] can only ever be
      re-anchored FORWARD. *)
-  Definition kw_round `{GEN : GenId} (CID0 : CPU)
+  Definition kw_round `{GEN : GenId} `{XI : CurCtx} (CID0 : CPU)
       (γf γw : gname) (jj : nat) (mm : regfile) (pme addr : mword 64)
       (K : nat) (eb : bool) (pid : mword 32) (U : ustate) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true pme (fun (CID : CpuId) =>
@@ -589,7 +590,7 @@ Section ProofKwait.
      whole hart tag.  Stated here rather than in SchedCtx.v because
      kwait is its first (and so far only) consumer; it belongs beside
      [proc_slots_unused] the moment kexit wants it too. *)
-  Lemma kw_slots_zombie `{GEN : GenId} `{CIDz : CpuId} (gs : list gname) (pa : mword 64) :
+  Lemma kw_slots_zombie `{GEN : GenId} `{CIDz : CpuId} `{XI : CurCtx} (gs : list gname) (pa : mword 64) :
     proc_slots gs pa ZOMBIE -∗
     proc_dormant pa ZOMBIE ∗ hart_at_any pa ∗ pslot_used_at pa.
   Proof.
@@ -605,7 +606,7 @@ Section ProofKwait.
   (* one lemma parameterised by the value s3 carries, exactly the        *)
   (* factoring sys_close's [sc_tail] and allocproc's epilogue use.       *)
   (* ================================================================== *)
-  Local Lemma kw_epilogue `{GEN : GenId} `{CIDe : CpuId}
+  Local Lemma kw_epilogue `{GEN : GenId} `{CIDe : CpuId} `{XI : CurCtx}
        (mm Mx : regfile) (pme rv : mword 64)
       (K lvl : nat) (eb bx : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
@@ -859,7 +860,7 @@ Section ProofKwait.
   (* +0xec .. +0xfa -- the "no kids, or killed" exit.  Releases           *)
   (* wait_lock, puts -1 in s3 and jumps to the epilogue.                 *)
   (* ================================================================== *)
-  Local Lemma kw_exit_wait `{GEN : GenId} `{CIDt : CpuId}
+  Local Lemma kw_exit_wait `{GEN : GenId} `{CIDt : CpuId} `{XI : CurCtx}
        (γw : gname) (mm Mt : regfile)
       (pme : mword 64) (K : nat) (eb : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
@@ -875,7 +876,7 @@ Section ProofKwait.
     arm_pay KT1 0 eb pme -∗
     kernel_text -∗
     pc_is (mword_of_int (KW + 0xfa)) -∗
-    is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+    is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
     locked γw CIDt -∗
     wait_res -∗
     kw_frame sp0 mm -∗
@@ -1013,7 +1014,7 @@ Section ProofKwait.
   (* +0x94 .. +0xa8 -- copyout FAILED: release the child's lock, then    *)
   (* wait_lock, return -1.  The only exit that unwinds two levels.       *)
   (* ================================================================== *)
-  Local Lemma kw_exit_both `{GEN : GenId} `{CIDt : CpuId}
+  Local Lemma kw_exit_both `{GEN : GenId} `{CIDt : CpuId} `{XI : CurCtx}
        (γs : list gname) (γw γk : gname)
       (mm Mt : regfile) (pme : mword 64) (k K : nat) (eb : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
@@ -1032,10 +1033,10 @@ Section ProofKwait.
     arm_pay KT1 0 eb pme -∗
     kernel_text -∗
     pc_is (mword_of_int (KW + 0x94)) -∗
-    is_lock γk (proc_addr k) "proc"%string (proc_lock_res γs γk (proc_addr k)) -∗
+    is_lock γk (proc_addr k) "proc"%string <{ proc_lock_res γs γk (proc_addr k) }> -∗
     locked γk CIDt -∗
     proc_lock_res γs γk (proc_addr k) -∗
-    is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+    is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
     locked γw CIDt -∗
     wait_res -∗
     kw_frame sp0 mm -∗
@@ -1238,7 +1239,7 @@ Section ProofKwait.
   (* the [addr != 0] test.  Disowns it ([pp->parent = 0], out of         *)
   (* wait_lock's table), frees it, and unwinds both locks.               *)
   (* ================================================================== *)
-  Local Lemma kw_reap `{GEN : GenId} `{CIDp : CpuId}
+  Local Lemma kw_reap `{GEN : GenId} `{CIDp : CpuId} `{XI : CurCtx}
        (γs : list gname) (γa γw γk : gname)
       (mm Mr : regfile) (pme : mword 64) (k K : nat) (eb : bool)
       (pidc : mword 32) (ch : mword 64) (ps : list (mword 64)) (lks : gset string) :
@@ -1263,7 +1264,7 @@ Section ProofKwait.
     pc_is (mword_of_int (KW + 0x60)) -∗
     kalloc_env γa None -∗
     (* the child's lock, contents out, at ZOMBIE *)
-    is_lock γk (proc_addr k) "proc"%string (proc_lock_res γs γk (proc_addr k)) -∗
+    is_lock γk (proc_addr k) "proc"%string <{ proc_lock_res γs γk (proc_addr k) }> -∗
     locked γk CIDp -∗
     p_state (proc_addr k) ↦₄ ZOMBIE -∗
     (* ZOMBIE is unclaimed, so the caller's lock share is the whole mirror --
@@ -1278,7 +1279,7 @@ Section ProofKwait.
        ([ProcAvail.v]).  Persistent. *)
     pslot_used_at (proc_addr k) -∗
     (* wait_lock, contents out *)
-    is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+    is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
     locked γw CIDp -∗
     parents_own ps -∗
     kw_frame sp0 mm -∗
@@ -1568,7 +1569,7 @@ Section ProofKwait.
   (* reaping tail is its own lemma ([kw_reap]) rather than duplicated:   *)
   (* the arms differ only in whether the user page table grew.           *)
   (* ================================================================== *)
-  Local Lemma kw_found `{GEN : GenId} `{CIDf : CpuId}
+  Local Lemma kw_found `{GEN : GenId} `{CIDf : CpuId} `{XI : CurCtx}
        (γs : list gname) (γa γf γw γk : gname)
       (mm Mf : regfile) (pme addr : mword 64) (k K : nat) (eb : bool)
       (pid : mword 32) (U : ustate) (ch : mword 64) (ps : list (mword 64)) (lks : gset string) :
@@ -1592,7 +1593,7 @@ Section ProofKwait.
     kernel_text -∗
     pc_is (mword_of_int (KW + 0x40)) -∗
     kalloc_env γa None -∗
-    is_lock γk (proc_addr k) "proc"%string (proc_lock_res γs γk (proc_addr k)) -∗
+    is_lock γk (proc_addr k) "proc"%string <{ proc_lock_res γs γk (proc_addr k) }> -∗
     locked γk CIDf -∗
     p_state (proc_addr k) ↦₄ ZOMBIE -∗
     (* the whole mirror: ZOMBIE is unclaimed, so the lock's share is both
@@ -1606,7 +1607,7 @@ Section ProofKwait.
        its lock invariant carries it and the rebuild below owes it back
        ([ProcAvail.v]).  Persistent. *)
     pslot_used_at (proc_addr k) -∗
-    is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+    is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
     locked γw CIDf -∗
     parents_own ps -∗
     proc_priv γf pme pid U -∗
@@ -2003,7 +2004,7 @@ Section ProofKwait.
   (* resources in its context, so the IH keeps its leading binders        *)
   (* (fdalloc's rule).                                                    *)
   (* ================================================================== *)
-  Local Lemma kw_scan `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma kw_scan `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γs : list gname) (γa γf γw : gname)
       (mm : regfile) (pme addr : mword 64) (K : nat) (eb : bool)
       (pid : mword 32) (U : ustate) (lks : gset string) :
@@ -2018,7 +2019,7 @@ Section ProofKwait.
     procs_inv γs -∗
     kernel_text -∗
     kalloc_env γa None -∗
-    is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+    is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
     ∀ (kk : nat) (M : regfile) (hv : mword 64) (ps : list (mword 64)),
       ⌜(kk < NPROC)%nat⌝ -∗ ⌜kw_scan_regs M mm pme addr kk⌝ -∗
       ⌜M !!! Regidx Ra4 = hv⌝ -∗
@@ -2475,7 +2476,7 @@ Section ProofKwait.
   (* still hold (the private block, unchanged, and the running-thread    *)
   (* frame).                                                            *)
   (* ================================================================== *)
-  Local Lemma kw_exit_neg `{GEN : GenId} `{CIDt : CpuId}
+  Local Lemma kw_exit_neg `{GEN : GenId} `{CIDt : CpuId} `{XI : CurCtx}
       (γf γw : gname) (jj : nat) (mm Mt : regfile)
       (pme addr : mword 64) (K : nat) (eb : bool)
       (pid : mword 32) (U : ustate) (px : list (mword 64)) (lks : gset string) :
@@ -2488,7 +2489,7 @@ Section ProofKwait.
        reaches. *)
     locks_below lks "wait_lock" ->
     kernel_text -∗
-    is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+    is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
     kw_exit_fn CIDt γf mm pme addr K eb pid U lks -∗
     sie_cap_gpr KT1 Mt (trap_res eb + (K - 10))%nat false pme -∗
     cpu_own 1 eb pme false ({["wait_lock"]} ∪ lks) -∗
@@ -2526,7 +2527,7 @@ Section ProofKwait.
   (* later at, which is why the IH arrives here ALREADY stripped (the    *)
   (* [c.j] at +0xea paid for it).                                        *)
   (* ================================================================== *)
-  Local Lemma kw_round_tail `{GEN : GenId} `{CIDt : CpuId} (CID0 : CPU)
+  Local Lemma kw_round_tail `{GEN : GenId} `{CIDt : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (γs : list gname) (γf γw γl : gname) (jj : nat)
       (mm Mx : regfile) (pme addr : mword 64) (K : nat) (eb : bool)
       (pid : mword 32) (U : ustate) (hx : mword 64) (px : list (mword 64)) (lks : gset string) :
@@ -2547,7 +2548,7 @@ Section ProofKwait.
        off this premise. *)
     locks_below lks "wait_lock" ->
     kernel_text -∗ procs_inv γs -∗
-    is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+    is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
     kw_round CID0 γf γw jj mm pme addr K eb pid U lks -∗
     kw_exit_fn CIDt γf mm pme addr K eb pid U lks -∗
     sie_cap_gpr KT1 Mx (trap_res eb + (K - 10))%nat false pme -∗
@@ -2917,7 +2918,7 @@ Section ProofKwait.
   (* +0xe0 .. +0xea -- ONE TURN of the outer loop, and the [iNext] that  *)
   (* pays for the IH's later.                                            *)
   (* ================================================================== *)
-  Local Lemma kw_round_body `{GEN : GenId} `{CIDy : CpuId} (CID0 : CPU)
+  Local Lemma kw_round_body `{GEN : GenId} `{CIDy : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (γs : list gname) (γa γf γw γl : gname) (jj : nat)
       (mm M : regfile) (pme addr : mword 64) (K : nat) (eb : bool)
       (pid : mword 32) (U : ustate) (lks : gset string) :
@@ -2935,7 +2936,7 @@ Section ProofKwait.
     locks_below lks "wait_lock" ->
     kernel_text -∗ procs_inv γs -∗
     kalloc_env γa None -∗
-    is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+    is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
     ▷ kw_round CID0 γf γw jj mm pme addr K eb pid U lks -∗
     kw_exit_fn CIDy γf mm pme addr K eb pid U lks -∗
     sie_cap_gpr KT1 M (trap_res eb + (K - 10))%nat false pme -∗
@@ -3079,7 +3080,7 @@ Section ProofKwaitMain.
   Notation Rs6 := (mword_of_int 22 : mword 5).
   Notation Rs7 := (mword_of_int 23 : mword 5).
 
-  Lemma wp_kwait_sconf `{GEN : GenId} `{CID : CpuId}
+  Lemma wp_kwait_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γa γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (b : bool)
       (pid : mword 32) (U : ustate) (lks : gset string) :

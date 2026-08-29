@@ -103,6 +103,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Set Printing Depth 40.
 
@@ -136,7 +137,7 @@ Section ProofSysLinkTails.
   (* ================================================================== *)
   (*  ARM B: +0xbc end_op ; +0xc0 a5 = -1 ; +0xc2 restore s1 ; +0xc4 j   *)
   (* ================================================================== *)
-  Lemma sl_tail_b `{GEN : GenId} `{CID0 : CpuId}
+  Lemma sl_tail_b `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (u : nat) (pidv : mword 32) (dq : dfrac)
@@ -165,7 +166,7 @@ Section ProofSysLinkTails.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     log_op icfg_log u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
@@ -341,7 +342,7 @@ Section ProofSysLinkTails.
   (*  above the [nlink++]), so neither carries a fragment and the         *)
   (*  COUNTED iunlockput is what both call.                               *)
   (* ================================================================== *)
-  Lemma sl_tail_c `{GEN : GenId} `{CID0 : CpuId}
+  Lemma sl_tail_c `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
@@ -409,7 +410,7 @@ Section ProofSysLinkTails.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     bslots 3 -∗
     (* the BUDGET half only: half this transaction's element is parked
        in the escrow's write arm for the whole locked window
@@ -662,7 +663,7 @@ Section ProofSysLinkTails.
 
   (* ---- ARM D: the NLINK_MAX guard's own tail, ARM C's six
      instructions at +0xd6.  See ARM C's banner. ---- *)
-  Lemma sl_tail_d `{GEN : GenId} `{CID0 : CpuId}
+  Lemma sl_tail_d `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
@@ -730,7 +731,7 @@ Section ProofSysLinkTails.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     bslots 3 -∗
     (* the BUDGET half only: half this transaction's element is parked
        in the escrow's write arm for the whole locked window
@@ -1012,7 +1013,7 @@ Section ProofSysLinkTails.
   (*  leaves [iput_units] in hand once the CREDITED flush ([cru := true], *)
   (*  paid for by the [++]'s own log_write) has cost nothing.             *)
   (* ================================================================== *)
-  Lemma sl_tail_bad `{GEN : GenId} `{CID0 : CpuId}
+  Lemma sl_tail_bad `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
@@ -1086,7 +1087,7 @@ Section ProofSysLinkTails.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     bslots 3 -∗
     log_opS icfg_log (S u) Sb -∗
     (* the transaction token beside the budget: this tail runs iupdate and
@@ -1673,7 +1674,7 @@ Section ProofSysLinkTails.
   (*  the call reports -- which is [SysLinkBudget]'s theorems, verbatim,  *)
   (*  and nothing this lemma has to know.                                 *)
   (* ================================================================== *)
-  Lemma sl_tail_f `{GEN : GenId} `{CID0 : CpuId}
+  Lemma sl_tail_f `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname) (gild gisld : gname)
@@ -1775,7 +1776,7 @@ Section ProofSysLinkTails.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     bslots 3 -∗
     log_opSe icfg_log n Sb e0 -∗
     (* the transaction token is INSIDE the checked-out descriptor while
@@ -1945,7 +1946,7 @@ Section ProofSysLinkTails.
   (*  tail's [ip->nlink--] consumes it back.  (Read the disassembly, not  *)
   (*  the C's reading order: the guard is after the mint, not before.)    *)
   (* ================================================================== *)
-  Lemma sl_tail_e2 `{GEN : GenId} `{CID0 : CpuId}
+  Lemma sl_tail_e2 `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname) (gild gisld : gname)
@@ -2046,7 +2047,7 @@ Section ProofSysLinkTails.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     bslots 3 -∗
     log_opSe icfg_log n Sb e0 -∗
     (* the transaction token is INSIDE the checked-out descriptor while

@@ -201,6 +201,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Require Import FsReady. (* [fs_ready]: the fabric IS this predicate now *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -346,7 +347,7 @@ Definition kexec_ok (V V' : pprivate) (r : mword 64)
    Promote it then. *)
 Definition fs_fabric
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (gs : list gname)
     (pd pav pu : mword 64)
     : iProp Σ :=
@@ -371,11 +372,11 @@ Definition fs_fabric
   (FsReady.fs_ready ∗
    procs_inv gs ∗
    disk_geom fsc_disk pd pav pu ∗
-   is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu))%I.
+   is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }>)%I.
 
 Global Instance fs_fabric_persistent
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     gs pd pav pu :
   Persistent (fs_fabric gs pd pav pu).
 Proof. rewrite /fs_fabric. apply _. Qed.
@@ -386,7 +387,7 @@ Proof. rewrite /fs_fabric. apply _. Qed.
    four ride in the bundle. *)
 Lemma fs_fabric_all
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (gs : list gname) (pd pav pu : mword 64) :
   fs_fabric gs pd pav pu -∗
   kernel_data ∗
@@ -404,7 +405,7 @@ Lemma fs_fabric_all
   procs_inv gs ∗
   dev_inv fsc_uart fsc_disk ∗
   disk_geom fsc_disk pd pav pu ∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu).
+  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }>.
 Proof.
   (* row by row, not one [iFrame]: every conjunct is definition-valued, so a
      named frame pays a goal-side conversion per hypothesis -- the same
@@ -437,7 +438,7 @@ Qed.
 (* ===================================================================== *)
 Definition wp_kexec_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (gs : list gname) (jp : nat) (gl : gname)           (* the running process *)
     (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -613,7 +614,7 @@ Definition wp_kexec_sconf_body
 Module Type KEXEC.
   Parameter wp_kexec_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (gs : list gname) (jp : nat) (gl : gname)
       (pd pav pu : mword 64)
  (gf : gname)

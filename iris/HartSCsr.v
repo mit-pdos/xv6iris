@@ -44,11 +44,12 @@ Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartSpan
 Require Import RiscvExtras RiscvFetchExec WpMmodeLeafBase HartMFrame
         ExecCommon HartMRun HartGoodb WpDecodeBridge.
 Require Import WpMmodeJump WpMmodeCsrSwp.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Section HartSCsr.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* [Ox"..."] is not available in this import context (stdpp's monadic
      pattern notation shadows the literal syntaxes), so the two mip/sip CSR

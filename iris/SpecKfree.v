@@ -25,7 +25,7 @@ From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 
-Definition wp_kfree_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (on : option nat) (n : nat) (eb : bool) (pcur : mword 64) (K : nat) (b : bool) (lks : gset string) :=
+Definition wp_kfree_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (on : option nat) (n : nat) (eb : bool) (pcur : mword 64) (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kfree in
   let p := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
@@ -40,7 +40,7 @@ Definition wp_kfree_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : C
   sie_cap_gpr kt m K b pcur -∗
   cpu_own n eb pcur b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  is_lock γl lk "kmem"%string (kmem_res γk fl) -∗
+  is_lock γl lk "kmem"%string <{ kmem_res γk fl }> -∗
   kfree_pre p -∗
   kalloc_avail γk on -∗
   wp_next b pcur (fun (CID : CpuId) =>
@@ -52,9 +52,10 @@ Definition wp_kfree_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : C
     kalloc_avail γk (avail_inc on) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
+Require Import TsoCtx.
 
 Module Type KFREE.
   Parameter wp_kfree_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (on : option nat) (n : nat) (eb : bool) (pcur : mword 64) (K : nat) (b : bool) (lks : gset string),
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (on : option nat) (n : nat) (eb : bool) (pcur : mword 64) (K : nat) (b : bool) (lks : gset string),
       wp_kfree_sconf_body kt γl γk lk fl m on n eb pcur K b lks.
 End KFREE.

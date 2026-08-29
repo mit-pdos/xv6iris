@@ -82,6 +82,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* ------------------------------------------------------------------ *)
 (*  Geometry: the pa-tier node base and the refcnt cell                 *)
@@ -217,6 +218,7 @@ Qed.
 
 Section BioInv.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{XI : CurCtx}.
 
   (* full ownership of a 4-byte cell is exclusive: the escrow's park swap
      refutes the parked arm with the full valid cell in hand. *)
@@ -224,11 +226,11 @@ Section BioInv.
     a ↦₄ w1 -∗ a ↦₄{dq} w2 -∗ False.
   Proof.
     iIntros "H1 H2".
-    iDestruct (word4_pointsto_bytes with "H1") as "H1".
-    iDestruct (word4_pointsto_bytes with "H2") as "H2".
+    iDestruct (ctx_word4_pointsto_bytes with "H1") as "H1".
+    iDestruct (ctx_word4_pointsto_bytes with "H2") as "H2".
     cbn [seq].
     iDestruct "H1" as "[Hb1 _]". iDestruct "H2" as "[Hb2 _]".
-    iDestruct (mem_pointsto_ne with "Hb1 Hb2") as %Hne. done.
+    iDestruct (ctx_pointsto_ne with "Hb1 Hb2") as %Hne. done.
   Qed.
 
   (* ---- the slot supply lives in [BioDefs] now, at the CANONICAL ghost
@@ -436,10 +438,10 @@ Section BioInv.
     iIntros "Hbody Hown Htok Hdev Hbno".
     iDestruct "Hbody" as "[Hparked | [Hchain | Hmid]]".
     - iDestruct "Hparked" as (v dev' bno' bs) "(Hvld & Hdev' & Hbuf & Hpay & Hbmid)".
-      iDestruct (word4_pointsto_agree with "Hdev Hdev'") as %Heqd. subst dev'.
+      iDestruct (ctx_word4_pointsto_agree with "Hdev Hdev'") as %Heqd. subst dev'.
       rewrite /buf_own.
       iDestruct "Hbuf" as "(Hbno' & Hdisk & %Hlen & Hdata)".
-      iDestruct (word4_pointsto_agree with "Hbno Hbno'") as %Heqb. subst bno'.
+      iDestruct (ctx_word4_pointsto_agree with "Hbno Hbno'") as %Heqb. subst bno'.
       iSplitL "Htok Hdev Hbno Hown Hbmid".
       { iRight; iLeft. rewrite /buf_chain. iExists q, dev, bno. iFrame. }
       iExists v, bs. iFrame "Hvld Hdev' Hpay".
@@ -474,10 +476,10 @@ Section BioInv.
     - iDestruct "Hparked" as (v' dev' bno' bs') "(Hvld' & _)".
       iExFalso. iApply (word4_pointsto_excl with "Hvld Hvld'").
     - iDestruct "Hchain" as (q dev' bno') "(Htok & Hdev' & Hbno' & Hown & Hbmid)".
-      iDestruct (word4_pointsto_agree with "Hdev Hdev'") as %Heqd. subst dev'.
+      iDestruct (ctx_word4_pointsto_agree with "Hdev Hdev'") as %Heqd. subst dev'.
       rewrite /buf_own.
       iDestruct "Hbuf" as "(Hbno & Hdisk & %Hlen & Hdata)".
-      iDestruct (word4_pointsto_agree with "Hbno' Hbno") as %Heqb. subst bno'.
+      iDestruct (ctx_word4_pointsto_agree with "Hbno' Hbno") as %Heqb. subst bno'.
       iSplitR "Htok Hdev' Hbno' Hown".
       { iLeft. rewrite /buf_parked. iExists v, dev, bno, bs.
         iFrame "Hvld Hdev Hpay Hbmid".
@@ -989,7 +991,7 @@ Section BioInv.
   (* ------------------------------------------------------------------ *)
 
   Definition bio_ctx (bn : bio_names) (V : bio_view Σ) : iProp Σ :=
-    (is_lock (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) ∗
+    (is_lock (bn_lk bn) bcache_addr "bcache"%string <{ bcache_res bn V }> ∗
      [∗ list] k ∈ seq 0 NBUF,
        (is_sleeplock (fst (bn_slk bn k)) (snd (bn_slk bn k))
           (buf_lock (bnode k)) "buffer"%string (bown bn k) ∗
@@ -1003,7 +1005,7 @@ Section BioInv.
 
   Lemma bio_ctx_lock bn V :
     bio_ctx bn V -∗
-    is_lock (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V).
+    is_lock (bn_lk bn) bcache_addr "bcache"%string <{ bcache_res bn V }>.
   Proof. iIntros "[$ _]". Qed.
 
   Lemma bio_ctx_buf bn V k :
@@ -1177,8 +1179,8 @@ Section BioInv.
     iMod (own_alloc (● (∅ : gmap nat (Qp * positive)) : bioUR)) as (γb) "Hauth".
     { apply auth_auth_valid. intros i. rewrite lookup_empty. done. }
     (* the bcache spinlock's gname, BEFORE its resource can be stated *)
-    iMod (newlock_delayed E bcache_addr "bcache"%string with "Hnm Hlkw Hcpu")
-      as (γlk) "Hmk".
+    iMod (newlock_delayed E bcache_addr "bcache"%string with "Hnm Hlkw [Hcpu]")
+      as (γlk) "Hmk"; [ iApply (WpLock.lk_cpu_ready_intro with "Hcpu") | ].
     (* every buffer's sleeplock, sealing exactly its checkout token *)
     iDestruct (big_sepL_sep_2 with "Hfresh Htoks") as "Hsl".
     iAssert ([∗ list] k ∈ seq 0 NBUF, |={E}=> ∃ p : gname * gname,

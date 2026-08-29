@@ -92,6 +92,7 @@ Require Import KernelRvcDecode.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -344,21 +345,21 @@ Notation ap_x0 := (mword_of_int 0 : mword 5).
 (* [rget] is the plain map lookup at every register this function reads --
    none of them is tp.  Stated once per register, with the hart IMPLICIT, so a
    [rewrite] fires at whatever hart the leaf's [let]-bound value carries. *)
-Lemma ap_rg_ra `{GEN : GenId} `{CID : CpuId} (MM : regfile) : rget MM ap_ra = MM !!! Regidx ap_ra.
+Lemma ap_rg_ra `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (MM : regfile) : rget MM ap_ra = MM !!! Regidx ap_ra.
 Proof. rgne. reflexivity. Qed.
-Lemma ap_rg_s0 `{GEN : GenId} `{CID : CpuId} (MM : regfile) : rget MM ap_s0 = MM !!! Regidx ap_s0.
+Lemma ap_rg_s0 `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (MM : regfile) : rget MM ap_s0 = MM !!! Regidx ap_s0.
 Proof. rgne. reflexivity. Qed.
-Lemma ap_rg_s1 `{GEN : GenId} `{CID : CpuId} (MM : regfile) : rget MM ap_s1 = MM !!! Regidx ap_s1.
+Lemma ap_rg_s1 `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (MM : regfile) : rget MM ap_s1 = MM !!! Regidx ap_s1.
 Proof. rgne. reflexivity. Qed.
-Lemma ap_rg_s2 `{GEN : GenId} `{CID : CpuId} (MM : regfile) : rget MM ap_s2 = MM !!! Regidx ap_s2.
+Lemma ap_rg_s2 `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (MM : regfile) : rget MM ap_s2 = MM !!! Regidx ap_s2.
 Proof. rgne. reflexivity. Qed.
-Lemma ap_rg_a0 `{GEN : GenId} `{CID : CpuId} (MM : regfile) : rget MM ap_a0 = MM !!! Regidx ap_a0.
+Lemma ap_rg_a0 `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (MM : regfile) : rget MM ap_a0 = MM !!! Regidx ap_a0.
 Proof. rgne. reflexivity. Qed.
-Lemma ap_rg_a4 `{GEN : GenId} `{CID : CpuId} (MM : regfile) : rget MM ap_a4 = MM !!! Regidx ap_a4.
+Lemma ap_rg_a4 `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (MM : regfile) : rget MM ap_a4 = MM !!! Regidx ap_a4.
 Proof. rgne. reflexivity. Qed.
-Lemma ap_rg_a5 `{GEN : GenId} `{CID : CpuId} (MM : regfile) : rget MM ap_a5 = MM !!! Regidx ap_a5.
+Lemma ap_rg_a5 `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (MM : regfile) : rget MM ap_a5 = MM !!! Regidx ap_a5.
 Proof. rgne. reflexivity. Qed.
-Lemma ap_rg_x0 `{GEN : GenId} `{CID : CpuId} (MM : regfile) : rget MM ap_x0 = MM !!! Regidx ap_x0.
+Lemma ap_rg_x0 `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (MM : regfile) : rget MM ap_x0 = MM !!! Regidx ap_x0.
 Proof. rgne. reflexivity. Qed.
 
 (* ===================================================================== *)
@@ -433,7 +434,7 @@ Section ProofAllocproc.
      variable of that name would be shadowed by them -- while the lemma's own
      anchor has to stay nameable from INSIDE those lambdas (that is what
      [wp_next (CID0 := CID0)] and [wp_next_chain] compose against). *)
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Lemma wp_allocproc_core
       (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname)
@@ -2323,7 +2324,7 @@ Module AllocprocSeal (Core : ALLOCPROC_GEN) : ALLOCPROC.
 
 Section SealAllocproc.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID0 : CpuId}.
+  Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
   Lemma wp_allocproc_sconf
       (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname)

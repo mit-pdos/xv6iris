@@ -66,6 +66,7 @@ Require Import KernelRvcDecode.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* wakeup's 7-entry callee-save frame, over [SpecWakeupParts.wk_fcell]: ra/s0
    and s1..s5 at spF+56 down to spF+8, written by the prologue and read back
@@ -203,7 +204,7 @@ Section ProofWakeup.
      resumes them, so [proc_lock_res] (SchedCtx.v, whose context slot is the
      ▷-guarded [proc_ctx] over the scheduler swtch chain) is threaded OPAQUELY
      here: the ▷-slot is carried between elim and intro/wakeup, never stripped. *)
-  Lemma wp_wakeup_loop_sconf `{GEN : GenId} `{CID0 : CpuId}
+  Lemma wp_wakeup_loop_sconf `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       
       (γs : list gname) (spF pme chan : mword 64)
       (vra vs0 vs1 vs2 vs3 vs4 vs5 : mword 64)
@@ -852,7 +853,7 @@ Section ProofWakeup.
   (* prologue's 8-slot frame carve) and procs_inv.  proc_lock_res            *)
   (* (SchedCtx.v) is threaded opaquely, ▷-slot untouched.                    *)
   (* ===================================================================== *)
-  Lemma wp_wakeup_sconf `{GEN : GenId} `{CID0 : CpuId}
+  Lemma wp_wakeup_sconf `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       
       (m : regfile) (γs : list gname) (pme : mword 64)
       (lvl K : nat) (eb : bool) (b : bool) (lks : gset string)

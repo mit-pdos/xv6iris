@@ -89,6 +89,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* ------------------------------------------------------------------ *)
 (*  Pure fraction arithmetic (over Qp variables, so no solver ever runs *)
@@ -114,7 +115,7 @@ Module BrelseProof (Hsl : HOLDINGSLEEP) (Rsl : RELEASESLEEP)
 
 Section ProofBrelse.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Notation Rra  := (mword_of_int 1 : mword 5).
@@ -149,7 +150,7 @@ Section ProofBrelse.
   (*  base is [sp], a concrete non-tp index, so it stays a raw lookup     *)
   (*  (exactly as [wp_csdsp_s_sconf] spells it).                          *)
   (* ---------------------------------------------------------------- *)
-  Local Lemma wp_csdsp_au_s_sconf `{CID0 : CpuId} 
+  Local Lemma wp_csdsp_au_s_sconf `{CID0 : CpuId} `{XI : CurCtx} 
       (pc : mword 64) (uimm : mword 6) (rs2 : mword 5) `{!SrcOk rs2}
       (m0 : regfile) (av : nat) (Ψ : iProp Σ) (Em : coPset)
       (b : bool) (pme : mword 64) :
@@ -253,7 +254,7 @@ Section ProofBrelse.
      [eb] -- release's own level-0 exit arm, which pop_off restores to the
      saved base enable.  The level is fixed at 1 (brelse's only call site),
      so no [nn] binder survives. *)
-  Local Lemma brelse_tail `{CID0 : CpuId}  (bn : bio_names)
+  Local Lemma brelse_tail `{CID0 : CpuId} `{XI : CurCtx}  (bn : bio_names)
       (V : bio_view Σ)
       (m M : regfile) (K : nat) (eb : bool) (p : mword 64)
       (lks : gset string) :
@@ -273,7 +274,7 @@ Section ProofBrelse.
     sie_cap_gpr KT1 M (trap_res eb + (K - 4))%nat false p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.brelse + 0x60) : mword 64) -∗
-    is_lock (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) -∗
+    is_lock (bn_lk bn) bcache_addr "bcache"%string <{ bcache_res bn V }> -∗
     locked (bn_lk bn) cpu_id -∗
     bcache_res bn V -∗
     cpu_own 1%nat eb p false ({["bcache"]} ∪ lks) -∗

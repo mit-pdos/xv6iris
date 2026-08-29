@@ -148,6 +148,7 @@ Require Import ProofSysOpenAUJoin.
 Require Import ProofSysOpenAUWalk.
 Require Import ProofSysOpen.   (* [so_neq_of_eq] / [so_neq_of_ne] / [so_bud_iput] *)
 Require Import FsAbs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -225,7 +226,7 @@ Section ProofSysOpenAUBody.
   (*  an ordinary [destruct] on the mask's [eq_vec] and no bit lemma is  *)
   (*  spent here.                                                       *)
   (* ================================================================== *)
-  Lemma wp_sys_open_au_plain `{GEN : GenId} `{CID0 : CpuId}
+  Lemma wp_sys_open_au_plain `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gfl gf : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)

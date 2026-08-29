@@ -78,6 +78,7 @@ Require Export FastSetSolver.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -532,7 +533,7 @@ Section VdrwfP6.
   (* s1 = desc[i].flags and s2 = desc[i].next (both callee-saved, so they   *)
   (* survive the call), and descriptor [i] back in the free pool.           *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_vdrwf_iter `{GEN : GenId} `{CID : CpuId}  (γs : list gname) (γd : disk_names)
+  Lemma wp_vdrwf_iter `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}  (γs : list gname) (γd : disk_names)
       (pd : SailStdpp.Values.mword 64) (i : nat) (fr : nat -> bool)
       (va : SailStdpp.Values.mword 64) (vl : SailStdpp.Values.mword 32)
       (vf vn : SailStdpp.Values.mword 16)
@@ -759,7 +760,7 @@ Section VdrwfP6.
   (* level 0 with the saved base [eb] and the epilogue below it runs at     *)
   (* that arm, which is interruptible whenever [eb = true].                 *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_vdrw_p6_seam `{GEN : GenId} `{CID : CpuId} (γk : gname)
+  Lemma wp_vdrw_p6_seam `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γk : gname)
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool)
       (sp0 b : Arch.pa) (m : regfile) (wr sector : SailStdpp.Values.mword 64)
@@ -784,7 +785,7 @@ Section VdrwfP6.
     perm_inv gen_id (dn_perm γd) -∗
     perm_receipt kq.2 Q -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     vdrw_saved (KTR := KT1) sp0 m -∗
     b_blockno b ↦₄{DfracOwn (1/2)} bno -∗
     (* NO caller-held [trap_csrs_pay]: the function is trap-CSR-balanced, so
@@ -1775,7 +1776,7 @@ End VdrwfP6.
 
 Section ProofVirtioDiskRwF.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Typeclasses Opaque cpu_own.
 

@@ -26,6 +26,7 @@ Require Import WpGprCsrrCommon.   (* drive_csr_term *)
 (* ===================================================================== *)
 
 Lemma exec_hartSupports_Sscofpmf s : exec (hartSupports Ext_Sscofpmf) s = Some (true, s).
+Require Import TsoCtx.
 Proof.
   unfold hartSupports. destruct (Defs.Zwf_guarded _).
   cbn [_rec_hartSupports]. unfold Defs.assert_exp'.
@@ -980,7 +981,7 @@ Qed.
 
 Section WpCsrwGprNewB.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   (* ------------------------------------------------------------------ *)
   (* mideleg: [write_CSR]'s menvcfg shape exactly -- read the cell, run a    *)
   (* READ-ONLY legalization, write it back, read it again.  So the           *)

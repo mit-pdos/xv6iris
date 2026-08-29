@@ -143,6 +143,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Set Printing Depth 40.
 
@@ -693,7 +694,7 @@ Section ProofSysUnlinkBody.
      changed.  [CIDs] is an explicit binder because the body writes
      [wp_next (CID0 := CIDs)], and its other rows resolve their [CpuId]
      instance to the innermost one. *)
-  Definition su_w1_seam `{GEN : GenId} `{CIDs : CpuId}
+  Definition su_w1_seam `{GEN : GenId} `{CIDs : CpuId} `{XI : CurCtx}
       (gf : gname) (jx : nat)
  (dqb : dfrac)
       (dqs : dfrac) (dqbs : dfrac) (pid : mword 32) (U : ustate)
@@ -759,7 +760,7 @@ Section ProofSysUnlinkBody.
            dqb dqs dqbs) -∗
        WP (Loop : expr riscv_lang))%I.
 
-  Lemma su_w1 `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_w1 `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -792,7 +793,7 @@ Section ProofSysUnlinkBody.
     gen_cert -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     bslots 3 -∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
     itable_inv -∗
@@ -1405,7 +1406,7 @@ Section ProofSysUnlinkBody.
   (* the sp bound the capability underwrites, [ProofSysClose.sc_sp_bounds]'
      shape.  [0 < k] is mandatory: [trap_res false] is nothing, so at the
      interrupts-off arm the caller's own slots are all that bound sp. *)
-  Lemma su_sp_bounds `{GEN : GenId} `{CIDh : CpuId} (M : regfile) (k : nat)
+  Lemma su_sp_bounds `{GEN : GenId} `{CIDh : CpuId} `{XI : CurCtx} (M : regfile) (k : nat)
       (b : bool) (pp : mword 64) :
     (0 < k)%nat ->
     sie_cap_gpr KT1 M k b pp -∗
@@ -1427,7 +1428,7 @@ Section ProofSysUnlinkBody.
   (*  pid quarter plus its CLOSER, which is what keeps the cwd half out   *)
   (*  of this interface entirely.                                        *)
   (* ================================================================== *)
-  Lemma su_w2_bad `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_w2_bad `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -1501,7 +1502,7 @@ Section ProofSysUnlinkBody.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     bslots 3 -∗
     iref_slots 1 -∗
     log_opb icfg_log u -∗
@@ -1602,7 +1603,7 @@ Section ProofSysUnlinkBody.
      changed.  [CIDs] is an explicit binder because the body writes
      [wp_next (CID0 := CIDs)], and its other rows resolve their [CpuId]
      instance to the innermost one. *)
-  Definition su_w2_seam `{GEN : GenId} `{CIDs : CpuId}
+  Definition su_w2_seam `{GEN : GenId} `{CIDs : CpuId} `{XI : CurCtx}
       (gf : gname) (jx : nat)
  (dqb : dfrac) (dqs : dfrac)
       (dqbs : dfrac) (pid : mword 32) (U : ustate) (P1 : uptd) (n1 : nat)
@@ -1707,7 +1708,7 @@ Section ProofSysUnlinkBody.
            dqb dqs dqbs) -∗
        WP (Loop : expr riscv_lang))%I.
 
-  Lemma su_w2 `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_w2 `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -1750,7 +1751,7 @@ Section ProofSysUnlinkBody.
     gen_cert -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     bslots 3 -∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
     itable_inv -∗
@@ -2668,7 +2669,7 @@ Section ProofSysUnlinkBody.
 
   (* THE ITERATION, by fuel over the remaining bytes.  Entry at +0x106
      with s3 = 16*jj, records 2..jj-1 known dead. *)
-  Local Lemma su_w4_loop `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma su_w4_loop `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gf : gname)
@@ -2711,7 +2712,7 @@ Section ProofSysUnlinkBody.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     i_dev (ientry ki) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     inode_meta (ientry ki) dni -∗
     inode_map fsc_fs (ientry ki) bmi -∗
@@ -3227,7 +3228,7 @@ Section ProofSysUnlinkBody.
   Qed.
 
   (* THE BLOCK: the entry test at +0xf8..+0x104, then the loop. *)
-  Lemma su_w4 `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_w4 `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gf : gname)
@@ -3265,7 +3266,7 @@ Section ProofSysUnlinkBody.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     i_dev (ientry ki) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     inode_meta (ientry ki) dni -∗
     inode_map fsc_fs (ientry ki) bmi -∗
@@ -3461,7 +3462,7 @@ Section ProofSysUnlinkBody.
      changed.  [CIDs] is an explicit binder because the body writes
      [wp_next (CID0 := CIDs)], and its other rows resolve their [CpuId]
      instance to the innermost one. *)
-  Definition su_w3_seam `{GEN : GenId} `{CIDs : CpuId}
+  Definition su_w3_seam `{GEN : GenId} `{CIDs : CpuId} `{XI : CurCtx}
       (gf : gname) (jx : nat)
  (dqb : dfrac) (dqs : dfrac) (dqbs : dfrac)
       (pid : mword 32) (U : ustate) (P1 : uptd) (n1 : nat) (Sb1 : gset Z)
@@ -3593,7 +3594,7 @@ Section ProofSysUnlinkBody.
            dqb dqs dqbs) -∗
        WP (Loop : expr riscv_lang))%I.
 
-  Lemma su_w3 `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_w3 `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -3656,7 +3657,7 @@ Section ProofSysUnlinkBody.
     gen_cert -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     bslots 3 -∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
     itable_inv -∗
@@ -4239,7 +4240,7 @@ Section ProofSysUnlinkBody.
   (*    reloads, and the shared epilogue.                                *)
 
   (* ================================================================== *)
-  Lemma su_w5_file `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_w5_file `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -4313,7 +4314,7 @@ Section ProofSysUnlinkBody.
     gen_cert -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     bslots 3 -∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
     itable_inv -∗
@@ -5849,7 +5850,7 @@ Section ProofSysUnlinkBody.
   (*  model cannot yet supply -- see the statement's banner and           *)
   (*  fs-sysfile.md S7-unlink W5.  The seal is STOPPED on them.           *)
   (* ================================================================== *)
-  Lemma su_w5_dir `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_w5_dir `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -5946,7 +5947,7 @@ Section ProofSysUnlinkBody.
     gen_cert -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     bslots 3 -∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
     itable_inv -∗
@@ -8083,7 +8084,7 @@ Section ProofSysUnlinkBody.
   (*  The T_DIR arm takes NO design-fact premise any more: (D1) and (D2)   *)
   (*  are derived inside [su_w5_dir] (V5' increment W).                    *)
   (* ==================================================================== *)
-  Lemma wp_sys_unlink_sconf `{GEN : GenId} `{CID0 : CpuId}
+  Lemma wp_sys_unlink_sconf `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)

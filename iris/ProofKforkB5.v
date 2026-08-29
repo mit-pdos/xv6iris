@@ -88,6 +88,7 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Set Printing Depth 40.
 
@@ -143,7 +144,7 @@ Section ProofKforkB5.
   (* =================================================================== *)
   (*  THE BLOCK.                                                          *)
   (* =================================================================== *)
-  Lemma kfk_b5 `{GEN : GenId} `{CID0 : CpuId}
+  Lemma kfk_b5 `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γs : list gname) (γf γw γft γl : gname) (j : nat)
       (Mt : regfile) (K lvl : nat) (eb b : bool)
       (pme ks : mword 64) (pid_c : mword 32) (Uc : ustate)
@@ -174,7 +175,7 @@ Section ProofKforkB5.
     kernel_text -∗
     pc_is (mword_of_int (KF + 0xc2) : mword 64) -∗
     SchedCtx.procs_inv γs -∗
-    WpLock.is_lock γw SpecProcinit.wait_lock_addr "wait_lock"%string WaitInv.wait_res -∗
+    WpLock.is_lock γw SpecProcinit.wait_lock_addr "wait_lock"%string <{ WaitInv.wait_res }> -∗
     (* THE PAID PARK'S ROWS: the open-file table, the world
        ([SyscParkEnv.park_world] -- device complement, console, the two
        global locks, the slot ledger, wire invariant, trampoline claim, an

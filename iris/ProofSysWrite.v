@@ -88,6 +88,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* a failing tactic in a whole-function WP over [proc_priv] otherwise spends
@@ -138,7 +139,7 @@ Module SysWriteProof (Argaddr : ARGADDR) (Argint : ARGINT) (Argfd : ARGFD)
 Section ProofSysWrite.
   (* NO [!icacheG Σ]: [fileG] bundles it (SpecFilewrite.v's note). *)
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -153,7 +154,7 @@ Section ProofSysWrite.
 
   (* THE CARVE THIS READS IS ARM-DEPENDENT, hence the [0 < k] premise --
      [ProofSysFstat.sfs_sp_bounds] verbatim. *)
-  Lemma sw_sp_bounds `{CID0 : CpuId} (mm : regfile) (kk : nat)
+  Lemma sw_sp_bounds `{CID0 : CpuId} `{XI : CurCtx} (mm : regfile) (kk : nat)
       (bb : bool) (pp : mword 64) :
     (0 < kk)%nat ->
     sie_cap_gpr KT1 mm kk bb pp -∗
@@ -171,7 +172,7 @@ Section ProofSysWrite.
      is entered at a MIGRATED hart -- its own [b] and [pp], and its
      continuation wrapped in [wp_next].  It does NOT carry [cpu_own]: the
      epilogue never touches it, so the caller transports it afterwards. *)
-  Lemma sw_tail `{CID0 : CpuId}
+  Lemma sw_tail `{CID0 : CpuId} `{XI : CurCtx}
       (m Mt : regfile) (av : nat) (rv : mword 64)
       (sp0 ra0 s00 : mword 64) (w3 w4 w5 w6 : bv 64) (b : bool) (pp : mword 64) :
     (6 <= av)%nat ->

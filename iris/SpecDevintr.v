@@ -81,6 +81,7 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 
@@ -111,7 +112,7 @@ Definition devintr_ret (sc : mword 64) : mword 64 :=
 
 Section DevintrCaps.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* Everything the five handlers ask of a caller, in the order the branches
      reach them:
@@ -148,7 +149,7 @@ Section DevintrCaps.
     ( dev_inv γu γv ∗
       console_caps γu ∗
       disk_geom γv pd pav pu ∗
-      is_lock γdk d_lock "virtio_disk"%string (disk_res γv pd pav pu) ∗
+      is_lock γdk d_lock "virtio_disk"%string <{ disk_res γv pd pav pu }> ∗
       timer_cap ∗
       tick_keeper γtl γs ∗
       procs_inv γs )%I.
@@ -164,7 +165,7 @@ End DevintrCaps.
    20, plic_complete 6, plic_claim 4). *)
 Notation devintr_stack := (52%nat) (only parsing).
 Definition wp_devintr_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
     (γs : list gname) (pd pav pu : mword 64)
     (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
@@ -201,7 +202,7 @@ Definition wp_devintr_sconf_body
 
 Module Type DEVINTR.
   Parameter wp_devintr_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
       (γs : list gname) (pd pav pu : mword 64)
       (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)

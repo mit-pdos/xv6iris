@@ -52,6 +52,7 @@ Require Import CodeSleepPrepare.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* a failing tactic in a whole-function WP over the proc invariant otherwise
@@ -68,7 +69,7 @@ Module SleepPrepareProof (Myproc : MYPROC) (Acquire : ACQUIRE) (Release : RELEAS
 
 Section ProofSleepPrepare.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation spr_ra := (mword_of_int 1 : mword 5).
   Notation spr_s0 := (mword_of_int 8 : mword 5).

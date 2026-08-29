@@ -36,7 +36,7 @@
    actually consumed (before the myproc call, and at the loop's two exits /
    back edge), since none of the ALU/mem/branch leaves touch it themselves.
    [fda_tail], the shared epilogue entered by both of fdalloc's exits, is
-   pulled out to its own fresh `{CID0 : CpuId}` binder (the "decomposed
+   pulled out to its own fresh `{CID0 : CpuId} `{XI : CurCtx}` binder (the "decomposed
    helper" recipe) and wraps its own continuation in [wp_next]; it does NOT
    carry [cpu_own] (fdalloc's epilogue never touches it, exactly as before
    the sweep), so a caller transports ["Hcpu"] AFTER fda_tail, not
@@ -82,6 +82,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -220,7 +221,7 @@ Module FdallocProof (Myproc : MYPROC) : FDALLOC.
 
 Section ProofFdalloc.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>
@@ -245,7 +246,7 @@ Section ProofFdalloc.
   (*  does NOT carry [cpu_own]: fdalloc's epilogue never touches it, so   *)
   (*  (as before the sweep) that resource stays entirely with the caller. *)
   (* =================================================================== *)
-  Lemma fda_tail `{CID0 : CpuId}
+  Lemma fda_tail `{CID0 : CpuId} `{XI : CurCtx}
       (m Mt : regfile) (av : nat) (rv : mword 64)
       (sp0 ra0 s00 s10 gapv : mword 64) (p : mword 64) (b : bool) :
     (4 <= av)%nat ->

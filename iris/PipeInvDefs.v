@@ -14,7 +14,7 @@
    the C code says it should be:
 
      is_pipe γl γp pi  :=  ⌜page_valid pi⌝ ∗
-                           inv lockN (lock_inv γl pi "pipe" (pipe_res γp pi)
+                           inv lockN (lock_inv γl pi "pipe" <{ pipe_res γp pi }>
                                       ∨ pipe_dead γl γp)
 
    persistent, and [pipe_res] owns every remaining byte of the page -- the
@@ -128,6 +128,7 @@ Require Import RiscvPtsto.
 Require Import KallocInv.
 Require Import WpLock.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import TsoCtx.
 Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
 Local Open Scope Z_scope.
 
@@ -330,6 +331,9 @@ Definition pn_mark (γp : pipe_names) (w : bool) : gname :=
 
 Section PipeInv.
   Context `{!riscvGS Σ, !lockG Σ, !pipeG Σ}.
+  (* §0.35': the lock handle is context-relative, so the index is ambient in
+     this section -- the T-leg binds it here too. *)
+  Context `{XI : TsoCtx.CurCtx}.
 
   (* ---- THE reference: a share of one END of the pipe ----
 
@@ -596,32 +600,51 @@ Section PipeInv.
      Persistent, so every holder of either end shares it.  [page_valid] is
      kalloc's guarantee travelling with the object: it is what makes the page
      re-freeable, so it has to survive to pipeclose. *)
+  (* §5.1(c)/A6.105: [is_pipe] is the SECOND handle and takes [is_lock]'s
+     treatment exactly -- the floor existential inside, the payload in
+     lambda form.  Shape copied verbatim from [tso-flip PipeInvDefs.v:601];
+     this one propagates to every pipe client, so it is not a place to
+     improvise.  The soundness argument is §0.35''s own: another core cannot
+     DISCOVER [is_pipe] for a freshly kalloc'd page and lock it -- it might
+     still see pre-initialization garbage -- so it must RECEIVE the handle
+     through a crossing, and the floor is what records that. *)
   Definition is_pipe (γl : gname) (γp : pipe_names) (pi : mword 64) : iProp Σ :=
     (⌜page_valid pi⌝ ∗
-     inv lockN (lock_inv γl pi "pipe" (pipe_res γp pi) ∨ pipe_dead γl γp))%I.
+     ∃ lo : nat,
+       inv lockN (lock_inv γl pi "pipe" <{ pipe_res γp pi }> lo ∨ pipe_dead γl γp) ∗
+       WpLock.lk_floor TsoCtx.cur_ctx lo)%I.
 
   Global Instance is_pipe_persistent γl γp pi : Persistent (is_pipe γl γp pi).
   Proof. apply _. Qed.
 
   (* PERFORMANCE: seal it, for the same reason [WpLock.is_lock] is sealed --
      without this, every [iIntros "#Hpipe"] re-derives persistence by unfolding
-     into [lock_inv γl pi "pipe" (pipe_res γp pi)] and descending through [pipe_res]
+     into [lock_inv γl pi "pipe" <{ pipe_res γp pi }>] and descending through [pipe_res]
      instead of stopping at the instance above.  Worth 6.5 % of [ProofPiperead]
      on its own (104 s -> 97 s).  The three lemmas below are the interface. *)
   Global Typeclasses Opaque is_pipe.
 
   Lemma is_pipe_valid γl γp pi : is_pipe γl γp pi -∗ ⌜page_valid pi⌝.
   Proof. rewrite /is_pipe. by iIntros "[$ _]". Qed.
+  (* [tso-flip PipeInvDefs.v:633]: the projection EXHIBITS the floor, the same
+     way [is_lock_inv] does -- a leaf that opens the body needs the [lo] it was
+     allocated at. *)
   Lemma is_pipe_inv γl γp pi :
-    is_pipe γl γp pi -∗ inv lockN (lock_inv γl pi "pipe" (pipe_res γp pi) ∨ pipe_dead γl γp).
-  Proof. rewrite /is_pipe. by iIntros "[_ $]". Qed.
+    is_pipe γl γp pi -∗
+    ∃ lo : nat,
+      inv lockN (lock_inv γl pi "pipe" <{ pipe_res γp pi }> lo ∨ pipe_dead γl γp) ∗
+      WpLock.lk_floor TsoCtx.cur_ctx lo.
+  Proof. rewrite /is_pipe. iIntros "[_ H]". iExact "H". Qed.
 
   (* what acquire / holding / release take.  The credential is left to the
      caller: a reference for acquire, the holder token for release. *)
   Lemma is_pipe_openable γl γp pi :
     is_pipe γl γp pi -∗
-    lock_openable γl pi "pipe" (pipe_res γp pi) (pipe_dead γl γp).
-  Proof. iIntros "H". iApply lock_openable_of_dead. by iApply is_pipe_inv. Qed.
+    lock_openable γl pi "pipe" <{ pipe_res γp pi }> (pipe_dead γl γp).
+  Proof.
+    iIntros "H". iDestruct (is_pipe_inv with "H") as (lo) "[#Hi #Hf]".
+    iApply (lock_openable_of_dead with "Hi Hf").
+  Qed.
 
   (* ---- what a [struct file] of type FD_PIPE carries, ADDRESS-KEYED ----
 

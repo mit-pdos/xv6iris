@@ -62,6 +62,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 
@@ -146,7 +147,7 @@ Module ArgfdProof (Argint : ARGINT) (Myproc : MYPROC) : ARGFD.
 
 Section ProofArgfd.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* =================================================================== *)
   (*  +0x38 .. +0x3c: [if (pfd) *pfd = fd], BOTH ways.                    *)
@@ -157,7 +158,7 @@ Section ProofArgfd.
      once here, rather than a case split that would duplicate the whole tail
      from +0x40 down.  [SpecArgfd.ofd_out] is the resource that is a cell in
      one arm and nothing in the other. *)
-  Lemma af_pfd `{CID0 : CpuId}
+  Lemma af_pfd `{CID0 : CpuId} `{XI : CurCtx}
       (Mt : regfile) (nav : nat) (pfd : mword 64) (oldfd wfd : mword 32)
       (p : mword 64) (b : bool) :
     Mt !!! Regidx (mword_of_int 18 : mword 5) = pfd ->
@@ -230,7 +231,7 @@ Section ProofArgfd.
   (* =================================================================== *)
   (*  The shared tail at +0x46: the epilogue, entered by all three arms.  *)
   (* =================================================================== *)
-  Lemma af_tail `{CID0 : CpuId}
+  Lemma af_tail `{CID0 : CpuId} `{XI : CurCtx}
       (m Mt : regfile) (av : nat) (rv : mword 64)
       (sp0 ra0 s00 s10 s20 : mword 64) (w5 w6 : bv 64)
       (p : mword 64) (b : bool) :

@@ -31,6 +31,7 @@ Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d SailStdp
 Require Import WpInstr.   (* wp_instr / mm_cycle, split out of InstrBytes *)
 Require Import HartSwp HartLift HartSpan HartSpanChar HartMFrame HartMPmp
         HartMLoad.
+Require Import TsoCtx.
 Import Defs.
 Import Defs.
 
@@ -164,7 +165,7 @@ Qed.
 
 Section LdFrames.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma hreg_frame_empty (rs : regstate) : ⊢ (hreg_frame rs ∅ : iProp Σ).
   Proof. rewrite /hreg_frame big_sepS_empty. auto. Qed.
@@ -238,7 +239,7 @@ End LdFrames.
 (* from WpGprLoad.v *)
 Section WpLdGpr.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* reg_pointsto Fractional/AsFractional, reg_pointsto_agree, and
      mmode_config_split_half / mmode_config_combine_half now live in InstrBytes.v
@@ -351,7 +352,7 @@ End WpLdGpr.
 (* from WpGprRvcTor.v (RvcTorEngines, load leaves) *)
 Section MmodeLoadTor.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_ld_gpr_tor (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5)
       (imm : mword 12) (m : regfile) (v : bv 64)

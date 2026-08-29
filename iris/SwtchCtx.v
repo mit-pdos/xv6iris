@@ -22,6 +22,7 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* struct-context field layout: field i (0..13) holds register [ctx_regs !! i]
    at byte offset 8*i -- ra sp s0 s1 s2 .. s11. *)
@@ -92,7 +93,7 @@ Proof. intro H; exact H. Qed.
 Section SwtchCtx.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ================================================================== *)
   (* struct context: ownership of its 14 saved-register cells.           *)
@@ -272,7 +273,7 @@ End SwtchCtx.
 
 Section Swconf.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)
   (* The swtch-crossing configuration bundle: what a scheduler context    *)

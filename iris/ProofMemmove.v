@@ -30,7 +30,7 @@
    EXPLICIT-CPUID: the whole function threads a generic [b : bool], exactly the
    shape of ProofPlicinit.v / ProofStrlen.v.  [mm_epilogue] and [mm_fwd] are
    non-recursive fragments of the whole-function contract, so each takes its
-   own leading (shadowing) hart [`{CID0 : CpuId}`] and its continuation
+   own leading (shadowing) hart [`{CID0 : CpuId} `{XI : CurCtx}`] and its continuation
    argument is [wp_next]-wrapped, discharged the same two-step way the
    outermost function is; a caller then treats a call to one of them exactly
    like a leaf application, peeling a fresh [(CIDk, Hsk)] off its result.
@@ -63,6 +63,7 @@ Require Import SpecMemmove.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the
    one-line bridge from a leaf's [rget] to the register-map facts a
@@ -151,7 +152,7 @@ Module MemmoveProof : MEMMOVE.
 
 Section ProofMemmove.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Context {kt : ktier}.
@@ -187,7 +188,7 @@ Section ProofMemmove.
   (*  post-loop arm use it.  Non-recursive: a single leading (shadowing)     *)
   (*  hart [CID0] suffices, resolved fresh by unification at each call.     *)
   (* =================================================================== *)
-  Local Lemma mm_epilogue `{CID0 : CpuId} 
+  Local Lemma mm_epilogue `{CID0 : CpuId} `{XI : CurCtx} 
       (m0 M : regfile) (n : nat) (b : bool) (pcur : mword 64) :
     let sp0 := (m0 !!! Regidx csp_rs1 : mword 64) in
     let ra0 := (m0 !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
@@ -535,7 +536,7 @@ Section ProofMemmove.
   (*  this, so none of it is proved twice.  Non-recursive: a single          *)
   (*  leading (shadowing) hart [CID0] suffices, as for [mm_epilogue].        *)
   (* =================================================================== *)
-  Local Lemma mm_fwd `{CID0 : CpuId} 
+  Local Lemma mm_fwd `{CID0 : CpuId} `{XI : CurCtx} 
       (m0 M : regfile) (n len : nat) (src_bytes dst_olds : nat -> bv 8)
       (dqs : dfrac) (b : bool) (pcur : mword 64) :
     let sp0 := (m0 !!! Regidx csp_rs1 : mword 64) in

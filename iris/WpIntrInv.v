@@ -112,6 +112,7 @@ Require Import WpSmodePtEngine WpSmodePtFetch.
 Require Export IntrDefs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 (* ===================================================================== *)
@@ -185,7 +186,7 @@ Proof. reflexivity. Qed.
 
 Section IFrames.
   Context `{!riscvGS Σ}.
-  Context `{CID : CpuId}.
+  Context `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma i_rw_split (rs : regstate) :
     (hreg_frame rs i_Drw : iProp Σ) ⊣⊢
@@ -689,7 +690,7 @@ Proof. reflexivity. Qed.
 
 Section TrapSwp.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma ti_frames (dqp dqm dqv : dfrac) (ms sc sv se : mword 64)
       (p : Privilege) (npc pc0 mis stv : mword 64) (e : mword 1) :
@@ -1048,7 +1049,7 @@ End TrapSwp.
 Section IntrEngine.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Definition pmp_facts (pcfg : type_of_register pmpcfg_n)
       (paddr : type_of_register pmpaddr_n) : Prop :=
@@ -2448,7 +2449,7 @@ Definition intr_cb_clock `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId}
     (kt : ktier) (m : regfile) (av : nat) (p pc0 : mword 64) (is_rvc : bool)
     (i : instruction) (b' : bool)
     (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
-    `{CID : CpuId} : iProp Σ :=
+    `{CID : CpuId} `{XI : CurCtx} : iProp Σ :=
   ((sconf -∗
     sie_cap kt m av true p -∗
     gpr_file (tp_pin m) -∗
@@ -2482,7 +2483,7 @@ Definition intr_cb_clock `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId}
    mstatus VALUE and the residue to the satp/tlb values, and those values
    are in the frame.  Reading them off the landing file is what keeps the
    two halves talking about the same cells. *)
-Definition intr_ret `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition intr_ret `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (kt : ktier) (p : mword 64) (b' : bool)
     (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
     (rs2 : regstate) : iProp Σ :=
@@ -2503,7 +2504,7 @@ Definition intr_ret `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
    [nextPC] is the pc the cycle commits, so both arms name their landing pc
    by reading it off rather than by an existential the continuation could
    not tie down. *)
-Definition intr_psi `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition intr_psi `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (kt : ktier) (m : regfile) (av : nat) (p pc0 : mword 64) (is_rvc : bool)
     (i : instruction) (b' : bool)
     (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
@@ -2546,7 +2547,7 @@ Definition intr_psi `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
                    wp_next true p (fun CID =>
                      intr_cb_clock kt m av p pc0 is_rvc i b' R (CID := CID))))%I.
 
-Lemma wp_exec_step_intr_clock `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID0 : CpuId}
+Lemma wp_exec_step_intr_clock `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
     {kt : ktier} (pc0 : mword 64) (m : regfile) (av : nat) (p : mword 64)
     (is_rvc : bool) (i : instruction) (b' : bool)
     (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :

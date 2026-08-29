@@ -204,6 +204,7 @@ Require Import FirstTok.   (* [first_done] -- the one thing the closer takes, se
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 (* forkret's own 48-byte frame is 6 slots; below it the deepest callee is
@@ -213,7 +214,7 @@ Import Defs.
 Notation K_forkret := ((6 + K_kexec)%nat) (only parsing).
 Section SpecForkret.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* WHAT forkret'S TAIL HANDS THE TRAP LOOP.  [ut_trap_parked] is the
      trap-side residue with the translation slot dropped (the switch inside
@@ -280,7 +281,7 @@ Definition forkret_closer
    the header for the three premises the boot arm costs and for why the
    descriptor is not a parameter. *)
 Definition wp_forkret_gen_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (* the trap loop's kernel-side bundle, abstract exactly as
        [SpecUserretClosed] takes it *)
     (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
@@ -350,7 +351,7 @@ Module Type FORKRET.
      PARK'S CHANNEL THROUGH THE MODULE TYPES". *)
   Include UtResFits.USERTRAP_RES_PARK.
   Parameter wp_forkret :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (W : iProp Σ)
       (j : nat) (γs : list gname) (γl γf : gname)
       (pid : mword 32) (U : ustate)

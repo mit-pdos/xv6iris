@@ -41,11 +41,12 @@ Require Export WpSmodeLeafBase.
 Require Import RiscvExtras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 Section WpMemsetS.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the entry halfword [c.addi sp,sp,-16], and the 4-byte fetch window it sits
      in (its own 0x1141 in the low half, the next halfword 0xe406 in the high). *)

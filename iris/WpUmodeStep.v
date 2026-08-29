@@ -54,6 +54,7 @@ Require UserTotalU.
 Require Import UserActiveClass.
 Require Import UmodeMem UmodeCap UmodeFetch.
 Require Import WpDecode.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 Set Printing Depth 40.
@@ -712,7 +713,7 @@ Qed.
 
 Section UvOpen.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma uv_pt_open (pt : uptd) (M : gmap Z (bv 8)) :
     utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) -∗ umem pt M -∗
@@ -970,7 +971,7 @@ End UvResume.
 
 Section UvEngine.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   (* ---- the page-table re-former, keyed on the tree it was opened at ---- *)
@@ -1078,6 +1079,7 @@ Section UvObl.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
   Context (C : ucfg) (pt : uptd).
+  Context `{XI : CurCtx}.
 
   (* ---- THE OBLIGATION: fetch-onward.  The engine has already taken the
      dispatch's [None] branch, so what is left to say is what the machine
@@ -1133,7 +1135,7 @@ End UvObl.
 
 Section UvLandClose.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   Lemma uv_land_close (M : gmap Z (bv 8)) (g : regfile) (npc : mword 64)
@@ -1320,7 +1322,7 @@ Qed.
 
 Section UvArms.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   (* the RETIRING payload: the process runs on, at the new file and pc *)
@@ -1555,6 +1557,7 @@ Section UvStepEngine.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
   Context (C : ucfg) (pt : uptd).
+  Context `{XI : CurCtx}.
 
   (* THE ENGINE, in the hart-quantified form the Loeb induction needs: only
      [CID] is bound inside the entailment, everything else is a lemma
@@ -2162,7 +2165,7 @@ Qed.
 
 Section UvFunnel.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   (* the engine at the ambient hart *)
@@ -2420,7 +2423,7 @@ Proof. unfold gpr_of_Z; repeat case_match; vm_compute; reflexivity. Qed.
 
 Section UvObligation.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   Lemma uv_obl_base (R : iProp Σ) (Ψ : usys_protocol Σ) (M : gmap Z (bv 8))
@@ -2741,7 +2744,7 @@ End UvObligation.
 
 Section UvRetire.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   Lemma wp_uv_retire_later (Ψ : usys_protocol Σ) (M : gmap Z (bv 8))
@@ -2941,7 +2944,7 @@ End UvRetire.
    application (claude-notes/projects/user-verified.md section 5). *)
 Section UvEcallPost.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   Lemma uv_ecall_post_fetch (R : iProp Σ) (Ψ : usys_protocol Σ)
@@ -3171,7 +3174,7 @@ End UvEcallPost.
 
 Section UvEcall.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   Lemma wp_uv_ecall (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)

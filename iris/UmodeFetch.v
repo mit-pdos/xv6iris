@@ -46,6 +46,7 @@ Require Import UserFetch.
 Require Import InstrBytes.
 Require Import UmodeMem.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -484,7 +485,7 @@ Qed.
 
 Section UmodeFetchWord.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma umem_fetch_byte (pt : uptd) (M : gmap Z (bv 8)) (w_leaf pc : mword 64)
       (j : nat) (b : bv 8) (σ' : mstate) :
@@ -518,7 +519,7 @@ End UmodeFetchWord.
 
 Section UmodeFetchOk.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* (a) a 4-ALIGNED pc holding a NON-compressed instruction: one 4-byte
      read, result [F_Base iw]. *)
@@ -638,7 +639,7 @@ Qed.
 
 Section UmodeFetchRvc4.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* (b) a 4-ALIGNED pc holding a COMPRESSED instruction: still ONE 4-byte
      read, result [F_RVC h]. *)
@@ -746,7 +747,7 @@ End UmodeFetchRvc4.
 
 Section UmodeFetchSplit.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* (c) a 2-mod-4 pc holding a COMPRESSED instruction: one 2-byte read,
      result [F_RVC h]. *)
@@ -839,7 +840,7 @@ End UmodeFetchSplit.
 
 Section UmodeFetchSplitBase.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* (d) a 2-mod-4 pc holding a NON-compressed instruction: the split 2+2
      fetch, result [F_Base iw].  Two absorbed translation moves, so the

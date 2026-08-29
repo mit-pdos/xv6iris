@@ -658,6 +658,9 @@ End ByteBuf.
    identity-mapped page and carries no tier index. *)
 Section ByteBufPage.
   Context `{!riscvGS Σ}.
+  (* this section states [page_own]/[byte_any] facts, which are flipped in
+     KallocInv, so the notation here is the context-relative one too. *)
+  Context `{XI : TsoCtx.CurCtx}.
 
   Lemma bb_page_named (q : mword 64) :
     page_own q ⊢ ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 4096, pa_add q j ↦ₘ f j.

@@ -63,8 +63,9 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 (* ===================================================================== *)
 
 Section ProofVirtioDiskRwC.
+Require Import TsoCtx.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Notation Rz  := (mword_of_int 0  : mword 5).

@@ -50,6 +50,7 @@ Require Import ProcGeom.
 Require Import PrintkFmt.
 From Kernel Require KernelSyms.
 From Kernel Require KernelData.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -269,7 +270,7 @@ Proof. vm_compute; reflexivity. Qed.
 
 Section ProcdumpData.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* --- the three literals --- *)
   Lemma pd_nl_bytes :
@@ -421,6 +422,7 @@ Definition pd_regs_loop (M : regfile) (spv : mword 64) (j : nat) : Prop :=
 
 Section ProcdumpFrame.
   Context `{!riscvGS Σ}.
+  Context `{XI : CurCtx}.
 
   (* procdump's ten slots: nine named saves and one the code never touches
      (offset 0 -- the 80-byte frame is round, the nine saves are not). *)

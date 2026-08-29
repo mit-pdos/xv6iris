@@ -34,11 +34,12 @@ Require Import UCodeSh USpecSh.
 Require User.ShSyms User.ShInstrs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 Section USpecShParse.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
   Context (gin gbrk : gname) (hbase hlen : Z).
   Context (Q : list (bv 8) -> list (list (bv 8)) -> iProp Σ).

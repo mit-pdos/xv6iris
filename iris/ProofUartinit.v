@@ -78,13 +78,14 @@ Require Import SpecUartinit.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 Module UartinitProof (Uart : UART) (Initlock : INITLOCK) : UARTINIT.
 
 Section ProofUartinit.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the "uart" literal in rodata, where the [auipc a1,0x6 / addi a1,a1,1942]
      pair at +0x3a lands. *)

@@ -22,6 +22,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelConsts.
 Require Import WpDecodeBridge.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -296,7 +297,7 @@ Qed.
 (* ===================================================================== *)
 Section CodeKernelvec.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma kv_i2 :
     kernel_text -∗ instr (mword_of_int (KernelSyms.kernelvec + 0x2) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 1 : mword 5), sp, 8)).

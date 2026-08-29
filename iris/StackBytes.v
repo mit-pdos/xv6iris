@@ -34,6 +34,7 @@ Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
 Require Import StackOwn.
 Require Import RiscvExtras.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* [pa_add] composes into a single offset -- the byte-run analogue of
@@ -76,7 +77,7 @@ Proof. intro Hj. apply nth_byte_assemble_len; cbn [length]; lia. Qed.
 
 Section StackBytes.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   (* THE FRAME'S TIER.  A byte run in this file is always STACK scratch, so
      it rides the same tier as the frame it was carved out of -- the
      capability's [kt], not the ambient KT0 default.  The binder is the
@@ -165,9 +166,9 @@ Section StackBytes.
     a ↦₈ w ⊢ ⌜ is_aligned_paddr (Physaddr a) 8 = true ⌝ ∗ bytes_own (DfracOwn 1) a 8.
   Proof.
     iIntros "Hw".
-    iDestruct (word_pointsto_aligned_p with "Hw") as %Hal.
+    iDestruct (ctx_word_pointsto_aligned_p with "Hw") as %Hal.
     iSplitR; [done | ].
-    iDestruct (word_pointsto_bytes with "Hw") as "Hbs".
+    iDestruct (ctx_word_pointsto_bytes with "Hw") as "Hbs".
     rewrite /bytes_own. iApply (big_sepL_impl with "Hbs").
     iIntros "!>" (k j Hk) "Hb". by iExists (nth_byte w j).
   Qed.
@@ -201,7 +202,7 @@ Section StackBytes.
     iEval (rewrite Hw4) in "H4". iEval (rewrite Hw5) in "H5".
     iEval (rewrite Hw6) in "H6". iEval (rewrite Hw7) in "H7".
     iExists W.
-    iApply word_pointsto_intro; [exact Hal | ].
+    iApply ctx_word_pointsto_intro; [exact Hal | ].
     cbn [seq].
     iFrame "H0 H1 H2 H3 H4 H5 H6 H7". done.
   Qed.

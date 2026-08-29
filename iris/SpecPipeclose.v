@@ -46,9 +46,10 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 
-Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γs : list gname)
     (γl : gname) (γp : pipe_names) (w : bool)
     (γkl : gname) (γk : gname * gname) (klk kfl : mword 64) (on : option nat)
@@ -83,7 +84,7 @@ Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
   is_pipe γl γp pi -∗
   pipe_ref γp w 1 -∗
   (* kfree's resources: the kmem lock and the page count *)
-  is_lock γkl klk "kmem"%string (kmem_res γk kfl) -∗
+  is_lock γkl klk "kmem"%string <{ kmem_res γk kfl }> -∗
   kalloc_avail γk on -∗
   (* wakeup's *)
   procs_inv γs -∗
@@ -101,7 +102,7 @@ Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslo
 
 Module Type PIPECLOSE.
   Parameter wp_pipeclose_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname)
       (γl : gname) (γp : pipe_names) (w : bool)
       (γkl : gname) (γk : gname * gname) (klk kfl : mword 64) (on : option nat)

@@ -101,6 +101,7 @@ Require Import PageFields.
 Require Export PageGeom.  (* [page_base] / [page_valid] are named by this file's consumers *)
 Require Import ProcGeom.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -2920,7 +2921,7 @@ Qed.
 
 Section ProcPt.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* one physical byte, contents existential (the [↦ₚ] analogue of
      KallocInv's [byte_any]) *)

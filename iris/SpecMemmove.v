@@ -39,6 +39,7 @@ Require Import IntrDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 (* memmove(dst, src, len): copies [len] bytes from [src] to [dst] and returns
    [dst] in a0.  As with memset, [len] need only fit in 32 bits (the C source
@@ -70,7 +71,7 @@ Import Defs.
    exclusivity ([RiscvPtsto.mem_bytes_notin]), and now comes from the
    DESTINATION byte's ([RiscvPtsto.mem_bytes_notin_r], the mirror image).
    Separation still carries the disjointness; only the whole side moved. *)
-Definition wp_memmove_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_memmove_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (kt kts ktw : ktier) `{!KtierLe kts kt} `{!KtierLe ktw kt}
     (m0 : regfile) (n : nat) (len : nat) (src_bytes dst_olds : nat -> bv 8)
     (dqs : dfrac) (b : bool) (p : mword 64) :=
@@ -102,7 +103,7 @@ Definition wp_memmove_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID :
 
 Module Type MEMMOVE.
   Parameter wp_memmove_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (kt kts ktw : ktier) `{!KtierLe kts kt} `{!KtierLe ktw kt}
       (m0 : regfile) (n : nat) (len : nat) (src_bytes dst_olds : nat -> bv 8)
       (dqs : dfrac) (b : bool) (p : mword 64),

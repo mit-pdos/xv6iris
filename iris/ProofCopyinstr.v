@@ -145,6 +145,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -208,7 +209,7 @@ Module CopyinstrProof (Walkaddr : WALKADDR) (Vmfault : VMFAULT) : COPYINSTR.
 
 Section ProofCopyinstr.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context {ktb : ktier}.
 
   Notation Rx0 := (mword_of_int 0 : mword 5).
@@ -265,14 +266,14 @@ Section ProofCopyinstr.
     intro H1; injection H1 as H2; vm_compute in H2; congruence.
 
   (* [rget]'s equation with [tp_pin] already unfolded (ProofCopyin.tp_pin_ne) *)
-  Local Lemma tp_pin_ne `{CIDx : CpuId} (m : regfile) (k : mword 5) :
+  Local Lemma tp_pin_ne `{CIDx : CpuId} `{XI : CurCtx} (m : regfile) (k : mword 5) :
     Regidx k <> Regidx Rtp -> tp_pin m !!! Regidx k = m !!! Regidx k.
   Proof. exact (rget_ne m k). Qed.
 
   (* vmfault's contract needs the RAW tp premise; copyinstr's own map carries
      no such invariant, so re-point at its own [tp_pin] image, for which the
      fact holds BY CONSTRUCTION (ProofCopyin.sie_cap_gpr_tp_pin). *)
-  Local Lemma sie_cap_gpr_tp_pin `{CIDx : CpuId} (m : regfile) (n : nat) (b : bool) (pcur : mword 64) :
+  Local Lemma sie_cap_gpr_tp_pin `{CIDx : CpuId} `{XI : CurCtx} (m : regfile) (n : nat) (b : bool) (pcur : mword 64) :
     sie_cap_gpr KT1 m n b pcur -∗ sie_cap_gpr KT1 (tp_pin m) n b pcur.
   Proof.
     rewrite /sie_cap_gpr /sie_cap (tp_pin_sp m).
@@ -290,7 +291,7 @@ Section ProofCopyinstr.
   (* ================================================================== *)
   (*  THE EPILOGUE (+0x4e .. +0x66).  All four frame-holding exits.      *)
   (* ================================================================== *)
-  Local Lemma cs_epilogue `{CID0 : CpuId}
+  Local Lemma cs_epilogue `{CID0 : CpuId} `{XI : CurCtx}
       (m Mt : regfile) (av : nat) (res : mword 64)
       (sp0 ra0 s00 s10 s20 s30 s40 s50 s60 s70 s80 s90 gap : mword 64)
       (b : bool) (pcur : mword 64) :
@@ -595,7 +596,7 @@ Section ProofCopyinstr.
   (*  THE RETURN-VALUE TAIL (+0x46 .. +0x4a), shared by the NUL exit     *)
   (*  (which reaches it through +0x40) and the max-exhausted one.        *)
   (* ================================================================== *)
-  Local Lemma cs_ret2c `{CID0 : CpuId}
+  Local Lemma cs_ret2c `{CID0 : CpuId} `{XI : CurCtx}
       (M : regfile) (Kv : nat) (a5v resv : mword 64) (b : bool) (pcur : mword 64) :
     M !!! Regidx Ra5 = a5v ->
     xor_vec a5v (sign_extend' 64 (mword_of_int 1 : mword 12)) = (mword_of_int 0 : mword 64)

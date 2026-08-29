@@ -126,6 +126,7 @@ Require Import FsAbsOpenFire.
 Require Import ProofSysOpenAUBits.
 Require Import ProofSysOpenAUParts.
 Require Import FsAbs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -155,7 +156,7 @@ Section ProofSysOpenAUPub.
   Notation Rs3 := (mword_of_int 19 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
 
-  Lemma so_tail_pub_au `{GEN : GenId} `{CID0 : CpuId}
+  Lemma so_tail_pub_au `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
@@ -252,7 +253,7 @@ Section ProofSysOpenAUPub.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     log_opb icfg_log u -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗

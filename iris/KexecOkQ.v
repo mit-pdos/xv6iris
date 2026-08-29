@@ -72,6 +72,7 @@ Require Import FdSlots.         (* [fdslotG]                            *)
 Require Import FileInvDefs.     (* [fileG]                              *)
 
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* ===================================================================== *)
 (*  1.  THE RELATION WITH THE HOLE                                        *)
@@ -171,7 +172,7 @@ Definition kexec_closer
        before it was killed.  A missing class is not a clean failure here;
        cap the memory when experimenting with this binder list. *)
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}
-    `{GEN : GenId} `{CID : CpuId}
+    `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (Q : mword 64 -> Prop)
     (gf ga : gname) (pj : mword 64) (pidv : mword 32) (U : ustate)
     (m : regfile) (ret_tgt : mword 64) (K : nat) (b eb : bool)

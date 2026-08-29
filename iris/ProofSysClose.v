@@ -60,6 +60,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* a failing tactic in a whole-function WP over [proc_priv] otherwise spends
@@ -112,7 +113,7 @@ Module SysCloseProof (Argfd : ARGFD) (Myproc : MYPROC) (Fileclose : FILECLOSE) :
 Section ProofSysClose.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the frame's sp is sound: read the bound out of the ambient capability's
      own stack carve (the conclusion is pure, so the bundle survives). *)
@@ -129,7 +130,7 @@ Section ProofSysClose.
      The premise is local to this helper: every call site sits inside the
      capstone, whose [<fn>_stack <= av] premise is already unfolded, so it is
      a [lia].) *)
-  Lemma sc_sp_bounds `{CID0 : CpuId} (m : regfile) (k : nat)
+  Lemma sc_sp_bounds `{CID0 : CpuId} `{XI : CurCtx} (m : regfile) (k : nat)
       (b : bool) (pp : mword 64) :
     (0 < k)%nat ->
     sie_cap_gpr KT1 m k b pp -∗
@@ -151,7 +152,7 @@ Section ProofSysClose.
      64)] (sie_cap_gpr's explicit process pointer), and its continuation
      wrapped in [wp_next].  It does NOT carry [cpu_own]: the epilogue never
      touches it, so the caller transports it afterwards. *)
-  Lemma sc_tail `{CID0 : CpuId}
+  Lemma sc_tail `{CID0 : CpuId} `{XI : CurCtx}
       (m Mt : regfile) (av : nat) (rv : mword 64)
       (sp0 ra0 s00 : mword 64) (w3 w4 : bv 64) (b : bool) (pp : mword 64) :
     (4 <= av)%nat ->

@@ -51,6 +51,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -77,7 +78,7 @@ Module SysSbrkProof (Argint : ARGINT) (Myproc : MYPROC)
 
 Section ProofSysSbrk.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>
@@ -114,7 +115,7 @@ Section ProofSysSbrk.
   (*   [c.mv a0,s1] then the 48-byte pop.  The return value is whatever s1
      holds -- [addr] on the three success paths, -1 on the two failures --
      which is why the two failure tails write s1 and not a0. *)
-  Lemma ss_tail `{CID0 : CpuId}
+  Lemma ss_tail `{CID0 : CpuId} `{XI : CurCtx}
       (m Mt : regfile) (av : nat) (b : bool) (p : mword 64) (rv : mword 64)
       (sp0 ra0 s00 s10 w4 w5 w6 : mword 64) :
     (6 <= av)%nat ->
@@ -311,7 +312,7 @@ Section ProofSysSbrk.
      have consumed the epilogue block one of them still needs. *)
   (* A DECOMPOSED helper (porting guide): its own fresh `{CID0} binder, its
      own [(b : bool)], and its continuation wrapped in [wp_next]. *)
-  Local Lemma ss_eager `{CID0 : CpuId} (γa γf : gname)
+  Local Lemma ss_eager `{CID0 : CpuId} `{XI : CurCtx} (γa γf : gname)
       (m Me : regfile) (av : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (U : ustate) (sp0 : mword 64) (nw : mword 32) (b : bool) (lks : gset string) :
     (52 <= av)%nat ->

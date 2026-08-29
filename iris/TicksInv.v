@@ -28,9 +28,11 @@ Require Import WpLock.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Section TicksInv.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{XI : CurCtx}.
 
   (* ---- geometry.  The lock's own two words ([locked] at +0, [cpu] at +16)
      belong to [lock_inv] (WpLock.v); nothing here names the cpu word. *)
@@ -44,13 +46,13 @@ Section TicksInv.
   Proof. iIntros "H". iExists t. iFrame "H". Qed.
 
   Definition is_tickslock (γl : gname) : iProp Σ :=
-    is_lock γl a_tickslock "time"%string ticks_res.
+    is_lock γl a_tickslock "time"%string <{ ticks_res }>.
 
   Global Instance is_tickslock_persistent γl : Persistent (is_tickslock γl).
   Proof. apply _. Qed.
 
   Lemma is_tickslock_lock γl :
-    is_tickslock γl -∗ is_lock γl a_tickslock "time"%string ticks_res.
+    is_tickslock γl -∗ is_lock γl a_tickslock "time"%string <{ ticks_res }>.
   Proof. iIntros "$". Qed.
 
   (* ---- construction (the "newlock" ghost step): what a caller does with
@@ -63,8 +65,9 @@ Section TicksInv.
     a_ticks ↦₄ t ={E}=∗ ∃ γl : gname, is_tickslock γl.
   Proof.
     iIntros "#Hnm Hlkw Hcpu Hticks".
-    iApply (newlock E a_tickslock "time"%string ticks_res
-              with "Hnm Hlkw Hcpu [Hticks]").
+    iApply (newlock E a_tickslock "time"%string <{ ticks_res }>
+              with "Hnm Hlkw [Hcpu] [Hticks]").
+    { iApply (WpLock.lk_cpu_ready_intro with "Hcpu"). }
     iApply (ticks_res_intro with "Hticks").
   Qed.
 

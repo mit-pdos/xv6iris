@@ -123,6 +123,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 
 (* userinit's own frame is 32 bytes (4 slots); its deepest callee is [namei]
@@ -133,7 +134,7 @@ Notation K_userinit := ((4 + K_namei_root_boot)%nat) (only parsing).
 
 Definition wp_userinit_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
-    `{GEN : GenId} `{CID : CpuId}
+    `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γp : gname) (γs : list gname)
     (* THE PARK'S NAMES: the open-file table's two gnames, the wait lock's,
        the ticks lock's, and the disk geometry's three words.  userinit
@@ -203,7 +204,7 @@ Definition wp_userinit_sconf_body
   (* the proc array's lock invariant: allocproc scans it, and release gives
      back the slot userinit found.  Persistent, so threading it is free. *)
   procs_inv γs -∗
-  is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
+  is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> -∗
   (* ---- THE SIX PARK ROWS (claude-notes/projects/forkret-park.md §3 E3).
      All persistent, none read here: they are what the first process's
      trap loop needs of the kernel BEYOND the file system (which forkret's
@@ -211,7 +212,7 @@ Definition wp_userinit_sconf_body
      device complement is stated at the ambient uart / disk / disk-lock
      names, which is what [fclose_ties] pins the record to. ---- *)
   devintr_caps_any fsc_uart fsc_disk fsc_dlock γtl γs pd pav pu -∗
-  is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+  is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
   is_ftable γft γf -∗
   ConsoleInv.console_ready -∗
   wire_inv -∗
@@ -271,7 +272,7 @@ Definition wp_userinit_sconf_body
 Module Type USERINIT.
   Parameter wp_userinit_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
-      `{GEN : GenId} `{CID : CpuId}
+      `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γp : gname) (γs : list gname)
       (γft γf γw γtl : gname) (pd pav pu : mword 64)
       (m : regfile) (K : nat) (eb : bool) (pj : mword 64)

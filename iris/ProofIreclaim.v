@@ -122,6 +122,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
    printable (claude-notes/durable-notes.md) *)
@@ -214,7 +215,7 @@ Section IreclaimDefs.
      split (claude-notes/optimization.md).  The bitmap no longer appears:
      under [BitmapInv.bitmap_inv] it is a PERSISTENT invariant the caller
      keeps, so nothing about it flows back out of ireclaim. *)
-  Definition irc_cont `{GEN : GenId} `{CID0 : CpuId}
+  Definition irc_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (pidv : mword 32) (dq dqb dqs dqn : dfrac) (j : nat)
       (m : regfile) (K : nat) (eb b : bool) (lks : gset string) (Upr : ustate) : iProp Σ :=
     (* the LITERAL [true], matching the contract's crossing: this function
@@ -292,7 +293,7 @@ Section IreclaimEpilogue.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma irc_epilogue `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma irc_epilogue `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (j : nat)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
       (m M : regfile) (K : nat) (eb b : bool) (lks : gset string) (Upr : ustate) :
@@ -670,7 +671,7 @@ Section IreclaimStep.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma irc_step `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma irc_step `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (j : nat)
  (inum : mword 32) (fuel : nat)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
@@ -931,7 +932,7 @@ Section IreclaimOrphan.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma irc_orphan `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma irc_orphan `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
       (inum bno : mword 32) (kk : nat)
@@ -997,7 +998,7 @@ Section IreclaimOrphan.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     irc_frame m -∗
     proc_priv_bare (proc_addr j) pidv Upr -∗
     sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
@@ -2082,7 +2083,7 @@ Section IreclaimRelease.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
-  Local Lemma irc_release `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma irc_release `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat)
       (inum bno : mword 32) (kk : nat)
       (bs bsd0 : list (bv 8)) (d0 : bool) (fuel : nat)
@@ -2310,7 +2311,7 @@ Section IreclaimScan.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     ∀ fuel : nat,
       irc_loop
                pidv dq dqb dqs dqn j m K eb b lks Upr fuel.
@@ -3070,7 +3071,7 @@ Section IreclaimMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ}.
 
-  Lemma wp_ireclaim_sconf `{GEN : GenId} `{CID : CpuId}
+  Lemma wp_ireclaim_sconf `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)

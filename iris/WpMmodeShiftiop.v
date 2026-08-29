@@ -10,6 +10,7 @@ Require Import InstrBytes.
 Require Import WpInstr.   (* wp_instr / mm_cycle, split out of InstrBytes *)
 Require Import HartSwp WpMmodeSwpBase.   (* the [swp] execute catalogue *)
 From iris.base_logic.lib Require Import invariants.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ---- base execute lemmas (take rX/wX facts), mirror exec_execute_ITYPE_ADDI ---- *)
@@ -115,7 +116,7 @@ Qed.
 (* ===== slli ===== *)
 Section Wp_slli.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context {dqc : dfrac}.
   Lemma wp_slli_gpr (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5) (shamt : mword 6)
       (m : regfile)
@@ -159,7 +160,7 @@ End Wp_slli.
 (* ===== srli ===== *)
 Section Wp_srli.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context {dqc : dfrac}.
   Lemma wp_srli_gpr (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5) (shamt : mword 6)
       (m : regfile)

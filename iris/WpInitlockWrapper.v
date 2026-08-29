@@ -33,6 +33,7 @@ Require Import SpecInitlockWrapper.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 (* pc stepping over a symbolic entry: [F+a] plus [n] bytes is [F+b].  The
@@ -46,7 +47,7 @@ Module InitlockWrapperProof (Initlock : INITLOCK) : INITLOCK_WRAPPER.
 Section WpInitlockWrapper.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Context {kt : ktier}.
   Lemma wp_initlock_wrapper_sconf

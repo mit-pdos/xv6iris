@@ -59,6 +59,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import CodePlicinithart.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 (* The hart-id case split, the two context base addresses, their geometry and
    what an access at each does to the PLIC state all live in PlicHart.v -- they
@@ -89,7 +90,7 @@ Module PlicinithartProof (Cpuid : CPUID) : PLICINITHART.
 
 Section ProofPlicinithart.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
 

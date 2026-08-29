@@ -35,6 +35,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 (* sret_ms1..5 / sret_newpriv / ret_pc -- the post-execute CSR tower this
    WP produces -- live with their bit theory in MstatusBits.v. *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 (* ===================================================================== *)
@@ -211,7 +212,7 @@ End ExecSRET.
 (* ===================================================================== *)
 Section WpSretGpr.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   (* ------------------------------------------------------------------- *)

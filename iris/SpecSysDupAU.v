@@ -193,6 +193,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 
@@ -349,7 +350,7 @@ Global Typeclasses Opaque sys_dup_au_post.
    the landed post replaced by the two arms (which imply it,
    [sys_dup_au_post_sound]).  The continuation binds NO [M']/[P']: dup
    copies no user memory, exactly as the landed continuation says. *)
-Definition wp_sys_dup_au_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (γl γf : gname)
+Definition wp_sys_dup_au_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γl γf : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
     (v : mword 64) (pid : mword 32) (U : ustate) (b : bool) (lks : gset string)
     (fd0 : nat) (fv : mword 64) (rb wb : bool) (t : fdtype)
@@ -400,7 +401,7 @@ Definition wp_sys_dup_au_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ
    (header: WHAT IT DELIBERATELY DOES NOT SAY). *)
 Module Type SYSDUP_AU.
   Parameter wp_sys_dup_au :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (γl γf : gname)
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γl γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (v : mword 64) (pid : mword 32) (U : ustate) (b : bool)
       (lks : gset string)

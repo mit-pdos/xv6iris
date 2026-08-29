@@ -138,6 +138,7 @@ Require Import FsDurSyscall. (* [snap_holds] -- the commit's own certificate *)
 Require Import FsFlushed.   (* [flushed], [dur_at]; the receipt itself      *)
 Require Import SpecSysSync. (* the landed empty contract, UNCHANGED       *)
 Import Defs.
+Require Import TsoCtx.
 
 Section sys_sync_flush.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
@@ -232,7 +233,7 @@ End sys_sync_flush.
 (*  nothing else.                                                         *)
 (* ====================================================================== *)
 Definition wp_sys_sync_flush_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names)
@@ -273,7 +274,7 @@ Definition wp_sys_sync_flush_sconf_body
 
 Module Type SYS_SYNC_FLUSH.
   Parameter wp_sys_sync_flush_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names)
@@ -291,7 +292,7 @@ End SYS_SYNC_FLUSH.
    a theorem rather than an intention. *)
 Module SysSyncFlushWeaken (F : SYS_SYNC_FLUSH) : SYS_SYNC.
   Lemma wp_sys_sync_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names)

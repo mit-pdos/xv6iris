@@ -43,6 +43,7 @@ Require Import SpecStati.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Set Printing Depth 40.
 
@@ -97,7 +98,7 @@ Definition sti_sp (m M : regfile) : Prop :=
 
 Section ProofStatiMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_stati_sconf
       (mm : regfile)

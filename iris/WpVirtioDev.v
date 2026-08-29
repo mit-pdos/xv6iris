@@ -61,6 +61,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import WpVirtioExec.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -155,7 +156,7 @@ Proof. rewrite vd_subrange32_31_0_id. apply autocast_id. Qed.
 
 Section WpVirtioDev.
 Context `{!riscvGS Σ, !xv6G Σ}.
-Context `{GEN : GenId} `{CID : CpuId}.
+Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context {kt : ktier}.
 (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
    bundle like the register map.  Implicit, so no call site changes. *)

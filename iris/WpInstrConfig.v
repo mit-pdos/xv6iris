@@ -45,6 +45,7 @@ Require Import KptPt.
 Local Open Scope Z_scope.
 
 Require Import InstrBytes WpInstrRun.
+Require Import TsoCtx.
 
 (* ====================================================================== *)
 (* THE PRIVILEGE-PARAMETRIC ANCHOR TOWER.                                  *)
@@ -248,7 +249,7 @@ Qed.
 
 Section WpInstrConfig.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Local Ltac mmrs :=
     by rewrite ?mm_rs_PC ?mm_rs_nPC ?mm_rs_ms ?mm_rs_mi ?mm_rs_cy ?mm_rs_ti

@@ -91,6 +91,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
    printable (claude-notes/durable-notes.md) *)
@@ -342,7 +343,7 @@ Section IupdateDefs.
 
   (* THE CONTINUATION, named so it is not re-traversed by every proofmode
      split (claude-notes/optimization.md). *)
-  Definition iu_cont `{GEN : GenId} `{CID0 : CpuId}
+  Definition iu_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
  (ip : mword 64) (inum : mword 32)
       (dn : dinode) (bm : blkmap) (u : nat) (Sbo : gset Z) (v : nat)
       (Pout : iProp Σ)
@@ -407,7 +408,7 @@ Definition iu_sp (m M : regfile) : Prop :=
 Section IupdateTail.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg}.
 
-  Local Lemma iu_tail `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma iu_tail `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat)
       (ip : mword 64) (inum : mword 32) (dn : dinode) (bm : blkmap)
       (ds : list dinode) (u : nat) (Sb : gset Z) (cru : bool) (e0 v : nat)
@@ -899,7 +900,7 @@ End IupdateTail.
 (* ===================================================================== *)
 Section ProofIupdateMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg, FSC : fscfg}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* THE GENERIC CREDITED CORE: [eb] and its complement [trap_csrs_ext]/
      [cpu_claim_ext] are REAL parameters (eb-generic-sweep.md), and [cru] is
@@ -962,7 +963,7 @@ Section ProofIupdateMain.
       procs_inv γs -∗
       dev_inv fsc_uart fsc_disk -∗
       disk_geom fsc_disk pd pav pu -∗
-      is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+      is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
       bslots 2 -∗
       log_epoch_lb icfg_log v -∗
       log_credit icfg_log cru Sb e0 (IBLOCK inum icfg_ist) -∗

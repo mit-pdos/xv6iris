@@ -41,13 +41,14 @@ Require Import SpecKinit.
 Require Import KernelRvcDecode.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 Module KinitProof (Freerange : FREERANGE) (Initlock : INITLOCK) : KINIT.
 
 Section ProofKinit.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Lemma wp_kinit_sconf

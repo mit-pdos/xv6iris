@@ -10,12 +10,13 @@ Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d SailStdp
 Require Import WpInstr.   (* wp_instr / mm_cycle, split out of InstrBytes *)
 Require Import HartSwp WpMmodeSwpBase.   (* the [swp] execute catalogue *)
 Import Defs.
+Require Import TsoCtx.
 Import Defs.
 
 (* from WpGprAddi.v *)
 Section WpAddiGpr.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context {dqc : dfrac}.
 
   (* [instr]/[mmode_config]-formulated register-generic ADDI WP, built on
@@ -65,7 +66,7 @@ End WpAddiGpr.
 (* from WpGprLogic.v *)
 Section WpLogicITypeGpr.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context {dqc : dfrac}.
 
   Lemma wp_ori_gpr (pc : mword 64) (rs1 rd : mword 5)

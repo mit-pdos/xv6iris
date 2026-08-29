@@ -40,13 +40,14 @@ Require Import KernelDecode27.
 Require Import KernelDecode28.
 Require Import KernelDecode30.
 Require Import KernelDecode31.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
 
 Section CodeUartwrite.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* ---- uartwrite @ KernelSyms.uartwrite, 142 bytes ---- *)
 

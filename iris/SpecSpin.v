@@ -19,13 +19,14 @@ Require Import SailStdpp.Base.
 Require Import RiscvLang RegFile RiscvPtsto RiscvFetchExec WpGpr.
 Require Import InstrBytes KernelText.
 From Kernel Require KernelSyms.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* the entry pc of the park loop (also its jump target -- the loop is a
    self-jump, so the two coincide). *)
 Definition pc_spin : mword 64 := mword_of_int KernelSyms.spin.
 
-Definition wp_spin_body `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile)
+Definition wp_spin_body `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (m : regfile)
     (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :=
   pmp_allows_all pmpcfg0 ->
   mmode_config (DfracOwn q) -∗
@@ -37,7 +38,7 @@ Definition wp_spin_body `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (m : regfil
 
 Module Type SPIN.
   Parameter wp_spin :
-    forall `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile)
+    forall `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp),
       wp_spin_body m pmpcfg0 q.
 End SPIN.

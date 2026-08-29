@@ -56,6 +56,7 @@ Require Import CodeProcdump.
 From Kernel Require KernelInstrs KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 (* a failing tactic in a whole-function WP over the proc resources otherwise
    spends tens of minutes FORMATTING the goal -- see durable-notes. *)
@@ -445,7 +446,7 @@ Section ProofProcdumpLoop.
        ([∗ list] k ∈ seq (S j) (NPROC - S j), proc_dump_slot (proc_addr k)) -∗
        WP (Loop : expr riscv_lang))%I.
 
-  Lemma wp_pd_loop `{GEN : GenId} `{CID0 : CpuId}
+  Lemma wp_pd_loop `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (γpr : gname) (γd : uart_names) (γv : disk_names)
       (m0 : regfile) (spv p : mword 64) (K' : nat) (eb b : bool)
       (lks : gset string) :

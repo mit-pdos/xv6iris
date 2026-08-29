@@ -27,6 +27,7 @@ Require Import UserBits SmodeCore CommonWalk UptTree UserPtTree.
 Require Import MemAccessGen UserMemPt UserMemAccess.
 Require Import HartMemRun HartMemAsm PtWalkCert.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -605,7 +606,7 @@ Qed.
 
 Section MisWindow.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma udata_window_facts (um : gmap (mword 27) (mword 64)) (data : gset Arch.pa)
       (w va : mword 64) (k : Z) (σ : mstate) :
@@ -1370,6 +1371,7 @@ Section MisPhys.
   Context (HWpos : 0 < W) (HWle : W <= 8).
   Context (HA : pmpAddrMatchType_encdec_backwards
                   (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR).
+  Context `{XI : CurCtx}.
   Context (Hord : zopz0zKzJ_u (zeros' 64)
                     (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false).
   Context (Hcovp : (ram_base + ram_size
@@ -2159,7 +2161,7 @@ Qed.
 
 Section MisUser.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the ghost side of the write chain: each step overwrites one chunk window
      inside [data], so [udata_own data] survives all N of them *)

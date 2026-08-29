@@ -22,6 +22,7 @@ Require Import CodeStrncpy SpecStrncpy.
 From Kernel Require KernelInstrs KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* A copied prefix is extended by the byte just copied. *)
@@ -38,7 +39,7 @@ Module StrncpyProof : STRNCPY.
 
 Section MachineProof.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -196,7 +197,7 @@ Section MachineProof.
   Qed.
 
   (* The common 2-slot leaf epilogue, reached after either loop terminates. *)
-  Local Lemma snc_tail `{CID0 : CpuId}
+  Local Lemma snc_tail `{CID0 : CpuId} `{XI : CurCtx}
       (mm Mt : regfile) (K : nat) (rv sp0 ra0 s00 : mword 64) (b : bool) (p : mword 64) :
     (2 <= K)%nat ->
     mm !!! Regidx csp_rs1 = sp0 ->

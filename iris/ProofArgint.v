@@ -39,6 +39,7 @@ Require Import CodeArgint.
 Require Import IrefSlots.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* ---- the three decodes not shared with the sys_uptime-shaped frame ---- *)
@@ -68,7 +69,7 @@ Module ArgintProof (Argraw : ARGRAW) : ARGINT.
 
 Section ProofArgint.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
 

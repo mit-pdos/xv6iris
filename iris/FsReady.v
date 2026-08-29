@@ -151,11 +151,13 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Section FsReady.
   (* FsSyscalls' own [Section FsBundles] context, verbatim... *)
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
+  Context `{XI : CurCtx}.
   (* ...AND THE CACHE'S INDEX, EXPLICIT AND DECLARED LAST (the header's
      last section).  Last, because instance resolution prefers the most
      recently declared candidate: with these here, every icache conjunct
@@ -316,7 +318,7 @@ Section FsReady.
      (∃ pd pav pu : mword 64,
         disk_geom fsc_disk pd pav pu ∗
         is_lock fsc_dlock d_lock "virtio_disk"%string
-                (disk_res fsc_disk pd pav pu)) ∗
+                <{ disk_res fsc_disk pd pav pu }>) ∗
      is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst
                 icfg_nib icfg_dev ∗
      itable_inv ∗
@@ -335,7 +337,7 @@ Section FsReady.
         does) could never tie its own name to a hidden one.  [fs_ready_kalloc]
         below recovers the bundled form for everyone else. *)
      is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
-       (kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) ∗
+       <{ kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24)) }> ∗
      kalloc_avail fsc_kpages None ∗
      (* ...AND THE IMAGE'S OWN ARITHMETIC AND THE FOUR SUPERBLOCK CELLS.
         See §0 and §0b: what "ready to operate" means includes the geometry
@@ -405,7 +407,7 @@ Section FsReady.
      (∃ pd pav pu : mword 64,
         disk_geom fsc_disk pd pav pu ∗
         is_lock fsc_dlock d_lock "virtio_disk"%string
-                (disk_res fsc_disk pd pav pu)) ∗
+                <{ disk_res fsc_disk pd pav pu }>) ∗
      is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst
                 icfg_nib icfg_dev ∗
      itable_inv ∗
@@ -413,7 +415,7 @@ Section FsReady.
      ic_sleeplocks fsc_ic ∗
      ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
      is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
-       (kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) ∗
+       <{ kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24)) }> ∗
      kalloc_avail fsc_kpages None ∗
      ⌜fs_geom_ok⌝ ∗
      fs_sb_cells ∗
@@ -532,7 +534,7 @@ Section FsReady.
                 (∃ pd pav pu : mword 64,
                    disk_geom fsc_disk pd pav pu ∗
                    is_lock fsc_dlock d_lock "virtio_disk"%string
-                           (disk_res fsc_disk pd pav pu)).
+                           <{ disk_res fsc_disk pd pav pu }>).
   Proof.
     rewrite /fs_ready.
     by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & $ & $ & _)".
@@ -569,7 +571,7 @@ Section FsReady.
   Lemma fs_ready_kmem :
     fs_ready -∗
     is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
-      (kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) ∗
+      <{ kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24)) }> ∗
     kalloc_avail fsc_kpages None.
   Proof.
     rewrite /fs_ready.
@@ -631,7 +633,7 @@ Section FsReady.
     (∃ pd pav pu : mword 64,
        disk_geom fsc_disk pd pav pu ∗
        is_lock fsc_dlock d_lock "virtio_disk"%string
-               (disk_res fsc_disk pd pav pu)) ∗
+               <{ disk_res fsc_disk pd pav pu }>) ∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst
                icfg_nib icfg_dev ∗ itable_inv ∗
     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst ∗ ic_sleeplocks fsc_ic ∗

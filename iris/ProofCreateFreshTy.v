@@ -107,6 +107,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -126,7 +127,7 @@ Definition cr_cs_but_s3 (m mf : regfile) : Prop :=
 
 Definition create_fresh_ty_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-      ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γs : list gname) (j : nat) (γl : gname)
     (pd pav pu : mword 64)
  (ty : mword 16)
@@ -187,7 +188,7 @@ Definition create_fresh_ty_body
      [ProofIalloc] and [ProofIlock] load-bearing: the axiom below assumes
      nothing about either function, only about the record identity across
      the two calls. ---- *)
-  (forall `{CIDa : CpuId}
+  (forall `{CIDa : CpuId} `{XI : CurCtx}
      (γs' : list gname) (j' : nat) (γl' : gname)
      (pd' pav' pu' : mword 64)
      (ty' : mword 16) (u' : nat) (Sb' : gset Z)
@@ -199,7 +200,7 @@ Definition create_fresh_ty_body
 
  ty' u' Sb' pidv' dq' dqs' dqn'
                         m' K' eb' b' lks' Upr' t' qt') ->
-  (forall `{CIDl : CpuId}
+  (forall `{CIDl : CpuId} `{XI : CurCtx}
      (γs' : list gname) (j' : nat) (γl' : gname)
      (pd' pav' pu' : mword 64)
      (gil' gisl' : gname)
@@ -234,7 +235,7 @@ Definition create_fresh_ty_body
   procs_inv γs -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
   sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
   proc_priv_bare pj pidv Upr -∗
@@ -390,7 +391,7 @@ Local Ltac nz := vm_compute; discriminate.
 
 Lemma create_fresh_ty :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
-             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             ICFG : icfg, FSC : fscfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
  (ty : mword 16)

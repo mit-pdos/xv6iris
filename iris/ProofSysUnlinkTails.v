@@ -94,6 +94,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 
 Set Printing Depth 40.
 
@@ -228,7 +229,7 @@ Section ProofSysUnlinkTails.
   (*  Its crossing index is [b], not [true]: two plain instructions and  *)
   (*  the epilogue, and no callee in between.                            *)
   (* ================================================================== *)
-  Lemma su_tail_a `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_tail_a `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (m M : regfile) (sp0 : mword 64) (K : nat) (b : bool) (pj : mword 64)
       (w3 w4 w5 w6 w27 w30 : mword 64) (bd bn bp be : nat -> bv 8) :
     (30 <= K)%nat -> ((K - 30) + 30 = K)%nat ->
@@ -329,7 +330,7 @@ Section ProofSysUnlinkTails.
   (*  the [addi] displacement differs too (1488 / 1446 / 1458, the three  *)
   (*  message strings).                                                   *)
   (* ================================================================== *)
-  Lemma su_panic_nlink `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_panic_nlink `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (M : regfile) (K : nat) (n : nat) (eb b : bool) (pj : mword 64)
       (lks : gset string) :
     (panic_stack <= K)%nat ->
@@ -393,7 +394,7 @@ Section ProofSysUnlinkTails.
       iSplit; [iPureIntro; exact su_nlink_nz|]. iExact "Hstr". }
   Qed.
 
-  Lemma su_panic_readi `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_panic_readi `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (M : regfile) (K : nat) (n : nat) (eb b : bool) (pj : mword 64)
       (lks : gset string) :
     (panic_stack <= K)%nat ->
@@ -457,7 +458,7 @@ Section ProofSysUnlinkTails.
       iSplit; [iPureIntro; exact su_readi_nz|]. iExact "Hstr". }
   Qed.
 
-  Lemma su_panic_writei `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_panic_writei `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (M : regfile) (K : nat) (n : nat) (eb b : bool) (pj : mword 64)
       (lks : gset string) :
     (panic_stack <= K)%nat ->
@@ -531,7 +532,7 @@ Section ProofSysUnlinkTails.
   (*  inode-shaped.  s2 and s3 are untouched -- both spills are below    *)
   (*  the branch at +0x2e -- so slots 4 and 5 ride through as junk.      *)
   (* ================================================================== *)
-  Lemma su_tail_b `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_tail_b `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (u : nat) (pidv : mword 32) (dq : dfrac)
@@ -561,7 +562,7 @@ Section ProofSysUnlinkTails.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     log_op icfg_log u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
@@ -757,7 +758,7 @@ Section ProofSysUnlinkTails.
   (*  by the time this block runs, which is why they are PREMISES and     *)
   (*  their slots ride through at existential words.                      *)
   (* ================================================================== *)
-  Lemma su_tail_bad `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_tail_bad `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
@@ -826,7 +827,7 @@ Section ProofSysUnlinkTails.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     bslots 3 -∗
     log_opb icfg_log u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
@@ -1090,7 +1091,7 @@ Section ProofSysUnlinkTails.
   (*  of the caller's s2 out of the slot the [c.sdsp] at +0x5c filled.    *)
   (*  s3 is untouched: its spill is at +0x72, BELOW this branch.          *)
   (* ================================================================== *)
-  Lemma su_tail_d `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_tail_d `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname)
@@ -1158,7 +1159,7 @@ Section ProofSysUnlinkTails.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     bslots 3 -∗
     log_opb icfg_log u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
@@ -1269,7 +1270,7 @@ Section ProofSysUnlinkTails.
   (*  its s2/s3 equations as premises: +0x5c and +0x72 are both above     *)
   (*  the [c.bnez] at +0x120 that reaches this block.                     *)
   (* ================================================================== *)
-  Lemma su_tail_e `{GEN : GenId} `{CID0 : CpuId}
+  Lemma su_tail_e `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (gs : list gname) (jx : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gil gisl : gname) (gili gisli : gname)
@@ -1360,7 +1361,7 @@ Section ProofSysUnlinkTails.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
     bslots 3 -∗
     log_opb icfg_log u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗

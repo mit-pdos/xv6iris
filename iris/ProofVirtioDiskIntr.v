@@ -57,6 +57,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -96,7 +97,7 @@ Proof. exact (data2_ext_4 w). Qed.
 
 Section VtLeaves.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).
@@ -364,7 +365,7 @@ End VtLeaves.
 Module VtPrologue (Acquire : ACQUIRE).
 Section VtPrologue.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).
@@ -383,7 +384,7 @@ Section VtPrologue.
     sie_cap_gpr KT1 m av b pme -∗
     cpu_own n eb pme b lks -∗
     kernel_text -∗ pc_is (mword_of_int KernelSyms.virtio_disk_intr : mword 64) -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     wp_next b pme (fun (CID : CpuId) =>
       ∀ (MA : regfile) (sp0 : mword 64),
         ⌜ sp0 = m !!! Regidx csp_rs1
@@ -635,7 +636,7 @@ End VtPrologue.
 Module VtEpilogue (Release : RELEASE).
 Section VtEpilogue.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).
@@ -661,7 +662,7 @@ Section VtEpilogue.
     locks_below lks "virtio_disk" ->
     sie_cap_gpr KT1 MB (trap_res b + (av - 4))%nat false pme -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x8a) : mword 64) -∗
-    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
     locked γk cpu_id -∗ disk_res γd pd pav pu -∗
     cpu_own (S n) eb pme false ({["virtio_disk"]} ∪ lks) -∗ arm_pay KT1 n eb pme -∗
     pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx ra_idx) -∗
@@ -957,6 +958,7 @@ Proof. exact (pa_add_aligned_in_page p k d). Qed.
 
 Section VtLoopSeam.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
+  Context `{XI : CurCtx}.
 
   (* [DiskInv.disk_res]'s body with the four existentials named. *)
   Definition disk_res_at (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64)
@@ -1112,7 +1114,7 @@ Qed.
 
 Section VtDevRam.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* the used-ring INDEX read: [lhu a5,2(a5)] at +0x36 and [lhu a4,2(a4)]
      at +0x82.  Drives [virtio_proto_used_idx_acc]; the value is the
@@ -1867,7 +1869,7 @@ Qed.
 
 Section VtBody.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).
@@ -2740,7 +2742,7 @@ Definition vt_regs_ok (m MB : regfile) (sp0 : mword 64) : Prop :=
 
 Section VtLoopDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Definition vt_exit (γd : disk_names)
       (pd pav pu : mword 64) (m : regfile) (av lvl : nat) (eb : bool)
@@ -2806,7 +2808,7 @@ Qed.
 Module VtLoopProof (Wakeup : WAKEUP).
 Section VtLoopProof.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).
@@ -3022,7 +3024,7 @@ Module Lp  := VtLoopProof Wakeup.
 
 Section ProofVirtioDiskIntr.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
   Notation tp_idx := (mword_of_int 4 : mword 5).

@@ -92,6 +92,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -315,7 +316,7 @@ Section SsProps.
      are [wp_next]s ANCHORED at the function's entry hart [CID0]: the park
      inside the loop means either can be entered at a hart nobody knew about
      when it was established. *)
-  Definition ss_exit `{GEN : GenId} (CID0 : CPU)
+  Definition ss_exit `{GEN : GenId} `{XI : CurCtx} (CID0 : CPU)
       (j : nat)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z)
@@ -337,7 +338,7 @@ Section SsProps.
       pc_is (mword_of_int (SS + 0x5e)) -∗
       WP (Loop : expr riscv_lang)))%I.
 
-  Definition ss_loop `{GEN : GenId} (CID0 : CPU)
+  Definition ss_loop `{GEN : GenId} `{XI : CurCtx} (CID0 : CPU)
       (j : nat)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z)
@@ -375,7 +376,7 @@ Section SsBodies.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* ---- THE SHARED TAIL: +0x5e (a0 := &log) .. +0x72 (c.ret) ---- *)
-  Lemma ss_tail_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
+  Lemma ss_tail_body `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (j : nat)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -633,7 +634,7 @@ Section SsBodies.
      edge), with the FALLING arm restoring s1/s2 and dropping into the tail
      at +0x5e.  The Löb hypothesis arrives WITH its [▷]; the taken [bge] at
      +0x56 is what strips it. ---- *)
-  Lemma ss_loop_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
+  Lemma ss_loop_body `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (γs : list gname) (j : nat) (γl : gname)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -987,7 +988,7 @@ Section SsBodies.
   (* ---- THE SPILL BLOCK: +0x2a (save s1/s2) .. +0x3a (s1 := &log), the
      entry to the wait loop.  Both guard arms -- "committing" (taken) and
      "outstanding > 0" (fallen) -- converge here. ---- *)
-  Lemma ss_entry_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
+  Lemma ss_entry_body `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (j : nat)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z)
@@ -1134,7 +1135,7 @@ End SsBodies.
 
 Section ProofSysSync.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_sys_sync_sconf
       (γs : list gname) (j : nat) (γl : gname)

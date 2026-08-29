@@ -185,8 +185,9 @@ Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
    uvmcopy (42), freeproc (44), filedup/idup (14 apiece), acquire/release
    (10), myproc (10), safestrcpy (2). *)
 Notation K_kfork := (56%nat) (only parsing).
+Require Import TsoCtx.
 Definition kfork_post
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
  (γf : gname) (lvl : nat) (eb : bool)
     (pme : mword 64)
     (b : bool) (pid_p : mword 32) (Up : ustate)
@@ -212,7 +213,7 @@ Definition kfork_post
       (∃ pidv : mword 32, ⌜ rv = (sign_extend' 64 pidv : mword 64) ⌝) ) )%I.
 
 Definition wp_kfork_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
  (γp γw γl γf : gname)  (γs : list gname)
     (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
     (b : bool) (pid_p : mword 32) (Up : ustate) (lks : gset string) :=
@@ -237,8 +238,8 @@ Definition wp_kfork_sconf_body
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
-  is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
-  is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+  is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> -∗
+  is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
   is_ftable γl γf -∗
   is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
   itable_inv -∗
@@ -297,7 +298,7 @@ Definition wp_kfork_sconf_body
 
 Module Type KFORK.
   Parameter wp_kfork_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
  (γp γw γl γf : gname) (γs : list gname)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
       (b : bool) (pid_p : mword 32) (Up : ustate) (lks : gset string),

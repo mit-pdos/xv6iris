@@ -50,6 +50,7 @@ From Kernel Require KernelInstrs KernelData.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 (* clean-context (mword-free) nat bounds *)
@@ -72,7 +73,7 @@ Module PrintkProof (Consputc : CONSPUTC) (Printint : PRINTINT)
 
 Section ProofPrintk.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Context {kt : ktier}.
@@ -162,7 +163,7 @@ Section ProofPrintk.
      (pa_stk sp0 2) ↦₈[kt] (m !!! Regidx (mword_of_int 16 : mword 5)) ∗
      (pa_stk sp0 1) ↦₈[kt] (m !!! Regidx (mword_of_int 17 : mword 5)))%I.
 
-  Lemma wp_printk_prologue `{CID0 : CpuId}
+  Lemma wp_printk_prologue `{CID0 : CpuId} `{XI : CurCtx}
       (m : regfile) (K : nat) (b : bool) (pcur : mword 64) :
     let sp0 := m !!! Regidx csp_rs1 in
     let spd := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 52 : mword 6))) in
@@ -439,7 +440,7 @@ Section ProofPrintk.
      (pa_stk sp0 21) ↦₈[kt] v27)%I.
 
   (* the block itself: nine loads, ending at [B + 18] *)
-  Lemma wp_printk_restore `{CID0 : CpuId}
+  Lemma wp_printk_restore `{CID0 : CpuId} `{XI : CurCtx}
       (mc : regfile) (K : nat) (B : Z) (sp0 : mword 64) (v9 v19 v20 v21 v22 v23 v24 v26 v27 : mword 64)
       (b : bool) (pcur : mword 64) :
     let spd := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 52 : mword 6))) in
@@ -666,7 +667,7 @@ Section ProofPrintk.
   Definition pk_held (γpr : gname) (h : CPU) (n : nat) (eb : bool) (pcur : mword 64) : iProp Σ :=
     (locked γpr h ∗ arm_pay kt (CID := h) n eb pcur)%I.
 
-  Lemma wp_printk_epi `{CID0 : CpuId}
+  Lemma wp_printk_epi `{CID0 : CpuId} `{XI : CurCtx}
       (γpr : gname) (h : CPU) (m mc : regfile) (K AV : nat)
       (n : nat) (eb : bool) (R : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -681,7 +682,7 @@ Section ProofPrintk.
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.printk + 0x254) : mword 64) -∗
     pk_frame sp0 (m !!! Regidx ra_idx) (m !!! Regidx s0_idx) (m !!! Regidx s2_idx) -∗
-    is_lock γpr pk_pr_lock "pr"%string (emp : iProp Σ) -∗
+    is_lock γpr pk_pr_lock "pr"%string <{ emp : iProp Σ }> -∗
     pk_held γpr h n eb pcur -∗
     cpu_own (S n) eb pcur false lks -∗
     R -∗
@@ -935,7 +936,7 @@ Section ProofPrintk.
   (*  proof body; the second block only differs by the [j] that follows. *)
   (* ================================================================== *)
 
-  Lemma wp_printk_exit `{CID0 : CpuId}
+  Lemma wp_printk_exit `{CID0 : CpuId} `{XI : CurCtx}
       (γpr : gname) (h : CPU) (m mc : regfile) (K AV : nat) (B : Z)
       (n : nat) (eb : bool) (R : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -956,7 +957,7 @@ Section ProofPrintk.
     (pa_stk sp0 12) ↦₈[kt] (m !!! Regidx s2_idx) -∗
     pk_saved sp0 (m !!! Regidx (mword_of_int 9 : mword 5)) (m !!! Regidx (mword_of_int 19 : mword 5)) (m !!! Regidx (mword_of_int 20 : mword 5)) (m !!! Regidx (mword_of_int 21 : mword 5)) (m !!! Regidx (mword_of_int 22 : mword 5)) (m !!! Regidx (mword_of_int 23 : mword 5)) (m !!! Regidx (mword_of_int 24 : mword 5)) (m !!! Regidx (mword_of_int 26 : mword 5)) (m !!! Regidx (mword_of_int 27 : mword 5)) -∗
     pk_slots_rest sp0 -∗
-    is_lock γpr pk_pr_lock "pr"%string (emp : iProp Σ) -∗
+    is_lock γpr pk_pr_lock "pr"%string <{ emp : iProp Σ }> -∗
     pk_held γpr h n eb pcur -∗
     cpu_own (S n) eb pcur false lks -∗
     R -∗
@@ -1017,7 +1018,7 @@ Section ProofPrintk.
   (* The SECOND restore block (0x276), the [c0 = 0] dispatch exit.  Unlike the
      one at 0x24e it does not fall into the epilogue: a [c.j] at 0x288 jumps
      back to 0x260.  One extra instruction, same tail. *)
-  Lemma wp_printk_exit2fe `{CID0 : CpuId}
+  Lemma wp_printk_exit2fe `{CID0 : CpuId} `{XI : CurCtx}
       (γpr : gname) (h : CPU) (m mc : regfile) (K AV : nat)
       (n : nat) (eb : bool) (R : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -1036,7 +1037,7 @@ Section ProofPrintk.
     (pa_stk sp0 12) ↦₈[kt] (m !!! Regidx s2_idx) -∗
     pk_saved sp0 (m !!! Regidx (mword_of_int 9 : mword 5)) (m !!! Regidx (mword_of_int 19 : mword 5)) (m !!! Regidx (mword_of_int 20 : mword 5)) (m !!! Regidx (mword_of_int 21 : mword 5)) (m !!! Regidx (mword_of_int 22 : mword 5)) (m !!! Regidx (mword_of_int 23 : mword 5)) (m !!! Regidx (mword_of_int 24 : mword 5)) (m !!! Regidx (mword_of_int 26 : mword 5)) (m !!! Regidx (mword_of_int 27 : mword 5)) -∗
     pk_slots_rest sp0 -∗
-    is_lock γpr pk_pr_lock "pr"%string (emp : iProp Σ) -∗
+    is_lock γpr pk_pr_lock "pr"%string <{ emp : iProp Σ }> -∗
     pk_held γpr h n eb pcur -∗
     cpu_own (S n) eb pcur false lks -∗
     R -∗
@@ -1153,7 +1154,7 @@ Section ProofPrintk.
     iFrame "Hb Hcl".
   Qed.
 
-  Lemma wp_printk_setup `{CID0 : CpuId}
+  Lemma wp_printk_setup `{CID0 : CpuId} `{XI : CurCtx}
       (γpr : gname) (h : CPU) (m mp : regfile) (K KE : nat)
       (n : nat) (eb : bool) (dqf : dfrac)
       (f : string) (R : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
@@ -1174,7 +1175,7 @@ Section ProofPrintk.
     sie_cap_gpr kt mp K false pcur -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.printk + 0x2a) : mword 64) -∗
-    is_lock γpr pk_pr_lock "pr"%string (emp : iProp Σ) -∗
+    is_lock γpr pk_pr_lock "pr"%string <{ emp : iProp Σ }> -∗
     pk_held γpr h n eb pcur -∗
     cpu_own (S n) eb pcur false lks -∗
     fmt ↦ₛ{ dqf } f -∗
@@ -1219,7 +1220,7 @@ Section ProofPrintk.
               mq !!! Regidx c = m !!! Regidx c) ⌝ -∗
       sie_cap_gpr kt mq K false pcur -∗
       pc_is (mword_of_int (KernelSyms.printk + 0x7a) : mword 64) -∗
-      is_lock γpr pk_pr_lock "pr"%string (emp : iProp Σ) -∗
+      is_lock γpr pk_pr_lock "pr"%string <{ emp : iProp Σ }> -∗
       pk_held γpr h n eb pcur -∗
       cpu_own (S n) eb pcur false lks -∗
       fmt ↦ₛ{ dqf } f -∗
@@ -1647,7 +1648,7 @@ Section ProofPrintk.
     forall c : mword 5, c <> mword_of_int 9 -> c <> mword_of_int 20 -> c <> a0_idx ->
       mf !!! Regidx c = mc !!! Regidx c.
 
-  Lemma wp_printk_advance `{CID0 : CpuId}
+  Lemma wp_printk_advance `{CID0 : CpuId} `{XI : CurCtx}
       (mc : regfile) (K : nat) (fmt : mword 64) (dqf : dfrac) (f : string) (p : nat)
       (Rest : iProp Σ) (b : bool) (pcur : mword 64) :
     (S p < length (cstring_bytes f))%nat ->
@@ -1797,11 +1798,11 @@ Section ProofPrintk.
   (* ================================================================== *)
 
   Hypothesis wp_consputc :
-    forall `{CID0 : CpuId} (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
+    forall `{CID0 : CpuId} `{XI : CurCtx} (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
       (l : list (bv 8)) (n : nat) (eb : bool) (b : bool) (pcur : mword 64) (lks : gset string),
       wp_consputc_sconf_body kt γl γd γv m0 K l n eb b pcur lks.
 
-  Lemma wp_printk_char `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
+  Lemma wp_printk_char `{CID0 : CpuId} `{XI : CurCtx} (γd : uart_names) (γv : disk_names)
       (mc : regfile) (K : nat) (l : list (bv 8)) (n : nat) (eb : bool)
       (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     (16 <= K)%nat ->
@@ -1965,7 +1966,7 @@ Section ProofPrintk.
      instr (mword_of_int (KernelSyms.printk + B + 8) : mword 64) false
        (STORE (mword_of_int 3976 : mword 12, Regidx (mword_of_int 14 : mword 5), Regidx s0_idx, 8)))%I.
 
-  Lemma wp_printk_vaarg `{CID0 : CpuId}
+  Lemma wp_printk_vaarg `{CID0 : CpuId} `{XI : CurCtx}
       (mc : regfile) (K : nat) (B : Z) (sp0 s0v : mword 64) (k : nat) (b : bool) (pcur : mword 64) :
     mc !!! Regidx s0_idx = s0v ->
     s0v = add_vec sp0 (sign_extend' 64 (mword_of_int (-64) : mword 12)) ->
@@ -2065,11 +2066,11 @@ Section ProofPrintk.
   Qed.
 
   Hypothesis wp_printint :
-    forall `{CID0 : CpuId} (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
+    forall `{CID0 : CpuId} `{XI : CurCtx} (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
       (l : list (bv 8)) (n : nat) (eb : bool) (b : bool) (pcur : mword 64) (lks : gset string),
       wp_printint_sconf_body kt γl γd γv m0 K l n eb b pcur lks.
 
-  Lemma wp_printk_arm_d `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
+  Lemma wp_printk_arm_d `{CID0 : CpuId} `{XI : CurCtx} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k : nat) (l : list (bv 8)) (n : nat) (eb : bool)
       (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -2255,7 +2256,7 @@ Section ProofPrintk.
   (* ------------------------------------------------------------------ *)
 
 
-  Lemma wp_printk_arm_ld `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
+  Lemma wp_printk_arm_ld `{CID0 : CpuId} `{XI : CurCtx} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k i : nat) (l : list (bv 8)) (n : nat) (eb : bool)
       (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -2418,7 +2419,7 @@ Section ProofPrintk.
   Qed.
 
 
-  Lemma wp_printk_arm_lld `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
+  Lemma wp_printk_arm_lld `{CID0 : CpuId} `{XI : CurCtx} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k i : nat) (l : list (bv 8)) (n : nat) (eb : bool)
       (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -2579,7 +2580,7 @@ Section ProofPrintk.
   Qed.
 
 
-  Lemma wp_printk_arm_lu `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
+  Lemma wp_printk_arm_lu `{CID0 : CpuId} `{XI : CurCtx} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k i : nat) (l : list (bv 8)) (n : nat) (eb : bool)
       (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -2742,7 +2743,7 @@ Section ProofPrintk.
   Qed.
 
 
-  Lemma wp_printk_arm_llu `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
+  Lemma wp_printk_arm_llu `{CID0 : CpuId} `{XI : CurCtx} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k i : nat) (l : list (bv 8)) (n : nat) (eb : bool)
       (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -2903,7 +2904,7 @@ Section ProofPrintk.
   Qed.
 
 
-  Lemma wp_printk_arm_lx `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
+  Lemma wp_printk_arm_lx `{CID0 : CpuId} `{XI : CurCtx} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k i : nat) (l : list (bv 8)) (n : nat) (eb : bool)
       (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -3056,7 +3057,7 @@ Section ProofPrintk.
   Qed.
 
 
-  Lemma wp_printk_arm_llx `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
+  Lemma wp_printk_arm_llx `{CID0 : CpuId} `{XI : CurCtx} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k i : nat) (l : list (bv 8)) (n : nat) (eb : bool)
       (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -3223,7 +3224,7 @@ Section ProofPrintk.
   (* ------------------------------------------------------------------ *)
 
 
-  Lemma wp_printk_arm_u `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
+  Lemma wp_printk_arm_u `{CID0 : CpuId} `{XI : CurCtx} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k : nat) (l : list (bv 8)) (n : nat) (eb : bool)
       (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -3363,7 +3364,7 @@ Section ProofPrintk.
   Qed.
 
 
-  Lemma wp_printk_arm_x `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
+  Lemma wp_printk_arm_x `{CID0 : CpuId} `{XI : CurCtx} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k : nat) (l : list (bv 8)) (n : nat) (eb : bool)
       (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -3507,7 +3508,7 @@ Section ProofPrintk.
 
   (* [%c] (0x1fa..0x20c): va_arg, then the low half of the slot straight to
      consputc.  Like the value arms, but with no (base, sign) pair. *)
-  Lemma wp_printk_arm_c `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
+  Lemma wp_printk_arm_c `{CID0 : CpuId} `{XI : CurCtx} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k : nat) (l : list (bv 8)) (n : nat) (eb : bool)
       (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -3619,7 +3620,7 @@ Section ProofPrintk.
      '%' in the first case and the unrecognised character in the second -- and
      the code prints it either way, which is why one lemma with a parameter
      for the leading character would not be simpler than these two. *)
-  Lemma wp_printk_arm_pct `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
+  Lemma wp_printk_arm_pct `{CID0 : CpuId} `{XI : CurCtx} (γd : uart_names) (γv : disk_names)
       (mc : regfile) (K : nat) (l : list (bv 8)) (n : nat) (eb : bool)
       (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     (16 <= K)%nat ->
@@ -3691,7 +3692,7 @@ Section ProofPrintk.
     rewrite /P2 upd_ne; [| congruence]. rewrite /P1 upd_ne; [reflexivity | congruence].
   Qed.
 
-  Lemma wp_printk_arm_unknown `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
+  Lemma wp_printk_arm_unknown `{CID0 : CpuId} `{XI : CurCtx} (γd : uart_names) (γv : disk_names)
       (mc : regfile) (K : nat) (l : list (bv 8)) (n : nat) (eb : bool)
       (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     (16 <= K)%nat ->
@@ -4044,7 +4045,7 @@ Section ProofPrintk.
   (* the arm proper (0x20e..0x226): take the vararg, and either walk it or,
      for a null pointer, walk the literal instead.  Two lemmas because the
      two are two different DESCRIPTORS, not two branches of one caller. *)
-  Lemma wp_printk_arm_s `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
+  Lemma wp_printk_arm_s `{CID0 : CpuId} `{XI : CurCtx} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k : nat) (l : list (bv 8)) (n : nat) (eb : bool)
       (γl : gname) (dq : dfrac) (s : string) (Rest : iProp Σ)
       (b : bool) (pcur : mword 64) (lks : gset string) :
@@ -4215,7 +4216,7 @@ Section ProofPrintk.
     vm_compute in Hj; discriminate.
   Qed.
 
-  Lemma wp_printk_arm_s_null `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
+  Lemma wp_printk_arm_s_null `{CID0 : CpuId} `{XI : CurCtx} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k : nat) (l : list (bv 8)) (n : nat) (eb : bool)
       (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -4628,7 +4629,7 @@ Section ProofPrintk.
   Qed.
 
   (* ---- the arm around it, 0x1b4 .. 0x1f8 ---- *)
-  Lemma wp_printk_arm_p `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
+  Lemma wp_printk_arm_p `{CID0 : CpuId} `{XI : CurCtx} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k : nat) (l : list (bv 8)) (n : nat) (eb : bool)
       (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -5052,7 +5053,7 @@ Section ProofPrintk.
       c <> mword_of_int 13 -> c <> mword_of_int 14 -> c <> mword_of_int 15 ->
       mf !!! Regidx c = mc !!! Regidx c.
 
-  Lemma wp_printk_disp_head `{CID0 : CpuId}
+  Lemma wp_printk_disp_head `{CID0 : CpuId} `{XI : CurCtx}
       (mc : regfile) (K : nat) (fmt : mword 64) (dqf : dfrac) (f : string) (i : nat)
       (Rest : iProp Σ) (b : bool) (pcur : mword 64) :
     (S i < length (cstring_bytes f))%nat ->
@@ -5322,7 +5323,7 @@ Section ProofPrintk.
   Proof. intros H1 H2 c A B C D E. rewrite (H1 c A B C D E). apply H2; assumption. Qed.
 
   (* ---- 0x2fa .. 0x31a: the six single-character tests and the fall-out -- *)
-  Lemma wp_printk_chain_2ce `{CID0 : CpuId}
+  Lemma wp_printk_chain_2ce `{CID0 : CpuId} `{XI : CurCtx}
       (mq : regfile) (K : nat) (c0 c1 c2 : Ascii.ascii) (Rest : iProp Σ) (b : bool) (pcur : mword 64) :
     Ascii.eqb c0 "d"%char = false ->
     (Ascii.eqb c0 "l"%char && Ascii.eqb c1 "d"%char)%bool = false ->
@@ -5542,7 +5543,7 @@ Section ProofPrintk.
   Qed.
 
   (* ---- 0x2f0 .. 0x2f6: the "%llx" test, then on to 0x2fa ---- *)
-  Lemma wp_printk_chain_2c4 `{CID0 : CpuId}
+  Lemma wp_printk_chain_2c4 `{CID0 : CpuId} `{XI : CurCtx}
       (mq : regfile) (K : nat) (c0 c1 c2 : Ascii.ascii) (Rest : iProp Σ) (b : bool) (pcur : mword 64) :
     Ascii.eqb c0 "d"%char = false ->
     (Ascii.eqb c0 "l"%char && Ascii.eqb c1 "d"%char)%bool = false ->
@@ -5658,7 +5659,7 @@ Section ProofPrintk.
   Qed.
 
   (* ---- 0x2e2 .. 0x2ec: "%x" and "%lx", then on to 0x2f0 ---- *)
-  Lemma wp_printk_chain_2b6 `{CID0 : CpuId}
+  Lemma wp_printk_chain_2b6 `{CID0 : CpuId} `{XI : CurCtx}
       (mq : regfile) (K : nat) (c0 c1 c2 : Ascii.ascii) (Rest : iProp Σ) (b : bool) (pcur : mword 64) :
     Ascii.eqb c0 "d"%char = false ->
     (Ascii.eqb c0 "l"%char && Ascii.eqb c1 "d"%char)%bool = false ->
@@ -5804,7 +5805,7 @@ Section ProofPrintk.
   Qed.
 
   (* ---- 0x2d8 .. 0x2de: the "%llu" test, then on to 0x2e2 ---- *)
-  Lemma wp_printk_chain_2ac `{CID0 : CpuId}
+  Lemma wp_printk_chain_2ac `{CID0 : CpuId} `{XI : CurCtx}
       (mq : regfile) (K : nat) (c0 c1 c2 : Ascii.ascii) (Rest : iProp Σ) (b : bool) (pcur : mword 64) :
     Ascii.eqb c0 "d"%char = false ->
     (Ascii.eqb c0 "l"%char && Ascii.eqb c1 "d"%char)%bool = false ->
@@ -5928,7 +5929,7 @@ Section ProofPrintk.
 
   (* ---- 0x2ca .. 0x2d4: "%u" and "%lu", then on to 0x2d8.  This is where
      the two SHORT-string entries rejoin the chain (0x2a8 jumps here). ---- *)
-  Lemma wp_printk_chain_29e `{CID0 : CpuId}
+  Lemma wp_printk_chain_29e `{CID0 : CpuId} `{XI : CurCtx}
       (mq : regfile) (K : nat) (c0 c1 c2 : Ascii.ascii) (Rest : iProp Σ) (b : bool) (pcur : mword 64) :
     Ascii.eqb c0 "d"%char = false ->
     (Ascii.eqb c0 "l"%char && Ascii.eqb c1 "d"%char)%bool = false ->
@@ -6077,7 +6078,7 @@ Section ProofPrintk.
   (* ---- 0x2b6 .. 0x2c6: build the "ll" flag, test "%lld", then on to 0x2ca.
      Entered from 0xf4 (all three characters present) and by falling out of
      the c0 = 0 preamble at 0x2b4. ---- *)
-  Lemma wp_printk_chain_28a `{CID0 : CpuId}
+  Lemma wp_printk_chain_28a `{CID0 : CpuId} `{XI : CurCtx}
       (mq : regfile) (K : nat) (c0 c1 c2 : Ascii.ascii) (Rest : iProp Σ) (b : bool) (pcur : mword 64) :
     Ascii.eqb c0 "d"%char = false ->
     (Ascii.eqb c0 "l"%char && Ascii.eqb c1 "d"%char)%bool = false ->
@@ -6268,7 +6269,7 @@ Section ProofPrintk.
   Qed.
 
   (* ---- 0x2aa .. 0x2b4: the c0 = 0 preamble, which falls into 0x2b6 ---- *)
-  Lemma wp_printk_chain_27e `{CID0 : CpuId}
+  Lemma wp_printk_chain_27e `{CID0 : CpuId} `{XI : CurCtx}
       (mq : regfile) (K : nat) (c0 c1 c2 : Ascii.ascii) (Rest : iProp Σ) (b : bool) (pcur : mword 64) :
     c0 = pk_nul -> c1 = pk_nul -> c2 = pk_nul ->
     mq !!! Regidx (mword_of_int 21 : mword 5) = zero_extend' 64 (pk_byte c0) ->
@@ -6379,7 +6380,7 @@ Section ProofPrintk.
   Qed.
 
   (* ---- 0x298 .. 0x2a8: the c1 = 0 preamble, which jumps to 0x2ca ---- *)
-  Lemma wp_printk_chain_26c `{CID0 : CpuId}
+  Lemma wp_printk_chain_26c `{CID0 : CpuId} `{XI : CurCtx}
       (mq : regfile) (K : nat) (c0 c1 c2 : Ascii.ascii) (Rest : iProp Σ) (b : bool) (pcur : mword 64) :
     c1 = pk_nul -> c2 = pk_nul ->
     mq !!! Regidx (mword_of_int 21 : mword 5) = zero_extend' 64 (pk_byte c0) ->
@@ -6532,7 +6533,7 @@ Section ProofPrintk.
      [iAssert] inside 0xa4's proof: the later [case_eq]s abstract their
      scrutinee throughout the GOAL, and an iris hypothesis lives in the goal,
      so an [iAssert] stated before them comes out specialised. ---- *)
-  Lemma wp_printk_chain_e0 `{CID0 : CpuId}
+  Lemma wp_printk_chain_e0 `{CID0 : CpuId} `{XI : CurCtx}
       (mq : regfile) (K : nat) (fmt : mword 64) (dqf : dfrac) (f : string) (i : nat)
       (c0 c1 c2 : Ascii.ascii) (Rest : iProp Σ) (b : bool) (pcur : mword 64) :
     (S (S (S i)) < length (cstring_bytes f))%nat ->
@@ -6661,7 +6662,7 @@ Section ProofPrintk.
   (* ---- 0xa4 .. 0xb6, and the 0xec join: the full-lookahead entry.  This is
      the only segment that reads memory -- the THIRD character, at 0xf0,
      through the [&f[i+1]] the head left in a5. ---- *)
-  Lemma wp_printk_chain_98 `{CID0 : CpuId}
+  Lemma wp_printk_chain_98 `{CID0 : CpuId} `{XI : CurCtx}
       (mq : regfile) (K : nat) (fmt : mword 64) (dqf : dfrac) (f : string) (i : nat)
       (c0 c1 c2 : Ascii.ascii) (Rest : iProp Σ) (b : bool) (pcur : mword 64) :
     (S (S (S i)) < length (cstring_bytes f))%nat ->
@@ -6877,7 +6878,7 @@ Section ProofPrintk.
       c <> mword_of_int 15 -> c <> mword_of_int 21 ->
       mf !!! Regidx c = mc !!! Regidx c.
 
-  Lemma wp_printk_dispatch `{CID0 : CpuId}
+  Lemma wp_printk_dispatch `{CID0 : CpuId} `{XI : CurCtx}
       (mc : regfile) (K : nat) (fmt : mword 64) (dqf : dfrac) (f : string) (i : nat)
       (Rest : iProp Σ) (b : bool) (pcur : mword 64) :
     (S i < length (cstring_bytes f))%nat ->
@@ -7020,7 +7021,7 @@ Section ProofPrintk.
     Ascii.eqb c d = true -> Ascii.eqb d e = false -> Ascii.eqb c e = false.
   Proof. intros H1 H2. apply Ascii.eqb_eq in H1. subst c. exact H2. Qed.
 
-  Lemma wp_printk_arm_num `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
+  Lemma wp_printk_arm_num `{CID0 : CpuId} `{XI : CurCtx} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k i : nat) (l : list (bv 8)) (n : nat) (eb : bool)
       (γl : gname) (c0 c1 c2 : Ascii.ascii) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -7290,7 +7291,7 @@ Section ProofPrintk.
      that needs the caller's descriptor.  Which of the two string arms runs
      is decided by the descriptor, not by the machine -- [PkANull] is a null
      char* and takes the "(null)" path. *)
-  Lemma wp_printk_arm_str `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
+  Lemma wp_printk_arm_str `{CID0 : CpuId} `{XI : CurCtx} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k i : nat) (l : list (bv 8)) (n : nat) (eb : bool)
       (γl : gname) (c0 c1 c2 : Ascii.ascii) (d : pk_arg_desc) (Rest : iProp Σ)
       (b : bool) (pcur : mword 64) (lks : gset string) :
@@ -7402,7 +7403,7 @@ Section ProofPrintk.
   Qed.
 
   (* '%%' and an unrecognised directive: two characters out, no vararg. *)
-  Lemma wp_printk_arm_none `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
+  Lemma wp_printk_arm_none `{CID0 : CpuId} `{XI : CurCtx} (γd : uart_names) (γv : disk_names)
       (mc : regfile) (K : nat) (i : nat) (l : list (bv 8)) (n : nat) (eb : bool)
       (γl : gname) (c0 c1 c2 : Ascii.ascii) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     (16 <= K)%nat ->
@@ -7592,7 +7593,7 @@ Section ProofPrintk.
 
     (* what the whole loop owes at the end: the spec's continuation, relative
        to the byte list [l] the UART held when the loop was entered *)
-    Definition pk_loop_post `{CID0 : CpuId} (l : list (bv 8)) : iProp Σ :=
+    Definition pk_loop_post `{CID0 : CpuId} `{XI : CurCtx} (l : list (bv 8)) : iProp Σ :=
       wp_next (CID0 := CID0) bo pcur (fun (CID : CpuId) =>
         ∀ (mf : regfile) (bs : list (bv 8)),
         sie_cap_gpr kt mf KE bo pcur -∗
@@ -7608,7 +7609,7 @@ Section ProofPrintk.
     (* "go round again": what one turn from index [i] hands back to the loop
        head at 0x78.  [p'] is the new last-consumed index, [k'] the new
        vararg count, [bs] what the turn printed. *)
-    Definition pk_loop_head `{CID0 : CpuId} (i : nat) (l : list (bv 8)) : iProp Σ :=
+    Definition pk_loop_head `{CID0 : CpuId} `{XI : CurCtx} (i : nat) (l : list (bv 8)) : iProp Σ :=
       wp_next (CID0 := CID0) false pcur (fun (CID : CpuId) =>
         ∀ (mk : regfile) (k' p' : nat) (bs : list (bv 8)),
         ⌜ (i <= p')%nat /\ (p' < String.length f)%nat
@@ -7713,7 +7714,7 @@ Section ProofPrintk.
     (*  ONE TURN, from the '%' test at 0x86.                             *)
     (* ---------------------------------------------------------------- *)
 
-    Lemma wp_printk_body7a `{CID0 : CpuId} (mq : regfile) (k i : nat) (l : list (bv 8)) :
+    Lemma wp_printk_body7a `{CID0 : CpuId} `{XI : CurCtx} (mq : regfile) (k i : nat) (l : list (bv 8)) :
       (cpu_id : CPU) = hh ->
       (i < String.length f)%nat ->
       pk_kinds (str_drop i f) = map pk_desc_kind (drop k descs) ->
@@ -7730,7 +7731,7 @@ Section ProofPrintk.
       fmtv ↦ₛ{ dqf } f -∗
       ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m j) d) -∗
       cpu_own (S n) eb pcur false lks -∗
-      is_lock γpr pk_pr_lock "pr"%string (emp : iProp Σ) -∗
+      is_lock γpr pk_pr_lock "pr"%string <{ emp : iProp Σ }> -∗
       pk_held γpr hh n eb pcur -∗
       dev_inv γd γv -∗ uart_sent_sub γd l -∗ is_txlock γl γd -∗
       pk_loop_frame k -∗
@@ -8028,7 +8029,7 @@ Section ProofPrintk.
     (*  THE LOOP, by induction on the fuel [length f - p] at 0x78.       *)
     (* ---------------------------------------------------------------- *)
 
-    Lemma wp_printk_loop6c (nf : nat) `{CID0 : CpuId} (mq : regfile) (k p : nat) (l : list (bv 8)) :
+    Lemma wp_printk_loop6c (nf : nat) `{CID0 : CpuId} `{XI : CurCtx} (mq : regfile) (k p : nat) (l : list (bv 8)) :
       (cpu_id : CPU) = hh ->
       (String.length f - p <= nf)%nat ->
       (p < String.length f)%nat ->
@@ -8045,7 +8046,7 @@ Section ProofPrintk.
       fmtv ↦ₛ{ dqf } f -∗
       ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m j) d) -∗
       cpu_own (S n) eb pcur false lks -∗
-      is_lock γpr pk_pr_lock "pr"%string (emp : iProp Σ) -∗
+      is_lock γpr pk_pr_lock "pr"%string <{ emp : iProp Σ }> -∗
       pk_held γpr hh n eb pcur -∗
       dev_inv γd γv -∗ uart_sent_sub γd l -∗ is_txlock γl γd -∗
       pk_loop_frame k -∗
@@ -8322,16 +8323,16 @@ End ProofPrintk.
 (* THE SEALED FUNCTOR: instantiate the callees' WP hypotheses with their  *)
 (* proven specs, discharging the PRINTK Module Type.                      *)
 (* ===================================================================== *)
-  Definition wp_printk_sconf `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+  Definition wp_printk_sconf `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       {kt : ktier} (γpr : gname) (γl : gname) (γd : uart_names) (γv : disk_names)
       (m0 : regfile) (K : nat) (bs : list (bv 8))
       (n : nat) (eb : bool) {dqf : dfrac}
       (f : string) (descs : list pk_arg_desc) (b : bool) (p : mword 64) (lks : gset string)
       : wp_printk_sconf_body kt γpr γl γd γv m0 K bs n eb dqf f descs b p lks :=
     wp_printk_sconf_gen
-      (fun `{CID0 : CpuId} γl' γd' γv' m' K' bs' n' eb' b' pcur' lks' =>
+      (fun `{CID0 : CpuId} `{XI : CurCtx} γl' γd' γv' m' K' bs' n' eb' b' pcur' lks' =>
          Consputc.wp_consputc_sconf kt (CID:=CID0) γl' γd' γv' m' K' bs' n' eb' b' pcur' lks')
-      (fun `{CID0 : CpuId} γl' γd' γv' m' K' bs' n' eb' b' pcur' lks' =>
+      (fun `{CID0 : CpuId} `{XI : CurCtx} γl' γd' γv' m' K' bs' n' eb' b' pcur' lks' =>
          Printint.wp_printint_sconf kt (CID:=CID0) γl' γd' γv' m' K' bs' n' eb' b' pcur' lks')
       γpr γl γd γv m0 K bs n eb dqf f descs b p lks.
 

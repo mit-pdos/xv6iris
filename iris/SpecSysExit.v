@@ -86,6 +86,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
+Require Import TsoCtx.
 Import Defs.
 
 (* 4 slots for sys_exit's own frame, and below it kexit's 74 -- argint's 18
@@ -93,7 +94,7 @@ Import Defs.
 Notation K_sys_exit := ((4 + K_kexit)%nat) (only parsing).
 Definition wp_sys_exit_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γft γf γw : gname)                               (* ftable lock, ftable, wait *)
      (γs : list gname) (j : nat) (γl : gname)
   (* disk fabric + lock  *)
@@ -144,12 +145,12 @@ Definition wp_sys_exit_sconf_body
   panic_env -∗
   (* the running-thread bundle -- consumed: this thread parks forever *)
   (* wait_lock, and what it protects *)
-  is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+  is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
   (* the open-file table: every non-null descriptor is fileclose'd *)
   is_ftable γft γf -∗
   (* ...and closing one can free a pipe's page *)
   is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
-    (kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) -∗
+    <{ kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24)) }> -∗
   kalloc_avail fsc_kpages on -∗
   (* the file system, for [begin_op(); iput(p->cwd); end_op();] inside kexit *)
   bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
@@ -158,7 +159,7 @@ Definition wp_sys_exit_sconf_body
   gen_cert -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res fsc_disk pd pav pu) -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
   bslots 3 -∗
   (* the inode cache and the two regions iput's truncate arm frees into,
      kexit's verbatim *)
@@ -182,7 +183,7 @@ Definition wp_sys_exit_sconf_body
 
 Module Type SYSEXIT.
   Parameter wp_sys_exit_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γft γf γw : gname)
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)

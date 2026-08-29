@@ -39,6 +39,7 @@ Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvExtras
 Require Import HartSwp HartLift HartSpan HartSpanChar HartGoodb.
 Require Import WpDecodeBridge Pt4kWalk CommonWalk PtTree PtTreeAdue.
 Require Import HartMFetch HartMStore PtAdBits.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* the same spelling [HartMFetch] uses for the misalignment tests *)
@@ -111,7 +112,7 @@ Qed.
 
 Section strans.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (acc : MemoryAccessType mem_payload) (p : Privilege) (mxr do_sum : bool).
 
   (* [translate] on a TLB HIT whose cached leaf needs no A/D update: the

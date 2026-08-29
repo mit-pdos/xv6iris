@@ -89,6 +89,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Import Defs.
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 
 (* MANDATORY IN ANY FILE THAT PROVES OVER [proc_priv] (durable-notes.md), and
@@ -271,7 +272,7 @@ Section CrBodies.
   Qed.
 
   (* the function's own exit, as a [wp_next] at the entry hart *)
-  Definition cr_ret `{CID0 : CpuId} (jp : nat) (m0 : regfile) (av : nat)
+  Definition cr_ret `{CID0 : CpuId} `{XI : CurCtx} (jp : nat) (m0 : regfile) (av : nat)
       (eb : bool) (pid : mword 32) (U : ustate) (Ment : gmap Z (bv 8))
       (n : Z) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr jp) (fun (CID : CpuId) =>
@@ -294,7 +295,7 @@ Section CrBodies.
   (*  +0xce .. +0xe0 -- THE EPILOGUE.  All three exits reach it with the  *)
   (*  answer already in a0.                                               *)
   (* =================================================================== *)
-  Lemma cr_epi `{CID : CpuId} (CID0 : CPU)
+  Lemma cr_epi `{CID : CpuId} `{XI : CurCtx} (CID0 : CPU)
       (jp : nat) (m0 M : regfile) (av : nat) (eb : bool)
       (sp0 : mword 64) (pid : mword 32) (U : ustate)
       (Ment : gmap Z (bv 8)) (n r : Z) (lks : gset string) :
@@ -630,7 +631,7 @@ Section CrBodies.
   (*  over one at a time -- so what a caller supplies is only the four     *)
   (*  free ones, the answer in a0, and the process block.                  *)
   (* =================================================================== *)
-  Definition cr_epi_prop `{CID0 : CpuId}
+  Definition cr_epi_prop `{CID0 : CpuId} `{XI : CurCtx}
       (jp : nat) (sp0 : mword 64) (m0 : regfile) (av : nat)
       (pid : mword 32) (U : ustate) (n : Z) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr jp) (fun (CIDe : CpuId) =>
@@ -658,7 +659,7 @@ Section CrBodies.
   (* ...and it is free in the IMAGE too: [cr_ret]'s block row is at the
      ∀-bound image now, so the parameter is not read and the shift may
      re-key it as well as the descriptor. *)
-  Lemma cr_ret_shift `{CID0 : CpuId} (jp : nat) (m0 : regfile) (av : nat)
+  Lemma cr_ret_shift `{CID0 : CpuId} `{XI : CurCtx} (jp : nat) (m0 : regfile) (av : nat)
       (pid : mword 32) (U : ustate) (Ment Mo : gmap Z (bv 8)) (P' : uptd)
       (n : Z) (lks : gset string) :
     uptd_ext (pv_upt (us_V U)) P' ->
@@ -676,7 +677,7 @@ Section CrBodies.
     - iExact "Hpriv".
   Qed.
 
-  Lemma cr_mk_epi `{CID : CpuId} (jp : nat) (sp0 : mword 64) (m0 : regfile)
+  Lemma cr_mk_epi `{CID : CpuId} `{XI : CurCtx} (jp : nat) (sp0 : mword 64) (m0 : regfile)
       (av : nat) (pid : mword 32) (U : ustate) (n : Z) (lks : gset string) :
     m0 !!! Regidx csp_rs1 = sp0 ->
     (consoleread_stack <= av)%nat ->
@@ -706,7 +707,7 @@ Module ConsolereadProof (Myproc : MYPROC) (Acquire : ACQUIRE) (Killed : KILLED)
 
 Section ProofConsoleread.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* Normalise every [rget m k] the leaves produce back to [m !!! Regidx k]
      across the WHOLE proofmode goal: away from tp the two are the same
@@ -732,7 +733,7 @@ Section ProofConsoleread.
      hands off to unmodified via [cr_mk_retx]): the PRECONDITION below still
      holds "cons", so it reads [{["cons"]} ∪ lks], not bare
      [lks] -- see durable-notes.md's OUTER/INNER convention. *)
-  Definition cr_retx_prop `{CID0 : CpuId}
+  Definition cr_retx_prop `{CID0 : CpuId} `{XI : CurCtx}
       (γc : gname) (jp : nat) (sp0 : mword 64) (m0 : regfile) (av : nat)
       (pid : mword 32) (U : ustate) (n : Z) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr jp) (fun (CIDx : CpuId) =>
@@ -897,7 +898,7 @@ Section ProofConsoleread.
      bundle is threaded LINEARLY through the head loop, the wait loop and
      the copy block: every one of them takes it as a premise and hands it
      to whichever successor it jumps to. *)
-  Definition cr_exits `{CID0 : CpuId}
+  Definition cr_exits `{CID0 : CpuId} `{XI : CurCtx}
       (γc : gname) (jp : nat) (sp0 : mword 64) (m0 : regfile) (av : nat)
       (pid : mword 32) (U : ustate) (n : Z) (lks : gset string) : iProp Σ :=
     (cr_retx_prop (CID0 := CID0) γc jp sp0 m0 av pid U n lks
@@ -923,7 +924,7 @@ Section ProofConsoleread.
   (* =================================================================== *)
   (*  [HEAD] (+0x38): the outer [while (n > 0)] head.                     *)
   (* =================================================================== *)
-  Definition cr_head_prop `{CID0 : CpuId}
+  Definition cr_head_prop `{CID0 : CpuId} `{XI : CurCtx}
       (γa γc γf : gname) (jp : nat) (sp0 : mword 64) (m0 : regfile) (av : nat)
       (pid : mword 32) (U : ustate) (n : Z) (fl : nat) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr jp) (fun (CIDh : CpuId) =>
@@ -959,7 +960,7 @@ Section ProofConsoleread.
   (*  the [cons.r] this block is about to bump: reassembling it at the     *)
   (*  seam would lose exactly the equation the [sw] at +0x82 needs.        *)
   (* =================================================================== *)
-  Definition cr_have_prop `{CID0 : CpuId}
+  Definition cr_have_prop `{CID0 : CpuId} `{XI : CurCtx}
       (γa γc γf : gname) (jp : nat) (sp0 : mword 64) (m0 : regfile) (av : nat)
       (pid : mword 32) (U : ustate) (n : Z) (fl : nat) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr jp) (fun (CIDv : CpuId) =>
@@ -1841,7 +1842,7 @@ Section ProofConsoleread.
   (*  token, [cons_res] and the register pins: nothing accumulates across  *)
   (*  a park, which is why the IH needs no extra quantifier.               *)
   (* =================================================================== *)
-  Definition cr_wait_prop `{CID0 : CpuId}
+  Definition cr_wait_prop `{CID0 : CpuId} `{XI : CurCtx}
       (γc : gname) (jp : nat) (sp0 : mword 64) (m0 : regfile) (av : nat)
       (pid : mword 32) (U : ustate) (n : Z) (fl : nat) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr jp) (fun (CIDw : CpuId) =>

@@ -31,6 +31,7 @@ Require Import WpSconfEngine.
 Require Import IntrDefs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
+Require Import TsoCtx.
 
 (* THE EXEC-SIDE BRIDGES ARE GONE.  This file used to carry a [rvv] helper
    and fourteen [exec_execute_BTYPE_*_{fall,taken_zca}] lemmas, because a
@@ -43,7 +44,7 @@ Import Defs.
 Section WpSconfBtype.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context {kt : ktier}.
   (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
      bundle like the register map.  Implicit, so no call site changes. *)

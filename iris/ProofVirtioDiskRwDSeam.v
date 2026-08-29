@@ -71,12 +71,13 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Module VirtioDiskRwRestD (Acquire : ACQUIRE) (Release : RELEASE)
                          (SleepPrepare : SLEEP_PREPARE) (Sleep : SLEEP) (FreeDesc : FREEDESC).
+Require Import TsoCtx.
 
 Module P3 := VirtioDiskRwRestC Acquire Release SleepPrepare Sleep FreeDesc.
 
 Section ProofVirtioDiskRwDSeam.
   Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
 
   Notation Ra0 := (mword_of_int 10 : mword 5).
@@ -91,7 +92,7 @@ Section ProofVirtioDiskRwDSeam.
   (* local survive for P6's [free_chain]; the two untouched descriptor-slot *)
   (* remainders come back with them.                                       *)
   (* ------------------------------------------------------------------- *)
-  Definition vdrw_p4_exit (CID0 : CPU) (γk : gname)
+  Definition vdrw_p4_exit `{XI : CurCtx} (CID0 : CPU) (γk : gname)
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
