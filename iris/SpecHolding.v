@@ -111,7 +111,7 @@ Definition wp_holding_lockinv_locked_s_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN
   (⊢ locked γl held_cpu -∗ Dc -∗ False) ->
   sie_cap_gpr kt m n false p -∗
   kernel_text -∗ pc_is pcE -∗
-  lock_openable_c γl lka s R Dc -∗
+  lock_openable γl lka s R Dc -∗
   locked γl held_cpu -∗
   ( ∀ mh,
     sie_cap_gpr kt mh n false p -∗

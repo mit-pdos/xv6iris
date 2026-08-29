@@ -79,7 +79,19 @@ Section ProofRelease.
        it ∃-closed (tso-port M3 -- at cutover this introduction becomes the
        transport into the lock's internal context,
        [TsoCtxTwin2.ctx_dom_to_parked]) *)
-    iAssert (∃ ξ : CtxId, R ξ)%I with "[HR]" as "HR"; first by iExists cur_ctx.
+    (* A6.119 (§0.18′): THE HONEST DEPOSIT, replacing the SC-era ∃-closure
+       this very comment predicted.  [lock_pay_intro] parks the payload on a
+       fresh context ([ctx_deposit] / [ctx_dom_to_parked]) and hands the
+       running token straight back. *)
+    (* A6.119 (§0.18′): the honest deposit, and it needs NO new premise --
+       [own_context] is a component of [sie_cap] (IntrDefs), and
+       [SieCapCtx.sie_cap_gpr_own_ctx_acc] borrows it and puts it back with
+       the bundle reassembled, "so no downstream spec premise changes
+       shape".  The token never crosses [wp_next] on its own, which is what
+       makes this immune to the CpuId re-park hazard. *)
+    iDestruct (SieCapCtx.sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+    iMod (WpLock.lock_pay_intro R with "Hrun HR") as "[Hrun HR]".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
     (* ---- 0x00: c.addi sp,-32 -- the frame trade (k := 4) ---- *)
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     set (R0 := <[Regidx csp_rs1 := regval_into_reg
@@ -562,7 +574,7 @@ Section CancelOfGen.
     intros pcE lk0 ret_tgt. cbv zeta. intros Hlka Hav Href Hrefpre.
     iIntros "Hcg #Htext Hpc #Hlock Htoken HR Hbuild Hown Hpay Hcont".
     iApply (G.wp_release_gen_sconf kt γl lka s R D
-              (lka ↦₄ (mword_of_int 0 : mword 32) ∗ WpLock.lk_cpu_fresh lka ∗ Out)%I
+              (WpLock.lock_word_fresh lka ∗ (∃ lo : nat, WpLock.lk_cpu_fresh lo lka) ∗ Out)%I
               m n eb p av lks
               Hlka Hav Href Hrefpre
               with "Hcg Htext Hpc Hlock Htoken HR [Hbuild] Hown Hpay").

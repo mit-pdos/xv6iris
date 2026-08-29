@@ -524,16 +524,11 @@ Section ProofHolding.
       symmetry. apply kv_addv_zero. }
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg #Htext Hpc #Hlock Htok Hcont".
-    (* A6.119: the reads want the ABSORBED opener; the other leaves take
-       the plain one, one weakening away. *)
-    iAssert (WpLock.lock_openable γl lka s R Dc) as "#Hlockp";
-      [ iApply WpLock.lock_openable_of_c; iExact "Hlock" | ].
-    (* ---- 0x00: c.lw a5,0(a0) through the lock invariant ---- *)
     iApply (wp_clw_lockopen_locked_s_sconf γl lka s R Dc pcE (mword_of_int 15) (mword_of_int 10)
               (mword_of_int 0) m n false
               Hlka ltac:(vm_compute; discriminate) ltac:(rdok)
               (or_introl eq_refl) Href
-              with "Hcg Hpc [] Hlockp Htok").
+              with "Hcg Hpc [] Hlock Htok").
     { iApply (hi_00 with "Htext"). }
     iIntros (lockv). iApply wp_next_off_intro.
     iIntros "%Hlv Htok Hcg Hpc".
@@ -656,8 +651,9 @@ Section ProofHolding.
     iApply (wp_cld_lkcpu_lockopen_locked_s_sconf γl lka s R Dc (mword_of_int (KernelSyms.holding + 0x12))
               (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
               (mword_of_int 16 : mword 12) S2 (n - 4)%nat false
-              Hacpu ltac:(vm_compute; discriminate) ltac:(rdok) Href
-              with "Hcg Hpc [] Hlockp Htok").
+              Hacpu ltac:(vm_compute; discriminate) ltac:(rdok)
+              ltac:(left; reflexivity) Href
+              with "Hcg Hpc [] Hlock Htok").
     { iApply (his_12 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Htok Hcg Hpc".

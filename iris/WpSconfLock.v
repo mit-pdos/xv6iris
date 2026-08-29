@@ -1683,7 +1683,10 @@ Section WpSconfLock.
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc cmp (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
-    lock_openable_c γl lk s R Dc -∗
+    (* A6.119: the PLAIN opener.  A cpu-field STORE reads nothing racily, so
+       it owes no floor -- only the [notheld] read does.  Measured, not
+       assumed: this leaf bound the floor and never used it. *)
+    lock_openable γl lk s R Dc -∗
     T -∗
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr kt m n b p -∗
@@ -1701,10 +1704,8 @@ Section WpSconfLock.
       by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     assert (Hsv2_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
       by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
-    iIntros "Hcg Hpc Hinstr #Hlockc HT Hcont".
-    iDestruct (WpLock.lock_openable_c_parts with "Hlockc") as (lo) "[#Hfl #Hopen]".
-    iAssert (lock_openable γl lk s R Dc) as "#Hlock".
-    { iApply WpLock.lock_openable_of_c. iExact "Hlockc". }
+    iIntros "Hcg Hpc Hinstr #Hlock HT Hcont".
+    iDestruct (WpLock.lock_openable_parts with "Hlock") as (lo) "[#Hfl #Hopen]".
     iApply fupd_wp.
     iMod (lock_claims γl lk s R T Dc ⊤ ltac:(solve_ndisj) Href
             with "Hlock HT") as "(#Hc4 & #Hc8 & HT)".
@@ -1854,7 +1855,7 @@ Section WpSconfLock.
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc true (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
-    lock_openable_c γl lk s R Dc -∗
+    lock_openable γl lk s R Dc -∗
     locked_pre γl h0 -∗
     cpu_locks_at h0 S -∗
     wp_next b p (fun (CID : CpuId) =>
@@ -1876,7 +1877,7 @@ Section WpSconfLock.
       by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     assert (Hsv : lk_cpu_val (Some (h0, true)) = rget m rs2).
     { rewrite lk_cpu_val_held cpus_ptr_cid. exact (eq_sym Hmycpu). }
-    iIntros "Hcg Hpc Hinstr #Hlockc Htok Hcl Hcont".
+    iIntros "Hcg Hpc Hinstr #Hlock Htok Hcl Hcont".
     iApply (wp_sd_lkcpu_lockopen_gen true γl lk s R Dc pc rs2 rs1 imm m n
               (locked_pre γl h0 ∗ cpu_locks_at h0 S)%I
               (locked γl h0 ∗ cpu_locks_at h0 ({[s]} ∪ S))%I
@@ -1892,7 +1893,7 @@ Section WpSconfLock.
               Hbp
               (lkcpu_take_exchange γl lk s S Hfresh)
               ltac:(iIntros "[Htok _]"; iApply Href; iExact "Htok")
-              with "Hcg Hpc Hinstr Hlockc [Htok Hcl] [Hcont]").
+              with "Hcg Hpc Hinstr Hlock [Htok Hcl] [Hcont]").
     { iFrame "Htok Hcl". }
     iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc [Htok Hcl]".
     iApply ("Hcont" $! CID1 with "[] Hcg Hpc Htok Hcl").
@@ -1917,7 +1918,7 @@ Section WpSconfLock.
     sie_cap_gpr kt m n b p -∗
     pc_is pc -∗
     instr pc false (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 8)) -∗
-    lock_openable_c γl lk s R Dc -∗
+    lock_openable γl lk s R Dc -∗
     locked γl h0 -∗
     cpu_locks_at h0 S -∗
     wp_next b p (fun (CID : CpuId) =>
@@ -1938,7 +1939,7 @@ Section WpSconfLock.
     assert (Hpa_all : forall hh : CpuId,
               add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
       by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
-    iIntros "Hcg Hpc Hinstr #Hlockc Htok Hcl Hcont".
+    iIntros "Hcg Hpc Hinstr #Hlock Htok Hcl Hcont".
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
     iDestruct (gpr_file_x0 (tp_pin m) (mword_of_int 0 : mword 5) ltac:(vm_compute; reflexivity)
                  with "Hfile") as "[%Hz Hfile]".
@@ -1961,7 +1962,7 @@ Section WpSconfLock.
               Hbp
               (lkcpu_give_exchange γl lk s S)
               ltac:(iIntros "[Htok _]"; iApply Href; iExact "Htok")
-              with "Hcg Hpc Hinstr Hlockc [Htok Hcl] [Hcont]").
+              with "Hcg Hpc Hinstr Hlock [Htok Hcl] [Hcont]").
     { iFrame "Htok Hcl". }
     iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc (Htok & Hcl & %Hin)".
     iApply ("Hcont" $! CID1 with "[] Hcg Hpc Htok Hcl [%]"); [ | exact Hin ].
