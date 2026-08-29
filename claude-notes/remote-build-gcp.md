@@ -521,3 +521,19 @@ batch on the host).  Rules:
   the VM and reaps anything orphaned (etime large, parent dead) —
   distinguish from a LIVE build (flock held, fresh etime) and leave
   that alone.
+
+## Gotcha: `--pull <file>` deletes the file it was asked to fetch (2026-08-28)
+
+Every `run-on-gcp` invocation without `--no-sync` pushes first, and the push
+is `rsync -a --delete` over everything not in `ROCQ_EXCLUDES`.  A remote-only
+file — a build log written on the VM by a detached driver — is therefore
+DELETED by the next push, and `--pull <file> <cmd>` pushes before it pulls,
+so it removes the very log it was asked for.  Measured: a whole round's
+`ZZ-iris.log` gone.  Rules:
+- write remote logs under an EXCLUDED name (`*.aux` is in the list; the
+  lane drivers now write `ZZ-iris.log.aux` / `ZZbuild.out.aux`);
+- read them with `run-on-gcp --no-sync bash -c 'grep … ZZbuild.out.aux'`
+  rather than `--pull`;
+- and never keep anything on the VM that is not either in the local tree
+  or matched by an exclude.
+

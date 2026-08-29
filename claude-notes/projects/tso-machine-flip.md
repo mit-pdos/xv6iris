@@ -15026,3 +15026,177 @@ transitions, the boundary note), `WpLockAt`, `WpSconfLock` (**green**),
 `ProofRelease`, `ProofInitlock`.
 
 Mirror refreshed at r37.
+
+---
+
+## A6.120 — THE SUCCESSOR'S TWO ITEMS CLOSE TOGETHER: the finisher goes two-part, and the creator's arm is the ctx tower's own dirty witness — which retires the crossing upgrade and the ~40-caller threading
+
+*(Amendment A6.120, lock lane, fresh agent resuming from `tso-handoff-current.md`
+at r37.  Authorized as the composition of standing rulings — **§0.38′**'s
+received-or-wrote reading of `lk_floor` spelled with **§0.36′(a)**'s author arm
+at the ctx tower (the same authority A6.111 used), and **§0.18′/§0.35′(iii)**'s
+absorb at acquire — with the owner informed and holding a veto.  One 3-line
+additive hunk in a KPT-lane file, mirrored into the KPT tree; see §6.)*
+
+### §1. THE NUMBER
+
+**r38: 1178 `.vo`, RED 8**, sentinel-backed (`MAKEEXIT=2`; 748 files in the
+`TsoCtx`-rooted validating round, 81 in the closing one).
+
+> `ProofForkretPark`, `ProofKernelvec`, `ProofMain`, `ProofSwtch`,
+> `ProofVirtioDiskIntr`, `ProofVirtioDiskRwD`, `UptWalkPt`, `UserMemPt`
+
+**The three never-compiled consumers A6.119 surfaced — `ProofAcquire`,
+`ProofRelease`, `ProofPipeclose` — are GREEN, and the 72 files behind them
+came with them** (`.vo` 1103 → 1178: the `Link*` chain through the fs and
+syscall proofs, the pipe proofs, `SystemAdequacy`'s feeders).  RED 11 → 8, and
+the list is exactly the baseline's nine minus `WpSconfLock`.  Zero
+`admit`/`Admitted`/`Abort`/`Axiom` across the twelve touched files.
+
+### §2. ITEM (1): THE CANCEL PATH — the finisher is TWO-PART, because the word clear is a plain store
+
+`ProofRelease:587`'s comment promised *"the cutover kit's finisher morphs
+against real AMO evidence instead"*.  **There is no AMO evidence at release's
+word clear**: `release+0x1a` is `sw zero,0(s1)` after a `fence rw,w`
+(`wp_sw_zero_lockfin_s_sconf` goes through `wp_store_s_sconf_au_dat`), so the
+hart's view does not move and a record parked at entry (`lock_pay_intro`,
+A6.119) can **never** be brought back to `cur_ctx` — `ctx_dom ξ0 cur_ctx`
+would need the destroyer's bound to dominate a stamp raised past its own
+dirty watermark.  The shim was conjuring exactly that.
+
+The honest shape: the two finisher arms want the payload in two different
+forms, and only the ENTRY has the running token (at the store the engine holds
+it inside its atomic update).  So `WpLock.lock_finisher` is now
+
+```coq
+  ∃ Pay, (own_context cur_ctx -∗ R cur_ctx ==∗ own_context cur_ctx ∗ Pay)   (* prelude, at entry *)
+       ∗ lock_finisher_body γ lk s R D Out E Pay                              (* body, at the store *)
+```
+
+`lock_finisher_close` picks `Pay := lock_pay R` (prelude = `lock_pay_intro`,
+the honest deposit); `lock_finisher_destroy` picks `Pay := R cur_ctx` (prelude
+= identity) and the cancel wrapper is one line: `iExact "Hbuild"`.  The
+word-clear leaf takes the body plus `Pay` and never sees the token;
+`wp_release_gen_sconf` runs the prelude where A6.119 ran the deposit.  No spec
+statement moved (`SpecRelease` names `lock_finisher` and never looks inside);
+the eight `lock_finisher_close` call sites in the pipe proofs are unchanged.
+
+### §3. ITEM (2): MEASURED FIRST — the bare `llb` arm cannot be cashed at ANY read, and the creator window is REAL
+
+Three facts, each a grep or a kernel-source read:
+
+1. `ProofAcquire` fails first at `:163` (the A6.119 `rget m rs2 = 1` premise,
+   passed `HSTZ` positionally — trivial), then at the loop's post (the leaf
+   hands `lock_pay R`, the loop promised `∃ξ, R ξ`), then at `:664` (the
+   shim), and only THEN at `:425` (`holding` wants the absorbed opener).
+2. **A6.113's finding, sharpened**: `llb loglen_name lo` and the reader's view
+   are comparable only at an AMO (`hart_view_lb_get` needs the interp and the
+   log-top fact).  A persistent handle cannot carry "lo ≤ my view" unless some
+   AMO with `lo` in hand converted it — which is what made the crossing upgrade
+   look universal and priced `SpecAcquire`'s ~40 callers (45 files call a
+   `wp_acquire_*`; 155 name `is_lock`).
+3. **The creator window is not empty**: `kinit` does `initlock(&kmem.lock)`
+   and then `freerange → kfree → acquire(&kmem.lock)` with **no AMO in
+   between**; `printfinit` does `initlock(&pr.lock)` and `main` then calls
+   `printf` → `acquire(&pr.lock)`.  Both `holding()` reads run on hart 0 with
+   only the right arm.  A6.113 §3 option 3 ("measure whether any first acquire
+   falls in the gap") — measured: **yes, at the first two locks the kernel
+   ever takes.**  So no amount of threading `lock_openable_c` makes acquire
+   provable; the creator's arm has to reach the read.
+
+### §4. THE CREATOR'S ARM WAS ALREADY BUILT — it is `ctx_at`'s dirty map
+
+`TsoCtx.ctx_at ξ q B D` is `mono_nat_auth (bound) ∗ ghost_map_auth (ctx_dirty_name ξ) D`,
+and `own_context` carries, for every key `k ∈ D`,
+
+```coq
+  dirty_ok logm_name (hart_agent cpu_id) B k :=
+    ⌜k.1 ≤ B⌝ ∨ ∃ i m, ⌜k.1 = S i⌝ ∗ i ↪[logm_name]□ m ∗ ⌜pm_tid m = hart_agent cpu_id⌝
+```
+
+— **`ledger_vis` verbatim** ("below my bound, or the message is MINE"), the
+exact two-armed premise A6.111 gave the racy read.  And `D` is never deleted
+from (`grep ghost_map_delete TsoCtx.v` is empty): a park stamps the record
+above every key (`ctx_parked_def`), a resume raises the bound past the stamp,
+so every key's obligation flips to the left disjunct at the new hart.  A
+persistent element fragment is therefore a sound lifetime witness:
+
+```coq
+  Definition ctx_wrote ξ t a := (t, a) ↪[ctx_dirty_name ξ]□ ().        (* TsoCtx *)
+  Definition lk_floor ξ lo := ctx_floor ξ lo
+                             ∨ (llb loglen_name lo ∗ ∃ a, ctx_wrote ξ lo a).   (* WpLock *)
+```
+
+ξ-indexed, hart-free, persistent — the handle's arity does not move (136 files
+still see `is_lock` opaquely; `PipeInvDefs.is_pipe` carries `lk_floor` opaquely
+and needed nothing).  Four lemmas do the work, all additive in `TsoCtx`:
+
+| lemma | job |
+|---|---|
+| `own_context_expose_w` / `ctx_wrote_register` | the registration, split around the store: the watermark bound `W ≤ length log` is taken BEFORE the append (the new key must be absent, and `W`'s only law is "a legal position above every dirty key"), the token is rebuilt with `(S i, a)` after, justified by the store's own-message fragment |
+| `own_context_wrote_vis` | the cash-in: `own_context ξ -∗ ctx_wrote ξ t a -∗ own_context ξ ∗ ∃K, view_lb K ∗ ledger_vis (hart_agent cpu_id) K t` — `ghost_map_lookup` + `big_sepM_lookup` on the token's own `dirty_ok` |
+| `ctx_dom_wrote_floor` | the transport: `ctx_dom ξ ξ' -∗ ctx_wrote ξ t a -∗ ctx_dom ξ ξ' ∗ ctx_floor ξ' t` — `ctx_dom_def` already carries `W ≤ B'`, so a crossing delivers the LEFT arm for free (A6.117's `ctx_floor_dom`, one arm over) |
+| `tso_interp_llb_valid` | the four-line validity helper both leaves wanted |
+
+and `WpLock.lk_floor_vis` joins the two arms into the one premise
+`lkcpu_read_not_mine` takes.  **Consequences, all deletions:**
+
+* the notheld read (`lock_cell_read_notheld`, `wp_ld_lkcpu_notheld_gen`,
+  `wp_cld_lkcpu_lockopen_notheld_s_sconf`) takes the plain `lock_openable`
+  again; `SpecHolding` follows; `ProofHolding` loses its `lock_openable_of_c`
+  shim; `ProofAcquire:425` typechecks as written;
+* `lock_openable_c` is retired in place (no producer, no consumer; three
+  lemmas kept with a note);
+* **queue item (5) — `lock_openable_c` through `SpecAcquire`'s ~40 callers —
+  is CANCELLED**, and with it the ~160-file cone sweep it would have forced.
+
+The one price: the mint gate `ledger_store_win_wpay_mint_ok` produced the
+fragment underneath and dropped it with an `_` — **A6.114 §4's throw-away,
+found a third time**.  `ledger_store_win_wpay_mint_frag_ok` keeps it (the old
+gate is its corollary), `SmodeCorePt.word_pointsto_wpay_mint_c` hands it out
+LAST (a one-token change to its destructuring), `WpSconfMem.wp_sd_zero_wpay_s_sconf`
+registers the key inside the store's own atomic update and exports
+`ctx_wrote cur_ctx lo ea`, and `ProofInitlock` builds the arm with
+`lk_floor_of_wrote`.
+
+### §5. ITEM (2)'s OTHER HALF: the absorb against real AMO evidence
+
+A6.116 §1's "half a transport" is closed at the leaf: the AMO write node has
+the record's `ctx_parked ξ T` in hand and mints `ctx_floor cur_ctx (S (length log))`
+for the holder token; `ctx_parked_llb` + `tso_interp_llb_valid` give
+`T ≤ length log`, so `ctx_floor_le` hands the winner the record **with its
+floor at the record's stamp**:
+
+```coq
+  Definition lock_pay_won R := ∃ ξ T, ctx_parked ξ T ∗ ctx_floor cur_ctx T ∗ R ξ.   (* WpLock *)
+```
+
+`ProofAcquire`'s hand-off is then `sie_cap_gpr_own_ctx_acc` (borrow) →
+`own_context_floor_view` (the stable pair) → `TsoCtxAbsorbLb.ctx_absorb_lb`
+(§0.35′(iii)'s absorb) → give back; the exported `∃K, hart_view_lb K` is the
+same `K`.  `ctx_dom_sc` and `hart_view_lb_any` are gone from acquire.
+(`ProofSwtch:157` still names `hart_view_lb_any` — §0.27′'s business, red at
+the baseline, untouched.)
+
+### §6. THE ONE FOREIGN HUNK, and the third consumer
+
+`SmodeCorePt.v` is on the KPT lane's merge list.  Its copy in
+`/shared/xv6iris-3-kpttree` differs from this tree's in two single-line
+hunks at `:4776/:4780`, nowhere near the wrapper at `:726`; the identical
+3-line post addition + one-token destructuring change was applied to BOTH
+trees, so the merge is a no-op there.  Recorded here and in the handoff.
+
+`ProofPipeclose:753` was the third never-compiled consumer: `pipe_bytes_page_own`
+still wanted the pre-flip ctx word `pi ↦₄ v` where release-cancel hands
+`lock_word_fresh` — re-cut onto `lock_word_fresh_free`, the word's twin of
+`lk_cpu_fresh_free`.
+
+### §7. FILES TOUCHED
+
+`TsoCtx` (the witness block after `ledger_vis_own`; the frag gate), `WpLock`
+(`lock_finisher` two-part, `lk_floor`, `lk_floor_vis`, `lock_pay_won`,
+`lock_openable_c` retired in place), `WpSconfLock` (the lockfin leaf's `Pay`;
+the notheld chain on `lk_floor`; the AMO leaf's `lock_pay_won`), `WpSconfMem`
+(the wpay store's registration + export), `SmodeCorePt` (both trees, §6),
+`ProofInitlock`, `SpecHolding`, `ProofHolding`, `PipeInv`, `ProofRelease`,
+`ProofAcquire`.

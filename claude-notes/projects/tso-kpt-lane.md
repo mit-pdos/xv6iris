@@ -1105,3 +1105,16 @@ more, and the four openers use it only to READ.  To drop it:
    `kpt_creds_intro` → `kpt_inv_alloc`; `kvm_bridge` strengthened to
    `kpt_ad_preset` at the source.  `ProofMainSecondary` takes the deposit's
    `ctx_parked`/`ctx_floor` pair where it already takes `kpt_creds`.
+
+---
+
+## K-note (2026-08-28, from the lock lane, A6.120 §6): one hunk landed in this tree's `SmodeCorePt.v`
+
+`word_pointsto_wpay_mint_c` (`:726`) gained a trailing conjunct — the
+store's own-message fragment, `TsoCtx.ledger_msg_at (length log) (PWMsg …)`
+— produced by the new `TsoCtx.ledger_store_win_wpay_mint_frag_ok` (the old
+gate is its corollary); its destructuring pattern is one token longer.  The
+identical hunk was applied to `/shared/xv6iris-3-kpttree/iris/SmodeCorePt.v`
+so the merge is a no-op there; the tree's own two K-series one-liners
+(`:4781`, `:4785`) are untouched.  Nothing else in this tree was opened.
+
