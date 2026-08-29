@@ -305,7 +305,7 @@ Section CwBodies.
        (* the image does not move: either_copyin is same-[U] *)
        ∀ (mf : regfile) (r : Z) (P' : uptd),
          ⌜callee_saved m0 mf⌝ -∗
-         ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+         ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
          ⌜(0 <= r <= Z.max 0 n)%Z⌝ -∗
          ⌜mf !!! Regidx Ra0 = (mword_of_int r : mword 64)⌝ -∗
          sie_cap_gpr KT1 mf av true (proc_addr jp) -∗
@@ -321,7 +321,7 @@ Section CwBodies.
   Lemma cw_ret_weaken `{CID0 : CpuId} `{XI : CurCtx} (jp : nat) (m0 : regfile) (av : nat)
       (eb : bool) (pid : mword 32) (U : ustate) (P1 : uptd) (n : Z) (lks : gset string)
       (γu : uart_names) (tr0 : list (bv 8)) :
-    uptd_ext (pv_upt (us_V U)) P1 ->
+    uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P1 ->
     cw_ret (CID0 := CID0) jp m0 av eb pid U n lks γu tr0 -∗
     cw_ret (CID0 := CID0) jp m0 av eb pid (us_upt U P1) n lks γu tr0.
   Proof.
@@ -331,7 +331,7 @@ Section CwBodies.
     iIntros (mf r P') "%Hcs %Hx %Hr %Ha0".
     iApply ("H" $! mf r P' with "[%] [%] [%] [%]").
     - exact Hcs.
-    - exact (uptd_ext_trans _ _ _ Hext Hx).
+    - exact (uptd_ext_sz_trans _ _ _ _ Hext Hx).
     - exact Hr.
     - exact Ha0.
   Qed.
@@ -502,7 +502,7 @@ Section CwBodies.
     iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! E5 r (pv_upt (us_V U)) with "[%] [%] [%] [%] Hcg Hcnt Hpc [Hpriv] Hrcpt").
     - exact Hcs.
-    - apply uptd_ext_refl.
+    - apply uptd_ext_sz_refl.
     - exact Hr.
     - exact HE5a0.
     - (* the round trip that moved nothing: [us_upt_id] folds the
