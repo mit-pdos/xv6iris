@@ -18,7 +18,9 @@ measured record; `main-tso-readiness.md` is the separate main-side handoff.
    `/mnt/rocq/trees/_shared_xv6iris-3-fliptree` (cloned from the lock
    lane's warm tree; incremental).  Durable mirror
    `/shared/xv6iris-3-fliptree-backup` (rsync'd at green boundaries).
-   GitHub: branch `tso-flip` (snapshots via the temp-index recipe).
+   GitHub: branch `tso-flip`, snapshot `619c23287` = r38 (snapshots via the
+   temp-index recipe; `ZZchain.sh <File>…` at the tree root rechecks files
+   locally in order against pulled `.vo`).
    Build driver: `ZZbuild.sh` at the tree root (the intr lane's, log names
    suffixed `.aux` -- see the gotcha).  **Last certified: r38, 1178/1296, RED 8, zero admits (A6.120).**
 2. **KPT tree**: `/shared/xv6iris-3-kpttree` — FROZEN mid-K15d, unchanged
