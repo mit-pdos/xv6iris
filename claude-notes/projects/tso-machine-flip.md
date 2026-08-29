@@ -15880,3 +15880,50 @@ of eight: `tri_card_8`), from `disk_res`'s `dom fl = set_seq nr (np − nr)`
 and the recorded triples' disjointness -- so `wrap16` is injective on the
 admitted span and the value read is "the latest write of that value at or
 above the floor".
+
+**A6.126 §4 step 1 LANDED (r49: 1183/1298, same 8 roots; snapshot
+`7f340d674`).**  `TsoCtx`: `phys_ledger_rpay a dq v t R` (the cell with
+`ts_pay_rel R` exposed), `ledger_rpay_ok` (the arm as a pure fact off the
+interp), `ledger_rpay_mint1`, `ledger_rpay_drop`, `ledger_rpay_mint` (n
+cells at a shared latest stamp → floor = that stamp, empty history),
+`ledger_store_rel_ok` (agent-generic, WORD-level: drop the arms with the
+old log's `rel_ok1` facts in hand, store through `ledger_store_ok`,
+re-mint at the appended log with `rel_ok1_app_store` -- so no map-level
+gate clone), and `ledger_read_rel_ok` (elements + `view_lb K` +
+`ledger_vis h K lo` → `rel_read`'s conclusion at every `tv ≥ gtv`).
+
+### §2, CORRECTED by measurement (2026-08-29): where the read's receipt comes from
+
+The machine advances the view at a plain RAM read (`RiscvLang.v:791`:
+"advance the view nondeterministically (the drain), then read every byte
+latest-visible at the new view"), and the lifting rule ALREADY hands the
+chosen view out: `HartEvents.swp_hart_ram_read_plain_ex`'s continuation is
+`∀ tvn w, ⌜tv ≤ tvn⌝ -∗ ⌜tvn ≤ |log|⌝ -∗ ⌜tso_read_bytes … tvn … w⌝ -∗ ⌜P w⌝
+-∗ view_lb … tvn -∗ swp …`.  What drops it is the ENGINE NODE
+(`HartSMem.Mobl_ram_exv` / `swp_read_ram_node{1,2,4,8}_exv`, tactic
+`node_read_exv`: `iIntros (tn bs) "_ _ _ % _"`), whose post keeps only
+`⌜P bytes⌝ ∗ R`.  So §2's "clone the leaf and mint `hart_view_lb (V h)`
+in the AU close" was the wrong place: `V h` is the PRE-advance view and
+the leaf never sees `tvn`.  The right shape, no machine or rule change:
+
+  * `HartSMem.Mobl_ram_exvv width pa (R : nat → bytes → iProp)`: obligation
+    `… ={⊤,∅}=∗ ⌜∀ tv' ≥ tv ≤ |log|, ∃ bytes, tso_read_bytes … tv' … bytes⌝
+    ∗ ▷ (|={∅,⊤}=> mstate ∗ tso_interp ∗ ∀ tvn bytes, ⌜tv ≤ tvn⌝ -∗ ⌜tvn ≤ |log|⌝
+    -∗ ⌜tso_read_bytes … tvn … bytes⌝ -∗ view_lb … tvn -∗ R tvn bytes)`, node
+    post `fun r => ∃ bytes tvn, ⌜r = (bytes, default_meta)⌝ ∗ R tvn bytes`;
+    proved through `swp_hart_ram_read_plain_ex` with `P := λ _, True`
+    (totality is the image's, `ledger_read_any_ok`) by a `node_read_exvv`
+    that KEEPS `tn`, the read fact and the receipt instead of discarding
+    them; four widths + the `_w` wrapper, ~70 lines.
+  * `WpSconfMem.wp_load_s_sconf_au_rel`, cloned from `_au_exv` on that
+    node: the client's obligation is the PURE
+    `⌜∀ tvr ≥ V, ∀ v, tso_read_bytes … tvr … v → Q v tvr⌝` (proved from
+    `ledger_read_rel_ok`: at any `tv ≥ gtv` the settled `T ≤ tv` and the
+    word is `T`'s), and the continuation receives
+    `∃ V0, hart_view_lb V0 ∗ ⌜Q v V0⌝ ∗ T`.  The value/position link needs
+    no injectivity argument at the leaf: `Q v V0` names the settled
+    position directly.
+  * Remaining measurement before the clone: whether the S-mode execute
+    wrapper the leaf applies (`swp_execute_LOAD_ram_Sw_ex`) is generic in
+    the node's post (it takes `(fun bs => ⌜P bs⌝ ∗ Rex)` and the node) --
+    if its post is any `bytes → iProp`, the `∃ tvn` rides inside it.
