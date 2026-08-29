@@ -725,6 +725,96 @@ durable part.
   (needs S1-S4) → S6 the deletions.  `UexecSlot.v` KEEPS its §0-§2
   vocabulary (every tier requires it); only §3-§4 are deleted.
 
+## §6 ECHO — the next verified program (opened 2026-08-29, plan)
+
+`sync` was chosen first because it is `sync(); exit(0);`.  `echo` is the
+real test of the contract, and the owner named the two interesting parts.
+Its source (`xv6-riscv/user/echo.c`):
+
+```c
+for (i = 1; i < argc; i++) {
+  write(1, argv[i], strlen(argv[i]));
+  if (i + 1 < argc) write(1, " ", 1); else write(1, "\n", 1);
+}
+exit(0);
+```
+
+**A HARD PREREQUISITE, established before any design: the Uk engine has no
+LOAD and no BRANCH leaf.**  `ls iris/Uk*.v` is `UkStep`, `UkLeaf`,
+`UkStore`, `UkSync` — `uk-engine.md` says loads and branches were "NOT
+ported (sync needs neither)".  echo does nothing BUT load (argv, the
+strings) and branch (two loops).  So `UkLoad.v` and `UkBranch.v` come
+first.  The note prices the port as the same mechanical rewrite the other
+leaves took, with the load's table premise becoming "the page is in π"
+via `perm_of_R`; the store leaf's transparent FAULT arm is the shape to
+copy for the load's (`perm_of_unmapped_lt` and `uk_fault_pair` at
+`Load Data` / `E_Load_Page_Fault` are already the pieces, per uk-engine's
+closing paragraph).
+
+**THE ARGV PROPERTIES ARE GENERIC, AND THAT IS THE POINT** (owner's
+framing).  What echo needs of the stack is not echo-specific: a0 = argc,
+a1 = the argv base, the array holds `argc` pointers followed by a NULL,
+each pointer addresses a NUL-TERMINATED string, and all of it lies in
+readable pages of the key's permission map.  Define that ONCE — a
+predicate on the KEY, in the same discipline that made `sync`'s
+constructor work (`sync_uexec_slot` takes four decidable facts about the
+key and nothing else) — and hand it to ANY user program at entry.
+Working name `uargv_ok W`.
+**AND NOTE WHERE THAT LANDS**: the thing that must ESTABLISH it is the
+exec-success mint, i.e. §3 item 5's exec-site forcing function, which is
+blocked on exec's post being unable to say what image it loaded.  So the
+useful increment there is not "exec says which image" in the abstract —
+it is "exec says the argv region is well-formed", which is precisely what
+programs consume.  Echo and the exec forcing function are the same seam,
+approached from the two ends.
+
+**WHY NUL-TERMINATION IS LOAD-BEARING AND NOT TIDINESS.**  `strlen` reads
+until it finds a NUL.  Without one in mapped memory the loop reads off
+the end, takes a load page fault, and — because the fault arm is
+TRANSPARENT (the key does not move) — resumes at the same state and loops
+forever.  That is SAFE (a diverging program has a WP) but useless, and it
+is also why the load leaf's fault arm must exist before echo can be
+stated at all.
+
+**WRITE, and why it may be easier than it looks.**  `write` is a
+returning syscall, so `uexec_ret`'s ecall arm applies and echo must
+supply `∀ r M' π', ⌜usys_mem_ok n tf r M π M' π'⌝ -∗ uslot (bump W r M' π')`
+— i.e. be safe for EVERY return value, including `-1` and a short write.
+Echo DISCARDS write's return value (see the source: no branch on it), so
+that ∀ costs it nothing.  And `write` is a writer-FROM-user-memory, so
+its row should be same-image with the permission map unmoved — meaning
+the returned key differs from the entry key only by the a0 bump and
+`epc+4`.  If that holds, echo's loop is a Löb over a key that moves only
+in the register file.  VERIFY against `UsysMemOk`'s row for write's number
+before relying on it.
+
+**FUNCTIONAL CONTENT IS A SEPARATE, LATER QUESTION.**  "echo is safe" is
+what the contract as it stands can express.  "the bytes echo passes to
+`write` are its argv strings, and they reach the console" needs the
+`Φ`-refinement the design note parks under the same ∀
+(`design/user-wp-slot.md`, the deposit-covering discussion: a later
+refinement adds an iProp premise under the same universal WITHOUT
+changing the shape).  Do not conflate the two: get safety first, and keep
+the refinement's door open by not special-casing the ∀.
+
+**Plan, in dependency order.**  (1) Port `UkLoad.v` and `UkBranch.v` —
+mechanical, and the prerequisite for everything else.  (2) Define
+`uargv_ok` on the key, with decidability where it is cheap, and prove the
+readers echo needs (argv[i] is a pointer into a readable nul-terminated
+run).  (3) Port/re-cut echo's own code facts: `UCodeEcho.v` (1165 lines)
+and `USpecEcho.v` (182) exist on the OLD capability engine — survey first
+whether they port like `UkSync` or want re-cutting.  (4) `strlen` and the
+loop as Löb'd stubs on the new engine.  (5) echo's slot constructor, the
+analogue of `USyncKernel.sync_uexec_slot`, taking `uargv_ok` plus echo's
+text/stack facts about the key.  (6) Only then: the exec seam that
+supplies `uargv_ok` at the mint.
+
+A read-only survey was in flight when this was written (the existing echo
+proof's shape and assumptions; what `kexec_ok` actually pins about the
+argv stack today; the write row; whether any existing U-mode proof calls
+a RETURNING syscall and continues — `sync` does not).  Its findings
+belong here.
+
 ## §5 Session-local artifacts (durable parts lifted into this file)
 
 The per-lane sweep log (tooling notes, per-file decisions, the raw
