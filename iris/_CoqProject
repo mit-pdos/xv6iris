@@ -1428,3 +1428,8 @@ SpecCreateAUF.v
 ProofCreateAUF.v
 LinkCreateAUF.v
 SpecCreateAUFOpen.v
+FsAbsWriteFire.v
+SpecSysWriteAUEra.v
+SpecFilewriteAU.v
+ProofSysWriteAU.v
+ProofSysWriteAUStable.v
