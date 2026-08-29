@@ -23,7 +23,7 @@ measured record; `main-tso-readiness.md` is the separate main-side handoff.
    temp-index recipe; `ZZchain.sh <File>…` at the tree root rechecks files
    locally in order against pulled `.vo`).
    Build driver: `ZZbuild.sh` at the tree root (the intr lane's, log names
-   suffixed `.aux` -- see the gotcha).  **Last certified: r39, 1179/1297, RED 8, zero admits (A6.121).**
+   suffixed `.aux` -- see the gotcha).  **Last certified: r40, 1179/1297, RED 8, zero admits (A6.123: the avail side's three bricks landed; the `VirtioProto` lease split is the next unit, sized in A6.123 §3).**
 2. **KPT tree**: `/shared/xv6iris-3-kpttree` — FROZEN mid-K15d, unchanged
    this session EXCEPT one mirrored hunk: `iris/SmodeCorePt.v`'s
    `word_pointsto_wpay_mint_c` gained the trailing own-message fragment

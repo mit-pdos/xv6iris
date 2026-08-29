@@ -15390,3 +15390,59 @@ over and needs nothing new.  Surface §3 for a ruling as the instrument
 question it is; do not spend rounds trying to bend the pin into it.  The
 lease special-casing §2 needs (one pinned range beside `dma_own`'s plain
 map) is the same special-casing §3 will need, so §2 is not throwaway.
+
+---
+
+## A6.123 — the avail side's three bricks land: the exact read on the two-armed floor, forget-with-floor, and `lk_floor` transports
+
+*(Amendment A6.123, lock lane.  Opening A6.122 §2.)*
+
+### §1. THE NUMBER
+
+**r40: 1179 `.vo` of 1297, RED 8 — unchanged, 1105 files recompiled**
+(`TsoCtx` and `WpLock` both moved), sentinel-backed (`MAKEEXIT=2`).  Red-list
+delta 0; zero admits in the three touched files.
+
+### §2. WHAT LANDED (all additive; one arm simplified)
+
+* **`TsoCtx.ledger_read_at_vis_ok`** — `ledger_read_at_ok` with the premise
+  `view_lb F ∗ ledger_vis h F t` in place of `t ≤ F`: the exact read that a
+  lock-payload cell's floor discharges on EITHER arm (received: the bound;
+  wrote: store forwarding, through `ledger_vis_visibleb`).  Fourteen lines,
+  the same proof with `visibleb_below` replaced by the two-armed fact.
+* **`TsoCtx.ctx_phys_pointsto_forget_floor`** — a cell leaving the tower for
+  the ledger hands its floor out: clean is `ctx_floor ξ t` (the bound is
+  past the stamp), dirty is the context's own write, whose dirty element —
+  no longer needed by a cell — is PERSISTED into A6.120's witness.  This is
+  what lets the boot's `virtio_disk_init`, which zeroes the queue pages
+  through the tower and forgets them into the DMA lease, hand the lock
+  payload the avail word's floor.  Eleven lines.
+* **`WpLock.lk_floor` loses the `llb` beside its witness** (no consumer read
+  it; a forgotten cell has the witness and no log-length receipt), and
+  **gains `lk_floor_morph : CtxMorph (λ ξ, lk_floor ξ lo)`** — both arms
+  land on the receiver's LEFT arm (`ctx_floor_dom`, `ctx_dom_wrote_floor`),
+  so a payload carrying a floor is transportable with no absorb capability.
+  `ProofInitlock` drops one argument.
+
+### §3. THE UNIT THIS OPENS, SIZED
+
+The avail word leaves `dma_own`'s plain map for its own conjunct of
+`virtio_proto`'s live arm — `∃ t0 t1, ghost_var (dn_avail γ) (1/2) (t0, t1)
+∗ phys_ledger_at a0 b0 t0 ∗ phys_ledger_at a1 b1 t1` (per-byte stamps: the
+boot's memset writes the two bytes at two positions; the publish store
+writes both at one) — with `dma_own (dma ∖ avail_idx_dom c)` beside it and
+the pure `dma` map unchanged, so every `vproto_ok`/`vproto_ctl` fact stands.
+The carve lemmas keep their statements; each of their nine call sites
+(`avail_idx_acc`, `publish_acc`, `used_idx_acc`, `used_peek`, `reclaim_acc`
+×2, `step`, and `dma_agree`'s two users) adds the disjointness of its range
+from the avail word — all already in `vproto_ok` (`vpo_idx_used`,
+`vpo_standing`).  `disk_names` gains `dn_avail` (five constructor sites, four
+of them dummies).  `disk_res` gains, LAST, `∃ t0 t1, ghost_var … (t0, t1) ∗
+lk_floor cur_ctx t0 ∗ lk_floor cur_ctx t1` (transports by `lk_floor_morph`).
+`ProofVirtioDiskRwD`'s two leaves go to the ledger datum forms: the read
+through `wp_load_s_sconf_au_dat` with `lk_floor_vis` and the new gate, the
+publish through `_au_dat` with `ledger_store_ok` + `ctx_wrote_register` +
+`lk_floor_of_wrote`.  `SpecVirtioDiskInit`'s post carries the two floors out
+of the forget.  Files: `VirtioProto`, `DiskPtsto`, `DiskInv`, `DiskBoot`,
+`SpecVirtioDiskInit`, `ProofVirtioDiskInit`, `VirtioDiskRwDefs`,
+`ProofVirtioDiskRwD`, the four `Spec*` dummies.
