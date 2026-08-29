@@ -51,6 +51,19 @@ Require Import SbPark.
    LEAF over [FsDurSnap] -- the WAL's cone gains the snapshot's PREDICATE
    and nothing above it. *)
 Require Import LogSnapLaw.
+(* THE DURABILITY RECEIPT (fs-syscall-specs lane Y, owner-ruled banking).
+   [log_res]'s last non-arm conjunct is the copy the committer leaves for a
+   later reader of the lock -- [FsFlushedCore.flushed], the crash record's
+   own mono-list lower bound with its index named.  The file is a LEAF over
+   [FsCrash] + [FsDurSnap]: [FsCrash]'s cone does not contain this file, and
+   [FsDurSnap] is already in this file's cone through [LogSnapLaw], so the
+   WAL's cone gains the crash record and nothing above it.  (The receipt
+   USED to live in [FsFlushed.v], which sits above the whole proof tree
+   through [FsDurSyscall] -> [SystemAdequacy]; that is why it had to be
+   split.  [FsFlushed.v] re-exports the split-out half, so no importer of it
+   moved.)  [snap_holds] is named QUALIFIED below, [FsImg.SB_BNO]'s way, so
+   that this import adds ONE name to the file's scope and no more. *)
+Require Import FsFlushedCore.
 (* NOTHING IN THE CRASH/LOG LAYER IMPORTS THE PURE WF LAYER any more
    (durable-disk 1d).  [FsImg]/[FsWf]/[FsObj*] were here for row (a) --
    "the logged view is the committed view except at the pending objects" --
@@ -388,8 +401,15 @@ Section LogInv.
      members of [Xv6G.xv6G] and this file sits below the bundle, so every
      consumer that binds [xv6G] resolves them and no contract gains a
      binder; the byte map's own class comes out of [riscvGS]. *)
+  (* [fsCrashG] joins them for the SAME reason, and on the same terms
+     (fs-syscall-specs lane Y): [log_res]'s banked receipt is stated over the
+     crash record's history, so this section has to be able to STATE it.  It
+     too is a member of [Xv6G.xv6G], so every consumer that binds the bundle
+     resolves it and NO contract gains a binder -- [log_ctx]'s and
+     [log_res]'s arities are the ones the ~75 files that thread them
+     already have. *)
   Context `{!riscvGS Σ, !lockG Σ, !diskGhostG Σ, !bioG Σ, !bioslotG Σ, !fsLogG Σ, !logG Σ,
-            !fsLinkG Σ, !fsTopG Σ}.
+            !fsLinkG Σ, !fsTopG Σ, !fsCrashG Σ}.
   (* the ambient generation: [log_ctx] carries this era's SWAP RECEIPT, which
      is what every WAL fupd curries to prove the crash record's arm is its
      own ([FsCrash.fs_arm_acc]).  Implicit, so no spec statement changes. *)
@@ -431,6 +451,83 @@ Section LogInv.
   Proof.
     iIntros "Ha Hl".
     iDestruct (mono_nat_lb_own_valid with "Ha Hl") as %[_ Hle]. done.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (*  THE BANK (fs-syscall-specs lane Y, owner-ruled)                  *)
+  (* ---------------------------------------------------------------- *)
+
+  (* WHAT THE LOG INVARIANT CARRIES FOR A LATER READER.  Read it as: THE
+     BATCH COUNTER STANDS AT [e], AND THE STATE THE LAST WRITE MADE DURABLE
+     IS [D] -- the [b]-th committed state, and a file system.
+
+     WHY IT HAS TO BE BANKED AT ALL.  A receipt is only obtainable where the
+     crash predicate is OPEN, which is a disk write's own fupd and nothing
+     else; sys_sync writes no block, so on its FAST path (nothing
+     outstanding, nothing committing) there is no fupd to run and no receipt
+     to mint.  What there is, is a COPY some earlier writer deposited here.
+     Both conjuncts are landed resources and both are PERSISTENT, so the
+     bank is free to copy out of the invariant and free to leave in it:
+     every opener of the log lock takes one and closes unchanged.
+
+     THEIR JOINT READING -- that [D] is the state as of batch [e] and not
+     some older one -- is established where the two are minted TOGETHER,
+     which is the one place it can be: the commit's re-deposit, which bumps
+     the counter with the commit's own receipt in hand ([ProofEndOp]'s
+     [eo_tail], and [ProofInitlog]'s seal at genesis, where the copy comes
+     off the header CLEAR that recovery ends with).  Nothing weaker would
+     do, and nothing stronger is needed: a consumer never compares [e] with
+     [b], it reads [D]'s rows ([FsFlushed.dur_at]) and orders its receipts by
+     [b] ([FsFlushedCore.flushed_earlier]). *)
+  Definition log_flushed_bank (γ : log_names) (e : nat) : iProp Σ :=
+    (∃ (b : nat) (D : gmap Z (list (bv 8))),
+       log_epoch_lb γ e ∗ flushed b D ∗ ⌜FsDurSnap.snap_holds D⌝)%I.
+
+  Global Instance log_flushed_bank_persistent γ e :
+    Persistent (log_flushed_bank γ e).
+  Proof. rewrite /log_flushed_bank. apply _. Qed.
+
+  (* THE DEPOSIT SIDE, as one step: the copy a WAL write left
+     ([FsCrash.fs_bank], through [FsFlushedCore.flushed_of_bank]) plus the
+     counter's own auth, at whatever value the depositing proof has just put
+     it.  This is the WHOLE of what a re-depositing proof has to do, and the
+     auth comes straight back. *)
+  Lemma log_flushed_bank_mk (γ : log_names) (E : nat) :
+    mono_nat_auth_own (ln_ep γ) 1 E -∗ FsCrash.fs_bank -∗
+    mono_nat_auth_own (ln_ep γ) 1 E ∗ log_flushed_bank γ E.
+  Proof.
+    iIntros "Ha Hbk".
+    iDestruct (log_epoch_lb_get with "Ha") as "[Ha #Hlb]".
+    iDestruct (flushed_of_bank with "Hbk") as (b D) "[#Hf %Hh]".
+    iFrame "Ha". rewrite /log_flushed_bank. iExists b, D.
+    iSplitR; [iExact "Hlb" |]. iSplitR; [iExact "Hf" | by iPureIntro].
+  Qed.
+
+  (* ...and BACK to the raw copy, which is what re-banking at a MOVED
+     counter needs.  The one caller is [end_op]'s empty-log path: the guard
+     found [lh.n = 0], so no commit body ran and NO disk write happened --
+     and yet the counter still gets bumped (the C code increments
+     [log.ncommit] on that path too).  Re-indexing the copy the invariant
+     already held is then not a weakening but the literal truth: nothing was
+     made durable because nothing needed to be. *)
+  Lemma log_flushed_bank_recycle (γ : log_names) (e : nat) :
+    log_flushed_bank γ e -∗ FsCrash.fs_bank.
+  Proof.
+    rewrite /log_flushed_bank /FsCrash.fs_bank. iIntros "H".
+    iDestruct "H" as (b D) "(_ & Hf & %Hh)".
+    iExists D. iSplitL; [by iApply flushed_receipt_any | by iPureIntro].
+  Qed.
+
+  (* ...and the READ side's one step: a bank at [E] answers a client whose
+     witness was taken at any earlier [e].  [log_epoch_lb] is monotone, so
+     re-indexing the copy is free. *)
+  Lemma log_flushed_bank_le (γ : log_names) (E e : nat) :
+    (e <= E)%nat -> log_flushed_bank γ E -∗ log_flushed_bank γ e.
+  Proof.
+    intros Hle. rewrite /log_flushed_bank. iIntros "H".
+    iDestruct "H" as (b D) "(#Hlb & #Hf & %Hh)".
+    iExists b, D. iSplitR; [| iSplitR; [iExact "Hf" | by iPureIntro]].
+    rewrite /log_epoch_lb. iApply (mono_nat_lb_own_le e with "Hlb"). exact Hle.
   Qed.
 
   (* one ledger entry with remaining budget u AND the blocks this op has
@@ -1233,6 +1330,26 @@ Section LogInv.
           all the commit reads ([log_tx_empty_of_ops]). *)
        ghost_map_auth (ln_tx γ) 1 T ∗
        ⌜size T = size om⌝ ∗
+       (* THE BANK (fs-syscall-specs lane Y, owner-ruled).  The durability
+          receipt the last WAL write left behind, at the counter's current
+          value -- see [log_flushed_bank] above for what it says and why a
+          reader that writes no block has no other way to get one.
+
+          POSITION: LAST among the conjuncts that are not the committing
+          arm, which is the same cheapest slot the transaction authority
+          above documents and for the same reason -- the arm is what every
+          opener destructures FURTHER, so a conjunct placed after it would
+          cost each of them a restructuring rather than one name in a
+          pattern.  Being persistent it also costs the openers that stop
+          early nothing at all: [ProofSysSync]'s three cell-accessors end
+          their pattern at [%Hcap] and close with [iExact "Hrest"], so the
+          bank rides inside [Hrest] and not one of them moves.
+
+          IT IS NEVER EMPTY, not even at genesis: [ProofInitlog] takes its
+          copy off the header CLEAR that ends recovery -- the one write
+          [initlog] makes before it seals this lock -- so sys_sync has an
+          answer from the first instant the log exists. *)
+       log_flushed_bank γ E ∗
        (if cmt then emp
         else ∃ (n : nat) (LB : gset Z),
           ⌜(n + op_sum om <= LOGBLOCKS)%nat⌝ ∗
@@ -1250,6 +1367,53 @@ Section LogInv.
              can never be used, because using one needs [e = E]. *)
           ⌜forall b : Z, (E, b) ∈ X -> b ∈ LB⌝ ∗
           log_state bn γfs cov logstart n LB (op_pending om)))%I.
+
+  (* ---------------------------------------------------------------- *)
+  (*  READING THE BANK (fs-syscall-specs lane Y -- THE PRODUCER)       *)
+  (* ---------------------------------------------------------------- *)
+
+  (* THE WHOLE OF WHAT SYS_SYNC DOES, in the logic.  With the "log" spinlock
+     held and a client's own invocation-time batch witness in hand, the
+     lock's resource yields a durability receipt standing at a batch AT OR
+     PAST the client's -- and closes UNCHANGED, because everything handed
+     out is persistent.  No fupd, no disk write, no operation token: this is
+     the fast path in one lemma, and the slow path reaches it too (the wait
+     loop only re-enters the critical section at a later counter value, and
+     this lemma reads whatever value it finds).
+
+     THE ORDER PREMISE IS THE ONLY THING THE CLIENT SUPPLIES, and it costs
+     nothing: [log_epoch_lb γ 0] is free from nothing
+     ([SpecSysSyncFlush.sync_witness_0]) and a client that has run
+     transactions already holds a sharper one out of [log_opSe]. *)
+  Lemma log_res_flushed (γ : log_names) (bn : bio_names) (γfs : fs_names)
+      (cov : gset Z) (logstart : Z) (e : nat) :
+    log_epoch_lb γ e -∗ log_res γ bn γfs cov logstart -∗
+      (∃ E : nat, ⌜(e <= E)%nat⌝ ∗ log_flushed_bank γ E)
+      ∗ log_res γ bn γfs cov logstart.
+  Proof.
+    rewrite /log_res. iIntros "#Hlb H".
+    iDestruct "H" as (out cmt nc om E X T)
+      "(Hout & Hcmt & Hnc & Hauth & %Hsz & %Hbnd & %Hout3 & %Hcmt0 & Hepa &
+        %Hepos & Hxa & %Hlive & %Hcap & Htxa & %Hszt & #Hbank & Hrest)".
+    iDestruct (log_epoch_lb_le with "Hepa Hlb") as %Hle.
+    iSplitR.
+    { iExists E. iSplitR; [by iPureIntro | iExact "Hbank"]. }
+    iExists out, cmt, nc, om, E, X, T.
+    iFrame "Hout Hcmt Hnc Hauth".
+    iSplitR; [iPureIntro; exact Hsz|].
+    iSplitR; [iPureIntro; exact Hbnd|].
+    iSplitR; [iPureIntro; exact Hout3|].
+    iSplitR; [iPureIntro; exact Hcmt0|].
+    iFrame "Hepa".
+    iSplitR; [iPureIntro; exact Hepos|].
+    iFrame "Hxa".
+    iSplitR; [iPureIntro; exact Hlive|].
+    iSplitR; [iPureIntro; exact Hcap|].
+    iFrame "Htxa".
+    iSplitR; [iPureIntro; exact Hszt|].
+    iSplitR; [iExact "Hbank"|].
+    iExact "Hrest".
+  Qed.
 
   (* the persistent bundle every log function shares: the sealed lock and
      the two cells initlog wrote once and froze.

@@ -1337,6 +1337,10 @@ FsCollect.v
 FsCollectImg.v
 FsCollectAll.v
 LogSnapLaw.v
+# the banked receipt itself: a leaf over FsCrash + FsDurSnap, listed here
+# beside the WAL's other parked laws because LogInv requires it (the
+# owner-ruled banking, fs-syscall-specs lane Y).
+FsFlushedCore.v
 FsDurSyscall.v
 FsAbs.v
 FsAbsSeam.v
@@ -1377,11 +1381,15 @@ FsAbsStart.v
 SpecSysDupAU.v
 SpecSysWriteConsAU.v
 
-# fs-syscall-specs lane Y: sys_sync's durability receipt.  Both are LEAVES.
-# FsFlushed builds [flushed b D] out of the crash record's mono-list history
-# (no new ghost, no arity moved) and composes it with FsDurSyscall's per-node
-# certificates; SpecSysSyncFlush is the R10 parallel contract stated beside
-# the landed empty one, which does not move.  Nothing requires either.
+# fs-syscall-specs lane Y: sys_sync's durability receipt.
+# FsFlushedCore builds [flushed b D] out of the crash record's mono-list
+# history (no new ghost, no arity moved) and is a LEAF over FsCrash +
+# FsDurSnap -- deliberately BELOW LogInv, which banks it as a conjunct of
+# log_res (the owner-ruled banking; see that file's header for why the
+# receipt could not stay above the WAL).  FsFlushed re-exports it and adds
+# the per-node composition over FsDurSyscall's certificates;
+# SpecSysSyncFlush is the R10 parallel contract stated beside the landed
+# empty one, which does not move.  Its row is listed with the WAL's files.
 FsFlushed.v
 SpecSysSyncFlush.v
 FsAbsOpenFire.v

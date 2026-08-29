@@ -530,6 +530,25 @@ Lemma snap_ok_intro (S : fs_state_rec) (D : gmap Z (list (bv 8))) :
   snap_bytes S D -> snap_local S -> snap_ok S D.
 Proof. intros Hb Hl. exact (conj Hb Hl). Qed.
 
+(* WHAT A COMMIT LEAVES BEHIND, as one word: the committed map really is a
+   file system, with the state that says so left nameless.
+
+   IT LIVES HERE, one line under [snap_ok], AND NOT IN [FsDurSyscall] where
+   it was first written (fs-syscall-specs lane Y's banking).  The reason is
+   a dependency one and it is worth recording: the receipt banked in
+   [LogInv.log_res] carries this fact, [LogInv] sits BELOW [FsCrash], and
+   [FsDurSyscall] sits above the whole proof tree ([SystemAdequacy] is in
+   its cone) -- so the word the bank is stated at has to be readable from
+   under the WAL.  Nothing else moved with it: the four files that name
+   [snap_holds] all have [FsDurSnap] in scope, and [FsDurSyscall] re-exports
+   this file so its own importers see the name exactly where they did. *)
+Definition snap_holds (D : gmap Z (list (bv 8))) : Prop :=
+  exists S : fs_state_rec, snap_ok S D.
+
+Lemma snap_holds_intro (S : fs_state_rec) (D : gmap Z (list (bv 8))) :
+  snap_ok S D -> snap_holds D.
+Proof. intros H. exists S. exact H. Qed.
+
 (* ===================================================================== *)
 (*  1c'. THE GEOMETRY -- THE ONE HALF OF THE TIE NO RESOURCE PINS         *)
 (*       (durable-disk lane H3)                                           *)

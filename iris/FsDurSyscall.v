@@ -79,7 +79,14 @@ Require Import InodeDefs.       (* [file_byte]                            *)
 Require Import DirView.         (* [dir_first], [dir_match], [dir_inum]   *)
 Require Import FsTree.           (* [fname], [dir_view], [file_bytes]      *)
 Require Import FsImg.           (* [SB_BNO], [fs_parse_sb], [FS_MAXFILE]  *)
-Require Import FsDurSnap.       (* [snap_ok] and its clauses; re-exports
+(* EXPORT, not Import (fs-syscall-specs lane Y's banking).  [snap_holds] --
+   section 1's first word below -- moved DOWN to [FsDurSnap], because the
+   durability receipt banked in [LogInv.log_res] is stated with it and
+   [LogInv] sits far below this file.  Exporting keeps every importer of
+   THIS file seeing the name exactly where it saw it before, which is why
+   the move cost nothing above. *)
+Require Export FsDurSnap.       (* [snap_ok], [snap_holds] and its clauses;
+                                   re-exports
                                    [FsState] -> [FsStateInode] -> [FsNode] *)
 
 Local Open Scope Z_scope.
@@ -90,9 +97,13 @@ Local Open Scope Z_scope.
 
 (* WHAT A COMMIT LEAVES BEHIND, as one word.  It is exactly the last
    conjunct of [SystemAdequacy.fs_boot_pure] and exactly what
-   [FsCrash.fs_commit_receipt] concludes; section 4 has both readings. *)
-Definition snap_holds (D : gmap Z (list (bv 8))) : Prop :=
-  exists S : fs_state_rec, snap_ok S D.
+   [FsCrash.fs_commit_receipt] concludes; section 4 has both readings.
+
+   [snap_holds] NOW LIVES IN [FsDurSnap], one line under [snap_ok], and
+   arrives here through the [Require Export] above -- so every reading in
+   this file and every importer of it is unchanged.  It had to move because
+   the banked receipt ([LogInv.log_flushed_bank]) carries it and [LogInv]
+   sits below the crash layer, while this file sits above the whole tree. *)
 
 (* THE PER-OBJECT CERTIFICATES.  Each says what EVERY snapshot state over
    the committed map says -- which, by section 2's determinism, is what THE
