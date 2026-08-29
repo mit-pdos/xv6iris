@@ -429,8 +429,11 @@ things, and the answer differs:
   header, difference (2): the pin refutes the mkdir half and the found-arm
   type inspection, −3,900 lines).  So the arm costs a general-`ty` or
   T_FILE-twin `ProofCreateAU` (7,121 lines) before any sys_open work
-  starts; size it as a lane of its own.  When it lands, delete
-  `SpecSysOpenAUPlain.v` and seal `SYSOPEN_AU` whole.
+  starts; size it as a lane of its own.  **DONE 2026-08-29 — that lane is
+  W-F below (`SpecCreateAUF` / `ProofCreateAUF` / `LinkCreateAUF`, the
+  twin), and the bridge into these arms is `SpecCreateAUFOpen`.**  What is
+  left on the O_CREATE arm is sys_open's own walk at that contract.  When
+  it lands, delete `SpecSysOpenAUPlain.v` and seal `SYSOPEN_AU` whole.
   REMAINING: unlink AU (wants the npar walk's contract shape), then
   read/close/fstat/chdir, mechanical.  NOTE (2026-08-27): the fd-state ghost
   landed upstream (`FdSlots.fd_frags` beside `ut_own`; `fdstate` =
@@ -439,6 +442,64 @@ things, and the answer differs:
   `file_ref`'s index) — the descriptor arms of these specs speak THAT
   carrier and can tie fd → inum → the §2 abstract node directly; the
   campaign does not mint its own fd ghost.
+- [x] **W-F — the T_FILE CREATE CARRY (the O_CREATE arm's prerequisite).**
+  DONE 2026-08-29 (Opus lane).  Shape chosen: **the T_FILE TWIN**, not a
+  general-`ty` form — the general form's extra cost is not a statement
+  change (`SpecSysMknodAU.delta_create` is already type-parameterized and
+  `acre_bump` already handles the dir case) but the ~3,900 lines of mkdir
+  walk `ProofCreateAU` deletes, plus that arm's two extra abstract
+  obligations (the parent's nlink bump and the "."/".." content that makes
+  the child's row an `ADir`), and no consumer on this list wants them.
+  FIVE NEW FILES, all EC2-green, zero `Admitted`, R10 clean (`SpecCreate`,
+  `SpecCreateAU`, `SpecSysOpenAU`, `ProofCreate`, `ProofCreateAU`,
+  `FsAbsMknodFire` all byte-identical; only `iris/_CoqProject` moved):
+  - `FsAbsCreateFire.v` (245 ln, 2.9 s) — **FIRE 2 at a NON-DIRECTORY
+    child.**  `mkf_acre_fire` is device-pinned only through
+    `SpecSysMknodAU.delta_create_dev`, whose proof uses nothing about a
+    device but that it is not an `ADir` (that is what zeroes `acre_bump`
+    and what `cre_pre_ne` needs).  So: `caf_delta_create_nondir`,
+    `caf_acre_fire` (any non-`ADir` `c`), `caf_acre_fire_file`, and the
+    row reading `caf_child_file` (`create_made T_FILE _ _` reads as
+    `AFile []` at nlink 1 — size zero, so `file_bytes _ 0 = []`).
+  - `SpecCreateAUF.v` (409 ln) — `wp_create_auf_body`: `SpecCreateAU`'s
+    body at `ty = T_FILE`, the commit at `AFile []`, and the success
+    payout **keyed on `made`** (`cauf_ok`), because `ok = true` no longer
+    forces it.  `cauf_fail` is `cau_fail` at the file child.  Projections
+    `cauf_ok_fresh` / `cauf_ok_exists` for the consumer.
+  - `ProofCreateAUF.v` (7,398 ln, 1 m 50 s) — `ProofCreateAU` with ARM
+    F-OK restored verbatim from `ProofCreate` (+0x5c..+0x70, the
+    `lhu`/`addiw`/`slli`/`srli`/`bltu` type span and F-BAD's second entry,
+    ~250 ln) and the `ty <> T_FILE` bullet refuted instead.  The mkdir
+    refutation at +0xca is UNCHANGED (`T_FILE <> T_DIR`).  The one
+    structural change beyond the arm: FIRE 1's receipt is no longer folded
+    into `cau_fail` one line after the fire — it now has TWO possible
+    consumers (F-BAD folds it into `cauf_fail`, F-OK hands it out as
+    `cauf_ok`'s `made = false` arm), so `HFex`/`HPpar`/`Hacre` ride down
+    the +0x4a..+0x6c walk and are assembled at each leaf.
+  - `LinkCreateAUF.v` — the same seven real callee proofs as
+    `LinkCreateAU`.  `Print Assumptions CreateAUF.wp_create_auf` = **3**:
+    the two platform axioms (`resv_matches`, `resv_is_valid`) + funext.
+    Identical to `LinkCreateAU`'s cone.
+  - `SpecCreateAUFOpen.v` (185 ln) — the bridge INTO `SpecSysOpenAU`
+    (which does not move).  `cauf_fail_to_open` is the WHOLE failure fold
+    (`cauf_fail`'s three alternatives are `open_post_fail_create`'s inner
+    three arm for arm; arm (a) is unreachable from a create that returned
+    0, by construction).  The success side is a FRAMING, not a fold —
+    `open_post_ok_create`'s two disjuncts each end in `open_fd_ok`, which
+    create never sees — so `cauf_ok_shape` records the correspondence
+    over the parts create DOES own.
+  WHAT IS LEFT ON THE O_CREATE ARM: sys_open's own walk of
+  `create(path, T_FILE, 0, 0)` at this contract, its terminal
+  `opf_open_fire` on the returned locked child (whose `AFile`/`ADev` split
+  is paid by this post's `di_type dn = T_FILE \/ di_type dn = T_DEVICE`
+  through `opf_era_file_row` / `opf_era_dev_row`), and the
+  `delta_trunc_nil` refund on the FRESH arm.  The carry itself is done.
+  LATER CONSOLIDATION, recorded so it is not rediscovered: the three
+  create walks (`ProofCreate`, `ProofCreateAU`, `ProofCreateAUF`) collapse
+  into ONE non-directory-generic AU walk (`ty <> T_DIR`, both sides of the
+  `bne s2,2` proven, the child's row a premise `abs_of (era_node
+  (create_made ty mj mn) _ _) = MkAnode c 1`), which `caf_acre_fire`
+  already supports.  That is a refactor, not new mathematics.
 - [x] **P — the /init pin port (after D; independent of S0).**  DONE
   2026-08-28 (Opus lane, `iris/FsInitPin.v`, 505 lines, EC2-green in
   **5.5 s**, zero `Admitted`, and `Print Assumptions` on all three
