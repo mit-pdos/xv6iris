@@ -620,17 +620,36 @@ durable part.
   `tf_resume_gpr0` (a7/a0/a1/x0 — only the sp one exists);
   **K7** nothing states `uvmcopy` preserves flags leaf-for-leaf (not
   needed at J, needed by a verified fork).
-- **(K8) THE GATING UNKNOWN**: no existing caller frames a LINEAR resource
-  across `wp_uservec_pt`'s `wp_next` park crossing.  R-a rests entirely on
-  it.  Stage S0 is a throwaway probe that carries one dummy linear
-  hypothesis across and re-closes the round; nothing else starts until it
-  answers.
+- **(K8) ANSWERED YES, 2026-08-29 — THE PARK CROSSING CARRIES A LINEAR
+  RESOURCE.**  S0's probe threaded an abstract `(Q : iProp Σ)` through
+  `stvec_handler_loop`'s Löb hypothesis, across `wp_uservec_pt` and into
+  the round's tail; it compiled with the whole downstream cone through
+  `SystemAdequacy`.  The reason is structural and worth keeping: NOTHING
+  IS PERSISTENT ON THE CROSSING — `WpNext.wp_next` is a plain
+  `∀ CID, ⌜…⌝ -∗ K CID` and `wp_uservec_pt_body`'s last premise is a bare
+  (non-persistent) wand, so the loop's remaining spatial context simply
+  travels into the continuation.  **R-a therefore stands**: the loop
+  frames `uexec_ret` across the round, the residue keeps NO slot
+  conjunct, and no one-shot channel is needed.  The probe was reverted;
+  its diff is a session artifact.
 - The mapped/lazy seam (§4b) is CONFIRMED and CORRECTED: the `ptm` twin is
   needed in BOTH directions (the entry image matters too — `usys_mem_ok`'s
   left image is the entry one, and `ut_res_pt_close` re-parks at `∃ Mz`),
   and `user_trap_frame_at` must gain a `user_ptm_inv` variant so the entry
   frame names its image.  Then `uv_round` upgrades from `uround_vis_ok` to
   the full `uround_ok`.
+- **LANDED so far**: S0 (the probe, above), S1 (`UexecApply.v` — the key
+  congruences `uslot_key_cong`/`uexec_ret_key_cong`/`uexec_ret_run`,
+  `ret_pc_add4`, the four `tf_resume_gpr0` peels, `usz_ok_of_maxsz`, and
+  `trapped_machine`'s length conjunct), S2 (the exit escape).  Three
+  tactic findings from S1 worth reusing: ssreflect's `rewrite` (pulled in
+  by the proofmode) rejects the `rewrite X by tac` and `rewrite X, Y`
+  spellings the `AlignBits` scripts use — pass fully-applied lemma terms,
+  space-separated; `lia` will not find the witness that `2j` and `2j+r`
+  (r<2) round down to the same `j`; and a `⊣⊢`/`⊢` statement about a
+  constant whose arguments do not mention Σ (e.g. `uslot W`) needs an
+  explicit `: iProp Σ` ascription outside that constant's own section, or
+  `bi_car ?b` cannot be unified before instance resolution runs.
 - Staging: S0 probe (gating) → S1 vocabulary / S2 exit escape / S4 park+
   kfork (mutually independent) → S3 lazy seam (needs S1) → S5 the loop
   (needs S1-S4) → S6 the deletions.  `UexecSlot.v` KEEPS its §0-§2
