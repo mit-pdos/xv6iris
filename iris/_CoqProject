@@ -1477,3 +1477,10 @@ ProofConsolewriteLoc.v
 LinkConsolewriteLoc.v
 SpecFilewriteCons.v
 ProofSysWriteConsAU.v
+
+# INIT STAGE 1 (bare tier, echo/sync mold): init.c on the Uk engine --
+# start + main prologue + the console preamble with BOTH arms of the
+# open(...) < 0 test, up to the restart loop head at 0x32, which the two
+# theorems take as a hypothesis.  The header records the three lane
+# findings (fork/exec rows; the unbounded-loop discipline; wait s window row).
+UkInit.v
