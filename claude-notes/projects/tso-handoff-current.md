@@ -83,13 +83,14 @@ lock_word_amo_keep WRITTEN (the failing-branch preservation gate,
 Sg := fun a => lkw_set (tso_pa_off ea a)); the sweep's ONE casualty
 fixed (PipeInvDefs — the only file that unfolded locked
 definitionally; everything opaque untouched — §0.34′'s "opaque to
-the callers" verified by measurement).  REMAINING (wiring only, bail
-condition never triggered): (1) the branch-before-store restructure
-in the AMO write node (~WpSconfLock:2102) — branch on Hbr BEFORE the
-store: success = plain→store→mint-pin (landed), failing =
-pin→store→pin-at-SAME-B via lock_word_amo_keep (preserve at the
-ORIGINAL B or lock_pos_agree breaks); (2) WpLockAt recheck;
-(3) sentinel round + A6.119.  NOTE the pinned-window machinery was
+the callers" verified by measurement).  The branch-before-store restructure LANDED (both arms close at their
+own (v,st,B); rget=1 premise + Hzeroone in).  REMAINING: tactic-level
+cleanup in lock_word_amo_mint/_keep's TAILS only — framing the pin's
+alignment conjunct against the exported floor; the two tails are
+textually similar, so do them as ONE pass with both in view (the
+lane's own diagnosis after mis-targeting one for the other).  Then
+WpLockAt recheck, sentinel, A6.119.  No design, no missing
+instrument, no unsupplied premise.  NOTE the pinned-window machinery was
 built speculatively for the PT tier and the lock word is its FIRST
 client — the tail is discovery-shaped; expect unsupplied premises,
 not missing instruments.  Then (5) the
