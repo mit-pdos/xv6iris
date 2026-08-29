@@ -16000,3 +16000,93 @@ rather than an Ltac); `TsoGhost.view_lb` must be spelled qualified in
 Sized: VirtioProto ~400 lines (three holes, the history, the step's two
 appends), WpUart ~60, DiskInv ~30, ProofVirtioDiskIntr ~300, RwF ~60,
 TsoCtx ~15.  One full session; every brick it needs exists at r50.
+
+### §6. THE VIRTIO SIDE, DESIGN SETTLED BY MEASUREMENT (2026-08-29, in flight)
+
+Seven facts measured after §5, each of which changed the plan; the shape
+below is what is being built (TsoMemPa/TsoCtx parts compiled locally first,
+then VirtioProto/WpUart/DiskInv/Intr/RwF).
+
+1. **ONE message, not two.** The machine's disk step appends exactly
+   `PWMsg w disk_agent` (`RiscvLang` disk arm; `WpUart` ~1020: `Hlog`), so
+   §5's "split the completion" would change the operational semantics.  Not
+   done.  Instead the release arm tolerates a message WIDER than its window
+   (`rel_ok1` (1)/(1b) only ask that a message touching a window byte write
+   the whole window), and the store gate is map-shaped:
+   `TsoCtx.ledger_store_rel_map_ok g g' auth old w base n vold vnew lo tf fv hist`
+   -- `old` (sealed, `dom old = dom w ∖ window`) + `rel_cells … (nth_byte vold) hist`
+   ==∗ `ledger_msg_at |log| (PWMsg w auth)` ∗ `[∗ map] a↦b ∈ w ∖ snap_of base n vnew, phys_ledger_at … (S |log|)`
+   ∗ the window re-minted with `hist ++ [(S |log|, nth_byte vnew)]`.
+2. **The floor is a BOUND with per-byte floor writes.** xv6 zeroes the used
+   page with `memset` = byte stores, so no single message writes the whole
+   index word and §1's "floor = a whole-window message" is unsatisfiable at
+   init.  `ts_rel` is now `TsRel base n j auth lo tf fv hist`: `tf k ≤ lo`
+   is byte k's floor write (value `fv k`), nothing in `(tf k, lo]` touches
+   byte k, everything STRICTLY above `lo` touching the window is a
+   whole-window write by `auth` recorded in `hist` (position, bytes).
+   `rel_read`'s premise is `∀ k<n, visibleb h tv log (tf k)` (each byte's
+   floor write in view), NOT visibility of `lo`; its conclusion is "the
+   floor's bytes, no history entry visible" ∨ "the LATEST visible history
+   entry's bytes (and every visible entry is at or under it)".  Helper
+   lemmas `read_down_skip`, `read_down_hit`, `rel_read_floor`, `rel_read_aux`.
+3. **History entries carry their bytes and the author.**  A reader must name
+   the index it read from the position it settled on -- including when it
+   reads the init floor (nc = 0) -- so values live in the arm, no
+   `ledger_msg_at` fragments are needed on the virtio side, and
+   `visibleb_le_other` turns "visible" into "≤ view" for a non-author
+   reader (a hart reading the device's counter).
+4. **The mint is LAZY.**  `virtio_proto_intro` runs inside the DRIVER_OK
+   MMIO store's continuation (`WpVirtioDev.wp_sw_virtio_dinv_s_sconf`),
+   whose node holds only `mstate_interp` = regs ∗ `gen_heap_interp` ∗
+   `dev_interp` -- NO TSO bundle -- and the mint moves a ghost-map payload
+   inside `tso_interp_at`.  So the lease's index word starts as
+   `TsoCtx.rel_pre_cells base 2 tf (nth_byte (wrap16 0))` (plain stamped
+   cells, `hist = []`) and is minted by `ledger_rpay_mint` at the FIRST
+   completion in `WpUart` (which has the bundle).  Both forms answer a
+   reader identically: `ledger_read_relpre_ok` (per byte through
+   `ledger_read_at_vis_ok`) vs `ledger_read_rel_ok`, same premises
+   (`view_lb K` + `rel_floor_vis h K n tf`).
+5. **The lease's cells are STAMPED.**  The handler must read a done slot's
+   used element and status byte EXACTLY (`ledger_read_at_vis_ok` needs
+   `phys_ledger_at … q` + view ≥ q); a sealed `phys_ledger` has lost q.
+   Rather than punch a hole per done slot (a computed `done_dom` over
+   `vp_done`), `dma_own_x dma D` becomes `dma_own_sx dma st D :=
+   [∗ map] a↦b ∈ filter (∉ D) dma, phys_ledger_at a 1 b (st a)` with a
+   stamp function `st` in the invariant and the pure fact
+   "every done slot's writable bytes and used element are stamped at that
+   completion's position (`hist !! p`)".  The step sets `st'` to
+   `S |log|` on `dom w` (the gate's `_at` cells) and leaves the rest;
+   reclaim and the peeks read stamps off `st`.  The index word itself is
+   the ONE fixed hole (`used_idx_dom c`), beside the ctl hole.
+6. **Ghosts and the reader floor.**  `disk_names` gains `dn_fl0 dn_fl1`
+   (the two floor stamps `tf 0`/`tf 1`, `ghost_var nat` halves, fixed) and
+   `dn_flr` (the reader floor `F`, halves).  `DiskInv.disk_res` holds
+   `lk_floor cur_ctx (tf 0) ∗ lk_floor cur_ctx (tf 1) ∗ lk_floor cur_ctx F`
+   beside `disk_done_lb γ nr`; at boot the two floor witnesses are the init
+   hart's OWN writes (`ctx_phys_pointsto_forget_floor`, A6.123 -- the right
+   arm; a later holder gets the left arm through `lk_floor_morph`), and
+   `F := lo` initially.  VirtioProto's live arm ties
+   `⌜∀ p q g, hist !! p = Some (q,g) → p ∉ dom (vp_done pr) → q ≤ F⌝`
+   ("every RECLAIMED completion is under the reader floor") and
+   `⌜length hist = nc⌝ ∗ ⌜hist !! k = Some (q,g) → g = nth_byte (wrap16 (S k))⌝ ∗ ⌜positions strictly increasing⌝`.
+   So a reader with `lk_floor_vis` on the three floors settles (§6.2) on
+   an entry ≥ the last reclaimed one: the value is `wrap16 k` with
+   `nr ≤ k ≤ nc`, injective on the span by `vdrwd_window_le2` (§2b).
+7. **The handler.**  `wp_vt_lhu_used_idx` goes through
+   `wp_load_s_sconf_au_rel` with
+   `Q v V0 := ∃ k, v = wrap16 k ∧ nr ≤ k ≤ nc ∧ (∀ p < k, pos p ≤ V0)`
+   (positions exported as persistent `disk_done_pos γ p q`? -- no: the
+   reclaim accessor takes `hart_view_lb V0 ∗ ⌜the read's k⌝` and proves
+   `q_p ≤ q_k ≤ V0` itself from the sortedness fact), then
+   `ctx_bound_raise` to `V0`, raising `F` to `V0` at each reclaim.  The
+   elem/status reads are `ledger_read_at_vis_ok` on the stamped cells
+   (`view_lb V0`, `ledger_vis_below`).  `parked_res` carries the slot's
+   `_at q` cells + `ctx_floor cur_ctx q` (left arm only: the reclaim's floor
+   IS a view bound, and the dirty arm cannot be inverted -- `ctx_wrote` is
+   persisted); `RwF` converts by `TsoCtx.ctx_phys_pointsto_of_at_floor`.
+
+Landed so far under this section: `TsoMemPa` §12e rewritten (compiles);
+`TsoCtx`: `ledger_rpay_mint` (per-byte stamps), `rel_pre_cells`,
+`rel_cells`, `rel_floor_vis` (+ `_below`, `_visibleb`),
+`ledger_store_rel_map_ok`, `visibleb_le_other`, `ledger_read_rel_ok`,
+`ledger_read_relpre_ok`, `ctx_phys_pointsto_of_at_floor` (compiling).
