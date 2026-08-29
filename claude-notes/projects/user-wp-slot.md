@@ -249,14 +249,41 @@ U-mode bundle `uvb` (C), and the five-step staging.  Lanes, in order:
    (ProcInv), `uvm_maxsz = 2^38 - 8192` is exactly `usz_ok`'s
    page-aligned bound, and `pgroundup` preserves a page-aligned bound;
    one three-line bridging lemma at J.
-3. **[ ] S8b — sbrk's permission row.**  The last escape in
-   `ut_round`/`uv_round`.  Needs (i) a `perm_of`-under-`uvmdealloc`
-   SHRINK lemma (the grow half is `perm_of_grow`; the shrink page set is
-   `uvmdealloc`'s run) and (ii) `growproc_ok`'s shrink arm to expose which
-   vpns it dropped — today it says `M' = umem_del …` and `uptd`-level
-   facts the kernel holds but `sysc_mem_ok` does not carry.  With those,
-   `usys_sbrk_perm`'s three arms are dischargeable and the escape is
-   deleted outright.
+3. **[ ] S8b — sbrk's row, SAYING WHAT HAPPENS** (owner-ruled
+   2026-08-29: "either extend the memory up with zeroed pages or cut them
+   down").  The last escape in `ut_round`/`uv_round`.  The row today is
+   existential where the code is DETERMINED — the same weakening pattern
+   the un-weakening sweep just retired, one more time:
+   `usys_sbrk_img` has `∃ np` for the shrink count and `usys_sbrk_perm`
+   has two existential PAGE SETS, yet `ProcPtOwn.uvmd_np oldsz newsz`
+   computes that count and `UserPtTree.umem_grow M sz :=
+   M ∪ gset_to_gmap (bv_0 8) (live_set sz)` is literally "extend with
+   zeroed bytes".  RESTATE BOTH AS FUNCTIONS OF THE TWO SIZES:
+   - image: `sz <= sz'` → `M' = umem_grow M (uint sz')`; else
+     `M' = umem_del M (uint (pgroundup sz')) (4096 * uvmd_np sz sz')`.
+   - permissions, and note this comes out TABLE-FREE, which the U tier
+     needs since it cannot see the table: on a GROW xv6 maps nothing (it
+     only raises `p->sz`) and `um_below` says nothing is mapped at or
+     above the old size, so the newly-live pages are all unmapped and
+     the "∖ dom um" caveat is VACUOUS —
+     `π' = π ∪ gset_to_gmap uperm_rw (live_pages sz' ∖ live_pages sz)`;
+     on a SHRINK everything in `π` is inside `live_pages sz` (leaves by
+     `um_below`, fill by construction), so cutting to the new size IS
+     dropping the dealloc run —
+     `π' = base.filter (fun kv => kv.1 ∈ live_pages sz') π`.
+   Then: thread `growproc_ok`'s shrink arm (which already names the run
+   exactly, `uptd_del_run P (svpn_of (pgroundup (add_vec szv n)))
+   (uvmd_np szv (add_vec szv n))`) up through `sys_sbrk_ok` into the
+   dispatcher's post, whose sbrk row is image-only today; prove the
+   SHRINK projection lemma (the mirror of the landed
+   `UsysMemOkSpec.perm_of_grow`); discharge both arms and DELETE the
+   escape disjunct outright, at which point `ut_round` has none left.
+   Separately, `usys_mem_ok`'s sbrk row quantifies the new size
+   existentially because the dispatcher offers no return-value relation;
+   a program that USES the memory it asked for needs the `r + a0` tie,
+   which is `sys_sbrk_ok`'s refinement to add — not needed by `sync`, and
+   the first caller that cares is `sh`'s malloc (a GROW, whose half is
+   already proved).
 4. **[ ] Milestone J** (§4): the kernel side switches to `ukont`'s
    shape.  **THE KEY'S IMAGE VIEW IS RULED (owner, 2026-08-28): option
    (A), the `proc_ptm` re-key** — the owner's principle, verbatim: the
