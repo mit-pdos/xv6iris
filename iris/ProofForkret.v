@@ -83,7 +83,9 @@ Require Import SpecUserretClosed.
 Require Import ParkCap.   (* [park_token] *)
 Require Import UsertrapRes.
 Require Import SpecForkret ProofForkretParts ProofPrepareReturnParts.
-Require Import UexecSlot. (* [uvis_of] *)
+Require Import TfUser.    (* [tf_ueq] -- prepare_return's four stores are
+                             invisible to the resume state *)
+Require Import UexecSlot. (* [uvis_of] / [tf_resume_pc] / [ret_pc_idem] *)
 Require Import UexecRet.  (* [uslot] -- the closer's second output lands in
                              the proofmode context here, so this Require is
                              DIRECT (durable-notes) *)
@@ -140,8 +142,7 @@ Section Res.
   Definition usertrap_res_bare_norm := UC.usertrap_res_bare_norm.
   Definition usertrap_res_csrs_open := UC.usertrap_res_csrs_open.
   Definition usertrap_res_sstc := UC.usertrap_res_sstc.
-  Definition usertrap_res_uwp_acc := UC.usertrap_res_uwp_acc.
-  Definition usertrap_res_run_open := UC.usertrap_res_run_open.
+  Definition usertrap_res_bare_sz := UC.usertrap_res_bare_sz.
   Definition usertrap_res_tf_csrs_open := UC.usertrap_res_tf_csrs_open.
   Definition usertrap_res_tf_open := UC.usertrap_res_tf_open.
   (* ...and the park's one producer-side entry, threaded like the rest.
@@ -301,11 +302,20 @@ Proof.
                 [upd_tf] does not touch: the closer this proof feeds was
                 stated at the parked process's name. *)
              ⌜pv_fdg V' = pv_fdg (us_V U)⌝ ∗
+             (* ...and that the four kernel stores are INVISIBLE to the
+                resume state ([SpecPrepareReturn.prepare_return_tf_ueq]).
+                Milestone J's entry needs it: the slot the park deposited is
+                keyed at the trapframe's own epc word, and what userret
+                sret's to is the [sepc] cell prepare_return wrote from it. *)
+             ⌜tf_ueq (pv_tf (us_V U)) (pv_tf V')⌝ ∗
              UsertrapRes.ut_tfk (CID := CIDf) ksp V' ∗ proc_priv γf p pid (MkUstate V' ((us_M U))))%I
-    with "[Hpv]" as (V') "(%HuptV' & %Hfg & #Htfk & Hpv)".
+    with "[Hpv]" as (V') "(%HuptV' & %Hfg & %Htueq & #Htfk & Hpv)".
   { iExists (upd_tf (us_V U) (prepare_return_tf (pv_tf (us_V U)) ksat ksp (cid_word (CID := CIDf)))).
     iFrame "Hpv". iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; reflexivity |].
+    iSplitR; [iPureIntro;
+              exact (prepare_return_tf_ueq (pv_tf (us_V U)) ksat ksp
+                       (cid_word (CID := CIDf))) |].
     iApply (ut_tfk_intro (CID := CIDf) ksp
               (upd_tf (us_V U) (prepare_return_tf (pv_tf (us_V U)) ksat ksp (cid_word (CID := CIDf))))
               kroot0
@@ -677,17 +687,14 @@ Proof.
   { rewrite /forkret_yield.
     iSplitL "Hparked"; [iExact "Hparked" | iExact "Hpnopt"]. }
   iDestruct (ut_tfk_upd_upt (CID := CIDf) ksp V' pt with "Htfk") as "#Htfk'".
-  (* THE CLOSER NOW YIELDS TWO THINGS: the residue, and a slot keyed at the
+  (* THE CLOSER YIELDS TWO THINGS: the residue, and a slot keyed at the
      record forkret actually resumes with ([SpecForkret.forkret_closer]).
-     S5 IS THE CONSUMER of the second -- the trap loop's own rewrite, where
-     [SpecUserretClosed.wp_userret_closed_body] grows a slot premise and the
-     residue loses its [uexec_wp] conjunct (projects/user-wp-slot.md SS4c,
-     R-a/R-c).  Until then this arm drops it: adding the premise here would
-     be S5's edit to [wp_userret_closed]'s statement, made in the wrong
-     lane. *)
+     BOTH ARE SPENT NOW (milestone J, S5): [wp_userret_closed] runs the
+     process's own continuation, so the second is what the trap loop's
+     first round consumes. *)
   iDestruct ("Hyield" $! CIDf pt (MkUstate (upd_upt V' pt) (us_M U))
                with "[%] [%] [%] [%] Htfk' Hdone HW Htc Hyld")
-    as "[Hures _]"; [reflexivity | exact Hnorm | exact Hptwf | | ].
+    as "[Hures Hslot]"; [reflexivity | exact Hnorm | exact Hptwf | | ].
   (* the resumed record names the parked process's fd-state ghost: forkret
      moved only [pv_upt], and [upd_upt] does not touch [pv_fdg]. *)
   { exact Hfg. }
@@ -696,6 +703,23 @@ Proof.
                   = kvi_satp_word (ud_root pt)).
   { rewrite /tp_pin upd_ne; [| reg_neq]. rewrite /SE upd_ne; [| reg_neq].
     rewrite /SD upd_eq HuptV'. reflexivity. }
+  (* ---- THE SLOT, AT THE STATE USERRET RESUMES.  [uslot_ukc] is the whole
+         re-key; the only thing to show is that the pc the sret lands on --
+         [ret_pc] of the [sepc] prepare_return wrote -- is the resume pc the
+         key records, which is [ret_pc] of the trapframe's own epc word.
+         [mepc_val] and [ret_pc] are the same function under two names, so
+         [ret_pc_idem] closes it. ---- *)
+  assert (Hpcslot : tf_resume_pc
+                      (uvis_tf (uvis_of (MkUstate (upd_upt V' pt) (us_M U))))
+                    = ret_pc (mepc_val epc)).
+  { change (uvis_tf (uvis_of (MkUstate (upd_upt V' pt) (us_M U))))
+      with (pv_tf V').
+    rewrite <- (tf_ueq_resume_pc (pv_tf (us_V U)) (pv_tf V') Htueq).
+    unfold tf_resume_pc, tf_w.
+    rewrite (list_lookup_total_correct _ _ _ Hepc).
+    exact (eq_sym (ret_pc_idem epc)). }
+  iEval (rewrite uslot_ukc) in "Hslot".
+  iEval (rewrite Hpcslot) in "Hslot".
   iApply (UC.wp_userret_closed (CID := CIDf)
             (loop_ucfg mdv0 Hmask) pt kroot j ksp (tp_pin SE)
             (kvi_satp_word (ud_root pt)) msg (mepc_val epc) scv stv
@@ -707,7 +731,7 @@ Proof.
             Hcov Haccwf
             with "Htext Hhw Hmin Hwire Hclaimmap Hkptinv Hhs Hprivc Hms Hmie
                  Hmdl Hmenv Hsenvc Hsepc Hscause Hstval Hstvec Hmedlc Hmsec
-                 Hssec Hkres Hufr Hdata Hpc Hfile Hures").
+                 Hssec Hkres Hufr Hdata Hpc Hfile Hslot Hures").
 Qed.
 
 (* ===================================================================== *)

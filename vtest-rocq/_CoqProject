@@ -138,3 +138,8 @@ ClintMsip.v
 CoreHartGen.v
 CoreHartHart1Gen.v
 CoreHart.v
+CoreCsrprobeGen.v
+CoreCsrprobeHwGen.v
+CoreCsrprobe.v
+CoreCsrwideGen.v
+CoreCsrwide.v

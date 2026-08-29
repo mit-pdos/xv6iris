@@ -42,8 +42,13 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras.
-Require Import RegFile.
+Require Import RiscvLang RiscvPtsto RiscvFetchExec RiscvExtras.
+Require Import RegFile WpGpr.
+Require Import MinstretInv WireInv.
+Require Import ProcDefs.     (* [ustate] / [pv_tf] / [pv_sz] / [pv_upt] *)
+Require Import UserFrame.    (* [u_regs] -- the loop's own cell bundle *)
+Require Import UmodeRegs.    (* [uv_regs] / [uv_amb] and the two movers *)
+Require Import UexecWp.      (* [loop_ok] -- [uslot]'s own guard *)
 Require Import ProcGeom.     (* [tf_arg_idx] / [tf_epc_idx] / [TFWORDS] *)
 Require Import UserPtTree.   (* [uptd] / [user_ptm_inv] / [pgroundup] on Z *)
 Require Import ProcPtOwn.    (* [uvm_maxsz] *)
@@ -482,3 +487,196 @@ Proof.
             (UserPtTree.pgroundup_mono sz 274877898752 H) _).
   vm_compute. discriminate.
 Qed.
+
+(* ===================================================================== *)
+(* SS6 THE ROUND'S TAIL, AS NAMED LEMMAS (milestone J, stage S5).          *)
+(*                                                                         *)
+(* [ProofUserretClosed.stvec_handler_loop] is a whole-function continuation *)
+(* -- every proofmode step in it pays for the whole Iris context           *)
+(* (claude-notes/optimization.md, RULE ONE) -- so the round's END, which is *)
+(* pure re-keying and one bundle construction, is discharged HERE, where    *)
+(* the context is the lemma's own premises and nothing else.               *)
+(*                                                                         *)
+(*   [uexec_ret_round_slot] / [_of]  steps A and B: the returned            *)
+(*        [uexec_ret] is re-keyed onto the RUN projection of the trapped    *)
+(*        key ([uexec_ret_run]) -- which is the key the round's relation is *)
+(*        stated at -- and then the round's own arm picks which of          *)
+(*        [uexec_ret]'s arms pays: transparent, ecall/exec (MINT),          *)
+(*        ecall/fork (MINT), ecall/other (the bumped slot).  The mint       *)
+(*        arrives as the premise [∀ W, uslot W]: the loop holds a           *)
+(*        [UEXEC_GEN] and [UexecCond.cond_entry_slot] turns its [box] into  *)
+(*        exactly that family, so this file needs no functor argument.      *)
+(*   [ukc_apply]                     step D: [uvb] built ROW BY ROW (never  *)
+(*        [iFrame]: the bundle carries [gpr_file]) and the continuation     *)
+(*        applied at the table/size the round landed on -- which is step C, *)
+(*        the guard, met by [reflexivity] because the bundle is asked for   *)
+(*        at [perm_of (ud_um pt) sz] itself.                                *)
+(*   [uslot_apply_loop]              the two composed at a KEY: the slot's  *)
+(*        four projections are supplied as equations, so the caller states  *)
+(*        what its post gave it and never unfolds the seal.                 *)
+(* ===================================================================== *)
+(* [tf_resume_gpr_bump] at the canonical dead base -- the spelling the
+   round's [uround_bump_ok] is stated in. *)
+Lemma tf_resume_gpr0_bump (tf : list (mword 64)) (r : mword 64) :
+  (tf_arg_idx 0 < length tf)%nat ->
+  tf_resume_gpr0 (bump_tf tf r)
+  = <[Regidx (mword_of_int 10) := r]> (tf_resume_gpr0 tf).
+Proof.
+  intros Hl. unfold tf_resume_gpr0. exact (tf_resume_gpr_bump zero_rf tf r Hl).
+Qed.
+
+Section LoopApply.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* ------------------------------------------------------------------ *)
+  (* STEPS A + B: the returned [uexec_ret], re-keyed at the resume state. *)
+  (* ------------------------------------------------------------------ *)
+  Lemma uexec_ret_round_slot (sc : mword 64) (W W' : uvis) :
+    length (uvis_tf W) = TFWORDS ->
+    uround_ok sc (uvis_tf (uvis_run W)) (uvis_M W) (uvis_perm W)
+      (uvis_tf W') (uvis_M W') (uvis_perm W') ->
+    (∀ W'' : uvis, uslot W'') -∗ uexec_ret sc W -∗ uslot W'.
+  Proof.
+    intros Hl Hr.
+    iIntros "Hmk Hret".
+    (* STEP A: the trapped key and its run projection are the same key *)
+    iEval (rewrite (uexec_ret_run sc W Hl)) in "Hret".
+    (* the two length side conditions the bump's readers take *)
+    assert (Hla : (tf_arg_idx 0 < length (uvis_tf (uvis_run W)))%nat)
+      by (rewrite (uvis_run_length W); unfold tf_arg_idx, TFWORDS; lia).
+    assert (Hle : (tf_epc_idx < length (uvis_tf (uvis_run W)))%nat)
+      by (rewrite (uvis_run_length W); unfold tf_epc_idx, TFWORDS; lia).
+    destruct (decide (sc = uecall_scause)) as [Hec | Hne].
+    - (* ---- ECALL ---- *)
+      rewrite (uexec_ret_ecall sc (uvis_run W) Hec).
+      rewrite Hec in Hr.
+      destruct (uround_ok_ecall (uvis_tf (uvis_run W)) (uvis_M W) (uvis_M W')
+                  (uvis_perm W) (uvis_perm W') (uvis_tf W') Hr)
+        as [Hexec | [Hnex [r [[Hb1 Hb2] Hm]]]].
+      + (* exec: the round says NOTHING by design -- the kernel MINTS *)
+        iApply "Hmk".
+      + cbv zeta.
+        destruct (decide (usys_num (uvis_tf (uvis_run W)) = USYS_exit))
+          as [Hx | _]; [ contradiction (Hnex Hx) | ].
+        destruct (decide (usys_num (uvis_tf (uvis_run W)) = USYS_fork))
+          as [_ | _].
+        * (* fork: nothing says [r <> 0] (K2) -- MINT *)
+          iApply "Hmk".
+        * (* the returning arms: the row is the round's own conjunct *)
+          iDestruct ("Hret" $! r (uvis_M W') (uvis_perm W') with "[%]") as "Hs";
+            [ exact Hm | ].
+          (* the bump's two readers, hoisted out of argument position
+             (claude-notes/optimization.md, "Inline [ltac:]") *)
+          assert (Hg1 : tf_resume_gpr0 (bump_tf (uvis_tf (uvis_run W)) r)
+                        = tf_resume_gpr0 (uvis_tf W')).
+          { rewrite (tf_resume_gpr0_bump (uvis_tf (uvis_run W)) r Hla).
+            exact (eq_sym Hb1). }
+          assert (Hp1 : tf_resume_pc (bump_tf (uvis_tf (uvis_run W)) r)
+                        = tf_resume_pc (uvis_tf W')).
+          { rewrite (tf_resume_pc_bump (uvis_tf (uvis_run W)) r Hle).
+            exact (eq_sym Hb2). }
+          iEval (rewrite (uslot_key_cong
+                            (bump (uvis_run W) r (uvis_M W') (uvis_perm W')) W'
+                            Hg1 Hp1 eq_refl eq_refl)) in "Hs".
+          iExact "Hs".
+    - (* ---- TRANSPARENT: interrupt, page fault, anything else ---- *)
+      rewrite (uexec_ret_transparent sc (uvis_run W) Hne).
+      destruct (uround_ok_transparent sc (uvis_tf (uvis_run W))
+                  (uvis_M W) (uvis_M W') (uvis_perm W) (uvis_perm W')
+                  (uvis_tf W') Hne Hr) as [[Hi1 Hi2] [HM Hpi]].
+      iEval (rewrite (uslot_key_cong (uvis_run W) W'
+                        (eq_sym Hi1) (eq_sym Hi2)
+                        (eq_sym HM) (eq_sym Hpi))) in "Hret".
+      iExact "Hret".
+  Qed.
+
+  (* ...at the key the loop actually holds: the round's post is stated at
+     the trapped machine's own register file and epc word, and the resume
+     key is [UexecSlot.uvis_of] of the record the round left. *)
+  Lemma uexec_ret_round_slot_of (sc : mword 64) (W : uvis) (g : regfile)
+      (sepc_v : mword 64) (U' : ustate) :
+    length (uvis_tf W) = TFWORDS ->
+    g = tf_resume_gpr0 (uvis_tf W) ->
+    sepc_v = tf_w (uvis_tf W) tf_epc_idx ->
+    uround_ok sc (tf_of g (ret_pc sepc_v)) (uvis_M W) (uvis_perm W)
+      (pv_tf (us_V U')) (us_M U')
+      (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U')))) ->
+    (∀ W'' : uvis, uslot W'') -∗ uexec_ret sc W -∗ uslot (uvis_of U').
+  Proof.
+    intros Hl -> -> Hr.
+    exact (uexec_ret_round_slot sc W (uvis_of U') Hl Hr).
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* STEP D (and C): [uvb], row by row, and the continuation applied.     *)
+  (* ------------------------------------------------------------------ *)
+  Lemma ukc_apply (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+      (sz : Z) (M : gmap Z (bv 8)) (m : regfile)
+      (ms_v sc_v stv_v sepc_v pc : mword 64) :
+    loop_ok C pt ->
+    usz_ok sz ->
+    user_mstatus_ok ms_v ->
+    ukc (perm_of (ud_um pt) sz) M m pc -∗
+    hw_config -∗ minstret_inv -∗ wire_inv -∗
+    u_regs (HART_ACTIVE tt) ms_v sc_v stv_v sepc_v pc pc m -∗
+    user_ptm_inv pt sz M -∗
+    user_cfg C -∗
+    Rut pt -∗
+    ▷ ukb C pt Rut sz (perm_of (ud_um pt) sz) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hlo Hsz Hms.
+    iIntros "Hkc Hhw Hmi Hwi Hregs Hupt Hcfg Hrut Hk".
+    (* the cell bundle splits into the U-mode residue, the file and the pc *)
+    iDestruct (u_regs_uv_regs ms_v sc_v stv_v sepc_v pc m Hms with "Hregs")
+      as "(Hur & Hg & Hpc)".
+    iApply ("Hkc" $! CID C pt Rut sz
+              with "[%] [%] [Hhw Hmi Hwi Hur Hg Hpc Hupt Hcfg Hrut Hk]").
+    - exact Hlo.
+    - reflexivity.
+    - (* THE BUNDLE, ROW BY ROW -- it carries [gpr_file], so never [iFrame]
+         (claude-notes/optimization.md, "Framing"). *)
+      rewrite /uvb /uvb_F.
+      iSplitL "Hhw Hmi Hwi"; [ iApply (uv_amb_intro with "Hhw Hmi Hwi") | ].
+      iSplitL "Hur"; [ iExact "Hur" | ].
+      iSplitR; [ iPureIntro; exact Hsz | ].
+      iSplitL "Hupt"; [ iExact "Hupt" | ].
+      iSplitL "Hcfg"; [ iExact "Hcfg" | ].
+      iSplitL "Hg"; [ iExact "Hg" | ].
+      iSplitL "Hpc"; [ iExact "Hpc" | ].
+      iSplitL "Hrut"; [ iExact "Hrut" | ].
+      rewrite /ukont_F. iExact "Hk".
+  Qed.
+
+  (* ...and the slot at a KEY, which is what the loop holds: the four
+     projections the slot reads, supplied as equations. *)
+  Lemma uslot_apply_loop (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+      (sz : Z) (W : uvis) (M : gmap Z (bv 8)) (m : regfile)
+      (ms_v sc_v stv_v sepc_v pc : mword 64) :
+    loop_ok C pt ->
+    usz_ok sz ->
+    user_mstatus_ok ms_v ->
+    uvis_perm W = perm_of (ud_um pt) sz ->
+    uvis_M W = M ->
+    tf_resume_gpr0 (uvis_tf W) = m ->
+    tf_resume_pc (uvis_tf W) = pc ->
+    uslot W -∗
+    hw_config -∗ minstret_inv -∗ wire_inv -∗
+    u_regs (HART_ACTIVE tt) ms_v sc_v stv_v sepc_v pc pc m -∗
+    user_ptm_inv pt sz M -∗
+    user_cfg C -∗
+    Rut pt -∗
+    ▷ ukb C pt Rut sz (perm_of (ud_um pt) sz) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hlo Hsz Hms Hpi HM Hg Hpc.
+    iIntros "Hs".
+    (* the seal comes off the HYPOTHESIS only *)
+    iEval (rewrite uslot_ukc) in "Hs".
+    iEval (rewrite Hpi HM Hg Hpc) in "Hs".
+    iApply (ukc_apply C pt Rut sz M m ms_v sc_v stv_v sepc_v pc Hlo Hsz Hms
+              with "Hs").
+  Qed.
+
+End LoopApply.

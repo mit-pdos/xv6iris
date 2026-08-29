@@ -173,7 +173,6 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import SyscParkEnv ParkCap.   (* [park_world] / [park_token] *)
-Require Import UexecWp.   (* [uexec_wp] -- the child's WP, spent by the park *)
 Require Import UexecSlot. (* [uvis] -- the slot's key *)
 Require Import UexecRet.  (* [uslot] -- the generic family kfork hands the
                              park.  Required DIRECTLY (durable-notes). *)
@@ -270,22 +269,14 @@ Definition wp_kfork_sconf_body
      which would be a module cycle, since that proof runs the trap loop
      kfork sits inside.  See ParkCap.v. *)
   park_token γs -∗
-  (* THE CHILD'S USER-EXECUTION WP, consumed by the park.  A LINEAR premise,
-     and the reason kfork's contract has one: the WP the child's trap loop
-     will run is a resource of the child's residue
-     ([UsertrapRes.ut_own_nopt]'s last row), captured at the park
+  (* THE GENERIC SLOT FAMILY FOR THE CHILD, consumed by the park.  A LINEAR
+     premise, and the reason kfork's contract has one: what the child's trap
+     loop will run is a resource of the child, captured at the park
      ([ParkCap.park_token_park]) and paid by whoever forks -- sys_fork, the
      one caller, mints the generic inhabitant for it.  Nothing persistent in
-     the tree carries a WP ([SyscParkEnv.park_world] used to), so this
-     premise is what makes the parent responsible for its child's WP -- the
-     shape a verified fork needs, where the child's WP will come from the
-     parent's own fork-continuation deposit rather than from the generic
-     theorem.  See claude-notes/design/user-wp-slot.md. *)
-  uexec_wp -∗
-  (* ...AND THE GENERIC SLOT FAMILY FOR THE CHILD, on exactly the same route
-     and for exactly the same reason: [ParkCap.park_token_park] captures it
-     and the package's resume closer instantiates it at the record the child
-     is resumed with.  KFORK INSTANTIATES NOTHING -- it hands the family
+     the tree carries one ([SyscParkEnv.park_world] used to), so this premise
+     is what makes the parent responsible for its child.  The package's
+     resume closer instantiates it at the record the child is resumed with.  KFORK INSTANTIATES NOTHING -- it hands the family
      straight to the park, which is what keeps the child's key out of this
      contract: a key chosen here would be stale by the time forkret's boot
      arm has run kexec("/init") (projects/user-wp-slot.md SS4c, R-b).  When

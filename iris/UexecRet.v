@@ -6,9 +6,10 @@
 (*                                                                         *)
 (* See claude-notes/design/user-wp-slot.md, 'The ruled design for the      *)
 (* user/kernel trap contract'.  These are the PARALLEL forms beside        *)
-(* UexecWp.v / UexecSlot.v (rule R10: nothing kernel-facing moves until    *)
-(* milestone J, when [uslot] takes over the name [uexec_slot] and the old   *)
-(* handler premise is deleted).                                            *)
+(* UexecWp.v / UexecSlot.v (rule R10: nothing kernel-facing moved until    *)
+(* milestone J).  At J's S6 [uslot] TOOK OVER: [UexecSlot.uexec_slot] and   *)
+(* the old handler premise are deleted, and UexecSlot.v keeps only the KEY  *)
+(* ([uvis]) and the trapframe word readers these forms are stated on.       *)
 (*                                                                         *)
 (* THE DEFECT THIS FIXES.  The old trap premise                             *)
 (*   ▷ (user_trap_frame C pt Rut ∗ uexec_wp -∗ WP Loop)                    *)
@@ -71,7 +72,8 @@
 (* x0, DECIDED.  [WpGpr.gpr_file f] does not IGNORE x0 the way [HartTp]     *)
 (* pins tp: its x0 entry is the pure fact [f x0 = zero_reg].  So every      *)
 (* register file the tier ever holds has x0 = 0, there IS a canonical      *)
-(* base, and the ∀-bound dead base of [UexecSlot.uexec_slot] is dropped:    *)
+(* base, and the ∀-bound dead base the deleted [uexec_slot] carried is      *)
+(* dropped:                                                                 *)
 (* the file the slot restores is [tf_resume_gpr0 tf := tf_resume_gpr        *)
 (* zero_rf tf].  [tf_resume_gpr_x0] is what milestone J's loop uses to      *)
 (* meet it from the base it happens to hold (x0 = 0 there too, by the same *)
@@ -639,7 +641,7 @@ Section UexecRet.
 End UexecRet.
 
 (* the bundle wraps [gpr_file] (the [iFrame] landmine class) and the slot
-   wraps the bundle: sealed, like [uexec_wp] / [uexec_slot].  Consumers
+   wraps the bundle: sealed, like [uexec_wp].  Consumers
    see the slot's body through [uslot_unfold] and the bundle's through
    [rewrite /uvb /uvb_F]; the seal does not travel, so a file manipulating
    either must [Require Import UexecRet] directly.  [ukc] stays

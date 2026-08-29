@@ -67,6 +67,98 @@ What a successor needs to know:
 - Milestone J now lands on a tree where the trap loop's own files already
   carry `CurCtx`; J's edits to them must preserve it (same union rule).
 
+## §0′ COORDINATOR CHECKPOINT — 2026-08-29, resume here
+
+Everything below is PUSHED AND GREEN on `origin/main` (`37d7a8781` at the
+time of writing).  Working tree clean, nothing in flight, no lane running.
+TRUST THE GIT LOG over any checkbox in this file.
+
+**MILESTONE J IS COMPLETE.**  The WP that `userret` runs is now a
+per-process resource keyed on what the process can observe (trapframe
+words, the LAZY memory image, a per-page permission map projected from
+the table with the table's structure hidden).  The trap round states its
+real relation between the entry key and the resume key for EVERY cause
+and EVERY syscall — `ut_round` is a bare `uround_ok` with no escape
+disjunct.  A verified program's slot travels the park channel.  The old
+generic channel is deleted; `uexec_wp` survives only as the generic
+safety theorem's form and as `cond_entry_slot`'s input.  The stage
+records are §4c (the plan and its three refutations) and §4b (J1a).
+
+**THE CURRENT EFFORT IS `echo`** — §6 has the full plan, the survey
+findings and the two corrections to the original framing.  State:
+
+- **DONE**: `UkLoad.v` + `UkBranch.v` (the engine had no load or branch
+  leaf — `sync` needed neither and `echo` is nothing but loads and
+  branches), and `UkAbi.v` (the GENERIC entry conditions on the key:
+  `uk_rpage`/`uk_rd`/`uk_args`/`uk_argv_null`, `Decision` throughout,
+  with readers that hand back exactly a load leaf's premise list in
+  order).
+- **NEXT, and it is the bulk of the work**: echo's own function walks on
+  the new engine — a `UkEcho.v` in the shape of `UkSync.v`.  Four pieces,
+  bottom-up as `UkSync` does them: the `write` stub (a near-copy of
+  `wp_ksync_sync_stub` — `SYS_write` is 16 and falls in `usys_mem_ok`'s
+  QUIET row exactly as `SYS_sync` 22 does, so the difference is the
+  immediate and the addresses), the `exit` stub, `strlen` (a scan loop —
+  `UkAbi.uk_args_str_byte` gives it the dichotomy it needs, the byte is
+  NUL iff the index is the length), and `main`/`start`.  Then echo's
+  entry gate and its slot constructor, the analogues of
+  `UexecCond.sync_gate` and `USyncKernel.sync_uexec_slot`.
+- **SIZING, so nobody is surprised**: `UkSync.v` is 853 lines for a
+  SEVENTEEN-instruction program (~25-30 lines per instruction; its §1
+  key-level lemmas ≈ 330 of those are generic and already reusable).
+  `UCodeEcho.v` carries 73 decode lemmas.  The old-tier echo proof
+  (`UProofEcho.v` + `UProofEchoA.v` + `USpecEcho.v`) is the source to
+  port from — read it for the function walks and the `strlen` loop's
+  shape, but state everything on the key.
+- **WHAT ECHO CAN AND CANNOT CLAIM.**  Safety, from decidable key facts,
+  exactly as `sync` has.  It CANNOT claim its output bytes are its argv
+  strings: the new contract has no place for it (`uexec_ret`'s ecall arm
+  is one PURE hypothesis, no iProp), the designed hook is the `Φ`
+  refinement in `design/user-wp-slot.md`, and the kernel half is blocked
+  independently at `SpecConsolewrite`'s deliberate loss (copyin's
+  destination is existential).  Do not conflate the two; do not
+  special-case the ∀ in a way that would close that door.
+
+**HAZARDS, all learned the hard way this session.**  `UkAbi`'s `Decision`s
+are `Defined` with `2^31` fuel — a gate must be CASE-SPLIT
+(`destruct (decide …)`) and never `vm_compute`d.  Never `simpl`/`cbn` on a
+goal mentioning a dumped literal (`SyncInstrs.sync_bytes`,
+`EchoInstrs.echo_bytes`).  Never let `reflexivity`/`f_equal`/an ssr
+`rewrite` meet the 31-insert `userret_gpr` tower with differing sides —
+enumerate and peel per index (three separate build rounds died on this).
+Seals come off HYPOTHESES only (`iEval (rewrite …) in "H"`).  Never
+`iFrame` a bundle containing `gpr_file`.  See `../optimization.md`.
+
+**OWNER RULINGS, all final.**  The key's image is ALWAYS the lazy view —
+the process cannot tell lazy from allocated, so the abstraction must not
+distinguish them.  sbrk's row says WHAT HAPPENS: zeroed pages up, or cut
+down.  The U-mode CONTEXT question (`CurCtx`; whether `uvb` should own
+one) is a SEPARATE, LATER effort — thread the ambient binder, claim
+nothing (`../design/uk-engine.md`).  Page-table and VM state is OUT OF
+SCOPE for fs-syscall-specs, so those contracts' VM clauses are ours; the
+DATA half is theirs and stays existential.  **`kexec_ok` is the
+fs-syscall-specs lane's to materialise — do not strengthen it from this
+side**; echo does not need it (its gate case-splits), and it is what will
+later let us PROVE exec's output satisfies that gate.
+
+**WHAT REMAINS BEYOND ECHO.**  The exec-site forcing function (§3 item 5)
+— now partly the fs lane's.  Fork's real row: nothing states `r ≠ 0`, so
+J MINTS on the fork arm; a verified fork also needs `uvmcopy`'s
+leaf-for-leaf flag preservation, which nothing states.  `sh`/`init` still
+run on the old capability engine.  And one comment debt: five stale prose
+references to the deleted `userret_to_user_state` should say
+`userret_to_user_state_ptm` (`SpecUser.v:28`, `SpecUsertrap.v:137`,
+`UserretUser.v:15`, `SpecUservec.v:337`, `SpecUserret.v:9`) — fold into
+the next pass that builds anyway.
+
+**OPERATING**, beyond §0 below: ALL builds go to the GCP VM, ONE at a
+time, with the `-o` dump-guard flags and the EXIT sentinel written into
+the log and grepped.  Trust a lane's gate when it names its log paths;
+re-validate only when a rebase actually moves the proof tree, and then a
+GREEN BUILD SUFFICES — a rebase introduces no assumptions, so do not
+re-run `audit-only`.  Run the audit when a stage REMOVES proof machinery,
+or when a lane did not.
+
 ## §0 Operating rules (hard-won; violating these cost real time)
 
 - Builds run on the GCP VM (`claude-notes/remote-build-gcp.md`) with
@@ -654,6 +746,187 @@ durable part.
   kfork (mutually independent) → S3 lazy seam (needs S1) → S5 the loop
   (needs S1-S4) → S6 the deletions.  `UexecSlot.v` KEEPS its §0-§2
   vocabulary (every tier requires it); only §3-§4 are deleted.
+
+## §6 ECHO — the next verified program (opened 2026-08-29, plan)
+
+`sync` was chosen first because it is `sync(); exit(0);`.  `echo` is the
+real test of the contract, and the owner named the two interesting parts.
+Its source (`xv6-riscv/user/echo.c`):
+
+```c
+for (i = 1; i < argc; i++) {
+  write(1, argv[i], strlen(argv[i]));
+  if (i + 1 < argc) write(1, " ", 1); else write(1, "\n", 1);
+}
+exit(0);
+```
+
+**A HARD PREREQUISITE, established before any design: the Uk engine has no
+LOAD and no BRANCH leaf.**  `ls iris/Uk*.v` is `UkStep`, `UkLeaf`,
+`UkStore`, `UkSync` — `uk-engine.md` says loads and branches were "NOT
+ported (sync needs neither)".  echo does nothing BUT load (argv, the
+strings) and branch (two loops).  So `UkLoad.v` and `UkBranch.v` come
+first.  The note prices the port as the same mechanical rewrite the other
+leaves took, with the load's table premise becoming "the page is in π"
+via `perm_of_R`; the store leaf's transparent FAULT arm is the shape to
+copy for the load's (`perm_of_unmapped_lt` and `uk_fault_pair` at
+`Load Data` / `E_Load_Page_Fault` are already the pieces, per uk-engine's
+closing paragraph).
+
+**THE ARGV PROPERTIES ARE GENERIC, AND THAT IS THE POINT** (owner's
+framing).  What echo needs of the stack is not echo-specific: a0 = argc,
+a1 = the argv base, the array holds `argc` pointers followed by a NULL,
+each pointer addresses a NUL-TERMINATED string, and all of it lies in
+readable pages of the key's permission map.  Define that ONCE — a
+predicate on the KEY, in the same discipline that made `sync`'s
+constructor work (`sync_uexec_slot` takes four decidable facts about the
+key and nothing else) — and hand it to ANY user program at entry.
+Working name `uargv_ok W`.
+**AND NOTE WHERE THAT LANDS**: the thing that must ESTABLISH it is the
+exec-success mint, i.e. §3 item 5's exec-site forcing function, which is
+blocked on exec's post being unable to say what image it loaded.  So the
+useful increment there is not "exec says which image" in the abstract —
+it is "exec says the argv region is well-formed", which is precisely what
+programs consume.  Echo and the exec forcing function are the same seam,
+approached from the two ends.
+
+**WHY NUL-TERMINATION IS LOAD-BEARING AND NOT TIDINESS.**  `strlen` reads
+until it finds a NUL.  Without one in mapped memory the loop reads off
+the end, takes a load page fault, and — because the fault arm is
+TRANSPARENT (the key does not move) — resumes at the same state and loops
+forever.  That is SAFE (a diverging program has a WP) but useless, and it
+is also why the load leaf's fault arm must exist before echo can be
+stated at all.
+
+**WRITE, and why it may be easier than it looks.**  `write` is a
+returning syscall, so `uexec_ret`'s ecall arm applies and echo must
+supply `∀ r M' π', ⌜usys_mem_ok n tf r M π M' π'⌝ -∗ uslot (bump W r M' π')`
+— i.e. be safe for EVERY return value, including `-1` and a short write.
+Echo DISCARDS write's return value (see the source: no branch on it), so
+that ∀ costs it nothing.  And `write` is a writer-FROM-user-memory, so
+its row should be same-image with the permission map unmoved — meaning
+the returned key differs from the entry key only by the a0 bump and
+`epc+4`.  If that holds, echo's loop is a Löb over a key that moves only
+in the register file.  VERIFY against `UsysMemOk`'s row for write's number
+before relying on it.
+
+**FUNCTIONAL CONTENT IS A SEPARATE, LATER QUESTION.**  "echo is safe" is
+what the contract as it stands can express.  "the bytes echo passes to
+`write` are its argv strings, and they reach the console" needs the
+`Φ`-refinement the design note parks under the same ∀
+(`design/user-wp-slot.md`, the deposit-covering discussion: a later
+refinement adds an iProp premise under the same universal WITHOUT
+changing the shape).  Do not conflate the two: get safety first, and keep
+the refinement's door open by not special-casing the ∀.
+
+**LANDED so far:** (1) `UkLoad.v` + `UkBranch.v` — branches were a pure
+re-thread; the load's table premise became `uk_load_ok` ("the page is in
+`π`", no extra bit) and it gained the transparent FAULT arm mirroring the
+store's, with `Load Data` twins of the Sail-facing fault lemmas (the
+store's were hard-wired to `Store Data`; `UserMemArmsBase.u_fault_pair`
+IS access-generic but demands `u_mem_wf`, which this tier does not have).
+(2) `UkAbi.v` — `uk_rpage`/`uk_rd`/`uk_args`/`uk_argv_null` with
+`Decision` throughout, and readers that hand back exactly a load leaf's
+premise list in order.  **A FOOTGUN TO KNOW ABOUT**: those `Decision`s are
+`Defined` and `uk_slen`'s fuel is `2^31`, so a gate must be CASE-SPLIT
+(`destruct (decide …)`, as `cond_entry_slot` does) and never
+`vm_compute`d — evaluating one would not terminate usefully.  Nothing in
+the tree does that today.
+
+**Plan, in dependency order.**  (1) Port `UkLoad.v` and `UkBranch.v` —
+mechanical, and the prerequisite for everything else.  (2) Define
+`uargv_ok` on the key, with decidability where it is cheap, and prove the
+readers echo needs (argv[i] is a pointer into a readable nul-terminated
+run).  (3) Port/re-cut echo's own code facts: `UCodeEcho.v` (1165 lines)
+and `USpecEcho.v` (182) exist on the OLD capability engine — survey first
+whether they port like `UkSync` or want re-cutting.  (4) `strlen` and the
+loop as Löb'd stubs on the new engine.  (5) echo's slot constructor, the
+analogue of `USyncKernel.sync_uexec_slot`, taking `uargv_ok` plus echo's
+text/stack facts about the key.  (6) Only then: the exec seam that
+supplies `uargv_ok` at the mint.
+
+**SURVEY FINDINGS (2026-08-29), and two corrections to the plan above.**
+
+- **WRITE IS EASY, AND THE TEMPLATE ALREADY EXISTS.**  `SYS_write` is 16;
+  `usys_window 16 = None`, so write lands in `usys_mem_ok`'s QUIET row —
+  `M' = M ∧ π' = π`, no window, `r` unconstrained.  That is the same row
+  `SYS_sync` (22) takes, and `UkSync.wp_ksync_sync_stub` is already a
+  returning-syscall stub on the new engine (`c.li a7,N; ecall; c.jr ra`,
+  closing with `usys_mem_ok_quiet` and `uslot_bump_run`).  Echo's write
+  stub differs only in the immediate and the addresses.  **The syscall was
+  never the hard part.**
+- **CORRECTION 1 — the argv ARRAY's null terminator is not what echo
+  needs.**  `UmodeAbi.uargs` (the existing generic predicate) has NO
+  `argv[argc] = 0` clause, and echo never dereferences that slot: its loop
+  compares the cursor against `av + 8*argc`.  What IS load-bearing is the
+  STRINGS' nul-termination (`ucstr M p len`), because that is what makes
+  `strlen` terminate.  So the generic entry predicate wants: 8-alignment,
+  `argc` in range, the pointer array readable, and per `i < argc` a
+  pointer to a readable NUL-TERMINATED run.  Adding `argv[argc] = 0`
+  anyway is defensible (it is true, and another program may read it), but
+  it is not echo's requirement.
+- **CORRECTION 2 — the generic predicate already exists; the work is
+  RE-CUTTING IT ON THE KEY.**  `uargs pt M av argc lo` is stated over the
+  TABLE (`uv_rd pt M …`).  The new tier needs `uk_args π M av argc lo`
+  with the readability clauses becoming "the page is in `π`" via
+  `UserPerm.perm_of_R` — exactly the move `uk_stack` made from
+  `uv_stack`.  That is the reusable artifact the owner asked for, and it
+  belongs in a generic file (`UkAbi.v`), not in echo's.
+- **THE ENTRY SUPPLY IS BLOCKED HARDER THAN EXPECTED.**  `SpecKexec.kexec_ok`'s
+  success arm pins a0 = argc, a1 = sp = the argv base, and sp as an exact
+  arithmetic function of the new size and the argument lengths — but
+  **the image is ENTIRELY existential**: `us_M U'` appears in NO clause,
+  so nothing is pinned about the argv array's contents, the strings, or
+  even THE PROGRAM TEXT.  `entry` is a ∀-bound parameter tied to nothing
+  (not to the ELF's entry, not to a symbol).  `SpecKexec.v`'s own header
+  calls this out and defers it as "win-2 work".
+  **OWNER, 2026-08-29: the fs-syscall-specs lane is materialising
+  `kexec_ok` — do NOT strengthen it from this side.**  And echo does not
+  have to wait for it: `cond_entry_slot` CASE-SPLITS on a decidable gate
+  rather than computing, so if `uk_args` is decidable on the key (it is —
+  finitely many pointers into a finite image) echo's gate decides it at
+  the mint and falls back to the generic WP otherwise.  A materialised
+  `kexec_ok` is what lets us PROVE exec's actual output satisfies that
+  gate, i.e. what puts a verified echo in the whole-system theorem; it is
+  not needed to build the machinery.
+  The nul-termination
+  facts that do exist are PREMISES about the kernel-side `char **argv`
+  kexec was handed, not conclusions about user memory.  So `uk_args` is a
+  PREMISE for now, exactly as `uargs` is today, and supplying it at the
+  mint is the exec forcing function.
+- **WHAT THE NEW CONTRACT LOST, and it is worth being deliberate about.**
+  On the old tier `xv6_sys_sem SYS_write = UsysReadsBuf` made "my buffer
+  is readable" a PRECONDITION THE PROGRAM PAYS — which is what forced
+  `strlen`'s answer to be the true length, and is echo's one piece of
+  functional content today.  `uexec_ret`'s ecall arm has no such place:
+  it is `∀ r M' π', ⌜usys_mem_ok …⌝ -∗ uslot (bump …)`, one pure
+  hypothesis and no iProp.  That loss is arguably CORRECT — the old
+  obligation was an artifact of the ASSUMED capability, and in reality a
+  bad buffer just makes the kernel's copyin fail and write return -1,
+  which echo must tolerate anyway — but it means echo's port is
+  safety-only, and `strlen` returning the true length becomes something
+  echo proves internally (or does not state) rather than something the
+  contract extracts.
+- **FUNCTIONAL CONTENT: the hook is designed, the kernel half is blocked
+  elsewhere.**  The refinement is `design/user-wp-slot.md`'s "adds an iProp
+  premise under the same ∀ without changing the shape"; the model to copy
+  is the old tier's `UmodeInitIo.uinit_arm_write` (`∃ bs, ⌜ubuf_at M a1 bs
+  ∧ length bs = a2⌝ ∗ W (uint a0) bs`).  A real output trace exists ONE
+  LAYER DOWN (`UartTxInv.uart_sent_sub` — every byte accepted by the UART,
+  in order), and the break is `SpecConsolewrite`'s deliberate loss: the
+  bytes came through copyin, whose destination is existential, so the
+  kernel cannot say which bytes reached the wire.  Stating "the console
+  prints what echo was given" therefore needs BOTH the U-side `Φ` and
+  copyin's destination named.  Not now; do not conflate with safety.
+- **Sizing.**  `UkSync.v` is 853 lines for a SEVENTEEN-instruction program
+  (~25-30 lines per instruction; §1's key-level lemmas ≈ 330 of those are
+  generic and reusable).  `UCodeEcho.v` carries 73 decode lemmas.  Echo is
+  a substantially bigger walk, and `UkAbi.v` + `UkLoad` + `UkBranch` are
+  all upstream of it.
+- One difference from sync worth carrying into echo's layout facts: echo's
+  two rodata strings (`" "` and `"\n"`) live on the TEXT page and are
+  passed to `write`, so `echo_layout` claims page 0 is fetch-ok AND
+  `Load Data`-ok, where `sync_layout` claims fetch only.
 
 ## §5 Session-local artifacts (durable parts lifted into this file)
 

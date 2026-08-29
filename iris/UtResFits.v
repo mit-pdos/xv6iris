@@ -24,7 +24,6 @@ Require Import ProcPtOwn UserPtTree ProcGeom TimerCap.
 Require Import ProcInv.   (* [us_tf] / [us_upt] -- the residue index's updaters *)
 Require Import IntrDefs KptShare.
 Require Import UsertrapRes.
-Require Import UexecWp.   (* [uexec_wp] -- named by the slot accessor's type *)
 Require Import ParkCap.
 Require Import SpecSyscall.
 Require Import SpecUsertrap.
@@ -159,11 +158,10 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES_PARK.
     usertrap_res_bare pt ksp U -∗ sstc_enabled ∗ usertrap_res_bare pt ksp U.
   Proof. exact (ut_res_bare_sstc (SY.syscall_env) pt ksp U). Qed.
 
-  Lemma usertrap_res_uwp_acc
+  Lemma usertrap_res_bare_sz
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) :
-    usertrap_res_bare pt ksp U -∗
-    uexec_wp ∗ (uexec_wp -∗ usertrap_res_bare pt ksp U).
-  Proof. exact (ut_res_bare_uwp_acc (SY.syscall_env) pt ksp U). Qed.
+    usertrap_res_bare pt ksp U -∗ ⌜uint (pv_sz (us_V U)) <= uvm_maxsz⌝.
+  Proof. exact (ut_res_bare_sz (SY.syscall_env) pt ksp U). Qed.
 
   Lemma usertrap_res_tf_csrs_open
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) :
@@ -175,18 +173,6 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES_PARK.
          ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗ hart_csrs -∗
          usertrap_res_bare pt ksp (us_tf U ws')).
   Proof. exact (ut_res_bare_tf_csrs_open (SY.syscall_env) pt ksp U). Qed.
-
-  Lemma usertrap_res_run_open
-      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) :
-    usertrap_res_bare pt ksp U -∗
-    uexec_wp ∗
-    ∃ kroot : mword 44,
-      kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp (pv_tf (us_V U))⌝ ∗
-      tf_page (ud_tfp pt) (pv_tf (us_V U)) ∗
-      (∀ ws' : list (mword 64),
-         ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗
-         (uexec_wp -∗ usertrap_res_bare pt ksp (us_tf U ws'))).
-  Proof. exact (ut_res_bare_run_open (SY.syscall_env) pt ksp U). Qed.
 
   (* THE PRODUCER, ASSEMBLED.  Two halves, and the seam between them is the
      whole reason this is provable at all: [ut_res_bare_park] turns

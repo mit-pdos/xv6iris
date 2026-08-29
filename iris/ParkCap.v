@@ -52,7 +52,6 @@ Require Import FdSlots IrefSlots FileInvDefs.
 Require Import FirstTok TimerCap.
 Require Import UserPtTree ProcPtOwn.   (* [uptd] / [ud_data] / [ud_pas] / [proc_pt_wf] *)
 Require Import UsertrapRes.
-Require Import UexecWp.   (* [uexec_wp] -- the child's WP, the channel's last row *)
 Require Import UexecSlot. (* [uvis] / [uvis_of] -- the slot's key, and the
                              projection of a resumed record onto it *)
 Require Import UexecRet.  (* [uslot] -- the KEYED slot the resume closer now
@@ -162,13 +161,12 @@ Section ParkCap.
              proc_priv_nopt (un_f N) (un_pj N) (un_pid N) (us_V U') -∗
              fd_slots FDSPARE -∗
              iref_slots IREFSPARE -∗
+             (* NO USER-EXECUTION WP ROW (milestone J, S6): this mirrors
+                [UsertrapRes.ut_park_intro_body] row for row, and the residue
+                no longer carries a ∀-state WP for the channel to spend.  The
+                keyed [uslot (uvis_of U')] in [park_pkg]'s closer above is
+                what crosses the park now. *)
              fd_frags_any (pv_fdg (us_V U')) -∗
-             (* ...and the child's user-execution WP, mirroring
-                [UsertrapRes.ut_park_intro_body] row for row.  Like the fd
-                fragments above it, it is CAPTURED AT THE PARK
-                ([park_token_park] below) rather than supplied by the
-                resumer, so it does not appear in [park_pkg]'s closer. *)
-             uexec_wp -∗
              URB h pt' (add_vec (un_ks N) (mword_of_int 4096)) U')))%I.
 
   (* THE TOKEN: some residue, its cap and its channel, both at [W := the
@@ -217,27 +215,23 @@ Section ParkCap.
        them to [UsertrapRes.ut_own], re-keyed by the closer's own
        [pv_fdg V' = pv_fdg V] premise. *)
     fd_frags_any (pv_fdg (us_V U)) -∗
-    (* THE CHILD'S USER-EXECUTION WP, on the fd fragments' route exactly:
+    (* THE GENERIC SLOT FAMILY, captured on the fd fragments' route exactly:
        not part of [park_child] (that bundle goes straight to the cap) but
-       captured by the package's RESUME closer, built here, and spent by
-       [UsertrapRes.ut_res_bare_park] when the record resumes.  LINEAR: the
-       parker has to own one, which is what makes a WP enter the world only
-       at the two mint sites (userinit's park and sys_fork's kfork call). *)
-    uexec_wp -∗
-    (* ...AND THE GENERIC SLOT FAMILY, captured on the very same route and
-       spent by the package's resume closer at [uvis_of U'].  A FAMILY rather
+       captured by the package's RESUME closer, built here, and instantiated
+       at [uvis_of U'] when the record resumes.  A FAMILY rather
        than a slot at the parked key: the party that resumes this record may
        have replaced its address space first (forkret's boot arm runs
        kexec("/init") between the park and the resume), so the only key that
        is honest here is the one the resume itself produces -- see
        [park_pkg]'s closer above and projects/user-wp-slot.md SS4c (R-b).
-       LINEAR, exactly like the WP above it: the two mint sites eliminate
-       [UEXEC_GEN.uexec_wp_gen]'s [box] once, into both. *)
+       LINEAR: the parker has to own one, which is what makes a slot enter
+       the world only at the two mint sites (userinit's park and sys_fork's
+       kfork call), each eliminating [UEXEC_GEN.uexec_wp_gen]'s [box] once. *)
     (∀ W : uvis, uslot W) -∗
     park_child (un_s N) (un_f N) (un_pj N) (un_ks N) rest (un_pid N) U -∗
     |==> ▷ proc_ctx (un_s N) (un_pj N).
   Proof.
-    iIntros (Hwf Hrest) "#Htok #Htext #Hwire #Hkmap #Hmk Hstack #Henv Hown Hfrag Huwp Hslot Hchild".
+    iIntros (Hwf Hrest) "#Htok #Htext #Hwire #Hkmap #Hmk Hstack #Henv Hown Hfrag Hslot Hchild".
     assert (Hkav : (K_usertrap <= KSTACK_AV)%nat) by (vm_compute; lia).
     iPoseProof "Htok" as "Htok'".
     iEval (rewrite park_token_unfold /park_token_F) in "Htok'".
@@ -247,7 +241,7 @@ Section ParkCap.
     iDestruct ("Hchan" $! N KSTACK_AV with "[%] [%] [%]") as "Hclose";
       [reflexivity | exact Hwf | exact Hkav |].
     iApply ("Hcap" $! (un_f N) (un_pj N) (un_ks N) rest (un_pid N) U KSTACK_AV
-              with "[%] [%] [%] [Hstack Hown Hclose Hfrag Huwp Hslot] [] Hchild").
+              with "[%] [%] [%] [Hstack Hown Hclose Hfrag Hslot] [] Hchild").
     - exact Hrest.
     - destruct Hwf as (Hj & _). exists (un_j N). split; [reflexivity | exact Hj].
     - exact Hkav.
@@ -263,7 +257,7 @@ Section ParkCap.
          instantiated slot on the right. *)
       iSplitR "Hslot".
       + iApply ("Hclose'" $! h pt' U'
-                  with "[%] Htfk Hdone HW Htc Htrap Hpriv Hfd Hiref Hfrag Huwp").
+                  with "[%] Htfk Hdone HW Htc Htrap Hpriv Hfd Hiref Hfrag").
         exact Hupt.
       + (* THE INSTANTIATION -- the whole of milestone J's park channel:
            a generic family in, the resumed record's key out. *)

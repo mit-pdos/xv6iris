@@ -112,7 +112,7 @@ Require Import SpecForkretParkPaid.   (* [FORKRET_PARK_PAID] -- [park_token_intr
 Require Import ParkCap.               (* [park_token_park] *)
 Require Import UsertrapRes.           (* [ut_names], [park_env], [park_own] *)
 Require Import SyscParkEnv.           (* [sysc_park_extra] / [park_world] *)
-Require Import UexecWp.               (* [UEXEC_GEN] / [uexec_wp] -- the park's *)
+Require Import UexecWp.               (* [UEXEC_GEN] -- the mint's [box] *)
 Require Import UexecSlot.             (* [uvis] *)
 Require Import UexecRet.              (* [uslot] -- DIRECT, the seal does not
                                          travel through a re-export *)
@@ -221,9 +221,10 @@ End PstateRunnableHelper.
 
 (* [UG] -- THE GENERIC USER-EXECUTION WP, as a functor argument.  userinit
    PARKS the first process, and parking a process now COSTS a WP for it: the
-   child's [UexecWp.uexec_wp] is a LINEAR row of the park channel, captured
-   at [ParkCap.park_token_park] (see claude-notes/design/user-wp-slot.md).
-   Nothing persistent carries a WP -- [SyscParkEnv.park_world] used to, which
+   child's [∀ W, UexecRet.uslot W] is a LINEAR row of the park channel,
+   captured at [ParkCap.park_token_park] (see
+   claude-notes/design/user-wp-slot.md).
+   Nothing persistent carries one -- [SyscParkEnv.park_world] used to, which
    made it duplicable from inside every trap round -- so this is one of the
    tree's TWO mint sites, the other being sys_fork's kfork call.  Nothing
    else in userinit's cone reaches a [SpecUser.USER], so the inhabitant
@@ -760,13 +761,10 @@ Section ProofUserinit.
        and from here on a resource every process hands its children. *)
     iPoseProof (FP.park_token_intro γs) as "#Htoken".
     (* MINT SITE #1 (the other is sys_fork's, at its kfork call): the first
-       process's user-execution WP, the GENERIC inhabitant out of this
-       functor's [UG] argument.  The [box] is eliminated once, here, into a
-       LINEAR resource the park below consumes -- nothing persistent carries
-       a WP any more (claude-notes/design/user-wp-slot.md). *)
-    iAssert (uexec_wp) as "Huwp".
-    { iPoseProof UG.uexec_wp_gen as "#Hgen". iExact "Hgen". }
-    (* ...AND THE GENERIC SLOT FAMILY, minted from the SAME [box].  Via
+       process's GENERIC SLOT FAMILY, out of this functor's [UG] argument.
+       The [box] is eliminated once, here, into a LINEAR resource the park
+       below consumes -- nothing persistent carries one any more
+       (claude-notes/design/user-wp-slot.md).  Via
        [UexecCond.cond_entry_slot] rather than the bare generic inhabitant
        [uexec_wp_uslot]: a process whose key qualifies picks up sync's own
        constructor instead, which is the whole point of the conditional
@@ -776,7 +774,7 @@ Section ProofUserinit.
     { iPoseProof UG.uexec_wp_gen as "#Hgen".
       iIntros (W). iApply (UexecCond.cond_entry_slot W with "Hgen"). }
     iMod (park_token_park N rest (MkUstate (upd_cwd V ipv) M) Hwf Hrest
-            with "Htoken Htext Hwire Htramp Hmk Hstack Henv Hown Hfrag Huwp Hjslot
+            with "Htoken Htext Hwire Htramp Hmk Hstack Henv Hown Hfrag Hjslot
                   [Hks Hctx Hpriv Hfd Hirs]")
       as "Hpctx".
     { rewrite /park_child. iFrame "Hks Hpriv Hfd Hirs". iExact "Hctx". }

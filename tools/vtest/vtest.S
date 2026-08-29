@@ -59,6 +59,14 @@ _start:
     fence
     li   t0, DONE_MAGIC
     sw   t0, RES_DONE(s11)
+    /* A SYMBOL, not an instruction: `.globl` emits no bytes, so every image
+       is unchanged.  It exists so a debugger-driven runner can put a
+       hardware breakpoint on the exact instruction the primary parks at,
+       instead of polling the DONE word over JTAG -- which costs a round trip
+       per poll and cannot tell "not finished yet" from "hung".  See
+       tools/vtest/board.py. */
+    .globl _vtest_done
+_vtest_done:
 1:  j    1b
 
 .Lap:

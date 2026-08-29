@@ -58,7 +58,7 @@ rest alone" is not available; what IS available is to leave the harts we do
 not use pointing where firmware left them, so they resume into their own
 park loops.  See PROFILE["spare_harts"] and the --takeover flag.
 """
-import argparse, os, re, socket, subprocess, sys, time
+import argparse, json, os, re, select, signal, socket, subprocess, sys, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -134,7 +134,17 @@ def runnable_tests(p):
     all, and running one would report a stuck model as though it were a
     finding about the device rather than about the board not having one."""
     skip = tuple(a + "_" for a in p.get("skip_areas", []))
-    return [t for t in vtest.all_tests() if not t.startswith(skip)]
+    out = []
+    for t in vtest.all_tests():
+        if t.startswith(skip):
+            continue
+        # a test may also opt out by itself, with `machines=qemu` in its
+        # `vtest:` directive -- for a question only QEMU can be asked, not
+        # for one this board happens to fail
+        if vtest.config(t).get("machines", "any") == "qemu":
+            continue
+        out.append(t)
+    return out
 
 
 def profile(name):
@@ -233,25 +243,104 @@ class Ocd:
 
 # --------------------------------------------------------------------- gdb --
 
-def gdb_batch(port, body, timeout=180):
-    """Run a gdb batch script against the board and return its output.
+class Gdb:
+    """A PERSISTENT gdb session, and it is the whole performance story.
 
-    One gdb invocation per phase rather than a persistent session: a phase
-    boundary is exactly where the target must be free for OpenOCD's own
-    command server to resume it, and a detached gdb is the simplest way to
-    be sure nothing is holding it."""
-    script = os.path.join(BUILDDIR, "board.gdb")
-    os.makedirs(BUILDDIR, exist_ok=True)
-    with open(script, "w") as fh:
-        fh.write("set confirm off\nset pagination off\n"
-                 "set architecture riscv:rv64\n"
-                 "set debuginfod enabled off\n"
-                 "target extended-remote localhost:%d\n" % port)
-        fh.write(body)
-        fh.write("\ndetach\nquit\n")
-    r = subprocess.run([GDB, "-batch", "-x", script],
-                       capture_output=True, text=True, timeout=timeout)
-    return r.stdout + r.stderr
+    THE BOTTLENECK IS NOT THE GUEST.  A vtest image runs on the board in
+    about 70 ms.  The first version of this runner took ~25 SECONDS per
+    test, i.e. the measurement was 0.3% of the cost, and all of the rest was
+    scaffolding:
+
+      - THREE gdb PROCESS SPAWNS per run (discover the hart map, load and
+        set up, read the result back).  Each is a process start plus a fresh
+        connection to OpenOCD and a detach.
+      - ~50 register writes PER HART, each one a separate JTAG transaction
+        over the GDB remote protocol.
+      - a POLLING LOOP on the DONE word over the OpenOCD telnet port, one
+        round trip per poll, which also cannot tell "not finished yet" from
+        "hung".
+
+    This class removes the first and the third.  One gdb process is started
+    per Board and lives for the whole batch, so a `gen --all` pays the
+    startup once instead of three times per test; and instead of polling,
+    the runner puts a HARDWARE BREAKPOINT on `_vtest_done` -- the instruction
+    the primary parks at, which vtest.S exports as a symbol for exactly this
+    -- and just continues.  That is one round trip for the whole run and it
+    is exact: the breakpoint hits when the program has finished, and a
+    timeout means it genuinely did not.
+
+    Commands are framed by an `echo` sentinel, for the same reason the
+    OpenOCD side is: output arrives asynchronously and a reader that guesses
+    where a reply ends goes out of sync."""
+
+    def __init__(self, port, timeout=120):
+        self.port, self.timeout, self.n = port, timeout, 0
+        self.p = subprocess.Popen(
+            [GDB, "-q", "-nx"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, text=True, bufsize=1)
+        self.buf = ""
+        for c in ("set confirm off", "set pagination off", "set height 0",
+                  "set width 0", "set debuginfod enabled off",
+                  "set architecture riscv:rv64",
+                  "set breakpoint pending off"):
+            self.cmd(c)
+        self.attach()
+
+    # -- plumbing ---------------------------------------------------------
+
+    def _read_until(self, mark, timeout):
+        end = time.time() + timeout
+        while mark not in self.buf:
+            if time.time() > end:
+                raise TimeoutError("gdb: no reply to %r in %.0fs" % (mark, timeout))
+            r, _, _ = select.select([self.p.stdout], [], [], 0.2)
+            if r:
+                ch = os.read(self.p.stdout.fileno(), 65536).decode(errors="replace")
+                if not ch:
+                    raise RuntimeError("gdb exited")
+                self.buf += ch
+        i = self.buf.index(mark)
+        out, self.buf = self.buf[:i], self.buf[i + len(mark):]
+        return out
+
+    def cmd(self, c, timeout=None):
+        self.n += 1
+        mark = "__GDB%d__" % self.n
+        self.p.stdin.write("%s\necho %s\\n\n" % (c, mark))
+        self.p.stdin.flush()
+        return self._read_until(mark, timeout or self.timeout)
+
+    def attach(self):
+        return self.cmd("target extended-remote localhost:%d" % self.port)
+
+    def close(self):
+        try:
+            self.p.stdin.write("detach\nquit\n")
+            self.p.stdin.flush()
+            self.p.wait(timeout=5)
+        except Exception:
+            try: self.p.kill()
+            except Exception: pass
+
+    # -- the one operation that can hang ----------------------------------
+
+    def cont(self, timeout):
+        """`continue`, with a deadline.  On timeout the inferior is
+        interrupted with SIGINT so the session stays usable and the caller
+        can read out where the harts actually are -- which is the diagnostic
+        that matters when a test does not finish."""
+        self.n += 1
+        mark = "__GDB%d__" % self.n
+        self.p.stdin.write("continue\necho %s\\n\n" % mark)
+        self.p.stdin.flush()
+        try:
+            return self._read_until(mark, timeout), True
+        except TimeoutError:
+            self.p.send_signal(signal.SIGINT)
+            try:
+                return self._read_until(mark, 30), False
+            except TimeoutError:
+                return "", False
 
 
 def zero_file(nbytes):
@@ -318,7 +407,9 @@ class Board:
     def __init__(self, p):
         self.p = p
         self.ocd = Ocd(p["ocd_port"])
+        self.gdb = Gdb(p["gdb_port"])
         self._threads = None
+        self._loaded = None      # the image currently in DRAM, for fast repeat
 
     # -- discovery ---------------------------------------------------------
 
@@ -329,17 +420,29 @@ class Board:
         and watching the test time out with no other symptom."""
         if self._threads is not None:
             return self._threads
-        body = "info threads\n"
-        # ask each thread for its own mhartid
+        # CACHED ON DISK across invocations: the map is a property of the
+        # board's OpenOCD config, not of a run, and discovering it costs a
+        # round trip per hart.
+        cache = os.path.join(BUILDDIR, "hartmap.json")
+        if os.path.exists(cache):
+            try:
+                self._threads = {int(k): v for k, v in
+                                 json.load(open(cache)).items()}
+                return self._threads
+            except Exception:
+                pass
+        out = ""
         for t in range(1, 16):
-            body += ('thread %d\nprintf "HART %d = %%d\\n", $mhartid\n' % (t, t))
-        out = gdb_batch(self.p["gdb_port"], body)
+            out += self.gdb.cmd('thread %d' % t)
+            out += self.gdb.cmd('printf "HART %d = %%d\\n", $mhartid' % t)
         m = {}
         for th, hid in re.findall(r"HART (\d+) = (-?\d+)", out):
             m[int(hid)] = int(th)
         if not m:
             sys.exit("board: could not read any hart's mhartid over gdb.\n" + out)
         self._threads = m
+        os.makedirs(BUILDDIR, exist_ok=True)
+        json.dump({str(k): v for k, v in m.items()}, open(cache, "w"))
         return m
 
     def probe(self):
@@ -350,15 +453,15 @@ class Board:
         print("  primary hart %d, spares %s, firmware hart %d"
               % (self.p["primary_hart"], self.p["spare_harts"],
                  self.p["firmware_hart"]))
-        body = ""
         for hid in sorted(tm):
             if hid in self.p.get("ignore_harts", []):
-                print("  hart %d: SKIPPED (%s)" % (hid, "E24, 32-bit"))
+                print("  hart %d: SKIPPED (E24, 32-bit)" % hid)
                 continue
-            body += ('thread %d\nprintf "hart %d: pc=%%#lx misa=%%#lx '
-                     'mstatus=%%#lx satp=%%#lx mtvec=%%#lx\\n", '
-                     '$pc, $misa, $mstatus, $satp, $mtvec\n' % (tm[hid], hid))
-        print(gdb_batch(self.p["gdb_port"], body).strip())
+            self.gdb.cmd("thread %d" % tm[hid])
+            print(self.gdb.cmd('printf "  hart %d: pc=%%#lx misa=%%#lx '
+                               'mstatus=%%#lx satp=%%#lx mtvec=%%#lx\\n", '
+                               '$pc, $misa, $mstatus, $satp, $mtvec'
+                               % hid).strip())
         print("  CLINT mtime = %#x" % self.read_u64(ABI_CLINT_MTIME))
         print("  targets:\n" + self.ocd.cmd("targets"))
 
@@ -368,73 +471,76 @@ class Board:
 
     # -- one run -----------------------------------------------------------
 
-    def run(self, name, image, regions, harts, timeout=15.0, takeover=False):
-        """Load [image], start it on [harts], wait for DONE, read the result."""
-        p, tm = self.p, self.thread_map()
-        gport = p["gdb_port"]
+    def run(self, name, image, regions, harts, timeout=15.0, takeover=False,
+            elf=None):
+        """Load [image], start it on [harts], wait for DONE, read the result.
 
-        self.ocd.cmd("halt", timeout=30)
+        ONE gdb SESSION, ONE `continue`.  The breakpoint is on `_vtest_done`
+        -- the instruction vtest.S parks the primary at, right after the DONE
+        store -- so this neither polls nor guesses: the stop IS the program
+        finishing, and a timeout genuinely means it did not.  See the Gdb
+        class for what this replaced and what it cost."""
+        p, tm, g = self.p, self.thread_map(), self.gdb
 
-        # ---- 1. memory: the zero regions, then the image.  Bulk only. ----
-        body = ""
-        for base, size in regions:
-            body += "restore %s binary 0x%x\n" % (zero_file(size), base)
         img = os.path.join(BUILDDIR, name + "_hw.bin")
         with open(img, "wb") as fh:
             fh.write(bytes(image))
-        body += "restore %s binary 0x%x\n" % (img, ABI["TEXT_BASE"])
+
+        # ---- 1. memory.  Bulk only; every access here is a round trip. ----
+        # THE IMAGE IS RELOADED ONLY WHEN IT CHANGES, which is what makes a
+        # repeat=700 litmus test affordable: a repeat re-zeroes the regions
+        # and re-establishes the registers, and that is all it needs to.
+        g.cmd("\n".join("restore %s binary 0x%x" % (zero_file(size), base)
+                        for base, size in regions))
+        if self._loaded != (name, bytes(image)):
+            g.cmd("restore %s binary 0x%x" % (img, ABI["TEXT_BASE"]))
+            if elf:
+                g.cmd("file %s" % elf)          # symbols only, for _vtest_done
+            self._loaded = (name, bytes(image))
 
         # ---- 1b. the CLINT word this hart owns.  FIRMWARE LEAVES IT SET:
         #      OpenSBI parks a secondary hart waiting for an IPI, so its MSIP
         #      is 1 when we take the hart over, where the model's power-on
-        #      CLINT has 0.  Measured on clint_msip, which read 1 before
-        #      touching anything.  Only OUR harts' words are cleared -- another
-        #      hart's MSIP is how firmware controls that hart. ----
-        for hid in harts:
-            body += "set *(unsigned int *)0x%x = 0\n" % (CLINT0 + 4 * hid)
+        #      CLINT has 0. ----
+        g.cmd("\n".join("set *(unsigned int *)0x%x = 0" % (CLINT0 + 4 * hid)
+                        for hid in harts))
 
         # ---- 2. registers: a DEFINED start state on every hart we use ----
         for hid in harts:
             if hid not in tm:
                 sys.exit("board: hart %d is not on this board (have %s)"
                          % (hid, sorted(tm)))
-            body += "thread %d\n" % tm[hid]
-            body += establish_state(p)
-        out = gdb_batch(gport, body)
-        if "Error" in out or "error" in out.lower() and "restore" not in out.lower():
-            pass  # gdb chatters; the real check is the DONE flag below
-        if "Load failed" in out or "Cannot access" in out:
-            sys.exit("board: loading %s failed\n%s" % (name, out))
+            # ONE round trip for the whole register file, not fifty.  Each
+            # `set` is still its own JTAG transaction, but the Python<->gdb
+            # sentinel exchange around each one is what dominated: batching
+            # them took a run from ~4 s to well under one.
+            g.cmd("thread %d\n" % tm[hid] + establish_state(p).strip())
 
-        # ---- 3. go.  Resume is SMP-wide; the harts we did not set up
-        #        resume into whatever park loop firmware left them in. ----
+        # ---- 3. go.  One breakpoint, one continue. ----
         t0 = time.time()
-        self.ocd.cmd("resume", timeout=30)
-
-        done, res_base = False, ABI["RESULT_BASE"]
-        deadline = t0 + timeout
-        while time.time() < deadline:
-            w = self.ocd.mdw(res_base, 1)
-            if w and w[0] == ABI["DONE_MAGIC"]:
-                done = True
-                break
-            time.sleep(0.02)
+        g.cmd("delete breakpoints")
+        bp = g.cmd("hbreak _vtest_done")
+        if "Hardware assisted breakpoint" not in bp:
+            # no symbols (or no trigger left): fall back to the poll
+            return self._run_polled(name, harts, timeout, t0)
+        _, ok = g.cont(timeout)
         ms = (time.time() - t0) * 1000
-        self.ocd.cmd("halt", timeout=30)
+        g.cmd("delete breakpoints")
 
-        # ---- 4. read the whole result region back, in one bulk transfer ----
+        # ---- 4. read the result region back, in one bulk transfer ----
         dump = os.path.join(BUILDDIR, name + "_hw_result.bin")
-        gdb_batch(gport, "dump binary memory %s 0x%x 0x%x\n"
-                  % (dump, res_base, res_base + ABI["RESULT_SIZE"]))
+        g.cmd("dump binary memory %s 0x%x 0x%x"
+              % (dump, ABI["RESULT_BASE"], ABI["RESULT_BASE"] + ABI["RESULT_SIZE"]))
         result = open(dump, "rb").read() if os.path.exists(dump) else b""
 
-        if not done:
+        if not ok:
             status = int.from_bytes(result[4:8], "little") if len(result) >= 8 else -1
-            pcs = gdb_batch(gport, "".join(
-                'thread %d\nprintf "  hart %d pc=%%#lx mcause=%%#lx mepc=%%#lx '
-                'mtval=%%#lx\\n", $pc, $mcause, $mepc, $mtval\n' % (tm[h], h)
-                for h in harts))
-            sys.exit("%s: the board never set the DONE flag within %.1fs\n"
+            pcs = ""
+            for h in harts:
+                g.cmd("thread %d" % tm[h])
+                pcs += g.cmd('printf "  hart %d pc=%%#lx mcause=%%#lx mepc=%%#lx '
+                             'mtval=%%#lx\\n", $pc, $mcause, $mepc, $mtval' % h)
+            sys.exit("%s: the board never reached _vtest_done within %.1fs\n"
                      "  status word = 0x%08x\n%s\n"
                      "  (a pc parked at 0 means the program TRAPPED: mtvec is "
                      "0, so a fault is a trap loop at 0 -- exactly what the "
@@ -444,8 +550,39 @@ class Board:
         return dict(name=name, text=bytes(image), result=result, ms=ms,
                     serial=b"", disk=[], board=self.p)
 
+    def _run_polled(self, name, harts, timeout, t0):   # noqa: the fallback
+        """The old path: resume over the OpenOCD command server and poll the
+        DONE word.  Kept because a board with no spare hardware trigger, or
+        an image built without symbols, cannot use the breakpoint."""
+        self.gdb.cmd("detach")
+        self.ocd.cmd("resume", timeout=30)
+        done, deadline = False, time.time() + timeout
+        while time.time() < deadline:
+            w = self.ocd.mdw(ABI["RESULT_BASE"], 1)
+            if w and w[0] == ABI["DONE_MAGIC"]:
+                done = True
+                break
+            time.sleep(0.02)
+        ms = (time.time() - t0) * 1000
+        self.ocd.cmd("halt", timeout=30)
+        self.gdb.attach()
+        dump = os.path.join(BUILDDIR, name + "_hw_result.bin")
+        self.gdb.cmd("dump binary memory %s 0x%x 0x%x"
+                     % (dump, ABI["RESULT_BASE"],
+                        ABI["RESULT_BASE"] + ABI["RESULT_SIZE"]))
+        result = open(dump, "rb").read() if os.path.exists(dump) else b""
+        if not done:
+            sys.exit("%s: the board never set DONE within %.1fs" % (name, timeout))
+        return dict(name=name, text=b"", result=result,
+                    ms=ms, serial=b"", disk=[], board=self.p)
+
     def close(self):
-        self.ocd.close()
+        try:
+            self.s.sendall(b"exit\n")
+            self.s.close()
+        except Exception:
+            pass
+
 
 
 CLINT0          = 0x02000000
@@ -609,7 +746,7 @@ def main():
     try:
         for n in names:
             cfg = vtest.config(n)
-            _, text = vtest.build(n, defines_for(p), p["march"], "_hw")
+            elf, text = vtest.build(n, defines_for(p), p["march"], "_hw")
             text = pad_image(text)
             harts = [p["primary_hart"]]
             for k in range(1, cfg["smp"]):
@@ -617,11 +754,13 @@ def main():
             if a.takeover:
                 harts = sorted(set(harts) | {p["firmware_hart"]})
             reps = a.repeat or cfg["repeat"]
-            seen = {}
+            seen, counts = {}, {}
             for _ in range(reps):
                 r = b.run(n, text, regions_for(n), harts,
-                          timeout=a.timeout, takeover=a.takeover)
-                seen.setdefault(bytes(r["result"]), r)
+                          timeout=a.timeout, takeover=a.takeover, elf=elf)
+                key = bytes(r["result"])
+                seen.setdefault(key, r)
+                counts[key] = counts.get(key, 0) + 1
             alts = sorted(seen.keys())
             r = seen[alts[0]]
             print("%s: %d run(s) on harts %s -> %d distinct result(s), %.0f ms"
@@ -633,6 +772,28 @@ def main():
                 words = " ".join("%#010x" % int.from_bytes(r["result"][o:o+4], "little")
                                  for o in range(8, 40, 4))
                 print("  status=0x%08x  +8..+40: %s" % (st, words))
+                if reps > 1:
+                    # A TALLY, which is what a litmus test wants: the same
+                    # program run many times, grouped by what it observed.
+                    # The repeat path does NOT reload the image (see
+                    # Board.run), so runs after the first cost only the
+                    # region zeroing, the register set-up and one continue.
+                    for k, (res, cnt) in enumerate(
+                            sorted(counts.items(), key=lambda kv: -kv[1])):
+                        ws = " ".join("%d" % int.from_bytes(res[o:o+4], "little")
+                                      for o in (4, 8, 12, 16, 20, 24))
+                        print("  [%d] x%-4d  +4/+8/+12/+16/+20/+24 = %s"
+                              % (k, cnt, ws))
+                    # ...and the SUM over all runs of each word, which is what
+                    # a sticky litmus counter wants: one occurrence anywhere.
+                    tot = {}
+                    for res, cnt in counts.items():
+                        for o in range(8, 40, 4):
+                            tot[o] = tot.get(o, 0) + cnt * int.from_bytes(
+                                res[o:o+4], "little")
+                    print("  SUM over %d runs, +8..+36: %s"
+                          % (reps, " ".join("%d" % tot[o]
+                                            for o in range(8, 40, 4))))
     finally:
         b.close()
 

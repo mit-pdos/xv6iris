@@ -118,6 +118,60 @@ and instruction counters, which differ between two runs on the SAME hart, so
 a cross-hart comparison would say nothing.  `core_regs_fpr` has none because
 it traps by design and never publishes a result.
 
+## Treating a trap as DATA (`trap.S`)
+
+By default a fault ends a run: `mtvec` is 0, the pc goes there, the fetch at
+an undeclared address faults again, and the machine trap-loops forever (see
+the rules below).  That is fine when the trap is the ANSWER -- `CoreRegsFpr.v`
+pins the pc at two step counts and reads the story out of `mcause`/`mepc`/
+`mtval`.  It is useless when a trap is something to STEP OVER, for two
+reasons:
+
+1. **The loop destroys the evidence.**  The second trap overwrites `mcause`,
+   `mepc` and `mtval` with its own.  Measured on the board: `core_regs_mcsr`
+   reported `mcause=1 mepc=0 mtval=0`, which says nothing; catching the FIRST
+   trap with a hardware breakpoint at 0 gave `mcause=2 mepc=0x8000008c
+   mtval=0x30a022f3`, i.e. `csrr menvcfg`, which says everything.
+2. **One trap ends the run**, so a program can only ever report its first
+   failure.  A probe that wants to ask forty questions gets one answer.
+
+[`trap.S`](trap.S) is an M-mode handler that records the trap and **resumes
+past the faulting instruction**.  A test `#include`s it after its body and
+points `mtvec` at `_vtest_trap`.  It is not in `vtest.S`, because putting it
+there would add bytes to all 60 images to serve the two tests that want it.
+Its contract is in its header and a test using it must obey all four points
+-- in particular **t0 and t1 are clobbered by any trap** and **it advances
+`mepc` by 4**, so such a test needs `.option norvc` of its own.
+
+**Reading a CSR over JTAG is not the same question as executing `csrr`.**
+All twenty of `core_regs_mcsr`'s CSRs read fine through OpenOCD on the U74 --
+`menvcfg` included, answering 0 -- while the hart refuses to *execute* a read
+of it.  The debug module can report a value for a register the machine will
+not let an instruction touch, so only a `csrr` in the image measures what a
+kernel would see.  This is why the probe below exists at all.
+
+### What the CSR probe found
+
+`core_csrprobe` (both machines) and `core_csrwide` (QEMU only, marked
+`machines=qemu` in its `vtest:` directive) split the question in two,
+because the model cannot be asked the second half -- see finding 32.
+
+| | model | QEMU virt | VisionFive 2 U74 |
+|---|---|---|---|
+| 32 standard M/S CSRs and counters | ok | ok | ok |
+| `menvcfg`, `mconfigptr`, `senvcfg` (priv 1.12) | ok | ok | **trap** |
+| `time` | ok | ok | **trap** |
+| `mseccfg` | **no transition** | trap | trap |
+| `mstateen0`, `sstateen0`, `scountovf`, `mcyclecfg`, `minstretcfg`, `ssp` | *unreached* | trap | trap |
+| an all-zeros instruction word (the control) | trap | trap | trap |
+
+**The control is load-bearing.**  Without it, a run in which the handler was
+never reached is indistinguishable from one in which nothing trapped -- every
+entry would be 0 either way.  It is also the only place the MODEL's trap
+machinery runs in `core_csrprobe`, since the model refuses none of the 36,
+so it is what establishes that the model takes the trap, runs the handler and
+returns through `mret` correctly.
+
 ## Observation channels
 
 1. **The RESULT region** (`abi.h`).  QEMU side: read out of guest physical
@@ -255,7 +309,7 @@ does not exist).
 
 ### Findings from REAL HARDWARE
 
-Four more, from running the suite on a StarFive VisionFive 2 over JTAG.
+Seven more, from running the suite on a StarFive VisionFive 2 over JTAG.
 [`README-hw.md`](README-hw.md) is where they are written up, what a board
 run claims (it is narrower than a QEMU run), and how the rig works; this
 table stays the authority for the numbers.
@@ -268,8 +322,37 @@ hart 0, and the harness's clock never ticks.
 |---|------|-------|-----------|------|----------|
 | 27 | **the model's clock never runs** | `mtime` frozen at 0 however many instructions retire, and `mcycle` frozen with it | both advance -- on the board AND on QEMU | **UNSOUNDNESS** | `clint_time` |
 | 28 | **the CLINT is not indexed by hart** | only hart 0's registers exist -- `clint_load`/`clint_store` compare the offset with `eq_vec` against `MSIP_BASE` = 0 and `MTIMECMP_BASE` = 0x4000, and every other hart's access takes a load access fault | every hart has its own MSIP at `CLINT+4*hartid`, with exactly the semantics the model gets right for hart 0 | **UNSOUNDNESS**, and live in xv6's `start()` | `clint_msip` |
-| 29 | `misa` bits 1 (B) and 23 (X) | absent (`MISA_C` = `0x800000000014112D`) | present (`0x800000000094112F`) | incompleteness | `core_regs_mcsr` |
+| 29 | `misa`, all three different | model `0x…14112D` (A C D F I M S U) | QEMU adds **H** (`0x…1411AD`, finding 19); the board adds **B** and **X** and has no H (`0x…94112F`) | incompleteness both ways | `core_csrprobe` |
 | 30 | the UART is a **different chip** on this board | a byte-strided 16550 in an 8-byte window (`DevModel.uart_size` = 8) | Synopsys DW-APB v3.14a, **reg-shift 2** -- LSR is at `0x14`, and the whole register file lies outside the model's window | board difference, not a model defect | the probe |
+| 31 | CSRs the **U74** refuses that the model and QEMU both implement: `menvcfg`, `mconfigptr`, `senvcfg` (privileged spec 1.12 additions the core predates) and `time` (SiFive leaves `rdtime` to firmware to emulate, which is what OpenSBI does on this board) | implemented, read successfully | implemented | illegal instruction | **model is WIDER than the board** | `core_csrprobe` |
+| 32 | **`csrr mseccfg` has NO TRANSITION in the model.**  Finding 22 records these seven CSRs as "implemented, read successfully"; under this suite's interpreter the model neither answers nor refuses -- `exec` returns None and the harness reports `VStuck`, so the run stops and the other six go unasked | `VStuck` | illegal instruction | illegal instruction | a THIRD outcome; same class of limit as finding 25's `sc.w` | `core_csrwide` |
+| 33 | **the machine's identity**: `mvendorid`, `marchid`, `mimpid` | `0, 0, 0` -- an anonymous machine | QEMU also `0, 0, 0`; the board answers `0x489` (SiFive's JEDEC id), `0x7`, `0x4210427` | incompleteness | `core_csrprobe` |
+
+**Finding 29 was previously attributed to `core_regs_mcsr`, and that was
+wrong**: that test does not complete on the board at all (it reads for
+values, so the U74's refusal of `menvcfg` ends its run seven registers in).
+The board's `misa` was known only from a JTAG read, and **a JTAG read is not
+this question** -- see "Treating a trap as DATA" above.  `core_csrprobe`
+establishes both that `misa` is `csrr`-readable on the U74 and what it
+answers, so the row is now a measurement.
+
+**One row where the board vindicates the MODEL against QEMU**, and it is the
+first: `mideleg`.  QEMU has the hypervisor extension, so VSSIP/VSTIP/VSEIP/
+SGEIP are hardwired into it (`0x1444`, finding 19's consequence).  The board
+has no H and reads 0 -- which is what the model reads.  Every other row in
+this table has the model narrower or wider than the hardware; here QEMU is
+the outlier.
+
+**Finding 31 has a live consequence.**  README's rules require a `pt_`
+program to pin `menvcfg.ADUE` explicitly before `satp` (finding 20).  On this
+board it **cannot** -- the CSR does not exist -- so any port of the `pt_` area
+to this hardware has to deal with that first.
+
+**Finding 32 should be settled before README's open decision is answered**,
+because that decision was framed on the belief that the model ANSWERS on
+these seven.  It does not, at least not through `exec`; whether finding 22's
+"read successfully" was measured some other way or has simply rotted is the
+thing to check.
 
 **Finding 27 is the largest of the four and is not a device question.**
 `VTest.run_until` steps `riscv_step false` -- the argument is the CLOCK TICK

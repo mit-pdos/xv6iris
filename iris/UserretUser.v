@@ -62,12 +62,14 @@ Require Import KptExecMap.
 Require Import UserPtTree UserExec UserKernelBridge.
 Require Import KptShare.
 Require Import TrampPt.
-Require Import UexecWp.   (* [uexec_wp] / [loop_ok] -- the slot this runs.
-                             REQUIRED DIRECTLY, not through a re-export: the
-                             file manipulates a slot hypothesis and the
-                             [Typeclasses Opaque] seal does not travel
-                             (durable-notes, "iFrame RESOLVES ITS INSTANCES
-                             UP TO DELTA"). *)
+Require Import UexecWp.   (* [loop_ok] -- the slot's own guard *)
+Require Import UserPerm.  (* [perm_of] / [usz_ok] -- the key's permission view *)
+Require Import UexecRet.  (* [ukc] / [ukb] / [uvb] -- the U-mode contract.
+                             REQUIRED DIRECTLY, not through a re-export: this
+                             file puts a [uvb]-carrying continuation in the
+                             proofmode context and the [Typeclasses Opaque]
+                             seal does not travel (durable-notes). *)
+Require Import UexecApply.  (* [ukc_apply] -- the bundle build, named *)
 Require Import SpecUserret.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -134,6 +136,9 @@ Section UserretUser.
     (* ---- the loop-invariant shape of [C]/[pt], which the SLOT demands and
            userret is indifferent to (see the header) ---- *)
     loop_ok C pt ->
+    (* ---- xv6's own bound on [p->sz], which [UexecRet.uvb] carries and the
+           caller reads off the residue ([UexecApply.usz_ok_of_maxsz]) ---- *)
+    usz_ok sz ->
     kernel_text -∗
     hw_config -∗
     minstret_inv -∗
@@ -238,23 +243,32 @@ Section UserretUser.
        tf_pa (ud_tfp pt) 280 ↦ₚ₈{ dqm } vt6 -∗
        tf_pa (ud_tfp pt) 112 ↦ₚ₈{ dqm } va0f -∗
      Rut pt) -∗
-    (* ---- THE WP TO RUN.  Not a functor-fixed theorem any more: the caller
-           extracted this slot from the kernel residue it is about to park,
-           and it is what user mode runs on ([UexecWp.uexec_wp]).  Applied
-           below at the concrete post-sret state the bridge builds. ---- *)
-    uexec_wp -∗
-    (* ---- THE TRAP SEAM, in both directions.  The kernel re-entry contract
-           as always -- hand me the trapped frame and I run forever -- but
-           PAIRED with the WP user execution returns at that trap, which is
-           what the next round resumes the process with (MILESTONE G: the
-           WP circulates, nothing is re-minted).  The returned one is typed
-           at the general [uexec_wp]: a verified process may hand back any
-           successor. ---- *)
-    ▷ (user_trap_frame C pt Rut ∗ uexec_wp -∗ WP (Loop : expr riscv_lang)) -∗
+    (* ---- THE CONTINUATION TO RUN (milestone J, stage S5).  It used to be
+           the forall-state [UexecWp.uexec_wp]; it is now the per-process
+           U-mode continuation at the NATURAL state userret is about to
+           resume -- the restored register file, the sret'd pc, the key's
+           image and the permission map the kernel computed for this table
+           and size.  [UexecRet.ukc] IS the slot at a natural state
+           ([uslot_ukc]), so the caller does the re-key and this lemma's
+           whole job is "build [uvb] and apply". ---- *)
+    ukc (perm_of (ud_um pt) sz) M
+        (userret_gpr m vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2
+           va3 va4 va5 va6 va7 vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10
+           vs11 vt3 vt4 vt5 vt6 va0f)
+        (ret_pc sepc0) -∗
+    (* ---- THE KERNEL'S SIDE OF THE CONTRACT, as user execution holds it:
+           [UexecRet.ukont] after [ukont_unfold].  It NAMES the state that
+           trapped -- cause, tval and the whole user-visible record -- and
+           takes back what user execution hands over there
+           ([UexecRet.uexec_ret]), which is what a verified program can
+           actually produce.  The old shape hid all five under
+           [user_trap_frame]'s existentials and typed the successor at
+           [uexec_wp] (defect F1/F2, design/user-wp-slot.md). ---- *)
+    ▷ ukb C pt Rut sz (perm_of (ud_um pt) sz) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HSIE HMPRV HSXL HTVM HMXR Hmm Hwf HTSR Hsup Ha0 HuMode Huasid Huppn
-      HFS HVS HXS HSD HMPP HSPIE Hdqc Hinj Hacc Hlok.
+      HFS HVS HXS HSD HMPP HSPIE Hdqc Hinj Hacc Hlok Hszok.
     iIntros "#Hkt #Hhw #Hmi #Hwi Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc
              #Hclaim Hktlb Hufr Hpc Hfile
              Htf40 Htf48 Htf56 Htf64 Htf72 Htf80 Htf88 Htf96 Htf104 Htf120
@@ -288,15 +302,11 @@ Section UserretUser.
                              Htf168 Htf176 Htf184 Htf192 Htf200 Htf208 Htf216
                              Htf224 Htf232 Htf240 Htf248 Htf256 Htf264 Htf272
                              Htf280 Htf112") as "Hrut".
-    (* the image is forgotten HERE: the generic slot below takes
-       [UserPtTree.user_pt_inv] -- the MAPPED view at some image -- so the
-       lazy name the caller supplied has no reader on this path.  It is
-       taken named anyway so that the entries into the trap loop (forkret's
-       tail above all) hand on what [ProcPtOwn.proc_ptm] already gives them
-       instead of weakening one tier higher. *)
-    iDestruct (umem_lazy_any with "Hdata") as "Hdata".
-    (* the machine, UNPACKED into the triple the slot consumes *)
-    iDestruct (userret_to_user_state C pt mstatus0 sepc0 sc_v stval_v
+    (* the machine, UNPACKED into the triple the bundle consumes -- AT THE
+       NAMED LAZY IMAGE (milestone J, S5): [UexecRet.uvb]'s image conjunct
+       IS [user_ptm_inv pt sz M], so the name the caller supplied is no
+       longer dropped here. *)
+    iDestruct (userret_to_user_state_ptm C pt sz M mstatus0 sepc0 sc_v stval_v
                  (uc_mie C) (uc_mideleg C) MENVCFG_S (mword_of_int 0)
                  (uc_stvec C) (uc_medeleg C)
                  (ud_root pt) (ud_tfp pt) (ud_um pt)
@@ -313,21 +323,17 @@ Section UserretUser.
                  with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb Hpc
                        Hfile Hsc Hstval Hstvec Hmedl Hmse Hsse
                        Hmcen Hscen Hhpm Hdata")
-      as (Mp) "(%Hmsok & Hregs & Hupt & Hcfg)".
-    (* AND THE SLOT RUNS.  The seal comes off HERE ONLY, and only on the
-       hypothesis: the proofmode has to see the slot's foralls to instantiate
-       them, but [Hhandler]'s own [uexec_wp] -- the WP user execution returns
-       -- must stay folded, since that is the type the slot's handler premise
-       is stated at.  A bare [rewrite] would unfold both. *)
-    iEval (rewrite uexec_wp_unfold /uexec_F) in "Huwp".
-    iApply ("Huwp" $! CID C pt Rut Mp
+      as "(%Hmsok & Hregs & Hupt & Hcfg)".
+    (* AND THE CONTINUATION RUNS.  The bundle is built row by row inside
+       [UexecApply.ukc_apply] -- where the context is that lemma's own
+       premises -- rather than inline here (optimization.md, RULE ONE). *)
+    iApply (ukc_apply C pt Rut sz M
               (userret_gpr m vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2
                  va3 va4 va5 va6 va7 vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10
                  vs11 vt3 vt4 vt5 vt6 va0f)
               (sret_ms5 mstatus0) sc_v stval_v sepc0 (ret_pc sepc0)
-              with "[%] [%] Hhw Hmi Hwi Hregs Hupt Hcfg Hrut Hhandler").
-    - exact Hlok.
-    - exact Hmsok.
+              Hlok Hszok Hmsok
+              with "Huwp Hhw Hmi Hwi Hregs Hupt Hcfg Hrut Hhandler").
   Qed.
 
 End UserretUser.

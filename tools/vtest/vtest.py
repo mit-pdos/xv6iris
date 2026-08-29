@@ -46,7 +46,12 @@ def config(name):
     the model must admit EVERY execution the hardware has, so such a test is
     captured as a SET of observations rather than one."""
     src = os.path.join(TESTDIR, name + ".S")
-    cfg = {"repeat": 1, "drives": "cache=writeback", "smp": 1, "serial_in": ""}
+    cfg = {"repeat": 1, "drives": "cache=writeback", "smp": 1, "serial_in": "",
+           # WHICH MACHINES THIS TEST MEANS ANYTHING ON.  "any" (the default)
+           # is every machine the suite can drive; "qemu" marks a test that
+           # is deliberately QEMU-only.  tools/vtest/board.py honours it, so
+           # a QEMU-only test never shows up as a board failure.
+           "machines": "any"}
     for line in open(src):
         m = re.search(r"vtest:\s*(.*?)\s*\*/", line)
         if m:

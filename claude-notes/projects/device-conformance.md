@@ -11,6 +11,75 @@ test sources, same ABI, same model side — and it writes
 checks hardware captures like any other, because they are checked-in
 literals; nothing new needs the board attached.
 
+## STATUS ADDENDUM (2026-08-29c): A TRAP AS DATA, AND THE CSR SCOREBOARD
+
+`tools/vtest/trap.S` is an M-mode handler that RECORDS a trap and resumes
+past the faulting instruction; a test `#include`s it and points `mtvec` at
+`_vtest_trap`.  It is not in `vtest.S` (that would change every image).  Its
+contract — t0/t1 clobbered, `mepc` advanced by 4 so the test needs its own
+`.option norvc`, no nesting, synchronous exceptions only — is in its header.
+
+It exists because the default rules make a trap the END of a run: `mtvec` is
+0, the pc goes there, the fetch faults again, and **the second trap
+overwrites `mcause`/`mepc`/`mtval`**, so the original fault is unrecoverable.
+Measured: `core_regs_mcsr` on the board reported `mcause=1 mepc=0 mtval=0`
+(useless); a hardware breakpoint at 0 caught the first trap as `mcause=2
+mtval=0x30a022f3`, i.e. `csrr menvcfg`.
+
+**A METHOD POINT WORTH KEEPING: reading a CSR over JTAG is not the same
+question as executing `csrr`.**  All twenty of `core_regs_mcsr`'s CSRs read
+fine through OpenOCD on the U74 — `menvcfg` included, answering 0 — while the
+hart refuses to *execute* a read of it.  The debug module can report a value
+for a register no instruction may touch.
+
+The two new tests split the CSR question the way the owner asked: the half
+every machine can be asked, and the half only QEMU can.
+
+- **`core_csrprobe`** (board + QEMU): 36 CSRs plus an all-zeros
+  instruction word as the CONTROL.  It records both WHETHER each read
+  trapped and WHAT IT RETURNED, which is what lets a value comparison be
+  made on a machine that refuses a register partway through the list —
+  something `core_regs_mcsr` structurally cannot do.  Model and QEMU
+  implement all 36; the U74 refuses FOUR — `menvcfg`, `mconfigptr`,
+  `senvcfg` (priv 1.12) and `time` (SiFive leaves `rdtime` to firmware).
+  **Finding 31.**  Two more came out of the value table: **finding 33**,
+  the model is an ANONYMOUS machine (`mvendorid`/`marchid`/`mimpid` all 0,
+  as is QEMU; the board answers with real SiFive ids), and a corrected
+  **finding 29** — `misa` differs three ways and the board's value had only
+  ever been read over JTAG, which is not the same question.
+
+  **`mideleg` is the one row where the board vindicates the MODEL against
+  QEMU**: QEMU has H so VSSIP/VSTIP/VSEIP/SGEIP are hardwired in (0x1444),
+  and the board reads 0, which is what the model reads.  A reminder that
+  "QEMU-virt is the reference" is an assumption the suite makes, not a fact.
+- **`core_csrwide`** (`machines=qemu`): finding 22's seven.  QEMU refuses
+  all seven; **the model has NO TRANSITION for `csrr mseccfg` — `exec`
+  returns None, `VStuck` — where finding 22 records it as "implemented,
+  read successfully".  Finding 32**, and it should be settled before
+  README's open decision is answered, since that decision was framed on
+  the belief that the model answers here.
+
+The CONTROL is load-bearing twice over: without it a run that never reached
+the handler is indistinguishable from one where nothing trapped, and it is
+the only place the MODEL's trap machinery runs in `core_csrprobe` (the model
+refuses none of the 36), so it is what establishes that the model takes the
+trap, runs the handler and returns through `mret`.
+
+`board.py` honours a `machines=qemu` directive, so a QEMU-only test never
+shows up as a board failure.
+
+**NEXT, and requested by the owner: `trap_m` and `trap_s` — dedicated
+M-mode and S-mode trap-handler tests, to validate that the model captures
+trap behaviour properly rather than incidentally.**  What `core_csrprobe`'s
+control establishes is only the narrowest case (one illegal instruction,
+M-mode, no delegation).  The tests should cover: `ecall` from M and from S,
+`ebreak`, misaligned and unmapped load/store faults, instruction access
+faults, `mtval` on each, `medeleg` actually delegating to S-mode with
+`sepc`/`scause`/`stval` and `sret`, `mstatus.MPP`/`SPP` and the
+MIE/MPIE/SIE/SPIE stacking across trap and return, and vectored `mtvec`
+(mode 1) beside direct.  `trap.S` is the foundation; a delegated test needs
+an S-mode handler beside it.
+
 ## STATUS ADDENDUM (2026-08-29b): TESTS ON A HART THAT IS NOT 0
 
 `vtest.py gen --hart N` builds the same source with `PRIMARY_HART=N`, runs it
