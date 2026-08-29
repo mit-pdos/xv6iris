@@ -797,6 +797,20 @@ refinement adds an iProp premise under the same universal WITHOUT
 changing the shape).  Do not conflate the two: get safety first, and keep
 the refinement's door open by not special-casing the ∀.
 
+**LANDED so far:** (1) `UkLoad.v` + `UkBranch.v` — branches were a pure
+re-thread; the load's table premise became `uk_load_ok` ("the page is in
+`π`", no extra bit) and it gained the transparent FAULT arm mirroring the
+store's, with `Load Data` twins of the Sail-facing fault lemmas (the
+store's were hard-wired to `Store Data`; `UserMemArmsBase.u_fault_pair`
+IS access-generic but demands `u_mem_wf`, which this tier does not have).
+(2) `UkAbi.v` — `uk_rpage`/`uk_rd`/`uk_args`/`uk_argv_null` with
+`Decision` throughout, and readers that hand back exactly a load leaf's
+premise list in order.  **A FOOTGUN TO KNOW ABOUT**: those `Decision`s are
+`Defined` and `uk_slen`'s fuel is `2^31`, so a gate must be CASE-SPLIT
+(`destruct (decide …)`, as `cond_entry_slot` does) and never
+`vm_compute`d — evaluating one would not terminate usefully.  Nothing in
+the tree does that today.
+
 **Plan, in dependency order.**  (1) Port `UkLoad.v` and `UkBranch.v` —
 mechanical, and the prerequisite for everything else.  (2) Define
 `uargv_ok` on the key, with decidability where it is cheap, and prove the
