@@ -438,3 +438,61 @@ Anything that contradicts a ruling (§0.x′) or this document by
 measurement: record the refutation in place, stop that item, surface to
 the owner with the exact failing statement and the measured facts —
 the standing protocol that produced every good design in this port.
+
+## Amendment 9 (2026-08-29, from the T-leg): §0.42′'s vocabulary -- the park box
+
+Landed on `tso-flip` at r51 (`2cec2c862`), A6.127 §5–§7 in
+tso-machine-flip.md; the ruling is §0.42′ in tso-port.md.  For main this is
+SHAPE, to be materialized in syntax/vocabulary first (SC-provable, as §0.30′
+prescribes); the tree is the authority for every statement below.
+
+- **`TsoCtxPark.v`** (new, off `TsoCtx`'s public unseals):
+  `ctx_parked_raise : llb loglen_name T' -∗ ctx_parked ξ T ==∗ ctx_parked ξ (max T T') ∗ ctx_floor ξ T'`;
+  `ctx_park_box : own_context ξ -∗ ctx_parked ξb Tb ==∗ ∃ T Tb', ⌜Tb ≤ Tb'⌝ ∗ ctx_parked ξb Tb' ∗ ctx_parked ξ T ∗ ctx_floor ξb T`;
+  `ctx_resume_floor : own_context ξr -∗ ctx_parked ξ T -∗ ctx_floor ξr T ==∗ own_context ξr ∗ own_context ξ`;
+  `ctx_morph_floor : CtxMorph (λ ξ, ctx_floor ξ lo)`;
+  `ctx_box_over : ctx_parked ξ T ==∗ ctx_parked ξ T ∗ ∃ ξb, ctx_parked ξb T ∗ ctx_floor ξb T`.
+  On main at SC these are the same statements with vacuous floors.
+- **`WpLockIn.v`** (new, off `WpLock`): `lock_finisher_in γ lk s R D Out E :=
+  ∃ Pay, (own_context cur_ctx ==∗ own_context cur_ctx ∗ Pay) ∗ lock_finisher_body … Pay`;
+  `lock_finisher_to_in`, `lock_finisher_close_body`, `lock_finisher_close_in`,
+  `lock_finisher_close_pay : lock_pay R -∗ lock_finisher_in … emp E`.
+- **`SpecRelease`**: `wp_release_gen_in_sconf_body` (generic, prelude takes
+  only the token) is the proof; `wp_release_gen_sconf` its corollary;
+  `wp_release_in_sconf_body` = the plain tier with
+  `(own_context cur_ctx ==∗ own_context cur_ctx ∗ lock_pay R)` for `R cur_ctx`;
+  `Module Type RELEASE_IN`, functor `ReleaseInOfGen`, `LinkRelease.ReleaseIn`.
+- **`SwtchCtx`**: `valid_context P A c p XIp` (identity a parameter, token
+  OUT of the record, the parked stack at `XIp`);
+  `park_tok None XIo := ∃ ξb Tb Tp, ctx_parked ξb Tb ∗ ctx_parked XIo Tp ∗ ctx_floor ξb Tp`,
+  `park_tok (Some h) XIo := own_context (CID := h) XIo`;
+  `resume_tok None XIt := ∃ T, ctx_parked XIt T ∗ ctx_floor cur_ctx T`,
+  `resume_tok (Some h) XIt := own_context (CID := h) XIt`; `stack_own_morph`.
+- **`SpecSwtch`**: premises `adm An cpu_id -> adm Ao cpu_id ->`; the target
+  `(∃ XIt, resume_tok An XIt ∗ ▷ valid_context P An newc p XIt)`; the hand-back
+  `(if back' then ∃ XIo, park_tok A' XIo ∗ ▷ valid_context P A' cret p XIo else own_ctx cret)`.
+- **`SchedCtx`**: `proc_ctx_at ξl pa := ∃ XIp Tp, ctx_parked XIp Tp ∗ ctx_floor ξl Tp ∗ ▷ valid_context p_sched None (p_context pa) pa XIp`;
+  `proc_slots_at ξl pa st`, `proc_lock_res_at ξl γl pa`, ambient forms
+  `proc_ctx pa := proc_ctx_at cur_ctx pa` (etc.) keep every consumer lemma;
+  `proc_lock_pay γl pa := λ ξ, proc_lock_res_at ξ γl pa` with
+  `CtxMorph (proc_lock_pay γl pa)` by instance search; `procs_inv` over it;
+  `sched_vc_at h c p := ∃ XIs, own_context (CID := h) XIs ∗ valid_context p_sched (Some h) c p XIs`;
+  `sched_vc_at_intro`/`_tok`, `proc_ctx_resume_tok`, `proc_ctx_at_of_tok`,
+  `proc_ctx_boxed pa := ∃ ξb Tb, ctx_parked ξb Tb ∗ proc_ctx_at ξb pa`,
+  `proc_slots_park_at`, `proc_slots_park_box`, `proc_lock_res_at_intro`,
+  `proc_lock_pay_of_box`.  The 40 `<{ proc_lock_res … }>` sites are
+  `(proc_lock_pay …)`.
+- **Consumers**: `ProofSwtch` (the exchange: `ctx_park_box`/the running token
+  in; `ctx_resume_floor`/the running token out; the block engine's
+  `own_context` threaded); `ProofScheduler` (`sc_tail_body` takes the
+  pre-parked payload; `ReleaseIn` in the functor; reclaim via
+  `proc_slots_park_box`); `ProofSched` (`sched_vc_at_tok` before both swtch
+  calls, `sched_vc_at_intro` after); `SpecForkretPark(Paid)`/`ParkCap`
+  conclude `proc_ctx_boxed`; `ProofForkretPark` deposits the child's stack
+  into its context (`ctx_deposit` + `stack_own_morph`) and boxes; `ProofUserinit`
+  / `ProofKforkB5` build the slot at the box and release through `RLI :
+  RELEASE_IN` (functor params threaded through `KforkProof`, `UserinitProof`,
+  `LinkUserinit`, `LinkKfork`).
+- **Deferred, named**: the per-hart cells' hand-off across swtch (`cpu_own`,
+  `p_sched`) stays at the ambient -- a hart-tier unit (A6.127 §6);
+  `ProofForkretPark`'s remaining root is the M3 debt on its rows.
