@@ -15638,3 +15638,13 @@ lease-hole machinery.
 **Order for the successor:** 1 (bricks; local compile of `TsoCtx`, then a
 round), 2, 4, 3, 5-OUT, 6; the IN half waits for the ruling.  A6.124 is
 the worked example for every step.
+
+**A6.125 step 1 LANDED (same session):** `TsoCtx.ctx_phys_pointsto_h`
+(½ mem ∗ ½ ts-elem ∗ (clean llb ∨ full dirty elem)),
+`ctx_phys_pointsto_split` (`… 1 v ⊢ _h ∗ phys_ledger a ½ v`),
+`ctx_phys_pointsto_join` (`_h -∗ phys_ledger a ½ v' -∗ ⌜v' = v⌝ ∗ … 1 v`),
+and the `CtxMorph` instance `ctx_morph_phys_pointsto_h` (the
+`ctx_morph_pointsto` proof with the dirty key `(t, a)`), placed after
+`ctx_phys_pointsto_forget_floor`.  Root-file change, no consumer touched;
+certified by round r42 (numbers in the handoff note).  Steps 2–6 remain
+as listed.

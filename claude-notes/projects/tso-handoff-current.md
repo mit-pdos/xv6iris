@@ -23,7 +23,7 @@ measured record; `main-tso-readiness.md` is the separate main-side handoff.
    temp-index recipe; `ZZchain.sh <File>…` at the tree root rechecks files
    locally in order against pulled `.vo`).
    Build driver: `ZZbuild.sh` at the tree root (the intr lane's, log names
-   suffixed `.aux` -- see the gotcha).  **Last certified: r41 (CLEAN round), 1183 .vo of 1298, red roots 8, zero admits (A6.124: the avail-index word is on the ledger -- lease split + payload half; `ProofVirtioDiskRwD`, `RwE`, `RwDSeam` GREEN; the new red root is `ProofVirtioDiskRwF:365`, the pin-return crossing, characterized and sized in A6.124).**  Snapshot `6168b7303` = r41.
+   suffixed `.aux` -- see the gotcha).  **Last certified: r41 (CLEAN round), 1183 .vo of 1298, red roots 8, zero admits (A6.124: the avail-index word is on the ledger -- lease split + payload half; `ProofVirtioDiskRwD`, `RwE`, `RwDSeam` GREEN; the new red root is `ProofVirtioDiskRwF:365`, the pin-return crossing, characterized and sized in A6.124).**  Snapshot `6168b7303` = r41; **r42 = `61fb20680`** (A6.125 step 1, the `TsoCtx` half-ctx-cell bricks, root change only: 1183/1298, same 8 roots).
 2. **KPT tree**: `/shared/xv6iris-3-kpttree` — FROZEN mid-K15d, unchanged
    this session EXCEPT one mirrored hunk: `iris/SmodeCorePt.v`'s
    `word_pointsto_wpay_mint_c` gained the trailing own-message fragment
