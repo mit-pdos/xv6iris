@@ -4233,3 +4233,42 @@ premises, §0.27′'s U, page currencies; audits; seal), the process law
 (measure-first, grep-for-the-law, arity rule, tranche discipline, build
 discipline, the typeclass and stale-.vo gotchas), and completion
 criteria (statement diff against the legs entirely below-seal).
+
+### 0.41′ OWNER RULING (2026-08-29): the device-written cells are RELEASE
+cells -- the used-index read is racy and yields a POSITION, not a value
+
+The owner's direction, verbatim in substance: the proof cannot know
+whether `virtio_disk_intr`'s load of `disk.used->idx` reads the latest
+write; the access is racy.  Treat the device's write as a RELEASE write:
+the reader does not know what value it will read, but whatever value it
+reads, it also holds a view at or above that write's position, and that
+position is sufficient to read everything the device wrote for that
+index -- the status byte, the used-ring element, an IN request's data --
+because one completion is ONE message.  The pattern is the `[first]` /
+`[started]` barriers': a flag set by one core and read by others, where
+seeing the flag is what puts the writer's position into the reader's
+view.
+
+What this rules OUT: any instrument about VALUES (A6.122 §3's monotone
+cell).  What it needs: "since the floor, every message touching this cell
+is the device's, whole-window" -- the window arm's conjunct (1) with the
+author-only reading (the device's word changes each completion, so
+`tw_cp`'s one-word-per-author does not fit) -- plus the completion
+positions recorded in the device invariant (`ledger_msg_at` fragments),
+a read gate that concludes "the value read is the whole-window word of a
+device message visible at the reader's view" and hands out the reader's
+view, and the floor carried in the vdisk_lock payload beside
+`disk_done_lb` (the handler that advanced `disk.used_idx` to `nr` had
+read `nr`'s message at a position at or below its view).  The lower
+bound `nr ≤ k` then follows from visibility and the recorded positions,
+with no premise about the values.
+
+Shape (measured, A6.126 in tso-machine-flip.md): `TsoMemPa.ts_pay` gains
+a third optional arm `tsp_rel : option ts_rel` (`ts_rel` = base, width,
+offset, author, floor; 4 constructor sites), `rel_ok` with `_app_frame`
+/ `_app_store` / `_of_latest`, a `ts_ok` conjunct; `TsoCtx` gets the frame
+at its four gate sites, `ledger_store_rel_ok` (agent-generic, the shape of
+`ledger_store_win_wpay_ok`), `ledger_rel_mint`/`_drop`, and
+`ledger_read_rel_ok` (the shape of `ledger_read_racy_word_ok`);
+`WpSconfMem` gets a load leaf whose post carries the step's view
+(`wp_load_s_sconf_au_rel`, cloned from `_au_exv`); then the virtio side.

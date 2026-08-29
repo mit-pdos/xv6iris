@@ -119,7 +119,12 @@ and re-splits.  `ProofVirtioDiskRwD` + `RwE` + `RwDSeam` green.
    their order are in A6.125.  Greens RwF's §1 and the OUT withdraw; the
    IN buffer (device-written) still needs item 2's instrument, so RwF is
    green only with both.  `LinkVirtioDiskRw` also waits on `LinkSleep` ← §0.27′.
-2. **FOR THE OWNER (A6.122 §3): the virtio USED index needs a MONOTONE-CELL
+2. **RULED (§0.41′, 2026-08-29): the used index is a RELEASE cell** -- an
+   author-only window arm (`tsp_rel`), a read gate that yields the
+   position, a view-carrying load leaf; build order in A6.126.  Greens
+   `ProofVirtioDiskIntr`, RwF's two device-written hand-backs, and the
+   Link files behind them.  (Superseded text of this item follows.)
+   **(old) FOR THE OWNER (A6.122 §3): the virtio USED index needs a MONOTONE-CELL
    instrument** (a third `ts_pay` arm: since `B`, one author, non-decreasing
    values) — the pin cannot carry a stale reader's lower bound, measured
    against every re-floor placement.  Σ-level; wants a §0.x′ ruling before
