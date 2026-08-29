@@ -3290,6 +3290,80 @@ Section ctx.
       iModIntro. iExists t. iFrame "Hpt Hts". by iRight.
   Qed.
 
+  (* >>> A6.125: THE HALF CTX CELL -- the pin-return crossing's instrument.
+     A hart-written cell that a DEVICE must read while the hart keeps the
+     right to get its ctx cell BACK splits in two: the lease takes a sealed
+     half ([phys_ledger a ½ v], A6.124's shape), the ctx side keeps the
+     other half WITH ITS ARM -- clean bound or the FULL dirty element.  The
+     join is exact and rebuilds the full ctx cell; and the half transports
+     along domination exactly as the full cell does
+     ([ctx_morph_pointsto]'s proof: either arm becomes the receiver's clean
+     one, the dirty fragment is dropped), so it can ride a lock payload.
+     What CANNOT be done instead: rebuilding a ctx cell from a sealed
+     ledger cell plus a persistent [ctx_wrote] -- the dirty arm of a full
+     cell is the full element. <<< *)
+  Definition ctx_phys_pointsto_h (ξ : CtxId) (a : Arch.pa) (v : bv 8) : iProp Σ :=
+    (∃ t : nat,
+       phys_pointsto a (DfracOwn (1/2)) v ∗
+       a ↪[ts_name]{DfracOwn (1/2)} (t, TsoMemPa.ts_pay_none) ∗
+       (llb (ctx_bound_name ξ) t ∨ (t, a) ↪[ctx_dirty_name ξ] ()))%I.
+
+  Lemma ctx_phys_pointsto_split (ξ : CtxId) (a : Arch.pa) (v : bv 8) :
+    ctx_phys_pointsto ξ a (DfracOwn 1) v ⊢
+    ctx_phys_pointsto_h ξ a v ∗ phys_ledger a (DfracOwn (1/2)) v.
+  Proof.
+    rewrite ctx_phys_pointsto_unseal /ctx_phys_pointsto_def /ctx_phys_pointsto_h
+            phys_ledger_unseal /phys_ledger_def /phys_pointsto.
+    iIntros "(%t & [Hp %Hr] & Hts & Harm)".
+    iEval (rewrite (fractional_half (pointsto (L := Arch.pa) (V := bv 8) a (DfracOwn 1) v)))
+      in "Hp".
+    iEval (rewrite (fractional_half (a ↪[ts_name] (t, TsoMemPa.ts_pay_none)))) in "Hts".
+    iDestruct "Hp" as "[Hp1 Hp2]". iDestruct "Hts" as "[Ht1 Ht2]".
+    iSplitL "Hp1 Ht1 Harm".
+    { iExists t. iFrame "Ht1 Harm Hp1". by iPureIntro. }
+    iExists t. iFrame "Ht2 Hp2". by iPureIntro.
+  Qed.
+
+  Lemma ctx_phys_pointsto_join (ξ : CtxId) (a : Arch.pa) (v v' : bv 8) :
+    ctx_phys_pointsto_h ξ a v -∗ phys_ledger a (DfracOwn (1/2)) v' -∗
+    ⌜v' = v⌝ ∗ ctx_phys_pointsto ξ a (DfracOwn 1) v.
+  Proof.
+    rewrite ctx_phys_pointsto_unseal /ctx_phys_pointsto_def /ctx_phys_pointsto_h
+            phys_ledger_unseal /phys_ledger_def /phys_pointsto.
+    iIntros "(%t & [Hp1 %Hr] & Ht1 & Harm) (%t' & [Hp2 _] & Ht2)".
+    iDestruct (pointsto_agree with "Hp1 Hp2") as %Heqv. subst v'.
+    iDestruct (ghost_map_elem_agree with "Ht1 Ht2") as %Heq.
+    injection Heq as Ht. subst t'.
+    iSplitR; [done|]. iExists t.
+    rewrite (fractional_half (pointsto (L := Arch.pa) (V := bv 8) a (DfracOwn 1) v))
+            (fractional_half (a ↪[ts_name] (t, TsoMemPa.ts_pay_none))).
+    iFrame "Hp1 Hp2 Ht1 Ht2 Harm". by iPureIntro.
+  Qed.
+
+  Global Instance ctx_morph_phys_pointsto_h (a : Arch.pa) (v : bv 8) :
+    CtxMorph (λ ξ, ctx_phys_pointsto_h ξ a v).
+  Proof.
+    iIntros (ξ ξ') "Hd HP".
+    rewrite ctx_dom_unseal /ctx_dom_def /ctx_phys_pointsto_h.
+    iDestruct "Hd" as
+      "(%B & %W & %B' & %D & [Hb Hdm] & %HDW & %HBB' & %HWB' & #Hlb')".
+    iDestruct "HP" as "(%t & Hpt & Hts & Hbit)".
+    iAssert (⌜(t ≤ B')%nat⌝)%I as %HtB'.
+    { iDestruct "Hbit" as "[Hcl | Hdt]".
+      - iDestruct (llb_valid_q with "Hb Hcl") as %HtB.
+        iPureIntro. lia.
+      - iDestruct (ghost_map_lookup with "Hdm Hdt") as %HDt.
+        have HtW : ((t, a).1 ≤ W)%nat
+          by apply HDW; eapply elem_of_dom_2.
+        simpl in HtW. iPureIntro. lia. }
+    iClear "Hbit". iModIntro.
+    iSplitL "Hb Hdm".
+    { iExists B, W, B', D. iFrame "Hb Hdm Hlb'". by iPureIntro. }
+    iExists t. iFrame "Hpt Hts".
+    iLeft. rewrite /llb. iLeft.
+    iApply (mono_nat_lb_own_le with "Hlb'"). lia.
+  Qed.
+
   (* exclusivity at the REGISTERED physical tier, the companion of
      [phys_ledger_ne] one tier up: two owned bytes cannot name the same
      address.  A6.49's user-memory flip needs it -- [UmodeMem.umem_inj]
