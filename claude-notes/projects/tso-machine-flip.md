@@ -16314,3 +16314,54 @@ ghost" and "relative `ctx_parked ξ ξr`" are WITHDRAWN; §3–§4 stand with
 `valid_context P A c p ξ` (ξ = the payload's context; `A = None` holds
 the link, `A = Some h` the running token) and the box threading through
 `SpecSwtch`'s record hand-over and `SchedCtx.p_sched`.
+
+### §6. SCOPED (2026-08-29): the token only; the per-hart CELLS are a separate unit
+
+Measuring the same-hart transport §5 would need for the swtch PAYLOAD
+(`SchedCtx.p_sched`: `p->state = RUNNING`, and `cpu_own`'s
+`cpus[h].proc/noff/intena` -- written by the scheduler, then stored to by
+the proc's `release`/`pop_off` and read by `forkret`'s `myproc()` before
+any fence, i.e. visible only by store-forwarding) shows it cannot be made
+TOTAL at the context tier: a dirty cell re-registered at the receiver
+needs the receiver's dirty map, and the "key already present" corner
+(from an earlier NON-deleting lock morph) is impossible in every execution
+but not locally refutable -- it needs a global "each write key is in
+exactly one context's map" invariant the ghost state does not express.
+The honest model for hart-private data is a HART TIER (ledger cells with
+hart-authorship visibility, `ledger_vis`, as the lock word already uses);
+converting `CpuOwn`/`IntrDefs` is its own unit (cone ~700 files).  Today
+the tree hides this under the constant embedding of `cpu_own`/`p_sched`
+at the ambient context: a PRE-EXISTING debt, unchanged by this unit.
+
+THIS UNIT, therefore: the TOKEN only.
+- `SwtchCtx.valid_context P A c p XIp`: body as today (cells/wand at the
+  ambient), the token REMOVED from the record, the record's identity
+  `XIp` a parameter.
+- A slot holds `SchedCtx.proc_ctx ξ pa := ∃ XIp Tp, ctx_parked XIp Tp ∗
+  ctx_floor ξ Tp ∗ ▷ valid_context p_sched None (p_context pa) pa XIp` --
+  the link is the ONLY ξ-dependence and it is OUTSIDE the `▷`, so
+  `proc_lock_pay γs γl pa := λ ξ, proc_lock_res ξ …` transports by
+  `ctx_floor_dom` + `ctx_morph_const` (no `◇` trick, no cell morphs).
+  Pinned: `sched_vc_at h c p := ∃ XIs, own_context (CID := h) XIs ∗
+  valid_context p_sched (Some h) c p XIs` (`run_slot` keeps its `▷`;
+  `own_context` is timeless).
+- `SpecSwtch`: the target record arrives as `TOK An XIt ∗ ▷ valid_context
+  … XIt` with `TOK None XIt := ∃ T, ctx_parked XIt T ∗ ctx_floor cur_ctx T`
+  (the link at the resumer's own context, as the acquire morph leaves
+  it) and `TOK (Some h) XIt := own_context (CID := h) XIt`; the caller's
+  record goes to the target as `∃ XIo, TOK' Ao XIo ∗ ▷ valid_context … XIo`
+  with `TOK' None XIo := ∃ ξb Tb Tp, ctx_parked ξb Tb ∗ ctx_parked XIo Tp ∗
+  ctx_floor ξb Tp` (the park BOX travels with the record until the
+  scheduler's release makes it the lock's context) and `TOK' (Some h)` the
+  running token.  `ProofSwtch`: `ctx_park_box` on the caller's token at
+  `Ao = None`, the running token itself at `Ao = Some`; resume by
+  `ctx_resume_floor` at `An = None`, the token straight out at `An = Some`.
+- Release: `WpLock.lock_finisher_in` (prelude `own_context cur_ctx ==∗
+  own_context cur_ctx ∗ Pay`) and `wp_release_in_*`; the scheduler's release
+  after a park needs NO deposit: `lock_pay R` at `ξ := ξb` is exactly what it
+  holds (`R ξb` = the const parts ∗ `proc_ctx ξb pa`).  Child-record
+  producers (`ParkCap.park_cap`, `SpecForkretPark(Paid)`) produce
+  `proc_ctx ξb pa` at a box; wakeup/kill/yield/sleep releases are unchanged
+  (the acquire's morph put the link at `cur_ctx`).
+- Kit (`TsoCtxPark.v`, no `TsoCtx` edit): `ctx_parked_raise`, `ctx_park_box`,
+  `ctx_resume_floor`, `CtxMorph (λ ξ, ctx_floor ξ lo)`.
