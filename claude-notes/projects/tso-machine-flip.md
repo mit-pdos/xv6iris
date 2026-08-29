@@ -16365,3 +16365,73 @@ THIS UNIT, therefore: the TOKEN only.
   (the acquire's morph put the link at `cur_ctx`).
 - Kit (`TsoCtxPark.v`, no `TsoCtx` edit): `ctx_parked_raise`, `ctx_park_box`,
   `ctx_resume_floor`, `CtxMorph (λ ξ, ctx_floor ξ lo)`.
+
+### §7. LANDED (2026-08-29, r51 CLEAN round): `ProofSwtch` GREEN, 1202/1300, red roots 7, zero admits
+
+What is in the tree (all compiled; the round's sentinels: `GREEN=1202/1300`,
+red roots `ProofMain:996`, `ProofForkretPark:315`, `ProofKernelvec:1704`,
+`ProofVirtioDiskIntr:1166`, `ProofVirtioDiskRwF:425`, `UserMemPt:427*`,
+`UptWalkPt:679*`; `ProofSwtch:157` is GONE and 17 files behind it are new
+green -- `ProofSwtch`, `LinkSwtch`, `LinkScheduler`, `LinkSched`,
+`LinkSleep`, `LinkYield`, `LinkAcquiresleep`, `LinkBeginOp`,
+`LinkConsoleread`, `LinkConsolewrite`, `LinkPiperead`, `LinkPipewrite`,
+`LinkSysPause`, `LinkSysSync`, `LinkUartwrite`, plus the two new kit files):
+
+- **`TsoCtxPark.v`** (new; off `TsoCtx`'s public unseals, `TsoCtx` untouched):
+  `ctx_parked_raise` (a stamped context's stamp rises at an `llb`, leaving
+  `ctx_floor`), `ctx_park_box` (park into a box: `ctx_park` + the raise),
+  `ctx_resume_floor` (`own_context_floor_view` + `ctx_resume`),
+  `ctx_morph_floor` (the `CtxMorph` instance for `λ ξ, ctx_floor ξ lo`),
+  `ctx_box_over` (a fresh box already over a stamped context).
+- **`WpLockIn.v`** (new; off `WpLock`, untouched): `lock_finisher_in` (prelude
+  `own_context cur_ctx ==∗ own_context cur_ctx ∗ Pay`), `lock_finisher_to_in`,
+  `lock_finisher_close_body`, `lock_finisher_close_in`, `lock_finisher_close_pay`.
+- **`SpecRelease`/`ProofRelease`/`LinkRelease`**: `wp_release_gen_in_sconf_body`
+  is THE generic proof now (its prelude takes only the token); the old
+  `wp_release_gen_sconf` is its corollary; a plain tier
+  `wp_release_in_sconf_body` (premise `own_context ==∗ own_context ∗ lock_pay R`
+  in place of `R cur_ctx`), module type `RELEASE_IN`, functor `ReleaseInOfGen`,
+  `LinkRelease.ReleaseIn`.
+- **`SwtchCtx`**: `valid_context P A c p XIp` -- the record's identity is a
+  parameter, the token is OUT of the record (`park_tok A XIo` / `resume_tok
+  A XIt`), the record's STACK is at `XIp` (the resumed thread takes it with
+  no re-index; the record's cells and wand stay at the ambient -- the M3
+  debt, unchanged); `stack_own_morph` instance.
+- **`SpecSwtch`**: the target arrives as `∃ XIt, resume_tok An XIt ∗ ▷
+  valid_context … XIt`; the resumed party gets the caller's record as
+  `∃ XIo, park_tok A' XIo ∗ ▷ valid_context … XIo`; new premise `adm Ao cpu_id`.
+- **`ProofSwtch`**: resume by `ctx_resume_floor` against the caller's own
+  running token (migratable target) or the token straight out of the record
+  (pinned); park by `ctx_park_box` into a fresh box (migratable caller) or
+  the running token into the record (pinned).  The block engine's
+  `own_context` premise is threaded explicitly (the old text past :157 had
+  never been checked).
+- **`SchedCtx`**: `proc_ctx_at ξl pa` (token + link OUTSIDE the later, the
+  record under it), `proc_slots_at`, `proc_lock_res_at`, the λ-payload
+  `proc_lock_pay γl pa` with `CtxMorph` by instance search; ambient forms
+  `proc_ctx`/`proc_slots`/`proc_lock_res` keep their names and every
+  consumer lemma; `sched_vc_at h c p := ∃ XIs, own_context (CID := h) XIs ∗
+  valid_context … XIs`; `sched_vc_at_intro`/`_tok`, `proc_ctx_resume_tok`,
+  `proc_ctx_at_of_tok`, `proc_ctx_boxed`, `proc_slots_park_at`,
+  `proc_slots_park_box`, `proc_lock_res_at_intro`, `proc_lock_pay_of_box`;
+  `procs_inv` over `proc_lock_pay`.  40 `<{ proc_lock_res … }>` sites
+  became `(proc_lock_pay …)` by sed.
+- **`ProofScheduler`** (+`LinkScheduler`, functor gains `ReleaseIn`): the
+  release tail takes the pre-parked payload; the no-work path parks its
+  payload with `lock_pay_intro`, the reclaim path rebuilds the slot at the
+  BOX the swtch brought back (`proc_slots_park_box`) and releases through
+  `ReleaseIn`.  `ProofSched`: the pinned record's token in and out of its
+  later at both swtch calls.
+- **The child-record producers**: `SpecForkretPark(Paid)`/`ParkCap` conclude
+  `proc_ctx_boxed`; `ProofForkretPark` deposits the child's STACK into the
+  child's fresh context (`ctx_deposit` with `stack_own_morph`) and boxes the
+  record (`ctx_box_over`); `ProofUserinit` and `ProofKforkB5` build the slot
+  at the box and release through `ReleaseIn` (functor params threaded:
+  `UserinitProof … RLI …`, `KforkB5 AQ RL RLI`, `KforkProof … Release
+  ReleaseIn …`).  `SpecProcinit`/`ProofKwait` unfold one level deeper.
+
+NOT CHANGED, and why: `ProofForkretPark`'s red root moved 298→315 (my
+insertions) but is the SAME failure -- the record's other rows are at the
+parker's ξ (the M3 λ-conversion debt on `procs_inv`/`park_globals`/
+`proc_priv`, this file's own header); the per-hart cells (`cpu_own`,
+`p_sched`) cross the swtch at the ambient as before (§6).

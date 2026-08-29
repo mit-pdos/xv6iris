@@ -23,7 +23,7 @@ measured record; `main-tso-readiness.md` is the separate main-side handoff.
    temp-index recipe; `ZZchain.sh <File>…` at the tree root rechecks files
    locally in order against pulled `.vo`).
    Build driver: `ZZbuild.sh` at the tree root (the intr lane's, log names
-   suffixed `.aux` -- see the gotcha).  **Last certified: r41 (CLEAN round), 1183 .vo of 1298, red roots 8, zero admits (A6.124: the avail-index word is on the ledger -- lease split + payload half; `ProofVirtioDiskRwD`, `RwE`, `RwDSeam` GREEN; the new red root is `ProofVirtioDiskRwF:365`, the pin-return crossing, characterized and sized in A6.124).**  Snapshot `6168b7303` = r41; **r42 = `61fb20680`** (A6.125 step 1, the `TsoCtx` half-ctx-cell bricks, root change only: 1183/1298, same 8 roots); **r43 = `6304d4c92`** (A6.125 step 2: `VirtioProto`'s hole is the whole control set at ½, publish takes a PIN OFFER and returns the memory half -- A6.125's step-2 entry; 1183/1298, same 8 roots); **r44 = `d496e0026`** (A6.125 step 4: the RwD pin builder offers and keeps; 1183/1298, same 8 roots); **r46 = `99a61e4f9`** (A6.125 steps 3 + 5-OUT: the pin's half ctx cells ride `flight_res`/`parked_res`, RwF withdraws hart-written cells; RwF's root is now `vdrwf_plist_mem:425`, the device-write crossing; 1183/1298, 8 roots); **r47 = `3b6488cd6`** (A6.126 §1: the release arm `ts_rel`/`rel_ok1`/`rel_read` in `TsoMemPa`, `ts_ok`'s fourth conjunct threaded; 1183/1298, same 8 roots); **r48 = `2f220f707`** (the arm carries a position HISTORY, `tr_hist`; same numbers); **r49 = `7f340d674`** (A6.126 §4 step 1: the `TsoCtx` release-arm kit -- `phys_ledger_rpay`, mint/drop, `ledger_store_rel_ok`, `ledger_read_rel_ok`; same numbers); **r50 = `42b9f404d`** (A6.126 §4 step 2: `HartSMem.Mobl_ram_exvv` + nodes, `WpSconfMem.wp_load_s_sconf_au_rel`; same numbers).
+   suffixed `.aux` -- see the gotcha).  **Last certified: r41 (CLEAN round), 1183 .vo of 1298, red roots 8, zero admits (A6.124: the avail-index word is on the ledger -- lease split + payload half; `ProofVirtioDiskRwD`, `RwE`, `RwDSeam` GREEN; the new red root is `ProofVirtioDiskRwF:365`, the pin-return crossing, characterized and sized in A6.124).**  Snapshot `6168b7303` = r41; **r42 = `61fb20680`** (A6.125 step 1, the `TsoCtx` half-ctx-cell bricks, root change only: 1183/1298, same 8 roots); **r43 = `6304d4c92`** (A6.125 step 2: `VirtioProto`'s hole is the whole control set at ½, publish takes a PIN OFFER and returns the memory half -- A6.125's step-2 entry; 1183/1298, same 8 roots); **r44 = `d496e0026`** (A6.125 step 4: the RwD pin builder offers and keeps; 1183/1298, same 8 roots); **r46 = `99a61e4f9`** (A6.125 steps 3 + 5-OUT: the pin's half ctx cells ride `flight_res`/`parked_res`, RwF withdraws hart-written cells; RwF's root is now `vdrwf_plist_mem:425`, the device-write crossing; 1183/1298, 8 roots); **r47 = `3b6488cd6`** (A6.126 §1: the release arm `ts_rel`/`rel_ok1`/`rel_read` in `TsoMemPa`, `ts_ok`'s fourth conjunct threaded; 1183/1298, same 8 roots); **r48 = `2f220f707`** (the arm carries a position HISTORY, `tr_hist`; same numbers); **r49 = `7f340d674`** (A6.126 §4 step 1: the `TsoCtx` release-arm kit -- `phys_ledger_rpay`, mint/drop, `ledger_store_rel_ok`, `ledger_read_rel_ok`; same numbers); **r50 = `42b9f404d`** (A6.126 §4 step 2: `HartSMem.Mobl_ram_exvv` + nodes, `WpSconfMem.wp_load_s_sconf_au_rel`; same numbers); **r51 (CLEAN) = see the tso-flip snapshot recorded in the next commit** (A6.127 §0.42′: the park box; `ProofSwtch` GREEN; **1202/1300, red roots 7**, zero admits; `TsoCtxPark.v` and `WpLockIn.v` are new files).
 2. **KPT tree**: `/shared/xv6iris-3-kpttree` — FROZEN mid-K15d, unchanged
    this session EXCEPT one mirrored hunk: `iris/SmodeCorePt.v`'s
    `word_pointsto_wpay_mint_c` gained the trailing own-message fragment
@@ -136,12 +136,13 @@ and re-splits.  `ProofVirtioDiskRwD` + `RwE` + `RwDSeam` green.
    values) — the pin cannot carry a stale reader's lower bound, measured
    against every re-floor placement.  Σ-level; wants a §0.x′ ruling before
    anyone builds it.  `ProofVirtioDiskIntr` stays red until then.
-3. **§0.42′ → `ProofSwtch`** (SUPERSEDES the §0.27′ `U` shape, 2026-08-29):
-   the parked thread token becomes RELATIVE to a context
-   (`ctx_parked ξ ξr`), the scheduler contexts never park, resume is the
-   acquire morph on the token; plan and build order in A6.127.  IN
-   PROGRESS on the fliptree.  Takes `proc_lock_res`'s λ-conversion with
-   it (the transport is a wand, so `▷` is no obstacle).
+3. **§0.42′ → `ProofSwtch`: LANDED (r51, 2026-08-29)** -- the park BOX
+   (A6.127 §5–§7): `ProofSwtch:157` is green and 17 files behind it; the
+   scheduler contexts never park; `proc_lock_res` is a λ-payload
+   (`proc_lock_pay`).  Remaining behind it: `ProofForkretPark:315` (the
+   same M3-debt failure as its old :298, re-measured: the record's rows at
+   the parker's ξ), and the per-hart cells' hand-off (`cpu_own`/`p_sched`
+   at the ambient) which is a HART-TIER unit of its own (A6.127 §6).
    **The virtio A6.126 item 2 work is PARKED** — 21-file WIP saved at
    `/shared/tmp/virtio/virtio-wip-A6.126.patch` (file copies in
    `/shared/tmp/virtio/wip-A6.126/`); the fliptree was restored to the r50
@@ -166,10 +167,11 @@ lock consumer the compiler reaches; the only lock-tier text still unreached
 is behind the eight reds above (virtio, swtch, kernelvec, main, the U-mode
 pair).  Case 2 (first/park): unchanged — `ProofSwtch` behind §0.27′,
 `ProofForkretPark` re-measure after.  Case 3 (started): K15d's tail then
-`ProofMain`.  **RED ROOTS 8 (r46)**: ProofForkretPark:298, ProofKernelvec:1704,
-ProofMain:996, ProofSwtch:157, ProofVirtioDiskIntr:1166, ProofVirtioDiskRwF:425
-(the device-write crossing; item 2), UptWalkPt:679*, UserMemPt:427*
-(* = deliberately red, §0.37′ — do not fix).  `ProofVirtioDiskRwD` is
+`ProofMain`.  **RED ROOTS 7 (r51, CLEAN, 1202/1300, zero admits)**: ProofForkretPark:315
+(was :298; same M3 debt), ProofKernelvec:1704, ProofMain:996,
+ProofVirtioDiskIntr:1166, ProofVirtioDiskRwF:425 (the device-write
+crossing; item 2), UptWalkPt:679*, UserMemPt:427*
+(* = deliberately red, §0.37′ — do not fix).  `ProofSwtch` is GREEN (§0.42′).  `ProofVirtioDiskRwD` is
 green (A6.124).
 
 ## Merge topology (when lanes finish)
