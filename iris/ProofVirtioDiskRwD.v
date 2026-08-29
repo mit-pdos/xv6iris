@@ -925,6 +925,10 @@ Section VdrwdLeaves.
       iDestruct ("Hback" with "Hah") as "[Hproto Hpub]".
       assert (Haddr : avail_idx_pa (v_cfg vst) = pa_add pav 2%nat)
         by (rewrite Hceq; reflexivity).
+      (* A6.125 step 2: the pin is OFFERED (memory at 1, stamp at ½); the
+         lease keeps a sealed half and hands the other half of memory back,
+         which this interim caller drops (step 4 keeps the ctx halves) *)
+      iDestruct (phys_map_offer with "Hpin") as "Hpin".
       iDestruct (virtio_proto_publish_acc γd vst np sl pin wrb
                    ltac:(rgall; rewrite Hceq; exact Hpinok) Hwrbdom Hwrpin
                    with "Hproto Hpub Hpin Hwrb Hpend") as "(_ & _ & Hah & Hclose)".
@@ -950,7 +954,7 @@ Section VdrwdLeaves.
         iEval (rewrite phys_ledger_at_halves) in "Hc". iDestruct "Hc" as "[H1 H2]".
         iSplitL "H1"; [by iApply phys_ledger_at_ledger|].
         iExists t. iFrame "H2". by iApply (lk_floor_of_wrote with "Hw"). }
-      iMod ("Hclose" with "Hah") as "(Hproto & Hpub & Hrcpt)".
+      iMod ("Hclose" with "Hah") as "(Hproto & Hpub & Hrcpt & _)".
       iMod ("Hdclose" with "[Hvf Hproto]") as "_".
       { iNext. iExists vst. iFrame. iPureIntro. exact Hvok. }
       iModIntro. iFrame "Hpub Hrcpt Havh". }
