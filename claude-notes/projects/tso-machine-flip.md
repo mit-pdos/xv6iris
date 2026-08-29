@@ -14831,3 +14831,198 @@ the second half live? — resolves without any arity moving:
   store position) claiming `{1}` is FALSE on `[lo, t_acq)` — the word is `0`
   before the AMO.  The word's floor is the acquire's position and nothing
   earlier.
+
+---
+
+# A6.119 — THE M4 UNIT'S CLOSING AMENDMENT: `WpSconfLock` IS GREEN
+
+*(Amendment A6.119, fliptree lane.  The lock tier's M4 flip, from A6.104's
+frame leaf to here.  Rulings executed: §0.34′, §0.35′(i)(iii)(iv), §0.36′(a)
+at the lock tier, §0.38′, §0.18′/A6.66's deposit; A6.92's refutation carried
+to its conclusion.)*
+
+## §1. THE NUMBER
+
+**r37: 1103 `.vo`, RED 11**, sentinel-backed (`MAKEEXIT=2`).
+
+> `ProofAcquire`, `ProofForkretPark`, `ProofKernelvec`, `ProofMain`,
+> `ProofPipeclose`, `ProofRelease`, `ProofSwtch`, `ProofVirtioDiskIntr`,
+> `ProofVirtioDiskRwD`, `UptWalkPt`, `UserMemPt`
+
+**`WpSconfLock` has left the red list for the first time since the baseline**,
+and with it `ProofHolding`.  `.vo` is up from 1100 to 1103.  Zero
+`admit`/`Admitted`/`Abort`/`Axiom` anywhere in the touched set.
+
+**The count went 9 → 11 and that is the honest arithmetic of progress here:**
+`ProofAcquire`, `ProofRelease` and `ProofPipeclose` were **unreached** behind
+`WpSconfLock` at the baseline — never compiled, therefore never counted.  They
+are not regressions; they are three files' worth of never-verified pre-flip
+text becoming *visible* because the file that hid them now compiles.  A red
+list is a measure of what the compiler has reached, and the compiler just
+reached further than it ever has here.
+
+## §2. THE FOUR SHAPES OF THE LOCK WORD
+
+The unit's spine, and the clearest illustration of measurement beating design
+intuition — each shape was refuted by building it, not by arguing:
+
+| # | shape | why it died |
+|---|---|---|
+| 1 | `lock_word_ex` indexed by `lk_wex` (the holder) | **A6.92**: `amoswap` writes UNCONDITIONALLY, so a spinner overwrites the word; after a failed acquire the word is the *spinner's* own write while the state still names the holder.  Unrepairable. |
+| 2 | plain `lock_word` | too weak at **exactly one read** — `holding()` must conclude the word is nonzero and has nothing to conclude it from. |
+| 3 | `TsWin` racy window | wrong instrument: it concludes a NEGATIVE off per-agent-DISTINCT words.  The cpu cell has that structure (each hart writes its own `cpus_ptr`); the lock word has the opposite — every agent writes the same `1`, and the injectivity premise is unprovable. |
+| 4 | **value-set PIN, `{1}`, arm-shaped by the state** | survives: spinner stores of `1` PRESERVE the set, which is exactly what author-shape cannot do.  §0.35′(iv) case 2's own prescription. |
+
+> **THE INSTRUMENT TAXONOMY, earned here and worth carrying:** *PIN for
+> same-value-many-writers; TsWin for distinct-values-per-writer.*  The two
+> racy kits serve opposite write structures, and this word is what
+> disambiguated them.
+
+Shape 4 in full: minted at the AMO (`lock_word_amo_mint`, floored at the
+store's own position), **preserved** across every losing spinner
+(`lock_word_amo_keep` on `ledger_store_win_pin_ok` — at the ORIGINAL `B`,
+never re-minted at the spinner's, or the holder's token and the invariant
+would disagree), **retracted** at release (`ledger_pin_drop`, new: the mint
+read backwards — 0 ∉ {1}, so retract-then-store, and *the only place the pin
+cannot survive is the only place the lock stops being held*).
+
+## §3. THE AU RULE, COMPLETE — FOUR MANIFESTATIONS AND ONE LIMIT
+
+An existential that crosses an atomic update must be:
+
+1. **pinned outside** it — `lock_openable`'s floor hoisted out of the `□∀`
+   (two opens of one lock handed out two unrelated witnesses, so a leaf that
+   lent the cell to an AU could not close the invariant it opened);
+2. **carried whole** through it — the `notheld` read takes the entire
+   `lock_body`, because `Res`/`Post` are fixed before the invariant opens and
+   cannot name the `st` found inside;
+3. **pinned by a dual** — the cpu store's two directions are inverses, so the
+   exchange exhibits the OLD face (`uold`, `exold`) and the telescope carries
+   it;
+4. **accompanied by its dependents** — the holder read's `⌜v ≠ 0⌝` travels
+   *inside* `Res` beside the pin, because the round trip returns a fresh `v`
+   and the invariant's branch cannot be rebuilt from the old one.
+
+> **AND THE LIMIT:** carry-whole fixes WITNESS IDENTITY; it cannot manufacture
+> EVIDENCE ABOUT THE READER.  `ledger_read_pin_ok` wants `view_lb` at the
+> pin's own `B`; the step can take `hart_view_lb (gtv)` free off the interp,
+> but `B ≤ gtv` is a per-hart history fact recorded nowhere.  That is what
+> killed the cheap route to the holder's read and forced the ghost tie.
+
+## §4. §0.34′ VERIFIED BY MEASUREMENT
+
+`locked`/`locked_pre` now carry `∃ B, lock_frag_at γ … B ∗ ctx_floor cur_ctx B`
+— arity unchanged, ξ ambient.  A6.89's refutation is **sharpened, not
+reversed**, and the note beside the definition now states the boundary:
+
+* a **hart-indexed** carrier is refuted — `CpuId` REBINDS at `wp_next`, so the
+  token elaborates at the resuming hart;
+* a **ξ-indexed** conjunct is licensed **by the same fact read the other way**
+  — `cur_ctx` does NOT rebind (`SpecAcquire`'s own note).
+
+**The sweep is the verification, and it is decisive: across 801 recompiled
+files, exactly ONE leaned on `locked` being definitionally `lock_frag`**
+(`PipeInvDefs.locked_dead`).  Everything treating the token as opaque was
+untouched — §0.34′'s *"especially if it's going to be opaque to the callers"*,
+confirmed by measurement rather than assertion.
+
+The ghost tie itself is the arity law applied to ghost state: the acquire
+position is a fact two parties must AGREE on, not a component every consumer
+of `lock_state` must see — so `lockUR` became a product with both halves
+hiding `B` existentially (`lock_pos_agree` supplies the equation at the point
+of use), and **every existing ghost step kept its shape**.
+
+## §5. THE FIFTEEN CLIENTLESS INSTANCES, AND THE GUARD'S THREE FUNCTIONS
+
+The lane's recurring shape reached fifteen in this unit, and along the way the
+grep-first guard acquired three distinct jobs:
+
+1. **catching MISSES** — the law exists, use it: `ledger_store_win_wpay_ok`,
+   `hart_view_lb_get`, `ctx_phys_load_bytes_ok`, `boot_cran_ledger_at0_word`,
+   `lock_word_amo_mint`, `ledger_store_win_pin_ok`, `phys_ledger_pin_win_map`,
+   `pin_map_own`, `SpecAcquire`'s exported receipt;
+2. **catching DUPLICATES** — the law exists one screen away and I was about to
+   rewrite it: `phys_ledger_at_ledger` (I had written `phys_ledger_of_at`; the
+   name was taken, by the reverse direction, eight lines up), and
+   `TsoCtx.tso_pa_off`/`tso_pa_off_add` (the offset↔address bridge, `Local`,
+   with a comment describing exactly the use I needed it for — I was two
+   minutes from defining my own `pa_add` inverse);
+3. **catching OVER-ENGINEERING, ex post** — the newest and least expected:
+   * **14th**: `SpecRelease` was approved to gain `own_context`.  It does not
+     need it — the token is already a component of `sie_cap`
+     (`IntrDefs:2669`), and `SieCapCtx.sie_cap_gpr_own_ctx_acc` exists for
+     exactly this, its docstring answering the question verbatim: *"Borrow-
+     and-return, not a split… **no downstream spec premise changes shape**."*
+     Signature change reverted; no caller cone.  The error that led there was
+     the CpuId re-park hazard on handing the token across `wp_next` — which is
+     the hazard the accessor exists to avoid: **the token never travels
+     alone.**
+   * **15th**: I had tightened the whole cpu-store family to
+     `lock_openable_c`.  It **binds the floor and never uses it** — *a cpu
+     field STORE reads nothing racily, so it owes no floor.*  Reverted, and
+     the consequence cascaded: release needs only plain openers, so the
+     `is_lock ⇝ lock_openable_c` crossing upgrade **is not needed there at
+     all**.  A seam I had reported as needing a build turned out to need a
+     deletion.
+
+> *In this port the expensive step has not once been building the law.  It has
+> been noticing the law is already built — and, twice now, noticing that the
+> law I was about to require was not required at all.*
+
+## §6. WHY THIS UNIT WAS DISCOVERY-SHAPED
+
+Recorded because it explains the whole stretch's cost profile: **the pinned-
+window machinery was built speculatively for the page-table tier and the lock
+word is its first real client.**  That is the twelfth-instance pattern's other
+face — it is why every instrument already existed, and equally why every step
+found one more unsupplied premise.  Estimates of "three wiring items" were
+consistently optimistic for that reason, and the same held one level out: the
+three consumer files behind `WpSconfLock` had never been compiled either, so
+they carry their own never-verified pre-flip residue (`lk_cpu_fresh`'s A6.105
+arity; `lka ↦₄ 0` where A6.92's flip wants `lock_word_fresh`; the SC shim).
+
+A method note that paid for itself: **`iPureIntro` as a goal-printer.**  When
+`iFrame` says "cannot frame X", frame the rest and `iPureIntro` — the failure
+message prints the residual goal, which the original error never tells you.
+It found the last two blockers in the AMO node immediately.
+
+## §7. THE ECONOMY, CONFIRMED
+
+The design's own economy showed up as a clean split at `ProofHolding`: **the
+`notheld` read takes the absorbed opener; the holder read takes the plain
+one** — only the racy read needs a floor.  That is the same fact §5's 15th
+instance found from the other side, and together they say the floor is needed
+in exactly one place in the lock tier and nowhere else.
+
+## §8. THE SUCCESSOR'S QUEUE — two items, both acquire-side
+
+1. **`ProofRelease`'s CANCEL path.**  `ctx_dom_sc` — the SC shim, retired in
+   this tree — at `ProofRelease:587`.  The line's own comment names the
+   replacement: *"SC-only transport (the cutover kit's finisher morphs against
+   real AMO evidence instead)"*.  Ruled but unbuilt.  The rest of
+   `ProofRelease` compiles.
+2. **`ProofAcquire`'s pre-AMO floor.**  Acquire calls `holding()` — the
+   `notheld` read — so it needs `lock_openable_c`, and its own AMO comes
+   AFTER that call.  So the floor cannot be sourced from acquire's own AMO;
+   it must arrive WITH the handle.  This is A6.109 §3's problem, now isolated
+   to a single caller instead of a family.  Two resolutions, both ruled
+   territory: the crossing-delivery upgrade (§0.35′(iii)), or `SpecAcquire`
+   taking the strengthened opener with callers paying by ancestry.  All three
+   inputs for the upgrade now exist — the handle's right arm, the interp, and
+   the AMO's exported `ctx_floor` (this unit's own export).
+
+`ProofPipeclose` also entered the list, for the same never-compiled reason as
+the others; expect residue of the same three kinds.
+
+## §9. FILES TOUCHED
+
+`Xv6Cameras` (product `lockUR`), `TsoMemPa` (the visibility premise swap,
+eight lemmas), `TsoCtx` (`ledger_pin_drop`, `ledger_vis_visibleb`,
+`ledger_vis_anchor`, the ∃-form window, `tso_pa_off` exported), `WpSconfMem`
+(the store's no-migration pin, `word_wpay_frame_store_gen_c`, the racy load's
+pin), `WpLock` (the pin, `lock_word_at`, the enriched tokens and all four
+transitions, the boundary note), `WpLockAt`, `WpSconfLock` (**green**),
+`PipeInvDefs`, `SpecHolding`, `ProofHolding` (**green**), `SpecRelease`,
+`ProofRelease`, `ProofInitlock`.
+
+Mirror refreshed at r37.
