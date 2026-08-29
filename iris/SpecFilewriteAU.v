@@ -182,6 +182,129 @@ Definition wp_filewrite_au_body
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* ===================================================================== *)
+(*  THE LOOP'S CARRIED AU STATE, AND ITS FOUR MOVES                       *)
+(* ===================================================================== *)
+
+(* This is the vocabulary the prover of [FILEWRITE_AU] threads through
+   [ProofFilewrite.fw_loop]'s induction, discharged HERE so the loop
+   proof is plumbing rather than design.
+
+   [fw_au_raw Γ i n Φ t p] is "[p] chunks have fired, they wrote [t] bytes
+   in total, here are their receipts and here is the unfired suffix of the
+   bundle".  It is the ONLY iProp the loop carries; the two facts that
+   make it a loop INVARIANT are Coq-level and ride as ordinary premises of
+   [fw_loop]:
+
+     clean = true -> t = iz /\ iz = FW_MAX * Z.of_nat p
+
+   -- the running offset IS the fired total, and every fired chunk was
+   exactly [FW_MAX].  [clean] is a plain [bool] loop parameter: it is
+   [true] until some chunk's row turns out not to read as a file (the
+   not-a-file arm's provenance, see [SpecSysWriteAUEra]'s owner question
+   1), and [false] forever after -- which is exactly the disjunct the
+   loop's three exits then land in.
+
+   WHY THE TIE IS NOT INSIDE THE iProp.  The last chunk may be SHORT, so
+   [t = FW_MAX * p] is false of the state the exhausted exit hands out; it
+   is a truth about every LOOP ENTRY, not about every state.  Keeping it
+   Coq-level is what lets the four moves below be tie-free.
+
+   THE FOUR MOVES, one per thing the loop does with it: start it
+   ([_init]), spend one commit at a chunk's fire ([_take] -- the peel and
+   the receipt snoc, with the instant-count bound coming from
+   [FsAbsWriteFire.wri_count_step]), and read it off at each of the three
+   exits ([_ok] at [t = n], [_fail] at [t < n], [_nofile] at any [t]). *)
+
+Section FilewriteAUState.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+            !irefslotG Σ, !pavG Σ}.
+  Implicit Types Γ : fs_view_names Σ.
+
+  Definition fw_au_raw Γ (i : Z) (n : Z)
+      (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ)
+      (t : Z) (p : nat) : iProp Σ :=
+    (∃ bss : list (list (bv 8)),
+       ⌜length bss = p⌝ ∗
+       ⌜Z.of_nat (length (concat bss)) = t⌝ ∗
+       ⌜(p <= wchunks n)%nat⌝ ∗
+       wri_receipts i Φ bss ∗
+       awrite_commits_at Γ ∅ i Φ p (wchunks n - p)%nat)%I.
+
+  Lemma fw_au_raw_init Γ (i n : Z) Φ :
+    awrite_commits_at Γ ∅ i Φ 0%nat (wchunks n) -∗ fw_au_raw Γ i n Φ 0 0%nat.
+  Proof.
+    iIntros "Hcm". rewrite /fw_au_raw. iExists [].
+    iSplitR; [done |]. iSplitR; [done |]. iSplitR; [iPureIntro; lia |].
+    iSplitR; [iApply wri_receipts_nil |].
+    rewrite Nat.sub_0_r. iExact "Hcm".
+  Qed.
+
+  (* ONE CHUNK'S FIRE, both halves: the head commit comes out at the index
+     the bundle handed it out at, and the closer takes the receipt back. *)
+  Lemma fw_au_raw_take Γ (i n : Z) Φ (t : Z) (p : nat) :
+    (0 <= t)%Z -> (t < n)%Z -> t = FW_MAX * Z.of_nat p ->
+    fw_au_raw Γ i n Φ t p -∗
+      awrite_commit_at Γ ∅ i p Φ ∗
+      (∀ (bs : list (bv 8)) (av : aview) (off : nat) (bs0 : list (bv 8))
+         (nl : nat),
+         ⌜wri_pre av i off bs bs0 nl⌝ -∗ Φ p av off bs -∗
+         fw_au_raw Γ i n Φ (t + Z.of_nat (length bs)) (S p)).
+  Proof.
+    intros Ht Htn Htie. iIntros "Hst".
+    assert (Hsp : (S p <= wchunks n)%nat)
+      by exact (wri_count_step n t p Ht Htn Htie).
+    rewrite /fw_au_raw. iDestruct "Hst" as (bss) "(%Hlen & %Htot & %Hp & Hrs & Hcm)".
+    (* the peel: the suffix has at least one commit left *)
+    assert (Hcnt : (wchunks n - p = S (wchunks n - S p))%nat) by lia.
+    rewrite /awrite_commits_at Hcnt /=.
+    iDestruct "Hcm" as "[Hhead Htail]".
+    iFrame "Hhead". iIntros (bs av off bs0 nl) "%Hpre HΦ".
+    iExists (bss ++ [bs])%list.
+    assert (Hlen' : length ((bss ++ [bs])%list) = S p)
+      by (rewrite length_app Hlen /=; lia).
+    iSplitR; [by iPureIntro |].
+    iSplitR.
+    { iPureIntro. rewrite concat_app length_app /= app_nil_r. lia. }
+    iSplitR; [by iPureIntro |].
+    iSplitL "Hrs HΦ".
+    { iApply (wri_receipts_snoc i Φ bss bs av off bs0 nl Hpre
+                with "Hrs [HΦ]"). rewrite Hlen. iExact "HΦ". }
+    iExact "Htail".
+  Qed.
+
+  (* THE THREE EXITS *)
+  Lemma fw_au_raw_ok Γ (i n : Z) Φ (p : nat) :
+    fw_au_raw Γ i n Φ n p -∗ write_post_ok_at Γ i n Φ.
+  Proof.
+    iIntros "Hst". rewrite /fw_au_raw /write_post_ok_at.
+    iDestruct "Hst" as (bss) "(%Hlen & %Htot & %Hp & Hrs & Hcm)".
+    iExists bss. iSplitR; [by iPureIntro |].
+    iSplitR; [iPureIntro; lia |]. iFrame "Hrs". rewrite Hlen. iExact "Hcm".
+  Qed.
+
+  Lemma fw_au_raw_fail Γ (i n : Z) Φ (t : Z) (p : nat) :
+    (t < n)%Z -> fw_au_raw Γ i n Φ t p -∗ write_post_fail_at Γ i n Φ.
+  Proof.
+    intros Htn. iIntros "Hst". rewrite /fw_au_raw /write_post_fail_at.
+    iDestruct "Hst" as (bss) "(%Hlen & %Htot & %Hp & Hrs & Hcm)".
+    iExists bss. iSplitR; [iPureIntro; left; lia |].
+    iSplitR; [iPureIntro; lia |]. iFrame "Hrs". rewrite Hlen. iExact "Hcm".
+  Qed.
+
+  Lemma fw_au_raw_nofile Γ (i n : Z) Φ (t : Z) (p : nat) :
+    fw_au_raw Γ i n Φ t p -∗ write_post_nofile_at Γ i n Φ.
+  Proof.
+    iIntros "Hst". rewrite /fw_au_raw /write_post_nofile_at.
+    iDestruct "Hst" as (bss) "(%Hlen & %Htot & %Hp & Hrs & Hcm)".
+    iExists bss. iSplitR; [iPureIntro; lia |]. iFrame "Hrs".
+    rewrite Hlen. iExact "Hcm".
+  Qed.
+
+End FilewriteAUState.
+
+Global Typeclasses Opaque fw_au_raw.
+
 Module Type FILEWRITE_AU.
   Parameter wp_filewrite_au :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,

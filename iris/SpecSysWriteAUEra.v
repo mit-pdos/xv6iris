@@ -142,9 +142,12 @@ Section SysWriteAUEra.
      neither field -- nor [di_nlink] -- so on such a row the abstract view
      does not move AT ALL: every chunk's [delta_write] is the IDENTITY
      ([delta_write] is total on purpose, and a non-[AFile] row is its
-     fixpoint).  Nothing this contract can observe happened, so the bundle
-     refunds WHOLE and the return value is whatever filewrite made of the
-     bytes it really did write to the disk blocks.
+     fixpoint).  Nothing this contract can observe happened at that chunk,
+     so the arm delivers whatever PREFIX of receipts was already fired,
+     refunds the rest of the bundle, and says NOTHING about the totals --
+     which is the whole difference from the fail arm, and the honest one:
+     the count in a0 is about bytes on disk blocks, and this arm is where
+     those bytes have no abstract reading.
 
      THE ARM IS UNREACHABLE IN XV6 AND THE PROOF CANNOT SAY SO.  sys_open
      sets [f->type = FD_DEVICE] exactly when [ip->type == T_DEVICE], so an
@@ -164,7 +167,11 @@ Section SysWriteAUEra.
      full refund is the "not a file" answer. *)
   Definition write_post_nofile_at Γ (i : Z) (n : Z)
       (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ) : iProp Σ :=
-    (awrite_commits_at Γ ∅ i Φ 0%nat (wchunks n))%I.
+    (∃ bss : list (list (bv 8)),
+       ⌜(length bss <= wchunks n)%nat⌝ ∗
+       wri_receipts i Φ bss ∗
+       awrite_commits_at Γ ∅ i Φ (length bss)
+         (wchunks n - length bss)%nat)%I.
 
   Definition write_arms_at Γ (i : Z) (n : Z)
       (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ)
