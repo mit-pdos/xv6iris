@@ -1475,3 +1475,14 @@ ProofConsolewriteLoc.v
 LinkConsolewriteLoc.v
 SpecFilewriteCons.v
 ProofSysWriteConsAU.v
+
+# THE CHUNK LOOP, AND THE SEAL IT CLOSES (lane W, FILEWRITE-AU).
+#   ProofFilewriteAU is ProofFilewrite's walk on the inode arm only, with
+# FsAbsWriteFire.wrf_awrite_fire in place of the ireg_top_retag; the three
+# Link files below make SYSWRITE_AU_ERA (and its stable corollary) an
+# unconditional theorem, WITHOUT LinkConsolewrite's Axiom -- the device arm
+# is refuted by the contract's premise rather than walked.
+ProofFilewriteAU.v
+LinkFilewriteAU.v
+LinkSysWriteAU.v
+LinkSysWriteAUStable.v
