@@ -190,12 +190,16 @@ Qed.
    computably invertible.  The residue mod 2^64 IS the inverse, and it
    needs no no-wrap side condition because the outer [mod] absorbs the
    wrap the window's own addition may have done. *)
-Local Definition tso_pa_off (base a : Arch.pa) : nat :=
+(* A6.119: EXPORTED, not duplicated.  The lock word's value-set pin is the
+   first client of the pinned-window store gate, and that gate's [Sg] premise
+   is exactly this bridge -- offset-keyed sets re-keyed by address.  The law
+   was here; only [Local] stood between it and its first caller. *)
+Definition tso_pa_off (base a : Arch.pa) : nat :=
   Z.to_nat ((bv_unsigned (a : SailStdpp.Values.mword 64)
              - bv_unsigned (base : SailStdpp.Values.mword 64))
             `mod` 18446744073709551616)%Z.
 
-Local Lemma tso_pa_off_add (base : Arch.pa) (j : nat) :
+Lemma tso_pa_off_add (base : Arch.pa) (j : nat) :
   (Z.of_nat j < 18446744073709551616)%Z ->
   tso_pa_off base (pa_add base j) = j.
 Proof.

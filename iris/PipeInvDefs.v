@@ -566,10 +566,21 @@ Section PipeInv.
     lock_frag γl st -∗ pipe_dead γl γp -∗ False.
   Proof. iIntros "Hf (Hf' & _ & _)". iApply (lock_frag_exclusive with "Hf Hf'"). Qed.
 
+  (* A6.119: [locked] is no longer DEFINITIONALLY [lock_frag] -- it carries
+     the acquire position's floor beside it (§0.34′) -- so the token is
+     unpacked here rather than applied through.  The arity did not move; what
+     moved is the definitional unfolding, and this is the one shape in the
+     sweep that noticed. *)
   Lemma locked_dead γl γp i : ⊢ locked γl i -∗ pipe_dead γl γp -∗ False.
-  Proof. iApply lock_frag_dead. Qed.
+  Proof.
+    iIntros "(%B & Hf & _) Hd".
+    iApply (lock_frag_dead with "[Hf] Hd"). by iExists B.
+  Qed.
   Lemma locked_pre_dead γl γp i : ⊢ locked_pre γl i -∗ pipe_dead γl γp -∗ False.
-  Proof. iApply lock_frag_dead. Qed.
+  Proof.
+    iIntros "(%B & Hf & _) Hd".
+    iApply (lock_frag_dead with "[Hf] Hd"). by iExists B.
+  Qed.
 
   (* THE reclamation step, and the reason the whole construction hangs
      together.  The last closer arrives inside release's finisher with a

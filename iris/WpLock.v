@@ -112,34 +112,53 @@ Section Lock.
   Qed.
 
   (* THE holder token: hart [i] holds the lock and [lk->cpu = cpus_ptr i]. *)
-  (* >>> A6.89 (owner ruling on A6.87 §(7), spelling (a)): STRENGTHENING
-     THIS TOKEN WITH THE AMBIENT HART WAS TRIED AND THE BUILD REFUTED IT.
-     The experiment was [locked `{CID : CpuId} γ i := lock_frag γ (Some
-     (i,true)) ∗ ⌜cpu_id = i⌝] (plus [CpuId] binders on the six kit
-     lemmas, which all went through).  It dies at the first CONSUMER:
-     every lock leaf hands the token THROUGH its instruction step, and
-     the continuation's [locked γ i] is elaborated at the [CpuId] the
-     [wp_next] lambda binds -- the RESUMING hart -- while the one in hand
-     is at the entry hart.  The two print identically and do not unify
-     (WpSconfLock:414, [iSpecialize: cannot instantiate ... with (locked
-     γl h0)]): A6.63''/§0.20′'s CpuId re-park hazard, now inside the
-     token itself.  The equality holds at [b = false], but [locked]
-     travels through b-GENERIC contracts (SpecAcquire, the syscall path,
-     the park chain -- 69 files mention it), so the premise would have to
-     be carried at every crossing, and the LEAF would still need the
-     step-level pin regardless.
-     THE HART IS ALREADY BOUND HERE -- it is the argument [i] -- and the
-     lock leaves already demand [locked γ cpu_id], so a token sent across
-     harts is already unusable at every consumer.  The no-migration fact
-     is not a property of the token but of the STEP, and it is delivered
-     where the step is: [WpSconfMem.wp_load_s_sconf_au_dat]'s obligation
-     now takes [wp_next]'s own same-CPU promise. <<< *)
+  (* >>> §0.34′ LANDS ON ITS SOUND AXIS (A6.119; §0.35′'s ξ-relativity, and
+     A6.89's refutation SHARPENED rather than reversed).
+
+     THE PRECISE BOUNDARY, because the earlier note read as a blanket warning
+     and is not one:
+
+       - A HART-INDEXED carrier is REFUTED.  The experiment was
+         [locked `{CID : CpuId} γ i := lock_frag γ (Some (i,true)) ∗
+         ⌜cpu_id = i⌝].  It dies at the first CONSUMER: every lock leaf hands
+         the token THROUGH its instruction step, and the continuation's
+         [locked γ i] is elaborated at the [CpuId] the [wp_next] lambda
+         binds -- the RESUMING hart -- while the one in hand is at the entry
+         hart.  The two print identically and do not unify (A6.63''/§0.20′'s
+         re-park hazard, inside the token).
+
+       - A ξ-INDEXED conjunct is LICENSED, and by the very fact that killed
+         the other one: [CpuId] REBINDS at [wp_next]; [cur_ctx] DOES NOT.
+         [SpecAcquire]'s own note says it -- "[cur_ctx] is bound OUTSIDE the
+         [wp_next] binder, so the facts a thread wins are its own even if the
+         prologue migrated".  So the token may carry ξ-indexed facts exactly
+         where it may not carry hart-indexed ones.
+
+     WHAT IT NOW CARRIES, and why: the ACQUIRE POSITION's floor.  The word's
+     value-set pin (A6.119, §0.35′(iv) case 2) is minted at the AMO at that
+     position, and [holding()]'s read needs [view_lb] at it -- a receipt only
+     the acquirer ever had, at an instruction long past by the time the read
+     runs.  The token is the one thing the holder holds across that gap.
+     [lock_pos_agree] ties the token's [B] to the invariant's.
+
+     ARITY UNCHANGED and ξ AMBIENT, so no consumer's spelling moves -- the
+     same treatment [is_lock] took under §0.35′, and the 69 files that
+     mention [locked] are the verification, not the cost. <<< *)
   Definition locked (γ : gname) (i : CPU) : iProp Σ :=
-    lock_frag γ (Some (i, true)).
+    (∃ B : nat, lock_frag_at γ (Some (i, true)) B ∗
+       TsoCtx.ctx_floor cur_ctx B)%I.
   (* the same, in the window where [lk->cpu] is still 0 (internal to the
-     acquire / release proofs; no caller ever sees it). *)
+     acquire / release proofs; no caller ever sees it).  It carries the floor
+     too: the pin exists from the WINNING amoswap, which is where this token
+     is minted, so the two arms of the held interval agree. *)
   Definition locked_pre (γ : gname) (i : CPU) : iProp Σ :=
-    lock_frag γ (Some (i, false)).
+    (∃ B : nat, lock_frag_at γ (Some (i, false)) B ∗
+       TsoCtx.ctx_floor cur_ctx B)%I.
+
+  Global Instance locked_timeless γ i : Timeless (locked γ i).
+  Proof. apply _. Qed.
+  Global Instance locked_pre_timeless γ i : Timeless (locked_pre γ i).
+  Proof. apply _. Qed.
 
   (* the value [lk->cpu] holds in each state: the OWNER word. *)
   Definition lk_cpu_val (st : lock_state) : mword 64 :=
@@ -208,8 +227,19 @@ Section Lock.
     destruct (proj1 (excl_auth_frag_op_valid _ _) Hv1).
   Qed.
 
+  Lemma lock_frag_at_exclusive γ st st' B B' :
+    lock_frag_at γ st B -∗ lock_frag_at γ st' B' -∗ False.
+  Proof.
+    iIntros "H1 H2".
+    iDestruct (own_valid_2 with "H1 H2") as %[Hv1 _].
+    destruct (proj1 (excl_auth_frag_op_valid _ _) Hv1).
+  Qed.
+
   Lemma locked_exclusive γ i j : locked γ i -∗ locked γ j -∗ False.
-  Proof. apply lock_frag_exclusive. Qed.
+  Proof.
+    iIntros "(%B & H1 & _) (%B' & H2 & _)".
+    iApply (lock_frag_at_exclusive with "H1 H2").
+  Qed.
 
   (* A bare exclusive token out of the same RA, for a client that needs an
      abstract "held" marker with no hart identity in it: the SLEEPlock's
@@ -232,24 +262,40 @@ Section Lock.
     iModIntro. iExists γ. iExists 0%nat. iExact "H".
   Qed.
 
-  (* THE holder law: the token pins the owner word to your own [struct cpu]. *)
-  Lemma locked_state γ st i :
-    lock_auth γ st -∗ locked γ i -∗ ⌜st = Some (i, true)⌝.
-  Proof. apply lock_frag_agree. Qed.
-
-  (* A6.119: the same laws where the invariant has the position exposed. *)
+  (* THE holder law: the token pins the owner word to your own [struct cpu].
+     A6.119: the token's own position comes back too -- it is what the word's
+     pin is read against, and [lock_pos_agree] is what ties it to the one the
+     invariant minted. *)
   Lemma locked_state_at γ st B i :
-    lock_auth_at γ st B -∗ locked γ i -∗ ⌜st = Some (i, true)⌝.
+    lock_auth_at γ st B -∗ locked γ i -∗
+    ⌜st = Some (i, true)⌝ ∗ TsoCtx.ctx_floor cur_ctx B.
   Proof.
-    iIntros "Ha (%B' & Hf)".
-    iDestruct (lock_pos_agree with "Ha Hf") as %[-> _]. done.
+    iIntros "Ha (%B' & Hf & #Hfl)".
+    iDestruct (lock_pos_agree with "Ha Hf") as %[-> ->].
+    iSplitR; [done|]. iExact "Hfl".
   Qed.
 
   Lemma locked_pre_state_at γ st B i :
-    lock_auth_at γ st B -∗ locked_pre γ i -∗ ⌜st = Some (i, false)⌝.
+    lock_auth_at γ st B -∗ locked_pre γ i -∗
+    ⌜st = Some (i, false)⌝ ∗ TsoCtx.ctx_floor cur_ctx B.
   Proof.
-    iIntros "Ha (%B' & Hf)".
-    iDestruct (lock_pos_agree with "Ha Hf") as %[-> _]. done.
+    iIntros "Ha (%B' & Hf & #Hfl)".
+    iDestruct (lock_pos_agree with "Ha Hf") as %[-> ->].
+    iSplitR; [done|]. iExact "Hfl".
+  Qed.
+
+  Lemma locked_state γ st i :
+    lock_auth γ st -∗ locked γ i -∗ ⌜st = Some (i, true)⌝.
+  Proof.
+    iIntros "(%B & Ha) Ht".
+    iDestruct (locked_state_at with "Ha Ht") as "[$ _]".
+  Qed.
+
+  Lemma locked_pre_state γ st i :
+    lock_auth γ st -∗ locked_pre γ i -∗ ⌜st = Some (i, false)⌝.
+  Proof.
+    iIntros "(%B & Ha) Ht".
+    iDestruct (locked_pre_state_at with "Ha Ht") as "[$ _]".
   Qed.
 
   Lemma locked_cpu_eq γ st i :
@@ -259,14 +305,11 @@ Section Lock.
     iDestruct (locked_state with "Hg Ht") as %->. done.
   Qed.
 
-  Lemma locked_pre_state γ st i :
-    lock_auth γ st -∗ locked_pre γ i -∗ ⌜st = Some (i, false)⌝.
-  Proof. apply lock_frag_agree. Qed.
-
-  (* ---- the four state transitions (one per lock instruction) --------- *)
-
-  (* A6.119: the update moves BOTH components; the position is a parameter so
-     the AMO can set it and the other three steps can keep it. *)
+  (* ---- the four state transitions (one per lock instruction) ---------
+     A6.119: the POSITION rides with them.  [lock_take] is the AMO's step and
+     is where it enters -- the floor is the acquire's own, minted at the same
+     instruction; the two middle steps carry it; [lock_give] drops it as the
+     lock goes free and the word's pin is retracted. *)
   Local Lemma lock_state_update_at γ st st' B B' :
     lock_auth_at γ st B -∗ lock_frag_at γ st B ==∗
     lock_auth_at γ st' B' ∗ lock_frag_at γ st' B'.
@@ -286,45 +329,55 @@ Section Lock.
     iModIntro. iSplitL "Ha"; by iExists B'.
   Qed.
 
-  (* acquire's amoswap: a free lock becomes "held by i, cpu not yet
-     written". *)
-  Lemma lock_take γ i :
+  (* acquire's amoswap: a free lock becomes "held by i, cpu not yet written",
+     AT THE POSITION THE AMO JUST OCCUPIED. *)
+  Lemma lock_take γ i (B : nat) :
+    TsoCtx.ctx_floor cur_ctx B -∗
     lock_auth γ None -∗ lock_frag γ None ==∗
-    lock_auth γ (Some (i, false)) ∗ locked_pre γ i.
-  Proof. apply lock_state_update. Qed.
+    lock_auth_at γ (Some (i, false)) B ∗ locked_pre γ i.
+  Proof.
+    iIntros "#Hfl (%B0 & Ha) (%B1 & Hf)".
+    iDestruct (lock_pos_agree with "Ha Hf") as %[_ ->].
+    iMod (lock_state_update_at γ None (Some (i, false)) B1 B with "Ha Hf")
+      as "[Ha Hf]".
+    iModIntro. iFrame "Ha". iExists B. iFrame "Hf Hfl".
+  Qed.
 
   (* acquire's [lk->cpu = mycpu()]: the window closes, the holder gets THE
-     token. *)
-  Lemma lock_setcpu γ st i :
-    lock_auth γ st -∗ locked_pre γ i ==∗
-    ⌜st = Some (i, false)⌝ ∗ lock_auth γ (Some (i, true)) ∗ locked γ i.
+     token; the position is unmoved. *)
+  Lemma lock_setcpu γ st B i :
+    lock_auth_at γ st B -∗ locked_pre γ i ==∗
+    ⌜st = Some (i, false)⌝ ∗ lock_auth_at γ (Some (i, true)) B ∗ locked γ i.
   Proof.
-    iIntros "Ha Hf".
-    iDestruct (locked_pre_state with "Ha Hf") as %->.
-    iMod (lock_state_update γ (Some (i, false)) (Some (i, true)) with "Ha Hf") as "[Ha Hf]".
-    iModIntro. iSplitR; [done|]. iFrame "Ha Hf".
+    iIntros "Ha (%B' & Hf & #Hfl)".
+    iDestruct (lock_pos_agree with "Ha Hf") as %[-> ->].
+    iMod (lock_state_update_at γ (Some (i, false)) (Some (i, true)) B' B' with "Ha Hf") as "[Ha Hf]".
+    iModIntro. iSplitR; [done|]. iFrame "Ha". iExists B'. iFrame "Hf Hfl".
   Qed.
 
-  (* release's [lk->cpu = 0]: back into the window. *)
-  Lemma lock_clrcpu γ st i :
-    lock_auth γ st -∗ locked γ i ==∗
-    ⌜st = Some (i, true)⌝ ∗ lock_auth γ (Some (i, false)) ∗ locked_pre γ i.
+  (* release's [lk->cpu = 0]: back into the window, position unmoved. *)
+  Lemma lock_clrcpu γ st B i :
+    lock_auth_at γ st B -∗ locked γ i ==∗
+    ⌜st = Some (i, true)⌝ ∗ lock_auth_at γ (Some (i, false)) B ∗ locked_pre γ i.
   Proof.
-    iIntros "Ha Hf".
-    iDestruct (locked_state with "Ha Hf") as %->.
-    iMod (lock_state_update γ (Some (i, true)) (Some (i, false)) with "Ha Hf") as "[Ha Hf]".
-    iModIntro. iSplitR; [done|]. iFrame "Ha Hf".
+    iIntros "Ha (%B' & Hf & #Hfl)".
+    iDestruct (lock_pos_agree with "Ha Hf") as %[-> ->].
+    iMod (lock_state_update_at γ (Some (i, true)) (Some (i, false)) B' B' with "Ha Hf") as "[Ha Hf]".
+    iModIntro. iSplitR; [done|]. iFrame "Ha". iExists B'. iFrame "Hf Hfl".
   Qed.
 
-  (* release's word clear: the lock goes free again. *)
-  Lemma lock_give γ st i :
-    lock_auth γ st -∗ locked_pre γ i ==∗
+  (* release's word clear: the lock goes free again, and the position goes
+     with it -- the pin it floored has just been retracted. *)
+  Lemma lock_give γ st B i :
+    lock_auth_at γ st B -∗ locked_pre γ i ==∗
     ⌜st = Some (i, false)⌝ ∗ lock_auth γ None ∗ lock_frag γ None.
   Proof.
-    iIntros "Ha Hf".
-    iDestruct (locked_pre_state with "Ha Hf") as %->.
-    iMod (lock_state_update γ (Some (i, false)) None with "Ha Hf") as "[Ha Hf]".
-    iModIntro. iSplitR; [done|]. iFrame "Ha Hf".
+    iIntros "Ha (%B' & Hf & _)".
+    iDestruct (lock_pos_agree with "Ha Hf") as %[-> ->].
+    iMod (lock_state_update_at γ (Some (i, false)) None B' B'
+            with "Ha Hf") as "[Ha Hf]".
+    iModIntro. iSplitR; [done|].
+    iSplitL "Ha"; by iExists B'.
   Qed.
 
   (* ---- the physical fields ------------------------------------------- *)
