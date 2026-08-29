@@ -70,13 +70,18 @@ retract-then-store), and locked/locked_pre carry
 ∃B, lock_frag_at γ _ B ∗ ctx_floor cur_ctx B (§0.34′ realized on the
 ξ-axis; boundary note rewritten at the definition).  ALL certified
 through r34 + WpLock/WpLockAt green after.  REMAINING (itemised, no
-design left): (i) lock_word_amo_mint re-ends store-then-mint-pin at
-B := S (length log) + produces the ctx_floor export via
-hart_view_lb_get + ctx_bound_raise; (ii) holder read on _exv +
-ledger_read_pin_ok with lock_pos_agree supplying B; (iii) spinner
-preservation (ledger_store_win_pin_ok, premise from rget=1);
-(iv) release retract-then-store; (v) the AMO failing branch;
-(vi) the 69-file sweep verifying arity-unchanged.  Then (5) the
+design left).  DONE SINCE: the mint+export (uncoupled from CtxPinMint
+— hart_view_lb_get at T:=0, "the acquirer's own view IS the
+position"), BOTH READS (holder via ledger_read_pin_bytes_ok —
+§0.35′(iv) case 2 DISCHARGED; the nonzero fact travels inside Res
+beside the pin — the AU rule's fourth manifestation), and
+lock_take/lock_give at the new arities.  REMAINING (all wiring,
+instruments in hand): (1) release retract-then-store at
+WpSconfLock:874 (lock_word_pin_drop then the free-word gate,
+replacing lock_word_ex_forget); (2) spinner preservation on the
+failing AMO branch (ledger_store_win_pin_ok, premise from rget=1);
+(3) the failing-branch close; (4) the WpSconfLock/WpLockAt re-cut
+tail + the 69-file sweep as arity verification + sentinel + A6.119.  Then (5) the
 SpecAcquire threading and (6) close + cone sweep as before.
 Then: (5) lock_openable_c threading through SpecAcquire's ~40 callers;
 (6) close WpSconfLock + sweep the cone (~160 files); DMA AU leaf +
