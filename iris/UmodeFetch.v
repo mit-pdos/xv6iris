@@ -107,6 +107,51 @@ Proof.
   rewrite (Z.div_small (R mod 4096 + d) 4096 ltac:(lia)). lia.
 Qed.
 
+(* ALIGNMENT ALONE BOUNDS THE WINDOW, which is why three of the four fetch
+   geometries need no in-page premise at all: a k-aligned pc has a page
+   offset that is a multiple of k, hence at most 4096 - k, so a k-byte
+   window starting there cannot leave the page.  At k = 4 that covers the
+   two 4-ALIGNED reads and at k = 2 the compressed 2-mod-4 one.
+
+   The remaining geometry -- a NON-compressed instruction at a 2-mod-4 pc,
+   read as 2 + 2 -- is the one that genuinely CAN straddle a page boundary
+   (its low half sits at page offset 4094), and the way to support it is to
+   give the second halfword its own leaf rather than to forbid the case with
+   an in-page premise. *)
+Lemma ualign_page_off (pc : mword 64) (k : Z) :
+  0 < k -> (k | 4096) -> is_aligned_vaddr (Virtaddr pc) k = true ->
+  (bv_unsigned pc mod 4096) mod k = 0.
+Proof.
+  intros Hk Hdvd Hal.
+  unfold is_aligned_vaddr in Hal. apply Z.eqb_eq in Hal.
+  rewrite uint_unsigned in Hal.
+  rewrite Z.rem_mod_nonneg in Hal;
+    [ | exact (proj1 (bv_unsigned_in_range _ pc)) | lia ].
+  rewrite <- (Znumtheory.Zmod_div_mod k 4096 (bv_unsigned pc) Hk ltac:(lia) Hdvd).
+  exact Hal.
+Qed.
+
+Lemma ualign4_nc (pc : mword 64) (d : Z) :
+  is_aligned_vaddr (Virtaddr pc) 4 = true -> 0 <= d <= 3 ->
+  bv_unsigned pc mod 4096 + d < 4096.
+Proof.
+  intros Hal Hd.
+  pose proof (ualign_page_off pc 4 ltac:(lia) ltac:(exists 1024; reflexivity) Hal) as Hm.
+  pose proof (Z.mod_pos_bound (bv_unsigned pc) 4096 ltac:(lia)) as Hb.
+  (* [lia] cannot see through the NESTED mod, so hand it the multiple *)
+  apply Z.mod_divide in Hm; [ | lia ]. destruct Hm as [q Hq]. lia.
+Qed.
+
+Lemma ualign2_nc (pc : mword 64) (d : Z) :
+  is_aligned_vaddr (Virtaddr pc) 2 = true -> 0 <= d <= 1 ->
+  bv_unsigned pc mod 4096 + d < 4096.
+Proof.
+  intros Hal Hd.
+  pose proof (ualign_page_off pc 2 ltac:(lia) ltac:(exists 2048; reflexivity) Hal) as Hm.
+  pose proof (Z.mod_pos_bound (bv_unsigned pc) 4096 ltac:(lia)) as Hb.
+  apply Z.mod_divide in Hm; [ | lia ]. destruct Hm as [q Hq]. lia.
+Qed.
+
 (* the [uinstr] in-page premise, in the working no-carry form *)
 Lemma uinpage_nc (pc : mword 64) (d : Z) :
   Z.rem (uint pc) 4096 <= 4092 -> 0 <= d <= 3 ->
@@ -400,219 +445,6 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
-(* §2b The physical fetch reads, at the two widths, from CONCRETE bytes.  *)
-(*     (The [udata_*] versions in UserFetchPt.v conjure the word from the *)
-(*     existential page contents; here the caller already knows it.)      *)
-(* ===================================================================== *)
-
-Lemma umode_mem_read_fetch_4 (pa : mword 64) (iw : mword 32) (σ' : mstate) :
-  (forall j : nat, (N.of_nat j < 4)%N ->
-     σ'.(mem) !! pa_add pa j = Some (nth_byte iw j)) ->
-  addr_is_ram pa -> addr_is_ram (pa_add pa 3) ->
-  is_aligned_paddr (Physaddr pa) 4 = true ->
-  pmpAddrMatchType_encdec_backwards
-    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ'.(sregs)) 0)) = TOR ->
-  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0) = false ->
-  eq_vec (_get_Pmpcfg_ent_X (vec_access_dec (register_lookup pmpcfg_n σ'.(sregs)) 0)) ('b"1") = true ->
-  (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0) * 4)%Z ->
-  register_lookup cur_privilege σ'.(sregs) = User ->
-  register_lookup htif_tohost_base σ'.(sregs) = None ->
-  pma_allows_all (register_lookup pma_regions σ'.(sregs)) ->
-  exec (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr pa) 4 false false false) σ'
-    = Some (Ok iw, σ').
-Proof.
-  intros Hbytes Hram0 Hram3 Halp HA Hord HX Hcovp Lpriv Lhtif Hall.
-  destruct (pma_all_ram Hall pa 4
-             (pma_access_ram _ _ _ Hram0 Hram3 (pma_width_ok 4 eq_refl eq_refl) eq_refl eq_refl))
-    as (region & Hpmam & Hexec & _).
-  pose proof (addr_is_ram_not_in_clint _ Hram0) as Hnc.
-  pose proof (addr_is_ram_not_in_sig _ Hram0) as Hns.
-  assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-            (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0)) 4)
-            (uint pa) (uint (to_bits 64 4)) = PMP_Match).
-  { exact (ram_fetch_pmp pa _ 4 3 ltac:(lia) ltac:(lia)
-             ltac:(vm_compute; reflexivity) ltac:(reflexivity)
-             Hram0 Hram3 Hcovp). }
-  exact (exec_mem_read_fetch_4_U PBMT_PMA pa region iw σ'
-           HA Hord Hrange HX Hpmam Halp Hexec
-           (within_clint_false pa 4 σ' Hnc ltac:(lia))
-           (within_sig_false pa 4 σ' Hns ltac:(lia))
-           (within_htif_false pa 4 σ' Lhtif)
-           (addr_is_ram_not_dev _ Hram0)
-           Hbytes Lpriv).
-Qed.
-
-Lemma umode_mem_read_fetch_2 (pa : mword 64) (ih : mword 16) (σ' : mstate) :
-  (forall j : nat, (N.of_nat j < 2)%N ->
-     σ'.(mem) !! pa_add pa j = Some (nth_byte ih j)) ->
-  addr_is_ram pa -> addr_is_ram (pa_add pa 1) ->
-  is_aligned_paddr (Physaddr pa) 2 = true ->
-  pmpAddrMatchType_encdec_backwards
-    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ'.(sregs)) 0)) = TOR ->
-  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0) = false ->
-  eq_vec (_get_Pmpcfg_ent_X (vec_access_dec (register_lookup pmpcfg_n σ'.(sregs)) 0)) ('b"1") = true ->
-  (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0) * 4)%Z ->
-  register_lookup cur_privilege σ'.(sregs) = User ->
-  register_lookup htif_tohost_base σ'.(sregs) = None ->
-  pma_allows_all (register_lookup pma_regions σ'.(sregs)) ->
-  exec (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr pa) 2 false false false) σ'
-    = Some (Ok ih, σ').
-Proof.
-  intros Hbytes Hram0 Hram1 Halp HA Hord HX Hcovp Lpriv Lhtif Hall.
-  destruct (pma_all_ram Hall pa 2
-             (pma_access_ram _ _ _ Hram0 Hram1 (pma_width_ok 2 eq_refl eq_refl) eq_refl eq_refl))
-    as (region & Hpmam & Hexec & _).
-  pose proof (addr_is_ram_not_in_clint _ Hram0) as Hnc.
-  pose proof (addr_is_ram_not_in_sig _ Hram0) as Hns.
-  assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-            (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0)) 4)
-            (uint pa) (uint (to_bits 64 2)) = PMP_Match).
-  { exact (ram_fetch_pmp pa _ 2 1 ltac:(lia) ltac:(lia)
-             ltac:(vm_compute; reflexivity) ltac:(reflexivity)
-             Hram0 Hram1 Hcovp). }
-  exact (exec_mem_read_fetch_2_U PBMT_PMA pa region ih σ'
-           HA Hord Hrange HX Hpmam Halp Hexec
-           (within_clint_false pa 2 σ' Hnc ltac:(lia))
-           (within_sig_false pa 2 σ' Hns ltac:(lia))
-           (within_htif_false pa 2 σ' Lhtif)
-           (addr_is_ram_not_dev _ Hram0)
-           Hbytes Lpriv).
-Qed.
-
-(* ===================================================================== *)
-(* §2c One image byte, borrowed out of [umem].                            *)
-(* ===================================================================== *)
-
-Section UmodeFetchWord.
-  Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
-
-  Lemma umem_fetch_byte (pt : uptd) (M : gmap Z (bv 8)) (w_leaf pc : mword 64)
-      (j : nat) (b : bv 8) (σ' : mstate) :
-    ud_um pt !! svpn_of pc = Some w_leaf ->
-    bv_unsigned pc mod 4096 + Z.of_nat j < 4096 ->
-    M !! (uint pc + Z.of_nat j) = Some b ->
-    gen_heap_interp σ'.(mem) -∗ umem pt M -∗
-    ⌜σ'.(mem) !! pa_add (u_walk_pa w_leaf pc) j = Some b /\
-     addr_is_ram (pa_add (u_walk_pa w_leaf pc) j)⌝.
-  Proof.
-    iIntros (Hl Hnc HM) "Hmem HM".
-    iDestruct (umem_lookup_acc pt M (uint pc + Z.of_nat j) b HM with "HM")
-      as "[Hb Hback]".
-    iDestruct (phys_valid with "Hmem Hb") as %Hv.
-    iDestruct (phys_ram with "Hb") as %Hr.
-    iPureIntro.
-    rewrite <- (uva_pa_window pt w_leaf pc j Hl Hnc).
-    exact (conj Hv Hr).
-  Qed.
-
-End UmodeFetchWord.
-
-(* ===================================================================== *)
-(* §3 THE FOUR FETCH COMPOSERS.                                           *)
-(*                                                                        *)
-(* Same premise list as UserFetchPt's composers (state pins + the         *)
-(* translate facts), with the [udata_own]/[udata_cov] pair replaced by     *)
-(* [umem pt M] and the concrete [uM_bytes] window; the fetched value is    *)
-(* the one the image determines, not an existential.                       *)
-(* ===================================================================== *)
-
-Section UmodeFetchOk.
-  Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
-
-  (* (a) a 4-ALIGNED pc holding a NON-compressed instruction: one 4-byte
-     read, result [F_Base iw]. *)
-  Lemma umode_fetch_base_4 (pt : uptd) (M : gmap Z (bv 8))
-      (w_leaf pc : mword 64) (iw : mword 32) (σ : mstate) :
-    ud_um pt !! svpn_of pc = Some w_leaf ->
-    uleaf_ok (InstructionFetch tt) w_leaf ->
-    uva_canon pc ->
-    Z.rem (uint pc) 4096 <= 4092 ->
-    is_aligned_vaddr (Virtaddr pc) 4 = true ->
-    uM_bytes M (uint pc) 4 iw ->
-    isRVC (subrange_vec_dec iw 15 0) = false ->
-    register_lookup PC σ.(sregs) = pc ->
-    register_lookup misa σ.(sregs) = MISA_C ->
-    register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
-    register_lookup htif_tohost_base σ.(sregs) = None ->
-    register_lookup cur_privilege σ.(sregs) = User ->
-    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
-    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
-    reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗
-    utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) -∗ umem pt M ==∗
-    ∃ σ' : mstate,
-      ⌜exec (fetch tt) σ = Some (F_Base iw, σ')⌝ ∗
-      ⌜σ'.(mdev) = σ.(mdev)⌝ ∗
-      ⌜(σ'.(sregs) = σ.(sregs) \/
-        exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type⌝ ∗
-      ⌜forall r : register, register_beq r tlb = false ->
-         register_lookup r σ'.(sregs) = register_lookup r σ.(sregs)⌝ ∗
-      reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗
-      utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗ umem pt M.
-  Proof.
-    intros Hl Hchk Hcanon Hpg Hal Hbytes HnRVC Lpc Hmisa Hmenv Hhtif Hcp HSXL Hall.
-    iIntros "Hri Hgh Hinv HM".
-    iDestruct (utlb_inv_pt_pmp_facts (ud_root pt) (ud_tfp pt) (ud_um pt) σ with "Hri Hinv")
-      as %(HA & Hord & HX & HR & HW & Hcovp).
-    iMod (utlb_inv_pt_translateAddr_u (InstructionFetch tt)
-            (ud_root pt) (ud_tfp pt) (ud_um pt) w_leaf pc (u_walk_pa w_leaf pc) σ
-            Hl Hchk Hcanon eq_refl Hmisa Hmenv Hhtif Hcp HSXL
-            (exec_effectivePrivilege_fetch (register_lookup mstatus σ.(sregs)) User σ)
-            (exec_is_shadow_stack_fetch σ) Hall
-            with "Hri Hgh Hinv")
-      as (σ') "(%Htr & %Hmdev & %Hsregs & Hri & Hgh & Hinv)".
-    assert (Tr : forall r : register, register_beq r tlb = false ->
-              register_lookup r σ'.(sregs) = register_lookup r σ.(sregs)).
-    { intros r Hne.
-      destruct Hsregs as [Heq | (tv & Heq)]; rewrite Heq;
-        [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
-    pose proof (uinpage_nc pc 3 Hpg ltac:(lia)) as Hnc3.
-    assert (Hnc : forall j : nat, (j < 4)%nat ->
-              bv_unsigned pc mod 4096 + Z.of_nat j < 4096).
-    { intros j Hj. lia. }
-    iDestruct (umem_fetch_byte pt M w_leaf pc 0 (nth_byte iw 0) σ' Hl
-                 (Hnc 0%nat ltac:(lia)) (Hbytes 0%nat ltac:(lia)) with "Hgh HM")
-      as %[Hm0 Hr0].
-    iDestruct (umem_fetch_byte pt M w_leaf pc 1 (nth_byte iw 1) σ' Hl
-                 (Hnc 1%nat ltac:(lia)) (Hbytes 1%nat ltac:(lia)) with "Hgh HM")
-      as %[Hm1 Hr1].
-    iDestruct (umem_fetch_byte pt M w_leaf pc 2 (nth_byte iw 2) σ' Hl
-                 (Hnc 2%nat ltac:(lia)) (Hbytes 2%nat ltac:(lia)) with "Hgh HM")
-      as %[Hm2 Hr2].
-    iDestruct (umem_fetch_byte pt M w_leaf pc 3 (nth_byte iw 3) σ' Hl
-                 (Hnc 3%nat ltac:(lia)) (Hbytes 3%nat ltac:(lia)) with "Hgh HM")
-      as %[Hm3 Hr3].
-    assert (Hmr : exec (mem_read (InstructionFetch tt) PBMT_PMA
-                     (Physaddr (u_walk_pa w_leaf pc)) 4 false false false) σ'
-                  = Some (Ok iw, σ')).
-    { apply (umode_mem_read_fetch_4 (u_walk_pa w_leaf pc) iw σ').
-      - intros j HjN. assert (Hj : (j < 4)%nat) by lia.
-        destruct j as [ | [ | [ | [ | ] ] ] ]; try lia;
-          [ exact Hm0 | exact Hm1 | exact Hm2 | exact Hm3 ].
-      - rewrite <- (pa_add_0 (u_walk_pa w_leaf pc)). exact Hr0.
-      - exact Hr3.
-      - exact (pa4_aligned _ pc Hal).
-      - rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HA.
-      - rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hord.
-      - rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HX.
-      - rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hcovp.
-      - rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp.
-      - rewrite (Tr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Hhtif.
-      - rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)); exact Hall. }
-    iModIntro. iExists σ'.
-    iSplit; [ iPureIntro | ].
-    { pose proof (exec_fetch_ok_4 σ σ' pc (u_walk_pa w_leaf pc) iw Lpc Hal Htr Hmr) as Hf.
-      rewrite autocast_mword_id in Hf. rewrite HnRVC in Hf. exact Hf. }
-    iSplit; [ iPureIntro; exact Hmdev | ].
-    iSplit; [ iPureIntro; exact Hsregs | ].
-    iSplit; [ iPureIntro; exact Tr | ].
-    iFrame "Hri Hgh Hinv HM".
-  Qed.
-
-End UmodeFetchOk.
-
-(* ===================================================================== *)
 (* §3b The word a COMPRESSED instruction at a 4-ALIGNED pc is fetched as: *)
 (*     the fetch unit reads FOUR bytes, so the word carries the two bytes *)
 (*     that follow the halfword ([uinstr]'s extra [ui_code] conjunct).    *)
@@ -637,374 +469,21 @@ Proof.
   rewrite subrange16_assemble4. apply bv16_of_bytes.
 Qed.
 
-Section UmodeFetchRvc4.
-  Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
-
-  (* (b) a 4-ALIGNED pc holding a COMPRESSED instruction: still ONE 4-byte
-     read, result [F_RVC h]. *)
-  Lemma umode_fetch_rvc_4 (pt : uptd) (M : gmap Z (bv 8))
-      (w_leaf pc : mword 64) (h : mword 16) (b2 b3 : bv 8) (σ : mstate) :
-    ud_um pt !! svpn_of pc = Some w_leaf ->
-    uleaf_ok (InstructionFetch tt) w_leaf ->
-    uva_canon pc ->
-    Z.rem (uint pc) 4096 <= 4092 ->
-    is_aligned_vaddr (Virtaddr pc) 4 = true ->
-    uM_bytes M (uint pc) 2 h ->
-    M !! (uint pc + 2) = Some b2 ->
-    M !! (uint pc + 3) = Some b3 ->
-    isRVC h = true ->
-    register_lookup PC σ.(sregs) = pc ->
-    register_lookup misa σ.(sregs) = MISA_C ->
-    register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
-    register_lookup htif_tohost_base σ.(sregs) = None ->
-    register_lookup cur_privilege σ.(sregs) = User ->
-    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
-    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
-    reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗
-    utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) -∗ umem pt M ==∗
-    ∃ σ' : mstate,
-      ⌜exec (fetch tt) σ = Some (F_RVC h, σ')⌝ ∗
-      ⌜σ'.(mdev) = σ.(mdev)⌝ ∗
-      ⌜(σ'.(sregs) = σ.(sregs) \/
-        exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type⌝ ∗
-      ⌜forall r : register, register_beq r tlb = false ->
-         register_lookup r σ'.(sregs) = register_lookup r σ.(sregs)⌝ ∗
-      reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗
-      utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗ umem pt M.
-  Proof.
-    intros Hl Hchk Hcanon Hpg Hal Hbytes Hb2 Hb3 HisRVC
-           Lpc Hmisa Hmenv Hhtif Hcp HSXL Hall.
-    iIntros "Hri Hgh Hinv HM".
-    iDestruct (utlb_inv_pt_pmp_facts (ud_root pt) (ud_tfp pt) (ud_um pt) σ with "Hri Hinv")
-      as %(HA & Hord & HX & HR & HW & Hcovp).
-    iMod (utlb_inv_pt_translateAddr_u (InstructionFetch tt)
-            (ud_root pt) (ud_tfp pt) (ud_um pt) w_leaf pc (u_walk_pa w_leaf pc) σ
-            Hl Hchk Hcanon eq_refl Hmisa Hmenv Hhtif Hcp HSXL
-            (exec_effectivePrivilege_fetch (register_lookup mstatus σ.(sregs)) User σ)
-            (exec_is_shadow_stack_fetch σ) Hall
-            with "Hri Hgh Hinv")
-      as (σ') "(%Htr & %Hmdev & %Hsregs & Hri & Hgh & Hinv)".
-    assert (Tr : forall r : register, register_beq r tlb = false ->
-              register_lookup r σ'.(sregs) = register_lookup r σ.(sregs)).
-    { intros r Hne.
-      destruct Hsregs as [Heq | (tv & Heq)]; rewrite Heq;
-        [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
-    pose proof (uinpage_nc pc 3 Hpg ltac:(lia)) as Hnc3.
-    assert (Hnc : forall j : nat, (j < 4)%nat ->
-              bv_unsigned pc mod 4096 + Z.of_nat j < 4096).
-    { intros j Hj. lia. }
-    iDestruct (umem_fetch_byte pt M w_leaf pc 0 (nth_byte h 0) σ' Hl
-                 (Hnc 0%nat ltac:(lia)) (Hbytes 0%nat ltac:(lia)) with "Hgh HM")
-      as %[Hm0 Hr0].
-    iDestruct (umem_fetch_byte pt M w_leaf pc 1 (nth_byte h 1) σ' Hl
-                 (Hnc 1%nat ltac:(lia)) (Hbytes 1%nat ltac:(lia)) with "Hgh HM")
-      as %[Hm1 Hr1].
-    iDestruct (umem_fetch_byte pt M w_leaf pc 2 b2 σ' Hl
-                 (Hnc 2%nat ltac:(lia)) Hb2 with "Hgh HM") as %[Hm2 Hr2].
-    iDestruct (umem_fetch_byte pt M w_leaf pc 3 b3 σ' Hl
-                 (Hnc 3%nat ltac:(lia)) Hb3 with "Hgh HM") as %[Hm3 Hr3].
-    assert (Hmr : exec (mem_read (InstructionFetch tt) PBMT_PMA
-                     (Physaddr (u_walk_pa w_leaf pc)) 4 false false false) σ'
-                  = Some (Ok (urvc4_word h b2 b3), σ')).
-    { apply (umode_mem_read_fetch_4 (u_walk_pa w_leaf pc) (urvc4_word h b2 b3) σ').
-      - intros j HjN. assert (Hj : (j < 4)%nat) by lia.
-        rewrite (urvc4_byte h b2 b3 j Hj).
-        destruct j as [ | [ | [ | [ | ] ] ] ]; try lia;
-          cbn [lookup_total list_lookup_total];
-          [ exact Hm0 | exact Hm1 | exact Hm2 | exact Hm3 ].
-      - rewrite <- (pa_add_0 (u_walk_pa w_leaf pc)). exact Hr0.
-      - exact Hr3.
-      - exact (pa4_aligned _ pc Hal).
-      - rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HA.
-      - rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hord.
-      - rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HX.
-      - rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hcovp.
-      - rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp.
-      - rewrite (Tr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Hhtif.
-      - rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)); exact Hall. }
-    iModIntro. iExists σ'.
-    iSplit; [ iPureIntro | ].
-    { pose proof (exec_fetch_ok_4 σ σ' pc (u_walk_pa w_leaf pc)
-                    (urvc4_word h b2 b3) Lpc Hal Htr Hmr) as Hf.
-      rewrite autocast_mword_id in Hf.
-      rewrite (urvc4_low h b2 b3) in Hf. rewrite HisRVC in Hf. exact Hf. }
-    iSplit; [ iPureIntro; exact Hmdev | ].
-    iSplit; [ iPureIntro; exact Hsregs | ].
-    iSplit; [ iPureIntro; exact Tr | ].
-    iFrame "Hri Hgh Hinv HM".
-  Qed.
-
-End UmodeFetchRvc4.
-
 (* ===================================================================== *)
-(* §3c The 2-mod-4 geometries.  The low halfword comes off the pc's page; *)
-(*     a NON-compressed instruction then needs the high halfword, which   *)
-(*     translates INDEPENDENTLY at pc+2 -- and, since [uinstr] keeps the  *)
-(*     whole 4-byte window on ONE page, through the SAME leaf.  So the    *)
-(*     mapped/canonical facts at pc+2 are DERIVED here, not assumed.      *)
+(* THE FETCH COMPOSERS ARE GONE (2026-08-29).                             *)
+(*                                                                        *)
+(* This file used to end with four whole-fetch composers -- [base_4],     *)
+(* [rvc_4], [rvc_2], [base_2] -- plus the physical read lemmas and the    *)
+(* byte-assembly arithmetic they needed.  NOTHING OUTSIDE THIS FILE EVER  *)
+(* CALLED THEM: the live fetch path is WpUmodeStep.v's [uv_fetch_4] /     *)
+(* [uv_fetch_rvc_2] / [uv_fetch_base_2], a parallel set built on          *)
+(* [uv_walk_fetch], which UkStep.v, UkStore.v, UkLoad.v and UkBranch.v    *)
+(* are the consumers of.  Keeping a second copy meant every change to the *)
+(* fetch -- starting with page-crossing support -- would have had to be   *)
+(* made twice, once in code no one runs.                                  *)
+(*                                                                        *)
+(* What survives is what the live path actually imports: §1's window and  *)
+(* canonicity arithmetic (including the new alignment bounds), the        *)
+(* [u_walk_pa] window lemmas, and §3b's [urvc4_*] view of a compressed    *)
+(* instruction fetched as a 4-byte read.                                  *)
 (* ===================================================================== *)
-
-Section UmodeFetchSplit.
-  Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
-
-  (* (c) a 2-mod-4 pc holding a COMPRESSED instruction: one 2-byte read,
-     result [F_RVC h]. *)
-  Lemma umode_fetch_rvc_2 (pt : uptd) (M : gmap Z (bv 8))
-      (w_leaf pc : mword 64) (h : mword 16) (σ : mstate) :
-    ud_um pt !! svpn_of pc = Some w_leaf ->
-    uleaf_ok (InstructionFetch tt) w_leaf ->
-    uva_canon pc ->
-    Z.rem (uint pc) 4096 <= 4092 ->
-    is_aligned_vaddr (Virtaddr pc) 2 = true ->
-    is_aligned_vaddr (Virtaddr pc) 4 = false ->
-    uM_bytes M (uint pc) 2 h ->
-    isRVC h = true ->
-    register_lookup PC σ.(sregs) = pc ->
-    register_lookup misa σ.(sregs) = MISA_C ->
-    register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
-    register_lookup htif_tohost_base σ.(sregs) = None ->
-    register_lookup cur_privilege σ.(sregs) = User ->
-    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
-    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
-    reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗
-    utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) -∗ umem pt M ==∗
-    ∃ σ' : mstate,
-      ⌜exec (fetch tt) σ = Some (F_RVC h, σ')⌝ ∗
-      ⌜σ'.(mdev) = σ.(mdev)⌝ ∗
-      ⌜(σ'.(sregs) = σ.(sregs) \/
-        exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type⌝ ∗
-      ⌜forall r : register, register_beq r tlb = false ->
-         register_lookup r σ'.(sregs) = register_lookup r σ.(sregs)⌝ ∗
-      reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗
-      utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗ umem pt M.
-  Proof.
-    intros Hl Hchk Hcanon Hpg Hal2 Hnal4 Hbytes HisRVC
-           Lpc Hmisa Hmenv Hhtif Hcp HSXL Hall.
-    assert (HmisaC : eq_vec (_get_Misa_C (register_lookup misa σ.(sregs))) ('b"1") = true)
-      by (rewrite Hmisa; vm_compute; reflexivity).
-    destruct (align2_not4_facts pc Hal2 Hnal4) as (_ & Hbit0 & Hbit1).
-    iIntros "Hri Hgh Hinv HM".
-    iDestruct (utlb_inv_pt_pmp_facts (ud_root pt) (ud_tfp pt) (ud_um pt) σ with "Hri Hinv")
-      as %(HA & Hord & HX & HR & HW & Hcovp).
-    iMod (utlb_inv_pt_translateAddr_u (InstructionFetch tt)
-            (ud_root pt) (ud_tfp pt) (ud_um pt) w_leaf pc (u_walk_pa w_leaf pc) σ
-            Hl Hchk Hcanon eq_refl Hmisa Hmenv Hhtif Hcp HSXL
-            (exec_effectivePrivilege_fetch (register_lookup mstatus σ.(sregs)) User σ)
-            (exec_is_shadow_stack_fetch σ) Hall
-            with "Hri Hgh Hinv")
-      as (σ') "(%Htr & %Hmdev & %Hsregs & Hri & Hgh & Hinv)".
-    assert (Tr : forall r : register, register_beq r tlb = false ->
-              register_lookup r σ'.(sregs) = register_lookup r σ.(sregs)).
-    { intros r Hne.
-      destruct Hsregs as [Heq | (tv & Heq)]; rewrite Heq;
-        [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
-    pose proof (uinpage_nc pc 3 Hpg ltac:(lia)) as Hnc3.
-    assert (Hnc : forall j : nat, (j < 2)%nat ->
-              bv_unsigned pc mod 4096 + Z.of_nat j < 4096).
-    { intros j Hj. lia. }
-    iDestruct (umem_fetch_byte pt M w_leaf pc 0 (nth_byte h 0) σ' Hl
-                 (Hnc 0%nat ltac:(lia)) (Hbytes 0%nat ltac:(lia)) with "Hgh HM")
-      as %[Hm0 Hr0].
-    iDestruct (umem_fetch_byte pt M w_leaf pc 1 (nth_byte h 1) σ' Hl
-                 (Hnc 1%nat ltac:(lia)) (Hbytes 1%nat ltac:(lia)) with "Hgh HM")
-      as %[Hm1 Hr1].
-    assert (Hmr : exec (mem_read (InstructionFetch tt) PBMT_PMA
-                     (Physaddr (u_walk_pa w_leaf pc)) 2 false false false) σ'
-                  = Some (Ok h, σ')).
-    { apply (umode_mem_read_fetch_2 (u_walk_pa w_leaf pc) h σ').
-      - intros j HjN. assert (Hj : (j < 2)%nat) by lia.
-        destruct j as [ | [ | ] ]; try lia; [ exact Hm0 | exact Hm1 ].
-      - rewrite <- (pa_add_0 (u_walk_pa w_leaf pc)). exact Hr0.
-      - exact Hr1.
-      - exact (pa_aligned_div _ pc 2 ltac:(lia) ltac:(exists 2048; reflexivity) Hal2).
-      - rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HA.
-      - rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hord.
-      - rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HX.
-      - rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hcovp.
-      - rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp.
-      - rewrite (Tr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Hhtif.
-      - rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)); exact Hall. }
-    iModIntro. iExists σ'.
-    iSplit; [ iPureIntro | ].
-    { exact (exec_fetch_rvc_2 σ σ' pc (u_walk_pa w_leaf pc)
-               Lpc HmisaC Hbit0 Hbit1 Hnal4 h Htr Hmr HisRVC). }
-    iSplit; [ iPureIntro; exact Hmdev | ].
-    iSplit; [ iPureIntro; exact Hsregs | ].
-    iSplit; [ iPureIntro; exact Tr | ].
-    iFrame "Hri Hgh Hinv HM".
-  Qed.
-
-End UmodeFetchSplit.
-
-Section UmodeFetchSplitBase.
-  Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
-
-  (* (d) a 2-mod-4 pc holding a NON-compressed instruction: the split 2+2
-     fetch, result [F_Base iw].  Two absorbed translation moves, so the
-     state shape is reported as the lookup-transport property (every
-     non-[tlb] register unchanged), exactly as [user_pt_fetch_instr_2]. *)
-  Lemma umode_fetch_base_2 (pt : uptd) (M : gmap Z (bv 8))
-      (w_leaf pc : mword 64) (iw : mword 32) (σ : mstate) :
-    ud_um pt !! svpn_of pc = Some w_leaf ->
-    uleaf_ok (InstructionFetch tt) w_leaf ->
-    uva_canon pc ->
-    Z.rem (uint pc) 4096 <= 4092 ->
-    is_aligned_vaddr (Virtaddr pc) 2 = true ->
-    is_aligned_vaddr (Virtaddr pc) 4 = false ->
-    uM_bytes M (uint pc) 4 iw ->
-    isRVC (subrange_vec_dec iw 15 0) = false ->
-    register_lookup PC σ.(sregs) = pc ->
-    register_lookup misa σ.(sregs) = MISA_C ->
-    register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
-    register_lookup htif_tohost_base σ.(sregs) = None ->
-    register_lookup cur_privilege σ.(sregs) = User ->
-    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
-    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
-    reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗
-    utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) -∗ umem pt M ==∗
-    ∃ σ' : mstate,
-      ⌜exec (fetch tt) σ = Some (F_Base iw, σ')⌝ ∗
-      ⌜σ'.(mdev) = σ.(mdev)⌝ ∗
-      ⌜forall r : register, register_beq r tlb = false ->
-         register_lookup r σ'.(sregs) = register_lookup r σ.(sregs)⌝ ∗
-      reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗
-      utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗ umem pt M.
-  Proof.
-    intros Hl Hchk Hcanon Hpg Hal2 Hnal4 Hbytes HnRVC
-           Lpc Hmisa Hmenv Hhtif Hcp HSXL Hall.
-    assert (HmisaC : eq_vec (_get_Misa_C (register_lookup misa σ.(sregs))) ('b"1") = true)
-      by (rewrite Hmisa; vm_compute; reflexivity).
-    destruct (align2_not4_facts pc Hal2 Hnal4) as (_ & Hbit0 & Hbit1).
-    pose proof (uinpage_nc pc 3 Hpg ltac:(lia)) as Hnc3.
-    pose proof (uinpage_nc pc 2 Hpg ltac:(lia)) as Hnc2.
-    (* the SECOND halfword's va lives on the SAME page, hence the same leaf *)
-    assert (Hl2 : ud_um pt !! svpn_of (add_vec_int pc 2) = Some w_leaf).
-    { rewrite (usvpn_window pc 2 ltac:(lia) Hnc2). exact Hl. }
-    pose proof (uva_canon_add pc 2 Hcanon ltac:(lia) Hnc2) as Hcanon2.
-    destruct (uwin_shift pc 2 Hpg ltac:(lia)) as [Hu2 Hmod2].
-    assert (Hncs : forall j : nat, (j < 2)%nat ->
-              bv_unsigned (add_vec_int pc 2) mod 4096 + Z.of_nat j < 4096).
-    { intros j Hj. rewrite Hmod2. lia. }
-    assert (Hbytes2 : forall j : nat, (j < 2)%nat ->
-              M !! (uint (add_vec_int pc 2) + Z.of_nat j)
-              = Some (nth_byte iw (2 + j))).
-    { intros j Hj.
-      pose proof (Hbytes (2 + j)%nat ltac:(lia)) as Hb.
-      rewrite Nat2Z.inj_add in Hb. change (Z.of_nat 2) with 2 in Hb.
-      rewrite Hu2. rewrite <- Z.add_assoc. exact Hb. }
-    iIntros "Hri Hgh Hinv HM".
-    iDestruct (utlb_inv_pt_pmp_facts (ud_root pt) (ud_tfp pt) (ud_um pt) σ with "Hri Hinv")
-      as %(HA & Hord & HX & HR & HW & Hcovp).
-    (* --- the low halfword: translate at pc, read 2 bytes --- *)
-    iMod (utlb_inv_pt_translateAddr_u (InstructionFetch tt)
-            (ud_root pt) (ud_tfp pt) (ud_um pt) w_leaf pc (u_walk_pa w_leaf pc) σ
-            Hl Hchk Hcanon eq_refl Hmisa Hmenv Hhtif Hcp HSXL
-            (exec_effectivePrivilege_fetch (register_lookup mstatus σ.(sregs)) User σ)
-            (exec_is_shadow_stack_fetch σ) Hall
-            with "Hri Hgh Hinv")
-      as (σ1) "(%Htr1 & %Hmdev1 & %Hsregs1 & Hri & Hgh & Hinv)".
-    assert (Tr1 : forall r : register, register_beq r tlb = false ->
-              register_lookup r σ1.(sregs) = register_lookup r σ.(sregs)).
-    { intros r Hne.
-      destruct Hsregs1 as [Heq | (tv & Heq)]; rewrite Heq;
-        [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
-    assert (Hnc : forall j : nat, (j < 2)%nat ->
-              bv_unsigned pc mod 4096 + Z.of_nat j < 4096).
-    { intros j Hj. lia. }
-    iDestruct (umem_fetch_byte pt M w_leaf pc 0 (nth_byte iw 0) σ1 Hl
-                 (Hnc 0%nat ltac:(lia)) (Hbytes 0%nat ltac:(lia)) with "Hgh HM")
-      as %[Hm0 Hr0].
-    iDestruct (umem_fetch_byte pt M w_leaf pc 1 (nth_byte iw 1) σ1 Hl
-                 (Hnc 1%nat ltac:(lia)) (Hbytes 1%nat ltac:(lia)) with "Hgh HM")
-      as %[Hm1 Hr1].
-    assert (Hmr1 : exec (mem_read (InstructionFetch tt) PBMT_PMA
-                     (Physaddr (u_walk_pa w_leaf pc)) 2 false false false) σ1
-                   = Some (Ok (subrange_vec_dec iw 15 0 : mword 16), σ1)).
-    { apply (umode_mem_read_fetch_2 (u_walk_pa w_leaf pc)
-               (subrange_vec_dec iw 15 0 : mword 16) σ1).
-      - intros j HjN. rewrite (nth_byte_subrange_lo iw j HjN).
-        assert (Hj : (j < 2)%nat) by lia.
-        destruct j as [ | [ | ] ]; try lia; [ exact Hm0 | exact Hm1 ].
-      - rewrite <- (pa_add_0 (u_walk_pa w_leaf pc)). exact Hr0.
-      - exact Hr1.
-      - exact (pa_aligned_div _ pc 2 ltac:(lia) ltac:(exists 2048; reflexivity) Hal2).
-      - rewrite (Tr1 pmpcfg_n ltac:(vm_compute; reflexivity)); exact HA.
-      - rewrite (Tr1 pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hord.
-      - rewrite (Tr1 pmpcfg_n ltac:(vm_compute; reflexivity)); exact HX.
-      - rewrite (Tr1 pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hcovp.
-      - rewrite (Tr1 cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp.
-      - rewrite (Tr1 htif_tohost_base ltac:(vm_compute; reflexivity)); exact Hhtif.
-      - rewrite (Tr1 pma_regions ltac:(vm_compute; reflexivity)); exact Hall. }
-    (* --- the high halfword: translate at pc+2 (same leaf), read 2 bytes --- *)
-    iMod (utlb_inv_pt_translateAddr_u (InstructionFetch tt)
-            (ud_root pt) (ud_tfp pt) (ud_um pt) w_leaf (add_vec_int pc 2)
-            (u_walk_pa w_leaf (add_vec_int pc 2)) σ1
-            Hl2 Hchk Hcanon2 eq_refl
-            (ltac:(rewrite (Tr1 misa ltac:(vm_compute; reflexivity)); exact Hmisa))
-            (ltac:(rewrite (Tr1 menvcfg ltac:(vm_compute; reflexivity)); exact Hmenv))
-            (ltac:(rewrite (Tr1 htif_tohost_base ltac:(vm_compute; reflexivity)); exact Hhtif))
-            (ltac:(rewrite (Tr1 cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))
-            (ltac:(rewrite (Tr1 mstatus ltac:(vm_compute; reflexivity)); exact HSXL))
-            (exec_effectivePrivilege_fetch (register_lookup mstatus σ1.(sregs)) User σ1)
-            (exec_is_shadow_stack_fetch σ1)
-            (ltac:(rewrite (Tr1 pma_regions ltac:(vm_compute; reflexivity)); exact Hall))
-            with "Hri Hgh Hinv")
-      as (σ2) "(%Htr2 & %Hmdev2 & %Hsregs2 & Hri & Hgh & Hinv)".
-    assert (Tr2 : forall r : register, register_beq r tlb = false ->
-              register_lookup r σ2.(sregs) = register_lookup r σ1.(sregs)).
-    { intros r Hne.
-      destruct Hsregs2 as [Heq | (tv & Heq)]; rewrite Heq;
-        [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
-    iDestruct (umem_fetch_byte pt M w_leaf (add_vec_int pc 2) 0
-                 (nth_byte iw (2 + 0)) σ2 Hl2
-                 (Hncs 0%nat ltac:(lia)) (Hbytes2 0%nat ltac:(lia)) with "Hgh HM")
-      as %[Hn0 Hs0].
-    iDestruct (umem_fetch_byte pt M w_leaf (add_vec_int pc 2) 1
-                 (nth_byte iw (2 + 1)) σ2 Hl2
-                 (Hncs 1%nat ltac:(lia)) (Hbytes2 1%nat ltac:(lia)) with "Hgh HM")
-      as %[Hn1 Hs1].
-    assert (Hmr2 : exec (mem_read (InstructionFetch tt) PBMT_PMA
-                     (Physaddr (u_walk_pa w_leaf (add_vec_int pc 2))) 2 false false false) σ2
-                   = Some (Ok (subrange_vec_dec iw 31 16 : mword 16), σ2)).
-    { apply (umode_mem_read_fetch_2 (u_walk_pa w_leaf (add_vec_int pc 2))
-               (subrange_vec_dec iw 31 16 : mword 16) σ2).
-      - intros j HjN. rewrite (nth_byte_subrange_hi iw j HjN).
-        assert (Hj : (j < 2)%nat) by lia.
-        destruct j as [ | [ | ] ]; try lia; [ exact Hn0 | exact Hn1 ].
-      - rewrite <- (pa_add_0 (u_walk_pa w_leaf (add_vec_int pc 2))). exact Hs0.
-      - exact Hs1.
-      - exact (pa_aligned_div _ (add_vec_int pc 2) 2 ltac:(lia)
-                 ltac:(exists 2048; reflexivity) (ualign2_plus2 pc Hal2)).
-      - rewrite (Tr2 pmpcfg_n ltac:(vm_compute; reflexivity))
-                (Tr1 pmpcfg_n ltac:(vm_compute; reflexivity)); exact HA.
-      - rewrite (Tr2 pmpaddr_n ltac:(vm_compute; reflexivity))
-                (Tr1 pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hord.
-      - rewrite (Tr2 pmpcfg_n ltac:(vm_compute; reflexivity))
-                (Tr1 pmpcfg_n ltac:(vm_compute; reflexivity)); exact HX.
-      - rewrite (Tr2 pmpaddr_n ltac:(vm_compute; reflexivity))
-                (Tr1 pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hcovp.
-      - rewrite (Tr2 cur_privilege ltac:(vm_compute; reflexivity))
-                (Tr1 cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp.
-      - rewrite (Tr2 htif_tohost_base ltac:(vm_compute; reflexivity))
-                (Tr1 htif_tohost_base ltac:(vm_compute; reflexivity)); exact Hhtif.
-      - rewrite (Tr2 pma_regions ltac:(vm_compute; reflexivity))
-                (Tr1 pma_regions ltac:(vm_compute; reflexivity)); exact Hall. }
-    iModIntro. iExists σ2.
-    iSplit; [ iPureIntro | ].
-    { pose proof (exec_fetch_base_2 σ σ1 pc (u_walk_pa w_leaf pc)
-                    Lpc HmisaC Hbit0 Hbit1 Hnal4
-                    (subrange_vec_dec iw 15 0 : mword 16) Htr1 Hmr1
-                    σ2 (u_walk_pa w_leaf (add_vec_int pc 2))
-                    (eq_trans (Tr1 PC ltac:(vm_compute; reflexivity)) Lpc)
-                    HnRVC (subrange_vec_dec iw 31 16 : mword 16) Htr2 Hmr2) as Hf.
-      rewrite concat_subranges_id in Hf. exact Hf. }
-    iSplit; [ iPureIntro; rewrite Hmdev2; exact Hmdev1 | ].
-    iSplit; [ iPureIntro;
-              intros r Hne; rewrite (Tr2 r Hne); exact (Tr1 r Hne) | ].
-    iFrame "Hri Hgh Hinv HM".
-  Qed.
-
-End UmodeFetchSplitBase.
