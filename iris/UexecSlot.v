@@ -190,15 +190,40 @@ Local Lemma tf_upd_ne (f : regfile) (k j : regidx) (v w : mword 64) :
   j <> k -> f !!! j = w -> (<[k := v]> f) !!! j = w.
 Proof. intros Hne <-. exact (upd_ne f k j v Hne). Qed.
 
-(* the USER sp, at [UmodeAbi.sp_idx] (= [mword_of_int 2], spelled here as
-   the literal so this file stays off the Umode tier): the trapframe's
-   [tf_sp_idx] word.  This is the one register the verified-program
-   constructors need to read back -- a whole-process entry contract asks
-   for the stack budget below the entry sp and nothing else. *)
+(* THE THREE REGISTERS A WHOLE-PROCESS ENTRY CONTRACT READS BACK, at the
+   [UmodeAbi] indices (= [mword_of_int 2] / 10 / 11, spelled here as the
+   literals so this file stays off the Umode tier).
+
+   [sp] is the stack budget's base -- every verified program asks for a
+   writable run below its entry sp.  [a0] and [a1] are the ABI's argc and
+   argv: a program that READS its arguments (echo does; sync does not)
+   needs them off the trapframe, since the slot's key is the trapframe and
+   nothing else.  They are trapframe words [tf_sp_idx] and [tf_arg_idx 0/1]
+   -- and note that [a0] is the LAST insert of [userret_gpr]'s tower (the
+   syscall return value overwrites it), so its peel is the shortest.
+
+   All three go through the same discipline: peel with [apply] at explicit
+   arguments until the key matches, and never [rewrite upd_eq]. *)
 Lemma tf_resume_gpr_sp (b : regfile) (tf : list (mword 64)) :
   tf_resume_gpr b tf !!! Regidx (mword_of_int 2) = tf_w tf tf_sp_idx.
 Proof.
   unfold tf_resume_gpr, userret_gpr.
   repeat (apply tf_upd_ne; [ vm_compute; discriminate | ]).
   exact (upd_eq _ (Regidx (mword_of_int 2)) _).
+Qed.
+
+Lemma tf_resume_gpr_a0 (b : regfile) (tf : list (mword 64)) :
+  tf_resume_gpr b tf !!! Regidx (mword_of_int 10) = tf_w tf (tf_arg_idx 0).
+Proof.
+  unfold tf_resume_gpr, userret_gpr.
+  repeat (apply tf_upd_ne; [ vm_compute; discriminate | ]).
+  exact (upd_eq _ (Regidx (mword_of_int 10)) _).
+Qed.
+
+Lemma tf_resume_gpr_a1 (b : regfile) (tf : list (mword 64)) :
+  tf_resume_gpr b tf !!! Regidx (mword_of_int 11) = tf_w tf (tf_arg_idx 1).
+Proof.
+  unfold tf_resume_gpr, userret_gpr.
+  repeat (apply tf_upd_ne; [ vm_compute; discriminate | ]).
+  exact (upd_eq _ (Regidx (mword_of_int 11)) _).
 Qed.

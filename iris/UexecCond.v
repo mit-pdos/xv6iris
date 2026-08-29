@@ -1,11 +1,17 @@
 (* ===================================================================== *)
 (* UexecCond.v -- THE CONDITIONAL ENTRY DEPOSIT: at a mint site, decide    *)
-(* on the KEY alone whether the process is `sync` at its entry, and         *)
-(* deposit sync's verified slot if so, the generic one otherwise.  NO       *)
-(* assumption enters the composition on either branch.                      *)
+(* on the KEY alone whether the process is a VERIFIED PROGRAM at its        *)
+(* entry, and deposit that program's slot if so, the generic one            *)
+(* otherwise.  NO assumption enters the composition on any branch.          *)
 (*                                                                         *)
-(* STEP 1 -- the DECIDABLE TEST that a process's memory image carries       *)
-(* `sync`'s text verbatim ([text_region_eq]), so a mint site can do          *)
+(* TWO PROGRAMS NOW: `sync` and `echo`.  [cond_entry_slot] is a CHAIN of    *)
+(* decidable gates ending in the generic WP; adding the next verified       *)
+(* program is one more [destruct].  Everything below that reads "sync" is   *)
+(* parametric in the program's dumped image ([text_region_eq_of]), with the *)
+(* sync-named forms kept as the instance the mint sites already spell.      *)
+(*                                                                         *)
+(* STEP 1 -- the DECIDABLE TEST that a process's memory image carries a     *)
+(* program's text verbatim ([text_region_eq_of]), so a mint site can do      *)
 (*                                                                         *)
 (*   destruct (decide (sync_gate W)) as [Hgate | _]                          *)
 (*                                                                         *)
@@ -23,7 +29,9 @@
 (*     without touching the literal.                                        *)
 (*                                                                         *)
 (* STEP 2 -- [cond_entry_slot], the conditional constructor.  ALL FOUR of   *)
-(* sync's entry conditions are now facts about the key with a [Decision]:  *)
+(* sync's entry conditions -- and all FIVE of echo's, whose extra one is    *)
+(* the argc/argv area ([UkAbi.uk_args_c], at the trapframe's own a0/a1/sp)  *)
+(* -- are facts about the key with a [Decision]:                            *)
 (* the text ([text_region_eq]), the resume pc, page 0 an X page of the      *)
 (* permission map ([uk_xpage]) and the stack budget ([uk_stack]) -- the     *)
 (* last two used to be facts about the TABLE ([sync_layout], [uv_stack]),  *)
@@ -41,14 +49,15 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
-Require Import ProcGeom ProcDefs ProcPt ProcPtOwn.
+Require Import ProcGeom ProcDefs ProcPt ProcPtOwn.   (* [tf_sp_idx] / [tf_arg_idx] *)
 Require Import UserPtTree UserFrame UserExec.
 Require Import UmodeMem UmodeAbi.
-Require Import UCodeSync.
+Require Import UCodeSync UCodeEcho.
 Require Import UserPerm UsysMemOk UexecWp UexecSlot UexecRet UkSync USyncKernel.
-Require Import UkAbi.   (* [uk_xpage] / [uk_stack]: the generic key-level layout facts *)
+Require Import UkAbi.   (* [uk_xpage] / [uk_stack] / [uk_args_c]: the key-level facts *)
+Require Import UkEcho UkEchoKernel.
 Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode*/Uk* precedent *)
-Require User.SyncSyms User.SyncInstrs.
+Require User.SyncSyms User.SyncInstrs User.EchoSyms User.EchoInstrs.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -60,14 +69,32 @@ Import Defs.
 (* spelling that gets a [Decision] cleanly is [map_filter] on the KEY       *)
 (* (decidable: [elem_of] on a [gset Z]) plus [EqDecision (gmap Z (bv 8))].  *)
 (* ===================================================================== *)
+(* PARAMETRIC IN THE PROGRAM'S IMAGE.  The test was cut for `sync` and is
+   now used by `echo` too, so it takes the dumped bytes as an argument; the
+   sync-named forms below are the instance at [SyncInstrs.sync_bytes] and
+   keep the names the mint sites already spell. *)
+Definition in_img_text (img : gmap Z (bv 8)) (kv : Z * bv 8) : Prop :=
+  kv.1 ∈ dom img.
+
+Global Instance in_img_text_dec (img : gmap Z (bv 8)) (kv : Z * bv 8) :
+  Decision (in_img_text img kv).
+Proof. unfold in_img_text. apply _. Defined.
+
+Definition text_region_eq_of (img M : gmap Z (bv 8)) : Prop :=
+  base.filter (in_img_text img) M = img.
+
+Global Instance text_region_eq_of_dec (img M : gmap Z (bv 8)) :
+  Decision (text_region_eq_of img M).
+Proof. unfold text_region_eq_of. apply _. Defined.
+
 Definition in_sync_text (kv : Z * bv 8) : Prop :=
-  kv.1 ∈ dom SyncInstrs.sync_bytes.
+  in_img_text SyncInstrs.sync_bytes kv.
 
 Global Instance in_sync_text_dec (kv : Z * bv 8) : Decision (in_sync_text kv).
 Proof. unfold in_sync_text. apply _. Defined.
 
 Definition text_region_eq (M : gmap Z (bv 8)) : Prop :=
-  base.filter in_sync_text M = SyncInstrs.sync_bytes.
+  text_region_eq_of SyncInstrs.sync_bytes M.
 
 Global Instance text_region_eq_dec (M : gmap Z (bv 8)) :
   Decision (text_region_eq M).
@@ -76,29 +103,38 @@ Proof. unfold text_region_eq. apply _. Defined.
 (* ===================================================================== *)
 (* SS2 ...and what it buys: sync's own image premise.                      *)
 (* ===================================================================== *)
-Lemma text_region_eq_uimg_sub (M : gmap Z (bv 8)) :
-  text_region_eq M -> uimg_sub SyncInstrs.sync_bytes M.
+Lemma text_region_eq_of_uimg_sub (img M : gmap Z (bv 8)) :
+  text_region_eq_of img M -> uimg_sub img M.
 Proof.
-  unfold text_region_eq, uimg_sub. intros Heq a b Hb.
-  assert (Hf : base.filter in_sync_text M !! a = Some b) by (rewrite Heq; exact Hb).
+  unfold text_region_eq_of, uimg_sub. intros Heq a b Hb.
+  assert (Hf : base.filter (in_img_text img) M !! a = Some b)
+    by (rewrite Heq; exact Hb).
   apply map_lookup_filter_Some in Hf as [HM _]. exact HM.
 Qed.
 
 (* The converse: an image CONTAINING the text has that text as its
    restriction -- so the test is exactly as strong as [uimg_sub] and no
    stronger.  NOTE [cbn [fst]], never [simpl]: see the header. *)
-Lemma uimg_sub_text_region_eq (M : gmap Z (bv 8)) :
-  uimg_sub SyncInstrs.sync_bytes M -> text_region_eq M.
+Lemma uimg_sub_text_region_eq_of (img M : gmap Z (bv 8)) :
+  uimg_sub img M -> text_region_eq_of img M.
 Proof.
-  unfold text_region_eq, uimg_sub. intros Hsub.
+  unfold text_region_eq_of, uimg_sub. intros Hsub.
   apply map_eq. intros a.
-  destruct (SyncInstrs.sync_bytes !! a) as [b|] eqn:Hsb.
+  destruct (img !! a) as [b|] eqn:Hsb.
   - apply map_lookup_filter_Some. split; [exact (Hsub a b Hsb)|].
-    unfold in_sync_text. cbn [fst]. apply elem_of_dom.
+    unfold in_img_text. cbn [fst]. apply elem_of_dom.
     exact (mk_is_Some _ _ Hsb).
   - apply map_lookup_filter_None. right. intros x _.
-    unfold in_sync_text. cbn [fst]. rewrite not_elem_of_dom. exact Hsb.
+    unfold in_img_text. cbn [fst]. rewrite not_elem_of_dom. exact Hsb.
 Qed.
+
+Lemma text_region_eq_uimg_sub (M : gmap Z (bv 8)) :
+  text_region_eq M -> uimg_sub SyncInstrs.sync_bytes M.
+Proof. exact (text_region_eq_of_uimg_sub SyncInstrs.sync_bytes M). Qed.
+
+Lemma uimg_sub_text_region_eq (M : gmap Z (bv 8)) :
+  uimg_sub SyncInstrs.sync_bytes M -> text_region_eq M.
+Proof. exact (uimg_sub_text_region_eq_of SyncInstrs.sync_bytes M). Qed.
 
 (* ===================================================================== *)
 (* SS3 THE GATE, and THE CONDITIONAL CONSTRUCTOR.                          *)
@@ -114,6 +150,25 @@ Definition sync_gate (W : uvis) : Prop :=
 Global Instance sync_gate_dec (W : uvis) : Decision (sync_gate W).
 Proof. unfold sync_gate. apply _. Defined.
 
+(* echo's FIVE, the same shape one program up.  The extra one is the
+   argument area, and note where its parameters come from: [argc], [argv]
+   and the entry [sp] are TRAPFRAME WORDS, so the gate names no
+   existential -- [uk_args_c] is UkAbi.v §3's canonical form (the lengths
+   scanned rather than quantified), which is what makes the whole
+   conjunction decidable. *)
+Definition echo_gate (W : uvis) : Prop :=
+  text_region_eq_of EchoInstrs.echo_bytes (uvis_M W) /\
+  tf_resume_pc (uvis_tf W) = (mword_of_int EchoSyms.start : mword 64) /\
+  uk_xpage (uvis_perm W) (mword_of_int 0) /\
+  uk_stack (uvis_perm W) (uvis_M W) (tf_w (uvis_tf W) tf_sp_idx) 96 /\
+  uk_args_c (uvis_perm W) (uvis_M W)
+    (uint (tf_w (uvis_tf W) (tf_arg_idx 1)))
+    (uint (tf_w (uvis_tf W) (tf_arg_idx 0)))
+    (uint (tf_w (uvis_tf W) tf_sp_idx)).
+
+Global Instance echo_gate_dec (W : uvis) : Decision (echo_gate W).
+Proof. unfold echo_gate. apply _. Defined.
+
 Section UexecCond.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
@@ -125,14 +180,33 @@ Section UexecCond.
     exact (sync_uexec_slot W Hpc (text_region_eq_uimg_sub (uvis_M W) Hteq) Hx Hst).
   Qed.
 
-  (* THE CONDITIONAL CONSTRUCTOR: sync's slot when the gate holds, the
-     generic one otherwise -- and nothing is assumed on either branch *)
+  (* the same for echo.  [uk_args_c] IS [uk_args] at the canonical lengths
+     (UkAbi.v's [uk_slens]), so the gate's decidable form is already the
+     witness the constructor's [alen] parameter wants. *)
+  Lemma echo_gate_slot (W : uvis) : echo_gate W -> ⊢ uslot W.
+  Proof.
+    intros (Hteq & Hpc & Hx & Hst & Hargs).
+    exact (echo_uexec_slot W
+             (uk_slens (uvis_M W) (uint (tf_w (uvis_tf W) (tf_arg_idx 1))))
+             Hpc
+             (text_region_eq_of_uimg_sub EchoInstrs.echo_bytes (uvis_M W) Hteq)
+             Hx Hst Hargs).
+  Qed.
+
+  (* THE CONDITIONAL CONSTRUCTOR: a verified program's slot when its gate
+     holds, the generic one otherwise -- and nothing is assumed on any
+     branch.  It is a CHAIN now rather than one test, and the order does
+     not matter to the conclusion: every branch produces the same [uslot W],
+     so a key that somehow satisfied two gates would simply take the first.
+     Adding the next verified program is one more [destruct]. *)
   Lemma cond_entry_slot (W : uvis) : □ uexec_wp -∗ uslot W.
   Proof.
     iIntros "#Hgen".
     destruct (decide (sync_gate W)) as [Hgate | _].
-    - iApply (sync_gate_slot W Hgate).
-    - iApply (uexec_wp_uslot W with "Hgen").
+    { iApply (sync_gate_slot W Hgate). }
+    destruct (decide (echo_gate W)) as [Hgate | _].
+    { iApply (echo_gate_slot W Hgate). }
+    iApply (uexec_wp_uslot W with "Hgen").
   Qed.
 
 End UexecCond.
