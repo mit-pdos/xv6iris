@@ -15772,3 +15772,111 @@ through a floor above the device's completion message) and wait on the
 used-index instrument (A6.122 §4, owner ruling); `ProofVirtioDiskIntr`
 (reclaim + the ring-entry split, `hcell_map` for the ring bytes rebuilt by
 `hcell_map_join` + `ctx_win_of_ccell`) is red on the same instrument.
+
+## A6.126 — THE RELEASE ARM (§0.41′): the used index as a flag, measured and started
+
+*(Lock lane, 2026-08-29.  Ruling §0.41′ in tso-port.md.)*
+
+### §1. The pure arm LANDED (`TsoMemPa` §12e)
+
+`ts_pay` has a third optional arm `tsp_rel : option ts_rel` (`ts_rel` =
+base, width, offset, floor, and `tr_hist : list nat` -- see §3 for why a
+HISTORY rather than an author).  `rel_ok1 img log a R`: the byte sits in
+the window; every message STRICTLY above the floor touching it is at a
+position in the history and writes the whole window; the image covers the
+window; the floor is a legal position and wrote the whole window (the floor
+message itself may be anyone's -- `virtio_disk_init`'s zeroing store).
+Laws: `rel_ok1_app_frame` (a message missing the byte), `rel_ok1_app_store`
+(the author's whole-window store, appending its position to the history),
+`rel_ok1_of_latest` (the mint: at a whole-window LATEST write `t`, floor
+`t`, empty history), and the read law `rel_read` (section `rel_read`,
+assembled from the `n` per-byte copies via `win_ok_fl` and
+`read_down_win_fl`): a reader whose view passed the floor settles on ONE
+position `T` -- `lo ≤ T ≤ |log|`, visible, `T = lo ∨ T ∈ hist`, whole
+window written at `T` -- and every byte reads from `T`.  `ts_ok` bundles
+four conjuncts now; `ts_ok_rel`; `TsoCtx`'s nine `ts_ok` construction
+sites carry the fourth (frame at the four gates, `None` at mint/drop).
+Certified by r47 (numbers in the handoff note).
+
+### §2. What is NOT needed, and why the leaf needs no new engine node
+
+*No value premise.*  The lower bound `disk.used_idx ≤ value read` is
+positions + visibility: the payload carries, beside `disk_done_lb nr`, the
+position of the message that wrote `nr` and a floor at or above it; the
+next holder's view passes that floor; the settled `T` is at or above it;
+the history is increasing with the completion count.
+
+*No new `swp` node.*  `wp_load_s_sconf_au_exv`'s post already returns a
+caller-chosen `R` AFTER the step (`Mobl_ram_exv`'s `▷ (… ∗ R)`), and its
+predicate `P` is pure in the word.  Two facts carry the position without
+the engine naming the view:
+  (a) `P bytes := ∃ T, (T = lo ∨ T ∈ hist) ∧ bytes = the whole word at T`
+      -- provable by the obligation from `rel_read`;
+  (b) the completion counts are DISTINCT, so the word determines `T`: the
+      continuation, holding the invariant's `ledger_msg_at (pos k) m_k` for
+      every `k ≤ nc` and `hist = [pos 1; …; pos nc]`, identifies
+      `bytes = wrap16 k` with `T = pos k`.
+What is still missing is `T ≤ V_read` as a resource -- the one thing the
+read event knows and `_exv` drops.  Fix (six lines, a clone
+`wp_load_s_sconf_au_exv_v`): the AU's close becomes
+`∀ V0, hart_view_lb V0 -∗ Res ={Em,⊤∖↑minstretN}=∗ T V0` and the post is
+`∃ V0, hart_view_lb V0 ∗ T V0`; the engine mints `hart_view_lb (V h)`
+from `Htso` (`TsoGhost.view_lb_get` on the view auth) right where it
+closes the AU, and `R := own_context ∗ ∃ V0, …` keeps the node untouched.
+The obligation additionally states, at `V h`, that the settled position is
+`≤ V h` (pure, `rel_read` at `tv := V h`), so `T V0` receives
+`⌜settled position at V0 ≤ V0⌝`; with (b) that is `pos k ≤ V0`, and
+`ctx_bound_raise` gives the floor for completion `k`'s cells.
+
+### §3. Why a history and not an author
+
+The device is the only writer above the floor, but "author = device" does
+not identify WHICH completion wrote the word the reader saw, and the
+invariant cannot say "every device message touching the cell is one I
+recorded" without seeing the log.  A history in the arm's ghost value is
+maintained by the author's own store gate (it appends its position) and
+framed by everyone else's, so `T ∈ hist` is exactly "one of the recorded
+completions", matched against the invariant's `ledger_msg_at` fragments.
+
+### §4. Remaining build, in order
+
+1. `TsoCtx`: `phys_ledger_rpay a dq v t R` (the cell with the arm exposed),
+   `ledger_rpay_mint` (n cells at a shared stamp → the arm, floor := the
+   stamp, cloned from `ledger_wpay_mint`), `ledger_store_rel_ok` (agent-
+   generic, cloned from `ledger_store_win_wpay_ok` with `rel_ok1_app_store`;
+   the history grows by `S |log|`; returns `ledger_msg_at |log| m`),
+   `ledger_rel_drop`, and `ledger_read_rel_ok` (cloned from
+   `ledger_read_racy_ok`: elements + `view_lb K` + `ledger_vis h K lo` →
+   `rel_read`'s conclusion at every `tv ≥ gtv`).
+2. `WpSconfMem.wp_load_s_sconf_au_exv_v` (§2).
+3. `VirtioProto`: the used-index word minted as a rel window at
+   `virtio_disk_init` (floor = the zeroing store; the lease keeps
+   `phys_ledger_rpay` cells for it instead of plain cells); the device's
+   completion step stores through `ledger_store_rel_ok` and records
+   `ledger_msg_at (pos k) m_k` with `pos` increasing; `slot_done_res`
+   keeps the completion's cells as `phys_ledger_at … (pos k)`.
+4. `DiskInv`: beside `disk_done_lb nr`, `∃ p, ⌜p = pos nr⌝ ∗ lk_floor cur_ctx p`
+   (the handler that advanced to `nr` raised its bound to `pos nr`).
+5. `ProofVirtioDiskIntr`: the `lhu` of `disk.used->idx` through `_exv_v`;
+   `ctx_bound_raise` to `pos k`; the status byte / used element / IN data
+   as clean-arm ctx cells (`ctx_phys_pointsto_def`'s left arm from
+   `phys_ledger_at … (pos k)` and the floor); the ring-entry split by
+   `hcell_map_join`.
+6. `ProofVirtioDiskRwF`: the two device-written hand-backs become clean-arm
+   cells from `parked_res`'s exposed stamps and the transported floor.
+
+### §2b. WRAP-AROUND (owner's point, 2026-08-29): the value is 16-bit and cycles
+
+`disk.used->idx` holds `wrap16 nc`, so over the machine's life every
+value has been written many times; the history's positions are not
+identified by the value alone.  Two facts make the read unambiguous, and
+both are already in the design: (i) the FLOOR carried beside
+`disk_done_lb nr` bounds the settled position below by `pos nr` -- the
+reader can never settle on a completion older than the one the previous
+holder advanced to; (ii) above that floor the history carries the counts
+`nr+1 … nc`, and `nc − nr ≤ np − nr ≤ 2` -- already a lemma,
+`ProofVirtioDiskRwD.vdrwd_window_le2` (three descriptors per request out
+of eight: `tri_card_8`), from `disk_res`'s `dom fl = set_seq nr (np − nr)`
+and the recorded triples' disjointness -- so `wrap16` is injective on the
+admitted span and the value read is "the latest write of that value at or
+above the floor".
