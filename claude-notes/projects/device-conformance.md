@@ -53,11 +53,48 @@ every machine can be asked, and the half only QEMU can.
   and the board reads 0, which is what the model reads.  A reminder that
   "QEMU-virt is the reference" is an assumption the suite makes, not a fact.
 - **`core_csrwide`** (`machines=qemu`): finding 22's seven.  QEMU refuses
-  all seven; **the model has NO TRANSITION for `csrr mseccfg` — `exec`
-  returns None, `VStuck` — where finding 22 records it as "implemented,
-  read successfully".  Finding 32**, and it should be settled before
-  README's open decision is answered, since that decision was framed on
-  the belief that the model answers here.
+  all seven; **the model has NO TRANSITION for `csrr mseccfg`**, where
+  finding 22 records it as "implemented, read successfully".  **Finding
+  32**, and it is now a THEOREM rather than a reading of `VStuck` — see
+  below.  It should be settled before README's open decision is answered,
+  since that decision was framed on the belief that the model answers here.
+
+## STATUS ADDENDUM (2026-08-29e): WHAT `VStuck` MEANS, AND A THEOREM FOR IT
+
+`VStuck` meant only that `exec` would not step, and `exec` bails on
+`Interface.Choose` — the Sail monad's nondeterminism — exactly as it bails
+where the relation is genuinely stuck.  `RiscvExec.exec_run_det` runs the
+`Some` direction only, so `exec m s = None` proved nothing about the model.
+Two findings had been recorded off that reading (27, withdrawn; 32, restated).
+
+**`vtest-rocq/VExecStuck.v` closes it**, in the harness rather than in
+`iris/` — nothing in the proof tower asks why `exec` declined, and
+`RiscvExec.v`'s reverse-dependency closure is ~1286 files.  `exec_r` is
+`exec` with its failure clause split into `ENoStep` / `EChoice`,
+`exec_r_exec` proves they agree everywhere, and
+
+    exec_r_no_step : exec_r m s = inr ENoStep -> forall x s', ~ run m s x s'
+
+is the converse the tree did not have.  `VTest.stuck_why` reports which kind
+a run hit and `VTest.stuck_why_no_step` lifts it to a whole run.  **Measured:
+`csrr mseccfg` is `Some ENoStep`** — real stuckness — so finding 32's
+original wording was right and is now backed by
+`CoreCsrwide.core_csrwide_model_really_stuck`.
+
+**Finding 25 (`sc.w` does not evaluate) is the obvious next candidate** and
+has not been given this treatment: it is stated as an `exec` limit, but
+nobody has asked whether the RELATION steps there.
+
+Three traps the proof hit, worth not re-deriving:
+- `RiscvModelBytes`' `pa_add`/`nth_byte` and `RiscvLang`'s are DIFFERENT
+  constants with identical bodies — convertible, not syntactically equal —
+  so `rewrite` and `congruence` fail on them and the equations must be
+  chained with `exact`, which checks up to conversion.
+- any `simpl` on a goal mentioning `riscv_step` unfolds the whole monadic
+  term, after which `destruct (exec_r (riscv_step false) s)` has nothing
+  syntactic to abstract.  `simpl stuck_why` does not help either; explicit
+  unfolding lemmas (`stuck_why_O` / `stuck_why_S`) are the way.
+- stdpp's `mapM_None` is an iff with `Exists`, not `∃ x, x ∈ l ∧ …`.
 
 The CONTROL is load-bearing twice over: without it a run that never reached
 the handler is indistinguishable from one where nothing trapped, and it is

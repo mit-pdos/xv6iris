@@ -33,6 +33,8 @@ Require Import RiscvModelBytes RiscvExec VirtioModel DevModel ColdBoot.
 (* EXPORT the language and the device schedule: a test names [mstate] and may
    name an [sitem], so [Require Import VTest] should be all it needs. *)
 Require Export RiscvLang VSched.
+(* [exec_r] and [exec_r_no_step]: what a stuck run's stuckness MEANS. *)
+Require Export VExecStuck.
 Local Open Scope Z_scope.
 
 (* ---------------------------------------------------------------------- *)
@@ -296,6 +298,66 @@ Fixpoint run_status_tick (n : nat) (s : mstate) : vstatus :=
             | None => VStuck
             end
   end.
+
+(* ---------------------------------------------------------------------- *)
+(* 3c. WHY it was stuck, which [VStuck] alone does not say.                *)
+(*                                                                         *)
+(*     [VStuck] means [exec] would not step, and [exec] declines on a       *)
+(*     [Choose] (nondeterminism) exactly as it declines where the relation  *)
+(*     really is stuck.  [VExecStuck.exec_r] splits the two, so a test can  *)
+(*     ask which it got -- and [ENoStep] is worth something, because        *)
+(*                                                                         *)
+(*       exec_r_no_step : exec_r m s = inr ENoStep ->                       *)
+(*                        forall x s', ~ run m s x s'                       *)
+(*                                                                         *)
+(*     is a theorem about the RELATION.  A test that reports [ENoStep] may  *)
+(*     say "the model has no transition here" and mean it; one that reports *)
+(*     [EChoice] has learned only that this interpreter would not choose.   *)
+(* ---------------------------------------------------------------------- *)
+
+Fixpoint stuck_why (n : nat) (s : mstate) : option estuck :=
+  if flag_set s then None else
+  match n with
+  | 0%nat => None
+  | S n' => match exec_r (riscv_step false) s with
+            | inl (_, s') => stuck_why n' (settle dev_fuel s')
+            | inr e => Some e
+            end
+  end.
+
+(* The two unfolding equations, so the proof below never has to [simpl]:
+   any [simpl] here also unfolds [riscv_step] into the whole monadic term,
+   and the [destruct] then has nothing syntactically matching
+   [exec_r (riscv_step false) s] to abstract. *)
+Lemma stuck_why_O (s : mstate) : stuck_why 0 s = None.
+Proof. cbn [stuck_why]. destruct (flag_set s); reflexivity. Qed.
+
+Lemma stuck_why_S (n : nat) (s : mstate) :
+  stuck_why (S n) s =
+    (if flag_set s then None
+     else match exec_r (riscv_step false) s with
+          | inl (_, s') => stuck_why n (settle dev_fuel s')
+          | inr e => Some e
+          end).
+Proof. reflexivity. Qed.
+
+(* ...AND WHAT [ENoStep] BUYS: a state the run reaches at which the MODEL
+   -- the relation, not the interpreter -- has no transition at all.  This
+   is the statement a test could not make before, and the reason a bare
+   [VStuck] was uninterpretable. *)
+Lemma stuck_why_no_step (n : nat) (s : mstate) :
+  stuck_why n s = Some ENoStep ->
+  exists s0 : mstate, forall x s', ~ run (riscv_step false) s0 x s'.
+Proof.
+  revert s. induction n as [|n IH]; intros s H.
+  - rewrite stuck_why_O in H. discriminate.
+  - rewrite stuck_why_S in H.
+    destruct (flag_set s); [discriminate|].
+    destruct (exec_r (riscv_step false) s) as [[u s']|e] eqn:He.
+    + exact (IH _ H).
+    + destruct e; [|discriminate].
+      exists s. exact (exec_r_no_step _ _ He).
+Qed.
 
 (* the pc the machine was stuck AT, or -1 if it did not get stuck *)
 Fixpoint stuck_pc (n : nat) (s : mstate) : Z :=

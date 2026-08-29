@@ -326,7 +326,7 @@ hart 0, and the harness's clock never ticks.
 | 29 | `misa`, all three different | model `0x…14112D` (A C D F I M S U) | QEMU adds **H** (`0x…1411AD`, finding 19); the board adds **B** and **X** and has no H (`0x…94112F`) | incompleteness both ways | `core_csrprobe` |
 | 30 | the UART is a **different chip** on this board | a byte-strided 16550 in an 8-byte window (`DevModel.uart_size` = 8) | Synopsys DW-APB v3.14a, **reg-shift 2** -- LSR is at `0x14`, and the whole register file lies outside the model's window | board difference, not a model defect | the probe |
 | 31 | CSRs the **U74** refuses that the model and QEMU both implement: `menvcfg`, `mconfigptr`, `senvcfg` (privileged spec 1.12 additions the core predates) and `time` (SiFive leaves `rdtime` to firmware to emulate, which is what OpenSBI does on this board) | implemented, read successfully | implemented | illegal instruction | **model is WIDER than the board** | `core_csrprobe` |
-| 32 | **`exec` cannot step `csrr mseccfg`** -- it returns None and the harness reports `VStuck`, so the run stops and the other six go unasked.  **This is a fact about the INTERPRETER, not about the model**: `exec_run_det` runs one way only, there is no `exec = None -> no run` lemma, and `exec`'s fallback bails on `Choose` (the Sail monad's nondeterminism).  What it does establish is that this suite cannot confirm finding 22's "read successfully" | `exec` declines | illegal instruction | illegal instruction | a limit of `exec`, same class as finding 25's `sc.w` | `core_csrwide` |
+| 32 | **the model has no transition for `csrr mseccfg`** -- and this is now a THEOREM, not a reading of `VStuck`.  `vtest-rocq/VExecStuck.v` splits `exec`'s failure into `ENoStep` / `EChoice` and proves `exec_r_no_step`; `stuck_why` answers `Some ENoStep` here, so by that theorem the RELATION has no step.  Finding 22 records these seven as "implemented, read successfully"; the model does not read `mseccfg` at all | no transition (proved) | illegal instruction | illegal instruction | **the model is NARROWER than both machines** | `core_csrwide` |
 | 33 | **the machine's identity**: `mvendorid`, `marchid`, `mimpid` | `0, 0, 0` -- an anonymous machine | QEMU also `0, 0, 0`; the board answers `0x489` (SiFive's JEDEC id), `0x7`, `0x4210427` | incompleteness | `core_csrprobe` |
 
 **Finding 29 was previously attributed to `core_regs_mcsr`, and that was
@@ -349,18 +349,32 @@ program to pin `menvcfg.ADUE` explicitly before `satp` (finding 20).  On this
 board it **cannot** -- the CSR does not exist -- so any port of the `pt_` area
 to this hardware has to deal with that first.
 
-**Finding 32 is narrower than first stated, and the correction matters.**
-It was written as "the model has NO TRANSITION", which `VStuck` does not
-establish: `RiscvExec.exec_run_det` runs one way only (`exec = Some` implies
-`run`), there is no lemma anywhere of the form `exec m s = None -> no run`,
-and `exec`'s own fallback is `| _ => fun _ => None  (* Choose / GenericFail
-/ Discard / ... *)` -- so it bails on `Choose`, the Sail monad's
-**nondeterminism**.  The relation may have a transition this interpreter
-declines to pick.  This is the same error as the withdrawn finding 27, one
-level down: **an interpreter that will not answer is not a model that has no
-execution.**  What stands is that this suite cannot confirm finding 22's
-"read successfully" on these seven, and that settling README's open decision
-needs a route other than `exec`.
+**Finding 32 stands, and getting it onto a proper footing produced the one
+piece of infrastructure this suite was missing.**  It was first written as
+"the model has NO TRANSITION", concluded from `VStuck` -- which does not
+establish that, because `exec` bails on `Choose` (the Sail monad's
+nondeterminism) exactly as it bails where the relation is genuinely stuck,
+and `exec_run_det` only runs the `Some` direction.  That was the same error
+as the withdrawn finding 27, one level down.
+
+So the gap was closed rather than the claim weakened.
+[`vtest-rocq/VExecStuck.v`](../../vtest-rocq/VExecStuck.v) defines `exec_r`
+-- `exec` with its failure clause split into `ENoStep` and `EChoice`, proved
+to agree with `exec` everywhere -- and then
+
+```coq
+exec_r_no_step : exec_r m s = inr ENoStep -> forall x s', ~ run m s x s'
+```
+
+which is the converse the tree did not have.  `VTest.stuck_why` reports
+which kind a run hit and `stuck_why_no_step` lifts it to the whole run.
+**Measured: `csrr mseccfg` is `Some ENoStep`** -- real stuckness, not a
+declined choice -- so the original claim was right and is now checkable.
+`CoreCsrwide.v` carries it as `core_csrwide_model_really_stuck`.
+
+**Finding 25 (`sc.w` does not evaluate) has NOT been given this treatment**
+and is the obvious next candidate: it is an `exec` limit stated as one, but
+nobody has asked whether the relation steps there.
 
 **FINDING 27 IS WITHDRAWN, and the mistake is worth more than the finding
 was.**  I ran the default runner, saw a frozen clock, and reported a

@@ -15,27 +15,30 @@
    stops at the first of the seven so every later probe in the same image
    goes unasked.
 
-   BUT THAT IS A FACT ABOUT [exec], NOT ABOUT THE MODEL, and an earlier
-   version of this file said otherwise ("the model has NO TRANSITION").
-   [RiscvExec.exec_run_det] runs one way only -- [exec = Some] implies [run]
-   -- and there is no lemma anywhere in the tree of the form
-   [exec m s = None -> no run].  There cannot be a trivial one: [exec]'s own
-   fallback is
+   AND IT REALLY IS THE MODEL, WHICH TOOK A NEW THEOREM TO ESTABLISH.  A
+   bare [VStuck] means only that [exec] would not step, and [exec] declines
+   on [Interface.Choose] -- the Sail monad's nondeterminism -- exactly as it
+   declines where the relation is genuinely stuck.  [RiscvExec.exec_run_det]
+   runs one way only, so [exec m s = None] on its own proves nothing.  This
+   file used to assert "no transition" off exactly that, which was not
+   justified at the time.
 
-     | _ => fun _ => None   (* Choose / GenericFail / Discard / ... *)
+   [VExecStuck.v] closes it: [exec_r] is [exec] with its failure clause
+   split into [ENoStep] and [EChoice], and
 
-   so it bails on [Choose], the Sail monad's NONDETERMINISM.  The relation
-   may well have a transition here that this interpreter declines to pick.
-   Compare finding 25, where `sc.w` does not evaluate because
-   [execute_STORECON] goes through opaque platform axioms -- the same class
-   of limit, and the same care needed in stating it.
+     exec_r_no_step : exec_r m s = inr ENoStep -> forall x s', ~ run m s x s'
 
-   SO WHAT IS OPEN is narrower than it looked, and still worth settling:
-   finding 22 records the model as "implemented, read successfully" on these
-   seven, and this suite cannot confirm that because its interpreter cannot
-   evaluate the read.  Whether the model ANSWERS here -- which is what
-   README.md's open decision was framed on -- needs a route other than
-   [exec]. *)
+   is the converse the tree did not have.  MEASURED HERE: [stuck_why]
+   answers [Some ENoStep], so by that theorem the RELATION has no
+   transition at the state this run reaches.  The original claim was right;
+   what was missing was any way to know it.
+
+   SO FINDING 32 STANDS, and it now says something checkable.  Finding 22
+   records the model as "implemented, read successfully" on these seven
+   CSRs; the model does not read [mseccfg] at all.  Compare finding 25,
+   where `sc.w` does not EVALUATE because [execute_STORECON] goes through
+   opaque platform axioms -- that one is still an [exec] limit and has not
+   been given this treatment. *)
 From Stdlib Require Import List ZArith.
 Import ListNotations.
 Require Import VTest CoreCsrwideGen.
@@ -89,6 +92,16 @@ Proof. reflexivity. Qed.
 
 Lemma core_csrwide_exec_stuck : run_status 4000 cw_start = VStuck.
 Proof. vm_cast_no_check (eq_refl VStuck). Qed.
+
+(* ...and it is REAL stuckness, not a [Choose] the interpreter declined. *)
+Lemma core_csrwide_stuck_why : stuck_why 4000 cw_start = Some ENoStep.
+Proof. vm_cast_no_check (eq_refl (Some ENoStep)). Qed.
+
+(* THE STATEMENT ABOUT THE MODEL, which [VStuck] alone could not support:
+   the run reaches a state at which the RELATION has no transition. *)
+Corollary core_csrwide_model_really_stuck :
+  exists s0, forall x s', ~ run (riscv_step false) s0 x s'.
+Proof. exact (stuck_why_no_step _ _ core_csrwide_stuck_why). Qed.
 
 Lemma core_csrwide_exec_stuck_at : stuck_pc 4000 cw_start = 0x80000078.
 Proof. vm_cast_no_check (eq_refl 0x80000078). Qed.

@@ -224,7 +224,7 @@ authority; they are written up here because they are what the board found.
 | 29 | `misa` — all three machines differ | `0x…14112D` (A C D F I M S U) | board `0x…94112F` adds **B** and **X** and has no H; QEMU `0x…1411AD` adds **H** | incompleteness both ways | `core_csrprobe` |
 | 30 | the UART is a **different chip** | byte-strided 16550 in an 8-byte window (`DevModel.uart_size = 8`) | Synopsys DW-APB v3.14a, **reg-shift 2**: LSR is at `0x14` and the whole file lies outside the model's window | board difference, not a model defect | the probe |
 | 31 | CSRs the **U74 refuses** that both the model and QEMU implement | implemented | `menvcfg`, `mconfigptr`, `senvcfg` (privileged spec 1.12 additions the core predates) and `time` (SiFive leaves `rdtime` to firmware — OpenSBI emulates it) all take an illegal instruction | **model is WIDER than the board** | `core_csrprobe` |
-| 32 | **`exec` cannot step `csrr mseccfg`** | `exec` returns None → `VStuck`.  A fact about the INTERPRETER: there is no `exec = None → no run` lemma, and `exec` bails on `Choose` (the Sail monad's nondeterminism) | an ordinary illegal-instruction trap, on both machines | a limit of `exec`, same class as finding 25's `sc.w` | `core_csrwide` |
+| 32 | **the model has no transition for `csrr mseccfg`** | proved, not read off `VStuck`: `VExecStuck.exec_r_no_step` plus `stuck_why = Some ENoStep` | an ordinary illegal-instruction trap, on both machines | **model NARROWER than both machines** | `core_csrwide` |
 | 33 | **the machine's identity** | `mvendorid`/`marchid`/`mimpid` all 0 — an anonymous machine (QEMU too) | `0x489` (SiFive's JEDEC id), `0x7`, `0x4210427` | incompleteness | `core_csrprobe` |
 
 ### The two that matter most
@@ -270,18 +270,19 @@ about Svadu first.  That eight of the nine `pt_` tests nonetheless run here
 access and the U74's behaviour happens to match; it is not because the rule
 was satisfied.
 
-### Finding 32, corrected
+### Finding 32, and the theorem it produced
 
-It was first written as "the model has no transition for `csrr mseccfg`".
-`VStuck` does not establish that: `exec_run_det` runs one way only, there is
-no `exec = None -> no run` lemma anywhere, and `exec` bails on `Choose` --
-the Sail monad's nondeterminism.  **An interpreter that will not answer is
-not a model that has no execution**, which is exactly the error that
-withdrew finding 27, one level down.
+It was first written as "the model has no transition for `csrr mseccfg`",
+concluded from `VStuck`.  That does not establish it -- `exec` bails on
+`Choose` (nondeterminism) exactly as it bails where the relation is really
+stuck -- and it was the same error as the withdrawn finding 27.
 
-What stands: this suite cannot confirm finding 22's *"implemented, read
-successfully"* on those seven CSRs, so README's open decision ("which
-machine is the model claiming to be?") needs a route other than `exec`.
+The gap was closed rather than the claim weakened.  `vtest-rocq/VExecStuck.v`
+splits `exec`'s failure into `ENoStep` and `EChoice` and proves
+`exec_r_no_step : exec_r m s = inr ENoStep -> forall x s', ~ run m s x s'`.
+`csrr mseccfg` measures `Some ENoStep`, so the finding stands **and is now a
+theorem about the relation**.  Finding 25 (`sc.w`) has not been given the
+same treatment and is the obvious next candidate.
 
 ## The memory model, measured
 

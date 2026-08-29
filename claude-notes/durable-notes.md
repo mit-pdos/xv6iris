@@ -492,11 +492,23 @@ device-conformance suite, both retracted (see
 - **`RiscvExec.exec` returns `None` on `Choose`**, the Sail monad's
   nondeterminism (its fallback clause is
   `| _ => fun _ => None  (* Choose / GenericFail / Discard / ... *)`).
-  `exec_run_det` runs ONE WAY only -- `exec = Some` implies `run` -- and
-  **there is no lemma anywhere in the tree of the form
-  `exec m s = None -> no run`.**  So `exec` declining to step proves nothing
-  about the relation, and a `VStuck` result conflates "no step exists" with
-  "a choice this interpreter will not make".
+  `exec_run_det` runs ONE WAY only -- `exec = Some` implies `run` -- so
+  `exec` declining to step proves nothing about the relation, and a `VStuck`
+  result conflates "no step exists" with "a choice this interpreter will not
+  make".
+
+  **THAT GAP IS NOW CLOSED, in the harness rather than in `iris/`:**
+  `vtest-rocq/VExecStuck.v` defines `exec_r`, which is `exec` with its
+  failure clause split into `ENoStep` and `EChoice` (`exec_r_exec` proves
+  they agree everywhere), and proves the missing converse
+
+      exec_r_no_step : exec_r m s = inr ENoStep -> forall x s', ~ run m s x s'
+
+  with `VTest.stuck_why` / `stuck_why_no_step` lifting it to a whole run.
+  A caller holding `ENoStep` may now say "the model has no transition" and
+  mean it.  It is not in `iris/` because nothing in the proof tower asks why
+  `exec` declined, and `RiscvExec.v`'s reverse-dependency closure is ~1286
+  files.
 
 THE RULE: a claim that the model CANNOT do something has to come from the
 model's DEFINITIONS, or from a positive wrong transition it does take --
