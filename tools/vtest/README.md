@@ -76,6 +76,48 @@ compiled (`-k`) before the verdict, so one red test does not hide the rest, and
 Rocq error into the run's step summary.  Its header has the rest, including why
 a passing test is judged by its `.vo` and why the target deletes them first.
 
+## Running a test on a hart that is not 0
+
+    vtest.py gen --hart 1 core_hart core_regs_gpr ...
+
+Every capture in this suite was of a program on hart 0 until 2026-08-29,
+because QEMU boots hart 0 and `-smp 1` is the rule.  `--hart N` builds the
+same source with `PRIMARY_HART=N`, runs it under `-smp N+1`, and writes
+`<Name>Hart<N>Gen.v` with its own `<name>_hartN_` definitions and a
+`<name>_hartN_primary_hart`.  The model side runs it with
+`VTest.start_hart`, which is a legal schedule for exactly the reason a
+hart-0-only schedule is.
+
+**IT IS A DIFFERENT IMAGE, not a different schedule**, and that is the one
+thing to keep in mind.  `vtest.S`'s prologue branches primary-vs-AP on the
+hart id and biases every hart's stack slot by `PRIMARY_HART`, so the primary
+is slot 0 whichever hart it is; under `#if PRIMARY_HART != 0` that costs one
+extra instruction, which is why `ra` moves by 4 between the two captures.
+A hart-0 capture is byte-identical to what it always was.
+
+**WHY IT IS WORTH DOING.**  `ColdBoot.cold_regs` takes the hart id as an
+argument, and the boot chain does exactly two things with it: it stores it,
+so `csrr mhartid` reads it, and it copies it into `a0`.  Those two claims are
+what make `csrr mhartid` the right way for a program to tell harts apart --
+`VConc.g0_of`'s header rests on them, and so does the whole multi-hart
+harness -- and **no hart-0 test in the tree can check either of them**, since
+on hart 0 both values are 0 and a model that ignored the argument entirely
+would pass.
+
+What the hart-1 captures established, all of it new:
+
+| | |
+|---|---|
+| `core_hart` | QEMU reports `mhartid` = **1**, and the model started on hart 1 reproduces it.  `a0` = `mhartid` on both machines, checked by the program itself rather than by reading two fields. |
+| `core_regs_mcsr` | of the whole M-mode CSR dump, **exactly one word differs** from the hart-0 capture, and it is `mhartid`.  Stated by rebuilding the hart-1 capture out of the hart-0 one with that word replaced, so it excludes both a model that leaks the id elsewhere and one that ignores it. |
+| `core_regs_gpr` | **29 of the 31** GPRs are identical.  The two that move are `a0` (the id) and `ra` (the longer prologue).  `sp`, `t0` and `t2` do NOT move, which is the check that the slot bias is right -- had it been wrong, `sp` would be a page off. |
+| `core_regs_scsr`, `core_regs_pmp`, `core_regs_hpm`, `core_regs_fcsr`, `core_smoke` | byte-identical result regions on hart 1, model and machine.  The hart id does not leak into the S-mode CSR file, the PMP file, the HPM file or the fp control file. |
+
+`core_regs_ctr` has no hart-1 capture on purpose: its fields are the cycle
+and instruction counters, which differ between two runs on the SAME hart, so
+a cross-hart comparison would say nothing.  `core_regs_fpr` has none because
+it traps by design and never publishes a result.
+
 ## Observation channels
 
 1. **The RESULT region** (`abi.h`).  QEMU side: read out of guest physical

@@ -30,7 +30,7 @@
    out of this comparison on purpose. *)
 From Stdlib Require Import List ZArith.
 Import ListNotations.
-Require Import VTest CoreRegsHpmGen.
+Require Import VTest CoreRegsHpmGen CoreRegsHpmHart1Gen.
 Local Open Scope Z_scope.
 
 Definition hpm_run : option mstate := run_until 900 (start core_regs_hpm_text).
@@ -39,4 +39,32 @@ Lemma core_regs_hpm_result : result_of hpm_run = core_regs_hpm_qemu_result.
 Proof. solve_vtest core_regs_hpm_qemu_result. Qed.
 
 Lemma core_regs_hpm_disk : core_regs_hpm_qemu_disk = [].
+Proof. reflexivity. Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* THE SAME FILE, ON HART 1.                                              *)
+(*                                                                        *)
+(*    Capture: CoreRegsHpmHart1Gen.v -- the same source built with PRIMARY_HART=1
+    and run under -smp 2, with the model started on the same hart by
+    [VTest.start_hart].  See CoreHart.v for what the hart variant is and
+    why it is a different IMAGE rather than a different schedule.
+
+    Two claims, and the second is the interesting one: the model
+    reproduces the machine on hart 1, and the whole HPM file is
+    BYTE-IDENTICAL to what it was on hart 0.  So the reset chain's
+    hart-id argument does not leak into this register file -- which is
+    not automatic, since [ColdBoot.cold_regs] takes that id and could
+    have put it anywhere.  Contrast core_regs_mcsr, where exactly one
+    register moves, and it is mhartid.                                    *)
+(* ---------------------------------------------------------------------- *)
+
+Definition hpm_h1_run : option mstate :=
+  run_until 900 (start_hart core_regs_hpm_hart1_primary_hart core_regs_hpm_hart1_text).
+
+Lemma core_regs_hpm_hart1_result :
+  result_of hpm_h1_run = core_regs_hpm_hart1_qemu_result.
+Proof. solve_vtest core_regs_hpm_hart1_qemu_result. Qed.
+
+Lemma core_regs_hpm_hart1_is_hart0 :
+  core_regs_hpm_hart1_qemu_result = core_regs_hpm_qemu_result.
 Proof. reflexivity. Qed.

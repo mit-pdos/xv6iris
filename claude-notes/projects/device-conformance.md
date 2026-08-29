@@ -11,6 +11,42 @@ test sources, same ABI, same model side — and it writes
 checks hardware captures like any other, because they are checked-in
 literals; nothing new needs the board attached.
 
+## STATUS ADDENDUM (2026-08-29b): TESTS ON A HART THAT IS NOT 0
+
+`vtest.py gen --hart N` builds the same source with `PRIMARY_HART=N`, runs it
+under QEMU with `-smp N+1`, and writes `<Name>Hart<N>Gen.v`; the model side
+runs it with `VTest.start_hart`.  Nine hart-1 captures are in
+(`core_hart`, `core_smoke`, `core_regs_gpr/mcsr/scsr/pmp/hpm/fcsr`), and
+`vtest-rocq/CoreHart.v` is the new baseline test.  A hart-0 capture is
+byte-identical to what it always was.
+
+**WHAT IT CHECKS THAT NOTHING ELSE COULD.**  `ColdBoot.cold_regs` takes the
+hart id as an argument and the boot chain does exactly two things with it:
+stores it (so `csrr mhartid` reads it) and copies it into `a0`.
+`VConc.g0_of`'s header rests on those two claims and so does the whole
+multi-hart harness — and **no hart-0 test in the tree can check either**,
+because on hart 0 both values are 0 and a model that ignored the argument
+entirely would pass everything.  The results:
+
+- QEMU reports `mhartid` = 1 on the hart-1 build, and the model started on
+  hart 1 reproduces it.  `a0` = `mhartid` on both machines.
+- Of the whole M-mode CSR dump, **exactly one word moves** and it is
+  `mhartid` — stated by rebuilding the hart-1 capture out of the hart-0 one
+  with that word replaced, so it excludes a model that leaks the id
+  elsewhere as well as one that ignores it.
+- 29 of the 31 GPRs are identical; the movers are `a0` (the id) and `ra`
+  (the hart-1 prologue is one instruction longer).  `sp`/`t0`/`t2` do NOT
+  move, which is the check that vtest.S's slot bias is right.
+- The S-mode CSR file, the PMP file, the HPM file and the fp control file
+  are byte-identical on hart 1.  The id does not leak into them.
+- Finding 18 (`a1` is a hardcoded `0x1000` where QEMU passes the real DTB
+  pointer) is **hart-independent** on both sides, so the defect is in the
+  VALUE and not in per-hart plumbing.  Worth knowing before anyone fixes it.
+
+`core_regs_ctr` is deliberately excluded (its fields are counters, which
+differ between two runs on the same hart) and so is `core_regs_fpr` (it
+traps by design and never publishes).
+
 **READ [`tools/vtest/README-hw.md`](../../tools/vtest/README-hw.md) BEFORE
 TOUCHING ANY OF IT.**  A board run claims something NARROWER than a QEMU run
 and the reasons are not obvious: it is not the same binary (three `abi.h`
