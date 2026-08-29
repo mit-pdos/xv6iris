@@ -1410,3 +1410,4 @@ LinkSysOpenAU.v
 # a LEAF: its import cone is FsInitPin's own and nothing requires it.
 FsInitPinBoot.v
 SpecSysUnlinkAU.v
+FsAbsWriteFire.v
