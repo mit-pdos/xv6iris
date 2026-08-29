@@ -14,7 +14,7 @@
      [wp_uk_ecall]   for [ecall].
 
    The statements are WpUmodeLeaf.v's with [uv_cap_gpr C pt Ψ M m ∗ pc_is pc]
-   read as [uvb C pt Rut π M m pc] and the continuation
+   read as [uvb C pt Rut sz π M m pc] and the continuation
    [∀ CID0, uv_cap_gpr … M m' -∗ pc_is pc' -∗ WP] read as [ukc π M m' pc'];
    the pure premises, the value convention and the proofs are unchanged
    (each proof is one application of the funnel).  The section carries the
@@ -226,7 +226,7 @@ Section UkLeaf.
                if Z.eqb (uint rd) 0 then s
                else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
                       (regval_into_reg wval))) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -261,7 +261,7 @@ Section UkLeaf.
                else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
                       (regval_into_reg (vf (gpr_src rs1 s))))) ->
     wval = vf (m !!! Regidx rs1) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -300,7 +300,7 @@ Section UkLeaf.
                else set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
                       (regval_into_reg (vf (gpr_src rs1 s) (gpr_src rs2 s))))) ->
     wval = vf (m !!! Regidx rs1) (m !!! Regidx rs2) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -337,7 +337,7 @@ Section UkLeaf.
     uk_instr π M pc true (C_LI (imm, Regidx rd)) ->
     uint rd <> 0 ->
     wval = add_vec zero_reg (sign_extend' 64 (sign_extend' 12 imm)) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -379,7 +379,7 @@ Section UkLeaf.
     uk_instr π M pc true (C_ADDI (imm, Regidx rd)) ->
     uint rd <> 0 ->
     wval = add_vec (m !!! Regidx rd) (sign_extend' 64 (sign_extend' 12 imm)) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -412,7 +412,7 @@ Section UkLeaf.
     uint rd <> 0 ->
     wval = add_vec (m !!! Regidx csp_rs1)
              (sign_extend' 64 (caddi4spn_imm nzimm)) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -466,7 +466,7 @@ Section UkLeaf.
     tgt = add_vec pc (sign_extend' 64 imm) ->
     wval = add_vec_int pc 4 ->
     eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) tgt -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -512,7 +512,7 @@ Section UkLeaf.
     uk_instr π M pc true (C_JR (Regidx rs1)) ->
     uint rs1 <> 0 ->
     tgt = ret_pc (m !!! Regidx rs1) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M m tgt -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -570,7 +570,7 @@ Section UkLeaf.
     uk_instr π M pc true (C_ADDI16SP imm) ->
     wval = add_vec (m !!! Regidx csp_rs1)
              (sign_extend' 64 (caddi16sp_imm imm)) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx csp_rs1 := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -605,7 +605,7 @@ Section UkLeaf.
     uk_instr π M pc true (C_MV (Regidx rd, Regidx rs2)) ->
     uint rd <> 0 ->
     wval = add_vec zero_reg (m !!! Regidx rs2) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -653,7 +653,7 @@ Section UkLeaf.
              (subrange_vec_dec
                 (add_vec (m !!! Regidx rd)
                          (sign_extend' 64 (sign_extend' 12 imm))) 31 0) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -688,7 +688,7 @@ Section UkLeaf.
     uk_instr π M pc true (C_J imm) ->
     tgt = add_vec pc (sign_extend' 64 (sign_extend' 21 (concat_vec imm ('b"0")))) ->
     eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M m tgt -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -738,7 +738,7 @@ Section UkLeaf.
     uk_instr π M pc false (ITYPE (imm, Regidx rs1, Regidx rd, ADDI)) ->
     uint rd <> 0 ->
     wval = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -765,7 +765,7 @@ Section UkLeaf.
     uk_instr π M pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)) ->
     uint rd <> 0 ->
     wval = add_vec (m !!! Regidx rs1) (m !!! Regidx rs2) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -798,7 +798,7 @@ Section UkLeaf.
     uint rd <> 0 ->
     wval = shift_bits_left (m !!! Regidx rs1)
              (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -822,7 +822,7 @@ Section UkLeaf.
     uint rd <> 0 ->
     wval = shift_bits_right (m !!! Regidx rs1)
              (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -853,7 +853,7 @@ Section UkLeaf.
     wval = sign_extend' 64
              (sub_vec (subrange_vec_dec (m !!! Regidx rs1) 31 0 : mword 32)
                       (subrange_vec_dec (m !!! Regidx rs2) 31 0 : mword 32)) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -886,7 +886,7 @@ Section UkLeaf.
     uk_instr π M pc false (UTYPE (imm, Regidx rd, AUIPC)) ->
     uint rd <> 0 ->
     wval = add_vec pc (auipc_off imm) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -914,7 +914,7 @@ Section UkLeaf.
     uk_instr π M pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SUB)) ->
     uint rd <> 0 ->
     wval = sub_vec (m !!! Regidx rs1) (m !!! Regidx rs2) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -943,7 +943,7 @@ Section UkLeaf.
     uk_instr π M pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, AND)) ->
     uint rd <> 0 ->
     wval = and_vec (m !!! Regidx rs1) (m !!! Regidx rs2) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -981,7 +981,7 @@ Section UkLeaf.
     uint rd <> 0 ->
     wval = zero_extend' 64
              (bool_to_bit (zopz0zI_u (m !!! Regidx rs1) (m !!! Regidx rs2))) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1022,7 +1022,7 @@ Section UkLeaf.
     wval = sign_extend' 64
              (add_vec (subrange_vec_dec (m !!! Regidx rs1) 31 0 : mword 32)
                       (subrange_vec_dec (m !!! Regidx rs2) 31 0 : mword 32)) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1054,7 +1054,7 @@ Section UkLeaf.
     uint rd <> 0 ->
     wval = zero_extend' 64
              (bool_to_bit (zopz0zI_u (m !!! Regidx rs1) (sign_extend' 64 imm))) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1082,7 +1082,7 @@ Section UkLeaf.
     uk_instr π M pc false (ITYPE (imm, Regidx rs1, Regidx rd, ANDI)) ->
     uint rd <> 0 ->
     wval = and_vec (m !!! Regidx rs1) (sign_extend' 64 imm) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1107,7 +1107,7 @@ Section UkLeaf.
     uk_instr π M pc false (ITYPE (imm, Regidx rs1, Regidx rd, XORI)) ->
     uint rd <> 0 ->
     wval = xor_vec (m !!! Regidx rs1) (sign_extend' 64 imm) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1138,7 +1138,7 @@ Section UkLeaf.
     wval = sign_extend' 64
              (subrange_vec_dec
                 (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) 31 0) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1169,7 +1169,7 @@ Section UkLeaf.
     wval = sign_extend' 64
              (shift_bits_left (subrange_vec_dec (m !!! Regidx rs1) 31 0 : mword 32)
                               shamt) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1197,7 +1197,7 @@ Section UkLeaf.
     uk_instr π M pc false (UTYPE (imm, Regidx rd, LUI)) ->
     uint rd <> 0 ->
     wval = luival imm ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1228,7 +1228,7 @@ Section UkLeaf.
     wval = to_bits_truncate 64
              (if Z.eqb (uint (m !!! Regidx rs2)) 0 then -1
               else Z.quot (uint (m !!! Regidx rs1)) (uint (m !!! Regidx rs2))) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1266,7 +1266,7 @@ Section UkLeaf.
     wval = to_bits_truncate 64
              (if Z.eqb (uint (m !!! Regidx rs2)) 0 then uint (m !!! Regidx rs1)
               else Z.rem (uint (m !!! Regidx rs1)) (uint (m !!! Regidx rs2))) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1321,7 +1321,7 @@ Section UkLeaf.
     (uint rd = 0 /\ wr = None) \/
     (uint rd <> 0 /\ wr = Some (rd, add_vec_int pc 4)) ->
     tgt = ret_pc (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (uv_upd m wr) tgt -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1375,7 +1375,7 @@ Section UkLeaf.
     uint rs1 <> 0 ->
     uint rd = 0 ->
     tgt = ret_pc (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M m tgt -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1401,7 +1401,7 @@ Section UkLeaf.
     uk_instr π M pc true (C_ADD (Regidx rd, Regidx rs2)) ->
     uint rd <> 0 ->
     wval = add_vec (m !!! Regidx rd) (m !!! Regidx rs2) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1425,7 +1425,7 @@ Section UkLeaf.
     creg2reg_idx (Cregidx crs2) = Regidx rs2 ->
     uint rd <> 0 ->
     wval = and_vec (m !!! Regidx rd) (m !!! Regidx rs2) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1465,7 +1465,7 @@ Section UkLeaf.
     wval = sign_extend' 64
              (add_vec (subrange_vec_dec (m !!! Regidx rd) 31 0 : mword 32)
                       (subrange_vec_dec (m !!! Regidx rs2) 31 0 : mword 32)) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1496,7 +1496,7 @@ Section UkLeaf.
     uk_instr π M pc true (C_LUI (imm, Regidx rd)) ->
     uint rd <> 0 ->
     wval = luival (sign_extend' 20 imm) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1518,7 +1518,7 @@ Section UkLeaf.
     uint rd <> 0 ->
     wval = shift_bits_left (m !!! Regidx rd)
              (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1542,7 +1542,7 @@ Section UkLeaf.
     uint rd <> 0 ->
     wval = shift_bits_right (m !!! Regidx rd)
              (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1573,7 +1573,7 @@ Section UkLeaf.
       (ITYPE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rd, ADDI)) ->
     uint rd <> 0 ->
     wval = add_vec zero_reg (sign_extend' 64 imm) ->
-    uvb C pt Rut π M m pc -∗
+    uvb C pt Rut sz π M m pc -∗
     ukc π M (<[Regidx rd := regval_into_reg wval]> m) (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.

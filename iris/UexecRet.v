@@ -16,10 +16,11 @@
 (* never told WHICH state trapped, and (F2) types the returned WP at the   *)
 (* ∀-state [uexec_wp], which a verified program cannot produce.  Here:     *)
 (*                                                                         *)
-(*   trapped_machine C pt Rut sc stv W                                     *)
+(*   trapped_machine C pt Rut sz sc stv W                                  *)
 (*     the trapped frame with cause [sc], tval [stv] and the user-visible   *)
 (*     state [W] as PARAMETERS: sepc = W's epc word, the register file =   *)
-(*     the one W's trapframe restores, the pages at W's image.             *)
+(*     the one W's trapframe restores, the pages at W's image -- at the    *)
+(*     LAZY view [user_ptm_inv pt sz (uvis_M W)] (see the note below).     *)
 (*   uexec_ret sc W                                                        *)
 (*     what user execution hands back at that trap -- a case analysis by   *)
 (*     PURE data (the cause, the a7 word of W): exit returns nothing,      *)
@@ -27,19 +28,40 @@
 (*     a slot at the bumped key for every return value and every image     *)
 (*     [usys_mem_ok] allows, and a non-ecall trap (interrupt, page fault)  *)
 (*     is transparent: the slot at [W] itself.                             *)
-(*   ukont C pt Rut                                                        *)
+(*   ukont C pt Rut sz π                                                   *)
 (*     the kernel obligation: ▷ (∀ W' sc stv, trapped_machine ∗ uexec_ret  *)
 (*     -∗ WP Loop).  The ▷ is the guard of the fixpoint below.             *)
-(*   uvb C pt Rut M m pc                                                   *)
+(*   uvb C pt Rut sz π M m pc                                              *)
 (*     everything user execution owns while it runs, keyed on the NATURAL  *)
-(*     user-space state: ambient bundles, machine cells, the KERNEL's own  *)
-(*     [user_pt_inv pt M] (so its three pure facts ride along), the config  *)
+(*     user-space state: ambient bundles, machine cells,                    *)
+(*     [user_ptm_inv pt sz M] (so its pure facts ride along), the config    *)
 (*     cells, the register file [m], the pc, the parked residue and         *)
 (*     [ukont].  The moral [sie_cap_gpr]; every U-mode leaf is to be       *)
 (*     stated against it.                                                  *)
 (*   uslot W                                                               *)
-(*     ∀ h C pt Rut, ⌜loop_ok C pt⌝ -∗ uvb … (uvis_M W) (regs of W) (pc of *)
-(*     W) -∗ WP Loop -- safe given the bundle at W's state.                *)
+(*     ∀ h C pt Rut sz, ⌜loop_ok C pt⌝ -∗ ⌜perm_of (ud_um pt) sz =         *)
+(*     uvis_perm W⌝ -∗ uvb … (uvis_M W) (regs of W) (pc of W) -∗ WP Loop   *)
+(*     -- safe given the bundle at W's state.                              *)
+(*                                                                         *)
+(* THE KEY'S IMAGE IS THE LAZY VIEW (owner's ruling, 2026-08-28).  A user  *)
+(* process cannot tell a faulted-in page from an untouched one, so the      *)
+(* abstraction must not distinguish them: [uvis_M W] is always the LAZY    *)
+(* sz-region view, and the bundle asserts [UserPtTree.user_ptm_inv pt sz   *)
+(* M] at it -- [user_pt_inv] with [umem_own] (which pins                    *)
+(* [dom M = uva_dom pt]) replaced by [umem_lazy].  On the mapped reading    *)
+(* the bundle would be UNSATISFIABLE for any process with an unfaulted      *)
+(* page (the GAP-premise trap) and the page-fault arm would not be          *)
+(* transparent.  [uvb] also carries [⌜UserPerm.usz_ok sz⌝] -- xv6's own     *)
+(* bound [p->sz <= MAXVA - 2 pages] -- which is what keeps [perm_of]'s      *)
+(* lazy FILL clear of the trapframe's and the trampoline's vpns, and hence  *)
+(* what lets the STORE leaf conclude that a live-but-unmapped page really   *)
+(* takes a page fault.                                                     *)
+(*                                                                         *)
+(* NOT [ProcPtOwn.proc_ptm].  That is the same image conjunct on the       *)
+(* PARKED tree ([pt_frame]); it owns neither satp, nor the TLB, nor the     *)
+(* PMP config, all three of which user execution needs to translate at     *)
+(* all.  [user_ptm_inv] is its installed-table twin, exactly as             *)
+(* [user_pt_inv] is [proc_pt]'s.                                           *)
 (*                                                                         *)
 (* [uslot] is MUTUALLY RECURSIVE with [uexec_ret] through [ukont]'s ▷, so   *)
 (* it is a guarded [fixpoint] over [uvis -d> iPropO Σ] (UexecWp.uexec_F's   *)
@@ -327,7 +349,7 @@ Section TrappedMachine.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Definition trapped_machine (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
-      (sc stv : mword 64) (W : uvis) : iProp Σ :=
+      (sz : Z) (sc stv : mword 64) (W : uvis) : iProp Σ :=
     (∃ ms_v : mword 64,
        ⌜trap_mstatus_ok ms_v⌝ ∗
        hart_state ↦ᵣ HART_ACTIVE tt ∗
@@ -338,22 +360,22 @@ Section TrappedMachine.
        sepc ↦ᵣ tf_w (uvis_tf W) tf_epc_idx ∗
        pc_is (stvec_base (uc_stvec C)) ∗
        gpr_file (tf_resume_gpr0 (uvis_tf W)) ∗
-       user_pt_inv pt (uvis_M W) ∗
+       user_ptm_inv pt sz (uvis_M W) ∗
        user_cfg C ∗
        Rut pt)%I.
 
   (* the old existential frame is a trapped machine at the key uservec
      saves -- the one direction the generic inhabitant needs *)
   Lemma user_trap_frame_trapped (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
-      (π : gmap (mword 27) uperm) :
+      (sz : Z) (π : gmap (mword 27) uperm) :
     user_trap_frame C pt Rut -∗
-    ∃ (W : uvis) (sc stv : mword 64), ⌜uvis_perm W = π⌝ ∗ trapped_machine C pt Rut sc stv W.
+    ∃ (W : uvis) (sc stv : mword 64), ⌜uvis_perm W = π⌝ ∗ trapped_machine C pt Rut sz sc stv W.
   Proof.
     rewrite /user_trap_frame.
     iIntros "H".
     iDestruct "H" as (ms_v sc_v stval_v sepc_v g)
       "(%Hto & Hhs & Hpriv & Hms & Hsc & Hstv & Hsep & Hpc & Hg & Hany & Hcfg & Hrut)".
-    rewrite /user_pt_any. iDestruct "Hany" as (M) "Hpt".
+    iDestruct (user_ptm_inv_intro pt sz with "Hany") as (M) "Hpt".
     iDestruct (gpr_file_x0 g (mword_of_int 0) ltac:(vm_compute; reflexivity)
                  with "Hg") as "[%Hx0 Hg]".
     iExists (uvis_of_run g sepc_v M π), sc_v, stval_v.
@@ -403,31 +425,34 @@ Section UexecRet.
 
   (* (B) the kernel obligation: its later-free BODY, and the guarded form *)
   Definition ukb_F (X : uvis -d> iPropO Σ) `{CID : CpuId}
-      (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (π : gmap (mword 27) uperm)
+      (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (sz : Z)
+      (π : gmap (mword 27) uperm)
       : iProp Σ :=
     (∀ (W' : uvis) (sc stv : mword 64),
        ⌜uvis_perm W' = π⌝ -∗
-       trapped_machine C pt Rut sc stv W' ∗ uexec_ret_F X sc W' -∗
+       trapped_machine C pt Rut sz sc stv W' ∗ uexec_ret_F X sc W' -∗
        WP (Loop : expr riscv_lang))%I.
 
   Definition ukont_F (X : uvis -d> iPropO Σ) `{CID : CpuId}
-      (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (π : gmap (mword 27) uperm)
+      (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (sz : Z)
+      (π : gmap (mword 27) uperm)
       : iProp Σ :=
-    (▷ ukb_F X C pt Rut π)%I.
+    (▷ ukb_F X C pt Rut sz π)%I.
 
   (* (C) the bundle *)
   Definition uvb_F (X : uvis -d> iPropO Σ) `{CID : CpuId}
-      (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (π : gmap (mword 27) uperm)
+      (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (sz : Z)
+      (π : gmap (mword 27) uperm)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) : iProp Σ :=
-    (uv_amb ∗ uv_regs ∗ user_pt_inv pt M ∗ user_cfg C ∗
-     gpr_file m ∗ pc_is pc ∗ Rut pt ∗ ukont_F X C pt Rut π)%I.
+    (uv_amb ∗ uv_regs ∗ ⌜usz_ok sz⌝ ∗ user_ptm_inv pt sz M ∗ user_cfg C ∗
+     gpr_file m ∗ pc_is pc ∗ Rut pt ∗ ukont_F X C pt Rut sz π)%I.
 
   Definition uslot_F (X : uvis -d> iPropO Σ) : uvis -d> iPropO Σ :=
     fun W =>
       (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (sz : Z),
          ⌜loop_ok C pt⌝ -∗
          ⌜perm_of (ud_um pt) sz = uvis_perm W⌝ -∗
-         uvb_F X (CID := h) C pt Rut (uvis_perm W) (uvis_M W)
+         uvb_F X (CID := h) C pt Rut sz (uvis_perm W) (uvis_M W)
            (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)) -∗
          WP (Loop : expr riscv_lang))%I.
 
@@ -440,13 +465,13 @@ Section UexecRet.
   Definition uslot : uvis -> iProp Σ := fixpoint uslot_F.
   Definition uexec_ret : mword 64 -> uvis -> iProp Σ := uexec_ret_F uslot.
   Definition ukb `{CID : CpuId} (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
-      (π : gmap (mword 27) uperm) : iProp Σ := ukb_F uslot C pt Rut π.
+      (sz : Z) (π : gmap (mword 27) uperm) : iProp Σ := ukb_F uslot C pt Rut sz π.
   Definition ukont `{CID : CpuId} (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
-      (π : gmap (mword 27) uperm) : iProp Σ := ukont_F uslot C pt Rut π.
+      (sz : Z) (π : gmap (mword 27) uperm) : iProp Σ := ukont_F uslot C pt Rut sz π.
   Definition uvb `{CID : CpuId} (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
-      (π : gmap (mword 27) uperm)
+      (sz : Z) (π : gmap (mword 27) uperm)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) : iProp Σ :=
-    uvb_F uslot C pt Rut π M m pc.
+    uvb_F uslot C pt Rut sz π M m pc.
 
   (* THE U-MODE CONTINUATION at a natural state: what every U-mode leaf's
      continuation is, and what a program function proves -- "safe from
@@ -457,7 +482,7 @@ Section UexecRet.
     (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (sz : Z),
        ⌜loop_ok C pt⌝ -∗
        ⌜perm_of (ud_um pt) sz = π⌝ -∗
-       uvb (CID := h) C pt Rut π M m pc -∗
+       uvb (CID := h) C pt Rut sz π M m pc -∗
        WP (Loop : expr riscv_lang))%I.
 
   Lemma uslot_unfold (W : uvis) :
@@ -465,7 +490,7 @@ Section UexecRet.
     (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (sz : Z),
        ⌜loop_ok C pt⌝ -∗
        ⌜perm_of (ud_um pt) sz = uvis_perm W⌝ -∗
-       uvb (CID := h) C pt Rut (uvis_perm W) (uvis_M W)
+       uvb (CID := h) C pt Rut sz (uvis_perm W) (uvis_M W)
          (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)) -∗
        WP (Loop : expr riscv_lang)).
   Proof. exact (fixpoint_unfold uslot_F W). Qed.
@@ -503,8 +528,8 @@ Section UexecRet.
   Qed.
 
   Lemma ukont_unfold `{CID : CpuId} (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
-      (π : gmap (mword 27) uperm) :
-    ukont C pt Rut π ⊣⊢ ▷ ukb C pt Rut π.
+      (sz : Z) (π : gmap (mword 27) uperm) :
+    ukont C pt Rut sz π ⊣⊢ ▷ ukb C pt Rut sz π.
   Proof. reflexivity. Qed.
 
   (* the arms, read at the fixpoint *)
@@ -578,18 +603,19 @@ Section UexecRetGen.
     rewrite uslot_unfold.
     iIntros (h C pt Rut sz) "%Hlo %Hpm Hb".
     rewrite /uvb /uvb_F.
-    iDestruct "Hb" as "(#Hamb & Hur & Hpt & Hcfg & Hg & Hpc & Hrut & Hk)".
+    iDestruct "Hb" as "(#Hamb & Hur & %Hsz & Hpt & Hcfg & Hg & Hpc & Hrut & Hk)".
+    iDestruct (user_ptm_inv_pt with "Hpt") as (Mp) "Hpt".
     iDestruct (uv_regs_u_regs with "Hur Hg Hpc") as (ms_v sc_v stval_v sepc_v) "[%Hms Hregs]".
     iDestruct "Hamb" as "(Hhw & Hmi & Hwi)".
     iPoseProof "Hwp" as "Hwp0".
     iEval (rewrite uexec_wp_unfold /uexec_F) in "Hwp0".
-    iApply ("Hwp0" $! h C pt Rut (uvis_M W) (tf_resume_gpr0 (uvis_tf W))
+    iApply ("Hwp0" $! h C pt Rut Mp (tf_resume_gpr0 (uvis_tf W))
               ms_v sc_v stval_v sepc_v (tf_resume_pc (uvis_tf W))
               with "[] [] Hhw Hmi Hwi Hregs Hpt Hcfg Hrut [Hk]");
       [ iPureIntro; exact Hlo | iPureIntro; exact Hms | ].
     rewrite /ukont_F /ukb_F.
     iNext. iIntros "[Hframe _]".
-    iDestruct (user_trap_frame_trapped C pt Rut (uvis_perm W) with "Hframe")
+    iDestruct (user_trap_frame_trapped C pt Rut sz (uvis_perm W) with "Hframe")
       as (W' sc stv) "[%Hperm Htm]".
     iApply ("Hk" $! W' sc stv with "[%] [Htm]"); [ exact Hperm | ].
     iFrame "Htm".

@@ -395,7 +395,7 @@ Section UkSync.
     is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true ->
     ⊢ ∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (sz : Z),
         ⌜loop_ok C pt⌝ -∗ ⌜perm_of (ud_um pt) sz = π⌝ -∗
-        uvb (CID := h) C pt Rut π M m (mword_of_int SyncSyms.sync) -∗
+        uvb (CID := h) C pt Rut sz π M m (mword_of_int SyncSyms.sync) -∗
         (∀ ret : mword 64,
            ukc π M (<[Regidx a0_idx := ret]>
                       (<[Regidx a7_idx := (mword_of_int 22 : mword 64)]> m))

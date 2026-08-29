@@ -502,3 +502,132 @@ Proof.
   intros Hwf Hdom Hb. apply (uva_dom_svpn pt va Hwf).
   rewrite <- Hdom. apply elem_of_dom. exists b. exact Hb.
 Qed.
+
+(* ===================================================================== *)
+(* §6 THE SIZE SIDE CONDITION, and what the FILLED pages can be.          *)
+(*                                                                         *)
+(* [perm_of]'s fill runs over [live_pages sz], and NOTHING in [perm_of]    *)
+(* stops that set from reaching the two vpns xv6 reserves at the top of    *)
+(* the user address space (the trapframe's, [tf_vpn], and the              *)
+(* trampoline's, [tramp_vpn]).  The kernel's own invariant does:           *)
+(* [p->sz] never exceeds MAXVA - 2 pages ([ProcPtOwn.uvm_maxsz] =          *)
+(* 2^38 - 8192), and that is [usz_ok].  It rides in the U-mode bundle      *)
+(* beside the size, and it is what lets the STORE leaf conclude that a     *)
+(* live-but-unmapped page really takes a page fault (rather than being     *)
+(* the trapframe page, which is mapped and merely U-less).                 *)
+(* ===================================================================== *)
+
+Definition usz_ok (sz : Z) : Prop := (UserPtTree.pgroundup sz <= 274877898752)%Z.
+
+Lemma usz_ok_live (sz va : Z) :
+  usz_ok sz -> uva_live sz va -> (0 <= va < 274877898752)%Z.
+Proof. unfold usz_ok, uva_live. lia. Qed.
+
+Lemma live_pages_lt (sz : Z) (p : mword 27) :
+  usz_ok sz -> p ∈ live_pages sz -> (bv_unsigned p < 67108862)%Z.
+Proof.
+  unfold usz_ok, live_pages. intros Hsz Hin.
+  apply elem_of_list_to_set, elem_of_list_fmap in Hin as (k & -> & Hk).
+  apply elem_of_seqZ in Hk.
+  assert (Hle : (UserPtTree.pgroundup sz / 4096 <= 67108862)%Z).
+  { apply (Z.div_le_mono _ _ 4096 ltac:(lia)) in Hsz.
+    change (274877898752 / 4096)%Z with 67108862%Z in Hsz. exact Hsz. }
+  assert (Hkb : (0 <= k < 67108862)%Z) by lia.
+  rewrite Z_to_bv_unsigned. rewrite bv_wrap_small; [ lia | ].
+  change (bv_modulus 27) with 134217728%Z. lia.
+Qed.
+
+(* a page of the key that the table does NOT map came from the fill *)
+Lemma perm_of_unmapped_fill (um : gmap (mword 27) (mword 64)) (sz : Z)
+    (p : mword 27) (q : uperm) :
+  perm_of um sz !! p = Some q -> um !! p = None -> p ∈ live_pages sz.
+Proof.
+  unfold perm_of, perm_fill. intros H Hn.
+  apply lookup_union_Some_raw in H as [H | [_ H]].
+  - apply lookup_omap_Some in H as (w & _ & Hl). rewrite Hn in Hl. discriminate Hl.
+  - apply lookup_gset_to_gmap_Some in H as [Hin _].
+    exact (proj1 (proj1 (elem_of_difference _ _ _) Hin)).
+Qed.
+
+(* ...and a filled page is a real user page: its vpn is below the
+   trapframe's, so it is neither the trapframe's page nor the
+   trampoline's.  This is the fact the store's FAULT arm needs to select
+   [u_fault_flavor]'s unmapped disjunct.  (The two reserved vpns are named
+   in [UptTree], whose constants this file does not import; the consumer
+   turns this bound into the two disequalities with
+   [ProcPtOwn.vpn_lt_ne].) *)
+Lemma perm_of_unmapped_lt (um : gmap (mword 27) (mword 64)) (sz : Z)
+    (p : mword 27) (q : uperm) :
+  usz_ok sz -> perm_of um sz !! p = Some q -> um !! p = None ->
+  (bv_unsigned p < 67108862)%Z.
+Proof.
+  intros Hsz H Hn.
+  exact (live_pages_lt sz p Hsz (perm_of_unmapped_fill um sz p q H Hn)).
+Qed.
+
+(* ===================================================================== *)
+(* §7 THE LAZY IMAGE'S WINDOW.                                            *)
+(*                                                                         *)
+(* Under the LAZY key the bundle's image [M] is NOT pinned to the table's  *)
+(* address space -- [dom M] is the live-or-mapped set -- so the engine     *)
+(* runs on the MAPPED SUB-IMAGE [Mp] and every byte fact it needs must be  *)
+(* transported from [M] to [Mp].  The transport is available exactly on a  *)
+(* MAPPED page, and the two lemmas below are what establish that a fetch's *)
+(* or a store's whole in-page window IS on one:                            *)
+(*                                                                         *)
+(*   [uva_of_image_lt]     a va the image records is below 2^39 -- from    *)
+(*                         [uva_mapped] (a vpn is a 27-bit page number) or *)
+(*                         from [uva_live] under [usz_ok];                 *)
+(*   [uva_mapped_window]   so [svpn_of] reads the va's page number back,   *)
+(*                         and every offset of a MAPPED page is mapped.    *)
+(* ===================================================================== *)
+
+Lemma uva_of_image_lt (pt : uptd) (sz va : Z) :
+  upt_map_wf (ud_um pt) -> usz_ok sz ->
+  (uva_mapped pt va \/ uva_live sz va) ->
+  (0 <= va < 549755813888)%Z.
+Proof.
+  intros Hwf Hsz [ (vpn & w & j & Hl & Hj & ->) | Hlv ].
+  - pose proof (upt_map_wf_vpn_lt _ _ _ Hwf Hl) as Hv.
+    pose proof (proj1 (bv_unsigned_in_range _ vpn)) as Hv0.
+    pose proof (Nat2Z.is_nonneg j) as Hj0.
+    pose proof (proj1 (Nat2Z.inj_lt j 4096) Hj) as Hjz.
+    change (Z.of_nat 4096) with 4096%Z in Hjz.
+    lia.
+  - unfold usz_ok, uva_live in *. lia.
+Qed.
+
+Lemma uva_mapped_window (pt : uptd) (pc : mword 64) (j : nat) (w : mword 64) :
+  ud_um pt !! svpn_of pc = Some w ->
+  (bv_unsigned pc < 549755813888)%Z ->
+  (bv_unsigned pc mod 4096 + Z.of_nat j < 4096)%Z ->
+  uva_mapped pt (uint pc + Z.of_nat j)%Z.
+Proof.
+  intros Hl Hb Hoff.
+  pose proof (proj1 (bv_unsigned_in_range _ pc)) as Hpc0.
+  pose proof (Z.mod_pos_bound (bv_unsigned pc) 4096 ltac:(lia)) as Hmb.
+  assert (Hoff0 : (0 <= bv_unsigned pc mod 4096 + Z.of_nat j)%Z) by lia.
+  exists (svpn_of pc), w, (Z.to_nat (bv_unsigned pc mod 4096 + Z.of_nat j)).
+  split; [ exact Hl | ].
+  split; [ lia | ].
+  rewrite (Z2Nat.id _ Hoff0).
+  rewrite svpn_of_unsigned_gen.
+  rewrite (Z.mod_small (bv_unsigned pc / 4096) 134217728);
+    [ | split; [ apply Z.div_pos; lia | apply Z.div_lt_upper_bound; lia ] ].
+  rewrite uint_unsigned.
+  pose proof (Z_div_mod_eq_full (bv_unsigned pc) 4096) as Hdm.
+  lia.
+Qed.
+
+(* ...and the transport itself: on a mapped va the two images agree. *)
+Lemma mapped_lookup_sub (pt : uptd) (M Mp : gmap Z (bv 8)) (va : Z) (b : bv 8) :
+  Mp ⊆ M -> dom Mp = uva_dom pt -> uva_mapped pt va ->
+  M !! va = Some b -> Mp !! va = Some b.
+Proof.
+  intros Hsub Hdom Hm Hb.
+  assert (Hs : is_Some (Mp !! va))
+    by (apply elem_of_dom; rewrite Hdom; by apply elem_of_uva_dom).
+  destruct Hs as [b' Hb'].
+  pose proof (lookup_weaken _ _ _ _ Hb' Hsub) as H1.
+  rewrite Hb in H1. injection H1 as ->. exact Hb'.
+Qed.
