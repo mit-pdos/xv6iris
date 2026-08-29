@@ -197,14 +197,24 @@ Definition wp_filewrite_au_body
    make it a loop INVARIANT are Coq-level and ride as ordinary premises of
    [fw_loop]:
 
-     clean = true -> t = iz /\ iz = FW_MAX * Z.of_nat p
+     0 <= t <= iz   /\   t = FW_MAX * Z.of_nat p
 
-   -- the running offset IS the fired total, and every fired chunk was
-   exactly [FW_MAX].  [clean] is a plain [bool] loop parameter: it is
-   [true] until some chunk's row turns out not to read as a file (the
-   not-a-file arm's provenance, see [SpecSysWriteAUEra]'s owner question
-   1), and [false] forever after -- which is exactly the disjunct the
-   loop's three exits then land in.
+   -- the fired total never runs ahead of the running offset, and every
+   fired chunk was exactly [FW_MAX].  THERE IS NO [clean] FLAG: the
+   design's boolean is exactly the decidable comparison [t = iz], so the
+   loop carries the inequality and each exit reads the case it is in off
+   [decide (t = iz)].
+
+   WHY [<=] AND NOT [=], AND IT IS THIS LANE'S FINDING.  A chunk fires only
+   when its start is INSIDE the file ([wri_pre]'s [off <= length bs0], the
+   splice's own side condition), and [SpecWritei]'s SUCCESS arm does not
+   expose that guard -- the code's [off > ip->size] test answers -1, but
+   only the [-1] arm of the post records it, so a success at [off > size]
+   is spec-permitted and code-impossible.  Such a chunk cannot be fired,
+   and the loop is what carries the shortfall: [t] falls behind [iz] by
+   that chunk and STAYS behind.  Both exits still land, because the fail
+   arm's [total < n] is exactly what a shortfall gives -- see
+   [SpecSysWriteAUEra]'s second arm, which is why this file needs no third.
 
    WHY THE TIE IS NOT INSIDE THE iProp.  The last chunk may be SHORT, so
    [t = FW_MAX * p] is false of the state the exhausted exit hands out; it
@@ -214,8 +224,9 @@ Definition wp_filewrite_au_body
    THE FOUR MOVES, one per thing the loop does with it: start it
    ([_init]), spend one commit at a chunk's fire ([_take] -- the peel and
    the receipt snoc, with the instant-count bound coming from
-   [FsAbsWriteFire.wri_count_step]), and read it off at each of the three
-   exits ([_ok] at [t = n], [_fail] at [t < n], [_nofile] at any [t]). *)
+   [FsAbsWriteFire.wri_count_step]), and read it off at each of the two
+   exits ([_ok] at [t = n], [_fail] at [t < n] or at the capstone's
+   never-entered loop). *)
 
 Section FilewriteAUState.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
@@ -285,22 +296,22 @@ Section FilewriteAUState.
     iSplitR; [iPureIntro; lia |]. iFrame "Hrs". rewrite Hlen. iExact "Hcm".
   Qed.
 
+  (* THE FAIL EXIT, AT BOTH OF ITS TWO SHAPES.  [t < n] is the loop's own
+     (the break, and the completed loop that skipped a chunk); the second
+     disjunct is the CAPSTONE's, on the [n < 0] guard at +0x20, where the
+     loop is never entered and the bundle is refunded whole. *)
   Lemma fw_au_raw_fail Γ (i n : Z) Φ (t : Z) (p : nat) :
-    (t < n)%Z -> fw_au_raw Γ i n Φ t p -∗ write_post_fail_at Γ i n Φ.
+    (t < n)%Z \/ (n < 0)%Z /\ p = 0%nat ->
+    fw_au_raw Γ i n Φ t p -∗ write_post_fail_at Γ i n Φ.
   Proof.
-    intros Htn. iIntros "Hst". rewrite /fw_au_raw /write_post_fail_at.
+    intros Hex. iIntros "Hst". rewrite /fw_au_raw /write_post_fail_at.
     iDestruct "Hst" as (bss) "(%Hlen & %Htot & %Hp & Hrs & Hcm)".
-    iExists bss. iSplitR; [iPureIntro; left; lia |].
+    iExists bss. iSplitR.
+    { iPureIntro. destruct Hex as [Htn | [Hneg Hp0]].
+      - left. lia.
+      - right. split; [exact Hneg |].
+        apply nil_length_inv. rewrite Hlen. exact Hp0. }
     iSplitR; [iPureIntro; lia |]. iFrame "Hrs". rewrite Hlen. iExact "Hcm".
-  Qed.
-
-  Lemma fw_au_raw_nofile Γ (i n : Z) Φ (t : Z) (p : nat) :
-    fw_au_raw Γ i n Φ t p -∗ write_post_nofile_at Γ i n Φ.
-  Proof.
-    iIntros "Hst". rewrite /fw_au_raw /write_post_nofile_at.
-    iDestruct "Hst" as (bss) "(%Hlen & %Htot & %Hp & Hrs & Hcm)".
-    iExists bss. iSplitR; [iPureIntro; lia |]. iFrame "Hrs".
-    rewrite Hlen. iExact "Hcm".
   Qed.
 
 End FilewriteAUState.

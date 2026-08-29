@@ -137,7 +137,7 @@ Section ProofStable.
        arm takes the ESCAPE disjunct at [off0 := 0].  The chained disjunct
        is not derivable -- see the header. *)
     rewrite /write_stable_arms_at /write_arms_at. iFrame "Hn".
-    iDestruct "Harms" as "[[%Hok Hpost] | [[%Hm1 Hpost] | [%Hnf Hpost]]]".
+    iDestruct "Harms" as "[[%Hok Hpost] | [%Hm1 Hpost]]".
     - iLeft. iSplitR; [by iPureIntro |].
       rewrite /write_post_ok_at.
       iDestruct "Hpost" as (bss) "(%Htot & %Hlen & Hrs & Hcm)".
@@ -146,8 +146,7 @@ Section ProofStable.
       iSplitR; [by iPureIntro |].
       iSplitR; [by iPureIntro |].
       iSplitL "Hrs"; [iRight; iExact "Hrs" |]. iExact "Hcm".
-    - iRight. iLeft. iSplitR; [by iPureIntro |]. iExact "Hpost".
-    - iRight. iRight. iSplitR; [by iPureIntro |]. iExact "Hpost".
+    - iRight. iSplitR; [by iPureIntro |]. iExact "Hpost".
   Qed.
 
 End ProofStable.

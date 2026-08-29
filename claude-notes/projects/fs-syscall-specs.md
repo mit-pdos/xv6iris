@@ -540,6 +540,85 @@ things, and the answer differs:
   `c = FW_MAX` (which holds because the chunk was not the last).  The
   capstone's non-inode arms are dead by the `st = FdOpen rb true
   (FdInode i)` premise.
+
+  **THE CHUNK LOOP IS PROVEN — 2026-08-29 (FILEWRITE-AU lane, Opus; four
+  new files, whole set EC2-green, zero `Admitted`).**
+  `SYSWRITE_AU_ERA` AND `SYSWRITE_AU_ERA_STABLE` ARE UNCONDITIONAL
+  THEOREMS.  `ProofFilewriteAU.v` (4.3 k lines, 57 s) seals `FILEWRITE_AU`;
+  `LinkFilewriteAU.v` / `LinkSysWriteAU.v` / `LinkSysWriteAUStable.v`
+  instantiate the three functors against real callee proofs.
+  `Print Assumptions` on `SysWriteAU.wp_sys_write_au_era`, on
+  `SysWriteStable.wp_sys_write_au_era_stable` and on
+  `FilewriteAU.wp_filewrite_au` is the SAME THREE-LINE SET —
+  `resv_matches`, `resv_is_valid`, funext — i.e. `LinkNameiEra`'s, and
+  **`LinkConsolewrite`'s Axiom is NOT in it**: `LinkSysWrite`'s cone carries
+  it, this one does not, because the AU premise refutes the device arm
+  instead of walking it.
+  - **THE FUNCTOR HAS FIVE PARAMETERS, NOT EIGHT.**  `st = FdOpen rb true
+    (FdInode i)` plus `fdstate_ok` pins `f->writable = 1` and
+    `f->type = FD_INODE`, so the `beq a5,x0` at +0x04, the FD_PIPE compare
+    at +0x20, the FD_DEVICE compare at +0x26 and the `panic` else-arm are
+    each refuted in three lines.  ~1050 lines of the landed walk (the
+    pipewrite block, the whole devsw dispatch, the panic block) simply do
+    not appear, and Pipewrite / Consolewrite / PANIC leave the parameter
+    list with them.
+  - **THE DEVICE ARM IS DEAD AND SO IS THE THIRD ARM.**  The owner's
+    `file_payload` strengthening is consumed exactly where the design said:
+    `di_type dnl = T_FILE_z` is now derivable at the fire from four facts
+    joined at ilock — `inode_rec_local`'s four-way enumeration,
+    `InodeLock.inode_ok`'s `type <> 0`, the carve's fourth output (not a
+    directory, on a writable fd) and its FIFTH (not a device, on an
+    FD_INODE fd).  `write_post_nofile_at`, `fw_au_raw_nofile` and
+    `write_arms_at`/`write_stable_arms_at`'s third disjunct are DELETED;
+    `ProofSysWriteAUStable`'s destructuring loses one bullet and
+    `ProofSysWriteAU` needed no edit at all (it frames the arms opaquely).
+  - **FINDING (and it is why the `clean` flag did not simply vanish):
+    `SpecWritei`'s SUCCESS ARM DOES NOT EXPOSE `off <= ip->size`.**  The
+    fire needs `wri_pre`'s `off <= length bs0` — without it the new file is
+    `bs0 ++ junk ++ wrote` and NOT `blk_splice off wrote bs0`, so the delta
+    is wrong, not merely unprovable.  The code tests `off > ip->size` and
+    answers -1, but only the post's `-1` arm records the guard; on the
+    `a0 = tot` arm nothing does.  So a success past EOF is spec-permitted
+    and code-impossible, and the walk must be able to SKIP a chunk it
+    cannot fire.  THE FIX IS FREE AND STAYS INSIDE THE CAMPAIGN: the loop
+    carries `0 <= t <= iz` instead of `t = iz` (the `clean` boolean IS the
+    decidable comparison `t = iz`, so no flag is needed), and a skip is a
+    STRICT SHORTFALL, which is exactly `write_post_fail_at`.  The fail arm's
+    return value is therefore widened to `-1 \/ (n /\ 0 <= n)` — strictly
+    MORE than the deleted third arm gave, since it keeps the totals fact.
+    Closing the gap properly is a one-conjunct output growth on
+    `SpecWritei`'s success arm (`bv_unsigned (di_size dn) >= off`), free at
+    every one of ProofWritei's exits (all are past the top check) but an
+    R10 edit to a landed contract + a 5 k-line proof + three callers'
+    intro patterns — OWNER'S CALL, and nothing is blocked on it.
+  - **TWO MORE PARALLEL FORMS, both `R10`-clean copies.**
+    `fwau_tail` is `ProofFilewriteParts.fw_tail` with its post KEYED on the
+    compare the block performs — `(iz = nz /\ rv = nz) \/ (iz <> nz /\
+    rv = -1)` instead of `rv = -1 \/ (iz = nz /\ rv = nz)`.  The landed
+    disjunction is enough for `filewrite_ret` but NOT for an armed post: at
+    the exhausted exit it still permits `-1`, the one value the ok arm
+    cannot carry.  Both branches prove the sharper form for free.
+    `fwau_pay_carve` is `SpecFileread.fileread_pay_carve` with
+    `fdstate_ok inum Cf st` as a SIXTH output: the carve and
+    `file_pay_st_ok` bind the payload's `inum` under two separate
+    existentials, so `i = bv_unsigned inum` — which the receipts need, since
+    the fire retags at the inum and the contract indexes by `i` — is not
+    otherwise derivable.  Both read off the same `pn`.
+  - **`fw_test`'s post is one conjunct wider** (`c = nz - iz \/ c =
+    FW_MAX`, free at both exits): the back edge needs it to re-prove
+    `t = FW_MAX * p`, because a chunk that leaves `i < n` IS the cap.
+  - **THE FIRE, as landed.**  One `iAssert` in place of the
+    `ireg_top_retag`, keyed on `rz = c /\ off <= size`; on the key
+    `fw_au_raw_take` peels the chunk's commit, `wrf_write_row` builds the
+    splice row (writei's range clause at `dist = 0`, `wi_dinode`'s `max`
+    size) and `wrf_awrite_fire` fires it inside the one `ftopN` section;
+    off the key the landed retag runs unchanged.  Both branches deliver
+    `∃ tf pf, ⌜(tf = t /\ pf = p) \/ (tf = t + c /\ pf = S p /\ rz = c)⌝ ∗
+    fw_au_raw … tf pf`, which is what lets the ~370 lines from the retag to
+    the exits stay single-copy.
+  - **`Hjoin` grew one conjunct** — `0 < rz -> rz = tot /\ dn' = wi_dinode
+    dnl bm' off tot` — because the landed join threw the record away (the
+    retag does not look inside it) and the fire needs the splice.
   **OPEN'S PLAIN ARM IS PROVEN** (Opus lane): `SpecSysOpenAUPlain.v` seals
   `SYSOPEN_AU_PLAIN` — `SpecSysOpenAU.wp_sys_open_au_plain_body` byte for
   byte, the O_CREATE parameter split off — and `LinkSysOpenAU.v`
