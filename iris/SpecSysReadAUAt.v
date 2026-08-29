@@ -27,22 +27,53 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.algebra Require Import auth gmap frac.
+From iris.algebra Require Import auth gmap frac dfrac.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
+Require Import InstrBytes.
+Require Import RegFile.
+Require Import RiscvExtras.
+Require Import CalleeSaved KernelText KernelDataInv.
+Require Import IntrDefs.
+Require Import WpNext.
+Require Import SpecPanic.
+Require Import FdSlots.
+Require Import ProcGeom.
+Require Export SwtchCtx.
+Require Import CpuOwn.
+Require Import SchedCtx.
+Require Import IrefSlots.
+Require Import UserPtTree.
+Require Import KvmSpec.
+Require Import ProcPtOwn.
+Require Import ProcInv.
+Require Import FileInvDefs.
+Require Import SpecArgfd.      (* [arg_fd]                                  *)
+Require Import ConsoleInv.
+Require Import FsTree.         (* [file_bytes]: the landed flat byte-list
+                                  reading the slice vocabulary is cut from  *)
+Require Import PipeInvDefs.    (* [pipe_rw_ret], the landed blanket the
+                                  sanity lemma folds the arms back into    *)
+Require Import InodeInv.       (* [MAXFILE]; exports InodeDefs' [file_byte] *)
+Require Import SpecReadi.      (* [rd_clamp], [rd_delivered]: what readi
+                                  actually answers -- the tie is to THESE  *)
+Require Import SpecFileread.   (* [fread_names], the env bundles,
+                                  [fileread_ret]                           *)
+Require Import SpecSysRead.    (* the landed contract this file states a
+                                  parallel form beside; [sys_rw_count]     *)
+From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import RegFile RiscvExtras WpNext.
-Require Import FdSlots ProcInv FileInvDefs.
-Require Import SpecFileread.   (* [fread_names] *)
-Require Import SpecSysRead.    (* [sys_rw_count] *)
-Require Import FsAbs FsBytesGamma.  (* the abstract state; [fs_gamma_L] *)
-Require Import Xv6G FsCfg.
+Require Import ProcAvail.
+Require Import FsAbs.          (* the abstract state (lane A, landed)       *)
+Require Import FsBytesGamma.   (* [fs_gamma_L]: the live Γ                  *)
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import FsCfg.  (* [fscfg]: the fs configuration is AMBIENT *)
+Import Defs.
 Require Import SpecSysReadAU.
 Require Import FsAbsReadFire.
-Import Defs.
 
 Local Open Scope Z_scope.
 
