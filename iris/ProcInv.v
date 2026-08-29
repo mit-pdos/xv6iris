@@ -2401,7 +2401,10 @@ Section ProcInv.
     iAssert ([∗ list] fd ↦ v ∈ replicate NOFILE (zero_reg : mword 64),
                (p_ofile pa fd ↦₈ v ∗ fd_slot ∗ fd_st_auth γd fd FdClosed))%I
       with "[Ho Hs Hst]" as "Ho".
-    { rewrite !big_sepL_sep. iFrame "Ho Hs Hst". }
+    (* the WAND form -- see [FileInv.ftable_res_boot] for the measurement;
+       this file is ON THE CRITICAL PATH, so the seconds are chain seconds. *)
+    { iApply (big_sepL_sep_2 with "Ho [Hs Hst]").
+      iApply (big_sepL_sep_2 with "Hs Hst"). }
     iApply (big_sepL_impl with "Ho"). iIntros "!>" (fd v Hv) "(Hcell & Hslot & Hst)".
     apply lookup_replicate in Hv as [-> _]. iFrame "Hcell". iLeft. by iFrame.
   Qed.

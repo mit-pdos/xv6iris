@@ -2236,7 +2236,10 @@ Section UserTotalU.
     pose proof (u_hval_base rsf mm w i Hag (Hdf0 dstateU (fun r _ => eq_refl)))
       as Hhv.
     pose proof (Hdf0 (u_state rsf mm) Hag) as Hdf. clear Hdf0.
-    destruct i; try (cbn in Hdi; discriminate).
+    (* [discriminate Hdi], not bare [discriminate]: the no-argument form
+       walks the whole local context head-normalising each hypothesis
+       type with delta, once per constructor of [i]. *)
+    destruct i; try (cbn in Hdi; discriminate Hdi).
     all: lazymatch type of Hdf with
     (* --- retiring compute families (arm_gprwrite + the family total) --- *)
     | _ = Some (ITYPE ?p, _) =>
@@ -2515,7 +2518,10 @@ Section UserTotalU.
     pose proof (u_hval_rvc rsf mm h i Hag (Hdf0 dstateU (fun r _ => eq_refl)))
       as Hhv.
     pose proof (Hdf0 (u_state rsf mm) Hag) as Hdf. clear Hdf0.
-    destruct i; try (cbn in Hdi; discriminate).
+    (* [discriminate Hdi], not bare [discriminate]: the no-argument form
+       walks the whole local context head-normalising each hypothesis
+       type with delta, once per constructor of [i]. *)
+    destruct i; try (cbn in Hdi; discriminate Hdi).
     all: lazymatch type of Hdf with
     (* --- RVC DIRECT (no ExecuteAs) --- *)
     | _ = Some (C_NOP ?g6, _) =>

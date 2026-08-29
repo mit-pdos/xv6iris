@@ -1346,10 +1346,51 @@ Definition const_pay {Σ : gFunctors} (P : iProp Σ) : CtxId → iProp Σ :=
 Notation "<{ P }>" := (const_pay P%I)
   (at level 0, P at level 200, format "<{  P  }>").
 
-(* the combinator's transport obligation: same guard role and priority
-   story as [ctx_morph_const] (which still serves bare λ-spellings). *)
+(* The combinator's transport obligation.
+
+   PRIORITY 0, AND THE 0 IS LOAD-BEARING -- it is what stops the
+   STRUCTURAL instances from being tried first.  [const_pay] is a plain
+   definition, so instance search unfolds it ([const_pay P] is [λ _, P])
+   and then [ctx_morph_exist] (priority 1, one premise) matches a payload
+   whose body is an [∃], [ctx_morph_sep] (2) its conjuncts,
+   [ctx_morph_if_then] each guarded slot, and the search walks down into a
+   payload the wrapper says outright is context-CONSTANT.  Every branch
+   eventually fails on a leaf nothing gives an instance to -- and nothing
+   should: [pstate_lock], [hart_at_any] and their kind are exactly the
+   ξ-dependent facts [ctx_morph]'s comment above says have no blanket
+   instance -- so the walk proves nothing at all and backtracks over the
+   whole space before this instance finally gets its turn and closes the
+   goal in one step.
+
+   Measured 2026-08-29 on the GCP VM, isolated coqc, min of two, this
+   priority the only change (and the AFTER arm ran at load 26 against the
+   BEFORE arm's 0.6-16, so it is the conservative direction):
+     [SpecProcinit.v]  11.9 s -> 2.95 s; its [apply _] on
+                       [CtxMorph <{ proc_lock_res .. }>] 10.09 s -> 0.34 s
+     [ProofKforkB1.v]  21.9 s -> 3.92 s; its [iApply (wp_release_sconf ..
+                       <{ proc_lock_res .. }> ..)] 18.40 s -> 0.34 s
+   The whole [wp_acquire_sconf]/[wp_release_sconf] call-site family --
+   67 statements totalling 444 s in the tree's top 1000, and every one of
+   the twenty non-[Qed] entries in CI's top thirty on 2026-08-29 -- was
+   this and nothing else.  After: 3 sites, 2.5 s between them.
+
+   THE EVAR GUARD IS UNAFFECTED, which is why the priority can move here
+   and not on [ctx_morph_const].  That one is [CtxMorph (λ _, P)]: its
+   head unifies with a payload that is still a bare evar, so an eager
+   [ctx_morph_const] would silently commit [?R := λ _, ?P].  This one's
+   head is a RIGID application of [const_pay], which only a call site
+   that WROTE [<{ .. }>] can produce; [ctx_morph_const] keeps its 100.
+
+   AND [Typeclasses Opaque const_pay] IS NOT THE FIX, though it is the
+   first thing to reach for and it does kill the same search.  The
+   payload's consumers read [R cur_ctx] through the wrapper -- [iDestruct
+   "HR" as (t) "H"] on a lock resource whose body is an [∃] is the common
+   case -- and sealing the wrapper takes [IntoExist] with it: measured, a
+   from-scratch build fails eight files (ProofSysUptime, ProofAllocpid,
+   ProofBpin, ProofBunpin, ProofFiledup, ProofFilealloc, ...) at
+   "iExistDestruct: cannot destruct". *)
 Global Instance ctx_morph_const_pay `{!riscvGS Σ} (P : iProp Σ) :
-  CtxMorph (const_pay P) | 99.
+  CtxMorph (const_pay P) | 0.
 Proof. iIntros (ξ ξ') "Hd HP". iFrame. Qed.
 
 (* The class TYPE is transparent to typeclass unification: [CurCtx] is

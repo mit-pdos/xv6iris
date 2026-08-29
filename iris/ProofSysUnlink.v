@@ -4932,7 +4932,13 @@ Section ProofSysUnlinkBody.
     assert (Haddr'v : di_addrs dnW = bm_cells bm')
       by (rewrite HdnW; reflexivity).
     (* the membership trio -- what pays the whole tail *)
-    destruct (Hpost16 ltac:(lia) (su_wi_blocks kk))
+    (* [wi16_post]'s guard is [0 < tot], and this arm has already
+       substituted [tot := 16], so the goal is [0 < 16].  HOISTED OUT OF
+       ARGUMENT POSITION and closed by a term: spliced as [ltac:(lia)] it
+       reifies this proof's whole context -- the tree's largest -- to
+       decide it, and measured 3.4 s at each of the two sites. *)
+    assert (Htot16 : (0 < 16)%nat) by (apply Nat.lt_0_succ).
+    destruct (Hpost16 Htot16 (su_wi_blocks kk))
       as (Hsp16 & Htgt16 & Hibd16 & Halc16).
     (* the ledger figures *)
     assert (Hnw5 : (5 <= nw)%nat).
@@ -6567,7 +6573,13 @@ Section ProofSysUnlinkBody.
     assert (Haddr'v : di_addrs dnW = bm_cells bm')
       by (rewrite HdnW; reflexivity).
     (* the membership trio -- what pays the whole tail *)
-    destruct (Hpost16 ltac:(lia) (su_wi_blocks kk))
+    (* [wi16_post]'s guard is [0 < tot], and this arm has already
+       substituted [tot := 16], so the goal is [0 < 16].  HOISTED OUT OF
+       ARGUMENT POSITION and closed by a term: spliced as [ltac:(lia)] it
+       reifies this proof's whole context -- the tree's largest -- to
+       decide it, and measured 3.4 s at each of the two sites. *)
+    assert (Htot16 : (0 < 16)%nat) by (apply Nat.lt_0_succ).
+    destruct (Hpost16 Htot16 (su_wi_blocks kk))
       as (Hsp16 & Htgt16 & Hibd16 & Halc16).
     (* the ledger figures *)
     assert (Hnw5 : (5 <= nw)%nat).

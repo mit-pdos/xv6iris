@@ -1622,7 +1622,12 @@ Section ProofPipealloc.
       (* the retype IS the descriptor's state change: a pipe end reports
          [FdOpen r w FdPipe] at the flags it stores, and [fp_inum] is
          meaningless on this arm *)
-      iSplitR; [iPureIntro; by split|].
+      (* NOT [by split]: the goal is three [eq_refl]s between concrete
+         mwords, but [done] ends in a no-argument [discriminate], which
+         head-normalises every hypothesis type in a whole-function
+         context with delta.  Name the term instead -- optimization.md's
+         "[iPureIntro. done.] on a goal you can read at a glance". *)
+      iSplitR; [iPureIntro; exact (conj eq_refl (conj eq_refl eq_refl))|].
       iFrame "Hpn0".
       rewrite /file_payload /file_core /fc_wbool;
         cbn [fc_type fc_pipe fc_writable].
@@ -1644,7 +1649,12 @@ Section ProofPipealloc.
       with "[Hpn1 Hwr Hiru1 Hoh1]" as "Hpay1".
     { iExists (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_ocv pn1)
                  (fp_inum pn1)).
-      iSplitR; [iPureIntro; by split|].
+      (* NOT [by split]: the goal is three [eq_refl]s between concrete
+         mwords, but [done] ends in a no-argument [discriminate], which
+         head-normalises every hypothesis type in a whole-function
+         context with delta.  Name the term instead -- optimization.md's
+         "[iPureIntro. done.] on a goal you can read at a glance". *)
+      iSplitR; [iPureIntro; exact (conj eq_refl (conj eq_refl eq_refl))|].
       iFrame "Hpn1".
       rewrite /file_payload /file_core /fc_wbool;
         cbn [fc_type fc_pipe fc_writable].
