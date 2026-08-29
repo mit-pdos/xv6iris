@@ -15718,3 +15718,27 @@ from the kept part plus `pin_back` -- no `ctx_phys_pointsto_split` needed
 at publish; `ctx_phys_pointsto_join` closes at withdraw.  The interim
 `ProofVirtioDiskRwD` caller offers by `phys_map_offer` and drops `pin_back`.
 Steps 3–6 remain.
+
+**A6.125 step 4 LANDED (r44: 1183/1298, same 8 roots; snapshot
+`d496e0026`).**  `TsoCtx.ctx_cell_keep ξ a` (½ stamp + arm),
+`ctx_phys_pointsto_offer_split` (full ctx cell ⊢ (½ raw + ½ sealed) ∗ keep),
+`ctx_cell_keep_back` (keep + ½ raw memory ⊢ `ctx_phys_pointsto_h`),
+`ctx_morph_cell_keep`.  `DiskAvail`: `keep_map ξ m`, `hcell_map ξ m`,
+`ccell_map ξ m` (full cells), `keep_map_back`, `hcell_map_join` (with the
+lease's `half_map` → full cells), `ctx_ident_phys`, `ctx_win_offer` (a
+window of ctx bytes → `pin_offer` ∗ `keep_map`), `ctx_win_of_ccell` (full
+cells → ctx bytes again), and the `CtxMorph` instances for `keep_map`/
+`hcell_map` (proved by `ctx_morph_big_sepM` directly -- `ctx_morph_solve`'s
+`apply` unfolds the leaves' own ∃).  `VirtioProto`: `range_map_big_sepM`
+(predicate-generic), `pin_offer_union/_empty/_disj`.  `ProofVirtioDiskRwD`:
+`po_list/po_union`, `kp_list/kp_union`, the offer bridges `vdrwd_o2/_o4/_o8`
+and `vdrwd_buf_offer`, `vdrwd_stat_out_ctx`; `vdrwd_pin_res` now yields
+`pin_offer pin ∗ keep_map cur_ctx pin ∗ phys_map wrb ∗ …` (OUT pins the
+buffer as offer+keep; IN still forgets it into the writable footprint);
+`wp_vdrwd_sh_publish` takes the offer and returns `pin_back pin`; the
+caller rebuilds `hcell_map cur_ctx pin` (`keep_map_back`) and, until step
+3, drops it.  Gotcha: `DiskAvail` must not import `SailStdpp.Values` (the
+`gmap Arch.pa` Countable leak; `mword` qualified).  Steps 3, 5-OUT, 6
+remain: `flight_res`/`parked_res` gain the pin's half ctx cells
+(transport by `hcell_map_morph`), the interrupt handler's reclaim keeps the
+½ form, RwF withdraws by `hcell_map_join` + `ctx_win_of_ccell`.

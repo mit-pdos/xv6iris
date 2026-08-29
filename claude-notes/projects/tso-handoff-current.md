@@ -23,7 +23,7 @@ measured record; `main-tso-readiness.md` is the separate main-side handoff.
    temp-index recipe; `ZZchain.sh <File>…` at the tree root rechecks files
    locally in order against pulled `.vo`).
    Build driver: `ZZbuild.sh` at the tree root (the intr lane's, log names
-   suffixed `.aux` -- see the gotcha).  **Last certified: r41 (CLEAN round), 1183 .vo of 1298, red roots 8, zero admits (A6.124: the avail-index word is on the ledger -- lease split + payload half; `ProofVirtioDiskRwD`, `RwE`, `RwDSeam` GREEN; the new red root is `ProofVirtioDiskRwF:365`, the pin-return crossing, characterized and sized in A6.124).**  Snapshot `6168b7303` = r41; **r42 = `61fb20680`** (A6.125 step 1, the `TsoCtx` half-ctx-cell bricks, root change only: 1183/1298, same 8 roots); **r43 = `6304d4c92`** (A6.125 step 2: `VirtioProto`'s hole is the whole control set at ½, publish takes a PIN OFFER and returns the memory half -- A6.125's step-2 entry; 1183/1298, same 8 roots).
+   suffixed `.aux` -- see the gotcha).  **Last certified: r41 (CLEAN round), 1183 .vo of 1298, red roots 8, zero admits (A6.124: the avail-index word is on the ledger -- lease split + payload half; `ProofVirtioDiskRwD`, `RwE`, `RwDSeam` GREEN; the new red root is `ProofVirtioDiskRwF:365`, the pin-return crossing, characterized and sized in A6.124).**  Snapshot `6168b7303` = r41; **r42 = `61fb20680`** (A6.125 step 1, the `TsoCtx` half-ctx-cell bricks, root change only: 1183/1298, same 8 roots); **r43 = `6304d4c92`** (A6.125 step 2: `VirtioProto`'s hole is the whole control set at ½, publish takes a PIN OFFER and returns the memory half -- A6.125's step-2 entry; 1183/1298, same 8 roots); **r44 = `d496e0026`** (A6.125 step 4: the RwD pin builder offers and keeps; 1183/1298, same 8 roots).
 2. **KPT tree**: `/shared/xv6iris-3-kpttree` — FROZEN mid-K15d, unchanged
    this session EXCEPT one mirrored hunk: `iris/SmodeCorePt.v`'s
    `word_pointsto_wpay_mint_c` gained the trailing own-message fragment
@@ -100,8 +100,11 @@ and re-splits.  `ProofVirtioDiskRwD` + `RwE` + `RwDSeam` green.
    `disk_slot`'s cells -- lease ½ sealed, payload ½ exposed + `lk_floor`,
    RwD's formatting stores through `_au_dat` with one obligation per width
    (`vdrwd_avail_store_ok`'s shape), `VdrwdPinBuild` splits instead of
-   forgetting, RwF §1's bridges deleted.  Sized in A6.124.  **Steps 1–2 of
-   the (b′) plan are LANDED (r42, r43); next is step 4 (RwD's pin builder
+   forgetting, RwF §1's bridges deleted.  Sized in A6.124.  **Steps 1, 2 and 4 of
+   the (b′) plan are LANDED (r42, r43, r44); next is step 3
+   (`flight_res`/`parked_res` carry `hcell_map cur_ctx (dc_pin v)`), then
+   5-OUT (RwF: `hcell_map_join` + `ctx_win_of_ccell`), 6.  Old text of
+   this item follows: step 4 (RwD's pin builder
    keeps `ts ½ + arm` per cell -- `keep_map` -- and rebuilds
    `ctx_phys_pointsto_h` from `pin_back`), then 3 (`flight_res`/`parked_res`
    carry the ctx halves), 5-OUT, 6.**  **RE-MEASURED
