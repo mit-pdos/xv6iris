@@ -75,13 +75,24 @@ design left).  DONE SINCE: the mint+export (uncoupled from CtxPinMint
 position"), BOTH READS (holder via ledger_read_pin_bytes_ok —
 §0.35′(iv) case 2 DISCHARGED; the nonzero fact travels inside Res
 beside the pin — the AU rule's fourth manifestation), and
-lock_take/lock_give at the new arities.  REMAINING (all wiring,
-instruments in hand): (1) release retract-then-store at
-WpSconfLock:874 (lock_word_pin_drop then the free-word gate,
-replacing lock_word_ex_forget); (2) spinner preservation on the
-failing AMO branch (ledger_store_win_pin_ok, premise from rget=1);
-(3) the failing-branch close; (4) the WpSconfLock/WpLockAt re-cut
-tail + the 69-file sweep as arity verification + sentinel + A6.119.  Then (5) the
+lock_take/lock_give at the new arities.  FURTHER DONE (r35, 801 files): release's retract-then-store; the
+either-arm flat read; the cpu-store family on lock_auth_at;
+TsoCtx.tso_pa_off/_add EXPORTED (was Local — the offset↔address
+bridge, 13th clientless instance, this time preventing a DUPLICATE);
+lock_word_amo_keep WRITTEN (the failing-branch preservation gate,
+Sg := fun a => lkw_set (tso_pa_off ea a)); the sweep's ONE casualty
+fixed (PipeInvDefs — the only file that unfolded locked
+definitionally; everything opaque untouched — §0.34′'s "opaque to
+the callers" verified by measurement).  REMAINING (wiring only, bail
+condition never triggered): (1) the branch-before-store restructure
+in the AMO write node (~WpSconfLock:2102) — branch on Hbr BEFORE the
+store: success = plain→store→mint-pin (landed), failing =
+pin→store→pin-at-SAME-B via lock_word_amo_keep (preserve at the
+ORIGINAL B or lock_pos_agree breaks); (2) WpLockAt recheck;
+(3) sentinel round + A6.119.  NOTE the pinned-window machinery was
+built speculatively for the PT tier and the lock word is its FIRST
+client — the tail is discovery-shaped; expect unsupplied premises,
+not missing instruments.  Then (5) the
 SpecAcquire threading and (6) close + cone sweep as before.
 Then: (5) lock_openable_c threading through SpecAcquire's ~40 callers;
 (6) close WpSconfLock + sweep the cone (~160 files); DMA AU leaf +
