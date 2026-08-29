@@ -1,69 +1,53 @@
 (* ===================================================================== *)
-(* UserHeap.v -- A SEPARATION-LOGIC HEAP OVER USER MEMORY.                *)
+(* UserHeap.v -- A SEPARATION-LOGIC HEAP OVER USER MEMORY, IN TWO HALVES. *)
 (*                                                                        *)
-(* The U tier's memory has been an image VALUE ([uvis_M W : gmap Z (bv 8)]) *)
+(* The U tier's memory has been an image VALUE ([uvis_M W : gmap Z (bv 8)])*)
 (* threaded through every contract as an equation.  That has no frame      *)
-(* rule: a function that touches ANY of it must say what happened to ALL   *)
-(* of it, so a four-byte copyout propagates as [M' = umem_wr M a d bs]     *)
-(* through every layer, and any layer that drops the window's bounds       *)
-(* (the syscall dispatcher does) makes "outside the window" empty and      *)
-(* nothing frames at all.  That is what blocked a verified [init]: it      *)
-(* calls [wait] with a NULL status pointer, its text lives at address 0, and no layer above *)
-(* kwait says the null pointer wrote nothing.                              *)
+(* rule: a function touching ANY of it must say what happened to ALL of    *)
+(* it, so a four-byte copyout propagates as [M' = umem_wr M a d bs]        *)
+(* through every layer -- and the syscall dispatcher, which drops the      *)
+(* window bounds SpecKwait and SpecSysWait both carry, makes `outside the  *)
+(* window' empty, at which point nothing frames.  That is what blocks a    *)
+(* verified [init]: it waits with a NULL status pointer, its text sits at  *)
+(* address 0, and no layer above kwait says a null pointer wrote nothing.  *)
 (*                                                                        *)
-(* This file replaces the value with a HEAP: one [ghost_map Z (bv 8)] per  *)
-(* process, allocated with a fresh [gname] over the process's initial      *)
-(* image, and a RUNNING PREDICATE [urun γ W] tying its authority to the    *)
-(* slot's key.  U-mode code then owns its bytes and frames everything it   *)
-(* does not hand over.                                                     *)
+(* THE DESIGN: TWO ghost_maps per process, not one.                        *)
 (*                                                                        *)
-(* THE ONE IDEA WORTH READING THIS FILE FOR: HOW AN EXCLUSIVE POINTS-TO    *)
-(* PROVES ITS OWN WRITABILITY, WITH NO PERMISSION BIT IN SIGHT.            *)
+(*   the TEXT heap [γt]  -- every fragment PERSISTED at allocation, so its *)
+(*     bytes are immutable and freely duplicable; the invariant knows its  *)
+(*     addresses are on X pages, so holding [utext γt a b] IS the right to *)
+(*     FETCH.                                                             *)
+(*   the DATA heap [γd]  -- fragments EXCLUSIVE; the invariant knows its   *)
+(*     addresses are on W pages, so holding [udata γd a b] IS the right to *)
+(*     WRITE.                                                             *)
 (*                                                                        *)
-(* The rule we want is "if I own [a] exclusively, I may write it".  The    *)
-(* machine's reason is that [a] is on a PTE_W page -- but a permission map *)
-(* in every U-mode statement is exactly the ugliness this file exists to   *)
-(* remove, and the authority alone cannot tell which fragments are         *)
-(* outstanding or at which [dfrac].  The trick is to make the SPLIT at     *)
-(* allocation and let dfrac incompatibility do the reasoning:              *)
+(* Splitting by SEGMENT rather than by ownership is what makes this        *)
+(* simple, and it is honest about xv6: user programs never write their     *)
+(* text and never execute their data -- no shared libraries, no dynamic    *)
+(* code generation -- so the two halves are disjoint by construction and   *)
+(* nothing is lost by refusing to mix them.  (An earlier cut used ONE heap *)
+(* and recovered writability from a dfrac conflict against persisted       *)
+(* fragments kept in the invariant.  It worked, but it had to prove what   *)
+(* the gname now simply says, and it could not express FETCHABILITY at all *)
+(* -- the split was by W, while a fetch needs X.)                          *)
 (*                                                                        *)
-(*   - every address of the image on a NON-writable page is PERSISTED      *)
-(*     ([a ↪[γ]□ b]) when the heap is allocated, and the running predicate *)
-(*     KEEPS those persisted fragments;                                    *)
-(*   - everything on a writable page is left EXCLUSIVE and handed to the   *)
-(*     process.                                                           *)
+(* THE PERMISSION MAP IS CONSUMED HERE AND NOWHERE ELSE.  [uvis_perm]      *)
+(* appears in this file, to decide the split at allocation and to state    *)
+(* the two invariants; above it, a leaf takes [utext]/[udata] and never    *)
+(* mentions a permission, a page, or a table.                             *)
 (*                                                                        *)
-(* Now "I hold [a ↪[γ] b] exclusively" PROVES [a] is writable: if it were  *)
-(* not, the invariant would hold a persisted fragment for the very same    *)
-(* key, and [ghost_map_elem_ne] -- an exclusive element is distinct from   *)
-(* any element at any dfrac -- gives [a <> a].  [urun_writable] is that    *)
-(* proof, and it is three lines.                                          *)
+(* WHAT THIS IS NOT YET.  [urun] still names [uvis_M W], so the image is   *)
+(* not hidden; that is the next step, together with re-cutting the leaves  *)
+(* so [uinstr]'s [uM_bytes M ...] clauses become [utext] and the load and  *)
+(* store leaves' byte facts become [udata].  And the payoff for [init]     *)
+(* needs the syscall arms to take the FOOTPRINT they write rather than     *)
+(* state an equation -- separation logic LOCALIZES that obligation to each *)
+(* syscall, it does not remove it, but a null pointer then hands over no   *)
+(* fragments and init keeps its text by separation.                        *)
 (*                                                                        *)
-(* Two things fall out of the same fact, rather than needing notions of    *)
-(* their own:                                                             *)
-(*                                                                        *)
-(*   - THE TEXT REGION IS IMMUTABLE.  A program's text is on an X, not-W   *)
-(*     page, so it is persisted, so no one can ever write it AND the       *)
-(*     fragments are freely duplicable -- which is what an instruction     *)
-(*     fetch wants, since [uk_instr] needs the same bytes at every step.   *)
-(*   - THE PERMISSION MAP IS CONSUMED ONCE, HERE.  [uvis_perm] appears in  *)
-(*     this file and nowhere above it: it decides what gets persisted at   *)
-(*     allocation and is never consulted again.                           *)
-(*                                                                        *)
-(* WHAT THIS FILE DOES NOT YET DO.  It is the substrate, not the payoff.   *)
-(* [urun γ W] still names [uvis_M W], so the image is not yet HIDDEN; the  *)
-(* next step restates the U-mode continuation so the image is existential  *)
-(* behind [urun] and the leaves take points-to instead of image facts.     *)
-(* And the payoff for [init] needs the syscall arms to take the FOOTPRINT  *)
-(* they write rather than state an equation -- separation logic localizes  *)
-(* that obligation to each syscall, it does not remove it: [wait] at a null pointer takes *)
-(* NO fragments, so init keeps its text by separation and no window        *)
-(* equation is needed anywhere.                                            *)
-(*                                                                        *)
-(* NO NEW GHOST CLASS.  [ghost_mapG Σ Z (bv 8)] already exists and         *)
-(* RiscvPtsto.v declares [riscvF_diskGS] its UNIQUE source in a [riscvGS]  *)
-(* context; a per-process heap is a fresh [ghost_map_alloc] at that same   *)
-(* class, so neither Σ nor adequacy moves.                                 *)
+(* NO NEW GHOST CLASS: RiscvPtsto.v declares [riscvF_diskGS] the tree's    *)
+(* unique [ghost_mapG Z (bv 8)], and both heaps are fresh                  *)
+(* [ghost_map_alloc]s at it, so neither Σ nor adequacy moves.              *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap bitvector.definitions.
@@ -79,12 +63,14 @@ Require Import UexecSlot.   (* [uvis] / [uvis_M] / [uvis_perm] *)
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
-(* §1 WRITABILITY, as an ADDRESS-level fact -- the only place the          *)
-(* permission map is read.                                                *)
+(* §1 THE TWO ADDRESS CLASSES -- the only place the permission map is read.*)
 (* ===================================================================== *)
 
 Definition uw_addr (π : gmap (mword 27) uperm) (a : Z) : Prop :=
   exists q : uperm, uperm_at π (mword_of_int a : mword 64) = Some q /\ up_W q = true.
+
+Definition ux_addr (π : gmap (mword 27) uperm) (a : Z) : Prop :=
+  exists q : uperm, uperm_at π (mword_of_int a : mword 64) = Some q /\ up_X q = true.
 
 Global Instance uw_addr_dec (π : gmap (mword 27) uperm) (a : Z) :
   Decision (uw_addr π a).
@@ -98,182 +84,176 @@ Proof.
   - right. intros (q' & Hq' & _). discriminate Hq'.
 Defined.
 
-(* the image's two halves: what a process may write, and what it may not.
-   The split is made ONCE, at allocation. *)
-Definition uro_part (W : uvis) : gmap Z (bv 8) :=
-  base.filter (fun kv : Z * bv 8 => ~ uw_addr (uvis_perm W) kv.1) (uvis_M W).
+Global Instance ux_addr_dec (π : gmap (mword 27) uperm) (a : Z) :
+  Decision (ux_addr π a).
+Proof.
+  unfold ux_addr, uperm_at.
+  destruct (π !! svpn_of (mword_of_int a : mword 64)) as [q |] eqn:E.
+  - destruct (up_X q) eqn:Ex.
+    + left. exists q. split; [ reflexivity | exact Ex ].
+    + right. intros (q' & Hq' & Hx'). injection Hq' as <-.
+      rewrite Ex in Hx'. discriminate.
+  - right. intros (q' & Hq' & _). discriminate Hq'.
+Defined.
 
-Definition uw_part (W : uvis) : gmap Z (bv 8) :=
+(* THE SPLIT, made once at allocation.  Text is "executable and not
+   writable" so the two halves are disjoint by construction; in xv6 that
+   costs nothing, because exec maps text R+X and everything else R+W and no
+   user page is ever both. *)
+Definition utext_part (W : uvis) : gmap Z (bv 8) :=
+  base.filter (fun kv : Z * bv 8 =>
+                 ux_addr (uvis_perm W) kv.1 /\ ~ uw_addr (uvis_perm W) kv.1)
+              (uvis_M W).
+
+Definition udata_part (W : uvis) : gmap Z (bv 8) :=
   base.filter (fun kv : Z * bv 8 => uw_addr (uvis_perm W) kv.1) (uvis_M W).
 
-Lemma uro_part_sub (W : uvis) : uro_part W ⊆ uvis_M W.
+Lemma utext_part_sub (W : uvis) : utext_part W ⊆ uvis_M W.
 Proof. apply map_filter_subseteq. Qed.
 
-Lemma uw_part_sub (W : uvis) : uw_part W ⊆ uvis_M W.
+Lemma udata_part_sub (W : uvis) : udata_part W ⊆ uvis_M W.
 Proof. apply map_filter_subseteq. Qed.
 
-Lemma uro_uw_disjoint (W : uvis) : uro_part W ##ₘ uw_part W.
+Lemma utext_udata_disjoint (W : uvis) : utext_part W ##ₘ udata_part W.
 Proof.
   apply map_disjoint_spec. intros a b1 b2 H1 H2.
-  apply map_lookup_filter_Some in H1 as [_ Hn].
+  apply map_lookup_filter_Some in H1 as [_ [_ Hn]].
   apply map_lookup_filter_Some in H2 as [_ Hy].
   exact (Hn Hy).
 Qed.
 
-Lemma uro_uw_union (W : uvis) : uro_part W ∪ uw_part W = uvis_M W.
+Lemma utext_part_x (W : uvis) (a : Z) :
+  is_Some (utext_part W !! a) -> ux_addr (uvis_perm W) a.
 Proof.
-  apply map_eq. intros a.
-  destruct (uvis_M W !! a) as [b |] eqn:Hb.
-  - destruct (decide (uw_addr (uvis_perm W) a)) as [Hw | Hn].
-    + rewrite lookup_union_r.
-      * apply map_lookup_filter_Some. split; [ exact Hb | exact Hw ].
-      * apply map_lookup_filter_None. right. intros x Hx. rewrite Hb in Hx.
-        injection Hx as <-. intro Hc. exact (Hc Hw).
-    + rewrite lookup_union_l'.
-      * apply map_lookup_filter_Some. split; [ exact Hb | exact Hn ].
-      * (* [lookup_union_l'] asks for [is_Some], not for the right map's None *)
-        exists b. apply map_lookup_filter_Some. split; [ exact Hb | exact Hn ].
-  - rewrite lookup_union_None. split; apply map_lookup_filter_None; left; exact Hb.
+  intros [b Hb]. apply map_lookup_filter_Some in Hb as [_ [Hx _]]. exact Hx.
 Qed.
 
-(* the covering fact the running predicate carries: every non-writable byte
-   of the image is in the read-only half *)
-Lemma uro_part_covers (W : uvis) (a : Z) :
-  is_Some (uvis_M W !! a) -> ~ uw_addr (uvis_perm W) a -> is_Some (uro_part W !! a).
-Proof.
-  intros [b Hb] Hn. exists b. apply map_lookup_filter_Some.
-  split; [ exact Hb | exact Hn ].
-Qed.
+Lemma udata_part_w (W : uvis) (a : Z) :
+  is_Some (udata_part W !! a) -> uw_addr (uvis_perm W) a.
+Proof. intros [b Hb]. apply map_lookup_filter_Some in Hb as [_ Hw]. exact Hw. Qed.
 
 Section UserHeap.
   Context `{!riscvGS Σ}.
 
   (* ===================================================================== *)
-  (* §2 THE POINTS-TO FAMILY.                                              *)
+  (* §2 THE TWO POINTS-TO FAMILIES.                                        *)
   (* ===================================================================== *)
 
-  (* ONE BYTE, exclusively owned: the right to write it (§3's              *)
-  (* [urun_writable] is what turns this into the machine's permission).    *)
-  Definition ubyte (γ : gname) (a : Z) (b : bv 8) : iProp Σ := (a ↪[γ] b)%I.
+  (* A TEXT byte.  PERSISTENT -- every text fragment is persisted when the
+     heap is allocated -- so it is immutable and freely duplicable, which is
+     exactly what an instruction fetch wants: the same bytes are read at
+     every step, by every continuation, forever. *)
+  Definition utext (γt : gname) (a : Z) (b : bv 8) : iProp Σ := (a ↪[γt]□ b)%I.
 
-  (* ...and READ-ONLY, hence persistent, duplicable and IMMUTABLE: the     *)
-  (* value can never change again, which is exactly what a text byte is.   *)
-  Definition ubyte_ro (γ : gname) (a : Z) (b : bv 8) : iProp Σ := (a ↪[γ]□ b)%I.
+  (* A DATA byte, exclusively owned: the right to write it. *)
+  Definition udata (γd : gname) (a : Z) (b : bv 8) : iProp Σ := (a ↪[γd] b)%I.
 
-  Global Instance ubyte_ro_persistent γ a b : Persistent (ubyte_ro γ a b).
+  Global Instance utext_persistent γt a b : Persistent (utext γt a b).
   Proof. apply _. Qed.
 
-  Global Instance ubyte_timeless γ a b : Timeless (ubyte γ a b).
+  Global Instance udata_timeless γd a b : Timeless (udata γd a b).
   Proof. apply _. Qed.
 
   (* ===================================================================== *)
   (* §3 THE RUNNING PREDICATE.                                             *)
   (*                                                                       *)
-  (* It owns the authority at the key's image, and KEEPS the persisted     *)
-  (* fragments for every non-writable byte -- which is the whole mechanism *)
-  (* (see the header).                                                     *)
+  (* Two authorities against one image, with the segment facts that make    *)
+  (* each half's points-to mean what it means.                             *)
   (* ===================================================================== *)
-  Definition urun (γ : gname) (W : uvis) : iProp Σ :=
-    (∃ Mro : gmap Z (bv 8),
-       ⌜ Mro ⊆ uvis_M W ⌝ ∗
-       ⌜ forall a : Z, is_Some (uvis_M W !! a) -> ~ uw_addr (uvis_perm W) a ->
-                       is_Some (Mro !! a) ⌝ ∗
-       ghost_map_auth γ 1 (uvis_M W) ∗
-       ([∗ map] a ↦ b ∈ Mro, ubyte_ro γ a b))%I.
+  Definition urun (γt γd : gname) (W : uvis) : iProp Σ :=
+    (∃ Mt Md : gmap Z (bv 8),
+       ⌜ Mt ⊆ uvis_M W ⌝ ∗ ⌜ Md ⊆ uvis_M W ⌝ ∗ ⌜ Mt ##ₘ Md ⌝ ∗
+       ⌜ forall a : Z, is_Some (Mt !! a) -> ux_addr (uvis_perm W) a ⌝ ∗
+       ⌜ forall a : Z, is_Some (Md !! a) -> uw_addr (uvis_perm W) a ⌝ ∗
+       ghost_map_auth γt 1 Mt ∗ ghost_map_auth γd 1 Md)%I.
 
-  (* THE BRIDGE to the image, at ANY fraction: a fragment names the byte
-     the key's image holds.  This is how a leaf that still speaks the image
-     gets its byte fact out of a points-to. *)
-  Lemma urun_lookup (γ : gname) (W : uvis) (a : Z) (dq : dfrac) (b : bv 8) :
-    urun γ W -∗ a ↪[γ]{dq} b -∗ ⌜ uvis_M W !! a = Some b ⌝.
+  (* A TEXT byte names the byte the image holds, and its page is FETCHABLE.
+     Both come straight off the text half's invariant -- no dfrac argument,
+     no permission in the statement. *)
+  Lemma urun_text (γt γd : gname) (W : uvis) (a : Z) (b : bv 8) :
+    urun γt γd W -∗ utext γt a b -∗
+    ⌜ uvis_M W !! a = Some b /\ ux_addr (uvis_perm W) a ⌝.
   Proof.
     iIntros "Hrun Hb".
-    iDestruct "Hrun" as (Mro) "(%Hsub & %Hcov & Hauth & Hro)".
-    iApply (ghost_map_lookup with "Hauth Hb").
+    iDestruct "Hrun" as (Mt Md) "(%Hst & %Hsd & %Hdisj & %Hx & %Hw & Ht & Hd)".
+    iDestruct (ghost_map_lookup with "Ht Hb") as %HMt.
+    iPureIntro. split.
+    - exact (proj1 (map_subseteq_spec Mt (uvis_M W)) Hst a b HMt).
+    - exact (Hx a (mk_is_Some _ _ HMt)).
   Qed.
 
-  (* THE PAYOFF: AN EXCLUSIVE POINTS-TO PROVES ITS OWN WRITABILITY.
-     If [a] were not writable the invariant would hold a PERSISTED fragment
-     at the same key, and an exclusive element is distinct from an element
-     at any dfrac ([ghost_map_elem_ne]) -- so [a <> a]. *)
-  Lemma urun_writable (γ : gname) (W : uvis) (a : Z) (b : bv 8) :
-    urun γ W -∗ ubyte γ a b -∗ ⌜ uw_addr (uvis_perm W) a ⌝.
+  (* ...and a DATA byte names its byte and its page is WRITABLE. *)
+  Lemma urun_data (γt γd : gname) (W : uvis) (a : Z) (b : bv 8) :
+    urun γt γd W -∗ udata γd a b -∗
+    ⌜ uvis_M W !! a = Some b /\ uw_addr (uvis_perm W) a ⌝.
   Proof.
     iIntros "Hrun Hb".
-    iDestruct "Hrun" as (Mro) "(%Hsub & %Hcov & Hauth & Hro)".
-    iDestruct (ghost_map_lookup with "Hauth Hb") as %HM.
-    destruct (decide (uw_addr (uvis_perm W) a)) as [Hw | Hnw]; [ done | ].
-    destruct (Hcov a (mk_is_Some _ _ HM) Hnw) as [b0 Hb0].
-    iDestruct (big_sepM_lookup _ _ a b0 Hb0 with "Hro") as "Hp".
-    rewrite /ubyte /ubyte_ro.
-    iDestruct (ghost_map_elem_ne with "Hb Hp") as %Hne.
-    exfalso. exact (Hne eq_refl).
+    iDestruct "Hrun" as (Mt Md) "(%Hst & %Hsd & %Hdisj & %Hx & %Hw & Ht & Hd)".
+    iDestruct (ghost_map_lookup with "Hd Hb") as %HMd.
+    iPureIntro. split.
+    - exact (proj1 (map_subseteq_spec Md (uvis_M W)) Hsd a b HMd).
+    - exact (Hw a (mk_is_Some _ _ HMd)).
   Qed.
 
-  (* ...and therefore the store: an exclusively-owned byte may be replaced,
-     and the key's image moves with it.  Note what does NOT have to be
-     re-established: the read-only half is untouched (the written address is
-     writable, so it is not in it) and the permission map does not move. *)
   Definition uvis_wM (W : uvis) (M' : gmap Z (bv 8)) : uvis :=
     MkUvis (uvis_tf W) M' (uvis_perm W).
 
-  Lemma urun_store (γ : gname) (W : uvis) (a : Z) (b b' : bv 8) :
-    urun γ W -∗ ubyte γ a b ==∗
-      urun γ (uvis_wM W (<[a := b']> (uvis_M W))) ∗ ubyte γ a b'.
+  (* THE STORE.  An exclusively-owned data byte may be replaced and the
+     key's image moves with it.  The text half is untouched, and it stays a
+     SUBMAP because the two halves are disjoint -- which is the whole reason
+     they are two heaps. *)
+  Lemma urun_store (γt γd : gname) (W : uvis) (a : Z) (b b' : bv 8) :
+    urun γt γd W -∗ udata γd a b ==∗
+      urun γt γd (uvis_wM W (<[a := b']> (uvis_M W))) ∗ udata γd a b'.
   Proof.
     iIntros "Hrun Hb".
-    iDestruct (urun_writable with "Hrun Hb") as %Hw.
-    iDestruct "Hrun" as (Mro) "(%Hsub & %Hcov & Hauth & Hro)".
-    (* THE WRITTEN KEY IS NOT IN THE READ-ONLY HALF.  [Mro] is abstract here
-       -- the invariant only says it COVERS the non-writable bytes, not that
-       it consists of them -- so this is not a pure fact about a filter; it
-       is the same dfrac conflict as [urun_writable], run once more: a
-       persisted fragment at the key we hold exclusively is impossible. *)
-    destruct (Mro !! a) as [b0 |] eqn:Hnro.
-    { iDestruct (big_sepM_lookup _ _ a b0 Hnro with "Hro") as "Hp".
-      rewrite /ubyte /ubyte_ro.
-      iDestruct (ghost_map_elem_ne with "Hb Hp") as %Hne.
-      exfalso. exact (Hne eq_refl). }
-    iMod (ghost_map_update b' with "Hauth Hb") as "[Hauth Hb]".
-    iModIntro. iFrame "Hb". iExists Mro.
+    iDestruct "Hrun" as (Mt Md) "(%Hst & %Hsd & %Hdisj & %Hx & %Hw & Ht & Hd)".
+    iDestruct (ghost_map_lookup with "Hd Hb") as %HMd.
+    assert (Hnt : Mt !! a = None)
+      by exact (map_disjoint_Some_r Mt Md a b Hdisj HMd).
+    iMod (ghost_map_update b' with "Hd Hb") as "[Hd Hb]".
+    iModIntro. iFrame "Hb". iExists Mt, (<[a := b']> Md).
     cbn [uvis_M uvis_perm uvis_wM].
-    iFrame "Hauth Hro". iPureIntro. split.
-    - apply insert_subseteq_r; [ exact Hnro | exact Hsub ].
-    - intros k Hk Hnw.
-      destruct (decide (k = a)) as [-> | Hne]; [ exfalso; exact (Hnw Hw) | ].
-      apply Hcov; [ | exact Hnw ].
-      rewrite lookup_insert_ne in Hk; [ exact Hk | exact (not_eq_sym Hne) ].
+    iFrame "Ht Hd". iPureIntro. split_and!.
+    - apply insert_subseteq_r; [ exact Hnt | exact Hst ].
+    - apply insert_mono. exact Hsd.
+    - apply map_disjoint_insert_r_2; [ exact Hnt | exact Hdisj ].
+    - exact Hx.
+    - intros k Hk. apply Hw.
+      destruct (decide (k = a)) as [-> | Hne].
+      + exact (mk_is_Some _ _ HMd).
+      + rewrite lookup_insert_ne in Hk; [ exact Hk | exact (not_eq_sym Hne) ].
   Qed.
 
   (* ===================================================================== *)
   (* §4 ALLOCATION -- the process's FIRST WP.                              *)
   (*                                                                       *)
-  (* One [ghost_map_alloc] over the whole initial image, then PERSIST the  *)
-  (* read-only half.  The process walks away with an exclusive fragment    *)
-  (* for every writable byte and a persistent one for every other.         *)
+  (* Two [ghost_map_alloc]s at the segment split, and the text half is      *)
+  (* PERSISTED on the spot: after this step nothing can ever write it, and  *)
+  (* every continuation may read it without owning anything.                *)
   (* ===================================================================== *)
   Lemma urun_alloc (W : uvis) :
-    ⊢ |==> ∃ γ : gname,
-        urun γ W ∗
-        ([∗ map] a ↦ b ∈ uw_part W, ubyte γ a b) ∗
-        ([∗ map] a ↦ b ∈ uro_part W, ubyte_ro γ a b).
+    ⊢ |==> ∃ γt γd : gname,
+        urun γt γd W ∗
+        ([∗ map] a ↦ b ∈ utext_part W, utext γt a b) ∗
+        ([∗ map] a ↦ b ∈ udata_part W, udata γd a b).
   Proof.
-    iMod (ghost_map_alloc (uvis_M W)) as (γ) "[Hauth Hfrag]".
-    iEval (rewrite -(uro_uw_union W)) in "Hfrag".
-    rewrite big_sepM_union; [ | apply uro_uw_disjoint ].
-    iDestruct "Hfrag" as "[Hro Hw]".
-    (* PERSIST the read-only half.  This is the whole mechanism: after this
-       step no one can ever hold those keys exclusively, which is what makes
-       [urun_writable] and [urun_store] go through. *)
-    iAssert (|==> [∗ map] a ↦ b ∈ uro_part W, ubyte_ro γ a b)%I
-      with "[Hro]" as ">#Hrop".
-    { iApply big_sepM_bupd. iApply (big_sepM_impl with "Hro").
-      iIntros "!>" (a b _) "H". rewrite /ubyte_ro.
+    iMod (ghost_map_alloc (utext_part W)) as (γt) "[Htauth Htfrag]".
+    iMod (ghost_map_alloc (udata_part W)) as (γd) "[Hdauth Hdfrag]".
+    iAssert (|==> [∗ map] a ↦ b ∈ utext_part W, utext γt a b)%I
+      with "[Htfrag]" as ">#Htp".
+    { iApply big_sepM_bupd. iApply (big_sepM_impl with "Htfrag").
+      iIntros "!>" (a b _) "H". rewrite /utext.
       iApply (ghost_map_elem_persist with "H"). }
-    iModIntro. iExists γ. rewrite /urun.
-    iSplitL "Hauth"; [ | iFrame "Hw"; iFrame "Hrop" ].
-    iExists (uro_part W). iFrame "Hauth". iFrame "Hrop". iPureIntro.
-    split; [ apply uro_part_sub | exact (uro_part_covers W) ].
+    iModIntro. iExists γt, γd.
+    iSplitL "Htauth Hdauth"; [ | iFrame "Hdfrag"; iFrame "Htp" ].
+    iExists (utext_part W), (udata_part W).
+    iFrame "Htauth Hdauth". iPureIntro. split_and!.
+    - apply utext_part_sub.
+    - apply udata_part_sub.
+    - apply utext_udata_disjoint.
+    - exact (utext_part_x W).
+    - exact (udata_part_w W).
   Qed.
 
 End UserHeap.
