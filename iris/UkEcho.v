@@ -68,7 +68,7 @@ From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import invariants.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
-Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import RegFile WpGpr.
@@ -77,7 +77,7 @@ Require Import WpMmodeLeafBase.
 Require Import UserBits UserPtTree UserExec.
 Require Import ProcPtOwn.
 Require Import UmodeMem UmodeFetch UmodeArith UmodeCap UmodeAbi UmodeSyscall.
-Require Import WpUmodeStep WpUmodeStore WpUmodeLoad.
+Require Import WpUmodeStep WpUmodeStore WpUmodeLoad WpUmodeBranch.
 Require Import UserPerm UsysMemOk UexecWp UexecSlot UexecRet.
 Require Import UkStep UkLeaf UkStore UkLoad UkBranch.
 Require Import UkAbi.        (* the generic key-level layout / argv facts *)
@@ -124,6 +124,91 @@ Proof.
     pose proof (Nat2Z.is_nonneg j) as Hj0. lia.
 Qed.
 
+
+(* ONE 8-byte store inside the disturbed window is a [uM_only]
+   (UProofEcho.v's, verbatim: it is about images alone). *)
+Lemma uM_only_store8 (M : gmap Z (bv 8)) (a lo n : Z) (v : mword 64) :
+  lo <= a -> a + 8 <= lo + n -> uM_only M (uM_store8 M a v) lo n.
+Proof.
+  intros H1 H2. split.
+  - intros k Hk. exact (uM_store8_is_Some M a v k Hk).
+  - intros k Hk. apply uM_store8_lookup_ne.
+    intros j Hj. pose proof (Nat2Z.is_nonneg j). lia.
+Qed.
+
+(* [upd_eq] / [upd_ne] in the shape a lookup CHAIN wants.  A register that
+   survives a call is read back through a sixteen-deep insert tower, and
+   [apply]ing these peels one insert per step (the durable-notes rule:
+   never [rewrite upd_eq]). *)
+Lemma upd_ne_tr (f : regfile) (kk jj : regidx) (v w : mword 64) :
+  jj <> kk -> f !!! jj = w -> (<[kk := v]> f) !!! jj = w.
+Proof. intros Hne Hw. rewrite (upd_ne f kk jj v Hne). exact Hw. Qed.
+
+Lemma upd_eq_tr (f : regfile) (kk : regidx) (v w : mword 64) :
+  v = w -> (<[kk := v]> f) !!! kk = w.
+Proof. intro H. rewrite (upd_eq f kk v). exact H. Qed.
+
+(* ===================================================================== *)
+(* §0b THE ARGV INDEX CHAIN -- main's one piece of real arithmetic.       *)
+(*                                                                        *)
+(* The C source's                                                         *)
+(*     s1 = argv + 1;  s5 = &argv[argc-1];  s4 = &argv[argc];             *)
+(* compiles to seven instructions that never mention argc-1 or argc:       *)
+(*                                                                        *)
+(*   1a  addi   s1,a1,8           s1 = argv + 8                            *)
+(*   1e  addiw  a0,a0,-2          a0 = (int32) (argc - 2)                  *)
+(*   20  slli   a5,a0,0x20        \  the zero-extend-and-scale idiom:      *)
+(*   24  srli   a0,a5,0x1d        /  a0 = (uint32)(argc-2) * 8             *)
+(*   28  add    s5,s1,a0                                                   *)
+(*   2c  addi   a1,a1,16                                                   *)
+(*   2e  add    s4,a1,a0                                                   *)
+(*                                                                        *)
+(* UProofEcho.v §1, verbatim: it is a fact about the ISA's arithmetic and  *)
+(* echo's immediates, with no tier in it at all.  Copied rather than       *)
+(* imported so that this file does not depend on the old capability        *)
+(* engine's proof; when that engine goes, this is where it lives.          *)
+(* ===================================================================== *)
+
+Lemma echo_argv_chain (argc av : Z) :
+  2 <= argc < 2 ^ 31 -> 0 <= av -> av + 8 * argc <= 2 ^ 38 ->
+  let a0_1 := sign_extend' 64
+       (subrange_vec_dec
+          (add_vec (mword_of_int argc : mword 64)
+             (sign_extend' 64 (sign_extend' 12 (mword_of_int 62 : mword 6)))) 31 0) in
+  let a0_2 := shift_bits_right
+       (shift_bits_left a0_1
+          (subrange_vec_dec (mword_of_int 32 : mword 6) (Z.sub log2_xlen 1) 0))
+       (subrange_vec_dec (mword_of_int 29 : mword 6) (Z.sub log2_xlen 1) 0) in
+  let s1   := add_vec (mword_of_int av : mword 64)
+                (sign_extend' 64 (mword_of_int 8 : mword 12)) in
+  let s5   := add_vec s1 a0_2 in
+  let a1_1 := add_vec (mword_of_int av : mword 64)
+                (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) in
+  let s4   := add_vec a1_1 a0_2 in
+  a0_2 = mword_of_int (8 * (argc - 2)) /\
+  s5   = mword_of_int (av + 8 * (argc - 1)) /\
+  s4   = mword_of_int (av + 8 * argc).
+Proof.
+  intros Hargc Hav Hhi a0_1 a0_2 s1 s5 a1_1 s4.
+  assert (E62 : sign_extend' 64 (sign_extend' 12 (mword_of_int 62 : mword 6))
+                = (mword_of_int (-2) : mword 64))
+    by (apply bv_eq; vm_compute; reflexivity).
+  assert (E8 : sign_extend' 64 (mword_of_int 8 : mword 12) = (mword_of_int 8 : mword 64))
+    by (apply bv_eq; vm_compute; reflexivity).
+  assert (E16 : sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))
+                = (mword_of_int 16 : mword 64))
+    by (apply bv_eq; vm_compute; reflexivity).
+  assert (Ha1 : a0_1 = mword_of_int (argc - 2)).
+  { unfold a0_1. rewrite E62. apply moi_addw. unfold Z31; lia. }
+  assert (Ha2 : a0_2 = mword_of_int (8 * (argc - 2))).
+  { unfold a0_2. rewrite Ha1.
+    rewrite (moi_shl32_shr29 (argc - 2) ltac:(unfold Z32; lia)).
+    f_equal; lia. }
+  split_and!.
+  - exact Ha2.
+  - unfold s5, s1. rewrite E8 Ha2 !moi_add. f_equal; lia.
+  - unfold s4, a1_1. rewrite E16 Ha2 !moi_add. f_equal; lia.
+Qed.
 
 (* the store leaf's key premise implies the LOAD leaf's -- a writable page
    is in the map, and presence in the map IS readability (UkAbi.v §1).
@@ -1221,6 +1306,1464 @@ Section UkEcho.
         exact (upd_eq m5 (Regidx a0_idx)
                  (regval_into_reg (mword_of_int len : mword 64))).
       + exact Honly.
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* §4 main @0x0 -- the eight-register prologue, the argc guard, the argv *)
+  (* index chain, and the loop.  DIVERGES (it ends in exit).               *)
+  (* ------------------------------------------------------------------- *)
+
+  (* the two image transports the prologue and the calls need, on the key *)
+  Local Lemma uk_stack_only (Ma Mb : gmap Z (bv 8)) (sp0 : mword 64) (n a k : Z) :
+    uM_only Ma Mb a k -> uk_stack π Ma sp0 n -> uk_stack π Mb sp0 n.
+  Proof. intros [Hd _] H. exact (uk_stack_dom π Ma Mb sp0 n Hd H). Qed.
+
+  Local Lemma uk_args_only (Ma Mb : gmap Z (bv 8)) (av argc lo a k : Z)
+      (alen : Z -> Z) :
+    uM_only Ma Mb a k -> a + k <= lo ->
+    uk_args π Ma av argc lo alen -> uk_args π Mb av argc lo alen.
+  Proof.
+    intros [_ He] Hk H.
+    apply (uk_args_above π Ma Mb av argc lo alen); [ | exact H ].
+    intros j Hj. apply He. right. lia.
+  Qed.
+
+  (* THE PROLOGUE STORE, once.  main spills eight registers and start two,
+     all by [c.sdsp rs2, d(sp)] into a slot of the budget the function just
+     carved; the only things that vary are the pc, the register, the offset
+     and the budget's size. *)
+  Local Lemma kecho_pro_store (M : gmap Z (bv 8)) (m : regfile)
+      (sp0 pc : mword 64) (uimm : mword 6) (rs2 : mword 5) (n d : Z) :
+    uk_instr π M pc true (C_SDSP (uimm, Regidx rs2)) ->
+    uk_stack π M sp0 n ->
+    0 <= d -> d + 8 <= n -> Z.rem d 8 = 0 ->
+    m !!! Regidx csp_rs1 = add_vec_int sp0 (- n) ->
+    (sign_extend' 64 (zero_extend' 12 (concat_vec uimm ('b"000"))) : mword 64)
+      = mword_of_int d ->
+    ⊢ ∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (sz : Z),
+        ⌜loop_ok C pt⌝ -∗ ⌜perm_of (ud_um pt) sz = π⌝ -∗
+        uvb (CID := h) C pt Rut sz π M m pc -∗
+        ukc π (uM_store8 M (uint sp0 - n + d) (m !!! Regidx rs2)) m
+          (add_vec_int pc 2) -∗
+        WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hui HS Hd0 Hdn Hd8 Hsp Himm.
+    destruct (uk_stack_slot π M sp0 n d HS Hd0 Hdn Hd8)
+      as (Hu & Hw & Hcanon & Hpg & Hal & Hb).
+    iIntros (h C pt Rut sz) "%Hlo %Hpm Hb Hcont".
+    iApply (wp_uk_csdsp C pt Rut π sz Hlo Hpm M m pc uimm rs2
+              (add_vec_int (add_vec_int sp0 (- n)) d) (m !!! Regidx rs2)
+              Hui
+              ltac:(rewrite Hsp; rewrite Himm; reflexivity)
+              eq_refl Hw Hcanon Hpg Hal Hb
+              with "Hb").
+    rewrite Hu. iExact "Hcont".
+  Qed.
+
+  (* THE EXIT TAIL @0x76: c.li a0,0; jal exit.  Reached from the argc <= 1
+     arm of main's guard and from the newline path at the end of the loop --
+     and from nowhere else. *)
+  Local Lemma kecho_exit_tail (M : gmap Z (bv 8)) (m : regfile) :
+    uk_xpage π (mword_of_int 0) ->
+    echo_text_sub M ->
+    ⊢ ukc π M m (mword_of_int 0x76).
+  Proof.
+    intros Hx Htext.
+    destruct echo_syms_pins as (Hsmain & Hsstart & Hsstrlen & Hsexit & Hswrite).
+    rewrite /ukc. iIntros (h C pt Rut sz) "%Hlo %Hpm Hb".
+    (* ---- 0x76  c.li a0,0 ---- *)
+    assert (Hw0 : (mword_of_int 0 : mword 64)
+                  = add_vec zero_reg
+                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 0 : mword 6))))
+      by (apply bv_eq; vm_compute; reflexivity).
+    iApply (wp_uk_cli C pt Rut π sz Hlo Hpm M m (mword_of_int 0x76)
+              (mword_of_int 0 : mword 6) a0_idx (mword_of_int 0 : mword 64)
+              (UI ui_echo_76 M Htext Hx)
+              ltac:(vm_compute; discriminate) Hw0
+              with "Hb").
+    set (m1 := <[Regidx a0_idx := regval_into_reg (mword_of_int 0 : mword 64)]> m).
+    assert (E76 : add_vec_int (mword_of_int 0x76 : mword 64) 2 = mword_of_int 0x78)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E76.
+    rewrite /ukc. iIntros (h1 C1 pt1 Rut1 sz1) "%Hlo1 %Hpm1 Hb".
+    (* ---- 0x78  jal ra,0x332 <exit> -- diverges ---- *)
+    assert (Htj : (mword_of_int EchoSyms.exit : mword 64)
+                  = add_vec (mword_of_int 0x78)
+                      (sign_extend' 64 (mword_of_int 698 : mword 21)))
+      by (apply bv_eq; vm_compute; reflexivity).
+    assert (Hwj : (mword_of_int 0x7c : mword 64)
+                  = add_vec_int (mword_of_int 0x78 : mword 64) 4)
+      by (apply bv_eq; vm_compute; reflexivity).
+    iApply (wp_uk_jal C1 pt1 Rut1 π sz1 Hlo1 Hpm1 M m1 (mword_of_int 0x78)
+              (mword_of_int 698 : mword 21) ra_idx
+              (mword_of_int EchoSyms.exit) (mword_of_int 0x7c)
+              (UI ui_echo_78 M Htext Hx)
+              ltac:(vm_compute; discriminate) Htj Hwj
+              ltac:(vm_compute; reflexivity)
+              with "Hb").
+    iApply (wp_kecho_exit_stub M _ Hx Htext).
+  Qed.
+
+  (* THE ARGV LOOP @0x4e -- an ORDINARY Rocq induction on the nat measure
+     [k] bounding [argc - 1 - i], NOT an [iLöb]: the loop is BOUNDED and
+     every leaf it uses is later-free.  The loop DIVERGES (it ends in exit),
+     so it has no continuation.
+
+       4e  ld s2,0(s1)   52  c.mv a0,s2   54  jal strlen
+       58  c.mv a2,a0    5a  c.mv a1,s2   5c  c.mv a0,s3   5e  jal write
+       62  bne s1,s5,0x3e
+        taken   3e c.mv a2,s3; 40 c.mv a1,s6; 42 c.mv a0,s3; 44 jal write
+                48 c.addi s1,s1,8; 4a beq s1,s4,0x76 (never taken); -> 4e
+        else    66 c.li a2,1; 68 auipc a1,1; 6c addi a1,a1,-1840
+                70 c.mv a0,a2; 72 jal write; -> the exit tail
+
+     The IMAGE moves only inside strlen's frame -- write's row is the quiet
+     one -- so [uk_args] and [uk_stack] cross each iteration by
+     [uk_args_only] / [uk_stack_only] and the induction is on the register
+     file alone. *)
+  Local Lemma kecho_loop (sp0 : mword 64) (argc av : Z) (alen : Z -> Z) (k : nat) :
+    forall (Mc : gmap Z (bv 8)) (mc : regfile) (i : Z),
+      uk_xpage π (mword_of_int 0) ->
+      echo_text_sub Mc ->
+      uk_args π Mc av argc (uint sp0) alen ->
+      uk_stack π Mc sp0 80 ->
+      1 <= i <= argc - 1 ->
+      argc - 1 - i < Z.of_nat k ->
+      mc !!! Regidx (mword_of_int 9 : mword 5)
+        = (mword_of_int (av + 8 * i) : mword 64) ->
+      mc !!! Regidx (mword_of_int 21 : mword 5)
+        = (mword_of_int (av + 8 * (argc - 1)) : mword 64) ->
+      mc !!! Regidx (mword_of_int 20 : mword 5)
+        = (mword_of_int (av + 8 * argc) : mword 64) ->
+      mc !!! Regidx (mword_of_int 19 : mword 5) = (mword_of_int 1 : mword 64) ->
+      mc !!! Regidx (mword_of_int 22 : mword 5) = (mword_of_int 2352 : mword 64) ->
+      mc !!! Regidx sp_idx = add_vec_int sp0 (-64) ->
+      ⊢ ukc π Mc mc (mword_of_int 0x4e).
+  Proof.
+    induction k as [ | k IH ];
+      intros Mc mc i Hx Htext Hargs Hst Hi Hk Hr9 Hr21 Hr20 Hr19 Hr22 Hrsp.
+    { (* k = 0 is vacuous: the measure is STRICTLY below it *)
+      exfalso. lia. }
+    assert (Hk' : argc - 1 - i <= Z.of_nat k)
+      by (rewrite Nat2Z.inj_succ in Hk; lia).
+    destruct echo_syms_pins as (Hsmain & Hsstart & Hsstrlen & Hsexit & Hswrite).
+    pose proof (uka_argc _ _ _ _ _ _ Hargs) as Hargcb.
+    change (2 ^ 31) with 2147483648 in Hargcb.
+    pose proof (uka_rd _ _ _ _ _ _ Hargs) as Hrdav.
+    pose proof (ukrd_lo _ _ _ _ Hrdav) as Hav0.
+    pose proof (ukrd_hi _ _ _ _ Hrdav) as Havhi.
+    change (2 ^ 38) with 274877906944 in Havhi.
+    pose proof (uks_lo _ _ _ _ Hst) as Hlo80.
+    pose proof (uks_canon _ _ _ _ Hst) as Hcan80.
+    change (2 ^ 38) with 274877906944 in Hcan80.
+    (* the post-prologue sp, as a number.  NOTE that [uint] is NOT rewritten
+       away in the hypotheses: every other bound in this proof is stated at
+       [uint sp0], and [lia] would see the two spellings as two atoms. *)
+    assert (Hbu : bv_unsigned sp0 = uint sp0)
+      by (rewrite uint_unsigned; reflexivity).
+    assert (Hu64 : uint (add_vec_int sp0 (-64)) = uint sp0 - 64).
+    { rewrite uint_unsigned.
+      rewrite (uv_avi_neg sp0 64 ltac:(lia) ltac:(rewrite Hbu; lia)).
+      rewrite Hbu. reflexivity. }
+    (* strlen's 16-byte slice, at main's post-prologue sp *)
+    destruct (uk_stack_split π Mc sp0 80 64 16 ltac:(lia) ltac:(lia)
+                ltac:(reflexivity) ltac:(lia) Hst) as [Hstf Hstm].
+    (* the argv entry at index i, and its string *)
+    destruct (uk_args_str π Mc av argc (uint sp0) alen i Hargs ltac:(lia))
+      as (Hplo & Hlenb & Hstrp & Hrdp).
+    change (2 ^ 31) with 2147483648 in Hlenb.
+    destruct (uk_args_slot π Mc av argc (uint sp0) alen i
+                (mword_of_int (av + 8 * i)) Hargs ltac:(lia) eq_refl)
+      as (Huva & Hokva & Hcanva & Hpgva & Halva & Hbva & Hwva).
+    rewrite /ukc. iIntros (h C pt Rut sz) "%Hlo %Hpm Hb".
+    (* ---- 0x4e  ld s2,0(s1) -- s2 := argv[i] ---- *)
+    assert (Hvai : (mword_of_int (av + 8 * i) : mword 64)
+                   = add_vec (mc !!! Regidx (mword_of_int 9 : mword 5))
+                       (sign_extend' 64 (mword_of_int 0 : mword 12))).
+    { rewrite Hr9.
+      assert (E0 : (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64)
+                   = mword_of_int 0) by (apply bv_eq; vm_compute; reflexivity).
+      rewrite E0 moi_add. f_equal; lia. }
+    iApply (wp_uk_ld C pt Rut π sz Hlo Hpm Mc mc (mword_of_int 0x4e)
+              (mword_of_int 0 : mword 12) (mword_of_int 9 : mword 5)
+              (mword_of_int 18 : mword 5)
+              (mword_of_int (av + 8 * i)) (uk_argv_w Mc av i)
+              (UI ui_echo_4e Mc Htext Hx)
+              ltac:(vm_compute; discriminate) Hvai
+              Hokva Hcanva Hpgva Halva Hbva Hwva
+              with "Hb").
+    set (n1 := <[Regidx (mword_of_int 18 : mword 5)
+                 := regval_into_reg (uk_argv_w Mc av i)]> mc).
+    assert (E4e : add_vec_int (mword_of_int 0x4e : mword 64) 4 = mword_of_int 0x52)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E4e.
+    rewrite /ukc. iIntros (h1 C1 pt1 Rut1 sz1) "%Hlo1 %Hpm1 Hb".
+    (* ---- 0x52  c.mv a0,s2 ---- *)
+    assert (Hs2_1 : n1 !!! Regidx (mword_of_int 18 : mword 5) = uk_argv_w Mc av i)
+      by (apply upd_eq_tr; reflexivity).
+    iApply (wp_uk_cmv C1 pt1 Rut1 π sz1 Hlo1 Hpm1 Mc n1 (mword_of_int 0x52)
+              (mword_of_int 10 : mword 5) (mword_of_int 18 : mword 5)
+              (uk_argv_w Mc av i)
+              (UI ui_echo_52 Mc Htext Hx)
+              ltac:(vm_compute; discriminate)
+              ltac:(rewrite Hs2_1 -uk_argv_p_w moi_add_zero_l uk_argv_p_w;
+                    reflexivity)
+              with "Hb").
+    set (n2 := <[Regidx (mword_of_int 10 : mword 5)
+                 := regval_into_reg (uk_argv_w Mc av i)]> n1).
+    assert (E52 : add_vec_int (mword_of_int 0x52 : mword 64) 2 = mword_of_int 0x54)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E52.
+    rewrite /ukc. iIntros (h2 C2 pt2 Rut2 sz2) "%Hlo2 %Hpm2 Hb".
+    (* ---- 0x54  jal ra,0xdc <strlen> ---- *)
+    assert (Htj1 : (mword_of_int EchoSyms.strlen : mword 64)
+                   = add_vec (mword_of_int 0x54)
+                       (sign_extend' 64 (mword_of_int 136 : mword 21)))
+      by (apply bv_eq; vm_compute; reflexivity).
+    assert (Hwj1 : (mword_of_int 0x58 : mword 64)
+                   = add_vec_int (mword_of_int 0x54 : mword 64) 4)
+      by (apply bv_eq; vm_compute; reflexivity).
+    iApply (wp_uk_jal C2 pt2 Rut2 π sz2 Hlo2 Hpm2 Mc n2 (mword_of_int 0x54)
+              (mword_of_int 136 : mword 21) ra_idx
+              (mword_of_int EchoSyms.strlen) (mword_of_int 0x58)
+              (UI ui_echo_54 Mc Htext Hx)
+              ltac:(vm_compute; discriminate) Htj1 Hwj1
+              ltac:(vm_compute; reflexivity)
+              with "Hb").
+    set (n3 := <[Regidx ra_idx
+                 := regval_into_reg (mword_of_int 0x58 : mword 64)]> n2).
+    (* ---- the call: strlen(argv[i]) ---- *)
+    assert (Hsp_3 : n3 !!! Regidx sp_idx = add_vec_int sp0 (-64)).
+    { rewrite /n3 /n2 /n1.
+      do 3 (apply upd_ne_tr; [ vm_compute; discriminate | ]).
+      exact Hrsp. }
+    assert (Ha0_3 : n3 !!! Regidx a0_idx
+                    = (mword_of_int (uk_argv_p Mc av i) : mword 64)).
+    { rewrite uk_argv_p_w. rewrite /n3.
+      apply upd_ne_tr; [ vm_compute; discriminate | ].
+      rewrite /n2. apply upd_eq_tr; reflexivity. }
+    assert (Hra_3 : n3 !!! Regidx ra_idx = (mword_of_int 0x58 : mword 64))
+      by (apply upd_eq_tr; reflexivity).
+    rewrite /ukc. iIntros (h3 C3 pt3 Rut3 sz3) "%Hlo3 %Hpm3 Hb".
+    iPoseProof (wp_kecho_strlen Mc n3 (add_vec_int sp0 (-64))
+                  (uk_argv_p Mc av i) (alen i)
+                  Hx Htext Hsp_3 Hstm Ha0_3 Hstrp Hrdp
+                  ltac:(change (2 ^ 31) with 2147483648; lia)
+                  ltac:(rewrite Hu64; lia)
+                  ltac:(rewrite Hra_3; vm_compute; reflexivity)) as "Hstrlen".
+    iApply ("Hstrlen" $! h3 C3 pt3 Rut3 sz3 with "[%] [%] Hb");
+      [ exact Hlo3 | exact Hpm3 | ].
+    iIntros (mp Mp) "%Hcs0 %Hpa0 %Hponly".
+    rewrite Hra_3.
+    rewrite Hu64 in Hponly.
+    replace (uint sp0 - 64 - 16) with (uint sp0 - 80) in Hponly by lia.
+    (* every image predicate, carried across strlen's frame in one step *)
+    assert (HkT : forall (kk : Z) (bb : bv 8),
+              EchoInstrs.echo_bytes !! kk = Some bb -> kk < uint sp0 - 80)
+      by (intros kk bb Hkb; pose proof (echo_bytes_key_lt kk bb Hkb); lia).
+    assert (HtP : echo_text_sub Mp)
+      by exact (uM_only_img EchoInstrs.echo_bytes Mc Mp (uint sp0 - 80) 16
+                  HkT Hponly Htext).
+    assert (HstP : uk_stack π Mp sp0 80)
+      by exact (uk_stack_only Mc Mp sp0 80 (uint sp0 - 80) 16 Hponly Hst).
+    assert (HargsP : uk_args π Mp av argc (uint sp0) alen)
+      by exact (uk_args_only Mc Mp av argc (uint sp0) (uint sp0 - 80) 16 alen
+                  Hponly ltac:(lia) Hargs).
+    rewrite /ukc. iIntros (h4 C4 pt4 Rut4 sz4) "%Hlo4 %Hpm4 Hb".
+    (* ---- 0x58  c.mv a2,a0 ---- *)
+    iApply (wp_uk_cmv C4 pt4 Rut4 π sz4 Hlo4 Hpm4 Mp mp (mword_of_int 0x58)
+              (mword_of_int 12 : mword 5) (mword_of_int 10 : mword 5)
+              (mword_of_int (alen i) : mword 64)
+              (UI ui_echo_58 Mp HtP Hx)
+              ltac:(vm_compute; discriminate)
+              ltac:(rewrite Hpa0 moi_add_zero_l; reflexivity)
+              with "Hb").
+    set (n4 := <[Regidx (mword_of_int 12 : mword 5)
+                 := regval_into_reg (mword_of_int (alen i) : mword 64)]> mp).
+    assert (E58 : add_vec_int (mword_of_int 0x58 : mword 64) 2 = mword_of_int 0x5a)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E58.
+    rewrite /ukc. iIntros (h5 C5 pt5 Rut5 sz5) "%Hlo5 %Hpm5 Hb".
+    (* ---- 0x5a  c.mv a1,s2 (s2 survived the call: it is callee-saved) ---- *)
+    assert (Hs2_P : mp !!! Regidx (mword_of_int 18 : mword 5) = uk_argv_w Mc av i).
+    { rewrite (Hcs0 (mword_of_int 18 : mword 5) ltac:(vm_compute; reflexivity)).
+      rewrite /n3 /n2.
+      do 2 (apply upd_ne_tr; [ vm_compute; discriminate | ]).
+      exact Hs2_1. }
+    assert (Hs2_4 : n4 !!! Regidx (mword_of_int 18 : mword 5) = uk_argv_w Mc av i).
+    { rewrite /n4. apply upd_ne_tr; [ vm_compute; discriminate | ]. exact Hs2_P. }
+    iApply (wp_uk_cmv C5 pt5 Rut5 π sz5 Hlo5 Hpm5 Mp n4 (mword_of_int 0x5a)
+              (mword_of_int 11 : mword 5) (mword_of_int 18 : mword 5)
+              (uk_argv_w Mc av i)
+              (UI ui_echo_5a Mp HtP Hx)
+              ltac:(vm_compute; discriminate)
+              ltac:(rewrite Hs2_4 -uk_argv_p_w moi_add_zero_l uk_argv_p_w;
+                    reflexivity)
+              with "Hb").
+    set (n5 := <[Regidx (mword_of_int 11 : mword 5)
+                 := regval_into_reg (uk_argv_w Mc av i)]> n4).
+    assert (E5a : add_vec_int (mword_of_int 0x5a : mword 64) 2 = mword_of_int 0x5c)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E5a.
+    rewrite /ukc. iIntros (h6 C6 pt6 Rut6 sz6) "%Hlo6 %Hpm6 Hb".
+    (* ---- 0x5c  c.mv a0,s3 ---- *)
+    assert (Hs3_5 : n5 !!! Regidx (mword_of_int 19 : mword 5)
+                    = (mword_of_int 1 : mword 64)).
+    { rewrite /n5 /n4.
+      do 2 (apply upd_ne_tr; [ vm_compute; discriminate | ]).
+      rewrite (Hcs0 (mword_of_int 19 : mword 5) ltac:(vm_compute; reflexivity)).
+      rewrite /n3 /n2 /n1.
+      do 3 (apply upd_ne_tr; [ vm_compute; discriminate | ]).
+      exact Hr19. }
+    iApply (wp_uk_cmv C6 pt6 Rut6 π sz6 Hlo6 Hpm6 Mp n5 (mword_of_int 0x5c)
+              (mword_of_int 10 : mword 5) (mword_of_int 19 : mword 5)
+              (mword_of_int 1 : mword 64)
+              (UI ui_echo_5c Mp HtP Hx)
+              ltac:(vm_compute; discriminate)
+              ltac:(rewrite Hs3_5 moi_add_zero_l; reflexivity)
+              with "Hb").
+    set (n6 := <[Regidx (mword_of_int 10 : mword 5)
+                 := regval_into_reg (mword_of_int 1 : mword 64)]> n5).
+    assert (E5c : add_vec_int (mword_of_int 0x5c : mword 64) 2 = mword_of_int 0x5e)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E5c.
+    rewrite /ukc. iIntros (h7 C7 pt7 Rut7 sz7) "%Hlo7 %Hpm7 Hb".
+    (* ---- 0x5e  jal ra,0x352 <write> ---- *)
+    assert (Htj2 : (mword_of_int EchoSyms.write : mword 64)
+                   = add_vec (mword_of_int 0x5e)
+                       (sign_extend' 64 (mword_of_int 756 : mword 21)))
+      by (apply bv_eq; vm_compute; reflexivity).
+    assert (Hwj2 : (mword_of_int 0x62 : mword 64)
+                   = add_vec_int (mword_of_int 0x5e : mword 64) 4)
+      by (apply bv_eq; vm_compute; reflexivity).
+    iApply (wp_uk_jal C7 pt7 Rut7 π sz7 Hlo7 Hpm7 Mp n6 (mword_of_int 0x5e)
+              (mword_of_int 756 : mword 21) ra_idx
+              (mword_of_int EchoSyms.write) (mword_of_int 0x62)
+              (UI ui_echo_5e Mp HtP Hx)
+              ltac:(vm_compute; discriminate) Htj2 Hwj2
+              ltac:(vm_compute; reflexivity)
+              with "Hb").
+    set (n7 := <[Regidx ra_idx
+                 := regval_into_reg (mword_of_int 0x62 : mword 64)]> n6).
+    (* ---- the call: write(1, argv[i], strlen(argv[i])) ---- *)
+    assert (Hra_7 : n7 !!! Regidx ra_idx = (mword_of_int 0x62 : mword 64))
+      by (apply upd_eq_tr; reflexivity).
+    rewrite /ukc. iIntros (h8 C8 pt8 Rut8 sz8) "%Hlo8 %Hpm8 Hb".
+    iPoseProof (wp_kecho_write_stub Mp n7 Hx HtP
+                  ltac:(rewrite Hra_7; vm_compute; reflexivity)) as "Hwrite".
+    iApply ("Hwrite" $! h8 C8 pt8 Rut8 sz8 with "[%] [%] Hb");
+      [ exact Hlo8 | exact Hpm8 | ].
+    iIntros (ret1).
+    rewrite Hra_7.
+    set (n8 := <[Regidx a0_idx := ret1]>
+                 (<[Regidx a7_idx := (mword_of_int 16 : mword 64)]> n7)).
+    (* the callee-saved set survived BOTH the call and the clobbers around it *)
+    assert (Hcsa : ucallee_saved n1 n2)
+      by (rewrite /n2; apply ucs_caller; vm_compute; reflexivity).
+    assert (Hcsb : ucallee_saved n1 n3).
+    { apply (ucallee_saved_trans n1 n2 n3 Hcsa).
+      rewrite /n3. apply ucs_caller; vm_compute; reflexivity. }
+    assert (Hcsc : ucallee_saved n1 mp)
+      by exact (ucallee_saved_trans n1 n3 mp Hcsb Hcs0).
+    assert (Hcsd : ucallee_saved n1 n4).
+    { apply (ucallee_saved_trans n1 mp n4 Hcsc).
+      rewrite /n4. apply ucs_caller; vm_compute; reflexivity. }
+    assert (Hcse : ucallee_saved n1 n5).
+    { apply (ucallee_saved_trans n1 n4 n5 Hcsd).
+      rewrite /n5. apply ucs_caller; vm_compute; reflexivity. }
+    assert (Hcsf : ucallee_saved n1 n6).
+    { apply (ucallee_saved_trans n1 n5 n6 Hcse).
+      rewrite /n6. apply ucs_caller; vm_compute; reflexivity. }
+    assert (Hcsg : ucallee_saved n1 n7).
+    { apply (ucallee_saved_trans n1 n6 n7 Hcsf).
+      rewrite /n7. apply ucs_caller; vm_compute; reflexivity. }
+    assert (Hcsh : ucallee_saved n1 n8).
+    { apply (ucallee_saved_trans n1 n7 n8 Hcsg).
+      apply (ucallee_saved_trans n7
+               (<[Regidx a7_idx := (mword_of_int 16 : mword 64)]> n7) n8).
+      - apply ucs_caller; vm_compute; reflexivity.
+      - rewrite /n8. apply ucs_caller; vm_compute; reflexivity. }
+    assert (Hs1_8 : n8 !!! Regidx (mword_of_int 9 : mword 5)
+                    = (mword_of_int (av + 8 * i) : mword 64)).
+    { rewrite (Hcsh (mword_of_int 9 : mword 5) ltac:(vm_compute; reflexivity)).
+      rewrite /n1. apply upd_ne_tr; [ vm_compute; discriminate | ]. exact Hr9. }
+    assert (Hs5_8 : n8 !!! Regidx (mword_of_int 21 : mword 5)
+                    = (mword_of_int (av + 8 * (argc - 1)) : mword 64)).
+    { rewrite (Hcsh (mword_of_int 21 : mword 5) ltac:(vm_compute; reflexivity)).
+      rewrite /n1. apply upd_ne_tr; [ vm_compute; discriminate | ]. exact Hr21. }
+    assert (Hs4_8 : n8 !!! Regidx (mword_of_int 20 : mword 5)
+                    = (mword_of_int (av + 8 * argc) : mword 64)).
+    { rewrite (Hcsh (mword_of_int 20 : mword 5) ltac:(vm_compute; reflexivity)).
+      rewrite /n1. apply upd_ne_tr; [ vm_compute; discriminate | ]. exact Hr20. }
+    assert (Hs3_8 : n8 !!! Regidx (mword_of_int 19 : mword 5)
+                    = (mword_of_int 1 : mword 64)).
+    { rewrite (Hcsh (mword_of_int 19 : mword 5) ltac:(vm_compute; reflexivity)).
+      rewrite /n1. apply upd_ne_tr; [ vm_compute; discriminate | ]. exact Hr19. }
+    assert (Hs6_8 : n8 !!! Regidx (mword_of_int 22 : mword 5)
+                    = (mword_of_int 2352 : mword 64)).
+    { rewrite (Hcsh (mword_of_int 22 : mword 5) ltac:(vm_compute; reflexivity)).
+      rewrite /n1. apply upd_ne_tr; [ vm_compute; discriminate | ]. exact Hr22. }
+    assert (Hsp_8 : n8 !!! Regidx sp_idx = add_vec_int sp0 (-64)).
+    { rewrite (Hcsh (mword_of_int 2 : mword 5) ltac:(vm_compute; reflexivity)).
+      rewrite /n1. apply upd_ne_tr; [ vm_compute; discriminate | ]. exact Hrsp. }
+    rewrite /ukc. iIntros (h9 C9 pt9 Rut9 sz9) "%Hlo9 %Hpm9 Hb".
+    (* ---- 0x62  bne s1,s5,0x3e -- separator or newline? ---- *)
+    assert (Etgt3e : (mword_of_int 0x3e : mword 64)
+                     = add_vec (mword_of_int 0x62)
+                         (sign_extend' 64 (mword_of_int 8156 : mword 13)))
+      by (apply bv_eq; vm_compute; reflexivity).
+    destruct (Z.eq_dec i (argc - 1)) as [Hieq | Hine].
+    - (* i = argc-1: the last argument -- newline, then exit *)
+      iApply (wp_uk_btype C9 pt9 Rut9 π sz9 Hlo9 Hpm9 Mp n8 (mword_of_int 0x62)
+                (mword_of_int 8156 : mword 13) (mword_of_int 21 : mword 5)
+                (mword_of_int 9 : mword 5) BNE false (mword_of_int 0x3e)
+                (UI ui_echo_62 Mp HtP Hx)
+                ltac:(cbn [uv_btaken]; rewrite Hs1_8 Hs5_8
+                        (moi_neq_vec (av + 8 * i) (av + 8 * (argc - 1))
+                           ltac:(unfold Z64; lia) ltac:(unfold Z64; lia))
+                        Hieq Z.eqb_refl; reflexivity)
+                Etgt3e ltac:(intro Hc; discriminate Hc)
+                with "Hb").
+      assert (E62 : (if false then (mword_of_int 0x3e : mword 64)
+                     else add_vec_int (mword_of_int 0x62 : mword 64) 4)
+                    = mword_of_int 0x66)
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite E62.
+      rewrite /ukc. iIntros (hA CA ptA RutA szA) "%HloA %HpmA Hb".
+      (* ---- 0x66  c.li a2,1 ---- *)
+      assert (Hw1 : (mword_of_int 1 : mword 64)
+                    = add_vec zero_reg
+                        (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))
+        by (apply bv_eq; vm_compute; reflexivity).
+      iApply (wp_uk_cli CA ptA RutA π szA HloA HpmA Mp n8 (mword_of_int 0x66)
+                (mword_of_int 1 : mword 6) (mword_of_int 12 : mword 5)
+                (mword_of_int 1 : mword 64)
+                (UI ui_echo_66 Mp HtP Hx)
+                ltac:(vm_compute; discriminate) Hw1
+                with "Hb").
+      set (q1 := <[Regidx (mword_of_int 12 : mword 5)
+                   := regval_into_reg (mword_of_int 1 : mword 64)]> n8).
+      assert (E66 : add_vec_int (mword_of_int 0x66 : mword 64) 2 = mword_of_int 0x68)
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite E66.
+      rewrite /ukc. iIntros (hB CB ptB RutB szB) "%HloB %HpmB Hb".
+      (* ---- 0x68  auipc a1,0x1 ---- *)
+      iApply (wp_uk_auipc CB ptB RutB π szB HloB HpmB Mp q1 (mword_of_int 0x68)
+                (mword_of_int 1 : mword 20) (mword_of_int 11 : mword 5)
+                (mword_of_int 4200 : mword 64)
+                (UI ui_echo_68 Mp HtP Hx)
+                ltac:(vm_compute; discriminate)
+                ltac:(apply bv_eq; vm_compute; reflexivity)
+                with "Hb").
+      set (q2 := <[Regidx (mword_of_int 11 : mword 5)
+                   := regval_into_reg (mword_of_int 4200 : mword 64)]> q1).
+      assert (E68 : add_vec_int (mword_of_int 0x68 : mword 64) 4 = mword_of_int 0x6c)
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite E68.
+      rewrite /ukc. iIntros (hC CC ptC RutC szC) "%HloC %HpmC Hb".
+      (* ---- 0x6c  addi a1,a1,-1840 -- a1 := 0x938, the "\n" literal ---- *)
+      assert (Ha1_q2 : q2 !!! Regidx (mword_of_int 11 : mword 5)
+                       = (mword_of_int 4200 : mword 64))
+        by (apply upd_eq_tr; reflexivity).
+      iApply (wp_uk_addi CC ptC RutC π szC HloC HpmC Mp q2 (mword_of_int 0x6c)
+                (mword_of_int 2256 : mword 12) (mword_of_int 11 : mword 5)
+                (mword_of_int 11 : mword 5) (mword_of_int 2360 : mword 64)
+                (UI ui_echo_6c Mp HtP Hx)
+                ltac:(vm_compute; discriminate)
+                ltac:(rewrite Ha1_q2; apply bv_eq; vm_compute; reflexivity)
+                with "Hb").
+      set (q3 := <[Regidx (mword_of_int 11 : mword 5)
+                   := regval_into_reg (mword_of_int 2360 : mword 64)]> q2).
+      assert (E6c : add_vec_int (mword_of_int 0x6c : mword 64) 4 = mword_of_int 0x70)
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite E6c.
+      rewrite /ukc. iIntros (hD CD ptD RutD szD) "%HloD %HpmD Hb".
+      (* ---- 0x70  c.mv a0,a2 ---- *)
+      assert (Ha2_q3 : q3 !!! Regidx (mword_of_int 12 : mword 5)
+                       = (mword_of_int 1 : mword 64)).
+      { rewrite /q3 /q2.
+        do 2 (apply upd_ne_tr; [ vm_compute; discriminate | ]).
+        rewrite /q1. apply upd_eq_tr; reflexivity. }
+      iApply (wp_uk_cmv CD ptD RutD π szD HloD HpmD Mp q3 (mword_of_int 0x70)
+                (mword_of_int 10 : mword 5) (mword_of_int 12 : mword 5)
+                (mword_of_int 1 : mword 64)
+                (UI ui_echo_70 Mp HtP Hx)
+                ltac:(vm_compute; discriminate)
+                ltac:(rewrite Ha2_q3 moi_add_zero_l; reflexivity)
+                with "Hb").
+      set (q4 := <[Regidx (mword_of_int 10 : mword 5)
+                   := regval_into_reg (mword_of_int 1 : mword 64)]> q3).
+      assert (E70 : add_vec_int (mword_of_int 0x70 : mword 64) 2 = mword_of_int 0x72)
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite E70.
+      rewrite /ukc. iIntros (hE CE ptE RutE szE) "%HloE %HpmE Hb".
+      (* ---- 0x72  jal ra,0x352 <write> ---- *)
+      assert (Htj3 : (mword_of_int EchoSyms.write : mword 64)
+                     = add_vec (mword_of_int 0x72)
+                         (sign_extend' 64 (mword_of_int 736 : mword 21)))
+        by (apply bv_eq; vm_compute; reflexivity).
+      assert (Hwj3 : (mword_of_int 0x76 : mword 64)
+                     = add_vec_int (mword_of_int 0x72 : mword 64) 4)
+        by (apply bv_eq; vm_compute; reflexivity).
+      iApply (wp_uk_jal CE ptE RutE π szE HloE HpmE Mp q4 (mword_of_int 0x72)
+                (mword_of_int 736 : mword 21) ra_idx
+                (mword_of_int EchoSyms.write) (mword_of_int 0x76)
+                (UI ui_echo_72 Mp HtP Hx)
+                ltac:(vm_compute; discriminate) Htj3 Hwj3
+                ltac:(vm_compute; reflexivity)
+                with "Hb").
+      set (q5 := <[Regidx ra_idx
+                   := regval_into_reg (mword_of_int 0x76 : mword 64)]> q4).
+      assert (Hra_q5 : q5 !!! Regidx ra_idx = (mword_of_int 0x76 : mword 64))
+        by (apply upd_eq_tr; reflexivity).
+      rewrite /ukc. iIntros (hF CF ptF RutF szF) "%HloF %HpmF Hb".
+      iPoseProof (wp_kecho_write_stub Mp q5 Hx HtP
+                    ltac:(rewrite Hra_q5; vm_compute; reflexivity)) as "Hw2".
+      iApply ("Hw2" $! hF CF ptF RutF szF with "[%] [%] Hb");
+        [ exact HloF | exact HpmF | ].
+      iIntros (ret2).
+      rewrite Hra_q5.
+      iApply (kecho_exit_tail Mp _ Hx HtP).
+    - (* i < argc-1: the separator, then the next iteration *)
+      iApply (wp_uk_btype C9 pt9 Rut9 π sz9 Hlo9 Hpm9 Mp n8 (mword_of_int 0x62)
+                (mword_of_int 8156 : mword 13) (mword_of_int 21 : mword 5)
+                (mword_of_int 9 : mword 5) BNE true (mword_of_int 0x3e)
+                (UI ui_echo_62 Mp HtP Hx)
+                ltac:(cbn [uv_btaken]; rewrite Hs1_8 Hs5_8
+                        (moi_neq_vec (av + 8 * i) (av + 8 * (argc - 1))
+                           ltac:(unfold Z64; lia) ltac:(unfold Z64; lia))
+                        (proj2 (Z.eqb_neq (av + 8 * i) (av + 8 * (argc - 1)))
+                           ltac:(lia));
+                      reflexivity)
+                Etgt3e ltac:(intros _; vm_compute; reflexivity)
+                with "Hb").
+      (* [if true then _ else _] reduces by iota, so no pc rewrite is needed *)
+      rewrite /ukc. iIntros (hA CA ptA RutA szA) "%HloA %HpmA Hb".
+      (* ---- 0x3e  c.mv a2,s3 ---- *)
+      iApply (wp_uk_cmv CA ptA RutA π szA HloA HpmA Mp n8 (mword_of_int 0x3e)
+                (mword_of_int 12 : mword 5) (mword_of_int 19 : mword 5)
+                (mword_of_int 1 : mword 64)
+                (UI ui_echo_3e Mp HtP Hx)
+                ltac:(vm_compute; discriminate)
+                ltac:(rewrite Hs3_8 moi_add_zero_l; reflexivity)
+                with "Hb").
+      set (r1 := <[Regidx (mword_of_int 12 : mword 5)
+                   := regval_into_reg (mword_of_int 1 : mword 64)]> n8).
+      assert (E3e : add_vec_int (mword_of_int 0x3e : mword 64) 2 = mword_of_int 0x40)
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite E3e.
+      rewrite /ukc. iIntros (hB CB ptB RutB szB) "%HloB %HpmB Hb".
+      (* ---- 0x40  c.mv a1,s6 ---- *)
+      assert (Hs6_r1 : r1 !!! Regidx (mword_of_int 22 : mword 5)
+                       = (mword_of_int 2352 : mword 64)).
+      { rewrite /r1. apply upd_ne_tr; [ vm_compute; discriminate | ]. exact Hs6_8. }
+      iApply (wp_uk_cmv CB ptB RutB π szB HloB HpmB Mp r1 (mword_of_int 0x40)
+                (mword_of_int 11 : mword 5) (mword_of_int 22 : mword 5)
+                (mword_of_int 2352 : mword 64)
+                (UI ui_echo_40 Mp HtP Hx)
+                ltac:(vm_compute; discriminate)
+                ltac:(rewrite Hs6_r1 moi_add_zero_l; reflexivity)
+                with "Hb").
+      set (r2 := <[Regidx (mword_of_int 11 : mword 5)
+                   := regval_into_reg (mword_of_int 2352 : mword 64)]> r1).
+      assert (E40 : add_vec_int (mword_of_int 0x40 : mword 64) 2 = mword_of_int 0x42)
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite E40.
+      rewrite /ukc. iIntros (hC CC ptC RutC szC) "%HloC %HpmC Hb".
+      (* ---- 0x42  c.mv a0,s3 ---- *)
+      assert (Hs3_r2 : r2 !!! Regidx (mword_of_int 19 : mword 5)
+                       = (mword_of_int 1 : mword 64)).
+      { rewrite /r2 /r1.
+        do 2 (apply upd_ne_tr; [ vm_compute; discriminate | ]). exact Hs3_8. }
+      iApply (wp_uk_cmv CC ptC RutC π szC HloC HpmC Mp r2 (mword_of_int 0x42)
+                (mword_of_int 10 : mword 5) (mword_of_int 19 : mword 5)
+                (mword_of_int 1 : mword 64)
+                (UI ui_echo_42 Mp HtP Hx)
+                ltac:(vm_compute; discriminate)
+                ltac:(rewrite Hs3_r2 moi_add_zero_l; reflexivity)
+                with "Hb").
+      set (r3 := <[Regidx (mword_of_int 10 : mword 5)
+                   := regval_into_reg (mword_of_int 1 : mword 64)]> r2).
+      assert (E42 : add_vec_int (mword_of_int 0x42 : mword 64) 2 = mword_of_int 0x44)
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite E42.
+      rewrite /ukc. iIntros (hD CD ptD RutD szD) "%HloD %HpmD Hb".
+      (* ---- 0x44  jal ra,0x352 <write> ---- *)
+      assert (Htj3 : (mword_of_int EchoSyms.write : mword 64)
+                     = add_vec (mword_of_int 0x44)
+                         (sign_extend' 64 (mword_of_int 782 : mword 21)))
+        by (apply bv_eq; vm_compute; reflexivity).
+      assert (Hwj3 : (mword_of_int 0x48 : mword 64)
+                     = add_vec_int (mword_of_int 0x44 : mword 64) 4)
+        by (apply bv_eq; vm_compute; reflexivity).
+      iApply (wp_uk_jal CD ptD RutD π szD HloD HpmD Mp r3 (mword_of_int 0x44)
+                (mword_of_int 782 : mword 21) ra_idx
+                (mword_of_int EchoSyms.write) (mword_of_int 0x48)
+                (UI ui_echo_44 Mp HtP Hx)
+                ltac:(vm_compute; discriminate) Htj3 Hwj3
+                ltac:(vm_compute; reflexivity)
+                with "Hb").
+      set (r4 := <[Regidx ra_idx
+                   := regval_into_reg (mword_of_int 0x48 : mword 64)]> r3).
+      assert (Hra_r4 : r4 !!! Regidx ra_idx = (mword_of_int 0x48 : mword 64))
+        by (apply upd_eq_tr; reflexivity).
+      rewrite /ukc. iIntros (hE CE ptE RutE szE) "%HloE %HpmE Hb".
+      iPoseProof (wp_kecho_write_stub Mp r4 Hx HtP
+                    ltac:(rewrite Hra_r4; vm_compute; reflexivity)) as "Hw2".
+      iApply ("Hw2" $! hE CE ptE RutE szE with "[%] [%] Hb");
+        [ exact HloE | exact HpmE | ].
+      iIntros (ret2).
+      rewrite Hra_r4.
+      set (r5 := <[Regidx a0_idx := ret2]>
+                   (<[Regidx a7_idx := (mword_of_int 16 : mword 64)]> r4)).
+      assert (Hcs85 : ucallee_saved n8 r5).
+      { assert (T1 : ucallee_saved n8 r1)
+          by (rewrite /r1; apply ucs_caller; vm_compute; reflexivity).
+        assert (T2 : ucallee_saved n8 r2).
+        { apply (ucallee_saved_trans n8 r1 r2 T1).
+          rewrite /r2. apply ucs_caller; vm_compute; reflexivity. }
+        assert (T3 : ucallee_saved n8 r3).
+        { apply (ucallee_saved_trans n8 r2 r3 T2).
+          rewrite /r3. apply ucs_caller; vm_compute; reflexivity. }
+        assert (T4 : ucallee_saved n8 r4).
+        { apply (ucallee_saved_trans n8 r3 r4 T3).
+          rewrite /r4. apply ucs_caller; vm_compute; reflexivity. }
+        apply (ucallee_saved_trans n8 r4 r5 T4).
+        apply (ucallee_saved_trans r4
+                 (<[Regidx a7_idx := (mword_of_int 16 : mword 64)]> r4) r5).
+        - apply ucs_caller; vm_compute; reflexivity.
+        - rewrite /r5. apply ucs_caller; vm_compute; reflexivity. }
+      rewrite /ukc. iIntros (hF CF ptF RutF szF) "%HloF %HpmF Hb".
+      (* ---- 0x48  c.addi s1,s1,8 -- i := i+1 ---- *)
+      assert (Hs1_r5 : r5 !!! Regidx (mword_of_int 9 : mword 5)
+                       = (mword_of_int (av + 8 * i) : mword 64)).
+      { rewrite (Hcs85 (mword_of_int 9 : mword 5) ltac:(vm_compute; reflexivity)).
+        exact Hs1_8. }
+      iApply (wp_uk_caddi CF ptF RutF π szF HloF HpmF Mp r5 (mword_of_int 0x48)
+                (mword_of_int 8 : mword 6) (mword_of_int 9 : mword 5)
+                (mword_of_int (av + 8 * (i + 1)) : mword 64)
+                (UI ui_echo_48 Mp HtP Hx)
+                ltac:(vm_compute; discriminate)
+                ltac:(rewrite Hs1_r5;
+                      assert (E8b : (sign_extend' 64 (sign_extend' 12
+                                       (mword_of_int 8 : mword 6)) : mword 64)
+                                    = mword_of_int 8)
+                        by (apply bv_eq; vm_compute; reflexivity);
+                      rewrite E8b moi_add; f_equal; lia)
+                with "Hb").
+      set (r6 := <[Regidx (mword_of_int 9 : mword 5)
+                   := regval_into_reg (mword_of_int (av + 8 * (i + 1))
+                                       : mword 64)]> r5).
+      assert (E48 : add_vec_int (mword_of_int 0x48 : mword 64) 2 = mword_of_int 0x4a)
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite E48.
+      rewrite /ukc. iIntros (hG CG ptG RutG szG) "%HloG %HpmG Hb".
+      (* ---- 0x4a  beq s1,s4,0x76 -- NEVER taken (i+1 <= argc-1 < argc) ---- *)
+      assert (Hs1_r6 : r6 !!! Regidx (mword_of_int 9 : mword 5)
+                       = (mword_of_int (av + 8 * (i + 1)) : mword 64))
+        by (apply upd_eq_tr; reflexivity).
+      assert (Hs4_r6 : r6 !!! Regidx (mword_of_int 20 : mword 5)
+                       = (mword_of_int (av + 8 * argc) : mword 64)).
+      { rewrite /r6. apply upd_ne_tr; [ vm_compute; discriminate | ].
+        rewrite (Hcs85 (mword_of_int 20 : mword 5) ltac:(vm_compute; reflexivity)).
+        exact Hs4_8. }
+      iApply (wp_uk_btype CG ptG RutG π szG HloG HpmG Mp r6 (mword_of_int 0x4a)
+                (mword_of_int 44 : mword 13) (mword_of_int 20 : mword 5)
+                (mword_of_int 9 : mword 5) BEQ false (mword_of_int 0x76)
+                (UI ui_echo_4a Mp HtP Hx)
+                ltac:(cbn [uv_btaken]; rewrite Hs1_r6 Hs4_r6
+                        (moi_eq_vec (av + 8 * (i + 1)) (av + 8 * argc)
+                           ltac:(unfold Z64; lia) ltac:(unfold Z64; lia))
+                        (proj2 (Z.eqb_neq (av + 8 * (i + 1)) (av + 8 * argc))
+                           ltac:(lia));
+                      reflexivity)
+                ltac:(apply bv_eq; vm_compute; reflexivity)
+                ltac:(intro Hc; discriminate Hc)
+                with "Hb").
+      assert (E4a : (if false then (mword_of_int 0x76 : mword 64)
+                     else add_vec_int (mword_of_int 0x4a : mword 64) 4)
+                    = mword_of_int 0x4e)
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite E4a.
+      (* ---- the next iteration: the measure strictly decreased ---- *)
+      iApply (IH Mp r6 (i + 1) Hx HtP HargsP HstP
+                ltac:(lia) ltac:(lia) Hs1_r6
+                ltac:(rewrite /r6;
+                      apply upd_ne_tr; [ vm_compute; discriminate | ];
+                      rewrite (Hcs85 (mword_of_int 21 : mword 5)
+                                 ltac:(vm_compute; reflexivity));
+                      exact Hs5_8)
+                Hs4_r6
+                ltac:(rewrite /r6;
+                      apply upd_ne_tr; [ vm_compute; discriminate | ];
+                      rewrite (Hcs85 (mword_of_int 19 : mword 5)
+                                 ltac:(vm_compute; reflexivity));
+                      exact Hs3_8)
+                ltac:(rewrite /r6;
+                      apply upd_ne_tr; [ vm_compute; discriminate | ];
+                      rewrite (Hcs85 (mword_of_int 22 : mword 5)
+                                 ltac:(vm_compute; reflexivity));
+                      exact Hs6_8)
+                ltac:(rewrite /r6;
+                      apply upd_ne_tr; [ vm_compute; discriminate | ];
+                      rewrite (Hcs85 (mword_of_int 2 : mword 5)
+                                 ltac:(vm_compute; reflexivity));
+                      exact Hsp_8)).
+  Qed.
+
+  (* main @0x0 -- the eight-register prologue, the argc guard, the argv
+     index chain, then the loop.  DIVERGES. *)
+  Lemma wp_kecho_main (M : gmap Z (bv 8)) (m : regfile) (sp0 : mword 64)
+      (argc av : Z) (alen : Z -> Z) :
+    uk_xpage π (mword_of_int 0) ->
+    echo_text_sub M ->
+    m !!! Regidx sp_idx = sp0 ->
+    uk_stack π M sp0 80 ->                     (* main's 64 + strlen's 16 *)
+    m !!! Regidx a0_idx = (mword_of_int argc : mword 64) ->
+    m !!! Regidx a1_idx = (mword_of_int av : mword 64) ->
+    uk_args π M av argc (uint sp0) alen ->
+    ⊢ ukc π M m (mword_of_int EchoSyms.main).
+  Proof.
+    intros Hx Htext Hsp Hst Hargc Hav Hargs.
+    destruct echo_syms_pins as (Hsmain & Hsstart & Hsstrlen & Hsexit & Hswrite).
+    rewrite Hsmain.
+    pose proof (uka_argc _ _ _ _ _ _ Hargs) as Hargcb.
+    change (2 ^ 31) with 2147483648 in Hargcb.
+    pose proof (uka_rd _ _ _ _ _ _ Hargs) as Hrdav.
+    pose proof (ukrd_lo _ _ _ _ Hrdav) as Hav0.
+    pose proof (ukrd_hi _ _ _ _ Hrdav) as Havhi.
+    change (2 ^ 38) with 274877906944 in Havhi.
+    pose proof (uks_lo _ _ _ _ Hst) as Hlo80.
+    destruct (uk_stack_split π M sp0 80 64 16 ltac:(lia) ltac:(lia)
+                ltac:(reflexivity) ltac:(lia) Hst) as [Hstf Hstm].
+    assert (HkT : forall (kk : Z) (bb : bv 8),
+              EchoInstrs.echo_bytes !! kk = Some bb -> kk < uint sp0 - 64)
+      by (intros kk bb Hkb; pose proof (echo_bytes_key_lt kk bb Hkb); lia).
+    rewrite /ukc. iIntros (h C pt Rut sz) "%Hlo %Hpm Hb".
+    (* ---- 0x00  c.addi16sp sp,-64 ---- *)
+    assert (Hwsp : add_vec_int sp0 (-64)
+                   = add_vec (m !!! Regidx csp_rs1)
+                       (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6)))).
+    { assert (Hsp' : m !!! Regidx csp_rs1 = sp0) by exact Hsp.
+      rewrite Hsp'.
+      assert (Hc : (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))
+                    : mword 64) = mword_of_int (-64))
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite Hc. reflexivity. }
+    iApply (wp_uk_caddi16sp C pt Rut π sz Hlo Hpm M m (mword_of_int 0x0)
+              (mword_of_int 60 : mword 6) (add_vec_int sp0 (-64))
+              (UI ui_echo_00 M Htext Hx) Hwsp
+              with "Hb").
+    set (m1 := <[Regidx csp_rs1 := regval_into_reg (add_vec_int sp0 (-64))]> m).
+    assert (Hsp1 : m1 !!! Regidx csp_rs1 = add_vec_int sp0 (-64))
+      by exact (upd_eq m (Regidx csp_rs1) (regval_into_reg (add_vec_int sp0 (-64)))).
+    assert (E00 : add_vec_int (mword_of_int 0x0 : mword 64) 2 = mword_of_int 0x2)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E00.
+    rewrite /ukc. iIntros (h1 C1 pt1 Rut1 sz1) "%Hlo1 %Hpm1 Hb".
+    (* ---- 0x02  c.sdsp x1,56(sp) ---- *)
+    iPoseProof (kecho_pro_store M m1 sp0 (mword_of_int 0x02)
+                  (mword_of_int 7 : mword 6) (mword_of_int 1 : mword 5) 64 56
+                  (UI ui_echo_02 M Htext Hx) Hstf
+                  ltac:(lia) ltac:(lia) ltac:(reflexivity) Hsp1
+                  ltac:(apply bv_eq; vm_compute; reflexivity)) as "Hps1".
+    iApply ("Hps1" $! h1 C1 pt1 Rut1 sz1 with "[%] [%] Hb");
+      [ exact Hlo1 | exact Hpm1 | ].
+    set (M1 := uM_store8 M (uint sp0 - 64 + 56)
+                 (m1 !!! Regidx (mword_of_int 1 : mword 5))).
+    assert (Ho1 : uM_only M M1 (uint sp0 - 64) 64)
+      by (rewrite /M1; apply uM_only_store8; lia).
+    assert (Ht1 : echo_text_sub M1)
+      by exact (uM_only_img EchoInstrs.echo_bytes M M1 (uint sp0 - 64) 64
+                  HkT Ho1 Htext).
+    assert (Hs1 : uk_stack π M1 sp0 64)
+      by exact (uk_stack_only M M1 sp0 64 (uint sp0 - 64) 64 Ho1 Hstf).
+    assert (E02 : add_vec_int (mword_of_int 0x02 : mword 64) 2 = mword_of_int 0x04)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E02.
+    rewrite /ukc. iIntros (h2 C2 pt2 Rut2 sz2) "%Hlo2 %Hpm2 Hb".
+    (* ---- 0x04  c.sdsp x8,48(sp) ---- *)
+    iPoseProof (kecho_pro_store M1 m1 sp0 (mword_of_int 0x04)
+                  (mword_of_int 6 : mword 6) (mword_of_int 8 : mword 5) 64 48
+                  (UI ui_echo_04 M1 Ht1 Hx) Hs1
+                  ltac:(lia) ltac:(lia) ltac:(reflexivity) Hsp1
+                  ltac:(apply bv_eq; vm_compute; reflexivity)) as "Hps2".
+    iApply ("Hps2" $! h2 C2 pt2 Rut2 sz2 with "[%] [%] Hb");
+      [ exact Hlo2 | exact Hpm2 | ].
+    set (M2 := uM_store8 M1 (uint sp0 - 64 + 48)
+                 (m1 !!! Regidx (mword_of_int 8 : mword 5))).
+    assert (Ho2 : uM_only M M2 (uint sp0 - 64) 64).
+    { apply (uM_only_trans M M1 M2 (uint sp0 - 64) 64 Ho1).
+      rewrite /M2. apply uM_only_store8; lia. }
+    assert (Ht2 : echo_text_sub M2)
+      by exact (uM_only_img EchoInstrs.echo_bytes M M2 (uint sp0 - 64) 64
+                  HkT Ho2 Htext).
+    assert (Hs2 : uk_stack π M2 sp0 64)
+      by exact (uk_stack_only M M2 sp0 64 (uint sp0 - 64) 64 Ho2 Hstf).
+    assert (E04 : add_vec_int (mword_of_int 0x04 : mword 64) 2 = mword_of_int 0x06)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E04.
+    rewrite /ukc. iIntros (h3 C3 pt3 Rut3 sz3) "%Hlo3 %Hpm3 Hb".
+    (* ---- 0x06  c.sdsp x9,40(sp) ---- *)
+    iPoseProof (kecho_pro_store M2 m1 sp0 (mword_of_int 0x06)
+                  (mword_of_int 5 : mword 6) (mword_of_int 9 : mword 5) 64 40
+                  (UI ui_echo_06 M2 Ht2 Hx) Hs2
+                  ltac:(lia) ltac:(lia) ltac:(reflexivity) Hsp1
+                  ltac:(apply bv_eq; vm_compute; reflexivity)) as "Hps3".
+    iApply ("Hps3" $! h3 C3 pt3 Rut3 sz3 with "[%] [%] Hb");
+      [ exact Hlo3 | exact Hpm3 | ].
+    set (M3 := uM_store8 M2 (uint sp0 - 64 + 40)
+                 (m1 !!! Regidx (mword_of_int 9 : mword 5))).
+    assert (Ho3 : uM_only M M3 (uint sp0 - 64) 64).
+    { apply (uM_only_trans M M2 M3 (uint sp0 - 64) 64 Ho2).
+      rewrite /M3. apply uM_only_store8; lia. }
+    assert (Ht3 : echo_text_sub M3)
+      by exact (uM_only_img EchoInstrs.echo_bytes M M3 (uint sp0 - 64) 64
+                  HkT Ho3 Htext).
+    assert (Hs3 : uk_stack π M3 sp0 64)
+      by exact (uk_stack_only M M3 sp0 64 (uint sp0 - 64) 64 Ho3 Hstf).
+    assert (E06 : add_vec_int (mword_of_int 0x06 : mword 64) 2 = mword_of_int 0x08)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E06.
+    rewrite /ukc. iIntros (h4 C4 pt4 Rut4 sz4) "%Hlo4 %Hpm4 Hb".
+    (* ---- 0x08  c.sdsp x18,32(sp) ---- *)
+    iPoseProof (kecho_pro_store M3 m1 sp0 (mword_of_int 0x08)
+                  (mword_of_int 4 : mword 6) (mword_of_int 18 : mword 5) 64 32
+                  (UI ui_echo_08 M3 Ht3 Hx) Hs3
+                  ltac:(lia) ltac:(lia) ltac:(reflexivity) Hsp1
+                  ltac:(apply bv_eq; vm_compute; reflexivity)) as "Hps4".
+    iApply ("Hps4" $! h4 C4 pt4 Rut4 sz4 with "[%] [%] Hb");
+      [ exact Hlo4 | exact Hpm4 | ].
+    set (M4 := uM_store8 M3 (uint sp0 - 64 + 32)
+                 (m1 !!! Regidx (mword_of_int 18 : mword 5))).
+    assert (Ho4 : uM_only M M4 (uint sp0 - 64) 64).
+    { apply (uM_only_trans M M3 M4 (uint sp0 - 64) 64 Ho3).
+      rewrite /M4. apply uM_only_store8; lia. }
+    assert (Ht4 : echo_text_sub M4)
+      by exact (uM_only_img EchoInstrs.echo_bytes M M4 (uint sp0 - 64) 64
+                  HkT Ho4 Htext).
+    assert (Hs4 : uk_stack π M4 sp0 64)
+      by exact (uk_stack_only M M4 sp0 64 (uint sp0 - 64) 64 Ho4 Hstf).
+    assert (E08 : add_vec_int (mword_of_int 0x08 : mword 64) 2 = mword_of_int 0x0a)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E08.
+    rewrite /ukc. iIntros (h5 C5 pt5 Rut5 sz5) "%Hlo5 %Hpm5 Hb".
+    (* ---- 0x0a  c.sdsp x19,24(sp) ---- *)
+    iPoseProof (kecho_pro_store M4 m1 sp0 (mword_of_int 0x0a)
+                  (mword_of_int 3 : mword 6) (mword_of_int 19 : mword 5) 64 24
+                  (UI ui_echo_0a M4 Ht4 Hx) Hs4
+                  ltac:(lia) ltac:(lia) ltac:(reflexivity) Hsp1
+                  ltac:(apply bv_eq; vm_compute; reflexivity)) as "Hps5".
+    iApply ("Hps5" $! h5 C5 pt5 Rut5 sz5 with "[%] [%] Hb");
+      [ exact Hlo5 | exact Hpm5 | ].
+    set (M5 := uM_store8 M4 (uint sp0 - 64 + 24)
+                 (m1 !!! Regidx (mword_of_int 19 : mword 5))).
+    assert (Ho5 : uM_only M M5 (uint sp0 - 64) 64).
+    { apply (uM_only_trans M M4 M5 (uint sp0 - 64) 64 Ho4).
+      rewrite /M5. apply uM_only_store8; lia. }
+    assert (Ht5 : echo_text_sub M5)
+      by exact (uM_only_img EchoInstrs.echo_bytes M M5 (uint sp0 - 64) 64
+                  HkT Ho5 Htext).
+    assert (Hs5 : uk_stack π M5 sp0 64)
+      by exact (uk_stack_only M M5 sp0 64 (uint sp0 - 64) 64 Ho5 Hstf).
+    assert (E0a : add_vec_int (mword_of_int 0x0a : mword 64) 2 = mword_of_int 0x0c)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E0a.
+    rewrite /ukc. iIntros (h6 C6 pt6 Rut6 sz6) "%Hlo6 %Hpm6 Hb".
+    (* ---- 0x0c  c.sdsp x20,16(sp) ---- *)
+    iPoseProof (kecho_pro_store M5 m1 sp0 (mword_of_int 0x0c)
+                  (mword_of_int 2 : mword 6) (mword_of_int 20 : mword 5) 64 16
+                  (UI ui_echo_0c M5 Ht5 Hx) Hs5
+                  ltac:(lia) ltac:(lia) ltac:(reflexivity) Hsp1
+                  ltac:(apply bv_eq; vm_compute; reflexivity)) as "Hps6".
+    iApply ("Hps6" $! h6 C6 pt6 Rut6 sz6 with "[%] [%] Hb");
+      [ exact Hlo6 | exact Hpm6 | ].
+    set (M6 := uM_store8 M5 (uint sp0 - 64 + 16)
+                 (m1 !!! Regidx (mword_of_int 20 : mword 5))).
+    assert (Ho6 : uM_only M M6 (uint sp0 - 64) 64).
+    { apply (uM_only_trans M M5 M6 (uint sp0 - 64) 64 Ho5).
+      rewrite /M6. apply uM_only_store8; lia. }
+    assert (Ht6 : echo_text_sub M6)
+      by exact (uM_only_img EchoInstrs.echo_bytes M M6 (uint sp0 - 64) 64
+                  HkT Ho6 Htext).
+    assert (Hs6 : uk_stack π M6 sp0 64)
+      by exact (uk_stack_only M M6 sp0 64 (uint sp0 - 64) 64 Ho6 Hstf).
+    assert (E0c : add_vec_int (mword_of_int 0x0c : mword 64) 2 = mword_of_int 0x0e)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E0c.
+    rewrite /ukc. iIntros (h7 C7 pt7 Rut7 sz7) "%Hlo7 %Hpm7 Hb".
+    (* ---- 0x0e  c.sdsp x21,8(sp) ---- *)
+    iPoseProof (kecho_pro_store M6 m1 sp0 (mword_of_int 0x0e)
+                  (mword_of_int 1 : mword 6) (mword_of_int 21 : mword 5) 64 8
+                  (UI ui_echo_0e M6 Ht6 Hx) Hs6
+                  ltac:(lia) ltac:(lia) ltac:(reflexivity) Hsp1
+                  ltac:(apply bv_eq; vm_compute; reflexivity)) as "Hps7".
+    iApply ("Hps7" $! h7 C7 pt7 Rut7 sz7 with "[%] [%] Hb");
+      [ exact Hlo7 | exact Hpm7 | ].
+    set (M7 := uM_store8 M6 (uint sp0 - 64 + 8)
+                 (m1 !!! Regidx (mword_of_int 21 : mword 5))).
+    assert (Ho7 : uM_only M M7 (uint sp0 - 64) 64).
+    { apply (uM_only_trans M M6 M7 (uint sp0 - 64) 64 Ho6).
+      rewrite /M7. apply uM_only_store8; lia. }
+    assert (Ht7 : echo_text_sub M7)
+      by exact (uM_only_img EchoInstrs.echo_bytes M M7 (uint sp0 - 64) 64
+                  HkT Ho7 Htext).
+    assert (Hs7 : uk_stack π M7 sp0 64)
+      by exact (uk_stack_only M M7 sp0 64 (uint sp0 - 64) 64 Ho7 Hstf).
+    assert (E0e : add_vec_int (mword_of_int 0x0e : mword 64) 2 = mword_of_int 0x10)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E0e.
+    rewrite /ukc. iIntros (h8 C8 pt8 Rut8 sz8) "%Hlo8 %Hpm8 Hb".
+    (* ---- 0x10  c.sdsp x22,0(sp) ---- *)
+    iPoseProof (kecho_pro_store M7 m1 sp0 (mword_of_int 0x10)
+                  (mword_of_int 0 : mword 6) (mword_of_int 22 : mword 5) 64 0
+                  (UI ui_echo_10 M7 Ht7 Hx) Hs7
+                  ltac:(lia) ltac:(lia) ltac:(reflexivity) Hsp1
+                  ltac:(apply bv_eq; vm_compute; reflexivity)) as "Hps8".
+    iApply ("Hps8" $! h8 C8 pt8 Rut8 sz8 with "[%] [%] Hb");
+      [ exact Hlo8 | exact Hpm8 | ].
+    set (M8 := uM_store8 M7 (uint sp0 - 64 + 0)
+                 (m1 !!! Regidx (mword_of_int 22 : mword 5))).
+    assert (Ho8 : uM_only M M8 (uint sp0 - 64) 64).
+    { apply (uM_only_trans M M7 M8 (uint sp0 - 64) 64 Ho7).
+      rewrite /M8. apply uM_only_store8; lia. }
+    assert (Ht8 : echo_text_sub M8)
+      by exact (uM_only_img EchoInstrs.echo_bytes M M8 (uint sp0 - 64) 64
+                  HkT Ho8 Htext).
+    (* the image predicates at the post-prologue image, once *)
+    assert (Hst8 : uk_stack π M8 sp0 80)
+      by exact (uk_stack_only M M8 sp0 80 (uint sp0 - 64) 64 Ho8 Hst).
+    assert (Hargs8 : uk_args π M8 av argc (uint sp0) alen)
+      by exact (uk_args_only M M8 av argc (uint sp0) (uint sp0 - 64) 64 alen
+                  Ho8 ltac:(lia) Hargs).
+    assert (E10 : add_vec_int (mword_of_int 0x10 : mword 64) 2 = mword_of_int 0x12)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E10.
+    rewrite /ukc. iIntros (h9 C9 pt9 Rut9 sz9) "%Hlo9 %Hpm9 Hb".
+    (* ---- 0x12  c.addi4spn s0,sp,64 ---- *)
+    assert (Hw64 : add_vec_int (add_vec_int sp0 (-64)) 64
+                   = add_vec (m1 !!! Regidx csp_rs1)
+                       (sign_extend' 64 (caddi4spn_imm (mword_of_int 16 : mword 8)))).
+    { rewrite Hsp1.
+      assert (Hc : (sign_extend' 64 (caddi4spn_imm (mword_of_int 16 : mword 8))
+                    : mword 64) = mword_of_int 64)
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite Hc. reflexivity. }
+    iApply (wp_uk_caddi4spn C9 pt9 Rut9 π sz9 Hlo9 Hpm9 M8 m1 (mword_of_int 0x12)
+              (mword_of_int 0 : mword 3) (mword_of_int 16 : mword 8)
+              (mword_of_int 8 : mword 5) (add_vec_int (add_vec_int sp0 (-64)) 64)
+              (UI ui_echo_12 M8 Ht8 Hx)
+              ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) Hw64
+              with "Hb").
+    set (m2 := <[Regidx (mword_of_int 8 : mword 5)
+                 := regval_into_reg (add_vec_int (add_vec_int sp0 (-64)) 64)]> m1).
+    assert (E12 : add_vec_int (mword_of_int 0x12 : mword 64) 2 = mword_of_int 0x14)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E12.
+    rewrite /ukc. iIntros (hA CA ptA RutA szA) "%HloA %HpmA Hb".
+    (* ---- 0x14  c.li a5,1 ---- *)
+    assert (Hw1 : (mword_of_int 1 : mword 64)
+                  = add_vec zero_reg
+                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))
+      by (apply bv_eq; vm_compute; reflexivity).
+    iApply (wp_uk_cli CA ptA RutA π szA HloA HpmA M8 m2 (mword_of_int 0x14)
+              (mword_of_int 1 : mword 6) (mword_of_int 15 : mword 5)
+              (mword_of_int 1 : mword 64)
+              (UI ui_echo_14 M8 Ht8 Hx)
+              ltac:(vm_compute; discriminate) Hw1
+              with "Hb").
+    set (m3 := <[Regidx (mword_of_int 15 : mword 5)
+                 := regval_into_reg (mword_of_int 1 : mword 64)]> m2).
+    assert (E14 : add_vec_int (mword_of_int 0x14 : mword 64) 2 = mword_of_int 0x16)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E14.
+    rewrite /ukc. iIntros (hB CB ptB RutB szB) "%HloB %HpmB Hb".
+    (* ---- 0x16  bge a5,a0,0x76 -- the argc guard ---- *)
+    assert (Ha5_3 : m3 !!! Regidx (mword_of_int 15 : mword 5)
+                    = (mword_of_int 1 : mword 64))
+      by (apply upd_eq_tr; reflexivity).
+    assert (Ha0_3 : m3 !!! Regidx (mword_of_int 10 : mword 5)
+                    = (mword_of_int argc : mword 64)).
+    { rewrite /m3 /m2.
+      apply upd_ne_tr; [ vm_compute; discriminate | ].
+      apply upd_ne_tr; [ vm_compute; discriminate | ].
+      rewrite /m1. apply upd_ne_tr; [ vm_compute; discriminate | ].
+      exact Hargc. }
+    assert (Ha1_3 : m3 !!! Regidx (mword_of_int 11 : mword 5)
+                    = (mword_of_int av : mword 64)).
+    { rewrite /m3 /m2.
+      apply upd_ne_tr; [ vm_compute; discriminate | ].
+      apply upd_ne_tr; [ vm_compute; discriminate | ].
+      rewrite /m1. apply upd_ne_tr; [ vm_compute; discriminate | ].
+      exact Hav. }
+    assert (Etgt76 : (mword_of_int 0x76 : mword 64)
+                     = add_vec (mword_of_int 0x16)
+                         (sign_extend' 64 (mword_of_int 96 : mword 13)))
+      by (apply bv_eq; vm_compute; reflexivity).
+    destruct (Z.geb 1 argc) eqn:Hge.
+    - (* argc <= 1: the guard is taken, straight to the exit tail *)
+      iApply (wp_uk_btype CB ptB RutB π szB HloB HpmB M8 m3 (mword_of_int 0x16)
+                (mword_of_int 96 : mword 13) (mword_of_int 10 : mword 5)
+                (mword_of_int 15 : mword 5) BGE true (mword_of_int 0x76)
+                (UI ui_echo_16 M8 Ht8 Hx)
+                ltac:(cbn [uv_btaken]; rewrite Ha5_3 Ha0_3
+                        (moi_ge_s 1 argc ltac:(unfold Z63; lia)
+                           ltac:(unfold Z63; lia));
+                      exact (eq_sym Hge))
+                Etgt76 ltac:(intros _; vm_compute; reflexivity)
+                with "Hb").
+      iApply (kecho_exit_tail M8 m3 Hx Ht8).
+    - (* argc >= 2: the argv index chain, then the loop *)
+      assert (Hargc2 : 2 <= argc).
+      { destruct (Z.le_gt_cases argc 1) as [Hle | Hgt]; [ | lia ].
+        exfalso. rewrite (proj2 (Z.geb_le 1 argc) Hle) in Hge. discriminate. }
+      iApply (wp_uk_btype CB ptB RutB π szB HloB HpmB M8 m3 (mword_of_int 0x16)
+                (mword_of_int 96 : mword 13) (mword_of_int 10 : mword 5)
+                (mword_of_int 15 : mword 5) BGE false (mword_of_int 0x76)
+                (UI ui_echo_16 M8 Ht8 Hx)
+                ltac:(cbn [uv_btaken]; rewrite Ha5_3 Ha0_3
+                        (moi_ge_s 1 argc ltac:(unfold Z63; lia)
+                           ltac:(unfold Z63; lia));
+                      exact (eq_sym Hge))
+                Etgt76 ltac:(intro Hc; discriminate Hc)
+                with "Hb").
+      assert (E16 : (if false then (mword_of_int 0x76 : mword 64)
+                     else add_vec_int (mword_of_int 0x16 : mword 64) 4)
+                    = mword_of_int 0x1a)
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite E16.
+      (* the whole index arithmetic, discharged by §0b *)
+      assert (HP1 : 2 <= argc < 2 ^ 31)
+        by (change (2 ^ 31) with 2147483648; lia).
+      assert (HP3 : av + 8 * argc <= 2 ^ 38)
+        by (change (2 ^ 38) with 274877906944; lia).
+      destruct (echo_argv_chain argc av HP1 Hav0 HP3) as (Hch1 & Hch2 & Hch3).
+      assert (Hs1val : add_vec (mword_of_int av : mword 64)
+                         (sign_extend' 64 (mword_of_int 8 : mword 12))
+                       = (mword_of_int (av + 8 * 1) : mword 64)).
+      { assert (E8 : (sign_extend' 64 (mword_of_int 8 : mword 12) : mword 64)
+                     = mword_of_int 8) by (apply bv_eq; vm_compute; reflexivity).
+        rewrite E8 moi_add. f_equal; lia. }
+      rewrite /ukc. iIntros (hC CC ptC RutC szC) "%HloC %HpmC Hb".
+      (* ---- 0x1a  addi s1,a1,8 ---- *)
+      iApply (wp_uk_addi CC ptC RutC π szC HloC HpmC M8 m3 (mword_of_int 0x1a)
+                (mword_of_int 8 : mword 12) (mword_of_int 11 : mword 5)
+                (mword_of_int 9 : mword 5)
+                (add_vec (mword_of_int av : mword 64)
+                   (sign_extend' 64 (mword_of_int 8 : mword 12)))
+                (UI ui_echo_1a M8 Ht8 Hx)
+                ltac:(vm_compute; discriminate)
+                ltac:(rewrite Ha1_3; reflexivity)
+                with "Hb").
+      set (m4 := <[Regidx (mword_of_int 9 : mword 5)
+                   := regval_into_reg (add_vec (mword_of_int av : mword 64)
+                        (sign_extend' 64 (mword_of_int 8 : mword 12)))]> m3).
+      assert (E1a : add_vec_int (mword_of_int 0x1a : mword 64) 4 = mword_of_int 0x1e)
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite E1a.
+      rewrite /ukc. iIntros (hD CD ptD RutD szD) "%HloD %HpmD Hb".
+      (* ---- 0x1e  c.addiw a0,a0,-2 ---- *)
+      assert (Ha0_4 : m4 !!! Regidx (mword_of_int 10 : mword 5)
+                      = (mword_of_int argc : mword 64)).
+      { rewrite /m4. apply upd_ne_tr; [ vm_compute; discriminate | ]. exact Ha0_3. }
+      iApply (wp_uk_caddiw CD ptD RutD π szD HloD HpmD M8 m4 (mword_of_int 0x1e)
+                (mword_of_int 62 : mword 6) (mword_of_int 10 : mword 5)
+                (sign_extend' 64
+                   (subrange_vec_dec
+                      (add_vec (mword_of_int argc : mword 64)
+                         (sign_extend' 64 (sign_extend' 12 (mword_of_int 62 : mword 6))))
+                      31 0))
+                (UI ui_echo_1e M8 Ht8 Hx)
+                ltac:(vm_compute; discriminate)
+                ltac:(rewrite Ha0_4; reflexivity)
+                with "Hb").
+      set (m5 := <[Regidx (mword_of_int 10 : mword 5)
+                   := regval_into_reg (sign_extend' 64
+                        (subrange_vec_dec
+                           (add_vec (mword_of_int argc : mword 64)
+                              (sign_extend' 64
+                                 (sign_extend' 12 (mword_of_int 62 : mword 6))))
+                           31 0))]> m4).
+      assert (E1e : add_vec_int (mword_of_int 0x1e : mword 64) 2 = mword_of_int 0x20)
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite E1e.
+      rewrite /ukc. iIntros (hE CE ptE RutE szE) "%HloE %HpmE Hb".
+      (* ---- 0x20  slli a5,a0,0x20 ---- *)
+      assert (Ha0_5 : m5 !!! Regidx (mword_of_int 10 : mword 5)
+                      = sign_extend' 64
+                          (subrange_vec_dec
+                             (add_vec (mword_of_int argc : mword 64)
+                                (sign_extend' 64
+                                   (sign_extend' 12 (mword_of_int 62 : mword 6))))
+                             31 0))
+        by (apply upd_eq_tr; reflexivity).
+      iApply (wp_uk_slli CE ptE RutE π szE HloE HpmE M8 m5 (mword_of_int 0x20)
+                (mword_of_int 32 : mword 6) (mword_of_int 10 : mword 5)
+                (mword_of_int 15 : mword 5)
+                (shift_bits_left
+                   (sign_extend' 64
+                      (subrange_vec_dec
+                         (add_vec (mword_of_int argc : mword 64)
+                            (sign_extend' 64
+                               (sign_extend' 12 (mword_of_int 62 : mword 6))))
+                         31 0))
+                   (subrange_vec_dec (mword_of_int 32 : mword 6) (Z.sub log2_xlen 1) 0))
+                (UI ui_echo_20 M8 Ht8 Hx)
+                ltac:(vm_compute; discriminate)
+                ltac:(rewrite Ha0_5; reflexivity)
+                with "Hb").
+      set (m6 := <[Regidx (mword_of_int 15 : mword 5)
+                   := regval_into_reg (shift_bits_left
+                        (sign_extend' 64
+                           (subrange_vec_dec
+                              (add_vec (mword_of_int argc : mword 64)
+                                 (sign_extend' 64
+                                    (sign_extend' 12 (mword_of_int 62 : mword 6))))
+                              31 0))
+                        (subrange_vec_dec (mword_of_int 32 : mword 6)
+                           (Z.sub log2_xlen 1) 0))]> m5).
+      assert (E20 : add_vec_int (mword_of_int 0x20 : mword 64) 4 = mword_of_int 0x24)
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite E20.
+      rewrite /ukc. iIntros (hF CF ptF RutF szF) "%HloF %HpmF Hb".
+      (* ---- 0x24  srli a0,a5,0x1d -- a0 := 8*(argc-2) ---- *)
+      assert (Ha5_6 : m6 !!! Regidx (mword_of_int 15 : mword 5)
+                      = shift_bits_left
+                          (sign_extend' 64
+                             (subrange_vec_dec
+                                (add_vec (mword_of_int argc : mword 64)
+                                   (sign_extend' 64
+                                      (sign_extend' 12 (mword_of_int 62 : mword 6))))
+                                31 0))
+                          (subrange_vec_dec (mword_of_int 32 : mword 6)
+                             (Z.sub log2_xlen 1) 0))
+        by (apply upd_eq_tr; reflexivity).
+      iApply (wp_uk_srli CF ptF RutF π szF HloF HpmF M8 m6 (mword_of_int 0x24)
+                (mword_of_int 29 : mword 6) (mword_of_int 15 : mword 5)
+                (mword_of_int 10 : mword 5)
+                (mword_of_int (8 * (argc - 2)))
+                (UI ui_echo_24 M8 Ht8 Hx)
+                ltac:(vm_compute; discriminate)
+                ltac:(rewrite Ha5_6; exact (eq_sym Hch1))
+                with "Hb").
+      set (m7 := <[Regidx (mword_of_int 10 : mword 5)
+                   := regval_into_reg (mword_of_int (8 * (argc - 2)) : mword 64)]> m6).
+      assert (E24 : add_vec_int (mword_of_int 0x24 : mword 64) 4 = mword_of_int 0x28)
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite E24.
+      rewrite /ukc. iIntros (hG CG ptG RutG szG) "%HloG %HpmG Hb".
+      (* ---- 0x28  add s5,s1,a0 ---- *)
+      assert (Hs1_7 : m7 !!! Regidx (mword_of_int 9 : mword 5)
+                      = add_vec (mword_of_int av : mword 64)
+                          (sign_extend' 64 (mword_of_int 8 : mword 12))).
+      { rewrite /m7 /m6 /m5.
+        apply upd_ne_tr; [ vm_compute; discriminate | ].
+        apply upd_ne_tr; [ vm_compute; discriminate | ].
+        apply upd_ne_tr; [ vm_compute; discriminate | ].
+        apply upd_eq_tr; reflexivity. }
+      assert (Ha0_7 : m7 !!! Regidx (mword_of_int 10 : mword 5)
+                      = (mword_of_int (8 * (argc - 2)) : mword 64))
+        by (apply upd_eq_tr; reflexivity).
+      iApply (wp_uk_add CG ptG RutG π szG HloG HpmG M8 m7 (mword_of_int 0x28)
+                (mword_of_int 9 : mword 5) (mword_of_int 10 : mword 5)
+                (mword_of_int 21 : mword 5)
+                (mword_of_int (av + 8 * (argc - 1)))
+                (UI ui_echo_28 M8 Ht8 Hx)
+                ltac:(vm_compute; discriminate)
+                ltac:(rewrite Hs1_7 Ha0_7 -Hch1; exact (eq_sym Hch2))
+                with "Hb").
+      set (m8 := <[Regidx (mword_of_int 21 : mword 5)
+                   := regval_into_reg (mword_of_int (av + 8 * (argc - 1))
+                                       : mword 64)]> m7).
+      assert (E28 : add_vec_int (mword_of_int 0x28 : mword 64) 4 = mword_of_int 0x2c)
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite E28.
+      rewrite /ukc. iIntros (hH CH ptH RutH szH) "%HloH %HpmH Hb".
+      (* ---- 0x2c  c.addi a1,a1,16 ---- *)
+      assert (Ha1_8 : m8 !!! Regidx (mword_of_int 11 : mword 5)
+                      = (mword_of_int av : mword 64)).
+      { rewrite /m8 /m7 /m6 /m5 /m4.
+        do 5 (apply upd_ne_tr; [ vm_compute; discriminate | ]).
+        exact Ha1_3. }
+      iApply (wp_uk_caddi CH ptH RutH π szH HloH HpmH M8 m8 (mword_of_int 0x2c)
+                (mword_of_int 16 : mword 6) (mword_of_int 11 : mword 5)
+                (add_vec (mword_of_int av : mword 64)
+                   (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))))
+                (UI ui_echo_2c M8 Ht8 Hx)
+                ltac:(vm_compute; discriminate)
+                ltac:(rewrite Ha1_8; reflexivity)
+                with "Hb").
+      set (m9 := <[Regidx (mword_of_int 11 : mword 5)
+                   := regval_into_reg (add_vec (mword_of_int av : mword 64)
+                        (sign_extend' 64
+                           (sign_extend' 12 (mword_of_int 16 : mword 6))))]> m8).
+      assert (E2c : add_vec_int (mword_of_int 0x2c : mword 64) 2 = mword_of_int 0x2e)
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite E2c.
+      rewrite /ukc. iIntros (hI CI ptI RutI szI) "%HloI %HpmI Hb".
+      (* ---- 0x2e  add s4,a1,a0 ---- *)
+      assert (Ha1_9 : m9 !!! Regidx (mword_of_int 11 : mword 5)
+                      = add_vec (mword_of_int av : mword 64)
+                          (sign_extend' 64
+                             (sign_extend' 12 (mword_of_int 16 : mword 6))))
+        by (apply upd_eq_tr; reflexivity).
+      assert (Ha0_9 : m9 !!! Regidx (mword_of_int 10 : mword 5)
+                      = (mword_of_int (8 * (argc - 2)) : mword 64)).
+      { rewrite /m9 /m8.
+        do 2 (apply upd_ne_tr; [ vm_compute; discriminate | ]).
+        exact Ha0_7. }
+      iApply (wp_uk_add CI ptI RutI π szI HloI HpmI M8 m9 (mword_of_int 0x2e)
+                (mword_of_int 11 : mword 5) (mword_of_int 10 : mword 5)
+                (mword_of_int 20 : mword 5)
+                (mword_of_int (av + 8 * argc))
+                (UI ui_echo_2e M8 Ht8 Hx)
+                ltac:(vm_compute; discriminate)
+                ltac:(rewrite Ha1_9 Ha0_9 -Hch1; exact (eq_sym Hch3))
+                with "Hb").
+      set (m10 := <[Regidx (mword_of_int 20 : mword 5)
+                    := regval_into_reg (mword_of_int (av + 8 * argc) : mword 64)]> m9).
+      assert (E2e : add_vec_int (mword_of_int 0x2e : mword 64) 4 = mword_of_int 0x32)
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite E2e.
+      rewrite /ukc. iIntros (hJ CJ ptJ RutJ szJ) "%HloJ %HpmJ Hb".
+      (* ---- 0x32  c.li s3,1 ---- *)
+      iApply (wp_uk_cli CJ ptJ RutJ π szJ HloJ HpmJ M8 m10 (mword_of_int 0x32)
+                (mword_of_int 1 : mword 6) (mword_of_int 19 : mword 5)
+                (mword_of_int 1 : mword 64)
+                (UI ui_echo_32 M8 Ht8 Hx)
+                ltac:(vm_compute; discriminate) Hw1
+                with "Hb").
+      set (m11 := <[Regidx (mword_of_int 19 : mword 5)
+                    := regval_into_reg (mword_of_int 1 : mword 64)]> m10).
+      assert (E32 : add_vec_int (mword_of_int 0x32 : mword 64) 2 = mword_of_int 0x34)
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite E32.
+      rewrite /ukc. iIntros (hK CK ptK RutK szK) "%HloK %HpmK Hb".
+      (* ---- 0x34  auipc s6,0x1 ---- *)
+      iApply (wp_uk_auipc CK ptK RutK π szK HloK HpmK M8 m11 (mword_of_int 0x34)
+                (mword_of_int 1 : mword 20) (mword_of_int 22 : mword 5)
+                (mword_of_int 4148 : mword 64)
+                (UI ui_echo_34 M8 Ht8 Hx)
+                ltac:(vm_compute; discriminate)
+                ltac:(apply bv_eq; vm_compute; reflexivity)
+                with "Hb").
+      set (m12 := <[Regidx (mword_of_int 22 : mword 5)
+                    := regval_into_reg (mword_of_int 4148 : mword 64)]> m11).
+      assert (E34 : add_vec_int (mword_of_int 0x34 : mword 64) 4 = mword_of_int 0x38)
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite E34.
+      rewrite /ukc. iIntros (hL CL ptL RutL szL) "%HloL %HpmL Hb".
+      (* ---- 0x38  addi s6,s6,-1796 -- s6 := 0x930, the " " literal ---- *)
+      assert (Hs6_12 : m12 !!! Regidx (mword_of_int 22 : mword 5)
+                       = (mword_of_int 4148 : mword 64))
+        by (apply upd_eq_tr; reflexivity).
+      iApply (wp_uk_addi CL ptL RutL π szL HloL HpmL M8 m12 (mword_of_int 0x38)
+                (mword_of_int 2300 : mword 12) (mword_of_int 22 : mword 5)
+                (mword_of_int 22 : mword 5) (mword_of_int 2352 : mword 64)
+                (UI ui_echo_38 M8 Ht8 Hx)
+                ltac:(vm_compute; discriminate)
+                ltac:(rewrite Hs6_12; apply bv_eq; vm_compute; reflexivity)
+                with "Hb").
+      set (m13 := <[Regidx (mword_of_int 22 : mword 5)
+                    := regval_into_reg (mword_of_int 2352 : mword 64)]> m12).
+      assert (E38 : add_vec_int (mword_of_int 0x38 : mword 64) 4 = mword_of_int 0x3c)
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite E38.
+      rewrite /ukc. iIntros (hM CM ptM RutM szM) "%HloM %HpmM Hb".
+      (* ---- 0x3c  c.j 0x4e -- enter the loop at i = 1 ---- *)
+      iApply (wp_uk_cj CM ptM RutM π szM HloM HpmM M8 m13 (mword_of_int 0x3c)
+                (mword_of_int 9 : mword 11) (mword_of_int 0x4e)
+                (UI ui_echo_3c M8 Ht8 Hx)
+                ltac:(apply bv_eq; vm_compute; reflexivity)
+                ltac:(vm_compute; reflexivity)
+                with "Hb").
+      (* ---- the loop, at i = 1 ---- *)
+      iApply (kecho_loop sp0 argc av alen (Z.to_nat (argc - 1)) M8 m13 1
+                Hx Ht8 Hargs8 Hst8 ltac:(lia)
+                ltac:(rewrite Z2Nat.id; lia)
+                ltac:(rewrite /m13 /m12 /m11 /m10 /m9 /m8 /m7 /m6 /m5;
+                      do 9 (apply upd_ne_tr; [ vm_compute; discriminate | ]);
+                      apply upd_eq_tr; exact Hs1val)
+                ltac:(rewrite /m13 /m12 /m11 /m10 /m9;
+                      do 5 (apply upd_ne_tr; [ vm_compute; discriminate | ]);
+                      apply upd_eq_tr; reflexivity)
+                ltac:(rewrite /m13 /m12 /m11;
+                      do 3 (apply upd_ne_tr; [ vm_compute; discriminate | ]);
+                      apply upd_eq_tr; reflexivity)
+                ltac:(rewrite /m13 /m12;
+                      do 2 (apply upd_ne_tr; [ vm_compute; discriminate | ]);
+                      apply upd_eq_tr; reflexivity)
+                ltac:(apply upd_eq_tr; reflexivity)
+                ltac:(rewrite /m13 /m12 /m11 /m10 /m9 /m8 /m7 /m6 /m5 /m4 /m3 /m2;
+                      do 12 (apply upd_ne_tr; [ vm_compute; discriminate | ]);
+                      exact Hsp1)).
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* §5 start @0x7c -- the ELF entry [exec()] jumps to, and THE top-level  *)
+  (* statement about the echo process: from the loaded image, the argument *)
+  (* area and the entry registers, the machine runs safely forever under   *)
+  (* the kernel's trap services.  Prologue, then main; main DIVERGES, so   *)
+  (* the jal exit at 0x88 is dead code with no [uinstr] fact.              *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_kecho_start (M : gmap Z (bv 8)) (m : regfile) (sp0 : mword 64)
+      (argc av : Z) (alen : Z -> Z) :
+    uk_xpage π (mword_of_int 0) ->
+    echo_text_sub M ->
+    m !!! Regidx sp_idx = sp0 ->
+    uk_stack π M sp0 96 ->                     (* start's 16 + main's 80 *)
+    m !!! Regidx a0_idx = (mword_of_int argc : mword 64) ->
+    m !!! Regidx a1_idx = (mword_of_int av : mword 64) ->
+    uk_args π M av argc (uint sp0) alen ->
+    ⊢ ukc π M m (mword_of_int EchoSyms.start).
+  Proof.
+    intros Hx Htext Hsp Hst Hargc Hav Hargs.
+    destruct echo_syms_pins as (Hsmain & Hsstart & Hsstrlen & Hsexit & Hswrite).
+    rewrite Hsstart.
+    pose proof (uks_lo _ _ _ _ Hst) as Hlo96.
+    destruct (uk_stack_split π M sp0 96 16 80 ltac:(lia) ltac:(lia)
+                ltac:(reflexivity) ltac:(lia) Hst) as [Hstf Hstm].
+    assert (Hbu : bv_unsigned sp0 = uint sp0)
+      by (rewrite uint_unsigned; reflexivity).
+    assert (Hu16 : uint (add_vec_int sp0 (-16)) = uint sp0 - 16).
+    { rewrite uint_unsigned.
+      rewrite (uv_avi_neg sp0 16 ltac:(lia) ltac:(rewrite Hbu; lia)).
+      rewrite Hbu. reflexivity. }
+    assert (HkT : forall (kk : Z) (bb : bv 8),
+              EchoInstrs.echo_bytes !! kk = Some bb -> kk < uint sp0 - 16)
+      by (intros kk bb Hkb; pose proof (echo_bytes_key_lt kk bb Hkb); lia).
+    rewrite /ukc. iIntros (h C pt Rut sz) "%Hlo %Hpm Hb".
+    (* ---- 0x7c  c.addi sp,sp,-16 ---- *)
+    assert (Hwsp : add_vec_int sp0 (-16)
+                   = add_vec (m !!! Regidx (mword_of_int 2 : mword 5))
+                       (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
+    { assert (Hsp' : m !!! Regidx (mword_of_int 2 : mword 5) = sp0) by exact Hsp.
+      rewrite Hsp'.
+      assert (Hc : (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))
+                    : mword 64) = mword_of_int (-16))
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite Hc. reflexivity. }
+    iApply (wp_uk_caddi C pt Rut π sz Hlo Hpm M m (mword_of_int 0x7c)
+              (mword_of_int 48 : mword 6) (mword_of_int 2 : mword 5)
+              (add_vec_int sp0 (-16))
+              (UI ui_echo_7c M Htext Hx)
+              ltac:(vm_compute; discriminate) Hwsp
+              with "Hb").
+    set (n1 := <[Regidx (mword_of_int 2 : mword 5)
+                 := regval_into_reg (add_vec_int sp0 (-16))]> m).
+    assert (Hsp1 : n1 !!! Regidx csp_rs1 = add_vec_int sp0 (-16))
+      by exact (upd_eq m (Regidx (mword_of_int 2 : mword 5))
+                  (regval_into_reg (add_vec_int sp0 (-16)))).
+    assert (E7c : add_vec_int (mword_of_int 0x7c : mword 64) 2 = mword_of_int 0x7e)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E7c.
+    rewrite /ukc. iIntros (h1 C1 pt1 Rut1 sz1) "%Hlo1 %Hpm1 Hb".
+    (* ---- 0x7e  c.sdsp ra,8(sp) ---- *)
+    iPoseProof (kecho_pro_store M n1 sp0 (mword_of_int 0x7e)
+                  (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5) 16 8
+                  (UI ui_echo_7e M Htext Hx) Hstf
+                  ltac:(lia) ltac:(lia) ltac:(reflexivity) Hsp1
+                  ltac:(apply bv_eq; vm_compute; reflexivity)) as "Hps1".
+    iApply ("Hps1" $! h1 C1 pt1 Rut1 sz1 with "[%] [%] Hb");
+      [ exact Hlo1 | exact Hpm1 | ].
+    set (N1 := uM_store8 M (uint sp0 - 16 + 8)
+                 (n1 !!! Regidx (mword_of_int 1 : mword 5))).
+    assert (Ho1 : uM_only M N1 (uint sp0 - 16) 16)
+      by (rewrite /N1; apply uM_only_store8; lia).
+    assert (Ht1 : echo_text_sub N1)
+      by exact (uM_only_img EchoInstrs.echo_bytes M N1 (uint sp0 - 16) 16
+                  HkT Ho1 Htext).
+    assert (Hs1 : uk_stack π N1 sp0 16)
+      by exact (uk_stack_only M N1 sp0 16 (uint sp0 - 16) 16 Ho1 Hstf).
+    assert (E7e : add_vec_int (mword_of_int 0x7e : mword 64) 2 = mword_of_int 0x80)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E7e.
+    rewrite /ukc. iIntros (h2 C2 pt2 Rut2 sz2) "%Hlo2 %Hpm2 Hb".
+    (* ---- 0x80  c.sdsp s0,0(sp) ---- *)
+    iPoseProof (kecho_pro_store N1 n1 sp0 (mword_of_int 0x80)
+                  (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5) 16 0
+                  (UI ui_echo_80 N1 Ht1 Hx) Hs1
+                  ltac:(lia) ltac:(lia) ltac:(reflexivity) Hsp1
+                  ltac:(apply bv_eq; vm_compute; reflexivity)) as "Hps2".
+    iApply ("Hps2" $! h2 C2 pt2 Rut2 sz2 with "[%] [%] Hb");
+      [ exact Hlo2 | exact Hpm2 | ].
+    set (N2 := uM_store8 N1 (uint sp0 - 16 + 0)
+                 (n1 !!! Regidx (mword_of_int 8 : mword 5))).
+    assert (Ho2 : uM_only M N2 (uint sp0 - 16) 16).
+    { apply (uM_only_trans M N1 N2 (uint sp0 - 16) 16 Ho1).
+      rewrite /N2. apply uM_only_store8; lia. }
+    assert (Ht2 : echo_text_sub N2)
+      by exact (uM_only_img EchoInstrs.echo_bytes M N2 (uint sp0 - 16) 16
+                  HkT Ho2 Htext).
+    assert (E80 : add_vec_int (mword_of_int 0x80 : mword 64) 2 = mword_of_int 0x82)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E80.
+    rewrite /ukc. iIntros (h3 C3 pt3 Rut3 sz3) "%Hlo3 %Hpm3 Hb".
+    (* ---- 0x82  c.addi4spn s0,sp,16 ---- *)
+    assert (Hw16 : add_vec_int (add_vec_int sp0 (-16)) 16
+                   = add_vec (n1 !!! Regidx csp_rs1)
+                       (sign_extend' 64 (caddi4spn_imm (mword_of_int 4 : mword 8)))).
+    { rewrite Hsp1.
+      assert (Hc : (sign_extend' 64 (caddi4spn_imm (mword_of_int 4 : mword 8))
+                    : mword 64) = mword_of_int 16)
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite Hc. reflexivity. }
+    iApply (wp_uk_caddi4spn C3 pt3 Rut3 π sz3 Hlo3 Hpm3 N2 n1 (mword_of_int 0x82)
+              (mword_of_int 0 : mword 3) (mword_of_int 4 : mword 8)
+              (mword_of_int 8 : mword 5) (add_vec_int (add_vec_int sp0 (-16)) 16)
+              (UI ui_echo_82 N2 Ht2 Hx)
+              ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) Hw16
+              with "Hb").
+    set (n2 := <[Regidx (mword_of_int 8 : mword 5)
+                 := regval_into_reg (add_vec_int (add_vec_int sp0 (-16)) 16)]> n1).
+    assert (E82 : add_vec_int (mword_of_int 0x82 : mword 64) 2 = mword_of_int 0x84)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E82.
+    rewrite /ukc. iIntros (h4 C4 pt4 Rut4 sz4) "%Hlo4 %Hpm4 Hb".
+    (* ---- 0x84  jal ra,0x0 <main> ---- *)
+    assert (Htj : (mword_of_int EchoSyms.main : mword 64)
+                  = add_vec (mword_of_int 0x84)
+                      (sign_extend' 64 (mword_of_int 2097020 : mword 21)))
+      by (apply bv_eq; vm_compute; reflexivity).
+    assert (Hwj : (mword_of_int 0x88 : mword 64)
+                  = add_vec_int (mword_of_int 0x84 : mword 64) 4)
+      by (apply bv_eq; vm_compute; reflexivity).
+    iApply (wp_uk_jal C4 pt4 Rut4 π sz4 Hlo4 Hpm4 N2 n2 (mword_of_int 0x84)
+              (mword_of_int 2097020 : mword 21) ra_idx
+              (mword_of_int EchoSyms.main) (mword_of_int 0x88)
+              (UI ui_echo_84 N2 Ht2 Hx)
+              ltac:(vm_compute; discriminate) Htj Hwj
+              ltac:(vm_compute; reflexivity)
+              with "Hb").
+    set (n3 := <[Regidx ra_idx
+                 := regval_into_reg (mword_of_int 0x88 : mword 64)]> n2).
+    (* ---- the call: main() -- diverges ----
+       ORDER MATTERS: carry [uk_args] across the prologue at the OLD bound
+       (where [uk_args_only]'s [a + n <= lo] holds exactly), and only then
+       lower the bound to main's entry sp. *)
+    assert (Hargs2 : uk_args π N2 av argc (uint sp0) alen)
+      by exact (uk_args_only M N2 av argc (uint sp0) (uint sp0 - 16) 16 alen
+                  Ho2 ltac:(lia) Hargs).
+    assert (Hargs3 : uk_args π N2 av argc (uint (add_vec_int sp0 (-16))) alen)
+      by exact (uk_args_lo_le π N2 av argc (uint sp0)
+                  (uint (add_vec_int sp0 (-16))) alen ltac:(lia) Hargs2).
+    assert (Hst3 : uk_stack π N2 (add_vec_int sp0 (-16)) 80)
+      by exact (uk_stack_only M N2 (add_vec_int sp0 (-16)) 80
+                  (uint sp0 - 16) 16 Ho2 Hstm).
+    assert (Hsp3 : n3 !!! Regidx sp_idx = add_vec_int sp0 (-16)).
+    { rewrite /n3 /n2.
+      do 2 (apply upd_ne_tr; [ vm_compute; discriminate | ]).
+      exact Hsp1. }
+    assert (Hargc3 : n3 !!! Regidx a0_idx = (mword_of_int argc : mword 64)).
+    { rewrite /n3 /n2 /n1.
+      do 3 (apply upd_ne_tr; [ vm_compute; discriminate | ]).
+      exact Hargc. }
+    assert (Hav3 : n3 !!! Regidx a1_idx = (mword_of_int av : mword 64)).
+    { rewrite /n3 /n2 /n1.
+      do 3 (apply upd_ne_tr; [ vm_compute; discriminate | ]).
+      exact Hav. }
+    iApply (wp_kecho_main N2 n3 (add_vec_int sp0 (-16)) argc av alen
+              Hx Ht2 Hsp3 Hst3 Hargc3 Hav3 Hargs3).
   Qed.
 
 End UkEcho.
