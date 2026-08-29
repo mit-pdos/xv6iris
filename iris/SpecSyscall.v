@@ -329,9 +329,18 @@ Definition wp_syscall_sconf_body
               instantiates it at whatever was stored.
          (ii) THE PAGE-TABLE DESCRIPTOR.  Literal equality is FALSE on the
               eleven buffer-touching entries -- a copyin/copyout lazy fault
-              grows [ud_um] -- so what holds is [ProcPtOwn.uptd_ext]: same
-              root, same trapframe page, a user map that only gained
-              entries.
+              grows [ud_um] -- so what holds is [ProcPtOwn.uptd_ext_sz] at
+              the process's OWN SIZE: same root, same trapframe page, a user
+              map that only gained entries, each of them BELOW [p->sz] and
+              carrying vmfault's own RW-user bits.  The size and the bits
+              are what [UserPerm.perm_of_uptd_ext_sz] needs to see that the
+              PERMISSION PROJECTION does not move under a lazy fill, which
+              is the [pi' = pi] the user-execution round
+              ([UexecRound.uround_ok]) is stated with -- a bare [uptd_ext]
+              cannot get there ([upt_acc_wf] permits R+X user leaves, and
+              text pages genuinely are R+X below [p->sz]).  Every producer
+              has it: copyin / copyout / copyinstr return it and the whole
+              chain between them and this post now relays it.
          (iii) THE SIZE, verbatim.
 
          [exec] escapes all three (it replaces the address space, trapframe
@@ -342,7 +351,8 @@ Definition wp_syscall_sconf_body
       ⌜ sysc_num (us_V U) = 7 \/ exists w : mword 64,
           pv_tf (us_V U') = <[tf_arg_idx 0 := w]> (pv_tf (us_V U)) ⌝ -∗
       ⌜ sysc_num (us_V U) = 7 \/ sysc_num (us_V U) = 12 \/
-          ProcPtOwn.uptd_ext (pv_upt (us_V U)) (pv_upt (us_V U')) ⌝ -∗
+          ProcPtOwn.uptd_ext_sz (pv_sz (us_V U))
+            (pv_upt (us_V U)) (pv_upt (us_V U')) ⌝ -∗
       ⌜ sysc_num (us_V U) = 7 \/ sysc_num (us_V U) = 12 \/
           pv_sz (us_V U') = pv_sz (us_V U) ⌝ -∗
       (* THE TRAPFRAME PAGE IS THE ONE THING THAT CANNOT MOVE.  Everything

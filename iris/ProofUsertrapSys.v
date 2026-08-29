@@ -65,7 +65,7 @@ Require Import CodeUsertrap.
 Require Import SpecKilled SpecKexit SpecYield SpecPrepareReturn.
 Require Import SpecSyscall.
 Require Import SpecUsertrap UsertrapRes.
-Require Import UsysMemOk UsysMemOkSpec UexecRound UexecSlot UserPerm.  (* the round's vocabulary *)
+Require Import UsysMemOk UsysMemOkSpec UexecRound UexecSlot UexecRet UserPerm.  (* the round's vocabulary *)
 Require Import ProofUsertrapParts ProofPrepareReturnParts.
 Require Import ProofUsertrapTail.
 From Kernel Require KernelInstrs.
@@ -308,6 +308,10 @@ Section UtSysBlock.
          [proc_priv_tf_upd] below consumes the block. *)
       iDestruct (ut_epc_exists with "Hpv") as %Hepcx.
       destruct Hepcx as [uepc Hepc].
+      (* ...and its LENGTH, off the same block: the bump lemmas
+         ([UexecRet.tf_resume_gpr_bump] / [tf_resume_pc_bump]) want the a0
+         and epc indices in range, and the block is consumed below. *)
+      iDestruct (ut_tf_length with "Hpv") as %Htflen0.
       iDestruct (ut_tfp_valid with "Hpv") as %Hpv_valid.
       iDestruct (proc_priv_tf_upd with "Hpv") as "(Htfc & Htfp & Hpvback)".
       (* [pt_node_claim], off [hw_config] (peeled from [Hcg] persistently)
@@ -548,29 +552,88 @@ Section UtSysBlock.
                        ltac:(vm_compute; reflexivity)); exact HS4s1).
       assert (Hcsmg : ut_cs m0 mg)
         by exact (ut_cs_trans m0 S4 mg HcsS4 (ut_cs_of_callee_saved _ _ Hcsg)).
-      (* THE ECALL ARM, stage S8.  The dispatch's own branch has fired left,
-         so what is owed is [uround_ok]'s ecall row.  EXEC lands on the nose
-         ([uround_ok]'s own left disjunct: a successful exec never returns to
-         this WP, and its failure arm's image row is the dispatcher's); every
-         other entry still takes the escape, now narrowed to non-exec.  What
-         blocks the rest is stated in the lane report: [SpecSyscall]'s resume
-         clause (ii) is [uptd_ext], not [uptd_ext_sz], so
-         [UserPerm.perm_of_uptd_ext_sz]'s RW-leaf premise is not available
-         here and [usys_mem_ok]'s π' = π cannot be shown. *)
+      (* THE ECALL ARM, in full (stage S8-rest).  The dispatch's own branch
+         has fired left, so what is owed is [uround_ok]'s ecall row, and
+         every entry but sbrk now proves it:
+
+           - EXEC lands on [uround_ok]'s own left disjunct -- a successful
+             exec never returns to this WP, and its failure arm's image row
+             is the dispatcher's;
+           - the other TWENTY-ONE give the row itself: the BUMP from the
+             [epc += 4] at +0x9a composed with the dispatcher's a0 insert
+             ([Hmema0]), which is [UsysMemOk.bump_tf] on the nose, and the
+             TABLE from [UsysMemOkSpec.sysc_mem_ok_usys] -- whose
+             [pi' = pi] premise is [UserPerm.perm_of_uptd_ext_sz] applied
+             to clause (ii), now stated at [uptd_ext_sz], together with the
+             size clause [Hmemsz];
+           - SBRK alone still escapes.  Its permission relation
+             ([UsysMemOk.usys_sbrk_perm]) is not in the dispatcher's post
+             and needs the [perm_of]-under-[uvmdealloc] shrink lemma
+             (stage S8b).
+
+         The two trapframes differ only in the epc word, which neither the
+         number ([usys_num_epc]) nor the table ([usys_mem_ok_epc]) reads --
+         [tf_ueq] is the wrong tool here, since the epc IS the difference. *)
       assert (HV1tf : pv_tf V1 = <[tf_epc_idx := rget S3 Ra5]> (pv_tf (us_V U)))
         by (rewrite /V1; destruct (us_V U); reflexivity).
-      assert (Hnumeq : sysc_num V1
-                       = usys_num (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))).
-      { rewrite (sysc_num_usys V1). rewrite <- (proj1 Hpro).
-        rewrite HV1tf. apply usys_num_epc. }
+      assert (Hnumeq : sysc_num V1 = usys_num (pv_tf (us_V U))).
+      { rewrite (sysc_num_usys V1). rewrite HV1tf. apply usys_num_epc. }
+      (* the bumped epc, in [bump_tf]'s [add_vec_int] spelling *)
+      assert (HS2a5 : rget S2 Ra5 = uepc)
+        by (rgne; rewrite /S2 upd_eq; reflexivity).
+      assert (HS3a5 : rget S3 Ra5
+                      = add_vec (rget S2 Ra5)
+                          (sign_extend' 64
+                             (sign_extend' 12 (mword_of_int 4 : mword 6))))
+        by (rgne; rewrite /S3 upd_eq; reflexivity).
+      assert (Ha5 : rget S3 Ra5 = add_vec_int (pv_tf (us_V U) !!! tf_epc_idx) 4).
+      { rewrite (list_lookup_total_correct _ _ _ Hepc) HS3a5 HS2a5.
+        apply addv_sext4. }
+      cbn [us_V us_M] in Hmemg, Hmema0, Hmemupt, Hmemsz.
       assert (Hrda : ut_round epv scv U0 (MkUstate V2 M2)).
-      { unfold ut_round.
-        destruct (decide (sysc_num V1 = 7)) as [Hex | Hnex].
+      { destruct Hpro as (Hp1 & Hp2 & Hp3 & Hp4).
+        unfold ut_round.
+        rewrite <- Hp1. rewrite <- Hp2. rewrite <- Hp3. rewrite <- Hp4.
+        destruct (decide (sysc_num V1 = 12)) as [Hsb | Hnsb].
+        - (* sbrk: the one escape left *)
+          left. split; [ exact Hscec | rewrite <- Hnumeq; exact Hsb ].
         - right. unfold uround_ok.
           destruct (decide (scv = uecall_scause)) as [_ | Hc];
             [ | contradiction (Hc Hscec) ].
-          left. rewrite <- Hnumeq. exact Hex.
-        - left. split; [ exact Hscec | rewrite <- Hnumeq; exact Hnex ]. }
+          destruct (decide (sysc_num V1 = 7)) as [Hex | Hnex].
+          + left. rewrite <- Hnumeq. exact Hex.
+          + right.
+            destruct Hmema0 as [Hc7 | (w & Hw)]; [ contradiction (Hnex Hc7) | ].
+            exists w.
+            assert (Hbump : pv_tf V2 = bump_tf (pv_tf (us_V U)) w).
+            { rewrite Hw HV1tf Ha5. unfold bump_tf. reflexivity. }
+            (* the permission half, which is where clause (ii)'s size and
+               RW-leaf content is spent *)
+            assert (Hpi : perm_of (ud_um (pv_upt V2)) (uint (pv_sz V2))
+                          = perm_of (ud_um (pv_upt (us_V U)))
+                                    (uint (pv_sz (us_V U)))).
+            { destruct Hmemsz as [H7 | [H12 | Hsz]];
+                [ contradiction (Hnex H7) | contradiction (Hnsb H12) | ].
+              destruct Hmemupt as [H7 | [H12 | Hup]];
+                [ contradiction (Hnex H7) | contradiction (Hnsb H12) | ].
+              rewrite Hsz. exact (perm_of_uptd_ext_sz _ _ _ Hup). }
+            split.
+            * (* THE BUMP *)
+              unfold uround_bump_ok. rewrite Hbump. split.
+              -- unfold tf_resume_gpr0.
+                 exact (tf_resume_gpr_bump zero_rf (pv_tf (us_V U)) w
+                          ltac:(rewrite Htflen0;
+                                unfold tf_arg_idx, TFWORDS; lia)).
+              -- exact (tf_resume_pc_bump (pv_tf (us_V U)) w
+                          ltac:(rewrite Htflen0;
+                                unfold tf_epc_idx, TFWORDS; lia)).
+            * (* THE TABLE *)
+              cbn [pv_upt pv_sz pv_tf us_V us_M].
+              rewrite Hpi. rewrite <- Hnumeq.
+              apply (usys_mem_ok_epc _ _ (rget S3 Ra5)).
+              rewrite <- HV1tf.
+              exact (sysc_mem_ok_usys V1 V2 (us_M U) M2 w _ _
+                       Hnex Hnsb eq_refl Hmemg). }
       iApply (T.ut_a6 (CID := CID2) SY.syscall_env N U0 (MkUstate V2 M2) pt ksp m0 mg av
                 n2 true
                 mie_v menvcfg0 epv scv lks

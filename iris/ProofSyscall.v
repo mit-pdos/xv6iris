@@ -1586,7 +1586,7 @@ Section SyscallVocab.
         ⌜ sysc_num (us_V U) = 7 \/ exists w : mword 64,
             pv_tf (us_V U') = <[tf_arg_idx 0 := w]> (pv_tf (us_V U)) ⌝ -∗
         ⌜ sysc_num (us_V U) = 7 \/ sysc_num (us_V U) = 12 \/
-            uptd_ext (pv_upt (us_V U)) (pv_upt (us_V U')) ⌝ -∗
+            uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt (us_V U')) ⌝ -∗
         ⌜ sysc_num (us_V U) = 7 \/ sysc_num (us_V U) = 12 \/
             pv_sz (us_V U') = pv_sz (us_V U) ⌝ -∗
         ⌜ ud_tfp (pv_upt (us_V U')) = ud_tfp (pv_upt (us_V U)) ⌝ -∗
@@ -1753,7 +1753,7 @@ Section SyscallVocab.
     (sysc_num (us_V U) = 7 \/ exists w : mword 64,
        pv_tf (us_V U') = <[tf_arg_idx 0 := w]> (pv_tf (us_V U))) ->
     (sysc_num (us_V U) = 7 \/ sysc_num (us_V U) = 12 \/
-       uptd_ext (pv_upt (us_V U)) (pv_upt (us_V U'))) ->
+       uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt (us_V U'))) ->
     (sysc_num (us_V U) = 7 \/ sysc_num (us_V U) = 12 \/
        pv_sz (us_V U') = pv_sz (us_V U)) ->
     ud_tfp (pv_upt (us_V U')) = ud_tfp (pv_upt (us_V U)) ->
@@ -2428,7 +2428,7 @@ Section SyscallRet.
        "my entry did not move [pv_tf]". *)
     (sysc_num (us_V U) = 7 \/ pv_tf (us_V U') = pv_tf (us_V U)) ->
     (sysc_num (us_V U) = 7 \/ sysc_num (us_V U) = 12 \/
-       uptd_ext (pv_upt (us_V U)) (pv_upt (us_V U'))) ->
+       uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt (us_V U'))) ->
     (sysc_num (us_V U) = 7 \/ sysc_num (us_V U) = 12 \/
        pv_sz (us_V U') = pv_sz (us_V U)) ->
     ud_tfp (pv_upt (us_V U')) = ud_tfp (pv_upt (us_V U)) ->
@@ -2514,7 +2514,7 @@ Section SyscallRet.
                     | right; exists (rget E Ra0);
                       cbn [us_V us_tf upd_usV upd_tf pv_tf];
                       rewrite Hx; reflexivity ])
-              ltac:(cbn [us_V us_tf upd_usV upd_tf pv_upt]; exact Hupte)
+              ltac:(cbn [us_V us_tf upd_usV upd_tf pv_upt pv_sz]; exact Hupte)
               ltac:(cbn [us_V us_tf upd_usV upd_tf pv_sz]; exact Hszv)
               Hud
               ltac:(cbn [pv_fdg upd_tf]; exact Hfg)
@@ -2650,7 +2650,7 @@ Section SyscallArms.
     iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid U U lks av m mf
               Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl)
               ltac:(right; reflexivity)
-              ltac:(right; right; apply uptd_ext_refl)
+              ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
@@ -2865,7 +2865,7 @@ Section SyscallArms.
                              ltac:(vm_compute; reflexivity));
                     rewrite Hv0t; reflexivity)
               ltac:(right; reflexivity)
-              ltac:(right; right; exact (uptd_ext_sz_ext _ _ _ Hext))
+              ltac:(right; right; exact Hext)
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
@@ -2938,7 +2938,7 @@ Section SyscallArms.
     iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid U U ∅ av m mf
               Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl)
               ltac:(right; reflexivity)
-              ltac:(right; right; apply uptd_ext_refl)
+              ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
@@ -3005,7 +3005,7 @@ Section SyscallArms.
     iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid U U ∅ av m mf
               Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl)
               ltac:(right; reflexivity)
-              ltac:(right; right; apply uptd_ext_refl)
+              ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
@@ -3072,7 +3072,7 @@ Section SyscallArms.
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U U ∅ av m mf
               Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl)
               ltac:(right; reflexivity)
-              ltac:(right; right; apply uptd_ext_refl)
+              ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
@@ -3093,20 +3093,20 @@ Section SyscallArms.
          rewrites the fd array and nothing else, so the trapframe words, the
          descriptor and the size all come back on the nose *)
       ⌜pv_tf V' = pv_tf (us_V U)⌝ ∗
-      ⌜uptd_ext (pv_upt (us_V U)) (pv_upt V')⌝ ∗
+      ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt V')⌝ ∗
       ⌜pv_sz V' = pv_sz (us_V U)⌝ ∗
       proc_priv γf p pid (MkUstate V' ((us_M U))) ∗ fd_frags_any (pv_fdg (us_V U)).
   Proof.
     rewrite /sys_dup_post.
     iIntros "[[_ [Hp Hfr]] | [Hb | Hc]]".
     - iExists (us_V U). iFrame "Hp Hfr". iPureIntro.
-      split_and!; [reflexivity | reflexivity | reflexivity | apply uptd_ext_refl | reflexivity].
+      split_and!; [reflexivity | reflexivity | reflexivity | apply uptd_ext_sz_refl | reflexivity].
     - iDestruct "Hb" as (fd0 fv) "[_ [Hp Hfr]]".
       iExists (us_V U). iFrame "Hp Hfr". iPureIntro.
-      split_and!; [reflexivity | reflexivity | reflexivity | apply uptd_ext_refl | reflexivity].
+      split_and!; [reflexivity | reflexivity | reflexivity | apply uptd_ext_sz_refl | reflexivity].
     - iDestruct "Hc" as (fd0 fd1 fv l) "[_ [Hp Hfr]]".
       iExists (upd_ofile (us_V U) fd1 fv). iFrame "Hp Hfr". iPureIntro.
-      split_and!; [reflexivity | reflexivity | reflexivity | apply uptd_ext_refl | reflexivity].
+      split_and!; [reflexivity | reflexivity | reflexivity | apply uptd_ext_sz_refl | reflexivity].
   Qed.
 
   (* THE SEVENTH ARM: k = 10, [sys_dup].  Beyond [proc_priv] it wants only the
@@ -3256,7 +3256,7 @@ Section SyscallArms.
     iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid U U ∅ av m mf
               Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl)
               ltac:(right; reflexivity)
-              ltac:(right; right; apply uptd_ext_refl)
+              ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
@@ -3576,7 +3576,7 @@ Section SyscallArms.
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U U
               ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl)
               ltac:(right; reflexivity)
-              ltac:(right; right; apply uptd_ext_refl)
+              ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
@@ -3663,7 +3663,12 @@ Section SyscallArms.
               (ex_intro _ v1 Hv1) Hv2 eq_refl eq_refl eq_refl
               with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hkalloc Hprocs
                     Hfse Hcaps Htbl").
-    iIntros (CIDy Hsy mf r P') "%Hcs %Hext %Hret' %Hmfa0 Hcg Hcpu Hpc Hpriv _ Hout".
+    iIntros (CIDy Hsy mf r P') "%Hcs %Hextz %Hret' %Hmfa0 Hcg Hcpu Hpc Hpriv _ Hout".
+    (* [Hextz] is the SIZED extension the callee reports, and it is what
+       clause (ii) is handed.  The bare projection below is the one the
+       [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first
+       component IS [uptd_ext], so this is a projection, not a weakening. *)
+    pose proof (uptd_ext_sz_ext _ _ _ Hextz) as Hext.
     (* NOTHING ABOUT THE BITMAP COMES BACK any more -- filewrite's FD_INODE
        arm ballocs, and the pool it draws from is an invariant now, so the
        postcondition says nothing about which blocks are in use.  The three
@@ -3693,7 +3698,7 @@ Section SyscallArms.
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
               (us_upt U P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl)
               ltac:(right; reflexivity)
-              ltac:(right; right; exact Hext)
+              ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
@@ -3748,7 +3753,12 @@ Section SyscallArms.
               ltac:(lia) Hj Hgamma Hlen Hv0 Hv1 Hv2
               eq_refl eq_refl eq_refl
               with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hkalloc Hprocs Hfse Hci").
-    iIntros (CIDy Hsy mf r P' dw bsw) "%Hcs %Hext %Hret' %Hdwle %Hmfa0 Hcg Hcpu Hpc Hpriv _ Hout".
+    iIntros (CIDy Hsy mf r P' dw bsw) "%Hcs %Hextz %Hret' %Hdwle %Hmfa0 Hcg Hcpu Hpc Hpriv _ Hout".
+    (* [Hextz] is the SIZED extension the callee reports, and it is what
+       clause (ii) is handed.  The bare projection below is the one the
+       [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first
+       component IS [uptd_ext], so this is a projection, not a weakening. *)
+    pose proof (uptd_ext_sz_ext _ _ _ Hextz) as Hext.
     iDestruct ("Hback" with "Hout") as "Hsl".
     iDestruct (sysc_bslot_join with "Hsl Hbs2") as "Hbs".
     assert (Htfp' : ud_tfp (pv_upt (upd_upt (us_V U) P')) = ud_tfp (pv_upt (us_V U))).
@@ -3781,7 +3791,7 @@ Section SyscallArms.
                              ltac:(vm_compute; reflexivity));
                     rewrite Hv1t; reflexivity)
               ltac:(right; reflexivity)
-              ltac:(right; right; exact Hext)
+              ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
@@ -3826,7 +3836,12 @@ Section SyscallArms.
               pid U v0 v1 M (av - 4)%nat true true ∅
               ltac:(lia) Hj Hgamma Hlen Hv0 Hv1 eq_refl
               with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hkalloc Hprocs Hfse").
-    iIntros (CIDy Hsy mf r P' dw bsw) "%Hcs %Hext %Hret' %Hdwle %Hmfa0 Hcg Hcpu Hpc Hpriv _ Hout".
+    iIntros (CIDy Hsy mf r P' dw bsw) "%Hcs %Hextz %Hret' %Hdwle %Hmfa0 Hcg Hcpu Hpc Hpriv _ Hout".
+    (* [Hextz] is the SIZED extension the callee reports, and it is what
+       clause (ii) is handed.  The bare projection below is the one the
+       [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first
+       component IS [uptd_ext], so this is a projection, not a weakening. *)
+    pose proof (uptd_ext_sz_ext _ _ _ Hextz) as Hext.
     iDestruct ("Hback" with "Hout") as "Hsl".
     iDestruct (sysc_bslot_join with "Hsl Hbs2") as "Hbs".
     assert (Htfp' : ud_tfp (pv_upt (upd_upt (us_V U) P')) = ud_tfp (pv_upt (us_V U))).
@@ -3859,7 +3874,7 @@ Section SyscallArms.
                              ltac:(vm_compute; reflexivity));
                     rewrite Hv1t; reflexivity)
               ltac:(right; reflexivity)
-              ltac:(right; right; exact Hext)
+              ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
@@ -3921,7 +3936,12 @@ Section SyscallArms.
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
                     Hropen Hbmp Hisp Hbmr Hkalloc Hprocs Hirc Hpriv").
     iIntros (CIDy Hsy mf P')
-      "%Hcs %Hext Hcg Hcpu _ _ Hpc Hbs _ _ Hirc Hpost".
+      "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ Hirc Hpost".
+    (* [Hextz] is the SIZED extension the callee reports, and it is what
+       clause (ii) is handed.  The bare projection below is the one the
+       [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first
+       component IS [uptd_ext], so this is a projection, not a weakening. *)
+    pose proof (uptd_ext_sz_ext _ _ _ Hextz) as Hext.
     (* the two arms of [sys_chdir_post] differ only in [V'], and neither
        moves the trapframe page: [upd_cwd] does not touch [pv_upt] at all. *)
     iAssert (∃ V' : pprivate,
@@ -3930,11 +3950,11 @@ Section SyscallArms.
                ⌜pv_fdg V' = pv_fdg (us_V U)⌝ ∗
                (* ...and everything the RESUME state reads *)
                ⌜pv_tf V' = pv_tf (us_V U)⌝ ∗
-               ⌜uptd_ext (pv_upt (us_V U)) (pv_upt V')⌝ ∗
+               ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt V')⌝ ∗
                ⌜pv_sz V' = pv_sz (us_V U)⌝ ∗
                proc_priv γf (proc_addr j) pid (MkUstate V' (us_M U)))%I with "[Hpost]" as
       (V') "(%Htfp' & %Hfg' & %Htfw' & %Hupte' & %Hszv' & Hpriv)".
-    { pose proof Hext as Hue. destruct Hext as (_ & Htf & _).
+    { pose proof Hextz as Hue. destruct Hext as (_ & Htf & _).
       iDestruct "Hpost" as "[[_ Hpv] | (%ipv & _ & Hpv)]".
       - iExists (upd_upt (us_V U) P'). iFrame "Hpv". iPureIntro.
         split_and!; [exact Htf | reflexivity | reflexivity | exact Hue | reflexivity].
@@ -4035,7 +4055,12 @@ Section SyscallArms.
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
                     Hropen Hbmp Hisp Hsbs Hbmr Hkalloc Hprocs Hiru Hpriv").
     iIntros (CIDy Hsy mf P')
-      "%Hcs %Hext Hcg Hcpu _ _ Hpc Hbs _ _ _ Hiru Hpriv %Hrv".
+      "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ Hiru Hpriv %Hrv".
+    (* [Hextz] is the SIZED extension the callee reports, and it is what
+       clause (ii) is handed.  The bare projection below is the one the
+       [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first
+       component IS [uptd_ext], so this is a projection, not a weakening. *)
+    pose proof (uptd_ext_sz_ext _ _ _ Hextz) as Hext.
     iDestruct (sysc_iref_join with "Hirk Hiru") as "Hir".
     assert (Htfp' : ud_tfp (pv_upt (upd_upt (us_V U) P')) = ud_tfp (pv_upt (us_V U))).
     { destruct Hext as (_ & Htf & _). cbn [pv_upt upd_upt pv_fdg]. exact Htf. }
@@ -4059,7 +4084,7 @@ Section SyscallArms.
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
               (us_upt U P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl)
               ltac:(right; reflexivity)
-              ltac:(right; right; exact Hext)
+              ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
@@ -4119,7 +4144,12 @@ Section SyscallArms.
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
                     Hropen Hbmp Hisp Hsbs Hbmr Hkalloc Hprocs Hirl Hpriv").
     iIntros (CIDy Hsy mf P')
-      "%Hcs %Hext Hcg Hcpu _ _ Hpc Hbs _ _ _ Hirl Hpriv %Hrv".
+      "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ Hirl Hpriv %Hrv".
+    (* [Hextz] is the SIZED extension the callee reports, and it is what
+       clause (ii) is handed.  The bare projection below is the one the
+       [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first
+       component IS [uptd_ext], so this is a projection, not a weakening. *)
+    pose proof (uptd_ext_sz_ext _ _ _ Hextz) as Hext.
     iDestruct (sysc_iref_join3 with "Hirl Hirk") as "Hir".
     assert (Htfp' : ud_tfp (pv_upt (upd_upt (us_V U) P')) = ud_tfp (pv_upt (us_V U))).
     { destruct Hext as (_ & Htf & _). cbn [pv_upt upd_upt pv_fdg]. exact Htf. }
@@ -4143,7 +4173,7 @@ Section SyscallArms.
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
               (us_upt U P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl)
               ltac:(right; reflexivity)
-              ltac:(right; right; exact Hext)
+              ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
@@ -4213,15 +4243,15 @@ Section SyscallArms.
                ⌜pv_fdg V' = pv_fdg (us_V U)⌝ ∗
                (* ...and everything the RESUME state reads *)
                ⌜pv_tf V' = pv_tf (us_V U)⌝ ∗
-               ⌜uptd_ext (pv_upt (us_V U)) (pv_upt V')⌝ ∗
+               ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt V')⌝ ∗
                ⌜pv_sz V' = pv_sz (us_V U)⌝ ∗
                proc_priv γf (proc_addr j) pid (MkUstate V' ((us_M U))) ∗ fd_frags_any (pv_fdg (us_V U)))%I
       with "[Hpost]" as (V') "(%Htfp' & %Hfg' & %Htfw' & %Hupte' & %Hszv' & Hpriv & Hufrag)".
     { iDestruct "Hpost" as "[[_ [Hpv Hfr]] | (%fd & %fv & _ & [Hpv Hfr])]".
       - iExists (us_V U). iFrame "Hpv Hfr". iPureIntro.
-        split_and!; [reflexivity | reflexivity | reflexivity | apply uptd_ext_refl | reflexivity].
+        split_and!; [reflexivity | reflexivity | reflexivity | apply uptd_ext_sz_refl | reflexivity].
       - iExists (upd_ofile (us_V U) fd (zero_reg : mword 64)). iFrame "Hpv Hfr". iPureIntro.
-        split_and!; [reflexivity | reflexivity | reflexivity | apply uptd_ext_refl | reflexivity]. }
+        split_and!; [reflexivity | reflexivity | reflexivity | apply uptd_ext_sz_refl | reflexivity]. }
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt V'))).
@@ -4321,7 +4351,12 @@ Section SyscallArms.
               Hpidt (sct_dq _ _ T)
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpanic Hftable Hkalloc
                     Hpriv Hufrag Hfd0 Hfd1 Hiru Hpenv Hfenv").
-    iIntros (CIDy Hsy mf P' dw bsw) "%Hcs %Hupt %Hdwle Hcg Hcpu _ _ Hpc Hpost Hiru Hpe' Hfe'".
+    iIntros (CIDy Hsy mf P' dw bsw) "%Hcs %Huptz %Hdwle Hcg Hcpu _ _ Hpc Hpost Hiru Hpe' Hfe'".
+    (* [Huptz] is the SIZED extension the callee reports, and it is what
+       clause (ii) is handed.  The bare projection below is the one the
+       [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first
+       component IS [uptd_ext], so this is a projection, not a weakening. *)
+    pose proof (uptd_ext_sz_ext _ _ _ Huptz) as Hupt.
     set (M' := umem_wr (us_M U) v0 dw bsw).
     (* the three block slots, back out of the nopid bundle.  THE BITMAP DOES
        NOT COME WITH THEM any more -- it is an invariant, so the bundle never
@@ -4343,17 +4378,17 @@ Section SyscallArms.
                ⌜pv_fdg V' = pv_fdg (us_V U)⌝ ∗
                (* ...and everything the RESUME state reads *)
                ⌜pv_tf V' = pv_tf (us_V U)⌝ ∗
-               ⌜uptd_ext (pv_upt (us_V U)) (pv_upt V')⌝ ∗
+               ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt V')⌝ ∗
                ⌜pv_sz V' = pv_sz (us_V U)⌝ ∗
                proc_priv γf (proc_addr j) pid (MkUstate V' M'))%I with "[Hpv]" as
       (V') "(%Htfp' & %Hfg' & %Htfw' & %Hupte' & %Hszv' & Hpriv)".
     { iDestruct "Hpv" as
         "[[_ Hpv] | (%fd0 & %fd1 & %l & %k0 & %k1 & _ & Hpv)]".
       - iExists (upd_upt (us_V U) P'). iFrame "Hpv". iPureIntro.
-        split_and!; [exact Htfpe | reflexivity | reflexivity | exact Hupte | reflexivity].
+        split_and!; [exact Htfpe | reflexivity | reflexivity | exact Huptz | reflexivity].
       - iExists (upd_ofile (upd_ofile (upd_upt (us_V U) P') fd0 (fnode k0)) fd1 (fnode k1)).
         iFrame "Hpv". iPureIntro.
-        split_and!; [exact Htfpe | reflexivity | reflexivity | exact Hupte | reflexivity]. }
+        split_and!; [exact Htfpe | reflexivity | reflexivity | exact Huptz | reflexivity]. }
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt V'))).
@@ -4468,7 +4503,12 @@ Section SyscallArms.
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
                     Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir Hpriv").
     iIntros (CIDy Hsy mf ns' P')
-      "%Hcs %Hext Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpriv %Hret0".
+      "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpriv %Hret0".
+    (* [Hextz] is the SIZED extension the callee reports, and it is what
+       clause (ii) is handed.  The bare projection below is the one the
+       [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first
+       component IS [uptd_ext], so this is a projection, not a weakening. *)
+    pose proof (uptd_ext_sz_ext _ _ _ Hextz) as Hext.
     (* THE LEDGER CLOSES: [ns' = ns = IREFSPARE], so what the epilogue hands
        on is the allowance the trap loop expects, unchanged. *)
     subst ns'.
@@ -4497,7 +4537,7 @@ Section SyscallArms.
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
               (us_upt U P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl)
               ltac:(right; reflexivity)
-              ltac:(right; right; exact Hupte)
+              ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
@@ -4566,7 +4606,12 @@ Section SyscallArms.
                     Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
                     Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir Hpriv").
     iIntros (CIDy Hsy mf ns' P')
-      "%Hcs %Hext Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpriv %Hret0".
+      "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpriv %Hret0".
+    (* [Hextz] is the SIZED extension the callee reports, and it is what
+       clause (ii) is handed.  The bare projection below is the one the
+       [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first
+       component IS [uptd_ext], so this is a projection, not a weakening. *)
+    pose proof (uptd_ext_sz_ext _ _ _ Hextz) as Hext.
     (* THE LEDGER CLOSES: [ns' = ns = IREFSPARE], so what the epilogue hands
        on is the allowance the trap loop expects, unchanged. *)
     subst ns'.
@@ -4595,7 +4640,7 @@ Section SyscallArms.
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
               (us_upt U P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl)
               ltac:(right; reflexivity)
-              ltac:(right; right; exact Hupte)
+              ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
               Htfp' ltac:(reflexivity)
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").
@@ -4678,7 +4723,12 @@ Section SyscallArms.
                     Hireg Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir
                     Hfd0 Hpriv Hufrag").
     iIntros (CIDy Hsy mf ns' P')
-      "%Hcs %Hext Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpost".
+      "%Hcs %Hextz Hcg Hcpu _ _ Hpc Hbs _ _ _ _ %Hns Hir Hpost".
+    (* [Hextz] is the SIZED extension the callee reports, and it is what
+       clause (ii) is handed.  The bare projection below is the one the
+       [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first
+       component IS [uptd_ext], so this is a projection, not a weakening. *)
+    pose proof (uptd_ext_sz_ext _ _ _ Hextz) as Hext.
     (* THE LEDGER CLOSES: [ns' = ns = IREFSPARE], so what the epilogue hands
        on is the allowance the trap loop expects, unchanged. *)
     subst ns'.
@@ -4697,15 +4747,15 @@ Section SyscallArms.
                ⌜pv_fdg V' = pv_fdg (us_V U)⌝ ∗
                (* ...and everything the RESUME state reads *)
                ⌜pv_tf V' = pv_tf (us_V U)⌝ ∗
-               ⌜uptd_ext (pv_upt (us_V U)) (pv_upt V')⌝ ∗
+               ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt V')⌝ ∗
                ⌜pv_sz V' = pv_sz (us_V U)⌝ ∗
                proc_priv γf (proc_addr j) pid (MkUstate V' (us_M U)))%I with "[Hpv]" as
       (V') "(%Htfp' & %Hfg' & %Htfw' & %Hupte' & %Hszv' & Hpriv)".
     { iDestruct "Hpv" as "[[_ Hpv] | (%fd & %ll & %kf & _ & Hpv)]".
       - iExists (upd_upt (us_V U) P'). iFrame "Hpv". iPureIntro.
-        split_and!; [exact Htfpe | reflexivity | reflexivity | exact Hupte | reflexivity].
+        split_and!; [exact Htfpe | reflexivity | reflexivity | exact Hextz | reflexivity].
       - iExists (upd_ofile (upd_upt (us_V U) P') fd (fnode kf)). iFrame "Hpv". iPureIntro.
-        split_and!; [exact Htfpe | reflexivity | reflexivity | exact Hupte | reflexivity]. }
+        split_and!; [exact Htfpe | reflexivity | reflexivity | exact Hextz | reflexivity]. }
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt V'))).
@@ -5120,7 +5170,7 @@ Section SyscallArms.
               ∅ av m G1 HG1sp HG1rest ltac:(lia)
               (sysc_mem_ok_quiet _ _ _ _ eq_refl)
               ltac:(right; exists (rget G1 Ra4); reflexivity)
-              ltac:(right; right; apply uptd_ext_refl)
+              ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
               eq_refl eq_refl
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hpc Hcont").

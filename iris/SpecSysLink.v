@@ -311,9 +311,9 @@ Definition wp_sys_link_sconf_body
   ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       (* the page table may have GROWN: the two fetchstrs fault user pages
-         in.  [uptd_ext] is argstr's own report, composed across the pair by
-         [ProcPtOwn.uptd_ext_trans]. *)
-      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+         in.  [uptd_ext_sz] is argstr's own report, composed across the pair by
+         [ProcPtOwn.uptd_ext_sz_trans]. *)
+      ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗

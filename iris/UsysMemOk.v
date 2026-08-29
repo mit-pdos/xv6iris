@@ -248,6 +248,28 @@ Proof.
   rewrite <- Hi. exact H.
 Qed.
 
+(* ...and the table is blind to the EPC WORD too, for the reason
+   [usys_num_epc] is: the window indices are 14 and 15, the number is 21,
+   and the epc is 3.  This is what lets the trap loop state the round at
+   the trapframe the process TRAPPED with, while the dispatcher's own row
+   is stated at the one usertrap's [p->trapframe->epc += 4] block handed
+   on.  ([tf_ueq] cannot do this job: the epc is exactly the word the two
+   lists differ in.) *)
+Lemma usys_mem_ok_epc (n : Z) (tf : list (mword 64)) (v r : mword 64)
+    (M M' : gmap Z (bv 8)) (pi pi' : gmap (mword 27) uperm) :
+  usys_mem_ok n (<[tf_epc_idx := v]> tf) r M pi M' pi' ->
+  usys_mem_ok n tf r M pi M' pi'.
+Proof.
+  unfold usys_mem_ok.
+  destruct (decide (n = USYS_exec)); [ intros H; exact H | ].
+  destruct (decide (n = USYS_sbrk)); [ intros H; exact H | ].
+  destruct (usys_window n) as [i | ] eqn:Hw; [ | intros H; exact H ].
+  rewrite list_lookup_total_insert_ne;
+    [ intros H; exact H
+    | destruct (usys_window_idx n i Hw) as [-> | ->];
+      unfold tf_arg_idx, tf_epc_idx; lia ].
+Qed.
+
 (* ===================================================================== *)
 (* SS4 The scause value of an ecall from U-mode: interrupt bit 0,          *)
 (* exception code 8 ([E_U_EnvCall]).  The user-execution contract's case   *)

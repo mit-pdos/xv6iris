@@ -653,7 +653,7 @@ Section ProofFileread.
                 with "[%] [%] [%] [%] [%] Hcg Hcnt [Hpc] [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                       [Hpriv] [Henv]").
       { exact Hcsf. }
-      { apply uptd_ext_refl. }
+      { apply uptd_ext_sz_refl. }
       { apply fileread_ret_m1. }
       { apply Z.le_max_l. }
       { exact Hrv. }
@@ -953,7 +953,7 @@ Section ProofFileread.
                   with "[%] [%] [%] [%] [%] Hcg Hcnt [Hpc] [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                         [Hpriv] [Henv]").
         { exact Hcsf. }
-        { apply uptd_ext_refl. }
+        { apply uptd_ext_sz_refl. }
         { apply fileread_ret_m1. }
         { apply Z.le_max_l. }
         { exact Hrv. }
@@ -1613,7 +1613,7 @@ Section ProofFileread.
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                 [Hpriv] [Hslot]").
                 { exact Hcsf. }
-                { apply uptd_ext_refl. }
+                { apply uptd_ext_sz_refl. }
                 { apply fileread_ret_m1. }
                 { apply Z.le_max_l. }
                 { exact Hrv. }
@@ -1862,7 +1862,7 @@ Section ProofFileread.
                              [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                              [Hpriv] [Henv]").
              { exact Hcsf. }
-             { apply uptd_ext_refl. }
+             { apply uptd_ext_sz_refl. }
              { apply fileread_ret_m1. }
              { apply Z.le_max_l. }
              { exact Hrv. }

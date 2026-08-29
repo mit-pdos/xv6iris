@@ -157,7 +157,7 @@ Definition uservec_gpr (g : regfile) (vksp vkhart vktr vksat : bv 64) : regfile 
 (* ===================================================================== *)
 Definition uv_round (U : ustate) (g : regfile) (sepc_v sc_v : mword 64)
     (U' : ustate) : Prop :=
-  (sc_v = uecall_scause /\ usys_num (tf_of g (ret_pc sepc_v)) <> USYS_exec)
+  (sc_v = uecall_scause /\ usys_num (tf_of g (ret_pc sepc_v)) = USYS_sbrk)
   \/ uround_vis_ok sc_v (tf_of g (ret_pc sepc_v))
        (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
        (pv_tf (us_V U'))

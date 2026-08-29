@@ -136,7 +136,7 @@ Definition wp_fetchstr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
      handed. *)
     ∀ (mf : regfile) (P' : uptd) (buf_new : nat -> bv 8),
       ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+      ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗

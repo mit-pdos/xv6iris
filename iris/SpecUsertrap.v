@@ -215,13 +215,17 @@ Qed.
 (* IS [tf0] by reflexivity.  ([ret_pc] is [WpGprCsrwA.mepc_val] -- the same *)
 (* term under two names; this file already has [ret_pc] in scope.)         *)
 (*                                                                         *)
-(* [sc_v = uecall_scause] is J1a's TEMPORARY escape for the ecall arm      *)
-(* (stage S7), narrowed to sbrk at S8 and retired when sbrk's permission   *)
-(* relation reaches the dispatcher's post.                                 *)
+(* THE ONE ESCAPE LEFT is sbrk.  Every other ecall -- exec by              *)
+(* [uround_ok]'s own left disjunct, the other twenty-one by the bump plus  *)
+(* [UsysMemOk.usys_mem_ok] -- is proved for real (stage S8-rest).  sbrk    *)
+(* alone still escapes: its permission relation ([usys_sbrk_perm]) is not  *)
+(* in the dispatcher's post, and putting it there needs the               *)
+(* [perm_of]-under-[uvmdealloc] shrink lemma (stage S8b).  When that       *)
+(* lands the whole left disjunct is deleted.                               *)
 (* ===================================================================== *)
 Definition ut_round (sepc_v sc_v : mword 64) (U U' : ustate) : Prop :=
   (sc_v = uecall_scause
-   /\ usys_num (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U))) <> USYS_exec)
+   /\ usys_num (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U))) = USYS_sbrk)
   \/ uround_ok sc_v
        (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U)))
        (us_M U) (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
@@ -240,9 +244,9 @@ Definition ut_pro (sepc_v : mword 64) (U U' : ustate) : Prop :=
 (* THE ENTRY INSTANCE: at the record the prologue hands on, the round has
    done nothing yet, so every arm of the relation is an identity. *)
 Lemma ut_round_entry (sepc_v sc_v : mword 64) (U U' : ustate) :
-  (* stage S8: the escape is now narrowed to a NON-exec ecall, so the entry
-     instance is available only where the dispatch has already ruled the
-     ecall arm out -- which is exactly the four arms that take it. *)
+  (* the escape is sbrk-only now, so the entry instance is available only
+     where the dispatch has already ruled the ecall arm out -- which is
+     exactly the four arms that take it. *)
   sc_v <> uecall_scause ->
   ut_pro sepc_v U U' -> ut_round sepc_v sc_v U U'.
 Proof.

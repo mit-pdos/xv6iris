@@ -143,7 +143,7 @@ Section SpecEitherCopyout.
         changed and what did not.  The DESCRIPTOR still grows, which is
         what the ∃ [P'] and [uptd_ext] are. *)
           ∃ (P' : uptd) (d : nat),
-            ⌜uptd_ext (pv_upt (us_V U)) P'⌝ ∗
+            ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ ∗
             ⌜either_copyout_ran len r d⌝ ∗
             proc_priv_core p pid
               (upd_usM (us_upt U P') (umem_wr (us_M U) dst d src_bytes))

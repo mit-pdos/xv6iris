@@ -825,7 +825,7 @@ Section ProofSysWrite.
       iApply ("Hcont" $! mf (mword_of_int (-1) : mword 64) (pv_upt (us_V U))
                 with "[%] [%] [%] [%] Hcg Hcpu Hpc [Hpriv] Hkenv [Henv]").
       { exact Hcsf. }
-      { apply uptd_ext_refl. }
+      { apply uptd_ext_sz_refl. }
       { left. split; [reflexivity | exact Hnone]. }
       { exact Hmfa0. }
       { rewrite us_upt_id. iExact "Hpriv". }

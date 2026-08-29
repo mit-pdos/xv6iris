@@ -519,7 +519,7 @@ Definition wp_filestat_sconf_body
      it. *)
   ∀ (mf : regfile) (r : mword 64) (P' : uptd) (d : nat) (bs : nat -> bv 8),
       ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+      ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       ⌜filestat_ret r⌝ -∗
       ⌜(d <= 24)%nat⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗

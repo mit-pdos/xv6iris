@@ -679,7 +679,7 @@ Section PwConts.
      ∀ (M : regfile) (P' : uptd),
        ⌜pw_base_regs m M (pa_stk sp0 14%nat)⌝ -∗
        ⌜pipe_rw_ret n (M !!! Regidx Rs2)⌝ -∗
-       ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
        pw_frame7 m sp0 -∗
        stack_own (KTR := KT1) (pa_stk sp0 7%nat) 7%nat -∗
        sie_cap_gpr KT1 M (av - 14)%nat true (proc_addr j) -∗
@@ -701,7 +701,7 @@ Section PwConts.
        ⌜pw_base_regs m M (pa_stk sp0 14%nat)⌝ -∗
        ⌜M !!! Regidx Rs1 = pi⌝ -∗
        ⌜pipe_rw_ret n (M !!! Regidx Rs2)⌝ -∗
-       ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
        pw_frame7 m sp0 -∗
        stack_own (KTR := KT1) (pa_stk sp0 7%nat) 7%nat -∗
        sie_cap_gpr KT1 M (trap_res true + (av - 14))%nat false (proc_addr j) -∗
@@ -724,7 +724,7 @@ Section PwConts.
      (* the image moves: the copyin may fault a page in *)
      ∀ (M : regfile) (P' : uptd),
        ⌜pw_min_regs m M (pa_stk sp0 14%nat) pi⌝ -∗
-       ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
        pw_frame7 m sp0 -∗
        pw_frame5 m sp0 -∗
        pw_chslot sp0 -∗
@@ -757,7 +757,7 @@ Section PwConts.
         block is carried at whatever image the round reached. *)
      ∀ (i : Z) (M : regfile) (Pc : uptd),
        ⌜(0 <= i < n)%Z⌝ -∗
-       ⌜uptd_ext (pv_upt (us_V U)) Pc⌝ -∗
+       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) Pc⌝ -∗
        ⌜pw_loop_regs m M (pa_stk sp0 14%nat) sp0 pi (proc_addr j) addr n i⌝ -∗
        pw_frame7 m sp0 -∗
        pw_frame5 m sp0 -∗
@@ -943,7 +943,7 @@ Section PwGuard.
       (i : Z) (M : regfile) (Pc : uptd) :
     (0 < n)%Z -> (n < 2 ^ 31)%Z -> (0 <= i <= n)%Z ->
     (true = false \/ proc_addr j = zero_reg -> (CID : CPU) = CID0) ->
-    uptd_ext (pv_upt (us_V U)) Pc ->
+    uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) Pc ->
     pw_loop_regs m M (pa_stk sp0 14%nat) sp0 pi (proc_addr j) addr n i ->
     kernel_text -∗
     pw_frame7 m sp0 -∗ pw_frame5 m sp0 -∗ pw_chslot sp0 -∗
@@ -1936,7 +1936,7 @@ Section ProofPipewrite.
         { rewrite /Z1 upd_ne; [exact Hs11M1 | reg_neq]. }
       + rewrite /Z1 upd_ne; [exact Hs1M1 | reg_neq].
       + rewrite /Z1 upd_eq. right. exists 0%Z. split; [reflexivity | lia].
-      + apply uptd_ext_refl.
+      + apply uptd_ext_sz_refl.
       + rewrite us_upt_id. iExact "Hpriv".
     - (* ======= n > 0: save s6..s10, set up the loop registers ======= *)
       assert (Hn0 : (0 < n)%Z).
@@ -2745,9 +2745,9 @@ Section ProofPipewrite.
                 [iPureIntro; exact Hextr|].
               iDestruct ("Hpback" $! P' (us_M U) with "Hxe Hszc Hptc Hpt") as "Hpriv".
               iEval (rewrite (pw_us_upt_upd U Pc P')) in "Hpriv".
-              assert (Hext' : uptd_ext (pv_upt (us_V U)) P')
-                by (apply (uptd_ext_trans (pv_upt (us_V U)) Pc P' Hext
-                             (uptd_ext_sz_ext _ _ _ Hextr))).
+              assert (Hext' : uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P')
+                by (apply (uptd_ext_sz_trans (pv_sz (us_V U)) (pv_upt (us_V U))
+                             Pc P' Hext Hextr)).
               (* the register state survived copyin *)
               assert (HcsK3N5 : callee_saved K3 N5).
               { rewrite /N5 /N4 /N3b /N3 /N2 /N1.
@@ -3140,7 +3140,7 @@ Section ProofPipewrite.
       iSpecialize ("LOOP" $! CIDaq with "[%]"); [wp_next_chain|].
       iApply ("LOOP" $! 0%Z C6 (pv_upt (us_V U)) with "[%] [%] [%] HF7 HF5 HCH Hcg Hown Hpay Hlocked Hres Hpc Href [Hpriv] Henv EXITS").
       + lia.
-      + apply uptd_ext_refl.
+      + apply uptd_ext_sz_refl.
       + exact HregsC6.
       + rewrite us_upt_id. iExact "Hpriv".
   Qed.

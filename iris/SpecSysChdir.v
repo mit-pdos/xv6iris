@@ -271,8 +271,8 @@ Definition wp_sys_chdir_sconf_body
   ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       (* the page table may have GROWN: argstr's fetchstr faults user pages
-         in.  [uptd_ext] is argstr's own report, relayed. *)
-      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+         in.  [uptd_ext_sz] is argstr's own report, relayed. *)
+      ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗

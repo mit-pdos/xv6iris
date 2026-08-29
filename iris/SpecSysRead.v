@@ -344,7 +344,7 @@ Definition wp_sys_read_sconf_body
      more about [bs] than that it is a byte function of the right length. *)
     ∀ (mf : regfile) (r : mword 64) (P' : uptd) (d : nat) (bs : nat -> bv 8),
       ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+      ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       ⌜sys_read_ret (us_V U) v (sys_rw_count v2) r⌝ -∗
       ⌜(Z.of_nat d <= Z.max 0 (sys_rw_count v2))%Z⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗

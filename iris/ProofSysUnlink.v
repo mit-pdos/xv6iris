@@ -714,7 +714,7 @@ Section ProofSysUnlinkBody.
           W2's [ilock(dp)] reads [a0], so this is its first premise.  (Found
           by the seal, which is the first consumer to compose W1 with W2.) *)
        ⌜(Ms !!! Regidx Ra0 : mword 64) = dpv⌝ -∗
-       ⌜uptd_ext (pv_upt (us_V U)) P1⌝ -∗
+       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P1⌝ -∗
        ⌜(su_u1 w1 <= n1)%nat⌝ -∗
        ⌜w1 = true -> fsc_bmapstart ∈ Sb1⌝ -∗
        ⌜dpv <> (zero_reg : mword 64)⌝ -∗
@@ -1463,7 +1463,7 @@ Section ProofSysUnlinkBody.
     (M !!! Regidx Rs3 : mword 64) = (m !!! Regidx Rs3 : mword 64) ->
     su_al sp0 ->
     eb = true ->
-    uptd_ext (pv_upt (us_V U)) P1 ->
+    uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P1 ->
     sie_cap_gpr KT1 M (K - 30) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SU + 0x15a)) -∗
@@ -1739,7 +1739,7 @@ Section ProofSysUnlinkBody.
             (m !!! Regidx Rs3 : mword 64) M ->
     (M !!! Regidx Ra0 : mword 64) = dpv ->
     (su_u1 w1 <= n1)%nat ->
-    uptd_ext (pv_upt (us_V U)) P1 ->
+    uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P1 ->
     sie_cap_gpr KT1 M (K - 30) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
     kernel_text -∗ kernel_data -∗
@@ -3624,7 +3624,7 @@ Section ProofSysUnlinkBody.
     sp0 = (m !!! Regidx csp_rs1 : mword 64) ->
     su_al sp0 ->
     (su_u1 w1 <= n1)%nat ->
-    uptd_ext (pv_upt (us_V U)) P1 ->
+    uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P1 ->
     (* ---- the +0x72 seam's pure facts, verbatim ---- *)
     su_regs m sp0 (ientry kd) (ientry ks)
             (m !!! Regidx Rs3 : mword 64) M2 ->
@@ -4273,7 +4273,7 @@ Section ProofSysUnlinkBody.
     sp0 = (m !!! Regidx csp_rs1 : mword 64) ->
     su_al sp0 ->
     (su_u1 w1 <= n1)%nat ->
-    uptd_ext (pv_upt (us_V U)) P1 ->
+    uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P1 ->
     (kd < NINODE)%nat ->
     (ks < NINODE)%nat ->
     bv_unsigned dinum < 16 * Z.of_nat icfg_nib ->
@@ -5889,7 +5889,7 @@ Section ProofSysUnlinkBody.
     sp0 = (m !!! Regidx csp_rs1 : mword 64) ->
     su_al sp0 ->
     (su_u1 w1 <= n1)%nat ->
-    uptd_ext (pv_upt (us_V U)) P1 ->
+    uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P1 ->
     (kd < NINODE)%nat ->
     (ks < NINODE)%nat ->
     bv_unsigned dinum < 16 * Z.of_nat icfg_nib ->

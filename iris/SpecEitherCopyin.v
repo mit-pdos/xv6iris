@@ -92,7 +92,7 @@ Section SpecEitherCopyin.
         DESCRIPTOR, and only that: the block comes back at the image it
         was handed. *)
           (∃ P' : uptd,
-             ⌜uptd_ext (pv_upt (us_V U)) P'⌝ ∗ proc_priv_core p pid (us_upt U P')) ∗
+             ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ ∗ proc_priv_core p pid (us_upt U P')) ∗
           (∃ dst_new : nat -> bv 8,
              [∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ[ktb] dst_new j)
      else ⌜r = (mword_of_int 0 : mword 64)⌝ ∗

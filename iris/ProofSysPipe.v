@@ -1226,7 +1226,7 @@ Section ProofSysPipe.
           /\ mj !!! Regidx Ra5 = res
           /\ (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
                 r <> Rs0 -> r <> Rs1 -> mj !!! Regidx r = m !!! Regidx r) ⌝ -∗
-        ⌜ uptd_ext (pv_upt (us_V U)) P' ⌝ -∗
+        ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
         ⌜ (d <= 8)%nat ⌝ -∗
         sie_cap_gpr KT1 mj (av - 8)%nat b p -∗
         cpu_own 0%nat eb p b lks -∗
@@ -1605,7 +1605,7 @@ Section ProofSysPipe.
       iApply ("Hepi" $! W1 (pv_upt (us_V U)) 0%nat (fun _ => bv_0 8) (mword_of_int (-1) : mword 64)
                 with "[%] [%] [%] Hcg Hcpu Hextc Hextm Hpc Hiru [Hpenv] Hfenv [Hb5 Hb6 Hb7] [Hlo Hhi] [Hpriv Hfrag Hua Hub]").
       { split; [exact HW1sp|]. split; [exact HW1a5 | exact HthrW1]. }
-      { apply uptd_ext_refl. }
+      { apply uptd_ext_sz_refl. }
       { lia. }
       { by iExists on. }
       { iExists v, w6, w7. iFrame "Hb5 Hb6 Hb7". }
@@ -1822,7 +1822,7 @@ Section ProofSysPipe.
       { split; [rewrite (Hmrcs csp_rs1 ltac:(vm_compute; reflexivity)); exact HY0sp|].
         split; [exact Hmra5|].
         intros r Hr N2 N8 N9. rewrite (Hmrcs r Hr). apply HthrY0; assumption. }
-      { apply uptd_ext_refl. }
+      { apply uptd_ext_sz_refl. }
       { lia. }
       { iExact "Hpenv". }
       { iExists v, (fnode k0), (fnode k1). iFrame "Hb5 Hb6 Hb7". }
@@ -2080,7 +2080,7 @@ Section ProofSysPipe.
         intros r Hr N2 N8 N9. rewrite (Hmrcs r Hr).
         assert (N15 : r <> Ra5) by (intro He; rewrite He in Hr; vm_compute in Hr; discriminate).
         rewrite (HF2thr r N15 N15). apply HthrF1; assumption. }
-      { apply uptd_ext_refl. }
+      { apply uptd_ext_sz_refl. }
       { lia. }
       { iExact "Hpenv". }
       { iExists v, (fnode k0'), (fnode k1). iFrame "Hb5 Hb6 Hb7". }
@@ -2427,7 +2427,7 @@ Section ProofSysPipe.
           /\ Mt !!! Regidx Rs1 = p
           /\ (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
                 r <> Rs0 -> r <> Rs1 -> Mt !!! Regidx r = m !!! Regidx r) ⌝ -∗
-        ⌜ uptd_ext (pv_upt (us_V U)) P' ⌝ -∗
+        ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
         ⌜ (d <= 8)%nat ⌝ -∗
         sie_cap_gpr KT1 Mt (av - 8)%nat b p -∗
         cpu_own 0%nat eb p b lks -∗
@@ -2678,7 +2678,7 @@ Section ProofSysPipe.
                 with "[%] [%] [%] Hcg Hcpu Hextc Hextm Hpc Hiru [Hpenv] Hfenv Hpriv Hfrag Hu0 Hu1 Hb5 Hb6 Hb7 Hlo Hhi").
       { split; [exact HB0sp|]. split; [exact HB0s0|].
         split; [exact HB0s1 | exact HthrB0]. }
-      { exact (uptd_ext_sz_ext _ _ _ Hext1). }
+      { exact Hext1. }
       { lia. }
       { by iExists on. } }
     (* ===== the first copyout succeeded: do the second ===== *)
@@ -3005,7 +3005,7 @@ Section ProofSysPipe.
       iApply ("Hepi" $! D1 Pb (4 + 4)%nat bsc (zero_reg : mword 64)
                 with "[%] [%] [%] Hcg Hcpu Hextc Hextm Hpc Hiru [Hpenv] Hfenv [Hb5 Hb6 Hb7] [Hlo Hhi] [Hpriv Hfrag Hu0 Hu1]").
       { split; [exact HD1sp|]. split; [exact HD1a5 | exact HthrD1]. }
-      { exact (uptd_ext_sz_ext _ _ _ Hextb). }
+      { exact Hextb. }
       { lia. }
       { by iExists on. }
       { iExists v, (fnode k0), (fnode k1). iFrame "Hb5 Hb6 Hb7". }
@@ -3048,7 +3048,7 @@ Section ProofSysPipe.
                 with "[%] [%] [%] Hcg Hcpu Hextc Hextm Hpc Hiru [Hpenv] Hfenv Hpriv Hfrag Hu0 Hu1 Hb5 Hb6 Hb7 Hlo Hhi").
       { split; [exact HD1sp|]. split; [exact HD1s0|].
         split; [exact HD1s1 | exact HthrD1]. }
-      { exact (uptd_ext_sz_ext _ _ _ Hextb). }
+      { exact Hextb. }
       { lia. }
       { by iExists on. }
   Qed.

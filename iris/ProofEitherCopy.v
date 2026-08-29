@@ -958,7 +958,7 @@ Section ProofEitherCopyout.
       { exact Hcsf. }
       rewrite /either_copyout_post. rewrite Hfa0.
       iExists P', dwr.
-      iSplitR; [iPureIntro; exact (uptd_ext_sz_ext _ _ _ Hext)|].
+      iSplitR; [iPureIntro; exact Hext|].
       iSplitR; [iPureIntro; exact Hran|]. iExact "Hres".
     - (* ================= user_dst == 0: memmove ================= *)
       assert (Hz : eq_vec (Am !!! Regidx Rs1) zero_reg = true)
@@ -1696,7 +1696,7 @@ Section ProofEitherCopyin.
       rewrite /either_copyin_post. rewrite Hfa0.
       iSplitR; [iPureIntro; exact Hret|].
       iSplitL "Hres".
-      { iExists P'. iSplitR; [iPureIntro; exact (uptd_ext_sz_ext _ _ _ Hext)|]. iExact "Hres". }
+      { iExists P'. iSplitR; [iPureIntro; exact Hext|]. iExact "Hres". }
       iExists dst_new. iExact "Hdst".
     - (* ================= user_src == 0: memmove ================= *)
       assert (Hz : eq_vec (Am !!! Regidx Rs1) zero_reg = true)

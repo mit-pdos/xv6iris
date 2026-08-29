@@ -912,7 +912,7 @@ Section ProofFetchstr.
       iSpecialize ("Hcont" $! CID23 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! mf P' dst_new with "[%] [%] Hcg Hcpu Hpc Hpriv Hbuf [%]").
       { exact Hcsf. }
-      { exact (uptd_ext_sz_ext _ _ _ Hext). }
+      { exact Hext. }
       left. exists k. split; [exact Hkmax|]. split; [exact Hcstr | exact Hfa0].
     - (* ======= copyinstr returned -1: take the branch ======= *)
       assert (Htk : zopz0zI_s (mr !!! Regidx Ra0) zero_reg = true)
@@ -973,7 +973,7 @@ Section ProofFetchstr.
       iSpecialize ("Hcont" $! CID22 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! mf P' dst_new with "[%] [%] Hcg Hcpu Hpc Hpriv Hbuf [%]").
       { exact Hcsf. }
-      { exact (uptd_ext_sz_ext _ _ _ Hext). }
+      { exact Hext. }
       right. exact Hfa0.
   Qed.
 
