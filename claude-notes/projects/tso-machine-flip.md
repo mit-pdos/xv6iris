@@ -15742,3 +15742,33 @@ caller rebuilds `hcell_map cur_ctx pin` (`keep_map_back`) and, until step
 remain: `flight_res`/`parked_res` gain the pin's half ctx cells
 (transport by `hcell_map_morph`), the interrupt handler's reclaim keeps the
 ½ form, RwF withdraws by `hcell_map_join` + `ctx_win_of_ccell`.
+
+**A6.125 steps 3 and 5-OUT LANDED (r46; numbers in the handoff note).**
+`DiskInv.flight_res` ends with `hcell_map cur_ctx (dc_pin v)` (the
+publisher's half ctx cells, parked at publish by `ProofVirtioDiskRwD`'s
+`keep_map_back`), `parked_res` holds `half_map (dc_pinr pav p v) ∗
+hcell_map cur_ctx (dc_pinr pav p v)` in place of the sealed `phys_map`;
+the `CtxMorph` instances close with `hcell_map_morph`.  `ProofVirtioDiskRwE`
+threads the two new names; `ProofVirtioDiskRwF` withdraws by
+`hcell_map_join` + `cm_split` (region split over full ctx cells) and the
+three ctx-word bridges `vdrwf_c2b/_c4b/_c8b` (`ctx_win_of_ccell` +
+alignment), the OUT buffer by `ctx_win_of_ccell` + `vdrwd_ctx_bytes_of_fun`;
+the old `vdrwf_w2b/_w4b/_w8b` are deleted.  `CtxMorphTac` gained
+`ctx_morph_leaf_syn`, a SYNTACTIC dispatcher for the two ∃-shaped leaves
+(`ctx_phys_pointsto_h`, `ctx_cell_keep`, in both the `ξ` and `@cur_ctx ξ`
+spellings) that runs before decomposition.  **Gotcha (cost a killed
+round):** putting the `apply`-leaves first instead makes `apply` unify each
+leaf lemma against the whole payload conjunction and DIVERGES (`DiskInv`,
+`ConsoleInv` hung >10 min) -- structural steps stay before `apply`-leaves.
+
+**Where `ProofVirtioDiskRwF` stands (measured with a local stub, not
+committed):** its red root is `vdrwf_plist_mem` (the IN buffer: device-
+written bytes → `↦ₘ`), and with that one stubbed the next failure is the
+STATUS BYTE hand-back (`Hstat`, `phys_ledger (vr_status …)` → `d_info_status
+↦ₘ`, ~line 1208) -- also device-written.  Everything else in RwF compiles:
+the pin-return crossing for hart-written cells is CLOSED.  Both remaining
+sites are the same crossing (a device write becomes visible to a hart only
+through a floor above the device's completion message) and wait on the
+used-index instrument (A6.122 §4, owner ruling); `ProofVirtioDiskIntr`
+(reclaim + the ring-entry split, `hcell_map` for the ring bytes rebuilt by
+`hcell_map_join` + `ctx_win_of_ccell`) is red on the same instrument.
