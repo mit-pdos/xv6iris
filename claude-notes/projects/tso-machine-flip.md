@@ -15683,3 +15683,38 @@ pure ledger untouched.  Consumers: `ProofVirtioDiskRwD.wp_vdrwd_sh_publish`
 `flight_res`), `DiskInv.parked_res` (`phys_map (dc_pinr …)` → the ½ form
 next to the ctx halves), `ProofVirtioDiskIntr`'s reclaim site,
 `ProofVirtioDiskRwF`'s withdraw (join).
+
+**A6.125 step 2 LANDED (r43: 1183/1298, same 8 roots; snapshot
+`6304d4c92`).**  `VirtioProto`'s live arm is now
+`dma_own_x dma (dom (vproto_ctl (v_cfg v) pr)) ∗ half_map (vproto_ctl (v_cfg v) pr)`
+(`half_map m := [∗ map] a ↦ b ∈ m, phys_ledger a ½ b`; `avail_lease_half c
+np ⊣⊢ half_map (avail_idx_bytes c np)` by the dq-generic
+`ledger_map_idx_list`).  Kit: `half_map_union/_agree`, `lease_agree_ctl`,
+`phys_map_half_map_disj`, `lease_disj_ctl`, `map_filter_hole_ext` /
+`dma_own_x_hole_ext`, `map_filter_drop_hole` / `dma_own_x_drop_hole`,
+`range_disj_ctl`, `ctl_split_disj`, `half_map_ctl_split`,
+`phys_ledger_split_half/_join_half`, `phys_map_split_half`.  The step's
+device-write disjointness is `vslot_writes_dom`'s own `Hwctl`; the
+used-page accessors use `range_disj_ctl`; `avail_idx_acc` splits the
+control set (`half_map_ctl_split`); `reclaim_acc` shrinks only the
+writable footprint out of the holed resource, takes the pin's half out of
+`half_map ctl` (`vproto_reclaim_ctl`'s split) and re-keys the hole
+(`dma_own_x_drop_hole` + a `dma ∖ (pin ∪ SB) = (dma ∖ SB) ∖ pin` identity);
+its post returns `half_map pin`.
+
+**THE PIN OFFER (a correction to A6.125's sketch).**  A new pin's
+exclusivity against the lease is an OWNERSHIP fact, and against the
+lease's ½ cells only a MORE-THAN-HALF owner conflicts (½ + ½ = 1 is the
+legitimate in-flight shape, indistinguishable from a double pin).  So
+`publish_acc` takes `pin_offer pin := [∗ map] a ↦ b ∈ pin, phys_pointsto a
+½ b ∗ phys_ledger a ½ b` (memory at 1, stamp at ½ -- exactly a ctx cell
+minus its arm and half its stamp), proves `dom pin ## dom dma` from it
+(`pin_offer_full_disj`: ½ vs 1; `pin_offer_half_disj`: the two offer halves
+assembled vs ½; `pin_offer_lease_disj`), keeps the sealed half, and hands
+`pin_back pin := [∗ map] a ↦ b ∈ pin, phys_pointsto a ½ b` back in the
+close-wand's post.  Step 4's caller therefore splits a ctx cell as
+(offer = mem 1 + ts ½) ⊕ (kept = ts ½ + arm) and rebuilds `ctx_phys_pointsto_h`
+from the kept part plus `pin_back` -- no `ctx_phys_pointsto_split` needed
+at publish; `ctx_phys_pointsto_join` closes at withdraw.  The interim
+`ProofVirtioDiskRwD` caller offers by `phys_map_offer` and drops `pin_back`.
+Steps 3–6 remain.
