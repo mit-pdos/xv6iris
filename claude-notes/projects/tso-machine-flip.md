@@ -15200,3 +15200,193 @@ the notheld chain on `lk_floor`; the AMO leaf's `lock_pay_won`), `WpSconfMem`
 (the wpay store's registration + export), `SmodeCorePt` (both trees, §6),
 `ProofInitlock`, `SpecHolding`, `ProofHolding`, `PipeInv`, `ProofRelease`,
 `ProofAcquire`.
+
+---
+
+## A6.121 — THE M3 λ-CONVERSION LANDS FOR THREE OF THE FOUR STRAGGLERS (`ticks_res`, `cons_res`, `disk_res`): 197 `<{ }>` sites, zero consumer edits, one real transport proof per payload
+
+*(Amendment A6.121, lock lane.  Opening the queue's item (2) ahead of item
+(1), because the virtio floors need a ξ-indexed `disk_res` to ride in
+(§0.35′(ii)/(iv) case 3) and nothing else on the frontier does not.)*
+
+### §1. THE NUMBER
+
+**r39: 1179 `.vo` of 1297, RED 8**, sentinel-backed (`MAKEEXIT=2`; the
+`TsoCtx`-rooted validating round recompiled 824 files, the closing one 9).
+The red list is byte-identical to r38's eight; `.vo` 1178 → 1179 is
+`CtxMorphTac` (new).  Zero `admit`/`Admitted`/`Abort`/`Axiom` across the
+five files with new text.  197 `<{ }>` sites renamed across 94 files; ONE
+consumer needed an edit and it was a spelling (`ProofFilewrite:1541` had the
+payload module-qualified, which the first rename pass did not match).
+Snapshot `820ae4406` on `tso-flip`; mirror refreshed.
+
+### §2. THE SHAPE, MEASURED ON A PILOT
+
+`tso-intr-lane.md` I4 sized this as "an M3-sweep sized change … not a single-lane
+job", on the reasoning that replacing the constant embedding `<{ P }>` by a
+λ turns the free `ctx_morph_const_pay` instance into a real proof obligation
+per payload AND touches 457 sites in 163 files.  Both halves are true and
+both are cheaper than they read, because of one design choice:
+
+> **The payload is converted at its HOME, not at its sites.**  Each straggler
+> gains an explicit-context twin — `ticks_res_at ξ`, `cons_res_at ξ`,
+> `disk_res_at γ pd pav pu ξ := disk_res (XI := ξ) γ pd pav pu` — with its
+> `CtxMorph` instance proved once beside it; every `<{ P args }>` site becomes
+> the plain term `(P_at args)`, which carries NO binder and so cannot fire the
+> silent-drop hazard `<{ }>` was invented against.  A consumer that reads
+> `R cur_ctx` after acquire gets `P_at args cur_ctx`, which is the old `P` by
+> β (and by δ for the two spelled with a duplicate body) — so every
+> `iDestruct`, every `P_intro`, every `rewrite /P` in the tree is untouched.
+
+Pilot `ticks_res` (15 sites, 6 files): **53 files recompiled, RED 8, delta 0,
+zero consumer edits.**  Then `cons_res` (9 sites) and `disk_res` (174 sites,
+89 files) the same way.  The transport proofs themselves: `ticks` is one
+`∃` over a word; `cons` is three words, a pure fact and a byte big-op;
+`disk` is five `∃`, a dozen conjuncts, two `big_sepM`s and a `big_sepL` with a
+boolean branch — every leaf a context cell or ξ-constant — through six
+component instances (`desc_entry_own`, `ops_own`, `free_slot_res`,
+`flight_res`, `parked_res`, `ring_slots_res`).  Two structural instances the
+tree lacked are added to `TsoCtx`: `ctx_morph_big_sepM` and `ctx_morph_if`.
+
+### §3. THE ONE THING WORTH A FILE: typeclass search is not reliable for these goals
+
+`apply _` on `CtxMorph (λ ξ, ∃ t, ctx_word4_pointsto ξ a_ticks 1 t)` FAILS
+inside `TicksInv.v` and SUCCEEDS on the identical goal, identical imports,
+identical section context, from a scratch file that imports `TicksInv`
+(measured six ways: `Lemma` vs `Global Instance`, with/without `WpLock`,
+with/without `Z_scope`, with/without an ambient `CurCtx`, local vs imported
+definition; the scratch passes every time and the home file fails every
+time).  Not diagnosed further — the honest cost of diagnosing exceeded the
+cost of not depending on it.  So `CtxMorphTac.v` (new, one screen) drives the
+proofs by applying the structural lemmas BY NAME (`ctx_morph_solve`), unfolds
+`cur_ctx` first (a payload spelled with the ambient notations elaborates its
+cells at `@cur_ctx XI`, and once `XI` is the λ's binder the projection hides
+it from the leaf lemmas), and stops at whatever it cannot decompose, which
+the payload's own component instances then close.  A separate file so the
+tactic can grow without re-certifying `TsoCtx`'s cone.
+
+### §4. THE FOURTH STRAGGLER IS NOT THIS UNIT'S: `proc_lock_res` waits for §0.27′
+
+`proc_lock_res`'s `proc_slots` holds `▷ proc_ctx pa` (the parked context
+record, under a later because the scheduler only ever holds it under its
+own swtch's later) and `run_slot`'s `▷ sched_vc_at`.  `CtxMorph` is a basic
+update, and `▷ R ξ ==∗ ▷ R ξ'` does not follow from `R ξ ==∗ R ξ'`; the
+record's re-indexing across the park is exactly what §0.27′ specifies (the
+lock invariant's `T ≤ t_rel` tie, the resume-ready bundle), so converting
+this payload IS the `ProofSwtch` unit and is left with it.  `wait_res`
+(38 sites) was not measured.  The `<{ }>` combinator and its instance stay
+for those two.
+
+### §5. WHAT THIS BUYS
+
+* the intr lane's I4 blocker (a handle minted at one context unusable at
+  another) is gone for the three converted payloads: `disk_res`'s
+  `is_lock`-free content now re-indexes at every acquire;
+* the virtio floors have a carrier: §0.35′(iv) case 3's "payload floored
+  against U" can now be spelled as a conjunct of `disk_res` that morphs
+  (`lk_floor`'s two arms both transport, A6.117 + A6.120);
+* A6.116 §3's question is moot — no `CtxMorph` strengthening was needed.
+
+### §6. FILES TOUCHED
+
+`TsoCtx` (two instances), `CtxMorphTac` (new), `_CoqProject`, `TicksInv`,
+`ConsoleInv`, `DiskInv`, and the 94 consumer files whose `<{ … }>` sites were
+renamed (no proof text changed in any of them).
+
+---
+
+## A6.122 — THE VIRTIO PAIR, MEASURED TO ITS FLOOR: the avail index is buildable now, the used index needs an instrument the model does not have
+
+*(Amendment A6.122, lock lane.  Characterize-and-stop on the second half;
+nothing edited in either virtio file.  Written against A6.95, whose §(4)
+("ready, needs only the tie") this corrects.)*
+
+### §1. WHAT A6.95 GOT RIGHT AND WHAT IT MISSED
+
+Right: the queue words are ledger cells inside the DMA lease (`dma_own`,
+carved by `dma_own_acc_same` into `phys_word2`), the device is a first-class
+author (`disk_agent`), the ledger gates are agent-generic
+(`ledger_store_ok`/`_pin_ok (auth : agent)`), and both files fail at one
+site apiece on the datum mismatch (`phys_to_word2` bridges to the RAW tower
+`word2_pointsto`, the flipped leaf wants `wordw_pointsto 2`).
+
+Missed: **the tie is not one object but two, and only one of them is the
+lock's.**
+
+### §2. THE AVAIL INDEX (`ProofVirtioDiskRwD:686`) — buildable, and it is the lock word's own pattern
+
+Written only by lock holders (the `sh` at `wp_vdrwd_sh_publish`), read only
+by lock holders, read by the device.  A reader's view is at least its
+acquire's AMO position, which is past the previous holder's release, which
+is past the last publish store — so the cell's timestamp is below the
+reader's view and the read is EXACT.  As ghost state, verbatim the lock
+word (A6.119's shape 4, singleton set):
+
+* the two bytes become a PIN cell in the lease, `S = {wrap16 np}`, floored
+  at the publish store's own position (retract-then-store-then-mint:
+  `ledger_pin_drop` + `ledger_store_ok` + `ledger_pin_mint`, all landed);
+* the floor is CARRIED IN THE PAYLOAD: `disk_res` (ξ-indexed since A6.121)
+  gains `∃ B, disk_pub_at γ np B ∗ lk_floor cur_ctx B`, where `disk_pub_at`
+  is `disk_pub` with the floor in the ghost var's value (five `dn_np` sites
+  in `VirtioProto`); the publisher registers its store
+  (`TsoCtx.ctx_wrote_register`, A6.120 — the plain store gate returns the
+  fragment) and installs the RIGHT arm; the crossing turns it into the LEFT
+  arm for free (`lk_floor`'s two-armed transport: `ctx_floor_dom` +
+  `ctx_dom_wrote_floor`);
+* the reader: `lk_floor_vis` against the token gives `view_lb K ∗ B ≤ K`,
+  then `ledger_read_pin_ok` on the pin gives the exact value — through
+  `wp_load_s_sconf_au_dat` with the pin word as its datum.
+
+Cost: `WpLock` (a `CtxMorph` instance for `lk_floor`), `VirtioProto` (the
+lease holds the avail word as a pin beside the plain map — `dma_own`'s
+carve lemmas special-case one 2-byte range; `disk_pub_at`; the avail
+accessor and the publish accessor re-cut), `DiskInv` (the payload conjunct),
+`ProofVirtioDiskRwD` (registration at the publish, the read).  Greens
+`ProofVirtioDiskRwD` and the three files behind it.
+
+### §3. THE USED INDEX (`ProofVirtioDiskIntr:1165`) — the pin cannot express it, and here is the measurement
+
+Written by the DEVICE, read by the handler in a loop; the post the loop
+needs is a RANGE, `nr ≤ nc ≤ np`, and the lower bound is the whole
+difficulty: a stale read below `nr` would re-process completed slots.
+
+* **Exactness is not available.**  The handler's `__sync_synchronize` is the
+  publishing fence (`wp_fence_pub_s_sconf`), but `HartBarrier.pub_step`
+  promises only `own_pub ≤ gtv` — the hart's OWN stores drained — not the
+  log top; and even the acquire's log-top view is one device step stale by
+  the time of the read (the device thread interleaves between
+  instructions).  So the read is "the latest write at or below my view",
+  and the model is right that it is.
+* **A pin cannot summarise it.**  `pin_ok img log a B S` says reads at views
+  ≥ B are in `S`; `ledger_pin_mint` needs `t ≤ B` (the cell's latest write
+  at or below the floor, because the mint proves `pin_ok` from `latest` and
+  cannot see history).  The handler's floor must be ≤ ITS view (it is the
+  reader), and the device's latest write is typically ABOVE that view — so
+  the handler can never re-mint, and the lower bound `nr` can never enter
+  the set.  The device can mint (at its own write, `t = B`), but a floor at
+  a device write is above every stale reader's view and useless to it.
+  Widening `S` upward is sound (`pin_ok_mono`-style) and covers the UPPER
+  bound; the lower bound is exactly what a set-since-floor cannot carry for
+  a reader below the floor.  Measured on paper against every placement of
+  the re-floor (acquire, fence, read, advance, release, device write).
+* **What the model needs is a MONOTONE cell**: "since position B every
+  write to `a` is by agent X and non-decreasing", so that a read at any
+  view ≥ B is at least the value at B — the fact the real machine gives the
+  handler and the reason xv6's loop is correct.  That is a third
+  `ts_pay` arm in `TsoMemPa` beside the pin and the window, with its own
+  frame lemma in every store gate (the pin's `pin_ok_app_frame` pattern,
+  ~6 gates), a mint/drop pair, a read gate, and the device rule as its one
+  writer.  It is a Σ-level instrument, i.e. an owner ruling (the "fifth
+  question" A6.95 §(3) said did not exist — it does, and it is this one).
+  Once it exists the handler's read is: floor at the acquire's position
+  (from `locked`'s `ctx_floor`), value ≥ the value at that position ≥ `nr`
+  (the previous holder's read was below the previous release, which is
+  below this acquire), upper bound from the invariant's current `vp_nc`.
+
+### §4. RECOMMENDATION
+
+Build §2 (the avail side) — it is the lock word's own kit applied one page
+over and needs nothing new.  Surface §3 for a ruling as the instrument
+question it is; do not spend rounds trying to bend the pin into it.  The
+lease special-casing §2 needs (one pinned range beside `dma_own`'s plain
+map) is the same special-casing §3 will need, so §2 is not throwaway.
