@@ -218,9 +218,11 @@ U-mode bundle `uvb` (C), and the five-step staging.  Lanes, in order:
    literal `proc_ptm` could not back an executing bundle — with the
    store leaf's transparent fault arm built from the generic tier's own
    fault machinery.  NEW J OBLIGATION from the landing: the loop must
-   discharge `usz_ok (uint (pv_sz V))` at resume — find or add the
-   kernel-side invariant that pins `p->sz` below the trampoline region
-   (growproc's own bound check is the likely source).
+   discharge `usz_ok (uint (pv_sz V))` at resume — FREE:
+   `proc_priv γf pa pid U -∗ ⌜uint (pv_sz (us_V U)) <= uvm_maxsz⌝`
+   (ProcInv), `uvm_maxsz = 2^38 - 8192` is exactly `usz_ok`'s
+   page-aligned bound, and `pgroundup` preserves a page-aligned bound;
+   one three-line bridging lemma at J.
 3. **[ ] Milestone J** (§4): the kernel side switches to `ukont`'s
    shape.  **THE KEY'S IMAGE VIEW IS RULED (owner, 2026-08-28): option
    (A), the `proc_ptm` re-key** — the owner's principle, verbatim: the
@@ -361,7 +363,11 @@ durable content is here.
   `sysc_arm_goal`'s own `Hnum`; 16 arms are eq_refl one-tokeners, 5
   need ~6-line iAssert widenings, fallback included.
   S6 = R4 (state the lemma over RW-leaf `uptd_ext`, not just one
-  `uptd_insert` — see S5's (ii)); S7 the transparent arms with a temporary ecall escape;
+  `uptd_insert` — see S5's (ii); RESOLVED 2026-08-28: no `SpecVmfault`
+  change needed — `uptd_insert` inserts `uvm_pte 22 r` and 22 is
+  PTE_U|PTE_W|PTE_R definitionally, so `perm_leaf` of it computes to
+  `Some uperm_rw` and the lemma is self-contained in
+  `UserPerm.v`/`UsysMemOkSpec.v`); S7 the transparent arms with a temporary ecall escape;
   S8 the ecall arm (route the framed `sysc_mem_ok` at
   `ProofUsertrapSys.v` ~:502-528 through `UsysMemOkSpec`); S9 the
   register-file/pc tie in `uservec_post` (the residue's 36 peeled tf

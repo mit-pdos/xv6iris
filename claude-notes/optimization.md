@@ -1343,6 +1343,14 @@ splice a closer into argument position.
   `rewrite`/`iFrame` against the 32-insert `userret_gpr` chain (enumerate
   the 32 `mword 5` indices and peel per case; an insert-chain `rewrite`
   unifies the `Insert` instance up to delta and does not terminate).
+  A THIRD DOOR into the same divergence (2026-08-28, a lane's
+  `tf_ueq_resume_gpr`): `f_equal` — it begins by trying `reflexivity`
+  on the whole goal, and that conversion check delta-unfolds
+  `userret_gpr` into the tower on both sides with UNEQUAL leaves and
+  backtracks forever.  Rule: never let `reflexivity`/`f_equal`/any
+  unification see a goal whose two sides contain the tower but differ —
+  rewrite the leaf equalities first (each pattern a closed `tf !!! i`),
+  so `reflexivity` only ever runs on syntactically identical sides.
 - **`vm_compute; reflexivity` is rechecked by the kernel's LAZY conversion at
   `Qed`** — the VM's speed does not carry over, and on model code that is a
   different order of magnitude (one such equation over the cold-boot chain

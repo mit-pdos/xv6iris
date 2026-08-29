@@ -40,9 +40,11 @@ map in the projection — but `sz` is the kernel's other address-space
 datum, so J's discharge of `perm_of pt sz = uvis_perm W` is by
 computation — and the leaves never look at it: a FETCH needs X, which no
 filled page has, so an X page is a mapped page (`perm_of_X_mapped`); a
-STORE needs W and a byte present in the image, and at the tier the
-leaves run on (`user_pt_inv`'s `dom M = uva_dom pt`) a present byte is a
-mapped page (`image_byte_mapped`).  R is implied for every page in the
+STORE to a W page of the key either lands on a mapped page (the mapped
+sub-image `Mp` has the byte) or takes the transparent fault arm — see
+"The contract, re-cut on the map" below for the landed lazy-view form
+(the earlier mapped-tier reading, `image_byte_mapped` over `user_pt_inv`'s
+dom pin, was superseded by the 2026-08-28 lazy-view ruling).  R is implied for every page in the
 map: xv6 never builds a U leaf without R, and `upt_acc_wf` excludes the
 execute-only and write-only shapes.
 
