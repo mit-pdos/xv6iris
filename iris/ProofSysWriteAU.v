@@ -957,7 +957,10 @@ Section ProofSysWriteAU.
         rewrite /S2 upd_ne; [| congruence].
         rewrite /S1 upd_ne; [| congruence].
         apply HthrA; assumption. }
+      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs4lo") as "Hs4lo".
+      iDestruct (TsoCtxShim.ctx_word4_to_mem with "Hs4hi") as "Hs4hi".
       iDestruct (word_pointsto_join4 _ _ _ _ Hal4 with "Hs4lo Hs4hi") as "Hs4".
+      iDestruct (TsoCtxShim.ctx_word_of_mem with "Hs4") as "Hs4".
       iApply (swau_tail (CID0 := CID25) m mf av rv sp0 ra0 s00 _ _ _ _ b pj
                 ltac:(lia) eq_refl eq_refl eq_refl HMfsp Hrva HthrF
                 with "Hcg Htext Hpc Hs1 Hs2 Hfcell Hs4 Hs5 Hs6").
