@@ -1,4 +1,4 @@
-DIGEST 7287c4252a01256582b052a8115573e6
+DIGEST 61642ab2003384b0a501810a4f8b5d2f
 Fxv6iris.SpecTrapinit
 R256:264 Stdlib.Logic.Eqdep_dec <> <> lib
 R266:271 Stdlib.ZArith.ZArith <> <> lib
@@ -157,7 +157,7 @@ R2990:2999 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
 R2964:2972 xv6iris.WpLock <> lock_name def
 R2974:2975 xv6iris.SpecTrapinit <> lk:16 var
 R3022:3031 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R3000:3018 xv6iris.WpLock <> lk_cpu_fresh def
+R3000:3018 xv6iris.WpLock <> lk_cpu_ready def
 R3020:3021 xv6iris.SpecTrapinit <> lk:16 var
 R3032:3035 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
 R3058:3058 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not

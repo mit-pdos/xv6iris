@@ -1057,8 +1057,21 @@ Section Lock.
      The handle stays ξ-indexed (the left arm names [cur_ctx]), so §0.16''s
      crossing discipline is unchanged; what moves is WHERE the purchase
      happens. <<< *)
+  (* >>> A6.120: THE RIGHT ARM IS THE OWN-WRITE WITNESS, not a bare log
+     position.  §0.38′'s reading -- "you received this handle, or you wrote
+     this lock" -- is now spelled with the ctx tower's own dirty witness
+     ([TsoCtx.ctx_wrote]: the floor message is a dirty key of the creating
+     context), which the read cashes against the running token on EITHER
+     arm ([lk_floor_vis]).  A6.113 had measured that the bare [llb] cannot
+     be cashed at a read at all (a view and a log position compare only at
+     an AMO) -- which is what made the crossing upgrade look universal and
+     left the creator's own first acquire (kinit's kfree, printfinit's
+     printf) with no route.  The [llb] stays beside the witness: it is what
+     [initlock] already exports, and the AMO-side upgrade
+     ([TsoCtx.hart_view_lb_get]) still reads it. <<< *)
   Definition lk_floor (ξ : TsoCtx.CtxId) (lo : nat) : iProp Σ :=
-    (TsoCtx.ctx_floor ξ lo ∨ TsoGhost.llb loglen_name lo)%I.
+    (TsoCtx.ctx_floor ξ lo
+     ∨ (TsoGhost.llb loglen_name lo ∗ ∃ a : Arch.pa, TsoCtx.ctx_wrote ξ lo a))%I.
 
   Global Instance lk_floor_persistent ξ lo : Persistent (lk_floor ξ lo).
   Proof. apply _. Qed.
@@ -1069,8 +1082,29 @@ Section Lock.
   Lemma lk_floor_of_ctx ξ lo : TsoCtx.ctx_floor ξ lo -∗ lk_floor ξ lo.
   Proof. iIntros "H". by iLeft. Qed.
 
-  Lemma lk_floor_of_llb ξ lo : TsoGhost.llb loglen_name lo -∗ lk_floor ξ lo.
-  Proof. iIntros "H". by iRight. Qed.
+  Lemma lk_floor_of_wrote ξ lo (a : Arch.pa) :
+    TsoGhost.llb loglen_name lo -∗ TsoCtx.ctx_wrote ξ lo a -∗ lk_floor ξ lo.
+  Proof. iIntros "#Hl #Hw". iRight. iFrame "Hl". by iExists a. Qed.
+
+  (* A6.120: THE READ-SIDE CASH-IN, ON EITHER ARM.  The left arm is
+     [TsoCtx.own_context_floor_view] (the bound has passed the floor, so
+     the view has); the right is [TsoCtx.own_context_wrote_vis] (the floor
+     message is a dirty key of my context: below my bound, or MINE).  Both
+     land on [ledger_vis] at the token's own receipt, which is exactly the
+     premise [lkcpu_read_not_mine] takes -- so the racy read needs no
+     absorbed opener and [lock_openable_c] has no consumer left. *)
+  Lemma lk_floor_vis `{CID : CpuId} (ξ : TsoCtx.CtxId) (lo : nat) :
+    TsoCtx.own_context ξ -∗ lk_floor ξ lo -∗
+    TsoCtx.own_context ξ ∗ ∃ K : nat,
+      TsoGhost.view_lb view_name loglen_name (hart_agent cpu_id) K ∗
+      TsoCtx.ledger_vis (hart_agent cpu_id) K lo.
+  Proof.
+    iIntros "Hrun #Hfl". iDestruct "Hfl" as "[#Hfl | [_ (%a & #Hw)]]".
+    - iDestruct (TsoCtx.own_context_floor_view with "Hrun Hfl")
+        as "[Hrun (%K & #HK & %HloK)]".
+      iFrame "Hrun". iExists K. iFrame "HK". by iApply TsoCtx.ledger_vis_below.
+    - iApply (TsoCtx.own_context_wrote_vis with "Hrun Hw").
+  Qed.
 
   Definition lk_cpu_ready_at (lk : mword 64) (v : mword 64) : iProp Σ :=
     (∃ lo : nat, lk_cpu_at lo lk v ∗ lk_floor cur_ctx lo)%I.
@@ -1192,6 +1226,19 @@ Section Lock.
      ratchet across generations and no token travels with the holder. *)
   Definition lock_pay (R : CtxId -> iProp Σ) : iProp Σ :=
     (∃ (ξ : CtxId) (T : nat), ctx_parked ξ T ∗ R ξ)%I.
+
+  (* A6.120: THE WINNER'S FORM of the record -- the same record, plus the
+     acquirer's floor AT THE RECORD'S STAMP.  The AMO leaf mints it: the
+     stamp is a legal log position, hence below the AMO's own, and the leaf
+     already exports [ctx_floor cur_ctx] at that position for the holder
+     token.  This is the "stable pair" A6.116 §1 found the bare receipt
+     lacked, in §0.38′'s one agreed spelling ([ctx_floor], re-cashed into
+     [hart_view_lb K ∗ ⌜T ≤ K⌝] by [TsoCtx.own_context_floor_view]); with it
+     [SpecAcquire]'s absorb is [TsoCtxAbsorbLb.ctx_absorb_lb] and the
+     retired SC shim [ctx_dom_sc] has nothing left to conjure. *)
+  Definition lock_pay_won (R : CtxId -> iProp Σ) : iProp Σ :=
+    (∃ (ξ : CtxId) (T : nat),
+       ctx_parked ξ T ∗ TsoCtx.ctx_floor cur_ctx T ∗ R ξ)%I.
 
   (* THE CREATOR'S MINT -- AND HERE IT IS HONEST, WHICH IT IS NOT ON MAIN.
      §0.18′ had to quarantine this at one site behind the shim's
@@ -1463,6 +1510,10 @@ Section Lock.
      the handle here), and free at [lo = 0] for every boot-static lock
      ([ctx_floor_0]).  [lock_openable_of_c] is the one-way weakening, so
      nothing that only OPENS a lock has to care which it holds. <<< *)
+  (* A6.120: RETIRED IN PLACE -- no producer and no consumer.  The racy
+     read cashes [lk_floor] on either arm now ([lk_floor_vis]), so the
+     absorbed opener is never needed; kept because it is three lemmas and
+     a grep landing here should read why. *)
   Definition lock_openable_c (γ : gname) (lk : mword 64) (s : string)
       (R : CtxId → iProp Σ) (D : iProp Σ) : iProp Σ :=
     (∃ lo : nat,
@@ -1593,9 +1644,28 @@ Section Lock.
   (* §0.35′(i) / A6.97 §(2): the floor is ∀-QUANTIFIED INSIDE the wand, not
      added to the arity -- the finisher is handed whichever [lo] the leaf's
      open produced, and no consumer of [lock_finisher] names it. *)
-  Definition lock_finisher (γ : gname) (lk : mword 64) (s : string)
+  (* >>> A6.120: THE FINISHER IS TWO-PART -- a PRELUDE at release's entry
+     and a BODY at the store -- because its two arms want the payload in two
+     different shapes and only the entry has the running token:
+       close   : the invariant's free arm is the parked record [lock_pay R],
+                 so the payload must be DEPOSITED ([lock_pay_intro]), which
+                 spends [own_context] -- borrowable from [sie_cap] at entry
+                 (SieCapCtx) and NOT at the store, where the step engine
+                 holds it inside its atomic update
+                 ([WpSconfMem.wp_store_s_sconf_au_dat]'s obligation);
+       destroy : the caller's completion wand speaks at [cur_ctx], and the
+                 word clear is a plain [sw] after a fence -- no AMO, so no
+                 log-top evidence could bring a record parked at entry back
+                 (the retired SC shim [ctx_dom_sc] used to conjure exactly
+                 that morph, at ProofRelease's cancel path).  The honest
+                 form never parks it.
+     So the finisher CHOOSES the shape [Pay]: the prelude turns [R cur_ctx]
+     into it with the token in hand, the body consumes it at the store.
+     [lock_finisher_body] is what the word-clear leaf takes; nothing outside
+     this file looks inside [lock_finisher]. <<< *)
+  Definition lock_finisher_body (γ : gname) (lk : mword 64) (s : string)
       (R : CtxId → iProp Σ) (D Out : iProp Σ)
-      (E : coPset) : iProp Σ :=
+      (E : coPset) (Pay : iProp Σ) : iProp Σ :=
     ( ∀ lo : nat,
       ((▷ lock_inv γ lk s R lo ={E ∖ ↑lockN, E}=∗ True)
        ∧ (D ={E ∖ ↑lockN, E}=∗ True)) -∗
@@ -1604,14 +1674,30 @@ Section Lock.
          [lock_word_fresh]: release cannot hand back a ctx cell. *)
       lock_word_fresh lk -∗
       lk_cpu_fresh lo lk -∗
-      lock_pay R -∗
+      (* the lock's floor, off the opener the leaf holds: a destroying
+         finisher hands the owner cell back BUNDLED ([lk_cpu_ready], A6.105's
+         shape) and needs it; a closing one ignores it. *)
+      lk_floor cur_ctx lo -∗
+      Pay -∗
       |={E ∖ ↑lockN, E}=> Out)%I.
 
+  Definition lock_finisher `{CID : CpuId} (γ : gname) (lk : mword 64)
+      (s : string) (R : CtxId → iProp Σ) (D Out : iProp Σ)
+      (E : coPset) : iProp Σ :=
+    (∃ Pay : iProp Σ,
+       (own_context cur_ctx -∗ R cur_ctx ==∗ own_context cur_ctx ∗ Pay) ∗
+       lock_finisher_body γ lk s R D Out E Pay)%I.
+
   (* put it back: today's release, and equally the release of an object that
-     merely still has other holders -- [D] is not used, only not taken. *)
-  Lemma lock_finisher_close γ lk s R D E : ⊢ lock_finisher γ lk s R D emp E.
+     merely still has other holders -- [D] is not used, only not taken.
+     The prelude is the deposit (A6.119 / §0.18′: the free arm is the parked
+     record, minted honestly by [ctx_deposit]). *)
+  Lemma lock_finisher_close `{CID : CpuId} γ lk s R `{!CtxMorph R} D E :
+    ⊢ lock_finisher γ lk s R D emp E.
   Proof.
-    iIntros (lo) "[Hclose _] Hauth Hfrag [#Hc4 Hword] [#Hc8 Hcpu] HR".
+    iExists (lock_pay R). iSplitR.
+    { iIntros "Hrun HR". iApply (lock_pay_intro with "Hrun HR"). }
+    iIntros (lo) "[Hclose _] Hauth Hfrag [#Hc4 Hword] [#Hc8 Hcpu] _ HR".
     iDestruct "Hauth" as (B) "Hauth".
     iMod ("Hclose" with "[Hauth Hfrag Hword Hcpu HR]") as "_"; [| by iModIntro].
     iNext. rewrite /lock_inv /lock_body. iFrame "Hc4 Hc8".
@@ -1625,19 +1711,26 @@ Section Lock.
      finds in [R] -- not brought along ready-made.  That generality is what a
      multiply-owned object needs: the last holder to let go has necessarily
      already surrendered its share of the certificate into [R], and [R] is
-     only in hand at this instant (see PipeInv.pipe_res_dead). *)
+     only in hand at this instant (see PipeInv.pipe_res_dead).
+     The prelude is the identity: the destroyer's payload stays at its own
+     context, which is the context its completion wand speaks at. *)
   (* the destroy arm's [Out] cannot mention [lo] (it is chosen by the caller,
-     before the open), so the owner cell leaves EXISTENTIALLY floored -- which
-     is all its one consumer wants: [lk_cpu_fresh_free] is floor-generic. *)
-  Lemma lock_finisher_destroy γ lk s R D Out E :
-    (lock_frag γ None -∗ lock_pay R ==∗ D ∗ Out) -∗
-    lock_finisher γ lk s R D
-      (lock_word_fresh lk ∗ (∃ lo : nat, lk_cpu_fresh lo lk) ∗ Out) E.
+     before the open), so the owner cell leaves in A6.105's BUNDLED form
+     [lk_cpu_ready] -- existentially floored, with the floor certificate
+     beside it, which is what [SpecRelease]'s cancel post hands back and
+     what [PipeInv.pipe_bytes_page_own] consumes. *)
+  Lemma lock_finisher_destroy `{CID : CpuId} γ lk s R D Out E :
+    (lock_frag γ None -∗ R cur_ctx ==∗ D ∗ Out) -∗
+    lock_finisher γ lk s R D (lock_word_fresh lk ∗ lk_cpu_ready lk ∗ Out) E.
   Proof.
-    iIntros "Hcomplete" (lo) "[_ Hdispose] Hauth Hfrag Hword Hcpu HR".
+    iIntros "Hcomplete". iExists (R cur_ctx). iSplitR "Hcomplete".
+    { iIntros "Hrun HR". iModIntro. iFrame "Hrun HR". }
+    iIntros (lo) "[_ Hdispose] Hauth Hfrag Hword Hcpu #Hfl HR".
     iMod ("Hcomplete" with "Hfrag HR") as "[HD HOut]".
     iMod ("Hdispose" with "HD") as "_".
-    iModIntro. iFrame "Hword HOut". by iExists lo.
+    iModIntro. iFrame "Hword HOut".
+    rewrite /lk_cpu_ready /lk_cpu_ready_at. iExists lo.
+    iSplitL "Hcpu"; [ iExact "Hcpu" | iExact "Hfl" ].
   Qed.
 
   (* [mem_pointsto]'s and [word4_pointsto]'s [Timeless] instances now live in

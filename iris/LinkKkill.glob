@@ -1,0 +1,9 @@
+DIGEST dc9efab23b3671a75f3858b1c0960c26
+Fxv6iris.LinkKkill
+R168:178 xv6iris.LinkAcquire <> <> lib
+R180:190 xv6iris.LinkRelease <> <> lib
+R192:201 xv6iris.ProofKkill <> <> lib
+R221:230 xv6iris.ProofKkill KkillProof <> modtype
+R232:238 xv6iris.LinkAcquire Acquire <> modtype
+R240:246 xv6iris.LinkRelease Release <> modtype
+mod 212:216 <> Kkill

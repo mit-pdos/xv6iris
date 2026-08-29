@@ -1,0 +1,7 @@
+DIGEST b26950f02b93c24eaa9375a0bc3a11fd
+Fxv6iris.LinkReparent
+R198:207 xv6iris.LinkWakeup <> <> lib
+R209:221 xv6iris.ProofReparent <> <> lib
+R244:256 xv6iris.ProofReparent ReparentProof <> modtype
+R258:263 xv6iris.LinkWakeup Wakeup <> modtype
+mod 232:239 <> Reparent

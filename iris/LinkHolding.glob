@@ -1,0 +1,7 @@
+DIGEST 7ad3ed252bceb2775d27fe8b8ba59667
+Fxv6iris.LinkHolding
+R155:163 xv6iris.LinkMycpu <> <> lib
+R165:176 xv6iris.ProofHolding <> <> lib
+R198:209 xv6iris.ProofHolding HoldingProof <> modtype
+R211:215 xv6iris.LinkMycpu Mycpu <> modtype
+mod 187:193 <> Holding

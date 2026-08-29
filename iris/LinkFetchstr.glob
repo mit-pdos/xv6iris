@@ -1,0 +1,11 @@
+DIGEST e43e17353649eab2ab37cc29b74eccb3
+Fxv6iris.LinkFetchstr
+R189:198 xv6iris.LinkMyproc <> <> lib
+R200:212 xv6iris.LinkCopyinstr <> <> lib
+R214:223 xv6iris.LinkStrlen <> <> lib
+R241:253 xv6iris.ProofFetchstr <> <> lib
+R276:288 xv6iris.ProofFetchstr FetchstrProof <> modtype
+R290:295 xv6iris.LinkMyproc Myproc <> modtype
+R297:305 xv6iris.LinkCopyinstr Copyinstr <> modtype
+R307:312 xv6iris.LinkStrlen Strlen <> modtype
+mod 264:271 <> Fetchstr

@@ -1,0 +1,9 @@
+DIGEST 292a1346b660c15d9bbb1d45331c1dda
+Fxv6iris.LinkSetkilled
+R179:189 xv6iris.LinkAcquire <> <> lib
+R191:201 xv6iris.LinkRelease <> <> lib
+R203:216 xv6iris.ProofSetkilled <> <> lib
+R240:253 xv6iris.ProofSetkilled SetkilledProof <> modtype
+R255:261 xv6iris.LinkAcquire Acquire <> modtype
+R263:269 xv6iris.LinkRelease Release <> modtype
+mod 227:235 <> Setkilled

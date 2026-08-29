@@ -1,0 +1,15 @@
+DIGEST 46e935adf565deac7f8c6008e302f270
+Fxv6iris.LinkVmfault
+R155:166 xv6iris.LinkIsmapped <> <> lib
+R168:177 xv6iris.LinkKalloc <> <> lib
+R179:192 xv6iris.LinkMemsetPage <> <> lib
+R194:205 xv6iris.LinkMappages <> <> lib
+R207:215 xv6iris.LinkKfree <> <> lib
+R233:244 xv6iris.ProofVmfault <> <> lib
+R266:277 xv6iris.ProofVmfault VmfaultProof <> modtype
+R279:286 xv6iris.LinkIsmapped Ismapped <> modtype
+R288:293 xv6iris.LinkKalloc Kalloc <> modtype
+R295:304 xv6iris.LinkMemsetPage MemsetPage <> modtype
+R306:313 xv6iris.LinkMappages Mappages <> modtype
+R315:319 xv6iris.LinkKfree Kfree <> modtype
+mod 255:261 <> Vmfault

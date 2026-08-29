@@ -89,8 +89,15 @@ Section ProofRelease.
        the bundle reassembled, "so no downstream spec premise changes
        shape".  The token never crosses [wp_next] on its own, which is what
        makes this immune to the CpuId re-park hazard. *)
+    (* A6.120: the deposit is the FINISHER'S PRELUDE, not this proof's
+       choice -- a closing finisher parks the payload here, a destroying one
+       keeps it at [cur_ctx] (its completion wand speaks there, and the
+       word clear below is a plain store with nothing to bring a parked
+       record back).  [Pay] is whatever the finisher chose; the leaf at
+       +0x1a hands it to the finisher's body. *)
+    iDestruct "Hfin" as (Pay) "[Hpre Hfin]".
     iDestruct (SieCapCtx.sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    iMod (WpLock.lock_pay_intro R with "Hrun HR") as "[Hrun HR]".
+    iMod ("Hpre" with "Hrun HR") as "[Hrun HR]".
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     (* ---- 0x00: c.addi sp,-32 -- the frame trade (k := 4) ---- *)
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
@@ -287,7 +294,7 @@ Section ProofRelease.
     iEval (rewrite Hpc1a) in "Hpc".
     (* ---- 0x1a: sw zero,0(s1) : the lock word clears ---- *)
     iApply (wp_sw_zero_lockfin_s_sconf (CID:=CID) γl lka s R Dc Out (mword_of_int (KernelSyms.release + 0x1a)) (mword_of_int 9 : mword 5)
-              (mword_of_int 0 : mword 12) mh (trap_res outb + (av - 4))%nat false
+              (mword_of_int 0 : mword 12) mh (trap_res outb + (av - 4))%nat false Pay
               ltac:(rgne; rewrite Hs1mh; exact Hlka) Hrefpre
               with "Hcg Hpc [] Hlock Htoken HR Hfin").
     { iApply (rli_1a with "Htext"). }
@@ -574,19 +581,17 @@ Section CancelOfGen.
     intros pcE lk0 ret_tgt. cbv zeta. intros Hlka Hav Href Hrefpre.
     iIntros "Hcg #Htext Hpc #Hlock Htoken HR Hbuild Hown Hpay Hcont".
     iApply (G.wp_release_gen_sconf kt γl lka s R D
-              (WpLock.lock_word_fresh lka ∗ (∃ lo : nat, WpLock.lk_cpu_fresh lo lka) ∗ Out)%I
+              (WpLock.lock_word_fresh lka ∗ WpLock.lk_cpu_ready lka ∗ Out)%I
               m n eb p av lks
               Hlka Hav Href Hrefpre
               with "Hcg Htext Hpc Hlock Htoken HR [Hbuild] Hown Hpay").
-    { (* the destroyer's completion wand speaks at ITS context; the
-         invariant's parked payload is ∃-closed -- bridge with the shim's
-         SC-only transport (the cutover kit's finisher morphs against real
-         AMO evidence instead) *)
-      iApply lock_finisher_destroy.
-      iIntros "Hfrag HRx". iDestruct "HRx" as (ξ0) "HRx".
-      iPoseProof (ctx_dom_sc ξ0 cur_ctx) as "Hdom".
-      iMod (ctx_morph ξ0 cur_ctx with "Hdom HRx") as "[_ HRx]".
-      iApply ("Hbuild" with "Hfrag HRx"). }
+    { (* A6.120: the destroyer's completion wand speaks at ITS context, and
+         so does the payload the finisher's body receives -- the finisher's
+         prelude never parks it (the word clear is a plain [sw]; there is no
+         log-top evidence to bring a parked record back, which is what the
+         retired SC shim [ctx_dom_sc] used to conjure here).  Nothing to
+         bridge. *)
+      iApply lock_finisher_destroy. iExact "Hbuild". }
     iIntros (CIDg Hsg mr) "(Hword & Hcpu & HOut) Hcg Hpc %Hcs Hown".
     iSpecialize ("Hcont" $! CIDg with "[%]"); [exact Hsg|].
     iApply ("Hcont" $! mr with "Hword Hcpu HOut Hcg Hpc [//] Hown").

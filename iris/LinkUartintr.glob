@@ -1,0 +1,11 @@
+DIGEST 543f791cc25f985675c632f0a54f5f3e
+Fxv6iris.LinkUartintr
+R421:430 xv6iris.LinkWakeup <> <> lib
+R432:446 xv6iris.LinkConsoleintr <> <> lib
+R448:455 xv6iris.LinkUart <> <> lib
+R457:469 xv6iris.ProofUartintr <> <> lib
+R492:504 xv6iris.ProofUartintr UartintrProof <> modtype
+R506:511 xv6iris.LinkWakeup Wakeup <> modtype
+R513:523 xv6iris.LinkConsoleintr Consoleintr <> modtype
+R525:528 xv6iris.LinkUart Uart <> modtype
+mod 480:487 <> Uartintr

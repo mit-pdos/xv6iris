@@ -1,0 +1,7 @@
+DIGEST 6616c68d7850d99338e2b23df4f45265
+Fxv6iris.LinkKvminit
+R124:134 xv6iris.LinkKvmmake <> <> lib
+R136:147 xv6iris.ProofKvminit <> <> lib
+R169:180 xv6iris.ProofKvminit KvminitProof <> modtype
+R182:188 xv6iris.LinkKvmmake Kvmmake <> modtype
+mod 158:164 <> Kvminit

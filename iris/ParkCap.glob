@@ -1,4 +1,4 @@
-DIGEST f70bf473f5f3243b3f4e69bc77075f41
+DIGEST 056695c0f8e7e23abaf51b0f872e1605
 Fxv6iris.ParkCap
 R2248:2253 Stdlib.ZArith.ZArith <> <> lib
 R2255:2257 Stdlib.micromega.Lia <> <> lib
@@ -82,670 +82,768 @@ binder 3978:3978 <> W:12
 R4005:4008 Corelib.Init.Datatypes <> list ind
 R4010:4014 iris.base_logic.lib.iprop <> gname def
 binder 3999:4001 <> γs:13
-R4024:4028 iris.base_logic.lib.iprop <> gname def
-binder 4018:4020 <> γf:14
-R4040:4044 SailStdpp.Values <> mword def
-binder 4032:4033 <> pa:15
-binder 4035:4036 <> ks:16
-R4063:4067 SailStdpp.Values <> mword def
-binder 4057:4059 <> pid:17
-R4079:4081 Corelib.Init.Datatypes <> nat ind
-binder 4074:4075 <> av:18
-R4086:4090 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R4092:4093 xv6iris.ParkCap <> ParkCap.Σ var
-R4114:4123 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R4103:4113 xv6iris.KernelText <> kernel_text def
-R4132:4141 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R4124:4131 xv6iris.WireInv <> wire_inv def
-R4175:4184 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R4142:4148 xv6iris.RiscvPtsto <> kmap_at def
-R4170:4174 xv6iris.RiscvPtsto <> KP_rx constr
-R4160:4168 xv6iris.KptExecMap <> tramp_ppn def
-R4150:4158 xv6iris.KptExecMap <> tramp_vpn def
-R4198:4207 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R4185:4193 xv6iris.SchedCtx <> procs_inv def
-R4195:4197 xv6iris.ParkCap <> γs:13 var
-R4224:4233 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R4208:4220 xv6iris.ProcAvail <> pslot_used_at def
-R4222:4223 xv6iris.ParkCap <> pa:15 var
-R4292:5195 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R5771:5771 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R4234:4242 xv6iris.StackOwn <> stack_own def
-R4258:4264 SailStdpp.Operators_mwords <> add_vec def
-R4270:4281 SailStdpp.Values <> mword_of_int def
-R4266:4267 xv6iris.ParkCap <> ks:16 var
-R4290:4291 xv6iris.ParkCap <> av:18 var
-R4252:4254 xv6iris.Ktier <> KT1 constr
-R5196:5200 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
-R5253:5263 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
-R5205:5209 xv6iris.RiscvLang <> CpuId class
-binder 5201:5201 <> h:19
-R5218:5223 xv6iris.TsoCtx <> CurCtx class
-binder 5213:5214 <> Xc:20
-R5233:5236 xv6iris.UserPtTree <> uptd rec
-binder 5227:5229 <> pt':21
-R5245:5252 xv6iris.ProcDefs <> pprivate rec
-binder 5240:5241 <> V':22
-R5285:5298 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R5264:5266 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R5282:5284 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R5276:5278 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R5267:5272 xv6iris.ProcDefs <> pv_upt proj
-R5274:5275 xv6iris.ParkCap <> V':22 var
-R5279:5281 xv6iris.ParkCap <> pt':21 var
-R5329:5342 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R5299:5301 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R5326:5328 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R5313:5315 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R5302:5308 xv6iris.UserPtTree <> ud_data proj
-R5310:5312 xv6iris.ParkCap <> pt':21 var
-R5316:5321 xv6iris.ProcPtOwn <> ud_pas def
-R5323:5325 xv6iris.ParkCap <> pt':21 var
-R5363:5376 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R5343:5345 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R5360:5362 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R5346:5355 xv6iris.ProcPtOwn <> proc_pt_wf def
-R5357:5359 xv6iris.ParkCap <> pt':21 var
-R5430:5443 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R5377:5382 xv6iris.UsertrapRes <> ut_tfk def
-R5396:5402 SailStdpp.Operators_mwords <> add_vec def
-R5408:5419 SailStdpp.Values <> mword_of_int def
-R5404:5405 xv6iris.ParkCap <> ks:16 var
-R5428:5429 xv6iris.ParkCap <> V':22 var
-R5392:5392 xv6iris.ParkCap <> h:19 var
-R5454:5467 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R5444:5453 xv6iris.FirstTok <> first_done def
-R5469:5482 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R5468:5468 xv6iris.ParkCap <> W:12 var
-R5503:5516 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R5483:5491 xv6iris.TimerCap <> timer_cap def
-R5501:5501 xv6iris.ParkCap <> h:19 var
-R5606:5619 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R5517:5530 xv6iris.UsertrapRes <> ut_trap_parked def
-R5554:5555 xv6iris.ParkCap <> pa:15 var
-R5568:5574 SailStdpp.Operators_mwords <> add_vec def
-R5580:5591 SailStdpp.Values <> mword_of_int def
-R5576:5577 xv6iris.ParkCap <> ks:16 var
-R5600:5601 xv6iris.ParkCap <> av:18 var
-R5603:5605 stdpp.base <> ::stdpp_scope:'∅' not
-R5550:5551 xv6iris.ParkCap <> Xc:20 var
-R5540:5540 xv6iris.ParkCap <> h:19 var
-R5648:5661 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R5620:5633 xv6iris.ProcInv <> proc_priv_nopt def
-R5635:5637 xv6iris.ParkCap <> γf:14 var
-R5639:5640 xv6iris.ParkCap <> pa:15 var
-R5642:5644 xv6iris.ParkCap <> pid:17 var
-R5646:5647 xv6iris.ParkCap <> V':22 var
-R5678:5691 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R5662:5669 xv6iris.FdSlots <> fd_slots def
-R5671:5677 xv6iris.FdSlots <> FDSPARE def
-R5712:5725 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R5692:5701 xv6iris.IrefSlots <> iref_slots def
-R5703:5711 xv6iris.IrefSlots <> IREFSPARE def
-R5726:5728 xv6iris.ParkCap <> URB:11 var
-R5740:5746 SailStdpp.Operators_mwords <> add_vec def
-R5752:5763 SailStdpp.Values <> mword_of_int def
-R5748:5749 xv6iris.ParkCap <> ks:16 var
-R5735:5737 xv6iris.ParkCap <> pt':21 var
-R5732:5733 xv6iris.ParkCap <> Xc:20 var
-R5730:5730 xv6iris.ParkCap <> h:19 var
-def 5846:5855 <> park_child
-R5864:5869 xv6iris.TsoCtx <> CurCtx class
-binder 5859:5860 <> XI:23
-R5879:5882 Corelib.Init.Datatypes <> list ind
-R5884:5888 iris.base_logic.lib.iprop <> gname def
-binder 5873:5875 <> γs:24
-R5898:5902 iris.base_logic.lib.iprop <> gname def
-binder 5892:5894 <> γf:25
-R5914:5918 SailStdpp.Values <> mword def
-binder 5906:5907 <> pa:26
-binder 5909:5910 <> ks:27
-R5938:5941 Corelib.Init.Datatypes <> list ind
-R5944:5948 SailStdpp.Values <> mword def
-binder 5931:5934 <> rest:28
-R5962:5966 SailStdpp.Values <> mword def
-binder 5956:5958 <> pid:29
-R5977:5984 xv6iris.ProcDefs <> pprivate rec
-binder 5973:5973 <> V:30
-R5989:5993 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R5995:5996 xv6iris.ParkCap <> ParkCap.Σ var
-R6021:6030 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R6006:6014 xv6iris.ProcDefs <> is_kstack def
-R6016:6017 xv6iris.ParkCap <> pa:26 var
-R6019:6020 xv6iris.ParkCap <> ks:27 var
-R6115:6124 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R6031:6039 xv6iris.SwtchCtx <> ctx_cells def
-R6042:6050 xv6iris.ProcGeom <> p_context def
-R6052:6053 xv6iris.ParkCap <> pa:26 var
-R6072:6075 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
-R6057:6071 xv6iris.ParkCap <> park_forkret_pc def
-R6106:6109 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
-R6076:6082 SailStdpp.Operators_mwords <> add_vec def
-R6088:6099 SailStdpp.Values <> mword_of_int def
-R6084:6085 xv6iris.ParkCap <> ks:27 var
-R6110:6113 xv6iris.ParkCap <> rest:28 var
-R6147:6156 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R6125:6133 xv6iris.ProcInv <> proc_priv def
-R6135:6137 xv6iris.ParkCap <> γf:25 var
-R6139:6140 xv6iris.ParkCap <> pa:26 var
-R6142:6144 xv6iris.ParkCap <> pid:29 var
-R6146:6146 xv6iris.ParkCap <> V:30 var
-R6173:6182 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R6157:6164 xv6iris.FdSlots <> fd_slots def
-R6166:6172 xv6iris.FdSlots <> FDSPARE def
-R6183:6192 xv6iris.IrefSlots <> iref_slots def
-R6194:6202 xv6iris.IrefSlots <> IREFSPARE def
-def 6339:6346 <> park_cap
-R6355:6360 xv6iris.TsoCtx <> CurCtx class
-binder 6350:6351 <> XI:31
-R6381:6384 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R6376:6380 xv6iris.RiscvLang <> CpuId class
-R6391:6394 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R6385:6390 xv6iris.TsoCtx <> CurCtx class
-R6399:6402 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R6395:6398 xv6iris.UserPtTree <> uptd rec
-R6411:6414 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R6403:6407 SailStdpp.Values <> mword def
-R6415:6419 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R6421:6422 xv6iris.ParkCap <> ParkCap.Σ var
-binder 6370:6372 <> URB:32
-R6430:6434 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R6436:6437 xv6iris.ParkCap <> ParkCap.Σ var
-binder 6426:6426 <> W:33
-R6453:6456 Corelib.Init.Datatypes <> list ind
-R6458:6462 iris.base_logic.lib.iprop <> gname def
-binder 6447:6449 <> γs:34
-R6467:6471 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R6473:6474 xv6iris.ParkCap <> ParkCap.Σ var
-R6484:6487 iris.bi.derived_connectives <> ::bi_scope:'□'_x not
-R6488:6492 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
-R6600:6609 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
-R6499:6503 iris.base_logic.lib.iprop <> gname def
-binder 6493:6495 <> γf:35
-R6515:6519 SailStdpp.Values <> mword def
-binder 6507:6508 <> pa:36
-R6515:6519 SailStdpp.Values <> mword def
-binder 6510:6511 <> ks:37
-R6533:6536 Corelib.Init.Datatypes <> list ind
-R6539:6543 SailStdpp.Values <> mword def
-binder 6526:6529 <> rest:38
-R6566:6570 SailStdpp.Values <> mword def
-binder 6560:6562 <> pid:39
-R6581:6588 xv6iris.ProcDefs <> pprivate rec
-binder 6577:6577 <> V:40
-R6597:6599 Corelib.Init.Datatypes <> nat ind
-binder 6592:6593 <> av:41
-R6636:6648 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R6610:6612 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R6633:6635 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R6624:6626 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R6613:6618 Stdlib.Lists.List <> length abbrev
-R6620:6623 xv6iris.ParkCap <> rest:38 var
-R6706:6718 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R6649:6651 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R6703:6705 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R6652:6658 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
-R6666:6667 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
-R6663:6665 Corelib.Init.Datatypes <> nat ind
-binder 6659:6659 <> j:42
-R6684:6687 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
-R6670:6672 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R6668:6669 xv6iris.ParkCap <> pa:36 var
-R6673:6681 xv6iris.ProcGeom <> proc_addr def
-R6683:6683 xv6iris.ParkCap <> j:42 var
-R6690:6692 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
-R6689:6689 xv6iris.ParkCap <> j:42 var
-R6693:6697 xv6iris.ProcGeom <> NPROC def
-R6747:6759 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R6719:6721 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R6744:6746 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R6733:6736 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
-R6723:6732 xv6iris.UsertrapRes <> K_usertrap abbrev
-R6737:6738 xv6iris.ParkCap <> av:41 var
-R6799:6927 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R6760:6763 iris.bi.interface <> ::bi_scope:'▷'_x not
-R6764:6771 xv6iris.ParkCap <> park_pkg def
-R6797:6798 xv6iris.ParkCap <> av:41 var
-R6793:6795 xv6iris.ParkCap <> pid:39 var
-R6790:6791 xv6iris.ParkCap <> ks:37 var
-R6787:6788 xv6iris.ParkCap <> pa:36 var
-R6783:6785 xv6iris.ParkCap <> γf:35 var
-R6779:6781 xv6iris.ParkCap <> γs:34 var
-R6777:6777 xv6iris.ParkCap <> W:33 var
-R6773:6775 xv6iris.ParkCap <> URB:32 var
-R6933:6945 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R6928:6931 iris.bi.interface <> ::bi_scope:'▷'_x not
-R6932:6932 xv6iris.ParkCap <> W:33 var
-R6981:6993 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R6946:6955 xv6iris.ParkCap <> park_child def
-R6980:6980 xv6iris.ParkCap <> V:40 var
-R6976:6978 xv6iris.ParkCap <> pid:39 var
-R6971:6974 xv6iris.ParkCap <> rest:38 var
-R6968:6969 xv6iris.ParkCap <> ks:37 var
-R6965:6966 xv6iris.ParkCap <> pa:36 var
-R6961:6963 xv6iris.ParkCap <> γf:35 var
-R6957:6959 xv6iris.ParkCap <> γs:34 var
-R6994:6998 iris.bi.updates <> ::bi_scope:'|==>'_x not
-R6999:7002 iris.bi.interface <> ::bi_scope:'▷'_x not
-R7003:7010 xv6iris.SchedCtx <> proc_ctx def
-R7016:7017 xv6iris.ParkCap <> pa:36 var
-R7012:7014 xv6iris.ParkCap <> γs:34 var
-def 7216:7224 <> park_chan
-R7233:7238 xv6iris.TsoCtx <> CurCtx class
-binder 7228:7229 <> XI:43
-R7259:7262 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R7254:7258 xv6iris.RiscvLang <> CpuId class
-R7269:7272 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R7263:7268 xv6iris.TsoCtx <> CurCtx class
-R7277:7280 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R7273:7276 xv6iris.UserPtTree <> uptd rec
-R7289:7292 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R7281:7285 SailStdpp.Values <> mword def
-R7293:7297 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R7299:7300 xv6iris.ParkCap <> ParkCap.Σ var
-binder 7248:7250 <> URB:44
-R7308:7312 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R7314:7315 xv6iris.ParkCap <> ParkCap.Σ var
-binder 7304:7304 <> W:45
-R7331:7334 Corelib.Init.Datatypes <> list ind
-R7336:7340 iris.base_logic.lib.iprop <> gname def
-binder 7325:7327 <> γs:46
-R7345:7349 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R7351:7352 xv6iris.ParkCap <> ParkCap.Σ var
-R7362:7365 iris.bi.derived_connectives <> ::bi_scope:'□'_x not
-R7366:7370 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
-R7394:7403 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
-R7375:7382 xv6iris.UsertrapRes <> ut_names rec
-binder 7371:7371 <> N:47
-R7391:7393 Corelib.Init.Datatypes <> nat ind
-binder 7386:7387 <> av:48
-R7422:7427 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7404:7406 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R7419:7421 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R7413:7415 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R7407:7410 xv6iris.UsertrapRes <> un_s proj
-R7412:7412 xv6iris.ParkCap <> N:47 var
-R7416:7418 xv6iris.ParkCap <> γs:46 var
-R7441:7446 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7428:7430 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R7438:7440 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R7431:7435 xv6iris.UsertrapRes <> ut_wf def
-R7437:7437 xv6iris.ParkCap <> N:47 var
-R7475:7487 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7447:7449 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R7472:7474 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R7461:7464 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
-R7451:7460 xv6iris.UsertrapRes <> K_usertrap abbrev
-R7465:7466 xv6iris.ParkCap <> av:48 var
-R7488:7492 iris.bi.interface <> ::bi_scope:'▷'_x not
-R8207:8207 iris.bi.interface <> ::bi_scope:'▷'_x not
-R7503:7508 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7493:7500 xv6iris.UsertrapRes <> park_env def
-R7502:7502 xv6iris.ParkCap <> N:47 var
-R7519:7606 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R8206:8206 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7509:7516 xv6iris.UsertrapRes <> park_own def
-R7518:7518 xv6iris.ParkCap <> N:47 var
-R7607:7611 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
-R7664:7679 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
-R7616:7620 xv6iris.RiscvLang <> CpuId class
-binder 7612:7612 <> h:49
-R7629:7634 xv6iris.TsoCtx <> CurCtx class
-binder 7624:7625 <> Xc:50
-R7644:7647 xv6iris.UserPtTree <> uptd rec
-binder 7638:7640 <> pt':51
-R7656:7663 xv6iris.ProcDefs <> pprivate rec
-binder 7651:7652 <> V':52
-R7701:7719 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7680:7682 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R7698:7700 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R7692:7694 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R7683:7688 xv6iris.ProcDefs <> pv_upt proj
-R7690:7691 xv6iris.ParkCap <> V':52 var
-R7695:7697 xv6iris.ParkCap <> pt':51 var
-R7780:7798 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7720:7725 xv6iris.UsertrapRes <> ut_tfk def
-R7739:7745 SailStdpp.Operators_mwords <> add_vec def
-R7758:7769 SailStdpp.Values <> mword_of_int def
-R7748:7752 xv6iris.UsertrapRes <> un_ks proj
-R7754:7754 xv6iris.ParkCap <> N:47 var
-R7778:7779 xv6iris.ParkCap <> V':52 var
-R7735:7735 xv6iris.ParkCap <> h:49 var
-R7809:7827 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7799:7808 xv6iris.FirstTok <> first_done def
-R7829:7847 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7828:7828 xv6iris.ParkCap <> W:45 var
-R7868:7886 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7848:7856 xv6iris.TimerCap <> timer_cap def
-R7866:7866 xv6iris.ParkCap <> h:49 var
-R7995:8013 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7887:7900 xv6iris.UsertrapRes <> ut_trap_parked def
-R7925:7929 xv6iris.UsertrapRes <> un_pj def
-R7931:7931 xv6iris.ParkCap <> N:47 var
-R7950:7956 SailStdpp.Operators_mwords <> add_vec def
-R7969:7980 SailStdpp.Values <> mword_of_int def
-R7959:7963 xv6iris.UsertrapRes <> un_ks proj
-R7965:7965 xv6iris.ParkCap <> N:47 var
-R7989:7990 xv6iris.ParkCap <> av:48 var
-R7992:7994 stdpp.base <> ::stdpp_scope:'∅' not
-R7920:7921 xv6iris.ParkCap <> Xc:50 var
-R7910:7910 xv6iris.ParkCap <> h:49 var
-R8061:8079 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R8014:8027 xv6iris.ProcInv <> proc_priv_nopt def
-R8030:8033 xv6iris.UsertrapRes <> un_f proj
-R8035:8035 xv6iris.ParkCap <> N:47 var
-R8039:8043 xv6iris.UsertrapRes <> un_pj def
-R8045:8045 xv6iris.ParkCap <> N:47 var
-R8049:8054 xv6iris.UsertrapRes <> un_pid proj
-R8056:8056 xv6iris.ParkCap <> N:47 var
-R8059:8060 xv6iris.ParkCap <> V':52 var
-R8096:8114 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R8080:8087 xv6iris.FdSlots <> fd_slots def
-R8089:8095 xv6iris.FdSlots <> FDSPARE def
-R8135:8153 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R8115:8124 xv6iris.IrefSlots <> iref_slots def
-R8126:8134 xv6iris.IrefSlots <> IREFSPARE def
-R8154:8156 xv6iris.ParkCap <> URB:44 var
-R8168:8174 SailStdpp.Operators_mwords <> add_vec def
-R8187:8198 SailStdpp.Values <> mword_of_int def
-R8177:8181 xv6iris.UsertrapRes <> un_ks proj
-R8183:8183 xv6iris.ParkCap <> N:47 var
-R8163:8165 xv6iris.ParkCap <> pt':51 var
-R8160:8161 xv6iris.ParkCap <> Xc:50 var
-R8158:8158 xv6iris.ParkCap <> h:49 var
-def 8322:8333 <> park_token_F
-R8342:8347 xv6iris.TsoCtx <> CurCtx class
-binder 8337:8338 <> XI:53
-R8357:8360 Corelib.Init.Datatypes <> list ind
-R8362:8366 iris.base_logic.lib.iprop <> gname def
-binder 8351:8353 <> γs:54
-R8374:8378 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R8380:8381 xv6iris.ParkCap <> ParkCap.Σ var
-binder 8370:8370 <> X:55
-R8386:8390 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R8392:8393 xv6iris.ParkCap <> ParkCap.Σ var
-R8403:8406 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R8460:8468 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R8418:8421 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R8413:8417 xv6iris.RiscvLang <> CpuId class
-R8428:8431 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R8422:8427 xv6iris.TsoCtx <> CurCtx class
-R8436:8439 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R8432:8435 xv6iris.UserPtTree <> uptd rec
-R8448:8451 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R8440:8444 SailStdpp.Values <> mword def
-R8452:8456 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R8458:8459 xv6iris.ParkCap <> ParkCap.Σ var
-binder 8407:8409 <> URB:56
-R8487:8491 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R8469:8476 xv6iris.ParkCap <> park_cap def
-R8484:8486 xv6iris.ParkCap <> γs:54 var
-R8482:8482 xv6iris.ParkCap <> X:55 var
-R8478:8480 xv6iris.ParkCap <> URB:56 var
-R8492:8500 xv6iris.ParkCap <> park_chan def
-R8508:8510 xv6iris.ParkCap <> γs:54 var
-R8506:8506 xv6iris.ParkCap <> X:55 var
-R8502:8504 xv6iris.ParkCap <> URB:56 var
-inst 8534:8557 <> park_token_F_contractive
-R8566:8571 xv6iris.TsoCtx <> CurCtx class
-binder 8561:8562 <> XI:57
-binder 8574:8576 <> γs:58
-R8580:8590 iris.algebra.ofe <> Contractive abbrev
-R8593:8604 xv6iris.ParkCap <> park_token_F def
-R8606:8608 xv6iris.ParkCap <> γs:58 var
-R8634:8645 xv6iris.ParkCap <> park_token_F def
-R8648:8655 xv6iris.ParkCap <> park_cap def
-R8658:8666 xv6iris.ParkCap <> park_chan def
-R8669:8676 xv6iris.ParkCap <> park_pkg def
-R8634:8645 xv6iris.ParkCap <> park_token_F def
-R8634:8645 xv6iris.ParkCap <> park_token_F def
-R8648:8655 xv6iris.ParkCap <> park_cap def
-R8648:8655 xv6iris.ParkCap <> park_cap def
-R8658:8666 xv6iris.ParkCap <> park_chan def
-R8658:8666 xv6iris.ParkCap <> park_chan def
-R8669:8676 xv6iris.ParkCap <> park_pkg def
-R8669:8676 xv6iris.ParkCap <> park_pkg def
-def 8723:8732 <> park_token
-R8741:8746 xv6iris.TsoCtx <> CurCtx class
-binder 8736:8737 <> XI:59
-R8756:8759 Corelib.Init.Datatypes <> list ind
-R8761:8765 iris.base_logic.lib.iprop <> gname def
-binder 8750:8752 <> γs:60
-R8770:8774 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R8776:8777 xv6iris.ParkCap <> ParkCap.Σ var
-R8782:8789 iris.algebra.ofe <> fixpoint def
-R8792:8803 xv6iris.ParkCap <> park_token_F def
-R8805:8807 xv6iris.ParkCap <> γs:60 var
-prf 8820:8836 <> park_token_unfold
-R8845:8850 xv6iris.TsoCtx <> CurCtx class
-binder 8840:8841 <> XI:61
-R8860:8863 Corelib.Init.Datatypes <> list ind
-R8865:8869 iris.base_logic.lib.iprop <> gname def
-binder 8854:8856 <> γs:62
-R8892:8899 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
-R8878:8887 xv6iris.ParkCap <> park_token def
-R8889:8891 xv6iris.ParkCap <> γs:62 var
-R8900:8911 xv6iris.ParkCap <> park_token_F def
-R8918:8927 xv6iris.ParkCap <> park_token def
-R8929:8931 xv6iris.ParkCap <> γs:62 var
-R8913:8915 xv6iris.ParkCap <> γs:62 var
-R8951:8965 iris.algebra.ofe <> fixpoint_unfold thm
-R8968:8979 xv6iris.ParkCap <> park_token_F def
-R8951:8965 iris.algebra.ofe <> fixpoint_unfold thm
-R8968:8979 xv6iris.ParkCap <> park_token_F def
-inst 9012:9032 <> park_token_persistent
-R9041:9046 xv6iris.TsoCtx <> CurCtx class
-binder 9036:9037 <> XI:63
-binder 9049:9051 <> γs:64
-R9055:9064 iris.bi.derived_connectives <> Persistent class
-R9067:9076 xv6iris.ParkCap <> park_token def
-R9078:9080 xv6iris.ParkCap <> γs:64 var
-R9106:9115 iris.bi.derived_connectives <> Persistent class
-R9117:9133 xv6iris.ParkCap <> park_token_unfold thm
-R9136:9147 xv6iris.ParkCap <> park_token_F def
-R9106:9115 iris.bi.derived_connectives <> Persistent class
-R9106:9115 iris.bi.derived_connectives <> Persistent class
-R9117:9133 xv6iris.ParkCap <> park_token_unfold thm
-R9117:9133 xv6iris.ParkCap <> park_token_unfold thm
-R9136:9147 xv6iris.ParkCap <> park_token_F def
-R9136:9147 xv6iris.ParkCap <> park_token_F def
-prf 9504:9518 <> park_token_park
-R9527:9532 xv6iris.TsoCtx <> CurCtx class
-binder 9522:9523 <> XI:65
-R9540:9547 xv6iris.UsertrapRes <> ut_names rec
-binder 9536:9536 <> N:66
-R9558:9561 Corelib.Init.Datatypes <> list ind
-R9564:9568 SailStdpp.Values <> mword def
-binder 9551:9554 <> rest:67
-R9580:9587 xv6iris.ProcDefs <> pprivate rec
-binder 9576:9576 <> V:68
-R9603:9610 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R9596:9600 xv6iris.UsertrapRes <> ut_wf def
-R9602:9602 xv6iris.ParkCap <> N:66 var
-R9631:9638 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R9622:9624 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R9611:9616 Stdlib.Lists.List <> length abbrev
-R9618:9621 xv6iris.ParkCap <> rest:67 var
-R9658:9667 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R9639:9648 xv6iris.ParkCap <> park_token def
-R9651:9654 xv6iris.UsertrapRes <> un_s proj
-R9656:9656 xv6iris.ParkCap <> N:66 var
-R9679:9688 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9668:9678 xv6iris.KernelText <> kernel_text def
-R9697:9706 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9689:9696 xv6iris.WireInv <> wire_inv def
-R9740:9749 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9707:9713 xv6iris.RiscvPtsto <> kmap_at def
-R9735:9739 xv6iris.RiscvPtsto <> KP_rx constr
-R9725:9733 xv6iris.KptExecMap <> tramp_ppn def
-R9715:9723 xv6iris.KptExecMap <> tramp_vpn def
-R9773:9782 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9750:9762 xv6iris.ProcAvail <> pslot_used_at def
-R9765:9769 xv6iris.UsertrapRes <> un_pj def
-R9771:9771 xv6iris.ParkCap <> N:66 var
-R9855:9864 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9783:9791 xv6iris.StackOwn <> stack_own def
-R9807:9813 SailStdpp.Operators_mwords <> add_vec def
-R9826:9837 SailStdpp.Values <> mword_of_int def
-R9816:9820 xv6iris.UsertrapRes <> un_ks proj
-R9822:9822 xv6iris.ParkCap <> N:66 var
-R9846:9854 xv6iris.ProcDefs <> KSTACK_AV def
-R9801:9803 xv6iris.Ktier <> KT1 constr
-R9875:9884 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9865:9872 xv6iris.UsertrapRes <> park_env def
-R9874:9874 xv6iris.ParkCap <> N:66 var
-R9895:9904 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9885:9892 xv6iris.UsertrapRes <> park_own def
-R9894:9894 xv6iris.ParkCap <> N:66 var
-R9971:9980 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9905:9914 xv6iris.ParkCap <> park_child def
-R9970:9970 xv6iris.ParkCap <> V:68 var
-R9960:9965 xv6iris.UsertrapRes <> un_pid proj
-R9967:9967 xv6iris.ParkCap <> N:66 var
-R9954:9957 xv6iris.ParkCap <> rest:67 var
-R9945:9949 xv6iris.UsertrapRes <> un_ks proj
-R9951:9951 xv6iris.ParkCap <> N:66 var
-R9935:9939 xv6iris.UsertrapRes <> un_pj def
-R9941:9941 xv6iris.ParkCap <> N:66 var
-R9926:9929 xv6iris.UsertrapRes <> un_f proj
-R9931:9931 xv6iris.ParkCap <> N:66 var
-R9917:9920 xv6iris.UsertrapRes <> un_s proj
-R9922:9922 xv6iris.ParkCap <> N:66 var
-R9981:9985 iris.bi.updates <> ::bi_scope:'|==>'_x not
-R9986:9989 iris.bi.interface <> ::bi_scope:'▷'_x not
-R9990:9997 xv6iris.SchedCtx <> proc_ctx def
-R10009:10013 xv6iris.UsertrapRes <> un_pj def
-R10015:10015 xv6iris.ParkCap <> N:66 var
-R10000:10003 xv6iris.UsertrapRes <> un_s proj
-R10005:10005 xv6iris.ParkCap <> N:66 var
-R10144:10147 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
-R10134:10143 xv6iris.UsertrapRes <> K_usertrap abbrev
-R10148:10156 xv6iris.ProcDefs <> KSTACK_AV def
-R10144:10147 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
-R10134:10143 xv6iris.UsertrapRes <> K_usertrap abbrev
-R10148:10156 xv6iris.ProcDefs <> KSTACK_AV def
-R10239:10255 xv6iris.ParkCap <> park_token_unfold thm
-R10258:10269 xv6iris.ParkCap <> park_token_F def
-R10239:10255 xv6iris.ParkCap <> park_token_unfold thm
-R10239:10255 xv6iris.ParkCap <> park_token_unfold thm
-R10258:10269 xv6iris.ParkCap <> park_token_F def
-R10258:10269 xv6iris.ParkCap <> park_token_F def
-R10346:10354 xv6iris.SchedCtx <> procs_inv def
-R10357:10360 xv6iris.UsertrapRes <> un_s proj
-R10346:10354 xv6iris.SchedCtx <> procs_inv def
-R10357:10360 xv6iris.UsertrapRes <> un_s proj
-R10475:10475 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10483:10486 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10488:10488 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10498:10503 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10517:10517 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10489:10497 xv6iris.ProcDefs <> KSTACK_AV def
-R10475:10475 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10483:10486 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10488:10488 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10498:10503 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10517:10517 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10489:10497 xv6iris.ProcDefs <> KSTACK_AV def
-R10591:10591 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10598:10602 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10609:10611 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10619:10621 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10629:10630 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10635:10636 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10645:10646 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10648:10648 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10658:10677 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10722:10722 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10603:10606 xv6iris.UsertrapRes <> un_f proj
-R10612:10616 xv6iris.UsertrapRes <> un_pj def
-R10622:10626 xv6iris.UsertrapRes <> un_ks proj
-R10637:10642 xv6iris.UsertrapRes <> un_pid proj
-R10649:10657 xv6iris.ProcDefs <> KSTACK_AV def
-R10591:10591 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10598:10602 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10609:10611 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10619:10621 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10629:10630 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10635:10636 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10645:10646 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10648:10648 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10658:10677 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10722:10722 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R10603:10606 xv6iris.UsertrapRes <> un_f proj
-R10612:10616 xv6iris.UsertrapRes <> un_pj def
-R10622:10626 xv6iris.UsertrapRes <> un_ks proj
-R10637:10642 xv6iris.UsertrapRes <> un_pid proj
-R10649:10657 xv6iris.ProcDefs <> KSTACK_AV def
-R10784:10787 xv6iris.UsertrapRes <> un_j proj
-R10784:10787 xv6iris.UsertrapRes <> un_j proj
-R10859:10866 xv6iris.ParkCap <> park_pkg def
-R10859:10866 xv6iris.ParkCap <> park_pkg def
-R10859:10866 xv6iris.ParkCap <> park_pkg def
-R10952:10952 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R10961:10966 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R10978:10978 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R10952:10952 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R10961:10966 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R10978:10978 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R11101:11101 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R11111:11114 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R11116:11116 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R11119:11119 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R11123:11123 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R11126:11131 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R11177:11177 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R11101:11101 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R11111:11114 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R11116:11116 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R11119:11119 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R11123:11123 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R11126:11131 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R11177:11177 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-prf 11709:11727 <> park_token_intro_of
-R11736:11741 xv6iris.TsoCtx <> CurCtx class
-binder 11731:11732 <> XI:69
-R11762:11765 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R11757:11761 xv6iris.RiscvLang <> CpuId class
-R11772:11775 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R11766:11771 xv6iris.TsoCtx <> CurCtx class
-R11780:11783 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R11776:11779 xv6iris.UserPtTree <> uptd rec
-R11792:11795 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R11784:11788 SailStdpp.Values <> mword def
-R11796:11800 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R11802:11803 xv6iris.ParkCap <> ParkCap.Σ var
-binder 11751:11753 <> URB:70
-R11813:11816 Corelib.Init.Datatypes <> list ind
-R11818:11822 iris.base_logic.lib.iprop <> gname def
-binder 11807:11809 <> γs:71
-R11831:11831 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R11894:11902 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R11832:11838 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-R11843:11844 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-binder 11839:11839 <> N:72
-binder 11841:11842 <> av:73
-R11845:11862 xv6iris.UsertrapRes <> ut_park_intro_body def
-R11892:11893 xv6iris.ParkCap <> av:73 var
-R11890:11890 xv6iris.ParkCap <> N:72 var
-R11869:11878 xv6iris.ParkCap <> park_token def
-R11881:11884 xv6iris.UsertrapRes <> un_s proj
-R11886:11886 xv6iris.ParkCap <> N:72 var
-R11864:11866 xv6iris.ParkCap <> URB:70 var
-R11936:11945 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R11903:11910 xv6iris.ParkCap <> park_cap def
-R11933:11935 xv6iris.ParkCap <> γs:71 var
-R11917:11926 xv6iris.ParkCap <> park_token def
-R11928:11930 xv6iris.ParkCap <> γs:71 var
-R11912:11914 xv6iris.ParkCap <> URB:70 var
-R11946:11955 xv6iris.ParkCap <> park_token def
-R11957:11959 xv6iris.ParkCap <> γs:71 var
-R12019:12035 xv6iris.ParkCap <> park_token_unfold thm
-R12038:12049 xv6iris.ParkCap <> park_token_F def
-R12019:12035 xv6iris.ParkCap <> park_token_unfold thm
-R12019:12035 xv6iris.ParkCap <> park_token_unfold thm
-R12038:12049 xv6iris.ParkCap <> park_token_F def
-R12038:12049 xv6iris.ParkCap <> park_token_F def
-R12098:12106 xv6iris.ParkCap <> park_chan def
-R12098:12106 xv6iris.ParkCap <> park_chan def
-R12098:12106 xv6iris.ParkCap <> park_chan def
-R12238:12244 xv6iris.ParkCap ParkCap <> sec
+R4038:4042 iris.base_logic.lib.iprop <> gname def
+binder 4018:4020 <> γw:14
+binder 4022:4025 <> γft:15
+binder 4027:4029 <> γf:16
+binder 4031:4034 <> γtl:17
+R4054:4058 SailStdpp.Values <> mword def
+binder 4046:4047 <> pa:18
+binder 4049:4050 <> ks:19
+R4077:4081 SailStdpp.Values <> mword def
+binder 4071:4073 <> pid:20
+R4093:4095 Corelib.Init.Datatypes <> nat ind
+binder 4088:4089 <> av:21
+R4100:4104 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R4106:4107 xv6iris.ParkCap <> ParkCap.Σ var
+R4128:4137 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4117:4127 xv6iris.KernelText <> kernel_text def
+R4146:4155 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4138:4145 xv6iris.WireInv <> wire_inv def
+R4189:4198 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4156:4162 xv6iris.RiscvPtsto <> kmap_at def
+R4184:4188 xv6iris.RiscvPtsto <> KP_rx constr
+R4174:4182 xv6iris.KptExecMap <> tramp_ppn def
+R4164:4172 xv6iris.KptExecMap <> tramp_vpn def
+R4212:4221 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4199:4207 xv6iris.SchedCtx <> procs_inv def
+R4209:4211 xv6iris.ParkCap <> γs:13 var
+R4264:4273 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4222:4233 xv6iris.UsertrapRes <> park_globals def
+R4260:4263 xv6iris.ParkCap <> γtl:17 var
+R4256:4258 xv6iris.ParkCap <> γf:16 var
+R4251:4254 xv6iris.ParkCap <> γft:15 var
+R4247:4249 xv6iris.ParkCap <> γw:14 var
+R4243:4245 xv6iris.ParkCap <> γs:13 var
+R4235:4241 xv6iris.TsoCtx <> cur_ctx def
+R4290:4299 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4274:4286 xv6iris.ProcAvail <> pslot_used_at def
+R4288:4289 xv6iris.ParkCap <> pa:18 var
+R4358:5665 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4300:4308 xv6iris.StackOwn <> stack_own def
+R4324:4330 SailStdpp.Operators_mwords <> add_vec def
+R4336:4347 SailStdpp.Values <> mword_of_int def
+R4332:4333 xv6iris.ParkCap <> ks:19 var
+R4356:4357 xv6iris.ParkCap <> av:21 var
+R4318:4320 xv6iris.Ktier <> KT1 constr
+R5666:5670 iris.bi.interface <> ::bi_scope:'▷'_x not
+R6456:6456 iris.bi.interface <> ::bi_scope:'▷'_x not
+R5671:5675 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R5728:5738 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R5680:5684 xv6iris.RiscvLang <> CpuId class
+binder 5676:5676 <> h:22
+R5693:5698 xv6iris.TsoCtx <> CurCtx class
+binder 5688:5689 <> Xc:23
+R5708:5711 xv6iris.UserPtTree <> uptd rec
+binder 5702:5704 <> pt':24
+R5720:5727 xv6iris.ProcDefs <> pprivate rec
+binder 5715:5716 <> V':25
+R5760:5773 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R5739:5741 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R5757:5759 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R5751:5753 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5742:5747 xv6iris.ProcDefs <> pv_upt proj
+R5749:5750 xv6iris.ParkCap <> V':25 var
+R5754:5756 xv6iris.ParkCap <> pt':24 var
+R5804:5817 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R5774:5776 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R5801:5803 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R5788:5790 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R5777:5783 xv6iris.UserPtTree <> ud_data proj
+R5785:5787 xv6iris.ParkCap <> pt':24 var
+R5791:5796 xv6iris.ProcPtOwn <> ud_pas def
+R5798:5800 xv6iris.ParkCap <> pt':24 var
+R5838:5988 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R5818:5820 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R5835:5837 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R5821:5830 xv6iris.ProcPtOwn <> proc_pt_wf def
+R5832:5834 xv6iris.ParkCap <> pt':24 var
+R6026:6039 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R5989:6000 xv6iris.UsertrapRes <> park_globals def
+R6022:6025 xv6iris.ParkCap <> γtl:17 var
+R6018:6020 xv6iris.ParkCap <> γf:16 var
+R6013:6016 xv6iris.ParkCap <> γft:15 var
+R6009:6011 xv6iris.ParkCap <> γw:14 var
+R6005:6007 xv6iris.ParkCap <> γs:13 var
+R6002:6003 xv6iris.ParkCap <> Xc:23 var
+R6093:6106 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R6040:6045 xv6iris.UsertrapRes <> ut_tfk def
+R6059:6065 SailStdpp.Operators_mwords <> add_vec def
+R6071:6082 SailStdpp.Values <> mword_of_int def
+R6067:6068 xv6iris.ParkCap <> ks:19 var
+R6091:6092 xv6iris.ParkCap <> V':25 var
+R6055:6055 xv6iris.ParkCap <> h:22 var
+R6128:6141 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R6107:6116 xv6iris.FirstTok <> first_done def
+R6125:6126 xv6iris.ParkCap <> Xc:23 var
+R6143:6156 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R6142:6142 xv6iris.ParkCap <> W:12 var
+R6177:6190 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R6157:6165 xv6iris.TimerCap <> timer_cap def
+R6175:6175 xv6iris.ParkCap <> h:22 var
+R6280:6293 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R6191:6204 xv6iris.UsertrapRes <> ut_trap_parked def
+R6228:6229 xv6iris.ParkCap <> pa:18 var
+R6242:6248 SailStdpp.Operators_mwords <> add_vec def
+R6254:6265 SailStdpp.Values <> mword_of_int def
+R6250:6251 xv6iris.ParkCap <> ks:19 var
+R6274:6275 xv6iris.ParkCap <> av:21 var
+R6277:6279 stdpp.base <> ::stdpp_scope:'∅' not
+R6224:6225 xv6iris.ParkCap <> Xc:23 var
+R6214:6214 xv6iris.ParkCap <> h:22 var
+R6333:6346 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R6294:6307 xv6iris.ProcInv <> proc_priv_nopt def
+R6320:6322 xv6iris.ParkCap <> γf:16 var
+R6324:6325 xv6iris.ParkCap <> pa:18 var
+R6327:6329 xv6iris.ParkCap <> pid:20 var
+R6331:6332 xv6iris.ParkCap <> V':25 var
+R6316:6317 xv6iris.ParkCap <> Xc:23 var
+R6363:6376 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R6347:6354 xv6iris.FdSlots <> fd_slots def
+R6356:6362 xv6iris.FdSlots <> FDSPARE def
+R6397:6410 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R6377:6386 xv6iris.IrefSlots <> iref_slots def
+R6388:6396 xv6iris.IrefSlots <> IREFSPARE def
+R6411:6413 xv6iris.ParkCap <> URB:11 var
+R6425:6431 SailStdpp.Operators_mwords <> add_vec def
+R6437:6448 SailStdpp.Values <> mword_of_int def
+R6433:6434 xv6iris.ParkCap <> ks:19 var
+R6420:6422 xv6iris.ParkCap <> pt':24 var
+R6417:6418 xv6iris.ParkCap <> Xc:23 var
+R6415:6415 xv6iris.ParkCap <> h:22 var
+def 6531:6540 <> park_child
+R6549:6554 xv6iris.TsoCtx <> CurCtx class
+binder 6544:6545 <> XI:26
+R6564:6567 Corelib.Init.Datatypes <> list ind
+R6569:6573 iris.base_logic.lib.iprop <> gname def
+binder 6558:6560 <> γs:27
+R6583:6587 iris.base_logic.lib.iprop <> gname def
+binder 6577:6579 <> γf:28
+R6599:6603 SailStdpp.Values <> mword def
+binder 6591:6592 <> pa:29
+binder 6594:6595 <> ks:30
+R6623:6626 Corelib.Init.Datatypes <> list ind
+R6629:6633 SailStdpp.Values <> mword def
+binder 6616:6619 <> rest:31
+R6647:6651 SailStdpp.Values <> mword def
+binder 6641:6643 <> pid:32
+R6662:6669 xv6iris.ProcDefs <> pprivate rec
+binder 6658:6658 <> V:33
+R6674:6678 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R6680:6681 xv6iris.ParkCap <> ParkCap.Σ var
+R6706:6715 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6691:6699 xv6iris.ProcDefs <> is_kstack def
+R6701:6702 xv6iris.ParkCap <> pa:29 var
+R6704:6705 xv6iris.ParkCap <> ks:30 var
+R6800:6809 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6716:6724 xv6iris.SwtchCtx <> ctx_cells def
+R6727:6735 xv6iris.ProcGeom <> p_context def
+R6737:6738 xv6iris.ParkCap <> pa:29 var
+R6757:6760 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R6742:6756 xv6iris.ParkCap <> park_forkret_pc def
+R6791:6794 Corelib.Init.Datatypes <> ::list_scope:x_'::'_x not
+R6761:6767 SailStdpp.Operators_mwords <> add_vec def
+R6773:6784 SailStdpp.Values <> mword_of_int def
+R6769:6770 xv6iris.ParkCap <> ks:30 var
+R6795:6798 xv6iris.ParkCap <> rest:31 var
+R6832:6841 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6810:6818 xv6iris.ProcInv <> proc_priv def
+R6820:6822 xv6iris.ParkCap <> γf:28 var
+R6824:6825 xv6iris.ParkCap <> pa:29 var
+R6827:6829 xv6iris.ParkCap <> pid:32 var
+R6831:6831 xv6iris.ParkCap <> V:33 var
+R6858:6867 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6842:6849 xv6iris.FdSlots <> fd_slots def
+R6851:6857 xv6iris.FdSlots <> FDSPARE def
+R6868:6877 xv6iris.IrefSlots <> iref_slots def
+R6879:6887 xv6iris.IrefSlots <> IREFSPARE def
+def 8284:8291 <> park_cap
+R8311:8314 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8306:8310 xv6iris.RiscvLang <> CpuId class
+R8321:8324 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8315:8320 xv6iris.TsoCtx <> CurCtx class
+R8329:8332 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8325:8328 xv6iris.UserPtTree <> uptd rec
+R8341:8344 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R8333:8337 SailStdpp.Values <> mword def
+R8345:8349 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R8351:8352 xv6iris.ParkCap <> ParkCap.Σ var
+binder 8300:8302 <> URB:34
+R8360:8364 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R8366:8367 xv6iris.ParkCap <> ParkCap.Σ var
+binder 8356:8356 <> W:35
+R8383:8386 Corelib.Init.Datatypes <> list ind
+R8388:8392 iris.base_logic.lib.iprop <> gname def
+binder 8377:8379 <> γs:36
+R8397:8401 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R8403:8404 xv6iris.ParkCap <> ParkCap.Σ var
+R8849:8852 iris.bi.derived_connectives <> ::bi_scope:'□'_x not
+R8853:8857 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R9015:9024 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R8863:8867 xv6iris.RiscvLang <> CpuId class
+binder 8858:8859 <> hp:37
+R8877:8881 xv6iris.TsoCtx <> CtxId rec
+binder 8871:8873 <> ξp:38
+R8905:8909 iris.base_logic.lib.iprop <> gname def
+binder 8885:8887 <> γw:39
+R8905:8909 iris.base_logic.lib.iprop <> gname def
+binder 8889:8892 <> γft:40
+R8905:8909 iris.base_logic.lib.iprop <> gname def
+binder 8894:8896 <> γf:41
+R8905:8909 iris.base_logic.lib.iprop <> gname def
+binder 8898:8901 <> γtl:42
+R8921:8925 SailStdpp.Values <> mword def
+binder 8913:8914 <> pa:43
+R8921:8925 SailStdpp.Values <> mword def
+binder 8916:8917 <> ks:44
+R8948:8951 Corelib.Init.Datatypes <> list ind
+R8954:8958 SailStdpp.Values <> mword def
+binder 8941:8944 <> rest:45
+R8981:8985 SailStdpp.Values <> mword def
+binder 8975:8977 <> pid:46
+R8996:9003 xv6iris.ProcDefs <> pprivate rec
+binder 8992:8992 <> V:47
+R9012:9014 Corelib.Init.Datatypes <> nat ind
+binder 9007:9008 <> av:48
+R9051:9063 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9025:9027 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R9048:9050 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R9039:9041 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9028:9033 Stdlib.Lists.List <> length abbrev
+R9035:9038 xv6iris.ParkCap <> rest:45 var
+R9121:9133 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9064:9066 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R9118:9120 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R9067:9073 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R9081:9082 Corelib.Init.Logic <> ::type_scope:'exists'_x_'..'_x_','_x not
+R9078:9080 Corelib.Init.Datatypes <> nat ind
+binder 9074:9074 <> j:49
+R9099:9102 Corelib.Init.Logic <> ::type_scope:x_'/\'_x not
+R9085:9087 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9083:9084 xv6iris.ParkCap <> pa:43 var
+R9088:9096 xv6iris.ProcGeom <> proc_addr def
+R9098:9098 xv6iris.ParkCap <> j:49 var
+R9105:9107 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R9104:9104 xv6iris.ParkCap <> j:49 var
+R9108:9112 xv6iris.ProcGeom <> NPROC def
+R9162:9365 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9134:9136 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R9159:9161 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R9148:9151 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R9138:9147 xv6iris.UsertrapRes <> K_usertrap abbrev
+R9152:9153 xv6iris.ParkCap <> av:48 var
+R9393:9636 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9366:9376 xv6iris.TsoCtx <> own_context def
+R9390:9392 xv6iris.ParkCap <> ξp:38 var
+R9386:9387 xv6iris.ParkCap <> hp:37 var
+R9698:9835 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9637:9644 xv6iris.ParkCap <> park_pkg def
+R9696:9697 xv6iris.ParkCap <> av:48 var
+R9692:9694 xv6iris.ParkCap <> pid:46 var
+R9689:9690 xv6iris.ParkCap <> ks:44 var
+R9686:9687 xv6iris.ParkCap <> pa:43 var
+R9681:9684 xv6iris.ParkCap <> γtl:42 var
+R9677:9679 xv6iris.ParkCap <> γf:41 var
+R9672:9675 xv6iris.ParkCap <> γft:40 var
+R9668:9670 xv6iris.ParkCap <> γw:39 var
+R9664:9666 xv6iris.ParkCap <> γs:36 var
+R9662:9662 xv6iris.ParkCap <> W:35 var
+R9658:9660 xv6iris.ParkCap <> URB:34 var
+R9653:9655 xv6iris.ParkCap <> ξp:38 var
+R9841:9853 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9836:9839 iris.bi.interface <> ::bi_scope:'▷'_x not
+R9840:9840 xv6iris.ParkCap <> W:35 var
+R9901:10555 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9854:9863 xv6iris.ParkCap <> park_child def
+R9900:9900 xv6iris.ParkCap <> V:47 var
+R9896:9898 xv6iris.ParkCap <> pid:46 var
+R9891:9894 xv6iris.ParkCap <> rest:45 var
+R9888:9889 xv6iris.ParkCap <> ks:44 var
+R9885:9886 xv6iris.ParkCap <> pa:43 var
+R9881:9883 xv6iris.ParkCap <> γf:41 var
+R9877:9879 xv6iris.ParkCap <> γs:36 var
+R9872:9874 xv6iris.ParkCap <> ξp:38 var
+R10556:10560 iris.bi.updates <> ::bi_scope:'|==>'_x not
+R10588:10592 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R10561:10571 xv6iris.TsoCtx <> own_context def
+R10585:10587 xv6iris.ParkCap <> ξp:38 var
+R10581:10582 xv6iris.ParkCap <> hp:37 var
+R10593:10596 iris.bi.interface <> ::bi_scope:'▷'_x not
+R10597:10604 xv6iris.SchedCtx <> proc_ctx def
+R10622:10623 xv6iris.ParkCap <> pa:43 var
+R10618:10620 xv6iris.ParkCap <> γs:36 var
+R10613:10615 xv6iris.ParkCap <> ξp:38 var
+def 10822:10830 <> park_chan
+R10850:10853 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10845:10849 xv6iris.RiscvLang <> CpuId class
+R10860:10863 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10854:10859 xv6iris.TsoCtx <> CurCtx class
+R10868:10871 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10864:10867 xv6iris.UserPtTree <> uptd rec
+R10880:10883 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R10872:10876 SailStdpp.Values <> mword def
+R10884:10888 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R10890:10891 xv6iris.ParkCap <> ParkCap.Σ var
+binder 10839:10841 <> URB:50
+R10899:10903 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R10905:10906 xv6iris.ParkCap <> ParkCap.Σ var
+binder 10895:10895 <> W:51
+R10922:10925 Corelib.Init.Datatypes <> list ind
+R10927:10931 iris.base_logic.lib.iprop <> gname def
+binder 10916:10918 <> γs:52
+R10936:10940 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R10942:10943 xv6iris.ParkCap <> ParkCap.Σ var
+R10953:10956 iris.bi.derived_connectives <> ::bi_scope:'□'_x not
+R10957:10961 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R10999:11008 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R10968:10972 xv6iris.TsoCtx <> CtxId rec
+binder 10962:10964 <> ξp:53
+R10980:10987 xv6iris.UsertrapRes <> ut_names rec
+binder 10976:10976 <> N:54
+R10996:10998 Corelib.Init.Datatypes <> nat ind
+binder 10991:10992 <> av:55
+R11027:11032 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11009:11011 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R11024:11026 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R11018:11020 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11012:11015 xv6iris.UsertrapRes <> un_s proj
+R11017:11017 xv6iris.ParkCap <> N:54 var
+R11021:11023 xv6iris.ParkCap <> γs:52 var
+R11046:11051 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11033:11035 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R11043:11045 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R11036:11040 xv6iris.UsertrapRes <> ut_wf def
+R11042:11042 xv6iris.ParkCap <> N:54 var
+R11080:11092 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11052:11054 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R11077:11079 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R11066:11069 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R11056:11065 xv6iris.UsertrapRes <> K_usertrap abbrev
+R11070:11071 xv6iris.ParkCap <> av:55 var
+R11093:11097 iris.bi.interface <> ::bi_scope:'▷'_x not
+R11927:11927 iris.bi.interface <> ::bi_scope:'▷'_x not
+R11120:11125 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11098:11105 xv6iris.UsertrapRes <> park_env def
+R11119:11119 xv6iris.ParkCap <> N:54 var
+R11114:11116 xv6iris.ParkCap <> ξp:53 var
+R11136:11223 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11926:11926 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11126:11133 xv6iris.UsertrapRes <> park_own def
+R11135:11135 xv6iris.ParkCap <> N:54 var
+R11224:11228 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R11281:11296 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R11233:11237 xv6iris.RiscvLang <> CpuId class
+binder 11229:11229 <> h:56
+R11246:11251 xv6iris.TsoCtx <> CurCtx class
+binder 11241:11242 <> Xc:57
+R11261:11264 xv6iris.UserPtTree <> uptd rec
+binder 11255:11257 <> pt':58
+R11273:11280 xv6iris.ProcDefs <> pprivate rec
+binder 11268:11269 <> V':59
+R11318:11336 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11297:11299 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R11315:11317 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R11309:11311 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R11300:11305 xv6iris.ProcDefs <> pv_upt proj
+R11307:11308 xv6iris.ParkCap <> V':59 var
+R11312:11314 xv6iris.ParkCap <> pt':58 var
+R11399:11417 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11337:11348 xv6iris.UsertrapRes <> park_globals def
+R11391:11395 xv6iris.UsertrapRes <> un_tk proj
+R11397:11397 xv6iris.ParkCap <> N:54 var
+R11382:11385 xv6iris.UsertrapRes <> un_f proj
+R11387:11387 xv6iris.ParkCap <> N:54 var
+R11372:11376 xv6iris.UsertrapRes <> un_ft proj
+R11378:11378 xv6iris.ParkCap <> N:54 var
+R11363:11366 xv6iris.UsertrapRes <> un_w proj
+R11368:11368 xv6iris.ParkCap <> N:54 var
+R11354:11357 xv6iris.UsertrapRes <> un_s proj
+R11359:11359 xv6iris.ParkCap <> N:54 var
+R11350:11351 xv6iris.ParkCap <> Xc:57 var
+R11478:11496 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11418:11423 xv6iris.UsertrapRes <> ut_tfk def
+R11437:11443 SailStdpp.Operators_mwords <> add_vec def
+R11456:11467 SailStdpp.Values <> mword_of_int def
+R11446:11450 xv6iris.UsertrapRes <> un_ks proj
+R11452:11452 xv6iris.ParkCap <> N:54 var
+R11476:11477 xv6iris.ParkCap <> V':59 var
+R11433:11433 xv6iris.ParkCap <> h:56 var
+R11518:11536 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11497:11506 xv6iris.FirstTok <> first_done def
+R11515:11516 xv6iris.ParkCap <> Xc:57 var
+R11538:11556 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11537:11537 xv6iris.ParkCap <> W:51 var
+R11577:11595 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11557:11565 xv6iris.TimerCap <> timer_cap def
+R11575:11575 xv6iris.ParkCap <> h:56 var
+R11704:11722 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11596:11609 xv6iris.UsertrapRes <> ut_trap_parked def
+R11634:11638 xv6iris.UsertrapRes <> un_pj def
+R11640:11640 xv6iris.ParkCap <> N:54 var
+R11659:11665 SailStdpp.Operators_mwords <> add_vec def
+R11678:11689 SailStdpp.Values <> mword_of_int def
+R11668:11672 xv6iris.UsertrapRes <> un_ks proj
+R11674:11674 xv6iris.ParkCap <> N:54 var
+R11698:11699 xv6iris.ParkCap <> av:55 var
+R11701:11703 stdpp.base <> ::stdpp_scope:'∅' not
+R11629:11630 xv6iris.ParkCap <> Xc:57 var
+R11619:11619 xv6iris.ParkCap <> h:56 var
+R11781:11799 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11723:11736 xv6iris.ProcInv <> proc_priv_nopt def
+R11750:11753 xv6iris.UsertrapRes <> un_f proj
+R11755:11755 xv6iris.ParkCap <> N:54 var
+R11759:11763 xv6iris.UsertrapRes <> un_pj def
+R11765:11765 xv6iris.ParkCap <> N:54 var
+R11769:11774 xv6iris.UsertrapRes <> un_pid proj
+R11776:11776 xv6iris.ParkCap <> N:54 var
+R11779:11780 xv6iris.ParkCap <> V':59 var
+R11745:11746 xv6iris.ParkCap <> Xc:57 var
+R11816:11834 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11800:11807 xv6iris.FdSlots <> fd_slots def
+R11809:11815 xv6iris.FdSlots <> FDSPARE def
+R11855:11873 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11835:11844 xv6iris.IrefSlots <> iref_slots def
+R11846:11854 xv6iris.IrefSlots <> IREFSPARE def
+R11874:11876 xv6iris.ParkCap <> URB:50 var
+R11888:11894 SailStdpp.Operators_mwords <> add_vec def
+R11907:11918 SailStdpp.Values <> mword_of_int def
+R11897:11901 xv6iris.UsertrapRes <> un_ks proj
+R11903:11903 xv6iris.ParkCap <> N:54 var
+R11883:11885 xv6iris.ParkCap <> pt':58 var
+R11880:11881 xv6iris.ParkCap <> Xc:57 var
+R11878:11878 xv6iris.ParkCap <> h:56 var
+def 12042:12053 <> park_token_F
+R12062:12065 Corelib.Init.Datatypes <> list ind
+R12067:12071 iris.base_logic.lib.iprop <> gname def
+binder 12056:12058 <> γs:60
+R12079:12083 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R12085:12086 xv6iris.ParkCap <> ParkCap.Σ var
+binder 12075:12075 <> X:61
+R12091:12095 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R12097:12098 xv6iris.ParkCap <> ParkCap.Σ var
+R12108:12111 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R12165:12173 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R12123:12126 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12118:12122 xv6iris.RiscvLang <> CpuId class
+R12133:12136 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12127:12132 xv6iris.TsoCtx <> CurCtx class
+R12141:12144 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12137:12140 xv6iris.UserPtTree <> uptd rec
+R12153:12156 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R12145:12149 SailStdpp.Values <> mword def
+R12157:12161 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R12163:12164 xv6iris.ParkCap <> ParkCap.Σ var
+binder 12112:12114 <> URB:62
+R12192:12196 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R12174:12181 xv6iris.ParkCap <> park_cap def
+R12183:12185 xv6iris.ParkCap <> URB:62 var
+R12187:12187 xv6iris.ParkCap <> X:61 var
+R12189:12191 xv6iris.ParkCap <> γs:60 var
+R12197:12205 xv6iris.ParkCap <> park_chan def
+R12207:12209 xv6iris.ParkCap <> URB:62 var
+R12211:12211 xv6iris.ParkCap <> X:61 var
+R12213:12215 xv6iris.ParkCap <> γs:60 var
+inst 12239:12262 <> park_token_F_contractive
+binder 12264:12266 <> γs:63
+R12270:12280 iris.algebra.ofe <> Contractive abbrev
+R12283:12294 xv6iris.ParkCap <> park_token_F def
+R12296:12298 xv6iris.ParkCap <> γs:63 var
+R12324:12335 xv6iris.ParkCap <> park_token_F def
+R12338:12345 xv6iris.ParkCap <> park_cap def
+R12348:12356 xv6iris.ParkCap <> park_chan def
+R12359:12366 xv6iris.ParkCap <> park_pkg def
+R12324:12335 xv6iris.ParkCap <> park_token_F def
+R12324:12335 xv6iris.ParkCap <> park_token_F def
+R12338:12345 xv6iris.ParkCap <> park_cap def
+R12338:12345 xv6iris.ParkCap <> park_cap def
+R12348:12356 xv6iris.ParkCap <> park_chan def
+R12348:12356 xv6iris.ParkCap <> park_chan def
+R12359:12366 xv6iris.ParkCap <> park_pkg def
+R12359:12366 xv6iris.ParkCap <> park_pkg def
+def 12413:12422 <> park_token
+R12431:12434 Corelib.Init.Datatypes <> list ind
+R12436:12440 iris.base_logic.lib.iprop <> gname def
+binder 12425:12427 <> γs:64
+R12445:12449 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R12451:12452 xv6iris.ParkCap <> ParkCap.Σ var
+R12457:12464 iris.algebra.ofe <> fixpoint def
+R12467:12478 xv6iris.ParkCap <> park_token_F def
+R12480:12482 xv6iris.ParkCap <> γs:64 var
+prf 12495:12511 <> park_token_unfold
+R12520:12523 Corelib.Init.Datatypes <> list ind
+R12525:12529 iris.base_logic.lib.iprop <> gname def
+binder 12514:12516 <> γs:65
+R12552:12559 iris.bi.interface <> ::stdpp_scope:x_'⊣⊢'_x not
+R12538:12547 xv6iris.ParkCap <> park_token def
+R12549:12551 xv6iris.ParkCap <> γs:65 var
+R12560:12571 xv6iris.ParkCap <> park_token_F def
+R12573:12575 xv6iris.ParkCap <> γs:65 var
+R12578:12587 xv6iris.ParkCap <> park_token def
+R12589:12591 xv6iris.ParkCap <> γs:65 var
+R12611:12625 iris.algebra.ofe <> fixpoint_unfold thm
+R12628:12639 xv6iris.ParkCap <> park_token_F def
+R12611:12625 iris.algebra.ofe <> fixpoint_unfold thm
+R12628:12639 xv6iris.ParkCap <> park_token_F def
+inst 12672:12692 <> park_token_persistent
+binder 12694:12696 <> γs:66
+R12700:12709 iris.bi.derived_connectives <> Persistent class
+R12712:12721 xv6iris.ParkCap <> park_token def
+R12723:12725 xv6iris.ParkCap <> γs:66 var
+R12751:12760 iris.bi.derived_connectives <> Persistent class
+R12762:12778 xv6iris.ParkCap <> park_token_unfold thm
+R12781:12792 xv6iris.ParkCap <> park_token_F def
+R12751:12760 iris.bi.derived_connectives <> Persistent class
+R12751:12760 iris.bi.derived_connectives <> Persistent class
+R12762:12778 xv6iris.ParkCap <> park_token_unfold thm
+R12762:12778 xv6iris.ParkCap <> park_token_unfold thm
+R12781:12792 xv6iris.ParkCap <> park_token_F def
+R12781:12792 xv6iris.ParkCap <> park_token_F def
+prf 13149:13163 <> park_token_park
+R13173:13177 xv6iris.RiscvLang <> CpuId class
+binder 13167:13169 <> CID:67
+R13187:13192 xv6iris.TsoCtx <> CurCtx class
+binder 13182:13183 <> XI:68
+R13206:13213 xv6iris.UsertrapRes <> ut_names rec
+binder 13202:13202 <> N:69
+R13224:13227 Corelib.Init.Datatypes <> list ind
+R13230:13234 SailStdpp.Values <> mword def
+binder 13217:13220 <> rest:70
+R13246:13253 xv6iris.ProcDefs <> pprivate rec
+binder 13242:13242 <> V:71
+R13269:13276 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13262:13266 xv6iris.UsertrapRes <> ut_wf def
+R13268:13268 xv6iris.ParkCap <> N:69 var
+R13297:13616 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13288:13290 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R13277:13282 Stdlib.Lists.List <> length abbrev
+R13284:13287 xv6iris.ParkCap <> rest:70 var
+R13636:13645 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R13617:13627 xv6iris.TsoCtx <> own_context def
+R13629:13635 xv6iris.TsoCtx <> cur_ctx def
+R13665:13674 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13646:13655 xv6iris.ParkCap <> park_token def
+R13658:13661 xv6iris.UsertrapRes <> un_s proj
+R13663:13663 xv6iris.ParkCap <> N:69 var
+R13686:13695 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13675:13685 xv6iris.KernelText <> kernel_text def
+R13704:13713 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13696:13703 xv6iris.WireInv <> wire_inv def
+R13747:13756 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13714:13720 xv6iris.RiscvPtsto <> kmap_at def
+R13742:13746 xv6iris.RiscvPtsto <> KP_rx constr
+R13732:13740 xv6iris.KptExecMap <> tramp_ppn def
+R13722:13730 xv6iris.KptExecMap <> tramp_vpn def
+R13775:13784 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13757:13765 xv6iris.SchedCtx <> procs_inv def
+R13768:13771 xv6iris.UsertrapRes <> un_s proj
+R13773:13773 xv6iris.ParkCap <> N:69 var
+R13852:13861 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13785:13796 xv6iris.UsertrapRes <> park_globals def
+R13844:13848 xv6iris.UsertrapRes <> un_tk proj
+R13850:13850 xv6iris.ParkCap <> N:69 var
+R13835:13838 xv6iris.UsertrapRes <> un_f proj
+R13840:13840 xv6iris.ParkCap <> N:69 var
+R13825:13829 xv6iris.UsertrapRes <> un_ft proj
+R13831:13831 xv6iris.ParkCap <> N:69 var
+R13816:13819 xv6iris.UsertrapRes <> un_w proj
+R13821:13821 xv6iris.ParkCap <> N:69 var
+R13807:13810 xv6iris.UsertrapRes <> un_s proj
+R13812:13812 xv6iris.ParkCap <> N:69 var
+R13798:13804 xv6iris.TsoCtx <> cur_ctx def
+R13885:13894 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13862:13874 xv6iris.ProcAvail <> pslot_used_at def
+R13877:13881 xv6iris.UsertrapRes <> un_pj def
+R13883:13883 xv6iris.ParkCap <> N:69 var
+R13967:13976 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13895:13903 xv6iris.StackOwn <> stack_own def
+R13919:13925 SailStdpp.Operators_mwords <> add_vec def
+R13938:13949 SailStdpp.Values <> mword_of_int def
+R13928:13932 xv6iris.UsertrapRes <> un_ks proj
+R13934:13934 xv6iris.ParkCap <> N:69 var
+R13958:13966 xv6iris.ProcDefs <> KSTACK_AV def
+R13913:13915 xv6iris.Ktier <> KT1 constr
+R13987:13996 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13977:13984 xv6iris.UsertrapRes <> park_env def
+R13986:13986 xv6iris.ParkCap <> N:69 var
+R14007:14016 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13997:14004 xv6iris.UsertrapRes <> park_own def
+R14006:14006 xv6iris.ParkCap <> N:69 var
+R14083:14092 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R14017:14026 xv6iris.ParkCap <> park_child def
+R14082:14082 xv6iris.ParkCap <> V:71 var
+R14072:14077 xv6iris.UsertrapRes <> un_pid proj
+R14079:14079 xv6iris.ParkCap <> N:69 var
+R14066:14069 xv6iris.ParkCap <> rest:70 var
+R14057:14061 xv6iris.UsertrapRes <> un_ks proj
+R14063:14063 xv6iris.ParkCap <> N:69 var
+R14047:14051 xv6iris.UsertrapRes <> un_pj def
+R14053:14053 xv6iris.ParkCap <> N:69 var
+R14038:14041 xv6iris.UsertrapRes <> un_f proj
+R14043:14043 xv6iris.ParkCap <> N:69 var
+R14029:14032 xv6iris.UsertrapRes <> un_s proj
+R14034:14034 xv6iris.ParkCap <> N:69 var
+R14093:14097 iris.bi.updates <> ::bi_scope:'|==>'_x not
+R14117:14121 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R14098:14108 xv6iris.TsoCtx <> own_context def
+R14110:14116 xv6iris.TsoCtx <> cur_ctx def
+R14122:14125 iris.bi.interface <> ::bi_scope:'▷'_x not
+R14126:14133 xv6iris.SchedCtx <> proc_ctx def
+R14145:14149 xv6iris.UsertrapRes <> un_pj def
+R14151:14151 xv6iris.ParkCap <> N:69 var
+R14136:14139 xv6iris.UsertrapRes <> un_s proj
+R14141:14141 xv6iris.ParkCap <> N:69 var
+R14647:14650 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R14637:14646 xv6iris.UsertrapRes <> K_usertrap abbrev
+R14651:14659 xv6iris.ProcDefs <> KSTACK_AV def
+R14647:14650 Corelib.Init.Peano <> ::nat_scope:x_'<='_x not
+R14637:14646 xv6iris.UsertrapRes <> K_usertrap abbrev
+R14651:14659 xv6iris.ProcDefs <> KSTACK_AV def
+R14742:14758 xv6iris.ParkCap <> park_token_unfold thm
+R14761:14772 xv6iris.ParkCap <> park_token_F def
+R14742:14758 xv6iris.ParkCap <> park_token_unfold thm
+R14742:14758 xv6iris.ParkCap <> park_token_unfold thm
+R14761:14772 xv6iris.ParkCap <> park_token_F def
+R14761:14772 xv6iris.ParkCap <> park_token_F def
+R14850:14850 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14858:14861 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14869:14869 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14871:14871 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14881:14886 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14900:14900 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14862:14868 xv6iris.TsoCtx <> cur_ctx def
+R14872:14880 xv6iris.ProcDefs <> KSTACK_AV def
+R14850:14850 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14858:14861 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14869:14869 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14871:14871 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14881:14886 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14900:14900 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14862:14868 xv6iris.TsoCtx <> cur_ctx def
+R14872:14880 xv6iris.ProcDefs <> KSTACK_AV def
+R14974:14974 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14981:14984 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14991:14991 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14999:15000 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15007:15009 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15017:15019 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15026:15028 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15036:15038 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15046:15062 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15070:15071 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15076:15077 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15086:15087 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15089:15089 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15099:15118 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15168:15168 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14985:14990 xv6iris.RiscvLang <> cpu_id def
+R14992:14998 xv6iris.TsoCtx <> cur_ctx def
+R15001:15004 xv6iris.UsertrapRes <> un_w proj
+R15010:15014 xv6iris.UsertrapRes <> un_ft proj
+R15020:15023 xv6iris.UsertrapRes <> un_f proj
+R15029:15033 xv6iris.UsertrapRes <> un_tk proj
+R15039:15043 xv6iris.UsertrapRes <> un_pj def
+R15063:15067 xv6iris.UsertrapRes <> un_ks proj
+R15078:15083 xv6iris.UsertrapRes <> un_pid proj
+R15090:15098 xv6iris.ProcDefs <> KSTACK_AV def
+R14974:14974 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14981:14984 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14991:14991 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14999:15000 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15007:15009 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15017:15019 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15026:15028 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15036:15038 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15046:15062 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15070:15071 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15076:15077 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15086:15087 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15089:15089 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15099:15118 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15168:15168 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R14985:14990 xv6iris.RiscvLang <> cpu_id def
+R14992:14998 xv6iris.TsoCtx <> cur_ctx def
+R15001:15004 xv6iris.UsertrapRes <> un_w proj
+R15010:15014 xv6iris.UsertrapRes <> un_ft proj
+R15020:15023 xv6iris.UsertrapRes <> un_f proj
+R15029:15033 xv6iris.UsertrapRes <> un_tk proj
+R15039:15043 xv6iris.UsertrapRes <> un_pj def
+R15063:15067 xv6iris.UsertrapRes <> un_ks proj
+R15078:15083 xv6iris.UsertrapRes <> un_pid proj
+R15090:15098 xv6iris.ProcDefs <> KSTACK_AV def
+R15230:15233 xv6iris.UsertrapRes <> un_j proj
+R15230:15233 xv6iris.UsertrapRes <> un_j proj
+R15305:15312 xv6iris.ParkCap <> park_pkg def
+R15305:15312 xv6iris.ParkCap <> park_pkg def
+R15305:15312 xv6iris.ParkCap <> park_pkg def
+R15730:15730 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15739:15744 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15756:15756 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15730:15730 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15739:15744 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15756:15756 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15886:15886 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15896:15899 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15901:15901 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15904:15904 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15908:15908 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15911:15932 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15984:15984 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15886:15886 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15896:15899 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15901:15901 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15904:15904 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15908:15908 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15911:15932 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R15984:15984 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+prf 16516:16534 <> park_token_intro_of
+R16554:16557 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R16549:16553 xv6iris.RiscvLang <> CpuId class
+R16564:16567 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R16558:16563 xv6iris.TsoCtx <> CurCtx class
+R16572:16575 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R16568:16571 xv6iris.UserPtTree <> uptd rec
+R16584:16587 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R16576:16580 SailStdpp.Values <> mword def
+R16588:16592 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R16594:16595 xv6iris.ParkCap <> ParkCap.Σ var
+binder 16543:16545 <> URB:72
+R16605:16608 Corelib.Init.Datatypes <> list ind
+R16610:16614 iris.base_logic.lib.iprop <> gname def
+binder 16599:16601 <> γs:73
+R16623:16623 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R16686:16694 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R16624:16630 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R16635:16636 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+binder 16631:16631 <> N:74
+binder 16633:16634 <> av:75
+R16637:16654 xv6iris.UsertrapRes <> ut_park_intro_body def
+R16684:16685 xv6iris.ParkCap <> av:75 var
+R16682:16682 xv6iris.ParkCap <> N:74 var
+R16661:16670 xv6iris.ParkCap <> park_token def
+R16673:16676 xv6iris.UsertrapRes <> un_s proj
+R16678:16678 xv6iris.ParkCap <> N:74 var
+R16656:16658 xv6iris.ParkCap <> URB:72 var
+R16728:16737 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R16695:16702 xv6iris.ParkCap <> park_cap def
+R16704:16706 xv6iris.ParkCap <> URB:72 var
+R16709:16718 xv6iris.ParkCap <> park_token def
+R16720:16722 xv6iris.ParkCap <> γs:73 var
+R16725:16727 xv6iris.ParkCap <> γs:73 var
+R16738:16747 xv6iris.ParkCap <> park_token def
+R16749:16751 xv6iris.ParkCap <> γs:73 var
+R16811:16827 xv6iris.ParkCap <> park_token_unfold thm
+R16830:16841 xv6iris.ParkCap <> park_token_F def
+R16811:16827 xv6iris.ParkCap <> park_token_unfold thm
+R16811:16827 xv6iris.ParkCap <> park_token_unfold thm
+R16830:16841 xv6iris.ParkCap <> park_token_F def
+R16830:16841 xv6iris.ParkCap <> park_token_F def
+R16890:16898 xv6iris.ParkCap <> park_chan def
+R16890:16898 xv6iris.ParkCap <> park_chan def
+R16890:16898 xv6iris.ParkCap <> park_chan def
+R17026:17026 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_')' not
+R17030:17033 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_')' not
+R17037:17037 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_')' not
+R17026:17026 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_')' not
+R17030:17033 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_')' not
+R17037:17037 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_')' not
+R17064:17070 xv6iris.ParkCap ParkCap <> sec

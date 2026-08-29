@@ -1,0 +1,19 @@
+DIGEST 2cda6db82758e720bd53457600af1ae5
+Fxv6iris.LinkProcPagetable
+R288:300 xv6iris.LinkUvmcreate <> <> lib
+R302:313 xv6iris.LinkMappages <> <> lib
+R315:325 xv6iris.LinkUvmfree <> <> lib
+R327:343 xv6iris.LinkUvmunmapFixed <> <> lib
+R361:378 xv6iris.ProofProcPagetable <> <> lib
+R480:497 xv6iris.ProofProcPagetable ProcPagetableProof <> modtype
+R499:507 xv6iris.LinkUvmcreate Uvmcreate <> modtype
+R509:516 xv6iris.LinkMappages Mappages <> modtype
+R518:524 xv6iris.LinkUvmfree Uvmfree <> modtype
+R526:538 xv6iris.LinkUvmunmapFixed UvmunmapFixed <> modtype
+mod 463:475 <> ProcPagetable
+R799:815 xv6iris.ProofProcPagetable ProcPagetableCore <> modtype
+R817:825 xv6iris.LinkUvmcreate Uvmcreate <> modtype
+R827:834 xv6iris.LinkMappages Mappages <> modtype
+R836:842 xv6iris.LinkUvmfree Uvmfree <> modtype
+R844:856 xv6iris.LinkUvmunmapFixed UvmunmapFixed <> modtype
+mod 779:794 <> ProcPagetableGen

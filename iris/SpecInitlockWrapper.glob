@@ -1,4 +1,4 @@
-DIGEST c14ad9bf1438b9c8bd83345b6a33b406
+DIGEST 2b608f29ffe1b3f46e3f0aa31f3cf96b
 Fxv6iris.SpecInitlockWrapper
 R926:934 Stdlib.Logic.Eqdep_dec <> <> lib
 R936:941 Stdlib.ZArith.ZArith <> <> lib
@@ -483,7 +483,7 @@ R6826:6834 xv6iris.WpLock <> lock_name def
 R6836:6837 xv6iris.SpecInitlockWrapper <> lk:27 var
 R6839:6839 xv6iris.SpecInitlockWrapper <> s:29 var
 R6872:6881 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R6850:6868 xv6iris.WpLock <> lk_cpu_fresh def
+R6850:6868 xv6iris.WpLock <> lk_cpu_ready def
 R6870:6871 xv6iris.SpecInitlockWrapper <> lk:27 var
 R6882:6885 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
 R6908:6908 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not

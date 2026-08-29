@@ -1,4 +1,4 @@
-DIGEST 8335a8d78d759ce07503efddd60f5ddd
+DIGEST c25c3265f865ae9fc4e6a8a68d968a5e
 Fxv6iris.PipeInvDefs
 R6564:6569 Stdlib.ZArith.ZArith <> <> lib
 R6571:6573 Stdlib.micromega.Lia <> <> lib
@@ -1422,213 +1422,255 @@ R26979:26979 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
 R26999:27004 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
 R27013:27013 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
 R26980:26998 xv6iris.WpLock <> lock_frag_exclusive thm
-prf 27030:27040 <> locked_dead
-binder 27042:27044 <> γl:142
-binder 27046:27048 <> γp:143
-binder 27050:27050 <> i:144
-R27054:27057 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
-R27070:27075 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R27058:27063 xv6iris.WpLock <> locked def
-R27065:27067 xv6iris.PipeInvDefs <> γl:142 var
-R27069:27069 xv6iris.PipeInvDefs <> i:144 var
-R27093:27098 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R27076:27084 xv6iris.PipeInvDefs <> pipe_dead def
-R27086:27088 xv6iris.PipeInvDefs <> γl:142 var
-R27090:27092 xv6iris.PipeInvDefs <> γp:143 var
-R27099:27103 iris.bi.interface <> ::bi_scope:'False' not
-R27122:27135 xv6iris.PipeInvDefs <> lock_frag_dead thm
-R27122:27135 xv6iris.PipeInvDefs <> lock_frag_dead thm
-prf 27151:27165 <> locked_pre_dead
-binder 27167:27169 <> γl:145
-binder 27171:27173 <> γp:146
-binder 27175:27175 <> i:147
-R27179:27182 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
-R27199:27204 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R27183:27192 xv6iris.WpLock <> locked_pre def
-R27194:27196 xv6iris.PipeInvDefs <> γl:145 var
-R27198:27198 xv6iris.PipeInvDefs <> i:147 var
-R27222:27227 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R27205:27213 xv6iris.PipeInvDefs <> pipe_dead def
-R27215:27217 xv6iris.PipeInvDefs <> γl:145 var
-R27219:27221 xv6iris.PipeInvDefs <> γp:146 var
-R27228:27232 iris.bi.interface <> ::bi_scope:'False' not
-R27251:27264 xv6iris.PipeInvDefs <> lock_frag_dead thm
-R27251:27264 xv6iris.PipeInvDefs <> lock_frag_dead thm
-prf 27785:27797 <> pipe_res_dead
-binder 27799:27801 <> γl:148
-binder 27803:27805 <> γp:149
-binder 27807:27808 <> pi:150
-R27835:27840 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R27816:27824 xv6iris.PipeInvDefs <> pipe_shut def
-R27826:27828 xv6iris.PipeInvDefs <> γp:149 var
-R27830:27834 Corelib.Init.Datatypes <> false constr
-R27859:27868 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R27841:27849 xv6iris.PipeInvDefs <> pipe_shut def
-R27851:27853 xv6iris.PipeInvDefs <> γp:149 var
-R27855:27858 Corelib.Init.Datatypes <> true constr
-R27887:27892 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R27869:27877 xv6iris.WpLock <> lock_frag def
-R27879:27881 xv6iris.PipeInvDefs <> γl:148 var
-R27883:27886 Corelib.Init.Datatypes <> None constr
-R27908:27917 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R27893:27900 xv6iris.PipeInvDefs <> pipe_res def
-R27902:27904 xv6iris.PipeInvDefs <> γp:149 var
-R27906:27907 xv6iris.PipeInvDefs <> pi:150 var
-R27935:27939 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R27918:27926 xv6iris.PipeInvDefs <> pipe_dead def
-R27928:27930 xv6iris.PipeInvDefs <> γl:148 var
-R27932:27934 xv6iris.PipeInvDefs <> γp:149 var
-R27940:27949 xv6iris.PipeInvDefs <> pipe_bytes def
-R27951:27952 xv6iris.PipeInvDefs <> pi:150 var
-R28146:28146 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R28170:28175 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R28186:28186 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R28147:28169 xv6iris.PipeInvDefs <> pipe_endstate_shut_elim thm
-R28146:28146 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R28170:28175 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R28186:28186 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R28147:28169 xv6iris.PipeInvDefs <> pipe_endstate_shut_elim thm
-R28216:28216 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R28240:28245 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R28256:28256 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R28217:28239 xv6iris.PipeInvDefs <> pipe_endstate_shut_elim thm
-R28216:28216 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R28240:28245 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R28256:28256 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R28217:28239 xv6iris.PipeInvDefs <> pipe_endstate_shut_elim thm
-R28375:28379 SailStdpp.Values <> mword def
-R28358:28369 SailStdpp.Values <> mword_of_int def
-R28404:28408 SailStdpp.Values <> mword def
-R28387:28398 SailStdpp.Values <> mword_of_int def
-R28375:28379 SailStdpp.Values <> mword def
-R28358:28369 SailStdpp.Values <> mword_of_int def
-R28404:28408 SailStdpp.Values <> mword def
-R28387:28398 SailStdpp.Values <> mword_of_int def
-def 28723:28729 <> is_pipe
-R28738:28742 iris.base_logic.lib.iprop <> gname def
-binder 28732:28734 <> γl:151
-R28752:28761 xv6iris.PipeInvDefs <> pipe_names rec
-binder 28746:28748 <> γp:152
-R28770:28774 SailStdpp.Values <> mword def
-binder 28765:28766 <> pi:153
-R28782:28786 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R28788:28789 xv6iris.PipeInvDefs <> PipeInv.Σ var
-R28818:28827 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R28799:28801 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R28815:28817 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R28802:28811 xv6iris.PageGeom <> page_valid def
-R28813:28814 xv6iris.PipeInvDefs <> pi:153 var
-R28828:28830 iris.base_logic.lib.invariants <> inv def
-R28883:28887 iris.bi.interface <> ::bi_scope:x_'∨'_x not
-R28839:28846 xv6iris.WpLock <> lock_inv def
-R28848:28850 xv6iris.PipeInvDefs <> γl:151 var
-R28852:28853 xv6iris.PipeInvDefs <> pi:153 var
-R28862:28864 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
-R28880:28882 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
-R28865:28872 xv6iris.PipeInvDefs <> pipe_res def
-R28874:28876 xv6iris.PipeInvDefs <> γp:152 var
-R28878:28879 xv6iris.PipeInvDefs <> pi:153 var
-R28888:28896 xv6iris.PipeInvDefs <> pipe_dead def
-R28898:28900 xv6iris.PipeInvDefs <> γl:151 var
-R28902:28904 xv6iris.PipeInvDefs <> γp:152 var
-R28832:28836 xv6iris.WpLock <> lockN def
-inst 28930:28947 <> is_pipe_persistent
-binder 28949:28951 <> γl:154
-binder 28953:28955 <> γp:155
-binder 28957:28958 <> pi:156
-R28962:28971 iris.bi.derived_connectives <> Persistent class
-R28974:28980 xv6iris.PipeInvDefs <> is_pipe def
-R28982:28984 xv6iris.PipeInvDefs <> γl:154 var
-R28986:28988 xv6iris.PipeInvDefs <> γp:155 var
-R28990:28991 xv6iris.PipeInvDefs <> pi:156 var
-prf 29472:29484 <> is_pipe_valid
-binder 29486:29488 <> γl:157
-binder 29490:29492 <> γp:158
-binder 29494:29495 <> pi:159
-R29517:29522 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R29499:29505 xv6iris.PipeInvDefs <> is_pipe def
-R29507:29509 xv6iris.PipeInvDefs <> γl:157 var
-R29511:29513 xv6iris.PipeInvDefs <> γp:158 var
-R29515:29516 xv6iris.PipeInvDefs <> pi:159 var
-R29523:29525 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R29539:29541 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R29526:29535 xv6iris.PageGeom <> page_valid def
-R29537:29538 xv6iris.PipeInvDefs <> pi:159 var
-R29562:29568 xv6iris.PipeInvDefs <> is_pipe def
-R29562:29568 xv6iris.PipeInvDefs <> is_pipe def
-R29562:29568 xv6iris.PipeInvDefs <> is_pipe def
-prf 29604:29614 <> is_pipe_inv
-binder 29616:29618 <> γl:160
-binder 29620:29622 <> γp:161
-binder 29624:29625 <> pi:162
-R29651:29656 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R29633:29639 xv6iris.PipeInvDefs <> is_pipe def
-R29641:29643 xv6iris.PipeInvDefs <> γl:160 var
-R29645:29647 xv6iris.PipeInvDefs <> γp:161 var
-R29649:29650 xv6iris.PipeInvDefs <> pi:162 var
-R29657:29659 iris.base_logic.lib.invariants <> inv def
-R29712:29716 iris.bi.interface <> ::bi_scope:x_'∨'_x not
-R29668:29675 xv6iris.WpLock <> lock_inv def
-R29677:29679 xv6iris.PipeInvDefs <> γl:160 var
-R29681:29682 xv6iris.PipeInvDefs <> pi:162 var
-R29691:29693 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
-R29709:29711 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
-R29694:29701 xv6iris.PipeInvDefs <> pipe_res def
-R29703:29705 xv6iris.PipeInvDefs <> γp:161 var
-R29707:29708 xv6iris.PipeInvDefs <> pi:162 var
-R29717:29725 xv6iris.PipeInvDefs <> pipe_dead def
-R29727:29729 xv6iris.PipeInvDefs <> γl:160 var
-R29731:29733 xv6iris.PipeInvDefs <> γp:161 var
-R29661:29665 xv6iris.WpLock <> lockN def
-R29755:29761 xv6iris.PipeInvDefs <> is_pipe def
-R29755:29761 xv6iris.PipeInvDefs <> is_pipe def
-R29755:29761 xv6iris.PipeInvDefs <> is_pipe def
-prf 29944:29959 <> is_pipe_openable
-binder 29961:29963 <> γl:163
-binder 29965:29967 <> γp:164
-binder 29969:29970 <> pi:165
-R29996:30005 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R29978:29984 xv6iris.PipeInvDefs <> is_pipe def
-R29986:29988 xv6iris.PipeInvDefs <> γl:163 var
-R29990:29992 xv6iris.PipeInvDefs <> γp:164 var
-R29994:29995 xv6iris.PipeInvDefs <> pi:165 var
-R30006:30018 xv6iris.WpLock <> lock_openable def
-R30020:30022 xv6iris.PipeInvDefs <> γl:163 var
-R30024:30025 xv6iris.PipeInvDefs <> pi:165 var
-R30034:30036 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
-R30052:30054 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
-R30037:30044 xv6iris.PipeInvDefs <> pipe_res def
-R30046:30048 xv6iris.PipeInvDefs <> γp:164 var
-R30050:30051 xv6iris.PipeInvDefs <> pi:165 var
-R30057:30065 xv6iris.PipeInvDefs <> pipe_dead def
-R30067:30069 xv6iris.PipeInvDefs <> γl:163 var
-R30071:30073 xv6iris.PipeInvDefs <> γp:164 var
-R30106:30126 xv6iris.WpLock <> lock_openable_of_dead thm
-R30106:30126 xv6iris.WpLock <> lock_openable_of_dead thm
-R30139:30149 xv6iris.PipeInvDefs <> is_pipe_inv thm
-R30139:30149 xv6iris.PipeInvDefs <> is_pipe_inv thm
-def 31124:31132 <> pipe_held
-R31140:31144 SailStdpp.Values <> mword def
-binder 31135:31136 <> pi:166
-R31155:31158 Corelib.Init.Datatypes <> bool ind
-binder 31151:31151 <> w:167
-R31166:31167 stdpp.numbers <> Qp rec
-binder 31162:31162 <> q:168
-R31172:31176 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R31178:31179 xv6iris.PipeInvDefs <> PipeInv.Σ var
-R31189:31193 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R31224:31226 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R31200:31204 iris.base_logic.lib.iprop <> gname def
-binder 31194:31196 <> γl:169
-R31214:31223 xv6iris.PipeInvDefs <> pipe_names rec
-binder 31208:31210 <> γp:170
-R31245:31249 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R31227:31233 xv6iris.PipeInvDefs <> is_pipe def
-R31235:31237 xv6iris.PipeInvDefs <> γl:169 var
-R31239:31241 xv6iris.PipeInvDefs <> γp:170 var
-R31243:31244 xv6iris.PipeInvDefs <> pi:166 var
-R31250:31257 xv6iris.PipeInvDefs <> pipe_ref def
-R31259:31261 xv6iris.PipeInvDefs <> γp:170 var
-R31263:31263 xv6iris.PipeInvDefs <> w:167 var
-R31265:31265 xv6iris.PipeInvDefs <> q:168 var
-R31275:31281 xv6iris.PipeInvDefs PipeInv <> sec
+prf 27362:27372 <> locked_dead
+binder 27374:27376 <> γl:142
+binder 27378:27380 <> γp:143
+binder 27382:27382 <> i:144
+R27386:27389 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
+R27402:27407 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R27390:27395 xv6iris.WpLock <> locked def
+R27397:27399 xv6iris.PipeInvDefs <> γl:142 var
+R27401:27401 xv6iris.PipeInvDefs <> i:144 var
+R27425:27430 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R27408:27416 xv6iris.PipeInvDefs <> pipe_dead def
+R27418:27420 xv6iris.PipeInvDefs <> γl:142 var
+R27422:27424 xv6iris.PipeInvDefs <> γp:143 var
+R27431:27435 iris.bi.interface <> ::bi_scope:'False' not
+R27490:27490 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27505:27510 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27520:27520 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27491:27504 xv6iris.PipeInvDefs <> lock_frag_dead thm
+R27490:27490 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27505:27510 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27520:27520 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27491:27504 xv6iris.PipeInvDefs <> lock_frag_dead thm
+prf 27552:27566 <> locked_pre_dead
+binder 27568:27570 <> γl:145
+binder 27572:27574 <> γp:146
+binder 27576:27576 <> i:147
+R27580:27583 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
+R27600:27605 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R27584:27593 xv6iris.WpLock <> locked_pre def
+R27595:27597 xv6iris.PipeInvDefs <> γl:145 var
+R27599:27599 xv6iris.PipeInvDefs <> i:147 var
+R27623:27628 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R27606:27614 xv6iris.PipeInvDefs <> pipe_dead def
+R27616:27618 xv6iris.PipeInvDefs <> γl:145 var
+R27620:27622 xv6iris.PipeInvDefs <> γp:146 var
+R27629:27633 iris.bi.interface <> ::bi_scope:'False' not
+R27688:27688 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27703:27708 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27718:27718 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27689:27702 xv6iris.PipeInvDefs <> lock_frag_dead thm
+R27688:27688 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27703:27708 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27718:27718 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R27689:27702 xv6iris.PipeInvDefs <> lock_frag_dead thm
+prf 28255:28267 <> pipe_res_dead
+binder 28269:28271 <> γl:148
+binder 28273:28275 <> γp:149
+binder 28277:28278 <> pi:150
+R28305:28310 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R28286:28294 xv6iris.PipeInvDefs <> pipe_shut def
+R28296:28298 xv6iris.PipeInvDefs <> γp:149 var
+R28300:28304 Corelib.Init.Datatypes <> false constr
+R28329:28338 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R28311:28319 xv6iris.PipeInvDefs <> pipe_shut def
+R28321:28323 xv6iris.PipeInvDefs <> γp:149 var
+R28325:28328 Corelib.Init.Datatypes <> true constr
+R28357:28362 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R28339:28347 xv6iris.WpLock <> lock_frag def
+R28349:28351 xv6iris.PipeInvDefs <> γl:148 var
+R28353:28356 Corelib.Init.Datatypes <> None constr
+R28378:28387 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R28363:28370 xv6iris.PipeInvDefs <> pipe_res def
+R28372:28374 xv6iris.PipeInvDefs <> γp:149 var
+R28376:28377 xv6iris.PipeInvDefs <> pi:150 var
+R28405:28409 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R28388:28396 xv6iris.PipeInvDefs <> pipe_dead def
+R28398:28400 xv6iris.PipeInvDefs <> γl:148 var
+R28402:28404 xv6iris.PipeInvDefs <> γp:149 var
+R28410:28419 xv6iris.PipeInvDefs <> pipe_bytes def
+R28421:28422 xv6iris.PipeInvDefs <> pi:150 var
+R28616:28616 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28640:28645 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28656:28656 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28617:28639 xv6iris.PipeInvDefs <> pipe_endstate_shut_elim thm
+R28616:28616 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28640:28645 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28656:28656 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28617:28639 xv6iris.PipeInvDefs <> pipe_endstate_shut_elim thm
+R28686:28686 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28710:28715 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28726:28726 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28687:28709 xv6iris.PipeInvDefs <> pipe_endstate_shut_elim thm
+R28686:28686 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28710:28715 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28726:28726 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R28687:28709 xv6iris.PipeInvDefs <> pipe_endstate_shut_elim thm
+R28845:28849 SailStdpp.Values <> mword def
+R28828:28839 SailStdpp.Values <> mword_of_int def
+R28874:28878 SailStdpp.Values <> mword def
+R28857:28868 SailStdpp.Values <> mword_of_int def
+R28845:28849 SailStdpp.Values <> mword def
+R28828:28839 SailStdpp.Values <> mword_of_int def
+R28874:28878 SailStdpp.Values <> mword def
+R28857:28868 SailStdpp.Values <> mword_of_int def
+def 29193:29199 <> is_pipe
+R29208:29212 iris.base_logic.lib.iprop <> gname def
+binder 29202:29204 <> γl:151
+R29222:29231 xv6iris.PipeInvDefs <> pipe_names rec
+binder 29216:29218 <> γp:152
+R29240:29244 SailStdpp.Values <> mword def
+binder 29235:29236 <> pi:153
+R29252:29256 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R29258:29259 xv6iris.PipeInvDefs <> PipeInv.Σ var
+R29288:29297 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R29269:29271 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R29285:29287 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R29272:29281 xv6iris.PageGeom <> page_valid def
+R29283:29284 xv6iris.PipeInvDefs <> pi:153 var
+R29298:29301 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R29310:29318 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R29307:29309 Corelib.Init.Datatypes <> nat ind
+binder 29302:29303 <> lo:154
+R29400:29411 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R29319:29321 iris.base_logic.lib.invariants <> inv def
+R29377:29381 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R29330:29337 xv6iris.WpLock <> lock_inv def
+R29339:29341 xv6iris.PipeInvDefs <> γl:151 var
+R29343:29344 xv6iris.PipeInvDefs <> pi:153 var
+R29353:29355 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R29371:29373 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R29356:29363 xv6iris.PipeInvDefs <> pipe_res def
+R29365:29367 xv6iris.PipeInvDefs <> γp:152 var
+R29369:29370 xv6iris.PipeInvDefs <> pi:153 var
+R29375:29376 xv6iris.PipeInvDefs <> lo:154 var
+R29382:29390 xv6iris.PipeInvDefs <> pipe_dead def
+R29392:29394 xv6iris.PipeInvDefs <> γl:151 var
+R29396:29398 xv6iris.PipeInvDefs <> γp:152 var
+R29323:29327 xv6iris.WpLock <> lockN def
+R29412:29426 xv6iris.WpLock <> lk_floor def
+R29428:29434 xv6iris.TsoCtx <> cur_ctx def
+R29436:29437 xv6iris.PipeInvDefs <> lo:154 var
+inst 29462:29479 <> is_pipe_persistent
+binder 29481:29483 <> γl:155
+binder 29485:29487 <> γp:156
+binder 29489:29490 <> pi:157
+R29494:29503 iris.bi.derived_connectives <> Persistent class
+R29506:29512 xv6iris.PipeInvDefs <> is_pipe def
+R29514:29516 xv6iris.PipeInvDefs <> γl:155 var
+R29518:29520 xv6iris.PipeInvDefs <> γp:156 var
+R29522:29523 xv6iris.PipeInvDefs <> pi:157 var
+prf 30004:30016 <> is_pipe_valid
+binder 30018:30020 <> γl:158
+binder 30022:30024 <> γp:159
+binder 30026:30027 <> pi:160
+R30049:30054 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R30031:30037 xv6iris.PipeInvDefs <> is_pipe def
+R30039:30041 xv6iris.PipeInvDefs <> γl:158 var
+R30043:30045 xv6iris.PipeInvDefs <> γp:159 var
+R30047:30048 xv6iris.PipeInvDefs <> pi:160 var
+R30055:30057 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R30071:30073 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R30058:30067 xv6iris.PageGeom <> page_valid def
+R30069:30070 xv6iris.PipeInvDefs <> pi:160 var
+R30094:30100 xv6iris.PipeInvDefs <> is_pipe def
+R30094:30100 xv6iris.PipeInvDefs <> is_pipe def
+R30094:30100 xv6iris.PipeInvDefs <> is_pipe def
+prf 30317:30327 <> is_pipe_inv
+binder 30329:30331 <> γl:161
+binder 30333:30335 <> γp:162
+binder 30337:30338 <> pi:163
+R30364:30373 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R30346:30352 xv6iris.PipeInvDefs <> is_pipe def
+R30354:30356 xv6iris.PipeInvDefs <> γl:161 var
+R30358:30360 xv6iris.PipeInvDefs <> γp:162 var
+R30362:30363 xv6iris.PipeInvDefs <> pi:163 var
+R30374:30377 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R30386:30393 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R30383:30385 Corelib.Init.Datatypes <> nat ind
+binder 30378:30379 <> lo:164
+R30475:30485 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R30394:30396 iris.base_logic.lib.invariants <> inv def
+R30452:30456 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R30405:30412 xv6iris.WpLock <> lock_inv def
+R30414:30416 xv6iris.PipeInvDefs <> γl:161 var
+R30418:30419 xv6iris.PipeInvDefs <> pi:163 var
+R30428:30430 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R30446:30448 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R30431:30438 xv6iris.PipeInvDefs <> pipe_res def
+R30440:30442 xv6iris.PipeInvDefs <> γp:162 var
+R30444:30445 xv6iris.PipeInvDefs <> pi:163 var
+R30450:30451 xv6iris.PipeInvDefs <> lo:164 var
+R30457:30465 xv6iris.PipeInvDefs <> pipe_dead def
+R30467:30469 xv6iris.PipeInvDefs <> γl:161 var
+R30471:30473 xv6iris.PipeInvDefs <> γp:162 var
+R30398:30402 xv6iris.WpLock <> lockN def
+R30486:30500 xv6iris.WpLock <> lk_floor def
+R30502:30508 xv6iris.TsoCtx <> cur_ctx def
+R30510:30511 xv6iris.PipeInvDefs <> lo:164 var
+R30532:30538 xv6iris.PipeInvDefs <> is_pipe def
+R30532:30538 xv6iris.PipeInvDefs <> is_pipe def
+R30532:30538 xv6iris.PipeInvDefs <> is_pipe def
+prf 30721:30736 <> is_pipe_openable
+binder 30738:30740 <> γl:165
+binder 30742:30744 <> γp:166
+binder 30746:30747 <> pi:167
+R30773:30782 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R30755:30761 xv6iris.PipeInvDefs <> is_pipe def
+R30763:30765 xv6iris.PipeInvDefs <> γl:165 var
+R30767:30769 xv6iris.PipeInvDefs <> γp:166 var
+R30771:30772 xv6iris.PipeInvDefs <> pi:167 var
+R30783:30795 xv6iris.WpLock <> lock_openable def
+R30797:30799 xv6iris.PipeInvDefs <> γl:165 var
+R30801:30802 xv6iris.PipeInvDefs <> pi:167 var
+R30811:30813 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R30829:30831 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
+R30814:30821 xv6iris.PipeInvDefs <> pipe_res def
+R30823:30825 xv6iris.PipeInvDefs <> γp:166 var
+R30827:30828 xv6iris.PipeInvDefs <> pi:167 var
+R30834:30842 xv6iris.PipeInvDefs <> pipe_dead def
+R30844:30846 xv6iris.PipeInvDefs <> γl:165 var
+R30848:30850 xv6iris.PipeInvDefs <> γp:166 var
+R30890:30890 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R30902:30907 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R30911:30911 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R30891:30901 xv6iris.PipeInvDefs <> is_pipe_inv thm
+R30890:30890 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R30902:30907 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R30911:30911 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R30891:30901 xv6iris.PipeInvDefs <> is_pipe_inv thm
+R30943:30943 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R30965:30970 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R30978:30978 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R30944:30964 xv6iris.WpLock <> lock_openable_of_dead thm
+R30943:30943 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R30965:30970 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R30978:30978 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R30944:30964 xv6iris.WpLock <> lock_openable_of_dead thm
+def 31955:31963 <> pipe_held
+R31971:31975 SailStdpp.Values <> mword def
+binder 31966:31967 <> pi:168
+R31986:31989 Corelib.Init.Datatypes <> bool ind
+binder 31982:31982 <> w:169
+R31997:31998 stdpp.numbers <> Qp rec
+binder 31993:31993 <> q:170
+R32003:32007 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R32009:32010 xv6iris.PipeInvDefs <> PipeInv.Σ var
+R32020:32024 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R32055:32057 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R32031:32035 iris.base_logic.lib.iprop <> gname def
+binder 32025:32027 <> γl:171
+R32045:32054 xv6iris.PipeInvDefs <> pipe_names rec
+binder 32039:32041 <> γp:172
+R32076:32080 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R32058:32064 xv6iris.PipeInvDefs <> is_pipe def
+R32066:32068 xv6iris.PipeInvDefs <> γl:171 var
+R32070:32072 xv6iris.PipeInvDefs <> γp:172 var
+R32074:32075 xv6iris.PipeInvDefs <> pi:168 var
+R32081:32088 xv6iris.PipeInvDefs <> pipe_ref def
+R32090:32092 xv6iris.PipeInvDefs <> γp:172 var
+R32094:32094 xv6iris.PipeInvDefs <> w:169 var
+R32096:32096 xv6iris.PipeInvDefs <> q:170 var
+R32106:32112 xv6iris.PipeInvDefs PipeInv <> sec

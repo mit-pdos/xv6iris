@@ -1,4 +1,4 @@
-DIGEST 360014d26ff66033adf50cd2c34f5fd7
+DIGEST b88b70542fe8b2854dde0c27e8166c7b
 Fxv6iris.SpecKvmmake
 R254:262 Stdlib.Logic.Eqdep_dec <> <> lib
 R264:269 Stdlib.ZArith.ZArith <> <> lib
@@ -131,7 +131,7 @@ R2870:2882 xv6iris.KvmSpec <> kalloc_env_at def
 R2884:2886 xv6iris.SpecKvmmake <> γa:7 var
 R2888:2890 xv6iris.SpecKvmmake <> γk:8 var
 R2892:2893 xv6iris.SpecKvmmake <> on:14 var
-R3589:3596 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R3604:3611 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
 R2902:2908 xv6iris.WpNext <> wp_next def
 R2926:2930 xv6iris.RiscvLang <> CpuId class
 binder 2920:2922 <> CID:19
@@ -212,81 +212,82 @@ R3432:3434 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
 R3418:3427 xv6iris.KvmMap <> kvm_pas_ok def
 R3429:3431 xv6iris.SpecKvmmake <> pas:22 var
 R3445:3445 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R3550:3560 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R3565:3575 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
 R3446:3456 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
 R3458:3462 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
 R3471:3479 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
 binder 3457:3457 <> i:23
 binder 3457:3457 <> i:24
-R3480:3487 xv6iris.KallocInv <> page_own def
-R3490:3501 Riscv.rv64d_types <> zero_extend' def
-R3507:3516 SailStdpp.Operators_mwords <> concat_vec def
-R3539:3543 SailStdpp.Values <> mword def
-R3527:3532 Riscv.rv64d <> zeros' def
-R3519:3521 xv6iris.SpecKvmmake <> pas:22 var
-R3523:3523 xv6iris.SpecKvmmake <> i:23 var
+R3480:3490 xv6iris.KallocInv <> page_filled def
+R3493:3504 Riscv.rv64d_types <> zero_extend' def
+R3510:3519 SailStdpp.Operators_mwords <> concat_vec def
+R3542:3546 SailStdpp.Values <> mword def
+R3530:3535 Riscv.rv64d <> zeros' def
+R3522:3524 xv6iris.SpecKvmmake <> pas:22 var
+R3526:3526 xv6iris.SpecKvmmake <> i:23 var
+R3554:3564 xv6iris.KallocInv <> kalloc_junk def
 R3463:3465 Corelib.Lists.ListDef <> seq def
-R3561:3564 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
-R3587:3587 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
-R3572:3575 iris.program_logic.language <> expr proj
-R3577:3586 xv6iris.RiscvLang <> riscv_lang def
-R3565:3568 xv6iris.RiscvLang <> Loop abbrev
+R3576:3579 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R3602:3602 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R3587:3590 iris.program_logic.language <> expr proj
+R3592:3601 xv6iris.RiscvLang <> riscv_lang def
+R3580:3583 xv6iris.RiscvLang <> Loop abbrev
 R2912:2912 xv6iris.SpecKvmmake <> p:13 var
 R2910:2910 xv6iris.SpecKvmmake <> b:15 var
-R3597:3600 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
-R3623:3623 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
-R3608:3611 iris.program_logic.language <> expr proj
-R3613:3622 xv6iris.RiscvLang <> riscv_lang def
-R3601:3604 xv6iris.RiscvLang <> Loop abbrev
-modtype 3639:3645 <> KVMMAKE
-ax 3660:3675 KVMMAKE wp_kvmmake_sconf
-R3683:3691 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-R3905:3913 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-R3693:3699 xv6iris.RiscvPtsto <> riscvGS class
-binder 3701:3702 <> Σ:25
-binder 3692:3702 <> riscvGS0:26
-R3706:3709 xv6iris.Xv6G <> xv6G class
-R3711:3712 xv6iris.SpecKvmmake <> Σ:25 var
-binder 3705:3712 <> xv6G0:27
-R3723:3727 xv6iris.RiscvLang <> GenId class
-binder 3717:3719 <> GEN:28
-R3738:3742 xv6iris.RiscvLang <> CpuId class
-binder 3732:3734 <> CID:29
-R3752:3757 xv6iris.TsoCtx <> CurCtx class
-binder 3747:3748 <> XI:30
-R3773:3777 iris.base_logic.lib.iprop <> gname def
-binder 3767:3769 <> γa:31
-R3792:3794 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
-R3787:3791 iris.base_logic.lib.iprop <> gname def
-R3795:3799 iris.base_logic.lib.iprop <> gname def
-binder 3781:3783 <> γk:32
-R3808:3814 xv6iris.RegFile <> regfile def
-binder 3803:3804 <> mm:33
-R3826:3828 Corelib.Init.Datatypes <> nat ind
-binder 3818:3820 <> lvl:34
-R3826:3828 Corelib.Init.Datatypes <> nat ind
-binder 3822:3822 <> K:35
-R3837:3840 Corelib.Init.Datatypes <> bool ind
-binder 3832:3833 <> eb:36
-R3848:3852 SailStdpp.Values <> mword def
-binder 3844:3844 <> p:37
-R3864:3869 Corelib.Init.Datatypes <> option ind
-R3871:3873 Corelib.Init.Datatypes <> nat ind
-binder 3859:3860 <> on:38
-R3881:3884 Corelib.Init.Datatypes <> bool ind
-binder 3877:3877 <> b:39
-R3894:3897 stdpp.gmap <> gset def
-R3899:3904 Stdlib.Strings.String <> string ind
-binder 3888:3890 <> lks:40
-R3914:3934 xv6iris.SpecKvmmake <> wp_kvmmake_sconf_body def
-R3963:3965 xv6iris.SpecKvmmake <> lks:40 var
-R3961:3961 xv6iris.SpecKvmmake <> b:39 var
-R3958:3959 xv6iris.SpecKvmmake <> on:38 var
-R3956:3956 xv6iris.SpecKvmmake <> p:37 var
-R3953:3954 xv6iris.SpecKvmmake <> eb:36 var
-R3951:3951 xv6iris.SpecKvmmake <> K:35 var
-R3947:3949 xv6iris.SpecKvmmake <> lvl:34 var
-R3944:3945 xv6iris.SpecKvmmake <> mm:33 var
-R3940:3942 xv6iris.SpecKvmmake <> γk:32 var
-R3936:3938 xv6iris.SpecKvmmake <> γa:31 var
-R3972:3978 xv6iris.SpecKvmmake KVMMAKE <> modtype
+R3612:3615 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R3638:3638 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R3623:3626 iris.program_logic.language <> expr proj
+R3628:3637 xv6iris.RiscvLang <> riscv_lang def
+R3616:3619 xv6iris.RiscvLang <> Loop abbrev
+modtype 3654:3660 <> KVMMAKE
+ax 3675:3690 KVMMAKE wp_kvmmake_sconf
+R3698:3706 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R3920:3928 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R3708:3714 xv6iris.RiscvPtsto <> riscvGS class
+binder 3716:3717 <> Σ:25
+binder 3707:3717 <> riscvGS0:26
+R3721:3724 xv6iris.Xv6G <> xv6G class
+R3726:3727 xv6iris.SpecKvmmake <> Σ:25 var
+binder 3720:3727 <> xv6G0:27
+R3738:3742 xv6iris.RiscvLang <> GenId class
+binder 3732:3734 <> GEN:28
+R3753:3757 xv6iris.RiscvLang <> CpuId class
+binder 3747:3749 <> CID:29
+R3767:3772 xv6iris.TsoCtx <> CurCtx class
+binder 3762:3763 <> XI:30
+R3788:3792 iris.base_logic.lib.iprop <> gname def
+binder 3782:3784 <> γa:31
+R3807:3809 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R3802:3806 iris.base_logic.lib.iprop <> gname def
+R3810:3814 iris.base_logic.lib.iprop <> gname def
+binder 3796:3798 <> γk:32
+R3823:3829 xv6iris.RegFile <> regfile def
+binder 3818:3819 <> mm:33
+R3841:3843 Corelib.Init.Datatypes <> nat ind
+binder 3833:3835 <> lvl:34
+R3841:3843 Corelib.Init.Datatypes <> nat ind
+binder 3837:3837 <> K:35
+R3852:3855 Corelib.Init.Datatypes <> bool ind
+binder 3847:3848 <> eb:36
+R3863:3867 SailStdpp.Values <> mword def
+binder 3859:3859 <> p:37
+R3879:3884 Corelib.Init.Datatypes <> option ind
+R3886:3888 Corelib.Init.Datatypes <> nat ind
+binder 3874:3875 <> on:38
+R3896:3899 Corelib.Init.Datatypes <> bool ind
+binder 3892:3892 <> b:39
+R3909:3912 stdpp.gmap <> gset def
+R3914:3919 Stdlib.Strings.String <> string ind
+binder 3903:3905 <> lks:40
+R3929:3949 xv6iris.SpecKvmmake <> wp_kvmmake_sconf_body def
+R3978:3980 xv6iris.SpecKvmmake <> lks:40 var
+R3976:3976 xv6iris.SpecKvmmake <> b:39 var
+R3973:3974 xv6iris.SpecKvmmake <> on:38 var
+R3971:3971 xv6iris.SpecKvmmake <> p:37 var
+R3968:3969 xv6iris.SpecKvmmake <> eb:36 var
+R3966:3966 xv6iris.SpecKvmmake <> K:35 var
+R3962:3964 xv6iris.SpecKvmmake <> lvl:34 var
+R3959:3960 xv6iris.SpecKvmmake <> mm:33 var
+R3955:3957 xv6iris.SpecKvmmake <> γk:32 var
+R3951:3953 xv6iris.SpecKvmmake <> γa:31 var
+R3987:3993 xv6iris.SpecKvmmake KVMMAKE <> modtype

@@ -1,0 +1,9 @@
+DIGEST b07a29eaaf03bf04dd4dddb751b3f47b
+Fxv6iris.LinkSysUptime
+R184:194 xv6iris.LinkAcquire <> <> lib
+R196:206 xv6iris.LinkRelease <> <> lib
+R208:221 xv6iris.ProofSysUptime <> <> lib
+R245:258 xv6iris.ProofSysUptime SysUptimeProof <> modtype
+R260:266 xv6iris.LinkAcquire Acquire <> modtype
+R268:274 xv6iris.LinkRelease Release <> modtype
+mod 232:240 <> SysUptime

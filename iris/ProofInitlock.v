@@ -212,7 +212,7 @@ Section ProofInitlock.
        the window -- the writer's half of §0.35′(iii).  See WpLock.lk_floor. *)
     iEval (rewrite Hea_cpu) in "Hcpay".
     (* assemble the creators' resource: the claim beside the payload *)
-    iDestruct "Hcpay" as (lo) "[#Hlb Hcpay]".
+    iDestruct "Hcpay" as (lo) "(#Hlb & #Hw & Hcpay)".
     iAssert (WpLock.lk_cpu_fresh lo lk) with "[Hcpay]" as "Hcpu".
     { rewrite /WpLock.lk_cpu_fresh /WpLock.lk_cpu_at
               /WpLock.lk_cpu_cell /WpLock.lk_cpu_cell_ex.
@@ -307,7 +307,10 @@ Section ProofInitlock.
        what the creator has, and the first acquire's AMO buys the left one. *)
     iAssert (WpLock.lk_cpu_ready lk) with "[Hcpu]" as "Hcpu".
     { rewrite /WpLock.lk_cpu_ready /WpLock.lk_cpu_ready_at.
-      iExists lo. iFrame "Hcpu". iApply WpLock.lk_floor_of_llb. iExact "Hlb". }
+      (* A6.120: the creator's arm is the OWN-WRITE witness beside the
+         receipt, cashed at the read by [WpLock.lk_floor_vis]; the crossing
+         upgrade is no longer what makes the first acquire provable. *)
+      iExists lo. iFrame "Hcpu". iApply (WpLock.lk_floor_of_wrote with "Hlb Hw"). }
     iApply ("Hcont" $! R5 with "Hcg Hpc [%] Hlock Hname Hcpu").
     (* callee_saved m R5 *)
     assert (Hthread : forall c : mword 5, c <> csp_rs1 -> c <> mword_of_int 8 -> c <> mword_of_int 1 ->

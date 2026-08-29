@@ -1,0 +1,17 @@
+DIGEST 6c321a375339f855989824636057f95a
+Fxv6iris.LinkUvmcopy
+R358:372 xv6iris.LinkWalkNoalloc <> <> lib
+R374:383 xv6iris.LinkKalloc <> <> lib
+R385:395 xv6iris.LinkMemmove <> <> lib
+R397:408 xv6iris.LinkMappages <> <> lib
+R426:434 xv6iris.LinkKfree <> <> lib
+R436:447 xv6iris.LinkUvmunmap <> <> lib
+R465:476 xv6iris.ProofUvmcopy <> <> lib
+R498:509 xv6iris.ProofUvmcopy UvmcopyProof <> modtype
+R511:521 xv6iris.LinkWalkNoalloc WalkNoalloc <> modtype
+R523:528 xv6iris.LinkKalloc Kalloc <> modtype
+R530:536 xv6iris.LinkMemmove Memmove <> modtype
+R538:545 xv6iris.LinkMappages Mappages <> modtype
+R547:551 xv6iris.LinkKfree Kfree <> modtype
+R553:560 xv6iris.LinkUvmunmap Uvmunmap <> modtype
+mod 487:493 <> Uvmcopy

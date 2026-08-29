@@ -107,13 +107,11 @@ Section ProofHolding.
     iIntros "Hcg #Htext Hpc #Hlock HTc Hlks Hcont".
     (* A6.119: the reads want the ABSORBED opener; the other leaves take
        the plain one, one weakening away. *)
-    iAssert (WpLock.lock_openable γl lka s R Dc) as "#Hlockp";
-      [ iApply WpLock.lock_openable_of_c; iExact "Hlock" | ].
     (* ---- 0x00: c.lw a5,0(a0) through the lock invariant ---- *)
     iApply (wp_clw_lockopen_s_sconf γl lka s R Tc Dc pcE (mword_of_int 15) (mword_of_int 10)
               (mword_of_int 0) m n false
               Hlka ltac:(vm_compute; discriminate) ltac:(rdok) Href
-              with "Hcg Hpc [] Hlockp HTc").
+              with "Hcg Hpc [] Hlock HTc").
     { iApply (hi_00 with "Htext"). }
     iIntros (lockv). iApply wp_next_off_intro.
     iIntros "HTc Hcg Hpc".

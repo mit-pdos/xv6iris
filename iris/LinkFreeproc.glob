@@ -1,0 +1,9 @@
+DIGEST 12fd8b36b491a482dada95ee98b2c223
+Fxv6iris.LinkFreeproc
+R231:239 xv6iris.LinkKfree <> <> lib
+R241:261 xv6iris.LinkProcFreepagetable <> <> lib
+R263:275 xv6iris.ProofFreeproc <> <> lib
+R298:310 xv6iris.ProofFreeproc FreeprocProof <> modtype
+R312:316 xv6iris.LinkKfree Kfree <> modtype
+R318:334 xv6iris.LinkProcFreepagetable ProcFreepagetable <> modtype
+mod 286:293 <> Freeproc

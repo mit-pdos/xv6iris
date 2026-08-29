@@ -1,4 +1,4 @@
-DIGEST 2b241531c4f882eb63b9382b3ed4c106
+DIGEST 3ba21a3f49ad5d9f555d515c8bb39fee
 Fxv6iris.SpecPrintkinit
 R260:268 Stdlib.Logic.Eqdep_dec <> <> lib
 R270:275 Stdlib.ZArith.ZArith <> <> lib
@@ -157,7 +157,7 @@ R2985:2994 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
 R2961:2969 xv6iris.WpLock <> lock_name def
 R2971:2972 xv6iris.SpecPrintkinit <> lk:16 var
 R3017:3026 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R2995:3013 xv6iris.WpLock <> lk_cpu_fresh def
+R2995:3013 xv6iris.WpLock <> lk_cpu_ready def
 R3015:3016 xv6iris.SpecPrintkinit <> lk:16 var
 R3027:3030 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
 R3053:3053 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not

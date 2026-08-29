@@ -29,6 +29,7 @@ Require Import SpecAcquire.
 Require Import ProcGeom.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import TsoCtxAbsorbLb.
 (* A6.86: [TsoCtxShim] is RETIRED -- its last live use died with the M4
    contract flip.  See its tombstone. *)
 Require Import SieCapCtx.
@@ -112,7 +113,9 @@ Section ProofAcquire.
     ( Tc -∗
       sie_cap_gpr kt (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (mword_of_int 0 : mword 32))]> M0) n false p -∗
       pc_is (mword_of_int (KernelSyms.acquire + 0x24)) -∗
-      locked_pre γl cpu_id -∗ (∃ ξ : CtxId, R ξ) -∗
+      (* A6.119/A6.120: the WHOLE parked record, with the acquirer's floor
+         at its stamp -- what the absorb below consumes. *)
+      locked_pre γl cpu_id -∗ lock_pay_won R -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -158,9 +161,17 @@ Section ProofAcquire.
                      ((<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg v1]> M0)
                         !!! Regidx (mword_of_int 15 : mword 5)))) zero_reg = true)
       by (rewrite upd_eq Hst1; vm_compute; reflexivity).
+    (* A6.119: the stored value is literally 1 -- hoisted, at every hart,
+       because an [ltac:] in application position elaborates against a goal
+       whose arguments are not yet fixed (A6.119's own precedent). *)
+    assert (Hrs2one : forall hh : CpuId,
+              rget (CID := hh) (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg v1]> M0)
+                (mword_of_int 15 : mword 5) = mword_of_int 1).
+    { intros hh. rgne. rewrite upd_eq. unfold regval_into_reg, v1, a4one.
+      apply bv_eq; vm_compute; reflexivity. }
     iApply (wp_amoswap_lockopen_s_sconf γl lk s R Tc Dc (mword_of_int (KernelSyms.acquire + 0x1c)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 9)
               (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg v1]> M0) n false
-              HPAlk HSTZ
+              HPAlk (Hrs2one _) HSTZ
               ltac:(vm_compute; discriminate) ltac:(rdok) Href
               with "Hcg Hpc [] Hlock HTc").
     { iApply (aqi_1c with "Htext"). }
@@ -535,7 +546,7 @@ Section ProofAcquire.
     iApply (wp_csd_lkcpu_lockopen_s_sconf γl lk0 s R Dc (mword_of_int (KernelSyms.acquire + 0x28))
               (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
               (mword_of_int 16 : mword 12) Cm (trap_res b + (av - 4))%nat false lks
-              Hpacpu Ha0C Hfresh (Hrefpre cpu_id)
+              Hpacpu Ha0C Hfresh ltac:(left; reflexivity) (Hrefpre cpu_id)
               with "Hcg Hpc [] Hlock Htokp Hlks").
     { iApply (aqi_28 with "Htext"). }
     iApply wp_next_off_intro.
@@ -657,15 +668,25 @@ Section ProofAcquire.
        case split on [b]. *)
     (* THE CONTEXT HAND-OFF (tso-port M3): the payload came out of the
        invariant at SOME context; re-index it to the caller's own, and
-       mint the view receipt.  Both evidence tokens are the shim's SC-only
-       stopgaps here; the cutover kit's direct proof mints them from the
-       AMO's at-the-top postcondition ([TsoCtxTwin2.ctx_dom_of_parked] /
-       [twin_passed_get]). *)
-    iDestruct "HRes" as (ξ0) "HRes".
-    iPoseProof (ctx_dom_sc ξ0 cur_ctx) as "Hdom".
-    iMod (ctx_morph ξ0 cur_ctx with "Hdom HRes") as "[_ HRes]".
+       mint the view receipt.
+       A6.120: AGAINST REAL AMO EVIDENCE.  The leaf hands the winner the
+       parked record WITH the floor at its stamp ([WpLock.lock_pay_won]);
+       the running token (borrowed from the capability, SieCapCtx) cashes
+       that floor into the stable pair [hart_view_lb K ∗ ⌜T ≤ K⌝], and
+       [TsoCtxAbsorbLb.ctx_absorb_lb] is §0.35′(iii)'s absorb.  The receipt
+       [SpecAcquire] exports is the same [K].  The SC shim's [ctx_dom_sc]
+       and [hart_view_lb_any] are gone. *)
+    iDestruct "HRes" as (ξ0 T0) "(Hpk0 & #Hfl0 & HRes)".
+    iDestruct (SieCapCtx.sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+    iDestruct (TsoCtx.own_context_floor_view (CID := CIDpo) cur_ctx T0
+                 with "Hrun Hfl0") as "[Hrun (%K0 & #HK0 & %HT0K)]".
+    iAssert (hart_view_lb (CID := CIDpo) K0) as "#HK0s".
+    { iEval (rewrite TsoCtx.hart_view_lb_unseal /TsoCtx.hart_view_lb_def). iExact "HK0". }
+    iMod (ctx_absorb_lb (CID := CIDpo) R ξ0 cur_ctx T0 K0 HT0K
+            with "Hrun HK0s Hpk0 HRes") as "(Hrun & _ & HRes)".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iAssert (∃ K : nat, hart_view_lb (CID := CIDpo) K)%I as "Hlb".
-    { iExists 0%nat. iApply hart_view_lb_any. }
+    { iExists K0. iExact "HK0s". }
     iSpecialize ("Hcont" $! CIDpo with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! ms E4 with "[%] HTc Hcg Hpc [%] Htok HRes Hlb Hown Hpay").
     { exact Hmsf. }

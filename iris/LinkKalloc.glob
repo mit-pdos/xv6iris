@@ -1,0 +1,11 @@
+DIGEST fbad8cb8088312d3d92acc12f43afa85
+Fxv6iris.LinkKalloc
+R153:163 xv6iris.LinkAcquire <> <> lib
+R165:178 xv6iris.LinkMemsetPage <> <> lib
+R180:190 xv6iris.LinkRelease <> <> lib
+R192:202 xv6iris.ProofKalloc <> <> lib
+R223:233 xv6iris.ProofKalloc KallocProof <> modtype
+R235:241 xv6iris.LinkAcquire Acquire <> modtype
+R243:252 xv6iris.LinkMemsetPage MemsetPage <> modtype
+R254:260 xv6iris.LinkRelease Release <> modtype
+mod 213:218 <> Kalloc

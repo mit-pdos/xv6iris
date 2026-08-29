@@ -273,10 +273,15 @@ Section PipeInv.
   (* what release hands back, reassembled into what kfree wants. *)
   (* A6.105: takes the BUNDLED form -- the floor certificate is dropped on the
      floor here, which is right: a page being freed has no readers left. *)
-  Lemma pipe_bytes_page_own (pi : mword 64) (v : mword 32) :
-    pi ↦₄ v -∗ WpLock.lk_cpu_ready pi -∗ pipe_bytes pi -∗ page_own pi.
+  (* A6.120: the lock WORD comes back as [lock_word_fresh] too (A6.89/A6.92:
+     release cannot hand back a ctx cell), and it goes home the same way the
+     owner cell does -- [WpLock.lock_word_fresh_free]. *)
+  Lemma pipe_bytes_page_own (pi : mword 64) :
+    WpLock.lock_word_fresh pi -∗ WpLock.lk_cpu_ready pi -∗ pipe_bytes pi -∗
+    page_own pi.
   Proof.
     iIntros "Hw Hready Hb".
+    iDestruct (WpLock.lock_word_fresh_free with "Hw") as "Hw".
     rewrite /WpLock.lk_cpu_ready /WpLock.lk_cpu_ready_at.
     iDestruct "Hready" as (lo) "[Hcpu _]".
     iDestruct "Hb" as (vname nr nw ro wo bs) "(Hnm & Hnr & Hnw & Hro & Hwo & %Hlen & Hdat & Hslack)".
@@ -302,7 +307,7 @@ Section PipeInv.
     rewrite (bwin_split pi 548 4 3544). replace (548 + 4)%nat with 552%nat by lia.
     iDestruct "Hslack" as "[Hpad Htail]".
     iSplitL "Hw".
-    { by iApply word4_bwin. }
+    { iExact "Hw". }
     iSplitL "Hpad"; [ iExact "Hpad" | ].
     iSplitL "Hnm".
     {

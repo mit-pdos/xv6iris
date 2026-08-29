@@ -1,0 +1,9 @@
+DIGEST feac10b7013768763f3320fe269c4877
+Fxv6iris.LinkUvmunmapFixed
+R569:583 xv6iris.LinkWalkNoalloc <> <> lib
+R585:593 xv6iris.LinkKfree <> <> lib
+R611:623 xv6iris.ProofUvmunmap <> <> lib
+R651:668 xv6iris.ProofUvmunmap UvmunmapFixedProof <> modtype
+R670:680 xv6iris.LinkWalkNoalloc WalkNoalloc <> modtype
+R682:686 xv6iris.LinkKfree Kfree <> modtype
+mod 634:646 <> UvmunmapFixed

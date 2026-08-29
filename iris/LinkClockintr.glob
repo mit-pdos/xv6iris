@@ -1,0 +1,13 @@
+DIGEST 8f4496585a3bdd4a0a41009a7c9e20a5
+Fxv6iris.LinkClockintr
+R200:208 xv6iris.LinkCpuid <> <> lib
+R210:220 xv6iris.LinkAcquire <> <> lib
+R222:232 xv6iris.LinkRelease <> <> lib
+R234:243 xv6iris.LinkWakeup <> <> lib
+R245:258 xv6iris.ProofClockintr <> <> lib
+R282:295 xv6iris.ProofClockintr ClockintrProof <> modtype
+R297:301 xv6iris.LinkCpuid Cpuid <> modtype
+R303:309 xv6iris.LinkAcquire Acquire <> modtype
+R311:317 xv6iris.LinkRelease Release <> modtype
+R319:324 xv6iris.LinkWakeup Wakeup <> modtype
+mod 269:277 <> Clockintr

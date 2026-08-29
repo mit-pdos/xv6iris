@@ -1,0 +1,13 @@
+DIGEST 9daab96a87a8f7ade06d8f3fca280b91
+Fxv6iris.LinkCopyout
+R207:218 xv6iris.LinkWalkaddr <> <> lib
+R220:230 xv6iris.LinkVmfault <> <> lib
+R232:246 xv6iris.LinkWalkNoalloc <> <> lib
+R248:258 xv6iris.LinkMemmove <> <> lib
+R276:287 xv6iris.ProofCopyout <> <> lib
+R983:994 xv6iris.ProofCopyout CopyoutProof <> modtype
+R996:1003 xv6iris.LinkWalkaddr Walkaddr <> modtype
+R1005:1011 xv6iris.LinkVmfault Vmfault <> modtype
+R1013:1023 xv6iris.LinkWalkNoalloc WalkNoalloc <> modtype
+R1025:1031 xv6iris.LinkMemmove Memmove <> modtype
+mod 972:978 <> Copyout

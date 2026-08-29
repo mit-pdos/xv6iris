@@ -1,0 +1,11 @@
+DIGEST 6e9213cdb9f92f4d897c3ab0b747e24b
+Fxv6iris.LinkGrowproc
+R159:168 xv6iris.LinkMyproc <> <> lib
+R170:181 xv6iris.LinkUvmalloc <> <> lib
+R183:196 xv6iris.LinkUvmdealloc <> <> lib
+R214:226 xv6iris.ProofGrowproc <> <> lib
+R249:261 xv6iris.ProofGrowproc GrowprocProof <> modtype
+R263:268 xv6iris.LinkMyproc Myproc <> modtype
+R270:277 xv6iris.LinkUvmalloc Uvmalloc <> modtype
+R279:288 xv6iris.LinkUvmdealloc Uvmdealloc <> modtype
+mod 237:244 <> Growproc

@@ -1,4 +1,4 @@
-DIGEST 97b7b4b930b5a1890adcbfc9ea10fc5e
+DIGEST 28f24517d3744d2d6b06851683ab8b7d
 Fxv6iris.ProofMemsetPage
 R429:437 Stdlib.Logic.Eqdep_dec <> <> lib
 R439:444 Stdlib.ZArith.ZArith <> <> lib
@@ -40,187 +40,152 @@ R1310:1320 Riscv.rv64d <> <> lib
 R1338:1351 xv6iris.SpecMemsetPage <> <> lib
 R1369:1372 xv6iris.Xv6G <> <> lib
 R1437:1442 xv6iris.TsoCtx <> <> lib
-R1444:1453 xv6iris.TsoCtxShim <> <> lib
-R1574:1577 Riscv.rv64d_types Defs <> mod
-R1620:1625 xv6iris.SpecMemset MEMSET <> mod
-R1630:1639 xv6iris.SpecMemsetPage MEMSETPAGE <> mod
-mod 1589:1603 <> MemsetPageProof
-sec 1651:1665 MemsetPageProof ProofMemsetPage
-R1681:1687 xv6iris.RiscvPtsto <> riscvGS class
-R1694:1697 xv6iris.Xv6G <> xv6G class
-R1699:1700 xv6iris.ProofMemsetPage <> Σ:1 var
-var  1716:1718 MemsetPageProof.ProofMemsetPage GEN
-var  1731:1733 MemsetPageProof.ProofMemsetPage CID
-var  1746:1747 MemsetPageProof.ProofMemsetPage XI
-R1722:1726 xv6iris.RiscvLang <> GenId class
-R1737:1741 xv6iris.RiscvLang <> CpuId class
-R1751:1756 xv6iris.TsoCtx <> CurCtx class
-var  1772:1773 MemsetPageProof.ProofMemsetPage kt
-R1777:1781 xv6iris.Ktier <> ktier ind
-prf 1793:1816 MemsetPageProof wp_memset_page_val_sconf
-R1830:1836 xv6iris.RegFile <> regfile def
-binder 1825:1826 <> m0:8
-R1844:1846 Corelib.Init.Datatypes <> nat ind
-binder 1840:1840 <> n:9
-R1857:1861 SailStdpp.Values <> mword def
-binder 1850:1853 <> cval:10
-R1872:1875 Corelib.Init.Datatypes <> bool ind
-binder 1868:1868 <> b:11
-R1886:1890 SailStdpp.Values <> mword def
-binder 1879:1882 <> pcur:12
-R1902:1930 xv6iris.SpecMemsetPage <> wp_memset_page_val_sconf_body def
-R1947:1950 xv6iris.ProofMemsetPage <> pcur:12 var
-R1945:1945 xv6iris.ProofMemsetPage <> b:11 var
-R1940:1943 xv6iris.ProofMemsetPage <> cval:10 var
-R1938:1938 xv6iris.ProofMemsetPage <> n:9 var
-R1935:1936 xv6iris.ProofMemsetPage <> m0:8 var
-R1932:1933 xv6iris.ProofMemsetPage <> MemsetPageProof.ProofMemsetPage.kt var
-R1982:2010 xv6iris.SpecMemsetPage <> wp_memset_page_val_sconf_body def
-R2216:2223 xv6iris.KallocInv <> page_own def
-R2226:2233 xv6iris.KallocInv <> byte_any def
-R2216:2223 xv6iris.KallocInv <> page_own def
-R2216:2223 xv6iris.KallocInv <> page_own def
-R2226:2233 xv6iris.KallocInv <> byte_any def
-R2226:2233 xv6iris.KallocInv <> byte_any def
-R2262:2262 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R2321:2326 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R2334:2334 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R2263:2274 xv6iris.WpMemsetPage <> bytes_choose thm
-binder 2288:2288 <> j:13
-binder 2290:2290 <> b:14
-R2296:2296 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ'_x not
-R2307:2315 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ'_x not
-R2297:2302 xv6iris.RiscvModelBytes <> pa_add def
-R2306:2306 xv6iris.ProofMemsetPage <> j:13 var
-R2316:2316 xv6iris.ProofMemsetPage <> b:14 var
-R2262:2262 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R2321:2326 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R2334:2334 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R2263:2274 xv6iris.WpMemsetPage <> bytes_choose thm
-binder 2288:2288 <> j:15
-binder 2290:2290 <> b:16
-R2296:2296 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ'_x not
-R2307:2315 xv6iris.TsoCtx <> ::bi_scope:x_'↦ₘ'_x not
-R2297:2302 xv6iris.RiscvModelBytes <> pa_add def
-R2306:2306 xv6iris.ProofMemsetPage <> j:15 var
-R2316:2316 xv6iris.ProofMemsetPage <> b:16 var
-R2447:2450 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R2490:2490 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R2429:2433 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
-R2434:2439 Riscv.rv64d_types <> Regidx constr
-R2482:2486 SailStdpp.Values <> mword def
-R2451:2462 SailStdpp.Values <> mword_of_int def
-R2465:2472 Stdlib.ZArith.BinInt Z of_nat def
-R2447:2450 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R2490:2490 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R2429:2433 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
-R2434:2439 Riscv.rv64d_types <> Regidx constr
-R2482:2486 SailStdpp.Values <> mword def
-R2451:2462 SailStdpp.Values <> mword_of_int def
-R2465:2472 Stdlib.ZArith.BinInt Z of_nat def
-R2820:2820 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R2941:2960 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R2983:2983 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R2821:2847 xv6iris.ProofMemsetPage MemsetArray wp_memset_sconf defax
-R2852:2854 xv6iris.Ktier <> KT0 constr
-R2849:2850 xv6iris.ProofMemsetPage <> MemsetPageProof.ProofMemsetPage.kt var
-R2820:2820 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R2941:2960 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R2983:2983 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R2821:2847 xv6iris.ProofMemsetPage MemsetArray wp_memset_sconf defax
-R2852:2854 xv6iris.Ktier <> KT0 constr
-R2849:2850 xv6iris.ProofMemsetPage <> MemsetPageProof.ProofMemsetPage.kt var
-R2999:2999 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3013:3018 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3025:3025 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3000:3012 iris.bi.big_op <> big_sepL_impl thm
-R2999:2999 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3013:3018 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3025:3025 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3000:3012 iris.bi.big_op <> big_sepL_impl thm
-R3133:3133 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R3141:3144 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R3149:3154 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R3159:3159 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R3133:3133 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R3141:3144 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R3149:3154 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R3159:3159 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R3269:3269 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R3277:3280 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R3285:3290 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R3311:3311 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R3269:3269 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R3277:3280 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R3285:3290 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R3311:3311 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R3327:3327 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3341:3346 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3353:3353 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3328:3340 iris.bi.big_op <> big_sepL_impl thm
-R3327:3327 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3341:3346 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3353:3353 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3328:3340 iris.bi.big_op <> big_sepL_impl thm
-prf 3492:3511 MemsetPageProof wp_memset_page_sconf
-R3525:3531 xv6iris.RegFile <> regfile def
-binder 3520:3521 <> m0:17
-R3539:3541 Corelib.Init.Datatypes <> nat ind
-binder 3535:3535 <> n:18
-R3552:3556 SailStdpp.Values <> mword def
-binder 3545:3548 <> cval:19
-R3567:3570 Corelib.Init.Datatypes <> bool ind
-binder 3563:3563 <> b:20
-R3581:3585 SailStdpp.Values <> mword def
-binder 3574:3577 <> pcur:21
-R3597:3621 xv6iris.SpecMemsetPage <> wp_memset_page_sconf_body def
-R3638:3641 xv6iris.ProofMemsetPage <> pcur:21 var
-R3636:3636 xv6iris.ProofMemsetPage <> b:20 var
-R3631:3634 xv6iris.ProofMemsetPage <> cval:19 var
-R3629:3629 xv6iris.ProofMemsetPage <> n:18 var
-R3626:3627 xv6iris.ProofMemsetPage <> m0:17 var
-R3623:3624 xv6iris.ProofMemsetPage <> MemsetPageProof.ProofMemsetPage.kt var
-R3673:3697 xv6iris.SpecMemsetPage <> wp_memset_page_sconf_body def
-R3822:3822 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3881:3900 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3922:3922 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3823:3846 xv6iris.ProofMemsetPage MemsetPageProof wp_memset_page_val_sconf thm
-R3822:3822 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3881:3900 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3922:3922 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R3823:3846 xv6iris.ProofMemsetPage MemsetPageProof wp_memset_page_val_sconf thm
-R3938:3944 xv6iris.WpNext <> wp_next def
-R3938:3944 xv6iris.WpNext <> wp_next def
-R3938:3944 xv6iris.WpNext <> wp_next def
-R3986:3986 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R3994:3997 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R4002:4007 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R4012:4012 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R3986:3986 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R3994:3997 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R4002:4007 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R4012:4012 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R4092:4092 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R4100:4103 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R4108:4113 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R4134:4134 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R4092:4092 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R4100:4103 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R4108:4113 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R4134:4134 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
-R4172:4179 xv6iris.KallocInv <> page_own def
-R4182:4189 xv6iris.KallocInv <> byte_any def
-R4172:4179 xv6iris.KallocInv <> page_own def
-R4172:4179 xv6iris.KallocInv <> page_own def
-R4182:4189 xv6iris.KallocInv <> byte_any def
-R4182:4189 xv6iris.KallocInv <> byte_any def
-R4204:4204 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R4218:4223 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R4230:4230 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R4205:4217 iris.bi.big_op <> big_sepL_impl thm
-R4204:4204 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R4218:4223 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R4230:4230 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R4205:4217 iris.bi.big_op <> big_sepL_impl thm
-R4298:4312 xv6iris.ProofMemsetPage MemsetPageProof.ProofMemsetPage <> sec
-R4320:4334 xv6iris.ProofMemsetPage MemsetPageProof <> mod
+R1565:1568 Riscv.rv64d_types Defs <> mod
+R1611:1616 xv6iris.SpecMemset MEMSET <> mod
+R1621:1630 xv6iris.SpecMemsetPage MEMSETPAGE <> mod
+mod 1580:1594 <> MemsetPageProof
+sec 1642:1656 MemsetPageProof ProofMemsetPage
+R1672:1678 xv6iris.RiscvPtsto <> riscvGS class
+R1685:1688 xv6iris.Xv6G <> xv6G class
+R1690:1691 xv6iris.ProofMemsetPage <> Σ:1 var
+var  1707:1709 MemsetPageProof.ProofMemsetPage GEN
+var  1722:1724 MemsetPageProof.ProofMemsetPage CID
+var  1737:1738 MemsetPageProof.ProofMemsetPage XI
+R1713:1717 xv6iris.RiscvLang <> GenId class
+R1728:1732 xv6iris.RiscvLang <> CpuId class
+R1742:1747 xv6iris.TsoCtx <> CurCtx class
+var  1763:1764 MemsetPageProof.ProofMemsetPage kt
+R1768:1772 xv6iris.Ktier <> ktier ind
+prf 1784:1807 MemsetPageProof wp_memset_page_val_sconf
+R1821:1827 xv6iris.RegFile <> regfile def
+binder 1816:1817 <> m0:8
+R1835:1837 Corelib.Init.Datatypes <> nat ind
+binder 1831:1831 <> n:9
+R1848:1852 SailStdpp.Values <> mword def
+binder 1841:1844 <> cval:10
+R1863:1866 Corelib.Init.Datatypes <> bool ind
+binder 1859:1859 <> b:11
+R1877:1881 SailStdpp.Values <> mword def
+binder 1870:1873 <> pcur:12
+R1893:1921 xv6iris.SpecMemsetPage <> wp_memset_page_val_sconf_body def
+R1938:1941 xv6iris.ProofMemsetPage <> pcur:12 var
+R1936:1936 xv6iris.ProofMemsetPage <> b:11 var
+R1931:1934 xv6iris.ProofMemsetPage <> cval:10 var
+R1929:1929 xv6iris.ProofMemsetPage <> n:9 var
+R1926:1927 xv6iris.ProofMemsetPage <> m0:8 var
+R1923:1924 xv6iris.ProofMemsetPage <> MemsetPageProof.ProofMemsetPage.kt var
+R1973:2001 xv6iris.SpecMemsetPage <> wp_memset_page_val_sconf_body def
+R2279:2286 xv6iris.KallocInv <> page_own def
+R2289:2296 xv6iris.KallocInv <> byte_any def
+R2279:2286 xv6iris.KallocInv <> page_own def
+R2279:2286 xv6iris.KallocInv <> page_own def
+R2289:2296 xv6iris.KallocInv <> byte_any def
+R2289:2296 xv6iris.KallocInv <> byte_any def
+R2350:2353 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2393:2393 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2332:2336 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R2337:2342 Riscv.rv64d_types <> Regidx constr
+R2385:2389 SailStdpp.Values <> mword def
+R2354:2365 SailStdpp.Values <> mword_of_int def
+R2368:2375 Stdlib.ZArith.BinInt Z of_nat def
+R2350:2353 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2393:2393 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R2332:2336 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R2337:2342 Riscv.rv64d_types <> Regidx constr
+R2385:2389 SailStdpp.Values <> mword def
+R2354:2365 SailStdpp.Values <> mword_of_int def
+R2368:2375 Stdlib.ZArith.BinInt Z of_nat def
+R2465:2465 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2586:2605 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2629:2629 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2466:2497 xv6iris.ProofMemsetPage MemsetArray wp_memset_free_sconf defax
+R2502:2504 xv6iris.Ktier <> KT0 constr
+R2499:2500 xv6iris.ProofMemsetPage <> MemsetPageProof.ProofMemsetPage.kt var
+R2465:2465 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2586:2605 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2629:2629 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2466:2497 xv6iris.ProofMemsetPage MemsetArray wp_memset_free_sconf defax
+R2502:2504 xv6iris.Ktier <> KT0 constr
+R2499:2500 xv6iris.ProofMemsetPage <> MemsetPageProof.ProofMemsetPage.kt var
+R2645:2645 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2659:2664 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2672:2672 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2646:2658 iris.bi.big_op <> big_sepL_impl thm
+R2645:2645 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2659:2664 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2672:2672 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2646:2658 iris.bi.big_op <> big_sepL_impl thm
+R2780:2780 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R2788:2791 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R2796:2801 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R2806:2806 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R2780:2780 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R2788:2791 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R2796:2801 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R2806:2806 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R2846:2846 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R2854:2857 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R2862:2867 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R2888:2888 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R2846:2846 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R2854:2857 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R2862:2867 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R2888:2888 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R2904:2904 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2918:2923 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2930:2930 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2905:2917 iris.bi.big_op <> big_sepL_impl thm
+R2904:2904 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2918:2923 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2930:2930 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2905:2917 iris.bi.big_op <> big_sepL_impl thm
+prf 3069:3088 MemsetPageProof wp_memset_page_sconf
+R3102:3108 xv6iris.RegFile <> regfile def
+binder 3097:3098 <> m0:13
+R3116:3118 Corelib.Init.Datatypes <> nat ind
+binder 3112:3112 <> n:14
+R3129:3133 SailStdpp.Values <> mword def
+binder 3122:3125 <> cval:15
+R3144:3147 Corelib.Init.Datatypes <> bool ind
+binder 3140:3140 <> b:16
+R3158:3162 SailStdpp.Values <> mword def
+binder 3151:3154 <> pcur:17
+R3174:3198 xv6iris.SpecMemsetPage <> wp_memset_page_sconf_body def
+R3215:3218 xv6iris.ProofMemsetPage <> pcur:17 var
+R3213:3213 xv6iris.ProofMemsetPage <> b:16 var
+R3208:3211 xv6iris.ProofMemsetPage <> cval:15 var
+R3206:3206 xv6iris.ProofMemsetPage <> n:14 var
+R3203:3204 xv6iris.ProofMemsetPage <> m0:13 var
+R3200:3201 xv6iris.ProofMemsetPage <> MemsetPageProof.ProofMemsetPage.kt var
+R3250:3274 xv6iris.SpecMemsetPage <> wp_memset_page_sconf_body def
+R3399:3399 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3458:3477 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3499:3499 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3400:3423 xv6iris.ProofMemsetPage MemsetPageProof wp_memset_page_val_sconf thm
+R3399:3399 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3458:3477 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3499:3499 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3400:3423 xv6iris.ProofMemsetPage MemsetPageProof wp_memset_page_val_sconf thm
+R3515:3521 xv6iris.WpNext <> wp_next def
+R3515:3521 xv6iris.WpNext <> wp_next def
+R3515:3521 xv6iris.WpNext <> wp_next def
+R3563:3563 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R3571:3574 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R3579:3584 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R3589:3589 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R3563:3563 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R3571:3574 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R3579:3584 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R3589:3589 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R3669:3669 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R3677:3680 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R3685:3690 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R3711:3711 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R3669:3669 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R3677:3680 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R3685:3690 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R3711:3711 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R3740:3756 xv6iris.KallocInv <> page_own_of_named thm
+R3740:3756 xv6iris.KallocInv <> page_own_of_named thm
+R3786:3800 xv6iris.ProofMemsetPage MemsetPageProof.ProofMemsetPage <> sec
+R3808:3822 xv6iris.ProofMemsetPage MemsetPageProof <> mod

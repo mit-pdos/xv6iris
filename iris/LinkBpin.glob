@@ -1,0 +1,9 @@
+DIGEST c031a9d86f29a2b1f8156809df0ea920
+Fxv6iris.LinkBpin
+R150:160 xv6iris.LinkAcquire <> <> lib
+R162:172 xv6iris.LinkRelease <> <> lib
+R174:182 xv6iris.ProofBpin <> <> lib
+R201:209 xv6iris.ProofBpin BpinProof <> modtype
+R211:217 xv6iris.LinkAcquire Acquire <> modtype
+R219:225 xv6iris.LinkRelease Release <> modtype
+mod 193:196 <> Bpin

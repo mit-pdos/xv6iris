@@ -1,0 +1,9 @@
+DIGEST 408bd9a7678fb9bb6486c79d73fa1641
+Fxv6iris.LinkFetchaddr
+R181:190 xv6iris.LinkMyproc <> <> lib
+R192:201 xv6iris.LinkCopyin <> <> lib
+R219:232 xv6iris.ProofFetchaddr <> <> lib
+R256:269 xv6iris.ProofFetchaddr FetchaddrProof <> modtype
+R271:276 xv6iris.LinkMyproc Myproc <> modtype
+R278:283 xv6iris.LinkCopyin Copyin <> modtype
+mod 243:251 <> Fetchaddr

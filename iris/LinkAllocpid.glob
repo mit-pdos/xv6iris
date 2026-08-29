@@ -1,0 +1,9 @@
+DIGEST c58a5a666f0912804f28e84d41cfaac3
+Fxv6iris.LinkAllocpid
+R234:244 xv6iris.LinkAcquire <> <> lib
+R246:256 xv6iris.LinkRelease <> <> lib
+R258:270 xv6iris.ProofAllocpid <> <> lib
+R293:305 xv6iris.ProofAllocpid AllocpidProof <> modtype
+R307:313 xv6iris.LinkAcquire Acquire <> modtype
+R315:321 xv6iris.LinkRelease Release <> modtype
+mod 281:288 <> Allocpid

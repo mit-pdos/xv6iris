@@ -1,0 +1,7 @@
+DIGEST 7f9380bd7665af0cbf24bdbac4ccd20f
+Fxv6iris.LinkFreewalk
+R270:278 xv6iris.LinkKfree <> <> lib
+R280:292 xv6iris.ProofFreewalk <> <> lib
+R315:327 xv6iris.ProofFreewalk FreewalkProof <> modtype
+R329:333 xv6iris.LinkKfree Kfree <> modtype
+mod 303:310 <> Freewalk

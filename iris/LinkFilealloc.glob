@@ -1,0 +1,9 @@
+DIGEST 43e7afd8b0cfd72d42075801ff3a14e4
+Fxv6iris.LinkFilealloc
+R161:171 xv6iris.LinkAcquire <> <> lib
+R173:183 xv6iris.LinkRelease <> <> lib
+R185:198 xv6iris.ProofFilealloc <> <> lib
+R222:235 xv6iris.ProofFilealloc FileallocProof <> modtype
+R237:243 xv6iris.LinkAcquire Acquire <> modtype
+R245:251 xv6iris.LinkRelease Release <> modtype
+mod 209:217 <> Filealloc

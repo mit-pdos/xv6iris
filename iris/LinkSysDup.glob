@@ -1,0 +1,11 @@
+DIGEST 381dbbddae2732f5c41be8ebe0c5b3ad
+Fxv6iris.LinkSysDup
+R256:264 xv6iris.LinkArgfd <> <> lib
+R266:276 xv6iris.LinkFdalloc <> <> lib
+R278:288 xv6iris.LinkFiledup <> <> lib
+R290:300 xv6iris.ProofSysDup <> <> lib
+R321:331 xv6iris.ProofSysDup SysDupProof <> modtype
+R333:337 xv6iris.LinkArgfd Argfd <> modtype
+R339:345 xv6iris.LinkFdalloc Fdalloc <> modtype
+R347:353 xv6iris.LinkFiledup Filedup <> modtype
+mod 311:316 <> SysDup

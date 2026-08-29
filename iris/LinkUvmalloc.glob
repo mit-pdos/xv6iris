@@ -1,0 +1,15 @@
+DIGEST 663c642b82c5ed1943afa6f828841403
+Fxv6iris.LinkUvmalloc
+R158:167 xv6iris.LinkKalloc <> <> lib
+R169:182 xv6iris.LinkMemsetPage <> <> lib
+R184:195 xv6iris.LinkMappages <> <> lib
+R197:205 xv6iris.LinkKfree <> <> lib
+R207:220 xv6iris.LinkUvmdealloc <> <> lib
+R238:250 xv6iris.ProofUvmalloc <> <> lib
+R273:285 xv6iris.ProofUvmalloc UvmallocProof <> modtype
+R287:292 xv6iris.LinkKalloc Kalloc <> modtype
+R294:303 xv6iris.LinkMemsetPage MemsetPage <> modtype
+R305:312 xv6iris.LinkMappages Mappages <> modtype
+R314:318 xv6iris.LinkKfree Kfree <> modtype
+R320:329 xv6iris.LinkUvmdealloc Uvmdealloc <> modtype
+mod 261:268 <> Uvmalloc

@@ -1,0 +1,14 @@
+DIGEST 4614d73701c09ea493c39ee8e6122b52
+Fxv6iris.LinkPipeclose
+R365:375 xv6iris.LinkAcquire <> <> lib
+R377:386 xv6iris.LinkWakeup <> <> lib
+R388:398 xv6iris.LinkRelease <> <> lib
+R400:408 xv6iris.LinkKfree <> <> lib
+R410:423 xv6iris.ProofPipeclose <> <> lib
+R447:460 xv6iris.ProofPipeclose PipecloseProof <> modtype
+R462:471 xv6iris.LinkAcquire AcquireGen <> modtype
+R473:478 xv6iris.LinkWakeup Wakeup <> modtype
+R480:489 xv6iris.LinkRelease ReleaseGen <> modtype
+R491:503 xv6iris.LinkRelease ReleaseCancel <> modtype
+R505:509 xv6iris.LinkKfree Kfree <> modtype
+mod 434:442 <> Pipeclose

@@ -1,0 +1,7 @@
+DIGEST 6c090b3b9051f08609935859dd18c92b
+Fxv6iris.LinkConsputc
+R156:167 xv6iris.LinkUartPutc <> <> lib
+R169:181 xv6iris.ProofConsputc <> <> lib
+R204:216 xv6iris.ProofConsputc ConsputcProof <> modtype
+R218:225 xv6iris.LinkUartPutc UartPutc <> modtype
+mod 192:199 <> Consputc

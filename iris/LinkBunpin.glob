@@ -1,0 +1,9 @@
+DIGEST 37996f5385f8446e7bd463ec24321e84
+Fxv6iris.LinkBunpin
+R154:164 xv6iris.LinkAcquire <> <> lib
+R166:176 xv6iris.LinkRelease <> <> lib
+R178:188 xv6iris.ProofBunpin <> <> lib
+R209:219 xv6iris.ProofBunpin BunpinProof <> modtype
+R221:227 xv6iris.LinkAcquire Acquire <> modtype
+R229:235 xv6iris.LinkRelease Release <> modtype
+mod 199:204 <> Bunpin

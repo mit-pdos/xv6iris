@@ -1,0 +1,122 @@
+DIGEST 542c21ca5dd09e2354c1257b2638895c
+Fxv6iris.LinkPrintk
+R1245:1250 Stdlib.ZArith.ZArith <> <> lib
+R1252:1257 Stdlib.Strings.String <> <> lib
+R1275:1294 Stdlib.micromega.Lia <> <> lib
+R1323:1326 stdpp.list <> <> lib
+R1328:1348 stdpp.bitvector.definitions <> <> lib
+R1384:1388 iris.algebra.dfrac <> <> lib
+R1426:1434 iris.proofmode.proofmode <> <> lib
+R1477:1485 iris.base_logic.lib.ghost_var <> <> lib
+R1527:1534 iris.program_logic.language <> <> lib
+R1536:1542 iris.program_logic.lifting <> <> lib
+R1560:1575 SailStdpp.Values <> <> lib
+R1593:1609 Riscv.rv64d_types <> <> lib
+R1611:1621 Riscv.rv64d <> <> lib
+R1639:1647 xv6iris.RiscvLang <> <> lib
+R1649:1658 xv6iris.RiscvPtsto <> <> lib
+R1676:1682 xv6iris.RegFile <> <> lib
+R1700:1705 xv6iris.WpLock <> <> lib
+R1707:1715 xv6iris.DiskPtsto <> <> lib
+R1717:1722 xv6iris.WpUart <> <> lib
+R1740:1751 xv6iris.LinkConsputc <> <> lib
+R1753:1764 xv6iris.LinkPrintint <> <> lib
+R1766:1776 xv6iris.LinkAcquire <> <> lib
+R1778:1788 xv6iris.LinkRelease <> <> lib
+R1790:1800 xv6iris.ProofPrintk <> <> lib
+R1818:1827 xv6iris.SpecPrintk <> <> lib
+R1845:1848 xv6iris.Xv6G <> <> lib
+R1913:1918 xv6iris.TsoCtx <> <> lib
+R1939:1949 xv6iris.ProofPrintk PrintkProof <> modtype
+R1951:1958 xv6iris.LinkConsputc Consputc <> modtype
+R1960:1967 xv6iris.LinkPrintint Printint <> modtype
+R1969:1975 xv6iris.LinkAcquire Acquire <> modtype
+R1977:1983 xv6iris.LinkRelease Release <> modtype
+mod 1929:1934 <> Printk
+R2006:2015 xv6iris.SpecPrintk PRINTK_GEN <> mod
+mod 1994:2002 <> PrintkGen
+prf 2026:2044 PrintkGen wp_printk_gen_sconf
+R2049:2055 xv6iris.RiscvPtsto <> riscvGS class
+binder 2057:2058 <> Σ:1
+binder 2048:2058 <> riscvGS0:2
+R2062:2065 xv6iris.Xv6G <> xv6G class
+R2067:2068 xv6iris.LinkPrintk <> Σ:1 var
+binder 2061:2068 <> xv6G0:3
+R2079:2083 xv6iris.RiscvLang <> GenId class
+binder 2073:2075 <> GEN:4
+R2094:2098 xv6iris.RiscvLang <> CpuId class
+binder 2088:2090 <> CID:5
+R2108:2113 xv6iris.TsoCtx <> CurCtx class
+binder 2103:2104 <> XI:6
+R2128:2132 xv6iris.Ktier <> ktier ind
+binder 2123:2124 <> kt:7
+R2143:2147 iris.base_logic.lib.iprop <> gname def
+binder 2136:2139 <> γpr:8
+R2157:2166 xv6iris.WpUart <> uart_names rec
+binder 2151:2153 <> γd:9
+R2176:2185 xv6iris.DiskPtsto <> disk_names rec
+binder 2170:2172 <> γv:10
+R2200:2206 xv6iris.RegFile <> regfile def
+binder 2195:2196 <> m0:11
+R2214:2216 Corelib.Init.Datatypes <> nat ind
+binder 2210:2210 <> K:12
+R2225:2228 Corelib.Init.Datatypes <> bool ind
+binder 2220:2221 <> eb:13
+R2237:2241 SailStdpp.Values <> mword def
+binder 2232:2233 <> pj:14
+R2260:2264 iris.algebra.dfrac <> dfrac ind
+binder 2254:2256 <> dqf:15
+R2272:2277 Stdlib.Strings.String <> string ind
+binder 2268:2268 <> f:16
+R2289:2292 Corelib.Init.Datatypes <> list ind
+R2294:2304 xv6iris.PrintkArgs <> pk_arg_desc ind
+binder 2281:2285 <> descs:17
+R2312:2315 Corelib.Init.Datatypes <> bool ind
+binder 2308:2308 <> b:18
+R2331:2334 stdpp.gmap <> gset def
+R2336:2341 Stdlib.Strings.String <> string ind
+binder 2325:2327 <> lks:19
+R2350:2373 xv6iris.SpecPrintk <> wp_printk_gen_sconf_body def
+R2416:2418 xv6iris.LinkPrintk <> lks:19 var
+R2414:2414 xv6iris.LinkPrintk <> b:18 var
+R2408:2412 xv6iris.LinkPrintk <> descs:17 var
+R2406:2406 xv6iris.LinkPrintk <> f:16 var
+R2402:2404 xv6iris.LinkPrintk <> dqf:15 var
+R2399:2400 xv6iris.LinkPrintk <> pj:14 var
+R2396:2397 xv6iris.LinkPrintk <> eb:13 var
+R2394:2394 xv6iris.LinkPrintk <> K:12 var
+R2391:2392 xv6iris.LinkPrintk <> m0:11 var
+R2387:2389 xv6iris.LinkPrintk <> γv:10 var
+R2383:2385 xv6iris.LinkPrintk <> γd:9 var
+R2378:2381 xv6iris.LinkPrintk <> γpr:8 var
+R2375:2376 xv6iris.LinkPrintk <> kt:7 var
+R2443:2466 xv6iris.SpecPrintk <> wp_printk_gen_sconf_body def
+R2443:2466 xv6iris.SpecPrintk <> wp_printk_gen_sconf_body def
+R2443:2466 xv6iris.SpecPrintk <> wp_printk_gen_sconf_body def
+R2674:2674 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2853:2872 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2935:2935 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2675:2696 xv6iris.LinkPrintk Printk wp_printk_sconf defax
+R2723:2724 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R2674:2674 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2853:2872 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2935:2935 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2675:2696 xv6iris.LinkPrintk Printk wp_printk_sconf defax
+R2723:2724 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R2999:2999 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_')' not
+R3007:3010 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_')' not
+R3015:3015 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_')' not
+R3020:3020 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_')' not
+R2999:2999 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_')' not
+R3007:3010 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_')' not
+R3015:3015 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_')' not
+R3020:3020 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_')' not
+R3113:3113 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R3122:3125 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R3128:3133 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R3170:3170 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R3113:3113 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R3122:3125 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R3128:3133 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R3170:3170 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R3233:3241 xv6iris.LinkPrintk PrintkGen <> mod

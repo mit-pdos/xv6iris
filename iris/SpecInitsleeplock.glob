@@ -1,4 +1,4 @@
-DIGEST e35e5bc4c793f84bc5d68654af5b6343
+DIGEST 1c2f3b0c828ce7d697b50ff02d9bebcf
 Fxv6iris.SpecInitsleeplock
 R613:618 Stdlib.ZArith.ZArith <> <> lib
 R620:622 Stdlib.micromega.Lia <> <> lib
@@ -189,7 +189,7 @@ R3404:3412 xv6iris.WpLock <> lock_name def
 R3415:3419 xv6iris.SleepLock <> sl_lk def
 R3421:3423 xv6iris.SpecInitsleeplock <> slk:19 var
 R3486:3495 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R3455:3473 xv6iris.WpLock <> lk_cpu_fresh def
+R3455:3473 xv6iris.WpLock <> lk_cpu_ready def
 R3476:3480 xv6iris.SleepLock <> sl_lk def
 R3482:3484 xv6iris.SpecInitsleeplock <> slk:19 var
 R3509:3518 iris.bi.interface <> ::bi_scope:x_'-∗'_x not

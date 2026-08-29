@@ -1,0 +1,11 @@
+DIGEST 55cd187f9bca152aa1988d42c09d5b38
+Fxv6iris.LinkLogWrite
+R158:168 xv6iris.LinkAcquire <> <> lib
+R170:180 xv6iris.LinkRelease <> <> lib
+R182:189 xv6iris.LinkBpin <> <> lib
+R191:203 xv6iris.ProofLogWrite <> <> lib
+R226:238 xv6iris.ProofLogWrite LogWriteProof <> modtype
+R240:246 xv6iris.LinkAcquire Acquire <> modtype
+R248:254 xv6iris.LinkRelease Release <> modtype
+R256:259 xv6iris.LinkBpin Bpin <> modtype
+mod 214:221 <> LogWrite

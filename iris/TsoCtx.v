@@ -2828,6 +2828,164 @@ Section ctx.
     iSplit; by iPureIntro.
   Qed.
 
+  (* ================================================================== *)
+  (* A6.120: THE CREATOR'S ARM IS THE CTX TOWER'S OWN DIRTY WITNESS.     *)
+  (*                                                                      *)
+  (* §0.38′ reads [WpLock.lk_floor] as "you received this handle, or you  *)
+  (* wrote this lock" -- [ctx_pointsto]'s clean-vs-own-write disjunction *)
+  (* surfacing in the handle.  Its right arm was spelled as a bare        *)
+  (* [llb loglen_name lo], which says the floor is a LOG POSITION and     *)
+  (* nothing about who wrote it; A6.113 measured that this cannot be     *)
+  (* cashed at the read (the reader's view and a log position are         *)
+  (* comparable only at an AMO), so every read needed the crossing        *)
+  (* upgrade -- and the creator's own first acquire (kinit's kfree,       *)
+  (* printfinit's printf: no AMO between initlock and holding()) had no   *)
+  (* route at all.                                                        *)
+  (*                                                                      *)
+  (* The tower already records own writes: [ctx_at]'s dirty map [D] is a  *)
+  (* ghost_map keyed by (timestamp, address), every entry justified by    *)
+  (* [dirty_ok] -- "below my bound, or the message is MINE" -- which is   *)
+  (* [ledger_vis] verbatim.  Entries are never deleted (a park stamps the *)
+  (* record above all of them, [ctx_parked_def]; a resume raises the      *)
+  (* bound past the stamp), so a PERSISTENT element fragment is a sound   *)
+  (* witness for the lifetime of the context.  So the creator's arm is    *)
+  (* [ctx_wrote ξ lo a]: ξ-indexed, hart-free, and cashed against the     *)
+  (* running token in BOTH arms ([own_context_wrote_vis]).  Across a      *)
+  (* crossing it travels as the LEFT arm for free ([ctx_dom_wrote_floor]: *)
+  (* [ctx_dom] already carries [W ≤ B'] over the dirty watermark).        *)
+  (*                                                                      *)
+  (* The registration wants the key ABSENT, and [W]'s only semantics is   *)
+  (* "a legal log position above every dirty key", so the bound          *)
+  (* [W ≤ length log] must be taken BEFORE the store appends:            *)
+  (* [own_context_expose_w] hands the watermark out, the store runs, and  *)
+  (* [ctx_wrote_register] rebuilds the token with the new key -- the two  *)
+  (* halves of one atomic step, split only so the append can sit between. *)
+  (* ================================================================== *)
+  Definition ctx_wrote (ξ : CtxId) (t : nat) (a : Arch.pa) : iProp Σ :=
+    ((t, a) ↪[ctx_dirty_name ξ]□ ())%I.
+
+  Global Instance ctx_wrote_persistent ξ t a : Persistent (ctx_wrote ξ t a).
+  Proof. rewrite /ctx_wrote. apply _. Qed.
+  Global Instance ctx_wrote_timeless ξ t a : Timeless (ctx_wrote ξ t a).
+  Proof. rewrite /ctx_wrote. apply _. Qed.
+
+  (* the token with its dirty watermark exposed (and its [llb] peeled off) *)
+  Definition own_context_w `{CID : CpuId} (ξ : CtxId) (W : nat) : iProp Σ :=
+    (∃ (B K : nat) (D : gmap (nat * Arch.pa) unit),
+      ctx_at ξ 1 B D ∗
+      view_lb view_name loglen_name (hart_agent cpu_id) K ∗ ⌜(B ≤ K)%nat⌝ ∗
+      ⌜∀ k, k ∈ dom D → (k.1 ≤ W)%nat⌝ ∗
+      [∗ map] k ↦ _ ∈ D, dirty_ok logm_name (hart_agent cpu_id) B k)%I.
+
+  Lemma own_context_expose_w `{CID : CpuId} (ξ : CtxId) :
+    own_context ξ -∗ ∃ W : nat, llb loglen_name W ∗ own_context_w ξ W.
+  Proof.
+    rewrite own_context_unseal /own_context_def.
+    iIntros "(%B & %K & %W & %D & Hat & #HK & %HBK & #HW & %HDW & #Hoks)".
+    iExists W. iFrame "HW". iExists B, K, D. iFrame "Hat HK Hoks".
+    iSplit; by iPureIntro.
+  Qed.
+
+  Lemma own_context_w_fold `{CID : CpuId} (ξ : CtxId) (W : nat) :
+    own_context_w ξ W -∗ llb loglen_name W -∗ own_context ξ.
+  Proof.
+    rewrite own_context_unseal /own_context_def.
+    iIntros "(%B & %K & %D & Hat & #HK & %HBK & %HDW & #Hoks) #HW".
+    iExists B, K, W, D. iFrame "Hat HK HW Hoks". iSplit; by iPureIntro.
+  Qed.
+
+  (* the store's own message, registered as a dirty key of its context *)
+  Lemma ctx_wrote_register `{CID : CpuId} (ξ : CtxId) (W i : nat)
+      (a : Arch.pa) (m : pwmsg) :
+    (W ≤ i)%nat ->
+    pm_tid m = hart_agent cpu_id ->
+    own_context_w ξ W -∗ llb loglen_name (S i) -∗ ledger_msg_at i m ==∗
+    own_context ξ ∗ ctx_wrote ξ (S i) a.
+  Proof.
+    iIntros (HWi Htid) "(%B & %K & %D & Hat & #HK & %HBK & %HDW & #Hoks) #HSi #Hm".
+    iDestruct "Hat" as "[Hb Hd]".
+    assert (Hnone : D !! (S i, a) = None).
+    { apply not_elem_of_dom. intros Hin. specialize (HDW _ Hin).
+      simpl in HDW. lia. }
+    iMod (ghost_map_insert_persist (S i, a) () Hnone with "Hd") as "[Hd #Hfrag]".
+    iModIntro. iSplitL.
+    - rewrite own_context_unseal /own_context_def.
+      iExists B, K, (S i), (<[(S i, a) := ()]> D).
+      iSplitL "Hb Hd"; [ rewrite /ctx_at; iFrame "Hb Hd" | ].
+      iSplitR; [ iExact "HK" | ].
+      iSplitR; [ iPureIntro; exact HBK | ].
+      iSplitR; [ iExact "HSi" | ].
+      iSplitR.
+      { iPureIntro. intros k Hk. rewrite dom_insert_L in Hk.
+        apply elem_of_union in Hk as [Hk | Hk].
+        - apply elem_of_singleton in Hk. subst k. simpl. lia.
+        - specialize (HDW _ Hk). lia. }
+      rewrite big_sepM_insert; last exact Hnone.
+      iSplitR; [ | iExact "Hoks" ].
+      rewrite /dirty_ok. iRight. iExists i, m. simpl.
+      iSplitR; [ iPureIntro; reflexivity | ].
+      iSplitR; [ rewrite /ledger_msg_at; iExact "Hm" | ].
+      iPureIntro. exact Htid.
+    - rewrite /ctx_wrote. iExact "Hfrag".
+  Qed.
+
+  (* THE CASH-IN: the witness against the running token is [ledger_vis] at
+     the token's own view receipt -- the two-armed floor premise the racy
+     read wants ([ledger_read_racy_ok]), on the creator's arm. *)
+  Lemma own_context_wrote_vis `{CID : CpuId} (ξ : CtxId) (t : nat) (a : Arch.pa) :
+    own_context ξ -∗ ctx_wrote ξ t a -∗
+    own_context ξ ∗ ∃ K : nat,
+      view_lb view_name loglen_name (hart_agent cpu_id) K ∗
+      ledger_vis (hart_agent cpu_id) K t.
+  Proof.
+    iIntros "Hrun #Hw".
+    iEval (rewrite own_context_unseal /own_context_def) in "Hrun".
+    iDestruct "Hrun" as (B K W D) "(Hat & #HK & %HBK & #HW & %HDW & #Hoks)".
+    iDestruct "Hat" as "[Hb Hd]".
+    iEval (rewrite /ctx_wrote) in "Hw".
+    iDestruct (ghost_map_lookup with "Hd Hw") as %HD.
+    iDestruct (big_sepM_lookup _ _ (t, a) () HD with "Hoks") as "#Hok".
+    iSplitL.
+    { iEval (rewrite own_context_unseal /own_context_def).
+      iExists B, K, W, D. iFrame "Hb Hd HK HW Hoks". by iPureIntro. }
+    iExists K. iFrame "HK".
+    iEval (rewrite /dirty_ok) in "Hok". rewrite /ledger_vis.
+    iDestruct "Hok" as "[%Hle | (%i & %m & %Ht & #Hm & %Htid)]".
+    - iLeft. iPureIntro. simpl in Hle. lia.
+    - iRight. iExists i, m. simpl in Ht.
+      iSplitR; [ iPureIntro; exact Ht | ].
+      iSplitR; [ rewrite /ledger_msg_at; iExact "Hm" | ].
+      iPureIntro. exact Htid.
+  Qed.
+
+  (* THE TRANSPORT: a crossing turns the creator's arm into the receiver's
+     LEFT arm for free -- [ctx_dom] already says the sender's dirty
+     watermark is below the receiver's bound. *)
+  Lemma ctx_dom_wrote_floor (ξ ξ' : CtxId) (t : nat) (a : Arch.pa) :
+    ctx_dom ξ ξ' -∗ ctx_wrote ξ t a -∗ ctx_dom ξ ξ' ∗ ctx_floor ξ' t.
+  Proof.
+    rewrite ctx_dom_unseal /ctx_dom_def /ctx_floor /ctx_wrote.
+    iIntros "(%B & %W & %B' & %D & [Hb Hd] & %HDW & %HBB' & %HWB' & #Hlb') #Hw".
+    iDestruct (ghost_map_lookup with "Hd Hw") as %HD.
+    apply elem_of_dom_2 in HD. pose proof (HDW _ HD) as HtW. simpl in HtW.
+    iSplitR "".
+    - iExists B, W, B', D. iFrame "Hb Hd Hlb'". by iPureIntro.
+    - iApply (llb_le _ B'); [lia|]. by iLeft.
+  Qed.
+
+  (* a log-length receipt, validated against the interpretation *)
+  Lemma tso_interp_llb_valid (g : gstate) (K : nat) :
+    tso_interp_at riscv_eraGS g -∗ llb loglen_name K -∗
+    tso_interp_at riscv_eraGS g ∗ ⌜(K ≤ length g.(glog))%nat⌝.
+  Proof.
+    iIntros "Hint #HK".
+    iDestruct "Hint"
+      as "(%TM & %LM & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
+    iDestruct (llb_valid with "Hlen HK") as %HKlen.
+    iSplitL; [ | by iPureIntro ].
+    iExists TM, LM. iFrame. iPureIntro. split_and!; done.
+  Qed.
+
   (* A6.111: the projection to the machine's own predicate, BOTH ARMS.  It
      is the shape [TsoMemPa]'s window lemmas now take, and it is why the
      creator of a lock needs no receipt: its arm is [visibleb_own], which
@@ -4850,6 +5008,44 @@ Section ctx.
   (* other producer in the tree hands out a whole window at a shared     *)
   (* timestamp.                                                         *)
   (* ---------------------------------------------------------------- *)
+  Lemma ledger_store_win_wpay_mint_frag_ok `{CID : CpuId} (g g' : gstate)
+      (pa : Arch.pa) (n : N) {m : N} (vold vnew : bv m)
+      (cp : agent -> nat -> bv 8) :
+    (Z.of_nat (N.to_nat n) <= 18446744073709551616)%Z ->
+    g'.(gimg) = g.(gimg) ->
+    g'.(glog) = (g.(glog) ++ [PWMsg (snap_of pa n vnew) (hart_agent cpu_id)])%list ->
+    g'.(gmem) = write_bytes g.(gmem) pa n vnew ->
+    (forall c : CPU, (g.(gtv) c <= g'.(gtv) c)%nat) ->
+    (forall c : CPU, (g'.(gtv) c <= length g'.(glog))%nat) ->
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗
+    ([∗ list] j ∈ seq 0 (N.to_nat n),
+       phys_ledger (pa_add pa j) (DfracOwn 1) (nth_byte vold j)) ==∗
+    gen_heap_interp (hG := riscv_memGS) g'.(gmem) ∗
+    tso_interp_at riscv_eraGS g' ∗
+    ([∗ list] j ∈ seq 0 (N.to_nat n),
+       phys_ledger_wpay (pa_add pa j) (DfracOwn 1) (nth_byte vnew j)
+         (S (length g.(glog)))
+         (TsWin pa (N.to_nat n) j (nth_byte vnew) cp
+            (fun _ => Some (S (length g.(glog)))) (S (length g.(glog))))) ∗
+    (* A6.120: THE STORE'S OWN-MESSAGE FRAGMENT, kept.  It was produced by
+       [ledger_store_win_at_ok] underneath and dropped with an [_] -- the
+       same throw-away A6.114 §4 found one gate over.  It is the creator's
+       arm of [WpLock.lk_floor]: [ctx_wrote_register] below turns it into
+       the ctx tower's own dirty witness. *)
+    ledger_msg_at (length g.(glog))
+      (PWMsg (snap_of pa n vnew) (hart_agent cpu_id)).
+  Proof.
+    iIntros (Hn Himg Hlog Hmem Htv Htvok') "Hgh Hint Hold".
+    iMod (ledger_store_win_at_ok g g' pa n vold vnew Hn Himg Hlog Hmem Htv Htvok'
+            with "Hgh Hint Hold") as "(Hgh & Hint & #Hmsg & Hnew)".
+    iMod (ledger_wpay_mint g' pa (N.to_nat n) (S (length g.(glog)))
+            (nth_byte vnew) cp with "Hgh Hint Hnew") as "(Hgh & Hint & Hnew)".
+    iModIntro. iFrame "Hgh Hint Hnew Hmsg".
+  Qed.
+
+  (* the fragment-dropping form, kept for its existing caller
+     ([SmodeCorePt.word_pointsto_wpay_mint_c]'s pre-A6.120 shape). *)
   Lemma ledger_store_win_wpay_mint_ok `{CID : CpuId} (g g' : gstate)
       (pa : Arch.pa) (n : N) {m : N} (vold vnew : bv m)
       (cp : agent -> nat -> bv 8) :
@@ -4872,10 +5068,9 @@ Section ctx.
             (fun _ => Some (S (length g.(glog)))) (S (length g.(glog))))).
   Proof.
     iIntros (Hn Himg Hlog Hmem Htv Htvok') "Hgh Hint Hold".
-    iMod (ledger_store_win_at_ok g g' pa n vold vnew Hn Himg Hlog Hmem Htv Htvok'
-            with "Hgh Hint Hold") as "(Hgh & Hint & _ & Hnew)".
-    iMod (ledger_wpay_mint g' pa (N.to_nat n) (S (length g.(glog)))
-            (nth_byte vnew) cp with "Hgh Hint Hnew") as "(Hgh & Hint & Hnew)".
+    iMod (ledger_store_win_wpay_mint_frag_ok g g' pa n vold vnew cp
+            Hn Himg Hlog Hmem Htv Htvok' with "Hgh Hint Hold")
+      as "(Hgh & Hint & Hnew & _)".
     iModIntro. iFrame "Hgh Hint Hnew".
   Qed.
 

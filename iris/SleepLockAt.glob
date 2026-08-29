@@ -1,4 +1,4 @@
-DIGEST 31c85668e609c481a5bb72f1163fadf7
+DIGEST c6974828aa9b18c6bd3864dd60774dc9
 Fxv6iris.SleepLockAt
 R814:822 iris.proofmode.proofmode <> <> lib
 R865:867 iris.base_logic.lib.own <> <> lib
@@ -92,7 +92,7 @@ R2431:2433 xv6iris.SleepLockAt <> slk:10 var
 R2460:2464 SailStdpp.Values <> mword def
 R2443:2454 SailStdpp.Values <> mword_of_int def
 R2510:2519 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R2479:2497 xv6iris.WpLock <> lk_cpu_fresh def
+R2479:2497 xv6iris.WpLock <> lk_cpu_ready def
 R2500:2504 xv6iris.SleepLock <> sl_lk def
 R2506:2508 xv6iris.SleepLockAt <> slk:10 var
 R2558:2567 iris.bi.interface <> ::bi_scope:x_'-∗'_x not

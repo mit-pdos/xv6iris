@@ -1,0 +1,11 @@
+DIGEST 5351d051129320e4766505bf968d6d6f
+Fxv6iris.LinkKfree
+R151:161 xv6iris.LinkAcquire <> <> lib
+R163:176 xv6iris.LinkMemsetPage <> <> lib
+R178:188 xv6iris.LinkRelease <> <> lib
+R190:199 xv6iris.ProofKfree <> <> lib
+R219:228 xv6iris.ProofKfree KfreeProof <> modtype
+R230:236 xv6iris.LinkAcquire Acquire <> modtype
+R238:247 xv6iris.LinkMemsetPage MemsetPage <> modtype
+R249:255 xv6iris.LinkRelease Release <> modtype
+mod 210:214 <> Kfree

@@ -1,4 +1,4 @@
-DIGEST de510cb10b89ddca1b2c4968e90685a6
+DIGEST 0e8b15656ddf83b65a8ce7a3ac3f7a5b
 Fxv6iris.TicksInv
 R1172:1180 iris.proofmode.proofmode <> <> lib
 R1216:1219 iris.algebra.excl <> <> lib
@@ -90,7 +90,7 @@ R3128:3138 xv6iris.TicksInv <> a_tickslock def
 R3165:3169 SailStdpp.Values <> mword def
 R3148:3159 SailStdpp.Values <> mword_of_int def
 R3215:3224 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R3184:3202 xv6iris.WpLock <> lk_cpu_fresh def
+R3184:3202 xv6iris.WpLock <> lk_cpu_ready def
 R3204:3214 xv6iris.TicksInv <> a_tickslock def
 R3241:3243 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not
 R3245:3250 iris.bi.updates <> ::bi_scope:x_'={'_x_'}=∗'_x not

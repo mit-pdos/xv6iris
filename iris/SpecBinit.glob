@@ -1,4 +1,4 @@
-DIGEST 8a540648623058e9d1c4e8a7c7eda7aa
+DIGEST de8f8ef991202826c8d4045ca4f49be7
 Fxv6iris.SpecBinit
 R1449:1454 Stdlib.ZArith.ZArith <> <> lib
 R1456:1458 Stdlib.micromega.Lia <> <> lib
@@ -184,7 +184,7 @@ R3902:3911 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
 R3874:3882 xv6iris.WpLock <> lock_name def
 R3884:3885 xv6iris.SpecBinit <> lk:16 var
 R3934:3943 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R3912:3930 xv6iris.WpLock <> lk_cpu_fresh def
+R3912:3930 xv6iris.WpLock <> lk_cpu_ready def
 R3932:3933 xv6iris.SpecBinit <> lk:16 var
 R3944:3944 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
 R4019:4029 iris.bi.interface <> ::bi_scope:x_'-∗'_x not

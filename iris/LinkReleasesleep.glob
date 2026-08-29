@@ -1,0 +1,11 @@
+DIGEST ceb5280c25546026881b220fecb8df77
+Fxv6iris.LinkReleasesleep
+R244:254 xv6iris.LinkAcquire <> <> lib
+R256:266 xv6iris.LinkRelease <> <> lib
+R268:277 xv6iris.LinkWakeup <> <> lib
+R279:295 xv6iris.ProofReleasesleep <> <> lib
+R322:338 xv6iris.ProofReleasesleep ReleasesleepProof <> modtype
+R340:346 xv6iris.LinkAcquire Acquire <> modtype
+R348:354 xv6iris.LinkRelease Release <> modtype
+R356:361 xv6iris.LinkWakeup Wakeup <> modtype
+mod 306:317 <> Releasesleep

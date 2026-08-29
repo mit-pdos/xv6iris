@@ -1,0 +1,7 @@
+DIGEST 8815e1b517299d1a36ca490849a32b6c
+Fxv6iris.LinkKvmmap
+R153:164 xv6iris.LinkMappages <> <> lib
+R166:176 xv6iris.ProofKvmmap <> <> lib
+R197:207 xv6iris.ProofKvmmap KvmmapProof <> modtype
+R209:216 xv6iris.LinkMappages Mappages <> modtype
+mod 187:192 <> Kvmmap

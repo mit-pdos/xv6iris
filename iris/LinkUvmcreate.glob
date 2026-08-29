@@ -1,0 +1,9 @@
+DIGEST 1ce74a001ed133266562621d9d5896ec
+Fxv6iris.LinkUvmcreate
+R291:300 xv6iris.LinkKalloc <> <> lib
+R302:316 xv6iris.LinkMemsetArray <> <> lib
+R318:331 xv6iris.ProofUvmcreate <> <> lib
+R355:368 xv6iris.ProofUvmcreate UvmcreateProof <> modtype
+R370:375 xv6iris.LinkKalloc Kalloc <> modtype
+R377:387 xv6iris.LinkMemsetArray MemsetArray <> modtype
+mod 342:350 <> Uvmcreate

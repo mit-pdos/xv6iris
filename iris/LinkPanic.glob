@@ -1,0 +1,7 @@
+DIGEST 16c791c40e35897a55dfccc768edc8a8
+Fxv6iris.LinkPanic
+R405:414 xv6iris.LinkPrintk <> <> lib
+R416:425 xv6iris.ProofPanic <> <> lib
+R445:454 xv6iris.ProofPanic PanicProof <> modtype
+R456:461 xv6iris.LinkPrintk Printk <> modtype
+mod 436:440 <> Panic

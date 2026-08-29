@@ -1,4 +1,4 @@
-DIGEST a5d38b828683b03f017a0e5aafc9dda9
+DIGEST 73e5b7ef738d6994998635cf5545ee64
 Fxv6iris.SleepLock
 R5107:5115 iris.proofmode.proofmode <> <> lib
 R5151:5154 iris.algebra.excl <> <> lib
@@ -1805,7 +1805,7 @@ R28992:28994 xv6iris.SleepLock <> slk:223 var
 R29021:29025 SailStdpp.Values <> mword def
 R29004:29015 SailStdpp.Values <> mword_of_int def
 R29071:29080 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R29040:29058 xv6iris.WpLock <> lk_cpu_fresh def
+R29040:29058 xv6iris.WpLock <> lk_cpu_ready def
 R29061:29065 xv6iris.SleepLock <> sl_lk def
 R29067:29069 xv6iris.SleepLock <> slk:223 var
 R29119:29128 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
@@ -1917,7 +1917,7 @@ R30123:30125 xv6iris.SleepLock <> slk:230 var
 R30152:30156 SailStdpp.Values <> mword def
 R30135:30146 SailStdpp.Values <> mword_of_int def
 R30202:30211 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R30171:30189 xv6iris.WpLock <> lk_cpu_fresh def
+R30171:30189 xv6iris.WpLock <> lk_cpu_ready def
 R30192:30196 xv6iris.SleepLock <> sl_lk def
 R30198:30200 xv6iris.SleepLock <> slk:230 var
 R30250:30259 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
@@ -2109,7 +2109,7 @@ R31619:31621 xv6iris.SleepLock <> slk:238 var
 R31648:31652 SailStdpp.Values <> mword def
 R31631:31642 SailStdpp.Values <> mword_of_int def
 R31698:31707 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R31667:31685 xv6iris.WpLock <> lk_cpu_fresh def
+R31667:31685 xv6iris.WpLock <> lk_cpu_ready def
 R31688:31692 xv6iris.SleepLock <> sl_lk def
 R31694:31696 xv6iris.SleepLock <> slk:238 var
 R31746:31755 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
@@ -2231,7 +2231,7 @@ R33597:33605 xv6iris.WpLock <> lock_name def
 R33608:33612 xv6iris.SleepLock <> sl_lk def
 R33614:33616 xv6iris.SleepLock <> slk:250 var
 R33679:33688 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R33648:33666 xv6iris.WpLock <> lk_cpu_fresh def
+R33648:33666 xv6iris.WpLock <> lk_cpu_ready def
 R33669:33673 xv6iris.SleepLock <> sl_lk def
 R33675:33677 xv6iris.SleepLock <> slk:250 var
 R33702:33711 iris.bi.interface <> ::bi_scope:x_'∗'_x not

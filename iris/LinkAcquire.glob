@@ -1,0 +1,14 @@
+DIGEST 62776add54933eb3cb9bdff8e68548a7
+Fxv6iris.LinkAcquire
+R343:351 xv6iris.LinkMycpu <> <> lib
+R353:363 xv6iris.LinkHolding <> <> lib
+R365:375 xv6iris.LinkPushOff <> <> lib
+R377:388 xv6iris.ProofAcquire <> <> lib
+R413:427 xv6iris.ProofAcquire AcquireGenProof <> modtype
+R429:433 xv6iris.LinkMycpu Mycpu <> modtype
+R435:441 xv6iris.LinkHolding Holding <> modtype
+R443:449 xv6iris.LinkPushOff PushOff <> modtype
+mod 399:408 <> AcquireGen
+R470:481 xv6iris.ProofAcquire AcquireOfGen <> modtype
+R483:492 xv6iris.LinkAcquire AcquireGen <> modtype
+mod 459:465 <> Acquire

@@ -1,4 +1,4 @@
-DIGEST c5e74e9941b830be9dfba40990e2cb59
+DIGEST e52b2a4b62e0d1b2f9189c2c2608aa57
 Fxv6iris.SpecUserret
 R1722:1727 Stdlib.ZArith.ZArith <> <> lib
 R1756:1776 stdpp.bitvector.definitions <> <> lib
@@ -35,1177 +35,1180 @@ R2472:2481 Kernel.KernelSyms <> <> lib
 R2499:2502 xv6iris.Xv6G <> <> lib
 R2567:2572 xv6iris.TsoCtx <> <> lib
 R2608:2611 Riscv.rv64d_types Defs <> mod
-def 2954:2964 <> userret_gpr
-R2971:2977 xv6iris.RegFile <> regfile def
-binder 2967:2967 <> m:1
-R3119:3120 stdpp.bitvector.definitions <> bv rec
-binder 2985:2987 <> vra:2
-binder 2989:2991 <> vsp:3
-binder 2993:2995 <> vgp:4
-binder 2997:2999 <> vtp:5
-binder 3001:3003 <> vt0:6
-binder 3005:3007 <> vt1:7
-binder 3009:3011 <> vt2:8
-binder 3013:3015 <> vs0:9
-binder 3017:3019 <> vs1:10
-binder 3021:3023 <> va1:11
-binder 3025:3027 <> va2:12
-binder 3029:3031 <> va3:13
-binder 3033:3035 <> va4:14
-binder 3037:3039 <> va5:15
-binder 3041:3043 <> va6:16
-binder 3045:3047 <> va7:17
-binder 3054:3056 <> vs2:18
-binder 3058:3060 <> vs3:19
-binder 3062:3064 <> vs4:20
-binder 3066:3068 <> vs5:21
-binder 3070:3072 <> vs6:22
-binder 3074:3076 <> vs7:23
-binder 3078:3080 <> vs8:24
-binder 3082:3084 <> vs9:25
-binder 3086:3089 <> vs10:26
-binder 3091:3094 <> vs11:27
-binder 3096:3098 <> vt3:28
-binder 3100:3102 <> vt4:29
-binder 3104:3106 <> vt5:30
-binder 3108:3110 <> vt6:31
-binder 3112:3115 <> va0f:32
-R3132:3138 xv6iris.RegFile <> regfile def
-R3145:3146 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3171:3174 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3195:4868 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3147:3152 Riscv.rv64d_types <> Regidx constr
-R3155:3166 SailStdpp.Values <> mword_of_int def
-R3175:3189 Riscv.rv64d <> regval_into_reg def
-R3191:3194 xv6iris.SpecUserret <> va0f:32 var
-R3199:3200 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3225:3228 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3248:4867 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3201:3206 Riscv.rv64d_types <> Regidx constr
-R3209:3220 SailStdpp.Values <> mword_of_int def
-R3229:3243 Riscv.rv64d <> regval_into_reg def
-R3245:3247 xv6iris.SpecUserret <> vt6:31 var
-R3252:3253 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3278:3281 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3301:4866 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3254:3259 Riscv.rv64d_types <> Regidx constr
-R3262:3273 SailStdpp.Values <> mword_of_int def
-R3282:3296 Riscv.rv64d <> regval_into_reg def
-R3298:3300 xv6iris.SpecUserret <> vt5:30 var
-R3305:3306 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3331:3334 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3354:4865 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3307:3312 Riscv.rv64d_types <> Regidx constr
-R3315:3326 SailStdpp.Values <> mword_of_int def
-R3335:3349 Riscv.rv64d <> regval_into_reg def
-R3351:3353 xv6iris.SpecUserret <> vt4:29 var
-R3358:3359 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3384:3387 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3407:4864 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3360:3365 Riscv.rv64d_types <> Regidx constr
-R3368:3379 SailStdpp.Values <> mword_of_int def
-R3388:3402 Riscv.rv64d <> regval_into_reg def
-R3404:3406 xv6iris.SpecUserret <> vt3:28 var
-R3411:3412 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3437:3440 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3461:4863 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3413:3418 Riscv.rv64d_types <> Regidx constr
-R3421:3432 SailStdpp.Values <> mword_of_int def
-R3441:3455 Riscv.rv64d <> regval_into_reg def
-R3457:3460 xv6iris.SpecUserret <> vs11:27 var
-R3465:3466 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3491:3494 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3515:4862 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3467:3472 Riscv.rv64d_types <> Regidx constr
-R3475:3486 SailStdpp.Values <> mword_of_int def
-R3495:3509 Riscv.rv64d <> regval_into_reg def
-R3511:3514 xv6iris.SpecUserret <> vs10:26 var
-R3519:3520 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3545:3548 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3568:4861 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3521:3526 Riscv.rv64d_types <> Regidx constr
-R3529:3540 SailStdpp.Values <> mword_of_int def
-R3549:3563 Riscv.rv64d <> regval_into_reg def
-R3565:3567 xv6iris.SpecUserret <> vs9:25 var
-R3572:3573 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3598:3601 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3621:4860 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3574:3579 Riscv.rv64d_types <> Regidx constr
-R3582:3593 SailStdpp.Values <> mword_of_int def
-R3602:3616 Riscv.rv64d <> regval_into_reg def
-R3618:3620 xv6iris.SpecUserret <> vs8:24 var
-R3625:3626 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3651:3654 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3674:4859 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3627:3632 Riscv.rv64d_types <> Regidx constr
-R3635:3646 SailStdpp.Values <> mword_of_int def
-R3655:3669 Riscv.rv64d <> regval_into_reg def
-R3671:3673 xv6iris.SpecUserret <> vs7:23 var
-R3678:3679 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3704:3707 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3727:4858 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3680:3685 Riscv.rv64d_types <> Regidx constr
-R3688:3699 SailStdpp.Values <> mword_of_int def
-R3708:3722 Riscv.rv64d <> regval_into_reg def
-R3724:3726 xv6iris.SpecUserret <> vs6:22 var
-R3731:3732 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3757:3760 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3780:4857 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3733:3738 Riscv.rv64d_types <> Regidx constr
-R3741:3752 SailStdpp.Values <> mword_of_int def
-R3761:3775 Riscv.rv64d <> regval_into_reg def
-R3777:3779 xv6iris.SpecUserret <> vs5:21 var
-R3784:3785 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3810:3813 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3833:4856 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3786:3791 Riscv.rv64d_types <> Regidx constr
-R3794:3805 SailStdpp.Values <> mword_of_int def
-R3814:3828 Riscv.rv64d <> regval_into_reg def
-R3830:3832 xv6iris.SpecUserret <> vs4:20 var
-R3837:3838 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3863:3866 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3886:4855 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3839:3844 Riscv.rv64d_types <> Regidx constr
-R3847:3858 SailStdpp.Values <> mword_of_int def
-R3867:3881 Riscv.rv64d <> regval_into_reg def
-R3883:3885 xv6iris.SpecUserret <> vs3:19 var
-R3890:3891 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3916:3919 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3939:4854 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3892:3897 Riscv.rv64d_types <> Regidx constr
-R3900:3911 SailStdpp.Values <> mword_of_int def
-R3920:3934 Riscv.rv64d <> regval_into_reg def
-R3936:3938 xv6iris.SpecUserret <> vs2:18 var
-R3943:3944 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3969:3972 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3992:4853 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3945:3950 Riscv.rv64d_types <> Regidx constr
-R3953:3964 SailStdpp.Values <> mword_of_int def
-R3973:3987 Riscv.rv64d <> regval_into_reg def
-R3989:3991 xv6iris.SpecUserret <> va7:17 var
-R3996:3997 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4022:4025 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4045:4852 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R3998:4003 Riscv.rv64d_types <> Regidx constr
-R4006:4017 SailStdpp.Values <> mword_of_int def
-R4026:4040 Riscv.rv64d <> regval_into_reg def
-R4042:4044 xv6iris.SpecUserret <> va6:16 var
-R4049:4050 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4075:4078 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4098:4851 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4051:4056 Riscv.rv64d_types <> Regidx constr
-R4059:4070 SailStdpp.Values <> mword_of_int def
-R4079:4093 Riscv.rv64d <> regval_into_reg def
-R4095:4097 xv6iris.SpecUserret <> va5:15 var
-R4102:4103 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4128:4131 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4151:4850 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4104:4109 Riscv.rv64d_types <> Regidx constr
-R4112:4123 SailStdpp.Values <> mword_of_int def
-R4132:4146 Riscv.rv64d <> regval_into_reg def
-R4148:4150 xv6iris.SpecUserret <> va4:14 var
-R4155:4156 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4181:4184 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4204:4849 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4157:4162 Riscv.rv64d_types <> Regidx constr
-R4165:4176 SailStdpp.Values <> mword_of_int def
-R4185:4199 Riscv.rv64d <> regval_into_reg def
-R4201:4203 xv6iris.SpecUserret <> va3:13 var
-R4208:4209 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4234:4237 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4257:4848 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4210:4215 Riscv.rv64d_types <> Regidx constr
-R4218:4229 SailStdpp.Values <> mword_of_int def
-R4238:4252 Riscv.rv64d <> regval_into_reg def
-R4254:4256 xv6iris.SpecUserret <> va2:12 var
-R4261:4262 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4287:4290 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4310:4847 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4263:4268 Riscv.rv64d_types <> Regidx constr
-R4271:4282 SailStdpp.Values <> mword_of_int def
-R4291:4305 Riscv.rv64d <> regval_into_reg def
-R4307:4309 xv6iris.SpecUserret <> va1:11 var
-R4314:4315 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4339:4342 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4362:4846 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4316:4321 Riscv.rv64d_types <> Regidx constr
-R4324:4335 SailStdpp.Values <> mword_of_int def
-R4343:4357 Riscv.rv64d <> regval_into_reg def
-R4359:4361 xv6iris.SpecUserret <> vs1:10 var
-R4366:4367 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4391:4394 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4414:4845 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4368:4373 Riscv.rv64d_types <> Regidx constr
-R4376:4387 SailStdpp.Values <> mword_of_int def
-R4395:4409 Riscv.rv64d <> regval_into_reg def
-R4411:4413 xv6iris.SpecUserret <> vs0:9 var
-R4418:4419 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4443:4446 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4466:4844 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4420:4425 Riscv.rv64d_types <> Regidx constr
-R4428:4439 SailStdpp.Values <> mword_of_int def
-R4447:4461 Riscv.rv64d <> regval_into_reg def
-R4463:4465 xv6iris.SpecUserret <> vt2:8 var
-R4470:4471 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4495:4498 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4518:4843 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4472:4477 Riscv.rv64d_types <> Regidx constr
-R4480:4491 SailStdpp.Values <> mword_of_int def
-R4499:4513 Riscv.rv64d <> regval_into_reg def
-R4515:4517 xv6iris.SpecUserret <> vt1:7 var
-R4522:4523 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4547:4550 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4570:4842 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4524:4529 Riscv.rv64d_types <> Regidx constr
-R4532:4543 SailStdpp.Values <> mword_of_int def
-R4551:4565 Riscv.rv64d <> regval_into_reg def
-R4567:4569 xv6iris.SpecUserret <> vt0:6 var
-R4574:4575 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4599:4602 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4622:4841 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4576:4581 Riscv.rv64d_types <> Regidx constr
-R4584:4595 SailStdpp.Values <> mword_of_int def
-R4603:4617 Riscv.rv64d <> regval_into_reg def
-R4619:4621 xv6iris.SpecUserret <> vtp:5 var
-R4626:4627 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4651:4654 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4674:4840 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4628:4633 Riscv.rv64d_types <> Regidx constr
-R4636:4647 SailStdpp.Values <> mword_of_int def
-R4655:4669 Riscv.rv64d <> regval_into_reg def
-R4671:4673 xv6iris.SpecUserret <> vgp:4 var
-R4678:4679 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4703:4706 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4726:4839 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4680:4685 Riscv.rv64d_types <> Regidx constr
-R4688:4699 SailStdpp.Values <> mword_of_int def
-R4707:4721 Riscv.rv64d <> regval_into_reg def
-R4723:4725 xv6iris.SpecUserret <> vsp:3 var
-R4730:4731 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4755:4758 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4778:4838 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4732:4737 Riscv.rv64d_types <> Regidx constr
-R4740:4751 SailStdpp.Values <> mword_of_int def
-R4759:4773 Riscv.rv64d <> regval_into_reg def
-R4775:4777 xv6iris.SpecUserret <> vra:2 var
-R4782:4783 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4808:4811 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4834:4837 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
-R4784:4789 Riscv.rv64d_types <> Regidx constr
-R4792:4803 SailStdpp.Values <> mword_of_int def
-R4812:4823 SailStdpp.Values <> mword_of_int def
-R4825:4833 xv6iris.TrampPt <> TRAPFRAME def
-R4837:4837 xv6iris.SpecUserret <> m:1 var
-def 4883:4900 <> wp_userret_pt_body
-R4905:4911 xv6iris.RiscvPtsto <> riscvGS class
-binder 4913:4914 <> Σ:33
-binder 4904:4914 <> riscvGS0:34
-R4918:4921 xv6iris.Xv6G <> xv6G class
-R4923:4924 xv6iris.SpecUserret <> Σ:33 var
-binder 4917:4924 <> xv6G0:35
-R4935:4939 xv6iris.RiscvLang <> GenId class
-binder 4929:4931 <> GEN:36
-R4950:4954 xv6iris.RiscvLang <> CpuId class
-binder 4944:4946 <> CID:37
-R4964:4969 xv6iris.TsoCtx <> CurCtx class
-binder 4959:4960 <> XI:38
-R4995:4999 SailStdpp.Values <> mword def
-binder 4977:4981 <> kroot:39
-binder 4983:4987 <> uroot:40
-binder 4989:4991 <> tfp:41
-R5015:5018 stdpp.gmap <> gmap rec
-R5032:5036 SailStdpp.Values <> mword def
-R5021:5025 SailStdpp.Values <> mword def
-binder 5010:5011 <> um:42
-R5052:5058 xv6iris.RegFile <> regfile def
-binder 5048:5048 <> m:43
-R5070:5074 SailStdpp.Values <> mword def
-binder 5062:5066 <> usatp:44
-R5131:5135 SailStdpp.Values <> mword def
-binder 5085:5092 <> mstatus0:45
-binder 5094:5098 <> mie_v:46
-binder 5100:5103 <> mdv0:47
-binder 5105:5112 <> menvcfg0:48
-binder 5114:5121 <> senvcfg0:49
-binder 5123:5127 <> sepc0:50
-R5280:5281 stdpp.bitvector.definitions <> bv rec
-binder 5146:5148 <> vra:51
-binder 5150:5152 <> vsp:52
-binder 5154:5156 <> vgp:53
-binder 5158:5160 <> vtp:54
-binder 5162:5164 <> vt0:55
-binder 5166:5168 <> vt1:56
-binder 5170:5172 <> vt2:57
-binder 5174:5176 <> vs0:58
-binder 5178:5180 <> vs1:59
-binder 5182:5184 <> va1:60
-binder 5186:5188 <> va2:61
-binder 5190:5192 <> va3:62
-binder 5194:5196 <> va4:63
-binder 5198:5200 <> va5:64
-binder 5202:5204 <> va6:65
-binder 5206:5208 <> va7:66
-binder 5215:5217 <> vs2:67
-binder 5219:5221 <> vs3:68
-binder 5223:5225 <> vs4:69
-binder 5227:5229 <> vs5:70
-binder 5231:5233 <> vs6:71
-binder 5235:5237 <> vs7:72
-binder 5239:5241 <> vs8:73
-binder 5243:5245 <> vs9:74
-binder 5247:5250 <> vs10:75
-binder 5252:5255 <> vs11:76
-binder 5257:5259 <> vt3:77
-binder 5261:5263 <> vt4:78
-binder 5265:5267 <> vt5:79
-binder 5269:5271 <> vt6:80
-binder 5273:5276 <> va0f:81
-R5298:5302 iris.algebra.dfrac <> dfrac ind
-binder 5292:5294 <> dqm:82
-R5388:5393 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R5380:5382 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R5338:5343 SailStdpp.Operators_mwords <> eq_vec def
-R5374:5375 SailStdpp.Values <> :::'''b'_x not
-R5346:5361 Riscv.rv64d <> _get_Mstatus_SIE def
-R5363:5370 xv6iris.SpecUserret <> mstatus0:45 var
-R5383:5387 Corelib.Init.Datatypes <> false constr
-R5445:5450 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R5437:5439 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R5394:5399 SailStdpp.Operators_mwords <> eq_vec def
-R5431:5432 SailStdpp.Values <> :::'''b'_x not
-R5402:5418 Riscv.rv64d <> _get_Mstatus_MPRV def
-R5420:5427 xv6iris.SpecUserret <> mstatus0:45 var
-R5440:5444 Corelib.Init.Datatypes <> false constr
-R5485:5490 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R5476:5478 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R5451:5466 Riscv.rv64d <> _get_Mstatus_SXL def
-R5468:5475 xv6iris.SpecUserret <> mstatus0:45 var
-R5479:5480 SailStdpp.Values <> :::'''b'_x not
-R5541:5546 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R5533:5535 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R5491:5496 SailStdpp.Operators_mwords <> eq_vec def
-R5527:5528 SailStdpp.Values <> :::'''b'_x not
-R5499:5514 Riscv.rv64d <> _get_Mstatus_TVM def
-R5516:5523 xv6iris.SpecUserret <> mstatus0:45 var
-R5536:5540 Corelib.Init.Datatypes <> false constr
-R5596:5601 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R5589:5591 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R5547:5552 SailStdpp.Operators_mwords <> eq_vec def
-R5583:5584 SailStdpp.Values <> :::'''b'_x not
-R5555:5570 Riscv.rv64d <> _get_Mstatus_MXR def
-R5572:5579 xv6iris.SpecUserret <> mstatus0:45 var
-R5592:5595 Corelib.Init.Datatypes <> true constr
-R5642:5647 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R5630:5632 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R5602:5608 SailStdpp.Operators_mwords <> and_vec def
-R5617:5623 SailStdpp.Operators_mwords <> not_vec def
-R5625:5628 xv6iris.SpecUserret <> mdv0:47 var
-R5610:5614 xv6iris.SpecUserret <> mie_v:46 var
-R5633:5638 Riscv.rv64d <> zeros' def
-R5709:5714 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R5694:5696 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R5648:5665 Riscv.rv64d <> pmm_mode_backwards def
-R5668:5683 Riscv.rv64d <> _get_MEnvcfg_PMM def
-R5685:5692 xv6iris.SpecUserret <> menvcfg0:48 var
-R5697:5708 Riscv.rv64d_types <> PMM_Disabled constr
-R5766:5771 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R5759:5761 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R5715:5720 SailStdpp.Operators_mwords <> eq_vec def
-R5753:5754 SailStdpp.Values <> :::'''b'_x not
-R5723:5740 Riscv.rv64d <> _get_MEnvcfg_PBMTE def
-R5742:5749 xv6iris.SpecUserret <> menvcfg0:48 var
-R5762:5765 Corelib.Init.Datatypes <> true constr
-R5792:5797 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R5780:5782 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R5772:5779 xv6iris.SpecUserret <> menvcfg0:48 var
-R5783:5791 xv6iris.RiscvFetchExec <> MENVCFG_S def
-R5823:5828 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R5806:5808 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R5798:5805 xv6iris.SpecUserret <> senvcfg0:49 var
-R5809:5820 SailStdpp.Values <> mword_of_int def
-R5842:5894 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R5829:5838 xv6iris.UptTree <> upt_map_wf def
-R5840:5841 xv6iris.SpecUserret <> um:42 var
-R5945:5950 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R5937:5939 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R5895:5900 SailStdpp.Operators_mwords <> eq_vec def
-R5931:5932 SailStdpp.Values <> :::'''b'_x not
-R5903:5918 Riscv.rv64d <> _get_Mstatus_TSR def
-R5920:5927 xv6iris.SpecUserret <> mstatus0:45 var
-R5940:5944 Corelib.Init.Datatypes <> false constr
-R5979:6021 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R5972:5974 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R5951:5962 xv6iris.MstatusBits <> sret_newpriv def
-R5964:5971 xv6iris.SpecUserret <> mstatus0:45 var
-R5975:5978 Riscv.rv64d_types <> User constr
-R6060:6065 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R6052:6054 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R6023:6027 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
-R6028:6033 Riscv.rv64d_types <> Regidx constr
-R6036:6047 SailStdpp.Values <> mword_of_int def
-R6022:6022 xv6iris.SpecUserret <> m:43 var
-R6055:6059 xv6iris.SpecUserret <> usatp:44 var
-R6123:6128 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R6100:6103 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R6122:6122 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R6066:6081 Riscv.rv64d <> _get_Satp64_Mode def
-R6084:6092 Riscv.rv64d <> Mk_Satp64 def
-R6094:6098 xv6iris.SpecUserret <> usatp:44 var
-R6115:6119 SailStdpp.Values <> mword def
-R6104:6105 SailStdpp.Values <> :::'''b'_x not
-R6230:6235 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R6200:6203 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R6229:6229 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R6129:6140 Riscv.rv64d_types <> zero_extend' def
-R6146:6157 Riscv.rv64d <> satp_to_asid def
-R6190:6194 SailStdpp.Values <> mword def
-R6160:6167 SailStdpp.TypeCasts <> autocast def
-R6182:6186 xv6iris.SpecUserret <> usatp:44 var
-R6175:6179 SailStdpp.Values <> mword def
-R6221:6225 SailStdpp.Values <> mword def
-R6204:6215 SailStdpp.Values <> mword_of_int def
-R6320:6325 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R6312:6314 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R6236:6243 SailStdpp.TypeCasts <> autocast def
-R6259:6269 Riscv.rv64d <> satp_to_ppn def
-R6302:6306 SailStdpp.Values <> mword def
-R6272:6279 SailStdpp.TypeCasts <> autocast def
-R6294:6298 xv6iris.SpecUserret <> usatp:44 var
-R6287:6291 SailStdpp.Values <> mword def
-R6251:6255 SailStdpp.Values <> mword def
-R6315:6319 xv6iris.SpecUserret <> uroot:40 var
-R6337:6344 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R6326:6336 xv6iris.KernelText <> kernel_text def
-R6354:6361 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R6345:6353 xv6iris.RiscvFetchExec <> hw_config def
-R6374:6381 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R6362:6373 xv6iris.MinstretInv <> minstret_inv def
-R6414:6421 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R6392:6399 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
-R6382:6391 Riscv.rv64d_types <> hart_state constr
-R6400:6410 Riscv.rv64d_types <> HART_ACTIVE constr
-R6412:6413 Corelib.Init.Datatypes <> tt constr
-R6453:6460 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R6435:6442 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
-R6422:6434 Riscv.rv64d_types <> cur_privilege constr
-R6443:6452 Riscv.rv64d_types <> Supervisor constr
-R6484:6491 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R6468:6475 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
-R6461:6467 Riscv.rv64d_types <> mstatus constr
-R6476:6483 xv6iris.SpecUserret <> mstatus0:45 var
-R6508:6515 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R6495:6502 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
-R6492:6494 Riscv.rv64d_types <> mie constr
-R6503:6507 xv6iris.SpecUserret <> mie_v:46 var
-R6535:6542 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R6523:6530 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
-R6516:6522 Riscv.rv64d_types <> mideleg constr
-R6531:6534 xv6iris.SpecUserret <> mdv0:47 var
-R6566:6573 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R6550:6557 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
-R6543:6549 Riscv.rv64d_types <> menvcfg constr
-R6558:6565 xv6iris.SpecUserret <> menvcfg0:48 var
-R6600:6607 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R6581:6591 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ□'_x not
-R6574:6580 Riscv.rv64d_types <> senvcfg constr
-R6592:6599 xv6iris.SpecUserret <> senvcfg0:49 var
-R6625:6691 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R6612:6619 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
-R6608:6611 Riscv.rv64d_types <> sepc constr
-R6620:6624 xv6iris.SpecUserret <> sepc0:50 var
-R6725:6732 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R6692:6698 xv6iris.RiscvPtsto <> kmap_at def
-R6720:6724 xv6iris.RiscvPtsto <> KP_rx constr
-R6710:6718 xv6iris.KptExecMap <> tramp_ppn def
-R6700:6708 xv6iris.KptExecMap <> tramp_vpn def
-R6749:6756 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R6733:6742 xv6iris.KptShare <> tlb_res_pt def
-R6744:6748 xv6iris.SpecUserret <> kroot:39 var
-R6794:6801 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R6757:6764 xv6iris.PtTree <> pt_frame abbrev
-R6767:6779 xv6iris.UptTree <> upt_tree_spec def
-R6781:6785 xv6iris.SpecUserret <> uroot:40 var
-R6787:6789 xv6iris.SpecUserret <> tfp:41 var
-R6791:6792 xv6iris.SpecUserret <> um:42 var
-R6818:6825 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R6802:6806 xv6iris.InstrBytes <> pc_is def
-R6809:6811 xv6iris.UserretDefs <> uva def
-R6836:6843 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R6826:6833 xv6iris.WpGpr <> gpr_file def
-R6835:6835 xv6iris.SpecUserret <> m:43 var
-R6877:6884 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R6856:6867 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R6871:6873 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R6844:6848 xv6iris.TrampPt <> tf_pa def
-R6850:6852 xv6iris.SpecUserret <> tfp:41 var
-R6868:6870 xv6iris.SpecUserret <> dqm:82 var
-R6874:6876 xv6iris.SpecUserret <> vra:51 var
-R6918:6925 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R6897:6908 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R6912:6914 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R6885:6889 xv6iris.TrampPt <> tf_pa def
-R6891:6893 xv6iris.SpecUserret <> tfp:41 var
-R6909:6911 xv6iris.SpecUserret <> dqm:82 var
-R6915:6917 xv6iris.SpecUserret <> vsp:52 var
-R6959:6966 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R6938:6949 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R6953:6955 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R6926:6930 xv6iris.TrampPt <> tf_pa def
-R6932:6934 xv6iris.SpecUserret <> tfp:41 var
-R6950:6952 xv6iris.SpecUserret <> dqm:82 var
-R6956:6958 xv6iris.SpecUserret <> vgp:53 var
-R7000:7007 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R6979:6990 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R6994:6996 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R6967:6971 xv6iris.TrampPt <> tf_pa def
-R6973:6975 xv6iris.SpecUserret <> tfp:41 var
-R6991:6993 xv6iris.SpecUserret <> dqm:82 var
-R6997:6999 xv6iris.SpecUserret <> vtp:54 var
-R7041:7048 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7020:7031 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7035:7037 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7008:7012 xv6iris.TrampPt <> tf_pa def
-R7014:7016 xv6iris.SpecUserret <> tfp:41 var
-R7032:7034 xv6iris.SpecUserret <> dqm:82 var
-R7038:7040 xv6iris.SpecUserret <> vt0:55 var
-R7082:7089 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7061:7072 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7076:7078 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7049:7053 xv6iris.TrampPt <> tf_pa def
-R7055:7057 xv6iris.SpecUserret <> tfp:41 var
-R7073:7075 xv6iris.SpecUserret <> dqm:82 var
-R7079:7081 xv6iris.SpecUserret <> vt1:56 var
-R7123:7130 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7102:7113 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7117:7119 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7090:7094 xv6iris.TrampPt <> tf_pa def
-R7096:7098 xv6iris.SpecUserret <> tfp:41 var
-R7114:7116 xv6iris.SpecUserret <> dqm:82 var
-R7120:7122 xv6iris.SpecUserret <> vt2:57 var
-R7164:7171 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7143:7154 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7158:7160 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7131:7135 xv6iris.TrampPt <> tf_pa def
-R7137:7139 xv6iris.SpecUserret <> tfp:41 var
-R7155:7157 xv6iris.SpecUserret <> dqm:82 var
-R7161:7163 xv6iris.SpecUserret <> vs0:58 var
-R7206:7213 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7185:7196 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7200:7202 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7172:7176 xv6iris.TrampPt <> tf_pa def
-R7178:7180 xv6iris.SpecUserret <> tfp:41 var
-R7197:7199 xv6iris.SpecUserret <> dqm:82 var
-R7203:7205 xv6iris.SpecUserret <> vs1:59 var
-R7248:7255 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7227:7238 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7242:7244 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7214:7218 xv6iris.TrampPt <> tf_pa def
-R7220:7222 xv6iris.SpecUserret <> tfp:41 var
-R7239:7241 xv6iris.SpecUserret <> dqm:82 var
-R7245:7247 xv6iris.SpecUserret <> va1:60 var
-R7290:7297 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7269:7280 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7284:7286 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7256:7260 xv6iris.TrampPt <> tf_pa def
-R7262:7264 xv6iris.SpecUserret <> tfp:41 var
-R7281:7283 xv6iris.SpecUserret <> dqm:82 var
-R7287:7289 xv6iris.SpecUserret <> va2:61 var
-R7332:7339 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7311:7322 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7326:7328 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7298:7302 xv6iris.TrampPt <> tf_pa def
-R7304:7306 xv6iris.SpecUserret <> tfp:41 var
-R7323:7325 xv6iris.SpecUserret <> dqm:82 var
-R7329:7331 xv6iris.SpecUserret <> va3:62 var
-R7374:7381 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7353:7364 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7368:7370 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7340:7344 xv6iris.TrampPt <> tf_pa def
-R7346:7348 xv6iris.SpecUserret <> tfp:41 var
-R7365:7367 xv6iris.SpecUserret <> dqm:82 var
-R7371:7373 xv6iris.SpecUserret <> va4:63 var
-R7416:7423 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7395:7406 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7410:7412 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7382:7386 xv6iris.TrampPt <> tf_pa def
-R7388:7390 xv6iris.SpecUserret <> tfp:41 var
-R7407:7409 xv6iris.SpecUserret <> dqm:82 var
-R7413:7415 xv6iris.SpecUserret <> va5:64 var
-R7458:7465 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7437:7448 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7452:7454 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7424:7428 xv6iris.TrampPt <> tf_pa def
-R7430:7432 xv6iris.SpecUserret <> tfp:41 var
-R7449:7451 xv6iris.SpecUserret <> dqm:82 var
-R7455:7457 xv6iris.SpecUserret <> va6:65 var
-R7500:7507 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7479:7490 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7494:7496 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7466:7470 xv6iris.TrampPt <> tf_pa def
-R7472:7474 xv6iris.SpecUserret <> tfp:41 var
-R7491:7493 xv6iris.SpecUserret <> dqm:82 var
-R7497:7499 xv6iris.SpecUserret <> va7:66 var
-R7542:7549 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7521:7532 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7536:7538 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7508:7512 xv6iris.TrampPt <> tf_pa def
-R7514:7516 xv6iris.SpecUserret <> tfp:41 var
-R7533:7535 xv6iris.SpecUserret <> dqm:82 var
-R7539:7541 xv6iris.SpecUserret <> vs2:67 var
-R7584:7591 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7563:7574 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7578:7580 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7550:7554 xv6iris.TrampPt <> tf_pa def
-R7556:7558 xv6iris.SpecUserret <> tfp:41 var
-R7575:7577 xv6iris.SpecUserret <> dqm:82 var
-R7581:7583 xv6iris.SpecUserret <> vs3:68 var
-R7626:7633 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7605:7616 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7620:7622 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7592:7596 xv6iris.TrampPt <> tf_pa def
-R7598:7600 xv6iris.SpecUserret <> tfp:41 var
-R7617:7619 xv6iris.SpecUserret <> dqm:82 var
-R7623:7625 xv6iris.SpecUserret <> vs4:69 var
-R7668:7675 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7647:7658 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7662:7664 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7634:7638 xv6iris.TrampPt <> tf_pa def
-R7640:7642 xv6iris.SpecUserret <> tfp:41 var
-R7659:7661 xv6iris.SpecUserret <> dqm:82 var
-R7665:7667 xv6iris.SpecUserret <> vs5:70 var
-R7710:7717 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7689:7700 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7704:7706 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7676:7680 xv6iris.TrampPt <> tf_pa def
-R7682:7684 xv6iris.SpecUserret <> tfp:41 var
-R7701:7703 xv6iris.SpecUserret <> dqm:82 var
-R7707:7709 xv6iris.SpecUserret <> vs6:71 var
-R7752:7759 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7731:7742 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7746:7748 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7718:7722 xv6iris.TrampPt <> tf_pa def
-R7724:7726 xv6iris.SpecUserret <> tfp:41 var
-R7743:7745 xv6iris.SpecUserret <> dqm:82 var
-R7749:7751 xv6iris.SpecUserret <> vs7:72 var
-R7794:7801 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7773:7784 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7788:7790 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7760:7764 xv6iris.TrampPt <> tf_pa def
-R7766:7768 xv6iris.SpecUserret <> tfp:41 var
-R7785:7787 xv6iris.SpecUserret <> dqm:82 var
-R7791:7793 xv6iris.SpecUserret <> vs8:73 var
-R7836:7843 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7815:7826 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7830:7832 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7802:7806 xv6iris.TrampPt <> tf_pa def
-R7808:7810 xv6iris.SpecUserret <> tfp:41 var
-R7827:7829 xv6iris.SpecUserret <> dqm:82 var
-R7833:7835 xv6iris.SpecUserret <> vs9:74 var
-R7879:7886 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7857:7868 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7872:7874 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7844:7848 xv6iris.TrampPt <> tf_pa def
-R7850:7852 xv6iris.SpecUserret <> tfp:41 var
-R7869:7871 xv6iris.SpecUserret <> dqm:82 var
-R7875:7878 xv6iris.SpecUserret <> vs10:75 var
-R7922:7929 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7900:7911 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7915:7917 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7887:7891 xv6iris.TrampPt <> tf_pa def
-R7893:7895 xv6iris.SpecUserret <> tfp:41 var
-R7912:7914 xv6iris.SpecUserret <> dqm:82 var
-R7918:7921 xv6iris.SpecUserret <> vs11:76 var
-R7964:7971 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7943:7954 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7958:7960 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7930:7934 xv6iris.TrampPt <> tf_pa def
-R7936:7938 xv6iris.SpecUserret <> tfp:41 var
-R7955:7957 xv6iris.SpecUserret <> dqm:82 var
-R7961:7963 xv6iris.SpecUserret <> vt3:77 var
-R8006:8013 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7985:7996 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R8000:8002 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R7972:7976 xv6iris.TrampPt <> tf_pa def
-R7978:7980 xv6iris.SpecUserret <> tfp:41 var
-R7997:7999 xv6iris.SpecUserret <> dqm:82 var
-R8003:8005 xv6iris.SpecUserret <> vt4:78 var
-R8048:8055 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R8027:8038 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R8042:8044 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R8014:8018 xv6iris.TrampPt <> tf_pa def
-R8020:8022 xv6iris.SpecUserret <> tfp:41 var
-R8039:8041 xv6iris.SpecUserret <> dqm:82 var
-R8045:8047 xv6iris.SpecUserret <> vt5:79 var
-R8090:8097 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R8069:8080 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R8084:8086 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R8056:8060 xv6iris.TrampPt <> tf_pa def
-R8062:8064 xv6iris.SpecUserret <> tfp:41 var
-R8081:8083 xv6iris.SpecUserret <> dqm:82 var
-R8087:8089 xv6iris.SpecUserret <> vt6:80 var
-R8133:8140 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R8111:8122 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R8126:8128 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R8098:8102 xv6iris.TrampPt <> tf_pa def
-R8104:8106 xv6iris.SpecUserret <> tfp:41 var
-R8123:8125 xv6iris.SpecUserret <> dqm:82 var
-R8129:8132 xv6iris.SpecUserret <> va0f:81 var
-R8141:8142 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R10056:10064 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R8175:8184 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R8153:8160 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
-R8143:8152 Riscv.rv64d_types <> hart_state constr
-R8161:8171 Riscv.rv64d_types <> HART_ACTIVE constr
-R8173:8174 Corelib.Init.Datatypes <> tt constr
-R8210:8219 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R8198:8205 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
-R8185:8197 Riscv.rv64d_types <> cur_privilege constr
-R8206:8209 Riscv.rv64d_types <> User constr
-R8252:8261 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R8227:8234 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
-R8220:8226 Riscv.rv64d_types <> mstatus constr
-R8235:8242 xv6iris.MstatusBits <> sret_ms5 def
-R8244:8251 xv6iris.SpecUserret <> mstatus0:45 var
-R8278:8287 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R8265:8272 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
-R8262:8264 Riscv.rv64d_types <> mie constr
-R8273:8277 xv6iris.SpecUserret <> mie_v:46 var
-R8307:8316 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R8295:8302 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
-R8288:8294 Riscv.rv64d_types <> mideleg constr
-R8303:8306 xv6iris.SpecUserret <> mdv0:47 var
-R8340:8349 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R8324:8331 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
-R8317:8323 Riscv.rv64d_types <> menvcfg constr
-R8332:8339 xv6iris.SpecUserret <> menvcfg0:48 var
-R8376:8385 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R8357:8367 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ□'_x not
-R8350:8356 Riscv.rv64d_types <> senvcfg constr
-R8368:8375 xv6iris.SpecUserret <> senvcfg0:49 var
-R8403:8412 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R8390:8397 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
-R8386:8389 Riscv.rv64d_types <> sepc constr
-R8398:8402 xv6iris.SpecUserret <> sepc0:50 var
-R8437:8446 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R8413:8423 xv6iris.UptTree <> utlb_inv_pt def
-R8425:8429 xv6iris.SpecUserret <> uroot:40 var
-R8431:8433 xv6iris.SpecUserret <> tfp:41 var
-R8435:8436 xv6iris.SpecUserret <> um:42 var
-R8467:8476 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R8447:8451 xv6iris.InstrBytes <> pc_is def
-R8454:8459 xv6iris.RiscvExtras <> ret_pc def
-R8461:8465 xv6iris.SpecUserret <> sepc0:50 var
-R8660:8669 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R8477:8484 xv6iris.WpGpr <> gpr_file def
-R8487:8497 xv6iris.SpecUserret <> userret_gpr def
-R8499:8499 xv6iris.SpecUserret <> m:43 var
-R8501:8503 xv6iris.SpecUserret <> vra:51 var
-R8505:8507 xv6iris.SpecUserret <> vsp:52 var
-R8509:8511 xv6iris.SpecUserret <> vgp:53 var
-R8513:8515 xv6iris.SpecUserret <> vtp:54 var
-R8517:8519 xv6iris.SpecUserret <> vt0:55 var
-R8521:8523 xv6iris.SpecUserret <> vt1:56 var
-R8525:8527 xv6iris.SpecUserret <> vt2:57 var
-R8529:8531 xv6iris.SpecUserret <> vs0:58 var
-R8533:8535 xv6iris.SpecUserret <> vs1:59 var
-R8537:8539 xv6iris.SpecUserret <> va1:60 var
-R8541:8543 xv6iris.SpecUserret <> va2:61 var
-R8545:8547 xv6iris.SpecUserret <> va3:62 var
-R8565:8567 xv6iris.SpecUserret <> va4:63 var
-R8569:8571 xv6iris.SpecUserret <> va5:64 var
-R8573:8575 xv6iris.SpecUserret <> va6:65 var
-R8577:8579 xv6iris.SpecUserret <> va7:66 var
-R8581:8583 xv6iris.SpecUserret <> vs2:67 var
-R8585:8587 xv6iris.SpecUserret <> vs3:68 var
-R8589:8591 xv6iris.SpecUserret <> vs4:69 var
-R8593:8595 xv6iris.SpecUserret <> vs5:70 var
-R8597:8599 xv6iris.SpecUserret <> vs6:71 var
-R8601:8603 xv6iris.SpecUserret <> vs7:72 var
-R8605:8607 xv6iris.SpecUserret <> vs8:73 var
-R8609:8611 xv6iris.SpecUserret <> vs9:74 var
-R8613:8616 xv6iris.SpecUserret <> vs10:75 var
-R8618:8621 xv6iris.SpecUserret <> vs11:76 var
-R8639:8641 xv6iris.SpecUserret <> vt3:77 var
-R8643:8645 xv6iris.SpecUserret <> vt4:78 var
-R8647:8649 xv6iris.SpecUserret <> vt5:79 var
-R8651:8653 xv6iris.SpecUserret <> vt6:80 var
-R8655:8658 xv6iris.SpecUserret <> va0f:81 var
-R8703:8712 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R8682:8693 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R8697:8699 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R8670:8674 xv6iris.TrampPt <> tf_pa def
-R8676:8678 xv6iris.SpecUserret <> tfp:41 var
-R8694:8696 xv6iris.SpecUserret <> dqm:82 var
-R8700:8702 xv6iris.SpecUserret <> vra:51 var
-R8746:8755 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R8725:8736 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R8740:8742 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R8713:8717 xv6iris.TrampPt <> tf_pa def
-R8719:8721 xv6iris.SpecUserret <> tfp:41 var
-R8737:8739 xv6iris.SpecUserret <> dqm:82 var
-R8743:8745 xv6iris.SpecUserret <> vsp:52 var
-R8789:8798 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R8768:8779 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R8783:8785 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R8756:8760 xv6iris.TrampPt <> tf_pa def
-R8762:8764 xv6iris.SpecUserret <> tfp:41 var
-R8780:8782 xv6iris.SpecUserret <> dqm:82 var
-R8786:8788 xv6iris.SpecUserret <> vgp:53 var
-R8832:8841 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R8811:8822 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R8826:8828 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R8799:8803 xv6iris.TrampPt <> tf_pa def
-R8805:8807 xv6iris.SpecUserret <> tfp:41 var
-R8823:8825 xv6iris.SpecUserret <> dqm:82 var
-R8829:8831 xv6iris.SpecUserret <> vtp:54 var
-R8875:8884 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R8854:8865 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R8869:8871 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R8842:8846 xv6iris.TrampPt <> tf_pa def
-R8848:8850 xv6iris.SpecUserret <> tfp:41 var
-R8866:8868 xv6iris.SpecUserret <> dqm:82 var
-R8872:8874 xv6iris.SpecUserret <> vt0:55 var
-R8918:8927 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R8897:8908 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R8912:8914 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R8885:8889 xv6iris.TrampPt <> tf_pa def
-R8891:8893 xv6iris.SpecUserret <> tfp:41 var
-R8909:8911 xv6iris.SpecUserret <> dqm:82 var
-R8915:8917 xv6iris.SpecUserret <> vt1:56 var
-R8961:8970 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R8940:8951 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R8955:8957 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R8928:8932 xv6iris.TrampPt <> tf_pa def
-R8934:8936 xv6iris.SpecUserret <> tfp:41 var
-R8952:8954 xv6iris.SpecUserret <> dqm:82 var
-R8958:8960 xv6iris.SpecUserret <> vt2:57 var
-R9004:9013 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R8983:8994 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R8998:9000 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R8971:8975 xv6iris.TrampPt <> tf_pa def
-R8977:8979 xv6iris.SpecUserret <> tfp:41 var
-R8995:8997 xv6iris.SpecUserret <> dqm:82 var
-R9001:9003 xv6iris.SpecUserret <> vs0:58 var
-R9048:9057 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9027:9038 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9042:9044 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9014:9018 xv6iris.TrampPt <> tf_pa def
-R9020:9022 xv6iris.SpecUserret <> tfp:41 var
-R9039:9041 xv6iris.SpecUserret <> dqm:82 var
-R9045:9047 xv6iris.SpecUserret <> vs1:59 var
-R9092:9101 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9071:9082 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9086:9088 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9058:9062 xv6iris.TrampPt <> tf_pa def
-R9064:9066 xv6iris.SpecUserret <> tfp:41 var
-R9083:9085 xv6iris.SpecUserret <> dqm:82 var
-R9089:9091 xv6iris.SpecUserret <> va1:60 var
-R9136:9145 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9115:9126 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9130:9132 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9102:9106 xv6iris.TrampPt <> tf_pa def
-R9108:9110 xv6iris.SpecUserret <> tfp:41 var
-R9127:9129 xv6iris.SpecUserret <> dqm:82 var
-R9133:9135 xv6iris.SpecUserret <> va2:61 var
-R9180:9189 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9159:9170 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9174:9176 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9146:9150 xv6iris.TrampPt <> tf_pa def
-R9152:9154 xv6iris.SpecUserret <> tfp:41 var
-R9171:9173 xv6iris.SpecUserret <> dqm:82 var
-R9177:9179 xv6iris.SpecUserret <> va3:62 var
-R9224:9233 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9203:9214 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9218:9220 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9190:9194 xv6iris.TrampPt <> tf_pa def
-R9196:9198 xv6iris.SpecUserret <> tfp:41 var
-R9215:9217 xv6iris.SpecUserret <> dqm:82 var
-R9221:9223 xv6iris.SpecUserret <> va4:63 var
-R9268:9277 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9247:9258 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9262:9264 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9234:9238 xv6iris.TrampPt <> tf_pa def
-R9240:9242 xv6iris.SpecUserret <> tfp:41 var
-R9259:9261 xv6iris.SpecUserret <> dqm:82 var
-R9265:9267 xv6iris.SpecUserret <> va5:64 var
-R9312:9321 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9291:9302 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9306:9308 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9278:9282 xv6iris.TrampPt <> tf_pa def
-R9284:9286 xv6iris.SpecUserret <> tfp:41 var
-R9303:9305 xv6iris.SpecUserret <> dqm:82 var
-R9309:9311 xv6iris.SpecUserret <> va6:65 var
-R9356:9365 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9335:9346 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9350:9352 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9322:9326 xv6iris.TrampPt <> tf_pa def
-R9328:9330 xv6iris.SpecUserret <> tfp:41 var
-R9347:9349 xv6iris.SpecUserret <> dqm:82 var
-R9353:9355 xv6iris.SpecUserret <> va7:66 var
-R9400:9409 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9379:9390 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9394:9396 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9366:9370 xv6iris.TrampPt <> tf_pa def
-R9372:9374 xv6iris.SpecUserret <> tfp:41 var
-R9391:9393 xv6iris.SpecUserret <> dqm:82 var
-R9397:9399 xv6iris.SpecUserret <> vs2:67 var
-R9444:9453 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9423:9434 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9438:9440 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9410:9414 xv6iris.TrampPt <> tf_pa def
-R9416:9418 xv6iris.SpecUserret <> tfp:41 var
-R9435:9437 xv6iris.SpecUserret <> dqm:82 var
-R9441:9443 xv6iris.SpecUserret <> vs3:68 var
-R9488:9497 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9467:9478 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9482:9484 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9454:9458 xv6iris.TrampPt <> tf_pa def
-R9460:9462 xv6iris.SpecUserret <> tfp:41 var
-R9479:9481 xv6iris.SpecUserret <> dqm:82 var
-R9485:9487 xv6iris.SpecUserret <> vs4:69 var
-R9532:9541 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9511:9522 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9526:9528 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9498:9502 xv6iris.TrampPt <> tf_pa def
-R9504:9506 xv6iris.SpecUserret <> tfp:41 var
-R9523:9525 xv6iris.SpecUserret <> dqm:82 var
-R9529:9531 xv6iris.SpecUserret <> vs5:70 var
-R9576:9585 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9555:9566 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9570:9572 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9542:9546 xv6iris.TrampPt <> tf_pa def
-R9548:9550 xv6iris.SpecUserret <> tfp:41 var
-R9567:9569 xv6iris.SpecUserret <> dqm:82 var
-R9573:9575 xv6iris.SpecUserret <> vs6:71 var
-R9620:9629 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9599:9610 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9614:9616 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9586:9590 xv6iris.TrampPt <> tf_pa def
-R9592:9594 xv6iris.SpecUserret <> tfp:41 var
-R9611:9613 xv6iris.SpecUserret <> dqm:82 var
-R9617:9619 xv6iris.SpecUserret <> vs7:72 var
-R9664:9673 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9643:9654 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9658:9660 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9630:9634 xv6iris.TrampPt <> tf_pa def
-R9636:9638 xv6iris.SpecUserret <> tfp:41 var
-R9655:9657 xv6iris.SpecUserret <> dqm:82 var
-R9661:9663 xv6iris.SpecUserret <> vs8:73 var
-R9708:9717 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9687:9698 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9702:9704 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9674:9678 xv6iris.TrampPt <> tf_pa def
-R9680:9682 xv6iris.SpecUserret <> tfp:41 var
-R9699:9701 xv6iris.SpecUserret <> dqm:82 var
-R9705:9707 xv6iris.SpecUserret <> vs9:74 var
-R9753:9762 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9731:9742 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9746:9748 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9718:9722 xv6iris.TrampPt <> tf_pa def
-R9724:9726 xv6iris.SpecUserret <> tfp:41 var
-R9743:9745 xv6iris.SpecUserret <> dqm:82 var
-R9749:9752 xv6iris.SpecUserret <> vs10:75 var
-R9798:9807 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9776:9787 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9791:9793 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9763:9767 xv6iris.TrampPt <> tf_pa def
-R9769:9771 xv6iris.SpecUserret <> tfp:41 var
-R9788:9790 xv6iris.SpecUserret <> dqm:82 var
-R9794:9797 xv6iris.SpecUserret <> vs11:76 var
-R9842:9851 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9821:9832 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9836:9838 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9808:9812 xv6iris.TrampPt <> tf_pa def
-R9814:9816 xv6iris.SpecUserret <> tfp:41 var
-R9833:9835 xv6iris.SpecUserret <> dqm:82 var
-R9839:9841 xv6iris.SpecUserret <> vt3:77 var
-R9886:9895 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9865:9876 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9880:9882 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9852:9856 xv6iris.TrampPt <> tf_pa def
-R9858:9860 xv6iris.SpecUserret <> tfp:41 var
-R9877:9879 xv6iris.SpecUserret <> dqm:82 var
-R9883:9885 xv6iris.SpecUserret <> vt4:78 var
-R9930:9939 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9909:9920 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9924:9926 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9896:9900 xv6iris.TrampPt <> tf_pa def
-R9902:9904 xv6iris.SpecUserret <> tfp:41 var
-R9921:9923 xv6iris.SpecUserret <> dqm:82 var
-R9927:9929 xv6iris.SpecUserret <> vt5:79 var
-R9974:9983 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9953:9964 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9968:9970 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9940:9944 xv6iris.TrampPt <> tf_pa def
-R9946:9948 xv6iris.SpecUserret <> tfp:41 var
-R9965:9967 xv6iris.SpecUserret <> dqm:82 var
-R9971:9973 xv6iris.SpecUserret <> vt6:80 var
-R10019:10028 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9997:10008 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R10012:10014 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ₚ₈{'_x_'}'_x not
-R9984:9988 xv6iris.TrampPt <> tf_pa def
-R9990:9992 xv6iris.SpecUserret <> tfp:41 var
-R10009:10011 xv6iris.SpecUserret <> dqm:82 var
-R10015:10018 xv6iris.SpecUserret <> va0f:81 var
-R10029:10032 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
-R10055:10055 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
-R10040:10043 iris.program_logic.language <> expr proj
-R10045:10054 xv6iris.RiscvLang <> riscv_lang def
-R10033:10036 xv6iris.RiscvLang <> Loop abbrev
-R10065:10068 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
-R10091:10091 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
-R10076:10079 iris.program_logic.language <> expr proj
-R10081:10090 xv6iris.RiscvLang <> riscv_lang def
-R10069:10072 xv6iris.RiscvLang <> Loop abbrev
-modtype 10107:10113 <> USERRET
-ax 10128:10140 USERRET wp_userret_pt
-R10148:10156 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-R10564:10572 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-R10158:10164 xv6iris.RiscvPtsto <> riscvGS class
-binder 10166:10167 <> Σ:83
-binder 10157:10167 <> riscvGS0:84
-R10171:10174 xv6iris.Xv6G <> xv6G class
-R10176:10177 xv6iris.SpecUserret <> Σ:83 var
-binder 10170:10177 <> xv6G0:85
-R10188:10192 xv6iris.RiscvLang <> GenId class
-binder 10182:10184 <> GEN:86
-R10203:10207 xv6iris.RiscvLang <> CpuId class
-binder 10197:10199 <> CID:87
-R10217:10222 xv6iris.TsoCtx <> CurCtx class
-binder 10212:10213 <> XI:88
-R10250:10254 SailStdpp.Values <> mword def
-binder 10232:10236 <> kroot:89
-R10250:10254 SailStdpp.Values <> mword def
-binder 10238:10242 <> uroot:90
-R10250:10254 SailStdpp.Values <> mword def
-binder 10244:10246 <> tfp:91
-R10272:10275 stdpp.gmap <> gmap rec
-R10289:10293 SailStdpp.Values <> mword def
-R10278:10282 SailStdpp.Values <> mword def
-binder 10267:10268 <> um:92
-R10305:10311 xv6iris.RegFile <> regfile def
-binder 10301:10301 <> m:93
-R10323:10327 SailStdpp.Values <> mword def
-binder 10315:10319 <> usatp:94
-R10386:10390 SailStdpp.Values <> mword def
-binder 10340:10347 <> mstatus0:95
-R10386:10390 SailStdpp.Values <> mword def
-binder 10349:10353 <> mie_v:96
-R10386:10390 SailStdpp.Values <> mword def
-binder 10355:10358 <> mdv0:97
-R10386:10390 SailStdpp.Values <> mword def
-binder 10360:10367 <> menvcfg0:98
-R10386:10390 SailStdpp.Values <> mword def
-binder 10369:10376 <> senvcfg0:99
-R10386:10390 SailStdpp.Values <> mword def
-binder 10378:10382 <> sepc0:100
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10403:10405 <> vra:101
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10407:10409 <> vsp:102
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10411:10413 <> vgp:103
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10415:10417 <> vtp:104
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10419:10421 <> vt0:105
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10423:10425 <> vt1:106
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10427:10429 <> vt2:107
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10431:10433 <> vs0:108
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10435:10437 <> vs1:109
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10439:10441 <> va1:110
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10443:10445 <> va2:111
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10447:10449 <> va3:112
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10451:10453 <> va4:113
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10455:10457 <> va5:114
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10459:10461 <> va6:115
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10463:10465 <> va7:116
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10474:10476 <> vs2:117
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10478:10480 <> vs3:118
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10482:10484 <> vs4:119
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10486:10488 <> vs5:120
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10490:10492 <> vs6:121
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10494:10496 <> vs7:122
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10498:10500 <> vs8:123
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10502:10504 <> vs9:124
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10506:10509 <> vs10:125
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10511:10514 <> vs11:126
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10516:10518 <> vt3:127
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10520:10522 <> vt4:128
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10524:10526 <> vt5:129
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10528:10530 <> vt6:130
-R10539:10540 stdpp.bitvector.definitions <> bv rec
-binder 10532:10535 <> va0f:131
-R10559:10563 iris.algebra.dfrac <> dfrac ind
-binder 10553:10555 <> dqm:132
-R10573:10590 xv6iris.SpecUserret <> wp_userret_pt_body def
-R10814:10816 xv6iris.SpecUserret <> dqm:132 var
-R10809:10812 xv6iris.SpecUserret <> va0f:131 var
-R10805:10807 xv6iris.SpecUserret <> vt6:130 var
-R10801:10803 xv6iris.SpecUserret <> vt5:129 var
-R10797:10799 xv6iris.SpecUserret <> vt4:128 var
-R10793:10795 xv6iris.SpecUserret <> vt3:127 var
-R10788:10791 xv6iris.SpecUserret <> vs11:126 var
-R10783:10786 xv6iris.SpecUserret <> vs10:125 var
-R10779:10781 xv6iris.SpecUserret <> vs9:124 var
-R10775:10777 xv6iris.SpecUserret <> vs8:123 var
-R10771:10773 xv6iris.SpecUserret <> vs7:122 var
-R10767:10769 xv6iris.SpecUserret <> vs6:121 var
-R10763:10765 xv6iris.SpecUserret <> vs5:120 var
-R10759:10761 xv6iris.SpecUserret <> vs4:119 var
-R10755:10757 xv6iris.SpecUserret <> vs3:118 var
-R10751:10753 xv6iris.SpecUserret <> vs2:117 var
-R10739:10741 xv6iris.SpecUserret <> va7:116 var
-R10735:10737 xv6iris.SpecUserret <> va6:115 var
-R10731:10733 xv6iris.SpecUserret <> va5:114 var
-R10727:10729 xv6iris.SpecUserret <> va4:113 var
-R10723:10725 xv6iris.SpecUserret <> va3:112 var
-R10719:10721 xv6iris.SpecUserret <> va2:111 var
-R10715:10717 xv6iris.SpecUserret <> va1:110 var
-R10711:10713 xv6iris.SpecUserret <> vs1:109 var
-R10707:10709 xv6iris.SpecUserret <> vs0:108 var
-R10703:10705 xv6iris.SpecUserret <> vt2:107 var
-R10699:10701 xv6iris.SpecUserret <> vt1:106 var
-R10695:10697 xv6iris.SpecUserret <> vt0:105 var
-R10691:10693 xv6iris.SpecUserret <> vtp:104 var
-R10687:10689 xv6iris.SpecUserret <> vgp:103 var
-R10683:10685 xv6iris.SpecUserret <> vsp:102 var
-R10679:10681 xv6iris.SpecUserret <> vra:101 var
-R10665:10669 xv6iris.SpecUserret <> sepc0:100 var
-R10656:10663 xv6iris.SpecUserret <> senvcfg0:99 var
-R10647:10654 xv6iris.SpecUserret <> menvcfg0:98 var
-R10642:10645 xv6iris.SpecUserret <> mdv0:97 var
-R10636:10640 xv6iris.SpecUserret <> mie_v:96 var
-R10627:10634 xv6iris.SpecUserret <> mstatus0:95 var
-R10613:10617 xv6iris.SpecUserret <> usatp:94 var
-R10611:10611 xv6iris.SpecUserret <> m:93 var
-R10608:10609 xv6iris.SpecUserret <> um:92 var
-R10604:10606 xv6iris.SpecUserret <> tfp:91 var
-R10598:10602 xv6iris.SpecUserret <> uroot:90 var
-R10592:10596 xv6iris.SpecUserret <> kroot:89 var
-R10823:10829 xv6iris.SpecUserret USERRET <> modtype
+R3591:3619 xv6iris.TsoCtx <> ctx_phys_word_pointsto def
+R3621:3634 xv6iris.TsoCtx <> cur_ctx def
+not 3562:3562 <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x
+def 4046:4056 <> userret_gpr
+R4063:4069 xv6iris.RegFile <> regfile def
+binder 4059:4059 <> m:1
+R4211:4212 stdpp.bitvector.definitions <> bv rec
+binder 4077:4079 <> vra:2
+binder 4081:4083 <> vsp:3
+binder 4085:4087 <> vgp:4
+binder 4089:4091 <> vtp:5
+binder 4093:4095 <> vt0:6
+binder 4097:4099 <> vt1:7
+binder 4101:4103 <> vt2:8
+binder 4105:4107 <> vs0:9
+binder 4109:4111 <> vs1:10
+binder 4113:4115 <> va1:11
+binder 4117:4119 <> va2:12
+binder 4121:4123 <> va3:13
+binder 4125:4127 <> va4:14
+binder 4129:4131 <> va5:15
+binder 4133:4135 <> va6:16
+binder 4137:4139 <> va7:17
+binder 4146:4148 <> vs2:18
+binder 4150:4152 <> vs3:19
+binder 4154:4156 <> vs4:20
+binder 4158:4160 <> vs5:21
+binder 4162:4164 <> vs6:22
+binder 4166:4168 <> vs7:23
+binder 4170:4172 <> vs8:24
+binder 4174:4176 <> vs9:25
+binder 4178:4181 <> vs10:26
+binder 4183:4186 <> vs11:27
+binder 4188:4190 <> vt3:28
+binder 4192:4194 <> vt4:29
+binder 4196:4198 <> vt5:30
+binder 4200:4202 <> vt6:31
+binder 4204:4207 <> va0f:32
+R4224:4230 xv6iris.RegFile <> regfile def
+R4237:4238 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4263:4266 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4287:5960 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4239:4244 Riscv.rv64d_types <> Regidx constr
+R4247:4258 SailStdpp.Values <> mword_of_int def
+R4267:4281 Riscv.rv64d <> regval_into_reg def
+R4283:4286 xv6iris.SpecUserret <> va0f:32 var
+R4291:4292 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4317:4320 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4340:5959 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4293:4298 Riscv.rv64d_types <> Regidx constr
+R4301:4312 SailStdpp.Values <> mword_of_int def
+R4321:4335 Riscv.rv64d <> regval_into_reg def
+R4337:4339 xv6iris.SpecUserret <> vt6:31 var
+R4344:4345 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4370:4373 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4393:5958 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4346:4351 Riscv.rv64d_types <> Regidx constr
+R4354:4365 SailStdpp.Values <> mword_of_int def
+R4374:4388 Riscv.rv64d <> regval_into_reg def
+R4390:4392 xv6iris.SpecUserret <> vt5:30 var
+R4397:4398 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4423:4426 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4446:5957 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4399:4404 Riscv.rv64d_types <> Regidx constr
+R4407:4418 SailStdpp.Values <> mword_of_int def
+R4427:4441 Riscv.rv64d <> regval_into_reg def
+R4443:4445 xv6iris.SpecUserret <> vt4:29 var
+R4450:4451 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4476:4479 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4499:5956 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4452:4457 Riscv.rv64d_types <> Regidx constr
+R4460:4471 SailStdpp.Values <> mword_of_int def
+R4480:4494 Riscv.rv64d <> regval_into_reg def
+R4496:4498 xv6iris.SpecUserret <> vt3:28 var
+R4503:4504 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4529:4532 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4553:5955 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4505:4510 Riscv.rv64d_types <> Regidx constr
+R4513:4524 SailStdpp.Values <> mword_of_int def
+R4533:4547 Riscv.rv64d <> regval_into_reg def
+R4549:4552 xv6iris.SpecUserret <> vs11:27 var
+R4557:4558 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4583:4586 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4607:5954 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4559:4564 Riscv.rv64d_types <> Regidx constr
+R4567:4578 SailStdpp.Values <> mword_of_int def
+R4587:4601 Riscv.rv64d <> regval_into_reg def
+R4603:4606 xv6iris.SpecUserret <> vs10:26 var
+R4611:4612 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4637:4640 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4660:5953 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4613:4618 Riscv.rv64d_types <> Regidx constr
+R4621:4632 SailStdpp.Values <> mword_of_int def
+R4641:4655 Riscv.rv64d <> regval_into_reg def
+R4657:4659 xv6iris.SpecUserret <> vs9:25 var
+R4664:4665 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4690:4693 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4713:5952 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4666:4671 Riscv.rv64d_types <> Regidx constr
+R4674:4685 SailStdpp.Values <> mword_of_int def
+R4694:4708 Riscv.rv64d <> regval_into_reg def
+R4710:4712 xv6iris.SpecUserret <> vs8:24 var
+R4717:4718 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4743:4746 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4766:5951 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4719:4724 Riscv.rv64d_types <> Regidx constr
+R4727:4738 SailStdpp.Values <> mword_of_int def
+R4747:4761 Riscv.rv64d <> regval_into_reg def
+R4763:4765 xv6iris.SpecUserret <> vs7:23 var
+R4770:4771 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4796:4799 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4819:5950 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4772:4777 Riscv.rv64d_types <> Regidx constr
+R4780:4791 SailStdpp.Values <> mword_of_int def
+R4800:4814 Riscv.rv64d <> regval_into_reg def
+R4816:4818 xv6iris.SpecUserret <> vs6:22 var
+R4823:4824 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4849:4852 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4872:5949 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4825:4830 Riscv.rv64d_types <> Regidx constr
+R4833:4844 SailStdpp.Values <> mword_of_int def
+R4853:4867 Riscv.rv64d <> regval_into_reg def
+R4869:4871 xv6iris.SpecUserret <> vs5:21 var
+R4876:4877 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4902:4905 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4925:5948 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4878:4883 Riscv.rv64d_types <> Regidx constr
+R4886:4897 SailStdpp.Values <> mword_of_int def
+R4906:4920 Riscv.rv64d <> regval_into_reg def
+R4922:4924 xv6iris.SpecUserret <> vs4:20 var
+R4929:4930 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4955:4958 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4978:5947 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4931:4936 Riscv.rv64d_types <> Regidx constr
+R4939:4950 SailStdpp.Values <> mword_of_int def
+R4959:4973 Riscv.rv64d <> regval_into_reg def
+R4975:4977 xv6iris.SpecUserret <> vs3:19 var
+R4982:4983 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5008:5011 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5031:5946 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R4984:4989 Riscv.rv64d_types <> Regidx constr
+R4992:5003 SailStdpp.Values <> mword_of_int def
+R5012:5026 Riscv.rv64d <> regval_into_reg def
+R5028:5030 xv6iris.SpecUserret <> vs2:18 var
+R5035:5036 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5061:5064 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5084:5945 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5037:5042 Riscv.rv64d_types <> Regidx constr
+R5045:5056 SailStdpp.Values <> mword_of_int def
+R5065:5079 Riscv.rv64d <> regval_into_reg def
+R5081:5083 xv6iris.SpecUserret <> va7:17 var
+R5088:5089 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5114:5117 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5137:5944 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5090:5095 Riscv.rv64d_types <> Regidx constr
+R5098:5109 SailStdpp.Values <> mword_of_int def
+R5118:5132 Riscv.rv64d <> regval_into_reg def
+R5134:5136 xv6iris.SpecUserret <> va6:16 var
+R5141:5142 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5167:5170 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5190:5943 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5143:5148 Riscv.rv64d_types <> Regidx constr
+R5151:5162 SailStdpp.Values <> mword_of_int def
+R5171:5185 Riscv.rv64d <> regval_into_reg def
+R5187:5189 xv6iris.SpecUserret <> va5:15 var
+R5194:5195 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5220:5223 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5243:5942 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5196:5201 Riscv.rv64d_types <> Regidx constr
+R5204:5215 SailStdpp.Values <> mword_of_int def
+R5224:5238 Riscv.rv64d <> regval_into_reg def
+R5240:5242 xv6iris.SpecUserret <> va4:14 var
+R5247:5248 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5273:5276 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5296:5941 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5249:5254 Riscv.rv64d_types <> Regidx constr
+R5257:5268 SailStdpp.Values <> mword_of_int def
+R5277:5291 Riscv.rv64d <> regval_into_reg def
+R5293:5295 xv6iris.SpecUserret <> va3:13 var
+R5300:5301 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5326:5329 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5349:5940 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5302:5307 Riscv.rv64d_types <> Regidx constr
+R5310:5321 SailStdpp.Values <> mword_of_int def
+R5330:5344 Riscv.rv64d <> regval_into_reg def
+R5346:5348 xv6iris.SpecUserret <> va2:12 var
+R5353:5354 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5379:5382 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5402:5939 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5355:5360 Riscv.rv64d_types <> Regidx constr
+R5363:5374 SailStdpp.Values <> mword_of_int def
+R5383:5397 Riscv.rv64d <> regval_into_reg def
+R5399:5401 xv6iris.SpecUserret <> va1:11 var
+R5406:5407 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5431:5434 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5454:5938 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5408:5413 Riscv.rv64d_types <> Regidx constr
+R5416:5427 SailStdpp.Values <> mword_of_int def
+R5435:5449 Riscv.rv64d <> regval_into_reg def
+R5451:5453 xv6iris.SpecUserret <> vs1:10 var
+R5458:5459 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5483:5486 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5506:5937 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5460:5465 Riscv.rv64d_types <> Regidx constr
+R5468:5479 SailStdpp.Values <> mword_of_int def
+R5487:5501 Riscv.rv64d <> regval_into_reg def
+R5503:5505 xv6iris.SpecUserret <> vs0:9 var
+R5510:5511 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5535:5538 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5558:5936 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5512:5517 Riscv.rv64d_types <> Regidx constr
+R5520:5531 SailStdpp.Values <> mword_of_int def
+R5539:5553 Riscv.rv64d <> regval_into_reg def
+R5555:5557 xv6iris.SpecUserret <> vt2:8 var
+R5562:5563 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5587:5590 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5610:5935 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5564:5569 Riscv.rv64d_types <> Regidx constr
+R5572:5583 SailStdpp.Values <> mword_of_int def
+R5591:5605 Riscv.rv64d <> regval_into_reg def
+R5607:5609 xv6iris.SpecUserret <> vt1:7 var
+R5614:5615 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5639:5642 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5662:5934 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5616:5621 Riscv.rv64d_types <> Regidx constr
+R5624:5635 SailStdpp.Values <> mword_of_int def
+R5643:5657 Riscv.rv64d <> regval_into_reg def
+R5659:5661 xv6iris.SpecUserret <> vt0:6 var
+R5666:5667 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5691:5694 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5714:5933 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5668:5673 Riscv.rv64d_types <> Regidx constr
+R5676:5687 SailStdpp.Values <> mword_of_int def
+R5695:5709 Riscv.rv64d <> regval_into_reg def
+R5711:5713 xv6iris.SpecUserret <> vtp:5 var
+R5718:5719 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5743:5746 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5766:5932 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5720:5725 Riscv.rv64d_types <> Regidx constr
+R5728:5739 SailStdpp.Values <> mword_of_int def
+R5747:5761 Riscv.rv64d <> regval_into_reg def
+R5763:5765 xv6iris.SpecUserret <> vgp:4 var
+R5770:5771 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5795:5798 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5818:5931 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5772:5777 Riscv.rv64d_types <> Regidx constr
+R5780:5791 SailStdpp.Values <> mword_of_int def
+R5799:5813 Riscv.rv64d <> regval_into_reg def
+R5815:5817 xv6iris.SpecUserret <> vsp:3 var
+R5822:5823 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5847:5850 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5870:5930 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5824:5829 Riscv.rv64d_types <> Regidx constr
+R5832:5843 SailStdpp.Values <> mword_of_int def
+R5851:5865 Riscv.rv64d <> regval_into_reg def
+R5867:5869 xv6iris.SpecUserret <> vra:2 var
+R5874:5875 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5900:5903 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5926:5929 stdpp.base <> ::stdpp_scope:'<['_x_':='_x_']>' not
+R5876:5881 Riscv.rv64d_types <> Regidx constr
+R5884:5895 SailStdpp.Values <> mword_of_int def
+R5904:5915 SailStdpp.Values <> mword_of_int def
+R5917:5925 xv6iris.TrampPt <> TRAPFRAME def
+R5929:5929 xv6iris.SpecUserret <> m:1 var
+def 5975:5992 <> wp_userret_pt_body
+R5997:6003 xv6iris.RiscvPtsto <> riscvGS class
+binder 6005:6006 <> Σ:33
+binder 5996:6006 <> riscvGS0:34
+R6010:6013 xv6iris.Xv6G <> xv6G class
+R6015:6016 xv6iris.SpecUserret <> Σ:33 var
+binder 6009:6016 <> xv6G0:35
+R6027:6031 xv6iris.RiscvLang <> GenId class
+binder 6021:6023 <> GEN:36
+R6042:6046 xv6iris.RiscvLang <> CpuId class
+binder 6036:6038 <> CID:37
+R6056:6061 xv6iris.TsoCtx <> CurCtx class
+binder 6051:6052 <> XI:38
+R6087:6091 SailStdpp.Values <> mword def
+binder 6069:6073 <> kroot:39
+binder 6075:6079 <> uroot:40
+binder 6081:6083 <> tfp:41
+R6107:6110 stdpp.gmap <> gmap rec
+R6124:6128 SailStdpp.Values <> mword def
+R6113:6117 SailStdpp.Values <> mword def
+binder 6102:6103 <> um:42
+R6144:6150 xv6iris.RegFile <> regfile def
+binder 6140:6140 <> m:43
+R6162:6166 SailStdpp.Values <> mword def
+binder 6154:6158 <> usatp:44
+R6223:6227 SailStdpp.Values <> mword def
+binder 6177:6184 <> mstatus0:45
+binder 6186:6190 <> mie_v:46
+binder 6192:6195 <> mdv0:47
+binder 6197:6204 <> menvcfg0:48
+binder 6206:6213 <> senvcfg0:49
+binder 6215:6219 <> sepc0:50
+R6372:6373 stdpp.bitvector.definitions <> bv rec
+binder 6238:6240 <> vra:51
+binder 6242:6244 <> vsp:52
+binder 6246:6248 <> vgp:53
+binder 6250:6252 <> vtp:54
+binder 6254:6256 <> vt0:55
+binder 6258:6260 <> vt1:56
+binder 6262:6264 <> vt2:57
+binder 6266:6268 <> vs0:58
+binder 6270:6272 <> vs1:59
+binder 6274:6276 <> va1:60
+binder 6278:6280 <> va2:61
+binder 6282:6284 <> va3:62
+binder 6286:6288 <> va4:63
+binder 6290:6292 <> va5:64
+binder 6294:6296 <> va6:65
+binder 6298:6300 <> va7:66
+binder 6307:6309 <> vs2:67
+binder 6311:6313 <> vs3:68
+binder 6315:6317 <> vs4:69
+binder 6319:6321 <> vs5:70
+binder 6323:6325 <> vs6:71
+binder 6327:6329 <> vs7:72
+binder 6331:6333 <> vs8:73
+binder 6335:6337 <> vs9:74
+binder 6339:6342 <> vs10:75
+binder 6344:6347 <> vs11:76
+binder 6349:6351 <> vt3:77
+binder 6353:6355 <> vt4:78
+binder 6357:6359 <> vt5:79
+binder 6361:6363 <> vt6:80
+binder 6365:6368 <> va0f:81
+R6390:6394 iris.algebra.dfrac <> dfrac ind
+binder 6384:6386 <> dqm:82
+R6480:6485 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6472:6474 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6430:6435 SailStdpp.Operators_mwords <> eq_vec def
+R6466:6467 SailStdpp.Values <> :::'''b'_x not
+R6438:6453 Riscv.rv64d <> _get_Mstatus_SIE def
+R6455:6462 xv6iris.SpecUserret <> mstatus0:45 var
+R6475:6479 Corelib.Init.Datatypes <> false constr
+R6537:6542 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6529:6531 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6486:6491 SailStdpp.Operators_mwords <> eq_vec def
+R6523:6524 SailStdpp.Values <> :::'''b'_x not
+R6494:6510 Riscv.rv64d <> _get_Mstatus_MPRV def
+R6512:6519 xv6iris.SpecUserret <> mstatus0:45 var
+R6532:6536 Corelib.Init.Datatypes <> false constr
+R6577:6582 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6568:6570 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6543:6558 Riscv.rv64d <> _get_Mstatus_SXL def
+R6560:6567 xv6iris.SpecUserret <> mstatus0:45 var
+R6571:6572 SailStdpp.Values <> :::'''b'_x not
+R6633:6638 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6625:6627 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6583:6588 SailStdpp.Operators_mwords <> eq_vec def
+R6619:6620 SailStdpp.Values <> :::'''b'_x not
+R6591:6606 Riscv.rv64d <> _get_Mstatus_TVM def
+R6608:6615 xv6iris.SpecUserret <> mstatus0:45 var
+R6628:6632 Corelib.Init.Datatypes <> false constr
+R6688:6693 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6681:6683 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6639:6644 SailStdpp.Operators_mwords <> eq_vec def
+R6675:6676 SailStdpp.Values <> :::'''b'_x not
+R6647:6662 Riscv.rv64d <> _get_Mstatus_MXR def
+R6664:6671 xv6iris.SpecUserret <> mstatus0:45 var
+R6684:6687 Corelib.Init.Datatypes <> true constr
+R6734:6739 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6722:6724 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6694:6700 SailStdpp.Operators_mwords <> and_vec def
+R6709:6715 SailStdpp.Operators_mwords <> not_vec def
+R6717:6720 xv6iris.SpecUserret <> mdv0:47 var
+R6702:6706 xv6iris.SpecUserret <> mie_v:46 var
+R6725:6730 Riscv.rv64d <> zeros' def
+R6801:6806 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6786:6788 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6740:6757 Riscv.rv64d <> pmm_mode_backwards def
+R6760:6775 Riscv.rv64d <> _get_MEnvcfg_PMM def
+R6777:6784 xv6iris.SpecUserret <> menvcfg0:48 var
+R6789:6800 Riscv.rv64d_types <> PMM_Disabled constr
+R6858:6863 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6851:6853 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6807:6812 SailStdpp.Operators_mwords <> eq_vec def
+R6845:6846 SailStdpp.Values <> :::'''b'_x not
+R6815:6832 Riscv.rv64d <> _get_MEnvcfg_PBMTE def
+R6834:6841 xv6iris.SpecUserret <> menvcfg0:48 var
+R6854:6857 Corelib.Init.Datatypes <> true constr
+R6884:6889 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6872:6874 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6864:6871 xv6iris.SpecUserret <> menvcfg0:48 var
+R6875:6883 xv6iris.RiscvFetchExec <> MENVCFG_S def
+R6915:6920 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6898:6900 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6890:6897 xv6iris.SpecUserret <> senvcfg0:49 var
+R6901:6912 SailStdpp.Values <> mword_of_int def
+R6934:6986 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R6921:6930 xv6iris.UptTree <> upt_map_wf def
+R6932:6933 xv6iris.SpecUserret <> um:42 var
+R7037:7042 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7029:7031 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R6987:6992 SailStdpp.Operators_mwords <> eq_vec def
+R7023:7024 SailStdpp.Values <> :::'''b'_x not
+R6995:7010 Riscv.rv64d <> _get_Mstatus_TSR def
+R7012:7019 xv6iris.SpecUserret <> mstatus0:45 var
+R7032:7036 Corelib.Init.Datatypes <> false constr
+R7071:7113 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7064:7066 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7043:7054 xv6iris.MstatusBits <> sret_newpriv def
+R7056:7063 xv6iris.SpecUserret <> mstatus0:45 var
+R7067:7070 Riscv.rv64d_types <> User constr
+R7152:7157 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7144:7146 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7115:7119 stdpp.base <> ::stdpp_scope:x_'!!!'_x not
+R7120:7125 Riscv.rv64d_types <> Regidx constr
+R7128:7139 SailStdpp.Values <> mword_of_int def
+R7114:7114 xv6iris.SpecUserret <> m:43 var
+R7147:7151 xv6iris.SpecUserret <> usatp:44 var
+R7215:7220 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7192:7195 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7214:7214 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7158:7173 Riscv.rv64d <> _get_Satp64_Mode def
+R7176:7184 Riscv.rv64d <> Mk_Satp64 def
+R7186:7190 xv6iris.SpecUserret <> usatp:44 var
+R7207:7211 SailStdpp.Values <> mword def
+R7196:7197 SailStdpp.Values <> :::'''b'_x not
+R7322:7327 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7292:7295 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7321:7321 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7221:7232 Riscv.rv64d_types <> zero_extend' def
+R7238:7249 Riscv.rv64d <> satp_to_asid def
+R7282:7286 SailStdpp.Values <> mword def
+R7252:7259 SailStdpp.TypeCasts <> autocast def
+R7274:7278 xv6iris.SpecUserret <> usatp:44 var
+R7267:7271 SailStdpp.Values <> mword def
+R7313:7317 SailStdpp.Values <> mword def
+R7296:7307 SailStdpp.Values <> mword_of_int def
+R7412:7417 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R7404:7406 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R7328:7335 SailStdpp.TypeCasts <> autocast def
+R7351:7361 Riscv.rv64d <> satp_to_ppn def
+R7394:7398 SailStdpp.Values <> mword def
+R7364:7371 SailStdpp.TypeCasts <> autocast def
+R7386:7390 xv6iris.SpecUserret <> usatp:44 var
+R7379:7383 SailStdpp.Values <> mword def
+R7343:7347 SailStdpp.Values <> mword def
+R7407:7411 xv6iris.SpecUserret <> uroot:40 var
+R7429:7436 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R7418:7428 xv6iris.KernelText <> kernel_text def
+R7446:7453 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7437:7445 xv6iris.RiscvFetchExec <> hw_config def
+R7466:7473 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7454:7465 xv6iris.MinstretInv <> minstret_inv def
+R7506:7513 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7484:7491 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
+R7474:7483 Riscv.rv64d_types <> hart_state constr
+R7492:7502 Riscv.rv64d_types <> HART_ACTIVE constr
+R7504:7505 Corelib.Init.Datatypes <> tt constr
+R7545:7552 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7527:7534 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
+R7514:7526 Riscv.rv64d_types <> cur_privilege constr
+R7535:7544 Riscv.rv64d_types <> Supervisor constr
+R7576:7583 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7560:7567 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
+R7553:7559 Riscv.rv64d_types <> mstatus constr
+R7568:7575 xv6iris.SpecUserret <> mstatus0:45 var
+R7600:7607 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7587:7594 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
+R7584:7586 Riscv.rv64d_types <> mie constr
+R7595:7599 xv6iris.SpecUserret <> mie_v:46 var
+R7627:7634 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7615:7622 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
+R7608:7614 Riscv.rv64d_types <> mideleg constr
+R7623:7626 xv6iris.SpecUserret <> mdv0:47 var
+R7658:7665 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7642:7649 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
+R7635:7641 Riscv.rv64d_types <> menvcfg constr
+R7650:7657 xv6iris.SpecUserret <> menvcfg0:48 var
+R7692:7699 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7673:7683 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ□'_x not
+R7666:7672 Riscv.rv64d_types <> senvcfg constr
+R7684:7691 xv6iris.SpecUserret <> senvcfg0:49 var
+R7717:7783 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7704:7711 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
+R7700:7703 Riscv.rv64d_types <> sepc constr
+R7712:7716 xv6iris.SpecUserret <> sepc0:50 var
+R7817:7824 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7784:7790 xv6iris.RiscvPtsto <> kmap_at def
+R7812:7816 xv6iris.RiscvPtsto <> KP_rx constr
+R7802:7810 xv6iris.KptExecMap <> tramp_ppn def
+R7792:7800 xv6iris.KptExecMap <> tramp_vpn def
+R7841:7848 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7825:7834 xv6iris.KptShare <> tlb_res_pt def
+R7836:7840 xv6iris.SpecUserret <> kroot:39 var
+R7886:7893 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7849:7856 xv6iris.PtTree <> pt_frame abbrev
+R7859:7871 xv6iris.UptTree <> upt_tree_spec def
+R7873:7877 xv6iris.SpecUserret <> uroot:40 var
+R7879:7881 xv6iris.SpecUserret <> tfp:41 var
+R7883:7884 xv6iris.SpecUserret <> um:42 var
+R7910:7917 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7894:7898 xv6iris.InstrBytes <> pc_is def
+R7901:7903 xv6iris.UserretDefs <> uva def
+R7928:7935 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7918:7925 xv6iris.WpGpr <> gpr_file def
+R7927:7927 xv6iris.SpecUserret <> m:43 var
+R7970:7977 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7948:7960 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R7964:7966 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R7936:7940 xv6iris.TrampPt <> tf_pa def
+R7942:7944 xv6iris.SpecUserret <> tfp:41 var
+R7961:7963 xv6iris.SpecUserret <> dqm:82 var
+R7967:7969 xv6iris.SpecUserret <> vra:51 var
+R8012:8019 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R7990:8002 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8006:8008 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R7978:7982 xv6iris.TrampPt <> tf_pa def
+R7984:7986 xv6iris.SpecUserret <> tfp:41 var
+R8003:8005 xv6iris.SpecUserret <> dqm:82 var
+R8009:8011 xv6iris.SpecUserret <> vsp:52 var
+R8054:8061 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8032:8044 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8048:8050 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8020:8024 xv6iris.TrampPt <> tf_pa def
+R8026:8028 xv6iris.SpecUserret <> tfp:41 var
+R8045:8047 xv6iris.SpecUserret <> dqm:82 var
+R8051:8053 xv6iris.SpecUserret <> vgp:53 var
+R8096:8103 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8074:8086 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8090:8092 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8062:8066 xv6iris.TrampPt <> tf_pa def
+R8068:8070 xv6iris.SpecUserret <> tfp:41 var
+R8087:8089 xv6iris.SpecUserret <> dqm:82 var
+R8093:8095 xv6iris.SpecUserret <> vtp:54 var
+R8138:8145 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8116:8128 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8132:8134 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8104:8108 xv6iris.TrampPt <> tf_pa def
+R8110:8112 xv6iris.SpecUserret <> tfp:41 var
+R8129:8131 xv6iris.SpecUserret <> dqm:82 var
+R8135:8137 xv6iris.SpecUserret <> vt0:55 var
+R8180:8187 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8158:8170 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8174:8176 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8146:8150 xv6iris.TrampPt <> tf_pa def
+R8152:8154 xv6iris.SpecUserret <> tfp:41 var
+R8171:8173 xv6iris.SpecUserret <> dqm:82 var
+R8177:8179 xv6iris.SpecUserret <> vt1:56 var
+R8222:8229 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8200:8212 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8216:8218 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8188:8192 xv6iris.TrampPt <> tf_pa def
+R8194:8196 xv6iris.SpecUserret <> tfp:41 var
+R8213:8215 xv6iris.SpecUserret <> dqm:82 var
+R8219:8221 xv6iris.SpecUserret <> vt2:57 var
+R8264:8271 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8242:8254 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8258:8260 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8230:8234 xv6iris.TrampPt <> tf_pa def
+R8236:8238 xv6iris.SpecUserret <> tfp:41 var
+R8255:8257 xv6iris.SpecUserret <> dqm:82 var
+R8261:8263 xv6iris.SpecUserret <> vs0:58 var
+R8307:8314 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8285:8297 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8301:8303 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8272:8276 xv6iris.TrampPt <> tf_pa def
+R8278:8280 xv6iris.SpecUserret <> tfp:41 var
+R8298:8300 xv6iris.SpecUserret <> dqm:82 var
+R8304:8306 xv6iris.SpecUserret <> vs1:59 var
+R8350:8357 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8328:8340 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8344:8346 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8315:8319 xv6iris.TrampPt <> tf_pa def
+R8321:8323 xv6iris.SpecUserret <> tfp:41 var
+R8341:8343 xv6iris.SpecUserret <> dqm:82 var
+R8347:8349 xv6iris.SpecUserret <> va1:60 var
+R8393:8400 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8371:8383 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8387:8389 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8358:8362 xv6iris.TrampPt <> tf_pa def
+R8364:8366 xv6iris.SpecUserret <> tfp:41 var
+R8384:8386 xv6iris.SpecUserret <> dqm:82 var
+R8390:8392 xv6iris.SpecUserret <> va2:61 var
+R8436:8443 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8414:8426 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8430:8432 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8401:8405 xv6iris.TrampPt <> tf_pa def
+R8407:8409 xv6iris.SpecUserret <> tfp:41 var
+R8427:8429 xv6iris.SpecUserret <> dqm:82 var
+R8433:8435 xv6iris.SpecUserret <> va3:62 var
+R8479:8486 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8457:8469 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8473:8475 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8444:8448 xv6iris.TrampPt <> tf_pa def
+R8450:8452 xv6iris.SpecUserret <> tfp:41 var
+R8470:8472 xv6iris.SpecUserret <> dqm:82 var
+R8476:8478 xv6iris.SpecUserret <> va4:63 var
+R8522:8529 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8500:8512 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8516:8518 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8487:8491 xv6iris.TrampPt <> tf_pa def
+R8493:8495 xv6iris.SpecUserret <> tfp:41 var
+R8513:8515 xv6iris.SpecUserret <> dqm:82 var
+R8519:8521 xv6iris.SpecUserret <> va5:64 var
+R8565:8572 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8543:8555 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8559:8561 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8530:8534 xv6iris.TrampPt <> tf_pa def
+R8536:8538 xv6iris.SpecUserret <> tfp:41 var
+R8556:8558 xv6iris.SpecUserret <> dqm:82 var
+R8562:8564 xv6iris.SpecUserret <> va6:65 var
+R8608:8615 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8586:8598 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8602:8604 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8573:8577 xv6iris.TrampPt <> tf_pa def
+R8579:8581 xv6iris.SpecUserret <> tfp:41 var
+R8599:8601 xv6iris.SpecUserret <> dqm:82 var
+R8605:8607 xv6iris.SpecUserret <> va7:66 var
+R8651:8658 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8629:8641 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8645:8647 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8616:8620 xv6iris.TrampPt <> tf_pa def
+R8622:8624 xv6iris.SpecUserret <> tfp:41 var
+R8642:8644 xv6iris.SpecUserret <> dqm:82 var
+R8648:8650 xv6iris.SpecUserret <> vs2:67 var
+R8694:8701 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8672:8684 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8688:8690 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8659:8663 xv6iris.TrampPt <> tf_pa def
+R8665:8667 xv6iris.SpecUserret <> tfp:41 var
+R8685:8687 xv6iris.SpecUserret <> dqm:82 var
+R8691:8693 xv6iris.SpecUserret <> vs3:68 var
+R8737:8744 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8715:8727 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8731:8733 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8702:8706 xv6iris.TrampPt <> tf_pa def
+R8708:8710 xv6iris.SpecUserret <> tfp:41 var
+R8728:8730 xv6iris.SpecUserret <> dqm:82 var
+R8734:8736 xv6iris.SpecUserret <> vs4:69 var
+R8780:8787 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8758:8770 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8774:8776 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8745:8749 xv6iris.TrampPt <> tf_pa def
+R8751:8753 xv6iris.SpecUserret <> tfp:41 var
+R8771:8773 xv6iris.SpecUserret <> dqm:82 var
+R8777:8779 xv6iris.SpecUserret <> vs5:70 var
+R8823:8830 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8801:8813 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8817:8819 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8788:8792 xv6iris.TrampPt <> tf_pa def
+R8794:8796 xv6iris.SpecUserret <> tfp:41 var
+R8814:8816 xv6iris.SpecUserret <> dqm:82 var
+R8820:8822 xv6iris.SpecUserret <> vs6:71 var
+R8866:8873 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8844:8856 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8860:8862 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8831:8835 xv6iris.TrampPt <> tf_pa def
+R8837:8839 xv6iris.SpecUserret <> tfp:41 var
+R8857:8859 xv6iris.SpecUserret <> dqm:82 var
+R8863:8865 xv6iris.SpecUserret <> vs7:72 var
+R8909:8916 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8887:8899 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8903:8905 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8874:8878 xv6iris.TrampPt <> tf_pa def
+R8880:8882 xv6iris.SpecUserret <> tfp:41 var
+R8900:8902 xv6iris.SpecUserret <> dqm:82 var
+R8906:8908 xv6iris.SpecUserret <> vs8:73 var
+R8952:8959 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8930:8942 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8946:8948 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8917:8921 xv6iris.TrampPt <> tf_pa def
+R8923:8925 xv6iris.SpecUserret <> tfp:41 var
+R8943:8945 xv6iris.SpecUserret <> dqm:82 var
+R8949:8951 xv6iris.SpecUserret <> vs9:74 var
+R8996:9003 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8973:8985 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8989:8991 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R8960:8964 xv6iris.TrampPt <> tf_pa def
+R8966:8968 xv6iris.SpecUserret <> tfp:41 var
+R8986:8988 xv6iris.SpecUserret <> dqm:82 var
+R8992:8995 xv6iris.SpecUserret <> vs10:75 var
+R9040:9047 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9017:9029 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R9033:9035 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R9004:9008 xv6iris.TrampPt <> tf_pa def
+R9010:9012 xv6iris.SpecUserret <> tfp:41 var
+R9030:9032 xv6iris.SpecUserret <> dqm:82 var
+R9036:9039 xv6iris.SpecUserret <> vs11:76 var
+R9083:9090 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9061:9073 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R9077:9079 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R9048:9052 xv6iris.TrampPt <> tf_pa def
+R9054:9056 xv6iris.SpecUserret <> tfp:41 var
+R9074:9076 xv6iris.SpecUserret <> dqm:82 var
+R9080:9082 xv6iris.SpecUserret <> vt3:77 var
+R9126:9133 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9104:9116 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R9120:9122 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R9091:9095 xv6iris.TrampPt <> tf_pa def
+R9097:9099 xv6iris.SpecUserret <> tfp:41 var
+R9117:9119 xv6iris.SpecUserret <> dqm:82 var
+R9123:9125 xv6iris.SpecUserret <> vt4:78 var
+R9169:9176 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9147:9159 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R9163:9165 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R9134:9138 xv6iris.TrampPt <> tf_pa def
+R9140:9142 xv6iris.SpecUserret <> tfp:41 var
+R9160:9162 xv6iris.SpecUserret <> dqm:82 var
+R9166:9168 xv6iris.SpecUserret <> vt5:79 var
+R9212:9219 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9190:9202 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R9206:9208 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R9177:9181 xv6iris.TrampPt <> tf_pa def
+R9183:9185 xv6iris.SpecUserret <> tfp:41 var
+R9203:9205 xv6iris.SpecUserret <> dqm:82 var
+R9209:9211 xv6iris.SpecUserret <> vt6:80 var
+R9256:9263 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9233:9245 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R9249:9251 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R9220:9224 xv6iris.TrampPt <> tf_pa def
+R9226:9228 xv6iris.SpecUserret <> tfp:41 var
+R9246:9248 xv6iris.SpecUserret <> dqm:82 var
+R9252:9255 xv6iris.SpecUserret <> va0f:81 var
+R9264:9265 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11210:11218 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9298:9307 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9276:9283 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
+R9266:9275 Riscv.rv64d_types <> hart_state constr
+R9284:9294 Riscv.rv64d_types <> HART_ACTIVE constr
+R9296:9297 Corelib.Init.Datatypes <> tt constr
+R9333:9342 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9321:9328 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
+R9308:9320 Riscv.rv64d_types <> cur_privilege constr
+R9329:9332 Riscv.rv64d_types <> User constr
+R9375:9384 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9350:9357 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
+R9343:9349 Riscv.rv64d_types <> mstatus constr
+R9358:9365 xv6iris.MstatusBits <> sret_ms5 def
+R9367:9374 xv6iris.SpecUserret <> mstatus0:45 var
+R9401:9410 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9388:9395 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
+R9385:9387 Riscv.rv64d_types <> mie constr
+R9396:9400 xv6iris.SpecUserret <> mie_v:46 var
+R9430:9439 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9418:9425 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
+R9411:9417 Riscv.rv64d_types <> mideleg constr
+R9426:9429 xv6iris.SpecUserret <> mdv0:47 var
+R9463:9472 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9447:9454 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
+R9440:9446 Riscv.rv64d_types <> menvcfg constr
+R9455:9462 xv6iris.SpecUserret <> menvcfg0:48 var
+R9499:9508 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9480:9490 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ□'_x not
+R9473:9479 Riscv.rv64d_types <> senvcfg constr
+R9491:9498 xv6iris.SpecUserret <> senvcfg0:49 var
+R9526:9535 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9513:9520 xv6iris.RiscvPtsto <> ::bi_scope:x_'↦ᵣ'_x not
+R9509:9512 Riscv.rv64d_types <> sepc constr
+R9521:9525 xv6iris.SpecUserret <> sepc0:50 var
+R9560:9569 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9536:9546 xv6iris.UptTree <> utlb_inv_pt def
+R9548:9552 xv6iris.SpecUserret <> uroot:40 var
+R9554:9556 xv6iris.SpecUserret <> tfp:41 var
+R9558:9559 xv6iris.SpecUserret <> um:42 var
+R9590:9599 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9570:9574 xv6iris.InstrBytes <> pc_is def
+R9577:9582 xv6iris.RiscvExtras <> ret_pc def
+R9584:9588 xv6iris.SpecUserret <> sepc0:50 var
+R9783:9792 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9600:9607 xv6iris.WpGpr <> gpr_file def
+R9610:9620 xv6iris.SpecUserret <> userret_gpr def
+R9622:9622 xv6iris.SpecUserret <> m:43 var
+R9624:9626 xv6iris.SpecUserret <> vra:51 var
+R9628:9630 xv6iris.SpecUserret <> vsp:52 var
+R9632:9634 xv6iris.SpecUserret <> vgp:53 var
+R9636:9638 xv6iris.SpecUserret <> vtp:54 var
+R9640:9642 xv6iris.SpecUserret <> vt0:55 var
+R9644:9646 xv6iris.SpecUserret <> vt1:56 var
+R9648:9650 xv6iris.SpecUserret <> vt2:57 var
+R9652:9654 xv6iris.SpecUserret <> vs0:58 var
+R9656:9658 xv6iris.SpecUserret <> vs1:59 var
+R9660:9662 xv6iris.SpecUserret <> va1:60 var
+R9664:9666 xv6iris.SpecUserret <> va2:61 var
+R9668:9670 xv6iris.SpecUserret <> va3:62 var
+R9688:9690 xv6iris.SpecUserret <> va4:63 var
+R9692:9694 xv6iris.SpecUserret <> va5:64 var
+R9696:9698 xv6iris.SpecUserret <> va6:65 var
+R9700:9702 xv6iris.SpecUserret <> va7:66 var
+R9704:9706 xv6iris.SpecUserret <> vs2:67 var
+R9708:9710 xv6iris.SpecUserret <> vs3:68 var
+R9712:9714 xv6iris.SpecUserret <> vs4:69 var
+R9716:9718 xv6iris.SpecUserret <> vs5:70 var
+R9720:9722 xv6iris.SpecUserret <> vs6:71 var
+R9724:9726 xv6iris.SpecUserret <> vs7:72 var
+R9728:9730 xv6iris.SpecUserret <> vs8:73 var
+R9732:9734 xv6iris.SpecUserret <> vs9:74 var
+R9736:9739 xv6iris.SpecUserret <> vs10:75 var
+R9741:9744 xv6iris.SpecUserret <> vs11:76 var
+R9762:9764 xv6iris.SpecUserret <> vt3:77 var
+R9766:9768 xv6iris.SpecUserret <> vt4:78 var
+R9770:9772 xv6iris.SpecUserret <> vt5:79 var
+R9774:9776 xv6iris.SpecUserret <> vt6:80 var
+R9778:9781 xv6iris.SpecUserret <> va0f:81 var
+R9827:9836 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9805:9817 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R9821:9823 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R9793:9797 xv6iris.TrampPt <> tf_pa def
+R9799:9801 xv6iris.SpecUserret <> tfp:41 var
+R9818:9820 xv6iris.SpecUserret <> dqm:82 var
+R9824:9826 xv6iris.SpecUserret <> vra:51 var
+R9871:9880 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9849:9861 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R9865:9867 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R9837:9841 xv6iris.TrampPt <> tf_pa def
+R9843:9845 xv6iris.SpecUserret <> tfp:41 var
+R9862:9864 xv6iris.SpecUserret <> dqm:82 var
+R9868:9870 xv6iris.SpecUserret <> vsp:52 var
+R9915:9924 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9893:9905 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R9909:9911 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R9881:9885 xv6iris.TrampPt <> tf_pa def
+R9887:9889 xv6iris.SpecUserret <> tfp:41 var
+R9906:9908 xv6iris.SpecUserret <> dqm:82 var
+R9912:9914 xv6iris.SpecUserret <> vgp:53 var
+R9959:9968 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9937:9949 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R9953:9955 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R9925:9929 xv6iris.TrampPt <> tf_pa def
+R9931:9933 xv6iris.SpecUserret <> tfp:41 var
+R9950:9952 xv6iris.SpecUserret <> dqm:82 var
+R9956:9958 xv6iris.SpecUserret <> vtp:54 var
+R10003:10012 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R9981:9993 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R9997:9999 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R9969:9973 xv6iris.TrampPt <> tf_pa def
+R9975:9977 xv6iris.SpecUserret <> tfp:41 var
+R9994:9996 xv6iris.SpecUserret <> dqm:82 var
+R10000:10002 xv6iris.SpecUserret <> vt0:55 var
+R10047:10056 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10025:10037 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10041:10043 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10013:10017 xv6iris.TrampPt <> tf_pa def
+R10019:10021 xv6iris.SpecUserret <> tfp:41 var
+R10038:10040 xv6iris.SpecUserret <> dqm:82 var
+R10044:10046 xv6iris.SpecUserret <> vt1:56 var
+R10091:10100 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10069:10081 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10085:10087 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10057:10061 xv6iris.TrampPt <> tf_pa def
+R10063:10065 xv6iris.SpecUserret <> tfp:41 var
+R10082:10084 xv6iris.SpecUserret <> dqm:82 var
+R10088:10090 xv6iris.SpecUserret <> vt2:57 var
+R10135:10144 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10113:10125 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10129:10131 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10101:10105 xv6iris.TrampPt <> tf_pa def
+R10107:10109 xv6iris.SpecUserret <> tfp:41 var
+R10126:10128 xv6iris.SpecUserret <> dqm:82 var
+R10132:10134 xv6iris.SpecUserret <> vs0:58 var
+R10180:10189 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10158:10170 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10174:10176 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10145:10149 xv6iris.TrampPt <> tf_pa def
+R10151:10153 xv6iris.SpecUserret <> tfp:41 var
+R10171:10173 xv6iris.SpecUserret <> dqm:82 var
+R10177:10179 xv6iris.SpecUserret <> vs1:59 var
+R10225:10234 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10203:10215 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10219:10221 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10190:10194 xv6iris.TrampPt <> tf_pa def
+R10196:10198 xv6iris.SpecUserret <> tfp:41 var
+R10216:10218 xv6iris.SpecUserret <> dqm:82 var
+R10222:10224 xv6iris.SpecUserret <> va1:60 var
+R10270:10279 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10248:10260 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10264:10266 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10235:10239 xv6iris.TrampPt <> tf_pa def
+R10241:10243 xv6iris.SpecUserret <> tfp:41 var
+R10261:10263 xv6iris.SpecUserret <> dqm:82 var
+R10267:10269 xv6iris.SpecUserret <> va2:61 var
+R10315:10324 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10293:10305 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10309:10311 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10280:10284 xv6iris.TrampPt <> tf_pa def
+R10286:10288 xv6iris.SpecUserret <> tfp:41 var
+R10306:10308 xv6iris.SpecUserret <> dqm:82 var
+R10312:10314 xv6iris.SpecUserret <> va3:62 var
+R10360:10369 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10338:10350 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10354:10356 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10325:10329 xv6iris.TrampPt <> tf_pa def
+R10331:10333 xv6iris.SpecUserret <> tfp:41 var
+R10351:10353 xv6iris.SpecUserret <> dqm:82 var
+R10357:10359 xv6iris.SpecUserret <> va4:63 var
+R10405:10414 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10383:10395 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10399:10401 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10370:10374 xv6iris.TrampPt <> tf_pa def
+R10376:10378 xv6iris.SpecUserret <> tfp:41 var
+R10396:10398 xv6iris.SpecUserret <> dqm:82 var
+R10402:10404 xv6iris.SpecUserret <> va5:64 var
+R10450:10459 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10428:10440 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10444:10446 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10415:10419 xv6iris.TrampPt <> tf_pa def
+R10421:10423 xv6iris.SpecUserret <> tfp:41 var
+R10441:10443 xv6iris.SpecUserret <> dqm:82 var
+R10447:10449 xv6iris.SpecUserret <> va6:65 var
+R10495:10504 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10473:10485 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10489:10491 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10460:10464 xv6iris.TrampPt <> tf_pa def
+R10466:10468 xv6iris.SpecUserret <> tfp:41 var
+R10486:10488 xv6iris.SpecUserret <> dqm:82 var
+R10492:10494 xv6iris.SpecUserret <> va7:66 var
+R10540:10549 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10518:10530 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10534:10536 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10505:10509 xv6iris.TrampPt <> tf_pa def
+R10511:10513 xv6iris.SpecUserret <> tfp:41 var
+R10531:10533 xv6iris.SpecUserret <> dqm:82 var
+R10537:10539 xv6iris.SpecUserret <> vs2:67 var
+R10585:10594 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10563:10575 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10579:10581 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10550:10554 xv6iris.TrampPt <> tf_pa def
+R10556:10558 xv6iris.SpecUserret <> tfp:41 var
+R10576:10578 xv6iris.SpecUserret <> dqm:82 var
+R10582:10584 xv6iris.SpecUserret <> vs3:68 var
+R10630:10639 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10608:10620 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10624:10626 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10595:10599 xv6iris.TrampPt <> tf_pa def
+R10601:10603 xv6iris.SpecUserret <> tfp:41 var
+R10621:10623 xv6iris.SpecUserret <> dqm:82 var
+R10627:10629 xv6iris.SpecUserret <> vs4:69 var
+R10675:10684 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10653:10665 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10669:10671 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10640:10644 xv6iris.TrampPt <> tf_pa def
+R10646:10648 xv6iris.SpecUserret <> tfp:41 var
+R10666:10668 xv6iris.SpecUserret <> dqm:82 var
+R10672:10674 xv6iris.SpecUserret <> vs5:70 var
+R10720:10729 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10698:10710 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10714:10716 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10685:10689 xv6iris.TrampPt <> tf_pa def
+R10691:10693 xv6iris.SpecUserret <> tfp:41 var
+R10711:10713 xv6iris.SpecUserret <> dqm:82 var
+R10717:10719 xv6iris.SpecUserret <> vs6:71 var
+R10765:10774 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10743:10755 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10759:10761 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10730:10734 xv6iris.TrampPt <> tf_pa def
+R10736:10738 xv6iris.SpecUserret <> tfp:41 var
+R10756:10758 xv6iris.SpecUserret <> dqm:82 var
+R10762:10764 xv6iris.SpecUserret <> vs7:72 var
+R10810:10819 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10788:10800 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10804:10806 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10775:10779 xv6iris.TrampPt <> tf_pa def
+R10781:10783 xv6iris.SpecUserret <> tfp:41 var
+R10801:10803 xv6iris.SpecUserret <> dqm:82 var
+R10807:10809 xv6iris.SpecUserret <> vs8:73 var
+R10855:10864 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10833:10845 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10849:10851 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10820:10824 xv6iris.TrampPt <> tf_pa def
+R10826:10828 xv6iris.SpecUserret <> tfp:41 var
+R10846:10848 xv6iris.SpecUserret <> dqm:82 var
+R10852:10854 xv6iris.SpecUserret <> vs9:74 var
+R10901:10910 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10878:10890 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10894:10896 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10865:10869 xv6iris.TrampPt <> tf_pa def
+R10871:10873 xv6iris.SpecUserret <> tfp:41 var
+R10891:10893 xv6iris.SpecUserret <> dqm:82 var
+R10897:10900 xv6iris.SpecUserret <> vs10:75 var
+R10947:10956 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10924:10936 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10940:10942 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10911:10915 xv6iris.TrampPt <> tf_pa def
+R10917:10919 xv6iris.SpecUserret <> tfp:41 var
+R10937:10939 xv6iris.SpecUserret <> dqm:82 var
+R10943:10946 xv6iris.SpecUserret <> vs11:76 var
+R10992:11001 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R10970:10982 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10986:10988 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R10957:10961 xv6iris.TrampPt <> tf_pa def
+R10963:10965 xv6iris.SpecUserret <> tfp:41 var
+R10983:10985 xv6iris.SpecUserret <> dqm:82 var
+R10989:10991 xv6iris.SpecUserret <> vt3:77 var
+R11037:11046 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11015:11027 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R11031:11033 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R11002:11006 xv6iris.TrampPt <> tf_pa def
+R11008:11010 xv6iris.SpecUserret <> tfp:41 var
+R11028:11030 xv6iris.SpecUserret <> dqm:82 var
+R11034:11036 xv6iris.SpecUserret <> vt4:78 var
+R11082:11091 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11060:11072 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R11076:11078 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R11047:11051 xv6iris.TrampPt <> tf_pa def
+R11053:11055 xv6iris.SpecUserret <> tfp:41 var
+R11073:11075 xv6iris.SpecUserret <> dqm:82 var
+R11079:11081 xv6iris.SpecUserret <> vt5:79 var
+R11127:11136 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11105:11117 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R11121:11123 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R11092:11096 xv6iris.TrampPt <> tf_pa def
+R11098:11100 xv6iris.SpecUserret <> tfp:41 var
+R11118:11120 xv6iris.SpecUserret <> dqm:82 var
+R11124:11126 xv6iris.SpecUserret <> vt6:80 var
+R11173:11182 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11150:11162 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R11166:11168 xv6iris.SpecUserret <> ::bi_scope:x_'↦ₚ₈c{'_x_'}'_x not
+R11137:11141 xv6iris.TrampPt <> tf_pa def
+R11143:11145 xv6iris.SpecUserret <> tfp:41 var
+R11163:11165 xv6iris.SpecUserret <> dqm:82 var
+R11169:11172 xv6iris.SpecUserret <> va0f:81 var
+R11183:11186 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R11209:11209 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R11194:11197 iris.program_logic.language <> expr proj
+R11199:11208 xv6iris.RiscvLang <> riscv_lang def
+R11187:11190 xv6iris.RiscvLang <> Loop abbrev
+R11219:11222 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R11245:11245 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R11230:11233 iris.program_logic.language <> expr proj
+R11235:11244 xv6iris.RiscvLang <> riscv_lang def
+R11223:11226 xv6iris.RiscvLang <> Loop abbrev
+modtype 11261:11267 <> USERRET
+ax 11282:11294 USERRET wp_userret_pt
+R11302:11310 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R11718:11726 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R11312:11318 xv6iris.RiscvPtsto <> riscvGS class
+binder 11320:11321 <> Σ:83
+binder 11311:11321 <> riscvGS0:84
+R11325:11328 xv6iris.Xv6G <> xv6G class
+R11330:11331 xv6iris.SpecUserret <> Σ:83 var
+binder 11324:11331 <> xv6G0:85
+R11342:11346 xv6iris.RiscvLang <> GenId class
+binder 11336:11338 <> GEN:86
+R11357:11361 xv6iris.RiscvLang <> CpuId class
+binder 11351:11353 <> CID:87
+R11371:11376 xv6iris.TsoCtx <> CurCtx class
+binder 11366:11367 <> XI:88
+R11404:11408 SailStdpp.Values <> mword def
+binder 11386:11390 <> kroot:89
+R11404:11408 SailStdpp.Values <> mword def
+binder 11392:11396 <> uroot:90
+R11404:11408 SailStdpp.Values <> mword def
+binder 11398:11400 <> tfp:91
+R11426:11429 stdpp.gmap <> gmap rec
+R11443:11447 SailStdpp.Values <> mword def
+R11432:11436 SailStdpp.Values <> mword def
+binder 11421:11422 <> um:92
+R11459:11465 xv6iris.RegFile <> regfile def
+binder 11455:11455 <> m:93
+R11477:11481 SailStdpp.Values <> mword def
+binder 11469:11473 <> usatp:94
+R11540:11544 SailStdpp.Values <> mword def
+binder 11494:11501 <> mstatus0:95
+R11540:11544 SailStdpp.Values <> mword def
+binder 11503:11507 <> mie_v:96
+R11540:11544 SailStdpp.Values <> mword def
+binder 11509:11512 <> mdv0:97
+R11540:11544 SailStdpp.Values <> mword def
+binder 11514:11521 <> menvcfg0:98
+R11540:11544 SailStdpp.Values <> mword def
+binder 11523:11530 <> senvcfg0:99
+R11540:11544 SailStdpp.Values <> mword def
+binder 11532:11536 <> sepc0:100
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11557:11559 <> vra:101
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11561:11563 <> vsp:102
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11565:11567 <> vgp:103
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11569:11571 <> vtp:104
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11573:11575 <> vt0:105
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11577:11579 <> vt1:106
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11581:11583 <> vt2:107
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11585:11587 <> vs0:108
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11589:11591 <> vs1:109
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11593:11595 <> va1:110
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11597:11599 <> va2:111
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11601:11603 <> va3:112
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11605:11607 <> va4:113
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11609:11611 <> va5:114
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11613:11615 <> va6:115
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11617:11619 <> va7:116
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11628:11630 <> vs2:117
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11632:11634 <> vs3:118
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11636:11638 <> vs4:119
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11640:11642 <> vs5:120
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11644:11646 <> vs6:121
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11648:11650 <> vs7:122
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11652:11654 <> vs8:123
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11656:11658 <> vs9:124
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11660:11663 <> vs10:125
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11665:11668 <> vs11:126
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11670:11672 <> vt3:127
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11674:11676 <> vt4:128
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11678:11680 <> vt5:129
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11682:11684 <> vt6:130
+R11693:11694 stdpp.bitvector.definitions <> bv rec
+binder 11686:11689 <> va0f:131
+R11713:11717 iris.algebra.dfrac <> dfrac ind
+binder 11707:11709 <> dqm:132
+R11727:11744 xv6iris.SpecUserret <> wp_userret_pt_body def
+R11968:11970 xv6iris.SpecUserret <> dqm:132 var
+R11963:11966 xv6iris.SpecUserret <> va0f:131 var
+R11959:11961 xv6iris.SpecUserret <> vt6:130 var
+R11955:11957 xv6iris.SpecUserret <> vt5:129 var
+R11951:11953 xv6iris.SpecUserret <> vt4:128 var
+R11947:11949 xv6iris.SpecUserret <> vt3:127 var
+R11942:11945 xv6iris.SpecUserret <> vs11:126 var
+R11937:11940 xv6iris.SpecUserret <> vs10:125 var
+R11933:11935 xv6iris.SpecUserret <> vs9:124 var
+R11929:11931 xv6iris.SpecUserret <> vs8:123 var
+R11925:11927 xv6iris.SpecUserret <> vs7:122 var
+R11921:11923 xv6iris.SpecUserret <> vs6:121 var
+R11917:11919 xv6iris.SpecUserret <> vs5:120 var
+R11913:11915 xv6iris.SpecUserret <> vs4:119 var
+R11909:11911 xv6iris.SpecUserret <> vs3:118 var
+R11905:11907 xv6iris.SpecUserret <> vs2:117 var
+R11893:11895 xv6iris.SpecUserret <> va7:116 var
+R11889:11891 xv6iris.SpecUserret <> va6:115 var
+R11885:11887 xv6iris.SpecUserret <> va5:114 var
+R11881:11883 xv6iris.SpecUserret <> va4:113 var
+R11877:11879 xv6iris.SpecUserret <> va3:112 var
+R11873:11875 xv6iris.SpecUserret <> va2:111 var
+R11869:11871 xv6iris.SpecUserret <> va1:110 var
+R11865:11867 xv6iris.SpecUserret <> vs1:109 var
+R11861:11863 xv6iris.SpecUserret <> vs0:108 var
+R11857:11859 xv6iris.SpecUserret <> vt2:107 var
+R11853:11855 xv6iris.SpecUserret <> vt1:106 var
+R11849:11851 xv6iris.SpecUserret <> vt0:105 var
+R11845:11847 xv6iris.SpecUserret <> vtp:104 var
+R11841:11843 xv6iris.SpecUserret <> vgp:103 var
+R11837:11839 xv6iris.SpecUserret <> vsp:102 var
+R11833:11835 xv6iris.SpecUserret <> vra:101 var
+R11819:11823 xv6iris.SpecUserret <> sepc0:100 var
+R11810:11817 xv6iris.SpecUserret <> senvcfg0:99 var
+R11801:11808 xv6iris.SpecUserret <> menvcfg0:98 var
+R11796:11799 xv6iris.SpecUserret <> mdv0:97 var
+R11790:11794 xv6iris.SpecUserret <> mie_v:96 var
+R11781:11788 xv6iris.SpecUserret <> mstatus0:95 var
+R11767:11771 xv6iris.SpecUserret <> usatp:94 var
+R11765:11765 xv6iris.SpecUserret <> m:93 var
+R11762:11763 xv6iris.SpecUserret <> um:92 var
+R11758:11760 xv6iris.SpecUserret <> tfp:91 var
+R11752:11756 xv6iris.SpecUserret <> uroot:90 var
+R11746:11750 xv6iris.SpecUserret <> kroot:89 var
+R11977:11983 xv6iris.SpecUserret USERRET <> modtype

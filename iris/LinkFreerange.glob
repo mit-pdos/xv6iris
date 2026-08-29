@@ -1,0 +1,7 @@
+DIGEST 14893c8fe796b7afd9ef4f34598d5afd
+Fxv6iris.LinkFreerange
+R159:167 xv6iris.LinkKfree <> <> lib
+R169:182 xv6iris.ProofFreerange <> <> lib
+R206:219 xv6iris.ProofFreerange FreerangeProof <> modtype
+R221:225 xv6iris.LinkKfree Kfree <> modtype
+mod 193:201 <> Freerange

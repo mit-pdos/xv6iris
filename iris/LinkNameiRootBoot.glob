@@ -1,0 +1,149 @@
+DIGEST 7e2c8b7baa9d4c99b589133daa6ff11e
+Fxv6iris.LinkNameiRootBoot
+R1456:1476 stdpp.bitvector.definitions <> <> lib
+R1514:1522 iris.proofmode.proofmode <> <> lib
+R1564:1571 iris.program_logic.language <> <> lib
+R1573:1579 iris.program_logic.lifting <> <> lib
+R1597:1612 SailStdpp.Values <> <> lib
+R1630:1646 Riscv.rv64d_types <> <> lib
+R1648:1658 Riscv.rv64d <> <> lib
+R1676:1684 xv6iris.RiscvLang <> <> lib
+R1686:1695 xv6iris.RiscvPtsto <> <> lib
+R1713:1719 xv6iris.RegFile <> <> lib
+R1953:1961 xv6iris.IrefSlots <> <> lib
+R1963:1971 xv6iris.IcacheRef <> <> lib
+R1973:1981 xv6iris.ProcAvail <> <> lib
+R1983:1993 xv6iris.FileInvDefs <> <> lib
+R1995:1999 xv6iris.FsCfg <> <> lib
+R2017:2020 xv6iris.Xv6G <> <> lib
+R2085:2101 xv6iris.SpecNameiRootBoot <> <> lib
+R2119:2126 xv6iris.ProcDefs <> <> lib
+R2128:2137 xv6iris.UserPtTree <> <> lib
+R2139:2146 xv6iris.ProcGeom <> <> lib
+R2214:2226 xv6iris.LinkNameiRoot <> <> lib
+R2244:2249 xv6iris.TsoCtx <> <> lib
+R2276:2290 xv6iris.SpecNameiRootBoot NAMEI_ROOT_BOOT <> mod
+mod 2260:2272 <> NameiRootBoot
+prf 2301:2318 NameiRootBoot wp_namei_root_boot
+R2326:2334 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R2573:2581 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R2336:2342 xv6iris.RiscvPtsto <> riscvGS class
+binder 2344:2345 <> Σ:1
+binder 2335:2345 <> riscvGS0:2
+R2349:2352 xv6iris.Xv6G <> xv6G class
+R2354:2355 xv6iris.LinkNameiRootBoot <> Σ:1 var
+binder 2348:2355 <> xv6G0:3
+R2359:2366 xv6iris.Xv6Cameras <> bioslotG class
+R2368:2369 xv6iris.LinkNameiRootBoot <> Σ:1 var
+binder 2358:2369 <> bioslotG0:4
+R2373:2377 xv6iris.FileInvDefs <> fileG class
+R2379:2380 xv6iris.LinkNameiRootBoot <> Σ:1 var
+binder 2372:2380 <> fileG0:5
+R2384:2392 xv6iris.IrefSlots <> irefslotG class
+R2394:2395 xv6iris.LinkNameiRootBoot <> Σ:1 var
+binder 2383:2395 <> irefslotG0:6
+R2399:2402 xv6iris.ProcAvail <> pavG class
+R2404:2405 xv6iris.LinkNameiRootBoot <> Σ:1 var
+binder 2398:2405 <> pavG0:7
+R2422:2426 xv6iris.RiscvLang <> GenId class
+binder 2416:2418 <> GEN:8
+R2437:2441 xv6iris.RiscvLang <> CpuId class
+binder 2431:2433 <> CID:9
+R2451:2456 xv6iris.TsoCtx <> CurCtx class
+binder 2446:2447 <> XI:10
+R2472:2476 iris.algebra.dfrac <> dfrac ind
+binder 2466:2468 <> dqp:11
+R2490:2496 xv6iris.RegFile <> regfile def
+binder 2486:2486 <> m:12
+R2506:2508 Corelib.Init.Datatypes <> nat ind
+binder 2500:2500 <> n:13
+R2506:2508 Corelib.Init.Datatypes <> nat ind
+binder 2502:2502 <> K:14
+R2517:2520 Corelib.Init.Datatypes <> bool ind
+binder 2512:2513 <> eb:15
+R2528:2532 SailStdpp.Values <> mword def
+binder 2524:2524 <> p:16
+R2549:2552 Corelib.Init.Datatypes <> bool ind
+binder 2545:2545 <> b:17
+R2562:2565 stdpp.gmap <> gset def
+R2567:2572 Stdlib.Strings.String <> string ind
+binder 2556:2558 <> lks:18
+R2582:2604 xv6iris.SpecNameiRootBoot <> wp_namei_root_boot_body def
+R2623:2625 xv6iris.LinkNameiRootBoot <> lks:18 var
+R2621:2621 xv6iris.LinkNameiRootBoot <> b:17 var
+R2619:2619 xv6iris.LinkNameiRootBoot <> p:16 var
+R2616:2617 xv6iris.LinkNameiRootBoot <> eb:15 var
+R2614:2614 xv6iris.LinkNameiRootBoot <> K:14 var
+R2612:2612 xv6iris.LinkNameiRootBoot <> n:13 var
+R2610:2610 xv6iris.LinkNameiRootBoot <> m:12 var
+R2606:2608 xv6iris.LinkNameiRootBoot <> dqp:11 var
+R2658:2680 xv6iris.SpecNameiRootBoot <> wp_namei_root_boot_body def
+R2658:2680 xv6iris.SpecNameiRootBoot <> wp_namei_root_boot_body def
+R2658:2680 xv6iris.SpecNameiRootBoot <> wp_namei_root_boot_body def
+R3203:3203 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3629:3648 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3741:3741 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3204:3226 xv6iris.LinkNameiRoot NameiRoot wp_namei_root defax
+R3607:3613 Corelib.Init.Logic <> eq_refl constr
+R3599:3605 Corelib.Init.Logic <> eq_refl constr
+R3357:3363 xv6iris.ProcDefs <> MkPPriv constr
+R3377:3381 SailStdpp.Values <> mword def
+R3366:3373 Riscv.rv64d <> zero_reg def
+R3405:3408 xv6iris.UserPtTree <> UPTD constr
+R3428:3432 SailStdpp.Values <> mword def
+R3411:3422 SailStdpp.Values <> mword_of_int def
+R3456:3460 SailStdpp.Values <> mword def
+R3439:3450 SailStdpp.Values <> mword_of_int def
+R3466:3468 stdpp.base <> ::stdpp_scope:'∅' not
+R3470:3472 stdpp.base <> ::stdpp_scope:'∅' not
+R3492:3493 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R3496:3504 stdpp.list_basics <> replicate def
+R3525:3529 SailStdpp.Values <> mword def
+R3514:3521 Riscv.rv64d <> zero_reg def
+R3506:3511 xv6iris.ProcGeom <> NOFILE def
+R3565:3569 SailStdpp.Values <> mword def
+R3554:3561 Riscv.rv64d <> zero_reg def
+R3575:3576 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R3312:3319 xv6iris.IcacheRef <> icfg_dev meth
+R3303:3310 xv6iris.IcacheRef <> icfg_nib meth
+R3294:3301 xv6iris.IcacheRef <> icfg_ist meth
+R3284:3292 xv6iris.FsCfg <> fsc_logst meth
+R3262:3268 xv6iris.FsCfg <> fsc_cov meth
+R3253:3260 xv6iris.FsCfg <> fsc_ireg meth
+R3246:3251 xv6iris.FsCfg <> fsc_fs meth
+R3239:3244 xv6iris.FsCfg <> fsc_ic meth
+R3228:3237 xv6iris.FsCfg <> fsc_itlock meth
+R3203:3203 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3629:3648 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3741:3741 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R3204:3226 xv6iris.LinkNameiRoot NameiRoot wp_namei_root defax
+R3607:3613 Corelib.Init.Logic <> eq_refl constr
+R3599:3605 Corelib.Init.Logic <> eq_refl constr
+R3357:3363 xv6iris.ProcDefs <> MkPPriv constr
+R3377:3381 SailStdpp.Values <> mword def
+R3366:3373 Riscv.rv64d <> zero_reg def
+R3405:3408 xv6iris.UserPtTree <> UPTD constr
+R3428:3432 SailStdpp.Values <> mword def
+R3411:3422 SailStdpp.Values <> mword_of_int def
+R3456:3460 SailStdpp.Values <> mword def
+R3439:3450 SailStdpp.Values <> mword_of_int def
+R3466:3468 stdpp.base <> ::stdpp_scope:'∅' not
+R3470:3472 stdpp.base <> ::stdpp_scope:'∅' not
+R3492:3493 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R3496:3504 stdpp.list_basics <> replicate def
+R3525:3529 SailStdpp.Values <> mword def
+R3514:3521 Riscv.rv64d <> zero_reg def
+R3506:3511 xv6iris.ProcGeom <> NOFILE def
+R3565:3569 SailStdpp.Values <> mword def
+R3554:3561 Riscv.rv64d <> zero_reg def
+R3575:3576 Stdlib.Lists.List ListNotations ::list_scope:'['_']' not
+R3312:3319 xv6iris.IcacheRef <> icfg_dev meth
+R3303:3310 xv6iris.IcacheRef <> icfg_nib meth
+R3294:3301 xv6iris.IcacheRef <> icfg_ist meth
+R3284:3292 xv6iris.FsCfg <> fsc_logst meth
+R3262:3268 xv6iris.FsCfg <> fsc_cov meth
+R3253:3260 xv6iris.FsCfg <> fsc_ireg meth
+R3246:3251 xv6iris.FsCfg <> fsc_fs meth
+R3239:3244 xv6iris.FsCfg <> fsc_ic meth
+R3228:3237 xv6iris.FsCfg <> fsc_itlock meth
+R3755:3767 xv6iris.LinkNameiRootBoot NameiRootBoot <> mod

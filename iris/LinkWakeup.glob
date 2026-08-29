@@ -1,0 +1,11 @@
+DIGEST 068ce693c97e312e0a2407624c825999
+Fxv6iris.LinkWakeup
+R153:163 xv6iris.LinkAcquire <> <> lib
+R165:175 xv6iris.LinkRelease <> <> lib
+R177:191 xv6iris.LinkWakeupParts <> <> lib
+R193:203 xv6iris.ProofWakeup <> <> lib
+R224:234 xv6iris.ProofWakeup WakeupProof <> modtype
+R236:242 xv6iris.LinkAcquire Acquire <> modtype
+R244:250 xv6iris.LinkRelease Release <> modtype
+R252:262 xv6iris.LinkWakeupParts WakeupParts <> modtype
+mod 214:219 <> Wakeup

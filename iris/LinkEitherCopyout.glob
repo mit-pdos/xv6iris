@@ -1,0 +1,11 @@
+DIGEST 5d733ff77b63a8a0e15dd017b06a6003
+Fxv6iris.LinkEitherCopyout
+R199:208 xv6iris.LinkMyproc <> <> lib
+R210:220 xv6iris.LinkCopyout <> <> lib
+R222:232 xv6iris.LinkMemmove <> <> lib
+R250:264 xv6iris.ProofEitherCopy <> <> lib
+R292:309 xv6iris.ProofEitherCopy EitherCopyoutProof <> modtype
+R311:316 xv6iris.LinkMyproc Myproc <> modtype
+R318:324 xv6iris.LinkCopyout Copyout <> modtype
+R326:332 xv6iris.LinkMemmove Memmove <> modtype
+mod 275:287 <> EitherCopyout

@@ -1,0 +1,9 @@
+DIGEST 96db412b1906cf3aa6d9b3f0fec6d6f8
+Fxv6iris.LinkProcMapstacks
+R191:200 xv6iris.LinkKalloc <> <> lib
+R202:211 xv6iris.LinkKvmmap <> <> lib
+R213:230 xv6iris.ProofProcMapstacks <> <> lib
+R258:275 xv6iris.ProofProcMapstacks ProcMapstacksProof <> modtype
+R277:282 xv6iris.LinkKalloc Kalloc <> modtype
+R284:289 xv6iris.LinkKvmmap Kvmmap <> modtype
+mod 241:253 <> ProcMapstacks

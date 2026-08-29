@@ -1,0 +1,4 @@
+File "./WpLock.v", line 731, characters -2019--2019:
+Warning: Not interpreting "*)" as the end of current non-terminated comment
+because it occurs in a non-terminated string of the comment.
+[comment-terminator-in-string,parsing,default]

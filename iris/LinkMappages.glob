@@ -1,0 +1,7 @@
+DIGEST 9ab8f96934e5aa3f34ea0d290944bb55
+Fxv6iris.LinkMappages
+R157:164 xv6iris.LinkWalk <> <> lib
+R166:178 xv6iris.ProofMappages <> <> lib
+R201:213 xv6iris.ProofMappages MappagesProof <> modtype
+R215:218 xv6iris.LinkWalk Walk <> modtype
+mod 189:196 <> Mappages

@@ -3004,7 +3004,13 @@ Section WpSconfMem.
       wordw_claim (KTR := KT0) 8 ea -∗
       (* A6.105: the floor's LOG-POSITION receipt travels with the window --
          the writer's half of ruling §0.35'(iii); see SmodeCorePt. *)
+      (* A6.120: and the CREATOR'S ARM beside it -- the floor message is a
+         dirty key of the writer's context ([TsoCtx.ctx_wrote]), the witness
+         [WpLock.lk_floor]'s right arm carries and the racy read cashes
+         against the running token.  Registered inside the store's own
+         atomic update, where the token and the message fragment both are. *)
       (∃ lo : nat, TsoGhost.llb loglen_name lo ∗
+         TsoCtx.ctx_wrote TsoCtx.cur_ctx lo ea ∗
          [∗ list] j ∈ seq 0 8,
          TsoCtx.phys_ledger_wpay (pa_add ea j) (DfracOwn 1) (z8 j) lo
            (TsoMemPa.TsWin ea 8 j z8 cp (fun _ => Some lo) lo)) -∗
@@ -3038,6 +3044,7 @@ Section WpSconfMem.
               (mword_of_int 0 : mword 5) rs1 imm m n (zero_reg : mword 64)
               (∃ (pl : Arch.pa) (lo : nat), ⌜pl = ea⌝ ∗
                  TsoGhost.llb loglen_name lo ∗
+                 TsoCtx.ctx_wrote TsoCtx.cur_ctx lo pl ∗
                  [∗ list] j ∈ seq 0 8,
                    TsoCtx.phys_ledger_wpay (pa_add pl j) (DfracOwn 1) (z8 j) lo
                      (TsoMemPa.TsWin pl 8 j z8 cp (fun _ => Some lo) lo))%I
@@ -3045,6 +3052,7 @@ Section WpSconfMem.
               (wordw_pointsto (KTR := KT0) 8 ea (DfracOwn 1) vold)
               (∃ (pl : Arch.pa) (lo : nat), ⌜pl = ea⌝ ∗
                  TsoGhost.llb loglen_name lo ∗
+                 TsoCtx.ctx_wrote TsoCtx.cur_ctx lo pl ∗
                  [∗ list] j ∈ seq 0 8,
                    TsoCtx.phys_ledger_wpay (pa_add pl j) (DfracOwn 1) (z8 j) lo
                      (TsoMemPa.TsWin pl 8 j z8 cp (fun _ => Some lo) lo))%I
@@ -3057,19 +3065,35 @@ Section WpSconfMem.
       intros CIDw img sigma log V ppn Hcan Hoff Hid _.
       iIntros "#Hk Hmem Htso Hctx Hbw".
       iEval (rewrite (wordw8_ctx (KTR2 := KT0))) in "Hbw".
+      (* A6.120: the dirty watermark's bound, taken BEFORE the append (the
+         registration wants the new key absent, and [W]'s only law is "a
+         legal log position above every dirty key"). *)
+      iDestruct (TsoCtx.own_context_expose_w with "Hctx") as (W) "[#HWl Hctxw]".
+      iDestruct (tso_interp_of_pin with "Htso") as %Hpin0.
+      iEval (rewrite (tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+                        sigma.(sregs) sigma.(mdev) Hpin0)) in "Htso".
+      iDestruct (TsoCtx.tso_interp_llb_valid with "Htso HWl") as "[Htso %HWle]".
+      iEval (rewrite -(tso_interp_of_at_gs riscv_eraGS img sigma.(mem) log V
+                         sigma.(sregs) sigma.(mdev) Hpin0)) in "Htso".
+      cbn [glog gs_of] in HWle.
       iMod (SmodeCorePt.word_pointsto_wpay_mint_c (KTR := KT0) img sigma log V
               ea ppn vold (zero_reg : mword 64) cp Hcan Hoff
-              with "Hk Hmem Htso Hbw") as "(Hmem & Htso & #Hlb & Hpay)".
+              with "Hk Hmem Htso Hbw") as "(Hmem & Htso & #Hlb & Hpay & #Hmsg)".
+      iMod (TsoCtx.ctx_wrote_register (CID := CIDw) TsoCtx.cur_ctx W (length log)
+              (pa_of ppn ea)
+              (PWMsg (snap_of (pa_of ppn ea) 8 (zero_reg : mword 64))
+                 (hart_agent (@cpu_id CIDw)))
+              HWle eq_refl with "Hctxw Hlb Hmsg") as "[Hctx #Hw]".
       iModIntro. iFrame "Hmem Htso Hctx".
       iExists (pa_of ppn ea), (S (length log)).
       iSplitR; [ iPureIntro; exact (ktier_pin_id ppn ea Hid) | ].
-      iFrame "Hlb". iExact "Hpay". }
+      iFrame "Hlb Hw". iExact "Hpay". }
     { iModIntro. iFrame "Hbytes". iIntros "Hp". by iModIntro. }
     iIntros (CID1 Hs1) "Hcg Hpc Hp".
-    iDestruct "Hp" as (pl lo) "(-> & #Hlb & Hp)".
+    iDestruct "Hp" as (pl lo) "(-> & #Hlb & #Hw & Hp)".
     iApply ("Hcont" $! CID1 with "[] Hcg Hpc Hclaim [Hp]").
     { iPureIntro. exact Hs1. }
-    { iExists lo. iFrame "Hlb". iExact "Hp". }
+    { iExists lo. iFrame "Hlb Hw". iExact "Hp". }
   Qed.
 
 

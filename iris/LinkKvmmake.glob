@@ -1,0 +1,13 @@
+DIGEST d25c980e6fd03af56f70fc809c4bb17a
+Fxv6iris.LinkKvmmake
+R323:332 xv6iris.LinkKalloc <> <> lib
+R334:348 xv6iris.LinkMemsetArray <> <> lib
+R350:359 xv6iris.LinkKvmmap <> <> lib
+R361:377 xv6iris.LinkProcMapstacks <> <> lib
+R379:390 xv6iris.ProofKvmmake <> <> lib
+R412:423 xv6iris.ProofKvmmake KvmmakeProof <> modtype
+R425:430 xv6iris.LinkKalloc Kalloc <> modtype
+R432:442 xv6iris.LinkMemsetArray MemsetArray <> modtype
+R444:449 xv6iris.LinkKvmmap Kvmmap <> modtype
+R451:463 xv6iris.LinkProcMapstacks ProcMapstacks <> modtype
+mod 401:407 <> Kvmmake

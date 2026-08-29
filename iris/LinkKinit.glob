@@ -1,0 +1,9 @@
+DIGEST 2391ae749404850c33b8f13de94482a8
+Fxv6iris.LinkKinit
+R151:163 xv6iris.LinkFreerange <> <> lib
+R165:176 xv6iris.LinkInitlock <> <> lib
+R178:187 xv6iris.ProofKinit <> <> lib
+R207:216 xv6iris.ProofKinit KinitProof <> modtype
+R218:226 xv6iris.LinkFreerange Freerange <> modtype
+R228:235 xv6iris.LinkInitlock Initlock <> modtype
+mod 198:202 <> Kinit

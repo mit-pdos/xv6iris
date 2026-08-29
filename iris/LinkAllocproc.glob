@@ -1,0 +1,22 @@
+DIGEST 99ca825c07c38002438459edaad840d8
+Fxv6iris.LinkAllocproc
+R784:794 xv6iris.LinkAcquire <> <> lib
+R796:806 xv6iris.LinkRelease <> <> lib
+R808:819 xv6iris.LinkAllocpid <> <> lib
+R821:830 xv6iris.LinkKalloc <> <> lib
+R832:848 xv6iris.LinkProcPagetable <> <> lib
+R850:864 xv6iris.LinkMemsetArray <> <> lib
+R866:877 xv6iris.LinkFreeproc <> <> lib
+R895:908 xv6iris.ProofAllocproc <> <> lib
+R937:949 xv6iris.ProofAllocproc AllocprocCore <> modtype
+R951:957 xv6iris.LinkAcquire Acquire <> modtype
+R959:965 xv6iris.LinkRelease Release <> modtype
+R967:974 xv6iris.LinkAllocpid Allocpid <> modtype
+R976:981 xv6iris.LinkKalloc Kalloc <> modtype
+R983:998 xv6iris.LinkProcPagetable ProcPagetableGen <> modtype
+R1000:1010 xv6iris.LinkMemsetArray MemsetArray <> modtype
+R1012:1019 xv6iris.LinkFreeproc Freeproc <> modtype
+mod 919:930 <> AllocprocGen
+R1042:1054 xv6iris.ProofAllocproc AllocprocSeal <> modtype
+R1056:1067 xv6iris.LinkAllocproc AllocprocGen <> modtype
+mod 1029:1037 <> Allocproc

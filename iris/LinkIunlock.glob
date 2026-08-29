@@ -1,0 +1,9 @@
+DIGEST 8d57cf63c11d194ee6fd7666e6a32308
+Fxv6iris.LinkIunlock
+R211:226 xv6iris.LinkHoldingsleep <> <> lib
+R228:243 xv6iris.LinkReleasesleep <> <> lib
+R245:256 xv6iris.ProofIunlock <> <> lib
+R278:289 xv6iris.ProofIunlock IunlockProof <> modtype
+R291:302 xv6iris.LinkHoldingsleep Holdingsleep <> modtype
+R304:315 xv6iris.LinkReleasesleep Releasesleep <> modtype
+mod 267:273 <> Iunlock

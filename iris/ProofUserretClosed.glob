@@ -1,0 +1,551 @@
+DIGEST ec7f156e4c30f7497c6c8bbde64f6cf1
+Fxv6iris.ProofUserretClosed
+R2374:2379 Stdlib.ZArith.ZArith <> <> lib
+R2381:2384 Stdlib.Bool.Bool <> <> lib
+R2386:2388 Stdlib.micromega.Lia <> <> lib
+R2417:2437 stdpp.bitvector.definitions <> <> lib
+R2439:2442 stdpp.gmap <> <> lib
+R2480:2488 iris.proofmode.proofmode <> <> lib
+R2531:2540 iris.base_logic.lib.invariants <> <> lib
+R2582:2589 iris.program_logic.language <> <> lib
+R2591:2597 iris.program_logic.lifting <> <> lib
+R2615:2644 SailStdpp.ConcurrencyInterface <> <> lib
+R2646:2683 SailStdpp.ConcurrencyInterfaceBuiltins <> <> lib
+R2685:2719 SailStdpp.ConcurrencyInterfaceTypes <> <> lib
+R2721:2746 SailStdpp.Operators_mwords <> <> lib
+R2764:2780 Riscv.rv64d_types <> <> lib
+R2782:2792 Riscv.rv64d <> <> lib
+R2810:2823 SailStdpp.Base <> <> lib
+R2825:2843 SailStdpp.TypeCasts <> <> lib
+R2845:2860 SailStdpp.Values <> <> lib
+R2862:2882 SailStdpp.MachineWord <> <> lib
+R2900:2908 xv6iris.RiscvLang <> <> lib
+R2910:2919 xv6iris.RiscvPtsto <> <> lib
+R2921:2934 xv6iris.RiscvFetchExec <> <> lib
+R2952:2958 xv6iris.RegFile <> <> lib
+R2960:2965 xv6iris.WpNext <> <> lib
+R2983:2993 xv6iris.MinstretInv <> <> lib
+R2995:3001 xv6iris.WireInv <> <> lib
+R3019:3028 xv6iris.KernelText <> <> lib
+R3030:3040 xv6iris.MstatusBits <> <> lib
+R3058:3068 xv6iris.RiscvExtras <> <> lib
+R3086:3095 xv6iris.KptExecMap <> <> lib
+R3113:3122 xv6iris.UserPtTree <> <> lib
+R3124:3131 xv6iris.UserExec <> <> lib
+R3133:3148 xv6iris.UserKernelBridge <> <> lib
+R3166:3173 xv6iris.ProcGeom <> <> lib
+R3175:3181 xv6iris.ProcInv <> <> lib
+R3199:3205 xv6iris.FdSlots <> <> lib
+R3207:3217 xv6iris.FileInvDefs <> <> lib
+R3235:3243 xv6iris.IrefSlots <> <> lib
+R3261:3269 xv6iris.ProcAvail <> <> lib
+R3287:3297 xv6iris.SpecUserret <> <> lib
+R3299:3306 xv6iris.SpecUser <> <> lib
+R3308:3318 xv6iris.SpecUservec <> <> lib
+R3320:3336 xv6iris.SpecUserretClosed <> <> lib
+R3354:3364 xv6iris.UserretUser <> <> lib
+R3382:3389 xv6iris.TfPage36 <> <> lib
+R3412:3421 Kernel.KernelSyms <> <> lib
+R3439:3447 xv6iris.UserFrame <> <> lib
+R3541:3544 xv6iris.Xv6G <> <> lib
+R3609:3615 xv6iris.ParkCap <> <> lib
+R3654:3664 xv6iris.UsertrapRes <> <> lib
+R3739:3744 xv6iris.TsoCtx <> <> lib
+R3804:3807 Riscv.rv64d_types Defs <> mod
+R4068:4074 xv6iris.SpecUserret USERRET <> mod
+R4083:4086 xv6iris.SpecUser USER <> mod
+R4095:4101 xv6iris.SpecUservec USERVEC <> mod
+mod 4049:4061 <> UserretClosed
+sec 4113:4125 UserretClosed UserretClosed
+R4141:4147 xv6iris.RiscvPtsto <> riscvGS class
+R4154:4157 xv6iris.Xv6G <> xv6G class
+R4159:4160 xv6iris.ProofUserretClosed <> Σ:1 var
+R4164:4171 xv6iris.Xv6Cameras <> bioslotG class
+R4173:4174 xv6iris.ProofUserretClosed <> Σ:1 var
+R4178:4184 xv6iris.FdSlots <> fdslotG class
+R4186:4187 xv6iris.ProofUserretClosed <> Σ:1 var
+R4191:4195 xv6iris.FileInvDefs <> fileG class
+R4197:4198 xv6iris.ProofUserretClosed <> Σ:1 var
+R4202:4210 xv6iris.IrefSlots <> irefslotG class
+R4212:4213 xv6iris.ProofUserretClosed <> Σ:1 var
+R4217:4220 xv6iris.ProcAvail <> pavG class
+R4222:4223 xv6iris.ProofUserretClosed <> Σ:1 var
+var  4239:4241 UserretClosed.UserretClosed GEN
+R4245:4249 xv6iris.RiscvLang <> GenId class
+var  4401:4402 UserretClosed.UserretClosed XI
+R4406:4411 xv6iris.TsoCtx <> CurCtx class
+def 4631:4636 UserretClosed Rut_at
+R4643:4647 xv6iris.RiscvLang <> CpuId class
+binder 4639:4639 <> h:11
+R4656:4659 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4652:4655 xv6iris.UserPtTree <> uptd rec
+R4660:4664 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R4666:4667 xv6iris.ProofUserretClosed <> UserretClosed.UserretClosed.Σ var
+binder 4680:4680 <> p:12
+R4686:4689 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R4704:4705 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R4696:4700 SailStdpp.Values <> mword def
+binder 4690:4692 <> ksp:13
+R4706:4725 xv6iris.ProofUserretClosed UV usertrap_res_bare defax
+R4740:4742 xv6iris.ProofUserretClosed <> ksp:13 var
+R4738:4738 xv6iris.ProofUserretClosed <> p:12 var
+R4735:4735 xv6iris.ProofUserretClosed <> h:11 var
+prf 4757:4774 UserretClosed stvec_handler_loop
+R4781:4783 Corelib.Init.Datatypes <> nat ind
+binder 4777:4777 <> j:14
+R4807:4814 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R4794:4796 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R4793:4793 xv6iris.ProofUserretClosed <> j:14 var
+R4797:4801 xv6iris.ProcGeom <> NPROC def
+R4826:4835 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R4815:4825 xv6iris.KernelText <> kernel_text def
+R4869:4878 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4836:4842 xv6iris.RiscvPtsto <> kmap_at def
+R4864:4868 xv6iris.RiscvPtsto <> KP_rx constr
+R4854:4862 xv6iris.KptExecMap <> tramp_ppn def
+R4844:4852 xv6iris.KptExecMap <> tramp_vpn def
+R4887:4896 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4879:4886 xv6iris.WireInv <> wire_inv def
+R4897:4901 iris.bi.derived_connectives <> ::bi_scope:'□'_x not
+R5199:5199 iris.bi.derived_connectives <> ::bi_scope:'□'_x not
+R4902:4906 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R4939:4950 iris.bi.interface <> ::bi_scope:'∀'_x_'..'_x_','_x not
+R4911:4915 xv6iris.RiscvLang <> CpuId class
+binder 4907:4907 <> h:15
+R4923:4926 xv6iris.UserExec <> ucfg rec
+binder 4919:4919 <> C:16
+R4935:4938 xv6iris.UserPtTree <> uptd rec
+binder 4930:4931 <> pt:17
+R4969:4983 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4951:4953 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R4966:4968 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R4954:4960 xv6iris.SpecUserretClosed <> loop_ok def
+R4962:4962 xv6iris.ProofUserretClosed <> C:16 var
+R4964:4965 xv6iris.ProofUserretClosed <> pt:17 var
+R5004:5087 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R4984:4992 xv6iris.RiscvFetchExec <> hw_config def
+R5002:5002 xv6iris.ProofUserretClosed <> h:15 var
+R5100:5114 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R5088:5099 xv6iris.MinstretInv <> minstret_inv def
+R5157:5171 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R5115:5129 xv6iris.UserExec <> user_trap_frame def
+R5148:5153 xv6iris.ProofUserretClosed UserretClosed Rut_at def
+R5155:5155 xv6iris.ProofUserretClosed <> h:15 var
+R5144:5145 xv6iris.ProofUserretClosed <> pt:17 var
+R5142:5142 xv6iris.ProofUserretClosed <> C:16 var
+R5139:5139 xv6iris.ProofUserretClosed <> h:15 var
+R5172:5175 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R5198:5198 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
+R5183:5186 iris.program_logic.language <> expr proj
+R5188:5197 xv6iris.RiscvLang <> riscv_lang def
+R5176:5179 xv6iris.RiscvLang <> Loop abbrev
+R5533:5533 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5570:5575 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5584:5584 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5534:5553 xv6iris.UserKernelBridge <> user_trap_frame_open thm
+R5561:5566 xv6iris.ProofUserretClosed UserretClosed Rut_at def
+R5533:5533 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5570:5575 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5584:5584 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R5534:5553 xv6iris.UserKernelBridge <> user_trap_frame_open thm
+R5561:5566 xv6iris.ProofUserretClosed UserretClosed Rut_at def
+R6281:6281 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6300:6305 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6311:6311 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6282:6299 xv6iris.UserExec <> hw_config_counters thm
+R6281:6281 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6300:6305 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6311:6311 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6282:6299 xv6iris.UserExec <> hw_config_counters thm
+R6359:6359 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6387:6392 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6400:6400 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6360:6379 xv6iris.ProofUserretClosed UV usertrap_res_sstc defax
+R6359:6359 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6387:6392 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6400:6400 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6360:6379 xv6iris.ProofUserretClosed UV usertrap_res_sstc defax
+R6550:6550 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6651:6673 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6783:6783 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6551:6571 xv6iris.UserExec <> user_trap_frame_intro thm
+R6587:6590 xv6iris.UserPtTree <> uptd rec
+R6595:6597 iris.bi.interface <> ::bi_scope:'emp' not
+R6550:6550 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6651:6673 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6783:6783 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R6551:6571 xv6iris.UserExec <> user_trap_frame_intro thm
+R6587:6590 xv6iris.UserPtTree <> uptd rec
+R6595:6597 iris.bi.interface <> ::bi_scope:'emp' not
+R6812:6829 xv6iris.UserPtTree <> user_pt_any_unfold thm
+R6812:6829 xv6iris.UserPtTree <> user_pt_any_unfold thm
+R6812:6829 xv6iris.UserPtTree <> user_pt_any_unfold thm
+R6925:6932 xv6iris.UserExec <> user_cfg def
+R6925:6932 xv6iris.UserExec <> user_cfg def
+R6925:6932 xv6iris.UserExec <> user_cfg def
+R7148:7148 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7244:7263 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7302:7302 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7149:7164 xv6iris.ProofUserretClosed UV wp_uservec_pt defax
+R7180:7183 xv6iris.UserPtTree <> uptd rec
+R7188:7190 iris.bi.interface <> ::bi_scope:'emp' not
+R7148:7148 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7244:7263 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7302:7302 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7149:7164 xv6iris.ProofUserretClosed UV wp_uservec_pt defax
+R7180:7183 xv6iris.UserPtTree <> uptd rec
+R7188:7190 iris.bi.interface <> ::bi_scope:'emp' not
+R7316:7328 xv6iris.WpNext <> wp_next_intro thm
+R7316:7328 xv6iris.WpNext <> wp_next_intro thm
+R7360:7371 xv6iris.SpecUservec <> uservec_post def
+R7360:7371 xv6iris.SpecUservec <> uservec_post def
+R7360:7371 xv6iris.SpecUservec <> uservec_post def
+R7709:7709 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7757:7762 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7771:7771 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7710:7734 xv6iris.ProofUserretClosed UV usertrap_res_csrs_open defax
+R7709:7709 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7757:7762 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7771:7771 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7710:7734 xv6iris.ProofUserretClosed UV usertrap_res_csrs_open defax
+R7878:7878 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7887:7892 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7902:7902 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7878:7878 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7887:7892 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R7902:7902 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8032:8032 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8051:8056 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8063:8063 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8033:8050 xv6iris.UserExec <> hw_config_counters thm
+R8032:8032 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8051:8056 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8063:8063 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8033:8050 xv6iris.UserExec <> hw_config_counters thm
+R8115:8115 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8144:8149 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8158:8158 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8116:8135 xv6iris.ProofUserretClosed UV usertrap_res_sstc defax
+R8115:8115 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8144:8149 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8158:8158 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8116:8135 xv6iris.ProofUserretClosed UV usertrap_res_sstc defax
+R8461:8461 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8523:8542 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8695:8695 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8462:8483 xv6iris.ProofUserretClosed US wp_user_exec_closed defax
+R8511:8516 xv6iris.ProofUserretClosed UserretClosed Rut_at def
+R8486:8494 xv6iris.SpecUserretClosed <> loop_ucfg def
+R8461:8461 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8523:8542 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8695:8695 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8462:8483 xv6iris.ProofUserretClosed US wp_user_exec_closed defax
+R8511:8516 xv6iris.ProofUserretClosed UserretClosed Rut_at def
+R8486:8494 xv6iris.SpecUserretClosed <> loop_ucfg def
+R8765:8775 Riscv.rv64d_types <> HART_ACTIVE constr
+R8777:8778 Corelib.Init.Datatypes <> tt constr
+R8783:8790 xv6iris.MstatusBits <> sret_ms5 def
+R8832:8837 xv6iris.RiscvExtras <> ret_pc def
+R8847:8852 xv6iris.RiscvExtras <> ret_pc def
+R8765:8775 Riscv.rv64d_types <> HART_ACTIVE constr
+R8777:8778 Corelib.Init.Datatypes <> tt constr
+R8783:8790 xv6iris.MstatusBits <> sret_ms5 def
+R8832:8837 xv6iris.RiscvExtras <> ret_pc def
+R8847:8852 xv6iris.RiscvExtras <> ret_pc def
+R9030:9030 Corelib.Init.Logic <> I constr
+R9030:9030 Corelib.Init.Logic <> I constr
+R9087:9110 xv6iris.UserKernelBridge <> user_mstatus_ok_sret_ms5 thm
+R9087:9110 xv6iris.UserKernelBridge <> user_mstatus_ok_sret_ms5 thm
+R9482:9490 xv6iris.UserExec <> user_regs def
+R9492:9503 xv6iris.UserFrame <> u_regs_pc_is thm
+R9482:9490 xv6iris.UserExec <> user_regs def
+R9482:9490 xv6iris.UserExec <> user_regs def
+R9492:9503 xv6iris.UserFrame <> u_regs_pc_is thm
+R9492:9503 xv6iris.UserFrame <> u_regs_pc_is thm
+R9657:9664 xv6iris.UserExec <> user_cfg def
+R9657:9664 xv6iris.UserExec <> user_cfg def
+R9657:9664 xv6iris.UserExec <> user_cfg def
+R10086:10086 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R10091:10094 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R10099:10100 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R10119:10120 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R10124:10129 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R10154:10154 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R10101:10109 xv6iris.SpecUserretClosed <> loop_ucfg def
+R10086:10086 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R10091:10094 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R10099:10100 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R10119:10120 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R10124:10129 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R10154:10154 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R10101:10109 xv6iris.SpecUserretClosed <> loop_ucfg def
+R10170:10186 xv6iris.SpecUserretClosed <> loop_ok_loop_ucfg thm
+R10170:10186 xv6iris.SpecUserretClosed <> loop_ok_loop_ucfg thm
+R10229:10241 xv6iris.ProofUserretClosed UserretClosed.UserretClosed <> sec
+R10248:10260 xv6iris.ProofUserretClosed UserretClosed <> mod
+R10526:10532 xv6iris.SpecUserret USERRET <> mod
+R10541:10544 xv6iris.SpecUser USER <> mod
+R10553:10559 xv6iris.SpecUservec USERVEC <> mod
+R10566:10579 xv6iris.SpecUserretClosed USERRET_CLOSED <> mod
+mod 10502:10519 <> UserretClosedProof
+R10598:10608 xv6iris.UserretUser UserretUser <> modtype
+R10610:10610 xv6iris.ProofUserretClosed R <> modtype
+R10612:10613 xv6iris.ProofUserretClosed US <> modtype
+mod 10592:10593 <> UserretClosedProof.RU
+R10631:10643 xv6iris.ProofUserretClosed UserretClosed <> modtype
+R10645:10645 xv6iris.ProofUserretClosed R <> modtype
+R10647:10648 xv6iris.ProofUserretClosed US <> modtype
+R10650:10651 xv6iris.ProofUserretClosed UV <> modtype
+mod 10625:10626 <> UserretClosedProof.LP
+sec 10663:10665 UserretClosedProof Res
+R10681:10687 xv6iris.RiscvPtsto <> riscvGS class
+R10694:10697 xv6iris.Xv6G <> xv6G class
+R10699:10700 xv6iris.ProofUserretClosed <> Σ:18 var
+R10704:10711 xv6iris.Xv6Cameras <> bioslotG class
+R10713:10714 xv6iris.ProofUserretClosed <> Σ:18 var
+R10718:10724 xv6iris.FdSlots <> fdslotG class
+R10726:10727 xv6iris.ProofUserretClosed <> Σ:18 var
+R10731:10735 xv6iris.FileInvDefs <> fileG class
+R10737:10738 xv6iris.ProofUserretClosed <> Σ:18 var
+R10742:10750 xv6iris.IrefSlots <> irefslotG class
+R10752:10753 xv6iris.ProofUserretClosed <> Σ:18 var
+R10757:10760 xv6iris.ProcAvail <> pavG class
+R10762:10763 xv6iris.ProofUserretClosed <> Σ:18 var
+var  10779:10781 UserretClosedProof.Res GEN
+var  10794:10796 UserretClosedProof.Res CID
+var  10809:10810 UserretClosedProof.Res XI
+R10785:10789 xv6iris.RiscvLang <> GenId class
+R10800:10804 xv6iris.RiscvLang <> CpuId class
+R10814:10819 xv6iris.TsoCtx <> CurCtx class
+def 10893:10904 UserretClosedProof usertrap_res
+R10909:10923 xv6iris.ProofUserretClosed UV usertrap_res defax
+def 10939:10957 UserretClosedProof usertrap_res_parked
+R10962:10983 xv6iris.ProofUserretClosed UV usertrap_res_parked defax
+def 10999:11020 UserretClosedProof usertrap_res_tlb_close
+R11025:11049 xv6iris.ProofUserretClosed UV usertrap_res_tlb_close defax
+def 11065:11085 UserretClosedProof usertrap_res_tlb_open
+R11090:11113 xv6iris.ProofUserretClosed UV usertrap_res_tlb_open defax
+def 11129:11145 UserretClosedProof usertrap_res_bare
+R11150:11169 xv6iris.ProofUserretClosed UV usertrap_res_bare defax
+def 11185:11205 UserretClosedProof usertrap_res_pt_close
+R11210:11233 xv6iris.ProofUserretClosed UV usertrap_res_pt_close defax
+def 11249:11268 UserretClosedProof usertrap_res_pt_open
+R11273:11295 xv6iris.ProofUserretClosed UV usertrap_res_pt_open defax
+def 11311:11332 UserretClosedProof usertrap_res_bare_norm
+R11337:11361 xv6iris.ProofUserretClosed UV usertrap_res_bare_norm defax
+def 11377:11398 UserretClosedProof usertrap_res_csrs_open
+R11403:11427 xv6iris.ProofUserretClosed UV usertrap_res_csrs_open defax
+def 11443:11459 UserretClosedProof usertrap_res_sstc
+R11464:11483 xv6iris.ProofUserretClosed UV usertrap_res_sstc defax
+def 11499:11523 UserretClosedProof usertrap_res_tf_csrs_open
+R11528:11555 xv6iris.ProofUserretClosed UV usertrap_res_tf_csrs_open defax
+def 11571:11590 UserretClosedProof usertrap_res_tf_open
+R11595:11617 xv6iris.ProofUserretClosed UV usertrap_res_tf_open defax
+def 11940:11961 UserretClosedProof usertrap_res_bare_park
+R11972:11978 xv6iris.RiscvPtsto <> riscvGS class
+R11980:11981 xv6iris.ProofUserretClosed <> UserretClosedProof.Res.Σ var
+binder 11971:11981 <> riscvGS1:29
+R11985:11988 xv6iris.Xv6G <> xv6G class
+R11990:11991 xv6iris.ProofUserretClosed <> UserretClosedProof.Res.Σ var
+binder 11984:11991 <> xv6G1:30
+R11995:12002 xv6iris.Xv6Cameras <> bioslotG class
+R12004:12005 xv6iris.ProofUserretClosed <> UserretClosedProof.Res.Σ var
+binder 11994:12005 <> bioslotG1:31
+R12009:12015 xv6iris.FdSlots <> fdslotG class
+R12017:12018 xv6iris.ProofUserretClosed <> UserretClosedProof.Res.Σ var
+binder 12008:12018 <> fdslotG1:32
+R12022:12026 xv6iris.FileInvDefs <> fileG class
+R12028:12029 xv6iris.ProofUserretClosed <> UserretClosedProof.Res.Σ var
+binder 12021:12029 <> fileG1:33
+R12033:12041 xv6iris.IrefSlots <> irefslotG class
+R12043:12044 xv6iris.ProofUserretClosed <> UserretClosedProof.Res.Σ var
+binder 12032:12044 <> irefslotG1:34
+R12048:12051 xv6iris.ProcAvail <> pavG class
+R12053:12054 xv6iris.ProofUserretClosed <> UserretClosedProof.Res.Σ var
+binder 12047:12054 <> pavG1:35
+R12065:12069 xv6iris.RiscvLang <> GenId class
+binder 12059:12061 <> GEN:36
+R12079:12084 xv6iris.TsoCtx <> CurCtx class
+binder 12074:12075 <> XI:37
+R12098:12105 xv6iris.UsertrapRes <> ut_names rec
+binder 12094:12094 <> N:38
+R12114:12116 Corelib.Init.Datatypes <> nat ind
+binder 12109:12110 <> av:39
+R12125:12142 xv6iris.UsertrapRes <> ut_park_intro_body def
+R12262:12263 xv6iris.ProofUserretClosed <> av:39 var
+R12260:12260 xv6iris.ProofUserretClosed <> N:38 var
+R12239:12248 xv6iris.ParkCap <> park_token def
+R12251:12254 xv6iris.UsertrapRes <> un_s proj
+R12256:12256 xv6iris.ProofUserretClosed <> N:38 var
+R12162:12166 xv6iris.RiscvLang <> CpuId class
+binder 12158:12158 <> h:40
+R12175:12180 xv6iris.TsoCtx <> CurCtx class
+binder 12170:12171 <> Xc:41
+R12186:12205 xv6iris.ProofUserretClosed UV usertrap_res_bare defax
+R12225:12226 xv6iris.ProofUserretClosed <> Xc:41 var
+R12215:12215 xv6iris.ProofUserretClosed <> h:40 var
+R12272:12296 xv6iris.ProofUserretClosed UV usertrap_res_bare_park defax
+R12300:12301 xv6iris.ProofUserretClosed <> av:39 var
+R12298:12298 xv6iris.ProofUserretClosed <> N:38 var
+R12309:12311 xv6iris.ProofUserretClosed UserretClosedProof.Res <> sec
+prf 12325:12341 UserretClosedProof wp_userret_closed
+R12352:12358 xv6iris.RiscvPtsto <> riscvGS class
+binder 12360:12361 <> Σ:42
+binder 12351:12361 <> riscvGS0:43
+R12365:12368 xv6iris.Xv6G <> xv6G class
+R12370:12371 xv6iris.ProofUserretClosed <> Σ:42 var
+binder 12364:12371 <> xv6G0:44
+R12375:12382 xv6iris.Xv6Cameras <> bioslotG class
+R12384:12385 xv6iris.ProofUserretClosed <> Σ:42 var
+binder 12374:12385 <> bioslotG0:45
+R12389:12395 xv6iris.FdSlots <> fdslotG class
+R12397:12398 xv6iris.ProofUserretClosed <> Σ:42 var
+binder 12388:12398 <> fdslotG0:46
+R12402:12406 xv6iris.FileInvDefs <> fileG class
+R12408:12409 xv6iris.ProofUserretClosed <> Σ:42 var
+binder 12401:12409 <> fileG0:47
+R12413:12421 xv6iris.IrefSlots <> irefslotG class
+R12423:12424 xv6iris.ProofUserretClosed <> Σ:42 var
+binder 12412:12424 <> irefslotG0:48
+R12428:12431 xv6iris.ProcAvail <> pavG class
+R12433:12434 xv6iris.ProofUserretClosed <> Σ:42 var
+binder 12427:12434 <> pavG0:49
+R12445:12449 xv6iris.RiscvLang <> GenId class
+binder 12439:12441 <> GEN:50
+R12460:12464 xv6iris.RiscvLang <> CpuId class
+binder 12454:12456 <> CID:51
+R12474:12479 xv6iris.TsoCtx <> CurCtx class
+binder 12469:12470 <> XI:52
+R12493:12496 xv6iris.UserExec <> ucfg rec
+binder 12489:12489 <> C:53
+R12505:12508 xv6iris.UserPtTree <> uptd rec
+binder 12500:12501 <> pt:54
+R12526:12530 SailStdpp.Values <> mword def
+binder 12518:12522 <> kroot:55
+R12541:12543 Corelib.Init.Datatypes <> nat ind
+binder 12537:12537 <> j:56
+R12553:12557 SailStdpp.Values <> mword def
+binder 12547:12549 <> ksp:57
+R12574:12580 xv6iris.RegFile <> regfile def
+binder 12570:12570 <> m:58
+R12620:12624 SailStdpp.Values <> mword def
+binder 12584:12588 <> usatp:59
+binder 12590:12597 <> mstatus0:60
+binder 12599:12603 <> sepc0:61
+binder 12605:12608 <> sc_v:62
+binder 12610:12616 <> stval_v:63
+R12638:12659 xv6iris.SpecUserretClosed <> wp_userret_closed_body def
+R12762:12768 xv6iris.ProofUserretClosed <> stval_v:63 var
+R12757:12760 xv6iris.ProofUserretClosed <> sc_v:62 var
+R12751:12755 xv6iris.ProofUserretClosed <> sepc0:61 var
+R12742:12749 xv6iris.ProofUserretClosed <> mstatus0:60 var
+R12736:12740 xv6iris.ProofUserretClosed <> usatp:59 var
+R12734:12734 xv6iris.ProofUserretClosed <> m:58 var
+R12730:12732 xv6iris.ProofUserretClosed <> ksp:57 var
+R12728:12728 xv6iris.ProofUserretClosed <> j:56 var
+R12722:12726 xv6iris.ProofUserretClosed <> kroot:55 var
+R12719:12720 xv6iris.ProofUserretClosed <> pt:54 var
+R12717:12717 xv6iris.ProofUserretClosed <> C:53 var
+R12670:12674 xv6iris.RiscvLang <> CpuId class
+binder 12666:12666 <> h:64
+R12679:12695 xv6iris.ProofUserretClosed UserretClosedProof usertrap_res_bare def
+R12705:12705 xv6iris.ProofUserretClosed <> h:64 var
+R12800:12821 xv6iris.SpecUserretClosed <> wp_userret_closed_body def
+R13415:13415 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13442:13447 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13466:13466 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13416:13436 xv6iris.ProofUserretClosed UserretClosedProof stvec_handler_loop thm
+R13415:13415 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13442:13447 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13466:13466 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13416:13436 xv6iris.ProofUserretClosed UserretClosedProof stvec_handler_loop thm
+R14356:14356 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14375:14380 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14386:14386 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14357:14374 xv6iris.UserExec <> hw_config_counters thm
+R14356:14356 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14375:14380 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14386:14386 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14357:14374 xv6iris.UserExec <> hw_config_counters thm
+R14434:14434 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14459:14464 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14472:14472 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14435:14451 xv6iris.ProofUserretClosed UserretClosedProof usertrap_res_sstc def
+R14434:14434 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14459:14464 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14472:14472 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14435:14451 xv6iris.ProofUserretClosed UserretClosedProof usertrap_res_sstc def
+R14554:14554 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14582:14587 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14595:14595 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14555:14574 xv6iris.ProofUserretClosed UserretClosedProof usertrap_res_tf_open def
+R14554:14554 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14582:14587 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14595:14595 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14555:14574 xv6iris.ProofUserretClosed UserretClosedProof usertrap_res_tf_open def
+R14669:14669 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14684:14689 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14696:14696 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14670:14683 xv6iris.ProcInv <> tf_page_length thm
+R14669:14669 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14684:14689 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14696:14696 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14670:14683 xv6iris.ProcInv <> tf_page_length thm
+R14724:14724 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14761:14766 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14773:14773 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14725:14738 xv6iris.TfPage36 <> tf_page_open36 thm
+R14741:14746 xv6iris.UserPtTree <> ud_tfp proj
+R14724:14724 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14761:14766 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14773:14773 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14725:14738 xv6iris.TfPage36 <> tf_page_open36 thm
+R14741:14746 xv6iris.UserPtTree <> ud_tfp proj
+R15279:15279 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15721:15740 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16226:16226 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15280:15297 xv6iris.ProofUserretClosed UserretClosedProof wp_userret_user thm
+R15305:15313 xv6iris.ProofUserretClosed UserretClosedProof Rut_at def
+R15538:15545 iris.algebra.dfrac <> DfracOwn constr
+R15619:15623 xv6iris.UserExec <> uc_mm proj
+R15279:15279 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15721:15740 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16226:16226 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15280:15297 xv6iris.ProofUserretClosed UserretClosedProof wp_userret_user thm
+R15305:15313 xv6iris.ProofUserretClosed UserretClosedProof Rut_at def
+R15538:15545 iris.algebra.dfrac <> DfracOwn constr
+R15619:15623 xv6iris.UserExec <> uc_mm proj
+R16558:16558 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16748:16769 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16947:16947 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16559:16573 xv6iris.TfPage36 <> tf_page_close36 thm
+R16576:16581 xv6iris.UserPtTree <> ud_tfp proj
+R16558:16558 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16748:16769 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16947:16947 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16559:16573 xv6iris.TfPage36 <> tf_page_close36 thm
+R16576:16581 xv6iris.UserPtTree <> ud_tfp proj
+R17045:17045 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17054:17059 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17071:17071 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17045:17045 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17054:17059 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17071:17071 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17088:17110 xv6iris.ProcGeom <> tf_kernel_words_ok_tail thm
+R17088:17110 xv6iris.ProcGeom <> tf_kernel_words_ok_tail thm
+R17256:17256 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R17264:17267 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R17271:17271 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R17273:17273 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R17276:17281 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R17303:17303 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R17256:17256 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R17264:17267 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R17271:17271 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R17273:17273 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R17276:17281 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R17303:17303 iris.proofmode.ltac_tactics <> :::'('_x_'$!'_x_'..'_x_'with'_x_')' not
+R17321:17327 xv6iris.SpecUserretClosed <> loop_ok def
+R17321:17327 xv6iris.SpecUserretClosed <> loop_ok def
+R17321:17327 xv6iris.SpecUserretClosed <> loop_ok def
+R17481:17498 xv6iris.ProofUserretClosed UserretClosedProof <> mod

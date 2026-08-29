@@ -1,4 +1,4 @@
-DIGEST 5de7ec4abb4024e6a97821ce875779c4
+DIGEST ed2d7de2429073ec7ba9844004c5c2b4
 Fxv6iris.TsoGhost
 R981:986 Stdlib.ZArith.ZArith <> <> lib
 R988:990 Stdlib.micromega.Lia <> <> lib
@@ -297,455 +297,477 @@ R7709:7709 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
 R7716:7721 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
 R7726:7726 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
 R7710:7715 xv6iris.TsoGhost <> llb_le thm
-prf 7750:7758 <> llb_valid
-binder 7760:7763 <> γll:38
-binder 7765:7765 <> n:39
-binder 7767:7767 <> K:40
-R7801:7806 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R7775:7791 iris.base_logic.lib.mono_nat <> mono_nat_auth_own def
-R7800:7800 xv6iris.TsoGhost <> n:39 var
-R7793:7796 xv6iris.TsoGhost <> γll:38 var
-R7817:7822 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R7807:7809 xv6iris.TsoGhost <> llb def
-R7811:7814 xv6iris.TsoGhost <> γll:38 var
-R7816:7816 xv6iris.TsoGhost <> K:40 var
-R7823:7825 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R7839:7841 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R7828:7832 stdpp.numbers <> ::nat_scope:x_'≤'_x not
-R7827:7827 xv6iris.TsoGhost <> K:40 var
-R7833:7833 xv6iris.TsoGhost <> n:39 var
-R7900:7900 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R7922:7927 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R7936:7936 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R7901:7921 iris.base_logic.lib.mono_nat <> mono_nat_lb_own_valid thm
-R7900:7900 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R7922:7927 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R7936:7936 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R7901:7921 iris.base_logic.lib.mono_nat <> mono_nat_lb_own_valid thm
-def 8564:8570 <> view_lb
-R8584:8588 iris.base_logic.lib.iprop <> gname def
-binder 8573:8575 <> γv:41
-binder 8577:8580 <> γll:42
-R8596:8600 xv6iris.TsoMemPa <> agent abbrev
-binder 8592:8592 <> h:43
-R8608:8610 Corelib.Init.Datatypes <> nat ind
-binder 8604:8604 <> K:44
-R8615:8619 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R8621:8622 xv6iris.TsoGhost <> ghosts.Σ var
-R8632:8632 iris.bi.interface <> ::bi_scope:x_'∨'_x not
-R8682:8687 iris.bi.interface <> ::bi_scope:x_'∨'_x not
-R8655:8659 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R8633:8635 iris.base_logic.lib.own <> own def
-R8642:8645 iris.algebra.auth <> :::'◯'_x not
-R8646:8649 xv6iris.TsoGhost <> vone def
-R8651:8651 xv6iris.TsoGhost <> h:43 var
-R8653:8653 xv6iris.TsoGhost <> K:44 var
-R8637:8639 xv6iris.TsoGhost <> γv:41 var
-R8660:8674 iris.base_logic.lib.mono_nat <> mono_nat_lb_own def
-R8681:8681 xv6iris.TsoGhost <> K:44 var
-R8676:8679 xv6iris.TsoGhost <> γll:42 var
-R8688:8690 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R8700:8702 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R8692:8694 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R8691:8691 xv6iris.TsoGhost <> K:44 var
-inst 8727:8744 <> view_lb_persistent
-binder 8746:8748 <> γv:45
-binder 8750:8753 <> γll:46
-binder 8755:8755 <> h:47
-binder 8757:8757 <> K:48
-R8765:8774 iris.bi.derived_connectives <> Persistent class
-R8777:8783 xv6iris.TsoGhost <> view_lb def
-R8785:8787 xv6iris.TsoGhost <> γv:45 var
-R8789:8792 xv6iris.TsoGhost <> γll:46 var
-R8794:8794 xv6iris.TsoGhost <> h:47 var
-R8796:8796 xv6iris.TsoGhost <> K:48 var
-inst 8841:8856 <> view_lb_timeless
-binder 8858:8860 <> γv:49
-binder 8862:8865 <> γll:50
-binder 8867:8867 <> h:51
-binder 8869:8869 <> K:52
-R8877:8884 iris.bi.derived_connectives <> Timeless class
-R8887:8893 xv6iris.TsoGhost <> view_lb def
-R8895:8897 xv6iris.TsoGhost <> γv:49 var
-R8899:8902 xv6iris.TsoGhost <> γll:50 var
-R8904:8904 xv6iris.TsoGhost <> h:51 var
-R8906:8906 xv6iris.TsoGhost <> K:52 var
-prf 8942:8950 <> view_lb_0
-binder 8952:8954 <> γv:53
-binder 8956:8959 <> γll:54
-binder 8961:8961 <> h:55
-R8965:8968 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
-R8969:8975 xv6iris.TsoGhost <> view_lb def
-R8977:8979 xv6iris.TsoGhost <> γv:53 var
-R8981:8984 xv6iris.TsoGhost <> γll:54 var
-R8986:8986 xv6iris.TsoGhost <> h:55 var
-prf 9025:9035 <> view_lb_llb
-binder 9037:9039 <> γv:56
-binder 9041:9044 <> γll:57
-binder 9046:9046 <> h:58
-binder 9048:9048 <> K:59
-R9072:9077 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R9052:9058 xv6iris.TsoGhost <> view_lb def
-R9060:9062 xv6iris.TsoGhost <> γv:56 var
-R9064:9067 xv6iris.TsoGhost <> γll:57 var
-R9069:9069 xv6iris.TsoGhost <> h:58 var
-R9071:9071 xv6iris.TsoGhost <> K:59 var
-R9078:9080 xv6iris.TsoGhost <> llb def
-R9082:9085 xv6iris.TsoGhost <> γll:57 var
-R9087:9087 xv6iris.TsoGhost <> K:59 var
-prf 9168:9179 <> vone_le_incl
-binder 9181:9181 <> h:60
-binder 9183:9183 <> K:61
-binder 9185:9186 <> K':62
-R9208:9212 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R9197:9201 stdpp.numbers <> ::nat_scope:x_'≤'_x not
-R9195:9196 xv6iris.TsoGhost <> K':62 var
-R9202:9202 xv6iris.TsoGhost <> K:61 var
-R9222:9226 iris.algebra.cmra <> ::stdpp_scope:x_'≼'_x not
-R9213:9216 xv6iris.TsoGhost <> vone def
-R9218:9218 xv6iris.TsoGhost <> h:60 var
-R9220:9221 xv6iris.TsoGhost <> K':62 var
-R9227:9230 xv6iris.TsoGhost <> vone def
-R9232:9232 xv6iris.TsoGhost <> h:60 var
-R9234:9234 xv6iris.TsoGhost <> K:61 var
-R9270:9273 xv6iris.TsoGhost <> vone def
-R9270:9273 xv6iris.TsoGhost <> vone def
-R9304:9325 iris.algebra.cmra <> discrete_fun_lookup_op def
-R9328:9331 xv6iris.TsoGhost <> vone def
-R9333:9342 iris.algebra.numbers <> max_nat_op def
-R9304:9325 iris.algebra.cmra <> discrete_fun_lookup_op def
-R9304:9325 iris.algebra.cmra <> discrete_fun_lookup_op def
-R9328:9331 xv6iris.TsoGhost <> vone def
-R9328:9331 xv6iris.TsoGhost <> vone def
-R9333:9342 iris.algebra.numbers <> max_nat_op def
-R9333:9342 iris.algebra.numbers <> max_nat_op def
-R9359:9364 stdpp.base <> decide def
-R9369:9371 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R9359:9364 stdpp.base <> decide def
-R9369:9371 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-prf 9407:9416 <> view_lb_le
-binder 9418:9420 <> γv:63
-binder 9422:9425 <> γll:64
-binder 9427:9427 <> h:65
-binder 9429:9429 <> K:66
-binder 9431:9432 <> K':67
-R9454:9458 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R9443:9447 stdpp.numbers <> ::nat_scope:x_'≤'_x not
-R9441:9442 xv6iris.TsoGhost <> K':67 var
-R9448:9448 xv6iris.TsoGhost <> K:66 var
-R9479:9484 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R9459:9465 xv6iris.TsoGhost <> view_lb def
-R9467:9469 xv6iris.TsoGhost <> γv:63 var
-R9471:9474 xv6iris.TsoGhost <> γll:64 var
-R9476:9476 xv6iris.TsoGhost <> h:65 var
-R9478:9478 xv6iris.TsoGhost <> K:66 var
-R9485:9491 xv6iris.TsoGhost <> view_lb def
-R9493:9495 xv6iris.TsoGhost <> γv:63 var
-R9497:9500 xv6iris.TsoGhost <> γll:64 var
-R9502:9502 xv6iris.TsoGhost <> h:65 var
-R9504:9505 xv6iris.TsoGhost <> K':67 var
-R9595:9595 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R9604:9609 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R9614:9614 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R9596:9603 iris.base_logic.lib.own <> own_mono thm
-R9595:9595 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R9604:9609 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R9614:9614 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R9596:9603 iris.base_logic.lib.own <> own_mono thm
-R9631:9644 iris.algebra.auth <> auth_frag_mono thm
-R9647:9658 xv6iris.TsoGhost <> vone_le_incl thm
-R9631:9644 iris.algebra.auth <> auth_frag_mono thm
-R9647:9658 xv6iris.TsoGhost <> vone_le_incl thm
-R9684:9701 iris.base_logic.lib.mono_nat <> mono_nat_lb_own_le thm
-R9684:9701 iris.base_logic.lib.mono_nat <> mono_nat_lb_own_le thm
-def 9925:9933 <> view_auth
-R9942:9946 iris.base_logic.lib.iprop <> gname def
-binder 9936:9938 <> γv:68
-R9961:9965 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R9956:9960 xv6iris.TsoMemPa <> agent abbrev
-R9966:9968 Corelib.Init.Datatypes <> nat ind
-binder 9950:9952 <> tvs:69
-R9973:9977 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R9979:9980 xv6iris.TsoGhost <> ghosts.Σ var
-R9989:9991 iris.base_logic.lib.own <> own def
-R10008:10012 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
-R9998:10000 iris.algebra.auth <> :::'●'_x_x not
-R10001:10001 iris.algebra.auth <> :::'●'_x_x not
-R10002:10003 xv6iris.TsoGhost <> vf def
-R10005:10007 xv6iris.TsoGhost <> tvs:69 var
-R10013:10016 iris.algebra.auth <> :::'◯'_x not
-R10017:10018 xv6iris.TsoGhost <> vf def
-R10020:10022 xv6iris.TsoGhost <> tvs:69 var
-R9993:9995 xv6iris.TsoGhost <> γv:68 var
-prf 10505:10519 <> view_auth_alloc
-R10533:10537 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R10528:10532 xv6iris.TsoMemPa <> agent abbrev
-R10538:10540 Corelib.Init.Datatypes <> nat ind
-binder 10522:10524 <> tvs:70
-R10549:10552 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
-R10553:10557 iris.bi.updates <> ::bi_scope:'|==>'_x not
-R10558:10561 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R10573:10574 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R10568:10572 iris.base_logic.lib.iprop <> gname def
-binder 10562:10564 <> γv:71
-R10575:10583 xv6iris.TsoGhost <> view_auth def
-R10585:10587 xv6iris.TsoGhost <> γv:71 var
-R10589:10591 xv6iris.TsoGhost <> tvs:70 var
-R10614:10622 iris.base_logic.lib.own <> own_alloc thm
-R10614:10622 iris.base_logic.lib.own <> own_alloc thm
-R10631:10654 iris.algebra.auth <> auth_both_valid_discrete thm
-R10631:10654 iris.algebra.auth <> auth_both_valid_discrete thm
-prf 10716:10729 <> view_auth_frag
-binder 10731:10733 <> γv:72
-binder 10735:10737 <> tvs:73
-binder 10739:10739 <> h:74
-binder 10741:10741 <> K:75
-R10766:10770 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R10751:10755 stdpp.numbers <> ::nat_scope:x_'≤'_x not
-R10750:10750 xv6iris.TsoGhost <> K:75 var
-R10756:10758 xv6iris.TsoGhost <> tvs:73 var
-R10760:10760 xv6iris.TsoGhost <> h:74 var
-R10788:10793 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R10771:10779 xv6iris.TsoGhost <> view_auth def
-R10781:10783 xv6iris.TsoGhost <> γv:72 var
-R10785:10787 xv6iris.TsoGhost <> tvs:73 var
-R10794:10796 iris.base_logic.lib.own <> own def
-R10803:10806 iris.algebra.auth <> :::'◯'_x not
-R10807:10810 xv6iris.TsoGhost <> vone def
-R10812:10812 xv6iris.TsoGhost <> h:74 var
-R10814:10814 xv6iris.TsoGhost <> K:75 var
-R10798:10800 xv6iris.TsoGhost <> γv:72 var
-R10857:10857 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R10866:10871 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R10876:10876 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R10858:10865 iris.base_logic.lib.own <> own_mono thm
-R10857:10857 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R10866:10871 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R10876:10876 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R10858:10865 iris.base_logic.lib.own <> own_mono thm
-R10898:10911 iris.algebra.auth <> auth_frag_mono thm
-R10914:10925 xv6iris.TsoGhost <> vone_incl_vf thm
-R10939:10953 iris.algebra.cmra <> cmra_included_r thm
-R10898:10911 iris.algebra.auth <> auth_frag_mono thm
-R10914:10925 xv6iris.TsoGhost <> vone_incl_vf thm
-R10939:10953 iris.algebra.cmra <> cmra_included_r thm
-prf 10973:10987 <> view_auth_valid
-binder 10989:10991 <> γv:76
-binder 10993:10996 <> γll:77
-binder 10998:11000 <> tvs:78
-binder 11002:11002 <> h:79
-binder 11004:11004 <> K:80
-R11029:11034 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R11012:11020 xv6iris.TsoGhost <> view_auth def
-R11022:11024 xv6iris.TsoGhost <> γv:76 var
-R11026:11028 xv6iris.TsoGhost <> tvs:78 var
-R11055:11060 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R11035:11041 xv6iris.TsoGhost <> view_lb def
-R11043:11045 xv6iris.TsoGhost <> γv:76 var
-R11047:11050 xv6iris.TsoGhost <> γll:77 var
-R11052:11052 xv6iris.TsoGhost <> h:79 var
-R11054:11054 xv6iris.TsoGhost <> K:80 var
-R11061:11063 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R11081:11083 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R11066:11070 stdpp.numbers <> ::nat_scope:x_'≤'_x not
-R11065:11065 xv6iris.TsoGhost <> K:80 var
-R11071:11073 xv6iris.TsoGhost <> tvs:78 var
-R11075:11075 xv6iris.TsoGhost <> h:79 var
-R11164:11164 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R11176:11181 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R11189:11189 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R11165:11175 iris.base_logic.lib.own <> own_valid_2 thm
-R11164:11164 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R11176:11181 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R11189:11189 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R11165:11175 iris.base_logic.lib.own <> own_valid_2 thm
-R11234:11238 stdpp.base <> assoc def
-R11241:11252 iris.algebra.auth <> auth_frag_op thm
-R11234:11238 stdpp.base <> assoc def
-R11234:11238 stdpp.base <> assoc def
-R11241:11252 iris.algebra.auth <> auth_frag_op thm
-R11241:11252 iris.algebra.auth <> auth_frag_op thm
-R11267:11290 iris.algebra.auth <> auth_both_valid_discrete thm
-R11267:11290 iris.algebra.auth <> auth_both_valid_discrete thm
-R11267:11290 iris.algebra.auth <> auth_both_valid_discrete thm
-R11318:11345 iris.algebra.cmra <> discrete_fun_included_spec_1 thm
-R11318:11345 iris.algebra.cmra <> discrete_fun_included_spec_1 thm
-R11389:11410 iris.algebra.cmra <> discrete_fun_lookup_op def
-R11413:11414 xv6iris.TsoGhost <> vf def
-R11417:11420 xv6iris.TsoGhost <> vone def
-R11422:11431 iris.algebra.numbers <> max_nat_op def
-R11389:11410 iris.algebra.cmra <> discrete_fun_lookup_op def
-R11389:11410 iris.algebra.cmra <> discrete_fun_lookup_op def
-R11413:11414 xv6iris.TsoGhost <> vf def
-R11413:11414 xv6iris.TsoGhost <> vf def
-R11417:11420 xv6iris.TsoGhost <> vone def
-R11417:11420 xv6iris.TsoGhost <> vone def
-R11422:11431 iris.algebra.numbers <> max_nat_op def
-R11422:11431 iris.algebra.numbers <> max_nat_op def
-R11446:11456 stdpp.decidable <> decide_True thm
-R11446:11456 stdpp.decidable <> decide_True thm
-R11446:11456 stdpp.decidable <> decide_True thm
-R11483:11498 iris.algebra.numbers <> max_nat_included thm
-prf 11525:11540 <> view_auth_update
-binder 11542:11544 <> γv:81
-binder 11546:11548 <> tvs:82
-binder 11550:11553 <> tvs':83
-R11590:11594 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R11562:11565 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
-R11567:11568 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
-binder 11566:11566 <> h:84
-R11574:11578 stdpp.numbers <> ::nat_scope:x_'≤'_x not
-R11569:11571 xv6iris.TsoGhost <> tvs:82 var
-R11573:11573 xv6iris.TsoGhost <> h:84 var
-R11579:11582 xv6iris.TsoGhost <> tvs':83 var
-R11584:11584 xv6iris.TsoGhost <> h:84 var
-R11612:11618 iris.bi.updates <> ::stdpp_scope:x_'==∗'_x not
-R11595:11603 xv6iris.TsoGhost <> view_auth def
-R11605:11607 xv6iris.TsoGhost <> γv:81 var
-R11609:11611 xv6iris.TsoGhost <> tvs:82 var
-R11619:11627 xv6iris.TsoGhost <> view_auth def
-R11629:11631 xv6iris.TsoGhost <> γv:81 var
-R11633:11636 xv6iris.TsoGhost <> tvs':83 var
-R11674:11683 iris.base_logic.lib.own <> own_update thm
-R11674:11683 iris.base_logic.lib.own <> own_update thm
-R11699:11709 iris.algebra.auth <> auth_update thm
-R11712:11726 xv6iris.TsoGhost <> vf_local_update thm
-R11699:11709 iris.algebra.auth <> auth_update thm
-R11712:11726 xv6iris.TsoGhost <> vf_local_update thm
-prf 11927:11937 <> view_lb_get
-binder 11939:11941 <> γv:85
-binder 11943:11946 <> γll:86
-binder 11948:11950 <> tvs:87
-R11957:11959 Corelib.Init.Datatypes <> nat ind
-binder 11953:11953 <> n:88
-binder 11962:11962 <> h:89
-R11987:11995 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R11976:11980 stdpp.numbers <> ::nat_scope:x_'≤'_x not
-R11971:11973 xv6iris.TsoGhost <> tvs:87 var
-R11975:11975 xv6iris.TsoGhost <> h:89 var
-R11981:11981 xv6iris.TsoGhost <> n:88 var
-R12013:12018 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R11996:12004 xv6iris.TsoGhost <> view_auth def
-R12006:12008 xv6iris.TsoGhost <> γv:85 var
-R12010:12012 xv6iris.TsoGhost <> tvs:87 var
-R12045:12054 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R12019:12035 iris.base_logic.lib.mono_nat <> mono_nat_auth_own def
-R12044:12044 xv6iris.TsoGhost <> n:88 var
-R12037:12040 xv6iris.TsoGhost <> γll:86 var
-R12072:12076 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R12055:12063 xv6iris.TsoGhost <> view_auth def
-R12065:12067 xv6iris.TsoGhost <> γv:85 var
-R12069:12071 xv6iris.TsoGhost <> tvs:87 var
-R12103:12111 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R12077:12093 iris.base_logic.lib.mono_nat <> mono_nat_auth_own def
-R12102:12102 xv6iris.TsoGhost <> n:88 var
-R12095:12098 xv6iris.TsoGhost <> γll:86 var
-R12112:12118 xv6iris.TsoGhost <> view_lb def
-R12120:12122 xv6iris.TsoGhost <> γv:85 var
-R12124:12127 xv6iris.TsoGhost <> γll:86 var
-R12129:12129 xv6iris.TsoGhost <> h:89 var
-R12132:12134 xv6iris.TsoGhost <> tvs:87 var
-R12136:12136 xv6iris.TsoGhost <> h:89 var
-R12192:12192 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12225:12230 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12235:12235 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12193:12206 xv6iris.TsoGhost <> view_auth_frag thm
-R12192:12192 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12225:12230 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12235:12235 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12193:12206 xv6iris.TsoGhost <> view_auth_frag thm
-R12273:12273 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12293:12298 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12304:12304 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12274:12292 iris.base_logic.lib.mono_nat <> mono_nat_lb_own_get thm
-R12273:12273 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12293:12298 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12304:12304 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12274:12292 iris.base_logic.lib.mono_nat <> mono_nat_lb_own_get thm
-R12369:12369 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12388:12393 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12399:12399 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12370:12387 iris.base_logic.lib.mono_nat <> mono_nat_lb_own_le thm
-R12369:12369 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12388:12393 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12399:12399 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12370:12387 iris.base_logic.lib.mono_nat <> mono_nat_lb_own_le thm
-def 13137:13144 <> dirty_ok
-R13156:13160 iris.base_logic.lib.iprop <> gname def
-binder 13147:13152 <> γlogm:90
-R13168:13172 xv6iris.TsoMemPa <> agent abbrev
-binder 13164:13164 <> h:91
-R13180:13182 Corelib.Init.Datatypes <> nat ind
-binder 13176:13176 <> B:92
-R13199:13201 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
-R13196:13198 Corelib.Init.Datatypes <> nat ind
-R13202:13208 Riscv.rv64d_types Arch pa def
-binder 13192:13192 <> k:93
-R13213:13217 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R13219:13220 xv6iris.TsoGhost <> ghosts.Σ var
-R13251:13260 iris.bi.interface <> ::bi_scope:x_'∨'_x not
-R13230:13232 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R13248:13250 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R13237:13241 stdpp.numbers <> ::nat_scope:x_'≤'_x not
-R13235:13236 stdpp.base <> :::x_'.1' not
-R13234:13234 xv6iris.TsoGhost <> k:93 var
-R13242:13242 xv6iris.TsoGhost <> B:92 var
-R13261:13264 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R13268:13269 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-binder 13265:13265 <> i:94
-binder 13267:13267 <> m:95
-R13285:13289 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R13270:13272 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R13282:13284 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R13276:13278 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R13274:13275 stdpp.base <> :::x_'.1' not
-R13273:13273 xv6iris.TsoGhost <> k:93 var
-R13279:13279 Corelib.Init.Datatypes <> S constr
-R13281:13281 xv6iris.TsoGhost <> i:94 var
-R13308:13312 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R13291:13295 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
-R13302:13302 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
-R13306:13306 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
-R13296:13301 xv6iris.TsoGhost <> γlogm:90 var
-R13290:13290 xv6iris.TsoGhost <> i:94 var
-R13303:13305 iris.algebra.dfrac <> :dfrac::'□' not
-R13307:13307 xv6iris.TsoGhost <> m:95 var
-R13313:13315 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R13328:13330 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
-R13324:13326 Corelib.Init.Logic <> ::type_scope:x_'='_x not
-R13316:13321 xv6iris.TsoMemPa <> pm_tid proj
-R13323:13323 xv6iris.TsoGhost <> m:95 var
-R13327:13327 xv6iris.TsoGhost <> h:91 var
-inst 13355:13373 <> dirty_ok_persistent
-binder 13375:13380 <> γlogm:96
-binder 13382:13382 <> h:97
-binder 13384:13384 <> B:98
-binder 13386:13386 <> k:99
-R13394:13403 iris.bi.derived_connectives <> Persistent class
-R13406:13413 xv6iris.TsoGhost <> dirty_ok def
-R13415:13420 xv6iris.TsoGhost <> γlogm:96 var
-R13422:13422 xv6iris.TsoGhost <> h:97 var
-R13424:13424 xv6iris.TsoGhost <> B:98 var
-R13426:13426 xv6iris.TsoGhost <> k:99 var
-prf 13462:13474 <> dirty_ok_mono
-binder 13476:13481 <> γlogm:100
-binder 13483:13483 <> h:101
-binder 13485:13485 <> B:102
-binder 13487:13488 <> B':103
-binder 13490:13490 <> k:104
-R13512:13516 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R13500:13504 stdpp.numbers <> ::nat_scope:x_'≤'_x not
-R13499:13499 xv6iris.TsoGhost <> B:102 var
-R13505:13506 xv6iris.TsoGhost <> B':103 var
-R13538:13543 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R13517:13524 xv6iris.TsoGhost <> dirty_ok def
-R13526:13531 xv6iris.TsoGhost <> γlogm:100 var
-R13533:13533 xv6iris.TsoGhost <> h:101 var
-R13535:13535 xv6iris.TsoGhost <> B:102 var
-R13537:13537 xv6iris.TsoGhost <> k:104 var
-R13544:13551 xv6iris.TsoGhost <> dirty_ok def
-R13553:13558 xv6iris.TsoGhost <> γlogm:100 var
-R13560:13560 xv6iris.TsoGhost <> h:101 var
-R13562:13563 xv6iris.TsoGhost <> B':103 var
-R13565:13565 xv6iris.TsoGhost <> k:104 var
-R13655:13660 xv6iris.TsoGhost ghosts <> sec
+prf 8327:8333 <> llb_get
+binder 8335:8338 <> γll:38
+binder 8340:8340 <> n:39
+R8374:8379 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R8348:8364 iris.base_logic.lib.mono_nat <> mono_nat_auth_own def
+R8373:8373 xv6iris.TsoGhost <> n:39 var
+R8366:8369 xv6iris.TsoGhost <> γll:38 var
+R8406:8410 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R8380:8396 iris.base_logic.lib.mono_nat <> mono_nat_auth_own def
+R8405:8405 xv6iris.TsoGhost <> n:39 var
+R8398:8401 xv6iris.TsoGhost <> γll:38 var
+R8411:8413 xv6iris.TsoGhost <> llb def
+R8415:8418 xv6iris.TsoGhost <> γll:38 var
+R8420:8420 xv6iris.TsoGhost <> n:39 var
+R8464:8464 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8484:8489 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8494:8494 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8465:8483 iris.base_logic.lib.mono_nat <> mono_nat_lb_own_get thm
+R8464:8464 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8484:8489 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8494:8494 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8465:8483 iris.base_logic.lib.mono_nat <> mono_nat_lb_own_get thm
+prf 8550:8558 <> llb_valid
+binder 8560:8563 <> γll:40
+binder 8565:8565 <> n:41
+binder 8567:8567 <> K:42
+R8601:8606 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R8575:8591 iris.base_logic.lib.mono_nat <> mono_nat_auth_own def
+R8600:8600 xv6iris.TsoGhost <> n:41 var
+R8593:8596 xv6iris.TsoGhost <> γll:40 var
+R8617:8622 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R8607:8609 xv6iris.TsoGhost <> llb def
+R8611:8614 xv6iris.TsoGhost <> γll:40 var
+R8616:8616 xv6iris.TsoGhost <> K:42 var
+R8623:8625 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R8639:8641 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R8628:8632 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R8627:8627 xv6iris.TsoGhost <> K:42 var
+R8633:8633 xv6iris.TsoGhost <> n:41 var
+R8700:8700 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8722:8727 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8736:8736 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8701:8721 iris.base_logic.lib.mono_nat <> mono_nat_lb_own_valid thm
+R8700:8700 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8722:8727 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8736:8736 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R8701:8721 iris.base_logic.lib.mono_nat <> mono_nat_lb_own_valid thm
+def 9364:9370 <> view_lb
+R9384:9388 iris.base_logic.lib.iprop <> gname def
+binder 9373:9375 <> γv:43
+binder 9377:9380 <> γll:44
+R9396:9400 xv6iris.TsoMemPa <> agent abbrev
+binder 9392:9392 <> h:45
+R9408:9410 Corelib.Init.Datatypes <> nat ind
+binder 9404:9404 <> K:46
+R9415:9419 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R9421:9422 xv6iris.TsoGhost <> ghosts.Σ var
+R9432:9432 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R9482:9487 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R9455:9459 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R9433:9435 iris.base_logic.lib.own <> own def
+R9442:9445 iris.algebra.auth <> :::'◯'_x not
+R9446:9449 xv6iris.TsoGhost <> vone def
+R9451:9451 xv6iris.TsoGhost <> h:45 var
+R9453:9453 xv6iris.TsoGhost <> K:46 var
+R9437:9439 xv6iris.TsoGhost <> γv:43 var
+R9460:9474 iris.base_logic.lib.mono_nat <> mono_nat_lb_own def
+R9481:9481 xv6iris.TsoGhost <> K:46 var
+R9476:9479 xv6iris.TsoGhost <> γll:44 var
+R9488:9490 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R9500:9502 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R9492:9494 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R9491:9491 xv6iris.TsoGhost <> K:46 var
+inst 9527:9544 <> view_lb_persistent
+binder 9546:9548 <> γv:47
+binder 9550:9553 <> γll:48
+binder 9555:9555 <> h:49
+binder 9557:9557 <> K:50
+R9565:9574 iris.bi.derived_connectives <> Persistent class
+R9577:9583 xv6iris.TsoGhost <> view_lb def
+R9585:9587 xv6iris.TsoGhost <> γv:47 var
+R9589:9592 xv6iris.TsoGhost <> γll:48 var
+R9594:9594 xv6iris.TsoGhost <> h:49 var
+R9596:9596 xv6iris.TsoGhost <> K:50 var
+inst 9641:9656 <> view_lb_timeless
+binder 9658:9660 <> γv:51
+binder 9662:9665 <> γll:52
+binder 9667:9667 <> h:53
+binder 9669:9669 <> K:54
+R9677:9684 iris.bi.derived_connectives <> Timeless class
+R9687:9693 xv6iris.TsoGhost <> view_lb def
+R9695:9697 xv6iris.TsoGhost <> γv:51 var
+R9699:9702 xv6iris.TsoGhost <> γll:52 var
+R9704:9704 xv6iris.TsoGhost <> h:53 var
+R9706:9706 xv6iris.TsoGhost <> K:54 var
+prf 9742:9750 <> view_lb_0
+binder 9752:9754 <> γv:55
+binder 9756:9759 <> γll:56
+binder 9761:9761 <> h:57
+R9765:9768 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
+R9769:9775 xv6iris.TsoGhost <> view_lb def
+R9777:9779 xv6iris.TsoGhost <> γv:55 var
+R9781:9784 xv6iris.TsoGhost <> γll:56 var
+R9786:9786 xv6iris.TsoGhost <> h:57 var
+prf 9825:9835 <> view_lb_llb
+binder 9837:9839 <> γv:58
+binder 9841:9844 <> γll:59
+binder 9846:9846 <> h:60
+binder 9848:9848 <> K:61
+R9872:9877 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R9852:9858 xv6iris.TsoGhost <> view_lb def
+R9860:9862 xv6iris.TsoGhost <> γv:58 var
+R9864:9867 xv6iris.TsoGhost <> γll:59 var
+R9869:9869 xv6iris.TsoGhost <> h:60 var
+R9871:9871 xv6iris.TsoGhost <> K:61 var
+R9878:9880 xv6iris.TsoGhost <> llb def
+R9882:9885 xv6iris.TsoGhost <> γll:59 var
+R9887:9887 xv6iris.TsoGhost <> K:61 var
+prf 9968:9979 <> vone_le_incl
+binder 9981:9981 <> h:62
+binder 9983:9983 <> K:63
+binder 9985:9986 <> K':64
+R10008:10012 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R9997:10001 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R9995:9996 xv6iris.TsoGhost <> K':64 var
+R10002:10002 xv6iris.TsoGhost <> K:63 var
+R10022:10026 iris.algebra.cmra <> ::stdpp_scope:x_'≼'_x not
+R10013:10016 xv6iris.TsoGhost <> vone def
+R10018:10018 xv6iris.TsoGhost <> h:62 var
+R10020:10021 xv6iris.TsoGhost <> K':64 var
+R10027:10030 xv6iris.TsoGhost <> vone def
+R10032:10032 xv6iris.TsoGhost <> h:62 var
+R10034:10034 xv6iris.TsoGhost <> K:63 var
+R10070:10073 xv6iris.TsoGhost <> vone def
+R10070:10073 xv6iris.TsoGhost <> vone def
+R10104:10125 iris.algebra.cmra <> discrete_fun_lookup_op def
+R10128:10131 xv6iris.TsoGhost <> vone def
+R10133:10142 iris.algebra.numbers <> max_nat_op def
+R10104:10125 iris.algebra.cmra <> discrete_fun_lookup_op def
+R10104:10125 iris.algebra.cmra <> discrete_fun_lookup_op def
+R10128:10131 xv6iris.TsoGhost <> vone def
+R10128:10131 xv6iris.TsoGhost <> vone def
+R10133:10142 iris.algebra.numbers <> max_nat_op def
+R10133:10142 iris.algebra.numbers <> max_nat_op def
+R10159:10164 stdpp.base <> decide def
+R10169:10171 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R10159:10164 stdpp.base <> decide def
+R10169:10171 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+prf 10207:10216 <> view_lb_le
+binder 10218:10220 <> γv:65
+binder 10222:10225 <> γll:66
+binder 10227:10227 <> h:67
+binder 10229:10229 <> K:68
+binder 10231:10232 <> K':69
+R10254:10258 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R10243:10247 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R10241:10242 xv6iris.TsoGhost <> K':69 var
+R10248:10248 xv6iris.TsoGhost <> K:68 var
+R10279:10284 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R10259:10265 xv6iris.TsoGhost <> view_lb def
+R10267:10269 xv6iris.TsoGhost <> γv:65 var
+R10271:10274 xv6iris.TsoGhost <> γll:66 var
+R10276:10276 xv6iris.TsoGhost <> h:67 var
+R10278:10278 xv6iris.TsoGhost <> K:68 var
+R10285:10291 xv6iris.TsoGhost <> view_lb def
+R10293:10295 xv6iris.TsoGhost <> γv:65 var
+R10297:10300 xv6iris.TsoGhost <> γll:66 var
+R10302:10302 xv6iris.TsoGhost <> h:67 var
+R10304:10305 xv6iris.TsoGhost <> K':69 var
+R10395:10395 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10404:10409 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10414:10414 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10396:10403 iris.base_logic.lib.own <> own_mono thm
+R10395:10395 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10404:10409 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10414:10414 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R10396:10403 iris.base_logic.lib.own <> own_mono thm
+R10431:10444 iris.algebra.auth <> auth_frag_mono thm
+R10447:10458 xv6iris.TsoGhost <> vone_le_incl thm
+R10431:10444 iris.algebra.auth <> auth_frag_mono thm
+R10447:10458 xv6iris.TsoGhost <> vone_le_incl thm
+R10484:10501 iris.base_logic.lib.mono_nat <> mono_nat_lb_own_le thm
+R10484:10501 iris.base_logic.lib.mono_nat <> mono_nat_lb_own_le thm
+def 10725:10733 <> view_auth
+R10742:10746 iris.base_logic.lib.iprop <> gname def
+binder 10736:10738 <> γv:70
+R10761:10765 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R10756:10760 xv6iris.TsoMemPa <> agent abbrev
+R10766:10768 Corelib.Init.Datatypes <> nat ind
+binder 10750:10752 <> tvs:71
+R10773:10777 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R10779:10780 xv6iris.TsoGhost <> ghosts.Σ var
+R10789:10791 iris.base_logic.lib.own <> own def
+R10808:10812 iris.algebra.cmra <> ::stdpp_scope:x_'⋅'_x not
+R10798:10800 iris.algebra.auth <> :::'●'_x_x not
+R10801:10801 iris.algebra.auth <> :::'●'_x_x not
+R10802:10803 xv6iris.TsoGhost <> vf def
+R10805:10807 xv6iris.TsoGhost <> tvs:71 var
+R10813:10816 iris.algebra.auth <> :::'◯'_x not
+R10817:10818 xv6iris.TsoGhost <> vf def
+R10820:10822 xv6iris.TsoGhost <> tvs:71 var
+R10793:10795 xv6iris.TsoGhost <> γv:70 var
+prf 11305:11319 <> view_auth_alloc
+R11333:11337 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R11328:11332 xv6iris.TsoMemPa <> agent abbrev
+R11338:11340 Corelib.Init.Datatypes <> nat ind
+binder 11322:11324 <> tvs:72
+R11349:11352 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
+R11353:11357 iris.bi.updates <> ::bi_scope:'|==>'_x not
+R11358:11361 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R11373:11374 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R11368:11372 iris.base_logic.lib.iprop <> gname def
+binder 11362:11364 <> γv:73
+R11375:11383 xv6iris.TsoGhost <> view_auth def
+R11385:11387 xv6iris.TsoGhost <> γv:73 var
+R11389:11391 xv6iris.TsoGhost <> tvs:72 var
+R11414:11422 iris.base_logic.lib.own <> own_alloc thm
+R11414:11422 iris.base_logic.lib.own <> own_alloc thm
+R11431:11454 iris.algebra.auth <> auth_both_valid_discrete thm
+R11431:11454 iris.algebra.auth <> auth_both_valid_discrete thm
+prf 11516:11529 <> view_auth_frag
+binder 11531:11533 <> γv:74
+binder 11535:11537 <> tvs:75
+binder 11539:11539 <> h:76
+binder 11541:11541 <> K:77
+R11566:11570 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R11551:11555 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R11550:11550 xv6iris.TsoGhost <> K:77 var
+R11556:11558 xv6iris.TsoGhost <> tvs:75 var
+R11560:11560 xv6iris.TsoGhost <> h:76 var
+R11588:11593 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R11571:11579 xv6iris.TsoGhost <> view_auth def
+R11581:11583 xv6iris.TsoGhost <> γv:74 var
+R11585:11587 xv6iris.TsoGhost <> tvs:75 var
+R11594:11596 iris.base_logic.lib.own <> own def
+R11603:11606 iris.algebra.auth <> :::'◯'_x not
+R11607:11610 xv6iris.TsoGhost <> vone def
+R11612:11612 xv6iris.TsoGhost <> h:76 var
+R11614:11614 xv6iris.TsoGhost <> K:77 var
+R11598:11600 xv6iris.TsoGhost <> γv:74 var
+R11657:11657 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11666:11671 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11676:11676 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11658:11665 iris.base_logic.lib.own <> own_mono thm
+R11657:11657 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11666:11671 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11676:11676 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11658:11665 iris.base_logic.lib.own <> own_mono thm
+R11698:11711 iris.algebra.auth <> auth_frag_mono thm
+R11714:11725 xv6iris.TsoGhost <> vone_incl_vf thm
+R11739:11753 iris.algebra.cmra <> cmra_included_r thm
+R11698:11711 iris.algebra.auth <> auth_frag_mono thm
+R11714:11725 xv6iris.TsoGhost <> vone_incl_vf thm
+R11739:11753 iris.algebra.cmra <> cmra_included_r thm
+prf 11773:11787 <> view_auth_valid
+binder 11789:11791 <> γv:78
+binder 11793:11796 <> γll:79
+binder 11798:11800 <> tvs:80
+binder 11802:11802 <> h:81
+binder 11804:11804 <> K:82
+R11829:11834 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R11812:11820 xv6iris.TsoGhost <> view_auth def
+R11822:11824 xv6iris.TsoGhost <> γv:78 var
+R11826:11828 xv6iris.TsoGhost <> tvs:80 var
+R11855:11860 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11835:11841 xv6iris.TsoGhost <> view_lb def
+R11843:11845 xv6iris.TsoGhost <> γv:78 var
+R11847:11850 xv6iris.TsoGhost <> γll:79 var
+R11852:11852 xv6iris.TsoGhost <> h:81 var
+R11854:11854 xv6iris.TsoGhost <> K:82 var
+R11861:11863 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R11881:11883 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R11866:11870 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R11865:11865 xv6iris.TsoGhost <> K:82 var
+R11871:11873 xv6iris.TsoGhost <> tvs:80 var
+R11875:11875 xv6iris.TsoGhost <> h:81 var
+R11964:11964 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11976:11981 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11989:11989 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11965:11975 iris.base_logic.lib.own <> own_valid_2 thm
+R11964:11964 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11976:11981 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11989:11989 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11965:11975 iris.base_logic.lib.own <> own_valid_2 thm
+R12034:12038 stdpp.base <> assoc def
+R12041:12052 iris.algebra.auth <> auth_frag_op thm
+R12034:12038 stdpp.base <> assoc def
+R12034:12038 stdpp.base <> assoc def
+R12041:12052 iris.algebra.auth <> auth_frag_op thm
+R12041:12052 iris.algebra.auth <> auth_frag_op thm
+R12067:12090 iris.algebra.auth <> auth_both_valid_discrete thm
+R12067:12090 iris.algebra.auth <> auth_both_valid_discrete thm
+R12067:12090 iris.algebra.auth <> auth_both_valid_discrete thm
+R12118:12145 iris.algebra.cmra <> discrete_fun_included_spec_1 thm
+R12118:12145 iris.algebra.cmra <> discrete_fun_included_spec_1 thm
+R12189:12210 iris.algebra.cmra <> discrete_fun_lookup_op def
+R12213:12214 xv6iris.TsoGhost <> vf def
+R12217:12220 xv6iris.TsoGhost <> vone def
+R12222:12231 iris.algebra.numbers <> max_nat_op def
+R12189:12210 iris.algebra.cmra <> discrete_fun_lookup_op def
+R12189:12210 iris.algebra.cmra <> discrete_fun_lookup_op def
+R12213:12214 xv6iris.TsoGhost <> vf def
+R12213:12214 xv6iris.TsoGhost <> vf def
+R12217:12220 xv6iris.TsoGhost <> vone def
+R12217:12220 xv6iris.TsoGhost <> vone def
+R12222:12231 iris.algebra.numbers <> max_nat_op def
+R12222:12231 iris.algebra.numbers <> max_nat_op def
+R12246:12256 stdpp.decidable <> decide_True thm
+R12246:12256 stdpp.decidable <> decide_True thm
+R12246:12256 stdpp.decidable <> decide_True thm
+R12283:12298 iris.algebra.numbers <> max_nat_included thm
+prf 12325:12340 <> view_auth_update
+binder 12342:12344 <> γv:83
+binder 12346:12348 <> tvs:84
+binder 12350:12353 <> tvs':85
+R12390:12394 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R12362:12365 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
+R12367:12368 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
+binder 12366:12366 <> h:86
+R12374:12378 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R12369:12371 xv6iris.TsoGhost <> tvs:84 var
+R12373:12373 xv6iris.TsoGhost <> h:86 var
+R12379:12382 xv6iris.TsoGhost <> tvs':85 var
+R12384:12384 xv6iris.TsoGhost <> h:86 var
+R12412:12418 iris.bi.updates <> ::stdpp_scope:x_'==∗'_x not
+R12395:12403 xv6iris.TsoGhost <> view_auth def
+R12405:12407 xv6iris.TsoGhost <> γv:83 var
+R12409:12411 xv6iris.TsoGhost <> tvs:84 var
+R12419:12427 xv6iris.TsoGhost <> view_auth def
+R12429:12431 xv6iris.TsoGhost <> γv:83 var
+R12433:12436 xv6iris.TsoGhost <> tvs':85 var
+R12474:12483 iris.base_logic.lib.own <> own_update thm
+R12474:12483 iris.base_logic.lib.own <> own_update thm
+R12499:12509 iris.algebra.auth <> auth_update thm
+R12512:12526 xv6iris.TsoGhost <> vf_local_update thm
+R12499:12509 iris.algebra.auth <> auth_update thm
+R12512:12526 xv6iris.TsoGhost <> vf_local_update thm
+prf 12727:12737 <> view_lb_get
+binder 12739:12741 <> γv:87
+binder 12743:12746 <> γll:88
+binder 12748:12750 <> tvs:89
+R12757:12759 Corelib.Init.Datatypes <> nat ind
+binder 12753:12753 <> n:90
+binder 12762:12762 <> h:91
+R12787:12795 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R12776:12780 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R12771:12773 xv6iris.TsoGhost <> tvs:89 var
+R12775:12775 xv6iris.TsoGhost <> h:91 var
+R12781:12781 xv6iris.TsoGhost <> n:90 var
+R12813:12818 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R12796:12804 xv6iris.TsoGhost <> view_auth def
+R12806:12808 xv6iris.TsoGhost <> γv:87 var
+R12810:12812 xv6iris.TsoGhost <> tvs:89 var
+R12845:12854 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R12819:12835 iris.base_logic.lib.mono_nat <> mono_nat_auth_own def
+R12844:12844 xv6iris.TsoGhost <> n:90 var
+R12837:12840 xv6iris.TsoGhost <> γll:88 var
+R12872:12876 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R12855:12863 xv6iris.TsoGhost <> view_auth def
+R12865:12867 xv6iris.TsoGhost <> γv:87 var
+R12869:12871 xv6iris.TsoGhost <> tvs:89 var
+R12903:12911 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R12877:12893 iris.base_logic.lib.mono_nat <> mono_nat_auth_own def
+R12902:12902 xv6iris.TsoGhost <> n:90 var
+R12895:12898 xv6iris.TsoGhost <> γll:88 var
+R12912:12918 xv6iris.TsoGhost <> view_lb def
+R12920:12922 xv6iris.TsoGhost <> γv:87 var
+R12924:12927 xv6iris.TsoGhost <> γll:88 var
+R12929:12929 xv6iris.TsoGhost <> h:91 var
+R12932:12934 xv6iris.TsoGhost <> tvs:89 var
+R12936:12936 xv6iris.TsoGhost <> h:91 var
+R12992:12992 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13025:13030 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13035:13035 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12993:13006 xv6iris.TsoGhost <> view_auth_frag thm
+R12992:12992 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13025:13030 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13035:13035 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12993:13006 xv6iris.TsoGhost <> view_auth_frag thm
+R13073:13073 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13093:13098 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13104:13104 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13074:13092 iris.base_logic.lib.mono_nat <> mono_nat_lb_own_get thm
+R13073:13073 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13093:13098 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13104:13104 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13074:13092 iris.base_logic.lib.mono_nat <> mono_nat_lb_own_get thm
+R13169:13169 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13188:13193 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13199:13199 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13170:13187 iris.base_logic.lib.mono_nat <> mono_nat_lb_own_le thm
+R13169:13169 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13188:13193 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13199:13199 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R13170:13187 iris.base_logic.lib.mono_nat <> mono_nat_lb_own_le thm
+def 13937:13944 <> dirty_ok
+R13956:13960 iris.base_logic.lib.iprop <> gname def
+binder 13947:13952 <> γlogm:92
+R13968:13972 xv6iris.TsoMemPa <> agent abbrev
+binder 13964:13964 <> h:93
+R13980:13982 Corelib.Init.Datatypes <> nat ind
+binder 13976:13976 <> B:94
+R13999:14001 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not
+R13996:13998 Corelib.Init.Datatypes <> nat ind
+R14002:14008 Riscv.rv64d_types Arch pa def
+binder 13992:13992 <> k:95
+R14013:14017 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R14019:14020 xv6iris.TsoGhost <> ghosts.Σ var
+R14051:14060 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R14030:14032 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R14048:14050 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R14037:14041 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R14035:14036 stdpp.base <> :::x_'.1' not
+R14034:14034 xv6iris.TsoGhost <> k:95 var
+R14042:14042 xv6iris.TsoGhost <> B:94 var
+R14061:14064 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R14068:14069 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+binder 14065:14065 <> i:96
+binder 14067:14067 <> m:97
+R14085:14089 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R14070:14072 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R14082:14084 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R14076:14078 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14074:14075 stdpp.base <> :::x_'.1' not
+R14073:14073 xv6iris.TsoGhost <> k:95 var
+R14079:14079 Corelib.Init.Datatypes <> S constr
+R14081:14081 xv6iris.TsoGhost <> i:96 var
+R14108:14112 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R14091:14095 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R14102:14102 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R14106:14106 iris.base_logic.lib.ghost_map <> ::bi_scope:x_'↪['_x_']'_x_x not
+R14096:14101 xv6iris.TsoGhost <> γlogm:92 var
+R14090:14090 xv6iris.TsoGhost <> i:96 var
+R14103:14105 iris.algebra.dfrac <> :dfrac::'□' not
+R14107:14107 xv6iris.TsoGhost <> m:97 var
+R14113:14115 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R14128:14130 iris.bi.interface <> ::bi_scope:'⌜'_x_'⌝' not
+R14124:14126 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R14116:14121 xv6iris.TsoMemPa <> pm_tid proj
+R14123:14123 xv6iris.TsoGhost <> m:97 var
+R14127:14127 xv6iris.TsoGhost <> h:93 var
+inst 14155:14173 <> dirty_ok_persistent
+binder 14175:14180 <> γlogm:98
+binder 14182:14182 <> h:99
+binder 14184:14184 <> B:100
+binder 14186:14186 <> k:101
+R14194:14203 iris.bi.derived_connectives <> Persistent class
+R14206:14213 xv6iris.TsoGhost <> dirty_ok def
+R14215:14220 xv6iris.TsoGhost <> γlogm:98 var
+R14222:14222 xv6iris.TsoGhost <> h:99 var
+R14224:14224 xv6iris.TsoGhost <> B:100 var
+R14226:14226 xv6iris.TsoGhost <> k:101 var
+prf 14262:14274 <> dirty_ok_mono
+binder 14276:14281 <> γlogm:102
+binder 14283:14283 <> h:103
+binder 14285:14285 <> B:104
+binder 14287:14288 <> B':105
+binder 14290:14290 <> k:106
+R14312:14316 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R14300:14304 stdpp.numbers <> ::nat_scope:x_'≤'_x not
+R14299:14299 xv6iris.TsoGhost <> B:104 var
+R14305:14306 xv6iris.TsoGhost <> B':105 var
+R14338:14343 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R14317:14324 xv6iris.TsoGhost <> dirty_ok def
+R14326:14331 xv6iris.TsoGhost <> γlogm:102 var
+R14333:14333 xv6iris.TsoGhost <> h:103 var
+R14335:14335 xv6iris.TsoGhost <> B:104 var
+R14337:14337 xv6iris.TsoGhost <> k:106 var
+R14344:14351 xv6iris.TsoGhost <> dirty_ok def
+R14353:14358 xv6iris.TsoGhost <> γlogm:102 var
+R14360:14360 xv6iris.TsoGhost <> h:103 var
+R14362:14363 xv6iris.TsoGhost <> B':105 var
+R14365:14365 xv6iris.TsoGhost <> k:106 var
+R14455:14460 xv6iris.TsoGhost ghosts <> sec

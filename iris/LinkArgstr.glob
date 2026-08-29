@@ -1,0 +1,9 @@
+DIGEST a703042312ae97e6a8fc5d67b8ea61eb
+Fxv6iris.LinkArgstr
+R252:261 xv6iris.LinkArgraw <> <> lib
+R263:274 xv6iris.LinkFetchstr <> <> lib
+R292:302 xv6iris.ProofArgstr <> <> lib
+R323:333 xv6iris.ProofArgstr ArgstrProof <> modtype
+R335:340 xv6iris.LinkArgraw Argraw <> modtype
+R342:349 xv6iris.LinkFetchstr Fetchstr <> modtype
+mod 313:318 <> Argstr

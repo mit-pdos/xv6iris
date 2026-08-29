@@ -1,0 +1,11 @@
+DIGEST a9c3b21f1a85f74391d5a2f49f87da11
+Fxv6iris.LinkVirtioDiskInit
+R534:545 xv6iris.LinkInitlock <> <> lib
+R547:556 xv6iris.LinkKalloc <> <> lib
+R558:572 xv6iris.LinkMemsetArray <> <> lib
+R574:592 xv6iris.ProofVirtioDiskInit <> <> lib
+R621:639 xv6iris.ProofVirtioDiskInit VirtioDiskInitProof <> modtype
+R641:648 xv6iris.LinkInitlock Initlock <> modtype
+R650:655 xv6iris.LinkKalloc Kalloc <> modtype
+R657:667 xv6iris.LinkMemsetArray MemsetArray <> modtype
+mod 603:616 <> VirtioDiskInit

@@ -748,7 +748,12 @@ Section SmodeCorePt.
        TsoCtx.phys_ledger_wpay (pa_add (pa_of ppn va) j) (DfracOwn 1)
          (nth_byte vnew j) (S (length log))
          (TsoMemPa.TsWin (pa_of ppn va) 8 j (nth_byte vnew) cp
-            (fun _ => Some (S (length log))) (S (length log)))).
+            (fun _ => Some (S (length log))) (S (length log)))) ∗
+    (* A6.120 (lock lane, mirrored into both trees): the store's OWN-MESSAGE
+       fragment, kept -- the creator's arm of [WpLock.lk_floor].  Last, so
+       the existing destructuring pattern is a one-token change. *)
+    TsoCtx.ledger_msg_at (length log)
+      (PWMsg (snap_of (pa_of ppn va) 8 vnew) (hart_agent cpu_id)).
   Proof.
     intros Hcan Hoff. iIntros "#Hk Hm Htso Hw".
     iDestruct (ctx_word_pointsto_bytes with "Hw") as "Hb".
@@ -789,19 +794,19 @@ Section SmodeCorePt.
       have := Hbd (hart_agent c). lia. }
     rewrite (tso_interp_of_at_gs riscv_eraGS img σ.(mem) log V
                σ.(sregs) σ.(mdev) Hpin).
-    iMod (TsoCtx.ledger_store_win_wpay_mint_ok
+    iMod (TsoCtx.ledger_store_win_wpay_mint_frag_ok
             (gs_of img σ.(mem) log V σ.(sregs) σ.(mdev))
             (gs_of img (write_bytes σ.(mem) pa 8 vnew) log' V'
                σ.(sregs) σ.(mdev))
             pa 8 vold vnew cp
             ltac:(vm_compute; discriminate) eq_refl eq_refl eq_refl
             Htvmono Htvtop with "Hm Htso Hb")
-      as "(Hm & Htso & Hb)".
+      as "(Hm & Htso & Hb & #Hmsg)".
     rewrite -(tso_interp_of_at_gs riscv_eraGS img
                 (write_bytes σ.(mem) pa 8 vnew) log' V'
                 σ.(sregs) σ.(mdev) Hpin').
     iDestruct (tso_interp_of_loglen_llb with "Htso") as "[Htso #Hlb]".
-    iModIntro. iFrame "Hm Htso Hb".
+    iModIntro. iFrame "Hm Htso Hb Hmsg".
     rewrite /RiscvPtsto.loglen_name.
     iApply (TsoGhost.llb_le with "Hlb"). rewrite /log' length_app /=. lia.
   Qed.

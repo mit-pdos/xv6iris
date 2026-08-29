@@ -1,0 +1,7 @@
+DIGEST bf5384de39cf514e0496a8a61b1558d4
+Fxv6iris.LinkPrintint
+R156:167 xv6iris.LinkConsputc <> <> lib
+R169:181 xv6iris.ProofPrintint <> <> lib
+R204:216 xv6iris.ProofPrintint PrintintProof <> modtype
+R218:225 xv6iris.LinkConsputc Consputc <> modtype
+mod 192:199 <> Printint

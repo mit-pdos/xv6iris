@@ -1,4 +1,4 @@
-DIGEST 135beaf8aea371e0d4e35b82db4de8c6
+DIGEST a75590659ed2def15e3022c3cf3998d7
 Fxv6iris.BioInv
 R4131:4136 Stdlib.ZArith.ZArith <> <> lib
 R4138:4140 Stdlib.micromega.Lia <> <> lib
@@ -3770,7 +3770,7 @@ R57150:57159 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
 R57113:57121 xv6iris.WpLock <> lock_name def
 R57123:57133 xv6iris.BcacheInv <> bcache_addr def
 R57191:57200 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R57160:57178 xv6iris.WpLock <> lk_cpu_fresh def
+R57160:57178 xv6iris.WpLock <> lk_cpu_ready def
 R57180:57190 xv6iris.BcacheInv <> bcache_addr def
 R57201:57201 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
 R57276:57286 iris.bi.interface <> ::bi_scope:x_'-∗'_x not

@@ -1,4 +1,4 @@
-DIGEST 7ad007af96aeed9a9627e534a9cc5dba
+DIGEST 733aeca348a14493fd093370088d40af
 Fxv6iris.KptPublish
 R2608:2613 Stdlib.ZArith.ZArith <> <> lib
 R2615:2618 Stdlib.Bool.Bool <> <> lib
@@ -615,4 +615,395 @@ R12188:12203 xv6iris.TsoCtx <> hart_view_lb_def def
 R12188:12203 xv6iris.TsoCtx <> hart_view_lb_def def
 R12231:12241 xv6iris.TsoGhost <> view_lb_llb thm
 R12231:12241 xv6iris.TsoGhost <> view_lb_llb thm
-R12256:12265 xv6iris.KptPublish KptPublish <> sec
+prf 13718:13737 <> pt_slots_publish_top
+R13744:13749 xv6iris.RiscvLang <> gstate rec
+binder 13740:13740 <> g:49
+R13758:13762 xv6iris.TsoCtx <> CtxId rec
+binder 13753:13754 <> xi:50
+R13776:13779 Corelib.Init.Datatypes <> list ind
+R13781:13781 Corelib.Numbers.BinNums <> Z ind
+binder 13772:13772 <> l:51
+R13790:13793 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13789:13789 Corelib.Numbers.BinNums <> Z ind
+R13794:13800 Riscv.rv64d_types Arch pa def
+binder 13785:13785 <> F:52
+R13809:13812 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R13808:13808 Corelib.Numbers.BinNums <> Z ind
+R13813:13817 SailStdpp.Values <> mword def
+binder 13804:13804 <> W:53
+R13873:13882 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R13829:13843 iris.base_logic.lib.gen_heap <> gen_heap_interp def
+R13868:13871 xv6iris.RiscvLang <> gmem proj
+R13865:13865 xv6iris.KptPublish <> g:49 var
+R13852:13862 xv6iris.RiscvPtsto <> riscv_memGS inst
+R13910:13915 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13883:13895 xv6iris.RiscvPtsto <> tso_interp_at def
+R13909:13909 xv6iris.KptPublish <> g:49 var
+R13897:13907 xv6iris.RiscvPtsto <> riscv_eraGS meth
+R13930:13939 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R13916:13926 xv6iris.TsoCtx <> own_context def
+R13928:13929 xv6iris.KptPublish <> xi:50 var
+R13940:13940 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R14008:14019 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R13941:13951 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R13953:13957 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R13959:13960 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 13952:13952 <> i:54
+binder 13952:13952 <> i:55
+R13961:13971 xv6iris.PtTree <> pt_slot_own def
+R13985:13985 xv6iris.KptPublish <> F:52 var
+R13987:13987 xv6iris.KptPublish <> i:54 var
+R13991:13998 iris.algebra.dfrac <> DfracOwn constr
+R14004:14004 xv6iris.KptPublish <> W:53 var
+R14006:14006 xv6iris.KptPublish <> i:54 var
+R13974:13978 xv6iris.PtTree <> UTier constr
+R13980:13981 xv6iris.KptPublish <> xi:50 var
+R13958:13958 xv6iris.KptPublish <> l:51 var
+R14064:14072 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R14020:14034 iris.base_logic.lib.gen_heap <> gen_heap_interp def
+R14059:14062 xv6iris.RiscvLang <> gmem proj
+R14056:14056 xv6iris.KptPublish <> g:49 var
+R14043:14053 xv6iris.RiscvPtsto <> riscv_memGS inst
+R14100:14104 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R14073:14085 xv6iris.RiscvPtsto <> tso_interp_at def
+R14099:14099 xv6iris.KptPublish <> g:49 var
+R14087:14097 xv6iris.RiscvPtsto <> riscv_eraGS meth
+R14119:14128 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R14211:14211 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R14105:14115 xv6iris.TsoCtx <> own_context def
+R14117:14118 xv6iris.KptPublish <> xi:50 var
+R14129:14139 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R14141:14145 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+R14147:14148 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'∈'_x_','_x not
+binder 14140:14140 <> i:56
+binder 14140:14140 <> i:57
+R14149:14159 xv6iris.PtTree <> pt_slot_own def
+R14188:14188 xv6iris.KptPublish <> F:52 var
+R14190:14190 xv6iris.KptPublish <> i:56 var
+R14194:14201 iris.algebra.dfrac <> DfracOwn constr
+R14207:14207 xv6iris.KptPublish <> W:53 var
+R14209:14209 xv6iris.KptPublish <> i:56 var
+R14162:14166 xv6iris.PtTree <> KTier constr
+R14169:14174 Stdlib.Lists.List <> length abbrev
+R14179:14182 xv6iris.RiscvLang <> glog proj
+R14176:14176 xv6iris.KptPublish <> g:49 var
+R14146:14146 xv6iris.KptPublish <> l:51 var
+R14356:14368 iris.bi.big_op <> big_sepL_cons thm
+R14356:14368 iris.bi.big_op <> big_sepL_cons thm
+R14356:14368 iris.bi.big_op <> big_sepL_cons thm
+R14356:14368 iris.bi.big_op <> big_sepL_cons thm
+R14356:14368 iris.bi.big_op <> big_sepL_cons thm
+R14425:14439 xv6iris.PtTree <> pt_slot_own_ctx thm
+R14462:14469 iris.algebra.dfrac <> DfracOwn constr
+R14480:14486 Corelib.Init.Logic <> eq_refl constr
+R14442:14446 xv6iris.PtTree <> UTier constr
+R14425:14439 xv6iris.PtTree <> pt_slot_own_ctx thm
+R14462:14469 iris.algebra.dfrac <> DfracOwn constr
+R14480:14486 Corelib.Init.Logic <> eq_refl constr
+R14442:14446 xv6iris.PtTree <> UTier constr
+R14425:14439 xv6iris.PtTree <> pt_slot_own_ctx thm
+R14462:14469 iris.algebra.dfrac <> DfracOwn constr
+R14480:14486 Corelib.Init.Logic <> eq_refl constr
+R14442:14446 xv6iris.PtTree <> UTier constr
+R14501:14501 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14635:14654 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14673:14673 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14502:14527 xv6iris.CtxPinMint <> ctx_phys_word_pin_mint_top thm
+binder 14586:14586 <> j:58
+R14595:14597 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R14594:14594 xv6iris.KptPublish <> j:58 var
+R14609:14625 xv6iris.KptPublish <> pte_slot_set_self thm
+R14633:14633 xv6iris.KptPublish <> j:58 var
+R14547:14558 xv6iris.PtTree <> pte_slot_set def
+R14501:14501 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14635:14654 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14673:14673 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14502:14527 xv6iris.CtxPinMint <> ctx_phys_word_pin_mint_top thm
+binder 14586:14586 <> j:59
+R14595:14597 Corelib.Init.Peano <> ::nat_scope:x_'<'_x not
+R14594:14594 xv6iris.KptPublish <> j:59 var
+R14609:14625 xv6iris.KptPublish <> pte_slot_set_self thm
+R14633:14633 xv6iris.KptPublish <> j:59 var
+R14547:14558 xv6iris.PtTree <> pte_slot_set def
+R14717:14717 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14720:14725 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14744:14744 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14717:14717 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14720:14725 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14744:14744 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R14836:14850 xv6iris.PtTree <> pt_slot_own_ker thm
+R14879:14884 Stdlib.Lists.List <> length abbrev
+R14889:14892 xv6iris.RiscvLang <> glog proj
+R14920:14927 iris.algebra.dfrac <> DfracOwn constr
+R14938:14944 Corelib.Init.Logic <> eq_refl constr
+R14853:14857 xv6iris.PtTree <> KTier constr
+R14860:14865 Stdlib.Lists.List <> length abbrev
+R14870:14873 xv6iris.RiscvLang <> glog proj
+R14836:14850 xv6iris.PtTree <> pt_slot_own_ker thm
+R14879:14884 Stdlib.Lists.List <> length abbrev
+R14889:14892 xv6iris.RiscvLang <> glog proj
+R14920:14927 iris.algebra.dfrac <> DfracOwn constr
+R14938:14944 Corelib.Init.Logic <> eq_refl constr
+R14853:14857 xv6iris.PtTree <> KTier constr
+R14860:14865 Stdlib.Lists.List <> length abbrev
+R14870:14873 xv6iris.RiscvLang <> glog proj
+R14836:14850 xv6iris.PtTree <> pt_slot_own_ker thm
+R14879:14884 Stdlib.Lists.List <> length abbrev
+R14889:14892 xv6iris.RiscvLang <> glog proj
+R14920:14927 iris.algebra.dfrac <> DfracOwn constr
+R14938:14944 Corelib.Init.Logic <> eq_refl constr
+R14853:14857 xv6iris.PtTree <> KTier constr
+R14860:14865 Stdlib.Lists.List <> length abbrev
+R14870:14873 xv6iris.RiscvLang <> glog proj
+prf 14983:15001 <> pt_page_publish_top
+R15008:15013 xv6iris.RiscvLang <> gstate rec
+binder 15004:15004 <> g:60
+R15022:15026 xv6iris.TsoCtx <> CtxId rec
+binder 15017:15018 <> xi:61
+R15034:15038 xv6iris.PtreeType <> ptree ind
+binder 15030:15030 <> t:62
+R15091:15100 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R15047:15061 iris.base_logic.lib.gen_heap <> gen_heap_interp def
+R15086:15089 xv6iris.RiscvLang <> gmem proj
+R15083:15083 xv6iris.KptPublish <> g:60 var
+R15070:15080 xv6iris.RiscvPtsto <> riscv_memGS inst
+R15128:15133 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15101:15113 xv6iris.RiscvPtsto <> tso_interp_at def
+R15127:15127 xv6iris.KptPublish <> g:60 var
+R15115:15125 xv6iris.RiscvPtsto <> riscv_eraGS meth
+R15148:15157 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15134:15144 xv6iris.TsoCtx <> own_context def
+R15146:15147 xv6iris.KptPublish <> xi:61 var
+R15198:15208 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R15158:15171 xv6iris.PtTree <> pt_page_own_at def
+R15185:15192 iris.algebra.dfrac <> DfracOwn constr
+R15197:15197 xv6iris.KptPublish <> t:62 var
+R15174:15178 xv6iris.PtTree <> UTier constr
+R15180:15181 xv6iris.KptPublish <> xi:61 var
+R15253:15261 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R15209:15223 iris.base_logic.lib.gen_heap <> gen_heap_interp def
+R15248:15251 xv6iris.RiscvLang <> gmem proj
+R15245:15245 xv6iris.KptPublish <> g:60 var
+R15232:15242 xv6iris.RiscvPtsto <> riscv_memGS inst
+R15289:15293 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R15262:15274 xv6iris.RiscvPtsto <> tso_interp_at def
+R15288:15288 xv6iris.KptPublish <> g:60 var
+R15276:15286 xv6iris.RiscvPtsto <> riscv_eraGS meth
+R15308:15316 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R15294:15304 xv6iris.TsoCtx <> own_context def
+R15306:15307 xv6iris.KptPublish <> xi:61 var
+R15317:15330 xv6iris.PtTree <> pt_page_own_at def
+R15359:15366 iris.algebra.dfrac <> DfracOwn constr
+R15371:15371 xv6iris.KptPublish <> t:62 var
+R15333:15337 xv6iris.PtTree <> KTier constr
+R15340:15345 Stdlib.Lists.List <> length abbrev
+R15350:15353 xv6iris.RiscvLang <> glog proj
+R15347:15347 xv6iris.KptPublish <> g:60 var
+R15431:15431 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15583:15588 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15607:15607 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15432:15451 xv6iris.KptPublish <> pt_slots_publish_top thm
+R15459:15462 stdpp.list_numbers <> seqZ def
+binder 15488:15488 <> i:63
+R15493:15502 xv6iris.CommonWalk <> u_pte_addr def
+R15505:15511 xv6iris.PtreeType <> pt_base def
+R15517:15528 SailStdpp.Values <> mword_of_int def
+R15530:15530 xv6iris.KptPublish <> i:63 var
+binder 15551:15551 <> i:64
+R15556:15562 xv6iris.PtreeType <> pt_ents def
+R15567:15578 SailStdpp.Values <> mword_of_int def
+R15580:15580 xv6iris.KptPublish <> i:64 var
+R15431:15431 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15583:15588 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15607:15607 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15432:15451 xv6iris.KptPublish <> pt_slots_publish_top thm
+R15459:15462 stdpp.list_numbers <> seqZ def
+binder 15488:15488 <> i:65
+R15493:15502 xv6iris.CommonWalk <> u_pte_addr def
+R15505:15511 xv6iris.PtreeType <> pt_base def
+R15517:15528 SailStdpp.Values <> mword_of_int def
+R15530:15530 xv6iris.KptPublish <> i:65 var
+binder 15551:15551 <> i:66
+R15556:15562 xv6iris.PtreeType <> pt_ents def
+R15567:15578 SailStdpp.Values <> mword_of_int def
+R15580:15580 xv6iris.KptPublish <> i:66 var
+R15694:15707 xv6iris.PtTree <> pt_page_own_at def
+R15694:15707 xv6iris.PtTree <> pt_page_own_at def
+R15694:15707 xv6iris.PtTree <> pt_page_own_at def
+prf 15747:15767 <> ptree_own_publish_top
+R15774:15779 xv6iris.RiscvLang <> gstate rec
+binder 15770:15770 <> g:67
+R15788:15792 xv6iris.TsoCtx <> CtxId rec
+binder 15783:15784 <> xi:68
+R15802:15804 Corelib.Init.Datatypes <> nat ind
+binder 15796:15798 <> lvl:69
+R15812:15816 xv6iris.PtreeType <> ptree ind
+binder 15808:15808 <> t:70
+R15869:15878 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R15825:15839 iris.base_logic.lib.gen_heap <> gen_heap_interp def
+R15864:15867 xv6iris.RiscvLang <> gmem proj
+R15861:15861 xv6iris.KptPublish <> g:67 var
+R15848:15858 xv6iris.RiscvPtsto <> riscv_memGS inst
+R15906:15911 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15879:15891 xv6iris.RiscvPtsto <> tso_interp_at def
+R15905:15905 xv6iris.KptPublish <> g:67 var
+R15893:15903 xv6iris.RiscvPtsto <> riscv_eraGS meth
+R15926:15935 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15912:15922 xv6iris.TsoCtx <> own_context def
+R15924:15925 xv6iris.KptPublish <> xi:68 var
+R15978:15988 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R15936:15947 xv6iris.PtTree <> ptree_own_at def
+R15960:15962 xv6iris.KptPublish <> lvl:69 var
+R15965:15972 iris.algebra.dfrac <> DfracOwn constr
+R15977:15977 xv6iris.KptPublish <> t:70 var
+R15950:15954 xv6iris.PtTree <> UTier constr
+R15956:15957 xv6iris.KptPublish <> xi:68 var
+R16033:16041 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R15989:16003 iris.base_logic.lib.gen_heap <> gen_heap_interp def
+R16028:16031 xv6iris.RiscvLang <> gmem proj
+R16025:16025 xv6iris.KptPublish <> g:67 var
+R16012:16022 xv6iris.RiscvPtsto <> riscv_memGS inst
+R16069:16073 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R16042:16054 xv6iris.RiscvPtsto <> tso_interp_at def
+R16068:16068 xv6iris.KptPublish <> g:67 var
+R16056:16066 xv6iris.RiscvPtsto <> riscv_eraGS meth
+R16088:16096 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R16074:16084 xv6iris.TsoCtx <> own_context def
+R16086:16087 xv6iris.KptPublish <> xi:68 var
+R16097:16108 xv6iris.PtTree <> ptree_own_at def
+R16136:16138 xv6iris.KptPublish <> lvl:69 var
+R16141:16148 iris.algebra.dfrac <> DfracOwn constr
+R16153:16153 xv6iris.KptPublish <> t:70 var
+R16111:16115 xv6iris.PtTree <> KTier constr
+R16118:16123 Stdlib.Lists.List <> length abbrev
+R16128:16131 xv6iris.RiscvLang <> glog proj
+R16125:16125 xv6iris.KptPublish <> g:67 var
+R16266:16266 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16293:16298 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16317:16317 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16267:16285 xv6iris.KptPublish <> pt_page_publish_top thm
+R16266:16266 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16293:16298 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16317:16317 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16267:16285 xv6iris.KptPublish <> pt_page_publish_top thm
+R16452:16452 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16479:16484 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16503:16503 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16453:16471 xv6iris.KptPublish <> pt_page_publish_top thm
+R16452:16452 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16479:16484 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16503:16503 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16453:16471 xv6iris.KptPublish <> pt_page_publish_top thm
+R16555:16555 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16795:16814 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16833:16833 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16556:16570 xv6iris.KptPublish <> pt_kids_publish thm
+binder 16596:16596 <> c:71
+R16601:16612 xv6iris.PtTree <> ptree_own_at def
+R16630:16637 iris.algebra.dfrac <> DfracOwn constr
+R16642:16642 xv6iris.KptPublish <> c:71 var
+R16615:16619 xv6iris.PtTree <> UTier constr
+binder 16664:16664 <> c:72
+R16669:16680 xv6iris.PtTree <> ptree_own_at def
+R16713:16720 iris.algebra.dfrac <> DfracOwn constr
+R16725:16725 xv6iris.KptPublish <> c:72 var
+R16683:16687 xv6iris.PtTree <> KTier constr
+R16690:16695 Stdlib.Lists.List <> length abbrev
+R16700:16703 xv6iris.RiscvLang <> glog proj
+R16743:16746 stdpp.list_numbers <> seqZ def
+binder 16760:16760 <> i:73
+R16765:16771 xv6iris.PtreeType <> pt_kids def
+R16776:16787 SailStdpp.Values <> mword_of_int def
+R16789:16789 xv6iris.KptPublish <> i:73 var
+R16555:16555 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16795:16814 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16833:16833 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16556:16570 xv6iris.KptPublish <> pt_kids_publish thm
+binder 16596:16596 <> c:74
+R16601:16612 xv6iris.PtTree <> ptree_own_at def
+R16630:16637 iris.algebra.dfrac <> DfracOwn constr
+R16642:16642 xv6iris.KptPublish <> c:74 var
+R16615:16619 xv6iris.PtTree <> UTier constr
+binder 16664:16664 <> c:75
+R16669:16680 xv6iris.PtTree <> ptree_own_at def
+R16713:16720 iris.algebra.dfrac <> DfracOwn constr
+R16725:16725 xv6iris.KptPublish <> c:75 var
+R16683:16687 xv6iris.PtTree <> KTier constr
+R16690:16695 Stdlib.Lists.List <> length abbrev
+R16700:16703 xv6iris.RiscvLang <> glog proj
+R16743:16746 stdpp.list_numbers <> seqZ def
+binder 16760:16760 <> i:76
+R16765:16771 xv6iris.PtreeType <> pt_kids def
+R16776:16787 SailStdpp.Values <> mword_of_int def
+R16789:16789 xv6iris.KptPublish <> i:76 var
+prf 16929:16946 <> kptree_publish_top
+R16953:16958 xv6iris.RiscvLang <> gstate rec
+binder 16949:16949 <> g:77
+R16967:16971 xv6iris.TsoCtx <> CtxId rec
+binder 16962:16963 <> xi:78
+R16981:16983 Corelib.Init.Datatypes <> nat ind
+binder 16975:16977 <> lvl:79
+R16991:16995 xv6iris.PtreeType <> ptree ind
+binder 16987:16987 <> t:80
+R17048:17057 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R17004:17018 iris.base_logic.lib.gen_heap <> gen_heap_interp def
+R17043:17046 xv6iris.RiscvLang <> gmem proj
+R17040:17040 xv6iris.KptPublish <> g:77 var
+R17027:17037 xv6iris.RiscvPtsto <> riscv_memGS inst
+R17085:17090 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R17058:17070 xv6iris.RiscvPtsto <> tso_interp_at def
+R17084:17084 xv6iris.KptPublish <> g:77 var
+R17072:17082 xv6iris.RiscvPtsto <> riscv_eraGS meth
+R17105:17114 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R17091:17101 xv6iris.TsoCtx <> own_context def
+R17103:17104 xv6iris.KptPublish <> xi:78 var
+R17157:17167 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R17115:17126 xv6iris.PtTree <> ptree_own_at def
+R17139:17141 xv6iris.KptPublish <> lvl:79 var
+R17144:17151 iris.algebra.dfrac <> DfracOwn constr
+R17156:17156 xv6iris.KptPublish <> t:80 var
+R17129:17133 xv6iris.PtTree <> UTier constr
+R17135:17136 xv6iris.KptPublish <> xi:78 var
+R17212:17220 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R17168:17182 iris.base_logic.lib.gen_heap <> gen_heap_interp def
+R17207:17210 xv6iris.RiscvLang <> gmem proj
+R17204:17204 xv6iris.KptPublish <> g:77 var
+R17191:17201 xv6iris.RiscvPtsto <> riscv_memGS inst
+R17248:17252 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R17221:17233 xv6iris.RiscvPtsto <> tso_interp_at def
+R17247:17247 xv6iris.KptPublish <> g:77 var
+R17235:17245 xv6iris.RiscvPtsto <> riscv_eraGS meth
+R17267:17275 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R17253:17263 xv6iris.TsoCtx <> own_context def
+R17265:17266 xv6iris.KptPublish <> xi:78 var
+R17333:17341 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R17276:17287 xv6iris.PtTree <> ptree_own_at def
+R17315:17317 xv6iris.KptPublish <> lvl:79 var
+R17320:17327 iris.algebra.dfrac <> DfracOwn constr
+R17332:17332 xv6iris.KptPublish <> t:80 var
+R17290:17294 xv6iris.PtTree <> KTier constr
+R17297:17302 Stdlib.Lists.List <> length abbrev
+R17307:17310 xv6iris.RiscvLang <> glog proj
+R17304:17304 xv6iris.KptPublish <> g:77 var
+R17342:17344 xv6iris.TsoGhost <> llb def
+R17346:17356 xv6iris.RiscvPtsto <> loglen_name def
+R17359:17364 Stdlib.Lists.List <> length abbrev
+R17369:17372 xv6iris.RiscvLang <> glog proj
+R17366:17366 xv6iris.KptPublish <> g:77 var
+R17432:17432 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17456:17461 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17468:17468 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17433:17453 xv6iris.TsoCtx <> tso_interp_loglen_llb thm
+R17432:17432 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17456:17461 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17468:17468 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17433:17453 xv6iris.TsoCtx <> tso_interp_loglen_llb thm
+R17498:17498 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17531:17536 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17555:17555 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17499:17519 xv6iris.KptPublish <> ptree_own_publish_top thm
+R17498:17498 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17531:17536 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17555:17555 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17499:17519 xv6iris.KptPublish <> ptree_own_publish_top thm
+R17653:17662 xv6iris.KptPublish KptPublish <> sec

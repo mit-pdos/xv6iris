@@ -1,4 +1,4 @@
-DIGEST 027858ebf602541d6b22afc7df5466c7
+DIGEST c3e2c742e7115daae55623524ca5569d
 Fxv6iris.SpecIinit
 R974:982 Stdlib.Logic.Eqdep_dec <> <> lib
 R984:989 Stdlib.ZArith.ZArith <> <> lib
@@ -217,7 +217,7 @@ R5023:5032 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
 R4995:5003 xv6iris.WpLock <> lock_name def
 R5005:5006 xv6iris.SpecIinit <> lk:17 var
 R5055:5064 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R5033:5051 xv6iris.WpLock <> lk_cpu_fresh def
+R5033:5051 xv6iris.WpLock <> lk_cpu_ready def
 R5053:5054 xv6iris.SpecIinit <> lk:17 var
 R5065:5065 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
 R5135:5145 iris.bi.interface <> ::bi_scope:x_'-∗'_x not

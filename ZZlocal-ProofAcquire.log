@@ -1,0 +1,11 @@
+File "./ProofAcquire.v", line 13, characters 0-36:
+Warning: Notations "WP _ @ _ ; _ {{ _ } }" defined at level 20 with arguments
+constr at level 200, constr and "WP _ @ _" defined at level 20 with arguments
+constr at level 20, constr at next level have incompatible prefixes.
+One of them will likely not work.
+[notation-incompatible-prefix,parsing,default]
+File "./ProofAcquire.v", line 13, characters 0-36:
+Warning: Notations "WP _ @ _ ; _ {{ _ } }" defined at level 20 with arguments
+constr at level 200 and "WP _" defined at level 20 with arguments constr
+at level 20 have incompatible prefixes. One of them will likely not work.
+[notation-incompatible-prefix,parsing,default]

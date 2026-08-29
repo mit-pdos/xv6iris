@@ -1,0 +1,9 @@
+DIGEST 9c14bb2337f97261617a67fe0ef449cd
+Fxv6iris.LinkUvmfree
+R374:389 xv6iris.LinkUvmunmapBare <> <> lib
+R391:402 xv6iris.LinkFreewalk <> <> lib
+R420:431 xv6iris.ProofUvmfree <> <> lib
+R453:464 xv6iris.ProofUvmfree UvmfreeProof <> modtype
+R466:477 xv6iris.LinkUvmunmapBare UvmunmapBare <> modtype
+R479:486 xv6iris.LinkFreewalk Freewalk <> modtype
+mod 442:448 <> Uvmfree

@@ -1,0 +1,11 @@
+DIGEST a9ec4bb198c59d69267a8d979d6e9b85
+Fxv6iris.LinkUartPutc
+R154:161 xv6iris.LinkUart <> <> lib
+R163:173 xv6iris.LinkAcquire <> <> lib
+R175:185 xv6iris.LinkRelease <> <> lib
+R187:199 xv6iris.ProofUartPutc <> <> lib
+R222:234 xv6iris.ProofUartPutc UartPutcProof <> modtype
+R236:239 xv6iris.LinkUart Uart <> modtype
+R241:247 xv6iris.LinkAcquire Acquire <> modtype
+R249:255 xv6iris.LinkRelease Release <> modtype
+mod 210:217 <> UartPutc

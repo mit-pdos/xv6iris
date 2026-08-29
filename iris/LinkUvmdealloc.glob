@@ -1,0 +1,7 @@
+DIGEST 0f424ad00631d1d801828b20c7dbd511
+Fxv6iris.LinkUvmdealloc
+R171:182 xv6iris.LinkUvmunmap <> <> lib
+R184:198 xv6iris.ProofUvmdealloc <> <> lib
+R223:237 xv6iris.ProofUvmdealloc UvmdeallocProof <> modtype
+R239:246 xv6iris.LinkUvmunmap Uvmunmap <> modtype
+mod 209:218 <> Uvmdealloc

@@ -1,0 +1,9 @@
+DIGEST ded169dd2b6bae0b46812c6c8d9308f6
+Fxv6iris.LinkProcFreepagetable
+R274:290 xv6iris.LinkUvmunmapFixed <> <> lib
+R292:302 xv6iris.LinkUvmfree <> <> lib
+R320:341 xv6iris.ProofProcFreepagetable <> <> lib
+R373:394 xv6iris.ProofProcFreepagetable ProcFreepagetableProof <> modtype
+R396:408 xv6iris.LinkUvmunmapFixed UvmunmapFixed <> modtype
+R410:416 xv6iris.LinkUvmfree Uvmfree <> modtype
+mod 352:368 <> ProcFreepagetable

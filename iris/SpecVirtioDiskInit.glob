@@ -1,4 +1,4 @@
-DIGEST 5016e85976e1564e44fbe4c1d70b9983
+DIGEST b51f27e94daeb2873bd90a4c885cf913
 Fxv6iris.SpecVirtioDiskInit
 R4472:4480 Stdlib.Logic.Eqdep_dec <> <> lib
 R4482:4487 Stdlib.ZArith.ZArith <> <> lib
@@ -254,7 +254,7 @@ R9639:9648 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
 R9599:9607 xv6iris.WpLock <> lock_name def
 R9609:9617 xv6iris.SpecVirtioDiskInit <> disk_lock def
 R9678:9687 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R9649:9667 xv6iris.WpLock <> lk_cpu_fresh def
+R9649:9667 xv6iris.WpLock <> lk_cpu_ready def
 R9669:9677 xv6iris.SpecVirtioDiskInit <> disk_lock def
 R9688:9691 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not
 R9714:9714 xv6iris.RiscvPtsto <> ::bi_scope:'WP'_x not

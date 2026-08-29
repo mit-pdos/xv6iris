@@ -1,0 +1,11 @@
+DIGEST 80390ec37c2abf6ea4f741f83e27029d
+Fxv6iris.LinkIget
+R750:760 xv6iris.LinkAcquire <> <> lib
+R762:772 xv6iris.LinkRelease <> <> lib
+R774:782 xv6iris.LinkPanic <> <> lib
+R784:792 xv6iris.ProofIget <> <> lib
+R811:819 xv6iris.ProofIget IgetProof <> modtype
+R821:827 xv6iris.LinkAcquire Acquire <> modtype
+R829:835 xv6iris.LinkRelease Release <> modtype
+R837:841 xv6iris.LinkPanic Panic <> modtype
+mod 803:806 <> Iget

@@ -1,0 +1,7 @@
+DIGEST 57f37e20ffbc8ad916b9fd340b91bfc5
+Fxv6iris.LinkNameiRoot
+R267:279 xv6iris.LinkNamexRoot <> <> lib
+R297:310 xv6iris.ProofNameiRoot <> <> lib
+R334:347 xv6iris.ProofNameiRoot NameiRootProof <> modtype
+R349:357 xv6iris.LinkNamexRoot NamexRoot <> modtype
+mod 321:329 <> NameiRoot

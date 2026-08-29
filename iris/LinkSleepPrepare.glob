@@ -1,0 +1,11 @@
+DIGEST 2e29a35fa21d65b74400d3548f1126a4
+Fxv6iris.LinkSleepPrepare
+R220:229 xv6iris.LinkMyproc <> <> lib
+R231:241 xv6iris.LinkAcquire <> <> lib
+R243:253 xv6iris.LinkRelease <> <> lib
+R255:271 xv6iris.ProofSleepPrepare <> <> lib
+R298:314 xv6iris.ProofSleepPrepare SleepPrepareProof <> modtype
+R316:321 xv6iris.LinkMyproc Myproc <> modtype
+R323:329 xv6iris.LinkAcquire Acquire <> modtype
+R331:337 xv6iris.LinkRelease Release <> modtype
+mod 282:293 <> SleepPrepare

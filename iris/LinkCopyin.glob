@@ -1,0 +1,11 @@
+DIGEST 0efd8a27345643558851d1080517c3cb
+Fxv6iris.LinkCopyin
+R186:197 xv6iris.LinkWalkaddr <> <> lib
+R199:209 xv6iris.LinkVmfault <> <> lib
+R211:221 xv6iris.LinkMemmove <> <> lib
+R239:249 xv6iris.ProofCopyin <> <> lib
+R270:280 xv6iris.ProofCopyin CopyinProof <> modtype
+R282:289 xv6iris.LinkWalkaddr Walkaddr <> modtype
+R291:297 xv6iris.LinkVmfault Vmfault <> modtype
+R299:305 xv6iris.LinkMemmove Memmove <> modtype
+mod 260:265 <> Copyin

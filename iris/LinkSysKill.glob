@@ -1,0 +1,9 @@
+DIGEST fc4d117c181b6ef1c8881a1cc5326ade
+Fxv6iris.LinkSysKill
+R172:181 xv6iris.LinkArgint <> <> lib
+R183:191 xv6iris.LinkKkill <> <> lib
+R193:204 xv6iris.ProofSysKill <> <> lib
+R226:237 xv6iris.ProofSysKill SysKillProof <> modtype
+R239:244 xv6iris.LinkArgint Argint <> modtype
+R246:250 xv6iris.LinkKkill Kkill <> modtype
+mod 215:221 <> SysKill

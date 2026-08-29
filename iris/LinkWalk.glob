@@ -1,0 +1,9 @@
+DIGEST 43cbd5e0fb612e4c6bfd3305d2fd7a56
+Fxv6iris.LinkWalk
+R149:158 xv6iris.LinkKalloc <> <> lib
+R160:174 xv6iris.LinkMemsetArray <> <> lib
+R176:184 xv6iris.ProofWalk <> <> lib
+R203:211 xv6iris.ProofWalk WalkProof <> modtype
+R213:218 xv6iris.LinkKalloc Kalloc <> modtype
+R220:230 xv6iris.LinkMemsetArray MemsetArray <> modtype
+mod 195:198 <> Walk

@@ -1,0 +1,7 @@
+DIGEST 7d9dbc977f39e086d9d5721032cb4a05
+Fxv6iris.LinkFreeDesc
+R155:164 xv6iris.LinkWakeup <> <> lib
+R166:178 xv6iris.ProofFreeDesc <> <> lib
+R201:213 xv6iris.ProofFreeDesc FreeDescProof <> modtype
+R215:220 xv6iris.LinkWakeup Wakeup <> modtype
+mod 189:196 <> FreeDesc
