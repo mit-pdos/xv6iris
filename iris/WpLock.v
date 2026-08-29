@@ -1069,9 +1069,13 @@ Section Lock.
      printf) with no route.  The [llb] stays beside the witness: it is what
      [initlock] already exports, and the AMO-side upgrade
      ([TsoCtx.hart_view_lb_get]) still reads it. <<< *)
+  (* A6.123: the [llb] that used to ride beside the witness is gone -- no
+     consumer read it (the read cashes the witness alone, [lk_floor_vis]),
+     and a cell forgotten out of the tower has the witness but no
+     log-length receipt ([TsoCtx.ctx_phys_pointsto_forget_floor]).  The
+     arm is the witness, full stop. *)
   Definition lk_floor (ξ : TsoCtx.CtxId) (lo : nat) : iProp Σ :=
-    (TsoCtx.ctx_floor ξ lo
-     ∨ (TsoGhost.llb loglen_name lo ∗ ∃ a : Arch.pa, TsoCtx.ctx_wrote ξ lo a))%I.
+    (TsoCtx.ctx_floor ξ lo ∨ ∃ a : Arch.pa, TsoCtx.ctx_wrote ξ lo a)%I.
 
   Global Instance lk_floor_persistent ξ lo : Persistent (lk_floor ξ lo).
   Proof. apply _. Qed.
@@ -1083,8 +1087,21 @@ Section Lock.
   Proof. iIntros "H". by iLeft. Qed.
 
   Lemma lk_floor_of_wrote ξ lo (a : Arch.pa) :
-    TsoGhost.llb loglen_name lo -∗ TsoCtx.ctx_wrote ξ lo a -∗ lk_floor ξ lo.
-  Proof. iIntros "#Hl #Hw". iRight. iFrame "Hl". by iExists a. Qed.
+    TsoCtx.ctx_wrote ξ lo a -∗ lk_floor ξ lo.
+  Proof. iIntros "#Hw". iRight. by iExists a. Qed.
+
+  (* A6.123: the floor TRANSPORTS -- both arms land on the receiver's LEFT
+     arm (A6.117's [ctx_floor_dom], A6.120's [ctx_dom_wrote_floor]), so a
+     payload that carries a floor (a lease-held word's, a nested handle's)
+     is [CtxMorph] with no absorb capability at all. *)
+  Global Instance lk_floor_morph (lo : nat) : CtxMorph (λ ξ, lk_floor ξ lo).
+  Proof.
+    iIntros (ξ ξ') "Hd [#Hfl | (%a & #Hw)]".
+    - iDestruct (TsoCtx.ctx_floor_dom with "Hd Hfl") as "[Hd #Hfl']".
+      iModIntro. iFrame "Hd". by iLeft.
+    - iDestruct (TsoCtx.ctx_dom_wrote_floor with "Hd Hw") as "[Hd #Hfl']".
+      iModIntro. iFrame "Hd". by iLeft.
+  Qed.
 
   (* A6.120: THE READ-SIDE CASH-IN, ON EITHER ARM.  The left arm is
      [TsoCtx.own_context_floor_view] (the bound has passed the floor, so
@@ -1099,7 +1116,7 @@ Section Lock.
       TsoGhost.view_lb view_name loglen_name (hart_agent cpu_id) K ∗
       TsoCtx.ledger_vis (hart_agent cpu_id) K lo.
   Proof.
-    iIntros "Hrun #Hfl". iDestruct "Hfl" as "[#Hfl | [_ (%a & #Hw)]]".
+    iIntros "Hrun #Hfl". iDestruct "Hfl" as "[#Hfl | (%a & #Hw)]".
     - iDestruct (TsoCtx.own_context_floor_view with "Hrun Hfl")
         as "[Hrun (%K & #HK & %HloK)]".
       iFrame "Hrun". iExists K. iFrame "HK". by iApply TsoCtx.ledger_vis_below.

@@ -310,7 +310,7 @@ Section ProofInitlock.
       (* A6.120: the creator's arm is the OWN-WRITE witness beside the
          receipt, cashed at the read by [WpLock.lk_floor_vis]; the crossing
          upgrade is no longer what makes the first acquire provable. *)
-      iExists lo. iFrame "Hcpu". iApply (WpLock.lk_floor_of_wrote with "Hlb Hw"). }
+      iExists lo. iFrame "Hcpu". iApply (WpLock.lk_floor_of_wrote with "Hw"). }
     iApply ("Hcont" $! R5 with "Hcg Hpc [%] Hlock Hname Hcpu").
     (* callee_saved m R5 *)
     assert (Hthread : forall c : mword 5, c <> csp_rs1 -> c <> mword_of_int 8 -> c <> mword_of_int 1 ->

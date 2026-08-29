@@ -3269,6 +3269,27 @@ Section ctx.
     iIntros "(%t & Hpt & Hts & _)". iExists t. iFrame.
   Qed.
 
+  (* A6.123: FORGETTING A CELL HANDS OUT ITS FLOOR.  A ctx cell leaving the
+     tower for the ledger (a DMA lease, a lock's own words) carries its
+     clean/dirty bit out with it as exactly [WpLock.lk_floor]'s two arms:
+     clean is the context's bound past the stamp, dirty is the context's own
+     write -- whose dirty element, no longer needed by a cell, can be
+     PERSISTED into the witness A6.120 reads.  This is what lets the creator
+     of a lease-held word (the boot's [virtio_disk_init]) hand the lock
+     payload the floor its readers will cash. *)
+  Lemma ctx_phys_pointsto_forget_floor (ξ : CtxId) (a : Arch.pa) (v : bv 8) :
+    ctx_phys_pointsto ξ a (DfracOwn 1) v ==∗
+    ∃ t : nat, phys_ledger_at a (DfracOwn 1) v t ∗
+               (ctx_floor ξ t ∨ ctx_wrote ξ t a).
+  Proof.
+    rewrite ctx_phys_pointsto_unseal /ctx_phys_pointsto_def /phys_ledger_at
+            /ctx_floor /ctx_wrote.
+    iIntros "(%t & Hpt & Hts & [#Hcl | Hd])".
+    - iModIntro. iExists t. iFrame "Hpt Hts". by iLeft.
+    - iMod (ghost_map_elem_persist with "Hd") as "#Hd".
+      iModIntro. iExists t. iFrame "Hpt Hts". by iRight.
+  Qed.
+
   (* exclusivity at the REGISTERED physical tier, the companion of
      [phys_ledger_ne] one tier up: two owned bytes cannot name the same
      address.  A6.49's user-memory flip needs it -- [UmodeMem.umem_inj]
@@ -5432,6 +5453,37 @@ Section ctx.
     iPureIntro. intros tv' Htv'.
     apply (tso_read_of_latest _ _ _ _ _ t); [exact Hlat|].
     apply visibleb_below. lia.
+  Qed.
+
+  (* A6.123: THE EXACT READ ON THE TWO-ARMED FLOOR.  [ledger_read_at_ok]
+     wants the reader's view past the cell's stamp; a lock-payload cell
+     whose floor arrived through [WpLock.lk_floor] discharges that on the
+     LEFT arm and, for the hart that wrote it, on the RIGHT (store
+     forwarding: [visibleb]'s own-author arm, via [ledger_vis_visibleb]).
+     Same conclusion, the premise [WpLock.lk_floor_vis] hands out. *)
+  Lemma ledger_read_at_vis_ok `{CID : CpuId} (g : gstate)
+      (a : Arch.pa) (dq : dfrac) (v : bv 8) (t F : nat) :
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗
+    view_lb view_name loglen_name (hart_agent cpu_id) F -∗
+    ledger_vis (hart_agent cpu_id) F t -∗
+    phys_ledger_at a dq v t -∗
+    ⌜forall tv' : nat, (g.(gtv) cpu_id <= tv')%nat ->
+       tso_read g.(gimg) g.(glog) (hart_agent cpu_id) tv' a = Some v⌝.
+  Proof.
+    iIntros "Hgh Hint #HF #Hvis [Hpt Htse]".
+    iDestruct (ledger_vis_visibleb with "Hint Hvis") as %Hvisb.
+    iDestruct "Hint"
+      as "(%TM & %LM & Hts & %Hdom & %Htie & Hm & %HLM & Hlen & Hv & %Hmm)".
+    iDestruct (phys_valid with "Hgh Hpt") as %Hgm.
+    iDestruct (ghost_map_lookup with "Hts Htse") as %HTMt.
+    destruct (ts_ok_latest _ _ _ _ _ (Htie _ _ HTMt)) as (v0 & Hgm0 & Hlat).
+    rewrite Hgm in Hgm0. injection Hgm0 as <-.
+    iDestruct (view_auth_valid with "Hv HF") as %HFtvs.
+    rewrite avf_hart in HFtvs.
+    iPureIntro. intros tv' Htv'.
+    apply (tso_read_of_latest _ _ _ _ _ t); [exact Hlat|].
+    apply Hvisb. lia.
   Qed.
 
   (* the window form, in the shape the plain read rule asks for: the slot
