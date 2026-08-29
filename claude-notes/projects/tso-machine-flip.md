@@ -15648,3 +15648,38 @@ and the `CtxMorph` instance `ctx_morph_phys_pointsto_h` (the
 `ctx_phys_pointsto_forget_floor`.  Root-file change, no consumer touched;
 certified by round r42 (numbers in the handoff note).  Steps 2–6 remain
 as listed.
+
+**A6.125 step 2, REFINED before building (measured in `VirtioProto` /
+`VirtioQueue`):** the lease's hole should be THE WHOLE CONTROL SET, not
+`avail_idx_dom ∪ pins_dom` assembled by hand.  `VirtioQueue.vproto_ctl c pr
+= avail_idx_bytes c (vp_np pr) ∪ pins_union (vp_pin pr)` already IS
+"every hart-written, device-read cell in the lease", `vp_pin` holds exactly
+the pins currently leased (publish inserts, reclaim `delete`s -- the split
+laws `vproto_publish_ctl` / `vproto_reclaim_ctl` / `vproto_pin_ctl` exist),
+and `vslot_writes_dom`'s second conjunct is `dom w ## dom (vproto_ctl c pr)`
+-- exactly the disjointness every `dma_acc_x` needs.  So the live arm
+becomes
+
+    dma_own_x dma (dom (vproto_ctl (v_cfg v) pr)) ∗ half_map (vproto_ctl (v_cfg v) pr)
+
+with `half_map m := [∗ map] a ↦ b ∈ m, phys_ledger a (DfracOwn ½) b`
+(`avail_lease_half c np = half_map (avail_idx_bytes c np)` by
+`avail_idx_bytes_range`).  Algebra: publish ADDS `half_map pin` (the
+caller's sealed halves, from `ctx_phys_pointsto_split` per byte) and the
+hole grows by `dom pin` -- `filter (∉ D ∪ dom pin) (pin ∪ …) = filter (∉ D)
+(…)`, no cell enters `dma_own`; reclaim takes `half_map pin` OUT of
+`half_map ctl` (`delete p`) and the hole shrinks with no resource movement
+(`dma_own_x m D ⊣⊢ dma_own_x m D'` when `dom m ## D ∖ D'` -- one new kit
+lemma); the used-page accessors' disjointness is `vpo_idx_used` plus a
+`vproto_ok` corollary "every leased pin is disjoint from the used page"
+(each slot's standing fact `slot_fp sl pin ## avail_idx_dom ∪ used_page_pas`
+already carries it).  Sites in `VirtioProto` (line numbers at r42):
+`lease_agree`/`phys_map_half_disj` 1385–1440; live arm 1694; init 1859–1870,
+1930; the three `lease_agree` uses 2105/2175/2422; `step` 2208–2262;
+`avail_idx_acc` 2638; `publish_acc` 2685–2770; `used_idx_acc` 2973;
+`used_peek`/`reclaim` 3059/3140/3200–3204 -- ~25 mechanical edits, the
+pure ledger untouched.  Consumers: `ProofVirtioDiskRwD.wp_vdrwd_sh_publish`
+(`phys_map pin` → `half_map pin`, the ctx halves stay with the caller ->
+`flight_res`), `DiskInv.parked_res` (`phys_map (dc_pinr …)` → the ½ form
+next to the ctx halves), `ProofVirtioDiskIntr`'s reclaim site,
+`ProofVirtioDiskRwF`'s withdraw (join).
