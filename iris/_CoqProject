@@ -1466,6 +1466,12 @@ ProofSysWriteAUStable.v
 # SpecUartwrite / SpecConsolewrite / SpecFilewrite / SpecSysWrite and their
 # proofs are untouched); SpecFilewriteCons is the device arm's dispatch
 # contract and ProofSysWriteConsAU seals SpecSysWriteConsAU over it.
+#   ProofFilewriteCons SEALS that dispatch contract -- ProofFilewrite's walk
+# with the pipe, inode and panic arms and the two device -1 paths refuted
+# from the premises rather than proved -- and the last two Links close the
+# chain: FilewriteCons is a closed instance, and LinkSysWriteConsAU turns
+# SYSWRITE_CONS_AU from a seal into a theorem.  init.c's printf path is then
+# proved end to end, over the standing three assumptions and nothing else.
 UartSentLoc.v
 SpecUartwriteLoc.v
 ProofUartwriteLoc.v
@@ -1475,3 +1481,6 @@ ProofConsolewriteLoc.v
 LinkConsolewriteLoc.v
 SpecFilewriteCons.v
 ProofSysWriteConsAU.v
+ProofFilewriteCons.v
+LinkFilewriteCons.v
+LinkSysWriteConsAU.v
