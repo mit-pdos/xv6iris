@@ -12,13 +12,20 @@
    never reaches the interpreter's device fabric, and until this file
    nothing had ever asked whether it behaves.
 
-   WHAT IT FINDS is not a decode bug.  It is that THE MODEL'S CLOCK DOES NOT
-   RUN, so two reads of [mtime] a thousand instructions apart return the
-   same value, and BOTH machines say they must not.  That is a hardware
-   behaviour with no model execution -- the unsound direction -- and it sits
-   beside finding 24 (the sequentially-consistent memory model) as a place
-   where the model is not merely narrower than the machine but wrong about
-   it.
+   WHAT IT FINDS, in the end, is that the model tracks both machines: the
+   clock advances, mcycle advances with it, minstret advances independently,
+   and the access widths agree.  Section 4 has those witnesses.
+
+   IT DID NOT LOOK THAT WAY AT FIRST, and the mistake is the most useful
+   thing in this file.  Read on the default runner -- [run_until], which
+   steps [riscv_step false] -- the model's clock is frozen, and that was
+   recorded as finding 27, "the model's clock never runs", classified as an
+   UNSOUNDNESS.  It is nothing of the kind.  [RiscvLang.mnode_step]'s
+   instruction-boundary rule is [exists tick : bool], so an execution with a
+   moving clock is one the model ALLOWS; the harness had been resolving that
+   choice the same way every time.  AN ABSENT WITNESS WAS READ AS AN ABSENT
+   EXECUTION, in a suite whose entire question is whether the model allows
+   what the hardware did.  Finding 27 is withdrawn.
 
    The test is written so that this is VISIBLE rather than merely raw.  The
    [mtime] words themselves can never be compared: they differ between two
@@ -54,20 +61,21 @@ Lemma ct_hw_model_completes :
 Proof. vm_cast_no_check (eq_refl VDone). Qed.
 
 (* ---------------------------------------------------------------------- *)
-(* 1. THE FINDING: the clock does not advance in the model, and does on    *)
-(*    both machines.                                                       *)
+(* 1. THE TWO BRANCHES OF THE BOUNDARY'S [exists tick].                    *)
 (*                                                                         *)
-(*    [VTest.run_until] steps [riscv_step false] -- the argument is the     *)
-(*    CLOCK TICK, and the harness never passes true.  So [mtime] holds its  *)
-(*    reset value for the whole run however many instructions retire.       *)
+(*    [VTest.run_until] steps [riscv_step false], so on THAT branch [mtime] *)
+(*    holds its reset value however many instructions retire.  Section 4    *)
+(*    runs the other branch, where it advances.  Both are executions of the *)
+(*    model; neither is a finding about it.                                 *)
 (*                                                                         *)
-(*    Recorded in the shape tools/vtest/README.md prescribes: pinned on     *)
-(*    BOTH sides and proved unequal, so it is green today and goes RED the  *)
-(*    day the harness or the model starts ticking -- which is exactly when  *)
-(*    this file should be revisited.                                       *)
+(*    These lemmas are kept because they say precisely what the DEFAULT     *)
+(*    runner does, which a reader of any other test in this suite needs to  *)
+(*    know -- every one of them is exhibited on the non-ticking branch, so  *)
+(*    none of them observes elapsed time.  That is a default, not a limit:  *)
+(*    a test that wants elapsed time asks for [run_until_tick].             *)
 (* ---------------------------------------------------------------------- *)
 
-Definition ct_model_advanced : Z := 0.   (* the model: the clock is frozen *)
+Definition ct_model_advanced : Z := 0.   (* on the NON-TICKING branch      *)
 Definition ct_qemu_advanced  : Z := 1.   (* QEMU virt                      *)
 Definition ct_board_advanced : Z := 1.   (* VisionFive 2                   *)
 
@@ -85,17 +93,16 @@ Proof. reflexivity. Qed.
 Lemma ct_board_clock_ran : cap_word clint_time_hw_result CT_ADV = ct_board_advanced.
 Proof. reflexivity. Qed.
 
-(* TWO INDEPENDENT MACHINES SAY THE SAME THING, which is what makes this a
-   fact about the model rather than about a timebase. *)
-Lemma ct_clock_really_diverges : ct_model_advanced <> ct_qemu_advanced.
+(* The two branches answer differently, which is what a nondeterministic
+   choice MEANS and is not a divergence from anything.  Named so that nobody
+   reads it as one: the machines' column is [ct_qemu_advanced] /
+   [ct_board_advanced] and section 4 shows the model matching it. *)
+Lemma ct_branches_differ : ct_model_advanced <> ct_qemu_advanced.
 Proof. discriminate. Qed.
 
-Lemma ct_board_clock_really_diverges : ct_model_advanced <> ct_board_advanced.
-Proof. discriminate. Qed.
-
-(* The freeze stated so it cannot be read as an artefact of a short run.
-   The model's [mtime] is not merely equal at the two samples, it is ZERO at
-   both: the reset chain leaves it there and nothing ever moves it. *)
+(* The freeze on this branch stated so it cannot be read as an artefact of a
+   short run: [mtime] is ZERO at both samples, because nothing on the
+   non-ticking branch ever moves it. *)
 Lemma ct_model_mtime_starts_at_zero : res_word ct_run CT_T0LO = 0.
 Proof. vm_cast_no_check (eq_refl 0). Qed.
 Lemma ct_model_mtime_stays_at_zero  : res_word ct_run CT_T1LO = 0.
@@ -121,6 +128,8 @@ Proof. reflexivity. Qed.
 Lemma ct_board_minstret_advances : cap_word clint_time_hw_result   CT_INSTRADV = 1.
 Proof. reflexivity. Qed.
 
+(* ...and mcycle freezes WITH mtime on this branch rather than with
+   minstret, which is the clock-derived set exactly. *)
 Lemma ct_model_mcycle_frozen    : res_word ct_run    CT_CYCLEADV = 0.
 Proof. vm_cast_no_check (eq_refl 0). Qed.
 Lemma ct_hw_model_mcycle_frozen : res_word ct_hw_run CT_CYCLEADV = 0.
@@ -163,3 +172,59 @@ Lemma ct_qemu_widths_agree  : cap_word clint_time_qemu_result CT_BRACKET = 1.
 Proof. reflexivity. Qed.
 Lemma ct_board_widths_agree : cap_word clint_time_hw_result   CT_BRACKET = 1.
 Proof. reflexivity. Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 4. CORRECTION TO §1: THE MODEL'S CLOCK CAN RUN.                         *)
+(*                                                                         *)
+(*    §1 above says the model's clock is frozen, and as a statement about   *)
+(*    the MODEL that is WRONG.  It is a statement about [run_until], which  *)
+(*    steps [riscv_step false].  [RiscvLang.mnode_step]'s boundary rule is  *)
+(*                                                                         *)
+(*      | Interface.Ret _ => exists tick : bool, m' = riscv_step tick /\ ...*)
+(*                                                                         *)
+(*    so the language quantifies EXISTENTIALLY over the tick at every       *)
+(*    instruction boundary -- the sound weakening of the model [loop]'s     *)
+(*    deterministic every-[plat_insns_per_tick] tick.  An execution with a  *)
+(*    moving clock is one the model ALLOWS.  The harness had been resolving *)
+(*    that choice the same way every time and never exhibiting the other    *)
+(*    branch, and I read the absence of a witness as the absence of an      *)
+(*    execution.                                                           *)
+(*                                                                         *)
+(*    [VTest.run_until_tick] takes the other branch, and the witnesses      *)
+(*    below are what §1 should have asked for: the model DOES have a run in *)
+(*    which mtime advances, mcycle advances with it, and the program        *)
+(*    reports exactly what both machines reported.                          *)
+(*                                                                         *)
+(*    AND IT IS NOT A LIMITATION OF THE HARNESS EITHER.  A test that wants  *)
+(*    to reason about elapsed time simply asks for the ticking branch, as   *)
+(*    this section does; the capability was always there and nothing had    *)
+(*    needed it.  [run_until] steps [riscv_step false] because that is a    *)
+(*    convenient DEFAULT for tests whose subject is not time, not because   *)
+(*    the other branch is unavailable.                                      *)
+(*                                                                          *)
+(*    So there is nothing left of §1 as a FINDING: finding 27 is withdrawn  *)
+(*    outright.  What is worth writing down is the reasoning error -- an    *)
+(*    absent witness was read as an absent execution, in a suite whose      *)
+(*    entire question is whether the model ALLOWS what the hardware did.    *)
+(* ---------------------------------------------------------------------- *)
+
+Definition ct_tick_run : option mstate := run_until_tick 8000 (start clint_time_text).
+
+Lemma ct_tick_completes : run_status_tick 8000 (start clint_time_text) = VDone.
+Proof. vm_cast_no_check (eq_refl VDone). Qed.
+
+(* THE CORRECTION: on the ticking branch the model advances the clock, which
+   is what both machines do and what §1 reported it could not. *)
+Lemma ct_tick_model_clock_ran : res_word ct_tick_run CT_ADV = ct_qemu_advanced.
+Proof. vm_cast_no_check (eq_refl ct_qemu_advanced). Qed.
+
+Lemma ct_tick_model_mcycle_ran : res_word ct_tick_run CT_CYCLEADV = 1.
+Proof. vm_cast_no_check (eq_refl 1). Qed.
+
+(* ...and it still never runs backwards, and the access widths still agree,
+   so the ticking branch is not a different machine -- it is the same one
+   with the clock allowed to move. *)
+Lemma ct_tick_no_backwards : res_word ct_tick_run CT_NOBACK = 1.
+Proof. vm_cast_no_check (eq_refl 1). Qed.
+Lemma ct_tick_widths_agree : res_word ct_tick_run CT_BRACKET = 1.
+Proof. vm_cast_no_check (eq_refl 1). Qed.

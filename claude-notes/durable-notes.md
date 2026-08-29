@@ -475,6 +475,49 @@ the record's own encoding and the goal no longer mentions `dinode_bytes d`
 at all (seen in `FsDurImg.diblk_bytes_split`). Apply such lemmas at
 spelled-out arguments (`rewrite (length_app l1 l2)`), never bare.
 
+## AN ABSENT WITNESS IS NOT AN ABSENT EXECUTION
+
+Anywhere the language quantifies EXISTENTIALLY and a runner resolves the
+choice, "the model cannot do X" needs checking against "did anything ever
+ASK it to".  Two findings were recorded off exactly that mistake in the
+device-conformance suite, both retracted (see
+`claude-notes/projects/device-conformance.md`):
+
+- **`RiscvLang.mnode_step`'s instruction boundary is `exists tick : bool`.**
+  `vtest-rocq/VTest.v`'s `run_until` steps `riscv_step false`, so every test
+  in that suite is exhibited on the NON-ticking branch and no test observes
+  elapsed time.  That is a default, not a limit -- `run_until_tick` takes
+  the other branch -- but a frozen `mtime` was written up as "the model's
+  clock never runs", classified as an unsoundness, and it was neither.
+- **`RiscvExec.exec` returns `None` on `Choose`**, the Sail monad's
+  nondeterminism (its fallback clause is
+  `| _ => fun _ => None  (* Choose / GenericFail / Discard / ... *)`).
+  `exec_run_det` runs ONE WAY only -- `exec = Some` implies `run` -- so
+  `exec` declining to step proves nothing about the relation, and a `VStuck`
+  result conflates "no step exists" with "a choice this interpreter will not
+  make".
+
+  **THAT GAP IS NOW CLOSED, in the harness rather than in `iris/`:**
+  `vtest-rocq/VExecStuck.v` defines `exec_r`, which is `exec` with its
+  failure clause split into `ENoStep` and `EChoice` (`exec_r_exec` proves
+  they agree everywhere), and proves the missing converse
+
+      exec_r_no_step : exec_r m s = inr ENoStep -> forall x s', ~ run m s x s'
+
+  with `VTest.stuck_why` / `stuck_why_no_step` lifting it to a whole run.
+  A caller holding `ENoStep` may now say "the model has no transition" and
+  mean it.  It is not in `iris/` because nothing in the proof tower asks why
+  `exec` declined, and `RiscvExec.v`'s reverse-dependency closure is ~1286
+  files.
+
+THE RULE: a claim that the model CANNOT do something has to come from the
+model's DEFINITIONS, or from a positive wrong transition it does take --
+never from a runner's silence.  The soundly-argued findings in that suite all
+do the former (`ConcSb.v` states the one-`gmem` property off `VConc`;
+`DiskChain.v` states `model_refuses_longer_chains` off `VirtioModel`;
+`ClintMsip.v` reads `clint_load`'s decode and then pins a positive load
+access fault), and that is what distinguishes them.
+
 ## INCONSISTENT PREMISES ARE THE WORST DEFECT, AND NOTHING IN THE BUILD SEES THEM
 
 A hedged conjunct makes a postcondition say nothing. **Contradictory
@@ -823,6 +866,42 @@ names the cause.
   the whole term's value applies, but with `taken := true` it has already
   iota-reduced and the same rewrite fails with **"all matches … are equal to
   the RHS"**. Rewrite on the fall-through arms only.
+
+## FOUR MORE PAPER CUTS, from porting `echo` onto the user-mode-on-kernel tier
+
+Same family as the three above: each cost a whole remote build round, and none
+of the messages names the cause.
+
+- **`uint x` and `bv_unsigned x` are TWO ATOMS to `lia`.** They are
+  definitionally the same, and `uint_unsigned` rewrites between them — which
+  is exactly the trap. Rewriting it into a shared hypothesis
+  (`rewrite uint_unsigned in Hlo`) to make ONE step go through silently
+  breaks every later `lia` that still reads the budget at `uint`, and those
+  report **"Cannot find witness"** with the fact plainly in context. Keep the
+  hypotheses in one spelling and derive the other where it is needed
+  (`assert (Hbu : bv_unsigned sp0 = uint sp0)` once, then `rewrite Hbu` inside
+  the two steps that want it).
+- **`apply` cannot invert `Z.opp` to find a displacement.** `add_vec_int sp0
+  (-16)` written in a proof is the NEGATIVE LITERAL `Zneg 16`; a lemma stated
+  as `add_vec_int a (- d)` has `Z.opp d`. The two are convertible, so `exact`
+  and explicit application are fine and `rewrite`'s keyed matching is fine —
+  but `apply uv_avi_neg` has to solve `Z.opp ?d =?= -16` and gives up. Supply
+  the displacement: `apply (uv_avi_neg sp0 16)`, or `pose proof` the instance
+  and `exact` it.
+- **`iPoseProof … as "H"` leaves `"H"` in the context after the `iApply` that
+  uses it**, so a lemma applied ten times in one proof needs ten names. The
+  failure is **`iRename: "H" not fresh`** at the SECOND use, which reads like a
+  shadowing bug in the first.
+- **Moving proof text between an Iris file and a PURE one changes what
+  `rewrite` means.** ssreflect's `rewrite` comes with `iris.proofmode`'s
+  `Import`, and it is not transitive: a file that `Require Import`s an Iris
+  file but not the proofmode has VANILLA `rewrite`. Space-separated multi-rule
+  rewrites (`rewrite E Hn Hm`) are then a **syntax error** ("[ltac_use_default]
+  expected"), and vanilla's keyed matching is stricter in the other direction
+  too (`rewrite Em64 in Hrng` where `Em64` guesses how `mword 64` elaborated
+  its width fails with "Found no subterm"). Convert to `rewrite E, Hn, Hm` and
+  discharge shape-dependent equations by computation instead of by rewriting a
+  guessed form.
 
 ## A `[-]` SPEC PATTERN EATS THE HYPOTHESES NAMED *AFTER* IT
 

@@ -886,6 +886,127 @@ the AFTER arm at load 26 against the BEFORE arm's 0.6–16 (so understated):
   the site that is the goal and nothing else: `SpecProcinit.v`'s bare `apply _.`
   discharging `CtxMorph <{ proc_lock_res … }>`, 71.1 s on CI.
 
+### A HAND-ROLLED `first [apply … | apply … | …]` IS INSTANCE SEARCH, AND IT PAYS THE SAME BILL (measured 2026-08-29)
+
+The subsection above is about a class whose search went wrong. This one is
+about the tactic that was written to *avoid* that search and reproduced it
+exactly — same class, same tree, six weeks later — so read the two together,
+because the tell is the same and the fix is not.
+
+`CtxMorphTac.ctx_morph_solve` discharges a λ-payload's `CtxMorph` obligation
+"by name, so nothing relies on typeclass search". As landed it was
+`repeat first [ apply ctx_morph_exist | apply ctx_morph_sep | … | apply
+ctx_morph_word | … | apply ctx_morph_const ]` — nine lemmas, tried in order,
+at every node. **That IS instance search**, with the same three costs and none
+of the tuning: one failing higher-order unification per lemma per node, no
+discrimination on the goal's head, and the cheap catch-all last.
+
+`DiskInv.v`'s four obligations, isolated `coqc -time` on the VM: **161 s in a
+168 s file**, and its top sentence (132 s) was the tree's most expensive
+non-`Qed` statement by a factor of twenty. `Set Ltac Profiling`:
+
+| | share | calls | avg |
+|---|---|---|---|
+| `apply ctx_morph_exist` | 30 % | 1268 | 38 ms |
+| `ctx_morph_word` / `_word2` / `_word4` / `_string` | 41 % | 175 each | ~100 ms |
+| `apply ctx_morph_sep` | 8.6 % | 1176 | 12 ms |
+| `apply ctx_morph_or` | 8.5 % | 586 | |
+| `apply ctx_morph_big_sepL` / `_big_sepM` | 9.3 % | 594 each | |
+
+**Read the equal call counts.** `word`, `word2`, `word4` and `string` are all
+called exactly 175 times, which in a `first` means every one of those 175
+visits fell through all four — the leaf lemmas had **zero successes** and were
+41 % of the file. `ctx_word_pointsto` is not sealed (each width is a tower over
+the sealed byte fact), so `apply ctx_morph_sep`, tried earlier, matched the
+tower and took every `↦₈` apart byte by byte. 586 leaf visits, each preceded by
+seven failing structural `apply`s.
+
+**The fix is a `lazymatch` on the goal's head — one `apply` per node, no
+failing unification anywhere.** 161 s → **0.15 s** (53 steps), file 168 s →
+~5 s, one commit, no proof script changed:
+
+```coq
+Ltac ctx_morph_step :=
+  cbv beta;
+  lazymatch goal with
+  | |- CtxMorph (fun _ => bi_sep _ _)    => apply ctx_morph_sep
+  | |- CtxMorph (fun _ => bi_exist _)    => apply ctx_morph_exist; intros ?
+  | |- CtxMorph (fun _ => big_opL _ _ _) => apply ctx_morph_big_sepL; intros ? ?
+  | |- CtxMorph (fun _ => ctx_word_pointsto _ _ _ _) => apply ctx_morph_word
+  …
+  | |- _ => first [ apply ctx_morph_if_then | apply ctx_morph_if_else
+                  | apply ctx_morph_const ]
+  end.
+Ltac ctx_morph_solve := try rewrite /cur_ctx; repeat ctx_morph_step.
+```
+
+Four transferable rules:
+
+- **DISPATCH LEAVES TOO, not just composites.** The leaf lemmas were dead
+  weight *because* a structural lemma matched through an unsealed tower first.
+  A `first` cannot express "this node is a word cell"; a `lazymatch` can.
+- **`cbv beta` PER STEP, not once at the top.** Each `apply` leaves its
+  subgoals with a β-redex under the λ, and the pattern has to see through it.
+- **STOPPING IS PART OF THE CONTRACT, and the `first` version broke it
+  silently.** The header says the tactic stops at what it cannot decompose so
+  the caller can close it with the component's own instance (`all: apply
+  free_slot_res_morph`). It did not: `free_slot_res` is a transparent
+  `Definition`, so `apply ctx_morph_sep` matched *through* it and re-walked a
+  body a named instance already covered — three times over, which is why the
+  four obligations cost 7 s, 6 s, 15 s and 132 s rather than four times 7 s.
+  A head dispatch stops by construction.
+- **DO NOT MOVE `ctx_morph_const` TO THE FRONT.** It is the obvious "cheap
+  test — does the body mention ξ?" and on a *leaf* it is exactly that. On a
+  whole payload body the unifier tries to eliminate ξ by delta (every cell is
+  spelled `ctx_pointsto (cur_ctx ξ) …`) and does not come back: >10 min at
+  1.3 GB on `disk_res`, against 161 s for the version that had it last.
+
+**A HINT DATABASE IS A VALID ALTERNATIVE AND IT WAS MEASURED, NOT GUESSED
+(2026-08-29).** `Hint Extern n (CtxMorph (fun _ => bi_sep _ _)) => apply
+ctx_morph_sep : ctx_morph` gives the same syntactic dispatch — an `Extern`
+hint's pattern IS a filter checked before its tactic runs — and a custom db is
+small, so `eauto with ctx_morph` never meets the ~55 wildcard instances in
+`typeclass_instances`. Built as ten `Extern` rows plus `Hint Resolve` for the
+component instances, DiskInv's four obligations close with a plain
+`eauto 40 with nocore ctx_morph` and the worst statement is **0.74 s** — no
+`all: apply free_slot_res_morph` tail needed, because a db is TOTAL where the
+walk is partial. Two reasons main keeps the `lazymatch` for now, neither of
+them performance:
+
+- `eauto` is all-or-nothing per goal: it cannot walk as far as the structure
+  goes and hand back the residual `CtxMorph (λ ξ, free_slot_res …)`, which is
+  this tactic's documented contract and its only diagnostic on a class that
+  DELIBERATELY leaves the ξ-dependent leaves uncovered. Registering every
+  component makes it total and takes that diagnostic away.
+- The walk is deterministic and linear; `eauto` backtracks and has a depth.
+
+**And the db's real advantage, which is not speed**: the `lazymatch` is a
+CLOSED table in one file, so a new payload shape or leaf family means editing
+`CtxMorphTac.v` — which is why main carries an empty branch for the T-leg's
+A6.125 half-cell shape. A db is open: each file registers its own rows.
+**Owner's call, 2026-08-29: fix the performance now, revisit the single global
+table if and when it becomes a problem.** The measurement above is what a
+revisit starts from.
+
+**And the question this leaves — why is there a tactic at all?** Because three
+properties of `CtxMorph` are not tunable from the instance side. (1) Every
+instance's conclusion is `CtxMorph <λ>`, and the hint net keys on the head of
+the conclusion's argument, so all ~55 `CtxMorph` instances in the tree are
+wildcards tried on every goal. (2) Search cannot be told to stop at a payload
+component whose own instance covers it, and a descent that reaches one of the
+deliberately uncovered ξ-dependent leaves (`pstate_lock`, `hart_at_any`,
+`own_context`) fails and backtracks over everything it just did. (3)
+`ctx_morph_const` is pinned at 100 by its evar guard, so the instance that
+closes most leaves runs after ~54 failures. Making search do this job means
+restating every payload as a keyed `_at` constant plus `Typeclasses Opaque` —
+a ~55-instance, 20-file refactor that still cannot express (2). **Search is
+already the right answer at the CALL sites**, where the payload is a named
+constant with a keyed zero-premise instance: after the `const_pay` fix above,
+the whole `wp_acquire_sconf`/`wp_release_sconf` family is 3 sites and 2.5 s in
+the tree's top 1000, and the fresh whole-tree profile taken for this fix shows
+no lock call site over 2 s. It is the INSTANCE CONSTRUCTION, whose goal is a
+raw payload body, that needs a tactic.
+
 - **A BIG-OP UNDER A TRANSPARENT NAME IS AN `iFrame` BOMB, AND SEALING IT IS A
   ONE-LINE FIX FOR EVERY CALL SITE AT ONCE** (measured 2026-08-21). `iFrame`'s
   `Frame` search unfolds a transparent constant to get at the `big_sepL`

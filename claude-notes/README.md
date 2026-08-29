@@ -102,13 +102,14 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   user-execution WP as a RESIDUE-RESIDENT RESOURCE: the two WP forms
   (`uexec_wp` / the trapframe-keyed `uexec_slot V M`), where the slot
   lives and how it travels, the two run sites, the seal discipline, and
-  the sync entry-deposit constructor.  Read before touching the trap
-  loop's user-WP seam.
+  the entry-deposit constructors (`sync`'s and `echo`'s).  Read before
+  touching the trap loop's user-WP seam.
 - **[`uk-engine.md`](design/uk-engine.md)** — the user-mode-on-kernel
   engine: the per-page PERMISSION MAP in the slot's key (a projection of
   the table and size, lazy pages filled RW, and why), the `Uk*.v` engine
-  stated against the kernel's trap contract, sync on it, and what
-  milestone J owes.
+  stated against the kernel's trap contract, where the program-GENERIC
+  key-level vocabulary lives (`UkAbi.v`), and `sync` and `echo` on it —
+  including what echo's port gave up and why.
 - **[`elf.md`](design/elf.md)** — ELF file semantics: the file-side
   `ElfFile.v` layer vs `ElfEnc.v`'s code-side readers, the PrimString import
   vehicle for whole binaries, the kernel-dump consistency theorem
@@ -188,12 +189,13 @@ outstanding; see the `completed/` section below).
 
 - **[`user-wp-slot-checkpoint.md`](projects/user-wp-slot-checkpoint.md)** — coordinator checkpoint 2026-08-28: the session's rulings, in-flight (possibly ungated) state, and how to resume.  Read FIRST if resuming user-wp-slot.
 - **[`user-wp-slot.md`](projects/user-wp-slot.md)** — the PER-PROCESS
-  user-execution WP slot, step 3: making a verified process run IN PLACE
-  of the generic-safety WP.  Steps 1–2 are landed (the slot machinery and
-  `sync`'s entry deposit — design of record:
-  `design/user-wp-slot.md`); the file is the six-item ledger, including
-  the two rulings to get before the residue re-key and the deliberately
-  undesigned deposit-covering formulation.  Its §2 is FINISHED and is
+  user-execution WP slot: making a verified process run IN PLACE of the
+  generic-safety WP.  **Start at §0′**, the coordinator checkpoint.
+  Milestone J is complete and TWO programs (`sync`, `echo`) now run on
+  the user-mode-on-kernel engine with decidable entry gates
+  (`design/user-wp-slot.md` for the slot, `design/uk-engine.md` for the
+  engine); what is left is led by the exec-site forcing function, which
+  is the fs lane's `kexec_ok` to materialise.  Its §2 is FINISHED and is
   worth reading for its own sake: the `proc_pt_any` campaign, which took
   every contract in the tree to a PRECISE image or an existential written
   out, and which carries the priced-and-shelved cost of deleting the

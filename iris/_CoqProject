@@ -267,6 +267,8 @@ UkStore.v
 UkLoad.v
 UkAbi.v
 UkSync.v
+UkEcho.v
+UkEchoKernel.v
 UexecCond.v
 UCodeEcho.v
 USpecEcho.v

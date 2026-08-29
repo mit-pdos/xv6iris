@@ -5,6 +5,7 @@
 -arg -w
 -arg -notation-overridden
 VSched.v
+VExecStuck.v
 VTest.v
 CoreSmokeGen.v
 CoreSmokeHart1Gen.v

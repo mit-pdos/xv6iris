@@ -79,7 +79,16 @@ Proof. vm_cast_no_check (eq_refl VDone). Qed.
 (*    status 3, the register 0 before, 1 when set, mip.MSIP = 8, 0 when     *)
 (*    cleared, mip.MSIP gone -- the same semantics QEMU showed, on a        *)
 (*    different hart's register.  So this is not a machine that refused the *)
-(*    access; it is a model that has no transition for it.                  *)
+(*    access; it is a model that answers it with a FAULT.                   *)
+(*                                                                         *)
+(*    "No transition" would be the wrong words and this file used to use    *)
+(*    them.  The model HAS a transition here -- a load access fault, which  *)
+(*    section 2 pins with mcause, mepc and mtval -- and that is why the     *)
+(*    status below is VBudget (the trap loop eats the budget) and not       *)
+(*    VStuck.  The distinction is load-bearing: VStuck would mean only that *)
+(*    [exec] declined to step, which is a fact about the interpreter and    *)
+(*    not about the model (see VTest.v section 3b).  Here the model really  *)
+(*    does take a step, and it is the wrong one.                            *)
 (* ---------------------------------------------------------------------- *)
 
 Definition msip_hw_start : mstate :=

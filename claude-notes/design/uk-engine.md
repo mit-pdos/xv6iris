@@ -4,13 +4,17 @@ The verified-user step engine stated against the KERNEL's trap contract
 (`UexecRet.uvb` / `ukont` / `uexec_ret`) instead of the Umode tier's
 assumed capability (`UmodeCap.uv_cap`).  It is the design's (C) from
 `user-wp-slot.md` ("The ruled design for the user/kernel trap contract")
-built as NEW FILES beside the old engine, which is left as-is: the sh/echo/
-init proofs still run on `WpUmode*.v`, and `sync` runs on both.
+built as NEW FILES beside the old engine, which is left as-is: the sh and
+init proofs still run on `WpUmode*.v`, and `sync` and `echo` run on both.
 
 Files, bottom-up: `UserPerm.v` (the per-page permission view; below the
 slot), `UkStep.v` (the engine), `UkLeaf.v` (the register-only leaves),
-`UkStore.v` (the store leaf), `UkSync.v` (sync on the new engine),
-`USyncKernel.v` (the slot constructor), `UexecCond.v` (the decidable gate).
+`UkStore.v` / `UkLoad.v` / `UkBranch.v` (the memory and branch leaves),
+`UkAbi.v` (the program-GENERIC key-level vocabulary: readable windows, C
+strings, the argument area, the X/W pages and the stack budget),
+`UkSync.v` / `UkEcho.v` (the two programs), `USyncKernel.v` /
+`UkEchoKernel.v` (their slot constructors), `UexecCond.v` (the decidable
+gate chain).
 
 ## The permission map is a projection, and the lazy pages are filled RW
 
@@ -124,7 +128,8 @@ capability.  New:
   re-binds the table (the resume after an interrupt comes back through
   `uslot`, which ∀-binds it), so the fetch obligation must hold at any
   table too.  A program gets it from its key facts once per instruction
-  (`UkSync.uk_instr_of_sync`, through `sync_layout_of_key`).
+  (`UkSync.uk_instr_of_sync` / `UkEcho.uk_instr_of_echo`, through the
+  program's `*_layout_of_key` bridge).
 - `uk_step_obl π Kc M m pc` — the fetch-onward obligation, at ∀ table
   with the guards and `uk_pt_pure pt M` (the three pure facts of
   `user_pt_inv` the Umode page half drops) as premises, taking
@@ -156,9 +161,25 @@ replaced by the key's `uk_store_ok va` (the page is a W page of `π`);
 byte's presence (`image_byte_mapped`) and `perm_of_W`.  Loads and
 branches are NOT ported (sync needs neither): `WpUmodeLoad.v` /
 `WpUmodeBranch.v` port by the same rewrite, the load's table premise
-becoming "the page is in `π`" (`perm_of_R`).
+becoming "the page is in `π`" (`perm_of_R`).  **Both landed 2026-08-29,
+for echo**: branches were a pure re-thread, and the load gained the
+transparent FAULT arm mirroring the store's.
 
-## sync on the engine (`UkSync.v`, `USyncKernel.v`, `UexecCond.v`)
+## Where the key-level vocabulary lives
+
+`UkAbi.v` is the PURE, program-generic file: the readable page/window
+(`uk_rpage` / `uk_rd`), C strings and the canonical length (`uk_slen`),
+the argument area (`uk_args`, `uk_args_c`, `uk_argv_null`) with its frame
+lemmas and its READERS -- each of which hands back exactly a leaf's
+premise list in order -- and, since echo, the X/W pages (`uk_xpage` /
+`uk_wpage`) and the stack budget (`uk_stack`, `uk_stack_split`,
+`uk_stack_slot`), which used to be UkSync.v §1's.  Nothing in it is any
+one program's, and everything in it is DECIDABLE, which is what an entry
+gate needs.  A program's own file keeps only its BRIDGES to the table
+(`sync_layout_of_key` / `echo_layout_of_key` and the `uk_instr_of_*` that
+lifts its decode facts to every table realizing the key) and its walks.
+
+## sync and echo on the engine (`UkSync.v`, `UkEcho.v`, the two kernel files, `UexecCond.v`)
 
 `uk_xpage π va` / `uk_wpage π va` (decidable) and `uk_stack π M sp n`
 (`uv_stack` with its leaf clause on the key; decidable) are the key-level
@@ -167,9 +188,44 @@ budget lemmas re-read on the key.  A diverging function proves
 `⊢ ukc π M m pc`; the returning stub takes `∀ ret, ukc …` as its
 continuation.  `USyncKernel.sync_uexec_slot` is `uslot_ukc` plus
 `wp_ksync_start`, with NO capability and no table premise.
-`UexecCond.cond_entry_slot : □ uexec_wp -∗ uslot W` decides `sync_gate W`
-(text, pc, X page, stack) and deposits sync's slot or the generic one.
-`sync_entry_tbl` and `sync_entry_tbl_refuted` are gone.
+`UexecCond.cond_entry_slot : □ uexec_wp -∗ uslot W` is a CHAIN of decidable
+gates ending in the generic WP: `sync_gate W` (text, pc, X page, stack),
+then `echo_gate W`, then the generic slot.  The order does not matter to
+the conclusion -- every branch produces the same `uslot W` -- and adding
+the next verified program is one more `destruct`.  `sync_entry_tbl` and
+`sync_entry_tbl_refuted` are gone.
+
+**ECHO (`UkEcho.v`, `UkEchoKernel.v`), landed 2026-08-29.**  All five
+functions (`start`, `main`, `strlen`, and the `write` / `exit` stubs) on
+the same engine, and the first consumer of the LOAD and BRANCH leaves and
+of `uk_args`.  Four things are worth carrying forward:
+
+- **echo's entry key is sync's plus the argument area.**  `uk_xpage π 0`,
+  `echo_text_sub M`, `uk_stack π M sp 96`, and
+  `uk_args π M av argc (uint sp) alen` -- where `argc`, `av` and `sp` are
+  TRAPFRAME WORDS, read back out of `userret_gpr`'s tower by
+  `UexecSlot.tf_resume_gpr_sp` / `_a0` / `_a1`.  So the constructor
+  DISCHARGES `wp_kecho_start`'s register premises rather than assuming
+  them, which is the payoff of keying the slot on the trapframe.
+- **The gate names no existential**, which is why it is decidable: the
+  argv pointers are FUNCTIONS of the image (`uk_argv_p`) and the string
+  lengths are the canonical scanned ones, so `uk_args_c` is both the
+  decidable form and the witness the constructor's `alen` wants
+  (`uk_args_canon`).
+- **`write` costs its caller NOTHING on this tier, and that is a real
+  loss.**  `SYS_write` is 16 and `usys_window 16 = None`, so it takes
+  `usys_mem_ok`'s quiet row and echo's image moves only inside strlen's
+  frame.  But where the old tier's `UsysReadsBuf` row made every caller PAY
+  `uv_rd pt M buf n`, `uexec_ret`'s ecall arm is one PURE hypothesis under
+  a ∀ over the return value and has no place for such an obligation.  That
+  obligation is what FORCED strlen's answer to be the true length, i.e.
+  echo's one piece of functional content; the port is therefore
+  safety-only, and recovering the rest is the `Φ` refinement parked in
+  `user-wp-slot.md` (an iProp premise under the SAME ∀).  Nothing in
+  `UkEcho.v` special-cases that ∀.
+- **Both loops are ordinary Rocq inductions on a `nat` measure, not
+  `iLöb`s** -- bounded by `argc` and by the NUL's index -- which is what
+  `UkBranch.v`'s later-FREE branch leaves exist for.
 
 ## What milestone J now owes
 

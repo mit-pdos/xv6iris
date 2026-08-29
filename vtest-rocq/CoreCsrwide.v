@@ -10,22 +10,35 @@
    column is the MODEL's -- so the board profile skips this test rather than
    reporting it as a failure.
 
-   WHY THEY CANNOT SHARE A TEST WITH ANYTHING ELSE, and this is the finding:
-   in the model `csrr mseccfg` has NO TRANSITION.  [exec] answers None and
-   the harness reports VStuck, so the run stops at the first of the seven
-   and every later probe in the same image goes unasked.  Finding 22 records
-   the model as IMPLEMENTING these CSRs -- "implemented, read successfully"
-   -- and for the interpreter this suite runs, that is not what happens: it
-   neither answers nor refuses.
+   WHY THEY CANNOT SHARE A TEST WITH ANYTHING ELSE: [exec] cannot step
+   `csrr mseccfg`.  It answers None, the harness reports VStuck, and the run
+   stops at the first of the seven so every later probe in the same image
+   goes unasked.
 
-   That is a THIRD outcome, and the suite's vocabulary already has a name
-   for each: a machine that answers, a machine that traps, and a model with
-   no transition.  Compare finding 25, where `sc.w` does not evaluate
-   because [execute_STORECON] goes through opaque platform axioms; this is
-   the same class of limit, in the CSR file.  Whether finding 22's "read
-   successfully" was measured some other way, or has rotted, is worth
-   settling before README.md's open decision is answered -- because the
-   decision was framed on the belief that the model ANSWERS here. *)
+   AND IT REALLY IS THE MODEL, WHICH TOOK A NEW THEOREM TO ESTABLISH.  A
+   bare [VStuck] means only that [exec] would not step, and [exec] declines
+   on [Interface.Choose] -- the Sail monad's nondeterminism -- exactly as it
+   declines where the relation is genuinely stuck.  [RiscvExec.exec_run_det]
+   runs one way only, so [exec m s = None] on its own proves nothing.  This
+   file used to assert "no transition" off exactly that, which was not
+   justified at the time.
+
+   [VExecStuck.v] closes it: [exec_r] is [exec] with its failure clause
+   split into [ENoStep] and [EChoice], and
+
+     exec_r_no_step : exec_r m s = inr ENoStep -> forall x s', ~ run m s x s'
+
+   is the converse the tree did not have.  MEASURED HERE: [stuck_why]
+   answers [Some ENoStep], so by that theorem the RELATION has no
+   transition at the state this run reaches.  The original claim was right;
+   what was missing was any way to know it.
+
+   SO FINDING 32 STANDS, and it now says something checkable.  Finding 22
+   records the model as "implemented, read successfully" on these seven
+   CSRs; the model does not read [mseccfg] at all.  Compare finding 25,
+   where `sc.w` does not EVALUATE because [execute_STORECON] goes through
+   opaque platform axioms -- that one is still an [exec] limit and has not
+   been given this treatment. *)
 From Stdlib Require Import List ZArith.
 Import ListNotations.
 Require Import VTest CoreCsrwideGen.
@@ -64,11 +77,12 @@ Lemma core_csrwide_qemu_traps_eight :
 Proof. reflexivity. Qed.
 
 (* ---------------------------------------------------------------------- *)
-(* 2. THE MODEL HAS NO TRANSITION FOR THE FIRST OF THEM.                   *)
+(* 2. [exec] CANNOT STEP THE FIRST OF THEM.                                *)
 (*                                                                         *)
 (*    Not VBudget (a trap loop eating the budget, which is what an          *)
 (*    illegal-instruction refusal would look like -- see ClintMsip.v) and   *)
-(*    not VDone.  VStuck: [exec] returned None.                             *)
+(*    not VDone.  VStuck: [exec] returned None -- see the header for what   *)
+(*    that does and does not establish.                                     *)
 (*                                                                         *)
 (*    0x80000078 is `csrr t2,0x747`, checked against                        *)
 (*    `riscv64-linux-gnu-objdump -d tools/vtest/build/core_csrwide.elf`,    *)
@@ -76,10 +90,20 @@ Proof. reflexivity. Qed.
 (*    materialising load that left a declared region.                       *)
 (* ---------------------------------------------------------------------- *)
 
-Lemma core_csrwide_model_stuck : run_status 4000 cw_start = VStuck.
+Lemma core_csrwide_exec_stuck : run_status 4000 cw_start = VStuck.
 Proof. vm_cast_no_check (eq_refl VStuck). Qed.
 
-Lemma core_csrwide_model_stuck_at : stuck_pc 4000 cw_start = 0x80000078.
+(* ...and it is REAL stuckness, not a [Choose] the interpreter declined. *)
+Lemma core_csrwide_stuck_why : stuck_why 4000 cw_start = Some ENoStep.
+Proof. vm_cast_no_check (eq_refl (Some ENoStep)). Qed.
+
+(* THE STATEMENT ABOUT THE MODEL, which [VStuck] alone could not support:
+   the run reaches a state at which the RELATION has no transition. *)
+Corollary core_csrwide_model_really_stuck :
+  exists s0, forall x s', ~ run (riscv_step false) s0 x s'.
+Proof. exact (stuck_why_no_step _ _ core_csrwide_stuck_why). Qed.
+
+Lemma core_csrwide_exec_stuck_at : stuck_pc 4000 cw_start = 0x80000078.
 Proof. vm_cast_no_check (eq_refl 0x80000078). Qed.
 
 (* ...so the model publishes nothing at all, where QEMU published a full
