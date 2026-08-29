@@ -284,6 +284,44 @@ has no transition at all.  Whether finding 22's claim was measured some other
 way or has rotted is worth checking, because the decision was framed on the
 belief that the model answers here.
 
+## The memory model, measured
+
+`conc_mp` is the litmus test that separates RVWMO from TSO -- the one thing
+`conc_sb` cannot ask, because `conc_sb` separates TSO from SC and QEMU's host
+is TSO.  The writer stores a monotonic sequence number to X and then to Y;
+the reader reads Y and then X.  The writer's own order makes X at least as
+new as Y at every instant, so a reader seeing **Y newer than X** has observed
+a reordering: **impossible under TSO, allowed under RVWMO**.
+
+| | witness (races observed in flight) | forbidden |
+|---|---|---|
+| the model | — (sequentially consistent; cannot produce it) | 0 by construction |
+| QEMU virt | **0** of 20480 — see below | 0, and it means nothing |
+| VisionFive 2 | **81920 of 81920** | **0** |
+
+**QEMU cannot be asked this question at all**, and that is the sharpest
+argument in this file for why a board is worth the trouble.  Its vCPUs
+round-robin with a long scheduling quantum, so the reader's whole loop runs
+inside one quantum and the writer never gets in -- measured, X and Y both
+still 0 when the unfenced pass ended, witness 0 out of 20480.  (The FENCED
+pass does interleave, because the fences break the translation block.)  It is
+not that QEMU gives a different answer; it is that it gives no answer.
+
+**What the board result does and does not say.**  It says that in 81920
+races, every one of which the reader demonstrably observed while the writer
+was between its two stores, the U74 never let the second store be seen
+before the first.  It does **not** say the U74 is TSO.  The mechanism that
+would produce this outcome on an in-order core is a store buffer that drains
+out of order -- Y hitting in L1 while X waits for ownership -- and a core
+with a strictly FIFO drain can never exhibit it however long you look.  A
+null result here bounds the rate; it does not establish a memory model.
+
+Two refinements worth trying before drawing any conclusion: bias the cache
+state so the writer's X line is remote and its Y line local (the current
+test has the reader touching both, which makes them symmetric), and add IRIW,
+which needs four harts -- this board has four U74s, but one runs firmware
+unless `--takeover` is used.
+
 ## The board scoreboard, and what it does and does not say
 
 Every non-`disk`, non-`uart` test, run on the VisionFive 2.  **These rows say

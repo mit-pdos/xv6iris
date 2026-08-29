@@ -780,10 +780,20 @@ def main():
                     # region zeroing, the register set-up and one continue.
                     for k, (res, cnt) in enumerate(
                             sorted(counts.items(), key=lambda kv: -kv[1])):
-                        ws = " ".join("%#x" % int.from_bytes(res[o:o+4], "little")
-                                      for o in (4, 8, 12, 0x100, 0x104))
-                        print("  [%d] x%-4d status/+8/+12/+0x100/+0x104 = %s"
+                        ws = " ".join("%d" % int.from_bytes(res[o:o+4], "little")
+                                      for o in (4, 8, 12, 16, 20, 24))
+                        print("  [%d] x%-4d  +4/+8/+12/+16/+20/+24 = %s"
                               % (k, cnt, ws))
+                    # ...and the SUM over all runs of each word, which is what
+                    # a sticky litmus counter wants: one occurrence anywhere.
+                    tot = {}
+                    for res, cnt in counts.items():
+                        for o in range(8, 40, 4):
+                            tot[o] = tot.get(o, 0) + cnt * int.from_bytes(
+                                res[o:o+4], "little")
+                    print("  SUM over %d runs, +8..+36: %s"
+                          % (reps, " ".join("%d" % tot[o]
+                                            for o in range(8, 40, 4))))
     finally:
         b.close()
 

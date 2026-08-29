@@ -38,18 +38,48 @@
  * says only "not observed by this test at this timing", never "the machine
  * is TSO".  Report it as a count out of a run total, not as a property.
  *
- * NO PER-ITERATION BARRIER, deliberately.  A barrier between the writer's
- * pair and the reader's pair would impose the very ordering under test.
- * Instead both harts sweep an ARRAY of independent slots at their own pace
- * after one rendezvous, so the reader lands in the writer's window at
- * whatever offsets the timing gives, and the interesting outcome is counted
- * over the whole sweep.  Most slots come out (0,0) (reader ahead) or (1,1)
- * (reader behind); those are not failures, they are the sweep missing.
+ * IT RACES REPEATEDLY, AND EVERY ITERATION IS A REAL RACE.
  *
- * SLOTS ARE 64 BYTES APART, one cache line each, and X and Y are 2 KB
- * apart.  If X[i] and Y[i] shared a line, seeing Y=1 would mean the line
- * carrying X=1 had already arrived and (1,0) could never appear for a
- * reason that has nothing to do with the memory model.
+ * The obvious encoding -- a flag and a data word, both reset between rounds
+ * -- needs the reader to be PHASE-ALIGNED with the writer for a given slot
+ * to be contended at all, and resetting needs barriers that serialise the
+ * two harts.  Measured on QEMU: 76 contended slots out of 5120, i.e. 98.5%
+ * of the work bought nothing, and a reordering with probability 1% would
+ * have needed a hundred runs to appear once.
+ *
+ * So there is no flag and no reset.  The writer stores a MONOTONIC SEQUENCE
+ * NUMBER to both words, data first:
+ *
+ *     writer:  i = i+1 ; X = i ; Y = i          (forever, until told to stop)
+ *     reader:  r1 = Y ; r2 = X                  (NITER times)
+ *
+ * X is written before Y on every iteration, so the writer's own sequence has
+ * X at least as new as Y at every instant.  A reader that observes the two
+ * in program order must therefore see
+ *
+ *     r2 >= r1        (the data is at least as new as the flag)
+ *
+ * and seeing r1 > r2 means Y was observed NEWER THAN X -- the stores, or the
+ * loads, were reordered.  IMPOSSIBLE UNDER TSO.  ALLOWED UNDER RVWMO.
+ *
+ * That buys three things at once.  There is nothing to reset, so no barrier
+ * and no zeroing pass, so both harts free-run at full speed on the same two
+ * cache lines.  Every reader iteration observes some writer state, so every
+ * iteration is a chance rather than one in sixty-five.  And the detector is
+ * one unsigned compare, ACCUMULATED, so a SINGLE occurrence anywhere in the
+ * run makes the published result differ -- which is the whole point: we do
+ * not need to catch the machine at a known moment, only to notice that it
+ * ever happened.
+ *
+ * THE WITNESS, beside the detector, is the count of iterations where
+ * r1 != r2 at all: the reader caught the writer BETWEEN its two stores.
+ * That is the number of genuine opportunities the run gave the machine, and
+ * a null detector count is only meaningful beside a large witness count.
+ *
+ * X AND Y ARE ON SEPARATE CACHE LINES (64 bytes apart).  If they shared
+ * one, a reader that saw the new Y would necessarily have the line carrying
+ * the new X, and the forbidden outcome could never appear for a reason that
+ * has nothing to do with the memory model.
  *
  * THE SECOND PASS IS THE CONTROL, and it is what makes a (1,0) in the first
  * pass believable: the same sweep with `fence w,w` between the stores and
@@ -59,224 +89,121 @@
  * exotic.
  *
  * RESULT layout (mirrored in vtest-rocq/ConcMp.v):
- *   +8    N, the number of slots swept
- *   ---- pass 1: NO FENCES ----
- *   +12   count of (r1,r2) = (0,0)   reader ran ahead of the writer
- *   +16   count of (1,1)             reader ran behind
- *   +20   count of (0,1)             saw old flag, new data -- legal anywhere
- *   +24   count of (1,0)   <-- THE RVWMO-ONLY OUTCOME
- *   ---- pass 2: FENCED (the control) ----
- *   +28   count of (0,0)
- *   +32   count of (1,1)
- *   +36   count of (0,1)
- *   +40   count of (1,0)   <-- MUST BE 0 ON EVERY MACHINE
- *   ---- rendezvous flags ----
- *   +0x100 BARW1  +0x104 BARR1   +0x108 BARW2  +0x10c BARR2
+ *   +8    NITER, the reader's iterations per pass
+ *   +12   pass 1 WITNESS   -- iterations where r1 != r2 (caught mid-pair)
+ *   +16   pass 1 FORBIDDEN -- iterations where r1 >  r2   <-- RVWMO-only
+ *   +20   pass 2 WITNESS   (fenced)
+ *   +24   pass 2 FORBIDDEN (fenced)  <-- MUST BE 0 ON EVERY MACHINE
+ *   +28   X as pass 1 ended    } the writer's sequence number: 0 here means
+ *   +32   Y as pass 1 ended    } the writer never ran, see below
  */
 /* vtest: smp=2 repeat=1 */
     .option norvc
 #include "abi.h"
 
-#define N         16              /* slots per sweep; 64 B apart */
-#define ROUNDS    16              /* sweeps per pass -- see the stagger note */
-#define DSTEP     6               /* reader delay added per round            */
-#define XBASE     DMA_BASE        /* X[i] at XBASE + 64*i        */
-#define YBASE     (DMA_BASE + 0x800)   /* Y[i], 2 KB away        */
+#define NITER     4096            /* reader iterations per pass */
+/* WGAP nops between the writer's two stores.  This imposes NO ORDERING --
+   nops are not fences -- it only widens the interval during which X has
+   been written and Y has not, which is the interval the reader has to
+   sample in for the observation to be about the pair at all.  Measured
+   without it on QEMU: the witness count was ZERO over 20480 races, because
+   the writer's unfenced loop is five instructions and the reader never
+   landed inside it.  The READER's two loads are deliberately left ADJACENT:
+   widening its gap would raise the witness too, but by making X strictly
+   newer, which is the direction that HIDES the forbidden outcome. */
+#define WGAP      12
+#define XADDR     DMA_BASE        /* the DATA word              */
+#define YOFFR     64              /* the FLAG word, the NEXT cache line */
 
-#define R_N       8
-#define R_P1      12              /* four counts: 00 11 01 10 */
-#define R_P2      28
-#define BARW1     0x100
-#define BARR1     0x104
-#define BARW2     0x108
-#define BARR2     0x10c
-#define BARD1     0x110           /* reader has FINISHED round r  */
-#define BARD2     0x114
+#define R_NITER   8
+#define R_P1WIT   12
+#define R_P1BAD   16
+#define R_P2WIT   20
+#define R_P2BAD   24
+#define STOP1     0x100           /* reader tells the writer to stop  */
+#define STOP2     0x104
+#define READY1    0x10c           /* writer has entered its UNFENCED loop */
+#define READY2    0x108           /* writer has entered its FENCED loop   */
 
-/* rendezvous: set my flag, spin on the other's */
-/* A SENSE-REVERSING rendezvous: each round bumps the flag to the round
-   number + 1 rather than to 1, so a flag left set by the previous round
-   does not let a hart through early.  s9 holds the round. */
-.macro SYNC mine, theirs
-    addi t0, s9, 1
-    li   t1, \mine
-    add  t1, s11, t1
-    sw   t0, 0(t1)
-    li   t1, \theirs
-    add  t1, s11, t1
-    addi t2, s9, 1
-9:  lw   t0, 0(t1)
-    blt  t0, t2, 9b
-.endm
-
-/* ---- the WRITER's sweep.  \fenced != 0 puts a w,w fence between the two
- * stores, which is the control pass. ---- */
-.macro WSWEEP fenced
-    li   s2, 0                    /* i */
-    li   s3, XBASE
-    li   s4, YBASE
-1:  li   t0, 1
-    sw   t0, 0(s3)                /* X[i] = 1  -- the DATA  */
+/* ---- the WRITER: store the sequence number to X then Y, forever, until
+ * the reader says stop.  \fenced puts a w,w fence between them, which is
+ * the control pass. ---- */
+.macro WLOOP fenced, stop
+    li   s2, 0
+1:  addi s2, s2, 1
+    sw   s2, 0(s3)                /* X = i  -- the DATA first */
 .if \fenced
     fence w, w
 .endif
-    sw   t0, 0(s4)                /* Y[i] = 1  -- the FLAG  */
-    addi s3, s3, 64
-    addi s4, s4, 64
-    addi s2, s2, 1
-    li   t1, N
-    blt  s2, t1, 1b
+    .rept WGAP
+    nop
+    .endr
+    sw   s2, YOFFR(s3)            /* Y = i  -- then the FLAG  */
+    lw   t0, \stop(s11)
+    beqz t0, 1b
 .endm
 
-/* ---- the READER's sweep, tallying the four outcomes into s5..s8 ---- */
-.macro RSWEEP fenced
+/* ---- the READER: r1 = Y, r2 = X, and accumulate.  Branch-free apart from
+ * the loop, so nothing here depends on what was observed. ---- */
+.macro RLOOP fenced
     li   s2, 0
-    li   s3, XBASE
-    li   s4, YBASE
-    /* s5..s8 are NOT reset here: they ACCUMULATE across the rounds of a
-       pass, and the round loop zeroes them once before entering. */
-2:  lw   t0, 0(s4)                /* r1 = Y[i]  -- the FLAG first */
+    li   s7, 0                    /* witness:  r1 != r2 */
+    li   s8, 0                    /* FORBIDDEN: r1 >  r2 */
+2:  lw   t0, YOFFR(s3)            /* r1 = Y -- the FLAG first */
 .if \fenced
     fence r, r
 .endif
-    lw   t1, 0(s3)                /* r2 = X[i]  -- then the DATA  */
-    bnez t0, 3f
-    /* r1 == 0 */
-    bnez t1, 4f
-    addi s5, s5, 1                /* (0,0) */
-    j    5f
-4:  addi s7, s7, 1                /* (0,1) */
-    j    5f
-3:  /* r1 == 1 */
-    bnez t1, 6f
-    addi s8, s8, 1                /* (1,0)  THE RVWMO-ONLY OUTCOME */
-    j    5f
-6:  addi s6, s6, 1                /* (1,1) */
-5:  addi s3, s3, 64
-    addi s4, s4, 64
+    lw   t1, 0(s3)                /* r2 = X -- then the DATA  */
+    sltu t2, t1, t0               /* r2 < r1: the flag is NEWER than the
+                                     data, which the writer's own order
+                                     makes impossible to observe in order */
+    add  s8, s8, t2
+    xor  t2, t0, t1
+    snez t2, t2
+    add  s7, s7, t2
     addi s2, s2, 1
-    li   t1, N
+    li   t1, NITER
     blt  s2, t1, 2b
 .endm
 
-/* THE EXIT BARRIER, and the control is what proved it necessary.
- *
- * The entry rendezvous synchronises the START of a round and nothing else.
- * The writer's sweep is shorter than the reader's, so it finished first,
- * looped, and ZEROED THE ARRAYS FOR THE NEXT ROUND while the reader was
- * still sweeping this one -- whereupon the reader saw Y[i] = 1 (written this
- * round) and X[i] = 0 (already zeroed for the next), which is a (1,0) that
- * has nothing to do with the memory model.
- *
- * MEASURED, and this is exactly what the fenced control exists to catch: on
- * QEMU, pass 2 -- with `fence w,w` and `fence r,r`, where (1,0) is forbidden
- * on every machine there is -- reported (1,0) = 12 out of 256.  Without the
- * control that would have been read as the board being exotic; with it, it
- * could only be the harness.
- *
- * So the reader publishes "round done" and the writer waits for it before
- * zeroing.  This is BETWEEN rounds, never between the accesses under test,
- * so it imposes no ordering on the thing being measured. */
-.macro RDONE flag
-    addi t0, s9, 1
-    li   t1, \flag
-    add  t1, s11, t1
-    sw   t0, 0(t1)
-.endm
-
-.macro WWAITD flag
-    li   t1, \flag
-    add  t1, s11, t1
-    addi t2, s9, 1
-14: lw   t0, 0(t1)
-    blt  t0, t2, 14b
-.endm
-
-/* store the reader's four tallies at \off */
-.macro RSTORE off
-    sw   s5, (\off + 0)(s11)
-    sw   s6, (\off + 4)(s11)
-    sw   s7, (\off + 8)(s11)
-    sw   s8, (\off + 12)(s11)
-.endm
-
-/* THE STAGGER, and it is what makes this test sensitive rather than lucky.
- *
- * Measured first attempt, N = 32, one round, no stagger: the reader came out
- * 32 x (0,0) in pass 1 and 32 x (1,1) in pass 2 -- it swept entirely AHEAD of
- * the writer, then entirely behind.  Its loop is a few instructions longer
- * per slot than the writer's, so with both released from the same rendezvous
- * the relative phase is not jitter, it is a CONSTANT, and no number of runs
- * would have found the window.
- *
- * So the WRITER delays (round * DSTEP) loop iterations after each
- * rendezvous.  It is the writer and not the reader because the writer's
- * loop is the SHORTER one: with both released together it finishes first
- * and the reader sees a completed sweep every time (measured: 256 x (1,1)).
- * Delaying the writer walks its sweep forward across the reader's, which
- * covers the window deterministically instead of hoping the machine's
- * timing wanders into it.  The tallies accumulate
- * across rounds, so the totals are out of N * ROUNDS.
- *
- * The writer re-zeroes both arrays BEFORE each rendezvous, so a round never
- * sees the previous round's flags. */
-.macro DELAY r
-    mv   t2, \r
-    li   t1, DSTEP
-    mul  t2, t2, t1
-    beqz t2, 8f
-7:  addi t2, t2, -1
-    bnez t2, 7b
-8:
-.endm
-
-.macro ZERO
-    li   t2, 0
-    li   t0, XBASE
-    li   t1, YBASE
-1:  sw   zero, 0(t0)
-    sw   zero, 0(t1)
-    addi t0, t0, 64
-    addi t1, t1, 64
-    addi t2, t2, 1
-    li   a1, N
-    blt  t2, a1, 1b
-.endm
 
     .globl _vtest_body
-_vtest_body:                     /* the PRIMARY is the READER, because it is
-                                    the one that has to publish the result */
+_vtest_body:                     /* the PRIMARY is the READER: it publishes */
     mv   s10, ra
-    li   t0, N * ROUNDS
-    sw   t0, R_N(s11)
+    li   s3, XADDR
+    li   t0, NITER
+    sw   t0, R_NITER(s11)
 
-    /* pass 1: no fences */
-    li   s5, 0
-    li   s6, 0
-    li   s7, 0
-    li   s8, 0
-    li   s9, 0                    /* round */
-10: SYNC BARR1, BARW1
-    RSWEEP 0
-    RDONE BARD1
-    addi s9, s9, 1
-    li   t1, ROUNDS
-    blt  s9, t1, 10b
-    RSTORE R_P1
+    /* WAIT FOR THE WRITER TO BE RUNNING.  Without this the reader finishes
+       all NITER iterations before the AP has even left the prologue, reads
+       X = Y = 0 every time, and reports a witness of ZERO -- which looks
+       exactly like a machine that never reorders.  Measured: 0 out of 20480
+       until this handshake existed. */
+4:  lw   t0, READY1(s11)
+    beqz t0, 4b
 
-    /* pass 2: the fenced control */
-    li   s5, 0
-    li   s6, 0
-    li   s7, 0
-    li   s8, 0
-    li   s9, 0
-11: SYNC BARR2, BARW2
-    RSWEEP 1
-    RDONE BARD2
-    addi s9, s9, 1
-    li   t1, ROUNDS
-    blt  s9, t1, 11b
-    RSTORE R_P2
+    RLOOP 0
+    sw   s7, R_P1WIT(s11)
+    sw   s8, R_P1BAD(s11)
+    lw   t0, 0(s3)
+    sw   t0, 28(s11)              /* DIAG: X as pass 1 ended */
+    lw   t0, YOFFR(s3)
+    sw   t0, 32(s11)              /* DIAG: Y as pass 1 ended */
+    li   t0, 1
+    sw   t0, STOP1(s11)           /* release the writer's first loop */
+
+    /* WAIT FOR THE WRITER TO REACH ITS FENCED LOOP.  Without this the
+       control pass would spend its first iterations racing against the
+       UNFENCED writer that has not noticed STOP1 yet -- which is exactly
+       the configuration the control is supposed to exclude. */
+3:  lw   t0, READY2(s11)
+    beqz t0, 3b
+
+    RLOOP 1
+    sw   s7, R_P2WIT(s11)
+    sw   s8, R_P2BAD(s11)
+    li   t0, 1
+    sw   t0, STOP2(s11)
 
     li   t0, 1
     sw   t0, RES_STATUS(s11)
@@ -285,23 +212,11 @@ _vtest_body:                     /* the PRIMARY is the READER, because it is
 
     .globl _vtest_body_ap
 _vtest_body_ap:                  /* the AP is the WRITER */
-    li   s9, 0
-12: ZERO
-    SYNC BARW1, BARR1
-    DELAY s9
-    WSWEEP 0
-    WWAITD BARD1
-    addi s9, s9, 1
-    li   t1, ROUNDS
-    blt  s9, t1, 12b
-
-    li   s9, 0
-13: ZERO
-    SYNC BARW2, BARR2
-    DELAY s9
-    WSWEEP 1
-    WWAITD BARD2
-    addi s9, s9, 1
-    li   t1, ROUNDS
-    blt  s9, t1, 13b
+    li   s3, XADDR
+    li   t0, 1
+    sw   t0, READY1(s11)
+    WLOOP 0, STOP1
+    li   t0, 1
+    sw   t0, READY2(s11)          /* now in the fenced loop */
+    WLOOP 1, STOP2
     ret
