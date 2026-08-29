@@ -1450,7 +1450,9 @@ ProofSysWriteAUStable.v
 UartSentLoc.v
 SpecUartwriteLoc.v
 ProofUartwriteLoc.v
+LinkUartwriteLoc.v
 SpecConsolewriteLoc.v
 ProofConsolewriteLoc.v
+LinkConsolewriteLoc.v
 SpecFilewriteCons.v
 ProofSysWriteConsAU.v
