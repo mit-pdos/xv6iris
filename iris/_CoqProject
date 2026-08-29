@@ -1395,3 +1395,6 @@ ProofSysOpenAUWalk.v
 SpecSysOpenAUPlain.v
 ProofSysOpenAU.v
 LinkSysOpenAU.v
+ProofSysDupAUTail.v
+ProofSysDupAU.v
+LinkSysDupAU.v
