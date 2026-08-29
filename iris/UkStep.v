@@ -98,6 +98,7 @@ Require Import ProcPtOwn.    (* [proc_pt_wf] *)
 Require Import UserPerm.
 Require Import UsysMemOk.
 Require Import UexecWp UexecSlot UexecRet.
+Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode* precedent *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -309,7 +310,7 @@ Qed.
 (* ===================================================================== *)
 Section UkBundle.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma uvb_elim (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (sz : Z)
       (π : gmap (mword 27) uperm) (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) :
@@ -437,7 +438,7 @@ End UkBundle.
 (* ===================================================================== *)
 Section UkObl.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId}.
+  Context `{GEN : GenId} `{XI : CurCtx}.
 
   Definition uk_step_obl (π : gmap (mword 27) uperm) (Kc : iProp Σ)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) : iProp Σ :=
@@ -486,7 +487,7 @@ End UkObl.
 (* ===================================================================== *)
 Section UkArms.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   (* the RETIRING payload: the process runs on, at the new file and pc,
@@ -661,7 +662,7 @@ End UkArms.
 (* ===================================================================== *)
 Section UkStepEngine.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId}.
+  Context `{GEN : GenId} `{XI : CurCtx}.
 
   Lemma wp_uk_step_gen (π : gmap (mword 27) uperm) (Kc : iProp Σ)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) :
@@ -878,7 +879,7 @@ End UkStepEngine.
 (* ===================================================================== *)
 Section UkFunnel.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
           (π : gmap (mword 27) uperm) (sz : Z).
   Hypothesis (Hlo : loop_ok C pt) (Hpm : perm_of (ud_um pt) sz = π).
@@ -899,7 +900,7 @@ End UkFunnel.
 
 Section UkPostFetch.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   (* everything from the FETCHED file on: the leaf's value-precise execute,
@@ -1087,7 +1088,7 @@ End UkPostFetch.
 (* ===================================================================== *)
 Section UkObligation.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   Lemma uk_obl_base (R : iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
@@ -1379,7 +1380,7 @@ End UkObligation.
 (* ===================================================================== *)
 Section UkRetire.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
           (π : gmap (mword 27) uperm) (sz : Z).
   Hypothesis (Hlo : loop_ok C pt) (Hpm : perm_of (ud_um pt) sz = π).
@@ -1575,7 +1576,7 @@ End UkRetire.
 (* ===================================================================== *)
 Section UkEcallPost.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   Lemma uk_ecall_post_fetch (R : iProp Σ) (Rut : uptd -> iProp Σ) (sz : Z)
@@ -1811,7 +1812,7 @@ End UkEcallPost.
 
 Section UkEcall.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
           (π : gmap (mword 27) uperm) (sz : Z).
   Hypothesis (Hlo : loop_ok C pt) (Hpm : perm_of (ud_um pt) sz = π).

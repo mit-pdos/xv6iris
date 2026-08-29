@@ -51,6 +51,7 @@ Require Import WpUmodeStep WpUmodeStore.
 Require Import UserPerm UsysMemOk UexecWp UexecSlot UexecRet.
 Require Import UkStep UkLeaf UkStore.
 Require Import UCodeSync UProofSync.   (* the decode facts and [sync_text_sub_store8] *)
+Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode* precedent *)
 Require User.SyncSyms User.SyncInstrs.
 Local Open Scope Z_scope.
 Import Defs.
@@ -330,7 +331,7 @@ Qed.
 
 Section UkSync.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId}.
+  Context `{GEN : GenId} `{XI : CurCtx}.
   Context (π : gmap (mword 27) uperm).
 
   (* the [uinstr] fact of one sync instruction at every table of the key *)

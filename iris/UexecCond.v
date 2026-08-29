@@ -46,6 +46,7 @@ Require Import UserPtTree UserFrame UserExec.
 Require Import UmodeMem UmodeAbi.
 Require Import UCodeSync.
 Require Import UserPerm UsysMemOk UexecWp UexecSlot UexecRet UkSync USyncKernel.
+Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode*/Uk* precedent *)
 Require User.SyncSyms User.SyncInstrs.
 Local Open Scope Z_scope.
 Import Defs.
@@ -114,7 +115,7 @@ Proof. unfold sync_gate. apply _. Defined.
 
 Section UexecCond.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId}.
+  Context `{GEN : GenId} `{XI : CurCtx}.
 
   (* the gate's yes branch: sync's own slot *)
   Lemma sync_gate_slot (W : uvis) : sync_gate W -> ⊢ uslot W.
@@ -150,7 +151,7 @@ End UexecCond.
 (* ===================================================================== *)
 Section UexecCondCongr.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId}.
+  Context `{GEN : GenId} `{XI : CurCtx}.
 
   Lemma uslot_congr (U1 U2 : ustate) :
     pv_tf (us_V U1) = pv_tf (us_V U2) ->

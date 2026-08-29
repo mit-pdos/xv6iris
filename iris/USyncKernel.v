@@ -45,13 +45,14 @@ Require Import UmodeAbi.
 Require Import UCodeSync.
 Require Import UserPerm UsysMemOk UexecWp UexecSlot UexecRet.
 Require Import UkStep UkSync.
+Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode*/Uk* precedent *)
 Require User.SyncSyms User.SyncInstrs.
 Local Open Scope Z_scope.
 Import Defs.
 
 Section USyncKernel.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId}.
+  Context `{GEN : GenId} `{XI : CurCtx}.
 
   (* NO [Context {CID : CpuId}]: the slot binds the hart itself. *)
 

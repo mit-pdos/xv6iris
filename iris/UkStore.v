@@ -65,6 +65,7 @@ Require Import UserMemCert UserMemArmsBase UserMemArmsC.
 Require Import UmodeMem UmodeCap UmodeFetch.
 Require Import WpUmodeStep WpUmodeStore.
 Require Import ProcPtOwn UserPerm UsysMemOk UexecWp UexecSlot UexecRet UkStep.
+Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode* precedent *)
 Local Open Scope Z_scope.
 Import Defs.
 Set Printing Depth 40.
@@ -319,7 +320,7 @@ End UkStoreExecErr.
 
 Section UkStoreTrapWrap.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* [WpUmodeStore.uv_swp_exec_mem] for an execute that TRAPS: the result is
      an arbitrary non-[ExecuteAs] [er] and the byte map does not move (a
@@ -393,7 +394,7 @@ End UkStoreTrapWrap.
 
 Section UkStorePostFetch.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   (* ------------------------------------------------------------------- *)
@@ -1003,7 +1004,7 @@ End UkStorePostFetch.
 
 Section UkStoreObl.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
   (* ------------------------------------------------------------------- *)
@@ -1320,7 +1321,7 @@ End UkStoreObl.
 
 Section UkStore.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
           (π : gmap (mword 27) uperm) (sz : Z).
   Hypothesis (Hlo : loop_ok C pt) (Hpm : perm_of (ud_um pt) sz = π).
