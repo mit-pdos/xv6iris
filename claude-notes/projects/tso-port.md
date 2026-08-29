@@ -4333,3 +4333,10 @@ move — §0.27′'s `U` parameter and its ~160-site cost are SUPERSEDED.
 in the caller's bundle; the park side uses the scheduler token found
 in the target record.  `ctx_park`/`ctx_resume` on a nat stamp retire.
 Build order in tso-machine-flip.md A6.127.
+
+0.42′ REFINEMENT (same day, by measurement -- tso-machine-flip.md A6.127
+§5): the relatum of a fresh park is a fresh STAMPED "park box" the
+scheduler carries and makes the lock's context at release, not the
+scheduler's running context -- same protocol, no watermark ghost, no
+change to `own_context`/`ctx_dom`.  The scheduler contexts still never
+park.

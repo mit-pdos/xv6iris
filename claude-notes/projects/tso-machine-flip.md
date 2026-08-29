@@ -16271,3 +16271,46 @@ a no-op round).  Step B: the watermark ghost in `ctx_at`/`own_context`/
 the scheduler chain.  Step F: certify a round, pull-vo, mirror, snapshot,
 notes, handoff; then hand the vocabulary to the main-branch agent.
 Zero admits at every step; measure before each.
+
+### §5. CORRECTED BY MEASUREMENT before building (2026-08-29): the PARK BOX, not a watermark ghost
+
+Measuring §2 against `TsoCtx` (`own_context_def`, `ctx_dom_def`, the 39
+unfold sites, `ctx_morph_pointsto`'s update-free proof) showed the
+watermark-ghost shape needs MORE than §2 says: the park-form arm of the
+link ("W under ξsched's watermark") is resumable only on the parking
+hart, so a total resume rule needs a hart PIN on the scheduler contexts
+(a `CtxId` field + an `own_context` invariant + a `pin = None` premise on
+every migratable park -- a fact no proc thread holds).  A strictly smaller
+construction gives the same protocol:
+
+- **The relatum of a fresh park is a fresh STAMPED context, the "park
+  box" `ξp`** (`ctx_parked_alloc`, pure), whose stamp is raised past the
+  parker's `max(K, W)` for free (no hart).  The link is
+  `∃ T, ctx_parked XIp T ∗ ctx_floor ξp T` -- today's token plus a floor.
+- The scheduler CARRIES the box (it never parks its own context) and at
+  `release(&p->lock)` makes the box the lock's context: `lock_pay R` with
+  `ξ := ξp`, the rest of the payload deposited into it by `ctx_deposit`.
+  The release spec gains an input-side finisher (`lock_finisher_in`:
+  prelude `own_context cur_ctx ==∗ own_context cur_ctx ∗ Pay`, the caller
+  having closed over its own material) and the old `R cur_ctx` tier
+  becomes its corollary.  Only sites that CREATE a record use it: the
+  scheduler after a park, kfork/allocproc/userinit for the child (their
+  `park_cap`/`forkret_park` conclusions produce the record AT A BOX,
+  `∃ ξb T, ctx_parked ξb T ∗ ▷ proc_ctx ξb γs pa`); wakeup/kill hand back
+  what acquire gave them.
+- Acquire is unchanged: `ctx_absorb_lb` morphs `R ξp → R cur_ctx`; the
+  link's transport under the `▷` is `ctx_floor_dom` with the `◇` trick
+  (`bi.later_exist` pulls `T` out, a timeless `▷ ctx_floor` is
+  `▷ False ∨ ctx_floor`, and the `▷ False` arm proves any later).
+- Resume in swtch: `own_context_floor_view` (`T ≤ K`) + the existing
+  `ctx_resume`.  Pinned records hold `own_context (CID := h) XIp` outright.
+
+So `TsoCtx.v` is NOT touched (no whole-tree rebuild): the new laws go in a
+new file `TsoCtxPark.v` after the `TsoCtxAbsorbLb` precedent -- `ctx_park_box`
+(park into a box), `ctx_parked_raise` (a stamped context's stamp raised at
+an `llb`), `ctx_resume_floor`, `ctx_floor_dom_later` (the `◇` trick), and
+the `CtxMorph` instance for a `▷`-guarded floored record.  §2's "watermark
+ghost" and "relative `ctx_parked ξ ξr`" are WITHDRAWN; §3–§4 stand with
+`valid_context P A c p ξ` (ξ = the payload's context; `A = None` holds
+the link, `A = Some h` the running token) and the box threading through
+`SpecSwtch`'s record hand-over and `SchedCtx.p_sched`.
