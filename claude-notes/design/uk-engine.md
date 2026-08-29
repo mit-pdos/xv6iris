@@ -189,3 +189,51 @@ continuation.  `USyncKernel.sync_uexec_slot` is `uslot_ukc` plus
   PROJECTION (uvmcopy copies flags leaf for leaf, at a new size equal to
   the old one).
 - exec-success: `cond_entry_slot` at the new `uvis_of U'`.
+
+## The TSO context (`CurCtx`), as this tier meets it
+
+Measured 2026-08-29, rebasing this work onto main after the TSO-readiness
+slices landed.  `main-tso-readiness.md` §5.2 SKIPPED the U tier on purpose
+(port ruling §0.37′): "main's own user-mode WP rework lands first; the
+context-ownership home for that tier is deliberately undecided".  This is
+the measurement that decision was waiting on.
+
+**The contract tier needs NO context.**  A full build put exactly ONE file
+in error: everything stating the user/kernel contract — `UexecRet.v`
+(`uslot`, `uexec_ret`, `ukont`, `ukb`, `uvb`, `trapped_machine`, `ukc`),
+`UserPerm.v`, `UsysMemOk.v`, `UsysMemOkSpec.v`, `TfUser.v`, `UexecRound.v`,
+`UexecSlot.v` — compiles against the context-bearing tree UNCHANGED.  The
+statements a verified program is written against are context-free, and
+nothing in them had to move.
+
+**The ENGINE binds it ambiently, and that is the whole adaptation.**
+`UkStep.v` / `UkLeaf.v` / `UkStore.v` / `UkSync.v` apply `WpUmodeStep`'s
+Sail-facing lemmas, which upstream gave the ambient binder, so each
+section gains `` `{XI : CurCtx}`` beside its `GenId`/`CpuId` — exactly the
+treatment upstream gave the parallel `WpUmode*` files, no statement
+changed (Rocq discharges a section variable only into the definitions that
+USE it, so the context-free statements stay context-free).  The binder
+then propagates along two dependency edges and stops: `USyncKernel`
+(`sync_uexec_slot` APPLIES an engine lemma though its own statement
+`⊢ uslot W` names no context) and `UexecCond` (which applies that).
+Nothing else consumes them yet — milestone J's loop will be the first.
+
+**Why ambient and not upstream's dummy.**  Upstream closed the OLD
+`sync_uexec_slot`'s shelved context goal with
+`Unshelve. exact (TsoCtx.MkCtxId inhabitant inhabitant)`.  This tier binds
+the context in the SECTION instead, so the lemma is `∀ XI, … ⊢ uslot W`
+and the slot is proved at the context the CALLER actually holds.  Equal
+strength today (the statement never mentions `XI`, and `CurCtx` is
+inhabited), but it is the shape that survives the cutover — a fabricated
+context id inside the one lemma that hands a verified program to the
+kernel is exactly what would have to be unpicked when the U tier's
+ownership home is decided.
+
+**STILL THE OWNER'S, AND UNPREJUDICED BY THE ABOVE**: whether the U-mode
+bundle should itself OWN a context (an `own_context cur_ctx` conjunct in
+`uvb`, the way `sie_cap_gpr` carries one kernel-side — TsoCtx ruling 2).
+Binding ambiently threads the context; it does not claim one.  The
+engine's own precedent argues the ambient reading is right —
+`WpUmodeStep`'s `UvStepEngine` binds `CurCtx` with NO `CpuId` and says
+why: "a user excursion is not a change of thread, so the hart may migrate
+under the engine while `cur_ctx` does not move".

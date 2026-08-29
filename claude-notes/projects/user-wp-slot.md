@@ -41,6 +41,32 @@ at the sanctioned 13 assumptions, tracked dumps unchanged):
   banner at its definition; §2 has the price of deleting it and why
   the owner shelved that.
 
+## §0a REBASED ONTO THE TSO-READY MAIN (2026-08-29)
+
+This work was cut before the TSO-readiness slices landed on `main` and
+was rebased over them (42 commits, ~970 files: the ambient `CurCtx`
+vocabulary, the lock/memory context twins, the TSO integration rounds).
+What a successor needs to know:
+
+- **The textual rebase touched 7 files, 27 hunks, one shape.**  Upstream
+  appends `` `{XI : CurCtx}`` to binder lists; this work's S4 re-typed the
+  same lines (the residue's `ustate` index).  Every resolution is the
+  UNION, and the check that it was done right is per file:
+  `grep -c "XI : CurCtx"` must equal `git show origin/main:<file> | grep -c`.
+- **The adaptation is one ambient binder per engine section, nothing
+  else** — the measurement, and the reason it matters to the OTHER lane,
+  are in `../design/uk-engine.md` §"The TSO context (`CurCtx`), as this
+  tier meets it".  Short version: the contract tier is context-free and
+  compiled unchanged; only the engine (`Uk*`) and the two lemmas applying
+  it (`USyncKernel.sync_uexec_slot`, `UexecCond.cond_entry_slot`) bind it.
+- **Tell the TSO lane.**  `main-tso-readiness.md` §5.2 deferred the U tier
+  (§0.37′) explicitly waiting on THIS work, and §9 asks that U-mode files
+  be reported to the owner rather than converted unilaterally.  The
+  deferred question — whether `uvb` should OWN a context — is still open
+  and is NOT prejudged by the ambient binding.
+- Milestone J now lands on a tree where the trap loop's own files already
+  carry `CurCtx`; J's edits to them must preserve it (same union rule).
+
 ## §0 Operating rules (hard-won; violating these cost real time)
 
 - Builds run on the GCP VM (`claude-notes/remote-build-gcp.md`) with
