@@ -46,6 +46,7 @@ Require Import UserPtTree UserFrame UserExec.
 Require Import UmodeMem UmodeAbi.
 Require Import UCodeSync.
 Require Import UserPerm UsysMemOk UexecWp UexecSlot UexecRet UkSync USyncKernel.
+Require Import UkAbi.   (* [uk_xpage] / [uk_stack]: the generic key-level layout facts *)
 Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode*/Uk* precedent *)
 Require User.SyncSyms User.SyncInstrs.
 Local Open Scope Z_scope.
