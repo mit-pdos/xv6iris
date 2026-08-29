@@ -26,7 +26,7 @@ Require Import RegFile.
 Require Import RiscvExtras.
 Require Import StackOwn CalleeSaved.
 Require Import WpSconfMem.
-Require Import VirtioModel DiskPtsto DiskInv.
+Require Import VirtioModel DiskPtsto DiskInv DiskAvail.
 Require Import SpecFreeDesc.
 Require Import SpecVirtioDiskRw.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -537,7 +537,8 @@ Section VdrwbDefs.
      ([∗ map] p ↦ v ∈ fl, flight_res γ p v) ∗
      ([∗ map] p ↦ v ∈ pk, parked_res γ pav p v) ∗
      free_bundles pd fr ∗
-     ring_slots_res pav (mod8 (dom fl)))%I.
+     ring_slots_res pav (mod8 (dom fl)) ∗
+     avail_half pav np)%I.
 
   Lemma vdrw_body_close (γ : disk_names) (pd pav pu : mword 64)
       (np nr : nat) (fl pk : gmap nat dclaim)

@@ -96,6 +96,7 @@ Require Import KvmSpec.
 Require Import VirtioModel.
 Require Import DiskPtsto.
 Require Import VirtioProto.
+Require Import DiskAvail.
 Require Import WpUart.
 Require Import IntrDefs.
 Require Import RegFile HartTp.
@@ -173,6 +174,9 @@ Definition vdi_post
        the persistent [lock_name], ready to be sealed into [is_lock]. *)
     lock_name disk_lock "virtio_disk"%string -∗
     WpLock.lk_cpu_ready disk_lock -∗
+    (* A6.124: the vdisk_lock payload's half of the avail-index word, with
+       its floors -- the boot creator's arm (DiskAvail.v) *)
+    avail_half pav 0%nat -∗
     WP (Loop : expr riscv_lang))%I.
 Global Typeclasses Opaque vdi_post.
 

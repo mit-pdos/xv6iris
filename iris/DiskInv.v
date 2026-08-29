@@ -41,6 +41,7 @@ Require Import VirtioModel.
 Require Import VirtioQueue.
 Require Import DiskPtsto.
 Require Import VirtioProto.
+Require Import DiskAvail.
 Require Import Xv6Cameras.
 Require Import KptPt.
 Require Import KMap.
@@ -437,7 +438,12 @@ Section DiskInv.
           (if fr i then free_slot_res pd i else emp)) ∗
        (* unclaimed avail-ring cells: only FLIGHT positions' ring entries are
           away (in the lease); a parked one's came back at interrupt time *)
-       ring_slots_res pav (mod8 (dom fl)))%I.
+       ring_slots_res pav (mod8 (dom fl)) ∗
+       (* A6.124: the holder's HALF of the avail-index word, stamps exposed,
+          floors beside them -- what a holder reads with and what the
+          publish store re-mints (DiskAvail.v).  LAST, so every destructuring
+          pattern in the tree is a one-name change. *)
+       avail_half pav np)%I.
 
   (* the publisher's claim on its own position *)
   Definition disk_claim (γ : disk_names) (p : nat) (v : dclaim) : iProp Σ :=
@@ -911,7 +917,8 @@ Section DiskResAt.
   Proof.
     rewrite /disk_res_at /disk_res. ctx_morph_solve.
     all: first [ apply flight_res_morph | apply parked_res_morph
-               | apply free_slot_res_morph | apply ring_slots_res_morph ].
+               | apply free_slot_res_morph | apply ring_slots_res_morph
+               | apply avail_half_morph | apply WpLock.lk_floor_morph ].
   Qed.
 End DiskResAt.
 

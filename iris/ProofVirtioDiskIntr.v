@@ -44,7 +44,7 @@ Require Import CpuOwn SchedCtx FdSlots.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import MinstretInv.
 Require Import WpSmodeHalf.
-Require Import VirtioQueue DiskPtsto VirtioProto DiskInv.
+Require Import VirtioQueue DiskPtsto VirtioProto DiskInv DiskAvail.
 Require Import VirtioModel.
 Require Import WpVirtioDev.
 Require Import WpUart.
@@ -974,7 +974,8 @@ Section VtLoopSeam.
      ([∗ map] p ↦ v ∈ fl, flight_res γ p v) ∗
      ([∗ map] p ↦ v ∈ pk, parked_res γ pav p v) ∗
      free_bundles pd fr ∗
-     ring_slots_res pav (mod8 (dom fl)))%I.
+     ring_slots_res pav (mod8 (dom fl)) ∗
+     avail_half pav np)%I.
 
   Lemma disk_res_at_elim `{XI : CurCtx} (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64) :
     disk_res γ pd pav pu -∗

@@ -478,6 +478,7 @@ WpAmo.v
 CodeHolding.v
 CodeAcquire.v
 WpLock.v
+DiskAvail.v
 WpLockAt.v
 ArrCursor.v
 FdSlots.v

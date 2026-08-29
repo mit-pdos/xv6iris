@@ -124,7 +124,7 @@ Require Import KptPt KMap.
 Require Import ByteBuf.
 Require Import VirtioModel VirtioQueue.
 Require Import DiskPtsto VirtioProto DiskInv WpUart WpVirtioDev.
-Require Import DiskBoot.
+Require Import DiskBoot DiskAvail.
 Require Import WpMemsetPage.
 Require Import CodeVirtioDiskInit.
 Require Import SpecInitlock SpecKalloc SpecMemset SpecVirtioDiskInit.
@@ -528,7 +528,7 @@ Section VdiLeaves.
     sie_cap_gpr KT1 m n false p -∗
     pc_is pc -∗ instr pc rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
     disk_inv γv -∗ disk_cfg_is γv (DfracOwn (1/2)) c -∗
-    phys_word2 (avail_idx_pa (virtio_init_cfg pd pav pu)) (wrap16 0%nat) -∗
+    avail_lease_half (virtio_init_cfg pd pav pu) 0%nat -∗
     phys_list pu (replicate 4096 byte_zero) -∗
     ( sie_cap_gpr KT1 m n false p -∗
       pc_is (add_vec_int pc (if rvc then 2 else 4)) -∗
@@ -549,7 +549,7 @@ Section VdiLeaves.
     iIntros "Hcg Hpc Hinstr #Hdinv Hvc Hidx Hpage Hcont".
     iApply (wp_sw_virtio_dinv_s_sconf (CID:=CID) γv pc rvc rs2 rs1 imm m n
               (disk_cfg_is γv (DfracOwn (1/2)) c ∗
-               phys_word2 (avail_idx_pa (virtio_init_cfg pd pav pu)) (wrap16 0%nat) ∗
+               avail_lease_half (virtio_init_cfg pd pav pu) 0%nat ∗
                phys_list pu (replicate 4096 byte_zero))%I
               (disk_pub γv 0%nat ∗ disk_cfg γv (virtio_init_cfg pd pav pu))%I
               ltac:(rewrite Ha8; exact Hr)
@@ -2484,7 +2484,14 @@ Section ProofVirtioDiskInit.
     iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm Hcg]".
     iDestruct (vdi_avail_split pav with "Hbpav") as "[Hidx Hbpavr]".
     iDestruct (vdi_dma_disj pd pav pu with "Hidx Hbpu") as %Hdmadisj.
-    iDestruct (vdi_idx_phys pd pav pu Hpavv with "Hkm Hidx") as "Hidxp".
+    (* A6.124: the index word leaves the tower as HALVES -- the lease's and
+       the payload's, the latter with its floors *)
+    iApply fupd_wp.
+    iMod (avail_split_init pd pav pu
+            ltac:(intros j Hj; rewrite pa_add_add;
+                  exact (vdi_page_static pav Hpavv (2 + j)%nat ltac:(lia)))
+            with "Hkm Hidx") as "[Hidxp Havh]".
+    iModIntro.
     iDestruct (vdi_used_phys pu Hpuv with "Hkm Hbpu") as "Hpup".
     iApply (wp_vdi_flip γv (mword_of_int (KernelSyms.virtio_disk_init + 0x170)) false (mword_of_int 18 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 112 : mword 12)
               H13 (K - 4)%nat Q14 pd pav pu (mword_of_int 0x10001070) 112 (Z_to_bv 32 15 : mword 32) pp ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
@@ -2700,7 +2707,7 @@ Section ProofVirtioDiskInit.
        chain the proofmode re-traverses at every context split. *)
     iEval (rewrite /vdi_post) in "Hcont".
     iApply ("Hcont" $! P5 pd pav pu with
-      "Hcg Hcpu Hpc [%] [%] [%] [%] Henv Hpub Hcfgp Hbpd Hbpavr Hdesc Havail Hused Hfree Hlk Hlnm Hcp").
+      "Hcg Hcpu Hpc [%] [%] [%] [%] Henv Hpub Hcfgp Hbpd Hbpavr Hdesc Havail Hused Hfree Hlk Hlnm Hcp Havh").
     { try iPureIntro. unfold callee_saved.
       split. { rewrite /P5 upd_eq. exact Hwv. }
       split. { rewrite /P5 upd_ne; [| reg_neq]. rewrite /P4 upd_ne; [| reg_neq].

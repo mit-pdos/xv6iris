@@ -45,7 +45,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes RiscvPtsto.
 Require Import ByteBuf.
 Require Import PageGeom.
-Require Import VirtioModel VirtioQueue DiskPtsto VirtioProto DiskInv.
+Require Import VirtioModel VirtioQueue DiskPtsto VirtioProto DiskInv DiskAvail.
 Require Import SpecVirtioDiskInit.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 From Kernel Require KernelSyms.
@@ -343,10 +343,12 @@ Section DiskBoot.
     (* --- ...and the two ghosts [disk_ghosts_alloc] minted at power-on --- *)
     disk_done_lb γ 0%nat -∗
     ghost_map_auth (dn_claim γ) 1 (∅ : gmap nat dclaim) -∗
+    (* A6.124: the payload's half of the avail-index word, out of the init *)
+    avail_half pav 0%nat -∗
     disk_res γ pd pav pu.
   Proof.
     intro Hal. destruct (init_cfg_pages_aligned pd pav pu Hal) as [Hpd Hpav].
-    iIntros "Hpub Hdesc Havail Hfree Huidx Hraw Hlb Hclaim".
+    iIntros "Hpub Hdesc Havail Hfree Huidx Hraw Hlb Hclaim Havh".
     iDestruct (desc_page_entries pd Hpd with "Hdesc") as "Hde".
     iDestruct (avail_page_ring pav Hpav with "Havail") as "Hring".
     iDestruct (free_bundles_boot pd with "Hfree Hde Hraw") as "Hfb".
@@ -373,7 +375,7 @@ Section DiskBoot.
     iFrame "Hpub Hlb Hclaim Huidx".
     assert (Hm8 : mod8 (∅ : gset nat) = ∅) by (rewrite /mod8; set_solver).
     rewrite Hm8.
-    iFrame "Hfb Hring".
+    iFrame "Hfb Hring Havh".
   Qed.
 
 End DiskBoot.

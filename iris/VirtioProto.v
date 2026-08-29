@@ -33,6 +33,7 @@
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var mono_nat invariants.
+From iris.bi.lib Require Import fractional.
 From iris.program_logic Require Import weakestpre.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -1106,6 +1107,334 @@ Section VirtioProto.
     iIntros "Hmm". iDestruct ("Hback" with "Hmm") as "Hd". rewrite Hun. iFrame "Hd".
   Qed.
 
+  (* ==================================================================== *)
+  (* A6.124: THE LEASE WITH A HOLE, and the ledger cell's halves.          *)
+  (*                                                                      *)
+  (* The avail-index word is written only by lock holders and read only   *)
+  (* by lock holders, so its floor (§0.35′(iv) case 3) belongs in the     *)
+  (* LOCK PAYLOAD, not in the device invariant: the payload holds HALF of *)
+  (* each of its two ledger cells with the stamp exposed and the floor    *)
+  (* beside it ([DiskInv]), and a holder reads with its own half -- no    *)
+  (* invariant opened.  The lease keeps the other half, so the device's   *)
+  (* view of the word ([dma_agree]) and the publisher's full cell (join   *)
+  (* the halves inside the store) are both still there.                   *)
+  (*                                                                      *)
+  (* So the lease resource has a HOLE at the avail word: [dma_own_x dma D]*)
+  (* is [dma_own] over [dma] minus the addresses in [D].  The PURE map    *)
+  (* [dma] is unchanged -- every [vproto_ok]/[vproto_ctl] fact stands --  *)
+  (* and each carve lemma keeps its shape, plus one premise: the carved   *)
+  (* range avoids the hole (all of them do, by [vproto_ok]'s standing     *)
+  (* facts).                                                              *)
+  (* ==================================================================== *)
+  Lemma phys_ledger_at_halves (a : Arch.pa) (v : bv 8) (t : nat) :
+    phys_ledger_at a (DfracOwn 1) v t ⊣⊢
+    phys_ledger_at a (DfracOwn (1/2)) v t ∗ phys_ledger_at a (DfracOwn (1/2)) v t.
+  Proof.
+    rewrite /phys_ledger_at /phys_pointsto.
+    rewrite (fractional_half (pointsto (L := Arch.pa) (V := bv 8) a (DfracOwn 1) v)).
+    rewrite (fractional_half (a ↪[ts_name] (t, TsoMemPa.ts_pay_none))).
+    iSplit.
+    - iIntros "(([Hp1 Hp2] & %Hr) & [Ht1 Ht2])".
+      iSplitL "Hp1 Ht1"; iFrame; by iPureIntro.
+    - iIntros "[([Hp1 %Hr] & Ht1) ([Hp2 _] & Ht2)]". iFrame. by iPureIntro.
+  Qed.
+
+  Lemma phys_ledger_at_agree (a : Arch.pa) (dq1 dq2 : dfrac) (v1 v2 : bv 8)
+      (t1 t2 : nat) :
+    phys_ledger_at a dq1 v1 t1 -∗ phys_ledger_at a dq2 v2 t2 -∗
+    ⌜v1 = v2 ∧ t1 = t2⌝.
+  Proof.
+    rewrite /phys_ledger_at /phys_pointsto.
+    iIntros "([Hp1 _] & Ht1) ([Hp2 _] & Ht2)".
+    iDestruct (pointsto_agree with "Hp1 Hp2") as %Hv.
+    iDestruct (ghost_map_elem_agree with "Ht1 Ht2") as %Ht.
+    iPureIntro. split; [exact Hv | by injection Ht].
+  Qed.
+
+  (* an exposed half meets the lease's sealed half: the same cell *)
+  Lemma phys_ledger_at_join_sealed (a : Arch.pa) (v v' : bv 8) (t : nat) :
+    phys_ledger_at a (DfracOwn (1/2)) v t -∗ phys_ledger a (DfracOwn (1/2)) v' -∗
+    ⌜v' = v⌝ ∗ phys_ledger_at a (DfracOwn 1) v t.
+  Proof.
+    iIntros "H1 H2". rewrite phys_ledger_unseal /phys_ledger_def.
+    iDestruct "H2" as (t') "H2".
+    iAssert (phys_ledger_at a (DfracOwn (1/2)) v' t') with "[H2]" as "H2".
+    { rewrite /phys_ledger_at. iExact "H2". }
+    iDestruct (phys_ledger_at_agree a (DfracOwn (1/2)) (DfracOwn (1/2)) v v' t t'
+                 with "H1 H2") as %[<- <-].
+    iSplitR; [done|]. rewrite phys_ledger_at_halves. iFrame "H1 H2".
+  Qed.
+
+  (* ---- the pure filter algebra ---------------------------------------- *)
+  Lemma map_filter_sub_of_disj (mm dma : gmap Arch.pa (bv 8)) (D : gset Arch.pa) :
+    mm ⊆ dma -> dom mm ## D ->
+    mm ⊆ filter (fun p : Arch.pa * bv 8 => p.1 ∉ D) dma.
+  Proof.
+    intros Hsub Hd. rewrite elem_of_disjoint in Hd.
+    rewrite map_subseteq_spec in Hsub. apply map_subseteq_spec.
+    intros a b Hab.
+    apply map_lookup_filter_Some_2; [by apply Hsub|].
+    cbn. intro Hc. apply (Hd a); [|exact Hc]. apply elem_of_dom. by exists b.
+  Qed.
+
+  Lemma map_filter_union_notin (mm dma : gmap Arch.pa (bv 8)) (D : gset Arch.pa) :
+    dom mm ## D ->
+    filter (fun p : Arch.pa * bv 8 => p.1 ∉ D) (mm ∪ dma)
+    = mm ∪ filter (fun p : Arch.pa * bv 8 => p.1 ∉ D) dma.
+  Proof.
+    intro Hd. rewrite elem_of_disjoint in Hd. apply map_eq. intro a.
+    destruct (mm !! a) as [b|] eqn:Hm.
+    - assert (Ha : a ∉ D).
+      { intro Hc. apply (Hd a); [|exact Hc]. apply elem_of_dom. by exists b. }
+      rewrite (lookup_union_Some_l _ _ _ _ Hm).
+      apply map_lookup_filter_Some_2; [|cbn; exact Ha].
+      by rewrite (lookup_union_Some_l _ _ _ _ Hm).
+    - rewrite (lookup_union_r _ _ _ Hm).
+      destruct (filter (fun p : Arch.pa * bv 8 => p.1 ∉ D) dma !! a) as [b|] eqn:Hf.
+      + apply map_lookup_filter_Some in Hf as [Hdm Ha].
+        apply map_lookup_filter_Some_2; [|exact Ha].
+        by rewrite (lookup_union_r _ _ _ Hm).
+      + apply map_lookup_filter_None.
+        apply map_lookup_filter_None in Hf as [Hn | Hp].
+        * left. by rewrite (lookup_union_r _ _ _ Hm).
+        * right. intros b Hb. rewrite (lookup_union_r _ _ _ Hm) in Hb.
+          exact (Hp b Hb).
+  Qed.
+
+  Lemma map_filter_union_in (rm dma : gmap Arch.pa (bv 8)) (D : gset Arch.pa) :
+    dom rm ⊆ D ->
+    filter (fun p : Arch.pa * bv 8 => p.1 ∉ D) (rm ∪ dma)
+    = filter (fun p : Arch.pa * bv 8 => p.1 ∉ D) dma.
+  Proof.
+    intro Hsub. apply map_eq. intro a.
+    destruct (rm !! a) as [b|] eqn:Hr.
+    - assert (Ha : a ∈ D) by (apply Hsub, elem_of_dom; by exists b).
+      assert (HL : filter (fun p : Arch.pa * bv 8 => p.1 ∉ D) (rm ∪ dma) !! a = None).
+      { apply map_lookup_filter_None. right. intros x _. cbn. intro Hc. exact (Hc Ha). }
+      assert (HR : filter (fun p : Arch.pa * bv 8 => p.1 ∉ D) dma !! a = None).
+      { apply map_lookup_filter_None. right. intros x _. cbn. intro Hc. exact (Hc Ha). }
+      by rewrite HL HR.
+    - rewrite map_lookup_filter (lookup_union_r _ _ _ Hr). by rewrite map_lookup_filter.
+  Qed.
+
+  Lemma map_filter_difference_l (m n : gmap Arch.pa (bv 8)) (D : gset Arch.pa) :
+    filter (fun p : Arch.pa * bv 8 => p.1 ∉ D) (m ∖ n)
+    = filter (fun p : Arch.pa * bv 8 => p.1 ∉ D) m ∖ n.
+  Proof.
+    apply map_eq. intro a.
+    destruct (n !! a) as [c|] eqn:Hn.
+    - assert (HL : filter (fun p : Arch.pa * bv 8 => p.1 ∉ D) (m ∖ n) !! a = None).
+      { apply map_lookup_filter_None. left. apply lookup_difference_None. right. by exists c. }
+      assert (HR : (filter (fun p : Arch.pa * bv 8 => p.1 ∉ D) m ∖ n) !! a = None).
+      { apply lookup_difference_None. right. by exists c. }
+      by rewrite HL HR.
+    - destruct (m !! a) as [b|] eqn:Hm.
+      + assert (Hd : (m ∖ n) !! a = Some b) by (apply lookup_difference_Some; by split).
+        destruct (decide (a ∈ D)) as [HaD | HaD].
+        * assert (HL : filter (fun p : Arch.pa * bv 8 => p.1 ∉ D) (m ∖ n) !! a = None).
+          { apply map_lookup_filter_None. right. intros x _. cbn. intro Hc. exact (Hc HaD). }
+          assert (HR : (filter (fun p : Arch.pa * bv 8 => p.1 ∉ D) m ∖ n) !! a = None).
+          { apply lookup_difference_None. left. apply map_lookup_filter_None. right.
+            intros x _. cbn. intro Hc. exact (Hc HaD). }
+          by rewrite HL HR.
+        * assert (HL : filter (fun p : Arch.pa * bv 8 => p.1 ∉ D) (m ∖ n) !! a = Some b)
+            by (apply map_lookup_filter_Some_2; [exact Hd | cbn; exact HaD]).
+          assert (HR : (filter (fun p : Arch.pa * bv 8 => p.1 ∉ D) m ∖ n) !! a = Some b).
+          { apply lookup_difference_Some. split; [|exact Hn].
+            apply map_lookup_filter_Some_2; [exact Hm | cbn; exact HaD]. }
+          by rewrite HL HR.
+      + assert (HL : filter (fun p : Arch.pa * bv 8 => p.1 ∉ D) (m ∖ n) !! a = None).
+        { apply map_lookup_filter_None. left. apply lookup_difference_None. by left. }
+        assert (HR : (filter (fun p : Arch.pa * bv 8 => p.1 ∉ D) m ∖ n) !! a = None).
+        { apply lookup_difference_None. left. apply map_lookup_filter_None. by left. }
+        by rewrite HL HR.
+  Qed.
+
+  Lemma dom_filter_notin (dma : gmap Arch.pa (bv 8)) (D : gset Arch.pa) :
+    dom (filter (fun p : Arch.pa * bv 8 => p.1 ∉ D) dma) = dom dma ∖ D.
+  Proof.
+    apply set_eq. intro a. rewrite elem_of_difference !elem_of_dom. split.
+    - intros [b Hb]. apply map_lookup_filter_Some in Hb as [Hb Ha].
+      split; [by exists b | exact Ha].
+    - intros [[b Hb] Ha]. exists b. apply map_lookup_filter_Some_2; [exact Hb | cbn; exact Ha].
+  Qed.
+
+  Lemma map_filter_id_notin (dma : gmap Arch.pa (bv 8)) (D : gset Arch.pa) :
+    dom dma ## D -> filter (fun p : Arch.pa * bv 8 => p.1 ∉ D) dma = dma.
+  Proof.
+    intro Hd. rewrite elem_of_disjoint in Hd. apply map_filter_id.
+    intros a b Hab. cbn. intro Hc. apply (Hd a); [|exact Hc]. apply elem_of_dom. by exists b.
+  Qed.
+
+  (* ---- the holed lease ------------------------------------------------- *)
+  Definition dma_own_x (dma : gmap Arch.pa (bv 8)) (D : gset Arch.pa) : iProp Σ :=
+    dma_own (filter (fun p : Arch.pa * bv 8 => p.1 ∉ D) dma).
+
+  Lemma dma_own_x_of_own (dma : gmap Arch.pa (bv 8)) (D : gset Arch.pa) :
+    dom dma ## D -> dma_own dma -∗ dma_own_x dma D.
+  Proof. intro Hd. rewrite /dma_own_x (map_filter_id_notin dma D Hd). iIntros "$". Qed.
+
+  Lemma dma_own_x_extend (rm dma : gmap Arch.pa (bv 8)) (D : gset Arch.pa) :
+    dom rm ⊆ D -> dma_own_x dma D -∗ dma_own_x (rm ∪ dma) D.
+  Proof. intro H. rewrite /dma_own_x (map_filter_union_in rm dma D H). iIntros "$". Qed.
+
+  Lemma dma_own_x_acc_same (mm dma : gmap Arch.pa (bv 8)) (D : gset Arch.pa) :
+    mm ⊆ dma -> dom mm ## D ->
+    dma_own_x dma D -∗ phys_map mm ∗ (phys_map mm -∗ dma_own_x dma D).
+  Proof.
+    intros Hsub Hd. rewrite /dma_own_x. apply dma_own_acc_same.
+    exact (map_filter_sub_of_disj _ _ _ Hsub Hd).
+  Qed.
+
+  Lemma dma_own_x_acc (mm mm' dma : gmap Arch.pa (bv 8)) (D : gset Arch.pa) :
+    mm ⊆ dma -> dom mm' = dom mm -> dom mm ## D ->
+    dma_own_x dma D -∗ phys_map mm ∗ (phys_map mm' -∗ dma_own_x (mm' ∪ dma) D).
+  Proof.
+    intros Hsub Hdom Hd. rewrite /dma_own_x. iIntros "Hd".
+    iDestruct (dma_own_acc mm mm' _ (map_filter_sub_of_disj _ _ _ Hsub Hd) Hdom
+                 with "Hd") as "[$ Hback]".
+    iIntros "Hmm". iDestruct ("Hback" with "Hmm") as "Hd".
+    rewrite (map_filter_union_notin mm' dma D); [iExact "Hd" | rewrite Hdom; exact Hd].
+  Qed.
+
+  Lemma dma_own_x_shrink (mm dma : gmap Arch.pa (bv 8)) (D : gset Arch.pa) :
+    mm ⊆ dma -> dom mm ## D ->
+    dma_own_x dma D -∗ phys_map mm ∗ dma_own_x (dma ∖ mm) D.
+  Proof.
+    intros Hsub Hd. rewrite /dma_own_x.
+    rewrite (dma_own_split mm _ (map_filter_sub_of_disj _ _ _ Hsub Hd)).
+    rewrite (map_filter_difference_l dma mm D). iIntros "$".
+  Qed.
+
+  Lemma dma_own_x_disj (dma : gmap Arch.pa (bv 8)) (D : gset Arch.pa)
+      (mm : gmap Arch.pa (bv 8)) :
+    dma_own_x dma D -∗ phys_map mm -∗ ⌜dom mm ## dom dma ∖ D⌝.
+  Proof.
+    rewrite /dma_own_x. iIntros "Hd Hm".
+    iDestruct (dma_own_disj with "Hd Hm") as %H.
+    rewrite dom_filter_notin in H. by iPureIntro.
+  Qed.
+
+  Lemma dma_acc_x (w dma : gmap Arch.pa (bv 8)) (D : gset Arch.pa) :
+    dom w ⊆ dom dma -> dom w ## D ->
+    dma_own_x dma D -∗
+    ∃ old : gmap Arch.pa (bv 8), ⌜dom old = dom w⌝ ∗ ⌜old ⊆ dma⌝ ∗
+      ([∗ map] a ↦ b ∈ old, phys_ledger a (DfracOwn 1) b) ∗
+      (([∗ map] a ↦ b ∈ w, phys_ledger a (DfracOwn 1) b) -∗ dma_own_x (w ∪ dma) D).
+  Proof.
+    intros Hdom Hd. rewrite /dma_own_x. iIntros "Hd".
+    assert (Hdom' : dom w ⊆ dom (filter (fun p : Arch.pa * bv 8 => p.1 ∉ D) dma)).
+    { rewrite dom_filter_notin. intros a Ha. apply elem_of_difference.
+      split; [by apply Hdom|]. intro Hc. rewrite elem_of_disjoint in Hd.
+      exact (Hd a Ha Hc). }
+    iDestruct (dma_acc w _ Hdom' with "Hd") as (old) "(%Hdo & %Hos & Hold & Hback)".
+    iExists old. iSplitR; [done|]. iSplitR.
+    { iPureIntro. etransitivity; [exact Hos | apply map_filter_subseteq]. }
+    iFrame "Hold". iIntros "Hnew". iDestruct ("Hback" with "Hnew") as "Hd".
+    rewrite (map_filter_union_notin w dma D Hd). iExact "Hd".
+  Qed.
+
+  Lemma dma_agree_x (m dma : gmap Arch.pa (bv 8)) (D : gset Arch.pa) :
+    gen_heap_interp m -∗ dma_own_x dma D -∗
+    ⌜filter (fun p : Arch.pa * bv 8 => p.1 ∉ D) dma ⊆ m⌝.
+  Proof. rewrite /dma_own_x. apply dma_agree. Qed.
+
+  (* ---- the avail word's lease half ------------------------------------ *)
+  Definition avail_lease_half (c : virtio_cfg) (np : nat) : iProp Σ :=
+    ([∗ list] j ∈ seq 0 2,
+       phys_ledger (pa_add (avail_idx_pa c) j) (DfracOwn (1/2))
+         (nth_byte (wrap16 np) j))%I.
+
+  Lemma avail_half_agree (m : gmap Arch.pa (bv 8)) (c : virtio_cfg) (np : nat) :
+    gen_heap_interp m -∗ avail_lease_half c np -∗ ⌜avail_idx_bytes c np ⊆ m⌝.
+  Proof.
+    iIntros "Hm H". rewrite /avail_lease_half avail_idx_bytes_range.
+    iAssert (⌜forall j, (j < 2)%nat ->
+               m !! pa_add (avail_idx_pa c) j = Some (nth_byte (wrap16 np) j)⌝)%I
+      with "[Hm H]" as %HH.
+    { rewrite bi.pure_forall. iIntros (j). rewrite bi.pure_impl. iIntros (Hj).
+      iDestruct (big_sepL_lookup _ _ j j with "H") as "Hj";
+        [apply lookup_seq; split; lia|].
+      iDestruct (phys_ledger_forget with "Hj") as "Hp". rewrite /phys_pointsto.
+      iDestruct "Hp" as "[Hp _]". by iDestruct (gen_heap_valid with "Hm Hp") as %?. }
+    iPureIntro. apply range_map_sub; [lia|]. exact HH.
+  Qed.
+
+  (* the whole pure lease sits in memory: the holed part by [dma_agree_x],
+     the hole by its half cells *)
+  Lemma lease_agree (m dma : gmap Arch.pa (bv 8)) (c : virtio_cfg) (np : nat) :
+    avail_idx_bytes c np ⊆ dma ->
+    gen_heap_interp m -∗ dma_own_x dma (avail_idx_dom c) -∗ avail_lease_half c np -∗
+    ⌜dma ⊆ m⌝.
+  Proof.
+    intro Hab. iIntros "Hm Hd Hh".
+    iDestruct (dma_agree_x with "Hm Hd") as %Hx.
+    iDestruct (avail_half_agree with "Hm Hh") as %Ha.
+    iPureIntro. rewrite map_subseteq_spec. intros a b Hab'.
+    destruct (decide (a ∈ avail_idx_dom c)) as [HaD | HaD].
+    - rewrite -(avail_idx_bytes_dom c np) in HaD. apply elem_of_dom in HaD as [b' Hb'].
+      rewrite map_subseteq_spec in Hab. pose proof (Hab a b' Hb') as Hab2.
+      rewrite Hab' in Hab2. injection Hab2 as ->.
+      rewrite map_subseteq_spec in Ha. by apply Ha.
+    - rewrite map_subseteq_spec in Hx. apply Hx.
+      apply map_lookup_filter_Some_2; [exact Hab' | cbn; exact HaD].
+  Qed.
+
+  (* a full window and the half cells do not overlap *)
+  Lemma phys_map_half_disj (mm : gmap Arch.pa (bv 8)) (c : virtio_cfg) (np : nat) :
+    phys_map mm -∗ avail_lease_half c np -∗ ⌜dom mm ## avail_idx_dom c⌝.
+  Proof.
+    iIntros "Hm H". rewrite /phys_map /avail_lease_half.
+    iAssert (⌜forall a, a ∈ dom mm -> a ∈ avail_idx_dom c -> False⌝)%I
+      with "[Hm H]" as %HH.
+    { rewrite bi.pure_forall. iIntros (a). rewrite !bi.pure_impl. iIntros (Ha Hb).
+      apply elem_of_dom in Ha as [b Hb'].
+      apply pa_range_elim in Hb as (j & Hj & ->).
+      iDestruct (big_sepM_lookup _ _ _ _ Hb' with "Hm") as "Ha".
+      iDestruct (big_sepL_lookup _ _ j j with "H") as "Hj";
+        [apply lookup_seq; split; lia|].
+      iDestruct (phys_ledger_forget with "Ha") as "Hp1".
+      iDestruct (phys_ledger_forget with "Hj") as "Hp2".
+      iEval (rewrite /phys_pointsto) in "Hp1". iEval (rewrite /phys_pointsto) in "Hp2".
+      iDestruct "Hp1" as "[Hp1 _]". iDestruct "Hp2" as "[Hp2 _]".
+      iDestruct (pointsto_valid_2 with "Hp1 Hp2") as %[Hv _].
+      exfalso. rewrite dfrac_op_own dfrac_valid_own in Hv.
+      exact (Qp.not_add_le_l 1 (1/2)%Qp Hv). }
+    iPureIntro. rewrite elem_of_disjoint. exact HH.
+  Qed.
+
+  Lemma range_disj_avail (c : virtio_cfg) (a : Arch.pa) (n : nat) (f : nat -> bv 8) :
+    (forall j, (j < n)%nat -> pa_add a j ∈ used_page_pas c) ->
+    avail_idx_dom c ## used_page_pas c ->
+    dom (range_map a n f) ## avail_idx_dom c.
+  Proof.
+    intros Hin Hd. rewrite range_map_dom. apply gset_disj_sym.
+    apply (gset_disj_sub_r _ _ (used_page_pas c)); [| exact Hd].
+    intros x Hx. apply pa_range_elim in Hx as (j & Hj & ->). exact (Hin j Hj).
+  Qed.
+
+  Lemma ctl_avail_sub (c : virtio_cfg) (pr : vproto) (dma : gmap Arch.pa (bv 8)) :
+    vproto_ctl c pr ⊆ dma -> avail_idx_bytes c (vp_np pr) ⊆ dma.
+  Proof.
+    intro H. unfold vproto_ctl in H.
+    etransitivity; [ apply map_union_subseteq_l | exact H ].
+  Qed.
+
+  (* a full window is disjoint from the WHOLE pure lease: from the holed
+     resource off the hole, and from the half cells on it *)
+  Lemma lease_disj (dma mm : gmap Arch.pa (bv 8)) (c : virtio_cfg) (np : nat) :
+    dma_own_x dma (avail_idx_dom c) -∗ avail_lease_half c np -∗ phys_map mm -∗
+    ⌜dom mm ## dom dma⌝.
+  Proof.
+    iIntros "Hd Hh Hm".
+    iDestruct (dma_own_x_disj with "Hd Hm") as %H1.
+    iDestruct (phys_map_half_disj with "Hm Hh") as %H2.
+    iPureIntro. rewrite elem_of_disjoint. intros x Hx Hy.
+    destruct (decide (x ∈ avail_idx_dom c)) as [HD|HD].
+    - exact (proj1 (elem_of_disjoint _ _) H2 x Hx HD).
+    - apply (proj1 (elem_of_disjoint _ _) H1 x Hx). apply elem_of_difference. by split.
+  Qed.
+
   (* -- the driver-facing tokens ----------------------------------------- *)
 
   (* the publisher credential: half of the published count.  The other half
@@ -1358,7 +1687,12 @@ Section VirtioProto.
     (if virtio_live (v_cfg v) then
         ∃ (pr : vproto) (dma : gmap Arch.pa (bv 8)),
           disk_cfg γ (v_cfg v) ∗
-          dma_own dma ∗
+          (* A6.124: the lease with a HOLE at the avail-index word, whose two
+             cells the lease holds at HALF -- the other half, with the stamp
+             exposed and the floor beside it, is in the vdisk_lock's payload
+             ([DiskInv.disk_res]); see the kit's header above. *)
+          dma_own_x dma (avail_idx_dom (v_cfg v)) ∗
+          avail_lease_half (v_cfg v) (vp_np pr) ∗
           ⌜vproto_ctl (v_cfg v) pr ⊆ dma⌝ ∗
           ⌜vproto_ok (v_cfg v) pr (dom dma)⌝ ∗
           ⌜virtio_pages_aligned (v_cfg v)⌝ ∗
@@ -1522,24 +1856,27 @@ Section VirtioProto.
     ghost_map_auth (dn_slot γ) 1 (∅ : gmap nat (vslot * gmap Arch.pa (bv 8))) -∗
     mono_nat_auth_own (dn_nc γ) 1 0%nat -∗
     ghost_var (dn_np γ) (1/2) 0%nat -∗
-    phys_word2 (avail_idx_pa c) (wrap16 0) -∗
+    avail_lease_half c 0 -∗
     phys_list (vc_used c) (replicate 4096 byte_zero) -∗
     virtio_proto γ v1.
   Proof.
     intros Hcfg Hlive Hqnum Hal Hdisj Hseen Hui Hwce Hca Htk.
     iIntros "#Hcfgp Hslot Hnc Hnp Hidx Hpage".
     assert (H4k : Z.of_nat 4096 < 18446744073709551616) by (rewrite z4096; lia).
-    rewrite phys_word2_map (phys_list_replicate (vc_used c) 4096 byte_zero H4k).
-    iAssert (dma_own (vinit_dma c)) with "[Hidx Hpage]" as "Hdma".
-    { rewrite /vinit_dma /dma_own.
-      rewrite (big_sepM_union (fun a b => phys_ledger a (DfracOwn 1) b) _ _
-                 (vinit_dma_disj c Hdisj)).
-      iFrame "Hidx Hpage". }
+    rewrite (phys_list_replicate (vc_used c) 4096 byte_zero H4k).
+    iAssert (dma_own_x (vinit_dma c) (avail_idx_dom c)) with "[Hpage]" as "Hdma".
+    { rewrite /vinit_dma. iApply dma_own_x_extend.
+      { rewrite range_map_dom. reflexivity. }
+      iApply dma_own_x_of_own.
+      { rewrite range_map_dom. apply gset_disj_sym. exact Hdisj. }
+      rewrite dma_own_phys_map. iExact "Hpage". }
     rewrite /virtio_proto.
     rewrite Hcfg Hlive.
     iExists vproto0, (vinit_dma c).
     rewrite vp_spins_init.
-    iFrame "Hcfgp Hdma Hslot Hnc Hnp".
+    assert (Hnp0 : vp_np vproto0 = 0%nat) by reflexivity.
+    rewrite Hnp0.
+    iFrame "Hcfgp Hdma Hidx Hslot Hnc Hnp".
     iSplitR; [iPureIntro; apply vinit_dma_ctl|].
     iSplitR.
     { iPureIntro. rewrite vinit_dma_dom.
@@ -1590,7 +1927,7 @@ Section VirtioProto.
        and holding it is what made the driver's knowledge of [v_cfg v0]
        deterministic all the way to this point. *)
     disk_cfg_is γ (DfracOwn (1/2)) (v_cfg v0) -∗
-    phys_word2 (avail_idx_pa (virtio_init_cfg pd pav pu)) (wrap16 0) -∗
+    avail_lease_half (virtio_init_cfg pd pav pu) 0 -∗
     phys_list pu (replicate 4096 byte_zero) -∗
     |==> virtio_proto γ v1 ∗ disk_pub γ 0 ∗
          disk_cfg γ (virtio_init_cfg pd pav pu).
@@ -1746,7 +2083,7 @@ Section VirtioProto.
     iIntros "Hp". rewrite /virtio_proto.
     destruct (virtio_live (v_cfg v)).
     - iDestruct "Hp" as (pr dma)
-        "(_ & _ & _ & _ & _ & _ & _ & _ & %Hwce & _)". done.
+        "(_ & _ & _ & _ & _ & _ & _ & _ & _ & %Hwce & _)". done.
     - iDestruct "Hp" as "(_ & _ & _ & _ & _ & %Hwce & _)". done.
   Qed.
 
@@ -1764,8 +2101,9 @@ Section VirtioProto.
     destruct (virtio_live (v_cfg v)) eqn:Hlive.
     2:{ iPureIntro. exact (virtio_not_live_not_stalled v mv Hlive). }
     iDestruct "Hp" as (pr dma)
-      "(Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx & Hrest)".
-    iDestruct (dma_agree with "Hm Hdma") as %Hsub.
+      "(Hcfg & Hdma & Hah & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx & Hrest)".
+    iDestruct (lease_agree _ _ _ _ (ctl_avail_sub _ _ _ Hctl) with "Hm Hdma Hah")
+      as %Hsub.
     iPureIntro.
     assert (Hctlm : vproto_ctl (v_cfg v) pr ⊆ m)
       by (etransitivity; [exact Hctl | exact Hsub]).
@@ -1832,9 +2170,10 @@ Section VirtioProto.
     { exfalso. rewrite (virtio_req_step_not_live v mv Hlive) in Hstep.
       discriminate. }
     iDestruct "Hp" as (pr dma)
-      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx & %Hwce & %Hwt &
+      "(#Hcfg & Hdma & Hah & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx & %Hwce & %Hwt &
         Hslot & Hnc & Hnp & Hpend & Hdone)".
-    iDestruct (dma_agree with "Hm Hdma") as %Hsub.
+    iDestruct (lease_agree _ _ _ _ (ctl_avail_sub _ _ _ Hctl) with "Hm Hdma Hah")
+      as %Hsub.
     assert (Hctlm : vproto_ctl (v_cfg v) pr ⊆ m)
       by (etransitivity; [exact Hctl | exact Hsub]).
     assert (Hvctl : mem_view (vproto_ctl (v_cfg v) pr) mv)
@@ -1915,7 +2254,12 @@ Section VirtioProto.
     assert (Hdv' : disk_view dmap (v_disk (vslot_post v sl)))
       by (rewrite vslot_post_disk; exact Hdv).
     (* the byte lease and the counters *)
-    iDestruct (dma_acc _ dma HwDdma with "Hdma")
+    assert (Hwav : dom (vslot_writes (v_cfg v) (wrap16 (vp_nc pr)) (v_disk v) sl)
+                   ## avail_idx_dom (v_cfg v)).
+    { apply (gset_disj_sub_r _ _ (dom (vproto_ctl (v_cfg v) pr))); [| exact Hwctl].
+      unfold vproto_ctl. rewrite dom_union_L avail_idx_bytes_dom.
+      apply union_subseteq_l. }
+    iDestruct (dma_acc_x _ dma _ HwDdma Hwav with "Hdma")
       as (old) "(%Hdomold & %Holdsub & Hold & Hdmaback)".
     assert (Hle : (vp_nc pr <= S (vp_nc pr))%nat) by lia.
     iMod (mono_nat_own_update (S (vp_nc pr)) Hle with "Hnc") as "[Hnc _]".
@@ -1982,7 +2326,7 @@ Section VirtioProto.
     iExists (vproto_step_state pr sl),
       (vslot_writes (v_cfg v) (wrap16 (vp_nc pr)) (v_disk v) sl ∪ dma).
     rewrite (vp_spins_step pr sl Hsl) vps_nc vps_np vps_pend vps_done.
-    iFrame "Hcfg Hdma Hslot Hnc Hnp".
+    iFrame "Hcfg Hdma Hah Hslot Hnc Hnp".
     (* the pure conjuncts *)
     iSplitR.
     { iPureIntro. rewrite (vproto_step_ctl (v_cfg v) pr sl).
@@ -2073,9 +2417,10 @@ Section VirtioProto.
     { exfalso. rewrite (virtio_capture_step_not_live v mv Hlive) in Hstep.
       discriminate. }
     iDestruct "Hp" as (pr dma)
-      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx & %Hwce & %Hwt &
+      "(#Hcfg & Hdma & Hah & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx & %Hwce & %Hwt &
         Hslot & Hnc & Hnp & Hpend & Hdone)".
-    iDestruct (dma_agree with "Hm Hdma") as %Hsub.
+    iDestruct (lease_agree _ _ _ _ (ctl_avail_sub _ _ _ Hctl) with "Hm Hdma Hah")
+      as %Hsub.
     assert (Hctlm : vproto_ctl (v_cfg v) pr ⊆ m)
       by (etransitivity; [exact Hctl | exact Hsub]).
     assert (Hvctl : mem_view (vproto_ctl (v_cfg v) pr) mv)
@@ -2106,7 +2451,7 @@ Section VirtioProto.
     rewrite /virtio_proto Hv1.
     cbn [v_cfg v_isr v_seen v_used_idx v_disk v_cache v_taken].
     rewrite Hlive Hce.
-    iExists pr, dma. iFrame "Hcfg Hdma Hslot Hnc Hnp Hdone".
+    iExists pr, dma. iFrame "Hcfg Hdma Hah Hslot Hnc Hnp Hdone".
     iSplitR; [iPureIntro; exact Hctl|].
     iSplitR; [iPureIntro; exact Hok|].
     iSplitR; [iPureIntro; exact Hal|].
@@ -2161,7 +2506,7 @@ Section VirtioProto.
       exfalso. rewrite (virtio_drain_step_empty v s Hca) in Hstep.
       discriminate. }
     iDestruct "Hp" as (pr dma)
-      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx & %Hwce & %Hwt &
+      "(#Hcfg & Hdma & Hah & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx & %Hwce & %Hwt &
         Hslot & Hnc & Hnp & Hpend & Hdone)".
     (* something is cached, so there IS a head request *)
     pose proof (virtio_drain_step_enabled v s v' Hstep) as Hsin.
@@ -2252,7 +2597,7 @@ Section VirtioProto.
     rewrite /virtio_proto Hv1.
     cbn [v_cfg v_isr v_seen v_used_idx v_disk v_cache v_taken].
     rewrite Hlive.
-    iExists pr, dma. iFrame "Hcfg Hdma Hslot Hnc Hnp Hdone".
+    iExists pr, dma. iFrame "Hcfg Hdma Hah Hslot Hnc Hnp Hdone".
     iSplitR; [iPureIntro; exact Hctl|].
     iSplitR; [iPureIntro; exact Hok|].
     iSplitR; [iPureIntro; exact Hal|].
@@ -2288,8 +2633,10 @@ Section VirtioProto.
     ⌜virtio_live (v_cfg v) = true⌝ ∗
     disk_cfg γ (v_cfg v) ∗
     ⌜virtio_pages_aligned (v_cfg v)⌝ ∗
-    phys_word2 (avail_idx_pa (v_cfg v)) (wrap16 np) ∗
-    (phys_word2 (avail_idx_pa (v_cfg v)) (wrap16 np) -∗
+    (* A6.124: the lease's HALF of the word; the holder's own half is in the
+       payload, and that is the one a read uses *)
+    avail_lease_half (v_cfg v) np ∗
+    (avail_lease_half (v_cfg v) np -∗
        virtio_proto γ v ∗ disk_pub γ np).
   Proof.
     iIntros "Hp Hpub". rewrite /virtio_proto /disk_pub.
@@ -2298,24 +2645,14 @@ Section VirtioProto.
       iDestruct (ghost_var_valid_2 with "Hnp Hpub") as %[Hq _].
       exfalso. exact (Qp.not_add_le_l 1 (1/2)%Qp Hq). }
     iDestruct "Hp" as (pr dma)
-      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx & %Hwce & %Hwt &
+      "(#Hcfg & Hdma & Hah & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx & %Hwce & %Hwt &
         Hslot & Hnc & Hnp & Hpend & Hdone)".
     iDestruct (ghost_var_agree with "Hnp Hpub") as %Hnpeq.
-    pose proof (vproto_ctl_idx (v_cfg v) pr (dom dma) Hok) as Hidx0.
-    rewrite Hnpeq in Hidx0.
-    pose proof (read_bytes_mono _ _ _ _ _ Hctl Hidx0) as Hread.
-    assert (Hsub : range_map (avail_idx_pa (v_cfg v)) 2 (nth_byte (wrap16 np))
-                     ⊆ dma).
-    { apply range_map_sub; [lia|]. intros j Hj.
-      apply (read_bytes_spec dma (avail_idx_pa (v_cfg v)) 2 (wrap16 np) Hread).
-      lia. }
-    iDestruct (dma_own_acc_same _ dma Hsub with "Hdma") as "[Hmm Hback]".
-    rewrite !phys_word2_map.
+    iEval (rewrite Hnpeq) in "Hah".
     iSplitR; [done|]. iSplitR; [iExact "Hcfg"|].
     iSplitR; [iPureIntro; exact Hal|].
-    iFrame "Hmm". iIntros "Hmm".
-    iDestruct ("Hback" with "Hmm") as "Hdma".
-    iFrame "Hpub". iExists pr, dma. iFrame "Hcfg Hdma Hslot Hnc Hnp Hpend Hdone".
+    iFrame "Hah". iIntros "Hah". iEval (rewrite -Hnpeq) in "Hah".
+    iFrame "Hpub". iExists pr, dma. iFrame "Hcfg Hdma Hah Hslot Hnc Hnp Hpend Hdone".
     iPureIntro. split_and!; assumption.
   Qed.
 
@@ -2342,8 +2679,11 @@ Section VirtioProto.
     slot_pend_res γ (vs_all sl) sl -∗
     ⌜virtio_live (v_cfg v) = true⌝ ∗
     disk_cfg γ (v_cfg v) ∗
-    phys_word2 (avail_idx_pa (v_cfg v)) (wrap16 np) ∗
-    (phys_word2 (avail_idx_pa (v_cfg v)) (wrap16 (S np)) ==∗
+    (* A6.124: the lease's half of the word goes out; the publisher joins it
+       with its own half, stores through the full cell, and hands the
+       lease's half back at the new count *)
+    avail_lease_half (v_cfg v) np ∗
+    (avail_lease_half (v_cfg v) (S np) ==∗
        virtio_proto γ v ∗ disk_pub γ (S np) ∗ disk_receipt γ np sl pin).
   Proof.
     intros Hslotok Hwrbdom Hwrpin.
@@ -2354,11 +2694,13 @@ Section VirtioProto.
       iDestruct (ghost_var_valid_2 with "Hnp Hpub") as %[Hq _].
       exfalso. exact (Qp.not_add_le_l 1 (1/2)%Qp Hq). }
     iDestruct "Hp" as (pr dma)
-      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx & %Hwce & %Hwt &
+      "(#Hcfg & Hdma & Hah & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx & %Hwce & %Hwt &
         Hslot & Hnc & Hnp & Hpend & Hdone)".
     iDestruct (ghost_var_agree with "Hnp Hpub") as %Hnpeq.
-    iDestruct (dma_own_disj with "Hdma Hpin") as %Hpind.
-    iDestruct (dma_own_disj with "Hdma Hwrb") as %Hwrbd.
+    iDestruct (lease_disj with "Hdma Hah Hpin") as %Hpind.
+    iDestruct (lease_disj with "Hdma Hah Hwrb") as %Hwrbd.
+    iDestruct (phys_map_half_disj with "Hpin Hah") as %HpinD.
+    iDestruct (phys_map_half_disj with "Hwrb Hah") as %HwrbD0.
     rewrite Hwrbdom in Hwrbd.
     iDestruct (phys_map_disj with "Hpin Hwrb") as %Hpw.
     apply map_disjoint_dom in Hpw.
@@ -2382,11 +2724,9 @@ Section VirtioProto.
     assert (HMMSdma : dom (range_map (avail_idx_pa (v_cfg v)) 2
                              (nth_byte (wrap16 (S np)))) ⊆ dom dma)
       by (rewrite Hdomeq; apply subseteq_dom; exact Hmmsub).
-    iDestruct (dma_own_acc _ _ dma Hmmsub Hdomeq with "Hdma") as "[Hmm Hback]".
-    rewrite !phys_word2_map.
+    iEval (rewrite Hnpeq) in "Hah".
     iSplitR; [done|]. iSplitR; [iExact "Hcfg"|].
-    iFrame "Hmm". iIntros "Hmm".
-    iDestruct ("Hback" with "Hmm") as "Hdma".
+    iFrame "Hah". iIntros "Hah".
     (* the enlarged lease *)
     assert (Hun_dom : dom (range_map (avail_idx_pa (v_cfg v)) 2
                              (nth_byte (wrap16 (S np))) ∪ dma) = dom dma)
@@ -2398,12 +2738,28 @@ Section VirtioProto.
                              (nth_byte (wrap16 (S np))) ∪ dma))).
     { apply map_disjoint_dom. rewrite dom_union_L Hun_dom.
       apply gset_disj_union_r; [exact Hpw | exact Hpind]. }
-    iAssert (dma_own (pin ∪ (wrb ∪ (range_map (avail_idx_pa (v_cfg v)) 2
-                             (nth_byte (wrap16 (S np))) ∪ dma))))
+    assert (HrmD : dom (range_map (avail_idx_pa (v_cfg v)) 2
+                          (nth_byte (wrap16 (S np)))) ⊆ avail_idx_dom (v_cfg v))
+      by (rewrite HdomMMS; reflexivity).
+    assert (Hd2' : wrb ##ₘ filter (fun p : Arch.pa * bv 8 => p.1 ∉ avail_idx_dom (v_cfg v)) dma).
+    { apply map_disjoint_dom. rewrite dom_filter_notin Hwrbdom.
+      apply (gset_disj_sub_r _ _ (dom dma)); [| exact Hwrbd].
+      intros x Hx. apply elem_of_difference in Hx as [Hx _]. exact Hx. }
+    assert (Hd1' : pin ##ₘ (wrb ∪ filter (fun p : Arch.pa * bv 8 => p.1 ∉ avail_idx_dom (v_cfg v)) dma)).
+    { apply map_disjoint_dom. rewrite dom_union_L dom_filter_notin.
+      apply gset_disj_union_r; [exact Hpw |].
+      apply (gset_disj_sub_r _ _ (dom dma)); [| exact Hpind].
+      intros x Hx. apply elem_of_difference in Hx as [Hx _]. exact Hx. }
+    iAssert (dma_own_x (pin ∪ (wrb ∪ (range_map (avail_idx_pa (v_cfg v)) 2
+                             (nth_byte (wrap16 (S np))) ∪ dma)))
+               (avail_idx_dom (v_cfg v)))
       with "[Hpin Hwrb Hdma]" as "Hdma".
-    { rewrite /dma_own.
-      rewrite (big_sepM_union (fun a b => phys_ledger a (DfracOwn 1) b) _ _ Hd1).
-      rewrite (big_sepM_union (fun a b => phys_ledger a (DfracOwn 1) b) _ _ Hd2).
+    { rewrite /dma_own_x (map_filter_union_notin pin _ _ HpinD)
+              (map_filter_union_notin wrb _ _ HwrbD0)
+              (map_filter_union_in _ _ _ HrmD).
+      rewrite /dma_own.
+      rewrite (big_sepM_union (fun a b => phys_ledger a (DfracOwn 1) b) _ _ Hd1').
+      rewrite (big_sepM_union (fun a b => phys_ledger a (DfracOwn 1) b) _ _ Hd2').
       iFrame "Hpin Hwrb Hdma". }
     (* the framing fact: everything old and outside the index field is intact *)
     assert (Hframe : forall x : Arch.pa, x ∈ dom dma ->
@@ -2454,7 +2810,7 @@ Section VirtioProto.
       (pin ∪ (wrb ∪ (range_map (avail_idx_pa (v_cfg v)) 2
          (nth_byte (wrap16 (S np))) ∪ dma))).
     rewrite (vp_spins_publish pr sl pin) vpp_nc vpp_np vpp_pend vpp_done Hnpeq.
-    iFrame "Hcfg Hdma Hslot Hnc Hnp".
+    iFrame "Hcfg Hdma Hah Hslot Hnc Hnp".
     iSplitR.
     { iPureIntro. rewrite Hctl'. apply map_union_least.
       - rewrite (avail_idx_bytes_range (v_cfg v) (S np)).
@@ -2604,7 +2960,7 @@ Section VirtioProto.
       iDestruct (ghost_var_valid_2 with "Hnp Hpub") as %[Hq _].
       exfalso. exact (Qp.not_add_le_l 1 (1/2)%Qp Hq). }
     iDestruct "Hp" as (pr dma)
-      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx & %Hwce & %Hwt &
+      "(#Hcfg & Hdma & Hah & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx & %Hwce & %Hwt &
         Hslot & Hnc & Hnp & Hpend & Hdone)".
     iDestruct (ghost_var_agree with "Hnp Hpub") as %Hnpeq.
     iDestruct (mono_nat_lb_own_valid with "Hnc Hlb0") as %[_ Hnr].
@@ -2614,7 +2970,9 @@ Section VirtioProto.
     { apply range_map_sub; [lia|]. intros j Hj.
       apply (read_bytes_spec dma (used_idx_pa (v_cfg v)) 2
                (wrap16 (vp_nc pr)) Hridx). lia. }
-    iDestruct (dma_own_acc_same _ dma Hsub with "Hdma") as "[Hmm Hback]".
+    iDestruct (dma_own_x_acc_same _ dma _ Hsub
+                 (range_disj_avail _ _ _ _ (fun j Hj => used_idx_in_page _ j Hj)
+                    (vpo_idx_used _ _ _ Hok)) with "Hdma") as "[Hmm Hback]".
     iExists (vp_nc pr). rewrite !phys_word2_map.
     iSplitR; [iPureIntro; exact Hnr|].
     iSplitR.
@@ -2622,7 +2980,7 @@ Section VirtioProto.
     iSplitR; [iExact "Hcfg"|]. iSplitR; [iPureIntro; exact Hal|].
     iFrame "Hlb Hmm". iIntros "Hmm".
     iDestruct ("Hback" with "Hmm") as "Hdma".
-    iFrame "Hpub". iExists pr, dma. iFrame "Hcfg Hdma Hslot Hnc Hnp Hpend Hdone".
+    iFrame "Hpub". iExists pr, dma. iFrame "Hcfg Hdma Hah Hslot Hnc Hnp Hpend Hdone".
     iPureIntro. split_and!; assumption.
   Qed.
 
@@ -2677,7 +3035,7 @@ Section VirtioProto.
       iDestruct (ghost_var_valid_2 with "Hnp Hpub") as %[Hq _].
       exfalso. exact (Qp.not_add_le_l 1 (1/2)%Qp Hq). }
     iDestruct "Hp" as (pr dma)
-      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx & %Hwce & %Hwt &
+      "(#Hcfg & Hdma & Hah & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx & %Hwce & %Hwt &
         Hslot & Hnc & Hnp & Hpend & Hdone)".
     iDestruct (ghost_map_lookup with "Hslot Hrecpt") as %Hspin.
     destruct (vp_spins_lookup pr p sl pin Hspin) as [Hs Hpin].
@@ -2698,13 +3056,15 @@ Section VirtioProto.
                      ⊆ dma).
     { apply range_map_sub; [lia|]. intros j Hj.
       apply (read_bytes_spec dma (used_elem_pa (v_cfg v) p) 4 _ Hre). lia. }
-    iDestruct (dma_own_acc_same _ dma HEMsub with "Hdma") as "[Hem Hback]".
+    iDestruct (dma_own_x_acc_same _ dma _ HEMsub
+                 (range_disj_avail _ _ _ _ (fun i Hi => used_elem_pa_in_page _ _ i Hi)
+                    (vpo_idx_used _ _ _ Hok)) with "Hdma") as "[Hem Hback]".
     rewrite !phys_word4_map.
     iSplitR; [iExact "Hcfg" |].
     iFrame "Hem". iIntros "Hem".
     iDestruct ("Hback" with "Hem") as "Hdma".
     iFrame "Hpub Hrecpt Hlb".
-    iExists pr, dma. iFrame "Hcfg Hdma Hslot Hnc Hnp Hpend".
+    iExists pr, dma. iFrame "Hcfg Hdma Hah Hslot Hnc Hnp Hpend".
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
     iSplitR; [done|]. iSplitR; [done|].
@@ -2751,7 +3111,7 @@ Section VirtioProto.
       iDestruct (ghost_var_valid_2 with "Hnp Hpub") as %[Hq _].
       exfalso. exact (Qp.not_add_le_l 1 (1/2)%Qp Hq). }
     iDestruct "Hp" as (pr dma)
-      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx & %Hwce & %Hwt &
+      "(#Hcfg & Hdma & Hah & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx & %Hwce & %Hwt &
         Hslot & Hnc & Hnp & Hpend & Hdone)".
     iDestruct (ghost_map_lookup with "Hslot Hrecpt") as %Hspin.
     destruct (vp_spins_lookup pr p sl pin Hspin) as [Hs Hpin].
@@ -2777,7 +3137,9 @@ Section VirtioProto.
                      ⊆ dma).
     { apply range_map_sub; [lia|]. intros j Hj.
       apply (read_bytes_spec dma (used_elem_pa (v_cfg v) p) 4 _ Hre). lia. }
-    iDestruct (dma_own_acc_same _ dma HEMsub with "Hdma") as "[Hem Hback]".
+    iDestruct (dma_own_x_acc_same _ dma _ HEMsub
+                 (range_disj_avail _ _ _ _ (fun i Hi => used_elem_pa_in_page _ _ i Hi)
+                    (vpo_idx_used _ _ _ Hok)) with "Hdma") as "[Hem Hback]".
     rewrite !phys_word4_map.
     iSplitR; [done|]. iSplitR; [iExact "Hcfg"|].
     iSplitR; [iPureIntro; exact Hal|].
@@ -2832,8 +3194,14 @@ Section VirtioProto.
                     (Hbl eq_refl)) as [Hl Hlk].
         destruct (lookup_lt_is_Some_2 bs j ltac:(lia)) as [b Hb].
         rewrite (list_lookup_total_correct bs j b Hb). exact (Hlk j b Hb). }
-    rewrite (dma_own_split _ dma HMMsub).
-    iDestruct "Hdma" as "[Hmm Hdma]".
+    assert (HMMav : dom (pin ∪ ({[ vr_status (vs_req sl) := byte_zero ]}
+                     ∪ (if vs_is_out sl then ∅
+                        else range_map (vr_buf (vs_req sl)) (length bs)
+                               (fun j : nat => bs !!! j)))) ## avail_idx_dom (v_cfg v)).
+    { rewrite HdomMM.
+      apply (gset_disj_sub_r _ _ (avail_idx_dom (v_cfg v) ∪ used_page_pas (v_cfg v)));
+        [ apply union_subseteq_l | exact Hstand ]. }
+    iDestruct (dma_own_x_shrink _ dma _ HMMsub HMMav with "Hdma") as "[Hmm Hdma]".
     rewrite {1}/phys_map.
     rewrite (big_sepM_union (fun a b => phys_ledger a (DfracOwn 1) b) _ _ HdPIN).
     iDestruct "Hmm" as "[Hpin Hsb]".
@@ -2897,7 +3265,7 @@ Section VirtioProto.
                    (fun j : nat => bs !!! j))))).
     rewrite (vp_spins_reclaim (v_cfg v) pr (dom dma) p sl Hok Hdone)
             vpr_nc vpr_np vpr_pend vpr_done.
-    iFrame "Hcfg Hdma Hslot Hnc Hnp Hpend".
+    iFrame "Hcfg Hdma Hah Hslot Hnc Hnp Hpend".
     iSplitR.
     { iPureIntro. rewrite Hctlr. apply map_sub_difference; [exact HAsub|].
       rewrite HdomMM. exact HAdisj. }
