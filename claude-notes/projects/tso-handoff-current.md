@@ -59,9 +59,25 @@ lk_cpu_cell_ex_pay + lk_own_ok_some, and BOTH READS — notheld
 on lock_openable_c, A6.92's refuted premise retired in place) and the
 holder read.  Design note: an existential crossing an atomic update
 must be pinned outside it or carried whole through it — hand the whole
-lock_body through Res (the A6.109 lo-hoist one level up).  REMAINING in
-the unit: (4) the cpu-store generic (compile sits at WpSconfLock:1249)
-and the AMO node re-cut with the ctx_floor export (A6.118's routing).
+lock_body through Res (the A6.109 lo-hoist one level up).  The unit then went THROUGH the cpu-store family and into the word-pin
+redesign (A6.92's refutation reached lock_body via the AMO's failing
+branch): the authorship arm is OUT of lock_body, the word carries
+lock_word_pin (value-set {1}, pin instrument — pin for
+same-value-many-writers vs TsWin for distinct-values-per-writer), the
+ghost lockUR went PRODUCT (state x acquire-position; lock_pos_agree the
+tie; arities preserved), ledger_pin_drop is the retraction (release =
+retract-then-store), and locked/locked_pre carry
+∃B, lock_frag_at γ _ B ∗ ctx_floor cur_ctx B (§0.34′ realized on the
+ξ-axis; boundary note rewritten at the definition).  ALL certified
+through r34 + WpLock/WpLockAt green after.  REMAINING (itemised, no
+design left): (i) lock_word_amo_mint re-ends store-then-mint-pin at
+B := S (length log) + produces the ctx_floor export via
+hart_view_lb_get + ctx_bound_raise; (ii) holder read on _exv +
+ledger_read_pin_ok with lock_pos_agree supplying B; (iii) spinner
+preservation (ledger_store_win_pin_ok, premise from rget=1);
+(iv) release retract-then-store; (v) the AMO failing branch;
+(vi) the 69-file sweep verifying arity-unchanged.  Then (5) the
+SpecAcquire threading and (6) close + cone sweep as before.
 Then: (5) lock_openable_c threading through SpecAcquire's ~40 callers;
 (6) close WpSconfLock + sweep the cone (~160 files); DMA AU leaf +
 virtio pair (A6.95: ready, datum phys_word2, claims from
