@@ -210,6 +210,17 @@ Proof.
   unfold usys_num. rewrite H21. reflexivity.
 Qed.
 
+(* ...and to the EPC WORD, which is what makes the number the dispatch reads
+   the number the ROUND is keyed by: usertrap's prologue writes index 3 and
+   nothing else before the [c.li a5,8] fires. *)
+Lemma usys_num_epc (tf : list (mword 64)) (v : mword 64) :
+  usys_num (<[tf_epc_idx := v]> tf) = usys_num tf.
+Proof.
+  unfold usys_num.
+  rewrite list_lookup_total_insert_ne;
+    [ reflexivity | unfold tf_arg_idx, tf_epc_idx; lia ].
+Qed.
+
 (* the window table only ever names argument 0 or argument 1 *)
 Lemma usys_window_idx (n : Z) (i : nat) :
   usys_window n = Some i -> (i = 0%nat \/ i = 1%nat).

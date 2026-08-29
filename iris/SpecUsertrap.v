@@ -118,6 +118,11 @@ Require Import TrampPt UptTree.
 Require Import KptShare.   (* [tlb_res_pt] -- the translation slot the parked residue drops *)
 Require Import UserPtTree UserExec.
 Require Import UexecWp.    (* [uexec_wp] -- the residue's user-execution WP slot *)
+Require Import UexecRound. (* [uround_ok] -- the trap round, on the user-visible state *)
+Require Import UexecSlot.  (* [tf_resume_pc] *)
+Require Import TfUser.     (* [tf_ueq] *)
+Require Import UserPerm.   (* [perm_of] -- the per-page permission view *)
+Require Import UsysMemOk.  (* [uecall_scause] *)
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import TimerCap.   (* [sstc_enabled]: the residue's mcounteren pin *)
@@ -198,6 +203,80 @@ Proof.
   rewrite HMPP. reflexivity.
 Qed.
 
+(* ===================================================================== *)
+(* THE TRAP ROUND, as the boundary states it (milestone J1a).             *)
+(*                                                                         *)
+(* [U] is the process's state AS USERTRAP WAS ENTERED -- the record        *)
+(* uservec's save walk left, whose epc word is still the PREVIOUS round's; *)
+(* [sepc_v] is the faulting pc the trap delivered and [sc_v] the cause.    *)
+(* [tf0] is therefore the entry trapframe as usertrap's own prologue       *)
+(* leaves it: the +0x28..+0x2e block writes [p->trapframe->epc =           *)
+(* r_sepc()] and nothing else, so [pv_tf] of the record the entry hands on *)
+(* IS [tf0] by reflexivity.  ([ret_pc] is [WpGprCsrwA.mepc_val] -- the same *)
+(* term under two names; this file already has [ret_pc] in scope.)         *)
+(*                                                                         *)
+(* [sc_v = uecall_scause] is J1a's TEMPORARY escape for the ecall arm      *)
+(* (stage S7), narrowed to sbrk at S8 and retired when sbrk's permission   *)
+(* relation reaches the dispatcher's post.                                 *)
+(* ===================================================================== *)
+Definition ut_round (sepc_v sc_v : mword 64) (U U' : ustate) : Prop :=
+  (sc_v = uecall_scause
+   /\ usys_num (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U))) <> USYS_exec)
+  \/ uround_ok sc_v
+       (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U)))
+       (us_M U) (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
+       (pv_tf (us_V U')) (us_M U')
+       (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U')))).
+
+(* THE PROLOGUE'S OWN MOVE: [U'] is [U] with the epc word rewritten, which
+   is what usertrap's +0x28..+0x2e block does and all it does.  Every block
+   below the entry carries this (or the round it grows into) as a premise. *)
+Definition ut_pro (sepc_v : mword 64) (U U' : ustate) : Prop :=
+  pv_tf (us_V U') = <[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U))
+  /\ pv_upt (us_V U') = pv_upt (us_V U)
+  /\ pv_sz (us_V U') = pv_sz (us_V U)
+  /\ us_M U' = us_M U.
+
+(* THE ENTRY INSTANCE: at the record the prologue hands on, the round has
+   done nothing yet, so every arm of the relation is an identity. *)
+Lemma ut_round_entry (sepc_v sc_v : mword 64) (U U' : ustate) :
+  (* stage S8: the escape is now narrowed to a NON-exec ecall, so the entry
+     instance is available only where the dispatch has already ruled the
+     ecall arm out -- which is exactly the four arms that take it. *)
+  sc_v <> uecall_scause ->
+  ut_pro sepc_v U U' -> ut_round sepc_v sc_v U U'.
+Proof.
+  intros Hne (Htf & Hupt & Hsz & HM). unfold ut_round.
+  right. unfold uround_ok.
+  destruct (decide (sc_v = uecall_scause)) as [Heq | _]; [ contradiction (Hne Heq) | ].
+  rewrite Htf Hupt Hsz HM. unfold uround_id_ok.
+  split; [ split; reflexivity | split; reflexivity ].
+Qed.
+
+(* A BLOCK THAT DOES NOT MOVE THE USER-VISIBLE STATE relays the round. *)
+Lemma ut_round_same (sepc_v sc_v : mword 64) (U U' U'' : ustate) :
+  pv_tf (us_V U'') = pv_tf (us_V U') ->
+  perm_of (ud_um (pv_upt (us_V U''))) (uint (pv_sz (us_V U'')))
+    = perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))) ->
+  us_M U'' = us_M U' ->
+  ut_round sepc_v sc_v U U' -> ut_round sepc_v sc_v U U''.
+Proof.
+  intros H1 H2 H3 H. unfold ut_round in H |- *. rewrite H1 H2 H3. exact H.
+Qed.
+
+(* ...and one that moves it only in the four KERNEL words (prepare_return). *)
+Lemma ut_round_ueq (sepc_v sc_v : mword 64) (U U' U'' : ustate) :
+  tf_ueq (pv_tf (us_V U')) (pv_tf (us_V U'')) ->
+  perm_of (ud_um (pv_upt (us_V U''))) (uint (pv_sz (us_V U'')))
+    = perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))) ->
+  us_M U'' = us_M U' ->
+  ut_round sepc_v sc_v U U' -> ut_round sepc_v sc_v U U''.
+Proof.
+  intros Hu H2 H3 H. unfold ut_round in H |- *. rewrite H2 H3.
+  destruct H as [Hl | Hr]; [ left; exact Hl | right ].
+  eapply uround_ok_ueq_r; [ exact Hu | exact Hr ].
+Qed.
+
 (* The statement, parameterized over the abstract kernel-internal resource
    [R : uptd -> mword 64 -> iProp Σ]: [R pt ksp] is everything usertrap needs
    beyond the machine state above, for the process whose user page table is
@@ -212,10 +291,33 @@ Qed.
    keyed on sp, which is what the [m !!! sp = ksp] premise below licenses. *)
 Definition usertrap_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (R : uptd -> mword 64 -> ustate -> iProp Σ) (pt : uptd) (ksp : mword 64) (m : regfile)
-    (mie_v menvcfg0 : mword 64) : iProp Σ :=
+    (mie_v menvcfg0 : mword 64)
+    (* THE ROUND'S ENTRY STATE (milestone J1a).  [U] is the process's state
+       AS USERTRAP WAS ENTERED -- the record uservec's save walk left, whose
+       epc word is still the PREVIOUS round's; [sepc_v] is the faulting pc
+       the trap delivered and [sc_v] the cause.  [tf0] below is therefore the
+       entry trapframe as usertrap's own prologue leaves it (the
+       +0x28..+0x2e block writes [epc := r_sepc()]), which is the user-visible
+       trapframe the round starts from. *)
+    (U : ustate) (sepc_v sc_v : mword 64) : iProp Σ :=
   let ret_tgt : mword 64 := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   ( ∀ (pt' : uptd) (mf : regfile)
       (ms' usatp uepc sc' stval' mdv0 : mword 64) (U' : ustate),
+    (* ---- THE ROUND, as a relation on the user-visible state -------------
+       [UexecRound.uround_ok] keyed on the cause, exactly as the dispatch's
+       own [c.li a5,8; bne] is: an ecall either was exec (whose successor WP
+       is a kernel MINT, so the row says nothing) or bumped the trapframe and
+       moved the image/permission map by what the entry's own syscall row
+       allows; anything else resumes the trapped state on the nose.
+       [sc_v = uecall_scause] is J1a's TEMPORARY escape for the ecall arm
+       (S7), narrowed to sbrk at S8 and retired when sbrk's permission
+       relation reaches the dispatcher's post.
+       The third premise is prepare_return's [csrw sepc, p->trapframe->epc]
+       read back through [tf_resume_pc]: the pc the sret lands at IS the
+       resume trapframe's own. *)
+    ⌜pv_upt (us_V U') = pt'⌝ -∗
+    ⌜ut_round sepc_v sc_v U U'⌝ -∗
+    ⌜ret_pc uepc = tf_resume_pc (pv_tf (us_V U'))⌝ -∗
     (* [mideleg]'s VALUE is not pinned to whatever usertrap was handed at
        entry -- unlike [mie_v]/[menvcfg0] (each a unique architectural
        constant, so their exit value provably equals the entry one),
@@ -364,7 +466,7 @@ Definition wp_usertrap_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, 
      may return on a different hart -- and the bundle comes back at THAT
      hart, which is why [R] is a family (see the note above). *)
   wp_next true pj (fun (CID' : CpuId) =>
-    usertrap_post (CID := CID') (R CID') pt ksp m mie_v menvcfg0) -∗
+    usertrap_post (CID := CID') (R CID') pt ksp m mie_v menvcfg0 U sepc_v sc_v) -∗
   WP (Loop : expr riscv_lang).
 
 (* THE MODULE TYPE'S INSTANCE LIST IS THE UNION OF THE FIVE CONES', NOT THE

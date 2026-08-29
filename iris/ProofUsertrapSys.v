@@ -65,6 +65,7 @@ Require Import CodeUsertrap.
 Require Import SpecKilled SpecKexit SpecYield SpecPrepareReturn.
 Require Import SpecSyscall.
 Require Import SpecUsertrap UsertrapRes.
+Require Import UsysMemOk UsysMemOkSpec UexecRound UexecSlot UserPerm.  (* the round's vocabulary *)
 Require Import ProofUsertrapParts ProofPrepareReturnParts.
 Require Import ProofUsertrapTail.
 From Kernel Require KernelInstrs.
@@ -113,9 +114,9 @@ Section UtSysBlock.
     iPureIntro. exact (proj2 (proj2 (proj2 (proj2 Hwf)))).
   Qed.
 
-  Lemma ut_90 (N : ut_names) (U : ustate) (pt : uptd) (ksp : mword 64)
+  Lemma ut_90 (N : ut_names) (U0 U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat)
-      (mie_v menvcfg0 : mword 64) (lks : gset string) :
+      (mie_v menvcfg0 epv scv : mword 64) (lks : gset string) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res false + nx)%nat = (av - 4)%nat ->
@@ -131,6 +132,12 @@ Section UtSysBlock.
     ut_cs m0 m ->
     mie_v = MIE_S ->
     menvcfg0 = MENVCFG_S ->
+    (* milestone J1a: [U0] is the state usertrap was entered at, [U] the one
+       the prologue handed on, and this block is the ECALL arm -- so the
+       round's own [decide (sc = 8)] has already fired left.  At stage S7
+       the arm takes [uround_ok]'s temporary escape; S8 replaces it. *)
+    ut_pro epv U0 U ->
+    scv = uecall_scause ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0x90)) -∗
     sie_cap_gpr KT1 m nx false (un_pj N) -∗
@@ -139,10 +146,10 @@ Section UtSysBlock.
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res SY.syscall_env) pt ksp m0
-                     mie_v menvcfg0) -∗
+                     mie_v menvcfg0 U0 epv scv) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hma0 Hcs Hmiev Hmenvv.
+    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hma0 Hcs Hmiev Hmenvv Hpro Hscec.
     pose proof (ut_nx_bound false av nx Hav Hnx) as Hks.
     pose proof (ut_nx_bound_off av nx Hav Hnx) as Hkso.
     
@@ -541,13 +548,36 @@ Section UtSysBlock.
                        ltac:(vm_compute; reflexivity)); exact HS4s1).
       assert (Hcsmg : ut_cs m0 mg)
         by exact (ut_cs_trans m0 S4 mg HcsS4 (ut_cs_of_callee_saved _ _ Hcsg)).
-      iApply (T.ut_a6 (CID := CID2) SY.syscall_env N (MkUstate V2 M2) pt ksp m0 mg av
+      (* THE ECALL ARM, stage S8.  The dispatch's own branch has fired left,
+         so what is owed is [uround_ok]'s ecall row.  EXEC lands on the nose
+         ([uround_ok]'s own left disjunct: a successful exec never returns to
+         this WP, and its failure arm's image row is the dispatcher's); every
+         other entry still takes the escape, now narrowed to non-exec.  What
+         blocks the rest is stated in the lane report: [SpecSyscall]'s resume
+         clause (ii) is [uptd_ext], not [uptd_ext_sz], so
+         [UserPerm.perm_of_uptd_ext_sz]'s RW-leaf premise is not available
+         here and [usys_mem_ok]'s π' = π cannot be shown. *)
+      assert (HV1tf : pv_tf V1 = <[tf_epc_idx := rget S3 Ra5]> (pv_tf (us_V U)))
+        by (rewrite /V1; destruct (us_V U); reflexivity).
+      assert (Hnumeq : sysc_num V1
+                       = usys_num (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))).
+      { rewrite (sysc_num_usys V1). rewrite <- (proj1 Hpro).
+        rewrite HV1tf. apply usys_num_epc. }
+      assert (Hrda : ut_round epv scv U0 (MkUstate V2 M2)).
+      { unfold ut_round.
+        destruct (decide (sysc_num V1 = 7)) as [Hex | Hnex].
+        - right. unfold uround_ok.
+          destruct (decide (scv = uecall_scause)) as [_ | Hc];
+            [ | contradiction (Hc Hscec) ].
+          left. rewrite <- Hnumeq. exact Hex.
+        - left. split; [ exact Hscec | rewrite <- Hnumeq; exact Hnex ]. }
+      iApply (T.ut_a6 (CID := CID2) SY.syscall_env N U0 (MkUstate V2 M2) pt ksp m0 mg av
                 n2 true
-                mie_v menvcfg0 lks
+                mie_v menvcfg0 epv scv lks
                 Hwf' Hav ltac:(rewrite Hn2; unfold trap_res in *; lia)
                 ltac:(rewrite Htfg HV1upt; exact Htfpe) Hksp Hm0sp
                 Hmgsp Hmgs1 Hcsmg
-                Hmiev Hmenvv
+                Hmiev Hmenvv Hrda
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
       all: try lkbelow.
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].

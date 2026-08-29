@@ -66,6 +66,7 @@ Require Import FileInvDefs.
 Require Import CodeUsertrap.
 Require Import SpecKilled SpecKexit SpecYield SpecPrepareReturn.
 Require Import SpecUsertrap UsertrapRes.
+Require Import UexecSlot TfUser.   (* [tf_resume_pc] / [ret_pc_idem] / [tf_ueq_epc] *)
 Require Import ProofUsertrapParts.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -176,10 +177,10 @@ Section UtRet2.
      durable-notes' "the chaining lemma needs its OWN section": stated here,
      the ambient [CID] IS the post-crossing hart and not one annotation is
      needed.  [ut_ret] below applies it at [(CID := CIDp)]. *)
-  Lemma ut_ret2 (N : ut_names) (U : ustate) (pt : uptd) (ksp : mword 64)
+  Lemma ut_ret2 (N : ut_names) (U0 U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 mf : regfile) (av nx : nat) (b : bool)
       (uepc : mword 64) (vb : mword 1)
-      (mie_v menvcfg0 : mword 64) (lks : gset string) :
+      (mie_v menvcfg0 epw scw : mword 64) (lks : gset string) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
@@ -196,6 +197,12 @@ Section UtRet2.
        as a parameter here. *)
     mie_v = MIE_S ->
     menvcfg0 = MENVCFG_S ->
+    (* THE ROUND, COMPLETE (milestone J1a): prepare_return has already run,
+       so [U] is the resume record and this is what [usertrap_post] says. *)
+    ut_round epw scw U0 U ->
+    (* ...and the epc word the [csrw sepc] restored IS the resume trapframe's
+       own -- prepare_return writes the four KERNEL words and skips index 3. *)
+    pv_tf (us_V U) !!! tf_epc_idx = uepc ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xb2)) -∗
     (* ---- exactly what prepare_return handed back ---- *)
@@ -217,10 +224,10 @@ Section UtRet2.
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
-                     mie_v menvcfg0) -∗
+                     mie_v menvcfg0 U0 epw scw) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcs Hmiev Hmenvv.
+    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcs Hmiev Hmenvv Hrd Hepcw.
     (* the budget, in numbers [lia] can see -- every one of these is a
        [Definition] and the index arithmetic below is what needs them *)
     pose proof Hav as Hav'.
@@ -585,9 +592,14 @@ Section UtRet2.
     iDestruct ("Hownback" $! U with "Hpv Hufr Hsy") as "Hown".
     iApply ("Hcont" $! (pv_upt (us_V U)) (tp_pin S9) msg
               (kvi_satp_word (ud_root (pv_upt (us_V U)))) (mepc_val uepc) scv stv mdv0 U
-              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
+              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                     Hhs Hpriv Hms Hscause Hstval Hsepc [Hstvec] Hpc [Hfile]
                     Hmie Hmdl Hmenv Hhw Hmin [-]").
+    - reflexivity.
+    - exact Hrd.
+    - (* [ret_pc (mepc_val uepc) = tf_resume_pc (pv_tf (us_V U))]: [mepc_val]
+         IS [ret_pc], which is idempotent, and the epc word is [uepc]. *)
+      unfold tf_resume_pc, tf_w. rewrite Hepcw. exact (ret_pc_idem uepc).
     - exact Hmaskx.
     - exact Htfpe.
     - exact Haccwf.
@@ -640,9 +652,9 @@ Section UtRet.
   (* ==================================================================== *)
   (* +0xae: jal prepare_return, then the second half at ITS hart.          *)
   (* ==================================================================== *)
-  Lemma ut_ret (N : ut_names) (U : ustate) (pt : uptd) (ksp : mword 64)
+  Lemma ut_ret (N : ut_names) (U0 U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat) (b : bool)
-      (mie_v menvcfg0 : mword 64) (lks : gset string) :
+      (mie_v menvcfg0 epw scw : mword 64) (lks : gset string) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
@@ -654,6 +666,8 @@ Section UtRet.
     ut_cs m0 m ->
     mie_v = MIE_S ->
     menvcfg0 = MENVCFG_S ->
+    (* THE ROUND SO FAR (milestone J1a) -- see [SpecUsertrap.ut_round]. *)
+    ut_round epw scw U0 U ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xae)) -∗
     sie_cap_gpr KT1 m nx b (un_pj N) -∗
@@ -662,10 +676,10 @@ Section UtRet.
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
-                     mie_v menvcfg0) -∗
+                     mie_v menvcfg0 U0 epw scw) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv.
+    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -737,8 +751,25 @@ Section UtRet.
                  with "Hkinv") as "#Htfk".
     iEval (rewrite Hksp) in "Htfk".
     iDestruct ("Hownback" $! (MkUstate Vr (us_M U)) with "Hpv Hufr Hsy") as "Hown".
-    iApply (ut_ret2 (CID := CIDp) Rsys N (MkUstate Vr _) pt ksp m0 mf av nx b uepc vb
-              mie_v menvcfg0 lks
+    (* THE ROUND ACROSS prepare_return: the four KERNEL words it re-armed are
+       exactly what [TfUser.tf_ueq] is blind to, and it moves neither the
+       descriptor nor the size nor the image. *)
+    assert (HVrsz : pv_sz Vr = pv_sz (us_V U))
+      by (rewrite /Vr; destruct (us_V U); reflexivity).
+    assert (HVrtf : pv_tf Vr = prepare_return_tf (pv_tf (us_V U)) ksat
+                      (add_vec (un_ks N) (mword_of_int 4096)) (cid_word (CID := CIDp)))
+      by (rewrite /Vr; destruct (us_V U); reflexivity).
+    assert (Hrdr : ut_round epw scw U0 (MkUstate Vr (us_M U))).
+    { refine (ut_round_ueq epw scw U0 U (MkUstate Vr (us_M U)) _ _ eq_refl Hrd).
+      - cbn [us_V]. rewrite HVrtf. apply prepare_return_tf_ueq.
+      - cbn [us_V]. rewrite HVrupt HVrsz. reflexivity. }
+    assert (Hepcw : pv_tf (us_V (MkUstate Vr (us_M U))) !!! tf_epc_idx = uepc).
+    { cbn [us_V]. rewrite HVrtf.
+      rewrite <- (tf_ueq_epc _ _ (prepare_return_tf_ueq (pv_tf (us_V U)) ksat
+                    (add_vec (un_ks N) (mword_of_int 4096)) (cid_word (CID := CIDp)))).
+      apply list_lookup_total_correct. exact Hepc. }
+    iApply (ut_ret2 (CID := CIDp) Rsys N U0 (MkUstate Vr _) pt ksp m0 mf av nx b uepc vb
+              mie_v menvcfg0 epw scw lks
               Hwf' Hav Hnx ltac:(rewrite HVrupt; exact Htfpe) Hksp Hm0sp
               ltac:(rewrite (callee_saved_lookup Hcspr csp_rs1
                               ltac:(vm_compute; reflexivity)); exact HM1sp)
@@ -746,7 +777,7 @@ Section UtRet.
                               ltac:(vm_compute; reflexivity)); exact HM1s1)
               ltac:(exact (ut_cs_trans m0 M1 mf HcsM1
                              (ut_cs_of_callee_saved _ _ Hcspr)))
-              Hmiev Hmenvv
+              Hmiev Hmenvv Hrdr Hepcw
               with "Htext Hpc Hcg Hcpu Hclm Hsepc Hscause Hstval Hsret Hstvec
                     Hq4 Hkptr Htfk [Hown] Hframe Hcont").
     rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].
@@ -766,9 +797,9 @@ Section UtA6.
      [b = false] from the other three.  [which_dev = 0] before the kexit is
      dead code in the resource sense -- kexit never returns -- so the [c.li
      s2,0] is stepped and its value never read again. *)
-  Lemma ut_a6 (N : ut_names) (U : ustate) (pt : uptd) (ksp : mword 64)
+  Lemma ut_a6 (N : ut_names) (U0 U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat) (b : bool)
-      (mie_v menvcfg0 : mword 64) (lks : gset string) :
+      (mie_v menvcfg0 epw scw : mword 64) (lks : gset string) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
@@ -780,6 +811,8 @@ Section UtA6.
     ut_cs m0 m ->
     mie_v = MIE_S ->
     menvcfg0 = MENVCFG_S ->
+    (* THE ROUND SO FAR (milestone J1a) -- see [SpecUsertrap.ut_round]. *)
+    ut_round epw scw U0 U ->
     (* the block's whole cone bottoms out at "ftable" (1), via the killed
        branch's [ut_kexit]; killed itself (rank "proc" = 11) follows by
        [locks_below_mono].  The not-killed branch (ut_ret / prepare_return)
@@ -793,10 +826,10 @@ Section UtA6.
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
-                     mie_v menvcfg0) -∗
+                     mie_v menvcfg0 U0 epw scw) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hbelow.
+    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd Hbelow.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -1001,10 +1034,10 @@ Section UtA6.
                    ltac:(wp_next_chain) with "Hclm") as "Hclm".
       iDestruct (wp_next_retarget CID3 CID4 true (un_pj N) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
-      iApply (ut_ret (CID := CID4) Rsys N U pt ksp m0 mf av nx b
-                mie_v menvcfg0 lks
+      iApply (ut_ret (CID := CID4) Rsys N U0 U pt ksp m0 mf av nx b
+                mie_v menvcfg0 epw scw lks
                 Hwf' Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
-                Hmiev Hmenvv
+                Hmiev Hmenvv Hrd
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
       iSplitL "Hcsrs"; [iExact "Hcsrs"|].
@@ -1027,9 +1060,9 @@ Section UtFa.
      callee here that takes the trap-CSR set and the running claim and gives
      them BACK -- it parks and resumes, so its crossing is real and everything
      has to be re-anchored on the far side. *)
-  Lemma ut_fa (N : ut_names) (U : ustate) (pt : uptd) (ksp : mword 64)
+  Lemma ut_fa (N : ut_names) (U0 U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat) (b : bool)
-      (mie_v menvcfg0 : mword 64) (lks : gset string) :
+      (mie_v menvcfg0 epw scw : mword 64) (lks : gset string) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
@@ -1041,6 +1074,8 @@ Section UtFa.
     ut_cs m0 m ->
     mie_v = MIE_S ->
     menvcfg0 = MENVCFG_S ->
+    (* THE ROUND SO FAR (milestone J1a) -- see [SpecUsertrap.ut_round]. *)
+    ut_round epw scw U0 U ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xfc)) -∗
     sie_cap_gpr KT1 m nx b (un_pj N) -∗
@@ -1049,10 +1084,10 @@ Section UtFa.
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
-                     mie_v menvcfg0) -∗
+                     mie_v menvcfg0 U0 epw scw) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv.
+    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -1109,10 +1144,10 @@ Section UtFa.
                    ltac:(wp_next_chain) with "Hclm") as "Hclm".
       iDestruct (wp_next_retarget CID CID2 true (un_pj N) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
-      iApply (ut_ret (CID := CID2) Rsys N U pt ksp m0 M1 av nx b
-                mie_v menvcfg0 lks
+      iApply (ut_ret (CID := CID2) Rsys N U0 U pt ksp m0 M1 av nx b
+                mie_v menvcfg0 epw scw lks
                 Hwf' Hav Hnx Htfpe Hksp Hm0sp HM1sp HM1s1 HcsM1
-                Hmiev Hmenvv
+                Hmiev Hmenvv Hrd
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
       iSplitL "Hcsrs"; [iExact "Hcsrs"|].
@@ -1197,10 +1232,10 @@ Section UtFa.
                    ltac:(wp_next_chain) with "Hclm") as "Hclm".
       iDestruct (wp_next_retarget CID4 CID5 true (un_pj N) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
-      iApply (ut_ret (CID := CID5) Rsys N U pt ksp m0 mf av nx b
-                mie_v menvcfg0 lks
+      iApply (ut_ret (CID := CID5) Rsys N U0 U pt ksp m0 mf av nx b
+                mie_v menvcfg0 epw scw lks
                 Hwf' Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
-                Hmiev Hmenvv
+                Hmiev Hmenvv Hrd
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
       (* the yield arm came back at the literal [∅]; [lks = ∅] at depth 0
          makes that the set [ut_hold] names. *)

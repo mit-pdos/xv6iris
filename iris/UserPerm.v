@@ -800,3 +800,24 @@ Proof.
                 (proj1 (bv_unsigned_in_range _ szv))) as Hge.
   lia.
 Qed.
+
+(* ...and at the RELATION the kernel's buffer-touching arms hand back.
+   [ProcPtOwn.uptd_ext_sz] carries exactly the two facts §8 needs about a
+   gained leaf: its vpn is below [p->sz] (hence inside the live region, by
+   [pgroundup_ge]) and its word is vmfault's own [uvm_pte 22 _] (hence
+   [uperm_rw], by [perm_leaf_uvm_pte22]).  No further size relation is
+   needed -- the range premise is the definition's own vpn bound. *)
+Lemma perm_of_uptd_ext_sz (szv : mword 64) (P P' : uptd) :
+  uptd_ext_sz szv P P' ->
+  perm_of (ud_um P') (uint szv) = perm_of (ud_um P) (uint szv).
+Proof.
+  intros (Hext & Hrng & Hleaf).
+  apply (perm_of_uptd_ext_rw P P' (uint szv) Hext).
+  intros p w Hp Hp'. split.
+  - apply live_pages_mem. rewrite uint_unsigned.
+    pose proof (Hrng p w Hp Hp') as Hlt.
+    pose proof (pgroundup_ge (bv_unsigned szv)
+                  (proj1 (bv_unsigned_in_range _ szv))) as Hge.
+    lia.
+  - destruct (Hleaf p w Hp Hp') as [r ->]. apply perm_leaf_uvm_pte22.
+Qed.

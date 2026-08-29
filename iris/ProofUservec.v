@@ -59,6 +59,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Require Import ParkCap.   (* [park_token] *)
 Require Import UsertrapRes UtResFits.  (* [ut_park_intro_body] -- the park's producer entry *)
+Require Import UexecRet UexecRound UexecSlot TfUser UserPerm.  (* the round's vocabulary *)
 Require Import TsoCtx.   (* [CurCtx]: the residue owns a thread token *)
 Import Defs.
 
@@ -106,14 +107,15 @@ Section UservecAllPt.
 
 
   Lemma wp_uservec_pt (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
-      (j : nat) (vksp : mword 64) (U : ustate) :
+      (j : nat) (vksp : mword 64) (U : ustate)
+      (g : regfile) (ms_v sc_v stval_v sepc_v : mword 64) :
     (* [UT.]-qualified, not the section alias: inside a section that FIXES
        [CID], the alias has no [CID] implicit left to instantiate (section
        variables are discharged only at [End]).  The module-type parameter
        still does, and the two are convertible, so the [: USERVEC] check
        accepts it. *)
     wp_uservec_pt_body (fun h : CpuId => UT.usertrap_res_bare (CID := h))
-      C pt Rut j vksp U.
+      C pt Rut j vksp U g ms_v sc_v stval_v sepc_v.
   Proof.
     cbv beta zeta delta [wp_uservec_pt_body].
     (* [tf_pa] deliberately NOT unfolded here: its 35 trapframe cells ride in
@@ -125,10 +127,23 @@ Section UservecAllPt.
     intros Hstvec Hdqc Hmie Hjlt Hnorm Hptwf.
     iIntros "#Hkt #Hhw #Hinv #Hclaim Hframe Hures Hcont".
     (* ============ open the trapped machine ============ *)
-    iDestruct (user_trap_frame_open C pt Rut with "Hframe") as (ms_v sc_v stval_v sepc_v g)
+    (* AT NAMED DATA (milestone J1a).  [user_trap_frame] is definitionally the
+       ∃ over [user_trap_frame_at], so this is the same premise with its five
+       data given names -- which is what lets the post say WHICH state the
+       round started from.  Unpacked by hand exactly as
+       [UserKernelBridge.user_trap_frame_open] does it (that opener re-binds
+       the five, which would lose the tie to this lemma's own binders); the
+       three counter-permission cells are dropped here for the same reason it
+       drops them -- whoever built the frame keeps its own copies. *)
+    rewrite /user_trap_frame_at.
+    iDestruct "Hframe" as
       "(%Hok & Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpc & Hfile &
-        Hutlb & Hdata & %Hcov & %Hacc & Hstvec & Hmie & Hmdl & Hmedl &
-        Hmenv & Hsenv & Hmse & Hsse & Hrut)".
+        Hupt & Hcfg & Hrut)".
+    iEval (rewrite user_pt_any_unfold) in "Hupt".
+    iDestruct "Hupt" as "(Hutlb & Hdata & %Hcov & %Hacc)".
+    iEval (rewrite /user_cfg) in "Hcfg".
+    iDestruct "Hcfg" as
+      "(Hstvec & Hmie & Hmdl & Hmedl & Hmenv & Hsenv & Hmse & Hsse & _ & _)".
     pose proof Hok as Hok2.
     destruct Hok2 as (HSXL & HMPRV & HMXR & HSPP & HSIE & HTVM & HTSR).
     pose proof (uc_mm C) as Hmm.
@@ -1586,8 +1601,13 @@ Section UservecAllPt.
     iApply wp_next_intro. iIntros (CID2).
     iEval (rewrite /usertrap_post).
     iIntros (pt' mf ms' usatp uepc sc' stval' mdv0 U2)
-      "%Hmask %Hpttf %Haccwf %Hmapwf %Hretms %Hsconf2 %Hcalleesaved %Htpcid %Ha0usatp %Hsatprooted
+      "%Huptpt2 %Hrd2 %Hpcret
+       %Hmask %Hpttf %Haccwf %Hmapwf %Hretms %Hsconf2 %Hcalleesaved %Htpcid %Ha0usatp %Hsatprooted
        Hhs2 Hpriv2 Hms2 Hsc2 Hstval2 Hsepc2 Hstvec2 Hpc2 Hfile2 Hmie3 Hmdl3 Hmenv3 #Hhw2 #Hmin2 Hures2".
+    (* x0 IS ZERO in the file usertrap handed back -- the one fact the
+       register-file tie below needs of the base ([UexecRet.userret_gpr_x0]). *)
+    iDestruct (gpr_file_x0 mf (mword_of_int 0) ltac:(vm_compute; reflexivity)
+                 with "Hfile2") as "[%Hmfx0 Hfile2]".
     (* ============ open usertrap_res A SECOND TIME, for userret ========== *)
     (* userret's entry switch is about to install the USER table, so both
        borrows come back out, in the mirror order to the entry side: first
@@ -1711,8 +1731,41 @@ Section UservecAllPt.
                               u136 u144 u152 u160 u168 u176 u184 u192 u200 u208 u216 u224 u232
                               u240 u248 u256 u264 u272 u280 u112)
              ms' usatp uepc sc' stval' mdv0 _
-             with "[%] [%] [%] [%] [%] [%] [%] [%] Hhs3 Hpriv3 Hms3 Hmie4 Hmdl4 Hmenv4 Hstvec2 Hsenv3 Hsc2 Hstval2 Hsepc3
+             with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hhs3 Hpriv3 Hms3 Hmie4 Hmdl4 Hmenv4 Hstvec2 Hsenv3 Hsc2 Hstval2 Hsepc3
                     Hupt3 Hpc3 Hfile3 Hures3 Hhw2 Hmin2").
+    - (* the descriptor the residue is keyed at IS the one handed over *)
+      reflexivity.
+    - (* THE ROUND, read at the machine that trapped.  usertrap's [tf0] is
+         the SAVED frame; this boundary's is [tf_of g …], and the two agree
+         at every word the round reads -- the 31 the save walk stored (whose
+         values ARE [g]'s registers), and the epc both name.  The IMAGE half
+         is dropped here: see [SpecUservec.uv_round].  [ut_round_same] carries
+         the round the last step, from the record usertrap returned to the
+         RENORMALISED one this post hands over -- [ud_norm] moves only
+         [ud_data], which [perm_of] does not read. *)
+      match goal with
+      | |- uv_round _ _ _ _ ?UU =>
+          refine (uv_round_of_ut _ U g sepc_v sc_v UU _ _
+                    (ut_round_same sepc_v sc_v _ U2 UU _ _ eq_refl Hrd2))
+      end.
+      + cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf].
+        split; [ reflexivity | ].
+        intros i Hi.
+        do 36 (destruct i as [| i]; [ first [ reflexivity | lia ] | ]). lia.
+      + reflexivity.
+      + cbn [us_V pv_tf us_upt upd_upt upd_usV us_tf upd_tf]. exact Hws1.
+      + cbn [us_V pv_upt pv_sz us_upt upd_upt upd_usV us_tf upd_tf].
+        rewrite Huptpt2. reflexivity.
+    - (* the resume pc, straight off usertrap's own row *)
+      cbn [us_V pv_tf us_upt upd_upt upd_usV us_tf upd_tf]. exact Hpcret.
+    - (* THE REGISTER-FILE TIE (S9).  [userret_gpr] at the words
+         [tf_page_open36] peeled IS [tf_resume_gpr] of the trapframe they came
+         out of -- definitionally, the peeled list being the total lookups --
+         and the base only matters at x0. *)
+      cbn [us_V pv_tf us_upt upd_upt upd_usV us_tf upd_tf].
+      match goal with
+      | |- _ = tf_resume_gpr0 ?L => exact (tf_resume_gpr_x0 mf L Hmfx0)
+      end.
     - exact Hpttf.
     - exact Hmapwf.
     - split; [| split]; [exact HuMode | exact Huasid | exact Huppn].

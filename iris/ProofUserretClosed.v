@@ -168,7 +168,7 @@ Section UserretClosed.
     iDestruct (UV.usertrap_res_sstc pt ksp Ur with "Hures") as "[Hsstc Hures]".
     iDestruct "Hsstc" as (mcen) "[#Hmcen _]".
     (* ---- and rebuild it for uservec at the EMPTY residue ---- *)
-    iDestruct (user_trap_frame_intro C pt (fun _ : uptd => emp%I)
+    iDestruct (user_trap_frame_at_intro C pt (fun _ : uptd => emp%I)
                  ms_v sc_v stval_v sepc_v g Hmsok
                  with "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr
                        [Hutlb Hdata] [Hstvec Hmiec Hmdlc Hmenvc] []") as "Hframe".
@@ -180,12 +180,17 @@ Section UserretClosed.
     { done. }
     (* ---- one round ---- *)
     iApply (UV.wp_uservec_pt C pt (fun _ : uptd => emp%I) j ksp Ur
+              g ms_v sc_v stval_v sepc_v
               Hstv Hdqc Hmie Hj Hnorm Hptwf
               with "Hkt Hhw Hmin Hclaim Hframe Hures [-]").
     iApply wp_next_intro. iIntros (CID').
     rewrite /uservec_post.
+    (* the round's four boundary rows (milestone J1a) -- intro'd and, at this
+       stage, not yet read: the loop starts consuming them when it switches
+       to [UexecRet.uvb]. *)
     iIntros (pt' mf ms' usatp uepc sc' stval' mdv0 U2)
-      "%Hpttf %Hmapwf %Hsatpr %Hnorm' %Hptwf' %Hmm %Hretms %Hacc'
+      "%Huptpt' %Hround' %Hpcret' %Hgprtie'
+       %Hpttf %Hmapwf %Hsatpr %Hnorm' %Hptwf' %Hmm %Hretms %Hacc'
        Hhs' Hpriv' Hms' Hmie' Hmdl' Hmenv' Hstvec' #Hsenv' Hsc' Hstval' Hsepc'
        Hupt' Hpc' Hgpr' Hures' #Hhw' #Hmin'".
     (* the three frozen CSRs, duplicated out of the residue for [user_cfg] *)

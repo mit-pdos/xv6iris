@@ -460,6 +460,26 @@ Section UserExec.
      exactly that package ([UserFrame.u_regs_pc_is] is the one-line bridge).
      Handing the cells separately would owe the caller three more arguments
      for resources it already holds bundled. *)
+  (* ...AT NAMED DATA.  The trap loop needs the [_at] form, not the ∃, so
+     that the round's post can say which state trapped; [user_trap_frame_intro]
+     below is this plus the [iExists]. *)
+  Lemma user_trap_frame_at_intro (ms' sc' stv' sep' : mword 64)
+      (g : regfile) :
+    trap_mstatus_ok ms' ->
+    hart_state ↦ᵣ HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ Supervisor -∗
+    mstatus ↦ᵣ ms' -∗ scause ↦ᵣ sc' -∗ stval ↦ᵣ stv' -∗ sepc ↦ᵣ sep' -∗
+    pc_is (stvec_base (uc_stvec C)) -∗
+    gpr_file g -∗ user_pt_any pt -∗ user_cfg -∗ Rut pt -∗
+    user_trap_frame_at ms' sc' stv' sep' g.
+  Proof.
+    iIntros (Hok) "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr Hupt Hcfg Hrut".
+    rewrite /user_trap_frame_at.
+    iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hgpr Hupt Hcfg Hrut".
+    iSplitR; [ iPureIntro; exact Hok | ].
+    iFrame "Hpc".
+  Qed.
+
   Lemma user_trap_frame_intro (ms' sc' stv' sep' : mword 64)
       (g : regfile) :
     trap_mstatus_ok ms' ->
