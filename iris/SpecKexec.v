@@ -372,7 +372,7 @@ Definition fs_fabric
   (FsReady.fs_ready ∗
    procs_inv gs ∗
    disk_geom fsc_disk pd pav pu ∗
-   is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }>)%I.
+   is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu))%I.
 
 Global Instance fs_fabric_persistent
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
@@ -405,7 +405,7 @@ Lemma fs_fabric_all
   procs_inv gs ∗
   dev_inv fsc_uart fsc_disk ∗
   disk_geom fsc_disk pd pav pu ∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }>.
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu).
 Proof.
   (* row by row, not one [iFrame]: every conjunct is definition-valued, so a
      named frame pays a goal-side conversion per hypothesis -- the same

@@ -95,9 +95,9 @@ Definition cpu_ctx_free `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} : iProp Σ 
      At boot the stamp is 0 and [TsoGhost.view_lb_0] gives the receipt for
      nothing; every later publication (a park into this slot) stamps at a
      position its own hart has already passed. *)
-  (* main-tso-readiness: the parked token + receipt are DEFERRED with the
-     rest of the M2 threading; the slot is the bare ∃-context cell run and
-     the claim goes through the shim ([ctx_dom_sc]). *)
+  (* main-tso-readiness (M2): the M-leg's SC shape -- the bare ∃-context
+     cell run; the claim is the shim's [ctx_dom_sc] (ProofScheduler).  The
+     T-leg's parked record + receipt is the cutover shape. *)
   (∃ (vs : list (mword 64)) (ξ : CtxId),
      ⌜ length vs = 14%nat ⌝ ∗
      ctx_cells (XI := ξ) (a_cpu_ctx cid_word) vs)%I.
@@ -799,6 +799,7 @@ Section SchedCtx.
   Qed.
 
 End SchedCtx.
+
 
 (* A BIG-OP UNDER A TRANSPARENT NAME IS AN [iFrame] BOMB (optimization.md):
    [procs_inv] is two [∗ list]s over NPROC, and it is named in 166 files.

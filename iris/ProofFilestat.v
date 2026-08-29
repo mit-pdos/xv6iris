@@ -1357,7 +1357,7 @@ Section ProofFilestat.
                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv] [Hpriv]
                 [Hsb Hbslot]").
       { exact Hcsf. }
-      { exact (uptd_ext_sz_ext _ _ _ Hext). }
+      { exact Hext. }
       { exact Hrvok. }
       { exact Hdwle. }
       { exact Hrv. }
@@ -1443,7 +1443,7 @@ Section ProofFilestat.
                       [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                       [Hpriv] [Henv]").
       { exact Hcsf. }
-      { apply uptd_ext_refl. }
+      { apply uptd_ext_sz_refl. }
       { exact fst_ret_m1. }
       { lia. }
       { exact Hrv. }

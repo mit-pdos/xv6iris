@@ -111,6 +111,7 @@ Require Import IntrDefs.
 Require Import KptShare.   (* [kpt_inv]: the post names the kernel root's invariant *)
 Require Import CpuOwn.
 Require Import ProcGeom.
+Require Import TfUser.   (* [tf_ueq]: the four kernel words are invisible to the resume state *)
 Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import ProcInv.
@@ -148,6 +149,27 @@ Definition prepare_return_tf (ws : list (mword 64))
     (<[tf_ktrap_idx := (mword_of_int KernelSyms.usertrap : mword 64)]>
       (<[tf_ksp_idx := ksp]>
         (<[tf_ksatp_idx := ksat]> ws))).
+
+(* THE FOUR STORES ARE INVISIBLE TO THE RESUME STATE.  They land at word
+   indices 4 / 2 / 1 / 0 -- none of them the epc word (3) and none of them
+   in the restorable-register range [5,35] -- so the trapframe
+   prepare_return hands the sret is [TfUser.tf_ueq]-equal to the one it was
+   given.  This is what lets the trap round (UexecRound.v) state its
+   resume-trapframe equations on EITHER list. *)
+Lemma prepare_return_tf_ueq (ws : list (mword 64)) (ksat ksp kh : mword 64) :
+  tf_ueq ws (prepare_return_tf ws ksat ksp kh).
+Proof.
+  unfold prepare_return_tf.
+  apply tf_ueq_insert_r; [ unfold tf_khartid_idx, tf_epc_idx; lia
+                         | unfold tf_khartid_idx; lia | ].
+  apply tf_ueq_insert_r; [ unfold tf_ktrap_idx, tf_epc_idx; lia
+                         | unfold tf_ktrap_idx; lia | ].
+  apply tf_ueq_insert_r; [ unfold tf_ksp_idx, tf_epc_idx; lia
+                         | unfold tf_ksp_idx; lia | ].
+  apply tf_ueq_insert_r; [ unfold tf_ksatp_idx, tf_epc_idx; lia
+                         | unfold tf_ksatp_idx; lia | ].
+  apply tf_ueq_refl.
+Qed.
 
 (* ... and what those four writes ESTABLISH: [ProcGeom.tf_kernel_words_ok]
    at the root the satp value decodes to, at the hart whose id was written.

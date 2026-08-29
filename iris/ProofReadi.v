@@ -300,7 +300,7 @@ Section ReadiDefs.
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (tot : nat) (P' : uptd),
         ⌜callee_saved m mf⌝ -∗
-        ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+        ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
         ⌜(tot <= rd_clamp (di_size dn) off n)%nat⌝ -∗
         ⌜(mf !!! Regidx Ra0 = (mword_of_int (-1) : mword 64) /\ user = true)
          \/ (mf !!! Regidx Ra0 = (mword_of_int (Z.of_nat tot) : mword 64)
@@ -360,7 +360,7 @@ Section ReadiRet.
     M !!! Regidx Rs9  = (m !!! Regidx Rs9  : mword 64) ->
     M !!! Regidx Rs10 = (m !!! Regidx Rs10 : mword 64) ->
     M !!! Regidx Rs11 = (m !!! Regidx Rs11 : mword 64) ->
-    uptd_ext (pv_upt (us_V U)) P' ->
+    uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ->
     (tot <= rd_clamp (di_size dn) off n)%nat ->
     ((M !!! Regidx Ra0 = (mword_of_int (-1) : mword 64) /\ user = true)
      \/ (M !!! Regidx Ra0 = (mword_of_int (Z.of_nat tot) : mword 64)
@@ -683,7 +683,7 @@ Section ReadiJoin.
     M !!! Regidx Rs9  = (m !!! Regidx Rs9  : mword 64) ->
     M !!! Regidx Rs10 = (m !!! Regidx Rs10 : mword 64) ->
     M !!! Regidx Rs11 = (m !!! Regidx Rs11 : mword 64) ->
-    uptd_ext (pv_upt (us_V U)) P' ->
+    uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ->
     (tot <= rd_clamp (di_size dn) off n)%nat ->
     ((ans = (mword_of_int (-1) : mword 64) /\ user = true)
      \/ (ans = (mword_of_int (Z.of_nat tot) : mword 64)
@@ -827,7 +827,7 @@ Section ReadiExit.
     (K_readi <= K)%nat ->
     rd_sp m M ->
     M !!! Regidx Rs3 = ans ->
-    uptd_ext (pv_upt (us_V U)) P' ->
+    uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ->
     (tot <= rd_clamp (di_size dn) off n)%nat ->
     ((ans = (mword_of_int (-1) : mword 64) /\ user = true)
      \/ (ans = (mword_of_int (Z.of_nat tot) : mword 64)
@@ -1130,7 +1130,7 @@ Section ReadiLoop.
     locks_below lks "bcache" ->
     forall (W tot : nat) (PI : uptd) (M : regfile),
     (tot < nc)%nat ->
-    uptd_ext (pv_upt (us_V U)) PI ->
+    uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) PI ->
     (rd_blocks (off + tot) (nc - tot) <= W)%nat ->
     rd_sp m M ->
     M !!! Regidx Rs6 = ip ->
@@ -1155,7 +1155,7 @@ Section ReadiLoop.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
     rd_fr13 m -∗
     i_dev ip ↦₄{dqd} icfg_dev -∗
     inode_meta ip dn -∗
@@ -1830,7 +1830,7 @@ Section ReadiLoop.
          reports [tot + dwr] -- which is why readi's own [tot] is the count
          of bytes that REACHED the process, not the loop counter. *)
       iAssert (∃ (P2 : uptd) (dwr : nat),
-                 ⌜uptd_ext (pv_upt (us_V U)) P2⌝ ∗
+                 ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P2⌝ ∗
                  ⌜(dwr <= mm)%nat⌝ ∗
                  ⌜((mE !!! Regidx Ra0 : mword 64) = (mword_of_int 0 : mword 64)
                    /\ dwr = mm)
@@ -1871,7 +1871,7 @@ Section ReadiLoop.
             - exact (umem_wr_app (us_M U) (m !!! Regidx Ra2 : mword 64) tot dwr
                        (rd_bytes data off)). }
           iExists P2, dwr.
-          iSplitR; [iPureIntro; exact (uptd_ext_trans _ _ _ HextI Hx)|].
+          iSplitR; [iPureIntro; exact (uptd_ext_sz_trans _ _ _ _ HextI Hx)|].
           iSplitR; [iPureIntro; exact Hdwrle|].
           iSplitR; [iPureIntro;
                     destruct Hran as [[Hr Hd] | [Hr _]];
@@ -2675,7 +2675,7 @@ Section ReadiMain.
       iApply ("Hcont" $! X1 0%nat (pv_upt (us_V U))
                 with "[%] [%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hidev Hmeta Hmap Hblocks Hdst Hsl").
       { unfold callee_saved. split_and!; lkp. }
-      { apply uptd_ext_refl. }
+      { apply uptd_ext_sz_refl. }
       { lia. }
       { right. split; [exact HX1a0 | rewrite Hclamp0; reflexivity]. }
     }
@@ -3164,7 +3164,7 @@ Section ReadiMain.
                   (mword_of_int (Z.of_nat 0%nat) : mword 64)
                   pidv dq dqd j m Z1 K eb b lks
                   HK HZ1sp HZ1s3 HZ1s2 HZ1s8 HZ1s9 HZ1s10 HZ1s11
-                  ltac:(apply uptd_ext_refl) ltac:(lia)
+                  ltac:(apply uptd_ext_sz_refl) ltac:(lia)
                   ltac:(right; split; [reflexivity | exact Hncdef])
                   with "Hcg Hcnt Hextc Hextm Htext Hpc Hframe Hidev
                         Hmeta Hmap Hblocks Hdst Hsl [Hcont]").
@@ -3356,7 +3356,7 @@ Section ReadiMain.
                 ltac:(change (2 ^ 32)%Z with 4294967296%Z; exact Hsum)
                 Hncn Hoffnc Hncdef Ha1 Hj Hgl Hbelow
                 (rd_blocks off nc) 0%nat (pv_upt (us_V U)) U3
-                ltac:(lia) ltac:(apply uptd_ext_refl)
+                ltac:(lia) ltac:(apply uptd_ext_sz_refl)
                 ltac:(replace (off + 0)%nat with off by lia;
                       replace (nc - 0)%nat with nc by lia; lia)
                 HU3sp HU3s6 HU3s7 HU3s4 HU3s1 HU3s5 HU3s3 HU3s9 HU3s8

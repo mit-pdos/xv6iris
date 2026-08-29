@@ -45,11 +45,21 @@ Section shim.
      caller whose own conversion is the remaining work. *)
   Lemma own_context_alloc `{CID : CpuId} : ⊢ |==> ∃ ξ : CtxId, own_context ξ.
   Proof.
-    iMod (ghost_var_alloc (0%fin : CPU)) as (γ) "Hv".
-    iModIntro. iExists (MkCtxId γ inhabitant).
-    rewrite own_context_unseal /own_context_def.
-    iExists (0%fin : CPU). iExact "Hv".
+    iModIntro. iExists inhabitant. rewrite own_context_unseal /own_context_def. by iLeft.
   Qed.
+
+  (* THE TOKENS AT A NAMED CONTEXT -- main's SC stub only (main-tso-readiness
+     Amendment 6; FALSE at TSO, where each context has ONE token).  Two
+     consumers, both structural: a forked child's record is stated at its
+     PARKER's context ([ProofForkretPark], the record's [ctx_parked]), and
+     the seven secondary harts run at the boot carve's context
+     ([SystemAdequacy]).  Both exist because main's T-leg trap tier cannot
+     restate [procs_inv] at a fresh context; at cutover these two sites ARE
+     the fork/boot items of the M2 worklist. *)
+  Lemma own_context_any `{CID : CpuId} (ξ : CtxId) : ⊢@{iPropI Σ} own_context ξ.
+  Proof. rewrite own_context_unseal /own_context_def. by iLeft. Qed.
+  Lemma ctx_parked_any (ξ : CtxId) (T : nat) : ⊢@{iPropI Σ} ctx_parked ξ T.
+  Proof. rewrite ctx_parked_unseal /ctx_parked_def. by iLeft. Qed.
 
   (* THE RESUME-EVIDENCE STOPGAP.  [ctx_resume]/[ctx_exchange] want the
      stable pair "view receipt K, parked stamp ≤ K"; the honest producer
@@ -73,16 +83,27 @@ Section shim.
   Lemma ctx_dom_sc (ξ ξ' : CtxId) : ⊢@{iPropI Σ} ctx_dom ξ ξ'.
   Proof. rewrite ctx_dom_unseal /ctx_dom_def. done. Qed.
 
-  (* THE INSTALL RECEIPT AT ANY POSITION -- SC ONLY, and it belongs here for
-     the same reason [hart_view_lb_any] does on the T-leg: at SC a log
-     position is not evidence of anything, so a creator can name one it has
-     not earned.  Under TSO the receipt comes off the store leaf beside the
-     window it wrote ([TsoGhost.llb loglen_name]) and this lemma is FALSE.
-     Its one client is the lock creators' floor (WpLock's newlock family):
-     when the shim burns, each is a compile error naming a creator whose
-     floor must then come from its own store. *)
-  Lemma log_lb_any (lo : nat) : ⊢@{iPropI Σ} log_lb lo.
-  Proof. rewrite log_lb_unseal /log_lb_def. done. Qed.
+  (* THE CREATOR'S WITNESS AT ANY POSITION -- SC ONLY (main-tso-readiness
+     Amendment 8, §5.1).  Under TSO a lock creator's floor is the dirty-write
+     witness its own mint store registered ([TsoCtx.ctx_wrote_register] at
+     the store leaf, tso-flip WpSconfMem.v's [wp_sd_zero_wpay_s_sconf]); at
+     SC the registration is a ghost step with a trivial body, and this lemma
+     is that step with the leaf left out.  FALSE at TSO.  Its clients are the
+     lock creators' floors; when the shim burns, each is a compile error
+     naming a creator whose witness must then come from its own store. *)
+  Lemma ctx_wrote_any (ξ : CtxId) (t : nat) (a : Arch.pa) :
+    ⊢@{iPropI Σ} ctx_wrote ξ t a.
+  Proof. rewrite ctx_wrote_unseal /ctx_wrote_def. done. Qed.
+
+  (* THE ACQUIRER'S FLOOR AT THE RECORD'S STAMP -- SC ONLY.  Under TSO the
+     AMO leaf mints it: the winning AMO takes the hart's view to the log top
+     and [TsoCtx.hart_view_lb_get] + [ctx_bound_raise] floor the running
+     token at the parked record's stamp (tso-flip WpSconfLock.v's winner
+     arm, A6.120).  At SC the floor is trivial and this lemma is that mint
+     with the interp left out; FALSE at TSO.  Its one client is the AMO leaf's
+     [WpLock.lock_pay_won] (WpSconfLock). *)
+  Lemma ctx_floor_any (ξ : CtxId) (lo : nat) : ⊢@{iPropI Σ} ctx_floor ξ lo.
+  Proof. rewrite ctx_floor_unseal /ctx_floor_def. done. Qed.
 
   Lemma ctx_pointsto_shim (KTR : CurKtier) (ξ : CtxId)
       (a : Arch.pa) (dq : dfrac) (v : bv 8) :

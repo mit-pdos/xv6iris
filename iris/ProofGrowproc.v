@@ -1193,12 +1193,35 @@ Section ProofGrowproc.
       - rewrite uint_unsigned uvm_maxsz_val. exact Hnewle.
       - apply (um_below_grow (pv_sz (us_V U)) (add_vec (pv_sz (us_V U)) nv) (ud_um (pv_upt (us_V U))));
           [exact Hbel | exact Hlesz | rewrite uvm_maxsz_val; exact Hnewle | exact Hdom].
-      - right. left.
+      - (* THE GAINED LEAVES, for sbrk's permission row.  Every vpn the map
+           gained is in uvmalloc's run ([Hdom]), the run is below the new
+           size ([um_below_grow] again), and every leaf on it is
+           [uvm_pte (4 lor 18) _] = vmfault's own [uvm_pte 22 _] ([Hleaf]) --
+           which is what [UserPerm.perm_of_uptd_ext_sz] reads. *)
+        assert (Hbelow' : um_below (add_vec (pv_sz (us_V U)) nv) (ud_um P')).
+        { apply (um_below_grow (pv_sz (us_V U)) (add_vec (pv_sz (us_V U)) nv)
+                   (ud_um (pv_upt (us_V U))));
+            [exact Hbel | exact Hlesz | rewrite uvm_maxsz_val; exact Hnewle
+            | exact Hdom]. }
+        assert (Hextsz : uptd_ext_sz (add_vec (pv_sz (us_V U)) nv)
+                           (pv_upt (us_V U)) P').
+        { split; [exact Hext |]. split.
+          - intros vpn w _ Hs. exact (Hbelow' vpn w Hs).
+          - intros vpn w Hn Hs.
+            assert (Hd : vpn ∈ dom (ud_um P'))
+              by (apply elem_of_dom; exists w; exact Hs).
+            rewrite Hdom in Hd. apply elem_of_union in Hd as [Hd | Hd].
+            { exfalso. apply elem_of_dom in Hd as [w0 Hw0].
+              rewrite Hn in Hw0. discriminate. }
+            destruct (Hleaf vpn Hd) as (r0 & Hr0). rewrite Hs in Hr0.
+            injection Hr0 as Hr0. exists r0. rewrite Hr0. reflexivity. }
+        right. left.
         split; [reflexivity |].
         split; [exact Hnpos |].
         split; [rewrite uint_unsigned uvm_maxsz_val; exact Hnewle |].
         split; [reflexivity |].
-        split; [exact Hext |].
+        split; [rewrite !uint_unsigned; exact Hlesz |].
+        split; [exact Hextsz |].
         split; [exact Hdom | reflexivity]. }
     (* =============== n <= 0 =============== *)
     assert (Htgt48 : add_vec (mword_of_int (KernelSyms.growproc + 0x16) : mword 64)

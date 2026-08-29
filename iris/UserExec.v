@@ -419,10 +419,16 @@ Section UserExec.
   (* step lemmas that produce this frame know them precisely, and a caller *)
   (* needing them can consume those lemmas directly).                      *)
   (* ------------------------------------------------------------------- *)
-  Definition user_trap_frame : iProp Σ :=
-    (∃ (ms_v sc_v stval_v sepc_v : mword 64)
-       (g : regfile),
-      ⌜trap_mstatus_ok ms_v⌝ ∗
+  (* THE SAME FRAME AT NAMED VALUES.  [user_trap_frame] below is this with
+     its five data existentially quantified; a caller that KNOWS which state
+     trapped -- the trap round's own post (UexecRound.v), which has to name
+     the resume trapframe -- keys on this one instead and never has to open
+     and re-close the ∃.  Nothing else changes: [user_trap_frame] is
+     definitionally what it was, so every existing opener/introducer stands
+     and [user_trap_frame_unfold] is [reflexivity]. *)
+  Definition user_trap_frame_at (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : regfile) : iProp Σ :=
+    (⌜trap_mstatus_ok ms_v⌝ ∗
       hart_state ↦ᵣ HART_ACTIVE tt ∗
       cur_privilege ↦ᵣ Supervisor ∗
       mstatus ↦ᵣ ms_v ∗
@@ -435,6 +441,100 @@ Section UserExec.
       user_cfg ∗
       Rut pt)%I.
 
+  (* ...AND THE SAME ROWS WITH THE IMAGE NAMED AT THE LAZY TIER (milestone J,
+     stage S3).  [user_trap_frame_atm] is [user_trap_frame_at] with
+     [UserPtTree.user_pt_any pt] -- the MAPPED bundle with its image
+     existentially quantified -- replaced by [user_ptm_inv pt sz M], the
+     lazy sz-region view at a NAMED image.  Everything else is verbatim, in
+     the same conjunct order.
+
+     WHY THE LOOP NEEDS IT.  Milestone J's loop hands user execution a
+     [UexecRet.uvb] bundle whose image conjunct IS [user_ptm_inv pt sz M],
+     and the round's post has to say what happened to THAT map; with the
+     image quantified inside the entry frame the loop cannot name what it
+     passes on.  [UexecRet.trapped_machine] is this predicate plus the K3
+     length conjunct, and [user_trap_frame_atm_at] below is the one-way
+     forgetful mover back to the [_at] form (via
+     [UserPtTree.user_ptm_inv_any]) for the generic tier, which speaks the
+     mapped view. *)
+  Definition user_trap_frame_atm (sz : Z) (M : gmap Z (bv 8))
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (g : regfile) : iProp Σ :=
+    (⌜trap_mstatus_ok ms_v⌝ ∗
+      hart_state ↦ᵣ HART_ACTIVE tt ∗
+      cur_privilege ↦ᵣ Supervisor ∗
+      mstatus ↦ᵣ ms_v ∗
+      scause ↦ᵣ sc_v ∗
+      stval ↦ᵣ stval_v ∗
+      sepc ↦ᵣ sepc_v ∗
+      pc_is (stvec_base (uc_stvec C)) ∗
+      gpr_file g ∗
+      user_ptm_inv pt sz M ∗
+      user_cfg ∗
+      Rut pt)%I.
+
+  (* FORGET THE IMAGE: the only conjunct that differs weakens by
+     [user_ptm_inv_any], and every other row is [iExact]. *)
+  Lemma user_trap_frame_atm_at (sz : Z) (M : gmap Z (bv 8))
+      (ms_v sc_v stval_v sepc_v : mword 64) (g : regfile) :
+    user_trap_frame_atm sz M ms_v sc_v stval_v sepc_v g -∗
+    user_trap_frame_at ms_v sc_v stval_v sepc_v g.
+  Proof.
+    rewrite /user_trap_frame_atm /user_trap_frame_at.
+    iIntros "(%Hok & Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpc & Hg &
+              Hpt & Hcfg & Hrut)".
+    iDestruct (user_ptm_inv_any with "Hpt") as "Hany".
+    iSplitR; [ iPureIntro; exact Hok | ].
+    iSplitL "Hhs"; [ iExact "Hhs" | ].
+    iSplitL "Hpriv"; [ iExact "Hpriv" | ].
+    iSplitL "Hms"; [ iExact "Hms" | ].
+    iSplitL "Hsc"; [ iExact "Hsc" | ].
+    iSplitL "Hstval"; [ iExact "Hstval" | ].
+    iSplitL "Hsepc"; [ iExact "Hsepc" | ].
+    iSplitL "Hpc"; [ iExact "Hpc" | ].
+    iSplitL "Hg"; [ iExact "Hg" | ].
+    iSplitL "Hany"; [ iExact "Hany" | ].
+    iSplitL "Hcfg"; [ iExact "Hcfg" | iExact "Hrut" ].
+  Qed.
+
+  (* ...and the introducer, [user_trap_frame_at_intro]'s twin at the named
+     image (row by row, never [iFrame]: see claude-notes/optimization.md). *)
+  Lemma user_trap_frame_atm_intro (sz : Z) (M : gmap Z (bv 8))
+      (ms' sc' stv' sep' : mword 64) (g : regfile) :
+    trap_mstatus_ok ms' ->
+    hart_state ↦ᵣ HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ Supervisor -∗
+    mstatus ↦ᵣ ms' -∗ scause ↦ᵣ sc' -∗ stval ↦ᵣ stv' -∗ sepc ↦ᵣ sep' -∗
+    pc_is (stvec_base (uc_stvec C)) -∗
+    gpr_file g -∗ user_ptm_inv pt sz M -∗ user_cfg -∗ Rut pt -∗
+    user_trap_frame_atm sz M ms' sc' stv' sep' g.
+  Proof.
+    iIntros (Hok) "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr Hupt Hcfg Hrut".
+    rewrite /user_trap_frame_atm.
+    iSplitR; [ iPureIntro; exact Hok | ].
+    iSplitL "Hhs"; [ iExact "Hhs" | ].
+    iSplitL "Hpriv"; [ iExact "Hpriv" | ].
+    iSplitL "Hms"; [ iExact "Hms" | ].
+    iSplitL "Hsc"; [ iExact "Hsc" | ].
+    iSplitL "Hstval"; [ iExact "Hstval" | ].
+    iSplitL "Hsepc"; [ iExact "Hsepc" | ].
+    iSplitL "Hpc"; [ iExact "Hpc" | ].
+    iSplitL "Hgpr"; [ iExact "Hgpr" | ].
+    iSplitL "Hupt"; [ iExact "Hupt" | ].
+    iSplitL "Hcfg"; [ iExact "Hcfg" | iExact "Hrut" ].
+  Qed.
+
+  Definition user_trap_frame : iProp Σ :=
+    (∃ (ms_v sc_v stval_v sepc_v : mword 64)
+       (g : regfile),
+      user_trap_frame_at ms_v sc_v stval_v sepc_v g)%I.
+
+  Lemma user_trap_frame_unfold :
+    user_trap_frame ⊣⊢
+    ∃ (ms_v sc_v stval_v sepc_v : mword 64) (g : regfile),
+      user_trap_frame_at ms_v sc_v stval_v sepc_v g.
+  Proof. reflexivity. Qed.
+
   (* assemble the trapped frame from the delivered cells (shared by every
      trap arm -- the values differ, the shape never does) *)
   (* IT TAKES [pc_is], NOT THE TWO CELLS.  Post-port every producer of a trap
@@ -443,6 +543,26 @@ Section UserExec.
      exactly that package ([UserFrame.u_regs_pc_is] is the one-line bridge).
      Handing the cells separately would owe the caller three more arguments
      for resources it already holds bundled. *)
+  (* ...AT NAMED DATA.  The trap loop needs the [_at] form, not the ∃, so
+     that the round's post can say which state trapped; [user_trap_frame_intro]
+     below is this plus the [iExists]. *)
+  Lemma user_trap_frame_at_intro (ms' sc' stv' sep' : mword 64)
+      (g : regfile) :
+    trap_mstatus_ok ms' ->
+    hart_state ↦ᵣ HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ Supervisor -∗
+    mstatus ↦ᵣ ms' -∗ scause ↦ᵣ sc' -∗ stval ↦ᵣ stv' -∗ sepc ↦ᵣ sep' -∗
+    pc_is (stvec_base (uc_stvec C)) -∗
+    gpr_file g -∗ user_pt_any pt -∗ user_cfg -∗ Rut pt -∗
+    user_trap_frame_at ms' sc' stv' sep' g.
+  Proof.
+    iIntros (Hok) "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr Hupt Hcfg Hrut".
+    rewrite /user_trap_frame_at.
+    iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hgpr Hupt Hcfg Hrut".
+    iSplitR; [ iPureIntro; exact Hok | ].
+    iFrame "Hpc".
+  Qed.
+
   Lemma user_trap_frame_intro (ms' sc' stv' sep' : mword 64)
       (g : regfile) :
     trap_mstatus_ok ms' ->
@@ -454,6 +574,7 @@ Section UserExec.
     user_trap_frame.
   Proof.
     iIntros (Hok) "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr Hupt Hcfg Hrut".
+    rewrite /user_trap_frame /user_trap_frame_at.
     iExists ms', sc', stv', sep', g.
     iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hgpr Hupt Hcfg Hrut".
     iSplitR; [ iPureIntro; exact Hok | ].

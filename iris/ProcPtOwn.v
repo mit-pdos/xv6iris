@@ -2514,9 +2514,17 @@ Qed.
 (* --------------------------------------------------------------------- *)
 Definition uptd_ext_sz (szv : mword 64) (P P' : uptd) : Prop :=
   uptd_ext P P' /\
-  forall (vpn : mword 27) (w : mword 64),
-    P.(ud_um) !! vpn = None -> P'.(ud_um) !! vpn = Some w ->
-    (bv_unsigned vpn * 4096 < bv_unsigned szv)%Z.
+  (forall (vpn : mword 27) (w : mword 64),
+     P.(ud_um) !! vpn = None -> P'.(ud_um) !! vpn = Some w ->
+     (bv_unsigned vpn * 4096 < bv_unsigned szv)%Z) /\
+  (* ...and every gained leaf is vmfault's own RW-user leaf.  Every producer
+     of this relation grows the map through [uptd_insert] = [vmfault_pte],
+     i.e. [uvm_pte 22 _]; recording it here is what lets [UserPerm]'s
+     [perm_of_uptd_ext_sz] see that the permission PROJECTION does not move
+     under a lazy fill (milestone J, R4). *)
+  (forall (vpn : mword 27) (w : mword 64),
+     P.(ud_um) !! vpn = None -> P'.(ud_um) !! vpn = Some w ->
+     exists r : mword 64, w = uvm_pte 22 r).
 
 Lemma uptd_ext_sz_ext (szv : mword 64) (P P' : uptd) :
   uptd_ext_sz szv P P' -> uptd_ext P P'.
@@ -2525,18 +2533,25 @@ Proof. intros [H _]. exact H. Qed.
 Lemma uptd_ext_sz_refl (szv : mword 64) (P : uptd) : uptd_ext_sz szv P P.
 Proof.
   split; [apply uptd_ext_refl |].
-  intros vpn w Hn Hs. rewrite Hn in Hs. discriminate.
+  split; intros vpn w Hn Hs; rewrite Hn in Hs; discriminate.
 Qed.
 
 Lemma uptd_ext_sz_trans (szv : mword 64) (P Q R : uptd) :
   uptd_ext_sz szv P Q -> uptd_ext_sz szv Q R -> uptd_ext_sz szv P R.
 Proof.
-  intros [He1 Hb1] [He2 Hb2].
+  intros (He1 & Hb1 & Hl1) (He2 & Hb2 & Hl2).
   split; [exact (uptd_ext_trans P Q R He1 He2) |].
-  intros vpn w Hn Hs.
-  destruct (Q.(ud_um) !! vpn) as [w' |] eqn:Hq.
+  (* the leaf clause needs one extra step at the Q-hit case: [He2]'s submap
+     turns Q's entry into R's, so the word [Hl1] speaks about IS [w]. *)
+  destruct He2 as (Hr2 & Ht2 & Hsub2).
+  split; intros vpn w Hn Hs; destruct (Q.(ud_um) !! vpn) as [w' |] eqn:Hq.
   - exact (Hb1 vpn w' Hn Hq).
   - exact (Hb2 vpn w Hq Hs).
+  - assert (Hw : w' = w).
+    { pose proof (lookup_weaken _ _ _ _ Hq Hsub2) as Hrr.
+      rewrite Hrr in Hs. injection Hs as Hs'. exact Hs'. }
+    subst w'. exact (Hl1 vpn w Hn Hq).
+  - exact (Hl2 vpn w Hq Hs).
 Qed.
 
 (* a WEAKER size is still a bound *)
@@ -2544,37 +2559,38 @@ Lemma uptd_ext_sz_mono (szv szv' : mword 64) (P P' : uptd) :
   (bv_unsigned szv <= bv_unsigned szv')%Z ->
   uptd_ext_sz szv P P' -> uptd_ext_sz szv' P P'.
 Proof.
-  intros Hle [He Hb]. split; [exact He |].
+  intros Hle (He & Hb & Hl). split; [exact He |].
+  split; [| exact Hl].
   intros vpn w Hn Hs. pose proof (Hb vpn w Hn Hs). lia.
 Qed.
 
-(* vmfault's move, at an arbitrary permission *)
-Lemma uptd_ext_sz_insert_perm (szv : mword 64) (P : uptd) (perm : Z)
-    (vpn : mword 27) (r : mword 64) :
-  P.(ud_um) !! vpn = None ->
-  (bv_unsigned vpn * 4096 < bv_unsigned szv)%Z ->
-  uptd_ext_sz szv P (uptd_insert_perm P perm vpn r).
-Proof.
-  intros Hn Hlt. split; [exact (uptd_ext_insert_perm P perm vpn r Hn) |].
-  unfold uptd_insert_perm. cbn [ud_um]. intros v w Hv Hs.
-  destruct (decide (v = vpn)) as [-> | Hne]; [exact Hlt |].
-  rewrite (lookup_insert_ne _ _ _ _ (not_eq_sym Hne)) in Hs.
-  rewrite Hv in Hs. discriminate.
-Qed.
-
-(* ...and the [perm = 22] instance copyin / copyout actually hand back *)
+(* vmfault's move -- the ONLY way any producer in the tree grows the map,
+   and the reason the leaf clause above is discharge-able.  (There is no
+   arbitrary-[perm] companion: the [uptd_ext_sz_insert_perm] that used to
+   sit here had no caller at [perm <> 22], and at an arbitrary permission
+   the leaf clause is false.) *)
 Lemma uptd_ext_sz_insert (szv : mword 64) (P : uptd) (vpn : mword 27)
     (r : mword 64) :
   P.(ud_um) !! vpn = None ->
   (bv_unsigned vpn * 4096 < bv_unsigned szv)%Z ->
   uptd_ext_sz szv P (uptd_insert P vpn r).
-Proof. exact (uptd_ext_sz_insert_perm szv P 22 vpn r). Qed.
+Proof.
+  intros Hn Hlt. split; [exact (uptd_ext_insert P vpn r Hn) |].
+  unfold uptd_insert, uptd_insert_perm. cbn [ud_um].
+  split; intros v w Hv Hs; destruct (decide (v = vpn)) as [-> | Hne].
+  - exact Hlt.
+  - rewrite (lookup_insert_ne _ _ _ _ (not_eq_sym Hne)) in Hs.
+    rewrite Hv in Hs. discriminate.
+  - rewrite lookup_insert in Hs. injection Hs as <-. exists r. reflexivity.
+  - rewrite (lookup_insert_ne _ _ _ _ (not_eq_sym Hne)) in Hs.
+    rewrite Hv in Hs. discriminate.
+Qed.
 
 (* THE POINT of the relation: it carries the invariant across a call. *)
 Lemma um_below_ext_sz (szv : mword 64) (P P' : uptd) :
   um_below szv P.(ud_um) -> uptd_ext_sz szv P P' -> um_below szv P'.(ud_um).
 Proof.
-  intros Hb [_ Hgrow] v w Hl.
+  intros Hb (_ & Hgrow & _) v w Hl.
   destruct (P.(ud_um) !! v) as [w0 |] eqn:Hp.
   - exact (Hb v w0 Hp).
   - exact (Hgrow v w Hp Hl).
@@ -5452,6 +5468,33 @@ Section ProcPt.
     unfold ud_norm; cbn [ud_root ud_tfp ud_um ud_data].
     rewrite (proc_pt_own_umem P Hmwf Hinj).
     iIntros "Htlb Hdat". iFrame "Htlb Hdat".
+    iPureIntro. split; [exact (uva_pa_inj_of_wf P Hmwf Hinj) | exact Hacc].
+  Qed.
+
+  (* KERNEL VIEW -> USER VIEW, AT THE NAMED LAZY IMAGE (milestone J, S3).
+     The mirror of [user_pt_inv_close], and SHORTER: [proc_ptm] is
+     [⌜proc_pt_wf⌝ ∗ pt_frame ∗ umem_lazy] and [user_ptm_inv] is
+     [utlb_inv_pt ∗ umem_lazy ∗ two pure], so the image conjunct is
+     LITERALLY the same resource on both sides and only the TREE conjunct
+     converts.  The mapped original had to re-index the pages
+     ([proc_pt_own_umem]); there is nothing to re-index here.
+     The descriptor still comes out RENORMALISED, for the same reason:
+     [ud_data] is read by the user tier alone, and at the derived footprint
+     its coverage side condition is free ([ud_pas_cov]).  Neither
+     [umem_lazy] nor [utlb_inv_pt] reads the field, so the re-key is an
+     iota step. *)
+  Lemma user_ptm_inv_close (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    proc_pt_wf P ->
+    utlb_inv_pt P.(ud_root) P.(ud_tfp) P.(ud_um) -∗
+    umem_lazy P sz M -∗
+    user_ptm_inv (ud_norm P) sz M.
+  Proof.
+    intros (Hmwf & Hacc & _ & Hinj & _).
+    rewrite /user_ptm_inv.
+    unfold ud_norm; cbn [ud_root ud_tfp ud_um ud_data].
+    iIntros "Htlb Hm".
+    iSplitL "Htlb"; [iExact "Htlb" |].
+    iSplitL "Hm"; [iExact "Hm" |].
     iPureIntro. split; [exact (uva_pa_inj_of_wf P Hmwf Hinj) | exact Hacc].
   Qed.
 

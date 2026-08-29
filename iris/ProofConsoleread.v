@@ -281,7 +281,7 @@ Section CrBodies.
         verbatim. *)
        ∀ (mf : regfile) (r : Z) (P' : uptd) (Mo : gmap Z (bv 8)),
          ⌜callee_saved m0 mf⌝ -∗
-         ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+         ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
          ⌜(-1 <= r <= Z.max 0 n)%Z⌝ -∗
          ⌜cr_win Ment Mo (m0 !!! Regidx Ra1) n⌝ -∗
          ⌜mf !!! Regidx Ra0 = (mword_of_int r : mword 64)⌝ -∗
@@ -616,7 +616,7 @@ Section CrBodies.
     iSpecialize ("Hcont" $! CIDr with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! E9 r (pv_upt (us_V U)) (us_M U) with "[%] [%] [%] [%] [%] Hcg Hcnt Hpc [Hpriv]").
     - exact Hcs.
-    - apply uptd_ext_refl.
+    - apply uptd_ext_sz_refl.
     - exact Hr.
     - exact Hwin.
     - exact HE9a0.
@@ -642,7 +642,7 @@ Section CrBodies.
          ⌜ M !!! Regidx csp_rs1 = pa_stk sp0 12%nat ⌝ -∗
          ⌜ M !!! Regidx Ra0 = (mword_of_int r : mword 64) ⌝ -∗
          ⌜ cr_cs_hi M m0 ⌝ -∗
-         ⌜ uptd_ext (pv_upt (us_V U)) P' ⌝ -∗
+         ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
          ⌜ (-1 <= r <= Z.max 0 n)%Z ⌝ -∗
          sie_cap_gpr KT1 M (av - 12)%nat true (proc_addr jp) -∗
          pc_is (mword_of_int (CR + 0xce)) -∗
@@ -662,7 +662,7 @@ Section CrBodies.
   Lemma cr_ret_shift `{CID0 : CpuId} `{XI : CurCtx} (jp : nat) (m0 : regfile) (av : nat)
       (pid : mword 32) (U : ustate) (Ment Mo : gmap Z (bv 8)) (P' : uptd)
       (n : Z) (lks : gset string) :
-    uptd_ext (pv_upt (us_V U)) P' ->
+    uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ->
     cr_ret (CID0 := CID0) jp m0 av true pid U Ment n lks -∗
     cr_ret (CID0 := CID0) jp m0 av true pid (upd_usM (us_upt U P') Mo) Ment n lks.
   Proof.
@@ -670,7 +670,7 @@ Section CrBodies.
     iSpecialize ("H" $! CIDx with "[%]"); [exact Hsx|].
     iApply ("H" $! mf r P'' Mo' with "[%] [%] [%] [%] [%] Hcg Hcnt Hpc [Hpriv]").
     - exact Hcs.
-    - exact (uptd_ext_trans _ P' _ Hx Hex).
+    - exact (uptd_ext_sz_trans _ _ P' _ Hx Hex).
     - exact Hr.
     - exact Hwin.
     - exact Ha0.
@@ -746,7 +746,7 @@ Section ProofConsoleread.
          ⌜ M !!! Regidx Rs7 = (mword_of_int n : mword 64) ⌝ -∗
          ⌜ cr_cs_hi M m0 ⌝ -∗
          ⌜ (0 <= n - nc <= Z.max 0 n)%Z ⌝ -∗
-         ⌜ uptd_ext (pv_upt (us_V U)) P' ⌝ -∗
+         ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
          sie_cap_gpr KT1 M (trap_res true + (av - 12))%nat false (proc_addr jp) -∗
          pc_is (mword_of_int (CR + 0xfc)) -∗
          cpu_own 1%nat true (proc_addr jp) false ({["cons"]} ∪ lks) -∗
@@ -825,7 +825,7 @@ Section ProofConsoleread.
       assert (N10 : r <> Ra0) by (intro He; rewrite He in Hr; vm_compute in Hr; discriminate).
       rewrite /X3 upd_ne; [| congruence]. rewrite /X2 upd_ne; [| congruence].
       rewrite /X1 upd_ne; [| congruence]. reflexivity. }
-    iApply (Release.wp_release_sconf KT1 γc a_cons "cons"%string <{ cons_res }> X3
+    iApply (Release.wp_release_sconf KT1 γc a_cons "cons"%string cons_res_at X3
               0%nat true (proc_addr jp) (av - 12)%nat ({["cons"]} ∪ lks) HX3lka
               ltac:(lia)
               with "Hcg Ht Hpc Hlk Hlocked Hres Hcnt Hpay").
@@ -936,7 +936,7 @@ Section ProofConsoleread.
          ⌜ M !!! Regidx Rs5 = m0 !!! Regidx Rs5 ⌝ -∗
          ⌜ (0 <= n - nc <= Z.max 0 n)%Z ⌝ -∗
          ⌜ (Z.to_nat nc < fl)%nat ⌝ -∗
-         ⌜ uptd_ext (pv_upt (us_V U)) P' ⌝ -∗
+         ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
          cr_exits (CID0 := CID0) γc jp sp0 m0 av pid U n lks -∗
          sie_cap_gpr KT1 M (trap_res true + (av - 12))%nat false (proc_addr jp) -∗
          pc_is (mword_of_int (CR + 0x38)) -∗
@@ -973,7 +973,7 @@ Section ProofConsoleread.
          ⌜ M !!! Regidx Ra5 = sign_extend' 64 rr ⌝ -∗
          ⌜ (0 < nc)%Z /\ (0 <= n - nc <= Z.max 0 n)%Z /\ (Z.to_nat nc <= fl)%nat ⌝ -∗
          ⌜ length bs = INPUT_BUF_SIZE ⌝ -∗
-         ⌜ uptd_ext (pv_upt (us_V U)) P' ⌝ -∗
+         ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
          cr_exits (CID0 := CID0) γc jp sp0 m0 av pid U n lks -∗
          sie_cap_gpr KT1 M (trap_res true + (av - 12))%nat false (proc_addr jp) -∗
          pc_is (mword_of_int (CR + 0x76)) -∗
@@ -1516,7 +1516,7 @@ Section ProofConsoleread.
     assert (Hwin'' : cr_win (us_M U) M'' (m0 !!! Regidx Ra1) n).
     { exists (Z.to_nat (n - nc) + dwr)%nat. split; [| exact Hwr''].
       rewrite Nat2Z.inj_add Z2Nat.id; lia. }
-    assert (Hextc : uptd_ext (pv_upt (us_V U)) P'') by exact (uptd_ext_trans _ P' _ Hext Hext2).
+    assert (Hextc : uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'') by exact (uptd_ext_sz_trans _ _ P' _ Hext Hext2).
     assert (HthrG : forall r : mword 5, is_cs_idx r = true -> r <> Rs5 ->
               mrc !!! Regidx r = M !!! Regidx r).
     { intros r Hr N21.
@@ -1853,7 +1853,7 @@ Section ProofConsoleread.
          ⌜ cr_regs M m0 sp0 nc cur n ⌝ -∗
          ⌜ M !!! Regidx Rs5 = m0 !!! Regidx Rs5 ⌝ -∗
          ⌜ (0 < nc)%Z /\ (0 <= n - nc <= Z.max 0 n)%Z /\ (Z.to_nat nc <= fl)%nat ⌝ -∗
-         ⌜ uptd_ext (pv_upt (us_V U)) P' ⌝ -∗
+         ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
          cr_exits (CID0 := CID0) γc jp sp0 m0 av pid U n lks -∗
          sie_cap_gpr KT1 M (trap_res true + (av - 12))%nat false (proc_addr jp) -∗
          pc_is (mword_of_int (CR + 0x48)) -∗
@@ -2027,7 +2027,7 @@ Section ProofConsoleread.
         apply callee_saved_insert_r; [vm_compute; reflexivity|].
         apply callee_saved_insert_r; [vm_compute; reflexivity|].
         apply callee_saved_insert_r; [vm_compute; reflexivity | apply callee_saved_refl]. }
-      iApply (Release.wp_release_sconf KT1 γc a_cons "cons"%string <{ cons_res }> K3
+      iApply (Release.wp_release_sconf KT1 γc a_cons "cons"%string cons_res_at K3
                 0%nat true (proc_addr jp) (av - 12)%nat ({["cons"]} ∪ lks) HK3lka
                 ltac:(lia)
                 with "Hcg Ht Hpc Hlk Hlocked Hres Hcnt Hpay").
@@ -2161,7 +2161,7 @@ Section ProofConsoleread.
     assert (HcsS4 : callee_saved msp S4).
     { rewrite /S4 /S3. apply callee_saved_insert_r; [vm_compute; reflexivity|].
       apply callee_saved_insert_r; [vm_compute; reflexivity | apply callee_saved_refl]. }
-    iApply (Release.wp_release_sconf KT1 γc a_cons "cons"%string <{ cons_res }> S4
+    iApply (Release.wp_release_sconf KT1 γc a_cons "cons"%string cons_res_at S4
               0%nat true (proc_addr jp) (av - 12)%nat ({["cons"]} ∪ lks) HS4lka
               ltac:(lia)
               with "Hcg Ht Hpc Hlk Hlocked Hres Hcnt Hpay").
@@ -2244,7 +2244,7 @@ Section ProofConsoleread.
       apply callee_saved_insert_r; [vm_compute; reflexivity | apply callee_saved_refl]. }
     iDestruct (cpu_own_transport CIDs1 CIDq1 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf KT1 γc "cons"%string <{ cons_res }> S7 0%nat true
+    iApply (Acquire.wp_acquire_sconf KT1 γc "cons"%string cons_res_at S7 0%nat true
               (proc_addr jp) (av - 12)%nat true lks cr_lvl0
               ltac:(lia)
               Hbelow
@@ -2895,7 +2895,7 @@ Section ProofConsoleread.
       rewrite /P6 upd_ne; [| congruence]. reflexivity. }
     iDestruct (cpu_own_transport CID CIDp17 0%nat true pj true ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf KT1 γc "cons"%string <{ cons_res }> P8 0%nat true pj
+    iApply (Acquire.wp_acquire_sconf KT1 γc "cons"%string cons_res_at P8 0%nat true pj
               (av - 12)%nat true lks cr_lvl0 ltac:(lia)
               Hbelow
               with "Hcg Hcnt Ht Hpc []").
@@ -3007,7 +3007,7 @@ Section ProofConsoleread.
     - exact HA4s5.
     - replace (n - n)%Z with 0%Z by lia. split; [lia | apply Z.le_max_l].
     - lia.
-    - apply uptd_ext_refl.
+    - apply uptd_ext_sz_refl.
     - rewrite us_upt_id upd_usM_id. iExact "Hpriv".
     - rewrite /cr_rest. iFrame "Q7 Q10 Q11 Q12".
   Qed.

@@ -1304,7 +1304,10 @@ Section SysExecHead.
               sx_arg0_lt ltac:(rewrite HM10a0; reflexivity) Harg0 sx_noff0 Kar
               ltac:(rewrite HM10a2; reflexivity) sx_maxpath_lt Hlb
               with "Hcg Hcnt Htext Hdata Hpc Hpriv Hka Hbuf").
-    iIntros (CID13 Hq13 M11 P' bnew) "%Hcs11 %Hext Hcg Hcnt Hpc Hpriv Hbuf %Hret".
+    iIntros (CID13 Hq13 M11 P' bnew) "%Hcs11 %Hextz Hcg Hcnt Hpc Hpriv Hbuf %Hret".
+    (* argstr now reports [uptd_ext_sz]; exec's own post is at the bare
+       [uptd_ext], so the extra content is dropped here and only here. *)
+    pose proof (uptd_ext_sz_ext _ _ _ Hextz) as Hext.
     iEval (rewrite HM10a1) in "Hbuf".
     assert (Hpc020 : ret_pc (M10 !!! Regidx Rra : mword 64)
                      = mword_of_int (SX + 0x20))
@@ -3500,7 +3503,10 @@ Section SysExecStep.
               (proc_addr jp) pid (us_upt U Pa) 4096%nat fpg b lks
               sx_noff0 Kfs HQ6a2 sx_pgsize_lt Hlb
               with "Hcg Hcnt Htext Hpc Hpriv Hka Hpg").
-    iIntros (CID18 Hq18 mg Ps bnew) "%Hcsg %Hexts Hcg Hcnt Hpc Hpriv Hpg %Hfr".
+    iIntros (CID18 Hq18 mg Ps bnew) "%Hcsg %Hextsz Hcg Hcnt Hpc Hpriv Hpg %Hfr".
+    (* fetchstr now reports [uptd_ext_sz]; exec's post is at the bare
+       [uptd_ext] (SpecSysExec.v), so it is dropped here. *)
+    pose proof (uptd_ext_sz_ext _ _ _ Hextsz) as Hexts.
     assert (Hups : us_upt (us_upt U Pa) Ps = us_upt U Ps)
       by (destruct U as [Vx Mx]; destruct Vx; reflexivity).
     iEval (rewrite Hups) in "Hpriv".

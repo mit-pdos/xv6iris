@@ -488,7 +488,7 @@ Section SpecFilewrite.
      dev_inv (fsc_uart) (fsc_disk) ∗
      disk_geom (fsc_disk) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn) ∗
      is_lock (fsc_dlock) d_lock "virtio_disk"%string
-       <{ disk_res (fsc_disk) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn) }> ∗
+       (disk_res_at (fsc_disk) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)) ∗
      (* THREE slot units: writei's peak (bmap's, and its own bread held
         across either_copyin and log_write).  ilock's bread and end_op's
         commit borrow from the same three, one transaction at a time. *)
@@ -626,7 +626,7 @@ Definition wp_filewrite_sconf_body
        (image campaign, tier 3.) *)
   ∀ (mf : regfile) (r : mword 64) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+      ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       ⌜filewrite_ret n r⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗

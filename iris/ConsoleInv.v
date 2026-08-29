@@ -243,6 +243,12 @@ Section ConsoleCtx.
     iFrame.
   Qed.
 
+  (* A6.121 (tso-flip ConsoleInv.v:224): the payload over an EXPLICIT
+     context -- [cons_res] at [ξ], what the lock surface takes as its
+     [CtxId → iProp]; every consumer keeps reading and writing [cons_res]. *)
+  Definition cons_res_at (ξ : CtxId) : iProp Σ := cons_res (XI := ξ).
+  Lemma cons_res_at_cur : cons_res_at cur_ctx = cons_res.
+  Proof. reflexivity. Qed.
   Global Instance cons_res_morph : CtxMorph (λ ξ0 : CtxId, cons_res (XI := ξ0)).
   Proof.
     iIntros (ξ ξ') "Hd H". rewrite /cons_res.
@@ -254,13 +260,15 @@ Section ConsoleCtx.
     iDestruct (ctx_morph_word4 _ _ _ _ ξ ξ' with "Hd He") as "[Hd He]".
     iFrame "Hd". iExists r, w, e, bs. iFrame.
   Qed.
+  Global Instance cons_res_at_morph : CtxMorph cons_res_at.
+  Proof. rewrite /cons_res_at. apply cons_res_morph. Qed.
 
   (* THE WHOLE CREDENTIAL.  Persistent, singleton, and taken by value: a
      caller of consoleread passes this and nothing else about the console.
      The payload is spelled as a λ that NAMES its context (recipe rule 1):
      the ring re-indexes to whichever context holds the lock. *)
   Definition is_conslock (γ : gname) : iProp Σ :=
-    is_lock γ a_cons "cons"%string <{ cons_res }>.
+    is_lock γ a_cons "cons"%string cons_res_at.
 
   Global Instance is_conslock_persistent γ : Persistent (is_conslock γ).
   Proof. apply _. Qed.
@@ -591,6 +599,30 @@ Section ConsoleMorph.
                            (ctx_morph_word _ _ _ _) (ctx_morph_word _ _ _ _))
                  ξ ξ' with "Hd H") as "[Hd H]".
     iFrame.
+  Qed.
+
+  (* [console_inv] / [console_ready] at another context (tso-port M2: a
+     forkret park carries [console_ready] in [UsertrapRes.park_globals]).
+     The cons lock's payload is the closed [cons_res_at], so the handle
+     moves by [WpLock.is_lock_morph] alone (its floor's transport). *)
+  Global Instance console_inv_morph (γ : gname) :
+    CtxMorph (λ ξ0 : CtxId, console_inv (XI := ξ0) γ).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /console_inv /is_conslock.
+    iDestruct "H" as "[#Hlk Ht]".
+    iDestruct (devsw_table_morph ξ ξ' with "Hd Ht") as "[Hd Ht]".
+    iDestruct (is_lock_morph γ a_cons "cons"%string cons_res_at ξ ξ' with "Hd Hlk")
+      as "[Hd #Hlk']".
+    iFrame "Hd Ht Hlk'".
+  Qed.
+
+  Global Instance console_ready_morph :
+    CtxMorph (λ ξ0 : CtxId, console_ready (XI := ξ0)).
+  Proof.
+    iIntros (ξ ξ') "Hd H". rewrite /console_ready.
+    iDestruct "H" as (γ) "H".
+    iDestruct (console_inv_morph γ ξ ξ' with "Hd H") as "[Hd H]".
+    iFrame "Hd". iExists γ. iExact "H".
   Qed.
 
 

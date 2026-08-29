@@ -169,7 +169,7 @@ Definition wp_filewrite_au_body
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile) (r : mword 64) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+      ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       (* EDIT 3: the armed post REPLACES [⌜filewrite_ret n r⌝] -- each arm
          pins [r], so the landed blanket is implied. *)
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗

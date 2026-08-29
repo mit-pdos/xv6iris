@@ -43,23 +43,23 @@ _vtest_body:
     li   s0, UART0
 
 /* ---- MCR is five bits of storage ---- */
-    lbu  t0, 4(s0)
+    lbu  t0, UART_REG(4)(s0)
     sw   t0, R_MCR0(s11)
     li   t0, 0xff
-    sb   t0, 4(s0)
-    lbu  t0, 4(s0)
+    sb   t0, UART_REG(4)(s0)
+    lbu  t0, UART_REG(4)(s0)
     sw   t0, R_MCRFF(s11)
     li   t0, 1
     sw   t0, RES_STATUS(s11)
 
 /* ---- the modem outputs, looped back to the inputs ---- */
     li   t0, 0x13                    /* LOOP|RTS|DTR */
-    sb   t0, 4(s0)
-    lbu  t0, 6(s0)
+    sb   t0, UART_REG(4)(s0)
+    lbu  t0, UART_REG(6)(s0)
     sw   t0, R_MSRL1(s11)
     li   t0, 0x1f                    /* LOOP|OUT2|OUT1|RTS|DTR */
-    sb   t0, 4(s0)
-    lbu  t0, 6(s0)
+    sb   t0, UART_REG(4)(s0)
+    lbu  t0, UART_REG(6)(s0)
     sw   t0, R_MSRL2(s11)
     li   t0, 2
     sw   t0, RES_STATUS(s11)
@@ -68,15 +68,15 @@ _vtest_body:
  * the return trip is the device's own step, not a side effect of the
  * store ---- */
     li   t0, 0x41                    /* 'A' */
-    sb   t0, 0(s0)
-1:  lbu  t0, 5(s0)
+    sb   t0, UART_REG(0)(s0)
+1:  lbu  t0, UART_REG(5)(s0)
     andi t0, t0, 0x01
     beqz t0, 1b
-    lbu  t0, 5(s0)
+    lbu  t0, UART_REG(5)(s0)
     sw   t0, R_LSRD(s11)
-    lbu  t0, 0(s0)
+    lbu  t0, UART_REG(0)(s0)
     sw   t0, R_RHR(s11)
-    lbu  t0, 5(s0)
+    lbu  t0, UART_REG(5)(s0)
     sw   t0, R_LSRE(s11)
     li   t0, 3
     sw   t0, RES_STATUS(s11)
@@ -84,18 +84,18 @@ _vtest_body:
 /* ---- out of loopback: the port is a port again, and 'Y' reaches the host
  * while 'A' never did ---- */
     li   t0, 0x03                    /* LOOP clear */
-    sb   t0, 4(s0)
-    lbu  t0, 6(s0)
+    sb   t0, UART_REG(4)(s0)
+    lbu  t0, UART_REG(6)(s0)
     sw   t0, R_MSR0(s11)
-2:  lbu  t0, 5(s0)
+2:  lbu  t0, UART_REG(5)(s0)
     andi t0, t0, 0x20
     beqz t0, 2b
     li   t0, 0x59                    /* 'Y' */
-    sb   t0, 0(s0)
-3:  lbu  t0, 5(s0)
+    sb   t0, UART_REG(0)(s0)
+3:  lbu  t0, UART_REG(5)(s0)
     andi t0, t0, 0x40                /* TEMT: it has left the transmitter */
     beqz t0, 3b
-    lbu  t0, 5(s0)
+    lbu  t0, UART_REG(5)(s0)
     sw   t0, R_LSRF(s11)
     li   t0, 4
     sw   t0, RES_STATUS(s11)

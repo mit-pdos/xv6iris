@@ -104,6 +104,11 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   lives and how it travels, the two run sites, the seal discipline, and
   the sync entry-deposit constructor.  Read before touching the trap
   loop's user-WP seam.
+- **[`uk-engine.md`](design/uk-engine.md)** — the user-mode-on-kernel
+  engine: the per-page PERMISSION MAP in the slot's key (a projection of
+  the table and size, lazy pages filled RW, and why), the `Uk*.v` engine
+  stated against the kernel's trap contract, sync on it, and what
+  milestone J owes.
 - **[`elf.md`](design/elf.md)** — ELF file semantics: the file-side
   `ElfFile.v` layer vs `ElfEnc.v`'s code-side readers, the PrimString import
   vehicle for whole binaries, the kernel-dump consistency theorem
@@ -181,6 +186,7 @@ outstanding; see the `completed/` section below).
   port's measured mistakes — followed by AMENDMENT 1, Slice 0's inventory of
   today's main, which corrects the brief in three places.
 
+- **[`user-wp-slot-checkpoint.md`](projects/user-wp-slot-checkpoint.md)** — coordinator checkpoint 2026-08-28: the session's rulings, in-flight (possibly ungated) state, and how to resume.  Read FIRST if resuming user-wp-slot.
 - **[`user-wp-slot.md`](projects/user-wp-slot.md)** — the PER-PROCESS
   user-execution WP slot, step 3: making a verified process run IN PLACE
   of the generic-safety WP.  Steps 1–2 are landed (the slot machinery and
@@ -201,7 +207,15 @@ outstanding; see the `completed/` section below).
   the port of `namei-pinned-lookup.md`'s results (its lane P).
 
 - **[`device-conformance.md`](projects/device-conformance.md)** — the
-  device semantics differentially tested against QEMU: one bare-metal image
+  device semantics differentially tested against QEMU **and, since
+  2026-08-29, against a real VisionFive 2 board over JTAG**
+  (`tools/vtest/board.py`, `make hwtest`; read
+  [`tools/vtest/README-hw.md`](../tools/vtest/README-hw.md) first — a board
+  run claims something narrower than a QEMU run).  The board has already
+  found TWO UNSOUNDNESSES that a QEMU image could not have — the model's
+  clock never runs, and the CLINT is not indexed by hart (live in xv6's
+  `start()`) — because every QEMU test runs on hart 0 and the harness's
+  clock never ticks.  The QEMU half: one bare-metal image
   run on both machines, the model side EXHIBITING one execution by
   `vm_compute` (no WP, no Iris, ~8 ms/instruction).  Landed and green
   (`make vtest`); it has already found FIVE divergences, one of them an

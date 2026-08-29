@@ -291,7 +291,7 @@ Definition wp_sys_mkdir_friendly_body
   ∀ (mf : regfile) (ns' : nat) (P' : uptd),
       ⌜sys_mkdir_ret (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+      ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       ⌜ns' = ns⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 true pj b lks -∗
@@ -459,7 +459,7 @@ Definition wp_sys_chdir_friendly_body
   (* the image moves: argstr's fetchstr faults user pages in *)
   ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+      ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 true pj b lks -∗
       pc_is ret_tgt -∗

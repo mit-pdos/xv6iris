@@ -261,7 +261,7 @@ Definition wp_iunlockput_dep_sconf_body
   procs_inv gs -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
   bslots 3 -∗
   (* THE BUDGET HALF ONLY: at a [DepTx] descriptor this caller's transaction
      token is part-parked in the escrow, so it cannot present [log_op]; the
@@ -410,7 +410,7 @@ Definition wp_iunlockput_dep_gen_body
   procs_inv gs -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
   bslots 3 -∗
   (* THE GROUP CREDIT, threaded verbatim to iput (SpecIput.v's [crz]):
      [emp] at [crz = false], the walker's [nlz_obs] plus the region's two
@@ -561,7 +561,7 @@ Definition wp_iunlockput_tx_sconf_body
   procs_inv gs -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
   bslots 3 -∗
   (* THE BUDGET HALF ONLY: this caller's transaction token is HALF-PARKED
      in the escrow, so it cannot present [log_op]; the disarm re-forms the
@@ -694,7 +694,7 @@ Definition wp_iunlockput_tx_gen_body
   procs_inv gs -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
   bslots 3 -∗
   (* THE GROUP CREDIT, threaded verbatim to iput (SpecIput.v's [crz]):
      [emp] at [crz = false], the walker's [nlz_obs] plus the region's two

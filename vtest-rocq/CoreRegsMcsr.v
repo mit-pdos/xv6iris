@@ -28,7 +28,7 @@
 From Stdlib Require Import List ZArith.
 Import ListNotations.
 From stdpp Require Import list.
-Require Import VBoot CoreRegsMcsrGen.
+Require Import VBoot CoreRegsMcsrGen CoreRegsMcsrHart1Gen.
 Local Open Scope Z_scope.
 
 (* a 64-bit result-region field, out of either side, as one number *)
@@ -229,3 +229,49 @@ Proof. discriminate. Qed.
 
 Lemma core_regs_mcsr_disk : core_regs_mcsr_qemu_disk = [].
 Proof. reflexivity. Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* THE M-MODE CSR FILE ON HART 1, AND THE ONE REGISTER THAT MOVES.        *)
+(*                                                                        *)
+(*    Capture: CoreRegsMcsrHart1Gen.v -- the same source built with        *)
+(*    PRIMARY_HART=1 and run under -smp 2.  MEASURED: of the whole M-mode  *)
+(*    dump, EXACTLY ONE word differs from the hart-0 capture, and it is    *)
+(*    mhartid (+144), 0 -> 1.  Everything else -- misa, mstatus, medeleg,  *)
+(*    mideleg, mvendorid, marchid, mimpid, the lot -- is byte-identical.   *)
+(*                                                                        *)
+(*    That is the sharpest form of the claim [VConc.g0_of]'s header makes: *)
+(*    the boot chain's hart-id argument reaches mhartid and NOTHING ELSE.  *)
+(*    A model that leaked it into another CSR, or one that ignored it, is  *)
+(*    excluded by the pair of lemmas below -- and neither could have been  *)
+(*    excluded by any hart-0 test in the tree.                             *)
+(*                                                                        *)
+(*    There is no whole-region lemma here because this file has open       *)
+(*    divergences of its own (findings 19, 20 and 22); it compares field   *)
+(*    by field, and so does this.                                         *)
+(* ---------------------------------------------------------------------- *)
+
+Definition mcsr_h1_run : option mstate :=
+  run_until 900 (start_hart core_regs_mcsr_hart1_primary_hart
+                            core_regs_mcsr_hart1_text).
+
+Definition mcsr_mhartid : nat := 144.
+
+Lemma core_regs_mcsr_hart0_mhartid_qemu :
+  cap_word core_regs_mcsr_qemu_result mcsr_mhartid = 0.
+Proof. reflexivity. Qed.
+Lemma core_regs_mcsr_hart1_mhartid_qemu :
+  cap_word core_regs_mcsr_hart1_qemu_result mcsr_mhartid = 1.
+Proof. reflexivity. Qed.
+Lemma core_regs_mcsr_hart1_mhartid_model :
+  res_word mcsr_h1_run mcsr_mhartid = 1.
+Proof. vm_cast_no_check (eq_refl 1). Qed.
+
+(* ...and it is the ONLY word that moved.  Stated by rebuilding the hart-1
+   capture out of the hart-0 one with just that word replaced: if any other
+   register carried the hart id, this would be false. *)
+Lemma core_regs_mcsr_only_mhartid_moves :
+  core_regs_mcsr_hart1_qemu_result
+    = firstn 144 core_regs_mcsr_qemu_result
+      ++ [1; 0; 0; 0]
+      ++ skipn 148 core_regs_mcsr_qemu_result.
+Proof. vm_cast_no_check (eq_refl core_regs_mcsr_hart1_qemu_result). Qed.

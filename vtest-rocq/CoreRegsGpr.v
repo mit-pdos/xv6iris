@@ -27,7 +27,7 @@
 From Stdlib Require Import List ZArith.
 Import ListNotations.
 From stdpp Require Import list.
-Require Import VBoot CoreRegsGprGen.
+Require Import VBoot CoreRegsGprGen CoreRegsGprHart1Gen.
 Local Open Scope Z_scope.
 
 (* a 64-bit result-region field, out of either side, as one number *)
@@ -158,3 +158,83 @@ Proof. discriminate. Qed.
 (* ...and the run touched no disk, as QEMU's did not. *)
 Lemma core_regs_gpr_disk : core_regs_gpr_qemu_disk = [].
 Proof. reflexivity. Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 4. THE SAME REGISTER FILE, ON HART 1.                                   *)
+(*                                                                         *)
+(*    Capture: CoreRegsGprHart1Gen.v -- the same source built with          *)
+(*    PRIMARY_HART=1 and run under -smp 2, so [_vtest_body] ran on hart 1   *)
+(*    and hart 0 took the AP path.  The model is started on the same hart   *)
+(*    with [VTest.start_hart], which is a legal schedule for exactly the    *)
+(*    reason a hart-0-only schedule is (README.md's `-smp 1` rule).         *)
+(*                                                                         *)
+(*    WHY THIS IS WORTH A CAPTURE.  Every other test in the tree runs on    *)
+(*    hart 0, so [ColdBoot.cold_regs] had never been exercised at an        *)
+(*    argument other than 0, and a boot chain that ignored the argument     *)
+(*    entirely would have passed everything.  What it does with it is       *)
+(*    store it and copy it into a0 -- and a0 is exactly one of the two      *)
+(*    registers that move here.                                            *)
+(*                                                                         *)
+(*    MEASURED: 29 of the 31 are IDENTICAL to the hart-0 capture.  The two  *)
+(*    that move are                                                        *)
+(*                                                                         *)
+(*      ra  0x8000002c -> 0x80000030   the prologue is one instruction      *)
+(*                                     longer (vtest.S's slot bias is under *)
+(*                                     `#if PRIMARY_HART != 0`), so the     *)
+(*                                     return address of the `jal` shifts   *)
+(*                                     by 4.  A property of the IMAGE, not  *)
+(*                                     of the hart.                        *)
+(*      a0  0 -> 1                     the hart id.  THE RESULT.            *)
+(*                                                                         *)
+(*    sp, t0 and t2 do NOT move, and that is the check that the slot bias   *)
+(*    is right: the primary is slot 0 on either hart, so it gets the top of *)
+(*    the stack region either way.  Had the bias been wrong, sp would be a  *)
+(*    page off and the 29 would not have been 29.                          *)
+(* ---------------------------------------------------------------------- *)
+
+Definition gpr_h1_run : option mstate :=
+  run_until 600 (start_hart core_regs_gpr_hart1_primary_hart
+                            core_regs_gpr_hart1_text).
+
+(* the same shape as section 1, against the hart-1 capture: 29 registers
+   equated, and the model's own a1/a2 carried alongside so the two known
+   divergences cost no further evaluation *)
+Definition gpr_h1_expect :=
+  ((fun o => cap_dw core_regs_gpr_hart1_qemu_result o) <$> gpr_agree_offs,
+   0x1000, 0).
+
+Lemma core_regs_gpr_hart1 :
+  ((fun o => res_dw gpr_h1_run o) <$> gpr_agree_offs,
+   res_dw gpr_h1_run 88%nat, res_dw gpr_h1_run 96%nat) = gpr_h1_expect.
+Proof. solve_vtest gpr_h1_expect. Qed.
+
+(* a0 IS THE HART ID, on both sides, on a hart where that is not trivially
+   true.  This is the claim [VConc.g0_of]'s header rests on -- that the boot
+   chain's only use of its argument is to store it and copy it into a0 --
+   checked against a machine for the first time. *)
+Definition gpr_a0_hart0 : Z := 0.
+Definition gpr_a0_hart1 : Z := 1.
+
+Lemma core_regs_gpr_hart1_a0_qemu :
+  cap_dw core_regs_gpr_hart1_qemu_result 80%nat = gpr_a0_hart1.
+Proof. reflexivity. Qed.
+Lemma core_regs_gpr_hart0_a0_qemu :
+  cap_dw core_regs_gpr_qemu_result 80%nat = gpr_a0_hart0.
+Proof. reflexivity. Qed.
+Lemma core_regs_gpr_hart1_a0_model : res_dw gpr_h1_run 80%nat = gpr_a0_hart1.
+Proof. solve_vtest gpr_a0_hart1. Qed.
+
+(* ...and it really moved, so a0 carries the id rather than a constant that
+   happens to be right on hart 0 *)
+Lemma core_regs_gpr_a0_moves_with_the_hart : gpr_a0_hart0 <> gpr_a0_hart1.
+Proof. discriminate. Qed.
+
+(* FINDING 18 IS HART-INDEPENDENT.  a1 is the same wrong constant on hart 1
+   as on hart 0 in the model, and the same real DTB pointer on hart 1 as on
+   hart 0 on QEMU -- so the defect is in the VALUE and not in per-hart
+   plumbing, which is worth knowing before anyone fixes it. *)
+Lemma core_regs_gpr_hart1_a1_qemu :
+  cap_dw core_regs_gpr_hart1_qemu_result 88%nat = gpr_a1_qemu.
+Proof. reflexivity. Qed.
+Lemma core_regs_gpr_hart1_a1_model : res_dw gpr_h1_run 88%nat = gpr_a1_model.
+Proof. solve_vtest gpr_a1_model. Qed.

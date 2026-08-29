@@ -164,7 +164,7 @@ Definition wp_consoleread_sconf_body
        invariant and the loop sleeps inside the read. *)
   ∀ (mf : regfile) (r : Z) (P' : uptd) (d : nat) (bs : nat -> bv 8),
       ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+      ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       (* the whole of what a device read promises: it delivered somewhere
          between "failed" and "all of it". *)
       ⌜(-1 <= r <= Z.max 0 n)%Z⌝ -∗

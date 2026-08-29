@@ -111,6 +111,40 @@ Definition start_dma (text : list Z) : mstate := start_with text dma_regions.
 Definition start_pt  (text : list Z) : mstate := start_with text pt_regions.
 
 (* ---------------------------------------------------------------------- *)
+(* 2b. THE SAME MACHINE, ON A HART THAT IS NOT HART 0.                     *)
+(*                                                                         *)
+(*     [start] above bakes in hart 0, because QEMU's virt board boots hart  *)
+(*     0 and every QEMU capture is of a program that ran there.  A REAL     *)
+(*     BOARD NEED NOT.  The JH7110's hart 0 is a 32-bit E24 monitor core    *)
+(*     that cannot execute one of these images at all, so                   *)
+(*     tools/vtest/board.py runs on a U74 -- mhartid 2 -- and the image is  *)
+(*     built with PRIMARY_HART=2 so that the prologue's stack slot and its  *)
+(*     primary/AP branch agree with where it actually runs.                 *)
+(*                                                                         *)
+(*     The model side has to follow, and NOT because the model cares which  *)
+(*     hart runs: [ColdBoot.cold_regs] is parametric in the hart id and the *)
+(*     id is the only thing the boot chain does with it (it stores it and   *)
+(*     copies it into a0), which is exactly what makes `csrr mhartid` the   *)
+(*     right way for a program to tell harts apart.  It has to follow       *)
+(*     because the PROGRAM reads [mhartid]: run the board's image against   *)
+(*     [start] and the prologue computes slot -2, puts sp two pages below   *)
+(*     STACK_BASE, and the first push is an undeclared address -- a STUCK   *)
+(*     machine that looks exactly like a genuine finding about memory.      *)
+(*                                                                         *)
+(*     So a hardware test says [start_hart <name>_hw_primary_hart           *)
+(*     <name>_hw_text], and the capture carries that hart id for it.        *)
+(* ---------------------------------------------------------------------- *)
+
+Definition start_hart_with (h : Z) (text : list Z) (rs : list region) : mstate :=
+  MState (ColdBoot.cold_regs (SailStdpp.Values.mword_of_int h))
+         (mem_of text rs) dev0_state.
+
+Definition start_hart    (h : Z) (text : list Z) : mstate :=
+  start_hart_with h text std_regions.
+Definition start_hart_pt (h : Z) (text : list Z) : mstate :=
+  start_hart_with h text pt_regions.
+
+(* ---------------------------------------------------------------------- *)
 (* 3. Stepping.                                                            *)
 (*                                                                         *)
 (*    One instruction, then every enabled device action ([VSched.settle],   *)

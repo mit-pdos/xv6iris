@@ -1392,6 +1392,66 @@ Section UserPtInv.
     iSplitR; [iPureIntro; exact Hdom |]. iExact "Hm".
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (* THE LAZY-IMAGE TWIN OF [user_pt_inv] -- added for the WP slot's key. *)
+  (*                                                                    *)
+  (* [user_ptm_inv P sz M] is [user_pt_inv P M] with the image conjunct  *)
+  (* re-keyed to the view the PROCESS has: [umem_lazy P sz M] instead of *)
+  (* [umem_own P M].  The two own exactly the same resource and differ   *)
+  (* only in what their map RECORDS -- the lazy one also carries a 0 at  *)
+  (* every live-but-unmapped va -- and the mapped sub-image is           *)
+  (* recoverable, because a submap is pinned by its domain.             *)
+  (*                                                                    *)
+  (* WHY THE TRAP CONTRACT NEEDS IT.  [UexecRet.uvb]'s image IS the WP   *)
+  (* slot's key, and the key is what the process can OBSERVE -- which    *)
+  (* under lazy allocation cannot tell a faulted-in page from an         *)
+  (* untouched one.  So the key's image is always the lazy view, and the *)
+  (* bundle must assert THIS at it: [user_pt_inv]'s [umem_own] pins      *)
+  (* [dom M = uva_dom P] and is therefore unsatisfiable at the key of a  *)
+  (* process with an unfaulted page (the GAP-premise trap).              *)
+  (*                                                                    *)
+  (* This is [ProcPtOwn.proc_ptm]'s twin on the INSTALLED table, exactly *)
+  (* as [user_pt_inv] is [ProcPtOwn.proc_pt]'s: [proc_ptm] carries the   *)
+  (* PARKED tree ([pt_frame]) and owns neither satp, nor the TLB, nor    *)
+  (* the PMP config, all three of which user execution needs to          *)
+  (* translate at all.                                                  *)
+  (* ------------------------------------------------------------------ *)
+  Definition user_ptm_inv (P : uptd) (sz : Z) (M : gmap Z (bv 8)) : iProp Σ :=
+    (utlb_inv_pt P.(ud_root) P.(ud_tfp) P.(ud_um) ∗
+     umem_lazy P sz M ∗
+     ⌜uva_pa_inj P⌝ ∗
+     ⌜upt_acc_wf P.(ud_um)⌝)%I.
+
+  Lemma user_ptm_inv_any (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    user_ptm_inv P sz M -∗ user_pt_any P.
+  Proof.
+    rewrite /user_ptm_inv user_pt_any_unfold.
+    iIntros "(Htlb & Hm & %Hinj & %Hacc)".
+    iFrame "Htlb".
+    iSplitL "Hm"; [ iApply (umem_lazy_any with "Hm") | ].
+    iPureIntro. split; [ exact Hinj | exact Hacc ].
+  Qed.
+
+  (* the MAPPED sub-image, at some map -- what a consumer that speaks
+     [user_pt_inv] (the generic user-safety tier) is handed *)
+  Lemma user_ptm_inv_pt (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    user_ptm_inv P sz M -∗ ∃ Mp : gmap Z (bv 8), user_pt_inv P Mp.
+  Proof.
+    iIntros "H". iDestruct (user_ptm_inv_any with "H") as "H".
+    rewrite /user_pt_any. iExact "H".
+  Qed.
+
+  (* ...and back: the user-execution bundle at SOME lazy image *)
+  Lemma user_ptm_inv_intro (P : uptd) (sz : Z) :
+    user_pt_any P -∗ ∃ M : gmap Z (bv 8), user_ptm_inv P sz M.
+  Proof.
+    rewrite user_pt_any_unfold /user_ptm_inv.
+    iIntros "(Htlb & Hm & %Hinj & %Hacc)".
+    iDestruct (umem_lazy_intro P sz with "Hm") as (M) "Hm".
+    iExists M. iFrame "Htlb Hm".
+    iPureIntro. split; [ exact Hinj | exact Hacc ].
+  Qed.
+
   (* on a MAPPED va the two halves agree, which is what makes the window
      accessor below read [M] and hand back [Mp] *)
   Lemma umem_lazy_mapped_lookup (P : uptd) (M Mp : gmap Z (bv 8)) (va : Z) :

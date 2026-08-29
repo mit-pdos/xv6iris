@@ -53,6 +53,9 @@ Ktier.v
 RiscvPtsto.v
 TsoCtx.v
 TsoCtxShim.v
+TsoCtxAbsorbLb.v
+CtxMorphTac.v
+CtxRecord.v
 PermInv.v
 PageGeom.v
 KptExecMap.v
@@ -225,6 +228,9 @@ CommonWalk.v
 DecodeTotalU.v
 DecodeSetU.v
 UserExec.v
+UserPerm.v
+TfUser.v
+UsysMemOk.v
 UexecWp.v
 UexecSlot.v
 UserStep.v
@@ -234,6 +240,10 @@ UserMem.v
 UserFetch.v
 UserStepFull.v
 UmodeMem.v
+UmodeRegs.v
+UexecRet.v
+UexecRound.v
+UexecApply.v
 UmodeCap.v
 UmodeFetch.v
 UmodeAbi.v
@@ -250,6 +260,10 @@ UCodeSync.v
 UProofSync.v
 UmodeKernelTie.v
 USyncKernel.v
+UkStep.v
+UkLeaf.v
+UkStore.v
+UkSync.v
 UexecCond.v
 UCodeEcho.v
 USpecEcho.v
@@ -295,6 +309,7 @@ ProofUser.v
 ProofUexecWp.v
 UserKernelBridge.v
 IntrDefs.v
+SieCapCtx.v
 LockRank.v
 LockSet.v
 WpIntrInv.v
@@ -1194,6 +1209,7 @@ ProofUsertrapArms.v
 ProofUsertrapSys.v
 SyscParkEnv.v
 SpecSyscall.v
+UsysMemOkSpec.v
 UtResFits.v
 LinkSyscall.v
 ProofUsertrap.v

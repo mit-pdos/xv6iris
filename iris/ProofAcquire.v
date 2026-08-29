@@ -29,11 +29,9 @@ Require Import SpecAcquire.
 Require Import ProcGeom.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require Import TsoCtxShim.   (* [hart_view_lb_any] / [ctx_dom_sc]: the SC-only
-   receipt and transport evidence behind the context-shaped spec, until the
-   cutover kit mints them from the AMO ([TsoCtxTwin2.twin_passed_get]).
-   main-tso-readiness: the running token ([SieCapCtx]/[ctx_absorb]) is
-   DEFERRED -- sie_cap carries no [own_context] yet. *)
+Require Import TsoCtxAbsorbLb.  (* [ctx_absorb_lb]: the receipt-side absorb *)
+Require Import SieCapCtx.    (* [sie_cap_gpr_own_ctx_acc]: the winner's own
+   running token, borrowed out of the bundle for the [ctx_absorb] below *)
 Import Defs.
 
 (* ---- the sext.w round-trip on the amoswap result (acquire +0x20) ---- *)
@@ -114,7 +112,9 @@ Section ProofAcquire.
     ( Tc -∗
       sie_cap_gpr kt (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (mword_of_int 0 : mword 32))]> M0) n false p -∗
       pc_is (mword_of_int (KernelSyms.acquire + 0x24)) -∗
-      locked_pre γl cpu_id -∗ lock_pay R -∗
+      (* A6.119/A6.120: the WHOLE parked record, with the acquirer's floor
+         at its stamp -- what the absorb below consumes. *)
+      locked_pre γl cpu_id -∗ lock_pay_won R -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -668,16 +668,30 @@ Section ProofAcquire.
        goes straight back ([SieCapCtx]); it is at [CIDpo], the hart that
        won the AMO, and so is the receipt -- the entry hart's would be the
        wrong one (the prologue may have migrated).
-       THE ONE M2 DEBT, named: the receipt is the shim's [hart_view_lb_any]
-       at [K := T], the record's own stamp, so the pure tie [T <= K] is
-       reflexivity.  At cutover the AMO mints the receipt at the log top
-       ([TsoCtxTwin2.twin_passed_get]) and the tie becomes the release's
-       [T' <= t_release] (WpLock.v's [lock_pay] block). *)
-    iDestruct "HRes" as (ξ0 T0) "[_ HRes]".
-    iPoseProof (ctx_dom_sc ξ0 cur_ctx) as "Hdom".
-    iDestruct (ctx_morph ξ0 cur_ctx with "Hdom HRes") as "[_ HRes]".
+       Amendment 8: the receipt is no longer conjured here.  The AMO leaf
+       hands over [lock_pay_won] -- the record with the winner's floor at
+       its stamp -- and [own_context_floor_view] cashes that floor into the
+       stable pair; the floor itself is the leaf's shim mint on main
+       ([TsoCtxShim.ctx_floor_any]) and [hart_view_lb_get] at cutover, where
+       the tie becomes the release's [T' <= t_release] (WpLock.v's
+       [lock_pay] block). *)
+    (* A6.120 (tso-flip ProofAcquire.v:679): AGAINST REAL AMO EVIDENCE.  The
+       leaf hands the winner the parked record WITH the floor at its stamp
+       ([WpLock.lock_pay_won]); the running token (borrowed from the
+       capability, SieCapCtx) cashes that floor into the stable pair
+       [hart_view_lb K ∗ ⌜T ≤ K⌝], and [TsoCtxAbsorbLb.ctx_absorb_lb] is
+       §0.35′(iii)'s absorb.  The receipt [SpecAcquire] exports is the same
+       [K].  The shim's [hart_view_lb_any] is gone from this file; on main
+       the floor itself is the AMO leaf's shim mint ([ctx_floor_any]). *)
+    iDestruct "HRes" as (ξ0 T0) "(Hpk0 & #Hfl0 & HRes)".
+    iDestruct (sie_cap_gpr_own_ctx_acc (CID := CIDpo) with "Hcg") as "[Hrun Hcgb]".
+    iDestruct (TsoCtx.own_context_floor_view (CID := CIDpo) cur_ctx T0
+                 with "Hrun Hfl0") as "[Hrun (%K0 & #HK0 & %HT0K)]".
+    iMod (ctx_absorb_lb (CID := CIDpo) R ξ0 cur_ctx T0 K0 HT0K
+            with "Hrun HK0 Hpk0 HRes") as "(Hrun & _ & HRes)".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iAssert (∃ K : nat, hart_view_lb (CID := CIDpo) K)%I as "Hlb".
-    { iExists T0. iApply hart_view_lb_any. }
+    { iExists K0. iExact "HK0". }
     iSpecialize ("Hcont" $! CIDpo with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! ms E4 with "[%] HTc Hcg Hpc [%] Htok HRes Hlb Hown Hpay").
     { exact Hmsf. }

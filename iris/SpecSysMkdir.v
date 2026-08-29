@@ -245,7 +245,7 @@ Definition wp_sys_mkdir_sconf_body
   gen_cert -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
   bslots 3 -∗
   (* ---- the inode cache, and the region ialloc claims out of ---- *)
   is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
@@ -286,8 +286,8 @@ Definition wp_sys_mkdir_sconf_body
   ∀ (mf : regfile) (ns' : nat) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       (* the page table may have GROWN: argstr's fetchstr faults user pages
-         in.  [uptd_ext] is argstr's own report, relayed. *)
-      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+         in.  [uptd_ext_sz] is argstr's own report, relayed. *)
+      ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗

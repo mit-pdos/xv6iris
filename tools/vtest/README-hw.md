@@ -1,0 +1,266 @@
+# tools/vtest on REAL HARDWARE -- the board side of the device tests
+
+[`README.md`](README.md) is the suite; this file is the second machine.
+Read that one first -- the naming, the ABI, the observation channels and the
+findings table are all its, and none of them change here.
+
+The question is the same one, asked of a development board instead of QEMU:
+
+> is what the real hardware did an execution our model ALLOWS?
+
+What changes is only how an image gets loaded, started and read back, so the
+test sources in `tests/`, the ABI in `abi.h` and the model side in
+`vtest-rocq/` are shared.  A board run writes `vtest-rocq/<Name>HwGen.v`
+beside `vtest.py`'s `<Name>Gen.v`, and **the same `vtest-rocq/<Name>.v`
+checks the model against both** -- so a divergence that shows up on only one
+machine is visible in one file, next to the other machine's answer.
+
+    make hwtest-probe     talk to the board, print what is there
+    make hwtest-gen HWTEST_TESTS="clint_time core_smoke"
+    make hwtest           regenerate every runnable capture, then vtest-check
+
+`hwtest-gen` needs the board and OpenOCD; nothing else does, and none of it
+is wired into `make vtest`, which must keep working with no hardware
+present.  `vtest-check` checks hardware captures like any other -- they are
+checked-in literals.
+
+
+## THE POINT, and why a board is worth the trouble
+
+QEMU is a reference *implementation*, not a machine.  It is the same
+codebase the model was written against, it runs on an x86 host whose memory
+model it inherits, and its `virt` board is a synthetic platform designed to
+be easy.  Every finding the suite had before this file came from comparing
+one model of a machine against another model of the same machine.
+
+A real SoC agrees with neither.  It has hart 0 as a 32-bit monitor core, a
+UART from a different vendor, no virtio at all, firmware already running,
+and a clock that does not stop when you stop looking.  **Two of the first
+three questions asked of it produced findings that six months of QEMU
+testing had not** -- see "Findings" below -- and both are things a QEMU
+image structurally could not have found, because every QEMU test runs on
+hart 0 and the harness's clock never ticks.
+
+
+## WHAT A BOARD RUN CLAIMS -- and it is NARROWER than a QEMU run
+
+Three things are weaker here, and each is a real limitation rather than a
+detail.  Nothing in `vtest-rocq/` hides them: a hardware lemma names its own
+`<name>_hw_text` and its own hart, so what it claims is on its face.
+
+### 1. It is not the same binary
+
+`README.md`'s architecture section opens with "one binary runs on both
+machines", and on a board that is not true.  Three things force it:
+
+| | why |
+|---|---|
+| `PRIMARY_HART` | the JH7110's hart 0 is a 32-bit E24 monitor core and cannot execute a 64-bit image at all, so `_vtest_body` runs on a U74 |
+| `UART_REG_SHIFT` | the board's UART is a different chip with a different register stride (finding 30) |
+| `VTEST_BOARD` | puts a `fence.i` first, because a JTAG code load does not reach the I-cache |
+
+They are all in [`abi.h`](abi.h), they all default to the identity, and the
+QEMU images are **byte-identical** to what they were before board support
+existed -- checked mechanically against all 56 checked-in `<name>_text`
+captures, not by inspection.
+
+Why this is still an honest one-directional claim: a capture carries its own
+program, so "the model, run on THIS image, admits what THIS machine did" is
+exactly as true as before.  What it costs is *attribution*.  When QEMU and
+the board disagree, the difference is no longer necessarily the machine --
+it might be the three macros -- so a cross-machine claim has to be argued
+rather than read off.  Keep the list of macros short for that reason, and
+keep it in `abi.h` where it can be seen at once.
+
+### 2. The board's power-on register file is not reachable
+
+On QEMU every run starts from a machine that has just been reset, and
+`VTest.v` starts the model from `ColdBoot.cold_regs` -- the model's own
+reset chain.  The two agree because both are power-on states, and
+`core_regs_*` is the evidence.
+
+**This rig cannot give us that.**  OpenOCD reports `reset_config trst_only`
+-- there is no SRST line -- and `reset halt` re-initialises the JTAG TAP and
+halts without resetting the cores: measured 2026-08-29, `mtvec` still held
+OpenSBI's `0x40000410` and `mepc`/`mcause` still held firmware's values
+afterwards.  So the harts start wherever firmware left them.
+
+What `board.py`'s `establish_state()` does instead is write a *defined*
+start state -- every GPR zeroed, `satp`/`mtvec`/`mie`/`mip`/`medeleg`/
+`mideleg`/`mcounteren`/`mscratch`/`mepc`/`mcause`/`mtval` and the S-mode
+shadows cleared, `mstatus` set to `ArchReset.board_regs`' power-on
+obligation -- so a run starts somewhere known rather than somewhere
+firmware-dependent.
+
+**The consequence, and it is the one real limitation of this rig: for the
+registers in that list, a `core_regs_*` test on this board measures what the
+runner wrote.**  It is not vacuous for anything else -- `misa`, the
+counters, the PMP file, and every register a test writes itself are real
+observations -- but a hardware reset-value result is not available here and
+must not be reported as one.  A board with SRST wired, or a `dmcontrol.
+ndmreset` the SoC honours, would lift this.
+
+### 3. The machine is not quiescent
+
+`halt` and `resume` are SMP-wide on this board -- one OpenOCD group of five
+harts -- so "run on one hart and leave the rest alone" does not exist.  By
+default the runner takes over only its own harts and leaves firmware running
+on hart 1, which keeps the board alive (and, importantly, keeps petting
+anything firmware is petting).  U-Boot idling at its prompt polls UART0 and
+touches nothing else the tests use, which is tolerable for `core`, `pt`,
+`conc`, `clint` and `plic` -- but it *is* a second agent on the machine, and
+a `uart` test cannot tolerate it at all.
+
+`board.py --takeover` additionally points firmware's hart at the image, so
+every U74 is ours and the machine really is quiescent.  Read the watchdog
+warning below before using it.
+
+
+## The board profile
+
+One entry in `PROFILES` in [`board.py`](board.py).  Today: `visionfive2`,
+a StarFive VisionFive 2 (JH7110).  Measured, not assumed:
+
+| | QEMU virt | VisionFive 2 (JH7110) |
+|---|---|---|
+| DRAM | `0x80000000` | base `0x40000000`, but `0x80000000`–`0x80301000` is free and writable, so **the whole ABI works unchanged** |
+| harts | hart 0 | hart 0 = **E24, 32-bit**; U74s are **mhartid 1–4** |
+| `misa` | `0x800000000014112D` (the model's `MISA_C`) | `0x800000000094112F` — adds **B** (bit 1) and **X** (bit 23) |
+| UART | `0x10000000`, 16550, byte-strided | `0x10000000`, **Synopsys DW-APB v3.14a** (`UCV` `0x3331342a`, `CTR` `0x44570110`), **reg-shift 2** |
+| PLIC | `0x0c000000` | `0x0c000000` — present |
+| CLINT | `0x02000000` | `0x02000000` — present, `mtime` **live** |
+| virtio-blk | `0x10001000` | absent |
+
+`primary_hart` is **2**, not 1: hart 1 is where firmware runs, and taking it
+is what the watchdog warning is about.
+
+
+## HOW A RUN WORKS, and the four things that will bite you
+
+    halt → write the zero regions and the image (gdb `restore`, bulk)
+         → clear our harts' CLINT MSIP
+         → write a defined register state on our harts
+         → resume (SMP-wide)
+         → poll RESULT_BASE for DONE over JTAG while running
+         → halt → read the 4 KB result region back (gdb `dump binary memory`)
+
+**Bulk, always.**  Every JTAG memory access is a round trip.  `restore`
+writes a whole region in one go — an image plus two zeroed 4 KB regions in
+1.6 s — where a gdb `while` loop writing the same 8 KB a doubleword at a
+time did not finish in two minutes.
+
+**OpenOCD is not in our filesystem.**  It may be another container or
+another host, so `load_image`/`dump_image` — which open files on OpenOCD's
+side — cannot be used at all.  Everything moves over the GDB remote
+protocol; only run control goes over the telnet command server.
+
+**The telnet console is not a synchronous channel.**  OpenOCD writes
+asynchronous messages to it (`Disabling abstract command writes to CSRs`,
+target-halted events, background poll errors) and injects stray NUL bytes
+mid-line.  A reader that waits for the next `> ` prompt reads someone else's
+output and is off by one from then on — observed as an `mdw` that returned
+nothing and a `targets` that returned the previous command's answer.  Every
+command is therefore framed by an `echo <marker>` sentinel, matched at the
+start of a line so the command's own echo does not end the reply early.
+
+**Never touch the E24.**  Reading a 64-bit CSR on hart 0 (`$misa`, `$satp`)
+does not merely fail — it *drops the gdb connection*, twice measured.  It is
+in `ignore_harts` and nothing may put it in a thread list.
+
+
+## Hazards, each of which cost a board
+
+**The watchdog, and the firmware hart.**  The first end-to-end attempt
+pointed hart 1's `pc` at the image and resumed.  The SoC reset a few seconds
+later and U-Boot restarted; OpenOCD's debug module did not survive it
+(`dmstatus=0x0`, and `jtag arp_init` does not recover it in this build — the
+server had to be restarted).  Hart 1 was firmware's *running* hart.  Either
+the JH7110 watchdog is gated off while the harts are debug-halted and
+resumed counting with nobody left to pet it, or the hart trapped into
+firmware with a context that had only `pc` set.  Both say the same thing:
+**do not hijack the hart firmware is running on, and set a complete
+register state rather than just `pc`.**  If you use `--takeover`, expect to
+need the watchdog stopped first (`wdt list` / `wdt stop` at the U-Boot
+prompt, or the JH7110 WDT registers at `0x13070000` over JTAG).
+
+**Firmware leaves state behind.**  A secondary hart parked by OpenSBI is
+waiting for an IPI, so **its CLINT MSIP is 1** when we take it over, where
+the model's power-on CLINT has 0.  `clint_msip` read exactly that before the
+runner learned to clear it.  Anything else firmware leaves set is a start
+state the model does not have; when a board test disagrees in its *first*
+observation, suspect this before suspecting the model.
+
+**A compressed instruction at the end of the image.**  The model sometimes
+fetches four bytes for a two-byte instruction, and its memory is a finite
+`gmap` holding exactly the image.  So a compressed instruction in the last
+two bytes has its fetch run off the end and the machine goes **`VStuck` at
+an address that disassembles to something perfectly ordinary**.  This is not
+a decode problem — the model handles RVC fine, and a board image is full of
+it.  QEMU images never hit it because they are built `-march=rv64imafd` and
+contain no compressed instructions at all; board images are built
+`-march=rv64gc`, what xv6 itself uses, and `core_smoke`'s final `ret` came
+out as a two-byte `c.jr ra` (measured: `VStuck` at `0x8000008c`).
+`board.py`'s `pad_image()` adds four bytes, which the machine does not
+notice and the model needs.
+
+
+## Findings
+
+These continue the numbering in [`README.md`](README.md), which stays the
+authority; they are written up here because they are what the board found.
+
+| # | what | model | the board | kind | found by |
+|---|------|-------|-----------|------|----------|
+| 27 | **the model's clock never runs** | `mtime` frozen at 0 however many instructions retire; `mcycle` frozen with it | both advance, on QEMU *and* on the board | **UNSOUNDNESS** | `clint_time` |
+| 28 | **the CLINT is not indexed by hart** | only hart 0's registers exist: `clint_load`/`clint_store` compare the offset with `eq_vec` against `MSIP_BASE` = 0 and `MTIMECMP_BASE` = 0x4000, and everything else takes a load access fault | every hart has its own MSIP at `CLINT+4*hartid`, with the semantics the model gets right for hart 0 | **UNSOUNDNESS**, and live in xv6 | `clint_msip` |
+| 29 | `misa` bits 1 (B) and 23 (X) | absent | present (`0x800000000094112F`) | incompleteness | `core_regs_mcsr` |
+| 30 | the UART is a **different chip** | a byte-strided 16550 in an 8-byte window (`DevModel.uart_size = 8`) | Synopsys DW-APB v3.14a, **reg-shift 2**, so LSR is at `0x14` and the whole file lies outside the model's window | board difference, not a model defect | the probe |
+
+**Finding 27 is the largest thing the board has found, and it is not a
+device question.**  `VTest.run_until` steps `riscv_step false` — the
+argument is the clock tick, and the harness never passes `true` — so no
+execution of the model has a moving `mtime`.  `ClintTime.v` states it with
+`minstret` as the control: the counters advance in the model exactly as they
+do on both machines, so the freeze is the *clock* and not "counters are
+unimplemented" or "the program did not run", and `mcycle` freezes with
+`mtime` rather than with `minstret`, which is the clock-derived set exactly.
+The suite already knew the clock did not tick (`README.md`'s rules), but
+knowing it and having no model execution for a hardware run are different
+things, and until `clint_time` nothing had *measured* it.
+
+It is the same shape as finding 24 (the sequentially consistent memory
+model): not a value the model gets wrong but a behaviour it cannot have.
+Unlike 24 it may be cheap — the model has the tick, the harness declines to
+use it — and the honest next step is to find out which.
+
+**Finding 28 is the one only a board could find.**  Every QEMU test runs on
+hart 0, where `4*hartid` is 0 and the gap is invisible; it took a machine
+whose hart 0 cannot run the image at all to address `CLINT+8`.  `ClintMsip.v`
+holds both halves — QEMU on hart 0, where the model's MSIP semantics are
+*right* end to end (including raising and dropping `mip.MSIP`, which a
+"stored but inert" model would fail), and the board on hart 2, where the
+same program completes on the machine and the model takes a load access
+fault at `0x8000006c` with `mtval` = `0x2000008` and trap-loops forever.
+Either half alone would be misread.
+
+It is live: xv6's `start()` stores to `CLINT_MTIMECMP(id)` with
+`id = r_mhartid()`, so on any hart but 0 that store has no model execution.
+It is the same shape as findings 11 and 12, where the PLIC was indexed by
+hart instead of by context and half the register file was simply absent.
+
+
+## What is not done
+
+- **The serial channel.**  `uart_tx` and `uart_loop` compare what the 16550
+  actually transmitted, captured from QEMU's serial file.  The board's
+  serial line is not exposed to the runner yet, so `<name>_hw_serial` is
+  always `[]` — which means *not observed*, not *nothing was sent*, and the
+  generated file says so.  Until it is wired up, a board UART test cannot
+  check the one property that channel exists for: that a loopbacked byte
+  does **not** reach the wire.
+- **The `uart` area.**  The test sources address the register file by bare
+  offset and must be converted to `UART_REG(n)` before they mean anything
+  here (finding 30).  `skip_areas` excludes them until then.
+- **The `disk` area.**  The JH7110 has no virtio-mmio block device.  Not a
+  finding — a device that is not there — and `skip_areas` excludes it.
+- **A hardware reset-value result**, for the reason in §2 above.

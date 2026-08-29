@@ -56,7 +56,7 @@ From Kernel Require KernelSyms.
 Require Import CodeSwtch.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require TsoCtxShim.   (* [ctx_dom_sc]: the swtch hand-off, while the M2 token is deferred *)
+Require Import TsoCtxShim.   (* [hart_view_lb_any]: the SC-only resume receipt (M2 debt) *)
 (* A6.86: [TsoCtxShim] is RETIRED -- its last live use died with the M4
    contract flip.  See its tombstone. *)
 Local Open Scope Z_scope.
@@ -111,7 +111,7 @@ Section ProofSwtch.
        this proof parks (below), while the TARGET record's token comes out
        and goes into the bundle the resumed thread receives.  The hart keeps
        running; the thread of control changes -- which is what swtch IS. *)
-    iDestruct "Hcap" as "(Hstk & Htr & Hsiearm & #Hwit)".
+    iDestruct "Hcap" as "(Hstk & Htr & Hsiearm & Hctx & #Hwit)".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Hspp & %Hmsf)".
     pose proof Hmsf as Hmsf'.
@@ -147,13 +147,15 @@ Section ProofSwtch.
     iEval (rewrite (valid_context_unfold P An newc p)
                    /valid_context_pre !bi.later_exist) in "Hvalidnew".
     iDestruct "Hvalidnew" as (new_vs av_t XIt Tt) "Hvalidnew".
-    iDestruct "Hvalidnew" as "(>%Hlen_new & >%Hal_new & >Hnewcells & >Hstk_t & Hnewwand)".
+    iDestruct "Hvalidnew" as "(>%Hlen_new & >%Hal_new & >Hnewcells & >Hstk_t & >Hctx_t & Hnewwand)".
     (* RE-CONNECT THE TARGET'S CONTEXT TO THIS CPU (tso-port checkpoint 0.4
        items 2/5): the record's token is PARKED; resuming it here --
        [TsoCtx.ctx_resume] -- ties it to this hart against a view receipt
        dominating the parked stamp.  The receipt is the shim's SC-only
        intro until the M2 sweep threads the honest one out of the p->lock
        acquire ([SpecAcquire]); the exchange itself is in its final shape. *)
+    iMod (ctx_resume XIt Tt Tt (Nat.le_refl _) with "[] Hctx_t") as "Hctx_t".
+    { iApply hart_view_lb_any. }
     iModIntro.
     (* ---- the symbolic environment: 0..31 = [gpr_file]'s ACTUAL map
        [tp_pin m0] (its tp slot, index 4, is [cid_word_of cpu_id] by
@@ -236,14 +238,15 @@ Section ProofSwtch.
        the stamp is read off the token's own receipts).  In the no-return
        case the token is dropped instead -- the zombie park is the one
        place a thread's identity dies. *)
+    iMod (ctx_park with "Hctx") as (Tp) "Hctx".
     iAssert (if back then valid_context P Ao oldc p else own_ctx oldc)
-      with "[Holdpart Hstk Hwold]" as "Hvoldc".
+      with "[Holdpart Hstk Hwold Hctx]" as "Hvoldc".
     { destruct back; last first.
       { iExists (callee_img m0). iSplitR.
         { iPureIntro. unfold callee_img, ctx_regs; cbn. reflexivity. }
         iExact "Holdpart". }
       rewrite (valid_context_unfold P Ao oldc p) /valid_context_pre.
-      iExists (callee_img m0), av, cur_ctx, 0%nat.
+      iExists (callee_img m0), av, cur_ctx, Tp.
       iSplit.
       { iPureIntro. unfold callee_img, ctx_regs; cbn. reflexivity. }
       iSplit.
@@ -252,6 +255,7 @@ Section ProofSwtch.
       iFrame "Holdpart".
       iSplitL "Hstk".
       { rewrite (callee_img_nth1 m0 (mword_of_int 0)). iExact "Hstk". }
+      iSplitL "Hctx"; [ iExact "Hctx" |].
       iExact "Hwold". }
     (* ---- the trailing c.ret returns to new's saved return address ---- *)
     assert (Hm1 : vregs_den rho swtch_regs1 !!! Regidx (mword_of_int 1 : mword 5)
@@ -293,7 +297,7 @@ Section ProofSwtch.
               with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Htr
                     Hpc Hfile []
                     [Hnewwand Hvoldc Hnewpart HP Hhalf Hspp Hq0 Hcpuown Hstk_t
-                     ]").
+                     Hctx_t]").
     { iApply (swi_68 with "Ht"). }
     (* ---- the ▷ continuation: iNext strips it AND the record's ▷'d pieces ---- *)
     iNext.
@@ -316,8 +320,8 @@ Section ProofSwtch.
     iPoseProof (TsoCtxShim.ctx_dom_sc cur_ctx XIt) as "Hdom_t".
     iMod (stack_own_reindex cur_ctx XIt with "Hdom_t Hstk_t") as "[_ Hstk_t]".
     iAssert (sie_cap (XI := XIt) KT1 (vregs_den rho swtch_regs1) av_t false p)
-      with "[Hstk_t Htr Hq0]" as "Hcap_t".
-    { rewrite /sie_cap Hcsp_t. iFrame "Hstk_t Htr Hwit". iExact "Hq0". }
+      with "[Hstk_t Htr Hq0 Hctx_t]" as "Hcap_t".
+    { rewrite /sie_cap Hcsp_t. iFrame "Hstk_t Htr Hwit Hctx_t". iExact "Hq0". }
     (* [Hfile] comes back from the block as the bare [gpr_file (vregs_den
        rho swtch_regs1)] (it went in the same way, via [Hden]); re-fold it
        under [tp_pin] -- a no-op, since that map's own tp slot is ALREADY

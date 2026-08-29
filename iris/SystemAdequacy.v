@@ -75,6 +75,8 @@ Require Import FsImg.  (* [fs_sb]: the era-wide image hypothesis's shape.  No
    instantiates the sweeps, and it is NOT on this file's cone. *)
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.   (* [own_context_boot]: the per-hart thread-of-control mint *)
+Require Import TsoCtxShim.   (* [own_context_any]: the secondaries' token at the boot carve's context *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -411,15 +413,16 @@ Section SystemBoot.
     iAssert (fs_crash_seam cov (FsImg.sb_logstart (fss_sb S))) as "#Hseam".
     { rewrite Hlseq /fs_crash_seam. iModIntro.
       rewrite Hcp. iSplitL; iIntros "H"; iExact "H". }
-    (* main-tso-readiness: the boot context is PINNED (the M-leg mints it
-       with [own_context_boot] -- deferred with the M2 threading); at SC any
-       [CtxId] serves, and one ambient serves all eight harts. *)
-    pose (ξ0 := TsoCtx.MkCtxId inhabitant inhabitant : TsoCtx.CtxId).
+    (* THE BOOT HART'S THREAD-OF-CONTROL TOKEN (tso-port M2): minted HERE,
+       before the shared carve, so the carve's ξ-indexed rows are pinned at
+       the identity the boot hart will run as.  The secondaries mint their
+       own below; each reads the deposit at [xid] through its own token. *)
+    iMod (own_context_boot (CID := 0%fin)) as (ξ0) "Hthr0".
     iMod (boot_shared_alloc (XI := ξ0) g XV6_DISK_BYTES (fss_sb S) (fs_nib S) cov
             S Pb (fun _ => emp)%I gsn gln gtn Hbf Hbundle
             with "Hdursnap Hres")
-      as (Hfd Hir Hpav Hbs HF γd γv Rspent)
-      "(%Hdimg & #Htext & #Hdata & #Hstarted & #Hdev & #Hwinv &
+      as (Hfd Hir Hpav Hbs HF γd γv Rspent xid)
+      "(%Hdimg & #Htext & #Hdata & #Hstarted & #Hpkinv & #Hdev & #Hwinv &
         #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hmdata & Hpark & Hpst & Hpavail & Huart &
         Hdlab & Hcfg & Hclaim & Hcmauth & #Hdone & Hkpt & Hkmap & Hmir & Hpages & Hirauth &
         Hirslot & Hfs)".
@@ -458,12 +461,12 @@ Section SystemBoot.
     iDestruct (dev_inv_disk with "Hdev") as "#Hvinv".
     iDestruct (dev_inv_perm with "Hdev") as "#Hqinv".
     iModIntro.
-    iSplitL "Hh0 Hhrest Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Htx Hdlab Hcfg Hclaim Hcmauth Hkpt Hkmap
+    iSplitL "Hthr0 Hh0 Hhrest Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Htx Hdlab Hcfg Hclaim Hcmauth Hkpt Hkmap
              Hpages".
     { iApply (big_sepL_cpu_glue
                 (fun c => WP (LoopE gen_id c : expr riscv_lang) @ ⊤
 )%I).
-      iSplitL "Hh0 Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Htx Hdlab Hcfg Hclaim Hcmauth Hkpt Hkmap
+      iSplitL "Hthr0 Hh0 Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Htx Hdlab Hcfg Hclaim Hcmauth Hkpt Hkmap
                Hpages".
       { (* THE BOOT HART: the arm that consumes the whole supply. *)
         (* AT [HF] EXPLICITLY, not by resolution.  [SpecMain.MAIN]'s
@@ -475,24 +478,95 @@ Section SystemBoot.
            unify", and the 400 GB divergence the deleted [adequacy_fscfg]
            was written to block). *)
         iDestruct "Hh0" as (iv) "Hh0".
-        iApply (boot_hart_primary (fileG0 := HF) (CID := 0%fin) (XI := ξ0)
-                  (g.(gregs) 0%fin) iv DfracDiscarded γd γv ps l0 b0 c0
+        (* THE BOOT HART'S THREAD OF CONTROL (tso-port leg M2) is [ξ0],
+           minted ABOVE -- before the carve, so that the whole boot supply
+           is carved at it (see the note there) -- and used as the AMBIENT
+           context of the chain below: that is what lets
+           [BootBridge.boot_bridge] take the token rather than mint it, and
+           hence what keeps every lemma in main's cone context-implicit.
+           ONE PER HART, not one for the system: [TsoCtx.own_context] is
+           exclusive, so the eight harts run at eight distinct [CtxId]s. *)
+        (* ROW BY ROW, NOT ONE [iApply … with "H1 … H30"], and this is a
+           PERFORMANCE fix, not a style one (tso-port.md §0.16′).  MEASURED:
+           with one mismatched premise in the list, the single [iApply] runs
+           past TWENTY-THREE MINUTES at 2 GB and never reports; the
+           [iSpecialize] chain below names the offending premise in 0.75 s.
+           [iApply] with a spec list builds the whole application and unifies
+           it against the goal in one go, so a mismatch deep in the list has
+           nowhere to fail fast; specializing one premise at a time gives the
+           unifier a head symbol to differ at.  §0.13′'s rule -- "a crawl IS
+           the signature of an unprovable crossing" -- applies to tactics as
+           well as to goals: never leave a 30-premise [iApply] as the place a
+           mismatch has to surface. *)
+        iPoseProof (boot_hart_primary (fileG0 := HF) (CID := 0%fin) (XI := ξ0)
+                  (g.(gregs) 0%fin) iv DfracDiscarded xid γd γv ps l0 b0 c0
                   (v_disk (g.(gdev).(dvirtio))) (fss_sb S) (fs_nib S) cov
                   XV6_DISK_BYTES S Pb Rspent
                   (boot_regs_of_facts g Hbf 0%fin) fin_0_z Hprun Hplen Hlive
-                  Hbundle
-                  with "Htext Hdata Hh0 Hstarted Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail
-                        Hfs Hmir Hirslot Hirauth Hcert Hseam
-                        Hdev Hwinv Htx Hsent Hlb Hdlab Hcfg Hclaim Hcmauth Hdone Hkpt Hkmap
-                        Hpages"). }
+                  Hbundle) as "HP".
+        iSpecialize ("HP" with "Htext").
+        iSpecialize ("HP" with "Hdata").
+        iSpecialize ("HP" with "Hh0").
+        iSpecialize ("HP" with "Hthr0").
+        (* THIS IS THE ONE THAT USED TO FAIL, and it was the M1 flip's
+           second multi-context invariant (tso-port.md §0.16′).
+           [StartedInv.started_inv] takes a PLAIN [iProp] and is handed
+           [SpecMainSecondary.main_deposit], which was ξ-INDEXED (through
+           [SchedCtx.procs_inv]) -- an [inv] over a ξ-indexed body that ALL
+           EIGHT harts need, each at its own [own_context_boot] identity.
+           That was structurally [BioInv.buf_escrow]'s refutation one layer
+           up, and ONE RULING covered both: the deposit is a PARKED RECORD
+           at a NAMED context [xid] ([BootShared.boot_shared_alloc] mints
+           it), so [main_deposit xid γd γv] is a CLOSED TERM and every hart
+           takes the SAME handle here; each absorbs the three ξ-indexed rows
+           into its own context after its acquire fence
+           ([ProofMainSecondary.ms_spin]).  The context is NAMED rather than
+           ∃-closed because the payload comes out under a [▷] and the absorb
+           has to happen at a SECOND open (tso-absorb-memo.md §5). *)
+        iSpecialize ("HP" with "Hstarted").
+        iSpecialize ("HP" with "Hpkinv").
+        iSpecialize ("HP" with "Hlk").
+        iSpecialize ("HP" with "Hgl").
+        iSpecialize ("HP" with "Hmfirst").
+        iSpecialize ("HP" with "Hmnext").
+        iSpecialize ("HP" with "Hpark").
+        iSpecialize ("HP" with "Hpst").
+        iSpecialize ("HP" with "Hpavail").
+        iSpecialize ("HP" with "Hfs").
+        iSpecialize ("HP" with "Hmir").
+        iSpecialize ("HP" with "Hirslot").
+        iSpecialize ("HP" with "Hirauth").
+        iSpecialize ("HP" with "Hcert").
+        iSpecialize ("HP" with "Hseam").
+        iSpecialize ("HP" with "Hdev").
+        iSpecialize ("HP" with "Hwinv").
+        iSpecialize ("HP" with "Htx").
+        iSpecialize ("HP" with "Hsent").
+        iSpecialize ("HP" with "Hlb").
+        iSpecialize ("HP" with "Hdlab").
+        iSpecialize ("HP" with "Hcfg").
+        iSpecialize ("HP" with "Hclaim").
+        iSpecialize ("HP" with "Hcmauth").
+        iSpecialize ("HP" with "Hdone").
+        iSpecialize ("HP" with "Hkpt").
+        iSpecialize ("HP" with "Hkmap").
+        iSpecialize ("HP" with "Hpages").
+        iApply "HP". }
       (* THE SEVEN SECONDARIES: every element of the tail is an [FS]. *)
       iApply (big_sepL_impl with "Hhrest").
       iIntros "!>" (k c _) "Hh".
       iDestruct "Hh" as (iv) "Hh".
+      (* THE SECONDARIES RUN AT THE BOOT CARVE'S CONTEXT [ξ0], with the SC
+         stub's token ([TsoCtxShim.own_context_any]; main-tso-readiness
+         Amendment 6).  The M-leg mints one context per hart, which needs
+         [main_deposit xid γd γv] to be a closed term; on main its
+         [procs_inv]/[console_caps]/disk-lock rows are ambient, so one
+         context serves all eight harts and the deposit unifies. *)
+      iPoseProof (TsoCtxShim.own_context_any (CID := FS c) ξ0) as "Hthrc".
       iApply (boot_hart_secondary (fileG0 := HF) (CID := FS c) (XI := ξ0)
-                (g.(gregs) (FS c)) iv DfracDiscarded γd γv
+                (g.(gregs) (FS c)) iv DfracDiscarded xid γd γv
                 (boot_regs_of_facts g Hbf (FS c)) (fin_FS_nz c)
-                with "Htext Hdata Hh Hstarted"). }
+                with "Htext Hdata Hh Hthrc Hstarted"). }
     iSplitR; [iApply (wp_uart_loop γd with "Hcert Huinv Hpinv") |].
     iSplitR;
       [iApply (wp_disk_loop γv Hdimg with "Hcert Hcinv Hqinv Hvinv Hpinv") |].

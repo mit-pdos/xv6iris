@@ -33,11 +33,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecRelease.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require Import TsoCtxShim.   (* [ctx_dom_sc]: SC-only transport evidence, and
-   after the §0.18′ convergence it is used at ONE site in this file -- the
-   CANCELLING instance's return trip, which is cashed inside the word-clear
-   store's atomic update where no [own_context] is in scope.  The ordinary
-   release path is an honest [TsoCtx.ctx_deposit]. *)
+Require Import SieCapCtx.    (* [sie_cap_gpr_own_ctx_acc]: the releaser's own running token *)
 Import Defs.
 
 
@@ -91,7 +87,14 @@ Section ProofRelease.
        was written before release's word clear, and the acquirer's AMO
        receipt dominates that store.  A record is minted PER RELEASE, so
        [T'] covers exactly this publication; see WpLock.v's [lock_pay]. *)
-    iMod (lock_pay_intro R with "HR") as "HR".
+    (* A6.120: THE FINISHER'S PRELUDE runs here, at release's entry, against
+       the running token borrowed from the capability -- for a closing
+       release it is the honest deposit ([WpLock.lock_pay_intro]); the body
+       goes on to the word-clear leaf with what the prelude left. *)
+    iDestruct "Hfin" as (Pay) "[Hpre Hfin]".
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+    iMod ("Hpre" with "Hrun HR") as "[Hrun HR]".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
     (* ---- 0x00: c.addi sp,-32 -- the frame trade (k := 4) ---- *)
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     set (R0 := <[Regidx csp_rs1 := regval_into_reg
@@ -287,7 +290,7 @@ Section ProofRelease.
     iEval (rewrite Hpc1a) in "Hpc".
     (* ---- 0x1a: sw zero,0(s1) : the lock word clears ---- *)
     iApply (wp_sw_zero_lockfin_s_sconf (CID:=CID) γl lka s R Dc Out (mword_of_int (KernelSyms.release + 0x1a)) (mword_of_int 9 : mword 5)
-              (mword_of_int 0 : mword 12) mh (trap_res outb + (av - 4))%nat false
+              (mword_of_int 0 : mword 12) mh (trap_res outb + (av - 4))%nat false Pay
               ltac:(rgne; rewrite Hs1mh; exact Hlka) Hrefpre
               with "Hcg Hpc [] Hlock Htoken HR Hfin").
     { iApply (rli_1a with "Htext"). }
@@ -574,25 +577,16 @@ Section CancelOfGen.
     intros pcE lk0 ret_tgt. cbv zeta. intros Hlka Hav Href Hrefpre.
     iIntros "Hcg #Htext Hpc #Hlock Htoken HR Hbuild Hown Hpay Hcont".
     iApply (G.wp_release_gen_sconf kt γl lka s R D
-              (lka ↦₄ (mword_of_int 0 : mword 32) ∗ lock_cpu lka ↦₈ (zero_reg : mword 64) ∗ Out)%I
+              (lka ↦₄ (mword_of_int 0 : mword 32) ∗ WpLock.lk_cpu_ready lka ∗ Out)%I
               m n eb p av lks
               Hlka Hav Href Hrefpre
               with "Hcg Htext Hpc Hlock Htoken HR [Hbuild] Hown Hpay").
-    { (* THE ONE SHIM USE THE CONVERGENCE DOES NOT RETIRE (§0.18′).  The
-         destroyer's completion wand speaks at ITS context, and the
-         invariant hands it the parked record; the honest transport is an
-         [ctx_absorb], but this wand is cashed INSIDE the word-clear
-         store's atomic update ([WpSconfLock.wp_sw_zero_lockfin_s_sconf]),
-         where the thread's [own_context] has already been consumed by the
-         WP leaf -- §0.17′'s measured rule, met again.  So the return trip
-         stays a [ctx_dom_sc] bridge (and the record's token is dropped:
-         the lock is being DESTROYED, so nothing will ever claim it).  At
-         cutover this is a lock-kit worklist entry, not a client one. *)
-      iApply lock_finisher_destroy.
-      iIntros "Hfrag HRx". iDestruct "HRx" as (ξ0 T0) "[_ HRx]".
-      iPoseProof (ctx_dom_sc ξ0 cur_ctx) as "Hdom".
-      iDestruct (ctx_morph ξ0 cur_ctx with "Hdom HRx") as "[_ HRx]".
-      iApply ("Hbuild" with "Hfrag HRx"). }
+    { (* A6.120 (tso-flip ProofRelease.v:594): THE SHIM USE §0.18′ COULD NOT
+         RETIRE IS GONE.  The finisher is two-part now: the destroyer's
+         prelude is the identity, so the word-clear leaf hands the
+         completion wand [R cur_ctx] itself -- no parked record to absorb
+         inside the store's atomic update, no [ctx_dom_sc] bridge. *)
+      iApply lock_finisher_destroy. iExact "Hbuild". }
     iIntros (CIDg Hsg mr) "(Hword & Hcpu & HOut) Hcg Hpc %Hcs Hown".
     iSpecialize ("Hcont" $! CIDg with "[%]"); [exact Hsg|].
     iApply ("Hcont" $! mr with "Hword Hcpu HOut Hcg Hpc [//] Hown").

@@ -535,6 +535,13 @@ worth 20× on individual files.
     `⊆`: `discriminate H1`, where `H1 : None = Some _` is the equation meant all
     along, skips the walk (4.1 s → 0 s across five sites). `discriminate Hreq`
     likewise.
+    **AND THE BILL IS PER BRANCH, so a `destruct` over a wide inductive
+    multiplies it.** `UserTotalU`'s two `destruct i; try (cbn in Hdi;
+    discriminate)` over the decoded-instruction type run the context walk once
+    per constructor: naming it (`discriminate Hdi`) took each sentence
+    **4.70 s → 0.62 s** and the file **9.2 s → 3.7 s** (2026-08-29). The tell is
+    the same as ever — the equation being refuted is one you can read, and it is
+    already named in the line above.
   - **This is not specific to `by`.** Every `done`, every `by tac`, and every
     bare `discriminate` in scope of a map-inclusion, map-disjointness or
     map-subset hypothesis carries the same bill. Before believing such a
@@ -564,6 +571,13 @@ worth 20× on individual files.
   done.` on `(0%nat = 0%nat ∧ true = true)` was 16.1 s where `exact (conj eq_refl
   eq_refl)` is free. When the same one-liner is cheap in one place and lethal in
   another, the difference is whether its subject is CONCRETE.
+  **`by split` IS THE SAME TACTIC WEARING A HAT** — `split` then `done`, so the
+  walk still happens. The tree's only two sites (`ProofPipealloc.v:1625,1647`,
+  closing `fdstate_ok` at a literal `MkFContent` — three `eq_refl`s) measured
+  **4.91 s and 4.98 s**; `exact (conj eq_refl (conj eq_refl eq_refl))` took both
+  out of the profile's top 1000 and the file from **35.1 s to 26.2 s** (isolated,
+  min of two, 2026-08-29 — and the after arm ran at the higher load of the two,
+  so it is the conservative direction).
 - **`upd_ne`'s side goal has exactly one answer: `CalleeSaved.reg_ne_side`.**
   Write `Local Ltac regne := reg_ne_side.` and never hand-roll the alternation.
   Its branch order is the point: (1) the disequality already in context, via
@@ -815,6 +829,63 @@ and it did not move.
 
 ## Typeclass search
 
+### AN INSTANCE WITH A LOW PRIORITY IS AN INSTANCE THAT RUNS LAST — and if the class's OTHER instances are structural, "last" means "after the whole payload has been walked" (measured 2026-08-29)
+
+The regression this cost, and the one-token fix, are the reference case for
+reading a profile at all.
+
+`TsoCtx.CtxMorph R` is the transport obligation the M1/M3 context flip put on
+every lock payload, and `<{ P }>` (`TsoCtx.const_pay`) is the wrapper that says
+"this payload does not depend on the context". `ctx_morph_const_pay` discharges
+the wrapped form in ONE step and carried priority **99**, deliberately, by
+analogy with `ctx_morph_const`'s evar guard. But the class's other instances are
+STRUCTURAL — `ctx_morph_exist`, `ctx_morph_sep`, `ctx_morph_if_then`,
+`ctx_morph_or`, `ctx_morph_big_sepL/M` — and they carry the default priority,
+which is their premise count (1, 2, ...). `const_pay` is a plain definition, so
+search unfolds it and every one of them matches first: the walk peels the
+payload's `∃`, its conjuncts, each guarded slot, and bottoms out on leaves that
+have no instance and never will (`pstate_lock`, `hart_at_any` — the ξ-dependent
+facts the class documents as deliberately uncovered). It proves nothing, and
+only after backtracking over the whole space does 99 get its turn.
+
+Changing the `| 99` to `| 0` is the entire fix. Isolated `coqc`, min of two,
+the AFTER arm at load 26 against the BEFORE arm's 0.6–16 (so understated):
+
+| | before | after |
+|---|---|---|
+| `SpecProcinit.v` (whose `apply _.` IS the goal) | 11.9 s | **2.95 s** |
+| — that sentence | 10.09 s | **0.34 s** |
+| `ProofKforkB1.v` | 21.9 s | **3.92 s** |
+| — its `iApply (wp_release_sconf … <{ proc_lock_res … }> …)` | 18.40 s | **0.34 s** |
+| lock call sites in the tree's top 1000 | 67 sites / 444 s | **3 sites / 2.5 s** |
+
+- **THE EVAR GUARD IS NOT WHAT THE PRIORITY WAS BUYING.** `ctx_morph_const` is
+  `CtxMorph (λ _, P)`, whose head unifies with a payload that is still a bare
+  evar, so an eager one would silently commit `?R := λ _, ?P`; keep its 100.
+  `ctx_morph_const_pay`'s head is a RIGID application of `const_pay`, which only
+  a call site that WROTE `<{ … }>` can produce. Read a low priority as a claim
+  about *when the head can match*, and check that claim against the actual head
+  before believing the priority is load-bearing.
+- **`Typeclasses Opaque` ON THE WRAPPER IS NOT THE FIX, and it is the first
+  thing you will reach for.** It does kill the same search. It also seals the
+  wrapper against `IntoExist`, and the payload's consumers read `R cur_ctx`
+  THROUGH the wrapper — `iDestruct "HR" as (t) "H"` on a lock resource whose
+  body is an `∃` is the common case. Measured: a from-scratch build fails eight
+  files at *"iExistDestruct: cannot destruct"* (`ProofSysUptime`,
+  `ProofAllocpid`, `ProofBpin`, `ProofBunpin`, `ProofFiledup`, `ProofFilealloc`,
+  …). The general rule: **seal a definition only where nothing reads through
+  it.** The big-op seals below satisfy that; a payload wrapper does not.
+- **HOW IT WAS FOUND, WHICH IS THE TRANSFERABLE PART.** Two consecutive CI runs'
+  profile tables, side by side. Before the flip, every one of the top thirty
+  statements was an honest `Qed`. After it, **twenty of the thirty were the same
+  sentence shape** — an `iApply (Acquire.wp_acquire_sconf …)` /
+  `(Release.wp_release_sconf …)` — in eleven unrelated files, all within a few
+  seconds of one another, with ΣCPU up 12 %. That uniformity is this file's
+  standing tell for ONE shared cause (see the `inode_blocks` seal below), and it
+  named the cause without anyone reading a proof. The cheapest confirmation is
+  the site that is the goal and nothing else: `SpecProcinit.v`'s bare `apply _.`
+  discharging `CtxMorph <{ proc_lock_res … }>`, 71.1 s on CI.
+
 - **A BIG-OP UNDER A TRANSPARENT NAME IS AN `iFrame` BOMB, AND SEALING IT IS A
   ONE-LINE FIX FOR EVERY CALL SITE AT ONCE** (measured 2026-08-21). `iFrame`'s
   `Frame` search unfolds a transparent constant to get at the `big_sepL`
@@ -1014,6 +1085,13 @@ surfaces the next dependency layer.; reach for `iNext`
   sweep this — the tree's other sites are sub-second because their predicates are
   small. Check the `.v.timing` cost of a candidate first; the site count tells
   you nothing.
+  - **Two sites were still on the rewrite form and BOTH were worth it**
+    (2026-08-29; `BootShared.v`'s eight-way chain is the idiom to copy, and its
+    comment already cites this rule). Each zips three families into one walk:
+    `FileInv.ftable_res_boot` **4.94 s → 0.78 s** for that sentence (file
+    14.6 s → 7.9 s) and `ProcInv`'s ofile block **1.79 s → 0.88 s** — the latter
+    small in itself but `ProcInv` is ON THE CRITICAL PATH, so it is chain
+    seconds. Grep is `rewrite !big_sepL_sep` followed by an `iFrame`.
 - **PEEL A CHAIN BY `apply`, NEVER BY `erewrite` — an equation lemma builds an
   `eq_ind_r` motive over the whole remaining term at every step.** `goodb_bind`
   is stated as `goodb D (bind m f) s = goodb D (f x) s`, so
@@ -1323,6 +1401,15 @@ problem, read it as a context problem, and note that `clear -H` is only
 available once the goal is a NAMED assert — which is the second reason not to
 splice a closer into argument position.
 
+**AND THE GOAL CAN BE A CLOSED NUMERAL AND STILL COST SECONDS.**
+`ProofSysUnlink.v:4935,6570` spliced `ltac:(lia)` for `wi16_post`'s `0 < tot`
+guard — on an arm that has already `destruct (decide (tot = 16%nat)) as [-> |
+_]`, so the goal is literally `0 < 16`. It measured **3.50 s and 3.56 s**,
+because `lia` reifies the context it is handed and this is the tree's largest.
+`assert (Htot16 : (0 < 16)%nat) by (apply Nat.lt_0_succ).` on the line above,
+passed by name, took both out of the profile's top 1000 (2026-08-29). Read a
+slow closer as a CONTEXT problem before you read the goal at all.
+
 - Grep for `ltac:(intros` inside a `kernel_data_window` / `kernel_data_string`
   argument list — every hit is this bug.
 - The related fix is often to state the byte premise over a SYMBOLIC index as its
@@ -1334,6 +1421,23 @@ splice a closer into argument position.
 
 ## Conversion and `Qed`
 
+- **A check that grows past a few hundred MB / minutes on a small file is a
+  DEGENERATE PROOF, not something to wait out** (user-wp-slot lane,
+  2026-08-28).  The two culprits that session: any reduction/unification
+  that touches the dumped literal `SyncInstrs.sync_bytes` (`cbn [fst]` on a
+  goal mentioning it, `decide` on a symbolic image `M` — keep the literal
+  behind opaque lemmas and gate `sync_layout`-first), and ssr
+  `rewrite`/`iFrame` against the 32-insert `userret_gpr` chain (enumerate
+  the 32 `mword 5` indices and peel per case; an insert-chain `rewrite`
+  unifies the `Insert` instance up to delta and does not terminate).
+  A THIRD DOOR into the same divergence (2026-08-28, a lane's
+  `tf_ueq_resume_gpr`): `f_equal` — it begins by trying `reflexivity`
+  on the whole goal, and that conversion check delta-unfolds
+  `userret_gpr` into the tower on both sides with UNEQUAL leaves and
+  backtracks forever.  Rule: never let `reflexivity`/`f_equal`/any
+  unification see a goal whose two sides contain the tower but differ —
+  rewrite the leaf equalities first (each pattern a closed `tf !!! i`),
+  so `reflexivity` only ever runs on syntactically identical sides.
 - **`vm_compute; reflexivity` is rechecked by the kernel's LAZY conversion at
   `Qed`** — the VM's speed does not carry over, and on model code that is a
   different order of magnitude (one such equation over the cold-boot chain

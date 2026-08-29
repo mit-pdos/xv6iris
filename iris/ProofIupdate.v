@@ -965,7 +965,7 @@ Section ProofIupdateMain.
       procs_inv γs -∗
       dev_inv fsc_uart fsc_disk -∗
       disk_geom fsc_disk pd pav pu -∗
-      is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+      is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
       bslots 2 -∗
       log_epoch_lb icfg_log v -∗
       log_credit icfg_log cru Sb e0 (IBLOCK inum icfg_ist) -∗

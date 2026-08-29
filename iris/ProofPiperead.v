@@ -502,7 +502,7 @@ Section ProofPiperead.
        /\ M !!! Regidx Rs9 = m !!! Regidx Rs9
        /\ M !!! Regidx Rs10 = m !!! Regidx Rs10
        /\ M !!! Regidx Rs11 = m !!! Regidx Rs11 ⌝ -∗
-     ⌜ uptd_ext (pv_upt (us_V U)) P' ⌝ -∗
+     ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
      ⌜ pipe_rw_ret n rv ⌝ -∗
      ⌜ pr_win U Mo (m !!! Regidx Ra1) n ⌝ -∗
      sie_cap_gpr KT1 M (av - 12)%nat true pj -∗
@@ -565,7 +565,7 @@ Section ProofPiperead.
        /\ M !!! Regidx Rs9 = m !!! Regidx Rs9
        /\ M !!! Regidx Rs10 = m !!! Regidx Rs10
        /\ M !!! Regidx Rs11 = m !!! Regidx Rs11 ⌝ -∗
-     ⌜ uptd_ext (pv_upt (us_V U)) P' ⌝ -∗
+     ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
      ⌜ pipe_rw_ret n rv ⌝ -∗
      ⌜ pr_win U Mo (m !!! Regidx Ra1) n ⌝ -∗
      sie_cap_gpr KT1 M (av - 12)%nat true pj -∗
@@ -1450,7 +1450,7 @@ Section ProofPiperead.
             /\ M2 !!! Regidx Rs9 = m !!! Regidx Rs9
             /\ M2 !!! Regidx Rs10 = m !!! Regidx Rs10
             /\ M2 !!! Regidx Rs11 = m !!! Regidx Rs11 ⌝ -∗
-          ⌜ uptd_ext (pv_upt (us_V U)) P' ⌝ -∗
+          ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
           ⌜ pipe_rw_ret n rv ⌝ -∗
           ⌜ pr_win U Mo addrv n ⌝ -∗
           sie_cap_gpr KT1 M2 (trap_res true + (av - 12))%nat false pj -∗
@@ -1675,7 +1675,7 @@ Section ProofPiperead.
         iApply ("HWX" $! G3 (pv_upt (us_V U)) (us_M U) (mword_of_int 0 : mword 64)
                   with "[%] [%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hchx").
         { split_and!; try assumption. }
-        { apply uptd_ext_refl. }
+        { apply uptd_ext_sz_refl. }
         { apply pr_ret_cnt. split; [lia | apply Z.le_max_l]. }
         { apply pr_win_0. } }
       (* ---- n > 0: run the bounded copy loop ---- *)
@@ -1816,7 +1816,7 @@ Section ProofPiperead.
             - rewrite (HthrK2 Rs9 ltac:(vm_compute; reflexivity)). exact H3s9.
             - rewrite (HthrK2 Rs10 ltac:(vm_compute; reflexivity)). exact H3s10.
             - rewrite (HthrK2 Rs11 ltac:(vm_compute; reflexivity)). exact H3s11. }
-          { exact (uptd_ext_sz_ext _ _ _ Hex3). }
+          { exact Hex3. }
           { apply pr_ret_cnt. rewrite Z.max_r; [| lia]. lia. }
           { (* nothing was copied on this arm, so the run is the [i] bytes
                the earlier rounds wrote *)
@@ -2258,7 +2258,7 @@ Section ProofPiperead.
               - rewrite (HthrD Rs9 ltac:(vm_compute; reflexivity) ltac:(reg_neq) ltac:(reg_neq)). exact H3s9.
               - rewrite (HthrD Rs10 ltac:(vm_compute; reflexivity) ltac:(reg_neq) ltac:(reg_neq)). exact H3s10.
               - rewrite (HthrD Rs11 ltac:(vm_compute; reflexivity) ltac:(reg_neq) ltac:(reg_neq)). exact H3s11. }
-            { exact (uptd_ext_sz_ext _ _ _ Hext'). }
+            { exact Hext'. }
             { apply pr_ret_cnt. rewrite Z.max_r; [| lia]. lia. }
             { exists (S i). split; [rewrite Z.max_r; lia | exact (Hwsucc Hr0)]. }
           - (* i+1 < n: the back edge *)
@@ -2370,7 +2370,7 @@ Section ProofPiperead.
               rewrite (HthrMr Rs10 ltac:(vm_compute; reflexivity)). exact H3s10.
             - rewrite /E1 upd_ne; [| reg_neq].
               rewrite (HthrMr Rs11 ltac:(vm_compute; reflexivity)). exact H3s11. }
-          { exact (uptd_ext_sz_ext _ _ _ Hext'). }
+          { exact Hext'. }
           { apply pr_ret_neg1. }
           { destruct Hwany as (dd & Hdd & Hw). exists dd.
             split; [rewrite Z.max_r; lia | exact Hw]. } }
@@ -2395,7 +2395,7 @@ Section ProofPiperead.
           - rewrite (HthrMr Rs9 ltac:(vm_compute; reflexivity)). exact H3s9.
           - rewrite (HthrMr Rs10 ltac:(vm_compute; reflexivity)). exact H3s10.
           - rewrite (HthrMr Rs11 ltac:(vm_compute; reflexivity)). exact H3s11. }
-        { exact (uptd_ext_sz_ext _ _ _ Hext'). }
+        { exact Hext'. }
         { apply pr_ret_cnt. rewrite Z.max_r; [| lia]. lia. }
         { destruct Hwany as (dd & Hdd & Hw). exists dd.
           split; [rewrite Z.max_r; lia | exact Hw]. } }
@@ -2715,7 +2715,7 @@ Section ProofPiperead.
             rewrite (callee_saved_lookup HcsMmrl Rs10 ltac:(vm_compute; reflexivity)). exact HMs10.
           - rewrite /N3 upd_ne; [| reg_neq].
             rewrite (callee_saved_lookup HcsMmrl Rs11 ltac:(vm_compute; reflexivity)). exact HMs11. }
-        { apply uptd_ext_refl. }
+        { apply uptd_ext_sz_refl. }
         { apply pr_ret_neg1. }
         { (* the killed arm never reaches the copy phase *)
           apply pr_win_0. } }

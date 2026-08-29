@@ -60,6 +60,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Local Open Scope Z_scope.
 Require Import TsoCtx.
+Require Import CtxMorphTac.   (* [ctx_morph_solve] -- the λ payload's transport driver *)
 Require TsoCtxShim.   (* the phys tier crosses the seam *)
 
 (* ---------------------------------------------------------------------- *)
@@ -686,6 +687,40 @@ Section DiskGeomMorph.
     iFrame "Hd H1 H2 H3 Hcfg". iPureIntro. auto.
   Qed.
 End DiskGeomMorph.
+
+(* ====================================================================== *)
+(* A6.121 (tso-flip DiskInv.v:880): THE PAYLOAD OVER AN EXPLICIT CONTEXT.   *)
+(* [disk_res_at γ pd pav pu] is what the vdisk lock surface takes as its    *)
+(* [CtxId → iProp]; the transport obligation is discharged structurally     *)
+(* ([CtxMorphTac.ctx_morph_solve]) down to the component instances below,  *)
+(* applied by name.  Main's [disk_res] body is its own (one claim map, the  *)
+(* stage and read cursors); only the component list differs from the       *)
+(* T-leg's.                                                                 *)
+(* ====================================================================== *)
+Section DiskResAt.
+  Context `{!riscvGS Σ, !xv6G Σ}.
+
+  Global Instance desc_entry_own_morph pd i :
+    CtxMorph (λ ξ, desc_entry_own (XI := ξ) pd i).
+  Proof. rewrite /desc_entry_own. ctx_morph_solve. Qed.
+  Global Instance ops_own_morph i : CtxMorph (λ ξ, ops_own (XI := ξ) i).
+  Proof. rewrite /ops_own. ctx_morph_solve. Qed.
+  Global Instance free_slot_res_morph pd i :
+    CtxMorph (λ ξ, free_slot_res (XI := ξ) pd i).
+  Proof.
+    rewrite /free_slot_res. ctx_morph_solve.
+    all: first [ apply desc_entry_own_morph | apply ops_own_morph ].
+  Qed.
+  Definition disk_res_at (γ : disk_names)
+      (pd pav pu : SailStdpp.Values.mword 64) : CtxId → iProp Σ :=
+    λ ξ, disk_res (XI := ξ) γ pd pav pu.
+  Global Instance disk_res_at_morph γ pd pav pu :
+    CtxMorph (disk_res_at γ pd pav pu).
+  Proof.
+    rewrite /disk_res_at /disk_res. ctx_morph_solve.
+    all: apply free_slot_res_morph.
+  Qed.
+End DiskResAt.
 
 (* ====================================================================== *)
 (* Building [slot_pin_ok] for the three-descriptor chain rw formats.       *)

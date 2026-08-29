@@ -201,6 +201,9 @@ Require Import IrefSlots ProcAvail.
 Require Import SpecKexec.
 Require Import UsertrapRes UtResFits.
 Require Import FirstTok.   (* [first_done] -- the one thing the closer takes, see the header *)
+Require Import UexecSlot.  (* [uvis] / [uvis_of] *)
+Require Import UexecRet.   (* [uslot] -- the closer's new second output.
+                              Required DIRECTLY: the seal does not travel. *)
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
@@ -239,13 +242,13 @@ End SpecForkret.
    into named definitions"). *)
 Definition forkret_closer
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
-    (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
+    (URes : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ)
     (W : iProp Σ) (γf : gname) (p ksp : mword 64)
     (* the parked process's fd-state ghost name *)
     (g : gname)
     (pid : mword 32) (av : nat) : iProp Σ :=
-  (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
-     ⌜pv_upt V' = pt'⌝ -∗
+  (∀ (h : CpuId) (pt' : uptd) (U' : ustate),
+     ⌜pv_upt (us_V U') = pt'⌝ -∗
      ⌜ud_data pt' = ud_pas pt'⌝ -∗
      ⌜proc_pt_wf pt'⌝ -∗
      (* ...and the fd-state ghost name the resumed record carries.  The
@@ -253,11 +256,11 @@ Definition forkret_closer
         PARKED record's name, so it needs to know the resumed one agrees --
         no step between park and resume reassigns a live process's
         descriptor ghost.  See [SpecForkretParkPaid.forkret_park_pkg]. *)
-     ⌜pv_fdg V' = g⌝ -∗
+     ⌜pv_fdg (us_V U') = g⌝ -∗
      (* THE TRAPFRAME'S KERNEL WORDS, at the resuming hart: prepare_return
         wrote them there and [V'] is the descriptor it handed back, so this
         is forkret's to pay -- see [UsertrapRes.ut_tfk]. *)
-     UsertrapRes.ut_tfk (CID := h) ksp V' -∗
+     UsertrapRes.ut_tfk (CID := h) ksp (us_V U') -∗
      (* THE FILE SYSTEM AND THE SEALED [first] CELL, HANDED TO THE CLOSER
         RATHER THAN HELD BY IT.  [FirstTok.first_done] is exactly
         [first_addr ↦₄□ 0 ∗ fs_ready] -- see the header's last section for
@@ -272,8 +275,13 @@ Definition forkret_closer
         could not hold it.  forkret has one, out of the very capability it
         is about to hand back. *)
      TimerCap.timer_cap (CID := h) -∗
-     forkret_yield (CID := h) γf p ksp pid av V' -∗
-     URes h pt' ksp)%I.
+     forkret_yield (CID := h) γf p ksp pid av (us_V U') -∗
+     (* THE RESIDUE, AND THE SLOT FOR THE RECORD THIS RESUME LANDS ON.  The
+        parker captured the GENERIC family and the closer instantiates it
+        here -- see [ParkCap.park_pkg], of which this is the forkret-side
+        spelling, and projects/user-wp-slot.md SS4c (R-b) for why the key
+        cannot be the parked one (the boot arm's kexec moves it). *)
+     (URes h pt' ksp U' ∗ uslot (uvis_of U')))%I.
 
 
 (* THE CONTRACT.  One statement, no [first] premise and no [first] reading:
@@ -284,7 +292,7 @@ Definition wp_forkret_gen_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (* the trap loop's kernel-side bundle, abstract exactly as
        [SpecUserretClosed] takes it *)
-    (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
+    (URes : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ)
     (* WHAT THE RESIDUE CLOSER IS HANDED BESIDE [first_done] -- the park
        token ([ParkCap.park_token]) in practice, abstract here: forkret
        holds it ([W -∗] below), reads nothing off it, and hands it to the

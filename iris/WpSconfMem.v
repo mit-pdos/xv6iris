@@ -485,7 +485,7 @@ Section WpSconfMem.
       (* THE SLOT STAYS FOLDED -- the pre-port shape; the frame comes out of
          [WpIntrInv.sda_slot_acc] below, the one place the two translation
          arms are told apart. *)
-      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Htc & #Hwit)".
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
       iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
       iPoseProof "Hhw" as "#Hhwc".
       iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
@@ -539,7 +539,7 @@ Section WpSconfMem.
                       (sign_extend' 64 imm) = ea)
         by (rewrite Lpin_rs1; reflexivity).
       iApply (swp_mono (CID := CID)
-                with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm Hclose] [-]").
+                with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm Hctx Hclose] [-]").
       2:{ iApply (swp_execute_LOAD_ram_Sw_ex (CID := CID) width Hvw Hwdvd Huintw
                     SD sda_Dro (sda_Df (DfracOwn 1))
                     (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv)
@@ -654,8 +654,8 @@ Section WpSconfMem.
                   = <[Regidx rd := regval_into_reg (ext v)]> m
                       !!! Regidx csp_rs1)
       by (symmetry; apply upd_ne; congruence).
-      iSplitL "Htr Hstk Harm".
-      { rewrite /sie_cap -Hsp. iFrame "Hstk Htr Harm Htc Hwit". }
+      iSplitL "Htr Hstk Harm Hctx".
+      { rewrite /sie_cap -Hsp. iFrame "Hstk Htr Harm Hctx Htc Hwit". }
       iSplitL "Hfile".
       { rewrite (Hext v).
       iEval (rewrite (tp_pin_upd m rd (regval_into_reg (ext v))
@@ -1165,7 +1165,7 @@ Section WpSconfMem.
       (* THE SLOT STAYS FOLDED -- the pre-port shape; the frame comes out of
          [WpIntrInv.sda_slot_acc] below, the one place the two translation
          arms are told apart. *)
-      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Htc & #Hwit)".
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
       iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
       iPoseProof "Hhw" as "#Hhwc".
       iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
@@ -1221,7 +1221,7 @@ Section WpSconfMem.
               by (rewrite Lmst;
                   exact (effectivePrivilege_mprv0 (Store Data) _ Supervisor HMPRV)).
       iApply (swp_mono (CID := CID)
-                with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm Hclose] [-]").
+                with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm Hctx Hclose] [-]").
       2:{ iApply (swp_execute_STORE_ram_Sw (CID := CID) width Hvw Hwdvd Huintw
                     SD sda_Dro (sda_Df (DfracOwn 1))
                     (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv)
@@ -1315,8 +1315,8 @@ Section WpSconfMem.
       { rewrite /sconf_at_priv. iExists mdv0.
         iFrame "Hhw Hminv Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv".
         iPureIntro. split; assumption. }
-      iSplitL "Htr Hstk Harm".
-      { rewrite /sie_cap. iFrame "Hstk Htr Harm Htc Hwit". }
+      iSplitL "Htr Hstk Harm Hctx".
+      { rewrite /sie_cap. iFrame "Hstk Htr Harm Hctx Htc Hwit". }
       iFrame "Hfile HPsi". iPureIntro. split_and!; reflexivity.
     - (* ---------------- THE CONTINUATION ---------------- *)
       iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & HPsi)".

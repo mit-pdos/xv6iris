@@ -317,7 +317,7 @@ Section FsReady.
         [is_lock] is not covariant in its resource. *)
      (∃ pd pav pu : mword 64,
         disk_geom fsc_disk pd pav pu ∗
-        is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }>) ∗
+        is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu)) ∗
      is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst
                 icfg_nib icfg_dev ∗
      itable_inv ∗
@@ -405,7 +405,7 @@ Section FsReady.
      (* the same one conjunct [fs_ready] carries; see the note there *)
      (∃ pd pav pu : mword 64,
         disk_geom fsc_disk pd pav pu ∗
-        is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }>) ∗
+        is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu)) ∗
      is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst
                 icfg_nib icfg_dev ∗
      itable_inv ∗
@@ -531,7 +531,7 @@ Section FsReady.
     fs_ready -∗ dev_inv fsc_uart fsc_disk ∗
                 (∃ pd pav pu : mword 64,
                    disk_geom fsc_disk pd pav pu ∗
-                   is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }>).
+                   is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu)).
   Proof.
     rewrite /fs_ready.
     by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & $ & $ & _)".
@@ -629,7 +629,7 @@ Section FsReady.
        [disk_geom] at its own three beside this predicate. *)
     (∃ pd pav pu : mword 64,
        disk_geom fsc_disk pd pav pu ∗
-       is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }>) ∗
+       is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu)) ∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst
                icfg_nib icfg_dev ∗ itable_inv ∗
     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst ∗ ic_sleeplocks fsc_ic ∗

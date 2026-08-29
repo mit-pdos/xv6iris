@@ -45,6 +45,7 @@ Require Import WpIntrCore.
 Require Import UptTree UserPtTree UserExec UserTrap.
 Require Import UmodeMem.
 Require Import TsoCtx.
+Require Export UmodeRegs.  (* [uv_regs] / [uv_amb] and their movers *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -64,30 +65,7 @@ Section UmodeFrames.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
 
-  (* ------------------------------------------------------------------- *)
-  (* The machine-cell residue of a RUNNING verified process: hart ACTIVE   *)
-  (* (verified programs that execute no WRS never wait), privilege User,   *)
-  (* mstatus pinned up to [user_mstatus_ok], stale trap CSRs.              *)
-  (* ------------------------------------------------------------------- *)
-  Definition uv_regs : iProp Σ :=
-    (∃ ms_v sc_v stval_v sepc_v : mword 64,
-       ⌜user_mstatus_ok ms_v⌝ ∗
-       hart_state ↦ᵣ HART_ACTIVE tt ∗
-       cur_privilege ↦ᵣ User ∗
-       mstatus ↦ᵣ ms_v ∗
-       scause ↦ᵣ sc_v ∗
-       stval ↦ᵣ stval_v ∗
-       sepc ↦ᵣ sepc_v)%I.
-
-  (* the ambient per-hart persistent bundles.  PERSISTENT but PER-HART
-     (hw_config / minstret_inv own THIS hart's cells), so a migration
-     cannot carry them across -- the resume bundle re-delivers them at the
-     resuming hart. *)
-  Definition uv_amb : iProp Σ :=
-    (hw_config ∗ minstret_inv ∗ wire_inv)%I.
-
-  Global Instance uv_amb_persistent : Persistent uv_amb.
-  Proof. apply _. Qed.
+  (* [uv_regs] and [uv_amb] live in UmodeRegs.v (re-exported above). *)
 
   (* the linear running residue at image [M] (everything but the register
      file and the pc) *)

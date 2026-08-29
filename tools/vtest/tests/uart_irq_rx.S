@@ -91,24 +91,24 @@ _vtest_body:
     add  s3, s2, s3
 
 /* ---- (1) wait for the host's byte; IER = 0, so no interrupt ---- */
-1:  lbu  t0, 5(s0)
+1:  lbu  t0, UART_REG(5)(s0)
     andi t0, t0, 0x01                /* DR: data ready */
     beqz t0, 1b
-    lbu  t0, 5(s0)
+    lbu  t0, UART_REG(5)(s0)
     sw   t0, R_LSR0(s11)
     lw   t0, 0(s1)
     sw   t0, R_PEND0(s11)
     csrr t0, mip
     andi t0, t0, 0x200
     sw   t0, R_MIP0(s11)
-    lbu  t0, 2(s0)
+    lbu  t0, UART_REG(2)(s0)
     sw   t0, R_ISR0(s11)
     li   t0, 1
     sw   t0, RES_STATUS(s11)
 
 /* ---- (2) enable the rx interrupt; SPIN for the pending bit ---- */
     li   t0, 0x01
-    sb   t0, 1(s0)                   /* IER = rx data available */
+    sb   t0, UART_REG(1)(s0)                   /* IER = rx data available */
 2:  lw   t0, 0(s1)
     andi t0, t0, SRC10
     beqz t0, 2b
@@ -119,7 +119,7 @@ _vtest_body:
     sw   t0, R_MIP1(s11)
 
 /* ---- (3) the ISR identifies the cause ---- */
-    lbu  t0, 2(s0)
+    lbu  t0, UART_REG(2)(s0)
     sw   t0, R_ISR1(s11)
     andi t2, t0, 0x0f
     sw   t2, R_CAUSE1(s11)
@@ -138,19 +138,19 @@ _vtest_body:
 /* ---- (5) remove the condition: drain RHR until DR is clear ---- */
     li   t3, 0                       /* count */
     li   t4, 0                       /* first byte */
-3:  lbu  t0, 5(s0)
+3:  lbu  t0, UART_REG(5)(s0)
     andi t0, t0, 0x01
     beqz t0, 4f
-    lbu  t5, 0(s0)                   /* RHR: pops the receive FIFO */
+    lbu  t5, UART_REG(0)(s0)                   /* RHR: pops the receive FIFO */
     bnez t3, 5f
     mv   t4, t5
 5:  addi t3, t3, 1
     j    3b
 4:  sw   t4, R_RX0(s11)
     sw   t3, R_RXN(s11)
-    lbu  t0, 5(s0)
+    lbu  t0, UART_REG(5)(s0)
     sw   t0, R_LSR1(s11)
-    lbu  t0, 2(s0)
+    lbu  t0, UART_REG(2)(s0)
     sw   t0, R_ISR2(s11)
 
 /* ---- (6) complete at the PLIC; the line is low, so nothing re-latches ---- */
@@ -161,7 +161,7 @@ _vtest_body:
     csrr t0, mip
     andi t0, t0, 0x200
     sw   t0, R_MIP3(s11)
-    sb   zero, 1(s0)                 /* IER = 0 */
+    sb   zero, UART_REG(1)(s0)                 /* IER = 0 */
     li   t0, 3
     sw   t0, RES_STATUS(s11)
 

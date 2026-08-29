@@ -714,7 +714,7 @@ Section ProofSysUnlinkBody.
           W2's [ilock(dp)] reads [a0], so this is its first premise.  (Found
           by the seal, which is the first consumer to compose W1 with W2.) *)
        ⌜(Ms !!! Regidx Ra0 : mword 64) = dpv⌝ -∗
-       ⌜uptd_ext (pv_upt (us_V U)) P1⌝ -∗
+       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P1⌝ -∗
        ⌜(su_u1 w1 <= n1)%nat⌝ -∗
        ⌜w1 = true -> fsc_bmapstart ∈ Sb1⌝ -∗
        ⌜dpv <> (zero_reg : mword 64)⌝ -∗
@@ -793,7 +793,7 @@ Section ProofSysUnlinkBody.
     gen_cert -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
     bslots 3 -∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
     itable_inv -∗
@@ -1463,7 +1463,7 @@ Section ProofSysUnlinkBody.
     (M !!! Regidx Rs3 : mword 64) = (m !!! Regidx Rs3 : mword 64) ->
     su_al sp0 ->
     eb = true ->
-    uptd_ext (pv_upt (us_V U)) P1 ->
+    uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P1 ->
     sie_cap_gpr KT1 M (K - 30) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SU + 0x15a)) -∗
@@ -1502,7 +1502,7 @@ Section ProofSysUnlinkBody.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
     bslots 3 -∗
     iref_slots 1 -∗
     log_opb icfg_log u -∗
@@ -1739,7 +1739,7 @@ Section ProofSysUnlinkBody.
             (m !!! Regidx Rs3 : mword 64) M ->
     (M !!! Regidx Ra0 : mword 64) = dpv ->
     (su_u1 w1 <= n1)%nat ->
-    uptd_ext (pv_upt (us_V U)) P1 ->
+    uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P1 ->
     sie_cap_gpr KT1 M (K - 30) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
     kernel_text -∗ kernel_data -∗
@@ -1751,7 +1751,7 @@ Section ProofSysUnlinkBody.
     gen_cert -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
     bslots 3 -∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
     itable_inv -∗
@@ -2712,7 +2712,7 @@ Section ProofSysUnlinkBody.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
     i_dev (ientry ki) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     inode_meta (ientry ki) dni -∗
     inode_map fsc_fs (ientry ki) bmi -∗
@@ -3266,7 +3266,7 @@ Section ProofSysUnlinkBody.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
     i_dev (ientry ki) ↦₄{DfracOwn (1/2)} icfg_dev -∗
     inode_meta (ientry ki) dni -∗
     inode_map fsc_fs (ientry ki) bmi -∗
@@ -3624,7 +3624,7 @@ Section ProofSysUnlinkBody.
     sp0 = (m !!! Regidx csp_rs1 : mword 64) ->
     su_al sp0 ->
     (su_u1 w1 <= n1)%nat ->
-    uptd_ext (pv_upt (us_V U)) P1 ->
+    uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P1 ->
     (* ---- the +0x72 seam's pure facts, verbatim ---- *)
     su_regs m sp0 (ientry kd) (ientry ks)
             (m !!! Regidx Rs3 : mword 64) M2 ->
@@ -3657,7 +3657,7 @@ Section ProofSysUnlinkBody.
     gen_cert -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
     bslots 3 -∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
     itable_inv -∗
@@ -4273,7 +4273,7 @@ Section ProofSysUnlinkBody.
     sp0 = (m !!! Regidx csp_rs1 : mword 64) ->
     su_al sp0 ->
     (su_u1 w1 <= n1)%nat ->
-    uptd_ext (pv_upt (us_V U)) P1 ->
+    uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P1 ->
     (kd < NINODE)%nat ->
     (ks < NINODE)%nat ->
     bv_unsigned dinum < 16 * Z.of_nat icfg_nib ->
@@ -4314,7 +4314,7 @@ Section ProofSysUnlinkBody.
     gen_cert -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
     bslots 3 -∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
     itable_inv -∗
@@ -4932,7 +4932,13 @@ Section ProofSysUnlinkBody.
     assert (Haddr'v : di_addrs dnW = bm_cells bm')
       by (rewrite HdnW; reflexivity).
     (* the membership trio -- what pays the whole tail *)
-    destruct (Hpost16 ltac:(lia) (su_wi_blocks kk))
+    (* [wi16_post]'s guard is [0 < tot], and this arm has already
+       substituted [tot := 16], so the goal is [0 < 16].  HOISTED OUT OF
+       ARGUMENT POSITION and closed by a term: spliced as [ltac:(lia)] it
+       reifies this proof's whole context -- the tree's largest -- to
+       decide it, and measured 3.4 s at each of the two sites. *)
+    assert (Htot16 : (0 < 16)%nat) by (apply Nat.lt_0_succ).
+    destruct (Hpost16 Htot16 (su_wi_blocks kk))
       as (Hsp16 & Htgt16 & Hibd16 & Halc16).
     (* the ledger figures *)
     assert (Hnw5 : (5 <= nw)%nat).
@@ -5883,7 +5889,7 @@ Section ProofSysUnlinkBody.
     sp0 = (m !!! Regidx csp_rs1 : mword 64) ->
     su_al sp0 ->
     (su_u1 w1 <= n1)%nat ->
-    uptd_ext (pv_upt (us_V U)) P1 ->
+    uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P1 ->
     (kd < NINODE)%nat ->
     (ks < NINODE)%nat ->
     bv_unsigned dinum < 16 * Z.of_nat icfg_nib ->
@@ -5947,7 +5953,7 @@ Section ProofSysUnlinkBody.
     gen_cert -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
     bslots 3 -∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
     itable_inv -∗
@@ -6567,7 +6573,13 @@ Section ProofSysUnlinkBody.
     assert (Haddr'v : di_addrs dnW = bm_cells bm')
       by (rewrite HdnW; reflexivity).
     (* the membership trio -- what pays the whole tail *)
-    destruct (Hpost16 ltac:(lia) (su_wi_blocks kk))
+    (* [wi16_post]'s guard is [0 < tot], and this arm has already
+       substituted [tot := 16], so the goal is [0 < 16].  HOISTED OUT OF
+       ARGUMENT POSITION and closed by a term: spliced as [ltac:(lia)] it
+       reifies this proof's whole context -- the tree's largest -- to
+       decide it, and measured 3.4 s at each of the two sites. *)
+    assert (Htot16 : (0 < 16)%nat) by (apply Nat.lt_0_succ).
+    destruct (Hpost16 Htot16 (su_wi_blocks kk))
       as (Hsp16 & Htgt16 & Hibd16 & Halc16).
     (* the ledger figures *)
     assert (Hnw5 : (5 <= nw)%nat).

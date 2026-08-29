@@ -245,8 +245,7 @@ Section SwtchCtx.
       ⌜eq_vec (access_vec_dec (ret_pc (nth 0 vs (mword_of_int 0))) 0) ('b"0") = true⌝ ∗
       ctx_cells c vs ∗
       stack_own (KTR := KT1) (nth 1 vs (mword_of_int 0)) av ∗
-      (* main-tso-readiness: [ctx_parked XIp Tp] DEFERRED (no running token
-         in sie_cap yet); [XIp]/[Tp] keep the T-leg arity. *)
+      ctx_parked XIp Tp ∗
       (∀ (h : CPU) (m : regfile) (eb' : bool),
          ⌜adm A h⌝ -∗
          ⌜callee_img m = vs⌝ -∗

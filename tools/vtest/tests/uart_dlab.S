@@ -45,17 +45,17 @@ _vtest_body:
 
 /* ---- DLAB set: offset 0/1 are the divisor latches ---- */
     li   t0, 0x80
-    sb   t0, 3(s0)
-    lbu  t0, 3(s0)
+    sb   t0, UART_REG(3)(s0)
+    lbu  t0, UART_REG(3)(s0)
     sw   t0, R_LCR1(s11)
 
     li   t0, 0x03
-    sb   t0, 0(s0)                   /* DLL = 3 */
+    sb   t0, UART_REG(0)(s0)                   /* DLL = 3 */
     li   t0, 0x12
-    sb   t0, 1(s0)                   /* DLM = 0x12 */
-    lbu  t0, 0(s0)
+    sb   t0, UART_REG(1)(s0)                   /* DLM = 0x12 */
+    lbu  t0, UART_REG(0)(s0)
     sw   t0, R_DLL(s11)
-    lbu  t0, 1(s0)
+    lbu  t0, UART_REG(1)(s0)
     sw   t0, R_DLM(s11)
     li   t0, 1
     sw   t0, RES_STATUS(s11)
@@ -63,32 +63,32 @@ _vtest_body:
 /* ---- the aliased store: 'N' to offset 0 while DLAB is set ----
  * It must land in DLL and never reach the wire. */
     li   t0, 0x4e                    /* 'N' */
-    sb   t0, 0(s0)
-    lbu  t0, 0(s0)
+    sb   t0, UART_REG(0)(s0)
+    lbu  t0, UART_REG(0)(s0)
     sw   t0, R_DLL2(s11)
     li   t0, 2
     sw   t0, RES_STATUS(s11)
 
 /* ---- DLAB clear: offset 0/1 are THR/RHR and IER again ---- */
     li   t0, 0x03                    /* 8N1, DLAB clear */
-    sb   t0, 3(s0)
-    lbu  t0, 3(s0)
+    sb   t0, UART_REG(3)(s0)
+    lbu  t0, UART_REG(3)(s0)
     sw   t0, R_LCR2(s11)
-    lbu  t0, 1(s0)
+    lbu  t0, UART_REG(1)(s0)
     sw   t0, R_IER(s11)
-    lbu  t0, 0(s0)
+    lbu  t0, UART_REG(0)(s0)
     sw   t0, R_RHR(s11)
 
 /* ---- and now the same store instruction DOES transmit ---- */
-1:  lbu  t0, 5(s0)
+1:  lbu  t0, UART_REG(5)(s0)
     andi t0, t0, 0x20
     beqz t0, 1b
     li   t0, 0x59                    /* 'Y' */
-    sb   t0, 0(s0)
-2:  lbu  t0, 5(s0)
+    sb   t0, UART_REG(0)(s0)
+2:  lbu  t0, UART_REG(5)(s0)
     andi t0, t0, 0x40
     beqz t0, 2b
-    lbu  t0, 5(s0)
+    lbu  t0, UART_REG(5)(s0)
     sw   t0, R_LSR(s11)
     li   t0, 3
     sw   t0, RES_STATUS(s11)

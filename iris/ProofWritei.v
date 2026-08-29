@@ -560,7 +560,7 @@ Section WriteiDefs.
         ⌜wi16_post (ba_bms A) inum icfg_ist ncount n' off n tot bm bm' Sb Sb'⌝ -∗
         ⌜wi16_spend_any (ba_bms A) inum icfg_ist ncount n' off n bm bm' Sb⌝ -∗
         ⌜wi16_atomic off n tot⌝ -∗
-        ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+        ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
         sie_cap_gpr KT1 mf K b (proc_addr j) -∗
         cpu_own 0 eb (proc_addr j) b lks -∗
         trap_csrs_ext KT1 eb -∗
@@ -661,7 +661,7 @@ Section WriteiRet.
     wi16_post (ba_bms A) inum icfg_ist ncount n' off n tot bm bm' Sb Sb' ->
     wi16_spend_any (ba_bms A) inum icfg_ist ncount n' off n bm bm' Sb ->
     wi16_atomic off n tot ->
-    uptd_ext (pv_upt (us_V U)) P' ->
+    uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ->
     sie_cap_gpr KT1 M (K - 14)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
     trap_csrs_ext KT1 eb -∗
@@ -1060,7 +1060,7 @@ Section WriteiJoin.
     Sb ⊆ SbC ->
     (* the sixteen-byte receipt, as it stands BEFORE the flush *)
     wi16_pre (ba_bms A) ncount (S u) off n tot bm bm' Sb SbC ->
-    uptd_ext (pv_upt (us_V U)) P' ->
+    uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ->
     locks_below lks "log" ->
     sie_cap_gpr KT1 M (K - 14)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
@@ -1074,7 +1074,7 @@ Section WriteiJoin.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
     wi_fr8 m -∗
     i_dev ip ↦₄{dqd} icfg_dev -∗
     i_inum ip ↦₄{dqn} inum -∗
@@ -1447,7 +1447,7 @@ Section WriteiSize.
     Sb ⊆ SbC ->
     (* the sixteen-byte receipt, travelling to the join unchanged *)
     wi16_pre (ba_bms A) ncount (S u) off n tot bm bm' Sb SbC ->
-    uptd_ext (pv_upt (us_V U)) P' ->
+    uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ->
     locks_below lks "log" ->
     sie_cap_gpr KT1 M (K - 14)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
@@ -1461,7 +1461,7 @@ Section WriteiSize.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
     wi_fr13 m -∗
     i_dev ip ↦₄{dqd} icfg_dev -∗
     i_inum ip ↦₄{dqn} inum -∗
@@ -2055,7 +2055,7 @@ Section WriteiLoop.
        = if decide ((off <= k)%nat /\ (k < off + tot)%nat)
          then wroteI (k - off)%nat else file_byte data k) ->
     (user = false -> forall i : nat, (i < tot)%nat -> wroteI i = src_bytes i) ->
-    uptd_ext (pv_upt (us_V U)) PI ->
+    uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) PI ->
     (wi_blocks (off + tot) (n - tot) <= W)%nat ->
     (* THE LEDGER INVARIANT (WriteiBudget section 10).  What used to be two
        raw inequalities in 6-per-block arithmetic is now the two clauses of
@@ -2114,7 +2114,7 @@ Section WriteiLoop.
     procs_inv γs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
     wi_fr13 m -∗
     i_dev ip ↦₄{dqd} icfg_dev -∗
     i_inum ip ↦₄{dqn} inum -∗
@@ -2962,7 +2962,7 @@ Section WriteiLoop.
         iEval (rewrite /either_copyin_post HD8a0 HD8a2) in "Hpost".
         (* ---- the two arms of the post, in one shape ---- *)
         iAssert (∃ (g : nat -> bv 8) (P2 : uptd),
-                   ⌜uptd_ext (pv_upt (us_V U)) P2⌝ ∗
+                   ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P2⌝ ∗
                    ⌜user = false -> forall i : nat, (i < mm)%nat ->
                       g i = src_bytes (tot + i)%nat⌝ ∗
                    (* THE -1 ARM CARRIES [user = true] (fs-icache.md §15.1(i)):
@@ -2988,7 +2988,7 @@ Section WriteiLoop.
             (* either_copyin is SAME-image now, so the fresh image writei's
                own post still binds is simply the one it went in at. *)
             iExists gg, P2.
-            iSplitR; [iPureIntro; exact (uptd_ext_trans _ _ _ HextI Hx)|].
+            iSplitR; [iPureIntro; exact (uptd_ext_sz_trans _ _ _ _ HextI Hx)|].
             iSplitR; [iPureIntro; discriminate|].
             iSplitR; [iPureIntro; destruct Hr as [H0 | Hm1];
                       [left; exact H0
@@ -4190,7 +4190,7 @@ Section WriteiMain.
         unfold wi16_spend_any. intros _. lia. }
       { (* ...and it wrote nothing, which is the [tot = 0] half *)
         unfold wi16_atomic. intros _. left. reflexivity. }
-      { apply uptd_ext_refl. }
+      { apply uptd_ext_sz_refl. }
       { rewrite us_upt_id. iExact "Hsrc". }
     }
 
@@ -4610,7 +4610,7 @@ Section WriteiMain.
                    bound is loose, and [tot = 0] gives the granularity *)
                 ltac:(unfold wi16_spend_any; intros _; lia)
                 ltac:(unfold wi16_atomic; intros _; left; reflexivity)
-                ltac:(apply uptd_ext_refl)
+                ltac:(apply uptd_ext_sz_refl)
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hframe Hidev Hinum
                       Hmeta Hmap Hblocks Hsb Hba Hdn Hsrc Hsl Hop [Hcont]").
       iApply (wp_next_shift (b := true) (CIDa := CID) (CIDb := CIDy3) ltac:(wp_next_chain)
@@ -4771,7 +4771,7 @@ Section WriteiMain.
                    granularity fact holds at BOTH of its disjuncts *)
                 ltac:(rewrite /wi16_pre; intros Hone; cbv zeta; split_and!;
                       [ lia | left; reflexivity | intros Hpos; exfalso; lia ])
-                ltac:(apply uptd_ext_refl)
+                ltac:(apply uptd_ext_sz_refl)
                 ltac:(lkbelow)
                 with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpanenv Hbio Hlctx Hprocs Hdevi
                       Hdgeom Hdlock Hframe Hidev Hinum Hmeta
@@ -4983,7 +4983,7 @@ Section WriteiMain.
               ltac:(apply (bm_covers_mono bm (bv_unsigned (di_size dn)) _ Hcovin);
                     rewrite Nat.add_0_r; exact Hbig)
               ltac:(intro k; rewrite decide_False; [reflexivity | lia])
-              ltac:(intros _ i Hi; exfalso; lia) ltac:(apply uptd_ext_refl)
+              ltac:(intros _ i Hi; exfalso; lia) ltac:(apply uptd_ext_sz_refl)
               ltac:(replace (off + 0)%nat with off by lia;
                     replace (n - 0)%nat with n by lia; lia)
               (* THE INVARIANT AT ENTRY, at the caller's OWN set: [wi_inv_enter]

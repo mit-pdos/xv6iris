@@ -475,7 +475,7 @@ Section SpecFileread.
      dev_inv (fsc_uart) (fsc_disk) ∗
      disk_geom (fsc_disk) (frn_pd fn) (frn_pav fn) (frn_pu fn) ∗
      is_lock (fsc_dlock) d_lock "virtio_disk"%string
-       <{ disk_res (fsc_disk) (frn_pd fn) (frn_pav fn) (frn_pu fn) }> ∗
+       (disk_res_at (fsc_disk) (frn_pd fn) (frn_pav fn) (frn_pu fn)) ∗
      (* ONE slot unit: ilock's bread takes it and brelse gives it back;
         readi's does the same, one after the other *)
      bslot)%I.
@@ -768,7 +768,7 @@ Definition wp_fileread_sconf_body
        shared shape is for. *)
   ∀ (mf : regfile) (r : mword 64) (P' : uptd) (d : nat) (bs : nat -> bv 8),
       ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+      ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       ⌜fileread_ret n r⌝ -∗
       ⌜(Z.of_nat d <= Z.max 0 n)%Z⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗

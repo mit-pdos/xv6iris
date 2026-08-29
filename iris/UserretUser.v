@@ -80,7 +80,17 @@ Section UserretUser.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
-  Lemma wp_userret_user (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+  Lemma wp_userret_user (C : ucfg) (pt : uptd)
+      (* THE PROCESS'S MEMORY, NAMED AT THE LAZY TIER (milestone J, S3).  The
+         caller holds [UserPtTree.umem_lazy pt sz M] -- what
+         [ProcPtOwn.proc_ptm] carries and what the trap loop parks -- rather
+         than the exists-weakened [umem_any pt] this used to take.  Nothing
+         on THIS path reads the name: the generic slot below speaks the
+         MAPPED view, so the proof forgets it again ([umem_lazy_any]) before
+         the bridge.  Taking the named form here is what keeps the weakening
+         in ONE place instead of at every entry into the loop. *)
+      (sz : Z) (M : gmap Z (bv 8))
+      (Rut : uptd -> iProp Σ)
       (kroot : mword 44)
       (m : regfile) (usatp : mword 64)
       (mstatus0 sepc0 : mword 64)
@@ -182,7 +192,7 @@ Section UserretUser.
     (R_bitvector_32 mcounteren) ↦ᵣ□ mcounteren_v -∗
     (R_bitvector_32 scounteren) ↦ᵣ□ scounteren_v -∗
     mhpmcounter ↦ᵣ□ mhpmcounter_v -∗
-    umem_any pt -∗
+    umem_lazy pt sz M -∗
     (* ---- THE RESIDUE, COMPLETED BY THE WORDS userret READS ----------------
        The 31 save slots are OWNED BY the kernel-side bundle that parks
        across user execution ([UsertrapRes.ut_res_bare]'s [tf_page], via
@@ -278,6 +288,13 @@ Section UserretUser.
                              Htf168 Htf176 Htf184 Htf192 Htf200 Htf208 Htf216
                              Htf224 Htf232 Htf240 Htf248 Htf256 Htf264 Htf272
                              Htf280 Htf112") as "Hrut".
+    (* the image is forgotten HERE: the generic slot below takes
+       [UserPtTree.user_pt_inv] -- the MAPPED view at some image -- so the
+       lazy name the caller supplied has no reader on this path.  It is
+       taken named anyway so that the entries into the trap loop (forkret's
+       tail above all) hand on what [ProcPtOwn.proc_ptm] already gives them
+       instead of weakening one tier higher. *)
+    iDestruct (umem_lazy_any with "Hdata") as "Hdata".
     (* the machine, UNPACKED into the triple the slot consumes *)
     iDestruct (userret_to_user_state C pt mstatus0 sepc0 sc_v stval_v
                  (uc_mie C) (uc_mideleg C) MENVCFG_S (mword_of_int 0)
@@ -296,14 +313,14 @@ Section UserretUser.
                  with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb Hpc
                        Hfile Hsc Hstval Hstvec Hmedl Hmse Hsse
                        Hmcen Hscen Hhpm Hdata")
-      as (M) "(%Hmsok & Hregs & Hupt & Hcfg)".
+      as (Mp) "(%Hmsok & Hregs & Hupt & Hcfg)".
     (* AND THE SLOT RUNS.  The seal comes off HERE ONLY, and only on the
        hypothesis: the proofmode has to see the slot's foralls to instantiate
        them, but [Hhandler]'s own [uexec_wp] -- the WP user execution returns
        -- must stay folded, since that is the type the slot's handler premise
        is stated at.  A bare [rewrite] would unfold both. *)
     iEval (rewrite uexec_wp_unfold /uexec_F) in "Huwp".
-    iApply ("Huwp" $! CID C pt Rut M
+    iApply ("Huwp" $! CID C pt Rut Mp
               (userret_gpr m vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2
                  va3 va4 va5 va6 va7 vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10
                  vs11 vt3 vt4 vt5 vt6 va0f)

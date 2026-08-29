@@ -122,6 +122,9 @@ Require Import BufOwn BcacheInv BioInv.
 Require Import BreadLru.
 Require Import WpAu4.
 Require Import ProofBreadParts.
+Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the escrow
+                               absorb/deposit sites need the thread's own
+                               [own_context], which rides in [sie_cap]. *)
 Require Import CodeBread.
 Require Import SpecAcquire SpecRelease SpecAcquiresleep.
 Require Import SpecVirtioDiskRw.
@@ -133,6 +136,9 @@ Require Import SpecBread.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
+Require TsoCtxShim.   (* BcacheInv's LRU link cells are still the RAW word
+                         tower: each link load crosses the ctx seam. *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
 
@@ -302,7 +308,7 @@ Section BreadDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{XI : CurCtx}.
 
-  Definition bd_cont `{GEN : GenId} `{CID0 : CpuId}
+  Definition bd_cont `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}
       (j : nat) (bn : bio_names) (V : bio_view Σ)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (pj : mword 64) (lks : gset string) (Upr : ustate)
@@ -344,7 +350,7 @@ Section BreadDefs.
 
   (* the six frame slots, as one bundle (slot 6 -- offset 0 -- is pushed but
      never written) *)
-  Definition bd_frame (m : regfile) : iProp Σ :=
+  Definition bd_frame `{XI : CurCtx} (m : regfile) : iProp Σ :=
     (pa_stk (m !!! Regidx csp_rs1) 1 ↦₈[KT1] (m !!! Regidx Rra) ∗
      pa_stk (m !!! Regidx csp_rs1) 2 ↦₈[KT1] (m !!! Regidx Rs0) ∗
      pa_stk (m !!! Regidx csp_rs1) 3 ↦₈[KT1] (m !!! Regidx Rs1) ∗
@@ -650,7 +656,7 @@ Section BreadBlocks.
     sie_cap_gpr KT1 M (K - 6)%nat eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.bread + 0xb4) : mword 64) -∗
-    inv bioN (buf_escrow_body bn V k) -∗
+    inv bioN (buf_escrow_rec bn V k) -∗
     bd_frame m -∗
     cpu_own 0 eb (proc_addr j) eb lks -∗
     trap_csrs_ext KT1 eb -∗
@@ -659,7 +665,7 @@ Section BreadBlocks.
     proc_priv_bare (proc_addr j) pidv Upr -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+    is_lock γk d_lock "virtio_disk"%string (disk_res_at γd pd pav pu) -∗
     sleeplocked (snd (bn_slk bn k)) (buf_lock (bnode k)) pidv -∗
     bown bn k -∗
     bref bn k q dev bno -∗
@@ -685,12 +691,29 @@ Section BreadBlocks.
        already holds -- which is also where its ADDRESS CLAIM comes from
        ([wordw_claim_of], off the very points-to it puts in the update). *)
     iApply fupd_wp.
-    iInv "Hesc" as ">Hbodyp" "Hclosep".
+    (* THE CHECKOUT IS ONE OF THE TWO OPENS THAT MOVE THE BUFFER'S BYTES,
+       so it is one of the two that ABSORB: the record's payload comes out
+       at the record's own ξ, [TsoCtx.ctx_absorb] re-registers it at THIS
+       thread's, and the swapped-back body is [ctx_deposit]ed into the same
+       record (stamp raised).  The [own_context] both laws want is peeled
+       out of [sie_cap_gpr]'s fourth conjunct and put straight back.
+       M2 DEBT, named: [hart_view_lb K ∗ ⌜T ≤ K⌝] is discharged at [K := T]
+       by the SC shim; the sweep that makes [K] real is the same one
+       [ProofSwtch]'s resume already owes (tso-absorb-memo.md §7). *)
+    iInv "Hesc" as ">Hrec" "Hclosep".
+    iDestruct "Hrec" as (xie Te) "[Hpke Hbodyp]".
+    iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
+    iDestruct (TsoCtxShim.hart_view_lb_any Te) as "#HKe".
+    iMod (escrow_absorb bn V k xie Te Te ltac:(lia)
+            with "Hrun HKe Hpke Hbodyp") as "(Hrun & Hpke & Hbodyp)".
     iDestruct (escrow_swap_checkout bn V k q dev bno
                  with "Hbodyp Hbown Hrtok Hrdev Hrbno") as "[Hbodyp Hpark2]".
     iDestruct "Hpark2" as (vb0 bs0) "(Hvld & Hbdev & Hbuf & Hpay)".
-    iMod ("Hclosep" with "[Hbodyp]") as "_".
-    { iApply bi.later_intro. iExact "Hbodyp". }
+    iMod (escrow_deposit bn V k xie Te with "Hrun Hpke Hbodyp") as "[Hrun Hres]".
+    iDestruct "Hres" as (Te') "[Hpke Hbodyp]".
+    iDestruct ("Hcgb" with "Hrun") as "Hcg".
+    iMod ("Hclosep" with "[Hpke Hbodyp]") as "_".
+    { iNext. iApply (buf_escrow_rec_intro bn V k xie Te' with "Hpke Hbodyp"). }
     iDestruct (ctx_word4_claim (KTR2 := KT0) (b_valid (bpa k)) (DfracOwn 1)
                  (if vb0 then (mword_of_int 1 : mword 32)
                   else (mword_of_int 0 : mword 32)) ltac:(lia)
@@ -1039,7 +1062,7 @@ Section BreadBlocks.
     proc_priv_bare (proc_addr j) pidv Upr -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+    is_lock γk d_lock "virtio_disk"%string (disk_res_at γd pd pav pu) -∗
     bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) lks Upr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1165,6 +1188,7 @@ Section BreadBlocks.
       by (rewrite /H5 upd_ne; [exact HH4a0 | vm_compute; discriminate]).
     assert (HH5ra : H5 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.bread + 0x56) : mword 64) 4)
       by (rewrite /H5; apply upd_eq).
+    pose proof (TsoCtx.ctx_morph_const_pay (bcache_res bn V)) as Hcm_bc1.
     iApply (R.wp_release_sconf KT1 (bn_lk bn) bcache_addr "bcache"%string <{ bcache_res bn V }> H5
               0%nat eb (proc_addr j) (K - 6)%nat ({["bcache"]} ∪ lks)
               ltac:(rewrite HH5a0; apply bv_eq; vm_compute; reflexivity)
@@ -1333,7 +1357,7 @@ Section BreadBlocks.
     proc_priv_bare (proc_addr j) pidv Upr -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+    is_lock γk d_lock "virtio_disk"%string (disk_res_at γd pd pav pu) -∗
     bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) lks Upr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1384,14 +1408,32 @@ Section BreadBlocks.
               with "Hcg Hpc [] [] [Hauth Hdevs]").
     { iApply (bdi_90 with "Htext"). }
     { rewrite Hadev. iExact "HclaimB". }
-    { iInv "Hesc" as ">Hbody" "Hclose2".
-      iDestruct (escrow_recyc_dev bn V k Mg (devs k) dev HMk Hdv
+    (* NO ABSORB AT THE THREE RECYCLER STORES -- AND SINCE M1 STAGE 2 THAT IS
+       A SHIM DEBT, not a free pass.  Everything that crosses the
+       escrow boundary here is a [↦₄] cell -- [b_dev], [b_blockno],
+       [b_valid] -- and stage 1 does not flip those, so the swap runs AT the
+       record's own ξ and the parked token is handed back at the SAME stamp
+       (nothing was written at ξ).  Only the two opens that move
+       [BufOwn.buf_own]'s bytes absorb, and neither is one of these.  (At
+       stage 2, when [↦₄] flips, these three become absorb/deposit sites like
+       the checkout; the shape above is the template.) *)
+    { iInv "Hesc" as ">Hrec" "Hclose2".
+      iDestruct "Hrec" as (xir Tr) "[Hpkr Hbody]".
+      iDestruct (TsoCtxShim.ctx_word4_reindex _ cur_ctx xir with "Hdevs") as "Hdevs".
+      iDestruct (escrow_recyc_dev (XI := xir) bn V k Mg (devs k) dev HMk Hdv
                    with "Hauth Hbody Hdevs") as "(Hauth & Hfull & Hback)".
       iModIntro. iExists (devs k).
+      (* M1 stage 2: the escrow's cell is at the RECORD's ξ and the store's
+         update wants it at this thread's; no absorb can run inside an AU
+         (§0.17′), so the SC-only re-index stands in.  See the shim. *)
+      iDestruct (TsoCtxShim.ctx_word4_reindex _ xir cur_ctx with "Hfull") as "Hfull".
       iEval (rewrite -Hadev) in "Hfull". iFrame "Hfull".
       iIntros "Hfull". iEval (rewrite Hadev Hsvdev) in "Hfull".
+      iDestruct (TsoCtxShim.ctx_word4_reindex _ cur_ctx xir with "Hfull") as "Hfull".
       iDestruct ("Hback" with "Hfull") as "[Hbody Hhalf]".
-      iMod ("Hclose2" with "[Hbody]") as "_". { iApply bi.later_intro. iExact "Hbody". }
+      iDestruct (TsoCtxShim.ctx_word4_reindex _ xir cur_ctx with "Hhalf") as "Hhalf".
+      iMod ("Hclose2" with "[Hpkr Hbody]") as "_".
+      { iNext. iApply (buf_escrow_rec_intro bn V k xir Tr with "Hpkr Hbody"). }
       iModIntro. iFrame "Hauth Hhalf". }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc [Hauth Hdevs]".
@@ -1413,17 +1455,27 @@ Section BreadBlocks.
               with "Hcg Hpc [] [] [Hauth Hdevs Hbnos Hpool]").
     { iApply (bdi_94 with "Htext"). }
     { rewrite Habno. iExact "HclaimC". }
-    { iInv "Hesc" as ">Hbody" "Hclose2".
-      iDestruct (escrow_recyc_bno bn V k Mg bnos dev bno
+    { iInv "Hesc" as ">Hrec" "Hclose2".
+      iDestruct "Hrec" as (xir Tr) "[Hpkr Hbody]".
+      (* M1 stage 2: the escrow's cells sit at the RECORD's ξ and the store's
+         update wants them at this thread's; no absorb can run inside an AU
+         (§0.17′), so the SC-only re-index stands in.  See the shim. *)
+      iDestruct (TsoCtxShim.ctx_word4_reindex _ cur_ctx xir with "Hdevs") as "Hdevs".
+      iDestruct (TsoCtxShim.ctx_word4_reindex _ cur_ctx xir with "Hbnos") as "Hbnos".
+      iDestruct (escrow_recyc_bno (XI := xir) bn V k Mg bnos dev bno
                    HMk Hk Hcov Hmiss Huniq Hdv
                    with "Hauth Hbody Hdevs Hbnos Hpool")
         as "(Hauth & Hfull & Hback)".
       iModIntro. iExists (bnos k).
+      iDestruct (TsoCtxShim.ctx_word4_reindex _ xir cur_ctx with "Hfull") as "Hfull".
       iEval (rewrite -Habno) in "Hfull". iFrame "Hfull".
       iIntros "Hfull". iEval (rewrite Habno Hsvbno) in "Hfull".
+      iDestruct (TsoCtxShim.ctx_word4_reindex _ cur_ctx xir with "Hfull") as "Hfull".
       iDestruct ("Hback" with "Hfull")
         as "(Hbody & Hbmid & HpoolB & Hbnos & Hpool)".
-      iMod ("Hclose2" with "[Hbody]") as "_". { iApply bi.later_intro. iExact "Hbody". }
+      iDestruct (TsoCtxShim.ctx_word4_reindex _ xir cur_ctx with "Hbnos") as "Hbnos".
+      iMod ("Hclose2" with "[Hpkr Hbody]") as "_".
+      { iNext. iApply (buf_escrow_rec_intro bn V k xir Tr with "Hpkr Hbody"). }
       iModIntro. iFrame "Hauth Hbmid HpoolB Hbnos Hpool". }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc (Hauth & Hbmid & HpoolB & Hbnos & Hpool)".
@@ -1438,13 +1490,16 @@ Section BreadBlocks.
        mid arm: [escrow_open_mid] / [escrow_close_mid] are an open/close pair
        with no ghost move, so the cell is looked at and put straight back. *)
     iApply fupd_wp.
-    iInv "Hesc" as ">Hbodyq" "Hcloseq".
-    iDestruct (escrow_open_mid bn V k with "Hbmid Hbodyq") as "(Hbmid & Hmidq & _)".
+    iInv "Hesc" as ">Hrecq" "Hcloseq".
+    iDestruct "Hrecq" as (xiq Tq) "[Hpkq Hbodyq]".
+    iDestruct (escrow_open_mid (XI := xiq) bn V k with "Hbmid Hbodyq")
+      as "(Hbmid & Hmidq & _)".
     iDestruct "Hmidq" as (vldq bnoq bsq) "(%Hpinq & Hvldq & Hdevfullq & Hbufq)".
     iDestruct (ctx_word4_claim (KTR2 := KT0) (b_valid (bpa k)) (DfracOwn 1)
                  vldq ltac:(lia) with "Hvldq") as "#HclaimD".
-    iMod ("Hcloseq" with "[Hvldq Hdevfullq Hbufq]") as "_".
-    { iApply bi.later_intro. iApply (escrow_close_mid bn V k).
+    iMod ("Hcloseq" with "[Hpkq Hvldq Hdevfullq Hbufq]") as "_".
+    { iNext. iApply (buf_escrow_rec_intro bn V k xiq Tq with "Hpkq").
+      iApply (escrow_close_mid (XI := xiq) bn V k).
       rewrite /buf_mid. iExists vldq, bnoq, bsq. iFrame.
       iPureIntro. exact Hpinq. }
     iModIntro.
@@ -1457,15 +1512,23 @@ Section BreadBlocks.
               with "Hcg Hpc [] [] [Hauth Hbmid HpoolB Hbnos]").
     { iApply (bdi_98 with "Htext"). }
     { rewrite Hava. iExact "HclaimD". }
-    { iInv "Hesc" as ">Hbody" "Hclose2".
-      iDestruct (escrow_recyc_valid bn V k bno Hcov
+    { iInv "Hesc" as ">Hrec" "Hclose2".
+      iDestruct "Hrec" as (xir Tr) "[Hpkr Hbody]".
+      (* M1 stage 2: same re-index as the two stores above. *)
+      iDestruct (TsoCtxShim.ctx_word4_reindex _ cur_ctx xir with "Hbnos") as "Hbnos".
+      iDestruct (escrow_recyc_valid (XI := xir) bn V k bno Hcov
                    with "Hbmid Hbody Hbnos HpoolB") as "(Hvld & Hbnos & Hback)".
       iDestruct "Hvld" as (vld) "Hvld".
       iModIntro. iExists vld.
+      iDestruct (TsoCtxShim.ctx_word4_reindex _ xir cur_ctx with "Hvld") as "Hvld".
+      iDestruct (TsoCtxShim.ctx_word4_reindex _ xir cur_ctx with "Hbnos") as "Hbnos".
       iEval (rewrite -Hava) in "Hvld". iFrame "Hvld".
       iIntros "Hvld". iEval (rewrite Hava Hsvz) in "Hvld".
+      iDestruct (TsoCtxShim.ctx_word4_reindex _ cur_ctx xir with "Hvld") as "Hvld".
       iDestruct ("Hback" with "Hvld") as "[Hbody Hdevs]".
-      iMod ("Hclose2" with "[Hbody]") as "_". { iApply bi.later_intro. iExact "Hbody". }
+      iDestruct (TsoCtxShim.ctx_word4_reindex _ xir cur_ctx with "Hdevs") as "Hdevs".
+      iMod ("Hclose2" with "[Hpkr Hbody]") as "_".
+      { iNext. iApply (buf_escrow_rec_intro bn V k xir Tr with "Hpkr Hbody"). }
       iModIntro. iFrame "Hauth Hdevs Hbnos". }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc (Hauth & Hdevs & Hbnos)".
@@ -1562,6 +1625,7 @@ Section BreadBlocks.
       by (rewrite /C4 upd_ne; [exact HC3a0 | vm_compute; discriminate]).
     assert (HC4ra : C4 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.bread + 0xa8) : mword 64) 4)
       by (rewrite /C4; apply upd_eq).
+    pose proof (TsoCtx.ctx_morph_const_pay (bcache_res bn V)) as Hcm_bc2.
     iApply (R.wp_release_sconf KT1 (bn_lk bn) bcache_addr "bcache"%string <{ bcache_res bn V }> C4
               0%nat eb (proc_addr j) (K - 6)%nat ({["bcache"]} ∪ lks)
               ltac:(rewrite HC4a0; apply bv_eq; vm_compute; reflexivity)
@@ -1721,7 +1785,7 @@ Section BreadBlocks.
     proc_priv_bare (proc_addr j) pidv Upr -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+    is_lock γk d_lock "virtio_disk"%string (disk_res_at γd pd pav pu) -∗
     bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) lks Upr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -2024,7 +2088,7 @@ Section BreadBlocks.
     proc_priv_bare (proc_addr j) pidv Upr -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+    is_lock γk d_lock "virtio_disk"%string (disk_res_at γd pd pav pu) -∗
     bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) lks Upr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -2246,7 +2310,7 @@ Section BreadBlocks.
     proc_priv_bare (proc_addr j) pidv Upr -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
-    is_lock γk d_lock "virtio_disk"%string <{ disk_res γd pd pav pu }> -∗
+    is_lock γk d_lock "virtio_disk"%string (disk_res_at γd pd pav pu) -∗
     bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) lks Upr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -2837,6 +2901,7 @@ Section ProofBread.
       by (rewrite /R7; apply upd_eq).
     iDestruct (cpu_own_transport CID CID12 0%nat eb pj eb ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
+    pose proof (TsoCtx.ctx_morph_const_pay (bcache_res bn V)) as Hcm_bc3.
     iApply (A.wp_acquire_sconf KT1 (bn_lk bn) "bcache"%string <{ bcache_res bn V }> R7
               0%nat eb pj (K - 6)%nat eb lks
               ltac:(vm_compute; reflexivity) ltac:(lia)

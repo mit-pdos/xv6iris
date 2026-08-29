@@ -35,7 +35,7 @@ _vtest_body:
     mv   s10, ra
     li   s0, UART0
 
-    lbu  t0, 5(s0)
+    lbu  t0, UART_REG(5)(s0)
     sw   t0, R_LSR0(s11)
     li   t0, 1
     sw   t0, RES_STATUS(s11)
@@ -45,19 +45,19 @@ _vtest_body:
     li   s2, 0
 1:  lbu  t1, 0(s1)
     beqz t1, 3f
-2:  lbu  t0, 5(s0)
+2:  lbu  t0, UART_REG(5)(s0)
     andi t0, t0, 0x20                /* THRE */
     beqz t0, 2b
-    sb   t1, 0(s0)
+    sb   t1, UART_REG(0)(s0)
     addi s1, s1, 1
     addi s2, s2, 1
     j    1b
 
 3:  /* wait for the transmitter to go idle (TEMT), then look at LSR */
-4:  lbu  t0, 5(s0)
+4:  lbu  t0, UART_REG(5)(s0)
     andi t0, t0, 0x40                /* TEMT */
     beqz t0, 4b
-    lbu  t0, 5(s0)
+    lbu  t0, UART_REG(5)(s0)
     sw   t0, R_LSR1(s11)
     sw   s2, R_NBYTES(s11)
     li   t0, 2
@@ -67,13 +67,13 @@ _vtest_body:
  * The model's harness drains the tx FIFO after every instruction, so the
  * model reads THRE set here; whether the hardware does is the question. */
     li   t1, 0x5a                    /* 'Z' */
-    sb   t1, 0(s0)
-    lbu  t0, 5(s0)
+    sb   t1, UART_REG(0)(s0)
+    lbu  t0, UART_REG(5)(s0)
     sw   t0, R_LSRHOT(s11)
-5:  lbu  t0, 5(s0)
+5:  lbu  t0, UART_REG(5)(s0)
     andi t0, t0, 0x40
     beqz t0, 5b
-    lbu  t0, 5(s0)
+    lbu  t0, UART_REG(5)(s0)
     sw   t0, R_LSR2(s11)
     li   t0, 3
     sw   t0, RES_STATUS(s11)
@@ -85,14 +85,14 @@ _vtest_body:
  * vtest-rocq/UartTx.v about why, under the harness's eager drain, it is not. */
     li   t2, 0x61                    /* 'a' */
     li   t3, 24
-6:  sb   t2, 0(s0)
+6:  sb   t2, UART_REG(0)(s0)
     addi t2, t2, 1
     addi t3, t3, -1
     bnez t3, 6b
-7:  lbu  t0, 5(s0)
+7:  lbu  t0, UART_REG(5)(s0)
     andi t0, t0, 0x40
     beqz t0, 7b
-    lbu  t0, 5(s0)
+    lbu  t0, UART_REG(5)(s0)
     sw   t0, R_LSR3(s11)
     li   t0, 4
     sw   t0, RES_STATUS(s11)

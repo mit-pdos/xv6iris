@@ -1346,9 +1346,9 @@ Section ProofPushOff.
        the leaf's postcondition already delivers [sie_arm false p] directly
        -- no disjunction to refute (the old ghost_var_agree-vs-Htok dance was
        needed only pre-port, when the arm was an internal [A ∨ B]). *)
-    iDestruct "Hrep" as "(%HSIEr & Hq0 & #Hwit)".
-    iAssert (sie_cap kt P3 (trap_res bexit + (av - 2))%nat false p) with "[Hstk Htr Hq0]" as "Hcapsc".
-    { iFrame "Hstk Htr Hq0 Hwit". }
+    iDestruct "Hrep" as "(%HSIEr & Hq0 & Hctx & #Hwit)".
+    iAssert (sie_cap kt P3 (trap_res bexit + (av - 2))%nat false p) with "[Hstk Htr Hq0 Hctx]" as "Hcapsc".
+    { iFrame "Hstk Htr Hq0 Hctx Hwit". }
     iDestruct (sconf_at_close with "Hsc") as "Hsc".
     iDestruct (sie_cap_gpr_join with "Hhs Hsc Hcapsc Hfile") as "Hcg".
     assert (Hsst2 : neq_vec (and_vec (sstatus_read msr)

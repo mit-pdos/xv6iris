@@ -119,11 +119,22 @@ Definition growproc_ok (szv n : mword 64) (P P' : uptd) (szv' r : mword 64)
      gained precisely the run [PGROUNDUP(sz) .. sz+n); which pages kalloc
      returned is not determined, so [P'] is pinned by extension + domain,
      exactly as uvmalloc's own success arm pins it.  The image gained
-     exactly the zeros that became readable at the new size. *)
+     exactly the zeros that became readable at the new size.
+
+     THE EXTENSION IS [uptd_ext_sz], not bare [uptd_ext], and the size
+     ordering is stated beside it.  Both are for sbrk's caller: the
+     dispatcher's row ([SpecSyscall.sysc_sbrk_ok]) says the address space
+     went UP, and the U tier's permission row needs to know that every leaf
+     the map GAINED is vmfault's own RW-user leaf inside the new size --
+     which is exactly what uvmalloc guarantees (growproc passes PTE_W, so
+     the leaf is [uvm_pte 22 _]) and what
+     [UserPerm.perm_of_uptd_ext_sz] consumes.  A bare [uptd_ext] cannot get
+     there: [upt_acc_wf] permits R+X user leaves. *)
   (r = (mword_of_int 0 : mword 64) /\ (0 < sint n)%Z /\
    (uint (add_vec szv n) <= uvm_maxsz)%Z /\
    szv' = add_vec szv n /\
-   uptd_ext P P' /\
+   (uint szv <= uint szv')%Z /\
+   uptd_ext_sz szv' P P' /\
    dom (ud_um P') = dom (ud_um P)
                     ∪ vpn_run (svpn_of (pgroundup szv)) (uvma_np szv (add_vec szv n)) /\
    M' = umem_grow M (uint szv'))

@@ -174,11 +174,10 @@ Import Defs.
    cannot say it at all.
 
    TWO ENTRIES MOVE THE ADDRESS SPACE ITSELF and a window is the wrong
-   shape for them.  [sbrk] gets the three arms its own contract has --
-   nothing, a zero-extension to the new size, or a deletion of the run above
-   it -- keyed to the size in the OUTGOING record; [exec] replaces the
-   address space outright and is unconstrained here, its image being
-   [SpecKexec]'s to pin. *)
+   shape for them.  [sbrk] gets [sysc_sbrk_ok] below -- a FUNCTION of the
+   entry and exit sizes, saying which way the address space went and how
+   far, descriptor included; [exec] replaces the address space outright and
+   is unconstrained here, its image being [SpecKexec]'s to pin. *)
 Definition sysc_num (V : pprivate) : Z :=
   bv_signed (subrange_vec_dec (pv_tf V !!! tf_arg_idx 7) 31 0 : mword 32).
 
@@ -189,16 +188,31 @@ Definition sysc_window (n : Z) : option nat :=
   else if decide (n = 8) then Some 1%nat   (* fstat -- struct stat *st *)
   else None.
 
-Definition sysc_sbrk_img (M M' : gmap Z (bv 8)) (szv' : mword 64) : Prop :=
-  M' = M
-  \/ M' = umem_grow M (uint szv')
-  \/ exists np : nat,
-       M' = umem_del M (uint (ProcPtOwn.pgroundup szv')) (4096 * np).
+(* SBRK SAYS WHAT HAPPENS.  Not "one of three things may have moved", but:
+   at the OLD size [szv] and the NEW one [szv'], either extend the memory up
+   with zeroed pages or cut it down -- and, because the U tier's permission
+   row needs it, WHICH DESCRIPTOR came back.
+
+   On the way UP the table is only ever EXTENDED, and every leaf it gains is
+   vmfault's own RW-user leaf inside the new size ([ProcPtOwn.uptd_ext_sz]):
+   the lazy path maps nothing at all, and the eager path's uvmalloc maps
+   [PTE_R|PTE_W|PTE_U].  On the way DOWN the descriptor is uvmdealloc's run,
+   named exactly -- the count is [ProcPtOwn.uvmd_np] of the two sizes, which
+   is 0 (hence the whole row an identity) on growproc's WRAP sub-case, which
+   is why that one lands in the FIRST branch beside the failures. *)
+Definition sysc_sbrk_ok (P P' : uptd) (szv szv' : mword 64)
+    (M M' : gmap Z (bv 8)) : Prop :=
+  if decide (uint szv <= uint szv')%Z
+  then ProcPtOwn.uptd_ext_sz szv' P P' /\ M' = umem_grow M (uint szv')
+  else P' = ProcPtOwn.uptd_del_run P (svpn_of (ProcPtOwn.pgroundup szv'))
+                                     (ProcPtOwn.uvmd_np szv szv')
+       /\ M' = umem_del M (uint (ProcPtOwn.pgroundup szv'))
+                          (4096 * ProcPtOwn.uvmd_np szv szv').
 
 Definition sysc_mem_ok (V V' : pprivate) (M M' : gmap Z (bv 8)) : Prop :=
   if decide (sysc_num V = 7) then True                    (* exec *)
   else if decide (sysc_num V = 12) then                   (* sbrk *)
-    sysc_sbrk_img M M' (pv_sz V')
+    sysc_sbrk_ok (pv_upt V) (pv_upt V') (pv_sz V) (pv_sz V') M M'
   else match sysc_window (sysc_num V) with
        | Some i => exists (d : nat) (bs : nat -> bv 8),
                      M' = umem_wr M (pv_tf V !!! tf_arg_idx i) d bs
@@ -316,6 +330,58 @@ Definition wp_syscall_sconf_body
          [sysc_mem_ok] above.  Sixteen of the twenty-two entries touch no
          user memory at all and this reads [us_M U' = us_M U] for them. *)
       ⌜ sysc_mem_ok (us_V U) (us_V U') (us_M U) (us_M U') ⌝ -∗
+      (* ...AND THIS ARM RETURNED, WHICH RULES [exit] OUT (milestone J,
+         K1).  [sysc_mem_ok] does NOT: exit falls into the quiet
+         "nothing moved" row, so the table alone cannot tell a returning
+         round from the one that never comes back -- and the
+         user-execution contract hands back [emp] at exit
+         ([UexecRet.uexec_ret]'s own arm), so a loop that could not
+         refute "the process exited and returned nothing" would be
+         stuck.  This clause is the refutation, and it is FREE: it sits
+         in the RETURNING conjunct of the exit slot, which only the
+         twenty-one returning entries ever take -- each off its own
+         table index -- while [sys_exit] takes the divergent conjunct
+         and owes nothing. *)
+      ⌜ sysc_num (us_V U) <> 2 ⌝ -∗
+      (* ...AND THE RESUME RECORD IS PINNED.  The three rows below are what
+         the user-execution slot (milestone J) needs and nothing above says;
+         each is stated to what is TRUE rather than to what would be tidy.
+
+         (i)  THE TRAPFRAME WORDS.  Literal equality is FALSE -- the return
+              value IS written into the a0 slot, by the [sd a0,112(s2)] at
+              [syscall + 0x3a], i.e. AFTER the dispatch returns -- so what
+              holds is that the outgoing list is the entry list with the a0
+              word replaced.  The word itself is not named: [uexec_ret]'s
+              ecall arm forall-binds the return value and the caller
+              instantiates it at whatever was stored.
+         (ii) THE PAGE-TABLE DESCRIPTOR.  Literal equality is FALSE on the
+              eleven buffer-touching entries -- a copyin/copyout lazy fault
+              grows [ud_um] -- so what holds is [ProcPtOwn.uptd_ext_sz] at
+              the process's OWN SIZE: same root, same trapframe page, a user
+              map that only gained entries, each of them BELOW [p->sz] and
+              carrying vmfault's own RW-user bits.  The size and the bits
+              are what [UserPerm.perm_of_uptd_ext_sz] needs to see that the
+              PERMISSION PROJECTION does not move under a lazy fill, which
+              is the [pi' = pi] the user-execution round
+              ([UexecRound.uround_ok]) is stated with -- a bare [uptd_ext]
+              cannot get there ([upt_acc_wf] permits R+X user leaves, and
+              text pages genuinely are R+X below [p->sz]).  Every producer
+              has it: copyin / copyout / copyinstr return it and the whole
+              chain between them and this post now relays it.
+         (iii) THE SIZE, verbatim.
+
+         [exec] escapes all three (it replaces the address space, trapframe
+         and all) and [sbrk] escapes (ii) and (iii) (it resizes it).  The
+         escapes are by [sysc_num], which the ENTRY record already
+         determines, so an arm selects its branch exactly as it does for
+         [sysc_mem_ok]. *)
+      ⌜ sysc_num (us_V U) = 7 \/ exists w : mword 64,
+          pv_tf (us_V U') = <[tf_arg_idx 0 := w]> (pv_tf (us_V U)) ⌝ -∗
+      ⌜ sysc_num (us_V U) = 7 \/ sysc_num (us_V U) = 12 \/
+          ProcPtOwn.uptd_ext_sz (pv_sz (us_V U))
+            (pv_upt (us_V U)) (pv_upt (us_V U')) ⌝ -∗
+      ⌜ sysc_num (us_V U) = 7 \/ sysc_num (us_V U) = 12 \/
+          pv_sz (us_V U') = pv_sz (us_V U) ⌝ -∗
       (* THE TRAPFRAME PAGE IS THE ONE THING THAT CANNOT MOVE.  Everything
          else in the record may: [pv_tf] always does (the a0 slot is the
          return value), and sbrk / exec / chdir / open move the rest. *)

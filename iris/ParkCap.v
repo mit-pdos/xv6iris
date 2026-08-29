@@ -53,6 +53,12 @@ Require Import FirstTok TimerCap.
 Require Import UserPtTree ProcPtOwn.   (* [uptd] / [ud_data] / [ud_pas] / [proc_pt_wf] *)
 Require Import UsertrapRes.
 Require Import UexecWp.   (* [uexec_wp] -- the child's WP, the channel's last row *)
+Require Import UexecSlot. (* [uvis] / [uvis_of] -- the slot's key, and the
+                             projection of a resumed record onto it *)
+Require Import UexecRet.  (* [uslot] -- the KEYED slot the resume closer now
+                             yields.  Required DIRECTLY: the [Typeclasses
+                             Opaque] seal on [uslot] does not travel through a
+                             re-export (durable-notes). *)
 From Kernel Require KernelSyms.
 Require Import Xv6G.
 Require Import TsoCtx.
@@ -72,7 +78,7 @@ Section ParkCap.
      is this, verbatim).  [W] is what the residue closer is handed at the
      resume beside [first_done] and the timer capability. *)
   Definition park_pkg
-      (URB : CpuId -> uptd -> mword 64 -> iProp Σ) (W : iProp Σ)
+      (URB : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ) (W : iProp Σ)
       (γs : list gname) (γf : gname) (pa ks : mword 64)
       (* the parked process's fd-state ghost name -- see
          [SpecForkretParkPaid.forkret_park_pkg], which is this verbatim *)
@@ -84,21 +90,31 @@ Section ParkCap.
      procs_inv γs ∗
      pslot_used_at pa ∗
      stack_own (KTR := KT1) (add_vec ks (mword_of_int 4096)) av ∗
-     (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
-        ⌜pv_upt V' = pt'⌝ -∗
+     (∀ (h : CpuId) (pt' : uptd) (U' : ustate),
+        ⌜pv_upt (us_V U') = pt'⌝ -∗
         ⌜ud_data pt' = ud_pas pt'⌝ -∗
         ⌜proc_pt_wf pt'⌝ -∗
         (* the resumed record names the parked process's fd-state ghost *)
-        ⌜pv_fdg V' = g⌝ -∗
-        ut_tfk (CID := h) (add_vec ks (mword_of_int 4096)) V' -∗
+        ⌜pv_fdg (us_V U') = g⌝ -∗
+        ut_tfk (CID := h) (add_vec ks (mword_of_int 4096)) (us_V U') -∗
         first_done -∗
         W -∗
         timer_cap (CID := h) -∗
         ut_trap_parked (CID := h) pa (add_vec ks (mword_of_int 4096)) av ∅ -∗
-        proc_priv_nopt γf pa pid V' -∗
+        proc_priv_nopt γf pa pid (us_V U') -∗
         fd_slots FDSPARE -∗
         iref_slots IREFSPARE -∗
-        URB h pt' (add_vec ks (mword_of_int 4096))))%I.
+        (* THE RESUMED BUNDLE, AND A SLOT KEYED AT THE RECORD THE RESUME
+           ACTUALLY LANDS ON.  The second conjunct is milestone J: what the
+           parker captured is the GENERIC FAMILY [∀ W, uslot W] (see
+           [park_token_park] below), and the closer instantiates it HERE, at
+           [uvis_of U'] -- the resumed record's key.  It cannot be keyed at
+           the PARK: [ProofForkret]'s boot arm runs kexec("/init") between the
+           park and the resume and applies this closer at the POST-EXEC
+           record, so a key captured at userinit's park is stale by then
+           (projects/user-wp-slot.md SS4c, refutation R-b). *)
+        (URB h pt' (add_vec ks (mword_of_int 4096)) U'
+         ∗ uslot (uvis_of U'))))%I.
 
   (* the child's own rows, the ones the park spends *)
   Definition park_child (γs : list gname) (γf : gname) (pa ks : mword 64)
@@ -112,7 +128,7 @@ Section ParkCap.
   (* THE CAP, at a given [W]: the statement of
      [SpecForkretParkPaid.forkret_park_paid_body], as a [□] wand *)
   Definition park_cap
-      (URB : CpuId -> uptd -> mword 64 -> iProp Σ) (W : iProp Σ)
+      (URB : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ) (W : iProp Σ)
       (γs : list gname) : iProp Σ :=
     (□ ∀ (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
          (pid : mword 32) (U : ustate) (av : nat),
@@ -130,35 +146,35 @@ Section ParkCap.
      the records of THIS table ([un_s N = γs]), which is all the token for
      [γs] ever parks *)
   Definition park_chan
-      (URB : CpuId -> uptd -> mword 64 -> iProp Σ) (W : iProp Σ)
+      (URB : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ) (W : iProp Σ)
       (γs : list gname) : iProp Σ :=
     (□ ∀ (N : ut_names) (av : nat),
        ⌜un_s N = γs⌝ -∗ ⌜ut_wf N⌝ -∗ ⌜(K_usertrap <= av)%nat⌝ -∗
        ▷ (park_env N -∗ park_own N -∗
-          (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
-             ⌜pv_upt V' = pt'⌝ -∗
-             ut_tfk (CID := h) (add_vec (un_ks N) (mword_of_int 4096)) V' -∗
+          (∀ (h : CpuId) (pt' : uptd) (U' : ustate),
+             ⌜pv_upt (us_V U') = pt'⌝ -∗
+             ut_tfk (CID := h) (add_vec (un_ks N) (mword_of_int 4096)) (us_V U') -∗
              first_done -∗
              W -∗
              timer_cap (CID := h) -∗
              ut_trap_parked (CID := h) (un_pj N)
                (add_vec (un_ks N) (mword_of_int 4096)) av ∅ -∗
-             proc_priv_nopt (un_f N) (un_pj N) (un_pid N) V' -∗
+             proc_priv_nopt (un_f N) (un_pj N) (un_pid N) (us_V U') -∗
              fd_slots FDSPARE -∗
              iref_slots IREFSPARE -∗
-             fd_frags_any (pv_fdg V') -∗
+             fd_frags_any (pv_fdg (us_V U')) -∗
              (* ...and the child's user-execution WP, mirroring
                 [UsertrapRes.ut_park_intro_body] row for row.  Like the fd
                 fragments above it, it is CAPTURED AT THE PARK
                 ([park_token_park] below) rather than supplied by the
                 resumer, so it does not appear in [park_pkg]'s closer. *)
              uexec_wp -∗
-             URB h pt' (add_vec (un_ks N) (mword_of_int 4096)))))%I.
+             URB h pt' (add_vec (un_ks N) (mword_of_int 4096)) U')))%I.
 
   (* THE TOKEN: some residue, its cap and its channel, both at [W := the
      token itself] *)
   Definition park_token_F (γs : list gname) (X : iProp Σ) : iProp Σ :=
-    (∃ URB : CpuId -> uptd -> mword 64 -> iProp Σ,
+    (∃ URB : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ,
        park_cap URB X γs ∗ park_chan URB X γs)%I.
 
   Local Instance park_token_F_contractive γs : Contractive (park_token_F γs).
@@ -208,10 +224,20 @@ Section ParkCap.
        parker has to own one, which is what makes a WP enter the world only
        at the two mint sites (userinit's park and sys_fork's kfork call). *)
     uexec_wp -∗
+    (* ...AND THE GENERIC SLOT FAMILY, captured on the very same route and
+       spent by the package's resume closer at [uvis_of U'].  A FAMILY rather
+       than a slot at the parked key: the party that resumes this record may
+       have replaced its address space first (forkret's boot arm runs
+       kexec("/init") between the park and the resume), so the only key that
+       is honest here is the one the resume itself produces -- see
+       [park_pkg]'s closer above and projects/user-wp-slot.md SS4c (R-b).
+       LINEAR, exactly like the WP above it: the two mint sites eliminate
+       [UEXEC_GEN.uexec_wp_gen]'s [box] once, into both. *)
+    (∀ W : uvis, uslot W) -∗
     park_child (un_s N) (un_f N) (un_pj N) (un_ks N) rest (un_pid N) U -∗
     |==> ▷ proc_ctx (un_s N) (un_pj N).
   Proof.
-    iIntros (Hwf Hrest) "#Htok #Htext #Hwire #Hkmap #Hslot Hstack #Henv Hown Hfrag Huwp Hchild".
+    iIntros (Hwf Hrest) "#Htok #Htext #Hwire #Hkmap #Hmk Hstack #Henv Hown Hfrag Huwp Hslot Hchild".
     assert (Hkav : (K_usertrap <= KSTACK_AV)%nat) by (vm_compute; lia).
     iPoseProof "Htok" as "Htok'".
     iEval (rewrite park_token_unfold /park_token_F) in "Htok'".
@@ -221,20 +247,27 @@ Section ParkCap.
     iDestruct ("Hchan" $! N KSTACK_AV with "[%] [%] [%]") as "Hclose";
       [reflexivity | exact Hwf | exact Hkav |].
     iApply ("Hcap" $! (un_f N) (un_pj N) (un_ks N) rest (un_pid N) U KSTACK_AV
-              with "[%] [%] [%] [Hstack Hown Hclose Hfrag Huwp] [] Hchild").
+              with "[%] [%] [%] [Hstack Hown Hclose Hfrag Huwp Hslot] [] Hchild").
     - exact Hrest.
     - destruct Hwf as (Hj & _). exists (un_j N). split; [reflexivity | exact Hj].
     - exact Hkav.
     - rewrite /park_pkg.
       iNext.
-      iFrame "Htext Hwire Hkmap Hprocs Hslot Hstack".
+      iFrame "Htext Hwire Hkmap Hprocs Hmk Hstack".
       iDestruct ("Hclose" with "Henv Hown") as "Hclose'".
-      iIntros (h pt' V') "%Hupt %Hnorm %Hptwf %Hfg #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
+      iIntros (h pt' U') "%Hupt %Hnorm %Hptwf %Hfg #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
       (* the parked bundle, re-keyed onto the resumed record *)
       iEval (rewrite -Hfg) in "Hfrag".
-      iApply ("Hclose'" $! h pt' V'
-                with "[%] Htfk Hdone HW Htc Htrap Hpriv Hfd Hiref Hfrag Huwp").
-      exact Hupt.
+      (* row by row, never a frame past a bundle carrying a slot
+         (claude-notes/optimization.md): the residue on the left, the
+         instantiated slot on the right. *)
+      iSplitR "Hslot".
+      + iApply ("Hclose'" $! h pt' U'
+                  with "[%] Htfk Hdone HW Htc Htrap Hpriv Hfd Hiref Hfrag Huwp").
+        exact Hupt.
+      + (* THE INSTANTIATION -- the whole of milestone J's park channel:
+           a generic family in, the resumed record's key out. *)
+        iApply ("Hslot" $! (uvis_of U')).
     - iNext. iExact "Htok".
   Qed.
 
@@ -245,7 +278,7 @@ Section ParkCap.
   (* [usertrap_res_bare_park], both at [URB := usertrap_res_bare].          *)
   (* ------------------------------------------------------------------- *)
   Lemma park_token_intro_of
-      (URB : CpuId -> uptd -> mword 64 -> iProp Σ) (γs : list gname) :
+      (URB : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ) (γs : list gname) :
     (forall N av, ut_park_intro_body URB (park_token (un_s N)) N av) ->
     park_cap URB (park_token γs) γs -∗
     park_token γs.

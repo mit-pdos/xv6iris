@@ -22,6 +22,16 @@ existing arbitrary-user-code SAFETY tier
 First target: the `sync` program (`user-rocq/Sync*.v` — `main` calls `sync()`
 then `exit(0)`; entry is `start` at 0x12, which calls `main` then `exit`).
 
+**SUCCESSOR (2026-08-28).**  `uv_cap` / `uv_cap_gpr` are being replaced by
+the kernel-derived trap contract of `iris/UexecRet.v` — the bundle
+`uvb C pt Rut M m pc` (the kernel's own `user_pt_inv` plus the machine
+cells, the register file, the pc, the parked residue and the kernel
+obligation `ukont`) and the trapframe-keyed slot `uslot`; see
+`../design/user-wp-slot.md` §"The ruled design for the user/kernel trap
+contract" and `../projects/user-wp-slot.md` §3 for what is landed and what
+blocks the leaf sweep.  Everything below describes the tier as built on
+`uv_cap`, which is still what sh / echo / init / sync thread.
+
 ## How the two tiers coexist
 
 From the kernel's perspective a user process carries ONE of two contracts:

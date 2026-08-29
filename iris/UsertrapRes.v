@@ -87,6 +87,7 @@ Require Import UexecWp.
 Require Import FsReady.
 Require Import SpecConsoleintr.  (* [console_caps] -- devintr's console row *)
 Require Import TicksInv.         (* [is_tickslock] -- the tick keeper's real arm *)
+Require Import ConsoleInv.       (* [console_ready] -- resumer-supplied, park_globals *)
 Require Import DiskInv.          (* [disk_geom] / [disk_res] *)
 Require Import SpecDevintr.
 Require Import SpecPrintk.
@@ -94,9 +95,11 @@ Require Import SpecKernelvec.   (* the two kernelvec trap-vector facts *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
+Require Import SpecAllocpid.  (* [alp_pid_lock] / [nextpid_res] -- park_env's ξ-free rows *)
 Require Import TimerCap.   (* [sstc_enabled]: the residue's mcounteren pin *)
 Local Open Scope Z_scope.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import TsoCtx.
 Import Defs.
 Require Import TsoCtx.
 
@@ -164,6 +167,23 @@ Section UsertrapRes.
         of SpecUsertrap.v's restatement *)
      strans_inv ∗
      sie_arm KT1 false pj ∗
+     (* THE THREAD-OF-CONTROL TOKEN, AT THE AMBIENT CONTEXT (tso-port leg
+        M2; owner ruling on the fifth design seam).  A USER EXCURSION DOES
+        NOT CHANGE THE THREAD OF CONTROL: the same kernel thread continues
+        after the trap, on the same hart, and -- unlike a
+        [SwtchCtx.valid_context] record, which the SCHEDULER (a different
+        thread) resumes -- nothing but this thread can ever resume this
+        residue.  So the residue is the thread's OWN parked state, held at
+        the thread's own identity, which is the ambient one wherever the
+        residue is manipulated.  That is why the token is [cur_ctx] here and
+        NOT existentially bound the way [valid_context_pre]'s is: internal
+        identity is only needed when a FOREIGN thread resumes the record.
+        ξ changes only at swtch, which owns the exchange and is a different
+        mechanism -- so "a thread never changes ξ across a user excursion"
+        is discharged by construction, not assumed.
+        Placed right after [sie_arm] to mirror [IntrDefs.sie_cap]'s own
+        order, since [ut_trap_open] hands these three straight across. *)
+     own_context cur_ctx ∗
      kpt_on cpu_id ∗
      (* NOT [IntrDefs.sconf_priv_closer]: [mie]/[mideleg]/[menvcfg] are
         [user_cfg]'s cells too (uservec/userret/user-mode hold them the
@@ -202,6 +222,11 @@ Section UsertrapRes.
       (lks : gset string) : iProp Σ :=
     (ut_stack ksp av ∗
      sie_arm KT1 false pj ∗
+     (* the token rides the parked twin too, in the same slot -- see
+        [ut_trap]'s note.  It is precisely what survives user execution
+        alongside the stack: the translation slot is what the park drops,
+        not the thread's identity. *)
+     own_context cur_ctx ∗
      strans_kpt ∗ kpt_on cpu_id ∗
      ut_ghosts ∗
      cpu_own 0%nat false pj false lks ∗
@@ -211,8 +236,8 @@ Section UsertrapRes.
       (lks : gset string) (kroot : mword 44) :
     ut_trap_parked pj ksp av lks -∗ tlb_res_pt kroot -∗ ut_trap pj ksp av lks.
   Proof.
-    iIntros "(Hstk & Harm & Hb1 & #Hb2 & Hgh & Hcpu & Hclm) Hkres".
-    rewrite /ut_trap. iFrame "Hstk Harm Hb2 Hgh Hcpu Hclm".
+    iIntros "(Hstk & Harm & Hctx & Hb1 & #Hb2 & Hgh & Hcpu & Hclm) Hkres".
+    rewrite /ut_trap. iFrame "Hstk Harm Hctx Hb2 Hgh Hcpu Hclm".
     iApply (strans_inv_intro kroot with "Hb1 Hkres").
   Qed.
 
@@ -221,14 +246,14 @@ Section UsertrapRes.
     ut_trap pj ksp av lks -∗
     ∃ kroot : mword 44, tlb_res_pt kroot ∗ ut_trap_parked pj ksp av lks.
   Proof.
-    iIntros "(Hstk & Hstr & Harm & #Hbit & Hgh & Hcpu & Hclm)".
+    iIntros "(Hstk & Hstr & Harm & Hctx & #Hbit & Hgh & Hcpu & Hclm)".
     (* the receipt BESIDE the slot pins the slot's arm: at Bare the shot's
        lower bound and the pending half conflict, so only KPT survives. *)
     iDestruct "Hstr" as "[(Hb0 & _ & _) | (Hb1 & Hkpt)]".
     { iDestruct (kpt_on_pending_False with "Hbit Hb0") as %[]. }
     iDestruct "Hkpt" as (kroot) "Hkres".
     iExists kroot. iFrame "Hkres". rewrite /ut_trap_parked.
-    iFrame "Hstk Harm Hb1 Hbit Hgh Hcpu Hclm".
+    iFrame "Hstk Harm Hctx Hb1 Hbit Hgh Hcpu Hclm".
   Qed.
 
   (* NOT IN THE BUNDLE: [intr_handler_spec kernelvec], the contract the
@@ -299,7 +324,7 @@ Section UsertrapRes.
        ([strans_ktier_wit_intro] below) instead of re-conjuring a KT0 one:
        [ut_trap] carries [kpt_on cpu_id] at every tier, so the bundle it
        builds attests the access right whatever the hart's regime is. *)
-    iDestruct "Ht" as "(Hstk & Hstr & Harm & #Hkpt & Hgh & Hcpu & Hclm)".
+    iDestruct "Ht" as "(Hstk & Hstr & Harm & Hctx & #Hkpt & Hgh & Hcpu & Hclm)".
     iDestruct "Hgh" as "(Hhalf & Hq & Htie & Htrav)".
     (* A named [iFrame] here still makes the tactic hunt these five atoms
        through the WHOLE goal, including the [sie_cap_gpr] conjunct that is
@@ -324,7 +349,11 @@ Section UsertrapRes.
       iExists menvcfg0. iFrame "Hmenv". subst menvcfg0.
       iPureIntro. split; [| split; [| split; [| split]]]; vm_compute; reflexivity. }
     rewrite /sie_cap /ut_stack Hsp.
-    iFrame "Hstk Hstr Harm Htc".
+    (* the thread-of-control token comes STRAIGHT ACROSS, out of the
+       residue and into the capability: [ut_trap] parked it at the ambient
+       context and this is the same thread waking up.  No premise is added
+       to this lemma for it -- see [ut_trap]'s note. *)
+    iFrame "Hstk Hstr Harm Hctx Htc".
     iSplitR; [ iApply (strans_ktier_wit_intro with "Hkpt") |].
     rewrite (tp_pin_id m Htp). iExact "Hgpr".
   Qed.
@@ -533,7 +562,7 @@ Section UsertrapRes.
     (dev_inv γu γv ∗
      console_caps γu ∗
      disk_geom γv pd pav pu ∗
-     is_lock γdk d_lock "virtio_disk"%string <{ disk_res γv pd pav pu }> ∗
+     is_lock γdk d_lock "virtio_disk"%string (disk_res_at γv pd pav pu) ∗
      (* the tick keeper's REAL arm, spelled: the left disjunct is
         [⌜tick_hart = false⌝], a statement about a particular hart, and this
         bundle is not allowed to depend on one. *)
@@ -606,7 +635,7 @@ Section UsertrapRes.
      is_lock (fsc_kalloc) (mword_of_int KernelSyms.kmem) "kmem"%string
        (λ ξ : CtxId, kmem_res (XIk := ξ) (fsc_kpages) (mword_of_int (KernelSyms.kmem + 24))) ∗
      is_lock (fsc_dlock) d_lock "virtio_disk"%string
-       <{ disk_res (fsc_disk) (un_pd N) (un_pav N) (un_pu N) }> ∗
+       (disk_res_at (fsc_disk) (un_pd N) (un_pav N) (un_pu N)) ∗
      bio_ctx (fsc_bio) (fs_view fsc_fs (fsc_disk) icfg_dev fsc_cov) ∗
      log_ctx icfg_log (fsc_bio) fsc_fs fsc_cov fsc_logst icfg_dev ∗
      fs_crash_seam fsc_cov fsc_logst ∗
@@ -680,12 +709,6 @@ Section UsertrapRes.
   Global Instance ut_park_caps_persistent N : Persistent (ut_park_caps N).
   Proof. rewrite /ut_park_caps. apply _. Qed.
 
-  (* ...AND THE JOIN.  The whole point of the split: a parker owes the seven
-     rows above ONCE, at the park, and the eleven file-system ones are owed
-     LATER -- by forkret, which is the first code the parked process runs and
-     the only party that has [FirstTok.first_done] on both arms of its
-     [if (first)].  So this is a wand rather than a conjunction, and the
-     wand is what a park package carries. *)
   Lemma ut_caps_of_park (N : ut_names) :
     ut_park_caps N -∗ FsReady.fs_ready -∗ ut_caps N.
   Proof.
@@ -729,6 +752,7 @@ Section UsertrapRes.
     iSplitR; [iExact "Hfs"|].
     iExact "Hpw".
   Qed.
+
 
   (* vmfault's and the kalloc cone's bundle, assembled out of three
      persistent members of [ut_caps] rather than carried separately. *)
@@ -938,8 +962,8 @@ Section UsertrapRes.
   (* [usertrap_res] itself.                                              *)
   (* ------------------------------------------------------------------- *)
   Definition ut_res (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) : iProp Σ :=
-    (∃ (N : ut_names) (U : ustate) (av : nat),
+      (pt : uptd) (ksp : mword 64) (U : ustate) : iProp Σ :=
+    (∃ (N : ut_names) (av : nat),
        (* THE PROCESS RUNNING IS THE ONE WHOSE TABLE THE TRAMPOLINE PARKED.
           This equation is the whole reason R is keyed on [pt]: it is what
           lets userret install [MAKE_SATP(p->pagetable)] and know it is the
@@ -969,8 +993,8 @@ Section UsertrapRes.
      survives user execution (no [satp]); [ut_res] itself is what usertrap
      consumes. *)
   Definition ut_res_parked (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) : iProp Σ :=
-    (∃ (N : ut_names) (U : ustate) (av : nat),
+      (pt : uptd) (ksp : mword 64) (U : ustate) : iProp Σ :=
+    (∃ (N : ut_names) (av : nat),
        ⌜ pv_upt (us_V U) = pt ⌝ ∗
        ⌜ add_vec (un_ks N) (mword_of_int 4096) = ksp ⌝ ∗
        ⌜ ut_wf N ⌝ ∗
@@ -993,11 +1017,11 @@ Section UsertrapRes.
      move (its exit switch just produced [tlb_res_pt kroot]); [_open] is
      userret's (its entry switch is about to consume it). *)
   Lemma ut_res_tlb_close (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) (kroot : mword 44) :
-    ut_res_parked Rsys pt ksp -∗ tlb_res_pt kroot -∗ ut_res Rsys pt ksp.
+      (pt : uptd) (ksp : mword 64) (kroot : mword 44) (U : ustate) :
+    ut_res_parked Rsys pt ksp U -∗ tlb_res_pt kroot -∗ ut_res Rsys pt ksp U.
   Proof.
     iIntros "H Hkres".
-    iDestruct "H" as (N U av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & Henv)".
+    iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & Henv)".
     iDestruct (ut_trap_tlb_close with "Htrap Hkres") as "Htrap".
     (* BUILT ROW BY ROW, NOT FRAMED.  The residue's last row is [ut_env],
        which is [proc_priv] and so [tf_page]; a named [iFrame] searches the
@@ -1005,7 +1029,7 @@ Section UsertrapRes.
        time (measured 4-6 s per call, ~55 s across this file).  Each
        [iSplitR]/[iSplitL] below is a syntactic check.  See
        claude-notes/optimization.md, "Framing: name the context side". *)
-    iExists N, U, av.
+    iExists N, av.
     iSplitR; [iPureIntro; exact Hupt |].
     iSplitR; [iPureIntro; exact Hksp |].
     iSplitR; [iPureIntro; exact Hwf |].
@@ -1016,16 +1040,16 @@ Section UsertrapRes.
   Qed.
 
   Lemma ut_res_tlb_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) :
-    ut_res Rsys pt ksp -∗
-    ∃ kroot : mword 44, tlb_res_pt kroot ∗ ut_res_parked Rsys pt ksp.
+      (pt : uptd) (ksp : mword 64) (U : ustate) :
+    ut_res Rsys pt ksp U -∗
+    ∃ kroot : mword 44, tlb_res_pt kroot ∗ ut_res_parked Rsys pt ksp U.
   Proof.
     iIntros "H".
-    iDestruct "H" as (N U av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & Henv)".
+    iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & Henv)".
     iDestruct (ut_trap_tlb_open with "Htrap") as (kroot) "[Hkres Htrap]".
     iExists kroot. iFrame "Hkres".
     (* row by row, not framed -- see [ut_res_tlb_close] *)
-    iExists N, U, av.
+    iExists N, av.
     iSplitR; [iPureIntro; exact Hupt |].
     iSplitR; [iPureIntro; exact Hksp |].
     iSplitR; [iPureIntro; exact Hwf |].
@@ -1040,31 +1064,32 @@ Section UsertrapRes.
      [ut_own_priv] + [proc_priv_tf_open]; the closer moves [V] to
      [upd_tf V ws'] (its [pv_upt] is unchanged, so [pt] is unaffected). *)
   Lemma ut_res_tf_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) :
-    ut_res_parked Rsys pt ksp -∗
-    ∃ (kroot : mword 44) (ws : list (mword 64)),
-      kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
+      (pt : uptd) (ksp : mword 64) (U : ustate) :
+    ut_res_parked Rsys pt ksp U -∗
+    ∃ kroot : mword 44,
+      kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp (pv_tf (us_V U))⌝ ∗
+      tf_page (ud_tfp pt) (pv_tf (us_V U)) ∗
       (∀ ws' : list (mword 64),
          ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗
-         ut_res_parked Rsys pt ksp).
+         ut_res_parked Rsys pt ksp (us_tf U ws')).
   Proof.
     iIntros "H".
-    iDestruct "H" as (N U av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & Henv)".
+    iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & Henv)".
     iDestruct "Henv" as "[Hcaps Hown]".
     iDestruct (ut_own_priv with "Hown") as "(Hpv & Hfr & Hsy & Hownback)".
     iDestruct (proc_priv_tf_open with "Hpv") as (ws) "(-> & Htf & Hclose)".
     rewrite Hupt.
     iDestruct "Htfk" as (kroot) "[#Hkpt %Htfk]".
-    iExists kroot, (pv_tf (us_V U)). iFrame "Hkpt".
+    iExists kroot. iFrame "Hkpt".
     iSplitR; [iPureIntro; exact Htfk |]. iFrame "Htf".
     iIntros (ws') "%Htfk' Htf'".
     iDestruct ("Hclose" $! ws' with "Htf'") as "Hpv'".
     iDestruct ("Hownback" $! (us_tf U ws') with "Hpv' Hfr Hsy") as "Hown'".
-    iExists N, (us_tf U ws'), av.
+    iExists N, av.
     iDestruct (ut_tfk_intro ksp (upd_tf (us_V U) ws') kroot Htfk' with "Hkpt") as "#Htfk'".
     (* row by row, not framed -- see [ut_res_tlb_close] *)
     rewrite /ut_env.
-    iSplitR; [iPureIntro; rewrite /upd_tf; exact Hupt |].
+    iSplitR; [iPureIntro; rewrite /us_tf /upd_usV /upd_tf; exact Hupt |].
     iSplitR; [iPureIntro; exact Hksp |].
     iSplitR; [iPureIntro; exact Hwf |].
     iSplitR; [iPureIntro; exact Hav |].
@@ -1112,6 +1137,13 @@ Section UsertrapRes.
      owns while the slot is dormant and allocproc hands over.  The [initproc]
      share is persistent (userinit discards the cell right after its store),
      so it costs a parker nothing. *)
+  (* THE [initproc] SHARE IS GONE FROM HERE (tso-park-protocol-memo.md ruling
+     3).  Both parkers pass [DfracDiscarded] -- [ut_park_caps] pins that as
+     [⌜un_dqi N = DfracDiscarded⌝] -- and the resumer's own [park_globals]
+     already carries [∃ ip, initproc ↦₈□ ip], so the record was carrying a
+     redundant copy of a persistent fact.  Dropping it is what makes
+     [park_own] CONTEXT-FREE, which removes the last exclusive ξ-crossing
+     from the park: [bslots] is a plain ghost fragment. *)
   Definition park_own (N : ut_names) : iProp Σ :=
     (bslots 3 ∗
      (mword_of_int KernelSyms.initproc : mword 64) ↦₈{un_dqi N} (un_ip N))%I.
@@ -1191,9 +1223,9 @@ Section UsertrapRes.
   Qed.
 
   Definition ut_res_bare (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) : iProp Σ :=
-    (∃ (N : ut_names) (V : pprivate) (av : nat),
-       ⌜ pv_upt V = pt ⌝ ∗
+      (pt : uptd) (ksp : mword 64) (U : ustate) : iProp Σ :=
+    (∃ (N : ut_names) (av : nat),
+       ⌜ pv_upt (us_V U) = pt ⌝ ∗
        ⌜ add_vec (un_ks N) (mword_of_int 4096) = ksp ⌝ ∗
        ⌜ ut_wf N ⌝ ∗
        ⌜ (K_usertrap <= av)%nat ⌝ ∗
@@ -1206,10 +1238,10 @@ Section UsertrapRes.
           it came out of that hart's boot chain into [main] /
           [main_secondary], both of which join into [scheduler].
           Persistent, so every accessor hands it straight back. *)
-       ut_tfk ksp V ∗
+       ut_tfk ksp (us_V U) ∗
        timer_cap ∗
        ut_trap_parked (un_pj N) ksp av ∅ ∗
-       ut_env_nopt Rsys N V)%I.
+       ut_env_nopt Rsys N (us_V U))%I.
 
   (* THE TIMER CAPABILITY'S mcounteren PIN, READ OUT OF THE BARE RESIDUE.
      The U tier needs [mcounteren ↦ᵣ□] -- a U-mode [csrr] of a counter CSR
@@ -1222,8 +1254,8 @@ Section UsertrapRes.
      already holds rather than from a new premise.  Persistent, hence handed
      straight back. *)
   Lemma ut_res_bare_sstc (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) :
-    ut_res_bare Rsys pt ksp -∗ sstc_enabled ∗ ut_res_bare Rsys pt ksp.
+      (pt : uptd) (ksp : mword 64) (U : ustate) :
+    ut_res_bare Rsys pt ksp U -∗ sstc_enabled ∗ ut_res_bare Rsys pt ksp U.
   Proof.
     (* READ THE CAPABILITY OUT WITHOUT TAKING THE BUNDLE APART.  Destructuring
        [ut_caps] here meant rebuilding it conjunct-by-conjunct against the
@@ -1232,7 +1264,7 @@ Section UsertrapRes.
        proof then reads exactly like its cheap siblings ([ut_res_tlb_close]
        and friends): [Henv] goes back whole. *)
     iIntros "H".
-    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & Henv)".
+    iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & Henv)".
     (* the pin, out of the capability, WITHOUT spending it: [iDestruct] on an
        intuitionistic hypothesis removes it, and the residue's own body wants
        it back one line down.  The [iAssert] destructs a copy instead. *)
@@ -1240,7 +1272,7 @@ Section UsertrapRes.
     (* same, and here the other conjunct is the residue's whole ∃ body. *)
     iSplitR; [iExact "Hsstc"|].
     (* row by row, not framed -- see [ut_res_tlb_close] *)
-    iExists N, V, av.
+    iExists N, av.
     iSplitR; [iPureIntro; exact Hupt |].
     iSplitR; [iPureIntro; exact Hksp |].
     iSplitR; [iPureIntro; exact Hwf |].
@@ -1267,18 +1299,18 @@ Section UsertrapRes.
      straight back) the slot really leaves the bundle, so the residue has to
      be rebuilt around the hole -- row by row, per [ut_res_tlb_close]. *)
   Lemma ut_res_bare_uwp_acc (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) :
-    ut_res_bare Rsys pt ksp -∗
-    uexec_wp ∗ (uexec_wp -∗ ut_res_bare Rsys pt ksp).
+      (pt : uptd) (ksp : mword 64) (U : ustate) :
+    ut_res_bare Rsys pt ksp U -∗
+    uexec_wp ∗ (uexec_wp -∗ ut_res_bare Rsys pt ksp U).
   Proof.
     iIntros "H".
-    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
+    iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
     iEval (rewrite /ut_own_nopt) in "Hown".
     iDestruct "Hown" as "(Hb & Hip & Hfd & Hir & Hpv & Hfr & Hsy & Huwp)".
     iSplitL "Huwp"; [iExact "Huwp" |].
     iIntros "Huwp".
     (* row by row, not framed -- see [ut_res_tlb_close] *)
-    iExists N, V, av. rewrite /ut_env_nopt /ut_own_nopt.
+    iExists N, av. rewrite /ut_env_nopt /ut_own_nopt.
     iSplitR; [iPureIntro; exact Hupt |].
     iSplitR; [iPureIntro; exact Hksp |].
     iSplitR; [iPureIntro; exact Hwf |].
@@ -1296,12 +1328,72 @@ Section UsertrapRes.
     iSplitL "Hsy"; [iExact "Hsy" | iExact "Huwp"].
   Qed.
 
-  Lemma ut_res_pt_close (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) (M : gmap Z (bv 8)) :
-    ut_res_bare Rsys pt ksp -∗ proc_pt pt M -∗ ut_res_parked Rsys pt ksp.
+  (* ---- THE SAME TWO CROSSINGS, WITH THE IMAGE NAMED (milestone J, S3) ----
+     [ut_res_pt_close] / [_pt_open] were stated at [proc_pt] / [proc_pt_any]
+     -- the MAPPED view -- so the open threw the name away
+     ([proc_ptm_pt]) and the close had to invent one
+     ([proc_pt_ptm_any]).  The residue's own [ut_own] has held
+     [proc_ptm … (uint (pv_sz (us_V U))) (us_M U)] all along
+     ([ut_own_pt_open] / [_pt_close]), so the named pair below is the SAME
+     proof minus that one weakening step -- which is exactly what the trap
+     loop needs to hand user execution an image it can name.
+
+     THE SIZE IS NOT A DEGREE OF FREEDOM: [ut_own]'s conjunct is at
+     [uint (pv_sz (us_V U))], the process's own [p->sz], so both directions
+     are stated there.  The IMAGE is: the bare residue does not own the user
+     bytes, so [ut_res_ptm_close] re-parks at whatever image the caller
+     hands back. *)
+  Lemma ut_res_ptm_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
+      (pt : uptd) (ksp : mword 64) (U : ustate) :
+    ut_res_parked Rsys pt ksp U -∗
+    proc_ptm pt (uint (pv_sz (us_V U))) (us_M U) ∗ ut_res_bare Rsys pt ksp U.
+  Proof.
+    iIntros "H".
+    iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
+    subst pt.
+    iDestruct (ut_own_pt_open with "Hown") as "(Hown & Hpt)".
+    iSplitL "Hpt"; [iExact "Hpt" |].
+    (* row by row, not framed -- see [ut_res_tlb_close] *)
+    iExists N, av. rewrite /ut_env_nopt.
+    iSplitR; [iPureIntro; reflexivity |].
+    iSplitR; [iPureIntro; exact Hksp |].
+    iSplitR; [iPureIntro; exact Hwf |].
+    iSplitR; [iPureIntro; exact Hav |].
+    iSplitR; [iExact "Htfk" |].
+    iSplitR; [iExact "Htc" |].
+    iSplitL "Htrap"; [iExact "Htrap" |].
+    iSplitL "Hcaps"; [iExact "Hcaps" | iExact "Hown"].
+  Qed.
+
+  Lemma ut_res_ptm_close (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
+      (pt : uptd) (ksp : mword 64) (U : ustate) (M : gmap Z (bv 8)) :
+    ut_res_bare Rsys pt ksp U -∗
+    proc_ptm pt (uint (pv_sz (us_V U))) M -∗
+    ut_res_parked Rsys pt ksp (upd_usM U M).
   Proof.
     iIntros "H Hpt".
-    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
+    iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
+    subst pt.
+    iDestruct (ut_own_pt_close Rsys N (upd_usM U M) with "Hown Hpt") as "Hown".
+    (* row by row, not framed -- see [ut_res_tlb_close] *)
+    iExists N, av. rewrite /ut_env.
+    iSplitR; [iPureIntro; reflexivity |].
+    iSplitR; [iPureIntro; exact Hksp |].
+    iSplitR; [iPureIntro; exact Hwf |].
+    iSplitR; [iPureIntro; exact Hav |].
+    iSplitR; [iExact "Htfk" |].
+    iSplitR; [iExact "Htc" |].
+    iSplitL "Htrap"; [iExact "Htrap" |].
+    iSplitL "Hcaps"; [iExact "Hcaps" | iExact "Hown"].
+  Qed.
+
+  Lemma ut_res_pt_close (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
+      (pt : uptd) (ksp : mword 64) (U : ustate) (M : gmap Z (bv 8)) :
+    ut_res_bare Rsys pt ksp U -∗ proc_pt pt M -∗
+    ∃ Mz : gmap Z (bv 8), ut_res_parked Rsys pt ksp (upd_usM U Mz).
+  Proof.
+    iIntros "H Hpt".
+    iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
     subst pt.
     (* THE TIER SEAM.  The user side speaks the MAPPED view
        ([UserPtTree.user_pt_inv] / [ProcPtOwn.proc_pt]); the block holds the
@@ -1309,10 +1401,10 @@ Section UsertrapRes.
        BOTH sides ([ut_res_parked] binds its own [∃ U]), so the crossing is
        free: any lazy image over the same address space will do, and
        [proc_pt_ptm_any] produces one. *)
-    iDestruct (proc_pt_ptm_any (pv_upt V) (uint (pv_sz V)) M with "Hpt") as (Mz) "Hpt".
-    iDestruct (ut_own_pt_close Rsys N (MkUstate V Mz) with "Hown Hpt") as "Hown".
+    iDestruct (proc_pt_ptm_any (pv_upt (us_V U)) (uint (pv_sz (us_V U))) M with "Hpt") as (Mz) "Hpt".
+    iDestruct (ut_own_pt_close Rsys N (upd_usM U Mz) with "Hown Hpt") as "Hown".
     (* row by row, not framed -- see [ut_res_tlb_close] *)
-    iExists N, (MkUstate V Mz), av. rewrite /ut_env.
+    iExists Mz. iExists N, av. rewrite /ut_env.
     iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; exact Hksp |].
     iSplitR; [iPureIntro; exact Hwf |].
@@ -1324,16 +1416,16 @@ Section UsertrapRes.
   Qed.
 
   Lemma ut_res_pt_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) :
-    ut_res_parked Rsys pt ksp -∗ proc_pt_any pt ∗ ut_res_bare Rsys pt ksp.
+      (pt : uptd) (ksp : mword 64) (U : ustate) :
+    ut_res_parked Rsys pt ksp U -∗ proc_pt_any pt ∗ ut_res_bare Rsys pt ksp U.
   Proof.
     iIntros "H".
-    iDestruct "H" as (N U av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
+    iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
     subst pt.
     iDestruct (ut_own_pt_open with "Hown") as "(Hown & Hpt)".
     iSplitL "Hpt"; [iApply (proc_ptm_pt with "Hpt") |].
     (* row by row, not framed -- see [ut_res_tlb_close] *)
-    iExists N, (us_V U), av. rewrite /ut_env_nopt.
+    iExists N, av. rewrite /ut_env_nopt.
     iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; exact Hksp |].
     iSplitR; [iPureIntro; exact Hwf |].
@@ -1351,16 +1443,17 @@ Section UsertrapRes.
      loop hand the user tier a descriptor whose [udata_cov] holds by
      construction -- see [ProcPtOwn.user_pt_inv_close]. *)
   Lemma ut_res_bare_norm (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) :
-    ut_res_bare Rsys pt ksp -∗ ut_res_bare Rsys (ud_norm pt) ksp.
+      (pt : uptd) (ksp : mword 64) (U : ustate) :
+    ut_res_bare Rsys pt ksp U -∗
+    ut_res_bare Rsys (ud_norm pt) ksp (us_upt U (ud_norm pt)).
   Proof.
     iIntros "H".
-    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
+    iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
     subst pt.
-    rewrite (ut_own_nopt_upt_irrel Rsys N V (ud_norm (pv_upt V))
+    rewrite (ut_own_nopt_upt_irrel Rsys N (us_V U) (ud_norm (pv_upt (us_V U)))
                eq_refl eq_refl eq_refl).
-    iExists N, (upd_upt V (ud_norm (pv_upt V))), av.
-    iDestruct (ut_tfk_upd_upt _ _ (ud_norm (pv_upt V)) with "Htfk") as "#Htfk'".
+    iExists N, av.
+    iDestruct (ut_tfk_upd_upt _ _ (ud_norm (pv_upt (us_V U))) with "Htfk") as "#Htfk'".
     (* row by row, not framed -- see [ut_res_tlb_close] *)
     rewrite /ut_env_nopt.
     iSplitR; [iPureIntro; reflexivity |].
@@ -1378,29 +1471,30 @@ Section UsertrapRes.
      (physical tier, unreachable from user mode), so it is available in
      exactly the window where the address space is not. *)
   Lemma ut_res_bare_tf_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) :
-    ut_res_bare Rsys pt ksp -∗
-    ∃ (kroot : mword 44) (ws : list (mword 64)),
-      kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
+      (pt : uptd) (ksp : mword 64) (U : ustate) :
+    ut_res_bare Rsys pt ksp U -∗
+    ∃ kroot : mword 44,
+      kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp (pv_tf (us_V U))⌝ ∗
+      tf_page (ud_tfp pt) (pv_tf (us_V U)) ∗
       (∀ ws' : list (mword 64),
          ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗
-         ut_res_bare Rsys pt ksp).
+         ut_res_bare Rsys pt ksp (us_tf U ws')).
   Proof.
     iIntros "H".
-    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
+    iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
     iDestruct (ut_own_nopt_priv with "Hown") as "(Hpv & Hfr & Hsy & Hownback)".
     iDestruct (proc_priv_nopt_tf_open with "Hpv") as (ws) "(-> & Htf & Hclose)".
     rewrite Hupt.
     iDestruct "Htfk" as (kroot) "[#Hkpt %Htfk]".
-    iExists kroot, (pv_tf V). iFrame "Hkpt". iSplitR; [iPureIntro; exact Htfk |]. iFrame "Htf".
+    iExists kroot. iFrame "Hkpt". iSplitR; [iPureIntro; exact Htfk |]. iFrame "Htf".
     iIntros (ws') "%Htfk' Htf'".
     iDestruct ("Hclose" $! ws' with "Htf'") as "Hpv'".
-    iDestruct ("Hownback" $! (upd_tf V ws') with "Hpv' Hfr Hsy") as "Hown'".
-    iExists N, (upd_tf V ws'), av.
-    iDestruct (ut_tfk_intro ksp (upd_tf V ws') kroot Htfk' with "Hkpt") as "#Htfk'".
+    iDestruct ("Hownback" $! (upd_tf (us_V U) ws') with "Hpv' Hfr Hsy") as "Hown'".
+    iExists N, av.
+    iDestruct (ut_tfk_intro ksp (upd_tf (us_V U) ws') kroot Htfk' with "Hkpt") as "#Htfk'".
     (* row by row, not framed -- see [ut_res_tlb_close] *)
     rewrite /ut_env_nopt.
-    iSplitR; [iPureIntro; rewrite /upd_tf; exact Hupt |].
+    iSplitR; [iPureIntro; rewrite /us_tf /upd_usV /upd_tf; exact Hupt |].
     iSplitR; [iPureIntro; exact Hksp |].
     iSplitR; [iPureIntro; exact Hwf |].
     iSplitR; [iPureIntro; exact Hav |].
@@ -1419,18 +1513,18 @@ Section UsertrapRes.
      the closer wand as the parked remainder.  Open/close, not a tier of its
      own: nothing needs a name for "the residue minus its CSRs". *)
   Lemma ut_res_bare_csrs_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) :
-    ut_res_bare Rsys pt ksp -∗
-    hart_csrs ∗ (hart_csrs -∗ ut_res_bare Rsys pt ksp).
+      (pt : uptd) (ksp : mword 64) (U : ustate) :
+    ut_res_bare Rsys pt ksp U -∗
+    hart_csrs ∗ (hart_csrs -∗ ut_res_bare Rsys pt ksp U).
   Proof.
     iIntros "H".
-    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & Henv)".
-    iDestruct "Htrap" as "(Hstk & Harm & Hb1 & Hb2 & Hgh & Hcpu & Hclm)".
+    iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & Henv)".
+    iDestruct "Htrap" as "(Hstk & Harm & Hctx & Hb1 & Hb2 & Hgh & Hcpu & Hclm)".
     iDestruct (cpu_own_csrs_open with "Hcpu") as "[Hcsrs Hback]".
     iFrame "Hcsrs". iIntros "Hcsrs".
     iDestruct ("Hback" with "Hcsrs") as "Hcpu".
     (* row by row, not framed -- see [ut_res_tlb_close] *)
-    iExists N, V, av. rewrite /ut_trap_parked.
+    iExists N, av. rewrite /ut_trap_parked.
     iSplitR; [iPureIntro; exact Hupt |].
     iSplitR; [iPureIntro; exact Hksp |].
     iSplitR; [iPureIntro; exact Hwf |].
@@ -1440,6 +1534,7 @@ Section UsertrapRes.
     iSplitR "Henv"; [| iExact "Henv"].
     iSplitL "Hstk"; [iExact "Hstk" |].
     iSplitL "Harm"; [iExact "Harm" |].
+    iSplitL "Hctx"; [iExact "Hctx" |].
     iSplitL "Hb1"; [iExact "Hb1" |].
     iSplitL "Hb2"; [iExact "Hb2" |].
     iSplitL "Hgh"; [iExact "Hgh" |].
@@ -1453,36 +1548,36 @@ Section UsertrapRes.
      residue, so neither can be applied to the other's remainder -- a sealed
      bundle's simultaneous borrows have to come out of ONE opener. *)
   Lemma ut_res_bare_tf_csrs_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) :
-    ut_res_bare Rsys pt ksp -∗
-    ∃ (kroot : mword 44) (ws : list (mword 64)),
-      kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗
-      tf_page (ud_tfp pt) ws ∗ hart_csrs ∗
+      (pt : uptd) (ksp : mword 64) (U : ustate) :
+    ut_res_bare Rsys pt ksp U -∗
+    ∃ kroot : mword 44,
+      kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp (pv_tf (us_V U))⌝ ∗
+      tf_page (ud_tfp pt) (pv_tf (us_V U)) ∗ hart_csrs ∗
       (∀ ws' : list (mword 64),
          ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗ hart_csrs -∗
-         ut_res_bare Rsys pt ksp).
+         ut_res_bare Rsys pt ksp (us_tf U ws')).
   Proof.
     iIntros "H".
-    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
+    iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
     (* the CSRs, out of the trap bundle's own [cpu_own] *)
-    iDestruct "Htrap" as "(Hstk & Harm & Hb1 & Hb2 & Hgh & Hcpu & Hclm)".
+    iDestruct "Htrap" as "(Hstk & Harm & Hctx & Hb1 & Hb2 & Hgh & Hcpu & Hclm)".
     iDestruct (cpu_own_csrs_open with "Hcpu") as "[Hcsrs Hcback]".
     (* ... and the trapframe page, out of the process block *)
     iDestruct (ut_own_nopt_priv with "Hown") as "(Hpv & Hfr & Hsy & Hownback)".
     iDestruct (proc_priv_nopt_tf_open with "Hpv") as (ws) "(-> & Htf & Hclose)".
     rewrite Hupt.
     iDestruct "Htfk" as (kroot) "[#Hkpt %Htfk]".
-    iExists kroot, (pv_tf V). iFrame "Hkpt". iSplitR; [iPureIntro; exact Htfk |].
+    iExists kroot. iFrame "Hkpt". iSplitR; [iPureIntro; exact Htfk |].
     iFrame "Htf Hcsrs".
     iIntros (ws') "%Htfk' Htf' Hcsrs'".
     iDestruct ("Hclose" $! ws' with "Htf'") as "Hpv'".
-    iDestruct ("Hownback" $! (upd_tf V ws') with "Hpv' Hfr Hsy") as "Hown'".
+    iDestruct ("Hownback" $! (upd_tf (us_V U) ws') with "Hpv' Hfr Hsy") as "Hown'".
     iDestruct ("Hcback" with "Hcsrs'") as "Hcpu".
-    iExists N, (upd_tf V ws'), av.
-    iDestruct (ut_tfk_intro ksp (upd_tf V ws') kroot Htfk' with "Hkpt") as "#Htfk'".
+    iExists N, av.
+    iDestruct (ut_tfk_intro ksp (upd_tf (us_V U) ws') kroot Htfk' with "Hkpt") as "#Htfk'".
     rewrite /ut_env_nopt /ut_trap_parked.
     (* row by row, not framed -- see [ut_res_tlb_close] *)
-    iSplitR; [iPureIntro; rewrite /upd_tf; exact Hupt |].
+    iSplitR; [iPureIntro; rewrite /us_tf /upd_usV /upd_tf; exact Hupt |].
     iSplitR; [iPureIntro; exact Hksp |].
     iSplitR; [iPureIntro; exact Hwf |].
     iSplitR; [iPureIntro; exact Hav |].
@@ -1492,6 +1587,7 @@ Section UsertrapRes.
       [| iSplitL "Hcaps"; [iExact "Hcaps" | iExact "Hown'"]].
     iSplitL "Hstk"; [iExact "Hstk" |].
     iSplitL "Harm"; [iExact "Harm" |].
+    iSplitL "Hctx"; [iExact "Hctx" |].
     iSplitL "Hb1"; [iExact "Hb1" |].
     iSplitL "Hb2"; [iExact "Hb2" |].
     iSplitL "Hgh"; [iExact "Hgh" |].
@@ -1512,17 +1608,18 @@ Section UsertrapRes.
      conclusion IS the [Rut] the loop parks across user execution, and no
      slot is minted anywhere on the path. *)
   Lemma ut_res_bare_run_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
-      (pt : uptd) (ksp : mword 64) :
-    ut_res_bare Rsys pt ksp -∗
+      (pt : uptd) (ksp : mword 64) (U : ustate) :
+    ut_res_bare Rsys pt ksp U -∗
     uexec_wp ∗
-    ∃ (kroot : mword 44) (ws : list (mword 64)),
-      kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
+    ∃ kroot : mword 44,
+      kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp (pv_tf (us_V U))⌝ ∗
+      tf_page (ud_tfp pt) (pv_tf (us_V U)) ∗
       (∀ ws' : list (mword 64),
          ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗
-         (uexec_wp -∗ ut_res_bare Rsys pt ksp)).
+         (uexec_wp -∗ ut_res_bare Rsys pt ksp (us_tf U ws'))).
   Proof.
     iIntros "H".
-    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
+    iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
     (* the slot, peeled off the process block by hand -- [ut_own_nopt_priv]
        RETAINS it, and here it has to leave *)
     iEval (rewrite /ut_own_nopt) in "Hown".
@@ -1532,14 +1629,14 @@ Section UsertrapRes.
     iDestruct (proc_priv_nopt_tf_open with "Hpv") as (ws) "(-> & Htf & Hclose)".
     rewrite Hupt.
     iDestruct "Htfk" as (kroot) "[#Hkpt %Htfk]".
-    iExists kroot, (pv_tf V). iFrame "Hkpt". iSplitR; [iPureIntro; exact Htfk |]. iFrame "Htf".
+    iExists kroot. iFrame "Hkpt". iSplitR; [iPureIntro; exact Htfk |]. iFrame "Htf".
     iIntros (ws') "%Htfk' Htf' Huwp".
     iDestruct ("Hclose" $! ws' with "Htf'") as "Hpv'".
-    iExists N, (upd_tf V ws'), av.
-    iDestruct (ut_tfk_intro ksp (upd_tf V ws') kroot Htfk' with "Hkpt") as "#Htfk'".
+    iExists N, av.
+    iDestruct (ut_tfk_intro ksp (upd_tf (us_V U) ws') kroot Htfk' with "Hkpt") as "#Htfk'".
     (* row by row, not framed -- see [ut_res_tlb_close] *)
     rewrite /ut_env_nopt /ut_own_nopt.
-    iSplitR; [iPureIntro; rewrite /upd_tf; exact Hupt |].
+    iSplitR; [iPureIntro; rewrite /us_tf /upd_usV /upd_tf; exact Hupt |].
     iSplitR; [iPureIntro; exact Hksp |].
     iSplitR; [iPureIntro; exact Hwf |].
     iSplitR; [iPureIntro; exact Hav |].
@@ -1758,6 +1855,136 @@ Section UsertrapRes.
 
 End UsertrapRes.
 
+(* ===================================================================== *)
+(* THE RESUMER'S HALF (tso-port.md design problem 1, option (b)).          *)
+(* ===================================================================== *)
+(* WHAT A PARKED RECORD MAY AND MAY NOT CARRY, and the rule is sharp.  A
+   record is read at the context of whatever thread RESUMES it, which is
+   not the context of the thread that wrote it -- and since the M1 flip an
+   [is_lock]/[inv] handle over a [<{ P }>] payload is a DIFFERENT
+   proposition at a different ξ (measured: [procs_inv], [console_ready],
+   [disk_geom], [is_kstack] and every discarded cell all fail to be
+   CONVERTIBLE across two contexts; [is_tickslock], the wait lock, the
+   nextpid lock, [procs_avail], [wire_inv], [kmap_at], [console_caps] and --
+   since §0.16′ -- [is_ftable] do cross, because their payloads are
+   λ-converted and their handles are therefore context-free terms).  What
+   the M3 sweep buys where it lands is not convertibility but
+   TRANSPORTABILITY: a converted payload's handle is closed and the ACQUIRER
+   re-indexes the resource along its [ctx_dom].  Invariant bodies are not
+   updatable, so no transport exists and none can be written.
+
+   SO THE ξ-DEPENDENT ROWS MOVE INSIDE THE ∀ AND ARE SUPPLIED BY THE
+   RESUMER, at its own context -- the same channel [W] / [first_done] /
+   [timer_cap] already use.  This is that bundle.  It is exactly the rows
+   that are ξ-dependent AND not reachable from [FirstTok.first_done] (which
+   is [first_addr ↦₄□ 0 ∗ FsReady.fs_ready], and the file system is most of
+   what [ut_caps] wants):
+
+     [procs_inv γs]     the process table -- already a [wp_forkret] premise
+     [is_ftable γft γf] the open-file table's lock.  IT IS NOW A CLOSED
+                        TERM (tso-port.md §0.16′) and so it crosses for
+                        nothing -- but it stays in this bundle, because the
+                        rest of the bundle does not.  It used to be the
+                        blocker: [ftable_res] reached [FileInvDefs.off_hold]'s
+                        [cinv] over a ξ-indexed [off_content], i.e. an
+                        invariant whose BODY is ξ-indexed, which no
+                        [CtxMorph] can cross.  The off-borrow ruling made
+                        that body ξ-free and the payload was then
+                        λ-converted, exactly as [KallocInv]'s [kmem_res] was;
+                        [file_core]'s [is_pipe] was λ-converted a tranche
+                        earlier.  (tso-park-protocol-memo.md called this one
+                        bounded, §0.12′ called it blocked; it was blocked,
+                        and it is now done.)
+     [console_caps] /
+     [console_ready]    consoleinit's two rows, which [fs_ready] does not
+                        carry
+     [initproc ↦₈□]     the sealed cell userinit stores once
+
+   The names are ARGUMENTS rather than read off a record so that the
+   resumer can supply the bundle before it has seen one. *)
+Definition park_globals `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+    !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
+    (ξ : CtxId) (γs : list gname) (γft γf : gname) : iProp Σ :=
+  (* [procs_inv] at the AMBIENT context, not [ξ] (main's M2 port, SC-stub
+     corner): its lock rows reach the ambient handler contract through
+     [valid_context] / [p_sched] / [trap_csrs], which has no transport without
+     the M-leg's caps channel; the row rides as a [ctx_morph_const] conjunct. *)
+  (procs_inv γs ∗
+   (* [is_ftable] is a CLOSED TERM since the M3 λ-conversion of
+      [ftable_res] (FileInv.v's [FileLock] section), so it names no ξ. *)
+   is_ftable γft γf ∗
+   console_caps fsc_uart ∗
+   console_ready (XI := ξ) ∗
+   (∃ ip : mword 64,
+      ctx_word_pointsto ξ (mword_of_int KernelSyms.initproc : mword 64)
+        DfracDiscarded ip))%I.
+
+Global Instance park_globals_persistent `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+    !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx} ξ γs γft γf :
+  Persistent (park_globals ξ γs γft γf).
+Proof. rewrite /park_globals. apply _. Qed.
+
+(* ...AND IT TRANSPORTS (tso-port.md §0.16′).  The park has to hand this
+   bundle to a freshly minted child context, and what a [TsoCtx.ctx_deposit]
+   wants is not context-FREEDOM but TRANSPORTABILITY (§0.15′'s rule).  Every
+   row goes through: [procs_inv] and [console_ready] by their own instances,
+   [is_ftable] and [console_caps] because they are CLOSED TERMS (the M3
+   λ-conversions -- [ftable_res]'s landed at §0.16′), and the [initproc] cell
+   by [ctx_morph_word] applied AS A TERM (instance search does not do the ∃
+   unification -- MEASURED).
+
+   THIS INSTANCE IS THE RECORD OF WHAT IS PAYABLE.  ALL SIX rows
+   [ProofForkretPark.forkret_park_paid] deposits into the child's context
+   are: this one, [SchedCtx.procs_inv], [ProcDefs.is_kstack],
+   [SwtchCtx.ctx_cells], [StackOwn.stack_own] -- and, since the bcache
+   escrow became a PARKED RECORD (tso-port.md §0.17′), [ProcInv.proc_priv]
+   too ([ProcInv.proc_priv_morph]).  The park is [Qed]. *)
+Global Instance park_globals_morph `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+    !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx} (γs : list gname) (γft γf : gname) :
+  CtxMorph (λ ξ0 : CtxId, park_globals ξ0 γs γft γf).
+Proof.
+  iIntros (ξ ξ') "Hd H". rewrite /park_globals.
+  iDestruct "H" as "(Hp & #Hft & #Hcc & Hcr & Hip)".
+  iDestruct (ctx_morph (R := λ ξ0 : CtxId, ConsoleInv.console_ready (XI := ξ0))
+               ξ ξ' with "Hd Hcr") as "[Hd Hcr]".
+  iDestruct "Hip" as (ip) "Hip".
+  iDestruct (ctx_morph_word _ _ _ _ ξ ξ' with "Hd Hip") as "[Hd Hip]".
+  iFrame "Hd Hp Hft Hcc Hcr". iExists ip. iExact "Hip".
+Qed.
+
+(* ------------------------------------------------------------------- *)
+(* THE TWO CROSS-CONTEXT AGREEMENTS THE PINS ARE READ WITH.              *)
+(* ------------------------------------------------------------------- *)
+(* [TsoCtx.ctx_word_pointsto_agree] is stated over two FREE contexts and
+   needs no [ctx_dom] -- two registered facts about one byte name one
+   lattice cell.  It is the only law in the sealed surface that relates two
+   contexts for nothing, and these two are its only park-side uses.  They
+   belong in [DiskInv.v] and [ProcDefs.v] beside their single-context
+   twins; they are here so that this fix does not rebuild the whole tree
+   for two four-line lemmas.  MOVE THEM WHEN THAT IS CHEAP. *)
+Lemma disk_geom_agree_x `{!riscvGS Σ, !xv6G Σ} (ξ1 ξ2 : CtxId) (γ : disk_names)
+    (pd pav pu pd' pav' pu' : mword 64) :
+  disk_geom (XI := ξ1) γ pd pav pu -∗ disk_geom (XI := ξ2) γ pd' pav' pu' -∗
+  ⌜pd = pd' /\ pav = pav' /\ pu = pu'⌝.
+Proof.
+  rewrite /disk_geom.
+  iIntros "(Hd & Ha & Hu & _) (Hd' & Ha' & Hu' & _)".
+  iDestruct (ctx_word_pointsto_agree ξ1 ξ2 with "Hd Hd'") as %->.
+  iDestruct (ctx_word_pointsto_agree ξ1 ξ2 with "Ha Ha'") as %->.
+  iDestruct (ctx_word_pointsto_agree ξ1 ξ2 with "Hu Hu'") as %->.
+  done.
+Qed.
+
+Lemma is_kstack_agree_x `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !bioslotG Σ}
+    (ξ1 ξ2 : CtxId) (pa ks ks' : mword 64) :
+  is_kstack (XI := ξ1) pa ks -∗ is_kstack (XI := ξ2) pa ks' -∗ ⌜ks = ks'⌝.
+Proof.
+  rewrite /is_kstack. iIntros "H H'".
+  by iDestruct (ctx_word_pointsto_agree ξ1 ξ2 with "H H'") as %->.
+Qed.
+
+
+
 (* ====================================================================== *)
 (* THE PARK'S ONE MOVE, GENERIC IN THE SYSCALL ENVIRONMENT.                *)
 (* ====================================================================== *)
@@ -1795,10 +2022,19 @@ Proof. rewrite /park_env. apply _. Qed.
    uses so that a Module Type and its implementation cannot drift apart.
    [URB] is the bare residue, which is a [Parameter] wherever this is stated
    abstractly; here it is whatever the instantiation's is. *)
+(* [ξp] IS THE PARKER'S CONTEXT, ∀-QUANTIFIED (the M2 ruling for design
+   problem 1; tso-park-protocol-memo.md ruling item 1, the ∀-parker variant).
+   Nothing here names an AMBIENT context any more: the record-carried half is
+   at the parker's [ξp], the resume half is at the resumer's [Xc], and the
+   two meet only in [ut_caps_of_park]'s pure equations.  That is what keeps
+   this statement -- and hence [ParkCap.park_chan] / [park_cap] /
+   [park_token], and hence [SpecSyscall]'s [syscall_env] -- CONTEXT-FREE, so
+   [W] can stay an [iProp] rather than becoming a [CurCtx -> iProp]: a token
+   that mentions no context instantiates at every [Xc] for nothing. *)
 Definition ut_park_intro_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
-    (URB : CpuId -> uptd -> mword 64 -> iProp Σ)
+    (URB : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ)
     (* WHAT THE SYSCALL ENVIRONMENT WANTS BESIDE THE FILE SYSTEM, supplied
        at the RESUME like [first_done] and the timer capability: an abstract
        [W] here, the fit check instantiates it ([UtResFits]).  It is the
@@ -1813,11 +2049,11 @@ Definition ut_park_intro_body
   (K_usertrap <= av)%nat ->
   ⊢ park_env N -∗
     park_own N -∗
-    (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
-       ⌜pv_upt V' = pt'⌝ -∗
+    (∀ (h : CpuId) (pt' : uptd) (U' : ustate),
+       ⌜pv_upt (us_V U') = pt'⌝ -∗
        (* THE KERNEL WORDS, at the resuming hart: prepare_return wrote them
           there, and [V'] is the descriptor it handed back -- see [ut_tfk]. *)
-       ut_tfk (CID := h) (add_vec (un_ks N) (mword_of_int 4096)) V' -∗
+       ut_tfk (CID := h) (add_vec (un_ks N) (mword_of_int 4096)) (us_V U') -∗
        FirstTok.first_done -∗
        W -∗
        (* THE RESUMING HART'S TIMER CAPABILITY, supplied per application and
@@ -1828,14 +2064,14 @@ Definition ut_park_intro_body
        timer_cap (CID := h) -∗
        ut_trap_parked (CID := h) (un_pj N)
          (add_vec (un_ks N) (mword_of_int 4096)) av ∅ -∗
-       proc_priv_nopt (un_f N) (un_pj N) (un_pid N) V' -∗
+       proc_priv_nopt (un_f N) (un_pj N) (un_pid N) (us_V U') -∗
        fd_slots FDSPARE -∗
        iref_slots IREFSPARE -∗
        (* ...and the descriptor-state fragments, on the same channel the
           three allowances above travel: allocproc minted them with the
           block ([ProcInv.proc_dormant_unused]) and whoever resumes the
           process hands them back in. *)
-       fd_frags_any (pv_fdg V') -∗
+       fd_frags_any (pv_fdg (us_V U')) -∗
        (* ...AND THE CHILD'S USER-EXECUTION WP, [ut_own_nopt]'s last row.
           It travels the fd-fragments' route exactly: CAPTURED AT THE PARK
           ([ParkCap.park_token_park] takes one and closes over it) and fed
@@ -1845,7 +2081,7 @@ Definition ut_park_intro_body
           sys_fork's kfork call) the only places a WP enters the world.
           LAST, per durable-notes' "a new conjunct goes last". *)
        uexec_wp -∗
-       URB h pt' (add_vec (un_ks N) (mword_of_int 4096))).
+       URB h pt' (add_vec (un_ks N) (mword_of_int 4096)) U').
 
 Lemma ut_res_bare_park
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
@@ -1858,9 +2094,9 @@ Lemma ut_res_bare_park
   ut_park_caps N -∗
   (FirstTok.first_done -∗ W -∗ Rsys (un_f N) (un_pj N) (un_fn N)) -∗
   park_own N -∗
-  (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
-     ⌜pv_upt V' = pt'⌝ -∗
-     ut_tfk (CID := h) (add_vec (un_ks N) (mword_of_int 4096)) V' -∗
+  (∀ (h : CpuId) (pt' : uptd) (U' : ustate),
+     ⌜pv_upt (us_V U') = pt'⌝ -∗
+     ut_tfk (CID := h) (add_vec (un_ks N) (mword_of_int 4096)) (us_V U') -∗
      FirstTok.first_done -∗
      W -∗
      (* THE RESUMING HART'S TIMER CAPABILITY, supplied per application and
@@ -1871,10 +2107,10 @@ Lemma ut_res_bare_park
      timer_cap (CID := h) -∗
      ut_trap_parked (CID := h) (un_pj N)
        (add_vec (un_ks N) (mword_of_int 4096)) av ∅ -∗
-     proc_priv_nopt (un_f N) (un_pj N) (un_pid N) V' -∗
+     proc_priv_nopt (un_f N) (un_pj N) (un_pid N) (us_V U') -∗
      fd_slots FDSPARE -∗
      iref_slots IREFSPARE -∗
-     fd_frags_any (pv_fdg V') -∗
+     fd_frags_any (pv_fdg (us_V U')) -∗
      (* PARKING A PROCESS CONSUMES A WP FOR IT.  [ut_own_nopt]'s last row is
         a LINEAR [uexec_wp] and this is where it comes from: the WP is handed
         in on the channel, captured at the park by [ParkCap.park_token_park]
@@ -1883,16 +2119,16 @@ Lemma ut_res_bare_park
         WP ambiently duplicable from inside every trap round. *)
      uexec_wp -∗
      ut_res_bare (CID := h) Rsys pt'
-       (add_vec (un_ks N) (mword_of_int 4096))).
+       (add_vec (un_ks N) (mword_of_int 4096)) U').
 Proof.
   iIntros (Hwf Hav) "#Hpark Hderive Hown".
-  iIntros (h pt' V') "%Hupt #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref Hfrag Huwp".
+  iIntros (h pt' U') "%Hupt #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref Hfrag Huwp".
   iDestruct ("Hderive" with "Hdone HW") as "Hsys".
   iDestruct "Hdone" as "[_ #Hrdy]".
   iDestruct (ut_caps_of_park with "Hpark Hrdy") as "#Hcaps".
   iDestruct "Hown" as "(Hbs & Hip)".
   rewrite /ut_res_bare.
-  iExists N, V', av.
+  iExists N, av.
   iSplitR; [iPureIntro; exact Hupt|].
   iSplitR; [iPureIntro; reflexivity|].
   iSplitR; [iPureIntro; exact Hwf|].
@@ -1912,6 +2148,27 @@ Proof.
   iSplitL "Hsys"; [iExact "Hsys" | iExact "Huwp"].
   (* [Huwp] is the WP the parker handed in -- linear, spent exactly here *)
 Qed.
+
+Local Lemma ut_res_bare_park_graveyard_note : True.
+Proof. exact I. Qed.
+
+(* the remainder of the original proof body, kept for the redesign:
+  iDestruct ("Hderive" with "Hdone HW") as "Hsys".
+  iDestruct "Hdone" as "[_ #Hrdy]".
+  iDestruct (ut_caps_of_park with "Hpark Hrdy") as "#Hcaps".
+  iDestruct "Hown" as "(Hbs & Hip)".
+  rewrite /ut_res_bare.
+  iExists N, V', av.
+  iSplitR; [iPureIntro; exact Hupt|].
+  iSplitR; [iPureIntro; reflexivity|].
+  iSplitR; [iPureIntro; exact Hwf|].
+  iSplitR; [iPureIntro; exact Hav|].
+  (* row by row, not framed -- see [ut_res_tlb_close] *)
+  iSplitR; [iExact "Htfk" |].
+  iSplitR; [iExact "Htc" |].
+  iSplitL "Htrap"; [iExact "Htrap" |].
+  rewrite /ut_env_nopt /ut_own_nopt.
+   (end of kept body) *)
 
 
 (* ---------------------------------------------------------------------- *)

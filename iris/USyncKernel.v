@@ -1,43 +1,34 @@
 (* ===================================================================== *)
 (* USyncKernel.v -- THE `sync` PROGRAM'S WHOLE-PROCESS WP AS A CONSTRUCTOR  *)
-(* OF THE TRAPFRAME-KEYED SLOT: the ENTRY DEPOSIT.                         *)
+(* OF THE TRAPFRAME-KEYED SLOT: the ENTRY DEPOSIT, with NO assumption.      *)
 (*                                                                         *)
-(* See claude-notes/projects/user-wp-slot.md SS3 (step 2).  [UProofSync.   *)
-(* wp_sync_start] is stated in the Umode tier's vocabulary ([uv_cap_gpr] +  *)
-(* [pc_is]); the kernel's trap loop holds [uexec_slot V M].  This file is   *)
-(* the one lemma that says those are THE SAME THEOREM at the right         *)
-(* [(V, M)] pair -- i.e. that a verified program's WP is TYPE-COMPATIBLE   *)
-(* with the residue's conjunct.  Nothing is plugged into the kernel loop    *)
-(* here; that is step 3.                                                    *)
+(* See claude-notes/design/user-wp-slot.md (the step-2 layer, as re-cut on  *)
+(* the user-mode-on-kernel engine) and claude-notes/design/uk-engine.md.    *)
+(* [UkSync.wp_ksync_start] is sync's top-level theorem on the new engine:   *)
+(* a U-mode continuation [ukc π M m start] from pure facts about the KEY   *)
+(* alone -- the text present in the image, page 0 an X page of the         *)
+(* permission map, a 32-byte writable stack budget below sp.  [uslot W] is  *)
+(* that continuation at the key's state ([UexecRet.uslot_ukc]), so this     *)
+(* file is the one-line identification.                                     *)
 (*                                                                         *)
 (* THE ENTRY CONDITIONS are the pure facts an INITIALIZER (exec, forkret's  *)
-(* park) establishes when it writes the trapframe and loads the image, and  *)
-(* they are spelled against the SLOT's own vocabulary -- [tf_resume_pc (us_V U0)]  *)
-(* and [tf_w V0 tf_sp_idx], not the Umode tier's [m]/[sp0].  They mirror    *)
-(* [USpecSync.wp_sync_start_body]'s premise set exactly, one for one:       *)
+(* park) establishes when it writes the trapframe and loads the image,      *)
+(* spelled against the SLOT's own vocabulary:                               *)
 (*                                                                         *)
-(*   Hlay  sync_layout (pv_upt (us_V U0))                                          *)
-(*   Htext uimg_sub SyncInstrs.sync_bytes (us_M U0)                                *)
-(*   Hsp   -- NOT a premise: it is DISCHARGED by [tf_resume_gpr_sp], which  *)
-(*            is the whole point of keying the slot on the trapframe.       *)
-(*   Hst   uv_stack (pv_upt (us_V U0)) (us_M U0) (tf_w (us_V U0) tf_sp_idx) 32                   *)
+(*   Hentry  tf_resume_pc (uvis_tf W) = SyncSyms.start   -- the resume pc   *)
+(*   Htext   uimg_sub SyncInstrs.sync_bytes (uvis_M W)   -- the image       *)
+(*   Hx      uk_xpage (uvis_perm W) 0                    -- page 0 is X      *)
+(*   Hst     uk_stack (uvis_perm W) (uvis_M W) sp 32     -- the stack budget *)
 (*                                                                         *)
-(* plus the one condition that is about the slot rather than about sync's   *)
-(* body: the resume pc IS the ELF entry, [tf_resume_pc (us_V U0) = SyncSyms.start].*)
-(* [wp_sync_start_body] asks for no alignment fact on the entry pc (its     *)
-(* first instruction's fetch fact comes from [sync_layout] through          *)
-(* [sync_layout_fetch]), so none is carried.                                *)
-(*                                                                         *)
-(* [Rut (pv_upt V0)] AND THE PAIRED TRAP SEAM -- [> (user_trap_frame ...    *)
-(* * uexec_wp -* WP Loop)], the premise that both hands the kernel the trap *)
-(* frame and takes the NEXT WP back (MILESTONE G) -- ARE RECEIVED AND       *)
-(* RETAINED UNUSED (Iris is affine, so they are simply left in the spatial  *)
-(* context at the end).  That is not an oversight: with [uv_cap] still an   *)
-(* ASSUMPTION, sync's traps are absorbed by the assumed round-trip          *)
-(* contracts and the kernel loop is never re-entered on this path, so       *)
-(* neither the kernel's re-entry premise nor its return channel has a       *)
-(* consumer yet.  [uv_cap] is thereby visibly the ONE gap between this      *)
-(* lemma and a real linkage.                                                *)
+(* at [sp = tf_w (uvis_tf W) tf_sp_idx]; [wp_ksync_start]'s [Hsp] is        *)
+(* DISCHARGED by [tf_resume_gpr_sp] -- the payoff of trapframe keying.      *)
+(* Every one of the four is DECIDABLE (UexecCond.v decides them), and none  *)
+(* mentions a table: the ∀-bound table inside the slot is met by the        *)
+(* program through UserPerm.v's leaf-bit transfers.  The former            *)
+(* [sync_entry_tbl] (a guard at EVERY [loop_ok] table, refuted by           *)
+(* [UexecCond.sync_entry_tbl_refuted]) and the [uv_cap] assumption are     *)
+(* gone: the kernel's own trap contract ([UexecRet.ukont]) is what the      *)
+(* program's traps go through.                                             *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap bitvector.definitions.
@@ -48,54 +39,35 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import ProcGeom ProcDefs.
+Require Import ProcGeom ProcDefs UserPtTree.
 Require Import UserExec.
-Require Import UmodeCap UmodeAbi UmodeSyscall.
-Require Import UCodeSync UProofSync.
-Require Import UexecWp UexecSlot UmodeKernelTie.
+Require Import UmodeAbi.
+Require Import UCodeSync.
+Require Import UserPerm UsysMemOk UexecWp UexecSlot UexecRet.
+Require Import UkStep UkSync.
+Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode*/Uk* precedent *)
 Require User.SyncSyms User.SyncInstrs.
 Local Open Scope Z_scope.
 Import Defs.
 
 Section USyncKernel.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId}.
+  Context `{GEN : GenId} `{XI : CurCtx}.
 
-  (* NO [Context {CID : CpuId}]: the slot binds the hart itself (a process
-     may resume on any hart), and [UProofSync.wp_sync_start] takes [CIDp]
-     as an explicit leading binder for exactly the same reason. *)
+  (* NO [Context {CID : CpuId}]: the slot binds the hart itself. *)
 
-  Lemma sync_uexec_slot (U0 : ustate) :
-    tf_resume_pc (us_V U0) = (mword_of_int SyncSyms.start : mword 64) ->
-    sync_layout (pv_upt (us_V U0)) ->
-    uimg_sub SyncInstrs.sync_bytes (us_M U0) ->
-    uv_stack (pv_upt (us_V U0)) (us_M U0) (tf_w (us_V U0) tf_sp_idx) 32 ->
-    □ (∀ C : ucfg, ⌜loop_ok C (pv_upt (us_V U0))⌝ -∗
-         uv_cap C (pv_upt (us_V U0)) (xv6_sys_protocol C (pv_upt (us_V U0)))) ⊢
-    uexec_slot U0.
+  Lemma sync_uexec_slot (W : uvis) :
+    tf_resume_pc (uvis_tf W) = (mword_of_int SyncSyms.start : mword 64) ->
+    uimg_sub SyncInstrs.sync_bytes (uvis_M W) ->
+    uk_xpage (uvis_perm W) (mword_of_int 0) ->
+    uk_stack (uvis_perm W) (uvis_M W) (tf_w (uvis_tf W) tf_sp_idx) 32 ->
+    ⊢ uslot W.
   Proof.
-    intros Hentry Hlay Htext Hst.
-    iIntros "#Hcap".
-    (* [Typeclasses Opaque uexec_slot] blocks [IntoForall]: unfold by hand. *)
-    rewrite /uexec_slot.
-    iIntros (h C Rut b ms_v sc_v stval_v sepc_v)
-            "%Hlo %Hmso Hhw Hmi Hwi Hregs Hpt Hcfg Hrut Hhdl".
-    (* the assumed trap capability, at THIS round's config *)
-    iAssert (uv_cap C (pv_upt (us_V U0)) (xv6_sys_protocol C (pv_upt (us_V U0))))
-      as "#Hcap0".
-    { iApply "Hcap". iPureIntro. exact Hlo. }
-    (* cross the seam: the slot's spatial premises become the verified
-       tier's threading bundle at the same concrete state *)
-    iDestruct (uexec_state_uv_cap_gpr (CID := h) C (pv_upt (us_V U0))
-                 (xv6_sys_protocol C (pv_upt (us_V U0))) (us_M U0) (tf_resume_gpr b (us_V U0))
-                 ms_v sc_v stval_v sepc_v (tf_resume_pc (us_V U0)) Hmso
-                 with "Hcap0 Hhw Hmi Hwi Hregs Hpt Hcfg") as "(Hcg & Hpc)".
-    iEval (rewrite Hentry) in "Hpc".
-    (* [Hrut] and [Hhdl] stay in the spatial context, unused -- see header *)
-    iApply (wp_sync_start C (pv_upt (us_V U0)) h (us_M U0) (tf_resume_gpr b (us_V U0))
-              (tf_w (us_V U0) tf_sp_idx) Hlay Htext (tf_resume_gpr_sp b (us_V U0)) Hst
-              with "Hcg Hpc").
-    Unshelve. exact (TsoCtx.MkCtxId inhabitant inhabitant).
+    intros Hentry Htext Hx Hst.
+    rewrite uslot_ukc Hentry.
+    iApply (wp_ksync_start (uvis_perm W) (uvis_M W) (tf_resume_gpr0 (uvis_tf W))
+              (tf_w (uvis_tf W) tf_sp_idx) Hx Htext
+              (tf_resume_gpr_sp zero_rf (uvis_tf W)) Hst).
   Qed.
 
 End USyncKernel.

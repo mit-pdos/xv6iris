@@ -40,19 +40,35 @@ Section TicksInv.
   Definition a_tickslock : mword 64 := mword_of_int KernelSyms.tickslock.
 
   (* the protected resource: the counter cell, contents existential. *)
-  Definition ticks_res : iProp Σ := (∃ t : mword 32, a_ticks ↦₄ t)%I.
+  (* A6.121 (the M3 λ-conversion, PILOT; tso-flip TicksInv.v:51): the payload
+     over an EXPLICIT context.  [ticks_res_at ξ] is what the lock surface
+     takes as its [CtxId → iProp] -- the invariant's free arm holds the cell
+     at the PARKED record's context and acquire's absorb re-indexes it to
+     the winner's by a REAL transport ([CtxMorph]) instead of the constant
+     embedding [<{ }>], which froze the payload at whichever context spelled
+     it.  [ticks_res] stays as the ambient spelling every consumer reads. *)
+  Definition ticks_res_at (ξ : CtxId) : iProp Σ :=
+    (∃ t : mword 32, ctx_word4_pointsto ξ a_ticks (DfracOwn 1) t)%I.
+  Definition ticks_res : iProp Σ := ticks_res_at cur_ctx.
+  Global Instance ticks_res_at_morph : CtxMorph ticks_res_at.
+  Proof.
+    rewrite /ticks_res_at.
+    apply (ctx_morph_exist (λ (t : mword 32) (ξ : CtxId),
+                              ctx_word4_pointsto ξ a_ticks (DfracOwn 1) t)).
+    intros t. apply ctx_morph_word4.
+  Qed.
 
   Lemma ticks_res_intro (t : mword 32) : a_ticks ↦₄ t -∗ ticks_res.
-  Proof. iIntros "H". iExists t. iFrame "H". Qed.
+  Proof. iIntros "H". rewrite /ticks_res /ticks_res_at. iExists t. iFrame "H". Qed.
 
   Definition is_tickslock (γl : gname) : iProp Σ :=
-    is_lock γl a_tickslock "time"%string <{ ticks_res }>.
+    is_lock γl a_tickslock "time"%string ticks_res_at.
 
   Global Instance is_tickslock_persistent γl : Persistent (is_tickslock γl).
   Proof. apply _. Qed.
 
   Lemma is_tickslock_lock γl :
-    is_tickslock γl -∗ is_lock γl a_tickslock "time"%string <{ ticks_res }>.
+    is_tickslock γl -∗ is_lock γl a_tickslock "time"%string ticks_res_at.
   Proof. iIntros "$". Qed.
 
   (* ---- construction (the "newlock" ghost step): what a caller does with
@@ -67,7 +83,7 @@ Section TicksInv.
     a_ticks ↦₄ t ={E}=∗ ∃ γl : gname, is_tickslock γl.
   Proof.
     iIntros "#Hnm Hlkw Hcpu Hticks".
-    iApply (newlock E a_tickslock "time"%string <{ ticks_res }>
+    iApply (newlock E a_tickslock "time"%string ticks_res_at
               with "Hnm Hlkw Hcpu [Hticks]").
     iApply (ticks_res_intro with "Hticks").
   Qed.

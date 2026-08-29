@@ -804,7 +804,7 @@ Section ProofSysRead.
                 0%nat (fun _ => bv_0 8)
                 with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc [Hpriv] Hkenv [Henv]").
       { exact Hcsf. }
-      { apply uptd_ext_refl. }
+      { apply uptd_ext_sz_refl. }
       { left. split; [reflexivity | exact Hnone]. }
       { apply Z.le_max_l. }
       { exact Hmfa0. }

@@ -247,7 +247,7 @@ Definition wp_sys_fstat_sconf_body
        [UserPtTree.umem_wr_lookup_out]. *)
     ∀ (mf : regfile) (r : mword 64) (P' : uptd) (d : nat) (bs : nat -> bv 8),
       ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+      ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       ⌜sys_fstat_ret (us_V U) v r⌝ -∗
       ⌜(d <= 24)%nat⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗

@@ -99,6 +99,7 @@ Require Import SpecKilled SpecSetkilled SpecKexit SpecYield SpecPrepareReturn.
 Require Import SpecVmfault.
 Require Import SpecPrintk.
 Require Import SpecUsertrap UsertrapRes.
+Require Import UserPerm.   (* [perm_of_uptd_ext_sz] -- the fill is transparent *)
 Require Import ProofUsertrapParts.
 Require Import UsertrapAux.
 Require Import ProofUsertrapTail.
@@ -218,9 +219,9 @@ Section Ut56.
      cell through [ProcInv.proc_priv_pid] -- the same quarter
      SpecAcquiresleep / SpecHoldingsleep take -- given straight back, so the
      process record does not move and [ut_a6] is applied at the SAME [V]. *)
-  Lemma ut_56 (N : ut_names) (U : ustate) (pt : uptd) (ksp : mword 64)
+  Lemma ut_56 (N : ut_names) (U0 U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat)
-      (mie_v menvcfg0 : mword 64) (lks : gset string) :
+      (mie_v menvcfg0 epv scv : mword 64) (lks : gset string) :
     printk_gen_contract (kt := KT1) (fsc_printk) (fsc_uart) (fsc_disk) ->
     ut_wf N ->
     (K_usertrap <= av)%nat ->
@@ -233,6 +234,8 @@ Section Ut56.
     ut_cs m0 m ->
     mie_v = MIE_S ->
     menvcfg0 = MENVCFG_S ->
+    (* THE ROUND SO FAR (milestone J1a) -- see [SpecUsertrap.ut_round]. *)
+    ut_round epv scv U0 U ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0x56)) -∗
     sie_cap_gpr KT1 m nx false (un_pj N) -∗
@@ -241,10 +244,10 @@ Section Ut56.
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
-                     mie_v menvcfg0) -∗
+                     mie_v menvcfg0 U0 epv scv) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hpk Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv.
+    intros Hpk Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd.
     pose proof (ut_nx_bound false av nx Hav Hnx) as Hks.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -597,10 +600,10 @@ Section Ut56.
     iEval (rewrite Hpa6) in "Hpc".
     (* ---- the bundle back together, and on to +0xa6 ---- *)
     iDestruct ("Hownback" $! U with "Hpv Hufr Hsy") as "Hown".
-    iApply (T.ut_a6 Rsys N U pt ksp m0 S1 av nx false
-              mie_v menvcfg0 lks
+    iApply (T.ut_a6 Rsys N U0 U pt ksp m0 S1 av nx false
+              mie_v menvcfg0 epv scv lks
               Hwf' Hav Hnx Htfpe Hksp Hm0sp HS1sp HS1s1 HcsS1'
-              Hmiev Hmenvv
+              Hmiev Hmenvv Hrd
               with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
     all: try lkbelow.
     iApply (ua_hold_on Rsys N U with "Hcpu [-Hclm Hown] Hclm [-]").
@@ -643,9 +646,9 @@ Section UtD0.
      alone, so the [bnez] falls through and the code joins the
      unexpected-scause arm; the right arm returns the backed page, so it is
      taken and the code joins +0xa6 -- with the process record MOVED. *)
-  Lemma ut_d0 (N : ut_names) (U : ustate) (pt : uptd) (ksp : mword 64)
+  Lemma ut_d0 (N : ut_names) (U0 U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat)
-      (mie_v menvcfg0 : mword 64) (lks : gset string) :
+      (mie_v menvcfg0 epv scv : mword 64) (lks : gset string) :
     printk_gen_contract (kt := KT1) (fsc_printk) (fsc_uart) (fsc_disk) ->
     ut_wf N ->
     (K_usertrap <= av)%nat ->
@@ -658,6 +661,8 @@ Section UtD0.
     ut_cs m0 m ->
     mie_v = MIE_S ->
     menvcfg0 = MENVCFG_S ->
+    (* THE ROUND SO FAR (milestone J1a) -- see [SpecUsertrap.ut_round]. *)
+    ut_round epv scv U0 U ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xd0)) -∗
     sie_cap_gpr KT1 m nx false (un_pj N) -∗
@@ -666,10 +671,10 @@ Section UtD0.
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
-                     mie_v menvcfg0) -∗
+                     mie_v menvcfg0 U0 epv scv) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hpk Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv.
+    intros Hpk Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd.
     pose proof (ut_nx_bound false av nx Hav Hnx) as Hks.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -937,10 +942,10 @@ Section UtD0.
                    with "Hsz Hpgt Hppt") as "Hpv".
       rewrite us_upt_id upd_usM_id.
       iDestruct ("Hownback" $! U with "Hpv Hufr Hsy") as "Hown".
-      iApply (ut_56 Rsys N U pt ksp m0 mr av nx
-                mie_v menvcfg0 lks
+      iApply (ut_56 Rsys N U0 U pt ksp m0 mr av nx
+                mie_v menvcfg0 epv scv lks
                 Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp Hmrsp Hmrs1 Hcsmr
-                Hmiev Hmenvv
+                Hmiev Hmenvv Hrd
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
       iApply (ua_hold_on Rsys N U with "Hcpu Hcsrs Hclm [-]").
       rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].
@@ -983,10 +988,26 @@ Section UtD0.
       assert (HV'tfp : ud_tfp (pv_upt V') = ud_tfp pt).
       { rewrite /V' /Pd. exact Htfpe. }
       iDestruct ("Hownback" $! (MkUstate V' (us_M U)) with "Hpv Hufr Hsy") as "Hown".
-      iApply (T.ut_a6 Rsys N (MkUstate V' (us_M U)) pt ksp m0 mr av nx false
-                mie_v menvcfg0 lks
+      (* THE ROUND IS TRANSPARENT ACROSS A LAZY FILL (milestone J1a, R4).  The
+         trapframe and the image do not move at all, and the PERMISSION
+         PROJECTION does not either: [uptd_ext_sz] now records that the
+         gained leaf is vmfault's own RW-user one, which is exactly what the
+         fill already said about a live-but-unmapped page
+         ([UserPerm.perm_of_uptd_ext_sz]). *)
+      assert (HV'upt : pv_upt V' = Pd) by (rewrite /V'; destruct (us_V U); reflexivity).
+      assert (HV'sz : pv_sz V' = pv_sz (us_V U))
+        by (rewrite /V'; destruct (us_V U); reflexivity).
+      assert (HV'tf : pv_tf V' = pv_tf (us_V U))
+        by (rewrite /V'; destruct (us_V U); reflexivity).
+      assert (Hrd' : ut_round epv scv U0 (MkUstate V' (us_M U))).
+      { refine (ut_round_same epv scv U0 U (MkUstate V' (us_M U)) _ _ eq_refl Hrd).
+        - cbn [us_V]. exact HV'tf.
+        - cbn [us_V]. rewrite HV'upt HV'sz.
+          exact (perm_of_uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) Pd Hextd). }
+      iApply (T.ut_a6 Rsys N U0 (MkUstate V' (us_M U)) pt ksp m0 mr av nx false
+                mie_v menvcfg0 epv scv lks
                 Hwf' Hav Hnx HV'tfp Hksp Hm0sp Hmrsp Hmrs1 Hcsmr
-                Hmiev Hmenvv
+                Hmiev Hmenvv Hrd'
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
       all: try lkbelow.
       iApply (ua_hold_on Rsys N (MkUstate V' (us_M U)) with "Hcpu Hcsrs Hclm [-]").
@@ -1015,9 +1036,9 @@ Section UtE8.
      (kexit never returns).  No premise about s2 is needed here either; it
      was set from devintr's return value at +0x3e and [ut_fa] only branches
      on it. *)
-  Lemma ut_e8 (N : ut_names) (U : ustate) (pt : uptd) (ksp : mword 64)
+  Lemma ut_e8 (N : ut_names) (U0 U : ustate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat)
-      (mie_v menvcfg0 : mword 64) (lks : gset string) :
+      (mie_v menvcfg0 epv scv : mword 64) (lks : gset string) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res false + nx)%nat = (av - 4)%nat ->
@@ -1029,6 +1050,8 @@ Section UtE8.
     ut_cs m0 m ->
     mie_v = MIE_S ->
     menvcfg0 = MENVCFG_S ->
+    (* THE ROUND SO FAR (milestone J1a) -- see [SpecUsertrap.ut_round]. *)
+    ut_round epv scv U0 U ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xea)) -∗
     sie_cap_gpr KT1 m nx false (un_pj N) -∗
@@ -1037,10 +1060,10 @@ Section UtE8.
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0
-                     mie_v menvcfg0) -∗
+                     mie_v menvcfg0 U0 epv scv) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv.
+    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hrd.
     pose proof (ut_nx_bound false av nx Hav Hnx) as Hks.
     
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -1134,10 +1157,10 @@ Section UtE8.
                           (concat_vec (mword_of_int 6 : mword 8) ('b"0"))))
                      = mword_of_int (UT + 0xfc)) by pcw.
       iEval (rewrite Hpfc) in "Hpc".
-      iApply (T.ut_fa Rsys N U pt ksp m0 mf av nx false
-                mie_v menvcfg0 lks
+      iApply (T.ut_fa Rsys N U0 U pt ksp m0 mf av nx false
+                mie_v menvcfg0 epv scv lks
                 Hwf' Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
-                Hmiev Hmenvv
+                Hmiev Hmenvv Hrd
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
       iApply (ua_hold_on Rsys N U with "Hcpu Hcsrs Hclm [-]").
       rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].

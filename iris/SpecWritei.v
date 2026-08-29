@@ -686,7 +686,7 @@ Definition wp_writei_sconf_body
   (* the disk fabric *)
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
   (* THREE slot units -- bmap's peak; writei's own bread holds one across
      either_copyin and log_write, and log_write wants one of its own *)
   bslots 3 -∗
@@ -755,7 +755,7 @@ Definition wp_writei_sconf_body
            /\ dn0' = dn')⌝ -∗
       (* at most [wi_cost_bmonly off n] units gone, and none gained *)
       ⌜((ncount - wi_cost_bmonly off n)%nat <= n')%nat /\ (n' <= ncount)%nat⌝ -∗
-      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+      ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗
@@ -960,7 +960,7 @@ Definition wp_writei_gen_body
   (* the disk fabric *)
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
   (* THREE slot units -- bmap's peak; writei's own bread holds one across
      either_copyin and log_write, and log_write wants one of its own *)
   bslots 3 -∗
@@ -1034,7 +1034,7 @@ Definition wp_writei_gen_body
          [wi16_spend_any] / [wi16_atomic]. *)
       ⌜wi16_spend_any fsc_bmapstart inum icfg_ist ncount n' off n bm bm' Sb⌝ -∗
       ⌜wi16_atomic off n tot⌝ -∗
-      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+      ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       trap_csrs_ext KT1 eb -∗

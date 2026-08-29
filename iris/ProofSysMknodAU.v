@@ -862,7 +862,7 @@ Section ProofSysMknodM1Tail.
     procs_inv gs -∗
     dev_inv fsc_uart fsc_disk -∗
     disk_geom fsc_disk pd pav pu -∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+    is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
     log_op icfg_log u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
@@ -1494,7 +1494,11 @@ Section ProofSysMknodBody.
               (Hlb "kmem"%string)
               with "Hcg Hown Htext Hdata Hpc Hpriv Hkenv [Hbuf]").
     { iEval (rewrite HM13a1). iExact "Hbuf". }
-    iIntros (CID19 Hq19 mas P' bf) "%Hcsas %Hupt Hcg Hown Hpc Hpriv Hbuf %Hfsr".
+    iIntros (CID19 Hq19 mas P' bf) "%Hcsas %Huptz Hcg Hown Hpc Hpriv Hbuf %Hfsr".
+    (* argstr now reports [uptd_ext_sz]; this contract is stated at the
+       bare [uptd_ext] (it is not on the dispatcher's permission path), so
+       the extra content is dropped here. *)
+    pose proof (ProcPtOwn.uptd_ext_sz_ext _ _ _ Huptz) as Hupt.
     iEval (rewrite HM13a1) in "Hbuf".
     assert (Hpc2e : ret_pc (M13 !!! Regidx Rra : mword 64)
                     = mword_of_int (MN + 0x2e)) by (rewrite HM13ra; pcw).

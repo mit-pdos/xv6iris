@@ -312,7 +312,7 @@ Proof.
     (* THE SLOT STAYS FOLDED -- the pre-port shape; the frame comes out of
        [WpIntrInv.sda_slot_acc] below, the one place the two translation
        arms are told apart. *)
-    iDestruct "Hcap" as "(Hstk & Htr & Harm & #Htc & #Hwit)".
+    iDestruct "Hcap" as "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
     iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
@@ -376,7 +376,7 @@ Proof.
        the capability into the POST side of the [swp_mono], which is where
        [sie_cap] is rebuilt; the [swp] side never touches it. *)
     iApply (swp_mono (CID := CID)
-              with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm Hclose] [-]").
+              with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm Hctx Hclose] [-]").
     2:{ iApply (swp_execute_LOAD_dev_S4_ex (CID := CID)
                   SD sda_Dro (sda_Df (DfracOwn 1))
                   (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv)
@@ -486,8 +486,8 @@ Proof.
                   = <[Regidx rd := regval_into_reg (ldval w)]> m
                       !!! Regidx csp_rs1)
       by (symmetry; apply upd_ne; congruence).
-    iSplitL "Htr Hstk Harm".
-    { rewrite /sie_cap -Hsp. iFrame "Hstk Htr Harm Htc Hwit". }
+    iSplitL "Htr Hstk Harm Hctx".
+    { rewrite /sie_cap -Hsp. iFrame "Hstk Htr Harm Hctx Htc Hwit". }
     iSplitL "Hfile".
     { iEval (rewrite (tp_pin_upd m rd (regval_into_reg (ldval w)) Hrdtp))
         in "Hfile". iExact "Hfile". }
@@ -591,7 +591,7 @@ Proof.
     (* THE SLOT STAYS FOLDED -- the pre-port shape; the frame comes out of
        [WpIntrInv.sda_slot_acc] below, the one place the two translation
        arms are told apart. *)
-    iDestruct "Hcap" as "(Hstk & Htr & Harm & #Htc & #Hwit)".
+    iDestruct "Hcap" as "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
     iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
@@ -659,7 +659,7 @@ Proof.
        the capability into the POST side of the [swp_mono], which is where
        [sie_cap] is rebuilt; the [swp] side never touches it. *)
     iApply (swp_mono (CID := CID)
-              with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm Hclose] [-]").
+              with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm Hctx Hclose] [-]").
     2:{ iApply (swp_execute_STORE_dev_S4 (CID := CID)
                   SD sda_Dro (sda_Df (DfracOwn 1))
                   (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv)
@@ -765,8 +765,8 @@ Proof.
     { rewrite /sconf_at_priv. iExists mdv0.
       iFrame "Hhw Hminv Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv".
       iPureIntro. split; assumption. }
-    iSplitL "Htr Hstk Harm".
-    { rewrite /sie_cap. iFrame "Hstk Htr Harm Htc Hwit". }
+    iSplitL "Htr Hstk Harm Hctx".
+    { rewrite /sie_cap. iFrame "Hstk Htr Harm Hctx Htc Hwit". }
     iFrame "Hfile HS". iPureIntro. split_and!; reflexivity.
   - (* ---------------- THE CONTINUATION ---------------- *)
     iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & -> & HS)".

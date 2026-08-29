@@ -240,7 +240,7 @@ Definition wp_kexit_sconf_body
   gen_cert -∗
   dev_inv fsc_uart fsc_disk -∗
   disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string <{ disk_res fsc_disk pd pav pu }> -∗
+  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
   bslots 3 -∗
   (* THE FILE SYSTEM, as [SpecFileclose] sees it: the ambient [fs_ready]
      and NOTHING pure beside it: [fclose_ties] died with the eight

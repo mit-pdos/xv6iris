@@ -569,9 +569,13 @@ Section PipeInv.
   Proof. iIntros "Hf (Hf' & _ & _)". iApply (lock_frag_exclusive with "Hf Hf'"). Qed.
 
   Lemma locked_dead γl γp i : ⊢ locked γl i -∗ pipe_dead γl γp -∗ False.
-  Proof. iApply lock_frag_dead. Qed.
+  Proof.
+    iIntros "(%B & Hf & _) Hd". iApply (lock_frag_dead with "[Hf] Hd"). by iExists B.
+  Qed.
   Lemma locked_pre_dead γl γp i : ⊢ locked_pre γl i -∗ pipe_dead γl γp -∗ False.
-  Proof. iApply lock_frag_dead. Qed.
+  Proof.
+    iIntros "(%B & Hf & _) Hd". iApply (lock_frag_dead with "[Hf] Hd"). by iExists B.
+  Qed.
 
   (* THE reclamation step, and the reason the whole construction hangs
      together.  The last closer arrives inside release's finisher with a

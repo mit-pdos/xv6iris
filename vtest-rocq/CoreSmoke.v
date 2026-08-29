@@ -8,7 +8,7 @@
    Source: tools/vtest/tests/core_smoke.S.  Capture: CoreSmokeGen.v. *)
 From Stdlib Require Import List ZArith.
 Import ListNotations.
-Require Import VTest CoreSmokeGen.
+Require Import VTest CoreSmokeGen CoreSmokeHart1Gen CoreSmokeHwGen.
 Local Open Scope Z_scope.
 
 Definition smoke_run : option mstate := run_until 200 (start core_smoke_text).
@@ -27,3 +27,64 @@ Proof. reflexivity. Qed.
    edit to the program makes the test go red with an empty result. *)
 Lemma core_smoke_budget : budget_left 200 (start core_smoke_text) = 167%nat.
 Proof. vm_cast_no_check (eq_refl 167%nat). Qed.
+
+(* ====================================================================== *)
+(* THE SAME QUESTION, ASKED OF REAL HARDWARE.                             *)
+(*                                                                        *)
+(* Capture: CoreSmokeHwGen.v, from tools/vtest/board.py and one run on a   *)
+(* StarFive VisionFive 2 over JTAG.  It is a DIFFERENT IMAGE from the one  *)
+(* QEMU ran -- same source, built with the board profile -- so it gets its *)
+(* own start state off its own [_hw_text], and on the hart it actually ran *)
+(* on.  tools/vtest/README-hw.md says what that costs.                     *)
+(*                                                                        *)
+(* What this particular test establishes is the PLUMBING, and on a board   *)
+(* there is more of it to establish than on QEMU: that the image survives  *)
+(* a JTAG load into DRAM and is fetched rather than a stale I-cache line,  *)
+(* that the declared regions really were zeroed before the run, that the   *)
+(* runner's register set-up leaves the hart somewhere the program can run  *)
+(* from, and that reading the result region back over JTAG is the same     *)
+(* observation the model makes of [gmem].  If this is red, no hardware     *)
+(* test above it means anything.                                          *)
+(* ====================================================================== *)
+
+Definition smoke_hw_run : option mstate :=
+  run_until 200 (start_hart core_smoke_hw_primary_hart core_smoke_hw_text).
+
+Lemma core_smoke_hw_result_ok : result_of smoke_hw_run = core_smoke_hw_result.
+Proof. solve_vtest core_smoke_hw_result. Qed.
+
+(* the diagnostic, as on the QEMU side: this tells "the budget was too small"
+   apart from "the model got stuck", and the board image is two instructions
+   longer than QEMU's (the [fence.i] and the hart-slot bias) *)
+Lemma core_smoke_hw_status : run_status 200 (start_hart core_smoke_hw_primary_hart
+                                                        core_smoke_hw_text) = VDone.
+Proof. vm_cast_no_check (eq_refl VDone). Qed.
+
+(* ====================================================================== *)
+(* THE SAME PLUMBING, ON HART 1.                                          *)
+(*                                                                        *)
+(* Capture: CoreSmokeHart1Gen.v -- built with PRIMARY_HART=1 and run under *)
+(* -smp 2, so hart 0 took the AP path and hart 1 ran the body and owned    *)
+(* the DONE flag.  This is the plumbing test for the hart variant: if it   *)
+(* is red, no hart-1 result above it means anything.                       *)
+(*                                                                        *)
+(* The result region is byte-identical to hart 0's, which is the point --  *)
+(* the program stores three constants and does a stack round trip, and     *)
+(* none of that should depend on which hart runs it.  In particular the    *)
+(* stack round trip landing in the same place is the check that vtest.S's  *)
+(* slot bias put the primary at the TOP of the declared region on hart 1   *)
+(* just as on hart 0; without the bias sp would be 2 KB low and the `sd`   *)
+(* would still work, so this is checked by the VALUE and not by the run    *)
+(* merely completing.                                                     *)
+(* ====================================================================== *)
+
+Definition smoke_h1_run : option mstate :=
+  run_until 200 (start_hart core_smoke_hart1_primary_hart core_smoke_hart1_text).
+
+Lemma core_smoke_hart1_result :
+  result_of smoke_h1_run = core_smoke_hart1_qemu_result.
+Proof. solve_vtest core_smoke_hart1_qemu_result. Qed.
+
+Lemma core_smoke_hart1_is_hart0 :
+  core_smoke_hart1_qemu_result = core_smoke_qemu_result.
+Proof. reflexivity. Qed.

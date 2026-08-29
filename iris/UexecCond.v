@@ -1,10 +1,13 @@
 (* ===================================================================== *)
-(* UexecCond.v -- PROBE (uncommitted; the force-link probe patch).         *)
+(* UexecCond.v -- THE CONDITIONAL ENTRY DEPOSIT: at a mint site, decide    *)
+(* on the KEY alone whether the process is `sync` at its entry, and         *)
+(* deposit sync's verified slot if so, the generic one otherwise.  NO       *)
+(* assumption enters the composition on either branch.                      *)
 (*                                                                         *)
 (* STEP 1 -- the DECIDABLE TEST that a process's memory image carries       *)
-(* `sync`'s text verbatim, so a mint site can do                            *)
+(* `sync`'s text verbatim ([text_region_eq]), so a mint site can do          *)
 (*                                                                         *)
-(*   destruct (decide (text_region_eq M)) as [Heq | _]                      *)
+(*   destruct (decide (sync_gate W)) as [Hgate | _]                          *)
 (*                                                                         *)
 (* BEFORE deciding which WP to construct.  The case analysis is             *)
 (* PROOF-LEVEL: [decide] on a SYMBOLIC [M] is an ordinary [Decision]        *)
@@ -19,7 +22,15 @@
 (*     Use [cbn [fst]] -- a delta list -- to reduce the pair projection     *)
 (*     without touching the literal.                                        *)
 (*                                                                         *)
-(* STEP 2 -- [cond_entry_slot], the conditional constructor, standalone.    *)
+(* STEP 2 -- [cond_entry_slot], the conditional constructor.  ALL FOUR of   *)
+(* sync's entry conditions are now facts about the key with a [Decision]:  *)
+(* the text ([text_region_eq]), the resume pc, page 0 an X page of the      *)
+(* permission map ([uk_xpage]) and the stack budget ([uk_stack]) -- the     *)
+(* last two used to be facts about the TABLE ([sync_layout], [uv_stack]),  *)
+(* guarded under the slot's own ∀ as [sync_entry_tbl], and THAT guard was   *)
+(* UNSATISFIABLE (the empty table is [loop_ok]; the refutation              *)
+(* [sync_entry_tbl_refuted] lived here until the permission map entered the *)
+(* key).  See claude-notes/design/user-wp-slot.md, "The permission map".    *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap bitvector.definitions.
@@ -30,11 +41,12 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
-Require Import ProcGeom ProcDefs ProcPtOwn.
+Require Import ProcGeom ProcDefs ProcPt ProcPtOwn.
 Require Import UserPtTree UserFrame UserExec.
-Require Import UmodeMem UmodeCap UmodeAbi UmodeSyscall.
+Require Import UmodeMem UmodeAbi.
 Require Import UCodeSync.
-Require Import UexecWp UexecSlot USyncKernel.
+Require Import UserPerm UsysMemOk UexecWp UexecSlot UexecRet UkSync USyncKernel.
+Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode*/Uk* precedent *)
 Require User.SyncSyms User.SyncInstrs.
 Local Open Scope Z_scope.
 Import Defs.
@@ -88,43 +100,38 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
-(* SS3 THE CONDITIONAL CONSTRUCTOR.                                        *)
-(*                                                                         *)
-(* The two conditions that HAVE a [Decision] are decided here; the two      *)
-(* that do not ([sync_layout], [uv_stack] -- both bottom out in            *)
-(* [UserPtTree.uleaf_ok], a forall over (mword 1)^2 x bool^2 of the Sail    *)
-(* [pte_check_ok], for which no decider exists) are taken as a PURE         *)
-(* premise, CONDITIONED on the two decided ones so the generic branch owes  *)
-(* nothing.  And [uv_cap] is not a [Prop] at all -- it is an iProp premise, *)
-(* which is the headline wart: supplying it at a mint site is an ASSUMPTION *)
-(* entering the composition.                                                *)
+(* SS3 THE GATE, and THE CONDITIONAL CONSTRUCTOR.                          *)
 (* ===================================================================== *)
-Definition sync_entry_pure (U : ustate) : Prop :=
-  sync_layout (pv_upt (us_V U))
-  /\ uv_stack (pv_upt (us_V U)) (us_M U) (tf_w (us_V U) tf_sp_idx) 32.
+
+(* sync's four entry conditions, all about the key, all decidable *)
+Definition sync_gate (W : uvis) : Prop :=
+  text_region_eq (uvis_M W) /\
+  tf_resume_pc (uvis_tf W) = (mword_of_int SyncSyms.start : mword 64) /\
+  uk_xpage (uvis_perm W) (mword_of_int 0) /\
+  uk_stack (uvis_perm W) (uvis_M W) (tf_w (uvis_tf W) tf_sp_idx) 32.
+
+Global Instance sync_gate_dec (W : uvis) : Decision (sync_gate W).
+Proof. unfold sync_gate. apply _. Defined.
 
 Section UexecCond.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId}.
+  Context `{GEN : GenId} `{XI : CurCtx}.
 
-  Lemma cond_entry_slot (U : ustate) :
-    (text_region_eq (us_M U) ->
-     tf_resume_pc (us_V U) = (mword_of_int SyncSyms.start : mword 64) ->
-     sync_entry_pure U) ->
-    □ (∀ C : ucfg, ⌜loop_ok C (pv_upt (us_V U))⌝ -∗
-         uv_cap C (pv_upt (us_V U)) (xv6_sys_protocol C (pv_upt (us_V U)))) -∗
-    uexec_wp -∗
-    uexec_slot U.
+  (* the gate's yes branch: sync's own slot *)
+  Lemma sync_gate_slot (W : uvis) : sync_gate W -> ⊢ uslot W.
   Proof.
-    intros Hpure. iIntros "#Hcap Hgen".
-    destruct (decide (text_region_eq (us_M U))) as [Hteq | _]; last first.
-    { iApply (uexec_wp_slot U with "Hgen"). }
-    destruct (decide (tf_resume_pc (us_V U) = (mword_of_int SyncSyms.start : mword 64)))
-      as [Hpc | _]; last first.
-    { iApply (uexec_wp_slot U with "Hgen"). }
-    destruct (Hpure Hteq Hpc) as [Hlay Hst].
-    iApply (sync_uexec_slot U Hpc Hlay (text_region_eq_uimg_sub (us_M U) Hteq) Hst).
-    iExact "Hcap".
+    intros (Hteq & Hpc & Hx & Hst).
+    exact (sync_uexec_slot W Hpc (text_region_eq_uimg_sub (uvis_M W) Hteq) Hx Hst).
+  Qed.
+
+  (* THE CONDITIONAL CONSTRUCTOR: sync's slot when the gate holds, the
+     generic one otherwise -- and nothing is assumed on either branch *)
+  Lemma cond_entry_slot (W : uvis) : □ uexec_wp -∗ uslot W.
+  Proof.
+    iIntros "#Hgen".
+    destruct (decide (sync_gate W)) as [Hgate | _].
+    - iApply (sync_gate_slot W Hgate).
+    - iApply (uexec_wp_uslot W with "Hgen").
   Qed.
 
 End UexecCond.
@@ -132,91 +139,66 @@ End UexecCond.
 (* ===================================================================== *)
 (* SS4 THE RE-KEY LEMMA the park channel needs.                            *)
 (*                                                                         *)
-(* [uexec_slot V M] reads [V] ONLY through [pv_upt V] (the table) and       *)
-(* [pv_tf V] (via [tf_resume_pc] / [tf_resume_gpr]).  So a slot minted at   *)
-(* the descriptor a PARKER holds can be spent at the descriptor a RESUMER   *)
-(* produces, given those two equations -- which is exactly the gap in       *)
-(* [ParkCap.park_token_park]: the captured [fd_frags_any (pv_fdg V)] row is *)
-(* re-keyed onto the closer's own [∀ V'] by [rewrite -Hfg] off the closer's *)
-(* [⌜pv_fdg V' = pv_fdg V⌝], and there is NO analogous premise for the      *)
-(* table or the trapframe.  With this lemma, adding                        *)
-(* [⌜pv_upt V' = pv_upt V⌝ ∗ ⌜pv_tf V' = pv_tf V⌝] to the package's resume  *)
-(* closer is all a keyed row costs.                                        *)
+(* [uslot (uvis_of U)] reads [U] through [pv_tf (us_V U)], [us_M U] and the *)
+(* PROJECTION of the table and size -- never the table itself.  So a slot   *)
+(* minted at the state a PARKER holds can be spent at the state a RESUMER   *)
+(* produces, given those equations -- the gap in [ParkCap.park_token_park]: *)
+(* the captured [fd_frags_any (pv_fdg V)] row is re-keyed onto the closer's *)
+(* own [∀ V'] by [rewrite -Hfg] off the closer's [⌜pv_fdg V' = pv_fdg V⌝],   *)
+(* and there is NO analogous premise for the trapframe.  A fresh TABLE      *)
+(* (fork's child) costs only its projection agreeing -- which uvmcopy's     *)
+(* leaf-for-leaf copy gives.                                                *)
 (* ===================================================================== *)
 Section UexecCondCongr.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId}.
+  Context `{GEN : GenId} `{XI : CurCtx}.
 
-  Lemma uexec_slot_congr (U1 U2 : ustate) :
-    pv_upt (us_V U1) = pv_upt (us_V U2) ->
+  Lemma uslot_congr (U1 U2 : ustate) :
     pv_tf (us_V U1) = pv_tf (us_V U2) ->
     us_M U1 = us_M U2 ->
-    uexec_slot U1 -∗ uexec_slot U2.
+    perm_of (ud_um (pv_upt (us_V U1))) (uint (pv_sz (us_V U1)))
+    = perm_of (ud_um (pv_upt (us_V U2))) (uint (pv_sz (us_V U2))) ->
+    uslot (uvis_of U1) -∗ uslot (uvis_of U2).
   Proof.
-    intros Hupt Htf Hm.
-    rewrite /uexec_slot /tf_resume_pc /tf_resume_gpr /tf_w Hupt Htf Hm.
-    iIntros "H". iExact "H".
+    intros Htf Hm Hp. rewrite /uvis_of Htf Hm Hp. iIntros "H". iExact "H".
   Qed.
 
 End UexecCondCongr.
 
 (* ===================================================================== *)
-(* SS5 THE GATED FORM -- what would make the hook LANDABLE at a mint site. *)
-(*                                                                         *)
-(* [cond_entry_slot] takes [uv_cap] UNCONDITIONALLY, and that is the       *)
-(* headline wart: supplying it at userinit's park would put an ASSUMPTION  *)
-(* into the composition.  The cap is only ever USED on the true branch, so *)
-(* it can be GATED on the two DECIDED facts -- and so can the pure         *)
-(* premise.  A mint site then owes the sync side NOTHING as soon as it can *)
-(* refute the gate.                                                        *)
+(* SS5 THE DISCHARGE AT userinit, and the ONE fact about the literal it    *)
+(* needs.  userinit's process has the EMPTY user map -- allocproc's arm    *)
+(* delivers [pv_upt V = ProcPtOwn.upt_desc root tfp] and [upt_desc root    *)
+(* tfp = UPTD root tfp emptyset (um_pas emptyset)] -- so the sync branch  *)
+(* is refutable there without computing over the byte literal: page 0 is  *)
+(* not an X page of the projection of an empty map at size 0 (the fill    *)
+(* carries no X either).                                                   *)
 (* ===================================================================== *)
-Section UexecCondGated.
-  Context `{!riscvGS Σ}.
-  Context `{GEN : GenId}.
-
-  Lemma cond_entry_slot_gated (U : ustate) :
-    (⌜text_region_eq (us_M U)⌝ -∗
-     ⌜tf_resume_pc (us_V U) = (mword_of_int SyncSyms.start : mword 64)⌝ -∗
-     ⌜sync_entry_pure U⌝ ∗
-     □ (∀ C : ucfg, ⌜loop_ok C (pv_upt (us_V U))⌝ -∗
-          uv_cap C (pv_upt (us_V U)) (xv6_sys_protocol C (pv_upt (us_V U))))) -∗
-    uexec_wp -∗
-    uexec_slot U.
-  Proof.
-    iIntros "Hsync Hgen".
-    destruct (decide (text_region_eq (us_M U))) as [Hteq | _]; last first.
-    { iApply (uexec_wp_slot U with "Hgen"). }
-    destruct (decide (tf_resume_pc (us_V U) = (mword_of_int SyncSyms.start : mword 64)))
-      as [Hpc | _]; last first.
-    { iApply (uexec_wp_slot U with "Hgen"). }
-    iDestruct ("Hsync" with "[%] [%]") as "[%Hpure #Hcap]";
-      [exact Hteq | exact Hpc |].
-    destruct Hpure as [Hlay Hst].
-    iApply (sync_uexec_slot U Hpc Hlay (text_region_eq_uimg_sub (us_M U) Hteq) Hst).
-    iExact "Hcap".
-  Qed.
-
-End UexecCondGated.
-
-(* THE DISCHARGE AT userinit, and the ONE fact about the literal it needs.
-   userinit's process has the EMPTY user map -- allocproc's arm delivers
-   [pv_upt V = ProcPtOwn.upt_desc root tfp] and
-   [upt_desc root tfp = UPTD root tfp emptyset (um_pas emptyset)] -- so the
-   SYNC BRANCH IS REFUTABLE THERE, with no computation over the byte
-   literal at all: *)
-Lemma sync_layout_upt_desc (root tfp : mword 44) :
-  ~ sync_layout (upt_desc root tfp).
+Lemma uk_xpage_upt_desc (root tfp : mword 44) (sz : Z) :
+  ~ uk_xpage (perm_of (ud_um (upt_desc root tfp)) sz) (mword_of_int 0).
 Proof.
-  intros [ (w & Hl & _) ]. unfold upt_desc in Hl. cbn [ud_um] in Hl.
-  rewrite lookup_empty in Hl. discriminate Hl.
+  intros (q & Hq & Hx). unfold uperm_at in Hq.
+  destruct (perm_of_X_mapped _ _ _ _ Hq Hx) as (w & Hw & _).
+  unfold upt_desc in Hw. cbn [ud_um] in Hw. rewrite lookup_empty in Hw. discriminate Hw.
 Qed.
 
-(* ...but [sync_layout] is the gate's CONSEQUENT, not its antecedent, so the
-   discharge above cannot be used directly: a mint site must refute
-   [text_region_eq M], and that needs the image's domain plus ONE fact about
-   the literal -- that [sync_bytes] names an address at all.  Stated here as
-   a hypothesis so the report can say exactly what is owed; discharging it is
-   a single [sync_bytes !! a] lookup, the only place in the whole hook where
+(* the empty table is [loop_ok] whenever any table is -- the fact that
+   refuted the former ∀-table guard, kept for the mint site that needs it *)
+Lemma loop_ok_upt_desc (C : ucfg) (P : uptd) (root tfp : mword 44) :
+  loop_ok C P -> page_valid (page_base tfp) -> loop_ok C (upt_desc root tfp).
+Proof.
+  intros (Hstvec & Hdqc & Hmie & Hmedl & _ & _) Hv.
+  split_and!; [ exact Hstvec | exact Hdqc | exact Hmie | exact Hmedl | reflexivity | ].
+  unfold upt_desc. cbn [ud_um ud_tfp].
+  split; [ exact ProcPt.upt_map_wf_empty | ].
+  split; [ exact upt_acc_wf_empty | ].
+  split; [ exact um_pages_valid_empty | ].
+  split; [ exact um_inj_empty | exact Hv ].
+Qed.
+
+(* ...and a mint site that has to refute [text_region_eq] instead needs one
+   fact about the literal: that [sync_bytes] names an address at all.  A
+   single [sync_bytes !! a] lookup, the only place in the whole hook where
    the 2242-entry literal would be reduced. *)
 Lemma text_region_eq_hits (M : gmap Z (bv 8)) (a : Z) (b : bv 8) :
   SyncInstrs.sync_bytes !! a = Some b -> text_region_eq M -> M !! a = Some b.

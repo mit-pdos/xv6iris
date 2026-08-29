@@ -9,6 +9,10 @@
 #   make vtest-check-ci  the same, but compile every test and report the
 #                   per-test result (what CI runs)
 #   make vtest-deps build just the ~14 iris/ files vtest needs (not all of iris)
+#   make hwtest     regenerate the captures from a REAL BOARD over JTAG, then
+#                   check the model against them (needs the board + OpenOCD;
+#                   read tools/vtest/README-hw.md first)
+#   make hwtest-probe  talk to the board and print what is there
 #   make audit      build, then Print Assumptions on the system theorem
 #   make audit-only the same audit, against an already-built tree
 #   make model      compile the Sail-generated Coq model (model-xv6iris/)
@@ -108,6 +112,7 @@ USER_DUMPS ?= sync:Sync echo:Echo sh:Sh init:Init
 .PHONY: all proofs model kernel user dump dump-force kernel-rocq user-rocq \
         xv6-rev-check sail-rev-check gen-code check-decode update-decode \
         audit audit-only vtest vtest-check vtest-check-ci vtest-gen vtest-deps \
+        hwtest hwtest-gen hwtest-gen-all hwtest-probe \
         clean clean-proofs distclean model-gen
 
 all: proofs
@@ -324,6 +329,38 @@ vtest-check: $(VTEST)/CoqMakefile
 	$(RUN) $(MAKE) -C $(VTEST) -f CoqMakefile -j$(JOBS)
 
 vtest: vtest-gen vtest-check
+
+# ---- 5b. hwtest: the same semantics, against a REAL BOARD over JTAG ----
+#
+# tools/vtest/board.py is vtest.py's sibling: it asks the same
+# one-directional question of a development board (currently a StarFive
+# VisionFive 2) instead of QEMU, and writes vtest-rocq/<Name>HwGen.v beside
+# vtest.py's <Name>Gen.v.  The SAME vtest-rocq/<Name>.v checks the model
+# against both captures, so there is no separate check target: a hardware
+# capture is checked by `vtest-check` like everything else.
+#
+# READ tools/vtest/README-hw.md BEFORE USING THESE.  A board run claims
+# something NARROWER than a QEMU run -- the image is not the same image, the
+# board's power-on register file is not reachable over JTAG, and the UART is
+# a different chip at a different stride -- and the reasons are not obvious.
+#
+# `hwtest-gen` needs the board attached and OpenOCD listening (gdb on 3333,
+# the command server on 4444); nothing else here does.  It is deliberately
+# NOT wired into `vtest`, which must keep working with no hardware present.
+HWTEST_BOARD ?= visionfive2
+
+hwtest-probe:
+	$(PYTHON) tools/vtest/board.py probe --board $(HWTEST_BOARD)
+
+hwtest-gen:
+	$(PYTHON) tools/vtest/board.py gen --board $(HWTEST_BOARD) $(HWTEST_TESTS)
+
+# every test that makes sense on a board with no virtio-mmio disk
+hwtest-gen-all:
+	$(PYTHON) tools/vtest/board.py gen --board $(HWTEST_BOARD) \
+	  $$($(PYTHON) tools/vtest/board.py runnable --board $(HWTEST_BOARD))
+
+hwtest: hwtest-gen-all vtest-check
 
 # WHAT CI RUNS, and it is `vtest-check` with the stopping rule moved.  Every
 # test must pass, here as there; what differs is that `-k` compiles them all

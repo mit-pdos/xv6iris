@@ -125,8 +125,20 @@ Section ctx.
      TsoCtxTwin2 swap would produce at the statement level.  Revert this
      block (plain definitions again) to go back to the permeable SC
      seal. *)
+  (* MAIN'S SC STUB (main-tso-readiness Amendment 6): the token bodies are
+     TRIVIAL here, exactly as [hart_view_lb_def] below is.  The M-leg models
+     them as one exclusive ghost per context; on main that exclusivity is
+     unsatisfiable at two sites (a forked child must share its parker's
+     context and eight harts must share the boot carve's), because main's
+     T-leg trap tier cannot restate [procs_inv] at a fresh context.  Every
+     LAW below keeps its statement; the real TsoCtxTwin2 swap replaces
+     these bodies and re-proves the law surface.  What is lost is only the
+     three exclusivity lemmas, which the tree never used.  The dead ghost
+     disjunct is there for ONE reason: it keeps the constant's implicit
+     signature (Σ, riscvGS, CID) identical to the M-leg's, so no call site
+     in the tree has to name Σ. *)
   Definition own_context_def `{CID : CpuId} (ξ : CtxId) : iProp Σ :=
-    (∃ c : CPU, ghost_var (ctx_bound_name ξ) 1 c)%I.
+    (True ∨ ∃ c : CPU, ghost_var (ctx_bound_name ξ) 1 c)%I.
   Lemma own_context_aux : { f | f = @own_context_def }.
   Proof. by eexists. Qed.
   Definition own_context `{CID : CpuId} (ξ : CtxId) : iProp Σ :=
@@ -142,7 +154,7 @@ Section ctx.
      [ProofForkretPark]).  Deliberately NOT hart-ambient: a parked record
      is migratable, and this token is why that is type-correct. *)
   Definition ctx_parked_def (ξ : CtxId) (T : nat) : iProp Σ :=
-    (∃ c : CPU, ghost_var (ctx_bound_name ξ) 1 c)%I.
+    (True ∨ ∃ c : CPU, ghost_var (ctx_bound_name ξ) 1 c)%I.
   Lemma ctx_parked_aux : { f | f = ctx_parked_def }.
   Proof. by eexists. Qed.
   Definition ctx_parked (ξ : CtxId) (T : nat) : iProp Σ :=
@@ -258,6 +270,42 @@ Section ctx.
   Lemma log_lb_le lo lo' : (lo' <= lo)%nat -> log_lb lo -∗ log_lb lo'.
   Proof. intros. rewrite !log_lb_unseal /log_lb_def. auto. Qed.
 
+  (* A6.120 (tso-flip TsoCtx.v:2889): THE CONTEXT'S OWN DIRTY-WRITE WITNESS --
+     "context [ξ] wrote address [a] at position [t]".  Persistent; on the
+     T-leg it is the discarded element of the token's dirty map, and it is
+     the right arm of [WpLock.lk_floor] ("you received this handle, or you
+     wrote this lock").  Sealed with the trivial SC body, like the rest of
+     this block; the registration step that mints it at a store
+     ([ctx_wrote_register], off the store leaf's ledger message) is below
+     the seal and has no statement here -- main's creators mint the witness
+     through the shim ([TsoCtxShim.ctx_wrote_any]). *)
+  Definition ctx_wrote_def (ξ : CtxId) (t : nat) (a : Arch.pa) : iProp Σ := True%I.
+  Lemma ctx_wrote_aux : { f | f = ctx_wrote_def }.
+  Proof. by eexists. Qed.
+  Definition ctx_wrote (ξ : CtxId) (t : nat) (a : Arch.pa) : iProp Σ :=
+    proj1_sig ctx_wrote_aux ξ t a.
+  Lemma ctx_wrote_unseal (ξ : CtxId) (t : nat) (a : Arch.pa) :
+    ctx_wrote ξ t a = ctx_wrote_def ξ t a.
+  Proof. unfold ctx_wrote. by rewrite (proj2_sig ctx_wrote_aux). Qed.
+  Global Instance ctx_wrote_persistent ξ t a : Persistent (ctx_wrote ξ t a).
+  Proof. rewrite ctx_wrote_unseal /ctx_wrote_def. apply _. Qed.
+  Global Instance ctx_wrote_timeless ξ t a : Timeless (ctx_wrote ξ t a).
+  Proof. rewrite ctx_wrote_unseal /ctx_wrote_def. apply _. Qed.
+
+  (* THE READ LICENCE AT ONE TIMESTAMP, main's above-seal spelling of the
+     T-leg's [ledger_vis h K t] ("[t] is visible to [h] at every view at or
+     above [K]: under the bound, or [h] wrote it"): the authorship arm is the
+     witness itself.  What [own_context_wrote_vis] / [WpLock.lk_floor_vis]
+     hand a racy read. *)
+  Definition ctx_vis (ξ : CtxId) (K t : nat) : iProp Σ :=
+    (⌜(t ≤ K)%nat⌝ ∨ ∃ a : Arch.pa, ctx_wrote ξ t a)%I.
+  Global Instance ctx_vis_persistent ξ K t : Persistent (ctx_vis ξ K t).
+  Proof. rewrite /ctx_vis. apply _. Qed.
+  Lemma ctx_vis_below ξ K t : (t ≤ K)%nat -> ⊢ ctx_vis ξ K t.
+  Proof. iIntros (Hle). iLeft. by iPureIntro. Qed.
+  Lemma ctx_vis_own ξ K t (a : Arch.pa) : ctx_wrote ξ t a -∗ ctx_vis ξ K t.
+  Proof. iIntros "#Hw". iRight. by iExists a. Qed.
+
   (* ------------------------------------------------------------------ *)
   (* BUY -- §0.35'(iii)'s absorb, "B_xi rises to K".                     *)
   (*                                                                    *)
@@ -307,36 +355,21 @@ Section ctx.
     rewrite hart_view_lb_unseal /hart_view_lb_def. auto.
   Qed.
 
-  (* Exclusivity, in all three pairings: one bound authority per context,
-     one token.  ([TsoCtxTwin2.own_context_excl] / [ctx_parked_excl] /
-     [own_context_parked_excl]; the running form holds across DIFFERENT
-     ambient harts too, which is the statement here.) *)
-  Lemma own_context_excl {CID1 CID2 : CpuId} (ξ : CtxId) :
-    own_context (CID := CID1) ξ -∗ own_context (CID := CID2) ξ -∗ False.
+  (* THE CASH-IN OF THE WITNESS against the running token (tso-flip
+     TsoCtx.v:2960): the two-armed floor premise a racy read wants, on the
+     creator's arm.  SC: the receipt is at 0 and the arm is the witness. *)
+  Lemma own_context_wrote_vis `{CID : CpuId} (ξ : CtxId) (t : nat) (a : Arch.pa) :
+    own_context ξ -∗ ctx_wrote ξ t a -∗
+    own_context ξ ∗ ∃ K : nat, hart_view_lb K ∗ ctx_vis ξ K t.
   Proof.
-    rewrite !own_context_unseal /own_context_def.
-    iIntros "[%c1 H1] [%c2 H2]".
-    iDestruct (ghost_var_valid_2 with "H1 H2") as %[Hq _].
-    exfalso. by apply (Qp.not_add_le_l 1 1).
+    iIntros "Hrun #Hw". iFrame "Hrun". iExists 0%nat.
+    iSplit; [ rewrite hart_view_lb_unseal /hart_view_lb_def; auto | ].
+    iApply (ctx_vis_own with "Hw").
   Qed.
 
-  Lemma ctx_parked_excl (ξ : CtxId) (T1 T2 : nat) :
-    ctx_parked ξ T1 -∗ ctx_parked ξ T2 -∗ False.
-  Proof.
-    rewrite !ctx_parked_unseal /ctx_parked_def.
-    iIntros "[%c1 H1] [%c2 H2]".
-    iDestruct (ghost_var_valid_2 with "H1 H2") as %[Hq _].
-    exfalso. by apply (Qp.not_add_le_l 1 1).
-  Qed.
-
-  Lemma own_context_parked_excl `{CID : CpuId} (ξ : CtxId) (T : nat) :
-    own_context ξ -∗ ctx_parked ξ T -∗ False.
-  Proof.
-    rewrite own_context_unseal /own_context_def ctx_parked_unseal /ctx_parked_def.
-    iIntros "[%c1 H1] [%c2 H2]".
-    iDestruct (ghost_var_valid_2 with "H1 H2") as %[Hq _].
-    exfalso. by apply (Qp.not_add_le_l 1 1).
-  Qed.
+  (* The M-leg's three exclusivity lemmas ([own_context_excl] /
+     [ctx_parked_excl] / [own_context_parked_excl]) are NOT stated here:
+     they are false for the trivial bodies above, and no file used them. *)
 
   Global Instance own_context_timeless `{CID : CpuId} ξ :
     Timeless (own_context ξ).
@@ -356,10 +389,7 @@ Section ctx.
      global-map twin.)  This is [ProofForkretPark]'s mint. *)
   Lemma ctx_parked_alloc : ⊢ |==> ∃ ξc : CtxId, ctx_parked ξc 0.
   Proof.
-    iMod (ghost_var_alloc (0%fin : CPU)) as (γ) "Hv".
-    iModIntro. iExists (MkCtxId γ inhabitant).
-    rewrite ctx_parked_unseal /ctx_parked_def.
-    iExists (0%fin : CPU). iExact "Hv".
+    iModIntro. iExists inhabitant. rewrite ctx_parked_unseal /ctx_parked_def. by iLeft.
   Qed.
 
   (* BOOT'S MINT: a hart's FIRST running token.  One per hart, at
@@ -370,10 +400,7 @@ Section ctx.
      hart could not honour), so this is licensing by NAME, not a lie. *)
   Lemma own_context_boot `{CID : CpuId} : ⊢ |==> ∃ ξ : CtxId, own_context ξ.
   Proof.
-    iMod (ghost_var_alloc (0%fin : CPU)) as (γ) "Hv".
-    iModIntro. iExists (MkCtxId γ inhabitant).
-    rewrite own_context_unseal /own_context_def.
-    iExists (0%fin : CPU). iExact "Hv".
+    iModIntro. iExists inhabitant. rewrite own_context_unseal /own_context_def. by iLeft.
   Qed.
 
   (* PARK: publish and let go of the hart.  One ghost step, no machine
@@ -383,9 +410,8 @@ Section ctx.
     own_context ξ ==∗ ∃ T, ctx_parked ξ T.
   Proof.
     rewrite own_context_unseal /own_context_def.
-    iIntros "[%c H]". iModIntro. iExists 0%nat.
-    rewrite ctx_parked_unseal /ctx_parked_def.
-    iExists c. iExact "H".
+    iIntros "_". iModIntro. iExists 0%nat.
+    rewrite ctx_parked_unseal /ctx_parked_def. by iLeft.
   Qed.
 
   (* RESUME: re-host a parked context on THIS hart.  The premise is the
@@ -397,7 +423,7 @@ Section ctx.
     hart_view_lb K -∗ ctx_parked ξ T ==∗ own_context ξ.
   Proof.
     rewrite ctx_parked_unseal /ctx_parked_def own_context_unseal /own_context_def.
-    iIntros (HTK) "_ [%c H]". iModIntro. iExists c. iExact "H".
+    iIntros (HTK) "_ _". iModIntro. by iLeft.
   Qed.
 
   (* THE SWTCH EXCHANGE: a hart always runs exactly one thread, so the
@@ -414,6 +440,11 @@ Section ctx.
     iMod (ctx_resume ξ2 T K HTK with "HK Hpk") as "Hrun".
     iModIntro. iFrame "Hrun". iExists T1. iExact "Hpk1".
   Qed.
+
+  (* a parked record's stamp is a legal log position (tso-flip TsoCtx.v:1677) *)
+  Lemma ctx_parked_llb ξ T :
+    ctx_parked ξ T -∗ ctx_parked ξ T ∗ log_lb T.
+  Proof. iIntros "$". rewrite log_lb_unseal /log_lb_def. done. Qed.
 
   (* ---------------------------------------------------------------- *)
   (* The context-indexed points-to                                     *)
@@ -1048,6 +1079,16 @@ Section ctx.
     iIntros "Hd _". by iFrame "Hd".
   Qed.
 
+  (* THE TRANSPORT OF THE WITNESS (tso-flip TsoCtx.v:2989): a crossing turns
+     the creator's arm into the receiver's LEFT arm for free -- [ctx_dom]
+     already says the sender's dirty watermark is below the receiver's
+     bound.  What makes [WpLock.lk_floor] a [CtxMorph]. *)
+  Lemma ctx_dom_wrote_floor (ξ ξ' : CtxId) (t : nat) (a : Arch.pa) :
+    ctx_dom ξ ξ' -∗ ctx_wrote ξ t a -∗ ctx_dom ξ ξ' ∗ ctx_floor ξ' t.
+  Proof.
+    iIntros "$ _". rewrite ctx_floor_unseal /ctx_floor_def. done.
+  Qed.
+
   (* A context-indexed payload that transports along domination.  This is
      the obligation lock payloads pick up in the M3 sweep: any payload
      failing it at SC is a payload the TSO flip would break -- found
@@ -1346,10 +1387,51 @@ Definition const_pay {Σ : gFunctors} (P : iProp Σ) : CtxId → iProp Σ :=
 Notation "<{ P }>" := (const_pay P%I)
   (at level 0, P at level 200, format "<{  P  }>").
 
-(* the combinator's transport obligation: same guard role and priority
-   story as [ctx_morph_const] (which still serves bare λ-spellings). *)
+(* The combinator's transport obligation.
+
+   PRIORITY 0, AND THE 0 IS LOAD-BEARING -- it is what stops the
+   STRUCTURAL instances from being tried first.  [const_pay] is a plain
+   definition, so instance search unfolds it ([const_pay P] is [λ _, P])
+   and then [ctx_morph_exist] (priority 1, one premise) matches a payload
+   whose body is an [∃], [ctx_morph_sep] (2) its conjuncts,
+   [ctx_morph_if_then] each guarded slot, and the search walks down into a
+   payload the wrapper says outright is context-CONSTANT.  Every branch
+   eventually fails on a leaf nothing gives an instance to -- and nothing
+   should: [pstate_lock], [hart_at_any] and their kind are exactly the
+   ξ-dependent facts [ctx_morph]'s comment above says have no blanket
+   instance -- so the walk proves nothing at all and backtracks over the
+   whole space before this instance finally gets its turn and closes the
+   goal in one step.
+
+   Measured 2026-08-29 on the GCP VM, isolated coqc, min of two, this
+   priority the only change (and the AFTER arm ran at load 26 against the
+   BEFORE arm's 0.6-16, so it is the conservative direction):
+     [SpecProcinit.v]  11.9 s -> 2.95 s; its [apply _] on
+                       [CtxMorph <{ proc_lock_res .. }>] 10.09 s -> 0.34 s
+     [ProofKforkB1.v]  21.9 s -> 3.92 s; its [iApply (wp_release_sconf ..
+                       <{ proc_lock_res .. }> ..)] 18.40 s -> 0.34 s
+   The whole [wp_acquire_sconf]/[wp_release_sconf] call-site family --
+   67 statements totalling 444 s in the tree's top 1000, and every one of
+   the twenty non-[Qed] entries in CI's top thirty on 2026-08-29 -- was
+   this and nothing else.  After: 3 sites, 2.5 s between them.
+
+   THE EVAR GUARD IS UNAFFECTED, which is why the priority can move here
+   and not on [ctx_morph_const].  That one is [CtxMorph (λ _, P)]: its
+   head unifies with a payload that is still a bare evar, so an eager
+   [ctx_morph_const] would silently commit [?R := λ _, ?P].  This one's
+   head is a RIGID application of [const_pay], which only a call site
+   that WROTE [<{ .. }>] can produce; [ctx_morph_const] keeps its 100.
+
+   AND [Typeclasses Opaque const_pay] IS NOT THE FIX, though it is the
+   first thing to reach for and it does kill the same search.  The
+   payload's consumers read [R cur_ctx] through the wrapper -- [iDestruct
+   "HR" as (t) "H"] on a lock resource whose body is an [∃] is the common
+   case -- and sealing the wrapper takes [IntoExist] with it: measured, a
+   from-scratch build fails eight files (ProofSysUptime, ProofAllocpid,
+   ProofBpin, ProofBunpin, ProofFiledup, ProofFilealloc, ...) at
+   "iExistDestruct: cannot destruct". *)
 Global Instance ctx_morph_const_pay `{!riscvGS Σ} (P : iProp Σ) :
-  CtxMorph (const_pay P) | 99.
+  CtxMorph (const_pay P) | 0.
 Proof. iIntros (ξ ξ') "Hd HP". iFrame. Qed.
 
 (* The class TYPE is transparent to typeclass unification: [CurCtx] is

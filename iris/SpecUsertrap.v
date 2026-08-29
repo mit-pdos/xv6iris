@@ -108,6 +108,7 @@ Require Import IntrDefs.
 Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import ProcDefs.
+Require Import ProcInv.   (* [us_tf] / [us_upt] -- the residue index's updaters *)
 Require Import ProcPtOwn.   (* [proc_pt] / [ud_norm] -- the bare residue's vocabulary *)
 (* the classes the module type's [usertrap_res] parameter needs -- see the
    note above [Module Type USERTRAP] at the foot of this file *)
@@ -117,6 +118,11 @@ Require Import TrampPt UptTree.
 Require Import KptShare.   (* [tlb_res_pt] -- the translation slot the parked residue drops *)
 Require Import UserPtTree UserExec.
 Require Import UexecWp.    (* [uexec_wp] -- the residue's user-execution WP slot *)
+Require Import UexecRound. (* [uround_ok] -- the trap round, on the user-visible state *)
+Require Import UexecSlot.  (* [tf_resume_pc] *)
+Require Import TfUser.     (* [tf_ueq] *)
+Require Import UserPerm.   (* [perm_of] -- the per-page permission view *)
+Require Import UsysMemOk.  (* [uecall_scause] *)
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import TimerCap.   (* [sstc_enabled]: the residue's mcounteren pin *)
@@ -197,6 +203,81 @@ Proof.
   rewrite HMPP. reflexivity.
 Qed.
 
+(* ===================================================================== *)
+(* THE TRAP ROUND, as the boundary states it (milestone J1a).             *)
+(*                                                                         *)
+(* [U] is the process's state AS USERTRAP WAS ENTERED -- the record        *)
+(* uservec's save walk left, whose epc word is still the PREVIOUS round's; *)
+(* [sepc_v] is the faulting pc the trap delivered and [sc_v] the cause.    *)
+(* [tf0] is therefore the entry trapframe as usertrap's own prologue       *)
+(* leaves it: the +0x28..+0x2e block writes [p->trapframe->epc =           *)
+(* r_sepc()] and nothing else, so [pv_tf] of the record the entry hands on *)
+(* IS [tf0] by reflexivity.  ([ret_pc] is [WpGprCsrwA.mepc_val] -- the same *)
+(* term under two names; this file already has [ret_pc] in scope.)         *)
+(*                                                                         *)
+(* THERE IS NO ESCAPE LEFT (stage S8b).  Every ecall is proved for real:   *)
+(* exec by [uround_ok]'s own left disjunct, the other twenty-two by the    *)
+(* bump plus [UsysMemOk.usys_mem_ok] -- sbrk included, now that the        *)
+(* dispatcher's row names the address space's move as a FUNCTION of the    *)
+(* two sizes ([SpecSyscall.sysc_sbrk_ok]) and both directions of its       *)
+(* permission relation are derivable                                       *)
+(* ([UsysMemOkSpec.usys_sbrk_perm_of_row], over                            *)
+(* [UsysMemOkSpec.perm_of_grow] and [UserPerm.perm_of_del_run]).           *)
+(* ===================================================================== *)
+Definition ut_round (sepc_v sc_v : mword 64) (U U' : ustate) : Prop :=
+  uround_ok sc_v
+    (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U)))
+    (us_M U) (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
+    (pv_tf (us_V U')) (us_M U')
+    (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U')))).
+
+(* THE PROLOGUE'S OWN MOVE: [U'] is [U] with the epc word rewritten, which
+   is what usertrap's +0x28..+0x2e block does and all it does.  Every block
+   below the entry carries this (or the round it grows into) as a premise. *)
+Definition ut_pro (sepc_v : mword 64) (U U' : ustate) : Prop :=
+  pv_tf (us_V U') = <[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U))
+  /\ pv_upt (us_V U') = pv_upt (us_V U)
+  /\ pv_sz (us_V U') = pv_sz (us_V U)
+  /\ us_M U' = us_M U.
+
+(* THE ENTRY INSTANCE: at the record the prologue hands on, the round has
+   done nothing yet, so every arm of the relation is an identity. *)
+Lemma ut_round_entry (sepc_v sc_v : mword 64) (U U' : ustate) :
+  (* the entry instance is available only where the dispatch has already
+     ruled the ecall arm out -- which is exactly the four arms that take
+     it; on the ecall arm the round has real content from the first step. *)
+  sc_v <> uecall_scause ->
+  ut_pro sepc_v U U' -> ut_round sepc_v sc_v U U'.
+Proof.
+  intros Hne (Htf & Hupt & Hsz & HM). unfold ut_round, uround_ok.
+  destruct (decide (sc_v = uecall_scause)) as [Heq | _]; [ contradiction (Hne Heq) | ].
+  rewrite Htf Hupt Hsz HM. unfold uround_id_ok.
+  split; [ split; reflexivity | split; reflexivity ].
+Qed.
+
+(* A BLOCK THAT DOES NOT MOVE THE USER-VISIBLE STATE relays the round. *)
+Lemma ut_round_same (sepc_v sc_v : mword 64) (U U' U'' : ustate) :
+  pv_tf (us_V U'') = pv_tf (us_V U') ->
+  perm_of (ud_um (pv_upt (us_V U''))) (uint (pv_sz (us_V U'')))
+    = perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))) ->
+  us_M U'' = us_M U' ->
+  ut_round sepc_v sc_v U U' -> ut_round sepc_v sc_v U U''.
+Proof.
+  intros H1 H2 H3 H. unfold ut_round in H |- *. rewrite H1 H2 H3. exact H.
+Qed.
+
+(* ...and one that moves it only in the four KERNEL words (prepare_return). *)
+Lemma ut_round_ueq (sepc_v sc_v : mword 64) (U U' U'' : ustate) :
+  tf_ueq (pv_tf (us_V U')) (pv_tf (us_V U'')) ->
+  perm_of (ud_um (pv_upt (us_V U''))) (uint (pv_sz (us_V U'')))
+    = perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))) ->
+  us_M U'' = us_M U' ->
+  ut_round sepc_v sc_v U U' -> ut_round sepc_v sc_v U U''.
+Proof.
+  intros Hu H2 H3 H. unfold ut_round in H |- *. rewrite H2 H3.
+  eapply uround_ok_ueq_r; [ exact Hu | exact H ].
+Qed.
+
 (* The statement, parameterized over the abstract kernel-internal resource
    [R : uptd -> mword 64 -> iProp Σ]: [R pt ksp] is everything usertrap needs
    beyond the machine state above, for the process whose user page table is
@@ -210,11 +291,33 @@ Qed.
    see claude-notes/projects/usertrap.md.  [ksp] appears because [sie_cap] is
    keyed on sp, which is what the [m !!! sp = ksp] premise below licenses. *)
 Definition usertrap_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (R : uptd -> mword 64 -> iProp Σ) (pt : uptd) (ksp : mword 64) (m : regfile)
-    (mie_v menvcfg0 : mword 64) : iProp Σ :=
+    (R : uptd -> mword 64 -> ustate -> iProp Σ) (pt : uptd) (ksp : mword 64) (m : regfile)
+    (mie_v menvcfg0 : mword 64)
+    (* THE ROUND'S ENTRY STATE (milestone J1a).  [U] is the process's state
+       AS USERTRAP WAS ENTERED -- the record uservec's save walk left, whose
+       epc word is still the PREVIOUS round's; [sepc_v] is the faulting pc
+       the trap delivered and [sc_v] the cause.  [tf0] below is therefore the
+       entry trapframe as usertrap's own prologue leaves it (the
+       +0x28..+0x2e block writes [epc := r_sepc()]), which is the user-visible
+       trapframe the round starts from. *)
+    (U : ustate) (sepc_v sc_v : mword 64) : iProp Σ :=
   let ret_tgt : mword 64 := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   ( ∀ (pt' : uptd) (mf : regfile)
-      (ms' usatp uepc sc' stval' mdv0 : mword 64),
+      (ms' usatp uepc sc' stval' mdv0 : mword 64) (U' : ustate),
+    (* ---- THE ROUND, as a relation on the user-visible state -------------
+       [UexecRound.uround_ok] keyed on the cause, exactly as the dispatch's
+       own [c.li a5,8; bne] is: an ecall either was exec (whose successor WP
+       is a kernel MINT, so the row says nothing) or bumped the trapframe and
+       moved the image/permission map by what the entry's own syscall row
+       allows; anything else resumes the trapped state on the nose.
+       J1a's temporary escape for the ecall arm (S7), narrowed to sbrk at
+       S8, is GONE at S8b: every entry, sbrk included, proves the row.
+       The third premise is prepare_return's [csrw sepc, p->trapframe->epc]
+       read back through [tf_resume_pc]: the pc the sret lands at IS the
+       resume trapframe's own. *)
+    ⌜pv_upt (us_V U') = pt'⌝ -∗
+    ⌜ut_round sepc_v sc_v U U'⌝ -∗
+    ⌜ret_pc uepc = tf_resume_pc (pv_tf (us_V U'))⌝ -∗
     (* [mideleg]'s VALUE is not pinned to whatever usertrap was handed at
        entry -- unlike [mie_v]/[menvcfg0] (each a unique architectural
        constant, so their exit value provably equals the entry one),
@@ -291,7 +394,7 @@ Definition usertrap_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fi
        prove, only to thread through. *)
     hw_config -∗
     minstret_inv -∗
-    R pt' ksp -∗
+    R pt' ksp U' -∗
     WP (Loop : expr riscv_lang)).
 
 (* [R] IS A HART-INDEXED FAMILY, AND IT HAS TO BE.  usertrap is handed the
@@ -308,10 +411,10 @@ Definition usertrap_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fi
    [R CID'] coming out, where [CID'] is the crossing's own binder.  The
    module type below supplies [fun h => usertrap_res (CID := h)]. *)
 Definition wp_usertrap_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (R : CpuId -> uptd -> mword 64 -> iProp Σ)
+    (R : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ)
     (pt : uptd) (j : nat)
     (m : regfile) (ms_v sc_v stval_v sepc_v ksp : mword 64)
-    (mie_v mdv0 menvcfg0 : mword 64) :=
+    (mie_v mdv0 menvcfg0 : mword 64) (U : ustate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.usertrap in
   let pj := proc_addr j in
   (* the trap delivered a legal S-mode configuration -- see above *)
@@ -358,12 +461,12 @@ Definition wp_usertrap_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, 
   menvcfg ↦ᵣ menvcfg0 -∗
   gpr_file m -∗
   (* everything kernel-side, abstractly, AT THE ENTRY HART *)
-  R CID pt ksp -∗
+  R CID pt ksp U -∗
   (* THE CROSSING: usertrap parks (yield, and every sleeping syscall), so it
      may return on a different hart -- and the bundle comes back at THAT
      hart, which is why [R] is a family (see the note above). *)
   wp_next true pj (fun (CID' : CpuId) =>
-    usertrap_post (CID := CID') (R CID') pt ksp m mie_v menvcfg0) -∗
+    usertrap_post (CID := CID') (R CID') pt ksp m mie_v menvcfg0 U sepc_v sc_v) -∗
   WP (Loop : expr riscv_lang).
 
 (* THE MODULE TYPE'S INSTANCE LIST IS THE UNION OF THE FIVE CONES', NOT THE
@@ -390,7 +493,7 @@ Module Type USERTRAP_RES.
      abstract); threaded opaquely by consumers. *)
   Parameter usertrap_res :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx},
-      uptd -> mword 64 -> iProp Σ.
+      uptd -> mword 64 -> ustate -> iProp Σ.
 
   (* THE TRAPFRAME BORROW.  [usertrap_res] owns the trapframe page at the
      VA tier internally (via [ProcInv.proc_priv]/[tf_page]) -- it is the
@@ -418,22 +521,22 @@ Module Type USERTRAP_RES.
      that back out.  Concrete: [UsertrapRes.ut_res_parked]. *)
   Parameter usertrap_res_parked :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx},
-      uptd -> mword 64 -> iProp Σ.
+      uptd -> mword 64 -> ustate -> iProp Σ.
 
   (* uservec's move: the switch just installed the kernel table, so the
      residue can be completed into the state usertrap consumes. *)
   Parameter usertrap_res_tlb_close :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (kroot : mword 44),
-      usertrap_res_parked pt ksp -∗ tlb_res_pt kroot -∗ usertrap_res pt ksp.
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (kroot : mword 44) (U : ustate),
+      usertrap_res_parked pt ksp U -∗ tlb_res_pt kroot -∗ usertrap_res pt ksp U.
 
   (* userret's move: its entry switch is about to install the USER table, so
      it needs the kernel one back out first.  The root is existential --
      nothing outside pins which table the slot holds, and userret is
      parametric in it. *)
   Parameter usertrap_res_tlb_open :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64),
-      usertrap_res pt ksp -∗
-      ∃ kroot : mword 44, tlb_res_pt kroot ∗ usertrap_res_parked pt ksp.
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate),
+      usertrap_res pt ksp U -∗
+      ∃ kroot : mword 44, tlb_res_pt kroot ∗ usertrap_res_parked pt ksp U.
 
   (* THE BARE FORM: the parked residue WITHOUT THE USER ADDRESS SPACE.
      [usertrap_res_parked] fixed ONE of four overlaps with the user tier
@@ -452,22 +555,54 @@ Module Type USERTRAP_RES.
      available in exactly the window the address space is not. *)
   Parameter usertrap_res_bare :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx},
-      uptd -> mword 64 -> iProp Σ.
+      uptd -> mword 64 -> ustate -> iProp Σ.
 
   (* uservec's move, one tier under [_tlb_close]: its exit switch converted
      the user table back to a [pt_frame], and the pages never moved, so
      [ProcPtOwn.user_pt_inv_open] rebuilds [proc_pt] and this reseals it
      into the residue. *)
   Parameter usertrap_res_pt_close :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64),
-      usertrap_res_bare pt ksp -∗ (∃ M : gmap Z (bv 8), proc_pt pt M) -∗ usertrap_res_parked pt ksp.
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate),
+      usertrap_res_bare pt ksp U -∗ (∃ M : gmap Z (bv 8), proc_pt pt M) -∗
+      ∃ Mz : gmap Z (bv 8), usertrap_res_parked pt ksp (upd_usM U Mz).
 
   (* userret's move: the address space is about to be installed again, so
      it comes back out, to be split into the tree the entry switch consumes
      and the pages [ProcPtOwn.user_pt_inv_close] hands the user tier. *)
   Parameter usertrap_res_pt_open :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64),
-      usertrap_res_parked pt ksp -∗ (∃ M : gmap Z (bv 8), proc_pt pt M) ∗ usertrap_res_bare pt ksp.
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate),
+      usertrap_res_parked pt ksp U -∗ (∃ M : gmap Z (bv 8), proc_pt pt M) ∗ usertrap_res_bare pt ksp U.
+
+  (* ---- THE SAME TWO CROSSINGS AT THE NAMED LAZY IMAGE (milestone J, S3).
+     The pair above is stated at the MAPPED view with the image quantified,
+     which is all the uservec seam needed while [uservec_post] handed back
+     [UserPtTree.user_pt_any pt'].  Once the round's post names its image --
+     and once the loop hands user execution a [UexecRet.uvb] whose image
+     conjunct is [user_ptm_inv pt sz M] -- the crossing has to carry the
+     name in BOTH directions: the entry image is what [UsysMemOk.usys_mem_ok]
+     relates the exit one to.
+
+     THE SIZE IS FORCED, THE IMAGE IS NOT.  The residue's [ut_own] holds
+     [ProcPtOwn.proc_ptm] at the process's own [p->sz]
+     ([uint (pv_sz (us_V U))]) -- that is the view [proc_priv] splits into --
+     so both directions are stated there and neither takes [sz] as a free
+     parameter.  The image is free on the close: the BARE residue owns none
+     of the user bytes, so it re-parks at whatever image comes back, and the
+     index moves by [upd_usM].
+
+     The [_pt_] pair STAYS: other callers speak the mapped view.  Concretes:
+     [UsertrapRes.ut_res_ptm_open] / [ut_res_ptm_close] -- the existing
+     proofs minus the one weakening step ([proc_ptm_pt] / [proc_pt_ptm_any]). *)
+  Parameter usertrap_res_ptm_close :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (M : gmap Z (bv 8)),
+      usertrap_res_bare pt ksp U -∗
+      proc_ptm pt (uint (pv_sz (us_V U))) M -∗
+      usertrap_res_parked pt ksp (upd_usM U M).
+
+  Parameter usertrap_res_ptm_open :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate),
+      usertrap_res_parked pt ksp U -∗
+      proc_ptm pt (uint (pv_sz (us_V U))) (us_M U) ∗ usertrap_res_bare pt ksp U.
 
   (* THE FOOTPRINT RENORMALISATION.  The bare residue reads its descriptor
      only through [ud_root]/[ud_tfp]/[ud_um] -- [proc_pt], the one conjunct
@@ -477,8 +612,9 @@ Module Type USERTRAP_RES.
      holds by construction, which is the fact this file's [usertrap_post]
      explains it cannot ask usertrap for. *)
   Parameter usertrap_res_bare_norm :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64),
-      usertrap_res_bare pt ksp -∗ usertrap_res_bare (ud_norm pt) ksp.
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate),
+      usertrap_res_bare pt ksp U -∗
+      usertrap_res_bare (ud_norm pt) ksp (us_upt U (ud_norm pt)).
 
   (* THE PER-HART CSRs, borrowed out of the parked residue.  [IntrDefs.
      hart_csrs] -- [sscratch] at an arbitrary value, [medeleg] at
@@ -492,9 +628,9 @@ Module Type USERTRAP_RES.
      parking the closer wand in their place.  Concrete:
      [UsertrapRes.ut_res_bare_csrs_open]. *)
   Parameter usertrap_res_csrs_open :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64),
-      usertrap_res_bare pt ksp -∗
-      hart_csrs ∗ (hart_csrs -∗ usertrap_res_bare pt ksp).
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate),
+      usertrap_res_bare pt ksp U -∗
+      hart_csrs ∗ (hart_csrs -∗ usertrap_res_bare pt ksp U).
 
   (* THE TIMER CAPABILITY'S mcounteren PIN.  The U tier needs
      [mcounteren ↦ᵣ□] and it cannot come from [hw_config] (timerinit writes
@@ -502,8 +638,8 @@ Module Type USERTRAP_RES.
      [devintr_caps_any]'s [timer_cap], at every hart.  Persistent, so it is
      handed straight back.  Concrete: [UsertrapRes.ut_res_bare_sstc]. *)
   Parameter usertrap_res_sstc :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64),
-      usertrap_res_bare pt ksp -∗ sstc_enabled ∗ usertrap_res_bare pt ksp.
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate),
+      usertrap_res_bare pt ksp U -∗ sstc_enabled ∗ usertrap_res_bare pt ksp U.
 
   (* ... AND BOTH AT ONCE, which is what uservec needs: its save walk holds
      the trapframe page open across the same stretch its [csrw sscratch,a0] /
@@ -512,14 +648,14 @@ Module Type USERTRAP_RES.
      remainder -- simultaneous borrows of a sealed bundle come out of ONE
      opener.  Concrete: [UsertrapRes.ut_res_bare_tf_csrs_open]. *)
   Parameter usertrap_res_tf_csrs_open :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64),
-      usertrap_res_bare pt ksp -∗
-      ∃ (kroot : mword 44) (ws : list (mword 64)),
-        kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗
-        tf_page (ud_tfp pt) ws ∗ hart_csrs ∗
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate),
+      usertrap_res_bare pt ksp U -∗
+      ∃ kroot : mword 44,
+        kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp (pv_tf (us_V U))⌝ ∗
+        tf_page (ud_tfp pt) (pv_tf (us_V U)) ∗ hart_csrs ∗
         (∀ ws' : list (mword 64),
            ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗ hart_csrs -∗
-           usertrap_res_bare pt ksp).
+           usertrap_res_bare pt ksp (us_tf U ws')).
 
   (* THE USER-EXECUTION WP, EXTRACTED AND RE-DEPOSITED.  The residue carries
      one more per-process resource than the kernel plumbing above: the WP
@@ -542,20 +678,21 @@ Module Type USERTRAP_RES.
      records, and this signature does not change.  That is what the accessor
      exists to localize.  Concrete: [UsertrapRes.ut_res_bare_uwp_acc]. *)
   Parameter usertrap_res_uwp_acc :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64),
-      usertrap_res_bare pt ksp -∗
-      uexec_wp ∗ (uexec_wp -∗ usertrap_res_bare pt ksp).
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate),
+      usertrap_res_bare pt ksp U -∗
+      uexec_wp ∗ (uexec_wp -∗ usertrap_res_bare pt ksp U).
 
   Parameter usertrap_res_tf_open :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64),
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate),
       (* THE CROSS-ROUND HISTORICAL FACT, bare and undischarged -- see
          [ProcGeom.tf_kernel_words_ok]'s own header. *)
-      usertrap_res_bare pt ksp -∗
-      ∃ (kroot : mword 44) (ws : list (mword 64)),
-        kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
+      usertrap_res_bare pt ksp U -∗
+      ∃ kroot : mword 44,
+        kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp (pv_tf (us_V U))⌝ ∗
+        tf_page (ud_tfp pt) (pv_tf (us_V U)) ∗
         (∀ ws' : list (mword 64),
            ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗
-           usertrap_res_bare pt ksp).
+           usertrap_res_bare pt ksp (us_tf U ws')).
 
   (* THE RUN OPENER: the slot OUT and the trapframe words BORROWED, together,
      with the closer landing in the HOLED form.  This is the shape the trap
@@ -572,14 +709,15 @@ Module Type USERTRAP_RES.
      [usertrap_res_tf_csrs_open]'s.  Concrete:
      [UsertrapRes.ut_res_bare_run_open]. *)
   Parameter usertrap_res_run_open :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64),
-      usertrap_res_bare pt ksp -∗
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate),
+      usertrap_res_bare pt ksp U -∗
       uexec_wp ∗
-      ∃ (kroot : mword 44) (ws : list (mword 64)),
-        kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
+      ∃ kroot : mword 44,
+        kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp (pv_tf (us_V U))⌝ ∗
+        tf_page (ud_tfp pt) (pv_tf (us_V U)) ∗
         (∀ ws' : list (mword 64),
            ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗
-           (uexec_wp -∗ usertrap_res_bare pt ksp)).
+           (uexec_wp -∗ usertrap_res_bare pt ksp (us_tf U ws'))).
 End USERTRAP_RES.
 
 Module Type USERTRAP.
@@ -588,7 +726,7 @@ Module Type USERTRAP.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (pt : uptd) (j : nat)
       (m : regfile) (ms_v sc_v stval_v sepc_v ksp : mword 64)
-      (mie_v mdv0 menvcfg0 : mword 64),
+      (mie_v mdv0 menvcfg0 : mword 64) (U : ustate),
       wp_usertrap_body (fun h : CpuId => usertrap_res (CID := h))
-        pt j m ms_v sc_v stval_v sepc_v ksp mie_v mdv0 menvcfg0.
+        pt j m ms_v sc_v stval_v sepc_v ksp mie_v mdv0 menvcfg0 U.
 End USERTRAP.

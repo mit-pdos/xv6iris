@@ -113,6 +113,12 @@ Require Import ParkCap.               (* [park_token_park] *)
 Require Import UsertrapRes.           (* [ut_names], [park_env], [park_own] *)
 Require Import SyscParkEnv.           (* [sysc_park_extra] / [park_world] *)
 Require Import UexecWp.               (* [UEXEC_GEN] / [uexec_wp] -- the park's *)
+Require Import UexecSlot.             (* [uvis] *)
+Require Import UexecRet.              (* [uslot] -- DIRECT, the seal does not
+                                         travel through a re-export *)
+Require Import UexecCond.             (* [cond_entry_slot] -- the conditional
+                                         mint: sync's constructor when the
+                                         key qualifies, the generic one else *)
 Require Import FsReady.               (* [fs_geom_ok] *)
 Require Import DiskInv TicksInv.      (* [disk_geom], [is_tickslock] *)
 Require Import SpecUserinit.
@@ -760,8 +766,17 @@ Section ProofUserinit.
        a WP any more (claude-notes/design/user-wp-slot.md). *)
     iAssert (uexec_wp) as "Huwp".
     { iPoseProof UG.uexec_wp_gen as "#Hgen". iExact "Hgen". }
+    (* ...AND THE GENERIC SLOT FAMILY, minted from the SAME [box].  Via
+       [UexecCond.cond_entry_slot] rather than the bare generic inhabitant
+       [uexec_wp_uslot]: a process whose key qualifies picks up sync's own
+       constructor instead, which is the whole point of the conditional
+       probe.  The family, not a keyed slot -- the park cannot know the key
+       the resume will land on (projects/user-wp-slot.md SS4c, R-b). *)
+    iAssert (∀ W : uvis, uslot W)%I as "Hjslot".
+    { iPoseProof UG.uexec_wp_gen as "#Hgen".
+      iIntros (W). iApply (UexecCond.cond_entry_slot W with "Hgen"). }
     iMod (park_token_park N rest (MkUstate (upd_cwd V ipv) M) Hwf Hrest
-            with "Htoken Htext Hwire Htramp Hmk Hstack Henv Hown Hfrag Huwp
+            with "Htoken Htext Hwire Htramp Hmk Hstack Henv Hown Hfrag Huwp Hjslot
                   [Hks Hctx Hpriv Hfd Hirs]")
       as "Hpctx".
     { rewrite /park_child. iFrame "Hks Hpriv Hfd Hirs". iExact "Hctx". }

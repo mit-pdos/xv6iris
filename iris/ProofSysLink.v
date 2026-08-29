@@ -1111,8 +1111,9 @@ Section ProofSysLinkBody.
       assert (Hpc2a : ret_pc (N3 !!! Regidx Rra : mword 64)
                       = mword_of_int (SL + 0x2a)) by (rewrite HN3ra; pcw).
       iEval (rewrite Hpc2a) in "Hpc".
-      assert (Hupt : uptd_ext (pv_upt (us_V U)) P2).
-      { apply (uptd_ext_trans (pv_upt (us_V U)) P1 P2); [exact Hupt1 | exact Hupt2]. }
+      assert (Hupt : uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P2).
+      { apply (uptd_ext_sz_trans (pv_sz (us_V U)) (pv_upt (us_V U)) P1 P2);
+          [exact Hupt1 | exact Hupt2]. }
       assert (Has2regs : sl_regs m sp0 (m !!! Regidx Rs1 : mword 64)
                            (m !!! Regidx Rs2 : mword 64) mas2)
         by exact (sl_regs_cs m sp0 _ _ N3 mas2 Hcsas2 HN3regs).

@@ -83,6 +83,10 @@ Require Import SpecUserretClosed.
 Require Import ParkCap.   (* [park_token] *)
 Require Import UsertrapRes.
 Require Import SpecForkret ProofForkretParts ProofPrepareReturnParts.
+Require Import UexecSlot. (* [uvis_of] *)
+Require Import UexecRet.  (* [uslot] -- the closer's second output lands in
+                             the proofmode context here, so this Require is
+                             DIRECT (durable-notes) *)
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -131,6 +135,8 @@ Section Res.
   Definition usertrap_res_bare := UC.usertrap_res_bare.
   Definition usertrap_res_pt_close := UC.usertrap_res_pt_close.
   Definition usertrap_res_pt_open := UC.usertrap_res_pt_open.
+  Definition usertrap_res_ptm_close := UC.usertrap_res_ptm_close.
+  Definition usertrap_res_ptm_open := UC.usertrap_res_ptm_open.
   Definition usertrap_res_bare_norm := UC.usertrap_res_bare_norm.
   Definition usertrap_res_csrs_open := UC.usertrap_res_csrs_open.
   Definition usertrap_res_sstc := UC.usertrap_res_sstc.
@@ -569,7 +575,7 @@ Proof.
      which the closer would re-park. *)
   iDestruct "Hsc" as "(#Hhw & #Hmin & Hprivc & Hmsx & Hmiex & Hmenvx)".
   iDestruct "Hmsx" as (msg) "(Hms & Hhalf & Htie & %Hmsg)".
-  iDestruct "Hcap" as "(Hstk & Hstr & Harm & #Htc & #Hwit)".
+  iDestruct "Hcap" as "(Hstk & Hstr & Harm & Hctx & #Htc & #Hwit)".
   (* THE QUARTER'S VALUE IS NOT A DEGREE OF FREEDOM.  prepare_return leaves
      it existential because it never reads it; the arm it also hands back is
      at [false], and [sie_arm_half_agree] reads the live SIE off that index,
@@ -616,11 +622,12 @@ Proof.
     iSplitL "Hf16"; [iExact "Hf16" | iExact "Hstk"]. }
   (* ---- the trap-side residue, and the table it hands userret ---- *)
   iAssert (ut_trap p ksp av ∅)
-    with "[Hstack Hstr Harm Hkptr Hhalf Hq4 Htie Hsret Hcpu Hclaim]" as "Htrap".
+    with "[Hstack Hstr Harm Hctx Hkptr Hhalf Hq4 Htie Hsret Hcpu Hclaim]" as "Htrap".
   { rewrite /ut_trap /ut_stack /ut_ghosts.
     iSplitL "Hstack". { iExact "Hstack". }
     iSplitL "Hstr". { iExact "Hstr". }
     iSplitL "Harm". { iExact "Harm". }
+    iSplitL "Hctx". { iExact "Hctx". }
     iSplitL "Hkptr". { iExact "Hkptr". }
     iSplitL "Hhalf Hq4 Htie Hsret".
     { iSplitL "Hhalf". { iExact "Hhalf". }
@@ -651,16 +658,18 @@ Proof.
                     (f_equal ud_root HuptV') (f_equal ud_tfp HuptV')
                     (f_equal ud_um HuptV'))) in "Hpnopt".
   set (pt := ud_norm (pv_upt (us_V U))).
-  iDestruct (proc_ptm_pt with "Hpt") as "Hpt".
-  iEval (rewrite proc_pt_split) in "Hpt".
-  iDestruct "Hpt" as "[[%Hptwf Hufr] Hdata]".
+  (* THE BLOCK ALREADY HOLDS THE LAZY NAMED VIEW, and post-S3 so does the
+     loop's entry: [proc_ptm] IS [proc_pt_wf] + the parked tree + the pages
+     at [umem_lazy], and [SpecUserretClosed.wp_userret_closed_body] takes
+     exactly those three.  This used to weaken through [proc_ptm_pt] /
+     [proc_pt_split] and then re-index the pages by user virtual address
+     ([proc_pt_own_umem]); none of that is needed any more. *)
+  iEval (rewrite /proc_ptm) in "Hpt".
+  iDestruct "Hpt" as "(%Hptwf & Hufr & Hdata)".
   assert (Hnorm : ud_data pt = ud_pas pt) by exact (ud_norm_pas (pv_upt (us_V U))).
   destruct Hptwf as (Hmapwf & Haccwf & Hpv1 & Hpv2 & Hpv3).
   assert (Hptwf : proc_pt_wf pt)
     by exact (conj Hmapwf (conj Haccwf (conj Hpv1 (conj Hpv2 Hpv3)))).
-  (* the pages, RE-KEYED by user virtual address: the same [↦ₚ] cells the
-     kernel held page-indexed, which is what the user tier now takes *)
-  iEval (rewrite (proc_pt_own_umem pt Hmapwf Hpv2)) in "Hdata".
   assert (Hcov : uva_pa_inj pt) by exact (uva_pa_inj_of_wf pt Hmapwf Hpv2).
   (* ---- and the residue, handed to the caller's wand ---- *)
   iAssert (forkret_yield (CID := CIDf) γf p ksp pid av (upd_upt V' pt))
@@ -668,12 +677,20 @@ Proof.
   { rewrite /forkret_yield.
     iSplitL "Hparked"; [iExact "Hparked" | iExact "Hpnopt"]. }
   iDestruct (ut_tfk_upd_upt (CID := CIDf) ksp V' pt with "Htfk") as "#Htfk'".
-  iDestruct ("Hyield" $! CIDf pt (upd_upt V' pt)
+  (* THE CLOSER NOW YIELDS TWO THINGS: the residue, and a slot keyed at the
+     record forkret actually resumes with ([SpecForkret.forkret_closer]).
+     S5 IS THE CONSUMER of the second -- the trap loop's own rewrite, where
+     [SpecUserretClosed.wp_userret_closed_body] grows a slot premise and the
+     residue loses its [uexec_wp] conjunct (projects/user-wp-slot.md SS4c,
+     R-a/R-c).  Until then this arm drops it: adding the premise here would
+     be S5's edit to [wp_userret_closed]'s statement, made in the wrong
+     lane. *)
+  iDestruct ("Hyield" $! CIDf pt (MkUstate (upd_upt V' pt) (us_M U))
                with "[%] [%] [%] [%] Htfk' Hdone HW Htc Hyld")
-    as "Hures"; [reflexivity | exact Hnorm | exact Hptwf | | ].
+    as "[Hures _]"; [reflexivity | exact Hnorm | exact Hptwf | | ].
   (* the resumed record names the parked process's fd-state ghost: forkret
      moved only [pv_upt], and [upd_upt] does not touch [pv_fdg]. *)
-  { cbn [pv_fdg upd_upt]. exact Hfg. }
+  { exact Hfg. }
   (* ---- the config record for this round ---- *)
   assert (HSEa0 : tp_pin SE !!! Regidx (mword_of_int 10)
                   = kvi_satp_word (ud_root pt)).
@@ -682,6 +699,7 @@ Proof.
   iApply (UC.wp_userret_closed (CID := CIDf)
             (loop_ucfg mdv0 Hmask) pt kroot j ksp (tp_pin SE)
             (kvi_satp_word (ud_root pt)) msg (mepc_val epc) scv stv
+            (MkUstate (upd_upt V' pt) (us_M U))
             (loop_ok_loop_ucfg mdv0 Hmask pt Hnorm Hptwf)
             Hjlt
             Hretms Hmapwf HSEa0

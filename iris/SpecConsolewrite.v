@@ -162,7 +162,7 @@ Definition wp_consolewrite_sconf_body
        DESCRIPTOR grows.  (image campaign, tier 3.) *)
   ∀ (mf : regfile) (r : Z) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+      ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       (* the whole of what a device write promises: it delivered somewhere
          between nothing and all of it. *)
       ⌜(0 <= r <= Z.max 0 n)%Z⌝ -∗

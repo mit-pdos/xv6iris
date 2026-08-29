@@ -1482,7 +1482,7 @@ Section ProofFilewrite.
     forall (W : nat) (iz : Z) (PI : uptd) (M : regfile),
     (n - iz <= Z.of_nat W)%Z ->
     (0 <= iz < n)%Z ->
-    uptd_ext (pv_upt (us_V U)) PI ->
+    uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) PI ->
     M !!! Regidx csp_rs1 = pa_stk sp0 12 ->
     M !!! Regidx Rs2 = fnode kx ->
     M !!! Regidx Rs4 = (mword_of_int iz : mword 64) ->
@@ -1542,7 +1542,7 @@ Section ProofFilewrite.
     dev_inv (fsc_uart) (fsc_disk) -∗
     DiskInv.disk_geom (fsc_disk) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn) -∗
     is_lock (fsc_dlock) DiskAddrs.d_lock "virtio_disk"%string
-      <{ DiskInv.disk_res (fsc_disk) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn) }> -∗
+      (DiskInv.disk_res_at (fsc_disk) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)) -∗
     (* THE BITMAP'S INVARIANT -- persistent, so it rides with the rest of
        the persistent half rather than being loop-carried. *)
     BitmapInv.bitmap_inv fsc_fs (fsc_bmapstart) fsc_cov
@@ -1557,7 +1557,7 @@ Section ProofFilewrite.
          [SpecFilewrite]'s ∃-weakened post, so the two spellings match *)
       ∀ (mf : regfile) (r : mword 64) (P' : uptd),
         ⌜callee_saved m mf⌝ -∗
-        ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
+        ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
         ⌜filewrite_ret n r⌝ -∗
         ⌜mf !!! Regidx Ra0 = r⌝ -∗
         sie_cap_gpr KT1 mf K b pj -∗
@@ -2471,8 +2471,8 @@ Section ProofFilewrite.
       iFrame "Hsbi Hsbsz Hsbb Hbsl". }
     (* the page-table descriptor, re-based on the contract's own [V] *)
     iEval (rewrite (fw_upd_upt_upd (us_V U) PI P')) in "Hpriv".
-    assert (Hupt2 : uptd_ext (pv_upt (us_V U)) P').
-    { apply (uptd_ext_trans (pv_upt (us_V U)) PI P'); [exact Hext |].
+    assert (Hupt2 : uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P').
+    { apply (uptd_ext_sz_trans (pv_sz (us_V U)) (pv_upt (us_V U)) PI P'); [exact Hext |].
       rewrite -(fw_pv_upt_upd (us_V U) PI). exact Hupt. }
     (* =================================================================
        +0xc0 bne s3,s1 -- THE SHORT-WRITE BREAK.  Taken when the count is
@@ -2805,7 +2805,7 @@ Section ProofFilewrite.
                       [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                       [Hpriv] [Henv]").
       { exact Hcs1. }
-      { apply uptd_ext_refl. }
+      { apply uptd_ext_sz_refl. }
       { apply filewrite_ret_m1. }
       { exact HA1a0. }
       { iEval (rewrite /ret_tgt). iExact "Hpc". }
@@ -3019,7 +3019,7 @@ Section ProofFilewrite.
                         [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                         [Hpriv] [Henv]").
         { exact Hcsf. }
-        { apply uptd_ext_refl. }
+        { apply uptd_ext_sz_refl. }
         { apply filewrite_ret_m1. }
         { exact Hrv. }
         { iEval (rewrite /ret_tgt). iExact "Hpc". }
@@ -3524,7 +3524,7 @@ Section ProofFilewrite.
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                 [Hpriv] [Hslot]").
                 { exact Hcsf. }
-                { apply uptd_ext_refl. }
+                { apply uptd_ext_sz_refl. }
                 { apply filewrite_ret_m1. }
                 { exact Hrv. }
                 { iEval (rewrite /ret_tgt). iExact "Hpc". }
@@ -3731,7 +3731,7 @@ Section ProofFilewrite.
                              [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                              [Hpriv] [Henv]").
              { exact Hcsf. }
-             { apply uptd_ext_refl. }
+             { apply uptd_ext_sz_refl. }
              { apply filewrite_ret_m1. }
              { exact Hrv. }
              { iEval (rewrite /ret_tgt). iExact "Hpc". }
@@ -3915,7 +3915,7 @@ Section ProofFilewrite.
                                  [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                  [Hpriv] [Henv]").
                  { exact Hcsf. }
-                 { apply uptd_ext_refl. }
+                 { apply uptd_ext_sz_refl. }
                  { apply filewrite_ret_all. exact Hn0. }
                  { exact Hrv. }
                  { iEval (rewrite /ret_tgt). iExact "Hpc". }
@@ -4321,7 +4321,7 @@ Section ProofFilewrite.
                            (Z.to_nat n) 0%Z (pv_upt (us_V U)) L7
                            ltac:(rewrite (Z2Nat.id n Hn0); lia)
                            ltac:(lia)
-                           ltac:(apply uptd_ext_refl)
+                           ltac:(apply uptd_ext_sz_refl)
                            HL7sp HL7s2 HL7s4 HL7s5 HL7s6 HL7s7 HL7s8 HL7s9
                            ltac:(intros r Hr A1 A2 A3 A4 A5 A6 A7 A8 A9 A10 A11;
                                  exact (HL7thr r Hr A1 A2 A4 A6 A7 A8 A9 A10 A11))
