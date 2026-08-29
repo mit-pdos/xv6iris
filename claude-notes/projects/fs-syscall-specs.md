@@ -1058,6 +1058,31 @@ things, and the answer differs:
     already been validated by the syscall seal above it, and it needed no
     edit to be provable.
 
+- [ ] **INIT — the init.c program theorem (three stages; scoped
+  2026-08-29 after upstream's echo landed the Uk pattern).**
+  STAGE 1 (bare tier, echo's mold, launchable): `UkInit.v` — init's
+  text as U-mode continuations over key facts (`init_text_sub M`,
+  X-page, stack budget; no uk_args); preamble syscalls are QUIET rows;
+  the argv-for-exec stores via UkStore; TWO in-lane verifications that
+  are the only possible blockers: do `usys_mem_ok` rows exist for
+  SYS_fork/SYS_exec/SYS_wait (echo exercised only write/sync/exit —
+  if absent, stop at the loop head and report: small upstream rows),
+  and the forever-loop's round/iLöb discipline (the one structural
+  novelty vs echo's bounded inductions; J's scheduler rounds are the
+  expected precedent).
+  STAGE 2 (functional preamble — fds 0-2 = console): OUR sealed AU
+  receipts (mknod/open/dup) under the ecall ∀ via the Φ REFINEMENT
+  PARKED in user-wp-slot's design (UkEcho's header names it; this
+  stage is its first real consumer — CROSS-CAMPAIGN ASK, raised
+  here: the receipts are ready on our side).
+  STAGE 3 (the child runs sh): J's `cond_entry_slot` mint consumes
+  `SpecKexecPin.Q_pin` (seam drawn in that file's header); needs the
+  pinned-exec PROVER (ELF-header step; owner Qs: oracle widening,
+  image-hole sweep timing) and, for the segments, the image-hole
+  widening.
+  Dependency truth: stage 1 blocks on nothing of ours; stage 2 on
+  upstream's Φ; stage 3 on our exec prover + two owner rulings.
+
 Sizing: D is spike-sized — the readings exist, the work is assembly and
 statement.  S0 is one design session.  A and W are the campaign's bulk.
 P is contained (two pins).  Y is CLOSED (2026-08-29): machinery, contract,
