@@ -131,6 +131,8 @@ Section Res.
   Definition usertrap_res_bare := UC.usertrap_res_bare.
   Definition usertrap_res_pt_close := UC.usertrap_res_pt_close.
   Definition usertrap_res_pt_open := UC.usertrap_res_pt_open.
+  Definition usertrap_res_ptm_close := UC.usertrap_res_ptm_close.
+  Definition usertrap_res_ptm_open := UC.usertrap_res_ptm_open.
   Definition usertrap_res_bare_norm := UC.usertrap_res_bare_norm.
   Definition usertrap_res_csrs_open := UC.usertrap_res_csrs_open.
   Definition usertrap_res_sstc := UC.usertrap_res_sstc.
@@ -652,16 +654,18 @@ Proof.
                     (f_equal ud_root HuptV') (f_equal ud_tfp HuptV')
                     (f_equal ud_um HuptV'))) in "Hpnopt".
   set (pt := ud_norm (pv_upt (us_V U))).
-  iDestruct (proc_ptm_pt with "Hpt") as "Hpt".
-  iEval (rewrite proc_pt_split) in "Hpt".
-  iDestruct "Hpt" as "[[%Hptwf Hufr] Hdata]".
+  (* THE BLOCK ALREADY HOLDS THE LAZY NAMED VIEW, and post-S3 so does the
+     loop's entry: [proc_ptm] IS [proc_pt_wf] + the parked tree + the pages
+     at [umem_lazy], and [SpecUserretClosed.wp_userret_closed_body] takes
+     exactly those three.  This used to weaken through [proc_ptm_pt] /
+     [proc_pt_split] and then re-index the pages by user virtual address
+     ([proc_pt_own_umem]); none of that is needed any more. *)
+  iEval (rewrite /proc_ptm) in "Hpt".
+  iDestruct "Hpt" as "(%Hptwf & Hufr & Hdata)".
   assert (Hnorm : ud_data pt = ud_pas pt) by exact (ud_norm_pas (pv_upt (us_V U))).
   destruct Hptwf as (Hmapwf & Haccwf & Hpv1 & Hpv2 & Hpv3).
   assert (Hptwf : proc_pt_wf pt)
     by exact (conj Hmapwf (conj Haccwf (conj Hpv1 (conj Hpv2 Hpv3)))).
-  (* the pages, RE-KEYED by user virtual address: the same [↦ₚ] cells the
-     kernel held page-indexed, which is what the user tier now takes *)
-  iEval (rewrite (proc_pt_own_umem pt Hmapwf Hpv2)) in "Hdata".
   assert (Hcov : uva_pa_inj pt) by exact (uva_pa_inj_of_wf pt Hmapwf Hpv2).
   (* ---- and the residue, handed to the caller's wand ---- *)
   iAssert (forkret_yield (CID := CIDf) γf p ksp pid av (upd_upt V' pt))
@@ -682,7 +686,8 @@ Proof.
     rewrite /SD upd_eq HuptV'. reflexivity. }
   iApply (UC.wp_userret_closed (CID := CIDf)
             (loop_ucfg mdv0 Hmask) pt kroot j ksp (tp_pin SE)
-            (kvi_satp_word (ud_root pt)) msg (mepc_val epc) scv stv _
+            (kvi_satp_word (ud_root pt)) msg (mepc_val epc) scv stv
+            (MkUstate (upd_upt V' pt) (us_M U))
             (loop_ok_loop_ucfg mdv0 Hmask pt Hnorm Hptwf)
             Hjlt
             Hretms Hmapwf HSEa0

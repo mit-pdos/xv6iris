@@ -573,6 +573,37 @@ Module Type USERTRAP_RES.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate),
       usertrap_res_parked pt ksp U -∗ (∃ M : gmap Z (bv 8), proc_pt pt M) ∗ usertrap_res_bare pt ksp U.
 
+  (* ---- THE SAME TWO CROSSINGS AT THE NAMED LAZY IMAGE (milestone J, S3).
+     The pair above is stated at the MAPPED view with the image quantified,
+     which is all the uservec seam needed while [uservec_post] handed back
+     [UserPtTree.user_pt_any pt'].  Once the round's post names its image --
+     and once the loop hands user execution a [UexecRet.uvb] whose image
+     conjunct is [user_ptm_inv pt sz M] -- the crossing has to carry the
+     name in BOTH directions: the entry image is what [UsysMemOk.usys_mem_ok]
+     relates the exit one to.
+
+     THE SIZE IS FORCED, THE IMAGE IS NOT.  The residue's [ut_own] holds
+     [ProcPtOwn.proc_ptm] at the process's own [p->sz]
+     ([uint (pv_sz (us_V U))]) -- that is the view [proc_priv] splits into --
+     so both directions are stated there and neither takes [sz] as a free
+     parameter.  The image is free on the close: the BARE residue owns none
+     of the user bytes, so it re-parks at whatever image comes back, and the
+     index moves by [upd_usM].
+
+     The [_pt_] pair STAYS: other callers speak the mapped view.  Concretes:
+     [UsertrapRes.ut_res_ptm_open] / [ut_res_ptm_close] -- the existing
+     proofs minus the one weakening step ([proc_ptm_pt] / [proc_pt_ptm_any]). *)
+  Parameter usertrap_res_ptm_close :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (M : gmap Z (bv 8)),
+      usertrap_res_bare pt ksp U -∗
+      proc_ptm pt (uint (pv_sz (us_V U))) M -∗
+      usertrap_res_parked pt ksp (upd_usM U M).
+
+  Parameter usertrap_res_ptm_open :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate),
+      usertrap_res_parked pt ksp U -∗
+      proc_ptm pt (uint (pv_sz (us_V U))) (us_M U) ∗ usertrap_res_bare pt ksp U.
+
   (* THE FOOTPRINT RENORMALISATION.  The bare residue reads its descriptor
      only through [ud_root]/[ud_tfp]/[ud_um] -- [proc_pt], the one conjunct
      whose user-side partner names [ud_data], is what it just gave up -- so

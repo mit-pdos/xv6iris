@@ -117,6 +117,20 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES_PARK.
     usertrap_res_parked pt ksp U -∗ (∃ M : gmap Z (bv 8), proc_pt pt M) ∗ usertrap_res_bare pt ksp U.
   Proof. exact (ut_res_pt_open (SY.syscall_env) pt ksp U). Qed.
 
+  (* ...and the same two at the NAMED lazy image (milestone J, S3) *)
+  Lemma usertrap_res_ptm_close
+      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) (M : gmap Z (bv 8)) :
+    usertrap_res_bare pt ksp U -∗
+    proc_ptm pt (uint (pv_sz (us_V U))) M -∗
+    usertrap_res_parked pt ksp (upd_usM U M).
+  Proof. exact (ut_res_ptm_close (SY.syscall_env) pt ksp U M). Qed.
+
+  Lemma usertrap_res_ptm_open
+      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) :
+    usertrap_res_parked pt ksp U -∗
+    proc_ptm pt (uint (pv_sz (us_V U))) (us_M U) ∗ usertrap_res_bare pt ksp U.
+  Proof. exact (ut_res_ptm_open (SY.syscall_env) pt ksp U). Qed.
+
   Lemma usertrap_res_bare_norm
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (pt : uptd) (ksp : mword 64) (U : ustate) :
     usertrap_res_bare pt ksp U -∗

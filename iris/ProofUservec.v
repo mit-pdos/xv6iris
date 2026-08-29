@@ -93,6 +93,8 @@ Section UservecAllPt.
   Definition usertrap_res_tlb_open := UT.usertrap_res_tlb_open.
   Definition usertrap_res_pt_close := UT.usertrap_res_pt_close.
   Definition usertrap_res_pt_open := UT.usertrap_res_pt_open.
+  Definition usertrap_res_ptm_close := UT.usertrap_res_ptm_close.
+  Definition usertrap_res_ptm_open := UT.usertrap_res_ptm_open.
   Definition usertrap_res_bare_norm := UT.usertrap_res_bare_norm.
 
   (* the user invariant already carries the map well-formedness the exit
@@ -107,7 +109,7 @@ Section UservecAllPt.
 
 
   Lemma wp_uservec_pt (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
-      (j : nat) (vksp : mword 64) (U : ustate)
+      (j : nat) (vksp : mword 64) (U : ustate) (M : gmap Z (bv 8))
       (g : regfile) (ms_v sc_v stval_v sepc_v : mword 64) :
     (* [UT.]-qualified, not the section alias: inside a section that FIXES
        [CID], the alias has no [CID] implicit left to instantiate (section
@@ -115,7 +117,7 @@ Section UservecAllPt.
        still does, and the two are convertible, so the [: USERVEC] check
        accepts it. *)
     wp_uservec_pt_body (fun h : CpuId => UT.usertrap_res_bare (CID := h))
-      C pt Rut j vksp U g ms_v sc_v stval_v sepc_v.
+      C pt Rut j vksp U M g ms_v sc_v stval_v sepc_v.
   Proof.
     cbv beta zeta delta [wp_uservec_pt_body].
     (* [tf_pa] deliberately NOT unfolded here: its 35 trapframe cells ride in
@@ -135,11 +137,15 @@ Section UservecAllPt.
        the five, which would lose the tie to this lemma's own binders); the
        three counter-permission cells are dropped here for the same reason it
        drops them -- whoever built the frame keeps its own copies. *)
-    rewrite /user_trap_frame_at.
+    rewrite /user_trap_frame_atm.
     iDestruct "Hframe" as
       "(%Hok & Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpc & Hfile &
         Hupt & Hcfg & Hrut)".
-    iEval (rewrite user_pt_any_unfold) in "Hupt".
+    (* AT THE NAMED LAZY IMAGE (milestone J, S3).  The frame's image conjunct
+       is [user_ptm_inv pt sz M], not the ∃-weakened [user_pt_any pt], so the
+       pages come out as [umem_lazy] -- already the shape [ProcPtOwn.proc_ptm]
+       wants, which is what deletes the re-indexing step at the exit switch. *)
+    iEval (rewrite /user_ptm_inv) in "Hupt".
     iDestruct "Hupt" as "(Hutlb & Hdata & %Hcov & %Hacc)".
     iEval (rewrite /user_cfg) in "Hcfg".
     iDestruct "Hcfg" as
@@ -1567,23 +1573,20 @@ Section UservecAllPt.
        wrote the KERNEL root into satp, which turned the user table from the
        installed [utlb_inv_pt] into the parked [Hufr : pt_frame ...] and
        produced [Hkres : tlb_res_pt kroot] for the kernel one.  The user
-       PAGES did not move at all -- [Hdata] is the same resource the kernel
-       tier calls [proc_pt_own], page-indexed rather than keyed by user
-       virtual address ([ProcPtOwn.proc_pt_own_umem]), which is why this
-       costs a rewrite and not a conversion.
-         So the whole user address space is now in the kernel's hands in the
-       kernel's shape, and [proc_pt] is exactly the two of them: that is
-       what the BARE residue is missing, and what makes it the residue that
-       could park across user execution in the first place. *)
-    assert (Hmwf0 : upt_map_wf (ud_um pt)) by (destruct Hptwf as (H1 & _); exact H1).
-    assert (Hinj0 : um_inj (ud_um pt))
-      by (destruct Hptwf as (_ & _ & _ & H4 & _); exact H4).
-    iEval (rewrite -(proc_pt_own_umem pt Hmwf0 Hinj0)) in "Hdata".
-    iAssert (proc_pt_any pt) with "[Hufr Hdata]" as "Hpt".
-    { rewrite proc_pt_split. iFrame "Hdata". iSplitR; [iPureIntro; exact Hptwf|].
-      iExact "Hufr". }
-    iEval (rewrite /proc_pt_any) in "Hpt".
-    iDestruct (usertrap_res_pt_close with "Hures' Hpt") as (Mz) "Hures'".
+       PAGES did not move at all, and post-S3 they did not even change
+       SHAPE: the entry frame delivered them as [umem_lazy pt sz M], which
+       is the image conjunct of [ProcPtOwn.proc_ptm] verbatim.  So the whole
+       user address space is now in the kernel's hands in the kernel's
+       shape, and [proc_ptm] is exactly the three of them (the tree, the
+       pages, and [proc_pt_wf]): that is what the BARE residue is missing,
+       and what makes it the residue that could park across user execution
+       in the first place.  The image name survives the crossing, which is
+       what lets [uservec_post] state the round's image half. *)
+    iAssert (proc_ptm pt (uint (pv_sz (us_V U))) M) with "[Hufr Hdata]" as "Hpt".
+    { rewrite /proc_ptm.
+      iSplitR; [iPureIntro; exact Hptwf |].
+      iSplitL "Hufr"; [iExact "Hufr" | iExact "Hdata"]. }
+    iDestruct (usertrap_res_ptm_close with "Hures' Hpt") as "Hures'".
     (* THE TRANSLATION SLOT, INJECTED.  [Hkres] is the [tlb_res_pt kroot]
        the exit switch just produced by writing the kernel root into satp --
        and it is exactly the piece the PARKED residue is missing.  usertrap
@@ -1622,12 +1625,10 @@ Section UservecAllPt.
        uservec framing it. *)
     iDestruct (UT.usertrap_res_tlb_open (CID:=CID2) pt' vksp U2 with "Hures2")
       as (kroot2) "[Hkres2 Hures2]".
-    iDestruct (UT.usertrap_res_pt_open (CID:=CID2) pt' vksp U2 with "Hures2")
+    iDestruct (UT.usertrap_res_ptm_open (CID:=CID2) pt' vksp U2 with "Hures2")
       as "[Hpt' Hures2]".
-    iDestruct "Hpt'" as (Mpt') "Hpt'".
-    iDestruct (proc_pt_forget with "Hpt'") as "Hpt'".
-    iEval (rewrite proc_pt_split) in "Hpt'".
-    iDestruct "Hpt'" as "[(%Hptwf' & Hufr') Hdata']".
+    iEval (rewrite /proc_ptm) in "Hpt'".
+    iDestruct "Hpt'" as "(%Hptwf' & Hufr' & Hdata')".
     iDestruct (UT.usertrap_res_tf_open (CID:=CID2) pt' vksp U2 with "Hures2") as (kroot1)
       "(#Hinv1 & %Hok1 & Htf1 & Hclose1)".
     remember (pv_tf (us_V U2)) as ws1 eqn:Hws1.
@@ -1704,8 +1705,9 @@ Section UservecAllPt.
     { refine (tf_kernel_words_ok_tail _ _ _ _ _ _ _ _ _ Hok1). }
     (* ---- THE ADDRESS SPACE CHANGES VIEW BACK -------------------------
        userret's entry switch installed the user root, so [Hutlb3] is the
-       tree live again; the pages ([Hdata'], still page-indexed since the
-       open) rejoin it, and the pair IS [user_pt_inv].  The descriptor comes
+       tree live again; the pages ([Hdata'], the residue's own [umem_lazy]
+       at [us_M U2]) rejoin it, and the pair IS [user_ptm_inv] -- at the
+       NAMED image, which is the whole point of S3.  The descriptor comes
        out RENORMALISED: [user_pt_inv] is the only reader of [ud_data], and
        at the derived footprint its coverage side condition holds by
        construction ([ProcPtOwn.ud_pas_cov]) -- which is the fact
@@ -1714,7 +1716,7 @@ Section UservecAllPt.
        the descriptor only through the three real fields, so that is free.
          After this the post holds the user address space EXACTLY ONCE, in
        the user's view, beside a residue that holds none of it. *)
-    iDestruct (user_pt_inv_close pt' Hptwf' with "Hutlb3 Hdata'") as "Hupt3".
+    iDestruct (user_ptm_inv_close pt' _ _ Hptwf' with "Hutlb3 Hdata'") as "Hupt3".
     iDestruct (UT.usertrap_res_bare_norm (CID:=CID2) pt' vksp _ with "Hures3") as "Hures3".
     (* THE CONTINUATION LANDS AT THE RESUMING HART.  [Hcont] is a [wp_next]
        over the hart usertrap came back on; at a real proc the pinning
@@ -1731,21 +1733,30 @@ Section UservecAllPt.
                               u136 u144 u152 u160 u168 u176 u184 u192 u200 u208 u216 u224 u232
                               u240 u248 u256 u264 u272 u280 u112)
              ms' usatp uepc sc' stval' mdv0 _
+             (* THE IMAGE ROW GOES IN A BRACKET, not by name: it is stated at
+                the post's own [U'], and [U'] is only pinned by the RESIDUE
+                row four premises later ([Hures3]'s index -- [U2] re-keyed by
+                [us_tf] at the words userret gave back and by [us_upt] at the
+                renormalised descriptor).  Handed by name, [iSpecialize] would
+                have to solve [us_M ?U' =?= us_M U2], which is not a pattern;
+                deferred to a goal, [?U'] is already resolved by the time the
+                (purely iota) conversion is checked. *)
              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hhs3 Hpriv3 Hms3 Hmie4 Hmdl4 Hmenv4 Hstvec2 Hsenv3 Hsc2 Hstval2 Hsepc3
-                    Hupt3 Hpc3 Hfile3 Hures3 Hhw2 Hmin2").
+                    [Hupt3] Hpc3 Hfile3 Hures3 Hhw2 Hmin2").
     - (* the descriptor the residue is keyed at IS the one handed over *)
       reflexivity.
     - (* THE ROUND, read at the machine that trapped.  usertrap's [tf0] is
          the SAVED frame; this boundary's is [tf_of g …], and the two agree
          at every word the round reads -- the 31 the save walk stored (whose
          values ARE [g]'s registers), and the epc both name.  The IMAGE half
-         is dropped here: see [SpecUservec.uv_round].  [ut_round_same] carries
+         is REAL post-S3: the residue was parked at [M], the frame's own
+         image.  [ut_round_same] carries
          the round the last step, from the record usertrap returned to the
          RENORMALISED one this post hands over -- [ud_norm] moves only
          [ud_data], which [perm_of] does not read. *)
       match goal with
-      | |- uv_round _ _ _ _ ?UU =>
-          refine (uv_round_of_ut _ U g sepc_v sc_v UU _ _
+      | |- uv_round _ _ _ _ _ ?UU =>
+          refine (uv_round_of_ut _ U M g sepc_v sc_v UU _ _ _
                     (ut_round_same sepc_v sc_v _ U2 UU _ _ eq_refl Hrd2))
       end.
       + cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf].
@@ -1753,6 +1764,9 @@ Section UservecAllPt.
         intros i Hi.
         do 36 (destruct i as [| i]; [ first [ reflexivity | lia ] | ]). lia.
       + reflexivity.
+      + (* the ENTRY IMAGE: the residue was parked at exactly the frame's own
+           [M] ([usertrap_res_ptm_close]), so the round's left image is it. *)
+        reflexivity.
       + cbn [us_V pv_tf us_upt upd_upt upd_usV us_tf upd_tf]. exact Hws1.
       + cbn [us_V pv_upt pv_sz us_upt upd_upt upd_usV us_tf upd_tf].
         rewrite Huptpt2. reflexivity.
@@ -1774,6 +1788,9 @@ Section UservecAllPt.
     - exact Hmask.
     - exact Hretms_keep.
     - exact Haccwf.
+    - (* the address space, at the post's index: [us_tf] / [us_upt] move
+         neither [pv_sz] nor [us_M], so this is a conversion. *)
+      iExact "Hupt3".
   Qed.
 
 End UservecAllPt.

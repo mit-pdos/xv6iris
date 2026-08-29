@@ -5471,6 +5471,33 @@ Section ProcPt.
     iPureIntro. split; [exact (uva_pa_inj_of_wf P Hmwf Hinj) | exact Hacc].
   Qed.
 
+  (* KERNEL VIEW -> USER VIEW, AT THE NAMED LAZY IMAGE (milestone J, S3).
+     The mirror of [user_pt_inv_close], and SHORTER: [proc_ptm] is
+     [⌜proc_pt_wf⌝ ∗ pt_frame ∗ umem_lazy] and [user_ptm_inv] is
+     [utlb_inv_pt ∗ umem_lazy ∗ two pure], so the image conjunct is
+     LITERALLY the same resource on both sides and only the TREE conjunct
+     converts.  The mapped original had to re-index the pages
+     ([proc_pt_own_umem]); there is nothing to re-index here.
+     The descriptor still comes out RENORMALISED, for the same reason:
+     [ud_data] is read by the user tier alone, and at the derived footprint
+     its coverage side condition is free ([ud_pas_cov]).  Neither
+     [umem_lazy] nor [utlb_inv_pt] reads the field, so the re-key is an
+     iota step. *)
+  Lemma user_ptm_inv_close (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    proc_pt_wf P ->
+    utlb_inv_pt P.(ud_root) P.(ud_tfp) P.(ud_um) -∗
+    umem_lazy P sz M -∗
+    user_ptm_inv (ud_norm P) sz M.
+  Proof.
+    intros (Hmwf & Hacc & _ & Hinj & _).
+    rewrite /user_ptm_inv.
+    unfold ud_norm; cbn [ud_root ud_tfp ud_um ud_data].
+    iIntros "Htlb Hm".
+    iSplitL "Htlb"; [iExact "Htlb" |].
+    iSplitL "Hm"; [iExact "Hm" |].
+    iPureIntro. split; [exact (uva_pa_inj_of_wf P Hmwf Hinj) | exact Hacc].
+  Qed.
+
   (* ------------------------------------------------------------------ *)
   (* ONE USER PAGE, BORROWED.  copyin and copyout do not change the       *)
   (* table at all -- they memmove into or out of a single page walkaddr   *)

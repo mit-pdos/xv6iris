@@ -167,19 +167,32 @@ Section UserretClosed.
     iDestruct (hw_config_counters with "Hhw") as (scen hpm) "[#Hscen #Hhpm]".
     iDestruct (UV.usertrap_res_sstc pt ksp Ur with "Hures") as "[Hsstc Hures]".
     iDestruct "Hsstc" as (mcen) "[#Hmcen _]".
-    (* ---- and rebuild it for uservec at the EMPTY residue ---- *)
-    iDestruct (user_trap_frame_at_intro C pt (fun _ : uptd => emp%I)
-                 ms_v sc_v stval_v sepc_v g Hmsok
-                 with "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr
-                       [Hutlb Hdata] [Hstvec Hmiec Hmdlc Hmenvc] []") as "Hframe".
+    (* ---- and rebuild it for uservec at the EMPTY residue, AT A NAMED
+       IMAGE (milestone J, S3).
+       [wp_uservec_pt] now takes [UserExec.user_trap_frame_atm], whose image
+       conjunct is the lazy sz-region view at a named map, so this round has
+       to pick the map it hands over.  THIS loop has nothing to pick it FROM
+       -- the bare residue does not own the user bytes, so its index says
+       nothing about them -- and names whatever the pages happen to hold,
+       at the residue index's own [p->sz] (the size the exit switch will
+       re-park at).  Stage S5, where the loop switches to [UexecRet.uvb],
+       is what makes the name come from the slot's key instead. ---- *)
+    iAssert (user_pt_any pt) with "[Hutlb Hdata]" as "Hupt".
     { rewrite user_pt_any_unfold. iFrame "Hutlb Hdata".
       iPureIntro. split; [exact Hupinj | exact Hacc]. }
+    iDestruct (user_ptm_inv_intro pt (uint (pv_sz (us_V Ur))) with "Hupt")
+      as (Mimg) "Hupt".
+    iDestruct (user_trap_frame_atm_intro C pt (fun _ : uptd => emp%I)
+                 (uint (pv_sz (us_V Ur))) Mimg
+                 ms_v sc_v stval_v sepc_v g Hmsok
+                 with "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr
+                       Hupt [Hstvec Hmiec Hmdlc Hmenvc] []") as "Hframe".
     { rewrite /user_cfg.
       iFrame "Hstvec Hmiec Hmdlc Hmenvc Hmedlc Hsenvc Hmsec Hssec".
       iSplitR; [iExists mcen, scen; iFrame "Hmcen Hscen" | iExists hpm; iFrame "Hhpm"]. }
     { done. }
     (* ---- one round ---- *)
-    iApply (UV.wp_uservec_pt C pt (fun _ : uptd => emp%I) j ksp Ur
+    iApply (UV.wp_uservec_pt C pt (fun _ : uptd => emp%I) j ksp Ur Mimg
               g ms_v sc_v stval_v sepc_v
               Hstv Hdqc Hmie Hj Hnorm Hptwf
               with "Hkt Hhw Hmin Hclaim Hframe Hures [-]").
@@ -232,9 +245,11 @@ Section UserretClosed.
       iFrame "Hstvec' Hmie' Hmdl' Hmenv' Hmedl' Hsenv' Hmse' Hsse'".
       iSplitR; [iExists mcen', scen'; iFrame "Hmcen' Hscen'"
                | iExists hpm'; iFrame "Hhpm'"]. }
-    (* the round's post hands the pages back with the image quantified; the
-       slot wants it named *)
-    iDestruct "Hupt'" as (M) "Hupt'".
+    (* the round's post hands the pages back at the NAMED LAZY image
+       (milestone J, S3); the generic slot below speaks the MAPPED view, so
+       the name is dropped again right here.  Stage S5 is where it stops
+       being dropped -- [UexecRet.uvb] asserts the lazy bundle itself. *)
+    iDestruct (user_ptm_inv_pt with "Hupt'") as (M) "Hupt'".
     (* the seal comes off THE HYPOTHESIS ONLY: [Hback]'s and the Löb
        hypothesis's own [uexec_wp]s are the returned WP's type and must stay
        folded (a bare [rewrite] would unfold every occurrence in the
@@ -283,6 +298,8 @@ Section Res.
   Definition usertrap_res_bare := UV.usertrap_res_bare.
   Definition usertrap_res_pt_close := UV.usertrap_res_pt_close.
   Definition usertrap_res_pt_open := UV.usertrap_res_pt_open.
+  Definition usertrap_res_ptm_close := UV.usertrap_res_ptm_close.
+  Definition usertrap_res_ptm_open := UV.usertrap_res_ptm_open.
   Definition usertrap_res_bare_norm := UV.usertrap_res_bare_norm.
   Definition usertrap_res_csrs_open := UV.usertrap_res_csrs_open.
   Definition usertrap_res_sstc := UV.usertrap_res_sstc.
@@ -357,7 +374,8 @@ End Res.
     iDestruct (tf_page_length with "Htfp") as %Hlenws.
     iDestruct (tf_page_open36 (ud_tfp pt) ws Hlenws with "Htfp") as
       (u0 u1 u2 u3 u4 u40 u48 u56 u64 u72 u80 u88 u96 u104 u112 u120 u128 u136 u144 u152 u160 u168 u176 u184 u192 u200 u208 u216 u224 u232 u240 u248 u256 u264 u272 u280) "(-> & Hu0 & Hu8 & Hu16 & Hu24 & Hu32 & Htf40 & Htf48 & Htf56 & Htf64 & Htf72 & Htf80 & Htf88 & Htf96 & Htf104 & Htf112 & Htf120 & Htf128 & Htf136 & Htf144 & Htf152 & Htf160 & Htf168 & Htf176 & Htf184 & Htf192 & Htf200 & Htf208 & Htf216 & Htf224 & Htf232 & Htf240 & Htf248 & Htf256 & Htf264 & Htf272 & Htf280 & Htail)".
-    iApply (RU.wp_userret_user C pt (LP.Rut_hole CID) kroot m usatp
+    iApply (RU.wp_userret_user C pt (uint (pv_sz (us_V U))) (us_M U)
+              (LP.Rut_hole CID) kroot m usatp
               mstatus0 sepc0 sc_v stval_v
               u40 u48 u56 u64 u72 u80 u88 u96 u104 u120 u128 u136 u144 u152 u160 u168 u176 u184 u192 u200 u208 u216 u224 u232 u240 u248 u256 u264 u272 u280 u112 (DfracOwn 1)
               mcen scen hpm

@@ -163,7 +163,16 @@ Definition wp_userret_closed_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN :
   sstateen0 ↦ᵣ□ (mword_of_int 0 : mword 32) -∗
   tlb_res_pt kroot -∗
   pt_frame (upt_tree_spec (ud_root pt) (ud_tfp pt) (ud_um pt)) -∗
-  umem_any pt -∗
+  (* THE PAGES, AT THE NAMED LAZY IMAGE (milestone J, S3).  It used to be
+     [UserPtTree.umem_any pt], the ∃-weakened form.  Both callers already
+     hold the named one -- forkret splits it straight off
+     [ProcInv.proc_priv]'s [ProcPtOwn.proc_ptm], which IS
+     [⌜proc_pt_wf⌝ ∗ pt_frame ∗ umem_lazy] at the process's own [p->sz] --
+     so taking it here deletes a weakening rather than adding an obligation,
+     and it is the shape milestone J's loop hands on.  The two other
+     conjuncts of [proc_ptm] are the [pt_frame] row above and [loop_ok]'s
+     own [proc_pt_wf]. *)
+  umem_lazy pt (uint (pv_sz (us_V U))) (us_M U) -∗
   pc_is (uva 0x9c) -∗
   gpr_file m -∗
   (* ---- the kernel-side bundle, at THIS hart ---- *)

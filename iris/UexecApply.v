@@ -441,7 +441,9 @@ Section Frame.
       user_trap_frame_at C pt Rut ms_v sc stv
         (tf_w (uvis_tf W) tf_epc_idx) (tf_resume_gpr0 (uvis_tf W)).
   Proof.
-    rewrite /trapped_machine /user_trap_frame_at.
+    (* post-S3 [trapped_machine] IS [user_trap_frame_atm] plus the K3 length
+       conjunct, so the only row that moves is the image. *)
+    rewrite /trapped_machine /user_trap_frame_atm /user_trap_frame_at.
     iIntros "H".
     iDestruct "H" as (ms_v) "(%Hlen & %Hto & Hhs & Hpriv & Hms & Hsc & Hstv &
                               Hsep & Hpc & Hg & Hpt & Hcfg & Hrut)".

@@ -412,7 +412,7 @@ Section UkBundle.
   Proof.
     intros (Hsub & Himg & Hz & Hdom & Hinj & Hacc & Hsz) Hx0.
     iIntros "Hf Hrut".
-    rewrite /uv_trap_frame /trapped_machine.
+    rewrite /uv_trap_frame /trapped_machine /user_trap_frame_atm.
     iDestruct "Hf" as (ms_v) "(%Hms & Hhs & Hpriv & Hmst & Hsc & Hstv & Hsep & Hpc & Hg & Htlb & Hmem & Hcfg)".
     cbn [uvis_tf uvis_M uvis_of_run].
     rewrite tf_of_epc (tf_of_resume_gpr m pc Hx0).

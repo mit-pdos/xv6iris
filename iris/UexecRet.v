@@ -387,29 +387,48 @@ Section TrappedMachine.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  (* A THIN WRAPPER ON [UserExec.user_trap_frame_atm] (milestone J, stage
+     S3).  The rows below the length conjunct ARE that predicate, at the
+     key's own data: the epc word in [sepc], the resume file in [gpr_file],
+     the lazy image at [uvis_M W].  Keeping it as a wrapper is what makes
+     [UexecApply.trapped_machine_frame] and the loop's entry premise the
+     same vocabulary rather than two parallel spellings.
+
+     THE KEY'S TRAPFRAME IS 36 WORDS LONG (milestone J, K3).  Every
+     [tf_resume_gpr0] / [tf_resume_pc] fact that has to survive the BUMP --
+     [tf_resume_gpr_bump], [tf_resume_pc_bump] -- is guarded on
+     [tf_arg_idx 0 < length tf] / [tf_epc_idx < length tf], and nothing else
+     in the bundle pins the length: [uvis] carries a bare list.  Both
+     producers deliver the key at [uvis_of_run], whose list is [tf_of], so
+     the conjunct is [tf_of_length] at both of them. *)
   Definition trapped_machine (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
       (sz : Z) (sc stv : mword 64) (W : uvis) : iProp Σ :=
     (∃ ms_v : mword 64,
-       (* THE KEY'S TRAPFRAME IS 36 WORDS LONG (milestone J, K3).  Every
-          [tf_resume_gpr0] / [tf_resume_pc] fact that has to survive the
-          BUMP -- [tf_resume_gpr_bump], [tf_resume_pc_bump] -- is guarded on
-          [tf_arg_idx 0 < length tf] / [tf_epc_idx < length tf], and nothing
-          else in the bundle pins the length: [uvis] carries a bare list.
-          Both producers deliver the key at [uvis_of_run], whose list is
-          [tf_of], so the conjunct is [tf_of_length] at both of them. *)
        ⌜length (uvis_tf W) = TFWORDS⌝ ∗
-       ⌜trap_mstatus_ok ms_v⌝ ∗
-       hart_state ↦ᵣ HART_ACTIVE tt ∗
-       cur_privilege ↦ᵣ Supervisor ∗
-       mstatus ↦ᵣ ms_v ∗
-       scause ↦ᵣ sc ∗
-       stval ↦ᵣ stv ∗
-       sepc ↦ᵣ tf_w (uvis_tf W) tf_epc_idx ∗
-       pc_is (stvec_base (uc_stvec C)) ∗
-       gpr_file (tf_resume_gpr0 (uvis_tf W)) ∗
-       user_ptm_inv pt sz (uvis_M W) ∗
-       user_cfg C ∗
-       Rut pt)%I.
+       user_trap_frame_atm C pt Rut sz (uvis_M W) ms_v sc stv
+         (tf_w (uvis_tf W) tf_epc_idx) (tf_resume_gpr0 (uvis_tf W)))%I.
+
+  (* the two movers.  The factoring is definitional, so the opener is
+     [reflexivity] and the closer is one [iExists]. *)
+  Lemma trapped_machine_unfold (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+      (sz : Z) (sc stv : mword 64) (W : uvis) :
+    trapped_machine C pt Rut sz sc stv W ⊣⊢
+    ∃ ms_v : mword 64,
+      ⌜length (uvis_tf W) = TFWORDS⌝ ∗
+      user_trap_frame_atm C pt Rut sz (uvis_M W) ms_v sc stv
+        (tf_w (uvis_tf W) tf_epc_idx) (tf_resume_gpr0 (uvis_tf W)).
+  Proof. reflexivity. Qed.
+
+  Lemma trapped_machine_intro (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+      (sz : Z) (sc stv : mword 64) (W : uvis) (ms_v : mword 64) :
+    length (uvis_tf W) = TFWORDS ->
+    user_trap_frame_atm C pt Rut sz (uvis_M W) ms_v sc stv
+      (tf_w (uvis_tf W) tf_epc_idx) (tf_resume_gpr0 (uvis_tf W)) -∗
+    trapped_machine C pt Rut sz sc stv W.
+  Proof.
+    iIntros (Hlen) "H". rewrite /trapped_machine. iExists ms_v.
+    iSplitR; [ iPureIntro; exact Hlen | iExact "H" ].
+  Qed.
 
   (* the old existential frame is a trapped machine at the key uservec
      saves -- the one direction the generic inhabitant needs *)
@@ -427,7 +446,7 @@ Section TrappedMachine.
                  with "Hg") as "[%Hx0 Hg]".
     iExists (uvis_of_run g sepc_v M π), sc_v, stval_v.
     iSplitR; [ iPureIntro; reflexivity | ].
-    rewrite /trapped_machine. cbn [uvis_tf uvis_M uvis_of_run].
+    rewrite /trapped_machine /user_trap_frame_atm. cbn [uvis_tf uvis_M uvis_of_run].
     rewrite tf_of_epc (tf_of_resume_gpr g sepc_v Hx0).
     iExists ms_v.
     iFrame "Hhs Hpriv Hms Hsc Hstv Hsep Hpc Hg Hpt Hcfg Hrut".

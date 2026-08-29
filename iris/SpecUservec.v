@@ -137,45 +137,50 @@ Definition uservec_gpr (g : regfile) (vksp vkhart vktr vksat : bv 64) : regfile 
   (<[Regidx (mword_of_int 10) := mword_of_int TRAPFRAME]> g)))))).
 
 (* ===================================================================== *)
-(* THE ROUND AT THIS BOUNDARY -- [SpecUsertrap.ut_round] with the IMAGE     *)
-(* HALF DROPPED (UexecRound.v SS5).                                        *)
+(* THE ROUND AT THIS BOUNDARY -- [SpecUsertrap.ut_round] read at the        *)
+(* MACHINE that trapped (milestone J, S3: the image half is back).         *)
 (*                                                                         *)
-(* usertrap hands back [UsertrapRes.ut_res], which OWNS                    *)
-(* [ProcPtOwn.proc_ptm … (us_M U')], so its post's image equation has      *)
-(* content.  THIS boundary hands back the BARE residue, whose body never   *)
-(* mentions [us_M] at all -- [ut_res_bare pt ksp U] and                    *)
+(* It used to drop the image (UexecRound.v SS5's [uround_vis_ok]), and the *)
+(* reason is worth keeping: THIS boundary hands back the BARE residue,     *)
+(* whose body never mentions [us_M] at all -- [ut_res_bare pt ksp U] and   *)
 (* [ut_res_bare pt ksp (upd_usM U M')] are literally the same proposition, *)
 (* because across user execution the kernel does not own the user bytes.   *)
-(* An image equation stated at THAT index would be a gap premise, so what  *)
-(* crosses here is only what the bare residue pins: the trapframe (its     *)
-(* [tf_page]) and the permission map (a function of the owned [pv_upt] /   *)
-(* [pv_sz]).  Milestone J proper re-states the image at [UexecRet.uvb],    *)
-(* which names it by construction.                                         *)
+(* An image equation stated at THAT index would have been a gap premise.   *)
+(*                                                                         *)
+(* What changed is that neither end is stated at the residue's index any   *)
+(* more.  The ENTRY image [M] is a parameter, anchored by the entry frame  *)
+(* ([UserExec.user_trap_frame_atm]'s [user_ptm_inv pt sz M]); the EXIT one *)
+(* is [us_M U'], anchored by the [ProcPtOwn.proc_ptm] the post hands over  *)
+(* as [UserPtTree.user_ptm_inv].  Both are real resources, so the full     *)
+(* [UexecRound.uround_ok] is honest here.                                  *)
 (*                                                                         *)
 (* [tf0] is [UexecRet.tf_of g (ret_pc sepc_v)]: the 36-word list uservec's *)
 (* own save walk stores, at the epc usertrap's prologue then writes.       *)
 (* ===================================================================== *)
-Definition uv_round (U : ustate) (g : regfile) (sepc_v sc_v : mword 64)
-    (U' : ustate) : Prop :=
-  uround_vis_ok sc_v (tf_of g (ret_pc sepc_v))
+Definition uv_round (U : ustate) (M : gmap Z (bv 8)) (g : regfile)
+    (sepc_v sc_v : mword 64) (U' : ustate) : Prop :=
+  uround_ok sc_v (tf_of g (ret_pc sepc_v))
+    M
     (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
     (pv_tf (us_V U'))
+    (us_M U')
     (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U')))).
 
 (* the bridge: usertrap's round, read at the machine that trapped.  The
    premise is the SAVE WALK's own fact -- the 31 words uservec stored are
    [g]'s registers -- as a [tf_ueq]. *)
-Lemma uv_round_of_ut (Uut U : ustate) (g : regfile) (sepc_v sc_v : mword 64)
-    (U' : ustate) :
+Lemma uv_round_of_ut (Uut U : ustate) (M : gmap Z (bv 8)) (g : regfile)
+    (sepc_v sc_v : mword 64) (U' : ustate) :
   tf_ueq (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V Uut)))
          (tf_of g (ret_pc sepc_v)) ->
   perm_of (ud_um (pv_upt (us_V Uut))) (uint (pv_sz (us_V Uut)))
     = perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))) ->
+  us_M Uut = M ->
   SpecUsertrap.ut_round sepc_v sc_v Uut U' ->
-  uv_round U g sepc_v sc_v U'.
+  uv_round U M g sepc_v sc_v U'.
 Proof.
-  intros Hu Hpi Hr. unfold uv_round. rewrite <- Hpi.
-  eapply uround_vis_of_ok. eapply uround_ok_ueq_l; [ exact Hu | exact Hr ].
+  intros Hu Hpi Hm Hr. unfold uv_round. rewrite <- Hpi. rewrite <- Hm.
+  eapply uround_ok_ueq_l; [ exact Hu | exact Hr ].
 Qed.
 
 (* THE CONTINUATION, NAMED for the same reason the old one was: a
@@ -198,19 +203,27 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{
        the register file [user_trap_frame_at] delivers and [sepc_v] the
        faulting pc, so [tf0] is [UexecRet.tf_of g (ret_pc sepc_v)] -- the very
        36-word list uservec's own save walk stores. *)
-    (U : ustate) (g : regfile) (sepc_v sc_v : mword 64) : iProp Σ :=
+    (U : ustate)
+    (* THE ROUND'S ENTRY IMAGE (milestone J, S3).  Named, because the entry
+       frame names it: [wp_uservec_pt_body] takes
+       [UserExec.user_trap_frame_atm] at [(uint (pv_sz (us_V U)), M)] and the
+       exit switch parks exactly that map into the residue.  So the round
+       below is the FULL [UexecRound.uround_ok], image half included. *)
+    (M : gmap Z (bv 8)) (g : regfile) (sepc_v sc_v : mword 64) : iProp Σ :=
   ( ∀ (pt' : uptd) (mf : regfile) (ms' usatp uepc sc' stval' mdv0 : mword 64)
       (U' : ustate),
-    (* ---- THE ROUND, WITHOUT THE IMAGE HALF.  [uround_vis_ok] rather than
-       [uround_ok] because THIS boundary's residue is the BARE one, whose
-       body never mentions [us_M]: an image equation stated at its index
-       would be a gap premise.  See UexecRound.v SS5.  What is stated is
-       what the bare residue pins -- the trapframe (its [tf_page]) and the
-       permission map (a function of the owned [pv_upt] / [pv_sz]).
+    (* ---- THE ROUND, IMAGE HALF INCLUDED (milestone J, S3).  It used to be
+       [uround_vis_ok] -- the relation with the image existentially weakened
+       away -- because the boundary's residue is the BARE one, whose body
+       never mentions [us_M], so an image equation stated at ITS index would
+       have been a gap premise.  The entry frame now NAMES the image ([M],
+       above), and the exit image is the one the residue's own [proc_ptm]
+       carried back through [usertrap_res_ptm_open], so both ends are
+       anchored to a resource and the full [UexecRound.uround_ok] is honest.
        The last row is the REGISTER-FILE TIE: the file userret restored IS
        the resume projection of the trapframe the round left. *)
     ⌜pv_upt (us_V U') = pt'⌝ -∗
-    ⌜uv_round U g sepc_v sc_v U'⌝ -∗
+    ⌜uv_round U M g sepc_v sc_v U'⌝ -∗
     ⌜ret_pc uepc = tf_resume_pc (pv_tf (us_V U'))⌝ -∗
     ⌜mf = tf_resume_gpr0 (pv_tf (us_V U'))⌝ -∗
     ⌜ud_tfp pt' = ud_tfp pt⌝ -∗
@@ -256,12 +269,19 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{
     sepc ↦ᵣ uepc -∗
     (* THE WHOLE ADDRESS SPACE, back in the USER view -- not just the
        translation invariant.  The pages come with it: they are the same
-       resource [proc_pt_own] holds page-indexed while the kernel runs
-       ([ProcPtOwn.user_pt_inv_close] is the conversion), and if this post
+       resource the residue held while the kernel ran
+       ([ProcPtOwn.user_ptm_inv_close] is the conversion), and if this post
        handed back only [utlb_inv_pt] while the residue below still carried
-       [proc_pt], the two together would claim the tree and the pages twice
-       over -- the vacuity this whole boundary was restated to avoid. *)
-    user_pt_any pt' -∗
+       the address space, the two together would claim the tree and the
+       pages twice over -- the vacuity this whole boundary was restated to
+       avoid.
+         AT THE NAMED LAZY IMAGE (milestone J, S3).  This used to be
+       [UserPtTree.user_pt_any pt'] -- the mapped bundle with the image
+       quantified -- and the loop could not name what it passed on to the
+       next round.  [user_ptm_inv] at the post's OWN index [U'] is what the
+       round's image half above relates to, and it is the conjunct
+       [UexecRet.uvb] carries. *)
+    user_ptm_inv pt' (uint (pv_sz (us_V U'))) (us_M U') -∗
     pc_is (ret_pc uepc) -∗
     gpr_file mf -∗
     (* the leftover: usertrap's OWN kernel-internal BARE bundle (no address
@@ -299,11 +319,18 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : Gen
     (URes : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ)
     (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
     (j : nat) (vksp : mword 64) (U : ustate)
-    (* THE DELIVERED FRAME, AT NAMED VALUES.  [user_trap_frame] is
-       definitionally the ∃ over [user_trap_frame_at], so this is the same
-       premise with its five data given names -- which is what lets the post
-       above say WHICH state the round started from. *)
-    (g : regfile) (ms_v sc_v stval_v sepc_v : mword 64) :=
+    (* THE DELIVERED FRAME, AT NAMED VALUES AND A NAMED IMAGE.
+       [user_trap_frame] is definitionally the ∃ over [user_trap_frame_at],
+       so the five data are the same premise with names -- which is what
+       lets the post above say WHICH state the round started from -- and
+       [user_trap_frame_atm] names the SIXTH, the process's memory, at the
+       lazy sz-region view (milestone J, S3).  The size is not free: the
+       exit switch parks the address space into the residue, whose [ut_own]
+       holds it at the process's own [p->sz], so it is
+       [uint (pv_sz (us_V U))].  The IMAGE is free -- the bare residue owns
+       none of the user bytes -- and it is what the round's left-hand side
+       is stated at. *)
+    (M : gmap Z (bv 8)) (g : regfile) (ms_v sc_v stval_v sepc_v : mword 64) :=
   (* stvec points at the trampoline base *)
   uc_stvec C = mword_of_int TRAMPOLINE ->
   (* the kernel owns the config cells outright at this join (same fact the
@@ -356,8 +383,10 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : Gen
      caller holds it from kvminithart's postcondition -- same premise
      [wp_userret_pt] takes) *)
   kmap_at tramp_vpn tramp_ppn KP_rx -∗
-  (* the machine, exactly as the trap delivers it -- at NAMED data *)
-  user_trap_frame_at C pt Rut ms_v sc_v stval_v sepc_v g -∗
+  (* the machine, exactly as the trap delivers it -- at NAMED data, image
+     included *)
+  user_trap_frame_atm C pt Rut (uint (pv_sz (us_V U))) M
+    ms_v sc_v stval_v sepc_v g -∗
   (* the kernel-side resources parked while user code ran.  [sscratch] is
      NOT among them: it lives in [IntrDefs.hart_csrs], inside the residue
      below, and the proof borrows it from there ([usertrap_res_tf_csrs_open])
@@ -383,7 +412,7 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : Gen
      [proc_addr j <> zero_reg]) the pinning condition is vacuous, so the
      caller owes the post at every hart. *)
   wp_next true (proc_addr j) (fun CID' : CpuId =>
-    uservec_post (CID := CID') (URes CID') C pt vksp U g sepc_v sc_v) -∗
+    uservec_post (CID := CID') (URes CID') C pt vksp U M g sepc_v sc_v) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type USERVEC.
@@ -397,7 +426,7 @@ Module Type USERVEC.
   Parameter wp_uservec_pt :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
-      (j : nat) (vksp : mword 64) (U : ustate)
+      (j : nat) (vksp : mword 64) (U : ustate) (M : gmap Z (bv 8))
       (g : regfile) (ms_v sc_v stval_v sepc_v : mword 64),
       (* THE BARE RESIDUE, not [usertrap_res] and not even the parked form.
          [usertrap_res] and this spec's own [user_trap_frame] premise claim
@@ -408,10 +437,10 @@ Module Type USERVEC.
          bare form owns none of the address space; uservec's exit switch
          produces both missing pieces at once (it converts the user table
          back to a [pt_frame] and writes the kernel root into satp), which
-         [usertrap_res_pt_close] then [usertrap_res_tlb_close] fold back in
+         [usertrap_res_ptm_close] then [usertrap_res_tlb_close] fold back in
          just before the call into usertrap.  userret's entry switch runs
          the same two moves in reverse.  See
          claude-notes/projects/uservec.md. *)
       wp_uservec_pt_body (fun h : CpuId => usertrap_res_bare (CID := h))
-        C pt Rut j vksp U g ms_v sc_v stval_v sepc_v.
+        C pt Rut j vksp U M g ms_v sc_v stval_v sepc_v.
 End USERVEC.

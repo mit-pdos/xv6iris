@@ -1328,6 +1328,65 @@ Section UsertrapRes.
     iSplitL "Hsy"; [iExact "Hsy" | iExact "Huwp"].
   Qed.
 
+  (* ---- THE SAME TWO CROSSINGS, WITH THE IMAGE NAMED (milestone J, S3) ----
+     [ut_res_pt_close] / [_pt_open] were stated at [proc_pt] / [proc_pt_any]
+     -- the MAPPED view -- so the open threw the name away
+     ([proc_ptm_pt]) and the close had to invent one
+     ([proc_pt_ptm_any]).  The residue's own [ut_own] has held
+     [proc_ptm … (uint (pv_sz (us_V U))) (us_M U)] all along
+     ([ut_own_pt_open] / [_pt_close]), so the named pair below is the SAME
+     proof minus that one weakening step -- which is exactly what the trap
+     loop needs to hand user execution an image it can name.
+
+     THE SIZE IS NOT A DEGREE OF FREEDOM: [ut_own]'s conjunct is at
+     [uint (pv_sz (us_V U))], the process's own [p->sz], so both directions
+     are stated there.  The IMAGE is: the bare residue does not own the user
+     bytes, so [ut_res_ptm_close] re-parks at whatever image the caller
+     hands back. *)
+  Lemma ut_res_ptm_open (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
+      (pt : uptd) (ksp : mword 64) (U : ustate) :
+    ut_res_parked Rsys pt ksp U -∗
+    proc_ptm pt (uint (pv_sz (us_V U))) (us_M U) ∗ ut_res_bare Rsys pt ksp U.
+  Proof.
+    iIntros "H".
+    iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
+    subst pt.
+    iDestruct (ut_own_pt_open with "Hown") as "(Hown & Hpt)".
+    iSplitL "Hpt"; [iExact "Hpt" |].
+    (* row by row, not framed -- see [ut_res_tlb_close] *)
+    iExists N, av. rewrite /ut_env_nopt.
+    iSplitR; [iPureIntro; reflexivity |].
+    iSplitR; [iPureIntro; exact Hksp |].
+    iSplitR; [iPureIntro; exact Hwf |].
+    iSplitR; [iPureIntro; exact Hav |].
+    iSplitR; [iExact "Htfk" |].
+    iSplitR; [iExact "Htc" |].
+    iSplitL "Htrap"; [iExact "Htrap" |].
+    iSplitL "Hcaps"; [iExact "Hcaps" | iExact "Hown"].
+  Qed.
+
+  Lemma ut_res_ptm_close (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
+      (pt : uptd) (ksp : mword 64) (U : ustate) (M : gmap Z (bv 8)) :
+    ut_res_bare Rsys pt ksp U -∗
+    proc_ptm pt (uint (pv_sz (us_V U))) M -∗
+    ut_res_parked Rsys pt ksp (upd_usM U M).
+  Proof.
+    iIntros "H Hpt".
+    iDestruct "H" as (N av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
+    subst pt.
+    iDestruct (ut_own_pt_close Rsys N (upd_usM U M) with "Hown Hpt") as "Hown".
+    (* row by row, not framed -- see [ut_res_tlb_close] *)
+    iExists N, av. rewrite /ut_env.
+    iSplitR; [iPureIntro; reflexivity |].
+    iSplitR; [iPureIntro; exact Hksp |].
+    iSplitR; [iPureIntro; exact Hwf |].
+    iSplitR; [iPureIntro; exact Hav |].
+    iSplitR; [iExact "Htfk" |].
+    iSplitR; [iExact "Htc" |].
+    iSplitL "Htrap"; [iExact "Htrap" |].
+    iSplitL "Hcaps"; [iExact "Hcaps" | iExact "Hown"].
+  Qed.
+
   Lemma ut_res_pt_close (Rsys : gname -> mword 64 -> fclose_names -> iProp Σ)
       (pt : uptd) (ksp : mword 64) (U : ustate) (M : gmap Z (bv 8)) :
     ut_res_bare Rsys pt ksp U -∗ proc_pt pt M -∗
