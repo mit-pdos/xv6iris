@@ -140,6 +140,7 @@ Require Import FsAbsMknodFire.   (* [mkf_auth_nview]                        *)
 Require Import FsAbsOpenFire.    (* [opf_era_file_row], [opf_era_type]      *)
 Require FsImg.                   (* [T_FILE_z] -- Require, NOT Import       *)
 Require Import FsAbs.            (* LAST (FsAbs's own rule)                 *)
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -368,6 +369,7 @@ Section WriteFire.
   (* [FsAbsMknodFire]'s binder list, verbatim. *)
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
   Implicit Types Γ : fs_view_names Σ.
 
   (* =================================================================== *)

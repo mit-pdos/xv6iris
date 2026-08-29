@@ -117,6 +117,7 @@ Require Import FsAbsWriteFire.     (* [awrite_commits_at]                   *)
 Require Import SpecSysWriteAUEra.  (* [write_arms_at]                       *)
 Require Import FsAbs.              (* LAST (FsAbs's own rule)               *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -124,7 +125,7 @@ Local Open Scope Z_scope.
    for resource; the three edits are marked. *)
 Definition wp_filewrite_au_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ,
-      !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname)                    (* kalloc, file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
     (k : nat) (q : Qp) (st : fdstate)            (* the borrowed reference  *)
@@ -219,6 +220,7 @@ Definition wp_filewrite_au_body
 Section FilewriteAUState.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
   Implicit Types Γ : fs_view_names Σ.
 
   Definition fw_au_raw Γ (i : Z) (n : Z)
@@ -308,7 +310,7 @@ Global Typeclasses Opaque fw_au_raw.
 Module Type FILEWRITE_AU.
   Parameter wp_filewrite_au :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (k : nat) (q : Qp) (st : fdstate)

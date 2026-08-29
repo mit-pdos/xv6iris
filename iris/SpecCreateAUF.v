@@ -135,6 +135,7 @@ Require Import Xv6G.
 Require Import FsCfg.
 Require Import FsAbs.           (* LAST (FsAbs's own rule)                  *)
 Import Defs.
+Require Import TsoCtx.
 
 Section CreateAUFSpec.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
@@ -244,7 +245,7 @@ Global Typeclasses Opaque cauf_ok cauf_fail.
 
 Definition wp_create_auf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -386,7 +387,7 @@ Definition wp_create_auf_body
 Module Type CREATE_AUF.
   Parameter wp_create_auf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γs : list gname) (j : nat) (γl : gname)
       (pd pav pu : mword 64)
  (γf : gname)

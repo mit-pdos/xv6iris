@@ -68,12 +68,14 @@ Require Import FsAbsMknodFire.   (* the two commits                         *)
 Require Import SpecCreateAUF.    (* [cauf_ok], [cauf_fail]                  *)
 Require Import SpecSysOpenAU.    (* the consumer, which does NOT move       *)
 Require Import FsAbs.            (* LAST (FsAbs's own rule)                 *)
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
 Section CreateAUFOpen.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
   Implicit Types Γ : fs_view_names Σ.
 
   (* ------------------------------------------------------------------ *)

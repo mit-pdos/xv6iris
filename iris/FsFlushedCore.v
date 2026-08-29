@@ -72,6 +72,7 @@ Require Import Xv6Cameras.      (* [fsCrashG], [lockG], [fsLinkG], [fsTopG] *)
 Require Import BioDefs.
 Require Import FsDurSnap.       (* [snap_ok], [snap_holds], [P_dur_tie_keep] *)
 Require Import FsCrash.         (* [P_fs], [fs_receipt], [fs_hist_lb], [fs_bank] *)
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -264,6 +265,7 @@ Section flushed_seam.
      section states things about [fs_receipt_any], which lives there because
      the seam equations name the FIXED layer's gnames. *)
   Context `{!riscvGS Σ, !fsCrashG Σ, !lockG Σ}.
+  Context `{XI : CurCtx}.
   Context `{!fsLinkG Σ, !fsTopG Σ}.
 
   (* [FsCrash.fs_receipt_any] with the batch NUMBER exposed.  [γs] is

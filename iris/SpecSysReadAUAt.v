@@ -72,6 +72,7 @@ Require Import FsBytesGamma.   (* [fs_gamma_L]: the live Γ                  *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.  (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
+Require Import TsoCtx.
 Require Import SpecSysReadAU.
 Require Import FsAbsReadFire.
 
@@ -82,7 +83,7 @@ Local Open Scope Z_scope.
    frozen file's, applied verbatim. *)
 Definition wp_sys_read_au_at_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname)
     (γs : list gname) (j : nat) (γlp : gname)
     (fn : fread_names)
@@ -101,7 +102,7 @@ Definition wp_sys_read_au_at_body
 (* THE STABLE COROLLARY at the same swap. *)
 Definition wp_sys_read_au_at_stable_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname)
     (γs : list gname) (j : nat) (γlp : gname)
     (fn : fread_names)
@@ -123,7 +124,7 @@ Definition wp_sys_read_au_at_stable_body
 Module Type SYSREAD_AU_AT.
   Parameter wp_sys_read_au_at :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fread_names)
@@ -137,7 +138,7 @@ Module Type SYSREAD_AU_AT.
 
   Parameter wp_sys_read_au_at_stable :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fread_names)

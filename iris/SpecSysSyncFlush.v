@@ -158,7 +158,7 @@ Require Import TsoCtx.
 
 Section sys_sync_flush.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId}.
+  Context `{GEN : GenId} `{XI : CurCtx}.
 
   (* ------------------------------------------------------------------ *)
   (*  THE RECEIPT, AT THE WAL'S OWN BATCH SCALE                           *)

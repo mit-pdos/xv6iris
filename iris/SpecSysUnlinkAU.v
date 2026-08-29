@@ -339,6 +339,7 @@ Require Import FsAbsEraMknod.   (* the era walk-premise pair, reused
 Require Import FsAbsMknodFire.  (* [dlookup_commit_at]; the [_at] mold *)
 Require Import FsAbs.           (* LAST (FsAbs's own rule) *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -571,6 +572,7 @@ Qed.
 Section SysUnlinkAU.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
   Implicit Types Γ : fs_view_names Σ.
 
   (* ------------------------------------------------------------------ *)
@@ -784,7 +786,7 @@ Global Typeclasses Opaque unlink_au_pre unlink_post_ok unlink_post_fail
    the binder list [(mf, P')]: the image does not move (header). *)
 Definition wp_sys_unlink_au_frame
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname)      (* ftable, kalloc, printk   *)
     (gs : list gname) (j : nat) (gl : gname)     (* the running process *)
     (pd pav pu : mword 64)                       (* disk fabric + lock  *)
@@ -890,7 +892,7 @@ Definition wp_sys_unlink_au_frame
    definitional ([FsAbs.ftop_gamma_top]). *)
 Definition wp_sys_unlink_au_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname)
     (gs : list gname) (j : nat) (gl : gname)
     (pd pav pu : mword 64)
@@ -917,7 +919,7 @@ Definition wp_sys_unlink_au_body
 Module Type SYSUNLINK_AU.
   Parameter wp_sys_unlink_au :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γf : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (pd pav pu : mword 64)

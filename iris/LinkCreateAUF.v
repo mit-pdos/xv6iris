@@ -12,6 +12,7 @@
    [T_FILE <> T_DIR] refutes the +0xca branch just as [T_DEVICE <> T_DIR]
    does one file over (SpecCreateAUF's header). *)
 Require Import LinkNparWrapEra LinkIlock LinkIunlockput LinkDirlookup
+Require Import TsoCtx.
         LinkIalloc LinkIupdate LinkDirlink
         ProofCreateAUF.
 

@@ -47,6 +47,7 @@ Require Import FsTree.
 Require Import FsImg.
 Require Import FsDurSnap.       (* [P_dur], [snap_ok], [P_dur_tie_keep]    *)
 Require Import FsDurSyscall.    (* [snap_holds], [dur_node], [dur_sb], ... *)
+Require Import TsoCtx.
 (* THE RECEIPT, re-exported so that this file's own interface is unchanged
    by the split.  [Require Export], not Import: importers of [FsFlushed]
    name [flushed]/[flushed_at] and must keep seeing them here. *)
@@ -64,6 +65,7 @@ Local Open Scope Z_scope.
 
 Section dur_at.
   Context `{!riscvGS Σ, !fsCrashG Σ, !lockG Σ}.
+  Context `{XI : CurCtx}.
   Context `{!fsLinkG Σ, !fsTopG Σ}.
 
   (* THE CERTIFICATE.  The bound [b] and the map [D] travel together because

@@ -89,6 +89,7 @@ Require Import FsAbsWriteFire.
 Require Import SpecSysWriteAUEra.
 Require Import FsAbs.          (* LAST (FsAbs's own rule) *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -99,7 +100,7 @@ Module SysWriteAUStable (W : SYSWRITE_AU_ERA) : SYSWRITE_AU_ERA_STABLE.
 Section ProofStable.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   Lemma wp_sys_write_au_era_stable
       (γf : gname) (γs : list gname) (j : nat) (γlp : gname)

@@ -74,6 +74,7 @@ Require Import FsAbsEra.
 Require Import FsAbsMknodFire.   (* [acre_commit_at], [mkf_abs_of_dir]      *)
 Require FsImg.                   (* [T_FILE_z] -- Require, NOT Import       *)
 Require Import FsAbs.            (* LAST (FsAbs's own rule)                 *)
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -151,6 +152,7 @@ Section CreateFire.
   (* [FsAbsMknodFire]'s binder list, verbatim. *)
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
   Implicit Types Γ : fs_view_names Σ.
 
   (* =================================================================== *)

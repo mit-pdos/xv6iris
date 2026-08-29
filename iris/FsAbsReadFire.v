@@ -107,6 +107,7 @@ Require Import SpecSysReadAU.    (* the contract this file serves           *)
 Require FsImg.                   (* [T_FILE_z] -- Require, NOT Import
                                     ([FsAbsOpenFire]'s reason)              *)
 Require Import FsAbs.            (* LAST (FsAbs's own rule)                 *)
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -209,6 +210,7 @@ Section ReadFire.
   (* [FsAbsOpenFire]'s binder list, verbatim. *)
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
   Implicit Types Γ : fs_view_names Σ.
 
   (* SINGLE-PHASE AND READ-ONLY at the RAW MAP: the caller hands the very

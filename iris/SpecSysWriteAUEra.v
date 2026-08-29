@@ -98,6 +98,7 @@ Require Import SpecSysWriteAU. (* the frozen statement this parallels       *)
 Require Import FsAbsWriteFire. (* [awrite_commit_at] and its bundle         *)
 Require Import FsAbs.          (* LAST (FsAbs's own rule)                   *)
 Import Defs.
+Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 
@@ -221,7 +222,7 @@ Global Typeclasses Opaque write_post_ok_at write_post_fail_at
 
 Definition wp_sys_write_au_era_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname)
     (γs : list gname) (j : nat) (γlp : gname)
     (fn : fwrite_names)
@@ -239,7 +240,7 @@ Definition wp_sys_write_au_era_body
 
 Definition wp_sys_write_au_era_stable_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γf : gname)
     (γs : list gname) (j : nat) (γlp : gname)
     (fn : fwrite_names)
@@ -264,7 +265,7 @@ Definition wp_sys_write_au_era_stable_body
 Module Type SYSWRITE_AU_ERA.
   Parameter wp_sys_write_au_era :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fwrite_names)
@@ -283,7 +284,7 @@ End SYSWRITE_AU_ERA.
 Module Type SYSWRITE_AU_ERA_STABLE.
   Parameter wp_sys_write_au_era_stable :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fwrite_names)

@@ -102,6 +102,7 @@ Require Import FsImgCheck.     (* [fsimg_sb], [fsimg_wf_log_clean],
 Require Import FsImg.
 Require Import FsAbs.          (* LAST (FsAbs's own rule)               *)
 Require Import FsInitPin.      (* [era0_D], [INIT_INO], [init_path],
+Require Import TsoCtx.
                                   [init_bytes] and the three pins       *)
 
 Local Open Scope Z_scope.
