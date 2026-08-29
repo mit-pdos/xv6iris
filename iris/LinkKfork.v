@@ -31,5 +31,5 @@ Require Import ProofKforkMain.
    silently read `assumed` despite being proven and linked.  Every other Link
    file in the tree uses the same bare `<F>Proof` convention. *)
 Module Kfork := KforkProof
-  Myproc AllocprocGen Uvmcopy Freeproc Release Acquire
+  Myproc AllocprocGen Uvmcopy Freeproc Release ReleaseIn Acquire
   Filedup Idup Safestrcpy.

@@ -1,4 +1,4 @@
-DIGEST 5d2433bd34cb9a60074c15080e6b5cbc
+DIGEST 84cdc14e93d71a718c12ee789cdae21d
 Fxv6iris.LinkKfork
 R1307:1316 xv6iris.LinkMyproc <> <> lib
 R1318:1330 xv6iris.LinkAllocproc <> <> lib
@@ -16,8 +16,9 @@ R1895:1906 xv6iris.LinkAllocproc AllocprocGen <> modtype
 R1908:1914 xv6iris.LinkUvmcopy Uvmcopy <> modtype
 R1916:1923 xv6iris.LinkFreeproc Freeproc <> modtype
 R1925:1931 xv6iris.LinkRelease Release <> modtype
-R1933:1939 xv6iris.LinkAcquire Acquire <> modtype
-R1943:1949 xv6iris.LinkFiledup Filedup <> modtype
-R1951:1954 xv6iris.LinkIdup Idup <> modtype
-R1956:1965 xv6iris.LinkSafestrcpy Safestrcpy <> modtype
+R1933:1941 xv6iris.LinkRelease ReleaseIn <> modtype
+R1943:1949 xv6iris.LinkAcquire Acquire <> modtype
+R1953:1959 xv6iris.LinkFiledup Filedup <> modtype
+R1961:1964 xv6iris.LinkIdup Idup <> modtype
+R1966:1975 xv6iris.LinkSafestrcpy Safestrcpy <> modtype
 mod 1866:1870 <> Kfork

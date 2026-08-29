@@ -1,4 +1,4 @@
-DIGEST ce864dae38a16820d54f495c858c2836
+DIGEST 3f4c596f7191b525ab12669a10424121
 Fxv6iris.SpecForkretPark
 R4921:4926 Stdlib.ZArith.ZArith <> <> lib
 R4928:4930 Stdlib.micromega.Lia <> <> lib
@@ -113,60 +113,59 @@ R7014:7023 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
 R6994:7003 xv6iris.IrefSlots <> iref_slots def
 R7005:7013 xv6iris.IrefSlots <> IREFSPARE def
 R7024:7028 iris.bi.updates <> ::bi_scope:'|==>'_x not
-R7029:7032 iris.bi.interface <> ::bi_scope:'▷'_x not
-R7033:7040 xv6iris.SchedCtx <> proc_ctx def
-R7046:7047 xv6iris.SpecForkretPark <> pa:13 var
-R7042:7044 xv6iris.SpecForkretPark <> γs:11 var
-modtype 7063:7074 <> FORKRET_PARK
-ax 7089:7100 FORKRET_PARK forkret_park
-R7108:7116 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-R7363:7371 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
-R7118:7124 xv6iris.RiscvPtsto <> riscvGS class
-binder 7126:7127 <> Σ:18
-binder 7117:7127 <> riscvGS0:19
-R7131:7134 xv6iris.Xv6G <> xv6G class
-R7136:7137 xv6iris.SpecForkretPark <> Σ:18 var
-binder 7130:7137 <> xv6G0:20
-R7141:7148 xv6iris.Xv6Cameras <> bioslotG class
-R7150:7151 xv6iris.SpecForkretPark <> Σ:18 var
-binder 7140:7151 <> bioslotG0:21
-R7155:7161 xv6iris.FdSlots <> fdslotG class
-R7163:7164 xv6iris.SpecForkretPark <> Σ:18 var
-binder 7154:7164 <> fdslotG0:22
-R7168:7176 xv6iris.IrefSlots <> irefslotG class
-R7178:7179 xv6iris.SpecForkretPark <> Σ:18 var
-binder 7167:7179 <> irefslotG0:23
-R7183:7187 xv6iris.FileInvDefs <> fileG class
-R7189:7190 xv6iris.SpecForkretPark <> Σ:18 var
-binder 7182:7190 <> fileG0:24
-R7201:7205 xv6iris.RiscvLang <> GenId class
-binder 7195:7197 <> GEN:25
-R7216:7220 xv6iris.RiscvLang <> CpuId class
-binder 7210:7212 <> CID:26
-R7230:7235 xv6iris.TsoCtx <> CurCtx class
-binder 7225:7226 <> XI:27
-R7251:7254 Corelib.Init.Datatypes <> list ind
-R7256:7260 iris.base_logic.lib.iprop <> gname def
-binder 7245:7247 <> γs:28
-R7276:7280 iris.base_logic.lib.iprop <> gname def
-binder 7270:7272 <> γf:29
-R7292:7296 SailStdpp.Values <> mword def
-binder 7284:7285 <> pa:30
-R7292:7296 SailStdpp.Values <> mword def
-binder 7287:7288 <> ks:31
-R7310:7313 Corelib.Init.Datatypes <> list ind
-R7316:7320 SailStdpp.Values <> mword def
-binder 7303:7306 <> rest:32
-R7340:7344 SailStdpp.Values <> mword def
-binder 7334:7336 <> pid:33
-R7355:7362 xv6iris.ProcDefs <> pprivate rec
-binder 7351:7351 <> V:34
-R7372:7388 xv6iris.SpecForkretPark <> forkret_park_body def
-R7413:7413 xv6iris.SpecForkretPark <> V:34 var
-R7409:7411 xv6iris.SpecForkretPark <> pid:33 var
-R7404:7407 xv6iris.SpecForkretPark <> rest:32 var
-R7401:7402 xv6iris.SpecForkretPark <> ks:31 var
-R7398:7399 xv6iris.SpecForkretPark <> pa:30 var
-R7394:7396 xv6iris.SpecForkretPark <> γf:29 var
-R7390:7392 xv6iris.SpecForkretPark <> γs:28 var
-R7420:7431 xv6iris.SpecForkretPark FORKRET_PARK <> modtype
+R7029:7042 xv6iris.SchedCtx <> proc_ctx_boxed def
+R7048:7049 xv6iris.SpecForkretPark <> pa:13 var
+R7044:7046 xv6iris.SpecForkretPark <> γs:11 var
+modtype 7065:7076 <> FORKRET_PARK
+ax 7091:7102 FORKRET_PARK forkret_park
+R7110:7118 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R7365:7373 stdpp.base <> ::type_scope:'forall'_x_'..'_x_','_x not
+R7120:7126 xv6iris.RiscvPtsto <> riscvGS class
+binder 7128:7129 <> Σ:18
+binder 7119:7129 <> riscvGS0:19
+R7133:7136 xv6iris.Xv6G <> xv6G class
+R7138:7139 xv6iris.SpecForkretPark <> Σ:18 var
+binder 7132:7139 <> xv6G0:20
+R7143:7150 xv6iris.Xv6Cameras <> bioslotG class
+R7152:7153 xv6iris.SpecForkretPark <> Σ:18 var
+binder 7142:7153 <> bioslotG0:21
+R7157:7163 xv6iris.FdSlots <> fdslotG class
+R7165:7166 xv6iris.SpecForkretPark <> Σ:18 var
+binder 7156:7166 <> fdslotG0:22
+R7170:7178 xv6iris.IrefSlots <> irefslotG class
+R7180:7181 xv6iris.SpecForkretPark <> Σ:18 var
+binder 7169:7181 <> irefslotG0:23
+R7185:7189 xv6iris.FileInvDefs <> fileG class
+R7191:7192 xv6iris.SpecForkretPark <> Σ:18 var
+binder 7184:7192 <> fileG0:24
+R7203:7207 xv6iris.RiscvLang <> GenId class
+binder 7197:7199 <> GEN:25
+R7218:7222 xv6iris.RiscvLang <> CpuId class
+binder 7212:7214 <> CID:26
+R7232:7237 xv6iris.TsoCtx <> CurCtx class
+binder 7227:7228 <> XI:27
+R7253:7256 Corelib.Init.Datatypes <> list ind
+R7258:7262 iris.base_logic.lib.iprop <> gname def
+binder 7247:7249 <> γs:28
+R7278:7282 iris.base_logic.lib.iprop <> gname def
+binder 7272:7274 <> γf:29
+R7294:7298 SailStdpp.Values <> mword def
+binder 7286:7287 <> pa:30
+R7294:7298 SailStdpp.Values <> mword def
+binder 7289:7290 <> ks:31
+R7312:7315 Corelib.Init.Datatypes <> list ind
+R7318:7322 SailStdpp.Values <> mword def
+binder 7305:7308 <> rest:32
+R7342:7346 SailStdpp.Values <> mword def
+binder 7336:7338 <> pid:33
+R7357:7364 xv6iris.ProcDefs <> pprivate rec
+binder 7353:7353 <> V:34
+R7374:7390 xv6iris.SpecForkretPark <> forkret_park_body def
+R7415:7415 xv6iris.SpecForkretPark <> V:34 var
+R7411:7413 xv6iris.SpecForkretPark <> pid:33 var
+R7406:7409 xv6iris.SpecForkretPark <> rest:32 var
+R7403:7404 xv6iris.SpecForkretPark <> ks:31 var
+R7400:7401 xv6iris.SpecForkretPark <> pa:30 var
+R7396:7398 xv6iris.SpecForkretPark <> γf:29 var
+R7392:7394 xv6iris.SpecForkretPark <> γs:28 var
+R7422:7433 xv6iris.SpecForkretPark FORKRET_PARK <> modtype

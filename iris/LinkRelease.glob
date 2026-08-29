@@ -1,4 +1,4 @@
-DIGEST 77103851c6c0009eea898460f9a694cc
+DIGEST 82353b91ec80ac448001d8d99a59498e
 Fxv6iris.LinkRelease
 R368:378 xv6iris.LinkHolding <> <> lib
 R380:390 xv6iris.LinkPushOff <> <> lib
@@ -13,3 +13,6 @@ mod 468:474 <> Release
 R528:545 xv6iris.ProofRelease ReleaseCancelOfGen <> modtype
 R547:556 xv6iris.LinkRelease ReleaseGen <> modtype
 mod 511:523 <> ReleaseCancel
+R579:592 xv6iris.ProofRelease ReleaseInOfGen <> modtype
+R594:603 xv6iris.LinkRelease ReleaseGen <> modtype
+mod 566:574 <> ReleaseIn

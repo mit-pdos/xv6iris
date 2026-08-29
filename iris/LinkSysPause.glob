@@ -1,0 +1,19 @@
+DIGEST 3b2823419a8811ecdfe8e32cc5428503
+Fxv6iris.LinkSysPause
+R129:138 xv6iris.LinkArgint <> <> lib
+R140:150 xv6iris.LinkAcquire <> <> lib
+R152:162 xv6iris.LinkRelease <> <> lib
+R164:173 xv6iris.LinkMyproc <> <> lib
+R175:184 xv6iris.LinkKilled <> <> lib
+R186:201 xv6iris.LinkSleepPrepare <> <> lib
+R203:211 xv6iris.LinkSleep <> <> lib
+R213:225 xv6iris.ProofSysPause <> <> lib
+R248:260 xv6iris.ProofSysPause SysPauseProof <> modtype
+R262:267 xv6iris.LinkArgint Argint <> modtype
+R269:275 xv6iris.LinkAcquire Acquire <> modtype
+R277:283 xv6iris.LinkRelease Release <> modtype
+R285:290 xv6iris.LinkMyproc Myproc <> modtype
+R292:297 xv6iris.LinkKilled Killed <> modtype
+R299:310 xv6iris.LinkSleepPrepare SleepPrepare <> modtype
+R312:316 xv6iris.LinkSleep Sleep <> modtype
+mod 236:243 <> SysPause

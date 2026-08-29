@@ -1,0 +1,21 @@
+DIGEST 1b9007bd4e46ed9b575c25edf3f9786a
+Fxv6iris.LinkPipewrite
+R618:627 xv6iris.LinkMyproc <> <> lib
+R629:639 xv6iris.LinkAcquire <> <> lib
+R641:650 xv6iris.LinkKilled <> <> lib
+R652:661 xv6iris.LinkWakeup <> <> lib
+R663:678 xv6iris.LinkSleepPrepare <> <> lib
+R680:688 xv6iris.LinkSleep <> <> lib
+R690:699 xv6iris.LinkCopyin <> <> lib
+R701:711 xv6iris.LinkRelease <> <> lib
+R729:742 xv6iris.ProofPipewrite <> <> lib
+R766:779 xv6iris.ProofPipewrite PipewriteProof <> modtype
+R781:786 xv6iris.LinkMyproc Myproc <> modtype
+R788:797 xv6iris.LinkAcquire AcquireGen <> modtype
+R799:804 xv6iris.LinkKilled Killed <> modtype
+R806:811 xv6iris.LinkWakeup Wakeup <> modtype
+R813:824 xv6iris.LinkSleepPrepare SleepPrepare <> modtype
+R826:830 xv6iris.LinkSleep Sleep <> modtype
+R832:837 xv6iris.LinkCopyin Copyin <> modtype
+R839:848 xv6iris.LinkRelease ReleaseGen <> modtype
+mod 753:761 <> Pipewrite

@@ -1,0 +1,203 @@
+DIGEST 12cdcf7b904bfc790171c890688dad7b
+Fxv6iris.WpLockIn
+R1071:1076 Stdlib.ZArith.ZArith <> <> lib
+R1078:1080 Stdlib.micromega.Lia <> <> lib
+R1082:1085 Stdlib.Lists.List <> <> lib
+R1114:1117 stdpp.gmap <> <> lib
+R1119:1139 stdpp.bitvector.definitions <> <> lib
+R1177:1185 iris.proofmode.proofmode <> <> lib
+R1228:1237 iris.base_logic.lib.invariants <> <> lib
+R1239:1247 iris.base_logic.lib.ghost_var <> <> lib
+R1265:1278 SailStdpp.Base <> <> lib
+R1280:1295 SailStdpp.Values <> <> lib
+R1297:1322 SailStdpp.Operators_mwords <> <> lib
+R1340:1356 Riscv.rv64d_types <> <> lib
+R1358:1368 Riscv.rv64d <> <> lib
+R1386:1394 xv6iris.RiscvLang <> <> lib
+R1396:1405 xv6iris.RiscvPtsto <> <> lib
+R1423:1430 xv6iris.IntrDefs <> <> lib
+R1448:1451 xv6iris.Xv6G <> <> lib
+R1469:1474 xv6iris.TsoCtx <> <> lib
+R1492:1497 xv6iris.WpLock <> <> lib
+sec 1535:1540 <> LockIn
+R1556:1562 xv6iris.RiscvPtsto <> riscvGS class
+R1569:1572 xv6iris.Xv6G <> xv6G class
+R1574:1575 xv6iris.WpLockIn <> Σ:1 var
+var  1591:1593 LockIn GEN
+var  1606:1607 LockIn XI
+R1597:1601 xv6iris.RiscvLang <> GenId class
+R1611:1616 xv6iris.TsoCtx <> CurCtx class
+def 1634:1649 <> lock_finisher_in
+R1659:1663 xv6iris.RiscvLang <> CpuId class
+binder 1653:1655 <> CID:6
+R1672:1676 iris.base_logic.lib.iprop <> gname def
+binder 1667:1668 <> γ:7
+R1685:1689 SailStdpp.Values <> mword def
+binder 1680:1681 <> lk:8
+R1706:1711 Stdlib.Strings.String <> string ind
+binder 1702:1702 <> s:9
+R1724:1728 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R1719:1723 xv6iris.TsoCtx <> CtxId rec
+R1729:1733 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R1735:1736 xv6iris.WpLockIn <> LockIn.Σ var
+binder 1715:1715 <> R:10
+R1748:1752 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R1754:1755 xv6iris.WpLockIn <> LockIn.Σ var
+binder 1740:1740 <> D:11
+binder 1742:1744 <> Out:12
+R1769:1774 stdpp.coPset <> coPset def
+binder 1765:1765 <> E:13
+R1779:1783 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R1785:1786 xv6iris.WpLockIn <> LockIn.Σ var
+R1796:1799 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R1814:1822 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R1806:1810 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R1812:1813 xv6iris.WpLockIn <> LockIn.Σ var
+binder 1800:1802 <> Pay:14
+R1823:1823 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R1877:1889 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R1843:1849 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R1824:1834 xv6iris.TsoCtx <> own_context def
+R1836:1842 xv6iris.TsoCtx <> cur_ctx def
+R1869:1873 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R1850:1860 xv6iris.TsoCtx <> own_context def
+R1862:1868 xv6iris.TsoCtx <> cur_ctx def
+R1874:1876 xv6iris.WpLockIn <> Pay:14 var
+R1890:1907 xv6iris.WpLock <> lock_finisher_body def
+R1909:1910 xv6iris.WpLockIn <> γ:7 var
+R1912:1913 xv6iris.WpLockIn <> lk:8 var
+R1915:1915 xv6iris.WpLockIn <> s:9 var
+R1917:1917 xv6iris.WpLockIn <> R:10 var
+R1919:1919 xv6iris.WpLockIn <> D:11 var
+R1921:1923 xv6iris.WpLockIn <> Out:12 var
+R1925:1925 xv6iris.WpLockIn <> E:13 var
+R1927:1929 xv6iris.WpLockIn <> Pay:14 var
+prf 2022:2040 <> lock_finisher_to_in
+R2050:2054 xv6iris.RiscvLang <> CpuId class
+binder 2044:2046 <> CID:15
+binder 2057:2058 <> γ:16
+binder 2060:2061 <> lk:17
+binder 2063:2063 <> s:18
+binder 2065:2065 <> R:19
+binder 2067:2067 <> D:20
+binder 2069:2071 <> Out:21
+binder 2073:2073 <> E:22
+R2090:2095 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R2081:2081 xv6iris.WpLockIn <> R:19 var
+R2083:2089 xv6iris.TsoCtx <> cur_ctx def
+R2127:2132 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R2096:2108 xv6iris.WpLock <> lock_finisher def
+R2126:2126 xv6iris.WpLockIn <> E:22 var
+R2122:2124 xv6iris.WpLockIn <> Out:21 var
+R2120:2120 xv6iris.WpLockIn <> D:20 var
+R2118:2118 xv6iris.WpLockIn <> R:19 var
+R2116:2116 xv6iris.WpLockIn <> s:18 var
+R2113:2114 xv6iris.WpLockIn <> lk:17 var
+R2110:2111 xv6iris.WpLockIn <> γ:16 var
+R2133:2148 xv6iris.WpLockIn <> lock_finisher_in def
+R2166:2166 xv6iris.WpLockIn <> E:22 var
+R2162:2164 xv6iris.WpLockIn <> Out:21 var
+R2160:2160 xv6iris.WpLockIn <> D:20 var
+R2158:2158 xv6iris.WpLockIn <> R:19 var
+R2156:2156 xv6iris.WpLockIn <> s:18 var
+R2153:2154 xv6iris.WpLockIn <> lk:17 var
+R2150:2151 xv6iris.WpLockIn <> γ:16 var
+R2274:2274 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2281:2286 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2296:2296 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2274:2274 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2281:2286 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2296:2296 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+prf 2456:2479 <> lock_finisher_close_body
+binder 2481:2482 <> γ:23
+binder 2484:2485 <> lk:24
+binder 2487:2487 <> s:25
+binder 2489:2489 <> R:26
+binder 2491:2491 <> D:27
+binder 2493:2493 <> E:28
+R2501:2504 iris.bi.interface <> ::stdpp_scope:'⊢'_x not
+R2505:2522 xv6iris.WpLock <> lock_finisher_body def
+R2524:2525 xv6iris.WpLockIn <> γ:23 var
+R2527:2528 xv6iris.WpLockIn <> lk:24 var
+R2530:2530 xv6iris.WpLockIn <> s:25 var
+R2532:2532 xv6iris.WpLockIn <> R:26 var
+R2534:2534 xv6iris.WpLockIn <> D:27 var
+R2536:2538 iris.bi.interface <> ::bi_scope:'emp' not
+R2540:2540 xv6iris.WpLockIn <> E:28 var
+R2543:2550 xv6iris.WpLock <> lock_pay def
+R2552:2552 xv6iris.WpLockIn <> R:26 var
+R2685:2685 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2694:2699 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2729:2729 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2685:2685 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2694:2699 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2729:2729 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R2777:2784 xv6iris.WpLock <> lock_inv def
+R2787:2795 xv6iris.WpLock <> lock_body def
+R2777:2784 xv6iris.WpLock <> lock_inv def
+R2777:2784 xv6iris.WpLock <> lock_inv def
+R2787:2795 xv6iris.WpLock <> lock_body def
+R2787:2795 xv6iris.WpLock <> lock_body def
+R2846:2850 SailStdpp.Values <> mword def
+R2829:2840 SailStdpp.Values <> mword_of_int def
+R2857:2860 Corelib.Init.Datatypes <> None constr
+R2846:2850 SailStdpp.Values <> mword def
+R2829:2840 SailStdpp.Values <> mword_of_int def
+R2857:2860 Corelib.Init.Datatypes <> None constr
+R2878:2892 xv6iris.WpLock <> lk_cpu_res_free thm
+R2878:2892 xv6iris.WpLock <> lk_cpu_res_free thm
+R2878:2892 xv6iris.WpLock <> lk_cpu_res_free thm
+prf 3128:3149 <> lock_finisher_close_in
+R3159:3163 xv6iris.RiscvLang <> CpuId class
+binder 3153:3155 <> CID:29
+binder 3166:3167 <> γ:30
+binder 3169:3170 <> lk:31
+binder 3172:3172 <> s:32
+binder 3174:3174 <> R:33
+binder 3176:3176 <> D:34
+binder 3178:3178 <> E:35
+R3186:3186 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R3247:3257 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R3206:3212 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R3187:3197 xv6iris.TsoCtx <> own_context def
+R3199:3205 xv6iris.TsoCtx <> cur_ctx def
+R3232:3236 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R3213:3223 xv6iris.TsoCtx <> own_context def
+R3225:3231 xv6iris.TsoCtx <> cur_ctx def
+R3237:3244 xv6iris.WpLock <> lock_pay def
+R3246:3246 xv6iris.WpLockIn <> R:33 var
+R3258:3273 xv6iris.WpLockIn <> lock_finisher_in def
+R3291:3291 xv6iris.WpLockIn <> E:35 var
+R3287:3289 iris.bi.interface <> ::bi_scope:'emp' not
+R3285:3285 xv6iris.WpLockIn <> D:34 var
+R3283:3283 xv6iris.WpLockIn <> R:33 var
+R3281:3281 xv6iris.WpLockIn <> s:32 var
+R3278:3279 xv6iris.WpLockIn <> lk:31 var
+R3275:3276 xv6iris.WpLockIn <> γ:30 var
+R3332:3339 xv6iris.WpLock <> lock_pay def
+R3332:3339 xv6iris.WpLock <> lock_pay def
+R3371:3394 xv6iris.WpLockIn <> lock_finisher_close_body thm
+R3371:3394 xv6iris.WpLockIn <> lock_finisher_close_body thm
+prf 3486:3508 <> lock_finisher_close_pay
+R3518:3522 xv6iris.RiscvLang <> CpuId class
+binder 3512:3514 <> CID:36
+binder 3525:3526 <> γ:37
+binder 3528:3529 <> lk:38
+binder 3531:3531 <> s:39
+binder 3533:3533 <> R:40
+binder 3535:3535 <> D:41
+binder 3537:3537 <> E:42
+R3555:3560 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R3545:3552 xv6iris.WpLock <> lock_pay def
+R3554:3554 xv6iris.WpLockIn <> R:40 var
+R3561:3576 xv6iris.WpLockIn <> lock_finisher_in def
+R3594:3594 xv6iris.WpLockIn <> E:42 var
+R3590:3592 iris.bi.interface <> ::bi_scope:'emp' not
+R3588:3588 xv6iris.WpLockIn <> D:41 var
+R3586:3586 xv6iris.WpLockIn <> R:40 var
+R3584:3584 xv6iris.WpLockIn <> s:39 var
+R3581:3582 xv6iris.WpLockIn <> lk:38 var
+R3578:3579 xv6iris.WpLockIn <> γ:37 var
+R3633:3654 xv6iris.WpLockIn <> lock_finisher_close_in thm
+R3633:3654 xv6iris.WpLockIn <> lock_finisher_close_in thm
+R3704:3709 xv6iris.WpLockIn LockIn <> sec

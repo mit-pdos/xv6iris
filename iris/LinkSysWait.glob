@@ -1,0 +1,9 @@
+DIGEST cd74a54f6ebd592126ed9dc10eba9e2d
+Fxv6iris.LinkSysWait
+R116:126 xv6iris.LinkArgaddr <> <> lib
+R128:136 xv6iris.LinkKwait <> <> lib
+R138:149 xv6iris.ProofSysWait <> <> lib
+R171:182 xv6iris.ProofSysWait SysWaitProof <> modtype
+R184:190 xv6iris.LinkArgaddr Argaddr <> modtype
+R192:196 xv6iris.LinkKwait Kwait <> modtype
+mod 160:166 <> SysWait

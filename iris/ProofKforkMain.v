@@ -191,7 +191,7 @@ Proof.
 Qed.
 
 Module KforkProof (MP : MYPROC) (AP : ALLOCPROC_GEN) (UC : UVMCOPY)
-             (FP : FREEPROC) (RL : RELEASE) (AQ : ACQUIRE)
+             (FP : FREEPROC) (RL : RELEASE) (RLI : RELEASE_IN) (AQ : ACQUIRE)
              (FD : FILEDUP) (ID : IDUP) (SS : SAFESTRCPY)
              : KFORK.
 
@@ -199,7 +199,7 @@ Module KforkProof (MP : MYPROC) (AP : ALLOCPROC_GEN) (UC : UVMCOPY)
   Module B1 := KforkB1 FP RL.
   Module B3 := KforkB3 FD.
   Module B4 := KforkB4 ID SS.
-  Module B5 := KforkB5 AQ RL.
+  Module B5 := KforkB5 AQ RL RLI.
 
 Section KforkArms.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.

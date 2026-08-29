@@ -1,0 +1,13 @@
+DIGEST 8987a579f5696083a850140de8a1b861
+Fxv6iris.LinkBeginOp
+R188:198 xv6iris.LinkAcquire <> <> lib
+R200:210 xv6iris.LinkRelease <> <> lib
+R212:227 xv6iris.LinkSleepPrepare <> <> lib
+R229:237 xv6iris.LinkSleep <> <> lib
+R239:250 xv6iris.ProofBeginOp <> <> lib
+R272:283 xv6iris.ProofBeginOp BeginOpProof <> modtype
+R285:291 xv6iris.LinkAcquire Acquire <> modtype
+R293:299 xv6iris.LinkRelease Release <> modtype
+R301:312 xv6iris.LinkSleepPrepare SleepPrepare <> modtype
+R314:318 xv6iris.LinkSleep Sleep <> modtype
+mod 261:267 <> BeginOp

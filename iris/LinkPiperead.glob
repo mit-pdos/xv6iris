@@ -1,0 +1,21 @@
+DIGEST fa59d75e830cf71d92951f9d9203270f
+Fxv6iris.LinkPiperead
+R530:539 xv6iris.LinkMyproc <> <> lib
+R541:551 xv6iris.LinkAcquire <> <> lib
+R553:562 xv6iris.LinkKilled <> <> lib
+R564:573 xv6iris.LinkWakeup <> <> lib
+R575:590 xv6iris.LinkSleepPrepare <> <> lib
+R592:600 xv6iris.LinkSleep <> <> lib
+R602:612 xv6iris.LinkCopyout <> <> lib
+R614:624 xv6iris.LinkRelease <> <> lib
+R642:654 xv6iris.ProofPiperead <> <> lib
+R677:689 xv6iris.ProofPiperead PipereadProof <> modtype
+R691:696 xv6iris.LinkMyproc Myproc <> modtype
+R698:707 xv6iris.LinkAcquire AcquireGen <> modtype
+R709:714 xv6iris.LinkKilled Killed <> modtype
+R716:721 xv6iris.LinkWakeup Wakeup <> modtype
+R723:734 xv6iris.LinkSleepPrepare SleepPrepare <> modtype
+R736:740 xv6iris.LinkSleep Sleep <> modtype
+R742:748 xv6iris.LinkCopyout Copyout <> modtype
+R750:759 xv6iris.LinkRelease ReleaseGen <> modtype
+mod 665:672 <> Piperead

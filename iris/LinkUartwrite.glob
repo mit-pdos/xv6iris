@@ -1,0 +1,34 @@
+DIGEST 634fe04f64a97c62dd094fe02af6ff07
+Fxv6iris.LinkUartwrite
+R1916:1921 Stdlib.ZArith.ZArith <> <> lib
+R1923:1925 Stdlib.micromega.Lia <> <> lib
+R1927:1930 Stdlib.Lists.List <> <> lib
+R1959:1962 stdpp.gmap <> <> lib
+R1964:1967 stdpp.list <> <> lib
+R1969:1989 stdpp.bitvector.definitions <> <> lib
+R2027:2035 iris.proofmode.proofmode <> <> lib
+R2077:2084 iris.program_logic.language <> <> lib
+R2086:2092 iris.program_logic.lifting <> <> lib
+R2135:2143 iris.base_logic.lib.ghost_var <> <> lib
+R2145:2154 iris.base_logic.lib.invariants <> <> lib
+R2156:2163 iris.base_logic.lib.gen_heap <> <> lib
+R2193:2198 Stdlib.Strings.String <> <> lib
+R2216:2229 SailStdpp.Base <> <> lib
+R2231:2249 SailStdpp.TypeCasts <> <> lib
+R2251:2266 SailStdpp.Values <> <> lib
+R2268:2288 SailStdpp.MachineWord <> <> lib
+R2306:2322 Riscv.rv64d_types <> <> lib
+R2324:2334 Riscv.rv64d <> <> lib
+R2564:2571 xv6iris.LinkUart <> <> lib
+R2573:2583 xv6iris.LinkAcquire <> <> lib
+R2585:2595 xv6iris.LinkRelease <> <> lib
+R2597:2605 xv6iris.LinkSleep <> <> lib
+R2607:2622 xv6iris.LinkSleepPrepare <> <> lib
+R2640:2653 xv6iris.ProofUartwrite <> <> lib
+R2677:2690 xv6iris.ProofUartwrite UartwriteProof <> modtype
+R2692:2698 xv6iris.LinkAcquire Acquire <> modtype
+R2700:2706 xv6iris.LinkRelease Release <> modtype
+R2708:2712 xv6iris.LinkSleep Sleep <> modtype
+R2714:2725 xv6iris.LinkSleepPrepare SleepPrepare <> modtype
+R2727:2730 xv6iris.LinkUart Uart <> modtype
+mod 2664:2672 <> Uartwrite

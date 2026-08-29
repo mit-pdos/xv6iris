@@ -1,0 +1,21 @@
+DIGEST 558feceab5b65d13d5a591135ba69bc3
+Fxv6iris.LinkKwait
+R124:134 xv6iris.LinkAcquire <> <> lib
+R136:146 xv6iris.LinkRelease <> <> lib
+R148:157 xv6iris.LinkMyproc <> <> lib
+R159:168 xv6iris.LinkKilled <> <> lib
+R170:185 xv6iris.LinkSleepPrepare <> <> lib
+R187:195 xv6iris.LinkSleep <> <> lib
+R205:215 xv6iris.LinkCopyout <> <> lib
+R217:228 xv6iris.LinkFreeproc <> <> lib
+R230:239 xv6iris.ProofKwait <> <> lib
+R259:268 xv6iris.ProofKwait KwaitProof <> modtype
+R270:276 xv6iris.LinkAcquire Acquire <> modtype
+R278:284 xv6iris.LinkRelease Release <> modtype
+R286:291 xv6iris.LinkMyproc Myproc <> modtype
+R293:298 xv6iris.LinkKilled Killed <> modtype
+R300:311 xv6iris.LinkSleepPrepare SleepPrepare <> modtype
+R313:317 xv6iris.LinkSleep Sleep <> modtype
+R319:325 xv6iris.LinkCopyout Copyout <> modtype
+R327:334 xv6iris.LinkFreeproc Freeproc <> modtype
+mod 250:254 <> Kwait

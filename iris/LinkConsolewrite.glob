@@ -1,0 +1,21 @@
+DIGEST a9043342c6d0f0c450be6959d6c17212
+Fxv6iris.LinkConsolewrite
+R891:896 Stdlib.ZArith.ZArith <> <> lib
+R898:901 Stdlib.Lists.List <> <> lib
+R930:933 stdpp.gmap <> <> lib
+R935:938 stdpp.list <> <> lib
+R940:960 stdpp.bitvector.definitions <> <> lib
+R998:1006 iris.proofmode.proofmode <> <> lib
+R1048:1055 iris.program_logic.language <> <> lib
+R1057:1066 iris.program_logic.weakestpre <> <> lib
+R1068:1074 iris.program_logic.lifting <> <> lib
+R1092:1107 SailStdpp.Values <> <> lib
+R1125:1141 Riscv.rv64d_types <> <> lib
+R1143:1153 Riscv.rv64d <> <> lib
+R1171:1186 xv6iris.LinkEitherCopyin <> <> lib
+R1188:1200 xv6iris.LinkUartwrite <> <> lib
+R1218:1234 xv6iris.ProofConsolewrite <> <> lib
+R1261:1277 xv6iris.ProofConsolewrite ConsolewriteProof <> modtype
+R1279:1290 xv6iris.LinkEitherCopyin EitherCopyin <> modtype
+R1292:1300 xv6iris.LinkUartwrite Uartwrite <> modtype
+mod 1245:1256 <> Consolewrite

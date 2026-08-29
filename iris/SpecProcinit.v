@@ -205,7 +205,9 @@ Section ProcinitSeals.
   Proof.
     iIntros "(Hlk & Hst & Hks & Hdorm) Hch Hpub Hpark Hg Hkst".
     iFrame "Hlk Hks".
+    rewrite /proc_lock_res /proc_lock_res_at.
     iExists UNUSED, ch. iFrame "Hst Hg Hch Hpub".
+    change (proc_slots_at γs cur_ctx (proc_addr i) UNUSED) with (proc_slots γs (proc_addr i) UNUSED).
     iApply (proc_slots_unused_intro with "[Hdorm Hkst] Hpark").
     iApply (proc_dormant_prestk_seal with "Hdorm Hkst").
   Qed.
@@ -364,7 +366,7 @@ Section ProcinitProcsInv.
                    is_lock g (proc_addr i) "proc"%string R) ∗ proc_res i)
                ={E}=∗ own_context cur_ctx ∗
                (is_lock g (proc_addr i) "proc"%string
-                  <{ proc_lock_res γs g (proc_addr i) }> ∗
+                  (proc_lock_pay γs g (proc_addr i)) ∗
                 ∃ ks : mword 64, is_kstack (proc_addr i) ks))%I as "Hstep".
     { iApply big_sepL_intro.
       iIntros "!>" (i g _) "Hrun [Hmk (Hks & Hst & Hch & Hpub & Hdorm & Hpark & Hg & Hstk)]".
@@ -375,7 +377,7 @@ Section ProcinitProcsInv.
       iAssert (kstack_free (proc_addr i)) with "[Hstk]" as "Hkst".
       { iApply (kstack_free_intro (proc_addr i) (kstack_va i)
                   with "[] Hstk"). iExact "Hksp". }
-      iMod ("Hmk" $! (<{ proc_lock_res γs g (proc_addr i) }>)
+      iMod ("Hmk" $! ((proc_lock_pay γs g (proc_addr i)))
               with "[%] Hrun [Hst Hg Hch Hpub Hdorm Hpark Hkst]") as "[Hrun #Hlk]".
       { apply _. }
       { iApply (proc_lock_res_intro γs g (proc_addr i) UNUSED ch

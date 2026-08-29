@@ -1,0 +1,13 @@
+DIGEST 9f480337399758909f5b2bd0c354b0d8
+Fxv6iris.LinkYield
+R209:218 xv6iris.LinkMyproc <> <> lib
+R220:230 xv6iris.LinkAcquire <> <> lib
+R232:240 xv6iris.LinkSched <> <> lib
+R242:252 xv6iris.LinkRelease <> <> lib
+R254:263 xv6iris.ProofYield <> <> lib
+R283:292 xv6iris.ProofYield YieldProof <> modtype
+R294:299 xv6iris.LinkMyproc Myproc <> modtype
+R301:307 xv6iris.LinkAcquire Acquire <> modtype
+R309:313 xv6iris.LinkSched Sched <> modtype
+R315:321 xv6iris.LinkRelease Release <> modtype
+mod 274:278 <> Yield

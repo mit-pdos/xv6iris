@@ -1,0 +1,13 @@
+DIGEST 7f88b007d7b390e16b720b8a8b88d4ff
+Fxv6iris.LinkSysSync
+R204:214 xv6iris.LinkAcquire <> <> lib
+R216:226 xv6iris.LinkRelease <> <> lib
+R228:243 xv6iris.LinkSleepPrepare <> <> lib
+R245:253 xv6iris.LinkSleep <> <> lib
+R255:266 xv6iris.ProofSysSync <> <> lib
+R288:299 xv6iris.ProofSysSync SysSyncProof <> modtype
+R301:307 xv6iris.LinkAcquire Acquire <> modtype
+R309:315 xv6iris.LinkRelease Release <> modtype
+R317:328 xv6iris.LinkSleepPrepare SleepPrepare <> modtype
+R330:334 xv6iris.LinkSleep Sleep <> modtype
+mod 277:283 <> SysSync

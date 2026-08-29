@@ -1,0 +1,13 @@
+DIGEST a5e42de21194139b4192d72971e28f01
+Fxv6iris.LinkSleep
+R463:472 xv6iris.LinkMyproc <> <> lib
+R474:484 xv6iris.LinkAcquire <> <> lib
+R486:494 xv6iris.LinkSched <> <> lib
+R496:506 xv6iris.LinkRelease <> <> lib
+R508:517 xv6iris.ProofSleep <> <> lib
+R537:546 xv6iris.ProofSleep SleepProof <> modtype
+R548:553 xv6iris.LinkMyproc Myproc <> modtype
+R555:561 xv6iris.LinkAcquire Acquire <> modtype
+R563:567 xv6iris.LinkSched Sched <> modtype
+R569:575 xv6iris.LinkRelease Release <> modtype
+mod 528:532 <> Sleep

@@ -1,0 +1,31 @@
+DIGEST d2bda6f579e34f0f91cf1f4ab157aa74
+Fxv6iris.LinkConsoleread
+R718:723 Stdlib.ZArith.ZArith <> <> lib
+R725:728 Stdlib.Lists.List <> <> lib
+R757:760 stdpp.gmap <> <> lib
+R762:765 stdpp.list <> <> lib
+R767:787 stdpp.bitvector.definitions <> <> lib
+R825:833 iris.proofmode.proofmode <> <> lib
+R875:882 iris.program_logic.language <> <> lib
+R884:893 iris.program_logic.weakestpre <> <> lib
+R895:901 iris.program_logic.lifting <> <> lib
+R919:934 SailStdpp.Values <> <> lib
+R952:968 Riscv.rv64d_types <> <> lib
+R970:980 Riscv.rv64d <> <> lib
+R998:1007 xv6iris.LinkMyproc <> <> lib
+R1009:1019 xv6iris.LinkAcquire <> <> lib
+R1021:1030 xv6iris.LinkKilled <> <> lib
+R1032:1047 xv6iris.LinkSleepPrepare <> <> lib
+R1049:1057 xv6iris.LinkSleep <> <> lib
+R1075:1091 xv6iris.LinkEitherCopyout <> <> lib
+R1093:1103 xv6iris.LinkRelease <> <> lib
+R1121:1136 xv6iris.ProofConsoleread <> <> lib
+R1164:1179 xv6iris.ProofConsoleread ConsolereadProof <> modtype
+R1181:1186 xv6iris.LinkMyproc Myproc <> modtype
+R1188:1194 xv6iris.LinkAcquire Acquire <> modtype
+R1196:1201 xv6iris.LinkKilled Killed <> modtype
+R1203:1214 xv6iris.LinkSleepPrepare SleepPrepare <> modtype
+R1216:1220 xv6iris.LinkSleep Sleep <> modtype
+R1222:1234 xv6iris.LinkEitherCopyout EitherCopyout <> modtype
+R1236:1242 xv6iris.LinkRelease Release <> modtype
+mod 1147:1157 <> Consoleread

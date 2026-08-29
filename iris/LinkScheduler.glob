@@ -1,0 +1,12 @@
+DIGEST d69cbf6ec885b6191ac16dc603ceb0f8
+Fxv6iris.LinkScheduler
+R189:199 xv6iris.LinkAcquire <> <> lib
+R201:211 xv6iris.LinkRelease <> <> lib
+R213:221 xv6iris.LinkSwtch <> <> lib
+R223:236 xv6iris.ProofScheduler <> <> lib
+R260:273 xv6iris.ProofScheduler SchedulerProof <> modtype
+R275:281 xv6iris.LinkAcquire Acquire <> modtype
+R283:289 xv6iris.LinkRelease Release <> modtype
+R291:299 xv6iris.LinkRelease ReleaseIn <> modtype
+R301:305 xv6iris.LinkSwtch Swtch <> modtype
+mod 247:255 <> Scheduler

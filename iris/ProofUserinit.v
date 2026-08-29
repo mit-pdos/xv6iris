@@ -214,7 +214,7 @@ End PstateRunnableHelper.
 (* ===================================================================== *)
 
 Module UserinitProof (AP : ALLOCPROC) (NR : NAMEI_ROOT_BOOT)
-                     (RL : RELEASE) (FP : FORKRET_PARK_PAID) : USERINIT.
+                     (RL : RELEASE) (RLI : RELEASE_IN) (FP : FORKRET_PARK_PAID) : USERINIT.
 
 Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 Local Ltac nz := vm_compute; discriminate.
@@ -797,9 +797,12 @@ Section ProofUserinit.
       as "Hpwhole".
     iEval (rewrite uin_pwhole_runnable) in "Hpwhole".
     iRename "Hpwhole" into "Hplock".
-    iDestruct (proc_slots_park γs (proc_addr j) RUNNABLE needs_ctx_RUNNABLE
+    (* A6.127 §6: the child's record came WITH ITS BOX; the slot is built at
+       the box's context and the release below makes the box the lock's. *)
+    iDestruct "Hpctx" as (ξb Tb) "[Hbox Hpctx]".
+    iDestruct (proc_slots_park_at γs ξb (proc_addr j) RUNNABLE needs_ctx_RUNNABLE
                  with "Hpctx Hhart Hmk") as "Hslots".
-    iDestruct (proc_lock_res_intro γs γl (proc_addr j) RUNNABLE ch
+    iDestruct (proc_lock_res_at_intro γs ξb γl (proc_addr j) RUNNABLE ch
                  with "Hpstcell Hplock Hpchan Hppub Hslots") as "HR".
     (* ===== +0x2c c.mv a0,s1 ===== *)
     iApply (wp_cmv_s_sconf (mword_of_int (UI + 0x2c)) Ra0 Rs1 R9
@@ -837,10 +840,12 @@ Section ProofUserinit.
     assert (Hlka : add_vec (R11 !!! Regidx Ra0)
                      (sign_extend' 64 (mword_of_int 0 : mword 12)) = proc_addr j)
       by (rewrite HR11a0; apply addv_sext0).
-    iApply (RL.wp_release_sconf KT1 γl (proc_addr j) "proc"%string <{ proc_lock_res γs γl (proc_addr j) }> R11 0%nat b pj (K - 4)%nat
+    iApply (RLI.wp_release_in_sconf KT1 γl (proc_addr j) "proc"%string (proc_lock_pay γs γl (proc_addr j)) R11 0%nat b pj (K - 4)%nat
               ({["proc"]} ∪ lks) Hlka Krl
-              with "Hcg Htext Hpc [] Htok HR Hcpu Hpay").
+              with "Hcg Htext Hpc [] Htok [Hbox HR] Hcpu Hpay").
     { iApply (procs_inv_lookup γs j γl Hgl with "Hpinv"). }
+    { iIntros "Hrun". iModIntro. iFrame "Hrun". iApply proc_lock_pay_of_box.
+      iExists ξb, Tb. iFrame "Hbox HR". }
     iIntros (CID20 Hq20 mr3) "Hcg Hpc %Hcsrl Hcpu".
     iEval (rewrite (_ : ({["proc"]} ∪ lks) ∖ {["proc"]} = lks);
            [| apply locks_add_del_below; exact Hbelow]) in "Hcpu".

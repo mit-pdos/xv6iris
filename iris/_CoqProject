@@ -64,6 +64,7 @@ TsoCtx.v
 CtxMorphTac.v
 TsoCtxShim.v
 TsoCtxAbsorbLb.v
+TsoCtxPark.v
 CtxKMap.v
 CtxPinMint.v
 PermInv.v
@@ -478,6 +479,7 @@ WpAmo.v
 CodeHolding.v
 CodeAcquire.v
 WpLock.v
+WpLockIn.v
 DiskAvail.v
 WpLockAt.v
 ArrCursor.v

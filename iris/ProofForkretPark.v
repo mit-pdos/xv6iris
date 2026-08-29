@@ -88,6 +88,8 @@ Require Import ProcAvail.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import UsertrapRes.  (* [ut_park_intro_body] -- the park's producer entry *)
+Require Import TsoCtxPark.
+Require Import StackOwn.
 Require Import SpecKexec.   (* [K_kexec] -- forkret's deepest callee, on the boot arm *)
 Require Import SpecForkret.
 Require Import FirstTok.
@@ -186,6 +188,17 @@ Proof.
      must precede the [iModIntro] below: that is the only update this
      proof has. *)
   iMod (ctx_parked_alloc) as (XIc) "Hthr".
+  (* A6.127 §6: THE CHILD'S STACK IS DEPOSITED INTO ITS OWN CONTEXT (the
+     record states it at the child's identity), which raises the child's
+     stamp past the parker's -- so the record's link cannot be at the
+     parker's context: it is floored on a fresh PARK BOX ([ctx_box_over]),
+     and the parker's release makes the box the lock's context
+     ([WpLockIn]).  The other rows stay at the parker's ξ, as below. *)
+  iEval (rewrite /forkret_park_pkg) in "Hpkg".
+  iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hglobp & #Hmk & Hstk & Hclose)".
+  iMod (ctx_deposit (λ ξ, stack_own (KTR := KT1) (XI := ξ) (add_vec ks (mword_of_int 4096)) av)
+          cur_ctx XIc 0 with "Hrun Hthr Hstk") as "(Hrun & %Tc & _ & Hthr & Hstk)".
+  iMod (ctx_box_over XIc Tc with "Hthr") as "[Hthr (%ξb & Hbox & #Hfl)]".
   (* THE PACKAGE IS NOT UNDER A LATER ANY MORE -- its CLOSER ROW is, and
      that is the whole of what the fixpoint ever needed (tso-port.md §0.16′
      step (ii)).  THE PARKER'S OWN THREAD-OF-CONTROL TOKEN is borrowed and
@@ -203,20 +216,18 @@ Proof.
      PARKER's ξ -- which is what [SwtchCtx.valid_context_pre] still reads
      them at in this tree, so the two agree and nothing is unsound; what is
      missing is the [XIp] reshape, not a law. *)
-  iModIntro. iFrame "Hrun". iNext.
-  iEval (rewrite /forkret_park_pkg) in "Hpkg".
-  iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hglobp & #Hmk & Hstk & Hclose)".
+  iModIntro. iFrame "Hrun".
+  rewrite /proc_ctx_boxed. iExists ξb, Tc. iFrame "Hbox".
+  rewrite /proc_ctx_at. iExists XIc, Tc. iFrame "Hthr Hfl".
+  iNext.
   (* ---- the record: the cells allocproc left, and the free stack ---- *)
-  rewrite /proc_ctx
-          (valid_context_unfold (p_sched γs) None (p_context (proc_addr j)) (proc_addr j))
+  rewrite (valid_context_unfold (p_sched γs) None (p_context (proc_addr j)) (proc_addr j) XIc)
           /valid_context_pre.
-  iExists (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest), av, XIc,
-    0%nat.
+  iExists (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest), av.
   iSplit; [iPureIntro; cbn [length]; lia |].
   iSplit; [iPureIntro; apply ret_pc_aligned |].
   iFrame "Hctx".
   iSplitL "Hstk"; [cbn [nth]; iExact "Hstk" |].
-  iSplitL "Hthr"; [iExact "Hthr" |].
   (* ================================================================== *)
   (* THE RESUME WAND -- forkret's precondition, assembled.               *)
   (* ================================================================== *)
@@ -271,6 +282,12 @@ Proof.
   iAssert (own_ctx (p_context (proc_addr j))) with "[Hcells]" as "Hown".
   { iExists (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest).
     iFrame "Hcells". iPureIntro. cbn [length]. lia. }
+  (* the dispatching scheduler's record came back with its RUNNING token
+     beside it ([SwtchCtx.park_tok (Some h)]); fold it back under the later
+     the running slot holds it beneath (A6.127 §6). *)
+  iDestruct "Hrec" as (XIo) "[Htok Hrec]".
+  iEval (rewrite /park_tok) in "Htok".
+  iDestruct (sched_vc_at_intro γs h _ _ XIo with "Htok Hrec") as "Hrec".
   iDestruct (proc_slots_running_intro γs j h Hj with "Htag2 Hown Hrec Hmk")
     as "Hslots".
   iDestruct (proc_lock_res_intro γs γl (proc_addr j) RUNNING ch

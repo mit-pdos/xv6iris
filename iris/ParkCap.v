@@ -181,7 +181,7 @@ Section ParkCap.
           PARKER's ξ; naming it keeps [park_cap]/[park_token] ξ-FREE all the
           same, which is the property [UtResFits] needs.  Drop the
           annotation when the reshape lands. *)
-       |==> own_context (CID := hp) ξp ∗ ▷ proc_ctx (XI := ξp) γs pa)%I.
+       |==> own_context (CID := hp) ξp ∗ proc_ctx_boxed (XI := ξp) γs pa)%I.
 
   (* THE CHANNEL, at a given [W], as a [□] proposition under a later -- for
      the records of THIS table ([un_s N = γs]), which is all the token for
@@ -256,7 +256,7 @@ Section ParkCap.
     park_env N -∗
     park_own N -∗
     park_child (un_s N) (un_f N) (un_pj N) (un_ks N) rest (un_pid N) V -∗
-    |==> own_context cur_ctx ∗ ▷ proc_ctx (un_s N) (un_pj N).
+    |==> own_context cur_ctx ∗ proc_ctx_boxed (un_s N) (un_pj N).
   Proof.
     (* [procs_inv] AND [park_globals] ARE PREMISES NOW, not read out of
        [park_env]: they are ξ-dependent, so the M2 split moved them out of
