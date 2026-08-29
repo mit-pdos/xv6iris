@@ -450,8 +450,36 @@ S1-S3, S5, S6, S6b, S7, S9 are in; S8 is partial.  What a successor needs:
   and the RW-leaf bits.  THE FIX IS TO UN-WEAKEN IT: clause (ii) becomes
   `uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) (pv_upt (us_V U'))`,
   the eleven buffer arms relay what their callee already gave, the other
-  eleven use `uptd_ext_sz_refl`.  Files: `SpecSyscall.v` and the ~9
-  `uptd_ext` sites in `ProofSyscall.v`.  Then `ut_90`'s twenty rows close
+  eleven use `uptd_ext_sz_refl`.  **CORRECTED 2026-08-29 — THE WEAKENING
+  IS A WHOLE TIER LOWER THAN THAT.**  The arms do not call
+  copyin/copyout/copyinstr; they call the PER-SYSCALL contracts, and it
+  is those that discard `uptd_ext_sz` at their own boundary
+  (`SpecSysWrite:233`, `SpecSysRead:347`, `SpecSysFstat:250`,
+  `SpecSysChdir:275`, `SpecSysUnlink:305`, `SpecSysLink:316`,
+  `SpecSysPipe:280`, `SpecSysMkdir:290`, `SpecSysMknod:273`,
+  `SpecSysOpen:383` all state plain `uptd_ext`).  Twelve of the 22
+  discharge sites are one-token edits; TEN are not dischargeable from
+  anything above that boundary — the range half is recoverable from
+  `proc_priv`'s `um_below`, but the RW-LEAF half is not and cannot be
+  (`upt_acc_wf` permits R+X user leaves, and text pages below `p->sz`
+  genuinely are R+X, so nothing in scope rules out a gained RX leaf,
+  which WOULD move `perm_of`).  The real fix is the un-weakening SWEEP:
+  31 contract statements over ~31 spec files and ~22 proof files, mostly
+  DELETING deliberate `uptd_ext_sz_ext` steps at
+  `ProofFetchstr:915/976`, `ProofEitherCopy:961/1699`, `ProofFilestat`,
+  `ProofSysPipe`, `ProofPipe{read,write}`.  Stages: (a) the argstr chain
+  (`SpecFetchstr:139` → `SpecArgstr:108` → six arms + their AU variants;
+  near-zero proof work), (b) fstat + pipe, (c) the read/write chain
+  (`SpecEitherCopy{in,out}` → console/pipe/readi/writei → file{read,write}
+  → the two syscalls; the slow rebuild cone).  The size at every site is
+  already literally `pv_sz (us_V U)`, so no `uptd_ext_sz_mono` is needed.
+  OWNER-AUTHORIZED 2026-08-29: page-table and VM state is OUT OF SCOPE for
+  the fs-syscall-specs lane, so these contracts' VM clause is ours to fix
+  and there is no collision — that lane's business in the same posts is
+  the DATA (which bytes `readi`/`writei` produce).  Touch only the
+  descriptor-extension clause; the data stays EXISTENTIAL (no U-mode
+  program we verify cares about file contents, and `usys_mem_ok`'s window
+  rows already quantify the bytes existentially).  Then `ut_90`'s twenty rows close
   with `sysc_mem_ok_usys` + `perm_of_uptd_ext_sz` + the size clause, and
   `uround_bump_ok` is already in reach there (`ut_90` writes `epc += 4`
   at +0x9a — `addv_sext4` — and `%Hmema0` gives the a0 insert, so
@@ -460,7 +488,11 @@ S1-S3, S5, S6, S6b, S7, S9 are in; S8 is partial.  What a successor needs:
   and exec's row proved for real.
 - Also landed: `uptd_ext_sz` gained S6b's RW-leaf conjunct (no contract
   statement moved — the ~14 posts hold it opaquely) and
-  `uptd_ext_sz_insert_perm` was DELETED as caller-less.  `ut_a6`/`ut_fa`
+  `uptd_ext_sz_insert_perm` was DELETED as caller-less.  Scheduling note:
+  `sync` (the first verified process) is `sync(); exit(0);` — `sync`'s row
+  is one of the twelve free ones and `exit` diverges, so milestone J's
+  first program needs NONE of the ten; the sweep is what a program that
+  reads or writes will need.  `ut_a6`/`ut_fa`
   hand on the LITERAL record, so yield's reacquisition needed no new
   fact.  `user_trap_frame_at` is now what `wp_uservec_pt` takes.
 
