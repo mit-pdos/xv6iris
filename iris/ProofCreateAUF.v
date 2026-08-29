@@ -5067,8 +5067,8 @@ Section ProofCreateMain.
               pidv (DfracOwn (1/4)) dqs dqn Ma (K - 10)%nat eb b lks (upd_usM U _)
               ltac:(exact HKia) ltac:(exact HKil) Hlg Hist0 Hiregb Hni1 Hni2
               Hni3 Htynz Htyk Hpkc Hj Hgs Hroot A20 A9 Hkdlt Heb ltac:(lkbelow)
-              (fun CIDx : CpuId => IA.wp_ialloc_gen (CID := CIDx))
-              (fun CIDx : CpuId => IL.wp_ilock_dep_sconf (CID := CIDx))
+              (fun (CIDx : CpuId) (XIx : CurCtx) => IA.wp_ialloc_gen (CID := CIDx) (XI := XIx))
+              (fun (CIDx : CpuId) (XIx : CurCtx) => IL.wp_ilock_dep_sconf (CID := CIDx) (XI := XIx))
               with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlogc Hitb2 Hitbl
                     Hesc Hslks Hiregi Hiopen Hprocs Hdevi Hgeom Hdlk Hsbn Hsbi
                     Hppid Hbsl Hisl1 Hidev Htp Htcl Hop").

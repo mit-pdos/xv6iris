@@ -89,6 +89,7 @@ Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Require Import TsoCtx.
+Require Import TsoCtxShim.
 (* ---- the AU side ---- *)
 Require Import ProofSysWrite.      (* [sw_addr_p]/[sw_addr_n]/[sw_addr_f]/
                                       [sw_addr_f_base] are TOP-LEVEL there *)
@@ -424,8 +425,11 @@ Section ProofSysWriteAU.
       by (rewrite /M2 upd_ne; [exact HM1sp | reg_neq]).
     (* THE [int n] IS THE UPPER HALF OF SLOT 4: carve it now, take the
        8-alignment fact out FIRST (the halves no longer carry it). *)
+    iDestruct (TsoCtxShim.ctx_word_to_mem with "Hs4") as "Hs4".
     iDestruct (word_pointsto_aligned_p with "Hs4") as %Hal4.
     iDestruct (word_pointsto_split4 with "Hs4") as "[Hs4lo Hs4hi]".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ cur_ctx with "Hs4lo") as "Hs4lo".
+    iDestruct (TsoCtxShim.ctx_word4_of_mem _ cur_ctx with "Hs4hi") as "Hs4hi".
     (* ---- +0x08: addi a1,s0,-40 -- a1 := &p ---- *)
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.sys_write + 0x08))
               Ra1 Rs0 (mword_of_int 0xfd8 : mword 12) M2 (av - 6)%nat b
