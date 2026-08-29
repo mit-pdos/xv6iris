@@ -1082,6 +1082,27 @@ things, and the answer differs:
   widening.
   Dependency truth: stage 1 blocks on nothing of ours; stage 2 on
   upstream's Φ; stage 3 on our exec prover + two owner rulings.
+  STAGE 1 AS-LANDED (2026-08-29, `iris/UkInit.v`, 1520 lines, audit =
+  the standing three): start→main through the WHOLE preamble proven —
+  both open arms, the mknod repair arm, both dups — stopping at the
+  printf call (0x32); the complete syscall-stub surface proven
+  independently (quiet ×3, exit, FORK = a separating conjunction —
+  parent AND child continuations owed, exec = the −1 arm only with
+  success being stage 3's mint, wait, jr).  Q1: ALL rows exist (wait
+  is syscall 3; fork is uexec_ret_F's own arm, not usys_mem_ok's).
+  Q2: the unbounded-loop discipline is UkBranch's `_later` leaves —
+  no J machinery needed.  Q3 (UNASKED, THE BLOCKER — CROSS-CAMPAIGN
+  ASK #2, beside the Φ refinement): `usys_window 3`'s row at
+  wait((int*)0) permits M' to differ over [0,d) — init's own TEXT —
+  so the loop invariant cannot re-establish; code-impossible (the C
+  guards addr != 0).  Minimal fix in SpecSyscall.sysc_mem_ok /
+  UsysMemOk.usys_mem_ok's window arm: a `decide (arg = 0)` null
+  disjunct with M' = M; weakens no caller; kernel discharge = the
+  existing short-circuit.  UPSTREAM'S CONTRACT — their call.
+  Remaining for a full stage 1: the printf walk (~280 instructions,
+  the old tier's 2925-line file) and, after the wait fix, the loop
+  closure via the proven `_later` shape.  Scoping corrections: no
+  argv stores (static global in .data); no uk_args (verified).
 
 Sizing: D is spike-sized — the readings exist, the work is assembly and
 statement.  S0 is one design session.  A and W are the campaign's bulk.
