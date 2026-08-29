@@ -174,11 +174,10 @@ Import Defs.
    cannot say it at all.
 
    TWO ENTRIES MOVE THE ADDRESS SPACE ITSELF and a window is the wrong
-   shape for them.  [sbrk] gets the three arms its own contract has --
-   nothing, a zero-extension to the new size, or a deletion of the run above
-   it -- keyed to the size in the OUTGOING record; [exec] replaces the
-   address space outright and is unconstrained here, its image being
-   [SpecKexec]'s to pin. *)
+   shape for them.  [sbrk] gets [sysc_sbrk_ok] below -- a FUNCTION of the
+   entry and exit sizes, saying which way the address space went and how
+   far, descriptor included; [exec] replaces the address space outright and
+   is unconstrained here, its image being [SpecKexec]'s to pin. *)
 Definition sysc_num (V : pprivate) : Z :=
   bv_signed (subrange_vec_dec (pv_tf V !!! tf_arg_idx 7) 31 0 : mword 32).
 
@@ -189,16 +188,31 @@ Definition sysc_window (n : Z) : option nat :=
   else if decide (n = 8) then Some 1%nat   (* fstat -- struct stat *st *)
   else None.
 
-Definition sysc_sbrk_img (M M' : gmap Z (bv 8)) (szv' : mword 64) : Prop :=
-  M' = M
-  \/ M' = umem_grow M (uint szv')
-  \/ exists np : nat,
-       M' = umem_del M (uint (ProcPtOwn.pgroundup szv')) (4096 * np).
+(* SBRK SAYS WHAT HAPPENS.  Not "one of three things may have moved", but:
+   at the OLD size [szv] and the NEW one [szv'], either extend the memory up
+   with zeroed pages or cut it down -- and, because the U tier's permission
+   row needs it, WHICH DESCRIPTOR came back.
+
+   On the way UP the table is only ever EXTENDED, and every leaf it gains is
+   vmfault's own RW-user leaf inside the new size ([ProcPtOwn.uptd_ext_sz]):
+   the lazy path maps nothing at all, and the eager path's uvmalloc maps
+   [PTE_R|PTE_W|PTE_U].  On the way DOWN the descriptor is uvmdealloc's run,
+   named exactly -- the count is [ProcPtOwn.uvmd_np] of the two sizes, which
+   is 0 (hence the whole row an identity) on growproc's WRAP sub-case, which
+   is why that one lands in the FIRST branch beside the failures. *)
+Definition sysc_sbrk_ok (P P' : uptd) (szv szv' : mword 64)
+    (M M' : gmap Z (bv 8)) : Prop :=
+  if decide (uint szv <= uint szv')%Z
+  then ProcPtOwn.uptd_ext_sz szv' P P' /\ M' = umem_grow M (uint szv')
+  else P' = ProcPtOwn.uptd_del_run P (svpn_of (ProcPtOwn.pgroundup szv'))
+                                     (ProcPtOwn.uvmd_np szv szv')
+       /\ M' = umem_del M (uint (ProcPtOwn.pgroundup szv'))
+                          (4096 * ProcPtOwn.uvmd_np szv szv').
 
 Definition sysc_mem_ok (V V' : pprivate) (M M' : gmap Z (bv 8)) : Prop :=
   if decide (sysc_num V = 7) then True                    (* exec *)
   else if decide (sysc_num V = 12) then                   (* sbrk *)
-    sysc_sbrk_img M M' (pv_sz V')
+    sysc_sbrk_ok (pv_upt V) (pv_upt V') (pv_sz V) (pv_sz V') M M'
   else match sysc_window (sysc_num V) with
        | Some i => exists (d : nat) (bs : nat -> bv 8),
                      M' = umem_wr M (pv_tf V !!! tf_arg_idx i) d bs

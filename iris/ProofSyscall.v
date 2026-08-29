@@ -2544,12 +2544,35 @@ Section SyscallArms.
      [M = M] on the nose.  So the fact holds for ANY [V], [V'] provided the
      image itself did not move -- no [sysc_num]/[Hnum] premise needed here at
      all, only at the call site where [M' = M] itself has to be established. *)
-  Lemma sysc_mem_ok_quiet (V V' : pprivate) (M M' : gmap Z (bv 8)) :
-    M' = M -> sysc_mem_ok V V' M M'.
+  (* the two ways an arm knows it is not sbrk, both TERM-LEVEL: an
+     [ltac:] in argument position cannot be used here, because the goal it
+     would be handed still has [V] as an evar at elaboration time. *)
+  Lemma sysc_num_ne12 (V : pprivate) (k : nat) :
+    sysc_num V = Z.of_nat k -> Nat.eqb k 12 = false -> sysc_num V <> 12.
   Proof.
-    intros ->. unfold sysc_mem_ok.
+    intros Hk Hne Hc. rewrite Hk in Hc.
+    change 12%Z with (Z.of_nat 12) in Hc.
+    apply Nat2Z.inj in Hc. rewrite Hc in Hne. discriminate Hne.
+  Qed.
+
+  Lemma sysc_num_ne12_range (V : pprivate) :
+    ~ (1 <= sysc_num V <= 22)%Z -> sysc_num V <> 12.
+  Proof.
+    intros Hr Hc. apply Hr. rewrite Hc.
+    split; discriminate.
+  Qed.
+
+  (* THE NUMBER IS NOW A PREMISE, and it has to be: since stage S8b the sbrk
+     branch is [sysc_sbrk_ok], which SAYS WHAT HAPPENED to the address space
+     -- there is no "nothing moved" disjunct left for a quiet arm to take, so
+     an arm must show it is not sbrk.  Every caller has that for free out of
+     its own [Hnum] (or, at the out-of-range fallback, out of [Hrange]). *)
+  Lemma sysc_mem_ok_quiet (V V' : pprivate) (M M' : gmap Z (bv 8)) :
+    M' = M -> sysc_num V <> 12 -> sysc_mem_ok V V' M M'.
+  Proof.
+    intros -> H12. unfold sysc_mem_ok.
     destruct (decide (sysc_num V = 7)) as [_ | _]; [done |].
-    destruct (decide (sysc_num V = 12)) as [_ | _]; [left; reflexivity |].
+    destruct (decide (sysc_num V = 12)) as [Hc | _]; [contradiction (H12 Hc) |].
     destruct (sysc_window (sysc_num V)) as [i |]; [| reflexivity].
     exists 0%nat, (fun _ => bv_0 8). reflexivity.
   Qed.
@@ -2585,12 +2608,11 @@ Section SyscallArms.
   Qed.
 
   (* [sys_sbrk]'s ARM: at [k = 12] the address space itself moves, so the
-     branch is [sysc_sbrk_img] rather than a window -- and its three arms are
-     exactly the three [SpecSysSbrk.sys_sbrk_ok] offers (nothing moved, the
-     lazy/eager growth, the shrink). *)
+     branch is [sysc_sbrk_ok] rather than a window -- the address space's
+     move as a FUNCTION of the two sizes, descriptor included. *)
   Lemma sysc_mem_ok_sbrk (V V' : pprivate) (M M' : gmap Z (bv 8)) :
     sysc_num V = Z.of_nat 12 ->
-    sysc_sbrk_img M M' (pv_sz V') ->
+    sysc_sbrk_ok (pv_upt V) (pv_upt V') (pv_sz V) (pv_sz V') M M' ->
     sysc_mem_ok V V' M M'.
   Proof.
     intros Hn Him. unfold sysc_mem_ok. rewrite Hn.
@@ -2648,7 +2670,8 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true pj _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid U U lks av m mf
-              Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl)
+              Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
+                 (sysc_num_ne12 _ _ Hnum eq_refl))
               ltac:(right; reflexivity)
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
@@ -2671,7 +2694,7 @@ Section SyscallArms.
     destruct Hok as [ (_ & HP & _) | (_ & [ (_ & Hg) | (_ & _ & HP & _ & _) ]) ].
     - rewrite HP. reflexivity.
     - destruct Hg as [ (_ & HP & _)
-                     | [ (_ & _ & _ & _ & (_ & Htf & _) & _)
+                     | [ (_ & _ & _ & _ & _ & ((_ & Htf & _) & _ & _) & _)
                        | [ (_ & _ & HP & _) | (_ & _ & HP & _) ] ] ].
       + rewrite HP. reflexivity.
       + exact Htf.
@@ -2680,39 +2703,94 @@ Section SyscallArms.
     - rewrite HP. reflexivity.
   Qed.
 
-  (* ...and what it did to the process's MEMORY, in the shape
-     [SpecSyscall.sysc_mem_ok]'s sbrk branch asks for.  Every arm of
-     [sys_sbrk_ok] lands in one of [sysc_sbrk_img]'s three: the failure and
-     [n = 0] arms move nothing, both growth paths (eager and lazy) are
-     [umem_grow] at the size the process ends at, and the real shrink is
-     [umem_del] at PGROUNDUP of it.  The one arm that needs an argument is
-     the shrink's WRAP sub-case ([sz <= sz + n], where uvmdealloc did nothing
-     and returned the old size): there [uvmd_np]'s guard is false, so the run
-     is empty and [umem_del M _ 0] is [M] by that fixpoint's own [O] case. *)
-  Lemma sysc_sbrk_img_of_ok (V : pprivate) (v0 v1 : mword 64)
-      (P' : uptd) (szv' r : mword 64) (M M' : gmap Z (bv 8)) :
-    sys_sbrk_ok V v0 v1 P' szv' r M M' -> sysc_sbrk_img M M' szv'.
+  (* THE PROCESS'S LAZY IMAGE COVERS ITS LIVE REGION -- [proc_ptm]'s own
+     domain law, read off [proc_priv] without spending it.  This is what
+     turns a "nothing moved" arm into sbrk's row: at the lazy view
+     [umem_grow M sz] IS [M] when every live byte is already recorded
+     ([UserPtTree.umem_grow_id]). *)
+  Lemma sysc_priv_mem_dom (gf : gname) (pa : mword 64) (pid : mword 32)
+      (U : ustate) :
+    proc_priv gf pa pid U -∗
+    ⌜forall va : Z, is_Some (us_M U !! va)
+       <-> (uva_mapped (pv_upt (us_V U)) va
+            \/ uva_live (uint (pv_sz (us_V U))) va)⌝.
   Proof.
-    intro Hok. unfold sysc_sbrk_img.
-    destruct Hok as [ (_ & _ & _ & Hm) | (_ & [ (_ & Hg) | Hlz ]) ].
-    - left; exact Hm.
-    - destruct Hg as [ (_ & _ & _ & Hm)
-                     | [ (_ & _ & _ & _ & _ & _ & Hm)
-                       | [ (_ & _ & _ & _ & Hm)
-                         | (_ & _ & _ & Hsub & Hm) ] ] ].
-      + left; exact Hm.
-      + right; left; exact Hm.
-      + left; exact Hm.
-      + destruct Hsub as [ (_ & Hsz) | (Hge & Hsz) ].
-        * right; right.
-          exists (uvmd_np (pv_sz V) (add_vec (pv_sz V) (sbrk_arg v0))).
-          rewrite Hsz. exact Hm.
-        * left.
+    rewrite proc_priv_split_pt. iIntros "[_ Hptm]".
+    iApply (proc_ptm_dom with "Hptm").
+  Qed.
+
+  (* the shape of every arm on which sbrk changed NOTHING: a failure, [n = 0],
+     and the shrink's WRAP sub-case.  The row still reads [umem_grow], and
+     that is not a weakening -- it is [M] itself at the lazy view. *)
+  Lemma sbrk_ok_still (V : pprivate) (M : gmap Z (bv 8)) :
+    (forall a : Z, uva_live (uint (pv_sz V)) a -> is_Some (M !! a)) ->
+    sysc_sbrk_ok (pv_upt V) (pv_upt V) (pv_sz V) (pv_sz V) M M.
+  Proof.
+    intros Hdom. unfold sysc_sbrk_ok.
+    destruct (decide (uint (pv_sz V) <= uint (pv_sz V))%Z) as [_ | Hc];
+      [ | exfalso; exact (Hc (Z.le_refl _)) ].
+    split; [ apply uptd_ext_sz_refl | ].
+    symmetry. apply umem_grow_id. exact Hdom.
+  Qed.
+
+  (* ...and what sbrk did to the ADDRESS SPACE, in the shape
+     [SpecSyscall.sysc_mem_ok]'s sbrk branch asks for -- descriptor and
+     image together, as a function of the two sizes.  Every arm of
+     [sys_sbrk_ok] lands in one of [sysc_sbrk_ok]'s two: the failure and
+     [n = 0] arms and the shrink's WRAP sub-case ([sz <= sz + n], where
+     uvmdealloc did nothing and returned the old size, so [uvmd_np]'s guard
+     is false and the run is empty) all sit in the GROW branch at
+     [sz' = sz]; both growth paths (eager and lazy) give it at the size the
+     process ends at; and the real shrink IS uvmdealloc's own run. *)
+  Lemma sysc_sbrk_ok_of_ok (V : pprivate) (v0 v1 : mword 64)
+      (P' : uptd) (szv' r : mword 64) (M M' : gmap Z (bv 8)) :
+    (forall a : Z, uva_live (uint (pv_sz V)) a -> is_Some (M !! a)) ->
+    sys_sbrk_ok V v0 v1 P' szv' r M M' ->
+    sysc_sbrk_ok (pv_upt V) P' (pv_sz V) szv' M M'.
+  Proof.
+    intros Hdom Hok.
+    destruct Hok as [ (_ & HP & Hs & Hm) | (_ & [ (_ & Hg) | Hlz ]) ].
+    - subst. exact (sbrk_ok_still V M Hdom).
+    - destruct Hg as [ (_ & HP & Hs & Hm)
+                     | [ (_ & _ & _ & _ & Hle & Hext & _ & Hm)
+                       | [ (_ & _ & HP & Hs & Hm)
+                         | (_ & _ & HP & Hsub & Hm) ] ] ].
+      + subst. exact (sbrk_ok_still V M Hdom).
+      + (* GREW, eagerly: uvmalloc's run, at vmfault's own RW-user leaf *)
+        unfold sysc_sbrk_ok.
+        destruct (decide (uint (pv_sz V) <= uint szv')%Z) as [_ | Hc];
+          [ | exfalso; exact (Hc Hle) ].
+        exact (conj Hext Hm).
+      + subst. exact (sbrk_ok_still V M Hdom).
+      + destruct Hsub as [ (Hlt & Hs) | (Hge & Hs) ].
+        * (* SHRANK for real *)
+          unfold sysc_sbrk_ok.
+          destruct (decide (uint (pv_sz V) <= uint szv')%Z) as [Hc | _];
+            [ exfalso; rewrite Hs in Hc;
+              exact (Z.lt_irrefl _ (Z.lt_le_trans _ _ _ Hlt Hc)) | ].
+          rewrite Hs. exact (conj HP Hm).
+        * (* the WRAP sub-case: uvmdealloc did nothing at all *)
           assert (Hz : uvmd_np (pv_sz V) (add_vec (pv_sz V) (sbrk_arg v0)) = 0%nat).
           { unfold uvmd_np. rewrite bool_decide_eq_false_2; [reflexivity |].
             rewrite <- !uint_unsigned. lia. }
-          rewrite Hm Hz Nat.mul_0_r. reflexivity.
-    - destruct Hlz as (_ & _ & _ & _ & _ & Hm). right; left; exact Hm.
+          rewrite Hz in HP. rewrite Hz Nat.mul_0_r in Hm.
+          unfold sysc_sbrk_ok.
+          destruct (decide (uint (pv_sz V) <= uint szv')%Z) as [_ | Hc];
+            [ | exfalso; apply Hc; rewrite Hs; exact (Z.le_refl _) ].
+          split.
+          -- rewrite HP. split;
+               [ split; [reflexivity | split; [reflexivity | reflexivity]] | ].
+             split; intros vpn w Hn Hw;
+               cbn [ud_um uptd_del_run um_del_run] in Hw;
+               rewrite Hn in Hw; discriminate.
+          -- cbn [umem_del] in Hm. rewrite Hm Hs. symmetry.
+             apply umem_grow_id. exact Hdom.
+    - (* GREW, lazily: the size alone moved, and the table not at all *)
+      destruct Hlz as (_ & _ & HP & _ & _ & Hle & Hm).
+      unfold sysc_sbrk_ok.
+      destruct (decide (uint (pv_sz V) <= uint szv')%Z) as [_ | Hc];
+        [ | exfalso; exact (Hc Hle) ].
+      rewrite HP. exact (conj (uptd_ext_sz_refl szv' (pv_upt V)) Hm).
   Qed.
 
   Lemma sysc_arm_sbrk (γf : gname) (pj : mword 64)
@@ -2741,6 +2819,11 @@ Section SyscallArms.
                 ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v0 Hv0].
     destruct (lookup_lt_is_Some_2 (pv_tf (us_V U)) (tf_arg_idx 1)
                 ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v1 Hv1].
+    (* the lazy image's domain law, for the row's "nothing moved" arms *)
+    iDestruct (sysc_priv_mem_dom with "Hpriv") as %Hdom0.
+    assert (HMdom : forall a : Z,
+              uva_live (uint (pv_sz (us_V U))) a -> is_Some (us_M U !! a))
+      by (intros a Ha; apply Hdom0; right; exact Ha).
     (* [kalloc_env], peeled off a COPY of the (fully persistent) environment
        bundle, so the original stays available to hand back verbatim *)
     iPoseProof "Henv" as "#Henvc".
@@ -2775,15 +2858,17 @@ Section SyscallArms.
     iDestruct (wp_next_retarget CID CIDy true pj _ Hcry with "Hcont") as "Hcont".
     (* sbrk is one of the two entries [sysc_mem_ok] does not state as a
        window -- the address space itself moved -- so its branch is
-       [sysc_sbrk_img], read straight off [sys_sbrk_ok] by
-       [sysc_sbrk_img_of_ok] above. *)
+       [sysc_sbrk_ok], read straight off [sys_sbrk_ok] by
+       [sysc_sbrk_ok_of_ok] above.  The one thing that row needs beyond
+       [sys_sbrk_ok] is the lazy image's domain law, which is [proc_priv]'s
+       ([sysc_priv_mem_dom], a pure read that does not spend the block). *)
     iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid U
               (upd_usM (upd_usV U (upd_sz (upd_upt (us_V U) P') szv')) M') lks av m mf
               Hmfsp Hmfs2 Hmfrest ltac:(lia)
               ltac:(apply (sysc_mem_ok_sbrk (us_V U)
                              (upd_sz (upd_upt (us_V U) P') szv') (us_M U) M' Hnum);
-                    exact (sysc_sbrk_img_of_ok (us_V U) v0 v1 P' szv'
-                             (mf !!! Regidx Ra0) (us_M U) M' Hok))
+                    exact (sysc_sbrk_ok_of_ok (us_V U) v0 v1 P' szv'
+                             (mf !!! Regidx Ra0) (us_M U) M' HMdom Hok))
               ltac:(right; reflexivity)
               ltac:(right; left; rewrite Hnum; reflexivity)
               ltac:(right; left; rewrite Hnum; reflexivity)
@@ -2936,7 +3021,8 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true pj _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid U U ∅ av m mf
-              Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl)
+              Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
+                 (sysc_num_ne12 _ _ Hnum eq_refl))
               ltac:(right; reflexivity)
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
@@ -3003,7 +3089,8 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true pj _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid U U ∅ av m mf
-              Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl)
+              Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
+                 (sysc_num_ne12 _ _ Hnum eq_refl))
               ltac:(right; reflexivity)
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
@@ -3070,7 +3157,8 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U U ∅ av m mf
-              Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl)
+              Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
+                 (sysc_num_ne12 _ _ Hnum eq_refl))
               ltac:(right; reflexivity)
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
@@ -3167,7 +3255,8 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true pj _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid U (upd_usV U V') ∅ av m mf
-              Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl)
+              Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
+                 (sysc_num_ne12 _ _ Hnum eq_refl))
               ltac:(right; exact Htfw')
               ltac:(right; right; exact Hupte')
               ltac:(right; right; exact Hszv')
@@ -3254,7 +3343,8 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true pj _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf pj fn dqi ip pid U U ∅ av m mf
-              Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl)
+              Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
+                 (sysc_num_ne12 _ _ Hnum eq_refl))
               ltac:(right; reflexivity)
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
@@ -3574,7 +3664,8 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U U
-              ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl)
+              ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
+                 (sysc_num_ne12 _ _ Hnum eq_refl))
               ltac:(right; reflexivity)
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)
@@ -3696,7 +3787,8 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
-              (us_upt U P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl)
+              (us_upt U P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
+                 (sysc_num_ne12 _ _ Hnum eq_refl))
               ltac:(right; reflexivity)
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
@@ -3979,7 +4071,8 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U (MkUstate V' (us_M U))
-              ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl)
+              ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
+                 (sysc_num_ne12 _ _ Hnum eq_refl))
               ltac:(right; exact Htfw')
               ltac:(right; right; exact Hupte')
               ltac:(right; right; exact Hszv')
@@ -4082,7 +4175,8 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
-              (us_upt U P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl)
+              (us_upt U P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
+                 (sysc_num_ne12 _ _ Hnum eq_refl))
               ltac:(right; reflexivity)
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
@@ -4171,7 +4265,8 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
-              (us_upt U P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl)
+              (us_upt U P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
+                 (sysc_num_ne12 _ _ Hnum eq_refl))
               ltac:(right; reflexivity)
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
@@ -4270,7 +4365,8 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U (upd_usV U V')
-              ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl)
+              ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
+                 (sysc_num_ne12 _ _ Hnum eq_refl))
               ltac:(right; exact Htfw')
               ltac:(right; right; exact Hupte')
               ltac:(right; right; exact Hszv')
@@ -4535,7 +4631,8 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
-              (us_upt U P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl)
+              (us_upt U P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
+                 (sysc_num_ne12 _ _ Hnum eq_refl))
               ltac:(right; reflexivity)
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
@@ -4638,7 +4735,8 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U
-              (us_upt U P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl)
+              (us_upt U P') ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
+                 (sysc_num_ne12 _ _ Hnum eq_refl))
               ltac:(right; reflexivity)
               ltac:(right; right; exact Hextz)
               ltac:(right; right; reflexivity)
@@ -4774,7 +4872,8 @@ Section SyscallArms.
       by wp_next_chain.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) fn dqi ip pid U (MkUstate V' (us_M U))
-              ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl)
+              ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) (sysc_mem_ok_quiet _ _ _ _ eq_refl
+                 (sysc_num_ne12 _ _ Hnum eq_refl))
               ltac:(right; exact Htfw')
               ltac:(right; right; exact Hupte')
               ltac:(right; right; exact Hszv')
@@ -5168,7 +5267,8 @@ Section SyscallArms.
     iApply (sysc_epilogue_tail (CID := CIDi) γf (proc_addr j) fn dqi ip pid U
               (us_tf U (<[tf_arg_idx 0 := rget G1 Ra4]> (pv_tf (us_V U))))
               ∅ av m G1 HG1sp HG1rest ltac:(lia)
-              (sysc_mem_ok_quiet _ _ _ _ eq_refl)
+              (sysc_mem_ok_quiet _ _ _ _ eq_refl
+                 (sysc_num_ne12_range _ Hrange))
               ltac:(right; exists (rget G1 Ra4); reflexivity)
               ltac:(right; right; apply uptd_ext_sz_refl)
               ltac:(right; right; reflexivity)

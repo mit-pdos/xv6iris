@@ -1453,8 +1453,9 @@ Section ProofSysSbrk.
       split; [exact Hnoteager |].
       split; [exact Hnpos |].
       split; [reflexivity |].
-      split; [| split; [reflexivity | reflexivity]].
-      rewrite uint_unsigned uvm_maxsz_val. rewrite -Hsum. exact Hfits.
+      split; [rewrite uint_unsigned uvm_maxsz_val; rewrite -Hsum; exact Hfits |].
+      split; [reflexivity |].
+      split; [exact Hszle | reflexivity].
     - iExists (word_of_words (trunc32 v0) (trunc32 v1)).
       iApply (ctx_word_pointsto_join4 _ _ _ _ Hal5 with "Hs5lo Hs5hi").
   Qed.

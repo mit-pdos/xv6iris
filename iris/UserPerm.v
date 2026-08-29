@@ -821,3 +821,261 @@ Proof.
     lia.
   - destruct (Hleaf p w Hp Hp') as [r ->]. apply perm_leaf_uvm_pte22.
 Qed.
+
+
+(* ===================================================================== *)
+(* §9 THE SHRINK: [perm_of] under uvmdealloc's run (stage S8b).           *)
+(*                                                                         *)
+(* The mirror of [UsysMemOkSpec.perm_of_grow], and the fact sbrk's         *)
+(* permission row needs on the way DOWN.  uvmdealloc deletes exactly the   *)
+(* run above PGROUNDUP of the new size; [ProcPtOwn.um_below] -- which      *)
+(* [ProcInv.proc_priv] carries -- says nothing is mapped at or above the   *)
+(* OLD size, so every page the projection can name lives inside the old    *)
+(* live region, and CUTTING THE REGION DOWN TO THE NEW SIZE IS DROPPING    *)
+(* THE DEALLOC RUN.  The right-hand side is therefore TABLE-FREE: the old  *)
+(* projection restricted to the pages that are still live -- which is what *)
+(* lets the U tier state sbrk's row without ever mentioning [dom um].      *)
+(*                                                                         *)
+(* EVERY PIECE OF ARITHMETIC IS A [Z]-ONLY LEMMA BELOW, and the main proof *)
+(* only [apply]s them.  That is durable-notes.md's standing advice for an  *)
+(* mword context, and it also makes the proof immune to the trap that cost *)
+(* two build rounds here: [rewrite !uint_unsigned in H] rewrote only ONE   *)
+(* of the two [uint]s in [uint szv' < uint szv], leaving a hypothesis with *)
+(* [bv_unsigned szv'] on the left and [uint szv] on the right -- two       *)
+(* distinct atoms, so [lia] answered "Cannot find witness" on a goal that  *)
+(* looks trivial.  Name the instances ([uint_unsigned szv]), never [!].    *)
+(* ===================================================================== *)
+
+Local Lemma pd_lt_le (a b c : Z) : a < b -> b <= c -> a <= c.
+Proof. lia. Qed.
+
+Local Lemma pd_le_lt (a b c : Z) : a < b -> b <= c -> a < c.
+Proof. lia. Qed.
+
+Local Lemma pd_nowrap (a : Z) : 0 <= a -> a <= 274877898752 ->
+  (a + 4095 < 2 ^ 64)%Z.
+Proof. change (2 ^ 64)%Z with 18446744073709551616%Z. lia. Qed.
+
+(* PGROUNDUP is a multiple of the page size, so dividing and re-multiplying
+   is the identity on it *)
+Local Lemma pd_quot (a : Z) :
+  (UserPtTree.pgroundup a / 4096 * 4096)%Z = UserPtTree.pgroundup a.
+Proof.
+  unfold UserPtTree.pgroundup.
+  rewrite (Z.div_mul ((a + 4095) / 4096) 4096 ltac:(discriminate)). reflexivity.
+Qed.
+
+Local Lemma pd_seq_mul (k G : Z) :
+  0 <= k < G / 4096 -> (G / 4096 * 4096)%Z = G -> (k * 4096 < G)%Z.
+Proof. lia. Qed.
+
+Local Lemma pd_k_small (k A : Z) :
+  0 <= k < A -> A <= 67108862 -> (0 <= k < 134217728)%Z.
+Proof. lia. Qed.
+
+Local Lemma pd_np (G G' : Z) :
+  (G / 4096 * 4096)%Z = G -> (G' / 4096 * 4096)%Z = G' -> (G' <= G)%Z ->
+  Z.of_nat (Z.to_nat ((G - G') / 4096)) = (G / 4096 - G' / 4096)%Z.
+Proof.
+  intros HG HG' Hle.
+  assert (Heq : (G - G')%Z = ((G / 4096 - G' / 4096) * 4096)%Z) by lia.
+  rewrite Heq. rewrite (Z.div_mul _ 4096 ltac:(discriminate)).
+  apply Z2Nat.id. lia.
+Qed.
+
+Local Lemma pd_Abound (G : Z) :
+  (G / 4096 * 4096)%Z = G -> (G <= 274877898752)%Z -> (G / 4096 <= 67108862)%Z.
+Proof. lia. Qed.
+
+Local Lemma pd_Bnn (G' : Z) :
+  (0 <= G')%Z -> (G' / 4096 * 4096)%Z = G' -> (0 <= G' / 4096)%Z.
+Proof. lia. Qed.
+
+Local Lemma pd_run_bound (B i A : Z) :
+  (0 <= B)%Z -> (0 <= i)%Z -> (i < A - B)%Z -> (A <= 67108862)%Z ->
+  (B + i < 134217728)%Z.
+Proof. lia. Qed.
+
+Local Lemma pd_run_absurd (B i G' : Z) :
+  (B * 4096)%Z = G' -> (0 <= i)%Z -> ((B + i) * 4096 < G')%Z -> False.
+Proof. lia. Qed.
+
+Local Lemma pd_ge_B (q B G' : Z) :
+  (B * 4096)%Z = G' -> (G' <= q * 4096)%Z -> (B <= q)%Z.
+Proof. lia. Qed.
+
+Local Lemma pd_lt_A (q A G zs : Z) :
+  (A * 4096)%Z = G -> (q * 4096 < zs)%Z -> (zs <= G)%Z -> (q < A)%Z.
+Proof. lia. Qed.
+
+Local Lemma pd_idx_lt (q B A : Z) :
+  (B <= q)%Z -> (q < A)%Z -> (Z.of_nat (Z.to_nat (q - B)) < A - B)%Z.
+Proof. intros H1 H2. rewrite Z2Nat.id; lia. Qed.
+
+Local Lemma pd_idx_nowrap (q B : Z) :
+  (B <= q)%Z -> (q < 134217728)%Z ->
+  (B + Z.of_nat (Z.to_nat (q - B)) < 134217728)%Z.
+Proof. intros H1 H2. rewrite Z2Nat.id; lia. Qed.
+
+Local Lemma pd_idx_val (q B : Z) :
+  (B <= q)%Z -> (B + Z.of_nat (Z.to_nat (q - B)))%Z = q.
+Proof. intros H1. rewrite Z2Nat.id; lia. Qed.
+
+(* the converse of [live_pages_mem].  [usz_ok] is what stops [Z_to_bv]'s
+   wrap from folding two page numbers together in the [list_to_set]. *)
+Lemma live_pages_bound (sz : Z) (p : mword 27) :
+  usz_ok sz -> p ∈ live_pages sz ->
+  (bv_unsigned p * 4096 < UserPtTree.pgroundup sz)%Z.
+Proof.
+  unfold usz_ok, live_pages. intros Hsz Hin.
+  apply elem_of_list_to_set, elem_of_list_fmap in Hin as (k & -> & Hk).
+  apply elem_of_seqZ in Hk. rewrite Z.add_0_l in Hk.
+  assert (Hle : (UserPtTree.pgroundup sz / 4096 <= 67108862)%Z).
+  { apply (Z.div_le_mono _ _ 4096 ltac:(reflexivity)) in Hsz.
+    change (274877898752 / 4096)%Z with 67108862%Z in Hsz. exact Hsz. }
+  rewrite Z_to_bv_unsigned. rewrite bv_wrap_small;
+    [ exact (pd_seq_mul k _ Hk (pd_quot sz))
+    | change (bv_modulus 27) with 134217728%Z; exact (pd_k_small k _ Hk Hle) ].
+Qed.
+
+(* nothing the table maps is outside the live region, so the fill's
+   "minus the mapped pages" caveat never bites at or below [p->sz] *)
+Lemma um_below_dom_live (szv : mword 64) (um : gmap (mword 27) (mword 64)) :
+  um_below szv um -> dom um ⊆ live_pages (uint szv).
+Proof.
+  intros Hb p Hp. apply elem_of_dom in Hp as [w Hw].
+  apply live_pages_mem. rewrite uint_unsigned.
+  exact (pd_le_lt _ _ _ (Hb p w Hw)
+           (pgroundup_ge (bv_unsigned szv)
+              (proj1 (bv_unsigned_in_range _ szv)))).
+Qed.
+
+(* THE LEMMA.  [uvmdealloc]'s run at the smaller size takes the projection
+   to the old one CUT to the pages that are still live. *)
+Lemma perm_of_del_run (um : gmap (mword 27) (mword 64)) (szv szv' : mword 64) :
+  um_below szv um ->
+  (uint szv <= uvm_maxsz)%Z ->
+  (uint szv' < uint szv)%Z ->
+  perm_of (um_del_run um (svpn_of (pgroundup szv')) (uvmd_np szv szv'))
+          (uint szv')
+  = base.filter (fun kv : mword 27 * uperm => kv.1 ∈ live_pages (uint szv'))
+      (perm_of um (uint szv)).
+Proof.
+  intros Hb Hmax Hlt.
+  rewrite (uint_unsigned szv) in Hmax.
+  rewrite (uint_unsigned szv') in Hlt. rewrite (uint_unsigned szv) in Hlt.
+  rewrite (uint_unsigned szv). rewrite (uint_unsigned szv').
+  rewrite uvm_maxsz_val in Hmax.
+  pose proof (proj1 (bv_unsigned_in_range _ szv)) as Hs0.
+  pose proof (proj1 (bv_unsigned_in_range _ szv')) as Hs'0.
+  pose proof (pd_lt_le _ _ _ Hlt Hmax) as Hmax'.
+  (* the two PGROUNDUPs, read on [Z] *)
+  pose proof (pgroundup_live szv (pd_nowrap _ Hs0 Hmax)) as HG.
+  pose proof (pgroundup_live szv' (pd_nowrap _ Hs'0 Hmax')) as HG'.
+  destruct (pgroundup_maxsz szv ltac:(rewrite uvm_maxsz_val; exact Hmax))
+    as [[Hge Hle] _].
+  destruct (pgroundup_maxsz szv' ltac:(rewrite uvm_maxsz_val; exact Hmax'))
+    as [[Hge' Hle'] _].
+  rewrite uvm_maxsz_val in Hle, Hle'.
+  assert (Hok : usz_ok (bv_unsigned szv))
+    by (unfold usz_ok; rewrite HG; exact Hle).
+  assert (Hok' : usz_ok (bv_unsigned szv'))
+    by (unfold usz_ok; rewrite HG'; exact Hle').
+  assert (HgeZ : (bv_unsigned szv <= UserPtTree.pgroundup (bv_unsigned szv))%Z)
+    by (rewrite HG; exact Hge).
+  assert (HG'0 : (0 <= UserPtTree.pgroundup (bv_unsigned szv'))%Z)
+    by (rewrite HG'; exact (proj1 (bv_unsigned_in_range _ (pgroundup szv')))).
+  pose proof (UserPtTree.pgroundup_mono (bv_unsigned szv') (bv_unsigned szv)
+                (Z.lt_le_incl _ _ Hlt)) as Hmono.
+  pose proof (pd_quot (bv_unsigned szv)) as HGq.
+  pose proof (pd_quot (bv_unsigned szv')) as HG'q.
+  pose proof (pd_Abound _ HGq Hok) as HAb.
+  pose proof (pd_Bnn _ HG'0 HG'q) as HBnn.
+  (* the run's base and length, as numbers *)
+  assert (Hv0 : bv_unsigned (svpn_of (pgroundup szv'))
+                = (UserPtTree.pgroundup (bv_unsigned szv') / 4096)%Z).
+  { rewrite HG'.
+    exact (svpn_of_unsigned_small _ ltac:(rewrite uvm_maxsz_val; exact Hle')). }
+  assert (Hk : Z.of_nat (uvmd_np szv szv')
+               = (UserPtTree.pgroundup (bv_unsigned szv) / 4096
+                  - UserPtTree.pgroundup (bv_unsigned szv') / 4096)%Z).
+  { rewrite (uvmd_np_lt szv szv' Hlt). rewrite <- HG, <- HG'.
+    exact (pd_np _ _ HGq HG'q Hmono). }
+  (* a still-live page is BELOW the run *)
+  assert (Hnin : forall p : mword 27,
+            p ∈ live_pages (bv_unsigned szv') ->
+            p ∉ vpn_run (svpn_of (pgroundup szv')) (uvmd_np szv szv')).
+  { intros p Hin Hrun.
+    pose proof (live_pages_bound _ p Hok' Hin) as Hpb.
+    apply elem_of_vpn_run in Hrun as (i & Hi & ->).
+    pose proof (proj1 (Nat2Z.inj_lt _ _) Hi) as Hib. rewrite Hk in Hib.
+    assert (Hnwrap : (bv_unsigned (svpn_of (pgroundup szv')) + Z.of_nat i
+                      < 134217728)%Z).
+    { rewrite Hv0.
+      exact (pd_run_bound _ _ _ HBnn (Nat2Z.is_nonneg i) Hib HAb). }
+    rewrite (vpn_at_unsigned _ _ Hnwrap), Hv0 in Hpb.
+    exact (pd_run_absurd _ _ _ HG'q (Nat2Z.is_nonneg i) Hpb). }
+  (* ...and a MAPPED page that is no longer live is INSIDE it *)
+  assert (Hinrun : forall (p : mword 27) (w : mword 64),
+            um !! p = Some w -> p ∉ live_pages (bv_unsigned szv') ->
+            p ∈ vpn_run (svpn_of (pgroundup szv')) (uvmd_np szv szv')).
+  { intros p w Hp Hnl.
+    pose proof (Hb p w Hp) as Hpb.
+    pose proof (proj2 (bv_unsigned_in_range _ p)) as Hphi.
+    change (bv_modulus 27) with 134217728%Z in Hphi.
+    assert (Hge2 : (UserPtTree.pgroundup (bv_unsigned szv')
+                    <= bv_unsigned p * 4096)%Z).
+    { destruct (Z.lt_ge_cases (bv_unsigned p * 4096)
+                  (UserPtTree.pgroundup (bv_unsigned szv'))) as [Hc | Hc];
+        [ exfalso; exact (Hnl (live_pages_mem _ p Hc)) | exact Hc ]. }
+    pose proof (pd_ge_B _ _ _ HG'q Hge2) as HBp.
+    pose proof (pd_lt_A _ _ _ _ HGq Hpb HgeZ) as HpA.
+    assert (Hnw2 : (bv_unsigned (svpn_of (pgroundup szv'))
+                    + Z.of_nat (Z.to_nat (bv_unsigned p
+                        - UserPtTree.pgroundup (bv_unsigned szv') / 4096))
+                    < 134217728)%Z)
+      by (rewrite Hv0; exact (pd_idx_nowrap _ _ HBp Hphi)).
+    apply elem_of_vpn_run.
+    exists (Z.to_nat (bv_unsigned p
+                      - UserPtTree.pgroundup (bv_unsigned szv') / 4096)).
+    split.
+    - apply (proj2 (Nat2Z.inj_lt _ _)). rewrite Hk.
+      exact (pd_idx_lt _ _ _ HBp HpA).
+    - symmetry. apply bv_eq. rewrite (vpn_at_unsigned _ _ Hnw2), Hv0.
+      exact (pd_idx_val _ _ HBp). }
+  (* ---- the two sides, page by page ---- *)
+  apply map_eq. intros p.
+  destruct (decide (p ∈ live_pages (bv_unsigned szv'))) as [Hin | Hout].
+  - (* still live: the run missed it, and so does the cut *)
+    assert (Hinl : p ∈ live_pages (bv_unsigned szv)).
+    { apply live_pages_mem.
+      exact (pd_le_lt _ _ _ (live_pages_bound _ p Hok' Hin) Hmono). }
+    assert (Hsame : perm_of (um_del_run um (svpn_of (pgroundup szv'))
+                               (uvmd_np szv szv')) (bv_unsigned szv') !! p
+                    = perm_of um (bv_unsigned szv) !! p).
+    { rewrite !perm_of_lookup.
+      rewrite (um_del_run_out um _ _ p (Hnin p Hin)).
+      destruct (um !! p) as [w |]; [ reflexivity | ].
+      rewrite (bool_decide_eq_true_2 _ Hin), (bool_decide_eq_true_2 _ Hinl).
+      reflexivity. }
+    rewrite Hsame. symmetry.
+    destruct (perm_of um (bv_unsigned szv) !! p) as [q |] eqn:Hq.
+    + apply map_lookup_filter_Some_2; [ exact Hq | exact Hin ].
+    + apply map_lookup_filter_None. left. exact Hq.
+  - (* no longer live: the run took it, and the cut drops it *)
+    assert (Hnone : um_del_run um (svpn_of (pgroundup szv'))
+                      (uvmd_np szv szv') !! p = None).
+    { destruct (decide (p ∈ vpn_run (svpn_of (pgroundup szv'))
+                          (uvmd_np szv szv'))) as [Hi | Hi];
+        [ exact (um_del_run_in _ _ _ p Hi) | ].
+      rewrite (um_del_run_out _ _ _ p Hi).
+      destruct (um !! p) as [w |] eqn:Hp; [ | reflexivity ].
+      exfalso. exact (Hi (Hinrun p w Hp Hout)). }
+    assert (HL : perm_of (um_del_run um (svpn_of (pgroundup szv'))
+                            (uvmd_np szv szv')) (bv_unsigned szv') !! p = None).
+    { rewrite perm_of_lookup, Hnone, (bool_decide_eq_false_2 _ Hout).
+      reflexivity. }
+    rewrite HL. symmetry.
+    apply map_lookup_filter_None. right. intros q _ Hg. cbn in Hg.
+    exact (Hout Hg).
+Qed.

@@ -215,22 +215,21 @@ Qed.
 (* IS [tf0] by reflexivity.  ([ret_pc] is [WpGprCsrwA.mepc_val] -- the same *)
 (* term under two names; this file already has [ret_pc] in scope.)         *)
 (*                                                                         *)
-(* THE ONE ESCAPE LEFT is sbrk.  Every other ecall -- exec by              *)
-(* [uround_ok]'s own left disjunct, the other twenty-one by the bump plus  *)
-(* [UsysMemOk.usys_mem_ok] -- is proved for real (stage S8-rest).  sbrk    *)
-(* alone still escapes: its permission relation ([usys_sbrk_perm]) is not  *)
-(* in the dispatcher's post, and putting it there needs the               *)
-(* [perm_of]-under-[uvmdealloc] shrink lemma (stage S8b).  When that       *)
-(* lands the whole left disjunct is deleted.                               *)
+(* THERE IS NO ESCAPE LEFT (stage S8b).  Every ecall is proved for real:   *)
+(* exec by [uround_ok]'s own left disjunct, the other twenty-two by the    *)
+(* bump plus [UsysMemOk.usys_mem_ok] -- sbrk included, now that the        *)
+(* dispatcher's row names the address space's move as a FUNCTION of the    *)
+(* two sizes ([SpecSyscall.sysc_sbrk_ok]) and both directions of its       *)
+(* permission relation are derivable                                       *)
+(* ([UsysMemOkSpec.usys_sbrk_perm_of_row], over                            *)
+(* [UsysMemOkSpec.perm_of_grow] and [UserPerm.perm_of_del_run]).           *)
 (* ===================================================================== *)
 Definition ut_round (sepc_v sc_v : mword 64) (U U' : ustate) : Prop :=
-  (sc_v = uecall_scause
-   /\ usys_num (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U))) = USYS_sbrk)
-  \/ uround_ok sc_v
-       (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U)))
-       (us_M U) (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
-       (pv_tf (us_V U')) (us_M U')
-       (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U')))).
+  uround_ok sc_v
+    (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U)))
+    (us_M U) (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
+    (pv_tf (us_V U')) (us_M U')
+    (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U')))).
 
 (* THE PROLOGUE'S OWN MOVE: [U'] is [U] with the epc word rewritten, which
    is what usertrap's +0x28..+0x2e block does and all it does.  Every block
@@ -244,14 +243,13 @@ Definition ut_pro (sepc_v : mword 64) (U U' : ustate) : Prop :=
 (* THE ENTRY INSTANCE: at the record the prologue hands on, the round has
    done nothing yet, so every arm of the relation is an identity. *)
 Lemma ut_round_entry (sepc_v sc_v : mword 64) (U U' : ustate) :
-  (* the escape is sbrk-only now, so the entry instance is available only
-     where the dispatch has already ruled the ecall arm out -- which is
-     exactly the four arms that take it. *)
+  (* the entry instance is available only where the dispatch has already
+     ruled the ecall arm out -- which is exactly the four arms that take
+     it; on the ecall arm the round has real content from the first step. *)
   sc_v <> uecall_scause ->
   ut_pro sepc_v U U' -> ut_round sepc_v sc_v U U'.
 Proof.
-  intros Hne (Htf & Hupt & Hsz & HM). unfold ut_round.
-  right. unfold uround_ok.
+  intros Hne (Htf & Hupt & Hsz & HM). unfold ut_round, uround_ok.
   destruct (decide (sc_v = uecall_scause)) as [Heq | _]; [ contradiction (Hne Heq) | ].
   rewrite Htf Hupt Hsz HM. unfold uround_id_ok.
   split; [ split; reflexivity | split; reflexivity ].
@@ -277,8 +275,7 @@ Lemma ut_round_ueq (sepc_v sc_v : mword 64) (U U' U'' : ustate) :
   ut_round sepc_v sc_v U U' -> ut_round sepc_v sc_v U U''.
 Proof.
   intros Hu H2 H3 H. unfold ut_round in H |- *. rewrite H2 H3.
-  destruct H as [Hl | Hr]; [ left; exact Hl | right ].
-  eapply uround_ok_ueq_r; [ exact Hu | exact Hr ].
+  eapply uround_ok_ueq_r; [ exact Hu | exact H ].
 Qed.
 
 (* The statement, parameterized over the abstract kernel-internal resource
@@ -313,9 +310,8 @@ Definition usertrap_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fi
        is a kernel MINT, so the row says nothing) or bumped the trapframe and
        moved the image/permission map by what the entry's own syscall row
        allows; anything else resumes the trapped state on the nose.
-       [sc_v = uecall_scause] is J1a's TEMPORARY escape for the ecall arm
-       (S7), narrowed to sbrk at S8 and retired when sbrk's permission
-       relation reaches the dispatcher's post.
+       J1a's temporary escape for the ecall arm (S7), narrowed to sbrk at
+       S8, is GONE at S8b: every entry, sbrk included, proves the row.
        The third premise is prepare_return's [csrw sepc, p->trapframe->epc]
        read back through [tf_resume_pc]: the pc the sret lands at IS the
        resume trapframe's own. *)

@@ -157,11 +157,10 @@ Definition uservec_gpr (g : regfile) (vksp vkhart vktr vksat : bv 64) : regfile 
 (* ===================================================================== *)
 Definition uv_round (U : ustate) (g : regfile) (sepc_v sc_v : mword 64)
     (U' : ustate) : Prop :=
-  (sc_v = uecall_scause /\ usys_num (tf_of g (ret_pc sepc_v)) = USYS_sbrk)
-  \/ uround_vis_ok sc_v (tf_of g (ret_pc sepc_v))
-       (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
-       (pv_tf (us_V U'))
-       (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U')))).
+  uround_vis_ok sc_v (tf_of g (ret_pc sepc_v))
+    (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
+    (pv_tf (us_V U'))
+    (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U')))).
 
 (* the bridge: usertrap's round, read at the machine that trapped.  The
    premise is the SAVE WALK's own fact -- the 31 words uservec stored are
@@ -175,11 +174,8 @@ Lemma uv_round_of_ut (Uut U : ustate) (g : regfile) (sepc_v sc_v : mword 64)
   SpecUsertrap.ut_round sepc_v sc_v Uut U' ->
   uv_round U g sepc_v sc_v U'.
 Proof.
-  intros Hu Hpi [[Hl Hnx] | Hr].
-  - left. split; [ exact Hl | ].
-    rewrite <- (tf_ueq_num _ _ Hu). exact Hnx.
-  - right. rewrite <- Hpi.
-    eapply uround_vis_of_ok. eapply uround_ok_ueq_l; [ exact Hu | exact Hr ].
+  intros Hu Hpi Hr. unfold uv_round. rewrite <- Hpi.
+  eapply uround_vis_of_ok. eapply uround_ok_ueq_l; [ exact Hu | exact Hr ].
 Qed.
 
 (* THE CONTINUATION, NAMED for the same reason the old one was: a

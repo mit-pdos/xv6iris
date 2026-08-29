@@ -135,7 +135,7 @@ Section UtSysBlock.
     (* milestone J1a: [U0] is the state usertrap was entered at, [U] the one
        the prologue handed on, and this block is the ECALL arm -- so the
        round's own [decide (sc = 8)] has already fired left.  At stage S7
-       the arm takes [uround_ok]'s temporary escape; S8 replaces it. *)
+       the arm proves [uround_ok]'s ecall row outright (S8 / S8b). *)
     ut_pro epv U0 U ->
     scv = uecall_scause ->
     kernel_text -∗
@@ -313,6 +313,13 @@ Section UtSysBlock.
          and epc indices in range, and the block is consumed below. *)
       iDestruct (ut_tf_length with "Hpv") as %Htflen0.
       iDestruct (ut_tfp_valid with "Hpv") as %Hpv_valid.
+      (* the two entry-state facts sbrk's permission row needs, read off
+         [proc_priv] before the trapframe borrow (a PURE [iDestruct] does not
+         spend the block).  [um_below] is what makes the row TABLE-FREE, and
+         the TRAPFRAME bound is what makes uvmdealloc's run arithmetic
+         wrap-free -- see [UsysMemOkSpec.usys_sbrk_perm_of_row]. *)
+      iDestruct (proc_priv_um_below with "Hpv") as %Hbel0.
+      iDestruct (proc_priv_sz_maxsz with "Hpv") as %Hszb0.
       iDestruct (proc_priv_tf_upd with "Hpv") as "(Htfc & Htfp & Hpvback)".
       (* [pt_node_claim], off [hw_config] (peeled from [Hcg] persistently)
          and [Hpv_valid] -- the mem-tier convenience wrapper is what the
@@ -411,6 +418,12 @@ Section UtSysBlock.
       change (upd_tf (us_V U) (<[tf_epc_idx := rget S3 Ra5]> (pv_tf (us_V U)))) with V1.
       assert (HV1upt : pv_upt V1 = pv_upt (us_V U))
         by (rewrite /V1; destruct (us_V U); reflexivity).
+      assert (HV1sz : pv_sz V1 = pv_sz (us_V U))
+        by (rewrite /V1; destruct (us_V U); reflexivity).
+      assert (Hbel1 : um_below (pv_sz V1) (ud_um (pv_upt V1)))
+        by (rewrite HV1upt HV1sz; exact Hbel0).
+      assert (Hszb1 : (uint (pv_sz V1) <= uvm_maxsz)%Z)
+        by (rewrite HV1sz; exact Hszb0).
       (* ---- +0x9e: csrsi sstatus,2 -- intr_on(), and the reserve is paid ---- *)
       iDestruct (ut_flip_pre (un_pj N) with "Hcpu") as "(Hcnt & Hcells)".
       (* THE CARVE, and why it needs a NAME for the remainder.  The enabling
@@ -566,10 +579,11 @@ Section UtSysBlock.
              [pi' = pi] premise is [UserPerm.perm_of_uptd_ext_sz] applied
              to clause (ii), now stated at [uptd_ext_sz], together with the
              size clause [Hmemsz];
-           - SBRK alone still escapes.  Its permission relation
-             ([UsysMemOk.usys_sbrk_perm]) is not in the dispatcher's post
-             and needs the [perm_of]-under-[uvmdealloc] shrink lemma
-             (stage S8b).
+           - SBRK too (stage S8b): its image row is the dispatcher's
+             [sysc_sbrk_ok] read at the two sizes, and its permission row
+             is DERIVED from the same fact plus [proc_priv]'s [um_below]
+             and TRAPFRAME bound ([UsysMemOkSpec.usys_sbrk_perm_of_row]).
+             There is no escape left.
 
          The two trapframes differ only in the epc word, which neither the
          number ([usys_num_epc]) nor the table ([usys_mem_ok_epc]) reads --
@@ -590,48 +604,67 @@ Section UtSysBlock.
       { rewrite (list_lookup_total_correct _ _ _ Hepc) HS3a5 HS2a5.
         apply addv_sext4. }
       cbn [us_V us_M] in Hmemg, Hmema0, Hmemupt, Hmemsz.
+      (* SBRK'S PERMISSION ROW, out of the dispatcher's own sbrk row.  It is
+         no longer a premise anybody has to conjure: [sysc_sbrk_ok] names
+         the descriptor's move and uvmdealloc's run, and the two entry facts
+         [proc_priv] carries ([Hbel1] / [Hszb1]) turn that into
+         [usys_sbrk_perm] in both directions -- the grow arm's page set is
+         the newly-live pages (the "minus the mapped ones" caveat vacuous by
+         [um_below]) and the shrink arm's is the cut to what is still live
+         ([UserPerm.perm_of_del_run]). *)
+      assert (Hsbperm : sysc_num V1 = 12 ->
+                usys_sbrk_perm
+                  (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
+                  (perm_of (ud_um (pv_upt V2)) (uint (pv_sz V2)))
+                  (pv_sz V1) (pv_sz V2)).
+      { intros Hsb. rewrite <- HV1upt. rewrite <- HV1sz.
+        apply (usys_sbrk_perm_of_row (pv_upt V1) (pv_upt V2)
+                 (pv_sz V1) (pv_sz V2) (us_M U) M2 Hbel1 Hszb1).
+        exact (sysc_mem_ok_sbrk_row V1 V2 (us_M U) M2 Hsb Hmemg). }
       assert (Hrda : ut_round epv scv U0 (MkUstate V2 M2)).
       { destruct Hpro as (Hp1 & Hp2 & Hp3 & Hp4).
         unfold ut_round.
         rewrite <- Hp1. rewrite <- Hp2. rewrite <- Hp3. rewrite <- Hp4.
-        destruct (decide (sysc_num V1 = 12)) as [Hsb | Hnsb].
-        - (* sbrk: the one escape left *)
-          left. split; [ exact Hscec | rewrite <- Hnumeq; exact Hsb ].
-        - right. unfold uround_ok.
-          destruct (decide (scv = uecall_scause)) as [_ | Hc];
-            [ | contradiction (Hc Hscec) ].
-          destruct (decide (sysc_num V1 = 7)) as [Hex | Hnex].
-          + left. rewrite <- Hnumeq. exact Hex.
-          + right.
-            destruct Hmema0 as [Hc7 | (w & Hw)]; [ contradiction (Hnex Hc7) | ].
-            exists w.
-            assert (Hbump : pv_tf V2 = bump_tf (pv_tf (us_V U)) w).
-            { rewrite Hw HV1tf Ha5. unfold bump_tf. reflexivity. }
-            (* the permission half, which is where clause (ii)'s size and
-               RW-leaf content is spent *)
-            assert (Hpi : perm_of (ud_um (pv_upt V2)) (uint (pv_sz V2))
-                          = perm_of (ud_um (pv_upt (us_V U)))
-                                    (uint (pv_sz (us_V U)))).
-            { destruct Hmemsz as [H7 | [H12 | Hsz]];
-                [ contradiction (Hnex H7) | contradiction (Hnsb H12) | ].
-              destruct Hmemupt as [H7 | [H12 | Hup]];
-                [ contradiction (Hnex H7) | contradiction (Hnsb H12) | ].
-              rewrite Hsz. exact (perm_of_uptd_ext_sz _ _ _ Hup). }
-            split.
-            * (* THE BUMP *)
-              unfold uround_bump_ok. rewrite Hbump. split.
-              -- unfold tf_resume_gpr0.
-                 exact (tf_resume_gpr_bump zero_rf (pv_tf (us_V U)) w
-                          ltac:(rewrite Htflen0;
-                                unfold tf_arg_idx, TFWORDS; lia)).
-              -- exact (tf_resume_pc_bump (pv_tf (us_V U)) w
-                          ltac:(rewrite Htflen0;
-                                unfold tf_epc_idx, TFWORDS; lia)).
-            * (* THE TABLE *)
-              cbn [pv_upt pv_sz pv_tf us_V us_M].
-              rewrite Hpi. rewrite <- Hnumeq.
-              apply (usys_mem_ok_epc _ _ (rget S3 Ra5)).
-              rewrite <- HV1tf.
+        unfold uround_ok.
+        destruct (decide (scv = uecall_scause)) as [_ | Hc];
+          [ | contradiction (Hc Hscec) ].
+        destruct (decide (sysc_num V1 = 7)) as [Hex | Hnex].
+        - left. rewrite <- Hnumeq. exact Hex.
+        - right.
+          destruct Hmema0 as [Hc7 | (w & Hw)]; [ contradiction (Hnex Hc7) | ].
+          exists w.
+          assert (Hbump : pv_tf V2 = bump_tf (pv_tf (us_V U)) w).
+          { rewrite Hw HV1tf Ha5. unfold bump_tf. reflexivity. }
+          split.
+          + (* THE BUMP *)
+            unfold uround_bump_ok. rewrite Hbump. split.
+            * unfold tf_resume_gpr0.
+              exact (tf_resume_gpr_bump zero_rf (pv_tf (us_V U)) w
+                       ltac:(rewrite Htflen0;
+                             unfold tf_arg_idx, TFWORDS; lia)).
+            * exact (tf_resume_pc_bump (pv_tf (us_V U)) w
+                       ltac:(rewrite Htflen0;
+                             unfold tf_epc_idx, TFWORDS; lia)).
+          + (* THE TABLE *)
+            cbn [pv_upt pv_sz pv_tf us_V us_M].
+            rewrite <- Hnumeq.
+            apply (usys_mem_ok_epc _ _ (rget S3 Ra5)).
+            rewrite <- HV1tf.
+            destruct (decide (sysc_num V1 = 12)) as [Hsb | Hnsb].
+            * (* SBRK, for real (stage S8b) *)
+              exact (sysc_mem_ok_usys_sbrk V1 V2 (us_M U) M2 w _ _
+                       Hsb (Hsbperm Hsb) Hmemg).
+            * (* the other twenty-one: the permission half is where clause
+                 (ii)'s size and RW-leaf content is spent *)
+              assert (Hpi : perm_of (ud_um (pv_upt V2)) (uint (pv_sz V2))
+                            = perm_of (ud_um (pv_upt (us_V U)))
+                                      (uint (pv_sz (us_V U)))).
+              { destruct Hmemsz as [H7 | [H12 | Hsz]];
+                  [ contradiction (Hnex H7) | contradiction (Hnsb H12) | ].
+                destruct Hmemupt as [H7 | [H12 | Hup]];
+                  [ contradiction (Hnex H7) | contradiction (Hnsb H12) | ].
+                rewrite Hsz. exact (perm_of_uptd_ext_sz _ _ _ Hup). }
+              rewrite Hpi.
               exact (sysc_mem_ok_usys V1 V2 (us_M U) M2 w _ _
                        Hnex Hnsb eq_refl Hmemg). }
       iApply (T.ut_a6 (CID := CID2) SY.syscall_env N U0 (MkUstate V2 M2) pt ksp m0 mg av

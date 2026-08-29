@@ -12,18 +12,21 @@
 (*     ([perm_of (pv_upt V') (pv_sz V') = perm_of (pv_upt V) (pv_sz V)]) -- *)
 (*     which is the kernel's to show from each arm's [P' = P] / [sz' = sz] *)
 (*     (the sixteen quiet entries and the four windows touch neither);    *)
-(*   - sbrk: the row's [usys_sbrk_perm π π'], with [perm_of_grow] proving  *)
-(*     the GROW arm's shape from [growproc_ok]'s own facts (table          *)
-(*     unchanged, size up) and the shrink arm left as the premise it is   *)
-(*     -- its exact page set is [uvmdealloc]'s [um_del_run] window, which  *)
-(*     [sysc_mem_ok] does not carry (see the project file: the kernel's   *)
-(*     spec would have to expose the run to close it here).               *)
+(*   - sbrk: the row's [usys_sbrk_perm π π' szv szv'], and it is no longer *)
+(*     a premise anybody has to conjure.  The dispatcher's own sbrk row    *)
+(*     ([SpecSyscall.sysc_sbrk_ok]) now names the descriptor's move and    *)
+(*     the dealloc run's count, so BOTH arms are derivable here:           *)
+(*     [usys_sbrk_perm_grow] out of [perm_of_grow] plus                    *)
+(*     [perm_of_uptd_ext_sz], and [usys_sbrk_perm_shrink] out of           *)
+(*     [UserPerm.perm_of_del_run].  What the caller supplies instead is    *)
+(*     the two facts [ProcInv.proc_priv] already carries about the ENTRY   *)
+(*     state: [um_below] and [uint sz <= uvm_maxsz].                       *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap sets bitvector.definitions.
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.MachineWord SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types.
-Require Import RiscvLang.
+Require Import RiscvLang RiscvPtsto.
 Require Import ProcGeom ProcDefs.
 Require Import UserPtTree ProcPtOwn.
 Require Import SpecSyscall.
@@ -53,20 +56,42 @@ Proof.
   destruct (sysc_window (sysc_num V)); exact (conj H Hp).
 Qed.
 
-(* sbrk: the image half is the kernel's; the permission half is the row's
-   own relation, supplied by the caller (see the header) *)
+(* sbrk: the dispatcher's row, read at the two sizes it is keyed by.  The
+   permission half is the row's own relation, and it is now DERIVABLE from
+   the same dispatcher row -- [usys_sbrk_perm_of_row] below. *)
+Lemma sysc_mem_ok_sbrk_row (V V' : pprivate) (M M' : gmap Z (bv 8)) :
+  sysc_num V = 12 ->
+  sysc_mem_ok V V' M M' ->
+  sysc_sbrk_ok (pv_upt V) (pv_upt V') (pv_sz V) (pv_sz V') M M'.
+Proof.
+  intros Hn H. unfold sysc_mem_ok in H. rewrite Hn in H.
+  destruct (decide (12 = 7)) as [Hc | _]; [ discriminate Hc | ].
+  destruct (decide (12 = 12)) as [_ | Hc]; [ exact H | exfalso; exact (Hc eq_refl) ].
+Qed.
+
+(* the IMAGE half is the dispatcher's row with the descriptor forgotten *)
+Lemma usys_sbrk_img_of_row (P P' : uptd) (szv szv' : mword 64)
+    (M M' : gmap Z (bv 8)) :
+  sysc_sbrk_ok P P' szv szv' M M' -> usys_sbrk_img M M' szv szv'.
+Proof.
+  unfold sysc_sbrk_ok, usys_sbrk_img.
+  destruct (decide (uint szv <= uint szv')%Z); intros [_ H]; exact H.
+Qed.
+
 Lemma sysc_mem_ok_usys_sbrk (V V' : pprivate) (M M' : gmap Z (bv 8)) (r : mword 64)
     (π π' : gmap (mword 27) uperm) :
   sysc_num V = 12 ->
-  usys_sbrk_perm π π' ->
+  usys_sbrk_perm π π' (pv_sz V) (pv_sz V') ->
   sysc_mem_ok V V' M M' ->
   usys_mem_ok (sysc_num V) (pv_tf V) r M π M' π'.
 Proof.
-  intros Hn Hp H. unfold sysc_mem_ok in H. unfold usys_mem_ok, USYS_exec, USYS_sbrk.
-  rewrite Hn in H |- *.
+  intros Hn Hp H.
+  pose proof (sysc_mem_ok_sbrk_row V V' M M' Hn H) as Hrow.
+  unfold usys_mem_ok, USYS_exec, USYS_sbrk. rewrite Hn.
   destruct (decide (12 = 7)) as [Hc | _]; [ discriminate Hc | ].
   destruct (decide (12 = 12)) as [_ | Hc]; [ | exfalso; exact (Hc eq_refl) ].
-  split; [ exists (pv_sz V'); exact H | exact Hp ].
+  exists (pv_sz V), (pv_sz V').
+  split; [ exact (usys_sbrk_img_of_row _ _ _ _ _ _ Hrow) | exact Hp ].
 Qed.
 
 (* ===================================================================== *)
@@ -136,10 +161,84 @@ Proof.
     + exact (conj Hl' Hn).
 Qed.
 
-Lemma usys_sbrk_perm_grow (um : gmap (mword 27) (mword 64)) (sz sz' : Z) :
-  sz <= sz' -> usys_sbrk_perm (perm_of um sz) (perm_of um sz').
+(* ===================================================================== *)
+(* THE PERMISSION HALF, DERIVED FROM THE DISPATCHER'S ROW.                 *)
+(*                                                                         *)
+(* This is what closes stage S8b: [usys_sbrk_perm] is no longer a premise  *)
+(* the caller has to conjure, it is a CONSEQUENCE of what the dispatcher   *)
+(* says the address space did, plus the two facts [ProcInv.proc_priv]      *)
+(* carries about the entry state ([um_below] and the TRAPFRAME bound).     *)
+(* ===================================================================== *)
+
+(* on the way UP the "minus the mapped pages" caveat is VACUOUS: [um_below]
+   puts every mapped page inside the OLD live region, so no newly-live page
+   is one of them.  This is the table-free reading of [perm_of_grow]. *)
+Lemma perm_of_grow_below (um : gmap (mword 27) (mword 64)) (szv szv' : mword 64) :
+  um_below szv um ->
+  (uint szv <= uint szv')%Z ->
+  perm_of um (uint szv')
+  = perm_of um (uint szv)
+    ∪ gset_to_gmap uperm_rw (live_pages (uint szv') ∖ live_pages (uint szv)).
 Proof.
-  intros Hle. right. left.
-  exists ((live_pages sz' ∖ live_pages sz) ∖ dom um).
-  exact (perm_of_grow um sz sz' Hle).
+  intros Hb Hle.
+  assert (Hset : ((live_pages (uint szv') ∖ live_pages (uint szv)) ∖ dom um)
+                 = (live_pages (uint szv') ∖ live_pages (uint szv))).
+  { apply set_eq. intros p. rewrite !elem_of_difference. split.
+    - intros [H _]. exact H.
+    - intros [Hl' Hl]. split; [ exact (conj Hl' Hl) | ].
+      intros Hd. exact (Hl (um_below_dom_live szv um Hb p Hd)). }
+  rewrite (perm_of_grow um (uint szv) (uint szv') Hle), Hset. reflexivity.
+Qed.
+
+(* GROW.  The eager path really does map the run -- but at vmfault's own
+   RW-user leaf inside the new size, which is exactly what
+   [perm_of_uptd_ext_sz] needs to see that the projection did not notice. *)
+Lemma usys_sbrk_perm_grow (P P' : uptd) (szv szv' : mword 64) :
+  um_below szv (ud_um P) ->
+  (uint szv <= uint szv')%Z ->
+  uptd_ext_sz szv' P P' ->
+  usys_sbrk_perm (perm_of (ud_um P) (uint szv))
+                 (perm_of (ud_um P') (uint szv')) szv szv'.
+Proof.
+  intros Hb Hle Hext. unfold usys_sbrk_perm.
+  destruct (decide (uint szv <= uint szv')%Z) as [_ | Hc];
+    [ | exfalso; exact (Hc Hle) ].
+  rewrite (perm_of_uptd_ext_sz szv' P P' Hext).
+  exact (perm_of_grow_below (ud_um P) szv szv' Hb Hle).
+Qed.
+
+(* SHRINK.  [UserPerm.perm_of_del_run], at the descriptor tier. *)
+Lemma usys_sbrk_perm_shrink (P : uptd) (szv szv' : mword 64) :
+  um_below szv (ud_um P) ->
+  (uint szv <= uvm_maxsz)%Z ->
+  (uint szv' < uint szv)%Z ->
+  usys_sbrk_perm (perm_of (ud_um P) (uint szv))
+    (perm_of (ud_um (uptd_del_run P (svpn_of (pgroundup szv'))
+                       (uvmd_np szv szv'))) (uint szv')) szv szv'.
+Proof.
+  intros Hb Hmax Hlt. unfold usys_sbrk_perm.
+  destruct (decide (uint szv <= uint szv')%Z) as [Hc | _];
+    [ exfalso; exact (Z.lt_irrefl _ (Z.lt_le_trans _ _ _ Hlt Hc)) | ].
+  unfold uptd_del_run. cbn [ud_um].
+  exact (perm_of_del_run (ud_um P) szv szv' Hb Hmax Hlt).
+Qed.
+
+(* THE ROW.  Both arms at once, out of the dispatcher's own sbrk row. *)
+Lemma usys_sbrk_perm_of_row (P P' : uptd) (szv szv' : mword 64)
+    (M M' : gmap Z (bv 8)) :
+  um_below szv (ud_um P) ->
+  (uint szv <= uvm_maxsz)%Z ->
+  sysc_sbrk_ok P P' szv szv' M M' ->
+  usys_sbrk_perm (perm_of (ud_um P) (uint szv))
+                 (perm_of (ud_um P') (uint szv')) szv szv'.
+Proof.
+  intros Hb Hmax H. unfold sysc_sbrk_ok in H.
+  destruct (decide (uint szv <= uint szv')%Z) as [Hle | Hgt].
+  - destruct H as [Hext _].
+    exact (usys_sbrk_perm_grow P P' szv szv' Hb Hle Hext).
+  - destruct H as [Hp _]. rewrite Hp.
+    assert (Hgt' : (uint szv' < uint szv)%Z).
+    { destruct (Z.le_gt_cases (uint szv) (uint szv')) as [Hc | Hc];
+        [ exfalso; exact (Hgt Hc) | exact Hc ]. }
+    apply usys_sbrk_perm_shrink; [ exact Hb | exact Hmax | exact Hgt' ].
 Qed.

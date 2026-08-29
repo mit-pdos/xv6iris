@@ -130,6 +130,12 @@ Definition sys_sbrk_ok (V : pprivate) (v0 v1 : mword 64)
        P' = pv_upt V /\
        (uint (pv_sz V) + sint (sbrk_arg v0) <= uvm_maxsz)%Z /\
        szv' = add_vec (pv_sz V) (sbrk_arg v0) /\
+       (* ...and the sum did NOT wrap, so the size really went up.  Spelled
+          out rather than left to the caller's arithmetic: the dispatcher's
+          sbrk row ([SpecSyscall.sysc_sbrk_ok]) is keyed on exactly this
+          comparison, and this is the one place the no-wrap argument is
+          already in hand. *)
+       (uint (pv_sz V) <= uint szv')%Z /\
        M' = umem_grow M (uint szv') ) )).
 
 Definition wp_sys_sbrk_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}

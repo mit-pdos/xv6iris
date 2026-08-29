@@ -17,23 +17,25 @@
 (* user-visible per-page permission view ([UserPerm.perm_of], the leaf   *)
 (* bits with the lazy pages filled in RW), so every row also says how    *)
 (* [π] moves: unchanged on the sixteen quiet entries, the four windows   *)
-(* and the exec failure arm; sbrk's row is [usys_sbrk_perm] -- unchanged,*)
-(* grown by a set of pages at {X := false; W := true} (the lazy fill of  *)
-(* the new live pages; [vmfault] later maps exactly that), or shrunk by  *)
-(* a set of pages.  The page sets are EXISTENTIAL for the same reason    *)
-(* sbrk's size is: the word list does not carry [pv_sz].                 *)
+(* and the exec failure arm; sbrk's row is [usys_sbrk_perm], which SAYS  *)
+(* WHAT HAPPENS -- the new live pages appear at {X := false; W := true}  *)
+(* (the lazy fill; [vmfault] later maps exactly that), or the map is cut *)
+(* down to the pages that are still live.  Both are FUNCTIONS OF THE TWO *)
+(* SIZES, which alone stay existential: the word list does not carry     *)
+(* [pv_sz].                                                              *)
 (*                                                                         *)
 (* THE ROWS, one for one with [sysc_mem_ok]:                               *)
 (*   exec (7)   -- the FAILURE arm only: [r = -1] and the image is intact. *)
 (*                 A successful exec never returns to this WP at all: the  *)
 (*                 new program's WP is MINTED by exec from the new         *)
 (*                 trapframe and image, so the success arm has no row.     *)
-(*   sbrk (12)  -- the three arms of [SpecSyscall.sysc_sbrk_img] at an     *)
-(*                 EXISTENTIAL new size: exactly what the kernel's table   *)
-(*                 says (its size is the outgoing record's [pv_sz], which  *)
-(*                 the word list does not carry).  Tying the size to the   *)
-(*                 return value ([r + a0] on success) is sbrk's own        *)
-(*                 contract's refinement, not this table's.               *)
+(*   sbrk (12)  -- EITHER EXTEND THE MEMORY UP WITH ZEROED PAGES, OR CUT   *)
+(*                 THEM DOWN, at an existential pair of sizes: exactly     *)
+(*                 what the kernel's table says (the sizes are the entry   *)
+(*                 and outgoing records' [pv_sz], which the word list does *)
+(*                 not carry).  Tying the old size to the return value     *)
+(*                 ([r = a0] on success) is sbrk's own contract's          *)
+(*                 refinement, not this table's.                          *)
 (*   wait/pipe/read/fstat -- a [umem_wr] window based at the argument the *)
 (*                 kernel's [sysc_window] names.                           *)
 (*   the other sixteen -- [M' = M].                                        *)
@@ -84,20 +86,45 @@ Definition usys_window (n : Z) : option nat :=
   else if decide (n = 8) then Some 1%nat   (* fstat -- struct stat *st *)
   else None.
 
-(* sbrk's three arms at new size [szv'] (verbatim [SpecSyscall.sysc_sbrk_img]) *)
-Definition usys_sbrk_img (M M' : gmap Z (bv 8)) (szv' : mword 64) : Prop :=
-  M' = M
-  \/ M' = umem_grow M (uint szv')
-  \/ exists np : nat,
-       M' = umem_del M (uint (ProcPtOwn.pgroundup szv')) (4096 * np).
+(* sbrk's row on the IMAGE, at the OLD size [szv] and the NEW one [szv'].
+   EITHER EXTEND THE MEMORY UP WITH ZEROED PAGES, OR CUT IT DOWN -- the C's
+   own two directions, and nothing existential in either.  [umem_grow] IS
+   "extend with zeroed bytes" ([UserPtTree.umem_grow M sz = M ∪
+   gset_to_gmap 0 (live_set sz)]), and the cut's page count is
+   [ProcPtOwn.uvmd_np] of the two sizes -- uvmdealloc's own run length,
+   guarded on the shrink actually happening, so the [szv' = szv] arms (a
+   failure, [n = 0], and growproc's WRAP sub-case) sit in the first branch
+   and read [M' = umem_grow M (uint szv)], which is [M] itself at the lazy
+   view ([UserPtTree.umem_grow_id]: every live byte is already recorded). *)
+Definition usys_sbrk_img (M M' : gmap Z (bv 8)) (szv szv' : mword 64) : Prop :=
+  if decide (uint szv <= uint szv')%Z
+  then M' = umem_grow M (uint szv')
+  else M' = umem_del M (uint (ProcPtOwn.pgroundup szv'))
+                       (4096 * ProcPtOwn.uvmd_np szv szv').
 
-(* how the permission map may move under sbrk: not at all, grown by some
-   pages at RW (the lazy fill of the new live pages), or shrunk by some
-   pages *)
-Definition usys_sbrk_perm (π π' : gmap (mword 27) uperm) : Prop :=
-  π' = π
-  \/ (exists P : gset (mword 27), π' = π ∪ gset_to_gmap uperm_rw P)
-  \/ (exists D : gset (mword 27), π' = base.filter (fun kv : mword 27 * uperm => kv.1 ∉ D) π).
+(* ...and on the PERMISSION MAP, and IT COMES OUT TABLE-FREE, which is what
+   the U tier needs since it cannot see the page table.
+
+   GROW.  Everything the table maps lies BELOW the old size
+   ([ProcPtOwn.um_below], [ProcInv.proc_priv]'s own conjunct), so the pages
+   that become live are all unmapped and [UserPerm.perm_of]'s fill supplies
+   every one of them at [uperm_rw] -- the "minus the mapped pages" caveat
+   [UsysMemOkSpec.perm_of_grow] carries is VACUOUS here.  The eager path,
+   which really does map the run, maps it at vmfault's own RW-user leaf, so
+   the projection does not notice the difference
+   ([UserPerm.perm_of_uptd_ext_sz]).
+
+   SHRINK.  Everything in [π] is inside [live_pages] of the old size (the
+   leaves by [um_below], the fill by construction), so cutting the map down
+   to the pages that are still live IS dropping the dealloc run
+   ([UserPerm.perm_of_del_run]). *)
+Definition usys_sbrk_perm (π π' : gmap (mword 27) uperm)
+    (szv szv' : mword 64) : Prop :=
+  if decide (uint szv <= uint szv')%Z
+  then π' = π ∪ gset_to_gmap uperm_rw
+                 (live_pages (uint szv') ∖ live_pages (uint szv))
+  else π' = base.filter
+              (fun kv : mword 27 * uperm => kv.1 ∈ live_pages (uint szv')) π.
 
 (* THE TABLE: syscall [n], entered with trapframe words [tf], returned
    [r], may take the image from [M] to [M'] and the permission map from
@@ -108,7 +135,11 @@ Definition usys_mem_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
   if decide (n = USYS_exec) then
     r = (mword_of_int (-1) : mword 64) /\ M' = M /\ π' = π
   else if decide (n = USYS_sbrk) then
-    (exists szv' : mword 64, usys_sbrk_img M M' szv') /\ usys_sbrk_perm π π'
+    (* the two sizes are existential because the WORD LIST does not carry
+       [pv_sz]; what is no longer existential is WHAT HAPPENS at them, and
+       the image and the permission map are keyed at the SAME pair. *)
+    exists szv szv' : mword 64,
+      usys_sbrk_img M M' szv szv' /\ usys_sbrk_perm π π' szv szv'
   else match usys_window n with
        | Some i => (exists (d : nat) (bs : nat -> bv 8),
                       M' = umem_wr M (tf !!! tf_arg_idx i) d bs) /\ π' = π
