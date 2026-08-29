@@ -2538,7 +2538,10 @@ Section ctx.
              and there is nothing in scope to prove it from). *)
           + intros W0 HW0. rewrite Hlog Himg.
             apply (win_ok1_app_frame _ _ _ _ _
-                     (ts_ok_win _ _ _ _ _ _ Hok HW0) Hmb). }
+                     (ts_ok_win _ _ _ _ _ _ Hok HW0) Hmb).
+          + intros R0 HR0. rewrite Hlog Himg.
+            apply (rel_ok1_app_frame _ _ _ _ _
+                     (ts_ok_rel _ _ _ _ _ _ Hok HR0) Hmb). }
       iSplitR.
       { iPureIntro. intros j. rewrite Hlog.
         destruct (decide (j = length g.(glog))) as [->|Hne].
@@ -3645,7 +3648,7 @@ Section ctx.
         rewrite (lookup_union_Some_l _ _ _ _ Hl) in Hlk. injection Hlk as <-.
         assert (Hmb : msg_byte msg a = Some vn)
           by (rewrite /msg_byte /=; exact Hpa).
-        split_and!; last (by move => W0 HW0).
+        split_and!; [ | | by move => W0 HW0 | by move => R0 HR0 ].
         + exists vn. split.
           { rewrite Hmem. by apply lookup_union_Some_l. }
           rewrite Hlog Himg. apply latest_app_new. exact Hmb.
@@ -3672,7 +3675,10 @@ Section ctx.
            as the pin's (TsoMemPa §12c) *)
         + intros W0 HW0. rewrite Hlog Himg.
           apply (win_ok1_app_frame _ _ _ _ _
-                   (ts_ok_win _ _ _ _ _ _ Hok HW0) Hmb). }
+                   (ts_ok_win _ _ _ _ _ _ Hok HW0) Hmb).
+        + intros R0 HR0. rewrite Hlog Himg.
+          apply (rel_ok1_app_frame _ _ _ _ _
+                   (ts_ok_rel _ _ _ _ _ _ Hok HR0) Hmb). }
     iSplitR.
     { iPureIntro. intros j. rewrite Hlog.
       destruct (decide (j = length g.(glog))) as [->|Hne].
@@ -3878,6 +3884,7 @@ Section ctx.
             -- right. split; [| exact Ho].
                move => k Hk. rewrite /msg_byte /=. exact (Hme k Hk).
           * cbn [pm_tid]. exact Hoth.
+        + intros R0 HR0. rewrite (HWf j Hj) in HR0. discriminate HR0.
       - assert (Hl : wpay_tm (length g.(glog)) Wf Pnew !! a = None)
           by (rewrite wpay_tm_lookup Hpa //).
         rewrite (lookup_union_r _ _ _ Hl) in Hlk.
@@ -3895,7 +3902,10 @@ Section ctx.
            as the pin's (TsoMemPa §12c) *)
         + intros W0 HW0. rewrite Hlog Himg.
           apply (win_ok1_app_frame _ _ _ _ _
-                   (ts_ok_win _ _ _ _ _ _ Hok HW0) Hmb). }
+                   (ts_ok_win _ _ _ _ _ _ Hok HW0) Hmb).
+        + intros R0 HR0. rewrite Hlog Himg.
+          apply (rel_ok1_app_frame _ _ _ _ _
+                   (ts_ok_rel _ _ _ _ _ _ Hok HR0) Hmb). }
     iSplitR.
     { iPureIntro. intros j. rewrite Hlog.
       destruct (decide (j = length g.(glog))) as [->|Hne].
@@ -4002,7 +4012,10 @@ Section ctx.
            as the pin's (TsoMemPa §12c) *)
         + intros W0 HW0. rewrite Hlog Himg.
           apply (win_ok1_app_frame _ _ _ _ _
-                   (ts_ok_win _ _ _ _ _ _ Hok HW0) Hmb). }
+                   (ts_ok_win _ _ _ _ _ _ Hok HW0) Hmb).
+        + intros R0 HR0. rewrite Hlog Himg.
+          apply (rel_ok1_app_frame _ _ _ _ _
+                   (ts_ok_rel _ _ _ _ _ _ Hok HR0) Hmb). }
     iSplitR.
     { iPureIntro. intros j. rewrite Hlog.
       destruct (decide (j = length g.(glog))) as [->|Hne].
@@ -4571,7 +4584,7 @@ Section ctx.
     iPureIntro. intros a' e Hlk.
     destruct (decide (a' = a)) as [->|Hne].
     - rewrite lookup_insert in Hlk. injection Hlk as <-.
-      split_and!; last (by move => W0 HW0).
+      split_and!; [ | | by move => W0 HW0 | by move => R0 HR0 ].
       + exists v. split; [exact Hgm | exact Hlat].
       + intros Sv' B' Heq. cbn in Heq. injection Heq as <- <-.
         exact (pin_ok_mint _ _ _ _ _ t v Hlat HtB Hv).
@@ -4625,6 +4638,7 @@ Section ctx.
       + exists v. split; [exact Hgm | exact Hlat].
       + by move => Sv' B' Heq.
       + by move => W0 HW0.
+      + by move => R0 HR0.
     - rewrite lookup_insert_ne in Hlk; last done. exact (Htie _ _ Hlk).
   Qed.
 
@@ -4758,6 +4772,7 @@ Section ctx.
       + exists v0. split; [exact Hgm0 | exact Hlat].
       + move => Sv' B' Heq. discriminate Heq.
       + move => W0 HW0. cbn in HW0. injection HW0 as <-. exact Hw.
+      + by move => R0 HR0.
     - rewrite lookup_insert_ne in Hlk; last done. exact (Htie _ _ Hlk).
   Qed.
 

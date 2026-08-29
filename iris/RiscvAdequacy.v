@@ -851,7 +851,9 @@ Proof.
         - intros Sv B Hc. discriminate Hc.
         (* the WINDOW half is vacuous at [None] too: no lock cell has been
            carved yet at the era's first state. *)
-        - intros W Hc. discriminate Hc. }
+        - intros W Hc. discriminate Hc.
+        (* and the RELEASE arm (§0.41′) *)
+        - intros R Hc. discriminate Hc. }
       iFrame "Hlogmauth".
       iSplitR.
       { iPureIntro. intros i. rewrite lookup_empty Hlog0 //. }
@@ -1483,7 +1485,8 @@ Section power.
               split; [exact Hv |].
               intros t' Ht'. destruct t' as [|i]; [lia | reflexivity].
             - intros Sv B Hc. discriminate Hc.
-            - intros W Hc. discriminate Hc. }
+            - intros W Hc. discriminate Hc.
+            - intros R0 Hc0. discriminate Hc0. }
           iFrame "Hlogmauth2".
           iSplitR.
           { iPureIntro. intros i. rewrite lookup_empty Hlog0 //. }
