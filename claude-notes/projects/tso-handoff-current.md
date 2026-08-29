@@ -18,11 +18,12 @@ measured record; `main-tso-readiness.md` is the separate main-side handoff.
    `/mnt/rocq/trees/_shared_xv6iris-3-fliptree` (cloned from the lock
    lane's warm tree; incremental).  Durable mirror
    `/shared/xv6iris-3-fliptree-backup` (rsync'd at green boundaries).
-   GitHub: branch `tso-flip`, snapshot `619c23287` = r38 (snapshots via the
+   GitHub: branch `tso-flip`, snapshot `820ae4406` = r39 (A6.121; r38 was
+   `619c23287`) (snapshots via the
    temp-index recipe; `ZZchain.sh <File>…` at the tree root rechecks files
    locally in order against pulled `.vo`).
    Build driver: `ZZbuild.sh` at the tree root (the intr lane's, log names
-   suffixed `.aux` -- see the gotcha).  **Last certified: r38, 1178/1296, RED 8, zero admits (A6.120).**
+   suffixed `.aux` -- see the gotcha).  **Last certified: r39, 1179/1297, RED 8, zero admits (A6.121).**
 2. **KPT tree**: `/shared/xv6iris-3-kpttree` — FROZEN mid-K15d, unchanged
    this session EXCEPT one mirrored hunk: `iris/SmodeCorePt.v`'s
    `word_pointsto_wpay_mint_c` gained the trailing own-message fragment
@@ -60,23 +61,30 @@ acquire absorbs by `TsoCtxAbsorbLb.ctx_absorb_lb`.  `ProofPipeclose`'s
 residue (`pipe_bytes_page_own` on the ctx word) re-cut.  Twelve files
 touched, all this lane's, plus the mirrored `SmodeCorePt` hunk (A6.120 §6).
 
+**A6.121 (r39): the M3 λ-conversion is DONE for `ticks_res`, `cons_res`,
+`disk_res`** (explicit-context twins `*_at` with real `CtxMorph` proofs,
+`CtxMorphTac.v`'s driver, 197 sites renamed, zero consumer proof edits).
+`proc_lock_res` (44 sites) waits for §0.27′ (its slots hold `▷ proc_ctx`);
+`wait_res` (38 sites) unmeasured.
+
 **Next queue (lock lane), in order:**
-1. **DMA AU leaf + the virtio pair** (A6.95: ready — datum `phys_word2`,
-   claims from `kmap_static_claims`, agent-generic gates).  Both virtio
-   files fail on the same pre-flip residue: `ProofVirtioDiskRwD:686` /
-   `ProofVirtioDiskIntr:1165` want `wordw_pointsto 2 … -∗ wordw_claim 2 …`
-   and hold `word2_pointsto` — the M4-shaped store leaf for the 2-byte
-   queue words.
-2. **The M3 λ-conversion** of the four payloads (`proc_lock_res` /
-   `disk_res` / `ticks_res` / `cons_res`) + the `TsoCtx` freshpack lemma
-   (statement in tso-intr-lane.md) — the gate for §0.27′ AND the intr lane.
-   Note for it: a payload carrying a nested `is_lock` now transports its
-   floor on BOTH arms for free (`ctx_floor_dom`, `ctx_dom_wrote_floor`), so
-   a `CtxMorph` instance for `is_lock` is provable without any absorb
-   capability — A6.116 §3's question is moot.
+1. **The virtio AVAIL side** (A6.122 §2, buildable now): the avail word
+   leaves `dma_own`'s plain map for an exposed-timestamp conjunct of the
+   protocol (`phys_word2_at … t` + the stamp in `dn_np`'s ghost value), the
+   publish store registers its position (A6.120's `ctx_wrote_register`) and
+   the floor rides in `disk_res` as `∃ t, disk_pub_at γ np t ∗ lk_floor cur_ctx t`
+   (a `CtxMorph` instance for `lk_floor` in `WpLock`); the read is
+   `lk_floor_vis` + an exact ledger read gate with the two-armed premise,
+   through `wp_load_s_sconf_au_dat`.  Greens `ProofVirtioDiskRwD` + 3.
+2. **FOR THE OWNER (A6.122 §3): the virtio USED index needs a MONOTONE-CELL
+   instrument** (a third `ts_pay` arm: since `B`, one author, non-decreasing
+   values) — the pin cannot carry a stale reader's lower bound, measured
+   against every re-floor placement.  Σ-level; wants a §0.x′ ruling before
+   anyone builds it.  `ProofVirtioDiskIntr` stays red until then.
 3. **§0.27′ → `ProofSwtch`** (`:157` still names the retired
    `hart_view_lb_any`; the parked record now arrives at the winner with
-   `ctx_parked` — §0.27′'s prerequisite, per A6.119).
+   `ctx_parked`), together with `proc_lock_res`'s λ-conversion (the `▷`
+   in its slots is this ruling's business).
 4. `ProofKernelvec:1704` (§0.39′), then `ProofForkretPark` re-measure
    (post-§0.27′).
 Then the KPT lane's K15d tail + `ProofMain:996`, and the merge.
@@ -109,6 +117,9 @@ re-run the destructuring-pattern audit near changed definitions; (c) NEW:
 `TsoCtx.own_context_def` is unfolded in `KptCtxTravel.v` (3 sites) and
 `CtxPinMint.v` (1) — A6.120 did NOT change the token's definition (only
 added lemmas beside it), so those are safe, but re-check on merge.
+(d) A6.121 renamed `<{ disk_res … }>` sites in 89 files; the KPT lane's 15
+files are not among them (none names the four payloads), but `_CoqProject`
+gained `CtxMorphTac.v` after `TsoCtx.v` — merge that line.
 
 ## Coordinator duties (what this session's coordinator did; do the same)
 
@@ -133,7 +144,9 @@ added lemmas beside it), so those are safe, but re-check on merge.
 
 ## Open owner items at checkpoint
 
-None pending ruling.  **For the owner's veto (A6.120):** the creator's arm
+**ONE for ruling: A6.122 §3 — the monotone-cell ledger instrument the
+virtio used-index read needs (a Σ-level `ts_pay` arm).**  For the owner's
+veto (A6.120): the creator's arm
 of `lk_floor` is now spelled as the ctx tower's dirty-map witness rather
 than a bare log position — the composition of §0.38′ (received-or-wrote)
 and §0.36′(a) (the author rides its own write), and the reason the ~40-caller
