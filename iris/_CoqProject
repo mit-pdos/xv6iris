@@ -1415,3 +1415,16 @@ ProofSysDupAU.v
 LinkSysDupAU.v
 FsAbsReadFire.v
 SpecSysReadAUAt.v
+# fs-syscall-specs lane W: the T_FILE CREATE CARRY, which unlocks
+# SpecSysOpenAU's O_CREATE arm.  FsAbsCreateFire is FIRE 2 at a
+# NON-DIRECTORY child ([mkf_acre_fire] is device-pinned only through
+# [delta_create_dev], whose proof needs nothing but "not a directory");
+# SpecCreateAUF/ProofCreateAUF/LinkCreateAUF are SpecCreateAU's twin at
+# [ty = T_FILE], where the mkdir arm stays refuted but ARM F-OK comes back;
+# SpecCreateAUFOpen is the bridge into SpecSysOpenAU's create arms.
+# R10: SpecCreate, SpecCreateAU and SpecSysOpenAU are untouched.
+FsAbsCreateFire.v
+SpecCreateAUF.v
+ProofCreateAUF.v
+LinkCreateAUF.v
+SpecCreateAUFOpen.v
