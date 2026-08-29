@@ -23,7 +23,7 @@ measured record; `main-tso-readiness.md` is the separate main-side handoff.
    temp-index recipe; `ZZchain.sh <File>…` at the tree root rechecks files
    locally in order against pulled `.vo`).
    Build driver: `ZZbuild.sh` at the tree root (the intr lane's, log names
-   suffixed `.aux` -- see the gotcha).  **Last certified: r41 (CLEAN round), 1183 .vo of 1298, red roots 8, zero admits (A6.124: the avail-index word is on the ledger -- lease split + payload half; `ProofVirtioDiskRwD`, `RwE`, `RwDSeam` GREEN; the new red root is `ProofVirtioDiskRwF:365`, the pin-return crossing, characterized and sized in A6.124).**  Snapshot `6168b7303` = r41; **r42 = `61fb20680`** (A6.125 step 1, the `TsoCtx` half-ctx-cell bricks, root change only: 1183/1298, same 8 roots); **r43 = `6304d4c92`** (A6.125 step 2: `VirtioProto`'s hole is the whole control set at ½, publish takes a PIN OFFER and returns the memory half -- A6.125's step-2 entry; 1183/1298, same 8 roots); **r44 = `d496e0026`** (A6.125 step 4: the RwD pin builder offers and keeps; 1183/1298, same 8 roots); **r46 = `99a61e4f9`** (A6.125 steps 3 + 5-OUT: the pin's half ctx cells ride `flight_res`/`parked_res`, RwF withdraws hart-written cells; RwF's root is now `vdrwf_plist_mem:425`, the device-write crossing; 1183/1298, 8 roots); **r47 = `3b6488cd6`** (A6.126 §1: the release arm `ts_rel`/`rel_ok1`/`rel_read` in `TsoMemPa`, `ts_ok`'s fourth conjunct threaded; 1183/1298, same 8 roots); **r48 = `2f220f707`** (the arm carries a position HISTORY, `tr_hist`; same numbers); **r49 = `7f340d674`** (A6.126 §4 step 1: the `TsoCtx` release-arm kit -- `phys_ledger_rpay`, mint/drop, `ledger_store_rel_ok`, `ledger_read_rel_ok`; same numbers).
+   suffixed `.aux` -- see the gotcha).  **Last certified: r41 (CLEAN round), 1183 .vo of 1298, red roots 8, zero admits (A6.124: the avail-index word is on the ledger -- lease split + payload half; `ProofVirtioDiskRwD`, `RwE`, `RwDSeam` GREEN; the new red root is `ProofVirtioDiskRwF:365`, the pin-return crossing, characterized and sized in A6.124).**  Snapshot `6168b7303` = r41; **r42 = `61fb20680`** (A6.125 step 1, the `TsoCtx` half-ctx-cell bricks, root change only: 1183/1298, same 8 roots); **r43 = `6304d4c92`** (A6.125 step 2: `VirtioProto`'s hole is the whole control set at ½, publish takes a PIN OFFER and returns the memory half -- A6.125's step-2 entry; 1183/1298, same 8 roots); **r44 = `d496e0026`** (A6.125 step 4: the RwD pin builder offers and keeps; 1183/1298, same 8 roots); **r46 = `99a61e4f9`** (A6.125 steps 3 + 5-OUT: the pin's half ctx cells ride `flight_res`/`parked_res`, RwF withdraws hart-written cells; RwF's root is now `vdrwf_plist_mem:425`, the device-write crossing; 1183/1298, 8 roots); **r47 = `3b6488cd6`** (A6.126 §1: the release arm `ts_rel`/`rel_ok1`/`rel_read` in `TsoMemPa`, `ts_ok`'s fourth conjunct threaded; 1183/1298, same 8 roots); **r48 = `2f220f707`** (the arm carries a position HISTORY, `tr_hist`; same numbers); **r49 = `7f340d674`** (A6.126 §4 step 1: the `TsoCtx` release-arm kit -- `phys_ledger_rpay`, mint/drop, `ledger_store_rel_ok`, `ledger_read_rel_ok`; same numbers); **r50 = `42b9f404d`** (A6.126 §4 step 2: `HartSMem.Mobl_ram_exvv` + nodes, `WpSconfMem.wp_load_s_sconf_au_rel`; same numbers).
 2. **KPT tree**: `/shared/xv6iris-3-kpttree` — FROZEN mid-K15d, unchanged
    this session EXCEPT one mirrored hunk: `iris/SmodeCorePt.v`'s
    `word_pointsto_wpay_mint_c` gained the trailing own-message fragment
@@ -123,9 +123,12 @@ and re-splits.  `ProofVirtioDiskRwD` + `RwE` + `RwDSeam` green.
    author-only window arm (`tsp_rel`), a read gate that yields the
    position, a view-carrying load leaf; build order in A6.126 §4 -- the
    pure arm (§1) and the `TsoCtx` kit (§4 step 1) are LANDED (r47–r49);
-   next is the engine node `HartSMem.Mobl_ram_exvv` (forwards the lifting
-   rule's `tvn` receipt -- A6.126 §2 corrected) and the leaf
-   `wp_load_s_sconf_au_rel`, then the virtio side.  Greens
+   the engine node and the release-read leaf are LANDED too (r50); what
+   remains is the virtio side, A6.126 §4 items 3–6 (the used-index word
+   minted as a release window at init, the device's completion as a
+   second message through `ledger_store_rel_ok`, positions exposed in
+   `slot_done_res`, the floor beside `disk_done_lb`, the handler's read
+   through `_au_rel`, RwF's two hand-backs).  Greens
    `ProofVirtioDiskIntr`, RwF's two device-written hand-backs, and the
    Link files behind them.  (Superseded text of this item follows.)
    **(old) FOR THE OWNER (A6.122 §3): the virtio USED index needs a MONOTONE-CELL

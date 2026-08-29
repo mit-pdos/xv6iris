@@ -15927,3 +15927,20 @@ the leaf never sees `tvn`.  The right shape, no machine or rule change:
     wrapper the leaf applies (`swp_execute_LOAD_ram_Sw_ex`) is generic in
     the node's post (it takes `(fun bs => ⌜P bs⌝ ∗ Rex)` and the node) --
     if its post is any `bytes → iProp`, the `∃ tvn` rides inside it.
+
+**A6.126 §4 step 2 LANDED (r50; numbers in the handoff note): the
+view-carrying read.**  `HartSMem.Mobl_ram_exvv width pa Q R` (the client
+owes, at every view the drain may choose, totality and `Q bytes tv'`),
+`swp_read_ram_node{1,2,4,8}_exvv` (proved through
+`swp_hart_ram_read_plain_ex` at `P := λ _, True`, KEEPING the rule's
+`tvn`, the read fact at `tvn` and the receipt) and the wrapper
+`swp_read_ram_node_w_exvv`; post `∃ bytes, ⌜r = …⌝ ∗ (∃ tvn,
+TsoGhost.view_lb … tvn ∗ ⌜Q bytes tvn⌝) ∗ R`.  `WpSconfMem.
+wp_load_s_sconf_au_rel`: `_au_exv`'s engine sentences verbatim on that
+node; obligation `⌜∀ tvr ≥ V, (∃ v, read tvr v) ∧ (∀ v, read tvr v → Q v
+tvr)⌝`, continuation `(∃ V0, hart_view_lb V0 ∗ ⌜Q v V0⌝) -∗ T -∗ WP`.
+Two gotchas: pure hypotheses named by `iIntros "%H"` inside an `Ltac`
+body are not addressable by that name (the node proofs are inlined
+rather than an Ltac); `TsoGhost.view_lb` must be spelled qualified in
+`HartSMem`.  Remaining for the used index: the virtio side (§4 items
+3–6).
