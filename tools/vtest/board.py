@@ -134,7 +134,17 @@ def runnable_tests(p):
     all, and running one would report a stuck model as though it were a
     finding about the device rather than about the board not having one."""
     skip = tuple(a + "_" for a in p.get("skip_areas", []))
-    return [t for t in vtest.all_tests() if not t.startswith(skip)]
+    out = []
+    for t in vtest.all_tests():
+        if t.startswith(skip):
+            continue
+        # a test may also opt out by itself, with `machines=qemu` in its
+        # `vtest:` directive -- for a question only QEMU can be asked, not
+        # for one this board happens to fail
+        if vtest.config(t).get("machines", "any") == "qemu":
+            continue
+        out.append(t)
+    return out
 
 
 def profile(name):

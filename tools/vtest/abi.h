@@ -31,6 +31,18 @@
 #define RES_PAYLOAD  8
 #define DONE_MAGIC   0x444f4e45   /* "DONE", written LAST, after a fence */
 
+/* THE TRAP-RECORD AREA, the second half of the result region, used only by a
+   test that includes trap.S and points mtvec at [_vtest_trap].  It is up
+   here at a fixed offset rather than chosen per test so that the handler can
+   find it with one `li` and no saved register -- which is what lets the
+   handler clobber only t0 and t1.  Read trap.S's contract before using it.
+
+     +0            the number of traps taken so far
+     +16 + 16*n    trap n: mcause, mepc, mtval, 0                         */
+#define RES_TRAPS    0x800
+#define RES_TRAPN    RES_TRAPS          /* the count */
+#define RES_TRAPREC  (RES_TRAPS + 16)   /* the first record */
+
 /* the two devices the model implements, at their QEMU virt addresses */
 #define UART0        0x10000000
 #define VIRTIO0      0x10001000
