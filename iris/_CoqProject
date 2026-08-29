@@ -1449,6 +1449,20 @@ SpecCreateAUF.v
 ProofCreateAUF.v
 LinkCreateAUF.v
 SpecCreateAUFOpen.v
+# ...and lane W's O_CREATE ARM itself, which the carry unlocks.
+# ProofSysOpenAUCreArm is the SHIM: the blocks from the join down are
+# parametric in the four caller predicates, so the create arm runs them at
+# shim predicates and converts the armed post afterwards.
+# ProofSysOpenAUEntryC is +0x38..+0x48 and ARM A-FAIL; ProofSysOpenAUFull
+# is the entry with the +0x36 branch mirrored, and it SEALS
+# SpecSysOpenAU.SYSOPEN_AU WHOLE -- the plain parameter is the landed
+# ProofSysOpenAU proof, re-exported through its own functor, so there is
+# one proof of that arm in the tree and not two (which is also why
+# SpecSysOpenAUPlain.v stays: retiring it would edit the landed walk).
+ProofSysOpenAUCreArm.v
+ProofSysOpenAUEntryC.v
+ProofSysOpenAUFull.v
+LinkSysOpenAUFull.v
 FsAbsWriteFire.v
 SpecSysWriteAUEra.v
 SpecFilewriteAU.v
