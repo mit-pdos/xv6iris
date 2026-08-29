@@ -503,12 +503,11 @@ Section WpSconfLock.
       (* the pin SURVIVES, at the position it already had: the spinner's
          store is 1 and 1 is in the set, which is the whole reason a
          value-shaped window works here where an author-shaped one cannot. *)
-      WpLock.lock_word_pin B ea vnew ∗
-      (* ...and the EXPORT: the acquirer's own view IS that position, so the
-         absorb needs no [llb] here -- [hart_view_lb_now] gives the receipt
-         free off the post-state and [ctx_bound_raise] turns it into the
-         floor the holder token carries away (§0.38′'s agreed one form). *)
-      TsoCtx.ctx_floor TsoCtx.cur_ctx (S (length log)).
+      (* NO EXPORT HERE, and that is the difference between the two gates:
+         the export's justification is "the acquirer's own view IS the
+         position", and a LOSING spinner is not the acquirer -- [B] is the
+         incumbent holder's.  A loser leaves with nothing but the interp. *)
+      WpLock.lock_word_pin B ea vnew.
   Proof.
     intros Hset. iIntros "Hm Htso Hctx [%Hal Hb]".
     iDestruct (tso_interp_of_pin with "Htso") as %Hpin.
@@ -555,7 +554,9 @@ Section WpSconfLock.
                   (write_bytes sigma.(mem) ea 4%N vnew) log' V'
                   sigma.(sregs) sigma.(mdev) Hpin').
       iExact "Htso". }
-    iFrame "Hctx". iSplitR; [done|]. iExact "Hnew".
+    iFrame "Hctx".
+    rewrite /WpLock.lock_word_pin. iFrame "Hnew".
+    iPureIntro. exact Hal.
   Qed.
 
   Local Lemma lock_word_amo_mint (ea : mword 64) (vnew : mword 32)
@@ -653,7 +654,9 @@ Section WpSconfLock.
                   sigma.(sregs) sigma.(mdev) Hpin').
       iExact "Htso". }
     iFrame "Hctx".
-    iSplitL "Hpin"; [ by iSplitR | ].
+    iSplitL "Hpin".
+    { rewrite /WpLock.lock_word_pin. iFrame "Hpin".
+      iPureIntro. exact Hal. }
     rewrite -HV'h. iExact "Hfl".
   Qed.
 
@@ -2001,7 +2004,18 @@ Section WpSconfLock.
         Tc -∗
         sie_cap_gpr kt (<[Regidx rd := regval_into_reg (amoswap_loaded w)]> m) n b p -∗
         pc_is (add_vec_int pc 4) -∗
-        (⌜w = (mword_of_int 0 : mword 32)⌝ ∗ locked_pre γl h0 ∗ (∃ ξ : CtxId, R ξ)
+        (* >>> A6.119: THE WINNER RECEIVES THE WHOLE PARKED RECORD.  The
+           invariant's free arm holds [lock_pay R] = [∃ ξ T, ctx_parked ξ T ∗
+           R ξ]; this post used to promise only [∃ ξ, R ξ], i.e. to DROP
+           [ctx_parked].  §0.18′/A6.66 puts the parked-record absorb AT
+           ACQUIRE ([ctx_dom_of_parked] against the AMO's at-the-top
+           evidence), so the leaf hands the record over and [SpecAcquire]
+           absorbs it.  The old post was pre-flip residue, never checked
+           because this file has been red upstream of it since the baseline.
+           FORWARD PAYOFF: [ctx_parked ξ T] arriving at the winner is exactly
+           what §0.27′'s resume tie will consume -- this is that ruling's
+           prerequisite landing early, not incidental churn. <<< *)
+        (⌜w = (mword_of_int 0 : mword 32)⌝ ∗ locked_pre γl h0 ∗ WpLock.lock_pay R
          ∨ ⌜neq_vec (sign_extend' 64 w) zero_reg = true⌝) -∗
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
@@ -2020,7 +2034,7 @@ Section WpSconfLock.
                    ⌜npc = add_vec_int pc 4⌝ ∗
                    ⌜m' = <[Regidx rd := regval_into_reg (amoswap_loaded w)]> m⌝ ∗
                    ⌜n' = n⌝ ∗ Tc ∗
-                   (⌜w = (mword_of_int 0 : mword 32)⌝ ∗ locked_pre γl h0 ∗ (∃ ξ : CtxId, R ξ)
+                   (⌜w = (mword_of_int 0 : mword 32)⌝ ∗ locked_pre γl h0 ∗ WpLock.lock_pay R
                     ∨ ⌜neq_vec (sign_extend' 64 w) zero_reg = true⌝))%I
               with "Hcg Hpc Hinstr [HTc Hcont]").
     iNext.
@@ -2092,16 +2106,24 @@ Section WpSconfLock.
       assert (Hea : add_vec (tp_pin (CID := CID) m !!! Regidx rs1) (zeros' 64)
                     = pa) by (rewrite Lpin_rs1; reflexivity).
       iApply (swp_mono (CID := CID)
-                with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm Hctx Hclose] [-]").
+                with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm Hclose] [-]").
       2:{ iApply (swp_execute_AMOSWAP_S_ex_mode (CID := CID)
                     SD sda_Dro (sda_Df (DfracOwn 1))
                     (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv)
                     rs2 rs1 rd (tp_pin (CID := CID) m) (pa_of ppn pa)
                     pmar0 pcfg paddr
                     (fun _ => Tc)
+                    (* A6.119: the RUNNING TOKEN RIDES OUT WITH THE RESULT.
+                       [ctx_bound_raise] -- the AMO's export -- needs
+                       [own_context], and the capability bundle hands it to
+                       [swp_mono]'s continuation, not to the nodes.  The gates
+                       thread it in and out, so the honest routing is to let
+                       it escape the node inside [R bytes] and be picked up by
+                       the continuation that rebuilds the capability. *)
                     (fun bytes => Tc ∗
+                       TsoCtx.own_context (CID := CID) TsoCtx.cur_ctx ∗
                        (⌜bytes = (mword_of_int 0 : mword 32)⌝ ∗
-                          locked_pre γl h0 ∗ (∃ ξ : CtxId, R ξ)
+                          locked_pre γl h0 ∗ WpLock.lock_pay R
                         ∨ ⌜neq_vec (sign_extend' 64 bytes) zero_reg = true⌝))%I
                     (sr_swp_res (strans_regime (CID := CID))) rr
                     (sr_swp_mode (strans_regime (CID := CID)) satp0)
@@ -2124,7 +2146,7 @@ Section WpSconfLock.
                     (pa_aligned_div ppn pa 4 ltac:(lia) ltac:(exists 1024; lia)
                        Halign4)
                     Hrd
-                    with "Hcert Hfrag HRes Hfile Hrw Hro [Htrobl] [HTc] []").
+                    with "Hcert Hfrag HRes Hfile Hrw Hro [Htrobl] [HTc] [Hctx]").
           - (* the data translation, ALREADY DISCHARGED at [SD] by the
                accessor -- this leaf never learns which arm it is on *)
             iIntros "Hfrag HRes Hrw Hro".
@@ -2188,6 +2210,16 @@ Section WpSconfLock.
                                   apply Hbf2; lia)) as Hr2.
               rewrite Hr2 in Hrb. by injection Hrb. }
             subst v2.
+            (* A6.119: the value-set side condition, HOISTED out of
+               application position.  An [ltac:] inside an [iMod (...)]
+               elaborates against a goal whose arguments are not yet fixed, so
+               [rewrite Hzeroone] finds nothing to match; written out here the
+               goal is concrete.  Same precedent as [Harm'] one leaf over. *)
+            assert (Hset1 : forall j : nat, (j < 4)%nat ->
+                      nth_byte (amoswap_stored (rget m rs2)) j
+                      ∈ WpLock.lkw_set j).
+            { intros j Hj. rewrite Hzeroone /WpLock.lkw_set.
+              apply TsoMemPa.byteset_sing_in. }
             (* >>> A6.119: THE BRANCH COMES BEFORE THE STORE, and it has to.
                A WINNING amoswap finds the word free (plain ledger cell) and
                MINTS the value-set pin at its own position; a LOSING one finds
@@ -2208,7 +2240,7 @@ Section WpSconfLock.
                                        (hart_agent (@cpu_id CID))])%list V) ∗
                        TsoCtx.own_context (CID := CID) TsoCtx.cur_ctx ∗
                        (⌜bytes = (mword_of_int 0 : mword 32)⌝ ∗
-                          locked_pre γl h0 ∗ ▷ (∃ ξ : CtxId, R ξ)
+                          locked_pre γl h0 ∗ ▷ WpLock.lock_pay R
                         ∨ ⌜neq_vec (sign_extend' 64 bytes) zero_reg = true⌝))%I
               with "[Hw Hcpu Hg Hbr Hcl Hmem Htso Hctx]"
               as ">(Hmem & Htso & Hctx & Hpay)".
@@ -2217,14 +2249,13 @@ Section WpSconfLock.
               - (* THE WINNER: free word, plain cell in, pin minted out *)
                 subst st2.
                 iMod (lock_word_amo_mint pa (amoswap_stored (rget m rs2)) CID img sigma log V
-                        ltac:(intros j Hj; rewrite /WpLock.lkw_set
-                              /WpLock.lkw_one Hzeroone;
-                              apply TsoMemPa.byteset_sing_in)
+                        Hset1
                         with "Hmem Htso Hctx [Hw]")
-                  as "(Hmem & Htso & Hctx & Hpin & #Hfl)".
+                  as "(Hmem & Htso & Hctx & Hpin & #Hflw)".
                 { iExists bytes. rewrite Hpalk. iExact "Hw". }
-                iMod (lock_take γl h0 (S (length log)) with "Hfl Hg Hfrag2")
-                  as "[Hg Hpre]".
+                iMod (lock_take γl h0 (S (length log))
+                        with "Hflw [Hg] Hfrag2") as "[Hg Hpre]";
+                  [ by iExists B2 | ].
                 iMod ("Hcl" with "[Hpin Hcpu Hg]") as "_".
                 { iNext. rewrite /lock_inv /lock_body. iFrame "Hcl4w Hcl8w".
                   iExists (amoswap_stored (rget m rs2)), (Some (h0, false)), (S (length log)).
@@ -2237,9 +2268,7 @@ Section WpSconfLock.
                 iLeft. iFrame "Hpre HR". iPureIntro. exact Hw0.
               - (* THE LOSER: the pin survives, at the B it already had *)
                 iMod (lock_word_amo_keep pa (amoswap_stored (rget m rs2)) bytes B2 CID img sigma log V
-                        ltac:(intros j Hj; rewrite /WpLock.lkw_set
-                              /WpLock.lkw_one Hzeroone;
-                              apply TsoMemPa.byteset_sing_in)
+                        Hset1
                         with "Hmem Htso Hctx [Hw]")
                   as "(Hmem & Htso & Hctx & Hpin)".
                 { destruct st2 as [[i o]|]; [| congruence ].
@@ -2256,13 +2285,20 @@ Section WpSconfLock.
             iMod (fupd_mask_subseteq ∅) as "Hclm"; [set_solver|].
             iModIntro. iNext. iMod "Hclm" as "_". iModIntro.
             rewrite Lpin_rs2.
-            iFrame "Hreg Hmem Hdev HTc Hpay". }
+            (* the node spells the stored value UNFOLDED ([sign_extend' …
+               (trunc … _)]); the gates spell it [amoswap_stored].  Fold once
+               so the two meet syntactically. *)
+            rewrite -/(amoswap_stored (rget m rs2)).
+            (* the node writes at the PHYSICAL address; the gates were given
+               the virtual one, which the tier pin identifies with it. *)
+            rewrite (ktier_pin_id ppn pa Hid).
+            iFrame "Hreg Hmem Htso Hdev HTc Hctx Hpay". }
       (* ---- the post ---- *)
       iIntros (e) "(-> & Hpost)".
       iDestruct "Hpost" as (bytes) "(Hfile & Hland)".
       iDestruct "Hland" as (rsf)
         "(%Hshape & Hrw & Hro & HRes & HR2 & Hfrag)".
-      iDestruct "HR2" as "[HTc Hpay]".
+      iDestruct "HR2" as "(HTc & Hctx & Hpay)".
       iSplitR; [done|].
       iAssert (∃ tv2 : type_of_register tlb,
                  hreg_frame (CID := CID)
