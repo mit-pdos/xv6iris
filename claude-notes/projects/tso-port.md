@@ -4272,3 +4272,64 @@ at its four gate sites, `ledger_store_rel_ok` (agent-generic, the shape of
 `ledger_read_rel_ok` (the shape of `ledger_read_racy_word_ok`);
 `WpSconfMem` gets a load leaf whose post carries the step's view
 (`wp_load_s_sconf_au_rel`, cloned from `_au_exv`); then the virtio side.
+
+### 0.42′ OWNER RULING (2026-08-29): the parked thread token is RELATIVE
+TO A CONTEXT, not to a stamp — swtch's resume is the acquire morph
+applied to the token, and the park is a context-to-context hand-off
+into the scheduler's (never-parked) context
+
+The owner's design, in the port's own terms.  `ctx_parked ξ T` (an
+absolute stamp `T`, existential in `valid_context`, produced by
+`ctx_park` as `max(K,W)` and known to nobody) is REPLACED by a
+relational token `ctx_parked ξ ξr`: "ξ is dominated by ξr" — ξ's bound
+is under ξr's bound (`ctx_floor ξr B_ξ`) and ξ's dirty watermark is
+under ξr's watermark (`ctx_wfloor ξr W_ξ`), beside ξ's own authority.
+The scheduler contexts (`a_cpu_ctx h`, one per hart) NEVER PARK: they
+are pinned to their hart, they stay `own_context` forever, and they are
+the relatum of every park on that hart.
+
+The protocol.  (1) PARK, inside swtch, proc → scheduler:
+`own_context ξ ∗ own_context ξsched ==∗ ctx_parked ξ ξsched ∗ own_context ξsched`,
+a ghost step paid with receipts off ξ's own token — ξsched's bound is
+raised to `max(B_sched, B_ξ)` (legal: `B_ξ ≤ K_ξ`, a view receipt of
+the SAME hart; this is `ctx_bound_raise`) and ξsched's watermark to
+`max(W_sched, W_ξ)` (legal: `llb`s of the same log).  Interp-free, like
+today's `ctx_park`.  (2) RELEASE of p->lock by the scheduler deposits
+the payload into the lock's parked context (`ctx_dom_to_parked`, whose
+stamp already covers the depositor's bound AND watermark), and the
+link transports by WAND along `ctx_dom ξsched ξlock`: both floors land
+under ξlock's stamp, so from here on the token's story is the
+points-to's story verbatim.  (3) ACQUIRE on any hart: `ctx_dom ξlock ξnew`
+(the AMO receipt, `ctx_dom_of_parked_lb`), the link transports to
+`ctx_parked ξ ξnew` with ξ's bound and watermark both under ξnew's
+BOUND.  (4) RESUME, inside swtch: `own_context ξnew ∗ ctx_parked ξ ξnew ==∗
+own_context ξnew ∗ own_context ξ` — raise ξ's bound to `B_new`; every
+clean cell stays clean, every dirty entry (`≤ W_ξ ≤ B_new`) becomes
+clean, `B_new ≤ K2` is the hart tie.  That is `ctx_morph_pointsto`'s
+dirty→clean step done once on the authority instead of per cell.
+
+WHY THE WATERMARK: the one hop with no counterpart in acquire/release
+is (1), a running→RUNNING hand-off on one hart.  A running context's
+bound is capped by the hart's view and a buffered store sits above it,
+so "ξ's writes ≤ ξsched's bound" is false; "≤ ξsched's watermark" is
+exactly the justification `own_context` already uses for ξsched's own
+buffered stores (same hart, same store buffer).  The release then does
+to ξsched's watermark what it always does.  Cost: the watermark becomes
+a per-context `mono_nat` (today an existential in the token) so the
+raise leaves a persistent `ctx_wfloor`, and `ctx_dom` states its
+`W ≤ B'` conjunct about that ghost.
+
+CONSEQUENCES.  The record's `Tp` existential goes; a migratable
+`valid_context` holds `ctx_parked XIp ξ` with ξ the PAYLOAD'S context
+parameter — the record's only ξ-dependence (its cells, stack and
+resume wand are all at XIp) — so `proc_lock_res` becomes a genuine
+`λ ξ` payload whose transport is a wand (`▷ proc_ctx` stops being an
+obstacle: wands pass through the later, `ctx_dom` is timeless).  A
+pinned record (`adm = Some h`) holds the scheduler's `own_context
+(CID := h)` outright.  `SpecSwtch` takes no receipt; the scheduler
+chain threads nothing new; the lock surface and payload type do not
+move — §0.27′'s `U` parameter and its ~160-site cost are SUPERSEDED.
+`ProofSwtch:157` becomes the resume rule against the scheduler token
+in the caller's bundle; the park side uses the scheduler token found
+in the target record.  `ctx_park`/`ctx_resume` on a nat stamp retire.
+Build order in tso-machine-flip.md A6.127.

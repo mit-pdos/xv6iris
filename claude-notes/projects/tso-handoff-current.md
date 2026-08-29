@@ -136,10 +136,18 @@ and re-splits.  `ProofVirtioDiskRwD` + `RwE` + `RwDSeam` green.
    values) — the pin cannot carry a stale reader's lower bound, measured
    against every re-floor placement.  Σ-level; wants a §0.x′ ruling before
    anyone builds it.  `ProofVirtioDiskIntr` stays red until then.
-3. **§0.27′ → `ProofSwtch`** (`:157` still names the retired
-   `hart_view_lb_any`; the parked record now arrives at the winner with
-   `ctx_parked`), together with `proc_lock_res`'s λ-conversion (the `▷`
-   in its slots is this ruling's business).
+3. **§0.42′ → `ProofSwtch`** (SUPERSEDES the §0.27′ `U` shape, 2026-08-29):
+   the parked thread token becomes RELATIVE to a context
+   (`ctx_parked ξ ξr`), the scheduler contexts never park, resume is the
+   acquire morph on the token; plan and build order in A6.127.  IN
+   PROGRESS on the fliptree.  Takes `proc_lock_res`'s λ-conversion with
+   it (the transport is a wand, so `▷` is no obstacle).
+   **The virtio A6.126 item 2 work is PARKED** — 21-file WIP saved at
+   `/shared/tmp/virtio/virtio-wip-A6.126.patch` (file copies in
+   `/shared/tmp/virtio/wip-A6.126/`); the fliptree was restored to the r50
+   mirror.  Its state: `VirtioProto` compiles to ~line 4352; three
+   `set_solver` blow-ups were replaced by explicit set proofs; downstream
+   files never compiled against the new interfaces.
 4. `ProofKernelvec:1704` (§0.39′), then `ProofForkretPark` re-measure
    (post-§0.27′).
 Then the KPT lane's K15d tail + `ProofMain:996`, and the merge.

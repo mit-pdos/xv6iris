@@ -16139,3 +16139,135 @@ written and these override it:
   takes them and returns `disk_fl/disk_nr/disk_flr` halves;
   `SpecVirtioDiskInit.vdi_post` hands main `∃ t0 t1, …` and
   `DiskBoot.disk_res_boot` seats them with `F := 0` (`ctx_floor_0`).
+
+## A6.127 — THE RELATIVE PARKED TOKEN (§0.42′): swtch's resume as the acquire morph on the token; plan and build order
+
+*(Lock lane, 2026-08-29.  Ruling §0.42′ in tso-port.md; supersedes the
+§0.27′ `U`-parameter shape and the A6.~11672 "gated on the AMO leaf"
+characterization.  The virtio A6.126 work is PARKED: its 21-file WIP is
+saved as `/shared/tmp/virtio/virtio-wip-A6.126.patch` (+ file copies in
+`/shared/tmp/virtio/wip-A6.126/`) and the fliptree was restored to the r50
+mirror so the whole tree is green under it.)*
+
+### §1. What is measured (2026-08-29)
+
+- `ProofSwtch:157` is the ONLY red line: `ctx_resume XIt Tt Tt` fed by the
+  retired `hart_view_lb_any`.  The same line serves BOTH directions
+  (proc record and the hart-pinned scheduler record).
+- `valid_context` (`SwtchCtx:243`) holds `ctx_parked XIp Tp`, `XIp Tp`
+  existential; the record is built at `XIp := cur_ctx` (`ProofSwtch:246`),
+  so every ctx-indexed part of it (cells, stack, the resume wand's inputs)
+  is at the thread's OWN context.
+- `own_context_def` (`TsoCtx:294`): bound `B ≤ K` (view receipt), dirty
+  map `D` with `∀k∈D, k.1 ≤ W` and `llb W`, `dirty_ok` per entry (under the
+  bound, or this hart's own message).  `W` is an EXISTENTIAL — no ghost.
+- `ctx_dom_def` (`TsoCtx:1406`): half of ξ's authority, `B ≤ B'`,
+  `W ≤ B'` (its own witness `W`), `mono_nat_lb (bound ξ') B'`.
+- `ctx_morph_pointsto` (`TsoCtx:1469`) performs NO update (drops the dirty
+  fragment, re-justifies clean at ξ'); `CtxMorph` is `==∗` by generality
+  only.  `ctx_dom` is timeless.
+- Callers: `ctx_park` — `ProofSwtch` only.  `ctx_resume` —
+  `ProofSwtch`, `ProofForkretPark`, `TsoCtxAbsorbLb`, `SpecAcquire`
+  (comment).  `ctx_parked` — 13 files (`WpLock.lock_pay`/`lock_pay_won`,
+  `WpSconfLock`, `TsoCtxAbsorbLb`, `SwtchCtx`, `SchedCtx`, `DiskInv`,
+  `KptGhost`, `ProofForkretPark`, the twins).  `ctx_at` unfolded outside
+  TsoCtx: `LogInv`, `FsDurWire`, `ProofBeginOp/EndOp/Initlog/SysSync/
+  Iupdate/LogWrite`, `SpecLogWrite` (the fs log's context bookkeeping).
+  `own_context_def` unfolded: `CtxPinMint`, `TsoCtxAbsorbLb`.
+- Scheduler token today: parked into `sched_vc_at h` / `run_slot`'s
+  `▷ sched_vc_at` at every dispatch and resumed through line 157 — for a
+  PINNED record no view receipt could ever prove `max(K,W) ≤ K`, so the
+  old shape was unprovable there too.  Under §0.42′ it is never parked.
+- `ProofScheduler:1291` and `ProofSched` bind acquire's `∃K, hart_view_lb K`
+  as `_`; nothing threads it and nothing will.
+
+### §2. The kit (TsoCtx), in order
+
+1. **Watermark ghost.** `ctx_at ξ q B W D` gains `mono_nat_auth_own
+   (ctx_wmark_name ξ) q W` (a third gname in `CtxId`'s allocation — see
+   `ctx_parked_alloc`/`own_context_boot`/`ctx_names`).  `own_context_def`
+   keeps `B K W D` with `W` now the ghost's value; `llb W` stays (the
+   ghost value is a legal position).  `ctx_wfloor ξ W := mono_nat_lb_own
+   (ctx_wmark_name ξ) W ∨ ⌜W = 0⌝` (llb-shaped, persistent).  Invariant
+   kept by every update: `B ≤ W` (raise `W` whenever `B` is raised; free,
+   `view_lb_llb`).  `ctx_dom_def` states `W ≤ B'` about the ghost value
+   (it holds the half-authority, so the value is pinned).
+2. **The relative parked token.** `ctx_parked_def ξ ξr := ∃ B W D,
+   ctx_at ξ 1 B W D ∗ llb W ∗ ⌜∀k∈D, k.1 ≤ W⌝ ∗ ctx_floor ξr B ∗ ctx_wfloor ξr W`.
+   Laws: `ctx_park_rel : own_context ξ -∗ own_context ξr ==∗ own_context ξr
+   ∗ ctx_parked ξ ξr` (bound raise = `ctx_bound_raise` at ξ's receipt,
+   watermark raise on `llb_max`); `ctx_parked_dom : ctx_dom ξr ξ' -∗
+   ctx_parked ξ ξr -∗ ctx_dom ξr ξ' ∗ ctx_parked ξ ξ'` (a WAND: both floors
+   transport, `ctx_floor_dom` + the new `ctx_wfloor_dom`; the target's
+   floor at `B'` covers `W` so the result is the STRONGER form with
+   `ctx_floor ξ' W` — record it as the definition's `ctx_wfloor` arm plus
+   an extra `ctx_floor ξ' W` conjunct? NO: keep one shape by defining the
+   W-arm as `ctx_floor ξr W ∨ ctx_wfloor ξr W`; resume needs the left arm;
+   every transport yields the left arm; only a fresh park yields the
+   right arm.  The right arm is resumable too on ξr's OWN hart (hart
+   authorship) — carry `[∗ k∈D] dirty_ok logm (hart of ξr) B k` there if a
+   same-hart resume without a lock crossing is ever needed; xv6 never
+   does it (every dispatch crosses p->lock), so start WITHOUT it and add it
+   only on measurement); `ctx_resume_rel : own_context ξr -∗ ctx_parked ξ
+   ξr ==∗ own_context ξr ∗ own_context ξ` (left arm; raise ξ's bound to
+   `B_r` — needs `B_r` readable: `own_context` exposes its bound as
+   `ctx_floor ξr B_r` by `own_context_floor_view`-style peek; the dirty
+   entries become clean; the view receipt is ξr's).
+3. **Instances.** `CtxMorph (λ ξ, ctx_parked ξp ξ)` from `ctx_parked_dom`
+   (wand ⇒ update).  A wand-flavoured morph class is NOT needed if
+   `proc_lock_res`'s `▷ proc_ctx` is handled by `ctx_parked_dom` applied
+   under `▷` directly (`bi.later_wand`, `ctx_dom` timeless): the record's
+   other parts are ξ-constant (at `XIp`), so `proc_ctx`'s morph is that one
+   wand.  Measure the `<{ }>` → `λ` conversion of `proc_lock_res` (44 sites)
+   as its own step (§4).
+4. **The nat-stamp laws retire**: `ctx_park`, `ctx_resume`,
+   `ctx_exchange`, `ctx_parked_llb`, `ctx_dom_to_parked`/`_of_parked(_lb)`
+   are re-stated for the NEW `ctx_parked` where they concern the LOCK's
+   parked context — the lock's parked context keeps an absolute stamp
+   (it is the relatum, not a relatee): keep a SEPARATE `ctx_stamped ξ T`
+   (today's `ctx_parked ξ T`, renamed) for `lock_pay`/`lock_pay_won`/
+   `KptGhost`/`DiskInv`/`ProofForkretPark` so that 13-file surface does not
+   move in this unit.  So: RENAME today's `ctx_parked` → `ctx_stamped`
+   tree-wide (mechanical, sed), then introduce the relative `ctx_parked`.
+
+### §3. The swtch/scheduler surface
+
+5. `SwtchCtx.valid_context_pre P rec A c p`: the token conjunct becomes
+   `(match A with None => ctx_parked XIp ξ | Some h => own_context (CID:=h) XIp end)`
+   with `ξ` — the holder's context — a NEW PARAMETER of `valid_context`
+   (the payload parameter; ambient `cur_ctx` at every site that names a
+   migratable record, so no arity moves at consumer sites written with
+   the ambient).  The `Tp` existential goes.  `sched_vc_at h c p` (pinned)
+   holds `own_context (CID:=h) XIp`.
+6. `SpecSwtch.wp_swtch_sconf_body`: unchanged shape; the record's token
+   form follows `An`/`Ao` by (5).  The parker at `Ao = None` needs the
+   scheduler token: it is in the TARGET record (`An = Some cpu_id`, the
+   scheduler's `own_context`); the resumer at `An = None` needs it from its
+   own bundle (`Ao = Some cpu_id` — its own record is the pinned one it is
+   about to deposit its running token into).  Both directions have it.
+   The `back = false` (zombie) case: the caller's token is dropped, as
+   today.
+7. `ProofSwtch`: line 157 → `ctx_resume_rel` (migratable target) or the
+   pinned token straight out of the record; line 240 → `ctx_park_rel`
+   against the scheduler token (migratable caller) or the running token
+   into the pinned record.
+8. `SchedCtx.proc_ctx pa` gains the context parameter; `proc_lock_res`
+   becomes `λ ξ` with `▷ proc_ctx ξ pa` — the `<{ }>` → λ conversion for
+   its 44 sites, following A6.121's recipe (`CtxMorphTac`), with the
+   `▷` discharged by `ctx_parked_dom` under `bi.later_wand`.
+9. `ProofScheduler` / `ProofSched` / `ProofSleep` / `ProofYield` /
+   `ProofForkretPark` / `ProofKexit`: re-thread; expected mostly
+   mechanical.  `ProofForkretPark` (the forked child's record — a fresh
+   context with a deposit) is re-measured after (7).
+
+### §4. Order and gates
+
+Step A: rename `ctx_parked` → `ctx_stamped` tree-wide; certify (should be
+a no-op round).  Step B: the watermark ghost in `ctx_at`/`own_context`/
+`ctx_dom` + `ctx_wfloor` + laws; certify (`TsoCtx` and its unfolders:
+`CtxPinMint`, `TsoCtxAbsorbLb`, the fs-log files).  Step C: the relative
+`ctx_parked` + park/dom/resume laws (TsoCtx only).  Step D: `SwtchCtx` +
+`SpecSwtch` + `ProofSwtch` green.  Step E: `SchedCtx` λ-conversion +
+the scheduler chain.  Step F: certify a round, pull-vo, mirror, snapshot,
+notes, handoff; then hand the vocabulary to the main-branch agent.
+Zero admits at every step; measure before each.
