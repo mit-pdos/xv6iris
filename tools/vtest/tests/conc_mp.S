@@ -136,7 +136,13 @@
    newer, which is the direction that HIDES the forbidden outcome. */
 #define WGAP      12
 #define XADDR     DMA_BASE        /* the DATA word              */
-#define YOFFR     64              /* the FLAG word, the NEXT cache line */
+/* X AND Y ARE 1 KB APART, which is sixteen 64-byte cache lines on this core.
+   64 would already put them in DIFFERENT lines, but adjacent is not
+   independent: a next-line prefetcher pulls the neighbour and re-couples
+   them, and adjacent lines also sit in adjacent L1 sets.  1 KB is clear of
+   both, costs nothing (the declared DMA region is 8 KB), and removes the
+   question. */
+#define YOFFR     1024
 
 #define R_NITER   8
 #define R_P1WIT   12

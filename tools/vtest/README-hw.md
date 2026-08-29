@@ -307,6 +307,16 @@ still 0 when the unfenced pass ended, witness 0 out of 20480.  (The FENCED
 pass does interleave, because the fences break the translation block.)  It is
 not that QEMU gives a different answer; it is that it gives no answer.
 
+**THE SEPARATION IS NOT THE PROBLEM.**  X and Y are 1 KB apart -- sixteen
+64-byte lines on this core.  64 would already put them in different lines,
+but adjacent is not independent (a next-line prefetcher pulls the neighbour,
+and adjacent lines sit in adjacent L1 sets), so the distance was widened to
+remove the question.  It changed nothing: witness still 4096 of 4096,
+forbidden still 0, and the raw log still shows `X - Y = 1` on every
+iteration.  That is a useful negative -- it rules out false sharing and
+prefetch coupling as the explanation, and leaves the lockstep below as the
+only one standing.
+
 **THE RAW OBSERVATIONS EXPLAIN THE NULL, and they are why the count alone
 would have been misleading.**  The test logs the first 32 raw `(r1, r2)`
 pairs, and on the board they are:
