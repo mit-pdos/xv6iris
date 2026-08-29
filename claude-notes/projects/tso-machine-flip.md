@@ -16090,3 +16090,52 @@ Landed so far under this section: `TsoMemPa` §12e rewritten (compiles);
 `rel_cells`, `rel_floor_vis` (+ `_below`, `_visibleb`),
 `ledger_store_rel_map_ok`, `visibleb_le_other`, `ledger_read_rel_ok`,
 `ledger_read_relpre_ok`, `ctx_phys_pointsto_of_at_floor` (compiling).
+
+**§6 corrected while building (2026-08-29, in flight).**  Three of §6's
+points changed on contact with the code; the note above is kept as
+written and these override it:
+
+- **6.5 (stamped lease) is NOT what landed.**  A stamped lease
+  (`dma_own_x` with a stamp function) would have needed the publisher's
+  freshly published sealed cells to re-enter with stamps -- an ∃-choice
+  over a big_sepM the tower does not offer.  Instead the lease keeps
+  three HOLES (`VirtioProto.lease_hole_pure c pr := dom (vproto_ctl c pr)
+  ∪ used_idx_dom c ∪ done_dom c (vp_done pr)`, `done_dom` a `map_fold` of
+  `slot_done_dom c p sl := slot_wr sl ∪ elem_dom c p` with `elem_dom` the
+  8-byte used element) and the done slot's cells live STRUCTURED in
+  `slot_done_res` (`slot_done_cells`: head ×4, length ×4, status, buffer,
+  all `phys_ledger_at … q`), built at the completion from the gate's map
+  by `vslot_writes_split` + `slot_done_cells_of_map` (the exact domain of
+  a completion's write set, `vslot_writes_dom_eq`).  `dma_own_x_take`
+  grows the hole at the completion, `dma_own_x_fill` shrinks it at the
+  reclaim (the element returns sealed).
+- **6.6: ghosts.**  `disk_names` gained FIVE gnames: `dn_fl0 dn_fl1`
+  (floor stamps), `dn_flr` (reader floor), `dn_nr` (reclaimed count --
+  the live arm pins `dom (vp_done pr) = set_seq nr (nc - nr)`), `dn_pos`
+  (a `ghost_map nat nat` of completion positions; `Xv6Cameras.diskGhostΣ`
+  gained `ghost_mapΣ nat nat`).  Its persistent fragments
+  `disk_done_pos γ p q` are the reader's memory of a read: the index read
+  leaf is the NEW `WpSconfMem.wp_load_s_sconf_au_reli` (an iProp-valued,
+  persistent `Q`, node family `HartSMem.*_exvi`) whose continuation gets
+  `vt_idx_q`: `wrap16 k`, `nr ≤ k ≤ np`, `disk_done_lb k`, and for every
+  `p < k` a fragment with `⌜q_p ≤ V0⌝`.  The loop state
+  (`vt_loop_state`) carries that receipt; the reclaim at `p = nr` hands
+  `disk_done_pos γ nr q0 ∗ ⌜q0 ≤ V0⌝` to `virtio_proto_reclaim_acc` and
+  raises the payload floor to `max F V0` (`TsoGhost.llb_max` on
+  `ctx_floor`).  The pure read theorem is `VirtioProto.used_rel_read_ok`.
+- **6.7: what the handler re-registers.**  The status byte is read by the
+  handler's own `lbu`, so it becomes a CTX byte right after the reclaim
+  (`DiskAvail.ctx_byte_of_at`: `phys_ledger_at a 1 v q ∗ ctx_floor cur_ctx q`
+  → `a ↦ₘ v`, the one sound device-byte re-entry); `parked_res` holds
+  `vr_status … ↦ₘ byte_zero` and the BUFFER still stamped
+  (`∃ q, ctx_floor cur_ctx q ∗ [∗ list] … phys_ledger_at … q`) because the
+  buffer page's claims are the publisher's: `ProofVirtioDiskRwF`
+  re-registers it at withdraw (`ctx_bytes_of_at_seq`).  The AU's `Res`
+  of both racy reads carries its own close-wand (`vt_idx_res`), since a
+  leaf hands `Res` back under fresh existentials.
+- The boot: `virtio_disk_init` carves the index word out of the used page
+  (`DiskAvail.used_split_init`: the two bytes stamped with the init hart's
+  floors, the rest `phys_map (used_page_rest c)`); `virtio_proto_intro`
+  takes them and returns `disk_fl/disk_nr/disk_flr` halves;
+  `SpecVirtioDiskInit.vdi_post` hands main `∃ t0 t1, …` and
+  `DiskBoot.disk_res_boot` seats them with `F := 0` (`ctx_floor_0`).
