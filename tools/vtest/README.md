@@ -324,10 +324,8 @@ hart 0, and the harness's clock never ticks.
 | 28 | **the CLINT is not indexed by hart** | only hart 0's registers exist -- `clint_load`/`clint_store` compare the offset with `eq_vec` against `MSIP_BASE` = 0 and `MTIMECMP_BASE` = 0x4000, and every other hart's access takes a load access fault | every hart has its own MSIP at `CLINT+4*hartid`, with exactly the semantics the model gets right for hart 0 | **UNSOUNDNESS**, and live in xv6's `start()` | `clint_msip` |
 | 29 | `misa`, all three different | model `0x…14112D` (A C D F I M S U) | QEMU adds **H** (`0x…1411AD`, finding 19); the board adds **B** and **X** and has no H (`0x…94112F`) | incompleteness both ways | `core_csrprobe` |
 | 30 | the UART is a **different chip** on this board | a byte-strided 16550 in an 8-byte window (`DevModel.uart_size` = 8) | Synopsys DW-APB v3.14a, **reg-shift 2** -- LSR is at `0x14`, and the whole register file lies outside the model's window | board difference, not a model defect | the probe |
-
 | 31 | CSRs the **U74** refuses that the model and QEMU both implement: `menvcfg`, `mconfigptr`, `senvcfg` (privileged spec 1.12 additions the core predates) and `time` (SiFive leaves `rdtime` to firmware to emulate, which is what OpenSBI does on this board) | implemented, read successfully | implemented | illegal instruction | **model is WIDER than the board** | `core_csrprobe` |
 | 32 | **`csrr mseccfg` has NO TRANSITION in the model.**  Finding 22 records these seven CSRs as "implemented, read successfully"; under this suite's interpreter the model neither answers nor refuses -- `exec` returns None and the harness reports `VStuck`, so the run stops and the other six go unasked | `VStuck` | illegal instruction | illegal instruction | a THIRD outcome; same class of limit as finding 25's `sc.w` | `core_csrwide` |
-
 | 33 | **the machine's identity**: `mvendorid`, `marchid`, `mimpid` | `0, 0, 0` -- an anonymous machine | QEMU also `0, 0, 0`; the board answers `0x489` (SiFive's JEDEC id), `0x7`, `0x4210427` | incompleteness | `core_csrprobe` |
 
 **Finding 29 was previously attributed to `core_regs_mcsr`, and that was

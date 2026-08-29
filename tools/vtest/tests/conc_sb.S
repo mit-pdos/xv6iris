@@ -116,7 +116,7 @@ pass:
     j    pass
 
 out:
-    csrr t0, mhartid
+    HART_SLOT(t0)                 /* the SLOT, not the id: see abi.h */
     bnez t0, out_ap
     li   t1, DONE1               /* hart 0 waits for hart 1 to record b */
     add  t1, s11, t1

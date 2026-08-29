@@ -74,6 +74,28 @@
 #define PRIMARY_HART 0
 #endif
 
+/* THE HART SLOT, for a test BODY that dispatches on which hart it is.
+   vtest.S's prologue already biases the slot it uses for the stack and for
+   the primary/AP branch, but a BODY that asks the question again gets the
+   RAW mhartid -- and `bnez t0, ap` after `csrr t0, mhartid` then sends the
+   PRIMARY down the AP path on any machine whose primary is not hart 0.
+
+   Measured, and it is why this macro exists: conc_lost on the VisionFive 2
+   ran the whole race correctly -- both rendezvous, a real lost update --
+   and then published nothing, because its `out:` block compared mhartid
+   against 0 and the primary was hart 2.  The same bug would bite
+   `vtest.py gen --hart 1` on QEMU.
+
+   With PRIMARY_HART = 0 this emits exactly the one instruction it always
+   did, so no QEMU image moves.  A test that wants the hart's REAL id (to
+   record it, or to index a per-hart device register) must still use `csrr`
+   directly -- see core_hart.S and clint_msip.S. */
+#if PRIMARY_HART == 0
+#define HART_SLOT(r)  csrr r, mhartid
+#else
+#define HART_SLOT(r)  csrr r, mhartid ; addi r, r, -(PRIMARY_HART)
+#endif
+
 /* The stride between two 16550 registers, as a shift.  0 on QEMU virt (the
    registers are adjacent bytes).  The JH7110's UART is a Synopsys DW-APB
    with reg-shift 2, so LSR is at 0x14 and not at 5.  EVERY uart test must
