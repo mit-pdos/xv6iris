@@ -1344,7 +1344,7 @@ Section BoBodies.
     (* open the lock's resource for the committing test *)
     rewrite /log_res.
     iDestruct "Hres" as (out cmt nc om Ep Xr Tx)
-      "(Hout & Hcmt & Hnc & Hauth & %Hsz & %Hbnd & %Hout3 & %Hcmtout & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Htxa & %Hszt & Hrest)".
+      "(Hout & Hcmt & Hnc & Hauth & %Hsz & %Hbnd & %Hout3 & %Hcmtout & Hepa & %Hepos & Hxa & %Hlive & %Hcap & Htxa & %Hszt & #Hbank & Hrest)".
     assert (Hacmt : add_vec (rget M (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 32 : mword 12)) = l_cmt).
     { rgne. rewrite Hs1. exact bo_addr_cmt. }
     (* +0x2c c.lw a5,32(s1) : a5 := log.committing *)
@@ -1392,6 +1392,12 @@ Section BoBodies.
                  ⌜forall e' b', ((e', b') : nat * Z) ∈ X -> (e' <= E)%nat⌝ ∗
                  ghost_map_auth (ln_tx γ) 1 T ∗
                  ⌜size T = size om⌝ ∗
+                 (* THE BANK (fs-syscall-specs lane Y).  This assertion
+                    RESTATES [LogInv.log_res]'s body verbatim -- it is the
+                    one site in the tree that does -- so the banked receipt
+                    has to be spelled here too, in its own position: last
+                    before the committing arm. *)
+                 log_flushed_bank γ E ∗
                  (if cmt then emp
                   else ∃ (n : nat) (LB : gset Z),
                        ⌜(n + op_sum om <= LOGBLOCKS)%nat⌝ ∗
@@ -1411,6 +1417,9 @@ Section BoBodies.
         iSplitR; [iPureIntro; exact Hcap|].
         iFrame "Htxa".
         iSplitR; [iPureIntro; exact Hszt|].
+        (* the bank rides back untouched: persistent, and this step does
+           not move the counter it is indexed by *)
+        iSplitR; [iExact "Hbank"|].
         iExact "Hrest". }
       iApply (wp_cbnez_taken_s_sconf (mword_of_int (KernelSyms.begin_op + 0x3c)) (mword_of_int 244 : mword 8)
                 (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5) E1 (trap_res eb + (K - 4))%nat false
@@ -1741,6 +1750,9 @@ Section BoBodies.
           iSplitR.
           { iPureIntro. rewrite (map_size_insert_None _ _ _ Ht).
             rewrite (map_size_insert_None _ _ _ Hi). by rewrite Hszt. }
+          (* a begin_op does not commit, so the counter -- and with it
+             the bank's index -- stands *)
+          iSplitR; [iExact "Hbank"|].
           iExists n, LB. iSplitR.
           { iPureIntro. rewrite (op_sum_insert om i (MAXOPBLOCKS, (∅ : gset Z), Ep) Hi).
             exact (log_reserve_ok n out om Hsz Hbnd (bo_guard_sum out n Hle)). }
@@ -1785,6 +1797,7 @@ Section BoBodies.
           iSplitR; [iPureIntro; exact Hcap|].
           iFrame "Htxa".
           iSplitR; [iPureIntro; exact Hszt|].
+          iSplitR; [iExact "Hbank"|].
           iExists n, LB. iSplitR; [iPureIntro; exact Hsum|].
           iSplitR; [iPureIntro; exact Hsub|].
           iSplitR; [iPureIntro; exact Hreg|].
