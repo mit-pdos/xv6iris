@@ -249,7 +249,32 @@ U-mode bundle `uvb` (C), and the five-step staging.  Lanes, in order:
    (ProcInv), `uvm_maxsz = 2^38 - 8192` is exactly `usz_ok`'s
    page-aligned bound, and `pgroundup` preserves a page-aligned bound;
    one three-line bridging lemma at J.
-3. **[ ] S8b — sbrk's row, SAYING WHAT HAPPENS** (owner-ruled
+3. **[x] S8b — sbrk's row, SAYING WHAT HAPPENS** — LANDED.  Both rows are
+   now functions of the two sizes, `ut_round`/`uv_round` have NO escape
+   disjunct left, and the dispatcher's image-only sbrk row became
+   `sysc_sbrk_ok` (descriptor + determined count), threaded through
+   `growproc_ok` / `sys_sbrk_ok`.  New `UserPerm.perm_of_del_run` is the
+   shrink mirror of `perm_of_grow`, premised on `um_below` in the shape
+   `proc_priv` hands out.  **TWO CORRECTIONS to what this entry predicted**,
+   both worth keeping: (1) the GROW arm is table-free, but NOT because
+   "xv6 maps nothing on a grow" — that is only the LAZY path; `sys_sbrk`'s
+   EAGER path (`t == SBRK_EAGER`, kernel/sysproc.c:50) really does call
+   `growproc`→`uvmalloc` and map the run.  It is table-free because
+   `uvmalloc` maps at VMFAULT'S OWN LEAF (growproc passes `PTE_W`, so the
+   leaf is `uvm_pte 22`), so `perm_of_uptd_ext_sz` says the projection
+   does not move — which required strengthening `growproc_ok`'s grow arm
+   from bare `uptd_ext` to `uptd_ext_sz` (free: `uvmalloc`'s post already
+   gives both halves).  (2) The image side needed a premise this entry
+   did not anticipate: the `sz' = sz` arms (failure, `n = 0`, growproc's
+   wrap sub-case) give `M' = M` where the row asks for
+   `umem_grow M (uint sz)`, and those agree only because the LAZY IMAGE
+   ALREADY RECORDS EVERY LIVE BYTE — `proc_ptm`'s domain law, read off
+   `proc_priv` by a pure accessor.  Follow-on: `sysc_mem_ok_quiet` used to
+   discharge sbrk via the "nothing moved" disjunct that no longer exists,
+   so it gained a `sysc_num <> 12` premise at its 16 sites.
+   The original plan, for the record:
+
+   **[historical] S8b as planned** (owner-ruled
    2026-08-29: "either extend the memory up with zeroed pages or cut them
    down").  The last escape in `ut_round`/`uv_round`.  The row today is
    existential where the code is DETERMINED — the same weakening pattern
