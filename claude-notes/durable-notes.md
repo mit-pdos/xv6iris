@@ -867,6 +867,42 @@ names the cause.
   iota-reduced and the same rewrite fails with **"all matches … are equal to
   the RHS"**. Rewrite on the fall-through arms only.
 
+## FOUR MORE PAPER CUTS, from porting `echo` onto the user-mode-on-kernel tier
+
+Same family as the three above: each cost a whole remote build round, and none
+of the messages names the cause.
+
+- **`uint x` and `bv_unsigned x` are TWO ATOMS to `lia`.** They are
+  definitionally the same, and `uint_unsigned` rewrites between them — which
+  is exactly the trap. Rewriting it into a shared hypothesis
+  (`rewrite uint_unsigned in Hlo`) to make ONE step go through silently
+  breaks every later `lia` that still reads the budget at `uint`, and those
+  report **"Cannot find witness"** with the fact plainly in context. Keep the
+  hypotheses in one spelling and derive the other where it is needed
+  (`assert (Hbu : bv_unsigned sp0 = uint sp0)` once, then `rewrite Hbu` inside
+  the two steps that want it).
+- **`apply` cannot invert `Z.opp` to find a displacement.** `add_vec_int sp0
+  (-16)` written in a proof is the NEGATIVE LITERAL `Zneg 16`; a lemma stated
+  as `add_vec_int a (- d)` has `Z.opp d`. The two are convertible, so `exact`
+  and explicit application are fine and `rewrite`'s keyed matching is fine —
+  but `apply uv_avi_neg` has to solve `Z.opp ?d =?= -16` and gives up. Supply
+  the displacement: `apply (uv_avi_neg sp0 16)`, or `pose proof` the instance
+  and `exact` it.
+- **`iPoseProof … as "H"` leaves `"H"` in the context after the `iApply` that
+  uses it**, so a lemma applied ten times in one proof needs ten names. The
+  failure is **`iRename: "H" not fresh`** at the SECOND use, which reads like a
+  shadowing bug in the first.
+- **Moving proof text between an Iris file and a PURE one changes what
+  `rewrite` means.** ssreflect's `rewrite` comes with `iris.proofmode`'s
+  `Import`, and it is not transitive: a file that `Require Import`s an Iris
+  file but not the proofmode has VANILLA `rewrite`. Space-separated multi-rule
+  rewrites (`rewrite E Hn Hm`) are then a **syntax error** ("[ltac_use_default]
+  expected"), and vanilla's keyed matching is stricter in the other direction
+  too (`rewrite Em64 in Hrng` where `Em64` guesses how `mword 64` elaborated
+  its width fails with "Found no subterm"). Convert to `rewrite E, Hn, Hm` and
+  discharge shape-dependent equations by computation instead of by rewriting a
+  guessed form.
+
 ## A `[-]` SPEC PATTERN EATS THE HYPOTHESES NAMED *AFTER* IT
 
 `with "… [-] Hcont"` is self-defeating, and the error blames the wrong thing:

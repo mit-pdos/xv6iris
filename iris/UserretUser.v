@@ -12,8 +12,9 @@
 
    [wp_userret_user] runs userret and, in its continuation, repackages the
    returned machine into the CONCRETE resume state the slot consumes via
-   [userret_to_user_state] (UserKernelBridge.v) -- the [u_regs] bundle,
-   [user_pt_inv] at the delivered image, [user_cfg] -- and applies the
+   [userret_to_user_state_ptm] (UserKernelBridge.v) -- the [u_regs]
+   bundle, [user_ptm_inv] at the delivered image, [user_cfg] -- and
+   applies the
    slot at it.  Type-checking this file is the proof that the userret
    spec's postcondition is EXACTLY strong enough for the slot's
    precondition:

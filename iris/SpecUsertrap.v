@@ -134,7 +134,7 @@ Require Import TsoCtx.
 (* the mstatus facts usertrap's return guarantees: exactly userret's
    premises (the sret decodes to User and does not trap) plus the FS/VS
    pins the user-mode invariant carries across the sret
-   ([userret_to_user_state], UserKernelBridge.v). *)
+   ([userret_to_user_state_ptm], UserKernelBridge.v). *)
 Definition usertrap_ret_ms (ms : mword 64) : Prop :=
   eq_vec (_get_Mstatus_SIE ms) ('b"1") = false /\
   eq_vec (_get_Mstatus_MPRV ms) ('b"1") = false /\

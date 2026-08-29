@@ -25,7 +25,7 @@
 (*                   with EXISTENTIAL contents) and the loop-constant boot *)
 (*                   config [C].  Packed at boot / after userret out of    *)
 (*                   the concrete state [UserKernelBridge.                 *)
-(*                   userret_to_user_state] delivers.                      *)
+(*                   userret_to_user_state_ptm] delivers.                  *)
 (*   [stvec_handler_wp C pt]                                             *)
 (*                   the kernel re-entry contract: from [user_trap_frame]  *)
 (*                   (Supervisor, pc at stvec's direct base, trap CSRs     *)
