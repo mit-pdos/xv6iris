@@ -262,7 +262,9 @@ UmodeKernelTie.v
 USyncKernel.v
 UkStep.v
 UkLeaf.v
+UkBranch.v
 UkStore.v
+UkLoad.v
 UkSync.v
 UexecCond.v
 UCodeEcho.v
