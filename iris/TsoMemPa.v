@@ -2067,19 +2067,19 @@ Record ts_rel : Type := TsRel {
   tr_base : Arch.pa;   (* byte 0 of the window *)
   tr_n    : nat;       (* its width *)
   tr_j    : nat;       (* THIS byte's offset inside it *)
-  tr_auth : agent;     (* the ONE author above the floor *)
   tr_lo   : nat;       (* the floor: a whole-window write, by anyone *)
+  tr_hist : list nat;  (* every position ABOVE the floor that wrote the window *)
 }.
 
 Definition rel_ok1 (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
     (a : Arch.pa) (R : ts_rel) : Prop :=
   a = pa_add (tr_base R) (tr_j R)
   /\ (tr_j R < tr_n R)%nat
-  (* (1) any message STRICTLY ABOVE the floor touching this byte is the
-     author's and writes the whole window *)
+  (* (1) any message STRICTLY ABOVE the floor touching this byte is one of
+     the recorded history positions and writes the whole window *)
   /\ (forall i m, (tr_lo R < S i)%nat -> log !! i = Some m ->
         is_Some (msg_byte m a) ->
-        pm_tid m = tr_auth R
+        S i ∈ tr_hist R
         /\ (forall k, (k < tr_n R)%nat -> is_Some (msg_byte m (pa_add (tr_base R) k))))
   (* (2) the image covers the window *)
   /\ (forall k, (k < tr_n R)%nat -> is_Some (img !! pa_add (tr_base R) k))
@@ -2103,35 +2103,39 @@ Proof.
   - move => k Hk. rewrite (log_byte_app_le _ _ _ _ _ Hlo). exact (Hfl k Hk).
 Qed.
 
-(* the author's own whole-window store keeps the arm *)
-Lemma rel_ok1_app_store img log msg a R :
-  rel_ok1 img log a R -> pm_tid msg = tr_auth R ->
-  (forall k, (k < tr_n R)%nat -> is_Some (msg_byte msg (pa_add (tr_base R) k))) ->
-  rel_ok1 img (log ++ [msg]) a R.
+(* the author's whole-window store keeps the arm, recording its position *)
+Lemma rel_ok1_app_store img log msg base n j lo hist :
+  rel_ok1 img log (pa_add base j) (TsRel base n j lo hist) ->
+  (forall k, (k < n)%nat -> is_Some (msg_byte msg (pa_add base k))) ->
+  rel_ok1 img (log ++ [msg]) (pa_add base j) (TsRel base n j lo (hist ++ [S (length log)])).
 Proof.
-  move => [Ha [Hj [H1 [H2 [Hlo Hfl]]]]] Hauth Hall.
+  move => [Ha [Hj [H1 [H2 [Hlo Hfl]]]]] Hall.
+  cbn [tr_base tr_n tr_j tr_lo tr_hist] in *.
   split_and!; [ exact Ha | exact Hj | | exact H2 | | ].
   - move => i m0 Hge Hlk Hs.
     apply lookup_app_Some in Hlk. destruct Hlk as [Hlk | [Hge2 Hlk]].
-    + exact (H1 i m0 Hge Hlk Hs).
+    + have [Hin Hw] := H1 i m0 Hge Hlk Hs.
+      split; [ apply elem_of_app; by left | exact Hw ].
     + destruct (i - length log)%nat as [|k] eqn:Hk; cbn in Hlk; last done.
-      injection Hlk as <-. split; [exact Hauth | exact Hall].
+      injection Hlk as <-.
+      have Hi : i = length log by lia.
+      split; [ apply elem_of_app; right; rewrite Hi; apply elem_of_list_singleton; done | exact Hall ].
   - rewrite length_app /=. lia.
   - move => k Hk. rewrite (log_byte_app_le _ _ _ _ _ Hlo). exact (Hfl k Hk).
 Qed.
 
 (* the mint: at a whole-window LATEST write [t], the floor is [t] and
    nothing is above it yet *)
-Lemma rel_ok1_of_latest img log base n j (t : nat) (f : nat -> bv 8) (X : agent) :
+Lemma rel_ok1_of_latest img log base n j (t : nat) (f : nat -> bv 8) :
   (j < n)%nat ->
   (forall k, (k < n)%nat -> latest img log (pa_add base k) t (f k)) ->
   (forall k, (k < n)%nat -> is_Some (img !! pa_add base k)) ->
-  rel_ok1 img log (pa_add base j) (TsRel base n j X t).
+  rel_ok1 img log (pa_add base j) (TsRel base n j t []).
 Proof.
   move => Hj Hlat Hcov.
   have Hlen : (t <= length log)%nat.
   { have [Hb _] := Hlat j Hj. exact (log_byte_some_le _ _ _ _ _ Hb). }
-  split_and!; cbn [tr_base tr_n tr_j tr_auth tr_lo].
+  split_and!; cbn [tr_base tr_n tr_j tr_lo tr_hist].
   - done.
   - exact Hj.
   - move => i m Hge Hlk Hs. exfalso.
@@ -2149,11 +2153,11 @@ Section rel_read.
   Variable log : list pwmsg.
   Variable base : Arch.pa.
   Variable n : nat.
-  Variable X : agent.
   Variable lo : nat.
+  Variable hist : list nat.
   Hypothesis Hn : (0 < n)%nat.
   Hypothesis Hcov :
-    forall j, (j < n)%nat -> rel_ok1 img log (pa_add base j) (TsRel base n j X lo).
+    forall j, (j < n)%nat -> rel_ok1 img log (pa_add base j) (TsRel base n j lo hist).
 
   Lemma rel_assemble_win_ok : win_ok_fl img log base n lo.
   Proof.
@@ -2189,7 +2193,7 @@ Section rel_read.
       /\ (forall j, (j < n)%nat ->
             tso_read img log h tv (pa_add base j) = log_byte img log T (pa_add base j))
       /\ (forall j, (j < n)%nat -> is_Some (log_byte img log T (pa_add base j)))
-      /\ (T = lo \/ exists i m, T = S i /\ log !! i = Some m /\ pm_tid m = X).
+      /\ (T = lo \/ (T ∈ hist /\ exists i m, T = S i /\ log !! i = Some m)).
   Proof.
     move => Hfv.
     have [_ [_ [_ [_ [Hlolen Hfl]]]]] := Hcov 0%nat Hn.
@@ -2207,11 +2211,12 @@ Section rel_read.
     - case: (decide (T = lo)) => [-> | Hne]; [by left | right].
       have Hgt : (lo < T)%nat by lia.
       destruct T as [|i]; [lia|].
-      exists i. move: HT0. rewrite /log_byte.
+      move: HT0. rewrite /log_byte.
       case El : (log !! i) => [m|]; last by move => [? ?].
-      move => HT0. exists m. split_and!; [done | done |].
+      move => HT0.
       have [_ [_ [H1 _]]] := Hcov 0%nat Hn.
-      by have [Hauth _] := H1 i m Hgt El HT0.
+      have [Hin _] := H1 i m Hgt El HT0.
+      split; [exact Hin |]. exists i, m. by split.
   Qed.
 End rel_read.
 
