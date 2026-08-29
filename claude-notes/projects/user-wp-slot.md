@@ -83,7 +83,18 @@ lazy image at both ends; S4 gave the park channel a keyed slot minted as
 the generic family; S5 switched the loop, `wp_userret_user` and
 `wp_userret_closed`, and restored `UserretClosed`'s `UEXEC_GEN` argument.
 
-**IN FLIGHT WHEN THIS WAS WRITTEN: stage S6, the deletions sweep.**  If
+**S6 LANDED — MILESTONE J IS COMPLETE** (net −604 lines; audit at the
+sanctioned 13).  The old generic channel is gone from the residue, the
+park rows, the accessors, kfork and `UexecSlot`'s §3-§4; `uexec_wp`,
+`UEXEC_GEN`, `UexecSlot`'s key vocabulary and the `WpUmode*` engine stay,
+as intended.  ONE SMALL DEBT, deliberately not taken in that lane so the
+pushed tree would stay byte-identical to the gated one: five stale prose
+references to the deleted `userret_to_user_state` should say
+`userret_to_user_state_ptm` — `SpecUser.v:28`, `SpecUsertrap.v:137`,
+`UserretUser.v:15`, `SpecUservec.v:337`, `SpecUserret.v:9`.  Comment-only;
+fold into the next pass that builds anyway.
+
+**[historical] IN FLIGHT WHEN THIS WAS WRITTEN: stage S6, the deletions sweep.**  If
 `git status` shows uncommitted edits under `iris/`, they are S6's and are
 UNGATED.  S6 is PURE SUBTRACTION — the old channel is threaded everywhere
 but nobody reads it since S5.  Its worklist, in outside-in order:
