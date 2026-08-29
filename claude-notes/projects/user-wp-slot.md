@@ -570,6 +570,72 @@ S1-S3, S5, S6, S6b, S7, S9 are in; S8 is partial.  What a successor needs:
   hand on the LITERAL record, so yield's reacquisition needed no new
   fact.  `user_trap_frame_at` is now what `wp_uservec_pt` takes.
 
+## §4c MILESTONE J, planned 2026-08-29 — three refutations of §4/§4a's sketch
+
+Planned against the post-J1a tree.  The plan REFUTES three things the
+earlier sketch (and the coordinator) assumed; the refutations are the
+durable part.
+
+- **(R-a) THE RESIDUE MUST NOT CARRY THE KEYED SLOT.**  `uslot (uvis_of U)`
+  as `ut_own`'s conjunct is unsound-by-construction: the residue's index
+  MOVES INSIDE the round (copyout moves `us_M`, the prologue moves the epc
+  word, `sysc_ret_tail` inserts a0), and `ut_own_priv`'s closer is
+  `∀ U', … -∗ ut_own Rsys N U'`, which RETAINS the conjunct only because
+  it is index-free.  Keyed, all 22 syscall arms plus vmfault would owe
+  `uslot (uvis_of U')` from `uslot (uvis_of U)` — unprovable, and the only
+  thing that may move a slot across a round is `uexec_ret`'s own arms,
+  which the LOOP holds.  So: DELETE the slot conjunct from
+  `ut_own`/`ut_own_nopt` and have the loop FRAME `uexec_ret sc W` across
+  `wp_uservec_pt`.  Sound because `uslot`/`uexec_ret` are hart-free
+  (`uslot_F` binds `h : CpuId` itself).  This kills `Rut_hole`,
+  `usertrap_res_uwp_acc` and `usertrap_res_run_open` outright.  GATED ON
+  K8 below — probe it before building anything on it.
+- **(R-b) THE PARK CHANNEL'S SLOT ROW CANNOT BE KEYED at the parked key.**
+  The design's "a `pv_tf` equation beside its `pv_fdg` one" fails because
+  `ProofForkret`'s BOOT arm runs `kexec("/init")` BETWEEN the park and the
+  resume, applying the closer at the POST-EXEC record — a key captured at
+  userinit's park is stale by then.  So the captured row is the GENERIC
+  FAMILY `∀ W : uvis, uslot W`, instantiated by the closer at
+  `uvis_of U'`.  A keyed row becomes possible only once forkret's boot arm
+  mints its own.
+- **(R-c) THE LOOP NEEDS A MINT**, so `UserretClosed` regains its
+  `(UG : UEXEC_GEN)` functor argument (undoing milestone G's "neither run
+  site names USER", for that functor only).  On the ecall arm at
+  `usys_num tf = USYS_exec`, `uround_ok`'s left disjunct says NOTHING —
+  by design, exec-success is a kernel mint — so the loop mints via
+  `cond_entry_slot`.  Fork's arm mints too at J (K2).
+- **(K1) THE EXIT ARM WOULD LEAVE THE LOOP STUCK**, and this is a real
+  gap, not a nicety: `uexec_ret` hands back `emp` on exit while
+  `usys_mem_ok USYS_exit …` is SATISFIABLE (exit falls into the quiet
+  row), so nothing refutes the arm.  Fix: `uround_ok`'s ecall arm gains
+  `usys_num tf ≠ USYS_exit`, inherited by both posts, and the
+  dispatcher's RETURNING post gains `⌜sysc_num ≠ 2⌝` — free at all 21
+  returning arms off `sysc_arm_goal`'s `Hnum`, and owed by nothing on the
+  exit arm, which takes the divergent conjunct.
+- Smaller gaps, each with a named fix: **K2** fork's `r ≠ 0` is nowhere
+  (mint at J; a real fork row is follow-on work); **K3**
+  `trapped_machine` does not pin `length (uvis_tf W)`, which
+  `tf_resume_gpr_bump` needs (add the conjunct; two discharge sites);
+  **K4** `ret_pc_add4`; **K5** four register-peel lemmas out of
+  `tf_resume_gpr0` (a7/a0/a1/x0 — only the sp one exists);
+  **K7** nothing states `uvmcopy` preserves flags leaf-for-leaf (not
+  needed at J, needed by a verified fork).
+- **(K8) THE GATING UNKNOWN**: no existing caller frames a LINEAR resource
+  across `wp_uservec_pt`'s `wp_next` park crossing.  R-a rests entirely on
+  it.  Stage S0 is a throwaway probe that carries one dummy linear
+  hypothesis across and re-closes the round; nothing else starts until it
+  answers.
+- The mapped/lazy seam (§4b) is CONFIRMED and CORRECTED: the `ptm` twin is
+  needed in BOTH directions (the entry image matters too — `usys_mem_ok`'s
+  left image is the entry one, and `ut_res_pt_close` re-parks at `∃ Mz`),
+  and `user_trap_frame_at` must gain a `user_ptm_inv` variant so the entry
+  frame names its image.  Then `uv_round` upgrades from `uround_vis_ok` to
+  the full `uround_ok`.
+- Staging: S0 probe (gating) → S1 vocabulary / S2 exit escape / S4 park+
+  kfork (mutually independent) → S3 lazy seam (needs S1) → S5 the loop
+  (needs S1-S4) → S6 the deletions.  `UexecSlot.v` KEEPS its §0-§2
+  vocabulary (every tier requires it); only §3-§4 are deleted.
+
 ## §5 Session-local artifacts (durable parts lifted into this file)
 
 The per-lane sweep log (tooling notes, per-file decisions, the raw
