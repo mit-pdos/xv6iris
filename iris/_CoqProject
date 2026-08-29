@@ -225,6 +225,7 @@ CommonWalk.v
 DecodeTotalU.v
 DecodeSetU.v
 UserExec.v
+UserPerm.v
 UsysMemOk.v
 UexecWp.v
 UexecSlot.v
@@ -253,6 +254,10 @@ UCodeSync.v
 UProofSync.v
 UmodeKernelTie.v
 USyncKernel.v
+UkStep.v
+UkLeaf.v
+UkStore.v
+UkSync.v
 UexecCond.v
 UCodeEcho.v
 USpecEcho.v

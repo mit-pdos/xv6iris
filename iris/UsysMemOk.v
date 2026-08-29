@@ -13,6 +13,16 @@
 (* SpecSyscall.v -- is the proof that the two agree, so the kernel can     *)
 (* discharge this one from the dispatcher's post at milestone J.           *)
 (*                                                                         *)
+(* THE PERMISSION MAP RIDES BESIDE THE IMAGE.  The key carries the        *)
+(* user-visible per-page permission view ([UserPerm.perm_of], the leaf   *)
+(* bits with the lazy pages filled in RW), so every row also says how    *)
+(* [π] moves: unchanged on the sixteen quiet entries, the four windows   *)
+(* and the exec failure arm; sbrk's row is [usys_sbrk_perm] -- unchanged,*)
+(* grown by a set of pages at {X := false; W := true} (the lazy fill of  *)
+(* the new live pages; [vmfault] later maps exactly that), or shrunk by  *)
+(* a set of pages.  The page sets are EXISTENTIAL for the same reason    *)
+(* sbrk's size is: the word list does not carry [pv_sz].                 *)
+(*                                                                         *)
 (* THE ROWS, one for one with [sysc_mem_ok]:                               *)
 (*   exec (7)   -- the FAILURE arm only: [r = -1] and the image is intact. *)
 (*                 A successful exec never returns to this WP at all: the  *)
@@ -41,6 +51,7 @@ Require Import RiscvLang.
 Require Import ProcGeom.     (* [tf_arg_idx] / [tf_epc_idx] / [TFWORDS] *)
 Require Import UserPtTree.   (* [umem_wr] / [umem_grow] / [umem_del] *)
 Require Import ProcPtOwn.    (* [pgroundup] on words *)
+Require Import UserPerm.     (* [uperm] / [uperm_rw] -- the permission view *)
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -79,32 +90,54 @@ Definition usys_sbrk_img (M M' : gmap Z (bv 8)) (szv' : mword 64) : Prop :=
   \/ exists np : nat,
        M' = umem_del M (uint (ProcPtOwn.pgroundup szv')) (4096 * np).
 
+(* how the permission map may move under sbrk: not at all, grown by some
+   pages at RW (the lazy fill of the new live pages), or shrunk by some
+   pages *)
+Definition usys_sbrk_perm (π π' : gmap (mword 27) uperm) : Prop :=
+  π' = π
+  \/ (exists P : gset (mword 27), π' = π ∪ gset_to_gmap uperm_rw P)
+  \/ (exists D : gset (mword 27), π' = base.filter (fun kv : mword 27 * uperm => kv.1 ∉ D) π).
+
 (* THE TABLE: syscall [n], entered with trapframe words [tf], returned
-   [r], may take the image from [M] to [M']. *)
+   [r], may take the image from [M] to [M'] and the permission map from
+   [π] to [π']. *)
 Definition usys_mem_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
-    (M M' : gmap Z (bv 8)) : Prop :=
+    (M : gmap Z (bv 8)) (π : gmap (mword 27) uperm)
+    (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm) : Prop :=
   if decide (n = USYS_exec) then
-    r = (mword_of_int (-1) : mword 64) /\ M' = M
+    r = (mword_of_int (-1) : mword 64) /\ M' = M /\ π' = π
   else if decide (n = USYS_sbrk) then
-    exists szv' : mword 64, usys_sbrk_img M M' szv'
+    (exists szv' : mword 64, usys_sbrk_img M M' szv') /\ usys_sbrk_perm π π'
   else match usys_window n with
-       | Some i => exists (d : nat) (bs : nat -> bv 8),
-                     M' = umem_wr M (tf !!! tf_arg_idx i) d bs
-       | None   => M' = M
+       | Some i => (exists (d : nat) (bs : nat -> bv 8),
+                      M' = umem_wr M (tf !!! tf_arg_idx i) d bs) /\ π' = π
+       | None   => M' = M /\ π' = π
        end.
 
 (* the sixteen quiet entries, by name: what a program calling one of them
    learns.  Stated for the row shape rather than per number so a program
    proof picks it up with one [apply] after [vm_compute]-ing the number. *)
 Lemma usys_mem_ok_quiet (n : Z) (tf : list (mword 64)) (r : mword 64)
-    (M M' : gmap Z (bv 8)) :
+    (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) :
   n <> USYS_exec -> n <> USYS_sbrk -> usys_window n = None ->
-  usys_mem_ok n tf r M M' -> M' = M.
+  usys_mem_ok n tf r M π M' π' -> M' = M /\ π' = π.
 Proof.
   intros Hne Hns Hw H. unfold usys_mem_ok in H.
   destruct (decide (n = USYS_exec)); [contradiction |].
   destruct (decide (n = USYS_sbrk)); [contradiction |].
   rewrite Hw in H. exact H.
+Qed.
+
+(* the permission map is untouched by every entry but sbrk *)
+Lemma usys_mem_ok_perm (n : Z) (tf : list (mword 64)) (r : mword 64)
+    (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) :
+  n <> USYS_sbrk ->
+  usys_mem_ok n tf r M π M' π' -> π' = π.
+Proof.
+  intros Hns H. unfold usys_mem_ok in H.
+  destruct (decide (n = USYS_exec)); [exact (proj2 (proj2 H)) |].
+  destruct (decide (n = USYS_sbrk)); [contradiction |].
+  destruct (usys_window n); exact (proj2 H).
 Qed.
 
 (* ===================================================================== *)

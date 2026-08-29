@@ -84,6 +84,7 @@ Require Import UexecWp.      (* [loop_ok] / [uexec_wp] *)
 Require Import UexecSlot.    (* [uvis] / [tf_w] / [tf_resume_gpr] / [tf_resume_pc] *)
 Require Import UsysMemOk.    (* [usys_mem_ok] / [bump_tf] / [uecall_scause] *)
 Require Import UmodeRegs.    (* [uv_regs] / [uv_amb] *)
+Require Import UserPerm.     (* [uperm] / [perm_of] *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -119,12 +120,15 @@ Definition tf_of (m : regfile) (pc : mword 64) : list (mword 64) :=
     m !!! Regidx (mword_of_int 29); m !!! Regidx (mword_of_int 30);
     m !!! Regidx (mword_of_int 31) ].
 
-Definition uvis_of_run (m : regfile) (pc : mword 64) (M : gmap Z (bv 8)) : uvis :=
-  MkUvis (tf_of m pc) M.
+Definition uvis_of_run (m : regfile) (pc : mword 64) (M : gmap Z (bv 8))
+    (π : gmap (mword 27) uperm) : uvis :=
+  MkUvis (tf_of m pc) M π.
 
-(* the resume key after a returning syscall *)
-Definition bump (W : uvis) (r : mword 64) (M' : gmap Z (bv 8)) : uvis :=
-  MkUvis (bump_tf (uvis_tf W) r) M'.
+(* the resume key after a returning syscall: the trapframe bumped, the
+   image and the permission map at whatever the syscall's row allows *)
+Definition bump (W : uvis) (r : mword 64) (M' : gmap Z (bv 8))
+    (π' : gmap (mword 27) uperm) : uvis :=
+  MkUvis (bump_tf (uvis_tf W) r) M' π'.
 
 Lemma tf_of_length (m : regfile) (pc : mword 64) : length (tf_of m pc) = TFWORDS.
 Proof. reflexivity. Qed.
@@ -279,9 +283,10 @@ Proof.
 Qed.
 
 (* ...and at the trap-out key: the program's own continuation state *)
-Lemma bump_run_gpr (m : regfile) (pc : mword 64) (M' : gmap Z (bv 8)) (r : mword 64) :
+Lemma bump_run_gpr (m : regfile) (pc : mword 64) (M M' : gmap Z (bv 8))
+    (π π' : gmap (mword 27) uperm) (r : mword 64) :
   m !!! Regidx (mword_of_int 0) = zero_reg ->
-  tf_resume_gpr0 (uvis_tf (bump (uvis_of_run m pc M') r M'))
+  tf_resume_gpr0 (uvis_tf (bump (uvis_of_run m pc M π) r M' π'))
   = <[Regidx (mword_of_int 10) := r]> m.
 Proof.
   intros Hx0. cbn [uvis_tf bump uvis_of_run]. unfold tf_resume_gpr0.
@@ -290,17 +295,28 @@ Proof.
   rewrite (tf_of_resume_gpr m pc Hx0). reflexivity.
 Qed.
 
-Lemma bump_run_pc (m : regfile) (pc : mword 64) (M' : gmap Z (bv 8)) (r : mword 64) :
+Lemma bump_run_pc (m : regfile) (pc : mword 64) (M M' : gmap Z (bv 8))
+    (π π' : gmap (mword 27) uperm) (r : mword 64) :
   is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
-  tf_resume_pc (uvis_tf (bump (uvis_of_run m pc M') r M')) = add_vec_int pc 4.
+  tf_resume_pc (uvis_tf (bump (uvis_of_run m pc M π) r M' π')) = add_vec_int pc 4.
 Proof.
   intros Hal. cbn [uvis_tf bump uvis_of_run].
   rewrite tf_resume_pc_bump; [ | rewrite tf_of_length; unfold tf_epc_idx, TFWORDS; lia ].
   rewrite tf_of_epc. unfold ret_pc. exact (update_bit0_zero_of_aligned2 _ Hal).
 Qed.
 
-Lemma bump_M (W : uvis) (r : mword 64) (M' : gmap Z (bv 8)) :
-  uvis_M (bump W r M') = M'.
+Lemma bump_M (W : uvis) (r : mword 64) (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm) :
+  uvis_M (bump W r M' π') = M'.
+Proof. reflexivity. Qed.
+
+Lemma bump_perm (W : uvis) (r : mword 64) (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm) :
+  uvis_perm (bump W r M' π') = π'.
+Proof. reflexivity. Qed.
+
+(* the trap-out key reads back its parts *)
+Lemma uvis_of_run_perm (m : regfile) (pc : mword 64) (M : gmap Z (bv 8))
+    (π : gmap (mword 27) uperm) :
+  uvis_perm (uvis_of_run m pc M π) = π.
 Proof. reflexivity. Qed.
 
 (* ===================================================================== *)
@@ -328,9 +344,10 @@ Section TrappedMachine.
 
   (* the old existential frame is a trapped machine at the key uservec
      saves -- the one direction the generic inhabitant needs *)
-  Lemma user_trap_frame_trapped (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) :
+  Lemma user_trap_frame_trapped (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+      (π : gmap (mword 27) uperm) :
     user_trap_frame C pt Rut -∗
-    ∃ (W : uvis) (sc stv : mword 64), trapped_machine C pt Rut sc stv W.
+    ∃ (W : uvis) (sc stv : mword 64), ⌜uvis_perm W = π⌝ ∗ trapped_machine C pt Rut sc stv W.
   Proof.
     rewrite /user_trap_frame.
     iIntros "H".
@@ -339,7 +356,8 @@ Section TrappedMachine.
     rewrite /user_pt_any. iDestruct "Hany" as (M) "Hpt".
     iDestruct (gpr_file_x0 g (mword_of_int 0) ltac:(vm_compute; reflexivity)
                  with "Hg") as "[%Hx0 Hg]".
-    iExists (uvis_of_run g sepc_v M), sc_v, stval_v.
+    iExists (uvis_of_run g sepc_v M π), sc_v, stval_v.
+    iSplitR; [ iPureIntro; reflexivity | ].
     rewrite /trapped_machine. cbn [uvis_tf uvis_M uvis_of_run].
     rewrite tf_of_epc (tf_of_resume_gpr g sepc_v Hx0).
     iExists ms_v.
@@ -351,6 +369,18 @@ End TrappedMachine.
 
 (* ===================================================================== *)
 (* SS3 THE CONTRACT, as one guarded fixpoint.                              *)
+(*                                                                         *)
+(* THE PERMISSION MAP in the contract: [uexec_ret]'s ecall arms carry the  *)
+(* returned slot at the bumped key with the image AND the permission map   *)
+(* re-bound under [usys_mem_ok] (which says how each row may move them);   *)
+(* the fork arms and the transparent arm keep both.  [ukont] is stated at  *)
+(* a permission map [π] -- the one the kernel computed for the table and   *)
+(* size it resumed the process under -- and the trapped key it receives   *)
+(* is pinned to it: user execution never changes the map, so this is what  *)
+(* lets milestone J re-apply the returned slot at the same table.  The     *)
+(* slot's guard binds the table AND a size, so that the projection is an   *)
+(* equation the loop meets by computation: [perm_of (ud_um pt) sz =        *)
+(* uvis_perm W].                                                           *)
 (* ===================================================================== *)
 Section UexecRet.
   Context `{!riscvGS Σ}.
@@ -364,56 +394,118 @@ Section UexecRet.
        if decide (n = USYS_exit) then emp
        else if decide (n = USYS_fork) then
          ((∀ r : mword 64, ⌜r <> (mword_of_int 0 : mword 64)⌝ -∗
-             X (bump W r (uvis_M W))) ∗
-          X (bump W (mword_of_int 0) (uvis_M W)))
-       else (∀ (r : mword 64) (M' : gmap Z (bv 8)),
-               ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) M'⌝ -∗ X (bump W r M'))
+             X (bump W r (uvis_M W) (uvis_perm W))) ∗
+          X (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W)))
+       else (∀ (r : mword 64) (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm),
+               ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) (uvis_perm W) M' π'⌝ -∗
+               X (bump W r M' π'))
      else X W)%I.
 
-  (* (B) the kernel obligation *)
+  (* (B) the kernel obligation: its later-free BODY, and the guarded form *)
+  Definition ukb_F (X : uvis -d> iPropO Σ) `{CID : CpuId}
+      (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (π : gmap (mword 27) uperm)
+      : iProp Σ :=
+    (∀ (W' : uvis) (sc stv : mword 64),
+       ⌜uvis_perm W' = π⌝ -∗
+       trapped_machine C pt Rut sc stv W' ∗ uexec_ret_F X sc W' -∗
+       WP (Loop : expr riscv_lang))%I.
+
   Definition ukont_F (X : uvis -d> iPropO Σ) `{CID : CpuId}
-      (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) : iProp Σ :=
-    (▷ (∀ (W' : uvis) (sc stv : mword 64),
-          trapped_machine C pt Rut sc stv W' ∗ uexec_ret_F X sc W' -∗
-          WP (Loop : expr riscv_lang)))%I.
+      (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (π : gmap (mword 27) uperm)
+      : iProp Σ :=
+    (▷ ukb_F X C pt Rut π)%I.
 
   (* (C) the bundle *)
   Definition uvb_F (X : uvis -d> iPropO Σ) `{CID : CpuId}
-      (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+      (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (π : gmap (mword 27) uperm)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) : iProp Σ :=
     (uv_amb ∗ uv_regs ∗ user_pt_inv pt M ∗ user_cfg C ∗
-     gpr_file m ∗ pc_is pc ∗ Rut pt ∗ ukont_F X C pt Rut)%I.
+     gpr_file m ∗ pc_is pc ∗ Rut pt ∗ ukont_F X C pt Rut π)%I.
 
   Definition uslot_F (X : uvis -d> iPropO Σ) : uvis -d> iPropO Σ :=
     fun W =>
-      (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ),
+      (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (sz : Z),
          ⌜loop_ok C pt⌝ -∗
-         uvb_F X (CID := h) C pt Rut (uvis_M W)
+         ⌜perm_of (ud_um pt) sz = uvis_perm W⌝ -∗
+         uvb_F X (CID := h) C pt Rut (uvis_perm W) (uvis_M W)
            (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)) -∗
          WP (Loop : expr riscv_lang))%I.
 
   Local Instance uslot_F_contractive : Contractive uslot_F.
   Proof.
-    rewrite /uslot_F /uvb_F /ukont_F /uexec_ret_F.
+    rewrite /uslot_F /uvb_F /ukont_F /ukb_F /uexec_ret_F.
     solve_contractive.
   Qed.
 
   Definition uslot : uvis -> iProp Σ := fixpoint uslot_F.
   Definition uexec_ret : mword 64 -> uvis -> iProp Σ := uexec_ret_F uslot.
+  Definition ukb `{CID : CpuId} (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+      (π : gmap (mword 27) uperm) : iProp Σ := ukb_F uslot C pt Rut π.
   Definition ukont `{CID : CpuId} (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
-      : iProp Σ := ukont_F uslot C pt Rut.
+      (π : gmap (mword 27) uperm) : iProp Σ := ukont_F uslot C pt Rut π.
   Definition uvb `{CID : CpuId} (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+      (π : gmap (mword 27) uperm)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) : iProp Σ :=
-    uvb_F uslot C pt Rut M m pc.
+    uvb_F uslot C pt Rut π M m pc.
+
+  (* THE U-MODE CONTINUATION at a natural state: what every U-mode leaf's
+     continuation is, and what a program function proves -- "safe from
+     (M, m, pc) under any table realizing the key's permission map".  The
+     slot is this at the key's state ([uslot_ukc]). *)
+  Definition ukc (π : gmap (mword 27) uperm) (M : gmap Z (bv 8))
+      (m : regfile) (pc : mword 64) : iProp Σ :=
+    (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (sz : Z),
+       ⌜loop_ok C pt⌝ -∗
+       ⌜perm_of (ud_um pt) sz = π⌝ -∗
+       uvb (CID := h) C pt Rut π M m pc -∗
+       WP (Loop : expr riscv_lang))%I.
 
   Lemma uslot_unfold (W : uvis) :
     uslot W ⊣⊢
-    (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ),
+    (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (sz : Z),
        ⌜loop_ok C pt⌝ -∗
-       uvb (CID := h) C pt Rut (uvis_M W)
+       ⌜perm_of (ud_um pt) sz = uvis_perm W⌝ -∗
+       uvb (CID := h) C pt Rut (uvis_perm W) (uvis_M W)
          (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)) -∗
        WP (Loop : expr riscv_lang)).
   Proof. exact (fixpoint_unfold uslot_F W). Qed.
+
+  Lemma uslot_ukc (W : uvis) :
+    uslot W ⊣⊢
+    ukc (uvis_perm W) (uvis_M W) (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)).
+  Proof. exact (uslot_unfold W). Qed.
+
+  (* the slot at the TRAP-OUT key is the continuation at the running state:
+     the round trip, under x0 = 0 (every [gpr_file] has it) and a 2-aligned
+     pc (every fetched pc has it) *)
+  Lemma uslot_run (m : regfile) (pc : mword 64) (M : gmap Z (bv 8))
+      (π : gmap (mword 27) uperm) :
+    m !!! Regidx (mword_of_int 0) = zero_reg ->
+    is_aligned_vaddr (Virtaddr pc) 2 = true ->
+    uslot (uvis_of_run m pc M π) ⊣⊢ ukc π M m pc.
+  Proof.
+    intros Hx0 Hal. rewrite uslot_ukc. cbn [uvis_tf uvis_M uvis_perm uvis_of_run].
+    rewrite (tf_of_resume_gpr m pc Hx0) (tf_of_resume_pc m pc Hal). reflexivity.
+  Qed.
+
+  (* ...and the slot at a BUMPED trap-out key is the continuation after the
+     syscall returned: a0 := r, pc + 4 *)
+  Lemma uslot_bump_run (m : regfile) (pc : mword 64) (M M' : gmap Z (bv 8))
+      (π π' : gmap (mword 27) uperm) (r : mword 64) :
+    m !!! Regidx (mword_of_int 0) = zero_reg ->
+    is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
+    uslot (bump (uvis_of_run m pc M π) r M' π')
+    ⊣⊢ ukc π' M' (<[Regidx (mword_of_int 10) := r]> m) (add_vec_int pc 4).
+  Proof.
+    intros Hx0 Hal. rewrite uslot_ukc.
+    rewrite (bump_run_gpr m pc M M' π π' r Hx0) (bump_run_pc m pc M M' π π' r Hal).
+    reflexivity.
+  Qed.
+
+  Lemma ukont_unfold `{CID : CpuId} (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+      (π : gmap (mword 27) uperm) :
+    ukont C pt Rut π ⊣⊢ ▷ ukb C pt Rut π.
+  Proof. reflexivity. Qed.
 
   (* the arms, read at the fixpoint *)
   Lemma uexec_ret_ecall (sc : mword 64) (W : uvis) :
@@ -423,10 +515,11 @@ Section UexecRet.
      if decide (n = USYS_exit) then emp
      else if decide (n = USYS_fork) then
        ((∀ r : mword 64, ⌜r <> (mword_of_int 0 : mword 64)⌝ -∗
-           uslot (bump W r (uvis_M W))) ∗
-        uslot (bump W (mword_of_int 0) (uvis_M W)))
-     else (∀ (r : mword 64) (M' : gmap Z (bv 8)),
-             ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) M'⌝ -∗ uslot (bump W r M'))).
+           uslot (bump W r (uvis_M W) (uvis_perm W))) ∗
+        uslot (bump W (mword_of_int 0) (uvis_M W) (uvis_perm W)))
+     else (∀ (r : mword 64) (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm),
+             ⌜usys_mem_ok n (uvis_tf W) r (uvis_M W) (uvis_perm W) M' π'⌝ -∗
+             uslot (bump W r M' π'))).
   Proof.
     intros ->. rewrite /uexec_ret /uexec_ret_F.
     destruct (decide (uecall_scause = uecall_scause)); [ reflexivity | contradiction ].
@@ -449,7 +542,7 @@ Section UexecRet.
     destruct (decide (usys_num (uvis_tf W) = USYS_exit)); [ done | ].
     destruct (decide (usys_num (uvis_tf W) = USYS_fork)).
     { iSplitR; [ iIntros (r _); iApply "H" | iApply "H" ]. }
-    iIntros (r M' _). iApply "H".
+    iIntros (r M' π' _). iApply "H".
   Qed.
 
 End UexecRet.
@@ -458,7 +551,9 @@ End UexecRet.
    wraps the bundle: sealed, like [uexec_wp] / [uexec_slot].  Consumers
    see the slot's body through [uslot_unfold] and the bundle's through
    [rewrite /uvb /uvb_F]; the seal does not travel, so a file manipulating
-   either must [Require Import UexecRet] directly. *)
+   either must [Require Import UexecRet] directly.  [ukc] stays
+   transparent: it is a plain ∀ over the sealed bundle, and a program proof
+   introduces it directly. *)
 Global Typeclasses Opaque uslot uvb.
 
 (* ===================================================================== *)
@@ -481,7 +576,7 @@ Section UexecRetGen.
     iIntros "#Hwp".
     iLöb as "IH" forall (W).
     rewrite uslot_unfold.
-    iIntros (h C pt Rut) "%Hlo Hb".
+    iIntros (h C pt Rut sz) "%Hlo %Hpm Hb".
     rewrite /uvb /uvb_F.
     iDestruct "Hb" as "(#Hamb & Hur & Hpt & Hcfg & Hg & Hpc & Hrut & Hk)".
     iDestruct (uv_regs_u_regs with "Hur Hg Hpc") as (ms_v sc_v stval_v sepc_v) "[%Hms Hregs]".
@@ -492,10 +587,11 @@ Section UexecRetGen.
               ms_v sc_v stval_v sepc_v (tf_resume_pc (uvis_tf W))
               with "[] [] Hhw Hmi Hwi Hregs Hpt Hcfg Hrut [Hk]");
       [ iPureIntro; exact Hlo | iPureIntro; exact Hms | ].
-    rewrite /ukont_F.
+    rewrite /ukont_F /ukb_F.
     iNext. iIntros "[Hframe _]".
-    iDestruct (user_trap_frame_trapped with "Hframe") as (W' sc stv) "Htm".
-    iApply ("Hk" $! W' sc stv with "[Htm]").
+    iDestruct (user_trap_frame_trapped C pt Rut (uvis_perm W) with "Hframe")
+      as (W' sc stv) "[%Hperm Htm]".
+    iApply ("Hk" $! W' sc stv with "[%] [Htm]"); [ exact Hperm | ].
     iFrame "Htm".
     iApply uexec_ret_of_all. iModIntro. iIntros (W''). iApply "IH".
   Qed.

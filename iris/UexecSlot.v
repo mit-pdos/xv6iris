@@ -62,6 +62,7 @@ Require Import UserExec.     (* [ucfg] / [user_cfg] / [user_mstatus_ok] /
                                 [user_trap_frame] *)
 Require Import SpecUserret.  (* [userret_gpr] -- the 31-insert register file *)
 Require Import ProcDefs.     (* [pprivate] / [ustate] / [pv_tf] *)
+Require Import UserPerm.     (* [uperm] / [perm_of] -- the permission view *)
 Require Import UexecWp.      (* [loop_ok] and the forall-state slot *)
 Local Open Scope Z_scope.
 Import Defs.
@@ -71,19 +72,27 @@ Import Defs.
 (*                                                                         *)
 (* [uvis_tf] is the FULL 36-word trapframe (kernel words 0/1/2/4 -- the     *)
 (* kernel satp/sp/trap/hartid -- are dead weight in the key; epc, word 3,   *)
-(* is user-visible); a later refinement may restrict it.  [uvis_M] is the   *)
+(* is user-visible); a later refinement may restrict it.  [uvis_M] is the  *)
 (* va-keyed image at the tier the slot's [user_pt_inv] premise names.      *)
+(* [uvis_perm] is the PER-PAGE PERMISSION VIEW (UserPerm.v): the process    *)
+(* observes permissions (a store to a read-only page faults), so they are   *)
+(* in the key -- as a PROJECTION of the kernel's table and size            *)
+(* ([perm_of]), never as stored state; the table's structure stays hidden.  *)
 (* Future user-visible state (the fd view, the pid) becomes a FIELD, never  *)
 (* an arity change here or at a consumer.                                  *)
 (* ===================================================================== *)
 Record uvis := MkUvis {
-  uvis_tf : list (mword 64);
-  uvis_M  : gmap Z (bv 8);
+  uvis_tf   : list (mword 64);
+  uvis_M    : gmap Z (bv 8);
+  uvis_perm : gmap (mword 27) uperm;
 }.
 
 (* the projection from the kernel's process state to the slot's key: drop
-   the descriptor (and everything else only the kernel reads) *)
-Definition uvis_of (U : ustate) : uvis := MkUvis (pv_tf (us_V U)) (us_M U).
+   the descriptor (and everything else only the kernel reads), keeping its
+   permission view *)
+Definition uvis_of (U : ustate) : uvis :=
+  MkUvis (pv_tf (us_V U)) (us_M U)
+         (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U)))).
 
 (* ===================================================================== *)
 (* SS1 The trapframe as a word reader.                                     *)
