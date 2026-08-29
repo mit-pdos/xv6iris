@@ -83,8 +83,22 @@ lock_word_amo_keep WRITTEN (the failing-branch preservation gate,
 Sg := fun a => lkw_set (tso_pa_off ea a)); the sweep's ONE casualty
 fixed (PipeInvDefs — the only file that unfolded locked
 definitionally; everything opaque untouched — §0.34′'s "opaque to
-the callers" verified by measurement).  **WpSconfLock IS GREEN — r36, 1101 .vo, first time since the
-baseline.**  Zero admit/Abort/Axiom across all eight touched files.
+the callers" verified by measurement).  **THE M4 UNIT IS CLOSED — r37, 1103 .vo: WpSconfLock AND ProofHolding
+GREEN, zero admits.  RED 11 = the baseline's list MINUS
+WpSconfLock/ProofHolding PLUS ProofAcquire/ProofRelease/ProofPipeclose
+— those three were NEVER COMPILED behind WpSconfLock (unreached since
+the project began); the compiler now reaches further than it ever has.
+ProofRelease is green except its cancel path.  A6.119 is the closing
+amendment; the successor's queue is TWO acquire-side items:
+(1) ProofRelease:587's cancel-path transport (retired SC shim
+ctx_dom_sc; the in-file comment names the replacement — the finisher
+morph against real AMO evidence; ruled, unbuilt); (2) ProofAcquire's
+pre-AMO floor (holding() precedes the AMO, so the floor arrives WITH
+the handle — A6.109 §3 isolated to one caller; all three
+crossing-upgrade inputs now exist incl. this unit's ctx_floor
+export).  Then the SpecAcquire threading, the ~160-file cone sweep,
+DMA+virtio, the λ-conversion, §0.27′, per the queue below.**
+Previous state for context: r36 —  Zero admit/Abort/Axiom across all eight touched files.
 The red set rotated exactly as designed: WpSconfLock out;
 ProofAcquire/ProofHolding/ProofRelease in — the direct consumers of
 the changed signatures (the widened lock_pay R post handing acquire
