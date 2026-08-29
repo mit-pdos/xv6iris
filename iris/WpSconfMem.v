@@ -1322,6 +1322,368 @@ Section WpSconfMem.
       iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
       iApply ("Hcont" $! v CID with "[%] Hcg' Hpc' [%] HT"); [exact Hs|exact HPv].
   Qed.
+
+  (* ==================================================================== *)
+  (* THE RELEASE READ (§0.41′, A6.126 §2 as corrected): [_au_exv] with     *)
+  (* the view the drain chose FORWARDED.  The client owes, at every view   *)
+  (* at or above the hart's, the word's totality and a predicate [Q v tvr] *)
+  (* of the word AND the view; the continuation learns [Q v V0] together   *)
+  (* with the receipt [hart_view_lb V0] for the SAME [V0] -- which is what *)
+  (* a racy read of a release cell needs to turn the position it settled  *)
+  (* on into its own floor.  The node is [HartSMem.Mobl_ram_exvv]; the     *)
+  (* engine sentences are [_au_exv]'s verbatim.                            *)
+  (* ==================================================================== *)
+  Lemma wp_load_s_sconf_au_rel {ktd : ktier} (width : Z) (c uns : bool) (pc : mword 64) (rd rs1 : mword 5)
+      `{!SrcOk rs1} (imm : mword 12)
+      (m : regfile) (n : nat) (ext : mword (8*width) -> mword 64)
+      (* NO [dqm] and NO value-indexed [Ψ]: the datum is a value-INDEPENDENT
+         resource [Res] and what the continuation learns about the word is a
+         PREDICATE.  A fraction, or a [Ψ] chosen before the step, would be
+         exactly the shape this leaf exists to avoid. *)
+      (Em : coPset) (b : bool) `{!KtierLe ktd kt}
+      (Q : mword (8*width) -> nat -> Prop) (Res T : iProp Σ) :
+    0 < width -> width <= 8 ->
+    (* the vmem level splits on a PAGE boundary now, which needs the width to
+       be one of the four the ISA allows there *)
+    vmem_width width ->
+    (width | 4096) ->
+    uint (to_bits 64 width) = width ->
+    (forall (addr : mword 64) (w : mword (8*width)) s,
+       dev_addr addr = false ->
+       (forall j : nat, (N.of_nat j < Z.to_N width)%N ->
+          s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+       exec (read_ram rv64d_types.Read_plain (Physaddr addr) width false) s
+         = Some ((w, default_meta), s)) ->
+    (* the vmem level hands back the value itself now, not the split
+       accumulator, so the caller's extension is just [extend_value] *)
+    (forall v : mword (8*width), extend_value uns v = ext v) ->
+    let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    uint rd <> 0 ->
+    rd_ok rd ->
+    (* [Em] is the caller's inner mask; the kernel-table accessor is opened
+       inside the translation node's own mask now, so this premise is what a
+       supplier already proves by [solve_ndisj] and nothing here needs. *)
+    ↑kptN ⊆ Em ->
+    (* THE LOAD OBLIGATION, AS A PREMISE -- AND THE [∃ v] IS INSIDE THE
+       [∀ tvr], which is the whole difference from [_dat].  A racy cell's
+       reader cannot name the word: what it can name is a predicate the word
+       satisfies at EVERY view the machine's drain may choose. *)
+    (forall (CIDw : CpuId) (img : bytemap) (sigma : mstate) (log : list pwmsg)
+            (V : agent -> nat) (ppn : mword 44),
+       (* the address facts the CLAIM yields inside the leaf, handed on so a
+          supplier that needs them (the ctx tower's does) has them.
+          A6.84 (archived residue, re-applied): the TIER PIN is one of
+          them -- without it the obligation cannot identify [pa_of ppn ea]
+          with [ea], which is the only bridge from the leaf's VA-keyed
+          claim to a [phys_ledger_*] cell.  The STORE form already has it;
+          the leaf has it in scope as [%Hid]. *)
+       (uint ea < 274877906944)%Z ->
+       (bv_unsigned (subrange_vec_dec ea 11 0) + width <= 4096)%Z ->
+       ktier_pin ktd ppn ea ->
+       (* A6.112: the no-migration pin, third and last of the family (A6.89
+          put it on [_dat], A6.109 on the store).  The racy READ needs it for
+          the same reason the acquire store did: [lkcpu_read_not_mine]'s
+          conclusion is about THIS hart's [struct cpu] pointer, and the
+          obligation's [CIDw] is ∀-bound.  Both existing callers ignore it. *)
+       (b = false \/ p = zero_reg -> (CIDw : CPU) = (CID : CPU)) ->
+       kmap_at (svpn_of ea) ppn KP_rw -∗
+       gen_heap_interp (hG := riscv_memGS) sigma.(mem) -∗
+       tso_interp_of riscv_eraGS img sigma.(mem) log V -∗
+       TsoCtx.own_context (CID := CIDw) TsoCtx.cur_ctx -∗
+       Res -∗
+       ⌜forall tvr : nat, (V (hart_agent (@cpu_id CIDw)) <= tvr)%nat ->
+          (exists v : mword (8*width),
+             tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+               (pa_of ppn ea) (Z.to_N width) v)
+          /\ (forall v : mword (8*width),
+                tso_read_bytes img log (hart_agent (@cpu_id CIDw)) tvr
+                  (pa_of ppn ea) (Z.to_N width) v -> Q v tvr)⌝) ->
+    sie_cap_gpr kt m n b p -∗
+    pc_is pc -∗
+    instr pc c (LOAD (imm, Regidx rs1, Regidx rd, uns, width)) -∗
+    wordw_claim (KTR := ktd) width ea -∗
+    (|={⊤ ∖ ↑minstretN, Em}=> Res ∗ (Res ={Em, ⊤ ∖ ↑minstretN}=∗ T)) -∗
+    ( ∀ v : mword (8*width),
+      wp_next b p (fun (CID : CpuId) =>
+        sie_cap_gpr kt (<[Regidx rd := regval_into_reg (ext v)]> m) n b p -∗
+        pc_is (add_vec_int pc (if c then 2 else 4)) -∗
+        (∃ V0 : nat, TsoCtx.hart_view_lb (CID := CID) V0 ∗ ⌜Q v V0⌝) -∗ T -∗
+        WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hw0 Hw8 Hvw Hwdvd Huintw Hread_plain Hext ea Hrd Hrdok HkptEm Hload.
+    rdok_split Hrdok.
+    iIntros "Hcg Hpc #Hinstr #Hclaim HAU Hcont".
+    iDestruct "Hclaim" as "[%Hpalign Hcl2]".
+    iDestruct "Hcl2" as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid)".
+    assert (Halign : is_aligned_vaddr (Virtaddr ea) width = true) by exact Hpalign.
+    pose proof (off_bound_div ea width Hw0 Hwdvd Halign) as Hoff.
+    rewrite (uint_unsigned_n _) in Hoff.
+    assert (Hoff' : (bv_unsigned (subrange_vec_dec ea 11 0) + Z.of_nat (Z.to_nat width) <= 4096)%Z)
+      by (rewrite Z2Nat.id; [ exact Hoff | lia ]).
+    iApply (wp_instr_s_sconf m n b b pc c
+              (LOAD (imm, Regidx rs1, Regidx rd, uns, width))
+              (fun (_CIDx : CpuId) npc _ms' m' n' =>
+                 ∃ v : mword (8*width),
+                   ⌜npc = add_vec_int pc (if c then 2 else 4)⌝ ∗
+                   ⌜m' = <[Regidx rd := regval_into_reg (ext v)]> m⌝ ∗
+                   ⌜n' = n⌝ ∗ (∃ V0 : nat, TsoCtx.hart_view_lb (CID := _CIDx) V0 ∗ ⌜Q v V0⌝) ∗ T)%I
+              with "Hcg Hpc Hinstr [HAU Hcont]").
+    iNext.
+    rename CID into CID0.
+    iIntros (CID Hs). rewrite /sconf_step_obl. iSplitL "HAU".
+    - (* ---------------- THE INSTRUCTION ---------------- *)
+      iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
+      assert (Lpin_rs1 : tp_pin (CID := CID) m !!! Regidx rs1 = rget m rs1)
+        by exact (src_ok_rget_indep m rs1 CID CID0).
+      iDestruct (sconf_to_cells (CID := CID) with "Hsc") as (mst0 mdv0)
+        "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Htie & Hmie &
+          Hmdl & Hmenv)".
+      pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD &
+                          HMPP & HTVM).
+      (* THE SLOT STAYS FOLDED -- the pre-port shape; the frame comes out of
+         [WpIntrInv.sda_slot_acc] below, the one place the two translation
+         arms are told apart. *)
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & Hctx & #Htc & #Hwit)".
+      iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
+      iPoseProof "Hhw" as "#Hhwc".
+      iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+        "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS &
+          %HmisaC & %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 &
+          %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+      subst misa0.
+      (* ---- THE FRAME, OUT OF THE FOLDED SLOT.  [SD] is abstract here:
+             [SD] under the kernel table, the EMPTY set under Bare. ---- *)
+      iDestruct (sda_slot_acc (CID := CID) kt (DfracOwn 1) mst0 MENVCFG_S
+                   pmar0 eq_refl HSXL HMPRV (pma_all_ram Hpma_all)
+                   with "Htr Hms Hpriv Hmenv Hpma Hhtif Hmisa")
+        as (SD satp0 tlbv pcfg paddr)
+        "(%Hdisj & %Hsub & %Hsok & %Hpok & Htrobl & Hrw & Hro & HRes & Hclose)".
+      destruct Hpok as (HA & Hord & HX & HW & HR & Hcov).
+      iAssert (sr_swp_res (strans_regime (CID := CID))
+                 (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv))
+        with "[HRes]" as "HRes".
+      { rewrite -(sr_swp_res_agree (strans_regime (CID := CID))
+                    (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv)).
+        rewrite sda_rs_satp sda_rs_tlb. iExact "HRes". }
+      iDestruct "Hresv" as (rr) "Hfrag".
+      (* the tower's lookups, POSED: an [ltac:] in argument position runs
+         before the application's implicits are solved (durable-notes). *)
+      pose proof (sda_rs_mst mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv) as Lmst.
+      pose proof (sda_rs_menv mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv) as Lmenv.
+      pose proof (sda_rs_satp mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv) as Lsatp.
+      assert (Lmxr : eq_vec (_get_Mstatus_MXR (register_lookup mstatus
+                (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv))) ('b"0")
+              = true) by (rewrite Lmst; exact HMXR).
+      assert (Lpmm : pmm_mode_backwards (_get_MEnvcfg_PMM (register_lookup menvcfg
+                (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv)))
+              = PMM_Disabled) by (rewrite Lmenv; vm_compute; reflexivity).
+      assert (Lsxl : _get_Mstatus_SXL (register_lookup mstatus
+                (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv)) = 'b"10")
+              by (rewrite Lmst; exact HSXL).
+      assert (Lmd : satpMode_of_bits RV64 (_get_Satp64_Mode (Mk_Satp64
+                (register_lookup satp
+                   (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv))))
+              = Some (sr_swp_mode (strans_regime (CID := CID)) satp0))
+              by (rewrite Lsatp;
+                  exact (sr_swp_mode_ok (strans_regime (CID := CID)) satp0 Hsok)).
+      assert (Lep : effectivePrivilege (Load Data) (register_lookup mstatus
+                (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv)) Supervisor
+              = returnM Supervisor)
+              by (rewrite Lmst;
+                  exact (effectivePrivilege_mprv0 (Load Data) _ Supervisor HMPRV)).
+      change (execute (LOAD (imm, Regidx rs1, Regidx rd, uns, width)))
+        with (execute_LOAD imm (Regidx rs1) (Regidx rd) uns width).
+      assert (Hea : add_vec (tp_pin (CID := CID) m !!! Regidx rs1)
+                      (sign_extend' 64 imm) = ea)
+        by (rewrite Lpin_rs1; reflexivity).
+      (* A6.58: [Hctx] goes DOWN to the read node.  Even a plain LOAD is
+         paid from the running context's own bound now
+         ([wordw_pointsto_load_c]), so the token travels with the access
+         and comes back inside the leaf's payload; [sie_cap] is rebuilt
+         from it in the post exactly as before. *)
+      (* A6.64's FORTY-ARGUMENT ELABORATION HAZARD LIVES IN THIS
+         SENTENCE -- see [wp_load_s_sconf_au_dat] above for the full
+         history and the measurement.  The rule it leaves is the one the
+         next block obeys: keep the leaf's [Rr], the OBLIGATION argument
+         and the NODE argument spelled in agreement, and move the node
+         when the payload moves. *)
+      (* A6.63's THREE-SPELLINGS RULE, at the exv shape: the engine's [Rr]
+         is [fun bs => ⌜P bs⌝ ∗ Rex] and the node/obligation take [P] and
+         [Rex] SEPARATELY, so what must be rigid is [Rex] -- making [Rr]
+         itself rigid would stop the node's post from unifying with the
+         engine's slot. *)
+      set (Rex := (TsoCtx.own_context (CID := CID) TsoCtx.cur_ctx ∗ T)%I).
+      assert (HRex : Rex
+                = (TsoCtx.own_context (CID := CID) TsoCtx.cur_ctx ∗ T)%I)
+        by reflexivity.
+      clearbody Rex.
+      iApply (swp_mono (CID := CID)
+                with "[HPC HnPC Hmie Hmdl Hhalf Htie Hstk Harm Hclose] [-]").
+      2:{ (* A6.63' THE SPLIT EXPERIMENT (see the note above this proof).
+             [iPoseProof] elaborates the forty-argument application;
+             [iApply] then only has to unify an already-built term with
+             the goal.  [-time] bills the two sentences separately, which
+             is the one measurement that says which half is the cost. *)
+          iPoseProof (swp_execute_LOAD_ram_Sw_ex (CID := CID) width Hvw Hwdvd Huintw
+                    SD sda_Dro (sda_Df (DfracOwn 1))
+                    (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv)
+                    imm rs1 rd uns (tp_pin (CID := CID) m) (pa_of ppn ea)
+                    pmar0 pcfg paddr
+                    (fun bs => ((∃ tvn : nat,
+                                   TsoGhost.view_lb view_name loglen_name (hart_agent (@cpu_id CID)) tvn ∗
+                                   ⌜Q bs tvn⌝) ∗ Rex)%I)
+                    (Mobl_ram_exvv width (pa_of ppn ea) Q Rex)
+                    (sr_swp_res (strans_regime (CID := CID))) rr
+                    (sr_swp_mode (strans_regime (CID := CID)) satp0)
+                    Hdisj (sda_in_mst_D SD) (sda_in_priv_D SD) (sda_in_menv_D SD) (sda_in_satp_D SD)
+                    (sda_in_pma_D SD) (sda_in_pcfg_D SD) (sda_in_paddr_D SD) (sda_in_htif_D SD)
+                    (sda_rs_priv _ _ _ _ _ _ _) (sda_rs_htif _ _ _ _ _ _ _)
+                    (sda_rs_pma _ _ _ _ _ _ _) (sda_rs_pcfg _ _ _ _ _ _ _)
+                    (sda_rs_paddr _ _ _ _ _ _ _)
+                    Lmxr Lpmm Lsxl
+                    (hval_transform_effective_address_S_mode
+                       (SD ∪ sda_Dro) SD
+                       (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv)
+                       (add_vec (tp_pin (CID := CID) m !!! Regidx rs1)
+                          (sign_extend' 64 imm))
+                       (Load Data)
+                       (sr_swp_mode (strans_regime (CID := CID)) satp0)
+                       (sda_in_mst_D SD) (sda_in_priv_D SD) (sda_in_menv_D SD) (sda_in_satp_D SD)
+                       (sda_rs_priv _ _ _ _ _ _ _)
+                       Lep
+                       eq_refl eq_refl eq_refl
+                       Lmxr Lpmm Lsxl Lmd)
+                    (hval_translationMode_S_mode (SD ∪ sda_Dro) SD
+                       (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv)
+                       (sr_swp_mode (strans_regime (CID := CID)) satp0)
+                       (sda_in_mst_D SD) (sda_in_satp_D SD) Lsxl Lmd)
+                    Lep
+                    HA Hord HR Hcov (pma_all_ram Hpma_all) Hkd0
+                    ltac:(rewrite Hea; exact Halign)
+                    (pa_aligned_div ppn ea width Hw0 Hwdvd Halign)
+                    Hrd
+                    (swp_read_ram_node_w_exvv (CID := CID) width (pa_of ppn ea) Q Rex
+                       Hvw (addr_is_ram_not_dev _ Hkd0))
+                    ) as "Hleaf".
+          iApply ("Hleaf" with "Hcert Hfrag HRes Hfile Hrw Hro [Htrobl] [HAU Hctx]").
+          - (* the data translation *)
+            iIntros "Hfrag HRes Hrw Hro".
+            rewrite Hea.
+            (* already discharged at [SD] by the accessor -- this leaf
+               never learns which arm it is on *)
+            iApply ("Htrobl" $! ktd (Load Data) KP_rw ea ppn rr
+                      with "[%] [%] [%] [%] [%] Hwit Hk Hcert Hfrag HRes
+                      Hrw Hro").
+            + apply _.
+            + exact (or_intror (or_introl eq_refl)).
+            + exact I.
+            + exact Hcan.
+            + exact Hid.
+          - (* the RAM read node: the caller's atomic update, opened HERE.
+               A6.58: the node receives the era's log bundle and hands it
+               back UNCHANGED (a plain load moves no view, so [V] returns
+               as [V]), and the obligation is now the view-indexed family
+               [wordw_pointsto_load_c] pays. *)
+            iIntros (sigma img log tv V) "%Htv Hsi Htso".
+            iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
+            iMod (fupd_mask_subseteq (⊤ ∖ ↑minstretN)) as "Hb1"; [set_solver|].
+            iMod "HAU" as "[Hbw Hcl]".
+            (* A6.63'': the read obligation is at the FRESH CpuId too --
+               [wordw_pointsto_load_c] now concludes at [@cpu_id CID], and
+               the ambient spelling here would print identically while
+               failing to unify (tso-port.md §0.20′). *)
+            iAssert (⌜forall tvr : nat, (V (hart_agent (@cpu_id CID)) <= tvr)%nat ->
+                       (exists v : mword (8*width),
+                          tso_read_bytes img log (hart_agent (@cpu_id CID)) tvr
+                            (pa_of ppn ea) (Z.to_N width) v)
+                       /\ (forall v : mword (8*width),
+                             tso_read_bytes img log (hart_agent (@cpu_id CID)) tvr
+                               (pa_of ppn ea) (Z.to_N width) v -> Q v tvr)⌝)%I as %Hrb.
+            { iApply (Hload CID img sigma log V ppn Hcan Hoff Hid Hs
+                        with "Hk Hmem Htso Hctx Hbw"). }
+            iMod ("Hcl" with "Hbw") as "HT".
+            iMod "Hb1" as "_".
+            iMod (fupd_mask_subseteq ∅) as "Hb2"; [set_solver|].
+            iModIntro.
+            iSplitR.
+            { iPureIntro. intros tvr Hlo _. rewrite -Htv in Hlo.
+              exact (proj2 (Hrb tvr Hlo)). }
+            iSplitR.
+            { iPureIntro. intros tvr Hlo _. rewrite -Htv in Hlo.
+              exact (proj1 (Hrb tvr Hlo)). }
+            iNext. iMod "Hb2" as "_". iModIntro.
+            (* [Rex] is RIGID (clearbody), so the ∗-shape has to be given
+               back explicitly before the frame *)
+            rewrite HRex.
+            iFrame "Hreg Hmem Hdev Htso Hctx HT". }
+      (* the node has closed, so the payload goes back to its ∗-shape for
+         the post's [iDestruct] pattern.  [Rr] is a literal lambda here
+         (see the note above the [set]), so the application still has to be
+         beta-reduced before the pattern matches. *)
+      rewrite HRex. cbn beta.
+      (* ---- the post ---- *)
+      iIntros (e) "(-> & Hpost)".
+      iDestruct "Hpost" as (v) "(Hfile & Hland)".
+      iDestruct "Hland" as (rsf)
+        "(%Hshape & Hrw & Hro & HRes & Hany & HQv & [Hctx HT])".
+      iSplitR; [done|].
+      iAssert (∃ tv2 : type_of_register tlb,
+               hreg_frame (CID := CID)
+                 (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tv2) SD ∗
+               hreg_frame_ro (CID := CID) (sda_Df (DfracOwn 1))
+                 (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tv2) sda_Dro ∗
+               strans_res_at (CID := CID) satp0 tv2)%I
+      with "[Hrw Hro HRes]" as (tv2) "(Hrw & Hro & HRes)".
+      { destruct Hshape as [-> | (tvx & ->)].
+      - iExists tlbv. iFrame "Hrw Hro".
+        iEval (rewrite -(sr_swp_res_agree (strans_regime (CID := CID))
+                 (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv))
+               sda_rs_satp sda_rs_tlb) in "HRes". iExact "HRes".
+      - iExists tvx.
+        iDestruct (sda_rw_ext_D SD _ _ Hsub (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
+                     pcfg paddr tlbv tvx) with "Hrw") as "Hrw".
+        iDestruct (sda_ro_ext _ _ _ (sda_set_tlb mst0 MENVCFG_S satp0 pmar0
+                     pcfg paddr tlbv tvx) with "Hro") as "Hro".
+        iFrame "Hrw Hro".
+        iEval (rewrite -(sr_swp_res_agree (strans_regime (CID := CID))
+                 (register_set tlb tvx
+                    (sda_rs mst0 MENVCFG_S satp0 pmar0 pcfg paddr tlbv)))
+               register_lookup_set) in "HRes".
+        rewrite irrelevant_register_set; [| vm_compute; reflexivity].
+        rewrite sda_rs_satp. iExact "HRes". }
+      (* the slot re-seals itself, at the landing tlb value *)
+      iDestruct ("Hclose" $! tv2 with "Hrw Hro HRes") as
+        "(Htr & Hms & Hpriv & Hmenv)".
+      iExists (add_vec_int pc (if c then 2 else 4)), mst0,
+            (<[Regidx rd := regval_into_reg (ext v)]> m), n.
+      iFrame "HPC HnPC Hany".
+      iSplitL "Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv".
+      { rewrite /sconf_at_priv. iExists mdv0.
+      iFrame "Hhw Hminv Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv".
+      iPureIntro. split; assumption. }
+      assert (Hsp : m !!! Regidx csp_rs1
+                  = <[Regidx rd := regval_into_reg (ext v)]> m
+                      !!! Regidx csp_rs1)
+      by (symmetry; apply upd_ne; congruence).
+      iSplitL "Htr Hstk Harm Hctx".
+      { rewrite /sie_cap -Hsp. iFrame "Hstk Htr Harm Hctx Htc Hwit". }
+      iSplitL "Hfile".
+      { rewrite (Hext v).
+      iEval (rewrite (tp_pin_upd m rd (regval_into_reg (ext v))
+                        (rd_ok_tp _ Hrdok))) in "Hfile".
+      iExact "Hfile". }
+      iExists v. iFrame "HT".
+      iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+      iDestruct "HQv" as (tvn) "[#Hrcpt %HQ]".
+      iExists tvn. iSplitR; [| by iPureIntro].
+      rewrite TsoCtx.hart_view_lb_unseal /TsoCtx.hart_view_lb_def. iExact "Hrcpt".
+    - (* ---------------- THE CONTINUATION ---------------- *)
+      iIntros (npc ms' m' n') "Hcg' Hpc' Hpay".
+      iDestruct "Hpay" as (v) "(-> & -> & -> & HQv & HT)".
+      iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
+      iApply ("Hcont" $! v CID with "[%] Hcg' Hpc' HQv HT"); [exact Hs].
+  Qed.
   (* The non-atomic instance: the caller owns the cell throughout.  Generic
      in BOTH the width and the extension flag [uns], so every RAM load leaf
      in the tree (lb/lbu/lh/lhu/lw/lwu/ld and the RVC twins) is one line off
