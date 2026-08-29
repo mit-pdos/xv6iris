@@ -843,7 +843,17 @@ supplies `uargv_ok` at the mint.
   so nothing is pinned about the argv array's contents, the strings, or
   even THE PROGRAM TEXT.  `entry` is a ∀-bound parameter tied to nothing
   (not to the ELF's entry, not to a symbol).  `SpecKexec.v`'s own header
-  calls this out and defers it as "win-2 work".  The nul-termination
+  calls this out and defers it as "win-2 work".
+  **OWNER, 2026-08-29: the fs-syscall-specs lane is materialising
+  `kexec_ok` — do NOT strengthen it from this side.**  And echo does not
+  have to wait for it: `cond_entry_slot` CASE-SPLITS on a decidable gate
+  rather than computing, so if `uk_args` is decidable on the key (it is —
+  finitely many pointers into a finite image) echo's gate decides it at
+  the mint and falls back to the generic WP otherwise.  A materialised
+  `kexec_ok` is what lets us PROVE exec's actual output satisfies that
+  gate, i.e. what puts a verified echo in the whole-system theorem; it is
+  not needed to build the machinery.
+  The nul-termination
   facts that do exist are PREMISES about the kernel-side `char **argv`
   kexec was handed, not conclusions about user memory.  So `uk_args` is a
   PREMISE for now, exactly as `uargs` is today, and supplying it at the
