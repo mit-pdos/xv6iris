@@ -15944,3 +15944,59 @@ body are not addressable by that name (the node proofs are inlined
 rather than an Ltac); `TsoGhost.view_lb` must be spelled qualified in
 `HartSMem`.  Remaining for the used index: the virtio side (§4 items
 3–6).
+
+### §5. The virtio side, MEASURED (what §4 items 3–6 are, to the line; r50)
+
+* **The completion is one message today.** `WpUart.v:934` runs
+  `virtio_proto_step` (old cells of `w` out, new cells back) and `:1029`
+  appends `PWMsg w disk_agent` through `ledger_store_ok`, with
+  `w = vslot_writes c ui dk sl` (`VirtioQueue.v:681`: the status byte, the
+  used element and the used index via `virtio_used_writes`, and for IN the
+  data).  Split it: first the data/status/element part through
+  `ledger_store_ok` (position `p`), then the used-index word through
+  `ledger_store_rel_ok disk_agent (used_idx_pa c) 2 … lo hist` (position
+  `p+1`, the release write).  Same `vstep`/`Htvtop` bookkeeping twice.
+* **The lease holds the used-index word as a release window.**  As the avail
+  word (A6.124): a second hole `used_idx_dom` in `dma_own_x` and a conjunct
+  `[∗ list] j ∈ seq 0 2, phys_ledger_rpay (pa_add (used_idx_pa c) j) 1
+  (nth_byte (wrap16 nc) j) t_j (TsRel (used_idx_pa c) 2 j lo hist)`, minted at
+  `virtio_disk_init` from the zeroed word (`ledger_rpay_mint`, floor = the
+  zeroing store's position, `hist = []`); `virtio_proto_step` hands the two
+  cells out and takes them back with `hist ++ [p+1]` and the fragment
+  `ledger_msg_at (p+1) (used-index message)`.  `vproto` gains nothing: the
+  history rides in the arm; the invariant keeps `∃ hist, ⌜length hist = vp_nc⌝
+  ∗ [∗ list] k ↦ q ∈ hist, ledger_msg_at q (PWMsg (virtio_used_writes … (wrap16
+  (S k)) …) disk_agent)` (the fragments from the gate) and `⌜StronglySorted lt
+  hist⌝`.  The pure row `read_bytes dma (used_idx_pa) 2 = Some (wrap16 nc)`
+  is unchanged.
+* **Done slots keep their positions.**  `slot_done_res` (`VirtioProto.v:1925`)
+  is pure about `dma`; the RESOURCE is the sealed `dma_own_x`.  Expose the
+  completion's cells instead: a third hole for the done slots' footprints
+  with `[∗ map] a ↦ b ∈ done_cells p, phys_ledger_at a 1 b (pos p)` -- what
+  `ledger_store_ok` returns already, unsealed -- so that the handler and the
+  woken publisher can compare the stamp against a floor.
+* **The floor beside `disk_done_lb`.**  `DiskInv.disk_res` row
+  `disk_done_lb γ nr` (`DiskInv.v:434`) gains `∃ q, ⌜q = hist !! (nr−1)⌝-shaped
+  knowledge as `lk_floor cur_ctx q` (the handler that advanced to `nr` had
+  settled at a position ≥ the used-index message of completion `nr` and
+  raised its bound to it); transported by `lk_floor_morph`.
+* **The handler's read** (`ProofVirtioDiskIntr.wp_vt_lhu_used_idx`, `:1106`,
+  used at `:1491`/`:2673`): through `wp_load_s_sconf_au_rel` with
+  `Q v V0 := ∃ k, v = wrap16 k ∧ nr ≤ k ≤ nc ∧ pos(k) ≤ V0`, proved from
+  `ledger_read_rel_ok` (the settled `T ≤ V0`, `T = lo ∨ T ∈ hist`), the
+  fragments (the word at `T` is `wrap16 (index of T in hist)`), the floor
+  (`T ≥ pos nr` by visibility, hence `k ≥ nr`), and `vdrwd_window_le2`'s
+  `np − nr ≤ 2` for `wrap16`'s injectivity on the span (§2b).  The
+  continuation: `ctx_bound_raise` to `V0`, which is ≥ `pos k` ≥ the data
+  message of every completion ≤ k; the status byte / used element then read
+  exactly through `ledger_read_at_vis_ok` on the exposed `_at` cells.
+* **RwF's two hand-backs**: `parked_res` carries the completion's `_at` cells
+  (status, IN data) and the floor; a one-line TsoCtx lemma
+  `ctx_phys_pointsto_of_at_floor : phys_ledger_at a 1 v t -∗ ctx_floor ξ t -∗
+  ctx_phys_pointsto ξ a 1 v` (the left arm of `ctx_phys_pointsto_def`, the
+  inverse of `forget_floor`'s clean case) turns them into ctx cells;
+  `vdrwf_plist_mem`/the status hand-back become that.
+
+Sized: VirtioProto ~400 lines (three holes, the history, the step's two
+appends), WpUart ~60, DiskInv ~30, ProofVirtioDiskIntr ~300, RwF ~60,
+TsoCtx ~15.  One full session; every brick it needs exists at r50.
