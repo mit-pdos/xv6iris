@@ -67,6 +67,65 @@ What a successor needs to know:
 - Milestone J now lands on a tree where the trap loop's own files already
   carry `CurCtx`; J's edits to them must preserve it (same union rule).
 
+## §0′ COORDINATOR CHECKPOINT — 2026-08-29, resume here if the session was cut off
+
+Written mid-flight, with a lane running.  If you are a successor: read
+this, then §4c (milestone J's plan and its refutations), then §0 below.
+TRUST THE GIT LOG over any checkbox in this file.
+
+**Pushed and green: `origin/main` at `61e7eb272`.**  Milestone J's stages
+S0-S5 are LANDED AND PUSHED.  The trap loop now runs the PER-PROCESS
+KEYED CONTRACT — `uslot`/`uexec_ret`/`ukont`/`uvb` — instead of the
+generic ∀-state `uexec_wp`.  In order: S0 proved the park crossing
+carries a linear resource; S1 built `UexecApply.v`'s key congruences;
+S2 closed the exit arm (a real soundness gap); S3 made the round name its
+lazy image at both ends; S4 gave the park channel a keyed slot minted as
+the generic family; S5 switched the loop, `wp_userret_user` and
+`wp_userret_closed`, and restored `UserretClosed`'s `UEXEC_GEN` argument.
+
+**IN FLIGHT WHEN THIS WAS WRITTEN: stage S6, the deletions sweep.**  If
+`git status` shows uncommitted edits under `iris/`, they are S6's and are
+UNGATED.  S6 is PURE SUBTRACTION — the old channel is threaded everywhere
+but nobody reads it since S5.  Its worklist, in outside-in order:
+(1) the `uexec_wp` conjunct out of `UsertrapRes.ut_own` / `ut_own_nopt`
+and every closer that threads it, including the `ut_own_rebuild` call in
+`ProofUsertrapSys.v` that S5 could not reach; (2) the three mirrored park
+rows (`ut_park_intro_body`, `ParkCap.park_chan`, `ut_res_bare_park`);
+(3) `usertrap_res_uwp_acc` and `usertrap_res_run_open` with their
+concretes and ~6 re-export rows each; (4) the `uexec_wp` premises on
+`park_token_park` / `wp_kfork_sconf_body` / `kfork_arm3` / `kfk_b5` and
+the two now-redundant `uexec_wp` mints; (5) `UexecSlot.v` §3-§4
+(`uexec_slot`, `uexec_wp_slot`) — **KEEP the file and its §0-§2**, every
+tier requires `uvis`/`uvis_of`/`tf_w`/`tf_resume_*`; (6) the caller-less
+`UserKernelBridge.userret_to_user_state` / `user_trap_frame_open`;
+(7) `uround_vis_ok` / `uround_vis_of_ok`; (8) dead `UexecWp` imports.
+If it is red or half-done, finish or revert PER ITEM — each is
+independent, and `grep` establishes deadness before any removal.
+**`uexec_wp`, `UexecWp.v`, `UEXEC_GEN`, `ProofUexecWp`, `UmodeCap.uv_cap`
+and the whole `WpUmode*` engine STAY** (the generic theorem's form,
+`cond_entry_slot`'s input, and sh/echo/init's engine).
+
+**Owner rulings from this session, all final.**  The key's image is
+ALWAYS the lazy view — the process cannot tell lazy from allocated, so
+the abstraction must not distinguish them (§3 item 3).  sbrk's row must
+SAY WHAT HAPPENS: zeroed pages up, or cut down (§3 item 3, S8b).  The
+U-mode CONTEXT question (`CurCtx`, whether `uvb` should own one) is a
+SEPARATE, LATER effort — do not fold it in, do not convert this tier
+toward context ownership in passing (`../design/uk-engine.md`).
+Page-table and VM state is OUT OF SCOPE for fs-syscall-specs, so those
+contracts' VM clauses are ours; their DATA half is not, and stays
+existential.  Gate economy: trust a lane's gate when it names its logs;
+after a rebase a GREEN BUILD SUFFICES — do not re-run `audit-only`, a
+rebase introduces no assumptions.
+
+**What remains after J.**  (a) A verified `sync` actually running in the
+whole-system theorem — J removed the obstacle; the exec-site forcing
+function (§3 item 5) is what wires it.  (b) Fork's real row: nothing
+states `r ≠ 0`, so J MINTS on the fork arm (K2); a verified fork needs
+the row plus `uvmcopy`'s leaf-for-leaf flag preservation (K7), which
+nothing states.  (c) `sh`/`echo`/`init` still run on the old engine;
+porting them or back-porting the design is an open owner decision.
+
 ## §0 Operating rules (hard-won; violating these cost real time)
 
 - Builds run on the GCP VM (`claude-notes/remote-build-gcp.md`) with
