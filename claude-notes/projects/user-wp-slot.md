@@ -67,75 +67,97 @@ What a successor needs to know:
 - Milestone J now lands on a tree where the trap loop's own files already
   carry `CurCtx`; J's edits to them must preserve it (same union rule).
 
-## §0′ COORDINATOR CHECKPOINT — 2026-08-29, resume here if the session was cut off
+## §0′ COORDINATOR CHECKPOINT — 2026-08-29, resume here
 
-Written mid-flight, with a lane running.  If you are a successor: read
-this, then §4c (milestone J's plan and its refutations), then §0 below.
+Everything below is PUSHED AND GREEN on `origin/main` (`37d7a8781` at the
+time of writing).  Working tree clean, nothing in flight, no lane running.
 TRUST THE GIT LOG over any checkbox in this file.
 
-**Pushed and green: `origin/main` at `61e7eb272`.**  Milestone J's stages
-S0-S5 are LANDED AND PUSHED.  The trap loop now runs the PER-PROCESS
-KEYED CONTRACT — `uslot`/`uexec_ret`/`ukont`/`uvb` — instead of the
-generic ∀-state `uexec_wp`.  In order: S0 proved the park crossing
-carries a linear resource; S1 built `UexecApply.v`'s key congruences;
-S2 closed the exit arm (a real soundness gap); S3 made the round name its
-lazy image at both ends; S4 gave the park channel a keyed slot minted as
-the generic family; S5 switched the loop, `wp_userret_user` and
-`wp_userret_closed`, and restored `UserretClosed`'s `UEXEC_GEN` argument.
+**MILESTONE J IS COMPLETE.**  The WP that `userret` runs is now a
+per-process resource keyed on what the process can observe (trapframe
+words, the LAZY memory image, a per-page permission map projected from
+the table with the table's structure hidden).  The trap round states its
+real relation between the entry key and the resume key for EVERY cause
+and EVERY syscall — `ut_round` is a bare `uround_ok` with no escape
+disjunct.  A verified program's slot travels the park channel.  The old
+generic channel is deleted; `uexec_wp` survives only as the generic
+safety theorem's form and as `cond_entry_slot`'s input.  The stage
+records are §4c (the plan and its three refutations) and §4b (J1a).
 
-**S6 LANDED — MILESTONE J IS COMPLETE** (net −604 lines; audit at the
-sanctioned 13).  The old generic channel is gone from the residue, the
-park rows, the accessors, kfork and `UexecSlot`'s §3-§4; `uexec_wp`,
-`UEXEC_GEN`, `UexecSlot`'s key vocabulary and the `WpUmode*` engine stay,
-as intended.  ONE SMALL DEBT, deliberately not taken in that lane so the
-pushed tree would stay byte-identical to the gated one: five stale prose
+**THE CURRENT EFFORT IS `echo`** — §6 has the full plan, the survey
+findings and the two corrections to the original framing.  State:
+
+- **DONE**: `UkLoad.v` + `UkBranch.v` (the engine had no load or branch
+  leaf — `sync` needed neither and `echo` is nothing but loads and
+  branches), and `UkAbi.v` (the GENERIC entry conditions on the key:
+  `uk_rpage`/`uk_rd`/`uk_args`/`uk_argv_null`, `Decision` throughout,
+  with readers that hand back exactly a load leaf's premise list in
+  order).
+- **NEXT, and it is the bulk of the work**: echo's own function walks on
+  the new engine — a `UkEcho.v` in the shape of `UkSync.v`.  Four pieces,
+  bottom-up as `UkSync` does them: the `write` stub (a near-copy of
+  `wp_ksync_sync_stub` — `SYS_write` is 16 and falls in `usys_mem_ok`'s
+  QUIET row exactly as `SYS_sync` 22 does, so the difference is the
+  immediate and the addresses), the `exit` stub, `strlen` (a scan loop —
+  `UkAbi.uk_args_str_byte` gives it the dichotomy it needs, the byte is
+  NUL iff the index is the length), and `main`/`start`.  Then echo's
+  entry gate and its slot constructor, the analogues of
+  `UexecCond.sync_gate` and `USyncKernel.sync_uexec_slot`.
+- **SIZING, so nobody is surprised**: `UkSync.v` is 853 lines for a
+  SEVENTEEN-instruction program (~25-30 lines per instruction; its §1
+  key-level lemmas ≈ 330 of those are generic and already reusable).
+  `UCodeEcho.v` carries 73 decode lemmas.  The old-tier echo proof
+  (`UProofEcho.v` + `UProofEchoA.v` + `USpecEcho.v`) is the source to
+  port from — read it for the function walks and the `strlen` loop's
+  shape, but state everything on the key.
+- **WHAT ECHO CAN AND CANNOT CLAIM.**  Safety, from decidable key facts,
+  exactly as `sync` has.  It CANNOT claim its output bytes are its argv
+  strings: the new contract has no place for it (`uexec_ret`'s ecall arm
+  is one PURE hypothesis, no iProp), the designed hook is the `Φ`
+  refinement in `design/user-wp-slot.md`, and the kernel half is blocked
+  independently at `SpecConsolewrite`'s deliberate loss (copyin's
+  destination is existential).  Do not conflate the two; do not
+  special-case the ∀ in a way that would close that door.
+
+**HAZARDS, all learned the hard way this session.**  `UkAbi`'s `Decision`s
+are `Defined` with `2^31` fuel — a gate must be CASE-SPLIT
+(`destruct (decide …)`) and never `vm_compute`d.  Never `simpl`/`cbn` on a
+goal mentioning a dumped literal (`SyncInstrs.sync_bytes`,
+`EchoInstrs.echo_bytes`).  Never let `reflexivity`/`f_equal`/an ssr
+`rewrite` meet the 31-insert `userret_gpr` tower with differing sides —
+enumerate and peel per index (three separate build rounds died on this).
+Seals come off HYPOTHESES only (`iEval (rewrite …) in "H"`).  Never
+`iFrame` a bundle containing `gpr_file`.  See `../optimization.md`.
+
+**OWNER RULINGS, all final.**  The key's image is ALWAYS the lazy view —
+the process cannot tell lazy from allocated, so the abstraction must not
+distinguish them.  sbrk's row says WHAT HAPPENS: zeroed pages up, or cut
+down.  The U-mode CONTEXT question (`CurCtx`; whether `uvb` should own
+one) is a SEPARATE, LATER effort — thread the ambient binder, claim
+nothing (`../design/uk-engine.md`).  Page-table and VM state is OUT OF
+SCOPE for fs-syscall-specs, so those contracts' VM clauses are ours; the
+DATA half is theirs and stays existential.  **`kexec_ok` is the
+fs-syscall-specs lane's to materialise — do not strengthen it from this
+side**; echo does not need it (its gate case-splits), and it is what will
+later let us PROVE exec's output satisfies that gate.
+
+**WHAT REMAINS BEYOND ECHO.**  The exec-site forcing function (§3 item 5)
+— now partly the fs lane's.  Fork's real row: nothing states `r ≠ 0`, so
+J MINTS on the fork arm; a verified fork also needs `uvmcopy`'s
+leaf-for-leaf flag preservation, which nothing states.  `sh`/`init` still
+run on the old capability engine.  And one comment debt: five stale prose
 references to the deleted `userret_to_user_state` should say
-`userret_to_user_state_ptm` — `SpecUser.v:28`, `SpecUsertrap.v:137`,
-`UserretUser.v:15`, `SpecUservec.v:337`, `SpecUserret.v:9`.  Comment-only;
-fold into the next pass that builds anyway.
+`userret_to_user_state_ptm` (`SpecUser.v:28`, `SpecUsertrap.v:137`,
+`UserretUser.v:15`, `SpecUservec.v:337`, `SpecUserret.v:9`) — fold into
+the next pass that builds anyway.
 
-**[historical] IN FLIGHT WHEN THIS WAS WRITTEN: stage S6, the deletions sweep.**  If
-`git status` shows uncommitted edits under `iris/`, they are S6's and are
-UNGATED.  S6 is PURE SUBTRACTION — the old channel is threaded everywhere
-but nobody reads it since S5.  Its worklist, in outside-in order:
-(1) the `uexec_wp` conjunct out of `UsertrapRes.ut_own` / `ut_own_nopt`
-and every closer that threads it, including the `ut_own_rebuild` call in
-`ProofUsertrapSys.v` that S5 could not reach; (2) the three mirrored park
-rows (`ut_park_intro_body`, `ParkCap.park_chan`, `ut_res_bare_park`);
-(3) `usertrap_res_uwp_acc` and `usertrap_res_run_open` with their
-concretes and ~6 re-export rows each; (4) the `uexec_wp` premises on
-`park_token_park` / `wp_kfork_sconf_body` / `kfork_arm3` / `kfk_b5` and
-the two now-redundant `uexec_wp` mints; (5) `UexecSlot.v` §3-§4
-(`uexec_slot`, `uexec_wp_slot`) — **KEEP the file and its §0-§2**, every
-tier requires `uvis`/`uvis_of`/`tf_w`/`tf_resume_*`; (6) the caller-less
-`UserKernelBridge.userret_to_user_state` / `user_trap_frame_open`;
-(7) `uround_vis_ok` / `uround_vis_of_ok`; (8) dead `UexecWp` imports.
-If it is red or half-done, finish or revert PER ITEM — each is
-independent, and `grep` establishes deadness before any removal.
-**`uexec_wp`, `UexecWp.v`, `UEXEC_GEN`, `ProofUexecWp`, `UmodeCap.uv_cap`
-and the whole `WpUmode*` engine STAY** (the generic theorem's form,
-`cond_entry_slot`'s input, and sh/echo/init's engine).
-
-**Owner rulings from this session, all final.**  The key's image is
-ALWAYS the lazy view — the process cannot tell lazy from allocated, so
-the abstraction must not distinguish them (§3 item 3).  sbrk's row must
-SAY WHAT HAPPENS: zeroed pages up, or cut down (§3 item 3, S8b).  The
-U-mode CONTEXT question (`CurCtx`, whether `uvb` should own one) is a
-SEPARATE, LATER effort — do not fold it in, do not convert this tier
-toward context ownership in passing (`../design/uk-engine.md`).
-Page-table and VM state is OUT OF SCOPE for fs-syscall-specs, so those
-contracts' VM clauses are ours; their DATA half is not, and stays
-existential.  Gate economy: trust a lane's gate when it names its logs;
-after a rebase a GREEN BUILD SUFFICES — do not re-run `audit-only`, a
-rebase introduces no assumptions.
-
-**What remains after J.**  (a) A verified `sync` actually running in the
-whole-system theorem — J removed the obstacle; the exec-site forcing
-function (§3 item 5) is what wires it.  (b) Fork's real row: nothing
-states `r ≠ 0`, so J MINTS on the fork arm (K2); a verified fork needs
-the row plus `uvmcopy`'s leaf-for-leaf flag preservation (K7), which
-nothing states.  (c) `sh`/`echo`/`init` still run on the old engine;
-porting them or back-porting the design is an open owner decision.
+**OPERATING**, beyond §0 below: ALL builds go to the GCP VM, ONE at a
+time, with the `-o` dump-guard flags and the EXIT sentinel written into
+the log and grepped.  Trust a lane's gate when it names its log paths;
+re-validate only when a rebase actually moves the proof tree, and then a
+GREEN BUILD SUFFICES — a rebase introduces no assumptions, so do not
+re-run `audit-only`.  Run the audit when a stage REMOVES proof machinery,
+or when a lane did not.
 
 ## §0 Operating rules (hard-won; violating these cost real time)
 
