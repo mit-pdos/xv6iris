@@ -88,11 +88,15 @@ Section LockAt.
     iMod (inv_alloc lockN E (lock_inv γ lk s R lo)
             with "[Hword Hcell Ha Hf HR]") as "#Hinv".
     { iNext. rewrite /lock_inv. iFrame "Hc4 Hc8".
-      iExists (mword_of_int 0 : mword 32), None.
+      (* A6.119: the pre-allocated token's position is whatever it was
+         allocated at; a FREE lock's word arm does not mention it. *)
+      iDestruct "Ha" as (B0) "Ha".
+      iExists (mword_of_int 0 : mword 32), None, B0.
       iDestruct (lock_word_intro with "Hword") as "Hword".
       rewrite lk_cpu_res_free. iFrame "Hword Ha".
       iSplitL "Hcell"; [ iExact "Hcell" | ].
-      iLeft. iFrame "Hf HR". done. }
+      iLeft. iSplitR; [done|]. iSplitR; [done|].
+      iSplitL "Hf"; [ iExact "Hf" | iExact "HR" ]. }
     iModIntro. iApply (is_lock_intro with "Hnm Hinv Hfl").
   Qed.
 

@@ -237,6 +237,21 @@ Section Lock.
     lock_auth γ st -∗ locked γ i -∗ ⌜st = Some (i, true)⌝.
   Proof. apply lock_frag_agree. Qed.
 
+  (* A6.119: the same laws where the invariant has the position exposed. *)
+  Lemma locked_state_at γ st B i :
+    lock_auth_at γ st B -∗ locked γ i -∗ ⌜st = Some (i, true)⌝.
+  Proof.
+    iIntros "Ha (%B' & Hf)".
+    iDestruct (lock_pos_agree with "Ha Hf") as %[-> _]. done.
+  Qed.
+
+  Lemma locked_pre_state_at γ st B i :
+    lock_auth_at γ st B -∗ locked_pre γ i -∗ ⌜st = Some (i, false)⌝.
+  Proof.
+    iIntros "Ha (%B' & Hf)".
+    iDestruct (lock_pos_agree with "Ha Hf") as %[-> _]. done.
+  Qed.
+
   Lemma locked_cpu_eq γ st i :
     lock_auth γ st -∗ locked γ i -∗ ⌜lk_cpu_val st = cpus_ptr i⌝.
   Proof.
@@ -379,6 +394,60 @@ Section Lock.
      The state SELECTS the arm, exactly as [lk_cpu_cell_ex] does: a free
      lock's word is nobody's own write and carries no receipt; a held one
      is the holder's AMO and carries its message fragment. <<< *)
+  (* >>> A6.119: THE WORD'S RACY KIT, AND IT IS THE PIN -- the fourth and, by
+     measurement, final shape for this word.
+
+     A6.92 refuted the AUTHORSHIP arm ([lock_word_ex] indexed by the holder):
+     `amoswap` writes UNCONDITIONALLY, so a spinner that finds the lock held
+     still stores, and after a failed acquire the word is the SPINNER's own
+     write while the state still names the holder.  The plain word was then
+     measured too weak at exactly one read -- [holding()]'s, which must
+     conclude the word is nonzero and has nothing to conclude it from.  What
+     is left is the VALUE-SET form, which is §0.35'(iv) case 2's own
+     prescription: read the locked word against a value set on the racy kit.
+
+     THE INSTRUMENT NOTE, since this word disambiguated the two racy kits:
+     PIN for same-value-many-writers, TsWin for distinct-values-per-writer.
+     [TsoCtx.ledger_read_pin_ok] concludes VALUE-SET MEMBERSHIP and its store
+     gate's premise is "the stored value stays in the set" -- the spinner
+     argument verbatim.  [ledger_read_racy_word_ok] concludes a NEGATIVE off
+     per-agent-DISTINCT words: exactly the cpu cell's structure (each hart
+     writes its own [cpus_ptr]) and exactly not this word's, where every
+     agent writes the same 1 and the injectivity premise is unprovable.
+
+     ARM-SHAPED BY THE STATE, [st = None] vs [st <> None]: the word is 1 from
+     the WINNING amoswap until release's `sw x0`, spanning both
+     [Some (i,false)] and [Some (i,true)] -- which is [lk_wex]'s domain used
+     as the pure state function it was demoted to.  The free arm carries no
+     pin: the free-path word read owns nothing and concludes nothing, and the
+     only write to a free word is the winning AMO, which flips the state. <<< *)
+  Definition lkw_one : mword 32 := mword_of_int 1.
+
+  Definition lkw_set (j : nat) : TsoMemPa.byteset :=
+    TsoMemPa.byteset_sing (nth_byte lkw_one j).
+
+  Definition lock_word_pin (B : nat) (lk : mword 64) (v : mword 32) : iProp Σ :=
+    (⌜is_aligned_paddr (Physaddr lk) 4 = true⌝ ∗
+     [∗ list] j ∈ seq 0 4, ∃ t : nat,
+       TsoCtx.phys_ledger_pin (pa_add lk j) (DfracOwn 1) (nth_byte v j) t B
+         (lkw_set j))%I.
+
+  Global Instance lock_word_pin_timeless B lk v :
+    Timeless (lock_word_pin B lk v).
+  Proof. apply _. Qed.
+
+  (* the word conjunct of the invariant, at whichever arm the state selects *)
+  Definition lock_word_at (st : lock_state) (B : nat) (lk : mword 64)
+      (v : mword 32) : iProp Σ :=
+    match st with
+    | None   => lock_word lk v
+    | Some _ => lock_word_pin B lk v
+    end.
+
+  Global Instance lock_word_at_timeless st B lk v :
+    Timeless (lock_word_at st B lk v).
+  Proof. destruct st; apply _. Qed.
+
   Definition lock_word_ex (ex : option CPU) (lk : mword 64) (v : mword 32)
       : iProp Σ :=
     match ex with
@@ -1134,10 +1203,17 @@ Section Lock.
        reads the locked word on the racy kit against a value-set, not against
        an authorship arm, so the exact form was never what the reads wanted.
        [lk_wex] demotes to a pure state function. <<< *)
-    (∃ (v : mword 32) (st : lock_state),
-        lock_word lk v ∗
+    (∃ (v : mword 32) (st : lock_state) (B : nat),
+        (* A6.119: arm-shaped by the state, and the ACQUIRE POSITION [B] is
+           exposed here beside the pin so [lock_auth_at] can tie it to the
+           holder's half ([lock_pos_agree]).  That tie is what lets the
+           holder's read name the pin's own [B] -- the one thing carrying the
+           body whole across the atomic update could not supply, because it
+           fixes witness identity and cannot manufacture evidence about the
+           reader. *)
+        lock_word_at st B lk v ∗
         lk_cpu_res lo st lk s ∗
-        lock_auth γ st ∗
+        lock_auth_at γ st B ∗
         (⌜st = None⌝ ∗ ⌜v = (mword_of_int 0 : mword 32)⌝ ∗ lock_frag γ None ∗
            lock_pay R
          ∨ ⌜st ≠ None⌝ ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝))%I.
@@ -1483,9 +1559,10 @@ Section Lock.
   Lemma lock_finisher_close γ lk s R D E : ⊢ lock_finisher γ lk s R D emp E.
   Proof.
     iIntros (lo) "[Hclose _] Hauth Hfrag [#Hc4 Hword] [#Hc8 Hcpu] HR".
+    iDestruct "Hauth" as (B) "Hauth".
     iMod ("Hclose" with "[Hauth Hfrag Hword Hcpu HR]") as "_"; [| by iModIntro].
     iNext. rewrite /lock_inv /lock_body. iFrame "Hc4 Hc8".
-    iExists (mword_of_int 0 : mword 32), None.
+    iExists (mword_of_int 0 : mword 32), None, B.
     rewrite lk_cpu_res_free. iFrame "Hword Hcpu Hauth".
     iLeft. by iFrame "Hfrag HR".
   Qed.
@@ -1544,10 +1621,11 @@ Section Lock.
       [ split; apply excl_auth_valid | ].
     iDestruct (own_op with "H") as "[Ha Hf]".
     iModIntro. iExists γ. rewrite /lock_inv /lock_body. iFrame "Hc4 Hc8".
-    iExists (mword_of_int 0 : mword 32), None.
+    iExists (mword_of_int 0 : mword 32), None, 0%nat.
     iDestruct (lock_word_intro with "Hword") as "Hword".
     rewrite lk_cpu_res_free. iFrame "Hword Hcpu Ha".
-    iLeft. iFrame "Hf HR". done.
+    iLeft. iSplitR; [done|]. iSplitR; [done|].
+      iSplitL "Hf"; [ by iExists 0%nat | iExact "HR" ].
   Qed.
 
   (* a FREE physical lock plus its resource become a lock that can DIE: the
@@ -1574,10 +1652,11 @@ Section Lock.
     iMod (lock_pay_intro (CtxMorph0 := HmR) R with "Hrun HR") as "[Hrun HR]".
     iFrame "Hrun".
     iApply (inv_alloc lockN E (lock_inv γ lk s R lo ∨ D)).
-    iNext. iLeft. rewrite /lock_inv /lock_body. iFrame "Hc4 Hc8". iExists (mword_of_int 0 : mword 32), None.
+    iNext. iLeft. rewrite /lock_inv /lock_body. iFrame "Hc4 Hc8". iExists (mword_of_int 0 : mword 32), None, 0%nat.
     iDestruct (lock_word_intro with "Hword") as "Hword".
     rewrite lk_cpu_res_free. iFrame "Hword Hcpu Ha".
-    iLeft. iFrame "Hf HR". done.
+    iLeft. iSplitR; [done|]. iSplitR; [done|].
+      iSplitL "Hf"; [ by iExists 0%nat | iExact "HR" ].
   Qed.
 
   (* a FREE physical lock plus the resource it protects and its name become a
@@ -1639,10 +1718,11 @@ Section Lock.
     iMod (lock_pay_intro (CtxMorph0 := HmR) R with "Hrun HR") as "[Hrun HR]".
     iFrame "Hrun".
     iMod (inv_alloc lockN E (lock_inv γ lk s R lo) with "[Hword Hcpu Ha Hf HR]") as "#Hinv".
-    { iNext. rewrite /lock_inv /lock_body. iFrame "Hc4 Hc8". iExists (mword_of_int 0 : mword 32), None.
+    { iNext. rewrite /lock_inv /lock_body. iFrame "Hc4 Hc8". iExists (mword_of_int 0 : mword 32), None, 0%nat.
       iDestruct (lock_word_intro with "Hword") as "Hword".
     rewrite lk_cpu_res_free. iFrame "Hword Hcpu Ha".
-      iLeft. iFrame "Hf HR". done. }
+      iLeft. iSplitR; [done|]. iSplitR; [done|].
+      iSplitL "Hf"; [ by iExists 0%nat | iExact "HR" ]. }
     iModIntro. iApply (is_lock_intro with "Hnm Hinv Hfl").
   Qed.
 

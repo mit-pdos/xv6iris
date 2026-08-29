@@ -2646,6 +2646,8 @@ Section ctx.
     Timeless (phys_ledger_at a dq v t).
   Proof. rewrite /phys_ledger_at. apply _. Qed.
 
+
+
   (* ---------------------------------------------------------------- *)
   (* THE CANON-PINNED LEDGER BYTE (tso-pin-memo.md §5.2; ruling 2).     *)
   (*                                                                   *)
@@ -4231,6 +4233,56 @@ Section ctx.
       + exists v. split; [exact Hgm | exact Hlat].
       + intros Sv' B' Heq. cbn in Heq. injection Heq as <- <-.
         exact (pin_ok_mint _ _ _ _ _ t v Hlat HtB Hv).
+    - rewrite lookup_insert_ne in Hlk; last done. exact (Htie _ _ Hlk).
+  Qed.
+
+  (* >>> A6.119: THE PIN'S RETRACTION, and it is the mint read backwards.
+     The owner of a pinned cell AT FULL FRACTION may give the pin up: the
+     element's LATEST tie is untouched (the value does not move), and both the
+     PIN and WINDOW ties are VACUOUS at [None], so nothing that was being
+     relied on survives to be broken -- which is exactly why the option arm
+     was made vacuous-at-None in the first place.
+
+     ITS CLIENT is the lock word's release ([WpSconfLock]'s `sw x0`): the held
+     arm's value set is [{1}] and release stores [0], so the pin CANNOT be
+     preserved across it ([ledger_store_win_pin_ok] wants the stored value in
+     the set).  The lock goes free and the word goes back to the plain ledger
+     cell, which is precisely what the free arm of [WpLock.lock_word_at]
+     holds.  Retract first, then store: the store is then the ordinary
+     [ledger_store_win_at_ok] the free word already uses. <<< *)
+  Lemma ledger_pin_drop (g : gstate) (a : Arch.pa) (v : bv 8)
+      (t B : nat) (Sv : gset (bv 8)) :
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+    tso_interp_at riscv_eraGS g -∗
+    phys_ledger_pin a (DfracOwn 1) v t B Sv ==∗
+    gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
+    tso_interp_at riscv_eraGS g ∗
+    phys_ledger_at a (DfracOwn 1) v t.
+  Proof.
+    iIntros "Hgh Hint [Hpt Hts]".
+    iDestruct "Hint"
+      as "(%TM & %LM & Hauth & %Hdom & %Htie & Hm & %HLM & Hlen & Hvw & %Hmm)".
+    iDestruct (phys_valid with "Hgh Hpt") as %Hgm.
+    iDestruct (ghost_map_lookup with "Hauth Hts") as %HTM.
+    destruct (ts_ok_latest _ _ _ _ _ (Htie _ _ HTM)) as (v0 & Hgm0 & Hlat).
+    rewrite Hgm in Hgm0. injection Hgm0 as <-.
+    iMod (ghost_map_update ((t, ts_pay_none) : ts_elem) with "Hauth Hts")
+      as "[Hauth Hts]".
+    iModIntro. iFrame "Hgh Hpt Hts".
+    iExists (<[a := ((t, ts_pay_none) : ts_elem)]> TM), LM.
+    iFrame "Hauth Hm Hlen Hvw".
+    iSplitR.
+    { iPureIntro. rewrite dom_insert_L Hdom.
+      assert (Ha : a ∈ dom g.(gmem)) by (by eapply elem_of_dom_2).
+      set_solver. }
+    iSplitR; last (iPureIntro; split; [exact HLM | exact Hmm]).
+    iPureIntro. intros a' e Hlk.
+    destruct (decide (a' = a)) as [->|Hne].
+    - rewrite lookup_insert in Hlk. injection Hlk as <-.
+      split_and!.
+      + exists v. split; [exact Hgm | exact Hlat].
+      + by move => Sv' B' Heq.
+      + by move => W0 HW0.
     - rewrite lookup_insert_ne in Hlk; last done. exact (Htie _ _ Hlk).
   Qed.
 
