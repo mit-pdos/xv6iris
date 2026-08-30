@@ -26,6 +26,7 @@ Import Defs.
 Require Import UkProgAbi.
 Require Import UkInit.
 Require Import UkInitPutc.
+Require Import UkRunBr.
 
 Section UkInitVprintf.
   Context `{!riscvGS Σ}.
@@ -687,4 +688,479 @@ Section UkInitVprintf.
       + assert (Hd : uint r = 3 \/ uint r = 4 \/ (25 <= uint r <= 27)) by lia.
         rewrite (Hmeo r Hd). exact (Hfree r Hr Hd).
   Qed.
+
+  (* ===================================================================== *)
+  (* THE LOOP.  For a format string with no '%', vprintf is                 *)
+  (*                                                                        *)
+  (*   0x52c  sext.w a5,s1        ; a5 := the current character             *)
+  (*   0x530  bnez  s3,0x516      ; NOT taken: s3 is the pending-% state    *)
+  (*   0x534  bne   a5,s5,0x50c   ; taken: the character is not '%'          *)
+  (*   0x50c  mv a1,s1 ; mv a0,s6 ; jal putc ; j 0x51a                       *)
+  (*   0x51a  addiw a5,s2,1 ; mv s2,a5 ; mv a4,a5 ; add a5,a5,s4             *)
+  (*   0x524  lbu   s1,0(a5)      ; the NEXT character                       *)
+  (*   0x528  beqz  s1,0x6fc      ; taken at the terminator                  *)
+  (*                                                                        *)
+  (* [vp_inv] is what survives a round: the frame pointer, the index, and    *)
+  (* the four values the prologue parked in callee-saved registers.  It      *)
+  (* survives the putc CALL for free -- every register it names is           *)
+  (* callee-saved, which is the whole reason ulib parks them there.          *)
+  (* ===================================================================== *)
+
+  Definition vp_inv (m0 m : regfile) (sp0 : mword 64) (a : Z) (fd : mword 64)
+      (i : nat) : Prop :=
+    m !!! Regidx csp_rs1 = add_vec_int sp0 (- (8 * Z.of_nat 12)) /\
+    m !!! Regidx s0_idx = sp0 /\
+    m !!! Regidx s2_idx = mword_of_int (Z.of_nat i) /\
+    m !!! Regidx s3_idx = zero_reg /\
+    m !!! Regidx s4_idx = mword_of_int a /\
+    m !!! Regidx s5_idx = mword_of_int 37 /\
+    m !!! Regidx s6_idx = fd /\
+    (forall r : mword 5, ucallee_saved_idx r = true ->
+       uint r = 3 \/ uint r = 4 \/ (25 <= uint r <= 27) ->
+       m !!! Regidx r = m0 !!! Regidx r).
+
+  (* every register [vp_inv] names is callee-saved, so a call preserves it *)
+  Lemma vp_inv_call (m0 m m' : regfile) (sp0 : mword 64) (a : Z) (fd : mword 64)
+      (i : nat) :
+    ucallee_saved m m' -> vp_inv m0 m sp0 a fd i -> vp_inv m0 m' sp0 a fd i.
+  Proof.
+    intros Hcs (Hsp & Hs0 & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hfr).
+    unfold vp_inv.
+    rewrite (Hcs csp_rs1 ltac:(vm_compute; reflexivity)).
+    rewrite (Hcs s0_idx ltac:(vm_compute; reflexivity)).
+    rewrite (Hcs s2_idx ltac:(vm_compute; reflexivity)).
+    rewrite (Hcs s3_idx ltac:(vm_compute; reflexivity)).
+    rewrite (Hcs s4_idx ltac:(vm_compute; reflexivity)).
+    rewrite (Hcs s5_idx ltac:(vm_compute; reflexivity)).
+    rewrite (Hcs s6_idx ltac:(vm_compute; reflexivity)).
+    repeat (split; [ assumption | ]).
+    intros r Hr Hset. rewrite (Hcs r Hr). exact (Hfr r Hr Hset).
+  Qed.
+
+
+  (* which registers a step may write without disturbing [vp_inv]: anything
+     that is neither one of the seven the invariant names (sp, s0, s2..s6)
+     nor one of the five [Hfree] covers (gp, tp, s9..s11).  One
+     [vm_compute] per call site instead of twelve. *)
+  Definition vp_writable (r : mword 5) : bool :=
+    negb (Z.eqb (uint r) 2 || Z.eqb (uint r) 3 || Z.eqb (uint r) 4 ||
+          Z.eqb (uint r) 8 ||
+          ((18 <=? uint r) && (uint r <=? 22)) ||
+          ((25 <=? uint r) && (uint r <=? 27))).
+
+  Lemma vp_writable_ne (r : mword 5) (z : Z) :
+    vp_writable r = true ->
+    (z = 2 \/ z = 3 \/ z = 4 \/ z = 8 \/ (18 <= z <= 22) \/ (25 <= z <= 27)) ->
+    uint r <> z.
+  Proof.
+    unfold vp_writable. intro H. apply negb_true_iff in H.
+    rewrite !orb_false_iff in H.
+    destruct H as [[[[[H1 H2] H3] H4] H5] H6].
+    apply Z.eqb_neq in H1. apply Z.eqb_neq in H2.
+    apply Z.eqb_neq in H3. apply Z.eqb_neq in H4.
+    apply andb_false_iff in H5. apply andb_false_iff in H6.
+    intros Hz He. rewrite He in H1, H2, H3, H4, H5, H6.
+    destruct H5 as [H5 | H5]; try apply Z.leb_gt in H5;
+      destruct H6 as [H6 | H6]; try apply Z.leb_gt in H6; lia.
+  Qed.
+
+  Lemma vp_inv_upd (m0 m : regfile) (sp0 : mword 64) (a : Z) (fd : mword 64)
+      (i : nat) (r : mword 5) (v : mword 64) :
+    vp_writable r = true ->
+    vp_inv m0 m sp0 a fd i ->
+    vp_inv m0 (<[Regidx r := regval_into_reg v]> m) sp0 a fd i.
+  Proof.
+    intros Hw (Hsp & Hs0 & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hfr).
+    unfold vp_inv.
+    rewrite (upd_ne m (Regidx r) (Regidx csp_rs1) (regval_into_reg v)
+               ltac:(apply not_eq_sym; apply uidx_ne;
+                     apply (vp_writable_ne r _ Hw);
+                     replace (uint csp_rs1) with 2
+                       by (vm_compute; reflexivity); lia)).
+    rewrite (upd_ne m (Regidx r) (Regidx s0_idx) (regval_into_reg v)
+               ltac:(apply not_eq_sym; apply uidx_ne;
+                     apply (vp_writable_ne r _ Hw);
+                     replace (uint s0_idx) with 8
+                       by (vm_compute; reflexivity); lia)).
+    rewrite (upd_ne m (Regidx r) (Regidx s2_idx) (regval_into_reg v)
+               ltac:(apply not_eq_sym; apply uidx_ne;
+                     apply (vp_writable_ne r _ Hw);
+                     replace (uint s2_idx) with 18
+                       by (vm_compute; reflexivity); lia)).
+    rewrite (upd_ne m (Regidx r) (Regidx s3_idx) (regval_into_reg v)
+               ltac:(apply not_eq_sym; apply uidx_ne;
+                     apply (vp_writable_ne r _ Hw);
+                     replace (uint s3_idx) with 19
+                       by (vm_compute; reflexivity); lia)).
+    rewrite (upd_ne m (Regidx r) (Regidx s4_idx) (regval_into_reg v)
+               ltac:(apply not_eq_sym; apply uidx_ne;
+                     apply (vp_writable_ne r _ Hw);
+                     replace (uint s4_idx) with 20
+                       by (vm_compute; reflexivity); lia)).
+    rewrite (upd_ne m (Regidx r) (Regidx s5_idx) (regval_into_reg v)
+               ltac:(apply not_eq_sym; apply uidx_ne;
+                     apply (vp_writable_ne r _ Hw);
+                     replace (uint s5_idx) with 21
+                       by (vm_compute; reflexivity); lia)).
+    rewrite (upd_ne m (Regidx r) (Regidx s6_idx) (regval_into_reg v)
+               ltac:(apply not_eq_sym; apply uidx_ne;
+                     apply (vp_writable_ne r _ Hw);
+                     replace (uint s6_idx) with 22
+                       by (vm_compute; reflexivity); lia)).
+    repeat (split; [ assumption | ]).
+    intros q Hq Hset.
+    rewrite (upd_ne m (Regidx r) (Regidx q) (regval_into_reg v)
+               ltac:(apply not_eq_sym; apply uidx_ne;
+                     apply (vp_writable_ne r _ Hw); lia)).
+    exact (Hfr q Hq Hset).
+  Qed.
+
+  (* ...and the ONE write that changes it: s2, the loop index *)
+  Lemma vp_inv_bump (m0 m : regfile) (sp0 : mword 64) (a : Z) (fd : mword 64)
+      (i j : nat) (v : mword 64) :
+    v = mword_of_int (Z.of_nat j) ->
+    vp_inv m0 m sp0 a fd i ->
+    vp_inv m0 (<[Regidx s2_idx := regval_into_reg v]> m) sp0 a fd j.
+  Proof.
+    intros -> (Hsp & Hs0 & _ & Hs3 & Hs4 & Hs5 & Hs6 & Hfr).
+    unfold vp_inv.
+    rewrite (upd_ne m (Regidx s2_idx) (Regidx csp_rs1) _
+               ltac:(vm_compute; discriminate)).
+    rewrite (upd_ne m (Regidx s2_idx) (Regidx s0_idx) _
+               ltac:(vm_compute; discriminate)).
+    rewrite (upd_ne m (Regidx s2_idx) (Regidx s3_idx) _
+               ltac:(vm_compute; discriminate)).
+    rewrite (upd_ne m (Regidx s2_idx) (Regidx s4_idx) _
+               ltac:(vm_compute; discriminate)).
+    rewrite (upd_ne m (Regidx s2_idx) (Regidx s5_idx) _
+               ltac:(vm_compute; discriminate)).
+    rewrite (upd_ne m (Regidx s2_idx) (Regidx s6_idx) _
+               ltac:(vm_compute; discriminate)).
+    rewrite (upd_eq m (Regidx s2_idx) _).
+    repeat (split; [ (assumption || reflexivity) | ]).
+    intros q Hq Hset.
+    rewrite (upd_ne m (Regidx s2_idx) (Regidx q) _
+               ltac:(apply uidx_ne; replace (uint s2_idx) with 18
+                       by (vm_compute; reflexivity); lia)).
+    exact (Hfr q Hq Hset).
+  Qed.
+
+  (* --------------------------------------------------------------------- *)
+  (* ONE ROUND, 0x52c -> 0x528.  It owns no frame word: putc's four are     *)
+  (* BELOW sp, and the twelve vprintf spilled are untouched here.            *)
+  (* --------------------------------------------------------------------- *)
+  Lemma wp_kinit_vprintf_step (m0 : regfile) (sp0 fd : mword 64) (a : Z)
+      (i : nat) (b0 b1 : mword 8) (h : CpuId) (m : regfile) (n : nat) :
+    0 <= a -> a + Z.of_nat i + 2 < 2 ^ 31 ->
+    bv_unsigned b0 <> 37 ->
+    vp_inv m0 m sp0 a fd i ->
+    m !!! Regidx s1_idx = mword_of_int (bv_unsigned b0) ->
+    init_code γt -∗
+    utext γt (a + Z.of_nat (S i)) b1 -∗
+    urun γt γd γs h m (mword_of_int 0x52c) (4 + n) -∗
+    (∀ (h' : CpuId) (m' : regfile),
+       ⌜ vp_inv m0 m' sp0 a fd (S i) ⌝ -∗
+       ⌜ m' !!! Regidx s1_idx = mword_of_int (bv_unsigned b1) ⌝ -∗
+       urun γt γd γs h' m' (mword_of_int 0x528) (4 + n) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Ha0 Habnd Hpct Hinv Hs1.
+    destruct Hinv as (Hsp & Hs0 & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hfr).
+    iIntros "#Hcode #Hb1 Hrun Hcont".
+    assert (Hb0 : 0 <= bv_unsigned b0 < 256).
+    { pose proof (bv_unsigned_in_range 8 b0) as HH.
+      assert (Em8 : bv_modulus 8 = 256) by (vm_compute; reflexivity).
+      rewrite Em8 in HH. exact HH. }
+    assert (Hi31 : 0 <= Z.of_nat i + 1 < Z31) by (unfold Z31; lia).
+    (* ---- 0x52c  sext.w a5,s1 ---- *)
+    assert (Es0 : (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64)
+                  = mword_of_int 0)
+      by (apply bv_eq; vm_compute; reflexivity).
+    assert (Ea5c : sign_extend' 64
+                     (subrange_vec_dec
+                        (add_vec (m !!! Regidx s1_idx)
+                           (sign_extend' 64 (mword_of_int 0 : mword 12))) 31 0)
+                   = (mword_of_int (bv_unsigned b0) : mword 64)).
+    { rewrite Hs1 Es0.
+      assert (Hbw : 0 <= bv_unsigned b0 + 0 < Z31) by (unfold Z31; lia).
+      rewrite (moi_addw (bv_unsigned b0) 0 Hbw).
+      f_equal. lia. }
+    iApply (wp_uk_addiw γt γd γs h m (mword_of_int 0x52c)
+              (mword_of_int 0 : mword 12) s1_idx a5_idx
+              (mword_of_int (bv_unsigned b0)) (4 + n)
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate)
+              ltac:(exact (eq_sym Ea5c))
+              with "[] Hrun").
+    { iApply (uis_init_52c with "Hcode"). }
+    assert (E52c : add_vec_int (mword_of_int 0x52c : mword 64) 4
+                   = mword_of_int 0x530)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E52c.
+    iIntros (h1) "Hrun".
+    set (m1 := <[Regidx a5_idx
+                 := regval_into_reg (mword_of_int (bv_unsigned b0) : mword 64)]> m).
+    assert (Ha5_1 : m1 !!! Regidx a5_idx = mword_of_int (bv_unsigned b0))
+      by exact (upd_eq m (Regidx a5_idx) (regval_into_reg _)).
+    assert (Hs3_1 : m1 !!! Regidx s3_idx = zero_reg).
+    { rewrite <- Hs3.
+      exact (upd_ne m (Regidx a5_idx) (Regidx s3_idx) (regval_into_reg _)
+               ltac:(vm_compute; discriminate)). }
+    assert (Hs5_1 : m1 !!! Regidx s5_idx = mword_of_int 37).
+    { rewrite <- Hs5.
+      exact (upd_ne m (Regidx a5_idx) (Regidx s5_idx) (regval_into_reg _)
+               ltac:(vm_compute; discriminate)). }
+    assert (Hs1_1 : m1 !!! Regidx s1_idx = mword_of_int (bv_unsigned b0)).
+    { rewrite <- Hs1.
+      exact (upd_ne m (Regidx a5_idx) (Regidx s1_idx) (regval_into_reg _)
+               ltac:(vm_compute; discriminate)). }
+    assert (Hs6_1 : m1 !!! Regidx s6_idx = fd).
+    { rewrite <- Hs6.
+      exact (upd_ne m (Regidx a5_idx) (Regidx s6_idx) (regval_into_reg _)
+               ltac:(vm_compute; discriminate)). }
+    (* ---- 0x530  bnez s3,0x516 -- NOT taken, the state register is 0 ---- *)
+    assert (Hnt : false = uv_btaken BNE (m1 !!! Regidx s3_idx) zero_reg)
+      by (rewrite Hs3_1; vm_compute; reflexivity).
+    iApply (wp_uk_btype0 γt γd γs h1 m1 (mword_of_int 0x530)
+              (mword_of_int 8166 : mword 13) s3_idx BNE false
+              (add_vec (mword_of_int 0x530 : mword 64)
+                 (sign_extend' 64 (mword_of_int 8166 : mword 13)))
+              (4 + n) Hnt eq_refl ltac:(discriminate)
+              with "[] Hrun").
+    { iApply (uis_init_530 with "Hcode"). }
+    assert (E530 : add_vec_int (mword_of_int 0x530 : mword 64) 4
+                   = mword_of_int 0x534)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E530.
+    iIntros (h2) "Hrun".
+    (* ---- 0x534  bne a5,s5,0x50c -- TAKEN, the character is not '%' ---- *)
+    assert (Ht : true = uv_btaken BNE (m1 !!! Regidx a5_idx) (m1 !!! Regidx s5_idx)).
+    { rewrite Ha5_1 Hs5_1. cbn [uv_btaken].
+      assert (Hb64 : 0 <= bv_unsigned b0 < Z64) by (unfold Z64; lia).
+      assert (H3764 : 0 <= 37 < Z64) by (unfold Z64; lia).
+      rewrite (moi_neq_vec (bv_unsigned b0) 37 Hb64 H3764).
+      destruct (Z.eqb_spec (bv_unsigned b0) 37) as [He | _];
+        [ exfalso; exact (Hpct He) | reflexivity ]. }
+    assert (Etgt534 : add_vec (mword_of_int 0x534 : mword 64)
+                        (sign_extend' 64 (mword_of_int 8152 : mword 13))
+                      = mword_of_int 0x50c)
+      by (apply bv_eq; vm_compute; reflexivity).
+    iApply (wp_uk_btype γt γd γs h2 m1 (mword_of_int 0x534)
+              (mword_of_int 8152 : mword 13) s5_idx a5_idx BNE true
+              (mword_of_int 0x50c) (4 + n) Ht (eq_sym Etgt534)
+              ltac:(intros _; vm_compute; reflexivity)
+              with "[] Hrun").
+    { iApply (uis_init_534 with "Hcode"). }
+    iIntros (h3) "Hrun".
+    (* ---- 0x50c  c.mv a1,s1 ---- *)
+    iApply (wp_uk_cmv γt γd γs h3 m1 (mword_of_int 0x50c) a1_idx s1_idx
+              (add_vec zero_reg (m1 !!! Regidx s1_idx)) (4 + n)
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate) eq_refl
+              with "[] Hrun").
+    { iApply (uis_init_50c with "Hcode"). }
+    assert (E50c : add_vec_int (mword_of_int 0x50c : mword 64) 2
+                   = mword_of_int 0x50e)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E50c.
+    iIntros (h4) "Hrun".
+    set (m2 := <[Regidx a1_idx
+                 := regval_into_reg (add_vec zero_reg (m1 !!! Regidx s1_idx))]> m1).
+    (* ---- 0x50e  c.mv a0,s6 ---- *)
+    iApply (wp_uk_cmv γt γd γs h4 m2 (mword_of_int 0x50e) a0_idx s6_idx
+              (add_vec zero_reg (m2 !!! Regidx s6_idx)) (4 + n)
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate) eq_refl
+              with "[] Hrun").
+    { iApply (uis_init_50e with "Hcode"). }
+    assert (E50e : add_vec_int (mword_of_int 0x50e : mword 64) 2
+                   = mword_of_int 0x510)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E50e.
+    iIntros (h5) "Hrun".
+    set (m3 := <[Regidx a0_idx
+                 := regval_into_reg (add_vec zero_reg (m2 !!! Regidx s6_idx))]> m2).
+    (* ---- 0x510  jal ra,0x41a <putc> ---- *)
+    destruct init_syms_pins
+      as (_ & _ & _ & _ & Hputc & _ & _ & _ & _ & _ & _ & _ & _).
+    iApply (wp_uk_jal γt γd γs h5 m3 (mword_of_int 0x510)
+              (mword_of_int 2096906 : mword 21) ra_idx
+              (mword_of_int InitSyms.putc) (mword_of_int 0x514) (4 + n)
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate)
+              ltac:(rewrite Hputc; apply bv_eq; vm_compute; reflexivity)
+              ltac:(apply bv_eq; vm_compute; reflexivity)
+              ltac:(rewrite Hputc; vm_compute; reflexivity)
+              with "[] Hrun").
+    { iApply (uis_init_510 with "Hcode"). }
+    iIntros (h6) "Hrun".
+    set (m4 := <[Regidx ra_idx
+                 := regval_into_reg (mword_of_int 0x514 : mword 64)]> m3).
+    assert (Hra4 : m4 !!! Regidx ra_idx = (mword_of_int 0x514 : mword 64))
+      by exact (upd_eq m3 (Regidx ra_idx) (regval_into_reg _)).
+    (* ---- putc(fd, c) ---- *)
+    iApply (wp_kinit_putc γt γd γs h6 m4 n with "Hcode Hrun").
+    iIntros (h7 m5) "%Hcs Hrun".
+    assert (Eret : ret_pc (m4 !!! Regidx ra_idx) = (mword_of_int 0x514 : mword 64))
+      by (rewrite Hra4; apply bv_eq; vm_compute; reflexivity).
+    rewrite Eret.
+    (* the invariant crossed the call, because every register it names is
+       callee-saved -- which is why ulib parked them there *)
+    assert (Hinv5 : vp_inv m0 m5 sp0 a fd i).
+    { apply (vp_inv_call m0 m4 m5 sp0 a fd i Hcs).
+      apply (vp_inv_upd _ _ _ _ _ _ ra_idx _ ltac:(vm_compute; reflexivity)).
+      apply (vp_inv_upd _ _ _ _ _ _ a0_idx _ ltac:(vm_compute; reflexivity)).
+      apply (vp_inv_upd _ _ _ _ _ _ a1_idx _ ltac:(vm_compute; reflexivity)).
+      apply (vp_inv_upd _ _ _ _ _ _ a5_idx _ ltac:(vm_compute; reflexivity)).
+      unfold vp_inv. repeat (split; [ assumption | ]). exact Hfr. }
+    destruct Hinv5 as (Hsp5 & Hs05 & Hs25 & Hs35 & Hs45 & Hs55 & Hs65 & Hfr5).
+    (* ---- 0x514  c.j 0x51a ---- *)
+    assert (Etgt514 : (mword_of_int 0x51a : mword 64)
+                      = add_vec (mword_of_int 0x514 : mword 64)
+                          (sign_extend' 64
+                             (sign_extend' 21
+                                (concat_vec (mword_of_int 3 : mword 11) ('b"0")))))
+      by (apply bv_eq; vm_compute; reflexivity).
+    iApply (wp_uk_cj γt γd γs h7 m5 (mword_of_int 0x514)
+              (mword_of_int 3 : mword 11) (mword_of_int 0x51a) (4 + n)
+              Etgt514 ltac:(vm_compute; reflexivity)
+              with "[] Hrun").
+    { iApply (uis_init_514 with "Hcode"). }
+    iIntros (h8) "Hrun".
+    (* ---- 0x51a  addiw a5,s2,1 ---- *)
+    assert (Es1_12 : (sign_extend' 64 (mword_of_int 1 : mword 12) : mword 64)
+                     = mword_of_int 1)
+      by (apply bv_eq; vm_compute; reflexivity).
+    assert (Ea5n : sign_extend' 64
+                     (subrange_vec_dec
+                        (add_vec (m5 !!! Regidx s2_idx)
+                           (sign_extend' 64 (mword_of_int 1 : mword 12))) 31 0)
+                   = (mword_of_int (Z.of_nat (S i)) : mword 64)).
+    { rewrite Hs25 Es1_12.
+      assert (Hiw : 0 <= Z.of_nat i + 1 < Z31) by (unfold Z31; lia).
+      rewrite (moi_addw (Z.of_nat i) 1 Hiw).
+      f_equal. lia. }
+    iApply (wp_uk_addiw γt γd γs h8 m5 (mword_of_int 0x51a)
+              (mword_of_int 1 : mword 12) s2_idx a5_idx
+              (mword_of_int (Z.of_nat (S i))) (4 + n)
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate)
+              ltac:(exact (eq_sym Ea5n))
+              with "[] Hrun").
+    { iApply (uis_init_51a with "Hcode"). }
+    assert (E51a : add_vec_int (mword_of_int 0x51a : mword 64) 4
+                   = mword_of_int 0x51e)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E51a.
+    iIntros (h9) "Hrun".
+    set (m6 := <[Regidx a5_idx
+                 := regval_into_reg
+                      (mword_of_int (Z.of_nat (S i)) : mword 64)]> m5).
+    assert (Ha56 : m6 !!! Regidx a5_idx = mword_of_int (Z.of_nat (S i)))
+      by exact (upd_eq m5 (Regidx a5_idx) (regval_into_reg _)).
+    assert (Hinv6 : vp_inv m0 m6 sp0 a fd i)
+      by (apply (vp_inv_upd _ _ _ _ _ _ a5_idx _ ltac:(vm_compute; reflexivity));
+          unfold vp_inv; repeat (split; [ assumption | ]); exact Hfr5).
+    (* ---- 0x51e  c.mv s2,a5 -- the index moves ---- *)
+    assert (Ez6 : add_vec zero_reg (m6 !!! Regidx a5_idx)
+                  = mword_of_int (Z.of_nat (S i)))
+      by (rewrite Ha56; apply add_vec_zero_l).
+    iApply (wp_uk_cmv γt γd γs h9 m6 (mword_of_int 0x51e) s2_idx a5_idx
+              (add_vec zero_reg (m6 !!! Regidx a5_idx)) (4 + n)
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate) eq_refl
+              with "[] Hrun").
+    { iApply (uis_init_51e with "Hcode"). }
+    assert (E51e : add_vec_int (mword_of_int 0x51e : mword 64) 2
+                   = mword_of_int 0x520)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E51e.
+    iIntros (h10) "Hrun".
+    set (m7 := <[Regidx s2_idx
+                 := regval_into_reg (add_vec zero_reg (m6 !!! Regidx a5_idx))]> m6).
+    assert (Hinv7 : vp_inv m0 m7 sp0 a fd (S i))
+      by exact (vp_inv_bump m0 m6 sp0 a fd i (S i) _ Ez6 Hinv6).
+    assert (Ha57 : m7 !!! Regidx a5_idx = mword_of_int (Z.of_nat (S i))).
+    { rewrite <- Ha56.
+      exact (upd_ne m6 (Regidx s2_idx) (Regidx a5_idx) _
+               ltac:(vm_compute; discriminate)). }
+    (* ---- 0x520  c.mv a4,a5 ---- *)
+    iApply (wp_uk_cmv γt γd γs h10 m7 (mword_of_int 0x520) a4_idx a5_idx
+              (add_vec zero_reg (m7 !!! Regidx a5_idx)) (4 + n)
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate) eq_refl
+              with "[] Hrun").
+    { iApply (uis_init_520 with "Hcode"). }
+    assert (E520 : add_vec_int (mword_of_int 0x520 : mword 64) 2
+                   = mword_of_int 0x522)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E520.
+    iIntros (h11) "Hrun".
+    set (m8 := <[Regidx a4_idx
+                 := regval_into_reg (add_vec zero_reg (m7 !!! Regidx a5_idx))]> m7).
+    assert (Hinv8 : vp_inv m0 m8 sp0 a fd (S i))
+      by exact (vp_inv_upd m0 m7 sp0 a fd (S i) a4_idx _
+                  ltac:(vm_compute; reflexivity) Hinv7).
+    assert (Ha58 : m8 !!! Regidx a5_idx = mword_of_int (Z.of_nat (S i))).
+    { rewrite <- Ha57.
+      exact (upd_ne m7 (Regidx a4_idx) (Regidx a5_idx) _
+               ltac:(vm_compute; discriminate)). }
+    destruct Hinv8 as (Hsp8 & Hs08 & Hs28 & Hs38 & Hs48 & Hs58 & Hs68 & Hfr8).
+    (* ---- 0x522  c.add a5,a5,s4 -- the pointer ---- *)
+    assert (Eadd8 : add_vec (m8 !!! Regidx a5_idx) (m8 !!! Regidx s4_idx)
+                    = mword_of_int (a + Z.of_nat (S i))).
+    { rewrite Ha58 Hs48. rewrite moi_add. f_equal. lia. }
+    iApply (wp_uk_cadd γt γd γs h11 m8 (mword_of_int 0x522) a5_idx s4_idx
+              (add_vec (m8 !!! Regidx a5_idx) (m8 !!! Regidx s4_idx)) (4 + n)
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate) eq_refl
+              with "[] Hrun").
+    { iApply (uis_init_522 with "Hcode"). }
+    assert (E522 : add_vec_int (mword_of_int 0x522 : mword 64) 2
+                   = mword_of_int 0x524)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E522.
+    iIntros (h12) "Hrun".
+    set (m9 := <[Regidx a5_idx
+                 := regval_into_reg
+                      (add_vec (m8 !!! Regidx a5_idx)
+                         (m8 !!! Regidx s4_idx))]> m8).
+    assert (Hinv9 : vp_inv m0 m9 sp0 a fd (S i)).
+    { apply (vp_inv_upd _ _ _ _ _ _ a5_idx _ ltac:(vm_compute; reflexivity)).
+      unfold vp_inv. repeat (split; [ assumption | ]). exact Hfr8. }
+    assert (Ha59 : m9 !!! Regidx a5_idx = mword_of_int (a + Z.of_nat (S i))).
+    { rewrite (upd_eq m8 (Regidx a5_idx) (regval_into_reg _)). exact Eadd8. }
+    (* ---- 0x524  lbu s1,0(a5) -- the NEXT character, out of .rodata ---- *)
+    assert (Haddr : (a + Z.of_nat (S i))%Z
+                    = uint (m9 !!! Regidx a5_idx)
+                      + uoff_i12 (mword_of_int 0 : mword 12)).
+    { rewrite Ha59.
+      assert (Hb64a : 0 <= a + Z.of_nat (S i) < Z64) by (unfold Z64; lia).
+      rewrite (uint_moi (a + Z.of_nat (S i)) Hb64a).
+      replace (uoff_i12 (mword_of_int 0 : mword 12)) with 0
+        by (vm_compute; reflexivity).
+      lia. }
+    iApply (wp_uk_lbu_text γt γd γs h12 m9 (mword_of_int 0x524)
+              (mword_of_int 0 : mword 12) a5_idx s1_idx
+              (a + Z.of_nat (S i)) b1 (4 + n)
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              Haddr ltac:(vm_compute; discriminate)
+              with "[] Hb1 Hrun").
+    { iApply (uis_init_524 with "Hcode"). }
+    assert (E524 : add_vec_int (mword_of_int 0x524 : mword 64) 4
+                   = mword_of_int 0x528)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E524.
+    iIntros (h13) "Hrun".
+    set (m10 := <[Regidx s1_idx
+                  := regval_into_reg (zero_extend' 64 b1 : mword 64)]> m9).
+    iApply ("Hcont" $! h13 m10 with "[] [] Hrun").
+    { iPureIntro.
+      exact (vp_inv_upd m0 m9 sp0 a fd (S i) s1_idx _
+               ltac:(vm_compute; reflexivity) Hinv9). }
+    { iPureIntro. rewrite /m10 (upd_eq m9 (Regidx s1_idx) (regval_into_reg _)).
+      exact (zext8_moi b1). }
+  Qed.
+
 End UkInitVprintf.
