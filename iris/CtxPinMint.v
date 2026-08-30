@@ -111,7 +111,7 @@ Section CtxPinMint.
     (own_pub (hart_agent cpu_id) g.(glog) <= g.(gtv) cpu_id)%nat ->
     tso_interp_at riscv_eraGS g -∗ own_context xi -∗
     phys_pointsto a dq v -∗ a ↪[ts_name]{dq} ((t, TsoMemPa.ts_pay_none) : TsoMemPa.ts_elem) -∗
-    (llb (ctx_bound_name xi) t ∨ (t, a) ↪[ctx_dirty_name xi]{dq} ()) -∗
+    (llb (ctx_bound_name xi) t ∨ dset_in (ctx_dirty_name xi) (t, a)) -∗
     ⌜(t <= g.(gtv) cpu_id)%nat⌝.
   Proof.
     iIntros (Hdrain) "Hint Hrun Hpt Hts Hbit".
@@ -124,8 +124,8 @@ Section CtxPinMint.
     rewrite avf_hart in HKtv.
     iDestruct "Hbit" as "[Hclean | Hdirty]".
     - iDestruct (llb_valid with "Hb' Hclean") as %HtB. iPureIntro. lia.
-    - iDestruct (ghost_map_lookup with "Hd' Hdirty") as %HDlk.
-      iDestruct (big_sepM_lookup _ _ _ _ HDlk with "Hoks") as "Hok".
+    - iDestruct (dset_lookup with "Hd' Hdirty") as %HDlk.
+      iDestruct (big_sepS_elem_of _ _ _ HDlk with "Hoks") as "Hok".
       iDestruct "Hok" as "[%Hle | (%i & %msg & %Hti & Hi & %Htid)]".
       + cbn in Hle. iPureIntro. lia.
       + iDestruct (ghost_map_lookup with "Hm Hi") as %HLi.

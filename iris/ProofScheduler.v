@@ -1557,7 +1557,7 @@ Section ProofScheduler.
                   (* the scheduler ALWAYS comes back: its record is what the
                      dispatched thread's own park will resume. *)
                   true
-                  Hctxlen Holdc Hnewc (adm_none cpu_id) (adm_pin cpu_id)
+                  Hctxlen Holdc Hnewc ltac:(intros; apply _) (adm_none cpu_id) (adm_pin cpu_id)
                   with "Htext Hcg Hcpu Hpc Hctxcells [Hvc] [HP]").
         { iApply proc_ctx_resume_tok. iExact "Hvc". }
         { iEval (rewrite (rget_tp Mc)). iExact "HP". }

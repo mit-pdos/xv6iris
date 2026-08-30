@@ -1355,7 +1355,7 @@ Section ProofSched.
       iApply (Swtch.wp_swtch_sconf (p_sched γs) (Some cpu_id) None
                 (p_context (proc_addr j)) (a_cpu_ctx cid_word)
                 Mc ctxvs 0%nat eb pj false
-                Hctxlen Holdc Hnewc (adm_pin cpu_id) (adm_none cpu_id)
+                Hctxlen Holdc Hnewc ltac:(intros; apply _) (adm_pin cpu_id) (adm_none cpu_id)
                 with "Htext Hcg0 Hcpu Hpc Hctxcells [Hown Hrec] [HP] []").
       { iExists XIs. iFrame "Hrec". rewrite /resume_tok. iExact "Hown". }
       { iEval (rewrite (rget_tp Mc)). iExact "HP". }
@@ -1382,7 +1382,7 @@ Section ProofSched.
     iApply (Swtch.wp_swtch_sconf (p_sched γs) (Some cpu_id) None
               (p_context (proc_addr j)) (a_cpu_ctx cid_word)
               Mc ctxvs (av - 6)%nat eb pj true
-              Hctxlen Holdc Hnewc (adm_pin cpu_id) (adm_none cpu_id)
+              Hctxlen Holdc Hnewc ltac:(intros; apply _) (adm_pin cpu_id) (adm_none cpu_id)
               with "Htext Hcg Hcpu Hpc Hctxcells [Hown Hrec] [HP]").
     { iExists XIs. iFrame "Hrec". rewrite /resume_tok. iExact "Hown". }
     { iEval (rewrite (rget_tp Mc)). iExact "HP". }

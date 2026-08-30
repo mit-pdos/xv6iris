@@ -65,6 +65,7 @@ CtxMorphTac.v
 TsoCtxShim.v
 TsoCtxAbsorbLb.v
 TsoCtxPark.v
+TsoCtxMove.v
 CtxKMap.v
 CtxPinMint.v
 PermInv.v
@@ -201,6 +202,7 @@ KptPt.v
 KMap.v
 TrampText.v
 PtTree.v
+PtTreeMove.v
 KptGhost.v
 KstackArith.v
 KvmMap.v
@@ -505,6 +507,7 @@ VcGen.v
 VcGenS.v
 SwtchCtx.v
 CpuOwn.v
+CpuOwnMove.v
 ProcInv.v
 WpPushOffBridges.v
 CodeSwtch.v

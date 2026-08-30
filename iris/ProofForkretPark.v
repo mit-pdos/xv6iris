@@ -86,7 +86,7 @@ Require Import IrefSlots.
 Require Import WpUart LogInv.
 Require Import ProcAvail.
 Require Import ProcInv.
-Require Import SchedCtx.
+Require Import SchedCtx TsoCtxMove CtxMorphTac.
 Require Import UsertrapRes.  (* [ut_park_intro_body] -- the park's producer entry *)
 Require Import TsoCtxPark.
 Require Import StackOwn.
@@ -164,6 +164,11 @@ Lemma fkp_pstate_split `{!riscvGS Σ} (pa : mword 64) :
   pstate_whole pa RUNNING ⊣⊢ pstate_lock pa RUNNING ∗ pstate_at_hlf pa RUNNING.
 Proof. rewrite pstate_whole_split unclaimed_RUNNING. reflexivity. Qed.
 
+(* A6.128: the kstack pointer row is deposited into the child's record too *)
+Global Instance fkp_is_kstack_morph `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (pa ks : mword 64) :
+  CtxMorph (λ ξ, is_kstack (XI := ξ) pa ks).
+Proof. rewrite /is_kstack. ctx_morph_solve. Qed.
+
 Theorem forkret_park_paid
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (W : iProp Σ)
@@ -196,9 +201,18 @@ Proof.
      ([WpLockIn]).  The other rows stay at the parker's ξ, as below. *)
   iEval (rewrite /forkret_park_pkg) in "Hpkg".
   iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hglobp & #Hmk & Hstk & Hclose)".
+  (* A6.128: the record's cells go to the CHILD's identity [XIc] as well --
+     the record is stated at its own identity now
+     ([SwtchCtx.valid_context_pre]'s [XIp]).  The child's context is born
+     parked, so this is a deposit, like the stack's below. *)
+  iMod (ctx_deposit (λ ξ, ctx_cells (XI := ξ) (p_context (proc_addr j))
+                            (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest))
+          cur_ctx XIc 0 with "Hrun Hthr Hctx") as "(Hrun & %Tc0 & _ & Hthr & Hctx)".
   iMod (ctx_deposit (λ ξ, stack_own (KTR := KT1) (XI := ξ) (add_vec ks (mword_of_int 4096)) av)
-          cur_ctx XIc 0 with "Hrun Hthr Hstk") as "(Hrun & %Tc & _ & Hthr & Hstk)".
-  iMod (ctx_box_over XIc Tc with "Hthr") as "[Hthr (%ξb & Hbox & #Hfl)]".
+          cur_ctx XIc Tc0 with "Hrun Hthr Hstk") as "(Hrun & %Tc & _ & Hthr & Hstk)".
+  iMod (ctx_deposit (λ ξ, is_kstack (XI := ξ) (proc_addr j) ks)
+          cur_ctx XIc Tc with "Hrun Hthr Hks") as "(Hrun & %Tc1 & _ & Hthr & #Hksc)".
+  iMod (ctx_box_over XIc Tc1 with "Hthr") as "[Hthr (%ξb & Hbox & #Hfl)]".
   (* THE PACKAGE IS NOT UNDER A LATER ANY MORE -- its CLOSER ROW is, and
      that is the whole of what the fixpoint ever needed (tso-port.md §0.16′
      step (ii)).  THE PARKER'S OWN THREAD-OF-CONTROL TOKEN is borrowed and
@@ -217,8 +231,8 @@ Proof.
      them at in this tree, so the two agree and nothing is unsound; what is
      missing is the [XIp] reshape, not a law. *)
   iModIntro. iFrame "Hrun".
-  rewrite /proc_ctx_boxed. iExists ξb, Tc. iFrame "Hbox".
-  rewrite /proc_ctx_at. iExists XIc, Tc. iFrame "Hthr Hfl".
+  rewrite /proc_ctx_boxed. iExists ξb, Tc1. iFrame "Hbox".
+  rewrite /proc_ctx_at. iExists XIc, Tc1. iFrame "Hthr Hfl".
   iNext.
   (* ---- the record: the cells allocproc left, and the free stack ---- *)
   rewrite (valid_context_unfold (p_sched γs) None (p_context (proc_addr j)) (proc_addr j) XIc)
@@ -279,7 +293,7 @@ Proof.
   iDestruct (cpu_claim_proc (CID := h) j Hj with "Hhlf2 Htag1") as "Hclm".
   (* ---- the lock resource: the raw context cells the wand handed back,
          and THAT hart's parked scheduler, which is [run_slot] ---- *)
-  iAssert (own_ctx (p_context (proc_addr j))) with "[Hcells]" as "Hown".
+  iAssert (own_ctx (XI := XIc) (p_context (proc_addr j))) with "[Hcells]" as "Hown".
   { iExists (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest).
     iFrame "Hcells". iPureIntro. cbn [length]. lia. }
   (* the dispatching scheduler's record came back with its RUNNING token
@@ -288,9 +302,9 @@ Proof.
   iDestruct "Hrec" as (XIo) "[Htok Hrec]".
   iEval (rewrite /park_tok) in "Htok".
   iDestruct (sched_vc_at_intro γs h _ _ XIo with "Htok Hrec") as "Hrec".
-  iDestruct (proc_slots_running_intro γs j h Hj with "Htag2 Hown Hrec Hmk")
+  iDestruct (proc_slots_running_intro (XI := XIc) γs j h Hj with "Htag2 Hown Hrec Hmk")
     as "Hslots".
-  iDestruct (proc_lock_res_intro γs γl (proc_addr j) RUNNING ch
+  iDestruct (proc_lock_res_intro (XI := XIc) γs γl (proc_addr j) RUNNING ch
                with "Hstate Hplock Hchan Hpub Hslots") as "HR".
   (* ---- the two register facts, off the saved image ---- *)
   assert (Hra : m !!! Regidx (mword_of_int 1 : mword 5) = forkret_pc).
@@ -312,11 +326,21 @@ Proof.
   (* ================================================================== *)
   (* forkret, at the resuming hart.                                      *)
   (* ================================================================== *)
-  iApply (FR.wp_forkret (CID := h) W j γs γl γw γft γf γtl pid V ks m av
+  iApply (FR.wp_forkret (CID := h) (XI := XIc) W j γs γl γw γft γf γtl pid V ks m av
             (av - 6 - trap_res eb')%nat eb'
             Hj Hgl Hbud Hkx Hut Hsp
-          with "Htext Hwire Hkmap Hpc Hpinv Hglobp Hcg Hcpu Htc Hclm
-                Hlocked HR Hks Hpriv HW Hclose").
+          with "Htext Hwire Hkmap Hpc [] [] Hcg Hcpu Htc Hclm
+                Hlocked HR Hksc [Hpriv] HW Hclose").
+  (* THE FRONTIER (tso-port.md §0.43′): three rows are still at the
+     PARKER's context -- [procs_inv], [park_globals]'s handles, and the
+     child's private block through [BioInv.buf_escrow] -- constant
+     embeddings of ξ-indexed bodies, which neither [CtxMorph] (at the park)
+     nor [ctx_move] (the parker's token is gone by the resume) can carry.
+     Bracketed so the mismatch FAILS HERE, fast, instead of sending
+     [iApply]'s unifier through the bodies. *)
+  { iExact "Hpinv". }
+  { iExact "Hglobp". }
+  iExact "Hpriv".
 Qed.
 
 (* ===================================================================== *)

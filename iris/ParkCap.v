@@ -172,16 +172,12 @@ Section ParkCap.
           because it is the fixpoint variable *)
        ▷ W -∗
        park_child (XI := ξp) γs γf pa ks rest pid V -∗
-       (* THE CONCLUSION NAMES [ξp] EXPLICITLY, and that is this tree's one
-          divergence from main's shape.  On main [SchedCtx.proc_ctx] is a
-          CLOSED TERM -- the §0.15′ [XIp] reshape put [valid_context]'s rows
-          at the record's own existential identity -- so the conclusion
-          needed no annotation.  Here the reshape has not landed, so
-          [proc_ctx] is ξ-indexed and the record a parker builds is at the
-          PARKER's ξ; naming it keeps [park_cap]/[park_token] ξ-FREE all the
-          same, which is the property [UtResFits] needs.  Drop the
-          annotation when the reshape lands. *)
-       |==> own_context (CID := hp) ξp ∗ proc_ctx_boxed (XI := ξp) γs pa)%I.
+       (* THE CONCLUSION IS ξ-FREE: [SchedCtx.proc_ctx_boxed] is a CLOSED
+          TERM since A6.128 (the record's rows live at the record's own
+          existential identity, [SwtchCtx.valid_context_pre]'s [XIp]) --
+          main's §0.15′ shape, reached here by the same-hart hand-off.  This
+          is the property [UtResFits] needs of [park_cap]/[park_token]. *)
+       |==> own_context (CID := hp) ξp ∗ proc_ctx_boxed γs pa)%I.
 
   (* THE CHANNEL, at a given [W], as a [□] proposition under a later -- for
      the records of THIS table ([un_s N = γs]), which is all the token for

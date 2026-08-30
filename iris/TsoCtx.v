@@ -242,16 +242,16 @@ Section ctx.
      are what [ctx_dom] borrows; agreement across halves is what pins
      the borrow. *)
   Definition ctx_at (ξ : CtxId) (q : Qp) (B : nat)
-      (D : gmap (nat * Arch.pa) unit) : iProp Σ :=
+      (D : gset (nat * Arch.pa)) : iProp Σ :=
     (mono_nat_auth_own (ctx_bound_name ξ) q B ∗
-     ghost_map_auth (ctx_dirty_name ξ) q D)%I.
+     dset_auth (ctx_dirty_name ξ) q D)%I.
 
   Lemma ctx_at_halves ξ B D :
     ctx_at ξ 1 B D ⊣⊢ ctx_at ξ (1/2) B D ∗ ctx_at ξ (1/2) B D.
   Proof.
     rewrite /ctx_at.
     rewrite (fractional_half (mono_nat_auth_own (ctx_bound_name ξ) 1 B)).
-    rewrite (fractional_half (ghost_map_auth (ctx_dirty_name ξ) 1 D)).
+    rewrite (dset_halves (ctx_dirty_name ξ) D).
     iSplit; [iIntros "[[$ $] [$ $]]" | iIntros "[[$ $] [$ $]]"].
   Qed.
 
@@ -260,7 +260,7 @@ Section ctx.
   Proof.
     iIntros "[Hb1 Hd1] [Hb2 Hd2]".
     iDestruct (mono_nat_auth_own_agree with "Hb1 Hb2") as %[_ ?].
-    iDestruct (ghost_map_auth_agree with "Hd1 Hd2") as %?.
+    iDestruct (dset_agree with "Hd1 Hd2") as %?.
     by iPureIntro.
   Qed.
 
@@ -292,11 +292,11 @@ Section ctx.
      [sie_cap_gpr] (ruling 2), is born at boot ([own_context_boot], one
      per hart), exchanged at swtch, and dropped at a zombie park. *)
   Definition own_context_def `{CID : CpuId} (ξ : CtxId) : iProp Σ :=
-    (∃ (B K W : nat) (D : gmap (nat * Arch.pa) unit),
+    (∃ (B K W : nat) (D : gset (nat * Arch.pa)),
       ctx_at ξ 1 B D ∗
       view_lb view_name loglen_name (hart_agent cpu_id) K ∗ ⌜(B ≤ K)%nat⌝ ∗
-      llb loglen_name W ∗ ⌜∀ k, k ∈ dom D → (k.1 ≤ W)%nat⌝ ∗
-      [∗ map] k ↦ _ ∈ D, dirty_ok logm_name (hart_agent cpu_id) B k)%I.
+      llb loglen_name W ∗ ⌜∀ k, k ∈ D → (k.1 ≤ W)%nat⌝ ∗
+      [∗ set] k ∈ D, dirty_ok logm_name (hart_agent cpu_id) B k)%I.
   Lemma own_context_aux : { f | f = @own_context_def }.
   Proof. by eexists. Qed.
   Definition own_context `{CID : CpuId} (ξ : CtxId) : iProp Σ :=
@@ -371,9 +371,9 @@ Section ctx.
      hart-ambient: a parked record is migratable, and this token is why
      that is type-correct. *)
   Definition ctx_parked_def (ξ : CtxId) (T : nat) : iProp Σ :=
-    (∃ D : gmap (nat * Arch.pa) unit,
+    (∃ D : gset (nat * Arch.pa),
       ctx_at ξ 1 T D ∗ llb loglen_name T ∗
-      ⌜∀ k, k ∈ dom D → (k.1 ≤ T)%nat⌝)%I.
+      ⌜∀ k, k ∈ D → (k.1 ≤ T)%nat⌝)%I.
   Lemma ctx_parked_aux : { f | f = ctx_parked_def }.
   Proof. by eexists. Qed.
   Definition ctx_parked (ξ : CtxId) (T : nat) : iProp Σ :=
@@ -455,10 +455,10 @@ Section ctx.
         iEval (rewrite hart_view_lb_unseal /hart_view_lb_def) in "HK'".
         iExact "HK'". }
     (* the dirty justifications, at the raised bound *)
-    iAssert ([∗ map] k ↦ _ ∈ D,
+    iAssert ([∗ set] k ∈ D,
                dirty_ok logm_name (hart_agent cpu_id) (Nat.max B K') k)%I
       as "#Hoks'".
-    { iApply (big_sepM_impl with "Hoks"). iIntros "!>" (k x _) "Hok".
+    { iApply (big_sepS_impl with "Hoks"). iIntros "!>" (k _) "Hok".
       iDestruct "Hok" as "[%Hle | Hown]"; [ iLeft; iPureIntro; lia | by iRight ]. }
     iModIntro.
     iSplitL "Hb Hd".
@@ -517,12 +517,12 @@ Section ctx.
   Lemma ctx_parked_alloc : ⊢ |==> ∃ ξc : CtxId, ctx_parked ξc 0.
   Proof.
     iMod (mono_nat_own_alloc 0) as (γb) "[Hb _]".
-    iMod (ghost_map_alloc_empty (K := nat * Arch.pa) (V := unit)) as (γd) "Hd".
+    iMod dset_alloc as (γd) "Hd".
     iModIntro. iExists (MkCtxId γb γd).
     rewrite ctx_parked_unseal /ctx_parked_def.
     iExists ∅. iFrame "Hb Hd".
     iSplitR; first by iApply llb_0.
-    iPureIntro. intros k Hk. rewrite dom_empty in Hk. set_solver.
+    iPureIntro. intros k Hk. set_solver.
   Qed.
 
   (* BOOT'S MINT: a hart's FIRST running token.  One per hart, at
@@ -534,16 +534,15 @@ Section ctx.
   Lemma own_context_boot `{CID : CpuId} : ⊢ |==> ∃ ξ : CtxId, own_context ξ.
   Proof.
     iMod (mono_nat_own_alloc 0) as (γb) "[Hb _]".
-    iMod (ghost_map_alloc_empty (K := nat * Arch.pa) (V := unit)) as (γd) "Hd".
+    iMod dset_alloc as (γd) "Hd".
     iModIntro. iExists (MkCtxId γb γd).
     rewrite own_context_unseal /own_context_def.
     iExists 0%nat, 0%nat, 0%nat, ∅. iFrame "Hb Hd".
     iSplitR; first by iApply view_lb_0.
     iSplitR; first done.
     iSplitR; first by iApply llb_0.
-    iSplitR; first (iPureIntro; intros k Hk; rewrite dom_empty in Hk;
-                    set_solver).
-    by iApply big_sepM_empty.
+    iSplitR; first (iPureIntro; intros k Hk; set_solver).
+    by iApply big_sepS_empty.
   Qed.
 
   (* PARK: publish and let go of the hart.  ONE BOUND-RAISE converts
@@ -582,8 +581,8 @@ Section ctx.
     iModIntro. iExists T, K, T, D. iFrame "Hat HK HT".
     iSplitR; first done.
     iSplitR; first done.
-    iApply big_sepM_intro. iIntros "!>" (k [] Hk).
-    iLeft. iPureIntro. apply HDT. by eapply elem_of_dom_2.
+    iApply big_sepS_intro. iIntros "!>" (k Hk).
+    iLeft. iPureIntro. by apply HDT.
   Qed.
 
   (* THE SWTCH EXCHANGE: a hart always runs exactly one thread, so the
@@ -636,7 +635,7 @@ Section ctx.
        pointsto (L:=Arch.pa) (V:=bv 8) (pa_of ppn va) dq v ∗
        (pa_of ppn va) ↪[ts_name]{dq} (t, ts_pay_none) ∗
        (llb (ctx_bound_name ξ) t                             (* CLEAN *)
-        ∨ (t, pa_of ppn va) ↪[ctx_dirty_name ξ]{dq} ()))%I.  (* DIRTY *)
+        ∨ dset_in (ctx_dirty_name ξ) (t, pa_of ppn va)))%I.  (* DIRTY *)
   Lemma ctx_pointsto_aux : { f | f = @ctx_pointsto_def }.
   Proof. by eexists. Qed.
   Definition ctx_pointsto `{KTR : !CurKtier} (ξ : CtxId)
@@ -743,8 +742,8 @@ Section ctx.
           iSplit; [done|]. iSplit; [done|]. iSplit; [done|]. by iLeft.
         * iExists ppn, t. iFrame "Hk Hpt2 Hts2".
           iSplit; [done|]. iSplit; [done|]. iSplit; [done|]. by iLeft.
-      + iDestruct "Hdt" as "[Hdt1 Hdt2]".
-        iSplitL "Hpt1 Hts1 Hdt1".
+      + iDestruct "Hdt" as "#Hdt1". iPoseProof "Hdt1" as "Hdt2".
+        iSplitL "Hpt1 Hts1".
         * iExists ppn, t. iFrame "Hk Hpt1 Hts1 Hdt1".
           iSplit; [done|]. iSplit; [done|]. done.
         * iExists ppn, t. iFrame "Hk Hpt2 Hts2 Hdt2".
@@ -760,8 +759,7 @@ Section ctx.
       iSplit; first done. iSplit; first done. iSplit; first done.
       iDestruct "Hbit1" as "[#Hcl | Hdt1]"; first by iLeft.
       iDestruct "Hbit2" as "[#Hcl | Hdt2]"; first by iLeft.
-      iDestruct (ghost_map_elem_combine with "Hdt1 Hdt2") as "[Hdt _]".
-      rewrite dfrac_op_own. by iRight.
+      iRight. iExact "Hdt1".
   Qed.
 
   Lemma ctx_pointsto_persist `{KTR : !CurKtier} ξ a dq b :
@@ -774,8 +772,7 @@ Section ctx.
     iDestruct "Hbit" as "[#Hcl | Hdt]".
     - iModIntro. iExists ppn, t. iFrame "Hk Hpt Hts".
       iSplit; first done. iSplit; first done. iSplit; first done. by iLeft.
-    - iMod (ghost_map_elem_persist with "Hdt") as "Hdt".
-      iModIntro. iExists ppn, t. iFrame "Hk Hpt Hts".
+    - iModIntro. iExists ppn, t. iFrame "Hk Hpt Hts".
       iSplit; first done. iSplit; first done. iSplit; first done. by iRight.
   Qed.
 
@@ -1404,9 +1401,9 @@ Section ctx.
      registering later facts -- the unsound step the `weak-memory`
      branch's notes call out). *)
   Definition ctx_dom_def (ξ ξ' : CtxId) : iProp Σ :=
-    (∃ (B W B' : nat) (D : gmap (nat * Arch.pa) unit),
+    (∃ (B W B' : nat) (D : gset (nat * Arch.pa)),
       ctx_at ξ (1/2) B D ∗
-      ⌜∀ k, k ∈ dom D → (k.1 ≤ W)%nat⌝ ∗
+      ⌜∀ k, k ∈ D → (k.1 ≤ W)%nat⌝ ∗
       ⌜(B ≤ B')%nat⌝ ∗ ⌜(W ≤ B')%nat⌝ ∗
       mono_nat_lb_own (ctx_bound_name ξ') B')%I.
   Lemma ctx_dom_aux : { f | f = ctx_dom_def }.
@@ -1478,9 +1475,8 @@ Section ctx.
     { iDestruct "Hbit" as "[Hcl | Hdt]".
       - iDestruct (llb_valid_q with "Hb Hcl") as %HtB.
         iPureIntro. lia.
-      - iDestruct (ghost_map_lookup with "Hdm Hdt") as %HDt.
-        have HtW : ((t, pa_of ppn a).1 ≤ W)%nat
-          by apply HDW; eapply elem_of_dom_2.
+      - iDestruct (dset_lookup with "Hdm Hdt") as %HDt.
+        have HtW : ((t, pa_of ppn a).1 ≤ W)%nat by apply HDW.
         simpl in HtW. iPureIntro. lia. }
     iClear "Hbit". iModIntro.
     iSplitL "Hb Hdm".
@@ -1750,8 +1746,8 @@ Section ctx.
       iSplitR; first iExact "Hrcpt".
       iSplitR; first done.
       iFrame "HW". iSplitR; first done.
-      iApply (big_sepM_impl with "Hoks").
-      iIntros "!>" (k [] Hk) "Hok".
+      iApply (big_sepS_impl with "Hoks").
+      iIntros "!>" (k Hk) "Hok".
       iApply (dirty_ok_mono with "Hok"). lia. }
     iSplitL "Hat1".
     { iExists T, T, (g.(gtv) cpu_id), D. iFrame "Hat1 Hlb'".
@@ -1847,8 +1843,8 @@ Section ctx.
         iDestruct (llb_valid with "Hb Hcl") as %HtB.
         iPureIntro. intros tv' Htv'. apply visibleb_below. lia.
       - (* dirty: the bundle's justification *)
-        iDestruct (ghost_map_lookup with "Hd Hdt") as %HDt.
-        iDestruct (big_sepM_lookup _ _ _ _ HDt with "Hoks") as "[%HtB | Hown]".
+        iDestruct (dset_lookup with "Hd Hdt") as %HDt.
+        iDestruct (big_sepS_elem_of _ _ _ HDt with "Hoks") as "[%HtB | Hown]".
         + iPureIntro. intros tv' Htv'. apply visibleb_below.
           simpl in HtB. lia.
         + iDestruct "Hown" as (i m) "(%Hti & Hi & %Htid)".
@@ -2100,7 +2096,7 @@ Section ctx.
        phys_pointsto a dq v ∗
        a ↪[ts_name]{dq} (t, ts_pay_none) ∗
        (llb (ctx_bound_name ξ) t                          (* CLEAN *)
-        ∨ (t, a) ↪[ctx_dirty_name ξ]{dq} ()))%I.          (* DIRTY *)
+        ∨ dset_in (ctx_dirty_name ξ) (t, a)))%I.          (* DIRTY *)
   Lemma ctx_phys_pointsto_aux : { f | f = ctx_phys_pointsto_def }.
   Proof. by eexists. Qed.
   Definition ctx_phys_pointsto (ξ : CtxId) (a : Arch.pa) (dq : dfrac)
@@ -2328,22 +2324,22 @@ Section ctx.
      before (one [ctx_phys_pointsto_free] on the way in). *)
   Local Lemma ctx_store_bytes (ξ : CtxId) (h : agent) (B i : nat)
       (msg : pwmsg) (Pold Pnew mem : gmap Arch.pa (bv 8))
-      (TM : gmap Arch.pa ts_elem) (D : gmap (nat * Arch.pa) unit) :
+      (TM : gmap Arch.pa ts_elem) (D : gset (nat * Arch.pa)) :
     dom Pold = dom Pnew ->
-    (forall k, k ∈ dom D -> (k.1 <= i)%nat) ->
+    (forall k, k ∈ D -> (k.1 <= i)%nat) ->
     gen_heap_interp (hG := riscv_memGS) mem -∗
     ghost_map_auth ts_name 1 TM -∗
-    ghost_map_auth (ctx_dirty_name ξ) 1 D -∗
+    dset_auth (ctx_dirty_name ξ) 1 D -∗
     ([∗ map] a ↦ _ ∈ Pold, phys_free a (DfracOwn 1)) ==∗
-    ∃ D' : gmap (nat * Arch.pa) unit,
+    ∃ D' : gset (nat * Arch.pa),
       ⌜dom Pnew ⊆ dom mem⌝ ∗
-      ⌜forall k, k ∈ dom D' <-> (k ∈ dom D \/ (k.1 = S i /\ k.2 ∈ dom Pnew))⌝ ∗
+      ⌜forall k, k ∈ D' <-> (k ∈ D \/ (k.1 = S i /\ k.2 ∈ dom Pnew))⌝ ∗
       gen_heap_interp (hG := riscv_memGS) (Pnew ∪ mem) ∗
       ghost_map_auth ts_name 1 (((fun _ => (S i, ts_pay_none)) <$> Pnew) ∪ TM) ∗
-      ghost_map_auth (ctx_dirty_name ξ) 1 D' ∗
+      dset_auth (ctx_dirty_name ξ) 1 D' ∗
       ([∗ map] a ↦ v ∈ Pnew,
          phys_pointsto a (DfracOwn 1) v ∗ a ↪[ts_name] (S i, ts_pay_none) ∗
-         (S i, a) ↪[ctx_dirty_name ξ] ()).
+         dset_in (ctx_dirty_name ξ) (S i, a)).
   Proof.
     revert Pold. induction Pnew as [|a vn P2 Hfresh IH] using map_ind;
       intros Pold Hdom HD.
@@ -2371,17 +2367,11 @@ Section ctx.
       iDestruct (phys_valid with "Hgh Hpt") as %Hmem.
       iMod (phys_update _ a vo0 vn with "Hgh Hpt") as "[Hgh Hpt]".
       iMod (ghost_map_update (S i, ts_pay_none) with "Hts Hte") as "[Hts Hte]".
-      (* the dirty key is FRESH: every old key is at or below [i] and every
-         key this loop has added names an address of [P2], which [a] is not *)
-      assert (Hfr : D2 !! (S i, a) = None).
-      { destruct (D2 !! (S i, a)) as [[]|] eqn:Hlk; last done. exfalso.
-        assert (Hin : (S i, a) ∈ dom D2) by (by apply elem_of_dom_2 in Hlk).
-        apply HD2 in Hin as [Hin|[_ Hin]].
-        - have := HD _ Hin. simpl. lia.
-        - simpl in Hin. by apply not_elem_of_dom in Hfresh. }
-      iMod (ghost_map_insert (S i, a) () Hfr with "Hd") as "[Hd Hdt]".
+      (* the dirty key is REGISTERED (A6.128: registration is monotone and
+         needs no freshness -- the set authority re-mints membership) *)
+      iMod (dset_insert _ D2 (S i, a) with "Hd") as "[Hd #Hdt]".
       iModIntro.
-      iExists (<[(S i, a) := ()]> D2).
+      iExists (D2 ∪ {[(S i, a)]}).
       rewrite fmap_insert -!insert_union_l !big_sepM_insert //.
       iFrame "Hgh Hts Hd Hbig Hpt Hte Hdt".
       iPureIntro. split.
@@ -2391,15 +2381,14 @@ Section ctx.
           destruct Hmem as [Hx|Hx]; last done.
           apply not_elem_of_dom in Hfresh. set_solver. }
         set_solver. }
-      intros k. rewrite dom_insert_L elem_of_union elem_of_singleton
-                        dom_insert_L.
+      intros k. rewrite elem_of_union elem_of_singleton dom_insert_L.
       split.
-      + intros [->|Hk]; first (right; simpl; set_solver).
+      + intros [Hk| ->]; last (right; simpl; set_solver).
         apply HD2 in Hk as [Hk|[Hk1 Hk2]]; [by left|]. right. set_solver.
-      + intros [Hk|[Hk1 Hk2]]; first (right; apply HD2; by left).
+      + intros [Hk|[Hk1 Hk2]]; first (left; apply HD2; by left).
         apply elem_of_union in Hk2 as [Hk2|Hk2].
-        * apply elem_of_singleton in Hk2. left. destruct k; cbn in *. by subst.
-        * right. apply HD2. right. by split.
+        * apply elem_of_singleton in Hk2. right. destruct k; cbn in *. by subst.
+        * left. apply HD2. right. by split.
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -2476,7 +2465,7 @@ Section ctx.
     iMod (mono_nat_own_update (length g'.(glog)) with "Hlen") as "[Hlen #Hlb]".
     { rewrite Hlog length_app /=. lia. }
     (* (1) + (4): the footprint *)
-    assert (HDi : forall k, k ∈ dom D -> (k.1 <= length g.(glog))%nat).
+    assert (HDi : forall k, k ∈ D -> (k.1 <= length g.(glog))%nat).
     { intros k Hk. have := HDW _ Hk. lia. }
     iMod (ctx_store_bytes ξ (hart_agent cpu_id) B (length g.(glog)) msg
             Pold Pnew g.(gmem) TM D Hdom HDi with "Hgh Hts Hd Hold")
@@ -2562,11 +2551,9 @@ Section ctx.
       { iPureIntro. intros k Hk. apply HD' in Hk as [Hk|[Hk1 _]].
         - have := HDW _ Hk. lia.
         - rewrite Hk1 Hlen'. lia. }
-      iApply big_sepM_intro. iIntros "!>" (k [] Hk).
-      assert (Hk' : k ∈ dom D') by (by eapply elem_of_dom_2).
-      apply HD' in Hk' as [Hin|[Hk1 _]].
-      - apply elem_of_dom in Hin as [[] Hin].
-        by iApply (big_sepM_lookup _ _ _ _ Hin with "Hoks").
+      iApply big_sepS_intro. iIntros "!>" (k Hk).
+      apply HD' in Hk as [Hin|[Hk1 _]].
+      - by iApply (big_sepS_elem_of _ _ _ Hin with "Hoks").
       - iRight. iExists (length g.(glog)), msg. iFrame "Hlogm".
         by iPureIntro. }
     iApply (big_sepM_mono with "Hbig").
@@ -2887,7 +2874,7 @@ Section ctx.
   (* halves of one atomic step, split only so the append can sit between. *)
   (* ================================================================== *)
   Definition ctx_wrote (ξ : CtxId) (t : nat) (a : Arch.pa) : iProp Σ :=
-    ((t, a) ↪[ctx_dirty_name ξ]□ ())%I.
+    dset_in (ctx_dirty_name ξ) (t, a).
 
   Global Instance ctx_wrote_persistent ξ t a : Persistent (ctx_wrote ξ t a).
   Proof. rewrite /ctx_wrote. apply _. Qed.
@@ -2896,11 +2883,11 @@ Section ctx.
 
   (* the token with its dirty watermark exposed (and its [llb] peeled off) *)
   Definition own_context_w `{CID : CpuId} (ξ : CtxId) (W : nat) : iProp Σ :=
-    (∃ (B K : nat) (D : gmap (nat * Arch.pa) unit),
+    (∃ (B K : nat) (D : gset (nat * Arch.pa)),
       ctx_at ξ 1 B D ∗
       view_lb view_name loglen_name (hart_agent cpu_id) K ∗ ⌜(B ≤ K)%nat⌝ ∗
-      ⌜∀ k, k ∈ dom D → (k.1 ≤ W)%nat⌝ ∗
-      [∗ map] k ↦ _ ∈ D, dirty_ok logm_name (hart_agent cpu_id) B k)%I.
+      ⌜∀ k, k ∈ D → (k.1 ≤ W)%nat⌝ ∗
+      [∗ set] k ∈ D, dirty_ok logm_name (hart_agent cpu_id) B k)%I.
 
   Lemma own_context_expose_w `{CID : CpuId} (ξ : CtxId) :
     own_context ξ -∗ ∃ W : nat, llb loglen_name W ∗ own_context_w ξ W.
@@ -2929,23 +2916,22 @@ Section ctx.
   Proof.
     iIntros (HWi Htid) "(%B & %K & %D & Hat & #HK & %HBK & %HDW & #Hoks) #HSi #Hm".
     iDestruct "Hat" as "[Hb Hd]".
-    assert (Hnone : D !! (S i, a) = None).
-    { apply not_elem_of_dom. intros Hin. specialize (HDW _ Hin).
-      simpl in HDW. lia. }
-    iMod (ghost_map_insert_persist (S i, a) () Hnone with "Hd") as "[Hd #Hfrag]".
+    assert (Hnone : (S i, a) ∉ D).
+    { intros Hin. specialize (HDW _ Hin). simpl in HDW. lia. }
+    iMod (dset_insert _ D (S i, a) with "Hd") as "[Hd #Hfrag]".
     iModIntro. iSplitL.
     - rewrite own_context_unseal /own_context_def.
-      iExists B, K, (S i), (<[(S i, a) := ()]> D).
+      iExists B, K, (S i), (D ∪ {[(S i, a)]}).
       iSplitL "Hb Hd"; [ rewrite /ctx_at; iFrame "Hb Hd" | ].
       iSplitR; [ iExact "HK" | ].
       iSplitR; [ iPureIntro; exact HBK | ].
       iSplitR; [ iExact "HSi" | ].
       iSplitR.
-      { iPureIntro. intros k Hk. rewrite dom_insert_L in Hk.
+      { iPureIntro. intros k Hk.
         apply elem_of_union in Hk as [Hk | Hk].
-        - apply elem_of_singleton in Hk. subst k. simpl. lia.
-        - specialize (HDW _ Hk). lia. }
-      rewrite big_sepM_insert; last exact Hnone.
+        - specialize (HDW _ Hk). lia.
+        - apply elem_of_singleton in Hk. subst k. simpl. lia. }
+      rewrite (union_comm_L D) big_sepS_insert; last exact Hnone.
       iSplitR; [ | iExact "Hoks" ].
       rewrite /dirty_ok. iRight. iExists i, m. simpl.
       iSplitR; [ iPureIntro; reflexivity | ].
@@ -2968,8 +2954,8 @@ Section ctx.
     iDestruct "Hrun" as (B K W D) "(Hat & #HK & %HBK & #HW & %HDW & #Hoks)".
     iDestruct "Hat" as "[Hb Hd]".
     iEval (rewrite /ctx_wrote) in "Hw".
-    iDestruct (ghost_map_lookup with "Hd Hw") as %HD.
-    iDestruct (big_sepM_lookup _ _ (t, a) () HD with "Hoks") as "#Hok".
+    iDestruct (dset_lookup with "Hd Hw") as %HD.
+    iDestruct (big_sepS_elem_of _ _ (t, a) HD with "Hoks") as "#Hok".
     iSplitL.
     { iEval (rewrite own_context_unseal /own_context_def).
       iExists B, K, W, D. iFrame "Hb Hd HK HW Hoks". by iPureIntro. }
@@ -2991,8 +2977,8 @@ Section ctx.
   Proof.
     rewrite ctx_dom_unseal /ctx_dom_def /ctx_floor /ctx_wrote.
     iIntros "(%B & %W & %B' & %D & [Hb Hd] & %HDW & %HBB' & %HWB' & #Hlb') #Hw".
-    iDestruct (ghost_map_lookup with "Hd Hw") as %HD.
-    apply elem_of_dom_2 in HD. pose proof (HDW _ HD) as HtW. simpl in HtW.
+    iDestruct (dset_lookup with "Hd Hw") as %HD.
+    pose proof (HDW _ HD) as HtW. simpl in HtW.
     iSplitR "".
     - iExists B, W, B', D. iFrame "Hb Hd Hlb'". by iPureIntro.
     - iApply (llb_le _ B'); [lia|]. by iLeft.
@@ -3289,7 +3275,7 @@ Section ctx.
             /ctx_floor /ctx_wrote.
     iIntros "(%t & Hpt & Hts & [#Hcl | Hd])".
     - iModIntro. iExists t. iFrame "Hpt Hts". by iLeft.
-    - iMod (ghost_map_elem_persist with "Hd") as "#Hd".
+    - iDestruct "Hd" as "#Hd".
       iModIntro. iExists t. iFrame "Hpt Hts". by iRight.
   Qed.
 
@@ -3309,7 +3295,7 @@ Section ctx.
     (∃ t : nat,
        phys_pointsto a (DfracOwn (1/2)) v ∗
        a ↪[ts_name]{DfracOwn (1/2)} (t, TsoMemPa.ts_pay_none) ∗
-       (llb (ctx_bound_name ξ) t ∨ (t, a) ↪[ctx_dirty_name ξ] ()))%I.
+       (llb (ctx_bound_name ξ) t ∨ dset_in (ctx_dirty_name ξ) (t, a)))%I.
 
   Lemma ctx_phys_pointsto_split (ξ : CtxId) (a : Arch.pa) (v : bv 8) :
     ctx_phys_pointsto ξ a (DfracOwn 1) v ⊢
@@ -3355,9 +3341,8 @@ Section ctx.
     { iDestruct "Hbit" as "[Hcl | Hdt]".
       - iDestruct (llb_valid_q with "Hb Hcl") as %HtB.
         iPureIntro. lia.
-      - iDestruct (ghost_map_lookup with "Hdm Hdt") as %HDt.
-        have HtW : ((t, a).1 ≤ W)%nat
-          by apply HDW; eapply elem_of_dom_2.
+      - iDestruct (dset_lookup with "Hdm Hdt") as %HDt.
+        have HtW : ((t, a).1 ≤ W)%nat by apply HDW.
         simpl in HtW. iPureIntro. lia. }
     iClear "Hbit". iModIntro.
     iSplitL "Hb Hdm".
@@ -3378,7 +3363,7 @@ Section ctx.
   Definition ctx_cell_keep (ξ : CtxId) (a : Arch.pa) : iProp Σ :=
     (∃ t : nat,
        a ↪[ts_name]{DfracOwn (1/2)} (t, TsoMemPa.ts_pay_none) ∗
-       (llb (ctx_bound_name ξ) t ∨ (t, a) ↪[ctx_dirty_name ξ] ()))%I.
+       (llb (ctx_bound_name ξ) t ∨ dset_in (ctx_dirty_name ξ) (t, a)))%I.
 
   Lemma ctx_phys_pointsto_offer_split (ξ : CtxId) (a : Arch.pa) (v : bv 8) :
     ctx_phys_pointsto ξ a (DfracOwn 1) v ⊢
@@ -3418,9 +3403,8 @@ Section ctx.
     { iDestruct "Hbit" as "[Hcl | Hdt]".
       - iDestruct (llb_valid_q with "Hb Hcl") as %HtB.
         iPureIntro. lia.
-      - iDestruct (ghost_map_lookup with "Hdm Hdt") as %HDt.
-        have HtW : ((t, a).1 ≤ W)%nat
-          by apply HDW; eapply elem_of_dom_2.
+      - iDestruct (dset_lookup with "Hdm Hdt") as %HDt.
+        have HtW : ((t, a).1 ≤ W)%nat by apply HDW.
         simpl in HtW. iPureIntro. lia. }
     iClear "Hbit". iModIntro.
     iSplitL "Hb Hdm".
@@ -4427,8 +4411,8 @@ Section ctx.
     { iDestruct "Hbit" as "[Hcl | Hdt]".
       - iDestruct (llb_valid with "Hb Hcl") as %HtB.
         iPureIntro. intros tv' Htv'. apply visibleb_below. lia.
-      - iDestruct (ghost_map_lookup with "Hd Hdt") as %HDt.
-        iDestruct (big_sepM_lookup _ _ _ _ HDt with "Hoks") as "[%HtB | Hown]".
+      - iDestruct (dset_lookup with "Hd Hdt") as %HDt.
+        iDestruct (big_sepS_elem_of _ _ _ HDt with "Hoks") as "[%HtB | Hown]".
         + iPureIntro. intros tv' Htv'. apply visibleb_below.
           simpl in HtB. lia.
         + iDestruct "Hown" as (i mg) "(%Hti & Hi & %Htid)".

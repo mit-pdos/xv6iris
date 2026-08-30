@@ -1,0 +1,161 @@
+DIGEST da53110db584dfe5cf70857cee4852e0
+Fxv6iris.CpuOwnMove
+R525:530 Stdlib.ZArith.ZArith <> <> lib
+R532:534 Stdlib.micromega.Lia <> <> lib
+R536:539 Stdlib.Lists.List <> <> lib
+R568:571 stdpp.gmap <> <> lib
+R573:593 stdpp.bitvector.definitions <> <> lib
+R631:639 iris.proofmode.proofmode <> <> lib
+R682:690 iris.base_logic.lib.ghost_var <> <> lib
+R692:701 iris.base_logic.lib.invariants <> <> lib
+R719:732 SailStdpp.Base <> <> lib
+R734:759 SailStdpp.Operators_mwords <> <> lib
+R761:776 SailStdpp.Values <> <> lib
+R794:810 Riscv.rv64d_types <> <> lib
+R812:822 Riscv.rv64d <> <> lib
+R840:849 xv6iris.RiscvPtsto <> <> lib
+R851:859 xv6iris.RiscvLang <> <> lib
+R861:866 xv6iris.HartTp <> <> lib
+R884:890 xv6iris.RegFile <> <> lib
+R908:915 xv6iris.IntrDefs <> <> lib
+R933:940 xv6iris.ProcGeom <> <> lib
+R958:964 xv6iris.LockSet <> <> lib
+R982:987 xv6iris.CpuOwn <> <> lib
+R1005:1008 xv6iris.Xv6G <> <> lib
+R1026:1031 xv6iris.TsoCtx <> <> lib
+R1033:1042 xv6iris.TsoCtxMove <> <> lib
+sec 1080:1089 <> CpuOwnMove
+R1105:1111 xv6iris.RiscvPtsto <> riscvGS class
+R1118:1121 xv6iris.Xv6G <> xv6G class
+R1123:1124 xv6iris.CpuOwnMove <> Σ:1 var
+var  1140:1142 CpuOwnMove GEN
+var  1155:1157 CpuOwnMove CID
+R1146:1150 xv6iris.RiscvLang <> GenId class
+R1161:1165 xv6iris.RiscvLang <> CpuId class
+inst 1188:1200 <> cur_proc_move
+R1207:1211 SailStdpp.Values <> mword def
+binder 1203:1203 <> p:6
+R1219:1225 xv6iris.TsoCtxMove <> CtxMove class
+R1228:1230 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R1233:1234 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 1231:1232 <> ξ:7
+R1235:1242 xv6iris.ProcGeom <> cur_proc def
+R1255:1255 xv6iris.CpuOwnMove <> p:6 var
+R1251:1252 xv6iris.CpuOwnMove <> ξ:7 var
+R1277:1284 xv6iris.ProcGeom <> cur_proc def
+R1277:1284 xv6iris.ProcGeom <> cur_proc def
+R1277:1284 xv6iris.ProcGeom <> cur_proc def
+inst 1327:1340 <> cpu_cells_move
+R1347:1349 Corelib.Init.Datatypes <> nat ind
+binder 1343:1343 <> n:8
+R1358:1361 Corelib.Init.Datatypes <> bool ind
+binder 1353:1354 <> eb:9
+R1369:1373 SailStdpp.Values <> mword def
+binder 1365:1365 <> p:10
+R1385:1391 xv6iris.TsoCtxMove <> CtxMove class
+R1394:1396 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R1399:1400 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 1397:1398 <> ξ:11
+R1401:1409 xv6iris.IntrDefs <> cpu_cells def
+R1422:1422 xv6iris.CpuOwnMove <> n:8 var
+R1424:1425 xv6iris.CpuOwnMove <> eb:9 var
+R1427:1427 xv6iris.CpuOwnMove <> p:10 var
+R1418:1419 xv6iris.CpuOwnMove <> ξ:11 var
+R1449:1457 xv6iris.IntrDefs <> cpu_cells def
+R1449:1457 xv6iris.IntrDefs <> cpu_cells def
+R1449:1457 xv6iris.IntrDefs <> cpu_cells def
+R1494:1506 xv6iris.CpuOwnMove <> cur_proc_move inst
+inst 1533:1545 <> cpu_priv_move
+R1552:1554 Corelib.Init.Datatypes <> nat ind
+binder 1548:1548 <> n:12
+R1563:1566 Corelib.Init.Datatypes <> bool ind
+binder 1558:1559 <> eb:13
+R1574:1578 SailStdpp.Values <> mword def
+binder 1570:1570 <> p:14
+R1591:1594 stdpp.gmap <> gset def
+R1596:1601 Stdlib.Strings.String <> string ind
+binder 1585:1587 <> lks:15
+R1610:1616 xv6iris.TsoCtxMove <> CtxMove class
+R1619:1621 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R1624:1625 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 1622:1623 <> ξ:16
+R1626:1633 xv6iris.IntrDefs <> cpu_priv def
+R1646:1646 xv6iris.CpuOwnMove <> n:12 var
+R1648:1649 xv6iris.CpuOwnMove <> eb:13 var
+R1651:1651 xv6iris.CpuOwnMove <> p:14 var
+R1653:1655 xv6iris.CpuOwnMove <> lks:15 var
+R1642:1643 xv6iris.CpuOwnMove <> ξ:16 var
+R1681:1688 xv6iris.IntrDefs <> cpu_priv def
+R1681:1688 xv6iris.IntrDefs <> cpu_priv def
+R1681:1688 xv6iris.IntrDefs <> cpu_priv def
+R1701:1712 xv6iris.TsoCtxMove <> ctx_move_sep inst
+R1722:1735 xv6iris.CpuOwnMove <> cpu_cells_move inst
+R1701:1712 xv6iris.TsoCtxMove <> ctx_move_sep inst
+R1722:1735 xv6iris.CpuOwnMove <> cpu_cells_move inst
+R1751:1762 xv6iris.TsoCtxMove <> ctx_move_sep inst
+R1771:1784 xv6iris.TsoCtxMove <> ctx_move_const inst
+R1751:1762 xv6iris.TsoCtxMove <> ctx_move_sep inst
+R1771:1784 xv6iris.TsoCtxMove <> ctx_move_const inst
+R1771:1784 xv6iris.TsoCtxMove <> ctx_move_const inst
+inst 1813:1825 <> cpu_hart_move
+R1832:1834 Corelib.Init.Datatypes <> nat ind
+binder 1828:1828 <> n:17
+R1843:1846 Corelib.Init.Datatypes <> bool ind
+binder 1838:1839 <> eb:18
+R1854:1858 SailStdpp.Values <> mword def
+binder 1850:1850 <> p:19
+R1871:1874 stdpp.gmap <> gset def
+R1876:1881 Stdlib.Strings.String <> string ind
+binder 1865:1867 <> lks:20
+R1890:1896 xv6iris.TsoCtxMove <> CtxMove class
+R1899:1901 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R1904:1905 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 1902:1903 <> ξ:21
+R1906:1913 xv6iris.IntrDefs <> cpu_hart def
+R1926:1926 xv6iris.CpuOwnMove <> n:17 var
+R1928:1929 xv6iris.CpuOwnMove <> eb:18 var
+R1931:1931 xv6iris.CpuOwnMove <> p:19 var
+R1933:1935 xv6iris.CpuOwnMove <> lks:20 var
+R1922:1923 xv6iris.CpuOwnMove <> ξ:21 var
+R1957:1964 xv6iris.IntrDefs <> cpu_hart def
+R1957:1964 xv6iris.IntrDefs <> cpu_hart def
+R1957:1964 xv6iris.IntrDefs <> cpu_hart def
+R1973:1984 xv6iris.TsoCtxMove <> ctx_move_sep inst
+R1994:2006 xv6iris.CpuOwnMove <> cpu_priv_move inst
+R2016:2029 xv6iris.TsoCtxMove <> ctx_move_const inst
+R1973:1984 xv6iris.TsoCtxMove <> ctx_move_sep inst
+R1994:2006 xv6iris.CpuOwnMove <> cpu_priv_move inst
+R2016:2029 xv6iris.TsoCtxMove <> ctx_move_const inst
+inst 2057:2068 <> cpu_own_move
+R2075:2077 Corelib.Init.Datatypes <> nat ind
+binder 2071:2071 <> n:22
+R2086:2089 Corelib.Init.Datatypes <> bool ind
+binder 2081:2082 <> eb:23
+R2097:2101 SailStdpp.Values <> mword def
+binder 2093:2093 <> p:24
+R2118:2121 Corelib.Init.Datatypes <> bool ind
+binder 2114:2114 <> b:25
+R2131:2134 stdpp.gmap <> gset def
+R2136:2141 Stdlib.Strings.String <> string ind
+binder 2125:2127 <> lks:26
+R2150:2156 xv6iris.TsoCtxMove <> CtxMove class
+R2159:2161 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R2164:2165 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 2162:2163 <> ξ:27
+R2166:2172 xv6iris.CpuOwn <> cpu_own def
+R2185:2185 xv6iris.CpuOwnMove <> n:22 var
+R2187:2188 xv6iris.CpuOwnMove <> eb:23 var
+R2190:2190 xv6iris.CpuOwnMove <> p:24 var
+R2192:2192 xv6iris.CpuOwnMove <> b:25 var
+R2194:2196 xv6iris.CpuOwnMove <> lks:26 var
+R2181:2182 xv6iris.CpuOwnMove <> ξ:27 var
+R2218:2224 xv6iris.CpuOwn <> cpu_own def
+R2218:2224 xv6iris.CpuOwn <> cpu_own def
+R2218:2224 xv6iris.CpuOwn <> cpu_own def
+R2233:2243 xv6iris.TsoCtxMove <> ctx_move_if inst
+R2253:2266 xv6iris.TsoCtxMove <> ctx_move_const inst
+R2276:2288 xv6iris.CpuOwnMove <> cpu_hart_move inst
+R2233:2243 xv6iris.TsoCtxMove <> ctx_move_if inst
+R2253:2266 xv6iris.TsoCtxMove <> ctx_move_const inst
+R2276:2288 xv6iris.CpuOwnMove <> cpu_hart_move inst
+R2302:2311 xv6iris.CpuOwnMove CpuOwnMove <> sec

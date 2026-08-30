@@ -89,8 +89,8 @@ Section AbsorbLb.
       iFrame "Hb' Hd' HKj HW'".
       iSplitR; first (iPureIntro; lia).
       iSplitR; first (iPureIntro; exact HDW').
-      iApply (big_sepM_impl with "Hoks").
-      iIntros "!>" (k [] Hk) "Hok". iApply (dirty_ok_mono with "Hok"). lia. }
+      iApply (big_sepS_impl with "Hoks").
+      iIntros "!>" (k Hk) "Hok". iApply (dirty_ok_mono with "Hok"). lia. }
     iSplitL "Hat1".
     { iExists T, T, (Nat.max B' T), D. iFrame "Hat1 Hlb'".
       iPureIntro. split_and!; [exact HDT | lia | lia]. }

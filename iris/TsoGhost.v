@@ -17,7 +17,7 @@
    names live in [CtxId]. *)
 From Stdlib Require Import ZArith Lia.
 From stdpp Require Import gmap bitvector.definitions.
-From iris.algebra Require Import auth dfrac numbers functions.
+From iris.algebra Require Import auth dfrac numbers functions gset.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import own ghost_map mono_nat.
 Require Import SailStdpp.Operators_mwords.
@@ -97,8 +97,14 @@ Class tsoMemG Σ := TsoMemG {
      context -- [riscvF_genGS] in every riscvFixedGS scope. *)
   (* the per-agent views ([view_lb] fragments) *)
   tsomem_viewG :: inG Σ (authR viewUR);
-  (* the per-context dirty sets: keys are (timestamp, byte) *)
-  tsomem_dirtyG :: ghost_mapG Σ (nat * Arch.pa) unit;
+  (* the per-context dirty sets: keys are (timestamp, byte).  A6.128: a
+     MONOTONE SET authority ([gsetUR] under [auth]) rather than a ghost map
+     with owned element fragments -- membership fragments are persistent
+     and RE-MINTABLE from the authority, which is what makes the same-hart
+     hand-off of a dirty cell between two running contexts a total rule
+     ([TsoCtx.ctx_move_h]): the receiver registers the key whether or not
+     it already has it. *)
+  tsomem_dirtyG :: inG Σ (authR (gsetUR (nat * Arch.pa)));
 }.
 
 (* ---------------------------------------------------------------------- *)
@@ -119,10 +125,83 @@ Definition tsoMemΣ : gFunctors :=
   #[ ghost_mapΣ Arch.pa TsoMemPa.ts_elem;
      ghost_mapΣ nat TsoMemPa.pwmsg;
      GFunctor (authR viewUR);
-     ghost_mapΣ (nat * Arch.pa) unit ].
+     GFunctor (authR (gsetUR (nat * Arch.pa))) ].
 
 Global Instance subG_tsoMemG {Σ} : subG tsoMemΣ Σ -> tsoMemG Σ.
 Proof. solve_inG. Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* A6.128 THE DIRTY SET: a monotone set authority with persistent,          *)
+(* re-mintable membership.  [dset_auth γ q S] is the (fractional) authority *)
+(* at the set [S]; [dset_in γ k] is a persistent witness that [k ∈ S].      *)
+(* Nothing is ever removed: a dirty key is a write's (timestamp, byte) and  *)
+(* stays registered for the life of the context (the cell's OWNERSHIP moves,*)
+(* the registration does not).                                              *)
+(* ---------------------------------------------------------------------- *)
+Section dset.
+  Context {Σ : gFunctors} `{!tsoMemG Σ}.
+
+  Definition dset_auth (γ : gname) (q : Qp) (S : gset (nat * Arch.pa)) : iProp Σ :=
+    own γ (●{#q} S).
+  Definition dset_in (γ : gname) (k : nat * Arch.pa) : iProp Σ :=
+    own γ (◯ ({[k]} : gset (nat * Arch.pa))).
+
+  Global Instance dset_in_persistent γ k : Persistent (dset_in γ k).
+  Proof. rewrite /dset_in. apply _. Qed.
+  Global Instance dset_in_timeless γ k : Timeless (dset_in γ k).
+  Proof. rewrite /dset_in. apply _. Qed.
+  Global Instance dset_auth_timeless γ q S : Timeless (dset_auth γ q S).
+  Proof. rewrite /dset_auth. apply _. Qed.
+
+  Lemma dset_alloc : ⊢ |==> ∃ γ : gname, dset_auth γ 1 ∅.
+  Proof.
+    iMod (own_alloc (● (∅ : gset (nat * Arch.pa)))) as (γ) "H".
+    { apply auth_auth_valid. done. }
+    iModIntro. iExists γ. iExact "H".
+  Qed.
+
+  Lemma dset_halves γ S :
+    dset_auth γ 1 S ⊣⊢ dset_auth γ (1/2) S ∗ dset_auth γ (1/2) S.
+  Proof.
+    rewrite /dset_auth -own_op -auth_auth_dfrac_op dfrac_op_own Qp.half_half.
+    done.
+  Qed.
+
+  Lemma dset_agree γ q1 q2 S1 S2 :
+    dset_auth γ q1 S1 -∗ dset_auth γ q2 S2 -∗ ⌜S1 = S2⌝.
+  Proof.
+    iIntros "H1 H2". iCombine "H1 H2" as "H".
+    iDestruct (own_valid with "H") as %Hv. iPureIntro.
+    exact (auth_auth_dfrac_op_inv_L _ _ _ _ Hv).
+  Qed.
+
+  Lemma dset_lookup γ q S k :
+    dset_auth γ q S -∗ dset_in γ k -∗ ⌜k ∈ S⌝.
+  Proof.
+    iIntros "Ha Hk". iCombine "Ha Hk" as "H".
+    iDestruct (own_valid with "H") as %Hv. iPureIntro.
+    apply auth_both_dfrac_valid_discrete in Hv as (_ & Hincl & _).
+    apply gset_included in Hincl. set_solver.
+  Qed.
+
+  Lemma dset_get γ q S k :
+    k ∈ S -> dset_auth γ q S ==∗ dset_auth γ q S ∗ dset_in γ k.
+  Proof.
+    iIntros (Hk) "H". rewrite /dset_auth /dset_in -own_op.
+    iApply (own_update with "H").
+    apply auth_update_dfrac_alloc; [apply _ |]. apply gset_included. set_solver.
+  Qed.
+
+  Lemma dset_insert γ S k :
+    dset_auth γ 1 S ==∗ dset_auth γ 1 (S ∪ {[k]}) ∗ dset_in γ k.
+  Proof.
+    iIntros "H".
+    iMod (own_update _ _ (● (S ∪ {[k]}) ⋅ ◯ (S ∪ {[k]})) with "H") as "[H _]".
+    { apply auth_update_alloc. apply gset_local_update. set_solver. }
+    iApply (dset_get with "H"). set_solver.
+  Qed.
+
+End dset.
 
 Section ghosts.
   Context {Σ : gFunctors} `{!tsoMemG Σ} `{!mono_natG Σ}.
