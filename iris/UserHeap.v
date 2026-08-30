@@ -555,4 +555,109 @@ Section UserHeap.
   Proof. rewrite /uinstr_is. destruct is_rvc; [ destruct (is_aligned_vaddr _ _) | ];
            apply _. Qed.
 
+
+  (* ===================================================================== *)
+  (* GETTING THE FRAGMENTS, and BUILDING [uinstr_is] OUT OF THEM.          *)
+  (*                                                                       *)
+  (* The entry hands a program [[∗ map] a ↦ b ∈ utext_part M pm, utext …]  *)
+  (* -- its whole text, at once.  These are how a program turns that into  *)
+  (* the per-instruction resource its leaves want, and they are the new    *)
+  (* engine's replacement for the old [uk_instr_of_…] plumbing: one run    *)
+  (* extraction plus one constructor per instruction.                      *)
+  (*                                                                       *)
+  (* [utext_part] wants X and NOT W, which is the disjointness that makes  *)
+  (* the two heaps a partition.  A program with a concrete permission map  *)
+  (* decides both.                                                         *)
+  (* ===================================================================== *)
+  Lemma utext_frag (γt : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
+      (a : Z) (b : bv 8) :
+    M !! a = Some b -> ux_addr pm a -> ~ uw_addr pm a ->
+    ([∗ map] a' ↦ b' ∈ utext_part M pm, utext γt a' b') -∗ utext γt a b.
+  Proof.
+    intros HM Hx Hw. iIntros "Ht".
+    iApply (big_sepM_lookup _ _ a b with "Ht").
+    apply map_lookup_filter_Some. exact (conj HM (conj Hx Hw)).
+  Qed.
+
+  Lemma utext_run_of {k : N} (γt : gname) (M : gmap Z (bv 8))
+      (pm : gmap (mword 27) uperm) (a : Z) (n : nat) (w : bv k) :
+    uM_bytes M a n w ->
+    (forall j : nat, (j < n)%nat ->
+       ux_addr pm (a + Z.of_nat j)%Z /\ ~ uw_addr pm (a + Z.of_nat j)%Z) ->
+    ([∗ map] a' ↦ b' ∈ utext_part M pm, utext γt a' b') -∗
+    ([∗ list] j ∈ seq 0 n, utext γt (a + Z.of_nat j) (nth_byte w j)).
+  Proof.
+    intros HM Hperm. iIntros "#Ht".
+    iApply big_sepL_intro. iIntros "!>" (idx j Hj).
+    apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l in Hlt |- *.
+    destruct (Hperm idx Hlt) as [Hx Hw].
+    iApply (utext_frag γt M pm _ _ (HM idx Hlt) Hx Hw with "Ht").
+  Qed.
+
+  (* ---- the three decode shapes ---------------------------------------- *)
+
+  (* 4-alignment implies 2-alignment; [uinstr_is] carries the 2-aligned form
+     because that is what the fetch path checks. *)
+  Lemma ualign4_al2 (pc : mword 64) :
+    is_aligned_vaddr (Virtaddr pc) 4 = true ->
+    is_aligned_vaddr (Virtaddr pc) 2 = true.
+  Proof.
+    unfold is_aligned_vaddr. intros H%Z.eqb_eq. apply Z.eqb_eq.
+    pose proof (proj1 (bv_unsigned_in_range _ pc)) as Hlo.
+    rewrite uint_unsigned in H |- *.
+    rewrite Z.rem_mod_nonneg in H; [ | exact Hlo | lia ].
+    rewrite Z.rem_mod_nonneg; [ | exact Hlo | lia ].
+    pose proof (Znumtheory.Zmod_div_mod 2 4 (bv_unsigned pc) ltac:(lia)
+                  ltac:(lia) ltac:(exists 2; reflexivity)) as Hdd.
+    rewrite Hdd. rewrite H. reflexivity.
+  Qed.
+
+  Lemma uinstr_is_base (γt : gname) (pc : mword 64) (w : mword 32)
+      (i : instruction) :
+    is_aligned_vaddr (Virtaddr pc) 2 = true ->
+    Z.rem (uint pc) 4096 <= 4092 ->
+    isRVC (subrange_vec_dec w 15 0) = false ->
+    udecode_base w i ->
+    ([∗ list] j ∈ seq 0 4, utext γt (uint pc + Z.of_nat j) (nth_byte w j)) -∗
+    uinstr_is γt pc false i.
+  Proof.
+    intros Hal Hpg Hn Hdec. iIntros "#Hbs".
+    rewrite /uinstr_is. iSplit; [ done | ]. iSplit; [ done | ].
+    iExists w. iSplit; [ done | ]. iSplit; [ done | ]. iExact "Hbs".
+  Qed.
+
+  (* a compressed instruction at a 4-ALIGNED pc: the fetch window is the
+     whole 4-byte word, of which the halfword is the low half *)
+  Lemma uinstr_is_rvc4 (γt : gname) (pc : mword 64) (h : mword 16)
+      (w : mword 32) (i : instruction) :
+    is_aligned_vaddr (Virtaddr pc) 4 = true ->
+    Z.rem (uint pc) 4096 <= 4092 ->
+    isRVC h = true -> udecode_rvc h i -> subrange_vec_dec w 15 0 = h ->
+    ([∗ list] j ∈ seq 0 4, utext γt (uint pc + Z.of_nat j) (nth_byte w j)) -∗
+    uinstr_is γt pc true i.
+  Proof.
+    intros Hal4 Hpg Hrvc Hdec Hlow. iIntros "#Hbs".
+    rewrite /uinstr_is.
+    iSplit; [ iPureIntro; exact (ualign4_al2 pc Hal4) | ].
+    iSplit; [ done | ].
+    iExists h. iSplit; [ done | ]. iSplit; [ done | ].
+    rewrite Hal4. iExists w. iSplit; [ done | ]. iExact "Hbs".
+  Qed.
+
+  (* ...and at a 2-mod-4 pc: only the two bytes that are there *)
+  Lemma uinstr_is_rvc2 (γt : gname) (pc : mword 64) (h : mword 16)
+      (i : instruction) :
+    is_aligned_vaddr (Virtaddr pc) 2 = true ->
+    is_aligned_vaddr (Virtaddr pc) 4 = false ->
+    Z.rem (uint pc) 4096 <= 4092 ->
+    isRVC h = true -> udecode_rvc h i ->
+    ([∗ list] j ∈ seq 0 2, utext γt (uint pc + Z.of_nat j) (nth_byte h j)) -∗
+    uinstr_is γt pc true i.
+  Proof.
+    intros Hal2 Hne Hpg Hrvc Hdec. iIntros "#Hbs".
+    rewrite /uinstr_is. iSplit; [ done | ]. iSplit; [ done | ].
+    iExists h. iSplit; [ done | ]. iSplit; [ done | ].
+    rewrite Hne. iExact "Hbs".
+  Qed.
+
 End UserHeap.
