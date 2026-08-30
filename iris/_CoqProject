@@ -57,6 +57,7 @@ TsoCtxShim.v
 TsoCtxAbsorbLb.v
 CtxMorphTac.v
 TsoCtxPark.v
+TsoCtxMove.v
 CtxRecord.v
 PermInv.v
 PageGeom.v
@@ -493,6 +494,7 @@ VcGen.v
 VcGenS.v
 SwtchCtx.v
 CpuOwn.v
+CpuOwnMove.v
 ProcInv.v
 WpPushOffBridges.v
 CodeSwtch.v

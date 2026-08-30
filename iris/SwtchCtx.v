@@ -22,6 +22,7 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import TsoCtxMove.
 Local Open Scope Z_scope.
 
 (* struct-context field layout: field i (0..13) holds register [ctx_regs !! i]
@@ -90,7 +91,10 @@ Proof. intro H; exact H. Qed.
 (* The pc a coroutine resumes on is [ret_pc] of its saved return address
    (RiscvExtras): the [c.ret] the swtch epilogue executes clears bit 0. *)
 
-Section SwtchCtx.
+(* A6.128: the save-area cells live in their OWN section, closed before the
+   record is defined, so that [valid_context_pre] can state them at the
+   record's identity ([ctx_cells (XI := XIp)]) rather than at the ambient. *)
+Section SwtchCells.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
@@ -129,6 +133,12 @@ Section SwtchCtx.
      unfold [own_ctx] on its own. *)
   Global Instance own_ctx_timeless pa : Timeless (own_ctx pa).
   Proof. rewrite /own_ctx. apply _. Qed.
+End SwtchCells.
+
+Section SwtchCtx.
+  Context `{!riscvGS Σ}.
+  Context `{!xv6G Σ, !bioslotG Σ}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* -------------------------------------------------------------------- *)
   (* valid_context P A c : the context saved at [c] admits a WP to       *)
@@ -259,7 +269,7 @@ Section SwtchCtx.
 
   Definition valid_context_pre
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
-           mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
+           mword 64 -d> mword 64 -d> bool -d> CtxId -d> iPropO Σ)
       (rec : ctx_adm -d> mword 64 -d> mword 64 -d> CtxId -d> iPropO Σ)
       : ctx_adm -d> mword 64 -d> mword 64 -d> CtxId -d> iPropO Σ :=
     fun A c p XIp =>
@@ -276,7 +286,12 @@ Section SwtchCtx.
     (∃ (vs : list (mword 64)) (av : nat),
       ⌜length vs = 14%nat⌝ ∗
       ⌜eq_vec (access_vec_dec (ret_pc (nth 0 vs (mword_of_int 0))) 0) ('b"0") = true⌝ ∗
-      ctx_cells c vs ∗
+      (* A6.128: THE RECORD IS ENTIRELY AT ITS OWN IDENTITY.  The save-area
+         cells the parker wrote are the parker's (dirty at [XIp], buffered);
+         the resumer moves them to its own context for its swtch block and
+         moves the target's back ([TsoCtxMove.ctx_move]) -- both tokens are
+         running at the crossing.  Nothing in a record is at "the ambient". *)
+      ctx_cells (XI := XIp) c vs ∗
       (* the parked STACK is the thread's own, at ITS identity: the parker
          built it from its own frame and the resumed thread's bundle wants
          it back at [XIp], with no re-index across the crossing *)
@@ -285,21 +300,24 @@ Section SwtchCtx.
          ⌜adm A h⌝ -∗
          ⌜callee_img m = vs⌝ -∗
          sie_cap_gpr KT1 (CID := h) (XI := XIp) m av false p -∗
-         cpu_own (CID := h) 1 eb' p false {["proc"]} -∗
+         (* the per-cpu bundle, the save-area cells, the crossing payload and
+            a zombie resumer's raw cells all arrive AT THE RESUMED THREAD'S
+            identity: the resumer moved them across ([TsoCtxMove]) *)
+         cpu_own (CID := h) (XI := XIp) 1 eb' p false {["proc"]} -∗
          pc_is (CID := h) (ret_pc (m !!! Regidx (mword_of_int 1))) -∗
-         ctx_cells c vs -∗
+         ctx_cells (XI := XIp) c vs -∗
          (* the resumer's own record comes back WITH ITS TOKEN BESIDE IT:
             parked-and-boxed if migratable, running if pinned *)
          (∃ (A' : ctx_adm) (cret : mword 64) (back : bool),
             (if back
              then ∃ XIo : CtxId, park_tok A' XIo ∗ ▷ rec A' cret p XIo
-             else own_ctx cret) ∗
-            P h A' c cret (rget (CID := h) m (mword_of_int 4 : mword 5)) p back) -∗
+             else own_ctx (XI := XIp) cret) ∗
+            P h A' c cret (rget (CID := h) m (mword_of_int 4 : mword 5)) p back XIp) -∗
          WP (LoopE gen_id h : expr riscv_lang)))%I.
 
   Global Instance valid_context_pre_contractive
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
-           mword 64 -d> mword 64 -d> bool -d> iPropO Σ) :
+           mword 64 -d> mword 64 -d> bool -d> CtxId -d> iPropO Σ) :
     Contractive (valid_context_pre P).
   (* [solve_contractive] gets all the way to the recursive occurrence and
      stops: the residual goal is [x A' cret p ≡{m}≡ y A' cret p] against a
@@ -316,13 +334,13 @@ Section SwtchCtx.
 
   Definition valid_context
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
-           mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
+           mword 64 -d> mword 64 -d> bool -d> CtxId -d> iPropO Σ)
       : ctx_adm -d> mword 64 -d> mword 64 -d> CtxId -d> iPropO Σ :=
     fixpoint (valid_context_pre P).
 
   Lemma valid_context_unfold
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
-           mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
+           mword 64 -d> mword 64 -d> bool -d> CtxId -d> iPropO Σ)
       (A : ctx_adm) (c p : mword 64) (XIp : CtxId) :
     valid_context P A c p XIp ⊣⊢
       valid_context_pre P (valid_context P) A c p XIp.
@@ -404,6 +422,28 @@ Section CtxCellsReindex.
      T-leg restates it here because ITS [StackOwn] exports only the [==∗]
      [stack_own_reindex]; on main the restatement would be a second
      instance for the same payload, so it is deliberately NOT taken. *)
+
+  (* A6.128: the SAME-HART hand-off of the same two payloads *)
+  Global Instance ctx_cells_at_move `{CID : CpuId} (c : mword 64) (off : Z) (vs : list (mword 64)) :
+    CtxMove (λ ξ, ctx_cells_at (XI := ξ) c off vs).
+  Proof.
+    revert off. induction vs as [|v vs IH] => off; iIntros (ξ0 ξ1) "H0 H1 Hc".
+    - iModIntro. iFrame "H0 H1".
+    - iDestruct "Hc" as "[Hv Hrest]".
+      iMod (ctx_move_word _ (add_vec c (mword_of_int off)) (DfracOwn 1) v
+              ξ0 ξ1 with "H0 H1 Hv") as "(H0 & H1 & Hv)".
+      iMod (IH (off + 8) ξ0 ξ1 with "H0 H1 Hrest") as "(H0 & H1 & Hrest)".
+      iModIntro. iFrame.
+  Qed.
+  Global Instance ctx_cells_move `{CID : CpuId} (c : mword 64) (vs : list (mword 64)) :
+    CtxMove (λ ξ, ctx_cells (XI := ξ) c vs).
+  Proof. rewrite /ctx_cells. apply _. Qed.
+  Global Instance own_ctx_move `{CID : CpuId} (pa : mword 64) :
+    CtxMove (λ ξ, own_ctx (XI := ξ) pa).
+  Proof. rewrite /own_ctx. ctx_move_solve; apply ctx_cells_move. Qed.
+  Global Instance stack_own_move `{CID : CpuId} (sp : Arch.pa) (n : nat) :
+    CtxMove (λ ξ, stack_own (KTR := KT1) (XI := ξ) sp n).
+  Proof. rewrite /stack_own. ctx_move_solve. Qed.
 
 End CtxCellsReindex.
 

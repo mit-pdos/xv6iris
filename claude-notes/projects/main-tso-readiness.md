@@ -1133,3 +1133,65 @@ additive kit, S = the conversion), each certified green before the next.
 ## 9.4 Deferred, as on r51
 
 The per-hart cells' hand-off across swtch (`cpu_own`, `p_sched`) stays at the ambient — a hart-tier unit (A6.127 §6); the fork child's own context (6.3 / §0.27′); `cpu_ctx_free`'s parked record (6.5).
+
+
+# AMENDMENT 10 (2026-08-29) — §0.43′'s VOCABULARY LANDED: the same-hart hand-off (`CtxMove`), the record fully at `XIp`, the swtch payload as a function of the context
+
+Executes the T-leg's Amendment 10 (`tso` `b359c3f37`): the §0.43′ unit as it
+stands at `tso-flip` r53 (`5779cf1b1`, A6.128), copied under the same rule as
+Amendment 9 — r53's text, nothing designed on main.  Gate, on main
+`93d342e0d` (Amendment 9 rebased onto `origin/main` `d173a413c`): one full `-k`
+round, 490 files recompiled, `MAKEEXIT=0`, 0 `Error`; `audit-only` = the
+sanctioned 13; `kernel-rocq/`/`user-rocq/` unchanged; zero `Admitted`/`Axiom`.
+
+## 10.1 What is BELOW THE SEAL on main and was NOT ported (measured)
+
+- `TsoGhost.v`'s `dset_*` registry (absent on main): on r53 it is consumed
+  only by `CtxPinMint.v` (absent) and by `TsoCtxMove`'s pointsto BODIES.
+- `TsoCtx.v`: the r51→r53 diff changes no exported statement (the dirty-set
+  body refactor; a grep of the diff for `Lemma|Definition|Instance|Class`
+  lines is empty).  `TsoCtx.v` untouched, as the seal prescribes.
+- `TsoCtxAbsorbLb.v`'s 4-line hunk (below-seal proof text).
+- **`PtTreeMove.v` is not created.**  Its instances are for the T-leg's
+  ξ-tiered page-table tree (`pt_slot_own (UTier ξ)`, `ptree_own_at`, …);
+  main's tree (`PtTree.ptree_own`/`pt_page_own`/`pt_kids_own`/`pt_frame`)
+  is over `↦ₚ₈` = `RiscvPtsto.phys_pointsto`, which is NOT context-indexed
+  on main (no `UTier`, no `ctx_phys_pointsto`/`ctx_phys_word_pointsto`).
+  Those pieces are syntactically ξ-free here and `ctx_move_solve`'s
+  `ctx_move_const` row closes them.  The same fact removes
+  `ctx_move_phys_pointsto`/`_inst`/`ctx_move_phys_word` and the two
+  `ctx_phys_*` rows of `ctx_move_step` from main's `TsoCtxMove.v`.
+
+## 10.2 What landed (r53's shapes)
+
+| r53 item | on main |
+|---|---|
+| `TsoCtxMove.v` (new) | `ctx_move_floor`, `ctx_move_pointsto` (statements verbatim, SC-trivial bodies by the unseal lemmas — `ctx_morph_pointsto`'s idiom; `view_lb_max'` dropped, below the seal), `Class CtxMove`, `ctx_move_const/sep/exist/big_sepL/big_sepM/big_sepS/or/if`, `ctx_move_pointsto_inst`, `ctx_move_floor_inst`, `ctx_move_word/word2/word4`, the syntactic `ctx_move_step`/`ctx_move_solve` (A6.128 §3) minus the two phys rows.  Imports: main's kit block (no `TsoMemPa`/`TsoGhost`/`auth`/`ghost_map`/`mono_nat`).  No `Typeclasses` declaration for `CtxMove` (r53 has none).  No `ctx_move_string`: no moved payload on main reaches `ctx_string_pointsto` (measured by the build). |
+| `CpuOwnMove.v` (new) | byte-identical to r53 (main's `cpu_own`/`cpu_hart`/`cpu_priv`/`cpu_cells`/`cur_proc` spines are r53's). |
+| `SwtchCtx` | the `SwtchCells`/`SwtchCtx` split; `P … -d> bool -d> CtxId -d> iPropO Σ`; the record at `ctx_cells (XI := XIp)`, the wand's `cpu_own (XI := XIp)`, `ctx_cells (XI := XIp)`, `own_ctx (XI := XIp) cret`, `P … back XIp`; `ctx_cells_at_move`, `ctx_cells_move`, `own_ctx_move`, `stack_own_move` (this one IS restated: main's `StackOwn` has no move instance).  A9's main-side items kept. |
+| `SpecSwtch` | `CtxId` arity on `P`, the `CtxMove` premise after the register equalities, `P … back cur_ctx` in / `back' cur_ctx` out. |
+| `SchedCtx` | the `SchedCtx`/`SchedCtxPay` split (`γs` re-declared); `p_sched … ξ` with `proc_held (XI := ξ)`/`park_pay (XI := ξ)`; the 20 `CtxMove` instances in r53's list and order, each `rewrite /name. ctx_move_solve.` — every one closed first try, no hang on `p_sched`; `cur_ctx` on the four intro/elim lemmas; `proc_ctx_cells`/`proc_ctx_own_ctx` deleted with r53's comment; `Require Import ProcPtOwn` (load-bearing: main's `SchedCtx` did not see `proc_pt`'s names), `TsoCtxMove`, `CpuOwnMove`.  EIGHT instances carry no `(XI := ξ)` because main's definitions take no `CurCtx` — `tf_words`, `tf_tail`, `tf_page` (main's trapframe is `↦ₚ`), `phys_byte_any`, `phys_page_own`, `upt_pages_own`, `proc_pt_own`, `proc_pt` (the physical tier, 10.1); `proc_pt_move`/`proc_pt_at_move` take main's `M : gmap Z (bv 8)`.  `cpu_ctx_free` and `Typeclasses Opaque procs_inv` kept (after `End SchedCtxPay.`). |
+| `ProofSwtch` | `HPm` premise; the two `ctx_move` hand-off blocks (the target's cells `XIt → cur_ctx` after the resume; the target's cells, `cpu_own` and `P` `cur_ctx → XIt` before the park; the zombie caller's cells to `XIt`).  A9's omission of the engine `Hctx` lines kept. |
+| `ProofSched`, `ProofScheduler` | `ltac:(intros; apply _)` at the three `wp_swtch_sconf` calls. |
+| `ParkCap` | r53's comment at the (already ξ-free, A9) `proc_ctx_boxed γs pa`; main's arity kept. |
+| `ProofForkretPark` | the 6.3 stub stays (`XIp := cur_ctx`): r53's three `ctx_deposit`s (record cells, stack, kstack row into `XIc`) have nothing to deposit into and are not ported; r53's `(XI := XIc)` annotations rendered `(XI := cur_ctx)` (syntactic no-ops keeping the shape); `fkp_is_kstack_morph` ported verbatim (dead here — its consumer is the kstack deposit); the bracketed final `iApply` has TWO brackets (main's `forkret_park_pkg` has no `park_globals` row).  Amendment 10's "on main those rows are already λ-converted, so the file should go GREEN" is met trivially: the rows are at the parker's context BY THE STUB.  Header records it beside A9's paragraph. |
+| `_CoqProject` | `TsoCtxMove.v` after `TsoCtxPark.v`; `CpuOwnMove.v` after `CpuOwn.v` (r53's relative positions); no `PtTreeMove.v`. |
+
+## 10.3 Measured
+
+- Single-file iterations: `TsoCtxMove.vo` one red (a trailing `done` after a
+  closing `iFrame` — the same slip as A9's), then `CpuOwnMove`, `SwtchCtx`,
+  `SpecSwtch`, `SchedCtx`, `ProofSwtch`, `ProofForkretPark` green first try.
+- Live `hart_view_lb_any` sites unchanged at THREE; live `ctx_dom_sc`
+  unchanged at two (`ProofScheduler` `cpu_ctx_free`, `WpLock.lock_pay_intro_sc`).
+- `p_sched`/`valid_context` are named in 27 files on main; only the seven
+  r53 touches are real uses, the other 20 are prose (`SpecMainSecondary`,
+  `UsertrapRes` included).
+- Review (independent agent, three-way against r53): see below.
+
+## 10.4 Deferred, as on r53
+
+The fork child's own context and the deposits that go with it (6.3 / §0.27′ —
+`ProofForkretPark`'s frontier on r53); `cpu_ctx_free`'s parked record (6.5);
+the U-tier page-table tree (main's `PtTree` is not context-indexed: when the
+physical tier gets its context axis, `PtTreeMove.v` is the file to take).

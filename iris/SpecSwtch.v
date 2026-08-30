@@ -46,12 +46,13 @@ Require Import SwtchCtx.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import TsoCtxMove.
 Import Defs.
 
 
 Definition wp_swtch_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
-         mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
+         mword 64 -d> mword 64 -d> bool -d> CtxId -d> iPropO Σ)
     (An Ao : ctx_adm)
     (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
     (av : nat) (eb : bool) (p : mword 64)
@@ -76,6 +77,11 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : Ge
      [Ao] is the index the caller's OWN record is built at from the
      continuation below, so the continuation's [⌜adm Ao h⌝] is exactly what
      that record promises. *)
+  (* A6.128: THE PAYLOAD IS A FUNCTION OF THE CONTEXT, and the crossing MOVES
+     it -- from the caller's identity to the target's, on this hart, with
+     both running tokens in hand ([TsoCtxMove.CtxMove]).  This is the
+     store-forwarding hand-off of [p->state]/[c->proc]/the held lock. *)
+  (forall h A c c' tp p' b, CtxMove (λ ξ, P h A c c' tp p' b ξ)) ->
   adm An cpu_id ->
   (* ...and the CALLER's own record admits resumption here too (A6.127 §6):
      a PINNED caller (the scheduler) parks its RUNNING token into its
@@ -115,7 +121,7 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : Ge
   (∃ XIt : CtxId, resume_tok An XIt ∗ ▷ valid_context P An newc p XIt) -∗
   (* the payload's [A'] slot is always the RESUMER's record index, and the
      resumer of this crossing is the caller itself -- so it is [Ao]. *)
-  P cpu_id Ao newc oldc (rget m0 (mword_of_int 4 : mword 5)) p back -∗
+  P cpu_id Ao newc oldc (rget m0 (mword_of_int 4 : mword 5)) p back cur_ctx -∗
   (* THE CALLER'S CONTINUATION -- its record's contents -- and only at
      [back = true].  At [false] there is nothing to prove about a
      resumption that cannot happen, which is exactly the point: it is what
@@ -133,7 +139,7 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : Ge
             (if back'
              then ∃ XIo : CtxId, park_tok A' XIo ∗ ▷ valid_context P A' cret p XIo
              else own_ctx cret) ∗
-            P h A' oldc cret (rget (CID := h) m (mword_of_int 4 : mword 5)) p back') -∗
+            P h A' oldc cret (rget (CID := h) m (mword_of_int 4 : mword 5)) p back' cur_ctx) -∗
          WP (LoopE gen_id h : expr riscv_lang) )
    else emp) -∗
   WP (Loop : expr riscv_lang).
@@ -142,7 +148,7 @@ Module Type SWTCH.
   Parameter wp_swtch_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
-           mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
+           mword 64 -d> mword 64 -d> bool -d> CtxId -d> iPropO Σ)
       (An Ao : ctx_adm)
       (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
       (av : nat) (eb : bool) (p : mword 64) (back : bool),

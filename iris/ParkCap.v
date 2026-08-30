@@ -139,6 +139,11 @@ Section ParkCap.
           later, for the same reason *)
        ▷ W -∗
        park_child γs γf pa ks rest pid U -∗
+       (* THE CONCLUSION IS ξ-FREE: [SchedCtx.proc_ctx_boxed] is a CLOSED
+          TERM since A6.128 (the record's rows live at the record's own
+          existential identity, [SwtchCtx.valid_context_pre]'s [XIp]) --
+          main's §0.15′ shape, reached here by the same-hart hand-off.  This
+          is the property [UtResFits] needs of [park_cap]/[park_token]. *)
        |==> proc_ctx_boxed γs pa)%I.
 
   (* THE CHANNEL, at a given [W], as a [□] proposition under a later -- for
