@@ -312,6 +312,52 @@ Section UserHeap.
     rewrite /ustr. iFrame "Hne Hlen Hbs Hnul".
   Qed.
 
+  (* ===================================================================== *)
+  (* A STRING IN THE TEXT HALF.  [ustr] is the DATA half's string, and a    *)
+  (* program's string LITERALS are not there: .rodata shares the            *)
+  (* executable segment's pages, so its bytes are X-and-not-W and belong to *)
+  (* [γt].  init's four format strings live at 0x970..0x9e7, inside the R-X *)
+  (* segment, and vprintf LOADS them one byte at a time -- so the tier      *)
+  (* needs both this resource and [UkRunMem.wp_uk_lbu_text] to read it.     *)
+  (*                                                                       *)
+  (* It carries no dfrac: [utext] is [↪□], persistent outright, so there is *)
+  (* nothing to give back and the accessors below hand out bytes without a  *)
+  (* closing wand.                                                         *)
+  (* ===================================================================== *)
+  Definition utext_str (γt : gname) (a : Z) (len : nat)
+      (f : nat -> bv 8) : iProp Σ :=
+    (⌜ forall j : nat, (j < len)%nat -> f j <> ubyte0 ⌝ ∗
+     ⌜ Z.of_nat len < 2 ^ 31 ⌝ ∗
+     ([∗ list] j ∈ seq 0 len, utext γt (a + Z.of_nat j) (f j)) ∗
+     utext γt (a + Z.of_nat len) ubyte0)%I.
+
+  Global Instance utext_str_persistent γt a len f :
+    Persistent (utext_str γt a len f).
+  Proof. apply _. Qed.
+
+  Lemma utext_str_len (γt : gname) (a : Z) (len : nat) (f : nat -> bv 8) :
+    utext_str γt a len f -∗ ⌜ Z.of_nat len < 2 ^ 31 ⌝.
+  Proof. iIntros "(_ & %H & _ & _)". iPureIntro. exact H. Qed.
+
+  Lemma utext_str_nonul (γt : gname) (a : Z) (len : nat) (f : nat -> bv 8) :
+    utext_str γt a len f -∗ ⌜ forall j : nat, (j < len)%nat -> f j <> ubyte0 ⌝.
+  Proof. iIntros "(%H & _ & _ & _)". iPureIntro. exact H. Qed.
+
+  (* one body byte -- no give-back, the resource is persistent *)
+  Lemma utext_str_byte (γt : gname) (a : Z) (len : nat)
+      (f : nat -> bv 8) (j : nat) :
+    (j < len)%nat ->
+    utext_str γt a len f -∗ utext γt (a + Z.of_nat j)%Z (f j).
+  Proof.
+    intros Hj. iIntros "(_ & _ & #Hbs & _)".
+    iApply (big_sepL_lookup _ _ j j with "Hbs").
+    apply lookup_seq. split; [ lia | exact Hj ].
+  Qed.
+
+  Lemma utext_str_nul (γt : gname) (a : Z) (len : nat) (f : nat -> bv 8) :
+    utext_str γt a len f -∗ utext γt (a + Z.of_nat len)%Z ubyte0.
+  Proof. iIntros "(_ & _ & _ & #H)". iExact "H". Qed.
+
   (* NOTE: the SPLIT of a run at an arbitrary point -- which is what a
      syscall footprint hand-over is -- is deliberately not here yet.  It is
      a step-3 tool and wants proving against its consumer, not before it. *)
@@ -888,6 +934,28 @@ Section UserHeap.
     rewrite /utext_img.
     iApply (big_sepM_lookup _ _ (a + Z.of_nat idx)%Z (nth_byte w idx) with "Ht").
     exact (HT idx Hlt).
+  Qed.
+
+  (* ...and where a literal comes from: the read-only image the entry hands
+     out, at a CONCRETE base and length, so every side condition below is a
+     [vm_compute] over the dumped map. *)
+  Lemma utext_str_of_img (γt : gname) (T : gmap Z (bv 8)) (a : Z) (len : nat)
+      (f : nat -> bv 8) :
+    (forall j : nat, (j < len)%nat -> f j <> ubyte0) ->
+    Z.of_nat len < 2 ^ 31 ->
+    (forall j : nat, (j < len)%nat -> T !! (a + Z.of_nat j)%Z = Some (f j)) ->
+    T !! (a + Z.of_nat len)%Z = Some ubyte0 ->
+    utext_img γt T -∗ utext_str γt a len f.
+  Proof.
+    intros Hne Hlen Hbs Hnul. iIntros "#HT". rewrite /utext_str /utext_img.
+    iSplit; [ iPureIntro; exact Hne | ]. iSplit; [ iPureIntro; exact Hlen | ].
+    iSplitR.
+    - iApply big_sepL_intro. iIntros "!>" (idx j Hj).
+      apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l in Hlt |- *.
+      iApply (big_sepM_lookup _ _ (a + Z.of_nat idx)%Z (f idx) with "HT").
+      exact (Hbs idx Hlt).
+    - iApply (big_sepM_lookup _ _ (a + Z.of_nat len)%Z ubyte0 with "HT").
+      exact Hnul.
   Qed.
 
   (* ---- the three decode shapes ---------------------------------------- *)

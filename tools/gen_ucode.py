@@ -1158,6 +1158,8 @@ def emit(dump, prog, pcs, groups, dropped, skipfuncs, skipdefault, notes, asts,
     a('  Context `{!riscvGS \u03a3}.')
     a('  Context (gt : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm).')
     a('  Context (Hsub : %s_text_sub M).' % P)
+    a('  (* ...and the DATA image, for the .rodata half of the same pages *)')
+    a('  Context (Hsub2 : %s_data_sub M).' % P)
     a('  (* the executable segment is X and not W -- the program\'s side of the')
     a('     two-heap split.  A concrete permission map decides both. *)')
     a('  Context (Hx : forall a : Z, (0 <= a < %d)%%Z ->' % (ntext * PAGE))
@@ -1298,6 +1300,45 @@ def emit(dump, prog, pcs, groups, dropped, skipfuncs, skipdefault, notes, asts,
             'one.  Both are discharged HERE, once, instead of in each of the %d '
             'per-pc lemmas.' % (P, P, len(allpcs))):
         a('  ' + l if l else l)
+    a('')
+    for l in comment_block(
+            'AND THE READ-ONLY IMAGE BESIDE IT.  A program\'s string LITERALS are '
+            'not in [%sInstrs.%s_bytes] and they are not in the data half either: '
+            '.rodata shares the EXECUTABLE segment\'s pages, so its bytes are '
+            'X-and-not-W and the heap files them under [γt] exactly as it files '
+            'the code.  init\'s four format strings sit at 0x970..0x9e7, inside '
+            'the R-X segment, and vprintf LOADS them one byte at a time.  This is '
+            'the part of [%sData.%s_data] that lands there -- everything below the '
+            'end of the executable segment -- and [UserHeap.utext_str_of_img] cuts '
+            'a literal out of it at a concrete base and length.'
+            % (M, D, M, D)):
+        a('  ' + l if l else l)
+    a('  Definition %s_ro : gmap Z (bv 8) :=' % P)
+    a('    filter (fun kv => (kv.1 < %d)%%Z) %sData.%s_data.' % (ntext * PAGE, M, D))
+    a('')
+    a('  Definition %s_rodata (g : gname) : iProp %s := utext_img g %s_ro.'
+      % (P, SIGMA, P))
+    a('')
+    a('  Global Instance %s_rodata_persistent g : Persistent (%s_rodata g).' % (P, P))
+    a('  Proof. apply _. Qed.')
+    a('')
+    a('  Global Typeclasses Opaque %s_rodata.' % P)
+    a('')
+    a('  Lemma %s_rodata_of_text : utext_all gt M pm -∗ %s_rodata gt.' % (P, P))
+    a('  Proof.')
+    a('    assert (Hin : forall (a : Z) (b : bv 8),')
+    a('               %s_ro !! a = Some b -> M !! a = Some b).' % P)
+    a('    { intros a b Hb. apply map_lookup_filter_Some in Hb as [Hb _].')
+    a('      exact (Hsub2 a b Hb). }')
+    a('    assert (Hp : forall a : Z, is_Some (%s_ro !! a) ->' % P)
+    a('                   ux_addr pm a /\\ ~ uw_addr pm a).')
+    a('    { intros a [b Hb]. apply map_lookup_filter_Some in Hb as [Hb Hlt].')
+    a('      apply Hx.')
+    a('      pose proof (%s_data_key_nonneg a b Hb) as Hge.' % P)
+    a('      simpl in Hlt. lia. }')
+    a('    iIntros "#Ht". rewrite /%s_rodata.' % P)
+    a('    iApply (utext_img_of_all gt M pm %s_ro Hin Hp with "Ht").' % P)
+    a('  Qed.')
     a('')
     a('  Lemma %s_code_of_text : utext_all gt M pm -∗ %s_code gt.' % (P, P))
     a('  Proof.')

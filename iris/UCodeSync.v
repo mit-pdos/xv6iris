@@ -425,6 +425,8 @@ Section UCodeSync.
   Context `{!riscvGS Σ}.
   Context (gt : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm).
   Context (Hsub : sync_text_sub M).
+  (* ...and the DATA image, for the .rodata half of the same pages *)
+  Context (Hsub2 : sync_data_sub M).
   (* the executable segment is X and not W -- the program's side of the
      two-heap split.  A concrete permission map decides both. *)
   Context (Hx : forall a : Z, (0 <= a < 4096)%Z ->
@@ -711,6 +713,41 @@ Section UCodeSync.
      the executable segment is X-and-not-W ([Hx]), which is what puts those
      bytes in the TEXT half rather than the data one. Both are discharged
      HERE, once, instead of in each of the 18 per-pc lemmas. *)
+
+  (* AND THE READ-ONLY IMAGE BESIDE IT. A program's string LITERALS are not
+     in [SyncInstrs.sync_bytes] and they are not in the data half either:
+     .rodata shares the EXECUTABLE segment's pages, so its bytes are
+     X-and-not-W and the heap files them under [γt] exactly as it files the
+     code. init's four format strings sit at 0x970..0x9e7, inside the R-X
+     segment, and vprintf LOADS them one byte at a time. This is the part of
+     [SyncData.sync_data] that lands there -- everything below the end of the
+     executable segment -- and [UserHeap.utext_str_of_img] cuts a literal out
+     of it at a concrete base and length. *)
+  Definition sync_ro : gmap Z (bv 8) :=
+    filter (fun kv => (kv.1 < 4096)%Z) SyncData.sync_data.
+
+  Definition sync_rodata (g : gname) : iProp Σ := utext_img g sync_ro.
+
+  Global Instance sync_rodata_persistent g : Persistent (sync_rodata g).
+  Proof. apply _. Qed.
+
+  Global Typeclasses Opaque sync_rodata.
+
+  Lemma sync_rodata_of_text : utext_all gt M pm -∗ sync_rodata gt.
+  Proof.
+    assert (Hin : forall (a : Z) (b : bv 8),
+               sync_ro !! a = Some b -> M !! a = Some b).
+    { intros a b Hb. apply map_lookup_filter_Some in Hb as [Hb _].
+      exact (Hsub2 a b Hb). }
+    assert (Hp : forall a : Z, is_Some (sync_ro !! a) ->
+                   ux_addr pm a /\ ~ uw_addr pm a).
+    { intros a [b Hb]. apply map_lookup_filter_Some in Hb as [Hb Hlt].
+      apply Hx.
+      pose proof (sync_data_key_nonneg a b Hb) as Hge.
+      simpl in Hlt. lia. }
+    iIntros "#Ht". rewrite /sync_rodata.
+    iApply (utext_img_of_all gt M pm sync_ro Hin Hp with "Ht").
+  Qed.
 
   Lemma sync_code_of_text : utext_all gt M pm -∗ sync_code gt.
   Proof.

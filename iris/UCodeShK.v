@@ -846,6 +846,8 @@ Section UCodeShK.
   Context `{!riscvGS Σ}.
   Context (gt : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm).
   Context (Hsub : shk_text_sub M).
+  (* ...and the DATA image, for the .rodata half of the same pages *)
+  Context (Hsub2 : shk_data_sub M).
   (* the executable segment is X and not W -- the program's side of the
      two-heap split.  A concrete permission map decides both. *)
   Context (Hx : forall a : Z, (0 <= a < 8192)%Z ->
@@ -1878,6 +1880,41 @@ Section UCodeShK.
      the executable segment is X-and-not-W ([Hx]), which is what puts those
      bytes in the TEXT half rather than the data one. Both are discharged
      HERE, once, instead of in each of the 91 per-pc lemmas. *)
+
+  (* AND THE READ-ONLY IMAGE BESIDE IT. A program's string LITERALS are not
+     in [ShInstrs.sh_bytes] and they are not in the data half either: .rodata
+     shares the EXECUTABLE segment's pages, so its bytes are X-and-not-W and
+     the heap files them under [γt] exactly as it files the code. init's four
+     format strings sit at 0x970..0x9e7, inside the R-X segment, and vprintf
+     LOADS them one byte at a time. This is the part of [ShData.sh_data] that
+     lands there -- everything below the end of the executable segment -- and
+     [UserHeap.utext_str_of_img] cuts a literal out of it at a concrete base
+     and length. *)
+  Definition shk_ro : gmap Z (bv 8) :=
+    filter (fun kv => (kv.1 < 8192)%Z) ShData.sh_data.
+
+  Definition shk_rodata (g : gname) : iProp Σ := utext_img g shk_ro.
+
+  Global Instance shk_rodata_persistent g : Persistent (shk_rodata g).
+  Proof. apply _. Qed.
+
+  Global Typeclasses Opaque shk_rodata.
+
+  Lemma shk_rodata_of_text : utext_all gt M pm -∗ shk_rodata gt.
+  Proof.
+    assert (Hin : forall (a : Z) (b : bv 8),
+               shk_ro !! a = Some b -> M !! a = Some b).
+    { intros a b Hb. apply map_lookup_filter_Some in Hb as [Hb _].
+      exact (Hsub2 a b Hb). }
+    assert (Hp : forall a : Z, is_Some (shk_ro !! a) ->
+                   ux_addr pm a /\ ~ uw_addr pm a).
+    { intros a [b Hb]. apply map_lookup_filter_Some in Hb as [Hb Hlt].
+      apply Hx.
+      pose proof (shk_data_key_nonneg a b Hb) as Hge.
+      simpl in Hlt. lia. }
+    iIntros "#Ht". rewrite /shk_rodata.
+    iApply (utext_img_of_all gt M pm shk_ro Hin Hp with "Ht").
+  Qed.
 
   Lemma shk_code_of_text : utext_all gt M pm -∗ shk_code gt.
   Proof.
