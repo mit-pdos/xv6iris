@@ -4512,3 +4512,85 @@ WHAT NEEDS TO BE BUILT (the (b) work list, to be sized by measurement):
    `ProofMain` unblock; the secondaries' `view_lb B` still comes off the
    `started` barrier (A6.132).
 
+### 0.47′ OWNER RULING (2026-08-30): ROOTED INVARIANTS and [ctx_history] —
+### the common pattern for shared-structure invariants under Ztso
+
+Settled over a design dialogue; the owner's words are quoted where the
+point is theirs.
+
+**The root cause, owner's formulation.**  "In SC, it doesn't matter
+exactly when [an invariant was] established: once they're established,
+that's all anyone cares about.  But in TSO, it's critically important to
+track when the inv was established, because the history's values
+predating the establishment of the invariant don't satisfy the
+invariant!  So we always need some kind of floor for an invariant (and,
+in the really limiting case, that floor is 0 if the invariant is
+established in adequacy before the system starts running)."  An Iris
+`inv` is knowledge and travels for free; what does NOT travel is the
+ability to CASH its contents, and that ability is exactly "my view/floor
+is past the invariant's establishment".
+
+**No raw stamps in interfaces** (the swtch lesson, re-applied): "having
+a raw T exposed feels like a bad smell … contexts-parked-against-other-
+contexts helped make this workable because we stopped having raw T's."
+All establishment points and floors are CONTEXTS; positions are
+kit-internal.
+
+**The primitive: [ctx_history ξ a H]** — "the history of `a` since ξ's
+bound", owner's framing: "your raw points-to has the history from the
+beginning of time, but almost always what you want is the history from
+the possible race window, and that race window doesn't start from 0 each
+time … e.g. in virtio we care about the values the used ring index could
+have only SINCE THE LAST BOUNDARY; otherwise the same value will have a
+different meaning."  Two corrections hardened in review:
+  (i) NO value-at-the-bound component — bounds are monotone (they move
+  up, including parked ones via deposits/absorbs), so "the value as of
+  the bound" is not a stable fact.  `ctx_history` claims CANDIDACY:
+  ∃ lo ≤ ξ's bound (∃-hidden, tied by `ctx_floor ξ lo`, stable because
+  bounds only grow), H covers the latest write at every view ≥ lo (head
+  = the floor entry or discipline; tail = the window's writes).
+  (ii) A reader DOMINATING ξ settles on some element of H — the read law
+  never mentions the bound's value.
+Re-basing (cut H's consumed prefix at a settle receipt, advance the
+floor) is the ONE protocol step: the virtio reclaim, the lock acquire,
+and the barrier crossing are all instances.
+
+**The two H-flavors** (both over the LANDED arms; started/virtio stay
+as proven — "no need to break them"):
+  - RECORDED: H is the rel arm's floor entries + history (`tf`/`fv`/
+    `tr_hist` ARE this data).  started = one-entry H; virtio = the
+    completion history.
+  - DISCIPLINED: H existential under a predicate; the page table is
+    `set_of H ⊆ the four A/D variants of the PTE` — the pin arm
+    (`pin_ok`: reads at ≥ B land in Sv) IS this flavor, B the floor,
+    pin_ok PRESERVED by family appends by any author.
+
+**The pattern**: every invariant is ROOTED at an establishment context
+ξe (parked by its creator after the construction writes); its cells'
+facts are `ctx_history` at that baseline; ACCESS is domination of the
+baseline (producers: the lock acquire, the started receipt, authorship,
+and the adequacy floor-0 case where boot-parked contexts are dominated
+by everything); context-relative record contents appear inside a body
+only as `∃ ξ', ξe ⊑ ξ' ∗ ctx_parked ξ' ∗ P ξ'` with `CtxMorph P` —
+never a bare fixed-ξ assertion, never a nested fixed-ξ inv.
+
+**The next-level abstraction, noted for evaluation, not mandated**:
+H as a predicate `P : value -> context -> iProp` — impossible values get
+`P v _ = False`; reading v yields `P v (reader's ctx)`; P persistent for
+broadcast cells, possibly not for AMO'd/exclusive ones.  The
+resource-post read leaves (`started_W`, the virtio `Q v V0`) already
+have this contract in leaf form; name it as an object when a client
+demands it.
+
+**BUILD ORDER**: (1) TsoMemPa: pin_ok preservation under a family
+append; (2) TsoCtx: the pin STORE gate (whole-window family write, any
+author, restamp; B unchanged); (3) `CtxHistory.v`: the surface layer
+(pin flavor first) — establishment at a parked baseline, the
+domination-gated read law, the author arm for hart 0 (at mint, record
+the stable prefix fact "all messages ≤ B touching the window are the
+creator's, latest = the built value"; author + that fact reads the
+family at ANY view); (4) the page-table instance (`kpt_inv` rooted at
+ξe; secondaries dominate via started, hart 0 via authorship) →
+`mn_grp_kvm`; (5) the record idiom (`stamped_rec`) with the pipe as
+first instance — closes A6.129 §4.
+

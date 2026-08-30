@@ -23,7 +23,7 @@ measured record; `main-tso-readiness.md` is the separate main-side handoff.
    temp-index recipe; `ZZchain.sh <File>…` at the tree root rechecks files
    locally in order against pulled `.vo`).
    Build driver: `ZZbuild.sh` at the tree root (the intr lane's, log names
-   suffixed `.aux` -- see the gotcha).  **Last certified: r58 (`b0631cf48`), 1263/1303, red roots 5, zero admits.  RULING §0.46′ (2026-08-30): the walker A/D write-backs are REAL and modeled — K15/preset retired, NO kpttree merge; the fliptree pre-K15 kpt stack + the pin-family design is the base; ProofMain unblocks via the pin write gate + the author-arm read (work list in §0.46′).  Builds via `run-on-gcp` ONLY.**
+   suffixed `.aux` -- see the gotcha).  **Last certified: r58 (`b0631cf48`), 1263/1303, red roots 5, zero admits.  RULINGS §0.46′ (A/D write-backs are real, modeled; K15/preset retired) and §0.47′ (ROOTED INVARIANTS + [ctx_history]: establishment contexts, domination access, no raw stamps in interfaces; build order in the ruling).  Current work: the ctx_history kit → the page-table instance → mn_grp_kvm.  Builds via `run-on-gcp` ONLY.**
 2. **KPT tree**: `/shared/xv6iris-3-kpttree` — FROZEN mid-K15d, unchanged
    this session EXCEPT one mirrored hunk: `iris/SmodeCorePt.v`'s
    `word_pointsto_wpay_mint_c` gained the trailing own-message fragment
