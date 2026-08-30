@@ -805,4 +805,101 @@ Section UserHeap.
       rewrite assoc. reflexivity.
   Qed.
 
+
+  (* ===================================================================== *)
+  (* THE CARVE: turning the entry's data map into a free stack.            *)
+  (*                                                                       *)
+  (* [uslot_of_urun] hands a program its data as [[∗ map] a ↦ b ∈ D,       *)
+  (* ubyte γd a b].  A process's stack is a contiguous run inside that,    *)
+  (* and these four steps turn it into [ustack]: pull the run out of the   *)
+  (* map, split it into 8-byte groups, assemble each group into a word,    *)
+  (* and index the words downward from sp.                                 *)
+  (* ===================================================================== *)
+
+  (* (1) a contiguous run, out of a map that contains it *)
+  Lemma ubytes_of_map (γd : gname) (D : gmap Z (bv 8)) (a : Z) (n : nat)
+      (f : nat -> bv 8) :
+    (forall j : nat, (j < n)%nat -> D !! (a + Z.of_nat j)%Z = Some (f j)) ->
+    ([∗ map] k ↦ b ∈ D, ubyte γd k b) -∗ ubytes γd a n f.
+  Proof.
+    revert D. induction n as [| n IH]; intros D HD; iIntros "HD".
+    - rewrite /ubytes /=. done.
+    - iDestruct (big_sepM_delete _ D (a + Z.of_nat n)%Z (f n) with "HD")
+        as "[Hb HD]"; [ exact (HD n ltac:(lia)) | ].
+      (* hoisted, not [ltac:]: an inline side-condition is elaborated before
+         the map argument is known, and runs against an evar *)
+      assert (HD' : forall j : nat, (j < n)%nat ->
+                delete (a + Z.of_nat n)%Z D !! (a + Z.of_nat j)%Z = Some (f j)).
+      { intros j Hj. rewrite lookup_delete_ne; [ apply HD; lia | lia ]. }
+      iDestruct (IH (delete (a + Z.of_nat n)%Z D) HD' with "HD") as "Hlo".
+      rewrite /ubytes seq_S big_sepL_app /=.
+      iFrame "Hlo Hb".
+  Qed.
+
+  (* (2) the split of a run *)
+  Lemma ubytes_app (γd : gname) (a : Z) (k n : nat) (f : nat -> bv 8) :
+    ubytes γd a (k + n) f ⊣⊢
+    ubytes γd a k f ∗ ubytes γd (a + Z.of_nat k) n (fun j => f (k + j)%nat).
+  Proof.
+    rewrite /ubytes seq_app big_sepL_app.
+    apply bi.sep_proper; [ reflexivity | ].
+    replace (seq (0 + k) n) with (Nat.add k <$> seq 0 n)
+      by (rewrite fmap_add_seq; f_equal; lia).
+    rewrite big_sepL_fmap.
+    apply big_opL_proper. intros i j _.
+    assert (E : (a + Z.of_nat (k + j))%Z = (a + Z.of_nat k + Z.of_nat j)%Z) by lia.
+    rewrite E. reflexivity.
+  Qed.
+
+  (* (3) eight bytes make a word.  Its value is the assembly of the bytes;
+     [ustack] only ever needs SOME word, so the witness is never named by a
+     caller. *)
+  Lemma uword_of_ubytes (γd : gname) (a : Z) (f : nat -> bv 8) :
+    ubytes γd a 8 f -∗ ∃ w : mword 64, uword γd a w.
+  Proof.
+    iIntros "Hb".
+    iExists (Z_to_bv 64 (assemble_bytes
+               [f 0%nat; f 1%nat; f 2%nat; f 3%nat;
+                f 4%nat; f 5%nat; f 6%nat; f 7%nat]) : mword 64).
+    rewrite /uword /ubytes.
+    iApply (big_sepL_mono with "Hb"). intros i j Hj.
+    apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l in Hlt |- *.
+    rewrite (nth_byte_assemble_len 64
+               [f 0%nat; f 1%nat; f 2%nat; f 3%nat;
+                f 4%nat; f 5%nat; f 6%nat; f 7%nat] i
+               ltac:(cbn; lia) ltac:(cbn; lia)).
+    destruct i as [| [| [| [| [| [| [| [| i']]]]]]]];
+      cbn; try reflexivity; exfalso; cbn in Hlt; lia.
+  Qed.
+
+  (* (4) ...and n of them, indexed downward from sp *)
+  Lemma ustack_of_ubytes (γd : gname) (sp : mword 64) (n : nat) (f : nat -> bv 8) :
+    8 * Z.of_nat n <= uint sp ->
+    ubytes γd (uint sp - 8 * Z.of_nat n) (8 * n) f -∗ ustack γd sp n.
+  Proof.
+    revert sp f. induction n as [| n IH]; intros sp f Hn.
+    - iIntros "_". rewrite ustack_0. done.
+    - iIntros "Hb".
+      pose proof (bv_unsigned_in_range _ sp) as Hr.
+      rewrite Zmod64 in Hr. rewrite <- uint_unsigned in Hr.
+      set (sp1 := (mword_of_int (uint sp - 8) : mword 64)).
+      assert (Hu1 : uint sp1 = uint sp - 8).
+      { unfold sp1. rewrite uint_unsigned moi64_unsigned. unfold bv_wrap.
+        rewrite Zmod64. apply Z.mod_small. unfold Z64 in *. lia. }
+      rewrite (ustack_S γd sp sp1 n Hu1).
+      replace (8 * S n)%nat with (8 * n + 8)%nat by lia.
+      assert (Ea : (uint sp - 8 * Z.of_nat (S n))%Z
+                   = (uint sp1 - 8 * Z.of_nat n)%Z) by (rewrite Hu1; lia).
+      rewrite Ea.
+      rewrite (ubytes_app γd (uint sp1 - 8 * Z.of_nat n) (8 * n) 8 f).
+      iDestruct "Hb" as "[Hlo Hhi]".
+      assert (Eh : (uint sp1 - 8 * Z.of_nat n + Z.of_nat (8 * n))%Z
+                   = (uint sp - 8)%Z) by (rewrite Hu1; lia).
+      rewrite Eh.
+      iSplitL "Hhi".
+      + iApply (uword_of_ubytes with "Hhi").
+      + assert (Hn' : 8 * Z.of_nat n <= uint sp1) by (rewrite Hu1; lia).
+        iApply (IH sp1 f Hn' with "Hlo").
+  Qed.
+
 End UserHeap.

@@ -358,21 +358,34 @@ Section UkRun.
     - pose proof (usz_ok_live sz a Hsz Hl). lia.
   Qed.
 
-  Lemma uslot_of_urun (W : uvis) :
+  (* THE ENTRY, with the process's initial free stack carved out of its data.
+     [avail] words below the resume sp become [urun]'s free stack; the rest
+     of the data is DROPPED (affinely), which is fine for a program whose
+     only memory is its stack.  A program that also needs static data wants
+     the non-lossy form of [ubytes_of_map], which its induction already
+     produces -- see the note there.
+
+     The two premises are exactly what the old [uk_stack] gate decided, in
+     the vocabulary of the heap: enough room below sp, and the bytes there
+     actually present in the data half.  [sz] is bound by the slot, so the
+     second is stated for every [sz] the bundle could carry. *)
+  Lemma uslot_of_urun (W : uvis) (avail : nat) :
+    8 * Z.of_nat avail
+      <= uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) ->
+    (forall (sz : Z) (j : nat), usz_ok sz -> (j < 8 * avail)%nat ->
+       is_Some (udata_lo (uvis_M W) (uvis_perm W) sz
+                 !! (uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)
+                     - 8 * Z.of_nat avail + Z.of_nat j)%Z)) ->
     (∀ (γt γd γs : gname) (h : CpuId) (sz : Z),
        ⌜ usz_ok sz ⌝ -∗
        usz γs sz -∗
        utext_all γt (uvis_M W) (uvis_perm W) -∗
-       ([∗ map] a ↦ b ∈ udata_lo (uvis_M W) (uvis_perm W) sz, ubyte γd a b) -∗
-       (* AVAIL = 0.  Carving the process's initial stack out of the data
-          the entry hands over is a separate step, and belongs with the
-          program's slot constructor rather than here -- it is the fact the
-          old [uk_stack] gate decided. *)
-       urun γt γd γs h (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)) 0 -∗
+       urun γt γd γs h (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W))
+         avail -∗
        WP (Loop : expr riscv_lang))
     -∗ uslot W.
   Proof.
-    iIntros "Hprog". rewrite uslot_ukc /ukc.
+    intros Hroom Hstk. iIntros "Hprog". rewrite uslot_ukc /ukc.
     iIntros (h C pt Rut sz) "%Hlo %Hpm Hb".
     assert (Hwf : proc_pt_wf pt)
       by (destruct Hlo as (_ & _ & _ & _ & _ & H); exact H).
@@ -384,12 +397,23 @@ Section UkRun.
     iMod (uheap_alloc (uvis_M W) (uvis_perm W) sz Hcan)
       as (γt γd γs) "(Hheap & Hszf & #Ht & Hd)".
     rewrite -/(utext_all γt (uvis_M W) (uvis_perm W)).
-    iSpecialize ("Hprog" $! γt γd γs h sz with "[%] Hszf Ht Hd"); [ exact Hsz | ].
+    (* ---- the carve ---- *)
+    set (sp := tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1).
+    set (D := udata_lo (uvis_M W) (uvis_perm W) sz).
+    set (base := (uint sp - 8 * Z.of_nat avail)%Z).
+    set (f := fun j : nat => default (bv_0 8) (D !! (base + Z.of_nat j)%Z)).
+    assert (Hf : forall j : nat, (j < 8 * avail)%nat ->
+                   D !! (base + Z.of_nat j)%Z = Some (f j)).
+    { intros j Hj. destruct (Hstk sz j Hsz Hj) as [b Hb].
+      unfold f. unfold D, base in *. rewrite Hb. reflexivity. }
+    iDestruct (ubytes_of_map γd D base (8 * avail) f Hf with "Hd") as "Hbs".
+    iDestruct (ustack_of_ubytes γd sp avail f Hroom with "Hbs") as "Hstk".
+    iSpecialize ("Hprog" $! γt γd γs h sz with "[%] Hszf Ht"); [ exact Hsz | ].
     iApply "Hprog".
     iExists C, pt, Rut, sz, (uvis_M W), (uvis_perm W).
     iSplitR; [ iPureIntro; exact Hlo | ].
     iSplitR; [ iPureIntro; exact Hpm | ].
-    iFrame "Hheap". rewrite ustack_0. iSplitR; [ done | ].
+    iFrame "Hheap Hstk".
     rewrite /uvb /uvb_F /user_ptm_inv.
     iFrame "Hamb Hregs Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
     iPureIntro. split_and!; [ exact Hsz | exact Hinj | exact Hacc ].
