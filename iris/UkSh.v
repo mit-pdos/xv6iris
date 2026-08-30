@@ -176,9 +176,6 @@ Section UkSh.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hcode Hrun Hcont".
-    iDestruct (uis_shk_cc6 with "Hcode") as "#Ccc6".
-    iDestruct (uis_shk_cc8 with "Hcode") as "#Ccc8".
-    iDestruct (uis_shk_ccc with "Hcode") as "#Cccc".
     destruct shk_syms_pins as (_ & _ & Hopen & _ & _). rewrite Hopen.
     iApply (wp_ksh_qstub h m 0xcc6 0xcc8 0xccc
               (mword_of_int 15 : mword 6) 15 avail
@@ -193,7 +190,10 @@ Section UkSh.
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Ccc6 Ccc8 Cccc Hrun Hcont").
+              with "[] [] [] Hrun Hcont").
+    { iApply (uis_shk_cc6 with "Hcode"). }
+    { iApply (uis_shk_cc8 with "Hcode"). }
+    { iApply (uis_shk_ccc with "Hcode"). }
   Qed.
 
   (* ---- close @0xcae, SYS_close = 21 ----------------------------------- *)
@@ -209,9 +209,6 @@ Section UkSh.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hcode Hrun Hcont".
-    iDestruct (uis_shk_cae with "Hcode") as "#Ccae".
-    iDestruct (uis_shk_cb0 with "Hcode") as "#Ccb0".
-    iDestruct (uis_shk_cb4 with "Hcode") as "#Ccb4".
     destruct shk_syms_pins as (_ & _ & _ & Hclose & _). rewrite Hclose.
     iApply (wp_ksh_qstub h m 0xcae 0xcb0 0xcb4
               (mword_of_int 21 : mword 6) 21 avail
@@ -226,7 +223,10 @@ Section UkSh.
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              with "Ccae Ccb0 Ccb4 Hrun Hcont").
+              with "[] [] [] Hrun Hcont").
+    { iApply (uis_shk_cae with "Hcode"). }
+    { iApply (uis_shk_cb0 with "Hcode"). }
+    { iApply (uis_shk_cb4 with "Hcode"). }
   Qed.
 
   (* ---- exit @0xc86, the arm with no continuation ---------------------- *)
@@ -236,14 +236,13 @@ Section UkSh.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hcode Hrun".
-    iDestruct (uis_shk_c86 with "Hcode") as "#Cc86".
-    iDestruct (uis_shk_c88 with "Hcode") as "#Cc88".
     destruct shk_syms_pins as (_ & _ & _ & _ & Hexit). rewrite Hexit.
     (* ---- 0xc86  c.li a7,2 ---- *)
     iApply (wp_uk_cli γt γd γs h m (mword_of_int 0xc86)
               (mword_of_int 2 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
-              ltac:(vm_compute; discriminate) with "Cc86 Hrun").
+              ltac:(vm_compute; discriminate) with "[] Hrun").
+    { iApply (uis_shk_c86 with "Hcode"). }
     assert (Ec86 : add_vec_int (mword_of_int 0xc86 : mword 64) 2
                    = mword_of_int 0xc88)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -260,7 +259,8 @@ Section UkSh.
               ltac:(unfold m1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx) (mword_of_int 2 : mword 64));
                     vm_compute; reflexivity)
-              with "Cc88 Hrun").
+              with "[] Hrun").
+    { iApply (uis_shk_c88 with "Hcode"). }
   Qed.
 
 
@@ -299,18 +299,13 @@ Section UkSh.
     iIntros "#Hcode".
     iLöb as "IH" forall (h m).
     iIntros "Hrun".
-    iDestruct (uis_shk_900 with "Hcode") as "#C900".
-    iDestruct (uis_shk_902 with "Hcode") as "#C902".
-    iDestruct (uis_shk_904 with "Hcode") as "#C904".
-    iDestruct (uis_shk_908 with "Hcode") as "#C908".
-    iDestruct (uis_shk_90c with "Hcode") as "#C90c".
-    iDestruct (uis_shk_910 with "Hcode") as "#C910".
     (* ---- 0x900  c.mv a1,s1 ---- *)
     iApply (wp_uk_cmv γt γd γs h m (mword_of_int 0x900) a1_idx s1_idx
               (add_vec zero_reg (m !!! Regidx s1_idx)) n
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) eq_refl
-              with "C900 Hrun").
+              with "[] Hrun").
+    { iApply (uis_shk_900 with "Hcode"). }
     assert (E900 : add_vec_int (mword_of_int 0x900 : mword 64) 2
                    = mword_of_int 0x902)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -322,7 +317,8 @@ Section UkSh.
               (add_vec zero_reg (mA !!! Regidx s2_idx)) n
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) eq_refl
-              with "C902 Hrun").
+              with "[] Hrun").
+    { iApply (uis_shk_902 with "Hcode"). }
     assert (E902 : add_vec_int (mword_of_int 0x902 : mword 64) 2
                    = mword_of_int 0x904)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -340,7 +336,8 @@ Section UkSh.
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(destruct shk_syms_pins as (_ & _ & Hop & _ & _);
                     rewrite Hop; vm_compute; reflexivity)
-              with "C904 Hrun").
+              with "[] Hrun").
+    { iApply (uis_shk_904 with "Hcode"). }
     iIntros (h3) "Hrun".
     set (mC := <[Regidx ra_idx
                  := regval_into_reg (mword_of_int 0x908 : mword 64)]> mB).
@@ -361,7 +358,8 @@ Section UkSh.
               Ht1
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(intros _; vm_compute; reflexivity)
-              with "C908 Hrun").
+              with "[] Hrun").
+    { iApply (uis_shk_908 with "Hcode"). }
     destruct t1.
     { (* open failed -- straight to the command loop's head *)
       iIntros (h5) "Hrun". iApply (ush_cmd_head h5 mD n with "Hcode Hrun"). }
@@ -378,7 +376,8 @@ Section UkSh.
               Ht2
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(intros _; vm_compute; reflexivity)
-              with "C90c Hrun").
+              with "[] Hrun").
+    { iApply (uis_shk_90c with "Hcode"). }
     destruct t2.
     { (* fd <= 2 -- round again, on the Löb hypothesis *)
       iNext. iIntros (h6) "Hrun". iApply ("IH" with "Hrun"). }
@@ -398,7 +397,8 @@ Section UkSh.
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(destruct shk_syms_pins as (_ & _ & _ & Hcl & _);
                     rewrite Hcl; vm_compute; reflexivity)
-              with "C910 Hrun").
+              with "[] Hrun").
+    { iApply (uis_shk_910 with "Hcode"). }
     iIntros (h7) "Hrun".
     set (mE := <[Regidx ra_idx
                  := regval_into_reg (mword_of_int 0x914 : mword 64)]> mD).
@@ -427,19 +427,6 @@ Section UkSh.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hcode Hrun".
-    iDestruct (uis_shk_8e2 with "Hcode") as "#C8e2".
-    iDestruct (uis_shk_8e4 with "Hcode") as "#C8e4".
-    iDestruct (uis_shk_8e6 with "Hcode") as "#C8e6".
-    iDestruct (uis_shk_8e8 with "Hcode") as "#C8e8".
-    iDestruct (uis_shk_8ea with "Hcode") as "#C8ea".
-    iDestruct (uis_shk_8ec with "Hcode") as "#C8ec".
-    iDestruct (uis_shk_8ee with "Hcode") as "#C8ee".
-    iDestruct (uis_shk_8f0 with "Hcode") as "#C8f0".
-    iDestruct (uis_shk_8f2 with "Hcode") as "#C8f2".
-    iDestruct (uis_shk_8f4 with "Hcode") as "#C8f4".
-    iDestruct (uis_shk_8f6 with "Hcode") as "#C8f6".
-    iDestruct (uis_shk_8f8 with "Hcode") as "#C8f8".
-    iDestruct (uis_shk_8fc with "Hcode") as "#C8fc".
     destruct shk_syms_pins as (_ & Hmain & _ & _ & _). rewrite Hmain.
     iDestruct (urun_stack with "Hrun") as %[Hal8' Hroom].
     remember (m !!! Regidx csp_rs1) as sp0 eqn:Hsp0.
@@ -474,7 +461,8 @@ Section UkSh.
     iApply (wp_uk_caddi16sp_dn γt γd γs h m (mword_of_int 0x8e2)
               (mword_of_int 60 : mword 6) 8 n
               ltac:(apply bv_eq; vm_compute; reflexivity)
-              with "C8e2 Hrun").
+              with "[] Hrun").
+    { iApply (uis_shk_8e2 with "Hcode"). }
     assert (E8e2 : add_vec_int (mword_of_int 0x8e2 : mword 64) 2
                    = mword_of_int 0x8e4)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -493,7 +481,8 @@ Section UkSh.
               (mword_of_int 7 : mword 6) ra_idx (uint sp0 - 8) v1 n
               ltac:(rewrite HspA Hsp64 Ho7; lia)
               ltac:(rewrite Zminus_mod Hal8; reflexivity)
-              with "C8e4 Hw1 Hrun").
+              with "[] Hw1 Hrun").
+    { iApply (uis_shk_8e4 with "Hcode"). }
     iIntros "Hw1".
     assert (Es0 : add_vec_int (mword_of_int 0x8e4 : mword 64) 2
                   = mword_of_int 0x8e6)
@@ -504,7 +493,8 @@ Section UkSh.
               (mword_of_int 6 : mword 6) s0_idx (uint sp0 - 16) v2 n
               ltac:(rewrite HspA Hsp64 Ho6; lia)
               ltac:(rewrite Zminus_mod Hal8; reflexivity)
-              with "C8e6 Hw2 Hrun").
+              with "[] Hw2 Hrun").
+    { iApply (uis_shk_8e6 with "Hcode"). }
     iIntros "Hw2".
     assert (Es1 : add_vec_int (mword_of_int 0x8e6 : mword 64) 2
                   = mword_of_int 0x8e8)
@@ -515,7 +505,8 @@ Section UkSh.
               (mword_of_int 5 : mword 6) s1_idx (uint sp0 - 24) v3 n
               ltac:(rewrite HspA Hsp64 Ho5; lia)
               ltac:(rewrite Zminus_mod Hal8; reflexivity)
-              with "C8e8 Hw3 Hrun").
+              with "[] Hw3 Hrun").
+    { iApply (uis_shk_8e8 with "Hcode"). }
     iIntros "Hw3".
     assert (Es2 : add_vec_int (mword_of_int 0x8e8 : mword 64) 2
                   = mword_of_int 0x8ea)
@@ -526,7 +517,8 @@ Section UkSh.
               (mword_of_int 4 : mword 6) s2_idx (uint sp0 - 32) v4 n
               ltac:(rewrite HspA Hsp64 Ho4; lia)
               ltac:(rewrite Zminus_mod Hal8; reflexivity)
-              with "C8ea Hw4 Hrun").
+              with "[] Hw4 Hrun").
+    { iApply (uis_shk_8ea with "Hcode"). }
     iIntros "Hw4".
     assert (Es3 : add_vec_int (mword_of_int 0x8ea : mword 64) 2
                   = mword_of_int 0x8ec)
@@ -537,7 +529,8 @@ Section UkSh.
               (mword_of_int 3 : mword 6) s3_idx (uint sp0 - 40) v5 n
               ltac:(rewrite HspA Hsp64 Ho3; lia)
               ltac:(rewrite Zminus_mod Hal8; reflexivity)
-              with "C8ec Hw5 Hrun").
+              with "[] Hw5 Hrun").
+    { iApply (uis_shk_8ec with "Hcode"). }
     iIntros "Hw5".
     assert (Es4 : add_vec_int (mword_of_int 0x8ec : mword 64) 2
                   = mword_of_int 0x8ee)
@@ -548,7 +541,8 @@ Section UkSh.
               (mword_of_int 2 : mword 6) s4_idx (uint sp0 - 48) v6 n
               ltac:(rewrite HspA Hsp64 Ho2; lia)
               ltac:(rewrite Zminus_mod Hal8; reflexivity)
-              with "C8ee Hw6 Hrun").
+              with "[] Hw6 Hrun").
+    { iApply (uis_shk_8ee with "Hcode"). }
     iIntros "Hw6".
     assert (Es5 : add_vec_int (mword_of_int 0x8ee : mword 64) 2
                   = mword_of_int 0x8f0)
@@ -559,7 +553,8 @@ Section UkSh.
               (mword_of_int 1 : mword 6) s5_idx (uint sp0 - 56) v7 n
               ltac:(rewrite HspA Hsp64 Ho1; lia)
               ltac:(rewrite Zminus_mod Hal8; reflexivity)
-              with "C8f0 Hw7 Hrun").
+              with "[] Hw7 Hrun").
+    { iApply (uis_shk_8f0 with "Hcode"). }
     iIntros "Hw7".
     assert (Es6 : add_vec_int (mword_of_int 0x8f0 : mword 64) 2
                   = mword_of_int 0x8f2)
@@ -570,7 +565,8 @@ Section UkSh.
               (mword_of_int 0 : mword 6) s6_idx (uint sp0 - 64) v8 n
               ltac:(rewrite HspA Hsp64 Ho0; lia)
               ltac:(rewrite Zminus_mod Hal8; reflexivity)
-              with "C8f2 Hw8 Hrun").
+              with "[] Hw8 Hrun").
+    { iApply (uis_shk_8f2 with "Hcode"). }
     iIntros "Hw8".
     assert (Es7 : add_vec_int (mword_of_int 0x8f2 : mword 64) 2
                   = mword_of_int 0x8f4)
@@ -585,7 +581,8 @@ Section UkSh.
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
               eq_refl
-              with "C8f4 Hrun").
+              with "[] Hrun").
+    { iApply (uis_shk_8f4 with "Hcode"). }
     assert (E8f4 : add_vec_int (mword_of_int 0x8f4 : mword 64) 2
                    = mword_of_int 0x8f6)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -599,7 +596,8 @@ Section UkSh.
     iApply (wp_uk_cli γt γd γs hb mB (mword_of_int 0x8f6)
               (mword_of_int 2 : mword 6) s1_idx n
               ltac:(unfold unot_sp; vm_compute; discriminate)
-              ltac:(vm_compute; discriminate) with "C8f6 Hrun").
+              ltac:(vm_compute; discriminate) with "[] Hrun").
+    { iApply (uis_shk_8f6 with "Hcode"). }
     assert (E8f6 : add_vec_int (mword_of_int 0x8f6 : mword 64) 2
                    = mword_of_int 0x8f8)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -614,7 +612,8 @@ Section UkSh.
                  (auipc_off (mword_of_int 1 : mword 20))) n
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) eq_refl
-              with "C8f8 Hrun").
+              with "[] Hrun").
+    { iApply (uis_shk_8f8 with "Hcode"). }
     assert (E8f8 : add_vec_int (mword_of_int 0x8f8 : mword 64) 4
                    = mword_of_int 0x8fc)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -630,7 +629,8 @@ Section UkSh.
                  (sign_extend' 64 (mword_of_int 2688 : mword 12))) n
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) eq_refl
-              with "C8fc Hrun").
+              with "[] Hrun").
+    { iApply (uis_shk_8fc with "Hcode"). }
     assert (E8fc : add_vec_int (mword_of_int 0x8fc : mword 64) 4
                    = mword_of_int 0x900)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -653,11 +653,6 @@ Section UkSh.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hcode Hrun".
-    iDestruct (uis_shk_9d0 with "Hcode") as "#C9d0".
-    iDestruct (uis_shk_9d2 with "Hcode") as "#C9d2".
-    iDestruct (uis_shk_9d4 with "Hcode") as "#C9d4".
-    iDestruct (uis_shk_9d6 with "Hcode") as "#C9d6".
-    iDestruct (uis_shk_9d8 with "Hcode") as "#C9d8".
     destruct shk_syms_pins as (Hstart & Hmain & _ & _ & _). rewrite Hstart.
     iDestruct (urun_stack with "Hrun") as %[Hal8' Hroom].
     remember (m !!! Regidx csp_rs1) as sp0 eqn:Hsp0.
@@ -680,7 +675,8 @@ Section UkSh.
     iApply (wp_uk_caddi_sp_dn γt γd γs h m (mword_of_int 0x9d0)
               (mword_of_int 48 : mword 6) 2 (8 + n)
               ltac:(apply bv_eq; vm_compute; reflexivity)
-              with "C9d0 Hrun").
+              with "[] Hrun").
+    { iApply (uis_shk_9d0 with "Hcode"). }
     assert (E9d0 : add_vec_int (mword_of_int 0x9d0 : mword 64) 2
                    = mword_of_int 0x9d2)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -698,7 +694,8 @@ Section UkSh.
               (mword_of_int 1 : mword 6) ra_idx (uint sp0 - 8) v8 (8 + n)
               ltac:(rewrite Hsp1 Hsp16 Ho8; lia)
               ltac:(rewrite Zminus_mod Hal8; reflexivity)
-              with "C9d2 Hw8 Hrun").
+              with "[] Hw8 Hrun").
+    { iApply (uis_shk_9d2 with "Hcode"). }
     iIntros "Hw8".
     assert (E9d2 : add_vec_int (mword_of_int 0x9d2 : mword 64) 2
                    = mword_of_int 0x9d4)
@@ -709,7 +706,8 @@ Section UkSh.
               (mword_of_int 0 : mword 6) s0_idx (uint sp0 - 16) v0 (8 + n)
               ltac:(rewrite Hsp1 Hsp16 Ho0; lia)
               ltac:(rewrite Zminus_mod Hal8; reflexivity)
-              with "C9d4 Hw0 Hrun").
+              with "[] Hw0 Hrun").
+    { iApply (uis_shk_9d4 with "Hcode"). }
     iIntros "Hw0".
     assert (E9d4 : add_vec_int (mword_of_int 0x9d4 : mword 64) 2
                    = mword_of_int 0x9d6)
@@ -724,7 +722,8 @@ Section UkSh.
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
               eq_refl
-              with "C9d6 Hrun").
+              with "[] Hrun").
+    { iApply (uis_shk_9d6 with "Hcode"). }
     assert (E9d6 : add_vec_int (mword_of_int 0x9d6 : mword 64) 2
                    = mword_of_int 0x9d8)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -743,7 +742,8 @@ Section UkSh.
               ltac:(rewrite Hmain; apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite Hmain; vm_compute; reflexivity)
-              with "C9d8 Hrun").
+              with "[] Hrun").
+    { iApply (uis_shk_9d8 with "Hcode"). }
     iIntros (h5) "Hrun".
     (* ---- main(), which never returns ---- *)
     (* [ShSyms.main] is what the jal's target already is, so this only ever

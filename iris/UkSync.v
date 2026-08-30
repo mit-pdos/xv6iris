@@ -70,15 +70,14 @@ Section UkSync.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hcode Hrun".
-    iDestruct (uis_sync_2c8 with "Hcode") as "#C2c8".
-    iDestruct (uis_sync_2ca with "Hcode") as "#C2ca".
     destruct sync_syms_pins as (Hsmain & Hsstart & Hsexit & Hssync).
     rewrite Hsexit.
     (* 0x2c8  c.li a7,2 *)
     iApply (wp_uk_cli γt γd γs h m (mword_of_int 0x2c8)
               (mword_of_int 2 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
-              ltac:(vm_compute; discriminate) with "C2c8 Hrun").
+              ltac:(vm_compute; discriminate) with "[] Hrun").
+    { iApply (uis_sync_2c8 with "Hcode"). }
     assert (Epc : add_vec_int (mword_of_int 0x2c8 : mword 64) 2
                   = mword_of_int 0x2ca)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -95,7 +94,8 @@ Section UkSync.
               ltac:(unfold m1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx) (mword_of_int 2 : mword 64));
                     vm_compute; reflexivity)
-              with "C2ca Hrun").
+              with "[] Hrun").
+    { iApply (uis_sync_2ca with "Hcode"). }
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -116,16 +116,14 @@ Section UkSync.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hret2. iIntros "#Hcode Hrun Hcont".
-    iDestruct (uis_sync_368 with "Hcode") as "#C368".
-    iDestruct (uis_sync_36a with "Hcode") as "#C36a".
-    iDestruct (uis_sync_36e with "Hcode") as "#C36e".
     destruct sync_syms_pins as (Hsmain & Hsstart & Hsexit & Hssync).
     rewrite Hssync.
     (* 0x368  c.li a7,22 *)
     iApply (wp_uk_cli γt γd γs h m (mword_of_int 0x368)
               (mword_of_int 22 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
-              ltac:(vm_compute; discriminate) with "C368 Hrun").
+              ltac:(vm_compute; discriminate) with "[] Hrun").
+    { iApply (uis_sync_368 with "Hcode"). }
     assert (E368 : add_vec_int (mword_of_int 0x368 : mword 64) 2
                    = mword_of_int 0x36a)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -147,7 +145,8 @@ Section UkSync.
               ltac:(discriminate) ltac:(discriminate)
               ltac:(discriminate) ltac:(discriminate)
               ltac:(vm_compute; reflexivity)
-              with "C36a Hrun").
+              with "[] Hrun").
+    { iApply (uis_sync_36a with "Hcode"). }
     assert (E36a : add_vec_int (mword_of_int 0x36a : mword 64) 4
                    = mword_of_int 0x36e)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -168,7 +167,8 @@ Section UkSync.
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra; unfold ret_pc; symmetry;
                     exact (update_bit0_zero_of_aligned2 _ Hret2))
-              with "C36e Hrun").
+              with "[] Hrun").
+    { iApply (uis_sync_36e with "Hcode"). }
     iIntros (h3) "Hrun". iApply ("Hcont" $! h3 ret with "Hrun").
   Qed.
 
@@ -193,24 +193,6 @@ Section UkSync.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hsp. iIntros "#Hcode Hrun".
-    iDestruct (uis_sync_00 with "Hcode") as "#C00".
-    iDestruct (uis_sync_02 with "Hcode") as "#C02".
-    iDestruct (uis_sync_04 with "Hcode") as "#C04".
-    iDestruct (uis_sync_06 with "Hcode") as "#C06".
-    iDestruct (uis_sync_08 with "Hcode") as "#C08".
-    iDestruct (uis_sync_0c with "Hcode") as "#C0c".
-    iDestruct (uis_sync_0e with "Hcode") as "#C0e".
-    iDestruct (uis_sync_12 with "Hcode") as "#C12".
-    iDestruct (uis_sync_14 with "Hcode") as "#C14".
-    iDestruct (uis_sync_16 with "Hcode") as "#C16".
-    iDestruct (uis_sync_18 with "Hcode") as "#C18".
-    iDestruct (uis_sync_1a with "Hcode") as "#C1a".
-    iDestruct (uis_sync_1e with "Hcode") as "#C1e".
-    iDestruct (uis_sync_2c8 with "Hcode") as "#C2c8".
-    iDestruct (uis_sync_2ca with "Hcode") as "#C2ca".
-    iDestruct (uis_sync_368 with "Hcode") as "#C368".
-    iDestruct (uis_sync_36a with "Hcode") as "#C36a".
-    iDestruct (uis_sync_36e with "Hcode") as "#C36e".
     (* the free stack the run already owns says sp is aligned and has room *)
     iDestruct (urun_stack with "Hrun") as %[Hal8' Hroom'].
     rewrite Hsp in Hal8', Hroom'.
@@ -229,7 +211,8 @@ Section UkSync.
     iApply (wp_uk_caddi_sp_dn γt γd γs h m (mword_of_int 0x0)
               (mword_of_int 48 : mword 6) 2 n
               ltac:(apply bv_eq; vm_compute; reflexivity)
-              with "C00 Hrun").
+              with "[] Hrun").
+    { iApply (uis_sync_00 with "Hcode"). }
     replace (add_vec_int (m !!! Regidx csp_rs1) (- (8 * Z.of_nat 2)))
       with (add_vec_int sp0 (-16)) by (rewrite Hsp; f_equal; lia).
     assert (E00 : add_vec_int (mword_of_int 0x0 : mword 64) 2 = mword_of_int 0x2)
@@ -246,7 +229,8 @@ Section UkSync.
               (mword_of_int 1 : mword 6) ra_idx (uint sp0 - 8) v8 n
               ltac:(rewrite Hsp1 Hsp16 Ho8; lia)
               ltac:(rewrite Zminus_mod Hal8; reflexivity)
-              with "C02 Hw8 Hrun").
+              with "[] Hw8 Hrun").
+    { iApply (uis_sync_02 with "Hcode"). }
     iIntros "Hw8".
     assert (E02 : add_vec_int (mword_of_int 0x2 : mword 64) 2 = mword_of_int 0x4)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -257,7 +241,8 @@ Section UkSync.
               (mword_of_int 0 : mword 6) s0_idx (uint sp0 - 16) v0 n
               ltac:(rewrite Hsp1 Hsp16 Ho0; lia)
               ltac:(rewrite Zminus_mod Hal8; reflexivity)
-              with "C04 Hw0 Hrun").
+              with "[] Hw0 Hrun").
+    { iApply (uis_sync_04 with "Hcode"). }
     iIntros "Hw0".
     assert (E04 : add_vec_int (mword_of_int 0x4 : mword 64) 2 = mword_of_int 0x6)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -275,7 +260,8 @@ Section UkSync.
                       with (mword_of_int 16 : mword 64)
                       by (apply bv_eq; vm_compute; reflexivity);
                     reflexivity)
-              with "C06 Hrun").
+              with "[] Hrun").
+    { iApply (uis_sync_06 with "Hcode"). }
     assert (E06 : add_vec_int (mword_of_int 0x6 : mword 64) 2 = mword_of_int 0x8)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E06.
@@ -291,7 +277,8 @@ Section UkSync.
               ltac:(rewrite Hssync; apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite Hssync; vm_compute; reflexivity)
-              with "C08 Hrun").
+              with "[] Hrun").
+    { iApply (uis_sync_08 with "Hcode"). }
     iIntros (h5) "Hrun".
     set (m3 := <[Regidx ra_idx := regval_into_reg (mword_of_int 0xc : mword 64)]> m2).
     (* ---- the call: sync() ---- *)
@@ -310,7 +297,8 @@ Section UkSync.
     iApply (wp_uk_cli γt γd γs h6 m4 (mword_of_int 0xc)
               (mword_of_int 0 : mword 6) a0_idx n
               ltac:(unfold unot_sp; vm_compute; discriminate)
-              ltac:(vm_compute; discriminate) with "C0c Hrun").
+              ltac:(vm_compute; discriminate) with "[] Hrun").
+    { iApply (uis_sync_0c with "Hcode"). }
     assert (E0c : add_vec_int (mword_of_int 0xc : mword 64) 2 = mword_of_int 0xe)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E0c.
@@ -327,7 +315,8 @@ Section UkSync.
               ltac:(rewrite Hsexit; apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite Hsexit; vm_compute; reflexivity)
-              with "C0e Hrun").
+              with "[] Hrun").
+    { iApply (uis_sync_0e with "Hcode"). }
     iIntros (h8) "Hrun".
     iApply (wp_ksync_exit h8 _ n with "[] Hrun").
     iExact "Hcode".
@@ -350,24 +339,6 @@ Section UkSync.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hsp. iIntros "#Hcode Hrun".
-    iDestruct (uis_sync_00 with "Hcode") as "#C00".
-    iDestruct (uis_sync_02 with "Hcode") as "#C02".
-    iDestruct (uis_sync_04 with "Hcode") as "#C04".
-    iDestruct (uis_sync_06 with "Hcode") as "#C06".
-    iDestruct (uis_sync_08 with "Hcode") as "#C08".
-    iDestruct (uis_sync_0c with "Hcode") as "#C0c".
-    iDestruct (uis_sync_0e with "Hcode") as "#C0e".
-    iDestruct (uis_sync_12 with "Hcode") as "#C12".
-    iDestruct (uis_sync_14 with "Hcode") as "#C14".
-    iDestruct (uis_sync_16 with "Hcode") as "#C16".
-    iDestruct (uis_sync_18 with "Hcode") as "#C18".
-    iDestruct (uis_sync_1a with "Hcode") as "#C1a".
-    iDestruct (uis_sync_1e with "Hcode") as "#C1e".
-    iDestruct (uis_sync_2c8 with "Hcode") as "#C2c8".
-    iDestruct (uis_sync_2ca with "Hcode") as "#C2ca".
-    iDestruct (uis_sync_368 with "Hcode") as "#C368".
-    iDestruct (uis_sync_36a with "Hcode") as "#C36a".
-    iDestruct (uis_sync_36e with "Hcode") as "#C36e".
     (* the free stack the run already owns says sp is aligned and has room *)
     iDestruct (urun_stack with "Hrun") as %[Hal8' Hroom'].
     rewrite Hsp in Hal8', Hroom'.
@@ -386,7 +357,8 @@ Section UkSync.
     iApply (wp_uk_caddi_sp_dn γt γd γs h m (mword_of_int 0x12)
               (mword_of_int 48 : mword 6) 2 (2 + n)
               ltac:(apply bv_eq; vm_compute; reflexivity)
-              with "C12 Hrun").
+              with "[] Hrun").
+    { iApply (uis_sync_12 with "Hcode"). }
     replace (add_vec_int (m !!! Regidx csp_rs1) (- (8 * Z.of_nat 2)))
       with (add_vec_int sp0 (-16)) by (rewrite Hsp; f_equal; lia).
     assert (E12 : add_vec_int (mword_of_int 0x12 : mword 64) 2 = mword_of_int 0x14)
@@ -403,7 +375,8 @@ Section UkSync.
               (mword_of_int 1 : mword 6) ra_idx (uint sp0 - 8) v8 (2 + n)
               ltac:(rewrite Hsp1 Hsp16 Ho8; lia)
               ltac:(rewrite Zminus_mod Hal8; reflexivity)
-              with "C14 Hw8 Hrun").
+              with "[] Hw8 Hrun").
+    { iApply (uis_sync_14 with "Hcode"). }
     iIntros "Hw8".
     assert (E14 : add_vec_int (mword_of_int 0x14 : mword 64) 2 = mword_of_int 0x16)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -414,7 +387,8 @@ Section UkSync.
               (mword_of_int 0 : mword 6) s0_idx (uint sp0 - 16) v0 (2 + n)
               ltac:(rewrite Hsp1 Hsp16 Ho0; lia)
               ltac:(rewrite Zminus_mod Hal8; reflexivity)
-              with "C16 Hw0 Hrun").
+              with "[] Hw0 Hrun").
+    { iApply (uis_sync_16 with "Hcode"). }
     iIntros "Hw0".
     assert (E16 : add_vec_int (mword_of_int 0x16 : mword 64) 2 = mword_of_int 0x18)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -432,7 +406,8 @@ Section UkSync.
                       with (mword_of_int 16 : mword 64)
                       by (apply bv_eq; vm_compute; reflexivity);
                     reflexivity)
-              with "C18 Hrun").
+              with "[] Hrun").
+    { iApply (uis_sync_18 with "Hcode"). }
     assert (E18 : add_vec_int (mword_of_int 0x18 : mword 64) 2 = mword_of_int 0x1a)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E18.
@@ -448,7 +423,8 @@ Section UkSync.
               ltac:(rewrite Hsmain; apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite Hsmain; vm_compute; reflexivity)
-              with "C1a Hrun").
+              with "[] Hrun").
+    { iApply (uis_sync_1a with "Hcode"). }
     iIntros (h5) "Hrun".
     set (m3 := <[Regidx ra_idx := regval_into_reg (mword_of_int 0x1e : mword 64)]> m2).
     (* ---- the call: main() -- diverges, so 0x1e is dead ---- *)

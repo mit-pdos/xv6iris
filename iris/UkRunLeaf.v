@@ -1149,4 +1149,44 @@ Section UkRunLeaf.
     - iIntros (h') "Hrun". iApply ("Hcont" with "Hframe Hrun").
   Qed.
 
+  (* ...and ITS pop.  putc, printf and vprintf all pop with c.addi16sp
+     (32 and 96 bytes), so the mirror is not optional; it is
+     [wp_uk_caddi_sp_up]'s proof with [caddi16sp_imm] in the premise. *)
+  Lemma wp_uk_caddi16sp_up (γt γd γs : gname) (h : CpuId) (m : regfile)
+      (pc : mword 64) (imm : mword 6) (k n : nat) :
+    (sign_extend' 64 (caddi16sp_imm imm) : mword 64)
+      = mword_of_int (8 * Z.of_nat k) ->
+    uinstr_is γt pc true (C_ADDI16SP imm) -∗
+    ustack γd (add_vec_int (m !!! Regidx csp_rs1) (8 * Z.of_nat k)) k -∗
+    urun γt γd γs h m pc n -∗
+    (∀ h' : CpuId,
+       urun γt γd γs h'
+         (<[Regidx csp_rs1
+            := regval_into_reg
+                 (add_vec_int (m !!! Regidx csp_rs1) (8 * Z.of_nat k))]> m)
+         (add_vec_int pc 2) (k + n) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Himm. iIntros "#Hi Hframe Hrun Hcont".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
+    iDestruct (ustack_nowrap with "Hheap Hframe") as %Hnw.
+    assert (Hu : uint (m !!! Regidx csp_rs1)
+                 = uint (add_vec_int (m !!! Regidx csp_rs1) (8 * Z.of_nat k))
+                   - 8 * Z.of_nat k).
+    { rewrite !uint_unsigned.
+      rewrite (uv_avi_pos (m !!! Regidx csp_rs1) (8 * Z.of_nat k) ltac:(lia)
+                 ltac:(rewrite <- uint_unsigned; exact Hnw)). lia. }
+    iApply (UkLeaf.wp_uk_caddi16sp C pt Rut pm sz Hlo Hpm M m pc imm
+              (add_vec_int (m !!! Regidx csp_rs1) (8 * Z.of_nat k))
+              Hui ltac:(unfold add_vec_int; f_equal; exact (eq_sym Himm))
+              with "Hb [Hheap Hstk Hframe Hcont]").
+    iApply (urun_close with "Hheap [Hstk Hframe] Hcont").
+    rewrite (upd_eq m (Regidx csp_rs1) (regval_into_reg _)).
+    rewrite (ustack_app γd (add_vec_int (m !!! Regidx csp_rs1) (8 * Z.of_nat k))
+               (m !!! Regidx csp_rs1) k n Hu).
+    iFrame "Hframe Hstk".
+  Qed.
+
 End UkRunLeaf.
