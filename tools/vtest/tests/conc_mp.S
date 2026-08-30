@@ -120,11 +120,32 @@
  * costs two instructions per iteration and does not disturb the timing that
  * makes the witness count high -- verified: the witness stayed at 100%.
  */
-/* vtest: smp=2 repeat=1 builder=multi */
+/* THE PROJECTION IS THE THREE FIELDS THIS TEST IS ABOUT.  The witness counts
+   and the writer's end-of-pass sequence numbers say WHEN the reader happened
+   to sample, which differs between two runs of the same machine and differs
+   again between QEMU's scheduler and the model's round-robin.  Demanding
+   those agree would be demanding the wrong thing.  What the test claims is
+   status, NITER, and the two FORBIDDEN counts -- and those are the fields a
+   reordering would move. */
+/* vtest: smp=2 repeat=20 builder=multi budget=6000 proj=fields:0,8,16,24 */
     .option norvc
 #include "abi.h"
 
-#define NITER     4096            /* reader iterations per pass */
+/* NITER IS SIZED BY THE MODEL, not by the hardware.  The model side of this
+   case is an actual two-hart execution -- VConc round-robins both harts and
+   VRunConc compares what they published -- and that runs at ~50 instructions
+   per second under vm_compute, measured.  At 4096 it was 164 000 instructions,
+   i.e. ~55 minutes for one schedule, so there was no run at all and the
+   table's cell for this case was empty.  At 64 it is ~2600 instructions and
+   about a minute, which buys a REAL run: the model executes this exact image
+   and its result is compared, rather than the case being asserted about.
+
+   WHAT IT COSTS is sensitivity on the hardware, and that is bought back with
+   `repeat`, not with NITER: every run projects to the same three fields
+   (below), so N repeats are N independent sweeps that cost the model side
+   nothing.  128 races per run x repeat is the real figure to quote, and a
+   null result is still only "not observed by this test at this timing". */
+#define NITER     64              /* reader iterations per pass */
 /* WGAP nops between the writer's two stores.  This imposes NO ORDERING --
    nops are not fences -- it only widens the interval during which X has
    been written and Y has not, which is the interval the reader has to
@@ -161,9 +182,23 @@
 
 /* ---- the WRITER: store the sequence number to X then Y, forever, until
  * the reader says stop.  \fenced puts a w,w fence between them, which is
- * the control pass. ---- */
+ * the control pass.
+ *
+ * THE SEQUENCE NUMBER IS NOT RESET BETWEEN THE PASSES, and that is a
+ * CORRECTNESS requirement rather than tidiness.  It used to be reset here,
+ * and then pass 2 began storing X=1 while X and Y still held the large
+ * values pass 1 had left in memory -- so the reader read Y=<big> and then
+ * X=1, saw r1 > r2, and counted a FORBIDDEN event in the FENCED control
+ * pass, which is supposed to be impossible on every machine.  A false
+ * positive in exactly the check whose job is to catch false positives.
+ *
+ * QEMU never showed it: there the writer does not get going until pass 2
+ * (p1wit=0, X=Y=0 at the end of pass 1), so there was no stale value to
+ * trip over.  THE MODEL FOUND IT, because VConc's strict alternation gives
+ * the writer a fair share and X and Y were large entering pass 2.  Keeping
+ * the counter monotonic across both passes removes the reset window: X >= Y
+ * holds in memory for the whole run, not merely within one pass. ---- */
 .macro WLOOP fenced, stop
-    li   s2, 0
 1:  addi s2, s2, 1
     sw   s2, 0(s3)                /* X = i  -- the DATA first */
 .if \fenced
@@ -276,6 +311,7 @@ _vtest_body:                     /* the PRIMARY is the READER: it publishes */
     .globl _vtest_body_ap
 _vtest_body_ap:                  /* the AP is the WRITER */
     li   s3, XADDR
+    li   s2, 0                    /* ONCE, not per pass -- see WLOOP */
     li   t0, 1
     sw   t0, READY1(s11)
     WLOOP 0, STOP1

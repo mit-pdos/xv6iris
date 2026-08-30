@@ -22,6 +22,7 @@ ConcByteGen.v
 ConcLostGen.v
 ConcMpGen.v
 ConcSbGen.v
+ConcSbxGen.v
 ConcSmokeGen.v
 CoreCsrprobeGen.v
 CoreCsrprobeHwGen.v
@@ -90,6 +91,7 @@ UartWidthGen.v
 ConcAmoSched.v
 ConcByteSched.v
 ConcLostSched.v
+ConcMpSched.v
 ConcSbSched.v
 ConcSmokeSched.v
 ClintMsipJh7110Run.v
@@ -99,6 +101,7 @@ ClintTimeQemuRun.v
 ConcAmoQemuRun.v
 ConcByteQemuRun.v
 ConcLostQemuRun.v
+ConcMpQemuRun.v
 ConcSbQemuRun.v
 ConcSmokeQemuRun.v
 CoreCsrprobeJh7110Run.v
@@ -163,6 +166,7 @@ ClintTimeQemuPass.v
 ConcAmoQemuPass.v
 ConcByteQemuPass.v
 ConcLostQemuPass.v
+ConcMpQemuPass.v
 ConcSmokeQemuPass.v
 CoreCsrprobeQemuPass.v
 CoreCsrwideQemuPass.v

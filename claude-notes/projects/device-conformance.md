@@ -1,5 +1,46 @@
 # Project: device conformance — the semantics, differentially tested against QEMU (and now against real hardware)
 
+## STATUS ADDENDUM (2026-08-30c): THE MODEL FOUND A BUG IN A TEST
+
+`conc_mp` (message passing, the RVWMO-vs-TSO litmus) had a FALSE POSITIVE IN
+ITS OWN CONTROL PASS, and the model is what caught it.
+
+The writer stores a monotonic sequence number to X then Y, so X >= Y holds in
+memory at every instant and a reader that sees `r1 > r2` has caught a
+reordering.  The counter was reset at the top of each pass -- `li s2, 0` lived
+inside the WLOOP macro -- so pass 2 began storing X=1 while X and Y still held
+the LARGE values pass 1 had left behind.  A reader sampling there reads
+Y=<big> then X=1, sees r1 > r2, and records a FORBIDDEN event in the FENCED
+pass: the pass whose entire job is to be zero on every machine, model
+included, precisely so that a nonzero count in pass 1 is believable.
+
+QEMU HAD BEEN HIDING IT.  There the writer does not get going until pass 2
+(p1wit=0, X=Y=0 at the end of pass 1 in every capture), so no stale value
+existed to trip over and the control pass read 0.  The model's [cfinish]
+round-robins the two harts one instruction at a time, which is a FAIRER
+schedule than QEMU's, so its writer had run thousands of iterations by the
+time pass 2 started -- and the run came back with p2bad = 1 against QEMU's 0.
+
+THIS IS THE SUITE WORKING IN THE DIRECTION NOBODY PLANNED FOR.  The question
+it asks is "is what the hardware did an execution the model allows"; a
+mismatch is meant to be evidence about the MODEL.  Here the mismatch was
+evidence about the TEST, and the only reason it surfaced is that the model
+schedules differently from QEMU.  A reference implementation that agrees with
+you about everything cannot tell you anything.
+
+Fixed by making the sequence monotonic across both passes (one `li s2, 0`
+before the first WLOOP), which removes the reset window entirely.
+
+Sized at the same time: NITER 4096 -> 64.  The model side is a real two-hart
+execution and runs at ~50 instructions/sec under vm_compute (measured;
+granularity between device settles makes no difference -- 1, 50 and 500
+instructions per settle all took 236-248 s for 12 000 instructions), so 4096
+was ~55 minutes for one schedule and there was no run at all.  64 is ~45 s.
+The sensitivity that costs is bought back with `repeat`, not with NITER: the
+run projects to (status, NITER, p1bad, p2bad), so 20 repeats collapse to ONE
+projected observation and cost the model side nothing.
+
+
 ## STATUS ADDENDUM (2026-08-30b): ONE SET OF CASES, ONE KIND OF RUN, ONE TABLE
 
 The suite had grown two of everything: a per-case `vtest-rocq/<Name>.v` that

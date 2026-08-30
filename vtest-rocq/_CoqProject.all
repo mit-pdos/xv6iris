@@ -38,10 +38,14 @@ ConcLostQemuPass.v
 ConcLostQemuRun.v
 ConcLostSched.v
 ConcMpGen.v
+ConcMpQemuPass.v
+ConcMpQemuRun.v
+ConcMpSched.v
 ConcSbGen.v
 ConcSbQemuPass.v
 ConcSbQemuRun.v
 ConcSbSched.v
+ConcSbxGen.v
 ConcSmokeGen.v
 ConcSmokeQemuPass.v
 ConcSmokeQemuRun.v
