@@ -277,7 +277,6 @@ Require Import ProcInv.
 Require Import SpecPrintk.      (* [printk_env], [printk_gen_contract] *)
 Require Import SpecDirlink.     (* [ic_sleeplocks], [ireg_blocks_ok] *)
 Require Import SpecFdalloc.     (* [fd_frees] *)
-Require Import SpecCreate.      (* [create_slots]; the F-OK facts *)
 Require Import ConsoleInv.      (* [NDEV_max] *)
 Require Import SpecSysOpen.     (* the landed contract this file states a
                                    parallel form beside; [K_sys_open],

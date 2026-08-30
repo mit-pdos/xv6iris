@@ -34,19 +34,14 @@ From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
+Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvExtras.
 Require Import CommonWalk.
-Require Import SmodeCore.
 Require Import KptPt.
-Require Import UptTree.
 Require Import UserPtTree.
 Require Import UserBits.
-Require Import UserMem.
-Require Import UserFetch.
 Require Import InstrBytes.
 Require Import UmodeMem.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 

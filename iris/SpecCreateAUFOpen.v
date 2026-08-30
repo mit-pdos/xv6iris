@@ -43,27 +43,17 @@ From iris.algebra Require Import auth gmap frac dfrac.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map.
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto.
-Require Import DinodeEnc.
-Require Import DirView.
 Require Import FsTree.           (* [fname]                                 *)
 Require Import PathElems.        (* [path_elems]                            *)
 Require Import FsBlocks.         (* [fs_names]                              *)
-Require Import FsBytesGamma.     (* [fs_gamma_L]                            *)
-Require Import InodeInv.
-Require Import InodeLock.
+Require Import FsStateDefs.     (* [fs_gamma_L]                            *)
+Require Import Xv6Cameras.
 Require Import IrefSlots.
-Require Import IcacheRef.
-Require Import IcacheEscrow.
 Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import ProcAvail.
-Require Import FsStateEra.
-Require Import InodeRegion.
 Require Import Xv6G.
-Require Import SpecCreate.
 Require Import SpecSysMknodAU.   (* [cre_pre], [mknod_parent_elems]         *)
-Require Import FsAbsEra.
-Require Import FsAbsEraMknod.    (* [mknod_walk_dead_era]                   *)
 Require Import FsAbsMknodFire.   (* the two commits                         *)
 Require Import SpecCreateAUF.    (* [cauf_ok], [cauf_fail]                  *)
 Require Import SpecSysOpenAU.    (* the consumer, which does NOT move       *)

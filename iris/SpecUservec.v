@@ -100,7 +100,6 @@ Require Import UexecRet.   (* [tf_of] -- the saved 36-word frame of a running ma
 Require Import UexecRound. (* [uround_ok] -- the round, image half included *)
 Require Import UexecSlot.  (* [tf_resume_pc] *)
 Require Import UserPerm.   (* [perm_of] *)
-Require Import UsysMemOk.  (* [uecall_scause] *)
 Require Import TfUser.     (* [tf_ueq] *)
 Require Import Xv6Cameras.
 (* [usertrap_res]'s own signature (SpecUsertrap.v/USERTRAP_RES) is stated

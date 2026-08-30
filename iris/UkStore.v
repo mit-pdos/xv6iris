@@ -42,18 +42,17 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import WpGpr RegFile InstrBytes.
-Require Import SmodeCore.
+Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
+Require Import WpGpr RegFile.
 Require Import WpDecodeBridge DecodeTotalU.
 Require Import CommonWalk.
-Require Import PtreeType PtAdBits PtTree PtTreeAdue KptPt KptTree.
-Require Import SRegime UptTree UptWalkPt.
-Require Import UserBits UserPtTree UserTranslate.
+Require Import PtreeType PtTree.
+Require Import SRegime UptTree.
+Require Import UserPtTree.
 Require Import HartSwp HartLift HartSpan HartGoodb HartMemRun HartMCycle
         HartStepFull HartRunFull HartRunGen.
 Require Import PtBytes UserBytes UserFrame UserClassifyAsm.
-Require Import UserFetchCert PtWalkCert UserFaultCert.
+Require Import UserFaultCert.
 Require Import WpIntrCore.    (* [elp_no_lp] *)
 Require Import UserTrap.      (* [swp_exec_trap_u] / [utrap_ms_ok] *)
 Require Import UserExec.
@@ -62,9 +61,10 @@ Require Import UserActiveClass.
 Require Import MemAccessGen WpMmodeLeafBase.
 Require Import UserMemPt UserMemArms UserMemClassify UserMemAccess UserMemMis.
 Require Import UserMemCert UserMemArmsBase UserMemArmsC.
-Require Import UmodeMem UmodeCap UmodeFetch.
+Require Import UmodeMem UmodeFetch.
+Require Import UmodeRegs.
 Require Import WpUmodeStep WpUmodeStore.
-Require Import ProcPtOwn UserPerm UsysMemOk UexecWp UexecSlot UexecRet UkStep.
+Require Import ProcPtOwn UserPerm UexecWp UexecRet UkStep.
 Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode* precedent *)
 Local Open Scope Z_scope.
 Import Defs.

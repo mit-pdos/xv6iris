@@ -69,7 +69,6 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require Import CtxRecord.   (* [ctx_parked_inv]: the deposit record's token *)
 Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the absorb's authority *)
 Require TsoCtxShim.         (* M2 DEBT: the [hart_view_lb] the absorb wants *)
 Local Open Scope Z_scope.

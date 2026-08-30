@@ -31,7 +31,6 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes.
 Require Import RiscvPtsto.
 Require Import WpLock.
-Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 Require Import SleepLock.
 Require Import WpLockAt.
 Require Import SleepLockAt.
@@ -42,7 +41,6 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.
 Require Import TsoCtx.
-Require Import SieCapCtx.
 Local Open Scope Z_scope.
 
 Section BioInitAt.

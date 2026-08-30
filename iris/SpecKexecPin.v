@@ -132,32 +132,25 @@ Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import RegFile.
 Require Import RiscvExtras.
-Require Import CalleeSaved KernelText.
+Require Import KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
-Require Import WpLock.
-Require Import KernelDataInv.
-Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
-Require Import SchedCtx.
 Require Import WpUart.
 Require Import DiskInv.
 Require Import Xv6Cameras.
-Require Import BioInv.
-Require Import FsBlocks LogInv.
-Require Import FsCrash.
+Require Import LogInv.
+Require Import LogDefs.
 Require Import BitmapInv.
 Require Import ByteBuf.
 Require Import InodeInv.
-Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
-Require Import IcacheEscrow.    (* Require Export's DirViewG: [fv_of] *)
-Require Import UserPtTree.
+Require Import DirViewG.    (* Require Export's DirViewG: [fv_of] *)
 Require Import KvmSpec.
 Require Import ProcInv.
 Require Import FileInvDefs.
@@ -170,7 +163,6 @@ Require Import InodeLock.       (* [inode_ok] -- the ilock payload's bundle  *)
 Require Import PathElems.       (* [SLASH], [path_elems]                     *)
 Require Import DirentEnc.       (* [bview]                                   *)
 Require Import FsTree.          (* [fname], [file_bytes]                     *)
-Require DirView.                (* qualified only                            *)
 Require FsImg.                  (* [FsImg.ROOTINO : Z] -- Require, NOT Import
                                    at syscall altitude (fs-syscall-specs
                                    lane W's recorded gotcha)                 *)
@@ -200,7 +192,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.
 Require Import FsCfg.
-Require Import FsReady.
 Import Defs.
 Require Import TsoCtx.
 

@@ -38,13 +38,12 @@ Require Import RiscvExtras.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
-Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpSmodeIntr.
+Require Import Xv6Cameras.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import StackOwn.
-Require Import ProcGeom CpuOwn.
+Require Import ProcGeom.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
-Require Import SpecArgfd SpecFdalloc SpecSysDup.
 Require Import KernelRvcDecode.
 Require Import CodeSysDup.
 Require Import ProofSysDup.   (* the landed walk: its TOP-LEVEL pure side

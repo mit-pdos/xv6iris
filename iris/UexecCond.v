@@ -48,14 +48,13 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto.
 Require Import ProcGeom ProcDefs ProcPt ProcPtOwn.   (* [tf_sp_idx] / [tf_arg_idx] *)
-Require Import UserPtTree UserFrame UserExec.
-Require Import UmodeMem UmodeAbi.
-Require Import UCodeSync UCodeEcho.
-Require Import UserPerm UsysMemOk UexecWp UexecSlot UexecRet UkSync USyncKernel.
+Require Import UserPtTree UserExec.
+Require Import UmodeAbi.
+Require Import UserPerm UexecWp UexecSlot UexecRet USyncKernel.
 Require Import UkAbi.   (* [uk_xpage] / [uk_stack] / [uk_args_c]: the key-level facts *)
-Require Import UkEcho UkEchoKernel.
+Require Import UkEchoKernel.
 Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode*/Uk* precedent *)
 Require User.SyncSyms User.SyncInstrs User.EchoSyms User.EchoInstrs.
 Local Open Scope Z_scope.

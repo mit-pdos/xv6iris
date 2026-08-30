@@ -33,7 +33,6 @@ Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
 Require Import RiscvExtras.
 Require Import KernelRvcDecode.
-Require Import VcGen.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import WpLock.
@@ -44,21 +43,14 @@ Require Import CpuOwn.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import WpUart.
-Require Import DiskPtsto.
-Require Import BioDefs.
-Require Import FsBlocks LogInv.
+Require Import Xv6Cameras.
+Require Import LogInv.
 Require Import DirentEnc.
 Require Import PathElems.
-Require Import IcacheEscrow.
 Require Import FileInvDefs.
-Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import CodeNameiparent.
 Require Import SpecDirlookup.
-Require Import SpecNamex.
-Require Import SpecNameiparent.
-Require Import SpecNameiTr.      (* [inode_held_at] *)
-Require Import FsAbsEra.         (* [elend] *)
 Require Import FsAbsNpar.        (* [np_elems]/[ep_hops_from]/[np_dead] *)
 Require Import SpecNparEra.      (* the walk's contract, and
                                     [inode_held_ty_at] *)

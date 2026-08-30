@@ -71,7 +71,6 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
 Require Import TsoCtxPark.
 Require Import TsoCtxMove.
-Require Import CpuOwnMove.
 Local Open Scope Z_scope.
 
 (* the context-slot payload while nobody is parked in it: the raw

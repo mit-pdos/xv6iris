@@ -52,7 +52,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Require Import TsoCtx.
-Require TsoCtxShim.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.

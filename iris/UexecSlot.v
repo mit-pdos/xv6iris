@@ -55,14 +55,12 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvFetchExec RiscvExtras.
+Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import AlignBits.    (* [jalr_ret_id] -- for [ret_pc_idem] *)
 Require Import RegFile.
-Require Import MinstretInv WireInv.
 Require Import ProcGeom.     (* [tf_epc_idx] / [tf_sp_idx] / [TFWORDS] *)
 Require Import TfUser.       (* [tf_ueq] *)
 Require Import UserPtTree.   (* [uptd] / [user_pt_inv] *)
-Require Import UserFrame.    (* [u_regs] *)
 Require Import UserExec.     (* [ucfg] / [user_cfg] / [user_mstatus_ok] /
                                 [user_trap_frame] *)
 Require Import SpecUserret.  (* [userret_gpr] -- the 31-insert register file *)

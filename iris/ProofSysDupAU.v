@@ -48,7 +48,7 @@ Require Import RegFile.
 Require Import WpMmodeLeafBase.
 Require Import VcGen.
 Require Import RiscvExtras.
-Require Import CalleeSaved KernelText KernelDataInv.
+Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
@@ -56,9 +56,9 @@ Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpSmodeIntr.
 Require Import StackOwn.
 Require Import LockRank.
 Require Import ProcGeom CpuOwn.
-Require Import FdSlots FileInv ProcInv.
+Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
-Require Import SpecArgfd SpecFdalloc SpecFiledup SpecSysDup.
+Require Import SpecArgfd SpecFdalloc SpecFiledup.
 Require Import SpecSysDupAU.
 Require Import ProofSysDup.        (* the landed walk's TOP-LEVEL pure side
                                       conditions: [sd_addr_f] and friends *)

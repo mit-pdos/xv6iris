@@ -30,15 +30,14 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras.
-Require Import InstrBytes WpGpr RegFile.
+Require Import WpGpr RegFile.
 Require Import ExecCommon WpMmodeLeafBase WpMmodeShiftiop.
 Require Import UserBits.
 Require Import HartMemRun UserFrame UserExecFacts.
 Require UserTotalU.
 Require Import UserPtTree UserExec.
-Require Import UmodeMem UmodeCap.
 Require Import WpUmodeStep.
-Require Import ProcPtOwn UserPerm UsysMemOk UexecWp UexecSlot UexecRet UkStep.
+Require Import UserPerm UexecWp UexecRet UkStep.
 Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode* precedent *)
 Local Open Scope Z_scope.
 Import Defs.

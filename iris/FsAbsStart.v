@@ -57,28 +57,15 @@ From iris.algebra Require Import gmap dfrac.
 From iris.base_logic.lib Require Import iprop own ghost_map.
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto.
-Require Import DinodeEnc.
-Require Import DirView.
 Require Import ByteBuf.         (* [bb_cstr]: the C-string buffer invariant *)
 Require Import DirentEnc.       (* [bview]                                  *)
-Require Import FsTree.          (* [fname]                                  *)
 Require Import PathElems.       (* [path_elems], [SLASH]                    *)
-Require Import BioDefs.
 Require Import InodeInv.        (* [ROOTINO] : mword 32, namex's own        *)
-Require Import InodeLock.
-Require Import IrefSlots.
 Require Import FsBlocks.        (* [fs_names]                               *)
-Require Import FsBytesGamma.    (* [fs_gamma_L]                             *)
-Require Import FsStateEra.
-Require Import IcacheRef.
-Require Import DirViewLend.
-Require Import IcacheEscrow.
+Require Import FsStateDefs.    (* [fs_gamma_L]                             *)
 Require Import Xv6G.
-Require Import FsAbsSeam.
-Require Import FsAbsPins.
 Require Import FsAbsEra.        (* [ex_hops_from]: the namei-side family    *)
 Require Import FsAbsNpar.       (* [ep_hops_from]: the parent-prefix family *)
-Require Import FsAbs.           (* LAST (FsAbs's own rule)                  *)
 
 Local Open Scope Z_scope.
 

@@ -45,10 +45,8 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto.
-Require Import DevModel DiskPtsto WpUart.
-Require Import WpLock.
+Require Import DiskPtsto WpUart.
 Require Import UartTxInv.
-Require Import TsoCtx.   (* the lock payload's context axis; [<{ }>] *)
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.

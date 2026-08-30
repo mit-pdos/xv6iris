@@ -14,7 +14,6 @@
 Require Import LinkNparWrapEra LinkIlock LinkIunlockput LinkDirlookup
         LinkIalloc LinkIupdate LinkDirlink
         ProofCreateAUF.
-Require Import TsoCtx.
 
 Module CreateAUF := CreateAUFProof NparWrap Ilock Iunlockput Dirlookup
                                    Ialloc Iupdate Dirlink.

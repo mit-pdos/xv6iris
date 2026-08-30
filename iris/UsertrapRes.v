@@ -88,7 +88,6 @@ Require Import SpecKernelvec.   (* the two kernelvec trap-vector facts *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
-Require Import SpecAllocpid.  (* [alp_pid_lock] / [nextpid_res] -- park_env's ξ-free rows *)
 Require Import TimerCap.   (* [sstc_enabled]: the residue's mcounteren pin *)
 Local Open Scope Z_scope.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)

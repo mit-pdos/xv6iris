@@ -84,20 +84,16 @@ Require Import ProcPtOwn.
 Require Import ProcInv.
 Require Import FileInvDefs.
 Require Import ConsoleInv.
-Require Import FsBlocks.
-Require Import InodeInv.
-Require Import DiskPtsto WpUart.      (* [uart_names], [uart_sent]           *)
-Require Import UartTxInv.
+Require Import Xv6Cameras.
+Require Import WpUart.      (* [uart_names], [uart_sent]           *)
 Require Import SpecFilewrite.   (* the landed contract this parallels       *)
 Require Import SpecConsolewriteLoc.   (* [cons_sent_cnt]: the callee's post *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
-Require Import FsBytesGamma.
 Require Import Xv6G.
 Require Import FsCfg.
 Require Import SpecSysWriteConsAU.   (* [write_cons_arms], [wcons_ok/short] *)
-Require Import FsAbs.              (* LAST (FsAbs's own rule)                *)
 Import Defs.
 Require Import TsoCtx.
 

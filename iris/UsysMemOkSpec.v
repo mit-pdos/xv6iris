@@ -27,7 +27,7 @@ From stdpp Require Import gmap sets bitvector.definitions.
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.MachineWord SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types.
 Require Import RiscvLang RiscvPtsto.
-Require Import ProcGeom ProcDefs.
+Require Import ProcDefs.
 Require Import UserPtTree ProcPtOwn.
 Require Import SpecSyscall.
 Require Import UserPerm UsysMemOk.

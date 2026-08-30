@@ -63,7 +63,6 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import FdSlots.
 Require Export SwtchCtx.
-Require Import WpUart.
 Require Import ByteBuf.
 Require Import ProcGeom.
 Require Import ProcInv.
@@ -92,7 +91,6 @@ Require Import SpecCopyout.
 Require Import SpecSafestrcpy.
 Require Import ProofKexecTail.
 Require Import ProofKexecSeam.
-Require Import ProofKexecA.
 Require Import ProofKexecB.
 Require Import SpecPanic.
 Require Import ProofKexecB2.
@@ -105,26 +103,13 @@ Require Import ProofKexecD.
    respected; [FsAbs] itself is NOT imported -- nothing here names
    [astate] or [aview], those live behind [kxp_run_pin]. ---- *)
 Require Import InstrBytes.     (* [pc_is]                            *)
-Require Import WpLock.
-Require Import KernelDataInv.
-Require Import SchedCtx.
-Require Import DiskInv.
-Require Import BioInv.
-Require Import FsBlocks LogInv.
-Require Import FsCrash.
-Require Import InodeRegion.
+Require Import LogInv.
+Require Import LogDefs.
 Require Import IcacheRef.
 Require Import IcacheInv.
-Require Import IcacheEscrow.
 Require Import KvmSpec.
-Require Import SpecDirlink.
 Require Import BioDefs.
-Require Import DinodeEnc.
-Require Import InodeDefs.
-Require Import FsStateEra.
-Require Import ElfEnc.
 Require Import InodeInv.       (* [ROOTDEV], [MAXFILE]               *)
-Require Import InodeLock.
 Require Import PathElems.      (* [SLASH], [path_elems]              *)
 
 Require Import DirentEnc.      (* [bview]                            *)

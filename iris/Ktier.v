@@ -1,5 +1,4 @@
 (* Ktier.v -- the KERNEL-TRANSLATION TIER of a datum, and the ambient tier
-Require TsoCtx.   (* qualified: the class only, no notation flip *)
    class.  A pure file: no project imports, nothing but the two-point
    lattice, its order class, and the ambient-tier class the notations
    elaborate through (claude-notes/projects/sp-migration.md, design §1/§4/§6).

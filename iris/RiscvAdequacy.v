@@ -47,14 +47,11 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang ObsTrace RiscvPtsto.
 Require Import KptPt.   (* kmap_M0, for the kmap ghost (rwx-kmap) *)
-Require Import KMap.    (* kmap_auth / kmap_wf_M0 *)
 Require Import BootCarve.  (* the boot-image carving library: the claims-bundle
                               persist and the rwx three-way split at [text_end],
                               lifted out of this proof so there is ONE copy *)
 Require Import SmodeCore.  (* sieG: the [ghost_varG Σ (mword 1)] for the SIE/SPP/SPIE ghosts *)
-Require Import KptGhost.   (* kpt_unset / kpt_ghost_alloc: the shared kernel table's one-shot agreement *)
-Require Import WireInv.
-Require Import PlicPlan VirtioProto WpUart.
+Require Import WpUart.
 Require Import PowerBoot.   (* the canonical reset machine + [boot_shape_boot_gstate] *)
 (* The [set_solver] override.  EXPORT, not Import: this import is         *)
 (* deliberately "dead" -- the file compiles without it, just far slower --  *)

@@ -27,7 +27,6 @@ From iris.base_logic.lib Require Import invariants ghost_var.
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto.
-Require Import IntrDefs.
 Require Import Xv6G.
 Require Import TsoCtx.
 Require Import WpLock.

@@ -25,16 +25,11 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
-Require Import RegFile InstrBytes.
-Require Import UserPtTree UserExec ProcPtOwn.
-Require Import UmodeMem UmodeArith UmodeAbi.
-Require Import UserPerm UsysMemOk UexecWp UexecSlot UexecRet.
-Require Import UptTree.
+Require Import RiscvLang RiscvPtsto RiscvExtras.
+Require Import RegFile.
+Require Import UmodeArith.
 Require Import WpMmodeLeafBase.
-Require Import UmodeFetch.
-Require Import WpUmodeStore.
-Require Import UkStep UkLeaf UkStore.
+Require Import UkLeaf.
 Require Import UserHeap.
 Require Import TsoCtx.
 Local Open Scope Z_scope.
@@ -46,16 +41,10 @@ Require Import UkRun.
 From Stdlib Require Import ZArith Bool Lia.
 From iris.base_logic.lib Require Import invariants.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras.
-Require Import InstrBytes WpGpr RegFile.
-Require Import ExecCommon WpMmodeLeafBase WpMmodeShiftiop.
-Require Import UserBits.
-Require Import HartMemRun UserFrame UserExecFacts.
-Require UserTotalU.
-Require Import UserPtTree UserExec.
-Require Import UmodeMem UmodeCap.
+Require Import RiscvLang RiscvPtsto RiscvExtras.
+Require Import RegFile.
+Require Import WpMmodeLeafBase.
 Require Import WpUmodeStep.
-Require Import ProcPtOwn UserPerm UsysMemOk UexecWp UexecSlot UexecRet UkStep.
 Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode* precedent *)
 
 Section UkRunLeaf.

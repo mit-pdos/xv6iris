@@ -25,46 +25,24 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
-Require Import RegFile InstrBytes.
-Require Import UserPtTree UserExec ProcPtOwn.
-Require Import UmodeMem UmodeArith UmodeAbi.
-Require Import UserPerm UsysMemOk UexecWp UexecSlot UexecRet.
-Require Import UptTree.
-Require Import WpMmodeLeafBase.
-Require Import UmodeFetch.
-Require Import WpUmodeStore.
-Require Import UkStep UkLeaf UkStore.
+Require Import RiscvLang RiscvPtsto.
+Require Import RegFile.
+Require Import UsysMemOk UexecSlot UexecRet.
+Require Import UkStep.
 Require Import UserHeap.
 Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 From Stdlib Require Import ZArith Bool Lia List FunctionalExtensionality.
 From iris.base_logic.lib Require Import invariants gen_heap.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
-Require Import MinstretInv WpGpr RegFile InstrBytes.
-Require Import WpIntrCore.
-Require Import RiscvExtras.
-Require Import WpDecodeBridge DecodeTotalU.
-Require Import CommonWalk.
-Require Import PtreeType PtAdBits PtTree KptTree.
-Require Import SRegime UptTree UptWalkPt.
-Require Import UserMem UserFetch UserPtTree UserTranslate.
+Require Import RiscvLang RiscvPtsto.
+Require Import RegFile.
 Require Import HartSwp HartLift HartSpan HartGoodb HartMemRun HartMCycle
         HartStepFull HartRunFull HartRunGen.
-Require Import PtBytes UserBytes UserFrame UserClassifyAsm.
-Require Import UserFetchCert UserFaultCert.
-Require Import UserExec UserStep UserTrap UserExecFacts.
-Require Import UserStepFull.
-Require UserTotalU.
-Require Import UserActiveClass.
-Require Import UmodeMem UmodeCap UmodeFetch.
-Require Import WpDecode.
-Require Import WpUmodeStep.
-Require Import ProcPtOwn.    (* [proc_pt_wf] *)
-Require Import UserPerm.
+Require Import UserFrame.
+Require Import UserExecFacts.
 Require Import UsysMemOk.
-Require Import UexecWp UexecSlot UexecRet.
+Require Import UexecSlot UexecRet.
 Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode* precedent *)
 Local Open Scope Z_scope.
 Require Import UkRun.

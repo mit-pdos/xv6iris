@@ -39,12 +39,10 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import ProcGeom ProcDefs UserPtTree.
-Require Import UserExec.
+Require Import ProcGeom.
 Require Import UmodeAbi.
-Require Import UCodeSync.
-Require Import UserPerm UsysMemOk UexecWp UexecSlot UexecRet.
-Require Import UkStep UkSync.
+Require Import UexecSlot UexecRet.
+Require Import UkSync.
 Require Import UkAbi.   (* [uk_xpage] / [uk_stack]: the generic key-level layout facts *)
 Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode*/Uk* precedent *)
 Require User.SyncSyms User.SyncInstrs.

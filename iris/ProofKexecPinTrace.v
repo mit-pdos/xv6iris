@@ -71,65 +71,35 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
-Require Import InstrBytes.
-Require Import RegFile.
-Require Import RiscvExtras.
-Require Import CalleeSaved KernelText.
-Require Import IntrDefs.
-Require Import WpNext.
-Require Import WpLock.
-Require Import KernelDataInv.
-Require Import SpecPanic.
 Require Import FdSlots.
-Require Import ProcGeom.
 Require Export SwtchCtx.
-Require Import CpuOwn.
-Require Import SchedCtx.
 Require Import WpUart.
 Require Import DiskInv.
 Require Import Xv6Cameras.
-Require Import BioInv.
 Require Import FsBlocks LogInv.
-Require Import FsCrash.
 Require Import BitmapInv.
-Require Import ByteBuf.
 Require Import InodeInv.
 Require Import InodeRegion.     (* [ftop_inv], [ftop_body], [ftopN]         *)
 Require Import IrefSlots.
-Require Import IcacheRef.
-Require Import IcacheInv.
-Require Import IcacheEscrow.    (* Require Export's DirViewG: [fv_of]       *)
-Require Import UserPtTree.
-Require Import KvmSpec.
+Require Import DirViewG.    (* Require Export's DirViewG: [fv_of]       *)
+Require Import DirViewLend.
 Require Import ProcInv.
 Require Import FileInvDefs.
-Require Import SpecDirlink.
-Require Import BioDefs.
 Require Import DinodeEnc.
 Require Import InodeDefs.
 Require Import InodeLock.
 Require Import PathElems.
-Require Import DirentEnc.
 Require Import FsTree.
-Require DirView.
 Require FsImg.
 Require Import FsStateEra.
-Require Import FsDurSnap.
-Require Import SpecReadi.
-Require Import SpecKexec.
+Require Import FsState.
 Require Import KexecOkQ.
-Require Import ElfEnc.
 Require Import FsAbsEra.        (* [elend], [ex_hop], [ex_hops_from]        *)
 Require Import FsAbsStart.      (* [ex_start]: the deferred start           *)
 Require Import FsAbs.           (* LAST of the fs-abs stack (its own rule)  *)
 Require Import FsBytesGamma.
 Require Import FsInitPin.
 Require Import FsInitPinBoot.
-Require Import ElfFile.
-Require Import UmodeAbi.
-Require Import UCodeInit.
-Require Import UCodeSh.
-Require Import ElfUser.
 From User Require Import InitData ShData.
 Require Import SpecKexecPin.    (* the contract this lane serves            *)
 From Kernel Require KernelSyms.
@@ -137,7 +107,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.
 Require Import FsCfg.
-Require Import FsReady.
 Import Defs.
 Require Import TsoCtx.
 

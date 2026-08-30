@@ -35,7 +35,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
-Require Import InstrBytes RegFile WpGpr.
+Require Import InstrBytes RegFile.
 Require Import MinstretInv WireInv.
 Require Import UptTree UserPtTree UserFrame UserExec.
 Require Import UmodeMem UmodeCap.

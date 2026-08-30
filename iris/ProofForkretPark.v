@@ -86,7 +86,7 @@ Require Import IrefSlots.
 Require Import WpUart LogInv.
 Require Import ProcAvail.
 Require Import ProcInv.
-Require Import SchedCtx TsoCtxMove CtxMorphTac.
+Require Import SchedCtx CtxMorphTac.
 Require Import UsertrapRes.  (* [ut_park_intro_body] -- the park's producer entry *)
 Require Import SpecKexec.   (* [K_kexec] -- forkret's deepest callee, on the boot arm *)
 Require Import SpecForkret.

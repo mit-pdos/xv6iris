@@ -54,7 +54,7 @@ Require Import RiscvExtras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import InstrBytes WpGpr RegFile.
-Require Import MstatusBits WpIntrCore.
+Require Import MstatusBits.
 Require Import UserFrame.
 Require Import UptTree UserPtTree UserExec.
 Require Import TsoCtx.

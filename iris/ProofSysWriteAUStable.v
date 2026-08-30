@@ -53,39 +53,19 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import InstrBytes.
 Require Import RegFile.
-Require Import RiscvExtras.
-Require Import CalleeSaved KernelText KernelDataInv.
-Require Import IntrDefs.
-Require Import WpNext.
-Require Import SpecPanic.
 Require Import FdSlots.
-Require Import ProcGeom.
 Require Export SwtchCtx.
-Require Import CpuOwn.
-Require Import SchedCtx.
 Require Import IrefSlots.
-Require Import UserPtTree.
-Require Import KvmSpec.
-Require Import ProcPtOwn.
 Require Import ProcInv.
 Require Import FileInvDefs.
-Require Import SpecArgfd.
-Require Import SpecSysRead.
-Require Import ConsoleInv.
-Require Import FsBlocks.
-Require Import InodeInv.
+Require Import Xv6Cameras.
 Require Import SpecFilewrite.
-Require Import SpecSysWrite.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
-Require Import FsBytesGamma.
 Require Import Xv6G.
-Require Import FsCfg.
 Require Import SpecSysWriteAU.
-Require Import FsAbsWriteFire.
 Require Import SpecSysWriteAUEra.
 Require Import FsAbs.          (* LAST (FsAbs's own rule) *)
 Import Defs.

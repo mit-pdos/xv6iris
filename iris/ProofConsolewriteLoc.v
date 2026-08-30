@@ -88,9 +88,8 @@ Require Import UserPtTree KvmSpec ProcPtOwn.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
 Require Import DiskPtsto WpUart UartTxInv.
-Require Import UartSentLoc.   (* the located receipt *)
 Require Import SchedCtx.
-Require Import SpecEitherCopyin SpecUartwrite.
+Require Import SpecEitherCopyin.
 Require Import SpecUartwriteLoc.   (* the located callee contract *)
 Require Import CodeConsolewrite.
 Require Import SpecConsolewrite.

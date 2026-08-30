@@ -895,7 +895,7 @@ Require Import WpMmodeLeafBase.
 Require Import StackOwn.
 Require Import CalleeSaved KernelText.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
-Require Import WpSmodeIntr WpSmodeHalf.
+Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import UserPtTree.
@@ -1040,7 +1040,6 @@ Proof. lia. Qed.
    [ProofFilewrite.v] verbatim; these six are what the fire and the carried
    state need, in the campaign's usual order with [FsAbs] LAST. ---- *)
 Require Import FsBytesGamma.       (* [fs_gamma_L]: the live Γ             *)
-Require Import SpecSysWriteAU.     (* [wchunks], [wri_pre], [wri_receipts] *)
 Require Import FsAbsOpenFire.      (* [opf_era_file_row]                   *)
 Require Import FsAbsWriteFire.     (* the fire, the splice bridge, item 4  *)
 Require Import SpecSysWriteAUEra.  (* [write_arms_at]                      *)

@@ -135,7 +135,6 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
-Require TsoCtxShim.
 
 (* a failing tactic in a WP over [proc_priv] otherwise spends tens of
    minutes FORMATTING the goal -- see claude-notes/durable-notes.md. *)

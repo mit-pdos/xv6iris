@@ -28,49 +28,29 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras RiscvModelBytes.
-Require Import RegFile InstrBytes.
-Require Import UserPtTree UserExec ProcPtOwn.
-Require Import UmodeMem UmodeArith UmodeAbi.
-Require Import UserPerm UsysMemOk UexecWp UexecSlot UexecRet.
-Require Import UptTree.
+Require Import RiscvLang RiscvPtsto RiscvModelBytes.
+Require Import RegFile.
+Require Import UserPtTree.
+Require Import UmodeMem UmodeArith.
+Require Import UserPerm.
 Require Import WpMmodeLeafBase.
-Require Import UmodeFetch.
-Require Import WpUmodeStore.
-Require Import UkStep UkLeaf UkStore.
+Require Import UkStore.
 Require Import UserHeap.
 Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 From Stdlib Require Import ZArith Bool Lia List FunctionalExtensionality.
 From iris.base_logic.lib Require Import invariants gen_heap.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import WpGpr RegFile InstrBytes.
-Require Import SmodeCore.
-Require Import WpDecodeBridge DecodeTotalU.
-Require Import CommonWalk.
-Require Import PtreeType PtAdBits PtTree PtTreeAdue KptPt KptTree.
-Require Import SRegime UptTree UptWalkPt.
-Require Import UserBits UserPtTree UserTranslate.
+Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep.
+Require Import RegFile.
+Require Import UserPtTree.
 Require Import HartSwp HartLift HartSpan HartGoodb HartMemRun HartMCycle
   HartStepFull HartRunFull HartRunGen.
-Require Import PtBytes UserBytes UserFrame UserClassifyAsm.
-Require Import UserFetchCert PtWalkCert UserFaultCert.
-Require Import WpIntrCore.    (* [elp_no_lp] *)
-Require Import UserTrap.      (* [swp_exec_trap_u] / [utrap_ms_ok] *)
-Require Import UserExec.
-Require UserTotalU.
-Require Import UserActiveClass.
-Require Import MemAccessGen WpMmodeLeafBase.
-Require Import UserMemPt UserMemArms UserMemClassify UserMemAccess UserMemMis.
-Require Import UserMemCert UserMemArmsBase UserMemArmsC.
-Require Import UmodeMem UmodeCap UmodeFetch.
-Require Import WpUmodeStep WpUmodeStore.
-Require Import ProcPtOwn UserPerm UsysMemOk UexecWp UexecSlot UexecRet UkStep.
+Require Import UmodeMem.
 Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode* precedent *)
-Require Import MemAccessGen WpMmodeLeafBase WpLoad.
-Require Import WpUmodeStep WpUmodeStore WpUmodeLoad.
-Require Import ProcPtOwn UserPerm UsysMemOk UexecWp UexecSlot UexecRet UkStep UkStore.
+Require Import WpMmodeLeafBase.
+Require Import WpUmodeLoad.
+Require Import UserPerm UkStore.
 Require Import UkLoad.
 Require Import UkRun.
 

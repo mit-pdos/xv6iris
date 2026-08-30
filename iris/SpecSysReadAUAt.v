@@ -33,31 +33,17 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import InstrBytes.
 Require Import RegFile.
-Require Import RiscvExtras.
-Require Import CalleeSaved KernelText KernelDataInv.
-Require Import IntrDefs.
-Require Import WpNext.
-Require Import SpecPanic.
 Require Import FdSlots.
-Require Import ProcGeom.
 Require Export SwtchCtx.
-Require Import CpuOwn.
-Require Import SchedCtx.
 Require Import IrefSlots.
-Require Import UserPtTree.
-Require Import KvmSpec.
-Require Import ProcPtOwn.
-Require Import ProcInv.
+Require Import ProcDefs.
 Require Import FileInvDefs.
-Require Import SpecArgfd.      (* [arg_fd]                                  *)
-Require Import ConsoleInv.
 Require Import FsTree.         (* [file_bytes]: the landed flat byte-list
                                   reading the slice vocabulary is cut from  *)
 Require Import PipeInvDefs.    (* [pipe_rw_ret], the landed blanket the
                                   sanity lemma folds the arms back into    *)
-Require Import InodeInv.       (* [MAXFILE]; exports InodeDefs' [file_byte] *)
+Require Import Xv6Cameras.       (* [MAXFILE]; exports InodeDefs' [file_byte] *)
 Require Import SpecReadi.      (* [rd_clamp], [rd_delivered]: what readi
                                   actually answers -- the tie is to THESE  *)
 Require Import SpecFileread.   (* [fread_names], the env bundles,

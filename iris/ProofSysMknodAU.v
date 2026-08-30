@@ -129,14 +129,9 @@ Require Import SpecArgint.
 Require Import SpecCreate.
 Require Import CodeSysMknod.
 Require Import SpecSysMknod.
-Require Import PathElems.        (* [path_elems], [SLASH]               *)
 Require Import DirentEnc.        (* [bview]                             *)
 Require Import FsTree.
-Require Import FsBytesGamma.
 Require Import SpecSysMknodAU.   (* [dev_arg]                           *)
-Require Import FsAbsEra.
-Require Import FsAbsNpar.
-Require Import FsAbsEraMknod.
 Require Import FsAbsNparMknod.   (* [np_start_of_mknod]                 *)
 Require Import FsAbsMknodFire.   (* the commits and [mkf_dev_arg]       *)
 Require Import SpecCreateAU.     (* [CREATE_AU], [cau_ok] / [cau_fail]  *)
@@ -148,7 +143,6 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
-Require TsoCtxShim.
 
 (* a failing tactic in a WP over [proc_priv] otherwise spends tens of
    minutes FORMATTING the goal -- see claude-notes/durable-notes.md. *)

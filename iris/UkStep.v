@@ -74,25 +74,21 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
-Require Import MinstretInv WpGpr RegFile InstrBytes.
+Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
+Require Import WpGpr RegFile InstrBytes.
 Require Import WpIntrCore.
 Require Import RiscvExtras.
 Require Import WpDecodeBridge DecodeTotalU.
-Require Import CommonWalk.
-Require Import PtreeType PtAdBits PtTree KptTree.
-Require Import SRegime UptTree UptWalkPt.
-Require Import UserMem UserFetch UserPtTree UserTranslate.
+Require Import PtreeType PtTree.
+Require Import UptTree.
+Require Import UserPtTree.
 Require Import HartSwp HartLift HartSpan HartGoodb HartMemRun HartMCycle
         HartStepFull HartRunFull HartRunGen.
-Require Import PtBytes UserBytes UserFrame UserClassifyAsm.
-Require Import UserFetchCert UserFaultCert.
+Require Import UserBytes UserFrame UserClassifyAsm.
 Require Import UserExec UserStep UserTrap UserExecFacts.
-Require Import UserStepFull.
 Require UserTotalU.
 Require Import UserActiveClass.
 Require Import UmodeMem UmodeCap UmodeFetch.
-Require Import WpDecode.
 Require Import WpUmodeStep.
 Require Import ProcPtOwn.    (* [proc_pt_wf] *)
 Require Import UserPerm.

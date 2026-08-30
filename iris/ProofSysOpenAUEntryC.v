@@ -55,20 +55,19 @@ Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import ByteBuf.
-Require Import RegFile HartTp WpNext.
+Require Import RegFile WpNext.
 Require Import WpMmodeLeafBase.
 Require Import RiscvExtras.
 Require Import StackOwn.
 Require Import CalleeSaved KernelText KernelDataInv.
 Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import WpSmodeIntr WpSmodeHalf.
+Require Import WpSconfAlu WpSconfCtl WpSconfBtype.
+Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import SchedCtx.
-Require Import SpecPanic.
 Require Import WpUart.
 Require Import DiskInv.
 Require Import Xv6Cameras.
@@ -83,10 +82,7 @@ Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import BitmapInv.
 Require Import DinodeEnc.
-Require Import DinodeSlot.
 Require Import InodeInv.
-Require Import InodeLock.
-Require Import SleepLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
@@ -96,14 +92,9 @@ Require Import KvmSpec.
 Require Import DirView.
 Require Import FileInvDefs.
 Require Import FileInv.
-Require Import UserPtTree.
 Require Import ProcInv.
 Require Import SpecArgint.
-Require Import SpecArgstr.
-Require Import SpecBeginOp.
 Require Import SpecEndOp.
-Require Import SpecIput.
-Require Import SpecIlock.
 Require Import SpecIunlock.
 Require Import SpecIunlockput.
 Require Import SpecFileclose.
@@ -112,13 +103,9 @@ Require Import SpecFdalloc.
 Require Import SpecItrunc.
 Require Import SpecPrintk.
 Require Import SpecDirlink.
-Require Import SpecNamex.
-Require Import SpecNamei.
 Require Import SpecCreate.
 Require Import CodeSysOpen.
 Require Import SpecSysOpen.
-Require Import SysOpenBudget.
-Require Import ProofKforkParts.       (* [proc_priv_tfp_valid], argint's premise *)
 Require Import ProofSysOpenParts.
 Require Import ProofSysOpenTails.
 From Kernel Require KernelSyms.
@@ -127,30 +114,19 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Local Open Scope Z_scope.
 
-Require Import ConsoleInv.
 Require Import DirentEnc.        (* [bview]                                 *)
-Require Import PathElems.
 Require Import FsTree.
 Require Import FsBytesGamma.
-Require Import SpecSysMknodAU.
 Require Import SpecSysOpenAU.
-Require Import FsAbsEra.
-Require Import FsAbsStart.
-Require Import FsAbsNpar.
 Require Import FsAbsEraMknod.
 Require Import FsAbsNparMknod.   (* [np_start_of_mknod]                     *)
 Require Import FsAbsMknodFire.
 Require Import FsAbsOpenFire.
-Require Import ProofSysOpenAUBits.
 Require Import ProofSysOpenAUParts.
-Require Import ProofSysOpenAUPub.
-Require Import ProofSysOpenAUStores.
-Require Import ProofSysOpenAUAlloc.
 Require Import ProofSysOpenAUJoin.
 Require Import SpecCreateAUF.     (* the T_FILE create-AU carry            *)
 Require Import SpecCreateAUFOpen. (* [cauf_fail_to_open]                   *)
 Require Import ProofSysOpenAUCreArm.
-Require Import ProofSysOpen.   (* [so_neq_of_eq] / [so_neq_of_ne] / [so_bud_iput] *)
 Require Import FsAbs.
 Require Import TsoCtx.
 

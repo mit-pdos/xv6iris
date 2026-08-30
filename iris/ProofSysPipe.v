@@ -97,7 +97,6 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
 Require Import TsoCtx.
-Require TsoCtxShim.
 Require Import RegFile.
 Require Import InstrBytes.
 Require Import WpMmodeLeafBase.
