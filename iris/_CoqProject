@@ -295,12 +295,22 @@ UProofShTop.v
 UProofShMain.v
 UProofShEcho.v
 UCodeInit.v
+# The register-index arithmetic every returning function proof needs to
+# state and discharge a [ucallee_saved] post.  Program-independent, and
+# not Iris at all.
+UkProgAbi.v
 # INIT ON THE SEPARATION-LOGIC HEAP.  The syscall stub layer so far: the
 # four quiet-row entries (open/mknod/dup/write), exit, exec's failure arm,
 # and wait at the NULL status pointer init passes.  What is left is the
 # printf cone, main's two unbounded loops and start; the fork call site is
 # the one seam, and UkFork.v's [wp_uk_ecall_fork] is what closes it.
+#   ONE FILE PER FUNCTION, deliberately: init's proof is big enough that a
+# single file makes the edit-compile cycle the bottleneck.  UkInit.v is
+# the syscall stub layer, and each function of the printf cone gets its
+# own.
 UkInit.v
+UkInitPutc.v
+UkInitVprintf.v
 UserMemArms.v
 UserClassify.v
 UserClassifyAsm.v
@@ -1616,13 +1626,16 @@ UartAccepted.v
 UartSentResidue.v
 SystemUartAccepted.v
 
-# OFF-BUILD (2026-08-30): what is LEFT of the stage-1 init program proof,
-# first Uk generation -- UkInitPrintf.v and UkInitLoop.v.  UkInit.v itself
-# has been REPLACED by the urun port (above); these two are kept, off the
-# build, purely as the reference for the rest of that port: the
-# 212-instruction structural refutation of vprintf's format tree from the
-# literal's own bytes, and the double-headed loop induction that closes
-# 0x32 and 0x44 under one iLoeb.  Delete them when the port reaches them.
+# The stage-1 init program proof (first Uk generation) is GONE as of
+# 2026-08-30: UkInit.v was replaced by the urun port below, and its two
+# companions UkInitPrintf.v / UkInitLoop.v are deleted rather than kept
+# off-build -- their engine (UexecRet's [ukc], UkStep/UkLeaf/UkStore) is
+# not what the port runs on, and `git show 812cc9880:iris/UkInitLoop.v`
+# is a better reference than a file the coverage gate has to be told to
+# ignore.  What is worth re-reading there: the 212-instruction structural
+# refutation of vprintf's format tree from the literal's own bytes, and
+# the double-headed loop induction that closes 0x32 and 0x44 under one
+# iLoeb.
 
 # fs-syscall-specs lane W: THE UNLINK AU.  FsAbsUnlinkFire is the fire
 # leaf (FsAbsMknodFire / FsAbsOpenFire / FsAbsWriteFire are the one-per-
