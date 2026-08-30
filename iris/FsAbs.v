@@ -76,8 +76,19 @@
 
    THE PINNED WALK, RESTATED (section 3's "functional corollary").  A client
    that holds an [nview] share for every directory on the path gets the walk's
-   answer AS [apath_at], with no divergence arm and no possible miss.  The
-   walk's hop ([SpecNameiTr.nx_hop]) is [ax_hop] at the lent fragment
+   answer AS [apath_at], with no divergence arm and no possible miss.
+
+   ===== READ THE NEXT THREE PARAGRAPHS AS HISTORY (2026-08-30) ==========
+   They record how this file's abstracted lend [F] was aimed at the landed
+   ghost-trace hop and what the attempt found.  THE DVIEW RETIREMENT deleted
+   both the hop ([SpecNameiTr.nx_hop]) and the ghost it lent
+   ([DirViewG.dv_half]); the consumed form is [FsAbsEra.ex_hop] = [ax_hop] at
+   [FsAbsEra.elend], the era fragment, which discharges the STRONG law
+   ([lend_agrees]) that [dv_half] could not.  Everything this file proves is
+   stated at the abstracted [F] and did not move.
+   ======================================================================
+
+   The walk's hop ([SpecNameiTr.nx_hop]) is [ax_hop] at the lent fragment
    [DirViewG.dv_half]: [ax_hop] is that definition with the lent predicate
    abstracted, so instantiating [F := dv_half] gives [nx_hop] and
    [ax_hops_from] gives [nx_hops_from] ON THE NOSE.  That is a CHECKED

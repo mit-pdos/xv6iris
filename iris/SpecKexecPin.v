@@ -7,8 +7,9 @@
 (*  WHAT THIS FILE IS.  A STATEMENT file: definitions, structural lemmas,
     and one Module Type.  It replaces the off-build
     [SpecKexecPinned]/[ProofKexecPinned*]/[LinkKexecPinned] contract --
-    whose premises ([FsCfgBoot.dv_pin]/[fv_pin], cancellable lends minted
-    by a deleted boot lemma) no longer exist -- with the SAME sentence
+    whose premises (cancellable contents lends minted by a deleted boot
+    lemma -- the whole ghost went with THE DVIEW RETIREMENT, 2026-08-30) no
+    longer exist -- with the SAME sentence
     stated over what IS landed:
 
       * the PINS are pure facts about the abstract view
@@ -156,7 +157,7 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
-Require Import IcacheEscrow.    (* Require Export's DirViewG: [fv_of] *)
+Require Import IcacheEscrow.    (* the payload arms *)
 Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcInv.
@@ -318,19 +319,22 @@ Proof.
 Qed.
 
 (* ---- 3b.  the payload tie: on an ilock payload's node ([era_node dn bm
-   data], with the payload's own [inode_ok] bundle), the node's byte
-   reading IS [fv_of dn data] -- the FILE sibling of
-   [FsAbsSeam.dv_of_dir_entries], stated over the same premise. ---- *)
-Lemma fv_of_file_bytes_era (cov : gset Z) (logstart : Z) (dn : dinode)
+   data], with the payload's own [inode_ok] bundle), the node's byte reading
+   IS the record's own [file_bytes] of the payload's bytes -- the FILE
+   sibling of [FsAbsSeam.dir_entries_era_ok], stated over the same premise.
+   (This was [fv_of_file_bytes_era] at the deleted [DirViewG.fv_of]; the
+   right-hand side is that function, spelled out.) ---- *)
+Lemma fn_file_bytes_era_ok (cov : gset Z) (logstart : Z) (dn : dinode)
     (bm : blkmap) (data : nat -> list (bv 8)) :
   inode_ok cov logstart dn bm data ->
-  fn_file_bytes (era_node dn bm data) = fv_of dn data.
+  fn_file_bytes (era_node dn bm data)
+  = file_bytes data (Z.to_nat (bv_unsigned (di_size dn))).
 Proof.
   intros (_ & _ & _ & _ & Hsz & Hh & _).
   pose proof (proj1 (bv_unsigned_in_range _ (di_size dn))) as H0.
   assert (Hcap : (Z.to_nat (bv_unsigned (di_size dn)) <= MAXFILE * BSIZE)%nat).
   { apply Nat2Z.inj_le. rewrite (Z2Nat.id _ H0) Nat2Z.inj_mul. exact Hsz. }
-  rewrite /fn_file_bytes /fn_size era_node_rec /fv_of /file_bytes.
+  rewrite /fn_file_bytes /fn_size era_node_rec /file_bytes.
   apply list_eq. intros k. rewrite !list_lookup_fmap.
   destruct (seq 0 (Z.to_nat (bv_unsigned (di_size dn))) !! k) as [x |] eqn:E;
     [| reflexivity].
@@ -346,21 +350,22 @@ Lemma kxp_era_bytes (cov : gset Z) (logstart : Z) (dn : dinode)
     (bm : blkmap) (data : nat -> list (bv 8)) (bs : list (bv 8)) (nl : nat) :
   inode_ok cov logstart dn bm data ->
   abs_of (era_node dn bm data) = MkAnode (AFile bs) nl ->
-  fv_of dn data = bs.
+  file_bytes data (Z.to_nat (bv_unsigned (di_size dn))) = bs.
 Proof.
   intros Hok Habs.
-  rewrite -(fv_of_file_bytes_era cov logstart dn bm data Hok).
+  rewrite -(fn_file_bytes_era_ok cov logstart dn bm data Hok).
   exact (abs_of_file_read _ _ _ Habs).
 Qed.
 
 (* ---- 3c.  the readi window, against the byte list -- the salvage of
    SpecKexecPinned sect. 3, verbatim and still at variables. ---- *)
-Lemma fv_of_file_byte (dn : dinode) (data : nat -> list (bv 8))
+Lemma kxp_file_byte (dn : dinode) (data : nat -> list (bv 8))
     (b : list (bv 8)) (i : nat) :
-  fv_of dn data = b -> (i < length b)%nat -> file_byte data i = b !!! i.
+  file_bytes data (Z.to_nat (bv_unsigned (di_size dn))) = b ->
+  (i < length b)%nat -> file_byte data i = b !!! i.
 Proof.
   intros Hb Hi. rewrite -Hb. rewrite -Hb in Hi.
-  rewrite /fv_of /file_bytes in Hi |- *.
+  rewrite /file_bytes in Hi |- *.
   rewrite length_fmap length_seq in Hi.
   rewrite list_lookup_total_fmap; [| rewrite length_seq; exact Hi].
   by rewrite lookup_total_seq_lt.
@@ -368,19 +373,20 @@ Qed.
 
 Lemma rd_delivered_pinned (dn : dinode) (data : nat -> list (bv 8))
     (dst_olds : nat -> bv 8) (b : list (bv 8)) (tot i : nat) :
-  fv_of dn data = b -> (tot <= length b)%nat -> (i < tot)%nat ->
+  file_bytes data (Z.to_nat (bv_unsigned (di_size dn))) = b ->
+  (tot <= length b)%nat -> (i < tot)%nat ->
   rd_delivered data dst_olds 0 tot i = b !!! i.
 Proof.
   intros Hb Htot Hi. rewrite /rd_delivered.
   destruct (decide (i < tot)%nat) as [_ | Hno]; [| lia].
-  rewrite Nat.add_0_l. apply (fv_of_file_byte dn data b i Hb). lia.
+  rewrite Nat.add_0_l. apply (kxp_file_byte dn data b i Hb). lia.
 Qed.
 
 (*  THE ONE THE WALK QUOTES: the 64-byte header read at offset 0 lands on
     the pinned header. *)
 Lemma kxp_rd_hdr (pb : kx_pin) (dn : dinode) (data : nat -> list (bv 8))
     (dst_olds : nat -> bv 8) (i : nat) :
-  fv_of dn data = kxp_bytes pb ->
+  file_bytes data (Z.to_nat (bv_unsigned (di_size dn))) = kxp_bytes pb ->
   (64 <= length (kxp_bytes pb))%nat -> (i < 64)%nat ->
   rd_delivered data dst_olds 0 64 i = kxp_ef pb i.
 Proof.
@@ -393,13 +399,14 @@ Qed.
    [kxq_hdr_ok HD (fun j => file_byte data j)]; the walk transports it to
    the frame's named header with the landed [kxq_hdr_ok_ext]
    (ProofKexecA.v:1564).  This is the pinned verdict's whole content. ---- *)
-Lemma kxp_hdr_of_fv (pb : kx_pin) (dn : dinode) (data : nat -> list (bv 8)) :
-  fv_of dn data = kxp_bytes pb ->
+Lemma kxp_hdr_of_bytes (pb : kx_pin) (dn : dinode)
+    (data : nat -> list (bv 8)) :
+  file_bytes data (Z.to_nat (bv_unsigned (di_size dn))) = kxp_bytes pb ->
   (64 <= length (kxp_bytes pb))%nat ->
   kxq_hdr_ok (Some (kxp_ef pb)) (fun j => file_byte data j).
 Proof.
   intros Hb Hlen. cbn. intros j Hj.
-  rewrite /kxp_ef. apply (fv_of_file_byte dn data (kxp_bytes pb) j Hb). lia.
+  rewrite /kxp_ef. apply (kxp_file_byte dn data (kxp_bytes pb) j Hb). lia.
 Qed.
 
 (* ===================================================================== *)
@@ -913,21 +920,15 @@ End KEXEC_PIN.
         which is the point of section 4's premise shape.
 
     (2) THE ORACLE'S DISCHARGE, and its one seam finding.  Phase A's
-        oracle premise (ProofKexecA.v:1847, post-sweep) hands the caller
-        the payload's [fv_ride zi (fv_of dn data)] ALONE and asks for
+        oracle premise hands the caller the payload's ERA LEG and asks for
         [kxq_hdr_ok HD (fun j => file_byte data j)] back at mask ⊤.  The
-        pinned verdict is [kxp_hdr_of_fv] fired at
-        [fv_of dn data = kxp_bytes pb] -- and THAT tie must come from the
+        pinned verdict is [kxp_hdr_of_bytes] fired at
+        [file_bytes data .. = kxp_bytes pb] -- and THAT tie comes from the
         authority ([kxp_view_pin] + [kxp_pins_frag_bytes] +
         [kxp_era_bytes], opened through ftopN inside the oracle's fupd)
-        via the payload's TOP FRAG, which the ride-only oracle does not
-        carry: the fv ghost has no tie to gamma-top outside the payload.
-        So the prover either (a) widens the oracle premise to
-        [fv_ride ... ∗ top_frag_q ...] -- a kexec-internal, self-canceling
-        edit of ProofKexecA's two oracle rows, the same authorization
-        class as the sweep's B2/B3 seam bodies -- or (b) re-derives
-        [kxc_a2] pinned (the copy the oracle existed to avoid).  Price
-        (a) first.
+        via that same leg.  (AS BUILT: the oracle was widened to carry the
+        leg on 2026-08-29 beside a [fv_ride] that THE DVIEW RETIREMENT has
+        since deleted; the leg was always the half that answered.)
 
     (3) THE NAMEI TRACE ([zi = kxp_ino pb]).  The landed functor argument
         is the traceless [SpecNamei.wp_namei_gen]; the pinned walk needs

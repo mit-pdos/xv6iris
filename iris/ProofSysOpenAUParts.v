@@ -151,8 +151,6 @@ Section ProofSysOpenAUParts.
      inode_addrs (ientry k) (bm_cells bm) ∗
      ind_res fsc_fs bm ∗
      inode_blocks fsc_fs bm data ∗
-     dv_ride (bv_unsigned inum) (dv_of dn data) ∗
-     fv_ride (bv_unsigned inum) (fv_of dn data) ∗
      top_frag (fs_gamma_L fsc_fs) (bv_unsigned inum) (era_node dn bm data))%I.
 
   Lemma so_flat_open (k : nat) (inum : mword 32) (dn : dinode) (bm : blkmap) :
@@ -196,12 +194,12 @@ Section ProofSysOpenAUParts.
   Proof.
     rewrite /so_flat.
     iIntros "(%H1 & %H2 & %H3 & %H4 & %H5 & %H6 & Ha & Hb & Hc & Hd & He &
-              Hf & Hg & Hh & Ht)".
+              Hf & Ht)".
     iFrame "Ht". iIntros "Ht".
     iSplitR; [iPureIntro; assumption |]. iSplitR; [iPureIntro; assumption |].
     iSplitR; [iPureIntro; assumption |]. iSplitR; [iPureIntro; assumption |].
     iSplitR; [iPureIntro; assumption |]. iSplitR; [iPureIntro; assumption |].
-    iFrame "Ha Hb Hc Hd He Hf Hg Hh Ht".
+    iFrame "Ha Hb Hc Hd He Hf Ht".
   Qed.
 
   (* ================================================================== *)
@@ -217,10 +215,10 @@ Section ProofSysOpenAUParts.
     iIntros "H".
     iDestruct (ic_loaded_open with "H") as (data)
       "(%Hok & %Hrl & %Hdok & %Hddix & %Hdoc & %Hduq & Hl & Hd & Hm & Ha & Hr &
-        Hb & Hv & Hw & Ht)".
+        Hb & Ht)".
     iFrame "Hm". iIntros "Hm".
     iApply (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dn bm data Hok Hrl Hdok Hddix
-              Hdoc Hduq with "Hl Hd Hm Ha Hr Hb Hv Hw Ht").
+              Hdoc Hduq with "Hl Hd Hm Ha Hr Hb Ht").
   Qed.
 
   (* ...and the same accessor at the PEELED payload, which is what the AU
@@ -234,12 +232,12 @@ Section ProofSysOpenAUParts.
   Proof.
     rewrite /so_flat.
     iIntros "(%H1 & %H2 & %H3 & %H4 & %H5 & %H6 & Ha & Hb & Hc & Hd & He &
-              Hf & Hg & Hh & Ht)".
+              Hf & Ht)".
     iFrame "Hc". iIntros "Hc".
     iSplitR; [iPureIntro; assumption |]. iSplitR; [iPureIntro; assumption |].
     iSplitR; [iPureIntro; assumption |]. iSplitR; [iPureIntro; assumption |].
     iSplitR; [iPureIntro; assumption |]. iSplitR; [iPureIntro; assumption |].
-    iFrame "Ha Hb Hc Hd He Hf Hg Hh Ht".
+    iFrame "Ha Hb Hc Hd He Hf Ht".
   Qed.
 
   Lemma so_type_acc (ip : mword 64) (dn : dinode) :

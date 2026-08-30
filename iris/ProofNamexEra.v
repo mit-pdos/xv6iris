@@ -117,7 +117,7 @@ Require Import InodeInv.
 Require Import InodeRegion.
 Require Import IregLinkNz.
 Require Import IgetLic.
-Require Import IcacheEscrow.  (* Require Export's DirViewG: [dv_hold], [dv_of] *)
+Require Import IcacheEscrow.  (* the payload arms *)
 Require Import FileInvDefs.
 Require Import IcacheRef.
 Require Import IrefSlots.
@@ -2654,7 +2654,7 @@ Section ProofNamexTrMain.
                    pose proof Hmilregs as HmilR.
                    destruct HmilR as (Y2 & Y8 & Y9 & Y19 & Y20 & Y21 & Y22
                                       & Y23 & Y24 & Y25 & Ythr).
-                   iDestruct (ic_loaded_open with "Hload") as (datl)"(%Hiok & %Hrl_datl & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs & Hind & Hblocks & Hdview & Hfview)".
+                   iDestruct (ic_loaded_open with "Hload") as (datl)"(%Hiok & %Hrl_datl & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs & Hind & Hblocks & Hfview)".
                    iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
                    iEval (rewrite /i_type) in "Hity".
                    (* +0xc6 lh a5,68(s4) : ip->type *)
@@ -2781,7 +2781,7 @@ Section ProofNamexTrMain.
                        iEval (rewrite Htg07an) in "Hpc".
                      iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst ik iinum dnl bml)
                        with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind
-                              Hblocks Hdlnk Hdview Hfview]" as "Hload".
+                              Hblocks Hdlnk Hfview]" as "Hload".
                      { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists datl.
                        iSplitR; [iPureIntro; exact Hiok |].
                        iSplitR; [iPureIntro; exact Hrl_datl |].
@@ -3061,7 +3061,7 @@ Section ProofNamexTrMain.
                                 Hcwdr Hname Hbs1 Hbs2 Hlog Hkeep Hru Hslkd
                                 Hdep Hidev Hiinum Hivalid Hfrz Hdiat Hity
                                 Himaj Himin Hinl Hisz Haddrs Hind Hblocks
-                               Hdlnk Hdview Hfview HP Hhops]"
+                               Hdlnk Hfview HP Hhops]"
                          as "Hdlblk".
                        { iIntros (CIDz Hsz Mz) "%Hregz Hcg Hcnt Hextc Hclmc Hpc Hpath".
                          pose proof Hregz as Hrz.
@@ -3278,7 +3278,7 @@ Section ProofNamexTrMain.
                             from dirlookup's [dir_first] answer to [ents !! s]
                             is UNIQUENESS-FREE: [FsTree.dv_lookup_found] /
                             [FsTree.dv_lookup_none] over
-                            [dv_of dnl datl = dir_view datl (dir_nrec ...)],
+                            [dir_view datl (dir_nrec (bv_unsigned (di_size dnl))) = dir_view datl (dir_nrec ...)],
                             which is the very record count dirlookup's own post
                             is stated at (probe verdict, charter §9.2). *)
                          iEval (rewrite -Hiz) in "HP".
@@ -3292,7 +3292,7 @@ Section ProofNamexTrMain.
                             frozen one lends [Hdview].  Split it once, before
                             the [found] case split, so both arms fire off
                             [Htop] and both re-pack [Hfv Htop]. *)
-                         iDestruct "Hfview" as "[Hfv Htop]".
+                         iRename "Hfview" into "Htop".
                          (* the lend carries DIRECTORY-NESS, and this is where
                             it comes from: the walk's own [ip->type == T_DIR]
                             test, already read as [Htyd] sixty lines up. *)
@@ -3302,7 +3302,7 @@ Section ProofNamexTrMain.
                          - (* ============ FOUND: recurse on the child ==== *)
                            iDestruct "Harm"
                              as "((%Hsome & %Hkslot & %Hdla0) & Href2 & Hru2 & _)".
-                           assert (Hents : dv_of dnl datl !! bname 14 nf'
+                           assert (Hents : dir_view datl (dir_nrec (bv_unsigned (di_size dnl))) !! bname 14 nf'
                                     = Some (bv_unsigned (dir_inum datl kdir))).
                            { apply (dv_lookup_found _ datl
                                       (dir_nrec (bv_unsigned (di_size dnl)))
@@ -3321,7 +3321,7 @@ Section ProofNamexTrMain.
                            iEval (rewrite -Hlen1) in "Hhops".
                            iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst ik iinum dnl
                                       bml)
-                             with "[Hdiat Hmeta Haddrs Hind Hblocks Hdlnk Hdview Hfv Htop]"
+                             with "[Hdiat Hmeta Haddrs Hind Hblocks Hdlnk Htop]"
                              as "Hload".
                            { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists datl.
                              iSplitR; [iPureIntro; exact Hiok |].
@@ -3331,7 +3331,7 @@ Section ProofNamexTrMain.
                              iSplitR; [iPureIntro; exact Hdoc |].
                              iSplitR; [iPureIntro; exact Hduq |].
                              iSplitL "Hdlnk"; [iExact "Hdlnk" |].
-                             iFrame "Hdiat Hmeta Haddrs Hind Hblocks Hdview Hfv Htop". }
+                             iFrame "Hdiat Hmeta Haddrs Hind Hblocks Htop". }
                            iDestruct (nx_bs3_join with "Hbs1 Hbs2")
                              as "Hbslot".
                            assert (Hklt : (kdir < dir_nrec
@@ -3591,7 +3591,7 @@ Section ProofNamexTrMain.
                          - (* ============ MISS: iunlockput and return 0 === *)
                            iDestruct "Harm"
                              as "((%Hnone & %Hdla0) & Hisl2 & _)".
-                           assert (Hents : dv_of dnl datl !! bname 14 nf'
+                           assert (Hents : dir_view datl (dir_nrec (bv_unsigned (di_size dnl))) !! bname 14 nf'
                                     = None).
                            { apply (dv_lookup_none _ datl
                                       (dir_nrec (bv_unsigned (di_size dnl))));
@@ -3606,7 +3606,7 @@ Section ProofNamexTrMain.
                            iModIntro.
                            iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst ik iinum dnl
                                       bml)
-                             with "[Hdiat Hmeta Haddrs Hind Hblocks Hdlnk Hdview Hfv Htop]"
+                             with "[Hdiat Hmeta Haddrs Hind Hblocks Hdlnk Htop]"
                              as "Hload".
                            { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists datl.
                              iSplitR; [iPureIntro; exact Hiok |].
@@ -3616,7 +3616,7 @@ Section ProofNamexTrMain.
                              iSplitR; [iPureIntro; exact Hdoc |].
                              iSplitR; [iPureIntro; exact Hduq |].
                              iSplitL "Hdlnk"; [iExact "Hdlnk" |].
-                             iFrame "Hdiat Hmeta Haddrs Hind Hblocks Hdview Hfv Htop". }
+                             iFrame "Hdiat Hmeta Haddrs Hind Hblocks Htop". }
                            iDestruct (nx_bs3_join with "Hbs1 Hbs2")
                              as "Hbslot".
                            (* +0xe8 c.mv s2,a0 *)
@@ -3911,7 +3911,7 @@ Section ProofNamexTrMain.
                      iEval (rewrite Htg054) in "Hpc".
                      iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst ik iinum dnl bml)
                        with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind
-                              Hblocks Hdlnk Hdview Hfview]" as "Hload".
+                              Hblocks Hdlnk Hfview]" as "Hload".
                      { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists datl.
                        iSplitR; [iPureIntro; exact Hiok |].
                        iSplitR; [iPureIntro; exact Hrl_datl |].

@@ -9,7 +9,9 @@
 
    THE ONE DIFFERENCE, AND THERE IS ONLY ONE.  [SpecNamexTr]'s trace
    premise is [SpecNameiTr.nx_hops_from P Pmiss pl 0], whose hop lends
-   [DirViewG.dv_half].  Here it is [FsAbsEra.ex_hops_from fsc_fs P Pmiss
+   [DirViewG.dv_half] (RETIRED 2026-08-30 -- read every [dv_half] below as
+   history; this contract is the surviving form).  Here it is
+   [FsAbsEra.ex_hops_from fsc_fs P Pmiss
    pl 0], whose hop lends [FsAbsEra.elend] -- the era fragment
    ([FsState.top_frag_q] at gamma-top) beside the two pure facts that make
    it readable ([fn_is_dir], [dir_entries n = ents]).  Both hops ARE
@@ -56,7 +58,7 @@
    THE FIRE POINT (what the proof owes, recorded here so the contract can
    be read against it).  namex holds the locked directory's payload from
    ilock's return to its iunlockput, and that payload carries BOTH
-   [DirViewG.dv_hold d (dv_of dn data)] and the era leg
+   the (now retired) [dview] contents hold and the era leg
    [FsState.top_frag ... (era_node dn bm data)] at [DfracOwn 1]
    ([IcacheEscrow.ic_loaded_flat_body]'s last two conjuncts).  The hop is
    fired in dirlookup's CONTINUATION, at the instruction boundary where the
@@ -105,7 +107,7 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
-Require Import IcacheEscrow.   (* Require Export's DirViewG *)
+Require Import IcacheEscrow.   (* the payload arms *)
 Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import SpecDirlink.

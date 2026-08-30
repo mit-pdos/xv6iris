@@ -2,7 +2,41 @@
    campaign's general contract (claude-notes/projects/namei-pinned-lookup.md
    §4; rulings in its STATUS header and §11.4).
 
-   WHAT THIS IS.  [SpecNamei.wp_namei_gen] returns [inode_held ipv] -- a
+   ===== TOMBSTONE (fs-syscall-specs, THE DVIEW RETIREMENT, 2026-08-30) =====
+
+   WHAT LEFT THIS FILE, AND WHY.  The contract itself is RETIRED with the ghost
+   it fired.  [nx_hop] lent [DirViewG.dv_half d dqv ents] through the caller's
+   fupd at every hop; that column is deleted (the payload arms, the movers, the
+   camera and the gnames all went with it), so the statement below could not be
+   restated without inventing a resource it never had.  Deleted here:
+
+     - [nx_hop] / [nx_hops_from]  (section 1's hop and its family);
+     - [wp_namei_tr_body] and [Module Type NAMEI_TR]  (section 2);
+     - [nxc_P] / [nxc_Pmiss] / [nxc_hop] / [nxc_hops]  (section 3's canonical
+       ghost-variable cursor).
+
+   The proofs and seals that consumed them -- [SpecNamexTr], [ProofNamexTr],
+   [ProofNameiTr], [LinkNamexTr], [LinkNameiTr] -- are OFF THE BUILD with their
+   source intact (see _CoqProject's tombstone there); this file could not
+   follow them, because everything ABOVE it wants the vocabulary that stays.
+
+   WHAT STAYS, AND WHO WANTS IT.  [inode_held_at] (and [inode_held_at_held]) --
+   [IcacheRef.inode_held] with the inum exposed -- is the currency of the ERA
+   walk that replaced this contract as the consumed form: [SpecNameiEra],
+   [SpecNamexEra], [SpecNparEra], [SpecNparWrapEra] state their pins in it,
+   their provers and [ProofSysOpenAU*] / [ProofKexecPin*] read it, and
+   [NameiTrDefs]'s binder list is quoted by half the era cone (understating it
+   is a documented 255 GB memory bomb).  So the file stays on the build as that
+   vocabulary, minus the trace.
+
+   THE REPLACEMENT, in one line: [FsAbsEra.ex_hop] = [FsAbs.ax_hop] at
+   [FsAbsEra.elend] (the era leg, which carries directory-ness and reads the
+   AUTHORITY's row through [elend_astate]), sealed by [LinkNamexEra] /
+   [LinkNameiEra] with a [Print Assumptions] byte-identical to the one this
+   file's seal had.
+   ========================================================================
+
+   WHAT THIS WAS.  [SpecNamei.wp_namei_gen] returns [inode_held ipv] -- a
    reference to SOME inode, no relation to the path (the SpecNamex.v:113-124
    scope ruling: no path -> inode function exists across instants).  This
    file states the refinement that ruling itself recorded as the honest one:
@@ -87,7 +121,7 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
-Require Import IcacheEscrow.   (* Require Export's DirViewG *)
+Require Import IcacheEscrow.   (* the payload arms *)
 Require Import FsTree.         (* [fname], [dir_view]'s home *)
 Require Import KvmSpec.
 Require Import FileInvDefs.
@@ -113,35 +147,10 @@ Section NameiTrDefs.
             !irefslotG Σ, !pavG Σ}.
   Context `{XI : CurCtx}.
 
-  (* ONE caller-supplied atomic step.  The walk applies it at hop [k]'s
-     linearization instant with [d] its current inum and [ents] the locked
-     directory's abstract contents, LENDING the whole [dv_hold] through the
-     caller's fupd.  The caller must hand the fragment back unchanged --
-     whole ownership makes anything else unprovable -- and receives the
-     answer as the match: the cursor steps on a hit, [Pmiss] fires on a
-     miss.  Affine and single-use by construction; the contract carries one
-     per element ([nx_hops_from .. 0]). *)
-  (* THE LENT FRACTION IS EXPOSED AND RETURNED AT THE SAME [dq]: the walk
-     lends whatever its custody carries -- [DfracOwn 1] today, and 3/4
-     once N-4's lend is outstanding on the directory -- and the caller
-     cannot keep a piece (the same [dq] comes back).  Agreement against a
-     client-held fraction works at ANY positive pair, which is exactly
-     what N-4's redeem does inside this fupd. *)
-  Definition nx_hop (P : nat -> Z -> iProp Σ) (Pmiss : nat -> Z -> iProp Σ)
-      (k : nat) (s : fname) : iProp Σ :=
-    (∀ (d : Z) (ents : gmap fname Z) (dqv : dfrac),
-       P k d -∗ dv_half d dqv ents ={⊤}=∗
-       dv_half d dqv ents ∗
-       match ents !! s with
-       | Some c => P (S k) c
-       | None   => Pmiss k d
-       end)%I.
-
-  (* the family from hop [n] on -- the premise at [n = 0], the failure
-     arms' refund at the death index *)
-  Definition nx_hops_from (P : nat -> Z -> iProp Σ)
-      (Pmiss : nat -> Z -> iProp Σ) (pl : list (bv 8)) (n : nat) : iProp Σ :=
-    ([∗ list] j ↦ s ∈ drop n (path_elems pl), nx_hop P Pmiss (n + j)%nat s)%I.
+  (* THE HOP AND ITS FAMILY ([nx_hop] / [nx_hops_from]) ARE DELETED -- see the
+     header's tombstone.  They lent [DirViewG.dv_half] through the caller's
+     fupd, and that ghost no longer exists; [FsAbsEra.ex_hop] /
+     [ex_hops_from] are the era walk's replacements. *)
 
   (* [IcacheRef.inode_held] with the inum EXPOSED -- the pinned package.
      Same four conjuncts, one new pure tie; [inode_held_at_held] recovers
@@ -163,188 +172,13 @@ Section NameiTrDefs.
 End NameiTrDefs.
 
 (* ===================================================================== *)
-(*  2. The contract: [SpecNamei.wp_namei_gen_body] + the trace           *)
+(*  2-3. THE CONTRACT AND ITS CANONICAL CURSOR: RETIRED                  *)
 (* ===================================================================== *)
 
-Definition wp_namei_tr_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
-   (* disk fabric + lock  *)
-    (pd pav pu : mword 64)
- (gf : gname)                          (* kalloc, file table  *)
-    (plen : nat) (pfun : nat -> bv 8)                  (* the path buffer     *)
-    (n : nat) (Sb : gset Z)
-    (P : nat -> Z -> iProp Σ)                          (* the cursor          *)
-    (Pmiss : nat -> Z -> iProp Σ)                      (* the miss receipt    *)
-    (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
-    (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (Upr : ustate) :=
-  let pcE : mword 64 := mword_of_int KernelSyms.namei in
-  let pj := proc_addr j in
-  let pv := m !!! Regidx (mword_of_int 10 : mword 5) in   (* a0 = path *)
-  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  let pl := bview plen pfun in
-  let L := length (path_elems pl) in
-  (K_namei <= K)%nat ->
-  icfg_dev = ROOTDEV ->
-  (0 < icfg_nib)%nat ->
-  log_geom_ok fsc_cov fsc_logst ->
-  0 < fsc_size <= BPB ->
-  0 <= fsc_bmapstart ->
-  fsc_bmapstart ∈ fsc_cov ->
-  ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
-  0 <= icfg_ist ->
-  cov_below fsc_cov fsc_size ->
-  ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
-  bb_cstr pfun plen ->
-  (Z.of_nat plen < 2 ^ 31)%Z ->
-  (* ABSOLUTE PATHS ONLY (ruling Q-c): the walk starts at the root and the
-     cursor is supplied there.  The relative form waits for an inum-exposed
-     cwd. *)
-  pfun 0%nat = SLASH ->
-  (walk_need L <= n)%nat ->
-  (j < NPROC)%nat ->
-  gs !! j = Some gl ->
-  sie_cap_gpr KT1 m K b pj -∗
-  cpu_own 0 eb pj b lks -∗
-  trap_csrs_ext KT1 eb -∗
-  cpu_claim_ext eb pj -∗
-  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_env -∗
-  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
-  log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
-  kalloc_env fsc_kalloc None -∗
-  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
-  itable_inv -∗
-  ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
-  ic_sleeplocks fsc_ic -∗
-  ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
-  ireg_open -∗
-  procs_inv gs -∗
-  dev_inv fsc_uart fsc_disk -∗
-  disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
-  sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
-  sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-  bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
-  proc_priv_bare pj pidv Upr -∗
-  inode_held (pv_cwd (us_V Upr)) -∗
-  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
-  bslots 3 -∗
-  iref_slots 2 -∗
-  (* the set form beside the transaction's token: namex's [ilock] takes
-     the write arm (durable-disk B''-tx), and the pair rides in the set
-     form's own position so no stage lemma moved *)
-  log_opSt icfg_log n Sb -∗
-  (* ---- THE TRACE (the two new resource premises) ---- *)
-  P 0%nat (bv_unsigned ROOTINO) -∗
-  nx_hops_from P Pmiss pl 0%nat -∗
-  wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (n' : nat) (Sb' : gset Z)
-    (ok : bool) (ipv : mword 64) (w : bool),
-      ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr KT1 mf K b pj -∗
-      cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext KT1 eb -∗
-      cpu_claim_ext eb pj -∗
-      pc_is ret_tgt -∗
-      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
-      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-      proc_priv_bare pj pidv Upr -∗
-      inode_held (pv_cwd (us_V Upr)) -∗
-      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
-      bslots 3 -∗
-      ⌜Sb ⊆ Sb'⌝ -∗
-      ⌜w = true -> fsc_bmapstart ∈ Sb'⌝ -∗
-      ⌜((n - (walk_spend w + (if ok then 0%nat else 1%nat)))%nat <= n')%nat
-       /\ (n' <= n)%nat⌝ -∗
-      (* the set form beside the transaction's token (B''-tx) *)
-      log_opSt icfg_log n' Sb' -∗
-      (if ok
-       then (* THE PIN: the register, the package AT ITS INUM, and the
-               cursor having walked the whole path to that same inum.  The
-               caller alone knows what its [P] says about [iL]; the
-               contract promises only the CHAIN -- L hops fired, in order,
-               each at the then-current contents. *)
-            ∃ (iL : Z),
-              ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = ipv⌝ ∗
-              inode_held_at ipv iL ∗
-              P L iL ∗
-              iref_slots 1
-       else ⌜mf !!! Regidx (mword_of_int 10 : mword 5)
-             = (mword_of_int 0 : mword 64)⌝ ∗
-            iref_slots 2 ∗
-            (* the death index, the receipt, and the UNFIRED suffix.  Left
-               disjunct: hop [k] never fired -- the cursor's node was not a
-               directory (or the walk's own [nlink] guard died there) --
-               so [P k d] itself comes back beside hops [k..].  Right
-               disjunct: hop [k] fired and missed -- [Pmiss k d] beside
-               hops [k+1..]. *)
-            (∃ (k : nat) (d : Z), ⌜(k < L)%nat⌝ ∗
-               ((P k d ∗ nx_hops_from P Pmiss pl k) ∨
-                (Pmiss k d ∗ nx_hops_from P Pmiss pl (S k))))) -∗
-      WP (Loop : expr riscv_lang)) -∗
-  WP (Loop : expr riscv_lang).
-
-Module Type NAMEI_TR.
-  Parameter wp_namei_tr :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-      (gs : list gname) (j : nat) (gl : gname)
-      (pd pav pu : mword 64)
- (gf : gname)
-      (plen : nat) (pfun : nat -> bv 8)
-      (n : nat) (Sb : gset Z)
-      (P : nat -> Z -> iProp Σ) (Pmiss : nat -> Z -> iProp Σ)
-      (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
-      (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Upr : ustate),
-      wp_namei_tr_body gs j gl pd pav pu
- gf
- plen pfun n Sb P Pmiss
-                       pidv dq dqb dqs dqpv m K eb b lks Upr.
-End NAMEI_TR.
-
-(* ===================================================================== *)
-(*  3. The canonical instantiation: the ghost-variable cursor            *)
-(*     (the "starting point" of the campaign's original ask)             *)
-(* ===================================================================== *)
-
-Section NameiTrCursor.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ}.
-  Context `{XI : CurCtx}.
-  Context `{!ghost_varG Σ (nat * Z)}.
-
-  (* [P k d := γw ↦ half (k, d)]: the client keeps the other half, so the
-     walk's position is readable mid-walk by whoever holds it, and the
-     success post's [P L iL] IS the receipt "the walk ended at iL".  The
-     hop's step is one [ghost_var_update_halves] against the client's
-     half... which the CLIENT cannot be holding at the instant -- so the
-     canonical form keeps BOTH halves in the family and the client reads
-     the pin out of [P L iL] at the end.  (A mid-walk observer variant
-     wants the halves split against a client invariant; that is N-4's
-     business, not this file's.) *)
-  Definition nxc_P (γw : gname) (k : nat) (d : Z) : iProp Σ :=
-    ghost_var γw 1 (k, d).
-  Definition nxc_Pmiss (γw : gname) (k : nat) (d : Z) : iProp Σ :=
-    ghost_var γw 1 (k, d).
-
-  Lemma nxc_hop (γw : gname) (k : nat) (s : fname) :
-    ⊢ nx_hop (nxc_P γw) (nxc_Pmiss γw) k s.
-  Proof.
-    iIntros (d ents dqv) "HP Hdv".
-    destruct (ents !! s) as [c|] eqn:Hs.
-    - iMod (ghost_var_update (S k, c) with "HP") as "HP". by iFrame.
-    - by iFrame.
-  Qed.
-
-  Lemma nxc_hops (γw : gname) (pl : list (bv 8)) (n : nat) :
-    ⊢ nx_hops_from (nxc_P γw) (nxc_Pmiss γw) pl n.
-  Proof.
-    rewrite /nx_hops_from. iApply big_sepL_intro.
-    iIntros "!>" (j s _). iApply nxc_hop.
-  Qed.
-
-End NameiTrCursor.
+(*  [wp_namei_tr_body], [Module Type NAMEI_TR] and the ghost-variable cursor
+    ([nxc_P] / [nxc_Pmiss] / [nxc_hop] / [nxc_hops]) are deleted with the hop
+    they were stated over -- see the header's tombstone.  Their prover and
+    seal ([ProofNameiTr], [ProofNamexTr], [LinkNameiTr], [LinkNamexTr], and
+    [SpecNamexTr] one level down) are off the build with their source intact.
+    The consumed form is the era walk: [SpecNameiEra]'s contract over
+    [FsAbsEra.ex_hops_from], sealed by [LinkNameiEra].                     *)

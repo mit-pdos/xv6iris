@@ -8,7 +8,9 @@
    26-byte wrapper's contract, [ProofNameiEra] joins them.
 
    THE ONE DIFFERENCE.  [SpecNameiTr]'s trace premise is
-   [ex_hops_from fsc_fs P Pmiss pl 0], whose hop lends [DirViewG.dv_half].  Here it
+   [ex_hops_from fsc_fs P Pmiss pl 0], whose hop lends [DirViewG.dv_half]
+   (RETIRED 2026-08-30 -- read every [dv_half] below as history; this
+   contract is the surviving form).  Here it
    is [FsAbsEra.ex_hops_from fsc_fs P Pmiss pl 0], whose hop lends
    [FsAbsEra.elend] -- the era fragment ([FsState.top_frag_q] at gamma-top,
    the SAME ghost the campaign's carrier [FsAbs.nview] reads) beside the
@@ -79,7 +81,7 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
-Require Import IcacheEscrow.   (* Require Export's DirViewG *)
+Require Import IcacheEscrow.   (* the payload arms *)
 Require Import FsTree.         (* [fname], [dir_view]'s home *)
 Require Import KvmSpec.
 Require Import FileInvDefs.

@@ -685,30 +685,15 @@ Definition frzmUR : ucmra := gmapUR Z (dfrac_agreeR (leibnizO bool)).
 Definition hpnUR : ucmra :=
   gmapUR nat (dfrac_agreeR (leibnizO (option (nat * Qp)))).
 
-(* THE PER-DIRECTORY CONTENTS GHOST (namei-pinned-lookup.md §9 W1).  [icntUR]
-   at the ABSTRACT ENTRY MAP: a per-inum agreement on what a directory's bytes
-   say, tied definitionally to those bytes ([DirViewG.dv_of]) everywhere the
-   bytes rest.  Carried WHOLE on the custody chain -- which is what keeps
-   every mover a free own-update and keeps every landed contract's arity
-   fixed; the fraction split belongs to the pinned form, not to the carrier.
-
-   THE KEY TYPE IS SPELLED [list (bv 8)], NOT [FsTree.fname]: this file sits
-   below [FsTree] (and below its [InodeDefs]/[BioDefs] cone), the two are the
-   same definition, and [DirViewG] states the whole theory at [fname]. *)
-Definition dviewUR : ucmra :=
-  gmapUR Z (dfrac_agreeR (leibnizO (gmap (list (bv 8)) Z))).
-
-(* THE PER-FILE CONTENTS GHOST (namei-pinned-lookup.md §13, D-52a).  [dviewUR]
-   one layer down: a per-inum agreement on what a FILE's bytes say, tied
-   definitionally to those bytes ([DirViewG.fv_of], i.e. [FsTree.file_bytes])
-   everywhere the bytes rest.  A SECOND, INDEPENDENT ghost rather than a pair
-   value inside [dviewUR]: re-typing the landed one would re-sweep every dview
-   site in the tree, whereas a twin's sweep is purely additive beside it.
-
-   The value type needs no [FsTree] name at all -- a file's contents ARE a
-   [list (bv 8)] -- so this one costs not even [dviewUR]'s spelling note. *)
-Definition fviewUR : ucmra :=
-  gmapUR Z (dfrac_agreeR (leibnizO (list (bv 8)))).
+(* THE TWO CONTENTS GHOSTS ARE GONE (fs-syscall-specs, THE DVIEW RETIREMENT,
+   2026-08-30).  [dviewUR] was [icntUR] at the ABSTRACT ENTRY MAP -- a
+   per-inum agreement on what a directory's bytes say -- and [fviewUR] its
+   per-FILE twin, both carried WHOLE on the custody chain beside the payload's
+   era fragment.  The fragment's own readings ([FsStateEra.dir_entries_era_node],
+   [FsTree.fn_file_bytes]) ARE what they said, so the column, its two class
+   members and its two [GFunctor] rows leave the tree together.  The audited
+   theorem moves the safe way: it now holds at a SMALLER functor list, and
+   [SystemAdequacy.v] / [SystemAssumptions.v] are byte-identical to main. *)
 
 (* THE ENTRY SLEEPLOCK'S DESCRIPTOR (design §14.8): what a checked-out
    entry's escrow arm is holding for the thread inside.  The fraction is a
@@ -858,8 +843,6 @@ Class icacheG (Σ : gFunctors) := IcacheG {
      reason verbatim: one half rides in an [IcacheEscrow] arm and the other
      in the freeing walk's hand across a window that spans a program step. *)
   icache_hpnG :: inG Σ hpnUR;
-  icache_dviewG :: inG Σ dviewUR;
-  icache_fviewG :: inG Σ fviewUR;
 }.
 Definition icacheΣ : gFunctors :=
   #[GFunctor icacheUR; ghost_varΣ (bool * SailStdpp.Values.mword 32 * SailStdpp.Values.mword 32);
@@ -869,9 +852,7 @@ Definition icacheΣ : gFunctors :=
     ghost_varΣ (gset Z);
     ghost_varΣ (gmap Z (nat * Qp));
     ghost_mapΣ Z icorpse;
-    GFunctor icntUR; GFunctor frzmUR; GFunctor hpnUR;
-    GFunctor dviewUR;
-    GFunctor fviewUR].
+    GFunctor icntUR; GFunctor frzmUR; GFunctor hpnUR].
 Global Instance subG_icacheΣ {Σ} : subG icacheΣ Σ -> icacheG Σ.
 Proof. solve_inG. Qed.
 

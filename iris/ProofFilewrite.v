@@ -1917,7 +1917,7 @@ Section ProofFilewrite.
     (* ---- PEEL the checked-out bundle.  The valid cell is beside the
            content (SpecIlock v2) and it IS [FileOff.off_mark]. ---- *)
     rewrite /ic_loaded.
-    iDestruct (ic_loaded_open with "Hlk") as (datal)"(%Hiok & %Hrl_datal & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdnat & Hmeta & Haddrs & Hindres & Hblocks & Hdview & Hfview)".
+    iDestruct (ic_loaded_open with "Hlk") as (datal)"(%Hiok & %Hrl_datal & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdnat & Hmeta & Haddrs & Hindres & Hblocks & Htopl)".
     destruct Hiok as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes & Hsized).
     iAssert (inode_map fsc_fs (ientry ik) bml)
       with "[Haddrs Hindres]" as "Hmap".
@@ -2266,15 +2266,11 @@ Section ProofFilewrite.
        determined garbage -- the fd is provably not a directory here -- and
        the fragment is WHOLE, so the move is one free own-update and no delta
        is proved. *)
-    (* the payload's last name carries [fv_ride * top_frag]; writei MOVED
-       the record and the blocks, so the ride is set and the era's abstract
-       value is RETAGGED at the new node (durable-disk 2b-inode-3). *)
-    iDestruct "Hfview" as "[Hfview Htop]".
-    iMod (dvw_set_rt ⊤ fsc_ireg fsc_fs icfg_ist icfg_nib
-            (bv_unsigned inum) (dv_of dnl datal) (dv_of dn' data')
-            (fv_of dnl datal) (fv_of dn' data')
-            ltac:(solve_ndisj) with "Hireg Hdview Hfview")
-      as "[Hdview Hfview]".
+    (* the payload's last name IS the era fragment; writei MOVED the record
+       and the blocks, so it is RETAGGED at the new node (durable-disk
+       2b-inode-3).  The two contents holds that used to be set beside it
+       were readings of this very fragment (THE DVIEW RETIREMENT). *)
+    iRename "Htopl" into "Htop".
     (* THE RETAG OWES THE ROW (durable-disk lane A).  A write leaves the
        inode well-formed -- writei grows the size only after the block it
        needs is in the map -- and these are the four facts the re-pack
@@ -2295,7 +2291,7 @@ Section ProofFilewrite.
     { rewrite -P8. iExact "Hmark". }
     iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov
                fsc_logst ik inum dn' bm')
-      with "[Hdnat Hmeta Hmap Hblocks Hdview Hfview Htop]" as "Hlk".
+      with "[Hdnat Hmeta Hmap Hblocks Htop]" as "Hlk".
     { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body /inode_map. iExists data'.
       iSplitR; [iPureIntro; exact Hiok2 |].
       iSplitR; [iPureIntro; exact Hrl2 |].
@@ -2309,7 +2305,7 @@ Section ProofFilewrite.
                           Hnodir') |].
       iDestruct "Hmap" as "[Haddrs Hindres]".
       rewrite Hdn0q.
-      iFrame "Hdnat Hmeta Haddrs Hindres Hblocks Hdview Hfview Htop". }
+      iFrame "Hdnat Hmeta Haddrs Hindres Hblocks Htop". }
     (* ---- +0xb4 ld a0,24(s2) ; +0xb8 jal ra,iunlock ---- *)
     assert (Hpip3 : add_vec (rget X0 Rs2)
                       (sign_extend' 64 (mword_of_int 24 : mword 12)) = a_fip kx).

@@ -112,8 +112,6 @@ Require Import FsStateEra.
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import FsTree.
-Require Import DirViewG.   (* [dv_hold]/[dv_of] -- the pool's contents holds *)
-Require Import DirViewLend. (* N-4 PHASE B: [dv_lcol] / [dv_lic], boot-stocked *)
 Require Import IcacheEscrow.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -605,204 +603,21 @@ Section IcacheBootRegion.
   Qed.
 
   (* ------------------------------------------------------------------ *)
-  (*  N-4 PHASE B (E1-region): the LEND COLUMN's boot state              *)
+  (*  THE LEND COLUMN'S BOOT STATE: RETIRED                              *)
+  (*      (fs-syscall-specs, THE DVIEW RETIREMENT, 2026-08-30)            *)
   (* ------------------------------------------------------------------ *)
 
-  (*  The region's per-inum lend column ([DirViewLend.dv_lcol], parked in
-      [InodeRegion.ireg_registry]) is stocked here, in the NONE state at
-      every inum, and it costs no boot map and no [icfg] field: the two
-      [dviewUR] cell families are minted by two [own_alloc]s at the SAME
-      [dview_boot_map] the contents ghost uses, and the two registry key
-      families ride the [icfg_reg] AUTHORITY this lemma is already handed
-      -- a ghost_map can grow a key, which is exactly why the lend's names
-      live there and not in a bare [own] map.  The mint LICENCES leave with
-      the caller (FsCfgBoot), where N-5.1's stocking mint will spend them.  *)
-
-  (* the region-set / [seq] bridge: [ireg_lends] is indexed flat *)
-  Lemma region_set_to_seq (nib : nat) (Phi : Z -> iProp Σ) :
-    ([∗ set] z ∈ region_inums nib, Phi z) ⊣⊢
-    ([∗ list] k ∈ seq 0 (16 * nib), Phi (Z.of_nat k)).
-  Proof.
-    rewrite /region_inums (big_sepS_list_to_set _ _ (region_list_nodup nib)).
-    by rewrite big_sepL_fmap.
-  Qed.
-
-  Definition lend_slots (γc γv : gname) (nib : nat) : gmap Z (gname * gname) :=
-    gset_to_gmap (γc, γv) (set_map dvl_k (region_inums nib)).
-  Definition lend_lics (nib : nat) : gmap Z (gname * gname) :=
-    gset_to_gmap (1%positive, 1%positive) (set_map dvl_l (region_inums nib)).
-  Definition lend_reg (γc γv : gname) (nib : nat) : gmap Z (gname * gname) :=
-    lend_slots γc γv nib ∪ lend_lics nib.
-
-  Lemma lend_slots_key (γc γv : gname) (nib : nat) (k : Z) (v : gname * gname) :
-    lend_slots γc γv nib !! k = Some v -> exists z, k = dvl_k z /\ (0 <= z)%Z.
-  Proof.
-    rewrite /lend_slots. intros Hk.
-    apply lookup_gset_to_gmap_Some in Hk as [Hin _].
-    apply elem_of_map in Hin as (z & -> & Hz).
-    apply region_inums_spec in Hz. exists z. split; [reflexivity | lia].
-  Qed.
-
-  Lemma lend_lics_key (nib : nat) (k : Z) (v : gname * gname) :
-    lend_lics nib !! k = Some v -> exists z, k = dvl_l z /\ (0 <= z)%Z.
-  Proof.
-    rewrite /lend_lics. intros Hk.
-    apply lookup_gset_to_gmap_Some in Hk as [Hin _].
-    apply elem_of_map in Hin as (z & -> & Hz).
-    apply region_inums_spec in Hz. exists z. split; [reflexivity | lia].
-  Qed.
-
-  Lemma lend_slots_lics_disj (γc γv : gname) (nib : nat) :
-    lend_slots γc γv nib ##ₘ lend_lics nib.
-  Proof.
-    apply map_disjoint_spec. intros k x y H1 H2.
-    apply lend_slots_key in H1 as (z & -> & _).
-    apply lend_lics_key in H2 as (w & Hw & _).
-    exact (dvl_k_l_ne z w Hw).
-  Qed.
-
-  (* ---- N-5.2A: the fview column's two key families, side by side ------ *)
-
-  Definition flend_slots (γc γv : gname) (nib : nat) : gmap Z (gname * gname) :=
-    gset_to_gmap (γc, γv) (set_map fvl_k (region_inums nib)).
-  Definition flend_lics (nib : nat) : gmap Z (gname * gname) :=
-    gset_to_gmap (1%positive, 1%positive) (set_map fvl_l (region_inums nib)).
-  Definition flend_reg (γc γv : gname) (nib : nat) : gmap Z (gname * gname) :=
-    flend_slots γc γv nib ∪ flend_lics nib.
-
-  (* all four families, as ONE insertion into the registry auth *)
-  Definition lend_reg_all (γc γv γfc γfv : gname) (nib : nat)
-    : gmap Z (gname * gname) :=
-    lend_reg γc γv nib ∪ flend_reg γfc γfv nib.
-
-  Lemma flend_slots_key (γc γv : gname) (nib : nat) (k : Z) (v : gname * gname) :
-    flend_slots γc γv nib !! k = Some v -> exists z, k = fvl_k z /\ (0 <= z)%Z.
-  Proof.
-    rewrite /flend_slots. intros Hk.
-    apply lookup_gset_to_gmap_Some in Hk as [Hin _].
-    apply elem_of_map in Hin as (z & -> & Hz).
-    apply region_inums_spec in Hz. exists z. split; [reflexivity | lia].
-  Qed.
-
-  Lemma flend_lics_key (nib : nat) (k : Z) (v : gname * gname) :
-    flend_lics nib !! k = Some v -> exists z, k = fvl_l z /\ (0 <= z)%Z.
-  Proof.
-    rewrite /flend_lics. intros Hk.
-    apply lookup_gset_to_gmap_Some in Hk as [Hin _].
-    apply elem_of_map in Hin as (z & -> & Hz).
-    apply region_inums_spec in Hz. exists z. split; [reflexivity | lia].
-  Qed.
-
-  Lemma flend_slots_lics_disj (γc γv : gname) (nib : nat) :
-    flend_slots γc γv nib ##ₘ flend_lics nib.
-  Proof.
-    apply map_disjoint_spec. intros k x y H1 H2.
-    apply flend_slots_key in H1 as (z & -> & _).
-    apply flend_lics_key in H2 as (w & Hw & _).
-    exact (fvl_k_l_ne z w Hw).
-  Qed.
-
-  (* THE COLLISION QUESTION, answered once: dview's two families and fview's
-     two are pairwise disjoint by residue mod 4 ([DirViewLend] §0's six
-     [lia]s), and all four are negative while every landed registry key is a
-     region inum. *)
-  Lemma lend_flend_disj (γc γv γfc γfv : gname) (nib : nat) :
-    lend_reg γc γv nib ##ₘ flend_reg γfc γfv nib.
-  Proof.
-    apply map_disjoint_spec. intros k x y H1 H2.
-    apply lookup_union_Some_raw in H1 as [H1|[_ H1]];
-      apply lookup_union_Some_raw in H2 as [H2|[_ H2]].
-    - apply lend_slots_key in H1 as (z & -> & _).
-      apply flend_slots_key in H2 as (w & Hw & _). exact (dvl_k_fvl_k_ne z w Hw).
-    - apply lend_slots_key in H1 as (z & -> & _).
-      apply flend_lics_key in H2 as (w & Hw & _). exact (dvl_k_fvl_l_ne z w Hw).
-    - apply lend_lics_key in H1 as (z & -> & _).
-      apply flend_slots_key in H2 as (w & Hw & _). exact (dvl_l_fvl_k_ne z w Hw).
-    - apply lend_lics_key in H1 as (z & -> & _).
-      apply flend_lics_key in H2 as (w & Hw & _). exact (dvl_l_fvl_l_ne z w Hw).
-  Qed.
-
-  Lemma lend_reg_all_neg (γc γv γfc γfv : gname) (nib : nat)
-      (k : Z) (v : gname * gname) :
-    lend_reg_all γc γv γfc γfv nib !! k = Some v -> (k < 0)%Z.
-  Proof.
-    rewrite /lend_reg_all /lend_reg /flend_reg. intros Hk.
-    apply lookup_union_Some_raw in Hk as [Hk|[_ Hk]];
-      apply lookup_union_Some_raw in Hk as [Hk|[_ Hk]].
-    - apply lend_slots_key in Hk as (z & -> & Hz). exact (dvl_k_neg z Hz).
-    - apply lend_lics_key in Hk as (z & -> & Hz). exact (dvl_l_neg z Hz).
-    - apply flend_slots_key in Hk as (z & -> & Hz). exact (fvl_k_neg z Hz).
-    - apply flend_lics_key in Hk as (z & -> & Hz). exact (fvl_l_neg z Hz).
-  Qed.
-
-  Lemma lend_reg_dummy_disj (γc γv γfc γfv : gname) (nib : nat) :
-    lend_reg_all γc γv γfc γfv nib ##ₘ dummy_reg nib.
-  Proof.
-    apply map_disjoint_spec. intros k x y H1 H2.
-    apply dummy_reg_key in H2.
-    pose proof (lend_reg_all_neg γc γv γfc γfv nib k x H1). lia.
-  Qed.
-
-  Lemma lend_reg_cov (γc γv γfc γfv : gname) (nib : nat) (z : Z) :
-    (0 <= z < 16 * Z.of_nat nib)%Z ->
-    is_Some ((lend_reg_all γc γv γfc γfv nib ∪ dummy_reg nib) !! z).
-  Proof.
-    intros Hz. destruct (dummy_reg_cov nib z Hz) as [v Hv].
-    exists v. apply lookup_union_Some_raw. right. split; [| exact Hv].
-    destruct (lend_reg_all γc γv γfc γfv nib !! z) as [u|] eqn:Hl;
-      [exfalso | reflexivity].
-    pose proof (lend_reg_all_neg γc γv γfc γfv nib z u Hl). lia.
-  Qed.
-
-  Lemma lend_slots_out (γc γv : gname) (nib : nat) :
-    ([∗ map] k ↦ v ∈ lend_slots γc γv nib, k ↪[icfg_reg] v)
-    ⊢ [∗ set] z ∈ region_inums nib, dvl_slot z (DfracOwn 1) (γc, γv).
-  Proof.
-    rewrite /lend_slots big_sepM_gset_to_gmap.
-    rewrite (big_opS_set_map dvl_k (region_inums nib)
-               (fun k => (k ↪[icfg_reg] ((γc, γv) : gname * gname))%I)
-               dvl_k_inj).
-    done.
-  Qed.
-
-  Lemma lend_lics_out (nib : nat) :
-    ([∗ map] k ↦ v ∈ lend_lics nib, k ↪[icfg_reg] v)
-    ⊢ [∗ set] z ∈ region_inums nib, dv_lic z.
-  Proof.
-    rewrite /lend_lics big_sepM_gset_to_gmap.
-    rewrite (big_opS_set_map dvl_l (region_inums nib)
-               (fun k => (k ↪[icfg_reg]
-                            ((1%positive, 1%positive) : gname * gname))%I)
-               dvl_l_inj).
-    iIntros "H". iApply (big_sepS_mono with "H"). intros z _.
-    iIntros "H". rewrite /dv_lic.
-    iExists ((1%positive, 1%positive) : gname * gname). iExact "H".
-  Qed.
-
-  Lemma flend_slots_out (γc γv : gname) (nib : nat) :
-    ([∗ map] k ↦ v ∈ flend_slots γc γv nib, k ↪[icfg_reg] v)
-    ⊢ [∗ set] z ∈ region_inums nib, fvl_slot z (DfracOwn 1) (γc, γv).
-  Proof.
-    rewrite /flend_slots big_sepM_gset_to_gmap.
-    rewrite (big_opS_set_map fvl_k (region_inums nib)
-               (fun k => (k ↪[icfg_reg] ((γc, γv) : gname * gname))%I)
-               fvl_k_inj).
-    done.
-  Qed.
-
-  Lemma flend_lics_out (nib : nat) :
-    ([∗ map] k ↦ v ∈ flend_lics nib, k ↪[icfg_reg] v)
-    ⊢ [∗ set] z ∈ region_inums nib, fv_lic z.
-  Proof.
-    rewrite /flend_lics big_sepM_gset_to_gmap.
-    rewrite (big_opS_set_map fvl_l (region_inums nib)
-               (fun k => (k ↪[icfg_reg]
-                            ((1%positive, 1%positive) : gname * gname))%I)
-               fvl_l_inj).
-    iIntros "H". iApply (big_sepS_mono with "H"). intros z _.
-    iIntros "H". rewrite /fv_lic.
-    iExists ((1%positive, 1%positive) : gname * gname). iExact "H".
-  Qed.
+  (*  N-4 phase B stocked the region's per-inum lend column here -- four
+      [own_alloc]s at [dview_boot_map]/[fview_boot_map], four registry key
+      families ([lend_slots] / [lend_lics] / [flend_slots] / [flend_lics],
+      keyed off the negative residues [dvl_k] .. [fvl_l] so they could not
+      collide with an inum's own row) inserted into the [icfg_reg] authority
+      this lemma already holds, and one MINT LICENCE per inum out with the
+      caller.  All of it, with [region_set_to_seq] and the eight key/disjointness
+      lemmas, goes with the [dview]/[fview] ghosts: there is no column to
+      stock, no licence to mint and no NONE state to establish.  [ireg_alloc]
+      keeps [dummy_reg] alone, which is what it registered before the column
+      arrived.                                                              *)
 
   (* THE FREE INUMS' ABSTRACT VALUE, AS BOOT HANDS IT OVER (durable-disk
      C-3c).  [emp] at a live inum -- there the fragment rides TIED inside the
@@ -830,10 +645,9 @@ Section IcacheBootRegion.
        readers cross into the byte view and [InodeRegion.ireg_bytes] is
        what carries the crossing.  No coverage premise: holding the run IS
        being a home block ([FsBlocks.fsblock_home]). *)
-    (* N-4 PHASE B: the lend column family is indexed at [icfg_nib] (see
-       [InodeRegion.ireg_lends] for why), and boot is the one place that has
-       to know the two agree.  The caller is [FsCfgBoot], which calls this
-       at [icfg_nib] literally. *)
+    (* [nib = icfg_nib]: boot is the one place that has to know the region's
+       parameter and the ambient one agree.  The caller is [FsCfgBoot], which
+       calls this at [icfg_nib] literally. *)
     nib = icfg_nib ->
     (forall bi : nat, (bi < nib)%nat -> length (bss bi) = 1024%nat) ->
     (forall dss : list (list dinode),
@@ -906,12 +720,6 @@ Section IcacheBootRegion.
       ⌜forall bi : nat, (bi < nib)%nat -> bss bi = diblk_bytes (dss !!! bi)⌝ ∗
       ireg_reg γi γfs inodestart nib ∗
       ireg_boot ∗
-      (* N-4 PHASE B: one MINT LICENCE per inum, out with the caller.  The
-         column itself stays inside the region, in its NONE state.
-         N-5.2A: and the fview column's licence beside it, the same way and
-         for the same consumer ([FsCfgBoot]'s stocking mint). *)
-      ([∗ set] z ∈ region_inums nib, dv_lic z) ∗
-      ([∗ set] z ∈ region_inums nib, fv_lic z) ∗
       ([∗ set] z ∈ region_inums nib,
          ireg_out γi (mword_of_int z : mword 32) (image_dinode dss z)).
   Proof.
@@ -925,59 +733,10 @@ Section IcacheBootRegion.
     iMod (ghost_map_insert_big (dummy_reg nib) with "Hrauth") as "[Hrauth Hfulls]".
     { apply map_disjoint_empty_r. }
     rewrite right_id_L.
-    (* N-4 PHASE B (E1-region): stock the lend column, NONE at every inum.
-       Two cell families at fresh gnames, two key families in the registry
-       auth this lemma already holds -- no boot map and no [icfg] field. *)
-    iMod (own_alloc (dview_boot_map (region_inums nib))) as (γlc) "Hlc";
-      [apply dview_boot_map_valid |].
-    iMod (own_alloc (dview_boot_map (region_inums nib))) as (γlv) "Hlv";
-      [apply dview_boot_map_valid |].
-    (* N-5.2A: the fview column's two cell families, at [fview_boot_map] and
-       at two more fresh gnames.  Four [own_alloc]s and four key families in
-       all, still no boot map widened and no [icfg] field added. *)
-    iMod (own_alloc (fview_boot_map (region_inums nib))) as (γfc) "Hfc";
-      [apply fview_boot_map_valid |].
-    iMod (own_alloc (fview_boot_map (region_inums nib))) as (γfv) "Hfv";
-      [apply fview_boot_map_valid |].
-    iMod (ghost_map_insert_big (lend_reg_all γlc γlv γfc γfv nib) with "Hrauth")
-      as "[Hrauth Hlend0]".
-    { apply lend_reg_dummy_disj. }
-    iDestruct (big_sepM_union with "Hlend0") as "[Hlend0 Hflend0]";
-      [apply lend_flend_disj |].
-    iDestruct (big_sepM_union with "Hlend0") as "[Hslots0 Hlics0]";
-      [apply lend_slots_lics_disj |].
-    iDestruct (big_sepM_union with "Hflend0") as "[Hfslots0 Hflics0]";
-      [apply flend_slots_lics_disj |].
-    iDestruct (lend_slots_out γlc γlv nib with "Hslots0") as "Hslots0".
-    iDestruct (lend_lics_out nib with "Hlics0") as "Hlics".
-    iDestruct (flend_slots_out γfc γfv nib with "Hfslots0") as "Hfslots0".
-    iDestruct (flend_lics_out nib with "Hflics0") as "Hflics".
-    iDestruct (dvl_boot_split γlc (region_inums nib) with "Hlc") as "Hlc".
-    iDestruct (dvl_boot_split γlv (region_inums nib) with "Hlv") as "Hlv".
-    iDestruct (fvl_boot_split γfc (region_inums nib) with "Hfc") as "Hfc".
-    iDestruct (fvl_boot_split γfv (region_inums nib) with "Hfv") as "Hfv".
-    iAssert ([∗ set] z ∈ region_inums nib, dv_lcol z)%I
-      with "[Hslots0 Hlc Hlv]" as "Hcols".
-    { iDestruct (big_sepS_sep_2 with "Hslots0 Hlc") as "H".
-      iDestruct (big_sepS_sep_2 with "H Hlv") as "H".
-      iApply (big_sepS_mono with "H"). intros z _.
-      iIntros "[[Hsl Hc] Hv]".
-      iApply (dv_lcol_boot z γlc γlv with "Hsl Hc Hv"). }
-    iAssert ([∗ set] z ∈ region_inums nib, fv_lcol z)%I
-      with "[Hfslots0 Hfc Hfv]" as "Hfcols".
-    { iDestruct (big_sepS_sep_2 with "Hfslots0 Hfc") as "H".
-      iDestruct (big_sepS_sep_2 with "H Hfv") as "H".
-      iApply (big_sepS_mono with "H"). intros z _.
-      iIntros "[[Hsl Hc] Hv]".
-      iApply (fv_lcol_boot z γfc γfv with "Hsl Hc Hv"). }
-    iDestruct (ireg_registry_from_map
-                 (lend_reg_all γlc γlv γfc γfv nib ∪ dummy_reg nib) nib
-                 (lend_reg_cov γlc γlv γfc γfv nib) with "Hrauth [Hcols Hfcols]")
-      as "Hreg".
-    { rewrite /ireg_lends -Hnibc -region_set_to_seq.
-      iDestruct (big_sepS_sep_2 with "Hcols Hfcols") as "H".
-      iApply (big_sepS_mono with "H"). intros z _.
-      iIntros "[Hd Hf]". rewrite /ireg_lcols. iFrame. }
+    (* the registry is the dummy pairs alone: the lend column that used to be
+       stocked beside them is retired (THE DVIEW RETIREMENT). *)
+    iDestruct (ireg_registry_from_map (dummy_reg nib) nib (dummy_reg_cov nib)
+                 with "Hrauth") as "Hreg".
     (* OPTION A (walk reg-fold): the reg_full fragments no longer form a
        standalone big-op; distribute them into the per-inum slots below. *)
     iEval (rewrite /dummy_reg big_sepM_gset_to_gmap) in "Hfulls".
@@ -1115,7 +874,7 @@ Section IcacheBootRegion.
       iExists home. iFrame "Hbinv". }
     iModIntro. iExists γi, dss.
     iSplitR; [done |]. iSplitR; [done |]. iSplitR; [iPureIntro; exact He |].
-    iFrame "Hrinv Hboot Hlics Hflics". iExact "Hout".
+    iFrame "Hrinv Hboot". iExact "Hout".
   Qed.
 
 End IcacheBootRegion.
@@ -1167,11 +926,6 @@ Section IcacheBootPool.
        and boot's bit is DOWN everywhere because boot's phase is [FrzOff]. *)
     frzm_h (bv_unsigned inum) false -∗
     ifreeze_off (bv_unsigned inum) -∗
-    (* ...and the CONTENTS HOLD, UNTIED (namei-pinned-lookup.md §9 W2): the
-       marker arm carries no bytes, so boot's own [∅] is as good a value as
-       any and the first fill sets it. *)
-    (∃ e, dv_ride (bv_unsigned inum) e) -∗
-    (∃ b, fv_ride (bv_unsigned inum) b) -∗
     (* THE ERA'S ABSTRACT VALUE IS NOT HERE (durable-disk C-3c): a FREE
        inum's [FsState.top_frag] parks WITH its record, region-side, in
        [InodeRegion.ireg_top_park] -- see [ireg_alloc]'s own premise. *)
@@ -1180,13 +934,12 @@ Section IcacheBootPool.
        [ipool_ord], which is what the pool INVARIANT holds. *)
     imark γi (bv_unsigned inum) -∗ ipool_ord γfs γi cov logstart inum.
   Proof.
-    iIntros "Hcnt Hmir Hoff Hdv Hfv Hmk".
+    iIntros "Hcnt Hmir Hoff Hmk".
     rewrite /ipool_ord /ipool_shape_np.
     iSplitL "Hcnt"; [iExact "Hcnt" |].
     iSplitL "Hmir"; [iExact "Hmir" |].
     iSplitR "Hoff"; [| iExact "Hoff"].
-    iRight. iSplitL "Hmk"; [iExact "Hmk" |].
-    iSplitL "Hdv"; [iExact "Hdv" | iExact "Hfv"].
+    iRight. iExact "Hmk".
   Qed.
 
   (* THE SECOND PREMISE IS §15(a)'S DIRECTORY-WF CLAUSE, and it joins the
@@ -1227,17 +980,10 @@ Section IcacheBootPool.
        [FsStateEra.inode_owned_era] is assembled OUT of, and this is its
        fourth piece. *)
     top_frag (fs_gamma_L γfs) (bv_unsigned inum) (era_node dn bm data) -∗
-    (* ...and the CONTENTS HOLD, TIED to the image's own record and bytes
-       (namei-pinned-lookup.md §9 W2/W3): the boot client sets the value with
-       a free [dv_set] before it gets here, so nothing in this file has to
-       compute it. *)
-    dv_ride (bv_unsigned inum) (dv_of dn data) -∗
-    (* ...and its PER-FILE twin (N-5.2A), beside it and for the same reason *)
-    fv_ride (bv_unsigned inum) (fv_of dn data) -∗
     ipool_ord γfs γi cov logstart inum.
   Proof.
     iIntros (Hok Hrl Hdok Hddix Hdoc Hduq)
-            "Hcnt Hmir Hoff Hdlk Hdn Hind Hblk Htop Hdv Hfv".
+            "Hcnt Hmir Hoff Hdlk Hdn Hind Hblk Htop".
     pose proof (node_shape_ok_of_inode_ok cov logstart dn bm data Hok) as Hsh.
     pose proof (inode_local_of_ok_rec (bv_unsigned inum) cov logstart dn bm
                   data Hok Hrl Hduq Hddix) as Hloc.
@@ -1252,13 +998,11 @@ Section IcacheBootPool.
     iSplitR; [iPureIntro; exact Hddix |].
     iSplitR; [iPureIntro; exact Hdoc |].
     iSplitR; [iPureIntro; exact Hduq |].
-    iSplitR "Hdv Hfv".
-    { (* the pool row's allocated arm carries the per-inode LEG (durable-disk
-         EV stage 4): the link tokens and the era bundle as ONE conjunct *)
-      iApply (ic_inode_leg_era_intro with "Hdlk").
-      iApply (inode_owned_era_era_node_of γfs γi inum dn bm data Hsh Hloc
-                with "Hdn Hind Hblk Htop"). }
-    iFrame "Hdv Hfv".
+    (* the pool row's allocated arm carries the per-inode LEG (durable-disk
+       EV stage 4): the link tokens and the era bundle as ONE conjunct *)
+    iApply (ic_inode_leg_era_intro with "Hdlk").
+    iApply (inode_owned_era_era_node_of γfs γi inum dn bm data Hsh Hloc
+              with "Hdn Hind Hblk Htop").
   Qed.
 
   (* the stocked rows are a [∗ set], so they split and rejoin along any
@@ -1303,23 +1047,12 @@ Section IcacheBootPool.
             for the contents holds' reason verbatim (durable-disk
             2b-inode-3) *)
          top_frag (fs_gamma_L γfs) (bv_unsigned (mword_of_int z : mword 32))
-                  (era_node dn bm data) ∗
-         (* the CONTENTS HOLD rides INSIDE the allocated bundle, because the
-            value it is tied to is this bundle's own [dn]/[data] and nothing
-            outside the existential can name them (§9 W2). *)
-         dv_ride (bv_unsigned (mword_of_int z : mword 32)) (dv_of dn data) ∗
-         fv_ride (bv_unsigned (mword_of_int z : mword 32)) (fv_of dn data)) -∗
+                  (era_node dn bm data)) -∗
     ([∗ set] z ∈ R ∖ A,
        imark γi (bv_unsigned (mword_of_int z : mword 32))) -∗
-    (* ...and the FREE inums' holds, untied and therefore outside any
-       existential -- one big-op per ghost (N-5.2A) *)
-    ([∗ set] z ∈ R ∖ A,
-       ∃ e, dv_ride (bv_unsigned (mword_of_int z : mword 32)) e) -∗
-    ([∗ set] z ∈ R ∖ A,
-       ∃ b, fv_ride (bv_unsigned (mword_of_int z : mword 32)) b) -∗
     ipool_rows γfs γi cov logstart R.
   Proof.
-    iIntros (Hsub) "Hcnts Hmirs Hoffs Ha Hf Hdvf Hfvf".
+    iIntros (Hsub) "Hcnts Hmirs Hoffs Ha Hf".
     (* the ledger pair splits along the same subset the pool does *)
     rewrite (union_difference_L A R Hsub) !big_sepS_union; [| set_solver ..].
     iDestruct "Hcnts" as "[HcA HcF]". iDestruct "Hoffs" as "[HoA HoF]".
@@ -1333,18 +1066,16 @@ Section IcacheBootPool.
       iDestruct (big_sepS_sep_2 with "Hlg Ha") as "Ha".
       iApply (big_sepS_mono with "Ha"). intros z _.
       iIntros "[[[Hcnt Hmir] Hoff] (%dn & %bm & %data & %Hok & %Hrl & %Hdok & %Hddix & %Hdoc & %Hduq
-                & Hdlk & Hdn & Hind & Hblk & Htop & Hdv & Hfv)]".
+                & Hdlk & Hdn & Hind & Hblk & Htop)]".
       iApply (ipool_shape_alloc _ _ _ _ _ dn bm data Hok Hrl Hdok Hddix Hdoc Hduq
-                with "Hcnt Hmir Hoff Hdlk Hdn Hind Hblk Htop Hdv Hfv").
+                with "Hcnt Hmir Hoff Hdlk Hdn Hind Hblk Htop").
     - rewrite /ipool_rows.
       iDestruct (big_sepS_sep_2 with "HcF HmF") as "Hlg0".
       iDestruct (big_sepS_sep_2 with "Hlg0 HoF") as "Hlg".
-      iDestruct (big_sepS_sep_2 with "Hlg Hdvf") as "Hlg".
-      iDestruct (big_sepS_sep_2 with "Hlg Hfvf") as "Hlg".
       iDestruct (big_sepS_sep_2 with "Hlg Hf") as "Hf".
       iApply (big_sepS_mono with "Hf"). intros z _.
-      iIntros "[[[[[Hcnt Hmir] Hoff] Hdv] Hfv] Hmk]".
-      iApply (ipool_shape_free with "Hcnt Hmir Hoff Hdv Hfv Hmk").
+      iIntros "[[[Hcnt Hmir] Hoff] Hmk]".
+      iApply (ipool_shape_free with "Hcnt Hmir Hoff Hmk").
   Qed.
 
   (* ...and the case that needs no image theory at all: an image whose inodes
@@ -1366,32 +1097,23 @@ Section IcacheBootPool.
     ([∗ set] z ∈ region_inums nib, icnt_half z 0%nat) -∗
     ([∗ set] z ∈ region_inums nib, frzm_h z false) -∗
     ([∗ set] z ∈ region_inums nib, ifreeze_off z) -∗
-    ([∗ set] z ∈ region_inums nib, dv_ride z ∅) -∗
-    ([∗ set] z ∈ region_inums nib, fv_ride z []) -∗
     ([∗ set] z ∈ region_inums nib,
        ireg_out γi (mword_of_int z : mword 32) (image_dinode dss z)) -∗
     ipool_rows γfs γi cov logstart (region_inums nib).
   Proof.
-    iIntros (Hnib H0) "Hcnts Hmirs Hoffs Hdvs Hfvs H". rewrite /ipool_rows.
+    iIntros (Hnib H0) "Hcnts Hmirs Hoffs H". rewrite /ipool_rows.
     iDestruct (region_key_shift nib (fun z => icnt_half z 0%nat) Hnib
                 with "Hcnts") as "Hcnts".
     iDestruct (region_key_shift nib (fun z => frzm_h z false) Hnib
                 with "Hmirs") as "Hmirs".
     iDestruct (region_key_shift nib (fun z => ifreeze_off z) Hnib
                 with "Hoffs") as "Hoffs".
-    iDestruct (region_key_shift nib (fun z => dv_ride z ∅) Hnib
-                with "Hdvs") as "Hdvs".
-    iDestruct (region_key_shift nib (fun z => fv_ride z []) Hnib
-                with "Hfvs") as "Hfvs".
     iDestruct (big_sepS_sep_2 with "Hcnts Hmirs") as "Hlg0".
     iDestruct (big_sepS_sep_2 with "Hlg0 Hoffs") as "Hlg1".
-    iDestruct (big_sepS_sep_2 with "Hlg1 Hdvs") as "Hlg2".
-    iDestruct (big_sepS_sep_2 with "Hlg2 Hfvs") as "Hlg3".
-    iDestruct (big_sepS_sep_2 with "Hlg3 H") as "H".
+    iDestruct (big_sepS_sep_2 with "Hlg1 H") as "H".
     iApply (big_sepS_mono with "H"). intros z Hz.
-    iIntros "[[[[[Hcnt Hmir] Hoff] Hdv] Hfv] Hout]".
-    iApply (ipool_shape_free with "Hcnt Hmir Hoff [Hdv] [Hfv]");
-      [by iExists ∅ | by iExists [] |].
+    iIntros "[[[Hcnt Hmir] Hoff] Hout]".
+    iApply (ipool_shape_free with "Hcnt Hmir Hoff").
     iApply (ireg_out_free_inv γi (mword_of_int z : mword 32)
               (image_dinode dss z) (H0 z Hz) with "Hout").
   Qed.

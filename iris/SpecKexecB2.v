@@ -341,25 +341,17 @@ Section KexecB2Res.
       inode_meta (ientry kf) dnf ∗
       inode_map fsc_fs (ientry kf) bmf ∗
       inode_blocks fsc_fs bmf datl ∗
-      (* ...and the CONTENTS HOLD (namei-pinned-lookup.md §9 W2).  It rides
-         the bracket rather than being dropped here because the peel and the
-         SEAL below are a self-cancelling pair inside one proof: the seal has
-         no other source for it, and readi -- the one callee this bracket is
-         opened for -- moves no byte, so the value comes back unchanged. *)
-      dv_ride (bv_unsigned inumf) (dv_of dnf datl) ∗
-      (* N-5.2A: and the PER-FILE contents hold, riding the same bracket for
-         the same reason -- this is the fourth (and, by the same
-         self-cancelling argument, equally caller-invisible) touch of the
-         pair.  For KEXEC in particular it is the load-bearing one: the
-         file whose bytes this bracket is opened over IS /init. *)
-      fv_ride (bv_unsigned inumf) (fv_of dnf datl) ∗
+      (* THE TWO CONTENTS HOLDS ARE RETIRED (THE DVIEW RETIREMENT): what
+         rides the bracket is the era fragment alone, and readi -- the one
+         callee this bracket is opened for -- moves no byte, so the node does
+         not move and the SEAL hands it back unchanged. *)
       top_frag (fs_gamma_L fsc_fs) (bv_unsigned inumf) (era_node dnf bmf datl).
   Proof.
     rewrite /inode_map.
     iIntros "H".
     iDestruct (ic_loaded_open with "H") as (datl)
       "(%Hok & %Hrl & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdiat & Hmeta &
-        Haddrs & Hind & Hbl & Hdv & Hfv & Htop)".
+        Haddrs & Hind & Hbl & Htop)".
     iExists datl.
     iSplitR; [iPureIntro; exact Hok |].
     iSplitR; [iPureIntro; exact Hrl |].
@@ -369,10 +361,8 @@ Section KexecB2Res.
     iSplitR; [iPureIntro; exact Hduq |].
     iSplitL "Hdlk"; [iExact "Hdlk" |]. iSplitL "Hdiat"; [iExact "Hdiat" |].
     iSplitL "Hmeta"; [iExact "Hmeta" |].
-    iSplitR "Hbl Htop Hdv Hfv";
-      [| iSplitL "Hbl"; [iExact "Hbl" |];
-         iSplitL "Hdv"; [iExact "Hdv" |];
-         iSplitL "Hfv"; [iExact "Hfv" | iExact "Htop"]].
+    iSplitR "Hbl Htop";
+      [| iSplitL "Hbl"; [iExact "Hbl" | iExact "Htop"]].
     iSplitL "Haddrs"; [iExact "Haddrs" | iExact "Hind"].
   Qed.
 
@@ -390,18 +380,14 @@ Section KexecB2Res.
     inode_meta (ientry kf) dnf -∗
     inode_map fsc_fs (ientry kf) bmf -∗
     inode_blocks fsc_fs bmf datl -∗
-    (* the bracket's other half: exactly what [kxc_load_peel] handed out, and
-       there is no other source for it (§9 W2). *)
-    dv_ride (bv_unsigned inumf) (dv_of dnf datl) -∗
-    fv_ride (bv_unsigned inumf) (fv_of dnf datl) -∗
     top_frag (fs_gamma_L fsc_fs) (bv_unsigned inumf) (era_node dnf bmf datl) -∗
     ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kf inumf dnf bmf.
   Proof.
     intros Hok Hrl Hdok Hddix Hdoc Hduq. rewrite /inode_map.
-    iIntros "Hdlk Hdiat Hmeta [Haddrs Hind] Hbl Hdv Hfv Htop".
+    iIntros "Hdlk Hdiat Hmeta [Haddrs Hind] Hbl Htop".
     iApply (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kf inumf dnf bmf datl
               Hok Hrl Hdok Hddix Hdoc Hduq
-              with "Hdlk Hdiat Hmeta Haddrs Hind Hbl Hdv Hfv Htop").
+              with "Hdlk Hdiat Hmeta Haddrs Hind Hbl Htop").
   Qed.
 
   (* ------------------------------------------------------------------ *)

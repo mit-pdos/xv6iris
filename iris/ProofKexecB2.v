@@ -1333,7 +1333,7 @@ Section KexecB2Loops.
                              Hivalid & Hload & #Hity & Hfrz & Hkeep & Hru)".
       iDestruct (kxc_load_peel with "Hload") as
         (datl) "(%Hiok & %Hrl & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdiat & Hmeta
-               & Hmap & Hblocks & Hdview & Hfview & Htop)".
+               & Hmap & Hblocks & Htop)".
       pose proof Hiok as Hiok'.
       destruct Hiok' as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes & Hsized).
       iDestruct (proc_priv_bare_acc gf (proc_addr jp) pidv U with "Hpriv")
@@ -1386,7 +1386,7 @@ Section KexecB2Loops.
       iDestruct ("Hgive" with "Hpage") as "Hpt".
       iDestruct (kxc_load_seal kf inumf dnf bmf datl
                    Hiok Hrl Hdok Hddix Hdoc Hduq
-                   with "Hdlk Hdiat Hmeta Hmap Hblocks Hdview Hfview Htop") as "Hload".
+                   with "Hdlk Hdiat Hmeta Hmap Hblocks Htop") as "Hload".
       iDestruct (A.kxa_bs3_join with "Hbs1 Hbs2") as "Hbs".
       iDestruct (kxc_open_intro pidv kf qf sf gyf
                    inumf dnf bmf gilf gislf

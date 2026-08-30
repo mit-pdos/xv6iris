@@ -712,8 +712,14 @@ LinkIinit.v
 InodeInv.v
 DirView.v
 FsTree.v
-DirViewG.v
-DirViewLend.v
+# DELETED (fs-syscall-specs, THE DVIEW RETIREMENT, 2026-08-30): DirViewG.v
+# (the per-directory contents ghost [dview] and its per-file twin [fview])
+# and DirViewLend.v (M1, the cancellable lend [dv_ride]/[dv_pin] and its
+# registry-keyed column).  Both files are GONE, not off-build: what they
+# carried is a reading of the era fragment every payload arm already holds
+# ([FsStateEra.dir_entries_era_node] / [FsTree.fn_file_bytes]), the camera
+# and the two gnames went with them, and the era walk replaced the one
+# contract that fired them.
 SpecBalloc.v
 SpecBmap.v
 CodeBmap.v
@@ -1174,21 +1180,35 @@ SpecNamex.v
 ProofNamexParts.v
 SpecNamei.v
 SpecNameiTr.v
-SpecNamexTr.v
 SpecNameiparent.v
 ProofNamex.v
 LinkNamex.v
-ProofNamexTr.v
-LinkNamexTr.v
 ProofNamexRoot.v
 LinkNamexRoot.v
 ProofNamei.v
 LinkNamei.v
-ProofNameiTr.v
-LinkNameiTr.v
+# OFF THE BUILD (fs-syscall-specs, THE DVIEW RETIREMENT): the dv-FIRING trace
+# trio.  [SpecNameiTr.nx_hop] lent [DirViewG.dv_half] at every hop, and that
+# ghost is deleted -- the era walk (SpecNamexEra/SpecNameiEra + the nameiparent
+# and relative-start wrappers, sealed by LinkNamexEra/LinkNameiEra) is the
+# consumed form everywhere, so these statements have no client and no ghost to
+# fire.  R10: they are RETIRED, not edited -- the source is kept exactly as it
+# sealed (Print Assumptions LinkNameiTr.NameiTr.wp_namei_tr = the five platform
+# externs + funext, 2026-08-21) and will not compile again, because the column
+# it fires is gone.  SpecNameiTr.v itself STAYS on the build: its
+# [inode_held_at] is the era cone's own vocabulary (see its header's tombstone
+# for the two definitions and the contract that left it).
+# SpecNamexTr.v
+# ProofNamexTr.v
+# LinkNamexTr.v
+# ProofNameiTr.v
+# LinkNameiTr.v
 # OFF THE BUILD (durable-disk lane E-unpin): the era-0 pinned-/init story.
-# Source kept; to be ported by the fs-syscall-specs project -- see the banner
-# at the top of claude-notes/projects/namei-pinned-lookup.md.
+# Source kept; it rides the [dview]/[fview] ghosts, which THE DVIEW RETIREMENT
+# (fs-syscall-specs, 2026-08-30) deleted -- so this source is now historical:
+# the port lane P asks for is a re-derivation on the abstract state
+# ([FsAbs]/[FsInitPin]), not a rebuild of these files.  See the banner at the
+# top of claude-notes/projects/namei-pinned-lookup.md.
 # DirViewPin.v
 # NameiInitPinned.v
 # LinkNameiPinned.v

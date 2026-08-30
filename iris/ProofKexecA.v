@@ -949,35 +949,29 @@ Section KexecABody.
     (* ---- THE HEADER ORACLE (N-5.2B) ------------------------------------
        ONE ghost step, fired at the instant ilock's payload is open and
        before readi runs on it: the client is handed the locked inode's
-       CONTENTS RIDE ([IcacheEscrow.ic_loaded]'s [fv_ride] conjunct, at the
-       inum the +0x032 seam named) and must give it back unchanged together
-       with whatever it wanted to claim about the file's bytes.  This is
-       [DirViewLend]'s redeem seen from the walk's side: an intact redeem is
-       a READ, so the ride is returned identical and the payload re-packs at
-       the very same [data] -- which is why readi's landed post still relates
-       its output to it and readi's contract does not move (D-52d).
+       ERA LEG ([IcacheEscrow.ic_loaded]'s last conjunct, at the inum the
+       +0x032 seam named) together with the payload's own [inode_ok] as a
+       pure premise, and must give the leg back unchanged together with
+       whatever it wanted to claim about the file's bytes.  An intact
+       redeem is a READ, so the leg is returned identical and the payload
+       re-packs at the very same [data] -- which is why readi's landed post
+       still relates its output to it and readi's contract does not move
+       (D-52d).
          A landed caller instantiates [HD := None] and discharges this with
        [iIntros; iModIntro; iFrame].
-         WIDENED (pinned-exec prover lane, 2026-08-29): the payload's ERA
-       LEG rides beside the byte ride, and the payload's own [inode_ok] is
-       handed over as a pure premise.  The ride alone cannot answer a
-       PINNED verdict -- [fv_ride] lives at [DirViewLend]'s ghost and has
-       no tie to gamma-top outside the payload, so a client that must
-       identify [data] with a pinned byte list has nothing to read the
-       abstract row against.  [ic_loaded]'s last name binds
-       [fv_ride ∗ top_frag] as ONE conjunct (durable-disk 2b-inode-3) and
-       the fire below already splits it, so this costs the seam one more
-       name and the landed caller one more [$] -- a kexec-internal,
-       self-cancelling edit, the sweep's B2/B3 seam-body class.  Nothing
-       above [ProofKexec.v] moves: [SpecKexec]'s and [KexecOkQ]'s
+         THE BYTE RIDE IS GONE (THE DVIEW RETIREMENT, 2026-08-30).  The
+       oracle used to be handed [fv_ride] beside the leg; that ghost had no
+       tie to gamma-top outside the payload, which is why the widening of
+       2026-08-29 put the leg here in the first place -- and the leg is what
+       the pinned verdict actually reads
+       ([ProofKexecPinTrace.kxt_pin_bytes], off the authority's row).
+       Nothing above [ProofKexec.v] moves: [SpecKexec]'s and [KexecOkQ]'s
        statements are untouched. ---- *)
     (∀ (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)),
         ⌜inode_ok fsc_cov fsc_logst dn bm data⌝ -∗
-        fv_ride zi (fv_of dn data)
-        ∗ FsState.top_frag (FsBytesGamma.fs_gamma_L fsc_fs) zi
+        FsState.top_frag (FsBytesGamma.fs_gamma_L fsc_fs) zi
             (FsStateEra.era_node dn bm data) ={⊤}=∗
-          fv_ride zi (fv_of dn data)
-          ∗ FsState.top_frag (FsBytesGamma.fs_gamma_L fsc_fs) zi
+          FsState.top_frag (FsBytesGamma.fs_gamma_L fsc_fs) zi
               (FsStateEra.era_node dn bm data)
           ∗ □ (⌜kxq_hdr_ok HD (fun j => file_byte data j)⌝ ∨ XCH)) -∗
     kxc_at_a2 jp gf
@@ -1166,25 +1160,23 @@ Section KexecABody.
       rewrite (callee_saved_lookup Hcsil r Hr).
       rewrite /Q2 upd_ne; [| regne]. exact (HQ1thr r Hr Nsp Ns0 Ns1 Ns2 Ns4). }
     (* ---- peel the loaded content for readi ---- *)
-    iDestruct (ic_loaded_open with "Hload") as (datl)"(%Hiok & %Hrl_datl & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdiat & Hmeta & Haddrs & Hindres & Hblocks & Hdview & Hfview)".
+    iDestruct (ic_loaded_open with "Hload") as (datl)"(%Hiok & %Hrl_datl & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdiat & Hmeta & Haddrs & Hindres & Hblocks & Hfview)".
     pose proof Hiok as Hiokb.   (* the bundle, kept whole for the oracle *)
     destruct Hiok as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes & Hsized).
-    (* the payload's last name binds [fv_ride * top_frag] (durable-disk
-       2b-inode-3); the oracle below takes BOTH (see its row) and gives
-       both back, so the split here is only a re-naming and the three
-       re-packs are unchanged. *)
-    iDestruct "Hfview" as "[Hfview Htopl]".
+    (* the payload's last name IS the era leg (durable-disk 2b-inode-3,
+       and THE DVIEW RETIREMENT took the byte ride that used to ride
+       beside it); the oracle below takes it and gives it back, so the
+       three re-packs are unchanged. *)
+    iRename "Hfview" into "Htopl".
     (* ---- THE HEADER ORACLE'S ONE INSTANT (N-5.2B) ----------------------
        The payload is open and readi has not run yet; the client redeems
        its contents pin against THIS inode's ride and era leg and hands
        both back untouched, so the re-pack below is at the very same
        [datl]. *)
     iApply fupd_wp.
-    iEval (rewrite Hz) in "Hfview".
     iEval (rewrite Hz) in "Htopl".
-    iMod ("Horacle" $! dnl bml datl with "[//] [$Hfview $Htopl]")
-      as "(Hfview & Htopl & #Hhdr)".
-    iEval (rewrite -Hz) in "Hfview".
+    iMod ("Horacle" $! dnl bml datl with "[//] Htopl")
+      as "(Htopl & #Hhdr)".
     iEval (rewrite -Hz) in "Htopl".
     iModIntro.
     iAssert (inode_map fsc_fs (ientry k) bml) with "[Haddrs Hindres]" as "Hmap".
@@ -1531,7 +1523,7 @@ Section KexecABody.
         iDestruct (cpu_claim_ext_transport CIDrd CID15 eb (proc_addr jp)
                      ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
         iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dnl bml)
-          with "[Hdiat Hmeta Hmap Hblocks Hdlk Hdview Hfview Htopl]" as "Hload".
+          with "[Hdiat Hmeta Hmap Hblocks Hdlk Htopl]" as "Hload".
         { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body /inode_map. iExists datl.
           iSplitR; [iPureIntro; split_and!;
             [exact Hbmwf | exact Hbmcov | exact Hdaddr | exact Hdty
@@ -1548,8 +1540,7 @@ Section KexecABody.
           iSplitL "Haddrs"; [iExact "Haddrs" |].
           iSplitL "Hindres"; [iExact "Hindres" |].
           iSplitL "Hblocks"; [iExact "Hblocks" |].
-          iSplitL "Hdview"; [iExact "Hdview" |].
-          iSplitL "Hfview"; [iExact "Hfview" | iExact "Htopl"]. }
+          iExact "Htopl". }
         iDestruct (T.kxa_bs3_join with "Hbs1 Hbs2") as "Hbs".
         iSpecialize ("Hcont90" $! CID15 with "[%]"); [wp_next_chain |].
         (* [b] is gone by here -- [kxc_sie_b_agree] pinned it and the proof
@@ -1637,7 +1628,7 @@ Section KexecABody.
         iDestruct (cpu_claim_ext_transport CIDrd CID15 eb (proc_addr jp)
                      ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
         iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dnl bml)
-          with "[Hdiat Hmeta Hmap Hblocks Hdlk Hdview Hfview Htopl]" as "Hload".
+          with "[Hdiat Hmeta Hmap Hblocks Hdlk Htopl]" as "Hload".
         { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body /inode_map. iExists datl.
           iSplitR; [iPureIntro; split_and!;
             [exact Hbmwf | exact Hbmcov | exact Hdaddr | exact Hdty
@@ -1654,8 +1645,7 @@ Section KexecABody.
           iSplitL "Haddrs"; [iExact "Haddrs" |].
           iSplitL "Hindres"; [iExact "Hindres" |].
           iSplitL "Hblocks"; [iExact "Hblocks" |].
-          iSplitL "Hdview"; [iExact "Hdview" |].
-          iSplitL "Hfview"; [iExact "Hfview" | iExact "Htopl"]. }
+          iExact "Htopl". }
         iDestruct (T.kxa_bs3_join with "Hbs1 Hbs2") as "Hbs".
         (* [T.kxc_bad64] is applied AT [CID15] (its [sie_cap_gpr] premise pins
            its own [CID0] from "Hcg"), so kexec's exit -- which we still hold
@@ -1719,7 +1709,7 @@ Section KexecABody.
       iDestruct (cpu_claim_ext_transport CIDrd CID11 eb (proc_addr jp)
                    ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
       iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dnl bml)
-        with "[Hdiat Hmeta Hmap Hblocks Hdlk Hdview Hfview Htopl]" as "Hload".
+        with "[Hdiat Hmeta Hmap Hblocks Hdlk Htopl]" as "Hload".
       { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body /inode_map. iExists datl.
         iSplitR; [iPureIntro; split_and!;
           [exact Hbmwf | exact Hbmcov | exact Hdaddr | exact Hdty
@@ -1736,8 +1726,7 @@ Section KexecABody.
         iSplitL "Haddrs"; [iExact "Haddrs" |].
         iSplitL "Hindres"; [iExact "Hindres" |].
         iSplitL "Hblocks"; [iExact "Hblocks" |].
-        iSplitL "Hdview"; [iExact "Hdview" |].
-        iSplitL "Hfview"; [iExact "Hfview" | iExact "Htopl"]. }
+        iExact "Htopl". }
       iDestruct (T.kxa_bs3_join with "Hbs1 Hbs2") as "Hbs".
       iAssert (stack_own (KTR := KT1) (pa_stk sp0 46) 8) with "[Helfb]" as "Helf".
       { iApply kxc_stack_of_elf_slots. iApply (kxc_bytes_elf sp0 Hal).
@@ -1877,11 +1866,9 @@ Section KexecAMain.
        at [kxc_a2]'s [zi]. *)
     (∀ (zi : Z) (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)),
         ⌜inode_ok fsc_cov fsc_logst dn bm data⌝ -∗
-        fv_ride zi (fv_of dn data)
-        ∗ FsState.top_frag (FsBytesGamma.fs_gamma_L fsc_fs) zi
+        FsState.top_frag (FsBytesGamma.fs_gamma_L fsc_fs) zi
             (FsStateEra.era_node dn bm data) ={⊤}=∗
-          fv_ride zi (fv_of dn data)
-          ∗ FsState.top_frag (FsBytesGamma.fs_gamma_L fsc_fs) zi
+          FsState.top_frag (FsBytesGamma.fs_gamma_L fsc_fs) zi
               (FsStateEra.era_node dn bm data)
           ∗ □ (⌜kxq_hdr_ok HD (fun j => file_byte data j)⌝ ∨ XCH)) -∗
     kalloc_env fsc_kalloc None -∗

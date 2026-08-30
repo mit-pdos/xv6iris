@@ -109,7 +109,7 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
-Require Import IcacheEscrow.   (* Require Export's DirViewG *)
+Require Import IcacheEscrow.   (* the payload arms *)
 Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import SpecDirlink.

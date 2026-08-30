@@ -161,11 +161,14 @@ Require Import FsBlocks.
 Require Import DinodeEnc.
 Require Import DirView.
 Require Import FsTree.        (* [dir_uniq] -- the name-uniqueness payload clause *)
-(* EXPORTED, not merely imported: [dv_ride] is a conjunct of [ipool_alloc] and
-   [ic_loaded], so every file that destructs either one names it -- and its
-   whole arm is [DirViewG]'s [dv_hold], so both leaves are exported. *)
-Require Export DirViewG.
-Require Export DirViewLend.  (* N-4 PHASE B: the custody chain rides the lend *)
+(* THE TWO CONTENTS HOLDS ARE GONE (fs-syscall-specs, THE DVIEW RETIREMENT,
+   2026-08-30).  [ipool_alloc], [ic_loaded], [ic_rd_arm] and the byte-less
+   arms each carried [dv_ride]/[fv_ride] beside the era leg, and this file
+   [Require Export]ed [DirViewG]/[DirViewLend] so the ~forty sites that
+   destruct those payloads could name them.  The abstract contents are a
+   reading of the era fragment the same arms already carry
+   ([FsStateEra.dir_entries_era_node], [fn_file_bytes]), so the column and
+   both leaves are deleted. *)
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import SleepLock.  (* [is_sleeplock_gen] / [slh_tok] -- see [ic_sleeplocks] below *)
@@ -843,20 +846,11 @@ Section IcacheEscrow.
           entry TOKENS and [FsStateEra.inode_owned_era_q] at fraction 1, i.e.
           exactly what the commit's collection takes off this inum.
           [ic_inode_leg_era_open]/[_era_intro] are the two directions. *)
-       ic_inode_leg γfs (DfracOwn 1) γi inum (era_node dn0 bm0 data0) ∗
-       (* ...AND THE CONTENTS HOLD, TIED (namei-pinned-lookup.md §9 W2).  The
-          tie is DEFINITIONAL (Revision 1): the abstract entry map is a
-          function of the record and the bytes this arm already owns, so the
-          conjunct is a value and not a guarded claim.  Of a FILE the value is
-          determined garbage; no client reads it and no site proves anything
-          about it. *)
-       dv_ride (bv_unsigned inum) (dv_of dn0 data0) ∗
-       (* ...AND ITS PER-FILE TWIN (namei-pinned-lookup.md §13, N-5.2A),
-          beside it and tied the same way.  Of a DIRECTORY this value is
-          determined garbage exactly as [dv_of] is of a file: neither ghost
-          is type-guarded, and every byte-write re-pack moves BOTH by one
-          [InodeRegion.dvw_set_rt] (D-52b). *)
-       fv_ride (bv_unsigned inum) (fv_of dn0 data0))%I.
+       (* THE TWO CONTENTS HOLDS THAT USED TO RIDE HERE ARE RETIRED (THE
+          DVIEW RETIREMENT).  What they said -- the abstract entry map and
+          the byte list of this inum -- is a READING of the era fragment
+          inside the leg above, at the same [(dn0, bm0, data0)]. *)
+       ic_inode_leg γfs (DfracOwn 1) γi inum (era_node dn0 bm0 data0))%I.
 
   (* OPTION A: the NON-PENDING (Timeless) pool shape -- the ORIGINAL two-arm
      shape, unchanged.  It is what the escrow's parked bundle [ic_unloaded]
@@ -875,13 +869,12 @@ Section IcacheEscrow.
   Definition ipool_shape_np (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (inum : mword 32) : iProp Σ :=
     (ipool_alloc γfs γi cov logstart inum
-     ∨ (imark γi (bv_unsigned inum) ∗
-        (* the MARKER arm has no bytes, so it carries the hold UNTIED
-           (namei-pinned-lookup.md §9 W2): a tied->untied peel forgets the
-           value, and the fill that re-ties it [dv_set]s to the fresh
-           record's own [dv_of]. *)
-        (∃ e, dv_ride (bv_unsigned inum) e) ∗
-        (∃ b, fv_ride (bv_unsigned inum) b)))%I.
+     ∨ imark γi (bv_unsigned inum))%I.
+  (* THE MARKER ARM'S TWO UNTIED HOLDS ARE RETIRED with the column (THE DVIEW
+     RETIREMENT): a byte-less arm used to carry the two elements at a
+     forgotten value, so that the fill which re-tied them had a hold to set.
+     There is nothing to re-tie now -- the fill retags the era fragment and
+     that IS the contents reading. *)
 
   (* THE AWAIT ARM (iclaim-ledger.md §1.2/§1.3): the entry a FREER has parked
      on its way to the off-lock deposit.  It is the whole point of B2's
@@ -925,13 +918,11 @@ Section IcacheEscrow.
      escrow arm's tail at +0x70 and +0x8a ([ic_payload_arm_decide_frz]) and
      what [IcacheInv.iref_close_last_freeze_store_au] consumes in between.
      One exclusive ledger cell cannot be in two places. *)
-  (* ...AND THE CONTENTS HOLD, UNTIED, for [pool_pending]'s reason verbatim:
-     this arm is byte-less, and the peel that turns it into an [imark] must
-     find the inum's [dv_ride] somewhere. *)
+  (* ...AND ITS TWO UNTIED CONTENTS HOLDS ARE RETIRED (THE DVIEW RETIREMENT),
+     for [ipool_shape_np]'s marker arm's reason verbatim. *)
   Definition pool_await (γfs : fs_names) (z : Z) : iProp Σ :=
     (∃ ge gr gd (rg : frzidx),
-       escA_inv γfs ge gr gd z rg ∗ redeem_ticketA gr ∗
-       (∃ e, dv_ride z e) ∗ (∃ b, fv_ride z b))%I.
+       escA_inv γfs ge gr gd z rg ∗ redeem_ticketA gr)%I.
 
   (* the PENDING-capable pool shape -- lives ONLY at the itable free pool,
      which is LOCK-HELD (never [iInv .. as ">"], verified), so the non-Timeless
@@ -1082,16 +1073,12 @@ Section IcacheEscrow.
           old shape back applies [ic_loaded_open], an ordinary entailment;
           see [ipool_alloc]'s note for why [inode_ok] stays a conjunct
           rather than being derived. *)
+       (* THE TWO CONTENTS HOLDS ARE RETIRED, [ipool_alloc]'s note verbatim:
+          a checked-out holder owns the era fragment inside the leg, and the
+          abstract contents are its reading. *)
        ic_inode_leg γfs (DfracOwn 1) γi inum (era_node dn bm data) ∗
        inode_meta (ientry k) dn ∗
-       inode_addrs (ientry k) (bm_cells bm) ∗
-       (* ...AND THE CONTENTS HOLD, TIED, the twin of [ipool_alloc]'s: see
-          there.  A checked-out holder therefore owns the abstract contents
-          outright while it owns the bytes, which is what makes every write
-          mover a free [dv_set] and what N-3 lends at a walk's hop instants. *)
-       dv_ride (bv_unsigned inum) (dv_of dn data) ∗
-       (* ...AND ITS PER-FILE TWIN, the twin of [ipool_alloc]'s: see there. *)
-       fv_ride (bv_unsigned inum) (fv_of dn data))%I.
+       inode_addrs (ientry k) (bm_cells bm))%I.
 
   (* An UNLOADED entry's parked content: the cells at no particular value
      (iget minted the entry and nobody has read the dinode yet) plus the
@@ -1150,9 +1137,7 @@ Section IcacheEscrow.
        (* the leg at THREE QUARTERS -- the same conjunct [ic_loaded] carries
           at 1, which is what makes [ic_loaded_shed]/[ic_rd_join] a fraction
           move and nothing else *)
-       ic_inode_leg γfs (DfracOwn (3/4)) γi inum (era_node dn bm data) ∗
-       dv_ride (bv_unsigned inum) (dv_of dn data) ∗
-       fv_ride (bv_unsigned inum) (fv_of dn data))%I.
+       ic_inode_leg γfs (DfracOwn (3/4)) γi inum (era_node dn bm data))%I.
 
   (* ...and what the READ-LOCKING HOLDER carries in its place.  [inode_ok] is
      restated here (it is pure, so both sides keep it) because the holder
@@ -1197,11 +1182,11 @@ Section IcacheEscrow.
   Proof.
     rewrite /ic_loaded /ic_rd_arm /ic_rd_held. iIntros "H".
     iDestruct "H" as (data)
-      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hleg & Hm & Ha & Hv & Hw)".
+      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hleg & Hm & Ha)".
     iDestruct (ic_inode_leg_local with "Hleg") as %Hloc.
     iDestruct (ic_inode_leg_shed_to with "Hleg") as "[Hleg34 Hn14]".
     iSplitR "Hm Ha Hn14".
-    - iExists dn, bm, data. iFrame "Hleg34 Hv Hw".
+    - iExists dn, bm, data. iFrame "Hleg34".
       iSplitR; [iPureIntro; exact Hok |].
       iSplitR; [iPureIntro; exact Hdok |].
       iSplitR; [iPureIntro; exact Hddix |].
@@ -1225,7 +1210,7 @@ Section IcacheEscrow.
     rewrite /ic_rd_arm /ic_rd_held /ic_loaded.
     iIntros "Harm Hheld".
     iDestruct "Harm" as (dn' bm' data')
-      "(%Hok' & %Hdok & %Hddix & %Hdoc & %Hduq & Hleg & Hv & Hw)".
+      "(%Hok' & %Hdok & %Hddix & %Hdoc & %Hduq & Hleg)".
     iDestruct "Hheld" as (data) "(%Hok & %Hloc & Hm & Ha & Hn14)".
     iDestruct (ic_inode_leg_rd_agree with "Hleg Hn14") as %Hnode.
     destruct (era_node_pair_inj cov logstart dn' dn bm' bm data' data
@@ -1244,7 +1229,7 @@ Section IcacheEscrow.
     iSplitR; [iPureIntro; exact Hduq |].
     iSplitL "Hleg Hn14";
       [iApply (ic_inode_leg_shed_of with "Hleg Hn14") |].
-    iFrame "Hm Ha Hv Hw".
+    iFrame "Hm Ha".
   Qed.
 
   (* the arm's own reading of the residue, which is what plan section 4's
@@ -2234,13 +2219,11 @@ Section IcacheEscrow.
     inode_addrs (ientry k) (bm_cells bm) -∗
     ind_res γfs bm -∗
     inode_blocks γfs bm data -∗
-    dv_ride (bv_unsigned inum) (dv_of dn data) -∗
-    fv_ride (bv_unsigned inum) (fv_of dn data) -∗
     top_frag (fs_gamma_L γfs) (bv_unsigned inum) (era_node dn bm data) -∗
     ic_loaded γfs γi cov logstart k inum dn bm.
   Proof.
     intros Hok Hrl Hdok Hddix Hdoc Hduq.
-    iIntros "Hl Hd Hm Ha Hr Hb Hv Hw Ht".
+    iIntros "Hl Hd Hm Ha Hr Hb Ht".
     pose proof (node_shape_ok_of_inode_ok cov logstart dn bm data Hok) as Hsh.
     pose proof (inode_local_of_ok_rec (bv_unsigned inum) cov logstart dn bm
                   data Hok Hrl Hduq Hddix) as Hloc.
@@ -2248,12 +2231,11 @@ Section IcacheEscrow.
     rewrite /ic_loaded.
     iExists data. iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
     iSplitR; [done |]. iSplitR; [done |].
-    iSplitR "Hm Ha Hv Hw".
+    iSplitR "Hm Ha".
     { iApply (ic_inode_leg_era_intro with "Hl").
       iApply (inode_owned_era_era_node_of γfs γi inum dn bm data Hsh Hloc
                 with "Hd Hr Hb Ht"). }
-    iSplitL "Hm"; [iExact "Hm" |]. iSplitL "Ha"; [iExact "Ha" |].
-    iSplitL "Hv"; [iExact "Hv" | iExact "Hw"].
+    iSplitL "Hm"; [iExact "Hm" | iExact "Ha"].
   Qed.
 
   (* THE OPEN, the other half of the same seam, and it is an ORDINARY
@@ -2292,13 +2274,10 @@ Section IcacheEscrow.
        inode_addrs (ientry k) (bm_cells bm) ∗
        ind_res γfs bm ∗
        inode_blocks γfs bm data ∗
-       dv_ride (bv_unsigned inum) (dv_of dn data) ∗
-       (* LAST, and that position is load-bearing: a consumer's existing
-          eight-name spatial pattern binds its last name to
-          [fv_ride ∗ top_frag], so the flip costs the ~forty payload sites
-          one PURE conjunct and no re-plumbing of any [with "[...]"]
-          selection at all. *)
-       fv_ride (bv_unsigned inum) (fv_of dn data) ∗
+       (* THE TWO CONTENTS HOLDS THAT USED TO SIT HERE, between the blocks
+          and the era fragment, are retired (THE DVIEW RETIREMENT): every
+          consumer's spatial pattern loses two names and every re-pack two
+          [iSplitL]s, and the era fragment below is the reading they were. *)
        top_frag (fs_gamma_L γfs) (bv_unsigned inum) (era_node dn bm data))%I.
 
   Lemma ic_loaded_open γfs γi cov logstart k (inum : mword 32)
@@ -2308,7 +2287,7 @@ Section IcacheEscrow.
   Proof.
     iIntros "H". rewrite /ic_loaded /ic_loaded_flat_body.
     iDestruct "H" as (data)
-      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hleg & Hm & Ha & Hv & Hw)".
+      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hleg & Hm & Ha)".
     iDestruct (ic_inode_leg_era_open with "Hleg") as "[Hl Hn]".
     pose proof (node_shape_ok_of_inode_ok cov logstart dn bm data Hok) as Hsh.
     iDestruct (inode_owned_era_local with "Hn") as %Hloc.
@@ -2325,9 +2304,7 @@ Section IcacheEscrow.
     iSplitL "Hm"; [iExact "Hm" |].
     iSplitL "Ha"; [iExact "Ha" |].
     iSplitL "Hr"; [iExact "Hr" |].
-    iSplitL "Hb"; [iExact "Hb" |].
-    iSplitL "Hv"; [iExact "Hv" |].
-    iSplitL "Hw"; [iExact "Hw" | iExact "Ht"].
+    iSplitL "Hb"; [iExact "Hb" | iExact "Ht"].
   Qed.
 
   Lemma ic_loaded_flat γfs γi cov logstart k (inum : mword 32)
@@ -2338,10 +2315,10 @@ Section IcacheEscrow.
     rewrite /ic_loaded_flat_body. iIntros "H".
     iDestruct "H" as (data)
       "(%Hok & %Hrl & %Hdok & %Hddix & %Hdoc & %Hduq & Hl & Hd & Hm & Ha & Hr & Hb
-        & Hv & Hw & Ht)".
+        & Ht)".
     iApply (ic_mk_loaded γfs γi cov logstart k inum dn bm data
               Hok Hrl Hdok Hddix Hdoc Hduq
-              with "Hl Hd Hm Ha Hr Hb Hv Hw Ht").
+              with "Hl Hd Hm Ha Hr Hb Ht").
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -3165,8 +3142,7 @@ Section IcacheEscrow.
         [| iDestruct "Hpay" as "[[Hr Hp] _]"; iFrame "Hr"; iExact "Hp" ].
       iDestruct "Hpay" as (dn bm) "[Hlk _]".
       iDestruct "Hlk" as (data)
-        "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hleg & Hmeta &
-          Haddrs & Hdv & Hfv)".
+        "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hleg & Hmeta & Haddrs)".
       pose proof Hok as Hok'.
       destruct Hok' as (Hwf & _ & Hda & _ & _ & _ & _).
       assert (Hcelllen : length (bm_cells bm) = 13%nat).
@@ -3305,10 +3281,6 @@ Section IcacheEscrow.
     frzm_h (bv_unsigned inum) false -∗
     escA_inv γfs ge gr gd (bv_unsigned inum) rg -∗
     redeem_ticketA gr -∗
-    (* the freer's own contents hold, which came out of the payload it
-       evicted and which the AWAIT arm parks untied (§9 W2) *)
-    (∃ e, dv_ride (bv_unsigned inum) e) -∗
-    (∃ b, fv_ride (bv_unsigned inum) b) -∗
     (* THE ERA'S ABSTRACT VALUE DOES NOT COME HERE (durable-disk C-3c): the
        freer hands it to [EscrowInode.escA_alloc] at the mint instead, and
        the off-lock deposit parks it region-side. *)
@@ -3318,14 +3290,12 @@ Section IcacheEscrow.
        half. *)
     ipool_ext γfs γi cov logstart inum.
   Proof.
-    iIntros "Hcnt Hmir #Hesc Htk Hdv Hfv". rewrite /ipool_ext.
+    iIntros "Hcnt Hmir #Hesc Htk". rewrite /ipool_ext.
     iSplitL "Hcnt"; [iExact "Hcnt" |].
     iSplitL "Hmir"; [iExact "Hmir" |].
     iRight.
     rewrite /pool_await. iExists ge, gr, gd, rg.
-    iSplitR; [iExact "Hesc" |].
-    iSplitL "Htk"; [iExact "Htk" |].
-    iSplitL "Hdv"; [iExact "Hdv" | iExact "Hfv"].
+    iSplitR; [iExact "Hesc" | iExact "Htk"].
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -4020,14 +3990,14 @@ Section IcacheEscrow.
   Proof.
     rewrite /ic_loaded. iIntros "H".
     iDestruct "H" as (data)
-      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hleg & Hm & Ha & Hv & Hw)".
+      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hleg & Hm & Ha)".
     iExists (era_node dn bm data).
     iSplitR.
     { iPureIntro.
       exact (FsStateEra.node_dir_local_of_ok (bv_unsigned inum) cov logstart
                icfg_nib dn bm data Hok Hdok Hddix Hdoc). }
     iFrame "Hleg". iIntros "Hleg".
-    iExists data. iFrame "Hleg Hm Ha Hv Hw".
+    iExists data. iFrame "Hleg Hm Ha".
     iSplitR; [iPureIntro; exact Hok |].
     iSplitR; [iPureIntro; exact Hdok |].
     iSplitR; [iPureIntro; exact Hddix |].
@@ -4046,14 +4016,14 @@ Section IcacheEscrow.
   Proof.
     rewrite /ic_rd_arm. iIntros "H".
     iDestruct "H" as (dn bm data)
-      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hleg & Hv & Hw)".
+      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hleg)".
     iExists (era_node dn bm data).
     iSplitR.
     { iPureIntro.
       exact (FsStateEra.node_dir_local_of_ok (bv_unsigned inum) cov logstart
                icfg_nib dn bm data Hok Hdok Hddix Hdoc). }
     iFrame "Hleg". iIntros "Hleg".
-    iExists dn, bm, data. iFrame "Hleg Hv Hw".
+    iExists dn, bm, data. iFrame "Hleg".
     iSplitR; [iPureIntro; exact Hok |].
     iSplitR; [iPureIntro; exact Hdok |].
     iSplitR; [iPureIntro; exact Hddix |].
@@ -5215,16 +5185,14 @@ Section IcacheEscrow.
       iAssert (|={E ∖ ↑ipoolN}=>
                  iname gi gfs inodestart inum l ∗
                  crp_elem (bv_unsigned inum) CrpDep ∗
-                 ifreeze_off (bv_unsigned inum) ∗
-                 (∃ e, dv_ride (bv_unsigned inum) e) ∗
-                 (∃ b, fv_ride (bv_unsigned inum) b))%I
-        with "[Harm Hl]" as ">(Hl & Hel & Hoff & Hdv & Hfv)".
+                 ifreeze_off (bv_unsigned inum))%I
+        with "[Harm Hl]" as ">(Hl & Hel & Hoff)".
       { iDestruct "Harm" as "[Hpp | Haw]".
-        - iDestruct "Hpp" as (ge gr gd rg) "(#Hesc & #Hcom & Htk & Hdv & Hfv)".
+        - iDestruct "Hpp" as (ge gr gd rg) "(#Hesc & #Hcom & Htk)".
           iMod (escA_redeem (E ∖ ↑ipoolN) gfs ge gr gd (bv_unsigned inum) rg
                   HEesc with "Hesc Htk Hcom") as "[Hel Hoff]".
-          iModIntro. iFrame "Hl Hel Hoff Hdv Hfv".
-        - iDestruct "Haw" as (ge gr gd rg) "(#Hesc & Htk & Hdv & Hfv)".
+          iModIntro. iFrame "Hl Hel Hoff".
+        - iDestruct "Haw" as (ge gr gd rg) "(#Hesc & Htk)".
           iMod (escA_await_peel (E ∖ ↑ipoolN) gfs ge gr gd (bv_unsigned inum) rg
                   (iname gi gfs inodestart inum l) HEesc
                   with "Hesc Htk Hl []") as "(Hl & Hel & Hoff)".
@@ -5233,7 +5201,7 @@ Section IcacheEscrow.
                     gi gfs inodestart nib inum l (FrzPost rg) HEreg2 Hin
                     with "Hrinv Hl Hpost") as "(%Hc & _ & _)".
             discriminate Hc. }
-          iModIntro. iFrame "Hl Hel Hoff Hdv Hfv". }
+          iModIntro. iFrame "Hl Hel Hoff". }
       (* the corpse row: the element the peel returned locates it, and its
          value is [CrpDep] by [ghost_map_lookup] -- which is the tie between
          the escrow's one-shot and the ledger's. *)
@@ -5246,10 +5214,8 @@ Section IcacheEscrow.
               with "Hx1 Hxkey") as "[Hx1 Hxkey]".
       iDestruct (ic_id_quarters_join with "Hq Hqp") as "Hhalf".
       iModIntro. iFrame "Hl Hcnt Hmir Hoff".
-      iSplitL "Hmk Hdv Hfv".
-      { rewrite /ipool_shape_np. iRight.
-        iSplitL "Hmk"; [iExact "Hmk" |].
-        iSplitL "Hdv"; [iExact "Hdv" | iExact "Hfv"]. }
+      iSplitL "Hmk".
+      { rewrite /ipool_shape_np. iRight. iExact "Hmk". }
       iSplitL "Hkey Hxkey Htkey Hext".
       { rewrite /ipool. iExists O.
         iSplitR; [iPureIntro; set_solver |]. iFrame "Hkey Htkey".

@@ -1203,7 +1203,7 @@ Section ProofSysLinkTails.
     assert (Hilthr : sl_thr m mil).
     { intros c Hc N2 N8 N9 N18. rewrite (callee_saved_lookup Hcsil c Hc).
       exact (HM2thr c Hc N2 N8 N9 N18). }
-    iDestruct (ic_loaded_open with "Hload") as (dat)"(%Hiok & %Hrl_dat & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs & Hind & Hblocks & Hdview & Hfview)".
+    iDestruct (ic_loaded_open with "Hload") as (dat)"(%Hiok & %Hrl_dat & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs & Hind & Hblocks & Htopl)".
     iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
     iEval (rewrite /i_nlink) in "Hinl".
     (* THE TYPE, ACROSS THE CALLER'S OWN [iunlock].  [ilock] hands back a
@@ -1400,18 +1400,12 @@ Section ProofSysLinkTails.
       rewrite /dn' sl_setnl_type. exact Hnotdir. }
     iAssert (ity_shot gy (di_type dn')) as "#Hshot'".
     { rewrite /dn' sl_setnl_type. iExact "Hshot". }
-    (* [dn'] is [sl_setnl dn ..]: one halfword of the record, no byte, and
-       [dv_of] reads only [di_size] -- so the contents value is unmoved
-       (§9 W3, [dv_of_size]). *)
-    iEval (rewrite (dv_of_size dn dn' dat (eq_sym (sl_setnl_size dn _))))
-      in "Hdview".
-    iEval (rewrite (fv_of_size dn dn' dat (eq_sym (sl_setnl_size dn _))))
-      in "Hfview".
     (* THE ERA'S ABSTRACT VALUE IS RETAGGED (durable-disk 2b-inode-3): the
-       payload's last name carries [fv_ride * top_frag], the flush MOVED
-       the record, and [InodeRegion.ireg_top_retag] is the one-line move.
-       It opens [ftopN] alone, so no mask this walk holds is disturbed. *)
-    iDestruct "Hfview" as "[Hfview Htop]".
+       payload's last name IS that fragment, the flush MOVED the record
+       ([dn'] is [sl_setnl dn ..], one halfword and no byte), and
+       [InodeRegion.ireg_top_retag] is the one-line move.  It opens [ftopN]
+       alone, so no mask this walk holds is disturbed. *)
+    iRename "Htopl" into "Htop".
     (* THE RETAG OWES THE ROW (durable-disk lane A): the raised record is
        well-formed, and these are the four facts the re-pack below proves
        anyway -- a link count is the one column [sl_setnl] moves. *)
@@ -1432,7 +1426,7 @@ Section ProofSysLinkTails.
       [iApply (ireg_inv_ftop with "Hireg") |].
     iModIntro.
     iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kk inum dn' bm)
-      with "[Hdlnk Hdiat Hmeta Hmap Hblocks Hdview Hfview Htop]" as "Hload".
+      with "[Hdlnk Hdiat Hmeta Hmap Hblocks Htop]" as "Hload".
     { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists dat.
       iSplitR; [iPureIntro; exact (sl_setnl_inode_ok fsc_cov fsc_logst dn bm dat _ Hiok) |].
       (* [sl_setnl] moves the COUNT and nothing else, so the type and the
@@ -1454,7 +1448,7 @@ Section ProofSysLinkTails.
       iSplitL "Hdlnk"; [iExact "Hdlnk" |].
       iFrame "Hdiat Hmeta". rewrite /inode_map.
       iDestruct "Hmap" as "[Ha Hi]".
-      iFrame "Ha Hi Hblocks Hdview Hfview Htop". }
+      iFrame "Ha Hi Hblocks Htop". }
     iDestruct (sl_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
       [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
     (* ===== +0x10a c.mv a0,s1 ===== *)

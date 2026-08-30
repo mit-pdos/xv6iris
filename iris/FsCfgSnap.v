@@ -622,10 +622,6 @@ Section SnapPool.
     ([∗ set] z ∈ region_inums icfg_nib, icnt_half z 0%nat) -∗
     ([∗ set] z ∈ region_inums icfg_nib, frzm_h z false) -∗
     ([∗ set] z ∈ region_inums icfg_nib, ifreeze_off z) -∗
-    ([∗ set] z ∈ region_inums icfg_nib,
-       dv_ride z (dv_of (fn_rec (snap_node S z)) (fn_data (snap_node S z)))) -∗
-    ([∗ set] z ∈ region_inums icfg_nib,
-       fv_ride z (fv_of (fn_rec (snap_node S z)) (fn_data (snap_node S z)))) -∗
     ([∗ set] z ∈ A, top_frag (fs_gamma_L γfs) z (snap_node S z)) -∗
     ([∗ set] z ∈ region_inums icfg_nib,
        ireg_out γi (mword_of_int z : mword 32) (fn_rec (snap_node S z))) -∗
@@ -636,7 +632,7 @@ Section SnapPool.
            fsblock (fs_bytes γfs) b (P b)).
   Proof.
     intros Hok Hw Hnib HA HC.
-    iIntros "Hcnt Hmir Hoff Hdv Hfv Htop Hout Hdlk Hblk".
+    iIntros "Hcnt Hmir Hoff Htop Hout Hdlk Hblk".
     pose proof (sk_bytes Hok) as Hb.
     pose proof (sk_local Hok) as Hloc.
     assert (HARs : A ⊆ region_inums icfg_nib).
@@ -696,39 +692,18 @@ Section SnapPool.
       apply elem_of_difference in Hz as [Hz1 Hz2]. iIntros "H".
       iApply (ireg_out_free_inv γi (mword_of_int z : mword 32)
                 (fn_rec (snap_node S z)) (Hfree z Hz1 Hz2) with "H"). }
-    (* ---- the contents holds, split along the same subset -------------- *)
-    iDestruct (big_sepS_split_sub _ (region_inums icfg_nib) A HARs
-                 with "Hdv") as "[HdvA HdvF]".
-    iAssert ([∗ set] z ∈ region_inums icfg_nib ∖ A,
-               ∃ e, dv_ride (bv_unsigned (mword_of_int z : mword 32)) e)%I
-      with "[HdvF]" as "HdvF".
-    { iApply (big_sepS_mono with "HdvF"). intros z Hz.
-      apply elem_of_difference in Hz as [Hz1 _].
-      rewrite (region_inum_faithful icfg_nib z Hnib Hz1).
-      iIntros "H". iExists _. iExact "H". }
-    iDestruct (big_sepS_split_sub _ (region_inums icfg_nib) A HARs
-                 with "Hfv") as "[HfvA HfvF]".
-    iAssert ([∗ set] z ∈ region_inums icfg_nib ∖ A,
-               ∃ b, fv_ride (bv_unsigned (mword_of_int z : mword 32)) b)%I
-      with "[HfvF]" as "HfvF".
-    { iApply (big_sepS_mono with "HfvF"). intros z Hz.
-      apply elem_of_difference in Hz as [Hz1 _].
-      rewrite (region_inum_faithful icfg_nib z Hnib Hz1).
-      iIntros "H". iExists _. iExact "H". }
     (* ---- the allocated arm, one named application per inum ----------- *)
     iDestruct (big_sepS_sep_2 with "HoutA Hdlk") as "Ha".
     iDestruct (big_sepS_sep_2 with "Ha Hpc") as "Ha".
-    iDestruct (big_sepS_sep_2 with "Ha HdvA") as "Ha".
-    iDestruct (big_sepS_sep_2 with "Ha HfvA") as "Ha".
     iDestruct (big_sepS_sep_2 with "Ha Htop") as "Ha".
     iApply (ipool_alloc γfs γi cov (sb_logstart (fss_sb S))
               (region_inums icfg_nib) A HARs
-              with "Hcnt Hmir Hoff [Ha] Hmk HdvF HfvF").
+              with "Hcnt Hmir Hoff [Ha] Hmk").
     iApply (big_sepS_mono with "Ha"). intros z Hz.
     pose proof (Hln z (HARs z Hz)) as Hlz.
     pose proof (Hnode z (HARs z Hz)) as Hnz.
     rewrite (region_inum_faithful icfg_nib z Hnib (HARs z Hz)).
-    iIntros "[[[[[Hreg Hdl] Hblks] Hdv] Hfv] Htopz]".
+    iIntros "[[[Hreg Hdl] Hblks] Htopz]".
     iExists (fn_rec (snap_node S z)), (bm_of (snap_node S z)),
             (fn_data (snap_node S z)).
     iSplitR.
@@ -753,9 +728,7 @@ Section SnapPool.
                 (fn_rec (snap_node S z)) (Hty z Hz) with "Hreg"). }
     iSplitL "Hind"; [iExact "Hind" |].
     iSplitL "Hblks"; [iExact "Hblks" |].
-    iSplitL "Htopz".
-    { rewrite (era_node_bm_of z (snap_node S z) Hlz). iExact "Htopz". }
-    iSplitL "Hdv"; [iExact "Hdv" | iExact "Hfv"].
+    rewrite (era_node_bm_of z (snap_node S z) Hlz). iExact "Htopz".
   Qed.
 
 End SnapPool.
@@ -913,14 +886,11 @@ Section SnapMint.
             (link_boot_map (region_inums nib))
             (icnt_boot_map (region_inums nib))
             (frzm_boot_map (region_inums nib))
-            (dview_boot_map (region_inums nib))
-            (fview_boot_map (region_inums nib))
             γlog (sb_inodestart (fss_sb S))
             (link_boot_map_valid _) (icnt_boot_map_valid _)
-            (frzm_boot_map_valid _)
-            (dview_boot_map_valid _) (fview_boot_map_valid _))
+            (frzm_boot_map_valid _))
       as (ICFG g0) "(%Hdev & %Hnibq & %Hlogq & %Histq & Hiref & Hlive &
-                     Hlk & Hcnt & Hfrzm & Hdv & Hfv & Hboot & Hep &
+                     Hlk & Hcnt & Hfrzm & Hboot & Hep &
                      Hisl & Hrauth & Hlkauth & Hpkey & Hxkey & Hhpn & Htkey &
                      Hckey)".
     iDestruct (hpn_boot_split with "Hhpn") as "Hhpn".
@@ -999,27 +969,10 @@ Section SnapMint.
       as "Hmir".
     iEval (rewrite big_sepS_sep) in "Hmir".
     iDestruct "Hmir" as "[HmirR HmirP]".
-    (* THE CONTENTS GHOSTS, MINTED AT [∅] AND SET TO THE SNAPSHOT'S TRUTH *)
-    iDestruct (dv_boot_split (region_inums icfg_nib) with "Hdv") as "Hdv".
-    iAssert (|==> [∗ set] z ∈ region_inums icfg_nib,
-                    dv_hold z (dv_of (fn_rec (snap_node S z))
-                                 (fn_data (snap_node S z))))%I
-      with "[Hdv]" as ">Hdv".
-    { iApply big_sepS_bupd. iApply (big_sepS_mono with "Hdv").
-      intros z _. iIntros "H".
-      iApply (dv_set z ∅
-                (dv_of (fn_rec (snap_node S z)) (fn_data (snap_node S z)))
-               with "H"). }
-    iDestruct (fv_boot_split (region_inums icfg_nib) with "Hfv") as "Hfv".
-    iAssert (|==> [∗ set] z ∈ region_inums icfg_nib,
-                    fv_hold z (fv_of (fn_rec (snap_node S z))
-                                 (fn_data (snap_node S z))))%I
-      with "[Hfv]" as ">Hfv".
-    { iApply big_sepS_bupd. iApply (big_sepS_mono with "Hfv").
-      intros z _. iIntros "H".
-      iApply (fv_set z []
-                (fv_of (fn_rec (snap_node S z)) (fn_data (snap_node S z)))
-               with "H"). }
+    (* THE TWO CONTENTS GHOSTS ARE RETIRED (THE DVIEW RETIREMENT): boot used
+       to mint them at [∅]/[[]] and set each one to the snapshot's own
+       reading before handing the family to the pool.  Those readings ride in
+       the era fragment the pool already gets, so nothing is minted here. *)
     iDestruct (region_of_seq (fun z => mono_nat_auth_own (icfg_iep z) 1 0)
                  icfg_nib with "Hep") as "Hep".
     iDestruct (live_boot_split g0 with "Hlive") as "Hlive".
@@ -1122,22 +1075,8 @@ Section SnapMint.
                            dss icfg_nib Hfull Hb Hloc Hnibeq Hnib32
                            Hdl Hdwf Hde))
             with "Hla Hlnks HcntR HmirR Hep Htopreg Hbireg Hbrow Hftopi Hboot Hrauth")
-      as (γi dss) "(%Hdl & %Hdwf & %Hde & Hireginv & Hboot & Hlics & Hflics &
-                    Hout)".
+      as (γi dss) "(%Hdl & %Hdwf & %Hde & Hireginv & Hboot & Hout)".
     iDestruct "Hireginv" as "#Hireginv".
-    iClear "Hlics". iClear "Hflics".
-    iAssert ([∗ set] z ∈ region_inums icfg_nib,
-               dv_ride z (dv_of (fn_rec (snap_node S z))
-                            (fn_data (snap_node S z))))%I
-      with "[Hdv]" as "Hdv".
-    { iApply (big_sepS_mono with "Hdv"). intros z _. iIntros "H".
-      iApply (dv_ride_of_hold with "H"). }
-    iAssert ([∗ set] z ∈ region_inums icfg_nib,
-               fv_ride z (fv_of (fn_rec (snap_node S z))
-                            (fn_data (snap_node S z))))%I
-      with "[Hfv]" as "Hfv".
-    { iApply (big_sepS_mono with "Hfv"). intros z _. iIntros "H".
-      iApply (fv_ride_of_hold with "H"). }
     (* the payout is at the DECODED record; restate it at [S]'s own *)
     destruct (snap_ireg_premises S Pb
                 (fs_home_set cov (sb_logstart (fss_sb S)))
@@ -1178,7 +1117,7 @@ Section SnapMint.
                     ∖ ireg_blk_set (sb_inodestart (fss_sb S)) icfg_nib)
                  (snap_live_set S icfg_nib) Hok Hnibeq Hnib32
                  (elem_of_snap_live_set S icfg_nib) HC
-                 with "HcntP HmirP Hoff Hdv Hfv Htopf Hout [Hetk] HfsbC")
+                 with "HcntP HmirP Hoff Htopf Hout [Hetk] HfsbC")
       as "[Hipool Hrem]".
     { (* the pool takes the LIVE inums' tickets; the free inums' are
          [emp]-shaped and are dropped here *)

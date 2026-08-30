@@ -323,9 +323,10 @@ Qed.
     take [node_rep (NDir ents) dn data] -- a THREE-way bundle whose second
     conjunct is [dir_names_unique] -- and every one of their proofs opens
     with [intros (_ & _ & ->)], discarding the type tag and the uniqueness
-    invariant UNREAD.  The pinned-lookup campaign's carrier
-    ([DirViewG.dv_hold z (dv_of dn data)]) holds only the THIRD conjunct:
-    the abstract map IS the byte view, with no well-formedness attached.
+    invariant UNREAD.  The pinned-lookup campaign's carrier (its per-inum
+    contents hold, retired 2026-08-30, and the era fragment's [dir_entries]
+    reading that replaced it) holds only the THIRD conjunct: the abstract
+    map IS the byte view, with no well-formedness attached.
 
     So the family below is the same five statements with the hypothesis
     weakened to the bare equation [ents = dir_view data nrec] and [nrec]
