@@ -204,14 +204,11 @@ Section UkSync.
       by (vm_compute; reflexivity).
     (* ---- 0x00  c.addi sp,sp,-16 -- THE PUSH ---- *)
     iApply (wp_uk_caddi_sp_dn γt γd γs h m (mword_of_int 0x0)
-              (mword_of_int 48 : mword 6) 2 n (add_vec_int sp0 (-16))
-              ltac:(rewrite Hsp;
-                    replace (sign_extend' 64 (mword_of_int 48 : mword 6) : mword 64)
-                      with (mword_of_int (-16) : mword 64)
-                      by (apply bv_eq; vm_compute; reflexivity);
-                    reflexivity)
-              ltac:(rewrite Hsp Hsp16; lia)
+              (mword_of_int 48 : mword 6) 2 n
+              ltac:(apply bv_eq; vm_compute; reflexivity)
               with "C00 Hrun").
+    replace (add_vec_int (m !!! Regidx csp_rs1) (- (8 * Z.of_nat 2)))
+      with (add_vec_int sp0 (-16)) by (rewrite Hsp; f_equal; lia).
     assert (E00 : add_vec_int (mword_of_int 0x0 : mword 64) 2 = mword_of_int 0x2)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite Hsp ustack_2 E00.
@@ -344,14 +341,11 @@ Section UkSync.
       by (vm_compute; reflexivity).
     (* ---- 0x12  c.addi sp,sp,-16 -- THE PUSH ---- *)
     iApply (wp_uk_caddi_sp_dn γt γd γs h m (mword_of_int 0x12)
-              (mword_of_int 48 : mword 6) 2 (2 + n) (add_vec_int sp0 (-16))
-              ltac:(rewrite Hsp;
-                    replace (sign_extend' 64 (mword_of_int 48 : mword 6) : mword 64)
-                      with (mword_of_int (-16) : mword 64)
-                      by (apply bv_eq; vm_compute; reflexivity);
-                    reflexivity)
-              ltac:(rewrite Hsp Hsp16; lia)
+              (mword_of_int 48 : mword 6) 2 (2 + n)
+              ltac:(apply bv_eq; vm_compute; reflexivity)
               with "C12 Hrun").
+    replace (add_vec_int (m !!! Regidx csp_rs1) (- (8 * Z.of_nat 2)))
+      with (add_vec_int sp0 (-16)) by (rewrite Hsp; f_equal; lia).
     assert (E12 : add_vec_int (mword_of_int 0x12 : mword 64) 2 = mword_of_int 0x14)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite Hsp ustack_2 E12.

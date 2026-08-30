@@ -222,11 +222,44 @@ Section UserHeap.
   Definition uword (γd : gname) (a : Z) (w : mword 64) : iProp Σ :=
     ubytes γd a 8 (nth_byte w).
 
-  (* a NUL-terminated C string of length [len]: the body, then the NUL.
-     The body's bytes are NOT pinned to values here -- a program that cares
-     which bytes they are owns them individually. *)
+  (* A NUL-TERMINATED C STRING of length [len] at [a]: [len] bytes NONE of
+     which is NUL, then the terminator.  The no-interior-NUL clause is part
+     of the PREDICATE rather than a side condition on the functions that
+     walk it, so [ustr γd a len f] pins the length: it is what makes
+     "strlen returns len" a statement about the resource the caller holds
+     rather than about an extra hypothesis it also had to supply. *)
   Definition ustr (γd : gname) (a : Z) (len : nat) (f : nat -> bv 8) : iProp Σ :=
-    (ubytes γd a len f ∗ ubyte γd (a + Z.of_nat len) ubyte0)%I.
+    (⌜ forall j : nat, (j < len)%nat -> f j <> ubyte0 ⌝ ∗
+     ubytes γd a len f ∗ ubyte γd (a + Z.of_nat len) ubyte0)%I.
+
+  Lemma ustr_nonul (γd : gname) (a : Z) (len : nat) (f : nat -> bv 8) :
+    ustr γd a len f -∗ ⌜ forall j : nat, (j < len)%nat -> f j <> ubyte0 ⌝.
+  Proof. iIntros "(%H & _ & _)". iPureIntro. exact H. Qed.
+
+  (* one body byte, out and back *)
+  Lemma ustr_byte (γd : gname) (a : Z) (len : nat) (f : nat -> bv 8) (j : nat) :
+    (j < len)%nat ->
+    ustr γd a len f -∗
+      ubyte γd (a + Z.of_nat j)%Z (f j) ∗
+      (ubyte γd (a + Z.of_nat j)%Z (f j) -∗ ustr γd a len f).
+  Proof.
+    intros Hj. iIntros "(#Hne & Hbs & Hnul)".
+    rewrite /ustr /ubytes.
+    iDestruct (big_sepL_lookup_acc _ _ j j with "Hbs") as "[Hb Hcl]";
+      [ apply lookup_seq; split; [ lia | exact Hj ] | ].
+    iFrame "Hb". iIntros "Hb".
+    iFrame "Hne Hnul". iApply ("Hcl" with "Hb").
+  Qed.
+
+  (* ...and the terminator *)
+  Lemma ustr_nul (γd : gname) (a : Z) (len : nat) (f : nat -> bv 8) :
+    ustr γd a len f -∗
+      ubyte γd (a + Z.of_nat len)%Z ubyte0 ∗
+      (ubyte γd (a + Z.of_nat len)%Z ubyte0 -∗ ustr γd a len f).
+  Proof.
+    iIntros "(#Hne & Hbs & Hnul)". iFrame "Hnul". iIntros "Hnul".
+    rewrite /ustr. iFrame "Hne Hbs Hnul".
+  Qed.
 
   (* NOTE: the SPLIT of a run at an arbitrary point -- which is what a
      syscall footprint hand-over is -- is deliberately not here yet.  It is

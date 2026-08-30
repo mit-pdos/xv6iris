@@ -44,6 +44,7 @@ Local Open Scope Z_scope.
 Import Defs.
 Require Import WpUmodeBranch.
 Require Import UkBranch.
+Require Import UmodeAbi.
 Require Import UkRun.
 
 From Stdlib Require Import ZArith Bool Lia.
@@ -967,58 +968,151 @@ Section UkRunLeaf.
   (* business moving sp.                                                    *)
   (* ===================================================================== *)
 
+  (* the positive twin of [UmodeAbi.uv_avi_neg]: sp moving UP by [d] *)
+  Lemma uv_avi_pos (a : mword 64) (d : Z) :
+    0 <= d -> bv_unsigned a + d < Z64 ->
+    bv_unsigned (add_vec_int a d) = bv_unsigned a + d.
+  Proof.
+    intros Hd Hlt. unfold add_vec_int.
+    rewrite add_vec64_unsigned moi64_unsigned.
+    unfold bv_wrap.
+    assert (E64 : bv_modulus 64 = 18446744073709551616)
+      by (vm_compute; reflexivity).
+    rewrite E64.
+    rewrite Zplus_mod_idemp_r.
+    apply Z.mod_small.
+    pose proof (bv_unsigned_in_range _ a) as Hr. rewrite E64 in Hr.
+    unfold Z64 in Hlt. lia.
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* THE PUSH.  The caller says WHAT THE IMMEDIATE IS -- a frame of [k]    *)
+  (* words down -- and nothing about how the decoder spells it; the new sp *)
+  (* is then this leaf's own arithmetic, in the caller's vocabulary        *)
+  (* ([add_vec_int]) rather than the model's.  At a concrete immediate the *)
+  (* premise is one [vm_compute].                                          *)
+  (* ------------------------------------------------------------------- *)
   Lemma wp_uk_caddi_sp_dn (γt γd γs : gname) (h : CpuId) (m : regfile)
-      (pc : mword 64) (imm : mword 6) (k n : nat) (sp' : mword 64) :
-    sp' = add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 imm) ->
-    uint sp' = uint (m !!! Regidx csp_rs1) - 8 * Z.of_nat k ->
+      (pc : mword 64) (imm : mword 6) (k n : nat) :
+    (sign_extend' 64 imm : mword 64) = mword_of_int (- (8 * Z.of_nat k)) ->
     uinstr_is γt pc true (C_ADDI (imm, Regidx csp_rs1)) -∗
     urun γt γd γs h m pc (k + n) -∗
     (ustack γd (m !!! Regidx csp_rs1) k -∗
        ∀ h' : CpuId,
-         urun γt γd γs h' (<[Regidx csp_rs1 := regval_into_reg sp']> m)
+         urun γt γd γs h'
+           (<[Regidx csp_rs1
+              := regval_into_reg
+                   (add_vec_int (m !!! Regidx csp_rs1) (- (8 * Z.of_nat k)))]> m)
            (add_vec_int pc 2) n -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hsp' Hu. iIntros "#Hi Hrun Hcont".
+    intros Himm. iIntros "#Hi Hrun Hcont".
     iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    (* split the free stack at the frame boundary *)
-    rewrite (ustack_app γd (m !!! Regidx csp_rs1) sp' k n Hu).
+    (* the room below sp is a CONSEQUENCE of owning the free stack *)
+    iDestruct (ustack_room with "Hheap Hstk") as %Hroom'.
+    assert (Hroom : 8 * Z.of_nat k <= uint (m !!! Regidx csp_rs1)) by lia.
+    assert (Hu : uint (add_vec_int (m !!! Regidx csp_rs1) (- (8 * Z.of_nat k)))
+                 = uint (m !!! Regidx csp_rs1) - 8 * Z.of_nat k).
+    { rewrite !uint_unsigned.
+      exact (uv_avi_neg (m !!! Regidx csp_rs1) (8 * Z.of_nat k) ltac:(lia)
+               ltac:(rewrite <- uint_unsigned; exact Hroom)). }
+    rewrite (ustack_app γd (m !!! Regidx csp_rs1)
+               (add_vec_int (m !!! Regidx csp_rs1) (- (8 * Z.of_nat k))) k n Hu).
     iDestruct "Hstk" as "(Hframe & Hstk)".
-    iApply (UkLeaf.wp_uk_caddi C pt Rut pm sz Hlo Hpm M m pc imm csp_rs1 sp'
+    iApply (UkLeaf.wp_uk_caddi C pt Rut pm sz Hlo Hpm M m pc imm csp_rs1
+              (add_vec_int (m !!! Regidx csp_rs1) (- (8 * Z.of_nat k)))
               Hui ltac:(vm_compute; discriminate)
-              ltac:(rewrite Hsp'; rewrite (sext6_12_64 imm); reflexivity)
+              ltac:(rewrite (sext6_12_64 imm) Himm; reflexivity)
               with "Hb [Hheap Hstk Hframe Hcont]").
     iApply (urun_close with "Hheap [Hstk] [Hframe Hcont]").
-    - rewrite (upd_eq m (Regidx csp_rs1) (regval_into_reg sp')). iExact "Hstk".
+    - rewrite (upd_eq m (Regidx csp_rs1) (regval_into_reg _)). iExact "Hstk".
     - iIntros (h') "Hrun". iApply ("Hcont" with "Hframe Hrun").
   Qed.
 
+  (* ...and THE POP, its mirror.  The extra premise is the absence of wrap,
+     which the push does not need (sp only ever comes back down to where it
+     started, but the leaf cannot see that). *)
   Lemma wp_uk_caddi_sp_up (γt γd γs : gname) (h : CpuId) (m : regfile)
-      (pc : mword 64) (imm : mword 6) (k n : nat) (sp' : mword 64) :
-    sp' = add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 imm) ->
-    uint (m !!! Regidx csp_rs1) = uint sp' - 8 * Z.of_nat k ->
+      (pc : mword 64) (imm : mword 6) (k n : nat) :
+    (sign_extend' 64 imm : mword 64) = mword_of_int (8 * Z.of_nat k) ->
     uinstr_is γt pc true (C_ADDI (imm, Regidx csp_rs1)) -∗
-    ustack γd sp' k -∗
+    ustack γd (add_vec_int (m !!! Regidx csp_rs1) (8 * Z.of_nat k)) k -∗
     urun γt γd γs h m pc n -∗
     (∀ h' : CpuId,
-       urun γt γd γs h' (<[Regidx csp_rs1 := regval_into_reg sp']> m)
+       urun γt γd γs h'
+         (<[Regidx csp_rs1
+            := regval_into_reg
+                 (add_vec_int (m !!! Regidx csp_rs1) (8 * Z.of_nat k))]> m)
          (add_vec_int pc 2) (k + n) -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hsp' Hu. iIntros "#Hi Hframe Hrun Hcont".
+    intros Himm. iIntros "#Hi Hframe Hrun Hcont".
     iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    iApply (UkLeaf.wp_uk_caddi C pt Rut pm sz Hlo Hpm M m pc imm csp_rs1 sp'
+    (* ...and so is the absence of wrap, off the frame being returned *)
+    iDestruct (ustack_nowrap with "Hheap Hframe") as %Hnw.
+    assert (Hu : uint (m !!! Regidx csp_rs1)
+                 = uint (add_vec_int (m !!! Regidx csp_rs1) (8 * Z.of_nat k))
+                   - 8 * Z.of_nat k).
+    { rewrite !uint_unsigned.
+      rewrite (uv_avi_pos (m !!! Regidx csp_rs1) (8 * Z.of_nat k) ltac:(lia)
+                 ltac:(rewrite <- uint_unsigned; exact Hnw)). lia. }
+    iApply (UkLeaf.wp_uk_caddi C pt Rut pm sz Hlo Hpm M m pc imm csp_rs1
+              (add_vec_int (m !!! Regidx csp_rs1) (8 * Z.of_nat k))
               Hui ltac:(vm_compute; discriminate)
-              ltac:(rewrite Hsp'; rewrite (sext6_12_64 imm); reflexivity)
+              ltac:(rewrite (sext6_12_64 imm) Himm; reflexivity)
               with "Hb [Hheap Hstk Hframe Hcont]").
     iApply (urun_close with "Hheap [Hstk Hframe] Hcont").
-    rewrite (upd_eq m (Regidx csp_rs1) (regval_into_reg sp')).
-    rewrite (ustack_app γd sp' (m !!! Regidx csp_rs1) k n Hu).
+    rewrite (upd_eq m (Regidx csp_rs1) (regval_into_reg _)).
+    rewrite (ustack_app γd (add_vec_int (m !!! Regidx csp_rs1) (8 * Z.of_nat k))
+               (m !!! Regidx csp_rs1) k n Hu).
     iFrame "Hframe Hstk".
+  Qed.
+
+  (* c.addi16sp is the OTHER push: gcc uses it for frames of 32..512 bytes,
+     which is echo's main (64).  Same shape, different immediate decoder --
+     and the decoder is again the CALLER's one-line obligation, not part of
+     the statement. *)
+  Lemma wp_uk_caddi16sp_dn (γt γd γs : gname) (h : CpuId) (m : regfile)
+      (pc : mword 64) (imm : mword 6) (k n : nat) :
+    (sign_extend' 64 (caddi16sp_imm imm) : mword 64)
+      = mword_of_int (- (8 * Z.of_nat k)) ->
+    uinstr_is γt pc true (C_ADDI16SP imm) -∗
+    urun γt γd γs h m pc (k + n) -∗
+    (ustack γd (m !!! Regidx csp_rs1) k -∗
+       ∀ h' : CpuId,
+         urun γt γd γs h'
+           (<[Regidx csp_rs1
+              := regval_into_reg
+                   (add_vec_int (m !!! Regidx csp_rs1) (- (8 * Z.of_nat k)))]> m)
+           (add_vec_int pc 2) n -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Himm. iIntros "#Hi Hrun Hcont".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
+    (* the room below sp is a CONSEQUENCE of owning the free stack *)
+    iDestruct (ustack_room with "Hheap Hstk") as %Hroom'.
+    assert (Hroom : 8 * Z.of_nat k <= uint (m !!! Regidx csp_rs1)) by lia.
+    assert (Hu : uint (add_vec_int (m !!! Regidx csp_rs1) (- (8 * Z.of_nat k)))
+                 = uint (m !!! Regidx csp_rs1) - 8 * Z.of_nat k).
+    { rewrite !uint_unsigned.
+      exact (uv_avi_neg (m !!! Regidx csp_rs1) (8 * Z.of_nat k) ltac:(lia)
+               ltac:(rewrite <- uint_unsigned; exact Hroom)). }
+    rewrite (ustack_app γd (m !!! Regidx csp_rs1)
+               (add_vec_int (m !!! Regidx csp_rs1) (- (8 * Z.of_nat k))) k n Hu).
+    iDestruct "Hstk" as "(Hframe & Hstk)".
+    iApply (UkLeaf.wp_uk_caddi16sp C pt Rut pm sz Hlo Hpm M m pc imm
+              (add_vec_int (m !!! Regidx csp_rs1) (- (8 * Z.of_nat k)))
+              Hui ltac:(unfold add_vec_int; f_equal; exact (eq_sym Himm))
+              with "Hb [Hheap Hstk Hframe Hcont]").
+    iApply (urun_close with "Hheap [Hstk] [Hframe Hcont]").
+    - rewrite (upd_eq m (Regidx csp_rs1) (regval_into_reg _)). iExact "Hstk".
+    - iIntros (h') "Hrun". iApply ("Hcont" with "Hframe Hrun").
   Qed.
 
 End UkRunLeaf.

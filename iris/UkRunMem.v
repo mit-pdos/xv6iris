@@ -30,6 +30,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvModelBytes.
 Require Import RegFile.
+Require Import RiscvExtras.
 Require Import UserPtTree.
 Require Import UmodeMem UmodeArith.
 Require Import UserPerm.
@@ -64,12 +65,39 @@ Require Import UkRun.
 Definition uoff_sdsp (uimm : mword 6) : Z :=
   uint (sign_extend' 64 (zero_extend' 12 (concat_vec uimm ('b"000"))) : mword 64).
 
-Definition uoff_i12 (imm : mword 12) : Z :=
-  uint (sign_extend' 64 imm : mword 64).
+(* A BASE-INSTRUCTION DISPLACEMENT IS SIGNED.  It used to be the UNSIGNED
+   reading, which made a negative displacement come out near 2^64 and so
+   unusable, since the heap bounds every address below MAXVA; echo's
+   [lbu a4,-1(a5)] is exactly that case.  [bv_signed] is the honest reading
+   and agrees with the old one wherever the old one worked. *)
+Definition uoff_i12 (imm : mword 12) : Z := bv_signed imm.
 Definition uoff_c8 (uimm : mword 5) : Z :=
   uint (sign_extend' 64 (zero_extend' 12 (concat_vec uimm ('b"000"))) : mword 64).
 Definition uoff_c4 (uimm : mword 5) : Z :=
   uint (sign_extend' 64 (zero_extend' 12 (concat_vec uimm ('b"00"))) : mword 64).
+
+(* ...and the bridge to the model's spelling.  Unlike the nonnegative case
+   this cannot go through [moi_add]: the sum is taken mod 2^64, and only the
+   heap's bound on [a] collapses it back. *)
+Lemma umoi_add_i12 (X : mword 64) (imm : mword 12) (a : Z) :
+  a = uint X + uoff_i12 imm ->
+  (mword_of_int a : mword 64) = add_vec X (sign_extend' 64 imm).
+Proof.
+  intros Ha. unfold uoff_i12 in Ha. rewrite uint_unsigned in Ha.
+  apply bv_eq.
+  rewrite add_vec_unsigned.
+  change (MachineWord.MachineWord.Z_idx 64) with 64%N.
+  assert (Hs : bv_unsigned (sign_extend' 64 imm : mword 64)
+               = bv_wrap 64 (bv_signed imm)).
+  { cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
+         to_word get_word MachineWord.MachineWord.sign_extend].
+    apply bv_sign_extend_unsigned. }
+  rewrite Hs moi64_unsigned.
+  unfold bv_wrap. rewrite !Zmod64.
+  (* NO BOUND NEEDED: both sides are taken mod 2^64, so the wrap the signed
+     displacement introduces cancels on its own. *)
+  rewrite Zplus_mod_idemp_r Ha. reflexivity.
+Qed.
 
 (* ---- the access widths, and what alignment buys at each -------------- *)
 Definition uwidth (z : Z) : Prop := z = 1 \/ z = 2 \/ z = 4 \/ z = 8.
@@ -157,8 +185,7 @@ Section UkRunMem.
       as %(Hua & Hcan & Hok & Hpg & Hal8 & Hmap).
     assert (Htgt : (mword_of_int a : mword 64)
                    = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)).
-    { rewrite Ha /uoff_i12. rewrite <- moi_add. rewrite !moi_of_uint.
-      reflexivity. }
+    { exact (umoi_add_i12 _ imm a Ha). }
     iMod (uheap_store_run γt γd γs M pm a 8 (nth_byte v0)
             (nth_byte (m !!! Regidx rs2)) with "Hheap Hw") as "(Hheap & Hw)".
     iApply (UkStore.wp_uk_sd C pt Rut pm sz Hlo Hpm M m pc imm rs1 rs2
@@ -192,8 +219,7 @@ Section UkRunMem.
       as %(Hua & Hcan & Hok & Hpg & Hal8 & Hmap).
     assert (Htgt : (mword_of_int a : mword 64)
                    = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)).
-    { rewrite Ha /uoff_i12. rewrite <- moi_add. rewrite !moi_of_uint.
-      reflexivity. }
+    { exact (umoi_add_i12 _ imm a Ha). }
     iMod (uheap_store_run γt γd γs M pm a 4 (nth_byte v0)
             (nth_byte (m !!! Regidx rs2)) with "Hheap Hw") as "(Hheap & Hw)".
     iApply (UkStore.wp_uk_sw C pt Rut pm sz Hlo Hpm M m pc imm rs1 rs2
@@ -336,8 +362,7 @@ Section UkRunMem.
     destruct (ucanon_of_bound a Hbnd) as [Hua Hcan].
     assert (Htgt : (mword_of_int a : mword 64)
                    = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)).
-    { rewrite Ha /uoff_i12. rewrite <- moi_add. rewrite !moi_of_uint.
-      reflexivity. }
+    { exact (umoi_add_i12 _ imm a Ha). }
     iMod (uheap_store γt γd γs M pm a b0 (nth_byte (m !!! Regidx rs2) 0)
             with "Hheap Hw") as "(Hheap & Hw)".
     iApply (UkStore.wp_uk_sb C pt Rut pm sz Hlo Hpm M m pc imm rs1 rs2
@@ -373,8 +398,7 @@ Section UkRunMem.
       as %(Hua & Hcan & Hok & Hpg & Hal8 & Hmap).
     assert (Htgt : (mword_of_int a : mword 64)
                    = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)).
-    { rewrite Ha /uoff_i12. rewrite <- moi_add. rewrite !moi_of_uint.
-      reflexivity. }
+    { exact (umoi_add_i12 _ imm a Ha). }
     iApply (UkLoad.wp_uk_ld C pt Rut pm sz Hlo Hpm M m pc imm rs1 rd
               (mword_of_int a) w Hui Hrd Htgt
               ltac:(destruct Hok as (q & Hq & _); exists q; exact Hq) Hcan Hpg Hal8
@@ -482,8 +506,7 @@ Section UkRunMem.
       as %(Hua & Hcan & Hok & Hpg & Hal8 & Hmap).
     assert (Htgt : (mword_of_int a : mword 64)
                    = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)).
-    { rewrite Ha /uoff_i12. rewrite <- moi_add. rewrite !moi_of_uint.
-      reflexivity. }
+    { exact (umoi_add_i12 _ imm a Ha). }
     iApply (UkLoad.wp_uk_lw C pt Rut pm sz Hlo Hpm M m pc imm rs1 rd
               (mword_of_int a) (sign_extend' 64 wv) wv Hui Hrd Htgt
               ltac:(destruct Hok as (q & Hq & _); exists q; exact Hq) Hcan Hpg Hal8
@@ -516,8 +539,7 @@ Section UkRunMem.
       as %(Hua & Hcan & Hok & Hpg & Hal8 & Hmap).
     assert (Htgt : (mword_of_int a : mword 64)
                    = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)).
-    { rewrite Ha /uoff_i12. rewrite <- moi_add. rewrite !moi_of_uint.
-      reflexivity. }
+    { exact (umoi_add_i12 _ imm a Ha). }
     iApply (UkLoad.wp_uk_lwu C pt Rut pm sz Hlo Hpm M m pc imm rs1 rd
               (mword_of_int a) (zero_extend' 64 wv) wv Hui Hrd Htgt
               ltac:(destruct Hok as (q & Hq & _); exists q; exact Hq) Hcan Hpg Hal8
@@ -587,8 +609,7 @@ Section UkRunMem.
     destruct (ucanon_of_bound a Hbnd) as [Hua Hcan].
     assert (Htgt : (mword_of_int a : mword 64)
                    = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)).
-    { rewrite Ha /uoff_i12. rewrite <- moi_add. rewrite !moi_of_uint.
-      reflexivity. }
+    { exact (umoi_add_i12 _ imm a Ha). }
     iApply (UkLoad.wp_uk_lbu C pt Rut pm sz Hlo Hpm M m pc imm rs1 rd
               (mword_of_int a) (zero_extend' 64 b0) b0 Hui Hrd Htgt
               ltac:(destruct Hok as (q & Hq & _); exists q; exact Hq) Hcan

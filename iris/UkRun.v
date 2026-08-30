@@ -49,6 +49,8 @@ Require Import UptTree.
 Require Import WpUmodeStore.
 Require Import WpUmodeStep.
 Require Import UkStep.
+Require Import RiscvExtras.
+Require Import UmodeAbi.
 Require Import UserHeap.
 Require Import TsoCtx.
 Local Open Scope Z_scope.
@@ -327,6 +329,65 @@ Section UkRun.
       iDestruct ("IH" $! f with "Hheap Hlo") as %Hlo.
       iPureIntro. intros j Hj.
       destruct (decide (j = n)) as [-> | Hne]; [ exact Hn | apply Hlo; lia ].
+  Qed.
+
+  (* ===================================================================== *)
+  (* WHAT THE FREE STACK ITSELF SAYS ABOUT SP.                             *)
+  (*                                                                       *)
+  (* The deepest word [ustack γd sp n] owns sits at [uint sp - 8n], and     *)
+  (* [uheap] bounds every owned address below MAXVA -- so "sp has n words   *)
+  (* of room below it" is a CONSEQUENCE of holding the free stack, not an   *)
+  (* obligation on whoever moves sp.  The sp-adjust rules take neither as   *)
+  (* a premise.                                                            *)
+  (* ===================================================================== *)
+  Lemma ustack_room (γt γd γs : gname) (M : gmap Z (bv 8))
+      (pm : gmap (mword 27) uperm) (sp : mword 64) (n : nat) :
+    uheap γt γd γs M pm -∗ ustack γd sp n -∗ ⌜ 8 * Z.of_nat n <= uint sp ⌝.
+  Proof.
+    iIntros "Hheap Hstk".
+    destruct n as [| n'].
+    - iPureIntro. pose proof (proj1 (bv_unsigned_in_range _ sp)) as H0.
+      rewrite uint_unsigned. lia.
+    - iDestruct (ustack_acc γd sp (S n') n' ltac:(lia) with "Hstk") as "[Hw _]".
+      iDestruct "Hw" as (w) "Hw".
+      iDestruct (uheap_uword_at with "Hheap Hw") as %[Hb _].
+      iPureIntro. rewrite Nat2Z.inj_succ. lia.
+  Qed.
+
+  (* ...and the same fact read at a MOVED sp: had [sp + 8k] wrapped, its own
+     frame's deepest word would be at a negative address. *)
+  Lemma ustack_nowrap (γt γd γs : gname) (M : gmap Z (bv 8))
+      (pm : gmap (mword 27) uperm) (sp : mword 64) (k : nat) :
+    uheap γt γd γs M pm -∗
+    ustack γd (add_vec_int sp (8 * Z.of_nat k)) k -∗
+    ⌜ uint sp + 8 * Z.of_nat k < Z64 ⌝.
+  Proof.
+    iIntros "Hheap Hstk".
+    iDestruct (ustack_room γt γd γs M pm
+                 (add_vec_int sp (8 * Z.of_nat k)) k with "Hheap Hstk") as %Hr.
+    iPureIntro.
+    pose proof (bv_unsigned_in_range _ (add_vec_int sp (8 * Z.of_nat k))) as Hr2.
+    rewrite Zmod64 in Hr2. rewrite <- uint_unsigned in Hr2.
+    pose proof (bv_unsigned_in_range _ sp) as Hs.
+    rewrite Zmod64 in Hs. rewrite <- uint_unsigned in Hs.
+    (* the moved sp's unsigned value IS the sum mod 2^64 *)
+    assert (Hmod : uint (add_vec_int sp (8 * Z.of_nat k))
+                   = (uint sp + 8 * Z.of_nat k) mod Z64).
+    { unfold add_vec_int. rewrite !uint_unsigned.
+      rewrite add_vec64_unsigned moi64_unsigned. unfold bv_wrap.
+      assert (E64 : bv_modulus 64 = 18446744073709551616)
+        by (vm_compute; reflexivity).
+      rewrite E64 Zplus_mod_idemp_r. unfold Z64. reflexivity. }
+    destruct (decide (uint sp + 8 * Z.of_nat k < Z64)) as [Hlt | Hge];
+      [ exact Hlt | exfalso ].
+    (* one wrap at most: [8k] and [uint sp] are each below 2^64 *)
+    assert (Hstep : (uint sp + 8 * Z.of_nat k) mod Z64
+                    = uint sp + 8 * Z.of_nat k - Z64).
+    { assert (Ha : uint sp + 8 * Z.of_nat k
+                   = (uint sp + 8 * Z.of_nat k - Z64) + 1 * Z64) by lia.
+      rewrite {1}Ha. rewrite Z_mod_plus_full.
+      apply Z.mod_small. unfold Z64 in *. lia. }
+    rewrite Hstep in Hmod. unfold Z64 in *. lia.
   Qed.
 
   (* ===================================================================== *)
