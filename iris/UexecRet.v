@@ -164,6 +164,11 @@ Lemma tf_of_num (m : regfile) (pc : mword 64) :
   = bv_signed (subrange_vec_dec (m !!! Regidx (mword_of_int 17)) 31 0 : mword 32).
 Proof. reflexivity. Qed.
 
+(* ...and argument 0 is its a0 -- what wait's row is based at *)
+Lemma tf_of_arg0 (m : regfile) (pc : mword 64) :
+  tf_of m pc !!! tf_arg_idx 0 = m !!! Regidx (mword_of_int 10).
+Proof. reflexivity. Qed.
+
 Lemma tf_of_resume_pc (m : regfile) (pc : mword 64) :
   is_aligned_vaddr (Virtaddr pc) 2 = true ->
   tf_resume_pc (tf_of m pc) = pc.
