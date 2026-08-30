@@ -1,5 +1,70 @@
 # Project: device conformance — the semantics, differentially tested against QEMU (and now against real hardware)
 
+## STATUS ADDENDUM (2026-08-30d): WHY EACH RED RUN IS RED, AND ONE THAT WASN'T
+
+Sixteen runs had no passing proof.  "No proof" only says the [TEST_PASSES]
+instantiation did not compile, which conflates three different things, so
+each one's [outcome] constructor was computed and read off:
+
+  * NONE were "passing but unbuilt".  The attempt project compiles EVERY
+    Pass.v with -k, so all 66 were tried; the table reads .vo only.
+  * TWELVE are genuine value divergences, each with a documented finding
+    (conc_sb -> 24, core_regs_gpr -> 18, core_regs_fpr n/a, core_regs_mcsr
+    -> 19/20/22, pt_ad -> 20, pt_tlb -> 26, disk_rw -> 1/2/4,
+    disk_ident_featsel + drvfsel -> 3, disk_ident_cap -> 13, core_csrprobe
+    -> 29/31/33).  conc_sb is the sharpest: the model exhibits THREE of the
+    four observed outcomes and differs at +12, which is exactly the missing
+    (0,0).
+  * THREE are [MBudget] -- NOT a value divergence at all.  The model never
+    reaches the DONE flag: core_regs_fpr traps on `fsd` (finding 21),
+    disk_chain leaves the device `virtio_stalled` (finding 17), clint_msip
+    takes a load access fault off hart 0 (finding 28).  Raising the budget
+    does not help -- measured, 10x was OOM-KILLED (exit 137), because these
+    spin in a handler forever.  The table currently renders "the model
+    disagreed about a value" and "the model made no progress" identically,
+    and they are different findings.
+
+### plic_level was none of the above, and is now green
+
+Its three differing words (R_PENDC, R_MIPC, R_CLAIM2) are named and
+PREDICTED in the .S itself: the model's gateway re-forwards a still-asserted
+level the instant [plic_complete] clears the claimed bit, so one device
+request yields a second interrupt, while QEMU's pending bit comes off the
+RISING EDGE only.
+
+THE MODEL IS THE ONE THAT IS RIGHT -- a re-forwarding level gateway is why a
+driver acknowledges the DEVICE before completing at the PLIC -- and the model
+also HAS an execution matching QEMU.  What it did not have was a harness that
+could reach it: [VSched.settle] takes every enabled arm, and a device step is
+an OPTIONAL transition, so eager settling forced a forward the RELATION never
+required.  The run reported a mismatch where what it showed was a gap in the
+harness.  (tools/vtest/README.md had already said so, under "One divergence
+where the MODEL is right", and asked for "a run_until variant parameterised
+by the device policy".)
+
+THE FIX, in two parts.  [VSched.settle1_gated] takes a [latch] flag and every
+existing caller passes [true], so nothing else moves.  And
+PlicLevelQemuRun.v is HAND-WRITTEN -- the first user of the generator's
+hand-written escape hatch -- with a device schedule.
+
+THE SCHEDULE IS A CREDIT, NOT A STEP COUNT, and that distinction is the whole
+design.  "Settle eagerly for the first K instructions" would also work and
+would be a lie: K is a magic number tied to the instruction sequence, says
+nothing about the device, and stops meaning anything when the .S changes.
+What the execution IS is "the gateway forwards ONCE" -- which is what an
+edge-triggered gateway does with a level that rises once, and is stated
+without reference to the program at all.  [settle1_credit] offers each settle
+round WITHOUT the gateway first and spends a credit only when nothing else is
+enabled, so the count counts FORWARDS rather than settle rounds.
+
+One forward is demonstrably enough for everything phase 1 checks: it sets
+pending (R_PEND0); [plic_latch] is guarded, so the level dropping does not
+clear it (R_PENDD is sticky) and the level rising again cannot re-forward
+while it is still pending (R_PENDR).  Only the post-complete forward is
+denied -- precisely the one QEMU does not make.  Result: MDone with ZERO
+differing bytes.
+
+
 ## STATUS ADDENDUM (2026-08-30c): THE MODEL FOUND A BUG IN A TEST
 
 `conc_mp` (message passing, the RVWMO-vs-TSO litmus) had a FALSE POSITIVE IN

@@ -190,6 +190,7 @@ DiskIdentWr1QemuPass.v
 DiskIntrQemuPass.v
 DiskOrderQemuPass.v
 PlicArbQemuPass.v
+PlicLevelQemuPass.v
 PlicMaskQemuPass.v
 PlicMctxQemuPass.v
 PlicPrio0QemuPass.v
