@@ -551,6 +551,8 @@ Section WriteiDefs.
           /\ bm' = bm /\ data' = data /\ dn' = dn /\ dn0' = dn0
           /\ n' = ncount)
          \/ (mf !!! Regidx Ra0 = (mword_of_int (Z.of_nat tot) : mword 64)
+             (* the EOF guard the writing arm passed -- see SpecWritei.v *)
+             /\ Z.of_nat off <= bv_unsigned (di_size dn)
              /\ (tot <= n)%nat
              /\ dn' = wi_dinode dn bm' off tot
              /\ dn0' = dn')⌝ -∗
@@ -653,6 +655,8 @@ Section WriteiRet.
       /\ bm' = bm /\ data' = data /\ dn' = dn /\ dn0' = dn0
       /\ n' = ncount)
      \/ (M !!! Regidx Ra0 = (mword_of_int (Z.of_nat tot) : mword 64)
+         (* the EOF guard the writing arm passed -- see SpecWritei.v *)
+         /\ Z.of_nat off <= bv_unsigned (di_size dn)
          /\ (tot <= n)%nat
          /\ dn' = wi_dinode dn bm' off tot
          /\ dn0' = dn')) ->
@@ -1025,6 +1029,9 @@ Section WriteiJoin.
        SpecWritei.v's header. *)
     (off + tot <= MAXFILE * BSIZE)%nat ->
     (inode_sized data -> inode_sized data') ->
+    (* ...and the OTHER up-front guard, +0x02's, travelling to the arm this
+       block builds.  Pure relay: nothing here reads it. *)
+    Z.of_nat off <= bv_unsigned (di_size dn) ->
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
     wi_sp m M ->
@@ -1099,7 +1106,7 @@ Section WriteiJoin.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hadr Hwf' Hhz' Hsz' Hcov'
-           Hrngt Hsized'
+           Hrngt Hsized' Hoffle
            Hj Hgl Hsp Hs5 Hs3 Hs1 Hs8 Hs9 Hs10 Hs11 Hdb Hd0 Hdk Hrange Hker Htotn Hdneq
            Hlo Hhi Hhi1 Hsbsub Hwi16 Hext Hlkbelow.
     pose proof HK as HK'. 
@@ -1350,7 +1357,8 @@ Section WriteiJoin.
               Hsized'
               Hdb Hd0 Hdk Hrange Hker
               ltac:(right; split_and!;
-                    [exact HT3a0 | exact Htotn | exact Hdneq | reflexivity])
+                    [exact HT3a0 | exact Hoffle | exact Htotn | exact Hdneq
+                    | reflexivity])
               ltac:(case_bool_decide; lia) ltac:(case_bool_decide; lia)
               (wiset_sub_add_r Sb SbC {[IBLOCK inum icfg_ist]} Hsbsub)
               (wi16_pre_join (ba_bms A) inum icfg_ist ncount u off n tot
@@ -1423,6 +1431,8 @@ Section WriteiSize.
        forwarded to [wi_join].  See SpecWritei.v's header. *)
     (off + tot <= MAXFILE * BSIZE)%nat ->
     (inode_sized data -> inode_sized data') ->
+    (* ...and +0x02's guard, relayed to [wi_join] unread. *)
+    Z.of_nat off <= bv_unsigned (di_size dn) ->
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
     wi_sp m M ->
@@ -1486,7 +1496,7 @@ Section WriteiSize.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hwf' Hhz' HcovS HcovT Hszlt Hofflt
-           Hrngt Hsized'
+           Hrngt Hsized' Hoffle
            Hj Hgl Hsp Hs5 Hs2 Hs3 Hdb Hd0 Hdk Hrange Hker Htotn Hlo Hhi Hhi1 Hsbsub
            Hwi16 Hext Hlkbelow.
     pose proof HK as HK'. 
@@ -1737,7 +1747,7 @@ Section WriteiSize.
                 dist dstb U P' ncount u Sb SbC pidv dq dqd dqn dqs A m QB5 K eb b lks
                 HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk eq_refl Hwf' Hhz'
                 ltac:(rewrite Hdsz; change (2 ^ 31)%Z with 2147483648%Z; exact Hszlt)
-                Hcovf Hrngt Hsized'
+                Hcovf Hrngt Hsized' Hoffle
                 Hj Hgl HQB5sp HQB5s5 HQB5s3
                 HQB5Rs1 HQB5Rs8 HQB5Rs9 HQB5Rs10 HQB5Rs11
                 Hdb Hd0 Hdk Hrange Hker Htotn eq_refl Hlo Hhi Hhi1 Hsbsub Hwi16 Hext Hlkbelow
@@ -1950,7 +1960,7 @@ Section WriteiSize.
                 dist dstb U P' ncount u Sb SbC pidv dq dqd dqn dqs A m QA5 K eb b lks
                 HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk eq_refl Hwf' Hhz'
                 ltac:(change (2 ^ 31)%Z with 2147483648%Z; exact Hszn)
-                Hcovf Hrngt Hsized'
+                Hcovf Hrngt Hsized' Hoffle
                 Hj Hgl HQA5sp HQA5s5 HQA5s3
                 HQA5Rs1 HQA5Rs8 HQA5Rs9 HQA5Rs10 HQA5Rs11
                 Hdb Hd0 Hdk Hrange Hker Htotn eq_refl Hlo Hhi Hhi1 Hsbsub Hwi16 Hext Hlkbelow
@@ -2028,6 +2038,9 @@ Section WriteiLoop.
     (Z.of_nat off < 2 ^ 31) ->
     (Z.of_nat n < 2 ^ 31) ->
     (off + n <= MAXFILE * BSIZE)%nat ->
+    (* +0x02's guard, relayed to [wi_size] and on to the arm.  Loop-invariant
+       for free: neither [off] nor [dn] moves. *)
+    Z.of_nat off <= bv_unsigned (di_size dn) ->
     eq_vec usv zero_reg = negb user ->
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
@@ -2138,7 +2151,8 @@ Section WriteiLoop.
             m K eb b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hszdn Hofflt Hnlt Hrng Husv Hj Hgl.
+    intros HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hszdn Hofflt Hnlt Hrng Hoffle
+           Husv Hj Hgl.
     pose proof HK as HK'. 
     change (2 ^ 31)%Z with 2147483648%Z in Hszdn, Hofflt, Hnlt.
     assert (Hgeom0 : log_geom_ok fsc_cov fsc_logst) by exact Hgeom.
@@ -2432,6 +2446,7 @@ Section WriteiLoop.
                 ltac:(lia)
                 ltac:(intros Hs; exact (wi_sized_bmap bmI dataI data2 fbn Hdep2
                                           (HsizedI Hs)))
+                Hoffle
                 Hj Hgl HB1sp HB1s5 HB1s2 HB1s3 ltac:(lia) ltac:(intros; reflexivity)
                 ltac:(intros; reflexivity)
                 (wi_range_dist0 data data2 off tot wroteI wroteI Hrange2)
@@ -3501,6 +3516,7 @@ Section WriteiLoop.
                       ltac:(intros Hs;
                             exact (wi_sized_step bmI data dataI data2 fbn o mm g
                                      Hdep2 HsizedI Hs))
+                      Hoffle
                       Hj Hgl HG3sp HG3s5 HG3s2 HG3s3
                       ltac:(lia) ltac:(intros; reflexivity)
                       ltac:(intros; reflexivity)
@@ -3860,6 +3876,7 @@ Section WriteiLoop.
                     ltac:(intros Hs;
                           exact (wi_sized_step bmI data dataI data2 fbn o mm g
                                    Hdep2 HsizedI Hs))
+                    Hoffle
                     Hj Hgl HRsp HRs5 HRs2 HRs3
                     ltac:(rewrite Hbsz in Hmmo |- *; lia)
                     ltac:(intros Heq; exfalso; lia)
@@ -4755,7 +4772,7 @@ Section WriteiMain.
                 0%nat (fun _ => bv_0 8) U (pv_upt (us_V U)) (S unc) unc Sb Sb
                 pidv dq dqd dqn dqs A m Z1 K eb b lks
                 HK Hgeom0 Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hadr Hwf Hhz Hszdn Hcovin
-                ltac:(lia) ltac:(intros Hc; exact Hc) Hj Hgl
+                ltac:(lia) ltac:(intros Hc; exact Hc) Hbig Hj Hgl
                 HZ1sp HZ1s5 HZ1s3 ltac:(lkp) ltac:(lkp) ltac:(lkp) ltac:(lkp)
                 ltac:(lkp) ltac:(unfold BSIZE; lia) ltac:(intros; reflexivity)
                 ltac:(intros; reflexivity)
@@ -4977,7 +4994,8 @@ Section WriteiMain.
  ip inum bm data dn dn0 user off n
               src_bytes U ncount Sb (m !!! Regidx Ra1 : mword 64)
               pidv dq dqd dqn dqs A m K eb b lks
-              HK Hgeom0 Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hszdn Hofflt Hnlt Hrng Ha1 Hj Hgl
+              HK Hgeom0 Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hszdn Hofflt Hnlt Hrng Hbig
+              Ha1 Hj Hgl
               (wi_blocks off n) 0%nat bm data (fun _ => bv_0 8) (pv_upt (us_V U)) ncount Sb U3
               ltac:(lia) Hwf Hhz ltac:(intros Hc; exact Hc) Hcovin
               ltac:(apply (bm_covers_mono bm (bv_unsigned (di_size dn)) _ Hcovin);

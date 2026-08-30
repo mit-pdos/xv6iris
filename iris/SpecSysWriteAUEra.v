@@ -40,16 +40,16 @@
      [write_post_fail] / [write_arms] with [awrite_commits] replaced by
      [awrite_commits_at] in the refund, and nothing else.
 
-   ==== ...AND ONE DELETION, PAID FOR BY THE OWNER'S RULING =============
+   ==== ...AND ONE DELETION, PAID FOR BY TWO OWNER RULINGS ==============
 
    The frozen sketch's THIRD arm ("the row does not read as a FILE") is
    GONE, together with [write_post_nofile_at] and the chunk loop's [clean]
    flag: [FileInvDefs.inode_pay] now carries the FD_INODE ⇒ not-a-device
    conjunct and filewrite's inode arm reads [di_type = T_FILE_z] outright.
-   What the loop still has to be able to do is SKIP a chunk whose start is
-   past EOF (see [write_arms_at] below and [SpecFilewriteAU]'s header),
-   and a skip is a strict shortfall, so it lands in the FAIL arm at a
-   WIDENED return value rather than in an arm of its own.
+   No third arm and no skip replaced it either: [SpecWritei]'s success arm
+   reports [off <= di_size] of the pre-write record (the second ruling), so
+   every chunk the loop runs to completion is one the fire can take, and
+   TWO arms keyed on the return value alone are the whole post.
 
    ==== THE STABLE COROLLARY ============================================
 
@@ -161,23 +161,18 @@ Section SysWriteAUEra.
      four-way enumeration to read [di_type = T_FILE_z] outright.  The arm,
      its [write_post_nofile_at] and the loop's [clean] flag all go.
 
-     WHAT DOES REMAIN IS A SHORTFALL, AND IT RIDES IN THE FAIL ARM.  A
-     chunk fires only if its start is inside the file ([wri_pre]'s
-     [off <= length bs0]); [SpecWritei]'s SUCCESS arm does not expose that
-     guard, so the prover must be able to SKIP a chunk it cannot fire.  A
-     skipped chunk is a strict shortfall -- and "the receipts fall short of
-     the count" is exactly [write_post_fail_at].  So the second arm's
-     RETURN VALUE is widened instead: it answers [-1] (the break) OR [n]
-     (the loop ran to the end but this contract holds a strict prefix of
-     the receipts).  A consumer that reads [n] in a0 therefore keeps the
-     one disjunction it always had -- and gets the totals fact on BOTH
-     sides of it, which the deleted arm did not give. *)
+     AND NOTHING REMAINS BESIDE IT.  A chunk fires only if its start is
+     inside the file ([wri_pre]'s [off <= length bs0]) -- and
+     [SpecWritei]'s SUCCESS arm now EXPOSES that guard (owner's ruling,
+     2026-08-29: the writing arm reports [off <= di_size] of the pre-write
+     record, the negation of the reason its own [-1] arm reports).  So
+     there is no chunk the prover has to skip, the two arms are keyed on
+     the return value alone, and this arm answers exactly [-1]. *)
   Definition write_arms_at Γ (i : Z) (n : Z)
       (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ)
       (r : mword 64) : iProp Σ :=
     ((⌜r = (mword_of_int n : mword 64) /\ 0 <= n⌝ ∗ write_post_ok_at Γ i n Φ)
-     ∨ (⌜r = (mword_of_int (-1) : mword 64)
-         \/ (r = (mword_of_int n : mword 64) /\ 0 <= n)⌝
+     ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
         ∗ write_post_fail_at Γ i n Φ))%I.
 
   (* the stable corollary's arms, at the same substitution *)
@@ -195,8 +190,7 @@ Section SysWriteAUEra.
             ∨ wri_receipts i Φ bss) ∗
            awrite_commits_at Γ ∅ i Φ (length bss)
              (wchunks n - length bss)%nat)
-      ∨ (⌜r = (mword_of_int (-1) : mword 64)
-          \/ (r = (mword_of_int n : mword 64) /\ 0 <= n)⌝
+      ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
          ∗ write_post_fail_at Γ i n Φ)))%I.
 
 End SysWriteAUEra.

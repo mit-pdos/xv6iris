@@ -4864,7 +4864,7 @@ Section ProofSysUnlinkBody.
                     = mword_of_int (SU + 0xaa)) by pcw.
     iEval (rewrite Hppaa) in "Hpc".
     (* ===== +0xaa bne a0,a5 -> [panic "unlink: writei"] ===== *)
-    destruct Harm as [(Ha0m & _ & Htot0 & _) | (Ha0w & Htotle & HdnW & Hdn0W)].
+    destruct Harm as [(Ha0m & _ & Htot0 & _) | (Ha0w & _ & Htotle & HdnW & Hdn0W)].
     { (* the -1 arm: writei refused; the test is TAKEN and panic never
          returns *)
       iApply (wp_bne_taken_s_sconf (CID := D14) (mword_of_int (SU + 0xaa))
@@ -6504,7 +6504,7 @@ Section ProofSysUnlinkBody.
                     = mword_of_int (SU + 0xaa)) by pcw.
     iEval (rewrite Hppaa) in "Hpc".
     (* ===== +0xaa bne a0,a5 -> [panic "unlink: writei"] ===== *)
-    destruct Harm as [(Ha0m & _ & Htot0 & _) | (Ha0w & Htotle & HdnW & Hdn0W)].
+    destruct Harm as [(Ha0m & _ & Htot0 & _) | (Ha0w & _ & Htotle & HdnW & Hdn0W)].
     { (* the -1 arm: writei refused; the test is TAKEN and panic never
          returns *)
       iApply (wp_bne_taken_s_sconf (CID := D14) (mword_of_int (SU + 0xaa))

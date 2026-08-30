@@ -168,7 +168,19 @@
 
    The -1 arm additionally reports WHY (off past the end, or the range past
    MAXFILE*BSIZE), so a caller that has checked those knows it will not be
-   taken.  The overflow test at +0x02e is DEAD BY THE JOINT NUMERIC PREMISE
+   taken.  AND THE WRITING ARM REPORTS THE EOF GUARD IT PASSED --
+   [off <= ip->size] on the PRE-write record.  The two arms are the two
+   readings of ONE test -- the [c.lw a5,76(a0)] at +0x00 and the [bltu
+   a5,a3] at +0x02 -- and stating it only on the -1 side left the contract
+   PERMITTING a success past the end of the file, which the code cannot
+   produce: an abstract caller that reads the effect of the write as a
+   SPLICE at [off] then has a range clause whose [file_byte data k] tail is
+   junk it never owned, and its delta is WRONG rather than merely
+   unprovable.  (FILEWRITE-AU is that caller; the guard is what its commit
+   is keyed on.)  It costs no proof: every path that reaches the writing
+   arm is past that branch, so the fall-through fact is already in hand and
+   only travels down the block chain to the arm.
+   The overflow test at +0x02e is DEAD BY THE JOINT NUMERIC PREMISE
    [off + n < 2^31] below -- NOT by two separate bounds on [off] and [n],
    which would let the [addw] at +0x022 wrap.  See that premise's comment,
    including the coverage note it carries.
@@ -750,6 +762,13 @@ Definition wp_writei_sconf_body
         /\ n' = ncount)
        \/ (mf !!! Regidx (mword_of_int 10 : mword 5)
              = (mword_of_int (Z.of_nat tot) : mword 64)
+           (* THE EOF GUARD, ON THE ARM THAT PASSED IT.  The negation of the
+              -1 arm's first reason, in the SAME position that arm states it,
+              about the SAME (pre-write) record.  Without it a success past
+              the end of the file is spec-permitted and code-impossible, and
+              a caller reading the write as a splice at [off] gets a wrong
+              delta, not an unprovable one.  See the header. *)
+           /\ Z.of_nat off <= bv_unsigned (di_size dn)
            /\ (tot <= n)%nat
            /\ dn' = wi_dinode dn bm' off tot
            /\ dn0' = dn')⌝ -∗
@@ -1018,6 +1037,13 @@ Definition wp_writei_gen_body
         /\ n' = ncount)
        \/ (mf !!! Regidx (mword_of_int 10 : mword 5)
              = (mword_of_int (Z.of_nat tot) : mword 64)
+           (* THE EOF GUARD, ON THE ARM THAT PASSED IT.  The negation of the
+              -1 arm's first reason, in the SAME position that arm states it,
+              about the SAME (pre-write) record.  Without it a success past
+              the end of the file is spec-permitted and code-impossible, and
+              a caller reading the write as a splice at [off] gets a wrong
+              delta, not an unprovable one.  See the header. *)
+           /\ Z.of_nat off <= bv_unsigned (di_size dn)
            /\ (tot <= n)%nat
            /\ dn' = wi_dinode dn bm' off tot
            /\ dn0' = dn')⌝ -∗
