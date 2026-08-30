@@ -12,6 +12,7 @@ Module ConcSmokeJh7110Case <: CONC_CASE.
   Definition platform  := "jh7110"%string.
   Definition regions   : list region := std_regions.
   Definition budget    : nat := 5000%nat.
+  Definition hart_base : Z := 2.
   Definition schedules := ConcSmokeSched.schedules.
   Definition proj      := whole.
 

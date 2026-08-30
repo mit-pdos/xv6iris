@@ -12,6 +12,7 @@ Module ConcAmoJh7110Case <: CONC_CASE.
   Definition platform  := "jh7110"%string.
   Definition regions   : list region := std_regions.
   Definition budget    : nat := 20000%nat.
+  Definition hart_base : Z := 2.
   Definition schedules := ConcAmoSched.schedules.
   Definition proj      := whole.
 

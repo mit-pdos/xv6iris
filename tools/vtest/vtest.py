@@ -690,7 +690,7 @@ def emit_run_for(name, platform, text, observed, hart, path):
         if not os.path.exists(os.path.join(ROCQDIR,
                                            modname(name) + "Sched.v")):
             return False                # no interleavings written yet
-        emit_run_conc(name, platform, text, observed, path)
+        emit_run_conc(name, platform, text, observed, path, hart)
     elif b == "sched":
         emit_run_sched(name, platform, text, observed, hart, path)
     elif b == "picks":
@@ -779,7 +779,7 @@ Module {mod} := PicksHart {mod}Case.
     return path
 
 
-def emit_run_conc(name, platform, text, observed, path):
+def emit_run_conc(name, platform, text, observed, path, hart=0):
     """The RUN MODULE for a multi-hart case.  Same [TEST_RUN] as any other
     run; only the way [outcome] is computed differs, and that lives in
     VRunConc's [ConcRun] functor.  The interleavings come from the
@@ -803,6 +803,7 @@ Module {mod}Case <: CONC_CASE.
   Definition platform  := "{platform}"%string.
   Definition regions   : list region := {regions_of(name)}.
   Definition budget    : nat := {cfg['budget']}%nat.
+  Definition hart_base : Z := {hart}.
   Definition schedules := {sched}.schedules.
   Definition proj      := {proj_of(name)}.
 

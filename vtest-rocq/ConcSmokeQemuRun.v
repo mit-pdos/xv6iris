@@ -12,6 +12,7 @@ Module ConcSmokeQemuCase <: CONC_CASE.
   Definition platform  := "qemu"%string.
   Definition regions   : list region := std_regions.
   Definition budget    : nat := 5000%nat.
+  Definition hart_base : Z := 0.
   Definition schedules := ConcSmokeSched.schedules.
   Definition proj      := whole.
 
