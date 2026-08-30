@@ -295,11 +295,6 @@ UProofShTop.v
 UProofShMain.v
 UProofShEcho.v
 UCodeInit.v
-UmodeInitIo.v
-USpecInit.v
-UProofInitLib.v
-UProofInitPrintf.v
-UProofInit.v
 UserMemArms.v
 UserClassify.v
 UserClassifyAsm.v
