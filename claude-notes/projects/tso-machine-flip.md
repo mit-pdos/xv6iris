@@ -16661,3 +16661,198 @@ iget/ilock/iput, filealloc/fileclose, pipe*).
 r54 (CLEAN, §1–§2): **1205/1303, red roots 7 (the same set), zero
 admits**; snapshot `6b62156`.  r55 (CLEAN, + §3): **1205/1303, red roots 7 (the same set), zero admits**; snapshot `3df4de899`.
 
+## A6.130 — THE PIPE λ-CONVERTED (r56)
+
+*(Lock lane, 2026-08-30.  A6.121's recipe, the third structure after
+wait/nextpid.)*
+
+`PipeInvDefs.pipe_data_at ξ pi bs` and `pipe_res_at γp pi ξ` (the context
+LAST, so `is_pipe … (pipe_res_at γp pi)` is a partial application);
+`pipe_res := pipe_res_at γp pi cur_ctx`; real `CtxMorph` instances for
+both.  `is_pipe` takes `(pipe_res_at γp pi)`; the 19 `<{ pipe_res }>`
+sites are the parenthesised partial application (the sweep that dropped
+the `<{ }>` brackets is the one to avoid: the bracket is the payload
+coercion, the parenthesis is the application).  Zero consumer proof
+edits.  What this does NOT settle is A6.129 §4's point for the pipe: the
+`inv` that owns `pipe_res_at γp pi ξ` at a FIXED ξ still has no opener
+floor -- the λ-conversion only makes the payload honest about which ξ.
+
+## A6.131 — THE ERA'S IMAGE IS A NAME (r56)
+
+*(Lock lane, 2026-08-30.  Root change; every hart shares it.)*
+
+`riscvEraGS.era_img : bytemap` is the era's initial image as a CONSTANT of
+the era record, and the interpretation says so: `tso_interp_at` carries
+`⌜mm_ok g ∧ g.(gimg) = era_img E⌝`, `tso_interp_of`'s last conjunct is
+`⌜img = era_img E⌝` (`tso_interp_at_img`, `tso_interp_of_img` read them
+back), `power_boot_res` carries `⌜era_img HE = g'.(gimg)⌝` and
+`power_boot_res_unpack` exports `⌜era_img riscv_eraGS = g.(gimg)⌝` (the
+trailing conjunct; `BootShared` destructs it as `%Hera`).  Files:
+`RiscvPtsto`, `RiscvExec`, `RiscvAdequacy`, `TsoCtx`, `CtxPinMint`,
+`BootShared`.  WHY: a racy reader's predicate must talk about the image
+byte under an EMPTY history (A6.132's `started_img`: "the era's image has
+`started_clear` at the four bytes"), and before this the image was an
+existential inside the interpretation that no invariant could name.  The
+boot side proves the fact from `boot_facts`' `gimg = gmem` clause and the
+`.bss` byte lemma (`boot_byte_bss`).
+
+r56 (CLEAN, A6.130 + A6.131): **1205/1303, red roots 7 (the same set),
+zero admits**; snapshot `80e2e1da7`.
+
+## A6.132 — THE `started` BARRIER: a racy release/acquire word at the ledger tier (§0.45′)
+
+*(Lock lane, 2026-08-30.  Ruling §0.45′ in tso-port.md; the design was
+settled with the owner before the port.  The owner wants the PATTERN
+abstracted next -- "barrier-style shared variable" -- so that virtio and
+started share one proof; this entry is the measured instance that
+abstraction has to cover.)*
+
+### §1. WHY `started_inv` COULD NOT STAY A `ctx_pointsto` INVARIANT
+
+`while (started == 0);` is a plain load on every secondary hart and
+`started = 1` is a plain store after a `fence rw,w` on the primary: nobody
+holds a lock, nobody reads the LATEST value.  A `∃ v, started ↦₄ v`
+escrow at a fixed context (the old `started_inv`) says the reader's
+context sees the cell's stable view -- false for a secondary whose view
+may be anywhere below the release store.  The owner's diagnosis: "truly a
+racy barrier … the primary core that sets started:=1 is similar to
+lock-release, and the secondary cores that wait for started==1 are like
+the lock-acquire" and, on the second look, "closer to the virtio pattern
+than the lock, because the lock only needs to say things about the latest
+value (acquire definitely gets to see the latest, by using an AMO), but
+in virtio the acquire-like reader isn't seeing the latest value."  So the
+cell is stated with the LEDGER vocabulary the virtio ring uses
+(`phys_ledger_rpay`, `ledger_msg_at`, `visibleb`), not with a view.
+
+### §2. THE INVARIANT (`StartedInv.v`, rewritten)
+
+```
+started_win_plain   := [∗ list] j ∈ seq 0 4, phys_ledger_at (pa_add started_addr j) (DfracOwn 1) (nth_byte started_clear j) 0
+started_win_rel i   := [∗ list] j ∈ seq 0 4, phys_ledger_rpay (pa_add started_addr j) (DfracOwn 1) (nth_byte started_set j) (S i)
+                                                (TsRel started_addr 4 j 0 [S i])
+started_img         := ∀ j < 4, era_img riscv_eraGS !! pa_add started_addr j = Some (nth_byte started_clear j)
+started_idx γi i    := dset_in γi (S i, started_addr)          started_prim γi := dset_auth γi (1/2) ∅
+started_right γi ξd P := ∃ i m c T, started_win_rel i ∗ ledger_msg_at i m ∗ ⌜pm_tid m = hart_agent c⌝ ∗ ⌜cid_word_of c = zero_reg⌝
+                         ∗ dset_auth γi 1 {[(S i, started_addr)]} ∗ ctx_parked ξd T ∗ ⌜T ≤ S i⌝ ∗ P ξd
+started_body γi ξd P := wordw_claim (KTR := KT0) 4 started_addr ∗ ⌜started_img⌝
+                         ∗ (started_win_plain ∗ dset_auth γi (1/2) ∅ ∗ ctx_parked ξd 0  ∨  started_right γi ξd P)
+started_inv γi ξd P := inv startedN (started_body γi ξd P)
+```
+
+- **`ξd` is the DEPOSIT CONTEXT**: a parked context used only to state
+  and carry the primary's facts across the barrier (`P : CtxId → iProp`,
+  `P ξd` in the armed arm).  Boot mints it at stamp 0
+  (`ctx_parked_alloc`, the boot-only mint of §0.44′); the release store
+  bumps it to the store's own index (`ctx_deposit` after `ctx_absorb_lb`
+  against the primary's running token, whose view is above the store);
+  the acquirer transports `P ξd → P cur_ctx` with `ctx_absorb_lb` at its
+  `hart_view_lb`.
+- **The index is a ghost singleton** (`TsoGhost.dset_*`, reused as a
+  monotone set of one element): the armed arm owns the whole authority
+  at `{[(S i, started_addr)]}`, a reader takes `started_idx γi i` (a
+  fragment) out with its read, and `started_absorb` re-opens the
+  invariant and AGREES the fragment against the authority to learn the
+  arm's index is the one it read at.  The plain arm holds half the
+  authority at `∅` and `started_prim` (boot's export to the primary) is
+  the other half: that is what excludes the armed arm at the store
+  (`dset_auth_excl`, `started_store_open`).
+- **`started_img`** is the plain arm's reading rule: with an EMPTY
+  history at the window the reader sees the image byte, i.e.
+  `started_clear`, at every view (A6.131 made the image nameable).
+- The four `ledger_msg_at`/`cid_word_of c = zero_reg` conjuncts pin the
+  release message to the primary's agent; nothing consumes the CPU
+  identity yet, it is there for the `visibleb` reading rule's author.
+
+### §3. THE RULES, AND THE ONE NEW MACHINE LEAF
+
+- **Reader** (`ProofMainSecondary.ms_spin`): the resource-post load leaf
+  **`WpSconfMem.wp_load_s_sconf_au_relr`** (new; `HartSMem.Mobl_ram_exvvr`,
+  `swp_read_ram_node{1,2,4,8}_exvvr`, `swp_read_ram_node_w_exvvr`,
+  `WpSconfMem.wp_load_s_sconf_au_relr`).  Its obligation returns the
+  resource UNCHANGED plus a pure "some value is readable at every view
+  ≥ V" and a wand `∀ tvr v, ⌜V ≤ tvr⌝ -∗ ⌜tso_read_bytes … tvr … v⌝ -∗
+  W v tvr`; the continuation gets `∃ V0, hart_view_lb V0 ∗ W v V0`.
+  This is the whole difference from `_dat`: a racy reader cannot name
+  the word, only a predicate the word satisfies at whatever view the
+  machine's drain picks -- and the wand closes over the ARM'S index, which
+  a pure `Q v` fixed before the step never could (the reader-side pin
+  problem that stalled the first design).
+  `started_read_open` (mask-changing open to `started_res`),
+  `started_read_obl` (the obligation: case on the arm; plain arm reads
+  `started_clear` by `started_img` + `ledger_read_bytes_vis_ok` on the
+  empty history; armed arm reads `started_set` iff `S i ≤ tvr`, else
+  `started_clear` -- `started_win_rel_latest` extracts the four `latest`
+  facts and hands the resources back), and
+  `started_W γi ξd P v tv := ⌜v = started_clear⌝ ∨ ∃ i, ⌜v = started_clear
+  ∨ (v = started_set ∧ S i ≤ tv)⌝ ∗ started_idx γi i ∗ ▷ P ξd`.
+  The fence at +0x18 strips the `▷` (its continuation is under a later,
+  and `iNext` strips through the ∃/∗/∨); on the fall-through arm the
+  `beqz` contradicts `v = started_clear`, and the acquire is
+  `started_absorb ⊤ γi ξd P i V0 : S i ≤ V0 → started_inv -∗ started_idx
+  -∗ hart_view_lb V0 -∗ own_context cur_ctx -∗ P ξd ={⊤}=∗ own_context
+  cur_ctx ∗ P cur_ctx` with the token borrowed through
+  `SieCapCtx.sie_cap_gpr_own_ctx_acc`.  The continuation gets `P cur_ctx`
+  (`main_dep γd γv cur_ctx` = `main_deposit (XI := cur_ctx)`).
+- **Writer** (`ProofMain.mn_grp_started`): `wp_store_s_sconf_au_dat` with
+  `Res := started_win_plain ∗ dset_auth γi (1/2) ∅ ∗ ctx_parked ξd 0 ∗
+  started_prim γi ∗ P cur_ctx` and `Post := started_right γi ξd P`;
+  `started_store_open` supplies the fupd (opens, excludes the armed arm by
+  `dset_auth_excl`, closes on `started_right`); `started_store_obl` is the
+  obligation: `ledger_rpay_mint` at the store's index over the four bytes
+  (`rel_ok1` with the store's position history `[S i]`), `dset_insert`
+  the index, `ctx_absorb_lb` + `ctx_deposit` of `P cur_ctx` into `ξd` at
+  the store's stamp.  The claim comes from `started_inv_claim` (a
+  peek-open; the claim is persistent and timeless).
+- **Boot** (`BootShared.boot_bss_carve`): the cell is carved to the
+  LEDGER tier at stamp 0 with the address facts beside it --
+  **`BootCarve.boot_cran_ledger_at0_bss4`** (raw run → mem bytes →
+  `mem_pointsto_acc`'s phys byte, `ktier_pin_id` at KT0; led run →
+  `ledger_elem0`; `phys_ledger_at0_of_elem`), then
+  `StartedInv.started_claim_intro` builds `started_claim` (=
+  `wordw_claim (KTR := KT0) 4 started_addr`, a name so `BootShared` need
+  not import the memory rules).  `boot_shared_alloc` mints `ξd`
+  (`ctx_parked_alloc`), proves `started_img` from `%Hera` (A6.131) +
+  `boot_facts`' `gimg = gmem` + `boot_byte_bss`, runs `started_alloc ⊤ ξd
+  (main_dep γd γv)` and exports `∃ … γi ξd, started_inv γi ξd (main_dep γd
+  γv) ∗ started_prim γi ∗ …`.  `BootChain.boot_hart_primary/secondary`
+  and `SystemAdequacy` thread `γi ξd` and route `Hprim` to the boot hart.
+- **Specs**: `SpecMain.wp_main_boot_sconf_body … γi ξd P` with `{!∀ ξ,
+  Persistent (P ξ)} {!CtxMorph P}`, rows `started_inv γi ξd P -∗
+  started_prim γi -∗ □(… -∗ P cur_ctx)`; `SpecMainSecondary`'s body takes
+  `γi ξd` and `started_inv γi ξd (main_dep γd γv)`; `main_dep γd γv := λ ξ,
+  main_deposit (XI := ξ)` with `main_dep_persistent`/`main_dep_morph`
+  (the morph needs `is_txlock_morph`, `is_conslock_morph`,
+  `console_caps_morph`, `printk_env_morph`, `disk_geom_morph`, in a
+  section split so `(XI := ξ)` can be written).
+
+### §4. WHAT COMPILED, WHAT COULD NOT BE REACHED (measured)
+
+- Green-chain files, compiled on the VM as `.vo`: `StartedInv`,
+  `SchedCtx`, `SpecMain`, `SpecMainSecondary`, `HartSMem`, `WpSconfMem`,
+  `BootCarve`, **`ProofMainSecondary`** (the spin, the fence, the absorb --
+  the whole acquire side is certified).
+- `ProofMain`: the store site and `wp_main_boot_sconf` compile, MEASURED
+  under two SCRATCH admits that were reverted before anything was
+  snapshotted: the standing red `mn_grp_kvm` (`:996`, K15d) and a SECOND
+  standing red behind it, **`mn_grp_fs` at `:1495` (`iApply fupd_wp`
+  against a goal that is not a `WP`)** -- previously masked by `:996`.
+  Both are pre-existing and unrelated to the barrier.
+- `BootChain`, `BootShared`, `SystemAdequacy`: NOT compile-checked.
+  They sit under `LinkMain` (`LinkKernelvec`, `LinkUserinit`, `ProofMain`),
+  i.e. under ALL SEVEN red roots (computed from `.CoqMakefile.d`); a
+  `.vok` check against `.vos` interfaces was tried and does not help --
+  `-vos` still runs these files' failing proof scripts, and
+  `ProofForkretPark` has a MODULE-SIGNATURE mismatch at `:373`
+  (`usertrap_res_bare_park`'s `CurCtx` parameter) behind its `:318` tactic
+  error, which no interface build can skip.  Their edits are written to
+  the recipe above and will be checked when the roots are green.
+
+### §5. NUMBERS
+
+r57 (VM incremental round, no stale `.vo`, A6.132): **1205/1303, red roots 7
+(the same set; `ProofMain` at `:997` after its new import), zero admits**;
+snapshot `3d998dbbb`.  The count is unchanged because the newly certified
+files (`StartedInv`, `ProofMainSecondary`, `SpecMain*`, `BootCarve`) were
+already green and the newly written ones (`BootChain`, `BootShared`,
+`SystemAdequacy`) were already under the red roots.
+

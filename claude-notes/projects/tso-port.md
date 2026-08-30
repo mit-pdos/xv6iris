@@ -4403,3 +4403,39 @@ child's [park_globals] and [proc_priv] is the invariant class -- the
 icache table, the pipe, the bcache escrow -- and A6.129 §4 states the
 open design point (an opener's floor at the record's stamp) for ruling.
 
+### 0.45′ OWNER RULING (2026-08-30): the `started` barrier is a RACY
+### release/acquire word, stated at the ledger tier with a deposit context
+
+Owner: "3 (started_inv) is truly a racy barrier, so that probably requires
+some changes to be stated without the stable-view ctx_pointsto
+assertion … one core is responsible for setting started := 1, and other
+cores just keep reading started repeatedly until they observe 1, at which
+point they know their contexts are high enough to observe all the other
+facts published by the first core … closer to the pattern in a spinlock,
+rather than an invariant that's stated with ctx_pointsto"; then, on the
+proposed ledger statement: "this pattern seems indeed closer to the
+virtio pattern than the lock, because the lock only needs to say things
+about the latest value (acquire definitely gets to see the latest, by
+using an AMO), but in virtio, the acquire-like reader isn't seeing the
+latest value"; and the approval: "ok, yes, this looks good.  so even when
+the invariant's disjunction is in the second case, a secondary core might
+not yet see it, but at least it knows then, the only alternative thing it
+can be seeing is the empty history, which means it'll see 0 and keep
+looping.  but if it does see started_set, it knows it's up-to-date and can
+extract the deposited facts.  yes, i like your plan for ξd to be the
+deposit context that's just used to state/carry facts across this
+barrier."
+
+Kit and consumers: A6.132 (`StartedInv` rewritten; the resource-post read
+leaf `wp_load_s_sconf_au_relr`; boot carves the cell to the ledger tier;
+`γi ξd` threaded through `SpecMain`/`SpecMainSecondary`/`BootShared`/
+`BootChain`/`SystemAdequacy`).  Prerequisite root change: the era's image
+is a name (A6.131).
+
+STATUS: the acquire side (`ProofMainSecondary`) and the kit are certified
+in r57; the release site compiles under scratch admits of `ProofMain`'s
+two standing reds; the boot chain is written but sits under all seven red
+roots (A6.132 §4).  NEXT, at the owner's request: an ABSTRACTION for the
+barrier-style shared variable (started, the virtio ring's device-written
+cells, …) so the pattern is proved once.
+

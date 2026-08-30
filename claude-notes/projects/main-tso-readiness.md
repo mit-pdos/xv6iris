@@ -571,3 +571,55 @@ Amendments 9–10.
   (`park_globals`, blocked on `is_ftable` -- A6.129 §4).
 - **Not landed, for the owner's ruling**: the invariant class (A6.129 §4).
 
+## Amendment 12 (2026-08-30, from the T-leg): §0.45′ -- the started barrier at the ledger tier; the era's image as a name; the pipe λ-converted
+
+Landed on `tso-flip` at r56 (`80e2e1da7`, A6.130–A6.131) and r57 (`3d998dbbb`, A6.132); the ruling is §0.45′ in
+tso-port.md.  Same terms as Amendments 9–11.
+
+- **`riscvEraGS.era_img`** (A6.131): the era's image is a constant of the
+  era record; `tso_interp_at`/`tso_interp_of` state `gimg = era_img`
+  (`tso_interp_at_img`, `tso_interp_of_img`); `power_boot_res` and
+  `power_boot_res_unpack` export `⌜era_img riscv_eraGS = g.(gimg)⌝` as the
+  TRAILING conjunct (`BootShared`'s unpack pattern ends `… & #Hcert &
+  %Hera`).  main's port must add the conjunct wherever it constructs
+  `power_boot_res` (`iSplitR; [iExact "HRelem" | iPureIntro; reflexivity]`).
+- **`PipeInvDefs.pipe_data_at ξ`, `pipe_res_at γp pi ξ`** (context last),
+  `pipe_res := pipe_res_at γp pi cur_ctx`; `is_pipe … (pipe_res_at γp pi)`
+  -- parenthesised partial application, NOT `<{ pipe_res }>`.
+- **`StartedInv`** (A6.132 §2–§3): `started_inv γi ξd P`, `started_prim γi`,
+  `started_alloc`, `started_inv_claim`, `started_claim`(+`_intro`),
+  `started_read_open`/`started_read_obl`/`started_W`/`started_res`,
+  `started_absorb`, `started_store_open`/`started_store_obl`/
+  `started_right`, `started_win_plain`/`started_win_rel`, `started_img`.
+  The old `started_inv P`, `started_inv_alloc`, `started_inv_load_au`,
+  `started_inv_store_au` are GONE.
+- **The read leaf** `WpSconfMem.wp_load_s_sconf_au_relr` (+ `HartSMem`'s
+  `_exvvr` nodes): resource-post, `W : mword → nat → iProp`, continuation
+  gets `∃ V0, hart_view_lb V0 ∗ W v V0`.
+- **Specs**: `SpecMain.wp_main_boot_sconf_body … tlbvec0 γi ξd P` with
+  `{!∀ ξ, Persistent (P ξ)} {!CtxMorph P}` and rows `started_inv γi ξd P
+  -∗ started_prim γi -∗ □(… -∗ P cur_ctx)`; `SpecMainSecondary`'s body
+  takes `γi ξd` and `started_inv γi ξd (main_dep γd γv)`; `main_dep γd γv
+  := λ ξ, main_deposit (XI := ξ)` with its `Persistent`/`CtxMorph`
+  instances (`is_txlock_morph`, `is_conslock_morph`, `console_caps_morph`,
+  `printk_env_morph`, `disk_geom_morph`).
+- **Boot**: `BootCarve.boot_cran_ledger_at0_bss4`; `BootShared.boot_bss_carve`
+  row `started_claim ∗ started_win_plain`; `boot_shared_alloc` ∃-binds
+  `γi ξd` and exports `started_inv γi ξd (main_dep γd γv) ∗ started_prim
+  γi`; `BootChain.boot_hart_primary/secondary` take `γi ξd`
+  (`started_prim γi` on the primary); `SystemAdequacy` routes `Hprim`.
+- **Consumers**: `ProofMain.mn_grp_started` (`cid_word = zero_reg`
+  premise, `Hprim`, `wp_store_s_sconf_au_dat` + `started_store_open` +
+  `started_store_obl`, `Require Import TsoGhost`);
+  `ProofMainSecondary.ms_spin` (`γi ξd P`, `cid_word ≠ zero_reg`,
+  `wp_load_s_sconf_au_relr` + `started_read_open/obl` + `started_absorb`
+  via `SieCapCtx.sie_cap_gpr_own_ctx_acc`; `Require Import SieCapCtx`).
+- **Verification status main should know** (A6.132 §4): `BootChain`,
+  `BootShared`, `SystemAdequacy` and `ProofMain`'s release site are NOT
+  certified on this tree -- they are under all seven red roots.
+  `ProofMain` has a second standing red at `mn_grp_fs` (`iApply fupd_wp`,
+  ~`:1495`) behind K15d's `:996`, and `ProofForkretPark` a module-signature
+  mismatch (`usertrap_res_bare_park`, `:373`) behind its `:318`.
+- **Not landed, for the owner**: the barrier ABSTRACTION (§0.45′ NEXT),
+  the invariant class (A6.129 §4), the bcache escrow recycler ruling.
+
