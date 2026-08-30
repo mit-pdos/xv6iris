@@ -2612,8 +2612,15 @@ Section SyscallArms.
     intros -> H12. unfold sysc_mem_ok.
     destruct (decide (sysc_num V = 7)) as [_ | _]; [done |].
     destruct (decide (sysc_num V = 12)) as [Hc | _]; [contradiction (H12 Hc) |].
-    destruct (sysc_window (sysc_num V)) as [i |]; [| reflexivity].
-    exists 0%nat, (fun _ => bv_0 8). reflexivity.
+    destruct (decide (sysc_num V = 3)) as [_ | _];
+      [ exists 0%nat, (fun _ => bv_0 8); split; [ lia | reflexivity ] | ].
+    destruct (decide (sysc_num V = 4)) as [_ | _];
+      [ exists 0%nat, (fun _ => bv_0 8); split; [ lia | reflexivity ] | ].
+    destruct (decide (sysc_num V = 5)) as [_ | _];
+      [ exists 0%nat, (fun _ => bv_0 8); split; [ lia | reflexivity ] | ].
+    destruct (decide (sysc_num V = 8)) as [_ | _];
+      [ exists 0%nat, (fun _ => bv_0 8); split; [ lia | reflexivity ] | ].
+    reflexivity.
   Qed.
 
   (* [sys_exec]'s ARM: at [k = 7], [sysc_mem_ok]'s [exec] branch is [True]
@@ -2626,24 +2633,71 @@ Section SyscallArms.
     destruct (decide (Z.of_nat 7 = 7)) as [_ | Hf]; [done | exfalso; lia].
   Qed.
 
-  (* THE FOUR WINDOW ARMS, IN ONE LEMMA.  wait (3), pipe (4), read (5) and
-     fstat (8) all end in a copyout into a buffer the syscall was HANDED, so
-     each one's obligation is the same shape at a different argument index --
-     which is exactly what [sysc_window] is a table of.  The arm supplies its
-     own number, the two disequalities that rule out the address-space
-     movers (by [lia] at a literal), the table entry (by [vm_compute]), and
-     the window its callee's own post already handed back. *)
-  Lemma sysc_mem_ok_window (V V' : pprivate) (M M' : gmap Z (bv 8))
-      (n : Z) (i d : nat) (bs : nat -> bv 8) :
-    sysc_num V = n -> n <> 7 -> n <> 12 ->
-    sysc_window n = Some i ->
-    M' = umem_wr M (pv_tf V !!! tf_arg_idx i) d bs ->
+  (* THE FOUR ARMS THAT WRITE USER MEMORY, one lemma each.  There used to
+     be a single [sysc_mem_ok_window] here, keyed by a [sysc_window] table
+     that named only WHICH ARGUMENT the write was based at and left the
+     LENGTH entirely existential.  That made the row nearly vacuous -- a
+     caller passing a null pointer to [wait] learned only that the kernel
+     had written some run from address 0 upward -- while each callee's own
+     post had already proved the exact bound and this table discarded it.
+     Each arm now carries its own. *)
+  Lemma sysc_mem_ok_wait (V V' : pprivate) (M M' : gmap Z (bv 8))
+      (n : Z) (d : nat) (bs : nat -> bv 8) :
+    sysc_num V = n -> n = 3 -> (d <= 4)%nat ->
+    M' = umem_wr M (pv_tf V !!! tf_arg_idx 0) d bs ->
     sysc_mem_ok V V' M M'.
   Proof.
-    intros Hn H7 H12 Hw Hm. unfold sysc_mem_ok. rewrite Hn.
-    destruct (decide (n = 7)) as [Hc | _]; [exfalso; exact (H7 Hc) |].
-    destruct (decide (n = 12)) as [Hc | _]; [exfalso; exact (H12 Hc) |].
-    rewrite Hw. exists d, bs. exact Hm.
+    intros Hn H3 Hd Hm. unfold sysc_mem_ok. rewrite Hn H3.
+    destruct (decide (3 = 7)) as [Hc | _]; [ discriminate Hc | ].
+    destruct (decide (3 = 12)) as [Hc | _]; [ discriminate Hc | ].
+    destruct (decide (3 = 3)) as [_ | Hc]; [ | exfalso; exact (Hc eq_refl) ].
+    exists d, bs. exact (conj Hd Hm).
+  Qed.
+
+  Lemma sysc_mem_ok_pipe (V V' : pprivate) (M M' : gmap Z (bv 8))
+      (n : Z) (d : nat) (bs : nat -> bv 8) :
+    sysc_num V = n -> n = 4 -> (d <= 8)%nat ->
+    M' = umem_wr M (pv_tf V !!! tf_arg_idx 0) d bs ->
+    sysc_mem_ok V V' M M'.
+  Proof.
+    intros Hn H4 Hd Hm. unfold sysc_mem_ok. rewrite Hn H4.
+    destruct (decide (4 = 7)) as [Hc | _]; [ discriminate Hc | ].
+    destruct (decide (4 = 12)) as [Hc | _]; [ discriminate Hc | ].
+    destruct (decide (4 = 3)) as [Hc | _]; [ discriminate Hc | ].
+    destruct (decide (4 = 4)) as [_ | Hc]; [ | exfalso; exact (Hc eq_refl) ].
+    exists d, bs. exact (conj Hd Hm).
+  Qed.
+
+  Lemma sysc_mem_ok_read (V V' : pprivate) (M M' : gmap Z (bv 8))
+      (n : Z) (d : nat) (bs : nat -> bv 8) :
+    sysc_num V = n -> n = 5 ->
+    (Z.of_nat d <= Z.max 0 (sysc_rdcount V))%Z ->
+    M' = umem_wr M (pv_tf V !!! tf_arg_idx 1) d bs ->
+    sysc_mem_ok V V' M M'.
+  Proof.
+    intros Hn H5 Hd Hm. unfold sysc_mem_ok. rewrite Hn H5.
+    destruct (decide (5 = 7)) as [Hc | _]; [ discriminate Hc | ].
+    destruct (decide (5 = 12)) as [Hc | _]; [ discriminate Hc | ].
+    destruct (decide (5 = 3)) as [Hc | _]; [ discriminate Hc | ].
+    destruct (decide (5 = 4)) as [Hc | _]; [ discriminate Hc | ].
+    destruct (decide (5 = 5)) as [_ | Hc]; [ | exfalso; exact (Hc eq_refl) ].
+    exists d, bs. exact (conj Hd Hm).
+  Qed.
+
+  Lemma sysc_mem_ok_fstat (V V' : pprivate) (M M' : gmap Z (bv 8))
+      (n : Z) (d : nat) (bs : nat -> bv 8) :
+    sysc_num V = n -> n = 8 -> (d <= 24)%nat ->
+    M' = umem_wr M (pv_tf V !!! tf_arg_idx 1) d bs ->
+    sysc_mem_ok V V' M M'.
+  Proof.
+    intros Hn H8 Hd Hm. unfold sysc_mem_ok. rewrite Hn H8.
+    destruct (decide (8 = 7)) as [Hc | _]; [ discriminate Hc | ].
+    destruct (decide (8 = 12)) as [Hc | _]; [ discriminate Hc | ].
+    destruct (decide (8 = 3)) as [Hc | _]; [ discriminate Hc | ].
+    destruct (decide (8 = 4)) as [Hc | _]; [ discriminate Hc | ].
+    destruct (decide (8 = 5)) as [Hc | _]; [ discriminate Hc | ].
+    destruct (decide (8 = 8)) as [_ | Hc]; [ | exfalso; exact (Hc eq_refl) ].
+    exists d, bs. exact (conj Hd Hm).
   Qed.
 
   (* [sys_sbrk]'s ARM: at [k = 12] the address space itself moves, so the
@@ -2985,10 +3039,9 @@ Section SyscallArms.
               Hmfsp Hmfs2 Hmfrest ltac:(lia)
               ltac:(assert (Hv0t : pv_tf (us_V U) !!! tf_arg_idx 0 = v0)
                       by (apply list_lookup_total_correct, Hv0);
-                    apply (sysc_mem_ok_window (us_V U) (upd_upt (us_V U) P') (us_M U)
-                             (umem_wr (us_M U) v0 dw bsw) (Z.of_nat 3) 0%nat dw bsw
-                             Hnum ltac:(lia) ltac:(lia)
-                             ltac:(vm_compute; reflexivity));
+                    apply (sysc_mem_ok_wait (us_V U) (upd_upt (us_V U) P') (us_M U)
+                             (umem_wr (us_M U) v0 dw bsw) (Z.of_nat 3) dw bsw
+                             Hnum ltac:(lia) ltac:(lia));
                     rewrite Hv0t; reflexivity)
               ltac:(right; reflexivity)
               ltac:(right; right; exact Hext)
@@ -3927,10 +3980,15 @@ Section SyscallArms.
               Hmfsp Hmfs2 Hmfrest ltac:(lia)
               ltac:(assert (Hv1t : pv_tf (us_V U) !!! tf_arg_idx 1 = v1)
                       by (apply list_lookup_total_correct, Hv1);
-                    apply (sysc_mem_ok_window (us_V U) (upd_upt (us_V U) P') (us_M U)
-                             (umem_wr (us_M U) v1 dw bsw) (Z.of_nat 5) 1%nat dw bsw
-                             Hnum ltac:(lia) ltac:(lia)
-                             ltac:(vm_compute; reflexivity));
+                    apply (sysc_mem_ok_read (us_V U) (upd_upt (us_V U) P') (us_M U)
+                             (umem_wr (us_M U) v1 dw bsw) (Z.of_nat 5) dw bsw
+                             Hnum ltac:(lia)
+                             ltac:(assert (Hv2t : pv_tf (us_V U) !!! tf_arg_idx 2
+                                                  = v2)
+                                     by (apply list_lookup_total_correct, Hv2);
+                                   unfold sysc_rdcount; rewrite Hv2t;
+                                   unfold sys_rw_count, trunc32 in Hdwle;
+                                   exact Hdwle));
                     rewrite Hv1t; reflexivity)
               ltac:(right; reflexivity)
               ltac:(right; right; exact Hextz)
@@ -4011,10 +4069,9 @@ Section SyscallArms.
               Hmfsp Hmfs2 Hmfrest ltac:(lia)
               ltac:(assert (Hv1t : pv_tf (us_V U) !!! tf_arg_idx 1 = v1)
                       by (apply list_lookup_total_correct, Hv1);
-                    apply (sysc_mem_ok_window (us_V U) (upd_upt (us_V U) P') (us_M U)
-                             (umem_wr (us_M U) v1 dw bsw) (Z.of_nat 8) 1%nat dw bsw
-                             Hnum ltac:(lia) ltac:(lia)
-                             ltac:(vm_compute; reflexivity));
+                    apply (sysc_mem_ok_fstat (us_V U) (upd_upt (us_V U) P') (us_M U)
+                             (umem_wr (us_M U) v1 dw bsw) (Z.of_nat 8) dw bsw
+                             Hnum ltac:(lia) ltac:(lia));
                     rewrite Hv1t; reflexivity)
               ltac:(right; reflexivity)
               ltac:(right; right; exact Hextz)
@@ -4562,10 +4619,9 @@ Section SyscallArms.
               ∅ av m mf Hmfsp Hmfs2 Hmfrest ltac:(lia)
               ltac:(assert (Hv0t : pv_tf (us_V U) !!! tf_arg_idx 0 = v0)
                       by (apply list_lookup_total_correct, Hv0);
-                    apply (sysc_mem_ok_window (us_V U) V' (us_M U) M'
-                             (Z.of_nat 4) 0%nat dw bsw
-                             Hnum ltac:(lia) ltac:(lia)
-                             ltac:(vm_compute; reflexivity));
+                    apply (sysc_mem_ok_pipe (us_V U) V' (us_M U) M'
+                             (Z.of_nat 4) dw bsw
+                             Hnum ltac:(lia) ltac:(lia));
                     rewrite Hv0t; reflexivity)
               ltac:(right; exact Htfw')
               ltac:(right; right; exact Hupte')

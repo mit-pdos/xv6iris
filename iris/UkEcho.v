@@ -857,9 +857,10 @@ Section UkEcho.
   (* ===================================================================== *)
   (* THE SYSCALL STUBS.  usys.S's two-instruction bodies: load the number   *)
   (* into a7, [ecall], return.  [exit] never returns, so its arm has no     *)
-  (* continuation at all; [write] takes the QUIET row -- SYS_write has no   *)
-  (* [usys_window], so the kernel writes no user byte and the heap the      *)
-  (* caller owns comes back exactly as it was.                              *)
+  (* continuation at all; [write] takes the QUIET row -- SYS_write is not   *)
+  (* one of the four entries that copy out into a user buffer, so the       *)
+  (* kernel writes no user byte and the heap the caller owns comes back     *)
+  (* exactly as it was.                                                     *)
   (* ===================================================================== *)
   Lemma wp_kecho_exit (h : CpuId) (m : regfile) (avail : nat) :
     echo_code γt -∗
@@ -928,7 +929,9 @@ Section UkEcho.
                                (mword_of_int 16 : mword 64));
                     vm_compute; reflexivity)
               ltac:(discriminate) ltac:(discriminate)
-              ltac:(discriminate) ltac:(discriminate) eq_refl
+              ltac:(discriminate) ltac:(discriminate)
+              ltac:(discriminate) ltac:(discriminate)
+              ltac:(discriminate) ltac:(discriminate)
               ltac:(vm_compute; reflexivity)
               with "C354 Hrun").
     assert (E354 : add_vec_int (mword_of_int 0x354 : mword 64) 4

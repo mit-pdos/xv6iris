@@ -18,8 +18,8 @@
 (*        window bases, so two keys agreeing there carry the same row.     *)
 (*   SS4  THE KEY CONGRUENCES: [uslot] depends on its key only through     *)
 (*        [(tf_resume_gpr0 tf, tf_resume_pc tf, uvis_M, uvis_perm)], and   *)
-(*        [uexec_ret] only through those plus the number and the two       *)
-(*        window bases.  [uexec_ret_run] is the instance the loop uses:    *)
+(*        [uexec_ret] only through those plus the number, the two          *)
+(*        destination pointers and read's count.  [uexec_ret_run] is the instance the loop uses:    *)
 (*        the trapped key and the RUN key it projects to are the same key. *)
 (*   SS5  [UserPerm.usz_ok] from the trapframe bound, so the loop can      *)
 (*        discharge [uvb]'s size guard from [ProcInv]'s own conjunct       *)
@@ -237,6 +237,14 @@ Proof.
   gpr_peel. exact (upd_eq _ (Regidx (mword_of_int 11)) _).
 Qed.
 
+(* a2 = x12, trapframe word [tf_arg_idx 2] = 16 (read's count) *)
+Lemma tf_resume_gpr0_a2 (tf : list (mword 64)) :
+  tf_resume_gpr0 tf !!! Regidx (mword_of_int 12) = tf_w tf (tf_arg_idx 2).
+Proof.
+  unfold tf_resume_gpr0, tf_resume_gpr, userret_gpr.
+  gpr_peel. exact (upd_eq _ (Regidx (mword_of_int 12)) _).
+Qed.
+
 (* a7 = x17, trapframe word [tf_arg_idx 7] = 21 -- THE SYSCALL NUMBER *)
 Lemma tf_resume_gpr0_a7 (tf : list (mword 64)) :
   tf_resume_gpr0 tf !!! Regidx (mword_of_int 17) = tf_w tf (tf_arg_idx 7).
@@ -258,15 +266,18 @@ Lemma usys_mem_ok_args (n : Z) (tf tf' : list (mword 64)) (r : mword 64)
     (M M' : gmap Z (bv 8)) (pi pi' : gmap (mword 27) uperm) (szv szv' : Z) :
   tf !!! tf_arg_idx 0 = tf' !!! tf_arg_idx 0 ->
   tf !!! tf_arg_idx 1 = tf' !!! tf_arg_idx 1 ->
+  tf !!! tf_arg_idx 2 = tf' !!! tf_arg_idx 2 ->
   usys_mem_ok n tf r M pi szv M' pi' szv'
   -> usys_mem_ok n tf' r M pi szv M' pi' szv'.
 Proof.
-  intros H0 H1 H. unfold usys_mem_ok in H |- *.
+  intros H0 H1 H2 H. unfold usys_mem_ok, usys_rdcount in H |- *.
   destruct (decide (n = USYS_exec)); [ exact H | ].
   destruct (decide (n = USYS_sbrk)); [ exact H | ].
-  destruct (usys_window n) as [i | ] eqn:Hw; [ | exact H ].
-  destruct (usys_window_idx n i Hw) as [-> | ->];
-    [ rewrite <- H0 | rewrite <- H1 ]; exact H.
+  destruct (decide (n = USYS_wait)); [ rewrite <- H0; exact H | ].
+  destruct (decide (n = USYS_pipe)); [ rewrite <- H0; exact H | ].
+  destruct (decide (n = USYS_read)); [ rewrite <- H1; rewrite <- H2; exact H | ].
+  destruct (decide (n = USYS_fstat)); [ rewrite <- H1; exact H | ].
+  exact H.
 Qed.
 
 (* ===================================================================== *)
@@ -320,6 +331,10 @@ Lemma uvis_run_arg1 (W : uvis) :
   uvis_tf (uvis_run W) !!! tf_arg_idx 1 = uvis_tf W !!! tf_arg_idx 1.
 Proof. exact (tf_resume_gpr0_a1 (uvis_tf W)). Qed.
 
+Lemma uvis_run_arg2 (W : uvis) :
+  uvis_tf (uvis_run W) !!! tf_arg_idx 2 = uvis_tf W !!! tf_arg_idx 2.
+Proof. exact (tf_resume_gpr0_a2 (uvis_tf W)). Qed.
+
 Section Apply.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
@@ -353,6 +368,7 @@ Section Apply.
     usys_num (uvis_tf W) = usys_num (uvis_tf W') ->
     uvis_tf W !!! tf_arg_idx 0 = uvis_tf W' !!! tf_arg_idx 0 ->
     uvis_tf W !!! tf_arg_idx 1 = uvis_tf W' !!! tf_arg_idx 1 ->
+    uvis_tf W !!! tf_arg_idx 2 = uvis_tf W' !!! tf_arg_idx 2 ->
     tf_resume_gpr0 (uvis_tf W) = tf_resume_gpr0 (uvis_tf W') ->
     tf_resume_pc (uvis_tf W) = tf_resume_pc (uvis_tf W') ->
     uvis_M W = uvis_M W' ->
@@ -360,7 +376,7 @@ Section Apply.
     uvis_sz W = uvis_sz W' ->
     (uexec_ret sc W : iProp Σ) ⊣⊢ uexec_ret sc W'.
   Proof.
-    intros HlW HlW' Hn Ha0 Ha1 Hg Hp HM Hpi Hsz.
+    intros HlW HlW' Hn Ha0 Ha1 Ha2 Hg Hp HM Hpi Hsz.
     (* the BUMPED keys agree too, at every return value and every
        image/permission pair the row allows *)
     assert (Hb : forall (r : mword 64) (M' : gmap Z (bv 8))
@@ -407,11 +423,11 @@ Section Apply.
       + iIntros "H" (r M' pi' szv' Hmo).
         rewrite -(Hb r M' pi' szv'). iApply ("H" $! r M' pi' szv'). iPureIntro.
         exact (usys_mem_ok_args _ (uvis_tf W') (uvis_tf W) r _ _ _ _ _ _
-                 (eq_sym Ha0) (eq_sym Ha1) Hmo).
+                 (eq_sym Ha0) (eq_sym Ha1) (eq_sym Ha2) Hmo).
       + iIntros "H" (r M' pi' szv' Hmo).
         rewrite (Hb r M' pi' szv'). iApply ("H" $! r M' pi' szv'). iPureIntro.
         exact (usys_mem_ok_args _ (uvis_tf W) (uvis_tf W') r _ _ _ _ _ _
-                 Ha0 Ha1 Hmo).
+                 Ha0 Ha1 Ha2 Hmo).
   Qed.
 
   (* THE INSTANCE THE LOOP USES: the key the kernel trapped with and the
@@ -425,7 +441,8 @@ Section Apply.
     intros Hl.
     apply (uexec_ret_key_cong sc W (uvis_run W) Hl (uvis_run_length W)
              (eq_sym (uvis_run_num W)) (eq_sym (uvis_run_arg0 W))
-             (eq_sym (uvis_run_arg1 W)) (eq_sym (uvis_run_gpr W))
+             (eq_sym (uvis_run_arg1 W)) (eq_sym (uvis_run_arg2 W))
+             (eq_sym (uvis_run_gpr W))
              (eq_sym (uvis_run_pc W)) eq_refl eq_refl eq_refl).
   Qed.
 

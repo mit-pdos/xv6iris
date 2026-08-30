@@ -34,10 +34,12 @@
 (*                 what the kernel's table says (the sizes are the entry   *)
 (*                 and outgoing records' [pv_sz], which the word list does *)
 (*                 not carry).  Tying the old size to the return value     *)
-(*                 ([r = a0] on success) is sbrk's own contract's          *)
+(*                 ([r = a0] on success) is sbrk own contract              *)
 (*                 refinement, not this table's.                          *)
-(*   wait/pipe/read/fstat -- a [umem_wr] window based at the argument the *)
-(*                 kernel's [sysc_window] names.                           *)
+(*   wait (3)   -- four bytes at argument 0, the zombie's [xstate].        *)
+(*   pipe (4)   -- eight bytes at argument 0, the two fds.                 *)
+(*   read (5)   -- at most the caller's own count, at argument 1.          *)
+(*   fstat (8)  -- one 24-byte [struct stat], at argument 1.               *)
 (*   the other sixteen -- [M' = M].                                        *)
 (*                                                                         *)
 (* PURE, and deliberately NOT importing SpecSyscall (whose cone is the     *)
@@ -76,14 +78,17 @@ Definition USYS_sbrk : Z := 12.
 (* SS2 The table.                                                          *)
 (* ===================================================================== *)
 
-(* which ARGUMENT the four copyout entries base their window at
-   (verbatim [SpecSyscall.sysc_window]) *)
-Definition usys_window (n : Z) : option nat :=
-  if decide (n = 3) then Some 0%nat        (* wait  -- int *status     *)
-  else if decide (n = 4) then Some 0%nat   (* pipe  -- int fd[2]       *)
-  else if decide (n = 5) then Some 1%nat   (* read  -- char *buf       *)
-  else if decide (n = 8) then Some 1%nat   (* fstat -- struct stat *st *)
-  else None.
+(* the four entries that write user memory, by number *)
+Definition USYS_wait  : Z := 3.
+Definition USYS_pipe  : Z := 4.
+Definition USYS_read  : Z := 5.
+Definition USYS_fstat : Z := 8.
+
+(* [read]'s count, as the C reads it: argument 2 into an [int].  The read
+   row is the one whose length is not a constant.  Definitionally
+   [SpecSyscall.sysc_rdcount V] at [tf := pv_tf V]. *)
+Definition usys_rdcount (tf : list (mword 64)) : Z :=
+  bv_signed (subrange_vec_dec (tf !!! tf_arg_idx 2) 31 0 : mword 32).
 
 (* sbrk's row on the IMAGE, at the OLD size [szv] and the NEW one [szv'].
    EITHER EXTEND THE MEMORY UP WITH ZEROED PAGES, OR CUT IT DOWN -- the C's
@@ -141,25 +146,46 @@ Definition usys_mem_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
        is what makes the return value meaningful. *)
     usys_sbrk_img M M' (mword_of_int szv) (mword_of_int szv') /\
     usys_sbrk_perm π π' (mword_of_int szv) (mword_of_int szv')
-  else match usys_window n with
-       | Some i => (exists (d : nat) (bs : nat -> bv 8),
-                      M' = umem_wr M (tf !!! tf_arg_idx i) d bs)
-                   /\ π' = π /\ szv' = szv
-       | None   => M' = M /\ π' = π /\ szv' = szv
-       end.
+  else if decide (n = USYS_wait) then
+    (* copyout of the zombie's four-byte [xstate] at argument 0 *)
+    (exists (d : nat) (bs : nat -> bv 8),
+       (d <= 4)%nat /\ M' = umem_wr M (tf !!! tf_arg_idx 0) d bs)
+    /\ π' = π /\ szv' = szv
+  else if decide (n = USYS_pipe) then
+    (* two four-byte fds, back to back at argument 0 *)
+    (exists (d : nat) (bs : nat -> bv 8),
+       (d <= 8)%nat /\ M' = umem_wr M (tf !!! tf_arg_idx 0) d bs)
+    /\ π' = π /\ szv' = szv
+  else if decide (n = USYS_read) then
+    (* at most the caller's own count, at argument 1 *)
+    (exists (d : nat) (bs : nat -> bv 8),
+       (Z.of_nat d <= Z.max 0 (usys_rdcount tf))%Z /\
+       M' = umem_wr M (tf !!! tf_arg_idx 1) d bs)
+    /\ π' = π /\ szv' = szv
+  else if decide (n = USYS_fstat) then
+    (* one [struct stat]: dev@0 ino@4 type@8 nlink@10 size@16, so 24 *)
+    (exists (d : nat) (bs : nat -> bv 8),
+       (d <= 24)%nat /\ M' = umem_wr M (tf !!! tf_arg_idx 1) d bs)
+    /\ π' = π /\ szv' = szv
+  else M' = M /\ π' = π /\ szv' = szv.
 
 (* the sixteen quiet entries, by name: what a program calling one of them
    learns.  Stated for the row shape rather than per number so a program
    proof picks it up with one [apply] after [vm_compute]-ing the number. *)
 Lemma usys_mem_ok_quiet (n : Z) (tf : list (mword 64)) (r : mword 64)
     (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z) :
-  n <> USYS_exec -> n <> USYS_sbrk -> usys_window n = None ->
+  n <> USYS_exec -> n <> USYS_sbrk ->
+  n <> USYS_wait -> n <> USYS_pipe -> n <> USYS_read -> n <> USYS_fstat ->
   usys_mem_ok n tf r M π szv M' π' szv' -> M' = M /\ π' = π /\ szv' = szv.
 Proof.
-  intros Hne Hns Hw H. unfold usys_mem_ok in H.
+  intros Hne Hns H3 H4 H5 H8 H. unfold usys_mem_ok in H.
   destruct (decide (n = USYS_exec)); [contradiction |].
   destruct (decide (n = USYS_sbrk)); [contradiction |].
-  rewrite Hw in H. exact H.
+  destruct (decide (n = USYS_wait)); [contradiction |].
+  destruct (decide (n = USYS_pipe)); [contradiction |].
+  destruct (decide (n = USYS_read)); [contradiction |].
+  destruct (decide (n = USYS_fstat)); [contradiction |].
+  exact H.
 Qed.
 
 (* the permission map is untouched by every entry but sbrk *)
@@ -171,7 +197,11 @@ Proof.
   intros Hns H. unfold usys_mem_ok in H.
   destruct (decide (n = USYS_exec)); [exact (proj1 (proj2 (proj2 H))) |].
   destruct (decide (n = USYS_sbrk)); [contradiction |].
-  destruct (usys_window n); exact (proj1 (proj2 H)).
+  destruct (decide (n = USYS_wait)); [exact (proj1 (proj2 H)) |].
+  destruct (decide (n = USYS_pipe)); [exact (proj1 (proj2 H)) |].
+  destruct (decide (n = USYS_read)); [exact (proj1 (proj2 H)) |].
+  destruct (decide (n = USYS_fstat)); [exact (proj1 (proj2 H)) |].
+  exact (proj1 (proj2 H)).
 Qed.
 
 (* ===================================================================== *)
@@ -254,54 +284,52 @@ Proof.
     [ reflexivity | unfold tf_arg_idx, tf_epc_idx; lia ].
 Qed.
 
-(* the window table only ever names argument 0 or argument 1 *)
-Lemma usys_window_idx (n : Z) (i : nat) :
-  usys_window n = Some i -> (i = 0%nat \/ i = 1%nat).
-Proof.
-  unfold usys_window.
-  destruct (decide (n = 3)); [ intros H; injection H as <-; left; reflexivity | ].
-  destruct (decide (n = 4)); [ intros H; injection H as <-; left; reflexivity | ].
-  destruct (decide (n = 5)); [ intros H; injection H as <-; right; reflexivity | ].
-  destruct (decide (n = 8)); [ intros H; injection H as <-; right; reflexivity | ].
-  intros H; discriminate H.
-Qed.
-
+(* THE THREE WORDS THE TABLE READS, besides the number: the two
+   destination pointers (arguments 0 and 1) and read's count (argument 2).
+   Everything below is "the table is blind to every other word". *)
 Lemma usys_mem_ok_ueq (n : Z) (tf tf' : list (mword 64)) (r : mword 64)
     (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z) :
   tf_ueq tf tf' ->
   usys_mem_ok n tf r M π szv M' π' szv' -> usys_mem_ok n tf' r M π szv M' π' szv'.
 Proof.
-  intros Hu H. unfold usys_mem_ok in H |- *.
+  intros Hu H.
+  assert (H0 : tf !!! tf_arg_idx 0 = tf' !!! tf_arg_idx 0)
+    by (destruct Hu as [_ Hg]; apply Hg; unfold tf_arg_idx; lia).
+  assert (H1 : tf !!! tf_arg_idx 1 = tf' !!! tf_arg_idx 1)
+    by (destruct Hu as [_ Hg]; apply Hg; unfold tf_arg_idx; lia).
+  assert (H2 : tf !!! tf_arg_idx 2 = tf' !!! tf_arg_idx 2)
+    by (destruct Hu as [_ Hg]; apply Hg; unfold tf_arg_idx; lia).
+  unfold usys_mem_ok, usys_rdcount in H |- *.
   destruct (decide (n = USYS_exec)); [ exact H | ].
   destruct (decide (n = USYS_sbrk)); [ exact H | ].
-  destruct (usys_window n) as [i | ] eqn:Hw; [ | exact H ].
-  assert (Hi : tf !!! tf_arg_idx i = tf' !!! tf_arg_idx i).
-  { destruct Hu as [_ Hg]. apply Hg.
-    destruct (usys_window_idx n i Hw) as [-> | ->]; unfold tf_arg_idx; lia. }
-  rewrite <- Hi. exact H.
+  destruct (decide (n = USYS_wait)); [ rewrite <- H0; exact H | ].
+  destruct (decide (n = USYS_pipe)); [ rewrite <- H0; exact H | ].
+  destruct (decide (n = USYS_read)); [ rewrite <- H1; rewrite <- H2; exact H | ].
+  destruct (decide (n = USYS_fstat)); [ rewrite <- H1; exact H | ].
+  exact H.
 Qed.
 
 (* ...and the table is blind to the EPC WORD too, for the reason
-   [usys_num_epc] is: the window indices are 14 and 15, the number is 21,
-   and the epc is 3.  This is what lets the trap loop state the round at
-   the trapframe the process TRAPPED with, while the dispatcher's own row
-   is stated at the one usertrap's [p->trapframe->epc += 4] block handed
-   on.  ([tf_ueq] cannot do this job: the epc is exactly the word the two
-   lists differ in.) *)
+   [usys_num_epc] is: the words it reads are 14, 15, 16 and 21, and the epc
+   is 3.  This is what lets the trap loop state the round at the trapframe
+   the process TRAPPED with, while the dispatcher's own row is stated at the
+   one usertrap's [p->trapframe->epc += 4] block handed on.  ([tf_ueq]
+   cannot do this job: the epc is exactly the word the two lists differ
+   in.) *)
 Lemma usys_mem_ok_epc (n : Z) (tf : list (mword 64)) (v r : mword 64)
     (szv szv' : Z)
     (M M' : gmap Z (bv 8)) (pi pi' : gmap (mword 27) uperm) :
   usys_mem_ok n (<[tf_epc_idx := v]> tf) r M pi szv M' pi' szv' ->
   usys_mem_ok n tf r M pi szv M' pi' szv'.
 Proof.
-  unfold usys_mem_ok.
-  destruct (decide (n = USYS_exec)); [ intros H; exact H | ].
-  destruct (decide (n = USYS_sbrk)); [ intros H; exact H | ].
-  destruct (usys_window n) as [i | ] eqn:Hw; [ | intros H; exact H ].
-  rewrite list_lookup_total_insert_ne;
-    [ intros H; exact H
-    | destruct (usys_window_idx n i Hw) as [-> | ->];
-      unfold tf_arg_idx, tf_epc_idx; lia ].
+  assert (E0 : (<[tf_epc_idx := v]> tf) !!! tf_arg_idx 0 = tf !!! tf_arg_idx 0)
+    by (apply list_lookup_total_insert_ne; unfold tf_arg_idx, tf_epc_idx; lia).
+  assert (E1 : (<[tf_epc_idx := v]> tf) !!! tf_arg_idx 1 = tf !!! tf_arg_idx 1)
+    by (apply list_lookup_total_insert_ne; unfold tf_arg_idx, tf_epc_idx; lia).
+  assert (E2 : (<[tf_epc_idx := v]> tf) !!! tf_arg_idx 2 = tf !!! tf_arg_idx 2)
+    by (apply list_lookup_total_insert_ne; unfold tf_arg_idx, tf_epc_idx; lia).
+  unfold usys_mem_ok, usys_rdcount. rewrite E0; rewrite E1; rewrite E2.
+  intros H; exact H.
 Qed.
 
 (* ===================================================================== *)

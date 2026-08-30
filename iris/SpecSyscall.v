@@ -163,15 +163,23 @@ Import Defs.
    [ld a5,168(s2)] at +0x16 and the [addiw a3,a5,0] at +0x1a are where that
    reading comes from.
 
-   [sysc_window] names, for the four entries that write user memory through
-   copyout, WHICH ARGUMENT the write is based at -- and the argument is the
-   trapframe word itself, since argaddr does no more than return it.
+   THE FOUR ENTRIES THAT WRITE USER MEMORY GET A ROW EACH, SPELLED OUT.
+   There used to be a [sysc_window] table naming only WHICH ARGUMENT the
+   write is based at, with the length left entirely existential -- which
+   made the row nearly vacuous: a caller passing a null pointer to [wait]
+   learned only that the kernel had written SOME run from address 0
+   upward, which is enough to clobber the caller's own text.  Each entry
+   now says how far the write can reach, which is what every one of the
+   four callee contracts already proved and this table discarded
+   ([SpecKwait]'s [d <= 4], [SpecSysPipe]'s [d <= 8], [SpecFilestat]'s
+   [d <= 24], [SpecSysRead]'s [d <= max 0 count]).
 
-   WHAT STAYS EXISTENTIAL IS A LENGTH AND THE BYTES, NEVER AN IMAGE.  A
-   caller learns that nothing outside the run [arg .. arg+d) moved, which is
-   what it can act on ([UserPtTree.umem_wr_lookup_out]); which bytes landed
-   there is the ENTRY's own contract to say, and the console and pipe arms
-   cannot say it at all.
+   WHAT STAYS EXISTENTIAL IS THE LENGTH WITHIN THAT BOUND AND THE BYTES,
+   NEVER AN IMAGE.  A caller learns that nothing outside the run
+   [arg .. arg+d) moved, which is what it can act on
+   ([UserPtTree.umem_wr_lookup_out]); which bytes landed there is the
+   ENTRY's own contract to say, and the console and pipe arms cannot say
+   it at all.
 
    TWO ENTRIES MOVE THE ADDRESS SPACE ITSELF and a window is the wrong
    shape for them.  [sbrk] gets [sysc_sbrk_ok] below -- a FUNCTION of the
@@ -181,12 +189,10 @@ Import Defs.
 Definition sysc_num (V : pprivate) : Z :=
   bv_signed (subrange_vec_dec (pv_tf V !!! tf_arg_idx 7) 31 0 : mword 32).
 
-Definition sysc_window (n : Z) : option nat :=
-  if decide (n = 3) then Some 0%nat        (* wait  -- int *status     *)
-  else if decide (n = 4) then Some 0%nat   (* pipe  -- int fd[2]       *)
-  else if decide (n = 5) then Some 1%nat   (* read  -- char *buf       *)
-  else if decide (n = 8) then Some 1%nat   (* fstat -- struct stat *st *)
-  else None.
+(* [read]'s count, as the C reads it: argument 2 into an [int].  The read
+   row is the one whose length is not a constant. *)
+Definition sysc_rdcount (V : pprivate) : Z :=
+  bv_signed (subrange_vec_dec (pv_tf V !!! tf_arg_idx 2) 31 0 : mword 32).
 
 (* SBRK SAYS WHAT HAPPENS.  Not "one of three things may have moved", but:
    at the OLD size [szv] and the NEW one [szv'], either extend the memory up
@@ -213,11 +219,24 @@ Definition sysc_mem_ok (V V' : pprivate) (M M' : gmap Z (bv 8)) : Prop :=
   if decide (sysc_num V = 7) then True                    (* exec *)
   else if decide (sysc_num V = 12) then                   (* sbrk *)
     sysc_sbrk_ok (pv_upt V) (pv_upt V') (pv_sz V) (pv_sz V') M M'
-  else match sysc_window (sysc_num V) with
-       | Some i => exists (d : nat) (bs : nat -> bv 8),
-                     M' = umem_wr M (pv_tf V !!! tf_arg_idx i) d bs
-       | None   => M' = M
-       end.
+  else if decide (sysc_num V = 3) then                    (* wait *)
+    (* copyout of the zombie's four-byte [xstate] at argument 0 *)
+    exists (d : nat) (bs : nat -> bv 8),
+      (d <= 4)%nat /\ M' = umem_wr M (pv_tf V !!! tf_arg_idx 0) d bs
+  else if decide (sysc_num V = 4) then                    (* pipe *)
+    (* two four-byte fds, back to back at argument 0 *)
+    exists (d : nat) (bs : nat -> bv 8),
+      (d <= 8)%nat /\ M' = umem_wr M (pv_tf V !!! tf_arg_idx 0) d bs
+  else if decide (sysc_num V = 5) then                    (* read *)
+    (* at most the caller's own count, at argument 1 *)
+    exists (d : nat) (bs : nat -> bv 8),
+      (Z.of_nat d <= Z.max 0 (sysc_rdcount V))%Z /\
+      M' = umem_wr M (pv_tf V !!! tf_arg_idx 1) d bs
+  else if decide (sysc_num V = 8) then                    (* fstat *)
+    (* one [struct stat]: dev@0 ino@4 type@8 nlink@10 size@16, so 24 *)
+    exists (d : nat) (bs : nat -> bv 8),
+      (d <= 24)%nat /\ M' = umem_wr M (pv_tf V !!! tf_arg_idx 1) d bs
+  else M' = M.
 
 (* syscall's own frame is 4 slots; below it the deepest table entry, which is
    sys_exit at [K_sys_exit] = 4 + kexit's 74.  Written as an expression, not

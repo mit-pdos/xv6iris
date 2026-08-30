@@ -142,7 +142,9 @@ Section UkSync.
                     rewrite (upd_eq m (Regidx a7_idx) (mword_of_int 22 : mword 64));
                     vm_compute; reflexivity)
               ltac:(discriminate) ltac:(discriminate)
-              ltac:(discriminate) ltac:(discriminate) eq_refl
+              ltac:(discriminate) ltac:(discriminate)
+              ltac:(discriminate) ltac:(discriminate)
+              ltac:(discriminate) ltac:(discriminate)
               ltac:(vm_compute; reflexivity)
               with "C36a Hrun").
     assert (E36a : add_vec_int (mword_of_int 0x36a : mword 64) 4

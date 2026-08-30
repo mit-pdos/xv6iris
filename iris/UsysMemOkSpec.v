@@ -51,11 +51,16 @@ Lemma sysc_mem_ok_usys (V V' : pprivate) (M M' : gmap Z (bv 8)) (r : mword 64)
   sysc_mem_ok V V' M M' ->
   usys_mem_ok (sysc_num V) (pv_tf V) r M π szv M' π' szv'.
 Proof.
-  intros Hne Hns Hp Hs H. unfold sysc_mem_ok in H. unfold usys_mem_ok, USYS_exec, USYS_sbrk.
+  intros Hne Hns Hp Hs H. unfold sysc_mem_ok in H.
+  unfold usys_mem_ok, USYS_exec, USYS_sbrk, USYS_wait, USYS_pipe,
+         USYS_read, USYS_fstat, usys_rdcount.
   destruct (decide (sysc_num V = 7)); [ contradiction | ].
   destruct (decide (sysc_num V = 12)); [ contradiction | ].
-  change usys_window with sysc_window.
-  destruct (sysc_window (sysc_num V)); exact (conj H (conj Hp Hs)).
+  destruct (decide (sysc_num V = 3)); [ exact (conj H (conj Hp Hs)) | ].
+  destruct (decide (sysc_num V = 4)); [ exact (conj H (conj Hp Hs)) | ].
+  destruct (decide (sysc_num V = 5)); [ exact (conj H (conj Hp Hs)) | ].
+  destruct (decide (sysc_num V = 8)); [ exact (conj H (conj Hp Hs)) | ].
+  exact (conj H (conj Hp Hs)).
 Qed.
 
 (* sbrk: the dispatcher's row, read at the two sizes it is keyed by.  The

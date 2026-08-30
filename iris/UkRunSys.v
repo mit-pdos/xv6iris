@@ -69,7 +69,8 @@ Section UkRunSys.
       (pc : mword 64) (n : Z) (avail : nat) :
     usysno m = n ->
     n <> USYS_exit -> n <> USYS_fork ->
-    n <> USYS_exec -> n <> USYS_sbrk -> usys_window n = None ->
+    n <> USYS_exec -> n <> USYS_sbrk ->
+    n <> USYS_wait -> n <> USYS_pipe -> n <> USYS_read -> n <> USYS_fstat ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
     uinstr_is γt pc false (ECALL tt) -∗
     urun γt γd γs h m pc avail -∗
@@ -78,7 +79,7 @@ Section UkRunSys.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hn Hexit Hfork Hexec Hsbrk Hwin Hal4.
+    intros Hn Hexit Hfork Hexec Hsbrk H3 H4 H5 H8 Hal4.
     iIntros "#Hi Hrun Hcont".
     iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
@@ -98,7 +99,7 @@ Section UkRunSys.
     destruct (decide (n = USYS_exit)) as [He | _]; [ exfalso; exact (Hexit He) | ].
     destruct (decide (n = USYS_fork)) as [He | _]; [ exfalso; exact (Hfork He) | ].
     iIntros (r M' pm' sz') "%Hok".
-    destruct (usys_mem_ok_quiet n _ r _ _ _ _ _ _ Hexec Hsbrk Hwin Hok)
+    destruct (usys_mem_ok_quiet n _ r _ _ _ _ _ _ Hexec Hsbrk H3 H4 H5 H8 Hok)
       as [-> [-> ->]].
     cbn [uvis_M uvis_perm uvis_of_run].
     rewrite (uslot_bump_run m pc M M pm pm sz sz r Hx0 Hal4).
