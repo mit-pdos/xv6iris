@@ -280,7 +280,26 @@ Definition pick_at (pick : virtio_state -> option Z)
 (* first enabled arm wins.  Nested rather than a list, so a later arm is not
    even evaluated once an earlier one fires -- [settle] runs after EVERY
    instruction, so this is the harness's hot path. *)
-Definition settle1_at (pick : virtio_state -> option Z)
+(* [latch] SAYS WHETHER THE GATEWAY ARMS MAY BE TAKEN, and it exists because
+   [settle] is HARNESS MACHINERY, not the model's transition relation.  A
+   device step is an OPTIONAL transition: the relation permits taking it or
+   not at any moment.  [settle] takes every enabled arm, which is a fine
+   default and the only one every other test wants -- but it means the
+   harness cannot reach executions the model HAS.
+
+   [plic_level] is the case that needs the difference.  The model's gateway
+   re-forwards a still-asserted level the instant [plic_complete] clears the
+   claimed bit, so one device request yields a second interrupt; QEMU's
+   pending bit comes off the RISING EDGE only, so it stays down.  The model
+   is the one that is right -- a re-forwarding level gateway is why a driver
+   acknowledges the DEVICE before completing at the PLIC -- and the model
+   also has an execution matching QEMU, namely the one that does not take
+   [SLatch] again.  Eager settling could not express it, so the run read as
+   a mismatch when what it really showed was a gap in the harness.
+
+   EVERY EXISTING CALLER IS UNCHANGED: [settle1_at] and [settle] pass
+   [true], which is the body this had before. *)
+Definition settle1_gated (pick : virtio_state -> option Z) (latch : bool)
     (s : mstate) : option mstate :=
   match sapply SUartTx s with Some s' => Some s' | None =>
   match sapply SDiskPop s with Some s' => Some s' | None =>
@@ -290,18 +309,29 @@ Definition settle1_at (pick : virtio_state -> option Z)
   (* the two interrupt gateways, then the wire.  [plic_latch] is itself
      guarded -- a level source is forwarded only when it is neither already
      pending nor claimed -- so these stop on their own. *)
-  match sapply (SLatch virtio_irq_id) s with Some s' => Some s' | None =>
-  match sapply (SLatch uart_irq_id) s with Some s' => Some s' | None =>
+  match (if latch then sapply (SLatch virtio_irq_id) s else None) with
+  | Some s' => Some s' | None =>
+  match (if latch then sapply (SLatch uart_irq_id) s else None) with
+  | Some s' => Some s' | None =>
   settle_wire s
   end end end end end end end.
 
+Definition settle1_at (pick : virtio_state -> option Z)
+    (s : mstate) : option mstate := settle1_gated pick true s.
+
 Definition settle1 (s : mstate) : option mstate := settle1_at lowest_head s.
 
-Fixpoint settle_at (pick : virtio_state -> option Z) (fuel : nat)
-    (s : mstate) : mstate :=
+Fixpoint settle_gated (pick : virtio_state -> option Z) (latch : bool)
+    (fuel : nat) (s : mstate) : mstate :=
   match fuel with
   | 0%nat => s
-  | S f => match settle1_at pick s with Some s' => settle_at pick f s' | None => s end
+  | S f => match settle1_gated pick latch s with
+           | Some s' => settle_gated pick latch f s'
+           | None => s
+           end
   end.
+
+Definition settle_at (pick : virtio_state -> option Z) (fuel : nat)
+    (s : mstate) : mstate := settle_gated pick true fuel s.
 
 Definition settle (fuel : nat) (s : mstate) : mstate := settle_at lowest_head fuel s.

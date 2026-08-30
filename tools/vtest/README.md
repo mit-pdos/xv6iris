@@ -682,8 +682,18 @@ edge only.  A level gateway that re-forwards is the spec-faithful behaviour --
 it is why a driver acknowledges the DEVICE before completing at the PLIC -- so
 no model change is wanted.  The model does have a matching execution (`SLatch`
 is never forced), but `VSched.settle` is eager and takes every enabled arm, so
-this test cannot exhibit it.  Exhibiting it needs a `run_until` variant
-parameterised by the device policy; until then it is recorded, not reproduced.
+the harness forced a forward the RELATION never required.
+
+**Now reproduced.**  `settle1_gated` takes a `latch` flag (every existing
+caller passes `true`, so nothing else moves), and `vtest-rocq/PlicLevelQemuRun.v`
+is HAND-WRITTEN with a device schedule -- the first user of the generator's
+hand-written escape hatch.  The schedule is a CREDIT, not a step count: what
+the execution is is "the gateway forwards ONCE", which is what an
+edge-triggered gateway does with a level that rises once and is stated without
+reference to the program.  `settle1_credit` offers each round without the
+gateway first and spends a credit only when nothing else is enabled, so it
+counts FORWARDS rather than settle rounds.  The run reproduces QEMU's result
+with zero differing bytes.
 
 ### Finding 17, and why the wild arm earns its keep
 
