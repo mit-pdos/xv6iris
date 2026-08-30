@@ -1646,3 +1646,28 @@ ProofSysUnlinkAUW5F.v
 ProofSysUnlinkAUW5D.v
 ProofSysUnlinkAU.v
 LinkSysUnlinkAU.v
+
+# fs-syscall-specs lane SH-TO-URUN, STAGE 1: the shell's program proof on
+# the urun engine.  UCodeShK.v is a SECOND code catalog over the SAME dump
+# as UCodeSh.v -- generated at [--prog shk] (tools/ucode_shk.txt) so the
+# first-generation sh proofs (UProofSh*.v, still on-build over WpUmode* and
+# UmodeIo's io-protocol) keep [sh_text_sub] / [ui_sh_*] / [sh_code] while
+# the port gets [shk_text_sub] / [uis_shk_*] / [shk_code] over the same
+# ShInstrs.sh_bytes.  It covers 91 instructions in 5 functions: start,
+# main, and the open/close/exit stubs.
+#   UkRunBr.v is the TWO branch leaves UkRunLeaf.v does not have and should
+# ([wp_uk_btype0], the base branch against x0, whose value is not readable
+# off the register file; and [wp_uk_btype_later], which hands the step's
+# own later OUT).  Both are six-line re-threads of an existing UkBranch
+# leaf.  RELOCATION ASK: they belong beside [wp_uk_btype] in UkRunLeaf.v.
+#   UkSh.v is the walk: the quiet-row stub shape once ([wp_ksh_qstub],
+# instantiated at open and close), exit, start, main's prologue, and main's
+# console preamble -- the first UNBOUNDED loop proven on this engine, under
+# one iLoeb whose invariant is EMPTY (the branch conditions are case split
+# on the abstract [uv_btaken] boolean, so the walk never learns what fd the
+# kernel returned).  It stops at the command loop's head 0x914, taken as
+# the single Prop [ush_cmd_head]; stage 2 discharges it.  Audit = the
+# standing three, zero Admitted.
+UCodeShK.v
+UkRunBr.v
+UkSh.v

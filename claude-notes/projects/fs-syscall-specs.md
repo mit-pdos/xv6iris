@@ -1413,6 +1413,207 @@ things, and the answer differs:
   `init_text_sub`, and the two entry theorems a frame-above-image
   inequality, because vprintf LOADS the .rodata literal's bytes.
 
+- [ ] **SH — the sh.c program theorem on the urun engine (six stages;
+  opened 2026-08-30).  Upstream owns the INIT port; this lane owns sh.**
+
+  **STAGE 0 — THE INVENTORY, and the two corrections it forces.**
+
+  (a) *There is already a COMPLETE first-generation sh program proof, and
+  it is ON-BUILD.*  Not three files — **eleven**: `UProofShLib` (2107),
+  `ShMem` (1814), `ShHeap` (4061), `ShLex` (5651), `ShIo` (3692),
+  `ShInput` (158), `ShParse` (8996), `ShCmd` (3676), `ShTop` (1017),
+  `ShMain` (1952), `ShEcho` (122) — ~33k lines, plus `UCodeSh.v` (10148)
+  and the two statement files `USpecSh.v` / `USpecShParse.v`.  It closes
+  end to end: `wp_sh_execs_echo` (`UProofShEcho.v`) says the shell, run on
+  the input `echo Hello world!\n`, reaches an `exec` naming `echo` with
+  argv `["echo";"Hello";"world!"]`.  Thirty functions covered, zero
+  `Admitted`, zero `Axiom`; the only two `Hypothesis`es
+  (`UProofShMain.Hparsecmd`, `UProofShCmd.Hparseline`) are cross-lane
+  section hypotheses that `UProofShEcho.v` §1 discharges by application.
+  Design of record: `claude-notes/completed/user-sh.md`.
+  **So this lane is a PORT, not a first proof** — and R10 says the eleven
+  files and their statements do not move.
+
+  (b) *`ShLib`/`ShMem`/`ShHeap` are NOT tier-neutral pure layers.*  They
+  are old-interface walks: measured by declaration, the engine fraction is
+  **91.6% / 80.9% / 92.0%** and the pure remainder is 9 / 19 / 20 tiny
+  shims (`bv8_zero`, `uM_bytes_4_of_8`, `heap_leaf`, register indices…).
+  The genuinely portable material in the stack is elsewhere: all of
+  `UProofShInput.v` (100% pure) and ~2 700 lines spread over the PURE
+  columns of ShParse (735), ShLex (615), ShCmd (411), ShIo (309), ShMem
+  (254) — plus **both `USpec*` files in full**, which hold every sh
+  contract statement and were among the 18 rows that survived the last
+  engine swap with zero edits.  `USpecShParse.sh_tokens`,
+  `USpecSh.sh_exec_below`, `sh_skipws`/`sh_toklen`, `ustr_find`,
+  `sh_gets_taken` and the `SH_*` address constants are the modelling work
+  worth harvesting verbatim.  What does *not* port is the shape: every
+  contract is `… -∗ WP (Loop …)` in CPS over `UmodeIo.xv6_io_protocol`,
+  whose eleven `Io*` arms are **assumptions about the kernel** (fork never
+  fails, open returns ≥3, exec never returns, sbrk never grows `pt`,
+  `wait` only at a null status, `write` forgets what it wrote).  The port's
+  content job is replacing each such conjunct with the real
+  `UsysMemOk.usys_mem_ok` row — per arm, not a rewrite.
+
+  (c) *The syscall-row coverage sh needs* (`UsysMemOk.usys_mem_ok`,
+  c27e0e839; kernel twin `SpecSyscall.sysc_mem_ok`, bridge
+  `UsysMemOkSpec.v`; no axiom, no `Admitted` anywhere in them):
+
+  | row | # | exists? | what it gives sh |
+  |---|---|---|---|
+  | open | 15 | quiet | `M'=M, π'=π, sz'=sz` — **stage 1 uses it** |
+  | close | 21 | quiet | ditto — **stage 1 uses it** |
+  | exit | 2 | dedicated arm in `UexecRet.uexec_ret_F` = `emp` | **stage 1 uses it** |
+  | write | 16 | quiet | echo already consumes it |
+  | chdir | 9 | quiet | `cd` builtin, stage 2 |
+  | dup | 10 | quiet | PIPE arm, stage 5 |
+  | read | 5 | **window**: `∃ d ≤ max 0 (arg2), M' = umem_wr M arg1 d bs` | `gets`, stage 2 |
+  | wait | 3 | **window**: `∃ d ≤ 4`, **plus** `arg0 = 0 → d = 0` (9dc84f919) | `wait(0)`, stage 2 |
+  | pipe | 4 | **window**: `∃ d ≤ 8` at arg0, **no null guard** | PIPE arm, stage 5 |
+  | fork | 1 | dedicated arm: a **separating conjunction** — parent AND child continuations owed | `fork1`, stage 4 |
+  | exec | 7 | user side = the **−1 arm only** (`r = −1`, image intact); success has no row by design | `execcmd`, stage 6 |
+
+  Every row sh needs EXISTS.  **What is missing is the consumer side**:
+  `UkRunSys.v` has exactly two ecall leaves, `wp_uk_ecall_quiet` and
+  `wp_uk_ecall_exit`, and its own header says the WINDOW row and the SBRK
+  row are "not yet built".  There is no `wp_uk_ecall_fork` either.  Those
+  three leaves are stage 2/3/4's first task — see the asks below.
+
+  (d) *Assets that plug in unchanged.*  `FsShPin.v` (sh at inode 13,
+  `sh_bytes = ElfUser.sh_elf`, 58 312 bytes — matching `ShElfRaw`
+  exactly); the sealed syscall AU theorems (sh's KERNEL-side story is
+  done; this lane is the USER-side walk); `UexecCond.cond_entry_slot`, to
+  which adding sh is literally one more `destruct (decide (sh_gate W))`
+  once the walk is unconditional.  The parked `UkInit*.v` files are the
+  molds for the shapes stage 4 needs (fork's two continuations, the dying
+  arms, the double-headed loop iLöb) but are stale against the current
+  engine — read them, do not import them.
+
+  **STAGE 1 AS LANDED (2026-08-30; `iris/UCodeShK.v` 2104 lines,
+  `iris/UkRunBr.v` 110, `iris/UkSh.v` 640; audit = the standing three
+  (`resv_matches`, `resv_is_valid`, funext), zero `Admitted`).**
+  start → main's prologue → main's CONSOLE PREAMBLE, closed, stopping at
+  the command loop's head 0x914.
+  * **The catalog had to be regenerated, and could not reuse the name.**
+    `UCodeSh.v` emits `uinstr` facts (page-table indexed) and the urun
+    leaves take `UserHeap.uinstr_is` (a separation-logic resource naming
+    no page table).  `tools/gen_ucode.py` already emits the new form, but
+    its `--prog` flag — the one that would let a second catalog over the
+    same dump avoid colliding with the first — was **broken**: five emit
+    sites spelled the dump maps `<M>Instrs.<prog>_bytes` instead of
+    `<M>Instrs.<prefix>_bytes`.  Fixed here (5 lines, plus the geometry
+    scalars, which read `<prog>Entry` and silently printed 0).
+    `tools/ucode_shk.txt` is the new pc spec and grows per stage.
+  * **Compile-time finding: the catalog does not scale to all of sh.**
+    91 instructions cost **3 m 20 s**; `ucode_sh.txt`'s 1032 would be
+    ~11× that, far past the per-file budget.  The catalog must be SPLIT
+    per stage (or per function group) before the parser lands.
+  * **Two engine leaves were missing, and both are UkRunLeaf's.**
+    `wp_uk_btype0` — the base branch against x0 (`bltz`/`bgez`/…): the
+    value of x0 is not readable off the register file, so `wp_uk_btype`'s
+    premise is undischargeable, and echo/sync never hit it.
+    `wp_uk_btype_later` — every leaf in `UkRunLeaf.v` is later-FREE, which
+    is right for a bounded Rocq induction (echo's two scans) and leaves an
+    UNBOUNDED loop unprovable, since an `iLöb` hypothesis is `□ ▷ …`.
+    Both are six-line re-threads of leaves `UkBranch.v` already has; they
+    are in `UkRunBr.v` only because UkRunLeaf.v is not this lane's file.
+  * **The first unbounded loop on urun, and its invariant is EMPTY.**
+    `while ((fd = open("console", O_RDWR)) >= 0) if (fd >= 3) { close(fd);
+    break; }` — 0x900..0x910, back edge `bge s1,a0,0x900` at 0x90c.  One
+    `iLöb`; the two branches are taken on the ABSTRACT `uv_btaken …`
+    boolean and case-split, so the walk never computes what fd the kernel
+    returned and carries nothing round the cycle but `urun … 0x900 n`
+    itself.  90 lines, not 900.  **This is the shape stage 2 should try
+    first on the command loop**, whose real invariant is the buffer's.
+  * `wp_ksh_qstub` states usys.S's whole stub shape (`c.li a7,n; ecall;
+    c.jr ra`) once, at any quiet-row number; open and close are two-line
+    instances and stage 2's chdir/dup/write are three more.
+  * The single Prop `ush_cmd_head` — "0x914 is safe at ANY register file"
+    — is the stage boundary.  ∀-over-`m` is honest: main never returns, so
+    the eight words its prologue spilled are dropped here and no epilogue
+    pc is reachable, and 0x914..0x926 rewrites every register the loop
+    reads.  Everything below it in the file is unconditional.
+
+  **THE PLAN (stages 2–6).**
+  * **STAGE 2 — the command loop's head, and the READ window.**  `getcmd`
+    (0x0, 29 instrs) → `write(2,"$ ",2)` (quiet) + `memset` (0xa5c, 16) +
+    `gets` (0xaaa, 50) → `read(0,&c,1)`, plus main's blank-line arm
+    (`while (*cmd==' '||*cmd=='\t') cmd++;  if (*cmd=='\n') continue;`) and
+    the outer `while (getcmd(...) >= 0)` back edge to 0x938 — a second
+    iLöb, at the head that matters.  Discharges `ush_cmd_head`.
+    **Blocked on one leaf**: `wp_uk_ecall_window`, the read row's consumer.
+    Its statement is forced — the caller hands over `ubytes γd a k f` for
+    the buffer it named in a1 with `k ≥ count`, and gets back
+    `∃ d ≤ count, ubytes γd a k g` with `g` agreeing with `f` above `d`;
+    the re-assembly primitive already exists and is
+    `UserHeap.uheap_store_run`.  ASK below.
+  * **STAGE 3 — the allocator.**  `malloc` (0x118c, 91) → `morecore` →
+    `sbrk` (0xc52, 10) → `sys_sbrk` (0xd0e), and `free` (0x1106, 46).  The
+    first call is the only one the old stack proved (`freep == 0`), and
+    that scoping carries.  **Blocked on `wp_uk_ecall_sbrk`**, the second
+    unbuilt row — and this one moves `π` and `sz`, so it is strictly
+    harder than the window.  `USpecSh`'s `sh_nunits`, `SH_FREEP`,
+    `SH_BASE` and `UProofShMem`'s `heap_leaf`/`data_leaf` port.
+  * **STAGE 4 — the parser's recursion.**  `parsecmd` (0x86e) →
+    `parseline` (0x6e2) → `parsepipe` (0x682) → `parseexec` (0x590) →
+    `parseredirs` (0x4ac), over `peek` (0x448) / `gettoken` (0x310) /
+    `strchr` (0xa82) / `nulterminate` (0x7ee).  ~500 instructions, the
+    lane's bulk.  The recursion is bounded by the input LINE, and
+    `USpecShParse.sh_tokens` is already the right induction — it is
+    defined in the exact shape `parseexec`'s arg loop runs, so the loop
+    invariant is one constructor.  Harvest `USpecShParse.v` verbatim; the
+    three-level shared postcondition (`wp_sh_parse_body entry budget`,
+    instantiated at parseexec/parsepipe/parseline) is the economy to keep.
+    `nulterminate`'s jump table is the one novelty (a computed control
+    transfer) and the old `UProofShCmd.nt_mem` model ports.
+    Catalog: split it — see the compile-time finding.
+  * **STAGE 5 — `runcmd`'s tree walk.**  0x8e, 102 instructions, five arms
+    off the 0x1398 jump table.  EXEC needs the exec −1 arm plus, for
+    success, the pinned-exec prover (lane X's `SpecKexecPin.Q_pin`) —
+    that is the same seam init's stage 3 sits on.  LIST and BACK need
+    `fork`'s TWO continuations (`uexec_ret_F`'s separating conjunction —
+    a `wp_uk_ecall_fork` leaf, third unbuilt).  REDIR needs open/close
+    (have them).  PIPE needs `pipe`'s window row + `dup` (quiet) — and
+    note the pipe row has **no null guard**, unlike wait's; if `p` can be
+    argued non-null from the code the row still permits a write at 0, so
+    this may become a fourth upstream contract ask.  `fork1`'s
+    `panic("fork")` arm and every `fprintf` diagnostic are REFUTABLE the
+    way UkInitPrintf refuted init's %-tree, or scoped out the way
+    `ucode_sh.txt` scoped them out; decide once, at the top.
+  * **STAGE 6 — the top theorem, stated honestly.**  The first-generation
+    statement is the target shape and the ceiling: `wp_sh_execs_echo` says
+    *on one fixed input*, the shell reaches `exec` naming the right path
+    and argv.  It is fixed-input for a recorded reason — parametric in the
+    input it is not merely unproven but not a theorem, because nothing
+    bounds the loop.  The honest urun form is therefore **per accepted
+    command line**: "given `ustdin`-equivalent ownership of a line the
+    lexer accepts, sh's next `exec` names the tokens of that line" — one
+    line, then the loop's iLöb re-enters at the head.  Functional content
+    rides the same Φ-refinement seam as init's stage 2 (UkEcho's header
+    names it) unless the entry chain's gate provides more.  Only when the
+    walk is unconditional does sh join `UexecCond.cond_entry_slot`: one
+    `destruct (decide (sh_gate W))` plus a `UShKernel.sh_uexec_slot` built
+    from `uslot_of_urun` at sh's stack budget (the old tier measured the
+    deepest chain at 560 bytes, i.e. 70 words) — and sh needs NO
+    `uk_args_c` (it takes no argv), so its gate is sync's six conditions
+    at sh's text and entry pc, not echo's nine.
+
+  **ASKS (relay, in priority order).**
+  1. **`wp_uk_ecall_window` in `UkRunSys.v`** — blocks stage 2 and every
+     stage above it, and blocks upstream's init port at exactly the same
+     place (`wait((int*)0)`).  Owner question: ours or upstream's?  The
+     row and the re-assembly lemma both exist; this is the leaf.
+  2. **`wp_uk_ecall_fork`** (the two-continuation arm) and
+     **`wp_uk_ecall_sbrk`** — stages 3–5.
+  3. **Relocate `UkRunBr.v`'s two leaves into `UkRunLeaf.v`.**
+  4. **`pipe`'s row has no null guard** while `wait`'s now does — the
+     same defect 9dc84f919 fixed, one row over.  Upstream's contract.
+  5. **The eleven first-generation `UProofSh*.v` files.**  Precedent says
+     the old proofs are DELETED when a program is ported (4f088971f did
+     exactly that for sync).  That is 33k green lines and a closed
+     theorem; deleting them is a coordinator/owner call, not this lane's.
+     Until it is made, both catalogs stay on-build and the port carries
+     the `shk_` prefix.
+
 ## RULING BRIEFS (drafted 2026-08-30, coordinator; each is a yes/no)
 
 - [ ] **RULING A — the copyin content seam.**  THE GAP: `either_copyin`'s

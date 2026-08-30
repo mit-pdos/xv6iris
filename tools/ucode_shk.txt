@@ -1,0 +1,46 @@
+# ucode_shk.txt -- the pc set of iris/UCodeShK.v, for tools/gen_ucode.py.
+#
+#   tools/gen_ucode.py --module Sh --prog shk --out iris/UCodeShK.v \
+#       --spec tools/ucode_shk.txt
+#
+# THE SECOND CATALOG OVER THE SAME DUMP.  tools/ucode_sh.txt drives
+# iris/UCodeSh.v, which emits [uinstr] facts -- the PAGE-TABLE-indexed form
+# the first-generation sh proofs (UProofSh*.v, on WpUmode*) take.  This file
+# drives the catalog for the SAME image on the urun engine, whose leaves take
+# [UserHeap.uinstr_is] -- a separation-logic resource that mentions no page
+# table at all.  Both are on-build, so the two must not collide: [--prog shk]
+# names what this file DEFINES ([shk_text_sub], [uis_shk_*], [shk_code]) while
+# the dump maps it READS stay [ShInstrs.sh_bytes] / [ShData.sh_data].
+#
+# GROWS PER STAGE.  The SH lane of claude-notes/projects/fs-syscall-specs.md
+# walks sh one stage at a time; each stage appends its functions here and
+# regenerates.  An [ui_shk_*] fact for an instruction no proof fetches is not
+# wrong, only compile time -- but a whole uncalled function would be a claim
+# about code nothing reads, so it is left out and the reason recorded.
+
+note SH LANE STAGE 1: the ELF entry and main's console preamble.  [start]
+note calls [main]; main's first act is the loop that opens "console" until it
+note owns fd 3, then closes it and falls into the command loop.  Every
+note syscall on this path -- open, close, exit -- takes the QUIET row of the
+note syscall memory table (UsysMemOk.usys_mem_ok), which is why the stage
+note stops where it does: the command loop's [gets] needs [read], whose
+note WINDOW row has no consumer leaf in UkRunSys.v yet.
+note
+note The whole of [main] is catalogued, not just its preamble: the pc set is
+note per function, and the command loop below the preamble is the next
+note stage's walk over the same facts.
+
+func start
+func main
+
+# ---- the syscall stubs the preamble issues (usys.S, two instructions and a
+# ---- return each; [exit]'s ecall never returns, so its [c.jr ra] is omitted)
+func open
+func close
+func exit
+
+omit 0xc8c exit's [c.jr ra] -- the ecall at 0xc88 never returns
+
+skipdefault not on stage 1's path: the command loop, the parser, the
+skipdefault fork/exec walk and the allocator are later stages of the SH lane,
+skipdefault and this catalog grows to meet them

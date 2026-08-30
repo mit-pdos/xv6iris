@@ -734,7 +734,13 @@ def wrap_comment(text, indent, width=72):
 
 def emit(dump, prog, pcs, groups, dropped, skipfuncs, skipdefault, notes, asts,
          out_path, args):
-    P, M = prog, dump.module
+    # P names what the file DEFINES ([--prog]); D names what it READS -- the
+    # dump maps [<M>Instrs.<D>_bytes] / [<M>Data.<D>_data], which are the dump
+    # tool's and do not move when a catalog is emitted under a second name.
+    # The two coincide unless [--prog] is given; the port of a program that
+    # already has a catalog on the old interface is the case that needs them
+    # apart (a second catalog over the SAME dump, without colliding names).
+    P, M, D = prog, dump.module, dump.prefix
     tmax = max(dump.bytes)
     dmax = max(dump.data) if dump.data else None
     tbound, dbound = page_bound(tmax), (page_bound(dmax) if dmax is not None else None)
@@ -772,7 +778,7 @@ def emit(dump, prog, pcs, groups, dropped, skipfuncs, skipdefault, notes, asts,
             'pc\'s page is mapped fetch-executable, and the fetched word decodes to a '
             'named AST on any U-mode machine.  This file proves those facts for the '
             '%d instruction(s) of this catalog, from the dumped image '
-            '[User.%sInstrs.%s_bytes].' % (len(pcs), M, P), '   '):
+            '[User.%sInstrs.%s_bytes].' % (len(pcs), M, D), '   '):
         a(l)
     a('')
     a('   Two premises carry every [uinstr] lemma:')
@@ -800,8 +806,8 @@ def emit(dump, prog, pcs, groups, dropped, skipfuncs, skipdefault, notes, asts,
     if dmax is not None:
         a('     data  0x%x .. 0x%x   (%d bytes)' % (min(dump.data), dmax + 1, len(dump.data)))
     a('     entry 0x%x, MemBase 0x%x, MemEnd 0x%x'
-      % (dump.defs.get(P + 'Entry', 0), dump.defs.get(P + 'MemBase', 0),
-         dump.defs.get(P + 'MemEnd', 0)))
+      % (dump.defs.get(D + 'Entry', 0), dump.defs.get(D + 'MemBase', 0),
+         dump.defs.get(D + 'MemEnd', 0)))
     a('')
     a('   Catalogued: %d instruction(s), %d distinct word(s), in %d function(s):'
       % (len(pcs), len(asts), sum(1 for s, p in groups if s and p)))
@@ -879,13 +885,13 @@ def emit(dump, prog, pcs, groups, dropped, skipfuncs, skipdefault, notes, asts,
     a('   at this program\'s text bytes.  An inclusion (not an equality), so a')
     a('   process image carrying rodata/bss/stack/argv on top still qualifies. *)')
     a('Definition %s_text_sub (M : gmap Z (bv 8)) : Prop :=' % P)
-    a('  uimg_sub %sInstrs.%s_bytes M.' % (M, P))
+    a('  uimg_sub %sInstrs.%s_bytes M.' % (M, D))
     a('')
     a('(* ... and the dumped RODATA/data.  A string literal a program hands to')
     a('   [write] lives here, not in the text map, so the readable-window lemma')
     a('   below needs THIS inclusion. *)')
     a('Definition %s_data_sub (M : gmap Z (bv 8)) : Prop :=' % P)
-    a('  uimg_sub %sData.%s_data M.' % (M, P))
+    a('  uimg_sub %sData.%s_data M.' % (M, D))
     a('')
     a('(* ... and the two together, so a spec carries ONE image premise.  The')
     a('   per-pc [uinstr] facts below deliberately take only [%s_text_sub]: an' % P)
@@ -916,8 +922,8 @@ def emit(dump, prog, pcs, groups, dropped, skipfuncs, skipdefault, notes, asts,
     a('  - apply andb_prop in HF as [ _ H2 ]. exact (IH H2 Hin).')
     a('Qed.')
     a('')
-    for nm, mod, mapname, bound in (('%s_bytes_key_lt' % P, M, '%s_bytes' % P, tbound),
-                                    ('%s_data_key_lt' % P, M, '%s_data' % P, dbound)):
+    for nm, mod, mapname, bound in (('%s_bytes_key_lt' % P, M, '%s_bytes' % D, tbound),
+                                    ('%s_data_key_lt' % P, M, '%s_data' % D, dbound)):
         if bound is None:
             continue
         modfile = mod + ('Instrs' if mapname.endswith('_bytes') else 'Data')
@@ -1006,7 +1012,7 @@ def emit(dump, prog, pcs, groups, dropped, skipfuncs, skipdefault, notes, asts,
     a('Lemma %s_rodata_rd1 (pt : uptd) (M : gmap Z (bv 8)) (a : Z) (b : bv 8) :' % P)
     a('  %s_text_layout pt -> %s_data_sub M ->' % (P, P))
     a('  0 <= a < %d ->' % (ntext * PAGE))
-    a('  %sData.%s_data !! a = Some b ->' % (M, P))
+    a('  %sData.%s_data !! a = Some b ->' % (M, D))
     a('  uv_rd pt M a 1.')
     a('Proof.')
     a('  intros Hl Hsub Ha Hb. constructor.')
