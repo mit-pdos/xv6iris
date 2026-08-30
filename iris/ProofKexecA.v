@@ -203,7 +203,14 @@ Require Import BioDefs.
    [fs_gamma_L], [era_node] / [inode_rec_local].  IMPORTED BEFORE
    [FsBlocks] on purpose -- the [FsState*] stack exports [fs_view] and
    [byte_range], both of which have live twins below, and the LAST import
-   wins (durable-notes, "AND WHERE THAT IMPORT COLLIDES, PUT IT EARLY"). *)
+   wins (durable-notes, "AND WHERE THAT IMPORT COLLIDES, PUT IT EARLY").
+   QUALIFIED, NOT IMPORTED (pinned-exec prover lane, 2026-08-29): the
+   oracle's widened row is the only place in this file that names them, so
+   [Require] without [Import] buys the three names and the collision this
+   comment warns about does not arise at all. *)
+Require FsState.        (* [FsState.top_frag]                              *)
+Require FsStateEra.     (* [FsStateEra.era_node]                           *)
+Require FsBytesGamma.   (* [FsBytesGamma.fs_gamma_L]                       *)
 Require Import LogInv.
 Require Import BitmapInv.
 Require Import DirentEnc.
@@ -950,11 +957,29 @@ Section KexecABody.
        the very same [data] -- which is why readi's landed post still relates
        its output to it and readi's contract does not move (D-52d).
          A landed caller instantiates [HD := None] and discharges this with
-       [iIntros; iModIntro; iFrame]. ---- *)
-    (∀ (dn : dinode) (data : nat -> list (bv 8)),
-        fv_ride zi (fv_of dn data) ={⊤}=∗
-          fv_ride zi (fv_of dn data) ∗
-          □ (⌜kxq_hdr_ok HD (fun j => file_byte data j)⌝ ∨ XCH)) -∗
+       [iIntros; iModIntro; iFrame].
+         WIDENED (pinned-exec prover lane, 2026-08-29): the payload's ERA
+       LEG rides beside the byte ride, and the payload's own [inode_ok] is
+       handed over as a pure premise.  The ride alone cannot answer a
+       PINNED verdict -- [fv_ride] lives at [DirViewLend]'s ghost and has
+       no tie to gamma-top outside the payload, so a client that must
+       identify [data] with a pinned byte list has nothing to read the
+       abstract row against.  [ic_loaded]'s last name binds
+       [fv_ride ∗ top_frag] as ONE conjunct (durable-disk 2b-inode-3) and
+       the fire below already splits it, so this costs the seam one more
+       name and the landed caller one more [$] -- a kexec-internal,
+       self-cancelling edit, the sweep's B2/B3 seam-body class.  Nothing
+       above [ProofKexec.v] moves: [SpecKexec]'s and [KexecOkQ]'s
+       statements are untouched. ---- *)
+    (∀ (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)),
+        ⌜inode_ok fsc_cov fsc_logst dn bm data⌝ -∗
+        fv_ride zi (fv_of dn data)
+        ∗ FsState.top_frag (FsBytesGamma.fs_gamma_L fsc_fs) zi
+            (FsStateEra.era_node dn bm data) ={⊤}=∗
+          fv_ride zi (fv_of dn data)
+          ∗ FsState.top_frag (FsBytesGamma.fs_gamma_L fsc_fs) zi
+              (FsStateEra.era_node dn bm data)
+          ∗ □ (⌜kxq_hdr_ok HD (fun j => file_byte data j)⌝ ∨ XCH)) -∗
     kxc_at_a2 jp gf
               plen pfun na avf aslen afun pidv U dqb dqs dqa dqpv dqas
               m M32 K eb b lks sp0 ra0 s00 s10 s20 pv av ipv zi n1 -∗
@@ -1142,19 +1167,25 @@ Section KexecABody.
       rewrite /Q2 upd_ne; [| regne]. exact (HQ1thr r Hr Nsp Ns0 Ns1 Ns2 Ns4). }
     (* ---- peel the loaded content for readi ---- *)
     iDestruct (ic_loaded_open with "Hload") as (datl)"(%Hiok & %Hrl_datl & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdiat & Hmeta & Haddrs & Hindres & Hblocks & Hdview & Hfview)".
+    pose proof Hiok as Hiokb.   (* the bundle, kept whole for the oracle *)
     destruct Hiok as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes & Hsized).
     (* the payload's last name binds [fv_ride * top_frag] (durable-disk
-       2b-inode-3); the oracle below wants the ride alone, so split them
-       here and re-join at the three re-packs. *)
+       2b-inode-3); the oracle below takes BOTH (see its row) and gives
+       both back, so the split here is only a re-naming and the three
+       re-packs are unchanged. *)
     iDestruct "Hfview" as "[Hfview Htopl]".
     (* ---- THE HEADER ORACLE'S ONE INSTANT (N-5.2B) ----------------------
        The payload is open and readi has not run yet; the client redeems
-       its contents pin against THIS inode's ride and hands the ride back
-       untouched, so the re-pack below is at the very same [datl]. *)
+       its contents pin against THIS inode's ride and era leg and hands
+       both back untouched, so the re-pack below is at the very same
+       [datl]. *)
     iApply fupd_wp.
     iEval (rewrite Hz) in "Hfview".
-    iMod ("Horacle" $! dnl datl with "Hfview") as "[Hfview #Hhdr]".
+    iEval (rewrite Hz) in "Htopl".
+    iMod ("Horacle" $! dnl bml datl with "[//] [$Hfview $Htopl]")
+      as "(Hfview & Htopl & #Hhdr)".
     iEval (rewrite -Hz) in "Hfview".
+    iEval (rewrite -Hz) in "Htopl".
     iModIntro.
     iAssert (inode_map fsc_fs (ientry k) bml) with "[Haddrs Hindres]" as "Hmap".
     { rewrite /inode_map. iSplitL "Haddrs"; [iExact "Haddrs" | iExact "Hindres"]. }
@@ -1840,13 +1871,19 @@ Section KexecAMain.
     kernel_text -∗ pc_is (mword_of_int KXA : mword 64) -∗
     fs_fabric gs pd pav pu
  -∗
-    (* THE HEADER ORACLE, relayed to [kxc_a2] -- see its statement.  Phase A
-       is the block that FINDS the inum, so the oracle is quantified over it
-       here and instantiated at [kxc_a2]'s [zi]. *)
-    (∀ (zi : Z) (dn : dinode) (data : nat -> list (bv 8)),
-        fv_ride zi (fv_of dn data) ={⊤}=∗
-          fv_ride zi (fv_of dn data) ∗
-          □ (⌜kxq_hdr_ok HD (fun j => file_byte data j)⌝ ∨ XCH)) -∗
+    (* THE HEADER ORACLE, relayed to [kxc_a2] -- see its statement (and its
+       note on the 2026-08-29 widening).  Phase A is the block that FINDS
+       the inum, so the oracle is quantified over it here and instantiated
+       at [kxc_a2]'s [zi]. *)
+    (∀ (zi : Z) (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)),
+        ⌜inode_ok fsc_cov fsc_logst dn bm data⌝ -∗
+        fv_ride zi (fv_of dn data)
+        ∗ FsState.top_frag (FsBytesGamma.fs_gamma_L fsc_fs) zi
+            (FsStateEra.era_node dn bm data) ={⊤}=∗
+          fv_ride zi (fv_of dn data)
+          ∗ FsState.top_frag (FsBytesGamma.fs_gamma_L fsc_fs) zi
+              (FsStateEra.era_node dn bm data)
+          ∗ □ (⌜kxq_hdr_ok HD (fun j => file_byte data j)⌝ ∨ XCH)) -∗
     kalloc_env fsc_kalloc None -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
@@ -1965,7 +2002,8 @@ Section KexecAMain.
               with "Htext Hfab [Horacle] Hseam Hexit Hkw Hcont90").
     (* the oracle is quantified over the inum HERE; [kxc_a2] wants it at the
        one the walk actually landed on. *)
-    { iIntros (dn data) "Hride". iApply ("Horacle" $! zi dn data with "Hride"). }
+    { iIntros (dn bm data) "%Hok Hpay".
+      iApply ("Horacle" $! zi dn bm data with "[//] Hpay"). }
   Qed.
 
 End KexecAMain.
