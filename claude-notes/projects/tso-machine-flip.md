@@ -17014,3 +17014,73 @@ solo: the merge crosses two lanes' files and K15d step 3 changes two
 statements in the §0.37′-deferred cone (K15's precedent allows it, but
 the owner should say go).
 
+## A6.135 — THE PAGE-TABLE PLAN UNDER §0.46′/§0.47′ (ctx_values landed; the per-slot-anchor design; owner: "try to finish the whole page-table thing")
+
+*(Lock lane, 2026-08-30/31.  The kit's first half is GREEN as of this
+entry: `TsoMemPa.pin_ok_author` (+ `visibleb_high`, `read_down_above`)
+and `CtxValues.v` (`cv_touch`, `ctx_values`, `ctx_values_mint`,
+`ctx_values_read`) compile on the VM.)*
+
+### §1. THE KEY SIMPLIFICATION FOUND WHILE BUILDING: PER-SLOT ANCHORS
+
+The author arm anchors [pin_ok_author]'s descent AT the arm's own floor
+B.  If a slot's pin is minted at B := THE SLOT'S OWN WRITE STAMP (each
+PTE is one 8-byte store — one message, one stamp for all 8 bytes), then:
+- the mint needs `t ≤ B` at t = B — NO drain, NO log-top: the
+  publication becomes UNCONDITIONAL (any interp-carrying moment).  The
+  whole A6.134 credential asymmetry evaporates: `kptree_publish`'s
+  drained/top variants are no longer forced on anyone.
+- hart 0's credential is the persistent anchor `cv_own h a B`
+  (msg_at + touches + pm_tid = h) — TOKEN-FREE at the read (the walker
+  never holds own_context; this was A6.106 §4's blocker, now gone).
+- a secondary's credential is `view_lb Bg` for a global bound
+  Bg ≥ every slot stamp (the existing `kpt_bound`), delivered by the
+  started receipt exactly as §0.36′ step 5 planned.
+Generalize `pin_ok_author` to an anchor p with B ≤ p (settle ≥ p ≥ B;
+pin_ok at the settle's own view) so recorded anchors compose with any
+per-slot B ≤ p.
+
+### §2. THE WORK LIST (S1–S6), state at writing
+
+S1. `pin_ok_author` anchor-generalized (B ≤ p).                    [next]
+S2. `CtxValues`: `cv_own h a B Sv` (persistent author anchor WITH
+    pm_tid), `cv_own_read` (token-free), word forms, mint-with-anchor
+    (the token is available AT MINT to extract dirty_ok's own arm; the
+    read needs none).                                              [next]
+S3. `PtTree.pt_slot_own (KTier Bg)`'s slot assertion becomes
+    `∃ Ba, ⌜Ba ≤ Bg⌝ ∗ phys_ledger_word_pin a dq w Ba (pte_slot_set w)`
+    (per-SLOT anchors under a global bound).  MEASURE the KTier
+    consumer set first; adapt `kpt_slot_bytes_pin` (credential becomes
+    `view_lb Bg ∨ cv_own-anchor`, `view_lb_le` closes the Ba gap) and
+    the publish gates (per-slot mint at the ctx cells' own stamps —
+    strictly simpler than the old log-top mint).
+S4. `kpt_creds` bifurcates: `∃ Bg, kpt_bound Bg ∗ (view_lb Bg ∨
+    kpt_own_anchors t)` where `kpt_own_anchors` is the per-slot
+    `cv_own` bundle (persistent).  Secondaries: started receipt →
+    view_lb arm (the SpecMainSecondary→SpecKvminithart premise thread
+    that already exists).  Hart 0: the anchor bundle, minted at
+    establishment.
+S5. Establishment site: ONE interp-exposing variant of the `csrw satp`
+    leaf (WpSconfCsr; its callback today is `|={⊤}=> strans_inv ∗ Rout`
+    with no interp) — the A6.107 fence-hook recipe.  There
+    `UTier ctx tree → ∃Ba KTier tree + anchors + kpt_bound Bg (Bg :=
+    loglen via tso_interp_loglen_llb) → kpt_inv_alloc → kpt_creds
+    (hart 0's arm)`.  Then `mn_grp_kvm` needs no twin, no fence, no
+    residue surgery.
+S6. The A/D write-back payer (the [pte_wb_ok] □-wand threaded through
+    SRegime/SmodeCorePt/TransPt/IntrDefs): discharge with S := the
+    interp currency closed by `ledger_store_win_pin_ok` (∃Ba-adapted).
+    OPEN MEASUREMENT: find where the GREEN post-satp fetches
+    (ProofKvminithart's tail) discharge this wand today — that site is
+    the template; no Wp* file names [pte_wb_ok], so the discharge (or
+    its current vacuous stub) hides in the sregime instance layer.
+
+### §3. BUILD LOG (running)
+
+- r-kit-1: `pin_ok_author` + `CtxValues.v` GREEN (targeted VM build).
+  Gotchas: python heredocs eat trailing `/\` (line-continuation) — use
+  quoted `cat` heredocs for Coq text; ssreflect `rewrite lemma`'s side
+  conditions come FIRST (no `last first`); `phys_pointsto` needs
+  `iEval (rewrite /phys_pointsto)` before destructuring; evar-`lia`
+  in `view_lb_le` needs explicit instances.
+
