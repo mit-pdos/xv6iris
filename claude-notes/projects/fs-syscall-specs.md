@@ -766,8 +766,9 @@ things, and the answer differs:
   twin), and the bridge into these arms is `SpecCreateAUFOpen`.**  What is
   left on the O_CREATE arm is sys_open's own walk at that contract.  When
   it lands, delete `SpecSysOpenAUPlain.v` and seal `SYSOPEN_AU` whole.
-  REMAINING: unlink AU (wants the npar walk's contract shape), then
-  read/close/fstat/chdir, mechanical.  NOTE (2026-08-27): the fd-state ghost
+  REMAINING: ~~unlink AU (wants the npar walk's contract shape)~~ **DONE
+  2026-08-30, see W-U below**, then read/close/fstat/chdir, mechanical.
+  NOTE (2026-08-27): the fd-state ghost
   landed upstream (`FdSlots.fd_frags` beside `ut_own`; `fdstate` =
   open-or-closed + `fdtype`, two-halves algebra, commits 28d707dc +
   3199a1b6; `FdInode` carries its INUM as of d1411776, riding on
@@ -832,6 +833,68 @@ things, and the answer differs:
   `bne s2,2` proven, the child's row a premise `abs_of (era_node
   (create_made ty mj mn) _ _) = MkAnode c 1`), which `caf_acre_fire`
   already supports.  That is a refactor, not new mathematics.
+- [x] **W-U — THE UNLINK AU, the last mutating-syscall lane.**  DONE
+  2026-08-30 (Opus lane).  `SpecSysUnlinkAU.SYSUNLINK_AU` is SEALED and
+  `LinkSysUnlinkAU` makes it unconditional; assumption set = `resv_matches`,
+  `resv_is_valid`, `functional_extensionality_dep`, i.e. `LinkNamexEra`'s,
+  with NOTHING new entering the cone.  EIGHT NEW FILES, all EC2-green, zero
+  `Admitted`, R10 clean (`SpecSysUnlinkAU`, `SpecSysUnlink`, `ProofSysUnlink`,
+  `ProofSysUnlinkParts`, `ProofSysUnlinkTails`, `FsAbsMknodFire`,
+  `SpecNparWrapEra` all byte-identical; only `iris/_CoqProject` moved):
+  - `FsAbsUnlinkFire.v` (5.7 s) — THE FIRE LEAF, the one-per-syscall
+    precedent of `FsAbsMknodFire` / `FsAbsOpenFire` / `FsAbsWriteFire`.  The
+    four fires and the four bridges.  `uf_uent_fire` (instant 1) replaces
+    the parent-row `ireg_top_retag` and reads a SECOND, read-only fragment
+    beside it — `unl_pre`'s last three conjuncts are about `ip`, whose lock
+    the walk has held since W3, and that borrowed row is what lets the pair
+    be read as one delta later (`delta_unlink_split`).  `uf_utgt_fire` is
+    instant 2.  `uf_dmiss_fire` is the fired miss; `uf_dex_fire` fires the
+    REUSED `dlookup_commit_at` at the isdirempty refusal holding BOTH
+    fragments, so one `av` carries all four of arm (iii-c)'s conjuncts.
+  - `ProofSysUnlinkAUParts.v` + `ProofSysUnlinkAUW1/W2/W3/W5F/W5D.v` +
+    `ProofSysUnlinkAU.v` (the seal) + `LinkSysUnlinkAU.v`.
+  AS-LANDED FINDINGS:
+  1. **THE AU PROOF OF A SYSCALL IS ITS LANDED PROOF, BLOCK FOR BLOCK.**
+     The five blocks are copy-adapts and the diff per block is ~40 lines out
+     of 700–2200; the instruction-level script is untouched.  Three files
+     are reused VERBATIM and each has a reason: `ProofSysUnlinkParts` (no
+     contract in it), `ProofSysUnlinkTails` (**every exit block** — the
+     tails conclude ABSTRACTLY, so the AU caller supplies a continuation
+     that pays `unlink_arms` at −1 and not one line of them moves), and
+     `ProofSysUnlink` itself for its top-level pure layer.  That last is a
+     whole-function proof taken as a dependency, which the house rule
+     forbids for ANOTHER function; this is the same function's second
+     contract, the case the rule does not cover.  **Budget the next AU lane
+     at its landed walk's line count, not at a re-proof.**
+  2. **ONE FIRE LEMMA SERVES BOTH W5 ARMS**, and the reason is that `dec` is
+     `unl_dec` of the TARGET's row, read off the target's own fragment: 0 on
+     the FILE arm (so the parent's count does not move and `unl_pre`'s
+     dots-only conjunct is vacuous), 1 on the DIR arm, where W5-DIR's single
+     post-`iupdate(dp)` retag makes the fire cover entry-delete and count
+     together.
+  3. **THE ONE STRENGTHENING TAKEN OVER A LANDED BLOCK** is `su_w4_exitE_au`,
+     which carries the isdirempty loop's NON-EMPTY WITNESS (`exists k,
+     2 <= k < dir_nrec /\ dir_live`).  The landed exit threw it away and arm
+     (iii-c) is precisely the report that it happened — it cannot be
+     re-derived downstream, because the loop's index is gone.  `k < dir_nrec`
+     comes from the FULL-READ fact `su_clamp16_in` already leaves
+     (`su_nrec_lt`).  No statement of `SpecSysUnlinkAU` moved.
+  4. **The `uptd_ext` / `uptd_ext_sz` seam.**  The AU contract's inlined
+     return continuation reports the descriptor growth as `uptd_ext` where
+     the landed closer's — and therefore every block's — is the stronger
+     `uptd_ext_sz`.  `ProcPtOwn.uptd_ext_sz_ext` closes it ONCE at the top
+     of the seal rather than at each of the eight exits.
+  5. **`lia` does not identify convertible-but-not-syntactically-equal
+     atoms**, and the DIR arm's parent-count premise (`A = A + 1 - 1` on two
+     spellings of the stored halfword) is where it bites.  The landed walk
+     hits the same wall at its own `HdWnd` site; the route is one
+     `Z.add_simpl_r` rewrite and `reflexivity`.
+  OWNER QUESTIONS 1–4 in `SpecSysUnlinkAU`'s header are ANSWERED BY
+  CONSTRUCTION as the statement proposed them: the two-instant surface is
+  realizable and realized (Q1); ret 0 does NOT fire the found observation,
+  and `unl_pre`-at-instant-1 was enough at every consumer inside the walk
+  (Q2); the dot refusal stayed PURE and needed no parent observation (Q3);
+  the mask floor ∅ never bound (Q4).
 - [x] **P — the /init pin port (after D; independent of S0).**  DONE
   2026-08-28 (Opus lane, `iris/FsInitPin.v`, 505 lines, EC2-green in
   **5.5 s**, zero `Admitted`, and `Print Assumptions` on all three
