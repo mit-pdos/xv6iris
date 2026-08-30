@@ -1087,3 +1087,58 @@ Sizing: D is spike-sized — the readings exist, the work is assembly and
 statement.  S0 is one design session.  A and W are the campaign's bulk.
 P is contained (two pins).  Y is CLOSED (2026-08-29): machinery, contract,
 banking and seal.
+
+
+---
+
+## Lane X (PINNED-EXEC PROVER) — landed 2026-08-30, with ONE owner question
+
+Files: `iris/ProofKexecPinTrace.v`, `ProofKexecPinA.v`, `ProofKexecPin.v`,
+`LinkKexecPin.v`; plus the seam widening inside `ProofKexecA.v` /
+`ProofKexec.v`.  `SpecKexec.v`, `KexecOkQ.v` and `SpecKexecPin.v` are
+byte-identical (R10) — the widening lives entirely below the seal.
+
+**What is proven.**  `SpecKexecPin` §8's (1), (2), (3) and (5).  The paying
+site is `kxc_cd`'s `Q (kxq_entry ef)`, discharged by `Q_pin_of_hdr` at
+`HD := Some (kxp_ef pb)`, `XCH := ⌜False⌝`; the other thirty-one relays
+carry the `Q` opaquely and needed no restatement (verified by the first
+compile).  Phase A is copied (`kxc_a1p` / `kxc_phaseAp`) because the landed
+one calls the *traceless* namei; every other block is the landed one,
+instantiated.  Audit: the platform's `resv` pair plus funext.  Zero
+`Admitted`.
+
+**The oracle seam (§8 (2)), measured.**  Route (a) — widen ProofKexecA's
+oracle premise to carry the payload's era leg (`top_frag`) and its
+`inode_ok` beside the `fv_ride` — is **+64/−21 lines across two files** and
+one full-tree `make` (green).  Route (b), a pinned `kxc_a2` copy, is
+**~920 lines** duplicated (`kxc_a2` + `kxc_a2_exit1`) and forces a parallel
+`kxc_phaseA` regardless.  (a) taken.  The ride alone genuinely cannot answer
+a pinned verdict: the fv ghost has no tie to γ-top outside the payload, and
+the era leg is what lets the abstract row be read off the authority.
+
+**THE OWNER QUESTION (§8 (3)'s premise, not its proof).**
+`kxp_view_pin` re-reads `kxp_pins` at every instant, and `kxp_pins` pins the
+two ENDPOINTS.  On a path of two or more elements that is not enough, and
+the contract's sentence is **false**, not merely unproven: between hop *k*
+and hop *k+1* a writer may re-point the root's `"a"` at a fresh directory
+whose `"b"` is the pinned inum and leave the stale `d`'s `"b"` pointing at
+junk — every instant still satisfies `kxp_pins`, and the walk answers junk.
+No cursor definable from `kxp_pins` rules this out (the invariant a hop can
+carry forward must hold at *every* pin-satisfying view, and "d is the k-th
+inum" does not).
+
+*The repair is one conjunct and it is already written upstream.*  What pins
+a walk is the CHAIN at a fixed `ds` — `FsAbs.arun av ROOTINO ps ds` — and
+`FsInitPinBoot.era0_pins` and `FsShPin.era0_sh_pins` BOTH carry exactly that
+conjunct today; `SpecKexecPin` §5a discards it (`intros (Hp & Hc & _)`).  So:
+give `kx_pin` a `kxp_chain` field (or `kxp_pins` a third conjunct) and both
+era-0 instances discharge it for free.
+
+**Nothing is blocked meanwhile.**  `ProofKexecPin.wp_kexec_pinned_run` proves
+the body at the honest premise (`kxp_run_pin`, the drop-in the statement lane
+can lift verbatim), and `wp_kexec_pinned_1hop` derives `SpecKexecPin`'s OWN
+body — the Module Type's sentence, quoted — for every one-element path.
+`init_path = ["init"]` and `sh_path = ["sh"]`, so /init and sh are covered
+and Milestone J's `cond_entry_slot` mint can consume `Q_pin` today.
+`KEXEC_PIN` itself is left UNSEALED deliberately: sealing it would require
+proving the multi-hop arm, which is false.
