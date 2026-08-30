@@ -4602,6 +4602,22 @@ Kit: mint (from the creator's ctx cells, B := the cell's own stamp, via
 [pin_ok_mint]), the two-arm read law, the CtxMorph instance, the gate
 wrapper — one small file ([CtxValues.v]).
 
+**THE THREE RULES (owner-confirmed closing form)**:
+  - RACY READ: { ctx_values ξ a S } read a { v. v ∈ S } — "the cool
+    thing is that now we have a clean separation-logic rule for racy
+    read: you get one of the values from the ctx_values set."
+  - RACY WRITE: ctx_values lives in an invariant; a write opens it,
+    takes ctx_values, writes any v' ∈ S, and puts it back UNCHANGED —
+    an upper bound is insensitive to writes inside the set.  (Growing S
+    is free weakening; changing the family is a re-mint needing all
+    fractions.)
+  - THE PTE INSTANCE: S = the A/D orbit of the built PTE; "we write
+    some combination of A/D bits, and the invariant just proves because
+    taking any combination of A/D bits out, and setting more A/D bits,
+    lands it exactly back in the same set."  One pure obligation: orbit
+    membership is preserved by [pte_wb_ok] (a variant's variants are
+    the original's variants).
+
 **The next-level abstraction, noted for evaluation, not mandated**:
 H as a predicate `P : value -> context -> iProp` — impossible values get
 `P v _ = False`; reading v yields `P v (reader's ctx)`; P persistent for
