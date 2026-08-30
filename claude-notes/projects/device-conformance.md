@@ -1,5 +1,107 @@
 # Project: device conformance — the semantics, differentially tested against QEMU (and now against real hardware)
 
+## STATUS ADDENDUM (2026-08-30c): THE MODEL FOUND A BUG IN A TEST
+
+`conc_mp` (message passing, the RVWMO-vs-TSO litmus) had a FALSE POSITIVE IN
+ITS OWN CONTROL PASS, and the model is what caught it.
+
+The writer stores a monotonic sequence number to X then Y, so X >= Y holds in
+memory at every instant and a reader that sees `r1 > r2` has caught a
+reordering.  The counter was reset at the top of each pass -- `li s2, 0` lived
+inside the WLOOP macro -- so pass 2 began storing X=1 while X and Y still held
+the LARGE values pass 1 had left behind.  A reader sampling there reads
+Y=<big> then X=1, sees r1 > r2, and records a FORBIDDEN event in the FENCED
+pass: the pass whose entire job is to be zero on every machine, model
+included, precisely so that a nonzero count in pass 1 is believable.
+
+QEMU HAD BEEN HIDING IT.  There the writer does not get going until pass 2
+(p1wit=0, X=Y=0 at the end of pass 1 in every capture), so no stale value
+existed to trip over and the control pass read 0.  The model's [cfinish]
+round-robins the two harts one instruction at a time, which is a FAIRER
+schedule than QEMU's, so its writer had run thousands of iterations by the
+time pass 2 started -- and the run came back with p2bad = 1 against QEMU's 0.
+
+THIS IS THE SUITE WORKING IN THE DIRECTION NOBODY PLANNED FOR.  The question
+it asks is "is what the hardware did an execution the model allows"; a
+mismatch is meant to be evidence about the MODEL.  Here the mismatch was
+evidence about the TEST, and the only reason it surfaced is that the model
+schedules differently from QEMU.  A reference implementation that agrees with
+you about everything cannot tell you anything.
+
+Fixed by making the sequence monotonic across both passes (one `li s2, 0`
+before the first WLOOP), which removes the reset window entirely.
+
+Sized at the same time: NITER 4096 -> 64.  The model side is a real two-hart
+execution and runs at ~50 instructions/sec under vm_compute (measured;
+granularity between device settles makes no difference -- 1, 50 and 500
+instructions per settle all took 236-248 s for 12 000 instructions), so 4096
+was ~55 minutes for one schedule and there was no run at all.  64 is ~45 s.
+The sensitivity that costs is bought back with `repeat`, not with NITER: the
+run projects to (status, NITER, p1bad, p2bad), so 20 repeats collapse to ONE
+projected observation and cost the model side nothing.
+
+
+## STATUS ADDENDUM (2026-08-30b): ONE SET OF CASES, ONE KIND OF RUN, ONE TABLE
+
+The suite had grown two of everything: a per-case `vtest-rocq/<Name>.v` that
+hand-wrote its own comparison, a separate hardware capture bolted into the
+same file, a `PASSING.txt` restating `_CoqProject`, and a `vtest_status.py`
+re-deriving from the build log what the table already read off the tree.
+That is all gone.  What replaced it:
+
+**A case declares its platforms; executing a case on a platform is a RUN.**
+`platforms=` in the `.S`'s `vtest:` directive, defaulting to both.  A case is
+marked down to one platform only when the question CANNOT BE ASKED there (the
+board has no virtio disk) -- never because it merely fails there, which is a
+finding and belongs in the table.
+
+**`VRun.TEST_RUN` is what a run is** -- case, platform, the observations the
+platform produced, and what the model did -- and `VRun.TEST_PASSES` is the
+theorem, a module type parametric in the run:
+
+    MNoStep          -> pass.  The model has NO TRANSITION, so no proof over
+                        the model can ever reach this state.  It costs reach,
+                        not soundness.  `VExecStuck.exec_r_no_step` is why
+                        this is honest rather than an interpreter's shrug.
+    MDone exhibited  -> pass iff every observed outcome is exhibited.
+    MUnknown         -> NOT a pass.  `Interface.Choose`: the relation does
+                        have transitions and `exec` merely will not pick one.
+    MBudget          -> not a pass.
+
+**`outcome` is COMPUTED, never asserted.**  That is why the builders are
+functors: a generated run module supplies the image, the regions and the
+capture, and `SingleHart` / `SchedHart` / `PicksHart` / `ConcRun` run the
+model.  A generator cannot claim a model execution the model does not have.
+Four builders because a case takes one of four shapes -- one hart; a hart
+after a schedule prefix (a serial byte ARRIVING is a schedule choice, not
+something `run_until` performs); several outcomes chosen by the DEVICE (the
+disk may answer two in-flight requests in either order); several outcomes
+chosen by an INTERLEAVING, whose schedules are hand-written per case because
+which interleaving reproduces which outcome is the thing a human works out.
+
+**There is no legacy tier.**  All 61 per-case `.v` are deleted.  The one
+thing they said that a run cannot -- the UNIVERSALLY QUANTIFIED statements
+about the model itself, which no comparison against a capture can express --
+was lifted into `vtest-rocq/VModelFacts.v` (13 lemmas).  Those are why a null
+result is ever meaningful.
+
+**`_CoqProject` IS the record.**  A run is listed exactly when its proof
+holds; `_CoqProject.all` lists everything so a red proof can still be
+ATTEMPTED (`make vtest-passes`, which rewrites the green project from the
+`.vo` the attempt produced).  The table reads `.vo`, not membership --
+membership is an assertion, and a table that read it would be reporting its
+own bookkeeping back.  CI compiles the green project and prints the same
+table; there is no second reporter to drift from it.
+
+**Where it stands: 63 cases, 65 runs, 49 passing proofs.**  The 16 red runs
+are the known divergences, and they now read as red rather than as a
+green `<>` theorem elsewhere in the file -- which is the honest shape, since
+"the model does not exhibit what the machine did" is exactly what a failing
+run means.  2 cases (`conc_mp`, `conc_sbx`) have no builder yet: their
+interleavings are unwritten.  30 board runs are uncaptured; 27 cases exclude
+the board (no disk).
+
+
 ## STATUS ADDENDUM (2026-08-29): A SECOND MACHINE
 
 The suite now runs on a **StarFive VisionFive 2** (JH7110) over JTAG, beside

@@ -17,7 +17,7 @@
  *   +0x004  status = 1    +0x104  DONE1
  *   +0x008  CTR read back by hart 0 = 2*NITER
  */
-/* vtest: smp=2 repeat=40 builder=multi */
+/* vtest: smp=2 repeat=40 builder=multi budget=20000 */
 #include "abi.h"
 
 #define R_TOTAL   8

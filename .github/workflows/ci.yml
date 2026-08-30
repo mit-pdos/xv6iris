@@ -403,42 +403,51 @@ jobs:
       # capture, so there is nothing to check after coqc.  See
       # tools/vtest/README.md and claude-notes/projects/device-conformance.md.
       #
-      # EVERY test must pass, and every test is COMPILED before the verdict:
-      # `make vtest-check-ci` runs the suite with `-k` so one red test does not
-      # hide the other 55, then tools/vtest/vtest_status.py writes the
-      # per-area table — naming each failure and quoting its Rocq error — and
-      # is what fails the step.  There is no list of expected-red tests: a
-      # KNOWN divergence from the hardware is pinned on BOTH sides and proved
-      # unequal (tools/vtest/README.md, "Recording a divergence"), so it is
-      # green today and goes red the day the model moves.  All 56 pass, the
-      # eleven open findings included, and a red test here is always news.
+      # EVERY run must pass, and every one is COMPILED before the verdict:
+      # `make vtest-check-ci` builds the suite with `-k` so one red run does
+      # not hide the rest, then `vtest.py table --check` prints THE RUN TABLE
+      # — every case, the runs it produced on each platform, and whether that
+      # run has a passing proof — and fails the step if anything listed in
+      # `_CoqProject` has no `.vo`.
+      #
+      # THE TABLE IS THE ONLY REPORT, and the work is done once.  A run is
+      # listed in `_CoqProject` exactly when its proof holds, so the green set
+      # and the table's "pass" column are the same fact read from the same
+      # `.vo`; there is no second reporter to drift from it.
+      #
+      # A RUN WITH NO PASSING PROOF IS A FINDING, NOT A BROKEN BUILD.  It is
+      # absent from `_CoqProject`, so this step stays green while its row in
+      # the table says `no proof` — which is the honest shape, since "the
+      # model does not exhibit what the machine did" is exactly what a failing
+      # run means.  What DOES fail the step is a listed proof that stopped
+      # compiling, i.e. a regression in something that used to hold.
       #
       # The build needs iris/'s .vo (RiscvExec + DevModel + ColdBoot and their
       # cone) and kernel-rocq/'s, both already on disk from the steps above —
       # nothing extra is compiled outside vtest-rocq/.  Measured on the dev VM:
-      # 117 files, ~600 s of CPU, longest single file 33 s (UartRx), so the
-      # wall-clock floor is one file and the step is minutes at most.
+      # ~200 files, longest single file 33 s, so the wall-clock floor is one
+      # file and the step is minutes at most.
       #
       # LAST ON PURPOSE.  A step with no `if:` is skipped once an earlier one
       # fails, so putting the conformance gate after the informational reports
-      # means a red test here still leaves the profile, coverage and dead-code
+      # means a red run still leaves the profile, coverage and dead-code
       # reports in the summary — and the failure that stops the run is the one
-      # a reader wants at the bottom of it.  vtest_status.py is run twice: make
-      # runs it for the job log (plain text, with the failing test names), and
-      # the second call renders the same verdict as markdown into the summary.
-      # It only reads the filesystem and the log, so the two cannot disagree.
-      - name: Device conformance tests (vtest-rocq/, checked-in QEMU captures)
+      # a reader wants at the bottom of it.
+      - name: Device conformance tests (vtest-rocq/, checked-in captures)
         run: |
           rc=0
           make SWITCH="$GITHUB_WORKSPACE" vtest-check-ci \
             VTEST_LOG="$RUNNER_TEMP/vtest-check.log" || rc=$?
-          # `|| rc=$?` and not a bare call: the reporter exits nonzero on a
-          # failing test, and this job's shell is `bash -eo pipefail`, so an
-          # unguarded failure here would end the step before the annotation
-          # below is printed.
-          python3 tools/vtest/vtest_status.py --md \
-            --log "$RUNNER_TEMP/vtest-check.log" >> "$GITHUB_STEP_SUMMARY" || rc=$?
+          # `|| rc=$?` and not a bare call: the table exits nonzero when a
+          # listed proof did not compile, and this job's shell is
+          # `bash -eo pipefail`, so an unguarded failure would end the step
+          # before the summary below is written.  The table is regenerated
+          # rather than captured from the make output, so that a failure in
+          # the make line above still leaves a table in the summary saying
+          # WHICH runs are red.
+          python3 tools/vtest/vtest.py table --format md \
+            >> "$GITHUB_STEP_SUMMARY" || true
           if [ "$rc" -ne 0 ]; then
-            echo "::error::A device-conformance test failed; see the step summary for which and why."
+            echo "::error::A device-conformance proof stopped compiling; see the step summary."
           fi
           exit $rc

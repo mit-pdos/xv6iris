@@ -18,7 +18,7 @@
  * disk diff to see every one of the nine sectors, without a 4096-iteration
  * fill loop the model would have to execute instruction by instruction.
  */
-/* vtest: repeat=20 drives=cache=writeback;cache=none,aio=threads platforms=qemu builder=multi */
+/* vtest: repeat=20 drives=cache=writeback;cache=none,aio=threads platforms=qemu builder=picks picks=lowest_head,highest_head budget=30000 */
 #include "abi.h"
 
 #define VDESC   0x000

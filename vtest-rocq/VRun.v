@@ -173,6 +173,73 @@ Module SingleHart (P : SINGLE_HART_CASE) <: TEST_RUN.
     end.
 End SingleHart.
 
+(* ---------------------------------------------------------------------- *)
+(* 6. TWO MORE BUILDERS, for the two other shapes a single-hart case takes. *)
+(*                                                                         *)
+(*    Both are still [TEST_RUN]: a builder is only a different way to       *)
+(*    COMPUTE [outcome], which is exactly why that is a functor.            *)
+(* ---------------------------------------------------------------------- *)
+
+(* (a) A case that needs a SCHEDULE PREFIX before it runs.  A serial byte
+       ARRIVING is a schedule choice -- [SUartRx] -- not something
+       [eval_run] performs, so a receiving case starts from the state
+       [srun] reaches and runs from there. *)
+
+Module Type SCHED_CASE.
+  Parameter case      : string.
+  Parameter platform  : string.
+  Parameter text      : list Z.
+  Parameter hart      : Z.
+  Parameter regions   : list region.
+  Parameter budget    : nat.
+  Parameter prefix    : list sitem.   (* delivered before the run *)
+  Parameter proj      : list Z -> list Z.
+  Parameter observed_raw : list (list Z).
+End SCHED_CASE.
+
+Module SchedHart (P : SCHED_CASE) <: TEST_RUN.
+  Definition case := P.case.
+  Definition platform := P.platform.
+  Definition observed : list (list Z) := map P.proj P.observed_raw.
+  Definition outcome : model_outcome :=
+    match srun P.prefix (start_hart_with P.hart P.text P.regions) with
+    | None => MBudget          (* the prefix itself was not enabled *)
+    | Some s0 =>
+        match eval_run false P.budget s0 with
+        | RDone s => MDone [P.proj (peek_mem (mem s) result_base result_size)]
+        | RStuck e => outcome_of_stuck e
+        | RBudget => MBudget
+        end
+    end.
+End SchedHart.
+
+(* (b) A case whose several outcomes come from the DEVICE, not from two
+       harts: the disk may complete two in-flight requests in either order,
+       and [run_until_at] takes which in-flight head to answer as a
+       parameter.  One run per pick, one observation each. *)
+
+Module Type PICKS_CASE.
+  Parameter case      : string.
+  Parameter platform  : string.
+  Parameter text      : list Z.
+  Parameter hart      : Z.
+  Parameter regions   : list region.
+  Parameter budget    : nat.
+  Parameter picks     : list (virtio_state -> option Z).
+  Parameter proj      : list Z -> list Z.
+  Parameter observed_raw : list (list Z).
+End PICKS_CASE.
+
+Module PicksHart (P : PICKS_CASE) <: TEST_RUN.
+  Definition case := P.case.
+  Definition platform := P.platform.
+  Definition observed : list (list Z) := map P.proj P.observed_raw.
+  Definition start : mstate := start_hart_with P.hart P.text P.regions.
+  Definition outcome : model_outcome :=
+    MDone (map (fun pk => P.proj (result_of (run_until_at pk P.budget start)))
+               P.picks).
+End PicksHart.
+
 (* The two projections almost every run uses.  [whole] is the default and
    the strongest: the entire 4 KB result region, nothing trimmed, so a
    difference cannot hide in the tail.  [fields] keeps a named list of
