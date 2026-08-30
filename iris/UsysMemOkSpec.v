@@ -31,6 +31,7 @@ Require Import ProcDefs.
 Require Import UserPtTree ProcPtOwn.
 Require Import SpecSyscall.
 Require Import UserPerm UsysMemOk.
+Require Import UmodeArith.
 Local Open Scope Z_scope.
 
 (* the number the dispatcher reads is the number the table is keyed by *)
@@ -43,17 +44,18 @@ Proof. reflexivity. Qed.
    new program's WP is a kernel mint), and its failure arm's [r = -1] is
    the dispatcher's return-value fact, which [sysc_mem_ok] does not carry. *)
 Lemma sysc_mem_ok_usys (V V' : pprivate) (M M' : gmap Z (bv 8)) (r : mword 64)
-    (π π' : gmap (mword 27) uperm) :
+    (π π' : gmap (mword 27) uperm) (szv szv' : Z) :
   sysc_num V <> 7 -> sysc_num V <> 12 ->
   π' = π ->
+  szv' = szv ->
   sysc_mem_ok V V' M M' ->
-  usys_mem_ok (sysc_num V) (pv_tf V) r M π M' π'.
+  usys_mem_ok (sysc_num V) (pv_tf V) r M π szv M' π' szv'.
 Proof.
-  intros Hne Hns Hp H. unfold sysc_mem_ok in H. unfold usys_mem_ok, USYS_exec, USYS_sbrk.
+  intros Hne Hns Hp Hs H. unfold sysc_mem_ok in H. unfold usys_mem_ok, USYS_exec, USYS_sbrk.
   destruct (decide (sysc_num V = 7)); [ contradiction | ].
   destruct (decide (sysc_num V = 12)); [ contradiction | ].
   change usys_window with sysc_window.
-  destruct (sysc_window (sysc_num V)); exact (conj H Hp).
+  destruct (sysc_window (sysc_num V)); exact (conj H (conj Hp Hs)).
 Qed.
 
 (* sbrk: the dispatcher's row, read at the two sizes it is keyed by.  The
@@ -83,14 +85,17 @@ Lemma sysc_mem_ok_usys_sbrk (V V' : pprivate) (M M' : gmap Z (bv 8)) (r : mword 
   sysc_num V = 12 ->
   usys_sbrk_perm π π' (pv_sz V) (pv_sz V') ->
   sysc_mem_ok V V' M M' ->
-  usys_mem_ok (sysc_num V) (pv_tf V) r M π M' π'.
+  usys_mem_ok (sysc_num V) (pv_tf V) r M π (uint (pv_sz V))
+              M' π' (uint (pv_sz V')).
 Proof.
   intros Hn Hp H.
   pose proof (sysc_mem_ok_sbrk_row V V' M M' Hn H) as Hrow.
   unfold usys_mem_ok, USYS_exec, USYS_sbrk. rewrite Hn.
   destruct (decide (12 = 7)) as [Hc | _]; [ discriminate Hc | ].
   destruct (decide (12 = 12)) as [_ | Hc]; [ | exfalso; exact (Hc eq_refl) ].
-  exists (pv_sz V), (pv_sz V').
+  (* the row's sizes are NAMED now, so this is no longer an [exists]: the
+     two [mword_of_int (uint ...)] round-trips are the only work left *)
+  rewrite !moi_of_uint.
   split; [ exact (usys_sbrk_img_of_row _ _ _ _ _ _ Hrow) | exact Hp ].
 Qed.
 

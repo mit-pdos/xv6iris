@@ -1756,8 +1756,8 @@ Section UservecAllPt.
          [ud_data], which [perm_of] does not read. *)
       match goal with
       | |- uv_round _ _ _ _ _ ?UU =>
-          refine (uv_round_of_ut _ U M g sepc_v sc_v UU _ _ _
-                    (ut_round_same sepc_v sc_v _ U2 UU _ _ eq_refl Hrd2))
+          refine (uv_round_of_ut _ U M g sepc_v sc_v UU _ _ _ _
+                    (ut_round_same sepc_v sc_v _ U2 UU _ _ eq_refl _ Hrd2))
       end.
       + cbn [us_V pv_tf upd_usM us_tf upd_usV upd_tf].
         split; [ reflexivity | ].
@@ -1767,9 +1767,13 @@ Section UservecAllPt.
       + (* the ENTRY IMAGE: the residue was parked at exactly the frame's own
            [M] ([usertrap_res_ptm_close]), so the round's left image is it. *)
         reflexivity.
+      + (* the ENTRY BREAK: neither [us_tf] nor [upd_usM] moves [pv_sz] *)
+        cbn [us_V pv_sz us_upt upd_upt upd_usV upd_usM us_tf upd_tf].
+        reflexivity.
       + cbn [us_V pv_tf us_upt upd_upt upd_usV us_tf upd_tf]. exact Hws1.
       + cbn [us_V pv_upt pv_sz us_upt upd_upt upd_usV us_tf upd_tf].
         rewrite Huptpt2. reflexivity.
+      + cbn [us_V pv_sz us_upt upd_upt upd_usV us_tf upd_tf]. reflexivity.
     - (* the resume pc, straight off usertrap's own row *)
       cbn [us_V pv_tf us_upt upd_upt upd_usV us_tf upd_tf]. exact Hpcret.
     - (* THE REGISTER-FILE TIE (S9).  [userret_gpr] at the words

@@ -190,6 +190,7 @@ Definition wp_userret_closed_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN :
          that one lemma plus the equation between its own [sepc] value and
          the trapframe's epc word. ---- *)
   ukc (perm_of (ud_um pt) (uint (pv_sz (us_V U)))) (us_M U)
+      (uint (pv_sz (us_V U)))
       (tf_resume_gpr0 (pv_tf (us_V U))) (ret_pc sepc0) -∗
   (* ---- the kernel-side bundle, at THIS hart ---- *)
   URes CID pt ksp U -∗

@@ -272,11 +272,8 @@ UkRunMem.v
 UkRunSys.v
 UkSync.v
 UkAbi.v
-UkEcho.v
-UkEchoKernel.v
 UexecCond.v
 UCodeEcho.v
-USpecEcho.v
 UCodeSh.v
 USpecSh.v
 USpecShParse.v
@@ -299,8 +296,6 @@ USpecInit.v
 UProofInitLib.v
 UProofInitPrintf.v
 UProofInit.v
-UProofEchoA.v
-UProofEcho.v
 UserMemArms.v
 UserClassify.v
 UserClassifyAsm.v
@@ -1558,7 +1553,6 @@ LinkSysWriteAUStable.v
 # open(...) < 0 test, up to the restart loop head at 0x32, which the two
 # theorems take as a hypothesis.  The header records the three lane
 # findings (fork/exec rows; the unbounded-loop discipline; wait s window row).
-UkInit.v
 # THE PINNED-EXEC PROVER LANE (fs-syscall-specs; SpecKexecPin.v sect. 8).
 #   ProofKexecPinTrace is the walk's trace built out of the contract's pin
 # -- and the file that records WHY the pin needs its chain conjunct back

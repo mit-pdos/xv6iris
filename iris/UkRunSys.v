@@ -92,16 +92,17 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm)) = n).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz)) = n).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite Hnum. cbv zeta.
     destruct (decide (n = USYS_exit)) as [He | _]; [ exfalso; exact (Hexit He) | ].
     destruct (decide (n = USYS_fork)) as [He | _]; [ exfalso; exact (Hfork He) | ].
-    iIntros (r M' pm') "%Hok".
-    destruct (usys_mem_ok_quiet n _ r _ _ _ _ Hexec Hsbrk Hwin Hok) as [-> ->].
+    iIntros (r M' pm' sz') "%Hok".
+    destruct (usys_mem_ok_quiet n _ r _ _ _ _ _ _ Hexec Hsbrk Hwin Hok)
+      as [-> [-> ->]].
     cbn [uvis_M uvis_perm uvis_of_run].
-    rewrite (uslot_bump_run m pc M M pm pm r Hx0 Hal4).
-    iApply (urun_close_upd _ _ _ _ _ m (mword_of_int 10) _ _ _
+    rewrite (uslot_bump_run m pc M M pm pm sz sz r Hx0 Hal4).
+    iApply (urun_close_upd _ _ _ _ _ m (mword_of_int 10) _ _ _ _
               ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk").
     iIntros (h') "Hrun".
     iApply ("Hcont" $! h' r with "Hrun").
@@ -130,7 +131,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm)) = USYS_exit).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz)) = USYS_exit).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite Hnum. cbv zeta.
     destruct (decide (USYS_exit = USYS_exit)) as [_ | Hne];

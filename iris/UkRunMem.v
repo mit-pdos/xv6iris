@@ -382,7 +382,7 @@ Section UkRunMem.
                     rewrite Hua; exact (Hmap j Hj))
               ltac:(rewrite Hua; exact (eq_sym (uM_word_w8 M a w Hmap)))
               with "Hb [Hheap Hstk Hw Hcont]").
-    iApply (urun_close_upd _ _ _ _ _ m rd _ _ _ Hns with "Hheap Hstk"). iApply ("Hcont" with "Hw").
+    iApply (urun_close_upd _ _ _ _ _ m rd _ _ _ _ Hns with "Hheap Hstk"). iApply ("Hcont" with "Hw").
   Qed.
 
   Lemma wp_uk_cldsp (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
@@ -418,7 +418,7 @@ Section UkRunMem.
                     rewrite Hua; exact (Hmap j Hj))
               ltac:(rewrite Hua; exact (eq_sym (uM_word_w8 M a w Hmap)))
               with "Hb [Hheap Hstk Hw Hcont]").
-    iApply (urun_close_upd _ _ _ _ _ m rd _ _ _ Hns with "Hheap Hstk"). iApply ("Hcont" with "Hw").
+    iApply (urun_close_upd _ _ _ _ _ m rd _ _ _ _ Hns with "Hheap Hstk"). iApply ("Hcont" with "Hw").
   Qed.
 
   Lemma wp_uk_cld (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
@@ -455,7 +455,7 @@ Section UkRunMem.
               ltac:(destruct Hok as (q & Hq & _); exists q; exact Hq) Hcan Hpg Hal8
               ltac:(rewrite Hua; exact Hmap)
               with "Hb [Hheap Hstk Hw Hcont]").
-    iApply (urun_close_upd _ _ _ _ _ m rd _ _ _ Hns with "Hheap Hstk"). iApply ("Hcont" with "Hw").
+    iApply (urun_close_upd _ _ _ _ _ m rd _ _ _ _ Hns with "Hheap Hstk"). iApply ("Hcont" with "Hw").
   Qed.
 
   Lemma wp_uk_lw (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
@@ -489,7 +489,7 @@ Section UkRunMem.
               ltac:(destruct Hok as (q & Hq & _); exists q; exact Hq) Hcan Hpg Hal8
               ltac:(rewrite Hua; exact Hmap) eq_refl
               with "Hb [Hheap Hstk Hw Hcont]").
-    iApply (urun_close_upd _ _ _ _ _ m rd _ _ _ Hns with "Hheap Hstk"). iApply ("Hcont" with "Hw").
+    iApply (urun_close_upd _ _ _ _ _ m rd _ _ _ _ Hns with "Hheap Hstk"). iApply ("Hcont" with "Hw").
   Qed.
 
   Lemma wp_uk_lwu (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
@@ -523,7 +523,7 @@ Section UkRunMem.
               ltac:(destruct Hok as (q & Hq & _); exists q; exact Hq) Hcan Hpg Hal8
               ltac:(rewrite Hua; exact Hmap) eq_refl
               with "Hb [Hheap Hstk Hw Hcont]").
-    iApply (urun_close_upd _ _ _ _ _ m rd _ _ _ Hns with "Hheap Hstk"). iApply ("Hcont" with "Hw").
+    iApply (urun_close_upd _ _ _ _ _ m rd _ _ _ _ Hns with "Hheap Hstk"). iApply ("Hcont" with "Hw").
   Qed.
 
   Lemma wp_uk_clw (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
@@ -560,7 +560,7 @@ Section UkRunMem.
               ltac:(destruct Hok as (q & Hq & _); exists q; exact Hq) Hcan Hpg Hal8
               ltac:(rewrite Hua; exact Hmap) eq_refl
               with "Hb [Hheap Hstk Hw Hcont]").
-    iApply (urun_close_upd _ _ _ _ _ m rd _ _ _ Hns with "Hheap Hstk"). iApply ("Hcont" with "Hw").
+    iApply (urun_close_upd _ _ _ _ _ m rd _ _ _ _ Hns with "Hheap Hstk"). iApply ("Hcont" with "Hw").
   Qed.
 
   (* lbu rd, imm(rs1) -- the BYTE load.  This is what a string walk runs on. *)
@@ -594,7 +594,7 @@ Section UkRunMem.
               ltac:(destruct Hok as (q & Hq & _); exists q; exact Hq) Hcan
               ltac:(rewrite Hua; exact HM) eq_refl
               with "Hb [Hheap Hstk Hw Hcont]").
-    iApply (urun_close_upd _ _ _ _ _ m rd _ _ _ Hns with "Hheap Hstk"). iApply ("Hcont" with "Hw").
+    iApply (urun_close_upd _ _ _ _ _ m rd _ _ _ _ Hns with "Hheap Hstk"). iApply ("Hcont" with "Hw").
   Qed.
 
 End UkRunMem.

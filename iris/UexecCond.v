@@ -54,7 +54,6 @@ Require Import UserPtTree UserExec.
 Require Import UmodeAbi.
 Require Import UserPerm UexecWp UexecSlot UexecRet.
 Require Import UkAbi.   (* [uk_xpage] / [uk_stack] / [uk_args_c]: the key-level facts *)
-Require Import UkEchoKernel.
 Require User.SyncInstrs.
 Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode*/Uk* precedent *)
 Local Open Scope Z_scope.
@@ -139,41 +138,9 @@ Proof. exact (uimg_sub_text_region_eq_of SyncInstrs.sync_bytes M). Qed.
 (* SS3 THE GATE, and THE CONDITIONAL CONSTRUCTOR.                          *)
 (* ===================================================================== *)
 
-(* echo's FIVE, the same shape one program up.  The extra one is the
-   argument area, and note where its parameters come from: [argc], [argv]
-   and the entry [sp] are TRAPFRAME WORDS, so the gate names no
-   existential -- [uk_args_c] is UkAbi.v §3's canonical form (the lengths
-   scanned rather than quantified), which is what makes the whole
-   conjunction decidable. *)
-Definition echo_gate (W : uvis) : Prop :=
-  text_region_eq_of EchoInstrs.echo_bytes (uvis_M W) /\
-  tf_resume_pc (uvis_tf W) = (mword_of_int EchoSyms.start : mword 64) /\
-  uk_xpage (uvis_perm W) (mword_of_int 0) /\
-  uk_stack (uvis_perm W) (uvis_M W) (tf_w (uvis_tf W) tf_sp_idx) 96 /\
-  uk_args_c (uvis_perm W) (uvis_M W)
-    (uint (tf_w (uvis_tf W) (tf_arg_idx 1)))
-    (uint (tf_w (uvis_tf W) (tf_arg_idx 0)))
-    (uint (tf_w (uvis_tf W) tf_sp_idx)).
-
-Global Instance echo_gate_dec (W : uvis) : Decision (echo_gate W).
-Proof. unfold echo_gate. apply _. Defined.
-
 Section UexecCond.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
-
-  (* the same for echo.  [uk_args_c] IS [uk_args] at the canonical lengths
-     (UkAbi.v's [uk_slens]), so the gate's decidable form is already the
-     witness the constructor's [alen] parameter wants. *)
-  Lemma echo_gate_slot (W : uvis) : echo_gate W -> ⊢ uslot W.
-  Proof.
-    intros (Hteq & Hpc & Hx & Hst & Hargs).
-    exact (echo_uexec_slot W
-             (uk_slens (uvis_M W) (uint (tf_w (uvis_tf W) (tf_arg_idx 1))))
-             Hpc
-             (text_region_eq_of_uimg_sub EchoInstrs.echo_bytes (uvis_M W) Hteq)
-             Hx Hst Hargs).
-  Qed.
 
   (* THE CONDITIONAL CONSTRUCTOR: a verified program's slot when its gate
      holds, the generic one otherwise -- and nothing is assumed on any
@@ -184,8 +151,6 @@ Section UexecCond.
   Lemma cond_entry_slot (W : uvis) : □ uexec_wp -∗ uslot W.
   Proof.
     iIntros "#Hgen".
-    destruct (decide (echo_gate W)) as [Hgate | _].
-    { iApply (echo_gate_slot W Hgate). }
     iApply (uexec_wp_uslot W with "Hgen").
   Qed.
 
@@ -213,9 +178,11 @@ Section UexecCondCongr.
     us_M U1 = us_M U2 ->
     perm_of (ud_um (pv_upt (us_V U1))) (uint (pv_sz (us_V U1)))
     = perm_of (ud_um (pv_upt (us_V U2))) (uint (pv_sz (us_V U2))) ->
+    (* the break is key material now *)
+    pv_sz (us_V U1) = pv_sz (us_V U2) ->
     uslot (uvis_of U1) -∗ uslot (uvis_of U2).
   Proof.
-    intros Htf Hm Hp. rewrite /uvis_of Htf Hm Hp. iIntros "H". iExact "H".
+    intros Htf Hm Hp Hs. rewrite /uvis_of Htf Hm Hp Hs. iIntros "H". iExact "H".
   Qed.
 
 End UexecCondCongr.

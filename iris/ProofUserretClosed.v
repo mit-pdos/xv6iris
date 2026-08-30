@@ -166,6 +166,8 @@ Section UserretClosed.
          (W : uvis) (sc stv : mword 64),
          ⌜loop_ok C pt⌝ -∗
          ⌜uvis_perm W = perm_of (ud_um pt) sz⌝ -∗
+         (* the key carries the break now, and the round below reads it *)
+         ⌜uvis_sz W = sz⌝ -∗
          hw_config (CID := h) -∗
          (* [minstret_inv] is [emp] post-port: no hart index left *)
          minstret_inv -∗
@@ -186,7 +188,7 @@ Section UserretClosed.
       iModIntro. iIntros (W).
       iApply (UexecCond.cond_entry_slot W with "Hgen"). }
     iLöb as "IH".
-    iIntros "!>" (h C pt sz W sc stv) "%Hok %Hperm #Hhw #Hmin [Hframe Hret]".
+    iIntros "!>" (h C pt sz W sc stv) "%Hok %Hperm %Hszw #Hhw #Hmin [Hframe Hret]".
     destruct Hok as (Hstv & Hdqc & Hmie & Hmedl & Hnorm & Hptwf).
     (* ---- open the trapped machine.  [user_cfg] stays BUNDLED: the frame
            uservec takes is the same predicate at [Rut := emp], so nothing
@@ -196,6 +198,9 @@ Section UserretClosed.
       "(%Hlen & %Hmsok & Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc &
         Hpc & Hgpr & Hupt & Hcfg & Hrut)".
     iDestruct "Hrut" as (ksp U0) "[%Hsz Hures]".
+    (* put [Hszw] in terms of the residue's size FIRST: otherwise [subst sz]
+       has two equations to choose from and takes the wrong one. *)
+    rewrite <- Hsz in Hszw.
     subst sz.
     (* THE INDEX, RE-KEYED ONTO [pt].  The round's relation reads its entry
        permission map off the residue index's own descriptor, and the loop
@@ -268,6 +273,10 @@ Section UserretClosed.
       by (rewrite Hperm; reflexivity).
     unfold uv_round in Hround'.
     rewrite Hpi0 in Hround'.
+    (* ...and the same for the break, which the key carries now *)
+    assert (Hsz0 : uint (pv_sz (us_V (us_upt U0 pt))) = uvis_sz W)
+      by exact (eq_sym Hszw).
+    rewrite Hsz0 in Hround'.
     iDestruct (uexec_ret_round_slot_of sc W (tf_resume_gpr0 (uvis_tf W))
                  (tf_w (uvis_tf W) tf_epc_idx) U2 Hlen eq_refl eq_refl Hround'
                  with "Hmk Hret") as "Hslot".
@@ -284,17 +293,18 @@ Section UserretClosed.
               Hszok
               (user_mstatus_ok_sret_ms5 ms' HSXL HMXR HFS HVS HTVM HTSR
                  HXS HSD HMPP HSPIE)
-              Hpi2 eq_refl (eq_sym Hgprtie') (eq_sym Hpcret')
+              Hpi2 eq_refl eq_refl (eq_sym Hgprtie') (eq_sym Hpcret')
               with "Hslot Hhw' Hmin' Hwire Hregs' Hupt' Hcfg' Hrut' [-]").
     (* the next round's contract, under the later the bundle takes it at --
        which is exactly the shape of the Löb hypothesis.  A GENUINE Löb back
        edge, so [iNext] and not [bi.later_intro]. *)
     iNext. rewrite /ukb /ukb_F.
-    iIntros (W2 sc2 stv2) "%Hp2 Hpair".
+    iIntros (W2 sc2 stv2) "%Hp2 %Hs2 Hpair".
     iApply ("IH" $! CID' (loop_ucfg mdv0 Hmm) pt' (uint (pv_sz (us_V U2)))
-              W2 sc2 stv2 with "[%] [%] Hhw' Hmin' Hpair").
+              W2 sc2 stv2 with "[%] [%] [%] Hhw' Hmin' Hpair").
     - exact (loop_ok_loop_ucfg mdv0 Hmm pt' Hnorm' Hptwf').
     - exact Hp2.
+    - exact Hs2.
   Qed.
 
 End UserretClosed.
@@ -438,13 +448,14 @@ End Res.
          handed the record that trapped and what user execution returned
          there, which is exactly this Löb hypothesis. *)
       iApply bi.later_intro. rewrite /ukb /ukb_F.
-      iIntros (W sc stv) "%Hp Hpair".
+      iIntros (W sc stv) "%Hp %Hs Hpair".
       iApply ("Hloop" $! CID C pt (uint (pv_sz (us_V U))) W sc stv
-                with "[%] [%] Hhw Hmin Hpair").
+                with "[%] [%] [%] Hhw Hmin Hpair").
       + rewrite /loop_ok.
         split; [exact Hstv | split; [exact Hdqc | split; [exact Hmie |
           split; [exact Hmedl | split; [exact Hnorm | exact Hptwf]]]]].
       + exact Hp.
+      + exact Hs.
   Qed.
 
 End UserretClosedProof.

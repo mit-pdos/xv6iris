@@ -655,17 +655,22 @@ Section UtSysBlock.
                        Hsb (Hsbperm Hsb) Hmemg).
             * (* the other twenty-one: the permission half is where clause
                  (ii)'s size and RW-leaf content is spent *)
+              (* clause (ii)'s SIZE half, hoisted: the row's break is named
+                 now, so the caller owes [szv' = szv] as well as the
+                 permission equation, and both come off [Hmemsz]. *)
+              assert (Hszq : pv_sz V2 = pv_sz (us_V U)).
+              { destruct Hmemsz as [H7 | [H12 | Hsz]];
+                  [ contradiction (Hnex H7) | contradiction (Hnsb H12) | ].
+                exact Hsz. }
               assert (Hpi : perm_of (ud_um (pv_upt V2)) (uint (pv_sz V2))
                             = perm_of (ud_um (pv_upt (us_V U)))
                                       (uint (pv_sz (us_V U)))).
-              { destruct Hmemsz as [H7 | [H12 | Hsz]];
+              { destruct Hmemupt as [H7 | [H12 | Hup]];
                   [ contradiction (Hnex H7) | contradiction (Hnsb H12) | ].
-                destruct Hmemupt as [H7 | [H12 | Hup]];
-                  [ contradiction (Hnex H7) | contradiction (Hnsb H12) | ].
-                rewrite Hsz. exact (perm_of_uptd_ext_sz _ _ _ Hup). }
+                rewrite Hszq. exact (perm_of_uptd_ext_sz _ _ _ Hup). }
               rewrite Hpi.
-              exact (sysc_mem_ok_usys V1 V2 (us_M U) M2 w _ _
-                       Hnex Hnsb eq_refl Hmemg). }
+              exact (sysc_mem_ok_usys V1 V2 (us_M U) M2 w _ _ _ _
+                       Hnex Hnsb eq_refl (f_equal uint Hszq) Hmemg). }
       iApply (T.ut_a6 (CID := CID2) SY.syscall_env N U0 (MkUstate V2 M2) pt ksp m0 mg av
                 n2 true
                 mie_v menvcfg0 epv scv lks

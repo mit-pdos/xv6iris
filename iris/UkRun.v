@@ -121,15 +121,18 @@ Section UkRun.
   (* THE CLOSE.  This is the lemma that makes the whole interface work: a
      continuation phrased on [urun] discharges the ∀-quantified [ukc] that
      every existing leaf demands, because [urun] supplies its own ambient. *)
+  (* [sz] is a parameter: [urun] hides the break existentially, but a leaf
+     that is closing back up has just destructed it, so it can say which one.
+     Re-introducing the existential at THAT size is all this does. *)
   Lemma urun_close (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
-      (m : regfile) (pc : mword 64) (avail : nat) :
+      (sz : Z) (m : regfile) (pc : mword 64) (avail : nat) :
     uheap γt γd γs M pm -∗
     ustack γd (m !!! Regidx csp_rs1) avail -∗
     (∀ h : CpuId, urun γt γd γs h m pc avail -∗ WP (Loop : expr riscv_lang)) -∗
-    ukc pm M m pc.
+    ukc pm M sz m pc.
   Proof.
     iIntros "Hheap Hstk Hcont".
-    rewrite /ukc. iIntros (h C pt Rut sz) "%Hlo %Hpm Hb".
+    rewrite /ukc. iIntros (h C pt Rut) "%Hlo %Hpm Hb".
     iApply ("Hcont" $! h). iExists C, pt, Rut, sz, M, pm.
     iFrame "Hheap Hstk Hb". iPureIntro. split; [ exact Hlo | exact Hpm ].
   Qed.
@@ -154,13 +157,13 @@ Section UkRun.
      is keyed by sp, and [unot_sp] says this write was not to sp. *)
   Lemma urun_close_upd (γt γd γs : gname) (M : gmap Z (bv 8))
       (pm : gmap (mword 27) uperm) (m : regfile) (rd : mword 5) (v : mword 64)
-      (pc' : mword 64) (avail : nat) :
+      (sz : Z) (pc' : mword 64) (avail : nat) :
     unot_sp rd ->
     uheap γt γd γs M pm -∗
     ustack γd (m !!! Regidx csp_rs1) avail -∗
     (∀ h : CpuId, urun γt γd γs h (<[Regidx rd := v]> m) pc' avail -∗
                   WP (Loop : expr riscv_lang)) -∗
-    ukc pm M (<[Regidx rd := v]> m) pc'.
+    ukc pm M sz (<[Regidx rd := v]> m) pc'.
   Proof.
     intros Hns. iIntros "Hheap Hstk Hcont".
     iApply (urun_close with "Hheap [Hstk] Hcont").
@@ -372,13 +375,17 @@ Section UkRun.
   Lemma uslot_of_urun (W : uvis) (avail : nat) :
     8 * Z.of_nat avail
       <= uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) ->
-    (forall (sz : Z) (j : nat), usz_ok sz -> (j < 8 * avail)%nat ->
-       is_Some (udata_lo (uvis_M W) (uvis_perm W) sz
+    (* DECIDABLE FROM THE KEY, now that the key carries the break.  Before
+       [uvis_sz] existed this had to be stated for every [sz] the slot's ∀
+       admitted -- which includes [sz = 0], so it was not merely
+       undecidable, it was unsatisfiable. *)
+    (forall j : nat, (j < 8 * avail)%nat ->
+       is_Some (udata_lo (uvis_M W) (uvis_perm W) (uvis_sz W)
                  !! (uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)
                      - 8 * Z.of_nat avail + Z.of_nat j)%Z)) ->
-    (∀ (γt γd γs : gname) (h : CpuId) (sz : Z),
-       ⌜ usz_ok sz ⌝ -∗
-       usz γs sz -∗
+    (∀ (γt γd γs : gname) (h : CpuId),
+       ⌜ usz_ok (uvis_sz W) ⌝ -∗
+       usz γs (uvis_sz W) -∗
        utext_all γt (uvis_M W) (uvis_perm W) -∗
        urun γt γd γs h (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W))
          avail -∗
@@ -386,7 +393,8 @@ Section UkRun.
     -∗ uslot W.
   Proof.
     intros Hroom Hstk. iIntros "Hprog". rewrite uslot_ukc /ukc.
-    iIntros (h C pt Rut sz) "%Hlo %Hpm Hb".
+    iIntros (h C pt Rut) "%Hlo %Hpm Hb".
+    set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)
       by (destruct Hlo as (_ & _ & _ & _ & _ & H); exact H).
     rewrite /uvb /uvb_F /user_ptm_inv.
@@ -404,11 +412,11 @@ Section UkRun.
     set (f := fun j : nat => default (bv_0 8) (D !! (base + Z.of_nat j)%Z)).
     assert (Hf : forall j : nat, (j < 8 * avail)%nat ->
                    D !! (base + Z.of_nat j)%Z = Some (f j)).
-    { intros j Hj. destruct (Hstk sz j Hsz Hj) as [b Hb].
+    { intros j Hj. destruct (Hstk j Hj) as [b Hb].
       unfold f. unfold D, base in *. rewrite Hb. reflexivity. }
     iDestruct (ubytes_of_map γd D base (8 * avail) f Hf with "Hd") as "Hbs".
     iDestruct (ustack_of_ubytes γd sp avail f Hroom with "Hbs") as "Hstk".
-    iSpecialize ("Hprog" $! γt γd γs h sz with "[%] Hszf Ht"); [ exact Hsz | ].
+    iSpecialize ("Hprog" $! γt γd γs h with "[%] Hszf Ht"); [ exact Hsz | ].
     iApply "Hprog".
     iExists C, pt, Rut, sz, (uvis_M W), (uvis_perm W).
     iSplitR; [ iPureIntro; exact Hlo | ].

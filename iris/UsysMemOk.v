@@ -129,29 +129,32 @@ Definition usys_sbrk_perm (π π' : gmap (mword 27) uperm)
    [r], may take the image from [M] to [M'] and the permission map from
    [π] to [π']. *)
 Definition usys_mem_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
-    (M : gmap Z (bv 8)) (π : gmap (mword 27) uperm)
-    (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm) : Prop :=
+    (M : gmap Z (bv 8)) (π : gmap (mword 27) uperm) (szv : Z)
+    (M' : gmap Z (bv 8)) (π' : gmap (mword 27) uperm) (szv' : Z) : Prop :=
   if decide (n = USYS_exec) then
-    r = (mword_of_int (-1) : mword 64) /\ M' = M /\ π' = π
+    r = (mword_of_int (-1) : mword 64) /\ M' = M /\ π' = π /\ szv' = szv
   else if decide (n = USYS_sbrk) then
-    (* the two sizes are existential because the WORD LIST does not carry
-       [pv_sz]; what is no longer existential is WHAT HAPPENS at them, and
-       the image and the permission map are keyed at the SAME pair. *)
-    exists szv szv' : mword 64,
-      usys_sbrk_img M M' szv szv' /\ usys_sbrk_perm π π' szv szv'
+    (* THE TWO SIZES ARE NAMED.  They used to be existential, because the
+       trapframe word list does not carry [p->sz]; now the KEY does, so the
+       row says what happens at the process's actual break rather than at
+       some pair of sizes.  A caller of sbrk therefore learns [szv'], which
+       is what makes the return value meaningful. *)
+    usys_sbrk_img M M' (mword_of_int szv) (mword_of_int szv') /\
+    usys_sbrk_perm π π' (mword_of_int szv) (mword_of_int szv')
   else match usys_window n with
        | Some i => (exists (d : nat) (bs : nat -> bv 8),
-                      M' = umem_wr M (tf !!! tf_arg_idx i) d bs) /\ π' = π
-       | None   => M' = M /\ π' = π
+                      M' = umem_wr M (tf !!! tf_arg_idx i) d bs)
+                   /\ π' = π /\ szv' = szv
+       | None   => M' = M /\ π' = π /\ szv' = szv
        end.
 
 (* the sixteen quiet entries, by name: what a program calling one of them
    learns.  Stated for the row shape rather than per number so a program
    proof picks it up with one [apply] after [vm_compute]-ing the number. *)
 Lemma usys_mem_ok_quiet (n : Z) (tf : list (mword 64)) (r : mword 64)
-    (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) :
+    (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z) :
   n <> USYS_exec -> n <> USYS_sbrk -> usys_window n = None ->
-  usys_mem_ok n tf r M π M' π' -> M' = M /\ π' = π.
+  usys_mem_ok n tf r M π szv M' π' szv' -> M' = M /\ π' = π /\ szv' = szv.
 Proof.
   intros Hne Hns Hw H. unfold usys_mem_ok in H.
   destruct (decide (n = USYS_exec)); [contradiction |].
@@ -161,14 +164,14 @@ Qed.
 
 (* the permission map is untouched by every entry but sbrk *)
 Lemma usys_mem_ok_perm (n : Z) (tf : list (mword 64)) (r : mword 64)
-    (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) :
+    (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z) :
   n <> USYS_sbrk ->
-  usys_mem_ok n tf r M π M' π' -> π' = π.
+  usys_mem_ok n tf r M π szv M' π' szv' -> π' = π.
 Proof.
   intros Hns H. unfold usys_mem_ok in H.
-  destruct (decide (n = USYS_exec)); [exact (proj2 (proj2 H)) |].
+  destruct (decide (n = USYS_exec)); [exact (proj1 (proj2 (proj2 H))) |].
   destruct (decide (n = USYS_sbrk)); [contradiction |].
-  destruct (usys_window n); exact (proj2 H).
+  destruct (usys_window n); exact (proj1 (proj2 H)).
 Qed.
 
 (* ===================================================================== *)
@@ -264,9 +267,9 @@ Proof.
 Qed.
 
 Lemma usys_mem_ok_ueq (n : Z) (tf tf' : list (mword 64)) (r : mword 64)
-    (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) :
+    (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z) :
   tf_ueq tf tf' ->
-  usys_mem_ok n tf r M π M' π' -> usys_mem_ok n tf' r M π M' π'.
+  usys_mem_ok n tf r M π szv M' π' szv' -> usys_mem_ok n tf' r M π szv M' π' szv'.
 Proof.
   intros Hu H. unfold usys_mem_ok in H |- *.
   destruct (decide (n = USYS_exec)); [ exact H | ].
@@ -286,9 +289,10 @@ Qed.
    on.  ([tf_ueq] cannot do this job: the epc is exactly the word the two
    lists differ in.) *)
 Lemma usys_mem_ok_epc (n : Z) (tf : list (mword 64)) (v r : mword 64)
+    (szv szv' : Z)
     (M M' : gmap Z (bv 8)) (pi pi' : gmap (mword 27) uperm) :
-  usys_mem_ok n (<[tf_epc_idx := v]> tf) r M pi M' pi' ->
-  usys_mem_ok n tf r M pi M' pi'.
+  usys_mem_ok n (<[tf_epc_idx := v]> tf) r M pi szv M' pi' szv' ->
+  usys_mem_ok n tf r M pi szv M' pi' szv'.
 Proof.
   unfold usys_mem_ok.
   destruct (decide (n = USYS_exec)); [ intros H; exact H | ].
