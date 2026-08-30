@@ -1395,6 +1395,12 @@ LinkCreateAU.v
 SpecSysMknodAUEra.v
 ProofSysMknodAU.v
 LinkSysMknodAU.v
+# ...and the mknod stable corollary, DERIVED from the sealed AU form
+# (SYSMKNOD_AU_ERA -> SYSMKNOD_AU_ERA_STABLE, no second walk).  Its arms are
+# NOT the frozen file's: those key on the fetched string, which no cursor
+# can see -- SpecSysMknodAUEra's closing note has the obstruction in full.
+ProofSysMknodAUEraStable.v
+LinkSysMknodAUStable.v
 
 # fs-syscall-specs lane P: the era-0 /init pins, re-derived on the abstract
 # state (the port the banner of claude-notes/projects/namei-pinned-lookup.md

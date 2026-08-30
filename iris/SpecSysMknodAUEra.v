@@ -69,7 +69,23 @@
    [mknod_post_fail] with the same substitution (its second disjunct is
    [SpecCreateAU.cau_fail] under an [∃ pl]).  The three-way fold, the
    fetched-path existential, and the DETERMINISM: NONE stance of the -1
-   arm are the frozen file's. *)
+   arm are the frozen file's.
+
+   ==== (4) THE STABLE COROLLARY LIVES HERE, AND IT IS RE-CUT ===========
+
+   [SYSMKNOD_AU_ERA_STABLE] is at the bottom of this file (statement and
+   seal together, as the campaign's own files carry both), and it is NOT
+   [SpecSysMknodAU.wp_sys_mknod_au_stable] at the era shape: that form's
+   arms key on the fetched string, and no AU form of this shape can deliver
+   that key.  The obstruction is written out in full in the note under the
+   seal; the short version is that the cursor family takes [(k, d)] and is
+   fixed before the fetched string exists, so nothing inside the syscall
+   can report "the walk was the client's".  What the pins DO buy is
+   agreement at the fire instants -- the client's chain still reads its own
+   values there, hence its path still names its own parent inum THERE --
+   and that is what the sealed form states.  It is derived, not owed:
+   [ProofSysMknodAUEraStable.v] implements the functor
+   [SYSMKNOD_AU_ERA -> SYSMKNOD_AU_ERA_STABLE]. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -177,12 +193,108 @@ Section SysMknodAUEra.
      ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
         ∗ mknod_post_fail_era Γ γfs ma mi P Pmiss Φok Φex))%I.
 
+  (* =================================================================== *)
+  (*  THE STABLE COROLLARY, AT THE ERA (and re-cut -- see the note at the *)
+  (*  bottom of this file for why the frozen shape's arms cannot be       *)
+  (*  derived from ANY AU form)                                           *)
+  (* =================================================================== *)
+
+  (* THE CLIENT'S CHAIN SHARE, PERSISTENT.  [FsAbs.apn_pin] at
+     [DfracDiscarded] instead of [DfracOwn q], and the flavour is forced by
+     the SHAPE of this contract rather than chosen: the bundle carries TWO
+     commits, exactly one of which fires on any run, and the other comes
+     back REFUNDED -- as a closure at whatever receipt it was built with.
+     A fractional share handed into both is therefore stranded inside the
+     refunded one on every arm (write's stable form dodges this by having a
+     single commit; read's by refuting its refund arm with [0 <= n], and
+     neither dodge exists here: argstr can fail).  A DISCARDED share is
+     copied into both, returned to the client for free, and costs the
+     client exactly what the corollary's name claims -- the chain
+     directories' rows never move again.  The PARENT is not among them:
+     [mkr_chain] pins [ds !!! j] for [j < |ps|] and the parent is
+     [ds !!! |ps|], so the success retag is untouched (the frozen header's
+     honesty note, satisfied by construction rather than by a side
+     condition). *)
+  Definition mkr_pin Γ (avc : aview) (d : Z) : iProp Σ :=
+    (∃ a : anode, ⌜avc !! d = Some a⌝ ∗ nview_dq Γ DfracDiscarded d a)%I.
+
+  Definition mkr_chain Γ (avc : aview) (ds : list Z)
+      (ps : list fname) : iProp Σ :=
+    ([∗ list] j ↦ _ ∈ ps, mkr_pin Γ avc (ds !!! j))%I.
+
+  Global Instance mkr_pin_persistent Γ avc d : Persistent (mkr_pin Γ avc d).
+  Proof. rewrite /mkr_pin /nview_dq /top_frag_q. apply _. Qed.
+
+  Global Instance mkr_chain_persistent Γ avc ds ps :
+    Persistent (mkr_chain Γ avc ds ps).
+  Proof. rewrite /mkr_chain. apply _. Qed.
+
+  (* THE ENRICHED RECEIPT, and it is the whole of what the pins buy: at the
+     instant the receipt fires, the client's run is a run OF THE LIVE VIEW
+     -- so [apath_at av root ps = Some (ds !!! |ps|)] holds THERE
+     ([FsAbs.arun_apath_tot]), not merely in the client's remembered [avc].
+     That is what makes the parent inum the arms expose comparable with the
+     client's own [ds !!! |ps|]: on [d = ds !!! |ps|] -- a comparison the
+     client makes itself, on data the arm hands it -- the create landed in
+     the directory its path names, under a name absent from that directory
+     at that instant ([cre_pre]'s second conjunct). *)
+  Definition mkr_recv (root : Z) (ps : list fname) (ds : list Z)
+      (Φ : aview -> Z -> fname -> Z -> iProp Σ)
+      : aview -> Z -> fname -> Z -> iProp Σ :=
+    fun av d nm i => (⌜arun av root ps ds⌝ ∗ Φ av d nm i)%I.
+
+  (* ret 0: [mknod_post_ok_era] with the cursor gone (the stable form owes
+     the walk nothing -- see the derivation) and the instant's run stated
+     purely beside the client's own receipt.  The lookup commit comes back
+     AT THE CLIENT'S OWN [Φex], not at the enriched one: the enrichment is
+     a conjunct, so the refund weakens back. *)
+  Definition mknod_stable_ok_era Γ (ma mi : Z) (root : Z)
+      (ps : list fname) (ds : list Z)
+      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
+    (∃ (pl : list (bv 8)) (av : aview) (d i : Z) (nm : fname)
+       (ents : gmap fname Z) (nl : nat),
+       ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+       ⌜cre_pre av d nm ents nl i (ADev ma mi)⌝ ∗
+       ⌜0 < i < 16 * Z.of_nat icfg_nib⌝ ∗
+       ⌜arun av root ps ds⌝ ∗
+       dlookup_commit_at Γ ∅ Φex ∗
+       Φok av d nm i)%I.
+
+  (* ret -1: TWO arms where the AU form has three folds, and the collapse
+     is the cursor's disappearance -- "the walk died at hop k" and "nothing
+     fs-visible happened" are the same statement once the residue is the
+     bundle itself.  The surviving distinction is the one a client can act
+     on: either NOTHING FIRED (both commits back, unspent), or the
+     exists-observation fired at a name the parent already held. *)
+  Definition mknod_stable_fail_era Γ (ma mi : Z) (root : Z)
+      (ps : list fname) (ds : list Z)
+      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
+    ((acre_commit_at Γ ∅ (ADev ma mi) Φok ∗ dlookup_commit_at Γ ∅ Φex)
+     ∨ (∃ (pl : list (bv 8)) (av : aview) (d i : Z) (nm : fname)
+          (ents : gmap fname Z) (nl : nat),
+          ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
+          ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
+          ⌜ents !! nm = Some i⌝ ∗
+          ⌜arun av root ps ds⌝ ∗
+          acre_commit_at Γ ∅ (ADev ma mi) Φok ∗
+          Φex av d nm i))%I.
+
+  Definition mknod_stable_arms_era Γ (ma mi : Z) (root : Z)
+      (ps : list fname) (ds : list Z)
+      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
+      (r : mword 64) : iProp Σ :=
+    ((⌜r = (zero_reg : mword 64)⌝
+      ∗ mknod_stable_ok_era Γ ma mi root ps ds Φok Φex)
+     ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
+        ∗ mknod_stable_fail_era Γ ma mi root ps ds Φok Φex))%I.
+
 End SysMknodAUEra.
 
 (* the same seals the frozen file puts on its own pair, and for the same
    reason (big-op bodies behind Definitions at syscall altitude) *)
 Global Typeclasses Opaque mknod_au_pre_era mknod_post_ok_era
-  mknod_post_fail_era mknod_arms_era.
+  mknod_post_fail_era mknod_arms_era mkr_chain mknod_stable_ok_era
+  mknod_stable_fail_era mknod_stable_arms_era.
 
 (* ===================================================================== *)
 (*  THE FRAME: [SpecSysMknod.wp_sys_mknod_sconf_body] at the CURRENT      *)
@@ -356,6 +468,51 @@ Definition wp_sys_mknod_au_era_body
     (mknod_au_pre_era Γfs fsc_fs ma mi P Pmiss Φok Φex)
     (mknod_arms_era Γfs fsc_fs ma mi P Pmiss Φok Φex).
 
+(* ===================================================================== *)
+(*  THE STABLE COROLLARY'S BODY                                           *)
+(* ===================================================================== *)
+
+(* The client names a chain it holds persistently -- a root [root], the
+   path elements [ps] of the directory it expects to create in, and the run
+   [ds] of that chain through its own view [avc] -- and its own two
+   receipts.  Every FIRED receipt then reports the run AT THE INSTANT.
+   Nothing is claimed about the fetched string: see the note below, which
+   is this lane's finding and the reason the frozen file's stable arms are
+   not what this form derives.
+
+   NOT A PARAMETER: the path itself.  [ps]/[ds] are the client's CHAIN, and
+   [root] is deliberately free -- an absolute expectation instantiates it
+   at [FsImg.ROOTINO], a relative one at the cwd's inum, and neither is
+   tied to the fetched string by anything (that is the point of the note).
+   Note also that [ps = []] -- init's own [mknod("console", 1, 1)] -- is a
+   legal instance: the chain is empty, [arun av root [] [root]] holds for
+   free, and the corollary degenerates to the AU form with the cursor
+   erased.  It is a DEEP path that pays for the pins. *)
+Definition wp_sys_mknod_au_era_stable_body
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    (γf : gname)
+    (gs : list gname) (j : nat) (gl : gname)
+    (pd pav pu : mword 64)
+    (ns : nat)
+    (dqb dqs dqbs dqn : dfrac)
+    (v0 v1 v2 : mword 64)
+    (pid : mword 32) (U : ustate)
+    (m : regfile) (K : nat) (eb : bool)
+    (b : bool) (lks : gset string)
+    (root : Z) (avc : aview) (ds : list Z) (ps : list fname)
+    (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) :=
+  let Γfs := fs_gamma_L fsc_fs in
+  let ma := dev_arg v1 in
+  let mi := dev_arg v2 in
+  arun avc root ps ds ->
+  wp_sys_mknod_au_era_frame γf gs j gl pd pav pu ns dqb dqs dqbs dqn
+    v0 v1 v2 pid U m K eb b lks
+    (mkr_chain Γfs avc ds ps
+     ∗ acre_commit_at Γfs ∅ (ADev ma mi) Φok
+     ∗ dlookup_commit_at Γfs ∅ Φex)%I
+    (mknod_stable_arms_era Γfs ma mi root ps ds Φok Φex).
+
 Module Type SYSMKNOD_AU_ERA.
   Parameter wp_sys_mknod_au_era :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
@@ -374,4 +531,65 @@ Module Type SYSMKNOD_AU_ERA.
       wp_sys_mknod_au_era_body γf gs j gl pd pav pu ns dqb dqs dqbs dqn
         v0 v1 v2 pid U m K eb b lks P Pmiss Φok Φex.
 End SYSMKNOD_AU_ERA.
+
+(* owed as a DERIVATION from [wp_sys_mknod_au_era] + the agreement seeds
+   ([FsAbsMknodFire]'s [_at_pinned] pair, at the chain rather than at one
+   row), never as a second walk -- and DISCHARGED, in
+   [ProofSysMknodAUEraStable.v]. *)
+Module Type SYSMKNOD_AU_ERA_STABLE.
+  Parameter wp_sys_mknod_au_era_stable :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      (γf : gname)
+      (gs : list gname) (j : nat) (gl : gname)
+      (pd pav pu : mword 64)
+      (ns : nat)
+      (dqb dqs dqbs dqn : dfrac)
+      (v0 v1 v2 : mword 64)
+      (pid : mword 32) (U : ustate)
+      (m : regfile) (K : nat) (eb : bool)
+      (b : bool) (lks : gset string)
+      (root : Z) (avc : aview) (ds : list Z) (ps : list fname)
+      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ),
+      wp_sys_mknod_au_era_stable_body γf gs j gl pd pav pu ns dqb dqs dqbs
+        dqn v0 v1 v2 pid U m K eb b lks root avc ds ps Φok Φex.
+End SYSMKNOD_AU_ERA_STABLE.
+
+(* ===================================================================== *)
+(*  THE NOTE: WHY THE FROZEN STABLE ARMS ARE NOT WHAT THIS DERIVES        *)
+(* ===================================================================== *)
+
+(* [SpecSysMknodAU.mknod_stable_arms] keys its receipts on the FETCHED
+   STRING -- "either [path_elems pl = path_elems pl0] and the receipt is at
+   [dpar], or it did not match and the receipt is unlocated".  That key is
+   NOT DERIVABLE FROM ANY AU FORM OF THIS SHAPE, and the obstruction is
+   structural rather than a gap in a proof:
+
+   - The walk's cursor family is the ONLY channel from the syscall's
+     interior back to the client, and its members take [(k, d)] -- an index
+     and an inum.  The cursor predicate is fixed when the contract is
+     instantiated, which is BEFORE the fetched string exists
+     ([mknod_walk_pre_era] is a one-shot universally quantified over [pl]),
+     so no cursor can mention [pl].
+   - Therefore the located branch of any match key must be an alternative
+     whose OTHER branch is entered when a hop's name misses the client's
+     chain -- and what a hop knows at that moment ("this name is not
+     [ps !!! k]") is a fact about the fetched string, which the cursor
+     cannot record.  Recording it as [emp] makes the disjunction
+     [⌜located⌝ ∨ True], which carries nothing.
+   - A ghost carried through the cursor does not break the wall either: the
+     value it would have to carry is the fetched path, the hops that must
+     compare against it are proved BEFORE the one-shot fires (they are
+     [⊢]-facts of the cursor), and the arm's own [pl] is bound by a
+     DIFFERENT existential from the cursor's -- nothing ties the two.
+
+   So the honest content of a stable mknod is not "the walk was mine" but
+   "MY TREE HELD AT THE INSTANT", which is what the form above states and
+   what the two [_at_pinned] seeds were landed to buy.  The client is left
+   holding the comparison the contract cannot make for it: the parent inum
+   is exposed on the arm, [ds !!! |ps|] is the client's own, and equality
+   of the two is decidable where it matters.  A contract that could key on
+   the path needs a USER-MEMORY tie ([SpecFetchstr]: "they came from user
+   memory"), i.e. a different premise at a lower altitude, not a stronger
+   corollary here. *)
 
