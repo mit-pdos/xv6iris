@@ -71,7 +71,6 @@ Require Import FsBlocks.        (* [fs_names]                               *)
 Require Import FsBytesGamma.    (* [fs_gamma_L]                             *)
 Require Import FsStateEra.
 Require Import IcacheRef.
-Require Import DirViewLend.
 Require Import IcacheEscrow.
 Require Import Xv6G.
 Require Import FsAbsSeam.

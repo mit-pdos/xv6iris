@@ -886,14 +886,11 @@ Section SnapMint.
             (link_boot_map (region_inums nib))
             (icnt_boot_map (region_inums nib))
             (frzm_boot_map (region_inums nib))
-            (dview_boot_map (region_inums nib))
-            (fview_boot_map (region_inums nib))
             γlog (sb_inodestart (fss_sb S))
             (link_boot_map_valid _) (icnt_boot_map_valid _)
-            (frzm_boot_map_valid _)
-            (dview_boot_map_valid _) (fview_boot_map_valid _))
+            (frzm_boot_map_valid _))
       as (ICFG g0) "(%Hdev & %Hnibq & %Hlogq & %Histq & Hiref & Hlive &
-                     Hlk & Hcnt & Hfrzm & Hdv & Hfv & Hboot & Hep &
+                     Hlk & Hcnt & Hfrzm & Hboot & Hep &
                      Hisl & Hrauth & Hlkauth & Hpkey & Hxkey & Hhpn & Htkey &
                      Hckey)".
     iDestruct (hpn_boot_split with "Hhpn") as "Hhpn".
@@ -973,10 +970,9 @@ Section SnapMint.
     iEval (rewrite big_sepS_sep) in "Hmir".
     iDestruct "Hmir" as "[HmirR HmirP]".
     (* THE TWO CONTENTS GHOSTS ARE RETIRED (THE DVIEW RETIREMENT): boot used
-       to mint them at [∅]/[[]] and [dv_set]/[fv_set] each one to the
-       snapshot's own reading before handing the family to the pool.  The
-       snapshot's readings ride in the era fragment the pool already gets. *)
-    iClear "Hdv". iClear "Hfv".
+       to mint them at [∅]/[[]] and set each one to the snapshot's own
+       reading before handing the family to the pool.  Those readings ride in
+       the era fragment the pool already gets, so nothing is minted here. *)
     iDestruct (region_of_seq (fun z => mono_nat_auth_own (icfg_iep z) 1 0)
                  icfg_nib with "Hep") as "Hep".
     iDestruct (live_boot_split g0 with "Hlive") as "Hlive".

@@ -117,7 +117,7 @@ Require Import InodeInv.
 Require Import InodeRegion.
 Require Import IregLinkNz.
 Require Import IgetLic.
-Require Import IcacheEscrow.  (* Require Export's DirViewG: [dv_hold], [dv_of] *)
+Require Import IcacheEscrow.  (* the payload arms *)
 Require Import FileInvDefs.
 Require Import IcacheRef.
 Require Import IrefSlots.

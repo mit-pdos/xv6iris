@@ -6,8 +6,13 @@
    era-fragment walk").  Design of record: claude-notes/design/
    fs-syscall-specs.md v3, sections 2-3.
 
+   (THE DVIEW RETIREMENT, 2026-08-30: the "first" lend and the contract that
+   fired it are DELETED -- this file's lend is the only one left, and the
+   history below is why it was built.)
+
    WHY A SECOND LEND EXISTS AT ALL.  [FsAbsSeam] settled item (iii)'s three
-   findings: the dv<->top tie is real and pure ([dv_of_dir_entries]), the
+   findings: the dv<->top tie is real and pure ([dir_entries_era_ok], as it
+   is now spelled), the
    law a payload can discharge is [FsAbs.lend_reads] and not
    [lend_agrees] -- and the landed fire ([SpecNameiTr.nx_hop], which R10
    freezes) passes only [DirViewG.dv_half] through the caller's fupd, so a
@@ -47,8 +52,9 @@
          section-4 package ([apn_walk]) and the section-4a' one
          ([apn_walk_rd]) therefore instantiate here.
 
-     (3) THE ENTRY MAP IS [dir_entries n], NOT [dv_of dn data].  Those are
-         one function on a payload node ([FsAbsSeam.dv_of_dir_entries]) and
+     (3) THE ENTRY MAP IS [dir_entries n], NOT the record's own byte
+         reading.  Those are one function on a payload node
+         ([FsAbsSeam.dir_entries_era_ok]) and
          [elend_of_era] is that bridge; but the CLIENT-facing side of the
          lend must speak the abstract state's own reading, or
          [FsAbs.astate] cannot be read against it.  [elend_astate] is what
@@ -105,7 +111,6 @@ Require Import FsBlocks.        (* [fs_names]                                 *)
 Require Import FsBytesGamma.    (* [fs_gamma_L]: the LIVE Gamma               *)
 Require Import FsStateEra.      (* [era_node], [era_node_rec]                 *)
 Require Import IcacheRef.
-Require Import DirViewLend.
 Require Import IcacheEscrow.    (* the payload arms                           *)
 Require Import Xv6G.            (* the bundle                                 *)
 Require Import FsAbsSeam.       (* [dir_entries_era_ok]: the pure bridge      *)

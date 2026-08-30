@@ -7,8 +7,9 @@
 (*  WHAT THIS FILE IS.  A STATEMENT file: definitions, structural lemmas,
     and one Module Type.  It replaces the off-build
     [SpecKexecPinned]/[ProofKexecPinned*]/[LinkKexecPinned] contract --
-    whose premises ([FsCfgBoot.dv_pin]/[fv_pin], cancellable lends minted
-    by a deleted boot lemma) no longer exist -- with the SAME sentence
+    whose premises (cancellable contents lends minted by a deleted boot
+    lemma -- the whole ghost went with THE DVIEW RETIREMENT, 2026-08-30) no
+    longer exist -- with the SAME sentence
     stated over what IS landed:
 
       * the PINS are pure facts about the abstract view

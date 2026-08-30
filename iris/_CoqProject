@@ -712,8 +712,14 @@ LinkIinit.v
 InodeInv.v
 DirView.v
 FsTree.v
-DirViewG.v
-DirViewLend.v
+# DELETED (fs-syscall-specs, THE DVIEW RETIREMENT, 2026-08-30): DirViewG.v
+# (the per-directory contents ghost [dview] and its per-file twin [fview])
+# and DirViewLend.v (M1, the cancellable lend [dv_ride]/[dv_pin] and its
+# registry-keyed column).  Both files are GONE, not off-build: what they
+# carried is a reading of the era fragment every payload arm already holds
+# ([FsStateEra.dir_entries_era_node] / [FsTree.fn_file_bytes]), the camera
+# and the two gnames went with them, and the era walk replaced the one
+# contract that fired them.
 SpecBalloc.v
 SpecBmap.v
 CodeBmap.v

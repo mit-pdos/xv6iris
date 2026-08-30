@@ -531,22 +531,11 @@ Definition icnt_boot_map (P : gset Z) : icntUR :=
 Definition frzm_boot_map (P : gset Z) : frzmUR :=
   gset_to_gmap (to_frac_agree 1 (false : leibnizO bool)) P.
 
-(* THE CONTENTS MAP is one WHOLE element per inum at the EMPTY entry map.
-   Boot mints the ghost before it has read any image bytes, so the value is
-   not the truth yet: [FsCfgBoot.ipool_alloc_of_image] [dv_set]s each inum to
-   its own [DirViewG.dv_of] as it stocks the pool.  Whole ownership is
-   exactly what makes that a free own-update -- no ordering constraint
-   against the region, no invariant, no second holder.  Spelled at
-   [list (bv 8)] for [dviewUR]'s reason; [DirViewG.dv_boot_split] restates it
-   at [fname]. *)
-Definition dview_boot_map (P : gset Z) : dviewUR :=
-  gset_to_gmap (to_frac_agree 1 (∅ : leibnizO (gmap (list (bv 8)) Z))) P.
-
-(* THE FILE-CONTENTS MAP (namei-pinned-lookup.md §13 D-52a), [dview_boot_map]'s
-   twin: one WHOLE element per inum at the EMPTY byte list, set to the image's
-   truth by the same [FsCfgBoot] sweep and for the same reason. *)
-Definition fview_boot_map (P : gset Z) : fviewUR :=
-  gset_to_gmap (to_frac_agree 1 ([] : leibnizO (list (bv 8)))) P.
+(* THE TWO CONTENTS MAPS ARE GONE with the ghosts they minted (THE DVIEW
+   RETIREMENT, 2026-08-30): [dview_boot_map] / [fview_boot_map] handed boot
+   one WHOLE element per inum at the empty value, which the image sweep then
+   set to each inode's own reading.  The era fragment carries those readings,
+   and boot parks it already tied. *)
 
 Definition lelem_boot : linkElemUR :=
   lelemf None 0 (Some (Excl FrzOff)).
@@ -578,22 +567,6 @@ Qed.
 Lemma frzm_boot_map_valid (P : gset Z) : ✓ (frzm_boot_map P).
 Proof.
   intros i. rewrite /frzm_boot_map lookup_gset_to_gmap.
-  destruct (decide (i ∈ P)) as [Hi | Hi].
-  - rewrite option_guard_True //.
-  - rewrite option_guard_False //.
-Qed.
-
-Lemma dview_boot_map_valid (P : gset Z) : ✓ (dview_boot_map P).
-Proof.
-  intros i. rewrite /dview_boot_map lookup_gset_to_gmap.
-  destruct (decide (i ∈ P)) as [Hi | Hi].
-  - rewrite option_guard_True //.
-  - rewrite option_guard_False //.
-Qed.
-
-Lemma fview_boot_map_valid (P : gset Z) : ✓ (fview_boot_map P).
-Proof.
-  intros i. rewrite /fview_boot_map lookup_gset_to_gmap.
   destruct (decide (i ∈ P)) as [Hi | Hi].
   - rewrite option_guard_True //.
   - rewrite option_guard_False //.
@@ -781,18 +754,8 @@ Class icfg := MkIcfg {
      [InodeRegion.ireg_slot] and the other in [IcacheEscrow.islot2]'s live
      arm, so a threaded name would enter [ireg_inv] AND [ic_escrow]. *)
   icfg_frzm : gname;
-  (* THE PER-DIRECTORY CONTENTS GHOST's gname (namei-pinned-lookup.md §9),
-     ambient for [icfg_icnt]'s reason verbatim -- and one door further: the
-     hold rides inside [IcacheEscrow.ipool_alloc] and [IcacheEscrow.ic_loaded],
-     so a threaded name would enter [ic_escrow]'s arity, i.e. every fs
-     contract in the tree.  Here it costs zero signature moves anywhere,
-     which is the whole reason N-1 needs no [Spec] file to grow a row. *)
-  icfg_dview : gname;
-  (* THE PER-FILE CONTENTS GHOST's gname (namei-pinned-lookup.md §13 D-52a),
-     ambient for [icfg_dview]'s reason verbatim and in the very same places:
-     the hold rides inside [IcacheEscrow.ipool_alloc] and
-     [IcacheEscrow.ic_loaded] beside its twin. *)
-  icfg_fview : gname;
+  (* THE TWO CONTENTS GHOSTS' gnames are GONE (THE DVIEW RETIREMENT,
+     2026-08-30), so [MkIcfg] is two gnames shorter than it was. *)
   (* THE LOCK-WINDOW PIN's gname (durable-disk B''-tx5, plan section 3/4),
      ambient for [icfg_frzm]'s reason verbatim and one door further: one half
      rides inside [IcacheEscrow.ic_held] and [IcacheEscrow.ic_payload_arm]'s
@@ -974,10 +937,9 @@ Proof.
 Qed.
 
 Lemma icfg_alloc {Σ} `{!riscvGS Σ, !icacheG Σ, !lockG Σ} (dv : mword 32) (nib : nat)
-    (LM : linkUR) (CM : icntUR) (BM : frzmUR) (DM : dviewUR)
-    (VM : fviewUR)
+    (LM : linkUR) (CM : icntUR) (BM : frzmUR)
     (γlog : log_names) (ist : Z) :
-  ✓ LM -> ✓ CM -> ✓ BM -> ✓ DM -> ✓ VM ->
+  ✓ LM -> ✓ CM -> ✓ BM ->
   ⊢ |==> ∃ (ICFG : icfg) (g0 : gname),
       ⌜icfg_dev = dv⌝ ∗ ⌜icfg_nib = nib⌝ ∗
       ⌜icfg_log = γlog⌝ ∗ ⌜icfg_ist = ist⌝ ∗
@@ -996,17 +958,6 @@ Lemma icfg_alloc {Σ} `{!riscvGS Σ, !icacheG Σ, !lockG Σ} (dv : mword 32) (ni
          [frzm_boot_split] cuts into [ireg_slot]'s clause half and the free
          pool's half. *)
       own icfg_frzm BM ∗
-      (* THE CONTENTS GHOST's boot map (namei-pinned-lookup.md §9 W1), an
-         ARGUMENT for [BM]'s reason: one WHOLE element per region inum at the
-         empty entry map, which [DirViewG.dv_boot_split] hands out as one
-         [dv_hold] per inum for the stocking to set to the image's truth. *)
-      own icfg_dview DM ∗
-      (* THE FILE-CONTENTS GHOST's boot map (namei-pinned-lookup.md §13), an
-         ARGUMENT for [DM]'s reason verbatim: one WHOLE element per region
-         inum at the empty byte list, which [DirViewG.fv_boot_split] hands out
-         as one [fv_hold] per inum for the stocking to set to the image's
-         truth beside its [dv_hold]. *)
-      own icfg_fview VM ∗
       (* the boot one-shot, PENDING -- this is [ireg_boot], the exclusive
          boot-shelter token (fs-fragments.md §7.12).  It reuses the pool's
          boot generation gname [g0] (they are independent [own]s: the pool
@@ -1049,7 +1000,7 @@ Lemma icfg_alloc {Σ} `{!riscvGS Σ, !icacheG Σ, !lockG Σ} (dv : mword 32) (ni
          to [IcacheEscrow.ipool_alloc_inv], whose [X] is [∅]. *)
       ghost_map_auth icfg_pcrp 1 (∅ : gmap Z icorpse).
 Proof.
-  intros HLM HCM HBM HDM HVM.
+  intros HLM HCM HBM.
   iMod (iep_fun_alloc (16 * nib) 0) as (fep) "Hep".
   iMod (isl_fun_alloc NINODE 0) as (fisl) "Hisl".
   iMod (own_alloc (● (∅ : gmap nat (Qp * positive)) : icacheUR)) as (γ) "Ha".
@@ -1064,8 +1015,6 @@ Proof.
   iMod (own_alloc LM) as (γlk) "Hlk"; [exact HLM |].
   iMod (own_alloc CM) as (γcnt) "Hcnt"; [exact HCM |].
   iMod (own_alloc BM) as (γfrzm) "Hfrzm"; [exact HBM |].
-  iMod (own_alloc DM) as (γdv) "Hdv"; [exact HDM |].
-  iMod (own_alloc VM) as (γfv) "Hfv"; [exact HVM |].
   (* OPTION A escrow registry gname: minted here for the ambient [icfg_reg].
      Its auth is affinely dropped at this bupd altitude; the reordered-iput
      boot fupd re-mints it registered over every inum and parks it in
@@ -1084,10 +1033,10 @@ Proof.
   (* the corpse ledger, whole and empty (durable-disk C-7) *)
   iMod (ghost_map_alloc (∅ : gmap Z icorpse)) as (γpcrp) "[Hpcrp _]".
   iModIntro.
-  iExists (MkIcfg γ dv nib γl γlk γlog ist fep fisl g0 γreg γlkr γpool γpext γcnt γfrzm γdv γfv γhpn γptrn γpcrp), g0.
+  iExists (MkIcfg γ dv nib γl γlk γlog ist fep fisl g0 γreg γlkr γpool γpext γcnt γfrzm γhpn γptrn γpcrp), g0.
   cbn [icfg_iep icfg_isl icfg_boot icfg_reg icfg_lk icfg_pool icfg_pext icfg_icnt
-       icfg_frzm icfg_dview icfg_fview icfg_hpn icfg_ptrn icfg_pcrp].
-  by iFrame "Ha Hl Hlk Hcnt Hfrzm Hdv Hfv Hep Hisl Hboot Hreg Hlkr Hpool Hpext Hhpn Hptrn Hpcrp".
+       icfg_frzm icfg_hpn icfg_ptrn icfg_pcrp].
+  by iFrame "Ha Hl Hlk Hcnt Hfrzm Hep Hisl Hboot Hreg Hlkr Hpool Hpext Hhpn Hptrn Hpcrp".
 Qed.
 
 (* ===================================================================== *)

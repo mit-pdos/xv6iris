@@ -117,8 +117,11 @@ things, and the answer differs:
   `T_DEVICE_z : Z` exists (ADev is the else arm; sharpen `abs_of_dev`
   if one lands); `apn_pins` is Typeclasses Opaque — consumers
   `Require Import FsAbs` directly.
-  REMAINING: (iii) THE DVIEW RETIREMENT — the one gate on
-  instantiating `apn_walk` against `wp_namei_tr`.  Suggested seam
+  REMAINING: (iii) THE DVIEW RETIREMENT — DONE 2026-08-30, see the
+  record at the end of this item; (iv) the offset seam for the fd row;
+  plus the §2 leftovers.
+  [history of (iii), kept because it is why the era walk exists:] the one
+  gate on instantiating `apn_walk` against `wp_namei_tr`.  Suggested seam
   (from the lane): `dv_half d dq ents ∗ top_frag_q Γ dq' d n ⊢
   ⌜ents = dir_entries n⌝`, proved ONCE where both live in the payload
   (escrow/region); then `lend_agrees Γ dv_half` is immediate and
@@ -330,6 +333,68 @@ things, and the answer differs:
      `FsAbsNparMknod.np_start_of_mknod` is one `iMod` and
      `np_rootino_agree`.  The one-shot now travels DOWN unfired instead of
      being fired at ROOTINO in the syscall.
+  **ITEM (iii) IS DONE — THE DVIEW RETIREMENT LANDED 2026-08-30** (Opus
+  lane, three staged green commits, whole tree green after each, zero
+  `Admitted`).  The `dview`/`fview` ghosts, their lend, their camera and
+  their two gnames are OUT OF THE TREE; `git grep` for the column's names
+  returns prose and tombstones only (plus the unrelated `LogDefs.dv_of_D`).
+  Stages, in the order that keeps each one green:
+  1. **The dv-FIRING STATEMENTS leave the build first.**  `SpecNamexTr`,
+     `ProofNamexTr`, `ProofNameiTr`, `LinkNamexTr`, `LinkNameiTr` are
+     off-build with their source intact and a `_CoqProject` tombstone (the
+     pinned-files precedent; R10 — not one statement edited).  MEASURED, not
+     assumed: their `.vo`s were deleted and a full `make` rebuilt NOTHING
+     and stayed green.
+     TWO FILES COULD NOT FOLLOW THE GHOST OUT and are trimmed in place with
+     tombstones, because the honest reverse-dependency closure says
+     off-building them takes 94 files including `SystemAdequacy`:
+     `SpecNameiTr` (its `inode_held_at` is the ERA cone's own vocabulary —
+     `SpecNameiEra`/`SpecNamexEra`/`SpecNparEra`/`SpecNparWrapEra` state
+     their pins in it, and `NameiTrDefs`'s binder list is quoted by half the
+     cone) keeps that and loses `nx_hop`/`nx_hops_from`/`wp_namei_tr_body`/
+     `NAMEI_TR`/the canonical cursor; `SpecSysMknodAU` (this campaign's own
+     file, twenty-five consumers of its §1–2a vocabulary) loses everything
+     stated over `ax_hops_from dv_half` — `mknod_walk_pre`, `_dead`, the AU
+     bundle, the three arm predicates, the frame, both bodies and
+     `SYSMKNOD_AU`, none of which had an on-build consumer (the sealed form
+     is `SpecSysMknodAUEra`'s `SYSMKNOD_AU_ERA`).
+  2. **The column comes off the payloads**, and the movers with it.  A
+     re-pack's dv step was always SUBSUMED by the `ireg_top_retag` beside it
+     (the retag moves the fragment; the fragment's `dir_entries` /
+     `fn_file_bytes` ARE what the two ghosts read off the same record and
+     bytes), so `dv_set_rt`/`fv_set_rt`/`dvw_set_rt` and the size-preserving
+     casts are deleted at ~30 call sites with every conclusion standing.
+     37 files, −1085 lines net.  `FsAbsSeam` keeps its one surviving result
+     as `dir_entries_era_ok`; the kexec header oracle is handed the ERA LEG
+     alone (it was always the half that answered the pinned verdict).
+  3. **The homes, the camera and the gnames.**  `DirViewG.v` and
+     `DirViewLend.v` DELETED; `dviewUR`/`fviewUR`, `icache_dviewG`/
+     `icache_fviewG` and their two `GFunctor` rows out of `Xv6Cameras`;
+     `icfg_dview`/`icfg_fview` out of `MkIcfg` (two gnames shorter), with
+     `icfg_alloc`'s two map arguments, their validity premises, their
+     `own_alloc`s and their output conjuncts, and the two boot maps and
+     `_valid` lemmas in `IcacheRef`.  Exactly upstream's rank-6 shape
+     (52d2e407c, "xv6Sigma loses a functor"): the audited theorem now holds
+     at a SMALLER functor list and `SystemAdequacy.v` / `SystemAssumptions.v`
+     are byte-identical.
+  AS-LANDED FINDINGS:
+  1. **An over-long `iDestruct` pattern SPLITS a fractional resource instead
+     of failing.**  Deleting two conjuncts from `ireg_registry` /
+     `ic_loaded` left `EscrowDeposit` and four accessor lemmas with one name
+     too many, and iris quietly cut `ghost_map_auth γ 1` (and `top_frag`)
+     into halves — the error then surfaces one tactic LATER, as
+     "cannot instantiate … with (… {#1/2} …)".  Read such a message as
+     "your pattern is one name too long", not as a resource that went
+     missing.
+  2. **The last payload name was load-bearing prose.**  `ic_loaded`'s final
+     conjunct bound `fv_ride ∗ top_frag` as ONE hypothesis at ~40 sites (the
+     2b-inode-3 flip's whole dividend); with the ride gone it binds the
+     fragment alone, so the sweep is a RENAME (`Hfview` → `Htopl`/`Htop`)
+     and not a re-plumbing.
+  3. **Nothing on the build ever READ the column** except the frozen Tr
+     fire — verified by grepping every consumer of `dv_agree`/`dv_ride_excl`/
+     the lend kit before touching a payload.  That is what made the sweep
+     mechanical: every other site was a re-pack.
 - [~] **W — the first increment's AU specs.**  mknod STATEMENT DONE
   2026-08-28 (Fable lane, `iris/SpecSysMknodAU.v`, 856 lines, green,
   zero admits — a statement file; the proof is a later Opus lane):

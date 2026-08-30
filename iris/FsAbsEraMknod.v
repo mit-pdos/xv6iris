@@ -10,7 +10,9 @@
    WHY THIS FILE.  Lane W's header records what its prover owes, and the
    first item is "the two fire points: dirlookup via [ftop_astate_ro]".
    With the LANDED trace contract that item was not merely unproven, it was
-   unprovable: [SpecNameiTr.nx_hop] lends [DirViewG.dv_half], which says
+   unprovable: [SpecNameiTr.nx_hop] lent [DirViewG.dv_half] (both retired
+   2026-08-30; the history is kept because it is why THIS file exists), which
+   says
    nothing about gamma-top, so no amount of opening ftopN at the fire
    instant identifies the authority's row for the directory the walk is
    standing on ([FsAbsSeam], findings 2 and 3).  [SpecSysMknodAU]'s

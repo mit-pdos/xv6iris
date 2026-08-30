@@ -203,7 +203,17 @@ state av     :=  the abs_of-fmap reading of fs_view's γtop authority
 ```
 
 **`dview` retires (this rules §9 Q1 and answers rank 4 for the live
-substrate).**  Since 2b-inode-3 the icache payload carries `top_frag`
+substrate).**  *DONE 2026-08-30 — the ghosts, the lend, the camera and
+the two gnames are out of the tree (three staged green commits; see the
+lane-A record in `projects/fs-syscall-specs.md`).  The sequencing below
+was ruled the other way round in the end, for the only reason that keeps
+each stage green: the dv-FIRING STATEMENTS leave the build FIRST (the
+frozen trace trio off-build with tombstones, `SpecNameiTr` and
+`SpecSysMknodAU` trimmed in place because their surviving vocabulary has
+the whole era cone above it), and only then does the column come off the
+payloads.  The "hop seam" itself was never built: `FsAbsSeam` showed the
+tie is pure and already landed, and the era walk replaced the fire.*
+Since 2b-inode-3 the icache payload carries `top_frag`
 (`IcacheEscrow.ic_loaded` holds it), and since N-1 it ALSO carries
 `dv_hold d (dv_of dn data)` — the same information at a coarser reading
 (`dir_entries` of the same node).  v2's plan to generalize `dview` to a
