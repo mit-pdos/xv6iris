@@ -802,11 +802,12 @@ Section ProofSysRead.
          nose. *)
       iApply ("Hcont" $! mf (mword_of_int (-1) : mword 64) (pv_upt (us_V U))
                 0%nat (fun _ => bv_0 8)
-                with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc [Hpriv] Hkenv [Henv]").
+                with "[%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc [Hpriv] Hkenv [Henv]").
       { exact Hcsf. }
       { apply uptd_ext_sz_refl. }
       { left. split; [reflexivity | exact Hnone]. }
       { apply Z.le_max_l. }
+      { right. reflexivity. }
       { exact Hmfa0. }
       { rewrite us_upt_id. cbn [umem_wr]. rewrite upd_usM_id. iExact "Hpriv". }
       { iApply (fileread_fs_env_out with "Henv"). }
@@ -946,7 +947,7 @@ Section ProofSysRead.
                 with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv").
       all: try lkbelow.
       iIntros (CID25 Hs25 mf rv P' dw bsw)
-        "%Hcsf %Hupt %Hrvok %Hdwle %Hrva Hcg Hcpu Hpc Href Hcore Hfout".
+        "%Hcsf %Hupt %Hrvok %Hdwle %Htie %Hrva Hcg Hcpu Hpc Href Hcore Hfout".
       iDestruct ("Hfback" with "Hfout") as "[Henv _]".
       (* SETTLE THE LOAN.  [pv_ofile (upd_upt V P') = pv_ofile V] by [cbn], so
          the deficit the lend opened is literally the one this closes. *)
@@ -1004,11 +1005,12 @@ Section ProofSysRead.
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID26 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! mg rv P' dw bsw
-                with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hkenv Henv").
+                with "[%] [%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hkenv Henv").
       { exact Hcsg. }
       { exact Hupt. }
       { right. exists fd, fv. split; [exact Hsome | exact Hrvok]. }
       { exact Hdwle. }
+      { exact Htie. }
       { exact Hmga0. }
   Qed.
 

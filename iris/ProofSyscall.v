@@ -3952,7 +3952,8 @@ Section SyscallArms.
               ltac:(lia) Hj Hgamma Hlen Hv0 Hv1 Hv2
               eq_refl eq_refl eq_refl
               with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hkalloc Hprocs Hfse Hci").
-    iIntros (CIDy Hsy mf r P' dw bsw) "%Hcs %Hextz %Hret' %Hdwle %Hmfa0 Hcg Hcpu Hpc Hpriv _ Hout".
+    iIntros (CIDy Hsy mf r P' dw bsw)
+      "%Hcs %Hextz %Hret' %Hdwle %Htie %Hmfa0 Hcg Hcpu Hpc Hpriv _ Hout".
     (* [Hextz] is the SIZED extension the callee reports, and it is what
        clause (ii) is handed.  The bare projection below is the one the
        [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first
@@ -4041,7 +4042,8 @@ Section SyscallArms.
               pid U v0 v1 M (av - 4)%nat true true ∅
               ltac:(lia) Hj Hgamma Hlen Hv0 Hv1 eq_refl
               with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hkalloc Hprocs Hfse").
-    iIntros (CIDy Hsy mf r P' dw bsw) "%Hcs %Hextz %Hret' %Hdwle %Hmfa0 Hcg Hcpu Hpc Hpriv _ Hout".
+    iIntros (CIDy Hsy mf r P' dw bsw)
+      "%Hcs %Hextz %Hret' %Hdwle %Hmfa0 Hcg Hcpu Hpc Hpriv _ Hout".
     (* [Hextz] is the SIZED extension the callee reports, and it is what
        clause (ii) is handed.  The bare projection below is the one the
        [ud_tfp] immobility argument reads -- [uptd_ext_sz]'s first

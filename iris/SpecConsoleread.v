@@ -169,6 +169,16 @@ Definition wp_consoleread_sconf_body
          between "failed" and "all of it". *)
       ⌜(-1 <= r <= Z.max 0 n)%Z⌝ -∗
       ⌜(Z.of_nat d <= Z.max 0 n)%Z⌝ -∗
+      (* ...AND ON A NON-NEGATIVE RETURN THE RUN IS EXACTLY THAT LONG: the
+         copy is one byte per round and a failing one-byte either_copyout
+         moves none, so the loop breaks having delivered exactly the
+         [target - n] it returns.  The -1 arm keeps only the bound --
+         consoleread's [killed] test is INSIDE its copy loop -- but that
+         arm is NOT OBSERVABLE FROM USER MODE: -1 is returned only when the
+         process was killed, and a killed process is never resumed in user
+         mode.  The bound is kept because this contract is stated for the
+         kernel caller, which does see the arm. *)
+      ⌜(0 <= r)%Z -> r = Z.of_nat d⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int r : mword 64)⌝ -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗

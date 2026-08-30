@@ -63,7 +63,12 @@
 #define R_CYCLE   52
 #define R_CYCLEADV 56
 
-#define DELAY     1000
+/* THE CAP IS A DEAD-CLOCK BACKSTOP, NOT THE WAIT.  The loop below spins
+   until mtime CHANGES and gives up after this many tries, so the cap is
+   reached only when the clock is not running -- which is the very thing
+   R_ADV reports.  It is not a delay: a fixed-count delay has to be sized
+   for the SLOWEST clock and then everyone pays for it. */
+#define WAITCAP   4000
 
     .globl _vtest_body
 _vtest_body:
@@ -81,13 +86,28 @@ _vtest_body:
     srli t0, s1, 32
     sw   t0, R_T0HI(s11)
 
-/* ---- a delay loop long enough that any running clock must move ----
- * DELAY iterations of three instructions.  On the board that is a few
- * microseconds and the RTC ticks at 4 MHz, so a strictly-greater mtime is
- * not a race; in the model it is exactly zero elapsed time. */
-    li   t1, DELAY
-1:  addi t1, t1, -1
-    bnez t1, 1b
+/* ---- WAIT FOR THE CLOCK TO MOVE, rather than spinning a fixed count ----
+ *
+ * This used to be `DELAY` iterations of a two-instruction loop, sized so
+ * that even the slowest clock must tick.  That is the wrong shape twice
+ * over.  It made this test the most expensive in the suite -- ~2000 model
+ * instructions, essentially its whole runtime on BOTH platforms, and the
+ * model needs none of it because with tick=1 mtime advances on every step.
+ * And it was sized by guesswork: measured, DELAY=1000 bought the board
+ * about 4 RTC ticks and DELAY=250 bought exactly ONE, i.e. no margin at
+ * all, so the cheap version was one scheduling wobble from reporting a
+ * stopped clock.
+ *
+ * Spinning until mtime CHANGES removes the sizing question entirely: the
+ * model leaves after one iteration, the board after ~one RTC period, and
+ * neither depends on a constant somebody has to re-tune per machine.  The
+ * cap keeps a dead clock reporting R_ADV = 0 instead of hanging. */
+    li   t2, WAITCAP
+1:  ld   t1, 0(s0)
+    bne  t1, s1, 2f                  /* it moved -- stop waiting */
+    addi t2, t2, -1
+    bnez t2, 1b
+2:
 
 /* ---- the second sample ---- */
     ld   s4, 0(s0)                   /* s4 = mtime after */

@@ -650,12 +650,20 @@ Section ProofFileread.
       assert (HVid : upd_usM (us_upt U (pv_upt (us_V U))) (us_M U) = U)
           by (rewrite us_upt_id; apply upd_usM_id).
       iApply ("Hcont" $! mf (mword_of_int (-1)) (pv_upt (us_V U)) 0%nat (fun _ => bv_0 8)
-                with "[%] [%] [%] [%] [%] Hcg Hcnt [Hpc] [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
+                with "[%] [%] [%] [%] [%] [%] Hcg Hcnt [Hpc] [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                       [Hpriv] [Henv]").
       { exact Hcsf. }
       { apply uptd_ext_sz_refl. }
       { apply fileread_ret_m1. }
       { apply Z.le_max_l. }
+      { first [ right; reflexivity
+                | left; reflexivity
+                | destruct Htiepr as [[Hx _] | Hx]; [ right; exact Hx | left; exact Hx ]
+                | destruct Hrdret as [[Hx _] | [Hx _]];
+                    [ right; exact Hx | left; exact Hx ]
+                | destruct (Z.le_gt_cases 0 r) as [H0 | H0];
+                    [ left; rewrite (Htiecr H0); reflexivity
+                    | right; f_equal; lia ] ]. }
       { exact Hrv. }
       { iEval (rewrite /ret_tgt). iExact "Hpc". }
       { rewrite /file_ref /file_fields. iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
@@ -950,12 +958,20 @@ Section ProofFileread.
         assert (HVid : upd_usM (us_upt U (pv_upt (us_V U))) (us_M U) = U)
           by (rewrite us_upt_id; apply upd_usM_id).
         iApply ("Hcont" $! mf (mword_of_int (-1)) (pv_upt (us_V U)) 0%nat (fun _ => bv_0 8)
-                  with "[%] [%] [%] [%] [%] Hcg Hcnt [Hpc] [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
+                  with "[%] [%] [%] [%] [%] [%] Hcg Hcnt [Hpc] [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                         [Hpriv] [Henv]").
         { exact Hcsf. }
         { apply uptd_ext_sz_refl. }
         { apply fileread_ret_m1. }
         { apply Z.le_max_l. }
+        { first [ right; reflexivity
+                  | left; reflexivity
+                  | destruct Htiepr as [[Hx _] | Hx]; [ right; exact Hx | left; exact Hx ]
+                  | destruct Hrdret as [[Hx _] | [Hx _]];
+                      [ right; exact Hx | left; exact Hx ]
+                  | destruct (Z.le_gt_cases 0 r) as [H0 | H0];
+                      [ left; rewrite (Htiecr H0); reflexivity
+                      | right; f_equal; lia ] ]. }
         { exact Hrv. }
         { iEval (rewrite /ret_tgt). iExact "Hpc". }
         { rewrite /file_ref /file_fields. iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
@@ -1213,13 +1229,21 @@ Section ProofFileread.
                      with "Hcnt") as "Hcnt".
         iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
         iApply ("Hcont" $! mfin (mf !!! Regidx Ra0) P' dpr bspr
-                  with "[%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
+                  with "[%] [%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
                         [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hpn Hpref Hiru Hoh Hrlv]
                         Hpriv [Henv]").
         { exact Hcsf. }
         { exact Hupt. }
         { exact Hretpr. }
         { exact Hdpr. }
+        { first [ right; reflexivity
+                  | left; reflexivity
+                  | destruct Htiepr as [[Hx _] | Hx]; [ right; exact Hx | left; exact Hx ]
+                  | destruct Hrdret as [[Hx _] | [Hx _]];
+                      [ right; exact Hx | left; exact Hx ]
+                  | destruct (Z.le_gt_cases 0 r) as [H0 | H0];
+                      [ left; rewrite (Htiecr H0); reflexivity
+                      | right; f_equal; lia ] ]. }
         { exact Hrv. }
         { iEval (rewrite /ret_tgt). iExact "Hpc". }
         { rewrite /file_ref /file_fields /file_pay_st.
@@ -1610,13 +1634,21 @@ Section ProofFileread.
                 assert (HVid : upd_usM (us_upt U (pv_upt (us_V U))) (us_M U) = U)
           by (rewrite us_upt_id; apply upd_usM_id).
                 iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt (us_V U)) 0%nat (fun _ => bv_0 8)
-                          with "[%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
+                          with "[%] [%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                 [Hpriv] [Hslot]").
                 { exact Hcsf. }
                 { apply uptd_ext_sz_refl. }
                 { apply fileread_ret_m1. }
                 { apply Z.le_max_l. }
+                { first [ right; reflexivity
+                          | left; reflexivity
+                          | destruct Htiepr as [[Hx _] | Hx]; [ right; exact Hx | left; exact Hx ]
+                          | destruct Hrdret as [[Hx _] | [Hx _]];
+                              [ right; exact Hx | left; exact Hx ]
+                          | destruct (Z.le_gt_cases 0 r) as [H0 | H0];
+                              [ left; rewrite (Htiecr H0); reflexivity
+                              | right; f_equal; lia ] ]. }
                 { exact Hrv. }
                 { iEval (rewrite /ret_tgt). iExact "Hpc". }
                 { rewrite /file_ref /file_fields.
@@ -1698,7 +1730,7 @@ Section ProofFileread.
                           with "Hcg Hcnt Htext Hpc Hconslk Hpriv Hkenv
                                 Hprocs").
                 all: try lkbelow.
-                iIntros (CIDcr Hscr mf r P' dcr bscr) "%Hcscr %Hupt %Hrr %Hdcr %Hra0 Hcg Hcnt Hpc
+                iIntros (CIDcr Hscr mf r P' dcr bscr) "%Hcscr %Hupt %Hrr %Hdcr %Htiecr %Hra0 Hcg Hcnt Hpc
                                               Hpriv".
                 (* consoleread copies to its own a1, which is fileread's
                    [addr] carried in s2 *)
@@ -1785,13 +1817,21 @@ Section ProofFileread.
                              with "Hcnt") as "Hcnt".
                 iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
                 iApply ("Hcont" $! mfin (mword_of_int r) P' dcr bscr
-                          with "[%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
+                          with "[%] [%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                 Hpriv [Hslot]").
                 { exact Hcsf. }
                 { exact Hupt. }
                 { apply (fr_ret_of_cons n r Hn0). rewrite Z.max_r in Hrr; lia. }
                 { exact Hdcr. }
+                { first [ right; reflexivity
+                          | left; reflexivity
+                          | destruct Htiepr as [[Hx _] | Hx]; [ right; exact Hx | left; exact Hx ]
+                          | destruct Hrdret as [[Hx _] | [Hx _]];
+                              [ right; exact Hx | left; exact Hx ]
+                          | destruct (Z.le_gt_cases 0 r) as [H0 | H0];
+                              [ left; rewrite (Htiecr H0); reflexivity
+                              | right; f_equal; lia ] ]. }
                 { exact Hrv. }
                 { iEval (rewrite /ret_tgt). iExact "Hpc". }
                 { rewrite /file_ref /file_fields.
@@ -1859,13 +1899,21 @@ Section ProofFileread.
              assert (HVid : upd_usM (us_upt U (pv_upt (us_V U))) (us_M U) = U)
           by (rewrite us_upt_id; apply upd_usM_id).
              iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt (us_V U)) 0%nat (fun _ => bv_0 8)
-                       with "[%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
+                       with "[%] [%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
                              [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                              [Hpriv] [Henv]").
              { exact Hcsf. }
              { apply uptd_ext_sz_refl. }
              { apply fileread_ret_m1. }
              { apply Z.le_max_l. }
+             { first [ right; reflexivity
+                       | left; reflexivity
+                       | destruct Htiepr as [[Hx _] | Hx]; [ right; exact Hx | left; exact Hx ]
+                       | destruct Hrdret as [[Hx _] | [Hx _]];
+                           [ right; exact Hx | left; exact Hx ]
+                       | destruct (Z.le_gt_cases 0 r) as [H0 | H0];
+                           [ left; rewrite (Htiecr H0); reflexivity
+                           | right; f_equal; lia ] ]. }
              { exact Hrv. }
              { iEval (rewrite /ret_tgt). iExact "Hpc". }
              { rewrite /file_ref /file_fields.
@@ -2618,7 +2666,7 @@ Section ProofFileread.
                 iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
                 iApply ("Hcont" $! mfin (mrd !!! Regidx Ra0) P' tot
                           (rd_bytes data (Z.to_nat (bv_unsigned v)))
-                          with "[%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
+                          with "[%] [%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                 Hpriv
                                 [Hsb Hbslot]").
@@ -2626,6 +2674,14 @@ Section ProofFileread.
                 { exact Hupt. }
                 { exact Hretok. }
                 { exact Hfrdtot. }
+                { first [ right; reflexivity
+                          | left; reflexivity
+                          | destruct Htiepr as [[Hx _] | Hx]; [ right; exact Hx | left; exact Hx ]
+                          | destruct Hrdret as [[Hx _] | [Hx _]];
+                              [ right; exact Hx | left; exact Hx ]
+                          | destruct (Z.le_gt_cases 0 r) as [H0 | H0];
+                              [ left; rewrite (Htiecr H0); reflexivity
+                              | right; f_equal; lia ] ]. }
                 { exact Hrv. }
                 { iEval (rewrite /ret_tgt). iExact "Hpc". }
                 { rewrite /file_ref /file_fields.
@@ -2909,7 +2965,7 @@ Section ProofFileread.
                 iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
                 iApply ("Hcont" $! mfin (mword_of_int (Z.of_nat tot)) P' tot
                           (rd_bytes data (Z.to_nat (bv_unsigned v)))
-                          with "[%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
+                          with "[%] [%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                 Hpriv
                                 [Hsb Hbslot]").
@@ -2917,6 +2973,14 @@ Section ProofFileread.
                 { exact Hupt. }
                 { exact Hretok2. }
                 { exact Hfrdtot. }
+                { first [ right; reflexivity
+                          | left; reflexivity
+                          | destruct Htiepr as [[Hx _] | Hx]; [ right; exact Hx | left; exact Hx ]
+                          | destruct Hrdret as [[Hx _] | [Hx _]];
+                              [ right; exact Hx | left; exact Hx ]
+                          | destruct (Z.le_gt_cases 0 r) as [H0 | H0];
+                              [ left; rewrite (Htiecr H0); reflexivity
+                              | right; f_equal; lia ] ]. }
                 { exact Hrv. }
                 { iEval (rewrite /ret_tgt). iExact "Hpc". }
                 { rewrite /file_ref /file_fields.

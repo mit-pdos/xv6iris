@@ -337,7 +337,8 @@ Definition wp_sys_read_sconf_body
      fileread's WINDOW verbatim: the entry image with the run
      [v1 .. v1+d) overwritten and nothing else touched.
 
-     WHAT STAYS EXISTENTIAL IS A LENGTH AND THE BYTES, NOT AN IMAGE.  A
+     WHAT STAYS EXISTENTIAL IS THE BYTES, NOT AN IMAGE -- and, on a
+     non-negative answer, not the length either: it IS the answer.  A
      caller of sys_read that wants its own untouched bytes back reads them
      with [UserPtTree.umem_wr_lookup_out], exactly as a caller of fileread
      does; this contract does not (and cannot, on the console/pipe arms) say
@@ -347,6 +348,13 @@ Definition wp_sys_read_sconf_body
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       ⌜sys_read_ret (us_V U) v (sys_rw_count v2) r⌝ -∗
       ⌜(Z.of_nat d <= Z.max 0 (sys_rw_count v2))%Z⌝ -∗
+      (* ...AND A NON-NEGATIVE ANSWER IS EXACTLY THE COUNT WRITTEN.  This is
+         fileread's, relayed: every arm copies a chunk at a time and a
+         failing copy moves none of the chunk it failed on.  The -1 answer
+         keeps only the bound, because readi discards its running count when
+         a copyout faults after earlier blocks landed. *)
+      ⌜r = (mword_of_int (Z.of_nat d) : mword 64)
+       \/ r = (mword_of_int (-1) : mword 64)⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
