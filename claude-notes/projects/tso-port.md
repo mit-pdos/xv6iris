@@ -4368,3 +4368,15 @@ authority), [TsoCtx] (the dirty sites, ~35), [TsoCtxMove.v] (the rule
 and its [CtxMove] class, [CtxMorph]'s mirror); then the swtch contract
 takes its payload as a function of the context and moves it, the record
 becomes fully [XIp]-indexed, [cpu_own] gets its λ form.  A6.128.
+
+STATUS (2026-08-29, later): LANDED, A6.128 §1–§3.  The record is fully
+[XIp]-indexed ([valid_context] is a closed term, main's §0.15′ shape);
+the swtch payload is a function of the context with a [CtxMove]
+obligation; [ProofSwtch] moves the caller's payload, bundle and
+save-area cells across; the zombie payload's every piece down to the
+page-table tree has a move instance.  [cpu_own] keeps its ambient
+spelling (the λ form was not needed: the spec moves it as a whole).
+What the rule does not reach: [ProofForkretPark]'s three rows
+([procs_inv], [park_globals]'s handles, [proc_priv]/[buf_escrow]) --
+they are at the PARKER's ξ and neither token is available where they
+would move; the λ-conversion is still their path.

@@ -16468,13 +16468,95 @@ parker's ξ (the M3 λ-conversion debt on `procs_inv`/`park_globals`/
   instances const/sep/exist/big_sepL/big_sepM/if/pointsto/floor/word/
   word2/word4.
 
-### §2. NEXT (the consumers)
+### §2. LANDED: the consumers (r53, CLEAN round; numbers in §5)
 
-`SwtchCtx`: `CtxMove` for `ctx_cells_at`/`stack_own`; the record fully at
-`XIp` (its `ctx_cells` and the wand's inputs -- `cpu_own`, `P`, the cells --
-at `XIp`); `SpecSwtch`: `P` takes the context (`… -d> CtxId -d> iPropO`)
-with a `CtxMove` obligation, `cpu_own` in its λ form; `ProofSwtch` moves
-the caller's `P`/`cpu_own`/save-area cells `cur_ctx → XIt` after the
-resume (both tokens running) and the record's cells `XIt → cur_ctx` for
-the block; `SchedCtx.p_sched` takes ξ; `IntrDefs`/`CpuOwn`: `cpu_own_at`
-with the ambient default; the scheduler chain re-threaded.
+- **`SwtchCtx`**: the record is ENTIRELY at its own identity.
+  `valid_context_pre` owns `ctx_cells (XI := XIp) c vs` and the parked
+  stack at `XIp`; its wand takes `cpu_own (CID := h) (XI := XIp) …`,
+  `ctx_cells (XI := XIp) c vs`, the crossing payload `P h A' c cret … back
+  XIp`, and a zombie resumer's raw cells `own_ctx (XI := XIp) cret`.
+  `valid_context` is now a CLOSED term (no `CpuId`/`CurCtx` parameter --
+  `About` shows `Σ, riscvGS, xv6G, GenId, P, A, c, p, XIp`), which is
+  main's §0.15′ shape.  The file's section is split (`SwtchCells` /
+  `SwtchCtx`) so the record can spell `ctx_cells (XI := XIp)`.  Instances
+  `ctx_cells_at_move`, `ctx_cells_move`, `own_ctx_move`, `stack_own_move`.
+- **`SpecSwtch`**: the payload is a function of the context, `P : … -d>
+  bool -d> CtxId -d> iPropO Σ`, with the premise `(forall h A c c' tp p' b,
+  CtxMove (λ ξ, P h A c c' tp p' b ξ))` (after the two register
+  equalities); the caller gives `P … back cur_ctx` and receives `P … back'
+  cur_ctx`.  `cpu_own` stays in its ambient spelling at both ends.
+- **`ProofSwtch`**: after the resume the target's record cells move
+  `XIt → cur_ctx` (the block writes them at the ambient); before the park
+  the target's cells, the per-cpu bundle and `P` move `cur_ctx → XIt`;
+  the zombie arm moves the DEAD CALLER's cells `cur_ctx → XIt` too (the
+  wand hands them at the target's identity).  Every move is
+  `ctx_move (R := λ ξ, …) ξ0 ξ1 with "Hctx Hctx_t H"`, both tokens running.
+- **`CpuOwnMove.v`** (new): `CtxMove` for `cur_proc`, `cpu_cells`,
+  `cpu_priv`, `cpu_hart`, `cpu_own`.
+- **`SchedCtx`**: `p_sched` takes ξ (`proc_held (XI := ξ)`, `park_pay (XI
+  := ξ)`), so its section is split too (`SchedCtx` / `SchedCtxPay`, `γs`
+  re-declared).  ONE `CtxMove` INSTANCE PER NAMED PIECE, down to the
+  zombie payload: `pname_cells`, `proc_fields`, `ofile_cells`, `tf_words`,
+  `tf_tail`, `tf_page`, `is_kstack`, `kstack_free`, `phys_byte_any`,
+  `phys_page_own`, `upt_pages_own`, `proc_pt_own`, `proc_pt`,
+  `proc_pt_at`, `proc_dormant_noctx`, `WpLock.locked`, `proc_pub`,
+  `proc_held`, `park_pay`, `p_sched`.  The two dead lemmas
+  `proc_ctx_cells`/`proc_ctx_own_ctx` (a record forgotten to `own_ctx` AT
+  THE AMBIENT) are deleted -- false in the new shape, no consumer.
+- **`PtTreeMove.v`** (new): the user-tier page-table tree moves --
+  `pt_slot_own (UTier ξ)`, `pt_page_own_at`, `ptree_own_at` (induction on
+  the level; `cbn [ptree_own_at]`, NOT `simpl`, which would compute
+  `seqZ 0 512`), `pt_kids_own_at`, `pt_frame_at`.  Reached from
+  `proc_pt`'s `pt_frame` in the zombie payload.
+- **`ProofScheduler`/`ProofSched`**: the `CtxMove` premise is
+  `ltac:(intros; apply _)` at the three `wp_swtch_sconf` calls.
+- **`ParkCap`**: `proc_ctx_boxed γs pa` is ξ-free; the `(XI := ξp)`
+  annotation and its "drop when the reshape lands" comment are gone.
+- **`ProofForkretPark`**: the child's cells and the kstack row are
+  DEPOSITED into the child's (born-parked) context beside the stack
+  (`ctx_deposit` + `ctx_cells`'s `CtxMorph`, `fkp_is_kstack_morph`); the
+  wand body is at `(XI := XIc)` (`own_ctx`, `proc_slots_running_intro`,
+  `proc_lock_res_intro`, `FR.wp_forkret`).  Its frontier is now exactly
+  the three rows the M3 debt names -- `procs_inv`, `park_globals`'s
+  handles, `proc_priv` through `buf_escrow` -- constant embeddings of
+  ξ-indexed bodies at the PARKER's ξ; they are bracketed in the final
+  `iApply` so the file fails FAST at `ProofForkretPark:341` (`iExact
+  "Hpinv"` vs `procs_inv` at `XIc`) instead of sending `iApply`'s unifier
+  through the bodies (measured: 18 min without the brackets).
+  `ctx_move` does not help these rows: at the resume the parker's token is
+  gone, and at the park the child is parked, so the path is still the
+  λ-conversion (§0.14′/§0.16′/§0.17′ on main).
+
+### §3. THE SOLVER IS SYNTACTIC (measured)
+
+The first `ctx_move_solve` mirrored `CtxMorphTac.ctx_morph_solve`: `repeat
+first [apply ctx_move_exist | apply ctx_move_sep | … | leaf]` with the
+leaves tried by `apply`.  On `p_sched`'s body it hung for 20 minutes:
+`apply ctx_move_sep` (or a leaf's `apply ctx_move_pointsto_inst`) against a
+NAMED piece (`proc_dormant_noctx (XI := ξ) pa st`, a ghost `own`, …) makes
+the unifier δ-unfold the name and search its `∗`/`∃` spine against the
+lemma's pattern.  `ctx_move_step` now dispatches on the head symbol with
+`lazymatch` (const when the body is syntactically ξ-free; `bi_exist`,
+`bi_sep`, `bi_or`, `big_opL`/`big_opM`/`big_opS bi_sep`, `if`; the six
+points-to heads -- byte/word/word2/word4 at the virtual tier,
+`ctx_phys_pointsto`/`ctx_phys_word_pointsto` at the physical tier -- and
+`ctx_floor`) and sends anything else to instance search (`apply _`), where
+the consumer's per-piece instances live.  `cur_ctx` is unfolded at EVERY
+step: the notations hide it and a `rewrite /name` exposes fresh
+occurrences (`CpuOwnMove`'s first failure).  Kit additions this step:
+`ctx_move_phys_pointsto` (+ instance), `ctx_move_phys_word`,
+`ctx_move_big_sepS`.
+
+### §4. WHAT THE RULE DID NOT REACH (still red, unchanged roots)
+
+`ProofForkretPark:341` (the three λ-conversion rows, above);
+`ProofKernelvec:1704` (§0.39′; `proc_lock_res` is a λ-payload now, so it
+is likely unblocked -- unmeasured); `ProofMain:996` (K15d);
+`ProofVirtioDiskIntr:1166` / `ProofVirtioDiskRwF:425` (tabled, WIP patch
+at `/shared/tmp/virtio/virtio-wip-A6.126.patch`); `UserMemPt:427` /
+`UptWalkPt:679` (deliberately red, the U-mode payer frontier).
+
+### §5. NUMBERS
+
+r52 (kit only, not snapshotted): 1203/1301, the same 7 roots.
+r53 (CLEAN, the consumers): **1205/1303, red roots 7 (the same set), zero admits**; snapshot `tso-flip` = `5779cf1b1`.  Sixteen files touched (three new: `TsoCtxMove.v`, `PtTreeMove.v`, `CpuOwnMove.v`).

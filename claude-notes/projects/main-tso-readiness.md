@@ -496,3 +496,48 @@ prescribes); the tree is the authority for every statement below.
 - **Deferred, named**: the per-hart cells' hand-off across swtch (`cpu_own`,
   `p_sched`) stays at the ambient -- a hart-tier unit (A6.127 §6);
   `ProofForkretPark`'s remaining root is the M3 debt on its rows.
+
+## Amendment 10 (2026-08-29, from the T-leg): §0.43′'s vocabulary -- the same-hart hand-off
+
+Landed on `tso-flip` at r53 (`5779cf1b1`), A6.128 in tso-machine-flip.md; the
+ruling is §0.43′ in tso-port.md.  Same terms as Amendment 9: shape and
+vocabulary for main, SC-provable; the tree is the authority.
+
+- **`TsoGhost`**: the per-context dirty registry is a MONOTONE SET
+  authority, `inG Σ (authR (gsetUR (nat * Arch.pa)))`; `dset_auth γ q S`,
+  `dset_in γ k` (persistent, timeless), `dset_alloc`, `dset_halves`,
+  `dset_agree`, `dset_lookup`, `dset_get`, `dset_insert`.  On main at SC
+  the registry is vacuous; the API is what consumers spell.
+- **`TsoCtx`**: `ctx_at ξ q B D` with `D : gset (nat * Arch.pa)`; a cell's
+  dirty arm is `dset_in (ctx_dirty_name ξ) (t, a)` at every fraction;
+  `ctx_wrote ξ t a := dset_in …`.
+- **`TsoCtxMove.v`** (new): `ctx_move_floor`, `ctx_move_pointsto`,
+  `ctx_move_phys_pointsto`; `Class CtxMove R := ctx_move : ∀ ξ0 ξ1,
+  own_context ξ0 -∗ own_context ξ1 -∗ R ξ0 ==∗ own_context ξ0 ∗ own_context ξ1 ∗ R ξ1`;
+  structural instances (const/sep/exist/or/if/big_sepL/big_sepM/big_sepS)
+  and the points-to leaves; the tactic `ctx_move_solve` (SYNTACTIC head
+  dispatch + `apply _` -- do not port an `apply`-based leaf, A6.128 §3).
+  On main every instance is trivial at SC (`R ξ0 ⊢ R ξ1` when nothing is
+  ξ-indexed) but the CLASS and the call shape are the vocabulary.
+- **`PtTreeMove.v`**, **`CpuOwnMove.v`** (new): the instance files for the
+  page-table tree at `UTier ξ` and for `cpu_own`'s tower.
+- **`SwtchCtx`**: `valid_context_pre` fully at `XIp` -- `ctx_cells (XI :=
+  XIp) c vs`, the wand's `cpu_own (CID := h) (XI := XIp) …`, `ctx_cells (XI
+  := XIp) c vs`, `P h A' c cret … back XIp`, zombie `own_ctx (XI := XIp)
+  cret`; `valid_context` is a closed term (this IS main's §0.15′ shape, so
+  main may already be there); the `SwtchCells`/`SwtchCtx` section split.
+- **`SpecSwtch`**: `P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d> mword
+  64 -d> mword 64 -d> bool -d> CtxId -d> iPropO Σ`; premise `(forall h A c
+  c' tp p' b, CtxMove (λ ξ, P h A c c' tp p' b ξ))` after the register
+  equalities; `P … back cur_ctx` in, `P … back' cur_ctx` out.
+- **`SchedCtx`**: `p_sched … back ξ` (its `proc_held`/`park_pay` at ξ), the
+  `SchedCtx`/`SchedCtxPay` split, one `CtxMove` instance per named piece
+  (list in A6.128 §2), `p_sched_move`; `proc_ctx_cells`/`proc_ctx_own_ctx`
+  deleted.  `ProofScheduler`/`ProofSched` pass `ltac:(intros; apply _)`.
+- **`ParkCap`**: `proc_ctx_boxed γs pa` unannotated.
+- **`ProofForkretPark`**: the child's cells and kstack row deposited into
+  the child's context beside the stack; the wand body at `(XI := XIc)`;
+  the three λ-conversion rows bracketed (`{ iExact "Hpinv". }` …) so the
+  red root fails fast.  On main those rows are already λ-converted, so
+  main's port of this file should go GREEN.
+
