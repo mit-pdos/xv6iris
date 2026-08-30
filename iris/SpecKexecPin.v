@@ -430,6 +430,28 @@ Section KexecPinView.
     Persistent (kxp_view_pin Γ pb).
   Proof. rewrite /kxp_view_pin. apply _. Qed.
 
+  (*  THE CHAIN-CARRYING READER (the repair of the multi-hop finding,
+      owner-authorized 2026-08-30).  [kxp_pins] pins only the ENDPOINTS,
+      and the prover machine-checked that on a path of >= 2 elements the
+      endpoint-only sentence is FALSE: between hops a writer can re-route
+      the interior through pin-satisfying views.  What pins a walk is the
+      chain at a FIXED [ds] -- [FsAbs.arun] -- which both era-0 pin
+      packages already carry.  This definition is the prover's honest
+      premise lifted verbatim (ProofKexecPinTrace's original); the sealed
+      Parameter below consumes it, and the endpoint form survives as the
+      view premise of the one-hop corollary. *)
+  Definition kxp_run_pin Γ (pb : kx_pin) (ds : list Z) : iProp Σ :=
+    (⌜ds !! 0%nat = Some FsImg.ROOTINO
+      /\ ds !! length (kxp_path pb) = Some (kxp_ino pb)⌝
+     ∗ □ (∀ av : aview, astate Γ av -∗
+            astate Γ av
+            ∗ ⌜kxp_pins av pb
+               /\ arun av FsImg.ROOTINO (kxp_path pb) ds⌝))%I.
+
+  Global Instance kxp_run_pin_persistent Γ pb ds :
+    Persistent (kxp_run_pin Γ pb ds).
+  Proof. rewrite /kxp_run_pin. apply _. Qed.
+
   (*  THE ILOCK-INSTANT READER: the pinned inum's payload fragment holds
       the pinned bytes.  [dq] is arbitrary, so the whole element (the
       loaded arm) and the 3/4 residue (the read arm) both fire it.       *)
@@ -677,7 +699,7 @@ Qed.
             [kexec_closer (Q_pin pb)], which IS the landed continuation
             shape at that [Q] (KexecOkQ sect. 1a, transparent), so every
             phase lemma's relay applies to it unchanged.                  *)
-Definition wp_kexec_pinned_body
+Definition wp_kexec_pinned_view_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (pb : kx_pin)
@@ -765,11 +787,100 @@ Definition wp_kexec_pinned_body
                  av dqa avf aslen dqas afun) -∗
   WP (Loop : expr riscv_lang).
 
+(*  THE SEALED FORM: the same body at the chain-carrying reader.  *)
+Definition wp_kexec_pinned_body
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    (pb : kx_pin) (ds : list Z)
+    (gs : list gname) (jp : nat) (gl : gname)           (* the running process *)
+    (pd pav pu : mword 64)                              (* disk fabric + lock  *)
+    (gf : gname)                                        (* file table          *)
+    (plen : nat) (pfun : nat -> bv 8)                   (* the path buffer     *)
+    (na : nat) (avf : nat -> mword 64)                  (* argv[0 .. na]       *)
+    (alen : nat -> nat) (aslen : nat -> nat)            (* strlen / owned len  *)
+    (afun : nat -> nat -> bv 8)                         (* the argument bytes  *)
+    (pidv : mword 32) (U : ustate)
+    (dqb dqs dqa dqpv dqas : dfrac)
+    (m : regfile) (K : nat) (eb : bool)
+    (b : bool) (lks : gset string) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.kexec in
+  let pj := proc_addr jp in
+  let pv := m !!! Regidx (mword_of_int 10 : mword 5) in   (* a0 = path *)
+  let av := m !!! Regidx (mword_of_int 11 : mword 5) in   (* a1 = argv *)
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (K_kexec <= K)%nat ->
+  icfg_dev = ROOTDEV ->
+  (0 < icfg_nib)%nat ->
+  log_geom_ok fsc_cov fsc_logst ->
+  0 < fsc_size <= BPB ->
+  0 <= fsc_bmapstart ->
+  fsc_bmapstart ∈ fsc_cov ->
+  ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
+  0 <= icfg_ist ->
+  cov_below fsc_cov fsc_size ->
+  ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
+  (* ---- the path ---- *)
+  bb_cstr pfun plen ->
+  (Z.of_nat plen < 2 ^ 31)%Z ->
+  (* ---- AND THE PATH IS THE PINNED ONE ----
+     absolute (the pins are stated from the root; the relative twin is
+     the recorded [FsAbsStart]-shaped parallel form) and spelling exactly
+     the pinned elements.  A caller holding the .rodata literal
+     discharges both by computation, as the dead contract's callers did. *)
+  pfun 0%nat = SLASH ->
+  path_elems (bview plen pfun) = kxp_path pb ->
+  (* ---- and the pinned file has a whole ELF header: without this the
+     oracle's verdict about the first 64 bytes would be unprovable (a
+     shorter pinned file makes the header readi short -- a run the
+     machine sends to [bad:], but the verdict is produced before the
+     length test).  [pin_init_hdr_len]/[pin_sh_hdr_len] discharge it. *)
+  (64 <= length (kxp_bytes pb))%nat ->
+  (* ---- the argument vector: [na] non-null pointers then a NULL ---- *)
+  (forall i, (i < na)%nat -> avf i <> (mword_of_int 0 : mword 64)) ->
+  avf na = (mword_of_int 0 : mword 64) ->
+  (na < MAXARG)%nat ->
+  (forall i, (i < na)%nat -> (alen i < aslen i)%nat) ->
+  (forall i, (i < na)%nat -> bb_cstr (afun i) (alen i)) ->
+  (forall i, (i < na)%nat -> (Z.of_nat (alen i) < 4096)%Z) ->
+  (* ---- the running process ---- *)
+  (jp < NPROC)%nat ->
+  gs !! jp = Some gl ->
+  sie_cap_gpr KT1 m K b pj -∗
+  cpu_own 0 eb pj b lks -∗
+  trap_csrs_ext KT1 eb -∗
+  cpu_claim_ext eb pj -∗
+  kernel_text -∗ pc_is pcE -∗
+  fs_fabric gs pd pav pu -∗
+  kalloc_env fsc_kalloc None -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
+  bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
+  proc_priv gf pj pidv U -∗
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
+  ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
+  ([∗ list] i ∈ seq 0 na,
+     [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
+  bslots 3 -∗
+  iref_slots 2 -∗
+  (* ==== THE PIN: one persistent reader (section 4).  Persistent, so it
+     costs the caller nothing to duplicate into the walk. ==== *)
+  kxp_run_pin (fs_gamma_L fsc_fs) pb ds -∗
+  (* ==== the moved image, at the PINNED relation.  [kexec_closer
+     (Q_pin pb) ...] unfolds to the landed continuation verbatim with
+     [kexec_ok_q (Q_pin pb)] in the pure slot: the [-1] arm is the landed
+     failure arm character for character, and the success arm carries
+     [entry = kxp_entry pb] in front ([kexec_ok_pin_read]). ==== *)
+  wp_next true pj (fun (CID : CpuId) =>
+    kexec_closer (kxp_entry_ok pb) gf fsc_kalloc pj pidv U m ret_tgt K b eb
+                 lks dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
+                 av dqa avf aslen dqas afun) -∗
+  WP (Loop : expr riscv_lang).
+
 Module Type KEXEC_PIN.
   Parameter wp_kexec_pinned :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-      (pb : kx_pin)
+      (pb : kx_pin) (ds : list Z)
       (gs : list gname) (jp : nat) (gl : gname)
       (pd pav pu : mword 64)
       (gf : gname)
@@ -780,9 +891,9 @@ Module Type KEXEC_PIN.
       (dqb dqs dqa dqpv dqas : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_kexec_pinned_body pb gs jp gl pd pav pu gf plen pfun na avf alen
-                           aslen afun pidv U dqb dqs dqa dqpv dqas m K eb
-                           b lks.
+      wp_kexec_pinned_body pb ds gs jp gl pd pav pu gf plen pfun na avf
+                           alen aslen afun pidv U dqb dqs dqa dqpv dqas m
+                           K eb b lks.
 End KEXEC_PIN.
 
 (* ===================================================================== *)

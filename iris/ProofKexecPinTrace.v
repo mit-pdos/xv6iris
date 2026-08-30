@@ -171,17 +171,8 @@ Section KexecPinTrace.
       the chain's endpoints, read off [arun] once by whoever builds this;
       they are carried rather than re-derived because the walk's answer is
       consumed at a point where no authority is open.                      *)
-  Definition kxp_run_pin Γ (pb : kx_pin) (ds : list Z) : iProp Σ :=
-    (⌜ds !! 0%nat = Some FsImg.ROOTINO
-      /\ ds !! length (kxp_path pb) = Some (kxp_ino pb)⌝
-     ∗ □ (∀ av : aview, astate Γ av -∗
-            astate Γ av
-            ∗ ⌜kxp_pins av pb
-               /\ arun av FsImg.ROOTINO (kxp_path pb) ds⌝))%I.
-
-  Global Instance kxp_run_pin_persistent Γ pb ds :
-    Persistent (kxp_run_pin Γ pb ds).
-  Proof. rewrite /kxp_run_pin. apply _. Qed.
+  (* [kxp_run_pin] now lives in SpecKexecPin (the owner-authorized chain
+     repair); this file's original definition moved there verbatim. *)
 
   Lemma kxp_run_pin_ends Γ pb ds :
     kxp_run_pin Γ pb ds -∗

@@ -672,6 +672,29 @@ Section KexecPinMain.
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 with "Htext Hst1ae Hcont").
   Qed.
+
+  (*  THE SEALED NAME: [SpecKexecPin.wp_kexec_pinned_body] is the run body
+      lifted into the contract (the chain repair), so the Parameter's
+      sentence IS [wp_kexec_pinned_run]'s, definitionally. *)
+  Lemma wp_kexec_pinned
+      (pb : kx_pin) (ds : list Z)
+      (gs : list gname) (jp : nat) (gl : gname)
+      (pd pav pu : mword 64)
+      (gf : gname)
+      (plen : nat) (pfun : nat -> bv 8)
+      (na : nat) (avf : nat -> mword 64)
+      (alen aslen : nat -> nat) (afun : nat -> nat -> bv 8)
+      (pidv : mword 32) (U : ustate)
+      (dqb dqs dqa dqpv dqas : dfrac)
+      (m : regfile) (K : nat) (eb : bool)
+      (b : bool) (lks : gset string) :
+    SpecKexecPin.wp_kexec_pinned_body pb ds gs jp gl pd pav pu gf plen pfun
+                        na avf alen aslen afun
+                        pidv U dqb dqs dqa dqpv dqas m K eb b lks.
+  Proof.
+    exact (wp_kexec_pinned_run pb ds gs jp gl pd pav pu gf plen pfun na avf
+             alen aslen afun pidv U dqb dqs dqa dqpv dqas m K eb b lks).
+  Qed.
   (* =================================================================== *)
   (*  THE RECEIPT: THE LANDED BODY, ON A ONE-ELEMENT PATH.                *)
   (*                                                                      *)
@@ -694,10 +717,10 @@ Section KexecPinMain.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
     kxp_path pb = [s] ->
-    wp_kexec_pinned_body pb gs jp gl pd pav pu gf plen pfun na avf alen
-                         aslen afun pidv U dqb dqs dqa dqpv dqas m K eb b lks.
+    wp_kexec_pinned_view_body pb gs jp gl pd pav pu gf plen pfun na avf
+                         alen aslen afun pidv U dqb dqs dqa dqpv dqas m K eb b lks.
   Proof.
-    intros Hps. rewrite /wp_kexec_pinned_body.
+    intros Hps. rewrite /wp_kexec_pinned_view_body.
     intros HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hcstr
            Hplen Hslash Hpl Hhlen Havf_nz Havf_na Hnamax Halen_b Halen_c
            Halen_4 Hjp Hgs.

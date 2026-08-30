@@ -34,3 +34,7 @@ Module KexecPin := KexecPinProof Myproc BeginOp Namei NameiEra Ilock Readi
 (* ===================================================================== *)
 Notation wp_kexec_pinned_1hop := KexecPin.wp_kexec_pinned_1hop (only parsing).
 Notation wp_kexec_pinned_run := KexecPin.wp_kexec_pinned_run (only parsing).
+
+(*  THE SEAL: with the chain repair in the contract, the general sentence
+    is the Parameter and the functor application inhabits the Module Type. *)
+Module KexecPinSealed : SpecKexecPin.KEXEC_PIN := KexecPin.
