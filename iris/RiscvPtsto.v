@@ -650,6 +650,17 @@ Definition obs_inv `{!riscvFixedGS Σ} : iProp Σ :=
 Definition obs_pred_triv `{!riscvFixedGS Σ} : iProp Σ :=
   (∃ h : list mobs, obs_frag h)%I.
 
+(* THE LEDGER: the trace predicate of a client with a TRACE-INDEXED RESOURCE
+   [R] (uart-trace.md) -- its half of the history ghost and [R] at that
+   history.  [R] is a resource rather than a pure fact so that a proof at
+   an event can relate the history to other ghosts (the durable state of a
+   file, a console's own picture); its pure reading is what adequacy exports.
+   Every hook that opens the ledger asks [R] to be TIMELESS (a client whose
+   [R] needs a non-timeless part keeps it outside, persistently, and hands
+   it to the wands). *)
+Definition obs_ledger `{!riscvFixedGS Σ} (R : list mobs -> iProp Σ) : iProp Σ :=
+  (∃ h : list mobs, obs_frag h ∗ R h)%I.
+
 Lemma obs_agree `{!riscvFixedGS Σ} (h1 h2 : list mobs) :
   obs_auth h1 -∗ obs_frag h2 -∗ ⌜h1 = h2⌝.
 Proof. iIntros "H1 H2". by iDestruct (ghost_var_agree with "H1 H2") as %->. Qed.

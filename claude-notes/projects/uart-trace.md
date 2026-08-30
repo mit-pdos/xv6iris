@@ -9,7 +9,19 @@ the CSL-free execution — the list of `RiscvLang.mobs` events a run emits:
 gap is that `riscv_irisGS`'s `state_interp` discards its `κs` argument
 (`design/adequacy.md`, "what is still on the table", item (b)).
 
-**STATUS (2026-08-29): phases 1–3 LANDED, tree green, audit unchanged.**
+**STATUS (2026-08-29, later): phases 1–4 LANDED, tree green, audit
+unchanged.**  Phase 4 added the LEDGER (`RiscvPtsto.obs_ledger` /
+`RiscvAdequacy.obs_ledger_at` with `_alloc`/`_step`/`_phi`), the permit
+from a ledger (`WpUart.uart_obs_permit_ledger`, the client's two wands),
+the packaged `RiscvAdequacy.riscv_trace_adequacy`, and at xv6 the general
+`SystemAdequacy.xv6_power_adequacy_gen` (trace slot + hooks + permit as
+parameters, `nsteps`-stated) with three instances: `xv6_power_adequacy`
+(the old statement, trivial slot), `xv6_trace_adequacy` /
+`xv6_trace_adequacy_xv6Σ` (a client's `R`, `P` of the run's trace) and the
+closed demo `xv6_obs_wf_xv6Σ` (every run's trace at the real image is
+well-formed: alternation, boot count, wire tie).  Per-cycle view:
+`ObsTrace.cycles_of` + `cycles_of_on/off/io`.  What is NOT there yet is
+below under "Open".  Earlier status, for the record:
 `ObsTrace.v` (pure), the trace conjunct of `state_interp`, the seven base
 rules, the power arms' `Hobs` hook, `riscv_power_adequacy` over `nsteps`
 with `phi g2 κs`, the second fixed-layer slot `riscv_obs_pred`/`obs_inv`,
@@ -176,5 +188,25 @@ below.
 5. A real `P_era` waits on console-side specs (printf / consolewrite /
    consoleintr) and, for durable-state-dependent ones, on the FS write path
    relating `Pc`'s snapshot to the typed bytes.  Not in this plan.
-6. Notes: update `design/adequacy.md` item (b) when phase 3 lands; move the
-   design section above into `design/` then.
+6. Notes: `design/adequacy.md` item (b) updated at phase 3; the design
+   section above still belongs in `design/` once the client API settles.
+
+## Open (after phase 4)
+
+- **`R` is required TIMELESS** by every ledger hook (`obs_ledger_at_step`,
+  `_phi`, `uart_obs_permit_ledger`), so the invariant's later strips.  A
+  client whose `R` needs a non-timeless part keeps it outside,
+  persistently, and hands it to the wands as a parameter.  Relax only if a
+  client actually needs it (the `▷`-shaped hooks are the `Hswap` pattern).
+- **The `P_era` chain's identification gate** (ruling 4): `Hpow` sees the
+  disk at a power event PURELY (`dk` is the machine's, by construction of
+  the hook), so `R` can record the boot disk of each cycle; but an ERA
+  cannot yet identify the disk `R` recorded with its own (`Ppure` is what
+  a boot learns, and no era holds the fixed auth).  The channel that
+  exists is `Hswap`'s `Rb dk` → `power_boot_res`; the trace-side twin
+  (a resource out of `Hobs` at PowerOn, delivered to the boot) is the
+  next machine-layer step when a real `P_era` is attempted.
+- The readable inductive `uart_cycles Q` (cons-form) was not written;
+  `Forall Q (cycles_of h)` is the per-cycle statement for now.
+- `xv6_trace_adequacy`'s wands are quantified over the era instance
+  (`HR : riscvGS Σ`) only because the fancy update needs its `invGS`.

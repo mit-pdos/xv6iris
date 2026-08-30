@@ -35,7 +35,7 @@ From iris.program_logic Require Import language lifting adequacy.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
-Require Import RiscvLang RiscvPtsto.
+Require Import RiscvLang ObsTrace RiscvPtsto.
 (* durable-disk 2b-A / B3: the era's two file-system-state capacity classes.
    Required EARLY so the later imports shadow [FsState]'s four colliding
    exports again ([fs_view], [link_auth], [byte_range], [blk_owned]); the
@@ -328,7 +328,12 @@ Section SystemBoot.
     (* THE TRACE SLOT'S VALUE, likewise (claude-notes/projects/uart-trace.md):
        this boot states no trace property, so the slot holds the trivial
        predicate, and that is what discharges the UART thread's permit. *)
-    riscv_obs_pred = obs_pred_triv ->
+    (* THE UART THREAD'S TRACE PERMIT (uart-trace.md): what this boot cannot
+       prove itself, since it depends on the trace slot's value -- the
+       trivial slot's is [WpUart.uart_obs_permit_triv], a ledger's is
+       [uart_obs_permit_ledger].  A Coq-level premise, so the system theorem
+       passes its own down. *)
+    (forall γ : uart_names, ⊢ obs_inv -∗ uart_obs_permit γ) ->
     obs_inv -∗
     power_boot_res riscv_eraGS gen_id boot_D NPROC XV6_DISK_BYTES
       (fun dk => mirror_of (fs_blocks dk))
@@ -340,7 +345,7 @@ Section SystemBoot.
       WP (DiskLoopE gen_id : expr riscv_lang) @ ⊤ ∗
       WP (PlicLoopE gen_id : expr riscv_lang) @ ⊤.
   Proof.
-    intros Hbf Hpure Hcovin Hlogsub Hls2 Hcp Hop. iIntros "#Hoinv Hres".
+    intros Hbf Hpure Hcovin Hlogsub Hls2 Hcp Hperm. iIntros "#Hoinv Hres".
     (* ================================================================ *)
     (* THE ERA'S OWN CONFIGURATION, OFF THE SNAPSHOT (durable-disk lane  *)
     (* E-himg).  [fs_boot_pure] names the committed map [D] and an        *)
@@ -574,7 +579,7 @@ Section SystemBoot.
                 (g.(gregs) (FS c)) iv DfracDiscarded xid γd γv
                 (boot_regs_of_facts g Hbf (FS c)) (fin_FS_nz c)
                 with "Htext Hdata Hh Hthrc Hstarted"). }
-    iDestruct (uart_obs_permit_triv γd Hop with "Hoinv") as "#Hperm".
+    iDestruct (Hperm γd with "Hoinv") as "#Hperm".
     iSplitR; [iApply (wp_uart_loop γd with "Hcert Huinv Hpinv Hperm") |].
     iSplitR;
       [iApply (wp_disk_loop γv Hdimg with "Hcert Hcinv Hqinv Hvinv Hpinv") |].
@@ -587,7 +592,7 @@ End SystemBoot.
 (* 3. THE SYSTEM THEOREM.                                                  *)
 (* ---------------------------------------------------------------------- *)
 
-Theorem xv6_power_adequacy Σ
+Theorem xv6_power_adequacy_gen Σ
     `{!xv6G Σ, !riscvGpreS Σ, !fileGpreS Σ, !pavGpreS Σ, !fdslotGpreS Σ,
       !irefslotGpreS Σ, !bioslotGpreS Σ}
     (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z)
@@ -604,17 +609,44 @@ Theorem xv6_power_adequacy Σ
        Stated at the [boot_fixedGS] literal, exactly as the theorem below
        consumes it, so every field projection reduces by iota; the client
        never has to see a [riscvFixedGS] it did not build. *)
-    (phi : gstate -> Prop)
+    (* THE TRACE SLOT AND ITS HOOKS, PASSED THROUGH (uart-trace.md): the
+       predicate, its birth, its power hook, and the UART thread's permit
+       it discharges -- each stated at this file's own record literal, as
+       [Hphi] is.  [xv6_power_adequacy] below fills the slot with the
+       trivial predicate, [xv6_trace_adequacy] with a client's ledger. *)
+    (Pt : gname -> iProp Σ)
+    (HPt : forall γobs : gname,
+       ghost_var γobs (1/2) ([] : list mobs) ⊢ |==> Pt γobs)
+    (Hobs : forall (γd γobs : gname) (h : list mobs) (on : bool)
+                   (dk : Z -> bv 8),
+       trace_shape h on ->
+       ⊢ disk_img_auth_sized γd XV6_DISK_BYTES dk -∗ ▷ Pt γobs -∗
+         ghost_var γobs (1/2) h ==∗
+           ◇ (disk_img_auth_sized γd XV6_DISK_BYTES dk ∗ ▷ Pt γobs ∗
+              ghost_var γobs (1/2)
+                (h ++ [if on then ObsPowerOff else ObsPowerOn])%list))
+    (Hperm : forall (HR : riscvGS Σ) (GEN : GenId) (γ : uart_names),
+       (exists (Hinv : invGS Σ) (γgen γstart γreg γd γsw γobs : gname)
+               (T : list mobs),
+          riscv_fixedGS =
+            boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
+              (P_fs_named γd XV6_DISK_BYTES γsw γreg γstart cov
+                 (FsImg.sb_logstart sb))
+              γobs T (Pt γobs)) ->
+       ⊢ obs_inv -∗ uart_obs_permit γ)
+    (phi : gstate -> list mobs -> Prop)
     (Hphi : forall (Hinv : invGS Σ)
                    (γgen γstart γreg γd γsw γobs : gname) (T : list mobs)
-                   (g' : gstate),
+                   (g' : gstate) (h : list mobs),
        ⊢ @power_interp Σ
             (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
                (P_fs_named γd XV6_DISK_BYTES γsw γreg γstart cov
                   (FsImg.sb_logstart sb))
-               γobs T (obs_pred_at γobs)) g' -∗
+               γobs T (Pt γobs)) g' -∗
+         ghost_var γobs (1/2) h -∗ ⌜obs_wf h g'⌝ -∗
          ▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γstart cov (FsImg.sb_logstart sb) -∗
-         ◇ ⌜phi g'⌝)
+         ▷ Pt γobs -∗
+         ◇ ⌜phi g' h⌝)
     (* the hypotheses about the machine: it is off, and nothing has ever
        run.  Everything else a boot needs -- RAM total and holding the loaded
        kernel image, the per-hart reset registers, the reset devices -- is
@@ -633,9 +665,9 @@ Theorem xv6_power_adequacy Σ
        mkfs image. *)
     (Himg : fs_boot_image_wf (v_disk (g.(gdev).(dvirtio))) XV6_DISK_BYTES
               sb nib cov) :
-  forall t2 g2,
-    rtc erased_step ([PowerLoopE : expr riscv_lang], g) (t2, g2) ->
-    (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\ phi g2.
+  forall (n : nat) (κs : list mobs) t2 g2,
+    nsteps n ([PowerLoopE : expr riscv_lang], g) κs (t2, g2) ->
+    (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\ phi g2 κs.
 Proof.
   (* THE CRASH SLOT IS NO LONGER [True] HERE, AND THE STATEMENT IS UNCHANGED
      (fs-cfg-boot.md stage (f)).  This theorem used to instantiate
@@ -695,8 +727,7 @@ Proof.
      initial image, handed over once by the power theorem and owned by the
      predicate from here on (design/crash.md, "The durable disk").  This is
      the only place the initial image is ever named. *)
-  intros t2 g2 Hrtc.
-  apply erased_steps_nsteps in Hrtc as (n & κs & Hn).
+  intros n κs t2 g2 Hn.
   refine (riscv_power_adequacy Σ boot_D NPROC XV6_DISK_BYTES g
            (fun (γd γsw γreg γst : gname) =>
               P_fs_named γd XV6_DISK_BYTES γsw γreg γst cov
@@ -743,18 +774,10 @@ Proof.
            ltac:(intros γd γsw γreg γst Er gen dk;
                  exact (P_fs_swap γd XV6_DISK_BYTES γsw γreg γst cov
                           (FsImg.sb_logstart sb) dk Er gen))
-           (* THE TRACE SLOT (uart-trace.md): this theorem states no trace
-              property, so it is the trivial predicate, with its two hooks. *)
-           obs_pred_at obs_pred_at_alloc (obs_pred_at_step XV6_DISK_BYTES)
-           (* THE TRACE HOOK, threaded straight through: this layer fixes the
-              crash predicate but says nothing about what the client reads off
-              it, so [phi]/[Hphi] pass down unexamined -- [phi] here is about
-              the state alone, so the history and the trace slot are simply
-              dropped on the floor. *)
-           (fun g _ => phi g)
-           ltac:(intros Hinv γgen γstart γreg γd γsw γobs T g' h;
-                 iIntros "Hsi _ _ HP _";
-                 iApply (Hphi Hinv γgen γstart γreg γd γsw γobs T g' with "Hsi HP"))
+           (* THE TRACE SLOT AND THE TRACE HOOK, threaded straight through:
+              this layer fixes the crash predicate but says nothing about the
+              trace, so both pass down unexamined. *)
+           Pt HPt Hobs phi Hphi
            Hgen0 Hpow _ n κs t2 g2 Hn).
   (* the per-era boot entailment, at the era instance the power thread just
      minted.  [riscv_fixedGS (RiscvGS Σ F HE)] iota-reduces to [F] and
@@ -771,7 +794,103 @@ Proof.
      member now, so the section generalises one class less. *)
   refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ gen g' sb nib cov
             Hbf Hpure Hcovin Hlogsub Hls2 _ _).
-  all: reflexivity.
+  { reflexivity. }
+  (* the UART thread's permit, at the record the era boots over *)
+  intros γ. apply (Hperm _ gen γ).
+  by exists Hi, Gg, Gs, Gr, Gt, Gsw, Gob, GT.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 3b. THE TWO INSTANCES OF THE TRACE SLOT.                                *)
+(*                                                                        *)
+(* [xv6_power_adequacy] is the theorem as it was before the trace layer:   *)
+(* the slot at the TRIVIAL predicate, [phi] about the state alone, the     *)
+(* conclusion over [rtc erased_step].  [xv6_trace_adequacy] is the         *)
+(* packaged trace theorem at xv6: a client's timeless trace resource [R],  *)
+(* its birth, its power step, its two UART-arm wands and its pure reading  *)
+(* [P], and the conclusion is [P] of the run's observable trace.           *)
+(* ---------------------------------------------------------------------- *)
+Theorem xv6_power_adequacy Σ
+    `{!xv6G Σ, !riscvGpreS Σ, !fileGpreS Σ, !pavGpreS Σ, !fdslotGpreS Σ,
+      !irefslotGpreS Σ, !bioslotGpreS Σ}
+    (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z)
+    (phi : gstate -> Prop)
+    (Hphi : forall (Hinv : invGS Σ)
+                   (γgen γstart γreg γd γsw γobs : gname) (T : list mobs)
+                   (g' : gstate),
+       ⊢ @power_interp Σ
+            (boot_fixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
+               (P_fs_named γd XV6_DISK_BYTES γsw γreg γstart cov
+                  (FsImg.sb_logstart sb))
+               γobs T (obs_pred_at γobs)) g' -∗
+         ▷ P_fs_named γd XV6_DISK_BYTES γsw γreg γstart cov (FsImg.sb_logstart sb) -∗
+         ◇ ⌜phi g'⌝)
+    (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
+    (Himg : fs_boot_image_wf (v_disk (g.(gdev).(dvirtio))) XV6_DISK_BYTES
+              sb nib cov) :
+  forall t2 g2,
+    rtc erased_step ([PowerLoopE : expr riscv_lang], g) (t2, g2) ->
+    (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\ phi g2.
+Proof.
+  intros t2 g2 Hrtc.
+  apply erased_steps_nsteps in Hrtc as (n & κs & Hn).
+  refine (xv6_power_adequacy_gen Σ g sb nib cov
+            obs_pred_at obs_pred_at_alloc (obs_pred_at_step XV6_DISK_BYTES)
+            _ (fun g _ => phi g)
+            ltac:(intros Hinv γgen γstart γreg γd γsw γobs T g' h;
+                  iIntros "Hsi _ _ HP _";
+                  iApply (Hphi Hinv γgen γstart γreg γd γsw γobs T g'
+                            with "Hsi HP"))
+            Hgen0 Hpow Himg n κs t2 g2 Hn).
+  (* the permit at the trivial slot *)
+  intros HR GEN γ (Hi & Gg & Gs & Gr & Gt & Gsw & Gob & GT & Heq).
+  apply (uart_obs_permit_triv γ). rewrite Heq. reflexivity.
+Qed.
+
+Theorem xv6_trace_adequacy Σ
+    `{!xv6G Σ, !riscvGpreS Σ, !fileGpreS Σ, !pavGpreS Σ, !fdslotGpreS Σ,
+      !irefslotGpreS Σ, !bioslotGpreS Σ}
+    (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z)
+    (R : list mobs -> iProp Σ) (HRt : forall h, Timeless (R h))
+    (HR0 : ⊢ |==> R [])
+    (Hpow : forall (h : list mobs) (on : bool) (dk : Z -> bv 8),
+       trace_shape h on ->
+       ⊢ R h ==∗ R (h ++ [if on then ObsPowerOff else ObsPowerOn])%list)
+    (* the two UART-arm steps ([WpUart.uart_obs_permit_ledger]): the byte
+       that reached the wire, and the environment's byte.  Quantified over
+       the era instance because the fancy update needs its [invGS]; the
+       wands themselves mention nothing era-specific. *)
+    (Htx : forall (HR : riscvGS Σ) (γ : uart_names),
+       ⊢ □ (∀ (h : list mobs) (b : bv 8) (u u' : uart_state),
+              ⌜uart_tx_pop u = Some (b, u')⌝ -∗ ⌜uart_loopback u = false⌝ -∗
+              ⌜trace_shape h true⌝ -∗ ⌜obs_wire (open_seg h) = u_wire u⌝ -∗
+              uart_ghosts γ u' -∗ R h ={⊤ ∖ ↑uartN ∖ ↑obsN}=∗
+              uart_ghosts γ u' ∗ R (h ++ [ObsUartOut b])%list))
+    (Hrx : forall (HR : riscvGS Σ) (γ : uart_names),
+       ⊢ □ (∀ (h : list mobs) (b : bv 8) (u u' : uart_state),
+              ⌜uart_rx_push u b = Some u'⌝ -∗ ⌜trace_shape h true⌝ -∗
+              uart_ghosts γ u' -∗ R h ={⊤ ∖ ↑uartN ∖ ↑obsN}=∗
+              uart_ghosts γ u' ∗ R (h ++ [ObsUartIn b])%list))
+    (P : list mobs -> Prop) (HR : forall h, R h ⊢ ⌜P h⌝)
+    (Hgen0 : g.(ggen) = 0%nat) (Hpow0 : g.(gpow) = false)
+    (Himg : fs_boot_image_wf (v_disk (g.(gdev).(dvirtio))) XV6_DISK_BYTES
+              sb nib cov) :
+  forall (n : nat) (κs : list mobs) t2 g2,
+    nsteps n ([PowerLoopE : expr riscv_lang], g) κs (t2, g2) ->
+    (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\ P κs.
+Proof.
+  refine (xv6_power_adequacy_gen Σ g sb nib cov
+            (obs_ledger_at R) (fun γ => obs_ledger_at_alloc R γ HR0)
+            (obs_ledger_at_step XV6_DISK_BYTES R HRt Hpow)
+            _ (fun _ h => P h)
+            ltac:(intros Hinv γgen γstart γreg γd γsw γobs T g' h;
+                  iIntros "_ Hauth _ _ HPt";
+                  iApply (obs_ledger_at_phi R HRt P HR γobs h with "Hauth HPt"))
+            Hgen0 Hpow0 Himg).
+  (* the permit at the ledger: the client's two wands *)
+  intros HRg GEN γ (Hi & Gg & Gs & Gr & Gt & Gsw & Gob & GT & Heq).
+  refine (uart_obs_permit_ledger R γ HRt _ (Htx HRg γ) (Hrx HRg γ)).
+  rewrite Heq. reflexivity.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -1082,4 +1201,61 @@ Proof.
            (xv6_trace_pure fsimg_cov (FsImg.sb_logstart fsimg_sb))
            (xv6_trace_hook xv6Σ fsimg_cov (FsImg.sb_logstart fsimg_sb))
            Hgen0 Hpow Hdisk).
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 4c. THE TRACE THEOREM AT THE IMAGE, and the smallest closed instance.  *)
+(*                                                                        *)
+(* [xv6_trace_adequacy_xv6Σ] is [xv6_trace_adequacy] with the functor list *)
+(* and the disk fixed, [R]/[P] free.  [xv6_obs_wf_xv6Σ] is the closed     *)
+(* demonstration: at the real image, every run's observable trace is      *)
+(* well-formed -- PowerOn, console I/O, PowerOff, PowerOn, ... with the    *)
+(* boot count and the wire tie ([ObsTrace.obs_wf]) -- read off the trace   *)
+(* conjunct of [state_interp] with the slot at the trivial predicate.      *)
+(* ---------------------------------------------------------------------- *)
+Corollary xv6_trace_adequacy_xv6Σ (g : gstate)
+    (R : list mobs -> iProp xv6Σ) (HRt : forall h, Timeless (R h))
+    (HR0 : ⊢ |==> R [])
+    (Hpow : forall (h : list mobs) (on : bool) (dk : Z -> bv 8),
+       trace_shape h on ->
+       ⊢ R h ==∗ R (h ++ [if on then ObsPowerOff else ObsPowerOn])%list)
+    (Htx : forall (HR : riscvGS xv6Σ) (γ : uart_names),
+       ⊢ □ (∀ (h : list mobs) (b : bv 8) (u u' : uart_state),
+              ⌜uart_tx_pop u = Some (b, u')⌝ -∗ ⌜uart_loopback u = false⌝ -∗
+              ⌜trace_shape h true⌝ -∗ ⌜obs_wire (open_seg h) = u_wire u⌝ -∗
+              uart_ghosts γ u' -∗ R h ={⊤ ∖ ↑uartN ∖ ↑obsN}=∗
+              uart_ghosts γ u' ∗ R (h ++ [ObsUartOut b])%list))
+    (Hrx : forall (HR : riscvGS xv6Σ) (γ : uart_names),
+       ⊢ □ (∀ (h : list mobs) (b : bv 8) (u u' : uart_state),
+              ⌜uart_rx_push u b = Some u'⌝ -∗ ⌜trace_shape h true⌝ -∗
+              uart_ghosts γ u' -∗ R h ={⊤ ∖ ↑uartN ∖ ↑obsN}=∗
+              uart_ghosts γ u' ∗ R (h ++ [ObsUartIn b])%list))
+    (P : list mobs -> Prop) (HR : forall h, R h ⊢ ⌜P h⌝)
+    (Hgen0 : g.(ggen) = 0%nat) (Hpow0 : g.(gpow) = false)
+    (Hdisk : v_disk (g.(gdev).(dvirtio)) = FsImgDisk.fsimg_dk) :
+  forall (n : nat) (κs : list mobs) t2 g2,
+    nsteps n ([PowerLoopE : expr riscv_lang], g) κs (t2, g2) ->
+    (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\ P κs.
+Proof.
+  apply (xv6_trace_adequacy xv6Σ g fsimg_sb fsimg_nib fsimg_cov R HRt HR0 Hpow
+           Htx Hrx P HR Hgen0 Hpow0).
+  rewrite Hdisk. exact fsimg_image_wf.
+Qed.
+
+Corollary xv6_obs_wf_xv6Σ (g : gstate)
+    (Hgen0 : g.(ggen) = 0%nat) (Hpow0 : g.(gpow) = false)
+    (Hdisk : v_disk (g.(gdev).(dvirtio)) = FsImgDisk.fsimg_dk) :
+  forall (n : nat) (κs : list mobs) t2 g2,
+    nsteps n ([PowerLoopE : expr riscv_lang], g) κs (t2, g2) ->
+    (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\ obs_wf κs g2.
+Proof.
+  refine (xv6_power_adequacy_gen xv6Σ g fsimg_sb fsimg_nib fsimg_cov
+            obs_pred_at obs_pred_at_alloc (obs_pred_at_step XV6_DISK_BYTES)
+            _ (fun g h => obs_wf h g)
+            ltac:(intros Hinv γgen γstart γreg γd γsw γobs T g' h;
+                  iIntros "_ _ %Hwf _ _"; iModIntro; iPureIntro; exact Hwf)
+            Hgen0 Hpow0 _).
+  { intros HR GEN γ (Hi & Gg & Gs & Gr & Gt & Gsw & Gob & GT & Heq).
+    apply (uart_obs_permit_triv γ). rewrite Heq. reflexivity. }
+  rewrite Hdisk. exact fsimg_image_wf.
 Qed.

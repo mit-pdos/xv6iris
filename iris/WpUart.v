@@ -831,6 +831,68 @@ Section DevLoops.
     iModIntro. iFrame "Hg Hauth".
   Qed.
 
+  (* THE PERMIT FROM A LEDGER (uart-trace.md phase 4).  The client's trace
+     predicate is [obs_ledger R], and its two wands are the whole
+     obligation: at the tx arm, with the byte that reached the wire (NOT
+     under LOOP, which emits nothing); at the rx arm, with the ENVIRONMENT's
+     byte -- each with the device ghosts after the step and the two machine
+     facts in hand, at a mask that lets the wand open the crash invariant
+     too.  Coq-level hypotheses, so the system theorem can pass its own
+     down; [R] timeless, so the ledger's later strips. *)
+  Lemma uart_obs_permit_ledger (R : list mobs -> iProp Σ) (γ : uart_names)
+      (HRt : forall h, Timeless (R h))
+      (Heq : riscv_obs_pred = obs_ledger R)
+      (Htx : ⊢ □ (∀ (h : list mobs) (b : bv 8) (u u' : uart_state),
+               ⌜uart_tx_pop u = Some (b, u')⌝ -∗ ⌜uart_loopback u = false⌝ -∗
+               ⌜trace_shape h true⌝ -∗ ⌜obs_wire (open_seg h) = u_wire u⌝ -∗
+               uart_ghosts γ u' -∗ R h ={⊤ ∖ ↑uartN ∖ ↑obsN}=∗
+               uart_ghosts γ u' ∗ R (h ++ [ObsUartOut b])%list))
+      (Hrx : ⊢ □ (∀ (h : list mobs) (b : bv 8) (u u' : uart_state),
+               ⌜uart_rx_push u b = Some u'⌝ -∗ ⌜trace_shape h true⌝ -∗
+               uart_ghosts γ u' -∗ R h ={⊤ ∖ ↑uartN ∖ ↑obsN}=∗
+               uart_ghosts γ u' ∗ R (h ++ [ObsUartIn b])%list)) :
+    obs_inv -∗ uart_obs_permit γ.
+  Proof.
+    iIntros "#Hoinv". iPoseProof Htx as "#Htx". iPoseProof Hrx as "#Hrx".
+    iIntros "!>" (h κ d u') "%Hstep %Hsh %Hwire Hg Hauth".
+    iInv "Hoinv" as "HP" "Hclose".
+    iEval (rewrite Heq /obs_ledger) in "HP".
+    iDestruct "HP" as (h') "[>Hfrag >HR]".
+    iDestruct (obs_agree with "Hauth Hfrag") as %<-.
+    remember (set_duart d u') as d' eqn:Hd'.
+    destruct Hstep as [b u0 Htx0 | b u0 Hrx0 | p' _ _ |].
+    - (* a byte left the transmitter *)
+      unfold set_duart in Hd'. injection Hd' as ->.
+      destruct (uart_loopback (duart d)) eqn:Hlb.
+      + (* under LOOP nothing reached the wire: no event *)
+        iMod ("Hclose" with "[Hfrag HR]") as "_".
+        { iNext. rewrite Heq /obs_ledger. iExists h. iFrame. }
+        iModIntro. rewrite app_nil_r. iFrame.
+      + iMod ("Htx" $! h b (duart d) _ with "[//] [//] [//] [//] Hg HR")
+          as "[Hg HR]".
+        iMod (obs_update _ (h ++ [ObsUartOut b])%list with "Hauth Hfrag")
+          as "[Hauth Hfrag]".
+        iMod ("Hclose" with "[Hfrag HR]") as "_".
+        { iNext. rewrite Heq /obs_ledger. iExists _. iFrame. }
+        iModIntro. iFrame.
+    - (* a byte arrived from the outside world *)
+      unfold set_duart in Hd'. injection Hd' as ->.
+      iMod ("Hrx" $! h b (duart d) _ with "[//] [//] Hg HR") as "[Hg HR]".
+      iMod (obs_update _ (h ++ [ObsUartIn b])%list with "Hauth Hfrag")
+        as "[Hauth Hfrag]".
+      iMod ("Hclose" with "[Hfrag HR]") as "_".
+      { iNext. rewrite Heq /obs_ledger. iExists _. iFrame. }
+      iModIntro. iFrame.
+    - (* the latch: silent *)
+      iMod ("Hclose" with "[Hfrag HR]") as "_".
+      { iNext. rewrite Heq /obs_ledger. iExists h. iFrame. }
+      iModIntro. rewrite app_nil_r. iFrame.
+    - (* the stutter: silent *)
+      iMod ("Hclose" with "[Hfrag HR]") as "_".
+      { iNext. rewrite Heq /obs_ledger. iExists h. iFrame. }
+      iModIntro. rewrite app_nil_r. iFrame.
+  Qed.
+
   Lemma wp_uart_loop γ :
     gen_cert -∗ uart_inv γ -∗ plic_inv -∗ uart_obs_permit γ -∗
     WP (UartLoop : expr riscv_lang).

@@ -1116,6 +1116,61 @@ Proof.
   iSplitL "Hfrag"; [iNext; iExists _; iExact "Hfrag" | iExact "Hauth"].
 Qed.
 
+(* THE LEDGER at a raw gname (uart-trace.md phase 4): [RiscvPtsto.obs_ledger]'s
+   twin, as [obs_pred_at] is [obs_pred_triv]'s -- the client's half of the
+   history and its trace-indexed resource [R] at that history -- with its
+   three hooks: born at the empty history from the client's [R []]; moved
+   at a power event by the client's own [Hpow], which sees the disk PURELY
+   (ruling 4's era chain records it); read at the end of the run for [R]'s
+   pure content.  [R] is asked to be TIMELESS: every hook strips the
+   invariant's later off it. *)
+Definition obs_ledger_at {Σ : gFunctors} `{!riscvGpreS Σ}
+    (R : list mobs -> iProp Σ) (γ : gname) : iProp Σ :=
+  (∃ h : list mobs, ghost_var γ (1/2) h ∗ R h)%I.
+
+Lemma obs_ledger_at_alloc {Σ : gFunctors} `{!riscvGpreS Σ}
+    (R : list mobs -> iProp Σ) (γ : gname) :
+  (⊢ |==> R []) ->
+  ghost_var γ (1/2) ([] : list mobs) ⊢ |==> obs_ledger_at R γ.
+Proof.
+  intros HR0. iIntros "H". iMod HR0 as "HR". iModIntro. iExists []. iFrame.
+Qed.
+
+Lemma obs_ledger_at_step {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ} (ndisk : nat)
+    (R : list mobs -> iProp Σ) (HRt : forall h, Timeless (R h))
+    (Hpow : forall (h : list mobs) (on : bool) (dk : Z -> bv 8),
+       trace_shape h on ->
+       ⊢ R h ==∗ R (h ++ [if on then ObsPowerOff else ObsPowerOn])%list)
+    (γdisk γobs : gname) (h : list mobs) (on : bool) (dk : Z -> bv 8) :
+  trace_shape h on ->
+  ⊢ disk_img_auth_sized γdisk ndisk dk -∗ ▷ obs_ledger_at R γobs -∗
+    ghost_var γobs (1/2) h ==∗
+      ◇ (disk_img_auth_sized γdisk ndisk dk ∗ ▷ obs_ledger_at R γobs ∗
+         ghost_var γobs (1/2)
+           (h ++ [if on then ObsPowerOff else ObsPowerOn])%list).
+Proof.
+  intros Hsh. iIntros "Htie HP Hauth".
+  iDestruct "HP" as (h') "[>Hfrag >HR]".
+  iDestruct (ghost_var_agree with "Hauth Hfrag") as %<-.
+  iMod (ghost_var_update_halves
+          (h ++ [if on then ObsPowerOff else ObsPowerOn])%list
+          with "Hauth Hfrag") as "[Hauth Hfrag]".
+  iMod (Hpow h on dk Hsh with "HR") as "HR".
+  iModIntro. iModIntro. iFrame "Htie".
+  iSplitL "Hfrag HR"; [iNext; iExists _; iFrame | iExact "Hauth"].
+Qed.
+
+Lemma obs_ledger_at_phi {Σ : gFunctors} `{!riscvGpreS Σ}
+    (R : list mobs -> iProp Σ) (HRt : forall h, Timeless (R h))
+    (P : list mobs -> Prop) (HR : forall h, R h ⊢ ⌜P h⌝)
+    (γobs : gname) (h : list mobs) :
+  ⊢ ghost_var γobs (1/2) h -∗ ▷ obs_ledger_at R γobs -∗ ◇ ⌜P h⌝.
+Proof.
+  iIntros "Hauth HP". iDestruct "HP" as (h') "[>Hfrag >HR]".
+  iDestruct (ghost_var_agree with "Hauth Hfrag") as %<-.
+  iDestruct (HR with "HR") as %HP. iModIntro. iPureIntro. exact HP.
+Qed.
+
 (* THE POWER ADEQUACY: the machine starts POWERED OFF with nothing ever
    run; if the client can boot ANY era from ANY reset state, every
    configuration reachable under any schedule of power-cycles, hart steps
@@ -1439,4 +1494,82 @@ Proof.
   iDestruct (Hph g2 κs with "Hsi Hoauth [//] HP HPt") as ">%Hphig2".
   iApply fupd_mask_intro; [set_solver|]. iIntros "_".
   iPureIntro. split; [intros e He; exact (Hns e eq_refl He) | exact Hphig2].
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* THE PACKAGED TRACE THEOREM (uart-trace.md phase 4): [riscv_power_adequacy] *)
+(* at the LEDGER.  A client brings a trace-indexed resource [R] -- timeless, *)
+(* born at the empty history, moved by its own [Hpow] at the power events   *)
+(* and by its two wands at the UART thread's arms (those sit inside [Hboot], *)
+(* through [WpUart.uart_obs_permit_ledger]) -- and its pure reading [P], and *)
+(* gets [P] OF THE RUN'S OBSERVABLE TRACE.  [phi] is folded into [P]: a      *)
+(* client wanting a state fact beside it uses [riscv_power_adequacy].       *)
+(* ---------------------------------------------------------------------- *)
+Corollary riscv_trace_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
+    (D : CPU -> gset register) (nproc ndisk : nat) (g : gstate)
+    (Pc : gname -> gname -> gname -> gname -> iProp Σ)
+    (HPc : forall γdisk γsw γreg γst : gname,
+       disk_img_bytes γdisk 0 (disk_read (v_disk (g.(gdev).(dvirtio))) 0 ndisk) ∗
+       mono_nat_auth_own γsw 1 0%nat ⊢
+         |==> Pc γdisk γsw γreg γst)
+    (Ppure : (Z -> bv 8) -> Prop)
+    (Hproj : forall (γdisk γsw γreg γst : gname)
+                    (dk : Z -> bv 8),
+       ⊢ disk_img_auth_sized γdisk ndisk dk -∗
+         ▷ Pc γdisk γsw γreg γst -∗
+         ◇ (disk_img_auth_sized γdisk ndisk dk ∗
+            ▷ Pc γdisk γsw γreg γst ∗ ⌜Ppure dk⌝))
+    (Mof : (Z -> bv 8) -> log_mirror)
+    (Rb : (Z -> bv 8) -> iProp Σ)
+    (Hswap : forall (γdisk γsw γreg γst : gname)
+                    (E : riscvEraGS)
+                    (gen : nat) (dk : Z -> bv 8),
+       ⊢ gen ↪[γreg]□ E -∗
+         mono_nat_lb_own γst (S gen) -∗
+         mono_nat_auth_own γst 1 (gen + 1)%nat -∗
+         disk_img_auth_sized γdisk ndisk dk -∗
+         ghost_var (era_mirror_name E) 1 (Mof dk) -∗
+         ▷ Pc γdisk γsw γreg γst ==∗
+           ◇ (mono_nat_auth_own γst 1 (gen + 1)%nat ∗
+              disk_img_auth_sized γdisk ndisk dk ∗
+              ▷ Pc γdisk γsw γreg γst ∗
+              ghost_var (era_mirror_name E) (1/2) (Mof dk) ∗
+              mono_nat_lb_own γsw (S gen) ∗
+              Rb dk))
+    (* THE CLIENT'S TRACE RESOURCE, its birth, its power step, and its pure
+       reading (uart-trace.md).  The UART-arm steps are the two wands of
+       [WpUart.uart_obs_permit_ledger], which the boot ([Hboot]) runs. *)
+    (R : list mobs -> iProp Σ) (HRt : forall h, Timeless (R h))
+    (HR0 : ⊢ |==> R [])
+    (Hpow : forall (h : list mobs) (on : bool) (dk : Z -> bv 8),
+       trace_shape h on ->
+       ⊢ R h ==∗ R (h ++ [if on then ObsPowerOff else ObsPowerOn])%list)
+    (P : list mobs -> Prop) (HR : forall h, R h ⊢ ⌜P h⌝)
+    (Hgen0 : g.(ggen) = 0%nat) (Hpow0 : g.(gpow) = false)
+    (Hboot : forall (F : riscvFixedGS Σ) (HE : riscvEraGS) (gen : nat)
+                    (g' : gstate),
+       boot_facts g' ->
+       Ppure (v_disk (g'.(gdev).(dvirtio))) ->
+       (exists (Hinv : invGS Σ) (γgen γstart γreg γdisk γswap γobs : gname)
+               (T : list mobs),
+          F = boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γswap
+                (Pc γdisk γswap γreg γstart) γobs T (obs_ledger_at R γobs)) ->
+       ⊢ obs_inv -∗ power_boot_res HE gen D nproc ndisk Mof Rb g' ={⊤}=∗
+          ([∗ list] c ∈ enum CPU,
+             WP (LoopE gen c : expr riscv_lang) @ ⊤) ∗
+          WP (UartLoopE gen : expr riscv_lang) @ ⊤ ∗
+          WP (DiskLoopE gen : expr riscv_lang) @ ⊤ ∗
+          WP (PlicLoopE gen : expr riscv_lang) @ ⊤) :
+  forall (n : nat) (κs : list mobs) t2 g2,
+    nsteps n ([PowerLoopE : expr riscv_lang], g) κs (t2, g2) ->
+    (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\ P κs.
+Proof.
+  apply (riscv_power_adequacy Σ D nproc ndisk g Pc HPc Ppure Hproj Mof Rb Hswap
+           (obs_ledger_at R) (fun γ => obs_ledger_at_alloc R γ HR0)
+           (obs_ledger_at_step ndisk R HRt Hpow)
+           (fun _ h => P h)
+           ltac:(intros Hinv γgen γstart γreg γdisk γswap γobs T g' h;
+                 iIntros "_ Hauth _ _ HPt";
+                 iApply (obs_ledger_at_phi R HRt P HR γobs h with "Hauth HPt"))
+           Hgen0 Hpow0 Hboot).
 Qed.

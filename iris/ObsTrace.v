@@ -382,3 +382,67 @@ Proof.
   intros Hpw Hgen Hn.
   exact (nsteps_obs_wf _ _ _ _ [] Hn (obs_wf_init _ Hpw Hgen)).
 Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 5. THE PER-CYCLE VIEW.  A trace property is stated over the WHOLE       *)
+(*    interleaved history (uart-trace.md, ruling 1); this is the derived    *)
+(*    reading a client uses when its property happens to be per power      *)
+(*    cycle: [cycles_of h] is the console I/O of every cycle so far, in     *)
+(*    order, the current (open) one last.  Kept as a fold in REVERSE (most  *)
+(*    recent cycle first, so extending the open cycle is a [cons] case) and *)
+(*    reversed for reading.                                                 *)
+(* ---------------------------------------------------------------------- *)
+
+Definition cyc_step (cs : list (list mobs)) (e : mobs) : list (list mobs) :=
+  match e with
+  | ObsPowerOn => [] :: cs
+  | ObsPowerOff => cs
+  | _ => match cs with [] => [[e]] | c :: cs' => (c ++ [e]) :: cs' end
+  end.
+
+Definition cycles_rev (h : list mobs) : list (list mobs) := foldl cyc_step [] h.
+Definition cycles_of (h : list mobs) : list (list mobs) := rev (cycles_rev h).
+
+Lemma cycles_rev_app (h κ : list mobs) :
+  cycles_rev (h ++ κ) = foldl cyc_step (cycles_rev h) κ.
+Proof. by rewrite /cycles_rev foldl_app. Qed.
+
+(* while the power is on, the most recent cycle IS the open segment *)
+Lemma trace_shape_cycles (h : list mobs) :
+  trace_shape h true -> exists cs, cycles_rev h = open_seg h :: cs.
+Proof.
+  rewrite /trace_shape /cycles_rev /open_seg.
+  induction h as [|e h IH] using rev_ind; [discriminate|].
+  rewrite !foldl_app. intros Hsh.
+  destruct (foldl obs_step (Some false) h) as [on|] eqn:Hs;
+    [|discriminate Hsh].
+  destruct on.
+  - destruct (IH eq_refl) as (cs & Hcs). rewrite Hcs.
+    destruct e; cbn in Hsh |- *; try discriminate Hsh; by eexists.
+  - destruct e; cbn in Hsh |- *; try discriminate Hsh. by eexists.
+Qed.
+
+Lemma cycles_of_on (h : list mobs) :
+  cycles_of (h ++ [ObsPowerOn]) = cycles_of h ++ [[]].
+Proof. by rewrite /cycles_of cycles_rev_app /=. Qed.
+
+Lemma cycles_of_off (h : list mobs) :
+  cycles_of (h ++ [ObsPowerOff]) = cycles_of h.
+Proof. by rewrite /cycles_of cycles_rev_app. Qed.
+
+(* a console event extends the open cycle, and only it *)
+Lemma cycles_of_io (h κ : list mobs) :
+  trace_shape h true -> Forall (fun e => is_io e = true) κ ->
+  exists cs, cycles_of h = cs ++ [open_seg h] /\
+             cycles_of (h ++ κ) = cs ++ [open_seg h ++ κ].
+Proof.
+  intros Hsh Hκ. destruct (trace_shape_cycles _ Hsh) as (cs & Hcs).
+  exists (rev cs). rewrite /cycles_of cycles_rev_app Hcs. split.
+  { done. }
+  assert (Hf : forall c κ', Forall (fun e => is_io e = true) κ' ->
+                foldl cyc_step (c :: cs) κ' = (c ++ κ') :: cs).
+  { intros c κ' Hκ'. revert c.
+    induction Hκ' as [|e κ' He _ IH]; intros c; [by rewrite app_nil_r|].
+    destruct e; try discriminate He; cbn; rewrite IH; by rewrite -app_assoc. }
+  rewrite (Hf _ _ Hκ). done.
+Qed.
