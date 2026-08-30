@@ -654,6 +654,8 @@ def disasm(dump, pc, width, t):
 # Emission.
 # ---------------------------------------------------------------------------
 
+SIGMA = '\u03a3'
+
 IMPORTS = """From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
@@ -1226,6 +1228,47 @@ def emit(dump, prog, pcs, groups, dropped, skipfuncs, skipdefault, notes, asts,
                 a('      (mword_of_int 0x%08x : mword 32).' % word)
                 a('  Qed.')
             a('')
+    # ---- §3 --------------------------------------------------------------
+    allpcs = [pc for _, gp in groups for pc in gp]
+    a('  (* =================================================================== *)')
+    a('  (* §3 The catalog as ONE resource.                                      *)')
+    a('  (* =================================================================== *)')
+    a('')
+    for l in comment_block(
+            'A program proof cannot hold [utext_all gt M pm]: [M] and [pm] are '
+            'hidden inside [UkRun.urun], existentially.  It holds THIS instead -- '
+            'the per-pc resources bundled, which name only the gname and the pc.  '
+            'It is persistent, so a function destructs it once and every branch '
+            'still has it.\n\n'
+            'Destruct with:\n'
+            '  iDestruct "Hcode" as "(%s)"'
+            % ' & '.join('C%02x' % pc for pc in allpcs)):
+        a('  ' + l if l else l)
+    a('')
+    a('  Definition %s_code (g : gname) : iProp %s :=' % (P, SIGMA))
+    for n, pc in enumerate(allpcs):
+        width, enc = dump.by_addr[pc]
+        term = rendered[(width, enc)]
+        head = '    (' if n == 0 else '     '
+        tail = ')%I.' if n == len(allpcs) - 1 else ' ∗'
+        a('%suinstr_is g (mword_of_int 0x%x) %s'
+          % (head, pc, 'true' if width == 16 else 'false'))
+        a('       (%s)%s' % (term, tail))
+    a('')
+    a('  Global Instance %s_code_persistent g : Persistent (%s_code g).' % (P, P))
+    a('  Proof. apply _. Qed.')
+    a('')
+    a('  (* ...and where it comes from: the text the process entry hands out *)')
+    a('  Lemma %s_code_of_text : utext_all gt M pm -∗ %s_code gt.' % (P, P))
+    a('  Proof.')
+    # NOT [repeat iSplit]: [uinstr_is] is ITSELF a separating conjunction,
+    # so a blind repeat descends into the first instruction's own clauses.
+    a('    iIntros "#Ht". rewrite /%s_code.' % P)
+    for pc in allpcs[:-1]:
+        a('    iSplit; [ iApply (uis_%s_%02x with "Ht") | ].' % (P, pc))
+    a('    iApply (uis_%s_%02x with "Ht").' % (P, allpcs[-1]))
+    a('  Qed.')
+    a('')
     a('End %s.' % sec)
 
     text = '\n'.join(L) + '\n'

@@ -647,4 +647,83 @@ Section UCodeSync.
     uis_rvc2 0x36e (mword_of_int 0x8082 : mword 16) udec_8082.
   Qed.
 
+  (* =================================================================== *)
+  (* §3 The catalog as ONE resource.                                      *)
+  (* =================================================================== *)
+
+  (* A program proof cannot hold [utext_all gt M pm]: [M] and [pm] are hidden
+     inside [UkRun.urun], existentially. It holds THIS instead -- the per-pc
+     resources bundled, which name only the gname and the pc. It is
+     persistent, so a function destructs it once and every branch still has
+     it.
+
+     Destruct with: iDestruct 'Hcode' as '(C00 & C02 & C04 & C06 & C08 & C0c
+     & C0e & C12 & C14 & C16 & C18 & C1a & C1e & C2c8 & C2ca & C368 & C36a &
+     C36e)' *)
+
+  Definition sync_code (g : gname) : iProp Σ :=
+    (uinstr_is g (mword_of_int 0x0) true
+       (C_ADDI (mword_of_int 48 : mword 6, Regidx (mword_of_int 2))) ∗
+     uinstr_is g (mword_of_int 0x2) true
+       (C_SDSP (mword_of_int 1 : mword 6, Regidx (mword_of_int 1))) ∗
+     uinstr_is g (mword_of_int 0x4) true
+       (C_SDSP (mword_of_int 0 : mword 6, Regidx (mword_of_int 8))) ∗
+     uinstr_is g (mword_of_int 0x6) true
+       (C_ADDI4SPN (Cregidx (mword_of_int 0), mword_of_int 4 : mword 8)) ∗
+     uinstr_is g (mword_of_int 0x8) false
+       (JAL (mword_of_int 864 : mword 21, Regidx (mword_of_int 1))) ∗
+     uinstr_is g (mword_of_int 0xc) true
+       (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 10))) ∗
+     uinstr_is g (mword_of_int 0xe) false
+       (JAL (mword_of_int 698 : mword 21, Regidx (mword_of_int 1))) ∗
+     uinstr_is g (mword_of_int 0x12) true
+       (C_ADDI (mword_of_int 48 : mword 6, Regidx (mword_of_int 2))) ∗
+     uinstr_is g (mword_of_int 0x14) true
+       (C_SDSP (mword_of_int 1 : mword 6, Regidx (mword_of_int 1))) ∗
+     uinstr_is g (mword_of_int 0x16) true
+       (C_SDSP (mword_of_int 0 : mword 6, Regidx (mword_of_int 8))) ∗
+     uinstr_is g (mword_of_int 0x18) true
+       (C_ADDI4SPN (Cregidx (mword_of_int 0), mword_of_int 4 : mword 8)) ∗
+     uinstr_is g (mword_of_int 0x1a) false
+       (JAL (mword_of_int 2097126 : mword 21, Regidx (mword_of_int 1))) ∗
+     uinstr_is g (mword_of_int 0x1e) false
+       (JAL (mword_of_int 682 : mword 21, Regidx (mword_of_int 1))) ∗
+     uinstr_is g (mword_of_int 0x2c8) true
+       (C_LI (mword_of_int 2 : mword 6, Regidx (mword_of_int 17))) ∗
+     uinstr_is g (mword_of_int 0x2ca) false
+       (ECALL tt) ∗
+     uinstr_is g (mword_of_int 0x368) true
+       (C_LI (mword_of_int 22 : mword 6, Regidx (mword_of_int 17))) ∗
+     uinstr_is g (mword_of_int 0x36a) false
+       (ECALL tt) ∗
+     uinstr_is g (mword_of_int 0x36e) true
+       (C_JR (Regidx (mword_of_int 1))))%I.
+
+  Global Instance sync_code_persistent g : Persistent (sync_code g).
+  Proof. apply _. Qed.
+
+  (* ...and where it comes from: the text the process entry hands out *)
+  Lemma sync_code_of_text : utext_all gt M pm -∗ sync_code gt.
+  Proof.
+    iIntros "#Ht". rewrite /sync_code.
+    iSplit; [ iApply (uis_sync_00 with "Ht") | ].
+    iSplit; [ iApply (uis_sync_02 with "Ht") | ].
+    iSplit; [ iApply (uis_sync_04 with "Ht") | ].
+    iSplit; [ iApply (uis_sync_06 with "Ht") | ].
+    iSplit; [ iApply (uis_sync_08 with "Ht") | ].
+    iSplit; [ iApply (uis_sync_0c with "Ht") | ].
+    iSplit; [ iApply (uis_sync_0e with "Ht") | ].
+    iSplit; [ iApply (uis_sync_12 with "Ht") | ].
+    iSplit; [ iApply (uis_sync_14 with "Ht") | ].
+    iSplit; [ iApply (uis_sync_16 with "Ht") | ].
+    iSplit; [ iApply (uis_sync_18 with "Ht") | ].
+    iSplit; [ iApply (uis_sync_1a with "Ht") | ].
+    iSplit; [ iApply (uis_sync_1e with "Ht") | ].
+    iSplit; [ iApply (uis_sync_2c8 with "Ht") | ].
+    iSplit; [ iApply (uis_sync_2ca with "Ht") | ].
+    iSplit; [ iApply (uis_sync_368 with "Ht") | ].
+    iSplit; [ iApply (uis_sync_36a with "Ht") | ].
+    iApply (uis_sync_36e with "Ht").
+  Qed.
+
 End UCodeSync.
