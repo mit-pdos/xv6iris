@@ -177,6 +177,109 @@ Proof.
   rewrite Hnp Hb. apply last_snoc.
 Qed.
 
+(* ===================================================================== *)
+(*  THE FIRE SITES' PURE SIDE CONDITIONS                                  *)
+(*                                                                        *)
+(*  Eight one-liners, hoisted rather than spelled at the four fire sites   *)
+(*  (durable-notes' rule about pure obligations inside a large proofmode   *)
+(*  goal).  Each is an [abs_of] reading of a fact the landed walk already  *)
+(*  has in hand at the retag it replaces.                                  *)
+(* ===================================================================== *)
+
+(* a non-directory target: its row is neither an [ADir] -- so [unl_pre]'s
+   dots-only clause is VACUOUS on the FILE arm -- nor counted by [unl_dec],
+   so the parent's own count does not move.  This is the whole of what
+   makes ONE fire lemma serve both W5 arms. *)
+Lemma su_au_era_not_dir (dn : dinode) (bm : blkmap)
+    (data : nat -> list (bv 8)) :
+  bv_unsigned (di_type dn) <> T_DIR_z -> fn_is_dir (era_node dn bm data) = false.
+Proof.
+  intro H. rewrite /fn_is_dir /fn_type era_node_rec.
+  by apply bool_decide_eq_false_2.
+Qed.
+
+Lemma su_au_nondir_node (n : fs_node) :
+  fn_is_dir n = false ->
+  forall es, an_node (abs_of n) = ADir es -> dots_only es.
+Proof.
+  intros Hd es Heq. exfalso. revert Heq.
+  rewrite /abs_of /abs_node /= Hd. case_decide; discriminate.
+Qed.
+
+Lemma su_au_nondir_dec (n : fs_node) :
+  fn_is_dir n = false -> unl_dec (an_node (abs_of n)) = 0%nat.
+Proof.
+  intros Hd. rewrite /abs_of /abs_node /= Hd. case_decide; reflexivity.
+Qed.
+
+Lemma su_au_dir_dec (n : fs_node) :
+  fn_is_dir n = true -> unl_dec (an_node (abs_of n)) = 1%nat.
+Proof. intros Hd. by rewrite /abs_of /abs_node /= Hd. Qed.
+
+(* the walked liveness facts, as [fn_nlink] bounds *)
+Lemma su_au_nl1 (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
+  bv_unsigned (di_nlink dn) <> 0 -> (1 <= fn_nlink (era_node dn bm data))%nat.
+Proof.
+  intro H. rewrite /fn_nlink era_node_rec.
+  pose proof (proj1 (bv_unsigned_in_range _ (di_nlink dn))). lia.
+Qed.
+
+Lemma su_au_nlink_down (dn dn' : dinode) (bm bm' : blkmap)
+    (data data' : nat -> list (bv 8)) :
+  bv_unsigned (di_nlink dn) <> 0 ->
+  bv_unsigned (di_nlink dn') = bv_unsigned (di_nlink dn) - 1 ->
+  (fn_nlink (era_node dn' bm' data')
+   = fn_nlink (era_node dn bm data) - 1)%nat.
+Proof.
+  intros Hnz Hd. rewrite /fn_nlink !era_node_rec Hd.
+  pose proof (proj1 (bv_unsigned_in_range _ (di_nlink dn))). lia.
+Qed.
+
+(* the parent's row at the zeroed record, [uf_parent_row] with the era
+   node's type reading supplied *)
+Lemma su_au_parent_row_era (dn dn' : dinode) (bm bm' : blkmap)
+    (data data' : nat -> list (bv 8)) (nm : fname) (dec : nat) :
+  bv_unsigned (di_type dn) = T_DIR_z ->
+  di_type dn' = di_type dn ->
+  (fn_nlink (era_node dn' bm' data')
+   = fn_nlink (era_node dn bm data) - dec)%nat ->
+  dir_entries (era_node dn' bm' data')
+    = delete nm (dir_entries (era_node dn bm data)) ->
+  abs_of (era_node dn' bm' data')
+  = MkAnode (ADir (delete nm (dir_entries (era_node dn bm data))))
+            (fn_nlink (era_node dn bm data) - dec)%nat.
+Proof.
+  intros Hty Hty' Hnl Hents.
+  apply (uf_parent_row _ _ nm dec); [| exact Hnl | exact Hents].
+  apply mkf_era_is_dir. by rewrite Hty'.
+Qed.
+
+(* the ret-0 arm's LOWER region bound: a live record's inum is nonzero *)
+Lemma su_au_inum_pos (data : nat -> list (bv 8)) (k : nat) :
+  dir_live data k -> 0 < bv_unsigned (dir_inum data k).
+Proof.
+  intro Hl.
+  pose proof (proj1 (bv_unsigned_in_range _ (dir_inum data k))) as Hnn.
+  destruct (decide (bv_unsigned (dir_inum data k) = 0)) as [Hz | Hnz];
+    [| lia].
+  exfalso. apply Hl. apply bv_eq. rewrite Hz. by vm_compute.
+Qed.
+
+(* the DIR arm's dots-only reading: [unl_pre]'s last conjunct at a target
+   that IS a directory, out of the isdirempty loop's harvest. *)
+Lemma su_au_dir_dots (dn : dinode) (bm : blkmap)
+    (data : nat -> list (bv 8)) :
+  blk_holes_zero bm data ->
+  bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+  bv_unsigned (di_type dn) = T_DIR_z ->
+  dir_dots_only dn data ->
+  forall es, an_node (abs_of (era_node dn bm data)) = ADir es -> dots_only es.
+Proof.
+  intros Hh Hb Hty Hdo es Heq.
+  rewrite (abs_of_dir _ (mkf_era_is_dir dn bm data Hty)) in Heq.
+  injection Heq as <-. exact (uf_dots_only dn bm data Hh Hb Hty Hdo).
+Qed.
+
 Section ProofSysUnlinkAUParts.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
 
