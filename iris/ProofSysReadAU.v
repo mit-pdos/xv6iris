@@ -35,15 +35,17 @@
       is inside fileread's lock window) and the armed post comes back on
       [rv].
 
-   4. THE POST IS THE ARMED ONE, AND THE WINDOW BECOMES A MAP.
-      [read_arms] REPLACES the landed [⌜sys_read_ret ...⌝]; each arm pins a0,
-      so the blanket is implied and no caller loses anything.  The AU frame
-      states the image existentially ([M' : gmap Z (bv 8)]) where the landed
-      contract states it as a WINDOW, so this walk instantiates [M'] with
-      fileread's own window [umem_wr (us_M U) v1 dw bsw] -- strictly more
-      information than the frame asks for, and the frame asks for less
-      because a receipt-carrying caller has no use for the destination bytes
-      ([SpecSysReadAU]'s WHAT "DELIVERED" DOES NOT MEAN).
+   4. THE POST IS THE ARMED ONE, AND THE WINDOW IS A WINDOW.
+      [read_arms] REPLACES the landed [⌜sys_read_ret ...⌝], each arm pins a0,
+      so the blanket is implied and no caller loses anything.  The image is
+      the landed contract's own WINDOW [umem_wr (us_M U) v1 dw bsw], and the
+      two pure conjuncts beside it -- the [dw <= max 0 n] bound and the
+      EXACT COUNT [rv = mword_of_int (Z.of_nat dw) \/ rv = -1] -- come off
+      fileread's post unchanged, because this shell writes no user memory of
+      its own.  The BYTES stay a bare function: a receipt-carrying caller
+      has no use for them ([SpecSysReadAU]'s WHAT "DELIVERED" DOES NOT
+      MEAN); the LENGTH it does have a use for, and joined with [read_arms]
+      it is the observed row's own count ([ard_ret_tie_exact_file]).
 
    Everything else -- the six-slot frame, the [word_pointsto_split4] carve of
    the [int n] out of the upper half of slot 4, the three callee seams,
@@ -307,20 +309,19 @@ Section ProofSysReadAU.
   (* =================================================================== *)
   Lemma wp_sys_read_au_at
       (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
-      (fn : fread_names) (pidv : mword 32) (U : ustate) (v v2 : mword 64)
+      (fn : fread_names) (pidv : mword 32) (U : ustate) (v v1 v2 : mword 64)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
       (fd : nat) (fv : mword 64) (wb : bool) (i : Z)
       (Φr : aview -> nat -> anode -> iProp Σ)
-    : wp_sys_read_au_at_body γf γs j γlp fn pidv U v v2 m av eb b lks
+    : wp_sys_read_au_at_body γf γs j γlp fn pidv U v v1 v2 m av eb b lks
         fd fv wb i Φr.
   Proof.
     cbv beta delta [wp_sys_read_au_at_body wp_sys_read_au_frame].
     intros Γfs nn pcE pj ret_tgt Hav Hj Hgs Hlens Harg0 Harg1 Harg2 Hrp Hdq
            Heb Hargfd.
-    (* the frame states argument 1 existentially (nothing above cares what it
-       is); the walk names it, because [argaddr] writes it into slot 5 and
-       fileread's window is anchored at it. *)
-    destruct Harg1 as (v1 & Harg1).
+    (* the frame NAMES argument 1 -- [argaddr] writes it into slot 5 and
+       fileread's window is anchored at it, and the contract's post is now
+       stated at that window (difference 4 below). *)
     (* every budget, or [lia] cannot see past [fileread_stack] -- it is an
        expression, not a literal, on purpose (SpecSysRead.v). *)
 
@@ -924,7 +925,7 @@ Section ProofSysReadAU.
                       Hfenv Hau").
       all: try lkbelow.
       iIntros (CID25 Hs25 mf rv P' dw bsw)
-        "%Hcsf %Hupt %Hdwle %Hrva Hcg Hcpu Hpc Href Hcore Hfout Harms".
+        "%Hcsf %Hupt %Hdwle %Hdwex %Hrva Hcg Hcpu Hpc Href Hcore Hfout Harms".
       iDestruct ("Hfback" with "Hfout") as "[Henv _]".
       (* SETTLE THE LOAN.  [pv_ofile (upd_upt V P') = pv_ofile V] by [cbn], so
          the deficit the lend opened is literally the one this closes. *)
@@ -986,10 +987,17 @@ Section ProofSysReadAU.
          on exactly as it came back, and the descriptor's fragment with it.
          The frame's existential image is instantiated at fileread's own
          window (difference 4). *)
-      iApply ("Hcont" $! mg rv P' (umem_wr (us_M U) v1 dw bsw)
-                with "[%] [%] [%] Hcg Hcpu Hpc Hpriv Hkenv Henv Hfdst Harms").
+      iApply ("Hcont" $! mg rv P' dw bsw
+                with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hkenv Henv Hfdst Harms").
       { exact Hcsg. }
       { exact Hupt. }
+      (* the window's length, and THE EXACT COUNT: both come off fileread's
+         own post unchanged -- this shell writes no user memory of its own,
+         so the count it relays is the count fileread delivered.  [n] is the
+         syscall's [sys_rw_count v2], which is exactly the [n] the callee was
+         handed (difference 4). *)
+      { exact Hdwle. }
+      { exact Hdwex. }
       { exact Hmga0. }
   Qed.
 

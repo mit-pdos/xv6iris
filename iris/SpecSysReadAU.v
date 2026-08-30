@@ -76,6 +76,26 @@
    A kernel-arm reader (kexec, dirlookup) that wants the bytes has
    readi's own contract.
 
+   ==== ...BUT THE LENGTH IS SAID, AND IT IS THE ANSWER =================
+
+   [SpecSysRead] / [SpecFileread] carry the exact-count conjunct
+
+       r = mword_of_int (Z.of_nat d)  \/  r = mword_of_int (-1)
+
+   and this frame RELAYS IT beside the window it is about.  So the caller
+   learns what "delivered" means for the DESTINATION after all, at the
+   only granularity the kernel proves: HOW MANY bytes moved, never which.
+   Joined with the arms it is [ard_ret_tie_pos] (the -1 disjunct is
+   refuted on an ok arm, so the window's length IS the answer, on every
+   row) and [ard_ret_tie_exact_file] (on a file row the length is the
+   ABSTRACT count -- the bytes the observed state had to give are exactly
+   the bytes that landed).  The -1 arm keeps only the bound [d <= max 0 n]
+   and that is the CODE's doing: readi overwrites its running [tot] with
+   -1 when a copyout faults, discarding blocks it has already delivered,
+   so a read really can return -1 with bytes in the buffer.  On that arm
+   [read_post_fail]'s right disjunct is what still reports the
+   observation.
+
    ==== THE DIRECTORY ARM (deviation from the lane W brief) =============
 
    A readable FD_INODE descriptor may name a DIRECTORY: xv6's open()
@@ -89,12 +109,18 @@
 
    - [AFile bs]  -> the exact count equation above (the whole slice
                     algebra applies);
-   - [ADir _]    -> BOUNDS ONLY ([0 <= r <= n]): readi still answers
-                    exactly [rd_clamp (dir's size)], but a directory's
-                    BYTE size (nrec * 16) is not recoverable from its
-                    [aview] reading (the first-match entry map forgets
-                    the dirent encoding, deliberately -- doc section 1),
-                    so an exact tie is unstatable at this abstraction;
+   - [ADir _]    -> BOUNDS ONLY ([0 <= r <= n]) AS AGAINST THE ABSTRACT
+                    SIZE: readi still answers exactly
+                    [rd_clamp (dir's size)], but a directory's BYTE size
+                    (nrec * 16) is not recoverable from its [aview]
+                    reading (the first-match entry map forgets the dirent
+                    encoding, deliberately -- doc section 1), so an exact
+                    tie to the STATE is unstatable at this abstraction.
+                    It is NOT bounds-only about the DELIVERY: the
+                    exact-count conjunct relayed below pins [r] to the
+                    window's length on this arm too, and
+                    [ard_ret_tie_pos] is where the bound's existential
+                    witness becomes [Z.of_nat d];
    - [ADev _ _]  -> folded into the bounds arm rather than REFUTED.  An
                     FD_INODE descriptor never names a device row, but
                     the client-visible tie "FdInode => the row reads
@@ -439,6 +465,111 @@ Proof.
     split; [reflexivity | lia].
 Qed.
 
+(* --------------------------------------------------------------------- *)
+(*  1b.  THE EXACT-COUNT JOIN: the return tie meets the window's length   *)
+(* --------------------------------------------------------------------- *)
+
+(* [SpecFilereadAU] / [SpecSysReadAUAt] relay the kernel contracts' output
+   conjunct -- a non-negative answer IS the number of bytes written,
+
+       r = mword_of_int (Z.of_nat d)  \/  r = mword_of_int (-1)
+
+   -- and THIS is where it meets [ard_ret_tie].  Every ok-arm value is a
+   non-negative count below [n < 2^31], so the -1 disjunct is REFUTED
+   ([ard_ret_tie_pos]) and the window's length is the answer on EVERY row.
+
+   WHAT THAT BUYS THE DIRECTORY ARM, and it is more than the header's
+   "BOUNDS ONLY" suggests: on a non-file row [ard_ret_tie] says only
+   [∃ rv, r = mword_of_int rv /\ 0 <= rv <= n], and [ard_ret_tie_pos]
+   supplies the witness -- [rv] IS [Z.of_nat d].  So the DELIVERY is exact
+   on a directory read too; what remains bounds-only is the relation of
+   that count to the row's abstract SIZE, and that is [aview]'s deliberate
+   forgetting of the dirent encoding (open question 1), not a weakness of
+   the count.  On a file row the two facts compose all the way to the
+   abstract state ([ard_ret_tie_exact_file]). *)
+
+Local Lemma moi64_lit_inj (x y : Z) :
+  0 <= x < 18446744073709551616 -> 0 <= y < 18446744073709551616 ->
+  (mword_of_int x : mword 64) = (mword_of_int y : mword 64) -> x = y.
+Proof.
+  intros Hx Hy Heq.
+  assert (Hx' : bv_wrap 64 x = x)
+    by (apply bvw64_small; change (2 ^ 64)%Z with 18446744073709551616%Z; lia).
+  assert (Hy' : bv_wrap 64 y = y)
+    by (apply bvw64_small; change (2 ^ 64)%Z with 18446744073709551616%Z; lia).
+  apply (f_equal bv_unsigned) in Heq.
+  rewrite !moi64_unsigned Hx' Hy' in Heq. exact Heq.
+Qed.
+
+Local Lemma moi64_lit_ne_m1 (x : Z) :
+  0 <= x < 18446744073709551615 ->
+  (mword_of_int x : mword 64) <> (mword_of_int (-1) : mword 64).
+Proof.
+  intros Hx Heq.
+  assert (Hx' : bv_wrap 64 x = x)
+    by (apply bvw64_small; change (2 ^ 64)%Z with 18446744073709551616%Z; lia).
+  assert (Hm1 : bv_wrap 64 (-1) = 18446744073709551615%Z)
+    by (vm_compute; reflexivity).
+  apply (f_equal bv_unsigned) in Heq.
+  rewrite !moi64_unsigned Hx' Hm1 in Heq. lia.
+Qed.
+
+(* the ok arm's value is never the -1 literal, so the relayed disjunction
+   collapses: THE ANSWER IS THE WINDOW'S LENGTH, on every row *)
+Lemma ard_ret_tie_pos (n : Z) (a : anode) (off d : nat) (r : mword 64) :
+  0 <= n < 2 ^ 31 ->
+  ard_ret_tie n a off r ->
+  (r = (mword_of_int (Z.of_nat d) : mword 64)
+   \/ r = (mword_of_int (-1) : mword 64)) ->
+  r = (mword_of_int (Z.of_nat d) : mword 64).
+Proof.
+  intros Hn Htie [Hd | Hm1]; [exact Hd |].
+  exfalso. change (2 ^ 31)%Z with 2147483648%Z in Hn.
+  rewrite /ard_ret_tie in Htie. revert Htie.
+  destruct (an_node a) as [bs | ents | ma mi]; intros Htie.
+  - rewrite Htie in Hm1.
+    assert (Hk : (ard_count (Z.to_nat n) off (length bs) <= Z.to_nat n)%nat)
+      by apply ard_count_le.
+    apply Nat2Z.inj_le in Hk. rewrite Z2Nat.id in Hk; [| lia].
+    assert (Hrg : 0 <= Z.of_nat (ard_count (Z.to_nat n) off (length bs))
+                  < 18446744073709551615) by lia.
+    exact (moi64_lit_ne_m1 _ Hrg Hm1).
+  - destruct Htie as (rv & Hrv & Hb). rewrite Hrv in Hm1.
+    assert (Hrg : 0 <= rv < 18446744073709551615) by lia.
+    exact (moi64_lit_ne_m1 _ Hrg Hm1).
+  - destruct Htie as (rv & Hrv & Hb). rewrite Hrv in Hm1.
+    assert (Hrg : 0 <= rv < 18446744073709551615) by lia.
+    exact (moi64_lit_ne_m1 _ Hrg Hm1).
+Qed.
+
+(* ...and on a FILE row the length is the ABSTRACT count: the bytes the
+   observed state had to give are exactly the bytes that landed *)
+Lemma ard_ret_tie_exact_file (n : Z) (bs : list (bv 8)) (a : anode)
+    (off d : nat) (r : mword 64) :
+  0 <= n < 2 ^ 31 ->
+  (Z.of_nat d <= Z.max 0 n)%Z ->
+  an_node a = AFile bs ->
+  ard_ret_tie n a off r ->
+  (r = (mword_of_int (Z.of_nat d) : mword 64)
+   \/ r = (mword_of_int (-1) : mword 64)) ->
+  d = ard_count (Z.to_nat n) off (length bs).
+Proof.
+  intros Hn Hdle Hfile Htie Hor.
+  pose proof (ard_ret_tie_pos n a off d r Hn Htie Hor) as Hpos.
+  change (2 ^ 31)%Z with 2147483648%Z in Hn.
+  rewrite Z.max_r in Hdle; [| lia].
+  rewrite /ard_ret_tie Hfile in Htie.
+  rewrite Htie in Hpos.
+  assert (Hk : (ard_count (Z.to_nat n) off (length bs) <= Z.to_nat n)%nat)
+    by apply ard_count_le.
+  apply Nat2Z.inj_le in Hk. rewrite Z2Nat.id in Hk; [| lia].
+  assert (Hrg1 : 0 <= Z.of_nat (ard_count (Z.to_nat n) off (length bs))
+                 < 18446744073709551616) by lia.
+  assert (Hrg2 : 0 <= Z.of_nat d < 18446744073709551616) by lia.
+  apply (moi64_lit_inj _ _ Hrg1 Hrg2) in Hpos.
+  lia.
+Qed.
+
 (* ===================================================================== *)
 (*  2.  THE COMMIT, THE SEEDS, AND THE ARMS                               *)
 (* ===================================================================== *)
@@ -599,7 +730,7 @@ Definition wp_sys_read_au_frame
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process    *)
     (fn : fread_names)                           (* the fs ghosts          *)
     (pidv : mword 32) (U : ustate)
-    (v v2 : mword 64)                            (* syscall args 0, 2      *)
+    (v v1 v2 : mword 64)                         (* syscall args 0, 1, 2   *)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
     (fd : nat) (fv : mword 64)                   (* the descriptor's slot  *)
     (wb : bool) (i : Z)                          (* its mode bit and inum  *)
@@ -612,7 +743,10 @@ Definition wp_sys_read_au_frame
   γs !! j = Some γlp ->
   length γs = NPROC ->
   pv_tf (us_V U) !! tf_arg_idx 0 = Some v ->
-  (exists v1 : mword 64, pv_tf (us_V U) !! tf_arg_idx 1 = Some v1) ->
+  (* ARGUMENT 1 IS NAMED, NOT EXISTENTIAL (the landed contract's own
+     spelling, restored): the destination address is what the window in the
+     post is stated at, and the window is what carries the exact count. *)
+  pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
   pv_tf (us_V U) !! tf_arg_idx 2 = Some v2 ->
   frn_rp fn = ConsoleInv.devsw_read_val ->
   frn_dqv fn = (fun _ => DfracDiscarded) ->
@@ -635,14 +769,34 @@ Definition wp_sys_read_au_frame
   (* ---- THE AU SIDE (the one addition to the landed premise list) ---- *)
   EXTRA -∗
   wp_next true pj (fun (CID : CpuId) =>
-    ∀ (mf : regfile) (r : mword 64) (P' : uptd) (M' : gmap Z (bv 8)),
+    (* THE IMAGE MOVES, AND THE MOVE IS A WINDOW AT ARGUMENT 1 -- the landed
+       contract's own post, restored.  The frame used to state the image
+       existentially ([M' : gmap Z (bv 8)]) on the grounds that a
+       receipt-carrying caller has no use for the destination BYTES.  That
+       is still true of the bytes and is why [bs] stays a bare function;
+       it is NOT true of the LENGTH, which the kernel contracts now pin to
+       the answer, so the window comes back and brings the exact count with
+       it. *)
+    ∀ (mf : regfile) (r : mword 64) (P' : uptd) (d : nat) (bs : nat -> bv 8),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
+      ⌜(Z.of_nat d <= Z.max 0 (sys_rw_count v2))%Z⌝ -∗
+      (* ...AND A NON-NEGATIVE ANSWER IS EXACTLY THE COUNT WRITTEN
+         ([SpecSysRead]'s conjunct, relayed).  Joined with [ARMS] at
+         [read_arms] this is [ard_ret_tie_pos] / [ard_ret_tie_exact_file]:
+         the window's length is the count the OBSERVED abstract row had to
+         give.  The -1 answer keeps only the bound, because readi discards
+         its running count when a copyout faults after earlier blocks
+         landed -- and on that arm [read_post_fail]'s right disjunct is
+         what still reports the observation. *)
+      ⌜r = (mword_of_int (Z.of_nat d) : mword 64)
+       \/ r = (mword_of_int (-1) : mword 64)⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
-      proc_priv γf pj pidv (upd_usM (us_upt U P') M') -∗
+      proc_priv γf pj pidv
+        (upd_usM (us_upt U P') (umem_wr (us_M U) v1 d bs)) -∗
       kalloc_env fsc_kalloc None -∗
       fileread_fs_out fn -∗
       (* the descriptor's state does not move: a read advances the
@@ -666,13 +820,13 @@ Definition wp_sys_read_au_body
     (γs : list gname) (j : nat) (γlp : gname)
     (fn : fread_names)
     (pidv : mword 32) (U : ustate)
-    (v v2 : mword 64)
+    (v v1 v2 : mword 64)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
     (fd : nat) (fv : mword 64) (wb : bool) (i : Z)
     (Φr : aview -> nat -> anode -> iProp Σ) :=
   let Γfs := fs_gamma_L fsc_fs in
   let n := sys_rw_count v2 in
-  wp_sys_read_au_frame γf γs j γlp fn pidv U v v2 m K eb b lks
+  wp_sys_read_au_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
     fd fv wb i
     (aread_commit Γfs ∅ i Φr)
     (read_arms Γfs i n Φr).
@@ -696,7 +850,7 @@ Definition wp_sys_read_au_stable_body
     (γs : list gname) (j : nat) (γlp : gname)
     (fn : fread_names)
     (pidv : mword 32) (U : ustate)
-    (v v2 : mword 64)
+    (v v1 v2 : mword 64)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
     (fd : nat) (fv : mword 64) (wb : bool) (i : Z)
     (q : Qp) (bs0 : list (bv 8)) (nl : nat)
@@ -704,7 +858,7 @@ Definition wp_sys_read_au_stable_body
   let Γfs := fs_gamma_L fsc_fs in
   let n := sys_rw_count v2 in
   0 <= sys_rw_count v2 ->
-  wp_sys_read_au_frame γf γs j γlp fn pidv U v v2 m K eb b lks
+  wp_sys_read_au_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
     fd fv wb i
     (nview Γfs q i (MkAnode (AFile bs0) nl)
      ∗ aread_commit Γfs ∅ i Φr)%I
@@ -722,11 +876,11 @@ Module Type SYSREAD_AU.
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fread_names)
       (pidv : mword 32) (U : ustate)
-      (v v2 : mword 64)
+      (v v1 v2 : mword 64)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (fd : nat) (fv : mword 64) (wb : bool) (i : Z)
       (Φr : aview -> nat -> anode -> iProp Σ),
-      wp_sys_read_au_body γf γs j γlp fn pidv U v v2 m K eb b lks
+      wp_sys_read_au_body γf γs j γlp fn pidv U v v1 v2 m K eb b lks
         fd fv wb i Φr.
 
   (* owed as a DERIVATION from [wp_sys_read_au] + the agreement seed
@@ -740,11 +894,11 @@ Module Type SYSREAD_AU.
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fread_names)
       (pidv : mword 32) (U : ustate)
-      (v v2 : mword 64)
+      (v v1 v2 : mword 64)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (fd : nat) (fv : mword 64) (wb : bool) (i : Z)
       (q : Qp) (bs0 : list (bv 8)) (nl : nat)
       (Φr : aview -> nat -> anode -> iProp Σ),
-      wp_sys_read_au_stable_body γf γs j γlp fn pidv U v v2 m K eb b
+      wp_sys_read_au_stable_body γf γs j γlp fn pidv U v v1 v2 m K eb b
         lks fd fv wb i q bs0 nl Φr.
 End SYSREAD_AU.

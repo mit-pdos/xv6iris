@@ -61,6 +61,38 @@
    DOES NOT MEAN), and the syscall shell above still needs the window to
    rebuild [proc_priv].
 
+   ==== ...AND THE WINDOW'S LENGTH IS THE ANSWER ========================
+
+   [SpecFileread]'s own post gained the exact-count conjunct
+
+       r = mword_of_int (Z.of_nat d)  \/  r = mword_of_int (-1)
+
+   and this contract RELAYS IT, in the landed spelling and the landed
+   position (immediately after the [d <= max 0 n] bound).  A non-negative
+   answer IS the number of bytes written, so a caller that also holds
+   [read_arms] learns the window's LENGTH from the abstract count and not
+   merely a bound on it: on the [AFile] row [ard_ret_tie] pins [r] to
+   [ard_count], hence [d = ard_count (Z.to_nat n) off (length bs)] --
+   "read delivered exactly the bytes the abstract state had to give".
+   [SpecSysReadAU.ard_ret_tie_pos] (the -1 disjunct is refuted on an ok
+   arm, so the window's length IS the answer -- on the DIRECTORY row too)
+   and [SpecSysReadAU.ard_ret_tie_exact_file] (the file row's composition
+   all the way to the abstract count) are that join, stated once.
+
+   THE -1 ARM CANNOT SAY MORE, AND HERE THAT IS THE CODE'S DOING, not a
+   weak spec.  readi overwrites its running [tot] with -1 when a copyout
+   faults, DISCARDING blocks it has already delivered
+
+       if (either_copyout(...) == -1) { brelse(bp); tot = -1; break; }
+
+   -- so this contract's fault arm really can return -1 with bytes in the
+   user buffer, and [d] then bounds them without counting them.  It is the
+   one arm where the AU's own receipt says MORE than the count does: the
+   observation FIRED, so [read_post_fail]'s right disjunct still reports
+   the value the transfer was serving from.  (The pipe and console -1s
+   upstream's [fileread] also carries are killed-process arms and never
+   reach user mode; they are out of this contract's domain by premise.)
+
    BINDERS: [SpecFileread]'s section list VERBATIM -- [fileG] is bound and
    [icacheG]/[icfg] resolve only through its fields. *)
 From Stdlib Require Import ZArith Lia List.
@@ -160,6 +192,14 @@ Definition wp_fileread_au_body
       (* EDIT 3: the armed post REPLACES [⌜fileread_ret n r⌝] -- each arm
          pins [r], so the landed blanket is implied. *)
       ⌜(Z.of_nat d <= Z.max 0 n)%Z⌝ -∗
+      (* ...AND A NON-NEGATIVE ANSWER IS EXACTLY THE COUNT WRITTEN.  The
+         landed conjunct, relayed in its landed spelling and position (this
+         file's "...AND THE WINDOW'S LENGTH IS THE ANSWER"): joined with
+         [read_arms] it turns the window's length into the ABSTRACT count on
+         the [AFile] row ([SpecSysReadAU.ard_ret_tie_exact]).  The -1 arm
+         keeps only the bound, and that is readi's doing, not the spec's. *)
+      ⌜r = (mword_of_int (Z.of_nat d) : mword 64)
+       \/ r = (mword_of_int (-1) : mword 64)⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0%nat eb pj b lks -∗

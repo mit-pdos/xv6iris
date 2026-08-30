@@ -23,7 +23,19 @@
    The stable corollary rides along at the same swap: its derivation
    ([FsAbsReadFire.arf_stable_of_arms]) is already proven against
    [read_stable_arms], so the sealer owes only the AU-to-stable
-   packaging the frozen file's header describes. *)
+   packaging the frozen file's header describes.
+
+   THE EXACT COUNT RIDES ALONG TOO, and it needs nothing from this file
+   but its own re-application: the conjunct
+
+       r = mword_of_int (Z.of_nat d)  \/  r = mword_of_int (-1)
+
+   lives in [wp_sys_read_au_frame], beside the window it is about
+   ([SpecSysReadAU]'s "...BUT THE LENGTH IS SAID, AND IT IS THE ANSWER"),
+   so BOTH forms below inherit it and both sealed Parameters state it.
+   The frame's argument 1 is NAMED for the same reason -- [v1] is what
+   the window is stated at -- which is why the parameter lists here carry
+   [v v1 v2] and not [v v2]. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -74,13 +86,13 @@ Definition wp_sys_read_au_at_body
     (γs : list gname) (j : nat) (γlp : gname)
     (fn : fread_names)
     (pidv : mword 32) (U : ustate)
-    (v v2 : mword 64)
+    (v v1 v2 : mword 64)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
     (fd : nat) (fv : mword 64) (wb : bool) (i : Z)
     (Φr : aview -> nat -> anode -> iProp Σ) :=
   let Γfs := fs_gamma_L fsc_fs in
   let n := sys_rw_count v2 in
-  wp_sys_read_au_frame γf γs j γlp fn pidv U v v2 m K eb b lks
+  wp_sys_read_au_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
     fd fv wb i
     (aread_commit_at Γfs ∅ i Φr)
     (read_arms Γfs i n Φr).
@@ -93,7 +105,7 @@ Definition wp_sys_read_au_at_stable_body
     (γs : list gname) (j : nat) (γlp : gname)
     (fn : fread_names)
     (pidv : mword 32) (U : ustate)
-    (v v2 : mword 64)
+    (v v1 v2 : mword 64)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
     (fd : nat) (fv : mword 64) (wb : bool) (i : Z)
     (q : Qp) (bs0 : list (bv 8)) (nl : nat)
@@ -101,7 +113,7 @@ Definition wp_sys_read_au_at_stable_body
   let Γfs := fs_gamma_L fsc_fs in
   let n := sys_rw_count v2 in
   0 <= sys_rw_count v2 ->
-  wp_sys_read_au_frame γf γs j γlp fn pidv U v v2 m K eb b lks
+  wp_sys_read_au_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
     fd fv wb i
     (nview Γfs q i (MkAnode (AFile bs0) nl)
      ∗ aread_commit_at Γfs ∅ i Φr)%I
@@ -115,11 +127,11 @@ Module Type SYSREAD_AU_AT.
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fread_names)
       (pidv : mword 32) (U : ustate)
-      (v v2 : mword 64)
+      (v v1 v2 : mword 64)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (fd : nat) (fv : mword 64) (wb : bool) (i : Z)
       (Φr : aview -> nat -> anode -> iProp Σ),
-      wp_sys_read_au_at_body γf γs j γlp fn pidv U v v2 m K eb b lks
+      wp_sys_read_au_at_body γf γs j γlp fn pidv U v v1 v2 m K eb b lks
         fd fv wb i Φr.
 
   Parameter wp_sys_read_au_at_stable :
@@ -129,11 +141,11 @@ Module Type SYSREAD_AU_AT.
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fread_names)
       (pidv : mword 32) (U : ustate)
-      (v v2 : mword 64)
+      (v v1 v2 : mword 64)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (fd : nat) (fv : mword 64) (wb : bool) (i : Z)
       (q : Qp) (bs0 : list (bv 8)) (nl : nat)
       (Φr : aview -> nat -> anode -> iProp Σ),
-      wp_sys_read_au_at_stable_body γf γs j γlp fn pidv U v v2 m K eb b
+      wp_sys_read_au_at_stable_body γf γs j γlp fn pidv U v v1 v2 m K eb b
         lks fd fv wb i q bs0 nl Φr.
 End SYSREAD_AU_AT.

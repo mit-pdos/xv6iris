@@ -773,11 +773,15 @@ Section ProofFilereadAU.
         assert (HVid : upd_usM (us_upt U (pv_upt (us_V U))) (us_M U) = U)
           by (rewrite us_upt_id; apply upd_usM_id).
         iApply ("Hcont" $! mf (mword_of_int (-1)) (pv_upt (us_V U)) 0%nat (fun _ => bv_0 8)
-                  with "[%] [%] [%] [%] Hcg Hcnt [Hpc] [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
+                  with "[%] [%] [%] [%] [%] Hcg Hcnt [Hpc] [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                         [Hpriv] [Henv] [Hau]").
         { exact Hcsf. }
         { apply uptd_ext_sz_refl. }
         { apply Z.le_max_l. }
+        (* THE EXACT COUNT, guard arm: nothing was written and the answer is
+           the literal -1, so the RIGHT disjunct holds outright.  The arm
+           that "cannot say more" says everything there is here. *)
+        { right. reflexivity. }
         { exact Hrv. }
         { iEval (rewrite /ret_tgt). iExact "Hpc". }
         { rewrite /file_ref /file_fields. iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
@@ -1700,13 +1704,22 @@ Section ProofFilereadAU.
                 iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
                 iApply ("Hcont" $! mfin (mrd !!! Regidx Ra0) P' tot
                           (rd_bytes data (Z.to_nat (bv_unsigned v)))
-                          with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
+                          with "[%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                 Hpriv
                                 [Hsb Hbslot] [HΦf]").
                 { exact Hcsf. }
                 { exact Hupt. }
                 { exact Hfrdtot. }
+                (* THE EXACT COUNT, and this exit is where the two halves of
+                   the conjunct part company: readi's own disjunction IS the
+                   conjunct.  Its fault half answers -1 having written [tot]
+                   bytes anyway (the [tot = -1] overwrite discards blocks
+                   already delivered -- the header's caveat, and the reason
+                   the -1 disjunct cannot be dropped); its zero-count half
+                   answers the count it wrote. *)
+                { destruct Hrdret as [[H1 _] | [H1 _]];
+                    [ right; exact H1 | left; exact H1 ]. }
                 { exact Hrv. }
                 { iEval (rewrite /ret_tgt). iExact "Hpc". }
                 { rewrite /file_ref /file_fields.
@@ -2013,13 +2026,17 @@ Section ProofFilereadAU.
                 iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
                 iApply ("Hcont" $! mfin (mword_of_int (Z.of_nat tot)) P' tot
                           (rd_bytes data (Z.to_nat (bv_unsigned v)))
-                          with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
+                          with "[%] [%] [%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                 Hpriv
                                 [Hsb Hbslot] [HΦf]").
                 { exact Hcsf. }
                 { exact Hupt. }
                 { exact Hfrdtot. }
+                (* THE EXACT COUNT, success arm: the value the epilogue
+                   returns IS [mword_of_int (Z.of_nat tot)] and [tot] is the
+                   window's length, so the LEFT disjunct is a reflexivity. *)
+                { left. reflexivity. }
                 { exact Hrv. }
                 { iEval (rewrite /ret_tgt). iExact "Hpc". }
                 { rewrite /file_ref /file_fields.

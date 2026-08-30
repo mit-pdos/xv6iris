@@ -40,6 +40,15 @@
       it every surviving arm carries a FIRED receipt, which is why read needs
       no escape arm where write has one.
 
+   THE MEMORY ROW IS NOT REWRITTEN BY ANY OF THE THREE.  The window, its
+   length bound and the EXACT-COUNT conjunct
+   ([SpecSysReadAU]'s "...BUT THE LENGTH IS SAID, AND IT IS THE ANSWER")
+   pass through untouched -- the corollary collapses ARMS, never memory --
+   so the stable form carries them beside the pinned receipt.  That is what
+   makes the client's reading available at all: with the row pinned to
+   [MkAnode (AFile bs0) nl], [ard_ret_tie_exact_file] turns the returned
+   count into [d = ard_count (Z.to_nat n) off (length bs0)].
+
    NOTE THE CONTRAST WITH THE WRITE LANE, because it is the whole reason this
    file is shorter than its twin: write's ok arm had to take an UN-KEYED
    escape disjunct at [off0 := 0], since chaining one chunk's offset to the
@@ -105,16 +114,16 @@ Section ProofStable.
 
   Lemma wp_sys_read_au_at_stable
       (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
-      (fn : fread_names) (pidv : mword 32) (U : ustate) (v v2 : mword 64)
+      (fn : fread_names) (pidv : mword 32) (U : ustate) (v v1 v2 : mword 64)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (fd : nat) (fv : mword 64) (wb : bool) (i : Z)
       (q : Qp) (bs0 : list (bv 8)) (nl : nat)
       (Φr : aview -> nat -> anode -> iProp Σ)
-    : wp_sys_read_au_at_stable_body γf γs j γlp fn pidv U v v2 m K eb b
+    : wp_sys_read_au_at_stable_body γf γs j γlp fn pidv U v v1 v2 m K eb b
         lks fd fv wb i q bs0 nl Φr.
   Proof.
     (* MOVE 1: the AU form at the ENRICHED receipt. *)
-    pose proof (wp_sys_read_au_at γf γs j γlp fn pidv U v v2 m K eb b lks
+    pose proof (wp_sys_read_au_at γf γs j γlp fn pidv U v v1 v2 m K eb b lks
                   fd fv wb i
                   (arf_pin_recv (fs_gamma_L fsc_fs) i q
                      (MkAnode (AFile bs0) nl) Φr)) as HW.
@@ -130,13 +139,22 @@ Section ProofStable.
     (* MOVE 2: the client's share is spent HERE, once, and rides inside every
        receipt from now on. *)
     { iApply (arf_pin_compose with "Hn Hcm"). }
-    iIntros (CID' Hchain mf r P' M')
-      "%Hcs %Hupt %Hra Hcg Hcpu Hpc Hpriv Hkenv Hout Hfdst Harms".
+    iIntros (CID' Hchain mf r P' d bs)
+      "%Hcs %Hupt %Hdle %Hdex %Hra Hcg Hcpu Hpc Hpriv Hkenv Hout Hfdst Harms".
     iSpecialize ("Hcont" $! CID' with "[%]"); [exact Hchain |].
-    iApply ("Hcont" $! mf r P' M'
-              with "[%] [%] [%] Hcg Hcpu Hpc Hpriv Hkenv Hout Hfdst [Harms]").
+    iApply ("Hcont" $! mf r P' d bs
+              with "[%] [%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hkenv Hout Hfdst
+                    [Harms]").
     { exact Hcs. }
     { exact Hupt. }
+    (* the window and THE EXACT COUNT ride through the derivation untouched:
+       the corollary rewrites only the ARMS, never the memory row.  What the
+       client gains by holding them together is the reading the stable arms
+       cannot state on their own -- [d] IS
+       [ard_count (Z.to_nat n) off (length bs0)]
+       ([SpecSysReadAU.ard_ret_tie_exact_file] at the pinned row). *)
+    { exact Hdle. }
+    { exact Hdex. }
     { exact Hra. }
     (* MOVE 3: THE COLLAPSE.  [Hnn] is what kills the guard arm's refund. *)
     iApply (arf_stable_of_arms (fs_gamma_L fsc_fs) i (sys_rw_count v2) q

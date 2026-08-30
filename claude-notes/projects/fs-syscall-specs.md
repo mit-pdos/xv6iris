@@ -793,6 +793,59 @@ things, and the answer differs:
     `SpecSysReadAU`'s owner question 2 (sharpen the wildcard to `ADir`) is
     therefore still open, still R10-clean, and now provably cheap — the
     fifth output is already in `frau_pay_carve`'s hand.
+  - **THE EXACT COUNT IS RELAYED INTO BOTH STOREYS — 2026-08-30**
+    (READ-EXACT-COUNT RELAY lane; the six read-AU files, EC2-green, audit =
+    the standing three, zero `Admitted`).  Upstream's `f9eed7297` gave
+    `SpecFileread` and `SpecSysRead` the output conjunct
+    `⌜r = mword_of_int (Z.of_nat d) \/ r = mword_of_int (-1)⌝` — a
+    non-negative answer IS the number of bytes written — and the AU layer
+    now carries it, in the landed SPELLING and the landed POSITION
+    (immediately after the `Z.of_nat d <= Z.max 0 n` bound).
+    - `SpecFilereadAU.wp_fileread_au_body`: one conjunct in EDIT 3's block.
+      **PROOF COST THREE LINES, one per exit of `ProofFilereadAU`**: the
+      sign-guard arm is `right; reflexivity`, the success arm
+      `left; reflexivity`, and the skip arm IS readi's own disjunction
+      (`destruct Hrdret`, the hypothesis the walk already carries) — its
+      fault half answers -1 having written `tot` bytes anyway.  33 s → 34 s.
+    - `SpecSysReadAU.wp_sys_read_au_frame`: **THE CONJUNCT COULD NOT BE
+      STATED UNTIL THE FRAME GOT ITS `d` BACK.**  The frame had replaced
+      the landed window by an existential image (`M' : gmap Z (bv 8)`) on
+      the grounds that a receipt-carrying caller has no use for the
+      destination BYTES — still true of the bytes, and NOT true of the
+      LENGTH once the length is the answer.  So argument 1 is a NAMED
+      parameter again (`v v1 v2`, the landed contract's own list), the post
+      binds `(d : nat) (bs : nat -> bv 8)` and returns
+      `proc_priv … (umem_wr (us_M U) v1 d bs)`, and the bound and the exact
+      count ride beside it.  `ProofSysReadAU` already held `v1`, `dw`,
+      `bsw` and the bound at its exit and was discarding them: the walk
+      lost its `destruct Harg1` and gained two `exact`s (16 s, unchanged).
+      Both `_at` bodies and both stable forms inherit the conjunct with no
+      statement of their own; `ProofSysReadAUStable` passes it through.
+    - **THE DIR ARM IS TIGHTENED — AND NOT WHERE THE HEADER SAID.**
+      `ard_ret_tie`'s wildcard stays `∃ rv, r = moi rv /\ 0 <= rv <= n` and
+      needs no edit: the new conjunct supplies its WITNESS.
+      `SpecSysReadAU.ard_ret_tie_pos` refutes the `-1` disjunct on any ok
+      arm (every tie value is a non-negative count below `n < 2^31`), so
+      `rv = Z.of_nat d` — a DIRECTORY read's delivery is exact too.  What
+      stays bounds-only is only the tie to the row's abstract SIZE, which
+      is `aview`'s deliberate forgetting of the dirent encoding (owner
+      question 1), never the count.  On a file row the two facts compose to
+      `d = ard_count (Z.to_nat n) off (length bs)`
+      (`ard_ret_tie_exact_file`).  Both lemmas are pure and additive; their
+      whole apparatus is a two-line `mword_of_int` injectivity /
+      disequality pair off `RiscvExtras`'s `moi64_unsigned` +
+      `bvw64_small`.  Owner question 2 (the `ADev` fold) is UNAFFECTED —
+      it is a custody question, not a count one.
+    - **WHAT THE CONJUNCT CANNOT REACH, and it is the code's doing.**  The
+      `-1` arm: readi overwrites its running `tot` with -1 when a copyout
+      faults, DISCARDING blocks it has already delivered, so a read really
+      can return -1 with bytes in the user buffer and `d` then bounds them
+      without counting them.  The AU layer is the one place that says more
+      about that arm than the count does — `read_post_fail`'s right
+      disjunct still carries the FIRED receipt.  Upstream's deliberately
+      deferred 57-site `SpecSyscall.sysc_mem_ok` change (the syscall memory
+      row still bounds read's `d` by the caller's count rather than by the
+      return value) is upstream's and is untouched here.
   - **`frau_pay_carve` IS `fwau_pay_carve`, COPIED.**  Both AU lanes need
     `fdstate_ok inum Cf st` as a sixth carve output for the same reason (the
     carve and `file_pay_st_ok` bind `inum` under separate existentials, so
@@ -1616,7 +1669,20 @@ things, and the answer differs:
 
 ## RULING BRIEFS (drafted 2026-08-30, coordinator; each is a yes/no)
 
-- [ ] **RULING A — the copyin content seam.**  THE GAP: `either_copyin`'s
+- [ ] **RULING A — the WRITE/copyin content seam.**  SCOPE NARROWED
+  2026-08-30: **the read direction is out of this ruling, because upstream
+  delivered its half.**  `f9eed7297` made consoleread's window predicate
+  take the return value and gave fileread and sys_read the output conjunct
+  `r = mword_of_int (Z.of_nat d) \/ r = mword_of_int (-1)` — a non-negative
+  answer IS the number of bytes written — and the read-AU family relays it
+  in both storeys (as-landed note in lane W above).  What read still does
+  not say is the destination's CONTENT, and that is not a copyin question
+  and not this ruling's: readi's user arm promises only `uptd_ext` about
+  the destination, and the AU contract inherits the silence deliberately
+  (`SpecSysReadAU`'s WHAT "DELIVERED" DOES NOT MEAN — the slice is
+  vocabulary tying the count to the OBSERVED state, not a memory
+  postcondition).  So what is left to rule is the write direction alone:
+  THE GAP: `either_copyin`'s
   success arm binds the copied bytes existentially, so write's receipts
   say "SOME bytes of the right length landed" and console-write's say
   "length and order" — never "MY bytes."  THE ASK: an output equation on
