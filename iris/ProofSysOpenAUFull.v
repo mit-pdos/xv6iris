@@ -9,8 +9,8 @@
 
    [wp_sys_open_au_plain] is NOT re-proved.  [ProofSysOpenAU]'s
    [SysOpenAUPlainProof] is a real theorem at a statement that is
-   [SpecSysOpenAU.wp_sys_open_au_plain_body] BYTE FOR BYTE (that is what
-   [SpecSysOpenAUPlain]'s header promised), so the full seal instantiates
+   [SpecSysOpenAU.wp_sys_open_au_plain_body] BYTE FOR BYTE, so the full
+   seal instantiates
    that functor at the same twelve callees and RE-EXPORTS it.  The two
    arms therefore cannot drift: there is one proof of the plain arm in the
    tree, not two.
@@ -133,7 +133,6 @@ Require Import SpecNameiTr.
 Require Import SpecNameiEra.
 Require Import SpecSysMknodAU.
 Require Import SpecSysOpenAU.
-Require Import SpecSysOpenAUPlain.
 Require Import FsAbsEra.
 Require Import FsAbsStart.
 Require Import FsAbsOpenFire.

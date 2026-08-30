@@ -1424,7 +1424,6 @@ ProofSysOpenAUStores.v
 ProofSysOpenAUAlloc.v
 ProofSysOpenAUJoin.v
 ProofSysOpenAUWalk.v
-SpecSysOpenAUPlain.v
 ProofSysOpenAU.v
 LinkSysOpenAU.v
 
@@ -1460,8 +1459,10 @@ SpecCreateAUFOpen.v
 # is the entry with the +0x36 branch mirrored, and it SEALS
 # SpecSysOpenAU.SYSOPEN_AU WHOLE -- the plain parameter is the landed
 # ProofSysOpenAU proof, re-exported through its own functor, so there is
-# one proof of that arm in the tree and not two (which is also why
-# SpecSysOpenAUPlain.v stays: retiring it would edit the landed walk).
+# one proof of that arm in the tree and not two.  That is also what
+# RETIRED SpecSysOpenAUPlain.v: with the whole contract sealed, the
+# split-off module type had no consumer, and ProofSysOpenAU's functor is
+# unascribed.
 ProofSysOpenAUCreArm.v
 ProofSysOpenAUEntryC.v
 ProofSysOpenAUFull.v

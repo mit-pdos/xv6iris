@@ -1,5 +1,8 @@
-(* ProofSysOpenAU.v -- sys_open's ATOMIC-UPDATE walk, PLAIN ARM, and the
-   seal: [SpecSysOpenAUPlain.SYSOPEN_AU_PLAIN].
+(* ProofSysOpenAU.v -- sys_open's ATOMIC-UPDATE walk, PLAIN ARM.  The
+   theorem is [wp_sys_open_au_plain], at [SpecSysOpenAU]'s own
+   [wp_sys_open_au_plain_body]; the functor carries NO signature of its
+   own since [LinkSysOpenAUFull] seals [SYSOPEN_AU] whole (see the note
+   under WHAT IS NOT HERE).
 
    Worklist: claude-notes/projects/fs-syscall-specs.md, lane W (the open AU
    prover).  A PARALLEL walk beside [ProofSysOpen] -- R10: the landed
@@ -38,9 +41,12 @@
 
    ==== WHAT IS NOT HERE ===============================================
 
-   The O_CREATE arm.  It needs a create-AU carrying [ty = T_FILE], and
-   [SpecCreateAU] is T_DEVICE-pinned by construction; see
-   [SpecSysOpenAUPlain]'s header for why the two arms seal separately. *)
+   The O_CREATE arm, which is [ProofSysOpenAUFull]'s.  That file
+   INSTANTIATES this functor for its plain parameter and seals
+   [SpecSysOpenAU.SYSOPEN_AU] whole, so there is one proof of this arm in
+   the tree and no second module type to keep in step: the split-off
+   [SYSOPEN_AU_PLAIN], which existed only while the create arm was
+   unproved, is retired and this module is unascribed. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -135,7 +141,6 @@ Require Import SpecNameiTr.
 Require Import SpecNameiEra.
 Require Import SpecSysMknodAU.
 Require Import SpecSysOpenAU.
-Require Import SpecSysOpenAUPlain.
 Require Import FsAbsEra.
 Require Import FsAbsStart.
 Require Import FsAbsOpenFire.
@@ -168,8 +173,7 @@ Module SysOpenAUPlainProof (Argint : ARGINT) (Argstr : ARGSTR)
                            (Ilock : ILOCK) (Iunlock : IUNLOCK)
                            (Iunlockput : IUNLOCKPUT) (EndOp : END_OP)
                            (Fileclose : FILECLOSE) (Itrunc : ITRUNC)
-                           (Filealloc : FILEALLOC) (Fdalloc : FDALLOC)
-  : SYSOPEN_AU_PLAIN.
+                           (Filealloc : FILEALLOC) (Fdalloc : FDALLOC).
 
 Module Walk := SysOpenAUWalk Iunlock Iunlockput EndOp Fileclose Itrunc
                              Filealloc Fdalloc NameiEra Ilock.
