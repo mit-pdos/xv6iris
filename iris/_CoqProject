@@ -1598,3 +1598,5 @@ LinkKexecPin.v
 # count-lowered bridge at both iupdates, and the isdirempty bridge in both
 # directions.  R10: SpecSysUnlinkAU and FsAbsMknodFire are untouched.
 FsAbsUnlinkFire.v
+ProofSysUnlinkAUParts.v
+ProofSysUnlinkAUW1.v
