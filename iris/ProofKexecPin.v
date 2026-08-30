@@ -1,52 +1,47 @@
-(* ProofKexec.v -- kexec() WHOLE: the four phases composed into
-   SpecKexec.wp_kexec_sconf_body, and the only place they meet.
+(* ===================================================================== *)
+(*  ProofKexecPin.v -- kexec AT A PINNED PATH, ASSEMBLED.                 *)
+(*  (fs-syscall-specs, PINNED-EXEC PROVER lane; SpecKexecPin.v sect. 8)   *)
+(* ===================================================================== *)
 
-   Every instruction of kexec is proven elsewhere; this file does the
-   plumbing and nothing else.  The chain, and where each seam is stated:
+(*  [ProofKexec.wp_kexec_sconf]'s composition run at [Q := Q_pin pb], which
+    is what sect. 8 says it is: the cone has been generic in [Q] since the
+    exit-generic sweep, so phases B / B2 / B3 / C / D and all eight [bad:]
+    tails apply UNCHANGED, and the file below is [ProofKexec.v]'s two
+    sections with four differences and no fifth:
 
-     entry            SpecKexec.wp_kexec_sconf_body      pc = kexec + 0
-       PA.kxc_phaseA                                     .. +0x090
-     +0x090           the eight-conjunct register block A publishes
-       PB.kxc_b1                                         .. +0x0cc / +0x1a2
-     +0x1a2 / +0x12c  ProofKexecSeam.kxc_at_1a2 / kxc_at_12c
-       PB3.kxc_b2z / PB3.kxc_b2                          .. +0x1ae
-     +0x1ae           ProofKexecSeam.kxc_at_1ae
-       PC.kxc_c_setup                                    .. +0x21a / +0x272
-     +0x21a           ProofKexecSeam.kxc_at_21a
-       PC.kxc_argv_loop                                  .. +0x272
-     +0x272           ProofKexecSeam.kxc_at_272
-       PC.kxc_c_close                                    .. +0x2a6
-     +0x2a6           ProofKexecSeam.kxc_at_2a6
-       PD.kxd_phaseD                                     .. ret
+      (1) THE ONE PAYING SITE.  [kxc_cd] takes [Q (kxq_entry ef)]; the
+          landed run discharges it with [I] and this one with
+          [SpecKexecPin.Q_pin_of_hdr pb ef Hhp], where [Hhp] is the header
+          claim phase A published -- [HD := Some (kxp_ef pb)],
+          [XCH := ⌜False⌝], exactly sect. 8 (1).
 
-   THE ONE THING THAT MAKES THE COMPOSITION WORK IS THAT EVERY SEAM HANDS
-   THE CALLER'S EXIT BACK.  A [wp_next] continuation is LINEAR, so a block
-   that owns a [bad:] path and also publishes a successor state would
-   consume the single exit the caller has and leave the successor with
-   none; each phase lemma therefore takes the exit once and returns it
-   inside its own output (durable-notes' "CHAINING TWO HALVES").  Reading
-   an [iApply] below: the exit travels as [Hcont] through every step and is
-   spent exactly once, by whichever block actually returns.
+      (2) PHASE A IS THE PINNED ONE ([ProofKexecPinA.kxc_phaseAp]), which
+          takes the pin where the landed block takes a header oracle, and
+          answers the oracle itself.  That is the ONLY block that is not
+          the landed one.
 
-   TWO PLUMBING FACTS ARE NOT FREE, and they are all this file has to
-   prove for itself.  (There used to be a third: the free-pool set SHRANK
-   across the phases, each block stated its exit's bitmap clause against
-   the CURRENT set, and a local [kxc_exit_weaken] transported the exit from
-   one set to the next.  With the bitmap living in the persistent
-   [BitmapInv.bitmap_inv] no contract names a set at all, so the exit is
-   the SAME proposition everywhere and the transport is gone.)
+      (3) NO [kxc_exit_qgen].  The landed contract's caller hands a
+          [kexec_ok]-shaped continuation; this contract's hands
+          [kexec_closer (Q_pin pb)], which IS the cone's own continuation
+          at that [Q] -- so the exit travels down unconverted and the
+          thirty-one relays carry it with no restatement whatever.
 
-   - THE ARGV LOOP IS ENTERED ONLY AT [c < na].  Its own measure argument
-     needs that, and the loop head cannot say it: what says it is the head's
-     [avf c <> 0] against the contract's [avf na = 0].
-   - [oldsz] AND THE 8192 BOUND COME OUT OF PHASE C'S SETUP, not out of the
-     contract, which is why [kxc_c_setup]'s output publishes both.
+      (4) THE PREMISE IS THE CHAIN PIN, not [SpecKexecPin.kxp_view_pin] --
+          see [ProofKexecPinTrace]'s header for WHY (the endpoint pin does
+          not survive a multi-hop walk, and the counterexample is written
+          out there).  [wp_kexec_pinned_run_body] below is the landed body
+          with that ONE premise replaced, and
 
-   The functor arguments are kexec's sixteen callees.  [PPT] is the
-   GENERAL [PROC_PAGETABLE_GEN], not [PROC_PAGETABLE]: kexec runs at
-   [kalloc_env ga None] and tests proc_pagetable's result against 0, so it
-   is the caller that can use the uncounted arm (projects/kexec.md, "What
-   is NOT blocked"). *)
+              [wp_kexec_pinned_1hop]
+
+          is the receipt that the LANDED body -- [SpecKexecPin]'s own,
+          quoted verbatim -- follows for every ONE-ELEMENT path, i.e. for
+          both era-0 instances ([FsInitPin.init_path = ["init"]],
+          [FsShPin.sh_path = ["sh"]]) and hence for everything /init and
+          forkret actually ask for.  [KEXEC_PIN] itself is left UNSEALED
+          on purpose: at [|kxp_path pb| >= 2] its statement is not merely
+          unproven, it is false, and repairing it is a statement-lane
+          conjunct (one line) and not a prover's licence.               *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -104,6 +99,41 @@ Require Import ProofKexecB2.
 Require Import ProofKexecB3.
 Require Import ProofKexecC.
 Require Import ProofKexecD.
+(* ---- and the names [SpecKexecPin]'s body is written in that the landed
+   assembly never had to spell (it only ever UNFOLDED its contract).
+   [SpecKexecPin]'s own order, so the fs-abs stack's shadowing rule is
+   respected; [FsAbs] itself is NOT imported -- nothing here names
+   [astate] or [aview], those live behind [kxp_run_pin]. ---- *)
+Require Import InstrBytes.     (* [pc_is]                            *)
+Require Import WpLock.
+Require Import KernelDataInv.
+Require Import SchedCtx.
+Require Import DiskInv.
+Require Import BioInv.
+Require Import FsBlocks LogInv.
+Require Import FsCrash.
+Require Import InodeRegion.
+Require Import IcacheRef.
+Require Import IcacheInv.
+Require Import IcacheEscrow.
+Require Import KvmSpec.
+Require Import SpecDirlink.
+Require Import BioDefs.
+Require Import DinodeEnc.
+Require Import InodeDefs.
+Require Import FsStateEra.
+Require Import ElfEnc.
+Require Import InodeInv.       (* [ROOTDEV], [MAXFILE]               *)
+Require Import InodeLock.
+Require Import PathElems.      (* [SLASH], [path_elems]              *)
+
+Require Import DirentEnc.      (* [bview]                            *)
+Require Import FsTree.         (* [fname]                            *)
+Require Import SpecNameiEra.   (* [NAMEI_ERA]: the functor argument  *)
+Require Import SpecKexecPin.   (* THE CONTRACT                       *)
+Require Import ProofKexecPinTrace.
+Require Import ProofKexecPinA. (* the pinned phase A                 *)
+Require FsBytesGamma.          (* [FsBytesGamma.fs_gamma_L]          *)
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -116,18 +146,126 @@ Local Open Scope Z_scope.
    durable-notes.md's rule. *)
 Set Printing Depth 40.
 
+
 Notation KX := KernelSyms.kexec (only parsing).
 
-Module KexecProof (Myproc : MYPROC) (BeginOp : BEGIN_OP) (Namei : NAMEI)
-                  (Ilock : ILOCK) (Readi : READI) (Iunlockput : IUNLOCKPUT)
-                  (EndOp : END_OP) (PPT : PROC_PAGETABLE_GEN)
-                  (PFP : PROC_FREEPAGETABLE) (Walkaddr : WALKADDR)
-                  (Flags2perm : FLAGS2PERM) (Uvmalloc : UVMALLOC)
-                  (Uvmclear : UVMCLEAR) (Strlen : STRLEN) (Copyout : COPYOUT)
-                  (SS : SAFESTRCPY) (PN : PANIC) : KEXEC.
+(* ===================================================================== *)
+(*  THE CONTRACT'S BODY AT THE HONEST PREMISE.                            *)
+(*                                                                        *)
+(*  [SpecKexecPin.wp_kexec_pinned_body] VERBATIM with its ONE resource     *)
+(*  premise replaced by the chain-carrying reader.  Stated here rather     *)
+(*  than in the statement file because R10 freezes what is landed: this    *)
+(*  is the drop-in the statement lane can lift, and until it does, the     *)
+(*  landed body follows from it on every one-element path                  *)
+(*  ([wp_kexec_pinned_1hop]).                                             *)
+(* ===================================================================== *)
+Definition wp_kexec_pinned_run_body
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+    (pb : kx_pin) (ds : list Z)
+    (gs : list gname) (jp : nat) (gl : gname)           (* the running process *)
+    (pd pav pu : mword 64)                              (* disk fabric + lock  *)
+    (gf : gname)                                        (* file table          *)
+    (plen : nat) (pfun : nat -> bv 8)                   (* the path buffer     *)
+    (na : nat) (avf : nat -> mword 64)                  (* argv[0 .. na]       *)
+    (alen : nat -> nat) (aslen : nat -> nat)            (* strlen / owned len  *)
+    (afun : nat -> nat -> bv 8)                         (* the argument bytes  *)
+    (pidv : mword 32) (U : ustate)
+    (dqb dqs dqa dqpv dqas : dfrac)
+    (m : regfile) (K : nat) (eb : bool)
+    (b : bool) (lks : gset string) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.kexec in
+  let pj := proc_addr jp in
+  let pv := m !!! Regidx (mword_of_int 10 : mword 5) in   (* a0 = path *)
+  let av := m !!! Regidx (mword_of_int 11 : mword 5) in   (* a1 = argv *)
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (K_kexec <= K)%nat ->
+  icfg_dev = ROOTDEV ->
+  (0 < icfg_nib)%nat ->
+  log_geom_ok fsc_cov fsc_logst ->
+  0 < fsc_size <= BPB ->
+  0 <= fsc_bmapstart ->
+  fsc_bmapstart ∈ fsc_cov ->
+  ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
+  0 <= icfg_ist ->
+  cov_below fsc_cov fsc_size ->
+  ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
+  (* ---- the path ---- *)
+  bb_cstr pfun plen ->
+  (Z.of_nat plen < 2 ^ 31)%Z ->
+  (* ---- AND THE PATH IS THE PINNED ONE ----
+     absolute (the pins are stated from the root; the relative twin is
+     the recorded [FsAbsStart]-shaped parallel form) and spelling exactly
+     the pinned elements.  A caller holding the .rodata literal
+     discharges both by computation, as the dead contract's callers did. *)
+  pfun 0%nat = SLASH ->
+  path_elems (bview plen pfun) = kxp_path pb ->
+  (* ---- and the pinned file has a whole ELF header: without this the
+     oracle's verdict about the first 64 bytes would be unprovable (a
+     shorter pinned file makes the header readi short -- a run the
+     machine sends to [bad:], but the verdict is produced before the
+     length test).  [pin_init_hdr_len]/[pin_sh_hdr_len] discharge it. *)
+  (64 <= length (kxp_bytes pb))%nat ->
+  (* ---- the argument vector: [na] non-null pointers then a NULL ---- *)
+  (forall i, (i < na)%nat -> avf i <> (mword_of_int 0 : mword 64)) ->
+  avf na = (mword_of_int 0 : mword 64) ->
+  (na < MAXARG)%nat ->
+  (forall i, (i < na)%nat -> (alen i < aslen i)%nat) ->
+  (forall i, (i < na)%nat -> bb_cstr (afun i) (alen i)) ->
+  (forall i, (i < na)%nat -> (Z.of_nat (alen i) < 4096)%Z) ->
+  (* ---- the running process ---- *)
+  (jp < NPROC)%nat ->
+  gs !! jp = Some gl ->
+  sie_cap_gpr KT1 m K b pj -∗
+  cpu_own 0 eb pj b lks -∗
+  trap_csrs_ext KT1 eb -∗
+  cpu_claim_ext eb pj -∗
+  kernel_text -∗ pc_is pcE -∗
+  fs_fabric gs pd pav pu -∗
+  kalloc_env fsc_kalloc None -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
+  bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
+  proc_priv gf pj pidv U -∗
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
+  ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
+  ([∗ list] i ∈ seq 0 na,
+     [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
+  bslots 3 -∗
+  iref_slots 2 -∗
+  (* ==== THE PIN: one persistent reader (section 4).  Persistent, so it
+     costs the caller nothing to duplicate into the walk. ==== *)
+  kxp_run_pin (FsBytesGamma.fs_gamma_L fsc_fs) pb ds -∗
+  (* ==== the moved image, at the PINNED relation.  [kexec_closer
+     (Q_pin pb) ...] unfolds to the landed continuation verbatim with
+     [kexec_ok_q (Q_pin pb)] in the pure slot: the [-1] arm is the landed
+     failure arm character for character, and the success arm carries
+     [entry = kxp_entry pb] in front ([kexec_ok_pin_read]). ==== *)
+  wp_next true pj (fun (CID : CpuId) =>
+    kexec_closer (kxp_entry_ok pb) gf fsc_kalloc pj pidv U m ret_tgt K b eb
+                 lks dqb dqs fsc_bmapstart na alen plen pv dqpv pfun
+                 av dqa avf aslen dqas afun) -∗
+  WP (Loop : expr riscv_lang).
 
-Module PA := ProofKexecA.KexecAProof Myproc BeginOp Namei Ilock Readi
-                                     Iunlockput EndOp.
+(* ===================================================================== *)
+(*  THE PROOF.  [ProofKexec.KexecProof]'s functor with ONE extra argument  *)
+(*  ([NAMEI_ERA], the era-traced namei the pinned walk calls) and the      *)
+(*  pinned phase A in place of the landed one; every other callee, and     *)
+(*  every other block, is the landed one at the pinned [Q].                *)
+(*                                                                        *)
+(*  NO MODULE-TYPE ASCRIPTION: see the header's (4).                       *)
+(* ===================================================================== *)
+Module KexecPinProof (Myproc : MYPROC) (BeginOp : BEGIN_OP) (Namei : NAMEI)
+                     (NE : NAMEI_ERA)
+                     (Ilock : ILOCK) (Readi : READI) (Iunlockput : IUNLOCKPUT)
+                     (EndOp : END_OP) (PPT : PROC_PAGETABLE_GEN)
+                     (PFP : PROC_FREEPAGETABLE) (Walkaddr : WALKADDR)
+                     (Flags2perm : FLAGS2PERM) (Uvmalloc : UVMALLOC)
+                     (Uvmclear : UVMCLEAR) (Strlen : STRLEN) (Copyout : COPYOUT)
+                     (SS : SAFESTRCPY) (PN : PANIC).
+
+Module PA := ProofKexecPinA.KexecPinAProof Myproc BeginOp Namei NE Ilock Readi
+                                           Iunlockput EndOp.
 Module PB := ProofKexecB.KexecBProof Myproc BeginOp Namei Ilock Readi
                                      Iunlockput EndOp PPT.
 Module PB2 := ProofKexecB2.KexecB2Proof Myproc BeginOp Namei Ilock Readi
@@ -139,17 +277,7 @@ Module PC := ProofKexecC.KexecCProof Myproc BeginOp Namei Ilock Readi
                                      Iunlockput EndOp PFP Walkaddr Flags2perm
                                      Uvmalloc Uvmclear Strlen Copyout.
 Module PD := ProofKexecD.KexecDProof PFP SS.
-
-(* ===================================================================== *)
-(*  PHASES C AND D, as one lemma over phase B's output state.             *)
-(*                                                                        *)
-(*  Its own section, and [CID0] a LEMMA binder rather than a section       *)
-(*  variable: phase B's two paths reach +0x1ae at two different harts, a   *)
-(*  dozen [wp_next]s past the entry one, and a [Local Lemma] declared      *)
-(*  under a section [Context `{CID0 : CpuId}] bakes THAT hart into its own *)
-(*  statement (projects/kexec.md's note at [kxc_c_exit_m1]).               *)
-(* ===================================================================== *)
-Section KexecTail.
+Section KexecPinTail.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
 
@@ -356,13 +484,9 @@ Section KexecTail.
                 with "Htext Hskip Hcont").
   Qed.
 
-End KexecTail.
+End KexecPinTail.
 
-
-(* ===================================================================== *)
-(*  THE CONTRACT.                                                         *)
-(* ===================================================================== *)
-Section KexecMain.
+Section KexecPinMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId} `{XI : CurCtx}.
 
@@ -382,10 +506,12 @@ Section KexecMain.
   Notation Ra0 := (mword_of_int 10 : mword 5).
   Notation Ra1 := (mword_of_int 11 : mword 5).
 
-  (* the vacuous plug: the landed contract IS the cone at this [Q]. *)
-  Notation QT := (fun _ : mword 64 => True) (only parsing).
+  (* WHERE [ProofKexec] WRITES [QT] THIS FILE WRITES [kxp_entry_ok pb], and
+     that substitution -- plus the one paying site's premise -- is the whole
+     of the difference through phases B / B2 / B3 / C / D. *)
 
-  Lemma wp_kexec_sconf
+  Lemma wp_kexec_pinned_run
+      (pb : kx_pin) (ds : list Z)
       (gs : list gname) (jp : nat) (gl : gname)
       (pd pav pu : mword 64)
  (gf : gname)
@@ -396,17 +522,17 @@ Section KexecMain.
       (dqb dqs dqa dqpv dqas : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
-    wp_kexec_sconf_body gs jp gl pd pav pu
+    wp_kexec_pinned_run_body pb ds gs jp gl pd pav pu
  gf
  plen pfun na avf alen aslen afun
                         pidv U dqb dqs dqa dqpv dqas m K eb b lks.
   Proof.
-    rewrite /wp_kexec_sconf_body.
+    rewrite /wp_kexec_pinned_run_body.
     intros HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0
-           Hcovb Hiregb Hcstr Hplen Havf_nz Havf_na Hnamax
+           Hcovb Hiregb Hcstr Hplen Hslash Hpl Hhlen Havf_nz Havf_na Hnamax
            Halen_b Halen_c Halen_4 Hjp Hgs.
     iIntros "Hcg Hcnt Hextc Hclmc #Htext Hpc #Hfab #Hka Hbm Hins Hbits Hpriv
-             Hpath Hargv Hargs Hbs Hirs Hcont".
+             Hpath Hargv Hargs Hbs Hirs #Hrp Hcont".
     (* THE INDEX IS NO LONGER PINNED BY A PREMISE.  The deleted [b = true ->]
        used to make [b] and [eb] both the literal; what is honest instead is
        that at level 0 they AGREE ([kxc_sie_b_agree]), so [b] is substituted
@@ -418,40 +544,30 @@ Section KexecMain.
     (* depth 0 pins the held-lock set empty, which is what every seam past
        phase A spells as the literal [∅]. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlk Hcnt]". subst lks.
-    (* ---- THE EXIT, MOVED TO THE GENERIC RELATION.  The cone below relays
-       [kexec_ok_q Q]; this contract's caller handed us a [kexec_ok]-shaped
-       continuation, and at [Q := QT] the two differ by a [True] that sits
-       to the LEFT of a wand.  One [iApply]. ---- *)
-    iDestruct (kxc_exit_qgen (CIDx := CID0) QT (proc_addr jp) gf
- plen pfun na avf alen aslen afun pidv U
-                 dqb dqs dqa dqpv dqas m K eb eb ∅
-                 (m !!! Regidx Rra) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
-                 with "Hcont") as "Hcont".
+    (* ---- NO [kxc_exit_qgen] HERE.  The landed contract's caller hands a
+       [kexec_ok]-shaped continuation and that step moves it to the generic
+       relation; THIS contract's caller already hands [kexec_closer
+       (Q_pin pb)] -- which IS the cone's own continuation shape at that
+       [Q] (KexecOkQ sect. 1a, transparent).  So the exit travels down
+       unconverted and the thirty-one relays carry it unrestated. ---- *)
     (* ---- PHASE A: +0x000 .. +0x090, and two of the eight [bad:] tails ---- *)
-    iApply (PA.kxc_phaseA (CID0 := CID0) QT gs jp gl pd pav pu
+    iApply (PA.kxc_phaseAp (CID0 := CID0) (kxp_entry_ok pb) pb ds
+              gs jp gl pd pav pu
  gf
               plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas
               m K eb eb ∅
               (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
               (m !!! Regidx Rs1) (m !!! Regidx Rs2)
-              (m !!! Regidx Ra0) (m !!! Regidx Ra1) None emp%I _
+              (m !!! Regidx Ra0) (m !!! Regidx Ra1) _
               HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml
-              Hins0 Hcovb Hiregb Hcstr Hplen Hjp Hgs
+              Hins0 Hcovb Hiregb Hcstr Hplen Hjp Hgs Hpl Hslash Hhlen
               eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
-              with "Hcg Hcnt Hextc Hclmc Htext Hpc Hfab [] Hka Hbm Hins Hbits Hpriv
-                    Hpath Hargv Hargs Hbs Hirs Hcont [] []").
-    (* the landed contract claims nothing about the header, so the oracle
-       gives the payload straight back ([HD := None]).  Since the
-       2026-08-29 widening the payload is the RIDE AND ITS ERA LEG (the
-       pinned lane reads the abstract row off the leg; see [kxc_a2]'s
-       row) -- one more name here and nothing else. *)
-    { iIntros (zi dn bm data) "%Hok Hpay". iModIntro.
-      iDestruct "Hpay" as "[Hride Htop]".
-      iSplitL "Hride"; [iExact "Hride" |].
-      iSplitL "Htop"; [iExact "Htop" |].
-      iModIntro. iLeft. by iPureIntro. }
-    (* ...and it wants no specialisation of the exit either: [KEX] IS the
-       landed continuation and the unfolding wand is the identity. *)
+              with "Hcg Hcnt Hextc Hclmc Htext Hpc Hfab Hrp Hka Hbm Hins Hbits Hpriv
+                    Hpath Hargv Hargs Hbs Hirs Hcont []").
+    (* NO ORACLE BRACKET: the pinned phase A owns its verdict (it takes the
+       pin where the landed block takes an oracle).  What is left is the
+       exit's unfolding wand, and it is the identity -- [KEX] IS this
+       contract's own continuation. *)
     { iModIntro. iIntros (CX) "H". iExact "H". }
     iIntros (CIDa) "%Hsa".
     iIntros (M90 kf qf sf inumf dnf bmf gilf gislf gyf n2 ef)
@@ -459,6 +575,11 @@ Section KexecMain.
              Hival Hloaded Hity Hfrz Hiref Hru Hlog Hirs Hbm Hins Hbits Hbs #Hka2
              Hpriv
              Hpath Hargv Hargs #Hhdr Hframe Hcont".
+    (* ---- THE ONE PAYING SITE'S INPUT.  Phase A published the pinned
+       header claim; [XCH] is [⌜False⌝] here, so the right disjunct is
+       refuted rather than carried, and what survives is exactly the
+       premise [Q_pin_of_hdr] wants. ---- *)
+    iDestruct "Hhdr" as "[%Hhp | %Hfalse]"; [| done].
     destruct Hregs90 as (HM90sp & HM90s0 & HM90s1 & HM90s2 & HM90s4 & Hkf &
                          Hinumf & HM90thr).
     (* the nine resources phase B threads whole and never looks inside *)
@@ -480,7 +601,7 @@ Section KexecMain.
       iSplitL "Hfrz"; [iExact "Hfrz" |].
       iSplitL "Hiref"; [iExact "Hiref" | iExact "Hru"]. }
     (* ---- PHASE B1: +0x090 .. +0x0cc, plus the +0x31c tail ---- *)
-    iApply (PB.kxc_b1 (CID0 := CIDa) QT gs jp gl pd pav pu
+    iApply (PB.kxc_b1 (CID0 := CIDa) (kxp_entry_ok pb) gs jp gl pd pav pu
  gf
               kf qf sf gyf inumf dnf bmf gilf gislf n2
               plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas
@@ -507,7 +628,7 @@ Section KexecMain.
       iIntros (CIDy) "%Hsy". iIntros (My) "Hst1ae".
       iDestruct (wp_next_retarget CIDz CIDy true (proc_addr jp) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
-      iApply (kxc_cd (CID0 := CIDy) QT jp gf
+      iApply (kxc_cd (CID0 := CIDy) (kxp_entry_ok pb) jp gf
  plen pfun na avf alen aslen afun
                 pidv U eb dqb dqs dqa dqpv dqas m My K
                 (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
@@ -517,13 +638,13 @@ Section KexecMain.
                 (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                 (m !!! Regidx Rs9) (m !!! Regidx Rs10) w13z
                 w67z ef Pz (mword_of_int 0 : mword 64)
-                I HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
+                (Q_pin_of_hdr pb ef Hhp) HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 with "Htext Hst1ae Hcont").
     - (* ---- OUTPUT 2: the phdr loop's body, entered at i = 0, sz = 0 ---- *)
       iIntros (CIDl) "%Hsl". iIntros (Ml Pl) "Hst12c Hcont".
-      iApply (PB3.kxc_b2 (CID0 := CIDl) QT gs jp gl pd pav pu
+      iApply (PB3.kxc_b2 (CID0 := CIDl) (kxp_entry_ok pb) gs jp gl pd pav pu
                 gilf gislf gf
  kf qf sf gyf inumf dnf bmf n2
                 plen pfun na avf alen aslen afun pidv U eb dqb dqs dqa dqpv dqas
@@ -536,7 +657,7 @@ Section KexecMain.
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 with "Htext Hfab Hst12c Hcont []").
       iIntros (CIDy) "%Hsy". iIntros (My Py szvy) "Hst1ae Hcont".
-      iApply (kxc_cd (CID0 := CIDy) QT jp gf
+      iApply (kxc_cd (CID0 := CIDy) (kxp_entry_ok pb) jp gf
  plen pfun na avf alen aslen afun
                 pidv U eb dqb dqs dqa dqpv dqas m My K
                 (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
@@ -546,12 +667,66 @@ Section KexecMain.
                 (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                 (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
                 (mword_of_int 4095 : mword 64) ef Py szvy
-                I HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
+                (Q_pin_of_hdr pb ef Hhp) HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 with "Htext Hst1ae Hcont").
   Qed.
+  (* =================================================================== *)
+  (*  THE RECEIPT: THE LANDED BODY, ON A ONE-ELEMENT PATH.                *)
+  (*                                                                      *)
+  (*  [SpecKexecPin.wp_kexec_pinned_body] quoted verbatim -- the Module    *)
+  (*  Type's own sentence -- under the one side condition that makes its   *)
+  (*  premise honest.  Both era-0 instances satisfy it by [reflexivity]:   *)
+  (*  [kxp_path pin_init = FsInitPin.init_path = ["init"]] and             *)
+  (*  [kxp_path (pin_sh FsShPin.sh_path i) = ["sh"]].                      *)
+  (* =================================================================== *)
+  Lemma wp_kexec_pinned_1hop
+      (pb : kx_pin) (s : fname)
+      (gs : list gname) (jp : nat) (gl : gname)
+      (pd pav pu : mword 64)
+      (gf : gname)
+      (plen : nat) (pfun : nat -> bv 8)
+      (na : nat) (avf : nat -> mword 64)
+      (alen aslen : nat -> nat) (afun : nat -> nat -> bv 8)
+      (pidv : mword 32) (U : ustate)
+      (dqb dqs dqa dqpv dqas : dfrac)
+      (m : regfile) (K : nat) (eb : bool)
+      (b : bool) (lks : gset string) :
+    kxp_path pb = [s] ->
+    wp_kexec_pinned_body pb gs jp gl pd pav pu gf plen pfun na avf alen
+                         aslen afun pidv U dqb dqs dqa dqpv dqas m K eb b lks.
+  Proof.
+    intros Hps. rewrite /wp_kexec_pinned_body.
+    intros HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hcstr
+           Hplen Hslash Hpl Hhlen Havf_nz Havf_na Hnamax Halen_b Halen_c
+           Halen_4 Hjp Hgs.
+    iIntros "Hcg Hcnt Hextc Hclmc Htext Hpc Hfab Hka Hbm Hins Hbits Hpriv
+             Hpath Hargv Hargs Hbs Hirs #Hpin Hcont".
+    (* the landed premise IS the chain premise here (one hop) *)
+    iDestruct (kxp_run_pin_of_view (FsBytesGamma.fs_gamma_L fsc_fs) pb s Hps
+                 with "Hpin") as "#Hrp".
+    iApply (wp_kexec_pinned_run pb [FsImg.ROOTINO; kxp_ino pb]
+              gs jp gl pd pav pu gf plen pfun na avf alen aslen afun pidv U
+              dqb dqs dqa dqpv dqas m K eb b lks
+              HK Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hcstr
+              Hplen Hslash Hpl Hhlen Havf_nz Havf_na Hnamax Halen_b Halen_c
+              Halen_4 Hjp Hgs
+              with "Hcg Hcnt Hextc Hclmc Htext Hpc Hfab Hka Hbm Hins Hbits
+                    Hpriv Hpath Hargv Hargs Hbs Hirs Hrp Hcont").
+  Qed.
 
-End KexecMain.
+  (* ...and the two era-0 instances of the side condition, so a consumer
+     never has to unfold the pack. *)
+  Lemma pin_init_one_hop : exists s : fname, kxp_path pin_init = [s].
+  Proof. eexists. reflexivity. Qed.
 
-End KexecProof.
+  (* sh's path is the sibling lane's parameter, so the side condition is
+     its to supply and this is the shape it takes. *)
+  Lemma pin_sh_one_hop (s : fname) (i : Z) :
+    kxp_path (pin_sh [s] i) = [s].
+  Proof. reflexivity. Qed.
+
+End KexecPinMain.
+
+End KexecPinProof.

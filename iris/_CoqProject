@@ -1519,3 +1519,17 @@ ProofFilewriteAU.v
 LinkFilewriteAU.v
 LinkSysWriteAU.v
 LinkSysWriteAUStable.v
+
+# THE PINNED-EXEC PROVER LANE (fs-syscall-specs; SpecKexecPin.v sect. 8).
+#   ProofKexecPinTrace is the walk's trace built out of the contract's pin
+# -- and the file that records WHY the pin needs its chain conjunct back
+# (its header carries the counterexample: an endpoint pin does not survive
+# a multi-hop walk).  ProofKexecPinA is ProofKexecA's two lemmas with the
+# namei call swapped for SpecNameiEra's and the header oracle ANSWERED
+# rather than relayed; ProofKexecPin is ProofKexec's own composition at
+# [Q := Q_pin pb], where the one paying site is kxc_cd's [Q (kxq_entry ef)];
+# LinkKexecPin closes the functor over LinkNameiEra beside LinkNamei.
+ProofKexecPinTrace.v
+ProofKexecPinA.v
+ProofKexecPin.v
+LinkKexecPin.v
