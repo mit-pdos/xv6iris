@@ -213,6 +213,7 @@ ConcMpQemuPass.v
 ConcSmokeQemuPass.v
 CoreCsrprobeQemuPass.v
 CoreCsrwideQemuPass.v
+CoreHartJh7110Pass.v
 CoreHartQemuPass.v
 CoreRegsFcsrQemuPass.v
 CoreRegsHpmQemuPass.v

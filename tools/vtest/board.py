@@ -509,7 +509,7 @@ class Board:
             # `set` is still its own JTAG transaction, but the Python<->gdb
             # sentinel exchange around each one is what dominated: batching
             # them took a run from ~4 s to well under one.
-            g.cmd("thread %d\n" % tm[hid] + establish_state(p).strip())
+            g.cmd("thread %d\n" % tm[hid] + establish_state(p, hid).strip())
 
         # ---- 3. go.  One breakpoint, one continue. ----
         t0 = time.time()
@@ -606,7 +606,7 @@ CLINT0          = 0x02000000
 ABI_CLINT_MTIME = 0x0200bff8
 
 
-def establish_state(p):
+def establish_state(p, hid=0):
     """The gdb commands that put ONE hart into a defined start state.
 
     WHAT THIS IS AND IS NOT.  On QEMU every run starts from a machine that
@@ -653,6 +653,22 @@ def establish_state(p):
     for r in ("ra sp gp tp t0 t1 t2 fp s1 a0 a1 a2 a3 a4 a5 a6 a7 "
               "s2 s3 s4 s5 s6 s7 s8 s9 s10 s11 t3 t4 t5 t6").split():
         cmds.append("set $%s = 0" % r)
+    # ...EXCEPT a0, WHICH THE BOOT CONTRACT DEFINES.  ColdBoot's firmware
+    # step is `a0 := mhartid, a1 := DTB`, so a0 = 0 is not "cleared", it is
+    # the WRONG cold state on any hart but 0 -- and this runner's primary is
+    # hart 2.  core_hart caught it: mhartid read 2 while a0 read 0, so the
+    # test's own `a0 == mhartid` check failed and the run was red against a
+    # model that had done nothing wrong.
+    #
+    # IT COULD ONLY EVER SHOW UP HERE.  On QEMU the capture is hart 0, where
+    # a0 and mhartid are both 0 and the check passes for free; core_hart.S
+    # says as much ("on hart 0 both are 0 and the test is nearly vacuous").
+    #
+    # a1 is deliberately NOT set: the model puts a hardcoded 0x1000 there
+    # where real firmware passes the DTB pointer, which is finding 18 -- a
+    # model defect, and replicating it in the harness would hide it.  The
+    # case projects a1 away for exactly that reason.
+    cmds.append("set $a0 = %d" % hid)
     # the CSRs a test can see and did not write itself
     cmds += [
         "set $mstatus = 0x%x" % p_["cold_mstatus"],
