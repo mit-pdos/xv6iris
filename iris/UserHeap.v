@@ -56,8 +56,9 @@ From iris.base_logic.lib Require Import ghost_map.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes RiscvPtsto.
+Require Import RiscvModelBytes RiscvPtsto RiscvExtras.
 Require Import UserPtTree.
+Require Import UmodeMem UmodeArith UmodeAbi.  (* [uva_canon] / [uint_moi] / [uva_canon_small] *)
 Require Import UserPerm.
 Require Import UexecSlot.   (* [uvis] / [uvis_M] / [uvis_perm] *)
 Local Open Scope Z_scope.
@@ -163,36 +164,58 @@ Section UserHeap.
   Definition urun (γt γd : gname) (W : uvis) : iProp Σ :=
     (∃ Mt Md : gmap Z (bv 8),
        ⌜ Mt ⊆ uvis_M W ⌝ ∗ ⌜ Md ⊆ uvis_M W ⌝ ∗ ⌜ Mt ##ₘ Md ⌝ ∗
+       (* CANONICITY, ONCE FOR THE WHOLE ADDRESS SPACE.  Every mapped user
+          address is below MAXVA, hence Sv39-canonical.  Stating it here
+          rather than per access is what stops [uinstr]'s [ui_canon] and the
+          [uva_canon] output of every data reader ([uk_rd_byte],
+          [uk_args_slot], [uk_stack_slot]) from each re-deriving it. *)
+       ⌜ forall a : Z, is_Some (uvis_M W !! a) -> 0 <= a < 2 ^ 38 ⌝ ∗
        ⌜ forall a : Z, is_Some (Mt !! a) -> ux_addr (uvis_perm W) a ⌝ ∗
        ⌜ forall a : Z, is_Some (Md !! a) -> uw_addr (uvis_perm W) a ⌝ ∗
        ghost_map_auth γt 1 Mt ∗ ghost_map_auth γd 1 Md)%I.
+
+  (* the canonicity fact in the shape an access wants: the address round-trips
+     through [mword_of_int] and the word is Sv39-canonical *)
+  Lemma ucanon_of_bound (a : Z) :
+    0 <= a < 2 ^ 38 ->
+    uint (mword_of_int a : mword 64) = a /\ uva_canon (mword_of_int a : mword 64).
+  Proof.
+    intros Hb. change (2 ^ 38) with 274877906944 in Hb.
+    assert (Hu : uint (mword_of_int a : mword 64) = a)
+      by (apply uint_moi; unfold Z64; lia).
+    split; [ exact Hu | ].
+    apply uva_canon_small. rewrite <- uint_unsigned, Hu. lia.
+  Qed.
 
   (* A TEXT byte names the byte the image holds, and its page is FETCHABLE.
      Both come straight off the text half's invariant -- no dfrac argument,
      no permission in the statement. *)
   Lemma urun_text (γt γd : gname) (W : uvis) (a : Z) (b : bv 8) :
     urun γt γd W -∗ utext γt a b -∗
-    ⌜ uvis_M W !! a = Some b /\ ux_addr (uvis_perm W) a ⌝.
+    ⌜ uvis_M W !! a = Some b /\ ux_addr (uvis_perm W) a /\ 0 <= a < 2 ^ 38 ⌝.
   Proof.
     iIntros "Hrun Hb".
-    iDestruct "Hrun" as (Mt Md) "(%Hst & %Hsd & %Hdisj & %Hx & %Hw & Ht & Hd)".
+    iDestruct "Hrun" as (Mt Md) "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hw & Ht & Hd)".
     iDestruct (ghost_map_lookup with "Ht Hb") as %HMt.
-    iPureIntro. split.
-    - exact (proj1 (map_subseteq_spec Mt (uvis_M W)) Hst a b HMt).
-    - exact (Hx a (mk_is_Some _ _ HMt)).
+    assert (HM : uvis_M W !! a = Some b)
+      by exact (proj1 (map_subseteq_spec Mt (uvis_M W)) Hst a b HMt).
+    (* NOTE: not [split_and!] -- it would split [0 <= a < 2 ^ 38] too *)
+    iPureIntro. split; [ exact HM | ].
+    split; [ exact (Hx a (mk_is_Some _ _ HMt)) | exact (Hcan a (mk_is_Some _ _ HM)) ].
   Qed.
 
   (* ...and a DATA byte names its byte and its page is WRITABLE. *)
   Lemma urun_data (γt γd : gname) (W : uvis) (a : Z) (b : bv 8) :
     urun γt γd W -∗ udata γd a b -∗
-    ⌜ uvis_M W !! a = Some b /\ uw_addr (uvis_perm W) a ⌝.
+    ⌜ uvis_M W !! a = Some b /\ uw_addr (uvis_perm W) a /\ 0 <= a < 2 ^ 38 ⌝.
   Proof.
     iIntros "Hrun Hb".
-    iDestruct "Hrun" as (Mt Md) "(%Hst & %Hsd & %Hdisj & %Hx & %Hw & Ht & Hd)".
+    iDestruct "Hrun" as (Mt Md) "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hw & Ht & Hd)".
     iDestruct (ghost_map_lookup with "Hd Hb") as %HMd.
-    iPureIntro. split.
-    - exact (proj1 (map_subseteq_spec Md (uvis_M W)) Hsd a b HMd).
-    - exact (Hw a (mk_is_Some _ _ HMd)).
+    assert (HM : uvis_M W !! a = Some b)
+      by exact (proj1 (map_subseteq_spec Md (uvis_M W)) Hsd a b HMd).
+    iPureIntro. split; [ exact HM | ].
+    split; [ exact (Hw a (mk_is_Some _ _ HMd)) | exact (Hcan a (mk_is_Some _ _ HM)) ].
   Qed.
 
   Definition uvis_wM (W : uvis) (M' : gmap Z (bv 8)) : uvis :=
@@ -207,7 +230,7 @@ Section UserHeap.
       urun γt γd (uvis_wM W (<[a := b']> (uvis_M W))) ∗ udata γd a b'.
   Proof.
     iIntros "Hrun Hb".
-    iDestruct "Hrun" as (Mt Md) "(%Hst & %Hsd & %Hdisj & %Hx & %Hw & Ht & Hd)".
+    iDestruct "Hrun" as (Mt Md) "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hw & Ht & Hd)".
     iDestruct (ghost_map_lookup with "Hd Hb") as %HMd.
     assert (Hnt : Mt !! a = None)
       by exact (map_disjoint_Some_r Mt Md a b Hdisj HMd).
@@ -218,6 +241,12 @@ Section UserHeap.
     - apply insert_subseteq_r; [ exact Hnt | exact Hst ].
     - apply insert_mono. exact Hsd.
     - apply map_disjoint_insert_r_2; [ exact Hnt | exact Hdisj ].
+    - (* a store replaces a key that is already there, so the domain -- and
+         with it the canonicity fact -- does not move *)
+      intros k Hk. apply Hcan.
+      destruct (decide (k = a)) as [-> | Hne].
+      + exact (mk_is_Some _ _ (proj1 (map_subseteq_spec Md (uvis_M W)) Hsd a b HMd)).
+      + rewrite lookup_insert_ne in Hk; [ exact Hk | exact (not_eq_sym Hne) ].
     - exact Hx.
     - intros k Hk. apply Hw.
       destruct (decide (k = a)) as [-> | Hne].
@@ -233,11 +262,18 @@ Section UserHeap.
   (* every continuation may read it without owning anything.                *)
   (* ===================================================================== *)
   Lemma urun_alloc (W : uvis) :
+    (* THE ONE PREMISE, and where it comes from: every mapped user address is
+       below MAXVA.  At the call site (the process's first WP) [uvb] carries
+       [usz_ok sz] and the lazy image over the sz-region, which is what bounds
+       the image's keys; it is taken here rather than re-derived so that this
+       file stays independent of the bundle. *)
+    (forall a : Z, is_Some (uvis_M W !! a) -> 0 <= a < 2 ^ 38) ->
     ⊢ |==> ∃ γt γd : gname,
         urun γt γd W ∗
         ([∗ map] a ↦ b ∈ utext_part W, utext γt a b) ∗
         ([∗ map] a ↦ b ∈ udata_part W, udata γd a b).
   Proof.
+    intros Hcan.
     iMod (ghost_map_alloc (utext_part W)) as (γt) "[Htauth Htfrag]".
     iMod (ghost_map_alloc (udata_part W)) as (γd) "[Hdauth Hdfrag]".
     iAssert (|==> [∗ map] a ↦ b ∈ utext_part W, utext γt a b)%I
@@ -252,8 +288,70 @@ Section UserHeap.
     - apply utext_part_sub.
     - apply udata_part_sub.
     - apply utext_udata_disjoint.
+    - exact Hcan.
     - exact (utext_part_x W).
     - exact (udata_part_w W).
   Qed.
+
+  (* ===================================================================== *)
+  (* §5 THE INSTRUCTION RESOURCE.                                          *)
+  (*                                                                       *)
+  (* WHY NOT [uinstr].  This file imports UmodeMem, so that name would     *)
+  (* SHADOW the Prop-level one, and any downstream file holding both        *)
+  (* (UkStep.v uses it heavily) would silently pick up the wrong one -- so  *)
+  (* the two have to coexist under distinct names until the re-cut is done, *)
+  (* at which point the Prop is deleted and this can take the plain name.   *)
+  (*                                                                       *)
+  (* [UmodeMem.uinstr] is a five-clause PROP about a table and an image;    *)
+  (* this is the same thing as an iProp over the text heap, and it is       *)
+  (* SHORTER, because three of those clauses were only ever making up for   *)
+  (* the absence of a per-byte permission:                                  *)
+  (*                                                                       *)
+  (*   ui_al2     kept -- the one piece of pure geometry left               *)
+  (*   ui_canon   GONE -- [urun]'s "every mapped address is below MAXVA"    *)
+  (*                covers it, and covers data addresses at the same time   *)
+  (*   ui_leaf    GONE -- [urun_text] yields [ux_addr] PER FRAGMENT, so     *)
+  (*                every byte brings its own fetchability                  *)
+  (*   ui_inpage  GONE -- with per-byte evidence a fetch window that        *)
+  (*                STRADDLES A PAGE needs nothing extra; that clause       *)
+  (*                existed only so ONE table leaf could cover four bytes   *)
+  (*   ui_code    the [uM_bytes] clauses become the fragments themselves    *)
+  (*                                                                       *)
+  (* This is the kernel's [InstrBytes.instr] shape with [utext] where it    *)
+  (* has [↦ₓ□], and for the same reason: a fetchable-byte points-to is the  *)
+  (* whole permission, one byte at a time.  Like the kernel's, it is        *)
+  (* PERSISTENT -- the same bytes are read at every step, by every          *)
+  (* continuation, forever, with nothing owned.                             *)
+  (*                                                                       *)
+  (* The RVC-at-4-ALIGNED case follows the kernel too: rather than          *)
+  (* [uinstr]'s trailing "if 4-aligned there are two more bytes"            *)
+  (* implication, the window IS a 4-byte word whose low half is the         *)
+  (* halfword -- which is exactly what UmodeFetch's surviving [urvc4_word]  *)
+  (* builds and [urvc4_low] projects.                                       *)
+  (*                                                                       *)
+  (* NOTE THE ADDRESSING: fragments are keyed at [uint pc + j] in [Z], not  *)
+  (* at [uint (add_vec_int pc j)].  That sidesteps wrap inside the          *)
+  (* definition, and it is where the page-crossing fetch gets the           *)
+  (* [uint (add_vec_int pc 2) = uint pc + 2] it needs -- [urun] bounds      *)
+  (* those addresses, so the two agree.                                     *)
+  (* ===================================================================== *)
+  Definition uinstr_is (γt : gname) (pc : mword 64) (is_rvc : bool)
+      (i : instruction) : iProp Σ :=
+    (⌜ is_aligned_vaddr (Virtaddr pc) 2 = true ⌝ ∗
+     if is_rvc
+     then ∃ h : mword 16,
+            ⌜ isRVC h = true ⌝ ∗ ⌜ udecode_rvc h i ⌝ ∗
+            if is_aligned_vaddr (Virtaddr pc) 4
+            then ∃ w : mword 32, ⌜ subrange_vec_dec w 15 0 = h ⌝ ∗
+                   [∗ list] j ∈ seq 0 4, utext γt (uint pc + Z.of_nat j) (nth_byte w j)
+            else   [∗ list] j ∈ seq 0 2, utext γt (uint pc + Z.of_nat j) (nth_byte h j)
+     else ∃ w : mword 32,
+            ⌜ isRVC (subrange_vec_dec w 15 0) = false ⌝ ∗ ⌜ udecode_base w i ⌝ ∗
+            [∗ list] j ∈ seq 0 4, utext γt (uint pc + Z.of_nat j) (nth_byte w j))%I.
+
+  Global Instance uinstr_is_persistent γt pc is_rvc i :
+    Persistent (uinstr_is γt pc is_rvc i).
+  Proof. rewrite /uinstr_is. destruct is_rvc; [ destruct (is_aligned_vaddr _ _) | ];
+           apply _. Qed.
 
 End UserHeap.
