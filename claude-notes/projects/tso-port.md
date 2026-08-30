@@ -4442,3 +4442,73 @@ roots (A6.132 §4).  NEXT, at the owner's request: an ABSTRACTION for the
 barrier-style shared variable (started, the virtio ring's device-written
 cells, …) so the pattern is proved once.
 
+### 0.46′ OWNER RULING (2026-08-30): the walker's A/D write-back is REAL
+### and is to be MODELED — the kernel is not patched, K15's refutation
+### strategy is retired
+
+THE CORRECTED FACTS FIRST (they invalidate a premise K13–K15 was built
+on).  Stock xv6 — and THIS repo's kernel, confirmed in the dumped binary
+(`kernel-rocq/KernelInstrs.v`, kvmmake at `0x800010c2`: `li a4,6` for
+R|W, `li a4,10` for R|X) — writes leaf PTEs with A = D = 0.  The Sail
+model's `update_PTE_Bits` (rv64d.v:24458) returns `Some` whenever A = 0
+on any non-prefetch access, or D = 0 on a store/AMO: the hardware walker
+REALLY writes A (and D) back into the shared kernel page table, on any
+hart, in the middle of any instruction, from the first satp install on.
+tso-kpt-lane.md:715's "A and D are preset in the two real kvmmake flag
+bytes" is FALSE — the note read the Rocq-side canonical `kperm_flags`
+(which has A|D set as the class representative) as if it were the stored
+bytes.  Consequently `kpt_ad_preset` is false of the table kvmmake
+builds, K15's preset-carrying `kpt_body` is unallocatable, and its four
+"refuted" write sites were conditionals whose producer obligation
+(ProofMain:996, red on both trees) was never discharged.
+
+THE RULING: "the only option is (b)" — model the write-backs.  "There's
+nothing broken, but we need to carefully model it."  No kernel patch
+(no presetting A|D), no model reconfiguration (no Svade faulting).
+
+CONSEQUENCES:
+- **The K15 merge is OFF** (supersedes A6.134's recommendation).  The
+  FLIPTREE's pre-K15 kpt stack — `kpt_tree_spec_gen` WITH the A/D slack,
+  `ptree_translateAddr_own` with its A/D-generic premises and its
+  full-fraction payer arm — is the right base; the slack existed
+  "precisely because write-backs used to be possible" and now they
+  simply ARE possible.
+- **The pin design is the (b) vocabulary.**  `pin_ok img log a B Sv` =
+  "every read at view ≥ B lands in Sv"; appending a message that writes
+  a family member PRESERVES it.  The walker's write-back writes
+  `pte|A` or `pte|A|D` — members of `pte_slot_set`'s A/D class, which
+  contains all four variants (`pte_set_ad_refl`).  Racing write-backs
+  from different harts (a load-walk's `pte|A` overwriting a store-walk's
+  `pte|A|D`, regressing D) stay inside the family; translation is
+  A/D-insensitive and xv6 never reads A or D, so the wobble is
+  observable by nobody.
+- **The ghost tree updates inside the slack**: `kpt_body` keeps the
+  full-fraction slots (K15d's tree drop is dead — writers need the
+  fraction); a write-back updates the slot's word to another
+  `pte_set_ad` variant and `kpt_tree_spec_gen` is preserved by
+  construction.
+
+WHAT NEEDS TO BE BUILT (the (b) work list, to be sized by measurement):
+1. TsoMemPa: `pin_ok` preservation under a family append (+ the `ts_ok`
+   frame for the pin arm at a store touching the cell — today's gates
+   likely FRAME pins as untouched-only).
+2. TsoCtx: a pin WRITE gate (`ledger_store_pin_ok`-shaped, clone of the
+   rel/wpay store gates): whole-PTE-word write of a family member,
+   element restamped, `ledger_msg_at` returned.
+3. The four walker write sites (K13's witnesses already name them):
+   discharge as PAID writes — the slot at full fraction out of
+   `kpt_inv` for the write step, back with the updated word; the
+   S-currency machinery K12 built is the intended carrier.  K14a's
+   gating of the deferred-cone sites (§0.37′) must be re-measured under
+   this ruling — the kernel-table arms may now need the plumbing that
+   was deferred.
+4. The read side is UNCHANGED for credentialed readers
+   (`ledger_read_pin_ok` at view ≥ B tolerates family writes by
+   construction).  Hart 0 (which can never buy `view_lb B` on its
+   fence-rw,w-only boot arm, A6.134) gets an AUTHOR-ARM pin read law:
+   its own latest write to each table cell is a family member and every
+   other hart's message on a pinned cell is family, so its reads land in
+   the family at any view ≥ its own — this replaces K15d as the
+   `ProofMain` unblock; the secondaries' `view_lb B` still comes off the
+   `started` barrier (A6.132).
+

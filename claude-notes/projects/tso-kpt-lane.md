@@ -1118,3 +1118,20 @@ identical hunk was applied to `/shared/xv6iris-3-kpttree/iris/SmodeCorePt.v`
 so the merge is a no-op there; the tree's own two K-series one-liners
 (`:4781`, `:4785`) are untouched.  Nothing else in this tree was opened.
 
+## CORRECTION (2026-08-30, from the lock lane, owner-confirmed): the K12e/K13 premise "A and D are preset in the two real kvmmake flag bytes" is FALSE
+
+The dumped binary's kvmmake (`KernelInstrs.v`, `0x800010c2`ff) passes
+`li a4,6` (R|W) and `li a4,10` (R|X): the stored kernel leaf PTEs have
+A = D = 0, exactly as stock xv6 writes them (`mappages`: `PA2PTE(pa) |
+perm | PTE_V`; this riscv.h does not even define PTE_A/PTE_D).  The
+claim at :715 above read the Rocq canonical `kperm_flags` (class
+representative, A|D set) as the kernel's bytes.  Therefore
+`kpt_ad_preset` is false of the real table, K15's preset-carrying
+`kpt_body` is unallocatable, and the four K15b refutations are
+conditionals with no producer (the obligation sits in ProofMain:996,
+red on both trees, which is why certification never caught it).  OWNER
+RULING §0.46′ (tso-port.md): the write-backs are REAL and are to be
+MODELED; no kernel patch; the K15 refutation strategy and the
+kpttree→fliptree K15 merge plan are retired.  The pre-K15 slack +
+payer design (K12–K14) is the base going forward.
+

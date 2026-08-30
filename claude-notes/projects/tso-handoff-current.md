@@ -23,7 +23,7 @@ measured record; `main-tso-readiness.md` is the separate main-side handoff.
    temp-index recipe; `ZZchain.sh <File>…` at the tree root rechecks files
    locally in order against pulled `.vo`).
    Build driver: `ZZbuild.sh` at the tree root (the intr lane's, log names
-   suffixed `.aux` -- see the gotcha).  **Last certified: r58 (`b0631cf48`, 2026-08-30, VM incremental round, no stale `.vo`), 1263/1303, red roots 5 (`ProofForkretPark:318`, `ProofKernelvec:1704`, `ProofMain:997`, `UptWalkPt:679`*, `UserMemPt:427`*), zero admits.  A6.133: the virtio side is DONE (§0.41′ complete — both virtio roots green); A6.132: the started barrier (§0.45′).  Builds via `run-on-gcp` ONLY (owner rule 2026-08-30).**
+   suffixed `.aux` -- see the gotcha).  **Last certified: r58 (`b0631cf48`), 1263/1303, red roots 5, zero admits.  RULING §0.46′ (2026-08-30): the walker A/D write-backs are REAL and modeled — K15/preset retired, NO kpttree merge; the fliptree pre-K15 kpt stack + the pin-family design is the base; ProofMain unblocks via the pin write gate + the author-arm read (work list in §0.46′).  Builds via `run-on-gcp` ONLY.**
 2. **KPT tree**: `/shared/xv6iris-3-kpttree` — FROZEN mid-K15d, unchanged
    this session EXCEPT one mirrored hunk: `iris/SmodeCorePt.v`'s
    `word_pointsto_wpay_mint_c` gained the trailing own-message fragment
