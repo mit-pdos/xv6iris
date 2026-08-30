@@ -1,5 +1,66 @@
 # Project: device conformance — the semantics, differentially tested against QEMU (and now against real hardware)
 
+## STATUS ADDENDUM (2026-08-30b): ONE SET OF CASES, ONE KIND OF RUN, ONE TABLE
+
+The suite had grown two of everything: a per-case `vtest-rocq/<Name>.v` that
+hand-wrote its own comparison, a separate hardware capture bolted into the
+same file, a `PASSING.txt` restating `_CoqProject`, and a `vtest_status.py`
+re-deriving from the build log what the table already read off the tree.
+That is all gone.  What replaced it:
+
+**A case declares its platforms; executing a case on a platform is a RUN.**
+`platforms=` in the `.S`'s `vtest:` directive, defaulting to both.  A case is
+marked down to one platform only when the question CANNOT BE ASKED there (the
+board has no virtio disk) -- never because it merely fails there, which is a
+finding and belongs in the table.
+
+**`VRun.TEST_RUN` is what a run is** -- case, platform, the observations the
+platform produced, and what the model did -- and `VRun.TEST_PASSES` is the
+theorem, a module type parametric in the run:
+
+    MNoStep          -> pass.  The model has NO TRANSITION, so no proof over
+                        the model can ever reach this state.  It costs reach,
+                        not soundness.  `VExecStuck.exec_r_no_step` is why
+                        this is honest rather than an interpreter's shrug.
+    MDone exhibited  -> pass iff every observed outcome is exhibited.
+    MUnknown         -> NOT a pass.  `Interface.Choose`: the relation does
+                        have transitions and `exec` merely will not pick one.
+    MBudget          -> not a pass.
+
+**`outcome` is COMPUTED, never asserted.**  That is why the builders are
+functors: a generated run module supplies the image, the regions and the
+capture, and `SingleHart` / `SchedHart` / `PicksHart` / `ConcRun` run the
+model.  A generator cannot claim a model execution the model does not have.
+Four builders because a case takes one of four shapes -- one hart; a hart
+after a schedule prefix (a serial byte ARRIVING is a schedule choice, not
+something `run_until` performs); several outcomes chosen by the DEVICE (the
+disk may answer two in-flight requests in either order); several outcomes
+chosen by an INTERLEAVING, whose schedules are hand-written per case because
+which interleaving reproduces which outcome is the thing a human works out.
+
+**There is no legacy tier.**  All 61 per-case `.v` are deleted.  The one
+thing they said that a run cannot -- the UNIVERSALLY QUANTIFIED statements
+about the model itself, which no comparison against a capture can express --
+was lifted into `vtest-rocq/VModelFacts.v` (13 lemmas).  Those are why a null
+result is ever meaningful.
+
+**`_CoqProject` IS the record.**  A run is listed exactly when its proof
+holds; `_CoqProject.all` lists everything so a red proof can still be
+ATTEMPTED (`make vtest-passes`, which rewrites the green project from the
+`.vo` the attempt produced).  The table reads `.vo`, not membership --
+membership is an assertion, and a table that read it would be reporting its
+own bookkeeping back.  CI compiles the green project and prints the same
+table; there is no second reporter to drift from it.
+
+**Where it stands: 63 cases, 65 runs, 49 passing proofs.**  The 16 red runs
+are the known divergences, and they now read as red rather than as a
+green `<>` theorem elsewhere in the file -- which is the honest shape, since
+"the model does not exhibit what the machine did" is exactly what a failing
+run means.  2 cases (`conc_mp`, `conc_sbx`) have no builder yet: their
+interleavings are unwritten.  30 board runs are uncaptured; 27 cases exclude
+the board (no disk).
+
+
 ## STATUS ADDENDUM (2026-08-29): A SECOND MACHINE
 
 The suite now runs on a **StarFive VisionFive 2** (JH7110) over JTAG, beside

@@ -80,13 +80,20 @@ End CoreSmokeQemuPass.
 ### The table
 
     make vtest-table     print it
-    make vtest-passes    build every run's proof, rewrite PASSING.txt, print it
+    make vtest-passes    ATTEMPT every run's proof (against `_CoqProject.all`,
+                         so a red one can still be tried), then rewrite the
+                         green `_CoqProject` from what produced a `.vo`
     make vtest-runs      rebuild the run modules from the checked-in captures
 
 Everything in it is read off the tree -- the case's directive, whether a run
 module exists, whether a `TEST_PASSES` instantiation compiles -- so it cannot
-drift.  **A run with no passing proof is a FINDING, not a broken build**, and
-all fifteen of them today are recorded rows in the findings table below.
+drift: the table reads the `.vo`, never `_CoqProject` membership -- membership
+is only an ASSERTION that a proof holds, and a table that read it would be
+reporting its own bookkeeping back.
+
+**A run with no passing proof is a FINDING, not a broken build.**  It is
+absent from `_CoqProject`, so CI stays green while the table's row for it says
+`no proof`; the findings table below says what the divergence is.
 
 ## Layout
 
@@ -94,9 +101,13 @@ all fifteen of them today are recorded rows in the findings table below.
     vtest.S            prologue/epilogue every test image uses
     tests/<area>_<name>.S   one test program (a `vtest:` directive in it
                             carries the repeat count and backend configs)
-    vtest.py           builds the image, runs QEMU, captures, generates Rocq
-    vtest_status.py    which tests passed, per area (CI's reporter)
-    ../../vtest-rocq/  the model side: harness + one .v per test
+    vtest.py           builds the image, runs QEMU, captures, generates Rocq,
+                       and prints THE RUN TABLE (`--check` is CI's verdict)
+    board.py           the same, against a real board over JTAG
+
+    ../../vtest-rocq/  the model side: harness, then per (case, platform)
+                       <Case><Platform>Run.v   what was run, what came back
+                       <Case><Platform>Pass.v  its VRun.TEST_PASSES instance
 
 ## Naming
 
@@ -143,15 +154,18 @@ from real hardware are still executions the model ADMITS.
 **Every test must pass, and a red one fails the job.**  There is no list of
 expected reds and no need for one: a known divergence is pinned on BOTH sides
 and proved unequal (see [Recording a divergence](#recording-a-divergence)), so
-it is green today and goes red exactly when the model moves.  All 56 pass, the
-eleven open findings included -- the findings are theorems about the
-disagreement, not failures.
+it is green today and goes red exactly when the model moves -- the findings are
+theorems about the disagreement, not failures.
 
-What the step adds over a plain `vtest-check` is the REPORT: all 56 are
-compiled (`-k`) before the verdict, so one red test does not hide the rest, and
-`tools/vtest/vtest_status.py` writes the per-area table with each failure's
-Rocq error into the run's step summary.  Its header has the rest, including why
-a passing test is judged by its `.vo` and why the target deletes them first.
+What the step adds over a plain `vtest-check` is the REPORT: everything is
+compiled (`-k`) before the verdict, so one red run does not hide the rest, and
+`vtest.py table --format md` puts THE RUN TABLE in the run's step summary.
+There is no second reporter: a run is listed in `_CoqProject` exactly when its
+proof holds, so the green set and the table's "pass" column are the same fact,
+read from the same `.vo`.  `--check` fails the step when a listed file has
+none.  `vtest-check-ci` deletes the `.vo` first, because a failed recompile
+leaves the previous one in place and a red run would otherwise be reported
+green off the last build.
 
 ## Running a test on a hart that is not 0
 

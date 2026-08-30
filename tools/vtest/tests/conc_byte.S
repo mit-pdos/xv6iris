@@ -24,7 +24,7 @@
  *                         +0x114  PRIV0  +0x115  PRIV1   warm-up bytes
  *                         +0x118  DONE1  -- hart 1's loop is over
  */
-/* vtest: smp=2 repeat=100 builder=multi */
+/* vtest: smp=2 repeat=100 builder=multi budget=20000 */
 #include "abi.h"
 
 #define R_WORD    8

@@ -76,9 +76,15 @@ def config(name):
            #               raw mtime, an image-dependent mtvec, the hart id)
            #   builder=single   the model side is one hart from [start_hart]
            #                    (the default, and most cases)
-           #   builder=sched    the case needs an explicit VSched item list
-           #                    -- a serial byte ARRIVING is a schedule
+           #   builder=sched    the case needs a SCHEDULE PREFIX before it
+           #                    runs -- a serial byte ARRIVING is a schedule
            #                    choice, not something run_until performs.
+           #                    The `serial_in=` bytes are the prefix.
+           #   builder=picks    the case's several outcomes come from the
+           #                    DEVICE rather than from two harts: the disk
+           #                    may answer two in-flight requests in either
+           #                    order.  `picks=lowest_head,highest_head`
+           #                    names one run per order.
            #   builder=multi    the case races two harts, so its model side
            #                    needs a VConc SCHEDULE.  VRun has no builder
            #                    for that yet, so no run module is emitted and
@@ -307,8 +313,12 @@ End {m}Pass.
     return made
 
 
-HARNESS = ["VSched.v", "VExecStuck.v", "VTest.v", "VRun.v",
-           "VBoot.v", "VConc.v", "VNode.v"]
+# The model side that is not per-case: the harness, the run framework, and
+# VModelFacts -- the universally quantified statements about the model that
+# no capture comparison can express, which is why they outlived the per-case
+# files they came from.
+HARNESS = ["VSched.v", "VExecStuck.v", "VTest.v", "VBoot.v", "VConc.v",
+           "VNode.v", "VRun.v", "VRunConc.v", "VModelFacts.v"]
 
 PROJECT_HEAD = """-R . VTest
 -R ../iris xv6iris
@@ -318,15 +328,6 @@ PROJECT_HEAD = """-R . VTest
 -arg -notation-overridden
 """
 
-
-def superseded(n):
-    """True when the uniform framework fully covers this case: it produces at
-    least one run and every run it produces PASSES.  Such a case's legacy
-    <Name>.v is duplicated work -- the same program vm_computed twice -- and
-    is dropped."""
-    runs = [_run_state(n, pl) for pl in PLATFORMS]
-    got = [r for r in runs if r in ("pass", "no-proof")]
-    return bool(got) and all(r == "pass" for r in got)
 
 
 def write_project(from_build=False):
@@ -346,19 +347,27 @@ def write_project(from_build=False):
         `make vtest-try` leaves behind.  That is how a newly-passing run
         gets ADDED, and how one that stopped passing gets removed.
 
-    Everything else -- which runs exist at all, and which legacy tests are
-    still needed -- is read off the case directives and the tree."""
-    keep_legacy, gens = [], []
+    Everything else -- which runs exist at all -- is read off the tree.
+
+    THERE IS NO LEGACY TIER.  Every case is expressed as a run through a
+    VRun builder; what a per-case <Name>.v used to say about a capture, its
+    Run and Pass modules now say uniformly, and what it said about the MODEL
+    ITSELF (the universally quantified lemmas, the ones a capture
+    comparison cannot express) lives in VModelFacts.v."""
+    gens = []
     for n in all_tests():
         mod = modname(n)
-        if superseded(n):
-            continue
-        for suffix in (".v", "Gen.v", "HwGen.v", "Hart1Gen.v"):
+        for suffix in ("Gen.v", "HwGen.v", "Hart1Gen.v"):
             f = mod + suffix
             if os.path.exists(os.path.join(ROCQDIR, f)):
-                (keep_legacy if suffix == ".v" else gens).append(f)
+                gens.append(f)
+    # the hand-written interleavings are always needed: a multi-hart run
+    # module Requires its <Case>Sched.v
+    scheds = sorted(f for f in os.listdir(ROCQDIR)
+                    if f.endswith("Sched.v") and f != "VSched.v")
     runs = sorted(f for f in os.listdir(ROCQDIR)
                   if f.endswith("Run.v") and not f.startswith("V"))
+    runs = scheds + runs
     if from_build:
         ok = {f[:-len("Pass.vo")] for f in os.listdir(ROCQDIR)
               if f.endswith("Pass.vo")}
@@ -367,7 +376,7 @@ def write_project(from_build=False):
     passes = sorted(f for f in os.listdir(ROCQDIR)
                     if f.endswith("Pass.v") and f[:-len("Pass.v")] in ok)
     files = ([h for h in HARNESS if os.path.exists(os.path.join(ROCQDIR, h))]
-             + sorted(set(gens)) + runs + passes + sorted(set(keep_legacy)))
+             + sorted(set(gens)) + runs + passes)
     open(os.path.join(ROCQDIR, "_CoqProject"), "w").write(
         PROJECT_HEAD + "\n".join(files) + "\n")
     # ...and the ATTEMPT project: everything, including the Pass modules the
@@ -379,7 +388,7 @@ def write_project(from_build=False):
                       if f.endswith(".v") and f not in HARNESS))
     open(os.path.join(ROCQDIR, "_CoqProject.all"), "w").write(
         PROJECT_HEAD + "\n".join(every) + "\n")
-    return files, keep_legacy, passes
+    return files, [], passes
 
 
 def _built_at_all():
@@ -411,7 +420,9 @@ def _run_state(n, pl):
     and its proof does or does not compile."""
     if pl not in platforms_of(n):
         return "excluded"
-    if config(n).get("builder", "single") != "single":
+    b = config(n).get("builder", "single")
+    if (b == "multi" and not os.path.exists(
+            os.path.join(ROCQDIR, modname(n) + "Sched.v"))):
         return "no-builder"
     mod = modname(n) + pl.capitalize()
     if not os.path.exists(os.path.join(ROCQDIR, mod + "Run.v")):
@@ -450,6 +461,7 @@ def print_table(fmt="text"):
     rows = [(n, _run_state(n, "qemu"), _run_state(n, "jh7110"))
             for n in all_tests()]
     if fmt == "md":
+        print("## Device conformance: every case, every run\n")
         print("| case | QEMU | JH7110 |")
         print("|---|---|---|")
         for n, q, b in rows:
@@ -476,7 +488,18 @@ def print_table(fmt="text"):
                c(1, "no-builder"), c(1, "excluded"),
                c(2, "pass"), c(2, "no-proof"), c(2, "uncaptured"),
                c(2, "no-builder"), c(2, "excluded")))
-    print(("\n" + line) if fmt == "md" else line)
+    if fmt == "md":
+        print("\n" + line)
+        print("""
+| state | meaning |
+|---|---|
+| **pass** | the run exists and its `VRun.TEST_PASSES` instantiation compiles: the model exhibits every outcome this platform observed, or has no transition at all (also a pass — a state the model cannot leave is one no proof can reach) |
+| no proof | the run exists, but its `TEST_PASSES` instantiation does not compile: the model does not exhibit what the platform observed |
+| *not captured* | the case declares this platform, but nothing has been run there yet, so there is no run to judge |
+| *no builder* | the case is captured, but its model side needs something `VRun` cannot yet compute — a race whose interleavings are not written |
+| — | the case excludes this platform: the question cannot be asked there (no disk on the board, a QEMU-only device) |""")
+    else:
+        print(line)
 
 
 def runs_from_captures():
@@ -494,7 +517,9 @@ def runs_from_captures():
     # asserting an outcome nobody meant.
     wanted = set()
     for n in all_tests():
-        if config(n).get("builder", "single") != "single":
+        b = config(n).get("builder", "single")
+        if b == "multi" and not os.path.exists(
+                os.path.join(ROCQDIR, modname(n) + "Sched.v")):
             continue
         for pl in platforms_of(n):
             wanted.add(modname(n) + pl.capitalize())
@@ -526,8 +551,10 @@ def runs_from_captures():
                 ("jh7110", "HwGen.v", n + "_hw",    n + "_hw_primary_hart")]:
             if platform not in platforms_of(n):
                 continue
-            if config(n).get("builder", "single") != "single":
-                continue
+            builder = config(n).get("builder", "single")
+            if builder == "multi" and not os.path.exists(
+                    os.path.join(ROCQDIR, mod + "Sched.v")):
+                continue                       # no interleavings written yet
             src = os.path.join(ROCQDIR, mod + gen_suffix)
             if not os.path.exists(src):
                 missing.append((n, platform)); continue
@@ -553,9 +580,134 @@ def runs_from_captures():
                 hm = _re.search(r"Definition %s : Z := (\d+)" % hart_def, txt)
                 hart = int(hm.group(1)) if hm else 0
             out = os.path.join(ROCQDIR, mod + platform.capitalize() + "Run.v")
-            emit_run(n, platform, text, observed, hart, out)
+            if builder == "multi":
+                emit_run_conc(n, platform, text, observed, out)
+            elif builder == "sched":
+                emit_run_sched(n, platform, text, observed, hart, out)
+            elif builder == "picks":
+                emit_run_picks(n, platform, text, observed, hart, out)
+            else:
+                emit_run(n, platform, text, observed, hart, out)
             made.append((n, platform))
     return made, missing
+
+
+def emit_run_sched(name, platform, text, observed, hart, path):
+    """The RUN MODULE for a case that needs a schedule PREFIX.  Same
+    [TEST_RUN]; [VRun.SchedHart] runs [srun] first and steps from there."""
+    cfg = config(name)
+    mod = modname(name) + platform.capitalize()
+    rx = [b for b in cfg.get("serial_in", "").split(",") if b]
+    prefix = "; ".join("SUartRx %s" % b for b in rx)
+    results = ";\n     ".join("[%s]" % lit(o) for o in observed)
+    open(path, "w").write(f"""(* {os.path.basename(path)} -- GENERATED by tools/vtest.  Do not edit.
+
+   The test RUN produced by executing case [{name}] on platform
+   [{platform}].  The bytes the serial line DELIVERS are a schedule, not
+   something the program performs, so this run's model side is
+   [VRun.SchedHart]: deliver [prefix], then step. *)
+From Stdlib Require Import List ZArith String.
+Import ListNotations.
+Require Import VTest VRun.
+Local Open Scope Z_scope.
+
+Module {mod}Case <: SCHED_CASE.
+  Definition case     := "{name}"%string.
+  Definition platform := "{platform}"%string.
+  Definition hart     : Z := {hart}.
+  Definition regions  : list region := {regions_of(name)}.
+  Definition budget   : nat := {cfg['budget']}%nat.
+  Definition prefix   : list sitem := [{prefix}].
+  Definition proj     := {proj_of(name)}.
+
+  Definition text : list Z :=
+    [{lit(text)}].
+
+  Definition observed_raw : list (list Z) :=
+    [{results}].
+End {mod}Case.
+
+Module {mod} := SchedHart {mod}Case.
+""")
+    return path
+
+
+def emit_run_picks(name, platform, text, observed, hart, path):
+    """The RUN MODULE for a case whose several outcomes are the DEVICE's
+    choice.  One model run per completion order; [VRun.PicksHart]."""
+    cfg = config(name)
+    mod = modname(name) + platform.capitalize()
+    picks = [x for x in cfg.get("picks", "lowest_head").split(",") if x]
+    results = ";\n     ".join("[%s]" % lit(o) for o in observed)
+    open(path, "w").write(f"""(* {os.path.basename(path)} -- GENERATED by tools/vtest.  Do not edit.
+
+   The test RUN produced by executing case [{name}] on platform
+   [{platform}].  The disk may answer its in-flight requests in more than
+   one order, so this run exhibits one model execution per order --
+   [VRun.PicksHart] over [picks]. *)
+From Stdlib Require Import List ZArith String.
+Import ListNotations.
+Require Import VTest VRun.
+Local Open Scope Z_scope.
+
+Module {mod}Case <: PICKS_CASE.
+  Definition case     := "{name}"%string.
+  Definition platform := "{platform}"%string.
+  Definition hart     : Z := {hart}.
+  Definition regions  : list region := {regions_of(name)}.
+  Definition budget   : nat := {cfg['budget']}%nat.
+  Definition picks    : list (virtio_state -> option Z) := [{"; ".join(picks)}].
+  Definition proj     := {proj_of(name)}.
+
+  Definition text : list Z :=
+    [{lit(text)}].
+
+  Definition observed_raw : list (list Z) :=
+    [{results}].
+End {mod}Case.
+
+Module {mod} := PicksHart {mod}Case.
+""")
+    return path
+
+
+def emit_run_conc(name, platform, text, observed, path):
+    """The RUN MODULE for a multi-hart case.  Same [TEST_RUN] as any other
+    run; only the way [outcome] is computed differs, and that lives in
+    VRunConc's [ConcRun] functor.  The interleavings come from the
+    hand-written <Case>Sched.v -- which schedule reproduces which observed
+    outcome is the one thing about a race that cannot be generated."""
+    cfg = config(name)
+    mod = modname(name) + platform.capitalize()
+    sched = modname(name) + "Sched"
+    results = ";\n     ".join("[%s]" % lit(o) for o in observed)
+    open(path, "w").write(f"""(* {os.path.basename(path)} -- GENERATED by tools/vtest.  Do not edit.
+
+   The test RUN produced by executing the multi-hart case [{name}] on
+   platform [{platform}].  The interleavings are {sched}.schedules. *)
+From Stdlib Require Import List ZArith String.
+Import ListNotations.
+Require Import VTest VConc VRun VRunConc {sched}.
+Local Open Scope Z_scope.
+
+Module {mod}Case <: CONC_CASE.
+  Definition case      := "{name}"%string.
+  Definition platform  := "{platform}"%string.
+  Definition regions   : list region := {regions_of(name)}.
+  Definition budget    : nat := {cfg['budget']}%nat.
+  Definition schedules := {sched}.schedules.
+  Definition proj      := {proj_of(name)}.
+
+  Definition text : list Z :=
+    [{lit(text)}].
+
+  Definition observed_raw : list (list Z) :=
+    [{results}].
+End {mod}Case.
+
+Module {mod} := ConcRun {mod}Case.
+""")
+    return path
 
 
 def emit_run(name, platform, text, observed, hart, path):
@@ -716,6 +868,9 @@ def main():
                    help="take the passing set from the .vo on disk (what "
                         "`make vtest-try` leaves) rather than from the "
                         "project's current membership")
+    p.add_argument("--check", action="store_true",
+                   help="exit nonzero if anything listed in _CoqProject has "
+                        "no .vo, i.e. did not compile")
     p.add_argument("--format", choices=["text", "md"], default="text",
                    help="md emits a GitHub-flavoured markdown table")
     p.add_argument("--hart", type=int, default=0,
@@ -732,12 +887,25 @@ def main():
             print("  no capture yet: %-18s %s" % (n, pl))
         return
     if a.cmd == "table":
-        print_table(a.format); return
+        print_table(a.format)
+        if not a.check:
+            return
+        # THE VERDICT, from the same artefacts the table just read.  Every
+        # file in _CoqProject is asserted to compile -- that is what listing
+        # it means -- so a listed .v with no .vo is a failure, and there is
+        # no second pass over the build log to disagree with the table.
+        proj = os.path.join(ROCQDIR, "_CoqProject")
+        red = [l.strip() for l in open(proj)
+               if l.strip().endswith(".v")
+               and not os.path.exists(os.path.join(ROCQDIR, l.strip() + "o"))]
+        if red:
+            print("\n**%d file(s) in _CoqProject did not compile:** %s"
+                  % (len(red), ", ".join(red)))
+            sys.exit(1)
+        return
     if a.cmd == "project":
-        files, legacy, passes = write_project(a.from_build)
-        print("_CoqProject: %d files (%d run proofs, %d legacy kept)"
-              % (len(files), len(passes), len(legacy)))
-        print("legacy kept:", " ".join(f[:-2] for f in legacy))
+        files, _, passes = write_project(a.from_build)
+        print("_CoqProject: %d files (%d run proofs)" % (len(files), len(passes)))
         return
     if a.cmd == "passes":
         made = emit_passes()
