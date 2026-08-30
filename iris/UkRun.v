@@ -84,16 +84,6 @@ Lemma uM_store8_umem_write (M : gmap Z (bv 8)) (a : Z) (v : mword 64) :
   uM_store8 M a v = umem_write M a 8 (nth_byte v).
 Proof. exact (uM_store_umem_write M a 8%nat v). Qed.
 
-(* THE OFFSET AN ADDRESSING MODE ADDS, as a number.  The decoder's
-   [sign_extend' 64 (zero_extend' 12 (concat_vec uimm ('b"000")))] chain
-   carries an [autocast], so it does not reduce at a symbolic immediate and
-   cannot be normalised away the way [uimm6_norm] normalises c.li's.  Naming
-   it keeps it out of the leaf statement anyway: the leaf's address is then
-   a plain [Z], and at a concrete immediate the caller's [vm_compute] turns
-   [uoff_sdsp (mword_of_int 1)] into [8]. *)
-Definition uoff_sdsp (uimm : mword 6) : Z :=
-  uint (sign_extend' 64 (zero_extend' 12 (concat_vec uimm ('b"000"))) : mword 64).
-
 Section UkRun.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
@@ -229,7 +219,7 @@ Section UkRun.
 
 
   (* ===================================================================== *)
-  (* §3 THE LEAVES.                                                        *)
+  (* §3 WHAT A MEMORY LEAF READS OFF THE HEAP.                                                        *)
   (*                                                                       *)
   (* Two representatives, one register-only and one memory, cut in the     *)
   (* shape every remaining leaf will take:                                 *)
@@ -262,118 +252,28 @@ Section UkRun.
     rewrite Z.add_0_r in Hw, Hb. exact (conj Hb Hw).
   Qed.
 
-  (* a run of owned data bytes is present in the image, at its own values *)
-  Lemma uheap_ubytes_mapped (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
-      (a : Z) (n : nat) (f : nat -> bv 8) :
+  (* A RUN OF OWNED DATA BYTES: present in the image at its own values, on
+     writable pages, in range.  This is the single lemma every memory leaf
+     goes through -- it is what replaces the caller-supplied permission,
+     canonicity and presence premises of the UkStore/UkLoad leaves. *)
+  Lemma uheap_ubytes_at (γt γd γs : gname) (M : gmap Z (bv 8))
+      (pm : gmap (mword 27) uperm) (a : Z) (n : nat) (f : nat -> bv 8) :
     uheap γt γd γs M pm -∗ ubytes γd a n f -∗
-    ⌜ forall j : nat, (j < n)%nat -> M !! (a + Z.of_nat j)%Z = Some (f j) ⌝.
+    ⌜ forall j : nat, (j < n)%nat ->
+        M !! (a + Z.of_nat j)%Z = Some (f j) /\
+        uw_addr pm (a + Z.of_nat j)%Z /\
+        0 <= a + Z.of_nat j < 2 ^ 38 ⌝.
   Proof.
     iIntros "Hheap Hbs". rewrite /ubytes.
     iInduction n as [| n IH] "IH" forall (f).
     - iPureIntro. intros j Hj. exfalso. lia.
     - iEval (rewrite seq_S big_sepL_app /=) in "Hbs".
       iDestruct "Hbs" as "(Hlo & Hhi & _)".
-      iDestruct (uheap_ubyte with "Hheap Hhi") as %(HM & _ & _).
+      iDestruct (uheap_ubyte with "Hheap Hhi") as %Hn.
       (* the IH is generalised over [f], so instantiate that before feeding it *)
       iDestruct ("IH" $! f with "Hheap Hlo") as %Hlo.
       iPureIntro. intros j Hj.
-      destruct (decide (j = n)) as [-> | Hne]; [ exact HM | apply Hlo; lia ].
-  Qed.
-
-  (* ------------------------------------------------------------------- *)
-  (* c.li rd, imm -- rd := sext(imm).  THE register-only shape.           *)
-  (*                                                                     *)
-  (* The immediate is [sign_extend' 64 imm], not the decoder's            *)
-  (* [add_vec x0 (sign_extend' 64 (sign_extend' 12 imm))]: the expansion  *)
-  (* chain is the model's business and [uimm6_norm] discharges it here,   *)
-  (* once, rather than at every call site.                                *)
-  (* ------------------------------------------------------------------- *)
-  Lemma wp_uk_cli (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
-      (imm : mword 6) (rd : mword 5) :
-    uint rd <> 0 ->
-    uinstr_is γt pc true (C_LI (imm, Regidx rd)) -∗
-    urun γt γd γs h m pc -∗
-    (∀ h' : CpuId,
-       urun γt γd γs h'
-         (<[Regidx rd := regval_into_reg (sign_extend' 64 imm : mword 64)]> m)
-         (add_vec_int pc 2) -∗
-       WP (Loop : expr riscv_lang)) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    intros Hrd. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hb)".
-    iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    iApply (UkLeaf.wp_uk_cli C pt Rut pm sz Hlo Hpm M m pc imm rd
-              (sign_extend' 64 imm) Hui Hrd (eq_sym (uimm6_norm imm))
-              with "Hb [Hheap Hcont]").
-    iApply (urun_close with "Hheap Hcont").
-  Qed.
-
-  (* ------------------------------------------------------------------- *)
-  (* c.sdsp rs2, uimm(sp) -- THE memory shape, and the point of the whole  *)
-  (* exercise: the caller hands over the eight bytes it is about to        *)
-  (* clobber and gets them back holding the stored value.  Every other     *)
-  (* byte of the process frames, untouched and unmentioned.                *)
-  (*                                                                      *)
-  (* Note what is NOT a premise: writability.  The old leaf demanded       *)
-  (* [uk_store_ok tgt] -- an explicit claim about the permission map --    *)
-  (* and every caller had to produce one.  Here it comes out of the        *)
-  (* EXCLUSIVE ownership of the bytes, which is the invariant [uheap]      *)
-  (* maintains.  Nor is presence in the image, nor canonicity, nor the     *)
-  (* in-page condition: an 8-aligned address has [rem 4096] a multiple of  *)
-  (* 8 below 4096, hence at most 4088, so alignment alone gives it.        *)
-  (* ------------------------------------------------------------------- *)
-  Lemma wp_uk_csdsp (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
-      (uimm : mword 6) (rs2 : mword 5) (a : Z) (v0 : mword 64) :
-    a = uint (m !!! Regidx csp_rs1) + uoff_sdsp uimm ->
-    a mod 8 = 0 ->
-    uinstr_is γt pc true (C_SDSP (uimm, Regidx rs2)) -∗
-    uword γd a v0 -∗
-    urun γt γd γs h m pc -∗
-    (uword γd a (m !!! Regidx rs2) -∗
-       ∀ h' : CpuId,
-         urun γt γd γs h' m (add_vec_int pc 2) -∗ WP (Loop : expr riscv_lang)) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    intros Ha Hal. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hb)".
-    iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    (* IN RANGE and WRITABLE, from OWNERSHIP -- not from a claim about a PTE *)
-    iDestruct (uheap_uword_at with "Hheap Hw") as %[Hbnd Hok].
-    (* all eight bytes are present in the image *)
-    iDestruct (uheap_ubytes_mapped γt γd γs M pm a 8 (nth_byte v0)
-                 with "Hheap Hw") as %Hmap.
-    destruct (ucanon_of_bound a Hbnd) as [Hua Hcan].
-    (* the address, in the model's spelling *)
-    assert (Htgt : (mword_of_int a : mword 64)
-                   = add_vec (m !!! Regidx csp_rs1)
-                       (sign_extend' 64
-                          (zero_extend' 12 (concat_vec uimm ('b"000"))))).
-    { rewrite Ha /uoff_sdsp. rewrite <- moi_add. rewrite !moi_of_uint.
-      reflexivity. }
-    (* 8-alignment, and the in-page condition it implies: [rem 4096] of an
-       8-aligned address is a multiple of 8 below 4096, hence at most 4088 *)
-    assert (Hal8 : is_aligned_vaddr (Virtaddr (mword_of_int a : mword 64)) 8 = true).
-    { unfold is_aligned_vaddr. apply Z.eqb_eq. rewrite Hua.
-      rewrite Z.rem_mod_nonneg; [ exact Hal | lia | lia ]. }
-    assert (Hrem : Z.rem (uint (mword_of_int a : mword 64)) 4096 <= 4088).
-    { rewrite Hua. rewrite Z.rem_mod_nonneg; [ | lia | lia ].
-      pose proof (Znumtheory.Zmod_div_mod 8 4096 a ltac:(lia) ltac:(lia)
-                    ltac:(exists 512; reflexivity)) as Hdd.
-      pose proof (Z.mod_pos_bound a 4096 ltac:(lia)) as Hb.
-      pose proof (Z.div_mod (a mod 4096) 8 ltac:(lia)) as Hdm.
-      lia. }
-    (* do the write in the ghost heap, then hand the image to the leaf *)
-    iMod (uheap_store_run γt γd γs M pm a 8 (nth_byte v0)
-            (nth_byte (m !!! Regidx rs2)) with "Hheap Hw") as "(Hheap & Hw)".
-    iApply (UkStore.wp_uk_csdsp C pt Rut pm sz Hlo Hpm M m pc uimm rs2
-              (mword_of_int a) (m !!! Regidx rs2) Hui Htgt eq_refl Hok Hcan
-              Hrem Hal8
-              ltac:(intros j Hj; exists (nth_byte v0 j);
-                    rewrite Hua; exact (Hmap j Hj))
-              with "Hb [Hheap Hw Hcont]").
-    rewrite Hua uM_store8_umem_write.
-    iApply (urun_close with "Hheap"). iApply ("Hcont" with "Hw").
+      destruct (decide (j = n)) as [-> | Hne]; [ exact Hn | apply Hlo; lia ].
   Qed.
 
   (* ===================================================================== *)

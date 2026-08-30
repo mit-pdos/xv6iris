@@ -61,6 +61,32 @@ Section UkRunLeaf.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
 
+  (* ------------------------------------------------------------------- *)
+  (* c.li rd, imm -- rd := sext(imm).  Hand-cut rather than generated,     *)
+  (* because the decoder ALSO adds x0 here, and [uimm6_norm] kills the     *)
+  (* whole chain at once.                                                  *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_uk_cli (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
+      (imm : mword 6) (rd : mword 5) :
+    uint rd <> 0 ->
+    uinstr_is γt pc true (C_LI (imm, Regidx rd)) -∗
+    urun γt γd γs h m pc -∗
+    (∀ h' : CpuId,
+       urun γt γd γs h'
+         (<[Regidx rd := regval_into_reg (sign_extend' 64 imm : mword 64)]> m)
+         (add_vec_int pc 2) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hrd. iIntros "#Hi Hrun Hcont".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hb)".
+    iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
+    iApply (UkLeaf.wp_uk_cli C pt Rut pm sz Hlo Hpm M m pc imm rd
+              (sign_extend' 64 imm) Hui Hrd (eq_sym (uimm6_norm imm))
+              with "Hb [Hheap Hcont]").
+    iApply (urun_close with "Hheap Hcont").
+  Qed.
+
   Lemma wp_uk_caddi (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
       (imm : mword 6) (rd : mword 5) (wval : mword 64) :
     uint rd <> 0 ->

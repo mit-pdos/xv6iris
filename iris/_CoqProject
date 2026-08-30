@@ -269,6 +269,7 @@ UkLoad.v
 UserHeap.v
 UkRun.v
 UkRunLeaf.v
+UkRunMem.v
 UkAbi.v
 UkSync.v
 UkEcho.v
