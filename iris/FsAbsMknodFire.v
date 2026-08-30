@@ -3,10 +3,11 @@
    prover (items 2 and 4).
 
    Worklist: claude-notes/projects/fs-syscall-specs.md, lane W (the mknod
-   AU prover).  A NEW LEAF rather than an append to [FsAbsEraMknod.v], for
-   the mirror's reason the campaign's other leaves record ([FsAbsNpar],
-   [FsAbsPins]): the build mirror forbids touching a tracked file.  Fuse
-   the two when [FsAbsEraMknod.v] is next edited.
+   AU prover).  (It was a NEW LEAF rather than an append to
+   [FsAbsEraMknod.v] for the mirror's reason the campaign's other leaves
+   record: the build mirror forbids touching a tracked file.  The two --
+   and the other two mknod leaves -- ARE FUSED as of 2026-08-30, which is
+   what this paragraph asked for; see the next note.)
 
    ==== WHY THE COMMITS HAD TO BE RESTATED AT THE AUTHORITY ==============
 
@@ -80,6 +81,36 @@
    and [icacheG]/[icfg] resolve only through its fields (SpecCreate's
    header: a standalone [icfg] beside [fileG] gives two instance paths and
    the propositions print identically while failing to unify). *)
+
+
+(* ==== WHAT IS IN THIS FILE (the mknod/create leaves, fused 2026-08-30) ==
+
+   ONE FILE FOR THE mknod/create AU's ABSTRACT-STATE WORK.  Four leaves were
+   one lane's, split only by the build mirror's rule that a tracked file is
+   not touched -- and three of the four headers below say, in as many
+   words, to fuse them the next time one of them is edited.  This is that
+   edit.  Every statement and proof is the original text, in its original
+   section at its original binder list (and all four sections take the SAME
+   binder list, which is what made them one file's worth of work):
+
+     sections 1-4  the authority-shaped commits, the two fires and the
+                   halfword bridge -- this file's own.
+     section 5     the era-lend fire points and lane W's two walk
+                   predicates -- WAS iris/FsAbsEraMknod.v.
+     section 6     the nameiparent acceptance test -- WAS
+                   iris/FsAbsNparMknod.v.
+     section 7     FIRE 2 at a non-directory child -- WAS
+                   iris/FsAbsCreateFire.v.
+
+   NOT FUSED, AND IT IS NOT A JUDGEMENT CALL: the other fire leaves
+   ([FsAbsOpenFire], [FsAbsWriteFire], [FsAbsUnlinkFire], [FsAbsReadFire])
+   each stand on a DIFFERENT [Spec*AU] contract, and three of those
+   contracts require THIS file -- so merging any of them here is a
+   dependency CYCLE, not a tidy-up.  One fire leaf per syscall is the
+   shape the cone forces.
+
+   All three old names survive as stubs that [Require Export] this file, so
+   no consumer moved. *)
 
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
@@ -474,3 +505,520 @@ Proof.
   rewrite Z_mod_plus_full.
   apply Z.mod_mod. vm_compute. discriminate.
 Qed.
+
+
+(* ===================================================================== *)
+(*  5.  THE ERA-LEND FIRE POINTS AND THE WALK PREDICATES                  *)
+(*      (was iris/FsAbsEraMknod.v, fused 2026-08-30)                       *)
+(* ===================================================================== *)
+
+(* THE THREE REQUIRES THIS HALF ADDS, and they sit HERE rather than at the
+   top for the reason [FsAbs.v]'s section 5 gives: nothing above this line
+   may have a name of theirs resolved by accident.  [FsImg] is REQUIRED and
+   NOT imported (both halves below spell [FsImg.ROOTINO] / [FsImg.T_FILE_z]
+   qualified, and an import would shadow [InodeInv.ROOTINO]). *)
+Require Import PathElems.       (* [path_elems], [SLASH] *)
+Require FsImg.
+Require Import FsAbsEra.        (* [elend], [ex_hops_from], [elend_astate],
+                                   and (since the era leaves fused) the
+                                   parent prefix and the deferred start *)
+
+(* FsAbsEraMknod.v -- THE FIRST CONSUMER, WIRED: [SpecSysMknodAU]'s two
+   commit steps consumed at an ERA hop's fire instant, and the era-lend
+   twins of its two walk predicates.
+
+   Worklist: claude-notes/projects/fs-syscall-specs.md, lane A item (iii)
+   (the era-fragment walk) meeting lane W (the mknod AU statement).  The
+   landed statement file does not move (its own R10-parallel discipline);
+   these are the PARALLEL forms beside it.
+
+   WHY THIS FILE.  Lane W's header records what its prover owes, and the
+   first item is "the two fire points: dirlookup via [ftop_astate_ro]".
+   With the LANDED trace contract that item was not merely unproven, it was
+   unprovable: [SpecNameiTr.nx_hop] lent [DirViewG.dv_half] (both retired
+   2026-08-30; the history is kept because it is why THIS file exists), which
+   says
+   nothing about gamma-top, so no amount of opening ftopN at the fire
+   instant identifies the authority's row for the directory the walk is
+   standing on ([FsAbsSeam], findings 2 and 3).  [SpecSysMknodAU]'s
+   [mknod_walk_pre] therefore rides [ax_hops_from dv_half] and its prover
+   has no way to reach [dlookup_commit]'s premises.
+
+   With the era lend it is three lines: [FsAbsEra.elend_astate] reads the
+   row straight off the authority, because the lent fragment and the
+   carrier are THE SAME GHOST.  [era_dlookup_fire] below is that step,
+   whole; [era_acre_fire] is the success commit's phase 1 at the same
+   instant, which needs the parent's row for exactly the same reason.
+
+   WHAT IS NOT HERE.  The nameiparent WALK.  These lemmas are about the
+   HOP, and the hop is the same on both sides of namex's [a1] test; what
+   the nameiparent side still needs is namex's two npar exits proven at a
+   trace contract, which is a walk-proof item and not a lend item (see
+   [ProofNamexEra]'s header).  So this file makes the mknod prover's fire
+   points discharged-in-advance, and leaves it waiting on the walk that
+   delivers them. *)
+Section EraMknod.
+  (* [SpecSysMknodAU]'s binder list, verbatim. *)
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+            !irefslotG Σ, !pavG Σ}.
+  Implicit Types Γ : fs_view_names Σ.
+
+  (* =================================================================== *)
+  (*  1.  THE READ-ONLY FIRE                                              *)
+  (* =================================================================== *)
+
+  (* THE STEP LANE W's PROVER OWES, discharged.  At the hop instant the
+     caller holds three things: its own [dlookup_commit] (the AU's
+     read-only arm), the ERA LEND the walk just handed it, and [astate]
+     (borrowed out of ftopN by [FsAbs.ftop_astate_ro] -- the borrow is
+     not repeated here because it is [FsAbs]'s and the caller does it
+     once around this step).  It gets the receipt, and BOTH the lend and
+     the state back: nothing of the walk's is consumed, so the hop's
+     "hand the fragment back at the same dfrac" obligation is met by the
+     same [HF] that came in.
+
+     The [ents !! nm = Some i] premise is dirlookup's own answer, which
+     is what the hop's match is computed from -- so a caller inside
+     [ax_hop]'s fupd has it by construction. *)
+  Lemma era_dlookup_fire Γ (E : coPset)
+      (Φ : aview -> Z -> fname -> Z -> iProp Σ)
+      (av : aview) (d : Z) (dq : dfrac) (ents : gmap fname Z)
+      (nm : fname) (i : Z) :
+    ents !! nm = Some i ->
+    dlookup_commit Γ E Φ -∗ elend Γ d dq ents -∗ astate Γ av ={E}=∗
+      astate Γ av ∗ elend Γ d dq ents ∗ Φ av d nm i.
+  Proof.
+    intros Hnm. iIntros "Hcm HF Hst".
+    iDestruct (elend_astate with "Hst HF") as %(nl & Hav).
+    iMod ("Hcm" $! av d i nm ents nl with "[//] [//] Hst") as "[Hst HΦ]".
+    iModIntro. iFrame "Hst HF HΦ".
+  Qed.
+
+  (* =================================================================== *)
+  (*  2.  THE SUCCESS COMMIT'S PHASE 1                                    *)
+  (* =================================================================== *)
+
+  (* [acre_commit]'s first phase asks for [cre_pre av d nm ents nl i c],
+     which is THREE facts: the parent's row read as an [ADir] at the entry
+     map the walk lent, the name's absence from it, and the minted child's
+     row.  The first is the one only the lend can supply -- and it is
+     exactly what the [dv_half] fire could not -- so the era lend supplies
+     it and the [nl] the row carries is existential to the caller.  The
+     other two are the caller's own (dirlookup's miss and the mint's
+     observation) and are premises here. *)
+  Lemma era_acre_fire Γ (E : coPset) (c : absnode)
+      (Φ : aview -> Z -> fname -> Z -> iProp Σ)
+      (av : aview) (d i : Z) (dq : dfrac) (ents : gmap fname Z)
+      (nm : fname) :
+    ents !! nm = None ->
+    av !! i = Some (MkAnode c 1%nat) ->
+    acre_commit Γ E c Φ -∗ elend Γ d dq ents -∗ astate Γ av ={E}=∗
+      elend Γ d dq ents ∗ astate Γ av
+      ∗ (astate Γ (delta_create d nm i c av) ={E}=∗
+         astate Γ (delta_create d nm i c av) ∗ Φ av d nm i).
+  Proof.
+    intros Hnm Hi. iIntros "Hcm HF Hst".
+    iDestruct (elend_astate with "Hst HF") as %(nl & Hav).
+    iMod ("Hcm" $! av d i nm ents nl with "[%] Hst") as "[Hst Hph2]".
+    { rewrite /cre_pre. split; [exact Hav | split; [exact Hnm | exact Hi]]. }
+    iModIntro. iFrame "HF Hst Hph2".
+  Qed.
+
+  (* =================================================================== *)
+  (*  3.  THE ERA TWINS OF LANE W's TWO WALK PREDICATES                   *)
+  (* =================================================================== *)
+
+  (* [SpecSysMknodAU.mknod_walk_pre] with [dv_half] replaced by the era
+     lend and NOTHING else -- same one-shot fupd, same fetched-path
+     shape, same root tie.  When the nameiparent era walk lands, THIS is
+     the premise the syscall contract carries; the landed one stays for
+     the dv-firing walk until the retirement step. *)
+  Definition mknod_walk_pre_era (γfs : fs_names)
+      (P Pmiss : nat -> Z -> iProp Σ) : iProp Σ :=
+    (∀ (pl : list (bv 8)) (r : Z),
+       ⌜pl !! 0%nat = Some SLASH -> r = FsImg.ROOTINO⌝ ={⊤}=∗
+       P 0%nat r
+       ∗ ax_hops_from (elend (fs_gamma_L γfs)) P Pmiss
+           (mknod_parent_elems pl) 0%nat)%I.
+
+  Definition mknod_walk_dead_era (γfs : fs_names)
+      (P Pmiss : nat -> Z -> iProp Σ) (pl : list (bv 8)) : iProp Σ :=
+    (∃ (k : nat) (d : Z),
+       ⌜(k < length (mknod_parent_elems pl))%nat⌝ ∗
+       ((P k d ∗ ax_hops_from (elend (fs_gamma_L γfs)) P Pmiss
+                   (mknod_parent_elems pl) k)
+        ∨ (Pmiss k d
+           ∗ ax_hops_from (elend (fs_gamma_L γfs)) P Pmiss
+               (mknod_parent_elems pl) (S k))))%I.
+
+  (* the same two seals lane W puts on its own pair, and for the same
+     reason (they are big-ops behind Definitions at syscall altitude) *)
+
+End EraMknod.
+
+Global Typeclasses Opaque mknod_walk_pre_era mknod_walk_dead_era.
+
+(* ===================================================================== *)
+(*  6.  THE ACCEPTANCE TEST                                               *)
+(*      (was iris/FsAbsNparMknod.v, fused 2026-08-30)                      *)
+(* ===================================================================== *)
+
+(* FsAbsNparMknod.v -- THE LANE'S ACCEPTANCE TEST, DISCHARGED: lane W's two
+   walk predicates ([FsAbsEraMknod.mknod_walk_pre_era] /
+   [mknod_walk_dead_era]) are exactly what the nameiparent era walk's
+   contract ([SpecNparEra]) consumes and produces.
+
+   Worklist: claude-notes/projects/fs-syscall-specs.md, lane A item (iii),
+   REMAINING item.  (WAS A LEAF, iris/FsAbsNparMknod.v, for the mirror's
+   reason; FUSED IN 2026-08-30, stub at the old name.)
+
+   THREE FACTS, and two of them are [reflexivity].
+
+   (1) THE FAMILIES ARE THE SAME FAMILY.  [FsAbsNpar.np_elems pl] and
+       [SpecSysMknodAU.mknod_parent_elems pl] are both
+       [removelast (path_elems pl)] -- so [ep_hops_from] and the
+       [ax_hops_from] inside [mknod_walk_pre_era] are the same big-op, and
+       the walk's trace premise IS what the syscall's one-shot hands out.
+       This is not a coincidence to be maintained: it is why the npar
+       contract ranges over the parent prefix at all (FsAbsNpar's header).
+
+   (2) THE PRE.  [np_pre_of_mknod] fires lane W's one-shot at the string
+       the walk fetched and at [ROOTINO], which is what the absolute-path
+       scope of this contract pins the start to.  The two [ROOTINO]s --
+       [InodeInv.ROOTINO : mword 32], read off namex's [li a1,1], and
+       [FsImg.ROOTINO : Z], the image's -- agree by computation.
+
+   (3) THE DEAD.  This one is NOT an identity, and the mismatch is worth
+       recording rather than papering over.  [mknod_walk_dead_era] bounds
+       its death index STRICTLY ([k < length ps]) in BOTH disjuncts; the
+       walk can die at [k = length ps], because namex runs the level's
+       type test and nlink guard at the PARENT's own level too
+       ([FsAbsNpar]'s header, case (1)), and at [k = 0 = length ps] when
+       the path has no elements at all (case (2)).  So the honest
+       statement is a DISJUNCTION: either lane W's predicate, or the
+       cursor at the parent index -- and the second alternative is exactly
+       [SpecSysMknodAU.mknod_post_fail]'s THIRD fold arm
+       ([exists d, P (length (mknod_parent_elems pl)) d * acre_commit *
+       (... \/ dlookup_commit)]), which a create that never got to
+       dirlink refunds anyway.  So mknod's post is dischargeable as it
+       stands; what is NOT true is that [mknod_walk_dead_era] alone covers
+       the walk's failures. *)
+
+Section NparMknod.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+            !irefslotG Σ, !pavG Σ}.
+
+  (* ------------------------------------------------------------------ *)
+  (*  (1) the families                                                   *)
+  (* ------------------------------------------------------------------ *)
+
+  Lemma np_elems_is_mknod_parent_elems (pl : list (bv 8)) :
+    np_elems pl = mknod_parent_elems pl.
+  Proof. reflexivity. Qed.
+
+  Lemma ep_hops_is_mknod_hops (γfs : fs_names)
+      (P Pmiss : nat -> Z -> iProp Σ) (pl : list (bv 8)) (n : nat) :
+    ep_hops_from γfs P Pmiss pl n
+    = ax_hops_from (elend (fs_gamma_L γfs)) P Pmiss (mknod_parent_elems pl) n.
+  Proof. reflexivity. Qed.
+
+  (* the roots agree *)
+  Lemma np_rootino_agree :
+    bv_unsigned InodeInv.ROOTINO = FsImg.ROOTINO.
+  Proof. vm_compute. reflexivity. Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  (2) lane W's one-shot supplies the walk's two trace premises       *)
+  (* ------------------------------------------------------------------ *)
+
+  (* THE FORM THE WALK ACTUALLY TAKES SINCE LANE A-iii: no firing at all,
+     because the START INUM is the walk's to choose ([FsAbsStart]'s
+     header).  [ep_start] at a fixed [pl] IS [mknod_walk_pre_era]
+     specialized to that [pl] -- same quantifier, same tie, same family --
+     so this is a rename plus the two ROOTINOs agreeing. *)
+  Lemma np_start_of_mknod (γfs : fs_names) (P Pmiss : nat -> Z -> iProp Σ)
+      (pl : list (bv 8)) :
+    mknod_walk_pre_era γfs P Pmiss -∗ ep_start γfs P Pmiss pl.
+  Proof.
+    iIntros "Hpre". rewrite /ep_start. iIntros (r Hr).
+    rewrite /mknod_walk_pre_era.
+    iMod ("Hpre" $! pl r with "[%]") as "[$ $]"; [| done].
+    intros Hsl. rewrite -np_rootino_agree. exact (Hr Hsl).
+  Qed.
+
+  Lemma np_pre_of_mknod (γfs : fs_names) (P Pmiss : nat -> Z -> iProp Σ)
+      (pl : list (bv 8)) :
+    mknod_walk_pre_era γfs P Pmiss ={⊤}=∗
+      P 0%nat (bv_unsigned InodeInv.ROOTINO)
+      ∗ ep_hops_from γfs P Pmiss pl 0%nat.
+  Proof.
+    iIntros "Hpre". rewrite /mknod_walk_pre_era.
+    iMod ("Hpre" $! pl (bv_unsigned InodeInv.ROOTINO) with "[%]") as "[$ $]".
+    { intros _. exact np_rootino_agree. }
+    done.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  (3) the walk's death arm, folded into lane W's two shapes          *)
+  (* ------------------------------------------------------------------ *)
+
+  Lemma np_dead_to_mknod (γfs : fs_names) (P Pmiss : nat -> Z -> iProp Σ)
+      (pl : list (bv 8)) :
+    np_dead γfs P Pmiss pl -∗
+      mknod_walk_dead_era γfs P Pmiss pl
+      ∨ (∃ d : Z, P (length (mknod_parent_elems pl)) d).
+  Proof.
+    rewrite /np_dead /mknod_walk_dead_era.
+    iIntros "[Hl | Hr]".
+    - iDestruct "Hl" as (k d) "(%Hk & HP & Hh)".
+      destruct (decide (k < length (np_elems pl))%nat) as [Hlt | Hge].
+      + iLeft. iExists k, d. iSplitR; [by iPureIntro |]. iLeft. iFrame.
+      + (* [k = length ps]: the parent's OWN level died.  The family from
+           there is empty, and the cursor at the parent index is the whole
+           refund -- mknod's third fold arm. *)
+        assert (Hkeq : k = length (np_elems pl)) by lia.
+        iRight. iExists d. rewrite -Hkeq. iClear "Hh". iExact "HP".
+    - iDestruct "Hr" as (k d) "(%Hk & HP & Hh)".
+      iLeft. iExists k, d. iSplitR; [by iPureIntro |]. iRight. iFrame.
+  Qed.
+
+  (* ...and the SUCCESS side needs no lemma at all: the walk returns
+     [P (length (np_elems pl)) iL], which IS
+     [P (length (mknod_parent_elems pl)) iL]. *)
+  Lemma np_ok_is_mknod_ok (P : nat -> Z -> iProp Σ) (pl : list (bv 8))
+      (iL : Z) :
+    P (length (np_elems pl)) iL = P (length (mknod_parent_elems pl)) iL.
+  Proof. reflexivity. Qed.
+
+End NparMknod.
+
+(* ===================================================================== *)
+(*  7.  FIRE 2, AT A NON-DIRECTORY CHILD                                  *)
+(*      (was iris/FsAbsCreateFire.v, fused 2026-08-30)                     *)
+(* ===================================================================== *)
+
+(* [TsoCtx] is IMPORTED here (and only here) because [Section CreateFire]
+   binds [CurCtx]; it is deliberately the LAST require in the file, so no
+   notation of its flips under anything above. *)
+Require Import TsoCtx.
+
+(* FsAbsCreateFire.v -- the create AU's SUCCESS FIRE AT A NON-DIRECTORY
+   CHILD, and the [T_FILE] row reading that instantiates it.
+
+   Worklist: claude-notes/projects/fs-syscall-specs.md, lane W (the T_FILE
+   create-AU carry).  (WAS A LEAF, iris/FsAbsCreateFire.v, for the mirror's
+   reason the campaign's other leaves record: the build mirror forbids
+   touching a tracked file.  FUSED IN 2026-08-30 -- "fuse the fire leaves
+   when one of them is next edited", as far as the cone allows: the OTHER
+   fire leaves each stand on a different [Spec*AU] that requires this file,
+   so they cannot follow without a cycle.)
+
+   ==== WHY THIS FILE EXISTS ============================================
+
+   [FsAbsMknodFire.mkf_acre_fire] is PINNED at [ADev ma mi] in exactly one
+   place: it discharges the delta's collapse with
+   [SpecSysMknodAU.delta_create_dev], the "under [cre_pre] with a DEVICE
+   child, the fused delta IS the one-row parent insert" lemma.  Reading
+   that lemma's proof shows the device-ness is not used -- what is used is
+   that the child is NOT A DIRECTORY, which is what makes
+   [SpecSysMknodAU.acre_bump] zero (so the parent's count does not move)
+   and what makes [cre_pre_ne] separate parent from child (so the child's
+   insert is the identity on its already-minted row).
+
+   So the two lemmas below are the [ADev]-free restatements:
+
+     [caf_delta_create_nondir]  -- [delta_create_dev] at any non-[ADir] [c]
+     [caf_acre_fire]            -- [mkf_acre_fire] at any non-[ADir] [c]
+
+   and [caf_child_file] is the [T_FILE] instance of the minted child's row
+   ([FsAbsMknodFire.mkf_child_dev]'s twin): [SpecCreate.create_made T_FILE
+   major minor] reads as [AFile []] at nlink 1, because that record's size
+   is zero and [fn_file_bytes] of a zero-size node is [file_bytes _ 0 = []]
+   -- the same arithmetic [FsAbsOpenFire.opf_trunc_bytes] does at itrunc's
+   own zeroing.
+
+   R10: neither [FsAbsMknodFire] nor [SpecSysMknodAU] moves.  The device
+   fire keeps its own name and its own proof; a caller that wants the
+   device instance is not asked to route through the general form.
+
+   BINDERS: [FsAbsMknodFire]'s section list VERBATIM (which is
+   [SpecSysMknodAU]'s) -- [fileG] is bound and [icacheG]/[icfg] resolve
+   only through its fields (SpecCreate's header: a standalone [icfg] beside
+   [fileG] gives two instance paths and the propositions print identically
+   while failing to unify). *)
+
+(* ===================================================================== *)
+(*  1.  THE DELTA'S COLLAPSE AT A NON-DIRECTORY CHILD (pure)              *)
+(* ===================================================================== *)
+
+(* [acre_bump] is zero at everything but a directory: the parent's count
+   moves only when the child's ".." takes a token. *)
+Lemma caf_acre_bump_nondir (c : absnode) :
+  (forall e, c <> ADir e) -> acre_bump c = 0%nat.
+Proof.
+  intros Hc. destruct c as [bs | ents | ma mi]; [reflexivity | | reflexivity].
+  exfalso. exact (Hc ents eq_refl).
+Qed.
+
+(* [SpecSysMknodAU.delta_create_dev] with the device-ness dropped: under
+   [cre_pre] at a NON-DIRECTORY child the fused delta IS the one-row parent
+   insert.  The child's own insert is the identity on the row [cre_pre]'s
+   third conjunct already observes, and [cre_pre_ne] is what keeps the two
+   inserts from being at the same key. *)
+Lemma caf_delta_create_nondir (av : aview) (d : Z) (nm : fname)
+    (ents : gmap fname Z) (nl : nat) (i : Z) (c : absnode) :
+  (forall e, c <> ADir e) ->
+  cre_pre av d nm ents nl i c ->
+  delta_create d nm i c av
+  = <[d := MkAnode (ADir (<[nm := i]> ents)) nl]> av.
+Proof.
+  intros Hc Hp.
+  assert (Hne : d <> i) by exact (cre_pre_ne av d nm ents nl i c Hp Hc).
+  destruct Hp as (Hd & Hnm & Hi).
+  rewrite /delta_create Hd /= (caf_acre_bump_nondir c Hc) Nat.add_0_r.
+  rewrite (insert_commute _ i d); [| congruence].
+  by rewrite (insert_id av i (MkAnode c 1%nat) Hi).
+Qed.
+
+(* ===================================================================== *)
+(*  2.  THE MINTED CHILD'S ROW AT [T_FILE]                                *)
+(* ===================================================================== *)
+
+(* [SpecSysMknodAU.abs_of_create_dev]'s twin.  Three readings, each off
+   [create_made]'s own fields: the type is not [T_DIR_z] (so the row is not
+   an [ADir]) and IS [T_FILE_z] (so it is an [AFile]); the size is zero, so
+   the byte list is [file_bytes _ 0 = []]; the count is one. *)
+Lemma caf_abs_of_create_file (n : fs_node) (major minor : mword 16) :
+  fn_rec n = create_made T_FILE major minor ->
+  abs_of n = MkAnode (AFile []) 1%nat.
+Proof.
+  intros Hr.
+  assert (Hnd : fn_is_dir n = false).
+  { rewrite /fn_is_dir /fn_type Hr. by apply bool_decide_eq_false_2. }
+  assert (Hfl : fn_type n = FsImg.T_FILE_z)
+    by (rewrite /fn_type Hr; reflexivity).
+  assert (Hbytes : fn_file_bytes n = []).
+  { rewrite /fn_file_bytes /fn_size Hr. reflexivity. }
+  assert (Hnl : fn_nlink n = 1%nat)
+    by (rewrite /fn_nlink Hr; reflexivity).
+  rewrite /abs_of Hnl. f_equal.
+  change (abs_node n) with (an_node (abs_of n)).
+  by rewrite (abs_of_file n Hnd Hfl) Hbytes.
+Qed.
+
+(* ...and at the era node, which is the shape a walk holds
+   ([FsAbsMknodFire.mkf_child_dev]'s spelling). *)
+Lemma caf_child_file (dn : dinode) (bm : blkmap)
+    (data : nat -> list (bv 8)) (major minor : mword 16) :
+  dn = create_made T_FILE major minor ->
+  abs_of (era_node dn bm data) = MkAnode (AFile []) 1%nat.
+Proof.
+  intros ->. apply (caf_abs_of_create_file _ major minor).
+  by rewrite era_node_rec.
+Qed.
+
+Section CreateFire.
+  (* [FsAbsMknodFire]'s binder list, verbatim. *)
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+            !irefslotG Σ, !pavG Σ}.
+  Context `{XI : CurCtx}.
+  Implicit Types Γ : fs_view_names Σ.
+
+  (* =================================================================== *)
+  (*  3.  THE SUCCESS FIRE AT A NON-DIRECTORY CHILD                       *)
+  (* =================================================================== *)
+
+  (* [FsAbsMknodFire.mkf_acre_fire] with [ADev ma mi] replaced by an
+     arbitrary non-[ADir] [c]: same premises, same [ghost_map_update], same
+     one [ftopN] critical section with the caller's two phases on either
+     side of it, same payout.  The device instance is [mkf_acre_fire]
+     itself and is NOT rerouted through this (R10). *)
+  Lemma caf_acre_fire (γfs : fs_names) (E : coPset) (c : absnode)
+      (Φ : aview -> Z -> fname -> Z -> iProp Σ)
+      (d i : Z) (nm : fname) (dqc : dfrac) (np np' nc : fs_node) :
+    ↑ftopN ⊆ E ->
+    (forall e, c <> ADir e) ->
+    inode_local d np' ->
+    fn_is_dir np = true ->
+    dir_entries np !! nm = None ->
+    abs_of np' = MkAnode (ADir (<[nm := i]> (dir_entries np))) (fn_nlink np) ->
+    abs_of nc = MkAnode c 1%nat ->
+    ftop_inv γfs -∗
+    acre_commit_at (fs_gamma_L γfs) ∅ c Φ -∗
+    top_frag (fs_gamma_L γfs) d np -∗
+    top_frag_q (fs_gamma_L γfs) dqc i nc ={E}=∗
+      top_frag (fs_gamma_L γfs) d np'
+      ∗ top_frag_q (fs_gamma_L γfs) dqc i nc
+      ∗ ∃ av : aview,
+          ⌜cre_pre av d nm (dir_entries np) (fn_nlink np) i c⌝
+          ∗ Φ av d nm i.
+  Proof.
+    intros HE Hc Hloc Hdir Hnone Habsp' Habsc.
+    iIntros "#Hi Hcm Hfp Hfc".
+    (* the same re-spelling [mkf_acre_fire] does, and for the same reason:
+       [γtop (fs_gamma_L γfs)] and [fs_top γfs] are the SAME gname
+       ([FsAbs.ftop_gamma_top], by reflexivity) but the unifier cannot
+       solve [γtop ?Γ =?= fs_top γfs]. *)
+    rewrite /top_frag /top_frag_q /fs_gamma_L /=.
+    iMod (inv_acc E ftopN with "Hi") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hbody" as ">Hb".
+    iDestruct "Hb" as (I A) "(Hta & Hla & Hpark & %Hcl)".
+    iDestruct (ghost_map_lookup with "Hta Hfp") as %Hlkp.
+    iDestruct (ghost_map_lookup with "Hta Hfc") as %Hlkc.
+    assert (Hpre : cre_pre (abs_view I) d nm (dir_entries np)
+                     (fn_nlink np) i c).
+    { rewrite /cre_pre. split_and!.
+      - by rewrite (abs_view_lookup I d np Hlkp) (mkf_abs_of_dir np Hdir).
+      - exact Hnone.
+      - by rewrite (abs_view_lookup I i nc Hlkc) Habsc. }
+    assert (Hdelta : abs_view (<[d := np']> I)
+                     = delta_create d nm i c (abs_view I)).
+    { rewrite (abs_view_insert I d np') Habsp'.
+      by rewrite (caf_delta_create_nondir (abs_view I) d nm (dir_entries np)
+                    (fn_nlink np) i c Hc Hpre). }
+    iMod (fupd_mask_subseteq ∅) as "Hcl2"; [set_solver |].
+    iMod ("Hcm" $! I d i nm (dir_entries np) (fn_nlink np)
+            with "[//] Hta") as "[Hta Hph2]".
+    iMod (ghost_map_update np' with "Hta Hfp") as "[Hta Hfp]".
+    iMod ("Hph2" $! (<[d := np']> I) with "[//] Hta") as "[Hta HΦ]".
+    iMod "Hcl2".
+    iMod ("Hclose" with "[Hta Hla Hpark]") as "_".
+    { iNext. rewrite /ftop_body. iExists (<[d := np']> I), A.
+      iFrame "Hta Hla Hpark". iPureIntro.
+      intros jj mm Hj Hun. destruct (decide (jj = d)) as [-> | Hne].
+      - rewrite lookup_insert in Hj. injection Hj as <-. exact Hloc.
+      - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
+        exact (Hcl jj mm Hj Hun). }
+    iModIntro. iFrame "Hfp Hfc". iExists (abs_view I).
+    iSplitR; [by iPureIntro |]. iExact "HΦ".
+  Qed.
+
+  (* the [AFile []] instance, which is the one the T_FILE create-AU fires:
+     a file child is never an [ADir]. *)
+  Lemma caf_acre_fire_file (γfs : fs_names) (E : coPset)
+      (Φ : aview -> Z -> fname -> Z -> iProp Σ)
+      (d i : Z) (nm : fname) (dqc : dfrac) (np np' nc : fs_node) :
+    ↑ftopN ⊆ E ->
+    inode_local d np' ->
+    fn_is_dir np = true ->
+    dir_entries np !! nm = None ->
+    abs_of np' = MkAnode (ADir (<[nm := i]> (dir_entries np))) (fn_nlink np) ->
+    abs_of nc = MkAnode (AFile []) 1%nat ->
+    ftop_inv γfs -∗
+    acre_commit_at (fs_gamma_L γfs) ∅ (AFile []) Φ -∗
+    top_frag (fs_gamma_L γfs) d np -∗
+    top_frag_q (fs_gamma_L γfs) dqc i nc ={E}=∗
+      top_frag (fs_gamma_L γfs) d np'
+      ∗ top_frag_q (fs_gamma_L γfs) dqc i nc
+      ∗ ∃ av : aview,
+          ⌜cre_pre av d nm (dir_entries np) (fn_nlink np) i (AFile [])⌝
+          ∗ Φ av d nm i.
+  Proof.
+    intros HE Hloc Hdir Hnone Habsp' Habsc.
+    iIntros "Hi Hcm Hfp Hfc".
+    iApply (caf_acre_fire γfs E (AFile []) Φ d i nm dqc np np' nc HE
+              ltac:(intros e Hc; discriminate Hc)
+              Hloc Hdir Hnone Habsp' Habsc with "Hi Hcm Hfp Hfc").
+  Qed.
+
+End CreateFire.

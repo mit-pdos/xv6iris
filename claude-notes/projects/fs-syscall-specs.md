@@ -129,8 +129,9 @@ things, and the answer differs:
   first, `dv_*` column off the payloads second.  (iv) the offset seam
   for the fd row; plus the §2 leftovers (`root_is` — `FsImg.ROOTINO`
   is reachable from FsAbs — and the fd/cwd carrier readings).
-  ITEM (iii) ATTEMPTED 2026-08-28 (Opus lane, `iris/FsAbsSeam.v`, zero
-  axioms, EC2-green) AND IT DOES NOT CLOSE AS SCHEDULED.  Three findings,
+  ITEM (iii) ATTEMPTED 2026-08-28 (Opus lane, `iris/FsAbsSeam.v` —
+  **FUSED INTO `FsAbsEra.v` 2026-08-30**, section 0, stub at the old
+  name — zero axioms, EC2-green) AND IT DOES NOT CLOSE AS SCHEDULED.  Three findings,
   all machine-checked:
   1. **The tie is real, pure, and already landed.**  Every payload arm
      (`ic_loaded` via `ic_loaded_flat_body`, `ic_rd_arm`, `ipool_alloc`)
@@ -186,7 +187,8 @@ things, and the answer differs:
     any death index.  `apr_pins_is_apn_pins` is a `reflexivity` receipt
     that it IS the landed accumulator at hop 0.  A NEW LEAF rather than
     an append to `FsAbs.v` for one mechanical reason: the mirror forbids
-    touching a tracked file.  Fuse the two when `FsAbs.v` is next edited.
+    touching a tracked file.  **FUSED INTO `FsAbs.v` 2026-08-30** (section
+    4a''; stub at the old name) — see the FSABS-LEAF-FUSE item below.
   - `FsAbsEra.v` — THE LEND.  `elend Γ d dq ents := ∃ n, top_frag_q Γ dq
     d n ∗ ⌜fn_is_dir n = true ∧ dir_entries n = ents⌝`.  Node
     existential (`ax_hop`'s `F` signature is frozen), but the fire SPLITS
@@ -208,7 +210,9 @@ things, and the answer differs:
     dnl) = T_DIR_z`.  `Hdview` is never touched.  1m57s to compile, so no
     split was needed.  TRANSITIONAL BY DESIGN — the retirement step
     deletes the dv-firing original once consumers move.
-  - `FsAbsEraMknod.v` — lane W's two fire points, DISCHARGED IN ADVANCE:
+  - `FsAbsEraMknod.v` (**FUSED INTO `FsAbsMknodFire.v` 2026-08-30**,
+    section 5, stub at the old name) — lane W's two fire points,
+    DISCHARGED IN ADVANCE:
     `era_dlookup_fire` (its prover's `dlookup_commit` consumed at an era
     hop, lend and state both returned) and `era_acre_fire` (`acre_commit`
     phase 1, with `cre_pre`'s ROW conjunct coming from the lend and the
@@ -238,13 +242,15 @@ things, and the answer differs:
     at `FsAbsEra.elend` over that shorter list, by `reflexivity`; the peel
     `ep_hops_cons`; and `np_dead`, the death arm.  A leaf, not an append to
     `FsAbsEra.v`, for the mirror's reason (it forbids touching a tracked
-    file) — fuse when `FsAbsEra.v` is next edited.
+    file).  **FUSED INTO `FsAbsEra.v` 2026-08-30** (section 6; stub at the
+    old name) — see the FSABS-LEAF-FUSE item below.
   - `SpecNparEra.v` / `ProofNparEra.v` / `LinkNparEra.v` — namex at the
     nameiparent side, `a1 <> 0`, absolute paths.  Plus
     `SpecNparWrapEra.v` / `ProofNparWrapEra.v` / `LinkNparWrapEra.v` —
     nameiparent's own contract over it, so a create-side caller never
     reaches past the wrapper.
-  - `FsAbsNparMknod.v` — THE ACCEPTANCE TEST, discharged:
+  - `FsAbsNparMknod.v` (**FUSED INTO `FsAbsMknodFire.v` 2026-08-30**,
+    section 6, stub at the old name) — THE ACCEPTANCE TEST, discharged:
     `np_pre_of_mknod` (lane W's `mknod_walk_pre_era` one-shot fired at the
     fetched path and at `ROOTINO`, supplying the contract's two trace
     premises) and `np_dead_to_mknod`.
@@ -296,7 +302,8 @@ things, and the answer differs:
      `SpecNameiTr.NameiTrDefs`'s list).
   **THE RELATIVE START: DONE 2026-08-28** (Opus lane, two commits, both
   green on the mirror with the whole tree rebuilt, zero admits).  New leaf
-  `iris/FsAbsStart.v`: `ex_start` / `ep_start`, the trace DEFERRED IN THE
+  `iris/FsAbsStart.v` (**FUSED INTO `FsAbsEra.v` 2026-08-30**, section 7;
+  stub at the old name): `ex_start` / `ep_start`, the trace DEFERRED IN THE
   START INUM —
   `∀ r, ⌜pl !! 0 = Some SLASH -> r = ROOTINO⌝ ={⊤}=∗ P 0 r ∗ hops 0`,
   over the full family and over the parent prefix — plus the two head
@@ -905,8 +912,9 @@ things, and the answer differs:
   FIVE NEW FILES, all EC2-green, zero `Admitted`, R10 clean (`SpecCreate`,
   `SpecCreateAU`, `SpecSysOpenAU`, `ProofCreate`, `ProofCreateAU`,
   `FsAbsMknodFire` all byte-identical; only `iris/_CoqProject` moved):
-  - `FsAbsCreateFire.v` (245 ln, 2.9 s) — **FIRE 2 at a NON-DIRECTORY
-    child.**  `mkf_acre_fire` is device-pinned only through
+  - `FsAbsCreateFire.v` (245 ln, 2.9 s; **FUSED INTO `FsAbsMknodFire.v`
+    2026-08-30**, section 7, stub at the old name) — **FIRE 2 at a
+    NON-DIRECTORY child.**  `mkf_acre_fire` is device-pinned only through
     `SpecSysMknodAU.delta_create_dev`, whose proof uses nothing about a
     device but that it is not an `ADir` (that is what zeroes `acre_bump`
     and what `cre_pre_ne` needs).  So: `caf_delta_create_nondir`,
@@ -1613,6 +1621,101 @@ things, and the answer differs:
      theorem; deleting them is a coordinator/owner call, not this lane's.
      Until it is made, both catalogs stay on-build and the port carries
      the `shk_` prefix.
+
+## FSABS-LEAF-FUSE — the `FsAbs*` leaf housekeeping.  DONE 2026-08-30
+
+One commit (Fable lane), EC2-green with the whole `FsAbs` cone rebuilt (85
+files, `make -k -j24`, `make rc=0`, zero `Error`, zero `Admitted`, zero new
+`Axiom`).  **INTERFACE-PRESERVING BY CONSTRUCTION**: not one file outside
+the `FsAbs*` family moved — not a `Require` line, not `_CoqProject` — because
+every fused name survives as a `Require Export` stub at its old path.  Every
+proof body is the ORIGINAL TEXT in its ORIGINAL `Section` at its ORIGINAL
+binder list; the only authored lines are banners and require blocks.  A
+mechanical check (187 declarations before, 187 after, none added, none
+missing; every non-comment source line still present) is what backs that.
+
+WHAT FUSED — 14 leaves → **7 real files + 7 stubs** (3233 lines vs 3246,
+i.e. line-neutral: the win is compile units, not lines):
+
+- **`FsAbs.v` ← `FsAbsPins.v`** (988 → 1230).  The pin-returning package is
+  section 4a'', dropped between `Typeclasses Opaque apn_pins` and section 5,
+  so section 5's `Require Import InodeRegion` is still the file's last word
+  and `FsAbsPins`'s own `Global Typeclasses Opaque apr_pins` still follows
+  its section.  Zero new requires — `FsAbsPins`'s block was a subset.
+- **`FsAbsEra.v` ← `FsAbsSeam.v` + `FsAbsNpar.v` + `FsAbsStart.v`**
+  (387 → 916).  Sections 0 (the payload seam and its two pure bridges),
+  6 (the nameiparent prefix family), 7 (the deferred start).  New requires:
+  `ByteBuf`, `DirentEnc` (section 7's), `IrefSlots`, `Xv6Cameras` (section
+  0's binder list) — `FsAbs` still LAST, `TsoCtx` still qualified.
+- **`FsAbsMknodFire.v` ← `FsAbsEraMknod.v` + `FsAbsNparMknod.v` +
+  `FsAbsCreateFire.v`** (476 → 1024) — the whole mknod/create family in one
+  file, and all four sections take the SAME binder list, which is the
+  evidence they were one file's worth of work.  `PathElems` / `FsImg`
+  (unimported) / `FsAbsEra` and `TsoCtx` (imported, for `CurCtx`) are
+  required MID-FILE, below the original content, on `FsAbs.v` section 5's
+  precedent — so nothing above them can resolve a name of theirs by
+  accident, and importing `FsImg` cannot shadow `InodeInv.ROOTINO` for the
+  halves that predate it.
+
+THE STUBS (7, each 9 lines: a tombstone comment + `Require Export`):
+`FsAbsPins`→`FsAbs`; `FsAbsSeam`/`FsAbsNpar`/`FsAbsStart`→`FsAbsEra`;
+`FsAbsEraMknod`/`FsAbsNparMknod`/`FsAbsCreateFire`→`FsAbsMknodFire`.  They
+are exact for this tree because **no consumer anywhere uses a qualified
+`FsAbsX.name`** (checked: every such spelling in the tree is inside a
+comment), so `Require Export` restores precisely the names a
+`Require Import` of the old file put in scope.  Removing the stubs — and the
+`Require` lines that name them, in ~20 consumers — is a LATER pass.
+
+WHAT DID NOT FUSE, AND FOR THREE OF THE FOUR IT IS A CONE FACT AND NOT A
+JUDGEMENT CALL.  The remaining fire leaves each stand on a DIFFERENT
+`Spec*AU` contract, and `FsAbsOpenFire` / `FsAbsUnlinkFire` /
+`FsAbsWriteFire` cannot move at all: `SpecSysOpenAU` and `SpecSysUnlinkAU`
+BOTH require `FsAbsMknodFire`, and `FsAbsWriteFire` reaches it through
+`FsAbsOpenFire`, so merging any of the three into it is a dependency CYCLE.
+`FsAbsReadFire` is the one that is a judgement call — `SpecSysReadAU`
+requires only `FsAbs`, so no cycle — and it was left alone on two grounds:
+it would drag the read contract into the cone of every mknod/open/unlink
+consumer for nothing, and a sibling lane was live in the read AU files.
+**One fire leaf per syscall is the shape the cone forces**;
+`FsAbsCreateFire` moved only because create and mknod share `SpecCreate` +
+`SpecSysMknodAU`, so it added no external edge at all.
+
+MEASURED, AND THE FUSE IS A GOOD TRADE (no big-op blowup — these files carry
+no `Definition`-behind-a-big-op body that a merge could make the unifier
+walk; the three `Typeclasses Opaque` seals came across unchanged):
+
+| | before (serial `coqc`) | after |
+|---|---|---|
+| `FsAbs` (+`Pins`) | 3.4 + 2.3 = 5.7 s | **3.4 s** |
+| `FsAbsEra` (+`Seam`,`Npar`,`Start`) | 2.7 + 2.3 + 4.3 + 2.1 = 11.4 s | **5.0 s** |
+| `FsAbsMknodFire` (+`EraMknod`,`NparMknod`,`CreateFire`) | 5.5 + 2.6 + 2.5 + 2.8 = 13.4 s | **6.3 s** |
+| the 10 files | **30.5 s** | **14.7 s** (+ 9.8 s of stubs) |
+
+So the bodies cost the same and the ~2 s/file of cone-loading is what was
+paid seven times over; today's saving is ~6 s and the stub-removal pass
+collects the other ~10 s.  `.vo` bytes fell the same way (`FsAbsEra.vo`
+130 KB against 166 KB for the four; `FsAbsMknodFire.vo` 188 KB against 236
+KB) — one serialization of a shared context instead of four.  Stub `.vo`s
+are ~600 bytes, which is what a `Require Export`-only file weighs and NOT a
+fabricated-empty-file tell.
+
+AUDIT.  18 `Print Assumptions` across the fused files (`apr_walk`,
+`apr_walk_era`, `elend_agrees`, `elend_astate`, `elend_fire_hit`,
+`np_dead_to_mknod`, `np_start_of_mknod`, `ex_start_of_pair`,
+`era_acre_fire`, `ic_loaded_nview_excl`, `ftop_astate_acc`, and the pure
+leaves): **Closed under the global context**, every one.  Downstream,
+`SysMknodAU.wp_sys_mknod_au_era` and `SysUnlinkAU.wp_sys_unlink_au` audit to
+the standing three (`resv_matches`, `resv_is_valid`,
+`functional_extensionality_dep`) — unchanged.
+
+BUILD NOTE FOR THE NEXT LANE.  The mirror had a sibling lane compiling in
+it, so this closure ran in an **isolated `rsync` copy** of the checkout
+(`/home/ubuntu/zfuse`, `--exclude=.git`, sibling's dirty files reverted to
+HEAD first), removed afterwards; `/shared/xv6iris` was never touched beyond
+scratch files that were cleaned up.  That is the right recipe whenever two
+lanes are live: editing a file as low as `FsAbs.v` under someone else's
+running build is exactly the "inconsistent assumptions" poisoning
+durable-notes warns about.
 
 ## RULING BRIEFS (drafted 2026-08-30, coordinator; each is a yes/no)
 
