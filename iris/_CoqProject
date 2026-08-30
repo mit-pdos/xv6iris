@@ -1598,6 +1598,20 @@ ProofKexecPinA.v
 ProofKexecPin.v
 LinkKexecPin.v
 
+# THE CONSOLE TRACE CONNECTION (fs-syscall-specs; claude-notes/projects/
+# uart-trace.md, the SAFETY direction).
+#   UartAccepted is the pure leaf beside ObsTrace: the device invariant
+# [u_wire <= u_out] as a step invariant of the language, and the TIE it
+# gives -- every ObsUartOut byte of the current power cycle is a byte the
+# kernel ACCEPTED, in order ([run_out_accepted]), plus the locating step a
+# located receipt needs.  UartSentResidue is the Iris-to-pure step:
+# [UartSentLoc.uart_sent_from] agreed against [WpUart.uart_sent_auth] IS
+# the pure residue those theorems take.  SystemUartAccepted states the
+# whole thing beside adequacy's own conclusion at the real image.
+UartAccepted.v
+UartSentResidue.v
+SystemUartAccepted.v
+
 # OFF-BUILD (2026-08-30): the stage-1 init program proof, first Uk
 # generation -- UkInit.v, UkInitPrintf.v, UkInitLoop.v.  Upstream's
 # urun rework (727cccf7c: "ditch the old program proofs") deleted the
