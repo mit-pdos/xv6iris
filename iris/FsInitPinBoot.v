@@ -80,21 +80,12 @@ From iris.base_logic.lib Require Import ghost_map.
    after [FsAbs].  Every module here is already on [FsInitPin]'s cone. *)
 Require Import Xv6Cameras.
 Require Import FsState.
-Require Import BioDefs.
-Require Import DinodeEnc.
-Require Import DirView.
-Require Import InodeInv.
-Require Import FsTree.
-Require Import IcacheEscrow.
-Require Import FsStateEra.
 Require Import FsCrash.        (* [fs_recovery], [fs_recovery_det],
                                   [fs_recovery_clean], [hdr_wset],
                                   [fs_blocks]; re-exports [LogDefs]     *)
 Require Import FsDurSnap.      (* [snap_ok], [sk_bytes], [sk_sbok],
                                   [fs_snap], [fs_snap_read_ok_keep]     *)
-Require Import FsDurSyscall.
 Require Import FsCfgBoot.      (* [fs_boot_snap_wf] -- the mint's bundle *)
-Require Import FsDurImg.
 Require Import SystemAdequacy. (* [fsimg_cov], [fsimg_nib]              *)
 Require Import FsImgDisk.      (* [fsimg_P] = [fs_blocks fsimg_dk]      *)
 Require Import FsImgCheck.     (* [fsimg_sb], [fsimg_wf_log_clean],
@@ -102,7 +93,6 @@ Require Import FsImgCheck.     (* [fsimg_sb], [fsimg_wf_log_clean],
 Require Import FsImg.
 Require Import FsAbs.          (* LAST (FsAbs's own rule)               *)
 Require Import FsInitPin.      (* [era0_D], [INIT_INO], [init_path],
-Require Import TsoCtx.
                                   [init_bytes] and the three pins       *)
 
 Local Open Scope Z_scope.

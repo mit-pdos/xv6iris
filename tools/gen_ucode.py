@@ -654,6 +654,8 @@ def disasm(dump, pc, width, t):
 # Emission.
 # ---------------------------------------------------------------------------
 
+SIGMA = '\u03a3'
+
 IMPORTS = """From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
@@ -1087,68 +1089,105 @@ def emit(dump, prog, pcs, groups, dropped, skipfuncs, skipdefault, notes, asts,
 
     # ---- §2 --------------------------------------------------------------
     a('(* ===================================================================== *)')
-    a('(* §2 Per-PC [uinstr] facts.                                              *)')
+    a('(* §2 Per-PC [uinstr_is] resources.                                       *)')
     a('(* ===================================================================== *)')
     a('')
+    a('(* The proof mode arrives HERE, not at the top of the file: its [rewrite]')
+    a('   is ssreflect\'s, and §0 and §1 above are pure-Coq proofs whose')
+    a('   [rewrite A, B] and [rewrite _ by _] are the vanilla forms.  Everything')
+    a('   below this line is separation logic. *)')
+    a('From iris.proofmode Require Import proofmode.')
+    a('From iris.base_logic.lib Require Import ghost_map.')
+    a('Require Import RiscvLang.')
+    a('Require Import UserPerm UserHeap.')
+    a('Local Open Scope Z_scope.')
+    a('')
     for l in comment_block(
-            'Shared shape: [ui_al2] / [ui_canon] / [ui_inpage] are [vm_compute]s on '
-            'the concrete pc; [ui_leaf] is ONE application of '
-            '[%s_text_layout_fetch], which finds the pc\'s page itself; and each '
-            'byte of [ui_code]\'s window is a concrete [%s_bytes] lookup '
-            'transported by [%s_text_sub].\n\n'
-            'NOTE the RVC-at-4-ALIGNED extra obligation: the fetch of a compressed '
-            'instruction at a 4-aligned pc is ONE 4-byte read, so [uinstr] also '
-            'wants the two FOLLOWING bytes present (their values are irrelevant -- '
-            'they belong to the next instruction, and are quoted from the image).'
-            % (P, P, P)):
+            '[UserHeap.uinstr_is] is the SEPARATION-LOGIC instruction resource: '
+            'the text bytes of one instruction as PERSISTENT points-to fragments, '
+            'plus the decode fact.  A leaf on [UkRun.urun] takes it directly, and '
+            'nothing here mentions a page table -- which is the whole difference '
+            'from the [uinstr] facts this section used to emit.\n\n'
+            'Each proof pulls its window out of the program\'s text with '
+            '[utext_run_of] and closes with one of [uinstr_is_base] / [_rvc4] / '
+            '[_rvc2].  The alignment and in-page conditions are [vm_compute]s on '
+            'the concrete pc; each byte of the window is a concrete [%s_bytes] '
+            'lookup transported by [%s_text_sub]; and the X-and-not-W verdict for '
+            'the window\'s addresses -- what puts them in the TEXT heap rather '
+            'than the data one -- comes from [Hx].\n\n'
+            'NOTE the RVC-at-4-ALIGNED case.  A compressed instruction at a '
+            '4-aligned pc is fetched as ONE 4-byte read, so the resource carries '
+            'the whole WORD.  The generator emits it as a literal (it knows the '
+            'two following bytes, which belong to the next instruction), and '
+            '[subrange_vec_dec w 15 0 = h] is then a [vm_compute].'
+            % (P, P)):
         a(l)
     a('')
-    a('(* the four field goals that do not depend on the encoding *)')
-    a('Ltac ui_frame off Hl :=')
-    a('  constructor;')
-    a('  [ vm_compute; reflexivity                                   (* ui_al2    *)')
-    a('  | vm_compute; reflexivity                                   (* ui_canon  *)')
-    a('  | apply (%s_text_layout_fetch _ off Hl); lia               (* ui_leaf   *)' % P)
-    a('  | apply Z.leb_le; vm_compute; reflexivity                   (* ui_inpage *)')
-    a('  | idtac ].')
-    a('')
-    a('(* one image byte, through [%s_text_sub] *)' % P)
-    a('Ltac ui_byte Hsub := apply Hsub; vm_compute; f_equal; apply bv_eq; reflexivity.')
-    a('')
-    a('Ltac ui_bytes2 Hsub :=')
-    a('  let j := fresh "j" in let Hj := fresh "Hj" in')
-    a('  intros j Hj; do 2 (destruct j as [|j]; [ui_byte Hsub|]); lia.')
-    a('Ltac ui_bytes4 Hsub :=')
-    a('  let j := fresh "j" in let Hj := fresh "Hj" in')
-    a('  intros j Hj; do 4 (destruct j as [|j]; [ui_byte Hsub|]); lia.')
-    a('')
-    a('(* compressed at a 2-mod-4 pc: 2-byte fetch, no trailing-byte obligation *)')
-    a('Ltac ui_rvc2 off Hl Hsub h dec :=')
-    a('  let Hc := fresh "Hc" in')
-    a('  ui_frame off Hl;')
-    a('  exists h; split; [vm_compute; reflexivity|];')
-    a('  split; [ui_bytes2 Hsub|];')
-    a('  split; [exact dec|];')
-    a('  intro Hc; vm_compute in Hc; discriminate.')
-    a('')
-    a('(* compressed at a 4-aligned pc: 4-byte fetch, so [b2]/[b3] must be there *)')
-    a('Ltac ui_rvc4 off Hl Hsub h dec b2 b3 :=')
-    a('  ui_frame off Hl;')
-    a('  exists h; split; [vm_compute; reflexivity|];')
-    a('  split; [ui_bytes2 Hsub|];')
-    a('  split; [exact dec|];')
-    a('  intros _; exists b2, b3; split; ui_byte Hsub.')
-    a('')
-    a('(* base (either alignment): 4 bytes of window *)')
-    a('Ltac ui_base off Hl Hsub w dec :=')
-    a('  ui_frame off Hl;')
-    a('  exists w; split; [vm_compute; reflexivity|];')
-    a('  split; [ui_bytes4 Hsub|]; exact dec.')
     a('')
     sec = os.path.basename(out_path)[:-2]
     a('Section %s.' % sec)
-    a('  Context (pt : uptd) (M : gmap Z (bv 8)).')
-    a('  Context (Hl : %s_text_layout pt) (Hsub : %s_text_sub M).' % (P, P))
+    a('  Context `{!riscvGS \u03a3}.')
+    a('  Context (gt : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm).')
+    a('  Context (Hsub : %s_text_sub M).' % P)
+    a('  (* the executable segment is X and not W -- the program\'s side of the')
+    a('     two-heap split.  A concrete permission map decides both. *)')
+    a('  Context (Hx : forall a : Z, (0 <= a < %d)%%Z ->' % (ntext * PAGE))
+    a('                  ux_addr pm a /\\ ~ uw_addr pm a).')
+    a('')
+    a('  (* The tactics live INSIDE the section so they can name [M], [pm] and')
+    a('     the concrete address: [utext_run_of] takes the run\'s base as an')
+    a('     argument, and leaving it to unification would run the byte')
+    a('     side-conditions against an unresolved evar. *)')
+    a('')
+    a('  (* one image byte, through [%s_text_sub] *)' % P)
+    a('  Ltac uis_byte := apply Hsub; vm_compute; f_equal; apply bv_eq; reflexivity.')
+    a('')
+    a('  Ltac uis_bytes2 :=')
+    a('    let j := fresh "j" in let Hj := fresh "Hj" in')
+    a('    intros j Hj; do 2 (destruct j as [|j]; [uis_byte|]); lia.')
+    a('  Ltac uis_bytes4 :=')
+    a('    let j := fresh "j" in let Hj := fresh "Hj" in')
+    a('    intros j Hj; do 4 (destruct j as [|j]; [uis_byte|]); lia.')
+    a('')
+    a('  (* the window lies in the executable segment, so every address of it is')
+    a('     X and not W -- which is what puts it in the TEXT heap *)')
+    a('  Ltac uis_perm off :=')
+    a('    let j := fresh "j" in let Hj := fresh "Hj" in')
+    a('    intros j Hj;')
+    a('    replace (uint (mword_of_int off : mword 64)) with off')
+    a('      by (vm_compute; reflexivity);')
+    a('    apply Hx; lia.')
+    a('')
+    a('  Ltac uis_run off n w :=')
+    a('    iApply (utext_run_of gt M pm (uint (mword_of_int off : mword 64)) n w')
+    a('              ltac:(first [ uis_bytes2 | uis_bytes4 ]) ltac:(uis_perm off));')
+    a('    iExact "Ht".')
+    a('')
+    a('  (* compressed at a 2-mod-4 pc: the resource is the two bytes there *)')
+    a('  Ltac uis_rvc2 off h dec :=')
+    a('    iApply (uinstr_is_rvc2 gt (mword_of_int off) h _')
+    a('              ltac:(vm_compute; reflexivity)')
+    a('              ltac:(vm_compute; reflexivity)')
+    a('              ltac:(apply Z.leb_le; vm_compute; reflexivity)')
+    a('              ltac:(vm_compute; reflexivity) dec);')
+    a('    uis_run off 2%nat h.')
+    a('')
+    a('  (* compressed at a 4-aligned pc: the resource is the whole fetched word *)')
+    a('  Ltac uis_rvc4 off h dec w :=')
+    a('    iApply (uinstr_is_rvc4 gt (mword_of_int off) h w _')
+    a('              ltac:(vm_compute; reflexivity)')
+    a('              ltac:(apply Z.leb_le; vm_compute; reflexivity)')
+    a('              ltac:(vm_compute; reflexivity) dec')
+    a('              ltac:(apply bv_eq; vm_compute; reflexivity));')
+    a('    uis_run off 4%nat w.')
+    a('')
+    a('  (* base (either alignment): 4 bytes of window *)')
+    a('  Ltac uis_base off w dec :=')
+    a('    iApply (uinstr_is_base gt (mword_of_int off) w _')
+    a('              ltac:(vm_compute; reflexivity)')
+    a('              ltac:(apply Z.leb_le; vm_compute; reflexivity)')
+    a('              ltac:(vm_compute; reflexivity) dec);')
+    a('    uis_run off 4%nat w.')
     a('')
     for sym, gp in groups:
         if not gp:
@@ -1162,22 +1201,74 @@ def emit(dump, prog, pcs, groups, dropped, skipfuncs, skipdefault, notes, asts,
             term = rendered[(width, enc)]
             note = disasm(dump, pc, width, t)
             a('  (* 0x%x  %s  (%s) *)' % (pc, csan(note), geometry_note(pc, width)))
-            a('  Lemma ui_%s_%02x :' % (P, pc))
-            a('    uinstr pt M (mword_of_int 0x%x) %s' % (pc, 'true' if width == 16 else 'false'))
+            a('  Lemma uis_%s_%02x :' % (P, pc))
+            a('    utext_all gt M pm -∗')
+            a('    uinstr_is gt (mword_of_int 0x%x) %s' % (pc, 'true' if width == 16 else 'false'))
             a('      (%s).' % term)
             g = geometry(pc, width)
             if g == 'base':
-                a('  Proof. ui_base 0x%x Hl Hsub (mword_of_int 0x%08x : mword 32) udec_%08x. Qed.'
+                a('  Proof.')
+                a('    iIntros "#Ht".')
+                a('    uis_base 0x%x (mword_of_int 0x%08x : mword 32) udec_%08x.'
                   % (pc, enc, enc))
+                a('  Qed.')
             elif g == 'rvc2':
-                a('  Proof. ui_rvc2 0x%x Hl Hsub (mword_of_int 0x%04x : mword 16) udec_%04x. Qed.'
+                a('  Proof.')
+                a('    iIntros "#Ht".')
+                a('    uis_rvc2 0x%x (mword_of_int 0x%04x : mword 16) udec_%04x.'
                   % (pc, enc, enc))
+                a('  Qed.')
             else:
                 b2, b3 = dump.bytes[pc + 2], dump.bytes[pc + 3]
-                a('  Proof. ui_rvc4 0x%x Hl Hsub (mword_of_int 0x%04x : mword 16) udec_%04x'
+                word = enc | (b2 << 16) | (b3 << 24)
+                a('  Proof.')
+                a('    iIntros "#Ht".')
+                a('    uis_rvc4 0x%x (mword_of_int 0x%04x : mword 16) udec_%04x'
                   % (pc, enc, enc))
-                a('           (Z_to_bv 8 0x%02x) (Z_to_bv 8 0x%02x). Qed.' % (b2, b3))
+                a('      (mword_of_int 0x%08x : mword 32).' % word)
+                a('  Qed.')
             a('')
+    # ---- §3 --------------------------------------------------------------
+    allpcs = [pc for _, gp in groups for pc in gp]
+    a('  (* =================================================================== *)')
+    a('  (* §3 The catalog as ONE resource.                                      *)')
+    a('  (* =================================================================== *)')
+    a('')
+    for l in comment_block(
+            'A program proof cannot hold [utext_all gt M pm]: [M] and [pm] are '
+            'hidden inside [UkRun.urun], existentially.  It holds THIS instead -- '
+            'the per-pc resources bundled, which name only the gname and the pc.  '
+            'It is persistent, so a function destructs it once and every branch '
+            'still has it.\n\n'
+            'Destruct with:\n'
+            '  iDestruct "Hcode" as "(%s)"'
+            % ' & '.join('C%02x' % pc for pc in allpcs)):
+        a('  ' + l if l else l)
+    a('')
+    a('  Definition %s_code (g : gname) : iProp %s :=' % (P, SIGMA))
+    for n, pc in enumerate(allpcs):
+        width, enc = dump.by_addr[pc]
+        term = rendered[(width, enc)]
+        head = '    (' if n == 0 else '     '
+        tail = ')%I.' if n == len(allpcs) - 1 else ' ∗'
+        a('%suinstr_is g (mword_of_int 0x%x) %s'
+          % (head, pc, 'true' if width == 16 else 'false'))
+        a('       (%s)%s' % (term, tail))
+    a('')
+    a('  Global Instance %s_code_persistent g : Persistent (%s_code g).' % (P, P))
+    a('  Proof. apply _. Qed.')
+    a('')
+    a('  (* ...and where it comes from: the text the process entry hands out *)')
+    a('  Lemma %s_code_of_text : utext_all gt M pm -∗ %s_code gt.' % (P, P))
+    a('  Proof.')
+    # NOT [repeat iSplit]: [uinstr_is] is ITSELF a separating conjunction,
+    # so a blind repeat descends into the first instruction's own clauses.
+    a('    iIntros "#Ht". rewrite /%s_code.' % P)
+    for pc in allpcs[:-1]:
+        a('    iSplit; [ iApply (uis_%s_%02x with "Ht") | ].' % (P, pc))
+    a('    iApply (uis_%s_%02x with "Ht").' % (P, allpcs[-1]))
+    a('  Qed.')
+    a('')
     a('End %s.' % sec)
 
     text = '\n'.join(L) + '\n'

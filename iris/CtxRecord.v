@@ -39,7 +39,7 @@ From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import invariants ghost_var.
 Require Import SailStdpp.Base SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto.
+Require Import RiscvPtsto.
 Require Import TsoCtx.
 
 Section CtxRecord.

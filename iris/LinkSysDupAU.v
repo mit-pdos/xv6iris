@@ -7,6 +7,5 @@
    dup touches NO fs state, so no era/AU form of any callee enters).  This
    composition therefore assumes nothing the landed sys_dup does not. *)
 Require Import LinkArgfd LinkFdalloc LinkFiledup ProofSysDupAU.
-Require Import TsoCtx.
 
 Module SysDupAU := SysDupAUProof Argfd Fdalloc Filedup.

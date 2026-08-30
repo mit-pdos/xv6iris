@@ -37,7 +37,7 @@
   (`DiskStepWild`). Lifting rules `wp_uart_step`/`wp_disk_step`/
   `wp_plic_step` (RiscvExec.v) each hand over the full interp triple (the
   disk one is the reason: DMA needs `gen_heap_interp` handed over, not
-  framed). Loop WPs (WpUart.v): `wp_uart_loop` under `uart_inv ∗ plic_inv`,
+  framed). Loop WPs (WpUart.v): `wp_uart_loop` under `uart_inv ∗ plic_inv ∗ uart_obs_permit γ` (the TRACE PERMIT: the tx/rx arms are observed and the history ghost moves only with the client's half — `projects/uart-trace.md`; `uart_obs_permit_triv` discharges it at the trivial trace predicate),
   `wp_disk_loop` under `disk_inv ∗ plic_inv` (each device reaches into the
   weak PLIC invariant to latch its own interrupt), `wp_plic_loop` under
   `plic_inv ∗ wire_inv` (`wire_inv`, WireInv.v `wireN`: every hart's

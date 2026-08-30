@@ -22,7 +22,6 @@ From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.MachineWord SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types.
-Require Import RiscvLang.
 Require Import ProcGeom.     (* [tf_epc_idx] / [TFWORDS] *)
 Local Open Scope Z_scope.
 

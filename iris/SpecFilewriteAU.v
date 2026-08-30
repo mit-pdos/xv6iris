@@ -102,9 +102,7 @@ Require Import KvmSpec.
 Require Import ProcPtOwn.
 Require Import ProcInv.
 Require Import FileInvDefs.
-Require Import ConsoleInv.
-Require Import FsBlocks.
-Require Import InodeInv.
+Require Import Xv6Cameras.
 Require Import SpecFilewrite.   (* the landed contract this parallels       *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

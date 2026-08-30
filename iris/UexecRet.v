@@ -94,14 +94,11 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvFetchExec RiscvExtras.
+Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import RegFile InstrBytes WpGpr.
-Require Import MinstretInv WireInv.
-Require Import WpIntrCore.    (* [stvec_base] *)
 Require Import AlignBits.    (* [update_bit0_zero_of_aligned2] *)
 Require Import ProcGeom.     (* [tf_epc_idx] / [tf_arg_idx] / [TFWORDS] *)
 Require Import UserPtTree.   (* [uptd] / [user_pt_inv] *)
-Require Import UserFrame.    (* [u_regs] *)
 Require Import UserExec.     (* [ucfg] / [user_cfg] / [trap_mstatus_ok] / [user_trap_frame] *)
 Require Import SpecUserret.  (* [userret_gpr] *)
 Require Import UexecWp.      (* [loop_ok] / [uexec_wp] *)

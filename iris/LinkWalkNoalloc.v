@@ -4,4 +4,4 @@
 Require Import SpecWalk.
 Require Import ProofWalkNoalloc.
 
-Module WalkNoalloc : WALK_NOALLOC := WalkNoallocProof.
+Module WalkNoalloc := WalkNoallocProof.

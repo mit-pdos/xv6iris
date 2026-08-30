@@ -74,25 +74,21 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
-Require Import MinstretInv WpGpr RegFile InstrBytes.
+Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
+Require Import WpGpr RegFile InstrBytes.
 Require Import WpIntrCore.
 Require Import RiscvExtras.
 Require Import WpDecodeBridge DecodeTotalU.
-Require Import CommonWalk.
-Require Import PtreeType PtAdBits PtTree KptTree.
-Require Import SRegime UptTree UptWalkPt.
-Require Import UserMem UserFetch UserPtTree UserTranslate.
+Require Import PtreeType PtTree.
+Require Import UptTree.
+Require Import UserPtTree.
 Require Import HartSwp HartLift HartSpan HartGoodb HartMemRun HartMCycle
         HartStepFull HartRunFull HartRunGen.
-Require Import PtBytes UserBytes UserFrame UserClassifyAsm.
-Require Import UserFetchCert UserFaultCert.
+Require Import UserBytes UserFrame UserClassifyAsm.
 Require Import UserExec UserStep UserTrap UserExecFacts.
-Require Import UserStepFull.
 Require UserTotalU.
 Require Import UserActiveClass.
 Require Import UmodeMem UmodeCap UmodeFetch.
-Require Import WpDecode.
 Require Import WpUmodeStep.
 Require Import ProcPtOwn.    (* [proc_pt_wf] *)
 Require Import UserPerm.
@@ -1477,7 +1473,7 @@ Section UkRetire.
             [ exact (Hbytes 0%nat ltac:(lia)) | exact (Hbytes 1%nat ltac:(lia))
             | exact Hb2 | exact Hb3 ]. }
         destruct (uv_fetch_4 pt' Mp' t rsA w_leaf pc (urvc4_word h b2 b3)
-                    Hinj Hum Hlok Hcanon Hinpage Hal4 Hbytes4 LpcA LcpA
+                    Hinj Hum Hlok Hcanon Hal4 Hbytes4 LpcA LcpA
                     (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
         rewrite urvc4_low HisRVC in Hfe.
@@ -1487,7 +1483,7 @@ Section UkRetire.
                   with "Hcert Hamb Hk Hany Hrw Hro Hmm Hres").
       + (* 2 mod 4: one 2-byte read *)
         destruct (uv_fetch_rvc_2 pt' Mp' t rsA w_leaf pc h
-                    Hinj Hum Hlok Hcanon Hinpage Hal2' Hal4 Hbytes HisRVC
+                    Hinj Hum Hlok Hcanon Hal2' Hal4 Hbytes HisRVC
                     LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
         iApply (uk_obl_rvc C' pt' R Rut' sz' π M Mp' m pc h i o jt wr t t' usatp pcfg paddr
@@ -1498,7 +1494,7 @@ Section UkRetire.
       destruct Hcode as (w & HnRVC & Hbytes & Hdecbase).
       destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal4.
       + destruct (uv_fetch_4 pt' Mp' t rsA w_leaf pc w
-                    Hinj Hum Hlok Hcanon Hinpage Hal4 Hbytes LpcA LcpA
+                    Hinj Hum Hlok Hcanon Hal4 Hbytes LpcA LcpA
                     (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
         rewrite HnRVC in Hfe.
@@ -1506,7 +1502,7 @@ Section UkRetire.
                   rs1 rsA rsf Hpre Hpure Hfe Hfg Tr Htlbok' Htok' Hshape Hdecbase
                   Hwrok Hred Hg1 Hg2 Hexec
                   with "Hcert Hamb Hk Hany Hrw Hro Hmm Hres").
-      + destruct (uv_fetch_base_2 pt' Mp' t rsA w_leaf pc w
+      + destruct (uv_fetch_base_2_pg pt' Mp' t rsA w_leaf pc w
                     Hinj Hum Hlok Hcanon Hinpage Hal2' Hal4 Hbytes HnRVC
                     LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
@@ -1866,14 +1862,14 @@ Section UkEcall.
               pt_same_shape 2 t t').
     { destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal4.
       - destruct (uv_fetch_4 pt' Mp' t rsA w_leaf pc w
-                    Hinj Hum Hlok Hcanon Hinpage Hal4 Hbytes LpcA LcpA
+                    Hinj Hum Hlok Hcanon Hal4 Hbytes LpcA LcpA
                     (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
         rewrite HnRVC in Hfe.
         exists rsf, t'. split_and!;
           [ exact Hfe | exact Hfg | exact Tr | exact Htlbok' | exact Htok'
           | exact Hshape ].
-      - destruct (uv_fetch_base_2 pt' Mp' t rsA w_leaf pc w
+      - destruct (uv_fetch_base_2_pg pt' Mp' t rsA w_leaf pc w
                     Hinj Hum Hlok Hcanon Hinpage Hal2' Hal4 Hbytes HnRVC
                     LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).

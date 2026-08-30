@@ -78,15 +78,11 @@ Require Import SailStdpp.Base SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto.
 Require Import DinodeEnc.
 Require Import DirView.          (* [T_DIR_z]                               *)
-Require Import FsTree.           (* [fname], [file_bytes]                   *)
-Require Import PathElems.
 Require Import FsBlocks.         (* [fs_names]                              *)
 Require Import FsBytesGamma.     (* [fs_gamma_L]                            *)
 Require Import InodeInv.
-Require Import InodeLock.
 Require Import IrefSlots.
-Require Import IcacheRef.
-Require Import IcacheEscrow.
+Require Import Xv6Cameras.
 (* the three binder classes the section list names, IMPORTED rather than
    inherited ([FsAbsMknodFire]'s header records why). *)
 Require Import FdSlots.          (* [fdslotG]                               *)
@@ -98,9 +94,7 @@ Require Import Xv6G.
 Require Import SpecItrunc.       (* [di_trunc]                              *)
 Require Import SpecSysMknodAU.   (* [abs_view_insert]                       *)
 Require Import SpecSysOpenAU.    (* the contract this file serves           *)
-Require Import FsAbsEra.
 Require Import FsAbsStart.       (* [ex_start]                              *)
-Require Import FsAbsEraMknod.
 Require Import FsAbsNparMknod.   (* [np_rootino_agree]                      *)
 Require Import FsAbsMknodFire.   (* [mkf_abs_of_dir], [mkf_era_is_dir]      *)
 Require FsImg.                   (* [T_FILE_z], [ROOTINO] -- Require, NOT

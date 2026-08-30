@@ -66,18 +66,10 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import RiscvModelBytes.
-Require Import DinodeEnc.
-Require Import InodeInv.
-Require Import InodeLock.
-Require Import DirView.
-Require Import FsStateInode.
-Require Import FsStateEra.
+Require Import Xv6Cameras.
 Require Import LogInv.
 Require Import FdSlots FileInvDefs.
-Require Import ProcGeom.
 Require Import ProcPtOwn ProcInv.
-Require Import PipeInvDefs.
-Require Import SpecWritei.        (* [K_writei]: [filewrite_stack] parses it *)
 Require Import SpecConsolewrite.  (* [consolewrite_stack]                    *)
 Require Import ConsoleInv.        (* [NDEV_max], [CONSOLE], [a_devsw_write]  *)
 Require Import SpecFilewrite.
@@ -154,35 +146,22 @@ Require Import RegFile.
 Require Import HartTp WpNext.
 Require Import WpMmodeLeafBase.
 Require Import StackOwn.
-Require Import CalleeSaved KernelText KernelDataInv.
+Require Import CalleeSaved.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpSmodeIntr WpSmodeHalf.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import UserPtTree.
-Require Import KvmSpec.
-Require Import SchedCtx.
 Require Import WpLock.
-Require Import SpecPanic.
-Require Import FileOff.
-Require Import DiskPtsto WpUart BioInv FsBlocks FsCrash.
+Require Import WpUart.
 Require Import UartTxInv.
-Require Import UartSentLoc.
-Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import FsTree.
-Require Import IcacheEscrow.
 (* [dev_major] and [NDEV_max] are SpecFileread's -- [SpecFilewrite] states
    [filewrite_dev_env]'s guard with them but does not re-export them. *)
-Require Import SpecFileread.
 Require Import CodeFilewrite ProofFilereadParts ProofFilewriteParts.
 Require Import ProcAvail.
-Require Import FsBytesGamma.
 Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Require Import SpecConsolewriteLoc.   (* the LOCATED callee                *)
-Require Import SpecSysWriteConsAU.    (* [write_cons_arms]                 *)
 Require Import SpecFilewriteCons.     (* the contract, and its bridges     *)
-Require Import FsAbs.                 (* LAST (FsAbs's own rule)           *)
 Import Defs.
 
 Set Printing Depth 40.

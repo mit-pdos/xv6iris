@@ -204,7 +204,9 @@ Section ProcinitSeals.
   Proof.
     iIntros "(Hlk & Hst & Hks & Hdorm) Hch Hpub Hpark Hg Hkst".
     iFrame "Hlk Hks".
+    rewrite /proc_lock_res /proc_lock_res_at.
     iExists UNUSED, ch. iFrame "Hst Hg Hch Hpub".
+    change (proc_slots_at γs cur_ctx (proc_addr i) UNUSED) with (proc_slots γs (proc_addr i) UNUSED).
     iApply (proc_slots_unused_intro with "[Hdorm Hkst] Hpark").
     iApply (proc_dormant_prestk_seal with "Hdorm Hkst").
   Qed.
@@ -353,7 +355,7 @@ Section ProcinitProcsInv.
                  (fun i g => ((∀ R : CtxId → iProp Σ, ⌜CtxMorph R⌝ -∗
                                  R cur_ctx ={E}=∗ is_lock g (proc_addr i) "proc"%string R)
                               ∗ proc_res i)%I)
-                 (fun i g => (|={E}=> is_lock g (proc_addr i) "proc"%string <{ proc_lock_res γs g (proc_addr i) }> ∗
+                 (fun i g => (|={E}=> is_lock g (proc_addr i) "proc"%string (proc_lock_pay γs g (proc_addr i)) ∗
                                       ∃ ks : mword 64, is_kstack (proc_addr i) ks)%I)
                  γs with "Hmk []") as "Hmk".
     { iIntros "!>" (i g _) "[Hmk (Hks & Hst & Hch & Hpub & Hdorm & Hpark & Hg & Hstk)]".
@@ -364,7 +366,7 @@ Section ProcinitProcsInv.
       iAssert (kstack_free (proc_addr i)) with "[Hstk]" as "Hkst".
       { iApply (kstack_free_intro (proc_addr i) (kstack_va i)
                   with "[] Hstk"). iExact "Hksp". }
-      iMod ("Hmk" $! (<{ proc_lock_res γs g (proc_addr i) }>)
+      iMod ("Hmk" $! ((proc_lock_pay γs g (proc_addr i)))
               with "[%] [Hst Hg Hch Hpub Hdorm Hpark Hkst]") as "#Hlk".
       { (* the payload's transport obligation (§0.18') *) apply _. }
       { iApply (proc_lock_res_intro γs g (proc_addr i) UNUSED ch

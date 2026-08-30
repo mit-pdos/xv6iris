@@ -474,7 +474,10 @@ Lemma uv_fetch_4 (pt : uptd) (M : gmap Z (bv 8)) (t : ptree) (rsf : regstate)
   ud_um pt !! svpn_of pc = Some w_leaf ->
   uleaf_ok (InstructionFetch tt) w_leaf ->
   uva_canon pc ->
-  Z.rem (uint pc) 4096 <= 4092 ->
+  (* no in-page premise: a 4-ALIGNED pc has a page offset that is a multiple
+     of 4, hence at most 4092, so a 4-byte read starting there cannot leave
+     the page ([ualign4_nc]).  The one geometry that CAN cross is the
+     2-mod-4 base fetch, and it takes the second halfword's leaf instead. *)
   is_aligned_vaddr (Virtaddr pc) 4 = true ->
   uM_bytes M (uint pc) 4 iw ->
   register_lookup PC rsf = pc ->
@@ -495,10 +498,10 @@ Lemma uv_fetch_4 (pt : uptd) (M : gmap Z (bv 8)) (t : ptree) (rsf : regstate)
     uv_tree_ok pt (upa_map pt M) t' /\
     pt_same_shape 2 t t'.
 Proof.
-  intros Hinj Hl Hleaf Hcanon Hpg Hal Hb Lpc Lcp Lsxl Lmenv Hpins Htok.
+  intros Hinj Hl Hleaf Hcanon Hal Hb Lpc Lcp Lsxl Lmenv Hpins Htok.
   assert (Hnc : forall j : nat, (j < 4)%nat ->
             bv_unsigned pc mod 4096 + Z.of_nat j < 4096)
-    by (intros j Hj; exact (uinpage_nc pc (Z.of_nat j) Hpg ltac:(lia))).
+    by (intros j Hj; exact (ualign4_nc pc (Z.of_nat j) Hal ltac:(lia))).
   destruct (uv_walk_fetch pt t (upa_map pt M) rsf w_leaf pc
               Hl Hleaf Hcanon Lcp Lsxl Lmenv Hpins Htok)
     as (rsf1 & t1 & Htr & Htrg & Tr1 & Htlbok1 & Htok1 & Hshape1).
@@ -526,7 +529,8 @@ Lemma uv_fetch_rvc_2 (pt : uptd) (M : gmap Z (bv 8)) (t : ptree)
   ud_um pt !! svpn_of pc = Some w_leaf ->
   uleaf_ok (InstructionFetch tt) w_leaf ->
   uva_canon pc ->
-  Z.rem (uint pc) 4096 <= 4092 ->
+  (* likewise: a 2-ALIGNED pc's page offset is even, hence at most 4094, so
+     a 2-byte read starting there cannot leave the page ([ualign2_nc]) *)
   is_aligned_vaddr (Virtaddr pc) 2 = true ->
   is_aligned_vaddr (Virtaddr pc) 4 = false ->
   uM_bytes M (uint pc) 2 h ->
@@ -547,7 +551,7 @@ Lemma uv_fetch_rvc_2 (pt : uptd) (M : gmap Z (bv 8)) (t : ptree)
     uv_tree_ok pt (upa_map pt M) t' /\
     pt_same_shape 2 t t'.
 Proof.
-  intros Hinj Hl Hleaf Hcanon Hpg Hal2 Hnal4 Hb Hrvc Lpc Lcp Lsxl Lmenv
+  intros Hinj Hl Hleaf Hcanon Hal2 Hnal4 Hb Hrvc Lpc Lcp Lsxl Lmenv
     Hpins Htok.
   pose proof Hpins as ((Hmisa & _ & _ & _ & _ & _) & _).
   assert (HmisaC : eq_vec (_get_Misa_C (register_lookup misa rsf)) ('b"1") = true)
@@ -555,7 +559,7 @@ Proof.
   destruct (align2_not4_facts pc Hal2 Hnal4) as (_ & Hbit0 & Hbit1).
   assert (Hnc : forall j : nat, (j < 2)%nat ->
             bv_unsigned pc mod 4096 + Z.of_nat j < 4096)
-    by (intros j Hj; exact (uinpage_nc pc (Z.of_nat j) Hpg ltac:(lia))).
+    by (intros j Hj; exact (ualign2_nc pc (Z.of_nat j) Hal2 ltac:(lia))).
   destruct (uv_walk_fetch pt t (upa_map pt M) rsf w_leaf pc
               Hl Hleaf Hcanon Lcp Lsxl Lmenv Hpins Htok)
     as (rsf1 & t1 & Htr & Htrg & Tr1 & Htlbok1 & Htok1 & Hshape1).
@@ -578,12 +582,22 @@ Qed.
 
 (* ---- (c) a 2-mod-4 pc holding a BASE instruction: TWO 2-byte reads ---- *)
 Lemma uv_fetch_base_2 (pt : uptd) (M : gmap Z (bv 8)) (t : ptree)
-    (rsf : regstate) (w_leaf pc : mword 64) (iw : mword 32) :
+    (rsf : regstate) (w_leaf w_leaf2 pc : mword 64) (iw : mword 32) :
   uva_inj pt M ->
   ud_um pt !! svpn_of pc = Some w_leaf ->
   uleaf_ok (InstructionFetch tt) w_leaf ->
   uva_canon pc ->
-  Z.rem (uint pc) 4096 <= 4092 ->
+  (* THE SECOND HALFWORD'S OWN FACTS.  This is the one fetch geometry that
+     can STRADDLE A PAGE BOUNDARY -- a 4-byte instruction at a 2-mod-4 pc
+     whose page offset is 4094 reads its low half from one page and its high
+     half from the next -- so the second halfword's leaf, canonicity and
+     no-wrap are TAKEN here rather than derived from an in-page premise that
+     would have forbidden the case outright.  When the two halves do share a
+     page these are exactly what [uv_fetch_base_2_pg] below derives. *)
+  ud_um pt !! svpn_of (add_vec_int pc 2) = Some w_leaf2 ->
+  uleaf_ok (InstructionFetch tt) w_leaf2 ->
+  uva_canon (add_vec_int pc 2) ->
+  uint (add_vec_int pc 2) = uint pc + 2 ->
   is_aligned_vaddr (Virtaddr pc) 2 = true ->
   is_aligned_vaddr (Virtaddr pc) 4 = false ->
   uM_bytes M (uint pc) 4 iw ->
@@ -604,22 +618,21 @@ Lemma uv_fetch_base_2 (pt : uptd) (M : gmap Z (bv 8)) (t : ptree)
     uv_tree_ok pt (upa_map pt M) t' /\
     pt_same_shape 2 t t'.
 Proof.
-  intros Hinj Hl Hleaf Hcanon Hpg Hal2 Hnal4 Hb HnRVC Lpc Lcp Lsxl Lmenv
+  intros Hinj Hl Hleaf Hcanon Hl2 Hleaf2 Hcanon2 Hu2 Hal2 Hnal4 Hb HnRVC Lpc Lcp Lsxl Lmenv
     Hpins Htok.
   pose proof Hpins as ((Hmisa & _ & _ & _ & _ & _) & _).
   assert (HmisaC : eq_vec (_get_Misa_C (register_lookup misa rsf)) ('b"1") = true)
     by (rewrite Hmisa; vm_compute; reflexivity).
   destruct (align2_not4_facts pc Hal2 Hnal4) as (_ & Hbit0 & Hbit1).
-  pose proof (uinpage_nc pc 2 Hpg ltac:(lia)) as Hnc2.
-  pose proof (uinpage_nc pc 3 Hpg ltac:(lia)) as Hnc3.
-  (* the SECOND halfword's va is on the SAME page, hence the same leaf *)
-  assert (Hl2 : ud_um pt !! svpn_of (add_vec_int pc 2) = Some w_leaf).
-  { rewrite (usvpn_window pc 2 ltac:(lia) Hnc2). exact Hl. }
-  pose proof (uva_canon_add pc 2 Hcanon ltac:(lia) Hnc2) as Hcanon2.
-  destruct (uwin_shift pc 2 Hpg ltac:(lia)) as [Hu2 Hmod2].
+  (* each halfword's window is bounded by its OWN alignment: pc is 2-aligned
+     and so is pc+2, so neither 2-byte read leaves its page -- whether or not
+     the two pages are the same one *)
+  pose proof (ualign2_nc pc 1 Hal2 ltac:(lia)) as Hnc1.
   assert (Hnch : forall j : nat, (j < 2)%nat ->
             bv_unsigned (add_vec_int pc 2) mod 4096 + Z.of_nat j < 4096).
-  { intros j Hj. rewrite Hmod2. lia. }
+  { intros j Hj.
+    exact (ualign2_nc (add_vec_int pc 2) (Z.of_nat j)
+             (ualign2_plus2 pc Hal2) ltac:(lia)). }
   assert (Hncl : forall j : nat, (j < 2)%nat ->
             bv_unsigned pc mod 4096 + Z.of_nat j < 4096)
     by (intros j Hj; lia).
@@ -653,10 +666,10 @@ Proof.
     by (rewrite (Tr1 menvcfg ltac:(vm_compute; reflexivity)); exact Lmenv).
   assert (Lpc1 : register_lookup PC rsf1 = pc)
     by (rewrite (Tr1 PC ltac:(vm_compute; reflexivity)); exact Lpc).
-  destruct (uv_walk_fetch pt t1 (upa_map pt M) rsf1 w_leaf (add_vec_int pc 2)
-              Hl2 Hleaf Hcanon2 Lcp1 Lsxl1 Lmenv1 Hpins1 Htok1)
+  destruct (uv_walk_fetch pt t1 (upa_map pt M) rsf1 w_leaf2 (add_vec_int pc 2)
+              Hl2 Hleaf2 Hcanon2 Lcp1 Lsxl1 Lmenv1 Hpins1 Htok1)
     as (rsf2 & t2 & Htr2 & Htr2g & Tr2 & Htlbok2 & Htok2 & Hshape2).
-  destruct (uv_read_2 pt M t1 t2 rsf1 rsf2 w_leaf (add_vec_int pc 2)
+  destruct (uv_read_2 pt M t1 t2 rsf1 rsf2 w_leaf2 (add_vec_int pc 2)
               (subrange_vec_dec iw 31 16 : mword 16)
               Hinj Hl2 Hnch Hal2h Hb2 Lcp1 Hpins1 Htok1 Htok2 Tr2)
     as [Hmr2 Hmr2g].
@@ -670,7 +683,7 @@ Proof.
              (u_state rsf1 (uv_mm t1 (upa_map pt M))) pc (u_walk_pa w_leaf pc)
              Lpc HmisaC Hbit0 Hbit1 Hnal4 (subrange_vec_dec iw 15 0)
              Htr1 Hmr1 (u_state rsf2 (uv_mm t2 (upa_map pt M)))
-             (u_walk_pa w_leaf (add_vec_int pc 2)) Lpc1 HnRVC
+             (u_walk_pa w_leaf2 (add_vec_int pc 2)) Lpc1 HnRVC
              (subrange_vec_dec iw 31 16) Htr2 Hmr2).
   - exact (goodmb_fetch_base_2 Du_r Du_w
              (u_state rsf (uv_mm t (upa_map pt M)))
@@ -679,7 +692,7 @@ Proof.
              ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
              Lpc HmisaC Hbit0 Hbit1 Hnal4 (subrange_vec_dec iw 15 0)
              Htr1 Htr1g Hmr1 Hmr1g (u_state rsf2 (uv_mm t2 (upa_map pt M)))
-             (u_walk_pa w_leaf (add_vec_int pc 2)) Lpc1 HnRVC
+             (u_walk_pa w_leaf2 (add_vec_int pc 2)) Lpc1 HnRVC
              (subrange_vec_dec iw 31 16) Htr2
              ltac:(rewrite (goodmb_dom Du_r Du_w
                      (translateAddr (Virtaddr (add_vec_int pc 2))
@@ -689,7 +702,7 @@ Proof.
                    exact Htr2g)
              Hmr2 ltac:(rewrite (goodmb_dom Du_r Du_w
                      (mem_read (InstructionFetch tt) PBMT_PMA
-                        (Physaddr (u_walk_pa w_leaf (add_vec_int pc 2))) 2
+                        (Physaddr (u_walk_pa w_leaf2 (add_vec_int pc 2))) 2
                         false false false)
                      (u_state rsf2 (uv_mm t2 (upa_map pt M)))
                      (uv_mm t (upa_map pt M)) (uv_mm t1 (upa_map pt M)) Hdom1);
@@ -698,6 +711,46 @@ Proof.
   - exact Htlbok2.
   - exact Htok2.
   - exact (pt_same_shape_trans 2 t t1 t2 Hshape1 Hshape2).
+Qed.
+
+(* ...and the OLD signature, for callers that still know their fetch window
+   sits on one page: the four facts above are exactly what in-page gives. *)
+Lemma uv_fetch_base_2_pg (pt : uptd) (M : gmap Z (bv 8)) (t : ptree)
+    (rsf : regstate) (w_leaf pc : mword 64) (iw : mword 32) :
+  uva_inj pt M ->
+  ud_um pt !! svpn_of pc = Some w_leaf ->
+  uleaf_ok (InstructionFetch tt) w_leaf ->
+  uva_canon pc ->
+  Z.rem (uint pc) 4096 <= 4092 ->
+  is_aligned_vaddr (Virtaddr pc) 2 = true ->
+  is_aligned_vaddr (Virtaddr pc) 4 = false ->
+  uM_bytes M (uint pc) 4 iw ->
+  isRVC (subrange_vec_dec iw 15 0) = false ->
+  register_lookup PC rsf = pc ->
+  register_lookup cur_privilege rsf = User ->
+  _get_Mstatus_SXL (register_lookup mstatus rsf) = 'b"10" ->
+  register_lookup menvcfg rsf = MENVCFG_S ->
+  u_exec_pins pt t rsf ->
+  uv_tree_ok pt (upa_map pt M) t ->
+  exists (rsf' : regstate) (t' : ptree),
+    exec (fetch tt) (u_state rsf (uv_mm t (upa_map pt M)))
+      = Some (F_Base iw, u_state rsf' (uv_mm t' (upa_map pt M))) /\
+    goodmb Du_r Du_w (fetch tt) (u_state rsf (uv_mm t (upa_map pt M)))
+      (uv_mm t (upa_map pt M)) = true /\
+    u_tlb_only rsf rsf' /\
+    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf') /\
+    uv_tree_ok pt (upa_map pt M) t' /\
+    pt_same_shape 2 t t'.
+Proof.
+  intros Hinj Hl Hleaf Hcanon Hpg Hal2 Hnal4 Hb HnRVC Lpc Lcp Lsxl Lmenv Hpins Htok.
+  pose proof (uinpage_nc pc 2 Hpg ltac:(lia)) as Hnc2.
+  assert (Hl2 : ud_um pt !! svpn_of (add_vec_int pc 2) = Some w_leaf)
+    by (rewrite (usvpn_window pc 2 ltac:(lia) Hnc2); exact Hl).
+  pose proof (uva_canon_add pc 2 Hcanon ltac:(lia) Hnc2) as Hcanon2.
+  destruct (uwin_shift pc 2 Hpg ltac:(lia)) as [Hu2 _].
+  exact (uv_fetch_base_2 pt M t rsf w_leaf w_leaf pc iw
+           Hinj Hl Hleaf Hcanon Hl2 Hleaf Hcanon2 Hu2 Hal2 Hnal4 Hb HnRVC
+           Lpc Lcp Lsxl Lmenv Hpins Htok).
 Qed.
 
 (* ===================================================================== *)
@@ -2828,7 +2881,7 @@ Section UvRetire.
             [ exact (Hbytes 0%nat ltac:(lia)) | exact (Hbytes 1%nat ltac:(lia))
             | exact Hb2 | exact Hb3 ]. }
         destruct (uv_fetch_4 pt M t rsA w_leaf pc (urvc4_word h b2 b3)
-                    Hinj Hum Hlok Hcanon Hinpage Hal4 Hbytes4 LpcA LcpA
+                    Hinj Hum Hlok Hcanon Hal4 Hbytes4 LpcA LcpA
                     (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
         rewrite urvc4_low HisRVC in Hfe.
@@ -2838,7 +2891,7 @@ Section UvRetire.
                   with "Hcert Hamb Hcap Hk Hany Hrw Hro Hmm Hres").
       + (* 2 mod 4: one 2-byte read *)
         destruct (uv_fetch_rvc_2 pt M t rsA w_leaf pc h
-                    Hinj Hum Hlok Hcanon Hinpage Hal2 Hal4 Hbytes HisRVC
+                    Hinj Hum Hlok Hcanon Hal2 Hal4 Hbytes HisRVC
                     LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
         iApply (uv_obl_rvc C pt R Ψ M m pc h i o jt wr t t' usatp pcfg paddr
@@ -2849,7 +2902,7 @@ Section UvRetire.
       destruct Hcode as (w & HnRVC & Hbytes & Hdecbase).
       destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal4.
       + destruct (uv_fetch_4 pt M t rsA w_leaf pc w
-                    Hinj Hum Hlok Hcanon Hinpage Hal4 Hbytes LpcA LcpA
+                    Hinj Hum Hlok Hcanon Hal4 Hbytes LpcA LcpA
                     (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
         rewrite HnRVC in Hfe.
@@ -2857,7 +2910,7 @@ Section UvRetire.
                   rs1 rsA rsf Hpre Hfe Hfg Tr Htlbok' Htok' Hshape Hdecbase
                   Hwrok Hred Hg1 Hg2 Hexec
                   with "Hcert Hamb Hcap Hk Hany Hrw Hro Hmm Hres").
-      + destruct (uv_fetch_base_2 pt M t rsA w_leaf pc w
+      + destruct (uv_fetch_base_2_pg pt M t rsA w_leaf pc w
                     Hinj Hum Hlok Hcanon Hinpage Hal2 Hal4 Hbytes HnRVC
                     LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
@@ -3219,14 +3272,14 @@ Section UvEcall.
               pt_same_shape 2 t t').
     { destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal4.
       - destruct (uv_fetch_4 pt M t rsA w_leaf pc w
-                    Hinj Hum Hlok Hcanon Hinpage Hal4 Hbytes LpcA LcpA
+                    Hinj Hum Hlok Hcanon Hal4 Hbytes LpcA LcpA
                     (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
         rewrite HnRVC in Hfe.
         exists rsf, t'. split_and!;
           [ exact Hfe | exact Hfg | exact Tr | exact Htlbok' | exact Htok'
           | exact Hshape ].
-      - destruct (uv_fetch_base_2 pt M t rsA w_leaf pc w
+      - destruct (uv_fetch_base_2_pg pt M t rsA w_leaf pc w
                     Hinj Hum Hlok Hcanon Hinpage Hal2 Hal4 Hbytes HnRVC
                     LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).

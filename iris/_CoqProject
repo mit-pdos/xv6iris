@@ -19,6 +19,7 @@ VirtioModel.v
 DiskImg.v
 DevModel.v
 RiscvLang.v
+ObsTrace.v
 HartBlock.v
 HartSwp.v
 HartLift.v
@@ -55,6 +56,8 @@ TsoCtx.v
 TsoCtxShim.v
 TsoCtxAbsorbLb.v
 CtxMorphTac.v
+TsoCtxPark.v
+TsoCtxMove.v
 CtxRecord.v
 PermInv.v
 PageGeom.v
@@ -255,19 +258,20 @@ WpUmodeLeaf.v
 WpUmodeBranch.v
 WpUmodeStore.v
 WpUmodeLoad.v
-USpecSync.v
 UCodeSync.v
-UProofSync.v
 UmodeKernelTie.v
-USyncKernel.v
 UkStep.v
 UkLeaf.v
 UkBranch.v
 UkStore.v
 UkLoad.v
 UserHeap.v
-UkAbi.v
+UkRun.v
+UkRunLeaf.v
+UkRunMem.v
+UkRunSys.v
 UkSync.v
+UkAbi.v
 UkEcho.v
 UkEchoKernel.v
 UexecCond.v
@@ -462,6 +466,7 @@ WpAmo.v
 CodeHolding.v
 CodeAcquire.v
 WpLock.v
+WpLockIn.v
 WpLockAt.v
 ArrCursor.v
 FdSlots.v
@@ -486,6 +491,7 @@ VcGen.v
 VcGenS.v
 SwtchCtx.v
 CpuOwn.v
+CpuOwnMove.v
 ProcInv.v
 WpPushOffBridges.v
 CodeSwtch.v

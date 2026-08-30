@@ -333,7 +333,6 @@ Require Import PathElems.       (* [path_elems], [SLASH] *)
 Require Import FsTree.          (* [fname], [DOT], [DOTDOT] *)
 Require Import FsBytesGamma.    (* [fs_gamma_L]: the live Γ *)
 Require Import SpecSysMknodAU.  (* [mknod_parent_elems]; the frozen mold *)
-Require Import FsAbsEra.
 Require Import FsAbsEraMknod.   (* the era walk-premise pair, reused
                                    verbatim (nameiparent-generic) *)
 Require Import FsAbsMknodFire.  (* [dlookup_commit_at]; the [_at] mold *)

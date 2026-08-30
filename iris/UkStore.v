@@ -42,18 +42,17 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import WpGpr RegFile InstrBytes.
-Require Import SmodeCore.
+Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
+Require Import WpGpr RegFile.
 Require Import WpDecodeBridge DecodeTotalU.
 Require Import CommonWalk.
-Require Import PtreeType PtAdBits PtTree PtTreeAdue KptPt KptTree.
-Require Import SRegime UptTree UptWalkPt.
-Require Import UserBits UserPtTree UserTranslate.
+Require Import PtreeType PtTree.
+Require Import SRegime UptTree.
+Require Import UserPtTree.
 Require Import HartSwp HartLift HartSpan HartGoodb HartMemRun HartMCycle
         HartStepFull HartRunFull HartRunGen.
 Require Import PtBytes UserBytes UserFrame UserClassifyAsm.
-Require Import UserFetchCert PtWalkCert UserFaultCert.
+Require Import UserFaultCert.
 Require Import WpIntrCore.    (* [elp_no_lp] *)
 Require Import UserTrap.      (* [swp_exec_trap_u] / [utrap_ms_ok] *)
 Require Import UserExec.
@@ -62,9 +61,10 @@ Require Import UserActiveClass.
 Require Import MemAccessGen WpMmodeLeafBase.
 Require Import UserMemPt UserMemArms UserMemClassify UserMemAccess UserMemMis.
 Require Import UserMemCert UserMemArmsBase UserMemArmsC.
-Require Import UmodeMem UmodeCap UmodeFetch.
+Require Import UmodeMem UmodeFetch.
+Require Import UmodeRegs.
 Require Import WpUmodeStep WpUmodeStore.
-Require Import ProcPtOwn UserPerm UsysMemOk UexecWp UexecSlot UexecRet UkStep.
+Require Import ProcPtOwn UserPerm UexecWp UexecRet UkStep.
 Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode* precedent *)
 Local Open Scope Z_scope.
 Import Defs.
@@ -1451,7 +1451,7 @@ Section UkStore.
             [ exact (Hbytes 0%nat ltac:(lia)) | exact (Hbytes 1%nat ltac:(lia))
             | exact Hb2 | exact Hb3 ]. }
         destruct (uv_fetch_4 pt' Mp' t rsA w_leaf pc (urvc4_word h b2 b3)
-                    Hinj Hum Hlok Hcanonpc Hinpage Hal4 Hbytes4 LpcA LcpA
+                    Hinj Hum Hlok Hcanonpc Hal4 Hbytes4 LpcA LcpA
                     (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
         rewrite urvc4_low HisRVC in Hfe.
@@ -1461,7 +1461,7 @@ Section UkStore.
                   Hcanon Hpg Hal
                   with "Hcert Hamb Hk Hany Hrw Hro Hmm Hres").
       + destruct (uv_fetch_rvc_2 pt' Mp' t rsA w_leaf pc h
-                    Hinj Hum Hlok Hcanonpc Hinpage Hal2' Hal4 Hbytes HisRVC
+                    Hinj Hum Hlok Hcanonpc Hal2' Hal4 Hbytes HisRVC
                     LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
         iApply (uk_store_obl_rvc C' pt' R Rut' sz' π M Mp' m pc h i o k imm rs1 rs2 va wval
@@ -1473,7 +1473,7 @@ Section UkStore.
       destruct Hcode as (w & HnRVC & Hbytes & Hdecbase).
       destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal4.
       + destruct (uv_fetch_4 pt' Mp' t rsA w_leaf pc w
-                    Hinj Hum Hlok Hcanonpc Hinpage Hal4 Hbytes LpcA LcpA
+                    Hinj Hum Hlok Hcanonpc Hal4 Hbytes LpcA LcpA
                     (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
         rewrite HnRVC in Hfe.
@@ -1482,7 +1482,7 @@ Section UkStore.
                   Htok' Hshape Hdecbase Hkw Hred Hg1 Hexp Hva Hwval Hdisp
                   Hcanon Hpg Hal
                   with "Hcert Hamb Hk Hany Hrw Hro Hmm Hres").
-      + destruct (uv_fetch_base_2 pt' Mp' t rsA w_leaf pc w
+      + destruct (uv_fetch_base_2_pg pt' Mp' t rsA w_leaf pc w
                     Hinj Hum Hlok Hcanonpc Hinpage Hal2' Hal4 Hbytes HnRVC
                     LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).

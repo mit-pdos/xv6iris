@@ -22,6 +22,7 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import TsoCtxMove.
 Local Open Scope Z_scope.
 
 (* struct-context field layout: field i (0..13) holds register [ctx_regs !! i]
@@ -90,7 +91,10 @@ Proof. intro H; exact H. Qed.
 (* The pc a coroutine resumes on is [ret_pc] of its saved return address
    (RiscvExtras): the [c.ret] the swtch epilogue executes clears bit 0. *)
 
-Section SwtchCtx.
+(* A6.128: the save-area cells live in their OWN section, closed before the
+   record is defined, so that [valid_context_pre] can state them at the
+   record's identity ([ctx_cells (XI := XIp)]) rather than at the ambient. *)
+Section SwtchCells.
   Context `{!riscvGS Σ}.
   Context `{!xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
@@ -129,6 +133,12 @@ Section SwtchCtx.
      unfold [own_ctx] on its own. *)
   Global Instance own_ctx_timeless pa : Timeless (own_ctx pa).
   Proof. rewrite /own_ctx. apply _. Qed.
+End SwtchCells.
+
+Section SwtchCtx.
+  Context `{!riscvGS Σ}.
+  Context `{!xv6G Σ, !bioslotG Σ}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
   (* -------------------------------------------------------------------- *)
   (* valid_context P A c : the context saved at [c] admits a WP to       *)
@@ -217,50 +227,97 @@ Section SwtchCtx.
      The SIE ghost needs no binder of its own: it is [sie_name h], so
      rebinding [h] rebinds it -- and a MIGRATABLE record still names no
      hart, which is what lets [SchedCtx.procs_inv] store one. *)
+  (* ================================================================== *)
+  (* §0.42′ (A6.127 §6): THE TOKEN RIDES BESIDE THE RECORD, NOT INSIDE IT. *)
+  (*                                                                      *)
+  (* A parked record is a thread of control; its token used to sit inside *)
+  (* the record as [ctx_parked XIp Tp] with [Tp] existential -- a stamp    *)
+  (* nobody outside could relate to anything, which is why the resumer had *)
+  (* to CONJURE its view receipt (the retired [hart_view_lb_any]).  Now the *)
+  (* record is indexed by its own identity [XIp] and carries NO token; the  *)
+  (* token travels beside it in one of two shapes:                         *)
+  (*   - [park_tok None XIo]: a MIGRATABLE record's token, parked, linked  *)
+  (*     to a fresh stamped PARK BOX whose stamp is over it                *)
+  (*     ([TsoCtxPark.ctx_park_box]).  The scheduler carries the box until  *)
+  (*     its release makes it the lock's context; from there the link is   *)
+  (*     [ctx_floor ξ Tp] on the LOCK's context and rides the ordinary      *)
+  (*     transport to every acquirer ([TsoCtx.ctx_floor_dom]).             *)
+  (*   - [park_tok (Some h) XIo]: a PINNED record (the hart's scheduler)   *)
+  (*     keeps its RUNNING token outright -- the scheduler never parks.    *)
+  (* [resume_tok] is what a resumer holds of the record it is about to     *)
+  (* run: for a migratable record the link at the resumer's OWN context    *)
+  (* (the acquire morph left it there), cashed by                          *)
+  (* [TsoCtxPark.ctx_resume_floor]; for a pinned one the running token.    *)
+  (* ================================================================== *)
+  Definition park_tok (A : ctx_adm) (XIo : CtxId) : iProp Σ :=
+    match A with
+    | None => (∃ (ξb : CtxId) (Tb Tp : nat),
+                 ctx_parked ξb Tb ∗ ctx_parked XIo Tp ∗ ctx_floor ξb Tp)%I
+    | Some h => own_context (CID := h) XIo
+    end.
+
+  Definition resume_tok (A : ctx_adm) (XIt : CtxId) : iProp Σ :=
+    match A with
+    | None => (∃ Tt : nat, ctx_parked XIt Tt ∗ ctx_floor cur_ctx Tt)%I
+    | Some h => own_context (CID := h) XIt
+    end.
+
+  Global Instance park_tok_timeless A XIo : Timeless (park_tok A XIo).
+  Proof. destruct A; rewrite /park_tok; [apply own_context_timeless | apply _]. Qed.
+  Global Instance resume_tok_timeless A XIt : Timeless (resume_tok A XIt).
+  Proof. destruct A; rewrite /resume_tok; [apply own_context_timeless | apply _]. Qed.
+
   Definition valid_context_pre
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
-           mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
-      (rec : ctx_adm -d> mword 64 -d> mword 64 -d> iPropO Σ)
-      : ctx_adm -d> mword 64 -d> mword 64 -d> iPropO Σ := fun A c p =>
-    (* THE PARKED RECORD OWNS ITS THREAD TOKEN, IN PARKED FORM (tso-port
-       checkpoint 0.4 item 5).  A parked context IS a thread of control:
-       [XIp] is ITS identity, held here while it is not running, and its
-       resume wand asks for the bundle at THAT identity -- so the facts
+           mword 64 -d> mword 64 -d> bool -d> CtxId -d> iPropO Σ)
+      (rec : ctx_adm -d> mword 64 -d> mword 64 -d> CtxId -d> iPropO Σ)
+      : ctx_adm -d> mword 64 -d> mword 64 -d> CtxId -d> iPropO Σ :=
+    fun A c p XIp =>
+    (* THE RECORD'S IDENTITY IS ITS PARAMETER (A6.127 §6): [XIp] is the
+       thread of control whose cells, stack and continuation these are;
+       its resume wand asks for the bundle at THAT identity, so the facts
        its closure captured (all indexed by [XIp]) are the facts it wakes
-       up holding.  The token is [ctx_parked], NOT [own_context]: the
-       running token is hart-ambient (at TSO it ties the context's bound
-       to a hart's view), while this record is MIGRATABLE -- the ∀h wand
-       below is resumable at every hart, and a hart-tied token here would
-       pin it.  [Tp] is the parked stamp (the bound a resumer's view must
-       dominate; the resumer's p->lock acquire supplies the receipt --
-       [TsoCtx.hart_view_lb], via [TsoCtx.ctx_resume]).  Both EXISTENTIAL,
-       like the lock's internal context: no consumer of [valid_context]
-       names them, so no arity moves.  swtch is the one place the token is
-       exchanged (ProofSwtch.v): the parker's token parks INTO the record
-       it builds, the target's is resumed OUT of the record it consumes --
-       which is exactly what makes the hart keep running while the THREAD
-       changes. *)
-    (∃ (vs : list (mword 64)) (av : nat) (XIp : CtxId) (Tp : nat),
+       up holding.  The token itself is NOT here -- see [park_tok] /
+       [resume_tok] above.  swtch is the one place the token is exchanged
+       (ProofSwtch.v): the parker's token parks INTO THE BOX beside the
+       record it builds, the target's is resumed OUT of the link beside
+       the record it consumes -- which is exactly what makes the hart keep
+       running while the THREAD changes. *)
+    (∃ (vs : list (mword 64)) (av : nat),
       ⌜length vs = 14%nat⌝ ∗
       ⌜eq_vec (access_vec_dec (ret_pc (nth 0 vs (mword_of_int 0))) 0) ('b"0") = true⌝ ∗
-      ctx_cells c vs ∗
-      stack_own (KTR := KT1) (nth 1 vs (mword_of_int 0)) av ∗
-      ctx_parked XIp Tp ∗
+      (* A6.128: THE RECORD IS ENTIRELY AT ITS OWN IDENTITY.  The save-area
+         cells the parker wrote are the parker's (dirty at [XIp], buffered);
+         the resumer moves them to its own context for its swtch block and
+         moves the target's back ([TsoCtxMove.ctx_move]) -- both tokens are
+         running at the crossing.  Nothing in a record is at "the ambient". *)
+      ctx_cells (XI := XIp) c vs ∗
+      (* the parked STACK is the thread's own, at ITS identity: the parker
+         built it from its own frame and the resumed thread's bundle wants
+         it back at [XIp], with no re-index across the crossing *)
+      stack_own (KTR := KT1) (XI := XIp) (nth 1 vs (mword_of_int 0)) av ∗
       (∀ (h : CPU) (m : regfile) (eb' : bool),
          ⌜adm A h⌝ -∗
          ⌜callee_img m = vs⌝ -∗
          sie_cap_gpr KT1 (CID := h) (XI := XIp) m av false p -∗
-         cpu_own (CID := h) 1 eb' p false {["proc"]} -∗
+         (* the per-cpu bundle, the save-area cells, the crossing payload and
+            a zombie resumer's raw cells all arrive AT THE RESUMED THREAD'S
+            identity: the resumer moved them across ([TsoCtxMove]) *)
+         cpu_own (CID := h) (XI := XIp) 1 eb' p false {["proc"]} -∗
          pc_is (CID := h) (ret_pc (m !!! Regidx (mword_of_int 1))) -∗
-         ctx_cells c vs -∗
+         ctx_cells (XI := XIp) c vs -∗
+         (* the resumer's own record comes back WITH ITS TOKEN BESIDE IT:
+            parked-and-boxed if migratable, running if pinned *)
          (∃ (A' : ctx_adm) (cret : mword 64) (back : bool),
-            (if back then ▷ rec A' cret p else own_ctx cret) ∗
-            P h A' c cret (rget (CID := h) m (mword_of_int 4 : mword 5)) p back) -∗
+            (if back
+             then ∃ XIo : CtxId, park_tok A' XIo ∗ ▷ rec A' cret p XIo
+             else own_ctx (XI := XIp) cret) ∗
+            P h A' c cret (rget (CID := h) m (mword_of_int 4 : mword 5)) p back XIp) -∗
          WP (LoopE gen_id h : expr riscv_lang)))%I.
 
   Global Instance valid_context_pre_contractive
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
-           mword 64 -d> mword 64 -d> bool -d> iPropO Σ) :
+           mword 64 -d> mword 64 -d> bool -d> CtxId -d> iPropO Σ) :
     Contractive (valid_context_pre P).
   (* [solve_contractive] gets all the way to the recursive occurrence and
      stops: the residual goal is [x A' cret p ≡{m}≡ y A' cret p] against a
@@ -277,17 +334,17 @@ Section SwtchCtx.
 
   Definition valid_context
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
-           mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
-      : ctx_adm -d> mword 64 -d> mword 64 -d> iPropO Σ :=
+           mword 64 -d> mword 64 -d> bool -d> CtxId -d> iPropO Σ)
+      : ctx_adm -d> mword 64 -d> mword 64 -d> CtxId -d> iPropO Σ :=
     fixpoint (valid_context_pre P).
 
   Lemma valid_context_unfold
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
-           mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
-      (A : ctx_adm) (c p : mword 64) :
-    valid_context P A c p ⊣⊢
-      valid_context_pre P (valid_context P) A c p.
-  Proof. apply (fixpoint_unfold (valid_context_pre P) A c p). Qed.
+           mword 64 -d> mword 64 -d> bool -d> CtxId -d> iPropO Σ)
+      (A : ctx_adm) (c p : mword 64) (XIp : CtxId) :
+    valid_context P A c p XIp ⊣⊢
+      valid_context_pre P (valid_context P) A c p XIp.
+  Proof. apply (fixpoint_unfold (valid_context_pre P) A c p XIp). Qed.
 
 End SwtchCtx.
 
@@ -358,6 +415,36 @@ Section CtxCellsReindex.
     ctx_dom ξ ξ' -∗ ctx_cells (XI := ξ) c vs ==∗
     ctx_dom ξ ξ' ∗ ctx_cells (XI := ξ') c vs.
   Proof. exact (ctx_cells_at_reindex ξ ξ' c 0 vs). Qed.
+  (* THE PARKED STACK'S TRANSPORT OBLIGATION (A6.127 §6) IS ALREADY ON MAIN:
+     [StackOwn.stack_own_morph] is a [Global Instance] there, in main's
+     NON-MODAL [CtxMorph] form and generic in [KTR], so it already covers
+     the [KTR := KT1] use a child-record producer's deposit needs.  The
+     T-leg restates it here because ITS [StackOwn] exports only the [==∗]
+     [stack_own_reindex]; on main the restatement would be a second
+     instance for the same payload, so it is deliberately NOT taken. *)
+
+  (* A6.128: the SAME-HART hand-off of the same two payloads *)
+  Global Instance ctx_cells_at_move `{CID : CpuId} (c : mword 64) (off : Z) (vs : list (mword 64)) :
+    CtxMove (λ ξ, ctx_cells_at (XI := ξ) c off vs).
+  Proof.
+    revert off. induction vs as [|v vs IH] => off; iIntros (ξ0 ξ1) "H0 H1 Hc".
+    - iModIntro. iFrame "H0 H1".
+    - iDestruct "Hc" as "[Hv Hrest]".
+      iMod (ctx_move_word _ (add_vec c (mword_of_int off)) (DfracOwn 1) v
+              ξ0 ξ1 with "H0 H1 Hv") as "(H0 & H1 & Hv)".
+      iMod (IH (off + 8) ξ0 ξ1 with "H0 H1 Hrest") as "(H0 & H1 & Hrest)".
+      iModIntro. iFrame.
+  Qed.
+  Global Instance ctx_cells_move `{CID : CpuId} (c : mword 64) (vs : list (mword 64)) :
+    CtxMove (λ ξ, ctx_cells (XI := ξ) c vs).
+  Proof. rewrite /ctx_cells. apply _. Qed.
+  Global Instance own_ctx_move `{CID : CpuId} (pa : mword 64) :
+    CtxMove (λ ξ, own_ctx (XI := ξ) pa).
+  Proof. rewrite /own_ctx. ctx_move_solve; apply ctx_cells_move. Qed.
+  Global Instance stack_own_move `{CID : CpuId} (sp : Arch.pa) (n : nat) :
+    CtxMove (λ ξ, stack_own (KTR := KT1) (XI := ξ) sp n).
+  Proof. rewrite /stack_own. ctx_move_solve. Qed.
+
 End CtxCellsReindex.
 
 Section Swconf.

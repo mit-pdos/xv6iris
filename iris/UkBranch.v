@@ -36,15 +36,14 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep.
-Require Import InstrBytes WpGpr RegFile.
-Require Import ExecCommon WpMmodeLeafBase.
-Require Import WpDecodeBridge DecodeTotalU HartMemRun UserFrame UserExecFacts.
+Require Import RiscvLang RiscvPtsto.
+Require Import WpGpr RegFile.
+Require Import WpMmodeLeafBase.
+Require Import WpDecodeBridge DecodeTotalU HartMemRun UserFrame.
 Require UserTotalU.
 Require Import UserPtTree UserExec.
-Require Import UmodeMem UmodeCap.
 Require Import WpUmodeStep WpUmodeBranch.
-Require Import ProcPtOwn UserPerm UsysMemOk UexecWp UexecSlot UexecRet UkStep.
+Require Import UserPerm UexecWp UexecRet UkStep.
 Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode* precedent *)
 Local Open Scope Z_scope.
 Import Defs.

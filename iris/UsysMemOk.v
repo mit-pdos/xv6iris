@@ -49,7 +49,6 @@ From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.MachineWord SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types.
-Require Import RiscvLang.
 Require Import ProcGeom.     (* [tf_arg_idx] / [tf_epc_idx] / [TFWORDS] *)
 Require Import TfUser.       (* [tf_ueq] -- the resume-visible word equality *)
 Require Import UserPtTree.   (* [umem_wr] / [umem_grow] / [umem_del] *)

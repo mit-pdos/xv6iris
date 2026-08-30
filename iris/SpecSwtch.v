@@ -46,12 +46,13 @@ Require Import SwtchCtx.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import TsoCtxMove.
 Import Defs.
 
 
 Definition wp_swtch_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
-         mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
+         mword 64 -d> mword 64 -d> bool -d> CtxId -d> iPropO Σ)
     (An Ao : ctx_adm)
     (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
     (av : nat) (eb : bool) (p : mword 64)
@@ -76,7 +77,16 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : Ge
      [Ao] is the index the caller's OWN record is built at from the
      continuation below, so the continuation's [⌜adm Ao h⌝] is exactly what
      that record promises. *)
+  (* A6.128: THE PAYLOAD IS A FUNCTION OF THE CONTEXT, and the crossing MOVES
+     it -- from the caller's identity to the target's, on this hart, with
+     both running tokens in hand ([TsoCtxMove.CtxMove]).  This is the
+     store-forwarding hand-off of [p->state]/[c->proc]/the held lock. *)
+  (forall h A c c' tp p' b, CtxMove (λ ξ, P h A c c' tp p' b ξ)) ->
   adm An cpu_id ->
+  (* ...and the CALLER's own record admits resumption here too (A6.127 §6):
+     a PINNED caller (the scheduler) parks its RUNNING token into its
+     record, and that token is indexed by this hart. *)
+  adm Ao cpu_id ->
   kernel_text -∗
   (* THE FULL AMBIENT BUNDLES: the suspender hands its whole [sie_cap_gpr]
      (stack + avail included -- they park in ITS [valid_context] record,
@@ -103,10 +113,15 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : Ge
   cpu_own 1 eb p false {["proc"]} -∗
   pc_is (mword_of_int KernelSyms.swtch) -∗
   ctx_cells oldc old_vs -∗
-  ▷ valid_context P An newc p -∗
+  (* THE TARGET RECORD AND ITS TOKEN (A6.127 §6): the record at its own
+     identity [XIt], and beside it what the resumer holds of the token --
+     the link at the resumer's OWN context for a migratable record (the
+     p->lock acquire's morph put it there), the running token for a pinned
+     one ([SwtchCtx.resume_tok]). *)
+  (∃ XIt : CtxId, resume_tok An XIt ∗ ▷ valid_context P An newc p XIt) -∗
   (* the payload's [A'] slot is always the RESUMER's record index, and the
      resumer of this crossing is the caller itself -- so it is [Ao]. *)
-  P cpu_id Ao newc oldc (rget m0 (mword_of_int 4 : mword 5)) p back -∗
+  P cpu_id Ao newc oldc (rget m0 (mword_of_int 4 : mword 5)) p back cur_ctx -∗
   (* THE CALLER'S CONTINUATION -- its record's contents -- and only at
      [back = true].  At [false] there is nothing to prove about a
      resumption that cannot happen, which is exactly the point: it is what
@@ -121,8 +136,10 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : Ge
          pc_is (CID := h) (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
          ctx_cells oldc (callee_img m0) -∗
          (∃ (A' : ctx_adm) (cret : mword 64) (back' : bool),
-            (if back' then ▷ valid_context P A' cret p else own_ctx cret) ∗
-            P h A' oldc cret (rget (CID := h) m (mword_of_int 4 : mword 5)) p back') -∗
+            (if back'
+             then ∃ XIo : CtxId, park_tok A' XIo ∗ ▷ valid_context P A' cret p XIo
+             else own_ctx cret) ∗
+            P h A' oldc cret (rget (CID := h) m (mword_of_int 4 : mword 5)) p back' cur_ctx) -∗
          WP (LoopE gen_id h : expr riscv_lang) )
    else emp) -∗
   WP (Loop : expr riscv_lang).
@@ -131,7 +148,7 @@ Module Type SWTCH.
   Parameter wp_swtch_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
-           mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
+           mword 64 -d> mword 64 -d> bool -d> CtxId -d> iPropO Σ)
       (An Ao : ctx_adm)
       (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
       (av : nat) (eb : bool) (p : mword 64) (back : bool),

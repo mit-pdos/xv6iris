@@ -118,14 +118,14 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
-Require Import RegFile WpGpr.
+Require Import RegFile.
 Require Import AlignBits.
 Require Import WpMmodeLeafBase.
-Require Import UserBits UserPtTree UserExec.
+Require Import UserPtTree UserExec.
 Require Import ProcPtOwn.
 Require Import ProcGeom.     (* [tf_arg_idx]: which trapframe word an argument is *)
-Require Import UmodeMem UmodeFetch UmodeArith UmodeCap UmodeAbi UmodeSyscall.
-Require Import WpUmodeStep WpUmodeStore WpUmodeLoad WpUmodeBranch.
+Require Import UmodeMem UmodeCap UmodeAbi.
+Require Import WpUmodeStore WpUmodeBranch.
 Require Import UserPerm UsysMemOk UexecWp UexecSlot UexecRet.
 Require Import UkStep UkLeaf UkStore UkBranch.
 Require Import UkAbi.        (* the generic key-level layout facts *)

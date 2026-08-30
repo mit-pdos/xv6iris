@@ -69,7 +69,6 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require Import CtxRecord.   (* [ctx_parked_inv]: the deposit record's token *)
 Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the absorb's authority *)
 Require TsoCtxShim.         (* M2 DEBT: the [hart_view_lb] the absorb wants *)
 Local Open Scope Z_scope.
@@ -477,8 +476,9 @@ Section ProofMainSecondary.
       + (* ---- THE ABSORB, at the second open ----
              M2 DEBT, named: [hart_view_lb K ∗ ⌜T ≤ K⌝] is discharged at
              [K := T] by the SC-only shim, exactly as the scheduler's resume
-             already does ([ProofSwtch]); the sweep that makes [K] real is
-             one item serving both (tso-absorb-memo.md §7).  NOT
+             did until Amendment 9 ([ProofSwtch] now cashes a real floor,
+             [TsoCtxPark.ctx_resume_floor]); the sweep that makes [K] real
+             here is the AMO's [hart_view_lb_get] (tso-absorb-memo.md §7).  NOT
              [TsoCtxShim.ctx_dom_sc]: a bare [inv] has no acquire, so a
              [ctx_dom] here would have no honest producer and would be a
              permanent lie -- absorb's premise is HART-LOCAL and says nothing

@@ -34,7 +34,7 @@ Require Import TrampPt UptTree.
 Require Import UserretDefs UserretPt.
 Require Import UservecDefs UservecPt UservecExitPt.
 Require Import WpIntrCore.
-Require Import UserPtTree UserExec UserKernelBridge.
+Require Import UserPtTree UserExec.
 Require Import ProcInv ProcGeom.
 Require Import ProcPtOwn.
 Require Import WpNext.
@@ -59,7 +59,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Require Import ParkCap.   (* [park_token] *)
 Require Import UsertrapRes UtResFits.  (* [ut_park_intro_body] -- the park's producer entry *)
-Require Import UexecRet UexecRound UexecSlot TfUser UserPerm.  (* the round's vocabulary *)
+Require Import UexecRet.  (* the round's vocabulary *)
 Require Import TsoCtx.   (* [CurCtx]: the residue owns a thread token *)
 Import Defs.
 

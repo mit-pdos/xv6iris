@@ -312,7 +312,7 @@ Qed.
 
 (* ===================================================================== *)
 
-Module SchedulerProof (Acquire : ACQUIRE) (Release : RELEASE) (Swtch : SWTCH) : SCHEDULER.
+Module SchedulerProof (Acquire : ACQUIRE) (Release : RELEASE) (ReleaseIn : RELEASE_IN) (Swtch : SWTCH) : SCHEDULER.
 
 Section ProofScheduler.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
@@ -387,7 +387,12 @@ Section ProofScheduler.
         sie_cap_gpr KT1 Mt (av - 12)%nat false zero_reg -∗
         pc_is (mword_of_int (KernelSyms.scheduler + 0x4e)) -∗
         locked γl cpu_id -∗
-        proc_lock_res γs γl (proc_addr jj) -∗
+        (* THE PAYLOAD, PRE-PARKED (A6.127 §6): the tail releases through the
+           input-side finisher, so it takes the free arm's record itself --
+           a scan that found no work parks the payload it holds at its own
+           context ([lock_pay_intro]); a reclaim after a park hands the
+           record at the park BOX the swtch brought back. *)
+        (own_context cur_ctx ==∗ own_context cur_ctx ∗ lock_pay (proc_lock_pay γs γl (proc_addr jj))) -∗
         (* THE SET IS {proc} ON THE WAY IN AND ∅ ON THE WAY OUT: the tail IS
            the release of proc jj's lock, so it is the one place in this file
            where the held set changes.  Every other [cpu_own] here is at one
@@ -1107,7 +1112,7 @@ Section ProofScheduler.
          the in-lock carve [av - 12]; its exit is [n], the index the tail owes
          its caller. *)
       iEval (rewrite -Hn) in "Hcg".
-      iApply (Release.wp_release_sconf KT1 γl (proc_addr jj) "proc"%string <{ proc_lock_res γs γl (proc_addr jj) }> T1 0 ebx zero_reg n
+      iApply (ReleaseIn.wp_release_in_sconf KT1 γl (proc_addr jj) "proc"%string (proc_lock_pay γs γl (proc_addr jj)) T1 0 ebx zero_reg n
                 {["proc"]}
                 Hlka ltac:(pose proof (sc_res_le ebx); lia)
                 with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").
@@ -1263,7 +1268,7 @@ Section ProofScheduler.
          contract all carry. *)
       assert (Hnoproc : locks_below (∅ : gset string) "proc")
         by (exact (locks_below_empty "proc")).
-      iApply (Acquire.wp_acquire_sconf KT1 γl "proc"%string <{ proc_lock_res γs γl (proc_addr jj) }> M1 0 ebc zero_reg n ebc ∅
+      iApply (Acquire.wp_acquire_sconf KT1 γl "proc"%string (proc_lock_pay γs γl (proc_addr jj)) M1 0 ebc zero_reg n ebc ∅
                 ltac:(lia) ltac:(pose proof (sc_res_le ebc); lia) Hnoproc
                 with "Hcg Hcpu Htext Hpc [Hislock]").
       all: try lkbelow.
@@ -1360,6 +1365,10 @@ Section ProofScheduler.
         (* the slot goes back UNTOUCHED *)
         iAssert (proc_lock_res γs γl (proc_addr jj)) with "[Hstate Hpg Hchan Hpub Hslot]" as "HR".
         { rewrite /proc_lock_res. iExists st, ch. iFrame "Hstate Hpg Hchan Hpub Hslot". }
+        iAssert (own_context cur_ctx ==∗ own_context cur_ctx ∗
+                   lock_pay (proc_lock_pay γs γl (proc_addr jj)))%I with "[HR]" as "HR".
+        { iIntros "Hrun". iEval (rewrite /proc_lock_res) in "HR".
+          iApply (lock_pay_intro (proc_lock_pay γs γl (proc_addr jj)) with "Hrun HR"). }
         iApply ("Tail" $! jj γl M2 ebc n with "[%] [%] [%] [%] [%] Hcg Hpc Hlocked HR Hcpu Hcsrs Hown").
         { exact Hjj. }
         { exact Hgl. }
@@ -1531,9 +1540,9 @@ Section ProofScheduler.
                   (* the scheduler ALWAYS comes back: its record is what the
                      dispatched thread's own park will resume. *)
                   true
-                  Hctxlen Holdc Hnewc (adm_none cpu_id)
+                  Hctxlen Holdc Hnewc ltac:(intros; apply _) (adm_none cpu_id) (adm_pin cpu_id)
                   with "Htext Hcg Hcpu Hpc Hctxcells [Hvc] [HP]").
-        { iExact "Hvc". }
+        { iApply proc_ctx_resume_tok. iExact "Hvc". }
         { iEval (rewrite (rget_tp Mc)). iExact "HP". }
         (* [lks'] IS A FRESH, INDEPENDENT BINDER (SpecSwtch.v's resume wand,
            which is [SwtchCtx.valid_context_pre]'s): the thread that will
@@ -1827,19 +1836,26 @@ Section ProofScheduler.
            every other fancy-update step in this tree is -- there is no
            [ElimModal] instance for a bare [WP] goal here. *)
         iApply fupd_wp.
-        iMod (proc_slots_park_gen γs ⊤ (proc_addr jj) st' Hneeds'
-                with "[Hvc'] [Htag'] Hmk Hppay") as "Hsl".
-        { iEval (rewrite Hcret) in "Hvc'". iExact "Hvc'". }
+        (* A6.127 §6: a resumable park came back WITH ITS BOX ([park_tok]);
+           the slot is rebuilt at the box's context and the box becomes the
+           lock's context at the release below. *)
+        iMod (proc_slots_park_box γs ⊤ (proc_addr jj) st' Hneeds'
+                with "[Hvc'] [Htag'] Hmk Hppay") as (ξb Tb) "[Hbox Hsl]".
+        { iEval (rewrite Hcret) in "Hvc'". destruct (needs_ctx st'); [| iExact "Hvc'"].
+          iDestruct "Hvc'" as (XIo) "[Htok Hrec]".
+          iApply (proc_ctx_at_of_tok with "Htok Hrec"). }
         { iApply (hart_at_any_intro jj cpu_id Hjj with "Htag'"). }
         (* the park state is [unclaimed] ([park_ok_unclaimed]), so the whole
            mirror the swtch payload carried is the lock's share again. *)
         iDestruct (pstate_whole_split (proc_addr jj) st') as "[Hwk _]".
         iDestruct ("Hwk" with "Hpg") as "[Hpg _]".
         iModIntro.
-        iAssert (proc_lock_res γs γl (proc_addr jj))
-          with "[Hstate Hpg Hchan Hpub Hsl]" as "HR".
-        { rewrite /proc_lock_res. iExists st', ch'.
-          iFrame "Hstate Hpg Hchan Hpub Hsl". }
+        iAssert (own_context cur_ctx ==∗ own_context cur_ctx ∗
+                   lock_pay (proc_lock_pay γs γl (proc_addr jj)))%I
+          with "[Hstate Hpg Hchan Hpub Hsl Hbox]" as "HR".
+        { iIntros "Hrun". iModIntro. iFrame "Hrun".
+          iApply proc_lock_pay_of_box. iExists ξb, Tb. iFrame "Hbox".
+          iApply (proc_lock_res_at_intro with "Hstate Hpg Hchan Hpub Hsl"). }
         (* c->proc is 0 again, so re-tag the bundle back to the idle index --
            this is what keeps [wp_next_idle] available at the loop head. *)
         iEval (rewrite (sc_retag_p M5 (av - 12)%nat (proc_addr jj) zero_reg)) in "Hcg".

@@ -103,10 +103,8 @@ Require Import DinodeEnc.       (* [dinode], [di_type]                        *)
 Require Import DirView.         (* [T_DIR_z]                                  *)
 Require Import FsTree.          (* [fname]                                    *)
 Require Import PathElems.       (* [path_elems]: the hop family's index       *)
-Require Import BioDefs.
 Require Import InodeInv.        (* [blkmap]                                   *)
 Require Import InodeLock.       (* [inode_ok]                                 *)
-Require Import IrefSlots.
 Require Import FsBlocks.        (* [fs_names]                                 *)
 Require Import FsBytesGamma.    (* [fs_gamma_L]: the LIVE Gamma               *)
 Require Import FsStateEra.      (* [era_node], [era_node_rec]                 *)

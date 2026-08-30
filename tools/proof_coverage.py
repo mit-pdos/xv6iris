@@ -293,8 +293,14 @@ MODTYPE_DECL = re.compile(r"^\s*Module\s+Type\s+(\w+)\s*\.", re.M)
 # so drop the dotted prefix -- reading `UtResFits` as the type is a silent
 # coverage downgrade, since no `Module Type UtResFits` exists to match a spec
 # against.  `verify_impl_modtypes` turns exactly that mismatch into an error.
+# A functor's parameter list: `(A : T) (B C : Lib.U)` -- several names to one
+# type, and a type QUALIFIED by the library that declares it, both of which
+# occur (`ProofUservec.v`: `(UT : UtResFits.USERTRAP_PARK)`).  A parameter list
+# this does not cover makes the whole declaration unreadable, and an unread
+# ascription is a proof that joins to no spec.
+MODPARAMS = r"(?:\(\s*\w+(?:\s+\w+)*\s*:\s*(?:\w+\.)*\w+\s*\)\s*)*"
 MODIMPL_DECL = re.compile(
-    r"^\s*Module\s+(\w+)\s*((?:\(\s*\w+\s*:\s*\w+\s*\)\s*)*)"
+    r"^\s*Module\s+(\w+)\s*(" + MODPARAMS + r")"
     r"<?:\s*(?:\w+\.)*(\w+)\s*\.", re.M)
 # `Include SpecUsertrap.USERTRAP.` inside a `Module Type` -- module-type
 # inheritance.  A module ascribed to the INCLUDING type exports everything the
@@ -302,6 +308,25 @@ MODIMPL_DECL = re.compile(
 MODTYPE_INCLUDE = re.compile(r"^\s*Include\s+(?:\w+\.)*(\w+)\s*\.", re.M)
 # `Module Kfree := KfreeProof Acquire MemsetPage Release.`
 MODINST_DECL = re.compile(r"^\s*Module\s+(\w+)\s*:=\s*(\w+)((?:\s+\w+)*)\s*\.", re.M)
+# `Module WalkNoalloc : WALK_NOALLOC := WalkNoallocProof.` -- an instance that
+# RE-ASCRIBES what it stands over.  Rocq accepts it, and it is redundant (the
+# functor or module on the right already carries the ascription, or should --
+# see design/spec-modules.md), so it is REJECTED rather than parsed: matched
+# here only to say so.  Matched BEFORE `MODIMPL_DECL`, which would otherwise
+# backtrack over the dot of a QUALIFIED type and read the qualifying prefix as
+# the module type -- `SpecKexecPin` for `: SpecKexecPin.KEXEC_PIN :=`, which is
+# how this spelling reaches `verify_impl_modtypes` as a mismatch instead of as
+# the deviation it is.  Unqualified, the same line matched nothing at all and
+# was dropped in silence, which is how `walk` came to read as `assumed` with
+# `LinkWalkNoalloc.v` linking it all along.
+MODASCINST_DECL = re.compile(
+    r"^\s*Module\s+(\w+)\s*<?:\s*(?:\w+\.)*(\w+)\s*:=\s*(\w+)", re.M)
+# `Module KforkB3 (FD : FILEDUP).` / `Module KexecPinMain.` -- opens a body and
+# ascribes nothing.  There is no spec join to record, and it is legal: named so
+# that the catch-all below can tell it from a spelling nobody has taught the
+# parser.
+MODOPEN_DECL = re.compile(
+    r"^\s*Module\s+(\w+)\s*(" + MODPARAMS + r")\.", re.M)
 
 
 # --------------------------------------------------------------------------
@@ -586,17 +611,37 @@ def scan_proofs(repo: str) -> Proofs:
         for line, kw, name, text in chunks(src):
             if kw == "Module":
                 mt = MODTYPE_DECL.match(text)
+                ma = MODASCINST_DECL.match(text)
                 mi = MODIMPL_DECL.match(text)
                 mn = MODINST_DECL.match(text)
                 if mt:
                     cur_modtype = mt.group(1)
                     p.modtype_file[cur_modtype] = base
+                elif ma:
+                    p.errors.append(
+                        f"{base}:{line}: `Module {ma.group(1)} : {ma.group(2)} "
+                        f":= {ma.group(3)}.` re-ascribes an instance.  The "
+                        f"ascription belongs on the functor (or on the module "
+                        f"the right-hand side names), and the link is then "
+                        f"`Module {ma.group(1)} := {ma.group(3)} <args>.` -- "
+                        f"see claude-notes/design/spec-modules.md")
                 elif mi:
                     cur_impl = mi.group(1)
                     p.impl[cur_impl] = (base, mi.group(3))
                 elif mn:
                     p.instances[mn.group(1)] = (mn.group(2), mn.group(3).split())
                     p.inst_file[mn.group(1)] = base
+                elif not MODOPEN_DECL.match(text):
+                    # Not a `Module Type`, not an ascribed functor, not an
+                    # instance, not a plain body-opener: a spelling this parser
+                    # has never been taught.  Silence here is what an unread
+                    # `Module` line used to cost -- a proof that no longer
+                    # joins to its spec, reported as merely assumed, with
+                    # nothing anywhere saying so.  Say so.
+                    head = " ".join(text.split())[:90]
+                    p.errors.append(
+                        f"{base}:{line}: unrecognized `Module` form, so "
+                        f"whatever it declares joins no spec: {head}")
             elif kw == "End":
                 if name == cur_modtype:
                     cur_modtype = None

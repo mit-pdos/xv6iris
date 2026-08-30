@@ -49,8 +49,7 @@ From iris.proofmode Require Import proofmode.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvExtras.
-Require Import RegFile.
+Require Import RiscvExtras.
 Require Import ProcGeom.     (* [tf_epc_idx] *)
 Require Import TfUser.       (* [tf_ueq] *)
 Require Import UserPerm.     (* [uperm] *)

@@ -86,7 +86,6 @@ Require Import UexecWp.      (* [uexec_wp] / [loop_ok] -- the [UEXEC_GEN] the
 Require Import ProcPtOwn.    (* [ud_norm] / [ud_norm_id] -- the index re-key *)
 Require Import UserPerm.     (* [perm_of] / [usz_ok] -- the key's permissions *)
 Require Import UexecSlot.    (* [uvis] / [uvis_of] / [tf_w] *)
-Require Import UexecRound.   (* [uround_ok] -- what the round may have done *)
 Require Import UexecRet.     (* [uslot] / [uexec_ret] / [ukb] / [ukc] /
                                 [trapped_machine] -- REQUIRED DIRECTLY: this
                                 file puts a [uslot]/[uvb] in the proofmode

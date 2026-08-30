@@ -139,7 +139,12 @@ Section ParkCap.
           later, for the same reason *)
        ▷ W -∗
        park_child γs γf pa ks rest pid U -∗
-       |==> ▷ proc_ctx γs pa)%I.
+       (* THE CONCLUSION IS ξ-FREE: [SchedCtx.proc_ctx_boxed] is a CLOSED
+          TERM since A6.128 (the record's rows live at the record's own
+          existential identity, [SwtchCtx.valid_context_pre]'s [XIp]) --
+          main's §0.15′ shape, reached here by the same-hart hand-off.  This
+          is the property [UtResFits] needs of [park_cap]/[park_token]. *)
+       |==> proc_ctx_boxed γs pa)%I.
 
   (* THE CHANNEL, at a given [W], as a [□] proposition under a later -- for
      the records of THIS table ([un_s N = γs]), which is all the token for
@@ -229,7 +234,7 @@ Section ParkCap.
        kfork call), each eliminating [UEXEC_GEN.uexec_wp_gen]'s [box] once. *)
     (∀ W : uvis, uslot W) -∗
     park_child (un_s N) (un_f N) (un_pj N) (un_ks N) rest (un_pid N) U -∗
-    |==> ▷ proc_ctx (un_s N) (un_pj N).
+    |==> proc_ctx_boxed (un_s N) (un_pj N).
   Proof.
     iIntros (Hwf Hrest) "#Htok #Htext #Hwire #Hkmap #Hmk Hstack #Henv Hown Hfrag Hslot Hchild".
     assert (Hkav : (K_usertrap <= KSTACK_AV)%nat) by (vm_compute; lia).

@@ -56,7 +56,9 @@ From Kernel Require KernelSyms.
 Require Import CodeSwtch.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require Import TsoCtxShim.   (* [hart_view_lb_any]: the SC-only resume receipt (M2 debt) *)
+Require Import TsoCtxPark.
+Require Import TsoCtxMove.
+Require Import CpuOwnMove.
 (* A6.86: [TsoCtxShim] is RETIRED -- its last live use died with the M4
    contract flip.  See its tombstone. *)
 Local Open Scope Z_scope.
@@ -67,8 +69,8 @@ Section ProofSwtch.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
 
-  Local Instance stack_own_timeless_local (sp : mword 64) (n : nat) :
-    Timeless (stack_own (KTR := KT1) sp n).
+  Local Instance stack_own_timeless_local `{XI' : CurCtx} (sp : mword 64) (n : nat) :
+    Timeless (stack_own (KTR := KT1) (XI := XI') sp n).
   Proof.
     rewrite /stack_own. apply bi.exist_timeless. intros ws.
     apply bi.sep_timeless; [ apply _ | ].
@@ -90,14 +92,14 @@ Section ProofSwtch.
 
   Lemma wp_swtch_sconf
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
-           mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
+           mword 64 -d> mword 64 -d> bool -d> CtxId -d> iPropO Σ)
       (An Ao : ctx_adm)
       (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
       (av : nat) (eb : bool) (p : mword 64) (back : bool) :
     wp_swtch_sconf_body P An Ao oldc newc m0 old_vs av eb p back.
   Proof.
     cbv beta delta [wp_swtch_sconf_body].
-    iIntros (Hlen_old Holdc Hnewc Hadm)
+    iIntros (Hlen_old Holdc Hnewc HPm Hadm Hadmo)
       "#Ht Hcg Hcpuown Hpc Holdcells Hvalidnew HP Hwold".
     (* The record no longer parks [eb] or an avail copy: its resume wand is
        [∀ m eb'], so the resumer supplies cpu_own at ITS OWN [eb']; the
@@ -144,18 +146,31 @@ Section ProofSwtch.
        and its resume wand demands cpu_own at that SAME index p -- so the
        cpu_own we already hold fits with no retune, no equation. ---- *)
     iApply fupd_wp.
-    iEval (rewrite (valid_context_unfold P An newc p)
+    iDestruct "Hvalidnew" as (XIt) "[Htok_t Hvalidnew]".
+    iEval (rewrite (valid_context_unfold P An newc p XIt)
                    /valid_context_pre !bi.later_exist) in "Hvalidnew".
-    iDestruct "Hvalidnew" as (new_vs av_t XIt Tt) "Hvalidnew".
-    iDestruct "Hvalidnew" as "(>%Hlen_new & >%Hal_new & >Hnewcells & >Hstk_t & >Hctx_t & Hnewwand)".
-    (* RE-CONNECT THE TARGET'S CONTEXT TO THIS CPU (tso-port checkpoint 0.4
-       items 2/5): the record's token is PARKED; resuming it here --
-       [TsoCtx.ctx_resume] -- ties it to this hart against a view receipt
-       dominating the parked stamp.  The receipt is the shim's SC-only
-       intro until the M2 sweep threads the honest one out of the p->lock
-       acquire ([SpecAcquire]); the exchange itself is in its final shape. *)
-    iMod (ctx_resume XIt Tt Tt (Nat.le_refl _) with "[] Hctx_t") as "Hctx_t".
-    { iApply hart_view_lb_any. }
+    iDestruct "Hvalidnew" as (new_vs av_t) "Hvalidnew".
+    iDestruct "Hvalidnew" as "(>%Hlen_new & >%Hal_new & >Hnewcells & >Hstk_t & Hnewwand)".
+    (* RE-CONNECT THE TARGET'S CONTEXT TO THIS CPU (§0.42′ / A6.127 §6).
+       A migratable record arrives with its token PARKED and LINKED to this
+       thread's own context -- [ctx_parked XIt Tt ∗ ctx_floor cur_ctx Tt],
+       the shape the p->lock acquire's morph leaves -- and our running
+       token cashes the floor into the view receipt [ctx_resume] needs
+       ([TsoCtxPark.ctx_resume_floor]).  A pinned record (the hart's
+       scheduler) holds its RUNNING token outright, and its admissibility
+       says that token is this hart's.  No receipt is conjured. *)
+    iAssert (|==> own_context cur_ctx ∗ own_context XIt)%I
+      with "[Hctx Htok_t]" as ">[Hctx Hctx_t]".
+    { destruct An as [h|].
+      - pose proof (adm_pin_inv _ _ Hadm) as Heq. subst h.
+        rewrite /resume_tok. iModIntro. iSplitL "Hctx"; [iExact "Hctx" | iExact "Htok_t"].
+      - rewrite /resume_tok. iDestruct "Htok_t" as (Tt) "[Hpk_t #Hfl_t]".
+        iApply (ctx_resume_floor XIt cur_ctx Tt with "Hctx Hpk_t Hfl_t"). }
+    (* THE HAND-OFF, PART 1 (A6.128): the target's save-area cells are ITS
+       (written by its own park); this hart's swtch block loads them, so
+       they move to THIS thread's context -- both tokens are running. *)
+    iMod (ctx_move (R := λ ξ, ctx_cells (XI := ξ) newc new_vs) XIt cur_ctx
+            with "Hctx_t Hctx Hnewcells") as "(Hctx_t & Hctx & Hnewcells)".
     iModIntro.
     (* ---- the symbolic environment: 0..31 = [gpr_file]'s ACTUAL map
        [tp_pin m0] (its tp slot, index 4, is [cid_word_of cpu_id] by
@@ -238,15 +253,50 @@ Section ProofSwtch.
        the stamp is read off the token's own receipts).  In the no-return
        case the token is dropped instead -- the zombie park is the one
        place a thread's identity dies. *)
-    iMod (ctx_park with "Hctx") as (Tp) "Hctx".
-    iAssert (if back then valid_context P Ao oldc p else own_ctx oldc)
-      with "[Holdpart Hstk Hwold Hctx]" as "Hvoldc".
+    (* THE TOKEN BESIDE THE RECORD (§0.42′ / A6.127 §6): a migratable
+       caller parks INTO A FRESH BOX -- a stamped context whose stamp is
+       raised over the parker's, leaving the link the resumer will cash
+       ([TsoCtxPark.ctx_park_box]); a pinned caller (the scheduler) puts
+       its RUNNING token into its record as it is, indexed by this hart by
+       its own admissibility. *)
+    (* THE HAND-OFF, PART 2: what the resumed thread receives -- the target's
+       cells the block just wrote, the per-cpu bundle, the crossing payload
+       -- moves to ITS identity now, while both tokens are still running;
+       the caller's token parks right after. *)
+    iMod (ctx_move (R := λ ξ, ctx_cells (XI := ξ) newc new_vs) cur_ctx XIt
+            with "Hctx Hctx_t Hnewpart") as "(Hctx & Hctx_t & Hnewpart)".
+    iMod (ctx_move (R := λ ξ, cpu_own (XI := ξ) 1 eb p false {["proc"]}) cur_ctx XIt
+            with "Hctx Hctx_t Hcpuown") as "(Hctx & Hctx_t & Hcpuown)".
+    iMod (HPm cpu_id Ao newc oldc (rget m0 (mword_of_int 4 : mword 5)) p back cur_ctx XIt
+            with "Hctx Hctx_t HP") as "(Hctx & Hctx_t & HP)".
+    (* the caller's own cells: at a resumable park they stay at [cur_ctx]
+       (its record); at the zombie park they go to the target too -- the
+       spec hands the dead caller's cells to the resumed thread at ITS
+       identity. *)
+    iAssert (ctx_cells oldc (callee_img m0)) with "[Holdpart]" as "Holdpart";
+      first iExact "Holdpart".
+    iAssert (|==> own_context cur_ctx ∗ own_context XIt ∗
+               (if back then ctx_cells oldc (callee_img m0)
+                else ctx_cells (XI := XIt) oldc (callee_img m0)))%I
+      with "[Hctx Hctx_t Holdpart]" as ">(Hctx & Hctx_t & Holdpart)".
+    { destruct back; first by iFrame.
+      iApply (ctx_move (R := λ ξ, ctx_cells (XI := ξ) oldc (callee_img m0)) cur_ctx XIt
+                with "Hctx Hctx_t Holdpart"). }
+    iAssert (|==> park_tok Ao cur_ctx)%I with "[Hctx]" as ">Htok".
+    { destruct Ao as [h|].
+      - pose proof (adm_pin_inv _ _ Hadmo) as Heq. subst h.
+        rewrite /park_tok. iModIntro. iExact "Hctx".
+      - rewrite /park_tok. iMod ctx_parked_alloc as (ξb) "Hbox".
+        iMod (ctx_park_box cur_ctx ξb 0 with "Hctx Hbox") as (Tp Tb) "(_ & Hbox & Hpk & #Hfl)".
+        iModIntro. iExists ξb, Tb, Tp. iFrame "Hbox Hpk Hfl". }
+    iAssert (if back then valid_context P Ao oldc p cur_ctx else own_ctx (XI := XIt) oldc)
+      with "[Holdpart Hstk Hwold]" as "Hvoldc".
     { destruct back; last first.
       { iExists (callee_img m0). iSplitR.
         { iPureIntro. unfold callee_img, ctx_regs; cbn. reflexivity. }
         iExact "Holdpart". }
-      rewrite (valid_context_unfold P Ao oldc p) /valid_context_pre.
-      iExists (callee_img m0), av, cur_ctx, Tp.
+      rewrite (valid_context_unfold P Ao oldc p cur_ctx) /valid_context_pre.
+      iExists (callee_img m0), av.
       iSplit.
       { iPureIntro. unfold callee_img, ctx_regs; cbn. reflexivity. }
       iSplit.
@@ -255,7 +305,6 @@ Section ProofSwtch.
       iFrame "Holdpart".
       iSplitL "Hstk".
       { rewrite (callee_img_nth1 m0 (mword_of_int 0)). iExact "Hstk". }
-      iSplitL "Hctx"; [ iExact "Hctx" |].
       iExact "Hwold". }
     (* ---- the trailing c.ret returns to new's saved return address ---- *)
     assert (Hm1 : vregs_den rho swtch_regs1 !!! Regidx (mword_of_int 1 : mword 5)
@@ -296,7 +345,7 @@ Section ProofSwtch.
               ltac:(intro Hc0; vm_compute in Hc0; discriminate) Hlpe
               with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Htr
                     Hpc Hfile []
-                    [Hnewwand Hvoldc Hnewpart HP Hhalf Hspp Hq0 Hcpuown Hstk_t
+                    [Hnewwand Hvoldc Htok Hnewpart HP Hhalf Hspp Hq0 Hcpuown Hstk_t
                      Hctx_t]").
     { iApply (swi_68 with "Ht"). }
     (* ---- the ▷ continuation: iNext strips it AND the record's ▷'d pieces ---- *)
@@ -315,10 +364,8 @@ Section ProofSwtch.
        our own [eb] (eb' := eb) -- no retune, no equation.  [sie_arm false p]
        is [intr_off_tok] by conversion now (an INDEX, not a disjunction), so
        building [sie_cap] at [false] needs no [iLeft]. ---- *)
-    (* the target thread's stack, re-indexed to ITS context: the swtch
-       hand-off is the M2 seam; SC crosses it through the shim. *)
-    iPoseProof (TsoCtxShim.ctx_dom_sc cur_ctx XIt) as "Hdom_t".
-    iMod (stack_own_reindex cur_ctx XIt with "Hdom_t Hstk_t") as "[_ Hstk_t]".
+    (* the target thread's stack arrives at ITS context already (the record
+       states it at [XIt], A6.127 §6): no re-index at the crossing. *)
     iAssert (sie_cap (XI := XIt) KT1 (vregs_den rho swtch_regs1) av_t false p)
       with "[Hstk_t Htr Hq0 Hctx_t]" as "Hcap_t".
     { rewrite /sie_cap Hcsp_t. iFrame "Hstk_t Htr Hwit Hctx_t". iExact "Hq0". }
@@ -337,11 +384,13 @@ Section ProofSwtch.
     (* [valid_context_pre]'s resume wand is [∀ h m eb'] -- the held set is no
        longer a binder, it is the pinned proc singleton on both sides. *)
     iApply ("Hnewwand" $! cpu_id (vregs_den rho swtch_regs1) eb
-              with "[] [] Hcg_t Hcpuown Hpc Hnewpart [Hvoldc HP]").
+              with "[] [] Hcg_t Hcpuown Hpc Hnewpart [Hvoldc Htok HP]").
     { iPureIntro. exact Hadm. }
     { iPureIntro. exact Hcallee_new. }
-    iExists Ao, oldc, back. iSplitL "Hvoldc".
-    { destruct back; [iApply bi.later_intro |]; iExact "Hvoldc". }
+    iExists Ao, oldc, back. iSplitL "Hvoldc Htok".
+    { destruct back.
+      - iExists cur_ctx. iFrame "Htok". iApply bi.later_intro. iExact "Hvoldc".
+      - iExact "Hvoldc". }
     { rewrite Hm4. iExact "HP". }
   Qed.
 

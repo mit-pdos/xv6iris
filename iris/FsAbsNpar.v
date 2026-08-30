@@ -63,22 +63,14 @@ From iris.algebra Require Import gmap dfrac.
 From iris.base_logic.lib Require Import iprop own ghost_map.
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto.
-Require Import DinodeEnc.
-Require Import DirView.
 Require Import FsTree.          (* [fname] *)
 Require Import PathElems.       (* [path_elems] *)
-Require Import BioDefs.
-Require Import InodeInv.
-Require Import InodeLock.
-Require Import IrefSlots.
 Require Import FsBlocks.        (* [fs_names] *)
 Require Import FsBytesGamma.    (* [fs_gamma_L] *)
 Require Import FsStateEra.
 Require Import IcacheRef.
 Require Import IcacheEscrow.
 Require Import Xv6G.
-Require Import FsAbsSeam.
-Require Import FsAbsPins.
 Require Import FsAbsEra.        (* [elend], [ex_hop]: the LEND, unchanged *)
 Require Import FsAbs.           (* LAST (FsAbs's own rule) *)
 

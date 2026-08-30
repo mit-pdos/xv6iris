@@ -75,7 +75,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Export FastSetSolver.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
-Require Import TsoCtx.
 
 (* ====================================================================== *)
 (* 1. THE PURE VOCABULARY.                                                *)

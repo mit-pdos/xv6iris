@@ -8,31 +8,21 @@
 
      - [riscvGpreS]/[riscvΣ] are the "pre-ghost-state" typeclass and functor
        list: what must be in [Σ] BEFORE any ghost names exist.
-     - [riscv_system_adequacy] says: pick a list [cs] of harts (the "N CPUs")
-       and an initial machine state [g].  If, for EVERY ghost-state
-       instantiation [riscvGS Σ], the initial resources
-         * per-hart register points-to  [reg_pointsto_at c r]
-           (for each hart [c], the registers [D c] the caller wants to own,
-            holding their values in [g]),
-         * one [a ↦ₘ b] for every byte of the initial RAM image,
-         * the user halves of the device state, [uart_frag]/[plic_frag],
-       suffice -- after a [={⊤}=∗], under which the caller allocates whatever
-       invariants its proof needs (the device invariant [dev_inv_body], the
-       wire invariant [wire_inv], lock invariants, [minstret_inv], ...) -- to
-       prove
-         * [WP (LoopE c) {{ _, True }}] for every chosen hart [c], and
-         * [WP UartLoop {{ _, True }}], [WP DiskLoop {{ _, True }}] and
-           [WP PlicLoop {{ _, True }}] -- one per device thread,
-       then the META-level conclusion holds, with no Iris judgment in it:
-       every thread-pool configuration reachable from
-       [(LoopE <$> cs) ++ [UartLoopE; DiskLoopE; PlicLoopE]] at state [g], by
-       ANY interleaving of hart and device steps, is reducible -- each hart
-       can always execute another instruction, and each device can always
-       step.  In particular every Iris invariant the caller established holds
-       at every step of every execution; "the system executes correctly" is
-       whatever those invariants + WPs enforce, and this theorem discharges
-       all of it down to the bare operational semantics
-       ([prim_step]/[run]/[uart_step]/[disk_step]/[plic_step]).
+     - [riscv_power_adequacy] says: start the machine POWERED OFF at
+       generation 0.  If, for EVERY fixed ghost layer, the client can boot
+       ANY era over ANY reset machine ([Hboot]: the resources a PowerOn
+       mints entail the WPs of every hart and of the three device threads),
+       then every configuration reachable under any schedule of power
+       cycles, hart steps and device steps is reducible, the client's
+       trace property holds of every reachable state and of the
+       OBSERVABLE TRACE ([phi]), and the client's crash predicate spans the
+       power cycles.  The old single-generation theorem (a machine that
+       starts powered ON with no power thread) is gone: it was a special
+       case, nothing used it, and the trace conjunct of [state_interp]
+       parses the history from OFF (claude-notes/projects/uart-trace.md).
+       The META-level conclusion has no Iris judgment in it: "the system
+       executes correctly" is whatever the client's invariants + WPs
+       enforce, discharged down to the bare operational semantics.
 
    [LoopE c] is [Loop] with ambient hart [c]: a caller proves each hart's WP
    in the usual single-CPU spelling ([Context `{GEN : GenId} `{CID : CpuId}.] ... [WP Loop])
@@ -55,16 +45,13 @@ From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var mono_nat in
 From iris.program_logic Require Import weakestpre lifting adequacy.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvLang RiscvPtsto.
+Require Import RiscvLang ObsTrace RiscvPtsto.
 Require Import KptPt.   (* kmap_M0, for the kmap ghost (rwx-kmap) *)
-Require Import KMap.    (* kmap_auth / kmap_wf_M0 *)
 Require Import BootCarve.  (* the boot-image carving library: the claims-bundle
                               persist and the rwx three-way split at [text_end],
                               lifted out of this proof so there is ONE copy *)
 Require Import SmodeCore.  (* sieG: the [ghost_varG Σ (mword 1)] for the SIE/SPP/SPIE ghosts *)
-Require Import KptGhost.   (* kpt_unset / kpt_ghost_alloc: the shared kernel table's one-shot agreement *)
-Require Import WireInv.
-Require Import PlicPlan VirtioProto WpUart.
+Require Import WpUart.
 Require Import PowerBoot.   (* the canonical reset machine + [boot_shape_boot_gstate] *)
 (* The [set_solver] override.  EXPORT, not Import: this import is         *)
 (* deliberately "dead" -- the file compiles without it, just far slower --  *)
@@ -89,6 +76,8 @@ Class riscvGpreS (Σ : gFunctors) := RiscvGpreS {
   riscv_pre_uartGS :: ghost_varG Σ uart_state;
   riscv_pre_plicGS :: ghost_varG Σ plic_state;
   riscv_pre_virtioGS :: ghost_varG Σ virtio_state;
+  (* the observable trace's history ghost (uart-trace.md) *)
+  riscv_pre_obsGS :: ghost_varG Σ (list mobs);
   (* [uartGhostG] and [diskGhostG] were fields here, "carried by
      [dev_inv_body]".  They are pure capacity and now live in [Xv6G.xv6G],
      the tree's ONE bundle: a class that carries them as well would give
@@ -143,6 +132,7 @@ Definition riscvΣ : gFunctors :=
      ghost_varΣ uart_state;
      ghost_varΣ plic_state;
      ghost_varΣ virtio_state;
+     ghost_varΣ (list mobs);
      uartGhostΣ;
      diskGhostΣ;
      @ghost_mapΣ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
@@ -391,446 +381,6 @@ Local Lemma big_sepL_enum_to_set {PROP : bi} (Φ : CPU -> PROP) :
   ([∗ list] c ∈ enum CPU, Φ c) ⊢ [∗ set] c ∈ (fin_to_set CPU : gset CPU), Φ c.
 Proof.
   rewrite /fin_to_set big_sepS_list_to_set; [done|apply NoDup_enum].
-Qed.
-
-(* ---------------------------------------------------------------------- *)
-(* 4. The initial thread pool: one [LoopE c] per chosen hart, plus the      *)
-(*    THREE device execution contexts (one per device -- RiscvLang §3c).   *)
-(* ---------------------------------------------------------------------- *)
-
-Definition cpu_pool `{GEN : GenId} (cs : list CPU) : list (expr riscv_lang) :=
-  (LoopE gen_id <$> cs) ++ [UartLoop; DiskLoop; PlicLoop].
-
-(* ---------------------------------------------------------------------- *)
-(* 5. The adequacy theorem.                                                *)
-(* ---------------------------------------------------------------------- *)
-
-Theorem riscv_system_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ} `{GEN : GenId}
-    (cs : list CPU) (g : gstate) (D : CPU -> gset register)
-    (* how many proc slots the kernel's proc[] array has: the boot client is
-       handed one hart tag per slot ([ProcGeom.hart_own], minted at hart 0).
-       A hart client passes [NPROC]; the device-only corollary below passes
-       0. *)
-    (nproc : nat)
-    (* THE CRASH PREDICATE (claude-notes/design/crash.md): the client's
-       durability property, sealed into [crash_inv] here and handed back in
-       the bundle below.  It is an ARBITRARY iProp over fixed-layer ghosts
-       (the intended instance is "the durable image satisfies P_fs", over
-       [disk_bytes] fragments and whatever abstract-state ghosts the FS
-       keeps); nothing between here and the disk thread's DMA completion --
-       the only place it is opened -- ever names it. *)
-    (* INDEXED BY THE SWAP GNAME as well as the disk image (phase C2b/D1):
-       [P_fs]'s checked-out arm owns the swap counter's AUTH, and that gname
-       is allocated HERE, so the client cannot mention it unless it is a
-       parameter.  The seam equation the client gets back is that its own
-       [fcn_swap] IS [riscv_swap_name] -- the same shape as
-       [VirtioProto.disk_ghosts_alloc]'s [dn_img γ = disk_img_name]. *)
-    (* THERE IS NO DURABLE-VIEW GNAME AND NO [Gamma_D] BUNDLE (S2's arity
-       sweep).  Both were fixed-layer arguments of [Pc] for the
-       pre-snapshot design, in which a client had to NAME the durable
-       instance it owed a step at; under the snapshot ruling
-       [FsCrash.P_fs]'s durable half is [FsDurSnap.P_dur] of the committed
-       map, over its own existential names, and nothing read either. *)
-    (Pc : gname -> gname -> gname -> gname -> iProp Σ)
-    (* the durable disk's extent, for the one-time mint of its fragments
-       into the client's crash predicate *)
-    (ndisk : nat)
-    (Hram : forall a b, g.(gmem) !! a = Some b -> addr_is_ram a)
-    (* the SINGLE-GENERATION form (crash.md): the machine is already booted
-       and running generation 0 -- the power thread is not in this pool, so
-       power stays on and the generation never moves.  The full power
-       adequacy (pool = [PowerLoop]) supersedes this at milestone M6. *)
-    (Hpow : g.(gpow) = true) (Hgen0 : g.(ggen) = 0%nat)
-    (Hgid : gen_id = 0%nat)
-    (* no reservation is outstanding at the start (design §3a) *)
-    (Hresv0 : forall c, g.(gresv) c = None)
-    (* THE CRASH PREDICATE MUST HOLD BEFORE ANYTHING RUNS -- mkfs's
-       obligation -- AT THE INITIAL DISK IMAGE.  A BUILD-FROM-NOTHING
-       ENTAILMENT UNDER AN UPDATE, not a plain one: once [Pc] owns ghosts (a
-       committed-history mono-list, the FS names) it is no longer provable
-       from nothing, and it cannot receive gnames allocated here either --
-       the field must be a fixed function.  The shape a real client uses is
-       therefore [Pc := fun dk => ∃ names, P_fs names … dk], whose
-       obligation is exactly [FsCrash.P_fs_alloc].  The TIE's own half is NOT
-       part of [Pc]: it is a sibling conjunct of [crash_inv]'s body,
-       allocated and installed here. *)
-    (HPc : forall γdisk γsw γreg γst : gname,
-       disk_img_bytes γdisk 0 (disk_read (v_disk (g.(gdev).(dvirtio))) 0 ndisk) ∗
-       mono_nat_auth_own γsw 1 0%nat ⊢
-         |==> Pc γdisk γsw γreg γst) :
-  (forall HR : riscvGS Σ,
-     ⊢ ([∗ set] c ∈ (fin_to_set CPU : gset CPU),
-          [∗ set] r ∈ D c,
-            reg_pointsto_at c r (DfracOwn 1) (register_lookup r (g.(gregs) c))) ∗
-       (* rwx-kmap init split at etext: the sub-etext image (kernel text +
-          the dump's padding tail) arrives PERSISTED as [↦ₓ□]; the data
-          region arrives owned as [↦ₘ] *)
-       ([∗ map] a ↦ b ∈ filter (fun p : Arch.pa * bv 8 => uint p.1 < text_end)
-                          g.(gmem), a ↦ₓ□ b) ∗
-       ([∗ map] a ↦ b ∈ filter (fun p : Arch.pa * bv 8 => text_end <= uint p.1)
-                          g.(gmem), a ↦ₘ b) ∗
-       (* the kernel-mapping auth, minted over the static map (rwx-kmap);
-          the client stores it in the Bare translation slot *)
-       kmap_auth kmap_M0 ∗
-       (* ... and the persisted static-claims bundle (uniform-claims):
-          the client threads it into hw_config *)
-       kmap_static_claims ∗
-       (* BOTH PENDING halves of EVERY hart's S-mode translation one-shot,
-          minted at 0 (Bare): each hart's boot introduction folds one into its
-          Bare translation slot via [sie_cap_intro_bare] and keeps the other
-          as the still-Bare receipt (which that hart's kvminithart switch
-          spends to SHOOT the one-shot, minting the persistent [kpt_on]). *)
-       ([∗ set] c ∈ (fin_to_set CPU : gset CPU),
-          strans_pending_at (strans_name c) ∗
-          strans_pending_at (strans_name c)) ∗
-       (* EVERY hart's SIE ghost, minted at '0' -- interrupts are off at boot --
-          in the three pieces the choreography (IntrDefs.v §2) splits it into:
-          the 1/2 live-bit tie that rides in [sconf], the 1/4 kernel-code
-          eighth-pair the capability and [intr_count] share, and the 1/4 the
-          interrupt invariant takes.  CANONICAL per hart ([sie_name]), which is
-          why nothing above names a SIE ghost any more. *)
-       ([∗ set] c ∈ (fin_to_set CPU : gset CPU),
-          ghost_var (sie_name c) (1/2)%Qp sie_bit_off ∗
-          ghost_var (sie_name c) (1/4)%Qp sie_bit_off ∗
-          ghost_var (sie_name c) (1/4)%Qp sie_bit_off) ∗
-       (* the shared kernel page table's one-shot agreement, UNSET: spent
-          once, in main's kvm assembly, to allocate [kpt_inv]. *)
-       kpt_unset ∗
-       (* EVERY proc slot's PARK RECEIPT, minted at [false] -- nobody is
-          dispatched at boot.  Both halves of each: they sit in the proc's
-          own p->lock until its first dispatch (SchedCtx.proc_slots). *)
-       ([∗ list] j ∈ seq 0 nproc, ghost_var (park_name j) 1 (0%fin : CPU)) ∗
-       (* ... and every slot's STATE MIRROR, minted at UNUSED, which is what
-          procinit stores into every p->state.  Both halves, in the proc's
-          own p->lock: at UNUSED nobody has claimed the slot. *)
-       ([∗ list] j ∈ seq 0 nproc,
-          ghost_var (pstate_name j) 1 (SailStdpp.Values.mword_of_int 0 : SailStdpp.Values.mword 32)) ∗
-       (* every hart's reservation mirror, at [None] (design §3a): the
-          client threads it into [pc_is] *)
-       ([∗ set] c ∈ (fin_to_set CPU : gset CPU), resv_frag c None) ∗
-       uart_frag (g.(gdev).(duart)) ∗ plic_frag (g.(gdev).(dplic)) ∗
-       virtio_frag (g.(gdev).(dvirtio)) ∗
-       (* the crash-spanning invariant, allocated over [Pc] below: the client
-          threads it to [wp_disk_loop] (the one consumer) and, once the FS
-          instantiates [Pc], opens it around its own commit points *)
-       crash_inv ∗
-       (* the generation certificates (crash.md): birth + started + the
-          era registration, i.e. [gen_cert] -- what a client needs to
-          allocate [minstret_inv] *)
-       gen_cert
-       ={⊤}=∗
-       ([∗ list] c ∈ cs, WP (LoopE gen_id c : expr riscv_lang) @ ⊤) ∗
-       WP (UartLoop : expr riscv_lang) @ ⊤ ∗
-       WP (DiskLoop : expr riscv_lang) @ ⊤ ∗
-       WP (PlicLoop : expr riscv_lang) @ ⊤) ->
-  forall t2 g2 e2,
-    rtc erased_step (cpu_pool cs, g) (t2, g2) ->
-    e2 ∈ t2 ->
-    reducible (Λ := riscv_lang) e2 g2.
-Proof.
-  intros Hwp t2 g2 e2 Hrtc He2.
-  apply erased_steps_nsteps in Hrtc as (n & κs & Hsteps).
-  cut (forall e : expr riscv_lang, e ∈ t2 -> not_stuck e g2).
-  { intros Hns. destruct (Hns e2 He2) as [[v Hv]|Hred];
-      [discriminate Hv|exact Hred]. }
-  eapply (wp_strong_adequacy Σ riscv_lang NotStuck (cpu_pool cs) g n κs t2 g2 _
-            (fun _ => 0%nat)); last exact Hsteps.
-  intros Hinv.
-  (* allocate every ghost component at the initial state [g] *)
-  iMod (gen_heap_init g.(gmem)) as (Hgen) "(Hh & Hbytes & _)".
-  (* expose the bundle's three components, so [riscv_memGS HR] below is a
-     CONSTRUCTOR application convertible (ι, no record η needed) with the
-     instance the freshly minted [pointsto]/[gen_heap_interp] carry *)
-  destruct Hgen as [Hmpre Hhn Hmn].
-  iMod (reg_alloc_cpus g.(gregs) D (enum CPU) (NoDup_enum CPU))
-    as (f) "Hcpus".
-  iMod (ghost_var_alloc g.(gdev).(duart)) as (γu) "Hu".
-  iMod (ghost_var_alloc g.(gdev).(dplic)) as (γp) "Hp".
-  iMod (ghost_var_alloc g.(gdev).(dvirtio)) as (γv) "Hv".
-  iEval (rewrite -Qp.half_half) in "Hu".
-  iDestruct (ghost_var_split with "Hu") as "[HuA HuF]".
-  iEval (rewrite -Qp.half_half) in "Hp".
-  iDestruct (ghost_var_split with "Hp") as "[HpA HpF]".
-  iEval (rewrite -Qp.half_half) in "Hv".
-  iDestruct (ghost_var_split with "Hv") as "[HvA HvF]".
-  iMod (ghost_map_alloc kmap_M0) as (γk) "[Hkauth Hkfrags]".
-  (* EVERY hart's S-mode translation one-shot, minted PENDING (auth at 0);
-     both halves of each are handed to the boot client below *)
-  iMod (mono_nat_alloc_halves_cpus 0%nat (enum CPU) (NoDup_enum CPU))
-    as (γs) "Hs".
-  (* EVERY hart's SIE ghost, minted at '0' (interrupts off at boot), in the
-     three pieces of the choreography *)
-  iMod (ghost_var_alloc_sie_cpus sie_bit_off (enum CPU) (NoDup_enum CPU))
-    as (γsie) "Hsie".
-  (* the SPP mirror, TWO halves like the translation bit.  The value here is
-     arbitrary: nothing is tied to it until the M->S bridge builds [sconf],
-     and that site holds BOTH halves and sets them to the mstatus it is
-     about to install ([BootBridge.sconf_intro]). *)
-  iMod (ghost_var_alloc_halves_cpus sie_bit_off (enum CPU) (NoDup_enum CPU))
-    as (γspp) "Hspp".
-  iMod (ghost_var_alloc_halves_cpus sie_bit_off (enum CPU) (NoDup_enum CPU))
-    as (γspie) "Hspie".
-  (* the shared kernel table's one-shot agreement, unset *)
-  iMod kpt_ghost_alloc as (γkpt) "Hkpt".
-  (* EVERY proc slot's park receipt, minted at [false] *)
-  iMod (ghost_var_alloc_nats (0%fin : CPU) nproc) as (γpark) "Hpark".
-  iMod (ghost_var_alloc_nats (SailStdpp.Values.mword_of_int 0 : SailStdpp.Values.mword 32) nproc) as (γpst) "Hpst".
-  iMod (mono_nat_own_alloc g.(ggen)) as (γgen) "[Hgenauth #Hbornlb]".
-  iMod (mono_nat_own_alloc (start_count g)) as (γstart) "[Hstartauth #Hstartlb]".
-  (* THE ERA's disk image, EMPTY: this single-generation theorem hands its
-     client no disk fragments (its bundle has no disk conjunct), and
-     [disk_view ∅ _] holds vacuously.  The BOOT MINT -- a full-range image
-     allocated at the disk's content -- is the POWER thread's
-     ([wp_power_loop] below, through [power_boot_res]). *)
-  iMod (ghost_map_alloc_empty (K := Z) (V := bv 8)) as (γdisk) "Hdiskauth".
-  (* the era's FS log-region mirror, at the VACUOUS picture: this
-     single-generation theorem hands its client no FS custody, and the first
-     real one is minted by [initlog]'s swap. *)
-  iMod (ghost_var_alloc (MkLogMirror (fun _ => []))) as (γmir) "_".
-  iMod (own_alloc_lockset_cpus (enum CPU) (NoDup_enum CPU)) as (γlks) "Hlks".
-  (* the reservation mirror, at the (all-[None]) machine map *)
-  iMod (ghost_map_alloc (resv_map g.(gresv))) as (γresv) "[Hresvauth Hresvfrags]".
-  set (E0 := RiscvEraGS f Hhn Hmn γu γp γv γk γkpt γs γsie γspp γspie γpark γpst γdisk γmir γlks γresv).
-  iMod (ghost_map_alloc_empty (K := nat) (V := riscvEraGS)) as (γreg) "HRauth".
-  (* THE DURABLE DISK, minted ONCE at the machine's own image: the AUTH is
-     [state_interp]'s fixed conjunct, the FULL fragments go to the client's
-     crash predicate and never leave it (design/crash.md, "The durable
-     disk").  FIXED-layer, so it survives every power cycle -- which is what
-     makes the crash predicate a statement about the REAL disk. *)
-  iMod (disk_img_sized_alloc (v_disk (g.(gdev).(dvirtio))) ndisk)
-    as (γfdisk) "[HtieS Hfdfrags]".
-  (* THE SWAP COUNTER, at 0: nobody is in custody of the FS record yet.  Its
-     AUTH goes to the client, which parks it inside [Pc] -- a fixed-layer
-     invariant never dies, so the auth never strands and every later era's
-     [initlog] can bump it at its swap. *)
-  iMod (mono_nat_own_alloc 0%nat) as (γswap) "[Hswap _]".
-  (* the crash-spanning invariant, over the client's [Pc] AND the tie's other
-     half.  Allocated at the FIXED layer, so it outlives every era; both
-     power arms leave it closed. *)
-  iMod (HPc γfdisk γswap γreg γstart
-          with "[$Hfdfrags $Hswap]") as "HPc0".
-  iMod (inv_alloc crashN ⊤ (Pc γfdisk γswap γreg γstart) with "HPc0")
-    as "#Hcinv".
-  assert (Hemp0 : (∅ : gmap nat riscvEraGS) !! 0%nat = None)
-    by apply lookup_empty.
-  iMod (ghost_map_insert 0%nat E0 Hemp0 with "HRauth") as "[HRauth HRelem]".
-  iMod (ghost_map_elem_persist with "HRelem") as "#HRelem".
-  set (HR := RiscvGS Σ
-               (RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ _ Hmpre _ γgen γstart _ γreg
-                  _ _ γfdisk ndisk
-                  (Pc γfdisk γswap γreg γstart) γswap)
-               E0).
-  (* THE CARVING, all four steps out of BootCarve.v (one copy; the crash
-     layer's boot client has the same raw inputs at a fresh era and reuses
-     them).  The claims bundle FIRST -- it comes from the kmap fragments,
-     which do not overlap the memory map, and both memory halves need it. *)
-  (* the [set]-bound era record is NOT a typeclass instance, so every lifted
-     lemma is applied at the EXPLICIT instance [HR] (crash.md's M0 gotcha). *)
-  iMod (@kmap_static_claims_intro Σ HR with "Hkfrags") as "#Hkbundle".
-  iDestruct (big_sepL_sep with "Hcpus") as "[Hauths Helems]".
-  iDestruct (@boot_bytes_split Σ HR g with "Hbytes") as "[Htext Hdata]".
-  iMod (@boot_text_persist Σ HR g Hram with "Hkbundle Htext") as "Htext".
-  iDestruct (@boot_data_own Σ HR g Hram with "Hkbundle Hdata") as "Hdata".
-  (* run the caller's proof to obtain the WPs *)
-  iPoseProof (Hwp HR) as "Hwand".
-  iMod ("Hwand" with "[Helems Htext Hdata Hkauth Hs Hsie Hkpt Hpark Hpst Hresvfrags HuF HpF HvF]")
-    as "[Hwps (Hwpu & Hwpd & Hwpp)]".
-  { iSplitL "Helems".
-    { iApply big_sepL_enum_to_set. iExact "Helems". }
-    iFrame "Htext Hdata". iSplitL "Hkauth".
-    { iExact "Hkauth". }
-    iSplitR; [iExact "Hkbundle" |].
-    iSplitL "Hs".
-    { iApply big_sepL_enum_to_set. iExact "Hs". }
-    iSplitL "Hsie".
-    { iApply big_sepL_enum_to_set. iExact "Hsie". }
-    iSplitL "Hkpt"; [iExact "Hkpt" |].
-    iSplitL "Hpark"; [iExact "Hpark" |].
-    iSplitL "Hpst"; [iExact "Hpst" |].
-    iSplitL "Hresvfrags".
-    { rewrite (resv_map_none _ Hresv0) big_sepM_gset_to_gmap. iExact "Hresvfrags". }
-    iSplitL "HuF"; [iExact "HuF"|].
-    iSplitL "HpF"; [iExact "HpF"|].
-    iSplitL "HvF"; [iExact "HvF"|].
-    iSplitR; [iExact "Hcinv"|].
-    rewrite /gen_cert Hgid.
-    assert (Hsc : start_count g = 1%nat)
-      by (rewrite /start_count Hpow Hgen0; done).
-    iSplitR; [iEval (rewrite -Hgen0); iExact "Hbornlb"|].
-    iSplitR; [|iExact "HRelem"].
-    iEval (rewrite Hsc) in "Hstartlb". iExact "Hstartlb". }
-  iModIntro.
-  iExists
-    (fun (g' : gstate) (_ : nat) (_ : list mobs) (_ : nat) =>
-       (@power_interp Σ (@riscv_fixedGS Σ HR) g')%I),
-    (replicate (length (cpu_pool cs)) (fun _ : mval => True%I)),
-    (fun _ : mval => True%I),
-    (@state_interp_mono HasLc riscv_lang Σ (@riscv_irisGS Σ (@riscv_fixedGS Σ HR))).
-  cbv zeta beta.
-  iSplitL "Hauths Hh HuA HpA HvA Hgenauth Hstartauth HRauth Hdiskauth HtieS Hresvauth".
-  { (* the initial state interpretation: generation 0, power on, the one
-       registered era, its image map empty *)
-    rewrite /power_interp /disk_fixed_interp.
-    iFrame "Hgenauth Hstartauth HtieS".
-    iExists {[ 0%nat := E0 ]}. iFrame "HRauth".
-    iSplitR.
-    { iPureIntro. rewrite dom_singleton_L /start_count Hpow Hgen0 /=.
-      set_solver. }
-    rewrite Hpow. iExists E0.
-    iSplitR.
-    { iPureIntro. rewrite Hgen0. by rewrite lookup_singleton. }
-    rewrite /era_interp /disk_dur_interp /disk_img_auth. iSplitL "Hauths".
-    { rewrite /gregs_interp_at. iApply big_sepL_enum_to_set. iExact "Hauths". }
-    iFrame "Hh".
-    (* the device fabric, then the era's (empty) image map.  NEST the splits:
-       [dev_interp_at] is ONE conjunct of [era_interp], so a flat
-       [iSplitL "HuA"] would split the fabric from the image (crash.md's
-       power_interp-conjunct trap, one layer in). *)
-    iSplitL "HuA HpA HvA".
-    { iSplitL "HuA"; [iExact "HuA"|].
-      iSplitL "HpA"; [iExact "HpA"|iExact "HvA"]. }
-    iSplitL "Hdiskauth".
-    { iExists ∅. iFrame "Hdiskauth". iPureIntro.
-      intros o b Hl. rewrite lookup_empty in Hl. discriminate. }
-    (* the reservation mirror and its (vacuous) snapshot invariant *)
-    iFrame "Hresvauth". iPureIntro.
-    intros c r Hc. rewrite Hresv0 in Hc. discriminate. }
-  iSplitL "Hwps Hwpu Hwpd Hwpp".
-  { (* the WPs of the initial threads: the harts, then the three devices *)
-    rewrite big_sepL2_replicate_r; [|done].
-    rewrite /cpu_pool big_sepL_app big_sepL_fmap /=.
-    iSplitL "Hwps"; [iExact "Hwps"|].
-    iSplitL "Hwpu"; [iExact "Hwpu"|].
-    iSplitL "Hwpd"; [iExact "Hwpd"|].
-    iSplitL "Hwpp"; [iExact "Hwpp"|done]. }
-  (* the final observation: [wp_strong_adequacy]'s not-stuck clause IS φ *)
-  iIntros (es' t2') "%Heq %Hlen %Hns Hsi Hes Hts".
-  iApply fupd_mask_intro; [set_solver|]. iIntros "_".
-  iPureIntro. intros e He. exact (Hns e eq_refl He).
-Qed.
-
-(* ---------------------------------------------------------------------- *)
-(* 6. Sanity corollary: the interface is consumable end-to-end.  The       *)
-(*    device-only system ([cs = []]; thread pool = the three device        *)
-(*    threads) runs forever, from ANY initial state whose memory image is  *)
-(*    RAM: allocate the three device invariants from the initial            *)
-(*    [uart_frag]/[plic_frag]/[virtio_frag] (via the bundle allocation      *)
-(*    [dev_inv_alloc] over [dev_inv_body], whose signature is unchanged)    *)
-(*    and the wire invariant [wire_inv] from every hart's [sig_seip]/       *)
-(*    [sig_meip] pin cells, then conclude with [wp_uart_loop],             *)
-(*    [wp_disk_loop] and [wp_plic_loop] -- one per pool thread.             *)
-(*    This is the smallest genuine instantiation of                         *)
-(*    [riscv_system_adequacy]; hart clients supply their [WP Loop]s the    *)
-(*    same way, with a richer [D].                                          *)
-(* ---------------------------------------------------------------------- *)
-
-Corollary riscv_device_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ} `{GEN : GenId} (g : gstate)
-    (Hram : forall a b, g.(gmem) !! a = Some b -> addr_is_ram a)
-    (* NOTE: there is deliberately NO hypothesis about the power-on DLAB.
-       [uart_ghosts_alloc] hands the caller its half of the DLAB agreement
-       rather than freezing it, and the freeze happens in the boot chain (at
-       uartinit's final LCR write), so the invariant is allocatable at ANY
-       power-on DLAB and uartinit is what makes it deterministic. *)
-    (* [dev_inv] also maintains the kernel's PLIC plan (PlicPlan.v), so the
-       initial PLIC must already satisfy it -- a reset PLIC (all S-context
-       enable words clear) does. *)
-    (Hplic : plic_ok g.(gdev).(dplic))
-    (* [dev_inv] carries the disk's driver protocol (VirtioProto.v), whose DMA
-       lease the invariant is BORN with is the empty one -- which is only good
-       while the queue is not live.  So the invariant must be allocated before
-       the driver makes the queue ready; a reset device satisfies this. *)
-    (Hvlive : virtio_live (v_cfg g.(gdev).(dvirtio)) = false)
-    (* ... and, for the same reason, the device has consumed nothing and
-       produced nothing yet: the not-live arm of [virtio_proto] records the
-       two ring counters at zero, which is what [virtio_disk_init] reads them
-       off at the live flip (the driver zeroes the rings in MEMORY; only the
-       invariant can say the DEVICE's counters agree).  A reset device
-       satisfies this too ([virtio_reset] zeroes both). *)
-    (Hvseen : v_seen g.(gdev).(dvirtio) = zero16)
-    (Hvuidx : v_used_idx g.(gdev).(dvirtio) = zero16)
-    (* ...and the device's VOLATILE WRITE CACHE is empty and untaken, and the
-       driver has negotiated nothing (claude-notes/projects/async-disk.md):
-       the not-live arm of [virtio_proto] records all three, which is what
-       the live flip needs and what refutes the drain arm of
-       [WpUart.wp_disk_loop] on a dead queue.  A reset device satisfies them
-       ([virtio_reset_cache]/[_taken]/[_wce]). *)
-    (Hvcache : v_cache g.(gdev).(dvirtio) = ∅)
-    (Hvtaken : v_taken g.(gdev).(dvirtio) = None)
-    (* ...and nothing was SERVED OUT OF TURN either: with the completion
-       order free the window carries a served-ahead set, and a reset device's
-       is empty ([virtio_reset_inflight]). *)
-    (Hvinflight : v_inflight g.(gdev).(dvirtio) = ∅)
-    (Hvwce : virtio_wce (v_cfg g.(gdev).(dvirtio)) = false)
-    (* [dev_inv] also maintains [virtio_isr_ok] (the disk's analogue of the
-       PLIC plan): the interrupt-status register holds only defined bits.  A
-       reset device does. *)
-    (Hvisr : virtio_isr_ok g.(gdev).(dvirtio))
-    (* the single-generation form: generation 0, power on (see the theorem) *)
-    (Hpow : g.(gpow) = true) (Hgen0 : g.(ggen) = 0%nat)
-    (Hgid : gen_id = 0%nat)
-    (Hresv0 : forall c, g.(gresv) c = None) :
-  forall t2 g2 e2,
-    rtc erased_step (cpu_pool [], g) (t2, g2) ->
-    e2 ∈ t2 ->
-    reducible (Λ := riscv_lang) e2 g2.
-Proof.
-  (* a device-only machine has no durability property to keep:
-     [Pc := fun _ => True], INDEX AND ALL -- the crash predicate ignores the
-     disk image, so its invariant is allocated and then never opened by
-     anything but the completion arm, which finds the index move free. *)
-  apply (riscv_system_adequacy Σ [] g
-           (fun _ => {[ (sig_seip : register); (sig_meip : register) ]}) 0
-           (fun (_ _ _ _ : gname) => True%I) 0%nat Hram
-           Hpow Hgen0 Hgid Hresv0).
-  { iIntros (γdisk γsw γreg γst) "_". by iModIntro. }
-  intros HR.
-  iIntros "(Hwires & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Huf & Hpf & Hvf &
-            #Hcinv & #Hcert)".
-  (* allocate the four UART ghosts at the initial device state.  The
-     caller-side outputs -- the transmitter token, the accepted-trace receipt
-     and the (unfrozen) DLAB half -- are what a boot chain would thread through
-     uartinit; this corollary runs a thread pool of devices only, so all three
-     are discarded here. *)
-  iMod (uart_ghosts_alloc g.(gdev).(duart)) as (γ) "(Hacc & Hout & Htx & Hdl & _ & _ & _)".
-  (* allocate the disk-protocol ghosts at the initial (not-live) device state;
-     the caller's half of the config tracker is discarded likewise, and so are
-     the vdisk_lock tokens ([disk_done_lb _ 0] and the eight per-descriptor
-     receipts at [HInactive]) that a boot chain would thread through
-     virtio_disk_init into main's [newlock]. *)
-  iMod (disk_ghosts_alloc gen_id g.(gdev).(dvirtio) Hvlive Hvseen Hvuidx
-          Hvcache Hvtaken Hvinflight Hvwce)
-    as (γv) "(%Himg & Hproto & _ & _ & _ & _ & Hpbody)".
-  iMod (dev_inv_alloc _ γ γv
-          with "[Huf Hpf Hvf Hacc Hout Htx Hdl Hproto] Hpbody") as "#Hinv".
-  { rewrite /dev_inv_body.
-    iExists g.(gdev).(duart), g.(gdev).(dplic), g.(gdev).(dvirtio).
-    iFrame "Hacc Hout Htx Hdl".
-    iSplitL "Huf"; [iExact "Huf"|].
-    iSplitL "Hpf"; [iExact "Hpf"|].
-    iSplitL "Hvf"; [iExact "Hvf"|].
-    iSplitL "Hproto"; [iExact "Hproto"|].
-    iSplit; [ iPureIntro; exact Hplic | iPureIntro; exact Hvisr ]. }
-  iMod (wire_inv_alloc _ (fun c => register_lookup sig_seip (g.(gregs) c))
-          (fun c => register_lookup sig_meip (g.(gregs) c)) with "[Hwires]")
-    as "#Hwinv".
-  { iApply (big_sepS_mono with "Hwires").
-    intros c _.
-    rewrite big_sepS_union; last first.
-    { apply disjoint_singleton_l, not_elem_of_singleton. discriminate. }
-    rewrite !big_sepS_singleton. done. }
-  (* the pool has three device threads now, so the conclusion splits into
-     the three loop WPs; each opens only the invariants its own relation
-     moves ([wp_plic_loop] is the only one that needs [wire_inv]). *)
-  iDestruct (dev_inv_uart with "Hinv") as "#Huinv".
-  iDestruct (dev_inv_plic with "Hinv") as "#Hpinv".
-  iDestruct (dev_inv_disk with "Hinv") as "#Hvinv".
-  iDestruct (dev_inv_perm with "Hinv") as "#Hqinv".
-  iModIntro. iSplitR; [done|].
-  iSplitL.
-  { iApply (wp_uart_loop γ with "Hcert Huinv Hpinv"). }
-  iSplitL.
-  { iApply (wp_disk_loop γv Himg with "Hcert Hcinv Hqinv Hvinv Hpinv"). }
-  iApply (wp_plic_loop with "Hcert Hpinv Hwinv").
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -1087,6 +637,20 @@ Section power.
                    the crash predicate, not just where the mirror's other
                    half goes in. *)
                 Rb dk))
+      (* THE TRACE HOOK (claude-notes/projects/uart-trace.md).  Both power
+         arms are OBSERVED (RiscvLang §3b'), and the history ghost can only
+         move with the client's half, which lives in its trace predicate --
+         so each arm opens [obsN] and runs this: given the shape of the
+         history so far (the power is [on]), the client moves its half by
+         the arm's event.  The fixed disk auth is LENT beside it, as
+         [Hproj] lends it: a client whose trace property chains ERA-LOCAL
+         facts through the durable disk reads the disk at every power event
+         here.  A basic update under a [◇] for [Hswap]'s reasons. *)
+      (Hobs : forall (h : list mobs) (on : bool) (dk : Z -> bv 8),
+         trace_shape h on ->
+         ⊢ disk_fixed_auth dk -∗ ▷ riscv_obs_pred -∗ obs_auth h ==∗
+           ◇ (disk_fixed_auth dk ∗ ▷ riscv_obs_pred ∗
+              obs_auth (h ++ [if on then ObsPowerOff else ObsPowerOn])%list))
       (* the boot client is handed the WHOLE fact set a reset machine has
          ([RiscvLang.boot_facts]: RAM total and holding the loaded image, the
          per-hart reset registers, the reset devices, power on) -- everything
@@ -1097,21 +661,34 @@ Section power.
       (Hboot : forall (HE : riscvEraGS) (gen : nat) (g' : gstate),
          boot_facts g' ->
          Ppure (v_disk (g'.(gdev).(dvirtio))) ->
-         ⊢ power_boot_res HE gen D nproc ndisk Mof Rb g' ={⊤}=∗
+         (* ...and the trace invariant, FIXED-layer like [crash_inv]: the
+            boot client threads it to the UART thread's permit *)
+         ⊢ obs_inv -∗ power_boot_res HE gen D nproc ndisk Mof Rb g' ={⊤}=∗
             ([∗ list] c ∈ enum CPU,
                WP (LoopE gen c : expr riscv_lang) @ ⊤) ∗
             WP (UartLoopE gen : expr riscv_lang) @ ⊤ ∗
             WP (DiskLoopE gen : expr riscv_lang) @ ⊤ ∗
             WP (PlicLoopE gen : expr riscv_lang) @ ⊤) :
-    crash_inv -∗ WP (PowerLoopE : expr riscv_lang).
+    crash_inv -∗ obs_inv -∗ WP (PowerLoopE : expr riscv_lang).
   Proof.
-    iIntros "#Hcinv".
+    iIntros "#Hcinv #Hoinv".
     iLöb as "IH".
     iApply wp_lift_step; first done.
-    iIntros (g ns κ κs nt) "(Hgauth & Hsauth & Htie & HR)".
+    iIntros (g ns κ κs nt) "((Hgauth & Hsauth & Htie & HR) & Hobs)".
     iDestruct "HR" as (R) "(HRauth & %Hdom & Hera)".
+    (* the history so far; the arm's event extends it below *)
+    iDestruct "Hobs" as (h) "(%Htot & %Hwf & Hoauth)".
     destruct (g.(gpow)) eqn:Hpw.
     - (* PowerOff: bump the generation, drop the power *)
+      (* THE TRACE STEP, FIRST: a power loss is observed, and the client's
+         trace predicate authorises it, with the fixed disk auth lent.  Run
+         at ⊤, before the step's mask shrink, like [Hproj] below. *)
+      pose proof Hwf as (Hsh & _ & _). rewrite Hpw in Hsh.
+      iEval (rewrite /disk_fixed_interp) in "Htie".
+      iInv "Hoinv" as "HPt" "Hoclose".
+      iMod (Hobs h true (v_disk (g.(gdev).(dvirtio))) Hsh
+              with "Htie HPt Hoauth") as ">(Htie & HPt & Hoauth)".
+      iMod ("Hoclose" with "HPt") as "_".
       iApply fupd_mask_intro; [set_solver|]. iIntros "Hback".
       iSplitR.
       { iPureIntro.
@@ -1121,6 +698,7 @@ Section power.
         do 4 right. split_and!; [done|done|].
         left. split_and!; done. }
       iIntros (e2 g2 efs Hstep) "!>".
+      pose proof Hstep as Hstep0.
       destruct Hstep as
         [ (gen2 & cpu2 & m2 & Hc & _)
         | [ (gen2 & Hc & _) | [ (gen2 & Hc & _) | [ (gen2 & Hc & _)
@@ -1133,14 +711,19 @@ Section power.
       iMod "Hback" as "_". iModIntro.
       rewrite /start_count Hpw /= in Hdom.
       iEval (rewrite /start_count Hpw /=) in "Hsauth".
-      iSplitL "Hgauth Hsauth HRauth Htie".
+      iSplitL "Hgauth Hsauth HRauth Htie Hoauth".
       { rewrite /state_interp /=.
+        (* the trace conjunct, at the extended history *)
+        iSplitL "Hgauth Hsauth HRauth Htie"; last first.
+        { iDestruct (obs_interp_close _ _ _ _ _ _ h κs Hstep0 Hwf Htot
+                       with "Hoauth") as "Hobs". iExact "Hobs". }
         unfold power_interp, start_count.
         cbn [ggen gpow gregs gmem gdev].
         replace (S (g.(ggen)) + 0)%nat with (g.(ggen) + 1)%nat by lia.
         (* the FS tie is FRAMED: a power loss touches no disk byte, so the
            machine-side half is already at the right image.  This is exactly
            why the tie is a FIXED conjunct and not part of [era_interp]. *)
+        rewrite /disk_fixed_interp.
         iFrame "Hgauth Hsauth Htie".
         (* the era is dropped WHOLE, its image map with it: nothing is owed
            (the map's only reader was this era's own disk thread, and every
@@ -1164,6 +747,13 @@ Section power.
          [Hproj] takes and returns it under the later and does its own
          stripping under the [◇]. *)
       iEval (rewrite /disk_fixed_interp) in "Htie".
+      (* THE TRACE STEP: a power-on is observed too (§3b'), and the client's
+         trace predicate authorises it, the disk lent as for [Hproj] *)
+      pose proof Hwf as (Hsh & _ & _). rewrite Hpw in Hsh.
+      iInv "Hoinv" as "HPt" "Hoclose".
+      iMod (Hobs h false (v_disk (g.(gdev).(dvirtio))) Hsh
+              with "Htie HPt Hoauth") as ">(Htie & HPt & Hoauth)".
+      iMod ("Hoclose" with "HPt") as "_".
       iInv "Hcinv" as "HP" "Hclose".
       iDestruct (Hproj (v_disk (g.(gdev).(dvirtio))) with "Htie HP")
         as ">(Htie & HP & %Hpure)".
@@ -1180,10 +770,11 @@ Section power.
         right. split_and!; [done|done|done|].
         apply boot_shape_boot_gstate. }
       iIntros (e2 g2 efs Hstep) "!>".
+      pose proof Hstep as Hstep0.
       destruct Hstep as
         [ (gen2 & cpu2 & m2 & Hc & _)
         | [ (gen2 & Hc & _) | [ (gen2 & Hc & _) | [ (gen2 & Hc & _)
-        | (_ & -> & [ (Hpw' & _) | (_ & _ & -> & Hbs) ]) ] ] ] ];
+        | (_ & -> & [ (Hpw' & _) | (_ & -> & -> & Hbs) ]) ] ] ] ];
         [ discriminate Hc | discriminate Hc | discriminate Hc | discriminate Hc
         | congruence | ].
       iIntros "_".
@@ -1276,7 +867,7 @@ Section power.
         as ">(Hsauth & Htie & HPsw & Hmir & #Hswlb & HRb)".
       iMod ("Hclosesw" with "HPsw") as "_".
       iMod (Hboot HE g.(ggen) g2 Hbf Hpure with
-              "[Helems Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hspp Hspie Hlks Hpark Hpst HuF HpF HvF
+              "Hoinv [Helems Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hspp Hspie Hlks Hpark Hpst HuF HpF HvF
                 Hdfrags Hmir Hresvfrags HRb]")
         as "(Hwps & Hwpu & Hwpd & Hwpp)".
       { rewrite /power_boot_res.
@@ -1295,8 +886,13 @@ Section power.
         iExact "Hgst". }
       iModIntro.
       rewrite /start_count Hpw /= Nat.add_0_r in Hdom.
-      iSplitL "Hgauth Hsauth HRauth Hauths Hh HuA HpA HvA Hdauth Htie Hresvauth".
+      iSplitL "Hgauth Hsauth HRauth Hauths Hh HuA HpA HvA Hdauth Htie Hresvauth Hoauth".
       { rewrite /state_interp /=.
+        (* the trace conjunct, at the extended history *)
+        iSplitL "Hgauth Hsauth HRauth Hauths Hh HuA HpA HvA Hdauth Htie Hresvauth";
+          last first.
+        { iDestruct (obs_interp_close _ _ _ _ _ _ h κs Hstep0 Hwf Htot
+                       with "Hoauth") as "Hobs". iExact "Hobs". }
         unfold power_interp, start_count.
         cbn [ggen gpow gregs gmem gdev].
         rewrite Hgen2 Hpow2.
@@ -1354,9 +950,12 @@ End power.
 Definition boot_fixedGS {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ}
     (Hinv : invGS Σ) (γgen γstart γreg γdisk : gname) (ndisk : nat)
     (γswap : gname) (Pcp : iProp Σ)
+    (* the trace layer (uart-trace.md): the history ghost's name, the run's
+       whole trace, and the client's trace predicate *)
+    (γobs : gname) (T : list mobs) (Ptp : iProp Σ)
   : riscvFixedGS Σ :=
   RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ _ _ _ γgen γstart _ γreg
-    _ _ γdisk ndisk Pcp γswap.
+    _ _ γdisk ndisk Pcp γswap _ γobs T Ptp.
 
 (* ---------------------------------------------------------------------- *)
 (* THE TRACE HOOK'S HELPERS -- ONE PER CONJUNCT OF [state_interp].          *)
@@ -1420,10 +1019,11 @@ Lemma disk_proj_trace {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ}
          ◇ (disk_img_auth_sized γdisk ndisk dk ∗
             ▷ Pc γdisk γsw γreg γst ∗ ⌜Ppure dk⌝))
     (Hinv : invGS Σ) (γgen γstart γreg γdisk γswap : gname)
+    (γobs : gname) (T : list mobs) (Ptp : iProp Σ)
     (g' : gstate) :
   ⊢ @power_interp Σ
        (boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γswap
-          (Pc γdisk γswap γreg γstart)) g' -∗
+          (Pc γdisk γswap γreg γstart) γobs T Ptp) g' -∗
     ▷ Pc γdisk γswap γreg γstart -∗
     ◇ ⌜Ppure (v_disk (dvirtio (gdev g')))⌝.
 Proof.
@@ -1479,6 +1079,93 @@ Proof.
   destruct (g.(gpow)) eqn:Hpw; last (iPureIntro; discriminate).
   iDestruct "Hera" as (E) "(_ & _ & _ & _ & _ & _ & %Hok)".
   iPureIntro. intros _. exact Hok.
+Qed.
+
+(* THE TRIVIAL TRACE PREDICATE, at a raw gname (uart-trace.md): the
+   client's half of the history ghost and nothing about it.  What a client
+   that states no trace property fills [riscv_power_adequacy]'s slot with;
+   [RiscvPtsto.obs_pred_triv] is the same predicate read off the record,
+   and the two are convertible at the [boot_fixedGS] literal.  Its two
+   hooks are the two lemmas below. *)
+Definition obs_pred_at {Σ : gFunctors} `{!riscvGpreS Σ} (γ : gname) : iProp Σ :=
+  (∃ h : list mobs, ghost_var γ (1/2) h)%I.
+
+Lemma obs_pred_at_alloc {Σ : gFunctors} `{!riscvGpreS Σ} (γ : gname) :
+  ghost_var γ (1/2) ([] : list mobs) ⊢ |==> obs_pred_at γ.
+Proof. iIntros "H". iModIntro. iExists []. iExact "H". Qed.
+
+Lemma obs_pred_at_step {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ} (ndisk : nat)
+    (γdisk γobs : gname) (h : list mobs) (on : bool) (dk : Z -> bv 8) :
+  trace_shape h on ->
+  ⊢ disk_img_auth_sized γdisk ndisk dk -∗ ▷ obs_pred_at γobs -∗
+    ghost_var γobs (1/2) h ==∗
+      ◇ (disk_img_auth_sized γdisk ndisk dk ∗ ▷ obs_pred_at γobs ∗
+         ghost_var γobs (1/2)
+           (h ++ [if on then ObsPowerOff else ObsPowerOn])%list).
+Proof.
+  intros _. iIntros "Htie HP Hauth".
+  iDestruct "HP" as (h') ">Hfrag".
+  iDestruct (ghost_var_agree with "Hauth Hfrag") as %<-.
+  iMod (ghost_var_update_halves
+          (h ++ [if on then ObsPowerOff else ObsPowerOn])%list
+          with "Hauth Hfrag") as "[Hauth Hfrag]".
+  iModIntro. iModIntro. iFrame "Htie".
+  iSplitL "Hfrag"; [iNext; iExists _; iExact "Hfrag" | iExact "Hauth"].
+Qed.
+
+(* THE LEDGER at a raw gname (uart-trace.md phase 4): [RiscvPtsto.obs_ledger]'s
+   twin, as [obs_pred_at] is [obs_pred_triv]'s -- the client's half of the
+   history and its trace-indexed resource [R] at that history -- with its
+   three hooks: born at the empty history from the client's [R []]; moved
+   at a power event by the client's own [Hpow], which sees the disk PURELY
+   (ruling 4's era chain records it); read at the end of the run for [R]'s
+   pure content.  [R] is asked to be TIMELESS: every hook strips the
+   invariant's later off it. *)
+Definition obs_ledger_at {Σ : gFunctors} `{!riscvGpreS Σ}
+    (R : list mobs -> iProp Σ) (γ : gname) : iProp Σ :=
+  (∃ h : list mobs, ghost_var γ (1/2) h ∗ R h)%I.
+
+Lemma obs_ledger_at_alloc {Σ : gFunctors} `{!riscvGpreS Σ}
+    (R : list mobs -> iProp Σ) (γ : gname) :
+  (⊢ |==> R []) ->
+  ghost_var γ (1/2) ([] : list mobs) ⊢ |==> obs_ledger_at R γ.
+Proof.
+  intros HR0. iIntros "H". iMod HR0 as "HR". iModIntro. iExists []. iFrame.
+Qed.
+
+Lemma obs_ledger_at_step {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ} (ndisk : nat)
+    (R : list mobs -> iProp Σ) (HRt : forall h, Timeless (R h))
+    (Hpow : forall (h : list mobs) (on : bool) (dk : Z -> bv 8),
+       trace_shape h on ->
+       ⊢ R h ==∗ R (h ++ [if on then ObsPowerOff else ObsPowerOn])%list)
+    (γdisk γobs : gname) (h : list mobs) (on : bool) (dk : Z -> bv 8) :
+  trace_shape h on ->
+  ⊢ disk_img_auth_sized γdisk ndisk dk -∗ ▷ obs_ledger_at R γobs -∗
+    ghost_var γobs (1/2) h ==∗
+      ◇ (disk_img_auth_sized γdisk ndisk dk ∗ ▷ obs_ledger_at R γobs ∗
+         ghost_var γobs (1/2)
+           (h ++ [if on then ObsPowerOff else ObsPowerOn])%list).
+Proof.
+  intros Hsh. iIntros "Htie HP Hauth".
+  iDestruct "HP" as (h') "[>Hfrag >HR]".
+  iDestruct (ghost_var_agree with "Hauth Hfrag") as %<-.
+  iMod (ghost_var_update_halves
+          (h ++ [if on then ObsPowerOff else ObsPowerOn])%list
+          with "Hauth Hfrag") as "[Hauth Hfrag]".
+  iMod (Hpow h on dk Hsh with "HR") as "HR".
+  iModIntro. iModIntro. iFrame "Htie".
+  iSplitL "Hfrag HR"; [iNext; iExists _; iFrame | iExact "Hauth"].
+Qed.
+
+Lemma obs_ledger_at_phi {Σ : gFunctors} `{!riscvGpreS Σ}
+    (R : list mobs -> iProp Σ) (HRt : forall h, Timeless (R h))
+    (P : list mobs -> Prop) (HR : forall h, R h ⊢ ⌜P h⌝)
+    (γobs : gname) (h : list mobs) :
+  ⊢ ghost_var γobs (1/2) h -∗ ▷ obs_ledger_at R γobs -∗ ◇ ⌜P h⌝.
+Proof.
+  iIntros "Hauth HP". iDestruct "HP" as (h') "[>Hfrag >HR]".
+  iDestruct (ghost_var_agree with "Hauth Hfrag") as %<-.
+  iDestruct (HR with "HR") as %HP. iModIntro. iPureIntro. exact HP.
 Qed.
 
 (* THE POWER ADEQUACY: the machine starts POWERED OFF with nothing ever
@@ -1555,6 +1242,35 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
               mono_nat_lb_own γsw (S gen) ∗
               (* ...and the client's lent resource (durable-disk BT-1) *)
               Rb dk))
+    (* THE TRACE PREDICATE (claude-notes/projects/uart-trace.md): the SECOND
+       fixed-layer named slot, beside the crash predicate and for a
+       different job.  The crash predicate is the file system's durable
+       record and says nothing about observations; this one owns the
+       client's half of the HISTORY ghost -- the interleaved list of
+       console I/O and power events the run has emitted so far -- and
+       whatever the client wants to know about it.  Because every event
+       needs both halves to move, every event is authorised by the client:
+       the UART thread's tx/rx arms through [WpUart.uart_obs_permit], the
+       power arms through [Hobs] below.  Stated at the raw gname for the
+       same reason as [Pc].  Born holding the empty history ([HPt]). *)
+    (Pt : gname -> iProp Σ)
+    (HPt : forall γobs : gname,
+       ghost_var γobs (1/2) ([] : list mobs) ⊢ |==> Pt γobs)
+    (* THE POWER HOOK: a power event is observed, and the client moves its
+       half of the history by it, knowing the shape of the history so far
+       (the power is [on]).  The durable disk's auth is LENT beside it, as
+       [Hproj] lends it, because a client whose trace property chains
+       ERA-LOCAL facts through the durable disk reads the disk at exactly
+       these two points.  A basic update under a [◇], for [Hswap]'s
+       reasons. *)
+    (Hobs : forall (γdisk γobs : gname) (h : list mobs) (on : bool)
+                   (dk : Z -> bv 8),
+       trace_shape h on ->
+       ⊢ disk_img_auth_sized γdisk ndisk dk -∗ ▷ Pt γobs -∗
+         ghost_var γobs (1/2) h ==∗
+           ◇ (disk_img_auth_sized γdisk ndisk dk ∗ ▷ Pt γobs ∗
+              ghost_var γobs (1/2)
+                (h ++ [if on then ObsPowerOff else ObsPowerOn])%list))
     (* THE TRACE INVARIANT (the strengthening of this theorem's conclusion).
        [Ppure]/[Hproj] above extract a pure fact from [Pc] and feed it INTO a
        boot; these two export one OUT of the whole execution.
@@ -1590,15 +1306,23 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        no [riscvFixedGS] at all, so the record has to be spelled out as the
        [boot_fixedGS] literal this proof actually builds.  Every projection
        out of it then reduces by iota. *)
-    (phi : gstate -> Prop)
+    (* ...AND IT SEES THE TRACE (uart-trace.md): [phi] ranges over the
+       operational state AND the observable history, and [Hphi] gets, beside
+       [state_interp] and the two fixed-layer predicates, the machine's
+       half of the history ghost at [h] and the fact that [h] is
+       well-formed for [g'] ([ObsTrace.obs_wf]: the power alternation, the
+       boot count, the wire tie).  At the end of the run [h] IS the run's
+       trace, which is what the conclusion says. *)
+    (phi : gstate -> list mobs -> Prop)
     (Hphi : forall (Hinv : invGS Σ)
-                   (γgen γstart γreg γdisk γswap : gname)
-                   (g' : gstate),
+                   (γgen γstart γreg γdisk γswap γobs : gname)
+                   (T : list mobs) (g' : gstate) (h : list mobs),
        ⊢ @power_interp Σ
             (boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γswap
-               (Pc γdisk γswap γreg γstart)) g' -∗
-         ▷ Pc γdisk γswap γreg γstart -∗
-         ◇ ⌜phi g'⌝)
+               (Pc γdisk γswap γreg γstart) γobs T (Pt γobs)) g' -∗
+         ghost_var γobs (1/2) h -∗ ⌜obs_wf h g'⌝ -∗
+         ▷ Pc γdisk γswap γreg γstart -∗ ▷ Pt γobs -∗
+         ◇ ⌜phi g' h⌝)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
     (* the client boots ANY era over ANY machine of the reset shape; what it
        is told about that machine is [RiscvLang.boot_facts] (RAM total and
@@ -1629,10 +1353,11 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
 
           It costs the client nothing ([eq_refl] here) and it does not
           weaken the obligation: [boot_fixedGS] IS what this proof builds. *)
-       (exists (Hinv : invGS Σ) (γgen γstart γreg γdisk γswap : gname),
+       (exists (Hinv : invGS Σ) (γgen γstart γreg γdisk γswap γobs : gname)
+               (T : list mobs),
           F = boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γswap
-                (Pc γdisk γswap γreg γstart)) ->
-       ⊢ power_boot_res HE gen D nproc ndisk Mof Rb g' ={⊤}=∗
+                (Pc γdisk γswap γreg γstart) γobs T (Pt γobs)) ->
+       ⊢ obs_inv -∗ power_boot_res HE gen D nproc ndisk Mof Rb g' ={⊤}=∗
           ([∗ list] c ∈ enum CPU,
              WP (LoopE gen c : expr riscv_lang) @ ⊤) ∗
           WP (UartLoopE gen : expr riscv_lang) @ ⊤ ∗
@@ -1649,13 +1374,15 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
      directly, since it fixes a single initial thread and
      [num_laters_per_step := 0], so we take the same conclusion out of
      [wp_strong_adequacy] itself.) *)
-  forall t2 g2,
-    rtc erased_step ([PowerLoopE : expr riscv_lang], g) (t2, g2) ->
-    (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\ phi g2.
+  (* ...stated over the RUN, trace included: [nsteps] is Iris's own step
+     relation with the observations kept ([erased_step] is it with them
+     erased), so [κs] is exactly the observable trace of the execution. *)
+  forall (n : nat) (κs : list mobs) t2 g2,
+    nsteps n ([PowerLoopE : expr riscv_lang], g) κs (t2, g2) ->
+    (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\ phi g2 κs.
 Proof.
-  intros t2 g2 Hrtc.
-  apply erased_steps_nsteps in Hrtc as (n & κs & Hsteps).
-  cut ((forall e : expr riscv_lang, e ∈ t2 -> not_stuck e g2) /\ phi g2).
+  intros n κs t2 g2 Hsteps.
+  cut ((forall e : expr riscv_lang, e ∈ t2 -> not_stuck e g2) /\ phi g2 κs).
   { intros [Hns Hph]. split; [|exact Hph].
     intros e2 He2. destruct (Hns e2 He2) as [[v Hv]|Hred];
       [discriminate Hv|exact Hred]. }
@@ -1680,45 +1407,63 @@ Proof.
           with "[$Hfdfrags $Hswap]") as "HPc0".
   iMod (inv_alloc crashN ⊤ (Pc γfdisk γswap γreg γstart) with "HPc0")
     as "#Hcinv".
+  (* THE HISTORY GHOST, at the EMPTY history: the machine's half goes into
+     [state_interp]'s trace conjunct, the client's into its trace predicate,
+     sealed into the second fixed-layer invariant (uart-trace.md). *)
+  iMod (ghost_var_alloc ([] : list mobs)) as (γobs) "Hob".
+  iEval (rewrite -Qp.half_half) in "Hob".
+  iDestruct (ghost_var_split with "Hob") as "[HobA HobF]".
+  iMod (HPt γobs with "HobF") as "HPt0".
+  iMod (inv_alloc obsN ⊤ (Pt γobs) with "HPt0") as "#Hoinv".
   (* no disk image map is allocated here: the machine starts POWERED OFF, so
      there is no era, hence no image conjunct in [state_interp].  The first
      boot mints the first one ([wp_power_loop]'s PowerOn arm). *)
+  (* the run's whole trace [κs] is a FIELD of the fixed record: that is what
+     lets [state_interp] tie the history so far to the future *)
   set (F := boot_fixedGS Hinv γgen γstart γreg γfdisk ndisk γswap
-              (Pc γfdisk γswap γreg γstart)).
+              (Pc γfdisk γswap γreg γstart) γobs κs (Pt γobs)).
   (* the client's trace hook at the gnames just allocated.  [F] is a local
      DEFINITION, so this statement and the one the final observation below
      faces are convertible. *)
-  pose proof (Hphi Hinv γgen γstart γreg γfdisk γswap) as Hph.
+  pose proof (Hphi Hinv γgen γstart γreg γfdisk γswap γobs κs) as Hph.
   iModIntro.
   iExists
-    (fun (g' : gstate) (_ : nat) (_ : list mobs) (_ : nat) =>
-       (@power_interp Σ F g')%I),
+    (fun (g' : gstate) (_ : nat) (κs' : list mobs) (_ : nat) =>
+       (@power_interp Σ F g' ∗ @obs_interp Σ F g' κs')%I),
     [fun _ : mval => True%I],
     (fun _ : mval => True%I),
     (@state_interp_mono HasLc riscv_lang Σ (@riscv_irisGS Σ F)).
   cbv zeta beta.
-  iSplitL "Hgauth Hsauth HRauth HtieS".
-  { (* the initial state interpretation: OFF, nothing ever started, no era
-       and hence no image map -- but the FS tie IS there: it is fixed-layer,
-       so it exists even with the power off. *)
-    rewrite /power_interp /disk_fixed_interp.
-    iFrame "Hgauth Hsauth HtieS".
-    iExists ∅. iFrame "HRauth".
-    iSplitR.
-    { iPureIntro. rewrite dom_empty_L /start_count Hpow /=.
-      rewrite Nat.add_0_r Hgen0 /=. done. }
-    rewrite Hpow. done. }
+  iSplitL "Hgauth Hsauth HRauth HtieS HobA".
+  { iSplitL "Hgauth Hsauth HRauth HtieS".
+    { (* the initial state interpretation: OFF, nothing ever started, no era
+         and hence no image map -- but the FS tie IS there: it is fixed-layer,
+         so it exists even with the power off. *)
+      rewrite /power_interp /disk_fixed_interp.
+      iFrame "Hgauth Hsauth HtieS".
+      iExists ∅. iFrame "HRauth".
+      iSplitR.
+      { iPureIntro. rewrite dom_empty_L /start_count Hpow /=.
+        rewrite Nat.add_0_r Hgen0 /=. done. }
+      rewrite Hpow. done. }
+    (* the trace conjunct: empty history, the whole run ahead, and the
+       history of a powered-off never-booted machine is well-formed *)
+    rewrite /obs_interp. iExists []. iSplitR; [done|].
+    iSplitR; [iPureIntro; exact (obs_wf_init _ Hpow Hgen0)|].
+    iExact "HobA". }
   iSplitL.
   { cbn. iSplitL; [|done].
-    assert (Hshape : exists (Hi : invGS Σ) (γg γs γr γd γsw : gname),
+    assert (Hshape : exists (Hi : invGS Σ) (γg γs γr γd γsw γob : gname)
+                            (T : list mobs),
               F = boot_fixedGS Hi γg γs γr γd ndisk γsw
-                    (Pc γd γsw γr γs))
-      by (exists Hinv, γgen, γstart, γreg, γfdisk, γswap; reflexivity).
+                    (Pc γd γsw γr γs) γob T (Pt γob))
+      by (exists Hinv, γgen, γstart, γreg, γfdisk, γswap, γobs, κs; reflexivity).
     iApply (@wp_power_loop Σ F _ D nproc ndisk Ppure
               (Hproj γfdisk γswap γreg γstart)
               Mof Rb (Hswap γfdisk γswap γreg γstart)
+              (Hobs γfdisk γobs)
               (fun HE gen g' Hbf Hp => Hboot F HE gen g' Hbf Hp Hshape)
-              with "Hcinv"). }
+              with "Hcinv Hoinv"). }
   (* THE FINAL OBSERVATION, AND IT IS NOW TWO FACTS.
 
      [Hns] is [wp_strong_adequacy]'s own not-stuck clause, as before.  The
@@ -1734,9 +1479,94 @@ Proof.
 
      So: open [crashN] and drop its closing update on the floor, hand the
      client both halves of the tie, and take the pure fact back. *)
-  iIntros (es' t2') "%Heq %Hlen %Hns Hsi Hes Hts".
+  iIntros (es' t2') "%Heq %Hlen %Hns [Hsi Hobs] Hes Hts".
+  (* AT THE END OF THE RUN THE HISTORY IS THE TRACE: nothing is left of the
+     future ([κs' = []]), so the tie [h ++ [] = riscv_obs_total] pins the
+     history ghost at the run's own [κs]. *)
+  iDestruct "Hobs" as (h) "(%Htot & %Hwf & Hoauth)".
+  assert (Hh : h = κs) by (rewrite app_nil_r in Htot; exact Htot).
+  subst h.
   iInv "Hcinv" as "HP" "Hclose".
-  iDestruct (Hph g2 with "Hsi HP") as ">%Hphig2".
+  iInv "Hoinv" as "HPt" "Hoclose".
+  iDestruct (Hph g2 κs with "Hsi Hoauth [//] HP HPt") as ">%Hphig2".
   iApply fupd_mask_intro; [set_solver|]. iIntros "_".
   iPureIntro. split; [intros e He; exact (Hns e eq_refl He) | exact Hphig2].
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* THE PACKAGED TRACE THEOREM (uart-trace.md phase 4): [riscv_power_adequacy] *)
+(* at the LEDGER.  A client brings a trace-indexed resource [R] -- timeless, *)
+(* born at the empty history, moved by its own [Hpow] at the power events   *)
+(* and by its two wands at the UART thread's arms (those sit inside [Hboot], *)
+(* through [WpUart.uart_obs_permit_ledger]) -- and its pure reading [P], and *)
+(* gets [P] OF THE RUN'S OBSERVABLE TRACE.  [phi] is folded into [P]: a      *)
+(* client wanting a state fact beside it uses [riscv_power_adequacy].       *)
+(* ---------------------------------------------------------------------- *)
+Corollary riscv_trace_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
+    (D : CPU -> gset register) (nproc ndisk : nat) (g : gstate)
+    (Pc : gname -> gname -> gname -> gname -> iProp Σ)
+    (HPc : forall γdisk γsw γreg γst : gname,
+       disk_img_bytes γdisk 0 (disk_read (v_disk (g.(gdev).(dvirtio))) 0 ndisk) ∗
+       mono_nat_auth_own γsw 1 0%nat ⊢
+         |==> Pc γdisk γsw γreg γst)
+    (Ppure : (Z -> bv 8) -> Prop)
+    (Hproj : forall (γdisk γsw γreg γst : gname)
+                    (dk : Z -> bv 8),
+       ⊢ disk_img_auth_sized γdisk ndisk dk -∗
+         ▷ Pc γdisk γsw γreg γst -∗
+         ◇ (disk_img_auth_sized γdisk ndisk dk ∗
+            ▷ Pc γdisk γsw γreg γst ∗ ⌜Ppure dk⌝))
+    (Mof : (Z -> bv 8) -> log_mirror)
+    (Rb : (Z -> bv 8) -> iProp Σ)
+    (Hswap : forall (γdisk γsw γreg γst : gname)
+                    (E : riscvEraGS)
+                    (gen : nat) (dk : Z -> bv 8),
+       ⊢ gen ↪[γreg]□ E -∗
+         mono_nat_lb_own γst (S gen) -∗
+         mono_nat_auth_own γst 1 (gen + 1)%nat -∗
+         disk_img_auth_sized γdisk ndisk dk -∗
+         ghost_var (era_mirror_name E) 1 (Mof dk) -∗
+         ▷ Pc γdisk γsw γreg γst ==∗
+           ◇ (mono_nat_auth_own γst 1 (gen + 1)%nat ∗
+              disk_img_auth_sized γdisk ndisk dk ∗
+              ▷ Pc γdisk γsw γreg γst ∗
+              ghost_var (era_mirror_name E) (1/2) (Mof dk) ∗
+              mono_nat_lb_own γsw (S gen) ∗
+              Rb dk))
+    (* THE CLIENT'S TRACE RESOURCE, its birth, its power step, and its pure
+       reading (uart-trace.md).  The UART-arm steps are the two wands of
+       [WpUart.uart_obs_permit_ledger], which the boot ([Hboot]) runs. *)
+    (R : list mobs -> iProp Σ) (HRt : forall h, Timeless (R h))
+    (HR0 : ⊢ |==> R [])
+    (Hpow : forall (h : list mobs) (on : bool) (dk : Z -> bv 8),
+       trace_shape h on ->
+       ⊢ R h ==∗ R (h ++ [if on then ObsPowerOff else ObsPowerOn])%list)
+    (P : list mobs -> Prop) (HR : forall h, R h ⊢ ⌜P h⌝)
+    (Hgen0 : g.(ggen) = 0%nat) (Hpow0 : g.(gpow) = false)
+    (Hboot : forall (F : riscvFixedGS Σ) (HE : riscvEraGS) (gen : nat)
+                    (g' : gstate),
+       boot_facts g' ->
+       Ppure (v_disk (g'.(gdev).(dvirtio))) ->
+       (exists (Hinv : invGS Σ) (γgen γstart γreg γdisk γswap γobs : gname)
+               (T : list mobs),
+          F = boot_fixedGS Hinv γgen γstart γreg γdisk ndisk γswap
+                (Pc γdisk γswap γreg γstart) γobs T (obs_ledger_at R γobs)) ->
+       ⊢ obs_inv -∗ power_boot_res HE gen D nproc ndisk Mof Rb g' ={⊤}=∗
+          ([∗ list] c ∈ enum CPU,
+             WP (LoopE gen c : expr riscv_lang) @ ⊤) ∗
+          WP (UartLoopE gen : expr riscv_lang) @ ⊤ ∗
+          WP (DiskLoopE gen : expr riscv_lang) @ ⊤ ∗
+          WP (PlicLoopE gen : expr riscv_lang) @ ⊤) :
+  forall (n : nat) (κs : list mobs) t2 g2,
+    nsteps n ([PowerLoopE : expr riscv_lang], g) κs (t2, g2) ->
+    (forall e2, e2 ∈ t2 -> reducible (Λ := riscv_lang) e2 g2) /\ P κs.
+Proof.
+  apply (riscv_power_adequacy Σ D nproc ndisk g Pc HPc Ppure Hproj Mof Rb Hswap
+           (obs_ledger_at R) (fun γ => obs_ledger_at_alloc R γ HR0)
+           (obs_ledger_at_step ndisk R HRt Hpow)
+           (fun _ h => P h)
+           ltac:(intros Hinv γgen γstart γreg γdisk γswap γobs T g' h;
+                 iIntros "_ Hauth _ _ HPt";
+                 iApply (obs_ledger_at_phi R HRt P HR γobs h with "Hauth HPt"))
+           Hgen0 Hpow0 Hboot).
 Qed.

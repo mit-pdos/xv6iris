@@ -17,7 +17,6 @@ Require Import LinkArgint LinkArgstr LinkBeginOp LinkNameiEra
         LinkIlock LinkIunlock LinkIunlockput LinkEndOp LinkFileclose
         LinkItrunc LinkFilealloc LinkFdalloc LinkCreateAUF
         ProofSysOpenAUFull.
-Require Import TsoCtx.
 
 Module SysOpenAUFull := SysOpenAUProof Argint Argstr BeginOp NameiEra Ilock
                                        Iunlock Iunlockput EndOp Fileclose

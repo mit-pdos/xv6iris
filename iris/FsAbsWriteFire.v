@@ -112,18 +112,14 @@ Require Import SailStdpp.Base SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto.
 Require Import RiscvExtras.      (* [moi32_small]                           *)
 Require Import DinodeEnc.
-Require Import DirView.          (* [T_DIR_z]                               *)
 Require Import FsTree.           (* [file_bytes]                            *)
-Require Import PathElems.
 Require Import FsBlocks.         (* [blk_splice] and its three lookups      *)
 Require Import FsBytesGamma.     (* [fs_gamma_L]                            *)
 Require Import BioDefs.          (* [BSIZE]                                 *)
 Require Import InodeDefs.        (* [file_byte]                             *)
 Require Import InodeInv.         (* [MAXFILE], [blk_holes_zero]             *)
-Require Import InodeLock.
 Require Import IrefSlots.
-Require Import IcacheRef.
-Require Import IcacheEscrow.
+Require Import Xv6Cameras.
 (* the three binder classes the section list names, IMPORTED rather than
    inherited ([FsAbsMknodFire]'s header records why). *)
 Require Import FdSlots.          (* [fdslotG]                               *)

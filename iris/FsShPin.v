@@ -84,13 +84,10 @@ Require Import DinodeEnc.
 Require Import DirView.
 Require Import InodeInv.
 Require Import FsTree.
-Require Import IcacheEscrow.
-Require Import FsStateEra.
 Require Import FsCrash.
 Require Import FsDurSnap.
 Require Import FsDurSyscall.
 Require Import FsCfgBoot.
-Require Import FsDurImg.
 Require Import SystemAdequacy.
 Require Import FsImgDisk.
 Require Import FsImgCheck.     (* [fname_sh], [fsimg_sh_path],

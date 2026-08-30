@@ -1,0 +1,21 @@
+# ucode_sync.txt -- the pc set of iris/UCodeSync.v, for tools/gen_ucode.py.
+#
+#   tools/gen_ucode.py --module Sync --out iris/UCodeSync.v \
+#       --spec tools/ucode_sync.txt
+#
+# sync is the smallest verified user program: four functions, eighteen
+# instructions.  main and start diverge (each ends in a [jal] that never
+# returns); exit's stub diverges at its ecall; sync's stub returns.
+
+note sync's four functions.  The [c.jr ra] at 0x2ce is dead -- exit's ecall
+note at 0x2ca never returns -- but 0x1e's [jal exit] IS catalogued, because
+note start's proof reaches it before main is known to diverge.
+
+func main
+func start
+func exit
+func sync
+
+omit 0x2ce exit's [c.jr ra] -- the ecall at 0x2ca never returns
+
+skipdefault library or syscall stub that sync never calls

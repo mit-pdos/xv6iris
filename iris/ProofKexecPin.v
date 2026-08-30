@@ -29,19 +29,17 @@
       (4) THE PREMISE IS THE CHAIN PIN, not [SpecKexecPin.kxp_view_pin] --
           see [ProofKexecPinTrace]'s header for WHY (the endpoint pin does
           not survive a multi-hop walk, and the counterexample is written
-          out there).  [wp_kexec_pinned_run_body] below is the landed body
-          with that ONE premise replaced, and
+          out there).  The contract carries that repair: [kxp_run_pin] is
+          [SpecKexecPin.wp_kexec_pinned_body]'s premise, so the general
+          sentence is TRUE at every path length and this functor is sealed
+          to [KEXEC_PIN] like any other.  The endpoint premise survives as
 
               [wp_kexec_pinned_1hop]
 
-          is the receipt that the LANDED body -- [SpecKexecPin]'s own,
-          quoted verbatim -- follows for every ONE-ELEMENT path, i.e. for
-          both era-0 instances ([FsInitPin.init_path = ["init"]],
-          [FsShPin.sh_path = ["sh"]]) and hence for everything /init and
-          forkret actually ask for.  [KEXEC_PIN] itself is left UNSEALED
-          on purpose: at [|kxp_path pb| >= 2] its statement is not merely
-          unproven, it is false, and repairing it is a statement-lane
-          conjunct (one line) and not a prover's licence.               *)
+          -- the Module Type's second export -- which follows for every
+          ONE-ELEMENT path, i.e. for both era-0 instances
+          ([FsInitPin.init_path = ["init"]], [FsShPin.sh_path = ["sh"]])
+          and hence for everything /init and forkret actually ask for.  *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -63,7 +61,6 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import FdSlots.
 Require Export SwtchCtx.
-Require Import WpUart.
 Require Import ByteBuf.
 Require Import ProcGeom.
 Require Import ProcInv.
@@ -92,7 +89,6 @@ Require Import SpecCopyout.
 Require Import SpecSafestrcpy.
 Require Import ProofKexecTail.
 Require Import ProofKexecSeam.
-Require Import ProofKexecA.
 Require Import ProofKexecB.
 Require Import SpecPanic.
 Require Import ProofKexecB2.
@@ -105,26 +101,13 @@ Require Import ProofKexecD.
    respected; [FsAbs] itself is NOT imported -- nothing here names
    [astate] or [aview], those live behind [kxp_run_pin]. ---- *)
 Require Import InstrBytes.     (* [pc_is]                            *)
-Require Import WpLock.
-Require Import KernelDataInv.
-Require Import SchedCtx.
-Require Import DiskInv.
-Require Import BioInv.
-Require Import FsBlocks LogInv.
-Require Import FsCrash.
-Require Import InodeRegion.
+Require Import LogInv.
+Require Import LogDefs.
 Require Import IcacheRef.
 Require Import IcacheInv.
-Require Import IcacheEscrow.
 Require Import KvmSpec.
-Require Import SpecDirlink.
 Require Import BioDefs.
-Require Import DinodeEnc.
-Require Import InodeDefs.
-Require Import FsStateEra.
-Require Import ElfEnc.
 Require Import InodeInv.       (* [ROOTDEV], [MAXFILE]               *)
-Require Import InodeLock.
 Require Import PathElems.      (* [SLASH], [path_elems]              *)
 
 Require Import DirentEnc.      (* [bview]                            *)
@@ -253,7 +236,8 @@ Definition wp_kexec_pinned_run_body
 (*  pinned phase A in place of the landed one; every other callee, and     *)
 (*  every other block, is the landed one at the pinned [Q].                *)
 (*                                                                        *)
-(*  NO MODULE-TYPE ASCRIPTION: see the header's (4).                       *)
+(*  SEALED TO [KEXEC_PIN]: its two Parameters are [wp_kexec_pinned] and    *)
+(*  [wp_kexec_pinned_1hop] below; everything else here is internal.        *)
 (* ===================================================================== *)
 Module KexecPinProof (Myproc : MYPROC) (BeginOp : BEGIN_OP) (Namei : NAMEI)
                      (NE : NAMEI_ERA)
@@ -262,7 +246,7 @@ Module KexecPinProof (Myproc : MYPROC) (BeginOp : BEGIN_OP) (Namei : NAMEI)
                      (PFP : PROC_FREEPAGETABLE) (Walkaddr : WALKADDR)
                      (Flags2perm : FLAGS2PERM) (Uvmalloc : UVMALLOC)
                      (Uvmclear : UVMCLEAR) (Strlen : STRLEN) (Copyout : COPYOUT)
-                     (SS : SAFESTRCPY) (PN : PANIC).
+                     (SS : SAFESTRCPY) (PN : PANIC) : KEXEC_PIN.
 
 Module PA := ProofKexecPinA.KexecPinAProof Myproc BeginOp Namei NE Ilock Readi
                                            Iunlockput EndOp.
@@ -739,16 +723,9 @@ Section KexecPinMain.
                     Hpriv Hpath Hargv Hargs Hbs Hirs Hrp Hcont").
   Qed.
 
-  (* ...and the two era-0 instances of the side condition, so a consumer
-     never has to unfold the pack. *)
-  Lemma pin_init_one_hop : exists s : fname, kxp_path pin_init = [s].
-  Proof. eexists. reflexivity. Qed.
-
-  (* sh's path is the sibling lane's parameter, so the side condition is
-     its to supply and this is the shape it takes. *)
-  Lemma pin_sh_one_hop (s : fname) (i : Z) :
-    kxp_path (pin_sh [s] i) = [s].
-  Proof. reflexivity. Qed.
+  (* The two era-0 instances of the side condition are pure facts about the
+     pins, so they live beside them: [SpecKexecPin.pin_init_one_hop] and
+     [SpecKexecPin.pin_sh_one_hop]. *)
 
 End KexecPinMain.
 

@@ -55,11 +55,10 @@ Require Import WpNext.
 Require Import WpMmodeLeafBase.
 Require Import RiscvExtras.
 Require Import StackOwn.
-Require Import StackBytes.
 Require Import CalleeSaved.
 Require Import InstrBytes.
 Require Import KernelText.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
+Require Import WpSconfAlu WpSconfCtl WpSconfBtype.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
@@ -71,7 +70,6 @@ Require Import WpUart.
 Require Import InodeRegion.
 Require Import IcacheEscrow.
 Require Import ByteBuf.
-Require Import ElfEnc.
 Require Import ProcGeom.
 Require Import Xv6Cameras.
 Require Import BioDefs.
@@ -84,8 +82,6 @@ Require Import BioDefs.
    oracle's widened row is the only place in this file that names them, so
    [Require] without [Import] buys the three names and the collision this
    comment warns about does not arise at all. *)
-Require FsState.        (* [FsState.top_frag]                              *)
-Require FsStateEra.     (* [FsStateEra.era_node]                           *)
 Require FsBytesGamma.   (* [FsBytesGamma.fs_gamma_L]                       *)
 Require Import LogInv.
 Require Import BitmapInv.
@@ -115,7 +111,6 @@ Require Import SpecNamei.
 (* [SpecNamex] for [walk_need]/[walk_spend]: the SET form's ledger clause is
    namex's, and phase A prices its namei call through it. *)
 Require Import SpecNamex.
-Require Import ProofKexecParts.
 Require Import ProofKexecTail.
 Require Import CodeKexec.
 Require Import SpecNameiTr.    (* [inode_held_at] and its readings   *)

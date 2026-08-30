@@ -50,16 +50,12 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map.
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto.
 Require Import DinodeEnc.
-Require Import DirView.          (* [T_DIR_z]                               *)
 Require Import FsTree.           (* [fname], [file_bytes]                   *)
-Require Import PathElems.
 Require Import FsBlocks.         (* [fs_names]                              *)
 Require Import FsBytesGamma.     (* [fs_gamma_L]                            *)
 Require Import InodeInv.
-Require Import InodeLock.
 Require Import IrefSlots.
-Require Import IcacheRef.
-Require Import IcacheEscrow.
+Require Import Xv6Cameras.
 (* the three binder classes the section list names, IMPORTED rather than
    inherited ([FsAbsMknodFire]'s header records why). *)
 Require Import FdSlots.          (* [fdslotG]                               *)
@@ -70,7 +66,6 @@ Require Import InodeRegion.      (* [ftop_inv]/[ftop_body]/[ftop_clean]     *)
 Require Import Xv6G.
 Require Import SpecCreate.       (* [create_made], [T_FILE]                 *)
 Require Import SpecSysMknodAU.   (* [delta_create], [cre_pre], [acre_bump]  *)
-Require Import FsAbsEra.
 Require Import FsAbsMknodFire.   (* [acre_commit_at], [mkf_abs_of_dir]      *)
 Require FsImg.                   (* [T_FILE_z] -- Require, NOT Import       *)
 Require Import FsAbs.            (* LAST (FsAbs's own rule)                 *)

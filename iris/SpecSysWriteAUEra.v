@@ -74,31 +74,15 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import InstrBytes.
 Require Import RegFile.
-Require Import RiscvExtras.
-Require Import CalleeSaved KernelText KernelDataInv.
-Require Import IntrDefs.
-Require Import WpNext.
-Require Import SpecPanic.
 Require Import FdSlots.
-Require Import ProcGeom.
 Require Export SwtchCtx.
-Require Import CpuOwn.
-Require Import SchedCtx.
 Require Import IrefSlots.
-Require Import UserPtTree.
-Require Import KvmSpec.
-Require Import ProcPtOwn.
-Require Import ProcInv.
+Require Import ProcDefs.
 Require Import FileInvDefs.
-Require Import SpecArgfd.      (* [arg_fd]                                  *)
 Require Import SpecSysRead.    (* [sys_rw_count]                            *)
-Require Import ConsoleInv.
-Require Import FsBlocks.       (* [blk_splice]                              *)
-Require Import InodeInv.       (* [MAXFILE]                                 *)
+Require Import Xv6Cameras.       (* [blk_splice]                              *)
 Require Import SpecFilewrite.  (* [FW_MAX], [fwrite_names], the env bundles *)
-Require Import SpecSysWrite.   (* [sys_write_stack]                         *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.

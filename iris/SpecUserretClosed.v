@@ -69,7 +69,6 @@ Require Import UtResFits.  (* [USERTRAP_RES_PARK] -- the residue plus its produc
    (claude-notes/projects/user-wp-slot.md SS1.1). *)
 Require Export UexecWp.
 Require Import UserPerm.   (* [perm_of] -- the key's permission projection *)
-Require Import UexecSlot.  (* [tf_resume_gpr0] lives beside the key *)
 Require Import UexecRet.   (* [ukc] -- the U-mode continuation the entry runs.
                               REQUIRED DIRECTLY: [ukc]'s body is the sealed
                               [uvb], and the seal does not travel through a

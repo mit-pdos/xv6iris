@@ -82,7 +82,6 @@ Require Import FdSlots ProcInv.
 Require Import ProofKforkParts.
 Require Import FileInvDefs.
 Require Import UserPtTree.
-Require Import ProcPtOwn.
 Require Import WpUart.
 Require Import LogInv.
 Require Import Xv6Cameras.          (* [fsCrashG] -- filewrite's extra class *)
@@ -106,17 +105,9 @@ Require Import TsoCtxShim.
 (* ---- the AU side ---- *)
 Require Import ProofSysWrite.      (* [sw_addr_p]/[sw_addr_n]/[sw_addr_f]/
                                       [sw_addr_f_base] are TOP-LEVEL there *)
-Require Import FsBytesGamma.
-Require Import FsCfg.
-Require Import SpecSysWriteAU.     (* [wchunks], [wp_sys_write_au_frame]   *)
-Require Import FsAbsWriteFire.     (* [awrite_commits_at]                  *)
-Require Import SpecSysWriteAUEra.  (* the contract this file seals         *)
-Require Import SpecFilewriteAU.    (* the callee's AU form                 *)
 (* ---- the console side ---- *)
-Require Import UartTxInv.
 Require Import SpecSysWriteConsAU.  (* the contract this file seals         *)
 Require Import SpecFilewriteCons.   (* the callee's located device form     *)
-Require Import FsAbs.              (* LAST (FsAbs's own rule)              *)
 
 Local Open Scope Z_scope.
 

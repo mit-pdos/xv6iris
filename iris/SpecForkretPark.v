@@ -120,7 +120,7 @@ Definition forkret_park_body
        cwd's own unit is NOT here -- a live process has a real [cwd_ref] and
        the unit is parked in the itable against it. *)
     iref_slots IREFSPARE -∗
-    |==> ▷ proc_ctx γs pa.
+    |==> proc_ctx_boxed γs pa.
 
 Module Type FORKRET_PARK.
   Parameter forkret_park :
