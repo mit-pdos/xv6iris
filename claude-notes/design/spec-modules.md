@@ -119,6 +119,18 @@ Module Acquire := AcquireProof Mycpu Holding PushOff.
   belongs at a lower altitude (see [`code-organization.md`](code-organization.md)).
   `tools/proof_coverage.py` reads the ascription to find which `Module Type` a
   functor implements; it accepts `<:` as well, but the rule is `:`.
+- **The ascription goes on the FUNCTOR, and nowhere else.** A `Link` file
+  applies (`Module F := FProof A B.`) or, for a callee-free proof that only
+  needs the uniform link name, renames (`Module WalkNoalloc :=
+  WalkNoallocProof.`) — it never RE-ascribes what it stands over
+  (`Module WalkNoalloc : WALK_NOALLOC := WalkNoallocProof.`). Rocq accepts the
+  re-ascription and it says nothing the sealed right-hand side did not already
+  say. If a proof cannot be sealed where it is written, that is a fact about the
+  `Module Type` — state the theorem the callees make provable, and seal to it —
+  not a licence to seal the application instead. `tools/proof_coverage.py`
+  reports the re-ascribed form, and any `Module` spelling it cannot read, as a
+  consistency error: an unread ascription joins a proof to no spec, and the
+  function then reads as `assumed` with nothing anywhere saying why.
 - **The statement lives only in the `_body` `Definition`.** Never spell it out
   inside `Module Type` — it would be duplicated between signature and proof and
   the two would drift.

@@ -488,6 +488,11 @@ Proof.
   vm_compute. discriminate.
 Qed.
 
+(*  and the one-hop side condition [KEXEC_PIN]'s receipt takes: /init's
+    path is [FsInitPin.init_path = ["init"]], one element.               *)
+Lemma pin_init_one_hop : exists s : fname, kxp_path pin_init = [s].
+Proof. eexists. reflexivity. Qed.
+
 (*  the pinned entry, computed: it is [InitData.initEntry] (0xbc), the pc
     every [USpecInit] theorem starts from -- the receipt that makes the
     contract's sentence consumable by the U-mode tier.                    *)
@@ -511,6 +516,12 @@ Proof.
   apply Nat2Z.inj_le. rewrite ElfUser.sh_elf_length.
   vm_compute. discriminate.
 Qed.
+
+(*  sh's path is the sibling lane's parameter, so the one-hop side
+    condition is its to supply and this is the shape it takes.           *)
+Lemma pin_sh_one_hop (s : fname) (i : Z) :
+  kxp_path (pin_sh [s] i) = [s].
+Proof. reflexivity. Qed.
 
 Lemma pin_sh_entry (ps : list fname) (i : Z) :
   eh_entry (kxp_ef (pin_sh ps i)) = ShData.shEntry.
@@ -885,6 +896,31 @@ Module Type KEXEC_PIN.
       wp_kexec_pinned_body pb ds gs jp gl pd pav pu gf plen pfun na avf
                            alen aslen afun pidv U dqb dqs dqa dqpv dqas m
                            K eb b lks.
+
+  (*  THE RECEIPT, on a ONE-ELEMENT pinned path: the ENDPOINT premise
+      ([kxp_view_pin], sect. 4) in place of the chain, which at one hop
+      is the same claim ([kxp_run_pin_of_view]) and at two is not -- see
+      ProofKexecPinTrace.v's counterexample.  Both era-0 instances
+      satisfy the side condition by [pin_init_one_hop] / [pin_sh_one_hop]
+      above, so this is the sentence /init and forkret actually apply. *)
+  Parameter wp_kexec_pinned_1hop :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
+      (pb : kx_pin) (s : fname)
+      (gs : list gname) (jp : nat) (gl : gname)
+      (pd pav pu : mword 64)
+      (gf : gname)
+      (plen : nat) (pfun : nat -> bv 8)
+      (na : nat) (avf : nat -> mword 64)
+      (alen aslen : nat -> nat) (afun : nat -> nat -> bv 8)
+      (pidv : mword 32) (U : ustate)
+      (dqb dqs dqa dqpv dqas : dfrac)
+      (m : regfile) (K : nat) (eb : bool)
+      (b : bool) (lks : gset string),
+      kxp_path pb = [s] ->
+      wp_kexec_pinned_view_body pb gs jp gl pd pav pu gf plen pfun na avf
+                                alen aslen afun pidv U dqb dqs dqa dqpv dqas m
+                                K eb b lks.
 End KEXEC_PIN.
 
 (* ===================================================================== *)

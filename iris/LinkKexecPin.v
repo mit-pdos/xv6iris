@@ -22,19 +22,3 @@ Module KexecPin := KexecPinProof Myproc BeginOp Namei NameiEra Ilock Readi
                                  ProcPagetableGen ProcFreepagetable Walkaddr
                                  Flags2perm Uvmalloc Uvmclear Strlen Copyout
                                  Safestrcpy Panic.
-
-(* ===================================================================== *)
-(*  THE SENTENCE, UNCONDITIONALLY.                                        *)
-(*                                                                        *)
-(*  [SpecKexecPin.wp_kexec_pinned_body] -- the Module Type's own           *)
-(*  statement, quoted through the module -- on every ONE-ELEMENT pinned    *)
-(*  path, which is both era-0 instances.  See ProofKexecPin.v's header     *)
-(*  (4) and ProofKexecPinTrace.v's for why the general arm is a            *)
-(*  statement-lane question and not a proof debt.                          *)
-(* ===================================================================== *)
-Notation wp_kexec_pinned_1hop := KexecPin.wp_kexec_pinned_1hop (only parsing).
-Notation wp_kexec_pinned_run := KexecPin.wp_kexec_pinned_run (only parsing).
-
-(*  THE SEAL: with the chain repair in the contract, the general sentence
-    is the Parameter and the functor application inhabits the Module Type. *)
-Module KexecPinSealed : SpecKexecPin.KEXEC_PIN := KexecPin.
