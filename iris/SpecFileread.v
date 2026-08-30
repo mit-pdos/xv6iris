@@ -771,6 +771,16 @@ Definition wp_fileread_sconf_body
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       ⌜fileread_ret n r⌝ -∗
       ⌜(Z.of_nat d <= Z.max 0 n)%Z⌝ -∗
+      (* ...AND A NON-NEGATIVE ANSWER IS EXACTLY THE COUNT WRITTEN.  All
+         three arms copy a chunk at a time and a failing copy moves none of
+         the chunk it failed on, so the run is as long as the answer.  The
+         -1 answer says only the bound, and for ONE arm that is not merely
+         conservative: readi overwrites its running [tot] with -1 when a
+         copyout faults, discarding blocks it has already delivered.  (The
+         pipe and console -1s are killed-process arms, which never reach
+         user mode.) *)
+      ⌜r = (mword_of_int (Z.of_nat d) : mword 64)
+       \/ r = (mword_of_int (-1) : mword 64)⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0%nat eb pj b lks -∗
