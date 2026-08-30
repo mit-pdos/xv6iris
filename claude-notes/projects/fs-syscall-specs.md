@@ -1290,3 +1290,86 @@ body — the Module Type's sentence, quoted — for every one-element path.
 and Milestone J's `cond_entry_slot` mint can consume `Q_pin` today.
 `KEXEC_PIN` itself is left UNSEALED deliberately: sealing it would require
 proving the multi-hop arm, which is false.
+
+## Lane C (CONSOLE TRACE CONNECTION) — landed 2026-08-30, with ONE upstream ask
+
+Files: `iris/UartAccepted.v` (pure leaf, beside `ObsTrace.v`),
+`iris/UartSentResidue.v` (Iris, above `UartSentLoc`),
+`iris/SystemUartAccepted.v` (the export, above `SystemAdequacy`).  Nothing
+of `claude-notes/projects/uart-trace.md`'s phases 1–4 was touched (R10):
+all three files are new leaves.
+
+**THE TIE (`UartAccepted.run_out_accepted`).**  For every run of the machine
+from a powered-off, never-booted state,
+
+```
+obs_wire (open_seg κs)  `sublist_of`  uart_acc (duart (gdev g2))
+```
+
+— every `ObsUartOut` byte of the current power cycle is a byte the kernel
+ACCEPTED into the UART, in order, and nothing else is on the wire.
+`uart_acc` is exactly the list `WpUart.uart_sent` / `UartSentLoc.
+uart_sent_from` are lower bounds of, so this is the sentence that turns a
+console receipt into a statement about what the host saw.
+
+It is PURE — no Iris, no ledger.  The carrier is a new device invariant,
+`out_wire_ok u := u_wire u ⊑ u_out u`, proved a step invariant of
+`prim_step` in the shape of `ObsTrace.prim_step_obs_wf`
+(`prim_step_gout_wire_ok`, conditioned on `gpow` and re-established at
+PowerOn from `boot_facts`' `duart = uart0_state`).  Sublist and not prefix
+because a byte can be accepted and never sent: LOOP diverts it to this
+UART's own receiver, an FCR clear drops the tx FIFO, and a power loss ends
+the cycle.  The statement is about a REACHED STATE, so it holds at every
+point of every run (every prefix of an `nsteps` is an `nsteps`) — which is
+how the completed cycles are covered, each while it was the open one.
+
+**THE EXPORT (`SystemUartAccepted.xv6_out_accepted_xv6Σ`).**  At the real
+image: adequacy's reducibility, `ObsTrace.obs_wf κs g2`, and the tie, about
+one run.  `xv6_out_accepted_from_xv6Σ` is the LOCATED reading: given a
+receipt's pure residue at the reached state (`tr0` a prefix of `uart_acc`,
+`bs` a sublist of `drop |tr0| uart_acc`), the cycle's output splits as
+`w1 ++ w2` with `w1 ⊑ tr0` and `w2 ⊑ drop |tr0| uart_acc` — the same window
+`bs` lives in.  Read for a printf: nothing the host sees after the printf's
+starting point can be a byte that was not accepted after that point, and
+outputs cannot outrun the acceptance order.  SAFETY ONLY (uart-trace.md
+ruling 5): it does NOT say the printf's bytes appeared.
+
+**Audit.**  `run_out_accepted` is on the platform's `resv` pair and NOTHING
+ELSE (two axioms) -- no funext, no Rocq primitives: it is a theorem about
+the semantics.  `uart_sent_from_acc` / `uart_sent_from_obs` are closed under
+the global context (zero).  `xv6_out_accepted_xv6Σ` and
+`xv6_out_accepted_from_xv6Σ` inherit the system theorem's standing set --
+the `resv` pair, funext and the ten Rocq primitives, thirteen in all -- and
+add nothing to it.  Zero `Admitted`; every file compiles in under three
+seconds on the mirror.
+
+**THE IRIS-TO-PURE STEP (`UartSentResidue.uart_sent_from_acc`).**
+`uart_sent_from γu tr0 bs` agreed against `WpUart.uart_sent_auth γu u` IS
+that residue; `uart_sent_from_obs` is the whole composition at one device
+state, given the wire tie and `out_wire_ok`.  Both green.
+
+**THE ASK (relay; it is uart-trace.md's open "identification gate" in its
+UART instance — not a new item).**  To fire `uart_sent_from_obs` at a trace
+EVENT, so that a receipt is exported without assuming its residue, the
+ledger's per-event wands need two things they are not given:
+
+1. **Era identity.**  `SystemAdequacy.xv6_power_adequacy_gen`'s permit
+   premise is `forall γ : uart_names, ⊢ obs_inv -∗ uart_obs_permit γ`, and
+   `xv6_trace_adequacy`'s `Htx`/`Hrx` likewise quantify over an arbitrary
+   `γ`.  A client's `R` therefore cannot know the `γ` it is handed is the
+   era's, and no ghost comparison recovers it (the wand holds `uart_ghosts
+   γ u'`, the ledger would hold a lower bound at some `γ0`; nothing relates
+   them).  The fix is the trace-side twin of `Hswap`'s `Rb dk`: the boot
+   deposits the era's `γu` (a persistent registration) where the ledger can
+   see it, and the permit premise is taken at the registered `γ`.
+2. **The device invariant at the event.**  The wands get `⌜trace_shape h
+   true⌝` and the wire tie but nothing about `u_out`.  The cheapest fix is a
+   FOURTH conjunct on `ObsTrace.obs_wf` — `gpow g = true -> out_wire_ok
+   (duart (gdev g))` — whose preservation proof is already green here
+   (`UartAccepted.prim_step_gout_wire_ok`); `wp_uart_step` then hands it
+   over beside the tie.
+
+Neither is needed by what landed: the pure route proves the acceptance
+content of the trace outright, and the ledger is only the vehicle for the
+LOCATED, era-attached form.  Recorded here rather than in uart-trace.md so
+the plan's own "Open" list is not duplicated.
