@@ -25,14 +25,34 @@
  * read, and this program does neither -- it never touches offsets 0 or 2 --
  * so the level stays up until the program itself lowers IER.
  */
-/* vtest: repeat=1 */
+/* QEMU ONLY, and the reason is MEASURED, not assumed.  This case drives an
+   interrupt through the PLIC, so it needs a source it can RAISE AND LOWER --
+   and the only one a test can drive is the UART.  On QEMU (and in the model,
+   DevModel.uart_irq_id) that is source 10; on the JH7110 it is source 32,
+   confirmed over JTAG: asserting IER made source 32 claimable while source
+   10 was never pending.  One image cannot satisfy both, and the model's
+   device fabric has its UART at 10, so the board's execution is not one the
+   model can exhibit -- the run would burn its whole budget waiting for an
+   interrupt that never arrives.
+
+   This is finding 30's sibling: the board's UART is a different chip AND it
+   sits on a different PLIC source.  The PLIC itself is fine on this board --
+   plic_mctx and plic_prio0 exercise its registers there and pass.  What is
+   QEMU-specific is this test, not the question, and a board-shaped version
+   driving source 32 would be a new case rather than a platform of this one.
+
+   (The context numbering is handled and verified separately -- see
+   PLIC_SCTX in abi.h.  There are exactly 9 contexts on this PLIC, measured:
+   0..8 can claim, 9 cannot, which is the E24's M-only context followed by
+   four U74s with an M and an S each.) */
+/* vtest: repeat=1 platforms=qemu */
 #include "abi.h"
 
 #define PLIC        0x0c000000
 #define P_PENDING   0x1000
-#define P_SENABLE   0x2080          /* hart 0, S context */
-#define P_STHRESH   0x201000
-#define P_SCLAIM    0x201004
+#define P_SENABLE   PLIC_SENABLE
+#define P_STHRESH   PLIC_STHRESH
+#define P_SCLAIM    PLIC_SCLAIM
 
 /* result-region offsets -- MIRRORED in vtest-rocq/PlicLevel.v */
 #define R_PEND0    8   /* pending, line up                          0x400  */

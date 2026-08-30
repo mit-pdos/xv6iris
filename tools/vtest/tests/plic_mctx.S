@@ -18,9 +18,9 @@
 #include "abi.h"
 
 #define PLIC        0x0c000000
-#define P_SENABLE   0x2080          /* hart 0, S context = context 1 */
-#define P_STHRESH   0x201000
-#define P_SCLAIM    0x201004
+#define P_SENABLE   PLIC_SENABLE
+#define P_STHRESH   PLIC_STHRESH
+#define P_SCLAIM    PLIC_SCLAIM
 #define P_MENABLE   0x2000          /* hart 0, M context = context 0 */
 #define P_MTHRESH   0x200000
 #define P_MCLAIM    0x200004
