@@ -1506,7 +1506,7 @@ Section UkRetire.
                   rs1 rsA rsf Hpre Hpure Hfe Hfg Tr Htlbok' Htok' Hshape Hdecbase
                   Hwrok Hred Hg1 Hg2 Hexec
                   with "Hcert Hamb Hk Hany Hrw Hro Hmm Hres").
-      + destruct (uv_fetch_base_2 pt' Mp' t rsA w_leaf pc w
+      + destruct (uv_fetch_base_2_pg pt' Mp' t rsA w_leaf pc w
                     Hinj Hum Hlok Hcanon Hinpage Hal2' Hal4 Hbytes HnRVC
                     LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
@@ -1873,7 +1873,7 @@ Section UkEcall.
         exists rsf, t'. split_and!;
           [ exact Hfe | exact Hfg | exact Tr | exact Htlbok' | exact Htok'
           | exact Hshape ].
-      - destruct (uv_fetch_base_2 pt' Mp' t rsA w_leaf pc w
+      - destruct (uv_fetch_base_2_pg pt' Mp' t rsA w_leaf pc w
                     Hinj Hum Hlok Hcanon Hinpage Hal2' Hal4 Hbytes HnRVC
                     LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).

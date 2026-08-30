@@ -1882,7 +1882,7 @@ Section WpUmodeStore.
                   Htok' Hshape Hdecbase Hkw Hred Hg1 Hexp Hva Hwval Hl Hchk
                   Hcanon Hpg Hal HMb
                   with "Hcert Hamb Hcap Hk Hany Hrw Hro Hmm Hres").
-      + destruct (uv_fetch_base_2 pt M t rsA w_leaf pc w
+      + destruct (uv_fetch_base_2_pg pt M t rsA w_leaf pc w
                     Hinj Hum Hlok Hcanonpc Hinpage Hal2 Hal4 Hbytes HnRVC
                     LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).

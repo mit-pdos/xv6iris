@@ -1353,7 +1353,7 @@ Section UkLoad.
                   Htlbok' Htok' Hshape Hdecbase Hkw Hred Hg1 Hexp Hrd Hva Hwval
                   Hdisp Hcanon Hpg Hal
                   with "Hcert Hamb Hk Hany Hrw Hro Hmm Hres").
-      + destruct (uv_fetch_base_2 pt' Mp' t rsA w_leaf pc w
+      + destruct (uv_fetch_base_2_pg pt' Mp' t rsA w_leaf pc w
                     Hinj Hum Hlok Hcanonpc Hinpage Hal2' Hal4 Hbytes HnRVC
                     LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
