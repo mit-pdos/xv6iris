@@ -48,12 +48,15 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
+From iris.base_logic.lib Require Import ghost_var.
 Require Import RiscvLang RiscvPtsto.
 Require Import ProcGeom ProcDefs ProcPt ProcPtOwn.   (* [tf_sp_idx] / [tf_arg_idx] *)
 Require Import UserPtTree UserExec.
 Require Import UmodeAbi.
 Require Import UserPerm UexecWp UexecSlot UexecRet.
 Require Import UkAbi.   (* [uk_xpage] / [uk_stack] / [uk_args_c]: the key-level facts *)
+Require Import WpMmodeLeafBase.
+Require Import USyncKernel.
 Require User.SyncInstrs.
 Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode*/Uk* precedent *)
 Local Open Scope Z_scope.
@@ -138,9 +141,29 @@ Proof. exact (uimg_sub_text_region_eq_of SyncInstrs.sync_bytes M). Qed.
 (* SS3 THE GATE, and THE CONDITIONAL CONSTRUCTOR.                          *)
 (* ===================================================================== *)
 
+(* sync's SIX entry conditions, all about the key, all decidable.  The last
+   is the one that could not even be STATED before the break joined the key:
+   [udata_lo] is filtered at [sz], and with [sz] bound by the slot's own ∀
+   the condition had to hold at every size the slot admitted -- including
+   zero, where it is false.  [uvis_sz W] pins it. *)
+Definition sync_gate (W : uvis) : Prop :=
+  text_region_eq (uvis_M W) /\
+  tf_resume_pc (uvis_tf W) = (mword_of_int SyncSyms.start : mword 64) /\
+  sync_xopage (uvis_perm W) /\
+  32 <= uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) /\
+  uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) mod 8 = 0 /\
+  sync_stkdata W.
+
+Global Instance sync_gate_dec (W : uvis) : Decision (sync_gate W).
+Proof. unfold sync_gate. apply _. Defined.
+
 Section UexecCond.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
+  (* the break's ghost class, for [UkRun.usz].  It already exists in the
+     tree -- [Xv6Cameras.uioG]'s [uio_brkG] is the same [ghost_varG Σ Z] --
+     so nothing new enters Σ. *)
+  Context `{!ghost_varG Σ Z}.
 
   (* THE CONDITIONAL CONSTRUCTOR: a verified program's slot when its gate
      holds, the generic one otherwise -- and nothing is assumed on any
@@ -148,9 +171,21 @@ Section UexecCond.
      not matter to the conclusion: every branch produces the same [uslot W],
      so a key that somehow satisfied two gates would simply take the first.
      Adding the next verified program is one more [destruct]. *)
+  (* the gate's yes branch: sync's own slot *)
+  Lemma sync_gate_slot (W : uvis) : sync_gate W -> ⊢ uslot W.
+  Proof.
+    intros (Hteq & Hpc & Hxo & Hroom & Hal8 & Hstk).
+    exact (sync_uexec_slot W Hpc
+             (text_region_eq_uimg_sub (uvis_M W) Hteq)
+             (sync_xopage_addrs (uvis_perm W) Hxo)
+             Hroom Hal8 (sync_stkdata_all W Hstk)).
+  Qed.
+
   Lemma cond_entry_slot (W : uvis) : □ uexec_wp -∗ uslot W.
   Proof.
     iIntros "#Hgen".
+    destruct (decide (sync_gate W)) as [Hgate | _].
+    { iApply (sync_gate_slot W Hgate). }
     iApply (uexec_wp_uslot W with "Hgen").
   Qed.
 

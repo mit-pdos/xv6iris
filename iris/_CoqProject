@@ -271,6 +271,7 @@ UkRunLeaf.v
 UkRunMem.v
 UkRunSys.v
 UkSync.v
+USyncKernel.v
 UkAbi.v
 UexecCond.v
 UCodeEcho.v
