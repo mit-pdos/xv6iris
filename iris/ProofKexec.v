@@ -442,12 +442,11 @@ Section KexecMain.
                     Hpath Hargv Hargs Hbs Hirs Hcont [] []").
     (* the landed contract claims nothing about the header, so the oracle
        gives the payload straight back ([HD := None]).  Since the
-       2026-08-29 widening the payload is the RIDE AND ITS ERA LEG (the
-       pinned lane reads the abstract row off the leg; see [kxc_a2]'s
-       row) -- one more name here and nothing else. *)
-    { iIntros (zi dn bm data) "%Hok Hpay". iModIntro.
-      iDestruct "Hpay" as "[Hride Htop]".
-      iSplitL "Hride"; [iExact "Hride" |].
+       2026-08-29 widening the payload IS the era leg (the pinned lane
+       reads the abstract row off it; see [kxc_a2]'s row), and since THE
+       DVIEW RETIREMENT the byte ride that used to ride beside it is
+       gone. *)
+    { iIntros (zi dn bm data) "%Hok Htop". iModIntro.
       iSplitL "Htop"; [iExact "Htop" |].
       iModIntro. iLeft. by iPureIntro. }
     (* ...and it wants no specialisation of the exit either: [KEX] IS the

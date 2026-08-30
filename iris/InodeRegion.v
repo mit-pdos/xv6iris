@@ -154,13 +154,17 @@ Require Import FsBytesGamma.
    carry the class; this is where it starts. *)
 Require Export IcacheRef.
 Require Import EscrowDefs.   (* OPTION A: region_pending / reg_half / committedA *)
-(* N-4 PHASE B (E1-region): the per-inum LEND COLUMN [dv_lcol] this file
-   parks inside [ireg_registry], and the three column moves §L wraps in an
-   [↑iregN] open.  The vocabulary is BELOW the region on purpose (see that
-   file's altitude note); only the operations are here. *)
-Require Import FsTree.       (* [fname] -- the lend's entry-map key type      *)
-Require Import DirViewG.     (* [dv_half] / [dv_hold] -- the lent fractions  *)
-Require Import DirViewLend.
+(* THE LEND COLUMN IS GONE (fs-syscall-specs, THE DVIEW RETIREMENT,
+   2026-08-30).  [ireg_registry] used to park a per-inum [DirViewLend.dv_lcol]
+   pair beside the [icfg_reg] auth, and sections L / LF / LW wrapped that
+   column's three moves in an [↑iregN] open for the sixteen byte-write mover
+   sites.  The [dview]/[fview] ghosts are deleted -- the payload's contents
+   reading IS the era fragment's ([FsStateEra.dir_entries_era_node]) -- so the
+   column, its accessors ([ireg_lcols], [ireg_lends], [ireg_lends_acc],
+   [ireg_lcols_use], [ireg_lcol_use], [ireg_fcol_use]) and its movers
+   ([dv_set_rt], [fv_set_rt], [dvw_set_rt]) are gone with it.  Every mover
+   site's dv step was SUBSUMED by the [ireg_top_retag] it already performs. *)
+Require Import FsTree.       (* [fname] -- the entry-map key type            *)
 (* [logged_at] / [log_epoch_lb]: the zero-receipt parked in [ireg_slot]
    (fs-log.md §G.17).  This is what puts [logG] in the section's context,
    and hence in the context of the four files that STATE something over
@@ -2865,49 +2869,20 @@ Section InodeRegion.
      pending-ness, so "non-pending ⟹ reg_full" is structural.  The auth is used
      only by the off-lock deposit (to rebind an inum's escrow-name pair) and by
      boot (to allocate); every other accessor threads it opaquely. *)
-  (* N-4 PHASE B (E1-region, namei-pinned-lookup.md §11.5): the LEND COLUMN
-     rides here too, one per inum.  This conjunct -- not [ireg_slot] -- is
-     the lend's home for one reason: every region accessor threads
-     [ireg_registry] OPAQUELY (it appears in exactly two constructions,
-     boot's and the off-lock deposit's, and in thirty-odd re-parks only as
-     the name "Hreg"), so hosting the column here moves NO [ireg_slot]
-     lemma, no [ireg_slot_intro] arity and no accessor's destructuring
-     pattern.  [dv_lcol] is all-[own], so [ireg_registry_timeless] and every
-     [">"] strip above it survive verbatim.
-
-     THE FAMILY IS INDEXED AT [icfg_nib], NOT at the region's [nib]
-     parameter, and that is load-bearing: it is what lets the three
-     operations state their addressing side-condition as the pure clause
-     the lend's OWN tokens carry ([DirViewLend.dvl_dom], also at
-     [icfg_nib]) and take NO premise relating the two.  Several mover
-     sites -- [ProofIlock]'s fill among them -- hold [ireg_inv] at a [nib]
-     that is never tied to [icfg_nib] by their contract, so a premise
-     [nib = icfg_nib] would have been unpayable there.  Boot builds the
-     family at [icfg_nib] because [ireg_alloc] is called at it. *)
-  (* N-5.2A (§13 D-52c): the column is now a PAIR -- the directory-contents
-     lend and the file-contents lend of the same inum, side by side.  Bundling
-     them here rather than adding a second conjunct to [ireg_registry] is what
-     keeps [ireg_registry]'s text, [ireg_registry_from_map]'s arity and
-     [EscrowDeposit]'s rebind byte-identical: the two ghosts are independent
-     (their four registry key families are disjoint by residue,
-     [DirViewLend] §0), so nothing relates the two halves and the pair is
-     purely a packaging choice. *)
-  Definition ireg_lcols (z : Z) : iProp Σ :=
-    (dv_lcol z ∗ fv_lcol z)%I.
-
-  Definition ireg_lends : iProp Σ :=
-    ([∗ list] k ∈ seq 0 (16 * icfg_nib), ireg_lcols (Z.of_nat k))%I.
-
-  Global Instance ireg_lcols_timeless z : Timeless (ireg_lcols z).
-  Proof. rewrite /ireg_lcols. apply _. Qed.
-
+  (* THE LEND COLUMN THAT USED TO RIDE HERE IS GONE (THE DVIEW RETIREMENT,
+     2026-08-30).  [ireg_registry] carried a per-inum [ireg_lcols] pair --
+     the directory-contents lend and the file-contents lend of the same inum
+     -- filed here rather than in [ireg_slot] because every region accessor
+     threads the registry OPAQUELY.  With the [dview]/[fview] ghosts deleted
+     the conjunct, [ireg_lcols], [ireg_lends] and their two Timeless
+     instances are gone, and [ireg_registry] is back to the bare [icfg_reg]
+     auth plus coverage -- which is what it was before N-4 phase B.
+     [ireg_registry_from_map] loses the column argument with it. *)
   Definition ireg_registry (nib : nat) : iProp Σ :=
     (∃ mr : gmap Z (gname * gname),
        ⌜∀ z : Z, (0 <= z < 16 * Z.of_nat nib)%Z -> is_Some (mr !! z)⌝ ∗
-       ghost_map_auth icfg_reg 1 mr ∗ ireg_lends)%I.
+       ghost_map_auth icfg_reg 1 mr)%I.
 
-  Global Instance ireg_lends_timeless : Timeless ireg_lends.
-  Proof. rewrite /ireg_lends. apply _. Qed.
   Global Instance ireg_registry_timeless nib : Timeless (ireg_registry nib).
   Proof. rewrite /ireg_registry. apply _. Qed.
 
@@ -2915,34 +2890,17 @@ Section InodeRegion.
      new hand-out): it bulk-inserts a fully-covering map and calls this to wrap
      the raw elements as [reg_full]s.  Parametric over the map so the caller
      (IcacheBoot, where [region_inums] lives) supplies the domain; [reg_full]
-     stays local to this file.  The lend column comes in beside it, in the
-     NONE state at every inum ([DirViewLend.dv_lcol_boot]). *)
+     stays local to this file. *)
   Lemma ireg_registry_from_map (mr : gmap Z (gname * gname)) (nib : nat) :
     (forall z : Z, (0 <= z < 16 * Z.of_nat nib)%Z -> is_Some (mr !! z)) ->
     ghost_map_auth icfg_reg 1 mr -∗
-    ireg_lends -∗
     ireg_registry nib.
   Proof.
-    iIntros (Hcov) "Ha Hl". iExists mr. iSplitR; [done |]. iFrame.
+    iIntros (Hcov) "Ha". iExists mr. iSplitR; [done |]. iFrame.
   Qed.
 
-  (* ONE INUM'S COLUMN, out of the family and back.  [big_sepL_delete] at
-     the index [Z.to_nat z], which is the only place the region's flat
-     [seq]-indexing meets the lend's [Z] keying. *)
-  Lemma ireg_lends_acc (z : Z) :
-    dvl_dom z ->
-    ireg_lends -∗ ireg_lcols z ∗ (ireg_lcols z -∗ ireg_lends).
-  Proof.
-    rewrite /dvl_dom. intros Hz. rewrite /ireg_lends. iIntros "Hs".
-    assert (Hi : seq 0 (16 * icfg_nib) !! Z.to_nat z = Some (Z.to_nat z)).
-    { apply lookup_seq. split; [lia | lia]. }
-    assert (Hid : Z.of_nat (Z.to_nat z) = z) by lia.
-    iDestruct (big_sepL_delete _ _ (Z.to_nat z) (Z.to_nat z) Hi with "Hs")
-      as "[Hone Hrest]".
-    rewrite Hid. iFrame "Hone". iIntros "Hone".
-    iApply (big_sepL_delete _ _ (Z.to_nat z) (Z.to_nat z) Hi).
-    rewrite Hid. iFrame.
-  Qed.
+  (* [ireg_lends_acc] -- one inum's column out of the family and back, by
+     [big_sepL_delete] at [Z.to_nat z] -- went with the column. *)
 
   Definition ireg_body (γi : gname) (γfs : fs_names)
       (inodestart : Z) (nib : nat) : iProp Σ :=
@@ -5436,161 +5394,22 @@ Section InodeRegion.
      for it -- is deleted. *)
 
   (* ==================================================================== *)
-  (*  §L.  THE LEND'S OPERATIONS (N-4 PHASE B, E1-region)                  *)
+  (*  §L / §LF / §LW.  THE LEND'S OPERATIONS: RETIRED                      *)
+  (*      (fs-syscall-specs, THE DVIEW RETIREMENT, 2026-08-30)             *)
   (* ==================================================================== *)
 
-  (*  Each one is [DirViewLend]'s column move with an [↑iregN] open around
-      it, and nothing else.  The [ireg_inv] argument is a PERSISTENT handle
-      that every calling context -- every byte-write mover, every escrow
-      arm, the pinned walk -- already holds as a premise, so not one spec's
-      text moves.  NO operation takes an inum-range premise and none
-      relates the region's [nib] to [icfg_nib]: the addressing bound is the
-      pure clause the lend's own tokens carry ([DirViewLend.dvl_dom]) and
-      the column family is indexed at [icfg_nib] to match (see
-      [ireg_lends]).  The mint, whose caller holds no lend token yet, is the
-      one exception and states [dvl_dom] outright.                         *)
+  (*  These were [DirViewLend]'s column moves with an [↑iregN] open around
+      them: [ireg_lcols_use] (the shared plumbing), [ireg_lcol_use] /
+      [ireg_fcol_use] (the two single-column forms), and the movers
+      [dv_set_rt], [fv_set_rt] and their combined wrapper [dvw_set_rt], which
+      is what every byte-write re-pack called to step the two contents ghosts
+      to the new record's own readings.
 
-  (* the shared plumbing: open the region, hand the caller this inum's
-     column, take it back, close.  Stated as a bupd-transformer so the three
-     operations below are one line each. *)
-  Lemma ireg_lcols_use (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (z : Z) (Q : iProp Σ) :
-    ↑iregN ⊆ E ->
-    dvl_dom z ->
-    ireg_inv γi γfs inodestart nib -∗
-    (ireg_lcols z ==∗ ireg_lcols z ∗ Q) ={E}=∗ Q.
-  Proof.
-    iIntros (HE Hz) "#Hinv Hmove".
-    iDestruct "Hinv" as "[#Hiinv [#Hrb #Hftopi]]".
-    iMod (inv_acc E iregN with "Hiinv") as "[Hbody Hclose]"; [exact HE |].
-    iDestruct "Hbody" as (m) "(>Ha & Hblks & >Hreg)".
-    iDestruct "Hreg" as (mr) "(%Hcov & Hauth & Hlends)".
-    iDestruct (ireg_lends_acc z Hz with "Hlends") as "[Hcol Hback]".
-    iMod ("Hmove" with "Hcol") as "[Hcol HQ]".
-    iDestruct ("Hback" with "Hcol") as "Hlends".
-    iMod ("Hclose" with "[Ha Hblks Hauth Hlends]") as "_".
-    { iNext. iExists m. iFrame "Ha Hblks".
-      iExists mr. iSplitR; [done |]. iFrame. }
-    iModIntro. iExact "HQ".
-  Qed.
-
-  (* ...and the two single-column forms the operations below actually use.
-     Each frames the OTHER ghost's column straight through, which is the
-     whole content of "the two lends are independent". *)
-  Lemma ireg_lcol_use (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (z : Z) (Q : iProp Σ) :
-    ↑iregN ⊆ E ->
-    dvl_dom z ->
-    ireg_inv γi γfs inodestart nib -∗
-    (dv_lcol z ==∗ dv_lcol z ∗ Q) ={E}=∗ Q.
-  Proof.
-    iIntros (HE Hz) "#Hinv Hmove".
-    iApply (ireg_lcols_use E γi γfs inodestart nib z with "Hinv");
-      [exact HE | exact Hz |].
-    iIntros "[Hd Hf]". iMod ("Hmove" with "Hd") as "[Hd $]".
-    iModIntro. rewrite /ireg_lcols. iFrame.
-  Qed.
-
-  Lemma ireg_fcol_use (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (z : Z) (Q : iProp Σ) :
-    ↑iregN ⊆ E ->
-    dvl_dom z ->
-    ireg_inv γi γfs inodestart nib -∗
-    (fv_lcol z ==∗ fv_lcol z ∗ Q) ={E}=∗ Q.
-  Proof.
-    iIntros (HE Hz) "#Hinv Hmove".
-    iApply (ireg_lcols_use E γi γfs inodestart nib z with "Hinv");
-      [exact HE | exact Hz |].
-    iIntros "[Hd Hf]". iMod ("Hmove" with "Hf") as "[Hf $]".
-    iModIntro. rewrite /ireg_lcols. iFrame.
-  Qed.
-
-  (* THE WRITER'S TOTAL MOVE: [DirViewG.dv_set] at the ride.  On the whole
-     arm it IS [dv_set] and the region is never opened; on the ¾ arm it
-     gathers the escrowed ¼, sets, and cancels on the way out.  Total, with
-     no premise beyond the ride and the ambient region handle -- which is
-     what let the sixteen mover sites swap [dv_set] for it one line at a
-     time. *)
-  Lemma dv_set_rt (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (z : Z) (e e' : gmap fname Z) :
-    ↑iregN ⊆ E ->
-    ireg_inv γi γfs inodestart nib -∗ dv_ride z e ={E}=∗ dv_ride z e'.
-  Proof.
-    iIntros (HE) "#Hinv H". rewrite {1}/dv_ride.
-    iDestruct "H" as "[Hw|[H34 Hm]]".
-    - iMod (dv_set with "Hw") as "Hw". iModIntro. by iApply dv_ride_of_hold.
-    - iDestruct "Hm" as "[%Hdom Hm']".
-      iAssert (dv_lentm z e)%I with "[Hm']" as "Hm".
-      { rewrite /dv_lentm. iSplitR; [by iPureIntro |]. iExact "Hm'". }
-      iApply (ireg_lcol_use E γi γfs inodestart nib z with "Hinv");
-        [exact HE | exact Hdom |].
-      iIntros "Hcol".
-      iMod (dv_col_set z e e' with "H34 Hm Hcol") as "[$ Hw]".
-      iModIntro. by iApply dv_ride_of_hold.
-  Qed.
-
-  (* THE CLIENT'S MOVE, fired inside an [SpecNameiTr.nx_hop] fupd: the hop
-     lends the directory's contents at whatever fraction its custody
-     carries, and agreement against the ESCROWED ¼ is what forces the lent
-     value to be the pinned one.  On the cancelled arm the client takes the
-     persistent receipt instead. *)
-
-  (* ==================================================================== *)
-  (*  §LF.  THE fview LEND'S OPERATIONS (N-5.2A, §13 D-52c)                *)
-  (* ==================================================================== *)
-
-  (*  §L's, at the file-contents column.  Same signatures, same [ireg_inv]
-      argument, same absence of an inum-range premise (the bound is
-      [DirViewLend.dvl_dom], carried by the fview tokens too), same totality
-      of the writer's move.  The fview lend's consumer is the kexec walk
-      (N-5.2B).                                                             *)
-
-  Lemma fv_set_rt (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (z : Z) (b b' : list (bv 8)) :
-    ↑iregN ⊆ E ->
-    ireg_inv γi γfs inodestart nib -∗ fv_ride z b ={E}=∗ fv_ride z b'.
-  Proof.
-    iIntros (HE) "#Hinv H". rewrite {1}/fv_ride.
-    iDestruct "H" as "[Hw|[H34 Hm]]".
-    - iMod (fv_set with "Hw") as "Hw". iModIntro. by iApply fv_ride_of_hold.
-    - iDestruct "Hm" as "[%Hdom Hm']".
-      iAssert (fv_lentm z b)%I with "[Hm']" as "Hm".
-      { rewrite /fv_lentm. iSplitR; [by iPureIntro |]. iExact "Hm'". }
-      iApply (ireg_fcol_use E γi γfs inodestart nib z with "Hinv");
-        [exact HE | exact Hdom |].
-      iIntros "Hcol".
-      iMod (fv_col_set z b b' with "H34 Hm Hcol") as "[$ Hw]".
-      iModIntro. by iApply fv_ride_of_hold.
-  Qed.
-
-
-  (* ==================================================================== *)
-  (*  §LW.  THE COMBINED MOVERS (N-5.2A, §13 D-52b)                        *)
-  (* ==================================================================== *)
-
-  (*  EVERY BYTE-WRITE RE-PACK MOVES BOTH GHOSTS.  A directory write changes
-      the garbage [fv_of] reads off the same bytes, and a file write changes
-      the garbage [dv_of] reads off them; neither ghost is type-guarded, so
-      the honest statement at every mover site is "both, at the new record's
-      own readings".  These two wrappers are what keep such a site ONE line
-      after the sweep -- the dv-only forms stay for Phase B's byte-stability
-      and are what these are built out of.                                 *)
-
-  Lemma dvw_set_rt (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (z : Z)
-      (e e' : gmap fname Z) (b b' : list (bv 8)) :
-    ↑iregN ⊆ E ->
-    ireg_inv γi γfs inodestart nib -∗
-    dv_ride z e -∗ fv_ride z b ={E}=∗ dv_ride z e' ∗ fv_ride z b'.
-  Proof.
-    iIntros (HE) "#Hinv Hd Hf".
-    iMod (dv_set_rt E γi γfs inodestart nib z e e' HE with "Hinv Hd") as "$".
-    by iMod (fv_set_rt E γi γfs inodestart nib z b b' HE with "Hinv Hf") as "$".
-  Qed.
-
-  (* ...and the size-preserving form, for the re-packs whose record move
-     leaves [di_size] alone ([DirViewLend.dv_ride_size] and its twin, taken
-     together): there BOTH readings are unchanged and no fupd is needed at
-     all -- the resource is simply re-typed. *)
+      ALL GONE, AND NOT ONE MOVER SITE LOST A FACT.  A re-pack's dv step was
+      always SUBSUMED by the [ireg_top_retag] beside it: the retag moves the
+      era fragment to [era_node dn' bm' data'], and the entry map and the byte
+      list of that node ARE what [dv_of]/[fv_of] read off the same record and
+      bytes ([FsStateEra.dir_entries_era_node], [fn_file_bytes]).  So the
+      thirty-odd sites lose a line each and keep every conclusion. *)
 
 End InodeRegion.

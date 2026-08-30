@@ -926,11 +926,6 @@ Section ProofSysOpenPublish.
       inode_meta (ientry k) dn ∗
       inode_map fsc_fs (ientry k) bm ∗
       inode_blocks fsc_fs bm data ∗
-      (* ...and the CONTENTS HOLD (namei-pinned-lookup.md §9 W2): unlike the
-         three clauses this peel discards, the hold is a RESOURCE and the
-         re-seal below cannot conjure it, so it must come out here. *)
-      dv_ride (bv_unsigned inum) (dv_of dn data) ∗
-      fv_ride (bv_unsigned inum) (fv_of dn data) ∗
       (* ...and the era's abstract value (durable-disk 2b-inode-3): itrunc
          MOVES the record, so the walk retags it between this peel and the
          seal below ([InodeRegion.ireg_top_retag]). *)
@@ -939,7 +934,7 @@ Section ProofSysOpenPublish.
     iIntros "H".
     iDestruct (ic_loaded_open with "H") as (data)
       "(%Hok & %Hrl & %Hdir & %Hddix & %Hdoc & %Hduq & Hlnk & Hat & Hmeta &
-        Haddr & Hind & Hblk & Hdv & Hfv & Htop)".
+        Haddr & Hind & Hblk & Htop)".
     (* Keep this structural: even [iFrame "%"] searches the whole goal, whose
        [inode_blocks] tail is large (171 s at this site).  The arity sweep's
        third, fourth and fifth pure conjuncts [Hddix]/[Hdoc]/[Hduq] are bound
@@ -955,9 +950,7 @@ Section ProofSysOpenPublish.
     iSplitL "Hmeta"; [iExact "Hmeta" |].
     iSplitL "Haddr Hind".
     { rewrite /inode_map. iSplitL "Haddr"; [iExact "Haddr" | iExact "Hind"]. }
-    iSplitL "Hblk"; [iExact "Hblk" |].
-    iSplitL "Hdv"; [iExact "Hdv" |].
-    iSplitL "Hfv"; [iExact "Hfv" | iExact "Htop"].
+    iSplitL "Hblk"; [iExact "Hblk" | iExact "Htop"].
   Qed.
 
   (* ...and the close direction at itrunc's outputs. *)
@@ -970,21 +963,13 @@ Section ProofSysOpenPublish.
     inode_meta (ientry k) (di_trunc dn) -∗
     inode_map fsc_fs (ientry k) bm_empty -∗
     inode_blocks fsc_fs bm_empty (fun _ => replicate BSIZE (bv_0 8)) -∗
-    (* THE MOVER (namei-pinned-lookup.md §9 W3, itrunc's row): itrunc zeroed
-       the bytes and truncated the record, so the caller [dv_set]s the hold
-       it peeled to the truncated record's own value and hands it in here.
-       No delta is proved: the fragment is WHOLE, so the move is free. *)
-    dv_ride (bv_unsigned inum)
-            (dv_of (di_trunc dn) (fun _ => replicate BSIZE (bv_0 8))) -∗
-    fv_ride (bv_unsigned inum)
-            (fv_of (di_trunc dn) (fun _ => replicate BSIZE (bv_0 8))) -∗
     (* ...and the RETAGGED abstract value, at the truncated node *)
     top_frag (fs_gamma_L fsc_fs) (bv_unsigned inum)
              (era_node (di_trunc dn) bm_empty
                        (fun _ => replicate BSIZE (bv_0 8))) -∗
     ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum (di_trunc dn) bm_empty.
   Proof.
-    intros Hnz Hnd Hrl. iIntros "Hat Hmeta [Haddr Hind] Hblk Hdv Hfv Htop".
+    intros Hnz Hnd Hrl. iIntros "Hat Hmeta [Haddr Hind] Hblk Htop".
     assert (Hty : di_type (di_trunc dn) = di_type dn) by reflexivity.
     iApply (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum (di_trunc dn) bm_empty
               (fun _ => replicate BSIZE (bv_0 8))
@@ -1001,7 +986,7 @@ Section ProofSysOpenPublish.
                  ltac:(rewrite Hty; exact Hnd))
               (dir_uniq_not_dir (di_trunc dn) _
                  ltac:(rewrite Hty; exact Hnd))
-              with "[] Hat Hmeta Haddr Hind Hblk Hdv Hfv Htop").
+              with "[] Hat Hmeta Haddr Hind Hblk Htop").
     iApply (dlinks_not_dir fsc_fs (bv_unsigned inum) (di_trunc dn) _ _).
     rewrite Hty. exact Hnd.
   Qed.

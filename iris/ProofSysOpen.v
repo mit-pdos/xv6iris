@@ -445,10 +445,10 @@ Section ProofSysOpenBody.
     iIntros "H".
     iDestruct (ic_loaded_open with "H") as (data)
       "(%Hok & %Hrl & %Hdok & %Hddix & %Hdoc & %Hduq & Hl & Hd & Hm & Ha & Hr &
-        Hb & Hv & Hw & Ht)".
+        Hb & Ht)".
     iFrame "Hm". iIntros "Hm".
     iApply (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst k inum dn bm data Hok Hrl Hdok Hddix
-              Hdoc Hduq with "Hl Hd Hm Ha Hr Hb Hv Hw Ht").
+              Hdoc Hduq with "Hl Hd Hm Ha Hr Hb Ht").
   Qed.
 
   Local Lemma so_type_acc `{XI : CurCtx} (ip : mword 64) (dn : dinode) :
@@ -1024,7 +1024,7 @@ Section ProofSysOpenBody.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     (* the locked record, opened whole for the one callee that rewrites it *)
     iDestruct (so_loaded_open with "Hload")
-      as (data) "(%Hok & %Hrl & %Hdok & Hlnk & Hat & Hmeta & Hmap & Hblk & Hdv & Hfv
+      as (data) "(%Hok & %Hrl & %Hdok & Hlnk & Hat & Hmeta & Hmap & Hblk 
                   & Htop)".
     destruct Hok as (Hbwf & Hbcov & Haddrs & Htynz & Hszcap & Hholes & Hsized).
     iDestruct (proc_priv_core_bare_acc with "Hcore") as "[Hpbare Hcback]".
@@ -1080,16 +1080,6 @@ Section ProofSysOpenBody.
     (* ---- THE O_TRUNC BRIDGE: rebuild [ic_loaded] at the truncated record ---- *)
     assert (Htynd : bv_unsigned (di_type dn) <> T_DIR_z).
     { rewrite Hfile. unfold T_DIR_z. vm_compute. discriminate. }
-    (* THE MOVER (namei-pinned-lookup.md §9 W3, itrunc's row): O_TRUNC zeroed
-       this inode's bytes and truncated its record, so the hold moves with
-       them.  The fragment is WHOLE, so this is one free own-update. *)
-    iApply fupd_wp.
-    iMod (dvw_set_rt ⊤ _ _ _ _ (bv_unsigned inum) (dv_of dn data)
-            (dv_of (di_trunc dn) (fun _ => replicate BSIZE (bv_0 8)))
-            (fv_of dn data)
-            (fv_of (di_trunc dn) (fun _ => replicate BSIZE (bv_0 8)))
-            ltac:(solve_ndisj) with "Hireg Hdv Hfv") as "[Hdv Hfv]".
-    iModIntro.
     (* itrunc MOVED the record and every block, so the era's abstract value
        is retagged at the truncated node before the seal (durable-disk
        2b-inode-3).  [ftopN] alone is opened. *)
@@ -1116,7 +1106,7 @@ Section ProofSysOpenBody.
       [iApply (ireg_inv_ftop with "Hireg") |].
     iModIntro.
     iDestruct (so_trunc_loaded kk inum dn Htynz Htynd Hrl
-                 with "Hat Hmeta Hmap Hblk Hdv Hfv Htop") as "Hload".
+                 with "Hat Hmeta Hmap Hblk Htop") as "Hload".
     (* ===== +0x154 c.j +0xb8 ===== *)
     iApply (wp_cj_s_sconf (CID := CID16) (mword_of_int (SO + 0x154))
               (sign_extend' 21 (concat_vec (mword_of_int 1970 : mword 11) ('b"0")))

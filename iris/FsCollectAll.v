@@ -409,10 +409,10 @@ Section CollectAll.
     ipool_shape_np γfs γi cov ls w ⊢ col_side γfs γi w.
   Proof.
     rewrite /ipool_shape_np /col_side.
-    iIntros "[Halloc | (Hmk & _ & _)]".
+    iIntros "[Halloc | Hmk]".
     - rewrite /ipool_alloc.
       iDestruct "Halloc" as (dn0 bm0 data0)
-        "(%Hok & %Hdok & %Hddix & %Hdoc & _ & Hleg & _ & _)".
+        "(%Hok & %Hdok & %Hddix & %Hdoc & _ & Hleg)".
       (* the pool row's leg IS [col_side]'s conjunct, on the nose
          (durable-disk EV stage 5): nothing is opened at this boundary any
          more *)
@@ -455,32 +455,30 @@ Section CollectAll.
     col_row γfs γi w (ipool_shape_np γfs γi cov ls w).
   Proof.
     rewrite /ipool_shape_np.
-    iIntros "[Halloc | (Hmk & Hdv & Hfv)]".
+    iIntros "[Halloc | Hmk]".
     - rewrite /ipool_alloc.
       iDestruct "Halloc" as (dn0 bm0 data0)
-        "(%Hok & %Hdok & %Hddix & %Hdoc & %Huniq & Hleg & Hdv & Hfv)".
+        "(%Hok & %Hdok & %Hddix & %Hdoc & %Huniq & Hleg)".
       iDestruct (ic_inode_leg_shed_to with "Hleg") as "[Hleg Hrd]".
       rewrite /col_row. iRight.
       iExists (era_node dn0 bm0 data0),
-              (inode_rd_era γfs (DfracOwn (1/4)) w (era_node dn0 bm0 data0)
-               ∗ dv_ride (bv_unsigned w) (dv_of dn0 data0)
-               ∗ fv_ride (bv_unsigned w) (fv_of dn0 data0))%I.
+              (inode_rd_era γfs (DfracOwn (1/4)) w (era_node dn0 bm0 data0))%I.
       iSplitR.
       { iPureIntro.
         exact (FsStateEra.node_dir_local_of_ok (bv_unsigned w) cov ls
                  icfg_nib dn0 bm0 data0 Hok Hdok Hddix Hdoc). }
-      iFrame "Hleg Hrd Hdv Hfv".
-      iIntros "Hleg (Hrd & Hdv & Hfv)".
+      iFrame "Hleg Hrd".
+      iIntros "Hleg Hrd".
       iDestruct (ic_inode_leg_shed_of with "Hleg Hrd") as "Hleg".
       iLeft. rewrite /ipool_alloc. iExists dn0, bm0, data0.
       iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
       iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
-      iSplitR; [by iPureIntro |]. iFrame "Hleg Hdv Hfv".
+      iSplitR; [by iPureIntro |]. iFrame "Hleg".
     - rewrite /col_row. iLeft.
-      iExists ((∃ e, dv_ride (bv_unsigned w) e)
-               ∗ (∃ b, fv_ride (bv_unsigned w) b))%I.
-      iFrame "Hmk Hdv Hfv".
-      iIntros "Hmk [Hdv Hfv]". iRight. iFrame "Hmk Hdv Hfv".
+      iExists emp%I.
+      iSplitL "Hmk"; [iExact "Hmk" |].
+      iSplitR; [done |].
+      iIntros "Hmk _". iRight. iExact "Hmk".
   Qed.
 
   Lemma ipool_ord_row (γfs : fs_names) (γi : gname) (cov : gset Z)

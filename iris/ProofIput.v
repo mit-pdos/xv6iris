@@ -2736,7 +2736,7 @@ Section IputFreePath.
     iDestruct "Hpayl" as "[Hlk2 _]".
     iDestruct (ic_loaded_open with "Hlk2") as (data2)
       "(%Hok2 & %Hrl2 & %Hdok2 & %Hddix2 & %Hdoc2 & %Hduq2 & Hdlk2 & Hdat & Hmeta & Haddrs
-        & Hind & Hblks & Hdv2 & Hfv2 & Htop2)".
+        & Hind & Hblks & Htop2)".
     pose proof Hok2 as Hok2'.
     destruct Hok2' as (Hbmwf2 & Hcovers2 & Hdiaddrs2 & Htyne2 & Hszcap2 & Hholes2 & Hsized2).
     (* ---- transport the cpu bundle to the itrunc call site (CIDm2) ---- *)
@@ -3313,13 +3313,11 @@ Section IputFreePath.
       as (ge gr gd) "(#Hescr & Htkr & Htkd)";
       [by iExists (era_node dn bm data2) |].
     iModIntro.
-    (* THE CONTENTS HOLD GOES BACK UNTIED (namei-pinned-lookup.md §9 W2/W3).
-       itrunc has zeroed this record's bytes, but the AWAIT arm is byte-less
-       and forgets the value; the next fill of this inum re-ties it off the
-       record it reads.  So the freer parks what it has and proves nothing. *)
+    (* THE TWO CONTENTS HOLDS ARE RETIRED (THE DVIEW RETIREMENT): the AWAIT
+       arm was byte-less and parked them at a forgotten value, and the next
+       fill re-tied them off the record it read.  There is nothing to park. *)
     iDestruct (ipool_shape_await fsc_fs fsc_ireg fsc_cov fsc_logst inum ge gr gd rg
-                 with "Hcnt0 Hfzp Hescr Htkr [Hdv2] [Hfv2]") as "Hgap";
-      [by iExists (dv_of dn data2) | by iExists (fv_of dn data2) |].
+                 with "Hcnt0 Hfzp Hescr Htkr") as "Hgap".
     (* the AWAIT row stays on the LOCK's side of the split (durable-disk
        B''-esc) -- [ipool_put] reads that off the shape itself. *)
     iApply fupd_wp.
@@ -4477,7 +4475,7 @@ Section IputFreePath.
     iDestruct "Hpayl" as "[Hlk #Hshot]".
     iDestruct (ic_loaded_open with "Hlk") as (data)
       "(%Hok & %Hrl & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdat & Hmeta & Haddrs & Hind
-        & Hblks & Hdv & Hfv & Htop)".
+        & Hblks & Htop)".
     pose proof Hok as Hok'.
     destruct Hok' as (Hbmwf & Hcovers & Hdiaddrs & Htyne & Hszcap & Hholes & Hsized).
     iEval (rewrite /inode_meta) in "Hmeta".
@@ -4545,13 +4543,13 @@ Section IputFreePath.
       iApply fupd_wp.
       iInv "Hesc" as ">Hbody" "Hclose".
       iAssert (ic_payload_at fsc_fs fsc_ireg fsc_cov fsc_logst k inum ga dn bm)
-        with "[Hdat Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hind Hblks Hdlk Htop
-               Hdv Hfv]" as "Hpayl".
+        with "[Hdat Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hind Hblks Hdlk Htop]"
+        as "Hpayl".
       { rewrite /ic_payload_at.
         iSplitR "Hshot"; [| iExact "Hshot"].
         iApply (ic_mk_loaded _ _ _ _ _ _ _ _ data Hok Hrl Hdok Hddix Hdoc Hduq
                   with "Hdlk Hdat [Hmty Hmmaj Hmmin Hmnl Hmsz] Haddrs Hind
-                        Hblks Hdv Hfv Htop").
+                        Hblks Htop").
         rewrite /inode_meta. iFrame. }
       iMod (ic_open_held fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst k (⊤ ∖ ↑(icEscN .@ k))
               Mt q (1/4) ga ga icfg_dev inum dn bm ltac:(solve_ndisj) HMk1
@@ -4785,13 +4783,12 @@ Section IputFreePath.
     (* ===== 0x5a: ip_free_locked's ENTRY.  Re-pack the payload, mint the
        re-assembly wand, hand the bundle over. ===== *)
     iAssert (ic_payload_at fsc_fs fsc_ireg fsc_cov fsc_logst k inum ga dn bm)
-      with "[Hdat Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hind Hblks Hdlk Htop
-             Hdv Hfv]" as "Hpayl".
+      with "[Hdat Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hind Hblks Hdlk Htop]" as "Hpayl".
     { rewrite /ic_payload_at.
       iSplitR "Hshot"; [| iExact "Hshot"].
       iApply (ic_mk_loaded _ _ _ _ _ _ _ _ data Hok Hrl Hdok Hddix Hdoc Hduq
                 with "Hdlk Hdat [Hmty Hmmaj Hmmin Hmnl Hmsz] Haddrs Hind
-                      Hblks Hdv Hfv Htop").
+                      Hblks Htop").
       rewrite /inode_meta. iFrame. }
     iAssert (iref_tok k q) with "[Hrfrg Hrlv Hrslh]" as "Hrtok".
     { rewrite /iref_tok. iFrame. }

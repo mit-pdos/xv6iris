@@ -24,7 +24,6 @@ Require Import FsBlocks.
 Require Import FsState.
 Require Import FsBytesGamma.
 Require Import IcacheRef.
-Require Import DirViewLend. (* N-4 PHASE B: the arm rides [dv_ride], not [dv_hold] *)
 Require Import EscrowDefs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
@@ -241,18 +240,16 @@ Section EscrowInode.
      [ireg_inv]).  It deliberately does NOT hold a [reg_half]: the registry
      half stays on the region side / in [ireg_body], so a recycle/fill of a
      genuine pending entry leaves nothing to dispose.  Walk-stable. *)
-  (* ...AND THE CONTENTS HOLD, UNTIED (namei-pinned-lookup.md §9 W2).  Every
-     arm an UNCACHED inum's pool bundle can stand on carries the inum's
-     [dv_hold]: the tie to the bytes exists only where the bytes do
-     ([ipool_alloc], [ic_loaded]), so a byte-less arm holds the element at a
-     forgotten value and the next fill sets it.  Without it this arm's redeem
-     to an [imark] would have to conjure the hold.
-     N-5.2A: and the per-FILE contents hold beside it, untied for the same
-     reason and carried the same way (namei-pinned-lookup.md §13). *)
+  (* THE TWO UNTIED CONTENTS HOLDS ARE RETIRED (fs-syscall-specs, THE DVIEW
+     RETIREMENT, 2026-08-30).  Every arm an UNCACHED inum's pool bundle could
+     stand on used to carry the inum's [dv_hold]/[fv_hold] at a forgotten
+     value, so that the arm's redeem to an [imark] had a hold to hand over and
+     the next fill had one to set.  The [dview]/[fview] ghosts are gone -- the
+     contents ARE the era fragment's reading, and a byte-less arm holds no
+     fragment either -- so nothing is parked here any more. *)
   Definition pool_pending (γfs : fs_names) (z : Z) : iProp Σ :=
     (∃ ge gr gd (rg : frzidx),
-       escA_inv γfs ge gr gd z rg ∗ committedA ge ∗ redeem_ticketA gr ∗
-       (∃ e, dv_ride z e) ∗ (∃ b, fv_ride z b))%I.
+       escA_inv γfs ge gr gd z rg ∗ committedA ge ∗ redeem_ticketA gr)%I.
   (* NOT Timeless: [escA_inv] is an [inv].  Wherever the pool row must stay
      Timeless, its pending arm is opened without the [>] later-strip. *)
 

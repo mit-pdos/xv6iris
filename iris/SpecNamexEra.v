@@ -56,7 +56,7 @@
    THE FIRE POINT (what the proof owes, recorded here so the contract can
    be read against it).  namex holds the locked directory's payload from
    ilock's return to its iunlockput, and that payload carries BOTH
-   [DirViewG.dv_hold d (dv_of dn data)] and the era leg
+   the (now retired) [dview] contents hold and the era leg
    [FsState.top_frag ... (era_node dn bm data)] at [DfracOwn 1]
    ([IcacheEscrow.ic_loaded_flat_body]'s last two conjuncts).  The hop is
    fired in dirlookup's CONTINUATION, at the instruction boundary where the

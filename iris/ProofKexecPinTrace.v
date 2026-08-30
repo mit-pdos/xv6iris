@@ -98,7 +98,7 @@ Require Import InodeRegion.     (* [ftop_inv], [ftop_body], [ftopN]         *)
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
-Require Import IcacheEscrow.    (* Require Export's DirViewG: [fv_of]       *)
+Require Import IcacheEscrow.    (* the payload arms                         *)
 Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcInv.
@@ -360,10 +360,11 @@ Section KexecPinTrace.
   (*                                                                      *)
   (*  [SpecKexecPin] sect. 8 (2): what the oracle must answer is           *)
   (*  [kxq_hdr_ok (Some (kxp_ef pb)) (fun j => file_byte data j)], and the *)
-  (*  route is [kxp_hdr_of_fv] fired at [fv_of dn data = kxp_bytes pb].    *)
-  (*  THAT tie is a fact about the AUTHORITY's row at the payload's inum,  *)
-  (*  which is why the oracle premise carries the payload's TOP FRAG       *)
-  (*  beside its ride (the seam widening, ProofKexecA).                    *)
+  (*  route is [kxp_hdr_of_bytes] fired at                                  *)
+  (*  [file_bytes data .. = kxp_bytes pb].  THAT tie is a fact about the   *)
+  (*  AUTHORITY's row at the payload's inum, which is why the oracle       *)
+  (*  premise carries the payload's ERA LEG (the seam widening,            *)
+  (*  ProofKexecA) -- and, since THE DVIEW RETIREMENT, only that.          *)
   (* =================================================================== *)
 
   Lemma kxt_pin_bytes (γfs : fs_names) (pb : kx_pin) (ds : list Z)
@@ -372,7 +373,8 @@ Section KexecPinTrace.
     ftop_inv γfs -∗ kxp_run_pin (fs_gamma_L γfs) pb ds -∗
     top_frag_q (fs_gamma_L γfs) dq (kxp_ino pb) (era_node dn bm data) ={⊤}=∗
       top_frag_q (fs_gamma_L γfs) dq (kxp_ino pb) (era_node dn bm data)
-      ∗ ⌜fv_of dn data = kxp_bytes pb⌝.
+      ∗ ⌜file_bytes data (Z.to_nat (bv_unsigned (di_size dn)))
+         = kxp_bytes pb⌝.
   Proof.
     intros Hok. iIntros "#Hi #Hp Hf".
     iMod (inv_acc ⊤ ftopN with "Hi") as "[Hbody Hclose]"; [solve_ndisj |].
@@ -388,7 +390,7 @@ Section KexecPinTrace.
     { iNext. rewrite /ftop_body. iExists I, A.
       iFrame "Hta Hla Hpark". iPureIntro. exact Hcl. }
     iModIntro. iFrame "Hf". iPureIntro.
-    rewrite -(fv_of_file_bytes_era fsc_cov fsc_logst dn bm data Hok).
+    rewrite -(fn_file_bytes_era_ok fsc_cov fsc_logst dn bm data Hok).
     exact Hbytes.
   Qed.
 
@@ -400,7 +402,8 @@ Section KexecPinTrace.
     ftop_inv γfs -∗ kxp_run_pin (fs_gamma_L γfs) pb ds -∗
     top_frag (fs_gamma_L γfs) (kxp_ino pb) (era_node dn bm data) ={⊤}=∗
       top_frag (fs_gamma_L γfs) (kxp_ino pb) (era_node dn bm data)
-      ∗ ⌜fv_of dn data = kxp_bytes pb⌝.
+      ∗ ⌜file_bytes data (Z.to_nat (bv_unsigned (di_size dn)))
+         = kxp_bytes pb⌝.
   Proof.
     intros Hok. rewrite !top_frag_1.
     exact (kxt_pin_bytes γfs pb ds (DfracOwn 1) dn bm data Hok).
@@ -416,18 +419,16 @@ Section KexecPinTrace.
     inode_ok fsc_cov fsc_logst dn bm data ->
     (64 <= length (kxp_bytes pb))%nat ->
     ftop_inv γfs -∗ kxp_run_pin (fs_gamma_L γfs) pb ds -∗
-    fv_ride (kxp_ino pb) (fv_of dn data)
-    ∗ top_frag (fs_gamma_L γfs) (kxp_ino pb) (era_node dn bm data) ={⊤}=∗
-      fv_ride (kxp_ino pb) (fv_of dn data)
-      ∗ top_frag (fs_gamma_L γfs) (kxp_ino pb) (era_node dn bm data)
+    top_frag (fs_gamma_L γfs) (kxp_ino pb) (era_node dn bm data) ={⊤}=∗
+      top_frag (fs_gamma_L γfs) (kxp_ino pb) (era_node dn bm data)
       ∗ □ (⌜kxq_hdr_ok (Some (kxp_ef pb)) (fun j => file_byte data j)⌝
            ∨ ⌜False⌝).
   Proof.
-    intros Hok Hlen. iIntros "#Hi #Hp [Hride Htop]".
+    intros Hok Hlen. iIntros "#Hi #Hp Htop".
     iMod (kxt_pin_bytes_1 γfs pb ds dn bm data Hok with "Hi Hp Htop")
       as "[Htop %Hb]".
-    iModIntro. iFrame "Hride Htop". iModIntro. iLeft. iPureIntro.
-    exact (kxp_hdr_of_fv pb dn data Hb Hlen).
+    iModIntro. iFrame "Htop". iModIntro. iLeft. iPureIntro.
+    exact (kxp_hdr_of_bytes pb dn data Hb Hlen).
   Qed.
 
 End KexecPinTrace.

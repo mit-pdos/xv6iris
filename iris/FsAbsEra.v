@@ -106,9 +106,9 @@ Require Import FsBytesGamma.    (* [fs_gamma_L]: the LIVE Gamma               *)
 Require Import FsStateEra.      (* [era_node], [era_node_rec]                 *)
 Require Import IcacheRef.
 Require Import DirViewLend.
-Require Import IcacheEscrow.    (* Require Export's DirViewG: [dv_of]         *)
+Require Import IcacheEscrow.    (* the payload arms                           *)
 Require Import Xv6G.            (* the bundle                                 *)
-Require Import FsAbsSeam.       (* [dv_of_dir_entries]: the pure bridge       *)
+Require Import FsAbsSeam.       (* [dir_entries_era_ok]: the pure bridge      *)
 Require Import FsAbsPins.       (* the PIN-RETURNING package (owner ruling)   *)
 Require Import FsAbs.           (* LAST: [nview], [ax_hop], [lend_agrees]     *)
 
@@ -239,7 +239,7 @@ Section FsAbsEra.
 
   (* THE BRIDGE.  What the walk holds is [ic_loaded]'s era leg at the
      payload's own [(dn, bm, data)]; what the lend speaks is
-     [dir_entries].  [FsAbsSeam.dv_of_dir_entries] is the identification,
+     [dir_entries].  [FsAbsSeam.dir_entries_era_ok] is the identification,
      and its two side conditions are the [inode_ok] the payload came with
      and the directory test the walk has already run. *)
   Lemma elend_of_era (γfs : fs_names) (cov : gset Z) (logstart : Z)
@@ -248,14 +248,15 @@ Section FsAbsEra.
     inode_ok cov logstart dn bm data ->
     bv_unsigned (di_type dn) = T_DIR_z ->
     top_frag_q (fs_gamma_L γfs) dq d (era_node dn bm data) ⊢
-      elend (fs_gamma_L γfs) d dq (dv_of dn data).
+      elend (fs_gamma_L γfs) d dq
+        (dir_view data (dir_nrec (bv_unsigned (di_size dn)))).
   Proof.
     intros Hok Hty.
     assert (Hd : fn_is_dir (era_node dn bm data) = true).
     { rewrite /fn_is_dir /fn_type era_node_rec.
       by apply bool_decide_eq_true_2. }
     iIntros "H". iExists (era_node dn bm data). iFrame "H". iPureIntro.
-    split; [exact Hd | exact (dv_of_dir_entries cov logstart dn bm data Hok Hd)].
+    split; [exact Hd | exact (dir_entries_era_ok cov logstart dn bm data Hok Hd)].
   Qed.
 
   (* THE SPLIT THE FIRE RIDES ON.  The walk lends HALF and keeps HALF; the
@@ -276,7 +277,7 @@ Section FsAbsEra.
       (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) (c : Z) :
     inode_ok cov logstart dn bm data ->
     bv_unsigned (di_type dn) = T_DIR_z ->
-    dv_of dn data !! s = Some c ->
+    dir_view data (dir_nrec (bv_unsigned (di_size dn))) !! s = Some c ->
     ex_hop γfs P Pmiss k s -∗ P k d -∗
     top_frag (fs_gamma_L γfs) d (era_node dn bm data) ={⊤}=∗
       top_frag (fs_gamma_L γfs) d (era_node dn bm data) ∗ P (S k) c.
@@ -286,7 +287,8 @@ Section FsAbsEra.
     iDestruct (elend_of_era γfs cov logstart (DfracOwn (1/2)) d dn bm data
                  Hok Hty with "Ht2") as "HF".
     rewrite /ex_hop /ax_hop.
-    iMod ("Hh" $! d (dv_of dn data) (DfracOwn (1/2)) with "HP HF")
+    iMod ("Hh" $! d (dir_view data (dir_nrec (bv_unsigned (di_size dn))))
+            (DfracOwn (1/2)) with "HP HF")
       as "[HF HR]".
     iDestruct (elend_frag with "HF") as (n') "Ht2".
     iDestruct (top_frag_q_agree with "Ht1 Ht2") as %<-.
@@ -301,7 +303,7 @@ Section FsAbsEra.
       (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
     inode_ok cov logstart dn bm data ->
     bv_unsigned (di_type dn) = T_DIR_z ->
-    dv_of dn data !! s = None ->
+    dir_view data (dir_nrec (bv_unsigned (di_size dn))) !! s = None ->
     ex_hop γfs P Pmiss k s -∗ P k d -∗
     top_frag (fs_gamma_L γfs) d (era_node dn bm data) ={⊤}=∗
       top_frag (fs_gamma_L γfs) d (era_node dn bm data) ∗ Pmiss k d.
@@ -311,7 +313,8 @@ Section FsAbsEra.
     iDestruct (elend_of_era γfs cov logstart (DfracOwn (1/2)) d dn bm data
                  Hok Hty with "Ht2") as "HF".
     rewrite /ex_hop /ax_hop.
-    iMod ("Hh" $! d (dv_of dn data) (DfracOwn (1/2)) with "HP HF")
+    iMod ("Hh" $! d (dir_view data (dir_nrec (bv_unsigned (di_size dn))))
+            (DfracOwn (1/2)) with "HP HF")
       as "[HF HR]".
     iDestruct (elend_frag with "HF") as (n') "Ht2".
     iDestruct (top_frag_q_agree with "Ht1 Ht2") as %<-.

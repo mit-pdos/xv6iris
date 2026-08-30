@@ -1579,7 +1579,7 @@ Section ProofSysChdirBody.
         assert (Hilthr : sc_thr m mil).
         { intros c Hc N2' N8 N9 N18. rewrite (callee_saved_lookup Hcsil c Hc).
           exact (HP0thr c Hc N2' N8 N9 N18). }
-        iDestruct (ic_loaded_open with "Hload") as (dat)"(%Hiok & %Hrl_dat & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs & Hind & Hblocks & Hdview & Hfview)".
+        iDestruct (ic_loaded_open with "Hload") as (dat)"(%Hiok & %Hrl_dat & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs & Hind & Hblocks & Htopl)".
         iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
         iEval (rewrite /i_type) in "Hity".
         (* ============ +0x38 lh a4,68(s1) -- ip->type ============ *)
@@ -1708,8 +1708,7 @@ Section ProofSysChdirBody.
           { intros c Hc N2' N8 N9 N18. rewrite /P4 upd_ne; [| regne].
             exact (HP3thr c Hc N2' N8 N9 N18). }
           iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kk inum dn bm)
-            with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind Hblocks Hdlnk Hdview
-                   Hfview]"
+            with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind Hblocks Hdlnk Htopl]"
             as "Hload".
           { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists dat.
             iSplitR; [iPureIntro; exact Hiok |].
@@ -2084,8 +2083,7 @@ iExact "Hrefnew". }
           { intros c Hc N2' N8 N9 N18. rewrite /Q1 upd_ne; [| regne].
             exact (HQ0thr c Hc N2' N8 N9 N18). }
           iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kk inum dn bm)
-            with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind Hblocks Hdlnk Hdview
-                   Hfview]"
+            with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind Hblocks Hdlnk Htopl]"
             as "Hload".
           { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists dat.
             iSplitR; [iPureIntro; exact Hiok |].

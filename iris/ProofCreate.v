@@ -2109,10 +2109,6 @@ Section ProofCreateMain.
        inode_meta (ientry kd) dn -∗
        inode_map fsc_fs (ientry kd) bm -∗
        inode_blocks fsc_fs bm data -∗
-       (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
-       dv_ride (bv_unsigned dind) (dv_of dn data) -∗
-       (* ...and its per-FILE twin (N-5.2A), beside it everywhere *)
-       fv_ride (bv_unsigned dind) (fv_of dn data) -∗
        (* ...and the era's abstract value, which the half retags at its
           own write (durable-disk 2b-inode-3) *)
        top_frag (fs_gamma_L fsc_fs) (bv_unsigned dind) (era_node dn bm data) -∗
@@ -2279,10 +2275,6 @@ Section ProofCreateMain.
        inode_meta (ientry kd) dn -∗
        inode_map fsc_fs (ientry kd) bm -∗
        inode_blocks fsc_fs bm data -∗
-       (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
-       dv_ride (bv_unsigned dind) (dv_of dn data) -∗
-       (* ...and its per-FILE twin (N-5.2A), beside it everywhere *)
-       fv_ride (bv_unsigned dind) (fv_of dn data) -∗
        (* ...and the era's abstract value, which the half retags at its
           own write (durable-disk 2b-inode-3) *)
        top_frag (fs_gamma_L fsc_fs) (bv_unsigned dind) (era_node dn bm data) -∗
@@ -2310,11 +2302,6 @@ Section ProofCreateMain.
                   (cr_setf dnc major minor (mword_of_int 1 : mword 16)) -∗
        inode_map fsc_fs (ientry kslot) bmc -∗
        inode_blocks fsc_fs bmc datc -∗
-       (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
-       dv_ride (bv_unsigned cinum)
-               (dv_of (cr_setf dnc major minor (mword_of_int 1 : mword 16)) datc) -∗
-       fv_ride (bv_unsigned cinum)
-               (fv_of (cr_setf dnc major minor (mword_of_int 1 : mword 16)) datc) -∗
        (* ...and the CHILD's abstract value, at the same record *)
        top_frag (fs_gamma_L fsc_fs) (bv_unsigned cinum)
                 (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16))
@@ -2486,9 +2473,6 @@ Section ProofCreateMain.
        inode_meta (ientry kd) dn' -∗
        inode_map fsc_fs (ientry kd) bm' -∗
        inode_blocks fsc_fs bm' data' -∗
-       (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
-       dv_ride (bv_unsigned dind) (dv_of dn' data') -∗
-       fv_ride (bv_unsigned dind) (fv_of dn' data') -∗
        (* ...and the era's abstract value (durable-disk 2b-inode-3) *)
        (* THE PARENT'S FRAGMENT ARRIVES UNRETAGGED (durable-disk lane A):
           the retag owes the registry's row, and the post record's
@@ -2519,11 +2503,6 @@ Section ProofCreateMain.
                   (cr_setf dnc major minor (mword_of_int 1 : mword 16)) -∗
        inode_map fsc_fs (ientry kslot) bmc -∗
        inode_blocks fsc_fs bmc datc -∗
-       (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
-       dv_ride (bv_unsigned cinum)
-               (dv_of (cr_setf dnc major minor (mword_of_int 1 : mword 16)) datc) -∗
-       fv_ride (bv_unsigned cinum)
-               (fv_of (cr_setf dnc major minor (mword_of_int 1 : mword 16)) datc) -∗
        (* ...and the CHILD's abstract value, at the same record *)
        top_frag (fs_gamma_L fsc_fs) (bv_unsigned cinum)
                 (era_node (cr_setf dnc major minor (mword_of_int 1 : mword 16))
@@ -3134,7 +3113,7 @@ Section ProofCreateMain.
       assert (Htydir : di_type dnl = SpecDirlookup.T_DIR) by (symmetry; exact Htyd).
       iDestruct (ic_loaded_open with "Hload") as (datl)
         "(%Hiok & %Hrl_datl & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta
-          & Haddrs & Hind & Hblocks & Hdview & Hfview & Htop)".
+          & Haddrs & Hind & Hblocks & Htop)".
       iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
       iEval (rewrite /i_nlink) in "Hinl".
       (* ===== +0x2a lh a5,74(s1) : dp->nlink -- THE GUARD (9da28f5) ==== *)
@@ -3187,8 +3166,7 @@ Section ProofCreateMain.
         { rewrite /inode_meta /i_type /i_nlink. iFrame. }
         iDestruct (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dind dnl bml datl
                      Hiok Hrl_datl Hdok Hddix Hdoc Hduq
-                     with "Hdlnk Hdiat Hmetal Haddrs Hind Hblocks Hdview Hfview
-                           Htop")
+                     with "Hdlnk Hdiat Hmetal Haddrs Hind Hblocks Htop")
           as "Hload".
         iDestruct (cr_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
           [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
@@ -3676,8 +3654,7 @@ Section ProofCreateMain.
           iDestruct "Hmap" as "[Haddrs Hind]".
           iDestruct (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dind dnl bml datl
                        Hiok Hrl_datl Hdok Hddix Hdoc Hduq
-                       with "Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Hdview Hfview
-                             Htop")
+                       with "Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Htop")
             as "Hload".
           iDestruct (cr_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
             [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
@@ -4052,7 +4029,7 @@ Section ProofCreateMain.
              iEval (rewrite Hp060) in "Hpc".
              iDestruct (ic_loaded_open with "Hcload") as (datc)
         "(%Hciok & %Hrl_datc & %Hcdok & %Hcddix & %Hcdoc & %Hcduq & Hcdlnk & Hcdiat
-          & Hcmeta & Hcaddrs & Hcind & Hcblocks & Hcdview & Hcfview & Hctop)".
+          & Hcmeta & Hcaddrs & Hcind & Hcblocks & Hctop)".
       iDestruct "Hcmeta" as "(Hcity & Hcimaj & Hcimin & Hcinl & Hcisz)".
              iEval (rewrite /i_type) in "Hcity".
              (* ===== +0x60 lhu a5,68(s2) : ip->type, ZERO-extended ==== *)
@@ -4213,7 +4190,7 @@ Section ProofCreateMain.
              iDestruct (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kslot cinum dnc bmc
                           datc Hciok Hrl_datc Hcdok Hcddix Hcdoc Hcduq
                           with "Hcdlnk Hcdiat Hcmetal Hcaddrs Hcind Hcblocks
-                                Hcdview Hcfview Hctop")
+                                Hctop")
                as "Hcload".
              destruct (zopz0zI_u (mword_of_int 1 : mword 64)
                          (cr_trange (di_type dnc))) eqn:Hrng.
@@ -4368,8 +4345,7 @@ Section ProofCreateMain.
                           [%] [%] [%]
                           Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
                           Hnb14 Hnb2 Hslkd Hslkdd Hdep Hidev Hiinum
-                          Hivalid Hdlnk Hdiat Hmeta Hmap Hblocks Hdview Hfview
-                          Htop Hshotl Hfrzl Hkeep Hrud
+                          Hivalid Hdlnk Hdiat Hmeta Hmap Hblocks Htop Hshotl Hfrzl Hkeep Hrud
                           Hsbn Hsbi Hsbs Hsbb Hbmr Hpriv Hpath Hbsl Hisl Hop Htx
                           Hcont").
           { rewrite -Hie. exact HA1regs. }
@@ -4406,8 +4382,7 @@ Section ProofCreateMain.
         { rewrite /inode_meta /i_type /i_nlink. iFrame. }
         iDestruct (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dind dnl bml datl
                      Hiok Hrl_datl Hdok Hddix Hdoc Hduq
-                     with "Hdlnk Hdiat Hmetal Haddrs Hind Hblocks Hdview Hfview
-                           Htop")
+                     with "Hdlnk Hdiat Hmetal Haddrs Hind Hblocks Htop")
           as "Hload".
         iDestruct (cr_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
           [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
@@ -4934,7 +4909,7 @@ Section ProofCreateMain.
              %Hnone %Hsb1 %Hwmem %Hnp1".
     iIntros "Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
              #Hslkd Hslkdd Hdep Hidev Hiinum Hivalid Hdlnk Hdiat
-             Hmeta Hmap Hblocks Hdview Hfview Htop #Hshotl Hfrzl Hkeep Hrud
+             Hmeta Hmap Hblocks Htop #Hshotl Hfrzl Hkeep Hrud
              Hsbn Hsbi Hsbs Hsbb #Hbmr Hpriv Hpath Hbsl Hisl Hop Htx Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     assert (Hb : b = true) by (rewrite -Hbm; exact Heb). clear Hbm.
@@ -5039,20 +5014,10 @@ Section ProofCreateMain.
       destruct HMoR as (M2 & M8 & M9 & M18 & M19 & M20 & M21 & M22 & Mthr).
       iDestruct (ic_loaded_open with "Hcload") as (datc)
         "(%Hciok & %Hrl_datc & %Hcdok & %Hcddix & %Hcdoc & %Hcduq & Hcdlnk & Hcdiat
-          & Hcmeta & Hcaddrs & Hcind & Hcblocks & Hcdview & Hcfview & Hctop)".
+          & Hcmeta & Hcaddrs & Hcind & Hcblocks & Hctop)".
       (* the child's record acquires [cr_setf]'s four fields below and NONE
          of them is [di_size], so its contents value never moves; convert the
          hold once, here (namei-pinned-lookup.md §9 W3). *)
-      iDestruct (dv_ride_size (bv_unsigned cinum) dnc
-                   (cr_setf dnc major minor (mword_of_int 1 : mword 16)) datc
-                   (eq_sym (cr_setf_size dnc major minor
-                              (mword_of_int 1 : mword 16)))
-                  with "Hcdview") as "Hcdview".
-      iDestruct (fv_ride_size (bv_unsigned cinum) dnc
-                   (cr_setf dnc major minor (mword_of_int 1 : mword 16)) datc
-                   (eq_sym (cr_setf_size dnc major minor
-                              (mword_of_int 1 : mword 16)))
-                  with "Hcfview") as "Hcfview".
       (* ...and the ERA's abstract value moves with the record, once, here:
          [cr_setf] rewrites four fields and no block, so the node's blkmap
          and data columns are untouched (durable-disk 2b-inode-3).
@@ -5372,10 +5337,9 @@ Section ProofCreateMain.
                         [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                         Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
                         Hnb14 Hnb2 Hslkd Hslkdd Hdep Hidev Hiinum
-                        Hivalid Hdlnk Hdiat Hmeta Hmap Hblocks Hdview Hfview
-                        Htop Hshotl Hfrzl Hkeep Hrud
+                        Hivalid Hdlnk Hdiat Hmeta Hmap Hblocks Htop Hshotl Hfrzl Hkeep Hrud
                         Hslkc Hcslkd Hcdep Hcidev Hciinum Hcivalid
-                        Hcdlnk Hcdiat Hcmeta Hcmap Hcblocks Hcdview Hcfview Hctop Hcshot Hcfrz
+                        Hcdlnk Hcdiat Hcmeta Hcmap Hcblocks Hctop Hcshot Hcfrz
                         Hckeep Hruc Htoken Hsbn Hsbi Hsbs Hsbb Hbmr Hppid Hppback Hpath
                         Hbsl Hislr Hop Hdirty Hcont").
         { exact HW4regs. }
@@ -5836,11 +5800,6 @@ Section ProofCreateMain.
                 instead of [iFrame]. *)
              (* THE MOVER (namei-pinned-lookup.md §9 W3, dirlink's row) *)
              iApply fupd_wp.
-             iMod (dvw_set_rt ⊤ fsc_ireg fsc_fs icfg_ist icfg_nib
-                     (bv_unsigned dind) (dv_of dn data) (dv_of dn' data')
-                     (fv_of dn data) (fv_of dn' data')
-                     ltac:(solve_ndisj) with "Hiregi Hdview Hfview")
-               as "[Hdview Hfview]".
              iModIntro.
              (* THE THREE RECORD-ONLY FACTS AT THE APPENDED PARENT
                 (durable-disk 2b-inode-3): dirlink keeps the TYPE and the
@@ -5872,7 +5831,7 @@ Section ProofCreateMain.
                [iApply (ireg_inv_ftop with "Hiregi") |].
              iModIntro.
              iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dind dn' bm')
-               with "[Hdlnk Hdiat Hmeta Hmap Hblocks Hdview Hfview Htop]"
+               with "[Hdlnk Hdiat Hmeta Hmap Hblocks Htop]"
                as "Hload".
              { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists data'.
                iSplitR; [iPureIntro; exact Hiok' |].
@@ -5889,8 +5848,7 @@ Section ProofCreateMain.
                iSplitL "Haddrs"; [iExact "Haddrs" |].
                iSplitL "Hind"; [iExact "Hind" |].
                iSplitL "Hblocks"; [iExact "Hblocks" |].
-               iSplitL "Hdview"; [iExact "Hdview" |].
-               iSplitL "Hfview"; [iExact "Hfview" | iExact "Htop"]. }
+               iExact "Htop". }
              (* ===== +0xe0 c.mv a0,s1 ============================== *)
              iApply (wp_cmv_s_sconf (mword_of_int (CK + 0xe0)) Ra0 Rs1 mdl
                        (K - 10)%nat b ltac:(nz) ltac:(rdok)
@@ -6076,7 +6034,7 @@ Section ProofCreateMain.
                        with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hpriv
                              Hpath Hbsl [%] Hisl [%] Hop [Hslkc Hcslkd
                              Hcdep Hcidev Hciinum Hcivalid Hcdlnk Hcdiat Hcmeta
-                             Hcmap Hcblocks Hcdview Hcfview Hctop Hcfrz Hckeep Hruc]").
+                             Hcmap Hcblocks Hctop Hcfrz Hckeep Hruc]").
              { exact Hcsf. }
              { exact (cr_slots_3 _ ns eq_refl Hns). }
              { split_and!.
@@ -6141,8 +6099,7 @@ Section ProofCreateMain.
                           (dir_uniq_not_dir
                              (cr_setf dnc major minor (mword_of_int 1 : mword 16))
                              datc ltac:(rewrite cr_setf_type; exact Htdirz))
-                          with "Hcdlnk1 Hcdiat Hcmeta Hca Hci Hcblocks Hcdview Hcfview
-                                Hctop")
+                          with "Hcdlnk1 Hcdiat Hcmeta Hca Hci Hcblocks Hctop")
                as "Hcload".
              iAssert (ity_shot g (di_type (cr_setf dnc major minor
                                              (mword_of_int 1 : mword 16))))
@@ -6182,11 +6139,6 @@ Section ProofCreateMain.
                 append moved the parent's bytes even on the failing return,
                 and [cr_fail_body] is stated at the POST record. *)
              iApply fupd_wp.
-             iMod (dvw_set_rt ⊤ fsc_ireg fsc_fs icfg_ist icfg_nib
-                     (bv_unsigned dind) (dv_of dn data) (dv_of dn' data')
-                     (fv_of dn data) (fv_of dn' data')
-                     ltac:(solve_ndisj) with "Hiregi Hdview Hfview")
-               as "[Hdview Hfview]".
              iModIntro.
              (* THE ERA'S ABSTRACT VALUE IS NOT MOVED HERE (durable-disk
                 lane A): the retag owes the registry's row, and the failing
@@ -6208,10 +6160,10 @@ Section ProofCreateMain.
                              [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                              Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
                              Hnb14 Hnb2 Hslkd Hslkdd Hdep Hidev Hiinum
-                             Hivalid Hdlnk Hdiat Hmeta Hmap Hblocks Hdview Hfview Htop Hshotl
+                             Hivalid Hdlnk Hdiat Hmeta Hmap Hblocks Htop Hshotl
                              Hfrzl Hkeep Hrud Hslkc Hcslkd Hcdep Hcidev
                              Hciinum Hcivalid Hcdlnk Hcdiat Hcmeta Hcmap
-                             Hcblocks Hcdview Hcfview Hctop Hcshot Hcfrz Hckeep Hruc Htoken Hsbn Hsbi Hsbs Hsbb Hbmr
+                             Hcblocks Hctop Hcshot Hcfrz Hckeep Hruc Htoken Hsbn Hsbi Hsbs Hsbb Hbmr
                              Hppid Hppback Hpath Hbsl Hislr Hop Htx Hcont").
              { exact Hmdlregs. }
              { exact Htdir. }
@@ -6331,8 +6283,7 @@ Section ProofCreateMain.
       iDestruct (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dind dn bm data
                    Hiok Hrl Hdok2 Hddix2 (cr_doc_of_live dn dn data eq_refl Hnl0)
                    Hduq
-                   with "Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Hdview Hfview
-                         Htop")
+                   with "Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Htop")
         as "Hload".
       iDestruct (cpu_own_transport CIDo CIDF2 0%nat eb (proc_addr j) b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
@@ -6576,9 +6527,9 @@ Section ProofCreateMain.
              %Hsb4 %Hmem4 %Hn4 %Hledge".
     iIntros "Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
              #Hslkd Hslkdd Hdep Hidev Hiinum Hivalid Hdlnk Hdiat
-             Hmeta Hmap Hblocks Hdview Hfview Htop #Hshotl Hfrzl Hkeep Hrud
+             Hmeta Hmap Hblocks Htop #Hshotl Hfrzl Hkeep Hrud
              #Hslkc Hcslkd Hcdep Hcidev Hciinum Hcivalid Hcdlnk
-             Hcdiat Hcmeta Hcmap Hcblocks Hcdview Hcfview Hctop #Hcshot Hcfrz Hckeep Hruc Htoken
+             Hcdiat Hcmeta Hcmap Hcblocks Hctop #Hcshot Hcfrz Hckeep Hruc Htoken
              Hsbn Hsbi Hsbs Hsbb #Hbmr Hppid Hppback Hpath Hbsl Hislr Hop Htx
              Hcont".
 
@@ -6769,22 +6720,6 @@ Section ProofCreateMain.
                   (mword_of_int 0 : mword 16)).
       exact Hchd. }
     iDestruct "Hcmap" as "[Hca Hci]".
-    iDestruct (dv_ride_size (bv_unsigned cinum)
-                 (cr_setf dnc major minor (mword_of_int 1 : mword 16))
-                 (cr_setf dnc major minor (mword_of_int 0 : mword 16)) datc
-                 (eq_trans (cr_setf_size dnc major minor
-                              (mword_of_int 1 : mword 16))
-                    (eq_sym (cr_setf_size dnc major minor
-                               (mword_of_int 0 : mword 16))))
-                with "Hcdview") as "Hcdview".
-    iDestruct (fv_ride_size (bv_unsigned cinum)
-                 (cr_setf dnc major minor (mword_of_int 1 : mword 16))
-                 (cr_setf dnc major minor (mword_of_int 0 : mword 16)) datc
-                 (eq_trans (cr_setf_size dnc major minor
-                              (mword_of_int 1 : mword 16))
-                    (eq_sym (cr_setf_size dnc major minor
-                               (mword_of_int 0 : mword 16))))
-                with "Hcfview") as "Hcfview".
     (* ...and the ERA's abstract value follows the [sh zero,74(s3)]: only
        [di_nlink] moved, so the node's other columns stand (2b-inode-3). *)
     (* THE RETAG OWES THE ROW (durable-disk lane A): the four facts are
@@ -6827,8 +6762,7 @@ Section ProofCreateMain.
                  (dir_uniq_not_dir
                     (cr_setf dnc major minor (mword_of_int 0 : mword 16)) datc
                     ltac:(rewrite cr_setf_type; exact Htdirz))
-                 with "Hcdlnk1 Hcdiat Hcmeta Hca Hci Hcblocks Hcdview Hcfview
-                       Hctop")
+                 with "Hcdlnk1 Hcdiat Hcmeta Hca Hci Hcblocks Hctop")
       as "Hcload".
     iAssert (ity_shot g (di_type (cr_setf dnc major minor
                                     (mword_of_int 0 : mword 16))))
@@ -7059,8 +6993,7 @@ Section ProofCreateMain.
     iDestruct (ic_mk_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dind dn' bm' data'
                  Hiok' Hrl' Hdok' Hddix' (cr_doc_of_live dn dn' data' Hnl' Hnl0)
                  Hduq'
-                 with "Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Hdview Hfview
-                       Htop")
+                 with "Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Htop")
       as "Hload".
     iAssert (ity_shot gd (di_type dn')) as "#Hshotl'".
     { rewrite Hty'. iExact "Hshotl". }
@@ -7293,9 +7226,6 @@ Section ProofCreateMain.
        inode_meta (ientry kd) dp -∗
        inode_map fsc_fs (ientry kd) bmp -∗
        inode_blocks fsc_fs bmp datap -∗
-       (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
-       dv_ride (bv_unsigned dind) (dv_of dp datap) -∗
-       fv_ride (bv_unsigned dind) (fv_of dp datap) -∗
        (* ...and the era's abstract value (durable-disk 2b-inode-3) *)
        top_frag (fs_gamma_L fsc_fs) (bv_unsigned dind) (era_node dp bmp datap) -∗
        ity_shot gd (di_type dp) -∗
@@ -7320,9 +7250,6 @@ Section ProofCreateMain.
        inode_meta (ientry kslot) dc -∗
        inode_map fsc_fs (ientry kslot) bmc -∗
        inode_blocks fsc_fs bmc datc -∗
-       (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
-       dv_ride (bv_unsigned cinum) (dv_of dc datc) -∗
-       fv_ride (bv_unsigned cinum) (fv_of dc datc) -∗
        (* ...and the CHILD's abstract value (durable-disk 2b-inode-3) *)
        top_frag (fs_gamma_L fsc_fs) (bv_unsigned cinum) (era_node dc bmc datc) -∗
        ity_shot g (di_type dc) -∗
@@ -7432,9 +7359,9 @@ Section ProofCreateMain.
              %Hsb4 %Hmem4 %Hn4 %Hledge".
     iIntros "Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
              #Hslkd Hslkdd Hdep Hidev Hiinum Hivalid Hdlnk Hdiat
-             Hmeta Hmap Hblocks Hdview Hfview Htop #Hshotl Hfrzl Hkeep Hrud
+             Hmeta Hmap Hblocks Htop #Hshotl Hfrzl Hkeep Hrud
              #Hslkc Hcslkd Hcdep Hcidev Hciinum Hcivalid
-             Hcdiat Hcmeta Hcmap Hcblocks Hcdview Hcfview Hctop #Hcshot Hcfrz Hckeep Hruc Htoken
+             Hcdiat Hcmeta Hcmap Hcblocks Hctop #Hcshot Hcfrz Hckeep Hruc Htoken
              Hsbn Hsbi Hsbs Hsbb #Hbmr Hppid Hppback Hpath Hbsl Hislr Hop Hdirty
              Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
@@ -7645,16 +7572,6 @@ Section ProofCreateMain.
     assert (HG4regs : cr_regs3 m sp0 (ientry kd) (mword_of_int 0 : mword 64)
                         (ientry kslot) ty major minor G4)
       by (rewrite /G4; apply cr_regs3_caller; [exact Hcsra | exact HG3regs]).
-    iDestruct (dv_ride_size (bv_unsigned cinum) dc
-                 (cr_setf dc major minor (mword_of_int 0 : mword 16)) datc
-                 (eq_sym (cr_setf_size dc major minor
-                            (mword_of_int 0 : mword 16)))
-                with "Hcdview") as "Hcdview".
-    iDestruct (fv_ride_size (bv_unsigned cinum) dc
-                 (cr_setf dc major minor (mword_of_int 0 : mword 16)) datc
-                 (eq_sym (cr_setf_size dc major minor
-                            (mword_of_int 0 : mword 16)))
-                with "Hcfview") as "Hcfview".
     (* ...and the ERA's abstract value follows the [sh zero,74(s3)]: the
        count moved, no block did (durable-disk 2b-inode-3). *)
     (* THE CHILD'S ROW COMES BACK HERE (durable-disk lane A).  This is the
@@ -7685,7 +7602,7 @@ Section ProofCreateMain.
     iModIntro.
     iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kslot cinum
                (cr_setf dc major minor (mword_of_int 0 : mword 16)) bmc)
-      with "[Hcdlnk Hcdiat Hcmeta Hcmap Hcblocks Hcdview Hcfview Hctop]"
+      with "[Hcdlnk Hcdiat Hcmeta Hcmap Hcblocks Hctop]"
       as "Hcload".
     { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists datc.
       iSplitR; [iPureIntro;
@@ -7825,7 +7742,7 @@ Section ProofCreateMain.
        its record, its bytes and its ledger are the ones the walk handed
        over -- and the walk has already undone its own failing append. *)
     iAssert (ic_loaded fsc_fs fsc_ireg fsc_cov fsc_logst kd dind dp bmp)
-      with "[Hdlnk Hdiat Hmeta Hmap Hblocks Hdview Hfview Htop]" as "Hload".
+      with "[Hdlnk Hdiat Hmeta Hmap Hblocks Htop]" as "Hload".
     { iApply ic_loaded_flat; rewrite /ic_loaded_flat_body. iExists datap.
       iSplitR; [iPureIntro; exact Hiok |].
       iSplitR; [iPureIntro; exact Hrl |].
@@ -8058,9 +7975,9 @@ Section ProofCreateMain.
              %Hsb3 %Hmem3 %Hn3 %Hcorr".
     iIntros "Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
              #Hslkd Hslkdd Hdep Hidev Hiinum Hivalid Hdlnk Hdiat
-             Hmeta Hmap Hblocks Hdview Hfview Htop #Hshotl Hfrzl Hkeep Hrud
+             Hmeta Hmap Hblocks Htop #Hshotl Hfrzl Hkeep Hrud
              #Hslkc Hcslkd Hcdep Hcidev Hciinum Hcivalid
-             Hcdlnk Hcdiat Hcmeta Hcmap Hcblocks Hcdview Hcfview Hctop #Hcshot Hcfrz Hckeep Hruc Htoken
+             Hcdlnk Hcdiat Hcmeta Hcmap Hcblocks Hctop #Hcshot Hcfrz Hckeep Hruc Htoken
              Hsbn Hsbi Hsbs Hsbb #Hbmr Hppid Hppback Hpath Hbsl Hislr Hop Hdirty
              Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
@@ -9830,16 +9747,6 @@ Section ProofCreateMain.
              parent's bytes moved, so its hold moves with them.  One free
              own-update; no delta is proved. *)
           iApply fupd_wp.
-          iMod (dv_set_rt ⊤ fsc_ireg fsc_fs icfg_ist icfg_nib _ _
-                  (dv_of (cr_setf dp3 (di_major dp3) (di_minor dp3)
-                                     (add_vec (di_nlink dp3 : mword 16)
-                                        (mword_of_int 1 : mword 16))) dat3)
-                  ltac:(solve_ndisj) with "Hiregi Hdview") as "Hdview".
-          iMod (fv_set_rt ⊤ fsc_ireg fsc_fs icfg_ist icfg_nib _ _
-                  (fv_of (cr_setf dp3 (di_major dp3) (di_minor dp3)
-                                     (add_vec (di_nlink dp3 : mword 16)
-                                        (mword_of_int 1 : mword 16))) dat3)
-                  ltac:(solve_ndisj) with "Hiregi Hfview") as "Hfview".
           iModIntro.
           assert (Hpfty : di_type (cr_setf dp3 (di_major dp3) (di_minor dp3)
                             (add_vec (di_nlink dp3 : mword 16)
@@ -9921,8 +9828,7 @@ Section ProofCreateMain.
                        (dir_orphan_clean_live _ dat3 Hmtnz)
                        (dir_uniq_cong dp3 _ dat3 (cr_setf_type _ _ _ _)
                           (cr_setf_size _ _ _ _) Hp3duq)
-                       with "Hdlnk Hdiat Hmeta Hpaddrs Hpind Hblocks Hdview Hfview
-                             Htop")
+                       with "Hdlnk Hdiat Hmeta Hpaddrs Hpind Hblocks Htop")
             as "Hload".
           (* ===== +0xe0 c.mv a0,s1 ==================================== *)
           iApply (wp_cmv_s_sconf (mword_of_int (CK + 0xe0)) Ra0 Rs1 mmt
@@ -10116,10 +10022,6 @@ Section ProofCreateMain.
           (* THE MOVER (§9 W3): the child's own ["."] and [".."] links moved
              its bytes. *)
           iApply fupd_wp.
-          iMod (dv_set_rt ⊤ fsc_ireg fsc_fs icfg_ist icfg_nib _ _ (dv_of dc2 dat2)
-                  ltac:(solve_ndisj) with "Hiregi Hcdview") as "Hcdview".
-          iMod (fv_set_rt ⊤ fsc_ireg fsc_fs icfg_ist icfg_nib _ _ (fv_of dc2 dat2)
-                  ltac:(solve_ndisj) with "Hiregi Hcfview") as "Hcfview".
           (* ...and the ERA's abstract value at that same record
              (durable-disk 2b-inode-3). *)
           iMod (cr_dirty_clear ⊤ t (bv_unsigned cinum)
@@ -10145,7 +10047,7 @@ Section ProofCreateMain.
                     with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hpriv
                           Hpath Hbsl [%] Hisl [%] Hop [Hslkc Hcslkd
                           Hcdep Hcidev Hciinum Hcivalid Hcdlnk2 Hcdiat Hcmeta
-                          Hcmap Hcblocks Hcdview Hcfview Hctop Hcfrz Hckeep
+                          Hcmap Hcblocks Hctop Hcfrz Hckeep
                           Hruc]").
           { exact Hcsf. }
           { exact (cr_slots_3 _ ns eq_refl Hns). }
@@ -10165,7 +10067,7 @@ Section ProofCreateMain.
                        Hc2iok Hc2rl Hc2dokn (Hc2ddix Ht162)
                        (dir_orphan_clean_of_only dc2 dat2 Hc2dots) Hc2duq
                        with "Hcdlnk2 Hcdiat Hcmeta Hcaddrs2 Hcind2 Hcblocks
-                             Hcdview Hcfview Hctop")
+                             Hctop")
             as "Hcloadf".
           iAssert (ity_shot g (di_type dc2)) as "#Hcshot2".
           { rewrite Hc2ty0 Hc1ty0 cr_setf_type. iExact "Hcshot". }
@@ -10265,10 +10167,6 @@ Section ProofCreateMain.
                           (dir_nrec (bv_unsigned (di_size dn)))))%Z.
                 rewrite Nat.add_0_r Nat2Z.inj_mul. lia. }
           iApply fupd_wp.
-          iMod (dv_set_rt ⊤ fsc_ireg fsc_fs icfg_ist icfg_nib _ _ (dv_of dp3 dat3)
-                  ltac:(solve_ndisj) with "Hiregi Hdview") as "Hdview".
-          iMod (fv_set_rt ⊤ fsc_ireg fsc_fs icfg_ist icfg_nib _ _ (fv_of dp3 dat3)
-                  ltac:(solve_ndisj) with "Hiregi Hfview") as "Hfview".
           iMod (ireg_top_retag ⊤ fsc_fs (bv_unsigned dind)
                   (era_node dn bm data) (era_node dp3 bm3 dat3)
                   ltac:(solve_ndisj)
@@ -10276,10 +10174,6 @@ Section ProofCreateMain.
                      bm3 dat3 Hp3iok Hp3rl Hp3duq Hp3ddix)
                   with "[] Htop") as "Htop";
             [iApply (ireg_inv_ftop with "Hiregi") |].
-          iMod (dv_set_rt ⊤ fsc_ireg fsc_fs icfg_ist icfg_nib _ _ (dv_of dc2 dat2)
-                  ltac:(solve_ndisj) with "Hiregi Hcdview") as "Hcdview".
-          iMod (fv_set_rt ⊤ fsc_ireg fsc_fs icfg_ist icfg_nib _ _ (fv_of dc2 dat2)
-                  ltac:(solve_ndisj) with "Hiregi Hcfview") as "Hcfview".
           (* ...and the ERA's abstract value at that same record
              (durable-disk 2b-inode-3). *)
           iMod (cr_dirty_retag ⊤ t (bv_unsigned cinum)
@@ -10333,9 +10227,9 @@ Section ProofCreateMain.
                           [%]
                           Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14
                           Hnb2 Hslkd Hslkdd Hdep Hidev Hiinum Hivalid
-                          Hdlnk Hdiat Hmeta Hmap Hblocks Hdview Hfview Htop Hshotp3 Hfrzl Hkeep Hrud
+                          Hdlnk Hdiat Hmeta Hmap Hblocks Htop Hshotp3 Hfrzl Hkeep Hrud
                           Hslkc Hcslkd Hcdep Hcidev Hciinum Hcivalid
-                          Hcdiat Hcmeta Hcmap Hcblocks Hcdview Hcfview Hctop Hcshot2 Hcfrz Hckeep Hruc
+                          Hcdiat Hcmeta Hcmap Hcblocks Hctop Hcshot2 Hcfrz Hckeep Hruc
                           Htoken
                           Hsbn Hsbi Hsbs Hsbb Hbmr Hppid Hppback Hpath Hbsl
                           Hislr Hop Hdirty Hcont").
@@ -10403,10 +10297,6 @@ Section ProofCreateMain.
         (* THE MOVER (§9 W3): the child's two interior links moved its bytes;
            the parent's own append has not run on this entry. *)
         iApply fupd_wp.
-        iMod (dv_set_rt ⊤ fsc_ireg fsc_fs icfg_ist icfg_nib _ _ (dv_of dc2 dat2)
-                  ltac:(solve_ndisj) with "Hiregi Hcdview") as "Hcdview".
-        iMod (fv_set_rt ⊤ fsc_ireg fsc_fs icfg_ist icfg_nib _ _ (fv_of dc2 dat2)
-                ltac:(solve_ndisj) with "Hiregi Hcfview") as "Hcfview".
         (* ...and the ERA's abstract value at the same record. *)
         iMod (cr_dirty_retag ⊤ t (bv_unsigned cinum)
                 (era_node (cr_setf dnc major minor
@@ -10458,9 +10348,9 @@ Section ProofCreateMain.
                         [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                         Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
                         Hslkd Hslkdd Hdep Hidev Hiinum Hivalid Hdlnk
-                        Hdiat Hmeta Hmap Hblocks Hdview Hfview Htop Hshotl Hfrzl Hkeep Hrud
+                        Hdiat Hmeta Hmap Hblocks Htop Hshotl Hfrzl Hkeep Hrud
                         Hslkc Hcslkd Hcdep Hcidev Hciinum Hcivalid
-                        Hcdiat Hcmeta Hcmap Hcblocks Hcdview Hcfview Hctop Hcshot2 Hcfrz Hckeep Hruc Htoken
+                        Hcdiat Hcmeta Hcmap Hcblocks Hctop Hcshot2 Hcfrz Hckeep Hruc Htoken
                         Hsbn Hsbi Hsbs Hsbb Hbmr Hppid Hppback Hpath Hbsl
                         Hislr Hop Hdirty Hcont").
         { exact Hmd2regs. }
@@ -10527,10 +10417,6 @@ Section ProofCreateMain.
           exists 0%Z. vm_compute. reflexivity. }
       (* THE MOVER (§9 W3): the child's first interior link moved its bytes. *)
       iApply fupd_wp.
-      iMod (fv_set_rt ⊤ fsc_ireg fsc_fs icfg_ist icfg_nib _ _ (fv_of dc1 dat1)
-              ltac:(solve_ndisj) with "Hiregi Hcfview") as "Hcfview".
-      iMod (dv_set_rt ⊤ fsc_ireg fsc_fs icfg_ist icfg_nib _ _ (dv_of dc1 dat1)
-                  ltac:(solve_ndisj) with "Hiregi Hcdview") as "Hcdview".
       (* ...and the ERA's abstract value at the same record. *)
       iMod (cr_dirty_retag ⊤ t (bv_unsigned cinum)
               (era_node (cr_setf dnc major minor
@@ -10556,9 +10442,9 @@ Section ProofCreateMain.
                       [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                       Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
                       Hslkd Hslkdd Hdep Hidev Hiinum Hivalid Hdlnk
-                      Hdiat Hmeta Hmap Hblocks Hdview Hfview Htop Hshotl Hfrzl Hkeep Hrud
+                      Hdiat Hmeta Hmap Hblocks Htop Hshotl Hfrzl Hkeep Hrud
                       Hslkc Hcslkd Hcdep Hcidev Hciinum Hcivalid
-                      Hcdiat Hcmeta Hcmap Hcblocks Hcdview Hcfview Hctop Hcshot1 Hcfrz Hckeep Hruc Htoken
+                      Hcdiat Hcmeta Hcmap Hcblocks Hctop Hcshot1 Hcfrz Hckeep Hruc Htoken
                       Hsbn Hsbi Hsbs Hsbb Hbmr Hppid Hppback Hpath Hbsl
                       Hislr Hop Hdirty Hcont").
       { exact Hmd1regs. }
