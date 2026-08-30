@@ -443,3 +443,44 @@ Proof.
   intros Hx Hy. unfold zopz0zKzJ_u.
   rewrite (uint_moi x Hx) (uint_moi y Hy). reflexivity.
 Qed.
+
+(* ===================================================================== *)
+(* THE IMMEDIATE NORMAL FORM                                             *)
+(*                                                                       *)
+(* The Sail decoder spells a compressed immediate the long way round: it *)
+(* sign-extends the 6-bit field to 12 (the ITYPE the compressed form     *)
+(* expands to), re-extends THAT to 64, and adds it to x0.  Every step of *)
+(* that chain is the identity, and a leaf spec that repeats it forces    *)
+(* every caller to stare at it.  So leaf specs say [sign_extend' 64 imm] *)
+(* and these two lemmas carry them to the model's own spelling.          *)
+(* ===================================================================== *)
+
+Lemma add_vec_zero_l (x : mword 64) :
+  add_vec (zero_reg : mword 64) x = x.
+Proof.
+  apply bv_eq. rewrite add_vec_unsigned.
+  replace (bv_unsigned (zero_reg : mword 64)) with 0 by (vm_compute; reflexivity).
+  rewrite Z.add_0_l. unfold bv_wrap.
+  change (MachineWord.MachineWord.Z_idx 64) with 64%N.
+  rewrite Zmod64.
+  pose proof (bv_unsigned_in_range _ x) as Hr. rewrite Zmod64 in Hr.
+  apply Z.mod_small. exact Hr.
+Qed.
+
+(* sign extension composes: widening to 12 and then to 64 is widening to 64 *)
+Lemma sext6_12_64 (imm : mword 6) :
+  (sign_extend' 64 (sign_extend' 12 imm : mword 12) : mword 64) = sign_extend' 64 imm.
+Proof.
+  apply bv_eq.
+  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
+       to_word get_word MachineWord.MachineWord.sign_extend].
+  rewrite !bv_sign_extend_unsigned.
+  rewrite (bv_sign_extend_signed 12 imm ltac:(vm_compute; discriminate)).
+  reflexivity.
+Qed.
+
+(* the whole chain, as the leaves consume it *)
+Lemma uimm6_norm (imm : mword 6) :
+  add_vec (zero_reg : mword 64) (sign_extend' 64 (sign_extend' 12 imm))
+  = (sign_extend' 64 imm : mword 64).
+Proof. rewrite add_vec_zero_l. exact (sext6_12_64 imm). Qed.

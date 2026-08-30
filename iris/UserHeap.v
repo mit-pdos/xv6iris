@@ -507,6 +507,16 @@ Section UserHeap.
   Definition uinstr_is (γt : gname) (pc : mword 64) (is_rvc : bool)
       (i : instruction) : iProp Σ :=
     (⌜ is_aligned_vaddr (Virtaddr pc) 2 = true ⌝ ∗
+     (* TEMPORARY, and it is the LAST one.  Nothing in the fetch path needs
+        this any more; its single remaining consumer is
+        [UkStep.uk_instr_mapped], which transports the fetch bytes from the
+        key's image to the MAPPED sub-image using the pc's one leaf.  Under
+        the heap that transport has nothing to do -- each fragment carries
+        its own page's evidence -- so the clause goes when the leaves stop
+        routing through the Prop-level [uinstr].  It lives HERE rather than
+        in a leaf statement because the decode lemmas discharge it for free,
+        one [vm_compute] per pc. *)
+     ⌜ Z.rem (uint pc) 4096 <= 4092 ⌝ ∗
      if is_rvc
      then ∃ h : mword 16,
             ⌜ isRVC h = true ⌝ ∗ ⌜ udecode_rvc h i ⌝ ∗
@@ -517,6 +527,28 @@ Section UserHeap.
      else ∃ w : mword 32,
             ⌜ isRVC (subrange_vec_dec w 15 0) = false ⌝ ∗ ⌜ udecode_base w i ⌝ ∗
             [∗ list] j ∈ seq 0 4, utext γt (uint pc + Z.of_nat j) (nth_byte w j))%I.
+
+  (* every byte of a text run is the byte the image holds -- the [uM_bytes]
+     clause [uinstr] states, read off the fragments one at a time *)
+  Lemma uheap_text_run {k : N} (γt γd γs : gname) (M : gmap Z (bv 8))
+      (pm : gmap (mword 27) uperm) (a : Z) (n : nat) (w : bv k) :
+    uheap γt γd γs M pm -∗
+    ([∗ list] j ∈ seq 0 n, utext γt (a + Z.of_nat j) (nth_byte w j)) -∗
+    ⌜ uM_bytes M a n w ⌝.
+  Proof.
+    iIntros "Hheap #Hbs".
+    iInduction n as [ | k' IH ] "IH".
+    { iPureIntro. intros j Hj. lia. }
+    iEval (rewrite seq_S big_sepL_app /=) in "Hbs".
+    iDestruct "Hbs" as "[#Hlo [#Hhi _]]".
+    (* [iInduction] generalises the PERSISTENT hypothesis first, so the
+       induction hypothesis takes the run before the heap *)
+    iDestruct ("IH" with "Hlo Hheap") as %Hlo.
+    iDestruct (uheap_text with "Hheap Hhi") as %(Hhi & _ & _).
+    iPureIntro. intros j Hj.
+    destruct (decide (j < k')%nat) as [Hlt | Hge]; [ exact (Hlo j Hlt) | ].
+    assert (Hje : j = k') by lia. subst j. exact Hhi.
+  Qed.
 
   Global Instance uinstr_is_persistent γt pc is_rvc i :
     Persistent (uinstr_is γt pc is_rvc i).
