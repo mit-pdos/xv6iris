@@ -84,6 +84,16 @@ Lemma uM_store8_umem_write (M : gmap Z (bv 8)) (a : Z) (v : mword 64) :
   uM_store8 M a v = umem_write M a 8 (nth_byte v).
 Proof. exact (uM_store_umem_write M a 8%nat v). Qed.
 
+(* THE OFFSET AN ADDRESSING MODE ADDS, as a number.  The decoder's
+   [sign_extend' 64 (zero_extend' 12 (concat_vec uimm ('b"000")))] chain
+   carries an [autocast], so it does not reduce at a symbolic immediate and
+   cannot be normalised away the way [uimm6_norm] normalises c.li's.  Naming
+   it keeps it out of the leaf statement anyway: the leaf's address is then
+   a plain [Z], and at a concrete immediate the caller's [vm_compute] turns
+   [uoff_sdsp (mword_of_int 1)] into [8]. *)
+Definition uoff_sdsp (uimm : mword 6) : Z :=
+  uint (sign_extend' 64 (zero_extend' 12 (concat_vec uimm ('b"000"))) : mword 64).
+
 Section UkRun.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
@@ -233,38 +243,23 @@ Section UkRun.
   (* outside and unmentioned (every other byte).                           *)
   (* ===================================================================== *)
 
-  (* the data byte AT a virtual address: canonical, and WRITABLE.  This is
-     where the permission table stops being visible -- the caller holds an
-     exclusive [ubyte], and the heap turns that into the leaf's [uk_store_ok]
-     without the caller ever naming a page or a PTE bit. *)
-  Lemma uheap_udata_va (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
-      (va : mword 64) (b : bv 8) :
-    uheap γt γd γs M pm -∗ ubyte γd (uint va + Z.of_nat 0) b -∗
-    ⌜ uva_canon va /\
-      exists q : uperm, uperm_at pm va = Some q /\ up_W q = true ⌝.
-  Proof.
-    iIntros "Hheap Hb".
-    iDestruct (uheap_ubyte with "Hheap Hb") as %(_ & (q & Hq & Hw) & Hbnd).
-    iPureIntro.
-    change (Z.of_nat 0) with 0 in Hbnd, Hq. rewrite Z.add_0_r in Hbnd, Hq.
-    destruct (ucanon_of_bound (uint va) Hbnd) as [_ Hcan].
-    rewrite moi_of_uint in Hcan, Hq.
-    split; [ exact Hcan | exists q; exact (conj Hq Hw) ].
-  Qed.
-
-  (* the same, off a whole owned word.  Consuming the run INSIDE this proof
-     is free: the conclusion is pure, so the caller's [iDestruct … as %…]
-     keeps both the heap and the word. *)
-  Lemma uheap_uword_va (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
-      (va : mword 64) (w : mword 64) :
-    uheap γt γd γs M pm -∗ uword γd (uint va) w -∗
-    ⌜ uva_canon va /\
-      exists q : uperm, uperm_at pm va = Some q /\ up_W q = true ⌝.
+  (* THE DATA WORD AT AN ADDRESS: in range, and WRITABLE.  This is where
+     the permission table stops being visible -- the caller holds an
+     exclusive [uword], and the heap turns that into the leaf's
+     [uk_store_ok] without the caller ever naming a page or a PTE bit.
+     Consuming the run inside this proof is free: the conclusion is pure, so
+     the caller's [iDestruct … as %…] keeps both the heap and the word. *)
+  Lemma uheap_uword_at (γt γd γs : gname) (M : gmap Z (bv 8))
+      (pm : gmap (mword 27) uperm) (a : Z) (w : mword 64) :
+    uheap γt γd γs M pm -∗ uword γd a w -∗
+    ⌜ 0 <= a < 2 ^ 38 /\ uw_addr pm a ⌝.
   Proof.
     iIntros "Hheap Hw". rewrite /uword /ubytes.
     iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hw") as "H0";
       [ reflexivity | ].
-    iApply (uheap_udata_va with "Hheap H0").
+    iDestruct (uheap_ubyte with "Hheap H0") as %(_ & Hw & Hb).
+    iPureIntro. change (Z.of_nat 0) with 0 in Hw, Hb.
+    rewrite Z.add_0_r in Hw, Hb. exact (conj Hb Hw).
   Qed.
 
   (* a run of owned data bytes is present in the image, at its own values *)
@@ -329,47 +324,57 @@ Section UkRun.
   (* 8 below 4096, hence at most 4088, so alignment alone gives it.        *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_csdsp (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
-      (uimm : mword 6) (rs2 : mword 5) (tgt v0 : mword 64) :
-    tgt = add_vec (m !!! Regidx csp_rs1)
-            (sign_extend' 64 (zero_extend' 12 (concat_vec uimm ('b"000")))) ->
-    is_aligned_vaddr (Virtaddr tgt) 8 = true ->
+      (uimm : mword 6) (rs2 : mword 5) (a : Z) (v0 : mword 64) :
+    a = uint (m !!! Regidx csp_rs1) + uoff_sdsp uimm ->
+    a mod 8 = 0 ->
     uinstr_is γt pc true (C_SDSP (uimm, Regidx rs2)) -∗
-    uword γd (uint tgt) v0 -∗
+    uword γd a v0 -∗
     urun γt γd γs h m pc -∗
-    (uword γd (uint tgt) (m !!! Regidx rs2) -∗
+    (uword γd a (m !!! Regidx rs2) -∗
        ∀ h' : CpuId,
          urun γt γd γs h' m (add_vec_int pc 2) -∗ WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Htgt Hal8. iIntros "#Hi Hw Hrun Hcont".
+    intros Ha Hal. iIntros "#Hi Hw Hrun Hcont".
     iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    (* the target is canonical, and writable -- from OWNERSHIP, not a PTE *)
-    iDestruct (uheap_uword_va with "Hheap Hw") as %[Hcanon Hok].
-    (* all eight are present in the image *)
-    iDestruct (uheap_ubytes_mapped γt γd γs M pm (uint tgt) 8 (nth_byte v0)
+    (* IN RANGE and WRITABLE, from OWNERSHIP -- not from a claim about a PTE *)
+    iDestruct (uheap_uword_at with "Hheap Hw") as %[Hbnd Hok].
+    (* all eight bytes are present in the image *)
+    iDestruct (uheap_ubytes_mapped γt γd γs M pm a 8 (nth_byte v0)
                  with "Hheap Hw") as %Hmap.
-    (* the in-page condition, from alignment alone *)
-    assert (Hrem : Z.rem (uint tgt) 4096 <= 4088).
-    { pose proof (ualign_page_off tgt 8 ltac:(lia)
-                    ltac:(exists 512; reflexivity) Hal8) as Hm8.
-      rewrite uint_unsigned.
-      rewrite Z.rem_mod_nonneg;
-        [ | exact (proj1 (bv_unsigned_in_range _ tgt)) | lia ].
-      pose proof (Z.mod_pos_bound (bv_unsigned tgt) 4096 ltac:(lia)) as Hb.
-      pose proof (Z.div_mod (bv_unsigned tgt mod 4096) 8 ltac:(lia)) as Hdm.
+    destruct (ucanon_of_bound a Hbnd) as [Hua Hcan].
+    (* the address, in the model's spelling *)
+    assert (Htgt : (mword_of_int a : mword 64)
+                   = add_vec (m !!! Regidx csp_rs1)
+                       (sign_extend' 64
+                          (zero_extend' 12 (concat_vec uimm ('b"000"))))).
+    { rewrite Ha /uoff_sdsp. rewrite <- moi_add. rewrite !moi_of_uint.
+      reflexivity. }
+    (* 8-alignment, and the in-page condition it implies: [rem 4096] of an
+       8-aligned address is a multiple of 8 below 4096, hence at most 4088 *)
+    assert (Hal8 : is_aligned_vaddr (Virtaddr (mword_of_int a : mword 64)) 8 = true).
+    { unfold is_aligned_vaddr. apply Z.eqb_eq. rewrite Hua.
+      rewrite Z.rem_mod_nonneg; [ exact Hal | lia | lia ]. }
+    assert (Hrem : Z.rem (uint (mword_of_int a : mword 64)) 4096 <= 4088).
+    { rewrite Hua. rewrite Z.rem_mod_nonneg; [ | lia | lia ].
+      pose proof (Znumtheory.Zmod_div_mod 8 4096 a ltac:(lia) ltac:(lia)
+                    ltac:(exists 512; reflexivity)) as Hdd.
+      pose proof (Z.mod_pos_bound a 4096 ltac:(lia)) as Hb.
+      pose proof (Z.div_mod (a mod 4096) 8 ltac:(lia)) as Hdm.
       lia. }
     (* do the write in the ghost heap, then hand the image to the leaf *)
-    iMod (uheap_store_run γt γd γs M pm (uint tgt) 8 (nth_byte v0)
+    iMod (uheap_store_run γt γd γs M pm a 8 (nth_byte v0)
             (nth_byte (m !!! Regidx rs2)) with "Hheap Hw") as "(Hheap & Hw)".
     iApply (UkStore.wp_uk_csdsp C pt Rut pm sz Hlo Hpm M m pc uimm rs2
-              tgt (m !!! Regidx rs2) Hui Htgt eq_refl Hok Hcanon Hrem Hal8
-              ltac:(intros j Hj; exists (nth_byte v0 j); exact (Hmap j Hj))
+              (mword_of_int a) (m !!! Regidx rs2) Hui Htgt eq_refl Hok Hcan
+              Hrem Hal8
+              ltac:(intros j Hj; exists (nth_byte v0 j);
+                    rewrite Hua; exact (Hmap j Hj))
               with "Hb [Hheap Hw Hcont]").
-    rewrite uM_store8_umem_write.
+    rewrite Hua uM_store8_umem_write.
     iApply (urun_close with "Hheap"). iApply ("Hcont" with "Hw").
   Qed.
-
 
   (* ===================================================================== *)
   (* §4 THE ENTRY: the process's FIRST WP.                                 *)
