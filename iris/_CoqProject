@@ -273,6 +273,7 @@ UkRunSys.v
 UkSync.v
 USyncKernel.v
 UkEcho.v
+UEchoKernel.v
 UkAbi.v
 UexecCond.v
 UCodeEcho.v

@@ -57,7 +57,9 @@ Require Import UserPerm UexecWp UexecSlot UexecRet.
 Require Import UkAbi.   (* [uk_xpage] / [uk_stack] / [uk_args_c]: the key-level facts *)
 Require Import WpMmodeLeafBase.
 Require Import USyncKernel.
+Require Import UEchoKernel.
 Require User.SyncInstrs.
+Require User.EchoSyms User.EchoInstrs.
 Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode*/Uk* precedent *)
 Local Open Scope Z_scope.
 Import Defs.
@@ -157,6 +159,36 @@ Definition sync_gate (W : uvis) : Prop :=
 Global Instance sync_gate_dec (W : uvis) : Decision (sync_gate W).
 Proof. unfold sync_gate. apply _. Defined.
 
+(* echo's NINE.  Four are sync's, said at echo's text and entry pc.  The
+   other five are the argument vector: it is well formed AT OR ABOVE the
+   entry sp ([uk_args_c], which pins the array's alignment, the count, the
+   readability of the array and of every string, and each string's NUL),
+   and every byte of it is present in the key's writable data
+   ([echo_avd_arr] for the array, [echo_avd_str] for the strings).
+   [uk_args_c]'s own [uka_lo] at [lo = uint sp] is what puts the argument
+   area on the far side of the cut from the frames echo carves below sp,
+   and hence what lets one deposit hand out both.
+
+   NOTHING here says the argv strings are pairwise DISJOINT, and nothing
+   needs to: the area is deposited read-only ([DfracDiscarded]), so two
+   slots pointing at the same string is simply not a question the gate has
+   to answer.  With an exclusive [ubyte] it would have been a quadratic
+   condition on the key. *)
+Definition echo_gate (W : uvis) : Prop :=
+  text_region_eq_of EchoInstrs.echo_bytes (uvis_M W) /\
+  tf_resume_pc (uvis_tf W) = (mword_of_int EchoSyms.start : mword 64) /\
+  sync_xopage (uvis_perm W) /\
+  96 <= uint (uvis_sp W) /\
+  uint (uvis_sp W) mod 8 = 0 /\
+  echo_stkdata W /\
+  uk_args_c (uvis_perm W) (uvis_M W) (uvis_av W) (uvis_argc W)
+    (uint (uvis_sp W)) /\
+  echo_avd_arr W /\
+  echo_avd_str W.
+
+Global Instance echo_gate_dec (W : uvis) : Decision (echo_gate W).
+Proof. unfold echo_gate. apply _. Defined.
+
 Section UexecCond.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
@@ -181,11 +213,24 @@ Section UexecCond.
              Hroom Hal8 (sync_stkdata_all W Hstk)).
   Qed.
 
+  (* ...and echo's *)
+  Lemma echo_gate_slot (W : uvis) : echo_gate W -> ⊢ uslot W.
+  Proof.
+    intros (Hteq & Hpc & Hxo & Hroom & Hal8 & Hstk & Hargs & Havd & Havs).
+    exact (echo_uexec_slot W Hpc
+             (text_region_eq_of_uimg_sub EchoInstrs.echo_bytes (uvis_M W) Hteq)
+             (sync_xopage_addrs (uvis_perm W) Hxo)
+             Hroom Hal8 (echo_stkdata_all W Hstk) Hargs
+             (echo_avd_arr_all W Havd) (echo_avd_str_all W Havs)).
+  Qed.
+
   Lemma cond_entry_slot (W : uvis) : □ uexec_wp -∗ uslot W.
   Proof.
     iIntros "#Hgen".
     destruct (decide (sync_gate W)) as [Hgate | _].
     { iApply (sync_gate_slot W Hgate). }
+    destruct (decide (echo_gate W)) as [Hgate | _].
+    { iApply (echo_gate_slot W Hgate). }
     iApply (uexec_wp_uslot W with "Hgen").
   Qed.
 

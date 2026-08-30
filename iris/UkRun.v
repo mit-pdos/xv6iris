@@ -508,4 +508,88 @@ Section UkRun.
     iPureIntro. split_and!; [ exact Hsz | exact Hinj | exact Hacc ].
   Qed.
 
+  (* ------------------------------------------------------------------- *)
+  (* ...AND THE SAME DEPOSIT WITH A READ-ONLY AREA ALONGSIDE.              *)
+  (*                                                                      *)
+  (* [uslot_of_urun] spends the whole data map on the frame.  A program    *)
+  (* that also reads what exec left it -- its argument vector -- needs the *)
+  (* rest of the map back, so this one CUTS the map at the entry sp:       *)
+  (* everything below is frame territory and is carved into the free       *)
+  (* stack exactly as before, everything at or above is PERSISTED and      *)
+  (* handed over read-only.  The cut is [UkAbi.uk_args]'s own [uka_lo].    *)
+  (*                                                                      *)
+  (* Persisting is what makes the argument area cheap: the program may     *)
+  (* take as many views of it as it likes and none of them has to be       *)
+  (* disjoint from any other, so no caller and no entry gate ever has to   *)
+  (* decide whether two argv slots point at the same string.               *)
+  (* ------------------------------------------------------------------- *)
+  Lemma uslot_of_urun_ro (W : uvis) (avail : nat) :
+    uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) mod 8 = 0 ->
+    8 * Z.of_nat avail
+      <= uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) ->
+    (forall j : nat, (j < 8 * avail)%nat ->
+       is_Some (udata_lo (uvis_M W) (uvis_perm W) (uvis_sz W)
+                 !! (uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)
+                     - 8 * Z.of_nat avail + Z.of_nat j)%Z)) ->
+    (∀ (γt γd γs : gname) (h : CpuId),
+       ⌜ usz_ok (uvis_sz W) ⌝ -∗
+       usz γs (uvis_sz W) -∗
+       utext_all γt (uvis_M W) (uvis_perm W) -∗
+       ([∗ map] k ↦ b ∈ base.filter
+             (fun kv : Z * bv 8 =>
+                ~ (kv.1 < uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)))
+             (udata_lo (uvis_M W) (uvis_perm W) (uvis_sz W)),
+          ubyteq γd DfracDiscarded k b) -∗
+       urun γt γd γs h (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W))
+         avail -∗
+       WP (Loop : expr riscv_lang))
+    -∗ uslot W.
+  Proof.
+    intros Hal8 Hroom Hstk. iIntros "Hprog". rewrite uslot_ukc /ukc.
+    iIntros (h C pt Rut) "%Hlo %Hpm Hb".
+    set (sz := uvis_sz W).
+    assert (Hwf : proc_pt_wf pt)
+      by (destruct Hlo as (_ & _ & _ & _ & _ & H); exact H).
+    rewrite /uvb /uvb_F /user_ptm_inv.
+    iDestruct "Hb" as
+      "(Hamb & Hregs & %Hsz & (Htlb & Hlazy & %Hinj & %Hacc) &
+        Hcfg & Hgpr & Hpc & Hrut & Hkont)".
+    iDestruct (umem_lazy_bound pt sz (uvis_M W) Hwf Hsz with "Hlazy") as %Hcan.
+    iMod (uheap_alloc (uvis_M W) (uvis_perm W) sz Hcan)
+      as (γt γd γs) "(Hheap & Hszf & #Ht & Hd)".
+    rewrite -/(utext_all γt (uvis_M W) (uvis_perm W)).
+    (* ---- the cut at the entry sp ---- *)
+    set (sp := tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1).
+    set (D := udata_lo (uvis_M W) (uvis_perm W) sz).
+    iDestruct (umap_split_at γd D (uint sp) with "Hd") as "[Dlo Dhi]".
+    iMod (uarea_persist γd _ with "Dhi") as "#Dhi".
+    (* ---- the frame, out of what is below sp ---- *)
+    set (base := (uint sp - 8 * Z.of_nat avail)%Z).
+    set (f := fun j : nat =>
+                default (bv_0 8)
+                  (base.filter (fun kv : Z * bv 8 => kv.1 < uint sp) D
+                     !! (base + Z.of_nat j)%Z)).
+    assert (Hf : forall j : nat, (j < 8 * avail)%nat ->
+                   base.filter (fun kv : Z * bv 8 => kv.1 < uint sp) D
+                     !! (base + Z.of_nat j)%Z = Some (f j)).
+    { intros j Hj. destruct (Hstk j Hj) as [b Hb].
+      assert (Hb' : base.filter (fun kv : Z * bv 8 => kv.1 < uint sp) D
+                      !! (base + Z.of_nat j)%Z = Some b)
+        by (apply umap_filter_lookup_lt; [ unfold base; lia | exact Hb ]).
+      unfold f. rewrite Hb'. reflexivity. }
+    iDestruct (ubytes_of_map γd
+                 (base.filter (fun kv : Z * bv 8 => kv.1 < uint sp) D)
+                 base (8 * avail) f Hf with "Dlo") as "Hbs".
+    iDestruct (ustack_of_ubytes γd sp avail f Hal8 Hroom with "Hbs") as "Hstk".
+    iSpecialize ("Hprog" $! γt γd γs h with "[%] Hszf Ht Dhi"); [ exact Hsz | ].
+    iApply "Hprog".
+    iExists C, pt, Rut, sz, (uvis_M W), (uvis_perm W).
+    iSplitR; [ iPureIntro; exact Hlo | ].
+    iSplitR; [ iPureIntro; exact Hpm | ].
+    iFrame "Hheap Hstk".
+    rewrite /uvb /uvb_F /user_ptm_inv.
+    iFrame "Hamb Hregs Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
+    iPureIntro. split_and!; [ exact Hsz | exact Hinj | exact Hacc ].
+  Qed.
+
 End UkRun.
