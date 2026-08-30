@@ -4,6 +4,7 @@
  * decoded: the load is stuck.  Together with disk_ident_cap this means the
  * whole config-space protocol is outside the model.
  */
+/* vtest: platforms=qemu */
 #include "abi.h"
 
 /* result-region offsets (mirrored in vtest-rocq/DiskIdent.v) */

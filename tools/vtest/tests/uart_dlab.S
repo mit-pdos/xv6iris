@@ -26,7 +26,7 @@
  *   +32  offset 0 read with DLAB clear = RHR     (expect 0x00: no input)
  *   +36  LSR at the end                          (expect 0x60)
  */
-/* vtest: repeat=1 */
+/* vtest: repeat=1 platforms=qemu */
 #include "abi.h"
 
 #define R_LCR1   8

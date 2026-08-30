@@ -5,12 +5,17 @@
    [core_smoke_text] is the image both machines execute.  [core_smoke_qemu_result] is
    the whole 4096-byte RESULT region as QEMU left it (nothing
    trimmed, so a difference cannot hide in the tail), and [core_smoke_qemu_disk]
-   is every 512-byte sector of the disk image the run changed. *)
+   is every 512-byte sector of the disk image the run changed.
+
+   THE HART: 0.  The plain capture -- the boot hart, -smp 1. *)
 From Stdlib Require Import List ZArith.
 Import ListNotations.
 Local Open Scope Z_scope.
 
 Definition core_smoke_text_base : Z := 0x80000000.
+
+(* which hart ran [_vtest_body] *)
+Definition core_smoke_primary_hart : Z := 0.
 
 Definition core_smoke_text : list Z :=
   [243; 34; 64; 241; 55; 3; 8; 0; 27; 3; 19; 9; 19; 19; 195; 0; 147; 147; 178; 0;

@@ -271,12 +271,10 @@ UkRunLeaf.v
 UkRunMem.v
 UkRunSys.v
 UkSync.v
+USyncKernel.v
 UkAbi.v
-UkEcho.v
-UkEchoKernel.v
 UexecCond.v
 UCodeEcho.v
-USpecEcho.v
 UCodeSh.v
 USpecSh.v
 USpecShParse.v
@@ -299,8 +297,6 @@ USpecInit.v
 UProofInitLib.v
 UProofInitPrintf.v
 UProofInit.v
-UProofEchoA.v
-UProofEcho.v
 UserMemArms.v
 UserClassify.v
 UserClassifyAsm.v

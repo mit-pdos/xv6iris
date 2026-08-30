@@ -44,9 +44,13 @@ Require Import RegFile InstrBytes.
 Require Import UserPtTree UserExec ProcPtOwn.
 Require Import UmodeMem UmodeArith.
 Require Import UserPerm UexecWp UexecSlot UexecRet.
+Require Import WpMmodeLeafBase.
 Require Import UptTree.
 Require Import WpUmodeStore.
+Require Import WpUmodeStep.
 Require Import UkStep.
+Require Import RiscvExtras.
+Require Import UmodeAbi.
 Require Import UserHeap.
 Require Import TsoCtx.
 Local Open Scope Z_scope.
@@ -93,26 +97,79 @@ Section UkRun.
   (* ===================================================================== *)
   (* §1 THE RUNNING PREDICATE.                                             *)
   (* ===================================================================== *)
-  Definition urun (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64) : iProp Σ :=
+  (* [avail] is the FREE STACK, in words, below the current sp -- the
+     user-mode twin of [sie_cap_gpr]'s counting argument.  The process owns
+     it; an sp-adjust hands a frame out of it or takes one back; every other
+     instruction threads it unchanged, which is why every leaf that writes a
+     register takes [unot_sp] as a premise (a write to sp would move the
+     index this ownership is keyed by). *)
+  Definition urun (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
+      (avail : nat) : iProp Σ :=
     (∃ (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (sz : Z)
        (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm),
        ⌜ loop_ok C pt ⌝ ∗ ⌜ perm_of (ud_um pt) sz = pm ⌝ ∗
        uheap γt γd γs M pm ∗
+       ustack γd (m !!! Regidx csp_rs1) avail ∗
        uvb (CID := h) C pt Rut sz pm M m pc)%I.
+
+  (* "this instruction does not write sp".  Every leaf that writes a general
+     register carries it; a concrete [rd] decides it by [vm_compute]. *)
+  Definition unot_sp (rd : mword 5) : Prop := Regidx csp_rs1 <> Regidx rd.
+
+  Lemma unot_sp_upd (rd : mword 5) (v : mword 64) (m : regfile) :
+    unot_sp rd -> (<[Regidx rd := v]> m) !!! Regidx csp_rs1 = m !!! Regidx csp_rs1.
+  Proof. intro H. exact (upd_ne m (Regidx rd) (Regidx csp_rs1) v H). Qed.
 
   (* THE CLOSE.  This is the lemma that makes the whole interface work: a
      continuation phrased on [urun] discharges the ∀-quantified [ukc] that
      every existing leaf demands, because [urun] supplies its own ambient. *)
+  (* [sz] is a parameter: [urun] hides the break existentially, but a leaf
+     that is closing back up has just destructed it, so it can say which one.
+     Re-introducing the existential at THAT size is all this does. *)
   Lemma urun_close (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
-      (m : regfile) (pc : mword 64) :
+      (sz : Z) (m : regfile) (pc : mword 64) (avail : nat) :
     uheap γt γd γs M pm -∗
-    (∀ h : CpuId, urun γt γd γs h m pc -∗ WP (Loop : expr riscv_lang)) -∗
-    ukc pm M m pc.
+    ustack γd (m !!! Regidx csp_rs1) avail -∗
+    (∀ h : CpuId, urun γt γd γs h m pc avail -∗ WP (Loop : expr riscv_lang)) -∗
+    ukc pm M sz m pc.
   Proof.
-    iIntros "Hheap Hcont".
-    rewrite /ukc. iIntros (h C pt Rut sz) "%Hlo %Hpm Hb".
+    iIntros "Hheap Hstk Hcont".
+    rewrite /ukc. iIntros (h C pt Rut) "%Hlo %Hpm Hb".
     iApply ("Hcont" $! h). iExists C, pt, Rut, sz, M, pm.
-    iFrame "Hheap Hb". iPureIntro. split; [ exact Hlo | exact Hpm ].
+    iFrame "Hheap Hstk Hb". iPureIntro. split; [ exact Hlo | exact Hpm ].
+  Qed.
+
+  (* [uv_upd] is the OTHER way a leaf writes a register (jalr's, where the
+     write is optional).  It hid a real bug: the generated wrapper did not
+     recognise the shape, so it claimed [avail] was preserved across an
+     instruction that can write sp -- and that showed up not as a proof
+     failure but as unification diverging inside the transparent [rf_upd].
+     Hence this lemma, and the [unot_sp] premise that goes with it. *)
+  Lemma uv_upd_not_sp (m : regfile) (rd : mword 5)
+      (wr : option (mword 5 * mword 64)) (d : mword 64) :
+    unot_sp rd ->
+    (uint rd = 0 /\ wr = None) \/ (uint rd <> 0 /\ wr = Some (rd, d)) ->
+    (uv_upd m wr) !!! Regidx csp_rs1 = m !!! Regidx csp_rs1.
+  Proof.
+    intros Hns [[_ ->] | [_ ->]]; [ reflexivity | ].
+    cbn [uv_upd]. exact (unot_sp_upd rd (regval_into_reg d) m Hns).
+  Qed.
+
+  (* ...and the same when the instruction WROTE a register: the free stack
+     is keyed by sp, and [unot_sp] says this write was not to sp. *)
+  Lemma urun_close_upd (γt γd γs : gname) (M : gmap Z (bv 8))
+      (pm : gmap (mword 27) uperm) (m : regfile) (rd : mword 5) (v : mword 64)
+      (sz : Z) (pc' : mword 64) (avail : nat) :
+    unot_sp rd ->
+    uheap γt γd γs M pm -∗
+    ustack γd (m !!! Regidx csp_rs1) avail -∗
+    (∀ h : CpuId, urun γt γd γs h (<[Regidx rd := v]> m) pc' avail -∗
+                  WP (Loop : expr riscv_lang)) -∗
+    ukc pm M sz (<[Regidx rd := v]> m) pc'.
+  Proof.
+    intros Hns. iIntros "Hheap Hstk Hcont".
+    iApply (urun_close with "Hheap [Hstk] Hcont").
+    rewrite (unot_sp_upd rd v m Hns). iExact "Hstk".
   Qed.
 
   (* ===================================================================== *)
@@ -275,6 +332,80 @@ Section UkRun.
   Qed.
 
   (* ===================================================================== *)
+  (* WHAT THE FREE STACK ITSELF SAYS ABOUT SP.                             *)
+  (*                                                                       *)
+  (* The deepest word [ustack γd sp n] owns sits at [uint sp - 8n], and     *)
+  (* [uheap] bounds every owned address below MAXVA -- so "sp has n words   *)
+  (* of room below it" is a CONSEQUENCE of holding the free stack, not an   *)
+  (* obligation on whoever moves sp.  The sp-adjust rules take neither as   *)
+  (* a premise.                                                            *)
+  (* ===================================================================== *)
+  Lemma ustack_room (γt γd γs : gname) (M : gmap Z (bv 8))
+      (pm : gmap (mword 27) uperm) (sp : mword 64) (n : nat) :
+    uheap γt γd γs M pm -∗ ustack γd sp n -∗ ⌜ 8 * Z.of_nat n <= uint sp ⌝.
+  Proof.
+    iIntros "Hheap Hstk".
+    destruct n as [| n'].
+    - iPureIntro. pose proof (proj1 (bv_unsigned_in_range _ sp)) as H0.
+      rewrite uint_unsigned. lia.
+    - iDestruct (ustack_acc γd sp (S n') n' ltac:(lia) with "Hstk") as "[Hw _]".
+      iDestruct "Hw" as (w) "Hw".
+      iDestruct (uheap_uword_at with "Hheap Hw") as %[Hb _].
+      iPureIntro. rewrite Nat2Z.inj_succ. lia.
+  Qed.
+
+  (* ...and the same fact read at a MOVED sp: had [sp + 8k] wrapped, its own
+     frame's deepest word would be at a negative address. *)
+  Lemma ustack_nowrap (γt γd γs : gname) (M : gmap Z (bv 8))
+      (pm : gmap (mword 27) uperm) (sp : mword 64) (k : nat) :
+    uheap γt γd γs M pm -∗
+    ustack γd (add_vec_int sp (8 * Z.of_nat k)) k -∗
+    ⌜ uint sp + 8 * Z.of_nat k < Z64 ⌝.
+  Proof.
+    iIntros "Hheap Hstk".
+    iDestruct (ustack_room γt γd γs M pm
+                 (add_vec_int sp (8 * Z.of_nat k)) k with "Hheap Hstk") as %Hr.
+    iPureIntro.
+    pose proof (bv_unsigned_in_range _ (add_vec_int sp (8 * Z.of_nat k))) as Hr2.
+    rewrite Zmod64 in Hr2. rewrite <- uint_unsigned in Hr2.
+    pose proof (bv_unsigned_in_range _ sp) as Hs.
+    rewrite Zmod64 in Hs. rewrite <- uint_unsigned in Hs.
+    (* the moved sp's unsigned value IS the sum mod 2^64 *)
+    assert (Hmod : uint (add_vec_int sp (8 * Z.of_nat k))
+                   = (uint sp + 8 * Z.of_nat k) mod Z64).
+    { unfold add_vec_int. rewrite !uint_unsigned.
+      rewrite add_vec64_unsigned moi64_unsigned. unfold bv_wrap.
+      assert (E64 : bv_modulus 64 = 18446744073709551616)
+        by (vm_compute; reflexivity).
+      rewrite E64 Zplus_mod_idemp_r. unfold Z64. reflexivity. }
+    destruct (decide (uint sp + 8 * Z.of_nat k < Z64)) as [Hlt | Hge];
+      [ exact Hlt | exfalso ].
+    (* one wrap at most: [8k] and [uint sp] are each below 2^64 *)
+    assert (Hstep : (uint sp + 8 * Z.of_nat k) mod Z64
+                    = uint sp + 8 * Z.of_nat k - Z64).
+    { assert (Ha : uint sp + 8 * Z.of_nat k
+                   = (uint sp + 8 * Z.of_nat k - Z64) + 1 * Z64) by lia.
+      rewrite {1}Ha. rewrite Z_mod_plus_full.
+      apply Z.mod_small. unfold Z64 in *. lia. }
+    rewrite Hstep in Hmod. unfold Z64 in *. lia.
+  Qed.
+
+  (* ...and what a PROGRAM can read off its own run, without opening it: the
+     two stack facts every prologue used to take as premises. *)
+  Lemma urun_stack (γt γd γs : gname) (h : CpuId) (m : regfile)
+      (pc : mword 64) (avail : nat) :
+    urun γt γd γs h m pc avail -∗
+    ⌜ uint (m !!! Regidx csp_rs1) mod 8 = 0
+      /\ 8 * Z.of_nat avail <= uint (m !!! Regidx csp_rs1) ⌝.
+  Proof.
+    iIntros "Hrun".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct (ustack_align with "Hstk") as %Hal.
+    iDestruct (ustack_room with "Hheap Hstk") as %Hroom.
+    iPureIntro. exact (conj Hal Hroom).
+  Qed.
+
+  (* ===================================================================== *)
   (* §4 THE ENTRY: the process's FIRST WP.                                 *)
   (*                                                                       *)
   (* This is the other end of the interface.  A program never constructs a  *)
@@ -306,18 +437,44 @@ Section UkRun.
     - pose proof (usz_ok_live sz a Hsz Hl). lia.
   Qed.
 
-  Lemma uslot_of_urun (W : uvis) :
-    (∀ (γt γd γs : gname) (h : CpuId) (sz : Z),
-       ⌜ usz_ok sz ⌝ -∗
-       usz γs sz -∗
+  (* THE ENTRY, with the process's initial free stack carved out of its data.
+     [avail] words below the resume sp become [urun]'s free stack; the rest
+     of the data is DROPPED (affinely), which is fine for a program whose
+     only memory is its stack.  A program that also needs static data wants
+     the non-lossy form of [ubytes_of_map], which its induction already
+     produces -- see the note there.
+
+     The two premises are exactly what the old [uk_stack] gate decided, in
+     the vocabulary of the heap: enough room below sp, and the bytes there
+     actually present in the data half.  [sz] is bound by the slot, so the
+     second is stated for every [sz] the bundle could carry. *)
+  Lemma uslot_of_urun (W : uvis) (avail : nat) :
+    (* the resume sp is word-aligned -- what [ustack] now asserts, and the
+       one place it is an obligation rather than a consequence, since it is
+       a fact about the process the kernel set up *)
+    uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) mod 8 = 0 ->
+    8 * Z.of_nat avail
+      <= uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) ->
+    (* DECIDABLE FROM THE KEY, now that the key carries the break.  Before
+       [uvis_sz] existed this had to be stated for every [sz] the slot's ∀
+       admitted -- which includes [sz = 0], so it was not merely
+       undecidable, it was unsatisfiable. *)
+    (forall j : nat, (j < 8 * avail)%nat ->
+       is_Some (udata_lo (uvis_M W) (uvis_perm W) (uvis_sz W)
+                 !! (uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)
+                     - 8 * Z.of_nat avail + Z.of_nat j)%Z)) ->
+    (∀ (γt γd γs : gname) (h : CpuId),
+       ⌜ usz_ok (uvis_sz W) ⌝ -∗
+       usz γs (uvis_sz W) -∗
        utext_all γt (uvis_M W) (uvis_perm W) -∗
-       ([∗ map] a ↦ b ∈ udata_lo (uvis_M W) (uvis_perm W) sz, ubyte γd a b) -∗
-       urun γt γd γs h (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)) -∗
+       urun γt γd γs h (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W))
+         avail -∗
        WP (Loop : expr riscv_lang))
     -∗ uslot W.
   Proof.
-    iIntros "Hprog". rewrite uslot_ukc /ukc.
-    iIntros (h C pt Rut sz) "%Hlo %Hpm Hb".
+    intros Hal8 Hroom Hstk. iIntros "Hprog". rewrite uslot_ukc /ukc.
+    iIntros (h C pt Rut) "%Hlo %Hpm Hb".
+    set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)
       by (destruct Hlo as (_ & _ & _ & _ & _ & H); exact H).
     rewrite /uvb /uvb_F /user_ptm_inv.
@@ -328,12 +485,23 @@ Section UkRun.
     iMod (uheap_alloc (uvis_M W) (uvis_perm W) sz Hcan)
       as (γt γd γs) "(Hheap & Hszf & #Ht & Hd)".
     rewrite -/(utext_all γt (uvis_M W) (uvis_perm W)).
-    iSpecialize ("Hprog" $! γt γd γs h sz with "[%] Hszf Ht Hd"); [ exact Hsz | ].
+    (* ---- the carve ---- *)
+    set (sp := tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1).
+    set (D := udata_lo (uvis_M W) (uvis_perm W) sz).
+    set (base := (uint sp - 8 * Z.of_nat avail)%Z).
+    set (f := fun j : nat => default (bv_0 8) (D !! (base + Z.of_nat j)%Z)).
+    assert (Hf : forall j : nat, (j < 8 * avail)%nat ->
+                   D !! (base + Z.of_nat j)%Z = Some (f j)).
+    { intros j Hj. destruct (Hstk j Hj) as [b Hb].
+      unfold f. unfold D, base in *. rewrite Hb. reflexivity. }
+    iDestruct (ubytes_of_map γd D base (8 * avail) f Hf with "Hd") as "Hbs".
+    iDestruct (ustack_of_ubytes γd sp avail f Hal8 Hroom with "Hbs") as "Hstk".
+    iSpecialize ("Hprog" $! γt γd γs h with "[%] Hszf Ht"); [ exact Hsz | ].
     iApply "Hprog".
     iExists C, pt, Rut, sz, (uvis_M W), (uvis_perm W).
     iSplitR; [ iPureIntro; exact Hlo | ].
     iSplitR; [ iPureIntro; exact Hpm | ].
-    iFrame "Hheap".
+    iFrame "Hheap Hstk".
     rewrite /uvb /uvb_F /user_ptm_inv.
     iFrame "Hamb Hregs Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
     iPureIntro. split_and!; [ exact Hsz | exact Hinj | exact Hacc ].

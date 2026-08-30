@@ -5,6 +5,7 @@
  * interesting half: the model refuses a transaction the hardware performs,
  * and the hardware performs it as a NO-OP.
  */
+/* vtest: platforms=qemu */
 #include "abi.h"
 
 /* result-region offsets (mirrored in vtest-rocq/DiskIdent.v) */

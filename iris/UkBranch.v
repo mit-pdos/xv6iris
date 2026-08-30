@@ -16,7 +16,7 @@
 (* The statements are WpUmodeBranch.v's with                              *)
 (* [uv_cap_gpr C pt Ψ M m ∗ pc_is pc] read as [uvb C pt Rut sz π M m pc]  *)
 (* and [∀ CID0, uv_cap_gpr … M m -∗ pc_is pc' -∗ WP] read as              *)
-(* [ukc π M m pc']; the pure premises, the value convention and the       *)
+(* [ukc π M sz m pc']; the pure premises, the value convention and the       *)
 (* proofs are unchanged.  The section carries the ambient table's guard   *)
 (* ([loop_ok C pt], [perm_of (ud_um pt) sz = π]), which is what lets the  *)
 (* retiring arm hand the bundle at THIS table to a continuation that      *)
@@ -110,13 +110,13 @@ Section UkBranch.
     tgt = add_vec pc (sign_extend' 64 imm) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
     uvb C pt Rut sz π M m pc -∗
-    ▷ ukc π M m (if taken then tgt else add_vec_int pc (if is_rvc then 2 else 4)) -∗
+    ▷ ukc π M sz m (if taken then tgt else add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hred Hlpad Hg1 Hexp Htaken Htgt Halign.
     iIntros "Hb Hcont".
     (* re-shape the continuation into the funnel's [uv_upd]/[uv_next] form *)
-    iAssert (▷ ukc π M (uv_upd m None)
+    iAssert (▷ ukc π M sz (uv_upd m None)
                (uv_next (if taken then Some tgt else None)
                   (add_vec_int pc (if is_rvc then 2 else 4))))%I
       with "[Hcont]" as "Hcont".
@@ -164,7 +164,7 @@ Section UkBranch.
     tgt = add_vec pc (sign_extend' 64 imm) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
     uvb C pt Rut sz π M m pc -∗
-    ukc π M m (if taken then tgt else add_vec_int pc (if is_rvc then 2 else 4)) -∗
+    ukc π M sz m (if taken then tgt else add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hred Hlpad Hg1 Hexp Htaken Htgt Halign.
@@ -186,7 +186,7 @@ Section UkBranch.
     tgt = add_vec pc (sign_extend' 64 imm) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
     uvb C pt Rut sz π M m pc -∗
-    ukc π M m (if taken then tgt else add_vec_int pc 4) -∗
+    ukc π M sz m (if taken then tgt else add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Htaken Htgt Halign.
@@ -209,7 +209,7 @@ Section UkBranch.
     tgt = add_vec pc (sign_extend' 64 imm) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
     uvb C pt Rut sz π M m pc -∗
-    ▷ ukc π M m (if taken then tgt else add_vec_int pc 4) -∗
+    ▷ ukc π M sz m (if taken then tgt else add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Htaken Htgt Halign.
@@ -238,7 +238,7 @@ Section UkBranch.
     tgt = add_vec pc (sign_extend' 64 imm) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
     uvb C pt Rut sz π M m pc -∗
-    ▷ ukc π M m (if taken then tgt else add_vec_int pc 4) -∗
+    ▷ ukc π M sz m (if taken then tgt else add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Htaken Htgt Halign.
@@ -258,7 +258,7 @@ Section UkBranch.
     tgt = add_vec pc (sign_extend' 64 imm) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
     uvb C pt Rut sz π M m pc -∗
-    ukc π M m (if taken then tgt else add_vec_int pc 4) -∗
+    ukc π M sz m (if taken then tgt else add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Htaken Htgt Halign.
@@ -284,7 +284,7 @@ Section UkBranch.
     tgt = add_vec pc (sign_extend' 64 (sign_extend' 13 (concat_vec imm ('b"0")))) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
     uvb C pt Rut sz π M m pc -∗
-    ukc π M m (if taken then tgt else add_vec_int pc 2) -∗
+    ukc π M sz m (if taken then tgt else add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hcr Htaken Htgt Halign.
@@ -321,7 +321,7 @@ Section UkBranch.
     tgt = add_vec pc (sign_extend' 64 (sign_extend' 13 (concat_vec imm ('b"0")))) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
     uvb C pt Rut sz π M m pc -∗
-    ukc π M m (if taken then tgt else add_vec_int pc 2) -∗
+    ukc π M sz m (if taken then tgt else add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hcr Htaken Htgt Halign.

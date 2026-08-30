@@ -30,6 +30,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvModelBytes.
 Require Import RegFile.
+Require Import RiscvExtras.
 Require Import UserPtTree.
 Require Import UmodeMem UmodeArith.
 Require Import UserPerm.
@@ -64,12 +65,39 @@ Require Import UkRun.
 Definition uoff_sdsp (uimm : mword 6) : Z :=
   uint (sign_extend' 64 (zero_extend' 12 (concat_vec uimm ('b"000"))) : mword 64).
 
-Definition uoff_i12 (imm : mword 12) : Z :=
-  uint (sign_extend' 64 imm : mword 64).
+(* A BASE-INSTRUCTION DISPLACEMENT IS SIGNED.  It used to be the UNSIGNED
+   reading, which made a negative displacement come out near 2^64 and so
+   unusable, since the heap bounds every address below MAXVA; echo's
+   [lbu a4,-1(a5)] is exactly that case.  [bv_signed] is the honest reading
+   and agrees with the old one wherever the old one worked. *)
+Definition uoff_i12 (imm : mword 12) : Z := bv_signed imm.
 Definition uoff_c8 (uimm : mword 5) : Z :=
   uint (sign_extend' 64 (zero_extend' 12 (concat_vec uimm ('b"000"))) : mword 64).
 Definition uoff_c4 (uimm : mword 5) : Z :=
   uint (sign_extend' 64 (zero_extend' 12 (concat_vec uimm ('b"00"))) : mword 64).
+
+(* ...and the bridge to the model's spelling.  Unlike the nonnegative case
+   this cannot go through [moi_add]: the sum is taken mod 2^64, and only the
+   heap's bound on [a] collapses it back. *)
+Lemma umoi_add_i12 (X : mword 64) (imm : mword 12) (a : Z) :
+  a = uint X + uoff_i12 imm ->
+  (mword_of_int a : mword 64) = add_vec X (sign_extend' 64 imm).
+Proof.
+  intros Ha. unfold uoff_i12 in Ha. rewrite uint_unsigned in Ha.
+  apply bv_eq.
+  rewrite add_vec_unsigned.
+  change (MachineWord.MachineWord.Z_idx 64) with 64%N.
+  assert (Hs : bv_unsigned (sign_extend' 64 imm : mword 64)
+               = bv_wrap 64 (bv_signed imm)).
+  { cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
+         to_word get_word MachineWord.MachineWord.sign_extend].
+    apply bv_sign_extend_unsigned. }
+  rewrite Hs moi64_unsigned.
+  unfold bv_wrap. rewrite !Zmod64.
+  (* NO BOUND NEEDED: both sides are taken mod 2^64, so the wrap the signed
+     displacement introduces cancels on its own. *)
+  rewrite Zplus_mod_idemp_r Ha. reflexivity.
+Qed.
 
 (* ---- the access widths, and what alignment buys at each -------------- *)
 Definition uwidth (z : Z) : Prop := z = 1 \/ z = 2 \/ z = 4 \/ z = 8.
@@ -137,28 +165,27 @@ Section UkRunMem.
   Qed.
 
   Lemma wp_uk_sd (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
-      (imm : mword 12) (rs1 rs2 : mword 5) (a : Z) (v0 : mword 64) :
+      (imm : mword 12) (rs1 rs2 : mword 5) (a : Z) (v0 : mword 64) (avail : nat) :
     a = uint (m !!! Regidx rs1) + uoff_i12 imm ->
     a mod 8 = 0 ->
     uinstr_is γt pc false (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
     uword γd a v0 -∗
-    urun γt γd γs h m pc -∗
+    urun γt γd γs h m pc avail -∗
     (uword γd a (m !!! Regidx rs2) -∗
        ∀ h' : CpuId,
-         urun γt γd γs h' m (add_vec_int pc 4) -∗
+         urun γt γd γs h' m (add_vec_int pc 4) avail -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Ha Hal. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hb)".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm a 8 (nth_byte v0)
                  ltac:(lia) ltac:(right; right; right; reflexivity) Hal with "Hheap Hw")
       as %(Hua & Hcan & Hok & Hpg & Hal8 & Hmap).
     assert (Htgt : (mword_of_int a : mword 64)
                    = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)).
-    { rewrite Ha /uoff_i12. rewrite <- moi_add. rewrite !moi_of_uint.
-      reflexivity. }
+    { exact (umoi_add_i12 _ imm a Ha). }
     iMod (uheap_store_run γt γd γs M pm a 8 (nth_byte v0)
             (nth_byte (m !!! Regidx rs2)) with "Hheap Hw") as "(Hheap & Hw)".
     iApply (UkStore.wp_uk_sd C pt Rut pm sz Hlo Hpm M m pc imm rs1 rs2
@@ -166,34 +193,33 @@ Section UkRunMem.
               Hpg Hal8
               ltac:(intros j Hj; exists (nth_byte v0 j);
                     rewrite Hua; exact (Hmap j Hj))
-              with "Hb [Hheap Hw Hcont]").
+              with "Hb [Hheap Hstk Hw Hcont]").
     rewrite Hua uM_store8_umem_write.
-    iApply (urun_close with "Hheap"). iApply ("Hcont" with "Hw").
+    iApply (urun_close with "Hheap Hstk"). iApply ("Hcont" with "Hw").
   Qed.
 
   Lemma wp_uk_sw (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
-      (imm : mword 12) (rs1 rs2 : mword 5) (a : Z) (v0 : mword 64) :
+      (imm : mword 12) (rs1 rs2 : mword 5) (a : Z) (v0 : mword 64) (avail : nat) :
     a = uint (m !!! Regidx rs1) + uoff_i12 imm ->
     a mod 4 = 0 ->
     uinstr_is γt pc false (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
     ubytes γd a 4 (nth_byte v0) -∗
-    urun γt γd γs h m pc -∗
+    urun γt γd γs h m pc avail -∗
     (ubytes γd a 4 (nth_byte (m !!! Regidx rs2)) -∗
        ∀ h' : CpuId,
-         urun γt γd γs h' m (add_vec_int pc 4) -∗
+         urun γt γd γs h' m (add_vec_int pc 4) avail -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Ha Hal. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hb)".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm a 4 (nth_byte v0)
                  ltac:(lia) ltac:(right; right; left; reflexivity) Hal with "Hheap Hw")
       as %(Hua & Hcan & Hok & Hpg & Hal8 & Hmap).
     assert (Htgt : (mword_of_int a : mword 64)
                    = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)).
-    { rewrite Ha /uoff_i12. rewrite <- moi_add. rewrite !moi_of_uint.
-      reflexivity. }
+    { exact (umoi_add_i12 _ imm a Ha). }
     iMod (uheap_store_run γt γd γs M pm a 4 (nth_byte v0)
             (nth_byte (m !!! Regidx rs2)) with "Hheap Hw") as "(Hheap & Hw)".
     iApply (UkStore.wp_uk_sw C pt Rut pm sz Hlo Hpm M m pc imm rs1 rs2
@@ -201,26 +227,26 @@ Section UkRunMem.
               Hpg Hal8
               ltac:(intros j Hj; exists (nth_byte v0 j);
                     rewrite Hua; exact (Hmap j Hj))
-              with "Hb [Hheap Hw Hcont]").
+              with "Hb [Hheap Hstk Hw Hcont]").
     rewrite Hua (uM_store_umem_write M a 4%nat (m !!! Regidx rs2)).
-    iApply (urun_close with "Hheap"). iApply ("Hcont" with "Hw").
+    iApply (urun_close with "Hheap Hstk"). iApply ("Hcont" with "Hw").
   Qed.
 
   Lemma wp_uk_csdsp (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
-      (uimm : mword 6) (rs2 : mword 5) (a : Z) (v0 : mword 64) :
+      (uimm : mword 6) (rs2 : mword 5) (a : Z) (v0 : mword 64) (avail : nat) :
     a = uint (m !!! Regidx csp_rs1) + uoff_sdsp uimm ->
     a mod 8 = 0 ->
     uinstr_is γt pc true (C_SDSP (uimm, Regidx rs2)) -∗
     uword γd a v0 -∗
-    urun γt γd γs h m pc -∗
+    urun γt γd γs h m pc avail -∗
     (uword γd a (m !!! Regidx rs2) -∗
        ∀ h' : CpuId,
-         urun γt γd γs h' m (add_vec_int pc 2) -∗
+         urun γt γd γs h' m (add_vec_int pc 2) avail -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Ha Hal. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hb)".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm a 8 (nth_byte v0)
                  ltac:(lia) ltac:(right; right; right; reflexivity) Hal with "Hheap Hw")
@@ -236,28 +262,28 @@ Section UkRunMem.
               Hpg Hal8
               ltac:(intros j Hj; exists (nth_byte v0 j);
                     rewrite Hua; exact (Hmap j Hj))
-              with "Hb [Hheap Hw Hcont]").
+              with "Hb [Hheap Hstk Hw Hcont]").
     rewrite Hua uM_store8_umem_write.
-    iApply (urun_close with "Hheap"). iApply ("Hcont" with "Hw").
+    iApply (urun_close with "Hheap Hstk"). iApply ("Hcont" with "Hw").
   Qed.
 
   Lemma wp_uk_csd (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
-      (uimm : mword 5) (cr1 cr2 : mword 3) (rs1 rs2 : mword 5) (a : Z) (v0 : mword 64) :
+      (uimm : mword 5) (cr1 cr2 : mword 3) (rs1 rs2 : mword 5) (a : Z) (v0 : mword 64) (avail : nat) :
     creg2reg_idx (Cregidx cr1) = Regidx rs1 ->
     creg2reg_idx (Cregidx cr2) = Regidx rs2 ->
     a = uint (m !!! Regidx rs1) + uoff_c8 uimm ->
     a mod 8 = 0 ->
     uinstr_is γt pc true (C_SD (uimm, Cregidx cr1, Cregidx cr2)) -∗
     uword γd a v0 -∗
-    urun γt γd γs h m pc -∗
+    urun γt γd γs h m pc avail -∗
     (uword γd a (m !!! Regidx rs2) -∗
        ∀ h' : CpuId,
-         urun γt γd γs h' m (add_vec_int pc 2) -∗
+         urun γt γd γs h' m (add_vec_int pc 2) avail -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros He1 He2 Ha Hal. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hb)".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm a 8 (nth_byte v0)
                  ltac:(lia) ltac:(right; right; right; reflexivity) Hal with "Hheap Hw")
@@ -273,28 +299,28 @@ Section UkRunMem.
               Hpg Hal8
               ltac:(intros j Hj; exists (nth_byte v0 j);
                     rewrite Hua; exact (Hmap j Hj))
-              with "Hb [Hheap Hw Hcont]").
+              with "Hb [Hheap Hstk Hw Hcont]").
     rewrite Hua uM_store8_umem_write.
-    iApply (urun_close with "Hheap"). iApply ("Hcont" with "Hw").
+    iApply (urun_close with "Hheap Hstk"). iApply ("Hcont" with "Hw").
   Qed.
 
   Lemma wp_uk_csw (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
-      (uimm : mword 5) (cr1 cr2 : mword 3) (rs1 rs2 : mword 5) (a : Z) (v0 : mword 64) :
+      (uimm : mword 5) (cr1 cr2 : mword 3) (rs1 rs2 : mword 5) (a : Z) (v0 : mword 64) (avail : nat) :
     creg2reg_idx (Cregidx cr1) = Regidx rs1 ->
     creg2reg_idx (Cregidx cr2) = Regidx rs2 ->
     a = uint (m !!! Regidx rs1) + uoff_c4 uimm ->
     a mod 4 = 0 ->
     uinstr_is γt pc true (C_SW (uimm, Cregidx cr1, Cregidx cr2)) -∗
     ubytes γd a 4 (nth_byte v0) -∗
-    urun γt γd γs h m pc -∗
+    urun γt γd γs h m pc avail -∗
     (ubytes γd a 4 (nth_byte (m !!! Regidx rs2)) -∗
        ∀ h' : CpuId,
-         urun γt γd γs h' m (add_vec_int pc 2) -∗
+         urun γt γd γs h' m (add_vec_int pc 2) avail -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros He1 He2 Ha Hal. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hb)".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm a 4 (nth_byte v0)
                  ltac:(lia) ltac:(right; right; left; reflexivity) Hal with "Hheap Hw")
@@ -310,97 +336,97 @@ Section UkRunMem.
               Hpg Hal8
               ltac:(intros j Hj; exists (nth_byte v0 j);
                     rewrite Hua; exact (Hmap j Hj))
-              with "Hb [Hheap Hw Hcont]").
+              with "Hb [Hheap Hstk Hw Hcont]").
     rewrite Hua (uM_store_umem_write M a 4%nat (m !!! Regidx rs2)).
-    iApply (urun_close with "Hheap"). iApply ("Hcont" with "Hw").
+    iApply (urun_close with "Hheap Hstk"). iApply ("Hcont" with "Hw").
   Qed.
 
   (* sb rs2, imm(rs1) -- the BYTE store.  No alignment to ask for, and the
      one image byte comes off the caller's own [ubyte]. *)
   Lemma wp_uk_sb (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
-      (imm : mword 12) (rs1 rs2 : mword 5) (a : Z) (b0 : mword 8) :
+      (imm : mword 12) (rs1 rs2 : mword 5) (a : Z) (b0 : mword 8) (avail : nat) :
     a = uint (m !!! Regidx rs1) + uoff_i12 imm ->
     uinstr_is γt pc false (STORE (imm, Regidx rs2, Regidx rs1, 1)) -∗
     ubyte γd a b0 -∗
-    urun γt γd γs h m pc -∗
+    urun γt γd γs h m pc avail -∗
     (ubyte γd a (nth_byte (m !!! Regidx rs2) 0) -∗
        ∀ h' : CpuId,
-         urun γt γd γs h' m (add_vec_int pc 4) -∗
+         urun γt γd γs h' m (add_vec_int pc 4) avail -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Ha. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hb)".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_ubyte with "Hheap Hw") as %(HM & Hok & Hbnd).
     destruct (ucanon_of_bound a Hbnd) as [Hua Hcan].
     assert (Htgt : (mword_of_int a : mword 64)
                    = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)).
-    { rewrite Ha /uoff_i12. rewrite <- moi_add. rewrite !moi_of_uint.
-      reflexivity. }
+    { exact (umoi_add_i12 _ imm a Ha). }
     iMod (uheap_store γt γd γs M pm a b0 (nth_byte (m !!! Regidx rs2) 0)
             with "Hheap Hw") as "(Hheap & Hw)".
     iApply (UkStore.wp_uk_sb C pt Rut pm sz Hlo Hpm M m pc imm rs1 rs2
               (mword_of_int a) (m !!! Regidx rs2) b0 Hui Htgt eq_refl Hok Hcan
               ltac:(rewrite Hua; exact HM)
-              with "Hb [Hheap Hw Hcont]").
+              with "Hb [Hheap Hstk Hw Hcont]").
     rewrite Hua (uM_store_umem_write M a 1%nat (m !!! Regidx rs2)).
     cbn [umem_write]. rewrite Z.add_0_r.
-    iApply (urun_close with "Hheap"). iApply ("Hcont" with "Hw").
+    iApply (urun_close with "Hheap Hstk"). iApply ("Hcont" with "Hw").
   Qed.
 
   Lemma wp_uk_ld (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
-      (imm : mword 12) (rs1 rd : mword 5) (a : Z) (w : mword 64) :
+      (imm : mword 12) (rs1 rd : mword 5) (a : Z) (w : mword 64) (avail : nat) :
+    unot_sp rd ->
     a = uint (m !!! Regidx rs1) + uoff_i12 imm ->
     a mod 8 = 0 ->
     uint rd <> 0 ->
     uinstr_is γt pc false (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
     uword γd a w -∗
-    urun γt γd γs h m pc -∗
+    urun γt γd γs h m pc avail -∗
     (uword γd a w -∗
        ∀ h' : CpuId,
          urun γt γd γs h' (<[Regidx rd := regval_into_reg w]> m)
-           (add_vec_int pc 4) -∗
+           (add_vec_int pc 4) avail -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hb)".
+    intros Hns Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm a 8 (nth_byte w)
                  ltac:(lia) ltac:(right; right; right; reflexivity) Hal with "Hheap Hw")
       as %(Hua & Hcan & Hok & Hpg & Hal8 & Hmap).
     assert (Htgt : (mword_of_int a : mword 64)
                    = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)).
-    { rewrite Ha /uoff_i12. rewrite <- moi_add. rewrite !moi_of_uint.
-      reflexivity. }
+    { exact (umoi_add_i12 _ imm a Ha). }
     iApply (UkLoad.wp_uk_ld C pt Rut pm sz Hlo Hpm M m pc imm rs1 rd
               (mword_of_int a) w Hui Hrd Htgt
               ltac:(destruct Hok as (q & Hq & _); exists q; exact Hq) Hcan Hpg Hal8
               ltac:(intros j Hj; exists (nth_byte w j);
                     rewrite Hua; exact (Hmap j Hj))
               ltac:(rewrite Hua; exact (eq_sym (uM_word_w8 M a w Hmap)))
-              with "Hb [Hheap Hw Hcont]").
-    iApply (urun_close with "Hheap"). iApply ("Hcont" with "Hw").
+              with "Hb [Hheap Hstk Hw Hcont]").
+    iApply (urun_close_upd _ _ _ _ _ m rd _ _ _ _ Hns with "Hheap Hstk"). iApply ("Hcont" with "Hw").
   Qed.
 
   Lemma wp_uk_cldsp (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
-      (uimm : mword 6) (rd : mword 5) (a : Z) (w : mword 64) :
+      (uimm : mword 6) (rd : mword 5) (a : Z) (w : mword 64) (avail : nat) :
+    unot_sp rd ->
     a = uint (m !!! Regidx csp_rs1) + uoff_sdsp uimm ->
     a mod 8 = 0 ->
     uint rd <> 0 ->
     uinstr_is γt pc true (C_LDSP (uimm, Regidx rd)) -∗
     uword γd a w -∗
-    urun γt γd γs h m pc -∗
+    urun γt γd γs h m pc avail -∗
     (uword γd a w -∗
        ∀ h' : CpuId,
          urun γt γd γs h' (<[Regidx rd := regval_into_reg w]> m)
-           (add_vec_int pc 2) -∗
+           (add_vec_int pc 2) avail -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hb)".
+    intros Hns Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm a 8 (nth_byte w)
                  ltac:(lia) ltac:(right; right; right; reflexivity) Hal with "Hheap Hw")
@@ -415,13 +441,14 @@ Section UkRunMem.
               ltac:(intros j Hj; exists (nth_byte w j);
                     rewrite Hua; exact (Hmap j Hj))
               ltac:(rewrite Hua; exact (eq_sym (uM_word_w8 M a w Hmap)))
-              with "Hb [Hheap Hw Hcont]").
-    iApply (urun_close with "Hheap"). iApply ("Hcont" with "Hw").
+              with "Hb [Hheap Hstk Hw Hcont]").
+    iApply (urun_close_upd _ _ _ _ _ m rd _ _ _ _ Hns with "Hheap Hstk"). iApply ("Hcont" with "Hw").
   Qed.
 
   Lemma wp_uk_cld (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
       (uimm : mword 5) (crs1 crd : mword 3) (rs1 rd : mword 5) (a : Z)
-      (w : mword 64) :
+      (w : mword 64) (avail : nat) :
+    unot_sp rd ->
     creg2reg_idx (Cregidx crs1) = Regidx rs1 ->
     creg2reg_idx (Cregidx crd) = Regidx rd ->
     a = uint (m !!! Regidx rs1) + uoff_c8 uimm ->
@@ -429,16 +456,16 @@ Section UkRunMem.
     uint rd <> 0 ->
     uinstr_is γt pc true (C_LD (uimm, Cregidx crs1, Cregidx crd)) -∗
     uword γd a w -∗
-    urun γt γd γs h m pc -∗
+    urun γt γd γs h m pc avail -∗
     (uword γd a w -∗
        ∀ h' : CpuId,
          urun γt γd γs h' (<[Regidx rd := regval_into_reg w]> m)
-           (add_vec_int pc 2) -∗
+           (add_vec_int pc 2) avail -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros He1 He2 Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hb)".
+    intros Hns He1 He2 Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm a 8 (nth_byte w)
                  ltac:(lia) ltac:(right; right; right; reflexivity) Hal with "Hheap Hw")
@@ -451,79 +478,80 @@ Section UkRunMem.
               (mword_of_int a) w Hui He1 He2 Hrd Htgt
               ltac:(destruct Hok as (q & Hq & _); exists q; exact Hq) Hcan Hpg Hal8
               ltac:(rewrite Hua; exact Hmap)
-              with "Hb [Hheap Hw Hcont]").
-    iApply (urun_close with "Hheap"). iApply ("Hcont" with "Hw").
+              with "Hb [Hheap Hstk Hw Hcont]").
+    iApply (urun_close_upd _ _ _ _ _ m rd _ _ _ _ Hns with "Hheap Hstk"). iApply ("Hcont" with "Hw").
   Qed.
 
   Lemma wp_uk_lw (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
-      (imm : mword 12) (rs1 rd : mword 5) (a : Z) (wv : mword 32) :
+      (imm : mword 12) (rs1 rd : mword 5) (a : Z) (wv : mword 32) (avail : nat) :
+    unot_sp rd ->
     a = uint (m !!! Regidx rs1) + uoff_i12 imm ->
     a mod 4 = 0 ->
     uint rd <> 0 ->
     uinstr_is γt pc false (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
     ubytes γd a 4 (nth_byte wv) -∗
-    urun γt γd γs h m pc -∗
+    urun γt γd γs h m pc avail -∗
     (ubytes γd a 4 (nth_byte wv) -∗
        ∀ h' : CpuId,
          urun γt γd γs h' (<[Regidx rd := regval_into_reg (sign_extend' 64 wv)]> m)
-           (add_vec_int pc 4) -∗
+           (add_vec_int pc 4) avail -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hb)".
+    intros Hns Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm a 4 (nth_byte wv)
                  ltac:(lia) ltac:(right; right; left; reflexivity) Hal with "Hheap Hw")
       as %(Hua & Hcan & Hok & Hpg & Hal8 & Hmap).
     assert (Htgt : (mword_of_int a : mword 64)
                    = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)).
-    { rewrite Ha /uoff_i12. rewrite <- moi_add. rewrite !moi_of_uint.
-      reflexivity. }
+    { exact (umoi_add_i12 _ imm a Ha). }
     iApply (UkLoad.wp_uk_lw C pt Rut pm sz Hlo Hpm M m pc imm rs1 rd
               (mword_of_int a) (sign_extend' 64 wv) wv Hui Hrd Htgt
               ltac:(destruct Hok as (q & Hq & _); exists q; exact Hq) Hcan Hpg Hal8
               ltac:(rewrite Hua; exact Hmap) eq_refl
-              with "Hb [Hheap Hw Hcont]").
-    iApply (urun_close with "Hheap"). iApply ("Hcont" with "Hw").
+              with "Hb [Hheap Hstk Hw Hcont]").
+    iApply (urun_close_upd _ _ _ _ _ m rd _ _ _ _ Hns with "Hheap Hstk"). iApply ("Hcont" with "Hw").
   Qed.
 
   Lemma wp_uk_lwu (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
-      (imm : mword 12) (rs1 rd : mword 5) (a : Z) (wv : mword 32) :
+      (imm : mword 12) (rs1 rd : mword 5) (a : Z) (wv : mword 32) (avail : nat) :
+    unot_sp rd ->
     a = uint (m !!! Regidx rs1) + uoff_i12 imm ->
     a mod 4 = 0 ->
     uint rd <> 0 ->
     uinstr_is γt pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 4)) -∗
     ubytes γd a 4 (nth_byte wv) -∗
-    urun γt γd γs h m pc -∗
+    urun γt γd γs h m pc avail -∗
     (ubytes γd a 4 (nth_byte wv) -∗
        ∀ h' : CpuId,
          urun γt γd γs h' (<[Regidx rd := regval_into_reg (zero_extend' 64 wv)]> m)
-           (add_vec_int pc 4) -∗
+           (add_vec_int pc 4) avail -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hb)".
+    intros Hns Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm a 4 (nth_byte wv)
                  ltac:(lia) ltac:(right; right; left; reflexivity) Hal with "Hheap Hw")
       as %(Hua & Hcan & Hok & Hpg & Hal8 & Hmap).
     assert (Htgt : (mword_of_int a : mword 64)
                    = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)).
-    { rewrite Ha /uoff_i12. rewrite <- moi_add. rewrite !moi_of_uint.
-      reflexivity. }
+    { exact (umoi_add_i12 _ imm a Ha). }
     iApply (UkLoad.wp_uk_lwu C pt Rut pm sz Hlo Hpm M m pc imm rs1 rd
               (mword_of_int a) (zero_extend' 64 wv) wv Hui Hrd Htgt
               ltac:(destruct Hok as (q & Hq & _); exists q; exact Hq) Hcan Hpg Hal8
               ltac:(rewrite Hua; exact Hmap) eq_refl
-              with "Hb [Hheap Hw Hcont]").
-    iApply (urun_close with "Hheap"). iApply ("Hcont" with "Hw").
+              with "Hb [Hheap Hstk Hw Hcont]").
+    iApply (urun_close_upd _ _ _ _ _ m rd _ _ _ _ Hns with "Hheap Hstk"). iApply ("Hcont" with "Hw").
   Qed.
 
   Lemma wp_uk_clw (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
       (uimm : mword 5) (crs1 crd : mword 3) (rs1 rd : mword 5) (a : Z)
-      (wv : mword 32) :
+      (wv : mword 32) (avail : nat) :
+    unot_sp rd ->
     creg2reg_idx (Cregidx crs1) = Regidx rs1 ->
     creg2reg_idx (Cregidx crd) = Regidx rd ->
     a = uint (m !!! Regidx rs1) + uoff_c4 uimm ->
@@ -531,16 +559,16 @@ Section UkRunMem.
     uint rd <> 0 ->
     uinstr_is γt pc true (C_LW (uimm, Cregidx crs1, Cregidx crd)) -∗
     ubytes γd a 4 (nth_byte wv) -∗
-    urun γt γd γs h m pc -∗
+    urun γt γd γs h m pc avail -∗
     (ubytes γd a 4 (nth_byte wv) -∗
        ∀ h' : CpuId,
          urun γt γd γs h' (<[Regidx rd := regval_into_reg (sign_extend' 64 wv)]> m)
-           (add_vec_int pc 2) -∗
+           (add_vec_int pc 2) avail -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros He1 He2 Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hb)".
+    intros Hns He1 He2 Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_access γt γd γs M pm a 4 (nth_byte wv)
                  ltac:(lia) ltac:(right; right; left; reflexivity) Hal with "Hheap Hw")
@@ -553,41 +581,41 @@ Section UkRunMem.
               (mword_of_int a) (sign_extend' 64 wv) wv Hui He1 He2 Hrd Htgt
               ltac:(destruct Hok as (q & Hq & _); exists q; exact Hq) Hcan Hpg Hal8
               ltac:(rewrite Hua; exact Hmap) eq_refl
-              with "Hb [Hheap Hw Hcont]").
-    iApply (urun_close with "Hheap"). iApply ("Hcont" with "Hw").
+              with "Hb [Hheap Hstk Hw Hcont]").
+    iApply (urun_close_upd _ _ _ _ _ m rd _ _ _ _ Hns with "Hheap Hstk"). iApply ("Hcont" with "Hw").
   Qed.
 
   (* lbu rd, imm(rs1) -- the BYTE load.  This is what a string walk runs on. *)
   Lemma wp_uk_lbu (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
-      (imm : mword 12) (rs1 rd : mword 5) (a : Z) (b0 : mword 8) :
+      (imm : mword 12) (rs1 rd : mword 5) (a : Z) (b0 : mword 8) (avail : nat) :
+    unot_sp rd ->
     a = uint (m !!! Regidx rs1) + uoff_i12 imm ->
     uint rd <> 0 ->
     uinstr_is γt pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
     ubyte γd a b0 -∗
-    urun γt γd γs h m pc -∗
+    urun γt γd γs h m pc avail -∗
     (ubyte γd a b0 -∗
        ∀ h' : CpuId,
          urun γt γd γs h'
            (<[Regidx rd := regval_into_reg (zero_extend' 64 b0)]> m)
-           (add_vec_int pc 4) -∗
+           (add_vec_int pc 4) avail -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Ha Hrd. iIntros "#Hi Hw Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hb)".
+    intros Hns Ha Hrd. iIntros "#Hi Hw Hrun Hcont".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uheap_ubyte with "Hheap Hw") as %(HM & Hok & Hbnd).
     destruct (ucanon_of_bound a Hbnd) as [Hua Hcan].
     assert (Htgt : (mword_of_int a : mword 64)
                    = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)).
-    { rewrite Ha /uoff_i12. rewrite <- moi_add. rewrite !moi_of_uint.
-      reflexivity. }
+    { exact (umoi_add_i12 _ imm a Ha). }
     iApply (UkLoad.wp_uk_lbu C pt Rut pm sz Hlo Hpm M m pc imm rs1 rd
               (mword_of_int a) (zero_extend' 64 b0) b0 Hui Hrd Htgt
               ltac:(destruct Hok as (q & Hq & _); exists q; exact Hq) Hcan
               ltac:(rewrite Hua; exact HM) eq_refl
-              with "Hb [Hheap Hw Hcont]").
-    iApply (urun_close with "Hheap"). iApply ("Hcont" with "Hw").
+              with "Hb [Hheap Hstk Hw Hcont]").
+    iApply (urun_close_upd _ _ _ _ _ m rd _ _ _ _ Hns with "Hheap Hstk"). iApply ("Hcont" with "Hw").
   Qed.
 
 End UkRunMem.

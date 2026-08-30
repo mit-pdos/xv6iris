@@ -1000,10 +1000,11 @@ Section UtD0.
       assert (HV'tf : pv_tf V' = pv_tf (us_V U))
         by (rewrite /V'; destruct (us_V U); reflexivity).
       assert (Hrd' : ut_round epv scv U0 (MkUstate V' (us_M U))).
-      { refine (ut_round_same epv scv U0 U (MkUstate V' (us_M U)) _ _ eq_refl Hrd).
+      { refine (ut_round_same epv scv U0 U (MkUstate V' (us_M U)) _ _ eq_refl _ Hrd).
         - cbn [us_V]. exact HV'tf.
         - cbn [us_V]. rewrite HV'upt HV'sz.
-          exact (perm_of_uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) Pd Hextd). }
+          exact (perm_of_uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) Pd Hextd).
+        - cbn [us_V]. exact HV'sz. }
       iApply (T.ut_a6 Rsys N U0 (MkUstate V' (us_M U)) pt ksp m0 mr av nx false
                 mie_v menvcfg0 epv scv lks
                 Hwf' Hav Hnx HV'tfp Hksp Hm0sp Hmrsp Hmrs1 Hcsmr

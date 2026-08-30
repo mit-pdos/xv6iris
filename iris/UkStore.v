@@ -26,7 +26,7 @@
 (*               and the trampoline's vpns), the walk denies, and the      *)
 (*               machine takes a STORE PAGE FAULT to stvec with the pc     *)
 (*               still AT the store.  The kernel gets [trapped_machine] at *)
-(*               [uvis_of_run m pc M π] -- nothing retired, the lazy image *)
+(*               [uvis_of_run m pc M π sz] -- nothing retired, the lazy image *)
 (*               and the projection unmoved -- and [uexec_ret]'s           *)
 (*               TRANSPARENT arm ([utrap_scause_samo_ne]), i.e. the        *)
 (*               program's own slot at that same key, which the engine     *)
@@ -773,7 +773,7 @@ Section UkStorePostFetch.
     uv_tree_ok pt (upa_map pt Mp) t' ->
     uk_pt_pure pt sz M Mp ->
     gen_cert -∗ uv_amb -∗
-    (R -∗ Rut pt ∗ ukb C pt Rut sz π ∗ uslot (uvis_of_run m pc M π)) -∗
+    (R -∗ Rut pt ∗ ukb C pt Rut sz π ∗ uslot (uvis_of_run m pc M π sz)) -∗
     resv_any cpu_id -∗
     bytes_own (uv_mm t' (upa_map pt Mp)) -∗
     uv_res pt Mp t' usatp pcfg paddr -∗
@@ -985,16 +985,17 @@ Section UkStorePostFetch.
               with "Hany Hmm Hres [Hk]").
     iIntros "Hframe HR".
     iDestruct ("Hk" with "HR") as "(Hrut & Hkb & Hret)".
-    iApply ("Hkb" $! (uvis_of_run m pc M π)
+    iApply ("Hkb" $! (uvis_of_run m pc M π sz)
               (utrap_scause (rv64d_types.Exception (E_SAMO_Page_Fault tt))
                  (register_lookup (R_bitvector_64 scause) rsx))
               (tval (xtval_exception_value (E_SAMO_Page_Fault tt) va))
-              with "[%] [Hframe Hrut Hret]"); [ reflexivity | ].
+              with "[%] [%] [Hframe Hrut Hret]");
+      [ reflexivity | reflexivity | ].
     iSplitL "Hframe Hrut".
     { iApply (trapped_of_uv_trap_frame C pt Rut _ _ m pc M Mp sz π Hpure Hx0
                 with "Hframe Hrut"). }
     iApply (bi.equiv_entails_1_2 _ _
-              (uexec_ret_transparent _ (uvis_of_run m pc M π)
+              (uexec_ret_transparent _ (uvis_of_run m pc M π sz)
                  (utrap_scause_samo_ne
                     (register_lookup (R_bitvector_64 scause) rsx)))).
     iExact "Hret".
@@ -1048,7 +1049,7 @@ Section UkStoreObl.
     (R -∗ Rut pt ∗ ukb C pt Rut sz π ∗
           ((uvb C pt Rut sz π (uM_store M (uint va) kk wval) m (add_vec_int pc 4) -∗
             WP (Loop : expr riscv_lang))
-           ∧ uslot (uvis_of_run m pc M π))) -∗
+           ∧ uslot (uvis_of_run m pc M π sz))) -∗
     resv_any cpu_id -∗
     hreg_frame rsA u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
     bytes_own (uv_mm t (upa_map pt Mp)) -∗
@@ -1198,7 +1199,7 @@ Section UkStoreObl.
     (R -∗ Rut pt ∗ ukb C pt Rut sz π ∗
           ((uvb C pt Rut sz π (uM_store M (uint va) kk wval) m (add_vec_int pc 2) -∗
             WP (Loop : expr riscv_lang))
-           ∧ uslot (uvis_of_run m pc M π))) -∗
+           ∧ uslot (uvis_of_run m pc M π sz))) -∗
     resv_any cpu_id -∗
     hreg_frame rsA u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
     bytes_own (uv_mm t (upa_map pt Mp)) -∗
@@ -1365,7 +1366,7 @@ Section UkStore.
     (forall j : nat, (j < Z.to_nat k)%nat ->
        exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     uvb C pt Rut sz π M m pc -∗
-    ▷ ukc π (uM_store M (uint va) k wval) m (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+    ▷ ukc π (uM_store M (uint va) k wval) sz m (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hkw Hui Hred Hg1 Hlpad Hexp Hva Hwval Hsok Hcanon Hpg Hal HMb.
@@ -1375,9 +1376,9 @@ Section UkStore.
     iApply (wp_uk_step C pt Rut π sz Hlo Hpm _ M m pc Hal2 with "Hb [] Hcont").
     iModIntro.
     rewrite /uk_step_obl.
-    iIntros (R CIDo C' pt' Rut' sz' Mp' t rs1s rsA usatp pcfg paddr)
+    iIntros (R CIDo C' pt' Rut' Mp' t rs1s rsA usatp pcfg paddr)
       "%Hlo' %Hpm' %Hpure %Hpre #Hamb Hk Hany Hrw Hro Hmm Hres".
-    destruct (uk_instr_mapped π M Mp' pc _ i pt' sz'
+    destruct (uk_instr_mapped π M Mp' pc _ i pt' sz
                 (loop_ok_wf C' pt' Hlo') Hpm' Hpure Hui)
       as [Hal2' Hcanonpc Hleaf Hinpage Hcode].
     destruct Hleaf as (w_leaf & Hum & Hlok).
@@ -1394,7 +1395,7 @@ Section UkStore.
     { destruct (ud_um pt' !! svpn_of va) as [w_st |] eqn:Hl.
       - left. exists w_st. split; [ exact Hl | ].
         split.
-        + exact (proj1 (perm_of_W pt' sz' _ q w_st Hwf'
+        + exact (proj1 (perm_of_W pt' sz _ q w_st Hwf'
                           ltac:(rewrite Hpm'; exact Hq) Hqw Hl)).
         + (* the key's window transports to the MAPPED sub-image: the page
              is mapped, so every byte of the in-page window is *)
@@ -1402,16 +1403,16 @@ Section UkStore.
           { destruct (HMb 0%nat ltac:(lia)) as (b0 & Hb0).
             rewrite Z.add_0_r in Hb0. exists b0. exact Hb0. }
           assert (Hbnd : (bv_unsigned va < 549755813888)%Z).
-          { pose proof (uva_of_image_lt pt' sz' (uint va) (proj1 Hwf')
+          { pose proof (uva_of_image_lt pt' sz (uint va) (proj1 Hwf')
                           (ukp_sz _ _ _ _ Hpure)
-                          (proj1 (ukp_img pt' sz' M Mp' (uint va) Hpure) Hva0))
+                          (proj1 (ukp_img pt' sz M Mp' (uint va) Hpure) Hva0))
               as Hb.
             rewrite uint_unsigned in Hb. lia. }
           intros j Hj. destruct (HMb j Hj) as (bb & Hbb). exists bb.
-          exact (ukp_win pt' sz' M Mp' va w_st j bb (proj1 Hwf') Hpure Hl
+          exact (ukp_win pt' sz M Mp' va w_st j bb (proj1 Hwf') Hpure Hl
                    (ukp_off va k (Z.of_nat j) Hpg ltac:(lia)) Hbb).
       - right. right. left.
-        pose proof (perm_of_unmapped_lt (ud_um pt') sz' (svpn_of va) q
+        pose proof (perm_of_unmapped_lt (ud_um pt') sz (svpn_of va) q
                       (ukp_sz _ _ _ _ Hpure)
                       ltac:(rewrite Hpm'; exact Hq) Hl) as Hlt.
         split; [ exact Hcanon | ].
@@ -1426,19 +1427,19 @@ Section UkStore.
                         HgagA & LstvecA & LmieA & LmdlA & LmedlA & LmenvA &
                         LsatpA & LpcfgA & LpaddrA & LmiA & Hx0).
     (* the continuation at THIS table, out of the table-generic one *)
-    iAssert (R -∗ Rut' pt' ∗ ukb C' pt' Rut' sz' π ∗
-             ((uvb (CID := CIDo) C' pt' Rut' sz' π (uM_store M (uint va) k wval) m
+    iAssert (R -∗ Rut' pt' ∗ ukb C' pt' Rut' sz π ∗
+             ((uvb (CID := CIDo) C' pt' Rut' sz π (uM_store M (uint va) k wval) m
                  (add_vec_int pc (if is_rvc then 2 else 4)) -∗
                WP (Loop : expr riscv_lang))
-              ∧ uslot (uvis_of_run m pc M π)))%I with "[Hk]" as "Hk".
+              ∧ uslot (uvis_of_run m pc M π sz)))%I with "[Hk]" as "Hk".
     { iIntros "HR". iDestruct ("Hk" with "HR") as "(Hrut & Hkb & Hkc)".
       iFrame "Hrut Hkb". iSplit.
       - iDestruct "Hkc" as "[Hkc _]".
         iIntros "Hb". rewrite /ukc.
-        iApply ("Hkc" $! CIDo C' pt' Rut' sz' with "[%] [%] Hb");
+        iApply ("Hkc" $! CIDo C' pt' Rut' with "[%] [%] Hb");
           [ exact Hlo' | exact Hpm' ].
       - iDestruct "Hkc" as "[_ Hkc]".
-        rewrite (uslot_run m pc M π Hx0 Hal2). iExact "Hkc". }
+        rewrite (uslot_run m pc M π sz Hx0 Hal2). iExact "Hkc". }
     destruct is_rvc.
     - (* ================= COMPRESSED ================= *)
       destruct Hcode as (h & HisRVC & Hbytes & Hdecrvc & Hnext2).
@@ -1455,7 +1456,7 @@ Section UkStore.
                     (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
         rewrite urvc4_low HisRVC in Hfe.
-        iApply (uk_store_obl_rvc C' pt' R Rut' sz' π M Mp' m pc h i o k imm rs1 rs2 va wval
+        iApply (uk_store_obl_rvc C' pt' R Rut' sz π M Mp' m pc h i o k imm rs1 rs2 va wval
                   t t' usatp pcfg paddr rs1s rsA rsf Hpre Hpure Hfe Hfg Tr Htlbok'
                   Htok' Hshape Hdecrvc Hkw Hred Hg1 Hexp Hva Hwval Hdisp
                   Hcanon Hpg Hal
@@ -1464,7 +1465,7 @@ Section UkStore.
                     Hinj Hum Hlok Hcanonpc Hal2' Hal4 Hbytes HisRVC
                     LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
-        iApply (uk_store_obl_rvc C' pt' R Rut' sz' π M Mp' m pc h i o k imm rs1 rs2 va wval
+        iApply (uk_store_obl_rvc C' pt' R Rut' sz π M Mp' m pc h i o k imm rs1 rs2 va wval
                   t t' usatp pcfg paddr rs1s rsA rsf Hpre Hpure Hfe Hfg Tr Htlbok'
                   Htok' Hshape Hdecrvc Hkw Hred Hg1 Hexp Hva Hwval Hdisp
                   Hcanon Hpg Hal
@@ -1477,7 +1478,7 @@ Section UkStore.
                     (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
         rewrite HnRVC in Hfe.
-        iApply (uk_store_obl_base C' pt' R Rut' sz' π M Mp' m pc w i o k imm rs1 rs2 va wval
+        iApply (uk_store_obl_base C' pt' R Rut' sz π M Mp' m pc w i o k imm rs1 rs2 va wval
                   t t' usatp pcfg paddr rs1s rsA rsf Hpre Hpure Hfe Hfg Tr Htlbok'
                   Htok' Hshape Hdecbase Hkw Hred Hg1 Hexp Hva Hwval Hdisp
                   Hcanon Hpg Hal
@@ -1486,7 +1487,7 @@ Section UkStore.
                     Hinj Hum Hlok Hcanonpc Hinpage Hal2' Hal4 Hbytes HnRVC
                     LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
-        iApply (uk_store_obl_base C' pt' R Rut' sz' π M Mp' m pc w i o k imm rs1 rs2 va wval
+        iApply (uk_store_obl_base C' pt' R Rut' sz π M Mp' m pc w i o k imm rs1 rs2 va wval
                   t t' usatp pcfg paddr rs1s rsA rsf Hpre Hpure Hfe Hfg Tr Htlbok'
                   Htok' Hshape Hdecbase Hkw Hred Hg1 Hexp Hva Hwval Hdisp
                   Hcanon Hpg Hal
@@ -1517,7 +1518,7 @@ Section UkStore.
     (forall j : nat, (j < Z.to_nat k)%nat ->
        exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     uvb C pt Rut sz π M m pc -∗
-    ukc π (uM_store M (uint va) k wval) m (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+    ukc π (uM_store M (uint va) k wval) sz m (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hkw Hui Hred Hg1 Hlpad Hexp Hva Hwval Hsok Hcanon Hpg Hal HMb.
@@ -1544,7 +1545,7 @@ Section UkStore.
     is_aligned_vaddr (Virtaddr va) 8 = true ->
     (forall j : nat, (j < 8)%nat -> exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     uvb C pt Rut sz π M m pc -∗
-    ukc π (uM_store8 M (uint va) wval) m (add_vec_int pc 4) -∗
+    ukc π (uM_store8 M (uint va) wval) sz m (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hva Hwval Hsok Hcanon Hpg Hal HMb.
@@ -1569,7 +1570,7 @@ Section UkStore.
     is_aligned_vaddr (Virtaddr va) 4 = true ->
     (forall j : nat, (j < 4)%nat -> exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     uvb C pt Rut sz π M m pc -∗
-    ukc π (uM_store M (uint va) 4 wval) m (add_vec_int pc 4) -∗
+    ukc π (uM_store M (uint va) 4 wval) sz m (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hva Hwval Hsok Hcanon Hpg Hal HMb.
@@ -1592,7 +1593,7 @@ Section UkStore.
     uva_canon va ->
     M !! (uint va) = Some bb ->
     uvb C pt Rut sz π M m pc -∗
-    ukc π (uM_store M (uint va) 1 wval) m (add_vec_int pc 4) -∗
+    ukc π (uM_store M (uint va) 1 wval) sz m (add_vec_int pc 4) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hva Hwval Hsok Hcanon Hbb.
@@ -1622,7 +1623,7 @@ Section UkStore.
     is_aligned_vaddr (Virtaddr tgt) 8 = true ->
     (forall j : nat, (j < 8)%nat -> exists bb : bv 8, M !! (uint tgt + Z.of_nat j) = Some bb) ->
     uvb C pt Rut sz π M m pc -∗
-    ukc π (uM_store8 M (uint tgt) wval) m (add_vec_int pc 2) -∗
+    ukc π (uM_store8 M (uint tgt) wval) sz m (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Htgt Hwval Hsok Hcanon Hpg Hal HMb.
@@ -1655,7 +1656,7 @@ Section UkStore.
     is_aligned_vaddr (Virtaddr va) 8 = true ->
     (forall j : nat, (j < 8)%nat -> exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     uvb C pt Rut sz π M m pc -∗
-    ukc π (uM_store8 M (uint va) wval) m (add_vec_int pc 2) -∗
+    ukc π (uM_store8 M (uint va) wval) sz m (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hcr1 Hcr2 Hva Hwval Hsok Hcanon Hpg Hal HMb.
@@ -1692,7 +1693,7 @@ Section UkStore.
     is_aligned_vaddr (Virtaddr va) 4 = true ->
     (forall j : nat, (j < 4)%nat -> exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     uvb C pt Rut sz π M m pc -∗
-    ukc π (uM_store M (uint va) 4 wval) m (add_vec_int pc 2) -∗
+    ukc π (uM_store M (uint va) 4 wval) sz m (add_vec_int pc 2) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hcr1 Hcr2 Hva Hwval Hsok Hcanon Hpg Hal HMb.

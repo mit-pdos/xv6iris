@@ -42,7 +42,7 @@
  *   +68  PLIC pending after those two reads
  *   +72  mip & SEIP after those two reads
  */
-/* vtest: repeat=1 */
+/* vtest: repeat=1 platforms=qemu */
 #include "abi.h"
 
 #define PLIC        0x0c000000

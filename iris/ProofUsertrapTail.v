@@ -762,9 +762,10 @@ Section UtRet.
                       (add_vec (un_ks N) (mword_of_int 4096)) (cid_word (CID := CIDp)))
       by (rewrite /Vr; destruct (us_V U); reflexivity).
     assert (Hrdr : ut_round epw scw U0 (MkUstate Vr (us_M U))).
-    { refine (ut_round_ueq epw scw U0 U (MkUstate Vr (us_M U)) _ _ eq_refl Hrd).
+    { refine (ut_round_ueq epw scw U0 U (MkUstate Vr (us_M U)) _ _ eq_refl _ Hrd).
       - cbn [us_V]. rewrite HVrtf. apply prepare_return_tf_ueq.
-      - cbn [us_V]. rewrite HVrupt HVrsz. reflexivity. }
+      - cbn [us_V]. rewrite HVrupt HVrsz. reflexivity.
+      - cbn [us_V]. exact HVrsz. }
     assert (Hepcw : pv_tf (us_V (MkUstate Vr (us_M U))) !!! tf_epc_idx = uepc).
     { cbn [us_V]. rewrite HVrtf.
       rewrite <- (tf_ueq_epc _ _ (prepare_return_tf_ueq (pv_tf (us_V U)) ksat

@@ -87,6 +87,12 @@ Record uvis := MkUvis {
   uvis_tf   : list (mword 64);
   uvis_M    : gmap Z (bv 8);
   uvis_perm : gmap (mword 27) uperm;
+  (* THE BREAK.  [p->sz] is not kernel-private state: a program observes it
+     by calling [sbrk(0)], so it is part of the resume state the slot is
+     keyed on, exactly like the trapframe.  Keeping it here is also what
+     lets [usys_mem_ok]'s sbrk row NAME the two sizes instead of
+     existentially quantifying them. *)
+  uvis_sz   : Z;
 }.
 
 (* the projection from the kernel's process state to the slot's key: drop
@@ -94,7 +100,8 @@ Record uvis := MkUvis {
    permission view *)
 Definition uvis_of (U : ustate) : uvis :=
   MkUvis (pv_tf (us_V U)) (us_M U)
-         (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U)))).
+         (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
+         (uint (pv_sz (us_V U))).
 
 (* ===================================================================== *)
 (* SS1 The trapframe as a word reader.                                     *)

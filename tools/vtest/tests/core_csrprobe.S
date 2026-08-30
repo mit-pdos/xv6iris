@@ -52,7 +52,7 @@
  *   +0x800     the total number of traps taken (trap.S's own count)
  *   +0x810..   the individual trap records: mcause, mepc, mtval, 0
  */
-/* vtest: repeat=1 */
+/* vtest: repeat=1 proj=fields:8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76,80,84,88,92,96,100,104,108,112,116,120,124,128,132,136,140,144,148,152 tick=0 budget=4000 */
     .option norvc
 #include "abi.h"
 

@@ -66,21 +66,21 @@ Section UkRunSys.
   (* which nothing is claimed.                                             *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_ecall_quiet (γt γd γs : gname) (h : CpuId) (m : regfile)
-      (pc : mword 64) (n : Z) :
+      (pc : mword 64) (n : Z) (avail : nat) :
     usysno m = n ->
     n <> USYS_exit -> n <> USYS_fork ->
     n <> USYS_exec -> n <> USYS_sbrk -> usys_window n = None ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
     uinstr_is γt pc false (ECALL tt) -∗
-    urun γt γd γs h m pc -∗
+    urun γt γd γs h m pc avail -∗
     (∀ (h' : CpuId) (r : mword 64),
-       urun γt γd γs h' (<[Regidx (mword_of_int 10) := r]> m) (add_vec_int pc 4) -∗
+       urun γt γd γs h' (<[Regidx (mword_of_int 10) := r]> m) (add_vec_int pc 4) avail -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hexit Hfork Hexec Hsbrk Hwin Hal4.
     iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hb)".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
     iApply (UkStep.wp_uk_ecall C pt Rut pm sz Hlo Hpm M m pc Hui
@@ -92,16 +92,19 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm)) = n).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz)) = n).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite Hnum. cbv zeta.
     destruct (decide (n = USYS_exit)) as [He | _]; [ exfalso; exact (Hexit He) | ].
     destruct (decide (n = USYS_fork)) as [He | _]; [ exfalso; exact (Hfork He) | ].
-    iIntros (r M' pm') "%Hok".
-    destruct (usys_mem_ok_quiet n _ r _ _ _ _ Hexec Hsbrk Hwin Hok) as [-> ->].
+    iIntros (r M' pm' sz') "%Hok".
+    destruct (usys_mem_ok_quiet n _ r _ _ _ _ _ _ Hexec Hsbrk Hwin Hok)
+      as [-> [-> ->]].
     cbn [uvis_M uvis_perm uvis_of_run].
-    rewrite (uslot_bump_run m pc M M pm pm r Hx0 Hal4).
-    iApply (urun_close with "Hheap"). iIntros (h') "Hrun".
+    rewrite (uslot_bump_run m pc M M pm pm sz sz r Hx0 Hal4).
+    iApply (urun_close_upd _ _ _ _ _ m (mword_of_int 10) _ _ _ _
+              ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk").
+    iIntros (h') "Hrun".
     iApply ("Hcont" $! h' r with "Hrun").
   Qed.
 
@@ -110,14 +113,14 @@ Section UkRunSys.
   (* not even a continuation.  This is the only leaf with no successor.    *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uk_ecall_exit (γt γd γs : gname) (h : CpuId) (m : regfile)
-      (pc : mword 64) :
+      (pc : mword 64) (avail : nat) :
     usysno m = USYS_exit ->
     uinstr_is γt pc false (ECALL tt) -∗
-    urun γt γd γs h m pc -∗
+    urun γt γd γs h m pc avail -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn. iIntros "#Hi Hrun".
-    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hb)".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkStep.wp_uk_ecall C pt Rut pm sz Hlo Hpm M m pc Hui
               (fun (s : mstate)
@@ -128,7 +131,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm)) = USYS_exit).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz)) = USYS_exit).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite Hnum. cbv zeta.
     destruct (decide (USYS_exit = USYS_exit)) as [_ | Hne];

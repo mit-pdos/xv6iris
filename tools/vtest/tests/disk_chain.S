@@ -19,6 +19,7 @@
  *   desc[2]  second 256 bytes of the payload, NEXT -> 3   <== the extra one
  *   desc[3]  status byte, WRITE, end of chain
  */
+/* vtest: platforms=qemu */
 #include "abi.h"
 
 /* offsets within the DMA region */

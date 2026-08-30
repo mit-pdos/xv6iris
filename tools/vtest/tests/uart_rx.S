@@ -33,7 +33,7 @@
  *   +40  how many bytes a drain loop still finds    (0)
  *   +44  LSR at the end                             (0x60)
  */
-/* vtest: serial_in=0x41,0x42,0x43,0x44 */
+/* vtest: serial_in=0x41,0x42,0x43,0x44 platforms=qemu builder=sched */
 #include "abi.h"
 
 #define R_LSR0    8

@@ -7,6 +7,7 @@
  *
  * The store is last for the model; the reads after it are QEMU's answer.
  */
+/* vtest: platforms=qemu */
 #include "abi.h"
 
 /* result-region offsets (mirrored in vtest-rocq/DiskIdent.v) */

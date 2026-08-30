@@ -8,6 +8,7 @@
  * not "the model is stricter about something the hardware also refuses" --
  * the hardware completes the access.
  */
+/* vtest: platforms=qemu */
 #include "abi.h"
 
 /* result-region offsets (mirrored in vtest-rocq/DiskIdent.v) */

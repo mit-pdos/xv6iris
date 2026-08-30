@@ -6,6 +6,7 @@
  * existent and non-existent -- so a driver that probes the queues by walking
  * QueueSel upward completes on hardware and not on the model.
  */
+/* vtest: platforms=qemu */
 #include "abi.h"
 
 /* result-region offsets (mirrored in vtest-rocq/DiskIdent.v) */

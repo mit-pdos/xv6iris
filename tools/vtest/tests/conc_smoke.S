@@ -4,7 +4,7 @@
  * dispatch runs _vtest_body_ap on hart 1 only, and that the model's
  * two-hart stepper (vtest-rocq/VConc.v) can interleave them at all.
  */
-/* vtest: smp=2 */
+/* vtest: smp=2 builder=multi */
 #include "abi.h"
 
 #define HANDSHAKE  0x100        /* offset in RESULT: hart 1 -> hart 0 */

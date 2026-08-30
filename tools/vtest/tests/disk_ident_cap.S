@@ -13,6 +13,7 @@
  * The stuck access is the FIRST load of 0x100; everything after it runs on
  * QEMU only, which is how the capacity gets recorded at all.
  */
+/* vtest: platforms=qemu */
 #include "abi.h"
 
 /* result-region offsets (mirrored in vtest-rocq/DiskIdent.v) */

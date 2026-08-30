@@ -11,6 +11,31 @@ test sources, same ABI, same model side — and it writes
 checks hardware captures like any other, because they are checked-in
 literals; nothing new needs the board attached.
 
+## STATUS ADDENDUM (2026-08-30): "FINISHED" IS NOT "PASSED"
+
+A board sweep reported `pt_` as "8 of 9 complete" by reading a set DONE flag
+as a pass.  It is not: all nine `pt_` programs trap on `csrs menvcfg, t0`
+(finding 31 — the U74 has no `menvcfg`, and the suite's own rules require a
+`pt_` program to pin `menvcfg.ADUE` before `satp`), land in their own M-mode
+backstop, and that handler records the trap, publishes **status 0x4D** and
+parks.  The backstop writes DONE, which is exactly why DONE alone means
+nothing.  **The `pt_` area has never worked on this board.**
+
+The same episode produced the opposite error from the runner: board.py's
+breakpoint on `_vtest_done` assumed the primary always parks there, which is
+true only when the body RETURNS normally, so it reported all nine as "never
+finished".  The DONE flag is the contract (abi.h) and is now checked
+regardless of whether the breakpoint fires; the breakpoint stays as an
+accelerator for the common shape.
+
+Current sweep (2026-08-30, 36 runnable): 19 finished with a normal status,
+9 finished reporting 0x4D (the `pt_` area), 8 did not finish
+(`core_regs_ctr/mcsr/scsr` — finding 31 from the other side, and
+`plic_arb/level/mask/thresh/tie`, the only genuinely undiagnosed rows).
+**Checked against the model: `core_smoke`, `core_hart`, `clint_time`,
+`clint_msip`, `core_csrprobe`** — everything else that "finished" is a
+program that ran, not a comparison that was made.
+
 ## STATUS ADDENDUM (2026-08-29c): A TRAP AS DATA, AND THE CSR SCOREBOARD
 
 `tools/vtest/trap.S` is an M-mode handler that RECORDS a trap and resumes

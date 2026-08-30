@@ -227,8 +227,10 @@ Definition ut_round (sepc_v sc_v : mword 64) (U U' : ustate) : Prop :=
   uround_ok sc_v
     (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U)))
     (us_M U) (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
+    (uint (pv_sz (us_V U)))
     (pv_tf (us_V U')) (us_M U')
-    (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U')))).
+    (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))))
+    (uint (pv_sz (us_V U'))).
 
 (* THE PROLOGUE'S OWN MOVE: [U'] is [U] with the epc word rewritten, which
    is what usertrap's +0x28..+0x2e block does and all it does.  Every block
@@ -251,7 +253,7 @@ Proof.
   intros Hne (Htf & Hupt & Hsz & HM). unfold ut_round, uround_ok.
   destruct (decide (sc_v = uecall_scause)) as [Heq | _]; [ contradiction (Hne Heq) | ].
   rewrite Htf Hupt Hsz HM. unfold uround_id_ok.
-  split; [ split; reflexivity | split; reflexivity ].
+  split_and!; reflexivity.
 Qed.
 
 (* A BLOCK THAT DOES NOT MOVE THE USER-VISIBLE STATE relays the round. *)
@@ -260,9 +262,13 @@ Lemma ut_round_same (sepc_v sc_v : mword 64) (U U' U'' : ustate) :
   perm_of (ud_um (pv_upt (us_V U''))) (uint (pv_sz (us_V U'')))
     = perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))) ->
   us_M U'' = us_M U' ->
+  (* the break is user-visible now, so "does not move the user-visible
+     state" has to say so *)
+  pv_sz (us_V U'') = pv_sz (us_V U') ->
   ut_round sepc_v sc_v U U' -> ut_round sepc_v sc_v U U''.
 Proof.
-  intros H1 H2 H3 H. unfold ut_round in H |- *. rewrite H1 H2 H3. exact H.
+  intros H1 H2 H3 H4 H. unfold ut_round in H |- *.
+  rewrite H1 H2 H3 H4. exact H.
 Qed.
 
 (* ...and one that moves it only in the four KERNEL words (prepare_return). *)
@@ -271,9 +277,10 @@ Lemma ut_round_ueq (sepc_v sc_v : mword 64) (U U' U'' : ustate) :
   perm_of (ud_um (pv_upt (us_V U''))) (uint (pv_sz (us_V U'')))
     = perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))) ->
   us_M U'' = us_M U' ->
+  pv_sz (us_V U'') = pv_sz (us_V U') ->
   ut_round sepc_v sc_v U U' -> ut_round sepc_v sc_v U U''.
 Proof.
-  intros Hu H2 H3 H. unfold ut_round in H |- *. rewrite H2 H3.
+  intros Hu H2 H3 H4 H. unfold ut_round in H |- *. rewrite H2 H3 H4.
   eapply uround_ok_ueq_r; [ exact Hu | exact H ].
 Qed.
 

@@ -3,6 +3,7 @@
  * store is stuck.  QEMU checks the index against VIRTIO_QUEUE_MAX and then
  * finds queue 1 has no descriptor ring, so the notification is a no-op.
  */
+/* vtest: platforms=qemu */
 #include "abi.h"
 
 /* result-region offsets (mirrored in vtest-rocq/DiskIdent.v) */

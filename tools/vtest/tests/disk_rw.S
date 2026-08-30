@@ -11,6 +11,7 @@
  * bytes, used-ring entries, interrupt status, the data read back) and the
  * disk image itself (sector 5 must hold the pattern).
  */
+/* vtest: platforms=qemu */
 #include "abi.h"
 
 /* offsets within the DMA region */

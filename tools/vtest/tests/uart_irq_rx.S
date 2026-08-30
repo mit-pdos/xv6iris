@@ -39,7 +39,7 @@
  *   +68  PLIC pending after PLIC complete         (0)
  *   +72  mip & SEIP at the end                    (0)
  */
-/* vtest: serial_in=0x41 */
+/* vtest: serial_in=0x41 platforms=qemu builder=sched */
 #include "abi.h"
 
 #define PLIC        0x0c000000

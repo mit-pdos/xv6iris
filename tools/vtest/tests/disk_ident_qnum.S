@@ -4,6 +4,7 @@
  * reported QueueNumMax = 1024 on QEMU (finding 1).  A driver that believes
  * QueueNumMax has no model execution.
  */
+/* vtest: platforms=qemu */
 #include "abi.h"
 
 /* result-region offsets (mirrored in vtest-rocq/DiskIdent.v) */

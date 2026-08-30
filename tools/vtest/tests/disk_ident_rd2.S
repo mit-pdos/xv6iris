@@ -2,6 +2,7 @@
  * disk_ident_rd1 one width up: [DevModel.dev_read] decodes width 4 only, and
  * QEMU returns 0 with a guest-error log rather than faulting.
  */
+/* vtest: platforms=qemu */
 #include "abi.h"
 
 /* result-region offsets (mirrored in vtest-rocq/DiskIdent.v) */
