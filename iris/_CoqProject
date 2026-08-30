@@ -1559,6 +1559,12 @@ LinkSysWriteAUStable.v
 # theorems take as a hypothesis.  The header records the three lane
 # findings (fork/exec rows; the unbounded-loop discipline; wait s window row).
 UkInit.v
+# UkInitPrintf.v is what the loop head 0x32 calls FIRST: ulib's
+# printf -> vprintf -> putc -> write, for init's one static literal.  The
+# %-conversion tree (0x516 and 0x53c..0x794) is REFUTED from the literal's
+# own bytes, not proved: [uki_fmt]'s last clause says no byte is a percent
+# sign, so vprintf's pending-% register is an invariant zero.
+UkInitPrintf.v
 # THE PINNED-EXEC PROVER LANE (fs-syscall-specs; SpecKexecPin.v sect. 8).
 #   ProofKexecPinTrace is the walk's trace built out of the contract's pin
 # -- and the file that records WHY the pin needs its chain conjunct back
