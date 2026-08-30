@@ -220,9 +220,14 @@ Definition sysc_mem_ok (V V' : pprivate) (M M' : gmap Z (bv 8)) : Prop :=
   else if decide (sysc_num V = 12) then                   (* sbrk *)
     sysc_sbrk_ok (pv_upt V) (pv_upt V') (pv_sz V) (pv_sz V') M M'
   else if decide (sysc_num V = 3) then                    (* wait *)
-    (* copyout of the zombie's four-byte [xstate] at argument 0 *)
+    (* copyout of the zombie's four-byte [xstate] at argument 0 -- and
+       kwait's own [addr != 0] test means a NULL destination is not a
+       destination at all, which is what lets a caller passing a null
+       status pointer keep every byte it held across the call. *)
     exists (d : nat) (bs : nat -> bv 8),
-      (d <= 4)%nat /\ M' = umem_wr M (pv_tf V !!! tf_arg_idx 0) d bs
+      (d <= 4)%nat /\
+      (pv_tf V !!! tf_arg_idx 0 = (zero_reg : mword 64) -> d = 0%nat) /\
+      M' = umem_wr M (pv_tf V !!! tf_arg_idx 0) d bs
   else if decide (sysc_num V = 4) then                    (* pipe *)
     (* two four-byte fds, back to back at argument 0 *)
     exists (d : nat) (bs : nat -> bv 8),

@@ -555,6 +555,7 @@ Section ProofKwait.
         ⌜ mf !!! Regidx Ra0 = sign_extend' 64 rv ⌝ -∗
         ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
         ⌜ (d <= 4)%nat ⌝ -∗
+        ⌜ addr = (zero_reg : mword 64) -> d = 0%nat ⌝ -∗
         sie_cap_gpr KT1 mf K eb pme -∗
         cpu_own 0 eb pme eb lks -∗
         pc_is (ret_pc (mm !!! Regidx Rra)) -∗
@@ -1622,6 +1623,7 @@ Section ProofKwait.
         ⌜ mf !!! Regidx Ra0 = sign_extend' 64 rv ⌝ -∗
         ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
         ⌜ (d <= 4)%nat ⌝ -∗
+        ⌜ addr = (zero_reg : mword 64) -> d = 0%nat ⌝ -∗
         sie_cap_gpr KT1 mf K eb pme -∗
         cpu_own 0 eb pme eb lks -∗
         pc_is (ret_pc (mm !!! Regidx Rra)) -∗
@@ -1684,13 +1686,24 @@ Section ProofKwait.
       iIntros (CIDz) "%Hsz". iIntros (mf) "%Hcsf %Ha0 Hcg Hown Hpc".
       iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
       iApply ("Hcont" $! mf (pv_upt (us_V U)) pidc 0%nat (fun _ : nat => bv_0 8)
-                with "[%] [%] [%] [%] Hcg Hown Hpc [Hpriv]").
+                with "[%] [%] [%] [%] [%] Hcg Hown Hpc [Hpriv]").
       { exact Hcsf. }
       { exact Ha0. }
       { apply uptd_ext_sz_refl. }
       { lia. }
+      { intros _; reflexivity. }
       { cbn [umem_wr]. rewrite us_upt_id upd_usM_id. iExact "Hpriv". }
     - (* ===== addr != 0: copyout(p->pagetable, addr, &pp->xstate, 4) ===== *)
+      (* the branch's own reading of the C's [addr != 0] test, named here
+         because BOTH copyout arms below owe it to the contract *)
+      assert (Hane : addr <> (zero_reg : mword 64)).
+      { intros Hc.
+        assert (Hzt : eq_vec (rget (CID := CIDf) F0 Rs7) (zero_reg : mword 64)
+                      = true).
+        { rewrite (rget_ne (CID := CIDf) F0 Rs7
+                     ltac:(vm_compute; discriminate)) HF0s7 Hc.
+          apply eq_vec_true_iff. reflexivity. }
+        rewrite Hzt in Hz. discriminate. }
       iApply (wp_beqz_x0_fall_s_sconf (mword_of_int (KW + 0x44))
                 (mword_of_int 28 : mword 13) Rs7 F0 (trap_res eb + (K - 10))%nat false
                 ltac:(vm_compute; discriminate) Hz
@@ -1960,11 +1973,12 @@ Section ProofKwait.
         iIntros (CIDz) "%Hsz". iIntros (mf) "%Hcsf %Ha0 Hcg Hown Hpc".
         iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
         iApply ("Hcont" $! mf P' (mword_of_int (-1) : mword 32) d (fun i => nth_byte xs i)
-                  with "[%] [%] [%] [%] Hcg Hown Hpc Hpriv").
+                  with "[%] [%] [%] [%] [%] Hcg Hown Hpc Hpriv").
         { exact Hcsf. }
         { rewrite Ha0. apply bv_eq; vm_compute; reflexivity. }
         { exact Hext. }
         { exact Hdle. }
+        { intros Hc; exfalso; exact (Hane Hc). }
       + (* ===== copyout succeeded: fall through to the reaping tail ===== *)
         iApply (wp_blt_x0_fall_s_sconf (mword_of_int (KW + 0x5c))
                   (mword_of_int 56 : mword 13) Ra0 mco (trap_res eb + (K - 10))%nat false
@@ -1983,11 +1997,12 @@ Section ProofKwait.
         iIntros (CIDz) "%Hsz". iIntros (mf) "%Hcsf %Ha0 Hcg Hown Hpc".
         iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
         iApply ("Hcont" $! mf P' pidc d (fun i => nth_byte xs i)
-                  with "[%] [%] [%] [%] Hcg Hown Hpc Hpriv").
+                  with "[%] [%] [%] [%] [%] Hcg Hown Hpc Hpriv").
         { exact Hcsf. }
         { exact Ha0. }
         { exact Hext. }
         { exact Hdle. }
+        { intros Hc; exfalso; exact (Hane Hc). }
   Qed.
 
   (* ================================================================== *)
@@ -2512,11 +2527,12 @@ Section ProofKwait.
     iSpecialize ("Hqfn" $! CIDx with "[%]"); [exact Hsx |].
     iApply ("Hqfn" $! mf (pv_upt (us_V U)) (mword_of_int (-1) : mword 32) 0%nat
               (fun _ : nat => bv_0 8)
-              with "[%] [%] [%] [%] Hcgx Hownx Hpcx [Hpriv]").
+              with "[%] [%] [%] [%] [%] Hcgx Hownx Hpcx [Hpriv]").
     { exact Hcsx. }
     { rewrite Ha0x. apply bv_eq; vm_compute; reflexivity. }
     { apply uptd_ext_sz_refl. }
     { lia. }
+    { intros _; reflexivity. }
     { cbn [umem_wr]. rewrite us_upt_id upd_usM_id. iExact "Hpriv". }
   Qed.
 
@@ -3576,12 +3592,15 @@ Section ProofKwaitMain.
     iAssert (kw_exit_fn CID19 γf m pj adr av eb pid U lks)
       with "[Hcont]" as "Hqfn".
     { rewrite /kw_exit_fn.
-      iIntros (CIDx Hsx mf P' rv d bs) "%Hcsx %Ha0x %Hextx %Hdx Hcgx Hownx Hpcx Hprivx".
+      iIntros (CIDx Hsx mf P' rv d bs)
+        "%Hcsx %Ha0x %Hextx %Hdx %Hnullx Hcgx Hownx Hpcx Hprivx".
       iSpecialize ("Hcont" $! CIDx with "[%]"); [wp_next_chain |].
-      iApply ("Hcont" $! mf P' rv d bs with "[%] [%] [%] Hcgx Hownx Hpcx [Hprivx]").
+      iApply ("Hcont" $! mf P' rv d bs
+                with "[%] [%] [%] [%] Hcgx Hownx Hpcx [Hprivx]").
       { split; [exact Hcsx | exact Ha0x]. }
       { exact Hextx. }
       { exact Hdx. }
+      { intros Hc. apply Hnullx. rewrite Hadr. exact Hc. }
       { rewrite Hadr. iExact "Hprivx". } }
     (* ==================== THE OUTER LOOP (iLöb) ==================== *)
     iAssert (kw_round CID γf γw j m pj adr av eb pid U lks) with "[]" as "Hround".

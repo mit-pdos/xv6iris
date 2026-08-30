@@ -2613,7 +2613,8 @@ Section SyscallArms.
     destruct (decide (sysc_num V = 7)) as [_ | _]; [done |].
     destruct (decide (sysc_num V = 12)) as [Hc | _]; [contradiction (H12 Hc) |].
     destruct (decide (sysc_num V = 3)) as [_ | _];
-      [ exists 0%nat, (fun _ => bv_0 8); split; [ lia | reflexivity ] | ].
+      [ exists 0%nat, (fun _ => bv_0 8);
+        split; [ lia | split; [ intros _; reflexivity | reflexivity ] ] | ].
     destruct (decide (sysc_num V = 4)) as [_ | _];
       [ exists 0%nat, (fun _ => bv_0 8); split; [ lia | reflexivity ] | ].
     destruct (decide (sysc_num V = 5)) as [_ | _];
@@ -2644,14 +2645,15 @@ Section SyscallArms.
   Lemma sysc_mem_ok_wait (V V' : pprivate) (M M' : gmap Z (bv 8))
       (n : Z) (d : nat) (bs : nat -> bv 8) :
     sysc_num V = n -> n = 3 -> (d <= 4)%nat ->
+    (pv_tf V !!! tf_arg_idx 0 = (zero_reg : mword 64) -> d = 0%nat) ->
     M' = umem_wr M (pv_tf V !!! tf_arg_idx 0) d bs ->
     sysc_mem_ok V V' M M'.
   Proof.
-    intros Hn H3 Hd Hm. unfold sysc_mem_ok. rewrite Hn H3.
+    intros Hn H3 Hd Hz Hm. unfold sysc_mem_ok. rewrite Hn H3.
     destruct (decide (3 = 7)) as [Hc | _]; [ discriminate Hc | ].
     destruct (decide (3 = 12)) as [Hc | _]; [ discriminate Hc | ].
     destruct (decide (3 = 3)) as [_ | Hc]; [ | exfalso; exact (Hc eq_refl) ].
-    exists d, bs. exact (conj Hd Hm).
+    exists d, bs. exact (conj Hd (conj Hz Hm)).
   Qed.
 
   Lemma sysc_mem_ok_pipe (V V' : pprivate) (M M' : gmap Z (bv 8))
@@ -3012,7 +3014,8 @@ Section SyscallArms.
     iApply (SysWait.wp_sys_wait_sconf fsc_kalloc γf γw γs j γl M (av - 4)%nat true true lks pid U v0
               Hj Hgamma Hv0 ltac:(lia) eq_refl
               with "Hcg Hcpu Htext Hdata Hpc Hprocs Hwaitlk Hkalloc Hpriv").
-    iIntros (CIDy Hsy mf P' rv dw bsw) "%Hcs %Hext %Hdwle Hcg Hcpu Hpc Hpriv".
+    iIntros (CIDy Hsy mf P' rv dw bsw)
+      "%Hcs %Hext %Hdwle %Hnullw Hcg Hcpu Hpc Hpriv".
     destruct Hcs as [Hcs _].
     assert (Htfp' : ud_tfp P' = ud_tfp (pv_upt (us_V U))).
     { destruct (uptd_ext_sz_ext (pv_sz (us_V U)) (pv_upt (us_V U)) P' Hext) as (_ & Htf & _).
@@ -3041,7 +3044,8 @@ Section SyscallArms.
                       by (apply list_lookup_total_correct, Hv0);
                     apply (sysc_mem_ok_wait (us_V U) (upd_upt (us_V U) P') (us_M U)
                              (umem_wr (us_M U) v0 dw bsw) (Z.of_nat 3) dw bsw
-                             Hnum ltac:(lia) ltac:(lia));
+                             Hnum ltac:(lia) ltac:(lia)
+                             ltac:(rewrite Hv0t; exact Hnullw));
                     rewrite Hv0t; reflexivity)
               ltac:(right; reflexivity)
               ltac:(right; right; exact Hext)

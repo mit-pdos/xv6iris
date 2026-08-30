@@ -124,6 +124,10 @@ Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
         mf !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 rv ⌝ -∗
       ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
       ⌜ (d <= 4)%nat ⌝ -∗
+      (* ...AND A NULL DESTINATION IS NOT A DESTINATION: kwait's own
+         [addr != 0] test, relayed.  [v0] is the syscall's argument 0, so a
+         caller passing a null status pointer keeps every byte it held. *)
+      ⌜ v0 = (zero_reg : mword 64) -> d = 0%nat ⌝ -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗

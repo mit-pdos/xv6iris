@@ -196,6 +196,12 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG �
         mf !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 rv ⌝ -∗
       ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
       ⌜ (d <= 4)%nat ⌝ -∗
+      (* ...AND A NULL DESTINATION IS NOT A DESTINATION.  kwait's own
+         [addr != 0] test is the C's, so the null arm copies nothing at
+         all -- which is what lets a caller passing a NULL pointer keep
+         everything it held across the call.  Without this the row would
+         still permit a four-byte write at address 0. *)
+      ⌜ addr = (zero_reg : mword 64) -> d = 0%nat ⌝ -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗

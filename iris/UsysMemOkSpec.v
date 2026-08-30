@@ -56,7 +56,14 @@ Proof.
          USYS_read, USYS_fstat, usys_rdcount.
   destruct (decide (sysc_num V = 7)); [ contradiction | ].
   destruct (decide (sysc_num V = 12)); [ contradiction | ].
-  destruct (decide (sysc_num V = 3)); [ exact (conj H (conj Hp Hs)) | ].
+  destruct (decide (sysc_num V = 3)).
+  { (* the null test is [= zero_reg] on the kernel side and [uint _ = 0] on
+       the user side: the U tier's file is below [zero_reg]'s. *)
+    destruct H as (d & bs & Hd & Hz & Hm).
+    split; [ | exact (conj Hp Hs) ].
+    exists d, bs. split; [ exact Hd | ]. split; [ | exact Hm ].
+    intros Hu. apply Hz.
+    rewrite zero_reg_moi. rewrite <- Hu. symmetry. apply moi_of_uint. }
   destruct (decide (sysc_num V = 4)); [ exact (conj H (conj Hp Hs)) | ].
   destruct (decide (sysc_num V = 5)); [ exact (conj H (conj Hp Hs)) | ].
   destruct (decide (sysc_num V = 8)); [ exact (conj H (conj Hp Hs)) | ].

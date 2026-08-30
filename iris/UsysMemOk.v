@@ -147,9 +147,13 @@ Definition usys_mem_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
     usys_sbrk_img M M' (mword_of_int szv) (mword_of_int szv') /\
     usys_sbrk_perm π π' (mword_of_int szv) (mword_of_int szv')
   else if decide (n = USYS_wait) then
-    (* copyout of the zombie's four-byte [xstate] at argument 0 *)
+    (* copyout of the zombie's four-byte [xstate] at argument 0 -- and a
+       NULL destination is not a destination, so a caller passing a null
+       status pointer keeps every byte it held. *)
     (exists (d : nat) (bs : nat -> bv 8),
-       (d <= 4)%nat /\ M' = umem_wr M (tf !!! tf_arg_idx 0) d bs)
+       (d <= 4)%nat /\
+       (uint (tf !!! tf_arg_idx 0) = 0 -> d = 0%nat) /\
+       M' = umem_wr M (tf !!! tf_arg_idx 0) d bs)
     /\ π' = π /\ szv' = szv
   else if decide (n = USYS_pipe) then
     (* two four-byte fds, back to back at argument 0 *)
