@@ -1849,30 +1849,30 @@ Section ProofScheduler.
            guard asks for -- the rejoined receipt, and whatever the
            crossing's [park_pay] carried (the dormant block at a ZOMBIE park,
            nothing at a resumable one). *)
-        (* the update is eliminated against the WP through [fupd_wp], the way
-           every other fancy-update step in this tree is -- there is no
-           [ElimModal] instance for a bare [WP] goal here. *)
-        iApply fupd_wp.
-        (* A6.127 §6: a resumable park came back WITH ITS BOX ([park_tok]);
-           the slot is rebuilt at the box's context and the box becomes the
-           lock's context at the release below. *)
-        iMod (proc_slots_park_box γs ⊤ (proc_addr jj) st' Hneeds'
-                with "[Hvc'] [Htag'] Hmk Hppay") as (ξb Tb) "[Hbox Hsl]".
-        { iEval (rewrite Hcret) in "Hvc'". destruct (needs_ctx st'); [| iExact "Hvc'"].
-          iDestruct "Hvc'" as (XIo) "[Htok Hrec]".
-          iApply (proc_ctx_at_of_tok with "Htok Hrec"). }
-        { iApply (hart_at_any_intro jj cpu_id Hjj with "Htag'"). }
         (* the park state is [unclaimed] ([park_ok_unclaimed]), so the whole
            mirror the swtch payload carried is the lock's share again. *)
         iDestruct (pstate_whole_split (proc_addr jj) st') as "[Hwk _]".
         iDestruct ("Hwk" with "Hpg") as "[Hpg _]".
-        iModIntro.
+        (* A6.127 §6 / A6.129: a resumable park came back WITH ITS BOX
+           ([park_tok]); the slot is rebuilt at the box's context, the cells
+           are DEPOSITED into the box, and the box becomes the lock's
+           context at the release below.  Both steps need the running token,
+           which the release's [ReleaseIn] wand lends -- so they run inside
+           it. *)
         iAssert (own_context cur_ctx ==∗ own_context cur_ctx ∗
                    lock_pay (proc_lock_pay γs γl (proc_addr jj)))%I
-          with "[Hstate Hpg Hchan Hpub Hsl Hbox]" as "HR".
-        { iIntros "Hrun". iModIntro. iFrame "Hrun".
-          iApply proc_lock_pay_of_box. iExists ξb, Tb. iFrame "Hbox".
-          iApply (proc_lock_res_at_intro with "Hstate Hpg Hchan Hpub Hsl"). }
+          with "[Hvc' Htag' Hstate Hpg Hchan Hpub Hppay]" as "HR".
+        { iIntros "Hrun".
+          iMod (proc_slots_park_box γs (proc_addr jj) st' Hneeds'
+                  with "Hrun [Hvc'] [Htag'] Hmk Hppay") as "[Hrun (%ξb & %Tb & Hbox & Hsl)]".
+          { iEval (rewrite Hcret) in "Hvc'". destruct (needs_ctx st'); [| iExact "Hvc'"].
+            iDestruct "Hvc'" as (XIo) "[Htok Hrec]".
+            iApply (proc_ctx_at_of_tok with "Htok Hrec"). }
+          { iApply (hart_at_any_intro jj cpu_id Hjj with "Htag'"). }
+          iMod (proc_lock_res_deposit γs γl (proc_addr jj) st' _ ξb Tb
+                  with "Hrun Hbox Hstate Hpg Hchan Hpub Hsl") as "[Hrun (%Tb' & _ & Hbox & Hres)]".
+          iModIntro. iFrame "Hrun".
+          iApply proc_lock_pay_of_box. iExists ξb, Tb'. iFrame "Hbox Hres". }
         (* c->proc is 0 again, so re-tag the bundle back to the idle index --
            this is what keeps [wp_next_idle] available at the loop head. *)
         iEval (rewrite (sc_retag_p M5 (av - 12)%nat (proc_addr jj) zero_reg)) in "Hcg".

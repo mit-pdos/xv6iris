@@ -3360,18 +3360,6 @@ R47099:47114 xv6iris.DiskAvail <> avail_half_morph inst
 R47124:47144 xv6iris.WpLock <> lk_floor_morph inst
 R47169:47183 xv6iris.DiskAvail <> hcell_map_morph inst
 R47193:47206 xv6iris.DiskAvail <> keep_map_morph inst
-R46962:46977 xv6iris.DiskInv <> flight_res_morph inst
-R46987:47002 xv6iris.DiskInv <> parked_res_morph inst
-R47027:47045 xv6iris.DiskInv <> free_slot_res_morph inst
-R47055:47074 xv6iris.DiskInv <> ring_slots_res_morph inst
-R47099:47114 xv6iris.DiskAvail <> avail_half_morph inst
-R47124:47144 xv6iris.WpLock <> lk_floor_morph inst
-R46962:46977 xv6iris.DiskInv <> flight_res_morph inst
-R46987:47002 xv6iris.DiskInv <> parked_res_morph inst
-R47027:47045 xv6iris.DiskInv <> free_slot_res_morph inst
-R47055:47074 xv6iris.DiskInv <> ring_slots_res_morph inst
-R47099:47114 xv6iris.DiskAvail <> avail_half_morph inst
-R47124:47144 xv6iris.WpLock <> lk_floor_morph inst
 R47222:47230 xv6iris.DiskInv DiskResAt <> sec
 prf 47986:47997 <> tri_set_size
 R48013:48015 Corelib.Init.Datatypes <> ::type_scope:x_'*'_x not

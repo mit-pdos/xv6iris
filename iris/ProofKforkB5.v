@@ -291,8 +291,6 @@ Section ProofKforkB5.
     iDestruct "Hpctx" as (ξb Tb) "[Hbox Hpctx]".
     iDestruct (SchedCtx.proc_slots_park_at γs ξb (proc_addr j) USED needs_ctx_USED
                  with "Hpctx Hhart Hmk") as "Hslots".
-    iDestruct (SchedCtx.proc_lock_res_at_intro γs ξb γl (proc_addr j) USED ch
-                 with "Hpstcell Hplock Hpchan Hppub Hslots") as "HRused".
     (* -------------------------------------------------------------- *)
     (* +0x0c2 c.mv a0,s4  -- regime OFF (np's lock still held)            *)
     (* -------------------------------------------------------------- *)
@@ -340,10 +338,16 @@ Section ProofKforkB5.
     iApply (RLI.wp_release_in_sconf KT1 (CID := CID0) γl (proc_addr j) "proc"%string (SchedCtx.proc_lock_pay γs γl (proc_addr j)) M2 lvl eb pme (K - 8)%nat
               ({["proc"]} ∪ lks)
               Hlka1 (kfkb5_stack_ok K HK)
-              with "Hcg Htext Hpc [Hpinv] Htok [Hbox HRused] Hown Hpay").
+              with "Hcg Htext Hpc [Hpinv] Htok [Hbox Hpstcell Hplock Hpchan Hppub Hslots] Hown Hpay").
     { iApply (SchedCtx.procs_inv_lookup γs j γl Hgl with "Hpinv"). }
-    { iIntros "Hrun". iModIntro. iFrame "Hrun". iApply SchedCtx.proc_lock_pay_of_box.
-      iExists ξb, Tb. iFrame "Hbox HRused". }
+    { (* A6.129: the cells are deposited into the record's box, which the
+         release makes the lock's context *)
+      iIntros "Hrun".
+      iMod (SchedCtx.proc_lock_res_deposit γs γl (proc_addr j) USED ch ξb Tb
+              with "Hrun Hbox Hpstcell Hplock Hpchan Hppub Hslots")
+        as "[Hrun (%Tb' & _ & Hbox & HRused)]".
+      iModIntro. iFrame "Hrun". iApply SchedCtx.proc_lock_pay_of_box.
+      iExists ξb, Tb'. iFrame "Hbox HRused". }
     iIntros (CID1 Hs1 mr1) "Hcg Hpc %Hcs_2_r1 Hown".
     assert (Hfresh_proc : locks_below lks "proc")
       by lkbelow.

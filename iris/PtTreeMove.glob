@@ -1,4 +1,4 @@
-DIGEST 925346449cf690ae359423f5a8a4e40f
+DIGEST 434bfbb00b4785f456c4b28e6e153f2b
 Fxv6iris.PtTreeMove
 R595:600 Stdlib.ZArith.ZArith <> <> lib
 R602:604 Stdlib.micromega.Lia <> <> lib
@@ -17,124 +17,243 @@ R887:894 xv6iris.TsoMemPa <> <> lib
 R896:903 xv6iris.TsoGhost <> <> lib
 R921:926 xv6iris.TsoCtx <> <> lib
 R928:937 xv6iris.TsoCtxMove <> <> lib
-R939:944 xv6iris.PtTree <> <> lib
-sec 956:965 <> PtTreeMove
-var  995:997 PtTreeMove CID
-R981:987 xv6iris.RiscvPtsto <> riscvGS class
-R1001:1005 xv6iris.RiscvLang <> CpuId class
-inst 1028:1043 <> pt_slot_own_move
-binder 1045:1045 <> a:4
-binder 1047:1048 <> dq:5
-binder 1050:1050 <> w:6
-R1058:1064 xv6iris.TsoCtxMove <> CtxMove class
-R1067:1069 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R1072:1073 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 1070:1071 <> ξ:7
-R1074:1084 xv6iris.PtTree <> pt_slot_own def
-R1097:1097 xv6iris.PtTreeMove <> a:4 var
-R1099:1100 xv6iris.PtTreeMove <> dq:5 var
-R1102:1102 xv6iris.PtTreeMove <> w:6 var
-R1087:1091 xv6iris.PtTree <> UTier constr
-R1093:1094 xv6iris.PtTreeMove <> ξ:7 var
-R1124:1134 xv6iris.PtTree <> pt_slot_own def
-R1124:1134 xv6iris.PtTree <> pt_slot_own def
-R1124:1134 xv6iris.PtTree <> pt_slot_own def
-inst 1182:1200 <> pt_page_own_at_move
-binder 1202:1203 <> dq:8
-binder 1205:1205 <> t:9
-R1213:1219 xv6iris.TsoCtxMove <> CtxMove class
-R1222:1224 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R1227:1228 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 1225:1226 <> ξ:10
-R1229:1242 xv6iris.PtTree <> pt_page_own_at def
-R1255:1256 xv6iris.PtTreeMove <> dq:8 var
-R1258:1258 xv6iris.PtTreeMove <> t:9 var
-R1245:1249 xv6iris.PtTree <> UTier constr
-R1251:1252 xv6iris.PtTreeMove <> ξ:10 var
-R1280:1293 xv6iris.PtTree <> pt_page_own_at def
-R1280:1293 xv6iris.PtTree <> pt_page_own_at def
-R1280:1293 xv6iris.PtTree <> pt_page_own_at def
-prf 1326:1344 <> ptree_own_at_move_l
-R1353:1355 Corelib.Init.Datatypes <> nat ind
-binder 1347:1349 <> lvl:11
-R1364:1367 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
-R1372:1373 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
-binder 1368:1369 <> dq:12
-binder 1371:1371 <> t:13
-R1374:1380 xv6iris.TsoCtxMove <> CtxMove class
-R1383:1385 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R1388:1389 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 1386:1387 <> ξ:14
-R1390:1401 xv6iris.PtTree <> ptree_own_at def
-R1414:1416 xv6iris.PtTreeMove <> lvl:11 var
-R1418:1419 xv6iris.PtTreeMove <> dq:12 var
-R1421:1421 xv6iris.PtTreeMove <> t:13 var
-R1404:1408 xv6iris.PtTree <> UTier constr
-R1410:1411 xv6iris.PtTreeMove <> ξ:14 var
-R1484:1495 xv6iris.PtTree <> ptree_own_at def
-R1533:1544 xv6iris.TsoCtxMove <> ctx_move_sep inst
-R1533:1544 xv6iris.TsoCtxMove <> ctx_move_sep inst
-R1572:1588 xv6iris.TsoCtxMove <> ctx_move_big_sepL inst
-R1572:1588 xv6iris.TsoCtxMove <> ctx_move_big_sepL inst
-R1629:1635 xv6iris.PtreeType <> pt_kids def
-R1640:1651 SailStdpp.Values <> mword_of_int def
-R1685:1698 xv6iris.TsoCtxMove <> ctx_move_const inst
-R1629:1635 xv6iris.PtreeType <> pt_kids def
-R1640:1651 SailStdpp.Values <> mword_of_int def
-R1685:1698 xv6iris.TsoCtxMove <> ctx_move_const inst
-inst 1727:1743 <> ptree_own_at_move
-binder 1745:1747 <> lvl:15
-binder 1749:1750 <> dq:16
-binder 1752:1752 <> t:17
-R1760:1766 xv6iris.TsoCtxMove <> CtxMove class
-R1769:1771 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R1774:1775 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 1772:1773 <> ξ:18
-R1776:1787 xv6iris.PtTree <> ptree_own_at def
-R1800:1802 xv6iris.PtTreeMove <> lvl:15 var
-R1804:1805 xv6iris.PtTreeMove <> dq:16 var
-R1807:1807 xv6iris.PtTreeMove <> t:17 var
-R1790:1794 xv6iris.PtTree <> UTier constr
-R1796:1797 xv6iris.PtTreeMove <> ξ:18 var
-R1813:1831 xv6iris.PtTreeMove <> ptree_own_at_move_l thm
-inst 1862:1880 <> pt_kids_own_at_move
-binder 1882:1884 <> lvl:19
-binder 1886:1887 <> dq:20
-binder 1889:1889 <> t:21
-R1897:1903 xv6iris.TsoCtxMove <> CtxMove class
-R1906:1908 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R1911:1912 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 1909:1910 <> ξ:22
-R1913:1926 xv6iris.PtTree <> pt_kids_own_at def
-R1939:1941 xv6iris.PtTreeMove <> lvl:19 var
-R1943:1944 xv6iris.PtTreeMove <> dq:20 var
-R1946:1946 xv6iris.PtTreeMove <> t:21 var
-R1929:1933 xv6iris.PtTree <> UTier constr
-R1935:1936 xv6iris.PtTreeMove <> ξ:22 var
-R1972:1985 xv6iris.PtTree <> pt_kids_own_at def
-R1972:1985 xv6iris.PtTree <> pt_kids_own_at def
-R1972:1985 xv6iris.PtTree <> pt_kids_own_at def
-R1994:2010 xv6iris.TsoCtxMove <> ctx_move_big_sepL inst
-R1994:2010 xv6iris.TsoCtxMove <> ctx_move_big_sepL inst
-R2049:2055 xv6iris.PtreeType <> pt_kids def
-R2060:2071 SailStdpp.Values <> mword_of_int def
-R2104:2117 xv6iris.TsoCtxMove <> ctx_move_const inst
-R2049:2055 xv6iris.PtreeType <> pt_kids def
-R2060:2071 SailStdpp.Values <> mword_of_int def
-R2104:2117 xv6iris.TsoCtxMove <> ctx_move_const inst
-inst 2147:2162 <> pt_frame_at_move
-R2174:2177 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
-R2169:2173 xv6iris.PtreeType <> ptree ind
-binder 2165:2165 <> S:23
-R2190:2196 xv6iris.TsoCtxMove <> CtxMove class
-R2199:2201 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R2204:2205 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 2202:2203 <> ξ:24
-R2206:2216 xv6iris.PtTree <> pt_frame_at def
-R2229:2229 xv6iris.PtTreeMove <> S:23 var
-R2219:2223 xv6iris.PtTree <> UTier constr
-R2225:2226 xv6iris.PtTreeMove <> ξ:24 var
-R2251:2261 xv6iris.PtTree <> pt_frame_at def
-R2251:2261 xv6iris.PtTree <> pt_frame_at def
-R2251:2261 xv6iris.PtTree <> pt_frame_at def
-R2289:2298 xv6iris.PtTreeMove PtTreeMove <> sec
+R939:949 xv6iris.CtxMorphTac <> <> lib
+R951:956 xv6iris.PtTree <> <> lib
+sec 968:977 <> PtTreeMove
+var  1007:1009 PtTreeMove CID
+R993:999 xv6iris.RiscvPtsto <> riscvGS class
+R1013:1017 xv6iris.RiscvLang <> CpuId class
+inst 1040:1055 <> pt_slot_own_move
+binder 1057:1057 <> a:4
+binder 1059:1060 <> dq:5
+binder 1062:1062 <> w:6
+R1070:1076 xv6iris.TsoCtxMove <> CtxMove class
+R1079:1081 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R1084:1085 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 1082:1083 <> ξ:7
+R1086:1096 xv6iris.PtTree <> pt_slot_own def
+R1109:1109 xv6iris.PtTreeMove <> a:4 var
+R1111:1112 xv6iris.PtTreeMove <> dq:5 var
+R1114:1114 xv6iris.PtTreeMove <> w:6 var
+R1099:1103 xv6iris.PtTree <> UTier constr
+R1105:1106 xv6iris.PtTreeMove <> ξ:7 var
+R1136:1146 xv6iris.PtTree <> pt_slot_own def
+R1136:1146 xv6iris.PtTree <> pt_slot_own def
+R1136:1146 xv6iris.PtTree <> pt_slot_own def
+inst 1194:1212 <> pt_page_own_at_move
+binder 1214:1215 <> dq:8
+binder 1217:1217 <> t:9
+R1225:1231 xv6iris.TsoCtxMove <> CtxMove class
+R1234:1236 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R1239:1240 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 1237:1238 <> ξ:10
+R1241:1254 xv6iris.PtTree <> pt_page_own_at def
+R1267:1268 xv6iris.PtTreeMove <> dq:8 var
+R1270:1270 xv6iris.PtTreeMove <> t:9 var
+R1257:1261 xv6iris.PtTree <> UTier constr
+R1263:1264 xv6iris.PtTreeMove <> ξ:10 var
+R1292:1305 xv6iris.PtTree <> pt_page_own_at def
+R1292:1305 xv6iris.PtTree <> pt_page_own_at def
+R1292:1305 xv6iris.PtTree <> pt_page_own_at def
+prf 1338:1356 <> ptree_own_at_move_l
+R1365:1367 Corelib.Init.Datatypes <> nat ind
+binder 1359:1361 <> lvl:11
+R1376:1379 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
+R1384:1385 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
+binder 1380:1381 <> dq:12
+binder 1383:1383 <> t:13
+R1386:1392 xv6iris.TsoCtxMove <> CtxMove class
+R1395:1397 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R1400:1401 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 1398:1399 <> ξ:14
+R1402:1413 xv6iris.PtTree <> ptree_own_at def
+R1426:1428 xv6iris.PtTreeMove <> lvl:11 var
+R1430:1431 xv6iris.PtTreeMove <> dq:12 var
+R1433:1433 xv6iris.PtTreeMove <> t:13 var
+R1416:1420 xv6iris.PtTree <> UTier constr
+R1422:1423 xv6iris.PtTreeMove <> ξ:14 var
+R1496:1507 xv6iris.PtTree <> ptree_own_at def
+R1545:1556 xv6iris.TsoCtxMove <> ctx_move_sep inst
+R1545:1556 xv6iris.TsoCtxMove <> ctx_move_sep inst
+R1584:1600 xv6iris.TsoCtxMove <> ctx_move_big_sepL inst
+R1584:1600 xv6iris.TsoCtxMove <> ctx_move_big_sepL inst
+R1641:1647 xv6iris.PtreeType <> pt_kids def
+R1652:1663 SailStdpp.Values <> mword_of_int def
+R1697:1710 xv6iris.TsoCtxMove <> ctx_move_const inst
+R1641:1647 xv6iris.PtreeType <> pt_kids def
+R1652:1663 SailStdpp.Values <> mword_of_int def
+R1697:1710 xv6iris.TsoCtxMove <> ctx_move_const inst
+inst 1739:1755 <> ptree_own_at_move
+binder 1757:1759 <> lvl:15
+binder 1761:1762 <> dq:16
+binder 1764:1764 <> t:17
+R1772:1778 xv6iris.TsoCtxMove <> CtxMove class
+R1781:1783 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R1786:1787 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 1784:1785 <> ξ:18
+R1788:1799 xv6iris.PtTree <> ptree_own_at def
+R1812:1814 xv6iris.PtTreeMove <> lvl:15 var
+R1816:1817 xv6iris.PtTreeMove <> dq:16 var
+R1819:1819 xv6iris.PtTreeMove <> t:17 var
+R1802:1806 xv6iris.PtTree <> UTier constr
+R1808:1809 xv6iris.PtTreeMove <> ξ:18 var
+R1825:1843 xv6iris.PtTreeMove <> ptree_own_at_move_l thm
+inst 1874:1892 <> pt_kids_own_at_move
+binder 1894:1896 <> lvl:19
+binder 1898:1899 <> dq:20
+binder 1901:1901 <> t:21
+R1909:1915 xv6iris.TsoCtxMove <> CtxMove class
+R1918:1920 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R1923:1924 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 1921:1922 <> ξ:22
+R1925:1938 xv6iris.PtTree <> pt_kids_own_at def
+R1951:1953 xv6iris.PtTreeMove <> lvl:19 var
+R1955:1956 xv6iris.PtTreeMove <> dq:20 var
+R1958:1958 xv6iris.PtTreeMove <> t:21 var
+R1941:1945 xv6iris.PtTree <> UTier constr
+R1947:1948 xv6iris.PtTreeMove <> ξ:22 var
+R1984:1997 xv6iris.PtTree <> pt_kids_own_at def
+R1984:1997 xv6iris.PtTree <> pt_kids_own_at def
+R1984:1997 xv6iris.PtTree <> pt_kids_own_at def
+R2006:2022 xv6iris.TsoCtxMove <> ctx_move_big_sepL inst
+R2006:2022 xv6iris.TsoCtxMove <> ctx_move_big_sepL inst
+R2061:2067 xv6iris.PtreeType <> pt_kids def
+R2072:2083 SailStdpp.Values <> mword_of_int def
+R2116:2129 xv6iris.TsoCtxMove <> ctx_move_const inst
+R2061:2067 xv6iris.PtreeType <> pt_kids def
+R2072:2083 SailStdpp.Values <> mword_of_int def
+R2116:2129 xv6iris.TsoCtxMove <> ctx_move_const inst
+inst 2159:2174 <> pt_frame_at_move
+R2186:2189 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R2181:2185 xv6iris.PtreeType <> ptree ind
+binder 2177:2177 <> S:23
+R2202:2208 xv6iris.TsoCtxMove <> CtxMove class
+R2211:2213 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R2216:2217 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 2214:2215 <> ξ:24
+R2218:2228 xv6iris.PtTree <> pt_frame_at def
+R2241:2241 xv6iris.PtTreeMove <> S:23 var
+R2231:2235 xv6iris.PtTree <> UTier constr
+R2237:2238 xv6iris.PtTreeMove <> ξ:24 var
+R2263:2273 xv6iris.PtTree <> pt_frame_at def
+R2263:2273 xv6iris.PtTree <> pt_frame_at def
+R2263:2273 xv6iris.PtTree <> pt_frame_at def
+R2301:2310 xv6iris.PtTreeMove PtTreeMove <> sec
+sec 2456:2466 <> PtTreeMorph
+R2482:2488 xv6iris.RiscvPtsto <> riscvGS class
+inst 2514:2530 <> pt_slot_own_morph
+binder 2532:2532 <> a:27
+binder 2534:2535 <> dq:28
+binder 2537:2537 <> w:29
+R2545:2552 xv6iris.TsoCtx <> CtxMorph class
+R2555:2557 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R2560:2561 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 2558:2559 <> ξ:30
+R2562:2572 xv6iris.PtTree <> pt_slot_own def
+R2585:2585 xv6iris.PtTreeMove <> a:27 var
+R2587:2588 xv6iris.PtTreeMove <> dq:28 var
+R2590:2590 xv6iris.PtTreeMove <> w:29 var
+R2575:2579 xv6iris.PtTree <> UTier constr
+R2581:2582 xv6iris.PtTreeMove <> ξ:30 var
+R2612:2622 xv6iris.PtTree <> pt_slot_own def
+R2612:2622 xv6iris.PtTree <> pt_slot_own def
+R2612:2622 xv6iris.PtTree <> pt_slot_own def
+inst 2671:2690 <> pt_page_own_at_morph
+binder 2692:2693 <> dq:31
+binder 2695:2695 <> t:32
+R2703:2710 xv6iris.TsoCtx <> CtxMorph class
+R2713:2715 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R2718:2719 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 2716:2717 <> ξ:33
+R2720:2733 xv6iris.PtTree <> pt_page_own_at def
+R2746:2747 xv6iris.PtTreeMove <> dq:31 var
+R2749:2749 xv6iris.PtTreeMove <> t:32 var
+R2736:2740 xv6iris.PtTree <> UTier constr
+R2742:2743 xv6iris.PtTreeMove <> ξ:33 var
+R2771:2784 xv6iris.PtTree <> pt_page_own_at def
+R2771:2784 xv6iris.PtTree <> pt_page_own_at def
+R2771:2784 xv6iris.PtTree <> pt_page_own_at def
+prf 2818:2837 <> ptree_own_at_morph_l
+R2846:2848 Corelib.Init.Datatypes <> nat ind
+binder 2840:2842 <> lvl:34
+R2857:2860 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
+R2865:2866 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
+binder 2861:2862 <> dq:35
+binder 2864:2864 <> t:36
+R2867:2874 xv6iris.TsoCtx <> CtxMorph class
+R2877:2879 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R2882:2883 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 2880:2881 <> ξ:37
+R2884:2895 xv6iris.PtTree <> ptree_own_at def
+R2908:2910 xv6iris.PtTreeMove <> lvl:34 var
+R2912:2913 xv6iris.PtTreeMove <> dq:35 var
+R2915:2915 xv6iris.PtTreeMove <> t:36 var
+R2898:2902 xv6iris.PtTree <> UTier constr
+R2904:2905 xv6iris.PtTreeMove <> ξ:37 var
+R2978:2989 xv6iris.PtTree <> ptree_own_at def
+R3028:3040 xv6iris.TsoCtx <> ctx_morph_sep inst
+R3028:3040 xv6iris.TsoCtx <> ctx_morph_sep inst
+R3068:3085 xv6iris.TsoCtx <> ctx_morph_big_sepL inst
+R3068:3085 xv6iris.TsoCtx <> ctx_morph_big_sepL inst
+R3126:3132 xv6iris.PtreeType <> pt_kids def
+R3137:3148 SailStdpp.Values <> mword_of_int def
+R3182:3196 xv6iris.TsoCtx <> ctx_morph_const inst
+R3126:3132 xv6iris.PtreeType <> pt_kids def
+R3137:3148 SailStdpp.Values <> mword_of_int def
+R3182:3196 xv6iris.TsoCtx <> ctx_morph_const inst
+inst 3225:3242 <> ptree_own_at_morph
+binder 3244:3246 <> lvl:38
+binder 3248:3249 <> dq:39
+binder 3251:3251 <> t:40
+R3259:3266 xv6iris.TsoCtx <> CtxMorph class
+R3269:3271 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R3274:3275 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 3272:3273 <> ξ:41
+R3276:3287 xv6iris.PtTree <> ptree_own_at def
+R3300:3302 xv6iris.PtTreeMove <> lvl:38 var
+R3304:3305 xv6iris.PtTreeMove <> dq:39 var
+R3307:3307 xv6iris.PtTreeMove <> t:40 var
+R3290:3294 xv6iris.PtTree <> UTier constr
+R3296:3297 xv6iris.PtTreeMove <> ξ:41 var
+R3313:3332 xv6iris.PtTreeMove <> ptree_own_at_morph_l thm
+inst 3363:3382 <> pt_kids_own_at_morph
+binder 3384:3386 <> lvl:42
+binder 3388:3389 <> dq:43
+binder 3391:3391 <> t:44
+R3399:3406 xv6iris.TsoCtx <> CtxMorph class
+R3409:3411 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R3414:3415 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 3412:3413 <> ξ:45
+R3416:3429 xv6iris.PtTree <> pt_kids_own_at def
+R3442:3444 xv6iris.PtTreeMove <> lvl:42 var
+R3446:3447 xv6iris.PtTreeMove <> dq:43 var
+R3449:3449 xv6iris.PtTreeMove <> t:44 var
+R3432:3436 xv6iris.PtTree <> UTier constr
+R3438:3439 xv6iris.PtTreeMove <> ξ:45 var
+R3475:3488 xv6iris.PtTree <> pt_kids_own_at def
+R3475:3488 xv6iris.PtTree <> pt_kids_own_at def
+R3475:3488 xv6iris.PtTree <> pt_kids_own_at def
+R3497:3514 xv6iris.TsoCtx <> ctx_morph_big_sepL inst
+R3497:3514 xv6iris.TsoCtx <> ctx_morph_big_sepL inst
+R3553:3559 xv6iris.PtreeType <> pt_kids def
+R3564:3575 SailStdpp.Values <> mword_of_int def
+R3608:3622 xv6iris.TsoCtx <> ctx_morph_const inst
+R3553:3559 xv6iris.PtreeType <> pt_kids def
+R3564:3575 SailStdpp.Values <> mword_of_int def
+R3608:3622 xv6iris.TsoCtx <> ctx_morph_const inst
+inst 3652:3668 <> pt_frame_at_morph
+R3680:3683 Corelib.Init.Logic <> ::type_scope:x_'->'_x not
+R3675:3679 xv6iris.PtreeType <> ptree ind
+binder 3671:3671 <> S:46
+R3696:3703 xv6iris.TsoCtx <> CtxMorph class
+R3706:3708 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R3711:3712 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 3709:3710 <> ξ:47
+R3713:3723 xv6iris.PtTree <> pt_frame_at def
+R3736:3736 xv6iris.PtTreeMove <> S:46 var
+R3726:3730 xv6iris.PtTree <> UTier constr
+R3732:3733 xv6iris.PtTreeMove <> ξ:47 var
+R3758:3768 xv6iris.PtTree <> pt_frame_at def
+R3758:3768 xv6iris.PtTree <> pt_frame_at def
+R3758:3768 xv6iris.PtTree <> pt_frame_at def
+R3797:3807 xv6iris.PtTreeMove PtTreeMorph <> sec

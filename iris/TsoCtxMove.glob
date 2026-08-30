@@ -1,4 +1,4 @@
-DIGEST a3a6a27afde67c61b246b048e858e347
+DIGEST 6daad80e59be90067dc1ca660d8b596c
 Fxv6iris.TsoCtxMove
 R1704:1709 Stdlib.ZArith.ZArith <> <> lib
 R1711:1713 Stdlib.micromega.Lia <> <> lib
@@ -652,885 +652,1147 @@ R10401:10413 stdpp.base <> elem_of_union meth
 R10401:10413 stdpp.base <> elem_of_union meth
 R10489:10505 stdpp.base <> elem_of_singleton meth
 R10489:10505 stdpp.base <> elem_of_singleton meth
-ind 10833:10839 <> CtxMove
-constr 10888:10895 <> ctx_move
-rec 10833:10839 <> CtxMove
-proj 10888:10895 <> ctx_move
-R10849:10853 xv6iris.RiscvLang <> CpuId class
-binder 10843:10845 <> CID:37
-R10866:10870 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R10861:10865 xv6iris.TsoCtx <> CtxId rec
-R10871:10875 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R10877:10878 xv6iris.TsoCtxMove <> Move.Σ var
-binder 10857:10857 <> R:38
-R10899:10902 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
-R10910:10911 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
-binder 10903:10905 <> ξ0:40
-binder 10907:10909 <> ξ1:41
-R10927:10932 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
-R10912:10922 xv6iris.TsoCtx <> own_context def
-R10924:10926 xv6iris.TsoCtxMove <> ξ0:40 var
-R10948:10953 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
-R10933:10943 xv6iris.TsoCtx <> own_context def
-R10945:10947 xv6iris.TsoCtxMove <> ξ1:41 var
-R10959:10989 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
-R10954:10954 xv6iris.TsoCtxMove <> R:38 var
-R10956:10958 xv6iris.TsoCtxMove <> ξ0:40 var
-R11005:11009 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R10990:11000 xv6iris.TsoCtx <> own_context def
-R11002:11004 xv6iris.TsoCtxMove <> ξ0:40 var
-R11025:11029 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R11010:11020 xv6iris.TsoCtx <> own_context def
-R11022:11024 xv6iris.TsoCtxMove <> ξ1:41 var
-R11030:11030 xv6iris.TsoCtxMove <> R:38 var
-R11032:11034 xv6iris.TsoCtxMove <> ξ1:41 var
-inst 11056:11069 <> ctx_move_const
-R11079:11083 xv6iris.RiscvLang <> CpuId class
-binder 11073:11075 <> CID:43
-R11091:11095 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R11097:11098 xv6iris.TsoCtxMove <> Move.Σ var
-binder 11087:11087 <> P:44
-R11103:11109 xv6iris.TsoCtxMove <> CtxMove class
-R11112:11114 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R11116:11117 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R11118:11118 xv6iris.TsoCtxMove <> P:44 var
-inst 11202:11213 <> ctx_move_sep
-R11223:11227 xv6iris.RiscvLang <> CpuId class
-binder 11217:11219 <> CID:45
-R11244:11248 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R11239:11243 xv6iris.TsoCtx <> CtxId rec
-R11249:11253 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R11255:11256 xv6iris.TsoCtxMove <> Move.Σ var
-binder 11231:11232 <> R1:46
-binder 11234:11235 <> R2:47
-R11275:11279 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R11265:11271 xv6iris.TsoCtxMove <> CtxMove class
-R11273:11274 xv6iris.TsoCtxMove <> R1:46 var
-R11290:11294 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R11280:11286 xv6iris.TsoCtxMove <> CtxMove class
-R11288:11289 xv6iris.TsoCtxMove <> R2:47 var
-R11295:11301 xv6iris.TsoCtxMove <> CtxMove class
-R11304:11306 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R11309:11310 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 11307:11308 <> ξ:48
-R11316:11320 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R11311:11312 xv6iris.TsoCtxMove <> R1:46 var
-R11314:11315 xv6iris.TsoCtxMove <> ξ:48 var
-R11321:11322 xv6iris.TsoCtxMove <> R2:47 var
-R11324:11325 xv6iris.TsoCtxMove <> ξ:48 var
-R11396:11396 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R11405:11410 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R11422:11422 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R11397:11404 xv6iris.TsoCtxMove <> ctx_move def
-R11396:11396 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R11405:11410 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R11422:11422 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R11397:11404 xv6iris.TsoCtxMove <> ctx_move def
-R11455:11455 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R11464:11469 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R11481:11481 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R11456:11463 xv6iris.TsoCtxMove <> ctx_move def
-R11455:11455 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R11464:11469 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R11481:11481 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R11456:11463 xv6iris.TsoCtxMove <> ctx_move def
-inst 11554:11567 <> ctx_move_exist
-R11577:11581 xv6iris.RiscvLang <> CpuId class
-binder 11571:11573 <> CID:49
-binder 11585:11585 <> A:50
-R11595:11599 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R11594:11594 xv6iris.TsoCtxMove <> A:50 var
-R11605:11609 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R11600:11604 xv6iris.TsoCtx <> CtxId rec
-R11610:11614 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R11616:11617 xv6iris.TsoCtxMove <> Move.Σ var
-binder 11589:11590 <> Φ:51
-R11626:11626 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R11648:11653 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R11627:11630 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
-R11632:11633 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
-binder 11631:11631 <> x:52
-R11634:11640 xv6iris.TsoCtxMove <> CtxMove class
-R11643:11644 xv6iris.TsoCtxMove <> Φ:51 var
-R11646:11646 xv6iris.TsoCtxMove <> x:52 var
-R11654:11660 xv6iris.TsoCtxMove <> CtxMove class
-R11663:11665 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R11668:11669 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 11666:11667 <> ξ:53
-R11670:11673 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R11675:11676 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-binder 11674:11674 <> x:54
-R11677:11678 xv6iris.TsoCtxMove <> Φ:51 var
-R11682:11683 xv6iris.TsoCtxMove <> ξ:53 var
-R11680:11680 xv6iris.TsoCtxMove <> x:54 var
-R11752:11752 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R11761:11766 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R11777:11777 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R11753:11760 xv6iris.TsoCtxMove <> ctx_move def
-R11752:11752 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R11761:11766 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R11777:11777 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R11753:11760 xv6iris.TsoCtxMove <> ctx_move def
-inst 11881:11897 <> ctx_move_big_sepL
-R11907:11911 xv6iris.RiscvLang <> CpuId class
-binder 11901:11903 <> CID:55
-binder 11915:11915 <> A:56
-R11923:11926 Corelib.Init.Datatypes <> list ind
-R11928:11928 xv6iris.TsoCtxMove <> A:56 var
-binder 11919:11919 <> l:57
-R11946:11950 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R11943:11945 Corelib.Init.Datatypes <> nat ind
-R11952:11956 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R11951:11951 xv6iris.TsoCtxMove <> A:56 var
-R11962:11966 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R11957:11961 xv6iris.TsoCtx <> CtxId rec
-R11967:11971 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R11973:11974 xv6iris.TsoCtxMove <> Move.Σ var
-binder 11938:11939 <> Φ:58
-R11983:11983 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R12009:12014 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R11984:11987 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
-R11991:11992 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
-binder 11988:11988 <> i:59
-binder 11990:11990 <> x:60
-R11993:11999 xv6iris.TsoCtxMove <> CtxMove class
-R12002:12003 xv6iris.TsoCtxMove <> Φ:58 var
-R12007:12007 xv6iris.TsoCtxMove <> x:60 var
-R12005:12005 xv6iris.TsoCtxMove <> i:59 var
-R12015:12021 xv6iris.TsoCtxMove <> CtxMove class
-R12024:12026 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R12029:12030 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 12027:12028 <> ξ:61
-R12031:12041 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
-R12043:12047 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
-R12049:12053 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
-R12055:12056 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
-binder 12042:12042 <> i:62
-binder 12042:12042 <> i:63
-binder 12048:12048 <> x:64
-binder 12048:12048 <> x:65
-R12057:12058 xv6iris.TsoCtxMove <> Φ:58 var
-R12064:12065 xv6iris.TsoCtxMove <> ξ:61 var
-R12062:12062 xv6iris.TsoCtxMove <> x:64 var
-R12060:12060 xv6iris.TsoCtxMove <> i:62 var
-R12054:12054 xv6iris.TsoCtxMove <> l:57 var
-R12233:12233 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12242:12247 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12258:12258 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12234:12241 xv6iris.TsoCtxMove <> ctx_move def
-R12233:12233 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12242:12247 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12258:12258 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12234:12241 xv6iris.TsoCtxMove <> ctx_move def
-R12292:12292 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12326:12331 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12343:12343 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12297:12299 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R12303:12304 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 12300:12300 <> i:66
-binder 12302:12302 <> y:67
-R12309:12309 Corelib.Init.Datatypes <> S constr
-R12311:12311 xv6iris.TsoCtxMove <> i:66 var
-R12314:12314 xv6iris.TsoCtxMove <> y:67 var
-R12292:12292 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12326:12331 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12343:12343 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12297:12299 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R12303:12304 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 12300:12300 <> i:68
-binder 12302:12302 <> y:69
-R12309:12309 Corelib.Init.Datatypes <> S constr
-R12311:12311 xv6iris.TsoCtxMove <> i:68 var
-R12314:12314 xv6iris.TsoCtxMove <> y:69 var
-inst 12418:12434 <> ctx_move_big_sepM
-R12444:12448 xv6iris.RiscvLang <> CpuId class
-binder 12438:12440 <> CID:70
-R12453:12461 stdpp.countable <> Countable class
-binder 12463:12463 <> K:71
-binder 12453:12463 <> H:73
-binder 12467:12467 <> A:74
-R12475:12478 stdpp.gmap <> gmap rec
-R12482:12482 xv6iris.TsoCtxMove <> A:74 var
-R12480:12480 xv6iris.TsoCtxMove <> K:71 var
-binder 12471:12471 <> m:75
-R12498:12502 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R12497:12497 xv6iris.TsoCtxMove <> K:71 var
-R12504:12508 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R12503:12503 xv6iris.TsoCtxMove <> A:74 var
-R12514:12518 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R12509:12513 xv6iris.TsoCtx <> CtxId rec
-R12519:12523 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R12525:12526 xv6iris.TsoCtxMove <> Move.Σ var
-binder 12492:12493 <> Φ:76
-R12535:12535 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R12561:12566 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R12536:12539 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
-R12543:12544 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
-binder 12540:12540 <> k:77
-binder 12542:12542 <> x:78
-R12545:12551 xv6iris.TsoCtxMove <> CtxMove class
-R12554:12555 xv6iris.TsoCtxMove <> Φ:76 var
-R12559:12559 xv6iris.TsoCtxMove <> x:78 var
-R12557:12557 xv6iris.TsoCtxMove <> k:77 var
-R12567:12573 xv6iris.TsoCtxMove <> CtxMove class
-R12576:12578 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R12581:12582 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 12579:12580 <> ξ:79
-R12583:12592 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
-R12594:12598 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
-R12600:12604 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
-R12606:12607 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
-binder 12593:12593 <> k:80
-binder 12593:12593 <> k:81
-binder 12599:12599 <> x:82
-binder 12599:12599 <> x:83
-R12608:12609 xv6iris.TsoCtxMove <> Φ:76 var
-R12615:12616 xv6iris.TsoCtxMove <> ξ:79 var
-R12613:12613 xv6iris.TsoCtxMove <> x:82 var
-R12611:12611 xv6iris.TsoCtxMove <> k:80 var
-R12605:12605 xv6iris.TsoCtxMove <> m:75 var
-R12683:12689 stdpp.fin_maps <> map_ind thm
-R12683:12689 stdpp.fin_maps <> map_ind thm
-R12738:12751 iris.bi.big_op <> big_sepM_empty thm
-R12738:12751 iris.bi.big_op <> big_sepM_empty thm
-R12738:12751 iris.bi.big_op <> big_sepM_empty thm
-R12817:12817 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12844:12849 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12854:12854 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12818:12832 iris.bi.big_op <> big_sepM_insert thm
-R12817:12817 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12844:12849 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12854:12854 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12818:12832 iris.bi.big_op <> big_sepM_insert thm
-R12882:12882 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12891:12896 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12907:12907 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12883:12890 xv6iris.TsoCtxMove <> ctx_move def
-R12882:12882 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12891:12896 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12907:12907 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12883:12890 xv6iris.TsoCtxMove <> ctx_move def
-R12941:12941 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12952:12957 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12969:12969 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12941:12941 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12952:12957 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R12969:12969 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R13035:13049 iris.bi.big_op <> big_sepM_insert thm
-R13035:13049 iris.bi.big_op <> big_sepM_insert thm
-R13035:13049 iris.bi.big_op <> big_sepM_insert thm
-inst 13098:13114 <> ctx_move_big_sepS
-R13124:13128 xv6iris.RiscvLang <> CpuId class
-binder 13118:13120 <> CID:84
-R13133:13141 stdpp.countable <> Countable class
-binder 13143:13143 <> A:85
-binder 13133:13143 <> H:87
-R13151:13154 stdpp.gmap <> gset def
-R13156:13156 xv6iris.TsoCtxMove <> A:85 var
-binder 13147:13147 <> X:88
-R13172:13176 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R13171:13171 xv6iris.TsoCtxMove <> A:85 var
-R13182:13186 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R13177:13181 xv6iris.TsoCtx <> CtxId rec
-R13187:13191 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R13193:13194 xv6iris.TsoCtxMove <> Move.Σ var
-binder 13166:13167 <> Φ:89
-R13203:13203 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R13225:13230 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R13204:13207 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
-R13209:13210 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
-binder 13208:13208 <> x:90
-R13211:13217 xv6iris.TsoCtxMove <> CtxMove class
-R13220:13221 xv6iris.TsoCtxMove <> Φ:89 var
-R13223:13223 xv6iris.TsoCtxMove <> x:90 var
-R13231:13237 xv6iris.TsoCtxMove <> CtxMove class
-R13240:13242 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R13245:13246 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 13243:13244 <> ξ:91
-R13247:13256 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
-R13258:13262 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
-R13264:13265 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
-binder 13257:13257 <> x:92
-binder 13257:13257 <> x:93
-R13266:13267 xv6iris.TsoCtxMove <> Φ:89 var
-R13271:13272 xv6iris.TsoCtxMove <> ξ:91 var
-R13269:13269 xv6iris.TsoCtxMove <> x:92 var
-R13263:13263 xv6iris.TsoCtxMove <> X:88 var
-R13337:13345 stdpp.fin_sets <> set_ind_L thm
-R13337:13345 stdpp.fin_sets <> set_ind_L thm
-R13394:13407 iris.bi.big_op <> big_sepS_empty thm
-R13394:13407 iris.bi.big_op <> big_sepS_empty thm
-R13394:13407 iris.bi.big_op <> big_sepS_empty thm
-R13473:13473 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R13498:13503 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R13508:13508 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R13474:13488 iris.bi.big_op <> big_sepS_insert thm
-R13473:13473 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R13498:13503 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R13508:13508 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R13474:13488 iris.bi.big_op <> big_sepS_insert thm
-R13536:13536 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R13545:13550 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R13561:13561 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R13537:13544 xv6iris.TsoCtxMove <> ctx_move def
-R13536:13536 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R13545:13550 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R13561:13561 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R13537:13544 xv6iris.TsoCtxMove <> ctx_move def
-R13595:13595 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R13606:13611 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R13623:13623 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R13595:13595 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R13606:13611 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R13623:13623 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R13689:13703 iris.bi.big_op <> big_sepS_insert thm
-R13689:13703 iris.bi.big_op <> big_sepS_insert thm
-R13689:13703 iris.bi.big_op <> big_sepS_insert thm
-inst 13750:13760 <> ctx_move_or
-R13770:13774 xv6iris.RiscvLang <> CpuId class
-binder 13764:13766 <> CID:94
-R13791:13795 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R13786:13790 xv6iris.TsoCtx <> CtxId rec
-R13796:13800 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R13802:13803 xv6iris.TsoCtxMove <> Move.Σ var
-binder 13778:13779 <> R1:95
-binder 13781:13782 <> R2:96
-R13822:13826 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R13812:13818 xv6iris.TsoCtxMove <> CtxMove class
-R13820:13821 xv6iris.TsoCtxMove <> R1:95 var
-R13837:13841 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R13827:13833 xv6iris.TsoCtxMove <> CtxMove class
-R13835:13836 xv6iris.TsoCtxMove <> R2:96 var
-R13842:13848 xv6iris.TsoCtxMove <> CtxMove class
-R13851:13853 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R13856:13857 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 13854:13855 <> ξ:97
-R13863:13867 iris.bi.interface <> ::bi_scope:x_'∨'_x not
-R13858:13859 xv6iris.TsoCtxMove <> R1:95 var
-R13861:13862 xv6iris.TsoCtxMove <> ξ:97 var
-R13868:13869 xv6iris.TsoCtxMove <> R2:96 var
-R13871:13872 xv6iris.TsoCtxMove <> ξ:97 var
-R13945:13945 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R13954:13959 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R13970:13970 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R13946:13953 xv6iris.TsoCtxMove <> ctx_move def
-R13945:13945 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R13954:13959 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R13970:13970 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R13946:13953 xv6iris.TsoCtxMove <> ctx_move def
-R14041:14041 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R14050:14055 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R14066:14066 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R14042:14049 xv6iris.TsoCtxMove <> ctx_move def
-R14041:14041 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R14050:14055 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R14066:14066 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R14042:14049 xv6iris.TsoCtxMove <> ctx_move def
-inst 14153:14163 <> ctx_move_if
-R14173:14177 xv6iris.RiscvLang <> CpuId class
-binder 14167:14169 <> CID:98
-R14185:14188 Corelib.Init.Datatypes <> bool ind
-binder 14181:14181 <> b:99
-R14205:14209 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R14200:14204 xv6iris.TsoCtx <> CtxId rec
-R14210:14214 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R14216:14217 xv6iris.TsoCtxMove <> Move.Σ var
-binder 14192:14193 <> R1:100
-binder 14195:14196 <> R2:101
-R14236:14240 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R14226:14232 xv6iris.TsoCtxMove <> CtxMove class
-R14234:14235 xv6iris.TsoCtxMove <> R1:100 var
-R14251:14255 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
-R14241:14247 xv6iris.TsoCtxMove <> CtxMove class
-R14249:14250 xv6iris.TsoCtxMove <> R2:101 var
-R14256:14262 xv6iris.TsoCtxMove <> CtxMove class
-R14265:14267 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R14270:14271 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 14268:14269 <> ξ:102
-R14272:14274 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
-R14276:14281 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
-R14287:14292 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
-R14293:14294 xv6iris.TsoCtxMove <> R2:101 var
-R14296:14297 xv6iris.TsoCtxMove <> ξ:102 var
-R14282:14283 xv6iris.TsoCtxMove <> R1:100 var
-R14285:14286 xv6iris.TsoCtxMove <> ξ:102 var
-R14275:14275 xv6iris.TsoCtxMove <> b:99 var
-inst 14385:14406 <> ctx_move_pointsto_inst
-R14416:14420 xv6iris.RiscvLang <> CpuId class
-binder 14410:14412 <> CID:103
-R14429:14433 xv6iris.Ktier <> ktier ind
-binder 14424:14425 <> kt:104
-binder 14436:14436 <> a:105
-binder 14438:14439 <> dq:106
-binder 14441:14441 <> v:107
-R14449:14455 xv6iris.TsoCtxMove <> CtxMove class
-R14458:14460 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R14463:14464 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 14461:14462 <> ξ:108
-R14465:14476 xv6iris.TsoCtx <> ctx_pointsto def
-R14498:14498 xv6iris.TsoCtxMove <> v:107 var
-R14495:14496 xv6iris.TsoCtxMove <> dq:106 var
-R14493:14493 xv6iris.TsoCtxMove <> a:105 var
-R14490:14491 xv6iris.TsoCtxMove <> ξ:108 var
-R14486:14487 xv6iris.TsoCtxMove <> kt:104 var
-R14548:14548 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R14566:14571 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R14582:14582 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R14549:14565 xv6iris.TsoCtxMove <> ctx_move_pointsto thm
-R14548:14548 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R14566:14571 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R14582:14582 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R14549:14565 xv6iris.TsoCtxMove <> ctx_move_pointsto thm
-inst 14609:14627 <> ctx_move_floor_inst
-R14637:14641 xv6iris.RiscvLang <> CpuId class
-binder 14631:14633 <> CID:109
-R14650:14652 Corelib.Init.Datatypes <> nat ind
-binder 14645:14646 <> lo:110
-R14661:14667 xv6iris.TsoCtxMove <> CtxMove class
-R14670:14672 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R14675:14676 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 14673:14674 <> ξ:111
-R14677:14685 xv6iris.TsoCtx <> ctx_floor def
-R14687:14688 xv6iris.TsoCtxMove <> ξ:111 var
-R14690:14691 xv6iris.TsoCtxMove <> lo:110 var
-R14743:14743 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R14758:14763 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R14775:14775 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R14744:14757 xv6iris.TsoCtxMove <> ctx_move_floor thm
-R14743:14743 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R14758:14763 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R14775:14775 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R14744:14757 xv6iris.TsoCtxMove <> ctx_move_floor thm
-inst 14802:14814 <> ctx_move_word
-R14824:14828 xv6iris.RiscvLang <> CpuId class
-binder 14818:14820 <> CID:112
-R14837:14841 xv6iris.Ktier <> ktier ind
-binder 14832:14833 <> kt:113
-binder 14844:14844 <> a:114
-binder 14846:14847 <> dq:115
-binder 14849:14849 <> w:116
-R14857:14863 xv6iris.TsoCtxMove <> CtxMove class
-R14866:14868 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R14871:14872 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 14869:14870 <> ξ:117
-R14873:14889 xv6iris.TsoCtx <> ctx_word_pointsto def
-R14911:14911 xv6iris.TsoCtxMove <> w:116 var
-R14908:14909 xv6iris.TsoCtxMove <> dq:115 var
-R14906:14906 xv6iris.TsoCtxMove <> a:114 var
-R14903:14904 xv6iris.TsoCtxMove <> ξ:117 var
-R14899:14900 xv6iris.TsoCtxMove <> kt:113 var
-R14973:14973 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R15146:15151 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R15161:15161 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R14974:14990 xv6iris.TsoCtxMove <> ctx_move_big_sepL inst
-R15099:15101 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R15105:15106 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 15102:15102 <> i:118
-binder 15104:15104 <> x:119
-R15107:15128 xv6iris.TsoCtxMove <> ctx_move_pointsto_inst inst
-R15015:15017 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R15024:15025 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 15020:15020 <> j:120
-binder 15022:15023 <> ξ:121
-R15026:15037 xv6iris.TsoCtx <> ctx_pointsto def
-R15071:15078 xv6iris.RiscvModelBytes <> nth_byte def
-R15082:15082 xv6iris.TsoCtxMove <> j:120 var
-R15055:15060 xv6iris.RiscvModelBytes <> pa_add def
-R15064:15064 xv6iris.TsoCtxMove <> j:120 var
-R15051:15052 xv6iris.TsoCtxMove <> ξ:121 var
-R14993:14995 Corelib.Lists.ListDef <> seq def
-R14973:14973 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R15146:15151 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R15161:15161 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R14974:14990 xv6iris.TsoCtxMove <> ctx_move_big_sepL inst
-R15099:15101 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R15105:15106 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 15102:15102 <> i:122
-binder 15104:15104 <> x:123
-R15107:15128 xv6iris.TsoCtxMove <> ctx_move_pointsto_inst inst
-R15015:15017 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R15024:15025 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 15020:15020 <> j:124
-binder 15022:15023 <> ξ:125
-R15026:15037 xv6iris.TsoCtx <> ctx_pointsto def
-R15071:15078 xv6iris.RiscvModelBytes <> nth_byte def
-R15082:15082 xv6iris.TsoCtxMove <> j:124 var
-R15055:15060 xv6iris.RiscvModelBytes <> pa_add def
-R15064:15064 xv6iris.TsoCtxMove <> j:124 var
-R15051:15052 xv6iris.TsoCtxMove <> ξ:125 var
-R14993:14995 Corelib.Lists.ListDef <> seq def
-inst 15269:15282 <> ctx_move_word2
-R15292:15296 xv6iris.RiscvLang <> CpuId class
-binder 15286:15288 <> CID:126
-R15305:15309 xv6iris.Ktier <> ktier ind
-binder 15300:15301 <> kt:127
-binder 15312:15312 <> a:128
-binder 15314:15315 <> dq:129
-binder 15317:15317 <> w:130
-R15325:15331 xv6iris.TsoCtxMove <> CtxMove class
-R15334:15336 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R15339:15340 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 15337:15338 <> ξ:131
-R15341:15358 xv6iris.TsoCtx <> ctx_word2_pointsto def
-R15380:15380 xv6iris.TsoCtxMove <> w:130 var
-R15377:15378 xv6iris.TsoCtxMove <> dq:129 var
-R15375:15375 xv6iris.TsoCtxMove <> a:128 var
-R15372:15373 xv6iris.TsoCtxMove <> ξ:131 var
-R15368:15369 xv6iris.TsoCtxMove <> kt:127 var
-R15442:15442 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R15615:15620 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R15630:15630 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R15443:15459 xv6iris.TsoCtxMove <> ctx_move_big_sepL inst
-R15568:15570 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R15574:15575 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 15571:15571 <> i:132
-binder 15573:15573 <> x:133
-R15576:15597 xv6iris.TsoCtxMove <> ctx_move_pointsto_inst inst
-R15484:15486 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R15493:15494 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 15489:15489 <> j:134
-binder 15491:15492 <> ξ:135
-R15495:15506 xv6iris.TsoCtx <> ctx_pointsto def
-R15540:15547 xv6iris.RiscvModelBytes <> nth_byte def
-R15551:15551 xv6iris.TsoCtxMove <> j:134 var
-R15524:15529 xv6iris.RiscvModelBytes <> pa_add def
-R15533:15533 xv6iris.TsoCtxMove <> j:134 var
-R15520:15521 xv6iris.TsoCtxMove <> ξ:135 var
-R15462:15464 Corelib.Lists.ListDef <> seq def
-R15442:15442 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R15615:15620 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R15630:15630 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R15443:15459 xv6iris.TsoCtxMove <> ctx_move_big_sepL inst
-R15568:15570 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R15574:15575 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 15571:15571 <> i:136
-binder 15573:15573 <> x:137
-R15576:15597 xv6iris.TsoCtxMove <> ctx_move_pointsto_inst inst
-R15484:15486 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R15493:15494 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 15489:15489 <> j:138
-binder 15491:15492 <> ξ:139
-R15495:15506 xv6iris.TsoCtx <> ctx_pointsto def
-R15540:15547 xv6iris.RiscvModelBytes <> nth_byte def
-R15551:15551 xv6iris.TsoCtxMove <> j:138 var
-R15524:15529 xv6iris.RiscvModelBytes <> pa_add def
-R15533:15533 xv6iris.TsoCtxMove <> j:138 var
-R15520:15521 xv6iris.TsoCtxMove <> ξ:139 var
-R15462:15464 Corelib.Lists.ListDef <> seq def
-inst 15738:15751 <> ctx_move_word4
-R15761:15765 xv6iris.RiscvLang <> CpuId class
-binder 15755:15757 <> CID:140
-R15774:15778 xv6iris.Ktier <> ktier ind
-binder 15769:15770 <> kt:141
-binder 15781:15781 <> a:142
-binder 15783:15784 <> dq:143
-binder 15786:15786 <> w:144
-R15794:15800 xv6iris.TsoCtxMove <> CtxMove class
-R15803:15805 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R15808:15809 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 15806:15807 <> ξ:145
-R15810:15827 xv6iris.TsoCtx <> ctx_word4_pointsto def
-R15849:15849 xv6iris.TsoCtxMove <> w:144 var
-R15846:15847 xv6iris.TsoCtxMove <> dq:143 var
-R15844:15844 xv6iris.TsoCtxMove <> a:142 var
-R15841:15842 xv6iris.TsoCtxMove <> ξ:145 var
-R15837:15838 xv6iris.TsoCtxMove <> kt:141 var
-R15911:15911 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R16084:16089 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R16099:16099 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R15912:15928 xv6iris.TsoCtxMove <> ctx_move_big_sepL inst
-R16037:16039 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R16043:16044 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 16040:16040 <> i:146
-binder 16042:16042 <> x:147
-R16045:16066 xv6iris.TsoCtxMove <> ctx_move_pointsto_inst inst
-R15953:15955 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R15962:15963 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 15958:15958 <> j:148
-binder 15960:15961 <> ξ:149
-R15964:15975 xv6iris.TsoCtx <> ctx_pointsto def
-R16009:16016 xv6iris.RiscvModelBytes <> nth_byte def
-R16020:16020 xv6iris.TsoCtxMove <> j:148 var
-R15993:15998 xv6iris.RiscvModelBytes <> pa_add def
-R16002:16002 xv6iris.TsoCtxMove <> j:148 var
-R15989:15990 xv6iris.TsoCtxMove <> ξ:149 var
-R15931:15933 Corelib.Lists.ListDef <> seq def
-R15911:15911 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R16084:16089 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R16099:16099 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R15912:15928 xv6iris.TsoCtxMove <> ctx_move_big_sepL inst
-R16037:16039 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R16043:16044 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 16040:16040 <> i:150
-binder 16042:16042 <> x:151
-R16045:16066 xv6iris.TsoCtxMove <> ctx_move_pointsto_inst inst
-R15953:15955 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R15962:15963 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 15958:15958 <> j:152
-binder 15960:15961 <> ξ:153
-R15964:15975 xv6iris.TsoCtx <> ctx_pointsto def
-R16009:16016 xv6iris.RiscvModelBytes <> nth_byte def
-R16020:16020 xv6iris.TsoCtxMove <> j:152 var
-R15993:15998 xv6iris.RiscvModelBytes <> pa_add def
-R16002:16002 xv6iris.TsoCtxMove <> j:152 var
-R15989:15990 xv6iris.TsoCtxMove <> ξ:153 var
-R15931:15933 Corelib.Lists.ListDef <> seq def
-inst 16207:16233 <> ctx_move_phys_pointsto_inst
-R16243:16247 xv6iris.RiscvLang <> CpuId class
-binder 16237:16239 <> CID:154
-binder 16250:16250 <> a:155
-binder 16252:16253 <> dq:156
-binder 16255:16255 <> v:157
-R16263:16269 xv6iris.TsoCtxMove <> CtxMove class
-R16272:16274 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R16277:16278 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 16275:16276 <> ξ:158
-R16279:16295 xv6iris.TsoCtx <> ctx_phys_pointsto def
-R16297:16298 xv6iris.TsoCtxMove <> ξ:158 var
-R16300:16300 xv6iris.TsoCtxMove <> a:155 var
-R16302:16303 xv6iris.TsoCtxMove <> dq:156 var
-R16305:16305 xv6iris.TsoCtxMove <> v:157 var
-R16340:16361 xv6iris.TsoCtxMove <> ctx_move_phys_pointsto thm
-R16340:16361 xv6iris.TsoCtxMove <> ctx_move_phys_pointsto thm
-inst 16388:16405 <> ctx_move_phys_word
-R16415:16419 xv6iris.RiscvLang <> CpuId class
-binder 16409:16411 <> CID:159
-binder 16422:16422 <> a:160
-binder 16424:16425 <> dq:161
-binder 16427:16427 <> w:162
-R16435:16441 xv6iris.TsoCtxMove <> CtxMove class
-R16444:16446 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R16449:16450 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 16447:16448 <> ξ:163
-R16451:16472 xv6iris.TsoCtx <> ctx_phys_word_pointsto def
-R16474:16475 xv6iris.TsoCtxMove <> ξ:163 var
-R16477:16477 xv6iris.TsoCtxMove <> a:160 var
-R16479:16480 xv6iris.TsoCtxMove <> dq:161 var
-R16482:16482 xv6iris.TsoCtxMove <> w:162 var
-R16544:16544 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R16713:16718 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R16728:16728 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R16545:16561 xv6iris.TsoCtxMove <> ctx_move_big_sepL inst
-R16663:16665 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R16669:16670 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 16666:16666 <> i:164
-binder 16668:16668 <> x:165
-R16671:16697 xv6iris.TsoCtxMove <> ctx_move_phys_pointsto_inst inst
-R16586:16588 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R16595:16596 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 16591:16591 <> j:166
-binder 16593:16594 <> ξ:167
-R16597:16613 xv6iris.TsoCtx <> ctx_phys_pointsto def
-R16615:16616 xv6iris.TsoCtxMove <> ξ:167 var
-R16619:16624 xv6iris.RiscvModelBytes <> pa_add def
-R16628:16628 xv6iris.TsoCtxMove <> j:166 var
-R16635:16642 xv6iris.RiscvModelBytes <> nth_byte def
-R16646:16646 xv6iris.TsoCtxMove <> j:166 var
-R16564:16566 Corelib.Lists.ListDef <> seq def
-R16544:16544 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R16713:16718 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R16728:16728 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
-R16545:16561 xv6iris.TsoCtxMove <> ctx_move_big_sepL inst
-R16663:16665 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R16669:16670 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 16666:16666 <> i:168
-binder 16668:16668 <> x:169
-R16671:16697 xv6iris.TsoCtxMove <> ctx_move_phys_pointsto_inst inst
-R16586:16588 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R16595:16596 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 16591:16591 <> j:170
-binder 16593:16594 <> ξ:171
-R16597:16613 xv6iris.TsoCtx <> ctx_phys_pointsto def
-R16615:16616 xv6iris.TsoCtxMove <> ξ:171 var
-R16619:16624 xv6iris.RiscvModelBytes <> pa_add def
-R16628:16628 xv6iris.TsoCtxMove <> j:170 var
-R16635:16642 xv6iris.RiscvModelBytes <> nth_byte def
-R16646:16646 xv6iris.TsoCtxMove <> j:170 var
-R16564:16566 Corelib.Lists.ListDef <> seq def
-R16822:16825 xv6iris.TsoCtxMove Move <> sec
-R17994:18000 xv6iris.TsoCtx <> cur_ctx def
-R18042:18048 xv6iris.TsoCtxMove <> CtxMove class
-R18051:18053 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18055:18056 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18042:18048 xv6iris.TsoCtxMove <> CtxMove class
-R18051:18053 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18055:18056 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18095:18101 xv6iris.TsoCtxMove <> CtxMove class
-R18104:18106 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18109:18110 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 18107:18108 <> ξ:172
-R18111:18118 iris.bi.interface <> bi_exist proj
-R18095:18101 xv6iris.TsoCtxMove <> CtxMove class
-R18104:18106 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18109:18110 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 18107:18108 <> ξ:173
-R18111:18118 iris.bi.interface <> bi_exist proj
-R18164:18170 xv6iris.TsoCtxMove <> CtxMove class
-R18173:18175 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18178:18179 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 18176:18177 <> ξ:174
-R18180:18185 iris.bi.interface <> bi_sep proj
-R18164:18170 xv6iris.TsoCtxMove <> CtxMove class
-R18173:18175 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18178:18179 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 18176:18177 <> ξ:175
-R18180:18185 iris.bi.interface <> bi_sep proj
-R18221:18227 xv6iris.TsoCtxMove <> CtxMove class
-R18230:18232 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18235:18236 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 18233:18234 <> ξ:176
-R18237:18241 iris.bi.interface <> bi_or proj
-R18221:18227 xv6iris.TsoCtxMove <> CtxMove class
-R18230:18232 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18235:18236 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 18233:18234 <> ξ:177
-R18237:18241 iris.bi.interface <> bi_or proj
-R18276:18282 xv6iris.TsoCtxMove <> CtxMove class
-R18285:18287 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18290:18291 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 18288:18289 <> ξ:178
-R18292:18298 iris.algebra.big_op <> big_opL def
-R18300:18305 iris.bi.interface <> bi_sep proj
-R18276:18282 xv6iris.TsoCtxMove <> CtxMove class
-R18285:18287 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18290:18291 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 18288:18289 <> ξ:179
-R18292:18298 iris.algebra.big_op <> big_opL def
-R18300:18305 iris.bi.interface <> bi_sep proj
-R18358:18364 xv6iris.TsoCtxMove <> CtxMove class
-R18367:18369 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18372:18373 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 18370:18371 <> ξ:180
-R18374:18380 iris.algebra.big_op <> big_opM def
-R18382:18387 iris.bi.interface <> bi_sep proj
-R18358:18364 xv6iris.TsoCtxMove <> CtxMove class
-R18367:18369 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18372:18373 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 18370:18371 <> ξ:181
-R18374:18380 iris.algebra.big_op <> big_opM def
-R18382:18387 iris.bi.interface <> bi_sep proj
-R18440:18446 xv6iris.TsoCtxMove <> CtxMove class
-R18449:18451 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18454:18455 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 18452:18453 <> ξ:182
-R18456:18462 iris.algebra.big_op <> big_opS def
-R18464:18469 iris.bi.interface <> bi_sep proj
-R18440:18446 xv6iris.TsoCtxMove <> CtxMove class
-R18449:18451 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18454:18455 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 18452:18453 <> ξ:183
-R18456:18462 iris.algebra.big_op <> big_opS def
-R18464:18469 iris.bi.interface <> bi_sep proj
-R18520:18526 xv6iris.TsoCtxMove <> CtxMove class
-R18529:18531 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18534:18535 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 18532:18533 <> ξ:184
-R18536:18538 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
-R18540:18545 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
-R18547:18552 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
-R18520:18526 xv6iris.TsoCtxMove <> CtxMove class
-R18529:18531 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18534:18535 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 18532:18533 <> ξ:185
-R18536:18538 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
-R18540:18545 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
-R18547:18552 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
-R18584:18590 xv6iris.TsoCtxMove <> CtxMove class
-R18593:18595 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18598:18599 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 18596:18597 <> ξ:186
-R18600:18611 xv6iris.TsoCtx <> ctx_pointsto def
-R18613:18614 xv6iris.TsoCtxMove <> ξ:186 var
-R18584:18590 xv6iris.TsoCtxMove <> CtxMove class
-R18593:18595 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18598:18599 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 18596:18597 <> ξ:187
-R18600:18611 xv6iris.TsoCtx <> ctx_pointsto def
-R18613:18614 xv6iris.TsoCtxMove <> ξ:187 var
-R18662:18668 xv6iris.TsoCtxMove <> CtxMove class
-R18671:18673 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18676:18677 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 18674:18675 <> ξ:188
-R18678:18686 xv6iris.TsoCtx <> ctx_floor def
-R18688:18689 xv6iris.TsoCtxMove <> ξ:188 var
-R18662:18668 xv6iris.TsoCtxMove <> CtxMove class
-R18671:18673 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18676:18677 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 18674:18675 <> ξ:189
-R18678:18686 xv6iris.TsoCtx <> ctx_floor def
-R18688:18689 xv6iris.TsoCtxMove <> ξ:189 var
-R18730:18736 xv6iris.TsoCtxMove <> CtxMove class
-R18739:18741 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18744:18745 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 18742:18743 <> ξ:190
-R18746:18762 xv6iris.TsoCtx <> ctx_word_pointsto def
-R18764:18765 xv6iris.TsoCtxMove <> ξ:190 var
-R18730:18736 xv6iris.TsoCtxMove <> CtxMove class
-R18739:18741 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18744:18745 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 18742:18743 <> ξ:191
-R18746:18762 xv6iris.TsoCtx <> ctx_word_pointsto def
-R18764:18765 xv6iris.TsoCtxMove <> ξ:191 var
-R18804:18810 xv6iris.TsoCtxMove <> CtxMove class
-R18813:18815 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18818:18819 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 18816:18817 <> ξ:192
-R18820:18837 xv6iris.TsoCtx <> ctx_word2_pointsto def
-R18839:18840 xv6iris.TsoCtxMove <> ξ:192 var
-R18804:18810 xv6iris.TsoCtxMove <> CtxMove class
-R18813:18815 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18818:18819 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 18816:18817 <> ξ:193
-R18820:18837 xv6iris.TsoCtx <> ctx_word2_pointsto def
-R18839:18840 xv6iris.TsoCtxMove <> ξ:193 var
-R18880:18886 xv6iris.TsoCtxMove <> CtxMove class
-R18889:18891 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18894:18895 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 18892:18893 <> ξ:194
-R18896:18913 xv6iris.TsoCtx <> ctx_word4_pointsto def
-R18915:18916 xv6iris.TsoCtxMove <> ξ:194 var
-R18880:18886 xv6iris.TsoCtxMove <> CtxMove class
-R18889:18891 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18894:18895 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 18892:18893 <> ξ:195
-R18896:18913 xv6iris.TsoCtx <> ctx_word4_pointsto def
-R18915:18916 xv6iris.TsoCtxMove <> ξ:195 var
-R18956:18962 xv6iris.TsoCtxMove <> CtxMove class
-R18965:18967 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18970:18971 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 18968:18969 <> ξ:196
-R18972:18988 xv6iris.TsoCtx <> ctx_phys_pointsto def
-R18990:18991 xv6iris.TsoCtxMove <> ξ:196 var
-R18956:18962 xv6iris.TsoCtxMove <> CtxMove class
-R18965:18967 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R18970:18971 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 18968:18969 <> ξ:197
-R18972:18988 xv6iris.TsoCtx <> ctx_phys_pointsto def
-R18990:18991 xv6iris.TsoCtxMove <> ξ:197 var
-R19044:19050 xv6iris.TsoCtxMove <> CtxMove class
-R19053:19055 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R19058:19059 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 19056:19057 <> ξ:198
-R19060:19081 xv6iris.TsoCtx <> ctx_phys_word_pointsto def
-R19083:19084 xv6iris.TsoCtxMove <> ξ:198 var
-R19044:19050 xv6iris.TsoCtxMove <> CtxMove class
-R19053:19055 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-R19058:19059 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
-binder 19056:19057 <> ξ:199
-R19060:19081 xv6iris.TsoCtx <> ctx_phys_word_pointsto def
-R19083:19084 xv6iris.TsoCtxMove <> ξ:199 var
-R19102:19119 xv6iris.TsoCtxMove <> ctx_move_phys_word inst
-R19009:19035 xv6iris.TsoCtxMove <> ctx_move_phys_pointsto_inst inst
-R18934:18947 xv6iris.TsoCtxMove <> ctx_move_word4 inst
-R18858:18871 xv6iris.TsoCtxMove <> ctx_move_word2 inst
-R18783:18795 xv6iris.TsoCtxMove <> ctx_move_word inst
-R18703:18721 xv6iris.TsoCtxMove <> ctx_move_floor_inst inst
-R18632:18653 xv6iris.TsoCtxMove <> ctx_move_pointsto_inst inst
-R18565:18575 xv6iris.TsoCtxMove <> ctx_move_if inst
-R18485:18501 xv6iris.TsoCtxMove <> ctx_move_big_sepS inst
-R18403:18419 xv6iris.TsoCtxMove <> ctx_move_big_sepM inst
-R18321:18337 xv6iris.TsoCtxMove <> ctx_move_big_sepL inst
-R18257:18267 xv6iris.TsoCtxMove <> ctx_move_or inst
-R18201:18212 xv6iris.TsoCtxMove <> ctx_move_sep inst
-R18132:18145 xv6iris.TsoCtxMove <> ctx_move_exist inst
-R18073:18086 xv6iris.TsoCtxMove <> ctx_move_const inst
+prf 10903:10916 <> ctx_move_wrote
+R10926:10930 xv6iris.RiscvLang <> CpuId class
+binder 10920:10922 <> CID:37
+R10944:10948 xv6iris.TsoCtx <> CtxId rec
+binder 10934:10936 <> ξ0:38
+binder 10938:10940 <> ξ1:39
+R10956:10958 Corelib.Init.Datatypes <> nat ind
+binder 10952:10952 <> t:40
+R10966:10972 Riscv.rv64d_types Arch pa def
+binder 10962:10962 <> a:41
+R10996:11001 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R10981:10991 xv6iris.TsoCtx <> own_context def
+R10993:10995 xv6iris.TsoCtxMove <> ξ0:38 var
+R11017:11022 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R11002:11012 xv6iris.TsoCtx <> own_context def
+R11014:11016 xv6iris.TsoCtxMove <> ξ1:39 var
+R11040:11050 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R11023:11031 xv6iris.TsoCtx <> ctx_wrote def
+R11033:11035 xv6iris.TsoCtxMove <> ξ0:38 var
+R11037:11037 xv6iris.TsoCtxMove <> t:40 var
+R11039:11039 xv6iris.TsoCtxMove <> a:41 var
+R11066:11070 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R11051:11061 xv6iris.TsoCtx <> own_context def
+R11063:11065 xv6iris.TsoCtxMove <> ξ0:38 var
+R11086:11091 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R11129:11129 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R11071:11081 xv6iris.TsoCtx <> own_context def
+R11083:11085 xv6iris.TsoCtxMove <> ξ1:39 var
+R11107:11111 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R11092:11100 xv6iris.TsoCtx <> ctx_floor def
+R11102:11104 xv6iris.TsoCtxMove <> ξ1:39 var
+R11106:11106 xv6iris.TsoCtxMove <> t:40 var
+R11112:11120 xv6iris.TsoCtx <> ctx_wrote def
+R11122:11124 xv6iris.TsoCtxMove <> ξ1:39 var
+R11126:11126 xv6iris.TsoCtxMove <> t:40 var
+R11128:11128 xv6iris.TsoCtxMove <> a:41 var
+R11176:11184 xv6iris.TsoCtx <> ctx_wrote def
+R11176:11184 xv6iris.TsoCtx <> ctx_wrote def
+R11176:11184 xv6iris.TsoCtx <> ctx_wrote def
+R11206:11223 xv6iris.TsoCtx <> own_context_unseal thm
+R11226:11240 xv6iris.TsoCtx <> own_context_def def
+R11206:11223 xv6iris.TsoCtx <> own_context_unseal thm
+R11206:11223 xv6iris.TsoCtx <> own_context_unseal thm
+R11226:11240 xv6iris.TsoCtx <> own_context_def def
+R11226:11240 xv6iris.TsoCtx <> own_context_def def
+R11366:11366 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11378:11383 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11393:11393 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11367:11377 xv6iris.TsoGhost <> dset_lookup thm
+R11366:11366 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11378:11383 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11393:11393 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11367:11377 xv6iris.TsoGhost <> dset_lookup thm
+R11418:11418 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11445:11450 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11458:11458 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11419:11434 iris.bi.big_op <> big_sepS_elem_of thm
+R11418:11418 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11445:11450 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11458:11458 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11419:11434 iris.bi.big_op <> big_sepS_elem_of thm
+R11604:11604 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11624:11629 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11635:11635 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11605:11623 iris.base_logic.lib.mono_nat <> mono_nat_lb_own_get thm
+R11604:11604 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11624:11629 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11635:11635 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11605:11623 iris.base_logic.lib.mono_nat <> mono_nat_lb_own_get thm
+R11664:11672 xv6iris.TsoCtx <> ctx_floor def
+R11664:11672 xv6iris.TsoCtx <> ctx_floor def
+R11710:11718 xv6iris.TsoCtx <> ctx_floor def
+R11721:11723 xv6iris.TsoGhost <> llb def
+R11710:11718 xv6iris.TsoCtx <> ctx_floor def
+R11710:11718 xv6iris.TsoCtx <> ctx_floor def
+R11721:11723 xv6iris.TsoGhost <> llb def
+R11721:11723 xv6iris.TsoGhost <> llb def
+R11740:11740 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11759:11764 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11771:11771 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11741:11758 iris.base_logic.lib.mono_nat <> mono_nat_lb_own_le thm
+R11740:11740 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11759:11764 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11771:11771 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11741:11758 iris.base_logic.lib.mono_nat <> mono_nat_lb_own_le thm
+R11796:11806 xv6iris.TsoCtx <> own_context def
+R11796:11806 xv6iris.TsoCtx <> own_context def
+R11855:11872 xv6iris.TsoCtx <> own_context_unseal thm
+R11875:11889 xv6iris.TsoCtx <> own_context_def def
+R11855:11872 xv6iris.TsoCtx <> own_context_unseal thm
+R11855:11872 xv6iris.TsoCtx <> own_context_unseal thm
+R11875:11889 xv6iris.TsoCtx <> own_context_def def
+R11875:11889 xv6iris.TsoCtx <> own_context_def def
+R11984:11984 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12009:12014 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12027:12027 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11985:11998 xv6iris.TsoCtxMove <> ctx_move_floor thm
+R11984:11984 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12009:12014 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12027:12027 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R11985:11998 xv6iris.TsoCtxMove <> ctx_move_floor thm
+R12129:12146 xv6iris.TsoCtx <> own_context_unseal thm
+R12149:12163 xv6iris.TsoCtx <> own_context_def def
+R12129:12146 xv6iris.TsoCtx <> own_context_unseal thm
+R12129:12146 xv6iris.TsoCtx <> own_context_unseal thm
+R12149:12163 xv6iris.TsoCtx <> own_context_def def
+R12149:12163 xv6iris.TsoCtx <> own_context_def def
+R12288:12288 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12312:12317 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12323:12323 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12289:12299 xv6iris.TsoGhost <> dset_insert thm
+R12306:12306 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12308:12309 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12311:12311 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12288:12288 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12312:12317 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12323:12323 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12289:12299 xv6iris.TsoGhost <> dset_insert thm
+R12306:12306 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12308:12309 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12311:12311 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12359:12359 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12367:12372 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12382:12382 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12360:12366 xv6iris.TsoGhost <> llb_max thm
+R12359:12359 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12367:12372 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12382:12382 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R12360:12366 xv6iris.TsoGhost <> llb_max thm
+R12411:12420 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
+R12422:12426 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
+R12444:12462 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
+binder 12421:12421 <> k:42
+binder 12421:12421 <> k:43
+R12463:12470 xv6iris.TsoGhost <> dirty_ok def
+R12472:12480 xv6iris.RiscvPtsto <> logm_name def
+R12483:12492 xv6iris.RiscvLang <> hart_agent def
+R12494:12499 xv6iris.RiscvLang <> cpu_id def
+R12505:12505 xv6iris.TsoCtxMove <> k:42 var
+R12429:12433 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R12434:12435 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R12442:12443 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R12436:12436 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12438:12439 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12441:12441 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12411:12420 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
+R12422:12426 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
+R12444:12462 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
+binder 12421:12421 <> k:44
+binder 12421:12421 <> k:45
+R12463:12470 xv6iris.TsoGhost <> dirty_ok def
+R12472:12480 xv6iris.RiscvPtsto <> logm_name def
+R12483:12492 xv6iris.RiscvLang <> hart_agent def
+R12494:12499 xv6iris.RiscvLang <> cpu_id def
+R12505:12505 xv6iris.TsoCtxMove <> k:44 var
+R12429:12433 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R12434:12435 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R12442:12443 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R12436:12436 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12438:12439 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12441:12441 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12542:12547 stdpp.base <> decide def
+R12556:12560 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R12550:12550 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12552:12553 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12555:12555 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12542:12547 stdpp.base <> decide def
+R12556:12560 stdpp.base <> ::stdpp_scope:x_'∈'_x not
+R12550:12550 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12552:12553 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12555:12555 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12624:12626 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12609:12613 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R12614:12615 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R12622:12623 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R12616:12616 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12618:12619 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12621:12621 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12624:12626 Corelib.Init.Logic <> ::type_scope:x_'='_x not
+R12609:12613 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R12614:12615 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R12622:12623 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R12616:12616 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12618:12619 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12621:12621 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R12704:12715 stdpp.sets <> union_comm_L inst
+R12721:12735 iris.bi.big_op <> big_sepS_insert thm
+R12704:12715 stdpp.sets <> union_comm_L inst
+R12704:12715 stdpp.sets <> union_comm_L inst
+R12721:12735 iris.bi.big_op <> big_sepS_insert thm
+R12721:12735 iris.bi.big_op <> big_sepS_insert thm
+R12802:12809 xv6iris.TsoGhost <> dirty_ok def
+R12802:12809 xv6iris.TsoGhost <> dirty_ok def
+R12802:12809 xv6iris.TsoGhost <> dirty_ok def
+R12863:12880 xv6iris.TsoCtx <> own_context_unseal thm
+R12883:12897 xv6iris.TsoCtx <> own_context_def def
+R12863:12880 xv6iris.TsoCtx <> own_context_unseal thm
+R12863:12880 xv6iris.TsoCtx <> own_context_unseal thm
+R12863:12880 xv6iris.TsoCtx <> own_context_unseal thm
+R12863:12880 xv6iris.TsoCtx <> own_context_unseal thm
+R12883:12897 xv6iris.TsoCtx <> own_context_def def
+R12883:12897 xv6iris.TsoCtx <> own_context_def def
+R13056:13062 Stdlib.Arith.PeanoNat Nat max def
+R13075:13079 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R13080:13081 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R13088:13089 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R13082:13082 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R13084:13085 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R13087:13087 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R13056:13062 Stdlib.Arith.PeanoNat Nat max def
+R13075:13079 stdpp.base <> ::stdpp_scope:x_'∪'_x not
+R13080:13081 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R13088:13089 stdpp.base <> ::stdpp_scope:'{['_x_']}' not
+R13082:13082 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R13084:13085 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R13087:13087 Corelib.Init.Datatypes <> ::core_scope:'('_x_','_x_','_'..'_','_x_')' not
+R13196:13208 stdpp.base <> elem_of_union meth
+R13196:13208 stdpp.base <> elem_of_union meth
+R13280:13296 stdpp.base <> elem_of_singleton meth
+R13280:13296 stdpp.base <> elem_of_singleton meth
+prf 14027:14042 <> own_context_twin
+R14052:14056 xv6iris.RiscvLang <> CpuId class
+binder 14046:14048 <> CID:46
+R14065:14069 xv6iris.TsoCtx <> CtxId rec
+binder 14060:14061 <> ξ:47
+R14092:14098 iris.bi.updates <> ::stdpp_scope:x_'==∗'_x not
+R14078:14088 xv6iris.TsoCtx <> own_context def
+R14090:14091 xv6iris.TsoCtxMove <> ξ:47 var
+R14113:14117 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R14099:14109 xv6iris.TsoCtx <> own_context def
+R14111:14112 xv6iris.TsoCtxMove <> ξ:47 var
+R14118:14121 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R14133:14134 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R14128:14132 xv6iris.TsoCtx <> CtxId rec
+binder 14122:14124 <> ξc:48
+R14135:14145 xv6iris.TsoCtx <> own_context def
+R14147:14149 xv6iris.TsoCtxMove <> ξc:48 var
+R14186:14203 xv6iris.TsoCtx <> own_context_unseal thm
+R14206:14220 xv6iris.TsoCtx <> own_context_def def
+R14186:14203 xv6iris.TsoCtx <> own_context_unseal thm
+R14186:14203 xv6iris.TsoCtx <> own_context_unseal thm
+R14206:14220 xv6iris.TsoCtx <> own_context_def def
+R14206:14220 xv6iris.TsoCtx <> own_context_def def
+R14317:14334 iris.base_logic.lib.mono_nat <> mono_nat_own_alloc thm
+R14317:14334 iris.base_logic.lib.mono_nat <> mono_nat_own_alloc thm
+R14367:14376 xv6iris.TsoGhost <> dset_alloc thm
+R14367:14376 xv6iris.TsoGhost <> dset_alloc thm
+R14504:14510 xv6iris.TsoCtx <> MkCtxId constr
+R14504:14510 xv6iris.TsoCtx <> MkCtxId constr
+R14530:14547 xv6iris.TsoCtx <> own_context_unseal thm
+R14550:14564 xv6iris.TsoCtx <> own_context_def def
+R14530:14547 xv6iris.TsoCtx <> own_context_unseal thm
+R14530:14547 xv6iris.TsoCtx <> own_context_unseal thm
+R14550:14564 xv6iris.TsoCtx <> own_context_def def
+R14550:14564 xv6iris.TsoCtx <> own_context_def def
+R14588:14590 stdpp.base <> ::stdpp_scope:'∅' not
+R14588:14590 stdpp.base <> ::stdpp_scope:'∅' not
+R14602:14607 xv6iris.TsoCtx <> ctx_at def
+R14602:14607 xv6iris.TsoCtx <> ctx_at def
+R14602:14607 xv6iris.TsoCtx <> ctx_at def
+R14729:14742 iris.bi.big_op <> big_sepS_empty thm
+R14729:14742 iris.bi.big_op <> big_sepS_empty thm
+ind 14981:14987 <> CtxMove
+constr 15036:15043 <> ctx_move
+rec 14981:14987 <> CtxMove
+proj 15036:15043 <> ctx_move
+R14997:15001 xv6iris.RiscvLang <> CpuId class
+binder 14991:14993 <> CID:49
+R15014:15018 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R15009:15013 xv6iris.TsoCtx <> CtxId rec
+R15019:15023 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R15025:15026 xv6iris.TsoCtxMove <> Move.Σ var
+binder 15005:15005 <> R:50
+R15047:15050 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
+R15058:15059 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
+binder 15051:15053 <> ξ0:52
+binder 15055:15057 <> ξ1:53
+R15075:15080 iris.bi.interface <> ::stdpp_scope:x_'-∗'_x not
+R15060:15070 xv6iris.TsoCtx <> own_context def
+R15072:15074 xv6iris.TsoCtxMove <> ξ0:52 var
+R15096:15101 iris.bi.interface <> ::bi_scope:x_'-∗'_x not
+R15081:15091 xv6iris.TsoCtx <> own_context def
+R15093:15095 xv6iris.TsoCtxMove <> ξ1:53 var
+R15107:15137 iris.bi.updates <> ::bi_scope:x_'==∗'_x not
+R15102:15102 xv6iris.TsoCtxMove <> R:50 var
+R15104:15106 xv6iris.TsoCtxMove <> ξ0:52 var
+R15153:15157 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R15138:15148 xv6iris.TsoCtx <> own_context def
+R15150:15152 xv6iris.TsoCtxMove <> ξ0:52 var
+R15173:15177 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R15158:15168 xv6iris.TsoCtx <> own_context def
+R15170:15172 xv6iris.TsoCtxMove <> ξ1:53 var
+R15178:15178 xv6iris.TsoCtxMove <> R:50 var
+R15180:15182 xv6iris.TsoCtxMove <> ξ1:53 var
+inst 15204:15217 <> ctx_move_const
+R15227:15231 xv6iris.RiscvLang <> CpuId class
+binder 15221:15223 <> CID:55
+R15239:15243 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R15245:15246 xv6iris.TsoCtxMove <> Move.Σ var
+binder 15235:15235 <> P:56
+R15251:15257 xv6iris.TsoCtxMove <> CtxMove class
+R15260:15262 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R15264:15265 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R15266:15266 xv6iris.TsoCtxMove <> P:56 var
+inst 15350:15361 <> ctx_move_sep
+R15371:15375 xv6iris.RiscvLang <> CpuId class
+binder 15365:15367 <> CID:57
+R15392:15396 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R15387:15391 xv6iris.TsoCtx <> CtxId rec
+R15397:15401 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R15403:15404 xv6iris.TsoCtxMove <> Move.Σ var
+binder 15379:15380 <> R1:58
+binder 15382:15383 <> R2:59
+R15423:15427 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R15413:15419 xv6iris.TsoCtxMove <> CtxMove class
+R15421:15422 xv6iris.TsoCtxMove <> R1:58 var
+R15438:15442 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R15428:15434 xv6iris.TsoCtxMove <> CtxMove class
+R15436:15437 xv6iris.TsoCtxMove <> R2:59 var
+R15443:15449 xv6iris.TsoCtxMove <> CtxMove class
+R15452:15454 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R15457:15458 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 15455:15456 <> ξ:60
+R15464:15468 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R15459:15460 xv6iris.TsoCtxMove <> R1:58 var
+R15462:15463 xv6iris.TsoCtxMove <> ξ:60 var
+R15469:15470 xv6iris.TsoCtxMove <> R2:59 var
+R15472:15473 xv6iris.TsoCtxMove <> ξ:60 var
+R15544:15544 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15553:15558 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15570:15570 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15545:15552 xv6iris.TsoCtxMove <> ctx_move def
+R15544:15544 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15553:15558 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15570:15570 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15545:15552 xv6iris.TsoCtxMove <> ctx_move def
+R15603:15603 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15612:15617 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15629:15629 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15604:15611 xv6iris.TsoCtxMove <> ctx_move def
+R15603:15603 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15612:15617 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15629:15629 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15604:15611 xv6iris.TsoCtxMove <> ctx_move def
+inst 15702:15715 <> ctx_move_exist
+R15725:15729 xv6iris.RiscvLang <> CpuId class
+binder 15719:15721 <> CID:61
+binder 15733:15733 <> A:62
+R15743:15747 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R15742:15742 xv6iris.TsoCtxMove <> A:62 var
+R15753:15757 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R15748:15752 xv6iris.TsoCtx <> CtxId rec
+R15758:15762 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R15764:15765 xv6iris.TsoCtxMove <> Move.Σ var
+binder 15737:15738 <> Φ:63
+R15774:15774 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R15796:15801 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R15775:15778 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
+R15780:15781 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
+binder 15779:15779 <> x:64
+R15782:15788 xv6iris.TsoCtxMove <> CtxMove class
+R15791:15792 xv6iris.TsoCtxMove <> Φ:63 var
+R15794:15794 xv6iris.TsoCtxMove <> x:64 var
+R15802:15808 xv6iris.TsoCtxMove <> CtxMove class
+R15811:15813 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R15816:15817 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 15814:15815 <> ξ:65
+R15818:15821 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R15823:15824 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+binder 15822:15822 <> x:66
+R15825:15826 xv6iris.TsoCtxMove <> Φ:63 var
+R15830:15831 xv6iris.TsoCtxMove <> ξ:65 var
+R15828:15828 xv6iris.TsoCtxMove <> x:66 var
+R15900:15900 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15909:15914 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15925:15925 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15901:15908 xv6iris.TsoCtxMove <> ctx_move def
+R15900:15900 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15909:15914 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15925:15925 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R15901:15908 xv6iris.TsoCtxMove <> ctx_move def
+inst 16029:16045 <> ctx_move_big_sepL
+R16055:16059 xv6iris.RiscvLang <> CpuId class
+binder 16049:16051 <> CID:67
+binder 16063:16063 <> A:68
+R16071:16074 Corelib.Init.Datatypes <> list ind
+R16076:16076 xv6iris.TsoCtxMove <> A:68 var
+binder 16067:16067 <> l:69
+R16094:16098 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R16091:16093 Corelib.Init.Datatypes <> nat ind
+R16100:16104 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R16099:16099 xv6iris.TsoCtxMove <> A:68 var
+R16110:16114 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R16105:16109 xv6iris.TsoCtx <> CtxId rec
+R16115:16119 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R16121:16122 xv6iris.TsoCtxMove <> Move.Σ var
+binder 16086:16087 <> Φ:70
+R16131:16131 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R16157:16162 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R16132:16135 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
+R16139:16140 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
+binder 16136:16136 <> i:71
+binder 16138:16138 <> x:72
+R16141:16147 xv6iris.TsoCtxMove <> CtxMove class
+R16150:16151 xv6iris.TsoCtxMove <> Φ:70 var
+R16155:16155 xv6iris.TsoCtxMove <> x:72 var
+R16153:16153 xv6iris.TsoCtxMove <> i:71 var
+R16163:16169 xv6iris.TsoCtxMove <> CtxMove class
+R16172:16174 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R16177:16178 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 16175:16176 <> ξ:73
+R16179:16189 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R16191:16195 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R16197:16201 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+R16203:16204 iris.bi.big_op <> ::bi_scope:'[∗'_'list]'_x_'↦'_x_'∈'_x_','_x not
+binder 16190:16190 <> i:74
+binder 16190:16190 <> i:75
+binder 16196:16196 <> x:76
+binder 16196:16196 <> x:77
+R16205:16206 xv6iris.TsoCtxMove <> Φ:70 var
+R16212:16213 xv6iris.TsoCtxMove <> ξ:73 var
+R16210:16210 xv6iris.TsoCtxMove <> x:76 var
+R16208:16208 xv6iris.TsoCtxMove <> i:74 var
+R16202:16202 xv6iris.TsoCtxMove <> l:69 var
+R16381:16381 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16390:16395 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16406:16406 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16382:16389 xv6iris.TsoCtxMove <> ctx_move def
+R16381:16381 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16390:16395 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16406:16406 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16382:16389 xv6iris.TsoCtxMove <> ctx_move def
+R16440:16440 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16474:16479 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16491:16491 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16445:16447 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R16451:16452 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 16448:16448 <> i:78
+binder 16450:16450 <> y:79
+R16457:16457 Corelib.Init.Datatypes <> S constr
+R16459:16459 xv6iris.TsoCtxMove <> i:78 var
+R16462:16462 xv6iris.TsoCtxMove <> y:79 var
+R16440:16440 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16474:16479 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16491:16491 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16445:16447 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R16451:16452 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 16448:16448 <> i:80
+binder 16450:16450 <> y:81
+R16457:16457 Corelib.Init.Datatypes <> S constr
+R16459:16459 xv6iris.TsoCtxMove <> i:80 var
+R16462:16462 xv6iris.TsoCtxMove <> y:81 var
+inst 16566:16582 <> ctx_move_big_sepM
+R16592:16596 xv6iris.RiscvLang <> CpuId class
+binder 16586:16588 <> CID:82
+R16601:16609 stdpp.countable <> Countable class
+binder 16611:16611 <> K:83
+binder 16601:16611 <> H:85
+binder 16615:16615 <> A:86
+R16623:16626 stdpp.gmap <> gmap rec
+R16630:16630 xv6iris.TsoCtxMove <> A:86 var
+R16628:16628 xv6iris.TsoCtxMove <> K:83 var
+binder 16619:16619 <> m:87
+R16646:16650 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R16645:16645 xv6iris.TsoCtxMove <> K:83 var
+R16652:16656 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R16651:16651 xv6iris.TsoCtxMove <> A:86 var
+R16662:16666 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R16657:16661 xv6iris.TsoCtx <> CtxId rec
+R16667:16671 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R16673:16674 xv6iris.TsoCtxMove <> Move.Σ var
+binder 16640:16641 <> Φ:88
+R16683:16683 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R16709:16714 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R16684:16687 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
+R16691:16692 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
+binder 16688:16688 <> k:89
+binder 16690:16690 <> x:90
+R16693:16699 xv6iris.TsoCtxMove <> CtxMove class
+R16702:16703 xv6iris.TsoCtxMove <> Φ:88 var
+R16707:16707 xv6iris.TsoCtxMove <> x:90 var
+R16705:16705 xv6iris.TsoCtxMove <> k:89 var
+R16715:16721 xv6iris.TsoCtxMove <> CtxMove class
+R16724:16726 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R16729:16730 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 16727:16728 <> ξ:91
+R16731:16740 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R16742:16746 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R16748:16752 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+R16754:16755 iris.bi.big_op <> ::bi_scope:'[∗'_'map]'_x_'↦'_x_'∈'_x_','_x not
+binder 16741:16741 <> k:92
+binder 16741:16741 <> k:93
+binder 16747:16747 <> x:94
+binder 16747:16747 <> x:95
+R16756:16757 xv6iris.TsoCtxMove <> Φ:88 var
+R16763:16764 xv6iris.TsoCtxMove <> ξ:91 var
+R16761:16761 xv6iris.TsoCtxMove <> x:94 var
+R16759:16759 xv6iris.TsoCtxMove <> k:92 var
+R16753:16753 xv6iris.TsoCtxMove <> m:87 var
+R16831:16837 stdpp.fin_maps <> map_ind thm
+R16831:16837 stdpp.fin_maps <> map_ind thm
+R16886:16899 iris.bi.big_op <> big_sepM_empty thm
+R16886:16899 iris.bi.big_op <> big_sepM_empty thm
+R16886:16899 iris.bi.big_op <> big_sepM_empty thm
+R16965:16965 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16992:16997 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17002:17002 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16966:16980 iris.bi.big_op <> big_sepM_insert thm
+R16965:16965 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16992:16997 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17002:17002 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R16966:16980 iris.bi.big_op <> big_sepM_insert thm
+R17030:17030 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17039:17044 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17055:17055 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17031:17038 xv6iris.TsoCtxMove <> ctx_move def
+R17030:17030 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17039:17044 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17055:17055 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17031:17038 xv6iris.TsoCtxMove <> ctx_move def
+R17089:17089 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17100:17105 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17117:17117 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17089:17089 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17100:17105 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17117:17117 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17183:17197 iris.bi.big_op <> big_sepM_insert thm
+R17183:17197 iris.bi.big_op <> big_sepM_insert thm
+R17183:17197 iris.bi.big_op <> big_sepM_insert thm
+inst 17246:17262 <> ctx_move_big_sepS
+R17272:17276 xv6iris.RiscvLang <> CpuId class
+binder 17266:17268 <> CID:96
+R17281:17289 stdpp.countable <> Countable class
+binder 17291:17291 <> A:97
+binder 17281:17291 <> H:99
+R17299:17302 stdpp.gmap <> gset def
+R17304:17304 xv6iris.TsoCtxMove <> A:97 var
+binder 17295:17295 <> X:100
+R17320:17324 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R17319:17319 xv6iris.TsoCtxMove <> A:97 var
+R17330:17334 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R17325:17329 xv6iris.TsoCtx <> CtxId rec
+R17335:17339 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R17341:17342 xv6iris.TsoCtxMove <> Move.Σ var
+binder 17314:17315 <> Φ:101
+R17351:17351 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R17373:17378 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R17352:17355 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
+R17357:17358 Stdlib.Unicode.Utf8_core <> ::type_scope:'∀'_x_'..'_x_','_x not
+binder 17356:17356 <> x:102
+R17359:17365 xv6iris.TsoCtxMove <> CtxMove class
+R17368:17369 xv6iris.TsoCtxMove <> Φ:101 var
+R17371:17371 xv6iris.TsoCtxMove <> x:102 var
+R17379:17385 xv6iris.TsoCtxMove <> CtxMove class
+R17388:17390 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R17393:17394 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 17391:17392 <> ξ:103
+R17395:17404 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
+R17406:17410 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
+R17412:17413 iris.bi.big_op <> ::bi_scope:'[∗'_'set]'_x_'∈'_x_','_x not
+binder 17405:17405 <> x:104
+binder 17405:17405 <> x:105
+R17414:17415 xv6iris.TsoCtxMove <> Φ:101 var
+R17419:17420 xv6iris.TsoCtxMove <> ξ:103 var
+R17417:17417 xv6iris.TsoCtxMove <> x:104 var
+R17411:17411 xv6iris.TsoCtxMove <> X:100 var
+R17485:17493 stdpp.fin_sets <> set_ind_L thm
+R17485:17493 stdpp.fin_sets <> set_ind_L thm
+R17542:17555 iris.bi.big_op <> big_sepS_empty thm
+R17542:17555 iris.bi.big_op <> big_sepS_empty thm
+R17542:17555 iris.bi.big_op <> big_sepS_empty thm
+R17621:17621 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17646:17651 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17656:17656 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17622:17636 iris.bi.big_op <> big_sepS_insert thm
+R17621:17621 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17646:17651 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17656:17656 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17622:17636 iris.bi.big_op <> big_sepS_insert thm
+R17684:17684 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17693:17698 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17709:17709 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17685:17692 xv6iris.TsoCtxMove <> ctx_move def
+R17684:17684 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17693:17698 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17709:17709 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17685:17692 xv6iris.TsoCtxMove <> ctx_move def
+R17743:17743 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17754:17759 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17771:17771 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17743:17743 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17754:17759 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17771:17771 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R17837:17851 iris.bi.big_op <> big_sepS_insert thm
+R17837:17851 iris.bi.big_op <> big_sepS_insert thm
+R17837:17851 iris.bi.big_op <> big_sepS_insert thm
+inst 17898:17908 <> ctx_move_or
+R17918:17922 xv6iris.RiscvLang <> CpuId class
+binder 17912:17914 <> CID:106
+R17939:17943 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R17934:17938 xv6iris.TsoCtx <> CtxId rec
+R17944:17948 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R17950:17951 xv6iris.TsoCtxMove <> Move.Σ var
+binder 17926:17927 <> R1:107
+binder 17929:17930 <> R2:108
+R17970:17974 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R17960:17966 xv6iris.TsoCtxMove <> CtxMove class
+R17968:17969 xv6iris.TsoCtxMove <> R1:107 var
+R17985:17989 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R17975:17981 xv6iris.TsoCtxMove <> CtxMove class
+R17983:17984 xv6iris.TsoCtxMove <> R2:108 var
+R17990:17996 xv6iris.TsoCtxMove <> CtxMove class
+R17999:18001 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R18004:18005 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 18002:18003 <> ξ:109
+R18011:18015 iris.bi.interface <> ::bi_scope:x_'∨'_x not
+R18006:18007 xv6iris.TsoCtxMove <> R1:107 var
+R18009:18010 xv6iris.TsoCtxMove <> ξ:109 var
+R18016:18017 xv6iris.TsoCtxMove <> R2:108 var
+R18019:18020 xv6iris.TsoCtxMove <> ξ:109 var
+R18093:18093 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18102:18107 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18118:18118 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18094:18101 xv6iris.TsoCtxMove <> ctx_move def
+R18093:18093 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18102:18107 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18118:18118 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18094:18101 xv6iris.TsoCtxMove <> ctx_move def
+R18189:18189 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18198:18203 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18214:18214 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18190:18197 xv6iris.TsoCtxMove <> ctx_move def
+R18189:18189 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18198:18203 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18214:18214 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18190:18197 xv6iris.TsoCtxMove <> ctx_move def
+inst 18301:18311 <> ctx_move_if
+R18321:18325 xv6iris.RiscvLang <> CpuId class
+binder 18315:18317 <> CID:110
+R18333:18336 Corelib.Init.Datatypes <> bool ind
+binder 18329:18329 <> b:111
+R18353:18357 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R18348:18352 xv6iris.TsoCtx <> CtxId rec
+R18358:18362 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R18364:18365 xv6iris.TsoCtxMove <> Move.Σ var
+binder 18340:18341 <> R1:112
+binder 18343:18344 <> R2:113
+R18384:18388 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R18374:18380 xv6iris.TsoCtxMove <> CtxMove class
+R18382:18383 xv6iris.TsoCtxMove <> R1:112 var
+R18399:18403 Stdlib.Unicode.Utf8_core <> ::type_scope:x_'→'_x not
+R18389:18395 xv6iris.TsoCtxMove <> CtxMove class
+R18397:18398 xv6iris.TsoCtxMove <> R2:113 var
+R18404:18410 xv6iris.TsoCtxMove <> CtxMove class
+R18413:18415 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R18418:18419 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 18416:18417 <> ξ:114
+R18420:18422 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R18424:18429 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R18435:18440 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R18441:18442 xv6iris.TsoCtxMove <> R2:113 var
+R18444:18445 xv6iris.TsoCtxMove <> ξ:114 var
+R18430:18431 xv6iris.TsoCtxMove <> R1:112 var
+R18433:18434 xv6iris.TsoCtxMove <> ξ:114 var
+R18423:18423 xv6iris.TsoCtxMove <> b:111 var
+inst 18533:18554 <> ctx_move_pointsto_inst
+R18564:18568 xv6iris.RiscvLang <> CpuId class
+binder 18558:18560 <> CID:115
+R18577:18581 xv6iris.Ktier <> ktier ind
+binder 18572:18573 <> kt:116
+binder 18584:18584 <> a:117
+binder 18586:18587 <> dq:118
+binder 18589:18589 <> v:119
+R18597:18603 xv6iris.TsoCtxMove <> CtxMove class
+R18606:18608 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R18611:18612 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 18609:18610 <> ξ:120
+R18613:18624 xv6iris.TsoCtx <> ctx_pointsto def
+R18646:18646 xv6iris.TsoCtxMove <> v:119 var
+R18643:18644 xv6iris.TsoCtxMove <> dq:118 var
+R18641:18641 xv6iris.TsoCtxMove <> a:117 var
+R18638:18639 xv6iris.TsoCtxMove <> ξ:120 var
+R18634:18635 xv6iris.TsoCtxMove <> kt:116 var
+R18696:18696 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18714:18719 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18730:18730 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18697:18713 xv6iris.TsoCtxMove <> ctx_move_pointsto thm
+R18696:18696 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18714:18719 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18730:18730 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18697:18713 xv6iris.TsoCtxMove <> ctx_move_pointsto thm
+inst 18757:18775 <> ctx_move_floor_inst
+R18785:18789 xv6iris.RiscvLang <> CpuId class
+binder 18779:18781 <> CID:121
+R18798:18800 Corelib.Init.Datatypes <> nat ind
+binder 18793:18794 <> lo:122
+R18809:18815 xv6iris.TsoCtxMove <> CtxMove class
+R18818:18820 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R18823:18824 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 18821:18822 <> ξ:123
+R18825:18833 xv6iris.TsoCtx <> ctx_floor def
+R18835:18836 xv6iris.TsoCtxMove <> ξ:123 var
+R18838:18839 xv6iris.TsoCtxMove <> lo:122 var
+R18891:18891 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18906:18911 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18923:18923 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18892:18905 xv6iris.TsoCtxMove <> ctx_move_floor thm
+R18891:18891 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18906:18911 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18923:18923 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R18892:18905 xv6iris.TsoCtxMove <> ctx_move_floor thm
+inst 18950:18962 <> ctx_move_word
+R18972:18976 xv6iris.RiscvLang <> CpuId class
+binder 18966:18968 <> CID:124
+R18985:18989 xv6iris.Ktier <> ktier ind
+binder 18980:18981 <> kt:125
+binder 18992:18992 <> a:126
+binder 18994:18995 <> dq:127
+binder 18997:18997 <> w:128
+R19005:19011 xv6iris.TsoCtxMove <> CtxMove class
+R19014:19016 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R19019:19020 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 19017:19018 <> ξ:129
+R19021:19037 xv6iris.TsoCtx <> ctx_word_pointsto def
+R19059:19059 xv6iris.TsoCtxMove <> w:128 var
+R19056:19057 xv6iris.TsoCtxMove <> dq:127 var
+R19054:19054 xv6iris.TsoCtxMove <> a:126 var
+R19051:19052 xv6iris.TsoCtxMove <> ξ:129 var
+R19047:19048 xv6iris.TsoCtxMove <> kt:125 var
+R19121:19121 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19294:19299 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19309:19309 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19122:19138 xv6iris.TsoCtxMove <> ctx_move_big_sepL inst
+R19247:19249 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R19253:19254 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 19250:19250 <> i:130
+binder 19252:19252 <> x:131
+R19255:19276 xv6iris.TsoCtxMove <> ctx_move_pointsto_inst inst
+R19163:19165 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R19172:19173 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 19168:19168 <> j:132
+binder 19170:19171 <> ξ:133
+R19174:19185 xv6iris.TsoCtx <> ctx_pointsto def
+R19219:19226 xv6iris.RiscvModelBytes <> nth_byte def
+R19230:19230 xv6iris.TsoCtxMove <> j:132 var
+R19203:19208 xv6iris.RiscvModelBytes <> pa_add def
+R19212:19212 xv6iris.TsoCtxMove <> j:132 var
+R19199:19200 xv6iris.TsoCtxMove <> ξ:133 var
+R19141:19143 Corelib.Lists.ListDef <> seq def
+R19121:19121 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19294:19299 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19309:19309 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19122:19138 xv6iris.TsoCtxMove <> ctx_move_big_sepL inst
+R19247:19249 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R19253:19254 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 19250:19250 <> i:134
+binder 19252:19252 <> x:135
+R19255:19276 xv6iris.TsoCtxMove <> ctx_move_pointsto_inst inst
+R19163:19165 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R19172:19173 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 19168:19168 <> j:136
+binder 19170:19171 <> ξ:137
+R19174:19185 xv6iris.TsoCtx <> ctx_pointsto def
+R19219:19226 xv6iris.RiscvModelBytes <> nth_byte def
+R19230:19230 xv6iris.TsoCtxMove <> j:136 var
+R19203:19208 xv6iris.RiscvModelBytes <> pa_add def
+R19212:19212 xv6iris.TsoCtxMove <> j:136 var
+R19199:19200 xv6iris.TsoCtxMove <> ξ:137 var
+R19141:19143 Corelib.Lists.ListDef <> seq def
+inst 19417:19430 <> ctx_move_word2
+R19440:19444 xv6iris.RiscvLang <> CpuId class
+binder 19434:19436 <> CID:138
+R19453:19457 xv6iris.Ktier <> ktier ind
+binder 19448:19449 <> kt:139
+binder 19460:19460 <> a:140
+binder 19462:19463 <> dq:141
+binder 19465:19465 <> w:142
+R19473:19479 xv6iris.TsoCtxMove <> CtxMove class
+R19482:19484 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R19487:19488 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 19485:19486 <> ξ:143
+R19489:19506 xv6iris.TsoCtx <> ctx_word2_pointsto def
+R19528:19528 xv6iris.TsoCtxMove <> w:142 var
+R19525:19526 xv6iris.TsoCtxMove <> dq:141 var
+R19523:19523 xv6iris.TsoCtxMove <> a:140 var
+R19520:19521 xv6iris.TsoCtxMove <> ξ:143 var
+R19516:19517 xv6iris.TsoCtxMove <> kt:139 var
+R19590:19590 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19763:19768 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19778:19778 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19591:19607 xv6iris.TsoCtxMove <> ctx_move_big_sepL inst
+R19716:19718 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R19722:19723 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 19719:19719 <> i:144
+binder 19721:19721 <> x:145
+R19724:19745 xv6iris.TsoCtxMove <> ctx_move_pointsto_inst inst
+R19632:19634 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R19641:19642 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 19637:19637 <> j:146
+binder 19639:19640 <> ξ:147
+R19643:19654 xv6iris.TsoCtx <> ctx_pointsto def
+R19688:19695 xv6iris.RiscvModelBytes <> nth_byte def
+R19699:19699 xv6iris.TsoCtxMove <> j:146 var
+R19672:19677 xv6iris.RiscvModelBytes <> pa_add def
+R19681:19681 xv6iris.TsoCtxMove <> j:146 var
+R19668:19669 xv6iris.TsoCtxMove <> ξ:147 var
+R19610:19612 Corelib.Lists.ListDef <> seq def
+R19590:19590 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19763:19768 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19778:19778 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R19591:19607 xv6iris.TsoCtxMove <> ctx_move_big_sepL inst
+R19716:19718 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R19722:19723 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 19719:19719 <> i:148
+binder 19721:19721 <> x:149
+R19724:19745 xv6iris.TsoCtxMove <> ctx_move_pointsto_inst inst
+R19632:19634 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R19641:19642 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 19637:19637 <> j:150
+binder 19639:19640 <> ξ:151
+R19643:19654 xv6iris.TsoCtx <> ctx_pointsto def
+R19688:19695 xv6iris.RiscvModelBytes <> nth_byte def
+R19699:19699 xv6iris.TsoCtxMove <> j:150 var
+R19672:19677 xv6iris.RiscvModelBytes <> pa_add def
+R19681:19681 xv6iris.TsoCtxMove <> j:150 var
+R19668:19669 xv6iris.TsoCtxMove <> ξ:151 var
+R19610:19612 Corelib.Lists.ListDef <> seq def
+inst 19886:19899 <> ctx_move_word4
+R19909:19913 xv6iris.RiscvLang <> CpuId class
+binder 19903:19905 <> CID:152
+R19922:19926 xv6iris.Ktier <> ktier ind
+binder 19917:19918 <> kt:153
+binder 19929:19929 <> a:154
+binder 19931:19932 <> dq:155
+binder 19934:19934 <> w:156
+R19942:19948 xv6iris.TsoCtxMove <> CtxMove class
+R19951:19953 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R19956:19957 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 19954:19955 <> ξ:157
+R19958:19975 xv6iris.TsoCtx <> ctx_word4_pointsto def
+R19997:19997 xv6iris.TsoCtxMove <> w:156 var
+R19994:19995 xv6iris.TsoCtxMove <> dq:155 var
+R19992:19992 xv6iris.TsoCtxMove <> a:154 var
+R19989:19990 xv6iris.TsoCtxMove <> ξ:157 var
+R19985:19986 xv6iris.TsoCtxMove <> kt:153 var
+R20059:20059 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20232:20237 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20247:20247 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20060:20076 xv6iris.TsoCtxMove <> ctx_move_big_sepL inst
+R20185:20187 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R20191:20192 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 20188:20188 <> i:158
+binder 20190:20190 <> x:159
+R20193:20214 xv6iris.TsoCtxMove <> ctx_move_pointsto_inst inst
+R20101:20103 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R20110:20111 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 20106:20106 <> j:160
+binder 20108:20109 <> ξ:161
+R20112:20123 xv6iris.TsoCtx <> ctx_pointsto def
+R20157:20164 xv6iris.RiscvModelBytes <> nth_byte def
+R20168:20168 xv6iris.TsoCtxMove <> j:160 var
+R20141:20146 xv6iris.RiscvModelBytes <> pa_add def
+R20150:20150 xv6iris.TsoCtxMove <> j:160 var
+R20137:20138 xv6iris.TsoCtxMove <> ξ:161 var
+R20079:20081 Corelib.Lists.ListDef <> seq def
+R20059:20059 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20232:20237 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20247:20247 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20060:20076 xv6iris.TsoCtxMove <> ctx_move_big_sepL inst
+R20185:20187 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R20191:20192 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 20188:20188 <> i:162
+binder 20190:20190 <> x:163
+R20193:20214 xv6iris.TsoCtxMove <> ctx_move_pointsto_inst inst
+R20101:20103 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R20110:20111 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 20106:20106 <> j:164
+binder 20108:20109 <> ξ:165
+R20112:20123 xv6iris.TsoCtx <> ctx_pointsto def
+R20157:20164 xv6iris.RiscvModelBytes <> nth_byte def
+R20168:20168 xv6iris.TsoCtxMove <> j:164 var
+R20141:20146 xv6iris.RiscvModelBytes <> pa_add def
+R20150:20150 xv6iris.TsoCtxMove <> j:164 var
+R20137:20138 xv6iris.TsoCtxMove <> ξ:165 var
+R20079:20081 Corelib.Lists.ListDef <> seq def
+inst 20355:20381 <> ctx_move_phys_pointsto_inst
+R20391:20395 xv6iris.RiscvLang <> CpuId class
+binder 20385:20387 <> CID:166
+binder 20398:20398 <> a:167
+binder 20400:20401 <> dq:168
+binder 20403:20403 <> v:169
+R20411:20417 xv6iris.TsoCtxMove <> CtxMove class
+R20420:20422 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R20425:20426 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 20423:20424 <> ξ:170
+R20427:20443 xv6iris.TsoCtx <> ctx_phys_pointsto def
+R20445:20446 xv6iris.TsoCtxMove <> ξ:170 var
+R20448:20448 xv6iris.TsoCtxMove <> a:167 var
+R20450:20451 xv6iris.TsoCtxMove <> dq:168 var
+R20453:20453 xv6iris.TsoCtxMove <> v:169 var
+R20488:20509 xv6iris.TsoCtxMove <> ctx_move_phys_pointsto thm
+R20488:20509 xv6iris.TsoCtxMove <> ctx_move_phys_pointsto thm
+inst 20536:20553 <> ctx_move_phys_word
+R20563:20567 xv6iris.RiscvLang <> CpuId class
+binder 20557:20559 <> CID:171
+binder 20570:20570 <> a:172
+binder 20572:20573 <> dq:173
+binder 20575:20575 <> w:174
+R20583:20589 xv6iris.TsoCtxMove <> CtxMove class
+R20592:20594 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R20597:20598 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 20595:20596 <> ξ:175
+R20599:20620 xv6iris.TsoCtx <> ctx_phys_word_pointsto def
+R20622:20623 xv6iris.TsoCtxMove <> ξ:175 var
+R20625:20625 xv6iris.TsoCtxMove <> a:172 var
+R20627:20628 xv6iris.TsoCtxMove <> dq:173 var
+R20630:20630 xv6iris.TsoCtxMove <> w:174 var
+R20692:20692 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20861:20866 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20876:20876 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20693:20709 xv6iris.TsoCtxMove <> ctx_move_big_sepL inst
+R20811:20813 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R20817:20818 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 20814:20814 <> i:176
+binder 20816:20816 <> x:177
+R20819:20845 xv6iris.TsoCtxMove <> ctx_move_phys_pointsto_inst inst
+R20734:20736 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R20743:20744 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 20739:20739 <> j:178
+binder 20741:20742 <> ξ:179
+R20745:20761 xv6iris.TsoCtx <> ctx_phys_pointsto def
+R20763:20764 xv6iris.TsoCtxMove <> ξ:179 var
+R20767:20772 xv6iris.RiscvModelBytes <> pa_add def
+R20776:20776 xv6iris.TsoCtxMove <> j:178 var
+R20783:20790 xv6iris.RiscvModelBytes <> nth_byte def
+R20794:20794 xv6iris.TsoCtxMove <> j:178 var
+R20712:20714 Corelib.Lists.ListDef <> seq def
+R20692:20692 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20861:20866 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20876:20876 iris.proofmode.ltac_tactics <> :::'('_x_'with'_x_')' not
+R20693:20709 xv6iris.TsoCtxMove <> ctx_move_big_sepL inst
+R20811:20813 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R20817:20818 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 20814:20814 <> i:180
+binder 20816:20816 <> x:181
+R20819:20845 xv6iris.TsoCtxMove <> ctx_move_phys_pointsto_inst inst
+R20734:20736 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R20743:20744 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 20739:20739 <> j:182
+binder 20741:20742 <> ξ:183
+R20745:20761 xv6iris.TsoCtx <> ctx_phys_pointsto def
+R20763:20764 xv6iris.TsoCtxMove <> ξ:183 var
+R20767:20772 xv6iris.RiscvModelBytes <> pa_add def
+R20776:20776 xv6iris.TsoCtxMove <> j:182 var
+R20783:20790 xv6iris.RiscvModelBytes <> nth_byte def
+R20794:20794 xv6iris.TsoCtxMove <> j:182 var
+R20712:20714 Corelib.Lists.ListDef <> seq def
+R20970:20973 xv6iris.TsoCtxMove Move <> sec
+R22142:22148 xv6iris.TsoCtx <> cur_ctx def
+R22190:22196 xv6iris.TsoCtxMove <> CtxMove class
+R22199:22201 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R22203:22204 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R22190:22196 xv6iris.TsoCtxMove <> CtxMove class
+R22199:22201 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R22203:22204 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R22243:22249 xv6iris.TsoCtxMove <> CtxMove class
+R22252:22254 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R22257:22258 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 22255:22256 <> ξ:184
+R22259:22266 iris.bi.interface <> bi_exist proj
+R22243:22249 xv6iris.TsoCtxMove <> CtxMove class
+R22252:22254 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R22257:22258 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 22255:22256 <> ξ:185
+R22259:22266 iris.bi.interface <> bi_exist proj
+R22312:22318 xv6iris.TsoCtxMove <> CtxMove class
+R22321:22323 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R22326:22327 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 22324:22325 <> ξ:186
+R22328:22333 iris.bi.interface <> bi_sep proj
+R22312:22318 xv6iris.TsoCtxMove <> CtxMove class
+R22321:22323 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R22326:22327 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 22324:22325 <> ξ:187
+R22328:22333 iris.bi.interface <> bi_sep proj
+R22369:22375 xv6iris.TsoCtxMove <> CtxMove class
+R22378:22380 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R22383:22384 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 22381:22382 <> ξ:188
+R22385:22389 iris.bi.interface <> bi_or proj
+R22369:22375 xv6iris.TsoCtxMove <> CtxMove class
+R22378:22380 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R22383:22384 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 22381:22382 <> ξ:189
+R22385:22389 iris.bi.interface <> bi_or proj
+R22424:22430 xv6iris.TsoCtxMove <> CtxMove class
+R22433:22435 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R22438:22439 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 22436:22437 <> ξ:190
+R22440:22446 iris.algebra.big_op <> big_opL def
+R22448:22453 iris.bi.interface <> bi_sep proj
+R22424:22430 xv6iris.TsoCtxMove <> CtxMove class
+R22433:22435 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R22438:22439 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 22436:22437 <> ξ:191
+R22440:22446 iris.algebra.big_op <> big_opL def
+R22448:22453 iris.bi.interface <> bi_sep proj
+R22506:22512 xv6iris.TsoCtxMove <> CtxMove class
+R22515:22517 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R22520:22521 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 22518:22519 <> ξ:192
+R22522:22528 iris.algebra.big_op <> big_opM def
+R22530:22535 iris.bi.interface <> bi_sep proj
+R22506:22512 xv6iris.TsoCtxMove <> CtxMove class
+R22515:22517 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R22520:22521 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 22518:22519 <> ξ:193
+R22522:22528 iris.algebra.big_op <> big_opM def
+R22530:22535 iris.bi.interface <> bi_sep proj
+R22588:22594 xv6iris.TsoCtxMove <> CtxMove class
+R22597:22599 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R22602:22603 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 22600:22601 <> ξ:194
+R22604:22610 iris.algebra.big_op <> big_opS def
+R22612:22617 iris.bi.interface <> bi_sep proj
+R22588:22594 xv6iris.TsoCtxMove <> CtxMove class
+R22597:22599 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R22602:22603 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 22600:22601 <> ξ:195
+R22604:22610 iris.algebra.big_op <> big_opS def
+R22612:22617 iris.bi.interface <> bi_sep proj
+R22668:22674 xv6iris.TsoCtxMove <> CtxMove class
+R22677:22679 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R22682:22683 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 22680:22681 <> ξ:196
+R22684:22686 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R22688:22693 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R22695:22700 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R22668:22674 xv6iris.TsoCtxMove <> CtxMove class
+R22677:22679 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R22682:22683 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 22680:22681 <> ξ:197
+R22684:22686 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R22688:22693 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R22695:22700 Corelib.ssr.ssreflect <> ::general_if_scope:'if'_x_'then'_x_'else'_x not
+R22732:22738 xv6iris.TsoCtxMove <> CtxMove class
+R22741:22743 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R22746:22747 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 22744:22745 <> ξ:198
+R22748:22759 xv6iris.TsoCtx <> ctx_pointsto def
+R22761:22762 xv6iris.TsoCtxMove <> ξ:198 var
+R22732:22738 xv6iris.TsoCtxMove <> CtxMove class
+R22741:22743 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R22746:22747 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 22744:22745 <> ξ:199
+R22748:22759 xv6iris.TsoCtx <> ctx_pointsto def
+R22761:22762 xv6iris.TsoCtxMove <> ξ:199 var
+R22810:22816 xv6iris.TsoCtxMove <> CtxMove class
+R22819:22821 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R22824:22825 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 22822:22823 <> ξ:200
+R22826:22834 xv6iris.TsoCtx <> ctx_floor def
+R22836:22837 xv6iris.TsoCtxMove <> ξ:200 var
+R22810:22816 xv6iris.TsoCtxMove <> CtxMove class
+R22819:22821 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R22824:22825 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 22822:22823 <> ξ:201
+R22826:22834 xv6iris.TsoCtx <> ctx_floor def
+R22836:22837 xv6iris.TsoCtxMove <> ξ:201 var
+R22878:22884 xv6iris.TsoCtxMove <> CtxMove class
+R22887:22889 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R22892:22893 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 22890:22891 <> ξ:202
+R22894:22910 xv6iris.TsoCtx <> ctx_word_pointsto def
+R22912:22913 xv6iris.TsoCtxMove <> ξ:202 var
+R22878:22884 xv6iris.TsoCtxMove <> CtxMove class
+R22887:22889 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R22892:22893 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 22890:22891 <> ξ:203
+R22894:22910 xv6iris.TsoCtx <> ctx_word_pointsto def
+R22912:22913 xv6iris.TsoCtxMove <> ξ:203 var
+R22952:22958 xv6iris.TsoCtxMove <> CtxMove class
+R22961:22963 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R22966:22967 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 22964:22965 <> ξ:204
+R22968:22985 xv6iris.TsoCtx <> ctx_word2_pointsto def
+R22987:22988 xv6iris.TsoCtxMove <> ξ:204 var
+R22952:22958 xv6iris.TsoCtxMove <> CtxMove class
+R22961:22963 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R22966:22967 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 22964:22965 <> ξ:205
+R22968:22985 xv6iris.TsoCtx <> ctx_word2_pointsto def
+R22987:22988 xv6iris.TsoCtxMove <> ξ:205 var
+R23028:23034 xv6iris.TsoCtxMove <> CtxMove class
+R23037:23039 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R23042:23043 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 23040:23041 <> ξ:206
+R23044:23061 xv6iris.TsoCtx <> ctx_word4_pointsto def
+R23063:23064 xv6iris.TsoCtxMove <> ξ:206 var
+R23028:23034 xv6iris.TsoCtxMove <> CtxMove class
+R23037:23039 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R23042:23043 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 23040:23041 <> ξ:207
+R23044:23061 xv6iris.TsoCtx <> ctx_word4_pointsto def
+R23063:23064 xv6iris.TsoCtxMove <> ξ:207 var
+R23104:23110 xv6iris.TsoCtxMove <> CtxMove class
+R23113:23115 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R23118:23119 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 23116:23117 <> ξ:208
+R23120:23136 xv6iris.TsoCtx <> ctx_phys_pointsto def
+R23138:23139 xv6iris.TsoCtxMove <> ξ:208 var
+R23104:23110 xv6iris.TsoCtxMove <> CtxMove class
+R23113:23115 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R23118:23119 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 23116:23117 <> ξ:209
+R23120:23136 xv6iris.TsoCtx <> ctx_phys_pointsto def
+R23138:23139 xv6iris.TsoCtxMove <> ξ:209 var
+R23192:23198 xv6iris.TsoCtxMove <> CtxMove class
+R23201:23203 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R23206:23207 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 23204:23205 <> ξ:210
+R23208:23229 xv6iris.TsoCtx <> ctx_phys_word_pointsto def
+R23231:23232 xv6iris.TsoCtxMove <> ξ:210 var
+R23192:23198 xv6iris.TsoCtxMove <> CtxMove class
+R23201:23203 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+R23206:23207 Stdlib.Unicode.Utf8_core <> :::'λ'_x_'..'_x_','_x not
+binder 23204:23205 <> ξ:211
+R23208:23229 xv6iris.TsoCtx <> ctx_phys_word_pointsto def
+R23231:23232 xv6iris.TsoCtxMove <> ξ:211 var
+R23250:23267 xv6iris.TsoCtxMove <> ctx_move_phys_word inst
+R23157:23183 xv6iris.TsoCtxMove <> ctx_move_phys_pointsto_inst inst
+R23082:23095 xv6iris.TsoCtxMove <> ctx_move_word4 inst
+R23006:23019 xv6iris.TsoCtxMove <> ctx_move_word2 inst
+R22931:22943 xv6iris.TsoCtxMove <> ctx_move_word inst
+R22851:22869 xv6iris.TsoCtxMove <> ctx_move_floor_inst inst
+R22780:22801 xv6iris.TsoCtxMove <> ctx_move_pointsto_inst inst
+R22713:22723 xv6iris.TsoCtxMove <> ctx_move_if inst
+R22633:22649 xv6iris.TsoCtxMove <> ctx_move_big_sepS inst
+R22551:22567 xv6iris.TsoCtxMove <> ctx_move_big_sepM inst
+R22469:22485 xv6iris.TsoCtxMove <> ctx_move_big_sepL inst
+R22405:22415 xv6iris.TsoCtxMove <> ctx_move_or inst
+R22349:22360 xv6iris.TsoCtxMove <> ctx_move_sep inst
+R22280:22293 xv6iris.TsoCtxMove <> ctx_move_exist inst
+R22221:22234 xv6iris.TsoCtxMove <> ctx_move_const inst

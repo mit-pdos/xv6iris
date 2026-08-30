@@ -86,7 +86,7 @@ Require Import IrefSlots.
 Require Import WpUart LogInv.
 Require Import ProcAvail.
 Require Import ProcInv.
-Require Import SchedCtx TsoCtxMove CtxMorphTac.
+Require Import SchedCtx TsoCtxMove.
 Require Import UsertrapRes.  (* [ut_park_intro_body] -- the park's producer entry *)
 Require Import TsoCtxPark.
 Require Import StackOwn.
@@ -164,11 +164,6 @@ Lemma fkp_pstate_split `{!riscvGS Σ} (pa : mword 64) :
   pstate_whole pa RUNNING ⊣⊢ pstate_lock pa RUNNING ∗ pstate_at_hlf pa RUNNING.
 Proof. rewrite pstate_whole_split unclaimed_RUNNING. reflexivity. Qed.
 
-(* A6.128: the kstack pointer row is deposited into the child's record too *)
-Global Instance fkp_is_kstack_morph `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (pa ks : mword 64) :
-  CtxMorph (λ ξ, is_kstack (XI := ξ) pa ks).
-Proof. rewrite /is_kstack. ctx_morph_solve. Qed.
-
 Theorem forkret_park_paid
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (W : iProp Σ)
@@ -181,58 +176,39 @@ Proof.
   intros Hrest [j [Hpa Hj]] Hut.
   subst pa.
   iIntros "Hrun Hpkg HW #Hks Hctx Hpriv Hfd Hirsp".
-  (* THE CHILD'S THREAD OF CONTROL IS BORN HERE -- PARKED (tso-port ruling
-     2d.4.1, realized by the checkpoint-0.5 repair).  A forked process's
-     kernel thread is a NEW thread that has never run, so its mint is the
-     PURE parked allocation ([TsoCtx.ctx_parked_alloc]) -- it claims no
-     hart and no visibility, which is why no machine evidence appears
-     here.  The token goes straight into the record it is building; the
-     dispatcher's resume ([TsoCtx.ctx_resume], via the p->lock acquire's
-     view receipt) is what first ties it to a hart.  From there it moves
-     only by the swtch exchange, until a zombie park drops it.  The mint
-     must precede the [iModIntro] below: that is the only update this
-     proof has. *)
-  iMod (ctx_parked_alloc) as (XIc) "Hthr".
-  (* A6.127 §6: THE CHILD'S STACK IS DEPOSITED INTO ITS OWN CONTEXT (the
-     record states it at the child's identity), which raises the child's
-     stamp past the parker's -- so the record's link cannot be at the
-     parker's context: it is floored on a fresh PARK BOX ([ctx_box_over]),
-     and the parker's release makes the box the lock's context
-     ([WpLockIn]).  The other rows stay at the parker's ξ, as below. *)
+  (* A6.129: THE CHILD'S CONTEXT IS A RUNNING TWIN OF THE PARKER'S
+     ([TsoCtxMove.own_context_twin]) -- not a context born empty at stamp 0
+     (that mint is boot's, for the per-hart contexts).  The parker hands the
+     child its rows while BOTH tokens are running, by the same-hart move
+     ([ctx_move], A6.128); then the twin parks on a fresh box
+     ([ctx_park_box]) into the record.  The mints must precede the
+     [iModIntro] below: those are the only updates this proof has. *)
+  iMod (own_context_twin cur_ctx with "Hrun") as "[Hrun (%XIc & Hthr)]".
   iEval (rewrite /forkret_park_pkg) in "Hpkg".
   iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hglobp & #Hmk & Hstk & Hclose)".
-  (* A6.128: the record's cells go to the CHILD's identity [XIc] as well --
-     the record is stated at its own identity now
-     ([SwtchCtx.valid_context_pre]'s [XIp]).  The child's context is born
-     parked, so this is a deposit, like the stack's below. *)
-  iMod (ctx_deposit (λ ξ, ctx_cells (XI := ξ) (p_context (proc_addr j))
-                            (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest))
-          cur_ctx XIc 0 with "Hrun Hthr Hctx") as "(Hrun & %Tc0 & _ & Hthr & Hctx)".
-  iMod (ctx_deposit (λ ξ, stack_own (KTR := KT1) (XI := ξ) (add_vec ks (mword_of_int 4096)) av)
-          cur_ctx XIc Tc0 with "Hrun Hthr Hstk") as "(Hrun & %Tc & _ & Hthr & Hstk)".
-  iMod (ctx_deposit (λ ξ, is_kstack (XI := ξ) (proc_addr j) ks)
-          cur_ctx XIc Tc with "Hrun Hthr Hks") as "(Hrun & %Tc1 & _ & Hthr & #Hksc)".
-  iMod (ctx_box_over XIc Tc1 with "Hthr") as "[Hthr (%ξb & Hbox & #Hfl)]".
+  iMod (ctx_move (R := λ ξ, ctx_cells (XI := ξ) (p_context (proc_addr j))
+                              (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest))
+          cur_ctx XIc with "Hrun Hthr Hctx") as "(Hrun & Hthr & Hctx)".
+  iMod (ctx_move (R := λ ξ, stack_own (KTR := KT1) (XI := ξ) (add_vec ks (mword_of_int 4096)) av)
+          cur_ctx XIc with "Hrun Hthr Hstk") as "(Hrun & Hthr & Hstk)".
+  iMod (ctx_move (R := λ ξ, is_kstack (XI := ξ) (proc_addr j) ks)
+          cur_ctx XIc with "Hrun Hthr Hks") as "(Hrun & Hthr & #Hksc)".
+  iMod (ctx_move (R := λ ξ, procs_inv (XI := ξ) γs)
+          cur_ctx XIc with "Hrun Hthr Hpinv") as "(Hrun & Hthr & #Hpinvc)".
+  iMod ctx_parked_alloc as (ξb) "Hbox".
+  iMod (ctx_park_box XIc ξb 0 with "Hthr Hbox") as (Tc Tb) "(_ & Hbox & Hthr & #Hfl)".
   (* THE PACKAGE IS NOT UNDER A LATER ANY MORE -- its CLOSER ROW is, and
      that is the whole of what the fixpoint ever needed (tso-port.md §0.16′
      step (ii)).  THE PARKER'S OWN THREAD-OF-CONTROL TOKEN is borrowed and
-     handed straight back here.  ON MAIN this is where the six-row
-     [TsoCtx.ctx_deposit] into [XIc] runs; IN THIS TREE IT CANNOT, and the
-     reason is measured rather than a matter of effort: the deposit's
-     obligation is [CtxMorph] on each row, and four of the rows
-     ([procs_inv], [park_globals]'s wait/ftable/console/ticks/nextpid
-     handles, [proc_priv] through [BioInv.buf_escrow]) are constant
-     embeddings [<{ P }>] of ξ-INDEXED payloads -- an [inv] over a
-     ξ-indexed body, the ONE shape [CtxMorph] cannot cross.  They become
-     transportable exactly when the M3 λ-payload sweep and the bcache
-     escrow's parked-record form land here (they have on main: tso-port.md
-     §0.14′/§0.16′/§0.17′).  Until then the record's rows stay at the
-     PARKER's ξ -- which is what [SwtchCtx.valid_context_pre] still reads
-     them at in this tree, so the two agree and nothing is unsound; what is
-     missing is the [XIp] reshape, not a law. *)
+     handed straight back here.  What does NOT cross yet: [park_globals]'s
+     wait/nextpid handles (constant payloads of ξ-indexed resources: the M3
+     λ-conversion, tso-port.md §0.14′) and [proc_priv]'s references into
+     the icache/file/bcache invariants (bodies at a fixed context: the
+     parked-record form, §0.17′).  They stay at the PARKER's ξ and are the
+     file's red root, below. *)
   iModIntro. iFrame "Hrun".
-  rewrite /proc_ctx_boxed. iExists ξb, Tc1. iFrame "Hbox".
-  rewrite /proc_ctx_at. iExists XIc, Tc1. iFrame "Hthr Hfl".
+  rewrite /proc_ctx_boxed. iExists ξb, Tb. iFrame "Hbox".
+  rewrite /proc_ctx_at. iExists XIc, Tc. iFrame "Hthr Hfl".
   iNext.
   (* ---- the record: the cells allocproc left, and the free stack ---- *)
   rewrite (valid_context_unfold (p_sched γs) None (p_context (proc_addr j)) (proc_addr j) XIc)
@@ -338,7 +314,7 @@ Proof.
      nor [ctx_move] (the parker's token is gone by the resume) can carry.
      Bracketed so the mismatch FAILS HERE, fast, instead of sending
      [iApply]'s unifier through the bodies. *)
-  { iExact "Hpinv". }
+  { iExact "Hpinvc". }
   { iExact "Hglobp". }
   iExact "Hpriv".
 Qed.

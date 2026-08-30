@@ -1028,8 +1028,6 @@ R11424:11433 xv6iris.DiskAvail <> avail_half def
 R11424:11433 xv6iris.DiskAvail <> avail_half def
 R11424:11433 xv6iris.DiskAvail <> avail_half def
 R11464:11477 xv6iris.WpLock <> lk_floor_morph inst
-R11464:11477 xv6iris.WpLock <> lk_floor_morph inst
-R11464:11477 xv6iris.WpLock <> lk_floor_morph inst
 inst 11579:11592 <> keep_map_morph
 R11599:11602 stdpp.gmap <> gmap rec
 R11613:11614 stdpp.bitvector.definitions <> bv rec

@@ -185,6 +185,78 @@ Section Move.
         iExists t. iFrame "Hpt Hts". iRight. iExact "Hdt1".
   Qed.
 
+  (* A DIRTY WITNESS moves the way a dirty cell's arm does: at ξ0 the key
+     is either under ξ0's bound -- then it is a FLOOR at ξ1 -- or this
+     hart's own message -- then it registers at ξ1.  The receiver gets the
+     disjunction, which is what a lock's [WpLock.lk_floor] is. *)
+  Lemma ctx_move_wrote `{CID : CpuId} (ξ0 ξ1 : CtxId) (t : nat) (a : Arch.pa) :
+    own_context ξ0 -∗ own_context ξ1 -∗ ctx_wrote ξ0 t a ==∗
+    own_context ξ0 ∗ own_context ξ1 ∗ (ctx_floor ξ1 t ∨ ctx_wrote ξ1 t a).
+  Proof.
+    iIntros "H0 H1 #Hdt". rewrite /ctx_wrote.
+    iEval (rewrite own_context_unseal /own_context_def) in "H0".
+    iDestruct "H0" as "(%B0 & %K0 & %W0 & %D0 & [Hb0 Hd0] & #HK0 & %HBK0 & #HW0 & %HDW0 & #Hoks0)".
+    iDestruct (dset_lookup with "Hd0 Hdt") as %HD0.
+    iDestruct (big_sepS_elem_of _ _ _ HD0 with "Hoks0") as "#Hok0".
+    pose proof (HDW0 _ HD0) as HtW0. simpl in HtW0.
+    iDestruct "Hok0" as "[%HtB0 | #Hown]".
+    - simpl in HtB0.
+      iDestruct (mono_nat_lb_own_get with "Hb0") as "#Hlb0".
+      iAssert (ctx_floor ξ0 t) as "#Hfl0".
+      { rewrite /ctx_floor /llb. iLeft. iApply (mono_nat_lb_own_le with "Hlb0"). lia. }
+      iAssert (own_context ξ0) with "[Hb0 Hd0]" as "H0".
+      { rewrite own_context_unseal /own_context_def.
+        iExists B0, K0, W0, D0. iFrame "Hb0 Hd0 HK0 HW0 Hoks0". by iPureIntro. }
+      iMod (ctx_move_floor ξ0 ξ1 t with "H0 H1 Hfl0") as "(H0 & H1 & #Hfl1)".
+      iModIntro. iFrame "H0 H1". iLeft. iExact "Hfl1".
+    - iEval (rewrite own_context_unseal /own_context_def) in "H1".
+      iDestruct "H1" as "(%B1 & %K1 & %W1 & %D1 & [Hb1 Hd1] & #HK1 & %HBK1 & #HW1 & %HDW1 & #Hoks1)".
+      iMod (dset_insert _ D1 (t, a) with "Hd1") as "[Hd1 #Hdt1]".
+      iDestruct (llb_max with "HW1 HW0") as "#HW1'".
+      iAssert ([∗ set] k ∈ D1 ∪ {[(t, a)]},
+                 dirty_ok logm_name (hart_agent cpu_id) B1 k)%I as "#Hoks1'".
+      { destruct (decide ((t, a) ∈ D1)) as [Hin | Hnin].
+        - assert (Heq : D1 ∪ {[(t, a)]} = D1) by set_solver.
+          rewrite Heq. iExact "Hoks1".
+        - rewrite (union_comm_L D1) big_sepS_insert; last exact Hnin.
+          iSplit; [| iExact "Hoks1"]. rewrite /dirty_ok. iRight. iExact "Hown". }
+      iModIntro. rewrite !own_context_unseal /own_context_def.
+      iSplitL "Hb0 Hd0".
+      { iExists B0, K0, W0, D0. iFrame "Hb0 Hd0 HK0 HW0 Hoks0". by iPureIntro. }
+      iSplitL "Hb1 Hd1".
+      { iExists B1, K1, (Nat.max W1 W0), (D1 ∪ {[(t, a)]}).
+        iFrame "Hb1 Hd1 HK1 HW1' Hoks1'". iPureIntro. split; [exact HBK1|].
+        intros k Hk. apply elem_of_union in Hk as [Hk | Hk].
+        - have := HDW1 _ Hk. lia.
+        - apply elem_of_singleton in Hk. subst k. simpl. lia. }
+      iRight. iExact "Hdt1".
+  Qed.
+
+  (* FORK'S MINT (A6.129, owner ruling §0.44′): a RUNNING TWIN of a
+     running context.  A new kernel thread's context is not born empty at
+     stamp 0 -- that is boot's mint, [TsoCtx.own_context_boot], for the
+     per-hart contexts that become the schedulers' -- it is born as a copy
+     of its PARKER's: the same bound and watermark (the parker's own view
+     receipts vouch for it), an empty dirty set (the rows the parker hands
+     over re-register as they cross, [ctx_move]).  While both tokens are
+     running every row moves by [ctx_move]; then the twin parks
+     ([TsoCtxPark.ctx_park_box]) into the record the parker is building. *)
+  Lemma own_context_twin `{CID : CpuId} (ξ : CtxId) :
+    own_context ξ ==∗ own_context ξ ∗ ∃ ξc : CtxId, own_context ξc.
+  Proof.
+    iIntros "H". rewrite own_context_unseal /own_context_def.
+    iDestruct "H" as "(%B & %K & %W & %D & Hat & #HK & %HBK & #HW & %HDW & #Hoks)".
+    iMod (mono_nat_own_alloc B) as (γb) "[Hb _]".
+    iMod dset_alloc as (γd) "Hd".
+    iModIntro. iSplitL "Hat".
+    { iExists B, K, W, D. iFrame "Hat HK HW Hoks". by iPureIntro. }
+    iExists (MkCtxId γb γd). rewrite own_context_unseal /own_context_def.
+    iExists B, K, W, ∅. rewrite /ctx_at. iFrame "Hb Hd HK HW".
+    iSplitR; first done.
+    iSplitR; first (iPureIntro; intros k Hk; set_solver).
+    by iApply big_sepS_empty.
+  Qed.
+
   (* ---------------------------------------------------------------- *)
   (* The class and its structural instances -- [CtxMorph]'s mirror.    *)
   (* ---------------------------------------------------------------- *)
