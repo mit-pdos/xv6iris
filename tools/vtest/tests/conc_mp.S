@@ -120,7 +120,7 @@
  * costs two instructions per iteration and does not disturb the timing that
  * makes the witness count high -- verified: the witness stayed at 100%.
  */
-/* vtest: smp=2 repeat=1 */
+/* vtest: smp=2 repeat=1 builder=multi */
     .option norvc
 #include "abi.h"
 

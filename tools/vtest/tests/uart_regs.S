@@ -32,7 +32,7 @@
  *   +40  LSR after the FIFO-clearing FCR write   (expect 0x60)
  *   +44  LSR after "OK" has drained              (expect 0x60)
  */
-/* vtest: repeat=1 */
+/* vtest: repeat=1 platforms=qemu */
 #include "abi.h"
 
 #define R_SCR    8

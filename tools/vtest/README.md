@@ -11,6 +11,83 @@ state and a literal captured from QEMU.  Nothing here is restricted to what
 the xv6 driver's proofs assume -- a test may program the queue illegally, and
 the only question is whether the model has a run that matches.
 
+## ONE SET OF CASES, TWO PLATFORMS, ONE THEOREM
+
+The suite has one set of test **cases** (`tests/*.S`).  A case declares, in
+its own `vtest:` directive, which **platforms** it is meaningful on.
+Executing a case on a platform produces a test **run**, so a case yields
+zero, one or two runs -- and every run, whichever platform it came from, is
+the same kind of object and is judged by the same theorem.
+
+    /* vtest: platforms=qemu  builder=multi  budget=4000  tick=1
+              proj=fields:24,48 */
+
+Every knob defaults, so most cases declare nothing:
+
+| | default | what it says |
+|---|---|---|
+| `platforms=` | `qemu,jh7110` | which platforms this case is MEANINGFUL on.  A case is narrowed when the question cannot be ASKED on the other platform -- not when it merely fails there.  A failure is a finding and belongs in the table. |
+| `builder=` | `single` | how the model side is run.  `multi` = races two harts, needs a `VConc` schedule; `sched` = needs an explicit `VSched` item list (a serial byte ARRIVING is a schedule choice).  `VRun` has a builder only for `single`, so the others produce NO run module and the table says `no builder` -- which is honest, where running them through the single-hart builder would compute an outcome in which the second hart never ran. |
+| `budget=` | `2000` | steps the model is given |
+| `tick=` | `0` | step the CLOCK-TICKING branch of the boundary's `exists tick : bool` |
+| `proj=` | `whole` | what is compared.  `fields:o1,o2,…` for a case some of whose fields legitimately differ between two runs of the SAME machine -- counters, a raw `mtime`, an image-dependent `mtvec`, the hart id. |
+
+**There is no runner-side skip list.**  A profile that excluded an area
+would be hiding a fact about a case inside a fact about a machine, and the
+two had already drifted apart.
+
+### The theorem
+
+[`vtest-rocq/VRun.v`](../../vtest-rocq/VRun.v).  A run is a `TEST_RUN`
+module; the theorem is stated once and parametrically:
+
+```coq
+Definition run_passes observed outcome : Prop :=
+  match outcome with
+  | MNoStep         => True                              (* a pass *)
+  | MDone exhibited => forall o, o ∈ observed -> o ∈ exhibited
+  | MUnknown | MBudget => False
+  end.
+
+Module Type TEST_PASSES (R : TEST_RUN).
+  Axiom passes : run_passes R.observed R.outcome.
+End TEST_PASSES.
+```
+
+A run passes when the model exhibits **every** outcome the platform observed
+(if the platform showed several, because the hardware itself has more than
+one legal execution, the model must have each), **or** when the model is
+STUCK -- which is a pass too, because a state the model cannot step from is
+a state no proof over the model can reach.  It costs REACH, not soundness.
+
+**Stuck means `MNoStep`, not `VStuck`.**  `exec` also declines on
+`Interface.Choose`, where the relation DOES have transitions and only the
+interpreter will not pick one, and "our proofs can never run into this case"
+is false there.  `VExecStuck.exec_r_no_step` is what makes `MNoStep`
+mean it; `EChoice` becomes `MUnknown`, which is a gap, not a pass.
+
+`outcome` is COMPUTED by the `SingleHart` functor, not asserted by the
+generated module, so a run cannot claim a model execution it does not have.
+Every proof is then the same two tactics:
+
+```coq
+Module CoreSmokeQemuPass <: TEST_PASSES CoreSmokeQemu.
+  Lemma passes : run_passes CoreSmokeQemu.observed CoreSmokeQemu.outcome.
+  Proof. apply run_passes_b_sound. vm_cast_no_check (eq_refl true). Qed.
+End CoreSmokeQemuPass.
+```
+
+### The table
+
+    make vtest-table     print it
+    make vtest-passes    build every run's proof, rewrite PASSING.txt, print it
+    make vtest-runs      rebuild the run modules from the checked-in captures
+
+Everything in it is read off the tree -- the case's directive, whether a run
+module exists, whether a `TEST_PASSES` instantiation compiles -- so it cannot
+drift.  **A run with no passing proof is a FINDING, not a broken build**, and
+all fifteen of them today are recorded rows in the findings table below.
+
 ## Layout
 
     abi.h              THE ABI: regions, result layout, done handshake  (read first)

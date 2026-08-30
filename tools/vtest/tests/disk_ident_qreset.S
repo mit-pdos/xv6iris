@@ -4,6 +4,7 @@
  * stuck.  The write that would actually reset the queue is stuck too, and
  * is not attempted here because one program can only pin one stuck access.
  */
+/* vtest: platforms=qemu */
 #include "abi.h"
 
 /* result-region offsets (mirrored in vtest-rocq/DiskIdent.v) */

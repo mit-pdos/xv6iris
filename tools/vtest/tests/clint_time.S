@@ -46,7 +46,7 @@
  *   +52   mcycle delta over the delay loop, low     RAW
  *   +56   1 if mcycle advanced                      <- driven by the same clock
  */
-/* vtest: repeat=1 */
+/* vtest: repeat=1 proj=fields:4,24,28,40,48,56 tick=1 budget=8000 */
 #include "abi.h"
 
 #define R_T0LO    8

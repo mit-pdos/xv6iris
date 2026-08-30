@@ -8,6 +8,7 @@
  * which is how a driver learns the device ACCEPTED its feature set.  That
  * whole sequence is outside the model.
  */
+/* vtest: platforms=qemu */
 #include "abi.h"
 
 /* result-region offsets (mirrored in vtest-rocq/DiskIdent.v) */

@@ -14,7 +14,7 @@
  * stays inside the same M-mode straight-line shape as the others.  mip is
  * read as a cross-check -- bit 9, SEIP, is the pin the wire drives.
  */
-/* vtest: repeat=1 */
+/* vtest: repeat=1 platforms=qemu */
 #include "abi.h"
 
 #define PLIC        0x0c000000

@@ -108,14 +108,8 @@ PROFILES = {
         ignore_harts = [0],
         uart_shift   = 2,        # Synopsys DW-APB, reg-shift 2
         march        = "rv64gc", # what xv6 itself is built with
-        # AREAS THIS BOARD CANNOT ANSWER FOR, and why.  `disk` needs a
-        # virtio-mmio block device, which the JH7110 does not have at all --
-        # not a finding, just a device that is not there.  `uart` is a
-        # DIFFERENT CHIP (Synopsys DW-APB, reg-shift 2) and its tests must
-        # be converted to address the register file through UART_REG()
-        # before they mean anything here; until then running them would
-        # read the wrong offsets and report nonsense.  See README-hw.md.
-        skip_areas   = ["disk", "uart"],
+        # the name a case's `platforms=` directive uses for this machine
+        platform_id  = "jh7110",
         # What the runner writes before resuming.  See establish_state().
         # mstatus is the model's own power-on obligation (ArchReset.board_regs:
         # SXL = UXL = 2, everything else clear), which core_regs_mcsr confirmed
@@ -136,24 +130,15 @@ class BoardRunFailed(Exception):
 
 
 def runnable_tests(p):
-    """The tests that MEAN something on this board, in suite order.
+    """The cases this platform is meant to execute, in suite order.
 
-    Skipping is per AREA and the profile says which (see skip_areas): a
-    board that has no virtio-mmio disk cannot answer a `disk` question at
-    all, and running one would report a stuck model as though it were a
-    finding about the device rather than about the board not having one."""
-    skip = tuple(a + "_" for a in p.get("skip_areas", []))
-    out = []
-    for t in vtest.all_tests():
-        if t.startswith(skip):
-            continue
-        # a test may also opt out by itself, with `machines=qemu` in its
-        # `vtest:` directive -- for a question only QEMU can be asked, not
-        # for one this board happens to fail
-        if vtest.config(t).get("machines", "any") == "qemu":
-            continue
-        out.append(t)
-    return out
+    ONE DECLARATION, AT THE CASE.  Which platforms a case is meaningful on
+    is a property of the CASE, so it lives in the case's own `vtest:`
+    directive (`platforms=`) and both runners read the same thing.  There is
+    no runner-side skip list any more: a board profile that excluded an area
+    would be hiding a fact about a case inside a fact about a machine, and
+    the two drifted apart the moment a case was added."""
+    return vtest.cases_for(p["platform_id"])
 
 
 def profile(name):
@@ -802,6 +787,11 @@ def main():
                   % (n, reps, harts, len(alts), r["ms"]))
             if a.cmd == "gen":
                 print("  ->", os.path.relpath(gen(r, alts), ROOT))
+                runp = os.path.join(ROCQDIR,
+                                    vtest.modname(n) + "Jh7110Run.v")
+                vtest.emit_run(n, "jh7110", r["text"],
+                               [list(x) for x in alts], p["primary_hart"], runp)
+                print("  ->", os.path.relpath(runp, ROOT))
             else:
                 st = int.from_bytes(r["result"][4:8], "little")
                 words = " ".join("%#010x" % int.from_bytes(r["result"][o:o+4], "little")

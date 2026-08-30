@@ -28,7 +28,7 @@
  *   +44  DLL after a 2-byte STORE of 0xbeef to +0        0xef
  *   +48  DLM, which that store did NOT reach             0x44
  */
-/* vtest: repeat=1 */
+/* vtest: repeat=1 platforms=qemu */
 #include "abi.h"
 
 #define R_LSR    8

@@ -24,7 +24,7 @@
  *   +36  MSR with LOOP cleared again                     0xb0 (the cable)
  *   +40  LSR at the end                                  0x60
  */
-/* vtest: repeat=1 */
+/* vtest: repeat=1 platforms=qemu */
 #include "abi.h"
 
 #define R_MCR0    8

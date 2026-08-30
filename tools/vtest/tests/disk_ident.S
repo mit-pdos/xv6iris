@@ -20,6 +20,7 @@
  * queue addresses are programmed (QEMU wants them before QUEUE_READY) but
  * avail.idx stays 0, so the device never has work and never DMAs.
  */
+/* vtest: platforms=qemu */
 #include "abi.h"
 
 /* result-region offsets (mirrored in vtest-rocq/DiskIdent.v) */

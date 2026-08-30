@@ -20,7 +20,7 @@
  *   +24  LSR after polling TEMT again at the very end
  *   +28  LSR after a 24-byte BURST with no polling at all
  */
-/* vtest: repeat=1 */
+/* vtest: repeat=1 platforms=qemu */
 #include "abi.h"
 
 #define R_LSR0    8

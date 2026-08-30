@@ -4,6 +4,7 @@
  * means "no such region".  None of the five registers is decoded, so the
  * SELECT is already stuck.
  */
+/* vtest: platforms=qemu */
 #include "abi.h"
 
 /* result-region offsets (mirrored in vtest-rocq/DiskIdent.v) */

@@ -40,7 +40,7 @@
  *   +40   mstatus, low word
  *   +44   mstatus, high word
  */
-/* vtest: repeat=1 */
+/* vtest: repeat=1 proj=fields:4,8,12,16,20,24,28,40,44 tick=0 budget=2000 */
 #include "abi.h"
 
 #define R_HARTID   8

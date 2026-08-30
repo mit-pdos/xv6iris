@@ -25,6 +25,7 @@
  * would say so.  And B names sector 5, the sector A just wrote, so if either
  * machine treated the unknown type as a write the disk capture would move.
  */
+/* vtest: platforms=qemu */
 #include "abi.h"
 
 /* offsets within the DMA region */
