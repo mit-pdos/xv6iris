@@ -24,8 +24,10 @@
 (*   { P γt γd γs }  fork  { parent: r <> 0, P γt γd γs   (same names)     *)
 (*                         ; child:  r  = 0, P γt' γd' γs' (fresh names) } *)
 (*                                                                         *)
-(* with the free stack below sp mirrored into the child alongside          *)
-(* (same [avail]) and the break carried over ([usz γs' szv]).              *)
+(* with the free stack below sp crossing ALONGSIDE the payload -- [ustack] *)
+(* is itself Forkable, and the leaf bundles [P ∗ ustack] into one payload  *)
+(* internally, so the child resumes at the same [avail] -- and the break   *)
+(* carried over ([usz γs' szv]).                                           *)
 (*                                                                         *)
 (* WHAT DOES NOT CROSS.  Resources that are not address-space state --     *)
 (* protocol tokens, shared-file facts -- are NOT [Forkable] and must not   *)
@@ -176,24 +178,6 @@ Section UkFork.
       iPureIntro. exact (map_insert_sub T Md a b Hb Hsub).
   Qed.
 
-  (* every byte of a run of fragments is in the authority *)
-  Local Lemma ghost_run_sub (γ : gname) (q : Qp) (Md : gmap Z (bv 8))
-      (a : Z) (n : nat) (f : nat -> bv 8) (dq : dfrac) :
-    ghost_map_auth γ q Md -∗
-    ([∗ list] j ∈ seq 0 n, (a + Z.of_nat j) ↪[γ]{dq} f j) -∗
-    ⌜ forall j : nat, (j < n)%nat -> Md !! (a + Z.of_nat j)%Z = Some (f j) ⌝.
-  Proof.
-    induction n as [| k IH].
-    - iIntros "_ _". iPureIntro. intros j Hj. exfalso. lia.
-    - iIntros "Hauth Hrun".
-      rewrite seq_S big_sepL_app /=.
-      iDestruct "Hrun" as "[Hlo [Hhi _]]".
-      iDestruct (ghost_map_lookup with "Hauth Hhi") as %Hhi.
-      iDestruct (IH with "Hauth Hlo") as %Hlo.
-      iPureIntro. intros j Hj.
-      destruct (decide (j = k)) as [-> | Hne]; [ exact Hhi | apply Hlo; lia ].
-  Qed.
-
   (* a FULL fragment map is disjoint from any other fragment map: full
      ownership composes with nothing *)
   Local Lemma ghost_frags_full_disjoint (γ : gname) (F G : gmap Z (bv 8))
@@ -260,133 +244,33 @@ Section UkFork.
   Qed.
 
   (* ===================================================================== *)
-  (* §2 THE FREE STACK'S BYTES.                                            *)
-  (* ===================================================================== *)
-
-  (* one byte of the free stack, out and back, located by its address *)
-  Local Lemma ustack_body_byte_acc (γd : gname) (sp : mword 64) (n : nat)
-      (a : Z) :
-    (uint sp - 8 * Z.of_nat n <= a < uint sp)%Z ->
-    ustack_body γd sp n -∗
-    ∃ b : bv 8, ubyte γd a b ∗ (ubyte γd a b -∗ ustack_body γd sp n).
-  Proof.
-    intros Ha.
-    set (i := Z.to_nat ((uint sp - a - 1) / 8)).
-    assert (Hdm := Z.div_mod (uint sp - a - 1) 8 ltac:(lia)).
-    assert (Hmb := Z.mod_pos_bound (uint sp - a - 1) 8 ltac:(lia)).
-    assert (Hiz : Z.of_nat i = (uint sp - a - 1) / 8).
-    { unfold i. rewrite Z2Nat.id; [ reflexivity | lia ]. }
-    assert (Hi : (i < n)%nat) by lia.
-    assert (Hrange : uint sp - 8 * (Z.of_nat i + 1) <= a
-                     < uint sp - 8 * (Z.of_nat i + 1) + 8) by lia.
-    set (k := Z.to_nat (a - (uint sp - 8 * (Z.of_nat i + 1)))).
-    assert (Hkz : (uint sp - 8 * (Z.of_nat i + 1) + Z.of_nat k)%Z = a).
-    { unfold k. rewrite Z2Nat.id; lia. }
-    assert (Hk : (k < 8)%nat) by (unfold k; lia).
-    iIntros "Hb". rewrite /ustack_body.
-    iDestruct (big_sepL_lookup_acc _ _ i i with "Hb") as "[Hw Hcl]";
-      [ apply lookup_seq; split; [ lia | exact Hi ] | ].
-    iDestruct "Hw" as (w) "Hw".
-    rewrite /uword /uwordq /ubytesq.
-    iDestruct (big_sepL_lookup_acc _ _ k k with "Hw") as "[Hbyte Hclw]";
-      [ apply lookup_seq; split; [ lia | exact Hk ] | ].
-    iEval (rewrite Hkz) in "Hbyte".
-    iExists (nth_byte w k). iFrame "Hbyte".
-    iIntros "Hbyte". iApply "Hcl". iExists w.
-    iApply "Hclw". iEval (rewrite Hkz). iExact "Hbyte".
-  Qed.
-
-  (* a fragment map coexisting with the free stack avoids its range: the
-     stack's bytes are held at full ownership *)
-  Local Lemma ustack_frags_avoid (γd : gname) (sp : mword 64) (n : nat)
-      (F : gmap Z (bv 8)) (dq : dfrac) :
-    ([∗ map] a ↦ b ∈ F, a ↪[γd]{dq} b) -∗ ustack_body γd sp n -∗
-    ⌜ forall a : Z, is_Some (F !! a) ->
-        ~ (uint sp - 8 * Z.of_nat n <= a < uint sp)%Z ⌝.
-  Proof.
-    induction F as [| a b F Ha IH] using map_ind.
-    - iIntros "_ _". iPureIntro. intros a Hs _.
-      rewrite lookup_empty in Hs. destruct Hs as [x Hx]. discriminate Hx.
-    - iIntros "HF Hstk".
-      rewrite big_sepM_insert; [ | exact Ha ].
-      iDestruct "HF" as "[Hb HF]".
-      iDestruct (IH with "HF Hstk") as %HIH.
-      destruct (decide (uint sp - 8 * Z.of_nat n <= a < uint sp)%Z)
-        as [Hin | Hout].
-      + iDestruct (ustack_body_byte_acc γd sp n a Hin with "Hstk")
-          as (b') "[Hb' _]".
-        rewrite /ubyte /ubyteq.
-        iDestruct (ghost_map_elem_valid_2 with "Hb' Hb") as %[Hv _].
-        destruct (dfrac_full_absurd dq Hv).
-      + iPureIntro. intros a' Hs Hrange.
-        destruct (decide (a = a')) as [<- | Hne]; [ exact (Hout Hrange) | ].
-        destruct Hs as [x Hx].
-        rewrite lookup_insert_ne in Hx; [ | exact Hne ].
-        exact (HIH a' (mk_is_Some _ _ Hx) Hrange).
-  Qed.
-
-  (* every byte of the free stack's range is in the data authority *)
-  Local Lemma ustack_body_auth_range (γ : gname) (q : Qp) (Md : gmap Z (bv 8))
-      (sp : mword 64) (n : nat) :
-    ghost_map_auth γ q Md -∗ ustack_body γ sp n -∗
-    ⌜ forall a : Z, (uint sp - 8 * Z.of_nat n <= a < uint sp)%Z ->
-        is_Some (Md !! a) ⌝.
-  Proof.
-    induction n as [| k IH].
-    - iIntros "_ _". iPureIntro. intros a Ha. exfalso. lia.
-    - iIntros "Hauth Hb".
-      rewrite /ustack_body seq_S big_sepL_app /=.
-      iDestruct "Hb" as "[Hlo [Hw _]]".
-      iDestruct (IH with "Hauth Hlo") as %Hlo.
-      iDestruct "Hw" as (w) "Hw".
-      rewrite /uword /uwordq /ubytesq /ubyteq.
-      iDestruct (ghost_run_sub γ q Md (uint sp - 8 * (Z.of_nat k + 1)) 8
-                   (nth_byte w) (DfracOwn 1) with "Hauth Hw") as %Hw8.
-      iPureIntro. intros a Ha.
-      destruct (decide (uint sp - 8 * Z.of_nat k <= a)) as [Hin | Hout].
-      + exact (Hlo a (conj Hin (proj2 Ha))).
-      + set (j := Z.to_nat (a - (uint sp - 8 * (Z.of_nat k + 1)))).
-        assert (Hjz : (uint sp - 8 * (Z.of_nat k + 1) + Z.of_nat j)%Z = a).
-        { unfold j. rewrite Z2Nat.id; lia. }
-        assert (Hj : (j < 8)%nat) by (unfold j; lia).
-        rewrite <- Hjz. rewrite (Hw8 j Hj).
-        exists (nth_byte w j). reflexivity.
-  Qed.
-
-  (* ===================================================================== *)
   (* §3 THE MINT: a SECOND heap over the same image.                       *)
   (*                                                                       *)
-  (* The semantic heart of fork.  Given the parent's heap, a designated    *)
-  (* text/read-only/exclusive footprint of it, and its free stack, mint a  *)
-  (* fresh gname triple over the SAME image whose fragments mirror exactly *)
-  (* those -- and hand the parent everything back untouched.  Sound        *)
-  (* because it is allocation: the child's authorities are fresh, and      *)
-  (* their contents are submaps of the image the parent's own authorities  *)
-  (* already vouch for.                                                    *)
+  (* The semantic heart of fork.  Given the parent's heap and a designated *)
+  (* text/read-only/exclusive footprint of it, mint a fresh gname triple   *)
+  (* over the SAME image whose fragments mirror exactly that footprint --  *)
+  (* and hand the parent everything back untouched.  Sound because it is   *)
+  (* allocation: the child's authorities are fresh, and their contents are *)
+  (* submaps of the image the parent's own authorities already vouch for.  *)
   (*                                                                       *)
   (* The child's slack is EMPTY: its data authority holds exactly the      *)
-  (* mirrored fragments plus the stack run, so a child that wants sbrk     *)
-  (* must be given the slack explicitly when the sbrk row exists.          *)
+  (* mirrored fragments, so a child that wants sbrk must be given slack    *)
+  (* explicitly when the sbrk row exists.                                  *)
   (* ===================================================================== *)
   Lemma uheap_fork (γt γd γs : gname) (M : gmap Z (bv 8))
-      (pm : gmap (mword 27) uperm) (szv : Z) (Ft Fp F : gmap Z (bv 8))
-      (sp : mword 64) (avail : nat) :
+      (pm : gmap (mword 27) uperm) (szv : Z) (Ft Fp F : gmap Z (bv 8)) :
     uheap γt γd γs M pm -∗
     ([∗ map] a ↦ b ∈ Ft, utext γt a b) -∗
     ([∗ map] a ↦ b ∈ Fp, ubyteq γd DfracDiscarded a b) -∗
     ([∗ map] a ↦ b ∈ F, ubyte γd a b) -∗
-    ustack γd sp avail -∗
     |==> uheap γt γd γs M pm ∗ ([∗ map] a ↦ b ∈ F, ubyte γd a b) ∗
-         ustack γd sp avail ∗
          ∃ γt' γd' γs' : gname,
            uheap γt' γd' γs' M pm ∗ usz γs' szv ∗
            ([∗ map] a ↦ b ∈ Ft, utext γt' a b) ∗
            ([∗ map] a ↦ b ∈ Fp, ubyteq γd' DfracDiscarded a b) ∗
-           ([∗ map] a ↦ b ∈ F, ubyte γd' a b) ∗
-           ustack γd' sp avail.
+           ([∗ map] a ↦ b ∈ F, ubyte γd' a b).
   Proof.
-    iIntros "Hheap #Htf Hpf Hdf Hstk".
-    iDestruct "Hstk" as "[%Hal Hbody]".
+    iIntros "Hheap #Htf Hpf Hdf".
     iDestruct "Hheap" as (Mt Md Mslack isz)
       "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hw & Ht & Hd & Hszg & %Hsl & Hslack)".
     (* ---- pure inventory, all non-consuming ---- *)
@@ -395,46 +279,10 @@ Section UkFork.
     iDestruct (ghost_frags_sub γd 1 Md F (DfracOwn 1) with "Hd Hdf") as %HF.
     iDestruct (ghost_frags_full_disjoint γd F Fp DfracDiscarded
                  with "Hdf Hpf") as %HFFp.
-    iDestruct (ustack_frags_avoid γd sp avail F (DfracOwn 1)
-                 with "Hdf Hbody") as %HFav.
-    iDestruct (ustack_frags_avoid γd sp avail Fp DfracDiscarded
-                 with "Hpf Hbody") as %HFpav.
-    iDestruct (ustack_body_auth_range γd 1 Md sp avail with "Hd Hbody") as %Hrng.
-    (* the stack's room below sp, off its own deepest byte *)
-    assert (Hroom : 8 * Z.of_nat avail <= uint sp).
-    { destruct avail as [| av].
-      - pose proof (proj1 (bv_unsigned_in_range _ sp)) as H0.
-        rewrite uint_unsigned. lia.
-      - destruct (Hrng (uint sp - 8 * Z.of_nat (S av)) ltac:(lia)) as [b Hb].
-        assert (HbM : is_Some (M !! (uint sp - 8 * Z.of_nat (S av))%Z)).
-        { exists b. exact (proj1 (map_subseteq_spec Md M) Hsd _ b Hb). }
-        pose proof (Hcan _ HbM). lia. }
-    (* ---- the child's data content: footprints plus the stack's range ---- *)
-    set (base := (uint sp - 8 * Z.of_nat avail)%Z).
-    set (Fs := base.filter (fun kv : Z * bv 8 => base <= kv.1 < uint sp) Md).
-    assert (HFsMd : Fs ⊆ Md) by apply map_filter_subseteq.
-    assert (HFs_dom : forall a : Z, is_Some (Fs !! a) -> base <= a < uint sp).
-    { intros a [b Hb]. apply map_lookup_filter_Some in Hb.
-      destruct Hb as [_ Hb]. cbn [fst] in Hb. exact Hb. }
-    assert (HFs_cov : forall a : Z, base <= a < uint sp -> is_Some (Fs !! a)).
-    { intros a Ha. destruct (Hrng a ltac:(unfold base in Ha; lia)) as [b Hb].
-      exists b. apply map_lookup_filter_Some.
-      split; [ exact Hb | cbn [fst]; exact Ha ]. }
-    assert (HFFs : F ##ₘ Fs).
-    { apply map_disjoint_spec. intros a b1 b2 H1 H2.
-      apply (HFav a (mk_is_Some _ _ H1)).
-      pose proof (HFs_dom a (mk_is_Some _ _ H2)). unfold base in *. lia. }
-    assert (HFpFs : Fp ##ₘ Fs).
-    { apply map_disjoint_spec. intros a b1 b2 H1 H2.
-      apply (HFpav a (mk_is_Some _ _ H1)).
-      pose proof (HFs_dom a (mk_is_Some _ _ H2)). unfold base in *. lia. }
-    set (Fd := F ∪ (Fp ∪ Fs)).
-    assert (HFdMd : Fd ⊆ Md).
-    { apply map_union_sub; [ exact HF | ].
-      apply map_union_sub; [ exact HFp | exact HFsMd ]. }
+    set (Fd := F ∪ Fp).
+    assert (HFdMd : Fd ⊆ Md)
+      by (apply map_union_sub; [ exact HF | exact HFp ]).
     assert (HFdM : Fd ⊆ M) by (etransitivity; [ exact HFdMd | exact Hsd ]).
-    assert (HFd1 : F ##ₘ (Fp ∪ Fs))
-      by (apply map_disjoint_union_r_2; [ exact HFFp | exact HFFs ]).
     (* ---- the three fresh ghosts ---- *)
     iMod (ghost_map_alloc Mt) as (γt') "[Ht' Htfr]".
     iAssert (|==> [∗ map] a ↦ b ∈ Mt, utext γt' a b)%I
@@ -447,21 +295,9 @@ Section UkFork.
     iEval (rewrite -Qp.half_half) in "Hsz'".
     iDestruct (ghost_var_split with "Hsz'") as "[HszA' HszF']".
     (* ---- route the child's fragments ---- *)
-    iEval (rewrite /Fd (big_sepM_union _ _ _ HFd1)) in "Hdfr".
-    iDestruct "Hdfr" as "[HdF' Hrest]".
-    iEval (rewrite (big_sepM_union _ _ _ HFpFs)) in "Hrest".
-    iDestruct "Hrest" as "[HdFp' HdFs']".
+    iEval (rewrite /Fd (big_sepM_union _ _ _ HFFp)) in "Hdfr".
+    iDestruct "Hdfr" as "[HdF' HdFp']".
     iMod (uarea_persist γd' Fp with "HdFp'") as "#HdFp'".
-    (* the child's free stack, carved out of the range's fragments *)
-    set (f := fun j : nat => default (bv_0 8) (Fs !! (base + Z.of_nat j)%Z)).
-    assert (Hf : forall j : nat, (j < 8 * avail)%nat ->
-                   Fs !! (base + Z.of_nat j)%Z = Some (f j)).
-    { intros j Hj.
-      destruct (HFs_cov (base + Z.of_nat j)%Z ltac:(unfold base; lia)) as [b Hb].
-      unfold f. rewrite Hb. reflexivity. }
-    iDestruct (ubytes_of_map γd' Fs base (8 * avail) f Hf with "HdFs'") as "Hbs'".
-    iDestruct (ustack_of_ubytes γd' sp avail f Hal Hroom with "Hbs'") as "Hstk'".
-    (* ---- the child's text footprint, off the persisted whole ---- *)
     iAssert ([∗ map] a ↦ b ∈ Ft, utext γt' a b)%I as "#Htf'".
     { iApply (big_sepM_subseteq
                 (fun (a : Z) (b : bv 8) => utext γt' a b) Mt Ft HFt).
@@ -472,8 +308,6 @@ Section UkFork.
     { iExists Mt, Md, Mslack, isz. iFrame "Ht Hd Hszg Hslack".
       iPureIntro. split_and!; assumption. }
     iFrame "Hdf".
-    iSplitL "Hbody".
-    { iSplitR; [ iPureIntro; exact Hal | iExact "Hbody" ]. }
     iExists γt', γd', γs'.
     iSplitL "Ht' Hd' HszA'".
     { (* the child's heap invariant, clause by clause *)
@@ -496,7 +330,7 @@ Section UkFork.
     iFrame "HszF'".
     iSplitR; [ iExact "Htf'" | ].
     iSplitR; [ iExact "HdFp'" | ].
-    iSplitL "HdF'"; [ iExact "HdF'" | iExact "Hstk'" ].
+    iExact "HdF'".
   Qed.
 
   (* ===================================================================== *)
@@ -783,6 +617,26 @@ Section UkFork.
     intros γt γd γs. rewrite /uwordq. reflexivity.
   Qed.
 
+  (* THE FREE STACK IS A PAYLOAD TOO: pure alignment over a list of
+     existentially-valued words, every piece of which the class already
+     covers.  This is what licenses the fork leaf's stack mirror -- the
+     leaf bundles [P ∗ ustack] into one payload and never special-cases
+     the stack. *)
+  Global Instance forkable_ustack (sp : mword 64) (n : nat) :
+    Forkable (fun _ γd _ => ustack γd sp n).
+  Proof.
+    eapply Forkable_ext.
+    2: {
+      apply forkable_sep; [ apply forkable_pure | ].
+      apply (forkable_big_sepL (seq 0 n)
+               (fun (_ i : nat) (_ γd _ : gname) =>
+                  (∃ w : mword 64,
+                     uword γd (uint sp - 8 * (Z.of_nat i + 1)) w)%I)).
+      intros _ i.
+      apply forkable_exist. intros w. apply forkable_uword. }
+    intros γt γd γs. rewrite /ustack /ustack_body. reflexivity.
+  Qed.
+
   (* ---- strings and the argument vector -------------------------------- *)
 
   Global Instance forkable_ustr (a : Z) (len : nat) (f : nat -> bv 8) :
@@ -881,13 +735,20 @@ Section UkFork.
     iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
-    (* ---- reveal the payload, mint the child's heap, restore ---- *)
-    iDestruct (FP γt γd γs with "HP")
-      as (Ft Fp F) "(#Htf & #Hpf & Hdf & Hrestore & #Hrebuild)".
-    iMod (uheap_fork γt γd γs M pm szv Ft Fp F (m !!! Regidx csp_rs1) avail
-            with "Hheap Htf Hpf Hdf Hstk")
-      as "(Hheap & Hdf & Hstk & Hchildres)".
-    iDestruct ("Hrestore" with "Hdf") as "HP".
+    (* ---- fork the payload TOGETHER WITH THE FREE STACK: [ustack] is a
+       payload like any other, so the two cross through one reveal ---- *)
+    pose proof (forkable_sep P
+                  (fun _ γd0 _ => ustack γd0 (m !!! Regidx csp_rs1) avail)
+                  FP (forkable_ustack (m !!! Regidx csp_rs1) avail)) as FPS.
+    iDestruct (FPS γt γd γs with "[HP Hstk]")
+      as (Ft Fp F) "(#Htf & #Hpf & Hdf & Hrestore & #Hrebuild)";
+      [ iSplitL "HP"; [ iExact "HP" | iExact "Hstk" ] | ].
+    iMod (uheap_fork γt γd γs M pm szv Ft Fp F with "Hheap Htf Hpf Hdf")
+      as "(Hheap & Hdf & Hchildres)".
+    iDestruct ("Hrestore" with "Hdf") as "[HP Hstk]".
+    iDestruct "Hchildres" as (γt' γd' γs')
+      "(Hheap' & Hsz' & #Htf' & #Hpf' & Hdf')".
+    iMod ("Hrebuild" $! γt' γd' γs' with "Htf' Hpf' Hdf'") as "[HP' Hstk']".
     (* ---- the trap ---- *)
     iApply (UkStep.wp_uk_ecall C pt Rut pm sz Hlo Hpm M m pc Hui
               (fun (s : mstate)
@@ -918,14 +779,11 @@ Section UkFork.
       iApply ("Hpar" $! h' r with "[%] HP Hsz Hrun"). exact Hr.
     (* ---- the child: fresh heap, r = 0, payload rebuilt at the new names *)
     - rewrite (uslot_bump_run m pc M M pm pm sz sz (mword_of_int 0) Hx0 Hal4).
-      iDestruct "Hchildres" as (γt' γd' γs')
-        "(Hheap' & Hsz' & #Htf' & #Hpf' & Hdf' & Hstk')".
       iApply (urun_close_upd γt' γd' γs' M pm m (mword_of_int 10)
                 (mword_of_int 0) sz (add_vec_int pc 4) avail
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 with "Hheap' Hstk'").
       iIntros (h') "Hrun".
-      iMod ("Hrebuild" $! γt' γd' γs' with "Htf' Hpf' Hdf'") as "HP'".
       iApply ("Hchild" $! γt' γd' γs' h' with "HP' Hsz' Hrun").
   Qed.
 

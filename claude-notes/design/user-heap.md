@@ -201,8 +201,11 @@ heap predicate in this tree already is.  `Forkable P` says P factors
 through a footprint: reveal its text / read-only / exclusive byte maps,
 restore P to the parent, rebuild `P γt' γd' γs'` at any fresh names from
 mirrored fragments.  Instances cover the primitives (`utext`, `ubyteq`,
-runs, words, `ustr`, `uargv`, `utext_all`) and compose over `∗`/`∃`/
-`big_sepL`, so a caller writes
+runs, words, `ustr`, `uargv`, `utext_all`, `ustack`) and compose over
+`∗`/`∃`/`big_sepL`.  The free stack crosses BY that mechanism, not by a
+special case: `ustack` is Forkable, and the leaf bundles `P ∗ ustack`
+into one payload internally, which is why the child resumes at the same
+`avail` with nothing in the mint about stacks at all.  A caller writes
 `P := fun γt γd γs => utext_all γt M π ∗ uargv γd av args`
 and instance search assembles the rest — `wp_uk_ecall_fork_argv` is that
 worked shape (init's child: the text to reach its exec, the argv to pass
