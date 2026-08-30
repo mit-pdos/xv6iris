@@ -177,6 +177,15 @@ Proof.
   cbn [fst] in Hge. exact Hge.
 Qed.
 
+(* One argv element: where the string is, how long it is, and what it says.
+   A record rather than a triple so [uargv]'s list is readable and so the
+   three fields can be named at a use site. *)
+Record uarg : Type := UArg {
+  ua_ptr   : Z;
+  ua_len   : nat;
+  ua_bytes : nat -> bv 8;
+}.
+
 Section UserHeap.
   Context `{!riscvGS Σ}.
   (* the break ghost's class.  It already exists in the tree --
@@ -272,6 +281,50 @@ Section UserHeap.
   (* NOTE: the SPLIT of a run at an arbitrary point -- which is what a
      syscall footprint hand-over is -- is deliberately not here yet.  It is
      a step-3 tool and wants proving against its consumer, not before it. *)
+
+  (* ===================================================================== *)
+  (* §2b' THE ARGUMENT VECTOR.                                             *)
+  (*                                                                       *)
+  (* [uargv γd av args] owns the argv ARRAY at [av] -- one 8-byte pointer   *)
+  (* per element -- TOGETHER WITH the string each pointer points at.  That  *)
+  (* pairing is the point: a program that walks argv reads a word out of    *)
+  (* the array and immediately wants a [ustr] for it, and with the two      *)
+  (* apart the caller would have to supply a side condition of its own      *)
+  (* saying that every element points at a string.                          *)
+  (*                                                                       *)
+  (* The array's own alignment lives in the resource for the same reason    *)
+  (* [ustack]'s does: the [ld] that reads a slot needs it, and it is a      *)
+  (* property of the vector, not of the function reading it.               *)
+  (* ===================================================================== *)
+  Definition uargv (γd : gname) (av : Z) (args : list uarg) : iProp Σ :=
+    (⌜ av mod 8 = 0 ⌝ ∗
+     (* ...and the COUNT is representable.  main scales the index with a
+        32-bit [addiw]/[slli]/[srli] idiom, so an argv longer than 2^31 is
+        not one this ABI can describe -- the same reason [ustr] carries its
+        own length bound rather than making every walker state it. *)
+     ⌜ Z.of_nat (length args) < 2 ^ 31 ⌝ ∗
+     [∗ list] i ↦ g ∈ args,
+        uword γd (av + 8 * Z.of_nat i) (mword_of_int (ua_ptr g)) ∗
+        ustr γd (ua_ptr g) (ua_len g) (ua_bytes g))%I.
+
+  Lemma uargv_align (γd : gname) (av : Z) (args : list uarg) :
+    uargv γd av args -∗
+    ⌜ av mod 8 = 0 /\ Z.of_nat (length args) < 2 ^ 31 ⌝.
+  Proof. iIntros "(%H & %H2 & _)". iPureIntro. split; assumption. Qed.
+
+  (* one element, out and back *)
+  Lemma uargv_acc (γd : gname) (av : Z) (args : list uarg) (i : nat) (g : uarg) :
+    args !! i = Some g ->
+    uargv γd av args -∗
+      (uword γd (av + 8 * Z.of_nat i) (mword_of_int (ua_ptr g)) ∗
+       ustr γd (ua_ptr g) (ua_len g) (ua_bytes g)) ∗
+      ((uword γd (av + 8 * Z.of_nat i) (mword_of_int (ua_ptr g)) ∗
+        ustr γd (ua_ptr g) (ua_len g) (ua_bytes g)) -∗ uargv γd av args).
+  Proof.
+    intros Hi. iIntros "(#Hal & #Hn & Hl)".
+    iDestruct (big_sepL_lookup_acc _ _ i g Hi with "Hl") as "[Hg Hcl]".
+    iFrame "Hg". iIntros "Hg". iFrame "Hal Hn". iApply "Hcl". iExact "Hg".
+  Qed.
 
 
   (* ===================================================================== *)
@@ -871,6 +924,34 @@ Section UserHeap.
 
   (* ONE SLOT of a frame, taken out and put back.  A prologue spills to
      slot i of the frame it just took; this is how it names that word. *)
+  (* the eight-word form: a frame big enough for ra plus the callee-saved
+     registers a real function body uses.  Spelled out like [ustack_2]
+     rather than derived from it: the intermediate stack pointers a
+     [ustack_app] chain would need are [mword]s whose [uint] the caller
+     would then have to pin, which is more work than the eight rewrites. *)
+  Lemma ustack_8 (γd : gname) (sp : mword 64) :
+    ustack γd sp 8 ⊣⊢ ⌜ uint sp mod 8 = 0 ⌝ ∗
+      (∃ w : mword 64, uword γd (uint sp - 8) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 16) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 24) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 32) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 40) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 48) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 56) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 64) w).
+  Proof.
+    rewrite /ustack /ustack_body /=.
+    assert (E0 : uint sp - 8 * (Z.of_nat 0 + 1) = uint sp - 8) by lia.
+    assert (E1 : uint sp - 8 * (Z.of_nat 1 + 1) = uint sp - 16) by lia.
+    assert (E2 : uint sp - 8 * (Z.of_nat 2 + 1) = uint sp - 24) by lia.
+    assert (E3 : uint sp - 8 * (Z.of_nat 3 + 1) = uint sp - 32) by lia.
+    assert (E4 : uint sp - 8 * (Z.of_nat 4 + 1) = uint sp - 40) by lia.
+    assert (E5 : uint sp - 8 * (Z.of_nat 5 + 1) = uint sp - 48) by lia.
+    assert (E6 : uint sp - 8 * (Z.of_nat 6 + 1) = uint sp - 56) by lia.
+    assert (E7 : uint sp - 8 * (Z.of_nat 7 + 1) = uint sp - 64) by lia.
+    rewrite E0 E1 E2 E3 E4 E5 E6 E7 right_id. reflexivity.
+  Qed.
+
   Lemma ustack_acc (γd : gname) (sp : mword 64) (n i : nat) :
     (i < n)%nat ->
     ustack γd sp n -∗
