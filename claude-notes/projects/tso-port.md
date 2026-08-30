@@ -4273,6 +4273,9 @@ at its four gate sites, `ledger_store_rel_ok` (agent-generic, the shape of
 `WpSconfMem` gets a load leaf whose post carries the step's view
 (`wp_load_s_sconf_au_rel`, cloned from `_au_exv`); then the virtio side.
 
+### 0.41′ status update (2026-08-30): COMPLETE — A6.133 landed the virtio
+### side; `ProofVirtioDiskIntr` and `ProofVirtioDiskRwF` are green (r58)
+
 ### 0.42′ OWNER RULING (2026-08-29): the parked thread token is RELATIVE
 TO A CONTEXT, not to a stamp — swtch's resume is the acquire morph
 applied to the token, and the park is a context-to-context hand-off

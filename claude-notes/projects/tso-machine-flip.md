@@ -16856,3 +16856,94 @@ files (`StartedInv`, `ProofMainSecondary`, `SpecMain*`, `BootCarve`) were
 already green and the newly written ones (`BootChain`, `BootShared`,
 `SystemAdequacy`) were already under the red roots.
 
+## A6.133 — THE VIRTIO SIDE LANDS (§0.41′ COMPLETE): the parked A6.126 §6 WIP resumed on the new kit, and BOTH virtio red roots are green
+
+*(Lock lane, 2026-08-30, straight after A6.132.  The owner's direction:
+"given that you hadn't actually finished the virtio proof, maybe this
+actually helps as opposed to creating busywork" — the shared-kit route.)*
+
+### §1. THE RESUME (the parked WIP onto the r57 tree)
+
+The 21-file WIP at `/shared/tmp/virtio/wip-A6.126/` (parked at r50; the
+tree had moved r51–r57): 17 files unchanged since r50 were copied in
+verbatim; the four that overlapped the barrier work (`TsoCtx`, `HartSMem`,
+`WpSconfMem`, `ProofMain`) were three-way merged (base r50).  `TsoCtx` and
+`ProofMain` merged clean; `HartSMem`/`WpSconfMem` conflicted where the
+barrier's `_exvvr`/`_au_relr` and the WIP's `_exvi`/`_au_reli` families were
+inserted at the same anchors — resolved by REGENERATING each file as the
+WIP text plus the r57-only additive blocks re-applied by anchor (a marker
+merge would have interleaved the two lemma families).
+
+**`StartedInv` was then PORTED to the WIP's kit** — the 8-field `TsRel`
+(per-byte floors `tf`/`fv`, history entries carrying `(position, bytes)`
+and the author): `started_win_rel`'s arm is `TsRel started_addr 4 j 0 0
+(λ _, 0) (nth_byte started_clear) [(S i, nth_byte started_set)]`; the
+message fragments (`ledger_msg_at`, `pm_tid`, `cid_word_of`) LEFT
+`started_right`/`started_res` (§6.3: the arm itself names the author —
+agent 0 — and carries the bytes); the armed read case runs the new
+`ledger_read_rel_ok` (floor-vs-hit disjunction) and needs no `latest`
+lemmas and no value-distinctness at all; the store runs
+`ledger_rpay_mint` (per-byte floors at stamp 0) + the map gate
+`ledger_store_rel_map_ok` with `w := snap_of`, `old := ∅`,
+`RiscvLang`'s `dom_snap_of` and `TsoMemPa.write_bytes_union` closing the
+domain/mem premises.  Two CPU↔agent lemmas (`agent_zero_cid`,
+`cid_zero_agent` — an 8-case fin split) identify "cid word zero" with
+"agent 0" both ways.  `started_read_open`/`started_absorb`/
+`started_store_open` re-shaped to the slimmed arms.  All barrier
+consumers (`SchedCtx`, `SpecMain*`, `ProofMainSecondary`) recompiled
+UNCHANGED.
+
+### §2. WHAT IT TOOK TO FINISH THE WIP (the fix ledger, for pattern-recognition)
+
+* `VirtioProto` from its parked frontier (:4353) to the end: a
+  `Hwrbdom`-spelled disjointness, an `Hdd` shadow, the reader accessor's
+  close reshaped to the 5-binder live arm (frame the four ghost-var
+  halves BEFORE `iExists`), `TsoMemPa.tso_read`/`visibleb_below`
+  qualifications with EXPLICIT instances (an `ltac:(lia)` against evars
+  cannot elaborate), an over-wide `injection` pattern, `(q,g).1`
+  unreduced under `lia` (`cbn in`), the `p ≠ k` direction flips.
+* `WpUart` (the completion's map-gate store): `VirtioQueue`/
+  `RiscvModelBytes` imports, nat literals, `gs_of` projections reduced
+  (`cbn [gs_of glog]`) before the frame, and the returned window recast
+  through `rel_cells` by `big_sepL_mono` (`N.to_nat 2` vs `2`).
+* `DiskAvail`: the never-compiled `used_split_init` — **a bare
+  `rewrite !big_sepL_cons` aimed at a 2-element list unrolled the 4092-byte
+  page instead (the goal's first big_sepL unifies `seq 0 4092` with a cons
+  by whnf) and span ~20 min; `iEval (…) in "H2"` fixes it** — plus
+  re-indexing `seq 2 2 → 2 + seq 0 2`, explicit maps for
+  `big_sepM_union`/`range_map_big_sepM` (evar-lia again), and
+  `map_disjoint_dom_2`.  The `mem_win_to_phys` bridge family MOVED here
+  from `DiskInv` (import direction).  New: `hcell_map_union`,
+  `hcell_map_carve`/`half_map_carve` (the ring window out of the pin's two
+  halves), `ctx_word2_of_ccell` (window → `↦₂`, elaborated HERE so the
+  tier instance matches the consumers').
+* `DiskInv`/`VirtioDiskRwDefs`: `vdrw_body` gained `disk_res`'s new floors
+  row `(∃ t0 t1 F, disk_fl ∗ disk_nr ∗ disk_flr ∗ lk_floor t0 ∗ lk_floor
+  t1 ∗ ctx_floor F)`; every `vdrw_body` destructure/close in RwB/RwD/RwE/
+  RwF/Intr threads a `Hdfl` row (five patterns, ~10 closes; two closures'
+  capture brackets too).  `WpLock` imports for `lk_floor`.
+* `ProofVirtioDiskIntr` (RED ROOT, now green): imports (`KMap`,
+  `TsoMemPa`, `RiscvExec`, `SieCapCtx`), `vt_loop_state` at a section
+  `CID` (its receipt row `∃ V0, hart_view_lb V0 ∗ …` is per-hart), the
+  ring-entry extraction reworked to the half/half pin (carve both halves
+  at the window, `hcell_map_join` just the window, `ctx_word2_of_ccell`),
+  the flight row's `hcell_map` split, `vt_payoff` framed by parts.
+* `ProofVirtioDiskInit`: the flip call passes the two floor stamps
+  (`wp_vdi_flip … t0 t1`), and the `vdi_post` block order puts the pure
+  side-goals before the floors bracket.
+* `ProofVirtioDiskRwF` (RED ROOT, now green): the two device-write
+  crossings `vdrwf_plist_mem`/`vdrwf_map_plist` — the raw phys→ctx bridge
+  that WAS the red — are DELETED; the withdraw takes the buffer back
+  stamped (`parked_res`'s `∃ q, ctx_floor q ∗ [phys_ledger_at … q]` row)
+  and re-registers through `DiskAvail.ctx_bytes_of_at_seq`, with the
+  claim-record length bridged by a pure chain (`Hlbs`/`Hbs`/`Hbslen`).
+
+### §3. NUMBERS
+
+r58 (VM incremental round, no stale `.vo`): **1263/1303 (+58 over r57),
+red roots 5 — `ProofForkretPark:318`, `ProofKernelvec:1704`,
+`ProofMain:997`, `UptWalkPt:679`*, `UserMemPt:427`* (* deliberately red,
+§0.37′) — zero admits**; snapshot `b0631cf48`.  BOTH virtio roots are
+gone; the 40 remaining red files all sit under the five roots
+(`LinkMain`'s cone, the U-mode cone, and the forkret/kernelvec pair).
+
