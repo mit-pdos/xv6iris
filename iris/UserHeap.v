@@ -1,7 +1,7 @@
 (* ===================================================================== *)
 (* UserHeap.v -- A SEPARATION-LOGIC HEAP OVER USER MEMORY, IN TWO HALVES. *)
 (*                                                                        *)
-(* The U tier's memory has been an image VALUE ([uvis_M W : gmap Z (bv 8)])*)
+(* The U tier's memory has been an image VALUE ([M : gmap Z (bv 8)])*)
 (* threaded through every contract as an equation.  That has no frame      *)
 (* rule: a function touching ANY of it must say what happened to ALL of    *)
 (* it, so a four-byte copyout propagates as [M' = umem_wr M a d bs]        *)
@@ -31,12 +31,12 @@
 (* the gname now simply says, and it could not express FETCHABILITY at all *)
 (* -- the split was by W, while a fetch needs X.)                          *)
 (*                                                                        *)
-(* THE PERMISSION MAP IS CONSUMED HERE AND NOWHERE ELSE.  [uvis_perm]      *)
+(* THE PERMISSION MAP IS CONSUMED HERE AND NOWHERE ELSE.  It             *)
 (* appears in this file, to decide the split at allocation and to state    *)
 (* the two invariants; above it, a leaf takes [utext]/[ubyte] and never    *)
 (* mentions a permission, a page, or a table.                             *)
 (*                                                                        *)
-(* WHAT THIS IS NOT YET.  [urun] still names [uvis_M W], so the image is   *)
+(* WHAT THIS IS NOT YET.  [urun] still names [M], so the image is   *)
 (* not hidden; that is the next step, together with re-cutting the leaves  *)
 (* so [uinstr]'s [uM_bytes M ...] clauses become [utext] and the load and  *)
 (* store leaves' byte facts become [ubyte].  And the payoff for [init]     *)
@@ -60,7 +60,6 @@ Require Import RiscvModelBytes RiscvPtsto RiscvExtras.
 Require Import UserPtTree.
 Require Import UmodeMem UmodeArith UmodeAbi.  (* [uva_canon] / [uint_moi] / [uva_canon_small] *)
 Require Import UserPerm.
-Require Import UexecSlot.   (* [uvis] / [uvis_M] / [uvis_perm] *)
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -101,21 +100,21 @@ Defined.
    writable" so the two halves are disjoint by construction; in xv6 that
    costs nothing, because exec maps text R+X and everything else R+W and no
    user page is ever both. *)
-Definition utext_part (W : uvis) : gmap Z (bv 8) :=
+Definition utext_part (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) : gmap Z (bv 8) :=
   base.filter (fun kv : Z * bv 8 =>
-                 ux_addr (uvis_perm W) kv.1 /\ ~ uw_addr (uvis_perm W) kv.1)
-              (uvis_M W).
+                 ux_addr (pm) kv.1 /\ ~ uw_addr (pm) kv.1)
+              (M).
 
-Definition udata_part (W : uvis) : gmap Z (bv 8) :=
-  base.filter (fun kv : Z * bv 8 => uw_addr (uvis_perm W) kv.1) (uvis_M W).
+Definition udata_part (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) : gmap Z (bv 8) :=
+  base.filter (fun kv : Z * bv 8 => uw_addr (pm) kv.1) (M).
 
-Lemma utext_part_sub (W : uvis) : utext_part W ⊆ uvis_M W.
+Lemma utext_part_sub (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) : utext_part M pm ⊆ M.
 Proof. apply map_filter_subseteq. Qed.
 
-Lemma udata_part_sub (W : uvis) : udata_part W ⊆ uvis_M W.
+Lemma udata_part_sub (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) : udata_part M pm ⊆ M.
 Proof. apply map_filter_subseteq. Qed.
 
-Lemma utext_udata_disjoint (W : uvis) : utext_part W ##ₘ udata_part W.
+Lemma utext_udata_disjoint (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) : utext_part M pm ##ₘ udata_part M pm.
 Proof.
   apply map_disjoint_spec. intros a b1 b2 H1 H2.
   apply map_lookup_filter_Some in H1 as [_ [_ Hn]].
@@ -123,28 +122,28 @@ Proof.
   exact (Hn Hy).
 Qed.
 
-Lemma utext_part_x (W : uvis) (a : Z) :
-  is_Some (utext_part W !! a) -> ux_addr (uvis_perm W) a.
+Lemma utext_part_x (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (a : Z) :
+  is_Some (utext_part M pm !! a) -> ux_addr (pm) a.
 Proof.
   intros [b Hb]. apply map_lookup_filter_Some in Hb as [_ [Hx _]]. exact Hx.
 Qed.
 
-Lemma udata_part_w (W : uvis) (a : Z) :
-  is_Some (udata_part W !! a) -> uw_addr (uvis_perm W) a.
+Lemma udata_part_w (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (a : Z) :
+  is_Some (udata_part M pm !! a) -> uw_addr (pm) a.
 Proof. intros [b Hb]. apply map_lookup_filter_Some in Hb as [_ Hw]. exact Hw. Qed.
 
 
 (* THE DATA HALF SPLITS AT THE BREAK: what the process owns, and the SLACK
    the invariant keeps above it.  Same shape as the text/data split, and for
    the same reason -- a filter, so the big-op divides by [big_sepM_union]. *)
-Definition udata_lo (W : uvis) (sz : Z) : gmap Z (bv 8) :=
-  base.filter (fun kv : Z * bv 8 => kv.1 < sz) (udata_part W).
+Definition udata_lo (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z) : gmap Z (bv 8) :=
+  base.filter (fun kv : Z * bv 8 => kv.1 < sz) (udata_part M pm).
 
-Definition udata_slack (W : uvis) (sz : Z) : gmap Z (bv 8) :=
-  base.filter (fun kv : Z * bv 8 => sz <= kv.1) (udata_part W).
+Definition udata_slack (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z) : gmap Z (bv 8) :=
+  base.filter (fun kv : Z * bv 8 => sz <= kv.1) (udata_part M pm).
 
-Lemma udata_lo_slack_disjoint (W : uvis) (sz : Z) :
-  udata_lo W sz ##ₘ udata_slack W sz.
+Lemma udata_lo_slack_disjoint (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z) :
+  udata_lo M pm sz ##ₘ udata_slack M pm sz.
 Proof.
   apply map_disjoint_spec. intros a b1 b2 H1 H2.
   apply map_lookup_filter_Some in H1 as [_ Hlt].
@@ -155,11 +154,11 @@ Proof.
   cbn [fst] in Hlt. cbn [fst] in Hge. lia.
 Qed.
 
-Lemma udata_lo_slack_union (W : uvis) (sz : Z) :
-  udata_lo W sz ∪ udata_slack W sz = udata_part W.
+Lemma udata_lo_slack_union (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z) :
+  udata_lo M pm sz ∪ udata_slack M pm sz = udata_part M pm.
 Proof.
   apply map_eq. intros a.
-  destruct (udata_part W !! a) as [b |] eqn:Hb.
+  destruct (udata_part M pm !! a) as [b |] eqn:Hb.
   - destruct (decide (a < sz)) as [Hlt | Hge].
     + rewrite lookup_union_l'.
       * apply map_lookup_filter_Some. split; [ exact Hb | exact Hlt ].
@@ -171,8 +170,8 @@ Proof.
   - rewrite lookup_union_None. split; apply map_lookup_filter_None; left; exact Hb.
 Qed.
 
-Lemma udata_slack_above (W : uvis) (sz : Z) (a : Z) :
-  is_Some (udata_slack W sz !! a) -> sz <= a.
+Lemma udata_slack_above (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z) (a : Z) :
+  is_Some (udata_slack M pm sz !! a) -> sz <= a.
 Proof.
   intros [b Hb]. apply map_lookup_filter_Some in Hb as [_ Hge].
   cbn [fst] in Hge. exact Hge.
@@ -265,17 +264,18 @@ Section UserHeap.
   (* Two authorities against one image, with the segment facts that make    *)
   (* each half's points-to mean what it means.                             *)
   (* ===================================================================== *)
-  Definition urun (γt γd γs : gname) (W : uvis) : iProp Σ :=
+  Definition urun (γt γd γs : gname) (M : gmap Z (bv 8))
+      (pm : gmap (mword 27) uperm) : iProp Σ :=
     (∃ (Mt Md Mslack : gmap Z (bv 8)) (sz : Z),
-       ⌜ Mt ⊆ uvis_M W ⌝ ∗ ⌜ Md ⊆ uvis_M W ⌝ ∗ ⌜ Mt ##ₘ Md ⌝ ∗
+       ⌜ Mt ⊆ M ⌝ ∗ ⌜ Md ⊆ M ⌝ ∗ ⌜ Mt ##ₘ Md ⌝ ∗
        (* CANONICITY, ONCE FOR THE WHOLE ADDRESS SPACE.  Every mapped user
           address is below MAXVA, hence Sv39-canonical.  Stating it here
           rather than per access is what stops [uinstr]'s [ui_canon] and the
           [uva_canon] output of every data reader ([uk_rd_byte],
           [uk_args_slot], [uk_stack_slot]) from each re-deriving it. *)
-       ⌜ forall a : Z, is_Some (uvis_M W !! a) -> 0 <= a < 2 ^ 38 ⌝ ∗
-       ⌜ forall a : Z, is_Some (Mt !! a) -> ux_addr (uvis_perm W) a ⌝ ∗
-       ⌜ forall a : Z, is_Some (Md !! a) -> uw_addr (uvis_perm W) a ⌝ ∗
+       ⌜ forall a : Z, is_Some (M !! a) -> 0 <= a < 2 ^ 38 ⌝ ∗
+       ⌜ forall a : Z, is_Some (Mt !! a) -> ux_addr (pm) a ⌝ ∗
+       ⌜ forall a : Z, is_Some (Md !! a) -> uw_addr (pm) a ⌝ ∗
        ghost_map_auth γt 1 Mt ∗ ghost_map_auth γd 1 Md ∗
        (* THE BREAK, and THE SLACK ABOVE IT.  The kernel's image grows and
           shrinks by whole PAGES while [sz] moves by bytes, so the invariant
@@ -304,46 +304,43 @@ Section UserHeap.
   (* A TEXT byte names the byte the image holds, and its page is FETCHABLE.
      Both come straight off the text half's invariant -- no dfrac argument,
      no permission in the statement. *)
-  Lemma urun_text (γt γd γs : gname) (W : uvis) (a : Z) (b : bv 8) :
-    urun γt γd γs W -∗ utext γt a b -∗
-    ⌜ uvis_M W !! a = Some b /\ ux_addr (uvis_perm W) a /\ 0 <= a < 2 ^ 38 ⌝.
+  Lemma urun_text (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (a : Z) (b : bv 8) :
+    urun γt γd γs M pm -∗ utext γt a b -∗
+    ⌜ M !! a = Some b /\ ux_addr (pm) a /\ 0 <= a < 2 ^ 38 ⌝.
   Proof.
     iIntros "Hrun Hb".
     iDestruct "Hrun" as (Mt Md Mslack sz)
       "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hw & Ht & Hd & %Hsz0 & Hszg & %Hsl & Hslack)".
     iDestruct (ghost_map_lookup with "Ht Hb") as %HMt.
-    assert (HM : uvis_M W !! a = Some b)
-      by exact (proj1 (map_subseteq_spec Mt (uvis_M W)) Hst a b HMt).
+    assert (HM : M !! a = Some b)
+      by exact (proj1 (map_subseteq_spec Mt (M)) Hst a b HMt).
     (* NOTE: not [split_and!] -- it would split [0 <= a < 2 ^ 38] too *)
     iPureIntro. split; [ exact HM | ].
     split; [ exact (Hx a (mk_is_Some _ _ HMt)) | exact (Hcan a (mk_is_Some _ _ HM)) ].
   Qed.
 
   (* ...and a DATA byte names its byte and its page is WRITABLE. *)
-  Lemma urun_ubyte (γt γd γs : gname) (W : uvis) (a : Z) (b : bv 8) :
-    urun γt γd γs W -∗ ubyte γd a b -∗
-    ⌜ uvis_M W !! a = Some b /\ uw_addr (uvis_perm W) a /\ 0 <= a < 2 ^ 38 ⌝.
+  Lemma urun_ubyte (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (a : Z) (b : bv 8) :
+    urun γt γd γs M pm -∗ ubyte γd a b -∗
+    ⌜ M !! a = Some b /\ uw_addr (pm) a /\ 0 <= a < 2 ^ 38 ⌝.
   Proof.
     iIntros "Hrun Hb".
     iDestruct "Hrun" as (Mt Md Mslack sz)
       "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hw & Ht & Hd & %Hsz0 & Hszg & %Hsl & Hslack)".
     iDestruct (ghost_map_lookup with "Hd Hb") as %HMd.
-    assert (HM : uvis_M W !! a = Some b)
-      by exact (proj1 (map_subseteq_spec Md (uvis_M W)) Hsd a b HMd).
+    assert (HM : M !! a = Some b)
+      by exact (proj1 (map_subseteq_spec Md (M)) Hsd a b HMd).
     iPureIntro. split; [ exact HM | ].
     split; [ exact (Hw a (mk_is_Some _ _ HMd)) | exact (Hcan a (mk_is_Some _ _ HM)) ].
   Qed.
-
-  Definition uvis_wM (W : uvis) (M' : gmap Z (bv 8)) : uvis :=
-    MkUvis (uvis_tf W) M' (uvis_perm W).
 
   (* THE STORE.  An exclusively-owned data byte may be replaced and the
      key's image moves with it.  The text half is untouched, and it stays a
      SUBMAP because the two halves are disjoint -- which is the whole reason
      they are two heaps. *)
-  Lemma urun_store (γt γd γs : gname) (W : uvis) (a : Z) (b b' : bv 8) :
-    urun γt γd γs W -∗ ubyte γd a b ==∗
-      urun γt γd γs (uvis_wM W (<[a := b']> (uvis_M W))) ∗ ubyte γd a b'.
+  Lemma urun_store (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (a : Z) (b b' : bv 8) :
+    urun γt γd γs M pm -∗ ubyte γd a b ==∗
+      urun γt γd γs (<[a := b']> M) pm ∗ ubyte γd a b'.
   Proof.
     iIntros "Hrun Hb".
     iDestruct "Hrun" as (Mt Md Mslack sz)
@@ -353,8 +350,7 @@ Section UserHeap.
       by exact (map_disjoint_Some_r Mt Md a b Hdisj HMd).
     iMod (ghost_map_update b' with "Hd Hb") as "[Hd Hb]".
     iModIntro. iFrame "Hb". iExists Mt, (<[a := b']> Md), Mslack, sz.
-    cbn [uvis_M uvis_perm uvis_wM].
-    iFrame "Ht Hd Hszg Hslack". iPureIntro. split_and!.
+        iFrame "Ht Hd Hszg Hslack". iPureIntro. split_and!.
     - apply insert_subseteq_r; [ exact Hnt | exact Hst ].
     - apply insert_mono. exact Hsd.
     - apply map_disjoint_insert_r_2; [ exact Hnt | exact Hdisj ].
@@ -362,7 +358,7 @@ Section UserHeap.
          with it the canonicity fact -- does not move *)
       intros k Hk. apply Hcan.
       destruct (decide (k = a)) as [-> | Hne].
-      + exact (mk_is_Some _ _ (proj1 (map_subseteq_spec Md (uvis_M W)) Hsd a b HMd)).
+      + exact (mk_is_Some _ _ (proj1 (map_subseteq_spec Md (M)) Hsd a b HMd)).
       + rewrite lookup_insert_ne in Hk; [ exact Hk | exact (not_eq_sym Hne) ].
     - exact Hx.
     - intros k Hk. apply Hw.
@@ -382,50 +378,88 @@ Section UserHeap.
   (* PERSISTED on the spot: after this step nothing can ever write it, and  *)
   (* every continuation may read it without owning anything.                *)
   (* ===================================================================== *)
-  Lemma urun_alloc (W : uvis) (sz : Z) :
+  Lemma urun_alloc (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z) :
     (* THE ONE PREMISE, and where it comes from: every mapped user address is
        below MAXVA.  At the call site (the process's first WP) [uvb] carries
        [usz_ok sz] and the lazy image over the sz-region, which is what bounds
        the image's keys; it is taken here rather than re-derived so that this
        file stays independent of the bundle. *)
-    (forall a : Z, is_Some (uvis_M W !! a) -> 0 <= a < 2 ^ 38) ->
+    (forall a : Z, is_Some (M !! a) -> 0 <= a < 2 ^ 38) ->
     0 <= sz ->
     ⊢ |==> ∃ γt γd γs : gname,
-        urun γt γd γs W ∗ usz γs sz ∗
-        ([∗ map] a ↦ b ∈ utext_part W, utext γt a b) ∗
-        ([∗ map] a ↦ b ∈ udata_lo W sz, ubyte γd a b).
+        urun γt γd γs M pm ∗ usz γs sz ∗
+        ([∗ map] a ↦ b ∈ utext_part M pm, utext γt a b) ∗
+        ([∗ map] a ↦ b ∈ udata_lo M pm sz, ubyte γd a b).
   Proof.
     intros Hcan Hsz0.
-    iMod (ghost_map_alloc (utext_part W)) as (γt) "[Htauth Htfrag]".
-    iMod (ghost_map_alloc (udata_part W)) as (γd) "[Hdauth Hdfrag]".
+    iMod (ghost_map_alloc (utext_part M pm)) as (γt) "[Htauth Htfrag]".
+    iMod (ghost_map_alloc (udata_part M pm)) as (γd) "[Hdauth Hdfrag]".
     iMod (ghost_var_alloc sz) as (γs) "Hsz".
     iEval (rewrite -Qp.half_half) in "Hsz".
     iDestruct (ghost_var_split with "Hsz") as "[HszA HszF]".
     (* PERSIST the text half.  After this step nothing can ever write it, and
        every continuation may read it without owning anything. *)
-    iAssert (|==> [∗ map] a ↦ b ∈ utext_part W, utext γt a b)%I
+    iAssert (|==> [∗ map] a ↦ b ∈ utext_part M pm, utext γt a b)%I
       with "[Htfrag]" as ">#Htp".
     { iApply big_sepM_bupd. iApply (big_sepM_impl with "Htfrag").
       iIntros "!>" (a b _) "H". rewrite /utext.
       iApply (ghost_map_elem_persist with "H"). }
     (* ...and divide the data half at the break: the process gets what is
        below it, the invariant keeps the slack above. *)
-    iEval (rewrite -(udata_lo_slack_union W sz)) in "Hdfrag".
+    iEval (rewrite -(udata_lo_slack_union M pm sz)) in "Hdfrag".
     rewrite big_sepM_union; [ | apply udata_lo_slack_disjoint ].
     iDestruct "Hdfrag" as "[Hlo Hslack]".
     iModIntro. iExists γt, γd, γs.
     iSplitL "Htauth Hdauth HszA Hslack";
       [ | iFrame "HszF"; iFrame "Hlo"; iFrame "Htp" ].
-    iExists (utext_part W), (udata_part W), (udata_slack W sz), sz.
+    iExists (utext_part M pm), (udata_part M pm), (udata_slack M pm sz), sz.
     iFrame "Htauth Hdauth HszA Hslack". iPureIntro. split_and!.
     - apply utext_part_sub.
     - apply udata_part_sub.
     - apply utext_udata_disjoint.
     - exact Hcan.
-    - exact (utext_part_x W).
-    - exact (udata_part_w W).
+    - exact (utext_part_x M pm).
+    - exact (udata_part_w M pm).
     - exact Hsz0.
-    - exact (udata_slack_above W sz).
+    - exact (udata_slack_above M pm sz).
+  Qed.
+
+  (* ===================================================================== *)
+  (* §4c THE WINDOW STORE -- the re-assembly a syscall return is.           *)
+  (*                                                                       *)
+  (* This is the shape of the whole trap seam.  At a trap the kernel is     *)
+  (* given back its [user_ptm_inv] over the same bytes; when it returns,    *)
+  (* its own spec says PRECISELY how the image moved, and [urun] has to be  *)
+  (* re-established at the new one.  For a syscall that writes a window     *)
+  (* that is exactly this lemma -- and it demands the caller OWNED the      *)
+  (* window, which is why a program's spec for such a syscall asks for the  *)
+  (* range up front.                                                        *)
+  (*                                                                        *)
+  (* THE FRAME IS THE POINT: nothing outside the window is mentioned, so    *)
+  (* every other fact the process holds about its memory survives by        *)
+  (* separation rather than by an equation someone has to keep precise.     *)
+  (* A syscall handed a null pointer writes NO window, takes NO fragments,  *)
+  (* and this lemma is not even needed.                                     *)
+  (* ===================================================================== *)
+  Lemma urun_store_run (γt γd γs : gname) (M : gmap Z (bv 8))
+      (pm : gmap (mword 27) uperm) (a : Z) (n : nat) (f g : nat -> bv 8) :
+    urun γt γd γs M pm -∗ urun_bytes γd a n f ==∗
+      urun γt γd γs (umem_write M a n g) pm ∗ urun_bytes γd a n g.
+  Proof.
+    iInduction n as [ | k IH ] "IH" forall (M).
+    { iIntros "Hrun _". iModIntro. iFrame "Hrun". rewrite /urun_bytes /=. done. }
+    iIntros "Hrun Hbs".
+    (* peel the LAST byte -- [umem_write] writes it outermost.  [iEval ... in]
+       rather than a bare [rewrite]: the proofmode's [rewrite] acts on the
+       WHOLE entailment, and putting the goal in split form here would leave
+       nothing to re-assemble at the end. *)
+    iEval (rewrite /urun_bytes seq_S big_sepL_app /=) in "Hbs".
+    iDestruct "Hbs" as "[Hlo [Hhi _]]".
+    iMod ("IH" $! M with "Hrun Hlo") as "[Hrun Hlo]".
+    iMod (urun_store with "Hrun Hhi") as "[Hrun Hhi]".
+    iModIntro. iFrame "Hrun".
+    iEval (rewrite /urun_bytes seq_S big_sepL_app /=).
+    iFrame "Hlo Hhi".
   Qed.
 
   (* ===================================================================== *)
