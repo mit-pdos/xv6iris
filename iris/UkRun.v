@@ -44,6 +44,7 @@ Require Import RegFile InstrBytes.
 Require Import UserPtTree UserExec ProcPtOwn.
 Require Import UmodeMem UmodeArith UmodeAbi.
 Require Import UserPerm UsysMemOk UexecWp UexecSlot UexecRet.
+Require Import UptTree.
 Require Import WpMmodeLeafBase.
 Require Import UmodeFetch.
 Require Import WpUmodeStore.
@@ -367,6 +368,71 @@ Section UkRun.
               with "Hb [Hheap Hw Hcont]").
     rewrite uM_store8_umem_write.
     iApply (urun_close with "Hheap"). iApply ("Hcont" with "Hw").
+  Qed.
+
+
+  (* ===================================================================== *)
+  (* §4 THE ENTRY: the process's FIRST WP.                                 *)
+  (*                                                                       *)
+  (* This is the other end of the interface.  A program never constructs a  *)
+  (* [urun]; it is handed one here, together with the points-to facts for   *)
+  (* its whole initial image, in exchange for a proof that it is safe from  *)
+  (* the key's resume state.  The gnames are FRESH -- allocated at this     *)
+  (* WP, under the ambient the slot quantifies over -- which is why they    *)
+  (* are arguments of [urun] rather than section variables.                 *)
+  (* ===================================================================== *)
+
+  (* [uheap_alloc]'s one premise, discharged.  Two sources: a MAPPED address
+     sits in a page the table maps, and [upt_map_wf] puts every such page
+     below the trapframe; a LIVE address is below the break, and [usz_ok]
+     puts the break below the trapframe too. *)
+  Lemma umem_lazy_bound (pt : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    proc_pt_wf pt -> usz_ok sz ->
+    umem_lazy pt sz M -∗ ⌜ forall a : Z, is_Some (M !! a) -> 0 <= a < 2 ^ 38 ⌝.
+  Proof.
+    iIntros (Hwf Hsz) "H". iDestruct "H" as (Mp) "(_ & %Hiff & _ & _)".
+    iPureIntro. intros a Ha.
+    change (2 ^ 38) with 274877906944.
+    destruct (proj1 (Hiff a) Ha) as [Hm | Hl].
+    - destruct Hm as (vpn & w & j & Hvl & Hj & ->).
+      destruct Hwf as (Hmw & _).
+      destruct (Hmw vpn w Hvl) as [Hlt _].
+      rewrite tf_vpn_unsigned in Hlt.
+      pose proof (proj1 (bv_unsigned_in_range _ vpn)) as Hv0.
+      lia.
+    - pose proof (usz_ok_live sz a Hsz Hl). lia.
+  Qed.
+
+  Lemma uslot_of_urun (W : uvis) :
+    (∀ (γt γd γs : gname) (h : CpuId) (sz : Z),
+       ⌜ usz_ok sz ⌝ -∗
+       usz γs sz -∗
+       ([∗ map] a ↦ b ∈ utext_part (uvis_M W) (uvis_perm W), utext γt a b) -∗
+       ([∗ map] a ↦ b ∈ udata_lo (uvis_M W) (uvis_perm W) sz, ubyte γd a b) -∗
+       urun γt γd γs h (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)) -∗
+       WP (Loop : expr riscv_lang))
+    -∗ uslot W.
+  Proof.
+    iIntros "Hprog". rewrite uslot_ukc /ukc.
+    iIntros (h C pt Rut sz) "%Hlo %Hpm Hb".
+    assert (Hwf : proc_pt_wf pt)
+      by (destruct Hlo as (_ & _ & _ & _ & _ & H); exact H).
+    rewrite /uvb /uvb_F /user_ptm_inv.
+    iDestruct "Hb" as
+      "(Hamb & Hregs & %Hsz & (Htlb & Hlazy & %Hinj & %Hacc) &
+        Hcfg & Hgpr & Hpc & Hrut & Hkont)".
+    iDestruct (umem_lazy_bound pt sz (uvis_M W) Hwf Hsz with "Hlazy") as %Hcan.
+    iMod (uheap_alloc (uvis_M W) (uvis_perm W) sz Hcan)
+      as (γt γd γs) "(Hheap & Hszf & #Ht & Hd)".
+    iSpecialize ("Hprog" $! γt γd γs h sz with "[%] Hszf Ht Hd"); [ exact Hsz | ].
+    iApply "Hprog".
+    iExists C, pt, Rut, sz, (uvis_M W), (uvis_perm W).
+    iSplitR; [ iPureIntro; exact Hlo | ].
+    iSplitR; [ iPureIntro; exact Hpm | ].
+    iFrame "Hheap".
+    rewrite /uvb /uvb_F /user_ptm_inv.
+    iFrame "Hamb Hregs Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
+    iPureIntro. split_and!; [ exact Hsz | exact Hinj | exact Hacc ].
   Qed.
 
 End UkRun.

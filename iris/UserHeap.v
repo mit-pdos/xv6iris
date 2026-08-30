@@ -277,13 +277,16 @@ Section UserHeap.
        ⌜ forall a : Z, is_Some (Mt !! a) -> ux_addr (pm) a ⌝ ∗
        ⌜ forall a : Z, is_Some (Md !! a) -> uw_addr (pm) a ⌝ ∗
        ghost_map_auth γt 1 Mt ∗ ghost_map_auth γd 1 Md ∗
-       (* THE BREAK, and THE SLACK ABOVE IT.  The kernel's image grows and
+       (* THE BREAK, and THE SLACK ABOVE IT.  NOTE [0 <= sz] is deliberately
+          NOT asserted: the bundle carries only [usz_ok sz], which does not
+          rule out a negative break, and nothing here needs it -- addresses
+          are bounded by the canonicity clause above.  Add it back when a
+          source for it appears (sbrk will want it).  The kernel's image grows and
           shrinks by whole PAGES while [sz] moves by bytes, so the invariant
           holds the bytes between the break and the next page boundary.
           That is what lets the user-facing sbrk be BYTE-granular: [sbrk 8]
           hands out eight bytes off the slack whether or not a fresh page
           came from the kernel, and [sbrk (-8)] takes eight back into it. *)
-       ⌜ 0 <= sz ⌝ ∗
        ghost_var γs (1/2) sz ∗
        ⌜ forall a : Z, is_Some (Mslack !! a) -> sz <= a ⌝ ∗
        ([∗ map] a ↦ b ∈ Mslack, ubyte γd a b))%I.
@@ -310,7 +313,7 @@ Section UserHeap.
   Proof.
     iIntros "Hrun Hb".
     iDestruct "Hrun" as (Mt Md Mslack sz)
-      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hw & Ht & Hd & %Hsz0 & Hszg & %Hsl & Hslack)".
+      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hw & Ht & Hd & Hszg & %Hsl & Hslack)".
     iDestruct (ghost_map_lookup with "Ht Hb") as %HMt.
     assert (HM : M !! a = Some b)
       by exact (proj1 (map_subseteq_spec Mt (M)) Hst a b HMt).
@@ -326,7 +329,7 @@ Section UserHeap.
   Proof.
     iIntros "Hrun Hb".
     iDestruct "Hrun" as (Mt Md Mslack sz)
-      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hw & Ht & Hd & %Hsz0 & Hszg & %Hsl & Hslack)".
+      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hw & Ht & Hd & Hszg & %Hsl & Hslack)".
     iDestruct (ghost_map_lookup with "Hd Hb") as %HMd.
     assert (HM : M !! a = Some b)
       by exact (proj1 (map_subseteq_spec Md (M)) Hsd a b HMd).
@@ -344,7 +347,7 @@ Section UserHeap.
   Proof.
     iIntros "Hrun Hb".
     iDestruct "Hrun" as (Mt Md Mslack sz)
-      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hw & Ht & Hd & %Hsz0 & Hszg & %Hsl & Hslack)".
+      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hw & Ht & Hd & Hszg & %Hsl & Hslack)".
     iDestruct (ghost_map_lookup with "Hd Hb") as %HMd.
     assert (Hnt : Mt !! a = None)
       by exact (map_disjoint_Some_r Mt Md a b Hdisj HMd).
@@ -367,7 +370,6 @@ Section UserHeap.
       + rewrite lookup_insert_ne in Hk; [ exact Hk | exact (not_eq_sym Hne) ].
     (* the break and the slack are untouched: a store moves one DATA byte the
        process owns, and the slack is what the invariant owns above the break *)
-    - exact Hsz0.
     - exact Hsl.
   Qed.
 
@@ -385,13 +387,12 @@ Section UserHeap.
        the image's keys; it is taken here rather than re-derived so that this
        file stays independent of the bundle. *)
     (forall a : Z, is_Some (M !! a) -> 0 <= a < 2 ^ 38) ->
-    0 <= sz ->
     ⊢ |==> ∃ γt γd γs : gname,
         uheap γt γd γs M pm ∗ usz γs sz ∗
         ([∗ map] a ↦ b ∈ utext_part M pm, utext γt a b) ∗
         ([∗ map] a ↦ b ∈ udata_lo M pm sz, ubyte γd a b).
   Proof.
-    intros Hcan Hsz0.
+    intros Hcan.
     iMod (ghost_map_alloc (utext_part M pm)) as (γt) "[Htauth Htfrag]".
     iMod (ghost_map_alloc (udata_part M pm)) as (γd) "[Hdauth Hdfrag]".
     iMod (ghost_var_alloc sz) as (γs) "Hsz".
@@ -420,7 +421,6 @@ Section UserHeap.
     - exact Hcan.
     - exact (utext_part_x M pm).
     - exact (udata_part_w M pm).
-    - exact Hsz0.
     - exact (udata_slack_above M pm sz).
   Qed.
 
