@@ -713,4 +713,96 @@ Section UserHeap.
       iApply (utext_run_of γt M pm (uint pc) 4 w Hbytes Hperm with "Ht").
   Qed.
 
+
+  (* ===================================================================== *)
+  (* THE FREE STACK.                                                       *)
+  (*                                                                       *)
+  (* [ustack γd sp n] is the n words BELOW sp -- at [sp-8], [sp-16], ...,  *)
+  (* [sp-8n] -- owned, with their values existential.  It is the user-mode *)
+  (* twin of [StackOwn.stack_own], and it lives inside [urun]: the process *)
+  (* owns its own free stack, hands a frame out when sp moves down, and    *)
+  (* takes it back when sp moves up.  A function's precondition is then a  *)
+  (* NUMBER (how much headroom it needs) rather than a list of addresses.  *)
+  (* ===================================================================== *)
+  Definition ustack (γd : gname) (sp : mword 64) (n : nat) : iProp Σ :=
+    ([∗ list] i ∈ seq 0 n,
+       ∃ w : mword 64, uword γd (uint sp - 8 * (Z.of_nat i + 1)) w)%I.
+
+  Lemma ustack_0 (γd : gname) (sp : mword 64) : ustack γd sp 0 ⊣⊢ emp.
+  Proof. rewrite /ustack /=. reflexivity. Qed.
+
+  (* ONE WORD of headroom, off the top: the step every sp-adjust is built
+     from.  [sp'] is the moved sp, named rather than computed so a caller
+     can supply whatever spelling its arithmetic produced. *)
+  Lemma ustack_S (γd : gname) (sp sp' : mword 64) (n : nat) :
+    uint sp' = uint sp - 8 ->
+    ustack γd sp (S n) ⊣⊢ (∃ w : mword 64, uword γd (uint sp - 8) w) ∗ ustack γd sp' n.
+  Proof.
+    intros Hsp. rewrite /ustack.
+    change (seq 0 (S n)) with (0%nat :: seq 1 n).
+    rewrite big_sepL_cons.
+    assert (E0 : uint sp - 8 * (Z.of_nat 0 + 1) = uint sp - 8) by lia.
+    rewrite E0.
+    apply bi.sep_proper; [ reflexivity | ].
+    rewrite <- (seq_shift n 0). rewrite big_sepL_fmap.
+    apply big_opL_proper. intros k j _.
+    assert (Ej : uint sp - 8 * (Z.of_nat (S j) + 1)
+                 = uint sp' - 8 * (Z.of_nat j + 1)) by (rewrite Hsp; lia).
+    rewrite Ej. reflexivity.
+  Qed.
+
+  (* the 16-byte frame, unfolded at NORMALISED addresses -- what a gcc
+     prologue's two spills want.  ([ustack_acc] is the general form; this is
+     the one every xv6 user function actually uses.) *)
+  Lemma ustack_2 (γd : gname) (sp : mword 64) :
+    ustack γd sp 2 ⊣⊢ (∃ w : mword 64, uword γd (uint sp - 8) w) ∗
+                      (∃ w : mword 64, uword γd (uint sp - 16) w).
+  Proof.
+    rewrite /ustack /=.
+    assert (E0 : uint sp - 8 * (Z.of_nat 0 + 1) = uint sp - 8) by lia.
+    assert (E1 : uint sp - 8 * (Z.of_nat 1 + 1) = uint sp - 16) by lia.
+    rewrite E0 E1 right_id. reflexivity.
+  Qed.
+
+  (* ONE SLOT of a frame, taken out and put back.  A prologue spills to
+     slot i of the frame it just took; this is how it names that word. *)
+  Lemma ustack_acc (γd : gname) (sp : mword 64) (n i : nat) :
+    (i < n)%nat ->
+    ustack γd sp n -∗
+      (∃ w : mword 64, uword γd (uint sp - 8 * (Z.of_nat i + 1)) w) ∗
+      ((∃ w : mword 64, uword γd (uint sp - 8 * (Z.of_nat i + 1)) w) -∗
+         ustack γd sp n).
+  Proof.
+    intros Hi. rewrite /ustack.
+    iApply (big_sepL_lookup_acc _ _ i i).
+    apply lookup_seq. split; [ lia | exact Hi ].
+  Qed.
+
+  (* ...and the split at any depth: the first [k] words are the frame the
+     caller is handing out, the rest is what remains below the moved sp *)
+  Lemma ustack_app (γd : gname) (sp sp' : mword 64) (k n : nat) :
+    uint sp' = uint sp - 8 * Z.of_nat k ->
+    ustack γd sp (k + n) ⊣⊢ ustack γd sp k ∗ ustack γd sp' n.
+  Proof.
+    revert sp sp'. induction k as [| k IH]; intros sp sp' Hsp.
+    - assert (Hs : sp' = sp) by (apply bv_eq; rewrite <- !uint_unsigned; lia).
+      rewrite Hs ustack_0 Nat.add_0_l bi.emp_sep. reflexivity.
+    - (* the headroom is not a premise: [sp'] is a machine word, so
+         [0 <= uint sp'], and the equation then bounds sp from below *)
+      assert (Hk : 8 * Z.of_nat (S k) <= uint sp).
+      { pose proof (proj1 (bv_unsigned_in_range _ sp')) as H0.
+        rewrite <- uint_unsigned in H0. lia. }
+      pose proof (bv_unsigned_in_range _ sp) as Hr.
+      rewrite Zmod64 in Hr. rewrite <- uint_unsigned in Hr.
+      set (sp1 := (mword_of_int (uint sp - 8) : mword 64)).
+      assert (Hu1 : uint sp1 = uint sp - 8).
+      { unfold sp1. rewrite uint_unsigned moi64_unsigned. unfold bv_wrap.
+        rewrite Zmod64. apply Z.mod_small. unfold Z64 in *. lia. }
+      replace (S k + n)%nat with (S (k + n))%nat by lia.
+      rewrite (ustack_S γd sp sp1 (k + n) Hu1).
+      rewrite (ustack_S γd sp sp1 k Hu1).
+      rewrite (IH sp1 sp' ltac:(rewrite Hu1; lia)).
+      rewrite assoc. reflexivity.
+  Qed.
+
 End UserHeap.

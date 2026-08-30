@@ -191,6 +191,33 @@ The engine is complete except the two syscall rows above.  `UkSync.v` and
 have not been re-cut; the old leaves in `UkLeaf.v` / `UkStore.v` /
 `UkLoad.v` / `UkBranch.v` stay because the new ones are wrappers over them.
 
+## The free stack
+
+`urun` carries `avail`, the words of free stack below sp, owned by the
+process (`ustack γd sp n` — the user-mode twin of `StackOwn.stack_own`,
+values existential).  The sp-adjust instructions are the TRANSFER points:
+`wp_uk_caddi_sp_dn` hands a k-word frame out and drops `avail` by k,
+`wp_uk_caddi_sp_up` takes it back.  Every other leaf threads `avail`
+unchanged, which is only sound if it does not move sp — so every leaf that
+writes a register carries `unot_sp rd`.
+
+A function's precondition is then a NUMBER: `main` asks for `2 + n`, and
+`start` asks for `2 + (2 + n)` and hands `main` exactly what it needs.  The
+earlier attempt made the caller name its callee's frame by absolute address
+(`uword γd (uint sp0 - 24) w8`); that is the old `uk_stack π M sp n`
+bookkeeping in new clothes, and it does not survive depth.
+
+**A HANG IS THE SYMPTOM OF AN UNSOUND avail CLAIM.**  `RegFile.rf_upd` is
+transparent, and its own comment warns that a symbolic register index feeds
+a symbolic value into modular arithmetic that "would not terminate".  So a
+leaf that wrongly claims to preserve `avail` does not fail to typecheck --
+it makes Iris unify `ustack γd (m !!! csp_rs1)` against
+`ustack γd ((<something> m) !!! csp_rs1)` and diverge.  That is exactly what
+`wp_uk_jalr` did: its post-state is `uv_upd m wr` (the write is OPTIONAL, so
+it is not the `<[Regidx rd := v]> m` shape), a wrapper generator classified
+it as writing no register, and the file hung.  When a leaf file stops
+terminating, look for a post-state whose register write was not recognised.
+
 ## Gotchas
 
 - `iInduction` generalises the hypotheses in an order that is not the
@@ -202,6 +229,8 @@ have not been re-cut; the old leaves in `UkLeaf.v` / `UkStore.v` /
   back to its caller.
 - Inside `⌜ … ⌝` the scope is not `Z_scope`: `a + b` parses as the SUM TYPE.
   Write `(a + b)%Z`.
+- `ROCQ compile X.v` is printed when compilation BEGINS.  A list of those
+  lines is not a list of files that compiled.
 - `WpUmodeStore.uM_store` folds index 0 outermost; `UserPtTree.umem_write`
   recurses with index n-1 outermost.  Same map, NOT convertible —
   `uM_store_umem_write` is the bridge, and every store wrapper needs it.

@@ -44,8 +44,10 @@ Require Import RegFile InstrBytes.
 Require Import UserPtTree UserExec ProcPtOwn.
 Require Import UmodeMem UmodeArith.
 Require Import UserPerm UexecWp UexecSlot UexecRet.
+Require Import WpMmodeLeafBase.
 Require Import UptTree.
 Require Import WpUmodeStore.
+Require Import WpUmodeStep.
 Require Import UkStep.
 Require Import UserHeap.
 Require Import TsoCtx.
@@ -93,26 +95,76 @@ Section UkRun.
   (* ===================================================================== *)
   (* §1 THE RUNNING PREDICATE.                                             *)
   (* ===================================================================== *)
-  Definition urun (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64) : iProp Σ :=
+  (* [avail] is the FREE STACK, in words, below the current sp -- the
+     user-mode twin of [sie_cap_gpr]'s counting argument.  The process owns
+     it; an sp-adjust hands a frame out of it or takes one back; every other
+     instruction threads it unchanged, which is why every leaf that writes a
+     register takes [unot_sp] as a premise (a write to sp would move the
+     index this ownership is keyed by). *)
+  Definition urun (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
+      (avail : nat) : iProp Σ :=
     (∃ (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (sz : Z)
        (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm),
        ⌜ loop_ok C pt ⌝ ∗ ⌜ perm_of (ud_um pt) sz = pm ⌝ ∗
        uheap γt γd γs M pm ∗
+       ustack γd (m !!! Regidx csp_rs1) avail ∗
        uvb (CID := h) C pt Rut sz pm M m pc)%I.
+
+  (* "this instruction does not write sp".  Every leaf that writes a general
+     register carries it; a concrete [rd] decides it by [vm_compute]. *)
+  Definition unot_sp (rd : mword 5) : Prop := Regidx csp_rs1 <> Regidx rd.
+
+  Lemma unot_sp_upd (rd : mword 5) (v : mword 64) (m : regfile) :
+    unot_sp rd -> (<[Regidx rd := v]> m) !!! Regidx csp_rs1 = m !!! Regidx csp_rs1.
+  Proof. intro H. exact (upd_ne m (Regidx rd) (Regidx csp_rs1) v H). Qed.
 
   (* THE CLOSE.  This is the lemma that makes the whole interface work: a
      continuation phrased on [urun] discharges the ∀-quantified [ukc] that
      every existing leaf demands, because [urun] supplies its own ambient. *)
   Lemma urun_close (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
-      (m : regfile) (pc : mword 64) :
+      (m : regfile) (pc : mword 64) (avail : nat) :
     uheap γt γd γs M pm -∗
-    (∀ h : CpuId, urun γt γd γs h m pc -∗ WP (Loop : expr riscv_lang)) -∗
+    ustack γd (m !!! Regidx csp_rs1) avail -∗
+    (∀ h : CpuId, urun γt γd γs h m pc avail -∗ WP (Loop : expr riscv_lang)) -∗
     ukc pm M m pc.
   Proof.
-    iIntros "Hheap Hcont".
+    iIntros "Hheap Hstk Hcont".
     rewrite /ukc. iIntros (h C pt Rut sz) "%Hlo %Hpm Hb".
     iApply ("Hcont" $! h). iExists C, pt, Rut, sz, M, pm.
-    iFrame "Hheap Hb". iPureIntro. split; [ exact Hlo | exact Hpm ].
+    iFrame "Hheap Hstk Hb". iPureIntro. split; [ exact Hlo | exact Hpm ].
+  Qed.
+
+  (* [uv_upd] is the OTHER way a leaf writes a register (jalr's, where the
+     write is optional).  It hid a real bug: the generated wrapper did not
+     recognise the shape, so it claimed [avail] was preserved across an
+     instruction that can write sp -- and that showed up not as a proof
+     failure but as unification diverging inside the transparent [rf_upd].
+     Hence this lemma, and the [unot_sp] premise that goes with it. *)
+  Lemma uv_upd_not_sp (m : regfile) (rd : mword 5)
+      (wr : option (mword 5 * mword 64)) (d : mword 64) :
+    unot_sp rd ->
+    (uint rd = 0 /\ wr = None) \/ (uint rd <> 0 /\ wr = Some (rd, d)) ->
+    (uv_upd m wr) !!! Regidx csp_rs1 = m !!! Regidx csp_rs1.
+  Proof.
+    intros Hns [[_ ->] | [_ ->]]; [ reflexivity | ].
+    cbn [uv_upd]. exact (unot_sp_upd rd (regval_into_reg d) m Hns).
+  Qed.
+
+  (* ...and the same when the instruction WROTE a register: the free stack
+     is keyed by sp, and [unot_sp] says this write was not to sp. *)
+  Lemma urun_close_upd (γt γd γs : gname) (M : gmap Z (bv 8))
+      (pm : gmap (mword 27) uperm) (m : regfile) (rd : mword 5) (v : mword 64)
+      (pc' : mword 64) (avail : nat) :
+    unot_sp rd ->
+    uheap γt γd γs M pm -∗
+    ustack γd (m !!! Regidx csp_rs1) avail -∗
+    (∀ h : CpuId, urun γt γd γs h (<[Regidx rd := v]> m) pc' avail -∗
+                  WP (Loop : expr riscv_lang)) -∗
+    ukc pm M (<[Regidx rd := v]> m) pc'.
+  Proof.
+    intros Hns. iIntros "Hheap Hstk Hcont".
+    iApply (urun_close with "Hheap [Hstk] Hcont").
+    rewrite (unot_sp_upd rd v m Hns). iExact "Hstk".
   Qed.
 
   (* ===================================================================== *)
@@ -312,7 +364,11 @@ Section UkRun.
        usz γs sz -∗
        utext_all γt (uvis_M W) (uvis_perm W) -∗
        ([∗ map] a ↦ b ∈ udata_lo (uvis_M W) (uvis_perm W) sz, ubyte γd a b) -∗
-       urun γt γd γs h (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)) -∗
+       (* AVAIL = 0.  Carving the process's initial stack out of the data
+          the entry hands over is a separate step, and belongs with the
+          program's slot constructor rather than here -- it is the fact the
+          old [uk_stack] gate decided. *)
+       urun γt γd γs h (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)) 0 -∗
        WP (Loop : expr riscv_lang))
     -∗ uslot W.
   Proof.
@@ -333,7 +389,7 @@ Section UkRun.
     iExists C, pt, Rut, sz, (uvis_M W), (uvis_perm W).
     iSplitR; [ iPureIntro; exact Hlo | ].
     iSplitR; [ iPureIntro; exact Hpm | ].
-    iFrame "Hheap".
+    iFrame "Hheap". rewrite ustack_0. iSplitR; [ done | ].
     rewrite /uvb /uvb_F /user_ptm_inv.
     iFrame "Hamb Hregs Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
     iPureIntro. split_and!; [ exact Hsz | exact Hinj | exact Hacc ].
