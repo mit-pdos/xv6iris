@@ -1675,6 +1675,89 @@ things, and the answer differs:
      Until it is made, both catalogs stay on-build and the port carries
      the `shk_` prefix.
 
+## WINDOW LEAF (in-house) — ASK 1 ANSWERED, LANDED 2026-08-30
+
+`UkRunSys.wp_uk_ecall_window` exists.  One commit, ONE file
+(`iris/UkRunSys.v`, +330), EC2-green; audit = the standing three
+(`resv_matches`, `resv_is_valid`, funext), zero `Admitted`, zero new
+`Axiom`, zero `Hypothesis`.  Stage 2 is unblocked, and so is upstream's
+init port at `wait((int*)0)`'s non-null sibling.
+
+**ONE LEAF FOR FOUR ROWS.**  read, wait, pipe and fstat differ in exactly
+two numbers — WHICH argument names the buffer and HOW MANY bytes may go
+there — so the leaf takes that pair off the register file
+(`usyswin m n = Some (dst, cap)`, `usysno`'s twin, agreeing with the
+trapframe-level `usys_win` by `reflexivity`) and there is no per-row leaf.
+The statement:
+
+```
+usysno m = n -> usyswin m n = Some (dst, cap) -> (cap <= k)%nat ->
+is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
+uinstr_is γt pc false (ECALL tt) -∗ urun γt γd γs h m pc avail -∗
+ubytes γd (uint dst) k f -∗
+(∀ h' r (d : nat) (g : nat -> bv 8),
+   ⌜(d <= cap)%nat⌝ -∗ ⌜∀ j, (d <= j < k)%nat -> g j = f j⌝ -∗
+   urun γt γd γs h' (<[Regidx (mword_of_int 10) := r]> m)
+     (add_vec_int pc 4) avail -∗
+   ubytes γd (uint dst) k g -∗ WP Loop) -∗ WP Loop
+```
+
+`k >= cap` because a program hands over the buffer it HAS, not the prefix
+a count happens to name.  `wp_uk_ecall_read` is the read instance (buffer
+a1, count a2 as an `int`) — the shape `getcmd` will apply, and the lane's
+smoke test that the leaf is usable rather than merely provable.
+
+**WHAT THE ROW GAVE vs WHAT WAS DERIVED.**  `usys_mem_ok`'s window rows
+give `∃ d ≤ cap, ∃ bs, M' = umem_wr M dst d bs`, `π' = π`, `sz' = sz`.
+Two things had to be built on top:
+* *The joined byte function.*  `bs` is the row's existential, so the leaf
+  names `g := if j < d then bs j else f j` itself; that is what makes the
+  window come back as ONE run instead of two, and it is why the
+  postcondition can say `g j = f j` above `d`.
+* *The no-wrap fact, and it is NOT a premise.*  The row is keyed at
+  `uint (add_vec_int dst j)`, `uheap_store_run` at `uint dst + j` in `Z`.
+  OWNING the run closes the gap: `uheap`'s canonicity clause bounds every
+  mapped address by MAXVA, so the run's vas really are consecutive
+  integers (`uheap_ubytes_run` + `uint_add_vec_int_small`) and
+  `umem_wr = umem_write`.  A caller therefore owes nothing about its
+  buffer's ADDRESS beyond the bytes themselves — worth keeping when the
+  sbrk leaf is written.
+
+**THE READ ROW DOES NOT STATE THE EXACT COUNT, and that is a real delta.**
+The ask hoped `d = r` on the read row (stage 1's `SpecSysReadAU`: a
+non-negative read return IS the byte count written).  `usys_mem_ok`'s read
+row ties `d` to the *count argument* and to nothing else — the return value
+`r` appears in the table only in exec's arm — so the leaf can only give
+`d ≤ count`.  The link is real one tier up and would have to be carried
+through `UsysMemOkSpec.sysc_mem_ok_usys` into the row before any leaf could
+state it.  **Relay item (upstream contract, priority behind the pipe null
+guard):** strengthen the read row to `0 ≤ bv_signed r -> d = Z.to_nat (uint
+r)`.  The leaf is already shaped for it: `d` is a continuation binder, so
+adding a third pure conjunct costs consumers nothing.
+
+**FILE PLACEMENT — one deliberate compromise.**  Six of the eight new
+declarations have a better home than `UkRunSys.v`, and each carries a
+`HOME:` comment saying so:
+* `usys_win` / `usys_win_num` / `usys_mem_ok_window` belong beside
+  `usys_mem_ok_wait_null` in `UsysMemOk.v`;
+* `uheap_ubytes_run` beside `uheap_ubyte`, and `ubytes_split` /
+  `ubytes_ext` beside `ubytes_app`, in `UserHeap.v`.
+
+They are in `UkRunSys.v` because those two files sit under 22 and 17
+files' worth of `.vo` respectively, and an *additive* lemma in either
+still forces a rebuild of the whole cone (Rocq refuses a `.vo` compiled
+against a different digest).  All six mention nothing `UkRunSys.v`
+defines, so moving them is a pure cut/paste whenever upstream wants to pay
+that rebuild.
+
+**MIRROR EVIDENCE.**  `UkRunSys.vo` 228 618 B (was 96 065).  Consumers
+rebuilt green: `UkFork.vo`, `UkEcho.vo`, `UkSync.vo`, `UkInit.vo`
+(`UCodeShK.v` does not require `UkRunSys`).  `UkSh.vo` FAILS — `The LHS of
+Hopen ShSyms.getcmd does not match any subterm`, at `UkSh.v:180` — and it
+fails **identically with the pristine HEAD `UkRunSys.v`**, so it is the
+stage-2 lane's own in-flight catalog/proof skew, not this leaf.  Mirror
+left clean: `UkRunSys.v` restored and its cone rebuilt at HEAD.
+
 ## FSABS-LEAF-FUSE — the `FsAbs*` leaf housekeeping.  DONE 2026-08-30
 
 One commit (Fable lane), EC2-green with the whole `FsAbs` cone rebuilt (85
