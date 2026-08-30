@@ -270,6 +270,7 @@ UkRun.v
 UkRunLeaf.v
 UkRunMem.v
 UkRunSys.v
+UkSync.v
 UkAbi.v
 UkEcho.v
 UkEchoKernel.v
