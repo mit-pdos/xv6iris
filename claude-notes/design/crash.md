@@ -351,7 +351,7 @@ and the WAL swaps the registry over.  The predicate is
 [`fs-state.md`](fs-state.md); the durable side and the commit are
 [`durable-fs-plan.md`](durable-fs-plan.md), the design of record.
 
-### Custody at birth: the PowerOn arm's two client hooks (landed 2026-08-23)
+### Custody at birth: the PowerOn arm's two client hooks (landed 2026-08-23), and the power arms' trace hook (2026-08-29)
 
 The era's mirror `ghost_var` is allocated at PowerOn **at the picture of
 the disk the era boots on**, and the crash record's custody arm is
@@ -378,6 +378,15 @@ boot must LEARN rather than assume:
   the client's obligation is stated at RAW gnames in a context that
   carries `invGpreS` and no `invGS`, so no fupd exists to write it with.
   The `◇` is what lets the client strip the crash predicate's later.
+- **`Hobs`** (landed 2026-08-29, `projects/uart-trace.md`) runs on BOTH
+  arms, at ⊤ before the mask shrink, with the SECOND fixed-layer invariant
+  `obs_inv` (`riscv_obs_pred`, the client's TRACE predicate) open: a power
+  event is an observation (`ObsPowerOff`/`ObsPowerOn`), the history ghost
+  `riscv_obs_name` moves only with both halves, and the client's half is in
+  that predicate.  The fixed disk auth is LENT beside it, as `Hproj` lends
+  it, so a trace predicate can read the durable disk at every power event.
+  Not a `Pc` hook: the crash predicate is the file system's durable record
+  and carries no observation.
 
 The client's picture function reaches the machine layer as a parameter
 `Mof : (Z -> bv 8) -> log_mirror` (no FS constant may appear below

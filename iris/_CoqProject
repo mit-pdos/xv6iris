@@ -19,6 +19,7 @@ VirtioModel.v
 DiskImg.v
 DevModel.v
 RiscvLang.v
+ObsTrace.v
 HartBlock.v
 HartSwp.v
 HartLift.v

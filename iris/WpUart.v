@@ -38,7 +38,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 (* re-import the model AFTER Base so the model's names (read_kind/Read_plain/
    write_kind/...) win over SailStdpp's homonyms -- same order as WpLoad.v. *)
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvExtras RiscvFetchExec.
+Require Import RiscvLang ObsTrace RiscvPtsto RiscvExec RiscvTryStep RiscvExtras RiscvFetchExec.
 Require Import WireInv WpVirtio.
 (* the disk's DMA lease is now carried in the KEYED driver protocol
    ([virtio_proto], VirtioProto.v) rather than as the bare [virtio_lease];
@@ -794,14 +794,51 @@ Section DevLoops.
   (*  the latch arm -- never both, because no single UART transition      *)
   (*  touches both halves.                                               *)
   (* ------------------------------------------------------------------ *)
+  (* THE TRACE PERMIT (claude-notes/projects/uart-trace.md).  [wp_uart_step]
+     hands the UART thread [state_interp]'s half of the HISTORY ghost and
+     wants it back at [h ++ κ]; the other half lives in the client's trace
+     predicate ([obs_inv]), so the move is the CLIENT's step, and this is
+     its shape: with the arm's own event (at the device state it leaves,
+     [set_duart d u']), the two facts the machine layer knows about the
+     history -- the power is on, and the open cycle's outputs ARE the
+     device's [u_wire] -- and the device ghosts AFTER the step in hand, move
+     the history by the event.  It runs inside [uartN] (hence the mask), so
+     a client's trace predicate may relate the history to the device ghosts;
+     [obsN] is disjoint from [uartN], so the predicate can be opened there.
+     The rx arm is the ENVIRONMENT's byte: a client's trace property has to
+     survive any input, which is why input assumptions are antecedents
+     inside it.  [uart_obs_permit_triv] discharges the permit for the
+     trivial predicate. *)
+  Definition uart_obs_permit (γ : uart_names) : iProp Σ :=
+    (□ ∀ (h κ : list mobs) (d : dev_state) (u' : uart_state),
+       ⌜uart_step d κ (set_duart d u')⌝ -∗ ⌜trace_shape h true⌝ -∗
+       ⌜obs_wire (open_seg h) = u_wire (duart d)⌝ -∗
+       uart_ghosts γ u' -∗ obs_auth h ={⊤ ∖ ↑uartN}=∗
+       uart_ghosts γ u' ∗ obs_auth (h ++ κ)%list)%I.
+
+  Lemma uart_obs_permit_triv (γ : uart_names) :
+    riscv_obs_pred = obs_pred_triv ->
+    obs_inv -∗ uart_obs_permit γ.
+  Proof.
+    intros Heq. iIntros "#Hoinv !>" (h κ d u') "%Hstep %Hsh %Hwire Hg Hauth".
+    iInv "Hoinv" as "HP" "Hclose".
+    iEval (rewrite Heq /obs_pred_triv) in "HP".
+    iDestruct "HP" as (h') ">Hfrag".
+    iDestruct (obs_agree with "Hauth Hfrag") as %<-.
+    iMod (obs_update _ (h ++ κ)%list with "Hauth Hfrag") as "[Hauth Hfrag]".
+    iMod ("Hclose" with "[Hfrag]") as "_".
+    { iNext. rewrite Heq /obs_pred_triv. iExists (h ++ κ)%list. iExact "Hfrag". }
+    iModIntro. iFrame "Hg Hauth".
+  Qed.
+
   Lemma wp_uart_loop γ :
-    gen_cert -∗ uart_inv γ -∗ plic_inv -∗
+    gen_cert -∗ uart_inv γ -∗ plic_inv -∗ uart_obs_permit γ -∗
     WP (UartLoop : expr riscv_lang).
   Proof.
-    iIntros "#Hcert #Huinv #Hpinv".
+    iIntros "#Hcert #Huinv #Hpinv #Hperm".
     iLöb as "IH".
     iApply (wp_uart_step with "Hcert").
-    iIntros (gr m d) "(Hgr & Hmem & Hdev)".
+    iIntros (gr m d h Hsh Hwire) "(Hgr & Hmem & Hdev & Hoauth)".
     (* No invariant is opened until the arm is known: each arm then opens
        exactly the one half of the fabric it moves. *)
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
@@ -810,6 +847,7 @@ Section DevLoops.
        the wire trace is already pinned by [u_wire] ([uart_step_wire]) *)
     iNext. iIntros (κ d' Hstep).
     iMod "Hmask" as "_".
+    pose proof Hstep as Hstep0.
     destruct Hstep as [b u' Htx0 | b u' Hrx | p' Hirq Hlatch |].
     - (* a byte leaves the tx FIFO: it moves from the head of [u_tx] to the
          tail of [u_out], so the accepted trace is UNCHANGED. *)
@@ -830,9 +868,15 @@ Section DevLoops.
                    (uart_tx_pop_dlab _ _ _ Htx0) with "Hdl") as "Hdl".
       iMod (uart_out_update _ u u' with "Hout") as "[Hout _]".
       { rewrite (uart_tx_pop_out _ _ _ Htx0). by apply prefix_app_r. }
-      iMod ("Hclose" with "[Hu' Hacc Hout Htx Hdl]") as "_".
-      { iNext. iExists u'. rewrite /uart_ghosts. iFrame. }
-      iModIntro. iFrame "Hgr Hmem Hdev'". iApply "IH".
+      (* THE TRACE STEP: the client moves the history by the output event
+         (nothing under LOOP -- the arm's own [κ]) *)
+      iAssert (uart_ghosts γ u') with "[Hacc Hout Htx Hdl]" as "Hg".
+      { rewrite /uart_ghosts. iFrame. }
+      iMod ("Hperm" $! h _ d u' with "[//] [//] [//] Hg Hoauth")
+        as "[Hg Hoauth]".
+      iMod ("Hclose" with "[Hu' Hg]") as "_".
+      { iNext. iExists u'. iFrame. }
+      iModIntro. iFrame "Hgr Hmem Hdev' Hoauth". iApply "IH".
     - (* a byte arrives from the outside world: rx only, trace untouched *)
       iInv "Huinv" as ">Hbody" "Hclose".
       iDestruct "Hbody" as (u) "(Hu & Hg)".
@@ -844,9 +888,12 @@ Section DevLoops.
                    (uart_rx_push_acc _ b _ Hrx)
                    (uart_rx_push_out _ b _ Hrx)
                    (uart_rx_push_dlab _ b _ Hrx) with "Hg") as "Hg".
+      (* THE TRACE STEP: the client moves the history by the input event *)
+      iMod ("Hperm" $! h [ObsUartIn b] d u' with "[//] [//] [//] Hg Hoauth")
+        as "[Hg Hoauth]".
       iMod ("Hclose" with "[Hu' Hg]") as "_".
       { iNext. iExists u'. iFrame. }
-      iModIntro. iFrame "Hgr Hmem Hdev'". iApply "IH".
+      iModIntro. iFrame "Hgr Hmem Hdev' Hoauth". iApply "IH".
     - (* the gateway latches the UART's interrupt level.  This is the ONE
          UART transition that touches the PLIC, and it touches nothing else,
          so only [plicN] is opened. *)
@@ -858,10 +905,13 @@ Section DevLoops.
       { iNext. iExists p'. iFrame "Hp'". iPureIntro.
         apply (plic_ok_latch p p' uart_irq_id);
           [ rewrite <- Hp; exact Hlatch | exact Hpok ]. }
-      iModIntro. iFrame "Hgr Hmem Hdev'". iApply "IH".
+      (* silent: the history is unchanged *)
+      rewrite app_nil_r.
+      iModIntro. iFrame "Hgr Hmem Hdev' Hoauth". iApply "IH".
     - (* the totality stutter (RiscvLang §3c): nothing moved, so nothing has
          to be re-established and no invariant is opened at all. *)
-      iModIntro. iFrame "Hgr Hmem Hdev". iApply "IH".
+      rewrite app_nil_r.
+      iModIntro. iFrame "Hgr Hmem Hdev Hoauth". iApply "IH".
   Qed.
 
   (* ------------------------------------------------------------------ *)

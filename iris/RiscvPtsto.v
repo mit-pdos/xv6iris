@@ -10,6 +10,7 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang.
+Require Import ObsTrace.
 Require Export DiskImg.  (* [diskImgG]/[disk_img_auth]: the disk image map *)
 (* [disk_write]/[disk_wr]/[wr_apply]: the disk image and the pure write
    identity a crash permit is indexed by.  Safe to import here -- DiskImg.v
@@ -457,6 +458,25 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
      SQUEEZE the arm's generation onto the ambient one, which is what
      identifies the arm's mirror gname. *)
   riscv_swap_name : gname;
+  (* THE OBSERVABLE TRACE (claude-notes/projects/uart-trace.md).  The
+     language emits console I/O and power events ([RiscvLang.mobs], §3b')
+     and Iris threads them through [state_interp]; these three fields are
+     what lets the logic READ them.  [riscv_obs_name] is a [ghost_var] over
+     the HISTORY SO FAR: [state_interp] holds one half ([obs_auth], below),
+     the client's trace predicate the other ([obs_frag]), so every event is
+     appended with the client's consent -- the UART thread's proof at its
+     tx/rx arms, the power thread through the [Hobs] hook.
+     [riscv_obs_total] is the run's WHOLE trace, a constant of the run like
+     every other fixed-layer datum: [obs_interp] ties the history to the
+     future as [h ++ κs = riscv_obs_total], which is what makes the history
+     the actual trace at the end of the run.  [riscv_obs_pred] is the
+     client's TRACE PREDICATE -- the second fixed-layer named slot beside
+     [riscv_crash_pred], sealed into [obs_inv] below; the crash predicate
+     is the file system's durable record and carries no observation. *)
+  riscvF_obsGS :: ghost_varG Σ (list mobs);
+  riscv_obs_name : gname;
+  riscv_obs_total : list mobs;
+  riscv_obs_pred : iProp Σ;
 }.
 
 Class riscvGS (Σ : gFunctors) := RiscvGS {
@@ -608,6 +628,38 @@ Definition crashN : namespace := nroot .@ "crash".
    arm touches [v_disk] and neither opens it. *)
 Definition crash_inv `{!riscvFixedGS Σ} : iProp Σ :=
   inv crashN riscv_crash_pred.
+
+(* THE TRACE INVARIANT (claude-notes/projects/uart-trace.md): the client's
+   trace predicate, in its own fixed-layer slot.  Opened by the power arms
+   (through the [Hobs] hook) and by the UART thread's tx/rx arms (through
+   [WpUart.uart_obs_permit]); [obsN], [crashN] and [devN] are pairwise
+   disjoint, so the openings compose. *)
+Definition obsN : namespace := nroot .@ "obs".
+
+(* the two halves of the history ghost: [state_interp]'s and the client's *)
+Definition obs_auth `{!riscvFixedGS Σ} (h : list mobs) : iProp Σ :=
+  ghost_var riscv_obs_name (1/2) h.
+Definition obs_frag `{!riscvFixedGS Σ} (h : list mobs) : iProp Σ :=
+  ghost_var riscv_obs_name (1/2) h.
+
+Definition obs_inv `{!riscvFixedGS Σ} : iProp Σ :=
+  inv obsN riscv_obs_pred.
+
+(* the TRIVIAL trace predicate -- the client's half and nothing about it.
+   What a client that states no trace property fills the slot with. *)
+Definition obs_pred_triv `{!riscvFixedGS Σ} : iProp Σ :=
+  (∃ h : list mobs, obs_frag h)%I.
+
+Lemma obs_agree `{!riscvFixedGS Σ} (h1 h2 : list mobs) :
+  obs_auth h1 -∗ obs_frag h2 -∗ ⌜h1 = h2⌝.
+Proof. iIntros "H1 H2". by iDestruct (ghost_var_agree with "H1 H2") as %->. Qed.
+
+Lemma obs_update `{!riscvFixedGS Σ} (h h' : list mobs) :
+  obs_auth h -∗ obs_frag h ==∗ obs_auth h' ∗ obs_frag h'.
+Proof.
+  iIntros "H1 H2". iMod (ghost_var_update_halves h' with "H1 H2") as "[$ $]".
+  done.
+Qed.
 
 (* the durable disk's auth, at an image: what [state_interp] holds and what
    a DMA completion lends a permit for the instant *)
@@ -1983,9 +2035,46 @@ Definition power_interp `{!riscvFixedGS Σ} (g : gstate) : iProp Σ :=
       (if g.(gpow) then (∃ E, ⌜R !! g.(ggen) = Some E⌝ ∗ era_interp E g)%I
        else True%I)))%I.
 
+(* THE TRACE CONJUNCT OF [state_interp] (claude-notes/projects/uart-trace.md).
+   [κs] is Iris's FUTURE observation list; [h] is the PAST.  Three facts:
+   the two concatenate to the run's whole trace (heap_lang's prophecy-interp
+   trick, applied to the past: at the end of the run [κs = []] and the
+   history IS the trace); the history is well-formed for the machine
+   ([ObsTrace.obs_wf] -- the power alternation, the boot count, and the WIRE
+   TIE [obs_wire (open_seg h) = u_wire], a pure step invariant of the
+   language exactly like [resv_ok]); and the machine's half of the history
+   ghost.  A silent step ([κ = []]) re-packs at the same [h]
+   ([obs_interp_silent]); an observed one re-packs at [h ++ κ] after the
+   client has moved the ghost ([obs_interp_close]). *)
+Definition obs_interp `{!riscvFixedGS Σ} (g : gstate) (κs : list mobs)
+    : iProp Σ :=
+  (∃ h : list mobs,
+     ⌜(h ++ κs)%list = riscv_obs_total⌝ ∗ ⌜obs_wf h g⌝ ∗ obs_auth h)%I.
+
+Lemma obs_interp_silent `{!riscvFixedGS Σ} e g e' g' efs (κs : list mobs) :
+  prim_step e g [] e' g' efs ->
+  obs_interp g κs ⊢ obs_interp g' κs.
+Proof.
+  intros Hstep. iDestruct 1 as (h) "(%Htot & %Hwf & Hauth)".
+  iExists h. iFrame "Hauth". iPureIntro. split; [exact Htot|].
+  pose proof (prim_step_obs_wf _ _ _ _ _ _ _ Hstep Hwf) as Hwf'.
+  by rewrite app_nil_r in Hwf'.
+Qed.
+
+Lemma obs_interp_close `{!riscvFixedGS Σ} e g κ e' g' efs (h κs : list mobs) :
+  prim_step e g κ e' g' efs ->
+  obs_wf h g ->
+  (h ++ (κ ++ κs))%list = riscv_obs_total ->
+  obs_auth (h ++ κ)%list ⊢ obs_interp g' κs.
+Proof.
+  intros Hstep Hwf Htot. iIntros "Hauth". iExists (h ++ κ)%list. iFrame "Hauth".
+  iPureIntro. split; [by rewrite -app_assoc|].
+  exact (prim_step_obs_wf _ _ _ _ _ _ _ Hstep Hwf).
+Qed.
+
 Global Program Instance riscv_irisGS `{!riscvFixedGS Σ} : irisGS riscv_lang Σ := {
   iris_invGS := riscvF_invGS;
-  state_interp g _ _ _ := power_interp g;
+  state_interp g _ κs _ := (power_interp g ∗ obs_interp g κs)%I;
   fork_post _ := True%I;
   num_laters_per_step _ := 0%nat;
 }.

@@ -225,6 +225,10 @@ outstanding; see the `completed/` section below).
   and real hardware does not, which is exactly what `virtio_disk_intr` reads
   the used element's id for.  §5 is the worklist, and §7 of it is the
   `prim_step` soundness bridge that `HartBlock.v`'s header already defers to.
+- **[`uart-trace.md`](projects/uart-trace.md)** — trace-level UART/power
+  properties out of adequacy: `state_interp` consuming the observation
+  list, the second fixed-layer predicate `riscv_obs_pred`, the whole-history
+  `P` and the `P_era` chain.  Rulings and the phased worklist.
 - **[`namei-pinned-lookup.md`](projects/namei-pinned-lookup.md)** — a
   ghost-state spec for WHICH inode `namei` returns: N-1 through N-5.2B
   (kexec loads `/init` at its entry) are proven, but they are era-0

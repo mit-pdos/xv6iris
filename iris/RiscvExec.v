@@ -5,7 +5,7 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
-Require Import RiscvLang RiscvPtsto.
+Require Import RiscvLang ObsTrace RiscvPtsto.
 (* The [set_solver] override.  EXPORT, not Import: this import is         *)
 (* deliberately "dead" -- the file compiles without it, just far slower --  *)
 (* and the nightly dead-import sweep skips [Require Export] lines.         *)
@@ -193,7 +193,7 @@ Section WPDead.
     intros Hg.
     iIntros "#Hdead". iLöb as "IH".
     iApply wp_lift_step; first by destruct e.
-    iIntros (g ns κ κs nt) "(Hgauth & Hsi)".
+    iIntros (g ns κ κs nt) "((Hgauth & Hsi) & Hobs)".
     iDestruct (mono_nat_lb_own_valid with "Hgauth Hdead") as %[_ Hge].
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hback".
     assert (Hnl : ~ thread_live g gen).
@@ -211,13 +211,13 @@ Section WPDead.
         right; right; right; left. exists gen. split_and!; auto. }
     iIntros (e2 g2 efs Hstep) "!>".
     (* only the corpse arm is enabled *)
-    assert (e2 = e /\ g2 = g /\ efs = []) as (-> & -> & ->).
+    assert (e2 = e /\ g2 = g /\ efs = [] /\ κ = []) as (-> & -> & -> & ->).
     { destruct e; simplify_eq/=.
       - destruct (prim_step_hart_inv _ _ _ _ _ _ _ _ Hstep)
           as (-> & -> & [(Hlive & _) | (_ & -> & ->)]);
           [exfalso; by apply Hnl|done].
       - destruct (prim_step_uart_inv _ _ _ _ _ _ Hstep)
-          as (-> & -> & [(Hlive & _) | (_ & _ & ->)]);
+          as (-> & -> & [(Hlive & _) | (_ & -> & ->)]);
           [exfalso; by apply Hnl|done].
       - destruct (prim_step_disk_inv _ _ _ _ _ _ Hstep)
           as (-> & -> & -> & [(Hlive & _) | (_ & ->)]);
@@ -226,7 +226,9 @@ Section WPDead.
           as (-> & -> & -> & [(Hlive & _) | (_ & ->)]);
           [exfalso; by apply Hnl|done]. }
     iIntros "_". iMod "Hback" as "_". iModIntro.
-    iFrame "Hgauth Hsi". iSplitL; [|done].
+    (* the corpse is silent: the trace conjunct is re-packed verbatim *)
+    iEval (cbn [app]) in "Hobs".
+    iFrame "Hgauth Hsi Hobs". iSplitL; [|done].
     iApply "IH".
   Qed.
 End WPDead.
@@ -286,7 +288,7 @@ Section WPExec.
     intros Hpres.
     iIntros "#(Hborn & Hstarted & Hrege) H".
     iApply wp_lift_step; first done.
-    iIntros (g ns κ κs nt) "(Hgauth & Hsauth & Htie & HR)".
+    iIntros (g ns κ κs nt) "((Hgauth & Hsauth & Htie & HR) & Hobs)".
     iDestruct (mono_nat_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
     iDestruct (mono_nat_lb_own_valid with "Hsauth Hstarted") as %[_ Hsge].
     iDestruct "HR" as (R) "(HRauth & %Hdom & Hera)".
@@ -305,7 +307,8 @@ Section WPExec.
       destruct (prim_step_hart_inv _ _ _ _ _ _ _ _ Hstep)
         as (-> & -> & [(Hlive & _) | (_ & -> & ->)]); [by exfalso|].
       iIntros "_". iMod "Hback" as "_". iModIntro.
-      iFrame "Hgauth Hsauth Htie".
+      iEval (cbn [app]) in "Hobs".
+      iFrame "Hgauth Hsauth Htie Hobs".
       iSplitL "HRauth Hera".
       { iExists R. iFrame "HRauth Hera". iPureIntro. exact Hdom. }
       iSplitL; [|done].
@@ -350,9 +353,13 @@ Section WPExec.
     iDestruct ("Hclose" with "Hri'") as "Hgr'".
     iIntros "_ !>".
     iEval (rewrite /disk_fixed_interp Hvd2) in "Htie".
+    (* the trace conjunct: a hart step is SILENT, so it is re-packed at the
+       same history ([obs_interp_silent]) *)
+    iEval (cbn [app]) in "Hobs".
+    iDestruct (obs_interp_silent _ _ _ _ _ _ Hstep with "Hobs") as "Hobs".
     rewrite /state_interp /power_interp /disk_fixed_interp
       /era_interp /disk_dur_interp /disk_img_auth /=.
-    iFrame "Hgauth Hsauth Htie HWP".
+    iFrame "Hgauth Hsauth Htie HWP Hobs".
     iExists R. iFrame "HRauth".
     iSplitR; [iPureIntro; exact Hdom|].
     rewrite Hpw. iExists riscv_eraGS.
@@ -393,7 +400,7 @@ Section WPExec.
   Proof.
     iIntros "#(Hborn & Hstarted & Hrege) Hfrag H".
     iApply wp_lift_step; first done.
-    iIntros (g ns κ κs nt) "(Hgauth & Hsauth & Htie & HR)".
+    iIntros (g ns κ κs nt) "((Hgauth & Hsauth & Htie & HR) & Hobs)".
     iDestruct (mono_nat_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
     iDestruct (mono_nat_lb_own_valid with "Hsauth Hstarted") as %[_ Hsge].
     iDestruct "HR" as (R) "(HRauth & %Hdom & Hera)".
@@ -412,7 +419,8 @@ Section WPExec.
       destruct (prim_step_hart_inv _ _ _ _ _ _ _ _ Hstep)
         as (-> & -> & [(Hlive & _) | (_ & -> & ->)]); [by exfalso|].
       iIntros "_". iMod "Hback" as "_". iModIntro.
-      iFrame "Hgauth Hsauth Htie".
+      iEval (cbn [app]) in "Hobs".
+      iFrame "Hgauth Hsauth Htie Hobs".
       iSplitL "HRauth Hera".
       { iExists R. iFrame "HRauth Hera". iPureIntro. exact Hdom. }
       iSplitL; [|done].
@@ -464,9 +472,13 @@ Section WPExec.
     iDestruct ("HWP" with "Hfrag") as "HWP".
     iIntros "_ !>".
     iEval (rewrite /disk_fixed_interp Hvd2) in "Htie".
+    (* the trace conjunct: a hart step is SILENT, so it is re-packed at the
+       same history ([obs_interp_silent]) *)
+    iEval (cbn [app]) in "Hobs".
+    iDestruct (obs_interp_silent _ _ _ _ _ _ Hstep with "Hobs") as "Hobs".
     rewrite /state_interp /power_interp /disk_fixed_interp
       /era_interp /disk_dur_interp /disk_img_auth /=.
-    iFrame "Hgauth Hsauth Htie HWP".
+    iFrame "Hgauth Hsauth Htie HWP Hobs".
     iExists R. iFrame "HRauth".
     iSplitR; [iPureIntro; exact Hdom|].
     rewrite Hpw. iExists riscv_eraGS.
@@ -521,20 +533,31 @@ Section WPDev.
      still hand over the same full interp triple as before. *)
 
 
-  (* the continuation is ∀-quantified over the step's OBSERVATION LIST too
-     (RiscvLang §3b'): the tx/rx arms emit the console I/O events, and a
-     client that does not state a trace property simply ignores [κ] *)
+  (* THE ONE RULE WHOSE STEP IS OBSERVED (RiscvLang §3b', claude-notes/
+     projects/uart-trace.md): the tx/rx arms emit the console I/O events, so
+     this rule hands its callback [state_interp]'s half of the HISTORY ghost
+     at the history so far -- together with the two facts about it the
+     callback can use, that the power is on ([trace_shape h true]) and the
+     WIRE TIE (the outputs of the open cycle are exactly the device's
+     [u_wire]) -- and takes it back at [h ++ κ].  The client can only get
+     there with the OTHER half, which lives in its trace predicate
+     ([obs_inv]): that is how every observation is authorised by the client
+     ([WpUart.uart_obs_permit]).  A client that states no trace property
+     moves the ghost and ignores [κ]. *)
   Lemma wp_uart_step :
     gen_cert -∗
-    (∀ gr m d, gregs_interp gr ∗ gen_heap_interp m ∗ dev_interp d ={⊤,∅}=∗
+    (∀ gr m d (h : list mobs),
+       ⌜trace_shape h true⌝ -∗ ⌜obs_wire (open_seg h) = u_wire (duart d)⌝ -∗
+       gregs_interp gr ∗ gen_heap_interp m ∗ dev_interp d ∗ obs_auth h ={⊤,∅}=∗
        ▷ (∀ κ d', ⌜uart_step d κ d'⌝ ={∅,⊤}=∗
             gregs_interp gr ∗ gen_heap_interp m ∗ dev_interp d' ∗
+            obs_auth (h ++ κ)%list ∗
             WP (UartLoop : expr riscv_lang))) -∗
     WP (UartLoop : expr riscv_lang).
   Proof.
     iIntros "#(Hborn & Hstarted & Hrege) H".
     iApply wp_lift_step; first done.
-    iIntros (g ns κ κs nt) "(Hgauth & Hsauth & Htie & HR)".
+    iIntros (g ns κ κs nt) "((Hgauth & Hsauth & Htie & HR) & Hobs)".
     iDestruct (mono_nat_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
     iDestruct (mono_nat_lb_own_valid with "Hsauth Hstarted") as %[_ Hsge].
     iDestruct "HR" as (R) "(HRauth & %Hdom & Hera)".
@@ -550,9 +573,10 @@ Section WPDev.
         right. split_and!; [intros [_ Hgg]; lia|done|done]. }
       iIntros (e2 g2 efs Hstep) "!>".
       destruct (prim_step_uart_inv _ _ _ _ _ _ Hstep)
-        as (-> & -> & [ ([_ Hgg] & _) | (_ & _ & ->) ]); [exfalso; lia|].
+        as (-> & -> & [ ([_ Hgg] & _) | (_ & -> & ->) ]); [exfalso; lia|].
       iIntros "_". iMod "Hback" as "_". iModIntro.
-      iFrame "Hgauth Hsauth Htie".
+      iEval (cbn [app]) in "Hobs".
+      iFrame "Hgauth Hsauth Htie Hobs".
       iSplitL "HRauth Hera".
       { iExists R. iFrame "HRauth Hera". iPureIntro. exact Hdom. }
       iSplitL; [|done].
@@ -565,7 +589,12 @@ Section WPDev.
     { rewrite Heq in HRE. congruence. }
     iDestruct "Hera" as "(Hgr & Hmem & Hdev & Hdur & Hresv & %Hrok)".
     iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
-    iMod ("H" $! g.(gregs) g.(gmem) g.(gdev) with "[$Hgr $Hmem $Hdev]") as "Hk".
+    (* the history so far, and what the callback may know about it *)
+    iDestruct "Hobs" as (h) "(%Htot & %Hwf & Hoauth)".
+    pose proof Hwf as (Hsh & _ & Hwire). rewrite Hpw in Hsh Hwire.
+    specialize (Hwire eq_refl).
+    iMod ("H" $! g.(gregs) g.(gmem) g.(gdev) h
+            with "[//] [//] [$Hgr $Hmem $Hdev $Hoauth]") as "Hk".
     iModIntro. iSplitR.
     { iPureIntro. exists [], (UartLoopE gen_id),
         (GState g.(gregs) g.(gmem) g.(gdev) g.(ggen) g.(gpow) g.(gresv)), [].
@@ -576,7 +605,7 @@ Section WPDev.
     destruct (prim_step_uart_inv _ _ _ _ _ _ Hstep)
       as (-> & -> & [ (Hlive & d' & Hdstep & ->) | (Hnl & _) ]);
       last by (exfalso; apply Hnl; split; congruence).
-    iMod ("Hk" $! κ d' with "[//]") as "(Hgr' & Hmem' & Hdev' & HWP)".
+    iMod ("Hk" $! κ d' with "[//]") as "(Hgr' & Hmem' & Hdev' & Hoauth' & HWP)".
     (* a UART step moves no disk byte, so the durable conjunct is FRAMED *)
     pose proof (uart_step_v_disk _ _ _ Hdstep) as Hvd.
     assert (Hdview2 : disk_view dmap (v_disk (dvirtio d')))
@@ -585,9 +614,13 @@ Section WPDev.
       by (symmetry; exact Hvd).
     iIntros "_ !>".
     iEval (rewrite /disk_fixed_interp Hvd2) in "Htie".
+    (* the trace conjunct, re-packed at the extended history: the client
+       moved the ghost, the language's step invariant does the rest *)
+    iDestruct (obs_interp_close _ _ _ _ _ _ h κs Hstep Hwf Htot with "Hoauth'")
+      as "Hobs".
     rewrite /state_interp /power_interp /disk_fixed_interp
       /era_interp /disk_dur_interp /disk_img_auth /=.
-    iFrame "Hgauth Hsauth Htie HWP".
+    iFrame "Hgauth Hsauth Htie HWP Hobs".
     iExists R. iFrame "HRauth".
     iSplitR; [iPureIntro; exact Hdom|].
     rewrite Hpw. iExists riscv_eraGS.
@@ -631,7 +664,7 @@ Section WPDev.
   Proof.
     iIntros "#(Hborn & Hstarted & Hrege) H".
     iApply wp_lift_step; first done.
-    iIntros (g ns κ κs nt) "(Hgauth & Hsauth & Htie & HR)".
+    iIntros (g ns κ κs nt) "((Hgauth & Hsauth & Htie & HR) & Hobs)".
     iDestruct (mono_nat_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
     iDestruct (mono_nat_lb_own_valid with "Hsauth Hstarted") as %[_ Hsge].
     iDestruct "HR" as (R) "(HRauth & %Hdom & Hera)".
@@ -649,7 +682,8 @@ Section WPDev.
       destruct (prim_step_disk_inv _ _ _ _ _ _ Hstep)
         as (-> & -> & -> & [ ([_ Hgg] & _) | (_ & ->) ]); [exfalso; lia|].
       iIntros "_". iMod "Hback" as "_". iModIntro.
-      iFrame "Hgauth Hsauth Htie".
+      iEval (cbn [app]) in "Hobs".
+      iFrame "Hgauth Hsauth Htie Hobs".
       iSplitL "HRauth Hera".
       { iExists R. iFrame "HRauth Hera". iPureIntro. exact Hdom. }
       iSplitL; [|done].
@@ -681,9 +715,12 @@ Section WPDev.
       last by (exfalso; apply Hnl; split; congruence).
     iMod ("Hk" $! d' m' with "[//]")
       as "(Hgr' & Hmem' & Hdev' & Hdur' & Htie' & Hsauth' & HWP)".
-    iIntros "_ !>". rewrite /state_interp /power_interp /disk_fixed_interp
+    iIntros "_ !>".
+    iEval (cbn [app]) in "Hobs".
+    iDestruct (obs_interp_silent _ _ _ _ _ _ Hstep with "Hobs") as "Hobs".
+    rewrite /state_interp /power_interp /disk_fixed_interp
       /era_interp /disk_dur_interp /disk_img_auth /=.
-    iFrame "Hgauth Hsauth' Htie' HWP".
+    iFrame "Hgauth Hsauth' Htie' HWP Hobs".
     iDestruct "Hdur'" as (dmap') "[Hdauth' %Hdview']".
     iExists R. iFrame "HRauth".
     iSplitR; [iPureIntro; exact Hdom|].
@@ -708,7 +745,7 @@ Section WPDev.
   Proof.
     iIntros "#(Hborn & Hstarted & Hrege) H".
     iApply wp_lift_step; first done.
-    iIntros (g ns κ κs nt) "(Hgauth & Hsauth & Htie & HR)".
+    iIntros (g ns κ κs nt) "((Hgauth & Hsauth & Htie & HR) & Hobs)".
     iDestruct (mono_nat_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
     iDestruct (mono_nat_lb_own_valid with "Hsauth Hstarted") as %[_ Hsge].
     iDestruct "HR" as (R) "(HRauth & %Hdom & Hera)".
@@ -726,7 +763,8 @@ Section WPDev.
       destruct (prim_step_plic_inv _ _ _ _ _ _ Hstep)
         as (-> & -> & -> & [ ([_ Hgg] & _) | (_ & ->) ]); [exfalso; lia|].
       iIntros "_". iMod "Hback" as "_". iModIntro.
-      iFrame "Hgauth Hsauth Htie".
+      iEval (cbn [app]) in "Hobs".
+      iFrame "Hgauth Hsauth Htie Hobs".
       iSplitL "HRauth Hera".
       { iExists R. iFrame "HRauth Hera". iPureIntro. exact Hdom. }
       iSplitL; [|done].
@@ -754,9 +792,12 @@ Section WPDev.
       as (-> & -> & -> & [ (Hlive & gr' & Hdstep & ->) | (Hnl & ->) ]);
       last by (exfalso; apply Hnl; split; congruence).
     iMod ("Hk" $! gr' with "[//]") as "(Hgr' & Hmem' & Hdev' & HWP)".
-    iIntros "_ !>". rewrite /state_interp /power_interp /disk_fixed_interp
+    iIntros "_ !>".
+    iEval (cbn [app]) in "Hobs".
+    iDestruct (obs_interp_silent _ _ _ _ _ _ Hstep with "Hobs") as "Hobs".
+    rewrite /state_interp /power_interp /disk_fixed_interp
       /era_interp /disk_dur_interp /disk_img_auth /=.
-    iFrame "Hgauth Hsauth Htie HWP".
+    iFrame "Hgauth Hsauth Htie HWP Hobs".
     (* a PLIC step moves only registers: the image conjunct and the FS tie
        are both FRAMED (the device state is literally unchanged) *)
     iExists R. iFrame "HRauth".
