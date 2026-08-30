@@ -1554,13 +1554,11 @@ LinkSysWriteAUStable.v
 # open(...) < 0 test, up to the restart loop head at 0x32, which the two
 # theorems take as a hypothesis.  The header records the three lane
 # findings (fork/exec rows; the unbounded-loop discipline; wait s window row).
-UkInit.v
 # UkInitPrintf.v is what the loop head 0x32 calls FIRST: ulib's
 # printf -> vprintf -> putc -> write, for init's one static literal.  The
 # %-conversion tree (0x516 and 0x53c..0x794) is REFUTED from the literal's
 # own bytes, not proved: [uki_fmt]'s last clause says no byte is a percent
 # sign, so vprintf's pending-% register is an invariant zero.
-UkInitPrintf.v
 # UkInitLoop.v walks init's RESTART LOOP itself -- 0x32..0xb8, both heads
 # (0x32 and 0x44) under ONE iLoeb over their conjunction, fork's BOTH
 # continuations, exec's -1 arm, and the three dying arms -- and so
@@ -1570,7 +1568,6 @@ UkInitPrintf.v
 # false as the row stands (finding (3)) and true of the kernel, so the
 # three theorems that take it are conditional; everything below them is
 # not.  Read the header before extending.
-UkInitLoop.v
 # THE PINNED-EXEC PROVER LANE (fs-syscall-specs; SpecKexecPin.v sect. 8).
 #   ProofKexecPinTrace is the walk's trace built out of the contract's pin
 # -- and the file that records WHY the pin needs its chain conjunct back
@@ -1584,3 +1581,12 @@ ProofKexecPinTrace.v
 ProofKexecPinA.v
 ProofKexecPin.v
 LinkKexecPin.v
+
+# OFF-BUILD (2026-08-30): the stage-1 init program proof, first Uk
+# generation -- UkInit.v, UkInitPrintf.v, UkInitLoop.v.  Upstream's
+# urun rework (727cccf7c: "ditch the old program proofs") deleted the
+# generation's engine files (UkEcho went with it); the init walk's
+# assets (the 113-instruction map, the 212-instruction structural
+# refutation of the format tree, the double-headed loop induction, the
+# uki_wait_ok formulation) carry to the urun port, queued after
+# upstream's echo re-port lands the pattern.
