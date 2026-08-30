@@ -1851,7 +1851,7 @@ Section WpUmodeStore.
             [ exact (Hbytes 0%nat ltac:(lia)) | exact (Hbytes 1%nat ltac:(lia))
             | exact Hb2 | exact Hb3 ]. }
         destruct (uv_fetch_4 pt M t rsA w_leaf pc (urvc4_word h b2 b3)
-                    Hinj Hum Hlok Hcanonpc Hinpage Hal4 Hbytes4 LpcA LcpA
+                    Hinj Hum Hlok Hcanonpc Hal4 Hbytes4 LpcA LcpA
                     (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
         rewrite urvc4_low HisRVC in Hfe.
@@ -1861,7 +1861,7 @@ Section WpUmodeStore.
                   Hcanon Hpg Hal HMb
                   with "Hcert Hamb Hcap Hk Hany Hrw Hro Hmm Hres").
       + destruct (uv_fetch_rvc_2 pt M t rsA w_leaf pc h
-                    Hinj Hum Hlok Hcanonpc Hinpage Hal2 Hal4 Hbytes HisRVC
+                    Hinj Hum Hlok Hcanonpc Hal2 Hal4 Hbytes HisRVC
                     LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
         iApply (uv_store_obl_rvc C pt R Ψ M m pc h i o k imm rs1 rs2 w_st va wval
@@ -1873,7 +1873,7 @@ Section WpUmodeStore.
       destruct Hcode as (w & HnRVC & Hbytes & Hdecbase).
       destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal4.
       + destruct (uv_fetch_4 pt M t rsA w_leaf pc w
-                    Hinj Hum Hlok Hcanonpc Hinpage Hal4 Hbytes LpcA LcpA
+                    Hinj Hum Hlok Hcanonpc Hal4 Hbytes LpcA LcpA
                     (proj1 HmsokA) LmenvA HpinsA Htok)
           as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
         rewrite HnRVC in Hfe.
