@@ -39,6 +39,8 @@ Require Import UserHeap.
 Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
+Require Import WpUmodeBranch.
+Require Import UkBranch.
 Require Import UkRun.
 
 From Stdlib Require Import ZArith Bool Lia.
@@ -828,6 +830,81 @@ Section UkRunLeaf.
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkLeaf.wp_uk_li C pt Rut pm sz Hlo Hpm M m pc imm rd wval
               Hui H1 H2
+              with "Hb [Hheap Hcont]").
+    iApply (urun_close with "Hheap Hcont").
+  Qed.
+
+
+  (* ===================================================================== *)
+  (* THE BRANCHES.  The one place [pc'] is not a constant offset: the       *)
+  (* continuation is at [if taken then tgt else pc+k], and the program      *)
+  (* discharges [taken] by computing it.                                    *)
+  (* ===================================================================== *)
+
+  Lemma wp_uk_btype (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
+      (imm : mword 13) (rs2 rs1 : mword 5) (op : bop) (taken : bool) (tgt : mword 64) :
+    taken = uv_btaken op (m !!! Regidx rs1) (m !!! Regidx rs2) ->
+    tgt = add_vec pc (sign_extend' 64 imm) ->
+    (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
+    uinstr_is γt pc false (BTYPE (imm, Regidx rs2, Regidx rs1, op)) -∗
+    urun γt γd γs h m pc -∗
+    (∀ h' : CpuId,
+       urun γt γd γs h' m
+         (if taken then tgt else add_vec_int pc 4) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros H1 H2 H3. iIntros "#Hi Hrun Hcont".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hb)".
+    iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
+    iApply (UkBranch.wp_uk_btype C pt Rut pm sz Hlo Hpm M m pc imm rs2 rs1 op taken tgt
+              Hui H1 H2 H3
+              with "Hb [Hheap Hcont]").
+    iApply (urun_close with "Hheap Hcont").
+  Qed.
+
+  Lemma wp_uk_cbeqz (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
+      (imm : mword 8) (cr : mword 3) (rs : mword 5) (taken : bool) (tgt : mword 64) :
+    creg2reg_idx (Cregidx cr) = Regidx rs ->
+    taken = eq_vec (m !!! Regidx rs) zero_reg ->
+    tgt = add_vec pc (sign_extend' 64 (sign_extend' 13 (concat_vec imm ('b"0")))) ->
+    (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
+    uinstr_is γt pc true (C_BEQZ (imm, Cregidx cr)) -∗
+    urun γt γd γs h m pc -∗
+    (∀ h' : CpuId,
+       urun γt γd γs h' m
+         (if taken then tgt else add_vec_int pc 2) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros H1 H2 H3 H4. iIntros "#Hi Hrun Hcont".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hb)".
+    iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
+    iApply (UkBranch.wp_uk_cbeqz C pt Rut pm sz Hlo Hpm M m pc imm cr rs taken tgt
+              Hui H1 H2 H3 H4
+              with "Hb [Hheap Hcont]").
+    iApply (urun_close with "Hheap Hcont").
+  Qed.
+
+  Lemma wp_uk_cbnez (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
+      (imm : mword 8) (cr : mword 3) (rs : mword 5) (taken : bool) (tgt : mword 64) :
+    creg2reg_idx (Cregidx cr) = Regidx rs ->
+    taken = neq_vec (m !!! Regidx rs) zero_reg ->
+    tgt = add_vec pc (sign_extend' 64 (sign_extend' 13 (concat_vec imm ('b"0")))) ->
+    (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
+    uinstr_is γt pc true (C_BNEZ (imm, Cregidx cr)) -∗
+    urun γt γd γs h m pc -∗
+    (∀ h' : CpuId,
+       urun γt γd γs h' m
+         (if taken then tgt else add_vec_int pc 2) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros H1 H2 H3 H4. iIntros "#Hi Hrun Hcont".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hb)".
+    iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
+    iApply (UkBranch.wp_uk_cbnez C pt Rut pm sz Hlo Hpm M m pc imm cr rs taken tgt
+              Hui H1 H2 H3 H4
               with "Hb [Hheap Hcont]").
     iApply (urun_close with "Hheap Hcont").
   Qed.
