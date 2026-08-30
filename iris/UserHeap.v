@@ -18,7 +18,7 @@
 (*     addresses are on X pages, so holding [utext γt a b] IS the right to *)
 (*     FETCH.                                                             *)
 (*   the DATA heap [γd]  -- fragments EXCLUSIVE; the invariant knows its   *)
-(*     addresses are on W pages, so holding [udata γd a b] IS the right to *)
+(*     addresses are on W pages, so holding [ubyte γd a b] IS the right to *)
 (*     WRITE.                                                             *)
 (*                                                                        *)
 (* Splitting by SEGMENT rather than by ownership is what makes this        *)
@@ -33,13 +33,13 @@
 (*                                                                        *)
 (* THE PERMISSION MAP IS CONSUMED HERE AND NOWHERE ELSE.  [uvis_perm]      *)
 (* appears in this file, to decide the split at allocation and to state    *)
-(* the two invariants; above it, a leaf takes [utext]/[udata] and never    *)
+(* the two invariants; above it, a leaf takes [utext]/[ubyte] and never    *)
 (* mentions a permission, a page, or a table.                             *)
 (*                                                                        *)
 (* WHAT THIS IS NOT YET.  [urun] still names [uvis_M W], so the image is   *)
 (* not hidden; that is the next step, together with re-cutting the leaves  *)
 (* so [uinstr]'s [uM_bytes M ...] clauses become [utext] and the load and  *)
-(* store leaves' byte facts become [udata].  And the payoff for [init]     *)
+(* store leaves' byte facts become [ubyte].  And the payoff for [init]     *)
 (* needs the syscall arms to take the FOOTPRINT they write rather than     *)
 (* state an equation -- separation logic LOCALIZES that obligation to each *)
 (* syscall, it does not remove it, but a null pointer then hands over no   *)
@@ -147,12 +147,12 @@ Section UserHeap.
   Definition utext (γt : gname) (a : Z) (b : bv 8) : iProp Σ := (a ↪[γt]□ b)%I.
 
   (* A DATA byte, exclusively owned: the right to write it. *)
-  Definition udata (γd : gname) (a : Z) (b : bv 8) : iProp Σ := (a ↪[γd] b)%I.
+  Definition ubyte (γd : gname) (a : Z) (b : bv 8) : iProp Σ := (a ↪[γd] b)%I.
 
   Global Instance utext_persistent γt a b : Persistent (utext γt a b).
   Proof. apply _. Qed.
 
-  Global Instance udata_timeless γd a b : Timeless (udata γd a b).
+  Global Instance ubyte_timeless γd a b : Timeless (ubyte γd a b).
   Proof. apply _. Qed.
 
   (* ===================================================================== *)
@@ -205,8 +205,8 @@ Section UserHeap.
   Qed.
 
   (* ...and a DATA byte names its byte and its page is WRITABLE. *)
-  Lemma urun_data (γt γd : gname) (W : uvis) (a : Z) (b : bv 8) :
-    urun γt γd W -∗ udata γd a b -∗
+  Lemma urun_ubyte (γt γd : gname) (W : uvis) (a : Z) (b : bv 8) :
+    urun γt γd W -∗ ubyte γd a b -∗
     ⌜ uvis_M W !! a = Some b /\ uw_addr (uvis_perm W) a /\ 0 <= a < 2 ^ 38 ⌝.
   Proof.
     iIntros "Hrun Hb".
@@ -226,8 +226,8 @@ Section UserHeap.
      SUBMAP because the two halves are disjoint -- which is the whole reason
      they are two heaps. *)
   Lemma urun_store (γt γd : gname) (W : uvis) (a : Z) (b b' : bv 8) :
-    urun γt γd W -∗ udata γd a b ==∗
-      urun γt γd (uvis_wM W (<[a := b']> (uvis_M W))) ∗ udata γd a b'.
+    urun γt γd W -∗ ubyte γd a b ==∗
+      urun γt γd (uvis_wM W (<[a := b']> (uvis_M W))) ∗ ubyte γd a b'.
   Proof.
     iIntros "Hrun Hb".
     iDestruct "Hrun" as (Mt Md) "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hw & Ht & Hd)".
@@ -271,7 +271,7 @@ Section UserHeap.
     ⊢ |==> ∃ γt γd : gname,
         urun γt γd W ∗
         ([∗ map] a ↦ b ∈ utext_part W, utext γt a b) ∗
-        ([∗ map] a ↦ b ∈ udata_part W, udata γd a b).
+        ([∗ map] a ↦ b ∈ udata_part W, ubyte γd a b).
   Proof.
     intros Hcan.
     iMod (ghost_map_alloc (utext_part W)) as (γt) "[Htauth Htfrag]".
@@ -292,6 +292,35 @@ Section UserHeap.
     - exact (utext_part_x W).
     - exact (udata_part_w W).
   Qed.
+
+  (* ===================================================================== *)
+  (* §4b WORDS AND STRINGS, over [ubyte].                                  *)
+  (*                                                                       *)
+  (* Everything a program says about its data is a run of bytes, so nothing *)
+  (* here is primitive: a word is eight consecutive [ubyte]s and a string   *)
+  (* is its bytes followed by the NUL.  Stating them this way rather than   *)
+  (* as new resources is what makes them SPLIT and RECOMBINE for free --    *)
+  (* which is what a syscall footprint needs, since the range the kernel is *)
+  (* handed rarely coincides with a program-level object.                   *)
+  (* ===================================================================== *)
+
+  (* [n] consecutive bytes, the shape everything else is built from *)
+  Definition urun_bytes (γd : gname) (a : Z) (n : nat) (f : nat -> bv 8) : iProp Σ :=
+    ([∗ list] j ∈ seq 0 n, ubyte γd (a + Z.of_nat j) (f j))%I.
+
+  (* an 8-byte little-endian word, as the load and store leaves read it *)
+  Definition uword (γd : gname) (a : Z) (w : mword 64) : iProp Σ :=
+    urun_bytes γd a 8 (nth_byte w).
+
+  (* a NUL-terminated C string of length [len]: the body, then the NUL.
+     The body's bytes are NOT pinned to values here -- a program that cares
+     which bytes they are owns them individually. *)
+  Definition ustr (γd : gname) (a : Z) (len : nat) (f : nat -> bv 8) : iProp Σ :=
+    (urun_bytes γd a len f ∗ ubyte γd (a + Z.of_nat len) ubyte0)%I.
+
+  (* NOTE: the SPLIT of a run at an arbitrary point -- which is what a
+     syscall footprint hand-over is -- is deliberately not here yet.  It is
+     a step-3 tool and wants proving against its consumer, not before it. *)
 
   (* ===================================================================== *)
   (* §5 THE INSTRUCTION RESOURCE.                                          *)
