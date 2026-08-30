@@ -1231,6 +1231,43 @@ things, and the answer differs:
   `init_text_sub`, and the two entry theorems a frame-above-image
   inequality, because vprintf LOADS the .rodata literal's bytes.
 
+## RULING BRIEFS (drafted 2026-08-30, coordinator; each is a yes/no)
+
+- [ ] **RULING A — the copyin content seam.**  THE GAP: `either_copyin`'s
+  success arm binds the copied bytes existentially, so write's receipts
+  say "SOME bytes of the right length landed" and console-write's say
+  "length and order" — never "MY bytes."  THE ASK: an output equation on
+  the success arm tying the copied run to the USER SOURCE bytes at the
+  instant's `M` (the vocabulary exists post-M-threading: copyinstr's
+  same-M contracts are the precedent).  THE COST, honestly: it is a
+  `SpecWritei`-class ripple — the equation must relay
+  either_copyin → writei → filewrite → the syscall arms (and the
+  console chain separately), i.e. one output conjunct each on two or
+  three landed contracts with their proofs re-elaborated; the write
+  precedent measured that class at zero proof content + a relay through
+  3 signatures + a handful of caller sites, but writei's is the tree's
+  big proof, so budget a full lane.  THE PAYOFF: "printf printed MY
+  bytes" and write's content-pinned receipts, in one ruling — the last
+  honesty gap in the write family.  RECOMMEND: YES, as a lane when the
+  current pair lands.
+- [ ] **RULING B — the A(iv) offset carrier.**  THE GAP: `f->off` lives
+  behind `file_pay`'s existential, so write/read receipts carry
+  per-instant existential offsets and dup's same-description fact stops
+  at the array cell.  THE OPTIONS: (a) a two-halves offset ghost keyed
+  on the struct-file SLOT (per description, shared by dup'd fds — the
+  `fdstate` two-halves pattern at the ftable: auth beside `file_ref`,
+  optional client half; movers = the two `f->off` advances in
+  fileread/filewrite), the d1411776 precedent one field further; (b)
+  status quo (existential offsets; single-threaded consumers re-derive
+  positions from their own receipts' lengths — workable, forever
+  slightly dishonest about sequencing).  THE COST of (a): one new
+  two-halves ghost + threading at exactly two mover sites + the
+  carve/settle plumbing — the fd-state landing's scale (~30 files
+  touched upstream when fdstate landed).  CONSUMERS WAITING: write,
+  read, dup, and any future lseek.  RECOMMEND: (a) YES but AFTER
+  ruling A's lane (they touch the same file-layer proofs; sequencing
+  them avoids a double re-elaboration).
+
 Sizing: D is spike-sized — the readings exist, the work is assembly and
 statement.  S0 is one design session.  A and W are the campaign's bulk.
 P is contained (two pins).  Y is CLOSED (2026-08-29): machinery, contract,
