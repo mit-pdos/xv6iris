@@ -1549,6 +1549,22 @@ ProofFilewriteAU.v
 LinkFilewriteAU.v
 LinkSysWriteAU.v
 LinkSysWriteAUStable.v
+# THE READ SEAL, CLOSED END TO END (lane W, SYSREAD_AU_AT).
+#   SpecFilereadAU is SpecFileread's body with the descriptor pinned to
+# [FdOpen true wb (FdInode i)] and the armed post in place of the return
+# blanket; ProofFilereadAU is ProofFileread's walk on the inode arm only,
+# with FsAbsReadFire.arf_read_fire INSERTED (not substituted -- a read
+# retags nothing) just after the f->off checkout.  ProofSysReadAU is the
+# syscall shell, ProofSysReadAUStable Includes it and adds the corollary --
+# SYSREAD_AU_AT carries both Parameters, so one module has to hold both.
+# The two Link files make the pair unconditional WITHOUT LinkConsoleread's
+# Axiom: the device arm is refuted by the contract's premise, not walked.
+SpecFilereadAU.v
+ProofFilereadAU.v
+ProofSysReadAU.v
+ProofSysReadAUStable.v
+LinkFilereadAU.v
+LinkSysReadAU.v
 # INIT STAGE 1 (bare tier, echo/sync mold): init.c on the Uk engine --
 # start + main prologue + the console preamble with BOTH arms of the
 # open(...) < 0 test, up to the restart loop head at 0x32, which the two

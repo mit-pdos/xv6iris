@@ -719,6 +719,125 @@ things, and the answer differs:
   - **`Hjoin` grew one conjunct** — `0 < rz -> rz = tot /\ dn' = wi_dinode
     dnl bm' off tot` — because the landed join threw the record away (the
     retag does not look inside it) and the fire needs the splice.
+
+  **READ IS CLOSED END TO END — 2026-08-30 (READ WALK PROVER lane, Opus;
+  six new files, whole set EC2-green, zero `Admitted`).**
+  BOTH Parameters of `SpecSysReadAUAt.SYSREAD_AU_AT` are sealed, and
+  `LinkSysReadAU.v` makes them unconditional theorems.  `Print Assumptions`
+  on `SysReadAU.wp_sys_read_au_at` AND on
+  `SysReadAU.wp_sys_read_au_at_stable` is the SAME THREE-LINE SET the whole
+  campaign carries — `resv_matches`, `resv_is_valid`, funext — and
+  **`LinkConsoleread`'s Axiom is NOT in it**: `LinkSysRead`'s cone carries
+  it, this one does not.  Files, with measured compile times:
+  - `iris/SpecFilereadAU.v` (189 lines, 3 s) — `FILEREAD_AU`.
+    `SpecFileread.wp_fileread_sconf_body` verbatim with three edits: the
+    premise `st = FdOpen true wb (FdInode i)`, the resource
+    `aread_commit_at Γfs ∅ i Φr`, and `read_arms Γfs i n Φr r` in place of
+    `⌜fileread_ret n r⌝`.  The user-memory WINDOW survives verbatim — the
+    syscall shell above still needs it to rebuild `proc_priv`.
+  - `iris/ProofFilereadAU.v` (2.0 k lines, 33 s) — the walk.
+  - `iris/ProofSysReadAU.v` (1.0 k lines, 16 s) — the syscall shell,
+    `ProofSysWriteAU`'s four deltas verbatim (the object code is the same
+    twenty-five instructions).
+  - `iris/ProofSysReadAUStable.v` (148 lines, 3 s) — the corollary AND the
+    seal.
+  - `iris/LinkFilereadAU.v`, `iris/LinkSysReadAU.v`.
+  - **THE FUNCTOR HAS THREE PARAMETERS, NOT SIX.**  `fdstate_ok` against
+    the premise pins `f->readable = 1` and `f->type = FD_INODE`, so the
+    `c.beqz a5` at +0x0e, the FD_PIPE compare at +0x24, the FD_DEVICE
+    compare at +0x2a and the `panic` else-arm are each refuted in three to
+    five lines.  ~980 lines of the landed walk (the readable -1 block, the
+    piperead block, the whole devsw dispatch, the panic block) do not
+    appear, and Piperead / Consoleread / PANIC leave the parameter list
+    with them — which is where the axiom goes.  ONE arm the write lane
+    could refute survives here: the fork's SIGN GUARD at +0x1a is a test on
+    a trapframe word and is walked, which is the only reason read has a
+    fail arm with an UNSPENT commit.  It lands in `read_post_fail`'s left
+    disjunct through `aread_commit_at_weaken` (the frozen arms are stated
+    over the astate-shaped commit; that weakening is what the `_at` file
+    was built to supply).
+  - **THE FIRE IS AN INSERTION, NOT A SUBSTITUTION, and that is the whole
+    structural difference from the write lane.**  A read retags nothing, so
+    there is no `ireg_top_retag` to fuse into: `arf_read_fire` stands on its
+    own, immediately after the `f->off` CHECKOUT and before the four
+    argument moves, taking the payload's own `top_frag` QUARTER — the one
+    `FsStateEra.inode_rd_era_era_node_to` hands out at the read-arm shed —
+    and giving it straight back.  `ard_pre`'s three conjuncts are exactly
+    what is in hand at that boundary and nowhere earlier: the row (the fire
+    proves it itself off the fragment), the offset cap (`FileOff.off_wf`,
+    just produced by the checkout) and the size cap (`arf_size_ok_era` over
+    the loaded record's `Hszb`, the premise readi is about to be handed).
+    Every LATER boundary in the window would do equally well — that is THE
+    ONE INSTANT, and it is the reason the ~700 lines from the fire to the
+    two exits stay single-copy with no carried disjunction (contrast
+    `fw_au_raw`, which the write loop needs because its instants recur).
+  - **THE FOUR ARMS, and where each lands.**  `+0x1a` n < 0 →
+    `read_post_fail` LEFT (the refund).  readi's copyout fault →
+    `read_post_fail` RIGHT, the FIRED receipt: the lock window happened and
+    the source value was observed even though the copy died.  readi's count
+    at `r = 0` (the `blez` skips the advance) and at `r > 0` → both
+    `read_post_ok`, at the same exact tie.  The `blez` diamond does NOT
+    separate the fault from the zero return — both take the branch — so
+    `Hrdret` is destructed a SECOND time inside the skip arm; keeping
+    `Hcase`'s right disjunct three-wide (`a0 = tot /\ 0 < tot /\ tot =
+    rd_clamp …`) is what lets the advance arm avoid re-deriving readi's
+    equation from a value comparison.
+  - **THE RETURN TIE IS TWO LINES AND A CASE SPLIT** (`frau_ret_tie`):
+    `arf_count_bridge_era` on the file row, `fr_clamp_le` on the other two.
+    THE DIRECTORY ROW STAYS BOUNDS-ONLY — the premise does not exclude it
+    (xv6 keeps T_DIR under FD_INODE, `ls` reads directories through
+    `read()`) — and the DEVICE row folds into the SAME wildcard arm.  So
+    the payload's fifth carve output, which the write lane spends to kill
+    its third arm, is NOT needed here at all: read's contract weakens toward
+    the caller on both non-file rows and never has to tell them apart.
+    `SpecSysReadAU`'s owner question 2 (sharpen the wildcard to `ADir`) is
+    therefore still open, still R10-clean, and now provably cheap — the
+    fifth output is already in `frau_pay_carve`'s hand.
+  - **`frau_pay_carve` IS `fwau_pay_carve`, COPIED.**  Both AU lanes need
+    `fdstate_ok inum Cf st` as a sixth carve output for the same reason (the
+    carve and `file_pay_st_ok` bind `inum` under separate existentials, so
+    `i = bv_unsigned inum` is not otherwise derivable), neither may edit
+    `SpecFileread` (R10), and requiring the write lane's copy from the read
+    lane would drag its whole cone in.  The copy is deliberate; retiring
+    BOTH into `FileInvDefs` is one edit when the tree next takes a
+    bottom-of-tree rebuild, and it belongs with the other five S4' items
+    `SpecFileread`'s header already lists.
+  - **THE SEAL HAD TO BE SPLIT DIFFERENTLY FROM WRITE'S.**
+    `SYSWRITE_AU_ERA` and `..._ERA_STABLE` are two module types with one
+    field each, so `ProofSysWriteAUStable` is a pure functor over the AU
+    module.  `SYSREAD_AU_AT` carries BOTH Parameters, so one module has to
+    contain both proofs: `ProofSysReadAU` exports the walk UNSEALED as
+    `SysReadAUWalk`, and `ProofSysReadAUStable` `Include`s an application of
+    it, adds the corollary beside it and applies the seal once.  R10 keeps
+    `SpecSysReadAUAt.v` byte-identical; only where the seal sits moved.
+  - **THE STABLE DERIVATION IS THREE MOVES AND NO ESCAPE ARM.**
+    Instantiate the AU at `arf_pin_recv Γ i q (MkAnode (AFile bs0) nl) Φr`;
+    build its commit with `arf_pin_compose` (the client's `nview` is spent
+    ONCE, on the way in, and rides inside every receipt after);
+    `arf_stable_of_arms` collapses the arms, and the body's `0 <= n` premise
+    is what refutes the guard arm — whose refund would otherwise strand the
+    wrapped share inside the returned closure.  Write's ok arm had to take
+    an UN-KEYED escape disjunct at `off0 := 0` because chaining one chunk's
+    offset to the next is not a truth of the concurrent kernel; read has ONE
+    instant, so there is nothing to chain and nothing to escape into, and
+    both arms land at the client's own value.  The landed
+    `arf_stable_of_arms` measured Qed trap (cut at the disjunction, never
+    one two-arm entailment) held: the derivation is 3 s.
+  - **THE VACUITY CAVEAT IS UNCHANGED AND STILL ONE-SIDED.**  A client
+    `nview` share against a live inum is refuted by today's whole-element
+    payload custody (`FsAbsSeam`'s finding 3), so the stable form is vacuous
+    until the tree layer's exclusivity fact exists.  Unlike write's, it needs
+    no re-cut then: a read fires no retag, so the same sealed statement
+    becomes non-vacuous as it stands.
+  - **REUSE, MEASURED.**  `ProofFileread`'s pure prefix (`fr_maxfile_bsize`,
+    `fr_K6`, the five stack projections, `fr_clamp_le`, `fr_ret_of_readi`,
+    …) and `ProofSysRead`'s four address lemmas are TOP-LEVEL in their
+    files, so both AU walks reuse them by `Require` and copy none of them —
+    `ProofSysWriteAU`'s precedent, applied on both storeys.
+    `ProofFilereadParts`'s `fr_pro` / `fr_epi` take an abstract continuation
+    and never mention fileread's post, so they are reused as they stand.
+    That is the sys_open lane's rule holding for a fourth syscall: only the
+    blocks that fire a commit or mint the armed post are re-derived.
   **OPEN'S PLAIN ARM IS PROVEN** (Opus lane): `SpecSysOpenAUPlain.v` seals
   `SYSOPEN_AU_PLAIN` — `SpecSysOpenAU.wp_sys_open_au_plain_body` byte for
   byte, the O_CREATE parameter split off — and `LinkSysOpenAU.v`
