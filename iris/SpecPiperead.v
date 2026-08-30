@@ -116,10 +116,11 @@ Definition wp_piperead_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
      reads its own untouched bytes back with
      [UserPtTree.umem_wr_lookup_out].
 
-     WHAT STAYS EXISTENTIAL IS A LENGTH AND THE BYTES, NOT AN IMAGE.  [d] is
-     how far the loop got (bounded by the requested count; it is NOT pinned
-     to the return value, because a copyout that faults part-way may still
-     have moved its byte before the loop broke).  [bs] is what came out of
+     WHAT STAYS EXISTENTIAL IS THE BYTES, NOT A LENGTH AND NOT AN IMAGE.
+     [d] is how far the loop got, and it IS pinned to the return value: the
+     copy is one byte per round, and a failing one-byte copyout moves
+     nothing (SpecCopyout's strict prefix), so the loop breaks having
+     written exactly what it returns.  [bs] is what came out of
      the pipe, which no contract at this tier can name: the ring's contents
      are the existential half of [PipeInvDefs]'s invariant and the loop sleeps
      inside the read. *)
@@ -128,6 +129,16 @@ Definition wp_piperead_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslot
       ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P'⌝ -∗
       ⌜(Z.of_nat d <= Z.max 0 n)%Z⌝ -∗
       ⌜pipe_rw_ret n (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
+      (* ...AND THE RUN IS AS LONG AS THE RETURN VALUE SAYS.  The copy loop
+         moves ONE byte per round and a failing one-byte copyout moves none
+         ([SpecCopyout.copyout_wrote]'s strict prefix), so the loop breaks
+         having written exactly the count it goes on to return -- or -1,
+         which the C only produces when the very first round failed and so
+         nothing was written at all. *)
+      ⌜ (mf !!! Regidx (mword_of_int 10 : mword 5)
+           = (mword_of_int (-1) : mword 64) /\ d = 0%nat)
+        \/ mf !!! Regidx (mword_of_int 10 : mword 5)
+           = (mword_of_int (Z.of_nat d) : mword 64) ⌝ -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗

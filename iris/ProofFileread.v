@@ -1120,7 +1120,8 @@ Section ProofFileread.
         { iEval (rewrite HQ2a0). iExact "Hpipe". }
         (* the pipe's copyout writes user memory, so piperead's post binds a
            fresh image ([SpecPiperead], mirroring [SpecPipewrite]). *)
-        iIntros (CIDpr Hspr mf P' dpr bspr) "%Hcspr %Hupt %Hdpr %Hretpr Hcg Hcnt Hpc Hpref Hpriv".
+        iIntros (CIDpr Hspr mf P' dpr bspr)
+          "%Hcspr %Hupt %Hdpr %Hretpr %Htiepr Hcg Hcnt Hpc Hpref Hpriv".
         (* THE ARM'S WINDOW IS THE DISPATCHER'S: piperead copies to its own
            a1, which is fileread's [addr] carried in s2.  Bringing the two
            to the same term here is the whole of the arm's contribution. *)

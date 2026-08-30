@@ -1027,7 +1027,8 @@ Section ProofPiperead.
       iEval (rewrite Hrafin) in "Hpc".
       clear Hrafin.
       iSpecialize ("Hcont" $! CIDp18 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! F8 P' dw bsw with "[%] [%] [%] [%] Hcg Hown Hpc Href Hpriv").
+      iApply ("Hcont" $! F8 P' dw bsw
+                with "[%] [%] [%] [%] [%] Hcg Hown Hpc Href Hpriv").
       { unfold callee_saved. split_and!.
         - exact HF8sp.
         - rewrite /F8 upd_ne; [| reg_neq]. rewrite /F7 upd_ne; [| reg_neq].
@@ -1065,7 +1066,8 @@ Section ProofPiperead.
           exact HMs11. }
       { exact Hext. }
       { exact Hdwle. }
-      { rewrite HF8a0. exact Hret. } }
+      { rewrite HF8a0. exact Hret. }
+      { rewrite HF8a0. exact Hrvtie. } }
     (* ============ 0x10: c.addi4spn s0,sp,96 ============ *)
     iApply (wp_caddi4spn_s_sconf (mword_of_int (KernelSyms.piperead + 0x10)) (Cregidx (mword_of_int 0))
               (mword_of_int 24 : mword 8) Rs0 P0 (av - 12)%nat true
