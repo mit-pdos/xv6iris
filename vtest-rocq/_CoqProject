@@ -206,10 +206,15 @@ UartWidthQemuRun.v
 ClintMsipQemuPass.v
 ClintTimeJh7110Pass.v
 ClintTimeQemuPass.v
+ConcAmoJh7110Pass.v
 ConcAmoQemuPass.v
+ConcByteJh7110Pass.v
 ConcByteQemuPass.v
+ConcLostJh7110Pass.v
 ConcLostQemuPass.v
+ConcMpJh7110Pass.v
 ConcMpQemuPass.v
+ConcSmokeJh7110Pass.v
 ConcSmokeQemuPass.v
 CoreCsrprobeQemuPass.v
 CoreCsrwideQemuPass.v

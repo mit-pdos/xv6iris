@@ -12,6 +12,7 @@ Module ConcMpJh7110Case <: CONC_CASE.
   Definition platform  := "jh7110"%string.
   Definition regions   : list region := dma_regions.
   Definition budget    : nat := 6000%nat.
+  Definition hart_base : Z := 2.
   Definition schedules := ConcMpSched.schedules.
   Definition proj      := (fields [0; 8; 16; 24]%nat).
 

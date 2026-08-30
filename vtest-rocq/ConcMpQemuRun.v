@@ -12,6 +12,7 @@ Module ConcMpQemuCase <: CONC_CASE.
   Definition platform  := "qemu"%string.
   Definition regions   : list region := dma_regions.
   Definition budget    : nat := 6000%nat.
+  Definition hart_base : Z := 0.
   Definition schedules := ConcMpSched.schedules.
   Definition proj      := (fields [0; 8; 16; 24]%nat).
 

@@ -40,6 +40,9 @@ Module Type CONC_CASE.
   Parameter regions   : list region.
   (* the budget [cfinish] gets after the named interleaving has run *)
   Parameter budget    : nat.
+  (* the mhartid of the FIRST hart of this run: 0 on QEMU, the board
+     profile's primary_hart (2) on the JH7110.  See VConc.g0_of_at. *)
+  Parameter hart_base : Z.
   (* ONE SCHEDULE PER OBSERVED OUTCOME, in the order the capture lists
      them.  This is the hand-written part. *)
   Parameter schedules : list (list citem).
@@ -51,7 +54,7 @@ Module ConcRun (P : CONC_CASE) <: TEST_RUN.
   Definition case := P.case.
   Definition platform := P.platform.
   Definition observed : list (list Z) := map P.proj P.observed_raw.
-  Definition start : gstate := g0_of P.text P.regions.
+  Definition start : gstate := g0_of_at P.hart_base P.text P.regions.
   (* every observation the named schedules exhibit *)
   Definition outcome : model_outcome :=
     MDone (map P.proj (cobs_all P.budget P.schedules start)).

@@ -65,10 +65,30 @@ Definition hart1 : CPU := 1%fin.
 (*    program to tell the harts apart.                                     *)
 (* ---------------------------------------------------------------------- *)
 
-Definition g0_of (text : list Z) (rs : list region) : gstate :=
+(* [base] IS THE FIRST HART'S mhartid, and it is not always 0.
+
+   A board image is built with PRIMARY_HART=<n> and computes its slot as
+   `mhartid - n`, because the JH7110's hart 0 is the E24 and hart 1 runs
+   firmware -- so its multi-hart tests run on harts 2 and 3.  Starting the
+   model at mhartid 0 and 1 gives those images slots -2 and -1: NOBODY takes
+   the primary path, _vtest_body never runs, DONE is never set, and the run
+   burns its whole budget executing a program that cannot work.  Measured:
+   conc_smoke's board run spent 162 s doing exactly that and came back with
+   an empty observation, which reads as a mismatch and is nothing of the
+   kind.  Every multi-hart board run had the same defect.
+
+   The CPU INDEX is just a slot in [gregs]; what the program sees is the
+   mhartid the cold state carries.  So the fix is here rather than in
+   [cfinish] or in the hand-written schedules, which go on naming hart0 and
+   hart1 and mean "the first and second hart of this run". *)
+Definition g0_of_at (base : Z) (text : list Z) (rs : list region) : gstate :=
   GState (fun c => ColdBoot.cold_regs
-                     (SailStdpp.Values.mword_of_int (Z.of_nat (fin_to_nat c))))
+                     (SailStdpp.Values.mword_of_int
+                        (base + Z.of_nat (fin_to_nat c))))
          (mem_of text rs) dev0_state 0%nat true (fun _ => None).
+
+Definition g0_of (text : list Z) (rs : list region) : gstate :=
+  g0_of_at 0 text rs.
 
 Definition g0     (text : list Z) : gstate := g0_of text std_regions.
 Definition g0_dma (text : list Z) : gstate := g0_of text dma_regions.
