@@ -4574,6 +4574,34 @@ by everything); context-relative record contents appear inside a body
 only as `∃ ξ', ξe ⊑ ξ' ∗ ctx_parked ξ' ∗ P ξ'` with `CtxMorph P` —
 never a bare fixed-ξ assertion, never a nested fixed-ξ inv.
 
+**FINAL NAMING AND STRENGTH (owner, closing the dialogue)**: the
+primitive is **[ctx_values ξ a S]** — "maybe I should have said something
+more like ctx_values?  I don't think it really even needs to be ordered;
+a set suffices, and that set is defined as an UPPER BOUND on the values
+that the context can observe.  It has to be an upper bound, because the
+context can always move up, and the observable set can shrink."  No
+ordering, no completeness claim; weakening S is free; shrinking S needs
+a receipt.  The ORDERED flavor stays the landed rel arm, reserved for
+protocols that must know WHICH write they saw (started, virtio).
+Definition (over landed pieces, NO new ghost — the owner's correction
+deleted the proposed author field: "ctx_history is context-relative …
+for the boot hart's context that's initially exactly the initial PTE
+value it wrote; on other harts, their context makes it true with just
+the bound and no dirty set"):
+
+  ctx_values ξ a S := ∃ B, ⟨pin arm on a's element: family S, floor B⟩
+                         ∗ (llb (bound ξ) B ∨ dset_in (dirty ξ) (B, a))
+
+— [ctx_pointsto]'s own two-arm justification with the pin arm in place
+of a single value.  The boot hart's dirty entry (B,a) is its authorship
+witness (reads-own-writes, via the EXISTING registry); readers only ever
+need to settle past the BUILD position B — later family writes restamp
+the element but never B, so the fact is stable for every holder and the
+walker's write gate is the landed [ledger_store_win_pin_ok] unchanged.
+Kit: mint (from the creator's ctx cells, B := the cell's own stamp, via
+[pin_ok_mint]), the two-arm read law, the CtxMorph instance, the gate
+wrapper — one small file ([CtxValues.v]).
+
 **The next-level abstraction, noted for evaluation, not mandated**:
 H as a predicate `P : value -> context -> iProp` — impossible values get
 `P v _ = False`; reading v yields `P v (reader's ctx)`; P persistent for
