@@ -16947,3 +16947,70 @@ red roots 5 — `ProofForkretPark:318`, `ProofKernelvec:1704`,
 gone; the 40 remaining red files all sit under the five roots
 (`LinkMain`'s cone, the U-mode cone, and the forkret/kernelvec pair).
 
+## A6.134 — ProofMain MEASURED (owner's "push through ProofMain"): one lemma left, and it is not mechanical — it is the K15 merge
+
+*(Lock lane, 2026-08-30, after r58.)*
+
+### §1. THE GOOD HALF: `mn_grp_fs` IS GREEN
+
+With `mn_grp_kvm` scratch-admitted (admit reverted, the tainted `.vo`
+deleted), **ProofMain compiles CLEAN** — the second standing red behind
+`:997` (`mn_grp_fs`, the `iApply fupd_wp` failure A6.132 §4 recorded at
+~`:1495`) was fixed en passant by the A6.133 landing (the WIP's
+`ProofMain` hunk: `SpecVirtioDiskInit.vdi_post`'s new shape).  So
+`ProofMain`'s ONLY red is `mn_grp_kvm:997` — the kinit→kvminit→
+kvminithart→procinit group.
+
+### §2. WHY `:997` IS NOT FLIPTREE-LOCAL MECHANICS (the credential asymmetry, measured)
+
+The seam: at `main+0x76` (jal kvminithart) the hart needs `kpt_inv root ∗
+kpt_creds`; `kpt_creds = ∃ B, kpt_bound B ∗ view_lb … B`; `kpt_inv_alloc`
+needs the PUBLISHED tree (`kptree_own B 2 1 t`).  The chain of facts that
+closes every fliptree-local route:
+
+1. `kptree_publish_top` mints at `B := length glog` and deliberately hands
+   no `hart_view_lb` (A6.106 §2) — and hart 0 can never buy `view_lb
+   (length glog)`: main's one fence (`main+0xac`) is `rw,w`,
+   `fence_drains = false`, and NOTHING on hart 0's boot arm drains.
+2. `kptree_publish` (the drained variant) mints at `B := gtv` and DOES
+   hand the receipt — but its premise `own_pub (hart 0) glog ≤ gtv` is
+   "hart 0's own buffer is empty", which the same no-drain fact blocks.
+3. So hart 0 must walk WITHOUT creds — A6.106 §5's two-armed residue
+   (the ctx arm, now properly a §0.44′ TWIN: the walker's token must not
+   be the cap's).  But then the publish cannot CONSUME the boot arm's
+   cells (hart 0 needs them forever), and it cannot mint from a half
+   (the pin mint rewrites the ledger element -- fraction 1), and ONE
+   ghost element cannot be half ctx-arm and half pin-arm.  So on THIS
+   tree's vocabulary, `kpt_inv`'s exclusive tree and hart 0's walkable
+   tree are the same unshareable thing.  Dead end — not by proof effort
+   but by the arms' exclusivity.
+
+Good news along the way: `strans_inv` (hence `tlb_res_pt`) lives INSIDE
+`sie_cap` (WpSconfAlu/WpSconfCsr headers), so a publish-at-the-fence
+would have had access to the residue; that part was never the blocker.
+
+### §3. THE PATH THAT EXISTS: THE K15 STACK
+
+The kpttree's K15 (certified there, r31/r34) is exactly the instrument
+this needs: `kpt_ad_preset` (nobody ever writes the shared table again),
+`ptree_translateAddr_own_noupd` (a read-only walk at a PARAMETRIC
+fraction — no S currency), `PhysSeen` (the seen-tier read law), and K15d
+steps 1–5 ("unblocked and fully mapped" in tso-kpt-lane.md): drop the
+tree from `kpt_body` entirely, walk off `kpt_creds`'s residue tree, and
+`ProofMain`'s chain becomes `ptree_own_at_persist → ptree_own_at_project
+(through sie_cap_gpr_own_ctx_acc) → kpt_creds_intro → kpt_inv_alloc` —
+no publish-at-a-fence, no view_lb-at-log-top anywhere.  A persistent
+□-tree is what both hart 0 and the secondaries can walk, and the
+secondaries' view side is a premise thread that already exists
+(`SpecMainSecondary:179 → SpecKvminithart:103`) and that A6.132's
+`started_W` can now actually feed.
+
+**So the order is the handoff's own line: the K15 MERGE (kpttree →
+fliptree, K15c's cumulative list: `PhysSeen` + `KptCtxTravel` new,
+`PtTree`/`HartSKpt`/`KptShare`/`SRegime`/`ProofKvminithart`/`KptTree`/
+`Pt2Walk`/`TransPt`/`UserFetchCert`/`UptTree`/`SmodeCorePt`/
+`WpSconfSfence`), then K15d steps 1–5, then `mn_grp_kvm`.**  Not opened
+solo: the merge crosses two lanes' files and K15d step 3 changes two
+statements in the §0.37′-deferred cone (K15's precedent allows it, but
+the owner should say go).
+
