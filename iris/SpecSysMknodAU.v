@@ -3,6 +3,18 @@
    structural lemmas, and a [Module Type] seal -- no walk, no proof against
    the machine.
 
+   ===== TOMBSTONE (fs-syscall-specs, THE DVIEW RETIREMENT, 2026-08-30) =====
+   THE CONTRACT HALF OF THIS FILE IS RETIRED, and only that half: everything
+   this file stated over [FsAbs.ax_hop dv_half] went with the [dview] column
+   ([mknod_walk_pre], [mknod_walk_dead], the AU bundle and post arms, the
+   stable arms, the machine frame and body, and [Module Type SYSMKNOD_AU]).
+   The full list, with what replaced each and why the vocabulary could not
+   follow it out of the build, is at the section 2b tombstone below.  What is
+   sealed and consumed is [SpecSysMknodAUEra]'s [SYSMKNOD_AU_ERA] over the era
+   walk.  Read the prose below as HISTORY wherever it says [dv_half],
+   [nx_hop] or [wp_namei_tr].
+   =========================================================================
+
    Design of record: claude-notes/design/fs-syscall-specs.md sections 0-5
    (v3) and section 7's mknod row; lane W of
    claude-notes/projects/fs-syscall-specs.md.  The abstract vocabulary is
@@ -95,6 +107,8 @@
    row obligation arises).
 
    ==== THE PATH: THE TRACE, QUANTIFIED OVER THE FETCHED STRING ========
+   (RETIRED 2026-08-30 with the dview column -- history, kept because the
+   era contract's walk premise is this one with the lend substituted.)
 
    The path vocabulary is the landed ghost-trace hop, spelled
    [FsAbs.ax_hop dv_half] -- BY THE CHECKED CLAIM in FsAbs's header this
@@ -261,7 +275,8 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
-Require Import IcacheEscrow.   (* Require Export's DirViewG: [dv_half] *)
+Require Import IcacheEscrow.   (* the escrow's vocabulary (it was [dv_half]'s
+                                  route here before the dview retirement) *)
 Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import UserPtTree.
@@ -517,340 +532,45 @@ Section SysMknodAU.
   Qed.
 
   (* ------------------------------------------------------------------ *)
-  (*  2b.  The walk package (the trace premise, fetched-path shaped)     *)
+  (*  2b-2d.  THE WALK PACKAGE, THE AU BUNDLE AND THE ARMS: RETIRED      *)
+  (*          (fs-syscall-specs, THE DVIEW RETIREMENT, 2026-08-30)       *)
   (* ------------------------------------------------------------------ *)
 
-  (* ONE SHOT, instantiated by the walk at the string argstr fetched and
-     at the inum it starts from.  The hop family is [FsAbs.ax_hop] at the
-     landed lent fragment [dv_half] (= [SpecNameiTr.nx_hop], checked
-     claim), over the parent prefix.  The [={⊤}=∗] is fired between
-     instructions where nothing is open (nx_hop culture); it lets the
-     caller allocate its cursor ghosts for the path it just learned. *)
-  Definition mknod_walk_pre (P Pmiss : nat -> Z -> iProp Σ) : iProp Σ :=
-    (∀ (pl : list (bv 8)) (r : Z),
-       ⌜pl !! 0%nat = Some SLASH -> r = FsImg.ROOTINO⌝ ={⊤}=∗
-       P 0%nat r
-       ∗ ax_hops_from dv_half P Pmiss (mknod_parent_elems pl) 0%nat)%I.
+  (*  [mknod_walk_pre] and [mknod_walk_dead] rode [FsAbs.ax_hops_from
+      dv_half] -- the landed lent fragment, i.e. [SpecNameiTr.nx_hop]'s own
+      resource -- and that ghost column is deleted, so the two predicates and
+      everything stated over them go with it:
 
-  (* the walk's death receipt, [wp_namei_tr]'s refund shape verbatim:
-     either hop [k] never fired (non-directory cursor, or namex's nlink
-     guard) and the cursor comes back with hops from [k], or it fired and
-     missed and the miss receipt comes back with hops from [S k] *)
-  Definition mknod_walk_dead (P Pmiss : nat -> Z -> iProp Σ)
-      (pl : list (bv 8)) : iProp Σ :=
-    (∃ (k : nat) (d : Z),
-       ⌜(k < length (mknod_parent_elems pl))%nat⌝ ∗
-       ((P k d ∗ ax_hops_from dv_half P Pmiss (mknod_parent_elems pl) k)
-        ∨ (Pmiss k d
-           ∗ ax_hops_from dv_half P Pmiss (mknod_parent_elems pl)
-               (S k))))%I.
+        - [mknod_walk_pre] / [mknod_walk_dead]           (2b);
+        - [mknod_au_pre], [mknod_post_ok], [mknod_post_fail], [mknod_arms],
+          [mknod_stable_arms]                            (2c, 2d);
+        - [wp_sys_mknod_au_frame], [wp_sys_mknod_au_body],
+          [wp_sys_mknod_au_stable_body] and [Module Type SYSMKNOD_AU]
+                                                          (sections 3, 4).
 
-  (* ------------------------------------------------------------------ *)
-  (*  2c.  The AU bundle and the post arms                               *)
-  (* ------------------------------------------------------------------ *)
+      NOTHING ON THE BUILD CONSUMED THEM.  [SpecSysMknodAUEra] -- the form
+      the campaign actually seals ([ProofSysMknodAU] : [SYSMKNOD_AU_ERA],
+      linked by [LinkSysMknodAU]) -- carries its own frame
+      ([wp_sys_mknod_au_era_frame], which the ustate sweep forced anyway,
+      see its header) and its own arms over [FsAbsEraMknod]'s era walk
+      predicates ([mknod_walk_pre_era] / [mknod_walk_dead_era], which are
+      [ep_start] / [np_dead] at [FsAbsEra.elend]).  From this file it takes
+      [dev_arg] and section 1-2a's vocabulary, all of which STAYS -- as does
+      everything [SpecCreateAU], [SpecCreateAUF], [SpecSysOpenAU],
+      [SpecSysUnlinkAU], [FsAbsMknodFire] and [FsAbsEraMknod] read here:
+      [delta_create] and its row algebra, [cre_pre], [abs_of_create_dev],
+      [mknod_parent_elems], [acre_commit] and [dlookup_commit] with their
+      four lemmas.
 
-  (* everything the AU caller hands in, at the machine contract's mask
-     floor [∅] *)
-  Definition mknod_au_pre Γ (ma mi : Z)
-      (P Pmiss : nat -> Z -> iProp Σ)
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
-    (mknod_walk_pre P Pmiss
-     ∗ acre_commit Γ ∅ (ADev ma mi) Φok
-     ∗ dlookup_commit Γ ∅ Φex)%I.
-
-  (* ret 0: the fetched path, the cursor at the parent, the fired success
-     receipt with its instant's facts restated purely, and the unfired
-     lookup commit refunded *)
-  Definition mknod_post_ok Γ (ma mi : Z) (P : nat -> Z -> iProp Σ)
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
-    (∃ (pl : list (bv 8)) (av : aview) (d i : Z) (nm : fname)
-       (ents : gmap fname Z) (nl : nat),
-       ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
-       ⌜cre_pre av d nm ents nl i (ADev ma mi)⌝ ∗
-       ⌜0 < i < 16 * Z.of_nat icfg_nib⌝ ∗
-       P (length (mknod_parent_elems pl)) d ∗
-       dlookup_commit Γ ∅ Φex ∗
-       Φok av d nm i)%I.
-
-  (* ret -1: the header's three-way fold, residue returned per arm *)
-  Definition mknod_post_fail Γ (ma mi : Z)
-      (P Pmiss : nat -> Z -> iProp Σ)
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) : iProp Σ :=
-    (mknod_au_pre Γ ma mi P Pmiss Φok Φex
-     ∨ (∃ pl : list (bv 8),
-          (mknod_walk_dead P Pmiss pl
-             ∗ acre_commit Γ ∅ (ADev ma mi) Φok
-             ∗ dlookup_commit Γ ∅ Φex)
-          ∨ (∃ d : Z,
-               P (length (mknod_parent_elems pl)) d
-               ∗ acre_commit Γ ∅ (ADev ma mi) Φok
-               ∗ ((∃ (av : aview) (i : Z) (nm : fname)
-                     (ents : gmap fname Z) (nl : nat),
-                     ⌜list_basics.last (path_elems pl) = Some nm⌝ ∗
-                     ⌜av !! d = Some (MkAnode (ADir ents) nl)⌝ ∗
-                     ⌜ents !! nm = Some i⌝ ∗
-                     Φex av d nm i)
-                  ∨ dlookup_commit Γ ∅ Φex))))%I.
-
-  (* the armed disjunction the continuation receives, keyed on a0 *)
-  Definition mknod_arms Γ (ma mi : Z)
-      (P Pmiss : nat -> Z -> iProp Σ)
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
-      (r : mword 64) : iProp Σ :=
-    ((⌜r = (zero_reg : mword 64)⌝ ∗ mknod_post_ok Γ ma mi P Φok Φex)
-     ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
-        ∗ mknod_post_fail Γ ma mi P Pmiss Φok Φex))%I.
-
-  (* ------------------------------------------------------------------ *)
-  (*  2d.  The stable corollary's arms (statement; header's limits)      *)
-  (* ------------------------------------------------------------------ *)
-
-  Definition mknod_stable_arms Γ (ma mi : Z) (avc : aview)
-      (ds : list Z) (pl0 : list (bv 8))
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ)
-      (r : mword 64) : iProp Σ :=
-    (let ps0 := mknod_parent_elems pl0 in
-     let dpar := ds !!! length ps0 in
-     (⌜r = (zero_reg : mword 64)⌝ ∗ dlookup_commit Γ ∅ Φex ∗
-        (∃ pl : list (bv 8),
-           (⌜path_elems pl = path_elems pl0
-             /\ pl !! 0%nat = Some SLASH⌝ ∗
-            ∃ (av : aview) (i : Z) (nm : fname) (ents : gmap fname Z)
-              (nl : nat),
-              ⌜list_basics.last (path_elems pl0) = Some nm⌝ ∗
-              ⌜cre_pre av dpar nm ents nl i (ADev ma mi)⌝ ∗
-              ⌜0 < i < 16 * Z.of_nat icfg_nib⌝ ∗
-              ⌜apath_at avc FsImg.ROOTINO ps0 = Some dpar⌝ ∗
-              Φok av dpar nm i)
-           ∨ (⌜path_elems pl <> path_elems pl0
-               \/ pl !! 0%nat <> Some SLASH⌝ ∗
-              ∃ (av : aview) (d : Z) (nm : fname) (i : Z),
-                Φok av d nm i)))
-     ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
-        ∗ acre_commit Γ ∅ (ADev ma mi) Φok
-        ∗ ((∃ (av : aview) (nm : fname) (i : Z),
-              ⌜list_basics.last (path_elems pl0) = Some nm⌝ ∗ Φex av dpar nm i)
-           ∨ (∃ (av : aview) (d : Z) (nm : fname) (i : Z),
-                Φex av d nm i)
-           ∨ dlookup_commit Γ ∅ Φex)))%I.
+      R10 note: this file is the CAMPAIGN's own (landed 2026-08-28, this
+      lane), so the dv-consuming half is trimmed in place rather than
+      taken off the build -- the vocabulary above it has twenty-five
+      consumers and could not follow the ghost out.                       *)
 
 End SysMknodAU.
 
 (* big-op bodies behind definitions: seal them, or an [iFrame] near a
    consumer resolves instances through the whole hop family
    (durable-notes; optimization.md, "a big-op body is the predictor").
-   The commits are match-free single wands and stay transparent. *)
-Global Typeclasses Opaque mknod_walk_pre mknod_walk_dead mknod_au_pre
-  mknod_post_ok mknod_post_fail mknod_arms mknod_stable_arms.
-
-(* ===================================================================== *)
-(*  3.  THE MACHINE CONTRACT: SpecSysMknod's frame + the AU              *)
-(* ===================================================================== *)
-
-(* THE SHARED FRAME: [SpecSysMknod.wp_sys_mknod_sconf_body]'s premises and
-   threaded resources VERBATIM (R10 -- the landed contract's calling
-   convention, not a new one), abstracted over the AU-side extras: the
-   caller's bundle [EXTRA] and the armed post [ARMS] on the returned a0
-   (which REPLACES the landed ⌜sys_mknod_ret⌝ -- each arm pins a0, so the
-   blanket disjunction is implied).  Both strengths below are this frame
-   at their own bundle and arms. *)
-Definition wp_sys_mknod_au_frame
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (γf : gname)             (* ftable, kalloc, printk *)
-    (gs : list gname) (j : nat) (gl : gname)            (* the running process *)
-    (pd pav pu : mword 64)                              (* disk fabric + lock  *)
-    (ns : nat)                                          (* the iref ledger     *)
-    (dqb dqs dqbs dqn : dfrac)
-    (v0 v1 v2 : mword 64)                    (* syscall arguments 0 / 1 / 2 *)
-    (pid : mword 32) (U : ustate)
-    (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string)
-    (EXTRA : iProp Σ) (ARMS : mword 64 -> iProp Σ) :=
-  let pcE : mword 64 := mword_of_int KernelSyms.sys_mknod in
-  let pj := proc_addr j in
-  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  (K_sys_mknod <= K)%nat ->
-  icfg_dev = ROOTDEV ->
-  (0 < icfg_nib)%nat ->
-  log_geom_ok fsc_cov fsc_logst ->
-  0 < fsc_size <= BPB ->
-  0 <= fsc_bmapstart ->
-  fsc_bmapstart ∈ fsc_cov ->
-  ~ (fsc_bmapstart ∈ log_region_set fsc_logst) ->
-  0 <= icfg_ist ->
-  cov_below fsc_cov fsc_size ->
-  bitmap_geom_ok fsc_cov fsc_logst fsc_bmapstart fsc_size ->
-  ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst ->
-  1 < fsc_ninodes ->
-  fsc_ninodes <= 16 * Z.of_nat icfg_nib ->
-  fsc_ninodes < 2 ^ 31 ->
-  16 * Z.of_nat icfg_nib <= 2 ^ 16 ->
-  printk_gen_contract (kt := KT1) fsc_printk fsc_uart fsc_disk ->
-  (create_slots <= ns)%nat ->
-  (j < NPROC)%nat ->
-  gs !! j = Some gl ->
-  eb = true ->
-  pv_tf (us_V U) !! tf_arg_idx 0 = Some v0 ->
-  pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
-  pv_tf (us_V U) !! tf_arg_idx 2 = Some v2 ->
-  sie_cap_gpr KT1 m K b pj -∗
-  cpu_own 0 eb pj b lks -∗
-  trap_csrs_ext KT1 eb -∗
-  cpu_claim_ext eb pj -∗
-  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  printk_env fsc_printk fsc_uart fsc_disk -∗
-  bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) -∗
-  log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
-  fs_crash_seam fsc_cov fsc_logst -∗
-  gen_cert -∗
-  dev_inv fsc_uart fsc_disk -∗
-  disk_geom fsc_disk pd pav pu -∗
-  is_lock fsc_dlock d_lock "virtio_disk"%string (disk_res_at fsc_disk pd pav pu) -∗
-  bslots 3 -∗
-  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst icfg_nib icfg_dev -∗
-  itable_inv -∗
-  ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
-  ic_sleeplocks fsc_ic -∗
-  ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
-  ireg_open -∗
-  sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
-  sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-  sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
-  sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
-  bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size -∗
-  kalloc_env fsc_kalloc None -∗
-  procs_inv gs -∗
-  iref_slots ns -∗
-  proc_priv γf pj pid U -∗
-  (* ---- THE AU SIDE (the one addition to the landed premise list) ---- *)
-  EXTRA -∗
-  wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (ns' : nat) (P' : uptd),
-      ⌜callee_saved m mf⌝ -∗
-      ⌜uptd_ext (pv_upt (us_V U)) P'⌝ -∗
-      sie_cap_gpr KT1 mf K b pj -∗
-      cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext KT1 eb -∗
-      cpu_claim_ext eb pj -∗
-      pc_is ret_tgt -∗
-      bslots 3 -∗
-      sb_ninodes ↦₄{dqn} (mword_of_int fsc_ninodes : mword 32) -∗
-      sb_inodestart ↦₄{dqs} (mword_of_int icfg_ist : mword 32) -∗
-      sb_size ↦₄{dqbs} (mword_of_int fsc_size : mword 32) -∗
-      sb_bmapstart ↦₄{dqb} (mword_of_int fsc_bmapstart : mword 32) -∗
-      ⌜ns' = ns⌝ -∗
-      iref_slots ns' -∗
-      proc_priv γf pj pid (us_upt U P') -∗
-      (* the armed post on the returned a0 (implies [sys_mknod_ret]) *)
-      ARMS (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
-      WP (Loop : expr riscv_lang)) -∗
-  WP (Loop : expr riscv_lang).
-
-(* THE AU FORM.  The abstract state is read at the LIVE Γ,
-   [fs_gamma_L fsc_fs] -- the gname tie to [ftop_body]'s authority is
-   definitional ([FsAbs.ftop_gamma_top]).  The device numbers are the
-   syscall arguments' own low halfwords ([dev_arg]), so the caller's
-   receipts speak about the numbers IT passed. *)
-Definition wp_sys_mknod_au_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (γf : gname)
-    (gs : list gname) (j : nat) (gl : gname)
-    (pd pav pu : mword 64)
-    (ns : nat)
-    (dqb dqs dqbs dqn : dfrac)
-    (v0 v1 v2 : mword 64)
-    (pid : mword 32) (U : ustate)
-    (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string)
-    (P Pmiss : nat -> Z -> iProp Σ)
-    (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) :=
-  let Γfs := fs_gamma_L fsc_fs in
-  let ma := dev_arg v1 in
-  let mi := dev_arg v2 in
-  wp_sys_mknod_au_frame γf gs j gl pd pav pu ns dqb dqs dqbs dqn
-    v0 v1 v2 pid U m K eb b lks
-    (mknod_au_pre Γfs ma mi P Pmiss Φok Φex)
-    (mknod_arms Γfs ma mi P Pmiss Φok Φex).
-
-(* THE STABLE COROLLARY'S STATEMENT (header: THE TWO STRENGTHS; its
-   derivation is the sealer's, expected from the AU form + agreement).
-   The client names its expected ABSOLUTE path [pl0] and a run [ds] of
-   its parent prefix through its own view [avc], and presents [apn_pins]
-   for the CHAIN (never the parent -- the mover discipline forbids it;
-   the [dpar ∉ take Lp ds] premise keeps cyclic tails from smuggling the
-   parent in).  On a fetch that matches, the receipts land at
-   [dpar = ds !!! Lp] and [apath_at] names the parent. *)
-Definition wp_sys_mknod_au_stable_body
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ, !ghost_varG Σ (nat * Z)}
-    `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (γf : gname)
-    (gs : list gname) (j : nat) (gl : gname)
-    (pd pav pu : mword 64)
-    (ns : nat)
-    (dqb dqs dqbs dqn : dfrac)
-    (v0 v1 v2 : mword 64)
-    (pid : mword 32) (U : ustate)
-    (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string)
-    (q : Qp) (avc : aview) (ds : list Z) (pl0 : list (bv 8))
-    (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ) :=
-  let Γfs := fs_gamma_L fsc_fs in
-  let ma := dev_arg v1 in
-  let mi := dev_arg v2 in
-  let ps0 := mknod_parent_elems pl0 in
-  pl0 !! 0%nat = Some SLASH ->
-  arun avc FsImg.ROOTINO ps0 ds ->
-  (ds !!! length ps0) ∉ take (length ps0) ds ->
-  wp_sys_mknod_au_frame γf gs j gl pd pav pu ns dqb dqs dqbs dqn
-    v0 v1 v2 pid U m K eb b lks
-    (apn_pins Γfs q avc ds ps0 0%nat
-     ∗ acre_commit Γfs ∅ (ADev ma mi) Φok
-     ∗ dlookup_commit Γfs ∅ Φex)%I
-    (mknod_stable_arms Γfs ma mi avc ds pl0 Φok Φex).
-
-(* ===================================================================== *)
-(*  4.  THE SEAL                                                          *)
-(* ===================================================================== *)
-
-Module Type SYSMKNOD_AU.
-  Parameter wp_sys_mknod_au :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-      (γf : gname)
-      (gs : list gname) (j : nat) (gl : gname)
-      (pd pav pu : mword 64)
-      (ns : nat)
-      (dqb dqs dqbs dqn : dfrac)
-      (v0 v1 v2 : mword 64)
-      (pid : mword 32) (U : ustate)
-      (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string)
-      (P Pmiss : nat -> Z -> iProp Σ)
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ),
-      wp_sys_mknod_au_body γf gs j gl pd pav pu ns dqb dqs dqbs dqn
-        v0 v1 v2 pid U m K eb b lks P Pmiss Φok Φex.
-
-  (* owed as a DERIVATION from [wp_sys_mknod_au] + the agreement seeds
-     above, never as a second walk (doc section 2, "a COROLLARY of the AU
-     form + agreement") *)
-  Parameter wp_sys_mknod_au_stable :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-             !irefslotG Σ, !pavG Σ, !ghost_varG Σ (nat * Z)}
-      `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-      (γf : gname)
-      (gs : list gname) (j : nat) (gl : gname)
-      (pd pav pu : mword 64)
-      (ns : nat)
-      (dqb dqs dqbs dqn : dfrac)
-      (v0 v1 v2 : mword 64)
-      (pid : mword 32) (U : ustate)
-      (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string)
-      (q : Qp) (avc : aview) (ds : list Z) (pl0 : list (bv 8))
-      (Φok Φex : aview -> Z -> fname -> Z -> iProp Σ),
-      wp_sys_mknod_au_stable_body γf gs j gl pd pav pu ns dqb dqs dqbs dqn
-        v0 v1 v2 pid U m K eb b lks q avc ds pl0 Φok Φex.
-End SYSMKNOD_AU.
+   The commits are match-free single wands and stay transparent.  The
+   sealed row named the seven retired predicates and is gone with them. *)
