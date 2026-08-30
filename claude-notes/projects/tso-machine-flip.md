@@ -16435,3 +16435,46 @@ insertions) but is the SAME failure -- the record's other rows are at the
 parker's ξ (the M3 λ-conversion debt on `procs_inv`/`park_globals`/
 `proc_priv`, this file's own header); the per-hart cells (`cpu_own`,
 `p_sched`) cross the swtch at the ambient as before (§6).
+
+## A6.128 — THE SAME-HART HAND-OFF (§0.43′): the dirty registry as a monotone set; the move rule
+
+*(Lock lane, 2026-08-29.  Ruling §0.43′ in tso-port.md.)*
+
+### §1. LANDED IN THE KIT (compiles; the tree round is in flight)
+
+- **`TsoGhost`**: `tsomem_dirtyG` is `inG Σ (authR (gsetUR (nat * Arch.pa)))`
+  (and `tsoMemΣ` accordingly); the API `dset_auth γ q S := own γ (●{#q} S)`,
+  `dset_in γ k := own γ (◯ {[k]})` (persistent, timeless), `dset_alloc`,
+  `dset_halves`, `dset_agree`, `dset_lookup`, `dset_get` (re-mint a
+  witness for a member), `dset_insert` (register, no freshness premise).
+- **`TsoCtx`**: `ctx_at ξ q B D` with `D : gset (nat * Arch.pa)` over
+  `dset_auth`; the cell's dirty arm is `dset_in (ctx_dirty_name ξ) (t,a)`
+  at every dq (the fraction lemmas got simpler: the witness duplicates);
+  `ctx_wrote ξ t a := dset_in …`; `own_context`/`ctx_parked`/`ctx_dom`
+  quantify `∀ k ∈ D` and `[∗ set] k ∈ D`; the store gate
+  (`ctx_store_bytes`) registers by `dset_insert` (its freshness assertion
+  is gone); `ctx_wrote_register` keeps its `∉` only for `big_sepS_insert`.
+  35 sites, mechanical; `TsoCtxAbsorbLb`, `CtxPinMint`, `TsoCtxPark`
+  unchanged in shape (three lines).
+- **`TsoCtxMove.v`** (new): `ctx_move_floor ξ0 ξ1 lo : own_context ξ0 -∗
+  own_context ξ1 -∗ ctx_floor ξ0 lo ==∗ own_context ξ0 ∗ own_context ξ1 ∗
+  ctx_floor ξ1 lo` (ξ1's bound rises to `max B1 B0`, receipt `max K1 K0`);
+  `ctx_move_pointsto ξ0 ξ1 a dq v` (clean arm by the floor; dirty arm: the
+  key's `dirty_ok` at ξ0 is either "under ξ0's bound" -- then it is the
+  clean case -- or "this hart's message" -- then `dset_insert` at ξ1 and
+  the watermark `max W1 W0`; the "already registered" case is
+  `D1 ∪ {[k]} = D1`); the class `CtxMove R` (`∀ ξ0 ξ1, own_context ξ0 -∗
+  own_context ξ1 -∗ R ξ0 ==∗ own_context ξ0 ∗ own_context ξ1 ∗ R ξ1`) with
+  instances const/sep/exist/big_sepL/big_sepM/if/pointsto/floor/word/
+  word2/word4.
+
+### §2. NEXT (the consumers)
+
+`SwtchCtx`: `CtxMove` for `ctx_cells_at`/`stack_own`; the record fully at
+`XIp` (its `ctx_cells` and the wand's inputs -- `cpu_own`, `P`, the cells --
+at `XIp`); `SpecSwtch`: `P` takes the context (`… -d> CtxId -d> iPropO`)
+with a `CtxMove` obligation, `cpu_own` in its λ form; `ProofSwtch` moves
+the caller's `P`/`cpu_own`/save-area cells `cur_ctx → XIt` after the
+resume (both tokens running) and the record's cells `XIt → cur_ctx` for
+the block; `SchedCtx.p_sched` takes ξ; `IntrDefs`/`CpuOwn`: `cpu_own_at`
+with the ambient default; the scheduler chain re-threaded.

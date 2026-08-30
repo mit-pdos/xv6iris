@@ -4340,3 +4340,31 @@ scheduler carries and makes the lock's context at release, not the
 scheduler's running context -- same protocol, no watermark ghost, no
 change to `own_context`/`ctx_dom`.  The scheduler contexts still never
 park.
+
+### 0.43′ OWNER RULING (2026-08-29): the same-hart hand-off is a RULE
+between two running contexts, and the dirty set is a monotone set
+
+The per-CPU cells ([cpus[h].noff/intena/proc]), the swtch payload
+([p->state], [p->chan], the held lock) and the save-area cells cross
+swtch between two RUNNING contexts on one hart with no fence between
+-- correct on the hardware by store forwarding.  The owner's rule: in
+the middle of swtch, just before the old token parks, the proof holds
+BOTH running tokens, and a fact moves between them:
+  [P ξ0 ∗ own_context ξ0 ∗ own_context ξ1 ==∗ P ξ1 ∗ own_context ξ0 ∗ own_context ξ1].
+A CLEAN cell moves by raising ξ1's bound to ξ0's (both under the
+hart's view); a DIRTY cell (this hart's own buffered store) is
+REGISTERED at ξ1 under the same hart-authorship justification -- the
+author arm of [visibleb], which is what forwarding is.
+
+What makes the rule TOTAL is a representation change in the kit: the
+per-context dirty registry is a MONOTONE SET authority
+([auth (gsetUR (nat * Arch.pa))], [TsoGhost.dset_*]) rather than a
+ghost map with owned element fragments.  Membership is persistent and
+re-mintable from the authority, so registering a key that the receiver
+already has (possible only after a non-deleting lock morph) is not a
+stuck case.  Cells keep their shape; [ctx_wrote] is the same witness.
+Nothing consults the interpretation.  Implementation: [TsoGhost] (the
+authority), [TsoCtx] (the dirty sites, ~35), [TsoCtxMove.v] (the rule
+and its [CtxMove] class, [CtxMorph]'s mirror); then the swtch contract
+takes its payload as a function of the context and moves it, the record
+becomes fully [XIp]-indexed, [cpu_own] gets its λ form.  A6.128.
