@@ -1620,3 +1620,27 @@ SystemUartAccepted.v
 # refutation of the format tree, the double-headed loop induction, the
 # uki_wait_ok formulation) carry to the urun port, queued after
 # upstream's echo re-port lands the pattern.
+
+# fs-syscall-specs lane W: THE UNLINK AU.  FsAbsUnlinkFire is the fire
+# leaf (FsAbsMknodFire / FsAbsOpenFire / FsAbsWriteFire are the one-per-
+# syscall precedent): the four fire points of SpecSysUnlinkAU's two-instant
+# contract, plus the abs_of wrap of the landed dir_entries_unlink_eq, the
+# count-lowered bridge at both iupdates, and the isdirempty bridge in both
+# directions.  R10: SpecSysUnlinkAU and FsAbsMknodFire are untouched.
+#   The walk is ProofSysUnlink's, block for block, at the AU contract:
+# ProofSysUnlinkAUParts is the shared layer (the AU closer, the hoisted
+# projections, the name tie, the fire sites' pure side conditions) and the
+# five blocks are the copy-adapts.  ProofSysUnlinkParts, ProofSysUnlinkTails
+# (every exit block) and ProofSysUnlink's top-level pure layer are REUSED
+# VERBATIM.  ProofSysUnlinkAU seals SYSUNLINK_AU and LinkSysUnlinkAU makes
+# it unconditional -- assumption set = resv_matches, resv_is_valid, funext,
+# i.e. LinkNamexEra's, with nothing new entering the cone.
+FsAbsUnlinkFire.v
+ProofSysUnlinkAUParts.v
+ProofSysUnlinkAUW1.v
+ProofSysUnlinkAUW2.v
+ProofSysUnlinkAUW3.v
+ProofSysUnlinkAUW5F.v
+ProofSysUnlinkAUW5D.v
+ProofSysUnlinkAU.v
+LinkSysUnlinkAU.v
