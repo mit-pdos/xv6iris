@@ -26,6 +26,7 @@ Require Import RiscvExtras.
 Require Import StackOwn CalleeSaved.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfLock.
 Require Import WpLock.
+Require Import WpLockIn.
 Require Import SpecHolding.
 Require Import SpecPushOff.
 Require Import CodeRelease.
@@ -54,13 +55,13 @@ Section ProofRelease.
     [ | let H1 := fresh in let H2 := fresh in
         intro H1; injection H1 as H2; vm_compute in H2; congruence ].
 
-  Lemma wp_release_gen_sconf
+  Lemma wp_release_gen_in_sconf
       (γl : gname) (lka : mword 64) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R} (Dc Out : iProp Σ)
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string)
-    : wp_release_gen_sconf_body kt γl lka s R Dc Out m n eb p av lks.
+    : wp_release_gen_in_sconf_body kt γl lka s R Dc Out m n eb p av lks.
   Proof.
-    cbv beta delta [wp_release_gen_sconf_body].
+    cbv beta delta [wp_release_gen_in_sconf_body].
     intros pcE lk0 ret_tgt. cbv zeta. intros Hlka Hav Href Hrefpre.
     (* [cbv zeta] just inlined the body's [outb]; give it a name again, because
        the ENTRY stack index now mentions it.  release's entry count is
@@ -72,7 +73,7 @@ Section ProofRelease.
        section) [trap_res false + n] IS [n], so nothing below changes there. *)
     pose (outb := match n with O => eb | S _ => false end).
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg #Htext Hpc #Hlock Htoken HR Hfin Hown Hpay Hcont".
+    iIntros "Hcg #Htext Hpc #Hlock Htoken Hfin Hown Hpay Hcont".
     (* THE DEPOSIT (tso-port §0.18′).  The payload arrives at the caller's
        own context and is PUBLISHED as a parked record: mint a fresh
        context ([TsoCtx.ctx_parked_alloc], pure) and hand the facts to it
@@ -93,7 +94,7 @@ Section ProofRelease.
        goes on to the word-clear leaf with what the prelude left. *)
     iDestruct "Hfin" as (Pay) "[Hpre Hfin]".
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    iMod ("Hpre" with "Hrun HR") as "[Hrun HR]".
+    iMod ("Hpre" with "Hrun") as "[Hrun HR]".
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     (* ---- 0x00: c.addi sp,-32 -- the frame trade (k := 4) ---- *)
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
@@ -516,9 +517,60 @@ Section ProofRelease.
       rewrite /R0 upd_ne; [| vm_compute; discriminate]. reflexivity.
   Qed.
 
+  (* THE ORIGINAL GENERIC TIER, as the corollary: the payload at the caller's
+     own context goes into the finisher's prelude ([WpLockIn.lock_finisher_to_in]). *)
+  Lemma wp_release_gen_sconf
+      (γl : gname) (lka : mword 64) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R} (Dc Out : iProp Σ)
+      (m : regfile)
+      (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string)
+    : wp_release_gen_sconf_body kt γl lka s R Dc Out m n eb p av lks.
+  Proof.
+    cbv beta delta [wp_release_gen_sconf_body].
+    intros pcE lk0 ret_tgt. cbv zeta. intros Hlka Hav Href Hrefpre.
+    iIntros "Hcg #Htext Hpc #Hlock Htoken HR Hfin Hown Hpay Hcont".
+    iApply (wp_release_gen_in_sconf γl lka s R Dc Out m n eb p av lks
+              Hlka Hav Href Hrefpre
+              with "Hcg Htext Hpc Hlock Htoken [HR Hfin] Hown Hpay Hcont").
+    iApply (lock_finisher_to_in with "HR Hfin").
+  Qed.
+
 End ProofRelease.
 
 End ReleaseGenProof.
+
+(* The static-kernel-lock instance for a PRE-PARKED payload (A6.127 §6): the
+   caller's prelude yields the free arm's record; the closing body is
+   [WpLockIn.lock_finisher_close_body]. *)
+Module ReleaseInOfGen (G : RELEASE_GEN) : RELEASE_IN.
+
+Section InOfGen.
+  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+
+  Context {kt : ktier}.
+  Lemma wp_release_in_sconf
+      (γl : gname) (lka : mword 64) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R}
+      (m : regfile)
+      (n : nat) (eb : bool) (p : mword 64) (av : nat)
+      (lks : gset string)
+    : wp_release_in_sconf_body kt γl lka s R m n eb p av lks.
+  Proof.
+    cbv beta delta [wp_release_in_sconf_body].
+    intros pcE lk0 ret_tgt. cbv zeta. intros Hlka Hav.
+    iIntros "Hcg #Htext Hpc #Hlock Htoken Hpre Hown Hpay Hcont".
+    iApply (G.wp_release_gen_in_sconf kt γl lka s R False%I emp%I m n eb p av lks
+              Hlka Hav (lock_refute_False _) (lock_refute_False _)
+              with "Hcg Htext Hpc [] Htoken [Hpre] Hown Hpay").
+    { iApply (is_lock_openable with "Hlock"). }
+    { iApply (lock_finisher_close_in with "Hpre"). }
+    iIntros (CIDg Hsg mr) "_ Hcg Hpc %Hcs Hown".
+    iSpecialize ("Hcont" $! CIDg with "[%]"); [exact Hsg|].
+    iApply ("Hcont" $! mr with "Hcg Hpc [//] Hown").
+  Qed.
+
+End InOfGen.
+
+End ReleaseInOfGen.
 
 (* The static-kernel-lock instance: the finisher closes the invariant, so
    nothing comes back out.  Verbatim the statement the thirteen ordinary

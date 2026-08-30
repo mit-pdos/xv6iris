@@ -477,8 +477,9 @@ Section ProofMainSecondary.
       + (* ---- THE ABSORB, at the second open ----
              M2 DEBT, named: [hart_view_lb K ∗ ⌜T ≤ K⌝] is discharged at
              [K := T] by the SC-only shim, exactly as the scheduler's resume
-             already does ([ProofSwtch]); the sweep that makes [K] real is
-             one item serving both (tso-absorb-memo.md §7).  NOT
+             did until Amendment 9 ([ProofSwtch] now cashes a real floor,
+             [TsoCtxPark.ctx_resume_floor]); the sweep that makes [K] real
+             here is the AMO's [hart_view_lb_get] (tso-absorb-memo.md §7).  NOT
              [TsoCtxShim.ctx_dom_sc]: a bare [inv] has no acquire, so a
              [ctx_dom] here would have no honest producer and would be a
              permanent lie -- absorb's premise is HART-LOCAL and says nothing

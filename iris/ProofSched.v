@@ -738,7 +738,7 @@ Section ProofSched.
     assert (HB1ra : B1 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.sched + 0x14) : mword 64) 4)
       by (rewrite /B1 upd_eq; reflexivity).
     iApply (Holding.wp_holding_lockinv_locked_s_sconf KT1 γl (proc_addr j) "proc"
-              <{ proc_lock_res γs γl (proc_addr j) }> False%I B1 (av - 6)%nat pj
+              (proc_lock_pay γs γl (proc_addr j)) False%I B1 (av - 6)%nat pj
               Hlkb ltac:(lia) (lock_refute_False _)
               with "Hcg Htext Hpc [] Hlocked").
     { iApply (is_lock_openable with "Hislock"). }
@@ -1349,11 +1349,15 @@ Section ProofSched.
                     with "Htc [Hlocked Hstate Hchan Hpub] Htag Hpp") as "HP".
       { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hpub". }
       iEval (rewrite Hnc) in "HP".
+      iApply fupd_wp.
+      iMod (sched_vc_at_tok γs ⊤ cpu_id with "Hvc") as (XIs) "[Hown Hrec]".
+      iModIntro.
       iApply (Swtch.wp_swtch_sconf (p_sched γs) (Some cpu_id) None
                 (p_context (proc_addr j)) (a_cpu_ctx cid_word)
                 Mc ctxvs 0%nat eb pj false
-                Hctxlen Holdc Hnewc (adm_pin cpu_id)
-                with "Htext Hcg0 Hcpu Hpc Hctxcells Hvc [HP] []").
+                Hctxlen Holdc Hnewc (adm_pin cpu_id) (adm_none cpu_id)
+                with "Htext Hcg0 Hcpu Hpc Hctxcells [Hown Hrec] [HP] []").
+      { iExists XIs. iFrame "Hrec". rewrite /resume_tok. iExact "Hown". }
       { iEval (rewrite (rget_tp Mc)). iExact "HP". }
       done. }
     (* ---- A RESUMABLE PARK: the caller comes back, so its continuation is
@@ -1372,11 +1376,15 @@ Section ProofSched.
        record sched deposits for ITSELF is a PROC context, hence MIGRATABLE
        ([Ao = None]) -- which is what makes the whole post-resume half below
        ∀-hart, and what lets [procs_inv] be hart-free. *)
+    iApply fupd_wp.
+    iMod (sched_vc_at_tok γs ⊤ cpu_id with "Hvc") as (XIs) "[Hown Hrec]".
+    iModIntro.
     iApply (Swtch.wp_swtch_sconf (p_sched γs) (Some cpu_id) None
               (p_context (proc_addr j)) (a_cpu_ctx cid_word)
               Mc ctxvs (av - 6)%nat eb pj true
-              Hctxlen Holdc Hnewc (adm_pin cpu_id)
-              with "Htext Hcg Hcpu Hpc Hctxcells Hvc [HP]").
+              Hctxlen Holdc Hnewc (adm_pin cpu_id) (adm_none cpu_id)
+              with "Htext Hcg Hcpu Hpc Hctxcells [Hown Hrec] [HP]").
+    { iExists XIs. iFrame "Hrec". rewrite /resume_tok. iExact "Hown". }
     { iEval (rewrite (rget_tp Mc)). iExact "HP". }
     (* THE SEAM IS CLOSED BY THE CONTRACT, not by a ghost fact: [SpecSwtch]
        pins the held set at [{["proc"]}] on BOTH sides, because
@@ -1397,6 +1405,12 @@ Section ProofSched.
     iDestruct "Hpay2" as (γl' ch') "(%Hgl' & Hheld' & Htag')".
     assert (γl' = γl) as -> by (rewrite Hgl in Hgl'; injection Hgl'; auto).
     iEval (rewrite Hcret) in "Hvc'".
+    (* the scheduler's record comes back with its RUNNING token beside it
+       ([park_tok (Some h)]); fold it back under the later the slot holds it
+       beneath ([sched_vc_at_intro]). *)
+    iDestruct "Hvc'" as (XIo) "[Htok Hrec]".
+    iEval (rewrite /park_tok) in "Htok".
+    iDestruct (sched_vc_at_intro γs h _ _ XIo with "Htok Hrec") as "Hvc'".
     (* callee-image component equalities. *)
     unfold callee_img, ctx_regs in Hcallee. simpl in Hcallee.
     injection Hcallee as Hm1 Hm2 Hm8 Hm9 Hm18 Hm19 Hm20 Hm21 Hm22 Hm23 Hm24 Hm25 Hm26 Hm27.

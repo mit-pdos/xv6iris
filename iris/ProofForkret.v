@@ -1834,7 +1834,7 @@ Proof.
   (* the arm splits: what release wants and what prepare_return will *)
   iDestruct (arm_pay_ext_split eb p with "Htc Hclm") as "[Hpay [Hext Hcx]]".
   iApply (RL.wp_release_sconf KT1 γl p "proc"%string
-            <{ proc_lock_res γs γl p }> M5 0%nat eb p av2 {["proc"%string]}
+            (proc_lock_pay γs γl p) M5 0%nat eb p av2 {["proc"%string]}
             Hlka ltac:(lia) with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").
   iIntros (CIDr Hkr mr) "Hcg Hpc %Hcsr Hcpu".
   assert (Hpc14 : ret_pc (M5 !!! Regidx Rra) = mword_of_int (FR + 0x14))

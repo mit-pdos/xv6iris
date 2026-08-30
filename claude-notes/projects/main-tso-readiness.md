@@ -1083,3 +1083,53 @@ A6.124/A6.125 payload shapes (`avail_half`, `hcell_map`, `keep_map`) and
 A6.126's release arm: below the seal or still moving on the T-leg. §0.27′
 (the forked child's own context), §0.39′, the U tier (§0.37′): the stubs
 of Amendment 6.3 stay.
+
+
+# AMENDMENT 9 (2026-08-29) — §0.42′'s VOCABULARY LANDED: the park box, the token beside the record, the λ-payload p->lock
+
+Executes the T-leg's Amendment 9 (`main-tso-readiness.md` on `tso`,
+`a8c714f52`): the §0.42′ unit as it stands at `tso-flip` r51
+(`2cec2c862`, A6.127 §5–§7), copied to main under the owner's standing
+rule for this project — **nothing designed on main; every definition,
+statement, name, proof route, comment and functor signature is r51's
+text**, with only the measured deviations below.  The unit is r51's
+r50→r51 diff exactly (35 files, 822+/180− there; 872+/180− here, the
+extra lines being the deviation comments).  Gate, on `origin/main`
+`7b1b4d163`: full `-k` build `MAKEEXIT=0`, `audit-only` = the sanctioned
+13, `kernel-rocq/`/`user-rocq/` unchanged, zero `Admitted`/`Axiom` in
+`iris/`.  Landed as ONE commit on `main`; built in two stages (K = the
+additive kit, S = the conversion), each certified green before the next.
+
+## 9.1 What landed (r51's shapes; see the T-leg entry for the statements)
+
+| r51 item | on main |
+|---|---|
+| `TsoCtxPark.v` (new) | `ctx_parked_raise`, `ctx_park_box`, `ctx_resume_floor`, `Global Instance ctx_morph_floor`, `ctx_box_over` — statements verbatim; `llb loglen_name` is main's sealed `log_lb`; bodies by the unseal lemmas (no `mono_nat`, no `llb_max`), the `TsoCtxAbsorbLb.v` arrangement. |
+| `WpLockIn.v` (new) | the five items verbatim, over main's `WpLock` exports; `lock_finisher_close_body`'s tail follows main's `lock_finisher_close` (r51's `[#Hc4 Hword]` ledger pairs are A6.89, below the seal). |
+| `SpecRelease`/`ProofRelease`/`LinkRelease` | `wp_release_gen_in_sconf` is THE proof (the old prelude `iMod ("Hpre" with "Hrun HR")` became `iMod ("Hpre" with "Hrun")` — a two-line change inside the big proof, because Amendment 8 had already moved the prelude to entry); `wp_release_gen_sconf` its corollary via `lock_finisher_to_in`; `wp_release_in_sconf_body`, `RELEASE_IN`, `ReleaseInOfGen`, `LinkRelease.ReleaseIn`. Cancel post keeps `lka ↦₄ 0` (A6.126 deferred, 8.3). |
+| `SwtchCtx` | `park_tok`/`resume_tok`, `valid_context P A c p XIp` (identity a parameter, token out of the record, the stack at `XIp`). NOT restated: r51's `stack_own_morph` — main's `StackOwn.v:436` already exports that instance, non-modally (r51's `StackOwn` has only the `==∗` reindex, which is why r51 restates it); a comment stands in its place. Main's `ctx_cells_morph`/`own_ctx_morph` and wand-form `ctx_cells_at_morph` kept (main's `CtxMorph` is `-∗`). |
+| `SpecSwtch`, `ProofSched` | byte-identical to r51. |
+| `SchedCtx` | r51's text except the two kept main forms: `cpu_ctx_free` bare `∃ vs ξ` (6.5 deferral) and the trailing `Global Typeclasses Opaque procs_inv`. The 38 `<{ proc_lock_res … }>` sites in 16 files are `(proc_lock_pay …)`; the two remaining mentions are `TsoCtx.v` comments. |
+| `ProofSwtch` | r51's proof; `TsoCtxShim` import, `hart_view_lb_any` (resume) and `ctx_dom_sc` (the stack re-index) GONE. Not taken: r51's two block-engine `Hctx` lines — main's `wp_vc_block_s_den_r` takes no `own_context` premise (the token is an ordinary spatial hypothesis across the block). |
+| `ProofScheduler` (+`LinkScheduler` `ReleaseIn`), `ProofUserinit`, `ProofKforkB5`, `ProofKforkMain`, `LinkUserinit` (keeps `UG`), `LinkKfork`, `SpecProcinit`, the 12 sed'd consumers | r51's hunks verbatim. `ProofScheduler`'s `cpu_ctx_free` claim still rides `ctx_dom_sc` (6.5). |
+| `SpecForkretPark(Paid)`, `ParkCap` | conclude `proc_ctx_boxed`; main's arities kept (`U : ustate`; no `own_context`/`ξp` threading — main's park channel is its own design, Amendment 6.2). |
+| `ProofForkretPark` | `proc_ctx_boxed` from the 6.3 stub: `XIp := cur_ctx`, `Tp := 0`, the token `TsoCtxShim.ctx_parked_any cur_ctx 0` (posed as `Hthr0`); the BOX half is honest (`ctx_box_over`), so the consumers see r51's exact shape. No `ctx_parked_alloc`/`ctx_deposit` of the stack (the child's own context is the deferred §0.27′ item). Header block records it. |
+
+## 9.2 Measured
+
+- Stage K (kit + release tier): round 1 = 243 files, one red (`TsoCtxPark.v`: a stray `done.` after a closing `iFrame`, then `Cannot infer the implicit parameter Σ of CtxMorph` — fixed with `CtxMorph (Σ := Σ)`, the `TsoCtxAbsorbLb.hart_view_lb_max` idiom); round 2 `MAKEEXIT=0`. Every existing release consumer compiled unchanged.
+- Stage S: spec probe (`SwtchCtx`/`SpecSwtch`/`SchedCtx`) green first; round 1 = 503 files, one red (`ProofForkretPark`: `"Hthr" … not fresh` — the stub's pose collided with r51's binder; renamed the stub's pose, r51's line kept); round 2 = 125 files, `MAKEEXIT=0`; `AUDITEXIT=0`, 13.
+- Review (an independent agent, read-only, every one of the 35 files three-way against r51): no residual difference outside the sanctioned list except `WpLockIn.v`'s section binders (main's `!lockG Σ` for r51's `!xv6G Σ` + `GenId` — a weakening, not forced) and two comment nits in `ProofRelease.v`; all three restored to r51's text. Certifying round after that: 233 files recompiled, `MAKEEXIT=0`, 0 `Error`; `audit-only` re-run = the sanctioned 13.
+- Live `hart_view_lb_any`: THREE — `ProofBread`, `ProofBrelse`, `ProofMainSecondary` (8.1's four minus `ProofSwtch`). Live `ctx_dom_sc`: `ProofScheduler` (the `cpu_ctx_free` claim) and `WpLock.lock_pay_intro_sc` (the creators). `grep -l TsoCtxShim`: 69 files (`ProofSwtch` only by the retained A6.86 comment, as on r51).
+- `ProofMainSecondary`'s absorb comment (main-only text from Amendment 6) cited `ProofSwtch` as the precedent for the shim receipt; updated to say the scheduler's resume now cashes a real floor.
+
+## 9.3 Departures from r51's text, complete (all recorded in source)
+
+1. `log_lb` for `llb loglen_name`; SC-trivial bodies (the seal).
+2. `TsoCtxPark.v` imports = `TsoCtxAbsorbLb.v`'s (no `TsoMemPa`/`TsoGhost`/`mono_nat`); `CtxMorph (Σ := Σ)` on `ctx_morph_floor`; `ctx_resume_floor` skips r51's `iAssert (hart_view_lb K)` re-assertion (main's `own_context_floor_view` already yields `hart_view_lb`).
+3. `WpLockIn.v` is r51's text (binders, imports, bare names) but for `lock_finisher_close_body`'s tail.
+4. `SwtchCtx.stack_own_morph` not restated (StackOwn's instance); `ProofSwtch`'s engine `Hctx` lines not taken; `ProofForkretPark`'s stub and `Hthr0`; `SpecForkretParkPaid`/`ParkCap` arities; `cpu_ctx_free`; `Typeclasses Opaque procs_inv`; the cancel post.
+
+## 9.4 Deferred, as on r51
+
+The per-hart cells' hand-off across swtch (`cpu_own`, `p_sched`) stays at the ambient — a hart-tier unit (A6.127 §6); the fork child's own context (6.3 / §0.27′); `cpu_ctx_free`'s parked record (6.5).

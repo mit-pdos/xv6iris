@@ -101,7 +101,34 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Require Import TsoCtx.
+Require Import TsoCtxPark.   (* [ctx_box_over] -- the record's PARK BOX (A6.127 §5) *)
 Require Import TsoCtxShim.   (* [ctx_parked_any] -- the record's token, SC stub *)
+
+(* ===================================================================== *)
+(* MAIN'S DEVIATION AT THIS SITE (Amendment 6.3 / Amendment 9).           *)
+(*                                                                       *)
+(* §0.42′ moves the parked record's token OUT of the record and beside    *)
+(* it, boxed: what a child-record producer owes is                        *)
+(* [SchedCtx.proc_ctx_boxed pa] -- a fresh stamped PARK BOX [ξb], the     *)
+(* record's own token [ctx_parked XIp Tp], and the link                   *)
+(* [ctx_floor ξb Tp] the parker's release makes the lock's context.       *)
+(*                                                                       *)
+(* On the T-leg the producer MINTS the child's identity                   *)
+(* ([TsoCtx.ctx_parked_alloc]) and DEPOSITS the child's stack into it     *)
+(* ([TsoCtx.ctx_deposit] at [StackOwn.stack_own_morph]), so [XIp] is a    *)
+(* genuinely fresh context and the box is raised over ITS stamp.          *)
+(* MAIN CANNOT: [procs_inv] has no transport channel here (Amendment 6.3, *)
+(* the deferred §0.27′ item), so this is one of the TWO SC STUB SITES --  *)
+(* the record stays AT THE PARKER'S CONTEXT, [XIp := cur_ctx], and its    *)
+(* token is [TsoCtxShim.ctx_parked_any cur_ctx 0].  THERE IS NO STACK     *)
+(* DEPOSIT, and none is needed: the record's stack is already stated at   *)
+(* [cur_ctx = XIp], which is exactly what [valid_context_pre] asks for.   *)
+(* What IS honest here is the box: [TsoCtxPark.ctx_box_over] mints the    *)
+(* fresh stamped [ξb] with the floor over the stub's stamp, so the        *)
+(* [proc_ctx_boxed] shape the consumers (kfork B5, userinit) release      *)
+(* through [WpLockIn] is the T-leg's exactly.  At the TSO cutover only    *)
+(* the two lines that produce [Hthr]/[XIp] move.                          *)
+(* ===================================================================== *)
 
 Module ForkretParkProof (FR : FORKRET) : FORKRET_PARK_PAID.
 
@@ -186,22 +213,29 @@ Proof.
      and restate the child's rows at it; main cannot ([procs_inv] has no
      transport without the caps channel), so the record keeps the parker's
      context and the SC stub supplies the token. *)
-  iPoseProof (TsoCtxShim.ctx_parked_any cur_ctx 0) as "Hthr".
+  iPoseProof (TsoCtxShim.ctx_parked_any cur_ctx 0) as "Hthr0".
+  (* THE PARK BOX (A6.127 §5): a fresh stamped context whose stamp is over
+     the record's, carrying the link the resumer will cash.  This half is
+     honest; only the record's identity [XIp := cur_ctx] and its token are
+     the stub's (file header). *)
+  iMod (ctx_box_over cur_ctx 0 with "Hthr0") as "[Hthr (%ξb & Hbox & #Hfl)]".
+  iModIntro.
+  rewrite /proc_ctx_boxed. iExists ξb, 0%nat. iFrame "Hbox".
+  rewrite /proc_ctx_at. iExists cur_ctx, 0%nat. iFrame "Hthr Hfl".
   (* the package is under a later and is opened only past the context's
      own [▷] -- which is what lets the token it names be a fixpoint *)
-  iModIntro. iNext.
+  iNext.
   iEval (rewrite /forkret_park_pkg) in "Hpkg".
   iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hmk & Hstk & Hclose)".
   (* ---- the record: the cells allocproc left, and the free stack ---- *)
-  rewrite /proc_ctx
-          (valid_context_unfold (p_sched γs) None (p_context (proc_addr j)) (proc_addr j))
+  rewrite (valid_context_unfold (p_sched γs) None (p_context (proc_addr j))
+             (proc_addr j) cur_ctx)
           /valid_context_pre.
-  iExists (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest), av, cur_ctx, 0%nat.
+  iExists (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest), av.
   iSplit; [iPureIntro; cbn [length]; lia |].
   iSplit; [iPureIntro; apply ret_pc_aligned |].
   iFrame "Hctx".
   iSplitL "Hstk"; [cbn [nth]; iExact "Hstk" |].
-  iSplitL "Hthr"; [iExact "Hthr" |].
   (* ================================================================== *)
   (* THE RESUME WAND -- forkret's precondition, assembled.               *)
   (* ================================================================== *)
@@ -255,6 +289,12 @@ Proof.
   iAssert (own_ctx (p_context (proc_addr j))) with "[Hcells]" as "Hown".
   { iExists (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest).
     iFrame "Hcells". iPureIntro. cbn [length]. lia. }
+  (* the dispatching scheduler's record came back with its RUNNING token
+     beside it ([SwtchCtx.park_tok (Some h)]); fold it back under the later
+     the running slot holds it beneath (A6.127 §6). *)
+  iDestruct "Hrec" as (XIo) "[Htok Hrec]".
+  iEval (rewrite /park_tok) in "Htok".
+  iDestruct (sched_vc_at_intro γs h _ _ XIo with "Htok Hrec") as "Hrec".
   iDestruct (proc_slots_running_intro γs j h Hj with "Htag2 Hown Hrec Hmk")
     as "Hslots".
   iDestruct (proc_lock_res_intro γs γl (proc_addr j) RUNNING ch

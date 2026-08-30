@@ -3,4 +3,4 @@
    four ever meet. *)
 Require Import LinkAcquire LinkRelease LinkSwtch ProofScheduler.
 
-Module Scheduler := SchedulerProof Acquire Release Swtch.
+Module Scheduler := SchedulerProof Acquire Release ReleaseIn Swtch.

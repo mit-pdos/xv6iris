@@ -35,4 +35,4 @@ Require Import ProofUserinit.
    and nothing more, so this application adds no assumption. *)
 Module UG := UexecGen UserProof.
 
-Module Userinit := UserinitProof Allocproc NameiRootBoot Release ForkretParkPaid UG.
+Module Userinit := UserinitProof Allocproc NameiRootBoot Release ReleaseIn ForkretParkPaid UG.

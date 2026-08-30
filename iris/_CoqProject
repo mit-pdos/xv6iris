@@ -56,6 +56,7 @@ TsoCtx.v
 TsoCtxShim.v
 TsoCtxAbsorbLb.v
 CtxMorphTac.v
+TsoCtxPark.v
 CtxRecord.v
 PermInv.v
 PageGeom.v
@@ -467,6 +468,7 @@ WpAmo.v
 CodeHolding.v
 CodeAcquire.v
 WpLock.v
+WpLockIn.v
 WpLockAt.v
 ArrCursor.v
 FdSlots.v

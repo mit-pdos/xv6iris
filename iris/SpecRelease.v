@@ -38,6 +38,7 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import WpLock.
+Require Import WpLockIn.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
@@ -105,6 +106,62 @@ Definition wp_release_gen_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* THE GENERIC FORM, INPUT-SIDE (A6.127 §6): the same contract with the
+   finisher already holding its payload.  The proof is this one; the
+   original generic tier is its corollary (ProofRelease.v). *)
+Definition wp_release_gen_in_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (R : CtxId → iProp Σ) (Dc Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.release in
+  let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (* the arm on the way OUT: at n = 0 the level fully unwinds, so pop_off's
+     re-enable flip fires and the live SIE mode becomes exactly the saved
+     base [eb]; at any deeper n it stays disabled -- see
+     [CpuOwn.cpu_own]/[IntrDefs.intr_count]/[intr_count_dec], which pins the
+     ghost eighth at '0' unconditionally for every [S _] level. *)
+  let outb := match n with O => eb | S _ => false end in
+  add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
+  (10 <= av)%nat ->
+  (⊢ locked γl cpu_id -∗ Dc -∗ False) ->
+  (⊢ locked_pre γl cpu_id -∗ Dc -∗ False) ->
+  (* holding the lock forces the level to be at least 1, hence interrupts
+     disabled on entry -- this is not a choice, it is what [cpu_own (S n)]
+     already means *)
+  (* [trap_res outb + av], NOT [av] -- and [av] here is the EXIT usable count.
+     release ends in pop_off, which at [n = 0] with an enabled base RE-ENABLES
+     interrupts, and re-enabling must PUT THE TRAP RESERVE BACK.  The carve is
+     conserved across the flip (entry [trap_res false + (trap_res outb + av)] =
+     [trap_res outb + av], exit [trap_res outb + av]), so this is a pure
+     re-indexing of the same stack ownership; the reserve is paid out of the
+     caller's usable slots -- precisely the ones acquire's push_off freed for
+     it.  Naming the ENTRY index as the sum is what makes the acquire/release
+     pair compose SYNTACTICALLY and kills the [kv_frame_slots <= av] side
+     condition: acquire handed the caller [trap_res b + av], [cpu_own] forces
+     [b = outb] ([CpuOwn.cpu_own_eb_agree]), so the caller's index is ALREADY of
+     this shape.  At [outb = false] (a nested critical section) the index is
+     [trap_res false + av], DEFINITIONALLY [av], so those callers are untouched.
+     [10 <= av] does not move: release's own 10-slot frame comes out of the
+     entry count [trap_res outb + av >= av]. *)
+  sie_cap_gpr kt m (trap_res outb + av)%nat false p -∗
+  kernel_text -∗ pc_is pcE -∗
+  lock_openable γl lka s R Dc -∗
+  locked γl cpu_id -∗
+  (* THE INPUT-SIDE FINISHER (A6.127 §6): the caller has closed over its
+     payload -- pre-parked, for a release that creates a thread record
+     ([WpLockIn.lock_finisher_in]); [wp_release_gen_sconf_body] below is
+     the special case with the payload at the caller's own context. *)
+  lock_finisher_in γl lka s R Dc Out (⊤ ∖ ↑minstretN) -∗
+  cpu_own (S n) eb p false lks -∗
+  arm_pay kt n eb p -∗
+  wp_next outb p (fun (CID : CpuId) =>
+    ∀ mr,
+    Out -∗
+    sie_cap_gpr kt mr av outb p -∗
+    pc_is ret_tgt -∗
+    ⌜ callee_saved m mr ⌝ -∗
+    cpu_own n eb p outb (lks ∖ {[s]}) -∗
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Definition wp_release_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (R : CtxId → iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.release in
   let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
@@ -134,6 +191,49 @@ Definition wp_release_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID :
   locked γl cpu_id -∗
   (* the deposit, AT THE CALLER'S OWN CONTEXT (tso-port M3) *)
   R cur_ctx -∗
+  cpu_own (S n) eb p false lks -∗
+  arm_pay kt n eb p -∗
+  wp_next outb p (fun (CID : CpuId) =>
+    ∀ mr,
+    sie_cap_gpr kt mr av outb p -∗
+    pc_is ret_tgt -∗
+    ⌜ callee_saved m mr ⌝ -∗
+    cpu_own n eb p outb (lks ∖ {[s]}) -∗
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
+(* The static-kernel-lock instance for a PRE-PARKED payload (A6.127 §6). *)
+Definition wp_release_in_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (R : CtxId → iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.release in
+  let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (* see [wp_release_gen_sconf_body] for why this is the exit arm *)
+  let outb := match n with O => eb | S _ => false end in
+  add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
+  (10 <= av)%nat ->
+  (* [trap_res outb + av], NOT [av] -- and [av] here is the EXIT usable count.
+     release ends in pop_off, which at [n = 0] with an enabled base RE-ENABLES
+     interrupts, and re-enabling must PUT THE TRAP RESERVE BACK.  The carve is
+     conserved across the flip (entry [trap_res false + (trap_res outb + av)] =
+     [trap_res outb + av], exit [trap_res outb + av]), so this is a pure
+     re-indexing of the same stack ownership; the reserve is paid out of the
+     caller's usable slots -- precisely the ones acquire's push_off freed for
+     it.  Naming the ENTRY index as the sum is what makes the acquire/release
+     pair compose SYNTACTICALLY and kills the [kv_frame_slots <= av] side
+     condition: acquire handed the caller [trap_res b + av], [cpu_own] forces
+     [b = outb] ([CpuOwn.cpu_own_eb_agree]), so the caller's index is ALREADY of
+     this shape.  At [outb = false] (a nested critical section) the index is
+     [trap_res false + av], DEFINITIONALLY [av], so those callers are untouched.
+     [10 <= av] does not move: release's own 10-slot frame comes out of the
+     entry count [trap_res outb + av >= av]. *)
+  sie_cap_gpr kt m (trap_res outb + av)%nat false p -∗
+  kernel_text -∗ pc_is pcE -∗
+  is_lock γl lka s R -∗
+  locked γl cpu_id -∗
+  (* THE DEPOSIT, PRE-PARKED (A6.127 §6): the free arm's record itself,
+     produced from the caller's running token -- what a release that just
+     created a thread record holds (its park box is the lock's context) *)
+  (own_context cur_ctx ==∗ own_context cur_ctx ∗ lock_pay R) -∗
   cpu_own (S n) eb p false lks -∗
   arm_pay kt n eb p -∗
   wp_next outb p (fun (CID : CpuId) =>
@@ -209,10 +309,19 @@ Definition wp_release_cancel_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} 
   WP (Loop : expr riscv_lang).
 
 Module Type RELEASE_GEN.
+  Parameter wp_release_gen_in_sconf :
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R} (Dc Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string),
+      wp_release_gen_in_sconf_body kt γl lka s R Dc Out m n eb p av lks.
   Parameter wp_release_gen_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R} (Dc Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string),
       wp_release_gen_sconf_body kt γl lka s R Dc Out m n eb p av lks.
 End RELEASE_GEN.
+
+Module Type RELEASE_IN.
+  Parameter wp_release_in_sconf :
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (R : CtxId → iProp Σ) `{!CtxMorph R} (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string),
+      wp_release_in_sconf_body kt γl lka s R m n eb p av lks.
+End RELEASE_IN.
 
 Module Type RELEASE.
   Parameter wp_release_sconf :
