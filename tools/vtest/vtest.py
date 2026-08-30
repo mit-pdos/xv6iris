@@ -47,6 +47,14 @@ def config(name):
     captured as a SET of observations rather than one."""
     src = os.path.join(TESTDIR, name + ".S")
     cfg = {"repeat": 1, "drives": "cache=writeback", "smp": 1, "serial_in": "",
+           # A SEPARATE REPEAT COUNT FOR THE BOARD, because a board run costs
+           # ~4 s of JTAG round trips where a QEMU run costs milliseconds.
+           # conc_sb wants repeat=700 on QEMU to hunt the rare (0,0); on the
+           # board that is 48 MINUTES to sample a test that performs ONE race
+           # per run, and it silently blew past two sweep timeouts.  The
+           # sensitive instrument for that question is conc_sbx, which does
+           # 200000 races in a single run.  Defaults to `repeat` when unset.
+           "board_repeat": "",
            # WHICH PLATFORMS THIS CASE IS MEANINGFUL ON.  There is ONE set of
            # test cases; executing a case on a platform produces a test RUN,
            # so a case yields zero, one or two runs.  The default is both.
@@ -98,7 +106,8 @@ def config(name):
         if m:
             for kv in m.group(1).split():
                 k, _, v = kv.partition("=")
-                cfg[k] = int(v) if k in ("repeat", "smp", "budget", "tick") else v
+                cfg[k] = int(v) if k in ("repeat", "smp", "budget", "tick",
+                                                 "board_repeat") else v
     return cfg
 
 def build(name, defines=(), march="rv64imafd", tag=""):

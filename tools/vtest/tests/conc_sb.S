@@ -38,7 +38,7 @@
  *                                     +0x128  A0     +0x12c  A1  (warm-up)
  *                                     +0x130  DONE1
  */
-/* vtest: smp=2 repeat=700 builder=multi budget=20000 */
+/* vtest: smp=2 repeat=700 builder=multi budget=20000 board_repeat=120 */
 #include "abi.h"
 
 #define R_A       8

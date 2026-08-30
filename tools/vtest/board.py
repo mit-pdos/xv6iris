@@ -817,7 +817,7 @@ def main():
                 harts.append(p["primary_hart"] + k)
             if a.takeover:
                 harts = sorted(set(harts) | {p["firmware_hart"]})
-            reps = a.repeat or cfg["repeat"]
+            reps = a.repeat or cfg.get("board_repeat") or cfg["repeat"]
             seen, counts = {}, {}
             try:
                 for _ in range(reps):
