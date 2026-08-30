@@ -126,6 +126,15 @@ PROFILES = {
 DEFAULT_PROFILE = "visionfive2"
 
 
+class BoardRunFailed(Exception):
+    """A test that did not reach [_vtest_done].  An EXCEPTION rather than a
+    [sys.exit] so that a sweep can record it and carry on -- one test that
+    hangs should not cost the other thirty."""
+    def __init__(self, name, msg):
+        super().__init__(msg)
+        self.name, self.msg = name, msg
+
+
 def runnable_tests(p):
     """The tests that MEAN something on this board, in suite order.
 
@@ -523,7 +532,7 @@ class Board:
         if "Hardware assisted breakpoint" not in bp:
             # no symbols (or no trigger left): fall back to the poll
             return self._run_polled(name, harts, timeout, t0)
-        _, ok = g.cont(timeout)
+        _, hit = g.cont(timeout)
         ms = (time.time() - t0) * 1000
         g.cmd("delete breakpoints")
 
@@ -533,6 +542,21 @@ class Board:
               % (dump, ABI["RESULT_BASE"], ABI["RESULT_BASE"] + ABI["RESULT_SIZE"]))
         result = open(dump, "rb").read() if os.path.exists(dump) else b""
 
+        # THE DONE FLAG IS THE CONTRACT, NOT THE BREAKPOINT.  abi.h: the flag
+        # is written last, after a fence, so a reader that sees it sees a
+        # complete result.  The breakpoint on [_vtest_done] is only an
+        # ACCELERATOR for the common shape -- a test whose body returns
+        # normally, so vtest.S writes the flag and parks there.
+        #
+        # A TEST MAY PUBLISH AND PARK SOMEWHERE ELSE, and several do: every
+        # pt_ program has its own M-mode backstop that records the trap,
+        # writes DONE, and loops inside the HANDLER.  Trusting the breakpoint
+        # alone reported all nine of them as "never finished" when they had
+        # finished -- measured 2026-08-30, and it is why the flag is checked
+        # here regardless of whether the breakpoint fired.
+        ok = (len(result) >= 4 and
+              int.from_bytes(result[0:4], "little") == ABI["DONE_MAGIC"])
+
         if not ok:
             status = int.from_bytes(result[4:8], "little") if len(result) >= 8 else -1
             pcs = ""
@@ -540,7 +564,8 @@ class Board:
                 g.cmd("thread %d" % tm[h])
                 pcs += g.cmd('printf "  hart %d pc=%%#lx mcause=%%#lx mepc=%%#lx '
                              'mtval=%%#lx\\n", $pc, $mcause, $mepc, $mtval' % h)
-            sys.exit("%s: the board never reached _vtest_done within %.1fs\n"
+            raise BoardRunFailed(name,
+                     "%s: the board never reached _vtest_done within %.1fs\n"
                      "  status word = 0x%08x\n%s\n"
                      "  (a pc parked at 0 means the program TRAPPED: mtvec is "
                      "0, so a fault is a trap loop at 0 -- exactly what the "
@@ -709,6 +734,9 @@ def main():
     ap.add_argument("--board", default=DEFAULT_PROFILE)
     ap.add_argument("--repeat", type=int, default=0)
     ap.add_argument("--timeout", type=float, default=15.0)
+    ap.add_argument("-k", "--keep-going", action="store_true",
+                    help="a test that does not finish is reported and the "
+                         "sweep continues.  What `run --all` wants.")
     ap.add_argument("--takeover", action="store_true",
                     help="also take over the firmware hart.  Gives a quiescent "
                          "machine (nothing else polling the UART), at the cost "
@@ -742,7 +770,7 @@ def main():
                   % (n, len(t), len(pad_image(t))))
         return
 
-    b = Board(p)
+    b, failed = Board(p), []
     try:
         for n in names:
             cfg = vtest.config(n)
@@ -755,12 +783,19 @@ def main():
                 harts = sorted(set(harts) | {p["firmware_hart"]})
             reps = a.repeat or cfg["repeat"]
             seen, counts = {}, {}
-            for _ in range(reps):
-                r = b.run(n, text, regions_for(n), harts,
-                          timeout=a.timeout, takeover=a.takeover, elf=elf)
-                key = bytes(r["result"])
-                seen.setdefault(key, r)
-                counts[key] = counts.get(key, 0) + 1
+            try:
+                for _ in range(reps):
+                    r = b.run(n, text, regions_for(n), harts,
+                              timeout=a.timeout, takeover=a.takeover, elf=elf)
+                    key = bytes(r["result"])
+                    seen.setdefault(key, r)
+                    counts[key] = counts.get(key, 0) + 1
+            except BoardRunFailed as e:
+                if not a.keep_going:
+                    sys.exit(e.msg)
+                failed.append(e)
+                print("%-16s DID NOT FINISH" % n)
+                continue
             alts = sorted(seen.keys())
             r = seen[alts[0]]
             print("%s: %d run(s) on harts %s -> %d distinct result(s), %.0f ms"
@@ -794,6 +829,10 @@ def main():
                     print("  SUM over %d runs, +8..+36: %s"
                           % (reps, " ".join("%d" % tot[o]
                                             for o in range(8, 40, 4))))
+        if failed:
+            print("\n%d of %d did not finish:" % (len(failed), len(names)))
+            for e in failed:
+                print(e.msg)
     finally:
         b.close()
 
