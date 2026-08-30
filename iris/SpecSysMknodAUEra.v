@@ -141,6 +141,7 @@ Require Import FsAbsEraMknod.    (* the era twins of the walk predicates *)
 Require Import FsAbsMknodFire.   (* the authority-shaped commits         *)
 Require Import SpecCreateAU.     (* [cau_ok] / [cau_fail]                *)
 Require Import FsAbs.            (* LAST (FsAbs's own rule)              *)
+Require Import PathElems.  (* [path_elems] -- previously via the trimmed SpecSysMknodAU *)
 Import Defs.
 Require Import TsoCtx.
 
