@@ -103,7 +103,16 @@ _vtest_body:
     li   t0, 15                      /* | DRIVER_OK */
     sw   t0, 0x70(s0)
 
-/* ---- 2. the two buffers: the write pattern, and the 0xaa prefill ---- */
+/* ---- 2. the two buffers: the write pattern, and the 0xaa prefill ----
+ *
+ * EIGHT doublewords, not the whole 512-byte sector.  These two loops used
+ * to run 64 iterations each and were ~900 of this test's ~910 model
+ * instructions -- its entire runtime -- to fill bytes the test never looks
+ * at individually.  What it actually checks is which SECTOR the device
+ * wrote and whether it scribbled outside its chain, and a pattern in the
+ * first 64 bytes answers both: a wrong-sector write still lands wrong, and
+ * a scribble still lands on a marked doubleword.  The rest of the sector is
+ * zero, which the capture records like any other byte. */
     addi t0, s1, VWBUF
     li   t1, 0x1122334455667700
     li   t2, 0
@@ -112,7 +121,7 @@ _vtest_body:
     add  t4, t1, t2
     sd   t4, 0(t5)
     addi t2, t2, 1
-    li   t3, 64
+    li   t3, 8
     blt  t2, t3, 1b
 
     li   t0, RESULT_BASE + RBUF      /* the untouchability marker */
@@ -122,7 +131,7 @@ _vtest_body:
     add  t5, t0, t3
     sd   t1, 0(t5)
     addi t2, t2, 1
-    li   t3, 64
+    li   t3, 8
     blt  t2, t3, 2b
 
 /* ---- 3. request A: an ordinary WRITE of sector 5 (descs 0,1,2) ---- */
