@@ -263,12 +263,23 @@ suite makes and not a fact.
 
 README's rules require a `pt_` program to pin `menvcfg.ADUE` explicitly
 before `satp` (finding 20), because power-on ADUE differs between the model
-and the machine.  **On this board it cannot** — `menvcfg` does not exist —
-so any port of the `pt_` area to this hardware has to decide what to do
-about Svadu first.  That eight of the nine `pt_` tests nonetheless run here
-(see the scoreboard) is because they set ADUE before the first translated
-access and the U74's behaviour happens to match; it is not because the rule
-was satisfied.
+and the machine.  **On this board it cannot** — `menvcfg` does not exist.
+
+**SO THE WHOLE `pt_` AREA FAILS HERE, ON ITS FIRST INSTRUCTION OF REAL
+WORK**, and an earlier version of this file said the opposite.  The ADUE
+write is `csrs menvcfg, t0`, the U74 raises an illegal instruction, the trap
+is undelegated, and it lands in the program's own M-mode backstop — which
+records `mcause`/`mepc`/`mtval`, publishes **status 0x4D** (`'M'`) and parks
+inside the handler.  Measured: `mcause=2`, `mepc=0x8000008e`,
+`mtval=0x30a2a073`, which decodes as exactly that write.
+
+That backstop writes the DONE flag, which is how the mistake happened: a
+board scoreboard read a set DONE as a pass and reported "8 of 9 `pt_` tests
+complete".  **"Finished" is not "passed."**  DONE means only that the
+program published a result; the STATUS says which result, and 0x4D is the
+program telling you it trapped.  Any sweep of this suite has to read the
+status word, and any port of the `pt_` area to this board starts by deciding
+what to do about Svadu.
 
 ### Finding 32, and the theorem it produced
 
@@ -362,24 +373,39 @@ test has the reader touching both, which makes them symmetric), and add IRIW,
 which needs four harts -- this board has four U74s, but one runs firmware
 unless `--takeover` is used.
 
-## The board scoreboard, and what it does and does not say
+## The board scoreboard
 
-Every non-`disk`, non-`uart` test, run on the VisionFive 2.  **These rows say
-only whether the program set the DONE flag on the board** — they are not
-model comparisons, and nothing is claimed from a row until a capture is taken
-and checked in `vtest-rocq/`.
+Every runnable test, one run each, 2026-08-30.  **Read the STATUS column, not
+just whether the program finished** -- see the `pt_` row for why.
 
-| area | completes | does not | the reason, where known |
-|---|---|---|---|
-| `pt_` | 8 of 9 | `pt_tlb` | not diagnosed |
-| `core_` | 7 of 10 | `core_regs_mcsr`, `core_regs_scsr`, `core_regs_ctr` | **finding 31**: they read for VALUES, so the U74's refusal of `menvcfg`/`senvcfg`/`time` ends the run.  `core_csrprobe` is the test that answers the same question anyway |
-| `clint_` | 2 of 2 | — | both captured and checked against the model |
-| `plic_` | 2 of 7 | `thresh`, `mask`, `arb`, `tie`, `level` | not diagnosed.  The two that pass only read and write registers; **all five that actually drive an interrupt fail**, which is one cause and not five — most likely firmware still owning the PLIC on hart 1 and claiming sources out from under the test.  A `--takeover` question |
-| `conc_` | 1 of 5 | `lost`, `byte`, `amo`, `sb` | not diagnosed.  Their two-pass rendezvous is tuned for QEMU's TB warm-up, which is not a thing on real harts |
+| | count | tests |
+|---|---|---|
+| **finished with a normal status** | 19 | `core_smoke`, `core_hart`, `core_csrprobe`, `core_regs_gpr/pmp/hpm/fcsr/fpr`, `clint_time`, `clint_msip`, all five `conc_*`, `conc_mp`, `conc_sbx`, `plic_mctx`, `plic_prio0` |
+| **finished reporting status 0x4D** -- the M-mode backstop, i.e. the test itself reporting an undelegated trap | 9 | every `pt_` test |
+| **did not finish** | 8 | `core_regs_ctr/mcsr/scsr`, `plic_arb/level/mask/thresh/tie` |
 
-**Checked in and proved against the model so far: `core_smoke`,
-`clint_time`, `clint_msip`, `core_csrprobe`.**  The rest of the "completes"
-column is a triage list, not a result.
+**The `pt_` row is a FAILURE, not a pass**, and reading it as one is the
+mistake this file used to make.  All nine trap on `csrs menvcfg, t0` --
+finding 31 -- land in their own M-mode backstop, which records the trap,
+publishes 0x4D and parks.  The backstop writes the DONE flag, so a sweep that
+only checks DONE calls them complete.  **"Finished" is not "passed."**
+
+**The `core_regs_ctr/mcsr/scsr` three are finding 31 as well**, from the
+other side: they read CSRs for their VALUES, so the first one the U74
+refuses ends the run with no result at all.  `core_csrprobe` answers the same
+question anyway by stepping over each refusal, and it passes.
+
+**So of the eight that do not finish, five are the `plic_` interrupt tests**
+and they are the only genuinely undiagnosed thing on the board.  The two
+`plic_` tests that pass (`mctx`, `prio0`) only read and write registers;
+every one that actually drives an interrupt fails.  That is one cause and not
+five -- most likely firmware still owning the PLIC on hart 1 and claiming
+sources out from under the test, which `--takeover` would settle.
+
+WHAT IS ACTUALLY CHECKED AGAINST THE MODEL is a much shorter list than
+either of the above: `core_smoke`, `core_hart`, `clint_time`, `clint_msip`,
+`core_csrprobe`.  Everything else in the "finished" column is a program that
+ran, not a comparison that was made.
 
 ## What is not done
 
