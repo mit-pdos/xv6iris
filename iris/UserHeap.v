@@ -203,8 +203,24 @@ Section UserHeap.
      every step, by every continuation, forever. *)
   Definition utext (γt : gname) (a : Z) (b : bv 8) : iProp Σ := (a ↪[γt]□ b)%I.
 
-  (* A DATA byte, exclusively owned: the right to write it. *)
-  Definition ubyte (γd : gname) (a : Z) (b : bv 8) : iProp Σ := (a ↪[γd] b)%I.
+  (* A DATA byte AT A FRACTION.  [DfracOwn 1] is the right to WRITE it --
+     [ubyte], what every store leaf and every stack word wants.
+     [DfracDiscarded] is a permanent READ-ONLY view, and the argument
+     vector is what needs it: two argv slots may legitimately point at the
+     same string, and an exclusive byte cannot describe that at all.  With
+     the read-only view the aliasing question simply does not arise, and
+     the entry gate is spared a quadratic "the strings are pairwise
+     disjoint" condition it would otherwise have to decide. *)
+  Definition ubyteq (γd : gname) (dq : dfrac) (a : Z) (b : bv 8) : iProp Σ :=
+    (a ↪[γd]{dq} b)%I.
+  Definition ubyte (γd : gname) (a : Z) (b : bv 8) : iProp Σ :=
+    ubyteq γd (DfracOwn 1) a b.
+
+  Global Instance ubyteq_timeless γd dq a b : Timeless (ubyteq γd dq a b).
+  Proof. apply _. Qed.
+  Global Instance ubyteq_persistent γd a b :
+    Persistent (ubyteq γd DfracDiscarded a b).
+  Proof. apply _. Qed.
 
   Global Instance utext_persistent γt a b : Persistent (utext γt a b).
   Proof. apply _. Qed.
@@ -224,12 +240,24 @@ Section UserHeap.
   (* ===================================================================== *)
 
   (* [n] consecutive bytes, the shape everything else is built from *)
+  Definition ubytesq (γd : gname) (dq : dfrac) (a : Z) (n : nat)
+      (f : nat -> bv 8) : iProp Σ :=
+    ([∗ list] j ∈ seq 0 n, ubyteq γd dq (a + Z.of_nat j) (f j))%I.
   Definition ubytes (γd : gname) (a : Z) (n : nat) (f : nat -> bv 8) : iProp Σ :=
-    ([∗ list] j ∈ seq 0 n, ubyte γd (a + Z.of_nat j) (f j))%I.
+    ubytesq γd (DfracOwn 1) a n f.
 
   (* an 8-byte little-endian word, as the load and store leaves read it *)
+  Definition uwordq (γd : gname) (dq : dfrac) (a : Z) (w : mword 64) : iProp Σ :=
+    ubytesq γd dq a 8 (nth_byte w).
   Definition uword (γd : gname) (a : Z) (w : mword 64) : iProp Σ :=
-    ubytes γd a 8 (nth_byte w).
+    uwordq γd (DfracOwn 1) a w.
+
+  Global Instance ubytesq_persistent γd a n f :
+    Persistent (ubytesq γd DfracDiscarded a n f).
+  Proof. apply _. Qed.
+  Global Instance uwordq_persistent γd a w :
+    Persistent (uwordq γd DfracDiscarded a w).
+  Proof. apply _. Qed.
 
   (* A NUL-TERMINATED C STRING of length [len] at [a]: [len] bytes NONE of
      which is NUL, then the terminator.  The no-interior-NUL clause is part
@@ -237,31 +265,37 @@ Section UserHeap.
      walk it, so [ustr γd a len f] pins the length: it is what makes
      "strlen returns len" a statement about the resource the caller holds
      rather than about an extra hypothesis it also had to supply. *)
-  Definition ustr (γd : gname) (a : Z) (len : nat) (f : nat -> bv 8) : iProp Σ :=
+  Definition ustr (γd : gname) (dq : dfrac) (a : Z) (len : nat)
+      (f : nat -> bv 8) : iProp Σ :=
     (⌜ forall j : nat, (j < len)%nat -> f j <> ubyte0 ⌝ ∗
      (* ...and the length is REPRESENTABLE.  strlen computes it with a
         32-bit [subw], so a string longer than 2^31 is not one this ABI can
         measure; that belongs to what a string IS, not to strlen's caller. *)
      ⌜ Z.of_nat len < 2 ^ 31 ⌝ ∗
-     ubytes γd a len f ∗ ubyte γd (a + Z.of_nat len) ubyte0)%I.
+     ubytesq γd dq a len f ∗ ubyteq γd dq (a + Z.of_nat len) ubyte0)%I.
 
-  Lemma ustr_len (γd : gname) (a : Z) (len : nat) (f : nat -> bv 8) :
-    ustr γd a len f -∗ ⌜ Z.of_nat len < 2 ^ 31 ⌝.
+  Global Instance ustr_persistent γd a len f :
+    Persistent (ustr γd DfracDiscarded a len f).
+  Proof. apply _. Qed.
+
+  Lemma ustr_len (γd : gname) (dq : dfrac) (a : Z) (len : nat) (f : nat -> bv 8) :
+    ustr γd dq a len f -∗ ⌜ Z.of_nat len < 2 ^ 31 ⌝.
   Proof. iIntros "(_ & %H & _ & _)". iPureIntro. exact H. Qed.
 
-  Lemma ustr_nonul (γd : gname) (a : Z) (len : nat) (f : nat -> bv 8) :
-    ustr γd a len f -∗ ⌜ forall j : nat, (j < len)%nat -> f j <> ubyte0 ⌝.
+  Lemma ustr_nonul (γd : gname) (dq : dfrac) (a : Z) (len : nat) (f : nat -> bv 8) :
+    ustr γd dq a len f -∗ ⌜ forall j : nat, (j < len)%nat -> f j <> ubyte0 ⌝.
   Proof. iIntros "(%H & _ & _ & _)". iPureIntro. exact H. Qed.
 
   (* one body byte, out and back *)
-  Lemma ustr_byte (γd : gname) (a : Z) (len : nat) (f : nat -> bv 8) (j : nat) :
+  Lemma ustr_byte (γd : gname) (dq : dfrac) (a : Z) (len : nat)
+      (f : nat -> bv 8) (j : nat) :
     (j < len)%nat ->
-    ustr γd a len f -∗
-      ubyte γd (a + Z.of_nat j)%Z (f j) ∗
-      (ubyte γd (a + Z.of_nat j)%Z (f j) -∗ ustr γd a len f).
+    ustr γd dq a len f -∗
+      ubyteq γd dq (a + Z.of_nat j)%Z (f j) ∗
+      (ubyteq γd dq (a + Z.of_nat j)%Z (f j) -∗ ustr γd dq a len f).
   Proof.
     intros Hj. iIntros "(#Hne & #Hlen & Hbs & Hnul)".
-    rewrite /ustr /ubytes.
+    rewrite /ustr /ubytesq.
     iDestruct (big_sepL_lookup_acc _ _ j j with "Hbs") as "[Hb Hcl]";
       [ apply lookup_seq; split; [ lia | exact Hj ] | ].
     iFrame "Hb". iIntros "Hb".
@@ -269,10 +303,10 @@ Section UserHeap.
   Qed.
 
   (* ...and the terminator *)
-  Lemma ustr_nul (γd : gname) (a : Z) (len : nat) (f : nat -> bv 8) :
-    ustr γd a len f -∗
-      ubyte γd (a + Z.of_nat len)%Z ubyte0 ∗
-      (ubyte γd (a + Z.of_nat len)%Z ubyte0 -∗ ustr γd a len f).
+  Lemma ustr_nul (γd : gname) (dq : dfrac) (a : Z) (len : nat) (f : nat -> bv 8) :
+    ustr γd dq a len f -∗
+      ubyteq γd dq (a + Z.of_nat len)%Z ubyte0 ∗
+      (ubyteq γd dq (a + Z.of_nat len)%Z ubyte0 -∗ ustr γd dq a len f).
   Proof.
     iIntros "(#Hne & #Hlen & Hbs & Hnul)". iFrame "Hnul". iIntros "Hnul".
     rewrite /ustr. iFrame "Hne Hlen Hbs Hnul".
@@ -281,6 +315,105 @@ Section UserHeap.
   (* NOTE: the SPLIT of a run at an arbitrary point -- which is what a
      syscall footprint hand-over is -- is deliberately not here yet.  It is
      a step-3 tool and wants proving against its consumer, not before it. *)
+
+  (* ===================================================================== *)
+  (* §2b'' READ-ONLY VIEWS: persisting bytes, and reading them back.        *)
+  (*                                                                        *)
+  (* Once an area is persisted, ANY number of views of it may be handed     *)
+  (* out and none of them has to be disjoint from any other.  That is the   *)
+  (* whole reason the argument vector is read-only: exec may point two      *)
+  (* argv slots at the same string, and nothing above has to decide         *)
+  (* whether it did.                                                        *)
+  (* ===================================================================== *)
+  Lemma ubyte_persist (γd : gname) (a : Z) (b : bv 8) :
+    ubyte γd a b ==∗ ubyteq γd DfracDiscarded a b.
+  Proof. iIntros "H". iApply (ghost_map_elem_persist with "H"). Qed.
+
+  Lemma uarea_persist (γd : gname) (A : gmap Z (bv 8)) :
+    ([∗ map] k ↦ b ∈ A, ubyte γd k b) ==∗
+    ([∗ map] k ↦ b ∈ A, ubyteq γd DfracDiscarded k b).
+  Proof.
+    iIntros "H". iApply big_sepM_bupd.
+    iApply (big_sepM_impl with "H"). iIntros "!>" (k b _) "Hb".
+    iApply (ghost_map_elem_persist with "Hb").
+  Qed.
+
+  Lemma ubytesq_of_pmap (γd : gname) (A : gmap Z (bv 8)) (a : Z) (n : nat)
+      (f : nat -> bv 8) :
+    (forall j : nat, (j < n)%nat -> A !! (a + Z.of_nat j)%Z = Some (f j)) ->
+    ([∗ map] k ↦ b ∈ A, ubyteq γd DfracDiscarded k b) -∗
+      ubytesq γd DfracDiscarded a n f.
+  Proof.
+    intros HA. iIntros "#HA". rewrite /ubytesq.
+    iApply big_sepL_intro. iIntros "!>" (i j Hij).
+    apply lookup_seq in Hij as [Hj Hlt].
+    assert (Hji : j = i) by lia. subst j.
+    iApply (big_sepM_lookup with "HA"). exact (HA i Hlt).
+  Qed.
+
+  Lemma uwordq_of_pmap (γd : gname) (A : gmap Z (bv 8)) (a : Z) (w : mword 64) :
+    (forall j : nat, (j < 8)%nat ->
+       A !! (a + Z.of_nat j)%Z = Some (nth_byte w j)) ->
+    ([∗ map] k ↦ b ∈ A, ubyteq γd DfracDiscarded k b) -∗
+      uwordq γd DfracDiscarded a w.
+  Proof.
+    intros HA. rewrite /uwordq.
+    exact (ubytesq_of_pmap γd A a 8 (nth_byte w) HA).
+  Qed.
+
+  Lemma ustr_of_pmap (γd : gname) (A : gmap Z (bv 8)) (a : Z) (len : nat)
+      (f : nat -> bv 8) :
+    (forall j : nat, (j < len)%nat -> f j <> ubyte0) ->
+    Z.of_nat len < 2 ^ 31 ->
+    (forall j : nat, (j < len)%nat -> A !! (a + Z.of_nat j)%Z = Some (f j)) ->
+    A !! (a + Z.of_nat len)%Z = Some ubyte0 ->
+    ([∗ map] k ↦ b ∈ A, ubyteq γd DfracDiscarded k b) -∗
+      ustr γd DfracDiscarded a len f.
+  Proof.
+    intros Hne Hlen HA Hnul. iIntros "#HA". rewrite /ustr.
+    iSplit; [ iPureIntro; exact Hne | ].
+    iSplit; [ iPureIntro; exact Hlen | ].
+    iSplit; [ iApply (ubytesq_of_pmap γd A a len f HA with "HA") | ].
+    iApply (big_sepM_lookup with "HA"). exact Hnul.
+  Qed.
+
+  (* THE CARVE, NON-LOSSY.  [ubytes_of_map] consumes the whole map; a
+     program that wants BOTH a stack and an argument area needs the rest
+     back.  Splitting at a decidable cut is what gives it: everything below
+     the entry sp is frame territory, everything at or above it is where
+     exec left the arguments ([UkAbi.uk_args]'s [uka_lo] is exactly that
+     cut), and [big_sepM_union] divides the ownership along it. *)
+  Lemma umap_split_at (γd : gname) (D : gmap Z (bv 8)) (c : Z) :
+    ([∗ map] k ↦ b ∈ D, ubyte γd k b) -∗
+      ([∗ map] k ↦ b ∈ base.filter (fun kv : Z * bv 8 => kv.1 < c) D,
+         ubyte γd k b) ∗
+      ([∗ map] k ↦ b ∈ base.filter (fun kv : Z * bv 8 => ~ (kv.1 < c)) D,
+         ubyte γd k b).
+  Proof.
+    iIntros "H".
+    rewrite -(big_sepM_union (fun k b => ubyte γd k b)
+                (base.filter (fun kv : Z * bv 8 => kv.1 < c) D)
+                (base.filter (fun kv : Z * bv 8 => ~ (kv.1 < c)) D)
+                (map_disjoint_filter_complement _ D)).
+    rewrite (map_filter_union_complement (fun kv : Z * bv 8 => kv.1 < c) D).
+    iExact "H".
+  Qed.
+
+  Lemma umap_filter_lookup_lt (D : gmap Z (bv 8)) (c a : Z) (b : bv 8) :
+    a < c -> D !! a = Some b ->
+    base.filter (fun kv : Z * bv 8 => kv.1 < c) D !! a = Some b.
+  Proof.
+    intros Hlt Hb. apply map_lookup_filter_Some. split; [ exact Hb | ].
+    cbn [fst]. exact Hlt.
+  Qed.
+
+  Lemma umap_filter_lookup_ge (D : gmap Z (bv 8)) (c a : Z) (b : bv 8) :
+    ~ (a < c) -> D !! a = Some b ->
+    base.filter (fun kv : Z * bv 8 => ~ (kv.1 < c)) D !! a = Some b.
+  Proof.
+    intros Hge Hb. apply map_lookup_filter_Some. split; [ exact Hb | ].
+    cbn [fst]. exact Hge.
+  Qed.
 
   (* ===================================================================== *)
   (* §2b' THE ARGUMENT VECTOR.                                             *)
@@ -304,8 +437,12 @@ Section UserHeap.
         own length bound rather than making every walker state it. *)
      ⌜ Z.of_nat (length args) < 2 ^ 31 ⌝ ∗
      [∗ list] i ↦ g ∈ args,
-        uword γd (av + 8 * Z.of_nat i) (mword_of_int (ua_ptr g)) ∗
-        ustr γd (ua_ptr g) (ua_len g) (ua_bytes g))%I.
+        uwordq γd DfracDiscarded (av + 8 * Z.of_nat i)
+          (mword_of_int (ua_ptr g)) ∗
+        ustr γd DfracDiscarded (ua_ptr g) (ua_len g) (ua_bytes g))%I.
+
+  Global Instance uargv_persistent γd av args : Persistent (uargv γd av args).
+  Proof. apply _. Qed.
 
   Lemma uargv_align (γd : gname) (av : Z) (args : list uarg) :
     uargv γd av args -∗
@@ -316,10 +453,13 @@ Section UserHeap.
   Lemma uargv_acc (γd : gname) (av : Z) (args : list uarg) (i : nat) (g : uarg) :
     args !! i = Some g ->
     uargv γd av args -∗
-      (uword γd (av + 8 * Z.of_nat i) (mword_of_int (ua_ptr g)) ∗
-       ustr γd (ua_ptr g) (ua_len g) (ua_bytes g)) ∗
-      ((uword γd (av + 8 * Z.of_nat i) (mword_of_int (ua_ptr g)) ∗
-        ustr γd (ua_ptr g) (ua_len g) (ua_bytes g)) -∗ uargv γd av args).
+      (uwordq γd DfracDiscarded (av + 8 * Z.of_nat i)
+         (mword_of_int (ua_ptr g)) ∗
+       ustr γd DfracDiscarded (ua_ptr g) (ua_len g) (ua_bytes g)) ∗
+      ((uwordq γd DfracDiscarded (av + 8 * Z.of_nat i)
+          (mword_of_int (ua_ptr g)) ∗
+        ustr γd DfracDiscarded (ua_ptr g) (ua_len g) (ua_bytes g)) -∗
+         uargv γd av args).
   Proof.
     intros Hi. iIntros "(#Hal & #Hn & Hl)".
     iDestruct (big_sepL_lookup_acc _ _ i g Hi with "Hl") as "[Hg Hcl]".
@@ -417,8 +557,8 @@ Section UserHeap.
   Qed.
 
   (* ...and a DATA byte names its byte and its page is WRITABLE. *)
-  Lemma uheap_ubyte (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (a : Z) (b : bv 8) :
-    uheap γt γd γs M pm -∗ ubyte γd a b -∗
+  Lemma uheap_ubyte (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (dq : dfrac) (a : Z) (b : bv 8) :
+    uheap γt γd γs M pm -∗ ubyteq γd dq a b -∗
     ⌜ M !! a = Some b /\ uw_addr (pm) a /\ 0 <= a < 2 ^ 38 ⌝.
   Proof.
     iIntros "Hrun Hb".
@@ -541,18 +681,18 @@ Section UserHeap.
       uheap γt γd γs (umem_write M a n g) pm ∗ ubytes γd a n g.
   Proof.
     iInduction n as [ | k IH ] "IH" forall (M).
-    { iIntros "Hrun _". iModIntro. iFrame "Hrun". rewrite /ubytes /=. done. }
+    { iIntros "Hrun _". iModIntro. iFrame "Hrun". rewrite /ubytes /ubytesq /=. done. }
     iIntros "Hrun Hbs".
     (* peel the LAST byte -- [umem_write] writes it outermost.  [iEval ... in]
        rather than a bare [rewrite]: the proofmode's [rewrite] acts on the
        WHOLE entailment, and putting the goal in split form here would leave
        nothing to re-assemble at the end. *)
-    iEval (rewrite /ubytes seq_S big_sepL_app /=) in "Hbs".
+    iEval (rewrite /ubytes /ubytesq seq_S big_sepL_app /=) in "Hbs".
     iDestruct "Hbs" as "[Hlo [Hhi _]]".
     iMod ("IH" $! M with "Hrun Hlo") as "[Hrun Hlo]".
     iMod (uheap_store with "Hrun Hhi") as "[Hrun Hhi]".
     iModIntro. iFrame "Hrun".
-    iEval (rewrite /ubytes seq_S big_sepL_app /=).
+    iEval (rewrite /ubytes /ubytesq seq_S big_sepL_app /=).
     iFrame "Hlo Hhi".
   Qed.
 
@@ -987,7 +1127,7 @@ Section UserHeap.
     ([∗ map] k ↦ b ∈ D, ubyte γd k b) -∗ ubytes γd a n f.
   Proof.
     revert D. induction n as [| n IH]; intros D HD; iIntros "HD".
-    - rewrite /ubytes /=. done.
+    - rewrite /ubytes /ubytesq /=. done.
     - iDestruct (big_sepM_delete _ D (a + Z.of_nat n)%Z (f n) with "HD")
         as "[Hb HD]"; [ exact (HD n ltac:(lia)) | ].
       (* hoisted, not [ltac:]: an inline side-condition is elaborated before
@@ -996,7 +1136,7 @@ Section UserHeap.
                 delete (a + Z.of_nat n)%Z D !! (a + Z.of_nat j)%Z = Some (f j)).
       { intros j Hj. rewrite lookup_delete_ne; [ apply HD; lia | lia ]. }
       iDestruct (IH (delete (a + Z.of_nat n)%Z D) HD' with "HD") as "Hlo".
-      rewrite /ubytes seq_S big_sepL_app /=.
+      rewrite /ubytes /ubytesq seq_S big_sepL_app /=.
       iFrame "Hlo Hb".
   Qed.
 
@@ -1005,7 +1145,7 @@ Section UserHeap.
     ubytes γd a (k + n) f ⊣⊢
     ubytes γd a k f ∗ ubytes γd (a + Z.of_nat k) n (fun j => f (k + j)%nat).
   Proof.
-    rewrite /ubytes seq_app big_sepL_app.
+    rewrite /ubytes /ubytesq seq_app big_sepL_app.
     apply bi.sep_proper; [ reflexivity | ].
     replace (seq (0 + k) n) with (Nat.add k <$> seq 0 n)
       by (rewrite fmap_add_seq; f_equal; lia).
@@ -1025,7 +1165,7 @@ Section UserHeap.
     iExists (Z_to_bv 64 (assemble_bytes
                [f 0%nat; f 1%nat; f 2%nat; f 3%nat;
                 f 4%nat; f 5%nat; f 6%nat; f 7%nat]) : mword 64).
-    rewrite /uword /ubytes.
+    rewrite /uword /uwordq /ubytes /ubytesq.
     iApply (big_sepL_mono with "Hb"). intros i j Hj.
     apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l in Hlt |- *.
     rewrite (nth_byte_assemble_len 64

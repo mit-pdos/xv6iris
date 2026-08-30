@@ -211,8 +211,8 @@ Section UkEcho.
   (* lives.  [urun_ustr_bnd] is that fact at the shape [ustr] hands out.   *)
   (* ------------------------------------------------------------------- *)
   Local Lemma urun_ubyte_bnd (h : CpuId) (m : regfile) (pc : mword 64)
-      (avail : nat) (a : Z) (b : bv 8) :
-    urun γt γd γs h m pc avail -∗ ubyte γd a b -∗ ⌜ 0 <= a < 2 ^ 38 ⌝.
+      (avail : nat) (dq : dfrac) (a : Z) (b : bv 8) :
+    urun γt γd γs h m pc avail -∗ ubyteq γd dq a b -∗ ⌜ 0 <= a < 2 ^ 38 ⌝.
   Proof.
     iIntros "Hrun Hb".
     iDestruct "Hrun" as (C pt Rut sz M pm) "(_ & _ & Hh & _ & _)".
@@ -221,8 +221,8 @@ Section UkEcho.
   Qed.
 
   Local Lemma urun_ustr_bnd (h : CpuId) (m : regfile) (pc : mword 64)
-      (avail : nat) (a : Z) (len : nat) (f : nat -> bv 8) :
-    urun γt γd γs h m pc avail -∗ ustr γd a len f -∗
+      (avail : nat) (dq : dfrac) (a : Z) (len : nat) (f : nat -> bv 8) :
+    urun γt γd γs h m pc avail -∗ ustr γd dq a len f -∗
     ⌜ 0 <= a /\ a + Z.of_nat len < 2 ^ 38 ⌝.
   Proof.
     iIntros "Hrun Hs".
@@ -231,18 +231,18 @@ Section UkEcho.
     iDestruct ("Hcl" with "Hnul") as "Hs".
     destruct len as [| len' ].
     - iPureIntro. lia.
-    - iDestruct (ustr_byte γd a (S len') f 0%nat ltac:(lia) with "Hs")
+    - iDestruct (ustr_byte γd dq a (S len') f 0%nat ltac:(lia) with "Hs")
         as "[Hb0 _]".
       iDestruct (urun_ubyte_bnd with "Hrun Hb0") as %Hlo.
       iPureIntro. lia.
   Qed.
 
   Local Lemma urun_uword_bnd (h : CpuId) (m : regfile) (pc : mword 64)
-      (avail : nat) (a : Z) (w : mword 64) :
-    urun γt γd γs h m pc avail -∗ uword γd a w -∗
+      (avail : nat) (dq : dfrac) (a : Z) (w : mword 64) :
+    urun γt γd γs h m pc avail -∗ uwordq γd dq a w -∗
     ⌜ 0 <= a /\ a + 8 <= 2 ^ 38 ⌝.
   Proof.
-    iIntros "Hrun Hw". rewrite /uword /ubytes.
+    iIntros "Hrun Hw". rewrite /uwordq /ubytesq.
     iDestruct (big_sepL_lookup_acc _ (seq 0 8) 0%nat 0%nat ltac:(reflexivity)
                  with "Hw") as "[H0 Hcl]".
     iDestruct (urun_ubyte_bnd with "Hrun H0") as %Hb0.
@@ -268,16 +268,16 @@ Section UkEcho.
   (* [lia] or to [rewrite], so a caller that owns a [bv 8] byte could not  *)
   (* otherwise discharge the [if].                                        *)
   (* ------------------------------------------------------------------- *)
-  Local Lemma wp_kecho_strlen_step (h : CpuId) (mc : regfile) (p : Z)
-      (b : mword 8) (bz : Z) (tgt : mword 64) (n : nat) :
+  Local Lemma wp_kecho_strlen_step (h : CpuId) (mc : regfile) (dq : dfrac)
+      (p : Z) (b : mword 8) (bz : Z) (tgt : mword 64) (n : nat) :
     0 <= p -> p + 1 < Z64 ->
     bv_unsigned b = bz ->
     mc !!! Regidx a5_idx = mword_of_int p ->
     tgt = (if bz =? 0 then mword_of_int 0xf8 else mword_of_int 0xee) ->
     echo_code γt -∗
-    ubyte γd p b -∗
+    ubyteq γd dq p b -∗
     urun γt γd γs h mc (mword_of_int 0xee) n -∗
-    (ubyte γd p b -∗
+    (ubyteq γd dq p b -∗
        ∀ h' : CpuId,
          urun γt γd γs h'
            (<[Regidx a4_idx := mword_of_int bz : mword 64]>
@@ -337,7 +337,7 @@ Section UkEcho.
     assert (Euip : uint (mword_of_int (p + 1) : mword 64) = p + 1)
       by (apply uint_moi; lia).
     iApply (wp_uk_lbu γt γd γs h2 m2 (mword_of_int 0xf2)
-              (mword_of_int 4095 : mword 12) a5_idx a4_idx p b n
+              (mword_of_int 4095 : mword 12) a5_idx a4_idx dq p b n
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(rewrite Ha52 Euip Eoff; lia)
               ltac:(vm_compute; discriminate)
@@ -385,15 +385,16 @@ Section UkEcho.
   (* [ustr] says the bytes below [len] are nonzero and the byte AT [len]   *)
   (* is not: the program cannot run off the end, and cannot stop early.    *)
   (* ------------------------------------------------------------------- *)
-  Local Lemma wp_kecho_strlen_loop (a : Z) (len : nat) (f : nat -> bv 8) :
+  Local Lemma wp_kecho_strlen_loop (dq : dfrac) (a : Z) (len : nat)
+      (f : nat -> bv 8) :
     forall (k j : nat) (h : CpuId) (mc : regfile) (n : nat),
     (len = 1 + j + k)%nat ->
     0 <= a -> a + Z.of_nat len < 2 ^ 38 ->
     mc !!! Regidx a5_idx = mword_of_int (a + 1 + Z.of_nat j) ->
     echo_code γt -∗
-    ustr γd a len f -∗
+    ustr γd dq a len f -∗
     urun γt γd γs h mc (mword_of_int 0xee) n -∗
-    (ustr γd a len f -∗
+    (ustr γd dq a len f -∗
        ∀ (h' : CpuId) (mc' : regfile),
          ⌜ mc' !!! Regidx a3_idx = mword_of_int (a + Z.of_nat len) ⌝ -∗
          ⌜ forall r : mword 5,
@@ -410,7 +411,7 @@ Section UkEcho.
     - (* the byte at [a + len] is the NUL: the branch falls through *)
       iDestruct (ustr_nul with "Hs") as "[Hb Hcl]".
       replace (a + Z.of_nat len) with (a + 1 + Z.of_nat j) by lia.
-      iApply (wp_kecho_strlen_step h mc (a + 1 + Z.of_nat j) ubyte0
+      iApply (wp_kecho_strlen_step h mc dq (a + 1 + Z.of_nat j) ubyte0
                 (bv_unsigned ubyte0) (mword_of_int 0xf8) n
                 ltac:(lia) ltac:(unfold Z64; lia) ltac:(reflexivity) Ha5
                 ltac:(vm_compute; reflexivity)
@@ -441,9 +442,10 @@ Section UkEcho.
       assert (Hnz : (bv_unsigned (f (1 + j)%nat) =? 0) = false).
       { apply Z.eqb_neq. intro Hz. apply (Hne (1 + j)%nat Hlt).
         apply bv_eq. rewrite Hz. vm_compute. reflexivity. }
-      iDestruct (ustr_byte γd a len f (1 + j)%nat Hlt with "Hs") as "[Hb Hcl]".
+      iDestruct (ustr_byte γd dq a len f (1 + j)%nat Hlt with "Hs")
+        as "[Hb Hcl]".
       replace (a + Z.of_nat (1 + j)) with (a + 1 + Z.of_nat j) by lia.
-      iApply (wp_kecho_strlen_step h mc (a + 1 + Z.of_nat j) (f (1 + j)%nat)
+      iApply (wp_kecho_strlen_step h mc dq (a + 1 + Z.of_nat j) (f (1 + j)%nat)
                 (bv_unsigned (f (1 + j)%nat)) (mword_of_int 0xee) n
                 ltac:(lia) ltac:(unfold Z64; lia) ltac:(reflexivity) Ha5
                 ltac:(rewrite Hnz; reflexivity)
@@ -486,13 +488,13 @@ Section UkEcho.
   (* ABI was honoured, and [2 + n] on both sides of the arrow says the two  *)
   (* words of stack the frame borrowed were given back.                     *)
   (* ===================================================================== *)
-  Lemma wp_kecho_strlen (h : CpuId) (m : regfile) (a : Z) (len : nat)
-      (f : nat -> bv 8) (n : nat) :
+  Lemma wp_kecho_strlen (h : CpuId) (m : regfile) (dq : dfrac) (a : Z)
+      (len : nat) (f : nat -> bv 8) (n : nat) :
     m !!! Regidx a0_idx = mword_of_int a ->
     echo_code γt -∗
-    ustr γd a len f -∗
+    ustr γd dq a len f -∗
     urun γt γd γs h m (mword_of_int EchoSyms.strlen) (2 + n) -∗
-    (ustr γd a len f -∗
+    (ustr γd dq a len f -∗
        ∀ (h' : CpuId) (m' : regfile),
          ⌜ ucallee_saved m m' ⌝ -∗
          ⌜ m' !!! Regidx a0_idx = mword_of_int (Z.of_nat len) ⌝ -∗
@@ -612,7 +614,8 @@ Section UkEcho.
        the [mword 8] the load leaf produces can be related by conversion. *)
     iAssert (∃ (b0 : mword 8) (bz : Z),
                ⌜ bv_unsigned b0 = bz ⌝ ∗ ⌜ (bz =? 0) = (len =? 0)%nat ⌝ ∗
-               ubyte γd a b0 ∗ (ubyte γd a b0 -∗ ustr γd a len f))%I
+               ubyteq γd dq a b0 ∗
+               (ubyteq γd dq a b0 -∗ ustr γd dq a len f))%I
       with "[Hs]" as "(%b0 & %bz & %Hbz & %Hbnz & Hb & Hcl)".
     { destruct len as [| len' ].
       - iDestruct (ustr_nul with "Hs") as "[Hb Hcl]".
@@ -622,7 +625,7 @@ Section UkEcho.
         iSplit; [ iPureIntro; vm_compute; reflexivity | ].
         iFrame.
       - iDestruct (ustr_nonul with "Hs") as %Hne.
-        iDestruct (ustr_byte γd a (S len') f 0%nat ltac:(lia) with "Hs")
+        iDestruct (ustr_byte γd dq a (S len') f 0%nat ltac:(lia) with "Hs")
           as "[Hb Hcl]".
         replace (a + Z.of_nat 0%nat) with a by lia.
         iExists (f 0%nat), (bv_unsigned (f 0%nat)).
@@ -636,7 +639,7 @@ Section UkEcho.
     assert (Eoff0 : uoff_i12 (mword_of_int 0 : mword 12) = 0)
       by (vm_compute; reflexivity).
     iApply (wp_uk_lbu γt γd γs h4 m2 (mword_of_int 0xe4)
-              (mword_of_int 0 : mword 12) a0_idx a5_idx a b0 n
+              (mword_of_int 0 : mword 12) a0_idx a5_idx dq a b0 n
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(rewrite Ha02 Hua Eoff0; lia)
               ltac:(vm_compute; discriminate)
@@ -766,7 +769,7 @@ Section UkEcho.
         exact (upd_eq m3 (Regidx a5_idx)
                  (regval_into_reg (mword_of_int (a + 1) : mword 64))). }
       (* ---- 0xee..0xf6  THE SCAN ---- *)
-      iApply (wp_kecho_strlen_loop a (S len') f len' 0%nat h7 m4 n
+      iApply (wp_kecho_strlen_loop dq a (S len') f len' 0%nat h7 m4 n
                 ltac:(lia) Halo Hahi Ha54 with "Hcode Hs Hrun").
       iIntros "Hs" (h8 mc2) "%Ha3c %Hprc Hrun".
       assert (Ha0c : mc2 !!! Regidx a0_idx = mword_of_int a).
@@ -1046,7 +1049,7 @@ Section UkEcho.
       by (apply bv_eq; vm_compute; reflexivity).
     (* ---- 0x4e  ld s2,0(s1) ---- *)
     iApply (wp_uk_ld γt γd γs h mc (mword_of_int 0x4e)
-              (mword_of_int 0 : mword 12) s1_idx s2_idx
+              (mword_of_int 0 : mword 12) s1_idx s2_idx DfracDiscarded
               (av + 8 * Z.of_nat i) (mword_of_int (ua_ptr g)) (2 + n)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(rewrite Hs1 Huai Eoff0; lia)
@@ -1099,7 +1102,8 @@ Section UkEcho.
       exact (upd_eq m1 (Regidx a0_idx)
                (regval_into_reg (mword_of_int (ua_ptr g) : mword 64))). }
     (* ---- the call: strlen(argv[i]) ---- *)
-    iApply (wp_kecho_strlen h3 m3 (ua_ptr g) (ua_len g) (ua_bytes g) n Ha03
+    iApply (wp_kecho_strlen h3 m3 DfracDiscarded (ua_ptr g) (ua_len g)
+              (ua_bytes g) n Ha03
               with "Hcode Hstr Hrun").
     rewrite Hra3 Eret58.
     iIntros "Hstr" (h4 m4) "%Hcs4 %Ha04 Hrun".

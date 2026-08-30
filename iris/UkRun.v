@@ -295,11 +295,11 @@ Section UkRun.
      Consuming the run inside this proof is free: the conclusion is pure, so
      the caller's [iDestruct … as %…] keeps both the heap and the word. *)
   Lemma uheap_uword_at (γt γd γs : gname) (M : gmap Z (bv 8))
-      (pm : gmap (mword 27) uperm) (a : Z) (w : mword 64) :
-    uheap γt γd γs M pm -∗ uword γd a w -∗
+      (pm : gmap (mword 27) uperm) (dq : dfrac) (a : Z) (w : mword 64) :
+    uheap γt γd γs M pm -∗ uwordq γd dq a w -∗
     ⌜ 0 <= a < 2 ^ 38 /\ uw_addr pm a ⌝.
   Proof.
-    iIntros "Hheap Hw". rewrite /uword /ubytes.
+    iIntros "Hheap Hw". rewrite /uwordq /ubytesq.
     iDestruct (big_sepL_lookup _ _ 0%nat 0%nat with "Hw") as "H0";
       [ reflexivity | ].
     iDestruct (uheap_ubyte with "Hheap H0") as %(_ & Hw & Hb).
@@ -312,14 +312,15 @@ Section UkRun.
      goes through -- it is what replaces the caller-supplied permission,
      canonicity and presence premises of the UkStore/UkLoad leaves. *)
   Lemma uheap_ubytes_at (γt γd γs : gname) (M : gmap Z (bv 8))
-      (pm : gmap (mword 27) uperm) (a : Z) (n : nat) (f : nat -> bv 8) :
-    uheap γt γd γs M pm -∗ ubytes γd a n f -∗
+      (pm : gmap (mword 27) uperm) (dq : dfrac) (a : Z) (n : nat)
+      (f : nat -> bv 8) :
+    uheap γt γd γs M pm -∗ ubytesq γd dq a n f -∗
     ⌜ forall j : nat, (j < n)%nat ->
         M !! (a + Z.of_nat j)%Z = Some (f j) /\
         uw_addr pm (a + Z.of_nat j)%Z /\
         0 <= a + Z.of_nat j < 2 ^ 38 ⌝.
   Proof.
-    iIntros "Hheap Hbs". rewrite /ubytes.
+    iIntros "Hheap Hbs". rewrite /ubytes /ubytesq.
     iInduction n as [| n IH] "IH" forall (f).
     - iPureIntro. intros j Hj. exfalso. lia.
     - iEval (rewrite seq_S big_sepL_app /=) in "Hbs".

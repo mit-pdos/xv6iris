@@ -136,9 +136,10 @@ Section UkRunMem.
   (* off ONE exclusive run of bytes plus its alignment.                     *)
   (* ===================================================================== *)
   Lemma uheap_access (γt γd γs : gname) (M : gmap Z (bv 8))
-      (pm : gmap (mword 27) uperm) (a : Z) (k : nat) (f : nat -> bv 8) :
+      (pm : gmap (mword 27) uperm) (dq : dfrac) (a : Z) (k : nat)
+      (f : nat -> bv 8) :
     (0 < k)%nat -> uwidth (Z.of_nat k) -> a mod Z.of_nat k = 0 ->
-    uheap γt γd γs M pm -∗ ubytes γd a k f -∗
+    uheap γt γd γs M pm -∗ ubytesq γd dq a k f -∗
     ⌜ uint (mword_of_int a : mword 64) = a /\
       uva_canon (mword_of_int a : mword 64) /\
       (exists q : uperm, uperm_at pm (mword_of_int a : mword 64) = Some q /\
@@ -148,7 +149,8 @@ Section UkRunMem.
       (forall j : nat, (j < k)%nat -> M !! (a + Z.of_nat j)%Z = Some (f j)) ⌝.
   Proof.
     intros Hk Hw Hm. iIntros "Hheap Hbs".
-    iDestruct (uheap_ubytes_at γt γd γs M pm a k f with "Hheap Hbs") as %Hall.
+    iDestruct (uheap_ubytes_at γt γd γs M pm dq a k f with "Hheap Hbs")
+      as %Hall.
     iPureIntro.
     destruct (Hall 0%nat Hk) as (_ & Hperm & Hbnd).
     change (Z.of_nat 0) with 0 in Hperm, Hbnd.
@@ -180,7 +182,7 @@ Section UkRunMem.
     intros Ha Hal. iIntros "#Hi Hw Hrun Hcont".
     iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    iDestruct (uheap_access γt γd γs M pm a 8 (nth_byte v0)
+    iDestruct (uheap_access γt γd γs M pm _ a 8 (nth_byte v0)
                  ltac:(lia) ltac:(right; right; right; reflexivity) Hal with "Hheap Hw")
       as %(Hua & Hcan & Hok & Hpg & Hal8 & Hmap).
     assert (Htgt : (mword_of_int a : mword 64)
@@ -214,7 +216,7 @@ Section UkRunMem.
     intros Ha Hal. iIntros "#Hi Hw Hrun Hcont".
     iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    iDestruct (uheap_access γt γd γs M pm a 4 (nth_byte v0)
+    iDestruct (uheap_access γt γd γs M pm _ a 4 (nth_byte v0)
                  ltac:(lia) ltac:(right; right; left; reflexivity) Hal with "Hheap Hw")
       as %(Hua & Hcan & Hok & Hpg & Hal8 & Hmap).
     assert (Htgt : (mword_of_int a : mword 64)
@@ -248,7 +250,7 @@ Section UkRunMem.
     intros Ha Hal. iIntros "#Hi Hw Hrun Hcont".
     iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    iDestruct (uheap_access γt γd γs M pm a 8 (nth_byte v0)
+    iDestruct (uheap_access γt γd γs M pm _ a 8 (nth_byte v0)
                  ltac:(lia) ltac:(right; right; right; reflexivity) Hal with "Hheap Hw")
       as %(Hua & Hcan & Hok & Hpg & Hal8 & Hmap).
     assert (Htgt : (mword_of_int a : mword 64)
@@ -285,7 +287,7 @@ Section UkRunMem.
     intros He1 He2 Ha Hal. iIntros "#Hi Hw Hrun Hcont".
     iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    iDestruct (uheap_access γt γd γs M pm a 8 (nth_byte v0)
+    iDestruct (uheap_access γt γd γs M pm _ a 8 (nth_byte v0)
                  ltac:(lia) ltac:(right; right; right; reflexivity) Hal with "Hheap Hw")
       as %(Hua & Hcan & Hok & Hpg & Hal8 & Hmap).
     assert (Htgt : (mword_of_int a : mword 64)
@@ -322,7 +324,7 @@ Section UkRunMem.
     intros He1 He2 Ha Hal. iIntros "#Hi Hw Hrun Hcont".
     iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    iDestruct (uheap_access γt γd γs M pm a 4 (nth_byte v0)
+    iDestruct (uheap_access γt γd γs M pm _ a 4 (nth_byte v0)
                  ltac:(lia) ltac:(right; right; left; reflexivity) Hal with "Hheap Hw")
       as %(Hua & Hcan & Hok & Hpg & Hal8 & Hmap).
     assert (Htgt : (mword_of_int a : mword 64)
@@ -375,15 +377,16 @@ Section UkRunMem.
   Qed.
 
   Lemma wp_uk_ld (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
-      (imm : mword 12) (rs1 rd : mword 5) (a : Z) (w : mword 64) (avail : nat) :
+      (imm : mword 12) (rs1 rd : mword 5) (dq : dfrac) (a : Z) (w : mword 64)
+      (avail : nat) :
     unot_sp rd ->
     a = uint (m !!! Regidx rs1) + uoff_i12 imm ->
     a mod 8 = 0 ->
     uint rd <> 0 ->
     uinstr_is γt pc false (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
-    uword γd a w -∗
+    uwordq γd dq a w -∗
     urun γt γd γs h m pc avail -∗
-    (uword γd a w -∗
+    (uwordq γd dq a w -∗
        ∀ h' : CpuId,
          urun γt γd γs h' (<[Regidx rd := regval_into_reg w]> m)
            (add_vec_int pc 4) avail -∗
@@ -393,7 +396,7 @@ Section UkRunMem.
     intros Hns Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
     iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    iDestruct (uheap_access γt γd γs M pm a 8 (nth_byte w)
+    iDestruct (uheap_access γt γd γs M pm _ a 8 (nth_byte w)
                  ltac:(lia) ltac:(right; right; right; reflexivity) Hal with "Hheap Hw")
       as %(Hua & Hcan & Hok & Hpg & Hal8 & Hmap).
     assert (Htgt : (mword_of_int a : mword 64)
@@ -428,7 +431,7 @@ Section UkRunMem.
     intros Hns Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
     iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    iDestruct (uheap_access γt γd γs M pm a 8 (nth_byte w)
+    iDestruct (uheap_access γt γd γs M pm _ a 8 (nth_byte w)
                  ltac:(lia) ltac:(right; right; right; reflexivity) Hal with "Hheap Hw")
       as %(Hua & Hcan & Hok & Hpg & Hal8 & Hmap).
     assert (Htgt : (mword_of_int a : mword 64)
@@ -467,7 +470,7 @@ Section UkRunMem.
     intros Hns He1 He2 Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
     iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    iDestruct (uheap_access γt γd γs M pm a 8 (nth_byte w)
+    iDestruct (uheap_access γt γd γs M pm _ a 8 (nth_byte w)
                  ltac:(lia) ltac:(right; right; right; reflexivity) Hal with "Hheap Hw")
       as %(Hua & Hcan & Hok & Hpg & Hal8 & Hmap).
     assert (Htgt : (mword_of_int a : mword 64)
@@ -501,7 +504,7 @@ Section UkRunMem.
     intros Hns Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
     iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    iDestruct (uheap_access γt γd γs M pm a 4 (nth_byte wv)
+    iDestruct (uheap_access γt γd γs M pm _ a 4 (nth_byte wv)
                  ltac:(lia) ltac:(right; right; left; reflexivity) Hal with "Hheap Hw")
       as %(Hua & Hcan & Hok & Hpg & Hal8 & Hmap).
     assert (Htgt : (mword_of_int a : mword 64)
@@ -534,7 +537,7 @@ Section UkRunMem.
     intros Hns Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
     iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    iDestruct (uheap_access γt γd γs M pm a 4 (nth_byte wv)
+    iDestruct (uheap_access γt γd γs M pm _ a 4 (nth_byte wv)
                  ltac:(lia) ltac:(right; right; left; reflexivity) Hal with "Hheap Hw")
       as %(Hua & Hcan & Hok & Hpg & Hal8 & Hmap).
     assert (Htgt : (mword_of_int a : mword 64)
@@ -570,7 +573,7 @@ Section UkRunMem.
     intros Hns He1 He2 Ha Hal Hrd. iIntros "#Hi Hw Hrun Hcont".
     iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    iDestruct (uheap_access γt γd γs M pm a 4 (nth_byte wv)
+    iDestruct (uheap_access γt γd γs M pm _ a 4 (nth_byte wv)
                  ltac:(lia) ltac:(right; right; left; reflexivity) Hal with "Hheap Hw")
       as %(Hua & Hcan & Hok & Hpg & Hal8 & Hmap).
     assert (Htgt : (mword_of_int a : mword 64)
@@ -587,14 +590,15 @@ Section UkRunMem.
 
   (* lbu rd, imm(rs1) -- the BYTE load.  This is what a string walk runs on. *)
   Lemma wp_uk_lbu (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
-      (imm : mword 12) (rs1 rd : mword 5) (a : Z) (b0 : mword 8) (avail : nat) :
+      (imm : mword 12) (rs1 rd : mword 5) (dq : dfrac) (a : Z) (b0 : mword 8)
+      (avail : nat) :
     unot_sp rd ->
     a = uint (m !!! Regidx rs1) + uoff_i12 imm ->
     uint rd <> 0 ->
     uinstr_is γt pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
-    ubyte γd a b0 -∗
+    ubyteq γd dq a b0 -∗
     urun γt γd γs h m pc avail -∗
-    (ubyte γd a b0 -∗
+    (ubyteq γd dq a b0 -∗
        ∀ h' : CpuId,
          urun γt γd γs h'
            (<[Regidx rd := regval_into_reg (zero_extend' 64 b0)]> m)
