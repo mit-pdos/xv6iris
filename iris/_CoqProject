@@ -295,6 +295,12 @@ UProofShTop.v
 UProofShMain.v
 UProofShEcho.v
 UCodeInit.v
+# INIT ON THE SEPARATION-LOGIC HEAP.  The syscall stub layer so far: the
+# four quiet-row entries (open/mknod/dup/write), exit, exec's failure arm,
+# and wait at the NULL status pointer init passes.  What is left is the
+# printf cone, main's two unbounded loops and start; the fork call site is
+# the one seam, and UkFork.v's [wp_uk_ecall_fork] is what closes it.
+UkInit.v
 UserMemArms.v
 UserClassify.v
 UserClassifyAsm.v
@@ -1610,14 +1616,13 @@ UartAccepted.v
 UartSentResidue.v
 SystemUartAccepted.v
 
-# OFF-BUILD (2026-08-30): the stage-1 init program proof, first Uk
-# generation -- UkInit.v, UkInitPrintf.v, UkInitLoop.v.  Upstream's
-# urun rework (727cccf7c: "ditch the old program proofs") deleted the
-# generation's engine files (UkEcho went with it); the init walk's
-# assets (the 113-instruction map, the 212-instruction structural
-# refutation of the format tree, the double-headed loop induction, the
-# uki_wait_ok formulation) carry to the urun port, queued after
-# upstream's echo re-port lands the pattern.
+# OFF-BUILD (2026-08-30): what is LEFT of the stage-1 init program proof,
+# first Uk generation -- UkInitPrintf.v and UkInitLoop.v.  UkInit.v itself
+# has been REPLACED by the urun port (above); these two are kept, off the
+# build, purely as the reference for the rest of that port: the
+# 212-instruction structural refutation of vprintf's format tree from the
+# literal's own bytes, and the double-headed loop induction that closes
+# 0x32 and 0x44 under one iLoeb.  Delete them when the port reaches them.
 
 # fs-syscall-specs lane W: THE UNLINK AU.  FsAbsUnlinkFire is the fire
 # leaf (FsAbsMknodFire / FsAbsOpenFire / FsAbsWriteFire are the one-per-

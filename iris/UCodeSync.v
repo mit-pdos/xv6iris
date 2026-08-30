@@ -137,6 +137,19 @@ Proof.
   - apply andb_prop in HF as [ _ H2 ]. exact (IH H2 Hin).
 Qed.
 
+(* ...and the LOWER bound, which the same [forallb] decides.  [Hx] and
+   every other page-range hypothesis is two-sided, so a key fact that
+   only bounds above leaves [0 <= k] for [lia] to invent out of nothing. *)
+Lemma list_key_nonneg {A : Type} (L : list (Z * A)) (k : Z) (b : A) :
+  forallb (fun kv => Z.leb 0 (fst kv)) L = true -> In (k, b) L -> 0 <= k.
+Proof.
+  induction L as [ | x xs IH ]; cbn [forallb In]; [ tauto | ].
+  intros HF [ Hx | Hin ].
+  - apply andb_prop in HF as [ H1 _ ]. subst x. cbn in H1.
+    apply Z.leb_le in H1. exact H1.
+  - apply andb_prop in HF as [ _ H2 ]. exact (IH H2 Hin).
+Qed.
+
 Lemma sync_bytes_key_lt (k : Z) (b : bv 8) :
   SyncInstrs.sync_bytes !! k = Some b -> k < 4096.
 Proof.
@@ -147,6 +160,16 @@ Proof.
   vm_compute. reflexivity.
 Qed.
 
+Lemma sync_bytes_key_nonneg (k : Z) (b : bv 8) :
+  SyncInstrs.sync_bytes !! k = Some b -> 0 <= k.
+Proof.
+  intro Hk.
+  apply elem_of_list_to_map_2 in Hk.
+  apply elem_of_list_In in Hk.
+  refine (list_key_nonneg _ k b _ Hk).
+  vm_compute. reflexivity.
+Qed.
+
 Lemma sync_data_key_lt (k : Z) (b : bv 8) :
   SyncData.sync_data !! k = Some b -> k < 4096.
 Proof.
@@ -154,6 +177,16 @@ Proof.
   apply elem_of_list_to_map_2 in Hk.
   apply elem_of_list_In in Hk.
   refine (list_key_lt _ 4096 k b _ Hk).
+  vm_compute. reflexivity.
+Qed.
+
+Lemma sync_data_key_nonneg (k : Z) (b : bv 8) :
+  SyncData.sync_data !! k = Some b -> 0 <= k.
+Proof.
+  intro Hk.
+  apply elem_of_list_to_map_2 in Hk.
+  apply elem_of_list_In in Hk.
+  refine (list_key_nonneg _ k b _ Hk).
   vm_compute. reflexivity.
 Qed.
 
@@ -397,13 +430,39 @@ Section UCodeSync.
   Context (Hx : forall a : Z, (0 <= a < 4096)%Z ->
                   ux_addr pm a /\ ~ uw_addr pm a).
 
-  (* The tactics live INSIDE the section so they can name [M], [pm] and
-     the concrete address: [utext_run_of] takes the run's base as an
-     argument, and leaving it to unification would run the byte
-     side-conditions against an unresolved evar. *)
 
-  (* one image byte, through [sync_text_sub] *)
-  Ltac uis_byte := apply Hsub; vm_compute; f_equal; apply bv_eq; reflexivity.
+  (* THE PROGRAM'S TEXT, AS ONE RESOURCE -- the U-tier twin of
+     [KernelText.kernel_text]. It is keyed by the DUMPED byte map, not by an
+     image variable, and that is the whole point: [UkRun.urun] hides [M] and
+     [pm] existentially, so a program proof can hold THIS while it could not
+     hold [utext_all]. Every per-pc lemma below extracts its fetch window
+     straight out of it by [big_sepM_lookup], exactly as the kernel's [instr]
+     lemmas do -- so no proof ever destructs a wide conjunction, and a
+     function that fetches three instructions pays for three. *)
+  Definition sync_code (g : gname) : iProp Σ :=
+    utext_img g SyncInstrs.sync_bytes.
+
+  Global Instance sync_code_persistent g : Persistent (sync_code g).
+  Proof. apply _. Qed.
+
+  (* Keep typeclass resolution from unfolding this into its 2242-entry
+     [big_sepM]; cf. [KernelText.kernel_text], which learned it the hard
+     way.  Conversion can still see through it -- [sync_code_img] below is
+     the one place that needs to. *)
+  Global Typeclasses Opaque sync_code.
+
+  Lemma sync_code_img (g : gname) :
+    sync_code g -∗ utext_img g SyncInstrs.sync_bytes.
+  Proof. rewrite /sync_code. iIntros "#H". iExact "H". Qed.
+
+  (* The tactics take the gname as an ARGUMENT: unlike the old [M]/[pm]
+     pair they are not section variables, so an Ltac body could not name
+     one.  The run's base is an argument for the same reason as before --
+     leaving it to unification runs the byte side-conditions against an
+     unresolved evar. *)
+
+  (* one image byte, straight out of [SyncInstrs.sync_bytes] *)
+  Ltac uis_byte := vm_compute; f_equal; apply bv_eq; reflexivity.
 
   Ltac uis_bytes2 :=
     let j := fresh "j" in let Hj := fresh "Hj" in
@@ -412,318 +471,259 @@ Section UCodeSync.
     let j := fresh "j" in let Hj := fresh "Hj" in
     intros j Hj; do 4 (destruct j as [|j]; [uis_byte|]); lia.
 
-  (* the window lies in the executable segment, so every address of it is
-     X and not W -- which is what puts it in the TEXT heap *)
-  Ltac uis_perm off :=
-    let j := fresh "j" in let Hj := fresh "Hj" in
-    intros j Hj;
-    replace (uint (mword_of_int off : mword 64)) with off
-      by (vm_compute; reflexivity);
-    apply Hx; lia.
-
-  Ltac uis_run off n w :=
-    iApply (utext_run_of gt M pm (uint (mword_of_int off : mword 64)) n w
-              ltac:(first [ uis_bytes2 | uis_bytes4 ]) ltac:(uis_perm off));
-    iExact "Ht".
+  Ltac uis_run g off n w :=
+    iApply (utext_img_run g SyncInstrs.sync_bytes
+              (uint (mword_of_int off : mword 64)) n w
+              ltac:(first [ uis_bytes2 | uis_bytes4 ]));
+    iApply (sync_code_img with "Ht").
 
   (* compressed at a 2-mod-4 pc: the resource is the two bytes there *)
-  Ltac uis_rvc2 off h dec :=
-    iApply (uinstr_is_rvc2 gt (mword_of_int off) h _
+  Ltac uis_rvc2 g off h dec :=
+    iApply (uinstr_is_rvc2 g (mword_of_int off) h _
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(apply Z.leb_le; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) dec);
-    uis_run off 2%nat h.
+    uis_run g off 2%nat h.
 
   (* compressed at a 4-aligned pc: the resource is the whole fetched word *)
-  Ltac uis_rvc4 off h dec w :=
-    iApply (uinstr_is_rvc4 gt (mword_of_int off) h w _
+  Ltac uis_rvc4 g off h dec w :=
+    iApply (uinstr_is_rvc4 g (mword_of_int off) h w _
               ltac:(vm_compute; reflexivity)
               ltac:(apply Z.leb_le; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) dec
               ltac:(apply bv_eq; vm_compute; reflexivity));
-    uis_run off 4%nat w.
+    uis_run g off 4%nat w.
 
   (* base (either alignment): 4 bytes of window *)
-  Ltac uis_base off w dec :=
-    iApply (uinstr_is_base gt (mword_of_int off) w _
+  Ltac uis_base g off w dec :=
+    iApply (uinstr_is_base g (mword_of_int off) w _
               ltac:(vm_compute; reflexivity)
               ltac:(apply Z.leb_le; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) dec);
-    uis_run off 4%nat w.
+    uis_run g off 4%nat w.
 
   (* ---------------- <main> @ 0x0 ---------------- *)
 
   (* 0x0  c.addi  (RVC, 4-aligned) *)
-  Lemma uis_sync_00 :
-    utext_all gt M pm -∗
-    uinstr_is gt (mword_of_int 0x0) true
+  Lemma uis_sync_00 (g : gname) :
+    sync_code g -∗
+    uinstr_is g (mword_of_int 0x0) true
       (C_ADDI (mword_of_int 48 : mword 6, Regidx (mword_of_int 2))).
   Proof.
     iIntros "#Ht".
-    uis_rvc4 0x0 (mword_of_int 0x1141 : mword 16) udec_1141
+    uis_rvc4 g 0x0 (mword_of_int 0x1141 : mword 16) udec_1141
       (mword_of_int 0xe4061141 : mword 32).
   Qed.
 
   (* 0x2  c.sdsp ra,8(sp)  (RVC, 2 mod 4) *)
-  Lemma uis_sync_02 :
-    utext_all gt M pm -∗
-    uinstr_is gt (mword_of_int 0x2) true
+  Lemma uis_sync_02 (g : gname) :
+    sync_code g -∗
+    uinstr_is g (mword_of_int 0x2) true
       (C_SDSP (mword_of_int 1 : mword 6, Regidx (mword_of_int 1))).
   Proof.
     iIntros "#Ht".
-    uis_rvc2 0x2 (mword_of_int 0xe406 : mword 16) udec_e406.
+    uis_rvc2 g 0x2 (mword_of_int 0xe406 : mword 16) udec_e406.
   Qed.
 
   (* 0x4  c.sdsp s0,0(sp)  (RVC, 4-aligned) *)
-  Lemma uis_sync_04 :
-    utext_all gt M pm -∗
-    uinstr_is gt (mword_of_int 0x4) true
+  Lemma uis_sync_04 (g : gname) :
+    sync_code g -∗
+    uinstr_is g (mword_of_int 0x4) true
       (C_SDSP (mword_of_int 0 : mword 6, Regidx (mword_of_int 8))).
   Proof.
     iIntros "#Ht".
-    uis_rvc4 0x4 (mword_of_int 0xe022 : mword 16) udec_e022
+    uis_rvc4 g 0x4 (mword_of_int 0xe022 : mword 16) udec_e022
       (mword_of_int 0x0800e022 : mword 32).
   Qed.
 
   (* 0x6  c.addi4spn s0,sp,16  (RVC, 2 mod 4) *)
-  Lemma uis_sync_06 :
-    utext_all gt M pm -∗
-    uinstr_is gt (mword_of_int 0x6) true
+  Lemma uis_sync_06 (g : gname) :
+    sync_code g -∗
+    uinstr_is g (mword_of_int 0x6) true
       (C_ADDI4SPN (Cregidx (mword_of_int 0), mword_of_int 4 : mword 8)).
   Proof.
     iIntros "#Ht".
-    uis_rvc2 0x6 (mword_of_int 0x0800 : mword 16) udec_0800.
+    uis_rvc2 g 0x6 (mword_of_int 0x0800 : mword 16) udec_0800.
   Qed.
 
   (* 0x8  jal 368 <sync>  (base, 4-aligned) *)
-  Lemma uis_sync_08 :
-    utext_all gt M pm -∗
-    uinstr_is gt (mword_of_int 0x8) false
+  Lemma uis_sync_08 (g : gname) :
+    sync_code g -∗
+    uinstr_is g (mword_of_int 0x8) false
       (JAL (mword_of_int 864 : mword 21, Regidx (mword_of_int 1))).
   Proof.
     iIntros "#Ht".
-    uis_base 0x8 (mword_of_int 0x360000ef : mword 32) udec_360000ef.
+    uis_base g 0x8 (mword_of_int 0x360000ef : mword 32) udec_360000ef.
   Qed.
 
   (* 0xc  c.li a0,0  (RVC, 4-aligned) *)
-  Lemma uis_sync_0c :
-    utext_all gt M pm -∗
-    uinstr_is gt (mword_of_int 0xc) true
+  Lemma uis_sync_0c (g : gname) :
+    sync_code g -∗
+    uinstr_is g (mword_of_int 0xc) true
       (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 10))).
   Proof.
     iIntros "#Ht".
-    uis_rvc4 0xc (mword_of_int 0x4501 : mword 16) udec_4501
+    uis_rvc4 g 0xc (mword_of_int 0x4501 : mword 16) udec_4501
       (mword_of_int 0x00ef4501 : mword 32).
   Qed.
 
   (* 0xe  jal 2c8 <exit>  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_sync_0e :
-    utext_all gt M pm -∗
-    uinstr_is gt (mword_of_int 0xe) false
+  Lemma uis_sync_0e (g : gname) :
+    sync_code g -∗
+    uinstr_is g (mword_of_int 0xe) false
       (JAL (mword_of_int 698 : mword 21, Regidx (mword_of_int 1))).
   Proof.
     iIntros "#Ht".
-    uis_base 0xe (mword_of_int 0x2ba000ef : mword 32) udec_2ba000ef.
+    uis_base g 0xe (mword_of_int 0x2ba000ef : mword 32) udec_2ba000ef.
   Qed.
 
   (* ---------------- <start> @ 0x12 ---------------- *)
 
   (* 0x12  c.addi  (RVC, 2 mod 4) *)
-  Lemma uis_sync_12 :
-    utext_all gt M pm -∗
-    uinstr_is gt (mword_of_int 0x12) true
+  Lemma uis_sync_12 (g : gname) :
+    sync_code g -∗
+    uinstr_is g (mword_of_int 0x12) true
       (C_ADDI (mword_of_int 48 : mword 6, Regidx (mword_of_int 2))).
   Proof.
     iIntros "#Ht".
-    uis_rvc2 0x12 (mword_of_int 0x1141 : mword 16) udec_1141.
+    uis_rvc2 g 0x12 (mword_of_int 0x1141 : mword 16) udec_1141.
   Qed.
 
   (* 0x14  c.sdsp ra,8(sp)  (RVC, 4-aligned) *)
-  Lemma uis_sync_14 :
-    utext_all gt M pm -∗
-    uinstr_is gt (mword_of_int 0x14) true
+  Lemma uis_sync_14 (g : gname) :
+    sync_code g -∗
+    uinstr_is g (mword_of_int 0x14) true
       (C_SDSP (mword_of_int 1 : mword 6, Regidx (mword_of_int 1))).
   Proof.
     iIntros "#Ht".
-    uis_rvc4 0x14 (mword_of_int 0xe406 : mword 16) udec_e406
+    uis_rvc4 g 0x14 (mword_of_int 0xe406 : mword 16) udec_e406
       (mword_of_int 0xe022e406 : mword 32).
   Qed.
 
   (* 0x16  c.sdsp s0,0(sp)  (RVC, 2 mod 4) *)
-  Lemma uis_sync_16 :
-    utext_all gt M pm -∗
-    uinstr_is gt (mword_of_int 0x16) true
+  Lemma uis_sync_16 (g : gname) :
+    sync_code g -∗
+    uinstr_is g (mword_of_int 0x16) true
       (C_SDSP (mword_of_int 0 : mword 6, Regidx (mword_of_int 8))).
   Proof.
     iIntros "#Ht".
-    uis_rvc2 0x16 (mword_of_int 0xe022 : mword 16) udec_e022.
+    uis_rvc2 g 0x16 (mword_of_int 0xe022 : mword 16) udec_e022.
   Qed.
 
   (* 0x18  c.addi4spn s0,sp,16  (RVC, 4-aligned) *)
-  Lemma uis_sync_18 :
-    utext_all gt M pm -∗
-    uinstr_is gt (mword_of_int 0x18) true
+  Lemma uis_sync_18 (g : gname) :
+    sync_code g -∗
+    uinstr_is g (mword_of_int 0x18) true
       (C_ADDI4SPN (Cregidx (mword_of_int 0), mword_of_int 4 : mword 8)).
   Proof.
     iIntros "#Ht".
-    uis_rvc4 0x18 (mword_of_int 0x0800 : mword 16) udec_0800
+    uis_rvc4 g 0x18 (mword_of_int 0x0800 : mword 16) udec_0800
       (mword_of_int 0xf0ef0800 : mword 32).
   Qed.
 
   (* 0x1a  jal 0 <main>  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_sync_1a :
-    utext_all gt M pm -∗
-    uinstr_is gt (mword_of_int 0x1a) false
+  Lemma uis_sync_1a (g : gname) :
+    sync_code g -∗
+    uinstr_is g (mword_of_int 0x1a) false
       (JAL (mword_of_int 2097126 : mword 21, Regidx (mword_of_int 1))).
   Proof.
     iIntros "#Ht".
-    uis_base 0x1a (mword_of_int 0xfe7ff0ef : mword 32) udec_fe7ff0ef.
+    uis_base g 0x1a (mword_of_int 0xfe7ff0ef : mword 32) udec_fe7ff0ef.
   Qed.
 
   (* 0x1e  jal 2c8 <exit>  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_sync_1e :
-    utext_all gt M pm -∗
-    uinstr_is gt (mword_of_int 0x1e) false
+  Lemma uis_sync_1e (g : gname) :
+    sync_code g -∗
+    uinstr_is g (mword_of_int 0x1e) false
       (JAL (mword_of_int 682 : mword 21, Regidx (mword_of_int 1))).
   Proof.
     iIntros "#Ht".
-    uis_base 0x1e (mword_of_int 0x2aa000ef : mword 32) udec_2aa000ef.
+    uis_base g 0x1e (mword_of_int 0x2aa000ef : mword 32) udec_2aa000ef.
   Qed.
 
   (* ---------------- <exit> @ 0x2c8 ---------------- *)
 
   (* 0x2c8  c.li  (RVC, 4-aligned) *)
-  Lemma uis_sync_2c8 :
-    utext_all gt M pm -∗
-    uinstr_is gt (mword_of_int 0x2c8) true
+  Lemma uis_sync_2c8 (g : gname) :
+    sync_code g -∗
+    uinstr_is g (mword_of_int 0x2c8) true
       (C_LI (mword_of_int 2 : mword 6, Regidx (mword_of_int 17))).
   Proof.
     iIntros "#Ht".
-    uis_rvc4 0x2c8 (mword_of_int 0x4889 : mword 16) udec_4889
+    uis_rvc4 g 0x2c8 (mword_of_int 0x4889 : mword 16) udec_4889
       (mword_of_int 0x00734889 : mword 32).
   Qed.
 
   (* 0x2ca  ecall  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_sync_2ca :
-    utext_all gt M pm -∗
-    uinstr_is gt (mword_of_int 0x2ca) false
+  Lemma uis_sync_2ca (g : gname) :
+    sync_code g -∗
+    uinstr_is g (mword_of_int 0x2ca) false
       (ECALL tt).
   Proof.
     iIntros "#Ht".
-    uis_base 0x2ca (mword_of_int 0x00000073 : mword 32) udec_00000073.
+    uis_base g 0x2ca (mword_of_int 0x00000073 : mword 32) udec_00000073.
   Qed.
 
   (* ---------------- <sync> @ 0x368 ---------------- *)
 
   (* 0x368  c.li  (RVC, 4-aligned) *)
-  Lemma uis_sync_368 :
-    utext_all gt M pm -∗
-    uinstr_is gt (mword_of_int 0x368) true
+  Lemma uis_sync_368 (g : gname) :
+    sync_code g -∗
+    uinstr_is g (mword_of_int 0x368) true
       (C_LI (mword_of_int 22 : mword 6, Regidx (mword_of_int 17))).
   Proof.
     iIntros "#Ht".
-    uis_rvc4 0x368 (mword_of_int 0x48d9 : mword 16) udec_48d9
+    uis_rvc4 g 0x368 (mword_of_int 0x48d9 : mword 16) udec_48d9
       (mword_of_int 0x007348d9 : mword 32).
   Qed.
 
   (* 0x36a  ecall  (base, 2 mod 4 -> split fetch) *)
-  Lemma uis_sync_36a :
-    utext_all gt M pm -∗
-    uinstr_is gt (mword_of_int 0x36a) false
+  Lemma uis_sync_36a (g : gname) :
+    sync_code g -∗
+    uinstr_is g (mword_of_int 0x36a) false
       (ECALL tt).
   Proof.
     iIntros "#Ht".
-    uis_base 0x36a (mword_of_int 0x00000073 : mword 32) udec_00000073.
+    uis_base g 0x36a (mword_of_int 0x00000073 : mword 32) udec_00000073.
   Qed.
 
   (* 0x36e  c.jr  (RVC, 2 mod 4) *)
-  Lemma uis_sync_36e :
-    utext_all gt M pm -∗
-    uinstr_is gt (mword_of_int 0x36e) true
+  Lemma uis_sync_36e (g : gname) :
+    sync_code g -∗
+    uinstr_is g (mword_of_int 0x36e) true
       (C_JR (Regidx (mword_of_int 1))).
   Proof.
     iIntros "#Ht".
-    uis_rvc2 0x36e (mword_of_int 0x8082 : mword 16) udec_8082.
+    uis_rvc2 g 0x36e (mword_of_int 0x8082 : mword 16) udec_8082.
   Qed.
 
   (* =================================================================== *)
-  (* §3 The catalog as ONE resource.                                      *)
+  (* §3 Where the catalog comes from.                                      *)
   (* =================================================================== *)
 
-  (* A program proof cannot hold [utext_all gt M pm]: [M] and [pm] are hidden
-     inside [UkRun.urun], existentially. It holds THIS instead -- the per-pc
-     resources bundled, which name only the gname and the pc. It is
-     persistent, so a function destructs it once and every branch still has
-     it.
+  (* [sync_code] is defined above, at the top of the section, because every
+     per-pc lemma consumes it. This is its INTRODUCTION, and the ONE place in
+     the whole development where the program's bytes meet the process image:
+     the entry hands out [utext_all gt M pm] -- the text half of the heap,
+     over the image the kernel actually loaded -- and the two section
+     hypotheses say that image contains the dump ([sync_text_sub]) and that
+     the executable segment is X-and-not-W ([Hx]), which is what puts those
+     bytes in the TEXT half rather than the data one. Both are discharged
+     HERE, once, instead of in each of the 18 per-pc lemmas. *)
 
-     Destruct with: iDestruct 'Hcode' as '(C00 & C02 & C04 & C06 & C08 & C0c
-     & C0e & C12 & C14 & C16 & C18 & C1a & C1e & C2c8 & C2ca & C368 & C36a &
-     C36e)' *)
-
-  Definition sync_code (g : gname) : iProp Σ :=
-    (uinstr_is g (mword_of_int 0x0) true
-       (C_ADDI (mword_of_int 48 : mword 6, Regidx (mword_of_int 2))) ∗
-     uinstr_is g (mword_of_int 0x2) true
-       (C_SDSP (mword_of_int 1 : mword 6, Regidx (mword_of_int 1))) ∗
-     uinstr_is g (mword_of_int 0x4) true
-       (C_SDSP (mword_of_int 0 : mword 6, Regidx (mword_of_int 8))) ∗
-     uinstr_is g (mword_of_int 0x6) true
-       (C_ADDI4SPN (Cregidx (mword_of_int 0), mword_of_int 4 : mword 8)) ∗
-     uinstr_is g (mword_of_int 0x8) false
-       (JAL (mword_of_int 864 : mword 21, Regidx (mword_of_int 1))) ∗
-     uinstr_is g (mword_of_int 0xc) true
-       (C_LI (mword_of_int 0 : mword 6, Regidx (mword_of_int 10))) ∗
-     uinstr_is g (mword_of_int 0xe) false
-       (JAL (mword_of_int 698 : mword 21, Regidx (mword_of_int 1))) ∗
-     uinstr_is g (mword_of_int 0x12) true
-       (C_ADDI (mword_of_int 48 : mword 6, Regidx (mword_of_int 2))) ∗
-     uinstr_is g (mword_of_int 0x14) true
-       (C_SDSP (mword_of_int 1 : mword 6, Regidx (mword_of_int 1))) ∗
-     uinstr_is g (mword_of_int 0x16) true
-       (C_SDSP (mword_of_int 0 : mword 6, Regidx (mword_of_int 8))) ∗
-     uinstr_is g (mword_of_int 0x18) true
-       (C_ADDI4SPN (Cregidx (mword_of_int 0), mword_of_int 4 : mword 8)) ∗
-     uinstr_is g (mword_of_int 0x1a) false
-       (JAL (mword_of_int 2097126 : mword 21, Regidx (mword_of_int 1))) ∗
-     uinstr_is g (mword_of_int 0x1e) false
-       (JAL (mword_of_int 682 : mword 21, Regidx (mword_of_int 1))) ∗
-     uinstr_is g (mword_of_int 0x2c8) true
-       (C_LI (mword_of_int 2 : mword 6, Regidx (mword_of_int 17))) ∗
-     uinstr_is g (mword_of_int 0x2ca) false
-       (ECALL tt) ∗
-     uinstr_is g (mword_of_int 0x368) true
-       (C_LI (mword_of_int 22 : mword 6, Regidx (mword_of_int 17))) ∗
-     uinstr_is g (mword_of_int 0x36a) false
-       (ECALL tt) ∗
-     uinstr_is g (mword_of_int 0x36e) true
-       (C_JR (Regidx (mword_of_int 1))))%I.
-
-  Global Instance sync_code_persistent g : Persistent (sync_code g).
-  Proof. apply _. Qed.
-
-  (* ...and where it comes from: the text the process entry hands out *)
   Lemma sync_code_of_text : utext_all gt M pm -∗ sync_code gt.
   Proof.
+    assert (Hin : forall (a : Z) (b : bv 8),
+               SyncInstrs.sync_bytes !! a = Some b -> M !! a = Some b)
+      by exact Hsub.
+    assert (Hp : forall a : Z, is_Some (SyncInstrs.sync_bytes !! a) ->
+                   ux_addr pm a /\ ~ uw_addr pm a).
+    { intros a [b Hb]. apply Hx.
+      pose proof (sync_bytes_key_lt a b Hb) as Hlt.
+      pose proof (sync_bytes_key_nonneg a b Hb) as Hge. lia. }
     iIntros "#Ht". rewrite /sync_code.
-    iSplit; [ iApply (uis_sync_00 with "Ht") | ].
-    iSplit; [ iApply (uis_sync_02 with "Ht") | ].
-    iSplit; [ iApply (uis_sync_04 with "Ht") | ].
-    iSplit; [ iApply (uis_sync_06 with "Ht") | ].
-    iSplit; [ iApply (uis_sync_08 with "Ht") | ].
-    iSplit; [ iApply (uis_sync_0c with "Ht") | ].
-    iSplit; [ iApply (uis_sync_0e with "Ht") | ].
-    iSplit; [ iApply (uis_sync_12 with "Ht") | ].
-    iSplit; [ iApply (uis_sync_14 with "Ht") | ].
-    iSplit; [ iApply (uis_sync_16 with "Ht") | ].
-    iSplit; [ iApply (uis_sync_18 with "Ht") | ].
-    iSplit; [ iApply (uis_sync_1a with "Ht") | ].
-    iSplit; [ iApply (uis_sync_1e with "Ht") | ].
-    iSplit; [ iApply (uis_sync_2c8 with "Ht") | ].
-    iSplit; [ iApply (uis_sync_2ca with "Ht") | ].
-    iSplit; [ iApply (uis_sync_368 with "Ht") | ].
-    iSplit; [ iApply (uis_sync_36a with "Ht") | ].
-    iApply (uis_sync_36e with "Ht").
+    iApply (utext_img_of_all gt M pm SyncInstrs.sync_bytes Hin Hp with "Ht").
   Qed.
 
 End UCodeSync.

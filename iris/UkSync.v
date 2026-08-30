@@ -58,8 +58,6 @@ Section UkSync.
   Local Notation a0_idx := (mword_of_int 10 : mword 5).
   Local Notation a7_idx := (mword_of_int 17 : mword 5).
 
-  Local Notation CODE :=
-    "(C00 & C02 & C04 & C06 & C08 & C0c & C0e & C12 & C14 & C16 & C18 & C1a & C1e & C2c8 & C2ca & C368 & C36a & C36e)".
 
   (* ------------------------------------------------------------------- *)
   (* exit @0x2c8: c.li a7,2; ecall.  DIVERGES -- the exit arm of the       *)
@@ -72,7 +70,8 @@ Section UkSync.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hcode Hrun".
-    iDestruct "Hcode" as CODE.
+    iDestruct (uis_sync_2c8 with "Hcode") as "#C2c8".
+    iDestruct (uis_sync_2ca with "Hcode") as "#C2ca".
     destruct sync_syms_pins as (Hsmain & Hsstart & Hsexit & Hssync).
     rewrite Hsexit.
     (* 0x2c8  c.li a7,2 *)
@@ -117,7 +116,9 @@ Section UkSync.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hret2. iIntros "#Hcode Hrun Hcont".
-    iDestruct "Hcode" as CODE.
+    iDestruct (uis_sync_368 with "Hcode") as "#C368".
+    iDestruct (uis_sync_36a with "Hcode") as "#C36a".
+    iDestruct (uis_sync_36e with "Hcode") as "#C36e".
     destruct sync_syms_pins as (Hsmain & Hsstart & Hsexit & Hssync).
     rewrite Hssync.
     (* 0x368  c.li a7,22 *)
@@ -192,7 +193,24 @@ Section UkSync.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hsp. iIntros "#Hcode Hrun".
-    iDestruct "Hcode" as CODE.
+    iDestruct (uis_sync_00 with "Hcode") as "#C00".
+    iDestruct (uis_sync_02 with "Hcode") as "#C02".
+    iDestruct (uis_sync_04 with "Hcode") as "#C04".
+    iDestruct (uis_sync_06 with "Hcode") as "#C06".
+    iDestruct (uis_sync_08 with "Hcode") as "#C08".
+    iDestruct (uis_sync_0c with "Hcode") as "#C0c".
+    iDestruct (uis_sync_0e with "Hcode") as "#C0e".
+    iDestruct (uis_sync_12 with "Hcode") as "#C12".
+    iDestruct (uis_sync_14 with "Hcode") as "#C14".
+    iDestruct (uis_sync_16 with "Hcode") as "#C16".
+    iDestruct (uis_sync_18 with "Hcode") as "#C18".
+    iDestruct (uis_sync_1a with "Hcode") as "#C1a".
+    iDestruct (uis_sync_1e with "Hcode") as "#C1e".
+    iDestruct (uis_sync_2c8 with "Hcode") as "#C2c8".
+    iDestruct (uis_sync_2ca with "Hcode") as "#C2ca".
+    iDestruct (uis_sync_368 with "Hcode") as "#C368".
+    iDestruct (uis_sync_36a with "Hcode") as "#C36a".
+    iDestruct (uis_sync_36e with "Hcode") as "#C36e".
     (* the free stack the run already owns says sp is aligned and has room *)
     iDestruct (urun_stack with "Hrun") as %[Hal8' Hroom'].
     rewrite Hsp in Hal8', Hroom'.
@@ -283,7 +301,7 @@ Section UkSync.
     iApply (wp_ksync_sync h5 m3 n
               ltac:(rewrite Hra3; vm_compute; reflexivity)
               with "[] Hrun").
-    { rewrite /sync_code. iSplit; [ iExact "C00" | ]. iSplit; [ iExact "C02" | ]. iSplit; [ iExact "C04" | ]. iSplit; [ iExact "C06" | ]. iSplit; [ iExact "C08" | ]. iSplit; [ iExact "C0c" | ]. iSplit; [ iExact "C0e" | ]. iSplit; [ iExact "C12" | ]. iSplit; [ iExact "C14" | ]. iSplit; [ iExact "C16" | ]. iSplit; [ iExact "C18" | ]. iSplit; [ iExact "C1a" | ]. iSplit; [ iExact "C1e" | ]. iSplit; [ iExact "C2c8" | ]. iSplit; [ iExact "C2ca" | ]. iSplit; [ iExact "C368" | ]. iSplit; [ iExact "C36a" | ]. iExact "C36e". }
+    { iExact "Hcode". }
     iIntros (h6 ret) "Hrun".
     rewrite Hra3.
     set (m4 := <[Regidx a0_idx := ret]>
@@ -312,7 +330,7 @@ Section UkSync.
               with "C0e Hrun").
     iIntros (h8) "Hrun".
     iApply (wp_ksync_exit h8 _ n with "[] Hrun").
-    rewrite /sync_code. iSplit; [ iExact "C00" | ]. iSplit; [ iExact "C02" | ]. iSplit; [ iExact "C04" | ]. iSplit; [ iExact "C06" | ]. iSplit; [ iExact "C08" | ]. iSplit; [ iExact "C0c" | ]. iSplit; [ iExact "C0e" | ]. iSplit; [ iExact "C12" | ]. iSplit; [ iExact "C14" | ]. iSplit; [ iExact "C16" | ]. iSplit; [ iExact "C18" | ]. iSplit; [ iExact "C1a" | ]. iSplit; [ iExact "C1e" | ]. iSplit; [ iExact "C2c8" | ]. iSplit; [ iExact "C2ca" | ]. iSplit; [ iExact "C368" | ]. iSplit; [ iExact "C36a" | ]. iExact "C36e".
+    iExact "Hcode".
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -332,7 +350,24 @@ Section UkSync.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hsp. iIntros "#Hcode Hrun".
-    iDestruct "Hcode" as CODE.
+    iDestruct (uis_sync_00 with "Hcode") as "#C00".
+    iDestruct (uis_sync_02 with "Hcode") as "#C02".
+    iDestruct (uis_sync_04 with "Hcode") as "#C04".
+    iDestruct (uis_sync_06 with "Hcode") as "#C06".
+    iDestruct (uis_sync_08 with "Hcode") as "#C08".
+    iDestruct (uis_sync_0c with "Hcode") as "#C0c".
+    iDestruct (uis_sync_0e with "Hcode") as "#C0e".
+    iDestruct (uis_sync_12 with "Hcode") as "#C12".
+    iDestruct (uis_sync_14 with "Hcode") as "#C14".
+    iDestruct (uis_sync_16 with "Hcode") as "#C16".
+    iDestruct (uis_sync_18 with "Hcode") as "#C18".
+    iDestruct (uis_sync_1a with "Hcode") as "#C1a".
+    iDestruct (uis_sync_1e with "Hcode") as "#C1e".
+    iDestruct (uis_sync_2c8 with "Hcode") as "#C2c8".
+    iDestruct (uis_sync_2ca with "Hcode") as "#C2ca".
+    iDestruct (uis_sync_368 with "Hcode") as "#C368".
+    iDestruct (uis_sync_36a with "Hcode") as "#C36a".
+    iDestruct (uis_sync_36e with "Hcode") as "#C36e".
     (* the free stack the run already owns says sp is aligned and has room *)
     iDestruct (urun_stack with "Hrun") as %[Hal8' Hroom'].
     rewrite Hsp in Hal8', Hroom'.
@@ -429,7 +464,7 @@ Section UkSync.
                      ltac:(vm_compute; discriminate))
                   Hsp1)). }
     iApply (wp_ksync_main h5 m3 (add_vec_int sp0 (-16)) n Hsp3 with "[] Hrun").
-    rewrite /sync_code. iSplit; [ iExact "C00" | ]. iSplit; [ iExact "C02" | ]. iSplit; [ iExact "C04" | ]. iSplit; [ iExact "C06" | ]. iSplit; [ iExact "C08" | ]. iSplit; [ iExact "C0c" | ]. iSplit; [ iExact "C0e" | ]. iSplit; [ iExact "C12" | ]. iSplit; [ iExact "C14" | ]. iSplit; [ iExact "C16" | ]. iSplit; [ iExact "C18" | ]. iSplit; [ iExact "C1a" | ]. iSplit; [ iExact "C1e" | ]. iSplit; [ iExact "C2c8" | ]. iSplit; [ iExact "C2ca" | ]. iSplit; [ iExact "C368" | ]. iSplit; [ iExact "C36a" | ]. iExact "C36e".
+    iExact "Hcode".
   Qed.
 
 End UkSync.

@@ -838,6 +838,58 @@ Section UserHeap.
     iApply (utext_frag γt M pm _ _ (HM idx Hlt) Hx Hw with "Ht").
   Qed.
 
+  (* ===================================================================== *)
+  (* A PROGRAM'S TEXT KEYED BY ITS OWN DUMPED BYTE MAP.                     *)
+  (*                                                                        *)
+  (* [utext_all] names [M] and [pm], and a program proof cannot hold it:    *)
+  (* [UkRun.urun] hides both existentially.  That is the whole reason the   *)
+  (* code catalogs used to bundle their per-pc [uinstr_is] facts into ONE   *)
+  (* wide separating conjunction -- and why a proof that fetches three      *)
+  (* instructions paid a 369-way [iDestruct].                              *)
+  (*                                                                        *)
+  (* The kernel tier never had that problem, because [KernelText.kernel_text] *)
+  (* is keyed by the CONSTANT [KernelInstrs.kernel_bytes] rather than by an  *)
+  (* image variable, so its 23K bytes are one persistent resource and every  *)
+  (* per-instruction lemma extracts from it by [big_sepM_lookup].  This is   *)
+  (* that resource for the user tier: [utext_img γt T] at the program's      *)
+  (* dumped [T].  [utext_all] converts into it ONCE, at the entry, where the *)
+  (* image and permission facts are still in scope.                          *)
+  (* ===================================================================== *)
+  Definition utext_img (γt : gname) (T : gmap Z (bv 8)) : iProp Σ :=
+    ([∗ map] a ↦ b ∈ T, utext γt a b)%I.
+
+  Global Instance utext_img_persistent γt T : Persistent (utext_img γt T).
+  Proof. apply _. Qed.
+
+  (* the ONE conversion: the process's text heap covers the program's bytes,
+     and every one of them is X-and-not-W (i.e. lands in the TEXT half) *)
+  Lemma utext_img_of_all (γt : gname) (M : gmap Z (bv 8))
+      (pm : gmap (mword 27) uperm) (T : gmap Z (bv 8)) :
+    (forall (a : Z) (b : bv 8), T !! a = Some b -> M !! a = Some b) ->
+    (forall a : Z, is_Some (T !! a) -> ux_addr pm a /\ ~ uw_addr pm a) ->
+    utext_all γt M pm -∗ utext_img γt T.
+  Proof.
+    intros HM Hperm. iIntros "#Ht". rewrite /utext_img.
+    iApply big_sepM_intro. iIntros "!>" (a b Hab).
+    destruct (Hperm a (mk_is_Some _ _ Hab)) as [Hx Hw].
+    iApply (utext_frag γt M pm a b (HM a b Hab) Hx Hw with "Ht").
+  Qed.
+
+  (* a fetch window out of it, byte by byte -- the twin of
+     [KernelText.kernel_window_pc], and what every per-pc decode lemma runs *)
+  Lemma utext_img_run {k : N} (γt : gname) (T : gmap Z (bv 8))
+      (a : Z) (n : nat) (w : bv k) :
+    (forall j : nat, (j < n)%nat -> T !! (a + Z.of_nat j)%Z = Some (nth_byte w j)) ->
+    utext_img γt T -∗
+    ([∗ list] j ∈ seq 0 n, utext γt (a + Z.of_nat j) (nth_byte w j)).
+  Proof.
+    intros HT. iIntros "#Ht". iApply big_sepL_intro. iIntros "!>" (idx j Hj).
+    apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l in Hlt |- *.
+    rewrite /utext_img.
+    iApply (big_sepM_lookup _ _ (a + Z.of_nat idx)%Z (nth_byte w idx) with "Ht").
+    exact (HT idx Hlt).
+  Qed.
+
   (* ---- the three decode shapes ---------------------------------------- *)
 
   (* 4-alignment implies 2-alignment; [uinstr_is] carries the 2-aligned form

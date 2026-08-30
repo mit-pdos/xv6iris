@@ -922,6 +922,19 @@ def emit(dump, prog, pcs, groups, dropped, skipfuncs, skipdefault, notes, asts,
     a('  - apply andb_prop in HF as [ _ H2 ]. exact (IH H2 Hin).')
     a('Qed.')
     a('')
+    a('(* ...and the LOWER bound, which the same [forallb] decides.  [Hx] and')
+    a('   every other page-range hypothesis is two-sided, so a key fact that')
+    a('   only bounds above leaves [0 <= k] for [lia] to invent out of nothing. *)')
+    a('Lemma list_key_nonneg {A : Type} (L : list (Z * A)) (k : Z) (b : A) :')
+    a('  forallb (fun kv => Z.leb 0 (fst kv)) L = true -> In (k, b) L -> 0 <= k.')
+    a('Proof.')
+    a('  induction L as [ | x xs IH ]; cbn [forallb In]; [ tauto | ].')
+    a('  intros HF [ Hx | Hin ].')
+    a('  - apply andb_prop in HF as [ H1 _ ]. subst x. cbn in H1.')
+    a('    apply Z.leb_le in H1. exact H1.')
+    a('  - apply andb_prop in HF as [ _ H2 ]. exact (IH H2 Hin).')
+    a('Qed.')
+    a('')
     for nm, mod, mapname, bound in (('%s_bytes_key_lt' % P, M, '%s_bytes' % D, tbound),
                                     ('%s_data_key_lt' % P, M, '%s_data' % D, dbound)):
         if bound is None:
@@ -934,6 +947,16 @@ def emit(dump, prog, pcs, groups, dropped, skipfuncs, skipdefault, notes, asts,
         a('  apply elem_of_list_to_map_2 in Hk.')
         a('  apply elem_of_list_In in Hk.')
         a('  refine (list_key_lt _ %d k b _ Hk).' % bound)
+        a('  vm_compute. reflexivity.')
+        a('Qed.')
+        a('')
+        a('Lemma %s_nonneg (k : Z) (b : bv 8) :' % nm[:-3])
+        a('  %s.%s !! k = Some b -> 0 <= k.' % (modfile, mapname))
+        a('Proof.')
+        a('  intro Hk.')
+        a('  apply elem_of_list_to_map_2 in Hk.')
+        a('  apply elem_of_list_In in Hk.')
+        a('  refine (list_key_nonneg _ k b _ Hk).')
         a('  vm_compute. reflexivity.')
         a('Qed.')
         a('')
@@ -1140,13 +1163,44 @@ def emit(dump, prog, pcs, groups, dropped, skipfuncs, skipdefault, notes, asts,
     a('  Context (Hx : forall a : Z, (0 <= a < %d)%%Z ->' % (ntext * PAGE))
     a('                  ux_addr pm a /\\ ~ uw_addr pm a).')
     a('')
-    a('  (* The tactics live INSIDE the section so they can name [M], [pm] and')
-    a('     the concrete address: [utext_run_of] takes the run\'s base as an')
-    a('     argument, and leaving it to unification would run the byte')
-    a('     side-conditions against an unresolved evar. *)')
     a('')
-    a('  (* one image byte, through [%s_text_sub] *)' % P)
-    a('  Ltac uis_byte := apply Hsub; vm_compute; f_equal; apply bv_eq; reflexivity.')
+    for l in comment_block(
+            'THE PROGRAM\'S TEXT, AS ONE RESOURCE -- the U-tier twin of '
+            '[KernelText.kernel_text].  It is keyed by the DUMPED byte map, not '
+            'by an image variable, and that is the whole point: [UkRun.urun] '
+            'hides [M] and [pm] existentially, so a program proof can hold THIS '
+            'while it could not hold [utext_all].  Every per-pc lemma below '
+            'extracts its fetch window straight out of it by [big_sepM_lookup], '
+            'exactly as the kernel\'s [instr] lemmas do -- so no proof ever '
+            'destructs a wide conjunction, and a function that fetches three '
+            'instructions pays for three.'):
+        a('  ' + l if l else l)
+    a('  Definition %s_code (g : gname) : iProp %s :=' % (P, SIGMA))
+    a('    utext_img g %sInstrs.%s_bytes.' % (M, D))
+    a('')
+    a('  Global Instance %s_code_persistent g : Persistent (%s_code g).' % (P, P))
+    a('  Proof. apply _. Qed.')
+    a('')
+    a('  (* Keep typeclass resolution from unfolding this into its %d-entry'
+      % len(dump.bytes))
+    a('     [big_sepM]; cf. [KernelText.kernel_text], which learned it the hard')
+    a('     way.  Conversion can still see through it -- [%s_code_img] below is'
+      % P)
+    a('     the one place that needs to. *)')
+    a('  Global Typeclasses Opaque %s_code.' % P)
+    a('')
+    a('  Lemma %s_code_img (g : gname) :' % P)
+    a('    %s_code g -∗ utext_img g %sInstrs.%s_bytes.' % (P, M, D))
+    a('  Proof. rewrite /%s_code. iIntros "#H". iExact "H". Qed.' % P)
+    a('')
+    a('  (* The tactics take the gname as an ARGUMENT: unlike the old [M]/[pm]')
+    a('     pair they are not section variables, so an Ltac body could not name')
+    a('     one.  The run\'s base is an argument for the same reason as before --')
+    a('     leaving it to unification runs the byte side-conditions against an')
+    a('     unresolved evar. *)')
+    a('')
+    a('  (* one image byte, straight out of [%sInstrs.%s_bytes] *)' % (M, D))
+    a('  Ltac uis_byte := vm_compute; f_equal; apply bv_eq; reflexivity.')
     a('')
     a('  Ltac uis_bytes2 :=')
     a('    let j := fresh "j" in let Hj := fresh "Hj" in')
@@ -1155,45 +1209,37 @@ def emit(dump, prog, pcs, groups, dropped, skipfuncs, skipdefault, notes, asts,
     a('    let j := fresh "j" in let Hj := fresh "Hj" in')
     a('    intros j Hj; do 4 (destruct j as [|j]; [uis_byte|]); lia.')
     a('')
-    a('  (* the window lies in the executable segment, so every address of it is')
-    a('     X and not W -- which is what puts it in the TEXT heap *)')
-    a('  Ltac uis_perm off :=')
-    a('    let j := fresh "j" in let Hj := fresh "Hj" in')
-    a('    intros j Hj;')
-    a('    replace (uint (mword_of_int off : mword 64)) with off')
-    a('      by (vm_compute; reflexivity);')
-    a('    apply Hx; lia.')
-    a('')
-    a('  Ltac uis_run off n w :=')
-    a('    iApply (utext_run_of gt M pm (uint (mword_of_int off : mword 64)) n w')
-    a('              ltac:(first [ uis_bytes2 | uis_bytes4 ]) ltac:(uis_perm off));')
-    a('    iExact "Ht".')
+    a('  Ltac uis_run g off n w :=')
+    a('    iApply (utext_img_run g %sInstrs.%s_bytes' % (M, D))
+    a('              (uint (mword_of_int off : mword 64)) n w')
+    a('              ltac:(first [ uis_bytes2 | uis_bytes4 ]));')
+    a('    iApply (%s_code_img with "Ht").' % P)
     a('')
     a('  (* compressed at a 2-mod-4 pc: the resource is the two bytes there *)')
-    a('  Ltac uis_rvc2 off h dec :=')
-    a('    iApply (uinstr_is_rvc2 gt (mword_of_int off) h _')
+    a('  Ltac uis_rvc2 g off h dec :=')
+    a('    iApply (uinstr_is_rvc2 g (mword_of_int off) h _')
     a('              ltac:(vm_compute; reflexivity)')
     a('              ltac:(vm_compute; reflexivity)')
     a('              ltac:(apply Z.leb_le; vm_compute; reflexivity)')
     a('              ltac:(vm_compute; reflexivity) dec);')
-    a('    uis_run off 2%nat h.')
+    a('    uis_run g off 2%nat h.')
     a('')
     a('  (* compressed at a 4-aligned pc: the resource is the whole fetched word *)')
-    a('  Ltac uis_rvc4 off h dec w :=')
-    a('    iApply (uinstr_is_rvc4 gt (mword_of_int off) h w _')
+    a('  Ltac uis_rvc4 g off h dec w :=')
+    a('    iApply (uinstr_is_rvc4 g (mword_of_int off) h w _')
     a('              ltac:(vm_compute; reflexivity)')
     a('              ltac:(apply Z.leb_le; vm_compute; reflexivity)')
     a('              ltac:(vm_compute; reflexivity) dec')
     a('              ltac:(apply bv_eq; vm_compute; reflexivity));')
-    a('    uis_run off 4%nat w.')
+    a('    uis_run g off 4%nat w.')
     a('')
     a('  (* base (either alignment): 4 bytes of window *)')
-    a('  Ltac uis_base off w dec :=')
-    a('    iApply (uinstr_is_base gt (mword_of_int off) w _')
+    a('  Ltac uis_base g off w dec :=')
+    a('    iApply (uinstr_is_base g (mword_of_int off) w _')
     a('              ltac:(vm_compute; reflexivity)')
     a('              ltac:(apply Z.leb_le; vm_compute; reflexivity)')
     a('              ltac:(vm_compute; reflexivity) dec);')
-    a('    uis_run off 4%nat w.')
+    a('    uis_run g off 4%nat w.')
     a('')
     for sym, gp in groups:
         if not gp:
@@ -1207,21 +1253,21 @@ def emit(dump, prog, pcs, groups, dropped, skipfuncs, skipdefault, notes, asts,
             term = rendered[(width, enc)]
             note = disasm(dump, pc, width, t)
             a('  (* 0x%x  %s  (%s) *)' % (pc, csan(note), geometry_note(pc, width)))
-            a('  Lemma uis_%s_%02x :' % (P, pc))
-            a('    utext_all gt M pm -∗')
-            a('    uinstr_is gt (mword_of_int 0x%x) %s' % (pc, 'true' if width == 16 else 'false'))
+            a('  Lemma uis_%s_%02x (g : gname) :' % (P, pc))
+            a('    %s_code g -∗' % P)
+            a('    uinstr_is g (mword_of_int 0x%x) %s' % (pc, 'true' if width == 16 else 'false'))
             a('      (%s).' % term)
             g = geometry(pc, width)
             if g == 'base':
                 a('  Proof.')
                 a('    iIntros "#Ht".')
-                a('    uis_base 0x%x (mword_of_int 0x%08x : mword 32) udec_%08x.'
+                a('    uis_base g 0x%x (mword_of_int 0x%08x : mword 32) udec_%08x.'
                   % (pc, enc, enc))
                 a('  Qed.')
             elif g == 'rvc2':
                 a('  Proof.')
                 a('    iIntros "#Ht".')
-                a('    uis_rvc2 0x%x (mword_of_int 0x%04x : mword 16) udec_%04x.'
+                a('    uis_rvc2 g 0x%x (mword_of_int 0x%04x : mword 16) udec_%04x.'
                   % (pc, enc, enc))
                 a('  Qed.')
             else:
@@ -1229,7 +1275,7 @@ def emit(dump, prog, pcs, groups, dropped, skipfuncs, skipdefault, notes, asts,
                 word = enc | (b2 << 16) | (b3 << 24)
                 a('  Proof.')
                 a('    iIntros "#Ht".')
-                a('    uis_rvc4 0x%x (mword_of_int 0x%04x : mword 16) udec_%04x'
+                a('    uis_rvc4 g 0x%x (mword_of_int 0x%04x : mword 16) udec_%04x'
                   % (pc, enc, enc))
                 a('      (mword_of_int 0x%08x : mword 32).' % word)
                 a('  Qed.')
@@ -1237,42 +1283,35 @@ def emit(dump, prog, pcs, groups, dropped, skipfuncs, skipdefault, notes, asts,
     # ---- §3 --------------------------------------------------------------
     allpcs = [pc for _, gp in groups for pc in gp]
     a('  (* =================================================================== *)')
-    a('  (* §3 The catalog as ONE resource.                                      *)')
+    a('  (* §3 Where the catalog comes from.                                      *)')
     a('  (* =================================================================== *)')
     a('')
     for l in comment_block(
-            'A program proof cannot hold [utext_all gt M pm]: [M] and [pm] are '
-            'hidden inside [UkRun.urun], existentially.  It holds THIS instead -- '
-            'the per-pc resources bundled, which name only the gname and the pc.  '
-            'It is persistent, so a function destructs it once and every branch '
-            'still has it.\n\n'
-            'Destruct with:\n'
-            '  iDestruct "Hcode" as "(%s)"'
-            % ' & '.join('C%02x' % pc for pc in allpcs)):
+            '[%s_code] is defined above, at the top of the section, because every '
+            'per-pc lemma consumes it.  This is its INTRODUCTION, and the ONE '
+            'place in the whole development where the program\'s bytes meet the '
+            'process image: the entry hands out [utext_all gt M pm] -- the text '
+            'half of the heap, over the image the kernel actually loaded -- and '
+            'the two section hypotheses say that image contains the dump '
+            '([%s_text_sub]) and that the executable segment is X-and-not-W ([Hx]), '
+            'which is what puts those bytes in the TEXT half rather than the data '
+            'one.  Both are discharged HERE, once, instead of in each of the %d '
+            'per-pc lemmas.' % (P, P, len(allpcs))):
         a('  ' + l if l else l)
     a('')
-    a('  Definition %s_code (g : gname) : iProp %s :=' % (P, SIGMA))
-    for n, pc in enumerate(allpcs):
-        width, enc = dump.by_addr[pc]
-        term = rendered[(width, enc)]
-        head = '    (' if n == 0 else '     '
-        tail = ')%I.' if n == len(allpcs) - 1 else ' ∗'
-        a('%suinstr_is g (mword_of_int 0x%x) %s'
-          % (head, pc, 'true' if width == 16 else 'false'))
-        a('       (%s)%s' % (term, tail))
-    a('')
-    a('  Global Instance %s_code_persistent g : Persistent (%s_code g).' % (P, P))
-    a('  Proof. apply _. Qed.')
-    a('')
-    a('  (* ...and where it comes from: the text the process entry hands out *)')
     a('  Lemma %s_code_of_text : utext_all gt M pm -∗ %s_code gt.' % (P, P))
     a('  Proof.')
-    # NOT [repeat iSplit]: [uinstr_is] is ITSELF a separating conjunction,
-    # so a blind repeat descends into the first instruction's own clauses.
+    a('    assert (Hin : forall (a : Z) (b : bv 8),')
+    a('               %sInstrs.%s_bytes !! a = Some b -> M !! a = Some b)' % (M, D))
+    a('      by exact Hsub.')
+    a('    assert (Hp : forall a : Z, is_Some (%sInstrs.%s_bytes !! a) ->' % (M, D))
+    a('                   ux_addr pm a /\\ ~ uw_addr pm a).')
+    a('    { intros a [b Hb]. apply Hx.')
+    a('      pose proof (%s_bytes_key_lt a b Hb) as Hlt.' % P)
+    a('      pose proof (%s_bytes_key_nonneg a b Hb) as Hge. lia. }' % P)
     a('    iIntros "#Ht". rewrite /%s_code.' % P)
-    for pc in allpcs[:-1]:
-        a('    iSplit; [ iApply (uis_%s_%02x with "Ht") | ].' % (P, pc))
-    a('    iApply (uis_%s_%02x with "Ht").' % (P, allpcs[-1]))
+    a('    iApply (utext_img_of_all gt M pm %sInstrs.%s_bytes Hin Hp with "Ht").'
+      % (M, D))
     a('  Qed.')
     a('')
     a('End %s.' % sec)

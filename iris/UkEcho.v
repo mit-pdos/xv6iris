@@ -66,7 +66,6 @@ Section UkEcho.
     rewrite Hrr Hq in Hr. discriminate.
   Qed.
 
-  Local Notation CODE := "(C00 & C02 & C04 & C06 & C08 & C0a & C0c & C0e & C10 & C12 & C14 & C16 & C1a & C1e & C20 & C24 & C28 & C2c & C2e & C32 & C34 & C38 & C3c & C3e & C40 & C42 & C44 & C48 & C4a & C4e & C52 & C54 & C58 & C5a & C5c & C5e & C62 & C66 & C68 & C6c & C70 & C72 & C76 & C78 & C7c & C7e & C80 & C82 & C84 & C88 & Cdc & Cde & Ce0 & Ce2 & Ce4 & Ce8 & Cea & Cee & Cf0 & Cf2 & Cf6 & Cf8 & Cfc & Cfe & C100 & C102 & C104 & C106 & C332 & C334 & C352 & C354 & C358)".
 
   (* ------------------------------------------------------------------- *)
   (* THE EPILOGUE @0xfc, shared by both of strlen's arms:                  *)
@@ -98,7 +97,10 @@ Section UkEcho.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hsp Hal8 Hlo. iIntros "#Hcode Hwra Hws0 Hrun Hcont".
-    iPoseProof "Hcode" as "#Hc". iDestruct "Hc" as CODE.
+    iDestruct (uis_echo_fc with "Hcode") as "#Cfc".
+    iDestruct (uis_echo_fe with "Hcode") as "#Cfe".
+    iDestruct (uis_echo_100 with "Hcode") as "#C100".
+    iDestruct (uis_echo_102 with "Hcode") as "#C102".
     assert (Hbsp1 : bv_unsigned (add_vec_int sp0 (- (8 * Z.of_nat 2)))
                     = bv_unsigned sp0 - 16).
     { replace (- (8 * Z.of_nat 2)) with (-16) by lia.
@@ -288,7 +290,10 @@ Section UkEcho.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hp0 Hp64 Hbz Ha5 Htgt. iIntros "#Hcode Hb Hrun Hcont".
-    iPoseProof "Hcode" as "#Hc". iDestruct "Hc" as CODE.
+    iDestruct (uis_echo_ee with "Hcode") as "#Cee".
+    iDestruct (uis_echo_f0 with "Hcode") as "#Cf0".
+    iDestruct (uis_echo_f2 with "Hcode") as "#Cf2".
+    iDestruct (uis_echo_f6 with "Hcode") as "#Cf6".
     assert (Hbr : 0 <= bz < Z64).
     { rewrite <- Hbz. destruct (bv_unsigned_in_range _ b) as [Hlo Hhi].
       split; [ exact Hlo | ].
@@ -503,7 +508,16 @@ Section UkEcho.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Ha0. iIntros "#Hcode Hs Hrun Hcont".
-    iPoseProof "Hcode" as "#Hc". iDestruct "Hc" as CODE.
+    iDestruct (uis_echo_dc with "Hcode") as "#Cdc".
+    iDestruct (uis_echo_de with "Hcode") as "#Cde".
+    iDestruct (uis_echo_e0 with "Hcode") as "#Ce0".
+    iDestruct (uis_echo_e2 with "Hcode") as "#Ce2".
+    iDestruct (uis_echo_e4 with "Hcode") as "#Ce4".
+    iDestruct (uis_echo_e8 with "Hcode") as "#Ce8".
+    iDestruct (uis_echo_ea with "Hcode") as "#Cea".
+    iDestruct (uis_echo_f8 with "Hcode") as "#Cf8".
+    iDestruct (uis_echo_104 with "Hcode") as "#C104".
+    iDestruct (uis_echo_106 with "Hcode") as "#C106".
     destruct echo_syms_pins as (_ & _ & Hstrlen & _ & _). rewrite Hstrlen.
     (* the free stack the run owns: sp is aligned and has two words of room *)
     iDestruct (urun_stack with "Hrun") as %[Hal8 Hroom].
@@ -867,7 +881,9 @@ Section UkEcho.
     urun γt γd γs h m (mword_of_int EchoSyms.exit) avail -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode Hrun". iDestruct "Hcode" as CODE.
+    iIntros "#Hcode Hrun".
+    iDestruct (uis_echo_332 with "Hcode") as "#C332".
+    iDestruct (uis_echo_334 with "Hcode") as "#C334".
     destruct echo_syms_pins as (_ & _ & _ & Hexit & _). rewrite Hexit.
     (* ---- 0x332  c.li a7,2 ---- *)
     iApply (wp_uk_cli γt γd γs h m (mword_of_int 0x332)
@@ -904,7 +920,10 @@ Section UkEcho.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode Hrun Hcont". iDestruct "Hcode" as CODE.
+    iIntros "#Hcode Hrun Hcont".
+    iDestruct (uis_echo_352 with "Hcode") as "#C352".
+    iDestruct (uis_echo_354 with "Hcode") as "#C354".
+    iDestruct (uis_echo_358 with "Hcode") as "#C358".
     destruct echo_syms_pins as (_ & _ & _ & _ & Hwrite). rewrite Hwrite.
     (* ---- 0x352  c.li a7,16 ---- *)
     iApply (wp_uk_cli γt γd γs h m (mword_of_int 0x352)
@@ -981,7 +1000,9 @@ Section UkEcho.
     urun γt γd γs h mc (mword_of_int 0x76) n -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode Hrun". iPoseProof "Hcode" as "#Hc". iDestruct "Hc" as CODE.
+    iIntros "#Hcode Hrun".
+    iDestruct (uis_echo_76 with "Hcode") as "#C76".
+    iDestruct (uis_echo_78 with "Hcode") as "#C78".
     destruct echo_syms_pins as (_ & _ & _ & Hexit & _).
     (* ---- 0x76  c.li a0,0 ---- *)
     iApply (wp_uk_cli γt γd γs h mc (mword_of_int 0x76)
@@ -1031,7 +1052,14 @@ Section UkEcho.
   Proof.
     intros Hi Hav0 Hav38 Hs1 Hs3 Hs5 Htgt.
     iIntros "#Hcode Hargv Hrun Hcont".
-    iPoseProof "Hcode" as "#Hc". iDestruct "Hc" as CODE.
+    iDestruct (uis_echo_4e with "Hcode") as "#C4e".
+    iDestruct (uis_echo_52 with "Hcode") as "#C52".
+    iDestruct (uis_echo_54 with "Hcode") as "#C54".
+    iDestruct (uis_echo_58 with "Hcode") as "#C58".
+    iDestruct (uis_echo_5a with "Hcode") as "#C5a".
+    iDestruct (uis_echo_5c with "Hcode") as "#C5c".
+    iDestruct (uis_echo_5e with "Hcode") as "#C5e".
+    iDestruct (uis_echo_62 with "Hcode") as "#C62".
     destruct echo_syms_pins as (_ & _ & Hstrlen & _ & Hwrite).
     iDestruct (uargv_align with "Hargv") as %[Hal Hargc31].
     change (2 ^ 38) with 274877906944 in Hav38.
@@ -1272,7 +1300,12 @@ Section UkEcho.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hav0 Hav38 Hi1 Hs1 Hs3 Hs4. iIntros "#Hcode Hrun Hcont".
-    iPoseProof "Hcode" as "#Hc". iDestruct "Hc" as CODE.
+    iDestruct (uis_echo_3e with "Hcode") as "#C3e".
+    iDestruct (uis_echo_40 with "Hcode") as "#C40".
+    iDestruct (uis_echo_42 with "Hcode") as "#C42".
+    iDestruct (uis_echo_44 with "Hcode") as "#C44".
+    iDestruct (uis_echo_48 with "Hcode") as "#C48".
+    iDestruct (uis_echo_4a with "Hcode") as "#C4a".
     destruct echo_syms_pins as (_ & _ & _ & _ & Hwrite).
     change (2 ^ 38) with 274877906944 in Hav38.
     assert (Eret48 : ret_pc (mword_of_int 0x48 : mword 64) = mword_of_int 0x48)
@@ -1441,7 +1474,11 @@ Section UkEcho.
     intros k. induction k as [| k IH ];
       intros i h mc n Hlen Hav0 Hav38 Hs1 Hs3 Hs4 Hs5;
       iIntros "#Hcode Hargv Hrun";
-      iPoseProof "Hcode" as "#Hc"; iDestruct "Hc" as CODE;
+      iDestruct (uis_echo_66 with "Hcode") as "#C66";
+      iDestruct (uis_echo_68 with "Hcode") as "#C68";
+      iDestruct (uis_echo_6c with "Hcode") as "#C6c";
+      iDestruct (uis_echo_70 with "Hcode") as "#C70";
+      iDestruct (uis_echo_72 with "Hcode") as "#C72";
       destruct (lookup_lt_is_Some_2 args i ltac:(lia)) as [g Hg];
       destruct echo_syms_pins as (_ & _ & _ & _ & Hwrite).
     - (* the LAST element: print it, then the newline, then exit *)
@@ -1585,7 +1622,29 @@ Section UkEcho.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Ha0 Ha1. iIntros "#Hcode Hargv Hrun".
-    iPoseProof "Hcode" as "#Hc". iDestruct "Hc" as CODE.
+    iDestruct (uis_echo_00 with "Hcode") as "#C00".
+    iDestruct (uis_echo_02 with "Hcode") as "#C02".
+    iDestruct (uis_echo_04 with "Hcode") as "#C04".
+    iDestruct (uis_echo_06 with "Hcode") as "#C06".
+    iDestruct (uis_echo_08 with "Hcode") as "#C08".
+    iDestruct (uis_echo_0a with "Hcode") as "#C0a".
+    iDestruct (uis_echo_0c with "Hcode") as "#C0c".
+    iDestruct (uis_echo_0e with "Hcode") as "#C0e".
+    iDestruct (uis_echo_10 with "Hcode") as "#C10".
+    iDestruct (uis_echo_12 with "Hcode") as "#C12".
+    iDestruct (uis_echo_14 with "Hcode") as "#C14".
+    iDestruct (uis_echo_16 with "Hcode") as "#C16".
+    iDestruct (uis_echo_1a with "Hcode") as "#C1a".
+    iDestruct (uis_echo_1e with "Hcode") as "#C1e".
+    iDestruct (uis_echo_20 with "Hcode") as "#C20".
+    iDestruct (uis_echo_24 with "Hcode") as "#C24".
+    iDestruct (uis_echo_28 with "Hcode") as "#C28".
+    iDestruct (uis_echo_2c with "Hcode") as "#C2c".
+    iDestruct (uis_echo_2e with "Hcode") as "#C2e".
+    iDestruct (uis_echo_32 with "Hcode") as "#C32".
+    iDestruct (uis_echo_34 with "Hcode") as "#C34".
+    iDestruct (uis_echo_38 with "Hcode") as "#C38".
+    iDestruct (uis_echo_3c with "Hcode") as "#C3c".
     destruct echo_syms_pins as (Hmain & _ & _ & _ & _). rewrite Hmain.
     iDestruct (urun_stack with "Hrun") as %[Hal8' Hroom].
     iDestruct (uargv_align with "Hargv") as %[Hal Hargc31].
@@ -2125,7 +2184,11 @@ Section UkEcho.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Ha0 Ha1. iIntros "#Hcode Hargv Hrun".
-    iPoseProof "Hcode" as "#Hc". iDestruct "Hc" as CODE.
+    iDestruct (uis_echo_7c with "Hcode") as "#C7c".
+    iDestruct (uis_echo_7e with "Hcode") as "#C7e".
+    iDestruct (uis_echo_80 with "Hcode") as "#C80".
+    iDestruct (uis_echo_82 with "Hcode") as "#C82".
+    iDestruct (uis_echo_84 with "Hcode") as "#C84".
     destruct echo_syms_pins as (Hmain & Hstart & _ & _ & _). rewrite Hstart.
     iDestruct (urun_stack with "Hrun") as %[Hal8' Hroom].
     remember (m !!! Regidx csp_rs1) as sp0 eqn:Hsp0.

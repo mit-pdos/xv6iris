@@ -94,7 +94,6 @@ Section UkSh.
   Local Notation s5_idx := (mword_of_int 21 : mword 5).
   Local Notation s6_idx := (mword_of_int 22 : mword 5).
 
-  Local Notation CODE := "(C9d0 & C9d2 & C9d4 & C9d6 & C9d8 & C9dc & C8e2 & C8e4 & C8e6 & C8e8 & C8ea & C8ec & C8ee & C8f0 & C8f2 & C8f4 & C8f6 & C8f8 & C8fc & C900 & C902 & C904 & C908 & C90c & C910 & C914 & C918 & C91c & C920 & C922 & C926 & C92a & C92c & C930 & C932 & C934 & C938 & C93a & C93c & C940 & C944 & C948 & C94c & C94e & C952 & C956 & C95a & C95c & C960 & C964 & C966 & C96a & C96e & C970 & C974 & C976 & C97a & C97e & C982 & C986 & C98a & C98e & C990 & C994 & C998 & C99a & C99c & C99e & C9a2 & C9a4 & C9a6 & C9aa & C9ae & C9b0 & C9b4 & C9b8 & C9ba & C9be & C9c0 & C9c2 & C9c6 & C9ca & C9cc & Ccc6 & Ccc8 & Cccc & Ccae & Ccb0 & Ccb4 & Cc86 & Cc88)".
 
   (* ===================================================================== *)
   (* THE SYSCALL STUB SHAPE.  usys.S emits every stub as                    *)
@@ -177,7 +176,9 @@ Section UkSh.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hcode Hrun Hcont".
-    iPoseProof "Hcode" as "#Hc". iDestruct "Hc" as CODE.
+    iDestruct (uis_shk_cc6 with "Hcode") as "#Ccc6".
+    iDestruct (uis_shk_cc8 with "Hcode") as "#Ccc8".
+    iDestruct (uis_shk_ccc with "Hcode") as "#Cccc".
     destruct shk_syms_pins as (_ & _ & Hopen & _ & _). rewrite Hopen.
     iApply (wp_ksh_qstub h m 0xcc6 0xcc8 0xccc
               (mword_of_int 15 : mword 6) 15 avail
@@ -208,7 +209,9 @@ Section UkSh.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hcode Hrun Hcont".
-    iPoseProof "Hcode" as "#Hc". iDestruct "Hc" as CODE.
+    iDestruct (uis_shk_cae with "Hcode") as "#Ccae".
+    iDestruct (uis_shk_cb0 with "Hcode") as "#Ccb0".
+    iDestruct (uis_shk_cb4 with "Hcode") as "#Ccb4".
     destruct shk_syms_pins as (_ & _ & _ & Hclose & _). rewrite Hclose.
     iApply (wp_ksh_qstub h m 0xcae 0xcb0 0xcb4
               (mword_of_int 21 : mword 6) 21 avail
@@ -232,7 +235,9 @@ Section UkSh.
     urun γt γd γs h m (mword_of_int ShSyms.exit) avail -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode Hrun". iDestruct "Hcode" as CODE.
+    iIntros "#Hcode Hrun".
+    iDestruct (uis_shk_c86 with "Hcode") as "#Cc86".
+    iDestruct (uis_shk_c88 with "Hcode") as "#Cc88".
     destruct shk_syms_pins as (_ & _ & _ & _ & Hexit). rewrite Hexit.
     (* ---- 0xc86  c.li a7,2 ---- *)
     iApply (wp_uk_cli γt γd γs h m (mword_of_int 0xc86)
@@ -294,7 +299,12 @@ Section UkSh.
     iIntros "#Hcode".
     iLöb as "IH" forall (h m).
     iIntros "Hrun".
-    iPoseProof "Hcode" as "#Hc". iDestruct "Hc" as CODE.
+    iDestruct (uis_shk_900 with "Hcode") as "#C900".
+    iDestruct (uis_shk_902 with "Hcode") as "#C902".
+    iDestruct (uis_shk_904 with "Hcode") as "#C904".
+    iDestruct (uis_shk_908 with "Hcode") as "#C908".
+    iDestruct (uis_shk_90c with "Hcode") as "#C90c".
+    iDestruct (uis_shk_910 with "Hcode") as "#C910".
     (* ---- 0x900  c.mv a1,s1 ---- *)
     iApply (wp_uk_cmv γt γd γs h m (mword_of_int 0x900) a1_idx s1_idx
               (add_vec zero_reg (m !!! Regidx s1_idx)) n
@@ -417,7 +427,19 @@ Section UkSh.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hcode Hrun".
-    iPoseProof "Hcode" as "#Hc". iDestruct "Hc" as CODE.
+    iDestruct (uis_shk_8e2 with "Hcode") as "#C8e2".
+    iDestruct (uis_shk_8e4 with "Hcode") as "#C8e4".
+    iDestruct (uis_shk_8e6 with "Hcode") as "#C8e6".
+    iDestruct (uis_shk_8e8 with "Hcode") as "#C8e8".
+    iDestruct (uis_shk_8ea with "Hcode") as "#C8ea".
+    iDestruct (uis_shk_8ec with "Hcode") as "#C8ec".
+    iDestruct (uis_shk_8ee with "Hcode") as "#C8ee".
+    iDestruct (uis_shk_8f0 with "Hcode") as "#C8f0".
+    iDestruct (uis_shk_8f2 with "Hcode") as "#C8f2".
+    iDestruct (uis_shk_8f4 with "Hcode") as "#C8f4".
+    iDestruct (uis_shk_8f6 with "Hcode") as "#C8f6".
+    iDestruct (uis_shk_8f8 with "Hcode") as "#C8f8".
+    iDestruct (uis_shk_8fc with "Hcode") as "#C8fc".
     destruct shk_syms_pins as (_ & Hmain & _ & _ & _). rewrite Hmain.
     iDestruct (urun_stack with "Hrun") as %[Hal8' Hroom].
     remember (m !!! Regidx csp_rs1) as sp0 eqn:Hsp0.
@@ -631,7 +653,11 @@ Section UkSh.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hcode Hrun".
-    iPoseProof "Hcode" as "#Hc". iDestruct "Hc" as CODE.
+    iDestruct (uis_shk_9d0 with "Hcode") as "#C9d0".
+    iDestruct (uis_shk_9d2 with "Hcode") as "#C9d2".
+    iDestruct (uis_shk_9d4 with "Hcode") as "#C9d4".
+    iDestruct (uis_shk_9d6 with "Hcode") as "#C9d6".
+    iDestruct (uis_shk_9d8 with "Hcode") as "#C9d8".
     destruct shk_syms_pins as (Hstart & Hmain & _ & _ & _). rewrite Hstart.
     iDestruct (urun_stack with "Hrun") as %[Hal8' Hroom].
     remember (m !!! Regidx csp_rs1) as sp0 eqn:Hsp0.
@@ -720,7 +746,10 @@ Section UkSh.
               with "C9d8 Hrun").
     iIntros (h5) "Hrun".
     (* ---- main(), which never returns ---- *)
-    rewrite <- Hmain.
+    (* [ShSyms.main] is what the jal's target already is, so this only ever
+       had work to do while the wide catalog destruct was dumping unused
+       [uinstr_is] hypotheses holding the literal into the context. *)
+    rewrite <- ?Hmain.
     iApply (wp_ksh_main h5 _ n with "Hcode Hrun").
   Qed.
 

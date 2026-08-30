@@ -2818,3 +2818,47 @@ for this switch.)
 
 - **A HANG AND A SLOW FILE LOOK IDENTICAL, AND `X.v.timing` WILL POINT AT THE WRONG TACTIC.** Two things mislead: `ps -o pid,etime,rss -C rocqworker` on the VM is the only honest progress signal, and a STABLE multi-GB RSS over minutes is the tell (a genuinely slow proof grows); and the `.v.timing` file is BLOCK-BUFFERED, so its last entry lags by up to 4 KB of source and re-reading it mid-run "confirms" whatever tactic sits at that boundary. Do not chase it. **Bisect by stubbing**: replace suspect proofs with `Proof. Admitted.` (park the body in a comment so it can be restored mechanically), halve each round, and give every build a REMOTE `timeout N` so the answer is unambiguous — exit 124 means "still running at N", which is a result, whereas killing a build yourself proves nothing. Eight rounds took this from a 2700-line file to one lemma.
 
+
+## A CODE CATALOG IS A **RESOURCE WITH LOOKUPS**, NOT A WIDE CONJUNCTION —
+## AND THE COST OF GETTING THAT WRONG IS INVISIBLE IN THE STATEMENTS
+
+`tools/gen_ucode.py` used to end each catalog with the whole program bundled
+into one flat `∗`, one `uinstr_is` conjunct per catalogued instruction, and
+its own header told callers to consume it as
+
+```coq
+iDestruct "Hcode" as "(Cbc & Cbe & … & C378)".   (* init: 369 names *)
+```
+
+That is fine at echo's 73 and it is *not* fine at init's 369: seven
+three-instruction syscall stubs compiled in **4m22s**, none of it in the
+proofs.  Splitting the bundle per function only moves the problem to
+`vprintf`'s 250.
+
+The kernel tier never had this problem, and the reason is worth stating as a
+rule.  `KernelText.kernel_text` is `[∗ map] a↦b ∈ KernelInstrs.kernel_bytes,
+… ↦ₓ□ b` — keyed by the **dumped constant**, not by an image variable — so
+23K bytes are ONE persistent resource and each `instr` lemma extracts its
+fetch window by `big_sepM_lookup`.  Nothing ever destructs anything.  The
+user tier had bundled instead only because its per-pc lemmas took
+`utext_all γt M pm`, and `M`/`pm` are existential inside `UkRun.urun`, so a
+program proof could not hold one.  The fix is `UserHeap.utext_img γt T` at
+the program's own `<M>Instrs.<p>_bytes`, `utext_img_of_all` to convert once
+at the entry (where the image and permission facts are still in scope), and
+`utext_img_run` as the per-pc window.  `<p>_code` became a one-line
+definition, the 369 conjuncts went away, and UkInit.v went **4m22s → 3.8s**.
+
+Two things this cost that a statement-level review would not have caught:
+
+- **Seal the definition.** `Global Typeclasses Opaque <p>_code`, exactly as
+  `kernel_text` does.  Without it every `iApply … with "Hcode"` pays a
+  typeclass search through a 2412-entry `big_sepM` (this is the same trap as
+  the `iFrame`-up-to-delta entry above).
+- **A wide destruct silently feeds other tactics.**  `UkSh.wp_ksh_start`
+  ended with `rewrite <- Hmain` (`ShSyms.main = 2274`), which passed only
+  because the 90-way destruct had dumped `C8e2 : uinstr_is _ (mword_of_int
+  0x8e2) …` into the context — Iris hypotheses live inside the goal term, so
+  `rewrite` reaches them.  With the pose narrowed to the five instructions
+  `start` actually fetches, the literal is gone and the tactic fails with
+  `Found no subterm matching "2274"`.  The rewrite had never been doing
+  anything to the real goal.  Expect one of these per converted proof.
