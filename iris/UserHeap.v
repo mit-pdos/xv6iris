@@ -52,7 +52,7 @@
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import ghost_map.
+From iris.base_logic.lib Require Import ghost_map ghost_var.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
@@ -133,8 +133,57 @@ Lemma udata_part_w (W : uvis) (a : Z) :
   is_Some (udata_part W !! a) -> uw_addr (uvis_perm W) a.
 Proof. intros [b Hb]. apply map_lookup_filter_Some in Hb as [_ Hw]. exact Hw. Qed.
 
+
+(* THE DATA HALF SPLITS AT THE BREAK: what the process owns, and the SLACK
+   the invariant keeps above it.  Same shape as the text/data split, and for
+   the same reason -- a filter, so the big-op divides by [big_sepM_union]. *)
+Definition udata_lo (W : uvis) (sz : Z) : gmap Z (bv 8) :=
+  base.filter (fun kv : Z * bv 8 => kv.1 < sz) (udata_part W).
+
+Definition udata_slack (W : uvis) (sz : Z) : gmap Z (bv 8) :=
+  base.filter (fun kv : Z * bv 8 => sz <= kv.1) (udata_part W).
+
+Lemma udata_lo_slack_disjoint (W : uvis) (sz : Z) :
+  udata_lo W sz ##ₘ udata_slack W sz.
+Proof.
+  apply map_disjoint_spec. intros a b1 b2 H1 H2.
+  apply map_lookup_filter_Some in H1 as [_ Hlt].
+  apply map_lookup_filter_Some in H2 as [_ Hge].
+  (* [lia] does not reduce the pair projection the filter's predicate is
+     stated over; one [cbn] per hypothesis (durable-notes: [in H1, H2]
+     reduces only in H1) *)
+  cbn [fst] in Hlt. cbn [fst] in Hge. lia.
+Qed.
+
+Lemma udata_lo_slack_union (W : uvis) (sz : Z) :
+  udata_lo W sz ∪ udata_slack W sz = udata_part W.
+Proof.
+  apply map_eq. intros a.
+  destruct (udata_part W !! a) as [b |] eqn:Hb.
+  - destruct (decide (a < sz)) as [Hlt | Hge].
+    + rewrite lookup_union_l'.
+      * apply map_lookup_filter_Some. split; [ exact Hb | exact Hlt ].
+      * exists b. apply map_lookup_filter_Some. split; [ exact Hb | exact Hlt ].
+    + rewrite lookup_union_r.
+      * apply map_lookup_filter_Some. split; [ exact Hb | cbn [fst]; lia ].
+      * apply map_lookup_filter_None. right. intros x Hx. rewrite Hb in Hx.
+        injection Hx as <-. cbn [fst]. lia.
+  - rewrite lookup_union_None. split; apply map_lookup_filter_None; left; exact Hb.
+Qed.
+
+Lemma udata_slack_above (W : uvis) (sz : Z) (a : Z) :
+  is_Some (udata_slack W sz !! a) -> sz <= a.
+Proof.
+  intros [b Hb]. apply map_lookup_filter_Some in Hb as [_ Hge].
+  cbn [fst] in Hge. exact Hge.
+Qed.
+
 Section UserHeap.
   Context `{!riscvGS Σ}.
+  (* the break ghost's class.  It already exists in the tree --
+     Xv6Cameras.uioG's [uio_brkG] is the same [ghost_varG Σ Z], introduced
+     for the old tier's sbrk -- so nothing new enters Σ. *)
+  Context `{!ghost_varG Σ Z}.
 
   (* ===================================================================== *)
   (* §2 THE TWO POINTS-TO FAMILIES.                                        *)
@@ -156,145 +205,7 @@ Section UserHeap.
   Proof. apply _. Qed.
 
   (* ===================================================================== *)
-  (* §3 THE RUNNING PREDICATE.                                             *)
-  (*                                                                       *)
-  (* Two authorities against one image, with the segment facts that make    *)
-  (* each half's points-to mean what it means.                             *)
-  (* ===================================================================== *)
-  Definition urun (γt γd : gname) (W : uvis) : iProp Σ :=
-    (∃ Mt Md : gmap Z (bv 8),
-       ⌜ Mt ⊆ uvis_M W ⌝ ∗ ⌜ Md ⊆ uvis_M W ⌝ ∗ ⌜ Mt ##ₘ Md ⌝ ∗
-       (* CANONICITY, ONCE FOR THE WHOLE ADDRESS SPACE.  Every mapped user
-          address is below MAXVA, hence Sv39-canonical.  Stating it here
-          rather than per access is what stops [uinstr]'s [ui_canon] and the
-          [uva_canon] output of every data reader ([uk_rd_byte],
-          [uk_args_slot], [uk_stack_slot]) from each re-deriving it. *)
-       ⌜ forall a : Z, is_Some (uvis_M W !! a) -> 0 <= a < 2 ^ 38 ⌝ ∗
-       ⌜ forall a : Z, is_Some (Mt !! a) -> ux_addr (uvis_perm W) a ⌝ ∗
-       ⌜ forall a : Z, is_Some (Md !! a) -> uw_addr (uvis_perm W) a ⌝ ∗
-       ghost_map_auth γt 1 Mt ∗ ghost_map_auth γd 1 Md)%I.
-
-  (* the canonicity fact in the shape an access wants: the address round-trips
-     through [mword_of_int] and the word is Sv39-canonical *)
-  Lemma ucanon_of_bound (a : Z) :
-    0 <= a < 2 ^ 38 ->
-    uint (mword_of_int a : mword 64) = a /\ uva_canon (mword_of_int a : mword 64).
-  Proof.
-    intros Hb. change (2 ^ 38) with 274877906944 in Hb.
-    assert (Hu : uint (mword_of_int a : mword 64) = a)
-      by (apply uint_moi; unfold Z64; lia).
-    split; [ exact Hu | ].
-    apply uva_canon_small. rewrite <- uint_unsigned, Hu. lia.
-  Qed.
-
-  (* A TEXT byte names the byte the image holds, and its page is FETCHABLE.
-     Both come straight off the text half's invariant -- no dfrac argument,
-     no permission in the statement. *)
-  Lemma urun_text (γt γd : gname) (W : uvis) (a : Z) (b : bv 8) :
-    urun γt γd W -∗ utext γt a b -∗
-    ⌜ uvis_M W !! a = Some b /\ ux_addr (uvis_perm W) a /\ 0 <= a < 2 ^ 38 ⌝.
-  Proof.
-    iIntros "Hrun Hb".
-    iDestruct "Hrun" as (Mt Md) "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hw & Ht & Hd)".
-    iDestruct (ghost_map_lookup with "Ht Hb") as %HMt.
-    assert (HM : uvis_M W !! a = Some b)
-      by exact (proj1 (map_subseteq_spec Mt (uvis_M W)) Hst a b HMt).
-    (* NOTE: not [split_and!] -- it would split [0 <= a < 2 ^ 38] too *)
-    iPureIntro. split; [ exact HM | ].
-    split; [ exact (Hx a (mk_is_Some _ _ HMt)) | exact (Hcan a (mk_is_Some _ _ HM)) ].
-  Qed.
-
-  (* ...and a DATA byte names its byte and its page is WRITABLE. *)
-  Lemma urun_ubyte (γt γd : gname) (W : uvis) (a : Z) (b : bv 8) :
-    urun γt γd W -∗ ubyte γd a b -∗
-    ⌜ uvis_M W !! a = Some b /\ uw_addr (uvis_perm W) a /\ 0 <= a < 2 ^ 38 ⌝.
-  Proof.
-    iIntros "Hrun Hb".
-    iDestruct "Hrun" as (Mt Md) "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hw & Ht & Hd)".
-    iDestruct (ghost_map_lookup with "Hd Hb") as %HMd.
-    assert (HM : uvis_M W !! a = Some b)
-      by exact (proj1 (map_subseteq_spec Md (uvis_M W)) Hsd a b HMd).
-    iPureIntro. split; [ exact HM | ].
-    split; [ exact (Hw a (mk_is_Some _ _ HMd)) | exact (Hcan a (mk_is_Some _ _ HM)) ].
-  Qed.
-
-  Definition uvis_wM (W : uvis) (M' : gmap Z (bv 8)) : uvis :=
-    MkUvis (uvis_tf W) M' (uvis_perm W).
-
-  (* THE STORE.  An exclusively-owned data byte may be replaced and the
-     key's image moves with it.  The text half is untouched, and it stays a
-     SUBMAP because the two halves are disjoint -- which is the whole reason
-     they are two heaps. *)
-  Lemma urun_store (γt γd : gname) (W : uvis) (a : Z) (b b' : bv 8) :
-    urun γt γd W -∗ ubyte γd a b ==∗
-      urun γt γd (uvis_wM W (<[a := b']> (uvis_M W))) ∗ ubyte γd a b'.
-  Proof.
-    iIntros "Hrun Hb".
-    iDestruct "Hrun" as (Mt Md) "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hw & Ht & Hd)".
-    iDestruct (ghost_map_lookup with "Hd Hb") as %HMd.
-    assert (Hnt : Mt !! a = None)
-      by exact (map_disjoint_Some_r Mt Md a b Hdisj HMd).
-    iMod (ghost_map_update b' with "Hd Hb") as "[Hd Hb]".
-    iModIntro. iFrame "Hb". iExists Mt, (<[a := b']> Md).
-    cbn [uvis_M uvis_perm uvis_wM].
-    iFrame "Ht Hd". iPureIntro. split_and!.
-    - apply insert_subseteq_r; [ exact Hnt | exact Hst ].
-    - apply insert_mono. exact Hsd.
-    - apply map_disjoint_insert_r_2; [ exact Hnt | exact Hdisj ].
-    - (* a store replaces a key that is already there, so the domain -- and
-         with it the canonicity fact -- does not move *)
-      intros k Hk. apply Hcan.
-      destruct (decide (k = a)) as [-> | Hne].
-      + exact (mk_is_Some _ _ (proj1 (map_subseteq_spec Md (uvis_M W)) Hsd a b HMd)).
-      + rewrite lookup_insert_ne in Hk; [ exact Hk | exact (not_eq_sym Hne) ].
-    - exact Hx.
-    - intros k Hk. apply Hw.
-      destruct (decide (k = a)) as [-> | Hne].
-      + exact (mk_is_Some _ _ HMd).
-      + rewrite lookup_insert_ne in Hk; [ exact Hk | exact (not_eq_sym Hne) ].
-  Qed.
-
-  (* ===================================================================== *)
-  (* §4 ALLOCATION -- the process's FIRST WP.                              *)
-  (*                                                                       *)
-  (* Two [ghost_map_alloc]s at the segment split, and the text half is      *)
-  (* PERSISTED on the spot: after this step nothing can ever write it, and  *)
-  (* every continuation may read it without owning anything.                *)
-  (* ===================================================================== *)
-  Lemma urun_alloc (W : uvis) :
-    (* THE ONE PREMISE, and where it comes from: every mapped user address is
-       below MAXVA.  At the call site (the process's first WP) [uvb] carries
-       [usz_ok sz] and the lazy image over the sz-region, which is what bounds
-       the image's keys; it is taken here rather than re-derived so that this
-       file stays independent of the bundle. *)
-    (forall a : Z, is_Some (uvis_M W !! a) -> 0 <= a < 2 ^ 38) ->
-    ⊢ |==> ∃ γt γd : gname,
-        urun γt γd W ∗
-        ([∗ map] a ↦ b ∈ utext_part W, utext γt a b) ∗
-        ([∗ map] a ↦ b ∈ udata_part W, ubyte γd a b).
-  Proof.
-    intros Hcan.
-    iMod (ghost_map_alloc (utext_part W)) as (γt) "[Htauth Htfrag]".
-    iMod (ghost_map_alloc (udata_part W)) as (γd) "[Hdauth Hdfrag]".
-    iAssert (|==> [∗ map] a ↦ b ∈ utext_part W, utext γt a b)%I
-      with "[Htfrag]" as ">#Htp".
-    { iApply big_sepM_bupd. iApply (big_sepM_impl with "Htfrag").
-      iIntros "!>" (a b _) "H". rewrite /utext.
-      iApply (ghost_map_elem_persist with "H"). }
-    iModIntro. iExists γt, γd.
-    iSplitL "Htauth Hdauth"; [ | iFrame "Hdfrag"; iFrame "Htp" ].
-    iExists (utext_part W), (udata_part W).
-    iFrame "Htauth Hdauth". iPureIntro. split_and!.
-    - apply utext_part_sub.
-    - apply udata_part_sub.
-    - apply utext_udata_disjoint.
-    - exact Hcan.
-    - exact (utext_part_x W).
-    - exact (udata_part_w W).
-  Qed.
-
-  (* ===================================================================== *)
-  (* §4b WORDS AND STRINGS, over [ubyte].                                  *)
+  (* §2b WORDS AND STRINGS, over [ubyte].                                  *)
   (*                                                                       *)
   (* Everything a program says about its data is a run of bytes, so nothing *)
   (* here is primitive: a word is eight consecutive [ubyte]s and a string   *)
@@ -321,6 +232,201 @@ Section UserHeap.
   (* NOTE: the SPLIT of a run at an arbitrary point -- which is what a
      syscall footprint hand-over is -- is deliberately not here yet.  It is
      a step-3 tool and wants proving against its consumer, not before it. *)
+
+
+  (* ===================================================================== *)
+  (* §2c THE PROGRAM BREAK, as a ghost the caller can FRAME.               *)
+  (*                                                                       *)
+  (* Half here, half in [urun]: the two must agree, and moving the break    *)
+  (* takes both.  A ghost rather than an argument of [urun] precisely so    *)
+  (* that a function which does not call sbrk carries its half through      *)
+  (* untouched and never mentions [sz] in its spec at all.                  *)
+  (* ===================================================================== *)
+  Definition usz (γs : gname) (sz : Z) : iProp Σ := ghost_var γs (1/2) sz.
+
+  Lemma usz_agree (γs : gname) (sz sz' : Z) :
+    usz γs sz -∗ usz γs sz' -∗ ⌜ sz = sz' ⌝.
+  Proof.
+    iIntros "H1 H2". iDestruct (ghost_var_agree with "H1 H2") as %->. done.
+  Qed.
+
+  Lemma usz_update (γs : gname) (sz sz' sz'' : Z) :
+    usz γs sz -∗ usz γs sz' ==∗ usz γs sz'' ∗ usz γs sz''.
+  Proof.
+    iIntros "H1 H2".
+    iDestruct (ghost_var_agree with "H1 H2") as %->.
+    iMod (ghost_var_update_2 sz'' with "H1 H2") as "[$ $]"; [ | done ].
+    rewrite Qp.half_half. reflexivity.
+  Qed.
+
+  (* ===================================================================== *)
+  (* §3 THE RUNNING PREDICATE.                                             *)
+  (*                                                                       *)
+  (* Two authorities against one image, with the segment facts that make    *)
+  (* each half's points-to mean what it means.                             *)
+  (* ===================================================================== *)
+  Definition urun (γt γd γs : gname) (W : uvis) : iProp Σ :=
+    (∃ (Mt Md Mslack : gmap Z (bv 8)) (sz : Z),
+       ⌜ Mt ⊆ uvis_M W ⌝ ∗ ⌜ Md ⊆ uvis_M W ⌝ ∗ ⌜ Mt ##ₘ Md ⌝ ∗
+       (* CANONICITY, ONCE FOR THE WHOLE ADDRESS SPACE.  Every mapped user
+          address is below MAXVA, hence Sv39-canonical.  Stating it here
+          rather than per access is what stops [uinstr]'s [ui_canon] and the
+          [uva_canon] output of every data reader ([uk_rd_byte],
+          [uk_args_slot], [uk_stack_slot]) from each re-deriving it. *)
+       ⌜ forall a : Z, is_Some (uvis_M W !! a) -> 0 <= a < 2 ^ 38 ⌝ ∗
+       ⌜ forall a : Z, is_Some (Mt !! a) -> ux_addr (uvis_perm W) a ⌝ ∗
+       ⌜ forall a : Z, is_Some (Md !! a) -> uw_addr (uvis_perm W) a ⌝ ∗
+       ghost_map_auth γt 1 Mt ∗ ghost_map_auth γd 1 Md ∗
+       (* THE BREAK, and THE SLACK ABOVE IT.  The kernel's image grows and
+          shrinks by whole PAGES while [sz] moves by bytes, so the invariant
+          holds the bytes between the break and the next page boundary.
+          That is what lets the user-facing sbrk be BYTE-granular: [sbrk 8]
+          hands out eight bytes off the slack whether or not a fresh page
+          came from the kernel, and [sbrk (-8)] takes eight back into it. *)
+       ⌜ 0 <= sz ⌝ ∗
+       ghost_var γs (1/2) sz ∗
+       ⌜ forall a : Z, is_Some (Mslack !! a) -> sz <= a ⌝ ∗
+       ([∗ map] a ↦ b ∈ Mslack, ubyte γd a b))%I.
+
+  (* the canonicity fact in the shape an access wants: the address round-trips
+     through [mword_of_int] and the word is Sv39-canonical *)
+  Lemma ucanon_of_bound (a : Z) :
+    0 <= a < 2 ^ 38 ->
+    uint (mword_of_int a : mword 64) = a /\ uva_canon (mword_of_int a : mword 64).
+  Proof.
+    intros Hb. change (2 ^ 38) with 274877906944 in Hb.
+    assert (Hu : uint (mword_of_int a : mword 64) = a)
+      by (apply uint_moi; unfold Z64; lia).
+    split; [ exact Hu | ].
+    apply uva_canon_small. rewrite <- uint_unsigned, Hu. lia.
+  Qed.
+
+  (* A TEXT byte names the byte the image holds, and its page is FETCHABLE.
+     Both come straight off the text half's invariant -- no dfrac argument,
+     no permission in the statement. *)
+  Lemma urun_text (γt γd γs : gname) (W : uvis) (a : Z) (b : bv 8) :
+    urun γt γd γs W -∗ utext γt a b -∗
+    ⌜ uvis_M W !! a = Some b /\ ux_addr (uvis_perm W) a /\ 0 <= a < 2 ^ 38 ⌝.
+  Proof.
+    iIntros "Hrun Hb".
+    iDestruct "Hrun" as (Mt Md Mslack sz)
+      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hw & Ht & Hd & %Hsz0 & Hszg & %Hsl & Hslack)".
+    iDestruct (ghost_map_lookup with "Ht Hb") as %HMt.
+    assert (HM : uvis_M W !! a = Some b)
+      by exact (proj1 (map_subseteq_spec Mt (uvis_M W)) Hst a b HMt).
+    (* NOTE: not [split_and!] -- it would split [0 <= a < 2 ^ 38] too *)
+    iPureIntro. split; [ exact HM | ].
+    split; [ exact (Hx a (mk_is_Some _ _ HMt)) | exact (Hcan a (mk_is_Some _ _ HM)) ].
+  Qed.
+
+  (* ...and a DATA byte names its byte and its page is WRITABLE. *)
+  Lemma urun_ubyte (γt γd γs : gname) (W : uvis) (a : Z) (b : bv 8) :
+    urun γt γd γs W -∗ ubyte γd a b -∗
+    ⌜ uvis_M W !! a = Some b /\ uw_addr (uvis_perm W) a /\ 0 <= a < 2 ^ 38 ⌝.
+  Proof.
+    iIntros "Hrun Hb".
+    iDestruct "Hrun" as (Mt Md Mslack sz)
+      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hw & Ht & Hd & %Hsz0 & Hszg & %Hsl & Hslack)".
+    iDestruct (ghost_map_lookup with "Hd Hb") as %HMd.
+    assert (HM : uvis_M W !! a = Some b)
+      by exact (proj1 (map_subseteq_spec Md (uvis_M W)) Hsd a b HMd).
+    iPureIntro. split; [ exact HM | ].
+    split; [ exact (Hw a (mk_is_Some _ _ HMd)) | exact (Hcan a (mk_is_Some _ _ HM)) ].
+  Qed.
+
+  Definition uvis_wM (W : uvis) (M' : gmap Z (bv 8)) : uvis :=
+    MkUvis (uvis_tf W) M' (uvis_perm W).
+
+  (* THE STORE.  An exclusively-owned data byte may be replaced and the
+     key's image moves with it.  The text half is untouched, and it stays a
+     SUBMAP because the two halves are disjoint -- which is the whole reason
+     they are two heaps. *)
+  Lemma urun_store (γt γd γs : gname) (W : uvis) (a : Z) (b b' : bv 8) :
+    urun γt γd γs W -∗ ubyte γd a b ==∗
+      urun γt γd γs (uvis_wM W (<[a := b']> (uvis_M W))) ∗ ubyte γd a b'.
+  Proof.
+    iIntros "Hrun Hb".
+    iDestruct "Hrun" as (Mt Md Mslack sz)
+      "(%Hst & %Hsd & %Hdisj & %Hcan & %Hx & %Hw & Ht & Hd & %Hsz0 & Hszg & %Hsl & Hslack)".
+    iDestruct (ghost_map_lookup with "Hd Hb") as %HMd.
+    assert (Hnt : Mt !! a = None)
+      by exact (map_disjoint_Some_r Mt Md a b Hdisj HMd).
+    iMod (ghost_map_update b' with "Hd Hb") as "[Hd Hb]".
+    iModIntro. iFrame "Hb". iExists Mt, (<[a := b']> Md), Mslack, sz.
+    cbn [uvis_M uvis_perm uvis_wM].
+    iFrame "Ht Hd Hszg Hslack". iPureIntro. split_and!.
+    - apply insert_subseteq_r; [ exact Hnt | exact Hst ].
+    - apply insert_mono. exact Hsd.
+    - apply map_disjoint_insert_r_2; [ exact Hnt | exact Hdisj ].
+    - (* a store replaces a key that is already there, so the domain -- and
+         with it the canonicity fact -- does not move *)
+      intros k Hk. apply Hcan.
+      destruct (decide (k = a)) as [-> | Hne].
+      + exact (mk_is_Some _ _ (proj1 (map_subseteq_spec Md (uvis_M W)) Hsd a b HMd)).
+      + rewrite lookup_insert_ne in Hk; [ exact Hk | exact (not_eq_sym Hne) ].
+    - exact Hx.
+    - intros k Hk. apply Hw.
+      destruct (decide (k = a)) as [-> | Hne].
+      + exact (mk_is_Some _ _ HMd).
+      + rewrite lookup_insert_ne in Hk; [ exact Hk | exact (not_eq_sym Hne) ].
+    (* the break and the slack are untouched: a store moves one DATA byte the
+       process owns, and the slack is what the invariant owns above the break *)
+    - exact Hsz0.
+    - exact Hsl.
+  Qed.
+
+  (* ===================================================================== *)
+  (* §4 ALLOCATION -- the process's FIRST WP.                              *)
+  (*                                                                       *)
+  (* Two [ghost_map_alloc]s at the segment split, and the text half is      *)
+  (* PERSISTED on the spot: after this step nothing can ever write it, and  *)
+  (* every continuation may read it without owning anything.                *)
+  (* ===================================================================== *)
+  Lemma urun_alloc (W : uvis) (sz : Z) :
+    (* THE ONE PREMISE, and where it comes from: every mapped user address is
+       below MAXVA.  At the call site (the process's first WP) [uvb] carries
+       [usz_ok sz] and the lazy image over the sz-region, which is what bounds
+       the image's keys; it is taken here rather than re-derived so that this
+       file stays independent of the bundle. *)
+    (forall a : Z, is_Some (uvis_M W !! a) -> 0 <= a < 2 ^ 38) ->
+    0 <= sz ->
+    ⊢ |==> ∃ γt γd γs : gname,
+        urun γt γd γs W ∗ usz γs sz ∗
+        ([∗ map] a ↦ b ∈ utext_part W, utext γt a b) ∗
+        ([∗ map] a ↦ b ∈ udata_lo W sz, ubyte γd a b).
+  Proof.
+    intros Hcan Hsz0.
+    iMod (ghost_map_alloc (utext_part W)) as (γt) "[Htauth Htfrag]".
+    iMod (ghost_map_alloc (udata_part W)) as (γd) "[Hdauth Hdfrag]".
+    iMod (ghost_var_alloc sz) as (γs) "Hsz".
+    iEval (rewrite -Qp.half_half) in "Hsz".
+    iDestruct (ghost_var_split with "Hsz") as "[HszA HszF]".
+    (* PERSIST the text half.  After this step nothing can ever write it, and
+       every continuation may read it without owning anything. *)
+    iAssert (|==> [∗ map] a ↦ b ∈ utext_part W, utext γt a b)%I
+      with "[Htfrag]" as ">#Htp".
+    { iApply big_sepM_bupd. iApply (big_sepM_impl with "Htfrag").
+      iIntros "!>" (a b _) "H". rewrite /utext.
+      iApply (ghost_map_elem_persist with "H"). }
+    (* ...and divide the data half at the break: the process gets what is
+       below it, the invariant keeps the slack above. *)
+    iEval (rewrite -(udata_lo_slack_union W sz)) in "Hdfrag".
+    rewrite big_sepM_union; [ | apply udata_lo_slack_disjoint ].
+    iDestruct "Hdfrag" as "[Hlo Hslack]".
+    iModIntro. iExists γt, γd, γs.
+    iSplitL "Htauth Hdauth HszA Hslack";
+      [ | iFrame "HszF"; iFrame "Hlo"; iFrame "Htp" ].
+    iExists (utext_part W), (udata_part W), (udata_slack W sz), sz.
+    iFrame "Htauth Hdauth HszA Hslack". iPureIntro. split_and!.
+    - apply utext_part_sub.
+    - apply udata_part_sub.
+    - apply utext_udata_disjoint.
+    - exact Hcan.
+    - exact (utext_part_x W).
+    - exact (udata_part_w W).
+    - exact Hsz0.
+    - exact (udata_slack_above W sz).
+  Qed.
 
   (* ===================================================================== *)
   (* §5 THE INSTRUCTION RESOURCE.                                          *)
