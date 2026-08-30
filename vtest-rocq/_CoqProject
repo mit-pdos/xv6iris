@@ -26,6 +26,7 @@ ConcLostHwGen.v
 ConcMpGen.v
 ConcMpHwGen.v
 ConcSbGen.v
+ConcSbHwGen.v
 ConcSbxGen.v
 ConcSbxHwGen.v
 ConcSmokeGen.v
@@ -128,6 +129,7 @@ ConcLostJh7110Run.v
 ConcLostQemuRun.v
 ConcMpJh7110Run.v
 ConcMpQemuRun.v
+ConcSbJh7110Run.v
 ConcSbQemuRun.v
 ConcSmokeJh7110Run.v
 ConcSmokeQemuRun.v
@@ -214,6 +216,7 @@ ConcLostJh7110Pass.v
 ConcLostQemuPass.v
 ConcMpJh7110Pass.v
 ConcMpQemuPass.v
+ConcSbJh7110Pass.v
 ConcSmokeJh7110Pass.v
 ConcSmokeQemuPass.v
 CoreCsrprobeQemuPass.v

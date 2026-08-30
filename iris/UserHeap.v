@@ -312,6 +312,52 @@ Section UserHeap.
     rewrite /ustr. iFrame "Hne Hlen Hbs Hnul".
   Qed.
 
+  (* ===================================================================== *)
+  (* A STRING IN THE TEXT HALF.  [ustr] is the DATA half's string, and a    *)
+  (* program's string LITERALS are not there: .rodata shares the            *)
+  (* executable segment's pages, so its bytes are X-and-not-W and belong to *)
+  (* [γt].  init's four format strings live at 0x970..0x9e7, inside the R-X *)
+  (* segment, and vprintf LOADS them one byte at a time -- so the tier      *)
+  (* needs both this resource and [UkRunMem.wp_uk_lbu_text] to read it.     *)
+  (*                                                                       *)
+  (* It carries no dfrac: [utext] is [↪□], persistent outright, so there is *)
+  (* nothing to give back and the accessors below hand out bytes without a  *)
+  (* closing wand.                                                         *)
+  (* ===================================================================== *)
+  Definition utext_str (γt : gname) (a : Z) (len : nat)
+      (f : nat -> bv 8) : iProp Σ :=
+    (⌜ forall j : nat, (j < len)%nat -> f j <> ubyte0 ⌝ ∗
+     ⌜ Z.of_nat len < 2 ^ 31 ⌝ ∗
+     ([∗ list] j ∈ seq 0 len, utext γt (a + Z.of_nat j) (f j)) ∗
+     utext γt (a + Z.of_nat len) ubyte0)%I.
+
+  Global Instance utext_str_persistent γt a len f :
+    Persistent (utext_str γt a len f).
+  Proof. apply _. Qed.
+
+  Lemma utext_str_len (γt : gname) (a : Z) (len : nat) (f : nat -> bv 8) :
+    utext_str γt a len f -∗ ⌜ Z.of_nat len < 2 ^ 31 ⌝.
+  Proof. iIntros "(_ & %H & _ & _)". iPureIntro. exact H. Qed.
+
+  Lemma utext_str_nonul (γt : gname) (a : Z) (len : nat) (f : nat -> bv 8) :
+    utext_str γt a len f -∗ ⌜ forall j : nat, (j < len)%nat -> f j <> ubyte0 ⌝.
+  Proof. iIntros "(%H & _ & _ & _)". iPureIntro. exact H. Qed.
+
+  (* one body byte -- no give-back, the resource is persistent *)
+  Lemma utext_str_byte (γt : gname) (a : Z) (len : nat)
+      (f : nat -> bv 8) (j : nat) :
+    (j < len)%nat ->
+    utext_str γt a len f -∗ utext γt (a + Z.of_nat j)%Z (f j).
+  Proof.
+    intros Hj. iIntros "(_ & _ & #Hbs & _)".
+    iApply (big_sepL_lookup _ _ j j with "Hbs").
+    apply lookup_seq. split; [ lia | exact Hj ].
+  Qed.
+
+  Lemma utext_str_nul (γt : gname) (a : Z) (len : nat) (f : nat -> bv 8) :
+    utext_str γt a len f -∗ utext γt (a + Z.of_nat len)%Z ubyte0.
+  Proof. iIntros "(_ & _ & _ & #H)". iExact "H". Qed.
+
   (* NOTE: the SPLIT of a run at an arbitrary point -- which is what a
      syscall footprint hand-over is -- is deliberately not here yet.  It is
      a step-3 tool and wants proving against its consumer, not before it. *)
@@ -838,6 +884,80 @@ Section UserHeap.
     iApply (utext_frag γt M pm _ _ (HM idx Hlt) Hx Hw with "Ht").
   Qed.
 
+  (* ===================================================================== *)
+  (* A PROGRAM'S TEXT KEYED BY ITS OWN DUMPED BYTE MAP.                     *)
+  (*                                                                        *)
+  (* [utext_all] names [M] and [pm], and a program proof cannot hold it:    *)
+  (* [UkRun.urun] hides both existentially.  That is the whole reason the   *)
+  (* code catalogs used to bundle their per-pc [uinstr_is] facts into ONE   *)
+  (* wide separating conjunction -- and why a proof that fetches three      *)
+  (* instructions paid a 369-way [iDestruct].                              *)
+  (*                                                                        *)
+  (* The kernel tier never had that problem, because [KernelText.kernel_text] *)
+  (* is keyed by the CONSTANT [KernelInstrs.kernel_bytes] rather than by an  *)
+  (* image variable, so its 23K bytes are one persistent resource and every  *)
+  (* per-instruction lemma extracts from it by [big_sepM_lookup].  This is   *)
+  (* that resource for the user tier: [utext_img γt T] at the program's      *)
+  (* dumped [T].  [utext_all] converts into it ONCE, at the entry, where the *)
+  (* image and permission facts are still in scope.                          *)
+  (* ===================================================================== *)
+  Definition utext_img (γt : gname) (T : gmap Z (bv 8)) : iProp Σ :=
+    ([∗ map] a ↦ b ∈ T, utext γt a b)%I.
+
+  Global Instance utext_img_persistent γt T : Persistent (utext_img γt T).
+  Proof. apply _. Qed.
+
+  (* the ONE conversion: the process's text heap covers the program's bytes,
+     and every one of them is X-and-not-W (i.e. lands in the TEXT half) *)
+  Lemma utext_img_of_all (γt : gname) (M : gmap Z (bv 8))
+      (pm : gmap (mword 27) uperm) (T : gmap Z (bv 8)) :
+    (forall (a : Z) (b : bv 8), T !! a = Some b -> M !! a = Some b) ->
+    (forall a : Z, is_Some (T !! a) -> ux_addr pm a /\ ~ uw_addr pm a) ->
+    utext_all γt M pm -∗ utext_img γt T.
+  Proof.
+    intros HM Hperm. iIntros "#Ht". rewrite /utext_img.
+    iApply big_sepM_intro. iIntros "!>" (a b Hab).
+    destruct (Hperm a (mk_is_Some _ _ Hab)) as [Hx Hw].
+    iApply (utext_frag γt M pm a b (HM a b Hab) Hx Hw with "Ht").
+  Qed.
+
+  (* a fetch window out of it, byte by byte -- the twin of
+     [KernelText.kernel_window_pc], and what every per-pc decode lemma runs *)
+  Lemma utext_img_run {k : N} (γt : gname) (T : gmap Z (bv 8))
+      (a : Z) (n : nat) (w : bv k) :
+    (forall j : nat, (j < n)%nat -> T !! (a + Z.of_nat j)%Z = Some (nth_byte w j)) ->
+    utext_img γt T -∗
+    ([∗ list] j ∈ seq 0 n, utext γt (a + Z.of_nat j) (nth_byte w j)).
+  Proof.
+    intros HT. iIntros "#Ht". iApply big_sepL_intro. iIntros "!>" (idx j Hj).
+    apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l in Hlt |- *.
+    rewrite /utext_img.
+    iApply (big_sepM_lookup _ _ (a + Z.of_nat idx)%Z (nth_byte w idx) with "Ht").
+    exact (HT idx Hlt).
+  Qed.
+
+  (* ...and where a literal comes from: the read-only image the entry hands
+     out, at a CONCRETE base and length, so every side condition below is a
+     [vm_compute] over the dumped map. *)
+  Lemma utext_str_of_img (γt : gname) (T : gmap Z (bv 8)) (a : Z) (len : nat)
+      (f : nat -> bv 8) :
+    (forall j : nat, (j < len)%nat -> f j <> ubyte0) ->
+    Z.of_nat len < 2 ^ 31 ->
+    (forall j : nat, (j < len)%nat -> T !! (a + Z.of_nat j)%Z = Some (f j)) ->
+    T !! (a + Z.of_nat len)%Z = Some ubyte0 ->
+    utext_img γt T -∗ utext_str γt a len f.
+  Proof.
+    intros Hne Hlen Hbs Hnul. iIntros "#HT". rewrite /utext_str /utext_img.
+    iSplit; [ iPureIntro; exact Hne | ]. iSplit; [ iPureIntro; exact Hlen | ].
+    iSplitR.
+    - iApply big_sepL_intro. iIntros "!>" (idx j Hj).
+      apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l in Hlt |- *.
+      iApply (big_sepM_lookup _ _ (a + Z.of_nat idx)%Z (f idx) with "HT").
+      exact (Hbs idx Hlt).
+    - iApply (big_sepM_lookup _ _ (a + Z.of_nat len)%Z ubyte0 with "HT").
+      exact Hnul.
+  Qed.
+
   (* ---- the three decode shapes ---------------------------------------- *)
 
   (* 4-alignment implies 2-alignment; [uinstr_is] carries the 2-aligned form
@@ -1092,6 +1212,87 @@ Section UserHeap.
     rewrite E0 E1 E2 E3 E4 E5 E6 E7 right_id. reflexivity.
   Qed.
 
+  (* the four-word form: putc's frame (32 bytes). *)
+  Lemma ustack_4 (γd : gname) (sp : mword 64) :
+    ustack γd sp 4 ⊣⊢ ⌜ uint sp mod 8 = 0 ⌝ ∗
+      (∃ w : mword 64, uword γd (uint sp - 8) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 16) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 24) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 32) w).
+  Proof.
+    rewrite /ustack /ustack_body /=.
+    assert (E0 : uint sp - 8 * (Z.of_nat 0 + 1) = uint sp - 8) by lia.
+    assert (E1 : uint sp - 8 * (Z.of_nat 1 + 1) = uint sp - 16) by lia.
+    assert (E2 : uint sp - 8 * (Z.of_nat 2 + 1) = uint sp - 24) by lia.
+    assert (E3 : uint sp - 8 * (Z.of_nat 3 + 1) = uint sp - 32) by lia.
+    rewrite E0 E1 E2 E3 right_id. reflexivity.
+  Qed.
+
+  (* ...and the twelve-word form: printf's and vprintf's frame (96
+     bytes).  printf spills seven argument registers into it. *)
+  Lemma ustack_12 (γd : gname) (sp : mword 64) :
+    ustack γd sp 12 ⊣⊢ ⌜ uint sp mod 8 = 0 ⌝ ∗
+      (∃ w : mword 64, uword γd (uint sp - 8) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 16) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 24) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 32) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 40) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 48) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 56) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 64) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 72) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 80) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 88) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 96) w).
+  Proof.
+    rewrite /ustack /ustack_body /=.
+    assert (E0 : uint sp - 8 * (Z.of_nat 0 + 1) = uint sp - 8) by lia.
+    assert (E1 : uint sp - 8 * (Z.of_nat 1 + 1) = uint sp - 16) by lia.
+    assert (E2 : uint sp - 8 * (Z.of_nat 2 + 1) = uint sp - 24) by lia.
+    assert (E3 : uint sp - 8 * (Z.of_nat 3 + 1) = uint sp - 32) by lia.
+    assert (E4 : uint sp - 8 * (Z.of_nat 4 + 1) = uint sp - 40) by lia.
+    assert (E5 : uint sp - 8 * (Z.of_nat 5 + 1) = uint sp - 48) by lia.
+    assert (E6 : uint sp - 8 * (Z.of_nat 6 + 1) = uint sp - 56) by lia.
+    assert (E7 : uint sp - 8 * (Z.of_nat 7 + 1) = uint sp - 64) by lia.
+    assert (E8 : uint sp - 8 * (Z.of_nat 8 + 1) = uint sp - 72) by lia.
+    assert (E9 : uint sp - 8 * (Z.of_nat 9 + 1) = uint sp - 80) by lia.
+    assert (E10 : uint sp - 8 * (Z.of_nat 10 + 1) = uint sp - 88) by lia.
+    assert (E11 : uint sp - 8 * (Z.of_nat 11 + 1) = uint sp - 96) by lia.
+    rewrite E0 E1 E2 E3 E4 E5 E6 E7 E8 E9 E10 E11 right_id. reflexivity.
+  Qed.
+
+  (* ===================================================================== *)
+  (* DIRECTED forms of the two splits above -- and they are not a           *)
+  (* convenience.  A [⊣⊢] used under [rewrite] INSIDE a proofmode goal      *)
+  (* fires on the whole [envs_entails Δ Q], context included (optimization  *)
+  (* .md, "Directed entailments, not [⊣⊢] rewrites").  putc's frame split   *)
+  (* written as [rewrite ustack_4] / [rewrite uword_8] at the call site was *)
+  (* killed at eight minutes and 41 GB; the same steps behind these lemmas, *)
+  (* where the goal is two lines long, are free.  Rule of thumb: if one of  *)
+  (* the [⊣⊢] splits above appears under [rewrite] in a program proof, it   *)
+  (* is a directed lemma waiting to be written.                             *)
+  (* ===================================================================== *)
+  Lemma ustack_4_open (γd : gname) (sp : mword 64) :
+    ustack γd sp 4 -∗
+      ⌜ uint sp mod 8 = 0 ⌝ ∗
+      (∃ w : mword 64, uword γd (uint sp - 8) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 16) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 24) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 32) w).
+  Proof. rewrite ustack_4. iIntros "H". iExact "H". Qed.
+
+  Lemma ustack_4_close (γd : gname) (sp : mword 64) :
+    uint sp mod 8 = 0 ->
+    (∃ w : mword 64, uword γd (uint sp - 8) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 16) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 24) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 32) w) -∗
+    ustack γd sp 4.
+  Proof.
+    intros Hal. iIntros "H0 H1 H2 H3". rewrite ustack_4.
+    iSplit; [ iPureIntro; exact Hal | ]. iFrame.
+  Qed.
+
   Lemma ustack_acc (γd : gname) (sp : mword 64) (n i : nat) :
     (i < n)%nat ->
     ustack γd sp n -∗
@@ -1174,6 +1375,74 @@ Section UserHeap.
                ltac:(cbn; lia) ltac:(cbn; lia)).
     destruct i as [| [| [| [| [| [| [| [| i']]]]]]]];
       cbn; try reflexivity; exfalso; cbn in Hlt; lia.
+  Qed.
+
+  (* ...and the other direction, spelled out.  A [uword] IS eight [ubyte]s
+     (that is its definition), but the [∗ list] over [seq 0 8] and the
+     [a + Z.of_nat j] addresses are not what a proof that writes ONE byte of
+     a stack slot wants to see -- putc's [sb a1,-17(s0)] lands on byte 7 of
+     the word at [sp-24].  Same shape as [ustack_8]: name the eight, once. *)
+  Lemma ubytes_8 (γd : gname) (a : Z) (f : nat -> bv 8) :
+    ubytes γd a 8 f ⊣⊢
+      ubyte γd a (f 0%nat) ∗ ubyte γd (a + 1) (f 1%nat) ∗
+      ubyte γd (a + 2) (f 2%nat) ∗ ubyte γd (a + 3) (f 3%nat) ∗
+      ubyte γd (a + 4) (f 4%nat) ∗ ubyte γd (a + 5) (f 5%nat) ∗
+      ubyte γd (a + 6) (f 6%nat) ∗ ubyte γd (a + 7) (f 7%nat).
+  Proof.
+    rewrite /ubytes /ubytesq /=.
+    assert (E0 : (a + Z.of_nat 0)%Z = a) by lia.
+    assert (E1 : (a + Z.of_nat 1)%Z = (a + 1)%Z) by lia.
+    assert (E2 : (a + Z.of_nat 2)%Z = (a + 2)%Z) by lia.
+    assert (E3 : (a + Z.of_nat 3)%Z = (a + 3)%Z) by lia.
+    assert (E4 : (a + Z.of_nat 4)%Z = (a + 4)%Z) by lia.
+    assert (E5 : (a + Z.of_nat 5)%Z = (a + 5)%Z) by lia.
+    assert (E6 : (a + Z.of_nat 6)%Z = (a + 6)%Z) by lia.
+    assert (E7 : (a + Z.of_nat 7)%Z = (a + 7)%Z) by lia.
+    rewrite E0 E1 E2 E3 E4 E5 E6 E7 right_id. reflexivity.
+  Qed.
+
+  (* the word form of the same split, which is what a [ustack] slot hands
+     over: eight named bytes in, SOME word back out *)
+  Lemma uword_8 (γd : gname) (a : Z) (w : mword 64) :
+    uword γd a w ⊣⊢
+      ubyte γd a (nth_byte w 0%nat) ∗ ubyte γd (a + 1) (nth_byte w 1%nat) ∗
+      ubyte γd (a + 2) (nth_byte w 2%nat) ∗ ubyte γd (a + 3) (nth_byte w 3%nat) ∗
+      ubyte γd (a + 4) (nth_byte w 4%nat) ∗ ubyte γd (a + 5) (nth_byte w 5%nat) ∗
+      ubyte γd (a + 6) (nth_byte w 6%nat) ∗ ubyte γd (a + 7) (nth_byte w 7%nat).
+  Proof. exact (ubytes_8 γd a (nth_byte w)). Qed.
+
+  (* the shape a one-byte store into a stack slot actually uses: hand the
+     eight bytes over with the [i]th one REPLACED, get SOME word back.  The
+     caller never names the resulting word, and [ustack] never asks. *)
+  Lemma uword_of_bytes_8 (γd : gname) (a : Z) (b0 b1 b2 b3 b4 b5 b6 b7 : bv 8) :
+    ubyte γd a b0 -∗ ubyte γd (a + 1) b1 -∗ ubyte γd (a + 2) b2 -∗
+    ubyte γd (a + 3) b3 -∗ ubyte γd (a + 4) b4 -∗ ubyte γd (a + 5) b5 -∗
+    ubyte γd (a + 6) b6 -∗ ubyte γd (a + 7) b7 -∗
+    ∃ w : mword 64, uword γd a w.
+  Proof.
+    iIntros "H0 H1 H2 H3 H4 H5 H6 H7".
+    iApply (uword_of_ubytes γd a
+              (fun j => match j with
+                        | 0%nat => b0 | 1%nat => b1 | 2%nat => b2 | 3%nat => b3
+                        | 4%nat => b4 | 5%nat => b5 | 6%nat => b6 | _ => b7
+                        end)).
+    rewrite ubytes_8. iFrame.
+  Qed.
+
+  (* ONE BYTE OF A STACK SLOT, taken out and put back.  The address is a
+     PREMISE rather than something the caller rewrites into shape, which is
+     what keeps [uint sp - 24 + 7] out of the proofmode goal: putc's
+     [sb a1,-17(s0)] names [sp0-17] and the arithmetic is discharged here. *)
+  Lemma uword_byte7_acc (γd : gname) (a b : Z) (w : mword 64) :
+    b = (a + 7)%Z ->
+    uword γd a w -∗
+      ubyte γd b (nth_byte w 7%nat) ∗
+      (∀ c : bv 8, ubyte γd b c -∗ ∃ w' : mword 64, uword γd a w').
+  Proof.
+    intros ->. rewrite uword_8.
+    iIntros "(H0 & H1 & H2 & H3 & H4 & H5 & H6 & H7)".
+    iFrame "H7". iIntros (c) "H7".
+    iApply (uword_of_bytes_8 γd a with "H0 H1 H2 H3 H4 H5 H6 H7").
   Qed.
 
   (* (4) ...and n of them, indexed downward from sp *)

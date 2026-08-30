@@ -622,4 +622,48 @@ Section UkRunMem.
     iApply (urun_close_upd _ _ _ _ _ m rd _ _ _ _ Hns with "Hheap Hstk"). iApply ("Hcont" with "Hw").
   Qed.
 
+  (* A LOAD OUT OF THE TEXT HALF.  [wp_uk_lbu] above reads a [γd] byte, and
+     a program's string LITERALS are not [γd]: .rodata shares the executable
+     segment's pages, so its bytes are X-and-not-W and the heap files them
+     under [γt].  vprintf's [lbu s1,0(a1)] on a format string is exactly that
+     read, and without this leaf the printf cone cannot be walked at all.
+
+     The only difference from [wp_uk_lbu] is where the byte and the
+     permission come from -- [uheap_text] rather than [uheap_ubyte], so the
+     load's leaf-exists guard is discharged from [ux_addr] instead of
+     [uw_addr] -- and that [utext] is persistent, so there is no give-back
+     wand in the continuation. *)
+  Lemma wp_uk_lbu_text (γt γd γs : gname) (h : CpuId) (m : regfile)
+      (pc : mword 64) (imm : mword 12) (rs1 rd : mword 5) (a : Z)
+      (b0 : mword 8) (avail : nat) :
+    unot_sp rd ->
+    a = uint (m !!! Regidx rs1) + uoff_i12 imm ->
+    uint rd <> 0 ->
+    uinstr_is γt pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
+    utext γt a b0 -∗
+    urun γt γd γs h m pc avail -∗
+    (∀ h' : CpuId,
+       urun γt γd γs h'
+         (<[Regidx rd := regval_into_reg (zero_extend' 64 b0)]> m)
+         (add_vec_int pc 4) avail -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hns Ha Hrd. iIntros "#Hi #Hw Hrun Hcont".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
+    iDestruct (uheap_text with "Hheap Hw") as %(HM & Hok & Hbnd).
+    destruct (ucanon_of_bound a Hbnd) as [Hua Hcan].
+    assert (Htgt : (mword_of_int a : mword 64)
+                   = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)).
+    { exact (umoi_add_i12 _ imm a Ha). }
+    iApply (UkLoad.wp_uk_lbu C pt Rut pm sz Hlo Hpm M m pc imm rs1 rd
+              (mword_of_int a) (zero_extend' 64 b0) b0 Hui Hrd Htgt
+              ltac:(destruct Hok as (q & Hq & _); exists q; exact Hq) Hcan
+              ltac:(rewrite Hua; exact HM) eq_refl
+              with "Hb [Hheap Hstk Hcont]").
+    iApply (urun_close_upd _ _ _ _ _ m rd _ _ _ _ Hns with "Hheap Hstk").
+    iApply "Hcont".
+  Qed.
+
 End UkRunMem.

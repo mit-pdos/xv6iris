@@ -54,6 +54,9 @@ ConcMpQemuPass.v
 ConcMpQemuRun.v
 ConcMpSched.v
 ConcSbGen.v
+ConcSbHwGen.v
+ConcSbJh7110Pass.v
+ConcSbJh7110Run.v
 ConcSbQemuPass.v
 ConcSbQemuRun.v
 ConcSbSched.v

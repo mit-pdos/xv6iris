@@ -906,6 +906,40 @@ Section UkRunLeaf.
     iApply (urun_close with "Hheap Hstk Hcont").
   Qed.
 
+  (* ------------------------------------------------------------------- *)
+  (* THE SAME BRANCH, HANDING THE STEP'S OWN [▷] OUT.  This is the only    *)
+  (* rule that can close an UNBOUNDED loop: [iLöb] gives the induction     *)
+  (* hypothesis under a later, and the back edge has to strip exactly one. *)
+  (* Every loop in sync and echo is bounded and closes by ordinary         *)
+  (* induction, which is why the tier has not needed this until now;       *)
+  (* init's two -- the restart loop's [beq s1,a0] and the wait loop's      *)
+  (* [bge a0,x0] -- are both BTYPE, so this is the one later-providing     *)
+  (* leaf it takes.                                                        *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_uk_btype_later (γt γd γs : gname) (h : CpuId) (m : regfile)
+      (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5) (op : bop)
+      (taken : bool) (tgt : mword 64) (avail : nat) :
+    taken = uv_btaken op (m !!! Regidx rs1) (m !!! Regidx rs2) ->
+    tgt = add_vec pc (sign_extend' 64 imm) ->
+    (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
+    uinstr_is γt pc false (BTYPE (imm, Regidx rs2, Regidx rs1, op)) -∗
+    urun γt γd γs h m pc avail -∗
+    ▷ (∀ h' : CpuId,
+         urun γt γd γs h' m
+           (if taken then tgt else add_vec_int pc 4) avail -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros H1 H2 H3. iIntros "#Hi Hrun Hcont".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
+    iApply (UkBranch.wp_uk_btype_later C pt Rut pm sz Hlo Hpm M m pc imm rs2 rs1
+              op taken tgt Hui H1 H2 H3
+              with "Hb [Hheap Hstk Hcont]").
+    iNext.
+    iApply (urun_close with "Hheap Hstk Hcont").
+  Qed.
+
   Lemma wp_uk_cbeqz (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
       (imm : mword 8) (cr : mword 3) (rs : mword 5) (taken : bool) (tgt : mword 64) (avail : nat) :
     creg2reg_idx (Cregidx cr) = Regidx rs ->
@@ -1113,6 +1147,46 @@ Section UkRunLeaf.
     iApply (urun_close with "Hheap [Hstk] [Hframe Hcont]").
     - rewrite (upd_eq m (Regidx csp_rs1) (regval_into_reg _)). iExact "Hstk".
     - iIntros (h') "Hrun". iApply ("Hcont" with "Hframe Hrun").
+  Qed.
+
+  (* ...and ITS pop.  putc, printf and vprintf all pop with c.addi16sp
+     (32 and 96 bytes), so the mirror is not optional; it is
+     [wp_uk_caddi_sp_up]'s proof with [caddi16sp_imm] in the premise. *)
+  Lemma wp_uk_caddi16sp_up (γt γd γs : gname) (h : CpuId) (m : regfile)
+      (pc : mword 64) (imm : mword 6) (k n : nat) :
+    (sign_extend' 64 (caddi16sp_imm imm) : mword 64)
+      = mword_of_int (8 * Z.of_nat k) ->
+    uinstr_is γt pc true (C_ADDI16SP imm) -∗
+    ustack γd (add_vec_int (m !!! Regidx csp_rs1) (8 * Z.of_nat k)) k -∗
+    urun γt γd γs h m pc n -∗
+    (∀ h' : CpuId,
+       urun γt γd γs h'
+         (<[Regidx csp_rs1
+            := regval_into_reg
+                 (add_vec_int (m !!! Regidx csp_rs1) (8 * Z.of_nat k))]> m)
+         (add_vec_int pc 2) (k + n) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Himm. iIntros "#Hi Hframe Hrun Hcont".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
+    iDestruct (ustack_nowrap with "Hheap Hframe") as %Hnw.
+    assert (Hu : uint (m !!! Regidx csp_rs1)
+                 = uint (add_vec_int (m !!! Regidx csp_rs1) (8 * Z.of_nat k))
+                   - 8 * Z.of_nat k).
+    { rewrite !uint_unsigned.
+      rewrite (uv_avi_pos (m !!! Regidx csp_rs1) (8 * Z.of_nat k) ltac:(lia)
+                 ltac:(rewrite <- uint_unsigned; exact Hnw)). lia. }
+    iApply (UkLeaf.wp_uk_caddi16sp C pt Rut pm sz Hlo Hpm M m pc imm
+              (add_vec_int (m !!! Regidx csp_rs1) (8 * Z.of_nat k))
+              Hui ltac:(unfold add_vec_int; f_equal; exact (eq_sym Himm))
+              with "Hb [Hheap Hstk Hframe Hcont]").
+    iApply (urun_close with "Hheap [Hstk Hframe] Hcont").
+    rewrite (upd_eq m (Regidx csp_rs1) (regval_into_reg _)).
+    rewrite (ustack_app γd (add_vec_int (m !!! Regidx csp_rs1) (8 * Z.of_nat k))
+               (m !!! Regidx csp_rs1) k n Hu).
+    iFrame "Hframe Hstk".
   Qed.
 
 End UkRunLeaf.

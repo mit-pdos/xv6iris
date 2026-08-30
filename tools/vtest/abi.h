@@ -88,6 +88,35 @@
 #define PRIMARY_HART 0
 #endif
 
+/* ---- THE PLIC CONTEXT THIS HART OWNS ----------------------------------
+ *
+ * The PLIC's enable bitmaps and threshold/claim pairs are PER CONTEXT, not
+ * per hart, and the context NUMBERING depends on the platform's hart
+ * layout.  A test that hardcodes hart 0's is only correct on hart 0.
+ *
+ *   QEMU virt   every hart has an M and an S context, in that order, so
+ *               hart h owns contexts 2h (M) and 2h+1 (S).  Hart 0's S
+ *               context is 1 -- which is what these tests used to hardcode.
+ *
+ *   JH7110      hart 0 is the E24, which is M-MODE ONLY and takes context 0
+ *               by itself; the four U74s follow, so U74 hart h owns
+ *               contexts 2h-1 (M) and 2h (S).  Our primary is hart 2, whose
+ *               S context is 4.
+ *
+ * Getting this wrong is silent: the enable and the claim land on ANOTHER
+ * hart's context (on this board, context 1 is the firmware hart's M
+ * context), our hart never sees the interrupt, and the test spins until the
+ * runner times it out.  That is why every plic_ case that drives an
+ * interrupt through a context was uncapturable on the board. */
+#ifdef VTEST_BOARD
+#define PLIC_SCTX     (2 * PRIMARY_HART)
+#else
+#define PLIC_SCTX     (2 * PRIMARY_HART + 1)
+#endif
+#define PLIC_SENABLE  (0x2000 + PLIC_SCTX * 0x80)
+#define PLIC_STHRESH  (0x200000 + PLIC_SCTX * 0x1000)
+#define PLIC_SCLAIM   (PLIC_STHRESH + 4)
+
 /* THE HART SLOT, for a test BODY that dispatches on which hart it is.
    vtest.S's prologue already biases the slot it uses for the stack and for
    the primary/AP branch, but a BODY that asks the question again gets the

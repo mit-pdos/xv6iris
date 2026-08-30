@@ -184,6 +184,44 @@ image the program must re-own.  What it was allowed to do is
 what it put in a7 and should not have to know the key spells it
 `usys_num (tf_of m pc)`.
 
+## Fork: the contract returns twice, and the payload that crosses it
+
+`UkFork.v`.  `uexec_ret`'s fork arm pays TWO slots at the same key, so
+`wp_uk_ecall_fork` takes two continuations: the PARENT keeps its gnames,
+its payload and its free stack and learns `r <> 0`; the CHILD gets a
+FRESH gname triple over the same image — same registers with `a0 = 0`,
+`pc + 4`, the same `avail`, the same break.  Duplicating a points-to
+across a fork is allocation at a fresh name (`uheap_fork`), never
+sharing, so no new logic is needed — the mint is an ordinary
+`ghost_map_alloc` whose contents the parent's own authorities vouch for.
+
+What the child inherits is the payload `P : gname -> gname -> gname ->
+iProp` — the caller's facts as a FAMILY over the heap names, which every
+heap predicate in this tree already is.  `Forkable P` says P factors
+through a footprint: reveal its text / read-only / exclusive byte maps,
+restore P to the parent, rebuild `P γt' γd' γs'` at any fresh names from
+mirrored fragments.  Instances cover the primitives (`utext`, `ubyteq`,
+runs, words, `ustr`, `uargv`, `utext_all`, `ustack`) and compose over
+`∗`/`∃`/`big_sepL`.  The free stack crosses BY that mechanism, not by a
+special case: `ustack` is Forkable, and the leaf bundles `P ∗ ustack`
+into one payload internally, which is why the child resumes at the same
+`avail` with nothing in the mint about stacks at all.  A caller writes
+`P := fun γt γd γs => utext_all γt M π ∗ uargv γd av args`
+and instance search assembles the rest — `wp_uk_ecall_fork_argv` is that
+worked shape (init's child: the text to reach its exec, the argv to pass
+it).
+
+Three deliberate exclusions.  Non-address-space resources (fd facts,
+protocol tokens) have no instance and MUST not have one: both processes
+run the code that would use them, so the caller distributes them between
+the two continuations at the leaf's `∗` — ordinary separation, which is
+fork's honest semantics (memory is copied, everything else is shared).
+Fractional data payloads (a dq neither full nor discarded) are not
+covered; nothing uses one.  And the child's slack is EMPTY — its data
+authority holds exactly the mirrored fragments plus the stack run — so a
+forked child cannot sbrk until the sbrk row exists and hands over slack
+explicitly.
+
 ## Status
 
 The engine is complete except the two syscall rows above.  `UkSync.v` and

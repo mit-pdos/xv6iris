@@ -192,6 +192,39 @@ Proof.
   exact H.
 Qed.
 
+(* EXEC's row pins everything: the failure arm is the only one that returns
+   here at all, and it says so.  (A successful exec never comes back to this
+   WP -- the new program's is MINTED by exec from the new trapframe and
+   image.) *)
+Lemma usys_mem_ok_exec_row (n : Z) (tf : list (mword 64)) (r : mword 64)
+    (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z) :
+  n = USYS_exec ->
+  usys_mem_ok n tf r M π szv M' π' szv' ->
+  r = (mword_of_int (-1) : mword 64) /\ M' = M /\ π' = π /\ szv' = szv.
+Proof.
+  intros -> H. unfold usys_mem_ok in H.
+  destruct (decide (USYS_exec = USYS_exec)) as [_ | Hc];
+    [ exact H | exfalso; exact (Hc eq_refl) ].
+Qed.
+
+(* WAIT AT A NULL STATUS POINTER moves nothing -- which is what a program
+   passing a null status pointer to wait needs, and what the row now
+   says. *)
+Lemma usys_mem_ok_wait_null (n : Z) (tf : list (mword 64)) (r : mword 64)
+    (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z) :
+  n = USYS_wait -> uint (tf !!! tf_arg_idx 0) = 0 ->
+  usys_mem_ok n tf r M π szv M' π' szv' ->
+  M' = M /\ π' = π /\ szv' = szv.
+Proof.
+  intros -> Hz H. unfold usys_mem_ok in H.
+  destruct (decide (USYS_wait = USYS_exec)) as [Hc | _]; [ discriminate Hc | ].
+  destruct (decide (USYS_wait = USYS_sbrk)) as [Hc | _]; [ discriminate Hc | ].
+  destruct (decide (USYS_wait = USYS_wait)) as [_ | Hc];
+    [ | exfalso; exact (Hc eq_refl) ].
+  destruct H as ((d & bs & Hd & Hnull & Hm) & Hp & Hs).
+  rewrite (Hnull Hz) in Hm. exact (conj Hm (conj Hp Hs)).
+Qed.
+
 (* the permission map is untouched by every entry but sbrk *)
 Lemma usys_mem_ok_perm (n : Z) (tf : list (mword 64)) (r : mword 64)
     (M M' : gmap Z (bv 8)) (π π' : gmap (mword 27) uperm) (szv szv' : Z) :

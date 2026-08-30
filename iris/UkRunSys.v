@@ -28,6 +28,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import UsysMemOk UexecSlot UexecRet.
+Require Import ProcGeom.   (* [tf_arg_idx] -- wait's row is based at a0 *)
 Require Import UkStep.
 Require Import UserHeap.
 Require Import TsoCtx.
@@ -113,6 +114,111 @@ Section UkRunSys.
   (* ecall, at exit.  The process never comes back, so it owes NOTHING --  *)
   (* not even a continuation.  This is the only leaf with no successor.    *)
   (* ------------------------------------------------------------------- *)
+  (* ------------------------------------------------------------------- *)
+  (* EXEC'S FAILURE ARM.  A successful exec never returns to this WP at all *)
+  (* -- the new program's is minted by exec from the new trapframe and     *)
+  (* image -- so the only arm that comes back is the failure, and the row  *)
+  (* says so outright: -1, and not one byte moved.                         *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_uk_ecall_exec (γt γd γs : gname) (h : CpuId) (m : regfile)
+      (pc : mword 64) (avail : nat) :
+    usysno m = USYS_exec ->
+    is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
+    uinstr_is γt pc false (ECALL tt) -∗
+    urun γt γd γs h m pc avail -∗
+    (∀ h' : CpuId,
+       urun γt γd γs h'
+         (<[Regidx (mword_of_int 10) := (mword_of_int (-1) : mword 64)]> m)
+         (add_vec_int pc 4) avail -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hn Hal4.
+    iIntros "#Hi Hrun Hcont".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
+    iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
+    iApply (UkStep.wp_uk_ecall C pt Rut pm sz Hlo Hpm M m pc Hui
+              (fun (s : mstate)
+                   (Hp : register_lookup cur_privilege s.(sregs) = User)
+                   (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
+                 UserExecFacts.goodmb_execute_ECALL_U UserFrame.Du_r UserFrame.Du_w
+                   s pc ltac:(vm_compute; reflexivity)
+                   ltac:(vm_compute; reflexivity) Hp Hc)
+              with "Hb").
+    rewrite (uexec_ret_ecall _ _ eq_refl).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz)) = USYS_exec).
+    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    rewrite Hnum. cbv zeta.
+    destruct (decide (USYS_exec = USYS_exit)) as [He | _];
+      [ exfalso; unfold USYS_exec, USYS_exit in He; discriminate He | ].
+    destruct (decide (USYS_exec = USYS_fork)) as [He | _];
+      [ exfalso; unfold USYS_exec, USYS_fork in He; discriminate He | ].
+    iIntros (r M' pm' sz') "%Hok".
+    destruct (usys_mem_ok_exec_row USYS_exec _ r _ _ _ _ _ _ eq_refl Hok)
+      as [-> [-> [-> ->]]].
+    cbn [uvis_M uvis_perm uvis_of_run].
+    rewrite (uslot_bump_run m pc M M pm pm sz sz
+               (mword_of_int (-1) : mword 64) Hx0 Hal4).
+    iApply (urun_close_upd _ _ _ _ _ m (mword_of_int 10) _ _ _ _
+              ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk").
+    iIntros (h') "Hrun".
+    iApply ("Hcont" $! h' with "Hrun").
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* WAIT AT A NULL STATUS POINTER.  The kernel's own [addr != 0] test     *)
+  (* means nothing is copied out, so the heap the caller owns comes back   *)
+  (* untouched and the leaf can hand the SAME run on -- exactly the quiet  *)
+  (* row's shape.  This is the arm init and sh both take.                  *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_uk_ecall_wait_null (γt γd γs : gname) (h : CpuId) (m : regfile)
+      (pc : mword 64) (avail : nat) :
+    usysno m = USYS_wait ->
+    uint (m !!! Regidx (mword_of_int 10)) = 0 ->
+    is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
+    uinstr_is γt pc false (ECALL tt) -∗
+    urun γt γd γs h m pc avail -∗
+    (∀ (h' : CpuId) (r : mword 64),
+       urun γt γd γs h' (<[Regidx (mword_of_int 10) := r]> m)
+         (add_vec_int pc 4) avail -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hn Hz Hal4.
+    iIntros "#Hi Hrun Hcont".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
+    iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
+    iApply (UkStep.wp_uk_ecall C pt Rut pm sz Hlo Hpm M m pc Hui
+              (fun (s : mstate)
+                   (Hp : register_lookup cur_privilege s.(sregs) = User)
+                   (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
+                 UserExecFacts.goodmb_execute_ECALL_U UserFrame.Du_r UserFrame.Du_w
+                   s pc ltac:(vm_compute; reflexivity)
+                   ltac:(vm_compute; reflexivity) Hp Hc)
+              with "Hb").
+    rewrite (uexec_ret_ecall _ _ eq_refl).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz)) = USYS_wait).
+    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    assert (Ha0 : uint (uvis_tf (uvis_of_run m pc M pm sz) !!! tf_arg_idx 0) = 0).
+    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_arg0. exact Hz. }
+    rewrite Hnum. cbv zeta.
+    destruct (decide (USYS_wait = USYS_exit)) as [He | _];
+      [ exfalso; unfold USYS_wait, USYS_exit in He; discriminate He | ].
+    destruct (decide (USYS_wait = USYS_fork)) as [He | _];
+      [ exfalso; unfold USYS_wait, USYS_fork in He; discriminate He | ].
+    iIntros (r M' pm' sz') "%Hok".
+    destruct (usys_mem_ok_wait_null USYS_wait _ r _ _ _ _ _ _
+                eq_refl Ha0 Hok) as [-> [-> ->]].
+    cbn [uvis_M uvis_perm uvis_of_run].
+    rewrite (uslot_bump_run m pc M M pm pm sz sz r Hx0 Hal4).
+    iApply (urun_close_upd _ _ _ _ _ m (mword_of_int 10) _ _ _ _
+              ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk").
+    iIntros (h') "Hrun".
+    iApply ("Hcont" $! h' r with "Hrun").
+  Qed.
+
   Lemma wp_uk_ecall_exit (γt γd γs : gname) (h : CpuId) (m : regfile)
       (pc : mword 64) (avail : nat) :
     usysno m = USYS_exit ->
