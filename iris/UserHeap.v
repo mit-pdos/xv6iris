@@ -36,7 +36,7 @@
 (* the two invariants; above it, a leaf takes [utext]/[ubyte] and never    *)
 (* mentions a permission, a page, or a table.                             *)
 (*                                                                        *)
-(* WHAT THIS IS NOT YET.  [urun] still names [M], so the image is   *)
+(* WHAT THIS IS NOT YET.  [uheap] still names [M], so the image is   *)
 (* not hidden; that is the next step, together with re-cutting the leaves  *)
 (* so [uinstr]'s [uM_bytes M ...] clauses become [utext] and the load and  *)
 (* store leaves' byte facts become [ubyte].  And the payoff for [init]     *)
@@ -215,18 +215,18 @@ Section UserHeap.
   (* ===================================================================== *)
 
   (* [n] consecutive bytes, the shape everything else is built from *)
-  Definition urun_bytes (γd : gname) (a : Z) (n : nat) (f : nat -> bv 8) : iProp Σ :=
+  Definition ubytes (γd : gname) (a : Z) (n : nat) (f : nat -> bv 8) : iProp Σ :=
     ([∗ list] j ∈ seq 0 n, ubyte γd (a + Z.of_nat j) (f j))%I.
 
   (* an 8-byte little-endian word, as the load and store leaves read it *)
   Definition uword (γd : gname) (a : Z) (w : mword 64) : iProp Σ :=
-    urun_bytes γd a 8 (nth_byte w).
+    ubytes γd a 8 (nth_byte w).
 
   (* a NUL-terminated C string of length [len]: the body, then the NUL.
      The body's bytes are NOT pinned to values here -- a program that cares
      which bytes they are owns them individually. *)
   Definition ustr (γd : gname) (a : Z) (len : nat) (f : nat -> bv 8) : iProp Σ :=
-    (urun_bytes γd a len f ∗ ubyte γd (a + Z.of_nat len) ubyte0)%I.
+    (ubytes γd a len f ∗ ubyte γd (a + Z.of_nat len) ubyte0)%I.
 
   (* NOTE: the SPLIT of a run at an arbitrary point -- which is what a
      syscall footprint hand-over is -- is deliberately not here yet.  It is
@@ -236,8 +236,8 @@ Section UserHeap.
   (* ===================================================================== *)
   (* §2c THE PROGRAM BREAK, as a ghost the caller can FRAME.               *)
   (*                                                                       *)
-  (* Half here, half in [urun]: the two must agree, and moving the break    *)
-  (* takes both.  A ghost rather than an argument of [urun] precisely so    *)
+  (* Half here, half in [uheap]: the two must agree, and moving the break    *)
+  (* takes both.  A ghost rather than an argument of [uheap] precisely so    *)
   (* that a function which does not call sbrk carries its half through      *)
   (* untouched and never mentions [sz] in its spec at all.                  *)
   (* ===================================================================== *)
@@ -259,12 +259,12 @@ Section UserHeap.
   Qed.
 
   (* ===================================================================== *)
-  (* §3 THE RUNNING PREDICATE.                                             *)
+  (* §3 THE HEAP INVARIANT.                                             *)
   (*                                                                       *)
   (* Two authorities against one image, with the segment facts that make    *)
   (* each half's points-to mean what it means.                             *)
   (* ===================================================================== *)
-  Definition urun (γt γd γs : gname) (M : gmap Z (bv 8))
+  Definition uheap (γt γd γs : gname) (M : gmap Z (bv 8))
       (pm : gmap (mword 27) uperm) : iProp Σ :=
     (∃ (Mt Md Mslack : gmap Z (bv 8)) (sz : Z),
        ⌜ Mt ⊆ M ⌝ ∗ ⌜ Md ⊆ M ⌝ ∗ ⌜ Mt ##ₘ Md ⌝ ∗
@@ -304,8 +304,8 @@ Section UserHeap.
   (* A TEXT byte names the byte the image holds, and its page is FETCHABLE.
      Both come straight off the text half's invariant -- no dfrac argument,
      no permission in the statement. *)
-  Lemma urun_text (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (a : Z) (b : bv 8) :
-    urun γt γd γs M pm -∗ utext γt a b -∗
+  Lemma uheap_text (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (a : Z) (b : bv 8) :
+    uheap γt γd γs M pm -∗ utext γt a b -∗
     ⌜ M !! a = Some b /\ ux_addr (pm) a /\ 0 <= a < 2 ^ 38 ⌝.
   Proof.
     iIntros "Hrun Hb".
@@ -320,8 +320,8 @@ Section UserHeap.
   Qed.
 
   (* ...and a DATA byte names its byte and its page is WRITABLE. *)
-  Lemma urun_ubyte (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (a : Z) (b : bv 8) :
-    urun γt γd γs M pm -∗ ubyte γd a b -∗
+  Lemma uheap_ubyte (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (a : Z) (b : bv 8) :
+    uheap γt γd γs M pm -∗ ubyte γd a b -∗
     ⌜ M !! a = Some b /\ uw_addr (pm) a /\ 0 <= a < 2 ^ 38 ⌝.
   Proof.
     iIntros "Hrun Hb".
@@ -338,9 +338,9 @@ Section UserHeap.
      key's image moves with it.  The text half is untouched, and it stays a
      SUBMAP because the two halves are disjoint -- which is the whole reason
      they are two heaps. *)
-  Lemma urun_store (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (a : Z) (b b' : bv 8) :
-    urun γt γd γs M pm -∗ ubyte γd a b ==∗
-      urun γt γd γs (<[a := b']> M) pm ∗ ubyte γd a b'.
+  Lemma uheap_store (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (a : Z) (b b' : bv 8) :
+    uheap γt γd γs M pm -∗ ubyte γd a b ==∗
+      uheap γt γd γs (<[a := b']> M) pm ∗ ubyte γd a b'.
   Proof.
     iIntros "Hrun Hb".
     iDestruct "Hrun" as (Mt Md Mslack sz)
@@ -378,7 +378,7 @@ Section UserHeap.
   (* PERSISTED on the spot: after this step nothing can ever write it, and  *)
   (* every continuation may read it without owning anything.                *)
   (* ===================================================================== *)
-  Lemma urun_alloc (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z) :
+  Lemma uheap_alloc (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm) (sz : Z) :
     (* THE ONE PREMISE, and where it comes from: every mapped user address is
        below MAXVA.  At the call site (the process's first WP) [uvb] carries
        [usz_ok sz] and the lazy image over the sz-region, which is what bounds
@@ -387,7 +387,7 @@ Section UserHeap.
     (forall a : Z, is_Some (M !! a) -> 0 <= a < 2 ^ 38) ->
     0 <= sz ->
     ⊢ |==> ∃ γt γd γs : gname,
-        urun γt γd γs M pm ∗ usz γs sz ∗
+        uheap γt γd γs M pm ∗ usz γs sz ∗
         ([∗ map] a ↦ b ∈ utext_part M pm, utext γt a b) ∗
         ([∗ map] a ↦ b ∈ udata_lo M pm sz, ubyte γd a b).
   Proof.
@@ -429,7 +429,7 @@ Section UserHeap.
   (*                                                                       *)
   (* This is the shape of the whole trap seam.  At a trap the kernel is     *)
   (* given back its [user_ptm_inv] over the same bytes; when it returns,    *)
-  (* its own spec says PRECISELY how the image moved, and [urun] has to be  *)
+  (* its own spec says PRECISELY how the image moved, and [uheap] has to be  *)
   (* re-established at the new one.  For a syscall that writes a window     *)
   (* that is exactly this lemma -- and it demands the caller OWNED the      *)
   (* window, which is why a program's spec for such a syscall asks for the  *)
@@ -441,24 +441,24 @@ Section UserHeap.
   (* A syscall handed a null pointer writes NO window, takes NO fragments,  *)
   (* and this lemma is not even needed.                                     *)
   (* ===================================================================== *)
-  Lemma urun_store_run (γt γd γs : gname) (M : gmap Z (bv 8))
+  Lemma uheap_store_run (γt γd γs : gname) (M : gmap Z (bv 8))
       (pm : gmap (mword 27) uperm) (a : Z) (n : nat) (f g : nat -> bv 8) :
-    urun γt γd γs M pm -∗ urun_bytes γd a n f ==∗
-      urun γt γd γs (umem_write M a n g) pm ∗ urun_bytes γd a n g.
+    uheap γt γd γs M pm -∗ ubytes γd a n f ==∗
+      uheap γt γd γs (umem_write M a n g) pm ∗ ubytes γd a n g.
   Proof.
     iInduction n as [ | k IH ] "IH" forall (M).
-    { iIntros "Hrun _". iModIntro. iFrame "Hrun". rewrite /urun_bytes /=. done. }
+    { iIntros "Hrun _". iModIntro. iFrame "Hrun". rewrite /ubytes /=. done. }
     iIntros "Hrun Hbs".
     (* peel the LAST byte -- [umem_write] writes it outermost.  [iEval ... in]
        rather than a bare [rewrite]: the proofmode's [rewrite] acts on the
        WHOLE entailment, and putting the goal in split form here would leave
        nothing to re-assemble at the end. *)
-    iEval (rewrite /urun_bytes seq_S big_sepL_app /=) in "Hbs".
+    iEval (rewrite /ubytes seq_S big_sepL_app /=) in "Hbs".
     iDestruct "Hbs" as "[Hlo [Hhi _]]".
     iMod ("IH" $! M with "Hrun Hlo") as "[Hrun Hlo]".
-    iMod (urun_store with "Hrun Hhi") as "[Hrun Hhi]".
+    iMod (uheap_store with "Hrun Hhi") as "[Hrun Hhi]".
     iModIntro. iFrame "Hrun".
-    iEval (rewrite /urun_bytes seq_S big_sepL_app /=).
+    iEval (rewrite /ubytes seq_S big_sepL_app /=).
     iFrame "Hlo Hhi".
   Qed.
 
@@ -477,9 +477,9 @@ Section UserHeap.
   (* the absence of a per-byte permission:                                  *)
   (*                                                                       *)
   (*   ui_al2     kept -- the one piece of pure geometry left               *)
-  (*   ui_canon   GONE -- [urun]'s "every mapped address is below MAXVA"    *)
+  (*   ui_canon   GONE -- [uheap]'s "every mapped address is below MAXVA"    *)
   (*                covers it, and covers data addresses at the same time   *)
-  (*   ui_leaf    GONE -- [urun_text] yields [ux_addr] PER FRAGMENT, so     *)
+  (*   ui_leaf    GONE -- [uheap_text] yields [ux_addr] PER FRAGMENT, so     *)
   (*                every byte brings its own fetchability                  *)
   (*   ui_inpage  GONE -- with per-byte evidence a fetch window that        *)
   (*                STRADDLES A PAGE needs nothing extra; that clause       *)
@@ -501,7 +501,7 @@ Section UserHeap.
   (* NOTE THE ADDRESSING: fragments are keyed at [uint pc + j] in [Z], not  *)
   (* at [uint (add_vec_int pc j)].  That sidesteps wrap inside the          *)
   (* definition, and it is where the page-crossing fetch gets the           *)
-  (* [uint (add_vec_int pc 2) = uint pc + 2] it needs -- [urun] bounds      *)
+  (* [uint (add_vec_int pc 2) = uint pc + 2] it needs -- [uheap] bounds      *)
   (* those addresses, so the two agree.                                     *)
   (* ===================================================================== *)
   Definition uinstr_is (γt : gname) (pc : mword 64) (is_rvc : bool)
