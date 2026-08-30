@@ -265,6 +265,7 @@ UkLeaf.v
 UkBranch.v
 UkStore.v
 UkLoad.v
+UserHeap.v
 UkAbi.v
 UkSync.v
 UkEcho.v
