@@ -1203,6 +1203,33 @@ things, and the answer differs:
   the old tier's 2925-line file) and, after the wait fix, the loop
   closure via the proven `_later` shape.  Scoping corrections: no
   argv stores (static global in .data); no uk_args (verified).
+  STAGE 1 COMPLETE (2026-08-30, `iris/UkInitPrintf.v` 3249 lines +
+  `iris/UkInitLoop.v` 1020 lines, audit = the standing three, zero
+  `Admitted`).  The printf walk landed as printf → vprintf → putc →
+  write (write is a fourth QUIET-row instantiation of
+  `wp_kinit_qstub`), and the ~180-instruction %-conversion tree is
+  REFUTED, not proved: vprintf's percent-pending register `s3` is
+  written only at 0x538 and 0x538 is reached only on a percent byte,
+  which init's literal has none of, so 0x516 and 0x53c..0x794 (212
+  instructions) are unreachable for this call — decided by
+  `uki_lit_ok`, one `vm_compute` per literal.  The scan is a bounded
+  Rocq induction (echo's strlen mold), NOT an iLöb.  The loop walk
+  closed BOTH heads (0x32 and 0x44) under ONE iLöb over their
+  conjunction (`∧`, so both branch arms may use all of it), one
+  `_later` leaf per cycle; fork's BOTH continuations paid, exec's −1
+  arm consumed, and the three printf+exit arms stated once
+  (`wp_kinit_die`).  `uki_loop_head` is DISCHARGED; what is left of
+  stage 1 is the single Prop `uki_wait_ok` — Q3's blocker, restated
+  minimally as "a window written at address 0 leaves `init_text_sub`
+  and `init_data_sub` standing".  It is FALSE of the row as written
+  (it quantifies over every `d`), so `wp_kinit_start_full` and the two
+  lemmas above it are TODAY VACUOUS and say so in their header;
+  everything below them is unconditional.  Upstream's fix makes the
+  closure `intros M d bs Ht Hd; split; assumption` — one lemma, no new
+  induction.  One deliberate change to `UkInit.v` (R10 waived by the
+  lane brief): `uki_loop_head` now carries `init_data_sub` beside
+  `init_text_sub`, and the two entry theorems a frame-above-image
+  inequality, because vprintf LOADS the .rodata literal's bytes.
 
 Sizing: D is spike-sized — the readings exist, the work is assembly and
 statement.  S0 is one design session.  A and W are the campaign's bulk.
