@@ -21,7 +21,7 @@
 (* pays for that mismatch by re-introducing five binders after every       *)
 (* instruction -- [rewrite /ukc. iIntros (h C pt Rut sz) "%Hlo %Hpm Hb"],  *)
 (* seventy-six times in UkEcho.v alone.  Packing the ambient inside [urun] *)
-(* makes the caller's continuation [urun … m' pc' -∗ WP] good at any       *)
+(* makes the caller's continuation [urun ... m' pc' -* WP] good at any       *)
 (* ambient BY CONSTRUCTION, so the leaf absorbs the quantifier and the     *)
 (* program never sees it.  [ukc] then has nothing left to name.            *)
 (*                                                                        *)
@@ -87,37 +87,28 @@ Section UkRun.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   (* NO ambient [CpuId]: the hart is an explicit argument of [urun], and the
-     [WP] inside [ucont] resolves to the one bound there -- the same trick
+     [WP] under that binder resolves to the one bound there -- the trick
      [UexecRet.ukc] uses. *)
   Context `{!ghost_varG Σ Z}.
-  Context (γt γd γs : gname).
 
   (* ===================================================================== *)
   (* §1 THE RUNNING PREDICATE.                                             *)
   (* ===================================================================== *)
-  Definition urun (h : CpuId) (m : regfile) (pc : mword 64) : iProp Σ :=
+  Definition urun (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64) : iProp Σ :=
     (∃ (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (sz : Z)
        (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm),
        ⌜ loop_ok C pt ⌝ ∗ ⌜ perm_of (ud_um pt) sz = pm ⌝ ∗
        uheap γt γd γs M pm ∗
        uvb (CID := h) C pt Rut sz pm M m pc)%I.
 
-  (* THE CONTINUATION.  The hart is the ONE piece of ambient that cannot be
-     hidden: [WP (Loop)] is itself hart-indexed, and an interrupt may hand
-     the process back on a different hart, so the obligation a program
-     carries really is "at whatever hart you resume me on".  Everything else
-     -- config, table, residue, size, image, permission map -- is inside
-     [urun].  So a program's per-instruction cost is ONE binder rather than
-     [ukc]'s five plus two pure guards. *)
-  Definition ucont (m : regfile) (pc : mword 64) : iProp Σ :=
-    (∀ h : CpuId, urun h m pc -∗ WP (Loop : expr riscv_lang))%I.
-
   (* THE CLOSE.  This is the lemma that makes the whole interface work: a
      continuation phrased on [urun] discharges the ∀-quantified [ukc] that
      every existing leaf demands, because [urun] supplies its own ambient. *)
-  Lemma urun_close (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
+  Lemma urun_close (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
       (m : regfile) (pc : mword 64) :
-    uheap γt γd γs M pm -∗ ucont m pc -∗ ukc pm M m pc.
+    uheap γt γd γs M pm -∗
+    (∀ h : CpuId, urun γt γd γs h m pc -∗ WP (Loop : expr riscv_lang)) -∗
+    ukc pm M m pc.
   Proof.
     iIntros "Hheap Hcont".
     rewrite /ukc. iIntros (h C pt Rut sz) "%Hlo %Hpm Hb".
@@ -136,7 +127,7 @@ Section UkRun.
   (* page.  The source for that premise is the fragment at [uint pc + 2],   *)
   (* which this lemma already has in hand.                                  *)
   (* ===================================================================== *)
-  Lemma uheap_text_byte (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
+  Lemma uheap_text_byte (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
       (a : Z) (b : bv 8) :
     uheap γt γd γs M pm -∗ utext γt a b -∗
     ⌜ M !! a = Some b /\ forall pt sz, proc_pt_wf pt ->
@@ -155,7 +146,7 @@ Section UkRun.
   (* the byte AT THE PC gives the two things every branch of the bridge needs:
      the pc is canonical, and its page is fetch-ok at any table realizing the
      key.  Factored out so the three decode shapes below do not triplicate it. *)
-  Lemma uheap_text_pc (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
+  Lemma uheap_text_pc (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
       (pc : mword 64) (b : bv 8) :
     uheap γt γd γs M pm -∗ utext γt (uint pc + Z.of_nat 0) b -∗
     ⌜ uva_canon pc /\
@@ -177,7 +168,7 @@ Section UkRun.
      off a text fragment -- the leaf and canonicity from the byte at the pc,
      the code bytes from the run -- except [ui_inpage], which [uinstr_is]
      still carries for its one remaining consumer. *)
-  Lemma uinstr_is_uk_instr (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
+  Lemma uinstr_is_uk_instr (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
       (pc : mword 64) (is_rvc : bool) (i : instruction) :
     uheap γt γd γs M pm -∗ uinstr_is γt pc is_rvc i -∗
     ⌜ uk_instr pm M pc is_rvc i ⌝.
@@ -245,7 +236,7 @@ Section UkRun.
      where the permission table stops being visible -- the caller holds an
      exclusive [ubyte], and the heap turns that into the leaf's [uk_store_ok]
      without the caller ever naming a page or a PTE bit. *)
-  Lemma uheap_udata_va (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
+  Lemma uheap_udata_va (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
       (va : mword 64) (b : bv 8) :
     uheap γt γd γs M pm -∗ ubyte γd (uint va + Z.of_nat 0) b -∗
     ⌜ uva_canon va /\
@@ -263,7 +254,7 @@ Section UkRun.
   (* the same, off a whole owned word.  Consuming the run INSIDE this proof
      is free: the conclusion is pure, so the caller's [iDestruct … as %…]
      keeps both the heap and the word. *)
-  Lemma uheap_uword_va (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
+  Lemma uheap_uword_va (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
       (va : mword 64) (w : mword 64) :
     uheap γt γd γs M pm -∗ uword γd (uint va) w -∗
     ⌜ uva_canon va /\
@@ -276,7 +267,7 @@ Section UkRun.
   Qed.
 
   (* a run of owned data bytes is present in the image, at its own values *)
-  Lemma uheap_ubytes_mapped (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
+  Lemma uheap_ubytes_mapped (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
       (a : Z) (n : nat) (f : nat -> bv 8) :
     uheap γt γd γs M pm -∗ ubytes γd a n f -∗
     ⌜ forall j : nat, (j < n)%nat -> M !! (a + Z.of_nat j)%Z = Some (f j) ⌝.
@@ -301,13 +292,16 @@ Section UkRun.
   (* chain is the model's business and [uimm6_norm] discharges it here,   *)
   (* once, rather than at every call site.                                *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_uk_cli (h : CpuId) (m : regfile) (pc : mword 64)
+  Lemma wp_uk_cli (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
       (imm : mword 6) (rd : mword 5) :
     uint rd <> 0 ->
     uinstr_is γt pc true (C_LI (imm, Regidx rd)) -∗
-    urun h m pc -∗
-    ucont (<[Regidx rd := regval_into_reg (sign_extend' 64 imm : mword 64)]> m)
-          (add_vec_int pc 2) -∗
+    urun γt γd γs h m pc -∗
+    (∀ h' : CpuId,
+       urun γt γd γs h'
+         (<[Regidx rd := regval_into_reg (sign_extend' 64 imm : mword 64)]> m)
+         (add_vec_int pc 2) -∗
+       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hrd. iIntros "#Hi Hrun Hcont".
@@ -333,15 +327,17 @@ Section UkRun.
   (* in-page condition: an 8-aligned address has [rem 4096] a multiple of  *)
   (* 8 below 4096, hence at most 4088, so alignment alone gives it.        *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_uk_csdsp (h : CpuId) (m : regfile) (pc : mword 64)
+  Lemma wp_uk_csdsp (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
       (uimm : mword 6) (rs2 : mword 5) (tgt v0 : mword 64) :
     tgt = add_vec (m !!! Regidx csp_rs1)
             (sign_extend' 64 (zero_extend' 12 (concat_vec uimm ('b"000")))) ->
     is_aligned_vaddr (Virtaddr tgt) 8 = true ->
     uinstr_is γt pc true (C_SDSP (uimm, Regidx rs2)) -∗
     uword γd (uint tgt) v0 -∗
-    urun h m pc -∗
-    (uword γd (uint tgt) (m !!! Regidx rs2) -∗ ucont m (add_vec_int pc 2)) -∗
+    urun γt γd γs h m pc -∗
+    (uword γd (uint tgt) (m !!! Regidx rs2) -∗
+       ∀ h' : CpuId,
+         urun γt γd γs h' m (add_vec_int pc 2) -∗ WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Htgt Hal8. iIntros "#Hi Hw Hrun Hcont".
@@ -350,7 +346,7 @@ Section UkRun.
     (* the target is canonical, and writable -- from OWNERSHIP, not a PTE *)
     iDestruct (uheap_uword_va with "Hheap Hw") as %[Hcanon Hok].
     (* all eight are present in the image *)
-    iDestruct (uheap_ubytes_mapped M pm (uint tgt) 8 (nth_byte v0)
+    iDestruct (uheap_ubytes_mapped γt γd γs M pm (uint tgt) 8 (nth_byte v0)
                  with "Hheap Hw") as %Hmap.
     (* the in-page condition, from alignment alone *)
     assert (Hrem : Z.rem (uint tgt) 4096 <= 4088).
