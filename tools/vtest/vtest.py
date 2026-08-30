@@ -307,59 +307,176 @@ End {m}Pass.
     return made
 
 
+HARNESS = ["VSched.v", "VExecStuck.v", "VTest.v", "VRun.v",
+           "VBoot.v", "VConc.v", "VNode.v"]
+
+PROJECT_HEAD = """-R . VTest
+-R ../iris xv6iris
+-R ../model-xv6iris Riscv
+-R ../kernel-rocq Kernel
+-arg -w
+-arg -notation-overridden
+"""
+
+
+def superseded(n):
+    """True when the uniform framework fully covers this case: it produces at
+    least one run and every run it produces PASSES.  Such a case's legacy
+    <Name>.v is duplicated work -- the same program vm_computed twice -- and
+    is dropped."""
+    runs = [_run_state(n, pl) for pl in PLATFORMS]
+    got = [r for r in runs if r in ("pass", "no-proof")]
+    return bool(got) and all(r == "pass" for r in got)
+
+
+def write_project(from_build=False):
+    """Regenerate vtest-rocq/_CoqProject.
+
+    THE PROJECT IS THE GREEN SET, and it is also the RECORD of which runs
+    pass: `make vtest-check` requires everything listed to compile, so a run
+    whose proof does not hold is simply not listed.  There is no second file
+    saying the same thing.
+
+    Which Pass modules to list comes from one of two places:
+
+      * by default, the ones ALREADY listed -- so regenerating after adding
+        a case, or after taking a new capture, is idempotent and cannot
+        silently drop a proof that still holds;
+      * with [from_build], the ones with a .vo on disk, which is what
+        `make vtest-try` leaves behind.  That is how a newly-passing run
+        gets ADDED, and how one that stopped passing gets removed.
+
+    Everything else -- which runs exist at all, and which legacy tests are
+    still needed -- is read off the case directives and the tree."""
+    keep_legacy, gens = [], []
+    for n in all_tests():
+        mod = modname(n)
+        if superseded(n):
+            continue
+        for suffix in (".v", "Gen.v", "HwGen.v", "Hart1Gen.v"):
+            f = mod + suffix
+            if os.path.exists(os.path.join(ROCQDIR, f)):
+                (keep_legacy if suffix == ".v" else gens).append(f)
+    runs = sorted(f for f in os.listdir(ROCQDIR)
+                  if f.endswith("Run.v") and not f.startswith("V"))
+    if from_build:
+        ok = {f[:-len("Pass.vo")] for f in os.listdir(ROCQDIR)
+              if f.endswith("Pass.vo")}
+    else:
+        ok = _passing()
+    passes = sorted(f for f in os.listdir(ROCQDIR)
+                    if f.endswith("Pass.v") and f[:-len("Pass.v")] in ok)
+    files = ([h for h in HARNESS if os.path.exists(os.path.join(ROCQDIR, h))]
+             + sorted(set(gens)) + runs + passes + sorted(set(keep_legacy)))
+    open(os.path.join(ROCQDIR, "_CoqProject"), "w").write(
+        PROJECT_HEAD + "\n".join(files) + "\n")
+    # ...and the ATTEMPT project: everything, including the Pass modules the
+    # green set leaves out.  coq_makefile only emits rules for files it is
+    # given, so a proof that is not listed anywhere cannot even be TRIED --
+    # which is how "is this still failing?" would become unanswerable.
+    every = ([h for h in HARNESS if os.path.exists(os.path.join(ROCQDIR, h))]
+             + sorted(f for f in os.listdir(ROCQDIR)
+                      if f.endswith(".v") and f not in HARNESS))
+    open(os.path.join(ROCQDIR, "_CoqProject.all"), "w").write(
+        PROJECT_HEAD + "\n".join(every) + "\n")
+    return files, keep_legacy, passes
+
+
+def _built_at_all():
+    """Has anything been compiled here?  With no build there are no .vo to
+    read, and the table would call every run a failure; say "unbuilt"
+    instead of lying in either direction."""
+    return any(f.endswith("Pass.vo") for f in os.listdir(ROCQDIR))
+
+
 def _passing():
-    """The runs whose [TEST_PASSES] instantiation compiles.  Read from the
-    checked-in PASSING.txt so the table needs no build; `make vtest-passes`
-    rewrites it."""
-    p = os.path.join(ROCQDIR, "PASSING.txt")
+    """The runs whose [TEST_PASSES] instantiation compiles.
+
+    THE PROJECT IS THE RECORD.  A Pass module is listed in _CoqProject
+    exactly when it holds, and `make vtest-check` -- which CI runs -- fails
+    if anything listed does not compile.  So membership already IS the
+    passing set, and a second file saying the same thing could only drift
+    from it."""
+    p = os.path.join(ROCQDIR, "_CoqProject")
     if not os.path.exists(p):
         return set()
-    return {l.strip() for l in open(p) if l.strip() and not l.startswith("#")}
+    return {l.strip()[:-len("Pass.v")] for l in open(p)
+            if l.strip().endswith("Pass.v")}
 
 
-def print_table():
-    """THE SINGLE TABLE: every case, the runs it produces on each platform,
-    and whether that run has a passing proof.
+def _run_state(n, pl):
+    """The ONE state of (case, platform).  They are mutually exclusive, so a
+    single column says everything: the case excludes the platform, or the
+    model side has no builder, or no capture has been taken, or a run exists
+    and its proof does or does not compile."""
+    if pl not in platforms_of(n):
+        return "excluded"
+    if config(n).get("builder", "single") != "single":
+        return "no-builder"
+    mod = modname(n) + pl.capitalize()
+    if not os.path.exists(os.path.join(ROCQDIR, mod + "Run.v")):
+        return "uncaptured"
+    # THE .vo IS THE EVIDENCE.  Membership in _CoqProject is only an
+    # ASSERTION that the proof holds -- a Pass.v listed there that does not
+    # actually compile would read as "pass" until a build caught it, i.e.
+    # the table would be reporting its own bookkeeping back.  Only a .vo
+    # says coqc accepted the proof, so CI generates the table AFTER the
+    # build and this reads the artefact.
+    if os.path.exists(os.path.join(ROCQDIR, mod + "Pass.vo")):
+        return "pass"
+    if not _built_at_all():
+        return "unbuilt" if mod in _passing() else "no-proof"
+    return "no-proof"
 
-    Everything here is read off the tree -- the case's own `platforms=`
-    directive, whether a run module exists, whether a [TEST_PASSES]
-    instantiation exists for it, and whether that instantiation has been
-    COMPILED.  Nothing is maintained by hand, so it cannot drift."""
-    passes = set()
-    for f in os.listdir(ROCQDIR):
-        if f.endswith(".v"):
-            for m in re.finditer(r"Module\s+(\w+)Pass\s*<:\s*TEST_PASSES",
-                                 open(os.path.join(ROCQDIR, f)).read()):
-                passes.add(m.group(1))
-    def cell(n, pl):
-        if pl not in platforms_of(n):
-            return "--", "--"                      # the case excludes it
-        if config(n).get("builder", "single") != "single":
-            return "no builder", ""                # needs the multi-hart one
-        mod = modname(n) + pl.capitalize()
-        if not os.path.exists(os.path.join(ROCQDIR, mod + "Run.v")):
-            return "no run", ""
-        if mod not in passes:
-            return "run", "no proof"
-        built = os.path.exists(os.path.join(ROCQDIR, mod + "Pass.vo")) or \
-                mod in _passing()
-        return "run", ("PASS" if built else "no proof")
-    rows = []
-    for n in all_tests():
-        qr, qp = cell(n, "qemu")
-        br, bp = cell(n, "jh7110")
-        rows.append((n, qr, qp, br, bp))
-    w = max(len(r[0]) for r in rows)
-    print("%-*s | %-7s %-14s | %-7s %-14s" % (w, "case", "qemu", "", "jh7110", ""))
-    print("-" * (w + 50))
-    for n, qr, qp, br, bp in rows:
-        print("%-*s | %-7s %-14s | %-7s %-14s" % (w, n, qr, qp, br, bp))
-    tot = len(rows)
-    def count(i, v): return sum(1 for r in rows if r[i] == v)
-    print("-" * (w + 50))
-    print("%d cases; qemu: %d runs, %d passing.  jh7110: %d runs, %d passing."
-          % (tot, count(1, "run"), count(2, "PASS"),
-             count(3, "run"), count(4, "PASS")))
+
+_MD = {"pass":       "**pass**",
+       "unbuilt":    "*not built*",
+       "no-proof":   "no proof",
+       "uncaptured": "*not captured*",
+       "no-builder": "*no builder*",
+       "excluded":   "—"}
+_TXT = {"pass": "PASS", "unbuilt": "not built",
+        "no-proof": "no proof", "uncaptured": "not captured",
+        "no-builder": "no builder", "excluded": "--"}
+
+
+def print_table(fmt="text"):
+    """THE SINGLE TABLE: every case, its run on each platform, and whether
+    that run has a passing proof.
+
+    Everything is read off the tree -- the case's own directive, whether a
+    run module exists, whether its [TEST_PASSES] instantiation compiles --
+    so it cannot drift."""
+    rows = [(n, _run_state(n, "qemu"), _run_state(n, "jh7110"))
+            for n in all_tests()]
+    if fmt == "md":
+        print("| case | QEMU | JH7110 |")
+        print("|---|---|---|")
+        for n, q, b in rows:
+            print("| `%s` | %s | %s |" % (n, _MD[q], _MD[b]))
+    else:
+        w = max(len(r[0]) for r in rows)
+        print("%-*s | %-13s | %-13s" % (w, "case", "qemu", "jh7110"))
+        print("-" * (w + 32))
+        for n, q, b in rows:
+            print("%-*s | %-13s | %-13s" % (w, n, _TXT[q], _TXT[b]))
+        print("-" * (w + 32))
+    def c(i, v): return sum(1 for r in rows if r[i] == v)
+    if any(r[1] == "unbuilt" or r[2] == "unbuilt" for r in rows):
+        print("\nNOTE: nothing is built here, so `not built` means the proof "
+              "is listed in _CoqProject but has not been checked in this "
+              "tree.  CI generates this table AFTER the build, where every "
+              "verdict is a .vo.")
+    line = ("%d cases.  QEMU: %d pass, %d no proof, %d not captured, "
+            "%d no builder, %d excluded.  "
+            "JH7110: %d pass, %d no proof, %d not captured, %d no builder, "
+            "%d excluded."
+            % (len(rows),
+               c(1, "pass"), c(1, "no-proof"), c(1, "uncaptured"),
+               c(1, "no-builder"), c(1, "excluded"),
+               c(2, "pass"), c(2, "no-proof"), c(2, "uncaptured"),
+               c(2, "no-builder"), c(2, "excluded")))
+    print(("\n" + line) if fmt == "md" else line)
 
 
 def runs_from_captures():
@@ -383,7 +500,15 @@ def runs_from_captures():
             wanted.add(modname(n) + pl.capitalize())
     stale = 0
     for f in os.listdir(ROCQDIR):
-        m = _re.match(r"(\w+?)(Run|Pass)\.v$", f)
+        # MATCH ONLY GENERATED MODULE NAMES, never a harness file.  The
+        # obvious pattern `(\w+?)(Run|Pass)\.v$` matches VRun.v with
+        # group(1) = "V", and "V" is never in [wanted] -- so it DELETED the
+        # harness module this whole framework is built on, and the deletion
+        # went unnoticed because the file had not been committed yet.
+        # A generated name is always <Case><Platform>, so require the suffix
+        # to be one of the known platforms.
+        m = _re.match(r"(\w+(?:%s))(Run|Pass)\.v$"
+                      % "|".join(pl.capitalize() for pl in PLATFORMS), f)
         if m and m.group(1) not in wanted:
             os.remove(os.path.join(ROCQDIR, f))
             for ext in (".vo", ".vos", ".vok", ".glob"):
@@ -580,13 +705,19 @@ def cases_for(platform):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("cmd", choices=["list", "build", "run", "gen", "runs",
-                                   "table", "passes"])
+                                   "table", "passes", "project"])
     p.add_argument("names", nargs="*")
     p.add_argument("--all", action="store_true")
     p.add_argument("--repeat", type=int, default=0,
                    help="run N times and report distinct observations")
     p.add_argument("--drive-opts", default="cache=writeback",
                    help="extra -drive options, e.g. aio=threads,cache=none")
+    p.add_argument("--from-build", action="store_true",
+                   help="take the passing set from the .vo on disk (what "
+                        "`make vtest-try` leaves) rather than from the "
+                        "project's current membership")
+    p.add_argument("--format", choices=["text", "md"], default="text",
+                   help="md emits a GitHub-flavoured markdown table")
     p.add_argument("--hart", type=int, default=0,
                    help="run _vtest_body on this hart instead of 0.  Builds a "
                         "SEPARATE image (PRIMARY_HART=N) and runs it under "
@@ -601,7 +732,13 @@ def main():
             print("  no capture yet: %-18s %s" % (n, pl))
         return
     if a.cmd == "table":
-        print_table(); return
+        print_table(a.format); return
+    if a.cmd == "project":
+        files, legacy, passes = write_project(a.from_build)
+        print("_CoqProject: %d files (%d run proofs, %d legacy kept)"
+              % (len(files), len(passes), len(legacy)))
+        print("legacy kept:", " ".join(f[:-2] for f in legacy))
+        return
     if a.cmd == "passes":
         made = emit_passes()
         print("wrote %d per-run Pass file(s)" % len(made))
