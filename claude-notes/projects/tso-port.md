@@ -4582,15 +4582,34 @@ resource-post read leaves (`started_W`, the virtio `Q v V0`) already
 have this contract in leaf form; name it as an object when a client
 demands it.
 
-**BUILD ORDER**: (1) TsoMemPa: pin_ok preservation under a family
-append; (2) TsoCtx: the pin STORE gate (whole-window family write, any
-author, restamp; B unchanged); (3) `CtxHistory.v`: the surface layer
-(pin flavor first) — establishment at a parked baseline, the
-domination-gated read law, the author arm for hart 0 (at mint, record
-the stable prefix fact "all messages ≤ B touching the window are the
-creator's, latest = the built value"; author + that fact reads the
-family at ANY view); (4) the page-table instance (`kpt_inv` rooted at
-ξe; secondaries dominate via started, hart 0 via authorship) →
-`mn_grp_kvm`; (5) the record idiom (`stamped_rec`) with the pipe as
-first instance — closes A6.129 §4.
+**On the fused predicate law's context argument** (owner): "what's the
+exact context the reader can use when learning [P v] after reading [v]…
+not sure… probably easiest to run into an example of this abstraction in
+use, if it turns out to show up, and then have Iris help figure out what
+context works out there."  The kit therefore exposes only the plain law
+(payload at the baseline) plus the separate absorb; the fused form waits
+for a client.
+
+**BUILD ORDER (revised after measurement — the gate layers turn out to
+be LANDED)**: steps "pin_ok preservation" and "the pin store gate"
+already exist from the A6.70/A6.109 pin work: `TsoMemPa.pin_ok_app`
+(family append preserves the pin) and `TsoCtx.ledger_store_win_pin_ok`
+(whole-window family store through pinned cells, B unchanged, restamp,
+hart-authored) — and `PtTree.pte_wb_ok` is definitionally the per-byte
+family condition, so the walker's payer wand meets the gate with no
+glue.  What actually remains:
+  (A) the AUTHOR-ARM pin read law (hart 0 reads the family at any view:
+      needs a persistent prefix fact minted at establishment — "every
+      message ≤ B touching the window is the creator's, latest = the
+      built value"; measure `ledger_msg_at`'s ghost backing for a
+      prefix-agreement form);
+  (B) the payer-wand DISCHARGE: the S-currency instance that carries
+      `tso_interp_of` (∃-quantified log/V with monotone-evolution ties)
+      through the translate, closed by `ledger_store_win_pin_ok`;
+  (C) `CtxHistory.v` (thin surface: baselines, domination-gated read,
+      re-base) over the landed gates;
+  (D) `ProofMain`: establishment = the pin mint (`kptree_publish*`) at
+      an interp-carrying site at/before the satp install (measure the
+      satp leaf's node for a ghost hook à la A6.107), secondaries via
+      started, hart 0 via (A); then the record idiom (pipe, A6.129 §4).
 
