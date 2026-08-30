@@ -469,22 +469,38 @@ Section ProofPiperead.
      block travels at.  piperead's copy loop writes ONE byte per round at
      [addr + i], so after [i] rounds the image is the entry image with the
      run [addr .. addr+i) overwritten by bytes the contract cannot name
-     ([UserPtTree.umem_wrote]).  [pr_win] is what the exits carry: SOME such
-     run, no longer than the requested count.
+     ([UserPtTree.umem_wrote]).
 
-     THIS IS THE ∃ THAT SURVIVES, AND IT IS A LENGTH PLUS A BYTE FUNCTION,
-     NOT AN IMAGE -- the image itself is pinned by the equation inside
-     [umem_wrote], which is what lets a caller read every untouched byte
-     back. *)
+     AND THE RUN IS EXACTLY AS LONG AS THE RETURN VALUE SAYS.  piperead's
+     copyout is ONE BYTE at a time, so a failing copyout moves nothing and
+     the loop breaks having written exactly [i]; the C then returns [i],
+     or -1 when that failure happened at [i = 0] (where nothing was
+     written either).  So the two arms are: returned -1 and the image is
+     untouched, or returned [d] and the run is [d] long.  The loop
+     invariant already carried the exact [i]; only the exits used to
+     weaken it to "some run no longer than the count", which is what made
+     a caller unable to say anything about a read that returned 0.
+
+     WHAT SURVIVES IS A LENGTH AND A BYTE FUNCTION, NOT AN IMAGE -- the
+     image itself is pinned by the equation inside [umem_wrote], which is
+     what lets a caller read every untouched byte back. *)
   Definition pr_win (U : ustate) (Mo : gmap Z (bv 8)) (addrv : mword 64)
-      (n : Z) : Prop :=
-    exists d : nat, (Z.of_nat d <= Z.max 0 n)%Z /\ umem_wrote (us_M U) Mo addrv d.
+      (n : Z) (rv : mword 64) : Prop :=
+    (rv = (mword_of_int (-1) : mword 64) /\ Mo = us_M U)
+    \/ (exists d : nat,
+           rv = (mword_of_int (Z.of_nat d) : mword 64) /\
+           (Z.of_nat d <= Z.max 0 n)%Z /\
+           umem_wrote (us_M U) Mo addrv d).
 
-  Lemma pr_win_0 (U : ustate) (addrv : mword 64) (n : Z) :
-    pr_win U (us_M U) addrv n.
+  Lemma pr_win_neg1 (U : ustate) (addrv : mword 64) (n : Z) :
+    pr_win U (us_M U) addrv n (mword_of_int (-1)).
+  Proof. left. split; reflexivity. Qed.
+
+  Lemma pr_win_zero (U : ustate) (addrv : mword 64) (n : Z) :
+    pr_win U (us_M U) addrv n (mword_of_int 0).
   Proof.
-    exists 0%nat. split; [rewrite Z.max_le_iff; left; reflexivity |].
-    apply umem_wrote_0.
+    right. exists 0%nat. split; [reflexivity |].
+    split; [rewrite Z.max_le_iff; left; reflexivity | apply umem_wrote_0].
   Qed.
 
   Definition pr_epi_body
@@ -504,7 +520,7 @@ Section ProofPiperead.
        /\ M !!! Regidx Rs11 = m !!! Regidx Rs11 ⌝ -∗
      ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
      ⌜ pipe_rw_ret n rv ⌝ -∗
-     ⌜ pr_win U Mo (m !!! Regidx Ra1) n ⌝ -∗
+     ⌜ pr_win U Mo (m !!! Regidx Ra1) n rv ⌝ -∗
      sie_cap_gpr KT1 M (av - 12)%nat true pj -∗
      pc_is (mword_of_int (KernelSyms.piperead + 0xe8) : mword 64) -∗
      cpu_own 0%nat true pj true lks -∗
@@ -567,7 +583,7 @@ Section ProofPiperead.
        /\ M !!! Regidx Rs11 = m !!! Regidx Rs11 ⌝ -∗
      ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
      ⌜ pipe_rw_ret n rv ⌝ -∗
-     ⌜ pr_win U Mo (m !!! Regidx Ra1) n ⌝ -∗
+     ⌜ pr_win U Mo (m !!! Regidx Ra1) n rv ⌝ -∗
      sie_cap_gpr KT1 M (av - 12)%nat true pj -∗
      pc_is (mword_of_int (KernelSyms.piperead + 0xe8) : mword 64) -∗
      cpu_own 0%nat true pj true lks -∗
@@ -815,7 +831,24 @@ Section ProofPiperead.
          predicate form of the post's [∃ d bs]; opening it here is where the
          image binder [Mo] disappears from the statement handed to the
          caller. *)
-      destruct Hwin as (dw & Hdwle & bsw & Hmoeq). subst Mo.
+      (* NORMALISE THE TWO ARMS.  Both are "a run of [dw] bytes at [addr]";
+         they differ only in what the return value says about [dw], which
+         is the fact the caller is owed. *)
+      assert (Hwin' : exists (dw : nat) (bsw : nat -> bv 8),
+                (Z.of_nat dw <= Z.max 0 n)%Z /\
+                Mo = umem_wr (us_M U) (m !!! Regidx Ra1) dw bsw /\
+                ((rv = (mword_of_int (-1) : mword 64) /\ dw = 0%nat)
+                 \/ rv = (mword_of_int (Z.of_nat dw) : mword 64))).
+      { destruct Hwin as [[Hrvm1 Hmo] | (dw & Hrveq & Hdwle & bsw & Hmoeq)].
+        - exists 0%nat, (fun _ : nat => bv_0 8).
+          split; [ rewrite Z.max_le_iff; left; reflexivity | ].
+          split; [ rewrite Hmo; reflexivity | ].
+          left. split; [ exact Hrvm1 | reflexivity ].
+        - exists dw, bsw.
+          split; [ exact Hdwle | ]. split; [ exact Hmoeq | ].
+          right. exact Hrveq. }
+      clear Hwin.
+      destruct Hwin' as (dw & bsw & Hdwle & Hmoeq & Hrvtie). subst Mo.
       destruct Hrg as (Hcsp & Hrv & HMs6 & HMs7 & HMs8 & HMs9 & HMs10 & HMs11).
       (* 0xe8 c.mv a0,s4 *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.piperead + 0xe8)) Ra0 Rs4
@@ -1452,7 +1485,7 @@ Section ProofPiperead.
             /\ M2 !!! Regidx Rs11 = m !!! Regidx Rs11 ⌝ -∗
           ⌜ uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P' ⌝ -∗
           ⌜ pipe_rw_ret n rv ⌝ -∗
-          ⌜ pr_win U Mo addrv n ⌝ -∗
+          ⌜ pr_win U Mo addrv n rv ⌝ -∗
           sie_cap_gpr KT1 M2 (trap_res true + (av - 12))%nat false pj -∗
           pc_is (mword_of_int (KernelSyms.piperead + 0xd4) : mword 64) -∗
           cpu_own 1%nat true pj false ({["pipe"]} ∪ lks) -∗
@@ -1677,7 +1710,7 @@ Section ProofPiperead.
         { split_and!; try assumption. }
         { apply uptd_ext_sz_refl. }
         { apply pr_ret_cnt. split; [lia | apply Z.le_max_l]. }
-        { apply pr_win_0. } }
+        { apply pr_win_zero. } }
       (* ---- n > 0: run the bounded copy loop ---- *)
       assert (Hnpos : (0 < n)%Z).
       { rewrite Z.geb_leb in Hbz. apply Z.leb_gt in Hbz. lia. }
@@ -1819,8 +1852,10 @@ Section ProofPiperead.
           { exact Hex3. }
           { apply pr_ret_cnt. rewrite Z.max_r; [| lia]. lia. }
           { (* nothing was copied on this arm, so the run is the [i] bytes
-               the earlier rounds wrote *)
-            exists i. split; [rewrite Z.max_r; lia | exact Hwr3]. } }
+               the earlier rounds wrote -- and [i] is what is returned *)
+            right. exists i.
+            split; [reflexivity | ].
+            split; [rewrite Z.max_r; lia | exact Hwr3]. } }
         (* the pipe is NOT empty: nr <> nw *)
         assert (Hne : nr <> nw) by (apply (pr_sext_neq nw nr); exact Hemp).
         iApply (wp_beq_fall_s_sconf (mword_of_int (KernelSyms.piperead + 0x9a)) (mword_of_int 58 : mword 13)
@@ -2083,6 +2118,32 @@ Section ProofPiperead.
             apply (umem_wrote_app (us_M U) Mc Mc' addrv i dd
                      (fun _ => trunc8 (K5 !!! Regidx Ra5)) Hwr3).
             rewrite Hm Hcur. reflexivity. }
+        (* THE FAILURE-AT-ROUND-ZERO ARM MOVED NOTHING, which is the arm
+           the C turns into a -1 return.  The copyout is ONE byte and a
+           failing copyout leaves STRICTLY fewer bytes written than it was
+           asked for ([SpecCopyout.copyout_wrote]), so its prefix is 0; and
+           at [i = 0] the earlier rounds wrote nothing either. *)
+        assert (Hwfail0 : (mrc !!! Regidx Ra0 : mword 64)
+                          = (mword_of_int (-1) : mword 64) ->
+                          (i = 0)%nat -> Mc' = us_M U).
+        { intros Hm1 Hi00.
+          destruct Hwrote as [[Hr _] | [_ (dd & Hdd & Hm)]].
+          - exfalso. rewrite Hr in Hm1.
+            apply (f_equal bv_unsigned) in Hm1. by vm_compute in Hm1.
+          - assert (Hdd0 : dd = 0%nat) by lia. rewrite Hdd0 in Hm.
+            rewrite Hi00 in Hwr3. destruct Hwr3 as (src & Hsrc).
+            rewrite Hm Hsrc. reflexivity. }
+        (* ...and at any [i], a FAILING copyout leaves the run exactly as
+           the earlier rounds left it, which is the [i] the C returns. *)
+        assert (Hwfaili : (mrc !!! Regidx Ra0 : mword 64)
+                          = (mword_of_int (-1) : mword 64) ->
+                          umem_wrote (us_M U) Mc' addrv i).
+        { intros Hm1.
+          destruct Hwrote as [[Hr _] | [_ (dd & Hdd & Hm)]].
+          - exfalso. rewrite Hr in Hm1.
+            apply (f_equal bv_unsigned) in Hm1. by vm_compute in Hm1.
+          - assert (Hdd0 : dd = 0%nat) by lia. rewrite Hdd0 in Hm.
+            rewrite Hm. exact Hwr3. }
         iEval (rewrite HK10a3) in "Hbuf".
         iDestruct (pr_buf1_elim with "Hbuf") as "Hch".
         iEval (rewrite Hroot) in "Hptc".
@@ -2260,7 +2321,9 @@ Section ProofPiperead.
               - rewrite (HthrD Rs11 ltac:(vm_compute; reflexivity) ltac:(reg_neq) ltac:(reg_neq)). exact H3s11. }
             { exact Hext'. }
             { apply pr_ret_cnt. rewrite Z.max_r; [| lia]. lia. }
-            { exists (S i). split; [rewrite Z.max_r; lia | exact (Hwsucc Hr0)]. }
+            { right. exists (S i).
+              split; [reflexivity | ].
+              split; [rewrite Z.max_r; lia | exact (Hwsucc Hr0)]. }
           - (* i+1 < n: the back edge *)
             assert (HSilt : (S i < Nn)%nat) by lia.
             assert (HZs : (Z.of_nat (S i) < n)%Z) by lia.
@@ -2372,8 +2435,7 @@ Section ProofPiperead.
               rewrite (HthrMr Rs11 ltac:(vm_compute; reflexivity)). exact H3s11. }
           { exact Hext'. }
           { apply pr_ret_neg1. }
-          { destruct Hwany as (dd & Hdd & Hw). exists dd.
-            split; [rewrite Z.max_r; lia | exact Hw]. } }
+          { left. split; [reflexivity | exact (Hwfail0 Hrm1 Hi0) ]. } }
         (* something WAS copied: keep the partial count *)
         iApply (wp_bnez_x0_taken_s_sconf (mword_of_int (KernelSyms.piperead + 0xfc)) (mword_of_int 8152 : mword 13)
                   Rs4 mrc (trap_res true + (av - 12))%nat false ltac:(nz)
@@ -2397,8 +2459,9 @@ Section ProofPiperead.
           - rewrite (HthrMr Rs11 ltac:(vm_compute; reflexivity)). exact H3s11. }
         { exact Hext'. }
         { apply pr_ret_cnt. rewrite Z.max_r; [| lia]. lia. }
-        { destruct Hwany as (dd & Hdd & Hw). exists dd.
-          split; [rewrite Z.max_r; lia | exact Hw]. } }
+        { right. exists i.
+          split; [reflexivity | ].
+          split; [rewrite Z.max_r; lia | exact (Hwfaili Hrm1) ]. } }
       (* enter the copy loop at i = 0: the cursor IS the entry address and
          nothing has been written yet *)
       iApply ("CLOOP" $! Nn 0%nat addrv G3 (pv_upt (us_V U)) (us_M U) chb0
@@ -2718,7 +2781,7 @@ Section ProofPiperead.
         { apply uptd_ext_sz_refl. }
         { apply pr_ret_neg1. }
         { (* the killed arm never reaches the copy phase *)
-          apply pr_win_0. } }
+          apply pr_win_neg1. } }
       (* ==== NOT killed: sleep on &pi->nread ==== *)
       iApply (wp_cbnez_fall_s_sconf (mword_of_int (KernelSyms.piperead + 0x40)) (mword_of_int 26 : mword 8)
                 (Cregidx (mword_of_int 2)) Ra0 mk (trap_res true + (av - 12))%nat false

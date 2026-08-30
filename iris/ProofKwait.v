@@ -1928,7 +1928,7 @@ Section ProofKwait.
                 Mco = umem_wr (us_M U) addr d (fun i => nth_byte xs i)).
       { destruct Hwrote as [(_ & HMco) | (_ & d0 & Hd0 & HMco)].
         - exists 4%nat. split; [lia | exact HMco].
-        - exists d0. split; [exact Hd0 | exact HMco]. }
+        - exists d0. split; [lia | exact HMco]. }
       destruct Hex as (d & Hdle & HMco).
       subst Mco.
       iDestruct ("Hback" $! P' (umem_wr (us_M U) addr d (fun i => nth_byte xs i))

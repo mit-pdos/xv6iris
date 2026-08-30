@@ -1227,7 +1227,7 @@ Section ProofFilestat.
                     /\ Mo = umem_wr (us_M U) addr d fbytes).
       { destruct Hwrote as [[_ Hm] | [_ (d & Hd & Hm)]].
         - exists 24%nat. split; [lia | exact Hm].
-        - exists d. split; [exact Hd | exact Hm]. }
+        - exists d. split; [lia | exact Hm]. }
       assert (Hret : (mco !!! Regidx Ra0 : mword 64) = (mword_of_int 0 : mword 64)
                      \/ (mco !!! Regidx Ra0 : mword 64)
                         = (mword_of_int (-1) : mword 64)).

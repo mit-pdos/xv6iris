@@ -99,12 +99,16 @@ Notation either_copyout_stack := (58%nat) (only parsing).
 (* HOW MUCH OF THE SOURCE REACHED THE PROCESS, as a pure fact about the
    returned a0.  copyout writes page by page and can give up on a later
    page (bad va, no backing, a read-only leaf), so a -1 means SOME prefix
-   crossed and the length of it is not observable from the return value;
-   a 0 means all of it did.  This is the ONLY existential left in the user
-   arm's memory story -- a prefix LENGTH, not an image. *)
+   crossed -- and STRICTLY less than all of it, since the failure exits
+   with bytes still to go ([SpecCopyout.copyout_wrote]).  A 0 means all of
+   it did.  At [len = 1] the two arms are therefore "wrote the byte" and
+   "wrote nothing", which is what consoleread's and piperead's one-byte
+   copy loops need to say they wrote exactly what they return.  This is
+   the ONLY existential left in the user arm's memory story -- a prefix
+   LENGTH, not an image. *)
 Definition either_copyout_ran (len : nat) (r : mword 64) (d : nat) : Prop :=
   (r = (mword_of_int 0 : mword 64) /\ d = len)
-  \/ (r = (mword_of_int (-1) : mword 64) /\ (d <= len)%nat).
+  \/ (r = (mword_of_int (-1) : mword 64) /\ (d < len)%nat).
 
 Lemma either_copyout_ran_ret (len : nat) (r : mword 64) (d : nat) :
   either_copyout_ran len r d ->

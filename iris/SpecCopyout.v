@@ -36,11 +36,18 @@
    has: the ∃-[M] corollary every caller used to speak is GONE, because
    every caller now names the image it hands in.
 
-   THE FAILURE ARM IS HONEST ABOUT THE PREFIX.  copyout writes page by page
-   and can fail on a later page (bad va, no backing, read-only leaf), so
-   the -1 arm promises [umem_wr M dstva d src_bytes] for SOME [d <= len],
-   not [M].  A caller that needs the all-or-nothing reading has to rule -1
-   out, which needs writable leaves -- see below.
+   THE FAILURE ARM IS HONEST ABOUT THE PREFIX, AND THE PREFIX IS SHORT.
+   copyout writes page by page and can fail on a later page (bad va, no
+   backing, read-only leaf), so the -1 arm promises
+   [umem_wr M dstva d src_bytes] for some [d], not [M].  But it promises
+   [d < len], STRICTLY: a failure exits the loop with bytes still to go,
+   so at least one requested byte did not land.  That is what a ONE-BYTE
+   caller needs -- for [len = 1] it forces [d = 0], i.e. a failing
+   one-byte copyout moved nothing -- and one-byte copyouts are what
+   piperead's and consoleread's copy loops are made of, which is in turn
+   what lets them say they wrote exactly as many bytes as they return.
+   A caller that needs the all-or-nothing reading at a longer [len] still
+   has to rule -1 out, which needs writable leaves -- see below.
 
    Note what the [PTE_W] test does NOT buy: [proc_ptm] is preserved
    whether or not the target leaf is writable.  The test is honoured as a
@@ -156,7 +163,7 @@ Definition copyout_wrote (M : gmap Z (bv 8)) (dstva : mword 64) (len : nat)
   (res = (mword_of_int 0 : mword 64)
    /\ M' = umem_wr M dstva len src_bytes)
   \/ (res = (mword_of_int (-1) : mword 64)
-      /\ exists d : nat, (d <= len)%nat /\ M' = umem_wr M dstva d src_bytes).
+      /\ exists d : nat, (d < len)%nat /\ M' = umem_wr M dstva d src_bytes).
 
 Definition wp_copyout_sconf_mem_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
