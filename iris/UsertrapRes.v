@@ -635,7 +635,7 @@ Section UsertrapRes.
      devintr_caps_any (un_u N) (un_v N) (un_k N) (un_tk N) (un_s N)
        (un_pd N) (un_pav N) (un_pu N) ∗
      printk_env (un_pr N) (un_u N) (un_v N) ∗
-     is_lock (un_w N) wait_lock_addr "wait_lock"%string <{ wait_res }> ∗
+     is_lock (un_w N) wait_lock_addr "wait_lock"%string wait_res_at ∗
      is_ftable (un_ft N) (un_f N) ∗
      is_lock (un_kl N) (mword_of_int KernelSyms.kmem) "kmem"%string
        (λ ξ : CtxId, kmem_res (XIk := ξ) (un_ka N) (mword_of_int (KernelSyms.kmem + 24))) ∗
@@ -717,14 +717,14 @@ Section UsertrapRes.
      λ-payload sweep had converted [ticks_res] and [nextpid_res], so their
      [is_lock] handles were CLOSED TERMS and rode the record; here the sweep
      has not run and [↦₄] is the ctx byte tower (tso-machine-flip.md A6.55),
-     so [<{ ticks_res }>] and [<{ nextpid_res }>] are ξ-DEPENDENT and go the
+     so [<{ ticks_res }>] and [nextpid_res_at] are ξ-DEPENDENT and go the
      other way -- into [park_globals].  Same for [is_ftable] (main's is
      closed since the §0.16′ off-borrow ruling; here [<{ ftable_res γ }>] is
      not) and for [console_caps] (which main also carries in [park_globals]).
      The WAIT LOCK goes the same way, and that one is a MEASUREMENT that
      corrects a reading: [WaitInv.wait_res] looks ξ-free at its section head
      and is not -- [parents_own] holds [p_parent (proc_addr j) ↦₈ v] for
-     every slot, so [<{ wait_res }>] is a constant embedding of a ξ-indexed
+     every slot, so [wait_res_at] is a constant embedding of a ξ-indexed
      payload exactly like the other three.  (Main carries it on the record
      because there [wait_res] IS closed.)  Only [procs_avail], [wire_inv]
      and [kmap_at] are genuinely closed here, and those three stay. *)
@@ -1637,7 +1637,7 @@ End UsertrapRes.
    [initproc] cell, because the M3 λ-payload sweep had already made
    [is_tickslock], the nextpid lock and [is_ftable] CLOSED TERMS there.  In
    this tree the sweep has run on [kmem_res] only, and [↦₄] is the ctx byte
-   tower (tso-machine-flip.md A6.55), so [<{ ticks_res }>] / [<{ nextpid_res }>]
+   tower (tso-machine-flip.md A6.55), so [<{ ticks_res }>] / [nextpid_res_at]
    / [<{ ftable_res }>] are constant embeddings of ξ-INDEXED payloads: two
    handles at two contexts are two different [inv]s.  They are therefore
    RESUMER-SUPPLIED here, by the same rule that put [procs_inv] here on main.
@@ -1650,13 +1650,13 @@ Definition park_globals `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fil
     !irefslotG Σ, !pavG Σ} `{GEN : GenId}
     (ξ : CtxId) (γs : list gname) (γw γft γf γtl : gname) : iProp Σ :=
   (procs_inv (XI := ξ) γs ∗
-   is_lock (XI := ξ) γw wait_lock_addr "wait_lock"%string <{ wait_res (XI := ξ) }> ∗
+   is_lock (XI := ξ) γw wait_lock_addr "wait_lock"%string wait_res_at ∗
    is_ftable (XI := ξ) γft γf ∗
    console_caps (XI := ξ) fsc_uart ∗
    console_ready (XI := ξ) ∗
    is_tickslock (XI := ξ) γtl ∗
    (∃ γp : gname,
-      is_lock (XI := ξ) γp alp_pid_lock "nextpid"%string <{ nextpid_res (XI := ξ) }>) ∗
+      is_lock (XI := ξ) γp alp_pid_lock "nextpid"%string nextpid_res_at) ∗
    (∃ ip : mword 64,
       ctx_word_pointsto ξ (mword_of_int KernelSyms.initproc : mword 64)
         DfracDiscarded ip))%I.

@@ -228,7 +228,7 @@ Definition wp_kexit_sconf_body
   panic_env -∗
   (* the running-thread bundle -- consumed: this thread parks forever *)
   (* wait_lock, and what it protects *)
-  is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
+  is_lock γw wait_lock_addr "wait_lock"%string wait_res_at -∗
   (* the open-file table: every non-null descriptor is fileclose'd *)
   is_ftable γft γf -∗
   (* ...and closing one can free a pipe's page, so kexit owns kalloc's side

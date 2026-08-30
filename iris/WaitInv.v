@@ -30,7 +30,7 @@ From iris.base_logic.lib Require Import gen_heap.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto.
-Require Import TsoCtx.
+Require Import TsoCtx CtxMorphTac.
 (* A6.61 THE RE-TIERING (A6.58's owner tranche, owner 3 -- and the owner is
    THIS file, not ProcInv: ProcInv already imports TsoCtx and its slot cells
    are ctx today).  [parents_own] held [p_parent] in the RAW word tower, so
@@ -122,14 +122,27 @@ Section WaitInv.
   (* every proc's [parent] cell, at its slot's value.  The length conjunct is
      part of the resource rather than a caller premise: it is a fact about the
      TABLE, and a caller handed the block has no other way to learn it. *)
-  Definition parents_own (ps : list (mword 64)) : iProp Σ :=
+  (* A6.129 (the M3 λ-conversion, A6.121's recipe): the block over an
+     EXPLICIT context, so the wait lock's payload is a function of the
+     holder's context with a real transport proof; [parents_own] stays as
+     the ambient spelling every consumer reads and writes. *)
+  Definition parents_own_at (ξ : CtxId) (ps : list (mword 64)) : iProp Σ :=
     (⌜length ps = NPROC⌝ ∗
-     [∗ list] j ↦ v ∈ ps, p_parent (proc_addr j) ↦₈ v)%I.
+     [∗ list] j ↦ v ∈ ps,
+       ctx_word_pointsto ξ (p_parent (proc_addr j)) (DfracOwn 1) v)%I.
+  Definition parents_own (ps : list (mword 64)) : iProp Σ := parents_own_at cur_ctx ps.
+
+  Global Instance parents_own_at_morph ps : CtxMorph (λ ξ, parents_own_at ξ ps).
+  Proof. rewrite /parents_own_at. ctx_morph_solve. Qed.
 
   (* what [wait_lock] protects, once kexit/kwait need the lock itself.  Nothing
      in this file consumes it; it is here so the altitude is named in one
      place. *)
-  Definition wait_res : iProp Σ := (∃ ps, parents_own ps)%I.
+  Definition wait_res_at (ξ : CtxId) : iProp Σ := (∃ ps, parents_own_at ξ ps)%I.
+  Definition wait_res : iProp Σ := wait_res_at cur_ctx.
+
+  Global Instance wait_res_at_morph : CtxMorph wait_res_at.
+  Proof. rewrite /wait_res_at. ctx_morph_solve. Qed.
 
   (* THE BOOT CARVE'S SHAPE, GATHERED.  [BootCarveMain.boot_procs_raw] hands
      the parent cells out one existential per slot; [parents_own] wants ONE
@@ -166,7 +179,7 @@ Section WaitInv.
   Proof.
     iIntros "H".
     iDestruct (parents_cells_gather NPROC 0 with "H") as (ps) "[%Hlen H]".
-    iExists ps. rewrite /parents_own.
+    iExists ps. rewrite /parents_own /parents_own_at.
     iSplit; [iPureIntro; exact Hlen |].
     iApply (big_sepL_mono with "H"). iIntros (j v _) "Hv". iExact "Hv".
   Qed.

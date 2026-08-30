@@ -40,7 +40,7 @@ Require Import RegFile WpNext.
 Require Import RiscvExtras.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
-Require Import WpLock.
+Require Import WpLock CtxMorphTac.
 Require Import CpuOwn.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -58,8 +58,14 @@ Section SpecAllocpid.
   Context `{XI : TsoCtx.CurCtx}.   (* A6.55: [↦₄] is the ctx byte tower *)
 
   (* everything <pid_lock> protects: the counter, value unconstrained. *)
-  Definition nextpid_res : iProp Σ :=
-    (∃ v : mword 32, alp_nextpid ↦₄ v)%I.
+  (* A6.129 (the M3 λ-conversion): over an EXPLICIT context; [nextpid_res]
+     is the ambient spelling *)
+  Definition nextpid_res_at (ξ : TsoCtx.CtxId) : iProp Σ :=
+    (∃ v : mword 32, TsoCtx.ctx_word4_pointsto ξ alp_nextpid (DfracOwn 1) v)%I.
+  Definition nextpid_res : iProp Σ := nextpid_res_at TsoCtx.cur_ctx.
+
+  Global Instance nextpid_res_at_morph : TsoCtx.CtxMorph nextpid_res_at.
+  Proof. rewrite /nextpid_res_at. CtxMorphTac.ctx_morph_solve. Qed.
 
 End SpecAllocpid.
 
@@ -78,7 +84,7 @@ Definition wp_allocpid_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
   sie_cap_gpr KT1 m av b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> -∗
+  is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜ callee_saved m mf ⌝ -∗

@@ -179,7 +179,7 @@ Section ProofKforkB5.
     kernel_text -∗
     pc_is (mword_of_int (KF + 0xc2) : mword 64) -∗
     SchedCtx.procs_inv γs -∗
-    WpLock.is_lock γw SpecProcinit.wait_lock_addr "wait_lock"%string <{ WaitInv.wait_res }> -∗
+    WpLock.is_lock γw SpecProcinit.wait_lock_addr "wait_lock"%string WaitInv.wait_res_at -∗
     (* THE PAID PARK'S ROWS: the open-file table, the world
        ([SyscParkEnv.park_world] -- device complement, console, the two
        global locks, the slot ledger, wire invariant, trampoline claim, an
@@ -412,7 +412,7 @@ Section ProofKforkB5.
       rewrite /M3. apply callee_saved_insert_r; [vm_compute; reflexivity | apply callee_saved_refl]. }
     (* carry [cpu_own] hart-generically across the three plain leaves *)
     iDestruct (cpu_own_transport CID1 CID4 lvl eb pme b ltac:(wp_next_chain) with "Hown") as "Hown".
-    iApply (AQ.wp_acquire_sconf KT1 (CID := CID4) γw "wait_lock"%string <{ WaitInv.wait_res }>
+    iApply (AQ.wp_acquire_sconf KT1 (CID := CID4) γw "wait_lock"%string WaitInv.wait_res_at
               M5 lvl eb pme (K - 8)%nat b lks Hlvl (kfkb5_stack_ok K HK)
               Hfresh
               with "Hcg Hown Htext Hpc [Hwl]").
@@ -508,7 +508,7 @@ Section ProofKforkB5.
        for what the release hands back.) *)
     iEval (rewrite Hb) in "Hcg".
     iApply (RL.wp_release_sconf KT1 (CID := CID5) γw SpecProcinit.wait_lock_addr "wait_lock"%string
-              <{ WaitInv.wait_res }> M8 lvl eb pme (K - 8)%nat
+              WaitInv.wait_res_at M8 lvl eb pme (K - 8)%nat
               ({["wait_lock"]} ∪ lks)
               Hlka2 (kfkb5_stack_ok K HK)
               with "Hcg Htext Hpc Hwl Htokw Hwaitres Hown Hpay").

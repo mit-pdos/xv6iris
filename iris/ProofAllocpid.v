@@ -238,7 +238,7 @@ Section ProofAllocpid.
        hart (CID1..CID8), so acquire wants it at CID8. *)
     iDestruct (cpu_own_transport CID CID8 n eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Acquire.wp_acquire_sconf KT1 γp "nextpid"%string <{ nextpid_res }> A4 n eb p (av - 4)%nat b lks
+    iApply (Acquire.wp_acquire_sconf KT1 γp "nextpid"%string nextpid_res_at A4 n eb p (av - 4)%nat b lks
               Hn ltac:(pose proof (apid_K10 av Hav); lia) Hbelow
               with "Hcg Hcpu Htext Hpc [Hislock]").
     all: try lkbelow.
@@ -330,7 +330,7 @@ Section ProofAllocpid.
     iEval (rewrite Hp26) in "Hpc".
     (* the lock's resource is whole again -- the counter's value is existential *)
     iAssert nextpid_res with "[Hnp]" as "HR".
-    { rewrite /nextpid_res. iExists (trunc32 (B4 !!! Regidx ai_a4)). iExact "Hnp". }
+    { rewrite /nextpid_res /nextpid_res_at. iExists (trunc32 (B4 !!! Regidx ai_a4)). iExact "Hnp". }
     (* +0x26 auipc a0,0x11 ; +0x2a addi a0,a0,-1710 : a0 := &pid_lock *)
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.allocpid + 0x26)) ai_a0 (mword_of_int 0x11 : mword 20) B4 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -412,7 +412,7 @@ Section ProofAllocpid.
        it -- so this is a pure re-spelling, and it is what makes the
        acquire/release pair compose back to [N]. *)
     iEval (rewrite Hbeq) in "Hcg".
-    iApply (Release.wp_release_sconf KT1 γp alp_pid_lock "nextpid"%string <{ nextpid_res }> B7 n eb p (av - 4)%nat
+    iApply (Release.wp_release_sconf KT1 γp alp_pid_lock "nextpid"%string nextpid_res_at B7 n eb p (av - 4)%nat
               ({["nextpid"]} ∪ lks)
               Hlka ltac:(pose proof (apid_K10 av Hav); lia)
               with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").

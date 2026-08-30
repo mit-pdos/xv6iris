@@ -1,4 +1,4 @@
-DIGEST 622ed38b5ed3640b52bc58c614b09fb7
+DIGEST e88ac626daa6136a8f3ba241ade9a3d6
 Fxv6iris.SyscParkEnv
 R2257:2262 Stdlib.ZArith.ZArith <> <> lib
 R2291:2311 stdpp.bitvector.definitions <> <> lib
@@ -50,7 +50,7 @@ binder 4054:4057 <> γtk:7
 R4070:4074 iris.base_logic.lib.iprop iProp_solution iProp abbrev
 R4076:4077 xv6iris.SyscParkEnv <> SyscParkEnv.Σ var
 R4087:4087 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R4164:4174 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4161:4171 iris.bi.interface <> ::bi_scope:x_'∗'_x not
 R4088:4091 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
 R4103:4104 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
 R4098:4102 iris.base_logic.lib.iprop <> gname def
@@ -58,128 +58,124 @@ binder 4092:4094 <> γp:8
 R4105:4111 xv6iris.WpLock <> is_lock def
 R4113:4115 xv6iris.SyscParkEnv <> γp:8 var
 R4117:4128 xv6iris.SpecAllocpid <> alp_pid_lock def
-R4147:4149 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
-R4161:4163 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
-R4150:4160 xv6iris.SpecAllocpid <> nextpid_res def
-R4191:4200 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R4175:4185 xv6iris.ProcAvail <> procs_avail def
-R4187:4190 Corelib.Init.Datatypes <> None constr
-R4218:4227 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R4201:4212 xv6iris.TicksInv <> is_tickslock def
-R4214:4217 xv6iris.SyscParkEnv <> γtk:7 var
-R4228:4240 xv6iris.ConsoleInv <> console_ready def
-inst 4265:4290 <> sysc_park_extra_persistent
-binder 4292:4295 <> γtk:9
-R4303:4312 iris.bi.derived_connectives <> Persistent class
-R4315:4329 xv6iris.SyscParkEnv <> sysc_park_extra def
-R4331:4334 xv6iris.SyscParkEnv <> γtk:9 var
-R4356:4370 xv6iris.SyscParkEnv <> sysc_park_extra def
-R4356:4370 xv6iris.SyscParkEnv <> sysc_park_extra def
-R4356:4370 xv6iris.SyscParkEnv <> sysc_park_extra def
-R4392:4402 xv6iris.SyscParkEnv SyscParkEnv <> sec
-sec 4414:4422 <> ParkWorld
-R4438:4444 xv6iris.RiscvPtsto <> riscvGS class
-R4451:4454 xv6iris.Xv6G <> xv6G class
-R4456:4457 xv6iris.SyscParkEnv <> Σ:10 var
-R4461:4468 xv6iris.Xv6Cameras <> bioslotG class
-R4470:4471 xv6iris.SyscParkEnv <> Σ:10 var
-R4475:4481 xv6iris.FdSlots <> fdslotG class
-R4483:4484 xv6iris.SyscParkEnv <> Σ:10 var
-R4488:4492 xv6iris.FileInvDefs <> fileG class
-R4494:4495 xv6iris.SyscParkEnv <> Σ:10 var
-R4499:4507 xv6iris.IrefSlots <> irefslotG class
-R4509:4510 xv6iris.SyscParkEnv <> Σ:10 var
-R4514:4517 xv6iris.ProcAvail <> pavG class
-R4519:4520 xv6iris.SyscParkEnv <> Σ:10 var
-var  4536:4538 ParkWorld GEN
-R4542:4546 xv6iris.RiscvLang <> GenId class
-var  4562:4563 ParkWorld XI
-R4567:4572 xv6iris.TsoCtx <> CurCtx class
-def 5385:5394 <> park_world
-R5403:5406 Corelib.Init.Datatypes <> list ind
-R5408:5412 iris.base_logic.lib.iprop <> gname def
-binder 5397:5399 <> γs:20
-R5417:5421 iris.base_logic.lib.iprop iProp_solution iProp abbrev
-R5423:5424 xv6iris.SyscParkEnv <> ParkWorld.Σ var
-R5434:5438 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R5474:5483 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R5446:5450 iris.base_logic.lib.iprop <> gname def
-binder 5439:5442 <> γtl:21
-R5466:5470 SailStdpp.Values <> mword def
-binder 5454:5455 <> pd:22
-R5466:5470 SailStdpp.Values <> mword def
-binder 5457:5459 <> pav:23
-R5466:5470 SailStdpp.Values <> mword def
-binder 5461:5462 <> pu:24
-R5509:5520 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R5484:5490 xv6iris.WpUart <> dev_inv def
-R5492:5499 xv6iris.FsCfg <> fsc_uart meth
-R5501:5508 xv6iris.FsCfg <> fsc_disk meth
-R5542:5553 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R5521:5532 xv6iris.SpecConsoleintr <> console_caps def
-R5534:5541 xv6iris.FsCfg <> fsc_uart meth
-R5582:5593 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R5554:5562 xv6iris.DiskInv <> disk_geom def
-R5564:5571 xv6iris.FsCfg <> fsc_disk meth
-R5573:5574 xv6iris.SyscParkEnv <> pd:22 var
-R5576:5578 xv6iris.SyscParkEnv <> pav:23 var
-R5580:5581 xv6iris.SyscParkEnv <> pu:24 var
-R5672:5683 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R5594:5600 xv6iris.WpLock <> is_lock def
-R5602:5610 xv6iris.FsCfg <> fsc_dlock meth
-R5612:5617 xv6iris.DiskInv <> d_lock def
-R5641:5651 xv6iris.DiskInv <> disk_res_at def
-R5653:5660 xv6iris.FsCfg <> fsc_disk meth
-R5662:5663 xv6iris.SyscParkEnv <> pd:22 var
-R5665:5667 xv6iris.SyscParkEnv <> pav:23 var
-R5669:5670 xv6iris.SyscParkEnv <> pu:24 var
-R5701:5712 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R5684:5695 xv6iris.TicksInv <> is_tickslock def
-R5697:5700 xv6iris.SyscParkEnv <> γtl:21 var
-R5726:5737 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R5713:5721 xv6iris.SchedCtx <> procs_inv def
-R5723:5725 xv6iris.SyscParkEnv <> γs:20 var
-R5751:5903 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R5738:5750 xv6iris.ConsoleInv <> console_ready def
-R5904:5904 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R5981:5993 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R5905:5908 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R5920:5921 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R5915:5919 iris.base_logic.lib.iprop <> gname def
-binder 5909:5911 <> γp:25
-R5922:5928 xv6iris.WpLock <> is_lock def
-R5930:5932 xv6iris.SyscParkEnv <> γp:25 var
-R5934:5945 xv6iris.SpecAllocpid <> alp_pid_lock def
-R5964:5966 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
-R5978:5980 xv6iris.TsoCtx <> :::'<{'_x_'}>' not
-R5967:5977 xv6iris.SpecAllocpid <> nextpid_res def
-R6010:6021 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R5994:6004 xv6iris.ProcAvail <> procs_avail def
-R6006:6009 Corelib.Init.Datatypes <> None constr
-R6030:6041 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R6022:6029 xv6iris.WireInv <> wire_inv def
-R6075:6087 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R6165:6165 iris.bi.interface <> ::bi_scope:x_'∗'_x not
-R6042:6048 xv6iris.RiscvPtsto <> kmap_at def
-R6070:6074 xv6iris.RiscvPtsto <> KP_rx constr
-R6060:6068 xv6iris.KptExecMap <> tramp_ppn def
-R6050:6058 xv6iris.KptExecMap <> tramp_vpn def
-R6088:6091 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R6105:6106 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
-R6097:6101 SailStdpp.Values <> mword def
-binder 6092:6093 <> ip:26
-R6107:6107 xv6iris.TsoCtx <> ::bi_scope:x_'↦₈□'_x not
-R6151:6162 xv6iris.TsoCtx <> ::bi_scope:x_'↦₈□'_x not
-R6143:6147 SailStdpp.Values <> mword def
-R6108:6119 SailStdpp.Values <> mword_of_int def
-R6121:6139 Kernel.KernelSyms <> initproc def
-R6163:6164 xv6iris.SyscParkEnv <> ip:26 var
-inst 6190:6210 <> park_world_persistent
-binder 6212:6214 <> γs:27
-R6218:6227 iris.bi.derived_connectives <> Persistent class
-R6230:6239 xv6iris.SyscParkEnv <> park_world def
-R6241:6243 xv6iris.SyscParkEnv <> γs:27 var
-R6265:6274 xv6iris.SyscParkEnv <> park_world def
-R6265:6274 xv6iris.SyscParkEnv <> park_world def
-R6265:6274 xv6iris.SyscParkEnv <> park_world def
-R6296:6304 xv6iris.SyscParkEnv ParkWorld <> sec
+R4147:4160 xv6iris.SpecAllocpid <> nextpid_res_at def
+R4188:4197 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4172:4182 xv6iris.ProcAvail <> procs_avail def
+R4184:4187 Corelib.Init.Datatypes <> None constr
+R4215:4224 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R4198:4209 xv6iris.TicksInv <> is_tickslock def
+R4211:4214 xv6iris.SyscParkEnv <> γtk:7 var
+R4225:4237 xv6iris.ConsoleInv <> console_ready def
+inst 4262:4287 <> sysc_park_extra_persistent
+binder 4289:4292 <> γtk:9
+R4300:4309 iris.bi.derived_connectives <> Persistent class
+R4312:4326 xv6iris.SyscParkEnv <> sysc_park_extra def
+R4328:4331 xv6iris.SyscParkEnv <> γtk:9 var
+R4353:4367 xv6iris.SyscParkEnv <> sysc_park_extra def
+R4353:4367 xv6iris.SyscParkEnv <> sysc_park_extra def
+R4353:4367 xv6iris.SyscParkEnv <> sysc_park_extra def
+R4389:4399 xv6iris.SyscParkEnv SyscParkEnv <> sec
+sec 4411:4419 <> ParkWorld
+R4435:4441 xv6iris.RiscvPtsto <> riscvGS class
+R4448:4451 xv6iris.Xv6G <> xv6G class
+R4453:4454 xv6iris.SyscParkEnv <> Σ:10 var
+R4458:4465 xv6iris.Xv6Cameras <> bioslotG class
+R4467:4468 xv6iris.SyscParkEnv <> Σ:10 var
+R4472:4478 xv6iris.FdSlots <> fdslotG class
+R4480:4481 xv6iris.SyscParkEnv <> Σ:10 var
+R4485:4489 xv6iris.FileInvDefs <> fileG class
+R4491:4492 xv6iris.SyscParkEnv <> Σ:10 var
+R4496:4504 xv6iris.IrefSlots <> irefslotG class
+R4506:4507 xv6iris.SyscParkEnv <> Σ:10 var
+R4511:4514 xv6iris.ProcAvail <> pavG class
+R4516:4517 xv6iris.SyscParkEnv <> Σ:10 var
+var  4533:4535 ParkWorld GEN
+R4539:4543 xv6iris.RiscvLang <> GenId class
+var  4559:4560 ParkWorld XI
+R4564:4569 xv6iris.TsoCtx <> CurCtx class
+def 5382:5391 <> park_world
+R5400:5403 Corelib.Init.Datatypes <> list ind
+R5405:5409 iris.base_logic.lib.iprop <> gname def
+binder 5394:5396 <> γs:20
+R5414:5418 iris.base_logic.lib.iprop iProp_solution iProp abbrev
+R5420:5421 xv6iris.SyscParkEnv <> ParkWorld.Σ var
+R5431:5435 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R5471:5480 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R5443:5447 iris.base_logic.lib.iprop <> gname def
+binder 5436:5439 <> γtl:21
+R5463:5467 SailStdpp.Values <> mword def
+binder 5451:5452 <> pd:22
+R5463:5467 SailStdpp.Values <> mword def
+binder 5454:5456 <> pav:23
+R5463:5467 SailStdpp.Values <> mword def
+binder 5458:5459 <> pu:24
+R5506:5517 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5481:5487 xv6iris.WpUart <> dev_inv def
+R5489:5496 xv6iris.FsCfg <> fsc_uart meth
+R5498:5505 xv6iris.FsCfg <> fsc_disk meth
+R5539:5550 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5518:5529 xv6iris.SpecConsoleintr <> console_caps def
+R5531:5538 xv6iris.FsCfg <> fsc_uart meth
+R5579:5590 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5551:5559 xv6iris.DiskInv <> disk_geom def
+R5561:5568 xv6iris.FsCfg <> fsc_disk meth
+R5570:5571 xv6iris.SyscParkEnv <> pd:22 var
+R5573:5575 xv6iris.SyscParkEnv <> pav:23 var
+R5577:5578 xv6iris.SyscParkEnv <> pu:24 var
+R5669:5680 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5591:5597 xv6iris.WpLock <> is_lock def
+R5599:5607 xv6iris.FsCfg <> fsc_dlock meth
+R5609:5614 xv6iris.DiskInv <> d_lock def
+R5638:5648 xv6iris.DiskInv <> disk_res_at def
+R5650:5657 xv6iris.FsCfg <> fsc_disk meth
+R5659:5660 xv6iris.SyscParkEnv <> pd:22 var
+R5662:5664 xv6iris.SyscParkEnv <> pav:23 var
+R5666:5667 xv6iris.SyscParkEnv <> pu:24 var
+R5698:5709 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5681:5692 xv6iris.TicksInv <> is_tickslock def
+R5694:5697 xv6iris.SyscParkEnv <> γtl:21 var
+R5723:5734 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5710:5718 xv6iris.SchedCtx <> procs_inv def
+R5720:5722 xv6iris.SyscParkEnv <> γs:20 var
+R5748:5900 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5735:5747 xv6iris.ConsoleInv <> console_ready def
+R5901:5901 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5975:5987 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5902:5905 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R5917:5918 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R5912:5916 iris.base_logic.lib.iprop <> gname def
+binder 5906:5908 <> γp:25
+R5919:5925 xv6iris.WpLock <> is_lock def
+R5927:5929 xv6iris.SyscParkEnv <> γp:25 var
+R5931:5942 xv6iris.SpecAllocpid <> alp_pid_lock def
+R5961:5974 xv6iris.SpecAllocpid <> nextpid_res_at def
+R6004:6015 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R5988:5998 xv6iris.ProcAvail <> procs_avail def
+R6000:6003 Corelib.Init.Datatypes <> None constr
+R6024:6035 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6016:6023 xv6iris.WireInv <> wire_inv def
+R6069:6081 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6159:6159 iris.bi.interface <> ::bi_scope:x_'∗'_x not
+R6036:6042 xv6iris.RiscvPtsto <> kmap_at def
+R6064:6068 xv6iris.RiscvPtsto <> KP_rx constr
+R6054:6062 xv6iris.KptExecMap <> tramp_ppn def
+R6044:6052 xv6iris.KptExecMap <> tramp_vpn def
+R6082:6085 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R6099:6100 iris.bi.interface <> ::bi_scope:'∃'_x_'..'_x_','_x not
+R6091:6095 SailStdpp.Values <> mword def
+binder 6086:6087 <> ip:26
+R6101:6101 xv6iris.TsoCtx <> ::bi_scope:x_'↦₈□'_x not
+R6145:6156 xv6iris.TsoCtx <> ::bi_scope:x_'↦₈□'_x not
+R6137:6141 SailStdpp.Values <> mword def
+R6102:6113 SailStdpp.Values <> mword_of_int def
+R6115:6133 Kernel.KernelSyms <> initproc def
+R6157:6158 xv6iris.SyscParkEnv <> ip:26 var
+inst 6184:6204 <> park_world_persistent
+binder 6206:6208 <> γs:27
+R6212:6221 iris.bi.derived_connectives <> Persistent class
+R6224:6233 xv6iris.SyscParkEnv <> park_world def
+R6235:6237 xv6iris.SyscParkEnv <> γs:27 var
+R6259:6268 xv6iris.SyscParkEnv <> park_world def
+R6259:6268 xv6iris.SyscParkEnv <> park_world def
+R6259:6268 xv6iris.SyscParkEnv <> park_world def
+R6290:6298 xv6iris.SyscParkEnv ParkWorld <> sec

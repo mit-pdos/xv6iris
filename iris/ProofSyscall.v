@@ -952,9 +952,9 @@ Section SyscallVocab.
         !irefslotG Σ, !pavG Σ} `{GEN : GenId}
       (γf : gname) : iProp Σ :=
     (∃ (γp γw γft γtk : gname),
-       is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> ∗
+       is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at ∗
        procs_avail None ∗
-       is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> ∗
+       is_lock γw wait_lock_addr "wait_lock"%string wait_res_at ∗
        is_ftable γft γf ∗
        is_tickslock γtk)%I.
 
@@ -1036,7 +1036,7 @@ Section SyscallVocab.
     fcn_procs fn !! fcn_j fn = Some (fcn_plock fn) ->
     fcn_dq fn = DfracOwn (1/4) ->
     sysc_park_extra γtk -∗
-    is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
+    is_lock γw wait_lock_addr "wait_lock"%string wait_res_at -∗
     is_ftable γft γf -∗
     procs_inv (fcn_procs fn) -∗
     disk_geom (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) -∗
@@ -1123,9 +1123,9 @@ Section SyscallVocab.
     ∃ (γa γp γw γft γtk γpr : gname)
       (γud : uart_names) (γvd : disk_names),
       kalloc_env γa None ∗
-      is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> ∗
+      is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at ∗
       procs_avail None ∗
-      is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> ∗
+      is_lock γw wait_lock_addr "wait_lock"%string wait_res_at ∗
       is_ftable γft γf ∗
       is_tickslock γtk ∗
       printk_env γpr γud γvd ∗

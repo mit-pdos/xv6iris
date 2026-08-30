@@ -886,12 +886,12 @@ Section ProofMain.
         (* THE nextpid LOCK, built here out of procinit's [lk_fresh] and the
            cell above.  Persistent.  allocproc takes it, so kfork, sys_fork
            and -- at its real contract -- userinit all do. *)
-        is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> -∗
+        is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
         (* THE wait_lock, built the same way and for the first time.  Every
            consumer in the tree takes it -- kexit, kwait, reparent, the
            syscall environment -- and nothing has ever built one; see
            projects/forkret-park.md E3. *)
-        is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
+        is_lock γw wait_lock_addr "wait_lock"%string wait_res_at -∗
         (* the KPT receipt kvminithart minted, on its way to [trap_csrs] *)
         kpt_on cpu_id -∗
         (∃ v : mword 64, stvec ↦ᵣ v) -∗
@@ -1092,9 +1092,9 @@ Section ProofMain.
        this proof holds the kernel bundle, so it borrows its own and puts
        it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    iMod (newlock ⊤ alp_pid_lock "nextpid"%string <{ nextpid_res }>
+    iMod (newlock ⊤ alp_pid_lock "nextpid"%string nextpid_res_at
             with "Hpnm Hrun Hpw Hpc0 [Hnpid]") as "[Hrun Hpid0]".
-    { rewrite /nextpid_res. iExact "Hnpid". }
+    { rewrite /nextpid_res /nextpid_res_at. iExact "Hnpid". }
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iDestruct "Hpid0" as (γp) "#Hpidlock".
     (* ---- ASSEMBLY 2c: the wait_lock, and it is the SAME move.  procinit
@@ -1107,7 +1107,7 @@ Section ProofMain.
        this proof holds the kernel bundle, so it borrows its own and puts
        it straight back ([SieCapCtx.sie_cap_gpr_own_ctx_acc]). *)
     iDestruct (sie_cap_gpr_own_ctx_acc with "Hcg") as "[Hrun Hcgb]".
-    iMod (newlock ⊤ wait_lock_addr "wait_lock"%string <{ wait_res }>
+    iMod (newlock ⊤ wait_lock_addr "wait_lock"%string wait_res_at
             with "Hwnm Hrun Hww Hwc0 Hwres") as "[Hrun Hwl0]".
     iDestruct ("Hcgb" with "Hrun") as "Hcg".
     iDestruct "Hwl0" as (γw) "#Hwaitlock".
@@ -1337,7 +1337,7 @@ Section ProofMain.
     console_caps γd -∗
     ConsoleInv.console_ready -∗
     is_tickslock γtl -∗
-    is_lock γw wait_lock_addr "wait_lock"%string <{ wait_res }> -∗
+    is_lock γw wait_lock_addr "wait_lock"%string wait_res_at -∗
     (* ---- ...AND ITS FOUR FORWARDED PERSISTENT ROWS.  [printk_env] is
        [mn_grp_printk]'s product and the kmem [is_lock] is [mn_grp_kvm]'s;
        [gen_cert] and [FsCrash.fs_crash_seam] come down the boot chain from
@@ -1372,7 +1372,7 @@ Section ProofMain.
     (* ...and the [nextpid] lock, for the same reason and to the same place:
        userinit's real contract takes it (allocproc's own premise), the weak
        one does not.  Persistent, so carrying it costs a frame. *)
-    is_lock γp alp_pid_lock "nextpid"%string <{ nextpid_res }> -∗
+    is_lock γp alp_pid_lock "nextpid"%string nextpid_res_at -∗
     kalloc_env_at fsc_kalloc fsc_kpages (avail_sub (Some (length ps)) K_kvmmake) -∗
     lk_raw bcache_addr -∗
     ([∗ list] k ∈ seq 0 NBUF, sl_raw (buf_lock (bnode k))) -∗
