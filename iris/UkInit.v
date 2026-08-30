@@ -13,11 +13,19 @@
 (* preamble with BOTH arms of the [open(...) < 0] test (the mknod+open    *)
 (* repair arm included), both [dup]s, and the two instructions that load  *)
 (* the "init: starting sh\n" pointer -- i.e. everything up to the         *)
-(* RESTART LOOP's head at 0x32.  The loop itself is NOT proved, and the   *)
-(* two theorems below say so in their statement: each takes the           *)
+(* RESTART LOOP's head at 0x32.  The loop itself is NOT proved HERE, and  *)
+(* the two theorems below say so in their statement: each takes the       *)
 (* continuation at 0x32 as a hypothesis ([uki_loop_head] below) and       *)
 (* concludes the [ukc] at its own entry.  That is an implication, not an  *)
 (* [Admitted]: nothing here is assumed true that is not.                  *)
+(*                                                                       *)
+(* [uki_loop_head] IS NOW DISCHARGED, in UkInitLoop.v, from the single    *)
+(* Prop [uki_wait_ok] -- finding (3) below and nothing else.  Read that   *)
+(* file's header before touching this one.  The reason [uki_loop_head]    *)
+(* carries [init_data_sub] beside [init_text_sub], and the reason the two *)
+(* theorems below carry a frame-above-image inequality, is that the       *)
+(* loop's first call is printf on a .rodata literal and vprintf LOADS its *)
+(* bytes: the data half of the image has to reach 0x32 too.               *)
 (*                                                                        *)
 (* THE SYSCALL SURFACE IS PROVED IN FULL, loop or no loop.  Beside the    *)
 (* three preamble entries the walk actually calls (open / mknod / dup,    *)
@@ -150,6 +158,23 @@ Proof.
   rewrite (uM_store8_lookup_ne M a v k).
   - exact (Hs k b Hk).
   - intros j Hj. pose proof (init_bytes_key_lt k b Hk) as Hlt.
+    pose proof (Nat2Z.is_nonneg j) as Hj0. lia.
+Qed.
+
+(* ... and the DATA half of the loaded image, which survives a frame store
+   as long as the frame is above the whole image (init's data keys stop
+   below 8192).  The loop head needs this beside [init_text_sub]: the
+   restart loop's first call is [printf("init: starting sh\n")] and that
+   literal is .rodata, not text, so vprintf's byte loads read it out of
+   THIS inclusion.  Every theorem below therefore carries the frame-above
+   -image inequality that makes the two survive together. *)
+Lemma init_data_sub_store8 (M : gmap Z (bv 8)) (a : Z) (v : mword 64) :
+  init_data_sub M -> 8192 <= a -> init_data_sub (uM_store8 M a v).
+Proof.
+  intros Hs Ha k b Hk.
+  rewrite (uM_store8_lookup_ne M a v k).
+  - exact (Hs k b Hk).
+  - intros j Hj. pose proof (init_data_key_lt k b Hk) as Hlt.
     pose proof (Nat2Z.is_nonneg j) as Hj0. lia.
 Qed.
 
@@ -788,6 +813,7 @@ Section UkInit.
   Definition uki_loop_head (spf : mword 64) (K : Z) : iProp Σ :=
     (∀ (M' : gmap Z (bv 8)) (m' : regfile),
        ⌜init_text_sub M'⌝ -∗
+       ⌜init_data_sub M'⌝ -∗
        ⌜uk_stack pi M' spf K⌝ -∗
        ⌜m' !!! Regidx sp_idx = spf⌝ -∗
        ⌜m' !!! Regidx s2_idx = (mword_of_int 0x978 : mword 64)⌝ -∗
@@ -806,11 +832,12 @@ Section UkInit.
   Lemma wp_kinit_main_1e (M : gmap Z (bv 8)) (m : regfile) (spf : mword 64) (K : Z) :
     uk_xpage pi (mword_of_int 0) ->
     init_text_sub M ->
+    init_data_sub M ->
     uk_stack pi M spf K ->
     m !!! Regidx sp_idx = spf ->
     ⊢ uki_loop_head spf K -∗ ukc pi M m (mword_of_int 0x1e).
   Proof.
-    intros Hx Htext Hst Hsp.
+    intros Hx Htext Hdata Hst Hsp.
     iIntros "Hhead".
     rewrite /ukc. iIntros (h C pt Rut sz) "%Hlo %Hpm Hb".
     (* ---- 0x1e  c.li a0,0 ---- *)
@@ -934,8 +961,8 @@ Section UkInit.
       exact Hsp. }
     assert (Hs2n : n8 !!! Regidx s2_idx = (mword_of_int 0x978 : mword 64))
       by exact (upd_eq n7 (Regidx s2_idx) (regval_into_reg (mword_of_int 0x978 : mword 64))).
-    iApply ("Hhead" $! M n8 with "[%] [%] [%] [%]");
-      [ exact Htext | exact Hst | exact Hspn | exact Hs2n ].
+    iApply ("Hhead" $! M n8 with "[%] [%] [%] [%] [%]");
+      [ exact Htext | exact Hdata | exact Hst | exact Hspn | exact Hs2n ].
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -950,11 +977,12 @@ Section UkInit.
   Lemma wp_kinit_main_64 (M : gmap Z (bv 8)) (m : regfile) (spf : mword 64) (K : Z) :
     uk_xpage pi (mword_of_int 0) ->
     init_text_sub M ->
+    init_data_sub M ->
     uk_stack pi M spf K ->
     m !!! Regidx sp_idx = spf ->
     ⊢ uki_loop_head spf K -∗ ukc pi M m (mword_of_int 0x64).
   Proof.
-    intros Hx Htext Hst Hsp.
+    intros Hx Htext Hdata Hst Hsp.
     iIntros "Hhead".
     rewrite /ukc. iIntros (h C pt Rut sz) "%Hlo %Hpm Hb".
     (* ---- 0x64  c.li a2,0 ---- *)
@@ -1144,7 +1172,7 @@ Section UkInit.
     { rewrite /q11 /q10 /q9 /q8 /q7 /q6 /q5 /q4 /q3 /q2 /q1.
       repeat (apply uki_upd_ne; [ vm_compute; discriminate | ]).
       exact Hsp. }
-    iApply (wp_kinit_main_1e M q11 spf K Hx Htext Hst Hspq with "Hhead").
+    iApply (wp_kinit_main_1e M q11 spf K Hx Htext Hdata Hst Hspq with "Hhead").
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -1163,13 +1191,15 @@ Section UkInit.
   Lemma wp_kinit_main (M : gmap Z (bv 8)) (m : regfile) (sp0 : mword 64) (K : Z) :
     uk_xpage pi (mword_of_int 0) ->
     init_text_sub M ->
+    init_data_sub M ->
+    8192 <= uint sp0 - 32 ->
     m !!! Regidx sp_idx = sp0 ->
     0 <= K ->
     uk_stack pi M sp0 (32 + K) ->
     ⊢ uki_loop_head (add_vec_int sp0 (-32)) K -∗
       ukc pi M m (mword_of_int InitSyms.main).
   Proof.
-    intros Hx Htext Hsp HK Hst.
+    intros Hx Htext Hdata Hdroom Hsp HK Hst.
     assert (Hmain : InitSyms.main = 0x0) by reflexivity.
     iIntros "Hhead".
     rewrite Hmain.
@@ -1245,6 +1275,8 @@ Section UkInit.
     set (M2 := uM_store8 M (uint sp0 - 8) (m !!! Regidx ra_idx)).
     assert (Htext2 : init_text_sub M2)
       by (unfold M2; apply init_text_sub_store8; [ exact Htext | lia ]).
+    assert (Hdata2 : init_data_sub M2)
+      by (unfold M2; apply init_data_sub_store8; [ exact Hdata | lia ]).
     assert (Hdom2 : forall a : Z, is_Some (M !! a) -> is_Some (M2 !! a))
       by (intros a Ha; exact (uM_store8_is_Some M _ _ a Ha)).
     assert (E02 : add_vec_int (mword_of_int 0x02 : mword 64) 2 = mword_of_int 0x04)
@@ -1282,6 +1314,8 @@ Section UkInit.
     set (M3 := uM_store8 M2 (uint sp0 - 16) (m !!! Regidx (mword_of_int 8 : mword 5))).
     assert (Htext3 : init_text_sub M3)
       by (unfold M3; apply init_text_sub_store8; [ exact Htext2 | lia ]).
+    assert (Hdata3 : init_data_sub M3)
+      by (unfold M3; apply init_data_sub_store8; [ exact Hdata2 | lia ]).
     assert (Hdom3 : forall a : Z, is_Some (M2 !! a) -> is_Some (M3 !! a))
       by (intros a Ha; exact (uM_store8_is_Some M2 _ _ a Ha)).
     assert (E04 : add_vec_int (mword_of_int 0x04 : mword 64) 2 = mword_of_int 0x06)
@@ -1319,6 +1353,8 @@ Section UkInit.
     set (M4 := uM_store8 M3 (uint sp0 - 24) (m !!! Regidx (mword_of_int 9 : mword 5))).
     assert (Htext4 : init_text_sub M4)
       by (unfold M4; apply init_text_sub_store8; [ exact Htext3 | lia ]).
+    assert (Hdata4 : init_data_sub M4)
+      by (unfold M4; apply init_data_sub_store8; [ exact Hdata3 | lia ]).
     assert (Hdom4 : forall a : Z, is_Some (M3 !! a) -> is_Some (M4 !! a))
       by (intros a Ha; exact (uM_store8_is_Some M3 _ _ a Ha)).
     assert (E06 : add_vec_int (mword_of_int 0x06 : mword 64) 2 = mword_of_int 0x08)
@@ -1355,6 +1391,8 @@ Section UkInit.
     set (M5 := uM_store8 M4 (uint sp0 - 32) (m !!! Regidx s2_idx)).
     assert (Htext5 : init_text_sub M5)
       by (unfold M5; apply init_text_sub_store8; [ exact Htext4 | lia ]).
+    assert (Hdata5 : init_data_sub M5)
+      by (unfold M5; apply init_data_sub_store8; [ exact Hdata4 | lia ]).
     assert (Hdom5 : forall a : Z, is_Some (M4 !! a) -> is_Some (M5 !! a))
       by (intros a Ha; exact (uM_store8_is_Some M4 _ _ a Ha)).
     assert (Hstm5 : uk_stack pi M5 (add_vec_int sp0 (-32)) K)
@@ -1482,7 +1520,7 @@ Section UkInit.
                 (eq_sym Htk) Etgt64 ltac:(intros _; vm_compute; reflexivity)
                 with "Hb").
       iApply (wp_kinit_main_64 M5 m7 (add_vec_int sp0 (-32)) K
-                Hx Htext5 Hstm5 Hsp7 with "Hhead").
+                Hx Htext5 Hdata5 Hstm5 Hsp7 with "Hhead").
     - (* open succeeded: straight on to the two dups *)
       iApply (wp_uk_btype0 CB ptB RutB pi szB HloB HpmB M5 m7 (mword_of_int 0x1a)
                 (mword_of_int 74 : mword 13) a0_idx BLT false (mword_of_int 0x64)
@@ -1495,7 +1533,7 @@ Section UkInit.
         by (apply bv_eq; vm_compute; reflexivity).
       rewrite E1a.
       iApply (wp_kinit_main_1e M5 m7 (add_vec_int sp0 (-32)) K
-                Hx Htext5 Hstm5 Hsp7 with "Hhead").
+                Hx Htext5 Hdata5 Hstm5 Hsp7 with "Hhead").
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -1510,13 +1548,15 @@ Section UkInit.
   Lemma wp_kinit_start (M : gmap Z (bv 8)) (m : regfile) (sp0 : mword 64) (K : Z) :
     uk_xpage pi (mword_of_int 0) ->
     init_text_sub M ->
+    init_data_sub M ->
+    8192 <= uint sp0 - 48 ->
     m !!! Regidx sp_idx = sp0 ->
     0 <= K ->
     uk_stack pi M sp0 (48 + K) ->   (* start's 16 + main's 32 + printf's K *)
     ⊢ uki_loop_head (add_vec_int (add_vec_int sp0 (-16)) (-32)) K -∗
       ukc pi M m (mword_of_int InitSyms.start).
   Proof.
-    intros Hx Htext Hsp HK Hst.
+    intros Hx Htext Hdata Hdroom Hsp HK Hst.
     assert (Hstart : InitSyms.start = 0xbc) by reflexivity.
     iIntros "Hhead".
     rewrite Hstart.
@@ -1581,6 +1621,8 @@ Section UkInit.
     set (M2 := uM_store8 M (uint sp0 - 8) (m !!! Regidx ra_idx)).
     assert (Htext2 : init_text_sub M2)
       by (unfold M2; apply init_text_sub_store8; [ exact Htext | lia ]).
+    assert (Hdata2 : init_data_sub M2)
+      by (unfold M2; apply init_data_sub_store8; [ exact Hdata | lia ]).
     assert (Hdom2 : forall a : Z, is_Some (M !! a) -> is_Some (M2 !! a))
       by (intros a Ha; exact (uM_store8_is_Some M _ _ a Ha)).
     assert (Ebe : add_vec_int (mword_of_int 0xbe : mword 64) 2 = mword_of_int 0xc0)
@@ -1618,6 +1660,8 @@ Section UkInit.
     set (M3 := uM_store8 M2 (uint sp0 - 16) (m !!! Regidx (mword_of_int 8 : mword 5))).
     assert (Htext3 : init_text_sub M3)
       by (unfold M3; apply init_text_sub_store8; [ exact Htext2 | lia ]).
+    assert (Hdata3 : init_data_sub M3)
+      by (unfold M3; apply init_data_sub_store8; [ exact Hdata2 | lia ]).
     assert (Hdom3 : forall a : Z, is_Some (M2 !! a) -> is_Some (M3 !! a))
       by (intros a Ha; exact (uM_store8_is_Some M2 _ _ a Ha)).
     assert (Ec0 : add_vec_int (mword_of_int 0xc0 : mword 64) 2 = mword_of_int 0xc2)
@@ -1669,8 +1713,13 @@ Section UkInit.
     assert (Hstm3 : uk_stack pi M3 (add_vec_int sp0 (-16)) (32 + K))
       by exact (uk_stack_dom pi M2 M3 _ (32 + K) Hdom3
                   (uk_stack_dom pi M M2 _ (32 + K) Hdom2 Hstm)).
+    assert (Hbu : bv_unsigned sp0 = uint sp0) by (symmetry; apply uint_unsigned).
+    assert (Huv16 : uint (add_vec_int sp0 (-16)) = uint sp0 - 16).
+    { rewrite uint_unsigned.
+      rewrite (uv_avi_neg sp0 16 ltac:(lia) ltac:(rewrite Hbu; lia)). lia. }
     iApply (wp_kinit_main M3 m3 (add_vec_int sp0 (-16)) K
-              Hx Htext3 Hsp3 HK Hstm3 with "Hhead").
+              Hx Htext3 Hdata3 ltac:(rewrite Huv16; lia) Hsp3 HK Hstm3
+              with "Hhead").
   Qed.
 
 End UkInit.

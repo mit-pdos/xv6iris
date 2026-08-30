@@ -81,25 +81,6 @@ Proof.
     pose proof (Nat2Z.is_nonneg j) as Hj0. lia.
 Qed.
 
-(* ... and the same for the DATA half.  vprintf reads the format string out
-   of .rodata, so [init_data_sub] must survive the frames the walk writes;
-   the data keys stop below 8192 and every frame is at or above 8192 for
-   init (its stack is well above the image), but the lemma is stated at the
-   key bound the dump reports so a caller supplies the inequality. *)
-Lemma init_data_sub_store (M : gmap Z (bv 8)) (a k : Z) (v : mword 64) :
-  init_data_sub M -> 8192 <= a -> init_data_sub (uM_store M a k v).
-Proof.
-  intros Hs Ha key b Hk.
-  rewrite (uM_store_lookup_ne M a k v key).
-  - exact (Hs key b Hk).
-  - intros j Hj. pose proof (init_data_key_lt key b Hk) as Hlt.
-    pose proof (Nat2Z.is_nonneg j) as Hj0. lia.
-Qed.
-
-Lemma init_data_sub_store8 (M : gmap Z (bv 8)) (a : Z) (v : mword 64) :
-  init_data_sub M -> 8192 <= a -> init_data_sub (uM_store8 M a v).
-Proof. exact (init_data_sub_store M a 8 v). Qed.
-
 (* ONE 8-byte store, as a [uM_only] over an arbitrary width ([UkEcho.v]'s
    [uM_only_store8] with the width a parameter). *)
 Lemma uki_only_store (M : gmap Z (bv 8)) (a k lo n : Z) (v : mword 64) :

@@ -1565,6 +1565,16 @@ UkInit.v
 # own bytes, not proved: [uki_fmt]'s last clause says no byte is a percent
 # sign, so vprintf's pending-% register is an invariant zero.
 UkInitPrintf.v
+# UkInitLoop.v walks init's RESTART LOOP itself -- 0x32..0xb8, both heads
+# (0x32 and 0x44) under ONE iLoeb over their conjunction, fork's BOTH
+# continuations, exec's -1 arm, and the three dying arms -- and so
+# DISCHARGES UkInit.v's [uki_loop_head].  What is left of stage 1 is the
+# single Prop [uki_wait_ok]: that wait's window row, based at the NULL
+# status pointer init passes, does not overwrite the loaded image.  It is
+# false as the row stands (finding (3)) and true of the kernel, so the
+# three theorems that take it are conditional; everything below them is
+# not.  Read the header before extending.
+UkInitLoop.v
 # THE PINNED-EXEC PROVER LANE (fs-syscall-specs; SpecKexecPin.v sect. 8).
 #   ProofKexecPinTrace is the walk's trace built out of the contract's pin
 # -- and the file that records WHY the pin needs its chain conjunct back
