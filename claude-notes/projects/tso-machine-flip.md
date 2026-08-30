@@ -16560,3 +16560,104 @@ at `/shared/tmp/virtio/virtio-wip-A6.126.patch`); `UserMemPt:427` /
 
 r52 (kit only, not snapshotted): 1203/1301, the same 7 roots.
 r53 (CLEAN, the consumers): **1205/1303, red roots 7 (the same set), zero admits**; snapshot `tso-flip` = `5779cf1b1`.  Sixteen files touched (three new: `TsoCtxMove.v`, `PtTreeMove.v`, `CpuOwnMove.v`).
+
+## A6.129 — FORK'S MINT IS A TWIN (§0.44′); THE p->lock PAYLOAD HONEST AT THE LOCK'S CONTEXT; wait/nextpid λ-converted; what is left is the invariants
+
+*(Lock lane, 2026-08-29, after A6.128.  Ruling §0.44′ in tso-port.md.)*
+
+### §1. THE TWIN, AND `ProofForkretPark` AS TWIN → MOVE → PARK
+
+- **`TsoCtxMove.own_context_twin : own_context ξ ==∗ own_context ξ ∗ ∃ ξc,
+  own_context ξc`** -- a RUNNING context born with ξ's bound and watermark
+  (ξ's own view receipts vouch for it) and an empty dirty set (rows
+  re-register as they cross).  `ctx_parked_alloc` (stamp 0) is boot's mint
+  and the lock boxes' only.
+- **`ProofForkretPark`**: twin `XIc` of the parker; `ctx_move` the record's
+  cells, the stack, `is_kstack`, and `procs_inv` into it (no `ctx_deposit`,
+  no `CtxMorph` obligation in the file); `ctx_parked_alloc ξb` +
+  `ctx_park_box XIc ξb 0`; the record at `(XIc, T)` on the box `ξb`.  The
+  wand body is at `XIc`.  Frontier: `ProofForkretPark:318`, `iExact
+  "Hglobp"` -- `park_globals` (row 2), see §4.
+- **`TsoCtxMove.ctx_move_wrote`**: a dirty witness moves as a dirty cell's
+  arm does (floor at ξ1 when under ξ0's bound, re-registered when this
+  hart's own message); **`SchedCtx.lk_floor_move`, `is_lock_move`,
+  `procs_inv_move`** (the last in a trailing section, `SchedCtxMove`, so the
+  table's context is explicit).
+
+### §2. THE p->lock PAYLOAD WAS A CONSTANT EMBEDDING IN DISGUISE
+
+Measured while moving `procs_inv`: `is_lock … (proc_lock_pay γs x pa)`
+would not move because `proc_lock_pay`'s payload STILL DEPENDED ON THE
+AMBIENT -- `proc_lock_res_at ξl` spelled `p_state ↦₄`, `p_chan ↦₈`,
+`proc_pub`, `run_slot`'s `own_ctx` and `proc_dormant` at the definer's
+`XI`, and its `CtxMorph` instance carried them as constants.  So every
+file's `procs_inv (XI := ξ)` was a DIFFERENT lock invariant, which is
+exactly why nobody could ever hand it across a context.  Now:
+
+- `run_slot_at ξl pa` (`own_ctx (XI := ξl)`), `run_slot := run_slot_at
+  cur_ctx`; `proc_slots_at ξl` uses `run_slot_at ξl` and `proc_dormant (XI
+  := ξl)`; `proc_lock_res_at ξl` spells `ctx_word4_pointsto ξl (p_state
+  pa) …`, `ctx_word_pointsto ξl (p_chan pa) …`, `proc_pub (XI := ξl)`.
+  Consumers at the ambient are textually unchanged (the notations ARE those
+  spellings at `cur_ctx`); the six that unfold `proc_lock_res` compiled as
+  they were.
+- **ONE `CtxMorph` INSTANCE PER NAMED PIECE**, the `CtxMove` pile's twin
+  (`pname_cells` … `proc_dormant_noctx`, `ctx_cells`, `own_ctx`,
+  `proc_dormant`, `proc_pub`, `run_slot_at`, `proc_ctx_at`,
+  `proc_slots_at`, `proc_lock_res_at`, `proc_lock_pay`), and
+  `PtTreeMove.v`'s `PtTreeMorph` section for the tree at `UTier ξ`.
+- **`CtxMorphTac` is syntactic now** (`ctx_morph_step`, A6.128 §3's twin)
+  with the leaves the pile needs: `ctx_morph_or`, `ctx_morph_big_sepS`,
+  `ctx_morph_phys_pointsto` (full byte), `ctx_morph_phys_word`.
+- **The producers deposit**: `proc_slots_park_box` (now a basic update)
+  takes and returns the running token and deposits a ZOMBIE's dormant
+  block into the fresh box; `proc_lock_res_deposit` deposits the three
+  cells into a parked box (`ProofKforkB5`, `ProofUserinit`,
+  `ProofScheduler`'s reclaim -- inside `ReleaseIn`'s token wand).
+  `proc_lock_res_at_intro` is the honest statement (cells at `ξl`).
+
+### §3. `wait_res` / `nextpid_res` λ-CONVERTED (A6.121's recipe)
+
+`WaitInv.parents_own_at ξ`, `wait_res_at ξ` (ambient names kept as
+definitions), `SpecAllocpid.nextpid_res_at ξ`, real `CtxMorph` instances;
+55 payload sites `<{ wait_res }>`/`<{ nextpid_res }>` (and the qualified
+spellings) are `wait_res_at`/`nextpid_res_at`; `park_globals`'s two lock
+rows are ξ-free payloads.  Zero consumer proof edits.
+
+### §4. WHAT IS LEFT, MEASURED: THE SHARED-STRUCTURE INVARIANTS (issue B)
+
+`park_globals ξ` still cannot move as a whole because of ONE row:
+`is_ftable (XI := ξ) = is_lock … <{ ftable_res (XI := ξ) γ }>`, and
+`ftable_res` is not a cell payload: `fslot → file_fields` (cells, fine)
+`∗ file_pay → file_payload → file_core`, which is `is_pipe` (an `inv`) for
+a pipe and `inode_pay → inode_held → inode_refp + IcacheInv.itable_inv` (an
+`inv` over `iref_cells`) for an inode.  `proc_priv` (row 3) reaches the
+same two through `cwd_ref`/`ofile_slot`, and `buf_escrow` through
+`first_tok → fs_ready → bio_ctx`.  These are `inv`s whose bodies own cells
+at a fixed context: the ONE shape no transport crosses (CtxRecord's
+header on origin/main).  On origin/main (`21214bdc0`, §0.17′) the bcache
+escrow and the boot deposit are parked records (`buf_escrow_rec := ∃ ξ T,
+ctx_parked ξ T ∗ body (XI := ξ)`, `CtxRecord.ctx_parked_inv`), opened with
+`ctx_absorb` against the SC shim's `hart_view_lb_any`; icache/file/pipe
+are untouched there too, and this tree has neither (its escrow is the
+plain `inv`, and the shim is gone -- the flip's floors are real).
+
+THE OPEN DESIGN POINT for this tree: an invariant opener has no floor at
+the record's stamp `Te` -- `ctx_absorb_lb` needs `Te ≤ K`.  The honest
+source is the lock that guards the structure: a depositor writes the
+record before releasing, so `Te ≤` that release's stamp `≤` the next
+acquirer's floor.  Proposal: tie each record's stamp to its guarding lock
+by a per-lock MONOTONE stamp (`mono_nat`, raised at every release to the
+new record's stamp -- monotone because each release's stamp is above the
+releaser's floor, which is above the previous record's), carry
+`mono_nat_lb lock_stamp Te` in the record, and cash it with the acquirer's
+`lock_pay_won` floor.  `buf_escrow` (guarded by two locks: bcache's and
+the virtio ring's) needs the bound against BOTH, or a stamp of its own.
+Owner ruling needed before the port (dozens of openers: bread/brelse,
+iget/ilock/iput, filealloc/fileclose, pipe*).
+
+### §5. NUMBERS
+
+r54 (CLEAN, §1–§2): **1205/1303, red roots 7 (the same set), zero
+admits**; snapshot `6b62156`.  r55 (CLEAN, + §3): **1205/1303, red roots 7 (the same set), zero admits**; snapshot `3df4de899`.
+

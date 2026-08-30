@@ -541,3 +541,33 @@ vocabulary for main, SC-provable; the tree is the authority.
   red root fails fast.  On main those rows are already λ-converted, so
   main's port of this file should go GREEN.
 
+## Amendment 11 (2026-08-29, from the T-leg): §0.44′ -- fork's mint is a twin; the p->lock payload honest at the lock's context; wait/nextpid λ-converted
+
+Landed on `tso-flip` at r54 (`6b62156`) and r55 (`3df4de899`), A6.129 in
+tso-machine-flip.md; the ruling is §0.44′ in tso-port.md.  Same terms as
+Amendments 9–10.
+
+- **`TsoCtxMove`**: `own_context_twin : own_context ξ ==∗ own_context ξ ∗ ∃ ξc,
+  own_context ξc` (fork's mint; stamp-0 `ctx_parked_alloc` is boot's and the
+  lock boxes'); `ctx_move_wrote` (the dirty witness's move).
+- **`SchedCtx`**: `lk_floor_move`, `is_lock_move`, `procs_inv_move`;
+  `run_slot_at ξl pa` (`run_slot := run_slot_at cur_ctx`), `proc_slots_at ξl`
+  with `run_slot_at ξl` and `proc_dormant (XI := ξl)`, `proc_lock_res_at ξl`
+  with its words and `proc_pub` at `ξl`; `proc_lock_res_at_intro` honest
+  (cells at `ξl`), `proc_lock_res_deposit` (cells at the ambient deposited
+  into a parked box), `proc_slots_park_box` a BASIC update taking and
+  returning the running token; one `CtxMorph` per named piece (A6.129 §2's
+  list).  `ProofKforkB5`/`ProofUserinit`/`ProofScheduler` deposit inside
+  `ReleaseIn`'s token wand.
+- **`CtxMorphTac`**: the syntactic `ctx_morph_step` (do not port an
+  `apply`-based solver), `ctx_morph_or`, `ctx_morph_big_sepS`,
+  `ctx_morph_phys_pointsto`, `ctx_morph_phys_word`.
+- **`WaitInv`**: `parents_own_at ξ`, `wait_res_at ξ` (+ morph);
+  **`SpecAllocpid`**: `nextpid_res_at ξ` (+ morph); every `<{ wait_res }>` /
+  `<{ nextpid_res }>` is `wait_res_at` / `nextpid_res_at` (55 sites, 21
+  files); `park_globals`'s two lock rows accordingly.
+- **`ProofForkretPark`**: twin → `ctx_move` (cells, stack, kstack,
+  `procs_inv`) → `ctx_park_box`; wand body at `XIc`; red at row 2
+  (`park_globals`, blocked on `is_ftable` -- A6.129 §4).
+- **Not landed, for the owner's ruling**: the invariant class (A6.129 §4).
+

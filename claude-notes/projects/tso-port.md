@@ -4380,3 +4380,26 @@ What the rule does not reach: [ProofForkretPark]'s three rows
 ([procs_inv], [park_globals]'s handles, [proc_priv]/[buf_escrow]) --
 they are at the PARKER's ξ and neither token is available where they
 would move; the λ-conversion is still their path.
+
+### 0.44′ OWNER RULING (2026-08-29): a process context is born a TWIN of
+### its parker's; stamp-0 allocation is boot's mint only
+
+"The only reason to allocate at 0 is at system bootup.  These will be the
+per-core contexts that will ultimately serve as the scheduler contexts,
+and they really do start at 0 because that's how the system boots.
+Process contexts should not be allocated at 0" -- allocate the child as a
+copy of the parker's running context: the parker is giving it resources
+that are valid at the parker's context, and a twin makes the transfer the
+same-hart hand-off (§0.43′) with nothing to justify.  Kit:
+[TsoCtxMove.own_context_twin]; consumer: [ProofForkretPark] (twin, move,
+park).  A6.129.
+
+STATUS: landed, r54 = 1205/1303, red roots 7.  The same round found
+that the p->lock payload's rows were still spelled at the definer's
+ambient (a constant embedding in disguise) and made them honest at the
+lock's context, with real [CtxMorph] proofs down to the page-table tree;
+[wait_res]/[nextpid_res] λ-converted (r55).  What remains for the forked
+child's [park_globals] and [proc_priv] is the invariant class -- the
+icache table, the pipe, the bcache escrow -- and A6.129 §4 states the
+open design point (an opener's floor at the record's stamp) for ruling.
+
