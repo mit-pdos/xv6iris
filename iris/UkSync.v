@@ -185,14 +185,17 @@ Section UkSync.
   (* ------------------------------------------------------------------- *)
   Lemma wp_ksync_main (h : CpuId) (m : regfile) (sp0 : mword 64) (n : nat) :
     m !!! Regidx csp_rs1 = sp0 ->
-    16 <= uint sp0 ->
-    uint sp0 mod 8 = 0 ->
     sync_code γt -∗
     urun γt γd γs h m (mword_of_int SyncSyms.main) (2 + n) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hsp Hlo Hal8. iIntros "#Hcode Hrun".
+    intros Hsp. iIntros "#Hcode Hrun".
     iDestruct "Hcode" as CODE.
+    (* the free stack the run already owns says sp is aligned and has room *)
+    iDestruct (urun_stack with "Hrun") as %[Hal8' Hroom'].
+    rewrite Hsp in Hal8', Hroom'.
+    assert (Hal8 : uint sp0 mod 8 = 0) by exact Hal8'.
+    assert (Hlo : 16 <= uint sp0) by lia.
     destruct sync_syms_pins as (Hsmain & Hsstart & Hsexit & Hssync).
     rewrite Hsmain.
     assert (Hsp16 : uint (add_vec_int sp0 (-16)) = uint sp0 - 16).
@@ -212,7 +215,7 @@ Section UkSync.
     assert (E00 : add_vec_int (mword_of_int 0x0 : mword 64) 2 = mword_of_int 0x2)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite Hsp ustack_2 E00.
-    iIntros "[[%v8 Hw8] [%v0 Hw0]]".
+    iIntros "(_ & [%v8 Hw8] & [%v0 Hw0])".
     iIntros (h1) "Hrun".
     set (m1 := <[Regidx csp_rs1 := regval_into_reg (add_vec_int sp0 (-16))]> m).
     assert (Hsp1 : m1 !!! Regidx csp_rs1 = add_vec_int sp0 (-16))
@@ -322,14 +325,17 @@ Section UkSync.
   (* ------------------------------------------------------------------- *)
   Lemma wp_ksync_start (h : CpuId) (m : regfile) (sp0 : mword 64) (n : nat) :
     m !!! Regidx csp_rs1 = sp0 ->
-    32 <= uint sp0 ->
-    uint sp0 mod 8 = 0 ->
     sync_code γt -∗
     urun γt γd γs h m (mword_of_int SyncSyms.start) (2 + (2 + n)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hsp Hlo Hal8. iIntros "#Hcode Hrun".
+    intros Hsp. iIntros "#Hcode Hrun".
     iDestruct "Hcode" as CODE.
+    (* the free stack the run already owns says sp is aligned and has room *)
+    iDestruct (urun_stack with "Hrun") as %[Hal8' Hroom'].
+    rewrite Hsp in Hal8', Hroom'.
+    assert (Hal8 : uint sp0 mod 8 = 0) by exact Hal8'.
+    assert (Hlo : 16 <= uint sp0) by lia.
     destruct sync_syms_pins as (Hsmain & Hsstart & Hsexit & Hssync).
     rewrite Hsstart.
     assert (Hsp16 : uint (add_vec_int sp0 (-16)) = uint sp0 - 16).
@@ -349,7 +355,7 @@ Section UkSync.
     assert (E12 : add_vec_int (mword_of_int 0x12 : mword 64) 2 = mword_of_int 0x14)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite Hsp ustack_2 E12.
-    iIntros "[[%v8 Hw8] [%v0 Hw0]]".
+    iIntros "(_ & [%v8 Hw8] & [%v0 Hw0])".
     iIntros (h1) "Hrun".
     set (m1 := <[Regidx csp_rs1 := regval_into_reg (add_vec_int sp0 (-16))]> m).
     assert (Hsp1 : m1 !!! Regidx csp_rs1 = add_vec_int sp0 (-16))
@@ -420,10 +426,7 @@ Section UkSync.
                      (regval_into_reg (add_vec_int (add_vec_int sp0 (-16)) 16))
                      ltac:(vm_compute; discriminate))
                   Hsp1)). }
-    iApply (wp_ksync_main h5 m3 (add_vec_int sp0 (-16)) n Hsp3
-              ltac:(rewrite Hsp16; lia)
-              ltac:(rewrite Hsp16 Zminus_mod Hal8; reflexivity)
-              with "[] Hrun").
+    iApply (wp_ksync_main h5 m3 (add_vec_int sp0 (-16)) n Hsp3 with "[] Hrun").
     rewrite /sync_code. iSplit; [ iExact "C00" | ]. iSplit; [ iExact "C02" | ]. iSplit; [ iExact "C04" | ]. iSplit; [ iExact "C06" | ]. iSplit; [ iExact "C08" | ]. iSplit; [ iExact "C0c" | ]. iSplit; [ iExact "C0e" | ]. iSplit; [ iExact "C12" | ]. iSplit; [ iExact "C14" | ]. iSplit; [ iExact "C16" | ]. iSplit; [ iExact "C18" | ]. iSplit; [ iExact "C1a" | ]. iSplit; [ iExact "C1e" | ]. iSplit; [ iExact "C2c8" | ]. iSplit; [ iExact "C2ca" | ]. iSplit; [ iExact "C368" | ]. iSplit; [ iExact "C36a" | ]. iExact "C36e".
   Qed.
 

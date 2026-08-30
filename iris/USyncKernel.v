@@ -137,12 +137,12 @@ Section USyncKernel.
     ⊢ uslot W.
   Proof.
     intros Hpc Hsub Hx Hroom Hal8 Hdata.
-    iApply (uslot_of_urun W 4 ltac:(lia) Hdata).
+    iApply (uslot_of_urun W 4 Hal8 ltac:(lia) Hdata).
     iIntros (γt γd γs h) "%Hsz Hszf #Ht Hrun".
     rewrite Hpc.
     iApply (wp_ksync_start γt γd γs h (tf_resume_gpr0 (uvis_tf W))
               (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) 0
-              eq_refl Hroom Hal8 with "[] Hrun").
+              eq_refl with "[] Hrun").
     iApply (sync_code_of_text γt (uvis_M W) (uvis_perm W) Hsub Hx with "Ht").
   Qed.
 

@@ -390,6 +390,21 @@ Section UkRun.
     rewrite Hstep in Hmod. unfold Z64 in *. lia.
   Qed.
 
+  (* ...and what a PROGRAM can read off its own run, without opening it: the
+     two stack facts every prologue used to take as premises. *)
+  Lemma urun_stack (γt γd γs : gname) (h : CpuId) (m : regfile)
+      (pc : mword 64) (avail : nat) :
+    urun γt γd γs h m pc avail -∗
+    ⌜ uint (m !!! Regidx csp_rs1) mod 8 = 0
+      /\ 8 * Z.of_nat avail <= uint (m !!! Regidx csp_rs1) ⌝.
+  Proof.
+    iIntros "Hrun".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct (ustack_align with "Hstk") as %Hal.
+    iDestruct (ustack_room with "Hheap Hstk") as %Hroom.
+    iPureIntro. exact (conj Hal Hroom).
+  Qed.
+
   (* ===================================================================== *)
   (* §4 THE ENTRY: the process's FIRST WP.                                 *)
   (*                                                                       *)
@@ -434,6 +449,10 @@ Section UkRun.
      actually present in the data half.  [sz] is bound by the slot, so the
      second is stated for every [sz] the bundle could carry. *)
   Lemma uslot_of_urun (W : uvis) (avail : nat) :
+    (* the resume sp is word-aligned -- what [ustack] now asserts, and the
+       one place it is an obligation rather than a consequence, since it is
+       a fact about the process the kernel set up *)
+    uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) mod 8 = 0 ->
     8 * Z.of_nat avail
       <= uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) ->
     (* DECIDABLE FROM THE KEY, now that the key carries the break.  Before
@@ -453,7 +472,7 @@ Section UkRun.
        WP (Loop : expr riscv_lang))
     -∗ uslot W.
   Proof.
-    intros Hroom Hstk. iIntros "Hprog". rewrite uslot_ukc /ukc.
+    intros Hal8 Hroom Hstk. iIntros "Hprog". rewrite uslot_ukc /ukc.
     iIntros (h C pt Rut) "%Hlo %Hpm Hb".
     set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)
@@ -476,7 +495,7 @@ Section UkRun.
     { intros j Hj. destruct (Hstk j Hj) as [b Hb].
       unfold f. unfold D, base in *. rewrite Hb. reflexivity. }
     iDestruct (ubytes_of_map γd D base (8 * avail) f Hf with "Hd") as "Hbs".
-    iDestruct (ustack_of_ubytes γd sp avail f Hroom with "Hbs") as "Hstk".
+    iDestruct (ustack_of_ubytes γd sp avail f Hal8 Hroom with "Hbs") as "Hstk".
     iSpecialize ("Hprog" $! γt γd γs h with "[%] Hszf Ht"); [ exact Hsz | ].
     iApply "Hprog".
     iExists C, pt, Rut, sz, (uvis_M W), (uvis_perm W).

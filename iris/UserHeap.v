@@ -230,11 +230,19 @@ Section UserHeap.
      rather than about an extra hypothesis it also had to supply. *)
   Definition ustr (γd : gname) (a : Z) (len : nat) (f : nat -> bv 8) : iProp Σ :=
     (⌜ forall j : nat, (j < len)%nat -> f j <> ubyte0 ⌝ ∗
+     (* ...and the length is REPRESENTABLE.  strlen computes it with a
+        32-bit [subw], so a string longer than 2^31 is not one this ABI can
+        measure; that belongs to what a string IS, not to strlen's caller. *)
+     ⌜ Z.of_nat len < 2 ^ 31 ⌝ ∗
      ubytes γd a len f ∗ ubyte γd (a + Z.of_nat len) ubyte0)%I.
+
+  Lemma ustr_len (γd : gname) (a : Z) (len : nat) (f : nat -> bv 8) :
+    ustr γd a len f -∗ ⌜ Z.of_nat len < 2 ^ 31 ⌝.
+  Proof. iIntros "(_ & %H & _ & _)". iPureIntro. exact H. Qed.
 
   Lemma ustr_nonul (γd : gname) (a : Z) (len : nat) (f : nat -> bv 8) :
     ustr γd a len f -∗ ⌜ forall j : nat, (j < len)%nat -> f j <> ubyte0 ⌝.
-  Proof. iIntros "(%H & _ & _)". iPureIntro. exact H. Qed.
+  Proof. iIntros "(%H & _ & _ & _)". iPureIntro. exact H. Qed.
 
   (* one body byte, out and back *)
   Lemma ustr_byte (γd : gname) (a : Z) (len : nat) (f : nat -> bv 8) (j : nat) :
@@ -243,12 +251,12 @@ Section UserHeap.
       ubyte γd (a + Z.of_nat j)%Z (f j) ∗
       (ubyte γd (a + Z.of_nat j)%Z (f j) -∗ ustr γd a len f).
   Proof.
-    intros Hj. iIntros "(#Hne & Hbs & Hnul)".
+    intros Hj. iIntros "(#Hne & #Hlen & Hbs & Hnul)".
     rewrite /ustr /ubytes.
     iDestruct (big_sepL_lookup_acc _ _ j j with "Hbs") as "[Hb Hcl]";
       [ apply lookup_seq; split; [ lia | exact Hj ] | ].
     iFrame "Hb". iIntros "Hb".
-    iFrame "Hne Hnul". iApply ("Hcl" with "Hb").
+    iFrame "Hne Hlen Hnul". iApply ("Hcl" with "Hb").
   Qed.
 
   (* ...and the terminator *)
@@ -257,8 +265,8 @@ Section UserHeap.
       ubyte γd (a + Z.of_nat len)%Z ubyte0 ∗
       (ubyte γd (a + Z.of_nat len)%Z ubyte0 -∗ ustr γd a len f).
   Proof.
-    iIntros "(#Hne & Hbs & Hnul)". iFrame "Hnul". iIntros "Hnul".
-    rewrite /ustr. iFrame "Hne Hbs Hnul".
+    iIntros "(#Hne & #Hlen & Hbs & Hnul)". iFrame "Hnul". iIntros "Hnul".
+    rewrite /ustr. iFrame "Hne Hlen Hbs Hnul".
   Qed.
 
   (* NOTE: the SPLIT of a run at an arbitrary point -- which is what a
@@ -757,21 +765,39 @@ Section UserHeap.
   (* takes it back when sp moves up.  A function's precondition is then a  *)
   (* NUMBER (how much headroom it needs) rather than a list of addresses.  *)
   (* ===================================================================== *)
-  Definition ustack (γd : gname) (sp : mword 64) (n : nat) : iProp Σ :=
+  (* sp is 8-ALIGNED, inside the predicate.  The free stack is a stack of
+     WORDS, so word alignment is part of what it means -- and every spill
+     into a frame carved off it then has its [a mod 8 = 0] for free, instead
+     of every function carrying the premise.
+
+     The BODY is factored out so the splitting lemmas keep working on a
+     plain [big_sepL]; the alignment rides alongside. *)
+  Definition ustack_body (γd : gname) (sp : mword 64) (n : nat) : iProp Σ :=
     ([∗ list] i ∈ seq 0 n,
        ∃ w : mword 64, uword γd (uint sp - 8 * (Z.of_nat i + 1)) w)%I.
 
-  Lemma ustack_0 (γd : gname) (sp : mword 64) : ustack γd sp 0 ⊣⊢ emp.
-  Proof. rewrite /ustack /=. reflexivity. Qed.
+  Definition ustack (γd : gname) (sp : mword 64) (n : nat) : iProp Σ :=
+    (⌜ uint sp mod 8 = 0 ⌝ ∗ ustack_body γd sp n)%I.
 
-  (* ONE WORD of headroom, off the top: the step every sp-adjust is built
-     from.  [sp'] is the moved sp, named rather than computed so a caller
-     can supply whatever spelling its arithmetic produced. *)
-  Lemma ustack_S (γd : gname) (sp sp' : mword 64) (n : nat) :
-    uint sp' = uint sp - 8 ->
-    ustack γd sp (S n) ⊣⊢ (∃ w : mword 64, uword γd (uint sp - 8) w) ∗ ustack γd sp' n.
+  Lemma ustack_align (γd : gname) (sp : mword 64) (n : nat) :
+    ustack γd sp n -∗ ⌜ uint sp mod 8 = 0 ⌝.
+  Proof. iIntros "[%H _]". iPureIntro. exact H. Qed.
+
+  Lemma ustack_0 (γd : gname) (sp : mword 64) :
+    ustack γd sp 0 ⊣⊢ ⌜ uint sp mod 8 = 0 ⌝.
   Proof.
-    intros Hsp. rewrite /ustack.
+    rewrite /ustack /ustack_body /=.
+    iSplit; [ iIntros "[$ _]" | iIntros "$"; done ].
+  Qed.
+
+  (* ---- the body's algebra, unchanged from before the alignment ---- *)
+
+  Lemma ustack_body_S (γd : gname) (sp sp' : mword 64) (n : nat) :
+    uint sp' = uint sp - 8 ->
+    ustack_body γd sp (S n)
+    ⊣⊢ (∃ w : mword 64, uword γd (uint sp - 8) w) ∗ ustack_body γd sp' n.
+  Proof.
+    intros Hsp. rewrite /ustack_body.
     change (seq 0 (S n)) with (0%nat :: seq 1 n).
     rewrite big_sepL_cons.
     assert (E0 : uint sp - 8 * (Z.of_nat 0 + 1) = uint sp - 8) by lia.
@@ -784,14 +810,60 @@ Section UserHeap.
     rewrite Ej. reflexivity.
   Qed.
 
-  (* the 16-byte frame, unfolded at NORMALISED addresses -- what a gcc
-     prologue's two spills want.  ([ustack_acc] is the general form; this is
-     the one every xv6 user function actually uses.) *)
+  Lemma ustack_body_app (γd : gname) (sp sp' : mword 64) (k n : nat) :
+    uint sp' = uint sp - 8 * Z.of_nat k ->
+    ustack_body γd sp (k + n) ⊣⊢ ustack_body γd sp k ∗ ustack_body γd sp' n.
+  Proof.
+    revert sp sp'. induction k as [| k IH]; intros sp sp' Hsp.
+    - assert (Hs : sp' = sp) by (apply bv_eq; rewrite <- !uint_unsigned; lia).
+      (* [/=] already reduced [0 + n]; a following [Nat.add_0_l]
+         would match nothing *)
+      rewrite Hs /ustack_body /= bi.emp_sep. reflexivity.
+    - assert (Hk : 8 * Z.of_nat (S k) <= uint sp).
+      { pose proof (proj1 (bv_unsigned_in_range _ sp')) as H0.
+        rewrite <- uint_unsigned in H0. lia. }
+      pose proof (bv_unsigned_in_range _ sp) as Hr.
+      rewrite Zmod64 in Hr. rewrite <- uint_unsigned in Hr.
+      set (sp1 := (mword_of_int (uint sp - 8) : mword 64)).
+      assert (Hu1 : uint sp1 = uint sp - 8).
+      { unfold sp1. rewrite uint_unsigned moi64_unsigned. unfold bv_wrap.
+        rewrite Zmod64. apply Z.mod_small. unfold Z64 in *. lia. }
+      replace (S k + n)%nat with (S (k + n))%nat by lia.
+      rewrite (ustack_body_S γd sp sp1 (k + n) Hu1).
+      rewrite (ustack_body_S γd sp sp1 k Hu1).
+      rewrite (IH sp1 sp' ltac:(rewrite Hu1; lia)).
+      rewrite assoc. reflexivity.
+  Qed.
+
+  (* ---- ...and the alignment travels with it ---- *)
+
+  Lemma ustack_app (γd : gname) (sp sp' : mword 64) (k n : nat) :
+    uint sp' = uint sp - 8 * Z.of_nat k ->
+    ustack γd sp (k + n) ⊣⊢ ustack γd sp k ∗ ustack γd sp' n.
+  Proof.
+    intros Hsp. rewrite /ustack (ustack_body_app γd sp sp' k n Hsp).
+    (* lia does not do the mod-8 iff on its own *)
+    assert (H8k : (8 * Z.of_nat k) mod 8 = 0)
+      by (rewrite Z.mul_comm; apply Z_mod_mult).
+    assert (Hal : uint sp mod 8 = 0 <-> uint sp' mod 8 = 0).
+    { rewrite Hsp Zminus_mod H8k. split; intro H.
+      - rewrite H. reflexivity.
+      - rewrite Z.sub_0_r in H.
+        rewrite (Z.mod_mod (uint sp) 8 ltac:(lia)) in H. exact H. }
+    iSplit.
+    - iIntros "(%Hal8 & Hlo & Hhi)".
+      iSplitL "Hlo"; [ iSplitR; [ iPureIntro; exact Hal8 | iExact "Hlo" ] | ].
+      iSplitR; [ iPureIntro; apply Hal; exact Hal8 | iExact "Hhi" ].
+    - iIntros "((%Hal8 & Hlo) & (_ & Hhi))".
+      iSplitR; [ iPureIntro; exact Hal8 | ]. iFrame "Hlo Hhi".
+  Qed.
+
   Lemma ustack_2 (γd : gname) (sp : mword 64) :
-    ustack γd sp 2 ⊣⊢ (∃ w : mword 64, uword γd (uint sp - 8) w) ∗
+    ustack γd sp 2 ⊣⊢ ⌜ uint sp mod 8 = 0 ⌝ ∗
+                      (∃ w : mword 64, uword γd (uint sp - 8) w) ∗
                       (∃ w : mword 64, uword γd (uint sp - 16) w).
   Proof.
-    rewrite /ustack /=.
+    rewrite /ustack /ustack_body /=.
     assert (E0 : uint sp - 8 * (Z.of_nat 0 + 1) = uint sp - 8) by lia.
     assert (E1 : uint sp - 8 * (Z.of_nat 1 + 1) = uint sp - 16) by lia.
     rewrite E0 E1 right_id. reflexivity.
@@ -806,37 +878,15 @@ Section UserHeap.
       ((∃ w : mword 64, uword γd (uint sp - 8 * (Z.of_nat i + 1)) w) -∗
          ustack γd sp n).
   Proof.
-    intros Hi. rewrite /ustack.
-    iApply (big_sepL_lookup_acc _ _ i i).
-    apply lookup_seq. split; [ lia | exact Hi ].
+    intros Hi. iIntros "(%Hal & Hb)". rewrite /ustack /ustack_body.
+    iDestruct (big_sepL_lookup_acc _ _ i i with "Hb") as "[Hw Hcl]";
+      [ apply lookup_seq; split; [ lia | exact Hi ] | ].
+    iFrame "Hw". iIntros "Hw".
+    iSplitR; [ iPureIntro; exact Hal | ]. iApply ("Hcl" with "Hw").
   Qed.
 
   (* ...and the split at any depth: the first [k] words are the frame the
      caller is handing out, the rest is what remains below the moved sp *)
-  Lemma ustack_app (γd : gname) (sp sp' : mword 64) (k n : nat) :
-    uint sp' = uint sp - 8 * Z.of_nat k ->
-    ustack γd sp (k + n) ⊣⊢ ustack γd sp k ∗ ustack γd sp' n.
-  Proof.
-    revert sp sp'. induction k as [| k IH]; intros sp sp' Hsp.
-    - assert (Hs : sp' = sp) by (apply bv_eq; rewrite <- !uint_unsigned; lia).
-      rewrite Hs ustack_0 Nat.add_0_l bi.emp_sep. reflexivity.
-    - (* the headroom is not a premise: [sp'] is a machine word, so
-         [0 <= uint sp'], and the equation then bounds sp from below *)
-      assert (Hk : 8 * Z.of_nat (S k) <= uint sp).
-      { pose proof (proj1 (bv_unsigned_in_range _ sp')) as H0.
-        rewrite <- uint_unsigned in H0. lia. }
-      pose proof (bv_unsigned_in_range _ sp) as Hr.
-      rewrite Zmod64 in Hr. rewrite <- uint_unsigned in Hr.
-      set (sp1 := (mword_of_int (uint sp - 8) : mword 64)).
-      assert (Hu1 : uint sp1 = uint sp - 8).
-      { unfold sp1. rewrite uint_unsigned moi64_unsigned. unfold bv_wrap.
-        rewrite Zmod64. apply Z.mod_small. unfold Z64 in *. lia. }
-      replace (S k + n)%nat with (S (k + n))%nat by lia.
-      rewrite (ustack_S γd sp sp1 (k + n) Hu1).
-      rewrite (ustack_S γd sp sp1 k Hu1).
-      rewrite (IH sp1 sp' ltac:(rewrite Hu1; lia)).
-      rewrite assoc. reflexivity.
-  Qed.
 
 
   (* ===================================================================== *)
@@ -906,12 +956,13 @@ Section UserHeap.
   Qed.
 
   (* (4) ...and n of them, indexed downward from sp *)
-  Lemma ustack_of_ubytes (γd : gname) (sp : mword 64) (n : nat) (f : nat -> bv 8) :
+  Lemma ustack_body_of_ubytes (γd : gname) (sp : mword 64) (n : nat)
+      (f : nat -> bv 8) :
     8 * Z.of_nat n <= uint sp ->
-    ubytes γd (uint sp - 8 * Z.of_nat n) (8 * n) f -∗ ustack γd sp n.
+    ubytes γd (uint sp - 8 * Z.of_nat n) (8 * n) f -∗ ustack_body γd sp n.
   Proof.
     revert sp f. induction n as [| n IH]; intros sp f Hn.
-    - iIntros "_". rewrite ustack_0. done.
+    - iIntros "_". rewrite /ustack_body /=. done.
     - iIntros "Hb".
       pose proof (bv_unsigned_in_range _ sp) as Hr.
       rewrite Zmod64 in Hr. rewrite <- uint_unsigned in Hr.
@@ -919,7 +970,7 @@ Section UserHeap.
       assert (Hu1 : uint sp1 = uint sp - 8).
       { unfold sp1. rewrite uint_unsigned moi64_unsigned. unfold bv_wrap.
         rewrite Zmod64. apply Z.mod_small. unfold Z64 in *. lia. }
-      rewrite (ustack_S γd sp sp1 n Hu1).
+      rewrite (ustack_body_S γd sp sp1 n Hu1).
       replace (8 * S n)%nat with (8 * n + 8)%nat by lia.
       assert (Ea : (uint sp - 8 * Z.of_nat (S n))%Z
                    = (uint sp1 - 8 * Z.of_nat n)%Z) by (rewrite Hu1; lia).
@@ -933,6 +984,17 @@ Section UserHeap.
       + iApply (uword_of_ubytes with "Hhi").
       + assert (Hn' : 8 * Z.of_nat n <= uint sp1) by (rewrite Hu1; lia).
         iApply (IH sp1 f Hn' with "Hlo").
+  Qed.
+
+  (* ...and the alignment, which the entry's gate supplies *)
+  Lemma ustack_of_ubytes (γd : gname) (sp : mword 64) (n : nat) (f : nat -> bv 8) :
+    uint sp mod 8 = 0 ->
+    8 * Z.of_nat n <= uint sp ->
+    ubytes γd (uint sp - 8 * Z.of_nat n) (8 * n) f -∗ ustack γd sp n.
+  Proof.
+    intros Hal Hn. iIntros "Hb". rewrite /ustack.
+    iSplitR; [ iPureIntro; exact Hal | ].
+    iApply (ustack_body_of_ubytes γd sp n f Hn with "Hb").
   Qed.
 
 End UserHeap.
