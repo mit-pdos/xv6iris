@@ -2436,11 +2436,13 @@ Section ProofDirlinkMain.
                       /\ dn' = dn /\ dn0' = dn0)).
         { destruct Harm as
             [(Hm1 & [Hbad | _] & Htz & _ & Hbmq & Hdtq & Hdnq & Hd0q & _)
-            | Hgood];
+            (* the writing arm's second conjunct is SpecWritei's EOF guard;
+               dirlink already refuted the -1 arm's copy of it above *)
+            | (Hg0 & _ & Hgrest)];
             [ exfalso; exact (dl_nle _ _ Hk0le Hbad)
             | right; exact (conj Hm1 (conj Htz (conj Hbmq
                               (conj Hdtq (conj Hdnq Hd0q)))))
-            | left; exact Hgood ]. }
+            | left; exact (conj Hg0 Hgrest) ]. }
         assert (Htotle : (tot <= 16)%nat)
           by (destruct Hwiok as [(_ & Ht & _) | (_ & Ht & _)];
               [ exact Ht | rewrite Ht; exact (Nat.le_0_l 16%nat) ]).

@@ -197,24 +197,18 @@ Definition wp_filewrite_au_body
    make it a loop INVARIANT are Coq-level and ride as ordinary premises of
    [fw_loop]:
 
-     0 <= t <= iz   /\   t = FW_MAX * Z.of_nat p
+     t = iz   /\   t = FW_MAX * Z.of_nat p
 
-   -- the fired total never runs ahead of the running offset, and every
-   fired chunk was exactly [FW_MAX].  THERE IS NO [clean] FLAG: the
-   design's boolean is exactly the decidable comparison [t = iz], so the
-   loop carries the inequality and each exit reads the case it is in off
-   [decide (t = iz)].
-
-   WHY [<=] AND NOT [=], AND IT IS THIS LANE'S FINDING.  A chunk fires only
-   when its start is INSIDE the file ([wri_pre]'s [off <= length bs0], the
-   splice's own side condition), and [SpecWritei]'s SUCCESS arm does not
-   expose that guard -- the code's [off > ip->size] test answers -1, but
-   only the [-1] arm of the post records it, so a success at [off > size]
-   is spec-permitted and code-impossible.  Such a chunk cannot be fired,
-   and the loop is what carries the shortfall: [t] falls behind [iz] by
-   that chunk and STAYS behind.  Both exits still land, because the fail
-   arm's [total < n] is exactly what a shortfall gives -- see
-   [SpecSysWriteAUEra]'s second arm, which is why this file needs no third.
+   -- the fired total IS the running offset, and every fired chunk was
+   exactly [FW_MAX].  THERE IS NO [clean] FLAG AND NO SLACK.  Both were
+   the price of a gap that is now closed: a chunk fires only when its
+   start is INSIDE the file ([wri_pre]'s [off <= length bs0], the splice's
+   own side condition), and [SpecWritei]'s SUCCESS ARM NOW REPORTS THAT
+   GUARD (owner's ruling, 2026-08-29 -- the writing arm carries
+   [off <= di_size] of the pre-write record, the negation of the reason
+   its own [-1] arm carries).  So no chunk the loop completes has to be
+   skipped, [t] never falls behind [iz], and the loop needs neither the
+   inequality nor a branch for the case it admitted.
 
    WHY THE TIE IS NOT INSIDE THE iProp.  The last chunk may be SHORT, so
    [t = FW_MAX * p] is false of the state the exhausted exit hands out; it
@@ -297,9 +291,9 @@ Section FilewriteAUState.
   Qed.
 
   (* THE FAIL EXIT, AT BOTH OF ITS TWO SHAPES.  [t < n] is the loop's own
-     (the break, and the completed loop that skipped a chunk); the second
-     disjunct is the CAPSTONE's, on the [n < 0] guard at +0x20, where the
-     loop is never entered and the bundle is refunded whole. *)
+     (the short-write break, the only way out of the loop that is not the
+     count); the second disjunct is the CAPSTONE's, on the [n < 0] guard at
+     +0x20, where the loop is never entered and the bundle refunds whole. *)
   Lemma fw_au_raw_fail Γ (i n : Z) Φ (t : Z) (p : nat) :
     (t < n)%Z \/ (n < 0)%Z /\ p = 0%nat ->
     fw_au_raw Γ i n Φ t p -∗ write_post_fail_at Γ i n Φ.

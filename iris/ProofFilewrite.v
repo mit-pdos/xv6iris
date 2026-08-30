@@ -2159,7 +2159,9 @@ Section ProofFilewrite.
               /\ dn0' = dn').
     { destruct Harms as
         [(Hm1 & _ & Htot0 & _ & Hbmq & Hdataq & Hdnq & Hdn0q & _)
-        | (Hcnt2 & Htotle & Hdnq & Hdn0q)].
+        (* the writing arm's second conjunct is SpecWritei's EOF guard,
+           which this landed walk does not need (the AU walk does) *)
+        | (Hcnt2 & _ & Htotle & Hdnq & Hdn0q)].
       - exists (-1)%Z. subst bm' data' dn' dn0'. split_and!.
         (* EIGHT branches, not seven: [split_and!] splits the chained
            [-1 <= rz <= c] into TWO goals (the recorded trap). *)

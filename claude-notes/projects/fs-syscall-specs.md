@@ -572,25 +572,60 @@ things, and the answer differs:
     `write_arms_at`/`write_stable_arms_at`'s third disjunct are DELETED;
     `ProofSysWriteAUStable`'s destructuring loses one bullet and
     `ProofSysWriteAU` needed no edit at all (it frames the arms opaquely).
-  - **FINDING (and it is why the `clean` flag did not simply vanish):
-    `SpecWritei`'s SUCCESS ARM DOES NOT EXPOSE `off <= ip->size`.**  The
-    fire needs `wri_pre`'s `off <= length bs0` — without it the new file is
-    `bs0 ++ junk ++ wrote` and NOT `blk_splice off wrote bs0`, so the delta
-    is wrong, not merely unprovable.  The code tests `off > ip->size` and
-    answers -1, but only the post's `-1` arm records the guard; on the
-    `a0 = tot` arm nothing does.  So a success past EOF is spec-permitted
-    and code-impossible, and the walk must be able to SKIP a chunk it
-    cannot fire.  THE FIX IS FREE AND STAYS INSIDE THE CAMPAIGN: the loop
-    carries `0 <= t <= iz` instead of `t = iz` (the `clean` boolean IS the
-    decidable comparison `t = iz`, so no flag is needed), and a skip is a
-    STRICT SHORTFALL, which is exactly `write_post_fail_at`.  The fail arm's
-    return value is therefore widened to `-1 \/ (n /\ 0 <= n)` — strictly
-    MORE than the deleted third arm gave, since it keeps the totals fact.
-    Closing the gap properly is a one-conjunct output growth on
-    `SpecWritei`'s success arm (`bv_unsigned (di_size dn) >= off`), free at
-    every one of ProofWritei's exits (all are past the top check) but an
-    R10 edit to a landed contract + a 5 k-line proof + three callers'
-    intro patterns — OWNER'S CALL, and nothing is blocked on it.
+  - **THE EOF-GUARD FINDING IS RULED AND PAID — 2026-08-29**
+    (`SpecWritei` output-growth lane, whole tree green, zero `Admitted`).
+    The gap was that `SpecWritei`'s success arm did not expose
+    `off <= ip->size`: the fire needs `wri_pre`'s `off <= length bs0`, and
+    without it the new file is `bs0 ++ junk ++ wrote` and NOT
+    `blk_splice off wrote bs0`, so the delta is WRONG, not merely
+    unprovable.  Only the `-1` arm recorded the guard the code tests, so a
+    success past EOF was spec-permitted and code-impossible.
+    - **THE CONJUNCT AND ITS POSITION.**
+      `Z.of_nat off <= bv_unsigned (di_size dn)` — the literal negation of
+      the `-1` arm's first reason, at the PRE-write record — placed SECOND
+      in the writing arm, immediately after the `a0 = tot` equation, which
+      is where the `-1` arm states its own copy.  Against durable-notes'
+      new-conjunct-LAST rule, and deliberately: that rule buys its saving
+      from intro patterns whose LAST name absorbs the remainder, and every
+      one of this arm's four consumers writes a full-width `&`-chain and
+      USES its last name (`dn0' = dn'`) in a `subst`.  LAST and SECOND
+      therefore cost the same one line per site, and durable-notes' own
+      mirror rule for a PURE conjunct ("put it SECOND, after the fact every
+      producer already has") and the contract's local convention both point
+      at SECOND.
+    - **PROOF COST: FREE, as estimated, but not FREE-STANDING.**  No new
+      proof obligation anywhere — `ProofWritei`'s `wp_writei_gen` already
+      names the fall-through of the `+0x02 bltu` as `Hbig`, in exactly this
+      spelling.  What it cost is a RELAY: the arm is built in one place
+      (`wi_join`'s `right; split_and!`), so the fact travels
+      `wp_writei_gen → wi_loop → wi_size → wi_join` as one new premise on
+      each (3 signatures, 7 call sites, all positional).  `wi_ret` needed
+      only its restated premise; both `-1` exits are `left` and did not
+      move.  5,073 lines re-elaborate with no tactic change, and
+      `ProofFilewriteAU` measures 62 s against the 57 s it landed at — the
+      whole collapse is inside the noise.  The cone below `SpecWritei` is
+      186 files, so budget a near-whole-tree rebuild for any edit to it,
+      comment-only ones included.
+    - **THREE CALLERS, FIVE SITES, ONE LINE EACH.**  `ProofFilewrite` (1),
+      `ProofSysUnlink` (2), `ProofDirlink` (1), plus the campaign's own
+      `ProofFilewriteAU` (1).  Four take an extra `_` in the writing arm's
+      pattern; dirlink's took the arm WHOLE (`left; exact Hgood`) and
+      became `(Hg0 & _ & Hgrest)` / `conj Hg0 Hgrest`.
+    - **THE DIVIDEND, and it is the whole of the containment.**
+      `SpecSysWriteAUEra.write_arms_at` / `write_stable_arms_at`: the fail
+      arm's return value is the exact `-1` again (the
+      `\/ (r = n /\ 0 <= n)` widening deleted).  `SpecFilewriteAU`'s loop
+      invariant is `t = iz` again (`0 <= t <= iz` deleted).
+      `ProofFilewriteAU`'s fire is keyed on `rz = c` ALONE; the second key
+      conjunct is now a READING off `Hjoin`'s `0 < rz ->` guard, which
+      gained a third component beside `rz = tot` and the `wi_dinode`
+      equation.  The carried disjunction's non-firing branch records
+      `rz <> c` (free from the `decide`), which is what makes the exhausted
+      exit unconditional: `Hcrz : rz = c` refutes it, so `tf = t + c = n`
+      and the `destruct (decide (tf = n))` with its fail branch is gone.
+      `ProofSysWriteAU`, `ProofSysWriteAUStable` and the three Links needed
+      NO edit — the syscall layer frames the arms opaquely, and the stable
+      corollary's `by iPureIntro` closes the narrowed pure goal unchanged.
   - **TWO MORE PARALLEL FORMS, both `R10`-clean copies.**
     `fwau_tail` is `ProofFilewriteParts.fw_tail` with its post KEYED on the
     compare the block performs — `(iz = nz /\ rv = nz) \/ (iz <> nz /\

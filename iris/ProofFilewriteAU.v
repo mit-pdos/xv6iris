@@ -29,26 +29,23 @@
 
    2. THE LOOP CARRIES [SpecFilewriteAU.fw_au_raw].  [fw_loop] gains the
       chunk index [p], the fired total [t], the entry tie
-      [0 <= t <= iz /\ t = FW_MAX * p], and the wand itself; its
-      continuation drops [|filewrite_ret n r|] (each arm pins [r]) and
-      gains [write_arms_at].
+      [t = iz /\ t = FW_MAX * p], and the wand itself; its continuation
+      drops [|filewrite_ret n r|] (each arm pins [r]) and gains
+      [write_arms_at].
 
    3. THE FIRE REPLACES THE RETAG.  [FsAbsWriteFire.wrf_awrite_fire] is
       [InodeRegion.ireg_top_retag] plus the caller's two phases inside the
       one [ftopN] critical section; it stands where the retag stood, between
       writei's return and [iunlock].
 
-   4. THE FIRE IS KEYED, and the key has TWO conjuncts:
-        [rz = c]  -- the chunk was FULL, so writei's [dist] is 0 and the
-                     bytes really are the splice; and
-        [off <= size] -- the chunk STARTED INSIDE THE FILE, which is
-                     [wri_pre]'s own side condition.
-      The first is the design's.  THE SECOND IS THIS LANE'S FINDING:
-      [SpecWritei]'s success arm does not expose the [off > ip->size] guard
-      the code tests (only its [-1] arm records it), so a success past EOF
-      is spec-permitted and code-impossible, and the walk must be able to
-      SKIP such a chunk.  Skipping is what [t <= iz] is for, and a skip
-      lands in [write_arms_at]'s widened FAIL arm.
+   4. THE FIRE IS KEYED ON [rz = c] AND ON NOTHING ELSE -- the chunk was
+      FULL, so writei's [dist] is 0 and the bytes really are the splice.
+      [wri_pre]'s other side condition, [off <= length bs0], is not a key
+      but a READING: [SpecWritei]'s success arm reports [off <= di_size] of
+      the pre-write record (owner's ruling, 2026-08-29), so [Hjoin] carries
+      it beside the two facts it already took off that arm and the fire
+      simply has it.  Hence [t = iz] with no slack, no skip branch, and
+      [write_arms_at]'s fail arm at the exact [-1].
 
    5. [fw_test]'S POST IS ONE CONJUNCT WIDER: [c = nz - iz \/ c = FW_MAX],
       free at both of its exits (they instantiate [c] with exactly those two
@@ -1895,11 +1892,12 @@ Section ProofFilewriteAU.
     (n - iz <= Z.of_nat W)%Z ->
     (0 <= iz < n)%Z ->
     (* AU EDIT (difference 2): THE ENTRY TIE.  [t] bytes have been FIRED in
-       [p] full chunks.  [t <= iz] and not [t = iz], because a chunk whose
-       start is past EOF cannot be fired -- see the file header, difference
-       4.  [t = FW_MAX * p] because a chunk that did not exhaust the count
-       IS the cap ([Hcpick]). *)
-    (0 <= t <= iz)%Z ->
+       [p] full chunks, and they are exactly the bytes the running offset
+       has passed -- every completed chunk fires, because writei's success
+       arm reports the EOF guard the fire needs (file header, difference 4).
+       [t = FW_MAX * p] because a chunk that did not exhaust the count IS
+       the cap ([Hcpick]). *)
+    t = iz ->
     t = (SpecFilewrite.FW_MAX * Z.of_nat p)%Z ->
     uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) PI ->
     M !!! Regidx csp_rs1 = pa_stk sp0 12 ->
@@ -2601,18 +2599,22 @@ Section ProofFilewriteAU.
               /\ di_type dn' = di_type dnl
               /\ di_nlink dn' = di_nlink dnl
               /\ dn0' = dn'
-              (* AU EDIT: the SUCCESS arm's two extra readings, which the
+              (* AU EDIT: the SUCCESS arm's three extra readings, which the
                  landed join threw away because only the retag needed the
                  record and the retag does not look inside it.  The fire
                  does: [wrf_write_row] wants the SPLICE, hence [tot] and
-                 hence [wi_dinode].  Guarded by [0 < rz], which is exactly
-                 "we are not on writei's [-1] arm". *)
+                 hence [wi_dinode], and it wants [wri_pre]'s own side
+                 condition [off <= length bs0], which is the arm's EOF
+                 guard read at the pre-write record.  Guarded by [0 < rz],
+                 which is exactly "we are not on writei's [-1] arm". *)
               /\ ((0 < rz)%Z ->
                   rz = Z.of_nat tot
-                  /\ dn' = wi_dinode dnl bm' (Z.to_nat (bv_unsigned v)) tot)).
+                  /\ dn' = wi_dinode dnl bm' (Z.to_nat (bv_unsigned v)) tot
+                  /\ (Z.to_nat (bv_unsigned v)
+                      <= Z.to_nat (bv_unsigned (di_size dnl)))%nat)).
     { destruct Harms as
         [(Hm1 & _ & Htot0 & _ & Hbmq & Hdataq & Hdnq & Hdn0q & _)
-        | (Hcnt2 & Htotle & Hdnq & Hdn0q)].
+        | (Hcnt2 & Hoffle & Htotle & Hdnq & Hdn0q)].
       - exists (-1)%Z. subst bm' data' dn' dn0'. split_and!.
         (* EIGHT branches, not seven: [split_and!] splits the chained
            [-1 <= rz <= c] into TWO goals (the recorded trap). *)
@@ -2656,7 +2658,9 @@ Section ProofFilewriteAU.
         + apply fw_wi_type.
         + reflexivity.
         + reflexivity.
-        + intros _. split; reflexivity. }
+        + intros _. split_and!; [reflexivity | reflexivity |].
+          (* the EOF guard, off the arm and at the pre-write record *)
+          lia. }
     destruct Hjoin as (rz & Hrza0 & Hrzr & Hrzadv & Hiok2 & Hdok2 & Htyq & Hnlq
                        & Hdn0q & Hsucc).
     (* the RESOURCE twin of [Hdok2] (design §20.3).  filewrite cannot reach a
@@ -2744,31 +2748,26 @@ Section ProofFilewriteAU.
        [FsAbsWriteFire.wrf_awrite_fire] IS [ireg_top_retag] with the
        caller's two phases on either side of the [ghost_map_update], inside
        the ONE [ftopN] critical section -- so the chunk's commit and the
-       row's move are one instant.  It is taken only on the KEY:
-
-         [rz = c]                 the chunk was full, so writei's disturbed
-                                  tail is empty and the bytes ARE the splice
-         [f->off <= ip->size]     the chunk started inside the file, which
-                                  is [wri_pre]'s own side condition and the
-                                  one guard [SpecWritei]'s success arm does
-                                  not expose (file header, difference 4).
+       row's move are one instant.  It is taken on the ONE KEY [rz = c]:
+       the chunk was full, so writei's disturbed tail is empty and the
+       bytes ARE the splice.  [wri_pre]'s other side condition,
+       [f->off <= ip->size], is not a second key -- writei's success arm
+       reports it and [Hsucc] hands it over (file header, difference 4).
 
        Off the key the plain retag runs and the carried state does not move
        -- which is what [tf = t] records for the exits below. *)
     iAssert (|={⊤}=> top_frag (fs_gamma_L fsc_fs) (bv_unsigned inum)
                        (era_node dn' bm' data')
              ∗ ∃ (tf : Z) (pf : nat),
-                 ⌜(tf = t /\ pf = p)
+                 ⌜(tf = t /\ pf = p /\ rz <> c)
                   \/ (tf = (t + c)%Z /\ pf = S p /\ rz = c)⌝
                  ∗ fw_au_raw (fs_gamma_L fsc_fs) nx n Φw tf pf)%I
       with "[Htop Hau]" as ">[Htop Hst]".
     { rewrite Hnum.
-      destruct (decide (rz = c /\ (Z.to_nat (bv_unsigned v)
-                  <= Z.to_nat (bv_unsigned (di_size dnl)))%nat))
-        as [[Hfc Hfo] | Hnokey].
+      destruct (decide (rz = c)) as [Hfc | Hnokey].
       - (* ---- THE CHUNK FIRES ---- *)
         assert (Hrzpos : (0 < rz)%Z) by lia.
-        destruct (Hsucc Hrzpos) as (Hrztot & Hdnwi).
+        destruct (Hsucc Hrzpos) as (Hrztot & Hdnwi & Hfo).
         assert (Htotc : (tot = Z.to_nat c)%nat) by lia.
         assert (Hd0 : dist = 0%nat) by (apply Hdistn; exact Htotc).
         assert (Htotpos : (0 < tot)%nat) by lia.
@@ -2852,7 +2851,8 @@ Section ProofFilewriteAU.
                 ltac:(solve_ndisj) Hlocw with "[] Htop") as "Htop";
           [iApply (ireg_inv_ftop with "Hireg") |].
         iModIntro. iFrame "Htop". iExists t, p.
-        iSplitR; [iPureIntro; left; split; reflexivity |]. iExact "Hau". }
+        iSplitR; [iPureIntro; left; split_and!;
+                  [reflexivity | reflexivity | exact Hnokey] |]. iExact "Hau". }
     iDestruct "Hst" as (tf pf) "[%Hfire Hau]".
     iModIntro.
     iAssert (i_valid (ientry ik) ↦₄ valid_word true)%I
@@ -3154,19 +3154,15 @@ Section ProofFilewriteAU.
         { exact Hupt2. }
         { exact Hrv. }
         { iApply (fw_env_out_fs fn stx Cf inumx Hokx Htyi). iExact "Hout". }
-        { (* THE ARMS, AT THE EXHAUSTED EXIT.  [tf <= iz + c = n] always;
-             the ok arm is the case where the loop skipped nothing. *)
-          assert (Htfle : (tf <= n)%Z)
-            by (destruct Hfire as [[E1 _] | [E1 [_ _]]]; rewrite E1; lia).
-          rewrite /write_arms_at.
-          destruct (decide (tf = n)) as [Htfn | Htfne].
-          - subst tf. iLeft.
-            iSplitR; [iPureIntro; split; [exact Hrvn | lia] |].
-            iApply (fw_au_raw_ok (fs_gamma_L fsc_fs) nx n Φw pf with "Hau").
-          - iRight.
-            iSplitR; [iPureIntro; right; split; [exact Hrvn | lia] |].
-            iApply (fw_au_raw_fail (fs_gamma_L fsc_fs) nx n Φw tf pf
-                      ltac:(left; lia) with "Hau"). }
+        { (* THE ARMS, AT THE EXHAUSTED EXIT.  The chunk that reached it was
+             FULL ([Hcrz]), so it FIRED, so [tf = t + c = iz + c = n]: this
+             exit takes the ok arm and no other. *)
+          assert (Htfn : tf = n).
+          { destruct Hfire as [[_ [_ E3]] | [E1 _]];
+              [exfalso; exact (E3 Hcrz) | rewrite E1; lia]. }
+          rewrite /write_arms_at. subst tf. iLeft.
+          iSplitR; [iPureIntro; split; [exact Hrvn | lia] |].
+          iApply (fw_au_raw_ok (fs_gamma_L fsc_fs) nx n Φw pf with "Hau"). }
       + (* ---- NOT EXHAUSTED: the FALL is the back edge to +0xcc ---- *)
         assert (Hlt : (iz + c < n)%Z).
         { destruct (Z.le_gt_cases n (iz + c)) as [Hle | Hgt]; [| lia].
@@ -3202,10 +3198,10 @@ Section ProofFilewriteAU.
           by (destruct Hcpick as [Hp1 | Hp2]; lia).
         iApply (IH CIDc3 (iz + c)%Z tf pf P' Y1
                   ltac:(lia) ltac:(lia)
-                  ltac:(destruct Hfire as [[E1 _] | [E1 [_ _]]];
-                        rewrite E1; lia)
-                  ltac:(destruct Hfire as [[E1 E2] | [E1 [E2 _]]];
-                        rewrite E1 E2; lia)
+                  ltac:(destruct Hfire as [[_ [_ E3]] | [E1 _]];
+                        [exfalso; exact (E3 Hcrz) | rewrite E1; lia])
+                  ltac:(destruct Hfire as [[_ [_ E3]] | [E1 [E2 _]]];
+                        [exfalso; exact (E3 Hcrz) | rewrite E1 E2; lia])
                   Hupt2
                   HY1sp
                   ltac:(rewrite (HY1cs Rs2 ltac:(vm_compute; reflexivity)
@@ -3283,7 +3279,7 @@ Section ProofFilewriteAU.
       { exact Hrv. }
       { iApply (fw_env_out_fs fn stx Cf inumx Hokx Htyi). iExact "Hout". }
       { rewrite /write_arms_at. iRight.
-        iSplitR; [iPureIntro; left; exact Hrvm1 |].
+        iSplitR; [iPureIntro; exact Hrvm1 |].
         iApply (fw_au_raw_fail (fs_gamma_L fsc_fs) nx n Φw tf pf
                   ltac:(left; lia) with "Hau"). }
   Qed.
@@ -3589,7 +3585,7 @@ Section ProofFilewriteAU.
              which is [write_post_fail_at]'s second disjunct, the one that
              exists for exactly this arm. *)
           rewrite /write_arms_at. iRight.
-          iSplitR; [iPureIntro; left; reflexivity |].
+          iSplitR; [iPureIntro; reflexivity |].
           iApply (fw_au_raw_fail Γfs i n Φw 0%Z 0%nat
                     ltac:(right; split; [lia | reflexivity])).
           iApply (fw_au_raw_init with "Hbundle"). } }
