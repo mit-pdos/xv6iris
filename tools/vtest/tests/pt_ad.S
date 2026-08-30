@@ -58,7 +58,19 @@ _vtest_body:
     li   t0, (1<<12)|(1<<13)|(1<<15)
     csrw medeleg, t0
 
+    /* menvcfg is CONTEXT here, not the measurement -- the A/D experiment
+       below does not need it.  The U74 has no menvcfg at all (finding 31):
+       `csrr t0, 0x30A` takes an illegal-instruction trap, and this test's
+       M-mode handler is an abort-and-report BACKSTOP rather than a
+       skip-and-continue, so the whole test died at this one instruction and
+       the experiment never ran.  Measured: mcause 2, mtval 0x30a022f3,
+       which is this exact encoding.  -1 records "this machine has no
+       menvcfg", which is a different claim from "menvcfg reads 0". */
+#ifdef VTEST_BOARD
+    li   t0, -1
+#else
     csrr t0, 0x30A                 /* menvcfg */
+#endif
     sd   t0, 8(s11)
 
     /* ---- the table ---- */

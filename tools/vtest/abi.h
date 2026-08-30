@@ -31,6 +31,20 @@
 #define RES_PAYLOAD  8
 #define DONE_MAGIC   0x444f4e45   /* "DONE", written LAST, after a fence */
 
+/* THE M-MODE BACKSTOP MARKER.  A test whose M-mode handler is an
+   abort-and-report backstop writes this to RES_STATUS, records mcause/mepc/
+   mtval at +56/+64/+72, and THEN sets DONE_MAGIC so the runner is not left
+   waiting.  So DONE here means "the test gave up", not "the test finished",
+   and a capture tool MUST refuse such a result: capturing it records the
+   failure report as though it were an observation, and the model is then
+   asked to reproduce a failure, which is meaningless.
+
+   This has bitten twice.  The pt_ family aborts on the U74 at its very first
+   instruction (`csrr menvcfg`, which the core does not implement -- finding
+   31), and both times the DONE flag made 7 of them look captured.
+   tools/vtest/{vtest,board}.py now reject it by this name. */
+#define STATUS_MTRAP 0x4D
+
 /* THE TRAP-RECORD AREA, the second half of the result region, used only by a
    test that includes trap.S and points mtvec at [_vtest_trap].  It is up
    here at a fixed offset rather than chosen per test so that the handler can

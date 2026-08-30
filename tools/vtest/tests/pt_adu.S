@@ -27,6 +27,17 @@
      +56/+64/+72  the M-mode backstop's record: mcause, mepc, mtval (all
           zero unless an UNDELEGATED trap happened)
      +0x100  the fault records, 24 bytes each: scause, sepc, stval          */
+/* THE BOARD CANNOT ANSWER THIS ONE, and that is an EXCLUSION rather than a
+   failure.  The whole subject here is Svadu -- menvcfg.ADUE = 1, hardware
+   writing A/D back -- and the U74 has no menvcfg at all (finding 31), so the
+   premise cannot be established on it.  pt_ad measured what the core does
+   instead: it is natively Svade (a load through an A=0 PTE faults with
+   scause 13, and the PTE comes back with A still clear), which is the
+   pt_ade half of the pair.  Every other pt_ case only pinned ADUE
+   DEFENSIVELY -- their leaves already carry PTE_A/PTE_D, so no A/D update
+   ever needs to happen -- and those run on the board under its native mode.
+   This one does not, so it does not claim to. */
+/* vtest: platforms=qemu */
 #include "abi.h"
 
 #define PTE_V   0x001

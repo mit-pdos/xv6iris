@@ -57,9 +57,20 @@ _vtest_body:
     csrw pmpcfg0, t0
     li   t0, (1<<12)|(1<<13)|(1<<15)
     csrw medeleg, t0
+    /* menvcfg.ADUE = 1 pins Svadu so that an access needing A/D cannot fault
+       and confuse what this test is actually about.  The U74 has NO menvcfg
+       (finding 31) -- `csrs 0x30A` takes an illegal-instruction trap and the
+       M-mode backstop aborts the test -- and it is natively Svade (measured
+       by pt_ad: a load through an A=0 PTE faults, scause 13, and the PTE
+       comes back unchanged).  This test's own leaves are built with PTE_A
+       and PTE_D already set, so nothing here ever needs an A/D update and
+       the mode does not matter; skipping the write on the board keeps the
+       test meaning what it means. */
+#ifndef VTEST_BOARD
     li   t0, 1
     slli t0, t0, 61
     csrs 0x30A, t0                 /* menvcfg.ADUE = 1 */
+#endif
 
     li   t0, PT_BASE
     li   t1, (0x80000000 >> 12) << 10

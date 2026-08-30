@@ -68,9 +68,19 @@ _vtest_body:
     csrw pmpcfg0, t0
     li   t0, (1<<12)|(1<<13)|(1<<15)
     csrw medeleg, t0
+    /* The U74 has NO menvcfg (finding 31): touching 0x30A takes an
+       illegal-instruction trap and this test's M-mode backstop aborts the
+       run.  The core is natively Svade (measured by pt_ad: a load through an
+       A=0 PTE faults with scause 13 and the PTE comes back with A still
+       clear), and this test's leaves carry PTE_A/PTE_D already, so no A/D
+       update ever needs to happen and the mode does not affect what is being
+       measured.  -1 records "this machine has no menvcfg", which is a
+       different claim from "menvcfg reads 0". */
+#ifndef VTEST_BOARD
     li   t0, 1
     slli t0, t0, 61                /* menvcfg.ADUE = 1: Svadu on both */
     csrs 0x30A, t0
+#endif
 
     /* ---- the table ---- */
     li   t0, PT_BASE
