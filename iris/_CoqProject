@@ -258,11 +258,8 @@ WpUmodeLeaf.v
 WpUmodeBranch.v
 WpUmodeStore.v
 WpUmodeLoad.v
-USpecSync.v
 UCodeSync.v
-UProofSync.v
 UmodeKernelTie.v
-USyncKernel.v
 UkStep.v
 UkLeaf.v
 UkBranch.v
@@ -274,7 +271,6 @@ UkRunLeaf.v
 UkRunMem.v
 UkRunSys.v
 UkAbi.v
-UkSync.v
 UkEcho.v
 UkEchoKernel.v
 UexecCond.v

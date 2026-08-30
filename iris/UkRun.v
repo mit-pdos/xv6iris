@@ -310,7 +310,7 @@ Section UkRun.
     (∀ (γt γd γs : gname) (h : CpuId) (sz : Z),
        ⌜ usz_ok sz ⌝ -∗
        usz γs sz -∗
-       ([∗ map] a ↦ b ∈ utext_part (uvis_M W) (uvis_perm W), utext γt a b) -∗
+       utext_all γt (uvis_M W) (uvis_perm W) -∗
        ([∗ map] a ↦ b ∈ udata_lo (uvis_M W) (uvis_perm W) sz, ubyte γd a b) -∗
        urun γt γd γs h (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)) -∗
        WP (Loop : expr riscv_lang))
@@ -327,6 +327,7 @@ Section UkRun.
     iDestruct (umem_lazy_bound pt sz (uvis_M W) Hwf Hsz with "Hlazy") as %Hcan.
     iMod (uheap_alloc (uvis_M W) (uvis_perm W) sz Hcan)
       as (γt γd γs) "(Hheap & Hszf & #Ht & Hd)".
+    rewrite -/(utext_all γt (uvis_M W) (uvis_perm W)).
     iSpecialize ("Hprog" $! γt γd γs h sz with "[%] Hszf Ht Hd"); [ exact Hsz | ].
     iApply "Hprog".
     iExists C, pt, Rut, sz, (uvis_M W), (uvis_perm W).

@@ -52,11 +52,11 @@ Require Import RiscvLang RiscvPtsto.
 Require Import ProcGeom ProcDefs ProcPt ProcPtOwn.   (* [tf_sp_idx] / [tf_arg_idx] *)
 Require Import UserPtTree UserExec.
 Require Import UmodeAbi.
-Require Import UserPerm UexecWp UexecSlot UexecRet USyncKernel.
+Require Import UserPerm UexecWp UexecSlot UexecRet.
 Require Import UkAbi.   (* [uk_xpage] / [uk_stack] / [uk_args_c]: the key-level facts *)
 Require Import UkEchoKernel.
+Require User.SyncInstrs.
 Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode*/Uk* precedent *)
-Require User.SyncSyms User.SyncInstrs User.EchoSyms User.EchoInstrs.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -139,16 +139,6 @@ Proof. exact (uimg_sub_text_region_eq_of SyncInstrs.sync_bytes M). Qed.
 (* SS3 THE GATE, and THE CONDITIONAL CONSTRUCTOR.                          *)
 (* ===================================================================== *)
 
-(* sync's four entry conditions, all about the key, all decidable *)
-Definition sync_gate (W : uvis) : Prop :=
-  text_region_eq (uvis_M W) /\
-  tf_resume_pc (uvis_tf W) = (mword_of_int SyncSyms.start : mword 64) /\
-  uk_xpage (uvis_perm W) (mword_of_int 0) /\
-  uk_stack (uvis_perm W) (uvis_M W) (tf_w (uvis_tf W) tf_sp_idx) 32.
-
-Global Instance sync_gate_dec (W : uvis) : Decision (sync_gate W).
-Proof. unfold sync_gate. apply _. Defined.
-
 (* echo's FIVE, the same shape one program up.  The extra one is the
    argument area, and note where its parameters come from: [argc], [argv]
    and the entry [sp] are TRAPFRAME WORDS, so the gate names no
@@ -172,13 +162,6 @@ Section UexecCond.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
 
-  (* the gate's yes branch: sync's own slot *)
-  Lemma sync_gate_slot (W : uvis) : sync_gate W -> ⊢ uslot W.
-  Proof.
-    intros (Hteq & Hpc & Hx & Hst).
-    exact (sync_uexec_slot W Hpc (text_region_eq_uimg_sub (uvis_M W) Hteq) Hx Hst).
-  Qed.
-
   (* the same for echo.  [uk_args_c] IS [uk_args] at the canonical lengths
      (UkAbi.v's [uk_slens]), so the gate's decidable form is already the
      witness the constructor's [alen] parameter wants. *)
@@ -201,8 +184,6 @@ Section UexecCond.
   Lemma cond_entry_slot (W : uvis) : □ uexec_wp -∗ uslot W.
   Proof.
     iIntros "#Hgen".
-    destruct (decide (sync_gate W)) as [Hgate | _].
-    { iApply (sync_gate_slot W Hgate). }
     destruct (decide (echo_gate W)) as [Hgate | _].
     { iApply (echo_gate_slot W Hgate). }
     iApply (uexec_wp_uslot W with "Hgen").

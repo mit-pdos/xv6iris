@@ -58,7 +58,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvPtsto RiscvExtras.
 Require Import UserPtTree.
-Require Import UmodeMem UmodeArith UmodeAbi.  (* [uva_canon] / [uint_moi] / [uva_canon_small] *)
+Require Import UmodeMem UmodeArith UmodeAbi UmodeFetch.  (* [uva_canon] / [uint_moi] / [uva_canon_small] *)
 Require Import UserPerm.
 Local Open Scope Z_scope.
 
@@ -569,12 +569,22 @@ Section UserHeap.
   (* the two heaps a partition.  A program with a concrete permission map  *)
   (* decides both.                                                         *)
   (* ===================================================================== *)
+  (* A PROGRAM'S WHOLE TEXT, as one resource.  This is what the entry hands
+     out and what a code catalog consumes; naming it keeps the [∗ map] out
+     of every generated statement. *)
+  Definition utext_all (γt : gname) (M : gmap Z (bv 8))
+      (pm : gmap (mword 27) uperm) : iProp Σ :=
+    ([∗ map] a ↦ b ∈ utext_part M pm, utext γt a b)%I.
+
+  Global Instance utext_all_persistent γt M pm : Persistent (utext_all γt M pm).
+  Proof. apply _. Qed.
+
   Lemma utext_frag (γt : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
       (a : Z) (b : bv 8) :
     M !! a = Some b -> ux_addr pm a -> ~ uw_addr pm a ->
-    ([∗ map] a' ↦ b' ∈ utext_part M pm, utext γt a' b') -∗ utext γt a b.
+    utext_all γt M pm -∗ utext γt a b.
   Proof.
-    intros HM Hx Hw. iIntros "Ht".
+    intros HM Hx Hw. iIntros "Ht". rewrite /utext_all.
     iApply (big_sepM_lookup _ _ a b with "Ht").
     apply map_lookup_filter_Some. exact (conj HM (conj Hx Hw)).
   Qed.
@@ -584,7 +594,7 @@ Section UserHeap.
     uM_bytes M a n w ->
     (forall j : nat, (j < n)%nat ->
        ux_addr pm (a + Z.of_nat j)%Z /\ ~ uw_addr pm (a + Z.of_nat j)%Z) ->
-    ([∗ map] a' ↦ b' ∈ utext_part M pm, utext γt a' b') -∗
+    utext_all γt M pm -∗
     ([∗ list] j ∈ seq 0 n, utext γt (a + Z.of_nat j) (nth_byte w j)).
   Proof.
     intros HM Hperm. iIntros "#Ht".
@@ -658,6 +668,49 @@ Section UserHeap.
     rewrite /uinstr_is. iSplit; [ done | ]. iSplit; [ done | ].
     iExists h. iSplit; [ done | ]. iSplit; [ done | ].
     rewrite Hne. iExact "Hbs".
+  Qed.
+
+
+  (* ---- THE CATALOG BRIDGE --------------------------------------------- *)
+  (* [tools/gen_ucode.py] emits [uinstr]-shaped facts ([ui_sync_02] &c) and
+     is the single source of decode truth for every user program, so it is
+     NOT forked: this turns one of its facts into the resource a leaf wants,
+     by pulling the bytes it names out of the program's own text.
+
+     The 4-aligned compressed case is the only place the two shapes differ.
+     [uinstr] carries the halfword and the two trailing bytes SEPARATELY
+     (that is what the fetch path checks); [uinstr_is] carries the assembled
+     word, because a fetch reads a word.  [urvc4_word] is that assembly. *)
+  Lemma uinstr_is_of_uinstr (γt : gname) (M : gmap Z (bv 8))
+      (pm : gmap (mword 27) uperm) (pt : uptd)
+      (pc : mword 64) (rvc : bool) (i : instruction) :
+    uinstr pt M pc rvc i ->
+    (forall j : nat, (j < 4)%nat ->
+       ux_addr pm (uint pc + Z.of_nat j)%Z /\
+       ~ uw_addr pm (uint pc + Z.of_nat j)%Z) ->
+    ([∗ map] a ↦ b ∈ utext_part M pm, utext γt a b) -∗ uinstr_is γt pc rvc i.
+  Proof.
+    intros Hui Hperm. iIntros "#Ht".
+    destruct Hui as [Hal2 Hcan Hleaf Hpg Hcode].
+    destruct rvc.
+    - destruct Hcode as (h & Hrvc & Hbytes & Hdec & Htrail).
+      destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal4.
+      + destruct (Htrail eq_refl) as (b2 & b3 & Hb2 & Hb3).
+        iApply (uinstr_is_rvc4 γt pc h (urvc4_word h b2 b3) i Hal4 Hpg Hrvc Hdec
+                  (urvc4_low h b2 b3)).
+        iApply (utext_run_of γt M pm (uint pc) 4 (urvc4_word h b2 b3)
+                  ltac:(intros j Hj; rewrite (urvc4_byte h b2 b3 j Hj);
+                        destruct j as [| [| [| [| j']]]]; cbn;
+                        [ exact (Hbytes 0%nat ltac:(lia))
+                        | exact (Hbytes 1%nat ltac:(lia))
+                        | exact Hb2 | exact Hb3 | exfalso; lia ])
+                  Hperm with "Ht").
+      + iApply (uinstr_is_rvc2 γt pc h i Hal2 Hal4 Hpg Hrvc Hdec).
+        iApply (utext_run_of γt M pm (uint pc) 2 h Hbytes
+                  ltac:(intros j Hj; apply Hperm; lia) with "Ht").
+    - destruct Hcode as (w & Hn & Hbytes & Hdec).
+      iApply (uinstr_is_base γt pc w i Hal2 Hpg Hn Hdec).
+      iApply (utext_run_of γt M pm (uint pc) 4 w Hbytes Hperm with "Ht").
   Qed.
 
 End UserHeap.
