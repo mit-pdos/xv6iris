@@ -1755,13 +1755,17 @@ things, and the answer differs:
     at sh's text and entry pc, not echo's nine.
 
   **ASKS (relay, in priority order).**
-  1. **`wp_uk_ecall_window` in `UkRunSys.v`** — no longer blocks stage 2,
-     which landed against it as the local Hypothesis `ush_read_leaf`
-     (statement above, spelled to match `wp_uk_ecall_wait_null`).  What is
-     left is to land the leaf and replace the Hypothesis by an `intros` +
-     `exact`; until then seven of `UkSh.v`'s lemmas carry it as an
-     explicit argument, `wp_ksh_start` among them.  The row and the
-     re-assembly lemma (`UserHeap.uheap_store_run`) both exist.
+  1. ~~**`wp_uk_ecall_window` in `UkRunSys.v`**~~ **DONE — built in-house
+     (see WINDOW LEAF section) and DISCHARGED (coordinator, same day)**:
+     `UkSh.v` now ends with `ush_read_leaf_holds`, proving the Hypothesis
+     from `UkRunSys.wp_uk_ecall_read`.  The bridge is one bound,
+     `ush_narrow_count_le`: `Z.to_nat` of a2's C-`int` narrowing never
+     exceeds a2's unsigned word, with NO side condition on the size (a
+     negative narrow floors at 0; a non-negative one is the unsigned low
+     half, bounded by `mod`).  Audit = the standing three.  Stage 2's
+     seven tainted lemmas become unconditional by application to
+     `ush_read_leaf_holds`; the Hypothesis text above is kept for the
+     record.
   2. **`wp_uk_ecall_fork`** (the two-continuation arm) and
      **`wp_uk_ecall_sbrk`** — stages 3–5.
   3. **Relocate `UkRunBr.v`'s remaining leaf into `UkRunLeaf.v`** —

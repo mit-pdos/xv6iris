@@ -5231,3 +5231,83 @@ Section UkSh.
   Qed.
 
 End UkSh.
+
+(* ===================================================================== *)
+(* THE READ LEAF, DISCHARGED.  [ush_read_leaf] was a Hypothesis while     *)
+(* the general window leaf did not exist; [UkRunSys.wp_uk_ecall_read] is  *)
+(* that leaf's read instance, and the two spellings differ only in how    *)
+(* the count is read: the hypothesis takes a2 as the unsigned word equal  *)
+(* to the buffer's size, the leaf takes it as the C [int] the kernel      *)
+(* narrows it to.  The bridge is ONE bound -- [Z.to_nat] of the narrowed  *)
+(* count never exceeds the unsigned word -- and it needs NO side          *)
+(* condition on [k]: a negative narrow floors at zero under [Z.to_nat],   *)
+(* and a non-negative one IS the unsigned low half, which [mod] bounds    *)
+(* by the whole word.  So every lemma above that carries the hypothesis   *)
+(* as an argument is made unconditional by applying it to                 *)
+(* [ush_read_leaf_holds].                                                 *)
+(* ===================================================================== *)
+
+Lemma ush_narrow_count_le (w : mword 64) (k : nat) :
+  uint w = Z.of_nat k ->
+  (Z.to_nat (bv_signed (subrange_vec_dec w 31 0 : mword 32)) <= k)%nat.
+Proof.
+  intros Hu. rewrite uint_unsigned in Hu.
+  pose proof (subrange_31_0_unsigned w) as Hlo.
+  (* the signed reading, as the unsigned one shifted into the signed
+     window -- convertibility does the modulus arithmetic *)
+  assert (Hs : bv_signed (subrange_vec_dec w 31 0 : mword 32)
+               = (bv_unsigned (subrange_vec_dec w 31 0 : mword 32)
+                  + 2147483648) mod 4294967296 - 2147483648)
+    by reflexivity.
+  rewrite Hs Hlo.
+  set (u := bv_unsigned w mod 4294967296).
+  assert (Hub : 0 <= u < 4294967296)
+    by (apply Z.mod_pos_bound; lia).
+  assert (Hule : u <= bv_unsigned w)
+    by (apply Z.mod_le; [ lia | lia ]).
+  pose proof (Z.div_mod (u + 2147483648) 4294967296 ltac:(lia)) as Hdm.
+  pose proof (Z.mod_pos_bound (u + 2147483648) 4294967296 ltac:(lia)) as Hmb.
+  lia.
+Qed.
+
+Section UkShLeaf.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{XI : CurCtx}.
+  Context `{!ghost_varG Σ Z}.
+  Context (γt γd γs : gname).
+
+  Lemma ush_read_leaf_holds :
+    forall (h : CpuId) (m : regfile) (pc : mword 64) (a : Z) (k : nat)
+           (f : nat -> bv 8) (avail : nat),
+      usysno m = USYS_read ->
+      uint (m !!! Regidx (mword_of_int 11 : mword 5)) = a ->
+      uint (m !!! Regidx (mword_of_int 12 : mword 5)) = Z.of_nat k ->
+      is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
+      uinstr_is γt pc false (ECALL tt) -∗
+      ubytes γd a k f -∗
+      urun γt γd γs h m pc avail -∗
+      (∀ (h' : CpuId) (r : mword 64) (d : nat) (g : nat -> bv 8),
+         ⌜ (d <= k)%nat ⌝ -∗
+         ⌜ forall j : nat, (d <= j < k)%nat -> g j = f j ⌝ -∗
+         ubytes γd a k g -∗
+         urun γt γd γs h' (<[Regidx (mword_of_int 10 : mword 5) := r]> m)
+           (add_vec_int pc 4) avail -∗
+         WP (Loop : expr riscv_lang)) -∗
+      WP (Loop : expr riscv_lang).
+  Proof.
+    intros h m pc a k f avail Hn Ha1 Ha2 Hal.
+    pose proof (ush_narrow_count_le (m !!! Regidx (mword_of_int 12 : mword 5))
+                  k Ha2) as Hbound.
+    subst a.
+    iIntros "#Hi Hbuf Hrun Hcont".
+    iApply (wp_uk_ecall_read γt γd γs h m pc
+              (bv_signed (subrange_vec_dec
+                            (m !!! Regidx (mword_of_int 12 : mword 5)) 31 0
+                          : mword 32))
+              k f avail Hn eq_refl Hbound Hal with "Hi Hrun Hbuf").
+    iIntros (h' r d g) "%Hd %Hgf Hrun Hbuf".
+    iApply ("Hcont" $! h' r d g with "[%] [%] Hbuf Hrun");
+      [ lia | exact Hgf ].
+  Qed.
+
+End UkShLeaf.
