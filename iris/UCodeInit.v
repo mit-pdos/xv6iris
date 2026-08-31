@@ -1647,10 +1647,18 @@ Section UCodeInit.
     let j := fresh "j" in let Hj := fresh "Hj" in
     intros j Hj; do 4 (destruct j as [|j]; [uis_byte|]); lia.
 
+  (* The byte side condition is discharged as a GOAL, not spliced into the
+     term as an [ltac:] ARGUMENT -- claude-notes/optimization.md's "unshelve
+     hoist", under "Inline [ltac:] in argument position".  It is worth
+     spelling out here because it was essentially the WHOLE cost of this
+     section: the inline form measured 0.85 s per instruction against 0.02 s
+     for this one, and the tactic runs exactly ONCE either way, so the
+     difference is the elaboration of the spliced term, not repeated
+     [vm_compute]s. *)
   Ltac uis_run g off n w :=
-    iApply (utext_img_run g InitInstrs.init_bytes
-              (uint (mword_of_int off : mword 64)) n w
-              ltac:(first [ uis_bytes2 | uis_bytes4 ]));
+    unshelve iApply (utext_img_run g InitInstrs.init_bytes
+              (uint (mword_of_int off : mword 64)) n w _);
+    [ first [ uis_bytes2 | uis_bytes4 ] | ];
     iApply (init_code_img with "Ht").
 
   (* compressed at a 2-mod-4 pc: the resource is the two bytes there *)
