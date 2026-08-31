@@ -206,9 +206,8 @@ Require Import SpecNamex.
 Require Import SpecCreate.
 Require Import SpecNparWrapEra.  (* the ERA nameiparent walk            *)
 Require Import FsBytesGamma.
-Require Import FsAbsStart.       (* [ep_start]: the DEFERRED start      *)
+Require Import FsAbsEra.       (* [ep_start]: the DEFERRED start      *)
 Require Import SpecSysMknodAU.   (* [cre_pre], [mknod_parent_elems]     *)
-Require Import FsAbsNparMknod.   (* [np_dead_to_mknod]                  *)
 Require Import FsAbsMknodFire.   (* the commits and the two fires       *)
 Require Import SpecCreateAU.     (* the contract this file seals        *)
 Require Import FsAbs.            (* LAST of the abstract stack          *)

@@ -617,6 +617,30 @@ Section UserHeap.
     split; [ exact (Hw a (mk_is_Some _ _ HMd)) | exact (Hcan a (mk_is_Some _ _ HM)) ].
   Qed.
 
+  (* A RUN a program owns is a run the IMAGE holds, and it does not wrap.
+     This is what a syscall row based at a user pointer needs before its
+     write can be absorbed: the row names addresses through [add_vec_int]
+     and the heap through plain [Z] addition, and the two agree exactly
+     because every owned address is below MAXVA. *)
+  Lemma uheap_ubytes_img (γt γd γs : gname) (M : gmap Z (bv 8))
+      (pm : gmap (mword 27) uperm) (a : Z) (n : nat) (f : nat -> bv 8) :
+    uheap γt γd γs M pm -∗ ubytes γd a n f -∗
+    ⌜ forall k : nat, (k < n)%nat ->
+        M !! (a + Z.of_nat k)%Z = Some (f k)
+        /\ 0 <= (a + Z.of_nat k)%Z < 2 ^ 38 ⌝.
+  Proof.
+    iIntros "Hheap Hbs".
+    iInduction n as [ | k IH ] "IH" forall (f).
+    { iPureIntro. intros j Hj. exfalso. lia. }
+    rewrite /ubytes /ubytesq seq_S big_sepL_app /=.
+    iDestruct "Hbs" as "[Hlo [Hhi _]]".
+    iDestruct ("IH" $! f with "Hheap Hlo") as %Hlo.
+    iDestruct (uheap_ubyte with "Hheap Hhi") as %(HM & _ & Hbnd).
+    iPureIntro. intros j Hj.
+    destruct (decide (j = k)) as [-> | Hne];
+      [ exact (conj HM Hbnd) | exact (Hlo j ltac:(lia)) ].
+  Qed.
+
   (* THE STORE.  An exclusively-owned data byte may be replaced and the
      key's image moves with it.  The text half is untouched, and it stays a
      SUBMAP because the two halves are disjoint -- which is the whole reason
@@ -1272,6 +1296,13 @@ Section UserHeap.
   (* the [⊣⊢] splits above appears under [rewrite] in a program proof, it   *)
   (* is a directed lemma waiting to be written.                             *)
   (* ===================================================================== *)
+  Lemma ustack_2_open (γd : gname) (sp : mword 64) :
+    ustack γd sp 2 -∗
+      ⌜ uint sp mod 8 = 0 ⌝ ∗
+      (∃ w : mword 64, uword γd (uint sp - 8) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 16) w).
+  Proof. rewrite ustack_2. iIntros "H". iExact "H". Qed.
+
   Lemma ustack_4_open (γd : gname) (sp : mword 64) :
     ustack γd sp 4 -∗
       ⌜ uint sp mod 8 = 0 ⌝ ∗
@@ -1291,6 +1322,143 @@ Section UserHeap.
   Proof.
     intros Hal. iIntros "H0 H1 H2 H3". rewrite ustack_4.
     iSplit; [ iPureIntro; exact Hal | ]. iFrame.
+  Qed.
+
+
+  (* the six-word form: cat's main frame (48 bytes). *)
+  Lemma ustack_6 (γd : gname) (sp : mword 64) :
+    ustack γd sp 6 ⊣⊢ ⌜ uint sp mod 8 = 0 ⌝ ∗
+      (∃ w : mword 64, uword γd (uint sp - 8) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 16) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 24) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 32) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 40) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 48) w).
+  Proof.
+    rewrite /ustack /ustack_body /=.
+    assert (E0 : uint sp - 8 * (Z.of_nat 0 + 1) = uint sp - 8) by lia.
+    assert (E1 : uint sp - 8 * (Z.of_nat 1 + 1) = uint sp - 16) by lia.
+    assert (E2 : uint sp - 8 * (Z.of_nat 2 + 1) = uint sp - 24) by lia.
+    assert (E3 : uint sp - 8 * (Z.of_nat 3 + 1) = uint sp - 32) by lia.
+    assert (E4 : uint sp - 8 * (Z.of_nat 4 + 1) = uint sp - 40) by lia.
+    assert (E5 : uint sp - 8 * (Z.of_nat 5 + 1) = uint sp - 48) by lia.
+    rewrite E0 E1 E2 E3 E4 E5 right_id. reflexivity.
+  Qed.
+
+  (* ...and the ten-word form: cat's fprintf frame (80 bytes). *)
+  Lemma ustack_10 (γd : gname) (sp : mword 64) :
+    ustack γd sp 10 ⊣⊢ ⌜ uint sp mod 8 = 0 ⌝ ∗
+      (∃ w : mword 64, uword γd (uint sp - 8) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 16) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 24) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 32) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 40) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 48) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 56) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 64) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 72) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 80) w).
+  Proof.
+    rewrite /ustack /ustack_body /=.
+    assert (E0 : uint sp - 8 * (Z.of_nat 0 + 1) = uint sp - 8) by lia.
+    assert (E1 : uint sp - 8 * (Z.of_nat 1 + 1) = uint sp - 16) by lia.
+    assert (E2 : uint sp - 8 * (Z.of_nat 2 + 1) = uint sp - 24) by lia.
+    assert (E3 : uint sp - 8 * (Z.of_nat 3 + 1) = uint sp - 32) by lia.
+    assert (E4 : uint sp - 8 * (Z.of_nat 4 + 1) = uint sp - 40) by lia.
+    assert (E5 : uint sp - 8 * (Z.of_nat 5 + 1) = uint sp - 48) by lia.
+    assert (E6 : uint sp - 8 * (Z.of_nat 6 + 1) = uint sp - 56) by lia.
+    assert (E7 : uint sp - 8 * (Z.of_nat 7 + 1) = uint sp - 64) by lia.
+    assert (E8 : uint sp - 8 * (Z.of_nat 8 + 1) = uint sp - 72) by lia.
+    assert (E9 : uint sp - 8 * (Z.of_nat 9 + 1) = uint sp - 80) by lia.
+    rewrite E0 E1 E2 E3 E4 E5 E6 E7 E8 E9 right_id. reflexivity.
+  Qed.
+
+  Lemma ustack_6_open (γd : gname) (sp : mword 64) :
+    ustack γd sp 6 -∗
+      ⌜ uint sp mod 8 = 0 ⌝ ∗
+      (∃ w : mword 64, uword γd (uint sp - 8) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 16) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 24) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 32) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 40) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 48) w).
+  Proof. rewrite ustack_6. iIntros "H". iExact "H". Qed.
+
+  Lemma ustack_6_close (γd : gname) (sp : mword 64) :
+    uint sp mod 8 = 0 ->
+    (∃ w : mword 64, uword γd (uint sp - 8) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 16) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 24) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 32) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 40) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 48) w) -∗
+    ustack γd sp 6.
+  Proof.
+    intros Hal. iIntros "H0 H1 H2 H3 H4 H5".
+    rewrite ustack_6. iSplit; [ iPureIntro; exact Hal | ]. iFrame.
+  Qed.
+
+  Lemma ustack_10_open (γd : gname) (sp : mword 64) :
+    ustack γd sp 10 -∗
+      ⌜ uint sp mod 8 = 0 ⌝ ∗
+      (∃ w : mword 64, uword γd (uint sp - 8) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 16) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 24) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 32) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 40) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 48) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 56) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 64) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 72) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 80) w).
+  Proof. rewrite ustack_10. iIntros "H". iExact "H". Qed.
+
+  Lemma ustack_10_close (γd : gname) (sp : mword 64) :
+    uint sp mod 8 = 0 ->
+    (∃ w : mword 64, uword γd (uint sp - 8) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 16) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 24) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 32) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 40) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 48) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 56) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 64) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 72) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 80) w) -∗
+    ustack γd sp 10.
+  Proof.
+    intros Hal. iIntros "H0 H1 H2 H3 H4 H5 H6 H7 H8 H9".
+    rewrite ustack_10. iSplit; [ iPureIntro; exact Hal | ]. iFrame.
+  Qed.
+
+  (* the eight-word frame, directed -- cat()'s (64 bytes) *)
+  Lemma ustack_8_open (γd : gname) (sp : mword 64) :
+    ustack γd sp 8 -∗
+      ⌜ uint sp mod 8 = 0 ⌝ ∗
+      (∃ w : mword 64, uword γd (uint sp - 8) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 16) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 24) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 32) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 40) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 48) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 56) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 64) w).
+  Proof. rewrite ustack_8. iIntros "H". iExact "H". Qed.
+
+  Lemma ustack_8_close (γd : gname) (sp : mword 64) :
+    uint sp mod 8 = 0 ->
+    (∃ w : mword 64, uword γd (uint sp - 8) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 16) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 24) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 32) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 40) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 48) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 56) w) -∗
+    (∃ w : mword 64, uword γd (uint sp - 64) w) -∗
+    ustack γd sp 8.
+  Proof.
+    intros Hal. iIntros "H0 H1 H2 H3 H4 H5 H6 H7".
+    rewrite ustack_8. iSplit; [ iPureIntro; exact Hal | ]. iFrame.
   Qed.
 
   (* the twelve-word frame, directed -- printf's and vprintf's (96 bytes) *)

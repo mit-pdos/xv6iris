@@ -75,7 +75,6 @@ Require Import FdSlots ProcInv.
 Require Import ProofKforkParts.
 Require Import FileInvDefs.
 Require Import UserPtTree.
-Require Import ProcPtOwn.
 Require Import WpUart.
 Require Import LogInv.
 Require Import IrefSlots.
@@ -92,10 +91,7 @@ Require TsoCtxShim.   (* the raw [WpSconfMem] word towers cross the seam here *)
 (* ---- the AU side ---- *)
 Require Import ProofSysRead.       (* [sr_addr_p]/[sr_addr_n]/[sr_addr_f]/
                                       [sr_addr_f_base] are TOP-LEVEL there  *)
-Require Import FsBytesGamma.
-Require Import FsCfg.
 Require Import SpecSysReadAU.      (* [wp_sys_read_au_frame], [read_arms]   *)
-Require Import FsAbsReadFire.      (* [aread_commit_at]                     *)
 Require Import SpecSysReadAUAt.    (* the contract this file seals          *)
 Require Import SpecFilereadAU.     (* the callee's AU form                  *)
 Require Import FsAbs.              (* LAST (FsAbs's own rule)               *)

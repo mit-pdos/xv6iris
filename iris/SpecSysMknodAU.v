@@ -252,39 +252,18 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import InstrBytes.
-Require Import RegFile.
-Require Import RiscvExtras.
-Require Import CalleeSaved KernelText KernelDataInv.
-Require Import IntrDefs.
-Require Import WpNext.
-Require Import WpLock.
 Require Import FdSlots.
-Require Import ProcGeom.
 Require Export SwtchCtx.
-Require Import CpuOwn.
-Require Import SchedCtx.
 Require Import WpUart.
 Require Import DiskInv.
 Require Import Xv6Cameras.
-Require Import BioInv.
-Require Import FsBlocks LogInv.
-Require Import FsCrash.
+Require Import LogInv.
 Require Import BitmapInv.
-Require Import InodeInv.
-Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import IcacheRef.
-Require Import IcacheInv.
 Require Import IcacheEscrow.   (* the escrow's vocabulary (it was [dv_half]'s
                                   route here before the dview retirement) *)
-Require Import KvmSpec.
 Require Import FileInvDefs.
-Require Import UserPtTree.
-Require Import ProcPtOwn.
 Require Import ProcInv.
-Require Import SpecPrintk.      (* [printk_env], [printk_gen_contract] *)
-Require Import SpecDirlink.     (* [ic_sleeplocks], [ireg_blocks_ok] *)
 Require Import SpecCreate.      (* [create_slots], [T_DEVICE], [create_made] *)
 Require Import SpecSysMknod.    (* K_sys_mknod; the landed contract this
                                    file states a parallel form beside *)
@@ -296,14 +275,12 @@ Require FsImg.                  (* [FsImg.ROOTINO : Z] -- Require, NOT
                                    the superblock CELL ADDRESSES the frame
                                    below threads *)
 Require Import FsAbs.           (* the abstract state (lane A, landed) *)
-Require Import FsBytesGamma.    (* [fs_gamma_L]: the live Γ *)
+Require Import FsStateDefs.    (* [fs_gamma_L]: the live Γ *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
-Require Import TsoCtx.
 
 Local Open Scope Z_scope.
 

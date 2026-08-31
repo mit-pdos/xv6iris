@@ -18,8 +18,6 @@ From stdpp Require Import gmap bitvector.definitions.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvExtras.
-Require Import RegFile.
 Require Import UserBits.
 Require Import UmodeAbi.
 Local Open Scope Z_scope.

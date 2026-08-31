@@ -53,52 +53,23 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import InstrBytes.
 Require Import RegFile.
-Require Import RiscvExtras.
-Require Import CalleeSaved KernelText KernelDataInv.
-Require Import IntrDefs.
-Require Import WpNext.
-Require Import WpLock.
 Require Import FdSlots.
-Require Import ProcGeom.
 Require Export SwtchCtx.
-Require Import CpuOwn.
-Require Import SchedCtx.
 Require Import WpUart.
 Require Import DiskInv.
 Require Import Xv6Cameras.
-Require Import BioInv.
 Require Import FsBlocks LogInv.
-Require Import FsCrash.
 Require Import BitmapInv.
-Require Import InodeInv.
-Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import IcacheRef.
-Require Import IcacheInv.
-Require Import IcacheEscrow.
-Require Import KvmSpec.
 Require Import FileInvDefs.
-Require Import UserPtTree.
-Require Import ProcPtOwn.
 Require Import ProcInv.
-Require Import SpecPrintk.
-Require Import SpecDirlink.
-Require Import SpecCreate.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.
-Require Import FsCfg.
-Require Import SpecSysMknod.
-Require Import PathElems.
 Require Import FsTree.
-Require Import FsBytesGamma.
-Require Import SpecSysMknodAU.
-Require Import FsAbsEra.
-Require Import FsAbsPins.        (* [apr_pins]: the pin-returning package *)
-Require Import FsAbsEraMknod.
+Require Import FsStateDefs.
 Require Import FsAbsMknodFire.
 Require Import SpecCreateAU.
 Require Import SpecSysMknodAUEra.

@@ -99,18 +99,17 @@ Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import KernelRvcDecode.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
-Require Import WpSmodeIntr WpSmodeHalf.
+Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import FdSlots FileOff.
 Require Import FileInvDefs.
-Require Import PipeInvDefs.
+Require Import Xv6Cameras.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import ProcInv.
 Require Import WpUart LogInv.
 Require Import BioDefs.
-Require Import ConsoleInv.
 (* THE PAYLOAD'S OWN VOCABULARY (durable-disk 2b-inode-3): [top_frag],
    [fs_gamma_L], [era_node] / [inode_rec_local].  IMPORTED EARLY on purpose
    -- the [FsState*] stack exports [fs_view] and [byte_range], both of which
@@ -125,10 +124,7 @@ Require Import IcacheEscrow.
    name is meant here except through the two contracts. *)
 Require Import DinodeEnc.
 Require Import WpLock.
-Require Import KernelDataInv.
-Require Import PrintkArgs.
-Require Import SpecPanic.
-Require Import SpecPiperead SpecIlock SpecReadi SpecIunlock SpecConsoleread.
+Require Import SpecIlock SpecReadi SpecIunlock.
 Require Import SpecFileread.
 Require Import CodeFileread ProofFilereadParts.
 From Kernel Require KernelSyms.
@@ -144,7 +140,6 @@ Require Import DirView.            (* [T_DIR_z]: the carve's non-directory
                                       witness, exactly as SpecFileread names
                                       it (FileInvDefs does not re-export it)  *)
 Require Import FsStateEra.         (* [era_node]                              *)
-Require Import FsBytesGamma.       (* [fs_gamma_L]                            *)
 Require Import SpecSysReadAU.      (* [ard_pre], [ard_ret_tie], [read_arms]   *)
 Require Import FsAbsReadFire.      (* [arf_read_fire] and the row readings    *)
 Require Import SpecFilereadAU.     (* the contract this file seals            *)

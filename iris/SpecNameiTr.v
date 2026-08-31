@@ -90,49 +90,17 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes.
-Require Import RiscvLang RiscvPtsto.
-Require Import InstrBytes.
-Require Import RegFile.
-Require Import RiscvExtras.
-Require Import CalleeSaved KernelText.
-Require Import IntrDefs.
-Require Import WpNext.
-Require Import WpLock.
-Require Import KernelDataInv.
-Require Import SpecPanic.
+Require Import RiscvPtsto.
 Require Import FdSlots.
-Require Import ProcGeom.
 Require Export SwtchCtx.
-Require Import CpuOwn.
-Require Import SchedCtx.
-Require Import ProcDefs.
-Require Import WpUart.
-Require Import DiskInv.
 Require Import Xv6Cameras.
-Require Import BioInv.
-Require Import FsBlocks LogInv.
-Require Import BitmapInv.
-Require Import ByteBuf.
-Require Import DirentEnc.
-Require Import PathElems.
-Require Import InodeInv.
-Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
-Require Import IcacheInv.
-Require Import IcacheEscrow.   (* the payload arms *)
-Require Import FsTree.         (* [fname], [dir_view]'s home *)
-Require Import KvmSpec.
 Require Import FileInvDefs.
-Require Import SpecDirlink.
-Require Import SpecNamex.
-Require Import SpecNamei.      (* K_namei, and the landed body this shadows *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.
-Require Import FsCfg.   (* [fscfg]: the fs configuration is AMBIENT *)
 Import Defs.
 Require Import TsoCtx.
 

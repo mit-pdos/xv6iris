@@ -227,11 +227,9 @@ Require Import SpecNamex.
 Require Import SpecCreate.
 Require Import SpecNparWrapEra.  (* the ERA nameiparent walk            *)
 Require Import FsBytesGamma.
-Require Import FsAbsStart.       (* [ep_start]: the DEFERRED start      *)
+Require Import FsAbsEra.       (* [ep_start]: the DEFERRED start      *)
 Require Import SpecSysMknodAU.   (* [cre_pre], [mknod_parent_elems]     *)
-Require Import FsAbsNparMknod.   (* [np_dead_to_mknod]                  *)
 Require Import FsAbsMknodFire.   (* the commits and FIRE 1              *)
-Require Import FsAbsCreateFire.  (* FIRE 2 at a NON-DIRECTORY child     *)
 Require Import SpecCreateAUF.    (* the contract this file seals        *)
 Require Import FsAbs.            (* LAST of the abstract stack          *)
 (* THE FRESH-TYPE SPAN: the four instructions +0xa4..+0xb0 that pin

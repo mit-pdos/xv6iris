@@ -51,7 +51,7 @@ Require Import FileInvDefs.
 Require Import IrefSlots.
 Require Import CodeNameiparent.
 Require Import SpecDirlookup.
-Require Import FsAbsNpar.        (* [np_elems]/[ep_hops_from]/[np_dead] *)
+Require Import FsAbsEra.        (* [np_elems]/[ep_hops_from]/[np_dead] *)
 Require Import SpecNparEra.      (* the walk's contract, and
                                     [inode_held_ty_at] *)
 Require Import SpecNparWrapEra.

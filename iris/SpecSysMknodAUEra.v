@@ -137,7 +137,6 @@ Require Import SpecSysMknod.   (* [K_sys_mknod]                        *)
 Require Import FsTree.
 Require Import FsBytesGamma.
 Require Import SpecSysMknodAU.   (* [dev_arg], and the frozen statement  *)
-Require Import FsAbsEraMknod.    (* the era twins of the walk predicates *)
 Require Import FsAbsMknodFire.   (* the authority-shaped commits         *)
 Require Import SpecCreateAU.     (* [cau_ok] / [cau_fail]                *)
 Require Import FsAbs.            (* LAST (FsAbs's own rule)              *)

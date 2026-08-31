@@ -33,9 +33,8 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import RegFile WpMmodeLeafBase.
-Require Import UserPtTree UserExec.
-Require Import UserPerm UexecWp UexecSlot UexecRet.
+Require Import WpMmodeLeafBase.
+Require Import UserPerm UexecSlot UexecRet.
 Require Import UserHeap UkRun UkSync.
 Require Import UCodeSync.
 Require Import TsoCtx.

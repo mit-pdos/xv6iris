@@ -164,7 +164,6 @@ Require Import EscrowDefs.   (* OPTION A: region_pending / reg_half / committedA
    [ireg_lcols_use], [ireg_lcol_use], [ireg_fcol_use]) and its movers
    ([dv_set_rt], [fv_set_rt], [dvw_set_rt]) are gone with it.  Every mover
    site's dv step was SUBSUMED by the [ireg_top_retag] it already performs. *)
-Require Import FsTree.       (* [fname] -- the entry-map key type            *)
 (* [logged_at] / [log_epoch_lb]: the zero-receipt parked in [ireg_slot]
    (fs-log.md §G.17).  This is what puts [logG] in the section's context,
    and hence in the context of the four files that STATE something over
