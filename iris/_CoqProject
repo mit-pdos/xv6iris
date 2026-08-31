@@ -302,6 +302,7 @@ UCodeInit.v
 UCodeCat.v
 UkCat.v
 UkCatPutc.v
+UkCatLit.v
 UkCatVprintf.v
 UkCatFprintf.v
 # The register-index arithmetic every returning function proof needs to
