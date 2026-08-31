@@ -17469,3 +17469,39 @@ every carrier arity UNCHANGED (27 files hold `intr_res kt`):
   SchedCtx compile is running; 420s was too short for the whole file,
   TEXIT=124 was MY timeout, not necessarily the tactic).
 
+### A6.139 build log (cont. 2) — the SchedCtx hang, root-caused
+
+The degenerate hang the owner flagged: `procs_inv_move`'s
+`ctx_move_solve` left `CtxMove (λ ξ, is_lock (XI:=ξ) … (proc_lock_pay
+(XI:=ξ) …))` open, and every explicit apply/refine of `is_lock_move`
+DIVERGED in conversion.  Raw-printing the goal (`Set Printing All` +
+`Show` under the -time profiler) showed the payload itself had become
+ξ-DEPENDENT: `p_sched`'s parked-world row `trap_csrs KT1 (CID := h)` was
+at the AMBIENT XI — unused (hence unabstracted) before A6.139, but
+`intr_res`'s new `□ E XI` made every section definition touching
+trap_csrs abstract XI, so `proc_lock_pay`'s TERM varied with the ambient
+and `is_lock_move` (constant-payload) could never fit; the unifier then
+dove through the ihs fixpoint.  THE FIX (semantically right, not just
+unblocking):
+- `p_sched`'s row is now `trap_csrs (XI := ξ) KT1 (CID := h)` — the
+  parked world's handler environment lives at the BOX'S OWN context
+  (A6.128's design extended to the new member).  The payload term is
+  ambient-closed again; the at/to lemmas stay stated at `cur_ctx`
+  (β-reduction restores their old shapes).
+- `intr_res` packs a third component: `□ env_move E`, the HART-GENERIC
+  swtch-crossing witness (`∀ CIDm ξ0 ξ1, own_context ξ0 -∗ own_context
+  ξ1 -∗ □ E ξ0 ==∗ … ∗ □ E ξ1`) — provable for the concrete kernelvec
+  env because every member is a lock handle (CtxMove) or context-free.
+  `intr_res_intro`/`intr_res_pack`/`ires_pack`/`sie_*_pack` all carry it.
+- New `Global Instance intr_res_move` / `trap_csrs_move` in SchedCtx,
+  with the CLASS index pinned explicitly (`CtxMove (CID := CID) …`) —
+  the statement's implicit CpuId otherwise resolves to the ROW's hart
+  binder and the instance never matches (measured: "Unable to unify
+  @CtxMove _ _ h … with @CtxMove _ _ CID …").  `p_sched_move` closes
+  with `ctx_move_solve` + `all: apply (trap_csrs_move KT1 h)`.
+- WpIntrInv's psi pack gained the witness (4-part); the trap-run
+  destructures the witness SPATIALLY (`HETmvB : □ env_move E` kept
+  boxed) because an intuitionistic bare `env_move` does not re-box at a
+  □-premise.
+GREEN: IntrDefs, WpIntrInv, SchedCtx.
+
