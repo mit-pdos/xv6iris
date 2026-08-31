@@ -652,10 +652,16 @@ Section ProofMainSecondary.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtkh) in "Hpc".
     iApply (Kvminithart.wp_kvminithart_sconf Q1 0%nat n root tlbvec0 p0
+              (KptShare.kpt_inv root ∗ KptShare.kpt_creds)%I True%I
               eq_refl ltac:(lia)
-              with "Hcg Hsbit Htext Hpc Htlb Hkptp Hkinv Hcreds").
+              with "Hcg Hsbit Htext Hpc Htlb Hkptp [] [Hkinv Hcreds]").
+    { (* A6.135 §5: a secondary ALREADY holds the table and its creds --
+         the establishment hook is the identity. *)
+      iIntros (g) "Hgh Hint Hctx [Hki Hcr]". iModIntro.
+      iFrame "Hgh Hint Hctx Hki Hcr". }
+    { iFrame "Hkinv Hcreds". }
     (* the KPT receipt is kept, not dropped -- see ProofMain.v's twin. *)
-    iIntros (mkh) "Hcg Hpc %Hcskh #Hkpt Hstvec".
+    iIntros (mkh) "Hcg Hpc %Hcskh #Hkpt Hstvec _".
     (* ---- THE BOOT SEAM (ProofMain.mn_grp_kvm's twin): this hart's regime
        moves KT0 -> KT1 the moment kvminithart has installed the table. ---- *)
     iDestruct (sie_cap_gpr_ktier_up KT0 KT1 with "Hcg Hkpt") as "Hcg".

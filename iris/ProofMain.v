@@ -127,7 +127,8 @@ Require Import WaitInv.   (* [wait_res] -- what main finally brings wait_lock up
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
-Require Import TsoGhost.   (* [dset_auth]: the started barrier's index authority (A6.132) *)
+Require Import TsoGhost.
+Require Import KptPublish.   (* [dset_auth]: the started barrier's index authority (A6.132) *)
 Require Import SieCapCtx.   (* [sie_cap_gpr_own_ctx_acc]: the creators' borrow *)
 Local Open Scope Z_scope.
 Import Defs.
@@ -813,6 +814,7 @@ Section ProofMain.
                         (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv ->
     prun phystop s1entry ps ->
     (K_kvmmake + 64 + 3 < length ps)%nat ->
+    hart_agent cpu_id = 0%nat ->
     sie_cap_gpr KT0 m n false p0 -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.main + 0x6e) : mword 64) -∗
@@ -906,7 +908,7 @@ Section ProofMain.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hn Hphystop Hs1 Hprun Hlen.
+    intros Hn Hphystop Hs1 Hprun Hlen H0cid.
     subst phystop s1entry.
     iIntros "Hcg #Htext #Hkdata Hpc Hfree Hcpu Hlkmem Hkkalloc Hkmem24 Hpages Hkpt".
     iIntros "Hsbit Htlb Hunset Hbunset Hkauth Hlpid Hlwait Hwres Hnpid Hprocs Hppub Hfds Hirs Hbss Hparks Hpst Hcont".
@@ -994,9 +996,13 @@ Section ProofMain.
        ([SpecProcinit.procs_inv_alloc]) -- so a process's kernel stack comes
        from HERE for the rest of the system's life. ---- *)
     iDestruct (kstack_bank_intro pas kalloc_junk Hpasok with "Hkstx Hkstacks") as "Hbank".
-    iMod (kpt_inv_alloc (pt_base t) t (kvm_M pas) ⊤
-            (kvm_bridge pas t (pt_base t) Hpasok eq_refl Hrep)
-            with "Htree Hauth Hunset") as "[#Hkinv #Hlbt]".
+    (* A6.135 §5: the invariant is NOT allocated here -- there is no interp
+       under a bare [fupd_wp].  The tree, the map auth and the two one-shots
+       ride into kvminithart's ESTABLISHMENT HOOK, which runs against the
+       live interp at the `csrw satp` write node and publishes every slot
+       byte at its own stamp ([KptPublish.kptree_publish_boot] -- no drain,
+       no log top), allocates [kpt_inv], and mints hart 0's boot
+       credentials ([kpt_creds_intro_boot] -- no view receipt). *)
     iModIntro.
     (* ---- +0x76 jal kvminithart ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x76)) (mword_of_int 1 : mword 5)
@@ -1014,14 +1020,35 @@ Section ProofMain.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtkh) in "Hpc".
     iApply (Kvminithart.wp_kvminithart_sconf V3 0%nat n (pt_base t) tlbvec0 p0
+              (PtTree.ptree_own_at (PtTree.UTier cur_ctx) 2 (DfracOwn 1) t ∗ kmap_auth (kvm_M pas) ∗
+               kpt_unset ∗ kptb_unset)%I
+              (kpt_inv (pt_base t) ∗ KptShare.kpt_creds)%I
               eq_refl ltac:(lia)
-              with "Hcg Hsbit Htext Hpc Htlb Hkptp Hkinv").
+              with "Hcg Hsbit Htext Hpc Htlb Hkptp []
+                    [Htree Hauth Hunset Hbunset]").
+    { (* THE ESTABLISHMENT *)
+      iIntros (g) "Hgh Hint Hctx (Htree & Hauth & Hunset & Hbunset)".
+      iMod (KptPublish.kptree_publish_boot g cur_ctx 2 t H0cid
+              with "Hgh Hint Hctx Htree")
+        as "(Hgh & Hint & Hctx & Ht & #Hllb)".
+      iMod (KptShare.kpt_inv_alloc (pt_base t) (length g.(glog)) t
+              (kvm_M pas) ⊤
+              (kvm_bridge pas t (pt_base t) Hpasok eq_refl Hrep)
+              with "Ht Hauth Hllb Hunset Hbunset")
+        as "(#Hkinv & #Hlbt & #Hbd)".
+      iDestruct (KptShare.kpt_creds_intro_boot _ H0cid with "Hbd Hllb")
+        as "#Hcreds".
+      iModIntro. iFrame "Hgh Hint Hctx".
+      iSplitR; [iExact "Hkinv" |]. iSplitR; [iExact "Hcreds" |].
+      iSplitR; [iExact "Hkinv" | iExact "Hcreds"]. }
+    { iFrame "Htree Hauth Hunset Hbunset". }
     (* kvminithart's KPT RECEIPT, kept rather than dropped: it is a member of
        [trap_csrs] now (IntrDefs §6b -- interrupts enabled implies the kernel
        table is installed), so the boot chain must carry it to the fold in
        [wp_main_boot_sconf].  Named [Hkptr] -- [Hkpt] in this lemma is the
        [kernel_pagetable] CELL, a different thing. *)
-    iIntros (mkh) "Hcg Hpc %Hcskh #Hkptr Hstvec".
+    iIntros (mkh) "Hcg Hpc %Hcskh #Hkptr Hstvec HQk".
+    iDestruct "HQk" as "(#Hkinv & #Hcreds)".
     (* ---- THE BOOT SEAM: kvminithart has installed the kernel table, so
        this hart's regime moves KT0 -> KT1.  [sie_cap_gpr_ktier_up] carries
        the capability across, weakening its (static, boot-stack) frame
@@ -2199,6 +2226,7 @@ Section ProofMain.
     (* --- 0x6e .. 0x7a : kinit / kvminit / kvminithart / procinit --- *)
     iApply (mn_grp_kvm m2 (K - 2)%nat p0 ps s1entry phystop tlbvec0
               Hn50 Hphystop Hs1 Hprun Hlen
+              (StartedInv.cid_zero_agent cpu_id Hcid)
               with "Hcg Htext Hkdata Hpc Hfree Hcpu Hlkmem Hkkalloc Hkmem24 Hpages Hkpt
                     Hsbit Htlb Hunset Hbunset Hkauth Hlpid Hlwait Hwres Hnpid Hprocs Hppub Hfds Hirs
                     Hbss Hparks Hpst").

@@ -247,14 +247,14 @@ Section StartedInv.
 
   (* a message receipt, cashed against the interpretation *)
   (* agent 0 IS the hart with the zero cid word, both ways *)
-  Local Lemma agent_zero_cid (c : CPU) :
+  Lemma agent_zero_cid (c : CPU) :
     hart_agent c = 0%nat -> cid_word_of c = zero_reg.
   Proof.
     intros H. unfold hart_agent in H. unfold cid_word_of. rewrite H.
     apply bv_eq. vm_compute. reflexivity.
   Qed.
 
-  Local Lemma cid_zero_agent (c : CPU) :
+  Lemma cid_zero_agent (c : CPU) :
     cid_word_of c = zero_reg -> hart_agent c = 0%nat.
   Proof.
     intros Hc. unfold cid_word_of in Hc. unfold hart_agent.

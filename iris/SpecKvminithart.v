@@ -74,7 +74,8 @@ Require Import TsoCtx.
 (* kvminithart(): the Bare->Sv39 kernel-page-table switch.  See the header. *)
 Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (mm : regfile) (lvl K : nat)
     (root : mword 44)
-    (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (p : mword 64) :=
+    (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (p : mword 64)
+    (Pk Qk : iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kvminithart in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   let root_b := zero_extend' 64 (concat_vec root (zeros' 12 : mword 12)) in
@@ -89,24 +90,34 @@ Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
      boot arm has published the table nobody may write it again -- which is
      what lets the [started] payload carry it to every secondary hart. *)
   (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□ root_b -∗
-  (* the shared table, likewise persistent *)
-  kpt_inv root -∗
-  (* A6.70: THE CANON PIN'S CREDENTIALS (A6.53 ruling 2 / A6.55).  The
-     switch re-seals this hart's translation slot at the KPT arm, and
-     [KptShare.tlb_res_pt] carries the pin's bound with THIS hart's receipt
-     that its view has passed it.  A hart coming off the Bare arm has
-     neither, so the obligation is a PREMISE -- which is exactly A6.55's
-     ruling one level up: the publisher's receipt is taken, not assumed.
-     Persistent, so it costs every caller nothing but the proof that its
-     hart really has seen the publication (hart 0 through its own fence,
-     a secondary through the [started] handshake). *)
-  KptShare.kpt_creds -∗
+  (* A6.135 §5: THE ESTABLISHMENT HOOK, replacing the old
+     [kpt_inv root -∗ KptShare.kpt_creds -∗] pair.  kvminithart's proof
+     runs this callback against the LIVE INTERP at its `csrw satp` write
+     node (the [wp_csrw_satp_s_sconf_gs] seam), borrowing its own context
+     token; the callback must produce the shared table's invariant and
+     THIS hart's read credentials -- plus whatever else ([Qk]) the caller
+     wants carried to the continuation.
+       - A SECONDARY already holds [kpt_inv ∗ kpt_creds] (off the
+         [started] deposit): its hook is the identity.
+       - HART 0 establishes here: [KptPublish.kptree_publish_boot] (every
+         byte pinned at its own stamp -- no drain, no log top) +
+         [KptShare.kpt_inv_alloc] + [kpt_creds_intro_boot].  This is the
+         ONE moment on the boot path that both holds the machinery and
+         precedes the first translated fetch. *)
+  (∀ g : gstate,
+     gen_heap_interp (hG := riscv_memGS) g.(gmem) -∗
+     tso_interp_at riscv_eraGS g -∗ own_context cur_ctx -∗ Pk ={⊤}=∗
+     gen_heap_interp (hG := riscv_memGS) g.(gmem) ∗
+     tso_interp_at riscv_eraGS g ∗ own_context cur_ctx ∗
+     (kpt_inv root ∗ KptShare.kpt_creds ∗ Qk)) -∗
+  Pk -∗
   ( ∀ (mr : regfile),
     sie_cap_gpr KT0 mr K false p -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     kpt_on cpu_id -∗
     (∃ v : mword 64, stvec ↦ᵣ v) -∗
+    Qk -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -114,6 +125,7 @@ Module Type KVMINITHART.
   Parameter wp_kvminithart_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (mm : regfile) (lvl K : nat)
       (root : mword 44)
-      (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (p : mword 64),
-      wp_kvminithart_sconf_body mm lvl K root tlbvec0 p.
+      (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (p : mword 64)
+      (Pk Qk : iProp Σ),
+      wp_kvminithart_sconf_body mm lvl K root tlbvec0 p Pk Qk.
 End KVMINITHART.
