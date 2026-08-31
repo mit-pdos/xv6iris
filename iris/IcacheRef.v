@@ -852,6 +852,19 @@ Class icfg := MkIcfg {
      the hold rides inside [IcacheEscrow.ipool_alloc] and
      [IcacheEscrow.ic_loaded] beside its twin. *)
   icfg_fview : gname;
+  (* A6.145 (the icache pinw restructure): two per-slot [mono_nat]
+     families, [icfg_iep]'s door for [icfg_iep]'s reason.
+     [icfg_ieplo k] is slot k's EPOCH FLOOR -- the log position of the
+     epoch's arm store, the word-set pin's [pw_lo]; its auth is
+     FRACTIONAL, half in the invariant beside the pinned window and the
+     rest cut along the reference fractions, so an epoch cannot retire
+     under a live reference's credential.  [icfg_istmp k] is slot k's
+     CELL STAMP -- the last count store's position; half in the
+     invariant beside the window, half in the itable lock's payload
+     under the A6.144 floor row, which is what makes the holder's read
+     EXACT. *)
+  icfg_ieplo : nat -> gname;
+  icfg_istmp : nat -> gname;
 }.
 
 (* the pool at BOOT: one whole unit at each of the fifty slots, as ONE map,
@@ -944,6 +957,24 @@ Proof.
   case_decide as Hd; [exfalso; lia | done].
 Qed.
 
+(* the A6.145 slot families: [iep_fun_alloc] at [nat] keys *)
+Lemma mono_slot_fun_alloc `{!riscvGS Σ} (n j : nat) :
+  ⊢ |==> ∃ f : nat -> gname,
+    [∗ list] k ∈ seq j n, mono_nat_auth_own (f k) 1 0.
+Proof.
+  iInduction n as [|n IH] forall (j).
+  { iModIntro. iExists (fun _ => inhabitant). cbn [seq]. done. }
+  iMod (mono_nat_own_alloc 0) as (γ) "[Hg _]".
+  iMod ("IH" $! (S j)) as (f) "Hf".
+  iModIntro. iExists (fun z => if decide (z = j) then γ else f z).
+  assert (Hcons : seq j (S n) = j :: seq (S j) n) by reflexivity.
+  rewrite Hcons big_sepL_cons. iSplitL "Hg".
+  { case_decide as Hd; [iExact "Hg" | congruence]. }
+  iApply (big_sepL_mono with "Hf"). intros i k Hk.
+  apply lookup_seq in Hk as [-> _].
+  case_decide as Hd; [exfalso; lia | done].
+Qed.
+
 (* the per-slot sleeplock ghosts, allocated as a family exactly as
    [iep_fun_alloc] allocates the observation counters.  What comes out per
    slot is [sl_free_tok] -- an unbuilt lock's free arm -- and the
@@ -1012,6 +1043,9 @@ Lemma icfg_alloc {Σ} `{!riscvGS Σ, !icacheG Σ, !lockG Σ} (dv : mword 32) (ni
          mono_nat_auth_own (icfg_iep (Z.of_nat k)) 1 0) ∗
       ([∗ list] k ∈ seq 0 NINODE,
          sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) ∗
+      (* A6.145: the epoch floors and cell stamps, at 0 (no slot armed) *)
+      ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own (icfg_ieplo k) 1 0) ∗
+      ([∗ list] k ∈ seq 0 NINODE, mono_nat_auth_own (icfg_istmp k) 1 0) ∗
       (* OPTION A (option 1, in-body registry): the escrow registry's auth,
          handed out EMPTY.  [ireg_alloc] populates it over every inum (dummy
          escrow gnames; the reordered-iput walk re-mints real ones at deposit)
@@ -1022,6 +1056,8 @@ Proof.
   intros HLM HCM HFM HBM HDM HVM.
   iMod (iep_fun_alloc (16 * nib) 0) as (fep) "Hep".
   iMod (isl_fun_alloc NINODE 0) as (fisl) "Hisl".
+  iMod (mono_slot_fun_alloc NINODE 0) as (feplo) "Heplo".
+  iMod (mono_slot_fun_alloc NINODE 0) as (fstmp) "Hstmp".
   iMod (own_alloc (● (∅ : gmap nat (Qp * positive)) : icacheUR)) as (γ) "Ha".
   { by apply auth_auth_valid. }
   (* the boot generation: a gname is all the pool needs, and minting it as a
@@ -1043,10 +1079,12 @@ Proof.
      [ireg_body] (where [reg_full] refutes the pending arm). *)
   iMod (ghost_map_alloc (∅ : gmap Z (gname * gname))) as (γreg) "[Hreg _]".
   iModIntro.
-  iExists (MkIcfg γ dv nib γl γlk γlog ist fep fisl g0 γreg γcnt γfrzo γfrzm γdv γfv), g0.
+  iExists (MkIcfg γ dv nib γl γlk γlog ist fep fisl g0 γreg γcnt γfrzo γfrzm
+             γdv γfv feplo fstmp), g0.
   cbn [icfg_iep icfg_isl icfg_boot icfg_reg icfg_icnt icfg_frzo icfg_frzm
-       icfg_dview icfg_fview].
-  by iFrame "Ha Hl Hlk Hcnt Hfrzo Hfrzm Hdv Hfv Hep Hisl Hboot Hreg".
+       icfg_dview icfg_fview icfg_ieplo icfg_istmp].
+  by iFrame "Ha Hl Hlk Hcnt Hfrzo Hfrzm Hdv Hfv Hep Hisl Heplo Hstmp Hboot
+             Hreg".
 Qed.
 
 (* ===================================================================== *)
