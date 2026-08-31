@@ -17084,3 +17084,90 @@ S6. The A/D write-back payer (the [pte_wb_ok] □-wand threaded through
   `iEval (rewrite /phys_pointsto)` before destructuring; evar-`lia`
   in `view_lb_le` needs explicit instances.
 
+### A6.135 §4-landed addendum (r59, snapshot 081a27ff178f, 1264/1304, zero regressions)
+
+Landed and certified in one round:
+- **S1/S2**: `pin_ok_author` anchor-generalized (`B ≤ p`); `CtxValues.v`
+  grew `cv_own` (persistent author anchor with `pm_tid`), `cv_boot_cred B`
+  (= `view_lb B ∨ (⌜hart 0⌝ ∗ llb B)`, with `_view/_boot/_llb` intros),
+  `big_sepL_seq_exist` (bounded choice: name a run's ∃-floors), and
+  `cv_slot_read_ok` — THE walk read law: interp + `cv_boot_cred B` +
+  per-byte `∃Ba ≤ B` pins each carrying
+  `(⌜Ba=0⌝ ∨ cv_own 0 _ Ba ∨ view_lb@agent0 Ba)` ⊢ every read ∈ family.
+- **Bg gates**: `pin_map_own`/`pin_tm`/`ledger_store_pin_{bytes,ok}`
+  generalized to a per-address bound `Bg`; `ledger_store_win_pin_okf` (+
+  `wobl_ram_ledger_pin_exf`) with `Bf : nat→nat` by offset; the old
+  single-B statements survive verbatim as corollaries (WpSconfLock
+  untouched).
+- **S3**: `PtTree.pt_slot_own (KTier B)` := `kpt_slot_pin a dq w B`
+  (per-byte `∃ Ba t, ⌜Ba ≤ B⌝ ∗ pin ∗ 3-arm credential`);
+  `pt_slot_own_{forget,ker,None}` restated.  `HartSKpt.kpt_slot_bytes_pin`
+  and `kpt_path_obl`/`kpt_pte*_obl`/`swp_translate_kpt` take
+  `cv_boot_cred B` in place of `view_lb B`; the A/D write seam
+  (`kpt_leaf_write_node` body) re-worked: `big_sepL_seq_exist` names `Bf`,
+  anchors split off persistent, store through the `exf` gate, slot
+  reassembled with the SAME floors+anchors (canon-invariance preserved).
+- **S4**: `kpt_creds := ∃B, kpt_bound B ∗ cv_boot_cred B`;
+  `kpt_creds_intro` retyped, `kpt_creds_intro_boot` (hart 0: bound + llb,
+  NO view receipt).  `KptTree.tlb_inv_pt` carries `cv_boot_cred` too.
+  SRegime/SmodeCorePt/IntrDefs/WpSFrames/WpIntrInv/WpSconfSfence/
+  ProofKvminithart all recompiled UNCHANGED (the funnel is name-based).
+- **KptPublish repurposed** (it had zero code consumers): drained
+  telescope now wraps slots via `kpt_slot_pin_of_word_pin` (records the
+  publisher's agent-0 view receipt as the per-byte credential; `hart 0`
+  premise); the log-top telescope REPLACED by the BOOT telescope
+  (`ctx_phys_byte_publish_boot` → … → `kptree_publish_boot`): every byte
+  minted at ITS OWN STAMP (`ledger_pin_mint (t t)` — no drain, no log
+  top, UNCONDITIONAL), credential from the token's clean/dirty registry
+  (clean/under-bound → own view receipt at `S i ≤ Btok ≤ K`; own-message
+  → `cv_own`), bound `length glog` with its `llb` for `kpt_inv_alloc`.
+
+### §5-establishment measurement (the remaining work, measured this session)
+
+`SpecKvminithart` takes `kpt_inv root ∗ kpt_creds` at ENTRY; the red
+`ProofMain.mn_grp_kvm:997` block between kvminit-ret and `jal kvminithart`
+(+0x76) runs `kpt_inv_alloc` under a bare `fupd_wp` — NO INTERP, which is
+the whole残 red.  The publication needs `gh ∗ tso_interp` + the token.
+Measured facts:
+- `wp_hart_step` (RiscvExec:741) exposes `mstate_interp` + `tso_interp_of`
+  at EVERY node — register writes included (HartRegNode's
+  `wp_hart_regwrite` just idles the tso side).
+- The only existing hooked leaf is the FENCE (`HartBarrier.ghost_step`,
+  `wp_fence_gs_s_sconf` at WpSconfFencePub — A6.107); main's boot arm has
+  NO fence before kvminithart (+0xac is after).
+- Every non-fence sconf leaf proves its `swp (execute i)` via WALKERS
+  (`swp_hfrun`, `swp_hmrun_of_exec_reg`) — no single-node seam.
+- The satp leaf (`WpSconfCsr.wp_csrw_satp_s_sconf`, ~:2025) supplies the
+  write-swp ITSELF (`swp_write_CSR_satp_S`, :1337) as a premise-bullet to
+  the engine, and that lemma's step 4 is a DIRECT
+  `swp_write_reg_owned` (HartSpanChar:281, via hfrun) on the satp cell.
+
+**The plan (next session): hook the satp write node.**
+1. `HartRegNode.swp_hart_regwrite_gs` — clone of `swp_hart_regwrite`
+   threading a `ghost_step`-shaped hook (P/Q) run against
+   `gs_of img σ.mem log V σ.sregs σ.mdev` (the `tso_interp_of_at_gs` +
+   `tso_interp_of_pin` sandwich exactly as `wp_hart_barrier_gs` does),
+   σ-callback unchanged otherwise.
+2. `swp_write_reg_owned_gs` — DIRECT proof (not hfrun): the frame's own
+   cell + `reg_update` inside the σ-callback.
+3. `swp_write_CSR_satp_S_gs` — clone of :1337 with step 4's write swapped.
+4. `wp_csrw_satp_s_sconf_gs` — clone of the leaf; the hook's P must
+   include `own_context cur_ctx` — the leaf's own "Hctx" capability piece
+   is IN HAND in the instruction branch (`iDestruct "Hcap" as
+   "(Hstk & Htr & Harm & Hctx & …)"`), so the leaf can lend it: hook shape
+   `∀g, gh -∗ interp -∗ own_context cur_ctx -∗ P ==∗ … ∗ own_context ∗ Q`.
+5. `SpecKvminithart`: replace the two premises with
+   `kpt_hook P (kpt_inv root ∗ kpt_creds ∗ Q)`-style ghost hook + `P`,
+   continuation returns `Q`; ProofKvminithart discharges at its satp leaf
+   (→ the `_gs` leaf); secondaries pass an identity hook (they HAVE
+   kpt_inv+creds); ProofMain hart 0 passes
+   P := UTier tree ∗ kmap_auth ∗ kpt_unset ∗ kptb_unset ∗ ⌜hart0 facts⌝
+   and the hook body = `kvm_M_mint` + `kptree_publish_boot` +
+   `kpt_inv_alloc` + `kpt_creds_intro_boot`.
+   (Alternative shape if the token lending fights the leaf: keep the
+   establishment callback taking `own_context` as an ARGUMENT as in 4.)
+
+Gotcha log additions: `git rm --cached` under GIT_DIR/GIT_INDEX_FILE does
+NOT drop the blob — use `git update-index --force-remove` (the r59
+snapshot push failed once on iris/.lia.cache, 229MB).
+

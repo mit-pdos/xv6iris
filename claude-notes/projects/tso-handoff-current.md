@@ -23,7 +23,7 @@ measured record; `main-tso-readiness.md` is the separate main-side handoff.
    temp-index recipe; `ZZchain.sh <File>…` at the tree root rechecks files
    locally in order against pulled `.vo`).
    Build driver: `ZZbuild.sh` at the tree root (the intr lane's, log names
-   suffixed `.aux` -- see the gotcha).  **Last certified: r58 (`b0631cf48`), 1263/1303, red roots 5, zero admits.  IN FLIGHT: the §0.47′ ctx_values kit is GREEN (TsoMemPa.pin_ok_author, CtxValues.v); the page-table plan is A6.135 §2 (S1–S6, per-slot anchors — the publication is now UNCONDITIONAL and hart 0 reads by persistent cv_own anchors, token-free).  Rulings §0.46′/§0.47′ in tso-port.md.  Builds via `run-on-gcp` ONLY.**
+   suffixed `.aux` -- see the gotcha).  **Last certified: r59 (`081a27ff178f`), 1264/1304, red cone unchanged from r58, zero admits.  A6.135 §1–§4 LANDED (per-slot-anchor KTier, Bg gates, cv_boot_cred walk credential, kptree_publish_boot — the UNCONDITIONAL boot publication).  Remaining: §5 (the satp-write ghost hook, plan measured in tso-machine-flip.md A6.135 §5) then ProofMain mn_grp_kvm.  Builds via `run-on-gcp` ONLY.**
 2. **KPT tree**: `/shared/xv6iris-3-kpttree` — FROZEN mid-K15d, unchanged
    this session EXCEPT one mirrored hunk: `iris/SmodeCorePt.v`'s
    `word_pointsto_wpay_mint_c` gained the trailing own-message fragment
