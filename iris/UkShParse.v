@@ -2639,6 +2639,263 @@ Section UkShParse.
       f_equal. lia.
   Qed.
 
+  (* the scan's ENTRY test, 0x46a: [bgeu s1,a1,0x482] is the [s < es] half of
+     the [&&], and it is what makes the cursor's index [j] range over
+     [0..len] rather than [0..len-1].  Folding it in here rather than at the
+     call site is what lets everything from 0x46a to 0x482 be ONE lemma with
+     ONE postcondition, so peek's body has no branch until 0x48c. *)
+  Local Lemma wp_kshp_peek_enter (dq dw : dfrac) (s0 : Z) (len j : nat)
+      (f : nat -> bv 8) (nn : nat) (h : CpuId) (mc : regfile) :
+    (j <= len)%nat ->
+    0 <= s0 -> s0 + Z.of_nat len < Z64 ->
+    mc !!! Regidx s1_idx = mword_of_int (s0 + Z.of_nat j) ->
+    mc !!! Regidx s2_idx = mword_of_int (s0 + Z.of_nat len) ->
+    mc !!! Regidx s3_idx = mword_of_int ushp_whitespace ->
+    mc !!! Regidx a1_idx = mword_of_int (s0 + Z.of_nat len) ->
+    shp_code γt -∗
+    ustr γd dq s0 len f -∗
+    ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
+    urun γt γd γs h mc (mword_of_int 0x46a) (2 + nn) -∗
+    (ustr γd dq s0 len f -∗
+     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
+       ∀ (h' : CpuId) (mc' : regfile),
+         ⌜ forall q : mword 5, ucallee_saved_idx q = true ->
+             Regidx q <> Regidx s1_idx ->
+             mc' !!! Regidx q = mc !!! Regidx q ⌝ -∗
+         ⌜ mc' !!! Regidx s1_idx
+             = mword_of_int
+                 (s0 + Z.of_nat (j + ushp_skipws (len - j) j f)) ⌝ -∗
+         urun γt γd γs h' mc' (mword_of_int 0x482) (2 + nn) -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hjle Hs0 Hs64 Hs1 Hs2 Hs3 Ha1.
+    iIntros "#Hcode Hstr Hws Hrun Hcont".
+    destruct (Nat.eq_dec j len) as [ Hend | Hne ].
+    { (* the cursor is already at [es]: the scan is skipped entirely *)
+      assert (Htk : true = uv_btaken BGEU (mc !!! Regidx s1_idx)
+                             (mc !!! Regidx a1_idx)).
+      { cbn [uv_btaken]. rewrite Hs1 Ha1 Hend.
+        rewrite (moi_ge_u (s0 + Z.of_nat len) (s0 + Z.of_nat len)
+                   ltac:(unfold Z64 in *; lia) ltac:(unfold Z64 in *; lia)).
+        symmetry. apply Z.geb_le. lia. }
+      iApply (wp_uk_btype γt γd γs h mc (mword_of_int 0x46a)
+                (mword_of_int 24 : mword 13) a1_idx s1_idx BGEU true
+                (mword_of_int 0x482) (2 + nn)
+                Htk
+                ltac:(apply bv_eq; vm_compute; reflexivity)
+                ltac:(intros _; vm_compute; reflexivity)
+                with "[] Hrun").
+      { iApply (uis_shp_46a with "Hcode"). }
+      iIntros (h1) "Hrun".
+      iApply ("Hcont" with "Hstr Hws [] [] Hrun").
+      - iPureIntro. intros q _ _. reflexivity.
+      - iPureIntro. rewrite Hs1.
+        assert (Hz : (len - j)%nat = 0%nat) by lia. rewrite Hz.
+        rewrite (ushp_skipws_zero j f). f_equal. lia. }
+    (* ...otherwise the scan runs *)
+    assert (Hjlt : (j < len)%nat) by lia.
+    assert (Htk : false = uv_btaken BGEU (mc !!! Regidx s1_idx)
+                            (mc !!! Regidx a1_idx)).
+    { cbn [uv_btaken]. rewrite Hs1 Ha1.
+      rewrite (moi_ge_u (s0 + Z.of_nat j) (s0 + Z.of_nat len)
+                 ltac:(unfold Z64 in *; lia) ltac:(unfold Z64 in *; lia)).
+      symmetry. rewrite Z.geb_leb. apply Z.leb_gt. lia. }
+    iApply (wp_uk_btype γt γd γs h mc (mword_of_int 0x46a)
+              (mword_of_int 24 : mword 13) a1_idx s1_idx BGEU false
+              (mword_of_int 0x482) (2 + nn)
+              Htk
+              ltac:(apply bv_eq; vm_compute; reflexivity)
+              ltac:(discriminate)
+              with "[] Hrun").
+    { iApply (uis_shp_46a with "Hcode"). }
+    rewrite (ushp_pc_step 0x46a 4). iIntros (h1) "Hrun".
+    iApply (wp_kshp_peek_scan dq dw s0 len f nn (len - j)%nat j h1 mc
+              eq_refl Hjlt Hs0 Hs64 Hs1 Hs2 Hs3 with "Hcode Hstr Hws Hrun").
+    iIntros "Hstr Hws" (h2 mc') "%Hpres %Hret Hrun".
+    iApply ("Hcont" with "Hstr Hws [] [] Hrun").
+    - iPureIntro. exact Hpres.
+    - iPureIntro. exact Hret.
+  Qed.
+
+  (* peek's epilogue, 0x48e..0x49e.  It is reached BOTH ways -- with a0
+     already 0 because the byte at the cursor is the line's terminator, and
+     with a0 the [snez] of a second strchr because it is not -- so it is
+     stated once, at whatever a0 holds.  Nothing it runs touches a0, so the
+     caller reads the result back through [ushp_spillback_ne]. *)
+  Local Lemma wp_kshp_peek_epi (sp0 spl : mword 64) (vals : nat -> mword 64)
+      (nn : nat) :
+    forall (h : CpuId) (me : regfile),
+    uint sp0 mod 8 = 0 -> 64 <= uint sp0 -> uint sp0 < Z64 ->
+    uint spl = uint sp0 - 56 ->
+    me !!! Regidx csp_rs1 = add_vec_int sp0 (- (8 * Z.of_nat 8)) ->
+    shp_code γt -∗
+    ([∗ list] i ↦ _ ∈ [(ra_idx, mword_of_int 7 : mword 6);
+                       (s0_idx, mword_of_int 6 : mword 6);
+                       (s1_idx, mword_of_int 5 : mword 6);
+                       (s2_idx, mword_of_int 4 : mword 6);
+                       (s3_idx, mword_of_int 3 : mword 6);
+                       (s4_idx, mword_of_int 2 : mword 6);
+                       (s5_idx, mword_of_int 1 : mword 6)],
+       uword γd (uint sp0 - 8 * (Z.of_nat i + 1)) (vals i)) -∗
+    ustack γd spl 1 -∗
+    urun γt γd γs h me (mword_of_int 0x48e) (2 + nn) -∗
+    (∀ h' : CpuId,
+       urun γt γd γs h'
+         (<[Regidx csp_rs1 := regval_into_reg sp0]>
+            (ushp_spillback [(ra_idx, mword_of_int 7 : mword 6);
+                             (s0_idx, mword_of_int 6 : mword 6);
+                             (s1_idx, mword_of_int 5 : mword 6);
+                             (s2_idx, mword_of_int 4 : mword 6);
+                             (s3_idx, mword_of_int 3 : mword 6);
+                             (s4_idx, mword_of_int 2 : mword 6);
+                             (s5_idx, mword_of_int 1 : mword 6)] vals me))
+         (ret_pc (vals 0%nat)) (8 + (2 + nn)) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros h me Hal8 Hlo Hhi Hsplu Hsp.
+    iIntros "#Hcode Hsl Hloc Hrun Hcont".
+    set (spn := add_vec_int sp0 (- (8 * Z.of_nat 8))).
+    assert (Hspu : uint spn = uint sp0 - 64).
+    { unfold spn. rewrite !uint_unsigned.
+      replace (- (8 * Z.of_nat 8)) with (-64) by lia.
+      exact (uv_avi_neg sp0 64 ltac:(lia)
+               ltac:(rewrite <- uint_unsigned; lia)). }
+    assert (Hoff : forall (i : nat) (r : mword 5) (u : mword 6),
+              [(ra_idx, mword_of_int 7 : mword 6);
+               (s0_idx, mword_of_int 6 : mword 6);
+               (s1_idx, mword_of_int 5 : mword 6);
+               (s2_idx, mword_of_int 4 : mword 6);
+               (s3_idx, mword_of_int 3 : mword 6);
+               (s4_idx, mword_of_int 2 : mword 6);
+               (s5_idx, mword_of_int 1 : mword 6)] !! i = Some (r, u) ->
+              (uint sp0 - 8 * (Z.of_nat i + 1)) = uint spn + uoff_sdsp u /\
+              (uint sp0 - 8 * (Z.of_nat i + 1)) mod 8 = 0 /\
+              unot_sp r /\ uint r <> 0).
+    { intros i r u Hi.
+      destruct i as [| [| [| [| [| [| [| i ]]]]]]]; cbn in Hi;
+        try discriminate; injection Hi as Hr Hu0; subst;
+        (split;
+         [ rewrite Hspu; vm_compute uoff_sdsp; lia
+         | split;
+           [ exact (ushp_slot_al (uint sp0) _ Hal8)
+           | split; [ unfold unot_sp; vm_compute; discriminate
+                    | vm_compute; discriminate ] ] ]). }
+    (* ---- 0x48e..0x49a  the seven restores ---- *)
+    iApply (wp_kshp_restore spn (2 + nn)
+              [(ra_idx, mword_of_int 7 : mword 6);
+               (s0_idx, mword_of_int 6 : mword 6);
+               (s1_idx, mword_of_int 5 : mword 6);
+               (s2_idx, mword_of_int 4 : mword 6);
+               (s3_idx, mword_of_int 3 : mword 6);
+               (s4_idx, mword_of_int 2 : mword 6);
+               (s5_idx, mword_of_int 1 : mword 6)]
+              (fun i : nat => match i with
+                              | 0%nat => 0x48e | 1%nat => 0x490
+                              | 2%nat => 0x492 | 3%nat => 0x494
+                              | 4%nat => 0x496 | 5%nat => 0x498
+                              | 6%nat => 0x49a | _ => 0x49c end)
+              (fun i : nat => uint sp0 - 8 * (Z.of_nat i + 1))
+              vals h me Hsp
+              ltac:(intros i Hi;
+                    destruct i as [| [| [| [| [| [| [| i ]]]]]]];
+                    cbn in Hi |- *; try reflexivity; lia)
+              Hoff
+              with "[] Hsl Hrun").
+    { rewrite !big_sepL_cons big_sepL_nil.
+      iSplit; [ iApply (uis_shp_48e with "Hcode") | ].
+      iSplit; [ iApply (uis_shp_490 with "Hcode") | ].
+      iSplit; [ iApply (uis_shp_492 with "Hcode") | ].
+      iSplit; [ iApply (uis_shp_494 with "Hcode") | ].
+      iSplit; [ iApply (uis_shp_496 with "Hcode") | ].
+      iSplit; [ iApply (uis_shp_498 with "Hcode") | ].
+      iSplit; [ iApply (uis_shp_49a with "Hcode") | done ]. }
+    iIntros "Hsl" (h1) "Hrun". cbn [length].
+    set (mr := ushp_spillback
+                 [(ra_idx, mword_of_int 7 : mword 6);
+                  (s0_idx, mword_of_int 6 : mword 6);
+                  (s1_idx, mword_of_int 5 : mword 6);
+                  (s2_idx, mword_of_int 4 : mword 6);
+                  (s3_idx, mword_of_int 3 : mword 6);
+                  (s4_idx, mword_of_int 2 : mword 6);
+                  (s5_idx, mword_of_int 1 : mword 6)] vals me).
+    assert (Hspr : mr !!! Regidx csp_rs1 = spn).
+    { rewrite /mr (ushp_spillback_ne
+                     [(ra_idx, mword_of_int 7 : mword 6);
+                      (s0_idx, mword_of_int 6 : mword 6);
+                      (s1_idx, mword_of_int 5 : mword 6);
+                      (s2_idx, mword_of_int 4 : mword 6);
+                      (s3_idx, mword_of_int 3 : mword 6);
+                      (s4_idx, mword_of_int 2 : mword 6);
+                      (s5_idx, mword_of_int 1 : mword 6)] vals me csp_rs1
+                     ltac:(intros i r u Hi;
+                           destruct i as [| [| [| [| [| [| [| i ]]]]]]];
+                           cbn in Hi; try discriminate;
+                           injection Hi as Hr Hu0; subst;
+                           vm_compute; discriminate)).
+      exact Hsp. }
+    assert (Hrar : mr !!! Regidx ra_idx = vals 0%nat).
+    { rewrite /mr. cbn [ushp_spillback fst].
+      rewrite (upd_ne _ (Regidx s5_idx) (Regidx ra_idx) _
+                 ltac:(vm_compute; discriminate)).
+      rewrite (upd_ne _ (Regidx s4_idx) (Regidx ra_idx) _
+                 ltac:(vm_compute; discriminate)).
+      rewrite (upd_ne _ (Regidx s3_idx) (Regidx ra_idx) _
+                 ltac:(vm_compute; discriminate)).
+      rewrite (upd_ne _ (Regidx s2_idx) (Regidx ra_idx) _
+                 ltac:(vm_compute; discriminate)).
+      rewrite (upd_ne _ (Regidx s1_idx) (Regidx ra_idx) _
+                 ltac:(vm_compute; discriminate)).
+      rewrite (upd_ne _ (Regidx s0_idx) (Regidx ra_idx) _
+                 ltac:(vm_compute; discriminate)).
+      exact (upd_eq me (Regidx ra_idx) (regval_into_reg (vals 0%nat))). }
+    assert (Hup : add_vec_int spn (8 * Z.of_nat 8) = sp0).
+    { apply bv_eq.
+      rewrite (uv_avi_pos spn (8 * Z.of_nat 8) ltac:(lia)
+                 ltac:(rewrite <- uint_unsigned; lia)).
+      rewrite <- !uint_unsigned. lia. }
+    (* ---- 0x49c  c.addi16sp sp,sp,64 -- THE POP ---- *)
+    iApply (wp_uk_caddi16sp_up γt γd γs h1 mr (mword_of_int 0x49c)
+              (mword_of_int 4 : mword 6) 8 (2 + nn)
+              ltac:(apply bv_eq; vm_compute; reflexivity)
+              with "[] [Hsl Hloc] Hrun").
+    { iApply (uis_shp_49c with "Hcode"). }
+    { rewrite Hspr Hup.
+      iApply (ushp_frame_join sp0 spl 1
+                [(ra_idx, mword_of_int 7 : mword 6);
+                 (s0_idx, mword_of_int 6 : mword 6);
+                 (s1_idx, mword_of_int 5 : mword 6);
+                 (s2_idx, mword_of_int 4 : mword 6);
+                 (s3_idx, mword_of_int 3 : mword 6);
+                 (s4_idx, mword_of_int 2 : mword 6);
+                 (s5_idx, mword_of_int 1 : mword 6)]
+                vals ltac:(cbn [length]; lia) with "Hsl Hloc"). }
+    rewrite Hspr Hup (ushp_pc_step 0x49c 2). iIntros (h2) "Hrun".
+    (* ---- 0x49e  c.jr ra ---- *)
+    iApply (wp_uk_cjr γt γd γs h2
+              (<[Regidx csp_rs1 := regval_into_reg sp0]> mr)
+              (mword_of_int 0x49e) ra_idx (ret_pc (vals 0%nat)) (8 + (2 + nn))
+              ltac:(vm_compute; discriminate)
+              ltac:(rewrite (upd_ne mr (Regidx csp_rs1) (Regidx ra_idx) _
+                               ltac:(vm_compute; discriminate));
+                    rewrite Hrar; reflexivity)
+              with "[] Hrun").
+    { iApply (uis_shp_49e with "Hcode"). }
+    iIntros (h3) "Hrun". iApply ("Hcont" $! h3 with "Hrun").
+  Qed.
+
+  (* peek's ANSWER.  0 once the cursor has run to [es] -- the byte there is
+     the line's terminator and C's [&&] short-circuits -- and otherwise
+     whether the byte at the cursor is one of [toks]. *)
+  Definition ushp_peek_res (len : nat) (f : nat -> bv 8) (k tlen : nat)
+      (tf : nat -> bv 8) : Z :=
+    if bool_decide (k < len)%nat
+    then (match ushp_find tlen 0%nat tf (f k) with
+          | Some _ => 1 | None => 0 end)
+    else 0.
+
+
   (* ===================================================================== *)
   (* §7 execcmd @0x1d2 -- 19 instructions, a four-word frame, NO branch.    *)
   (*                                                                       *)
