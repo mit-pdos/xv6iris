@@ -400,4 +400,134 @@ Section UkInitMain.
     iApply (wp_kinit_exit γt γd γs hdw6 _ (12 + (12 + (4 + n))) with "Hcode Hrun").
   Qed.
 
+
+  (* --------------------------------------------------------------------- *)
+  (* THE CHILD ARM @0x96: exec("sh", argv).                                  *)
+  (*                                                                        *)
+  (*   0x96 auipc a1 ; 0x9a addi a1,a1,-150   -- argv, at 0x1000            *)
+  (*   0x9e auipc a0 ; 0xa2 addi a0,a0,-1782  -- "sh", at 0x9a8             *)
+  (*   0xa6 jal <exec>                                                       *)
+  (*                                                                        *)
+  (* A SUCCESSFUL exec never comes back to this WP -- the new program runs   *)
+  (* under a slot minted for its own image, which is not this proof's        *)
+  (* business.  [UsysMemOk]'s exec row therefore states the FAILURE arm      *)
+  (* only ([r = -1], image and permissions unchanged), and that arm falls    *)
+  (* into the 0xaa diagnostic.  So this lemma needs nothing about the argv   *)
+  (* array or the "sh" string: they are addresses in registers, and the      *)
+  (* only path back through here is the one where the kernel looked at       *)
+  (* neither.                                                                *)
+  (* --------------------------------------------------------------------- *)
+  Lemma wp_kinit_main_child (h : CpuId) (m : regfile) (n : nat) :
+    init_code γt -∗ init_rodata γt -∗
+    urun γt γd γs h m (mword_of_int 0x96) (12 + (12 + (4 + n))) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros "#Hcode #Hro Hrun".
+    destruct init_syms_pins
+      as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hexec & _ & _).
+    (* ---- 0x96  auipc a1,0x1 ---- *)
+    iApply (wp_uk_auipc γt γd γs h m (mword_of_int 0x96)
+              (mword_of_int 1 : mword 20) a1_idx
+              (add_vec (mword_of_int 0x96 : mword 64)
+                 (auipc_off (mword_of_int 1 : mword 20))) (12 + (12 + (4 + n)))
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate) eq_refl with "[] Hrun").
+    { iApply (uis_init_96 with "Hcode"). }
+    assert (E96 : add_vec_int (mword_of_int 0x96 : mword 64) 4
+                  = mword_of_int 0x9a)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E96.
+    iIntros (hc1) "Hrun".
+    set (mc1 := <[Regidx a1_idx := regval_into_reg
+                    (add_vec (mword_of_int 0x96 : mword 64)
+                       (auipc_off (mword_of_int 1 : mword 20)))]> m).
+    (* ---- 0x9a  addi a1,a1,-150 -- argv ---- *)
+    assert (Eargv : add_vec (add_vec (mword_of_int 0x96 : mword 64)
+                               (auipc_off (mword_of_int 1 : mword 20)))
+                      (sign_extend' 64 (mword_of_int 3946 : mword 12))
+                    = mword_of_int 0x1000)
+      by (apply bv_eq; vm_compute; reflexivity).
+    iApply (wp_uk_addi γt γd γs hc1 mc1 (mword_of_int 0x9a)
+              (mword_of_int 3946 : mword 12) a1_idx a1_idx
+              (mword_of_int 0x1000) (12 + (12 + (4 + n)))
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate)
+              ltac:(rewrite (upd_eq m (Regidx a1_idx) (regval_into_reg _));
+                    exact (eq_sym Eargv))
+              with "[] Hrun").
+    { iApply (uis_init_9a with "Hcode"). }
+    assert (E9a : add_vec_int (mword_of_int 0x9a : mword 64) 4
+                  = mword_of_int 0x9e)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E9a.
+    iIntros (hc2) "Hrun".
+    set (mc2 := <[Regidx a1_idx
+                  := regval_into_reg (mword_of_int 0x1000 : mword 64)]> mc1).
+    (* ---- 0x9e  auipc a0,0x1 ---- *)
+    iApply (wp_uk_auipc γt γd γs hc2 mc2 (mword_of_int 0x9e)
+              (mword_of_int 1 : mword 20) a0_idx
+              (add_vec (mword_of_int 0x9e : mword 64)
+                 (auipc_off (mword_of_int 1 : mword 20))) (12 + (12 + (4 + n)))
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate) eq_refl with "[] Hrun").
+    { iApply (uis_init_9e with "Hcode"). }
+    assert (E9e : add_vec_int (mword_of_int 0x9e : mword 64) 4
+                  = mword_of_int 0xa2)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E9e.
+    iIntros (hc3) "Hrun".
+    set (mc3 := <[Regidx a0_idx := regval_into_reg
+                    (add_vec (mword_of_int 0x9e : mword 64)
+                       (auipc_off (mword_of_int 1 : mword 20)))]> mc2).
+    (* ---- 0xa2  addi a0,a0,-1782 -- "sh" ---- *)
+    assert (Esh : add_vec (add_vec (mword_of_int 0x9e : mword 64)
+                             (auipc_off (mword_of_int 1 : mword 20)))
+                    (sign_extend' 64 (mword_of_int 2314 : mword 12))
+                  = mword_of_int 0x9a8)
+      by (apply bv_eq; vm_compute; reflexivity).
+    iApply (wp_uk_addi γt γd γs hc3 mc3 (mword_of_int 0xa2)
+              (mword_of_int 2314 : mword 12) a0_idx a0_idx
+              (mword_of_int 0x9a8) (12 + (12 + (4 + n)))
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate)
+              ltac:(rewrite (upd_eq mc2 (Regidx a0_idx) (regval_into_reg _));
+                    exact (eq_sym Esh))
+              with "[] Hrun").
+    { iApply (uis_init_a2 with "Hcode"). }
+    assert (Ea2 : add_vec_int (mword_of_int 0xa2 : mword 64) 4
+                  = mword_of_int 0xa6)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite Ea2.
+    iIntros (hc4) "Hrun".
+    set (mc4 := <[Regidx a0_idx
+                  := regval_into_reg (mword_of_int 0x9a8 : mword 64)]> mc3).
+    (* ---- 0xa6  jal ra,0x3aa <exec> ---- *)
+    iApply (wp_uk_jal γt γd γs hc4 mc4 (mword_of_int 0xa6)
+              (mword_of_int 772 : mword 21) ra_idx
+              (mword_of_int InitSyms.exec) (mword_of_int 0xaa)
+              (12 + (12 + (4 + n)))
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate)
+              ltac:(rewrite Hexec; apply bv_eq; vm_compute; reflexivity)
+              ltac:(apply bv_eq; vm_compute; reflexivity)
+              ltac:(rewrite Hexec; vm_compute; reflexivity)
+              with "[] Hrun").
+    { iApply (uis_init_a6 with "Hcode"). }
+    iIntros (hc5) "Hrun".
+    set (mc5 := <[Regidx ra_idx
+                  := regval_into_reg (mword_of_int 0xaa : mword 64)]> mc4).
+    assert (Hrac5 : mc5 !!! Regidx ra_idx = (mword_of_int 0xaa : mword 64))
+      by exact (upd_eq mc4 (Regidx ra_idx) (regval_into_reg _)).
+    (* ---- exec("sh", argv) -- and it FAILED, or we would not be here ---- *)
+    iApply (wp_kinit_exec γt γd γs hc5 mc5 (12 + (12 + (4 + n)))
+              with "Hcode Hrun").
+    iIntros (hc6) "Hrun".
+    assert (Eretc : ret_pc (mc5 !!! Regidx ra_idx)
+                    = (mword_of_int 0xaa : mword 64))
+      by (rewrite Hrac5; apply bv_eq; vm_compute; reflexivity).
+    rewrite Eretc.
+    (* ---- 0xaa  "init: exec sh failed" ; exit(1) ---- *)
+    iApply (wp_kinit_main_die_de hc6 _ n with "Hcode Hro Hrun").
+  Qed.
+
 End UkInitMain.
