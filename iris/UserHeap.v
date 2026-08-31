@@ -1296,6 +1296,13 @@ Section UserHeap.
   (* the [⊣⊢] splits above appears under [rewrite] in a program proof, it   *)
   (* is a directed lemma waiting to be written.                             *)
   (* ===================================================================== *)
+  Lemma ustack_2_open (γd : gname) (sp : mword 64) :
+    ustack γd sp 2 -∗
+      ⌜ uint sp mod 8 = 0 ⌝ ∗
+      (∃ w : mword 64, uword γd (uint sp - 8) w) ∗
+      (∃ w : mword 64, uword γd (uint sp - 16) w).
+  Proof. rewrite ustack_2. iIntros "H". iExact "H". Qed.
+
   Lemma ustack_4_open (γd : gname) (sp : mword 64) :
     ustack γd sp 4 -∗
       ⌜ uint sp mod 8 = 0 ⌝ ∗
