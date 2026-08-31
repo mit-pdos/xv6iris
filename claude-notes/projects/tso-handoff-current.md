@@ -1,83 +1,61 @@
-# TSO port: LIVE HANDOFF CHECKPOINT (2026-08-31, r63 banked — SUCCESSION DOC)
+# TSO port: LIVE HANDOFF CHECKPOINT (2026-08-31, post-A6.141 — r65 pending)
 
 This file is the resumption point for a FRESH agent taking over the TSO
 port.  It is updated at green boundaries; trust the newest git commit of
-it on branch `tso`.  The previous coordinator ran out of credits at r63;
-a successor agent TAKES OVER THE PRIMARY TREE AND THIS ROLE (the
-lane-isolation rule — own clone, own branch — applies to CONCURRENT
-side lanes, not to the successor of the coordinator itself).
+it on branch `tso`.  The successor coordinator (this round) OWNS THE
+PRIMARY TREE; lane isolation applies to CONCURRENT side lanes only.
 
 Reading order for a fresh agent:
 1. `claude-notes/README.md`, `durable-notes.md`, `remote-build-gcp.md`.
 2. This file, top to bottom.
 3. `projects/tso-port.md` — the OWNER RULINGS (§0.x′).  Minimum set:
    §0.7′ §0.11′ §0.12′ §0.23′ §0.25′ §0.27′ §0.35′ §0.36′ §0.37′ §0.38′
-   §0.39′ §0.41′ §0.42′ §0.44′ §0.46′ §0.47′, and the ProofForkretPark
-   crossing write-up (search "THE PARK'S SECOND CROSSING").
-4. `projects/tso-machine-flip.md` — the A6-series measured record
-   (A6.119–A6.139).  Skim headers; read in full the sections named below.
-5. `projects/tso-umode-lane.md` — the user-cone brief + its §7 interface
-   records (the next conversion's starting point).
-6. `projects/main-tso-readiness.md` — the SEPARATE main-branch port
-   track (another agent's; not yours unless told).
+   §0.39′ §0.41′ §0.42′ §0.44′ §0.46′ §0.47′.
+4. `projects/tso-machine-flip.md` — the A6-series measured record.  Read
+   A6.139–A6.141 in full (the kernelvec family fixpoint; the trampoline
+   port; the fork-crossing reduction).
+5. `projects/tso-umode-lane.md` — historical (its mission is complete;
+   §7's interface records are DISCHARGED as of A6.140/A6.141).
+6. `projects/main-tso-readiness.md` — the SEPARATE main-branch track.
 
-## 1. WHERE THE PROJECT STANDS (r63, certified 2026-08-31)
+## 1. WHERE THE PROJECT STANDS (post-A6.140/A6.141)
 
-**GREEN = 1283/1305 iris files, zero admits, zero axioms** (grep-verified;
-`Admitted` appears only in comments).  model-xv6iris, kernel-rocq,
-user-rocq all build clean.  Proven under the TSO machine end to end:
+r63 was 1283/1305 with five error roots.  This round LANDED, per the
+owner's direction ("the per-binary proofs don't need to be done … but
+the reasoning about executing in the kernel's trampoline page, in
+userret / usertrap, does need to be ported"):
 
-- the TSO machine itself (`TsoMemPa`), the context/ledger tier
-  (`TsoCtx`, `CtxValues`), locks + acquire/release floors, scheduler +
-  swtch + the park box, fork/exec/exit/wait, the whole FS + virtio
-  (incl. the §0.41′ release-cell used-index and two-message completion),
-  console/UART, the kernel page table end to end (A6.135), secondary
-  boot wiring (A6.138), and the ENTIRE trap-handler chain — kerneltrap,
-  kernelvec, usertrap + links (A6.139, landed this round).
-- the GENERIC user-mode step theorem (fetch/mem-access/user-walk
-  engine) — u-mode lane, merged at r61.
+- THE WHOLE TRAMPOLINE EXECUTION TIER (A6.140): the tramp_tr_obl token
+  tranche (TrampStepPt/UptWalkTramp/Pt2WalkPt/TransPt), the satp-switch
+  legs (UserretEntryPt/UservecExitPt), the instruction leaves
+  (UserretPt/UservecPt, trapframe now ctx-tier), the token-threaded
+  S-mode RAM engines (HartSMemTok.v, NEW), the whole-function chains
+  (ProofUserret 38-instr, ProofUservec 44-instr + usertrap + userret),
+  the trap-loop Löb closer (ProofUserretClosed) and its Links, the
+  userret→user bridge (UserretUser), and ProofUser (the u-lane's
+  recorded Rut_ctx accessor).  The residue opens
+  (usertrap_res_tf_open/_tf_csrs_open + parked twin) hand the running
+  token out and take it back; kpt_creds threads uservec's kcur window
+  and rides uservec_post.
+- THE FORK CROSSING, MEASURED TO ITS TRUE WALL (A6.141 + its §0
+  correction): the `is_ftable` context-λ flip made `CtxMove
+  park_globals` provable and the park's bullets cross — but
+  `WpLock.newlock`'s `CtxMorph R` premise (the producer side) then
+  demands a morphable payload, and `ftable_res` contains ξ-BODIED cinvs.
+  The flip is REVERTED and re-lands with the rooted restatement; both
+  the `park_globals` and `proc_priv` bullets are blocked on the SAME
+  design point.
 
-**The 22 red files fall into exactly three buckets:**
+**The red set now funnels through ONE design point** (see §6): the
+ξ-BODIED invariant/cinv bodies — `IcacheInv.itable_inv`,
+`BioInv.buf_escrow`, `inode_pay`'s `cinv fileipN (inode_held_short)`,
+and `off_hold`'s cinv over `off_content`.
+Everything else red is the boot/adequacy tail sitting behind
+ProofForkretPark: LinkForkretParkPaid, LinkUserinit, LinkMain,
+BootChain, BootShared, FsAdequacyImg, SystemAdequacy.
 
-**A. Trampoline + per-binary user cone (~15 files; owner ruled "do not
-convert yet" — the ruling may be lifted; ask).**  Two jobs:
-  (1) the trampoline TOKEN TRANCHE: `tramp_tr_obl` (a □-obligation,
-  cannot capture a token) must take/return `own_context` as an inner-∀
-  parameter.  Edits `UptWalkTramp` (deliberately red — the instances are
-  parked there), `TrampStepPt`, `Pt2WalkPt`, `TransPt`, `UservecExitPt`,
-  `UserretEntryPt`; the trampoline-proof files then need
-  `Require Import UptWalkTramp`.  Mechanical threading, ~7k lines.
-  (2) the per-binary conversion proper: `UserretPt:195` (fails on
-  `wp_instr_u_pt` not found — the u-lane renamed that layer),
-  `UservecPt`, `ProofUserret`, `ProofUservec` (~5k lines, UNMEASURED),
-  plus `ProofUser:75` which needs only the recorded `Rut_ctx` accessor
-  (a two-line borrow from `UsertrapRes.ut_trap_parked`).  Interface
-  needs are pre-recorded in `tso-umode-lane.md` §7.
-
-**B. `ProofForkretPark:318` — the one genuinely hard open problem.**
-Forkret's cap mints the child's fresh context; every ξ-dependent global
-arrives at the PARKER's ξ; a fresh context cannot hold `inv`/`is_lock`
-handles; both context-motion laws are ξ-preserving by design.  Fully
-characterized in `tso-port.md` with two ranked ways out.  Way 1
-(restate `wp_forkret_gen_body` with an explicit `ξg` for the globals —
-`procs_inv`, `park_globals`, `proc_lock_res`, `is_kstack` — thread-local
-rows stay ambient) needs NO new machinery but reopens the green
-`ProofForkret` (~1900 lines; risk spot = the boot arm where
-kexec/fsinit mix the two contexts).  It is a spec change ⇒ NEEDS THE
-OWNER'S SIGN-OFF FIRST.  Way 2 (λ-payload sweep) is measured-blocked on
-`CtxMorph proc_lock_res` and `CtxMorph ftable_res`.
-
-**C. The boot/adequacy tail (blocked-only, mostly written).**
-`LinkMain`, `BootChain`, `BootShared`, `FsAdequacyImg`,
-`SystemAdequacy` + Link stragglers have no errors of their own — they
-sit under A and B (the kernelvec leg of their cone is PAID as of r63).
-Their TSO text (incl. the A6.138 deposit-wand edit in `BootChain`) was
-written while unbuildable ⇒ expect a modest first-compile fallout tail.
-NOTE: the old scratch-admit measurement trick NO LONGER WORKS here —
-`UserretPt` fails on a missing REFERENCE, which admits cannot skip.
-
-True error roots (r63): `ProofUser:75`, `UserretPt:195`,
-`Pt2WalkPt:427`, `ProofForkretPark:318`, `UptWalkTramp:101`(deliberate).
+True error root (single): `ProofForkretPark` at its park_globals /
+proc_priv bullets (one shared blocker).
 
 ## 2. THE LEGS (trees, branches, dirs)
 
@@ -266,25 +244,31 @@ trailing `/\` and can mis-terminate — write edit scripts to a file.
 
 ## 6. WHERE TO PICK UP (in order)
 
-1. **Bucket B first if the owner is available**: get the sign-off on
-   Way 1 (the `ξg` restatement of `wp_forkret_gen_body`), then do it —
-   it unblocks `LinkForkret`/`LinkForkretParkPaid` and is the only
-   kernel-side red left.
-2. **Bucket A when the owner lifts the per-binary hold**: run the token
-   tranche first (mechanical), then measure `UserretPt:195` /
-   `Pt2WalkPt:427` and convert the four trampoline-proof files;
-   `ProofUser` last (two-line accessor).  Start from
-   `tso-umode-lane.md` §7.
-3. **Bucket C last**: first honest compile of the boot/adequacy chain;
-   fix the fallout tail; that closes `SystemAdequacy` = the whole
-   system proven under TSO.
+1. **THE OWNER REVIEW ITEM (blocks everything left)**: restate the four
+   ξ-bodied invariant/cinv bodies (`itable_inv`, `buf_escrow`,
+   `inode_pay`'s `cinv fileipN`, `off_hold`'s cinv) in §0.47′'s ROOTED form
+   (establishment context packed inside; cells as ctx_values/rooted
+   records; access gated on domination; A6.129 §4's per-lock mono_nat
+   stamp is the instrument for re-base).  Both invs then become ξ-free
+   propositions, `CtxMove proc_priv` closes by the A6.141 §3 unfold
+   tower, and ProofForkretPark's last bullet goes through.  NOTE the
+   child twin is born dominating everything its parker dominated, so
+   the fork pays nothing at the gate.  Characterization + the measured
+   unfold tower: tso-machine-flip.md A6.141.
+2. **Bucket C right after**: LinkForkretParkPaid → LinkUserinit →
+   LinkMain → BootChain/BootShared → FsAdequacyImg → SystemAdequacy —
+   first honest compile of text written while unbuildable; expect a
+   modest fallout tail, then the whole system is proven under TSO.
+3. With the ruling landed, re-apply the recorded reverts: the
+   `is_ftable` λ-flip + `ftable_res_at` + the 9 consumer re-spells +
+   `park_globals_move` (all in comments at their sites), and the same
+   class for `bio_ctx`'s `<{ bcache_res bn V }>`.
 4. Bank every green boundary: round → pull-vo → snapshot → mirror →
    notes (`tso-machine-flip.md` running log + THIS file) → push `tso`.
 
 ## 7. Open owner items
 
-- **ProofForkretPark Way-1 sign-off** (bucket B; spec change).
-- **Lifting the §0.37′/per-binary hold** (bucket A) and deciding which
-  lane runs it.
+- **The rooted-invariant restatement of itable_inv/buf_escrow** (the
+  A6.141 §3 review item; the ONLY blocker of the last kernel red).
 - The C-leg cutover gate (§0.23′/§0.25′) once SystemAdequacy is green.
 - The main-side slices (separate agent, main-tso-readiness.md).

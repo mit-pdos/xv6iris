@@ -17698,7 +17698,26 @@ gone.
 ## proc_priv measured to the true wall (owner's "context-relative where
 ## it just works out" directive)
 
-### §1. THE r54 WALL IS GONE FOR park_globals
+### §0. CORRECTION (same session, measured at ProofMain): THE FLIP IS
+### REVERTED — newlock's [CtxMorph R] premise is the enforcement point
+
+§1 below stood for one round: the λ-flip of [is_ftable] type-checked
+through every CONSUMER (acquire/release sites re-spelled to the named λ
+[ftable_res_at]), and [CtxMove park_globals] was proven.  What failed was
+the PRODUCER: [WpLock.newlock] takes [CtxMorph R] for the payload — the
+premise that makes a λ-payload lock honest (any-context acquirers
+re-index through it) — and [CtxMorph ftable_res_at] recurses into TWO
+MORE ξ-BODIED cinvs the A6.129/§0.13′ measurement had named and A6.130
+did NOT dissolve: [inode_pay]'s [cinv fileipN _ (inode_held_short …)]
+and [off_hold]'s cinv over [off_content].  Same untransportable class as
+itable_inv/buf_escrow.  So the flip, the 9 consumer re-spells, and
+[park_globals_move] are REVERTED (recorded in comments at
+FileInv.is_ftable and ProofForkretPark); they re-land together with the
+rooted restatement.  §3's owner-review item now covers FOUR bodies:
+[itable_inv], [buf_escrow], [cinv fileipN (inode_held_short)],
+[off_hold]'s [off_content] cinv.
+
+### §1. THE r54 WALL IS GONE FOR park_globals (SEE §0 — HELD ONE ROUND)
 
 A6.129 §4 recorded "[park_globals] cannot move as a whole because of ONE
 row: [is_ftable]".  Re-measured this session: the payload story changed
