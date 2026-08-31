@@ -126,11 +126,12 @@ Section ProofSysExit.
       (ip : mword 64) (dqi : dfrac)
       (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (b : bool)
-      (pid : mword 32) (U : ustate) (v0 : mword 64) (lks : gset string)
+      (pid : mword 32) (U : ustate) (sts : list fdstate)
+      (v0 : mword 64) (lks : gset string)
     : wp_sys_exit_sconf_body γft γf γw γs j γl pd pav pu
  ip dqi
 
-                             on fn m av eb b pid U v0 lks.
+                             on fn m av eb b pid U sts v0 lks.
   Proof.
     cbv beta delta [wp_sys_exit_sconf_body].
     intros pcE pj Hfn Hj Hgl Hv0 Hav Hgeo Heb Hbelow.
@@ -340,6 +341,14 @@ Section ProofSysExit.
        Hb3lo/Hb4) is simply framed away in [-] -- nothing ever reloads
        them, because nothing after this call is reachable. *)
     iDestruct (cpu_own_transport CID8 CID10 0%nat eb pj b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    (* THE LAST WEAKENING ON THIS ROUTE, and it is a boundary rather than a
+       loss: kexit closes EVERY descriptor and never returns, so there is no
+       row it could state -- [fd_frags_any] is its premise's honest shape,
+       "at whatever table the process had".  sys_exit's own spec names the
+       table because a SPEC should; kexit's does not because there is
+       nothing on the other side to say it to. *)
+    iAssert (fd_frags_any (pv_fdg (us_V U))) with "[Hufrag]" as "Hufrag";
+      [ by iExists sts | ].
     iApply (Kexit.wp_kexit_sconf γft γf γw γs j γl pd pav pu
  ip dqi
 

@@ -3709,6 +3709,9 @@ Section SyscallArms.
        is what the call needs. *)
     rewrite Hpja.
     (* ---- the call: it does not return ---- *)
+    (* name the table -- sys_exit's spec takes it named, even though it
+       returns nothing to state a row to *)
+    iDestruct "Hufrag" as (sts) "Hufrag".
     iApply (SysExit.wp_sys_exit_sconf γft γf γw
               (fcn_procs fn) (fcn_j fn) (fcn_plock fn)
 
@@ -3718,7 +3721,7 @@ Section SyscallArms.
 
 
               None fn
-              M (av - 4)%nat true true pid U v0 ∅
+              M (av - 4)%nat true true pid U sts v0 ∅
               (sysc_fn_eta fn pid Hpidt Hdq)
               Hjn Hlk Hv0 ltac:(lia) Hlg eq_refl (locks_below_empty "log")
               with "Hcg Hkcl4 Hcpu Htext Hdata Hpc Hpi Hpanic Hwaitlk Hftable

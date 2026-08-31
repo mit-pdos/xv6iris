@@ -103,7 +103,8 @@ Definition wp_sys_exit_sconf_body
                (* kmem.lock, kalloc   *)
     (on : option nat) (fn : fclose_names)
     (m : regfile) (av : nat) (eb : bool) (b : bool)
-    (pid : mword 32) (U : ustate) (v0 : mword 64) (lks : gset string) :=
+    (pid : mword 32) (U : ustate) (sts : list fdstate)
+    (v0 : mword 64) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_exit in
   let pj := proc_addr j in
   fn = MkFCloseNames γs j γl pd pav pu
@@ -177,7 +178,7 @@ Definition wp_sys_exit_sconf_body
      kexit, which closes every descriptor (a retype, so it needs both halves)
      and then parks the process as a ZOMBIE.  The bundle dies with the
      incarnation whose name it is keyed on (FdSlots.v). *)
-  fd_frags_any (pv_fdg (us_V U)) -∗
+  fd_frags (pv_fdg (us_V U)) sts -∗
   (* NO continuation: sys_exit does not return.  See the header. *)
   WP (Loop : expr riscv_lang).
 
@@ -190,9 +191,10 @@ Module Type SYSEXIT.
       (ip : mword 64) (dqi : dfrac)
         (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (b : bool)
-      (pid : mword 32) (U : ustate) (v0 : mword 64) (lks : gset string),
+      (pid : mword 32) (U : ustate) (sts : list fdstate)
+    (v0 : mword 64) (lks : gset string),
       wp_sys_exit_sconf_body γft γf γw γs j γl pd pav pu
  ip dqi
 
-                             on fn m av eb b pid U v0 lks.
+                             on fn m av eb b pid U sts v0 lks.
 End SYSEXIT.
