@@ -23,7 +23,7 @@ measured record; `main-tso-readiness.md` is the separate main-side handoff.
    temp-index recipe; `ZZchain.sh <File>…` at the tree root rechecks files
    locally in order against pulled `.vo`).
    Build driver: `ZZbuild.sh` at the tree root (the intr lane's, log names
-   suffixed `.aux` -- see the gotcha).  **Last certified: r61 (`72bb94f1300a3`), 1279/1305, zero admits.  The u-mode lane (tso-flip-umode) is MERGED and certified on the main tree: the §0.37′ roots are gone (generic U-mode WP theorem green; UptWalkTramp.v deliberately red for the A6.61 trampoline tranche).  Remaining red (26 files): the trampoline/per-binary user cone (out of scope by owner ruling), ProofKernelvec (A6.137: devintr_caps context-relativity — OWNER RULING WANTED, three options recorded), ProofForkretPark (stamped_rec ruling pending).  Secondary wiring mapped in A6.138 (position-indexed started payload).  Builds via `run-on-gcp` ONLY.**
+   suffixed `.aux` -- see the gotcha).  **Last certified: r62 (`05ff8bf16c8e4`), 1279/1305, zero admits.  A6.138 (secondary wiring / position-indexed started payload) LANDED AND CERTIFIED — secondaries mint their own kpt_creds from the started acquire.  IN FLIGHT: A6.139 (the kernelvec fix, owner-approved option 1) — full implementation design in tso-machine-flip.md A6.139; next step is the IntrDefs E-parameter surgery.  Builds via `run-on-gcp` ONLY.**
 2. **KPT tree**: `/shared/xv6iris-3-kpttree` — FROZEN mid-K15d, unchanged
    this session EXCEPT one mirrored hunk: `iris/SmodeCorePt.v`'s
    `word_pointsto_wpay_mint_c` gained the trailing own-message fragment

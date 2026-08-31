@@ -17359,3 +17359,63 @@ payload instance, then the receiver chain — but the receiver files sit
 behind the kernelvec red (A6.137) in the certification order, so the
 kernelvec ruling should come first.
 
+### A6.138 LANDED at r62 (`05ff8bf16c8e4`, 1279/1305, zero regressions)
+
+As mapped: `StartedInv` position-indexed (the store obligation takes
+`llb B0` + `□(∀ pos, ⌜B0 ≤ pos⌝ -∗ P pos cur_ctx)` and fires it at its
+own append position — `tso_interp_llb_valid` gives the tie);
+`SpecMain`'s deposit wand gained the `∀ pos` + the
+`∃B, kpt_bound B ∗ ⌜B ≤ pos⌝` input; `mn_grp_kvm`'s continuation
+forwards `kpt_creds`; `mn_grp_started` destructures them
+(`cv_boot_cred_llb` for the llb) and builds the store-site builder;
+`main_dep` is `nat → CtxId → iProp` carrying the bound tie;
+`ms_spin`'s continuation hands `∃ pos, P pos cur_ctx ∗ view_lb … pos`
+(the read receipt weakened to the flag position via
+`hart_view_lb_unseal` + `view_lb_le`); the secondary MINTS its own
+`kpt_creds` (`view_lb_le` + `cv_boot_cred_view` + `kpt_creds_intro`)
+and `SpecMainSecondary`'s creds premise is GONE.  §0.36 clause 2 is
+fully realized.  BootChain's deposit wand updated (uncertified — behind
+the per-binary user cone, NOT behind kernelvec as A6.138 first guessed:
+BootShared/BootChain transitively need ProofUser/UserretPt/Pt2WalkPt).
+
+### A6.139 — the kernelvec fix (A6.137 option 1), implementation design
+
+Owner approved threading.  Layering fact: `intr_res` (IntrDefs) cannot
+name `devintr_caps` (SpecDevintr sits far above).  The design that keeps
+every carrier arity UNCHANGED (27 files hold `intr_res kt`):
+
+- The `ihs` fixpoint machinery gains an abstract HANDLER ENVIRONMENT
+  `E : CurCtx → iProp Σ` parameter: `ihs_entry_of` grows a `□ E XIb`
+  conjunct; `ires_of E S`; `ihs_of kt E R`; `ihs_pre kt E`;
+  `ihs kt E := fixpoint (ihs_pre kt E)`;
+  `intr_handler_spec kt E h := ihs kt E cpu_id h`.  The Contractive/
+  NonExpansive instances re-run with E fixed (`solve_contractive` /
+  `solve_proper` — watch the >16min naive-shape trap recorded above the
+  fixpoint; keep the split shape).
+- `intr_res kt := ∃ h b (E : CurCtx → iProp Σ), ⌜tv-direct⌝ ∗ ⌜base⌝ ∗
+  ghost_var sie (1/4) b ∗ stvec ↦ᵣ h ∗ ▷ intr_handler_spec kt E h ∗
+  □ E cur_ctx` — the ∃ keeps the arity; `sie_arm`/`sie_arm_of`/
+  `trap_csrs` untouched.  NOTE this amends the recorded M2 sentence
+  ("intr_res does not depend on the ambient XI"): the E-slot is at the
+  CARRIED thread's context, and "a trap moves the hart, never the
+  context" is exactly why entry and post share one E@XIb.
+- The trap engine (WpIntrInv:2679's unfold + the entry assembly) passes
+  `□ E XIb` into the entry; `intr_handler_spec_apply/intro/unfold`
+  E-parameterized.
+- Re-seal sites destructure the extra ∃E + □E and repack (same ctx):
+  WpSconfCsr ×3 (~3669/4095/4289), WpSconfSret:201,
+  ProofPrepareReturn:288, ProofKernelvec:1487/:1742, IntrDefs' own
+  reseals (~2431 comment), ProofKerneltrap (GREEN — the park/return
+  threading; the yield path's trap_csrs crossing carries the caps —
+  morphing across the park is the forkret-park lane's crossing work,
+  same as intr_res's other members).
+- `SpecKernelvec`: the `devintr_caps` premise is REPLACED by choosing
+  `E_kv := λ ξ, ∃ γu γv γdk γtl γs pd pav pu, ⌜length γs = NPROC⌝ ∗
+  devintr_caps (XI := ξ) γu γv γdk γtl γs pd pav pu` at the contract
+  build; `ProofKernelvec` takes caps at XIc from the entry's `□ E XIb`
+  and instantiates `wp_kerneltrap_sconf` at the ∃-bound γs (it is
+  ∀-generic in them) — THE RED CLOSES THERE.
+- Suppliers of `intr_res` (`intr_res_intro` callers: ProofMain ~2291,
+  ProofMainSecondary's ms_inithart_sched, boot-chain intro sites) pass
+  `E := E_kv` + their `#Hcaps` (both already in hand at those sites).
+
