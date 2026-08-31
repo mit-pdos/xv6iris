@@ -2127,7 +2127,7 @@ Section ProofFilewrite.
     { iExact "Hpriv". }
     iIntros (CIDwi Hswi mwi tot bm' data' dn' dn0' n' wrote dist dstb P' Sb')
       "%Hcswi %Hbmwf2 %Hholes2 %Hdaddr2 %Hsz2 %Hbmcov2 %Hcap2 %Hsized2
-       %Hdist %Hdistn %Hdistk %Hrange %Hkbytes %Harms %Hbud
+       %Hdist %Hdistn %Hdistk %Hrange %Hkbytes %Hubytes %Harms %Hbud
        %HSbsub %Hwi16p %Hwi16sp %Hwi16at %Hupt
        Hcg Hcnt _ _ Hpc Hidev Hinum Hmeta Hmap Hblocks Hsbi Hsbsz Hsbb
        Hdnat Hpriv Hbsl HlogS".

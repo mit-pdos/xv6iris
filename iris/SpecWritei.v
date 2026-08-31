@@ -87,15 +87,24 @@
    untouched, and a kernel-arm consumer rewrites [dist] to 0 and reads the
    two-way clause off the same line.
 
-   WHAT THE "BYTE WRITTEN" IS, AND WHY IT IS AN EXISTENTIAL.  On the KERNEL
-   arm the source bytes are the caller's own and the clause pins them.  On
-   the USER arm they are copied out of user memory, about which the kernel
-   may assume NOTHING -- [SpecCopyin]/[SpecEitherCopyin] hand the
-   destination back as [exists dst_new] for exactly that reason -- so there
-   is no nameable "source byte at k - off" at all.  The honest shape is
-   therefore an existentially quantified [wrote : nat -> bv 8] plus a tie
-   that fires only on the kernel arm.  A contract that named the source
-   bytes unconditionally would be UNPROVABLE.
+   WHAT THE "BYTE WRITTEN" IS, AND WHY IT IS STILL AN EXISTENTIAL.  On the
+   KERNEL arm the source bytes are the caller's own and the clause pins
+   them to [src_bytes].  On the USER arm they are copied out of user
+   memory -- and SINCE RULING A (2026-08-31, the content seam) the contract
+   pins them there too, to the IMAGE the caller lent: [copyin_got (us_M U)
+   src tot wrote], byte [i] of the run IS the process's byte at user va
+   [src + i].  [wrote] stays existentially quantified because the two arms
+   name it differently and because the DISTURBED region's bytes still have
+   no name at all; what has gone is the silence about the written range.
+
+   THE OLD STANCE, and why it moved: [SpecEitherCopyin] used to hand the
+   destination back as a bare [exists dst_new] -- not because the kernel
+   may assume nothing about user memory (it may assume exactly what the
+   process's own image says) but because either_copyin's relay dropped the
+   fact [SpecCopyin.wp_copyin_sconf_mem] had been proving since the image
+   campaign's tier 3.  writei holds [proc_priv_core], hence the image, so
+   the fact is now stateable here; the seam is one output conjunct at each
+   storey and no premise anywhere moves.
 
    HOLES READ AS ZEROS ([InodeInv.blk_holes_zero]).  [inode_blocks] leaves
    [data i] unconstrained at an UNALLOCATED index [i], and bmap deposits a
@@ -315,6 +324,7 @@ Require Import SpecPrintk.
 Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
+Require Import SpecCopyin.   (* [copyin_got]: the content seam's vocabulary *)
 Require Import ProcInv.
 Require Import FileInvDefs.
 From Kernel Require KernelSyms.
@@ -750,8 +760,17 @@ Definition wp_writei_sconf_body
            else if decide ((off + tot <= k)%nat /\ (k < off + tot + dist)%nat)
                 then dstb (k - (off + tot))%nat
                 else file_byte data k⌝ -∗
-      (* ...and, on the KERNEL arm only, what those bytes were *)
+      (* ...and, on the KERNEL arm, what those bytes were *)
       ⌜user = false -> forall i : nat, (i < tot)%nat -> wrote i = src_bytes i⌝ -∗
+      (* ...AND ON THE USER ARM, THE SAME FACT AT THE SAME ALTITUDE (RULING
+         A -- the content seam).  Byte [i] of the written run IS the byte the
+         process has at user va [src + i], in the image the caller lent.
+         [copyin_got] is [SpecCopyin]'s, relayed unchanged through
+         [SpecEitherCopyin].  THE RANGE IS [tot], NOT [n]: a chunk whose copy
+         failed part-way is committed into [dist], and which bytes reached
+         the disk there is not observable from the return value -- the same
+         silence [SpecCopyin]'s own [-1] arm keeps. *)
+      ⌜user = true -> copyin_got (us_M U) src tot wrote⌝ -∗
       (* THE TWO ARMS, on the returned a0.  A SHORT WRITE IS THE SECOND
          ARM, not the first: only the up-front checks answer -1. *)
       ⌜(mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int (-1) : mword 64)
@@ -1025,8 +1044,17 @@ Definition wp_writei_gen_body
            else if decide ((off + tot <= k)%nat /\ (k < off + tot + dist)%nat)
                 then dstb (k - (off + tot))%nat
                 else file_byte data k⌝ -∗
-      (* ...and, on the KERNEL arm only, what those bytes were *)
+      (* ...and, on the KERNEL arm, what those bytes were *)
       ⌜user = false -> forall i : nat, (i < tot)%nat -> wrote i = src_bytes i⌝ -∗
+      (* ...AND ON THE USER ARM, THE SAME FACT AT THE SAME ALTITUDE (RULING
+         A -- the content seam).  Byte [i] of the written run IS the byte the
+         process has at user va [src + i], in the image the caller lent.
+         [copyin_got] is [SpecCopyin]'s, relayed unchanged through
+         [SpecEitherCopyin].  THE RANGE IS [tot], NOT [n]: a chunk whose copy
+         failed part-way is committed into [dist], and which bytes reached
+         the disk there is not observable from the return value -- the same
+         silence [SpecCopyin]'s own [-1] arm keeps. *)
+      ⌜user = true -> copyin_got (us_M U) src tot wrote⌝ -∗
       (* THE TWO ARMS, on the returned a0.  A SHORT WRITE IS THE SECOND
          ARM, not the first: only the up-front checks answer -1. *)
       ⌜(mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int (-1) : mword 64)

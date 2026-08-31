@@ -84,18 +84,20 @@
      and of the wire stream up to the (at most 16 + 1) bytes still in
      the tx path at that state.
 
-   * (b) -> "the bytes are MY buffer's": blocked at copyin, not here.
-     The written bytes come from USER memory and
-     [SpecEitherCopyin.either_copyin_post]'s user arm returns the
-     destination at an EXISTENTIAL content (a faulting copy has still
-     written a prefix), so no kernel contract can name which bytes
-     arrived (SpecConsolewrite's header records this; SpecSysWriteAU's
-     "THE BYTES' SOURCE IS NOT NAMED" is the same stance on the inode
-     arm).  Hence the receipts below are EXISTENTIAL byte strings of
-     the right LENGTH, in order.  When copyin's spec can name a stable
-     user page's content, a content-pinned parallel form (R10) can say
-     WHICH bytes; nothing in this file's shape has to change for it --
-     the receipt gains an equation, not a new resource.
+   * (b) -> "the bytes are MY buffer's": CLOSED, 2026-08-31 (RULING A, the
+     write/copyin content seam).  This paragraph used to read "blocked at
+     copyin, not here", because [SpecEitherCopyin.either_copyin_post]'s
+     user arm returned the destination at an existential content.  It
+     does not any more: the arm relays [SpecCopyin.copyin_got] on its
+     success exit, consolewrite's located contract carries the join
+     through its chunk loop ([SpecConsolewriteLoc.cons_sent_cnt]), and
+     the receipts below now say [SpecCopyin.ubytes_at (us_M U) v1 bs] --
+     the accepted run IS the caller's buffer at syscall argument 1, byte
+     for byte, in the image it lent.  And this file's own prediction held
+     exactly: "the receipt gains an equation, not a new resource" -- the
+     three arms grew one pure conjunct each and no resource moved.  The
+     byte string stays existentially bound because [M] is a PARTIAL map,
+     so "the bytes at [v1]" is not a function this layer can apply.
 
    ==== WHY THERE IS NO COMMIT BUNDLE (contrast with SpecSysWriteAU) ===
 
@@ -243,6 +245,7 @@ Require Import IrefSlots.
 Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
+Require Import SpecCopyin.     (* [ubytes_at]: the content seam (RULING A)   *)
 Require Import ProcInv.
 Require Import FileInvDefs.
 Require Import SpecArgfd.      (* [arg_fd]                                  *)
@@ -370,44 +373,53 @@ Section SysWriteConsAU.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
 
-  (* OK: every requested byte accepted, in order, after the seed.  The
-     byte STRING is existential (header: the copyin gap); its LENGTH is
-     the count. *)
-  Definition wcons_ok (γu : uart_names) (tr0 : list (bv 8)) (n : Z)
-      : iProp Σ :=
+  (* OK: every requested byte accepted, in order, after the seed -- AND THEY
+     ARE THE CALLER'S OWN BYTES (RULING A, 2026-08-31: the copyin gap is
+     closed).  The byte string is still bound existentially, because [M] is a
+     PARTIAL map and "the bytes at [ua]" is not a function this layer can
+     apply; [SpecCopyin.ubytes_at] pins every one of them against the image
+     the caller lent.  Its LENGTH is the count, as before. *)
+  Definition wcons_ok (γu : uart_names) (tr0 : list (bv 8))
+      (M : gmap Z (bv 8)) (ua : mword 64) (n : Z) : iProp Σ :=
     (∃ bs : list (bv 8),
-       ⌜Z.of_nat (length bs) = n⌝ ∗ uart_sent_from γu tr0 bs)%I.
+       ⌜Z.of_nat (length bs) = n⌝ ∗ ⌜ubytes_at M ua bs⌝ ∗
+       uart_sent_from γu tr0 bs)%I.
 
   (* SHORT: either_copyin faulted mid-loop; the count already pushed is
      the answer AND the receipt's length.  [0 <= count] is the coercion's;
      [count < n] forces [0 < n], so no separate sign clause is needed. *)
-  Definition wcons_short (γu : uart_names) (tr0 : list (bv 8)) (n : Z)
+  Definition wcons_short (γu : uart_names) (tr0 : list (bv 8))
+      (M : gmap Z (bv 8)) (ua : mword 64) (n : Z)
       (r : mword 64) : iProp Σ :=
     (∃ bs : list (bv 8),
        ⌜r = (mword_of_int (Z.of_nat (length bs)) : mword 64)⌝ ∗
        ⌜Z.of_nat (length bs) < n⌝ ∗
+       (* the SHORT arm names its bytes too: the prefix that got through IS
+          the caller's own prefix (RULING A) *)
+       ⌜ubytes_at M ua bs⌝ ∗
        uart_sent_from γu tr0 bs)%I.
 
   (* the armed disjunction the continuation receives, keyed on a0.  THREE
      arms (header: THE ARMS); the NEG arm is filewrite's own sign guard,
      the only -1 the premises leave reachable. *)
   Definition write_cons_arms (γu : uart_names) (tr0 : list (bv 8))
+      (M : gmap Z (bv 8)) (ua : mword 64)
       (n : Z) (r : mword 64) : iProp Σ :=
-    ((⌜r = (mword_of_int n : mword 64) /\ 0 <= n⌝ ∗ wcons_ok γu tr0 n)
-     ∨ wcons_short γu tr0 n r
+    ((⌜r = (mword_of_int n : mword 64) /\ 0 <= n⌝ ∗ wcons_ok γu tr0 M ua n)
+     ∨ wcons_short γu tr0 M ua n r
      ∨ ⌜r = (mword_of_int (-1) : mword 64) /\ n < 0⌝)%I.
 
-  Global Instance wcons_ok_persistent γu tr0 n :
-    Persistent (wcons_ok γu tr0 n).
+  Global Instance wcons_ok_persistent γu tr0 M ua n :
+    Persistent (wcons_ok γu tr0 M ua n).
   Proof. apply _. Qed.
 
-  Global Instance wcons_short_persistent γu tr0 n r :
-    Persistent (wcons_short γu tr0 n r).
+  Global Instance wcons_short_persistent γu tr0 M ua n r :
+    Persistent (wcons_short γu tr0 M ua n r).
   Proof. apply _. Qed.
 
   (* the receipts are HISTORY: the caller keeps the whole disjunction *)
-  Global Instance write_cons_arms_persistent γu tr0 n r :
-    Persistent (write_cons_arms γu tr0 n r).
+  Global Instance write_cons_arms_persistent γu tr0 M ua n r :
+    Persistent (write_cons_arms γu tr0 M ua n r).
   Proof. apply _. Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -417,12 +429,12 @@ Section SysWriteConsAU.
   (* the arms refine the landed blanket: [sys_write_ret]'s device-side
      disjunct is [filewrite_ret], and every arm lands inside it -- the
      dispatcher's bridge back to the landed calling convention *)
-  Lemma write_cons_arms_ret γu tr0 n r :
-    write_cons_arms γu tr0 n r -∗ ⌜filewrite_ret n r⌝.
+  Lemma write_cons_arms_ret γu tr0 M ua n r :
+    write_cons_arms γu tr0 M ua n r -∗ ⌜filewrite_ret n r⌝.
   Proof.
     iIntros "[[%Hr _] | [H | %Hr]]".
     - iPureIntro. destruct Hr as [-> Hn]. by apply filewrite_ret_all.
-    - iDestruct "H" as (bs) "(%Hr & %Hlt & _)". iPureIntro.
+    - iDestruct "H" as (bs) "(%Hr & %Hlt & _ & _)". iPureIntro.
       rewrite /filewrite_ret /pipe_rw_ret. right.
       exists (Z.of_nat (length bs)). split; [exact Hr | lia].
     - iPureIntro. destruct Hr as [-> _]. apply filewrite_ret_m1.
@@ -431,16 +443,17 @@ Section SysWriteConsAU.
   (* satisfiability at the degenerate count: the [n = 0] instance is
      constructible outright from a seed, so the seal cannot be vacuously
      strong at the trivial call *)
-  Lemma wcons_ok_zero γu tr0 :
-    uart_sent γu tr0 -∗ wcons_ok γu tr0 0.
+  Lemma wcons_ok_zero γu tr0 M ua :
+    uart_sent γu tr0 -∗ wcons_ok γu tr0 M ua 0.
   Proof.
     iIntros "H". iExists []. iSplitR; [done|].
+    iSplitR; [iPureIntro; apply ubytes_at_nil|].
     by iApply uart_sent_from_refl.
   Qed.
 
-  Lemma write_cons_arms_zero γu tr0 :
+  Lemma write_cons_arms_zero γu tr0 M ua :
     uart_sent γu tr0 -∗
-    write_cons_arms γu tr0 0 (mword_of_int 0 : mword 64).
+    write_cons_arms γu tr0 M ua 0 (mword_of_int 0 : mword 64).
   Proof.
     iIntros "H". iLeft. iSplitR; [iPureIntro; split; [done | lia]|].
     by iApply wcons_ok_zero.
@@ -478,7 +491,7 @@ Definition wp_sys_write_cons_frame
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process    *)
     (fn : fwrite_names)                          (* the fs ghosts          *)
     (pidv : mword 32) (U : ustate)
-    (v v2 : mword 64)                            (* syscall args 0, 2      *)
+    (v v1 v2 : mword 64)                         (* syscall args 0, 1, 2   *)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
     (fd : nat) (fv : mword 64)                   (* the descriptor's slot  *)
     (rb : bool) (ma : Z)                         (* its mode bit and major *)
@@ -493,7 +506,9 @@ Definition wp_sys_write_cons_frame
   fwn_j fn = j ->
   fwn_procs fn = γs ->
   pv_tf (us_V U) !! tf_arg_idx 0 = Some v ->
-  (exists v1 : mword 64, pv_tf (us_V U) !! tf_arg_idx 1 = Some v1) ->
+  (* NAMED, not existential, since RULING A: the receipts speak about the
+     bytes at THIS address. *)
+  pv_tf (us_V U) !! tf_arg_idx 1 = Some v1 ->
   pv_tf (us_V U) !! tf_arg_idx 2 = Some v2 ->
   fwn_wp fn = ConsoleInv.devsw_write_val ->
   fwn_dqv fn = (fun _ => DfracDiscarded) ->
@@ -552,15 +567,19 @@ Definition wp_sys_write_cons_au_body
     (γs : list gname) (j : nat) (γlp : gname)
     (fn : fwrite_names)
     (pidv : mword 32) (U : ustate)
-    (v v2 : mword 64)
+    (v v1 v2 : mword 64)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
     (fd : nat) (fv : mword 64) (rb : bool) (ma : Z)
     (tr0 : list (bv 8)) :=
   let n := sys_rw_count v2 in
-  wp_sys_write_cons_frame γf γs j γlp fn pidv U v v2 m K eb b lks
+  wp_sys_write_cons_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
     fd fv rb ma
     (uart_sent fsc_uart tr0)
-    (write_cons_arms fsc_uart tr0 n).
+    (* RULING A: the receipts are stated at the caller's OWN image and at
+       the buffer address IT passed -- syscall argument 1, which used to be
+       existentially quantified in the premise below precisely because
+       nothing could be said about the bytes there. *)
+    (write_cons_arms fsc_uart tr0 (us_M U) v1 n).
 
 (* ===================================================================== *)
 (*  5.  THE SEAL                                                          *)
@@ -574,10 +593,10 @@ Module Type SYSWRITE_CONS_AU.
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fwrite_names)
       (pidv : mword 32) (U : ustate)
-      (v v2 : mword 64)
+      (v v1 v2 : mword 64)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (fd : nat) (fv : mword 64) (rb : bool) (ma : Z)
       (tr0 : list (bv 8)),
-      wp_sys_write_cons_au_body γf γs j γlp fn pidv U v v2 m K eb b lks
+      wp_sys_write_cons_au_body γf γs j γlp fn pidv U v v1 v2 m K eb b lks
         fd fv rb ma tr0.
 End SYSWRITE_CONS_AU.

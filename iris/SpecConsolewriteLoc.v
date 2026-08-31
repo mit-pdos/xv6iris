@@ -25,13 +25,20 @@
    ([wcons_ok] at [r = n], [wcons_short] at [r < n]; one predicate serves
    both because consolewrite cannot tell them apart and does not need to).
 
-   WHAT IT STILL DOES NOT SAY IS WHICH BYTES -- the copyin content gap, and
-   it is unchanged: [SpecEitherCopyin.either_copyin_post]'s user arm returns
-   the destination at an EXISTENTIAL content, so the receipt's byte string
-   is existential too and only its LENGTH and ORDER are claimed.
-   SpecConsolewrite.v's header ("WHAT IT DOES NOT PROMISE IS WHICH BYTES
-   REACHED THE WIRE") is the design of record for that, and
-   SpecSysWriteConsAU.v's for why acceptance rather than the wire.
+   ...AND SINCE RULING A (2026-08-31) IT SAYS WHICH BYTES.  The receipt used
+   to claim LENGTH and ORDER only, because [either_copyin]'s user arm handed
+   the destination back at an existential content.  It does not any more:
+   [SpecEitherCopyin.either_copyin_post] relays [SpecCopyin.copyin_got] on
+   its success exit, so each chunk's bytes are pinned to the process's own
+   image, and [cons_sent_cnt] carries the join --
+   [SpecCopyin.ubytes_at (us_M U) uaddr bs] beside the length.  That is what
+   makes "init's printf printed THESE characters" stateable: the accepted
+   run IS the caller's buffer, byte for byte, at the image it lent.
+
+   WHAT IS STILL NOT CLAIMED is the WIRE, not the bytes: this is an
+   ACCEPTANCE receipt (SpecSysWriteConsAU.v's header is the design of
+   record for why), and SpecConsolewrite.v's landed header keeps the old
+   stance because the landed contract does not carry the seed at all.
 
    EVERYTHING ELSE IS [SpecConsolewrite.v] LINE FOR LINE -- same binders,
    same premises in the same order, same frame, same stack budget, same
@@ -62,6 +69,7 @@ Require Import FileInvDefs.
 Require Import DiskPtsto WpUart.
 Require Import UartTxInv.
 Require Import UartSentLoc.       (* [uart_sent_from]: the located receipt *)
+Require Import SpecCopyin.        (* [ubytes_at]: the content seam        *)
 Require Import SpecConsolewrite.  (* the landed contract this parallels;
                                      [consolewrite_stack] *)
 Require Import SchedCtx.
@@ -77,25 +85,36 @@ Local Open Scope Z_scope.
 Section ConsSentCnt.
   Context `{!riscvGS Σ, !xv6G Σ}.
 
-  (* THE DEVICE-WRITE RECEIPT AT A COUNT: [r] bytes -- which ones is not
-     said (the copyin gap) -- were accepted by the UART, in order, after the
-     seed.  This is [SpecSysWriteConsAU.wcons_ok]'s body at [n := r], which
-     is how the syscall's OK and SHORT arms are both read off it. *)
-  Definition cons_sent_cnt (γu : uart_names) (tr0 : list (bv 8)) (r : Z)
-      : iProp Σ :=
-    (∃ bs : list (bv 8),
-       ⌜Z.of_nat (length bs) = r⌝ ∗ uart_sent_from γu tr0 bs)%I.
+  (* THE DEVICE-WRITE RECEIPT AT A COUNT: [r] bytes were accepted by the
+     UART, in order, after the seed -- AND THEY ARE THE CALLER'S OWN BYTES,
+     the process's run at user va [ua] in the image [M] it lent (RULING A,
+     the content seam; [SpecCopyin.ubytes_at]).  This is
+     [SpecSysWriteConsAU.wcons_ok]'s body at [n := r], which is how the
+     syscall's OK and SHORT arms are both read off it.
 
-  Global Instance cons_sent_cnt_persistent γu tr0 r :
-    Persistent (cons_sent_cnt γu tr0 r).
+     THE BYTE STRING IS STILL BOUND EXISTENTIALLY and that is not a
+     weakness: [M] is a PARTIAL map, so "the bytes at [ua]" is not a
+     function this layer can apply; the equation pins every one of them
+     against the image the caller handed in, which is the whole of what
+     "printf printed MY characters" needs. *)
+  Definition cons_sent_cnt (γu : uart_names) (tr0 : list (bv 8))
+      (M : gmap Z (bv 8)) (ua : mword 64) (r : Z) : iProp Σ :=
+    (∃ bs : list (bv 8),
+       ⌜Z.of_nat (length bs) = r⌝ ∗ ⌜ubytes_at M ua bs⌝ ∗
+       uart_sent_from γu tr0 bs)%I.
+
+  Global Instance cons_sent_cnt_persistent γu tr0 M ua r :
+    Persistent (cons_sent_cnt γu tr0 M ua r).
   Proof. apply _. Qed.
 
   (* the empty call's receipt, free from the seed: the [n <= 0] exit and the
      loop's entry both start here *)
-  Lemma cons_sent_cnt_zero (γu : uart_names) (tr0 : list (bv 8)) :
-    uart_sent γu tr0 -∗ cons_sent_cnt γu tr0 0.
+  Lemma cons_sent_cnt_zero (γu : uart_names) (tr0 : list (bv 8))
+      (M : gmap Z (bv 8)) (ua : mword 64) :
+    uart_sent γu tr0 -∗ cons_sent_cnt γu tr0 M ua 0.
   Proof.
     iIntros "H". iExists []. iSplitR; [done|].
+    iSplitR; [iPureIntro; apply ubytes_at_nil|].
     by iApply uart_sent_from_refl.
   Qed.
 
@@ -104,13 +123,15 @@ Section ConsSentCnt.
      receipt -- the walk keeps it for the exit that returns [r] unchanged
      (consolewrite's copy-failed break) and uses the [tr1] it hands out to
      seed the next [uartwrite]. *)
-  Lemma cons_sent_cnt_seed (γu : uart_names) (tr0 : list (bv 8)) (r : Z) :
-    cons_sent_cnt γu tr0 r -∗
+  Lemma cons_sent_cnt_seed (γu : uart_names) (tr0 : list (bv 8))
+      (M : gmap Z (bv 8)) (ua : mword 64) (r : Z) :
+    cons_sent_cnt γu tr0 M ua r -∗
     ∃ (tr1 bs1 : list (bv 8)),
-      ⌜Z.of_nat (length bs1) = r⌝ ∗ ⌜tr0 `prefix_of` tr1⌝ ∗
+      ⌜Z.of_nat (length bs1) = r⌝ ∗ ⌜ubytes_at M ua bs1⌝ ∗
+      ⌜tr0 `prefix_of` tr1⌝ ∗
       ⌜bs1 `sublist_of` drop (length tr0) tr1⌝ ∗ uart_sent γu tr1.
   Proof.
-    iIntros "H". iDestruct "H" as (bs1) "[%Hlen Hfrom]".
+    iIntros "H". iDestruct "H" as (bs1) "(%Hlen & %Hby & Hfrom)".
     iDestruct "Hfrom" as (tr1) "(#Htr & %Hp & %Hs)".
     iExists tr1, bs1. by iFrame "Htr".
   Qed.
@@ -122,16 +143,23 @@ Section ConsSentCnt.
      bookkeeping are the same step, which is why the returned count IS the
      receipt's length at every exit. *)
   Lemma cons_sent_cnt_chunk (γu : uart_names) (tr0 tr1 : list (bv 8))
+      (M : gmap Z (bv 8)) (ua : mword 64)
       (r : Z) (bs1 bs2 : list (bv 8)) :
     Z.of_nat (length bs1) = r ->
     tr0 `prefix_of` tr1 ->
     bs1 `sublist_of` drop (length tr0) tr1 ->
+    (* the two content halves: what is already accepted, and what this chunk
+       copied -- the latter at the BUMPED base, which is exactly the
+       [add a2,si,sbase] the loop performs *)
+    ubytes_at M ua bs1 ->
+    ubytes_at M (add_vec_int ua (Z.of_nat (length bs1))) bs2 ->
     uart_sent_from γu tr1 bs2 -∗
-    cons_sent_cnt γu tr0 (r + Z.of_nat (length bs2)).
+    cons_sent_cnt γu tr0 M ua (r + Z.of_nat (length bs2)).
   Proof.
-    iIntros (Hlen Hp Hb) "H".
+    iIntros (Hlen Hp Hb Hb1 Hb2) "H".
     iExists ((bs1 ++ bs2)%list). iSplitR.
     { iPureIntro. rewrite length_app. lia. }
+    iSplitR; [iPureIntro; exact (ubytes_at_app M ua bs1 bs2 Hb1 Hb2)|].
     by iApply (uart_sent_from_chain γu tr0 tr1 bs1 bs2 Hp Hb with "H").
   Qed.
 
@@ -148,6 +176,10 @@ Definition wp_consolewrite_loc_sconf_body
   let pcE : mword 64 := mword_of_int KernelSyms.consolewrite in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (* THE USER SOURCE, named (RULING A).  a1 was unconstrained and unnamed
+     until the content seam; it is a [let], not a premise, so no caller
+     moves. *)
+  let uaddr : mword 64 := m !!! Regidx (mword_of_int 11 : mword 5) in
   (j < NPROC)%nat ->
   γs !! j = Some γlp ->
   length γs = NPROC ->
@@ -179,8 +211,12 @@ Definition wp_consolewrite_loc_sconf_body
       pc_is ret_tgt -∗
       proc_priv_core pj pid (us_upt U P') -∗
       (* THE RECEIPT, at the returned count: [r] bytes accepted, in order,
-         after the seed.  Persistent -- the caller keeps it forever. *)
-      cons_sent_cnt γu tr0 r -∗
+         after the seed, AND THEY ARE THE BYTES AT [a1] in the image the
+         caller lent (RULING A).  Persistent -- the caller keeps it forever.
+         [us_M U] is the INPUT image and stays the right one to state it
+         against: consolewrite only READS user memory, and the pages a copy
+         faults in were already in the view. *)
+      cons_sent_cnt γu tr0 (us_M U) uaddr r -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

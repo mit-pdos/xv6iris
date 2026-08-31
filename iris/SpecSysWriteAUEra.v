@@ -89,6 +89,7 @@ Require Import ProcAvail.
 Require Import FsBytesGamma.   (* [fs_gamma_L]: the live Γ                  *)
 Require Import Xv6G.
 Require Import FsCfg.
+Require Import SpecCopyin.     (* [ubytes_at]: the content seam (RULING A)  *)
 Require Import SpecSysWriteAU. (* the frozen statement this parallels       *)
 Require Import FsAbsWriteFire. (* [awrite_commit_at] and its bundle         *)
 Require Import FsAbs.          (* LAST (FsAbs's own rule)                   *)
@@ -109,10 +110,26 @@ Section SysWriteAUEra.
   (* ret n (0 <= n): every byte landed.  The fired chunks concatenate to the
      whole count and the unfired tail of the bundle refunds. *)
   Definition write_post_ok_at Γ (i : Z) (n : Z)
+      (M : gmap Z (bv 8)) (ua : mword 64)
       (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ) : iProp Σ :=
     (∃ bss : list (list (bv 8)),
        ⌜Z.of_nat (length (concat bss)) = n⌝ ∗
        ⌜(length bss <= wchunks n)%nat⌝ ∗
+       (* WHAT WAS WRITTEN (RULING A, 2026-08-31 -- the content seam).  The
+          DECOMPOSITION [bss] stays existential, because the kernel picks the
+          chunk boundaries by transaction budget; the BYTES do not.  Their
+          concatenation IS the caller's own run at [ua] in the image it lent
+          ([SpecCopyin.ubytes_at]), so a receipt bundle now determines every
+          byte it claims to have spliced.
+
+          STATED ON THE CONCATENATION, NOT PER CHUNK, and that is the honest
+          shape: the per-chunk FILE offsets are existential on purpose
+          (nothing ties chunk k+1's to chunk k's -- another writer through
+          the same struct file moves [f->off] between them), while the
+          SOURCE offsets chain by construction, because filewrite reads
+          [addr + i] with [i] its own running total.  So the source side can
+          be pinned end-to-end where the destination side cannot. *)
+       ⌜ubytes_at M ua (concat bss)⌝ ∗
        wri_receipts i Φ bss ∗
        awrite_commits_at Γ ∅ i Φ (length bss)
          (wchunks n - length bss)%nat)%I.
@@ -124,10 +141,14 @@ Section SysWriteAUEra.
      one this contract's receipts can speak about (FsAbsWriteFire's second
      finding).  That is exactly the slack "< n" leaves. *)
   Definition write_post_fail_at Γ (i : Z) (n : Z)
+      (M : gmap Z (bv 8)) (ua : mword 64)
       (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ) : iProp Σ :=
     (∃ bss : list (list (bv 8)),
        ⌜Z.of_nat (length (concat bss)) < n \/ (n < 0 /\ bss = [])⌝ ∗
        ⌜(length bss <= wchunks n)%nat⌝ ∗
+       (* the FIRED PREFIX's bytes are pinned too (RULING A): a partial write
+          delivers a PREFIX of the caller's buffer, and now says so *)
+       ⌜ubytes_at M ua (concat bss)⌝ ∗
        wri_receipts i Φ bss ∗
        awrite_commits_at Γ ∅ i Φ (length bss)
          (wchunks n - length bss)%nat)%I.
@@ -153,15 +174,18 @@ Section SysWriteAUEra.
      there is no chunk the prover has to skip, the two arms are keyed on
      the return value alone, and this arm answers exactly [-1]. *)
   Definition write_arms_at Γ (i : Z) (n : Z)
+      (M : gmap Z (bv 8)) (ua : mword 64)
       (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ)
       (r : mword 64) : iProp Σ :=
-    ((⌜r = (mword_of_int n : mword 64) /\ 0 <= n⌝ ∗ write_post_ok_at Γ i n Φ)
+    ((⌜r = (mword_of_int n : mword 64) /\ 0 <= n⌝
+      ∗ write_post_ok_at Γ i n M ua Φ)
      ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
-        ∗ write_post_fail_at Γ i n Φ))%I.
+        ∗ write_post_fail_at Γ i n M ua Φ))%I.
 
   (* the stable corollary's arms, at the same substitution *)
   Definition write_stable_arms_at Γ (i : Z) (n : Z) (q : Qp)
       (bs0 : list (bv 8)) (nl : nat)
+      (M : gmap Z (bv 8)) (ua : mword 64)
       (Φ : nat -> aview -> nat -> list (bv 8) -> iProp Σ)
       (r : mword 64) : iProp Σ :=
     (nview Γ q i (MkAnode (AFile bs0) nl) ∗
@@ -170,12 +194,15 @@ Section SysWriteAUEra.
            ⌜(off0 <= length bs0)%nat⌝ ∗
            ⌜Z.of_nat (length (concat bss)) = n⌝ ∗
            ⌜(length bss <= wchunks n)%nat⌝ ∗
+           (* the single-delta reading now names the delta's BYTES: they are
+              the caller's own run at [ua] (RULING A) *)
+           ⌜ubytes_at M ua (concat bss)⌝ ∗
            (wri_receipts_chained i bs0 nl off0 Φ bss
             ∨ wri_receipts i Φ bss) ∗
            awrite_commits_at Γ ∅ i Φ (length bss)
              (wchunks n - length bss)%nat)
       ∨ (⌜r = (mword_of_int (-1) : mword 64)⌝
-         ∗ write_post_fail_at Γ i n Φ)))%I.
+         ∗ write_post_fail_at Γ i n M ua Φ)))%I.
 
 End SysWriteAUEra.
 
@@ -193,16 +220,18 @@ Definition wp_sys_write_au_era_body
     (γs : list gname) (j : nat) (γlp : gname)
     (fn : fwrite_names)
     (pidv : mword 32) (U : ustate)
-    (v v2 : mword 64)
+    (v v1 v2 : mword 64)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
     (fd : nat) (fv : mword 64) (rb : bool) (i : Z)
     (Φw : nat -> aview -> nat -> list (bv 8) -> iProp Σ) :=
   let Γfs := fs_gamma_L fsc_fs in
   let n := sys_rw_count v2 in
-  wp_sys_write_au_frame γf γs j γlp fn pidv U v v2 m K eb b lks
+  wp_sys_write_au_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
     fd fv rb i
     (awrite_commits_at Γfs ∅ i Φw 0%nat (wchunks n))
-    (write_arms_at Γfs i n Φw).
+    (* RULING A: the receipts are stated at the caller's OWN image and at
+       the buffer address IT passed -- syscall argument 1. *)
+    (write_arms_at Γfs i n (us_M U) v1 Φw).
 
 Definition wp_sys_write_au_era_stable_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
@@ -211,18 +240,18 @@ Definition wp_sys_write_au_era_stable_body
     (γs : list gname) (j : nat) (γlp : gname)
     (fn : fwrite_names)
     (pidv : mword 32) (U : ustate)
-    (v v2 : mword 64)
+    (v v1 v2 : mword 64)
     (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
     (fd : nat) (fv : mword 64) (rb : bool) (i : Z)
     (q : Qp) (bs0 : list (bv 8)) (nl : nat)
     (Φw : nat -> aview -> nat -> list (bv 8) -> iProp Σ) :=
   let Γfs := fs_gamma_L fsc_fs in
   let n := sys_rw_count v2 in
-  wp_sys_write_au_frame γf γs j γlp fn pidv U v v2 m K eb b lks
+  wp_sys_write_au_frame γf γs j γlp fn pidv U v v1 v2 m K eb b lks
     fd fv rb i
     (nview Γfs q i (MkAnode (AFile bs0) nl)
      ∗ awrite_commits_at Γfs ∅ i Φw 0%nat (wchunks n))%I
-    (write_stable_arms_at Γfs i n q bs0 nl Φw).
+    (write_stable_arms_at Γfs i n q bs0 nl (us_M U) v1 Φw).
 
 (* ===================================================================== *)
 (*  3.  THE SEALS                                                         *)
@@ -236,11 +265,11 @@ Module Type SYSWRITE_AU_ERA.
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fwrite_names)
       (pidv : mword 32) (U : ustate)
-      (v v2 : mword 64)
+      (v v1 v2 : mword 64)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (fd : nat) (fv : mword 64) (rb : bool) (i : Z)
       (Φw : nat -> aview -> nat -> list (bv 8) -> iProp Σ),
-      wp_sys_write_au_era_body γf γs j γlp fn pidv U v v2 m K eb b lks
+      wp_sys_write_au_era_body γf γs j γlp fn pidv U v v1 v2 m K eb b lks
         fd fv rb i Φw.
 End SYSWRITE_AU_ERA.
 
@@ -255,11 +284,11 @@ Module Type SYSWRITE_AU_ERA_STABLE.
       (γs : list gname) (j : nat) (γlp : gname)
       (fn : fwrite_names)
       (pidv : mword 32) (U : ustate)
-      (v v2 : mword 64)
+      (v v1 v2 : mword 64)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (fd : nat) (fv : mword 64) (rb : bool) (i : Z)
       (q : Qp) (bs0 : list (bv 8)) (nl : nat)
       (Φw : nat -> aview -> nat -> list (bv 8) -> iProp Σ),
-      wp_sys_write_au_era_stable_body γf γs j γlp fn pidv U v v2 m K eb b
+      wp_sys_write_au_era_stable_body γf γs j γlp fn pidv U v v1 v2 m K eb b
         lks fd fv rb i q bs0 nl Φw.
 End SYSWRITE_AU_ERA_STABLE.

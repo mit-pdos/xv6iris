@@ -72,6 +72,7 @@ Require Import ProofWriteiParts.
 Require Import BitmapInv.
 Require Import KernelDataInv.
 Require Import SpecPrintk.
+Require Import SpecCopyin.   (* [copyin_got]: the content seam's vocabulary *)
 Require Import SpecWritei.
 (* the loop's ledger algebra: bm_pot, wi_inv_bud/wi_inv_spent, the two step
    lemmas, wi_inv_enter/wi_inv_exit and the two iteration bounds.  Section 10
@@ -544,6 +545,9 @@ Section WriteiDefs.
                   then dstb (k - (off + tot))%nat
                   else file_byte data k⌝ -∗
         ⌜user = false -> forall i : nat, (i < tot)%nat -> wrote i = src_bytes i⌝ -∗
+        (* the USER arm's twin (RULING A, the content seam) *)
+        ⌜user = true ->
+         copyin_got (us_M U) (m !!! Regidx Ra2 : mword 64) tot wrote⌝ -∗
         ⌜(mf !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)
           /\ (bv_unsigned (di_size dn) < Z.of_nat off
               \/ (MAXFILE * BSIZE < off + n)%nat)
@@ -648,6 +652,7 @@ Section WriteiRet.
               then dstb (k - (off + tot))%nat
               else file_byte data k) ->
     (user = false -> forall i : nat, (i < tot)%nat -> wrote i = src_bytes i) ->
+    (user = true -> copyin_got (us_M U) (m !!! Regidx Ra2 : mword 64) tot wrote) ->
     ((M !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)
       /\ (bv_unsigned (di_size dn) < Z.of_nat off
           \/ (MAXFILE * BSIZE < off + n)%nat)
@@ -695,7 +700,7 @@ Section WriteiRet.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hs1 Hs3 Hs8 Hs9 Hs10 Hs11
-           Hwf' Hhz' Hadr' Hsz' Hcov' Hcap' Hsized' Hdb Hd0 Hdk Hrange Hker Harm
+           Hwf' Hhz' Hadr' Hsz' Hcov' Hcap' Hsized' Hdb Hd0 Hdk Hrange Hker Husr Harm
            Hlo Hhi Hsbsub Hwi16 Hwiany Hwiat Hext.
     pose proof HK as HK'. 
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc Hframe Hidev Hinum
@@ -956,7 +961,7 @@ Section WriteiRet.
     rewrite /wi_cont.
     iSpecialize ("Hcont" $! CID9 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! P8 tot bm' data' dn' dn0' n' wrote dist dstb P' Sb'
-              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hidev Hinum Hmeta Hmap Hblocks Hsb Hba Hdn
+              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hidev Hinum Hmeta Hmap Hblocks Hsb Hba Hdn
                     Hsrc Hsl Hop").
     { unfold callee_saved. split_and!; assumption. }
     { exact Hwf'. }
@@ -971,6 +976,7 @@ Section WriteiRet.
     { exact Hdk. }
     { exact Hrange. }
     { exact Hker. }
+    { exact Husr. }
     { rewrite Ca0. exact Harm. }
     { split; assumption. }
     { exact Hsbsub. }
@@ -1053,6 +1059,7 @@ Section WriteiJoin.
               then dstb (k - (off + tot))%nat
               else file_byte data k) ->
     (user = false -> forall i : nat, (i < tot)%nat -> wrote i = src_bytes i) ->
+    (user = true -> copyin_got (us_M U) (m !!! Regidx Ra2 : mword 64) tot wrote) ->
     (tot <= n)%nat ->
     dn' = wi_dinode dn bm' off tot ->
     ((ncount - wi_cost_bmonly off n)%nat <= u)%nat -> (u <= ncount)%nat ->
@@ -1107,7 +1114,7 @@ Section WriteiJoin.
   Proof.
     intros HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hadr Hwf' Hhz' Hsz' Hcov'
            Hrngt Hsized' Hoffle
-           Hj Hgl Hsp Hs5 Hs3 Hs1 Hs8 Hs9 Hs10 Hs11 Hdb Hd0 Hdk Hrange Hker Htotn Hdneq
+           Hj Hgl Hsp Hs5 Hs3 Hs1 Hs8 Hs9 Hs10 Hs11 Hdb Hd0 Hdk Hrange Hker Husr Htotn Hdneq
            Hlo Hhi Hhi1 Hsbsub Hwi16 Hext Hlkbelow.
     pose proof HK as HK'. 
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx #Hprocs
@@ -1355,7 +1362,7 @@ Section WriteiJoin.
               ltac:(intros Hc; rewrite Hdneq;
                     exact (wi_size_cap bm' dn off tot Hrngt Hc))
               Hsized'
-              Hdb Hd0 Hdk Hrange Hker
+              Hdb Hd0 Hdk Hrange Hker Husr
               ltac:(right; split_and!;
                     [exact HT3a0 | exact Hoffle | exact Htotn | exact Hdneq
                     | reflexivity])
@@ -1450,6 +1457,7 @@ Section WriteiSize.
               then dstb (k - (off + tot))%nat
               else file_byte data k) ->
     (user = false -> forall i : nat, (i < tot)%nat -> wrote i = src_bytes i) ->
+    (user = true -> copyin_got (us_M U) (m !!! Regidx Ra2 : mword 64) tot wrote) ->
     (tot <= n)%nat ->
     ((ncount - wi_cost_bmonly off n)%nat <= u)%nat -> (u <= ncount)%nat ->
     (* at the count IN HAND -- see [wi_join]'s premise of the same shape *)
@@ -1497,7 +1505,7 @@ Section WriteiSize.
   Proof.
     intros HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hwf' Hhz' HcovS HcovT Hszlt Hofflt
            Hrngt Hsized' Hoffle
-           Hj Hgl Hsp Hs5 Hs2 Hs3 Hdb Hd0 Hdk Hrange Hker Htotn Hlo Hhi Hhi1 Hsbsub
+           Hj Hgl Hsp Hs5 Hs2 Hs3 Hdb Hd0 Hdk Hrange Hker Husr Htotn Hlo Hhi Hhi1 Hsbsub
            Hwi16 Hext Hlkbelow.
     pose proof HK as HK'. 
     change (2 ^ 31)%Z with 2147483648%Z in Hszlt, Hofflt.
@@ -1750,7 +1758,7 @@ Section WriteiSize.
                 Hcovf Hrngt Hsized' Hoffle
                 Hj Hgl HQB5sp HQB5s5 HQB5s3
                 HQB5Rs1 HQB5Rs8 HQB5Rs9 HQB5Rs10 HQB5Rs11
-                Hdb Hd0 Hdk Hrange Hker Htotn eq_refl Hlo Hhi Hhi1 Hsbsub Hwi16 Hext Hlkbelow
+                Hdb Hd0 Hdk Hrange Hker Husr Htotn eq_refl Hlo Hhi Hhi1 Hsbsub Hwi16 Hext Hlkbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hprocs Hdevi
                       Hdgeom Hdlock Hframe Hidev Hinum Hmeta
                       Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
@@ -1963,7 +1971,7 @@ Section WriteiSize.
                 Hcovf Hrngt Hsized' Hoffle
                 Hj Hgl HQA5sp HQA5s5 HQA5s3
                 HQA5Rs1 HQA5Rs8 HQA5Rs9 HQA5Rs10 HQA5Rs11
-                Hdb Hd0 Hdk Hrange Hker Htotn eq_refl Hlo Hhi Hhi1 Hsbsub Hwi16 Hext Hlkbelow
+                Hdb Hd0 Hdk Hrange Hker Husr Htotn eq_refl Hlo Hhi Hhi1 Hsbsub Hwi16 Hext Hlkbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hprocs Hdevi
                       Hdgeom Hdlock Hframe Hidev Hinum Hmeta
                       Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
@@ -2068,6 +2076,14 @@ Section WriteiLoop.
        = if decide ((off <= k)%nat /\ (k < off + tot)%nat)
          then wroteI (k - off)%nat else file_byte data k) ->
     (user = false -> forall i : nat, (i < tot)%nat -> wroteI i = src_bytes i) ->
+    (* THE CONTENT INVARIANT (RULING A).  The user arm's twin of the clause
+       above: the run accumulated so far IS the process's bytes at
+       [src .. src + tot).  Stable across the back edge because
+       [us_M (us_upt U PI) = us_M U] -- either_copyin moves the descriptor,
+       never the image -- and extended one chunk at a time by
+       [ProofWriteiParts.wi_usr_step]. *)
+    (user = true ->
+     copyin_got (us_M U) (m !!! Regidx Ra2 : mword 64) tot wroteI) ->
     uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) PI ->
     (wi_blocks (off + tot) (n - tot) <= W)%nat ->
     (* THE LEDGER INVARIANT (WriteiBudget section 10).  What used to be two
@@ -2163,7 +2179,7 @@ Section WriteiLoop.
     intro W. revert CID0.
     induction W as [| W IH];
       intros CID0 tot bmI dataI wroteI PI nI SI M
-             Htotlt HwfI HhzI HsizedI HcovSI HcovTI HrangeI HkerI HextI
+             Htotlt HwfI HhzI HsizedI HcovSI HcovTI HrangeI HkerI HusrI HextI
              HW1 HW2 HW3 HW4 HW5 HWsb Hfresh
              Hsp Hs5 Hs7 Hs4 Hs2 Hs6 Hs3 Hs9 Hs8 Hprkc Hbelow;
       [ exfalso; pose proof (wi_blocks_pos (off + tot) (n - tot) ltac:(lia)); lia |].
@@ -2450,7 +2466,7 @@ Section WriteiLoop.
                 Hj Hgl HB1sp HB1s5 HB1s2 HB1s3 ltac:(lia) ltac:(intros; reflexivity)
                 ltac:(intros; reflexivity)
                 (wi_range_dist0 data data2 off tot wroteI wroteI Hrange2)
-                HkerI ltac:(lia)
+                HkerI HusrI ltac:(lia)
                 ltac:(exact (proj1 (wi_inv_exit (ba_bms A) ncount (S uX) uX
                               (wi_blocks off n) W off n Sb2
                               ltac:(lia) eq_refl (proj2 Hinv2) HSuXnc
@@ -2980,6 +2996,15 @@ Section WriteiLoop.
                    ⌜uptd_ext_sz (pv_sz (us_V U)) (pv_upt (us_V U)) P2⌝ ∗
                    ⌜user = false -> forall i : nat, (i < mm)%nat ->
                       g i = src_bytes (tot + i)%nat⌝ ∗
+                   (* THE CHUNK'S CONTENT (RULING A), on the SUCCESS exit:
+                      the chunk was copied from [src + tot], because writei
+                      advances the source pointer by [m] each round.  On the
+                      [-1] exit these bytes become the disturbed region and
+                      nothing is claimed about them. *)
+                   ⌜user = true ->
+                    (mE !!! Regidx Ra0 : mword 64) = (mword_of_int 0 : mword 64) ->
+                    copyin_got (us_M U)
+                      (pa_add (m !!! Regidx Ra2 : mword 64) tot) mm g⌝ ∗
                    (* THE -1 ARM CARRIES [user = true] (fs-icache.md §15.1(i)):
                       either_copyin's KERNEL post is a bare [r = 0], so a
                       failed copy is evidence of the user arm.  That is what
@@ -2999,12 +3024,15 @@ Section WriteiLoop.
         { destruct user.
           - iDestruct "Hpost" as "(%Hr & Hpp & Hdst)".
             iDestruct "Hpp" as (P2) "[%Hx Hpriv]".
-            iDestruct "Hdst" as (gg) "Hw".
+            iDestruct "Hdst" as (gg) "[%Hgg Hw]".
             (* either_copyin is SAME-image now, so the fresh image writei's
-               own post still binds is simply the one it went in at. *)
+               own post still binds is simply the one it went in at -- which
+               is also why [us_M (us_upt U PI)] IS [us_M U] and the content
+               equation lands at the caller's own image. *)
             iExists gg, P2.
             iSplitR; [iPureIntro; exact (uptd_ext_sz_trans _ _ _ _ HextI Hx)|].
             iSplitR; [iPureIntro; discriminate|].
+            iSplitR; [iPureIntro; intros _; exact Hgg|].
             iSplitR; [iPureIntro; destruct Hr as [H0 | Hm1];
                       [left; exact H0
                       | right; split; [reflexivity | exact Hm1]]|].
@@ -3014,13 +3042,14 @@ Section WriteiLoop.
             iExists (fun jj => src_bytes (tot + jj)%nat), PI.
             iSplitR; [iPureIntro; exact HextI|].
             iSplitR; [iPureIntro; intros _ i _; reflexivity|].
+            iSplitR; [iPureIntro; discriminate|].
             iSplitR; [iPureIntro; left; exact Hr|].
             iSplitL "Hdst"; [iExact "Hdst"|].
             iSplitR "Hppid"; [| iExact "Hppid"].
             iApply (ProofWriteiParts.wi_join3 (KTR := ktb) (m !!! Regidx Ra2 : mword 64)
                       tot mm (n - tot - mm)%nat n (fun i => src_bytes i)
                       ltac:(lia) with "Hp Hsb2 Hq"). }
-        iDestruct "Hnorm" as (g P2) "(%Hext2 & %Hgk & %HrE & Hwin & Hsrc)".
+        iDestruct "Hnorm" as (g P2) "(%Hext2 & %Hgk & %Hgu & %HrE & Hwin & Hsrc)".
         (* ---- the buffer, re-formed at the spliced bytes ---- *)
         iDestruct ("Hwinback" $! g with "Hwin") as "Hbuf".
         iDestruct ("Hheldback" $! (wi_splice (data2 fbn) o mm g) with "Hbuf")
@@ -3426,6 +3455,16 @@ Section WriteiLoop.
           assert (Hker3 : user = false -> forall i : nat, (i < tot + mm)%nat ->
                             wrote2 i = src_bytes i)
             by exact (wi_ker_step user src_bytes wroteI g tot mm HkerI Hgk).
+          (* ...and the USER arm's twin (RULING A).  We are on the arm where
+             either_copyin returned 0 ([Hr0]), which is exactly the guard
+             [Hgu] wants; [wi_usr_step] joins the accumulated run at [src]
+             with this chunk's at [src + tot]. *)
+          assert (Husr3 : user = true ->
+                    copyin_got (us_M U) (m !!! Regidx Ra2 : mword 64)
+                      (tot + mm)%nat wrote2)
+            by exact (ProofWriteiParts.wi_usr_step user (us_M U)
+                        (m !!! Regidx Ra2 : mword 64) wroteI g tot mm HusrI
+                        (fun Hu => Hgu Hu Hr0)).
           (* COVERAGE, one chunk further on: the chunk never leaves the block
              bmap just allocated, so every block below the new byte offset is
              allocated too *)
@@ -3521,7 +3560,7 @@ Section WriteiLoop.
                       ltac:(lia) ltac:(intros; reflexivity)
                       ltac:(intros; reflexivity)
                       (wi_range_dist0 data _ off (tot + mm)%nat wrote2 wrote2 Hrange3)
-                      Hker3 ltac:(lia)
+                      Hker3 Husr3 ltac:(lia)
                       ltac:(exact (proj1 (wi_inv_exit (ba_bms A) ncount (S uY) uY
                                     (wi_blocks off n) W off n _
                                     ltac:(lia) eq_refl (proj2 Hinv3) ltac:(lia)
@@ -3578,7 +3617,7 @@ Section WriteiLoop.
                       ltac:(intros Hs;
                             exact (wi_sized_step bmI data dataI data2 fbn o mm g
                                      Hdep2 HsizedI Hs))
-                      HcovS2 Hcov3 Hrange3 Hker3 Hext2
+                      HcovS2 Hcov3 Hrange3 Hker3 Husr3 Hext2
                       ltac:(lia) (proj1 Hinv3) ltac:(lia) (proj2 Hinv3)
                       ltac:(lia) HsbSb3
                       (* THE BACK EDGE IS UNREACHABLE FOR A ONE-BLOCK WRITE:
@@ -3885,7 +3924,7 @@ Section WriteiLoop.
                     ltac:(intros Heq; exfalso; rewrite Heq in Huser; discriminate)
                     (wi_range_fail data data2 off tot mm fbn o wroteI g
                        Hmmo Hdm Hrange2)
-                    HkerI ltac:(lia)
+                    HkerI HusrI ltac:(lia)
                     ltac:(exact (proj1 (wi_inv_exit (ba_bms A) ncount (S uY) uY
                                   (wi_blocks off n) W off n _
                                   ltac:(lia) eq_refl (proj2 Hinv3) ltac:(lia)
@@ -4077,7 +4116,7 @@ Section WriteiMain.
     { rewrite /wi_cont. iEval (rewrite /wp_next).
       iIntros (CIDf) "%Hchain".
       iIntros (mf tot bm2 data2 dn2 dn02 n2 wrote dist dstb P2 SbF)
-        "%C1 %C2 %C3 %C4 %C5 %C6 %Ccap %Csz %C7 %C8 %C8k %C9 %C10 %C11 %C12 %Csb
+        "%C1 %C2 %C3 %C4 %C5 %C6 %Ccap %Csz %C7 %C8 %C8k %C9 %C10 %C10u %C11 %C12 %Csb
          %Cwi %Cwiany %Cwiat %C13
          Hcg Hcnt Hextc Hextm Hpc Hidev Hinum Hmeta Hmap Hblocks Hsb
          Hba Hdn Hsrc Hsl Hop".
@@ -4085,14 +4124,14 @@ Section WriteiMain.
       iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
       iApply ("Hcont" $! mf tot bm2 data2 dn2 dn02 n2 wrote dist dstb P2 SbF
                 with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
-                      [%] [%] [%] [%] [%]
+                      [%] [%] [%] [%] [%] [%]
                       Hcg Hcnt Hextc Hextm Hpc Hidev Hinum Hmeta Hmap
                       Hblocks Hsb Hszc Hbmsc Hdn Hsrc Hsl Hop").
       { exact C1. } { exact C2. } { exact C3. }
       { exact C4. } { exact C5. } { exact C6. }
       { exact Ccap. } { exact Csz. } { exact C7. } { exact C8. }
       { exact C8k. }
-      { exact C9. } { exact C10. } { exact C11. } { exact C12. }
+      { exact C9. } { exact C10. } { exact C10u. } { exact C11. } { exact C12. }
       { exact Csb. }
       { exact Cwi. }
       { exact Cwiany. }
@@ -4178,7 +4217,7 @@ Section WriteiMain.
          the one it came in with *)
       iApply ("Hcont" $! X1 0%nat bm data dn dn0 ncount
                 (fun _ => bv_0 8) 0%nat (fun _ => bv_0 8) (pv_upt (us_V U)) Sb
-                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hidev Hinum Hmeta Hmap Hblocks Hsb Hba Hdn
+                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hidev Hinum Hmeta Hmap Hblocks Hsb Hba Hdn
                       [Hsrc] Hsl Hop").
       { unfold callee_saved. split_and!; lkp. }
       { exact Hwf. }
@@ -4194,6 +4233,8 @@ Section WriteiMain.
       { intro k. rewrite decide_False; [| lia]. rewrite decide_False; [| lia].
         reflexivity. }
       { intros _ i Hi. exfalso. lia. }
+      { (* the content clause at [tot = 0]: vacuous *)
+        intros _ i Hi. exfalso. lia. }
       { left. split_and!;
           [ lkp | left; exact Hsml | reflexivity | reflexivity | reflexivity
           | reflexivity | reflexivity | reflexivity | reflexivity ]. }
@@ -4616,6 +4657,8 @@ Section WriteiMain.
                 ltac:(intro k; rewrite decide_False; [| lia];
                       rewrite decide_False; [reflexivity | lia])
                 ltac:(intros _ i Hi; exfalso; lia)
+                (* the content clause at [tot = 0]: vacuous *)
+                ltac:(intros _ i Hi; exfalso; lia)
                 ltac:(left; split_and!;
                       [ exact HY1a0
                       | right; rewrite wi_maxfile_val wi_bsize_val; lia
@@ -4778,6 +4821,7 @@ Section WriteiMain.
                 ltac:(intros; reflexivity)
                 ltac:(intro k; rewrite decide_False; [| lia];
                       rewrite decide_False; [reflexivity | lia])
+                ltac:(intros _ i Hi; exfalso; lia)
                 ltac:(intros _ i Hi; exfalso; lia) ltac:(lia)
                 ltac:(symmetry; exact Hdn0)
                 ltac:(unfold wi_cost_bmonly; lia) ltac:(lia) ltac:(lia)
@@ -5001,6 +5045,8 @@ Section WriteiMain.
               ltac:(apply (bm_covers_mono bm (bv_unsigned (di_size dn)) _ Hcovin);
                     rewrite Nat.add_0_r; exact Hbig)
               ltac:(intro k; rewrite decide_False; [reflexivity | lia])
+              ltac:(intros _ i Hi; exfalso; lia)
+              (* the content invariant at entry: vacuous at [tot = 0] *)
               ltac:(intros _ i Hi; exfalso; lia) ltac:(apply uptd_ext_sz_refl)
               ltac:(replace (off + 0)%nat with off by lia;
                     replace (n - 0)%nat with n by lia; lia)
@@ -5069,19 +5115,20 @@ Section WriteiMain.
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
     iIntros (mf tot bm' data' dn' dn0' n' wrote dist dstb P' Sb')
-      "%D1 %D3 %D4 %D5 %D6 %D7 %Dcap %Dsz %D8 %D9 %D9k %D10 %D11 %D12 %D13
+      "%D1 %D3 %D4 %D5 %D6 %D7 %Dcap %Dsz %D8 %D9 %D9k %D10 %D11 %D11u %D12 %D13
        %Dsb %Dwi %Dwiany %Dwiat %D14
        Hcg Hcnt Hextc Hextm Hpc Hidev Hinum Hmeta Hmap Hblocks Hsb
        Hszc Hbmsc Hdn Hsrc Hsl Hop".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
     iApply ("Hcont" $! mf tot bm' data' dn' dn0' n' wrote dist dstb P'
               with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
-                    [%]
+                    [%] [%]
                     Hcg Hcnt Hextc Hextm Hpc Hidev Hinum Hmeta Hmap Hblocks Hsb
                     Hszc Hbmsc Hdn Hsrc Hsl [Hop Htx]").
     { exact D1. } { exact D3. } { exact D4. } { exact D5. }
     { exact D6. } { exact D7. } { exact Dcap. } { exact Dsz. } { exact D8. }
-    { exact D9. } { exact D9k. } { exact D10. } { exact D11. } { exact D12. }
+    { exact D9. } { exact D9k. } { exact D10. } { exact D11. } { exact D11u. }
+    { exact D12. }
     { exact D13. } { exact D14. }
     { iApply (log_opS_op with "Hop Htx"). }
   Qed.

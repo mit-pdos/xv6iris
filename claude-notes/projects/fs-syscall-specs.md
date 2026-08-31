@@ -486,6 +486,19 @@ things, and the answer differs:
     15 s, first try.
   - `iris/ProofSysWriteAUStable.v` — `SYSWRITE_AU_ERA -> …_STABLE`, 14
     lines, lands in the escape disjunct at `off0 := 0`.
+  **SINCE 2026-08-31 THE ARMS NAME THE BYTES (RULING A, as landed at the
+  ruling briefs below).**  `write_post_ok_at` / `write_post_fail_at` /
+  `write_stable_arms_at` — and their frozen non-`_at` twins — carry
+  `⌜SpecCopyin.ubytes_at M ua (concat bss)⌝` and take `(M) (ua)`;
+  `fw_au_raw` carries the same conjunct as its content half and
+  `fw_au_raw_take`'s closer gained `⌜ubytes_at M (add_vec_int ua t) bs⌝`,
+  discharged at the fire from `SpecWritei`'s new user-arm clause.  The
+  chunk DECOMPOSITION is still existential and the per-chunk FILE offsets
+  still are; only the CONTENT existential died.  Syscall argument 1 is a
+  named binder now (`v1`), because the arms speak about the bytes there.
+  Finding 2 below is unaffected — the disturbed tail still carries no
+  receipt and still has no nameable bytes.
+
   AS-LANDED FINDINGS:
   1. **The astate-shaped commit is not dischargeable — again.**
      `FsAbsMknodFire`'s first finding repeats verbatim at the write
@@ -1400,6 +1413,19 @@ things, and the answer differs:
     (3) `SpecFilewriteCons.v` is BYTE-IDENTICAL (R10): its shape had
     already been validated by the syscall seal above it, and it needed no
     edit to be provable.
+  - **SINCE 2026-08-31 THE RECEIPT NAMES THE BYTES (RULING A, as landed at
+    the ruling briefs below).**  Note (3) no longer holds: `cons_sent_cnt`,
+    `wcons_ok`, `wcons_short` and `write_cons_arms` all take
+    `(M : gmap Z (bv 8)) (ua : mword 64)` and carry
+    `⌜SpecCopyin.ubytes_at M ua bs⌝` beside the length, so the three bridge
+    lemmas grew one `iSplitR` each and the walk grew ONE new register fact,
+    `HE2a1` (a1 survives to the `c.jalr a5` untouched — the landed walk
+    never needed to say so, because consolewrite promised nothing about the
+    bytes there).  The syscall shell grew `HS4a1` and one `iEval`, and
+    syscall argument 1 stopped being existentially quantified.  What the
+    printf theorem now says: `write(1, buf, n)` returns a count that IS the
+    UART's accepted-byte receipt AND those bytes are `buf`'s own, at the
+    image the caller lent.
 
 - [ ] **INIT — the init.c program theorem (three stages; scoped
   2026-08-29 after upstream's echo landed the Uk pattern).**
@@ -2280,37 +2306,170 @@ durable-notes warns about.
 
 ## RULING BRIEFS (drafted 2026-08-30, coordinator; each is a yes/no)
 
-- [ ] **RULING A — the WRITE/copyin content seam.**  SCOPE NARROWED
-  2026-08-30: **the read direction is out of this ruling, because upstream
-  delivered its half.**  `f9eed7297` made consoleread's window predicate
-  take the return value and gave fileread and sys_read the output conjunct
-  `r = mword_of_int (Z.of_nat d) \/ r = mword_of_int (-1)` — a non-negative
-  answer IS the number of bytes written — and the read-AU family relays it
-  in both storeys (as-landed note in lane W above).  What read still does
-  not say is the destination's CONTENT, and that is not a copyin question
-  and not this ruling's: readi's user arm promises only `uptd_ext` about
-  the destination, and the AU contract inherits the silence deliberately
-  (`SpecSysReadAU`'s WHAT "DELIVERED" DOES NOT MEAN — the slice is
-  vocabulary tying the count to the OBSERVED state, not a memory
-  postcondition).  So what is left to rule is the write direction alone:
-  THE GAP: `either_copyin`'s
-  success arm binds the copied bytes existentially, so write's receipts
-  say "SOME bytes of the right length landed" and console-write's say
-  "length and order" — never "MY bytes."  THE ASK: an output equation on
-  the success arm tying the copied run to the USER SOURCE bytes at the
-  instant's `M` (the vocabulary exists post-M-threading: copyinstr's
-  same-M contracts are the precedent).  THE COST, honestly: it is a
-  `SpecWritei`-class ripple — the equation must relay
-  either_copyin → writei → filewrite → the syscall arms (and the
-  console chain separately), i.e. one output conjunct each on two or
-  three landed contracts with their proofs re-elaborated; the write
-  precedent measured that class at zero proof content + a relay through
-  3 signatures + a handful of caller sites, but writei's is the tree's
-  big proof, so budget a full lane.  THE PAYOFF: "printf printed MY
-  bytes" and write's content-pinned receipts, in one ruling — the last
-  honesty gap in the write family.  RECOMMEND: YES, as a lane when the
-  current pair lands.
-  **RULED YES (owner, 2026-08-31).  Lane launched same day.**
+- [x] **RULING A — the WRITE/copyin content seam.  RULED YES 2026-08-30;
+  AS LANDED 2026-08-31.**  Scope as ruled: the write direction only (the
+  read direction stayed out — upstream's `f9eed7297` delivered read's count
+  half, and read's DESTINATION content is not a copyin question).
+
+  **What the gap was.**  `SpecEitherCopyin.either_copyin_post`'s user arm
+  bound the copied run existentially, so write's receipts said "SOME bytes
+  of the right length landed" and console-write's said "length and order" —
+  never "MY bytes".  It was never a limit of the code:
+  `SpecCopyin.wp_copyin_sconf_mem` has promised `copyin_got M srcva len
+  dst_new` since the image campaign's tier 3, and `ProofEitherCopy` was
+  *discarding* it with the comment "its caller owns no user memory to state
+  them against".  That stopped being true once writei and consolewrite
+  began threading `proc_priv_core`, whose block carries the image `us_M U`.
+
+  **THE CONJUNCT, AT EACH STOREY (exact spelling).**
+
+  1. `SpecEitherCopyin.either_copyin_post`, user arm, inside the existing
+     `∃ dst_new` (the outer three-conjunct shape did NOT move):
+
+     ```
+     ⌜r = (mword_of_int 0 : mword 64) -> copyin_got (us_M U) src len dst_new⌝
+     ```
+
+     Guarded by the SUCCESS exit: `-1` still promises nothing, because a
+     part-way copy wrote a prefix and which prefix is not observable
+     (`SpecCopyin`'s own stance, relayed).
+
+  2. `SpecWritei`, BOTH bodies (`wp_writei_sconf_body`, `wp_writei_gen_body`),
+     as the user-arm twin of the landed kernel-arm clause:
+
+     ```
+     ⌜user = true -> copyin_got (us_M U) src tot wrote⌝ -∗
+     ```
+
+     Range is `tot`, not `n`: a chunk whose copy failed part-way is
+     committed into `dist`, and those bytes stay unnamed.
+
+  3. `SpecCopyin` gained the LIST spelling of the same fact, beside
+     `copyin_got`, because every receipt layer above carries lists:
+
+     ```
+     Definition ubytes_at (M : gmap Z (bv 8)) (ua : mword 64)
+         (bs : list (bv 8)) : Prop :=
+       forall (d : nat) (c : bv 8), bs !! d = Some c ->
+         M !! uint (add_vec_int ua (Z.of_nat d)) = Some c.
+     ```
+
+     with `ubytes_at_nil`, `ubytes_at_app` (adjacent runs, no no-wrap side
+     condition — `add_vec_int_nat_assoc`), `ubytes_at_of_got` (the ONE
+     bridge from the function spelling, applied once per chain) and
+     `add_vec_moi_comm` (gcc emits the index first at both chunk loops;
+     the receipts are stated at the base).
+
+  4. `SpecSysWriteAUEra.write_post_ok_at` / `write_post_fail_at` /
+     `write_arms_at` / `write_stable_arms_at` (and their frozen non-`_at`
+     twins in `SpecSysWriteAU`) gained `(M : gmap Z (bv 8)) (ua : mword 64)`
+     and, inside the `∃ bss`, exactly one conjunct:
+
+     ```
+     ⌜ubytes_at M ua (concat bss)⌝
+     ```
+
+     **THE PER-CHUNK EXISTENTIAL OFFSETS STAY; THE CONTENT EXISTENTIAL
+     DIES.**  Stated on the CONCATENATION and not per chunk, and that is
+     the honest shape: the per-chunk FILE offsets are existential on
+     purpose (another writer through the same struct file moves `f->off`
+     between our chunks), while the SOURCE offsets chain by construction —
+     filewrite reads `addr + i` with `i` its own running total.  So the
+     source side can be pinned end to end where the destination side
+     cannot.  `SpecFilewriteAU.fw_au_raw` carries the same conjunct as its
+     content half (INSIDE the iProp, unlike `t = FW_MAX * p`, because it is
+     true of every state the loop hands out), and `fw_au_raw_take`'s closer
+     gained the premise `⌜ubytes_at M (add_vec_int ua t) bs⌝`.
+
+  5. `SpecConsolewriteLoc.cons_sent_cnt` gained `(M) (ua)` and the same
+     conjunct beside the length:
+
+     ```
+     Definition cons_sent_cnt (γu : uart_names) (tr0 : list (bv 8))
+         (M : gmap Z (bv 8)) (ua : mword 64) (r : Z) : iProp Σ :=
+       (∃ bs, ⌜Z.of_nat (length bs) = r⌝ ∗ ⌜ubytes_at M ua bs⌝ ∗
+              uart_sent_from γu tr0 bs)%I.
+     ```
+
+     …and so did `SpecSysWriteConsAU.wcons_ok` / `wcons_short` /
+     `write_cons_arms`, on ALL THREE arms.  **WHAT THE CONSOLE RECEIPTS NOW
+     SAY:** `r` bytes were accepted by the UART, in order, after the seed,
+     AND they are the process's own bytes at `[v1 .. v1+r)` in the image
+     it lent — where `v1` is syscall argument 1, which had to stop being
+     existentially quantified in the premise (`pv_tf (us_V U) !!
+     tf_arg_idx 1 = Some v1`, a named binder now, in both
+     `SpecSysWriteConsAU` and `SpecSysWriteAU`/`Era`).  With
+     `UartAccepted.run_out_accepted` (lane C) that is "init's printf
+     printed THESE characters", end to end.  `SpecSysWriteConsAU`'s own
+     header had predicted the shape exactly — "the receipt gains an
+     equation, not a new resource" — and it held: three arms, one pure
+     conjunct each, no resource moved.
+
+  **THE BYTE STRING IS STILL ∃-BOUND EVERYWHERE, and that is not slack:**
+  `M` is a PARTIAL map, so "the bytes at `ua`" is not a function any of
+  these layers can apply.  The equation determines every byte.
+
+  **MEASURED COST vs THE `SpecWritei` PRECEDENT** (which was "zero proof
+  content + a relay through 3 signatures + a handful of caller sites").
+  The writei relay came in AT the precedent, not above it, and the budget
+  ceiling (3×) was never approached:
+
+  | file | what changed | new proof content |
+  |---|---|---|
+  | `SpecEitherCopyin.v` | 1 conjunct + header | — |
+  | `ProofEitherCopy.v` | `HU5a3` (a3 named, copied from the copyout half) + the `0`-guard extraction | ~18 lines, no new lemma |
+  | `SpecCopyin.v` | `ubytes_at` + 4 pure lemmas | ~40 lines, all one-liners |
+  | `SpecWritei.v` | 1 conjunct × 2 bodies | — |
+  | `ProofWriteiParts.v` | `wi_usr_step`, `wi_usr_le` | ~25 lines (mirrors `wi_ker_step`) |
+  | `ProofWritei.v` (5091 lines, the tree's biggest) | ~30 threading points, all beside the existing `Hker` | one `wi_usr_step` application beside the existing `wi_ker_step` one, and two `discriminate`/`exact` conjuncts in the chunk normalisation — **no new lemma, no new block** |
+  | 6 writei callers (dirlink, filewrite, filewriteAU, 3× sysunlink) | one token in the `iIntros` pattern | — |
+  | `SpecConsolewriteLoc.v` + `ProofConsolewriteLoc.v` | 2 binders on 5 lemmas, the `a1`/`a2` names the landed walk never needed, the chunk join | ~30 lines |
+  | `SpecFilewriteCons.v` + `ProofFilewriteCons.v` | 2 binders, 3 bridge lemmas, `HE2a1` | ~25 lines |
+  | `SpecSysWriteConsAU.v` + `ProofSysWriteConsAU.v` | 2 binders on 3 arms, `HS4a1` | ~15 lines |
+  | `SpecSysWriteAU{,Era}.v`, `SpecFilewriteAU.v` | 2 binders + 1 conjunct per arm | ~15 lines |
+  | `ProofFilewriteAU.v` | `HQ3a2` (a2 named — the landed walk left it deliberately unconstrained), `Hchunkb` at the fire | ~25 lines |
+  | `ProofSysWriteAU{,Stable}.v` | `HS4a1` + one `iEval` | ~10 lines |
+
+  Whole seam, `git diff --numstat` over 24 files: **+740 / −235**, of
+  which the three biggest are `ProofConsolewriteLoc` (+90/−34),
+  `ProofWritei` (+69/−22 in 5091 lines) and `SpecCopyin` (+69/−0, the new
+  vocabulary).  Compile iterations: 3 for the writei relay, 4 for the
+  console chain, 3 for the fs-AU chain.
+
+  THE ONE GENUINE OBSTACLE, hit twice: `rget` carries the ambient `CpuId`,
+  so an `a2` equation has to be asserted at the `set` that BUILT the
+  register file, not at the consumer block several harts' instances later
+  (`ProofConsolewriteLoc`'s `HB5a2` and `ProofFilewriteAU`'s `HQ3a2` both
+  moved for this reason).  Worth knowing before the next walk names a
+  register the landed one left unconstrained.
+
+  **AUDIT.**  `Print Assumptions` on ALL ELEVEN reseals the lane touched —
+  `EitherCopyin.wp_either_copyin_sconf`, `Writei.wp_writei_gen` /
+  `wp_writei_sconf`, `Filewrite.wp_filewrite_sconf`,
+  `Consolewrite.wp_consolewrite_sconf`,
+  `ConsolewriteLoc.wp_consolewrite_loc_sconf`,
+  `FilewriteCons.wp_filewrite_cons`, `SysWriteConsAU.wp_sys_write_cons_au`,
+  `FilewriteAU.wp_filewrite_au`, `SysWriteAU.wp_sys_write_au_era`,
+  `SysWriteStable.wp_sys_write_au_era_stable` — is **the standing three and
+  nothing else** (`resv_matches`, `resv_is_valid`,
+  `functional_extensionality_dep`).  Zero `Admitted`, zero new `Axiom`.
+  Mirror evidence: the whole `SpecCopyin` reverse closure, 236 files, `make
+  -k` with **zero** errors and zero missing `.vo`.
+
+  **WHAT THE EQUATION COULD NOT REACH, and why.**
+  - writei's DISTURBED REGION (`dist`, the committed partial chunk).  A
+    failed `either_copyin` returns `-1` and its post promises nothing about
+    the prefix it wrote; the bytes are on disk and unnamed.  Closing this
+    needs a copied-prefix invariant threaded through copyin's own
+    `memmove` loop — `SpecCopyin`'s `-1` arm, not this seam.
+  - the STABLE corollary's CHAINED disjunct.  Unchanged: the content
+    conjunct rides through the escape disjunct untouched (it is about the
+    SOURCE, which no chaining question touches), so open question 2 is
+    exactly where it was.
+  - `SpecSysWriteConsAU`'s returned image `M'` is still existential.  The
+    receipts are stated against the INPUT image `us_M U`, which is what the
+    caller lent and what makes them usable; pinning the OUTPUT image is a
+    different question and not one write's honesty needs.
 - [ ] **RULING B — the A(iv) offset carrier.**  THE GAP: `f->off` lives
   behind `file_pay`'s existential, so write/read receipts carry
   per-instant existential offsets and dup's same-description fact stops
@@ -2328,7 +2487,9 @@ durable-notes warns about.
   read, dup, and any future lseek.  RECOMMEND: (a) YES but AFTER
   ruling A's lane (they touch the same file-layer proofs; sequencing
   them avoids a double re-elaboration).
-  **RULED (owner, 2026-08-31): POSTPONED until a consumer exists.**
+  **RULED (owner, 2026-08-31): POSTPONED until a consumer exists** —
+  ruled AFTER ruling A's lane landed, so the sequencing condition is
+  moot and the postponement is the standing word.
   The "consumers waiting" above are all *would-benefit*, none *blocked*:
   today's write/read/dup theorems close over the existential offsets.
   The trigger to re-raise this: the first proof that needs a POSITION

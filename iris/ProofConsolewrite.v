@@ -1148,7 +1148,9 @@ Section CwBodies.
       (* either_copyin is SAME-image, so the block comes back at [us_M U]
          and consolewrite's loop carries no moved image at all. *)
       iDestruct "Hpv" as (P1) "(%Hext1 & Hpriv)".
-      iDestruct "Hb1" as (fb') "Hb1".
+      (* the content seam (RULING A): the run comes back with its equation
+         to the process's image, guarded by the [0] exit. *)
+      iDestruct "Hb1" as (fb') "[%Hfbc Hb1]".
       iEval (rewrite HB6a0) in "Hb1".
       (* the register shape survives the call *)
       assert (Hregc : cw_regs mf1 (pa_stk sp0 16%nat) sp0 src n i).

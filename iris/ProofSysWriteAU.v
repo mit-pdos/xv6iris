@@ -299,11 +299,11 @@ Section ProofSysWriteAU.
   (* =================================================================== *)
   Lemma wp_sys_write_au_era
       (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
-      (fn : fwrite_names) (pidv : mword 32) (U : ustate) (v v2 : mword 64)
+      (fn : fwrite_names) (pidv : mword 32) (U : ustate) (v v1 v2 : mword 64)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
       (fd : nat) (fv : mword 64) (rb : bool) (i : Z)
       (Φw : nat -> aview -> nat -> list (bv 8) -> iProp Σ)
-    : wp_sys_write_au_era_body γf γs j γlp fn pidv U v v2 m av eb b lks
+    : wp_sys_write_au_era_body γf γs j γlp fn pidv U v v1 v2 m av eb b lks
         fd fv rb i Φw.
   Proof.
     cbv beta delta [wp_sys_write_au_era_body wp_sys_write_au_frame].
@@ -323,7 +323,8 @@ Section ProofSysWriteAU.
        a power (durable-notes.md). *)
     assert (Hnoff : (Z.of_nat 0 + 1 < 2 ^ 31)%Z)
       by (change (2 ^ 31)%Z with 2147483648%Z; lia).
-    destruct Harg1 as [v1 Harg1].
+    (* [v1] is a BINDER now (RULING A): the arms speak about the bytes at
+       that address, so the argument cannot stay existential. *)
     set (sp0 := m !!! Regidx csp_rs1).
     set (ra0 := m !!! Regidx Rra).
     set (s00 := m !!! Regidx Rs0).
@@ -887,6 +888,11 @@ Section ProofSysWriteAU.
       { rewrite /S4 upd_ne; [| reg_neq]. rewrite /S3 upd_eq. reflexivity. }
       assert (HS4a2 : S4 !!! Regidx Ra2 = (mword_of_int (sys_rw_count v2) : mword 64))
         by (rewrite /S4 upd_ne; [exact HS3a2 | reg_neq]).
+      (* a1 IS the trapframe's argument 1 (RULING A): the arms name the bytes
+         at that address, so the walk has to say which address it is. *)
+      assert (HS4a1 : S4 !!! Regidx Ra1 = v1).
+      { rewrite /S4 upd_ne; [| reg_neq]. rewrite /S3 upd_ne; [| reg_neq].
+        rewrite /S2 upd_eq. reflexivity. }
       assert (HS4sp : S4 !!! Regidx csp_rs1 = pa_stk sp0 6)
         by (rewrite /S4 upd_ne; [exact HS3sp | reg_neq]).
       (* ---- THE B1 SEAM.  Lend the descriptor's reference out of the block,
@@ -915,6 +921,9 @@ Section ProofSysWriteAU.
       all: try lkbelow.
       iIntros (CID25 Hs25 mf rv P')
         "%Hcsf %Hupt %Hrva Hcg Hcpu Hpc Href Hcore Hfout Harms".
+      (* the arms come back stated at filewrite's a1; [HS4a1] says that IS
+         the syscall's own argument 1 (RULING A). *)
+      iEval (rewrite HS4a1) in "Harms".
       iDestruct ("Hfback" with "Hfout") as "[Henv _]".
       (* SETTLE THE LOAN.  [pv_ofile (upd_upt V P') = pv_ofile V] by [cbn], so
          the deficit the lend opened is literally the one this closes. *)
