@@ -28,10 +28,12 @@ user-page-table walk — the theorem that says "a U-mode step over
 
 ## 1. Ground rules (non-negotiable, from the owner and hard experience)
 
-1. **All builds on the GCP VM** via
-   `/shared/xv6iris-3/gcp-rocq/run-on-gcp bash -c 'cd iris && opam exec
+1. **All builds on the GCP VM** via `run-on-gcp` (from YOUR OWN clone's
+   `gcp-rocq/` — see §6; never the kernel lane's copy):
+   `<your-notes-clone>/gcp-rocq/run-on-gcp bash -c 'cd iris && opam exec
    --switch=/shared/xv6rocq -- make -f CoqMakefile -j180 -k <File>.vo …'`
-   — never compile in the container, including one-file checks.  The
+   run with your WORK checkout as cwd — never compile in the container,
+   including one-file checks.  The
    sync pushes local edits and DELETES remote-only files; logs get
    `*.aux` names; read logs with `--no-sync`.
 2. **Measure before designing.**  Read the actual error, the enclosing
@@ -58,7 +60,7 @@ user-page-table walk — the theorem that says "a U-mode step over
 
 ## 2. Read these before editing anything
 
-In `/shared/xv6iris-3/claude-notes/` (branch `tso`):
+In `claude-notes/` of your own clone (branch `tso`):
 - `durable-notes.md` — build system, cross-cutting gotchas.
 - `projects/tso-port.md` — the rulings.  Minimum: §0.7′ (explicit-index
   rule), §0.37′ (why this cone was left red), §0.44′ (process contexts
@@ -204,7 +206,16 @@ lane's).
 
 ## 6. Checkout, branches, and coordination protocol
 
-**Your own checkout, your own branch.**  `tso-flip` is a SNAPSHOT
+**Your own directories, your own branch — never the kernel lane's.**
+The kernel lane's directories are OFF-LIMITS entirely:
+`/shared/xv6iris-3` (its notes/tooling clone), `/shared/xv6iris-3-fliptree`
+(its work tree), `/shared/xv6iris-3-fliptree-backup` (its mirror), and
+`/shared/tmp/virtio` (its scratch).  Set up two checkouts of your own:
+(a) a clone of the repo at branch `tso` (for `claude-notes/` and
+`gcp-rocq/run-on-gcp`), (b) a work tree materialized from `tso-flip`
+@ r60.  Pick your own scratch dir (e.g. `/shared/tmp/umode`).
+
+  `tso-flip` is a SNAPSHOT
 branch: every commit on it is a whole-tree state (temp-index
 `commit-tree`, `.vo` binaries included), not a diff — so a snapshot
 pushed from a tree that lacks the kernel lane's latest edits would
@@ -231,9 +242,11 @@ silently revert them.  Therefore:
 - `_CoqProject`: append-only, and record every addition in §8 so the
   merge is mechanical.
 
-**Notes**: commit your entries in THIS file to branch `tso` (commit
-from the repo root `/shared/xv6iris-3`; committing from inside
-`claude-notes/` breaks relative paths) at every meaningful step:
+**Notes**: commit your entries in THIS file to branch `tso` from YOUR
+OWN clone (commit from that clone's repo root; committing from inside
+`claude-notes/` breaks relative paths), and `git pull --rebase` before
+pushing (the kernel lane pushes to `tso` too) — at every meaningful
+step:
 measurements, landed lemmas, requests, dead ends, build state.
 
 **Builds**: targeted `make <File>.vo` on your own tree any time.  Full
