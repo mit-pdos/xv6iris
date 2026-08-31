@@ -2994,7 +2994,8 @@ frozen touched; all EC2-green, zero `Admitted`, zero new `Axiom`):
   table `ufs_step` for the two pilot rows (open = 15, mknod = 17), every
   arm a reading of the landed AU contracts' arms (delta_create,
   delta_trunc, om_*, dev_arg, NDEV_max), the `-1` blanket kept on every
-  row (the landed determinism stance).
+  row (the landed determinism stance).  **+ the AGREEMENT with upstream's
+  `UsysMemOk.usys_fd_ok` (convergence round, below).**
 - `iris/UexecRetFs.v` — the enriched trap contract as a PARALLEL guarded
   fixpoint (`uslot_fs`): `uexec_ret_fs_F` = UexecRet's arm with ONE
   disjunct spliced in at `uenr_dom n` (plain-verbatim ∨ deposit-the-
@@ -3407,19 +3408,119 @@ THE STAGES (prover lanes; budgets keyed to the landed analogues):
   exactly the TWO seals + the standing three (`resv_matches`,
   `resv_is_valid`, `functional_extensionality_dep`).  ZERO new axioms.
 
+- [x] **PC — the CONVERGENCE round** (2026-08-31, PILOT-CONVERGENCE
+  lane; EC2-green, zero `Admitted`, zero new `Axiom`, audit = *Closed
+  under the global context* on every new statement).  Upstream landed the
+  fd CHANNEL in five commits on one day — `c83604c8b` (the key carries
+  `uvis_fd`), `8091053d1` (the residue names the states), `34c2d83f2`
+  (the fragments join the bundle), `544c08005` (`UsysMemOk.usys_fd_ok`,
+  the pure per-syscall DESCRIPTOR table), `e185c293a` (`fd_frags_any`
+  retires at the mint and the park) — and this round converges the pilot
+  onto it.
+
+  1. **TABLE ALIGNMENT (`iris/FsFdMirror.v`, +279 lines).**  `ufs_step`'s
+     fd leg is now a READING of `usys_fd_ok`, not a second opinion:
+     - **the catch-all DELEGATES.**  `ufs_step_at`'s else arm read
+       `u' = u` — "no syscall outside `uenr_dom` moves the mirror" —
+       which is FALSE of the descriptor table on three of upstream's own
+       rows (close, pipe, and a dup outside the domain).  Unreachable
+       today (the arm is only offered at `uenr_dom n`), and an
+       undischargeable contract the day `uenr_dom` widened: stage P5's
+       dup finding, one row over.  It now reads
+       `usys_fd_ok n tf r (um_fdt u) (um_fdt u')`.  Nothing is claimed
+       about `um_av`/`um_cwd` there — chdir/write/unlink DO move those,
+       and claiming otherwise just moves the same false conjunct one leg
+       over.
+     - **the agreement is a THEOREM.**  `ufs_step_fd_agrees` (and its
+       `_at` form): under the bundle's own `length (um_fdt u) = NOFILE`
+       (which `mirror_tied_fdlen` supplies), every mirror step is a legal
+       step of upstream's table.  Definitional off the enriched rows; a
+       REFINEMENT on them — ours pins the descriptor NUMBER
+       (`fd_lowest_closed`) and the row's TYPE where theirs says only
+       that some open row landed at `Z.to_nat (uint r)`.  Plus
+       `ufs_step_fd_len` (the length survives, so a stepped mirror is
+       still re-indexable at `fd_frags`) and `usys_fd_ok_neg1` (a −1
+       return moves no descriptor on ANY of their rows — what every
+       honest blanket hands back, and why the path rows' unreadable-
+       string escape costs the agreement nothing).
+     - **RIPPLE: ZERO.**  `ufs_step_np` / `ufs_step_pin` /
+       `ufs_step_at_blanket` and every P5 walk lemma resealed with no
+       edit (the catch-all is `pl`-free on both sides and no consumer
+       reads it).  All seven cone files rebuilt clean; `pilot_console_pure`
+       and `pilot_console_dups` still audit *Closed*.
+     - the one arithmetic snag worth keeping: **`bv_half_modulus` in a
+       goal is at `MachineWord.Z_idx 64`, not `64%N`,** so an
+       `assert (bv_half_modulus 64 = 2^63) by reflexivity` + `rewrite`
+       silently fails to match until a `moi64_unsigned` rewrite has
+       re-spelled the width.  `RiscvExtras.sint64_unsigned` is the
+       already-proven way round it.
+
+  2. **THE ASK-2 RECEIPT (`iris/FdRowMint.v` §6, rewritten
+     verbatim-current).**  Input (A) is CLOSED by `e185c293a` — the site
+     now parks at `fdt0` with a named bundle.  The splice was COMPILED on
+     a scratch twin of `ProofUserinit.v` (not committed), and the ask
+     SPLITS:
+     - **(2a) the mint compiles as ONE `iMod` line**, park call
+       untouched, ~270 remaining lines of the walk unaffected.  Its costs
+       are all outside the site: the class `ghost_varG Σ umirror` (the
+       rest are free — `fsTopG`/`fsLinkG` are members of `Xv6G.xv6G`);
+       the pure `snap_ok S era0_D`, which widens `wp_userinit_sconf` and
+       therefore the Module Type `SpecUserinit.USERINIT` and its callers
+       (the twin fails at "Signature components for field
+       `wp_userinit_sconf` do not match" with the ascription in place,
+       green with it dropped); and a CONE SPLIT — `Require Import
+       FdRowMint` inside `ProofUserinit` is a CYCLE (FdRowMint →
+       FdRowPilot → FsImgCheck → SystemAdequacy → BootChain → LinkMain →
+       LinkUserinit → ProofUserinit), so the mint's statements must move
+       below the boot chain first.
+     - **(2b) parking the enriched family is NOT three lines and NOT
+       independent of ask 1.**  `park_token_park` rejects
+       `∀ W, uslot_fs γm W`, and cannot merely be re-typed: `uslot
+       (uvis_of U' sts)` lives inside `ParkCap.park_pkg`, i.e. inside the
+       `park_token` FIXPOINT (`ParkCap.v:134`).  It is also premature —
+       while the loop is the plain one the honest park is the plain
+       family and the process lifts through `uslot_uslot_fs`.
+     - **the TIED mint cannot fire at the park at all, by LINEARITY:**
+       `mirror_tied`'s `fd_frags γfd (um_fdt u)` IS the bundle the site
+       hands to the park, which the package then holds across the parked
+       period (`ParkCap.v:284-299`).  **The park mints the GHOST; the
+       LOOP establishes the TIE** — beside `UsertrapRes.ut_own`, which is
+       where `mirror_tied_round` was already aimed, so P4 absorbs it at
+       no extra cost.
+
+  3. **THE FINDING THAT SETS THE NEXT ASK.**  Upstream built the fd
+     channel but did not ATTACH it: `uexec_ret_F`'s returning-syscall arm
+     ∀-binds `fdv'` with no premise (`UexecRet.v:529-533`), and both
+     sides say so — `UexecApply.v:575-580` ("the fd component is the
+     LOOP's to choose … `fdv'` … is arbitrary") and
+     `ProofUsertrapSys.v:558-563` (future tense: "When the four
+     fd-touching rows … state a delta, it is `sts2` they will relate to
+     the entry `sts`").  So a program still learns nothing about its
+     descriptors across a syscall, and the key's fd field is write-only
+     at the one arm the pilot cares about.  **New upstream ask (5), one
+     pure conjunct:** `⌜usys_fd_ok n (uvis_tf W) r (uvis_fd W) fdv'⌝` on
+     that arm.  It also GATES the re-key (`um_fdt` → `uvis_fd`): the
+     alignment removed the re-key's agreement obligation, but re-keying
+     before ask 5 would delete the only carrier that says anything about
+     init's fd 0.
+
 - [ ] **P5b — the widening** (not started).  fork's mirror
   retirement/downgrade (the solo flip) and the post-fork general row (av
   leg → existential observations + persistent certs).  The fd leg needs
-  nothing new; the design's §5 records the shape.
+  nothing new; the design's §5 records the shape.  NOTE (convergence
+  round): the fd leg's widening is now upstream's `usys_fd_ok` plus ask
+  5, not ours — `ufs_step_fd_agrees` is the receipt that our leg can be
+  replaced by theirs wherever theirs is strong enough.
 
 UPSTREAM ASKS (design §8, each a yes/no brief there): (1) the arm diff
 in `UexecRet.v` (conservative — the bridge is the compiled receipt;
 recommend YES); (2) the era-0 entry deposit at the userinit park —
-SPECIFIED, `FdRowMint.v` §6 is the diff and its three inputs (A) pinned
-`fd_frags … fdt0`, (B) the founded `astate` at the boot instant, (C) the
-pure `snap_ok S era0_D` are the whole cost; (3) the pure return-range
-conjuncts on open/mknod's rows (WINDOW-LEAF-style, independent;
-recommend YES).
+SPECIFIED and now RE-MEASURED (convergence round PC.2): input (A) is
+CLOSED by upstream's `fd_frags_any` retirement, the mint half (2a)
+COMPILES as one `iMod`, and the park half (2b) + the tied residue move
+to stage P4 — `FdRowMint.v` §6 is the verbatim-current diff; (3) the pure
+return-range conjuncts on open/mknod's rows (WINDOW-LEAF-style,
+independent; recommend YES).
 
 (4) **NEW, filed by P2 and the cheapest of the four — THE X-GENERIC
 ENGINE.**  Parameterise `UkStep.v`'s §3 (`uk_step_obl` / `uk_ih` /
@@ -3438,4 +3539,21 @@ either beyond those two; `uvb`/`ukb`/`uexec_ret` become
 no copy — and P5's "one `urun_fs` twin per leaf kind" collapses to zero
 for every leaf, not just this one.  RECOMMEND YES; it is strictly
 smaller than ask (1) and independent of it (it does not change any
-landed statement, only generalises).
+landed statement, only generalises).  **The convergence round found the
+SAME shape one layer up:** `ParkCap`'s park channel hardwires `uslot`
+inside its own fixpoint (`ParkCap.v:134`), so ask (2b) is ask (4) for the
+PARK.  Worth ruling on together.
+
+(5) **NEW, filed by the convergence round and the cheapest of the five —
+ATTACH `usys_fd_ok` TO THE ARM.**  `uexec_ret_F`'s returning-syscall arm
+∀-binds `fdv'` with NO premise (`UexecRet.v:529-533`), so upstream's own
+freshly-landed descriptor table says nothing to a user program: the key's
+new fd field is write-only at the one arm that moves it.  Both sides
+already say the row is missing — `UexecApply.v:575-580` and
+`ProofUsertrapSys.v:558-563`.  One pure conjunct,
+`⌜usys_fd_ok n (uvis_tf W) r (uvis_fd W) fdv'⌝ -∗`, fixes it: the
+dispatcher already discharges the table (`SpecSyscall.sysc_fd_ok`,
+`UsysMemOkSpec.sysc_fd_ok_usys`) and `usys_fd_ok_length` is the
+`fd_frags` side condition.  No binder moves, each leaf passes one more
+pure premise through, and it is the precondition for retiring the pilot's
+`um_fdt` leg onto the key.  RECOMMEND YES.
