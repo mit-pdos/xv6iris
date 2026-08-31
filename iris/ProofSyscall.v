@@ -4445,8 +4445,15 @@ Section SyscallArms.
     (* fileclose's loan, out of the dispatch's four spare iref units and
        straight back in below -- see [SpecFileclose]'s [iref_slot] row. *)
     iDestruct (sysc_iref_split3 with "Hir") as "[Hir Hiru]".
+    (* NAME THE TABLE FOR THE CALL.  sys_close's post now states its row
+       against it -- [<[fd := FdClosed]> sts] on the success arm -- so the
+       arm has to say which table it is calling at.  The introduction is
+       local because [sysc_arm_pre] still carries the bundle [∃]-weakened;
+       when that is indexed too, this line goes away and the row travels
+       out of the arm instead of being re-forgotten below. *)
+    iDestruct "Hufrag" as (sts) "Hufrag".
     iApply (SysClose.wp_sys_close_sconf γft γf fn None M (av - 4)%nat 0%nat
-              true (proc_addr j) v0 pid U true ∅
+              true (proc_addr j) v0 pid U sts true ∅
               Hv0 ltac:(cbn; lia) ltac:(lia) (locks_below_empty "log")
               Hpidt (sct_dq _ _ T)
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hftable Hpanic Hpriv

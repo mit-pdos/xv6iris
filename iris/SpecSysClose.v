@@ -89,16 +89,25 @@ Section SpecSysClose.
   (* THE fd-STATE FRAGMENT BUNDLE comes back on BOTH arms, and is a premise
      of the call: sys_close RETYPES a descriptor (open -> closed), and after
      [ProcInv]'s auth/frag split that is a step the array cannot take on its
-     own ([FdSlots.fd_st_move] needs both halves).  The failure arm hands it
-     straight back untouched -- it closed nothing. *)
+     own ([FdSlots.fd_st_move] needs both halves).
+
+     AT A NAMED TABLE, and the two arms say different things about it --
+     which is the whole point of naming it.  The failure arm hands [sts]
+     back UNTOUCHED: it closed nothing, and the [arg_fd … = None] beside it
+     says why.  The success arm hands back [<[fd := FdClosed]> sts] at the
+     very [fd] the argument named, so the slot that moved is the one the
+     caller asked about and every other slot is still what it was.  That
+     second half is what a caller holding other descriptors needs, and it
+     is exactly [UsysMemOk.usys_fd_ok]'s close row read at this
+     vocabulary. *)
   Definition sys_close_post `{XI : CurCtx} (γf : gname) (p : mword 64) (pid : mword 32)
-      (U : ustate) (v : mword 64) (r : mword 64) : iProp Σ :=
+      (U : ustate) (sts : list fdstate) (v : mword 64) (r : mword 64) : iProp Σ :=
     (⌜r = (mword_of_int (-1) : mword 64) /\ arg_fd v (pv_ofile (us_V U)) = None⌝ ∗
-       proc_priv γf p pid U ∗ fd_frags_any (pv_fdg (us_V U))
+       proc_priv γf p pid U ∗ fd_frags (pv_fdg (us_V U)) sts
      ∨ ∃ (fd : nat) (fv : mword 64),
          ⌜r = (zero_reg : mword 64) /\ arg_fd v (pv_ofile (us_V U)) = Some (fd, fv)⌝ ∗
          proc_priv γf p pid (us_ofile U fd (zero_reg : mword 64)) ∗
-         fd_frags_any (pv_fdg (us_V U)))%I.
+         fd_frags (pv_fdg (us_V U)) (<[fd := FdClosed]> sts))%I.
 
 End SpecSysClose.
 
@@ -107,7 +116,8 @@ Definition wp_sys_close_sconf_body
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
      (γl γf : gname) (fn : fclose_names) (on : option nat)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
-    (v : mword 64) (pid : mword 32) (U : ustate) (b : bool) (lks : gset string) :=
+    (v : mword 64) (pid : mword 32) (U : ustate) (sts : list fdstate)
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_close in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (* sys_close reads syscall argument 0, out of the trapframe page
@@ -161,8 +171,9 @@ Definition wp_sys_close_sconf_body
   is_ftable γl γf -∗
   panic_env -∗
   proc_priv γf p pid U -∗
-  (* the descriptor-state fragments: what the retype below is paid out of *)
-  fd_frags_any (pv_fdg (us_V U)) -∗
+  (* the descriptor-state fragments: what the retype below is paid out of,
+     at the table the post states its row against *)
+  fd_frags (pv_fdg (us_V U)) sts -∗
   (* THE CLOSING ENVIRONMENT.  sys_close closes a descriptor of unknown type,
      so it owns both of fileclose's bundles and hands over whichever the
      type selects ([SpecFileclose.fileclose_env_split]); the other is
@@ -187,7 +198,7 @@ Definition wp_sys_close_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb p -∗
       pc_is ret_tgt -∗
-      sys_close_post γf p pid U v (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
+      sys_close_post γf p pid U sts v (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       (* the whole environment back: the page count may have moved (the
          descriptor may have held a pipe's last end), which is why the pipe
          bundle returns under an existential *)
@@ -203,6 +214,7 @@ Module Type SYSCLOSE.
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
        (γl γf : gname) (fn : fclose_names) (on : option nat)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
-      (v : mword 64) (pid : mword 32) (U : ustate) (b : bool) (lks : gset string),
-      wp_sys_close_sconf_body γl γf fn on m av n eb p v pid U b lks.
+      (v : mword 64) (pid : mword 32) (U : ustate) (sts : list fdstate)
+      (b : bool) (lks : gset string),
+      wp_sys_close_sconf_body γl γf fn on m av n eb p v pid U sts b lks.
 End SYSCLOSE.

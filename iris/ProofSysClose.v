@@ -326,8 +326,9 @@ Section ProofSysClose.
   Lemma wp_sys_close_sconf  (γl γf : gname)
       (fn : fclose_names) (on : option nat)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
-      (v : mword 64) (pid : mword 32) (U : ustate) (b : bool) (lks : gset string)
-    : wp_sys_close_sconf_body γl γf fn on m av n eb p v pid U b lks.
+      (v : mword 64) (pid : mword 32) (U : ustate) (sts : list fdstate)
+      (b : bool) (lks : gset string)
+    : wp_sys_close_sconf_body γl γf fn on m av n eb p v pid U sts b lks.
   Proof.
     cbv beta delta [wp_sys_close_sconf_body].
     intros pcE ret_tgt Harg Hn Hav Hbelow Hfpid Hfdq.
@@ -894,9 +895,18 @@ Section ProofSysClose.
          only the AUTHORITY ([Hst], out of [ofile_slot]'s file arm); the
          matching fragment comes out of the bundle, and [fd_st_move] joins
          them.  This is the one step in sys_close that could not be taken
-         after [ProcInv]'s auth/frag split without holding [fd_frags_any]. *)
-      iDestruct (fd_frags_any_acc (pv_fdg (us_V U)) fd Hfdlt with "Hfrag")
-        as (stq) "[Hfr Hfrback]".
+         after [ProcInv]'s auth/frag split without holding the bundle.
+
+         AT THE NAMED TABLE: [fd_frags_acc]'s closer hands back
+         [fd_frags γ (<[fd := FdClosed]> sts)], which IS the post's success
+         arm.  The [_any] form's closer went back to [_any] and so could
+         never have proved it -- the row was unstatable, not unproved. *)
+      iDestruct (fd_frags_len with "Hfrag") as %Hstslen.
+      assert (Hstq : is_Some (sts !! fd))
+        by (apply lookup_lt_is_Some_2; rewrite Hstslen; unfold NOFILE in *; lia).
+      destruct Hstq as [stq Hstq].
+      iDestruct (fd_frags_acc (pv_fdg (us_V U)) sts fd stq Hstq with "Hfrag")
+        as "[Hfr Hfrback]".
       iMod (fd_st_move _ fd stf stq FdClosed with "Hst Hfr")
         as "[Hst Hfr]".
       iDestruct ("Hfrback" with "Hfr") as "Hfrag".
