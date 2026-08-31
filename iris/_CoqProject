@@ -307,6 +307,7 @@ UkCatVprintf.v
 UkCatVprintfS.v
 UkCatFprintf.v
 UkCatCat.v
+UkCatMain.v
 # The register-index arithmetic every returning function proof needs to
 # state and discharge a [ucallee_saved] post.  Program-independent, and
 # not Iris at all.
