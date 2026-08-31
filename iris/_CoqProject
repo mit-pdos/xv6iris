@@ -304,6 +304,7 @@ UkCat.v
 UkCatPutc.v
 UkCatLit.v
 UkCatVprintf.v
+UkCatVprintfS.v
 UkCatFprintf.v
 UkCatCat.v
 # The register-index arithmetic every returning function proof needs to

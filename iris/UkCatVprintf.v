@@ -706,7 +706,7 @@ Section UkCatVprintf.
   (* callee-saved, which is the whole reason ulib parks them there.          *)
   (* ===================================================================== *)
 
-  Definition vp_inv (m0 m : regfile) (sp0 : mword 64) (a : Z) (fd : mword 64)
+  Definition vp_inv (m0 m : regfile) (sp0 : mword 64) (a : Z) (fd ap : mword 64)
       (i : nat) : Prop :=
     m !!! Regidx csp_rs1 = add_vec_int sp0 (- (8 * Z.of_nat 12)) /\
     m !!! Regidx s0_idx = sp0 /\
@@ -715,16 +715,18 @@ Section UkCatVprintf.
     m !!! Regidx s4_idx = mword_of_int a /\
     m !!! Regidx s5_idx = mword_of_int 37 /\
     m !!! Regidx s6_idx = fd /\
+    m !!! Regidx s7_idx = ap /\
+    m !!! Regidx s8_idx = mword_of_int 100 /\
     (forall r : mword 5, ucallee_saved_idx r = true ->
        uint r = 3 \/ uint r = 4 \/ (25 <= uint r <= 27) ->
        m !!! Regidx r = m0 !!! Regidx r).
 
   (* every register [vp_inv] names is callee-saved, so a call preserves it *)
-  Lemma vp_inv_call (m0 m m' : regfile) (sp0 : mword 64) (a : Z) (fd : mword 64)
-      (i : nat) :
-    ucallee_saved m m' -> vp_inv m0 m sp0 a fd i -> vp_inv m0 m' sp0 a fd i.
+  Lemma vp_inv_call (m0 m m' : regfile) (sp0 : mword 64) (a : Z)
+      (fd ap : mword 64) (i : nat) :
+    ucallee_saved m m' -> vp_inv m0 m sp0 a fd ap i -> vp_inv m0 m' sp0 a fd ap i.
   Proof.
-    intros Hcs (Hsp & Hs0 & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hfr).
+    intros Hcs (Hsp & Hs0 & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hs7 & Hs8 & Hfr).
     unfold vp_inv.
     rewrite (Hcs csp_rs1 ltac:(vm_compute; reflexivity)).
     rewrite (Hcs s0_idx ltac:(vm_compute; reflexivity)).
@@ -733,6 +735,8 @@ Section UkCatVprintf.
     rewrite (Hcs s4_idx ltac:(vm_compute; reflexivity)).
     rewrite (Hcs s5_idx ltac:(vm_compute; reflexivity)).
     rewrite (Hcs s6_idx ltac:(vm_compute; reflexivity)).
+    rewrite (Hcs s7_idx ltac:(vm_compute; reflexivity)).
+    rewrite (Hcs s8_idx ltac:(vm_compute; reflexivity)).
     repeat (split; [ assumption | ]).
     intros r Hr Hset. rewrite (Hcs r Hr). exact (Hfr r Hr Hset).
   Qed.
@@ -745,12 +749,12 @@ Section UkCatVprintf.
   Definition vp_writable (r : mword 5) : bool :=
     negb (Z.eqb (uint r) 2 || Z.eqb (uint r) 3 || Z.eqb (uint r) 4 ||
           Z.eqb (uint r) 8 ||
-          ((18 <=? uint r) && (uint r <=? 22)) ||
+          ((18 <=? uint r) && (uint r <=? 24)) ||
           ((25 <=? uint r) && (uint r <=? 27))).
 
   Lemma vp_writable_ne (r : mword 5) (z : Z) :
     vp_writable r = true ->
-    (z = 2 \/ z = 3 \/ z = 4 \/ z = 8 \/ (18 <= z <= 22) \/ (25 <= z <= 27)) ->
+    (z = 2 \/ z = 3 \/ z = 4 \/ z = 8 \/ (18 <= z <= 24) \/ (25 <= z <= 27)) ->
     uint r <> z.
   Proof.
     unfold vp_writable. intro H. apply negb_true_iff in H.
@@ -764,13 +768,13 @@ Section UkCatVprintf.
       destruct H6 as [H6 | H6]; try apply Z.leb_gt in H6; lia.
   Qed.
 
-  Lemma vp_inv_upd (m0 m : regfile) (sp0 : mword 64) (a : Z) (fd : mword 64)
+  Lemma vp_inv_upd (m0 m : regfile) (sp0 : mword 64) (a : Z) (fd ap : mword 64)
       (i : nat) (r : mword 5) (v : mword 64) :
     vp_writable r = true ->
-    vp_inv m0 m sp0 a fd i ->
-    vp_inv m0 (<[Regidx r := regval_into_reg v]> m) sp0 a fd i.
+    vp_inv m0 m sp0 a fd ap i ->
+    vp_inv m0 (<[Regidx r := regval_into_reg v]> m) sp0 a fd ap i.
   Proof.
-    intros Hw (Hsp & Hs0 & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hfr).
+    intros Hw (Hsp & Hs0 & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hs7 & Hs8 & Hfr).
     unfold vp_inv.
     rewrite (upd_ne m (Regidx r) (Regidx csp_rs1) (regval_into_reg v)
                ltac:(apply not_eq_sym; apply uidx_ne;
@@ -807,6 +811,16 @@ Section UkCatVprintf.
                      apply (vp_writable_ne r _ Hw);
                      replace (uint s6_idx) with 22
                        by (vm_compute; reflexivity); lia)).
+    rewrite (upd_ne m (Regidx r) (Regidx s7_idx) (regval_into_reg v)
+               ltac:(apply not_eq_sym; apply uidx_ne;
+                     apply (vp_writable_ne r _ Hw);
+                     replace (uint s7_idx) with 23
+                       by (vm_compute; reflexivity); lia)).
+    rewrite (upd_ne m (Regidx r) (Regidx s8_idx) (regval_into_reg v)
+               ltac:(apply not_eq_sym; apply uidx_ne;
+                     apply (vp_writable_ne r _ Hw);
+                     replace (uint s8_idx) with 24
+                       by (vm_compute; reflexivity); lia)).
     repeat (split; [ assumption | ]).
     intros q Hq Hset.
     rewrite (upd_ne m (Regidx r) (Regidx q) (regval_into_reg v)
@@ -816,13 +830,13 @@ Section UkCatVprintf.
   Qed.
 
   (* ...and the ONE write that changes it: s2, the loop index *)
-  Lemma vp_inv_bump (m0 m : regfile) (sp0 : mword 64) (a : Z) (fd : mword 64)
+  Lemma vp_inv_bump (m0 m : regfile) (sp0 : mword 64) (a : Z) (fd ap : mword 64)
       (i j : nat) (v : mword 64) :
     v = mword_of_int (Z.of_nat j) ->
-    vp_inv m0 m sp0 a fd i ->
-    vp_inv m0 (<[Regidx s2_idx := regval_into_reg v]> m) sp0 a fd j.
+    vp_inv m0 m sp0 a fd ap i ->
+    vp_inv m0 (<[Regidx s2_idx := regval_into_reg v]> m) sp0 a fd ap j.
   Proof.
-    intros -> (Hsp & Hs0 & _ & Hs3 & Hs4 & Hs5 & Hs6 & Hfr).
+    intros -> (Hsp & Hs0 & _ & Hs3 & Hs4 & Hs5 & Hs6 & Hs7 & Hs8 & Hfr).
     unfold vp_inv.
     rewrite (upd_ne m (Regidx s2_idx) (Regidx csp_rs1) _
                ltac:(vm_compute; discriminate)).
@@ -835,6 +849,10 @@ Section UkCatVprintf.
     rewrite (upd_ne m (Regidx s2_idx) (Regidx s5_idx) _
                ltac:(vm_compute; discriminate)).
     rewrite (upd_ne m (Regidx s2_idx) (Regidx s6_idx) _
+               ltac:(vm_compute; discriminate)).
+    rewrite (upd_ne m (Regidx s2_idx) (Regidx s7_idx) _
+               ltac:(vm_compute; discriminate)).
+    rewrite (upd_ne m (Regidx s2_idx) (Regidx s8_idx) _
                ltac:(vm_compute; discriminate)).
     rewrite (upd_eq m (Regidx s2_idx) _).
     repeat (split; [ (assumption || reflexivity) | ]).
@@ -849,17 +867,17 @@ Section UkCatVprintf.
   (* ONE ROUND, 0x566 -> 0x562.  It owns no frame word: putc's four are     *)
   (* BELOW sp, and the twelve vprintf spilled are untouched here.            *)
   (* --------------------------------------------------------------------- *)
-  Lemma wp_kcat_vprintf_step (m0 : regfile) (sp0 fd : mword 64) (a : Z)
+  Lemma wp_kcat_vprintf_step (m0 : regfile) (sp0 fd ap : mword 64) (a : Z)
       (i : nat) (b0 b1 : mword 8) (h : CpuId) (m : regfile) (n : nat) :
     0 <= a -> a + Z.of_nat i + 2 < 2 ^ 31 ->
     bv_unsigned b0 <> 37 ->
-    vp_inv m0 m sp0 a fd i ->
+    vp_inv m0 m sp0 a fd ap i ->
     m !!! Regidx s1_idx = mword_of_int (bv_unsigned b0) ->
     cat_code γt -∗
     utext γt (a + Z.of_nat (S i)) b1 -∗
     urun γt γd γs h m (mword_of_int 0x566) (4 + n) -∗
     (∀ (h' : CpuId) (m' : regfile),
-       ⌜ vp_inv m0 m' sp0 a fd (S i) ⌝ -∗
+       ⌜ vp_inv m0 m' sp0 a fd ap (S i) ⌝ -∗
        ⌜ m' !!! Regidx s1_idx = mword_of_int (bv_unsigned b1) ⌝ -∗
        urun γt γd γs h' m' (mword_of_int 0x562) (4 + n) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -1007,14 +1025,14 @@ Section UkCatVprintf.
     rewrite Eret.
     (* the invariant crossed the call, because every register it names is
        callee-saved -- which is why ulib parked them there *)
-    assert (Hinv5 : vp_inv m0 m5 sp0 a fd i).
-    { apply (vp_inv_call m0 m4 m5 sp0 a fd i Hcs).
-      apply (vp_inv_upd _ _ _ _ _ _ ra_idx _ ltac:(vm_compute; reflexivity)).
-      apply (vp_inv_upd _ _ _ _ _ _ a0_idx _ ltac:(vm_compute; reflexivity)).
-      apply (vp_inv_upd _ _ _ _ _ _ a1_idx _ ltac:(vm_compute; reflexivity)).
-      apply (vp_inv_upd _ _ _ _ _ _ a5_idx _ ltac:(vm_compute; reflexivity)).
+    assert (Hinv5 : vp_inv m0 m5 sp0 a fd ap i).
+    { apply (vp_inv_call m0 m4 m5 sp0 a fd ap i Hcs).
+      apply (vp_inv_upd _ _ _ _ _ _ _ ra_idx _ ltac:(vm_compute; reflexivity)).
+      apply (vp_inv_upd _ _ _ _ _ _ _ a0_idx _ ltac:(vm_compute; reflexivity)).
+      apply (vp_inv_upd _ _ _ _ _ _ _ a1_idx _ ltac:(vm_compute; reflexivity)).
+      apply (vp_inv_upd _ _ _ _ _ _ _ a5_idx _ ltac:(vm_compute; reflexivity)).
       unfold vp_inv. repeat (split; [ assumption | ]). exact Hfr. }
-    destruct Hinv5 as (Hsp5 & Hs05 & Hs25 & Hs35 & Hs45 & Hs55 & Hs65 & Hfr5).
+    destruct Hinv5 as (Hsp5 & Hs05 & Hs25 & Hs35 & Hs45 & Hs55 & Hs65 & Hs75 & Hs85 & Hfr5).
     (* ---- 0x54e  c.j 0x554 ---- *)
     assert (Etgt514 : (mword_of_int 0x554 : mword 64)
                       = add_vec (mword_of_int 0x54e : mword 64)
@@ -1059,8 +1077,8 @@ Section UkCatVprintf.
                       (mword_of_int (Z.of_nat (S i)) : mword 64)]> m5).
     assert (Ha56 : m6 !!! Regidx a5_idx = mword_of_int (Z.of_nat (S i)))
       by exact (upd_eq m5 (Regidx a5_idx) (regval_into_reg _)).
-    assert (Hinv6 : vp_inv m0 m6 sp0 a fd i)
-      by (apply (vp_inv_upd _ _ _ _ _ _ a5_idx _ ltac:(vm_compute; reflexivity));
+    assert (Hinv6 : vp_inv m0 m6 sp0 a fd ap i)
+      by (apply (vp_inv_upd _ _ _ _ _ _ _ a5_idx _ ltac:(vm_compute; reflexivity));
           unfold vp_inv; repeat (split; [ assumption | ]); exact Hfr5).
     (* ---- 0x558  c.mv s2,a5 -- the index moves ---- *)
     assert (Ez6 : add_vec zero_reg (m6 !!! Regidx a5_idx)
@@ -1079,8 +1097,8 @@ Section UkCatVprintf.
     iIntros (h10) "Hrun".
     set (m7 := <[Regidx s2_idx
                  := regval_into_reg (add_vec zero_reg (m6 !!! Regidx a5_idx))]> m6).
-    assert (Hinv7 : vp_inv m0 m7 sp0 a fd (S i))
-      by exact (vp_inv_bump m0 m6 sp0 a fd i (S i) _ Ez6 Hinv6).
+    assert (Hinv7 : vp_inv m0 m7 sp0 a fd ap (S i))
+      by exact (vp_inv_bump m0 m6 sp0 a fd ap i (S i) _ Ez6 Hinv6).
     assert (Ha57 : m7 !!! Regidx a5_idx = mword_of_int (Z.of_nat (S i))).
     { rewrite <- Ha56.
       exact (upd_ne m6 (Regidx s2_idx) (Regidx a5_idx) _
@@ -1099,14 +1117,14 @@ Section UkCatVprintf.
     iIntros (h11) "Hrun".
     set (m8 := <[Regidx a4_idx
                  := regval_into_reg (add_vec zero_reg (m7 !!! Regidx a5_idx))]> m7).
-    assert (Hinv8 : vp_inv m0 m8 sp0 a fd (S i))
-      by exact (vp_inv_upd m0 m7 sp0 a fd (S i) a4_idx _
+    assert (Hinv8 : vp_inv m0 m8 sp0 a fd ap (S i))
+      by exact (vp_inv_upd m0 m7 sp0 a fd ap (S i) a4_idx _
                   ltac:(vm_compute; reflexivity) Hinv7).
     assert (Ha58 : m8 !!! Regidx a5_idx = mword_of_int (Z.of_nat (S i))).
     { rewrite <- Ha57.
       exact (upd_ne m7 (Regidx a4_idx) (Regidx a5_idx) _
                ltac:(vm_compute; discriminate)). }
-    destruct Hinv8 as (Hsp8 & Hs08 & Hs28 & Hs38 & Hs48 & Hs58 & Hs68 & Hfr8).
+    destruct Hinv8 as (Hsp8 & Hs08 & Hs28 & Hs38 & Hs48 & Hs58 & Hs68 & Hs78 & Hs88 & Hfr8).
     (* ---- 0x55c  c.add a5,a5,s4 -- the pointer ---- *)
     assert (Eadd8 : add_vec (m8 !!! Regidx a5_idx) (m8 !!! Regidx s4_idx)
                     = mword_of_int (a + Z.of_nat (S i))).
@@ -1126,8 +1144,8 @@ Section UkCatVprintf.
                  := regval_into_reg
                       (add_vec (m8 !!! Regidx a5_idx)
                          (m8 !!! Regidx s4_idx))]> m8).
-    assert (Hinv9 : vp_inv m0 m9 sp0 a fd (S i)).
-    { apply (vp_inv_upd _ _ _ _ _ _ a5_idx _ ltac:(vm_compute; reflexivity)).
+    assert (Hinv9 : vp_inv m0 m9 sp0 a fd ap (S i)).
+    { apply (vp_inv_upd _ _ _ _ _ _ _ a5_idx _ ltac:(vm_compute; reflexivity)).
       unfold vp_inv. repeat (split; [ assumption | ]). exact Hfr8. }
     assert (Ha59 : m9 !!! Regidx a5_idx = mword_of_int (a + Z.of_nat (S i))).
     { rewrite (upd_eq m8 (Regidx a5_idx) (regval_into_reg _)). exact Eadd8. }
@@ -1157,7 +1175,7 @@ Section UkCatVprintf.
                   := regval_into_reg (zero_extend' 64 b1 : mword 64)]> m9).
     iApply ("Hcont" $! h13 m10 with "[] [] Hrun").
     { iPureIntro.
-      exact (vp_inv_upd m0 m9 sp0 a fd (S i) s1_idx _
+      exact (vp_inv_upd m0 m9 sp0 a fd ap (S i) s1_idx _
                ltac:(vm_compute; reflexivity) Hinv9). }
     { iPureIntro. rewrite /m10 (upd_eq m9 (Regidx s1_idx) (regval_into_reg _)).
       exact (zext8_moi b1). }
@@ -1176,7 +1194,7 @@ Section UkCatVprintf.
   (* [utext_str] carries its length.  cat's two loops in main are the       *)
   (* unbounded ones.                                                         *)
   (* --------------------------------------------------------------------- *)
-  Lemma wp_kcat_vprintf_loop (m0 : regfile) (sp0 fd : mword 64) (a : Z)
+  Lemma wp_kcat_vprintf_loop (m0 : regfile) (sp0 fd ap : mword 64) (a : Z)
       (len : nat) (f : nat -> mword 8) (k : nat) :
     0 <= a -> a + Z.of_nat len + 2 < 2 ^ 31 ->
     (forall j : nat, (j < len)%nat -> bv_unsigned (f j) <> 37) ->
@@ -1185,7 +1203,7 @@ Section UkCatVprintf.
     96 <= uint sp0 ->
     forall (i : nat) (h : CpuId) (m : regfile) (n : nat),
       (i + S k)%nat = len ->
-      vp_inv m0 m sp0 a fd i ->
+      vp_inv m0 m sp0 a fd ap i ->
       m !!! Regidx s1_idx = mword_of_int (bv_unsigned (f i)) ->
       cat_code γt -∗
       utext_str γt a len f -∗
@@ -1217,7 +1235,7 @@ Section UkCatVprintf.
     - (* the LAST character: the byte after it is the terminator *)
       assert (Ei : (S i)%nat = len) by lia.
       iDestruct (utext_str_nul with "Hstr") as "#Hnul".
-      iApply (wp_kcat_vprintf_step m0 sp0 fd a i (f i) ubyte0 h m n
+      iApply (wp_kcat_vprintf_step m0 sp0 fd ap a i (f i) ubyte0 h m n
                 Ha0 ltac:(lia) (Hpct i Hilt) Hinv Hs1
                 with "Hcode [] Hrun").
       { rewrite Ei. iExact "Hnul". }
@@ -1238,14 +1256,14 @@ Section UkCatVprintf.
                 with "[] Hrun").
       { iApply (uis_cat_562 with "Hcode"). }
       iIntros (h2) "Hrun".
-      destruct Hinv1 as (Hsp1 & _ & _ & _ & _ & _ & _ & Hfr1).
+      destruct Hinv1 as (Hsp1 & _ & _ & _ & _ & _ & _ & _ & _ & Hfr1).
       iApply (wp_kcat_vprintf_epi h2 m1 m0 sp0 (4 + n)
                 Hsp1 Hsp0 Hal8 Hlo Hfr1
                 with "Hcode Hwra Hws0 Hws1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw11 Hw12 Hrun Hcont").
     - (* a BODY character: the byte after it is one too *)
       assert (Hslt : (S i < len)%nat) by lia.
       iDestruct (utext_str_byte γt a len f (S i) Hslt with "Hstr") as "#Hb1".
-      iApply (wp_kcat_vprintf_step m0 sp0 fd a i (f i) (f (S i)) h m n
+      iApply (wp_kcat_vprintf_step m0 sp0 fd ap a i (f i) (f (S i)) h m n
                 Ha0 ltac:(lia) (Hpct i Hilt) Hinv Hs1
                 with "Hcode Hb1 Hrun").
       iIntros (h1 m1) "%Hinv1 %Hs11 Hrun".
@@ -1286,7 +1304,11 @@ Section UkCatVprintf.
 
 
   (* --------------------------------------------------------------------- *)
-  (* vprintf(fd, fmt, ap) @0x510, for a format string with no '%'.           *)
+  (* THE PROLOGUE, 0x510 -> 0x566.  Forty instructions that say nothing     *)
+  (* about the format string: the frame is carved, twelve callee-saved      *)
+  (* words are spilled, the four registers the loop reads are parked, and    *)
+  (* fmt[0] is in s1.  Both top-level entries -- the plain one below and     *)
+  (* the one that walks a '%s' -- start here, so it is proved once.          *)
   (*                                                                        *)
   (* The contract asks for a NON-EMPTY string.  cat prints four literals    *)
   (* and none of them is empty, and taking [0 < len] deletes the whole       *)
@@ -1294,22 +1316,36 @@ Section UkCatVprintf.
   (* never spilled.  [wp_kcat_vprintf_epi0] still states that arm's shape,  *)
   (* so re-admitting it later is a branch, not a rewrite.                    *)
   (* --------------------------------------------------------------------- *)
-  Lemma wp_kcat_vprintf (a : Z) (len : nat) (f : nat -> mword 8)
+  Lemma wp_kcat_vprintf_pro (a : Z) (len : nat) (f : nat -> mword 8)
       (h : CpuId) (m : regfile) (n : nat) :
     0 <= a -> a + Z.of_nat len + 2 < 2 ^ 31 ->
     (0 < len)%nat ->
-    (forall j : nat, (j < len)%nat -> bv_unsigned (f j) <> 37) ->
     m !!! Regidx a1_idx = mword_of_int a ->
     cat_code γt -∗
     utext_str γt a len f -∗
     urun γt γd γs h m (mword_of_int CatSyms.vprintf) (12 + (4 + n)) -∗
-    (∀ (h' : CpuId) (m' : regfile),
-       ⌜ ucallee_saved m m' ⌝ -∗
-       urun γt γd γs h' m' (ret_pc (m !!! Regidx ra_idx)) (12 + (4 + n)) -∗
+    (∀ (h' : CpuId) (m' : regfile) (fd ap : mword 64),
+       ⌜ uint (m !!! Regidx csp_rs1) mod 8 = 0 ⌝ -∗
+       ⌜ 96 <= uint (m !!! Regidx csp_rs1) ⌝ -∗
+       ⌜ vp_inv m m' (m !!! Regidx csp_rs1) a fd ap 0%nat ⌝ -∗
+       ⌜ m' !!! Regidx s1_idx = mword_of_int (bv_unsigned (f 0%nat)) ⌝ -∗
+       uword γd (uint (m !!! Regidx csp_rs1) - 8) (m !!! Regidx ra_idx) -∗
+       uword γd (uint (m !!! Regidx csp_rs1) - 16) (m !!! Regidx s0_idx) -∗
+       uword γd (uint (m !!! Regidx csp_rs1) - 24) (m !!! Regidx s1_idx) -∗
+       uword γd (uint (m !!! Regidx csp_rs1) - 32) (m !!! Regidx s2_idx) -∗
+       uword γd (uint (m !!! Regidx csp_rs1) - 40) (m !!! Regidx s3_idx) -∗
+       uword γd (uint (m !!! Regidx csp_rs1) - 48) (m !!! Regidx s4_idx) -∗
+       uword γd (uint (m !!! Regidx csp_rs1) - 56) (m !!! Regidx s5_idx) -∗
+       uword γd (uint (m !!! Regidx csp_rs1) - 64) (m !!! Regidx s6_idx) -∗
+       uword γd (uint (m !!! Regidx csp_rs1) - 72) (m !!! Regidx s7_idx) -∗
+       uword γd (uint (m !!! Regidx csp_rs1) - 80) (m !!! Regidx s8_idx) -∗
+       (∃ w : mword 64, uword γd (uint (m !!! Regidx csp_rs1) - 88) w) -∗
+       (∃ w : mword 64, uword γd (uint (m !!! Regidx csp_rs1) - 96) w) -∗
+       urun γt γd γs h' m' (mword_of_int 0x566) (4 + n) -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Ha0 Habnd Hlen Hpct Ha1.
+    intros Ha0 Habnd Hlen Ha1.
     iIntros "#Hcode #Hstr Hrun Hcont".
     iDestruct (utext_str_nonul with "Hstr") as %Hnn.
     destruct cat_syms_pins
@@ -1892,8 +1928,30 @@ Section UkCatVprintf.
       rewrite /mp4 (upd_eq mp3 (Regidx s6_idx) _).
       reflexivity.
     }
+    assert (Hz_s7_idx : mp11 !!! Regidx s7_idx
+                        = add_vec zero_reg (mp5 !!! Regidx a2_idx)).
+    {
+      rewrite /mp11 (upd_ne mp10 (Regidx s8_idx) (Regidx s7_idx) _
+                 ltac:(vm_compute; discriminate)).
+      rewrite /mp10 (upd_ne mp9 (Regidx s5_idx) (Regidx s7_idx) _
+                 ltac:(vm_compute; discriminate)).
+      rewrite /mp9 (upd_ne mp8 (Regidx a4_idx) (Regidx s7_idx) _
+                 ltac:(vm_compute; discriminate)).
+      rewrite /mp8 (upd_ne mp7 (Regidx s2_idx) (Regidx s7_idx) _
+                 ltac:(vm_compute; discriminate)).
+      rewrite /mp7 (upd_ne mp6 (Regidx s3_idx) (Regidx s7_idx) _
+                 ltac:(vm_compute; discriminate)).
+      rewrite /mp6 (upd_eq mp5 (Regidx s7_idx) _).
+      reflexivity.
+    }
+    assert (Hz_s8_idx : mp11 !!! Regidx s8_idx = mword_of_int 100).
+    {
+      rewrite /mp11 (upd_eq mp10 (Regidx s8_idx) _).
+      rewrite add_vec_zero_l. apply bv_eq; vm_compute; reflexivity.
+    }
     assert (Hinv0 : vp_inv m mp11 sp0 a
-                      (add_vec zero_reg (mp3 !!! Regidx a0_idx)) 0%nat).
+                      (add_vec zero_reg (mp3 !!! Regidx a0_idx))
+                      (add_vec zero_reg (mp5 !!! Regidx a2_idx)) 0%nat).
     { unfold vp_inv.
       split; [ exact Hz_csp_rs1 | ].
       split; [ exact Hz_s0_idx | ].
@@ -1902,6 +1960,8 @@ Section UkCatVprintf.
       split; [ exact Hz_s4_idx | ].
       split; [ exact Hz_s5_idx | ].
       split; [ exact Hz_s6_idx | ].
+      split; [ exact Hz_s7_idx | ].
+      split; [ exact Hz_s8_idx | ].
       intros r Hr Hset.
       rewrite /mp11 (upd_ne mp10 (Regidx s8_idx) (Regidx r) _
                  ltac:(apply not_eq_sym; apply uidx_ne;
@@ -1967,11 +2027,53 @@ Section UkCatVprintf.
       rewrite /mp4 (upd_ne mp3 (Regidx s6_idx) (Regidx s1_idx) _
                  ltac:(vm_compute; discriminate)).
       reflexivity. }
+    iApply ("Hcont" $! h22 mp11
+              (add_vec zero_reg (mp3 !!! Regidx a0_idx))
+              (add_vec zero_reg (mp5 !!! Regidx a2_idx))
+              with "[] [] [] [] Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10
+                    Hw11 Hw12 Hrun").
+    - iPureIntro. exact Hal8.
+    - iPureIntro. exact Hlo.
+    - iPureIntro. exact Hinv0.
+    - iPureIntro. exact Hs1z.
+  Qed.
+
+
+  (* --------------------------------------------------------------------- *)
+  (* vprintf(fd, fmt, ap) @0x510, for a format string with no '%'.           *)
+  (*                                                                        *)
+  (* The contract asks for a NON-EMPTY string.  cat prints four literals    *)
+  (* and none of them is empty, and taking [0 < len] deletes the whole       *)
+  (* 0x51e arm -- the one that jumps straight to the shared tail with s2..s8 *)
+  (* never spilled.  [wp_kcat_vprintf_epi0] still states that arm's shape,  *)
+  (* so re-admitting it later is a branch, not a rewrite.                    *)
+  (* --------------------------------------------------------------------- *)
+  Lemma wp_kcat_vprintf (a : Z) (len : nat) (f : nat -> mword 8)
+      (h : CpuId) (m : regfile) (n : nat) :
+    0 <= a -> a + Z.of_nat len + 2 < 2 ^ 31 ->
+    (0 < len)%nat ->
+    (forall j : nat, (j < len)%nat -> bv_unsigned (f j) <> 37) ->
+    m !!! Regidx a1_idx = mword_of_int a ->
+    cat_code γt -∗
+    utext_str γt a len f -∗
+    urun γt γd γs h m (mword_of_int CatSyms.vprintf) (12 + (4 + n)) -∗
+    (∀ (h' : CpuId) (m' : regfile),
+       ⌜ ucallee_saved m m' ⌝ -∗
+       urun γt γd γs h' m' (ret_pc (m !!! Regidx ra_idx)) (12 + (4 + n)) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Ha0 Habnd Hlen Hpct Ha1.
+    iIntros "#Hcode #Hstr Hrun Hcont".
+    iApply (wp_kcat_vprintf_pro a len f h m n Ha0 Habnd Hlen Ha1
+              with "Hcode Hstr Hrun").
+    iIntros (h' m' fd ap) "%Hal8 %Hlo %Hinv0 %Hs1z
+                           Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10
+                           Hw11 Hw12 Hrun".
     assert (Hk0 : (0 + S (len - 1))%nat = len) by lia.
-    iApply (wp_kcat_vprintf_loop m sp0
-              (add_vec zero_reg (mp3 !!! Regidx a0_idx)) a len f (len - 1)%nat
-              Ha0 Habnd Hpct Hsp Hal8 Hlo 0%nat h22 mp11 n
-              Hk0 Hinv0 Hs1z
+    iApply (wp_kcat_vprintf_loop m (m !!! Regidx csp_rs1) fd ap a len f
+              (len - 1)%nat Ha0 Habnd Hpct eq_refl Hal8 Hlo
+              0%nat h' m' n Hk0 Hinv0 Hs1z
               with "Hcode Hstr Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hrun Hcont").
   Qed.
 
