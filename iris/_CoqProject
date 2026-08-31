@@ -311,6 +311,7 @@ UkProgAbi.v
 UkInit.v
 UkInitPutc.v
 UkInitVprintf.v
+UkInitPrintf.v
 UserMemArms.v
 UserClassify.v
 UserClassifyAsm.v
