@@ -301,6 +301,8 @@ UCodeInit.v
 # Also the first to reach vprintf's %s arm.
 UCodeCat.v
 UkCat.v
+UkCatPutc.v
+UkCatVprintf.v
 # The register-index arithmetic every returning function proof needs to
 # state and discharge a [ucallee_saved] post.  Program-independent, and
 # not Iris at all.
