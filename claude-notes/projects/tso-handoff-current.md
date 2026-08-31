@@ -364,3 +364,20 @@ accessors that expose `inode_shr_gen` through a round trip (SpecFilestat/
 SpecFileread pay-accessors, SpecIlock/SpecIunlock posts) should expose
 the GENLO form instead so the return re-ties lo, floors held outside.
 Pre-cutover every lo is 0 (live_frac0 kit; ctx_floor _ 0 free).
+
+## A6.145 4b-iii pattern addendum (pin-on-exit)
+
+The AU s-rows do NOT need genlo binders: `live_slot_norm_of_lv` now PINS
+the caller's slice against the pool's zero-epoch residual on the way out
+(`live_frac0_pin`), so every pool-touching AU RETURNS `live_frac0` rows
+(one-sided upgrade, no new binders).  Ride-only s-rows (never pool-
+touched, e.g. `iref_upgrade_store_au`) stay `live_frac`.  Downstream a
+proof rebuilds the floored bundle from a returned frac0 row via
+`live_frac0_fracc` (floor 0 free).  New kit since the last note:
+`live_slot_live_genlo`, `iref_share_lookup_au_lo` (identity-preserving
+look), `live_frac0_absorb/pin/join/split/bump`, `iref_tok0` (+`_tok`).
+CURRENT RED (same 3 adaptations each): ProofIunlockput:279 ProofIput:1006
+ProofIreclaim:1687 ProofIget:1450 ProofCreateFreshTy:572
+ProofFilestat:531 ProofSysOpenParts:715 ProofSysMkdir:1272
+ProofSysMknod:1735 ProofSysChdir:1545 ProofFileread:1892 ProofNamex:3129
+ProofKexecA:1152.
