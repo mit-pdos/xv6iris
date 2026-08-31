@@ -2190,7 +2190,20 @@ frozen touched; all EC2-green, zero `Admitted`, zero new `Axiom`):
   `uslot_uslot_fs : uslot W -∗ uslot_fs γm W` (Löb; audit = the standing
   `resv` pair, no funext), `uexec_ret_fs_of`, `ukont_fs_ukont`,
   `urun_fs_urun`, `uheap_ustrq`.  SEALED: `FDROW_UKFS_ENGINE.
-  wp_uk_ecall_fs`, the enriched ecall leaf (stage P2).
+  wp_uk_ecall_fs`, the enriched ecall leaf (stage P2) — DISCHARGED by
+  `UkRunSysFs.v` over the smaller `FDROW_UKFS_STEP`.
+- `iris/UkRunSysFs.v` (stage P2, landed) — the enriched ecall leaf:
+  `UkRunSys.wp_uk_ecall_quiet`'s shape on `urun_fs`, with the caller's
+  `mcur` half deposited into the arm's RIGHT disjunct and handed back
+  stepped by `ufs_step_at` AT THE CALLER'S OWN STRING (the `ustrq` /
+  `ufs_step_pin` collapse).  Plus the enriched `ukc_fs`, the enriched
+  slot at the bumped trap-out key, `UkRun`'s two closes at `urun_fs`,
+  and the quiet-row reading of `uenr_dom`.  ONE seal remains,
+  `FDROW_UKFS_STEP.wp_uk_ecall_fs_step` = `UkStep.wp_uk_ecall` with
+  `uvb`/`uexec_ret` swapped for their enriched twins; the functor
+  `FdRowUkfsEngineOfStep … <: FDROW_UKFS_ENGINE` is the compiled receipt
+  that nothing else is owed.  The file header measures why the plain
+  engine cannot be reused (see the P2 row).
 - `iris/FdRowPilot.v` — the era-0 seed (`era0_seed`, INSTANTIATED
   against the checked image: `era0_seed_boot`, `fsimg_console_miss`) and
   the pilot theorems: `pilot_console_pure` (**Closed under the global
@@ -2227,16 +2240,70 @@ AS-LANDED FINDINGS:
    And `assert (… /\ …) as [-> ->] by (split; congruence)` beats nested
    `injection` on `MkAnode`/`ADir` equations (recursion depth is
    version-dependent).
+5. **A PLAIN-RETURN ARGUMENT IS A GAP PREMISE FOR AN ENRICHED CALLER**
+   (P2's measurement).  `UkStep.wp_uk_ecall` and `uk_ecall_post_fetch`
+   take `uexec_ret uecall_scause W0` as an ARGUMENT.  A leaf can route
+   an enriched bundle through the plain engine and have its own trap-out
+   closure discard that argument — but it must still INHABIT it, and its
+   ecall arm says "plain-safe after the syscall at every `r`", which an
+   enriched-only caller is not (`ukont ⊬ ukont_fs`).  So "reuse the
+   engine and smuggle the enrichment" is not merely expensive, it is
+   unprovable; the engine has to be generic in the slot family, which is
+   upstream ask (4).  The same shape is worth checking before any future
+   parallel-contract lane assumes an upstream driver is reusable: ask
+   first which of its ARGUMENTS the parallel form can still inhabit.
 
 THE STAGES (prover lanes; budgets keyed to the landed analogues):
 
-- [ ] **P2 — the engine leaf** (discharges `FDROW_UKFS_ENGINE`).  A
-  `UkStep.wp_uk_ecall` twin fired at `uvb_fs` (the trap-out hands
-  `uexec_ret_fs`; the leaf takes the RIGHT disjunct with the caller's
-  deposit) + the `wp_uk_ecall_fs` wrapper (open `urun_fs`, pin the path
-  via `uheap_ustrq`, re-close with `urun_close_upd`'s twin).  BUDGET:
-  `UkStep.wp_uk_ecall` measures 126 lines and `wp_uk_ecall_window` ~100;
-  budget 300 with the re-close plumbing.  Opus-sized, blocked on nothing.
+- [x] **P2 — the engine leaf** — AS LANDED (`iris/UkRunSysFs.v`, 352
+  lines of which 220 are statements+proofs; EC2-green, zero `Admitted`, zero new
+  `Axiom`, audit = the standing three).  **The wrapper is DISCHARGED and
+  the seal SHRANK; it did not vanish.**
+  - UNSEALED (all proven, no premise but the machine step):
+    `uvb_fs_x0`; `ukc_fs` / `uslot_fs_ukc` / `uslot_fs_bump_run` (the
+    enriched `ukc` and the enriched slot at the BUMPED trap-out key);
+    `urun_fs_close` / `urun_fs_close_upd` (`UkRun`'s closes at
+    `urun_fs`); `uenr_dom_num` / `uenr_dom_rows` (open = 15 and
+    mknod = 17 are neither exit nor fork and are QUIET rows, so the arm's
+    own case analysis lands on the enriched branch and
+    `usys_mem_ok_quiet` pins image/perm/break across the trap);
+    `ufs_step_at_blanket` / `ufs_step_pin` (owning `ustrq` collapses the
+    contract's `ufs_step` — which reads the path off the image, with the
+    unreadable-string escape into the −1 blanket — onto the CALLER's
+    `pl`, which is what makes the returned tie usable); and
+    `wp_uk_ecall_fs_of_step`, the leaf itself: open `urun_fs`, pin the
+    path, take the arm's RIGHT (deposit) disjunct with the caller's
+    `mcur`, read the quiet row, re-close at `<[a0 := r]> m` / `pc+4`.
+    `FDROW_UKFS_ENGINE` is then discharged by the compiled functor
+    `FdRowUkfsEngineOfStep (S : FDROW_UKFS_STEP) <: FDROW_UKFS_ENGINE`.
+  - STILL SEALED, one statement: `FDROW_UKFS_STEP.wp_uk_ecall_fs_step` =
+    `UkStep.wp_uk_ecall` with `uvb → uvb_fs` and
+    `uexec_ret → uexec_ret_fs`.  Two type substitutions; ZERO fs content.
+  - WHY IT COULD NOT BE STATED AWAY (the measured obstacle; see the
+    file header for the full argument).  `UkStep.wp_uk_ecall` takes the
+    PLAIN return as an argument, and `uk_ecall_post_fetch` — the only
+    trap-out in the tree — demands it too.  That argument must be
+    INHABITED even when the leaf's own trap-out closure discards it, and
+    its ecall arm is "the process is PLAIN-safe after the syscall at
+    every `r`": `uslot (bump W0 r M' π' szv')`.  The pilot's caller is
+    enriched-safe only (its continuation eats `urun_fs`), and `urun_fs`
+    cannot be rebuilt from the plain `uvb` a plain slot receives —
+    `ukont ⊬ ukont_fs`, i.e. `uslot_fs ⊬ uslot`, the direction AS-LANDED
+    finding 1 already refutes.  Nor can the enrichment reach the
+    trap-out by another channel: `uk_step_obl` re-binds `C`/`pt`/`Rut`
+    universally (so a `ukb_fs` fixed at one triple cannot ride `Kc`); the
+    bundle's own promise slot is `ukb`-typed; and the `Rut` slot — the
+    one channel re-bound WITH the bundle — is later-free in `uvb_F`
+    while the enriched promise is `ukont_fs = ▷ ukb_fs`.
+  - BUDGET vs MEASURED: budget 300; the pilot content came in at 220
+    (391-line file, 71-line header + Require block + section prose).
+    The transitional alternative (copy the engine at the enriched
+    fixpoint) measures `uvb_elim` 24 + `uk_step_obl`/`uk_ih`/`uk_payload`
+    40 + `uk_psi_active` 62 + `uk_arm_intr` ~60 + `wp_uk_step_gen` 207 +
+    `wp_uk_step` 10 + `uk_ecall_post_fetch` 229 + `wp_uk_ecall` 126
+    ≈ 760 lines of VERBATIM upstream duplication — past the 3× stop
+    rule, and a maintenance liability the parallel-form discipline
+    exists to avoid.  Filed as upstream ask (4) below instead.
 - [ ] **P3 — the era-0 mint** at the userinit park: allocate the `mcur`
   pair (`mcur_alloc`), seed = `era0_seed_boot` at the boot snapshot's S,
   user half + seed into init's entry deposit, kernel half parked beside
@@ -2269,3 +2336,22 @@ in `UexecRet.v` (conservative — the bridge is the compiled receipt;
 recommend YES); (2) the era-0 entry deposit at the userinit park (with
 P3); (3) the pure return-range conjuncts on open/mknod's rows
 (WINDOW-LEAF-style, independent; recommend YES).
+
+(4) **NEW, filed by P2 and the cheapest of the four — THE X-GENERIC
+ENGINE.**  Parameterise `UkStep.v`'s §3 (`uk_step_obl` / `uk_ih` /
+`uk_payload`), §5 (`wp_uk_step_gen` / `wp_uk_step`) and §8
+(`uk_ecall_post_fetch` / `wp_uk_ecall`) over the slot family instead of
+hardwiring `UexecRet`'s: a section `Context (RetF : (uvis -d> iPropO Σ)
+-> mword 64 -> uvis -> iProp Σ) (X : uvis -d> iPropO Σ)` with the TWO
+facts the engine actually uses — `X W ⊣⊢ ∀ h C pt Rut, … -∗ uvb_F' RetF
+X … -∗ WP Loop` (the fixpoint unfolding, used at the interrupt arm via
+`uslot_run`) and `sc ≠ uecall_scause → RetF X sc W ⊣⊢ X W` (the
+transparent arm, `uexec_ret_transparent`).  NO engine proof inspects
+either beyond those two; `uvb`/`ukb`/`uexec_ret` become
+`uvb_F'`/`ukb_F'`/`RetF X` throughout and the plain instance is
+`(uexec_ret_F, uslot)`, verbatim.  With it, `FDROW_UKFS_STEP` is
+`wp_uk_ecall` at `(uexec_ret_fs_F γm, uslot_fs γm)` — one instantiation,
+no copy — and P5's "one `urun_fs` twin per leaf kind" collapses to zero
+for every leaf, not just this one.  RECOMMEND YES; it is strictly
+smaller than ask (1) and independent of it (it does not change any
+landed statement, only generalises).

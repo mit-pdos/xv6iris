@@ -1719,8 +1719,14 @@ UkSh.v
 # FD-ROW PILOT (fs-syscall-specs; design/fd-row-pilot.md): the enriched
 # u-tier syscall row.  FsFdMirror = the pure mirror + step table;
 # UexecRetFs = the parallel enriched trap contract + the conservativity
-# bridge + the engine seal; FdRowPilot = the era-0 pilot theorems (an
+# bridge + the engine seal; UkRunSysFs = the enriched ecall leaf (the
+# deposit arm taken, the row read at the caller's own string, the re-close
+# on urun_fs) over ONE remaining seal, FDROW_UKFS_STEP -- UkStep.wp_uk_ecall
+# with uvb/uexec_ret swapped for their enriched twins, which the plain
+# engine cannot supply (its file header measures why, and files the
+# X-generic-engine ask); FdRowPilot = the era-0 pilot theorems (an
 # image-check consumer -- the leaf rule applies, nothing may require it).
 FsFdMirror.v
 UexecRetFs.v
+UkRunSysFs.v
 FdRowPilot.v
