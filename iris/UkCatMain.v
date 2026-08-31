@@ -734,4 +734,113 @@ Section UkCatMain.
       split; [ exact Hsp10 | ]. split; [ reflexivity | ]. exact Hs3_10.
   Qed.
 
+  (* --------------------------------------------------------------------- *)
+  (* THE LOOP, by induction on the files LEFT.  [k+1] of them remain; the    *)
+  (* [bne s2,s3] at 0xc2 is what decides, and at [k = 0] the cursor has      *)
+  (* reached the end of argv and main falls into its exit.                   *)
+  (*                                                                        *)
+  (* An ordinary induction, not a Löb: argc bounds the count and [uargv]     *)
+  (* carries it.                                                             *)
+  (* --------------------------------------------------------------------- *)
+  Lemma wp_kcat_main_loop (sp0 : mword 64) (av : Z) (args : list uarg)
+      (k : nat) :
+    0 <= av -> av + 8 * Z.of_nat (length args) <= 2 ^ 38 ->
+    (forall (j : nat) (g : uarg), args !! j = Some g -> ua_ptr g <> 0) ->
+    forall (i : nat) (h : CpuId) (m : regfile) (f : nat -> bv 8) (n : nat),
+      (i + S k)%nat = length args ->
+      cm_inv sp0 av (length args) i m ->
+      cat_code γt -∗
+      cat_rodata γt -∗
+      uargv γd av args -∗
+      ubytes γd CatSyms.buf 512 f -∗
+      urun γt γd γs h m (mword_of_int 0xa6) (8 + (10 + (12 + (4 + n)))) -∗
+      WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hav0 Havhi Hptr.
+    induction k as [| k IH ];
+      intros i h m f n Hik Hinv;
+      iIntros "#Hcode #Hro #Hargv Hbuf Hrun";
+      destruct cat_syms_pins
+        as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hexit);
+      iApply (wp_kcat_main_body sp0 av args i h m f n Hav0 Havhi Hptr
+                ltac:(lia) Hinv with "Hcode Hro Hargv Hbuf Hrun");
+      iIntros (h1 m1 f1) "%Hinv1 Hbuf Hrun";
+      pose proof Hinv1 as Hd1;
+      destruct Hd1 as (Hsp1 & Hs2_1 & Hs3_1);
+      assert (Hlo2 : 0 <= av + 8 * Z.of_nat (S i) < Z64) by (unfold Z64; lia);
+      assert (Hlo3 : 0 <= av + 8 * Z.of_nat (length args) < Z64)
+        by (unfold Z64; lia).
+    - (* the LAST file: s2 has caught s3 ---- *)
+      assert (Heq : (S i)%nat = length args) by lia.
+      assert (Hnt : false
+                    = uv_btaken BNE (m1 !!! Regidx s2_idx)
+                        (m1 !!! Regidx s3_idx)).
+      { rewrite Hs2_1 Hs3_1 Heq. cbn [uv_btaken].
+        rewrite (moi_neq_vec (av + 8 * Z.of_nat (length args))
+                   (av + 8 * Z.of_nat (length args)) Hlo3 Hlo3).
+        rewrite Z.eqb_refl. reflexivity. }
+      iApply (wp_uk_btype γt γd γs h1 m1 (mword_of_int 0xc2)
+                (mword_of_int 8164 : mword 13) s3_idx s2_idx BNE false
+                (add_vec (mword_of_int 0xc2 : mword 64)
+                   (sign_extend' 64 (mword_of_int 8164 : mword 13)))
+                (8 + (10 + (12 + (4 + n)))) Hnt eq_refl ltac:(discriminate)
+                with "[] Hrun").
+      { iApply (uis_cat_c2 with "Hcode"). }
+      assert (Ec2 : add_vec_int (mword_of_int 0xc2 : mword 64) 4
+                    = mword_of_int 0xc6)
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite Ec2.
+      iIntros (h2) "Hrun".
+      (* ---- 0xc6  c.li a0,0 ; 0xc8  jal exit ---- *)
+      iApply (wp_uk_cli γt γd γs h2 m1 (mword_of_int 0xc6)
+                (mword_of_int 0 : mword 6) a0_idx (8 + (10 + (12 + (4 + n))))
+                ltac:(unfold unot_sp; vm_compute; discriminate)
+                ltac:(vm_compute; discriminate)
+                with "[] Hrun").
+      { iApply (uis_cat_c6 with "Hcode"). }
+      assert (Ec6 : add_vec_int (mword_of_int 0xc6 : mword 64) 2
+                    = mword_of_int 0xc8)
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite Ec6.
+      iIntros (h3) "Hrun".
+      iApply (wp_uk_jal γt γd γs h3 _ (mword_of_int 0xc8)
+                (mword_of_int 740 : mword 21) ra_idx
+                (mword_of_int CatSyms.exit) (mword_of_int 0xcc)
+                (8 + (10 + (12 + (4 + n))))
+                ltac:(unfold unot_sp; vm_compute; discriminate)
+                ltac:(vm_compute; discriminate)
+                ltac:(rewrite Hexit; apply bv_eq; vm_compute; reflexivity)
+                ltac:(apply bv_eq; vm_compute; reflexivity)
+                ltac:(rewrite Hexit; vm_compute; reflexivity)
+                with "[] Hrun").
+      { iApply (uis_cat_c8 with "Hcode"). }
+      iIntros (h4) "Hrun".
+      iApply (wp_kcat_exit γt γd γs h4 _ (8 + (10 + (12 + (4 + n))))
+                with "Hcode Hrun").
+    - (* more files to come ---- *)
+      assert (Hne : (S i)%nat <> length args) by lia.
+      assert (Ht : true
+                   = uv_btaken BNE (m1 !!! Regidx s2_idx)
+                       (m1 !!! Regidx s3_idx)).
+      { rewrite Hs2_1 Hs3_1. cbn [uv_btaken].
+        rewrite (moi_neq_vec (av + 8 * Z.of_nat (S i))
+                   (av + 8 * Z.of_nat (length args)) Hlo2 Hlo3).
+        destruct (Z.eqb_spec (av + 8 * Z.of_nat (S i))
+                    (av + 8 * Z.of_nat (length args))) as [He | _];
+          [ exfalso; apply Hne; lia | reflexivity ]. }
+      assert (Etgt : add_vec (mword_of_int 0xc2 : mword 64)
+                       (sign_extend' 64 (mword_of_int 8164 : mword 13))
+                     = mword_of_int 0xa6)
+        by (apply bv_eq; vm_compute; reflexivity).
+      iApply (wp_uk_btype γt γd γs h1 m1 (mword_of_int 0xc2)
+                (mword_of_int 8164 : mword 13) s3_idx s2_idx BNE true
+                (mword_of_int 0xa6) (8 + (10 + (12 + (4 + n)))) Ht
+                (eq_sym Etgt) ltac:(intros _; vm_compute; reflexivity)
+                with "[] Hrun").
+      { iApply (uis_cat_c2 with "Hcode"). }
+      iIntros (h2) "Hrun".
+      iApply (IH (S i) h2 m1 f1 n ltac:(lia) Hinv1
+                with "Hcode Hro Hargv Hbuf Hrun").
+  Qed.
+
 End UkCatMain.
