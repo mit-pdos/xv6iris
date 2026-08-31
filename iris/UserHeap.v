@@ -617,6 +617,30 @@ Section UserHeap.
     split; [ exact (Hw a (mk_is_Some _ _ HMd)) | exact (Hcan a (mk_is_Some _ _ HM)) ].
   Qed.
 
+  (* A RUN a program owns is a run the IMAGE holds, and it does not wrap.
+     This is what a syscall row based at a user pointer needs before its
+     write can be absorbed: the row names addresses through [add_vec_int]
+     and the heap through plain [Z] addition, and the two agree exactly
+     because every owned address is below MAXVA. *)
+  Lemma uheap_ubytes_img (γt γd γs : gname) (M : gmap Z (bv 8))
+      (pm : gmap (mword 27) uperm) (a : Z) (n : nat) (f : nat -> bv 8) :
+    uheap γt γd γs M pm -∗ ubytes γd a n f -∗
+    ⌜ forall k : nat, (k < n)%nat ->
+        M !! (a + Z.of_nat k)%Z = Some (f k)
+        /\ 0 <= (a + Z.of_nat k)%Z < 2 ^ 38 ⌝.
+  Proof.
+    iIntros "Hheap Hbs".
+    iInduction n as [ | k IH ] "IH" forall (f).
+    { iPureIntro. intros j Hj. exfalso. lia. }
+    rewrite /ubytes /ubytesq seq_S big_sepL_app /=.
+    iDestruct "Hbs" as "[Hlo [Hhi _]]".
+    iDestruct ("IH" $! f with "Hheap Hlo") as %Hlo.
+    iDestruct (uheap_ubyte with "Hheap Hhi") as %(HM & _ & Hbnd).
+    iPureIntro. intros j Hj.
+    destruct (decide (j = k)) as [-> | Hne];
+      [ exact (conj HM Hbnd) | exact (Hlo j ltac:(lia)) ].
+  Qed.
+
   (* THE STORE.  An exclusively-owned data byte may be replaced and the
      key's image moves with it.  The text half is untouched, and it stays a
      SUBMAP because the two halves are disjoint -- which is the whole reason

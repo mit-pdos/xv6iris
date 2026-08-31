@@ -29,7 +29,10 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import UsysMemOk UexecSlot UexecRet.
 Require Import ProcGeom.   (* [tf_arg_idx] -- wait's row is based at a0 *)
+Require Import UserPtTree. (* [umem_wr_write] / [umem_write_prefix] *)
 Require Import UkStep.
+Require Import UmodeArith.  (* [moi_add_l] / [uint_moi]: read's row addresses
+                               through [add_vec_int], the heap through [Z] *)
 Require Import UserHeap.
 Require Import TsoCtx.
 Local Open Scope Z_scope.
@@ -114,6 +117,121 @@ Section UkRunSys.
   (* ecall, at exit.  The process never comes back, so it owes NOTHING --  *)
   (* not even a continuation.  This is the only leaf with no successor.    *)
   (* ------------------------------------------------------------------- *)
+
+  (* ------------------------------------------------------------------- *)
+  (* ecall, at read -- THE FIRST SYSCALL IN THIS TIER THAT WRITES USER     *)
+  (* MEMORY.                                                              *)
+  (*                                                                      *)
+  (* [UsysMemOk]'s read row says the kernel wrote SOME [d] bytes at        *)
+  (* argument 1, no more than the count at argument 2, and left the        *)
+  (* permission map and the break alone.  It does not say WHICH bytes, and *)
+  (* it does not tie [d] to the return value -- so this leaf does not      *)
+  (* either.  What it does say is the only thing a caller can use: hand in *)
+  (* the whole count as a run you own, get the whole count back at SOME    *)
+  (* contents.                                                            *)
+  (*                                                                      *)
+  (* OWNING THE WHOLE COUNT IS THE PREMISE, not a convenience.  The row    *)
+  (* licenses a write anywhere in [buf .. buf+cnt), so a caller that owned *)
+  (* less could not absorb it, and the heap would be left describing bytes *)
+  (* the kernel had changed underneath it.                                *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_uk_ecall_read (γt γd γs : gname) (h : CpuId) (m : regfile)
+      (pc : mword 64) (a : Z) (cnt : nat) (f : nat -> bv 8) (avail : nat) :
+    usysno m = USYS_read ->
+    m !!! Regidx (mword_of_int 11) = (mword_of_int a : mword 64) ->
+    bv_signed (subrange_vec_dec (m !!! Regidx (mword_of_int 12)) 31 0
+               : mword 32) = Z.of_nat cnt ->
+    is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
+    uinstr_is γt pc false (ECALL tt) -∗
+    ubytes γd a cnt f -∗
+    urun γt γd γs h m pc avail -∗
+    (∀ (h' : CpuId) (r : mword 64) (g : nat -> bv 8),
+       ubytes γd a cnt g -∗
+       urun γt γd γs h' (<[Regidx (mword_of_int 10) := r]> m)
+         (add_vec_int pc 4) avail -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hn Ha1 Hcnt Hal4.
+    iIntros "#Hi Hbs Hrun Hcont".
+    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
+    iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
+    (* the run is in the image, and does not wrap *)
+    iDestruct (uheap_ubytes_img with "Hheap Hbs") as %Himg.
+    iApply (UkStep.wp_uk_ecall C pt Rut pm sz Hlo Hpm M m pc Hui
+              (fun (s : mstate)
+                   (Hp : register_lookup cur_privilege s.(sregs) = User)
+                   (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
+                 UserExecFacts.goodmb_execute_ECALL_U UserFrame.Du_r UserFrame.Du_w
+                   s pc ltac:(vm_compute; reflexivity)
+                   ltac:(vm_compute; reflexivity) Hp Hc)
+              with "Hb").
+    rewrite (uexec_ret_ecall _ _ eq_refl).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz)) = USYS_read).
+    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    rewrite Hnum. cbv zeta.
+    destruct (decide (USYS_read = USYS_exit)) as [He | _];
+      [ exfalso; vm_compute in He; discriminate | ].
+    destruct (decide (USYS_read = USYS_fork)) as [He | _];
+      [ exfalso; vm_compute in He; discriminate | ].
+    iIntros (r M' pm' sz') "%Hok".
+    (* unfold the row down to its read arm *)
+    unfold usys_mem_ok in Hok.
+    destruct (decide (USYS_read = USYS_exec)) as [He | _];
+      [ exfalso; vm_compute in He; discriminate | ].
+    destruct (decide (USYS_read = USYS_sbrk)) as [He | _];
+      [ exfalso; vm_compute in He; discriminate | ].
+    destruct (decide (USYS_read = USYS_wait)) as [He | _];
+      [ exfalso; vm_compute in He; discriminate | ].
+    destruct (decide (USYS_read = USYS_pipe)) as [He | _];
+      [ exfalso; vm_compute in He; discriminate | ].
+    destruct (decide (USYS_read = USYS_read)) as [_ | Hne];
+      [ | exfalso; exact (Hne eq_refl) ].
+    destruct Hok as [(d & bs & Hdle & HM') [-> ->]].
+    (* the row's [d] is within the run the caller owns *)
+    cbn [uvis_tf uvis_of_run] in Hdle, HM'.
+    unfold usys_rdcount in Hdle. rewrite tf_of_arg2 in Hdle.
+    rewrite Hcnt in Hdle.
+    assert (Hdn : (d <= cnt)%nat) by lia.
+    rewrite tf_of_arg1 Ha1 in HM'.
+    (* ...so writing [d] of them is writing all [cnt], the tail unchanged *)
+    (* the row addresses through [add_vec_int], the heap through [Z] --
+       and they agree, because every owned address is below MAXVA *)
+    assert (Hwrap : forall k : nat, (k < d)%nat ->
+               uint (add_vec_int (mword_of_int a : mword 64) (Z.of_nat k))
+               = (a + Z.of_nat k)%Z).
+    { intros k Hk.
+      destruct (proj2 (Himg 0%nat ltac:(lia))) as [Ha0 _].
+      destruct (proj2 (Himg k ltac:(lia))) as [_ Hak].
+      assert (Ha64 : 0 <= a < Z64) by (unfold Z64; lia).
+      assert (Hak64 : 0 <= a + Z.of_nat k < Z64) by (unfold Z64; lia).
+      unfold add_vec_int.
+      rewrite moi_add_l (uint_moi a Ha64).
+      exact (uint_moi (a + Z.of_nat k) Hak64). }
+    rewrite (umem_wr_write M a d bs Hwrap) in HM'.
+    rewrite (umem_write_prefix M a cnt d bs f Hdn
+               ltac:(intros k Hk; exact (proj1 (Himg k Hk)))) in HM'.
+    subst M'.
+    (* the slot ends in a [WP], so it absorbs the heap's update -- which is
+       the only place the update CAN run, the row being what says how far
+       the image moved *)
+    iApply uslot_bupd.
+    iMod (uheap_store_run γt γd γs M pm a cnt f
+            (fun k => if decide (k < d)%nat then bs k else f k)
+            with "Hheap Hbs") as "[Hheap Hbs]".
+    iModIntro.
+    cbn [uvis_M uvis_perm uvis_of_run].
+    rewrite (uslot_bump_run m pc M
+               (umem_write M a cnt
+                  (fun k => if decide (k < d)%nat then bs k else f k))
+               pm pm sz sz r Hx0 Hal4).
+    iApply (urun_close_upd _ _ _ _ _ m (mword_of_int 10) _ _ _ _
+              ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk").
+    iIntros (h') "Hrun".
+    iApply ("Hcont" $! h' r _ with "Hbs Hrun").
+  Qed.
+
   (* ------------------------------------------------------------------- *)
   (* EXEC'S FAILURE ARM.  A successful exec never returns to this WP at all *)
   (* -- the new program's is minted by exec from the new trapframe and     *)

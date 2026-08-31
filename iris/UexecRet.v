@@ -169,6 +169,16 @@ Lemma tf_of_arg0 (m : regfile) (pc : mword 64) :
   tf_of m pc !!! tf_arg_idx 0 = m !!! Regidx (mword_of_int 10).
 Proof. reflexivity. Qed.
 
+(* ...and arguments 1 and 2 are a1 and a2 -- what read's row is based at,
+   and where it reads its count *)
+Lemma tf_of_arg1 (m : regfile) (pc : mword 64) :
+  tf_of m pc !!! tf_arg_idx 1 = m !!! Regidx (mword_of_int 11).
+Proof. reflexivity. Qed.
+
+Lemma tf_of_arg2 (m : regfile) (pc : mword 64) :
+  tf_of m pc !!! tf_arg_idx 2 = m !!! Regidx (mword_of_int 12).
+Proof. reflexivity. Qed.
+
 Lemma tf_of_resume_pc (m : regfile) (pc : mword 64) :
   is_aligned_vaddr (Virtaddr pc) 2 = true ->
   tf_resume_pc (tf_of m pc) = pc.
@@ -576,6 +586,20 @@ Section UexecRet.
          (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)) -∗
        WP (Loop : expr riscv_lang)).
   Proof. exact (fixpoint_unfold uslot_F W). Qed.
+
+  (* A SLOT ABSORBS A GHOST UPDATE, because it ends in a [WP].  This is what
+     a syscall row that MOVES THE IMAGE needs: [uexec_ret]'s arm hands the
+     row back as a plain implication, with no modality to run the heap's
+     update under, and the update cannot be run before the ecall because the
+     row is what says how far the image moved.  Entering the slot puts the
+     goal back under a [WP], where it can. *)
+  Lemma uslot_bupd (W : uvis) : (|==> uslot W) -∗ uslot W.
+  Proof.
+    rewrite !(uslot_unfold W).
+    iIntros "H" (h C pt Rut) "%Hl %Hp Hb".
+    iMod "H".
+    iApply ("H" $! h C pt Rut with "[//] [//] Hb").
+  Qed.
 
   Lemma uslot_ukc (W : uvis) :
     uslot W ⊣⊢
