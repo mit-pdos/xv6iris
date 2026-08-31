@@ -17886,3 +17886,48 @@ the last count store's position, llb off the store leaf), and the
 CtxAnchor guard's slot mint (row floors the anchor's stamp, llb off
 `anchor_deposit`) -- this closes the A6.142 "guard mint at release" gap
 with no per-site measurement needed.
+
+## A6.145: THE ICACHE PINW RESTRUCTURE (in progress)
+
+**(4a, LANDED, snapshot `d9dc2d46dbe`):** `icfg` gains two per-slot
+mono_nat gname families `icfg_ieplo`/`icfg_istmp` (epoch floor / cell
+stamp), `mono_slot_fun_alloc`, `icfg_alloc` emits both at 0, FsCfgBoot
+threads them.  World green.
+
+**(4b step i, LANDED):** additive layer in IcacheInv beside the old body:
+`iref_set` (the count word's member predicate, z ∈ [1..IREFSLOTS] as
+4-byte words; `iref_set_count`/`iref_set_read`/`iref_set_word` -- the
+read side yields 0 < uint v < 2^31, the panic-killing bounds),
+`iref_pin_slot` (a live slot's custody: half epoch-floor auth + half
+stamp auth + 4 raw pinw ledger bytes at the count word),
+`itable_body_pinw` (live slots pinned, free slots' cells OUT to the lock
+payload), `iref_cred` (first cut).
+
+**THE EPOCH-CURRENCY DESIGN CORRECTION (records a decision):** the
+1/1024-quantum mono_nat cred does NOT survive reference splitting (idup
+splits q arbitrarily; a fixed quantum cannot follow).  The RIGHT
+instrument already exists: §17.2's liveness GENERATIONS -- `live_gen k s
+g` pins an agree'd generation gname per epoch, slices split freely
+(frac), and "a stale generation is UNOWNABLE" (`live_gen_agree`) is
+precisely epoch currency.  So: EXTEND `iliveUR`'s agree payload from
+`gname` to `gname * nat` (the generation AND its arm position).
+`live_frac k s := ∃ g lo, live_gen k s g lo` keeps the thirty-odd
+consumers' arity exactly as §17.2's wrapper did for the generation
+itself.  The racy cred becomes `∃ g, live_gen k s g lo ∗ ctx_floor ξ
+lo`; at the invariant open the reader's slice agrees (g, lo) with the
+body's slice, so its floor IS the current epoch's pin floor.
+`icfg_ieplo` becomes unused (kept, harmless); `icfg_istmp` stays for
+the A6.144 exact-read row.  Surface: Xv6Cameras (iliveUR payload),
+IcacheRef vocabulary (~21 sites), IcacheEscrow (14), IcacheInv (12),
+ProofIput (5), 4 singles.
+
+**Remaining 4b/4c**: restructure itable_body_pinw to bind each live
+slot's lo across the pin row AND the live arm (merge live_pool into the
+per-slot row or thread lo through live_norm/live_frzn); itable_res:
+free-slot ctx cells + stamp halves + the A6.144 floor row + the is_itable
+λ-flip; the accessor family (racy read via wp_load_s_sconf_au_rel +
+ledger_read_pinw_ok at the cred; locked exact via
+ledger_read_pinw_latest at the floor row; count stores via pinw_write_c;
+arm/retire via pinw mint/drop + a fresh (g, lo) generation); icM_wf
+gains n <= IREFSLOTS (fed by iref_slots_no_overflow's credit argument);
+then the 7 AU-consumer proof files + cred threading + IcacheBoot.
