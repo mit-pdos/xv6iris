@@ -53,6 +53,7 @@ Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
+Require Import VcGen.        (* [trunc32_unsigned] -- argfd's C [int] read *)
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -315,6 +316,24 @@ Proof.
   exact (sint64_unsigned b Hs).
 Qed.
 
+(* a 64-bit word whose signed reading is a SMALL non-negative number reads
+   the same through a C [int].  [argfd] narrows its argument to 32 bits
+   before using it -- which is what [usys_argfd] records -- while the
+   mirror's dup row keys on the full 64-bit signed reading; below 2^31 the
+   two are the same number, and the row's own lookup (into a table of
+   [NOFILE] slots) is what puts the argument below 2^31. *)
+Lemma um_trunc32_signed_small (b : mword 64) :
+  (0 <= bv_signed b < 2 ^ 31)%Z -> bv_signed (trunc32 b) = bv_signed b.
+Proof.
+  intros Hr.
+  assert (Hu : bv_unsigned b = bv_signed b).
+  { rewrite <- uint_unsigned. apply um_uint_of_signed. lia. }
+  assert (Hh : bv_half_modulus 32 = 2147483648%Z) by (vm_compute; reflexivity).
+  unfold bv_signed at 1. rewrite trunc32_unsigned Hu.
+  rewrite (bvw32_small (bv_signed b) ltac:(lia)).
+  apply bv_swrap_small. rewrite Hh. lia.
+Qed.
+
 (* the two readings of the FAILURE value, which every row's failure arm is
    keyed on *)
 Lemma um_signed_moi_neg1 :
@@ -330,28 +349,24 @@ Proof. vm_compute. reflexivity. Qed.
 (*                                                                        *)
 (*  Stated about [usys_fd_ok] alone -- it is a fact about THEIR table, not *)
 (*  about the mirror -- because it is what every one of our rows' honest   *)
-(*  [-1] blanket has to hand back.  Each of the four rows keys its         *)
-(*  failure arm on the return value ([uint r = 0] for close and pipe,      *)
-(*  [0 <= bv_signed r] for dup and open), and [-1] is on the failing side  *)
-(*  of all four.                                                          *)
+(*  [-1] blanket has to hand back.  The four rows fail two different ways: *)
+(*  close and pipe report success by returning zero, so their row is       *)
+(*  guarded on [uint r = 0] and [-1] fails the guard; dup and open report  *)
+(*  it by returning the DESCRIPTOR, so their row is a disjunction and the  *)
+(*  untouched table is simply its right side.  [-1] needs no argument at   *)
+(*  all on those two -- the right disjunct is available unconditionally.   *)
 (* ===================================================================== *)
 Lemma usys_fd_ok_neg1 (n : Z) (tf : list (mword 64)) (sts : list fdstate) :
   usys_fd_ok n tf (mword_of_int (-1) : mword 64) sts sts.
 Proof.
-  assert (Hneg : ¬ (0 <= bv_signed (mword_of_int (-1) : mword 64))%Z).
-  { rewrite um_signed_moi_neg1. lia. }
   assert (Hnz : uint (mword_of_int (-1) : mword 64) <> 0%Z).
   { rewrite um_uint_moi_neg1. discriminate. }
   unfold usys_fd_ok.
   destruct (decide (n = UsysMemOk.USYS_close)) as [_ | _].
   { destruct (decide (uint (mword_of_int (-1) : mword 64) = 0%Z))
       as [Hc | _]; [ exfalso; exact (Hnz Hc) | reflexivity ]. }
-  destruct (decide (n = UsysMemOk.USYS_dup)) as [_ | _].
-  { destruct (decide (0 <= bv_signed (mword_of_int (-1) : mword 64))%Z)
-      as [Hc | _]; [ exfalso; exact (Hneg Hc) | reflexivity ]. }
-  destruct (decide (n = UsysMemOk.USYS_open)) as [_ | _].
-  { destruct (decide (0 <= bv_signed (mword_of_int (-1) : mword 64))%Z)
-      as [Hc | _]; [ exfalso; exact (Hneg Hc) | reflexivity ]. }
+  destruct (decide (n = UsysMemOk.USYS_dup)) as [_ | _]; [ by right | ].
+  destruct (decide (n = UsysMemOk.USYS_open)) as [_ | _]; [ by right | ].
   destruct (decide (n = UsysMemOk.USYS_pipe)) as [_ | _].
   { destruct (decide (uint (mword_of_int (-1) : mword 64) = 0%Z))
       as [Hc | _]; [ exfalso; exact (Hnz Hc) | reflexivity ]. }
@@ -641,32 +656,23 @@ Section Steps.
       destruct (decide (USYS_open = UsysMemOk.USYS_open)) as [_ | Hc];
         [ | exfalso; exact (Hc eq_refl) ].
       destruct Hst as [[-> ->] | (i & a & fd & Hres & Hrow & Hfd & -> & Harm)].
-      - (* the blanket: -1 is on the failing side of their row *)
-        destruct (decide (0 <= bv_signed (mword_of_int (-1) : mword 64))%Z)
-          as [Hc | _]; [ | reflexivity ].
-        exfalso. rewrite um_signed_moi_neg1 in Hc. lia.
-      - (* the success arm: ours pins the number, theirs only asks that
-           SOME open row landed at [Z.to_nat (uint r)] *)
-        pose proof (fd_lowest_closed_bound (um_fdt u) fd Hfd) as Hb.
-        assert (Hz : (0 <= Z.of_nat fd < 2 ^ 63)%Z) by lia.
-        destruct (decide (0 <= bv_signed
-                            (mword_of_int (Z.of_nat fd) : mword 64))%Z)
-          as [_ | Hc];
-          [ | exfalso; apply Hc; rewrite (um_signed_moi (Z.of_nat fd) Hz);
-              lia ].
-        assert (Hidx : Z.to_nat (uint (mword_of_int (Z.of_nat fd)
-                                       : mword 64)) = fd).
-        { rewrite (um_uint_moi (Z.of_nat fd) Hz). exact (Nat2Z.id fd). }
-        rewrite Hidx.
+      - (* the blanket: a failing open installs nothing, which is their
+           row's right disjunct *)
+        right. reflexivity.
+      - (* the success arm: ours pins the descriptor, and theirs MATCHES the
+           returned word against it -- [usys_ret_is] is an equation on the
+           word, not a decode of it, so exhibiting [fd] closes the goal with
+           no bitvector arithmetic at all. *)
+        left. exists fd.
         destruct Harm as [(ma & mi & nl & _ & _ & ->)
                          | [(bs & nl & _ & ->) | (e & nl & _ & _ & ->)]].
         + exists (om_readable (ufs_arg tf 1)), (om_writable (ufs_arg tf 1)),
                  (FdDevice ma).
-          reflexivity.
+          split; reflexivity.
         + exists (om_readable (ufs_arg tf 1)), (om_writable (ufs_arg tf 1)),
                  (FdInode i).
-          reflexivity.
-        + exists true, false, (FdInode i). reflexivity. }
+          split; reflexivity.
+        + exists true, false, (FdInode i). split; reflexivity. }
     destruct (decide (n = USYS_mknod)) as [-> | Hnm].
     { (* ---- mknod = 17: NEITHER table moves a descriptor.  Upstream has
            no mknod row at all, and that is right against the C: sys_mknod
@@ -693,25 +699,25 @@ Section Steps.
       unfold ufs_arg in Hst.
       destruct Hst as [[-> ->]
                       | (nfd & st & Hnn & Hlk & _ & Hfd & -> & ->)].
-      - destruct (decide (0 <= bv_signed (mword_of_int (-1) : mword 64))%Z)
-          as [Hc | _]; [ | reflexivity ].
-        exfalso. rewrite um_signed_moi_neg1 in Hc. lia.
-      - pose proof (fd_lowest_closed_bound (um_fdt u) nfd Hfd) as Hb.
-        assert (Hz : (0 <= Z.of_nat nfd < 2 ^ 63)%Z) by lia.
-        destruct (decide (0 <= bv_signed
-                            (mword_of_int (Z.of_nat nfd) : mword 64))%Z)
-          as [_ | Hc];
-          [ | exfalso; apply Hc; rewrite (um_signed_moi (Z.of_nat nfd) Hz);
-              lia ].
-        assert (Hidx : Z.to_nat (uint (mword_of_int (Z.of_nat nfd)
-                                       : mword 64)) = nfd).
-        { rewrite (um_uint_moi (Z.of_nat nfd) Hz). exact (Nat2Z.id nfd). }
-        rewrite Hidx.
-        (* THE ARGUMENT'S INDEX IS THE SAME INDEX ON BOTH SIDES: ours keys
-           the row on [bv_signed] (argfd reads an [int] and rejects the
-           negative half), theirs on [uint], and the two agree exactly
-           where argfd accepted. *)
-        rewrite (um_uint_of_signed (tf !!! tf_arg_idx 0) Hnn).
+      - (* a failing dup installs nothing: the row's right disjunct *)
+        right. reflexivity.
+      - (* the success arm.  The DESCRIPTOR needs no argument -- the row
+           matches the returned word against it, and the post's [r] IS that
+           word.  THE ARGUMENT'S INDEX is the one thing to bridge: ours keys
+           the row on the full 64-bit [bv_signed] (the mirror's own
+           reading), theirs on the C [int] [usys_argfd], and the row's
+           lookup into a [NOFILE]-slot table is what puts the argument in
+           the range where the two agree. *)
+        left. exists nfd. split; [ reflexivity | ].
+        pose proof (lookup_lt_Some _ _ _ Hlk) as Hlt.
+        rewrite Hlen HN in Hlt.
+        apply (proj1 (Nat2Z.inj_lt _ _)) in Hlt.
+        rewrite (Z2Nat.id _ Hnn) in Hlt.
+        assert (Hsm : (0 <= bv_signed (tf !!! tf_arg_idx 0) < 2 ^ 31)%Z).
+        { change (Z.of_nat 16) with 16%Z in Hlt.
+          assert (H16 : (16 < 2 ^ 31)%Z) by lia.
+          exact (conj Hnn (Z.lt_trans _ _ _ Hlt H16)). }
+        unfold usys_argfd. rewrite (um_trunc32_signed_small _ Hsm).
         rewrite (list_lookup_total_correct (um_fdt u)
                    (Z.to_nat (bv_signed (tf !!! tf_arg_idx 0))) st Hlk).
         reflexivity. }

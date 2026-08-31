@@ -56,6 +56,8 @@ Require Import TfUser.       (* [tf_ueq] -- the resume-visible word equality *)
 Require Import UserPtTree.   (* [umem_wr] / [umem_grow] / [umem_del] *)
 Require Import ProcPtOwn.    (* [pgroundup] on words *)
 Require Import UserPerm.     (* [uperm] / [uperm_rw] -- the permission view *)
+Require Import VcGen.       (* [trunc32_unsigned]/[trunc32_mword_of_int] *)
+Require Import RiscvExtras.  (* [trunc32] -- the C [int] reading *)
 Require Import FdSlots.      (* [fdstate] / [fdtype] -- the descriptor view *)
 Local Open Scope Z_scope.
 
@@ -205,6 +207,24 @@ Definition usys_mem_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
 (* [usys_fd_ok_length] below.                                             *)
 (* ===================================================================== *)
 
+(* THE DESCRIPTOR ARGUMENT, AS THE KERNEL DECODES IT.  [argfd] reads
+   argument 0 as a C [int] -- [bv_signed] of the low 32 bits -- not as the
+   full 64-bit word.  The two differ on any argument above 2^32, so a row
+   that read [uint] of the whole word would be describing a different
+   function from the one the kernel runs.  Same reading for the returned
+   descriptor, which is likewise an [int]. *)
+Definition usys_argfd (tf : list (mword 64)) : Z :=
+  bv_signed (trunc32 (tf !!! tf_arg_idx 0)).
+
+(* THE RETURNED DESCRIPTOR, MATCHED RATHER THAN DECODED.  A row that reports
+   an fd could say "read the return register back as an int"; saying instead
+   "the return register IS this descriptor's encoding" is the same fact in
+   the direction every party already has it -- the kernel arm returns
+   [mword_of_int (Z.of_nat fd)] and [SpecArgfd.arg_fd_lookup] reports exactly
+   this shape.  It also keeps the row free of a round-trip lemma. *)
+Definition usys_ret_is (r : mword 64) (fd : nat) : Prop :=
+  r = (mword_of_int (Z.of_nat fd) : mword 64).
+
 Definition usys_fd_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
     (sts sts' : list fdstate) : Prop :=
   if decide (n = USYS_close) then
@@ -213,17 +233,17 @@ Definition usys_fd_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
        the number -- out of range, or already closed -- and a rejected close
        moves nothing, which is what a program that closes twice needs. *)
     (if decide (uint r = 0)
-     then sts' = <[Z.to_nat (uint (tf !!! tf_arg_idx 0)) := FdClosed]> sts
+     then sts' = <[Z.to_nat (usys_argfd tf) := FdClosed]> sts
      else sts' = sts)
   else if decide (n = USYS_dup) then
     (* dup(fd): the RETURNED descriptor is a COPY of the argument's -- same
        type, same mode -- because filedup only bumps [f->ref] and the two
        descriptors then name the same [struct file].  The old slot keeps
        what it had, which [list_insert] says by leaving it alone. *)
-    (if decide (0 <= bv_signed r)%Z
-     then sts' = <[Z.to_nat (uint r)
-                     := sts !!! Z.to_nat (uint (tf !!! tf_arg_idx 0))]> sts
-     else sts' = sts)
+    ((exists fd1 : nat,
+        usys_ret_is r fd1 /\
+        sts' = <[fd1 := sts !!! Z.to_nat (usys_argfd tf)]> sts)
+     \/ sts' = sts)
   else if decide (n = USYS_open) then
     (* open(path, omode): the returned descriptor becomes OPEN at some type
        and mode.  Both are existential HERE and both are pinnable: the mode
@@ -234,10 +254,9 @@ Definition usys_fd_ok (n : Z) (tf : list (mword 64)) (r : mword 64)
        vocabulary this table does not have yet -- the mode wants omode's
        bits decoded, the type wants the path lookup -- so the row says what
        it can honestly say: the slot is now OPEN, and no other slot moved. *)
-    (if decide (0 <= bv_signed r)%Z
-     then (exists (rd wr : bool) (t : fdtype),
-             sts' = <[Z.to_nat (uint r) := FdOpen rd wr t]> sts)
-     else sts' = sts)
+    ((exists (fd : nat) (rd wr : bool) (t : fdtype),
+        usys_ret_is r fd /\ sts' = <[fd := FdOpen rd wr t]> sts)
+     \/ sts' = sts)
   else if decide (n = USYS_pipe) then
     (* pipe(fdarray): TWO descriptors, and the row says which end is which
        -- [FdOpen true false FdPipe] reads and [FdOpen false true FdPipe]
@@ -336,12 +355,10 @@ Proof.
   destruct (decide (n = USYS_close)) as [_ | _].
   { destruct (decide (uint r = 0)); subst; [ apply length_insert | reflexivity ]. }
   destruct (decide (n = USYS_dup)) as [_ | _].
-  { destruct (decide (0 <= bv_signed r)%Z); subst;
-      [ apply length_insert | reflexivity ]. }
+  { destruct H as [(fd1 & _ & ->) | ->]; [apply length_insert | reflexivity]. }
   destruct (decide (n = USYS_open)) as [_ | _].
-  { destruct (decide (0 <= bv_signed r)%Z) as [_ | _].
-    - destruct H as (rd & wr & t & ->). apply length_insert.
-    - subst. reflexivity. }
+  { destruct H as [(fd & rd & wr & t & _ & ->) | ->];
+      [apply length_insert | reflexivity]. }
   destruct (decide (n = USYS_pipe)) as [_ | _].
   { destruct (decide (uint r = 0)) as [_ | _].
     - destruct H as (a & b & _ & ->). rewrite length_insert. apply length_insert.

@@ -3052,7 +3052,7 @@ Section ProofSysPipe.
       iSplitR "Hu0 Hu1";
         [| iSplitL "Hu0"; [iExact "Hu0" | iExact "Hu1"]].
       iRight. iExists fd0, fd1, l1, k0, k1.
-      iSplitR; [iPureIntro; split; [reflexivity | exact Hfr1']|].
+      iSplitR; [iPureIntro; split; [reflexivity | split; [exact Hfr1' | exact Hne01]]|].
       rewrite -sp_us_upt_ofile_comm. iFrame "Hpriv Hfrag".
     - (* ============ copyout(&fd1) failed: the shared tail ============ *)
       (* the second run landed only a [d2 <= 4] prefix: the composed window

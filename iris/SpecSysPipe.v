@@ -171,7 +171,12 @@ Section SpecSysPipe.
      (* SUCCESS.  The two least free descriptors now hold the read and the
         write end, in that order. *)
      (∃ (fd0 fd1 : nat) (l : list nat) (k0 k1 : nat),
-       ⌜r = (zero_reg : mword 64) /\ fd_frees (pv_ofile (us_V UW)) = fd0 :: fd1 :: l⌝ ∗
+       (* THE TWO ARE DISTINCT, and the post says so: a caller reading the
+          row needs it to know the two inserts commute, and pipe's own proof
+          has the fact already (the second descriptor is still free after
+          the first is installed). *)
+       ⌜r = (zero_reg : mword 64) /\ fd_frees (pv_ofile (us_V UW)) = fd0 :: fd1 :: l
+        /\ fd0 <> fd1⌝ ∗
        proc_priv γf p pid
          (upd_usV UW (upd_ofile (upd_ofile (us_V UW) fd0 (fnode k0)) fd1 (fnode k1))) ∗
        (* written in the order the two settles run: fd0's read end first,
@@ -193,7 +198,7 @@ Section SpecSysPipe.
     ((⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ proc_priv γf p pid UW
       ∨ ∃ (fd0 fd1 : nat) (l : list nat) (k0 k1 : nat),
           ⌜r = (zero_reg : mword 64) /\
-           fd_frees (pv_ofile (us_V UW)) = fd0 :: fd1 :: l⌝ ∗
+           fd_frees (pv_ofile (us_V UW)) = fd0 :: fd1 :: l /\ fd0 <> fd1⌝ ∗
           proc_priv γf p pid
             (upd_usV UW (upd_ofile (upd_ofile (us_V UW) fd0 (fnode k0)) fd1 (fnode k1))))
      ∗ fd_frags_any (pv_fdg (us_V UW)) ∗ fd_slot ∗ fd_slot).

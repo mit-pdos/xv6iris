@@ -478,13 +478,13 @@ Section UtSysBlock.
         exact Hcsmf. }
       iApply (SY.wp_syscall_sconf (CID := CID1) (un_f N) (un_s N) (un_j N) (un_l N)
  (un_fn N) (un_ip N) (un_dqi N)
-                S4 n2 (un_pid N) (MkUstate V1 ((us_M U))) lks
+                S4 n2 (un_pid N) (MkUstate V1 ((us_M U))) sts lks
                 Hj Hjl ltac:(rewrite Hn2; lia) eq_refl
                 with "Hcg [] Htext Hkd Hpc Hpi Hbs Hip Hfd Hir Hsy Hpv [Hufr] [-]").
-    (* the syscall channel takes the bundle ∃-weakened: it spends
-       descriptors and states no delta, so the residue's NAMED states are
-       weakened here -- the one line where the two conventions meet. *)
-    2: { rewrite /FdSlots.fd_frags_any. iExists sts. iExact "Hufr". }
+    (* the syscall channel takes the bundle AT ITS NAMED STATES now, and
+       hands back the states the call left together with the table row that
+       says how they moved -- no ∃-weakening on either side of the call. *)
+    2: { iExact "Hufr". }
       (* [cpu_own_on_intro] mints the bundle at the literal [∅]; [lks = ∅]
          at depth 0 makes that the set syscall's contract names.  It now
          takes no premise at all -- [cpu_own] carries no caller frame to
@@ -532,8 +532,8 @@ Section UtSysBlock.
          descriptor up to a lazy-fault extension, the size).  Framed, not
          read -- like [Hmemg], they are the CALLER's to consume, and the trap
          loop's own invariant is indifferent to all four. *)
-      iIntros (CID2 Hk2 mg U2)
-        "%Hcsg %Hmemg %Hmemne2 %Hmema0 %Hmemupt %Hmemsz %Htfg %Hfgg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hpc".
+      iIntros (CID2 Hk2 mg U2 stsR)
+        "%Hcsg %Hmemg %Hfdrow %Hmemne2 %Hmema0 %Hmemupt %Hmemsz %Htfg %Hfgg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hpc".
       destruct U2 as [V2 M2].
       assert (Hreta6 : ret_pc (S4 !!! Regidx Rra) = mword_of_int (UT + 0xa6))
         by (rewrite HS4ra; pcw).
@@ -552,16 +552,14 @@ Section UtSysBlock.
       (* the bundle comes back keyed on the ENTRY record; [Hfgg] is the
          dispatcher's own statement that no syscall moves [pv_fdg]. *)
       iEval (rewrite -Hfgg) in "Hufr".
-      (* THE SYSCALL HANDED THE BUNDLE BACK ∃-WEAKENED, and the residue is
-         indexed by the states, so the dispatcher NAMES where they landed.
-         This is the one direction the syscall channel cannot supply: a
-         landed spec says which descriptors it spent, not which list the
-         table now reads -- so the name is introduced here, and it is what
-         [ut_own] is rebuilt at.  When the four fd-touching rows (pipe, dup,
-         open, close) state a delta, it is [sts2] they will relate to the
-         entry [sts]. *)
-      iDestruct "Hufr" as (sts2) "Hufr".
-      iPoseProof (ut_own_rebuild SY.syscall_env N (MkUstate V2 M2) sts2
+      (* THE SYSCALL HANDS THE BUNDLE BACK AT NAMED STATES.  [stsR] is the
+         call's own [sts'] and [Hfdrow] is its row against the entry [sts]:
+         eighteen entries read [stsR = sts] and the four fd-touching ones
+         (open, close, dup, pipe) each say which slot moved and to what.
+         The residue is rebuilt at [stsR], so the row travels UP with it
+         rather than being discarded here -- which is what the ∃-weakening
+         this line used to do cost. *)
+      iPoseProof (ut_own_rebuild SY.syscall_env N (MkUstate V2 M2) stsR
                     with "Hbs Hip Hfd Hir Hpv Hufr Hsy") as "Hown".
       assert (Hmgsp : mg !!! Regidx csp_rs1 = pa_stk ksp 4)
         by (rewrite (callee_saved_lookup Hcsg csp_rs1
@@ -686,7 +684,7 @@ Section UtSysBlock.
                        Hnex Hnsb eq_refl (f_equal uint Hszq) Hmemg). }
       iApply (T.ut_a6 (CID := CID2) SY.syscall_env N U0 (MkUstate V2 M2) pt ksp m0 mg av
                 n2 true
-                mie_v menvcfg0 epv scv lks sts sts2
+                mie_v menvcfg0 epv scv lks sts stsR
                 Hwf' ltac:(intros Hne; exfalso; exact (Hne Hscec)) Hav ltac:(rewrite Hn2; unfold trap_res in *; lia)
                 ltac:(rewrite Htfg HV1upt; exact Htfpe) Hksp Hm0sp
                 Hmgsp Hmgs1 Hcsmg

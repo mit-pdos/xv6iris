@@ -122,6 +122,20 @@ Definition arg_fd (v : mword 64) (fs : list (mword 64)) : option (nat * mword 64
     end
   else None.
 
+(* THE INDEX ITSELF, as a Z.  [arg_fd] computes it as [Z.to_nat] of the
+   signed low 32 bits; a caller relating the descriptor table's own reading
+   of argument 0 to the [fd] this reports needs the equation in that
+   direction. *)
+Lemma arg_fd_index (v : mword 64) (fs : list (mword 64)) (fd : nat) (fv : mword 64) :
+  arg_fd v fs = Some (fd, fv) -> bv_signed (trunc32 v) = Z.of_nat fd.
+Proof.
+  unfold arg_fd. destruct (decide _) as [Hr|]; [| discriminate].
+  destruct (fs !! Z.to_nat (bv_signed (trunc32 v))) as [fv0|] eqn:Hlk; [| discriminate].
+  destruct (decide _); [discriminate|].
+  intros Heq. injection Heq as <- <-.
+  symmetry. apply Z2Nat.id. exact (proj1 Hr).
+Qed.
+
 (* the index [arg_fd] reports is in range, and names the pointer it reports *)
 Lemma arg_fd_lookup (v : mword 64) (fs : list (mword 64)) (fd : nat) (fv : mword 64) :
   arg_fd v fs = Some (fd, fv) ->

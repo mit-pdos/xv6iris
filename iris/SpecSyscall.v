@@ -291,7 +291,10 @@ Definition wp_syscall_sconf_body
     (fn : fclose_names)
     (ip : mword 64) (dqi : dfrac)
     (m : regfile) (av : nat)
-    (pid : mword 32) (U : ustate) (lks : gset string) :=
+    (pid : mword 32) (U : ustate)
+    (* THE DESCRIPTOR STATES syscall() IS ENTERED AT.  The post below states
+       [sysc_fd_ok] against them, beside [sysc_mem_ok] against the image. *)
+    (sts : list fdstate) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.syscall in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -342,8 +345,10 @@ Definition wp_syscall_sconf_body
      them, and four of the twenty-two entries (open, close, pipe, dup) spend
      them -- retyping a descriptor takes both halves after [ProcInv]'s
      auth/frag split, and the array holds only the authority.  exit and fork
-     spend them too, through the process they end or start. *)
-  fd_frags_any (pv_fdg (us_V U)) -∗
+     spend them too, through the process they end or start.
+
+     AT A NAMED TABLE, so the post can say which descriptors moved. *)
+  fd_frags (pv_fdg (us_V U)) sts -∗
   (* THE EXIT SLOT IS AN ADDITIVE CONJUNCTION, AND THAT IS WHAT LETS ONE
      TABLE ENTRY NOT RETURN WITHOUT THE CONTRACT SAYING WHICH ONE.
 
@@ -382,12 +387,21 @@ Definition wp_syscall_sconf_body
        copyin's page fault is NOT one of them: at the lazy [proc_ptm] view
        backing a page moves no byte ([SpecVmfault]), which is what lets the
        sixteen remaining entries read [us_M U' = us_M U] on the nose. *)
-    ∀ (mf : regfile) (U' : ustate),
+    ∀ (mf : regfile) (U' : ustate)
+      (* THE DESCRIPTOR STATES THE CALL LEFT, beside the record it left *)
+      (sts' : list fdstate),
       ⌜ callee_saved m mf ⌝ -∗
       (* ...AND WHICH USER BYTES CAN HAVE MOVED, by table index -- see
          [sysc_mem_ok] above.  Sixteen of the twenty-two entries touch no
          user memory at all and this reads [us_M U' = us_M U] for them. *)
       ⌜ sysc_mem_ok (us_V U) (us_V U') (us_M U) (us_M U') ⌝ -∗
+      (* ...AND WHICH DESCRIPTORS MOVED, by the same table index.  Eighteen
+         of the twenty-two never receive the fragment bundle at all, so this
+         reads [sts' = sts] for them; the four that do (open, close, dup,
+         pipe) each say exactly which slot they changed and to what.  See
+         [sysc_fd_ok] above and [UsysMemOk.usys_fd_ok] beneath it. *)
+      ⌜ sysc_fd_ok (us_V U) (mf !!! Regidx (mword_of_int 10 : mword 5))
+                   sts sts' ⌝ -∗
       (* ...AND THIS ARM RETURNED, WHICH RULES [exit] OUT (milestone J,
          K1).  [sysc_mem_ok] does NOT: exit falls into the quiet
          "nothing moved" row, so the table alone cannot tell a returning
@@ -457,7 +471,7 @@ Definition wp_syscall_sconf_body
       iref_slots IREFSPARE -∗
       R γf pj fn -∗
       proc_priv γf pj pid U' -∗
-      fd_frags_any (pv_fdg (us_V U)) -∗
+      fd_frags (pv_fdg (us_V U)) sts' -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang))
    ∧ kstack_closer pj (m !!! Regidx csp_rs1) (trap_res true + av)) -∗
@@ -562,6 +576,7 @@ Module Type SYSCALL.
       (fn : fclose_names)
       (ip : mword 64) (dqi : dfrac)
       (m : regfile) (av : nat)
-      (pid : mword 32) (U : ustate) (lks : gset string),
-      wp_syscall_sconf_body (syscall_env) γf γs j γl fn ip dqi m av pid U lks.
+      (pid : mword 32) (U : ustate) (sts : list fdstate)
+      (lks : gset string),
+      wp_syscall_sconf_body (syscall_env) γf γs j γl fn ip dqi m av pid U sts lks.
 End SYSCALL.
