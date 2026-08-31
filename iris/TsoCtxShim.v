@@ -263,6 +263,11 @@ Section shim.
     ctx_word4_pointsto (KTR := KTR) ξ' a dq w.
   Proof. rewrite !ctx_word4_shim. auto. Qed.
 
+  Lemma ctx_word_reindex (KTR : CurKtier) (ξ ξ' : CtxId) a dq w :
+    ctx_word_pointsto (KTR := KTR) ξ a dq w -∗
+    ctx_word_pointsto (KTR := KTR) ξ' a dq w.
+  Proof. rewrite !ctx_word_shim. auto. Qed.
+
   Lemma ctx_word2_reindex (KTR : CurKtier) (ξ ξ' : CtxId) a dq w :
     ctx_word2_pointsto (KTR := KTR) ξ a dq w -∗
     ctx_word2_pointsto (KTR := KTR) ξ' a dq w.

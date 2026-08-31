@@ -32,6 +32,7 @@ Require Import MinstretInv.
 Require Import KernelText.
 Require Import WpIntrCore.
 Require Import IntrDefs.
+Require Import TsoCtxMove.
 (* devintr_caps: the PERSISTENT device/proc credential kerneltrap's cone needs.
    It is closed over here, exactly as [hw_config] / [minstret_inv] /
    [kernel_text] already are -- the handler contract is a [□], so everything it
@@ -73,6 +74,38 @@ Proof. apply bv_eq. vm_compute. reflexivity. Qed.
    trapinithart writes stvec -- the disk lock does not exist until
    virtio_disk_init.  The stvec cell rides raw (that is what [trap_csrs_raw] is
    for) until the last credential is in hand. *)
+(* A6.139: THE HANDLER ENVIRONMENT.  The credentials are §0.35′
+   context-relative (every lock handle carries the holder's floor), and a
+   trap arrives at whatever context the hart then runs -- so the contract
+   is stated AT the environment family, and the caps premise is GONE: the
+   □-body receives [□ E XIc] from the trap engine (packed beside the
+   contract in [intr_res] by whoever installs the handler). *)
+Definition kernelvec_env
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+    (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
+    (γs : list gname) (pd pav pu : mword 64) : CurCtx -d> iPropO Σ :=
+  fun ξ => devintr_caps (XI := ξ) γu γv γdk γtl γs pd pav pu.
+
+Lemma kernelvec_env_move
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+    (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
+    (γs : list gname) (pd pav pu : mword 64) :
+  ⊢ □ IntrDefs.env_move (kernelvec_env γu γv γdk γtl γs pd pav pu).
+Proof.
+  iModIntro. rewrite /IntrDefs.env_move.
+  iIntros (CIDm ξ0 ξ1) "H0 H1 #HE".
+  iEval (rewrite /kernelvec_env) in "HE".
+  iMod (ctx_move (CID := CIDm)
+          (R := λ ξ, devintr_caps (XI := ξ) (CID := CID)
+                       γu γv γdk γtl γs pd pav pu)
+          ξ0 ξ1 with "H0 H1 HE") as "(H0 & H1 & HE1)".
+  iDestruct "HE1" as "#HE1".
+  iModIntro. iFrame "H0 H1".
+  iEval (rewrite /kernelvec_env). iModIntro. iExact "HE1".
+Qed.
+
 Definition kernelvec_handler_spec_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
@@ -81,8 +114,8 @@ Definition kernelvec_handler_spec_body
   hw_config -∗
   minstret_inv -∗
   kernel_text -∗
-  devintr_caps γu γv γdk γtl γs pd pav pu -∗
-  intr_handler_spec KT1 (mword_of_int KernelSyms.kernelvec : mword 64).
+  intr_handler_spec KT1 (kernelvec_env γu γv γdk γtl γs pd pav pu)
+    (mword_of_int KernelSyms.kernelvec : mword 64).
 
 Module Type KERNELVEC.
   Parameter kernelvec_handler_spec :

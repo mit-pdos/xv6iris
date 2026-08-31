@@ -425,20 +425,23 @@ Section UsertrapRes.
     stvec ↦ᵣ (mword_of_int KernelSyms.kernelvec : mword 64) -∗
     ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
     kpt_on cpu_id -∗
-    intr_handler_spec KT1 (mword_of_int KernelSyms.kernelvec : mword 64) -∗
+    ihs_env KT1 (mword_of_int KernelSyms.kernelvec : mword 64) -∗
     trap_csrs KT1.
   Proof.
     iIntros "Hep Hsc Hst Hsret Hstv Hq Hkpt #Hih".
+    iEval (rewrite /ihs_env) in "Hih".
+    iDestruct "Hih" as (E0) "(#Hspec & #HE0 & #HE0mv)".
     iApply (trap_csrs_of_raw with "[Hep Hsc Hst Hsret] [Hq Hstv] Hkpt").
     - rewrite /trap_csrs_raw.
       iSplitL "Hep"; [iExists ep; iExact "Hep" |].
       iSplitL "Hsc"; [iExists sc; iExact "Hsc" |].
       iSplitL "Hst"; [iExists st; iExact "Hst" |].
       iExists ('b"0" : mword 1), ('b"1" : mword 1). iExact "Hsret".
-    - iApply (intr_res_intro (mword_of_int KernelSyms.kernelvec : mword 64)
+    - iApply (intr_res_intro E0
+                (mword_of_int KernelSyms.kernelvec : mword 64)
                 ('b"0" : mword 1) kernelvec_tv_direct kernelvec_stvec_base
-                with "Hq Hstv [Hih]").
-      iApply bi.later_intro. iExact "Hih".
+                with "Hq Hstv [] HE0 HE0mv").
+      iApply bi.later_intro. iExact "Hspec".
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -1693,7 +1696,7 @@ Section UsertrapRes.
 
   Lemma ut_csrs_raw_fold (ep sc st : mword 64) :
     ut_csrs_raw ep sc st -∗
-    intr_handler_spec KT1 (mword_of_int KernelSyms.kernelvec : mword 64) -∗
+    ihs_env KT1 (mword_of_int KernelSyms.kernelvec : mword 64) -∗
     trap_csrs KT1.
   Proof.
     iIntros "(Hep & Hsc & Hst & Hstv & Hq & Hsret & Hkpt) #Hih".

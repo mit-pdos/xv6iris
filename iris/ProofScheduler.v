@@ -1855,6 +1855,8 @@ Section ProofScheduler.
           with "[Hstate Hpg Hchan Hpub Hsl Hbox]" as "HR".
         { iIntros "Hrun". iModIntro. iFrame "Hrun".
           iApply proc_lock_pay_of_box. iExists ξb, Tb. iFrame "Hbox".
+          iDestruct (proc_cells_reindex_sc TsoCtx.cur_ctx ξb (proc_addr jj)
+                       with "Hstate Hchan Hpub") as "(Hstate & Hchan & Hpub)".
           iApply (proc_lock_res_at_intro with "Hstate Hpg Hchan Hpub Hsl"). }
         (* c->proc is 0 again, so re-tag the bundle back to the idle index --
            this is what keeps [wp_next_idle] available at the loop head. *)

@@ -787,6 +787,8 @@ Section ProofUserinit.
     iDestruct "Hpctx" as (ξb Tb) "[Hbox Hpctx]".
     iDestruct (proc_slots_park_at γs ξb (proc_addr j) RUNNABLE needs_ctx_RUNNABLE
                  with "Hpctx Hhart Hmk") as "Hslots".
+    iDestruct (proc_cells_reindex_sc TsoCtx.cur_ctx ξb (proc_addr j) RUNNABLE ch
+                 with "Hpstcell Hpchan Hppub") as "(Hpstcell & Hpchan & Hppub)".
     iDestruct (proc_lock_res_at_intro γs ξb γl (proc_addr j) RUNNABLE ch
                  with "Hpstcell Hplock Hpchan Hppub Hslots") as "HR".
     (* ===== +0x2c c.mv a0,s1 ===== *)
