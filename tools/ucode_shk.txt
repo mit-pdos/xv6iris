@@ -18,16 +18,21 @@
 # wrong, only compile time -- but a whole uncalled function would be a claim
 # about code nothing reads, so it is left out and the reason recorded.
 
-note SH LANE STAGES 1-2 and 5.
+note SH LANE STAGES 1-2, 5 and the DIAGNOSTIC SUBTREE.
+note
+note THE DIAGNOSTIC SUBTREE (ask 7) adds [panic], [fprintf], [vprintf] and
+note [putc] -- the cone every one of sh's three fprintf-and-die tails runs
+note through.  It is no longer cut: iris/UkShDiag.v walks it and discharges
+note UkShRun.v's [ush_diag_leaf].  [printf] stays out because sh never calls
+note it (every diagnostic in sh.c is an [fprintf(2, ...)]), and [printint]
+note stays out because the only formats sh prints are "%s\n",
+note "exec %s failed\n" and "open %s failed\n" -- vprintf reaches printint
+note only from its %d/%u/%x arms, which those three format strings refute.
 note
 note STAGE 5 adds [runcmd] and [fork1] -- the command TREE walk -- with the
 note six further usys.S stubs they and the [cd] builtin issue: fork, exec,
 note pipe, wait, chdir and dup.  [runcmd]'s whole range is catalogued, the
-note two fprintf-and-die tails included: they are not walked (the diagnostic
-note code is cut at UkShRun.v's [ush_diag_leaf]) but they sit inside the
-note function and pruning per branch would have to be re-audited whenever an
-note arm moves.  [panic], [fprintf], [printf] and [vprintf] are NOT here:
-note nothing fetches an instruction of them under that cut.
+note two fprintf-and-die tails included.
 note
 note SH LANE STAGES 1-2: the ELF entry, main's console preamble, and the
 note COMMAND LOOP down to the blank-line test.  [start] calls [main]; main's
@@ -73,14 +78,29 @@ func wait
 func dup
 func chdir
 
+# ---- ask 7: the diagnostic subtree, walked in iris/UkShDiag.v.  [panic] is
+# ---- fprintf(2,"%s\n",s) and exit(1); the two runcmd tails are the same
+# ---- shape with a longer format.  [fprintf] marshals the varargs it will
+# ---- not read and tail-calls [vprintf], which walks the format one byte at
+# ---- a time and hands each to [putc], which is write(fd,&c,1).
+func panic
+func fprintf
+func vprintf
+func putc
+
 omit 0xc8c exit's [c.jr ra] -- the ecall at 0xc88 never returns
 
-skipfunc panic every path into it prints through fprintf; UkShRun.v cuts the
-skipfunc panic diagnostic code at [ush_diag_leaf], whose first site IS panic's
-skipfunc panic entry, so no instruction of panic is ever fetched
-skipfunc fprintf the diagnostic printer, behind [ush_diag_leaf] -- see panic
-skipfunc printf the diagnostic printer, behind [ush_diag_leaf] -- see panic
-skipfunc vprintf the diagnostic printer, behind [ush_diag_leaf] -- see panic
+# The ONE pc the tier cannot state: [UserHeap.uinstr_is] still carries its
+# temporary in-page clause ([Z.rem (uint pc) 4096 <= 4092]) and this [c.mv
+# a1,a5] sits two bytes below the page boundary.  It is the SECOND [putc] of
+# vprintf's unknown-'%' arm ([putc(fd,'%'); putc(fd,c0)]), which none of sh's
+# three formats reaches -- every one of them is a '%s' -- and cat's proof of
+# the same code never names the corresponding pc either.
+omit 0xffe vprintf's unknown-'%' arm, unreachable from a '%s' format; and it straddles a page, which [uinstr_is]'s temporary in-page clause still forbids
+
+skipfunc printf unreachable: every diagnostic in sh.c is an [fprintf(2, ...)]
+skipfunc printint unreachable: vprintf reaches it only from the %d/%u/%x
+skipfunc printint arms, and sh's only conversion is %s
 
 skipdefault not on stage 1's, 2's or 5's path: the [cd] builtin's body, the
 skipdefault parser and the allocator are later stages of the SH lane, and this

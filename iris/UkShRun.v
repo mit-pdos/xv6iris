@@ -30,19 +30,34 @@
 (*    type is one of 1..5, so [panic("runcmd")] is refuted rather than     *)
 (*    walked.                                                             *)
 (*                                                                        *)
-(* THE DIAGNOSTIC CODE IS CUT, and that cut is this file's ONE Hypothesis. *)
-(* Three places hand control to sh's printer: [panic] (from fork1's -1 arm *)
-(* and from PIPE's [pipe] failure), and the two per-cent-s failed tails inside   *)
+(* THE DIAGNOSTIC CODE IS CUT HERE AND WALKED IN [UkShDiag.v].  Three      *)
+(* places hand control to sh's printer: [panic] (from fork1's -1 arm and   *)
+(* from PIPE's [pipe] failure), and the two per-cent-s failed tails inside *)
 (* runcmd itself (0xda after a returning [exec], 0x10e after a failing     *)
-(* [open]).  All three END IN [exit] and none of them returns, but all     *)
-(* three run [fprintf] -- ~280 instructions of printf that no stage of     *)
-(* this lane has walked, and whose format strings live in .rodata at       *)
-(* [gt], which nothing here owns.  [ush_diag_leaf] is therefore the whole  *)
-(* diagnostic subtree as one premise, at the three entry pcs, with exactly *)
-(* what each site has in hand.  It is SATISFIABLE by construction: its     *)
-(* discharger holds sh's read-only image persistently and OUTSIDE the      *)
-(* premise, so nothing about it is quantified away.  RELAY ASK, recorded   *)
-(* in claude-notes/projects/fs-syscall-specs.md.                           *)
+(* [open]).  All three END IN [exit] and none of them returns, and all     *)
+(* three run [fprintf] -- 279 instructions of printf.  [ush_diag_leaf] is  *)
+(* that whole subtree as one premise, at the three entry pcs, with exactly *)
+(* what each site has in hand; [UkShDiag.ush_diag_leaf_holds] proves it    *)
+(* and [UkShDiag.wp_kshr_runcmd_final] / [_fork1_final] are the two        *)
+(* theorems below with it supplied.                                        *)
+(*                                                                        *)
+(* WHAT DISCHARGING IT COST THIS FILE, and it is worth knowing why: the    *)
+(* premise as first written handed the walk only [shk_code], which is      *)
+(* [ShInstrs.sh_bytes] -- the INSTRUCTIONS.  The format strings are at     *)
+(* 0x1290..0x12c7, i.e. in [ShData.sh_data], and panic's own '%s' argument *)
+(* is a .rodata literal too, so no amount of [shk_code] produces them: the *)
+(* premise was not dischargeable, and its ∀ over the gname triple (a       *)
+(* forked child runs it at FRESH names) meant no caller could supply the   *)
+(* image from outside either.  The fix is one conjunct threaded where      *)
+(* [ush_jtab] already goes -- [ush_jtab] now carries [shk_rodata] beside   *)
+(* the five rows, so [wp_kshr_runcmd]'s statement, all four fork payloads  *)
+(* and every budget are exactly where stage 5 left them.  [wp_kshr_fork1]  *)
+(* is the one exception: it has no [ush_jtab] of its own, so it takes      *)
+(* [shk_rodata γt] as a premise and forwards it to the child through the   *)
+(* payload it already carries.  The second short conjunct was the two      *)
+(* tails' first instruction, [c.ld a2,<k>(s1)], which is 8-aligned or it   *)
+(* is not a step at all -- so [ush_diag_at] now names the node's alignment *)
+(* alongside the pc, which both sites read off [ush_cmd].                  *)
 (*                                                                        *)
 (* FOUR LANE LEAVES, all of them one-line generalisations of UkRunMem's.   *)
 (* [wp_uk_cldq]/[wp_uk_clwq]/[wp_uk_lwuq] are [wp_uk_cld]/[wp_uk_clw]/     *)
@@ -326,9 +341,18 @@ Section UkShRun.
     ([∗ list] j ∈ seq 0 4,
        utext g (SH_JTAB + 4 * k + Z.of_nat j) (nth_byte (ush_jent k) j))%I.
 
+  (* ...AND SH'S READ-ONLY IMAGE BESIDE THEM.  The jump table IS .rodata
+     (0x1398 is inside [ShData.sh_data]), so the two belong together, and
+     what makes it worth saying is the DIAGNOSTIC CUT below: every site that
+     reaches sh's printer needs the three format strings, which are .rodata
+     too, and every one of those sites already carries [ush_jtab] -- through
+     the recursion, through each arm, and across every fork, since the whole
+     thing is [Forkable].  Carrying the image here rather than as a sixth
+     premise is what keeps [wp_kshr_runcmd]'s statement, all four fork
+     payloads and every budget exactly where stage 5 left them. *)
   Definition ush_jtab (g : gname) : iProp Σ :=
     (ush_jrow g 1 ∗ ush_jrow g 2 ∗ ush_jrow g 3 ∗
-     ush_jrow g 4 ∗ ush_jrow g 5)%I.
+     ush_jrow g 4 ∗ ush_jrow g 5 ∗ shk_rodata g)%I.
 
   Global Instance ush_jrow_persistent g k : Persistent (ush_jrow g k).
   Proof. apply _. Qed.
@@ -339,18 +363,26 @@ Section UkShRun.
     Forkable (fun g _ _ => ush_jrow g k).
   Proof. apply forkable_utext_run. Qed.
 
+  Lemma forkable_shk_code : Forkable (fun g _ _ => shk_code g).
+  Proof.
+    eapply Forkable_ext; [ | apply (forkable_utext_map ShInstrs.sh_bytes) ].
+    intros g gd gs. rewrite /shk_code /utext_img. reflexivity.
+  Qed.
+
+  Lemma forkable_shk_rodata : Forkable (fun g _ _ => shk_rodata g).
+  Proof.
+    eapply Forkable_ext; [ | apply (forkable_utext_map shk_ro) ].
+    intros g gd gs. rewrite /shk_rodata /utext_img. reflexivity.
+  Qed.
+
   Lemma forkable_ush_jtab : Forkable (fun g _ _ => ush_jtab g).
   Proof.
     apply forkable_sep; [ apply forkable_ush_jrow | ].
     apply forkable_sep; [ apply forkable_ush_jrow | ].
     apply forkable_sep; [ apply forkable_ush_jrow | ].
-    apply forkable_sep; apply forkable_ush_jrow.
-  Qed.
-
-  Lemma forkable_shk_code : Forkable (fun g _ _ => shk_code g).
-  Proof.
-    eapply Forkable_ext; [ | apply (forkable_utext_map ShInstrs.sh_bytes) ].
-    intros g gd gs. rewrite /shk_code /utext_img. reflexivity.
+    apply forkable_sep; [ apply forkable_ush_jrow | ].
+    apply forkable_sep; [ apply forkable_ush_jrow | ].
+    apply forkable_shk_rodata.
   Qed.
 
   (* the row a node selects, and the entry it holds *)
@@ -358,9 +390,13 @@ Section UkShRun.
     ush_jtab g -∗ ush_jrow g (ush_ty c).
   Proof.
     destruct c; cbn [ush_ty];
-      iIntros "(#H1 & #H2 & #H3 & #H4 & #H5)";
+      iIntros "(#H1 & #H2 & #H3 & #H4 & #H5 & _)";
       [ iExact "H1" | iExact "H2" | iExact "H3" | iExact "H4" | iExact "H5" ].
   Qed.
+
+  (* ...and the image it carries *)
+  Lemma ush_jtab_ro (g : gname) : ush_jtab g -∗ shk_rodata g.
+  Proof. iIntros "(_ & _ & _ & _ & _ & #H)". iExact "H". Qed.
 
   (* ===================================================================== *)
   (* §3 FOUR LANE LEAVES.                                                   *)
@@ -1080,33 +1116,37 @@ Section UkShRun.
   (*   0xda  the exec-failed tail          -- inside runcmd's EXEC arm      *)
   (*   0x10e the open-failed tail          -- inside runcmd's REDIR arm     *)
   (*                                                                       *)
-  (* Each runs [fprintf] (0x10aa, ~280 instructions with vprintf under it)  *)
-  (* and then [exit].  The walk is not this stage's, and the format strings *)
-  (* it reads live in .rodata under the TEXT gname, which nothing here      *)
-  (* owns -- so the honest cut is the subtree as ONE premise, at those      *)
-  (* three pcs, with exactly what each site has in hand:                    *)
+  (* Each runs [fprintf] (0x10aa, 279 instructions with vprintf and putc    *)
+  (* under it) and then [exit].  The walk is [UkShDiag.v]'s, so the cut     *)
+  (* here is the subtree as ONE premise, at those three pcs, with exactly   *)
+  (* what each site has in hand:                                            *)
   (*                                                                       *)
   (*  - panic is entered with a0 naming one of sh's THREE panic messages    *)
-  (*    (fork, runcmd, pipe), and needs nothing from the caller: its own    *)
-  (*    string is .rodata, which the DISCHARGER holds persistently and      *)
-  (*    outside the premise;                                                *)
+  (*    (fork, runcmd, pipe), and needs nothing but the image: its own      *)
+  (*    string is .rodata, and so is the "%s\n" it prints it through;       *)
   (*  - the two tails are entered with s1 still on the node, and each reads *)
-  (*    ONE heap string through it, so each is handed that pointer word and *)
-  (*    that string -- both [DfracDiscarded], both straight out of          *)
-  (*    [ush_cmd].                                                          *)
+  (*    ONE heap string through it, so each is handed that pointer word,    *)
+  (*    that string and the node's 8-alignment -- all three [DfracDiscarded] *)
+  (*    or pure, and all three straight out of [ush_cmd].                   *)
   (*                                                                       *)
   (* Nothing here is quantified away: every premise is satisfied by a       *)
-  (* resource a real caller holds, so the discharge is a printf walk and    *)
-  (* not an impossible obligation.  TAINT SET: every lemma below carries    *)
-  (* it -- [wp_kshr_fork1], [wp_kshr_runcmd] and the five arm lemmas -- and *)
-  (* says so in its header.  RELAY ASK.                                     *)
+  (* resource a real caller holds, and [UkShDiag.ush_diag_leaf_holds] is    *)
+  (* the proof of it.  TAINT SET: every lemma below carries it --           *)
+  (* [wp_kshr_fork1], [wp_kshr_runcmd] and the five arm lemmas -- and says  *)
+  (* so in its header; [UkShDiag.wp_kshr_runcmd_final] and                  *)
+  (* [_fork1_final] are those two with it supplied.                         *)
   (* ===================================================================== *)
   Definition ush_panic_msg (z : Z) : Prop :=
     z = 0x1298 \/ z = 0x12a0 \/ z = 0x12c8.
 
+  (* The two tails' first instruction is [c.ld a2,<k>(s1)], and a [c.ld] is
+     8-aligned or it is not a step at all -- so the node's own alignment,
+     which every caller has out of [ush_cmd], is part of what the site
+     hands over. *)
   Definition ush_diag_at (pc : Z) (m : regfile) : Prop :=
     (pc = ShSyms.panic /\ ush_panic_msg (uint (m !!! Regidx a0_idx)))
-    \/ pc = 0xda \/ pc = 0x10e.
+    \/ (pc = 0xda /\ uint (m !!! Regidx s1_idx) mod 8 = 0)
+    \/ (pc = 0x10e /\ uint (m !!! Regidx s1_idx) mod 8 = 0).
 
   Definition ush_diag_res (g : gname) (pc : Z) (m : regfile) : iProp Σ :=
     (if decide (pc = 0xda) then
@@ -1128,10 +1168,17 @@ Section UkShRun.
     reflexivity.
   Qed.
 
+  (* [shk_rodata γt] IS NOT DECORATION.  All three sites read a format
+     string out of .rodata (0x1290, 0x12a8, 0x12b8) and panic's own '%s'
+     argument is a .rodata literal too; none of them is in
+     [ShInstrs.sh_bytes], so [shk_code] cannot produce them and the premise
+     is not dischargeable without this conjunct.  It costs its callers
+     nothing: [ush_jtab] carries it and every site already holds one. *)
   Hypothesis ush_diag_leaf :
     forall (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : Z) (n : nat),
       ush_diag_at pc m ->
       shk_code γt -∗
+      shk_rodata γt -∗
       ush_diag_res γd pc m -∗
       urun γt γd γs h m (mword_of_int pc) (Dg + n) -∗
       WP (Loop : expr riscv_lang).
@@ -1157,6 +1204,7 @@ Section UkShRun.
     16 <= uint sp0 ->
     mt !!! Regidx csp_rs1 = add_vec_int sp0 (- (8 * Z.of_nat 2)) ->
     shk_code γt -∗
+    shk_rodata γt -∗
     uword γd (uint sp0 - 8) vra -∗
     uword γd (uint sp0 - 16) vs0 -∗
     urun γt γd γs h mt (mword_of_int 0x74) (Dg + n) -∗
@@ -1170,7 +1218,7 @@ Section UkShRun.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hal8 Hlo Hsp. iIntros "#Hcode Hw8 Hw0 Hrun Hcont".
+    intros Hal8 Hlo Hsp. iIntros "#Hcode #Hro Hw8 Hw0 Hrun Hcont".
     assert (Hbsp1 : bv_unsigned (add_vec_int sp0 (- (8 * Z.of_nat 2)))
                     = bv_unsigned sp0 - 16).
     { replace (- (8 * Z.of_nat 2)) with (-16) by lia.
@@ -1273,7 +1321,7 @@ Section UkShRun.
         apply uint_moi. unfold Z64. lia. }
       iApply (ush_diag_leaf γt γd γs h5 t4 ShSyms.panic n
                 ltac:(left; split; [ reflexivity | left; exact Hmsg ])
-                with "Hcode [] Hrun").
+                with "Hcode Hro [] Hrun").
       rewrite ush_diag_res_panic. done. }
     (* ---- fork succeeded: pop and return ---- *)
     (* 0x7a  c.ldsp ra,8(sp) *)
@@ -1381,7 +1429,7 @@ Section UkShRun.
   Lemma wp_kshr_fork1 (γt γd γs : gname)
       (P : gname -> gname -> gname -> iProp Σ) `{FP : !Forkable P}
       (szv : Z) (h : CpuId) (m : regfile) (n : nat) :
-    shk_code γt -∗ P γt γd γs -∗ usz γs szv -∗
+    shk_code γt -∗ shk_rodata γt -∗ P γt γd γs -∗ usz γs szv -∗
     urun γt γd γs h m (mword_of_int ShSyms.fork1) (2 + (Dg + n)) -∗
     ((∀ (h' : CpuId) (m' : regfile) (r : mword 64),
         ⌜ r <> (mword_of_int 0 : mword 64) ⌝ -∗
@@ -1398,7 +1446,7 @@ Section UkShRun.
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "#Hcode HP Hsz Hrun [Hpar Hchi]".
+    iIntros "#Hcode #Hro HP Hsz Hrun [Hpar Hchi]".
     rewrite shr_fork1.
     iDestruct (urun_stack with "Hrun") as %[Hal8 Hroom].
     remember (m !!! Regidx csp_rs1) as sp0 eqn:Hsp0.
@@ -1511,22 +1559,33 @@ Section UkShRun.
                     = (mword_of_int 0x74 : mword 64))
       by (rewrite Hra3; apply bv_eq; vm_compute; reflexivity).
     (* ---- the fork stub, and the frame crosses with the payload ---- *)
+    (* THE IMAGE RIDES THE PAYLOAD, because the CHILD's -1 arm needs it at
+       ITS gname triple and nothing else at those names carries it: the
+       caller's [P] is abstract here.  It is one more [Forkable] conjunct,
+       and the caller's [P] is untouched. *)
     iApply (wp_kshr_fork γt γd γs
-              (fun gt gd gs => (P gt gd gs
+              (fun gt gd gs => (shk_rodata gt
+                                ∗ P gt gd gs
                                 ∗ uword gd (uint sp0 - 8) vra
                                 ∗ uword gd (uint sp0 - 16) vs0)%I)
-              (FP := forkable_sep P
-                       (fun _ gd _ => (uword gd (uint sp0 - 8) vra
-                                       ∗ uword gd (uint sp0 - 16) vs0)%I)
-                       FP
-                       (forkable_sep
-                          (fun _ gd _ => uword gd (uint sp0 - 8) vra)
-                          (fun _ gd _ => uword gd (uint sp0 - 16) vs0)
-                          (forkable_uword (uint sp0 - 8) vra)
-                          (forkable_uword (uint sp0 - 16) vs0)))
+              (FP := forkable_sep
+                       (fun g _ _ => shk_rodata g)
+                       (fun gt gd gs => (P gt gd gs
+                                         ∗ uword gd (uint sp0 - 8) vra
+                                         ∗ uword gd (uint sp0 - 16) vs0)%I)
+                       forkable_shk_rodata
+                       (forkable_sep P
+                          (fun _ gd _ => (uword gd (uint sp0 - 8) vra
+                                          ∗ uword gd (uint sp0 - 16) vs0)%I)
+                          FP
+                          (forkable_sep
+                             (fun _ gd _ => uword gd (uint sp0 - 8) vra)
+                             (fun _ gd _ => uword gd (uint sp0 - 16) vs0)
+                             (forkable_uword (uint sp0 - 8) vra)
+                             (forkable_uword (uint sp0 - 16) vs0))))
               szv h5 m3 (Dg + n)
               with "Hcode [HP Hw8 Hw0] Hsz Hrun").
-    { iFrame "HP Hw8 Hw0". }
+    { iFrame "Hro HP Hw8 Hw0". }
     rewrite Hret3.
     (* the register file both arms resume under, and its sp *)
     assert (Hspf : forall r : mword 64,
@@ -1582,12 +1641,12 @@ Section UkShRun.
            exact (Hm1 q (ushr_ridx_ne q csp_rs1 ltac:(lia))). }
     iSplitL "Hpar".
     - (* ---- THE PARENT ---- *)
-      iIntros (hp r) "%Hr (HP & Hw8 & Hw0) Hsz Hrun".
+      iIntros (hp r) "%Hr (_ & HP & Hw8 & Hw0) Hsz Hrun".
       iApply (wp_kshr_fork1_tail γt γd γs hp
                 (<[Regidx a0_idx := r]>
                    (<[Regidx a7_idx := (mword_of_int 1 : mword 64)]> m3))
                 sp0 vra vs0 n Hal8 Hlo (Hspf r)
-                with "Hcode Hw8 Hw0 Hrun").
+                with "Hcode Hro Hw8 Hw0 Hrun").
       iIntros (hp2 m') "%Hq %Hra %Hs0 %Hsps Hrun".
       iApply ("Hpar" $! hp2 m' r with "[%] [%] [%] HP Hsz [Hrun]").
       + exact Hr.
@@ -1597,12 +1656,12 @@ Section UkShRun.
         exact (upd_eq _ (Regidx a0_idx) r).
       + iExact "Hrun".
     - (* ---- THE CHILD, under fresh names ---- *)
-      iIntros (gt gd gs hc) "#Hck (HP & Hw8 & Hw0) Hsz Hrun".
+      iIntros (gt gd gs hc) "#Hck (#Hcro & HP & Hw8 & Hw0) Hsz Hrun".
       iApply (wp_kshr_fork1_tail gt gd gs hc
                 (<[Regidx a0_idx := (mword_of_int 0 : mword 64)]>
                    (<[Regidx a7_idx := (mword_of_int 1 : mword 64)]> m3))
                 sp0 vra vs0 n Hal8 Hlo (Hspf (mword_of_int 0 : mword 64))
-                with "Hck Hw8 Hw0 Hrun").
+                with "Hck Hcro Hw8 Hw0 Hrun").
       iIntros (hc2 m') "%Hq %Hra %Hs0 %Hsps Hrun".
       iApply ("Hchi" $! gt gd gs hc2 m' with "[%] [%] Hck HP Hsz [Hrun]").
       + exact (fun q => Hback (mword_of_int 0 : mword 64) m' q Hq Hra Hs0 Hsps).
@@ -2592,6 +2651,7 @@ Section UkShRun.
                    | l IHl r IHr | c1 IH ];
       intros γt γd γs h m t szv n Ha0;
       iIntros "#Hcode #Hjt #Htree Hsz Hrun";
+      iDestruct (ush_jtab_ro with "Hjt") as "#Hro";
       iDestruct (ush_cmd_addr with "Htree") as %[Htr Ht8];
       assert (Ht4 : t mod 4 = 0)
         by (pose proof (Z.mod_divide t 8 ltac:(lia)) as Hd;
@@ -2742,8 +2802,9 @@ Section UkShRun.
           rewrite Hs1_k. apply uint_moi. unfold Z64. lia. }
         replace (2 + (Dg + n))%nat with (Dg + (2 + n))%nat by lia.
         iApply (ush_diag_leaf γt γd γs h6 k4 0xda (2 + n)
-                  ltac:(right; left; reflexivity)
-                  with "Hcode [] Hrun").
+                  ltac:(right; left; split;
+                        [ reflexivity | rewrite Hs1_k4; exact Ht8 ])
+                  with "Hcode Hro [] Hrun").
         rewrite /ush_diag_res.
         destruct (decide ((0xda : Z) = 0xda)) as [_ | Hc];
           [ | exfalso; exact (Hc eq_refl) ].
@@ -2882,8 +2943,9 @@ Section UkShRun.
           by (unfold av; lia).
         iApply (ush_diag_leaf γt γd γs h7 k5 0x10e
                   (6 * ush_ht c1 + (2 + n))
-                  ltac:(right; right; reflexivity)
-                  with "Hcode [] Hrun").
+                  ltac:(right; right; split;
+                        [ reflexivity | rewrite Hs1u; exact Ht8 ])
+                  with "Hcode Hro [] Hrun").
         rewrite /ush_diag_res.
         destruct (decide ((0x10e : Z) = 0xda)) as [Hc | _];
           [ exfalso; discriminate Hc | ].
@@ -3086,7 +3148,7 @@ Section UkShRun.
         iApply (ush_diag_leaf γt γd γs h8 p6 ShSyms.panic
                   (6 * Nat.max (ush_ht l) (ush_ht r) + (2 + n))
                   ltac:(left; split; [ reflexivity | exact Hmsg ])
-                  with "Hcode [] Hrun").
+                  with "Hcode Hro [] Hrun").
         rewrite ush_diag_res_panic. done.
       + (* ---- pipe succeeded: two forks, four closes, two waits ---- *)
         iDestruct (ush_pipe_halves γd (uint sp0 - 40) gp with "Hp")
@@ -3124,7 +3186,7 @@ Section UkShRun.
                   (FP := forkable_ush_paypipe t (uint sp0 - 40)
                            (uint sp0 - 36) (UPipe l r) w0 w1)
                   szv h6 f1 (6 * Nat.max (ush_ht l) (ush_ht r) + n)
-                  with "Hcode [Hp0 Hp1] Hsz Hrun").
+                  with "Hcode Hro [Hp0 Hp1] Hsz Hrun").
         { iFrame "Hjt Htree Hp0 Hp1". }
         assert (Hst_f1 : ush_st f1 sp0 t)
           by (apply ush_st_upd;
@@ -3187,7 +3249,7 @@ Section UkShRun.
                     (FP := forkable_ush_paypipe t (uint sp0 - 40)
                              (uint sp0 - 36) (UPipe l r) w0 w1)
                     szv hC f2 (6 * Nat.max (ush_ht l) (ush_ht r) + n)
-                    with "Hcode [Hp0 Hp1] Hsz Hrun").
+                    with "Hcode Hro [Hp0 Hp1] Hsz Hrun").
           { iFrame "Hjt2 Ht2 Hp0 Hp1". }
           rewrite Hra_f2.
           iSplitL "".
@@ -3602,7 +3664,7 @@ Section UkShRun.
                 (fun gt gd _ => (ush_jtab gt ∗ ush_cmd gd t (UList l r))%I)
                 (FP := forkable_ush_pay t (UList l r))
                 szv h2 g1 (6 * Nat.max (ush_ht l) (ush_ht r) + n)
-                with "Hcode [] Hsz Hrun").
+                with "Hcode Hro [] Hsz Hrun").
       { iFrame "Hjt Htree". }
       rewrite Hra_g1.
       iSplitL "".
@@ -3773,7 +3835,7 @@ Section UkShRun.
                 (fun gt gd _ => (ush_jtab gt ∗ ush_cmd gd t (UBack c1))%I)
                 (FP := forkable_ush_pay t (UBack c1))
                 szv h2 b1 (6 * ush_ht c1 + n)
-                with "Hcode [] Hsz Hrun").
+                with "Hcode Hro [] Hsz Hrun").
       { iFrame "Hjt Htree". }
       rewrite Hra_b1.
       iSplitL "".

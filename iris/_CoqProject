@@ -1721,18 +1721,31 @@ LinkSysUnlinkAU.v
 # what lets it cross a fork as a [UkFork.Forkable] payload; the three
 # forking arms carry it, the jump table and (PIPE) the two fd words over.
 # ONE Hypothesis, [ush_diag_leaf]: the diagnostic subtree -- panic and the
-# two fprintf-and-die tails -- at its three entry pcs, which no stage of
-# this lane has walked and whose format strings are .rodata under the TEXT
-# gname.  FOUR lane leaves, all RELOCATION ASKS: [wp_uk_cldq]/[wp_uk_clwq]/
+# two fprintf-and-die tails -- at its three entry pcs; UkShDiag.v below
+# DISCHARGES it.  FOUR lane leaves, all RELOCATION ASKS:
+# [wp_uk_cldq]/[wp_uk_clwq]/
 # [wp_uk_lwuq] are UkRunMem's compressed loads and lwu at a DFRAC (their
 # proofs already are), and [wp_uk_clw_text] is a real gap -- a four-byte
 # load out of the TEXT half, which the jump table needs and which
 # [wp_uk_lbu_text] only does one byte wide.  Audit = the standing three,
 # zero Admitted, zero new Axiom.
+#   THE DIAGNOSTIC SUBTREE (ask 7) is UkShDiag.v: panic (0x4a, 11
+# instructions) on top of fprintf (0x10aa, 17), vprintf (0xdea, 250) and
+# putc (0xd2e, 12), and it discharges [ush_diag_leaf] -- so
+# [wp_kshr_runcmd_final] and [wp_kshr_fork1_final] are UNCONDITIONAL and
+# the runcmd cone has no Hypothesis left.  IT IS UPSTREAM'S WALK AT SH'S
+# ADDRESSES: sh and cat contain the same ulib printf, byte for byte, with
+# sh's copies exactly 0x8da above cat's, so UkCatLit/UkCatPutc/
+# UkCatVprintf/UkCatVprintfS/UkCatFprintf port as an address shift.  The
+# one real generalisation is [shd_str]/[wp_shd_lbu], which abstract the
+# '%s' argument over WHICH HALF of the heap holds it -- cat's is a heap
+# string, sh's panic prints a .rodata literal -- so the '%s' arm is proved
+# once for both instead of twice.  Audit = the standing three.
 UCodeShK.v
 UkRunBr.v
 UkSh.v
 UkShRun.v
+UkShDiag.v
 
 # ... STAGE 4: the parser.  UCodeShP.v is a THIRD catalog over the same
 # dump (tools/ucode_shp.txt, [--prog shp]) -- 564 instructions in eleven

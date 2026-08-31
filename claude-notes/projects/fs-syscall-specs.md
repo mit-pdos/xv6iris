@@ -1777,22 +1777,17 @@ things, and the answer differs:
     induction hypothesis applicable at a smaller height without weakening
     the statement.  Nothing is ever popped — runcmd does not return.
 
-  * **ONE HYPOTHESIS, `ush_diag_leaf`, AND ITS TAINT SET.**  Three pcs
-    hand control to sh's printer and none returns: `panic` (0x4a — from
-    fork1's −1 arm and from PIPE's failing `pipe`), the "exec … failed"
-    tail (0xda) and the "open … failed" tail (0x10e).  Each runs `fprintf`
-    (0x10aa, ~280 instructions with vprintf under it) and then `exit`.
-    The premise is stated at those three pcs with exactly what each site
-    holds: panic with a0 pinned to one of sh's THREE message addresses
-    (0x1298 "fork", 0x12a0 "runcmd", 0x12c8 "pipe") and no resource, the
-    two tails with the node's pointer word and its string, both
-    `DfracDiscarded` and both straight out of `ush_cmd`.  **It is
-    satisfiable by construction** — its discharger holds sh's read-only
-    image persistently and OUTSIDE the premise, so nothing is quantified
-    away (cf. the durable notes' unsatisfiable-gap rule).  TAINT SET:
-    `wp_kshr_fork1`, `wp_kshr_runcmd`.  Everything else in the file —
-    the four leaves, the stubs, the tree algebra, the entry walk,
-    `wp_kshr_runcmd_null` — is unconditional.
+  * **`ush_diag_leaf` — DISCHARGED (see the diagnostic-subtree record
+    below).**  Three pcs hand control to sh's printer and none returns:
+    `panic` (0x4a — from fork1's −1 arm and from PIPE's failing `pipe`),
+    the "exec … failed" tail (0xda) and the "open … failed" tail (0x10e).
+    Each runs `fprintf` (0x10aa) and then `exit`.  The premise is stated
+    at those three pcs with exactly what each site holds: panic with a0
+    pinned to one of sh's THREE message addresses (0x1298 "fork", 0x12a0
+    "runcmd", 0x12c8 "pipe"), the two tails with the node's pointer word,
+    its string and its 8-alignment — all straight out of `ush_cmd`.
+    TAINT SET: `wp_kshr_fork1`, `wp_kshr_runcmd`; both are unconditional
+    as `UkShDiag.wp_kshr_fork1_final` / `wp_kshr_runcmd_final`.
 
   * **FOUR LANE LEAVES, ALL RELOCATION ASKS.**  `wp_uk_cldq`,
     `wp_uk_clwq`, `wp_uk_lwuq` are UkRunMem's `wp_uk_cld` / `wp_uk_clw` /
@@ -1815,12 +1810,134 @@ things, and the answer differs:
 
   * **CATALOG DELTA.**  `tools/ucode_shk.txt` gains `runcmd`, `fork1` and
     the fork/exec/pipe/wait/dup/chdir stubs; 192 → **326** instructions,
-    18 functions.  `panic`, `fprintf`, `printf` and `vprintf` are
-    `skipfunc`ed with the reason: under the diagnostic cut no instruction
-    of them is ever fetched.  Regenerating grew `shk_syms_pins` from 10 to
+    18 functions.  Regenerating grew `shk_syms_pins` from 10 to
     18 conjuncts, which broke `UkSh.v`'s positional `shp_read`
     (`&_&_&…&H` now binds a nested conjunction); fixed forward, one
     character.
+
+  **THE DIAGNOSTIC SUBTREE AS LANDED — ASK 7 DISCHARGED (2026-08-31;
+  `iris/UkShDiag.v` 7 322 lines, `iris/UCodeShK.v` 8 996 / 615
+  instructions in 22 functions; audit = the standing three
+  (`resv_matches`, `resv_is_valid`, funext) on `ush_diag_leaf_holds`,
+  `wp_kshr_runcmd_final`, `wp_kshr_fork1_final`, `wp_kshd_panic` and
+  `wp_kshd_die`; zero `Admitted`, zero new `Axiom`, and ZERO Hypotheses
+  left in the runcmd cone).**
+
+  * **THE WALK IS UPSTREAM'S, AT SH'S ADDRESSES, and that is the whole
+    finding.**  sh and cat contain the SAME ulib printf and the two images
+    agree on it BYTE FOR BYTE: every instruction of `putc` (12), `vprintf`
+    (250) and `fprintf` (17) has the same width and the same encoding in
+    both dumps, and sh's copies sit exactly **0x8da** above cat's.  So
+    every decoded immediate, every branch displacement and every jal
+    target is identical and ONLY THE PCS MOVE — measured, by diffing
+    `ShInstrs` against `CatInstrs` over the three ranges: 279 instructions,
+    **two** encoding differences, both `addi` halves of an `auipc`/`addi`
+    pair naming .rodata (`"(null)"` and `digits`), both on arms a '%s'
+    format cannot reach and neither named by cat's proof either.  The port
+    is therefore a scripted address shift plus a rename over
+    `UkCatLit`/`UkCatPutc`/`UkCatVprintf`/`UkCatVprintfS`/`UkCatFprintf`
+    (6 401 lines), one `Section` each, and it came up green with **two**
+    hand fixes.  **Check this before writing a second walk of ulib**: two
+    programs' copies of the same library function are a `git`-free diff
+    away, and where they agree the second proof is a substitution.
+
+  * **THE ONE REAL GENERALISATION: which HALF of the heap the '%s'
+    argument is in.**  cat's only '%s' argument is `argv[i]`, a DATA
+    string (`ustr` at γd); sh's `panic` prints a .rodata literal, which is
+    X-and-not-W and therefore lives in the TEXT half (`utext_str` at γt).
+    The two predicates have the same four conjuncts and the arm reads a
+    string in exactly one way — one byte at a time at a known index — so
+    rather than duplicate ~2 000 lines, `shd_sb` / `shd_str` /
+    `wp_shd_lbu` abstract over the half, the '%s' section takes the choice
+    as a section variable `tx : bool`, and `shd_str γt γd false` is `ustr
+    γd DfracDiscarded` while `shd_str γt γd true` is `utext_str γt` — both
+    BY CONVERSION, so neither producer moved.  Stating the accessors at
+    `ustr_byte`'s and `wp_uk_lbu`'s exact shapes (give-back wands and all,
+    though every resource in sight is persistent) is what kept the port a
+    name change: 14 substitution sites, no restructuring.
+
+  * **THE PREMISE AS STAGE 5 LANDED IT WAS NOT DISCHARGEABLE, and the
+    reason generalises.**  `ush_diag_leaf` handed the walk `shk_code γt` —
+    `ShInstrs.sh_bytes`, the INSTRUCTIONS — and the three format strings
+    are at 0x1290/0x12a8/0x12b8, i.e. in `ShData.sh_data`, i.e. `shk_ro`.
+    No amount of `shk_code` produces them, and because the premise
+    quantifies over the gname triple (a forked child runs it at FRESH
+    names) the "discharger holds the image OUTSIDE the premise" plan
+    cannot work either — there is no outside for a ∀-bound γt.  **The
+    satisfiability check the durable notes prescribe finds this in one
+    reading and it was not run.**  Fix-forward, all lane-local: `ush_jtab`
+    now carries `shk_rodata` beside its five rows, so every site that
+    reaches the printer already holds the image and `wp_kshr_runcmd`'s
+    statement, all four fork payloads and every budget stayed exactly
+    where stage 5 left them.  `wp_kshr_fork1` is the one exception (it has
+    no `ush_jtab` of its own) and takes `shk_rodata γt` as a premise,
+    forwarding it to the child through the payload it already wraps.  A
+    second short conjunct: the two tails open with `c.ld a2,<k>(s1)`, so
+    `ush_diag_at` now names the node's 8-alignment beside the pc — which
+    both sites read straight off `ush_cmd`.
+
+  * **WHAT WALKED.**  `wp_kshd_panic` (0x4a, 11 instructions: a 16-byte
+    frame, ra and s0 spilled and never read, `c.mv a2,a0`, then the
+    block), and the two tails at 0xda and 0x10e (`c.ld a2,8(s1)` /
+    `c.ld a2,16(s1)`, then the block).  **The block is ONE lemma**,
+    `wp_kshd_die`, parameterised by its six pcs as literals per the
+    recipe — `auipc a1,0x1 ; addi a1,a1,<K> ; c.li a0,2 ; jal fprintf ;
+    c.li a0,<k> ; jal exit` — because gcc emitted it three times
+    identically.  Everything about each format is DECIDED, not enumerated:
+    `shd_fmt_ok` (no interior NUL, NUL at `len`) and `shd_nopct` (the only
+    '%' is at `q`) are two `vm_compute`s per literal, exactly as
+    `UkInitLit`'s `init_lit_ok` and `UkCatMain`'s `cm_ok` are.
+
+  * **THE %-SCOPE, DECIDED.**  All three of sh's diagnostics are
+    `fprintf(2, <one '%s'>, <a C string>)` — `"%s\n"` (q=0, len=3),
+    `"exec %s failed\n"` and `"open %s failed\n"` (q=5, len=15) — so the
+    walk needs the '%s' arm and NOTHING ELSE.  `printint` is out of the
+    catalog for that reason (vprintf reaches it only from %d/%u/%x, which
+    those three formats refute) and so is `printf` (sh calls `fprintf`
+    only).  The unknown-'%' arm is out for the same reason, which is what
+    makes the one omitted pc below sound.
+
+  * **THE BUDGET.**  `ush_Dg = 2 + (10 + (12 + 4)) = 28` words, spelled as
+    the sum: panic's two-word frame on top of fprintf's ten, vprintf's
+    twelve and putc's four; `write` is a three-instruction stub and
+    allocates nothing.  The two tails run on runcmd's frame and need
+    26 + n, so they instantiate fprintf's tail at `n + 2`.
+
+  * **ONE PC THE TIER CANNOT STATE, and it is a real engine limit.**
+    `UserHeap.uinstr_is` still carries its temporary in-page clause
+    (`Z.rem (uint pc) 4096 <= 4092`) and sh's `c.mv a1,a5` at **0xffe**
+    sits two bytes below the page boundary — cat's copy of the same
+    instruction is nowhere near one, which is why upstream never met this.
+    It is the SECOND `putc` of vprintf's unknown-'%' arm, which no '%s'
+    format reaches and which cat's proof never names either, so it is
+    `omit`ted from the catalog with that reason.  RELOCATION ASK: the
+    clause's own comment in `UserHeap.v` says it is the last one and that
+    nothing in the fetch path needs it.
+
+  * **CATALOG DELTA.**  `tools/ucode_shk.txt` gains `panic`, `fprintf`,
+    `vprintf` and `putc` (the three `skipfunc`s go); 326 → **615**
+    instructions, 22 functions, 410 decode lemmas, one `omit`.  Measured
+    on the mirror: `UCodeShK.v` **8 996 lines**, and the whole chain
+    rebuilt in 22.9 s (`UkShRun.v`) + 49.7 s (`UkShDiag.v`) — the
+    unshelve hoist is in the generator, so the 1.9 s/instruction law no
+    longer applies to a regeneration.  `shk_syms_pins` grew 18 → 22
+    conjuncts; because the four new rows are APPENDED, every existing
+    positional destruct in `UkSh.v` and `UkShRun.v` still ends in `&H&_`
+    and **no fix-forward was needed** (the stage-5 breakage was the LAST
+    row moving, not the count changing).
+
+  * **THE CONTENT-RECEIPT BONUS: NOT TAKEN, and the distance is an engine
+    change.**  RULING A's content seam is kernel-side; the urun tier has
+    no receipt or trace notion at all — `grep` for one across
+    `UkRun.v`/`UkRunSys.v`/`UsysMemOk.v` is empty, and `write` is the
+    QUIET row, whose entire content is "the image did not move".  Saying
+    "the panic message's own bytes reached the console" would need (i) a
+    console-output ghost in `UkRun.urun`'s bundle, (ii) a `write` leaf
+    that emits into it, and (iii) an output-list index threaded through
+    the postconditions of `putc`, `vprintf`, `vprintf_s` and `fprintf` —
+    all of which today end in `ucallee_saved` and nothing else, so all
+    ~15 of them would move.  That is a tier feature, not a walk, and it
+    belongs beside `uart-trace.md`'s identification gate.
 
   * **ASK 6, RESOLVED IN-TREE.**  Stage 4's blocker — `wp_ksh_memset`'s
     postcondition was `∃ g, ubytes γd a N g`, forgetting that memset
@@ -2074,6 +2191,16 @@ things, and the answer differs:
      bridge already takes one — and the `DfracOwn 1` spelling is what
      stops any read-only structure being read), and `wp_uk_clw_text` is a
      genuinely new leaf: the four-byte load out of the TEXT half.
+     **And take the diagnostic subtree's two with them**: `shd_sb` /
+     `shd_str` / `shd_str_byte` / `shd_str_nul` / `shd_str_nonul` (a C
+     string generalised over WHICH HALF of the heap holds it — `ustr` and
+     `utext_str` are the same four conjuncts) belong beside
+     `UserHeap.ustr`, and `wp_shd_lbu` (that string's one load) beside
+     `UkRunMem.wp_uk_lbu`/`wp_uk_lbu_text`, which it is the join of.
+     Also: **`UserHeap.uinstr_is`'s temporary in-page clause**
+     (`Z.rem (uint pc) 4096 <= 4092`) is now costing something real — its
+     own comment says nothing in the fetch path needs it, and it is why
+     sh's `c.mv a1,a5` at 0xffe has to be `omit`ted from the catalog.
   4. ~~**`pipe`'s row has no null guard**~~ **NOT A BLOCKER after all**:
      stage 5 hands the row eight bytes it OWNS (the `int p[2]` on
      runcmd's own frame), so the row's licence to write at a null pointer
@@ -2082,14 +2209,21 @@ things, and the answer differs:
      this lane.
   6. ~~**Strengthen `wp_ksh_memset`'s postcondition**~~ (stage 4's
      blocker) — **RESOLVED IN-TREE by stage 5**; see the stage-5 record.
-  7. **`ush_diag_leaf` — the diagnostic subtree.**  Stage 5's one
-     Hypothesis, and the only thing between `wp_kshr_runcmd` and an
-     unconditional theorem.  Discharging it is the printf walk (`panic`
-     11 instructions on top of `fprintf` 0x10aa and `vprintf` 0xdea,
-     ~280 in all) plus a persistent view of sh's .rodata at the TEXT
-     gname, in the shape `UkInit.init_rodata` / `UkInitLit.init_lit_str`
-     already have for init.  Everything the premise needs is in that
-     shape; nothing about it is unsatisfiable.
+  7. ~~**`ush_diag_leaf` — the diagnostic subtree.**~~  **DONE
+     (2026-08-31)**: `iris/UkShDiag.v` walks panic, fprintf, vprintf and
+     putc (279 instructions plus panic's 11), proves
+     `ush_diag_leaf_holds`, and states `wp_kshr_runcmd_final` /
+     `wp_kshr_fork1_final` by application — the runcmd cone has no
+     Hypothesis left.  See the diagnostic-subtree record above; the two
+     things worth carrying forward are that the walk is UPSTREAM'S at
+     sh's addresses (sh's and cat's ulib printf are byte-identical, sh's
+     0x8da higher) and that the premise as landed was NOT dischargeable
+     until `ush_jtab` grew `shk_rodata`.  Two relocation asks came out of
+     it: `UserHeap.uinstr_is`'s temporary in-page clause (it costs sh one
+     `omit`ted pc at 0xffe), and `shd_sb`/`shd_str`/`wp_shd_lbu` — the
+     half-generic C string and its one load — which belong beside
+     `UserHeap.ustr`/`utext_str` and `UkRunMem.wp_uk_lbu`/`_lbu_text`
+     rather than in a program file.
   5. **RULED (owner, 2026-08-31): DELETE.**  Done same day — the eleven
      `UProofSh*.v` + `UCodeSh.v` + `USpecSh.v` + `USpecShParse.v` are
      deleted; `sh_img_sub` + halves relocated verbatim into
