@@ -778,15 +778,16 @@ reshape.  This unblocked the whole `devintr_caps_move` chain.
   devintr caps spell `fsc_uart/fsc_disk/fsc_dlock`).
 
 **SC seams ADDED (cutover worklist, grep these):**
-- `TsoCtxShim.ctx_word_reindex` (8-byte sibling of `ctx_word4_reindex`).
-- `SchedCtx.proc_cells_reindex_sc` (three producer sites:
-  ProofKforkB5/ProofUserinit/ProofScheduler) and the `ctx_dom_sc`
-  retier in `proc_slots_park_box`'s ZOMBIE arm -- each stands where
-  tso-flip DEPOSITS into the record's box (`proc_lock_res_deposit` /
-  `TsoCtx.ctx_deposit`, which raises the box's stamp).  At the cutover
-  the three sites adopt the deposit shape and both seams die.
 - `SchedCtx.lock_inv_reindex_sc/is_lock_reindex_sc` (Local; the
   is_lock transport proof bodies).
+- (The producer-site seams this amendment first shipped --
+  `proc_cells_reindex_sc`, `ctx_word_reindex`, the `ctx_dom_sc` retier
+  in `proc_slots_park_box` -- are GONE: `TsoCtx.ctx_deposit` was on
+  main all along, so the three sites and the ZOMBIE park now run
+  tso-flip's deposit shape verbatim (`SchedCtx.proc_lock_res_deposit`,
+  the token-threaded `proc_slots_park_box`).  RULE for the next port:
+  when a flip proof leans on a TsoCtx gate, grep TsoCtx.v itself, not
+  just the Move/Park satellites.)
 
 **Measured and deferred (unchanged from the survey, now with reasons
 verified in-tree):**
