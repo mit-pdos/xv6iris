@@ -17447,3 +17447,25 @@ every carrier arity UNCHANGED (27 files hold `intr_res kt`):
   ProofKerneltrap (park threading), intro sites ProofMain ~2291 /
   ProofMainSecondary ms_inithart_sched (pass E_kv + #Hcaps)).
 
+### A6.139 build log (cont.)
+
+- WpIntrInv GREEN: the engine unfold destructures the ∃E pack
+  ("Ecap"/"#HEcap"); the trap-side psi tuple's two rows
+  (`intr_res ∗ intr_handler_spec`) merged into ONE E-shared pack
+  `∃ E, intr_res_at kt E ∗ □ E XI ∗ intr_handler_spec kt E (…nextPC…)`
+  (they MUST share the E — the trap-run assembles the entry at
+  `ires_of (ihs kt E)` and applies with the same E's env); the psi
+  builder runs AFTER `srs; rewrite Hsb` (the nextPC↦handler
+  normalization must precede the pack's spec framing); the Löb re-entry
+  packs the E-fixed post capability back to the real one via the new
+  `sie_cap_gpr_pack` (+ `sie_cap_pack`/`sie_arm_pack` in IntrDefs).
+- SEALS ARE LOAD-BEARING (again): unsealed `intr_res_at`/`ires_pack`/
+  `ihs_env` let TC-search/unification walk into the ihs fixpoint —
+  `apply is_lock_move` in SchedCtx.procs_inv_move DIVERGED (>10 min).
+  All three now `Typeclasses Opaque` (placed AFTER their definitions).
+  SchedCtx's move/morph instances still needed the explicit
+  `exact (is_lock_move _ _ _ _)` fallback after `ctx_move_solve` —
+  under investigation whether the seal alone suffices (a full-length
+  SchedCtx compile is running; 420s was too short for the whole file,
+  TEXIT=124 was MY timeout, not necessarily the tactic).
+
