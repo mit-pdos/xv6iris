@@ -66,6 +66,7 @@ Require Import UserExec.     (* [ucfg] / [user_cfg] / [user_mstatus_ok] /
 Require Import SpecUserret.  (* [userret_gpr] -- the 31-insert register file *)
 Require Import ProcDefs.     (* [pprivate] / [ustate] / [pv_tf] *)
 Require Import UserPerm.     (* [uperm] / [perm_of] -- the permission view *)
+Require Import FdSlots.     (* [fdstate] -- the per-descriptor user-visible state *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -80,8 +81,10 @@ Import Defs.
 (* observes permissions (a store to a read-only page faults), so they are   *)
 (* in the key -- as a PROJECTION of the kernel's table and size            *)
 (* ([perm_of]), never as stored state; the table's structure stays hidden.  *)
-(* Future user-visible state (the fd view, the pid) becomes a FIELD, never  *)
-(* an arity change here or at a consumer.                                  *)
+(* [uvis_fd] is the DESCRIPTOR VIEW (FdSlots.v): one [fdstate] per          *)
+(* descriptor, taken by [uvis_of] from the [fd_frags] bundle the boundary   *)
+(* holds.  Future user-visible state (the pid) becomes a FIELD the same     *)
+(* way, never an arity change here or at a consumer.                        *)
 (* ===================================================================== *)
 Record uvis := MkUvis {
   uvis_tf   : list (mword 64);
@@ -93,15 +96,35 @@ Record uvis := MkUvis {
      lets [usys_mem_ok]'s sbrk row NAME the two sizes instead of
      existentially quantifying them. *)
   uvis_sz   : Z;
+  (* THE FD VIEW.  What the process sees of the kernel's file layer: one
+     [FdSlots.fdstate] per descriptor -- CLOSED, or OPEN at a type -- for
+     the NOFILE descriptors of [p->ofile[]].  It is user-visible for the
+     same reason [uvis_sz] is: open(2) hands back a descriptor of a known
+     type and the program's next read(2) behaves by that type, so a
+     contract that cannot name it cannot say what the program observes.
+
+     A VALUE, not the ghost name.  [ProcDefs.pv_fdg] is the name of the
+     per-incarnation ghost; the STATES it authorizes are what the kernel
+     holds as [FdSlots.fd_frags (pv_fdg V) sts] across the trap, and [sts]
+     is what goes here.  So the key stays a pure record -- no resource, no
+     [gname] -- and the tie to reality is the same one [uvis_M] and
+     [uvis_perm] have: the trap boundary INSTANTIATES the key at the value
+     it is holding ([uvis_of] takes it), and nothing else may. *)
+  uvis_fd   : list fdstate;
 }.
 
 (* the projection from the kernel's process state to the slot's key: drop
    the descriptor (and everything else only the kernel reads), keeping its
    permission view *)
-Definition uvis_of (U : ustate) : uvis :=
+(* [sts] is a PARAMETER, not a projection: [ustate] carries the fd ghost's
+   NAME ([pv_fdg]) and not the states under it, so the value comes from the
+   [fd_frags] bundle the boundary is holding.  Every call site is a place
+   that already has that bundle open. *)
+Definition uvis_of (U : ustate) (sts : list fdstate) : uvis :=
   MkUvis (pv_tf (us_V U)) (us_M U)
          (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
-         (uint (pv_sz (us_V U))).
+         (uint (pv_sz (us_V U)))
+         sts.
 
 (* ===================================================================== *)
 (* SS1 The trapframe as a word reader.                                     *)

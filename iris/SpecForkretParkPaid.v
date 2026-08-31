@@ -138,7 +138,7 @@ Definition forkret_park_pkg
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{XI : CurCtx}
     (* the trap loop's kernel-side bundle, abstract exactly as [SpecForkret]
        takes it *)
-    (URes : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ)
+    (URes : CpuId -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ)
     (* what the closer is handed at the resume beside [first_done] -- the
        park token, abstract here; see [SpecForkret] and ParkCap.v *)
     (W : iProp Σ)
@@ -215,12 +215,15 @@ Definition forkret_park_pkg
       (* ...AND IT YIELDS A SLOT KEYED AT THE RECORD IT RESUMES WITH, beside
          the residue.  [ParkCap.park_pkg] is this verbatim; the note there
          says why the key is [uvis_of U'] and not the parked one. *)
-      (URes h pt' (add_vec ks (mword_of_int 4096)) U'
-       ∗ uslot (uvis_of U'))))%I.
+      (* ONE [sts] for the residue and the key -- [ParkCap.park_pkg], of
+         which this is the forkret-side spelling, has the argument *)
+      (∃ sts : list fdstate,
+         URes h pt' (add_vec ks (mword_of_int 4096)) U' sts
+         ∗ uslot (uvis_of U' sts))))%I.
 
 Definition forkret_park_paid_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
-    (URes : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ) (W : iProp Σ)
+    (URes : CpuId -> uptd -> mword 64 -> ustate -> list fdstate -> iProp Σ) (W : iProp Σ)
     (γs : list gname) (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
     (pid : mword 32) (U : ustate) (av : nat) : Prop :=
   (length rest = 12%nat) ->

@@ -223,6 +223,30 @@ the wrapper can report success while the log ends in `Error 1`.  Write the
 sentinel into the log (`> log 2>&1; echo "EXIT=$?" >> log`) and grep the log,
 never the wrapper's exit alone.
 
+**EDIT A FILE WHILE A REMOTE BUILD IS RUNNING AND THE NEXT BUILD SILENTLY
+SKIPS IT.**  The sync preserves the LOCAL mtime, and the remote `.vo` from
+the build in flight is stamped with the REMOTE clock at the moment it was
+compiled — which is later.  So a `.v` edited at 10:05 against a `.vo` the
+running build produced at 10:12 looks up to date, make says nothing, and
+the file keeps its stale `.vo` through every later round.  The symptom is
+a file that NEVER appears in any `ROCQ compile` line while its errors are
+plainly still in the source.
+
+**A LOCAL `touch` DOES NOT FIX IT.**  The sync compares by CONTENT
+(`--no-checksum` is an opt-out, so checksums are the default), so a file
+whose bytes did not change is not transferred at all and its remote mtime
+never moves.  What works is deleting the stale artifacts ON THE REMOTE, in
+the same invocation as the build:
+
+```sh
+FILES=$(git diff --name-only | grep '^iris/.*\.v$' | sed 's|^iris/||' | tr '\n' ' ')
+run-on-gcp opam exec --switch=/shared/xv6rocq -- bash -c \
+  "cd iris && for f in $FILES; do rm -f \${f%.v}.vo \${f%.v}.vos \${f%.v}.vok \${f%.v}.glob; done \
+   && make -f CoqMakefile -j180 -k"
+```
+
+Better still: do not edit while a remote build is in flight.
+
 ## Getting the .vo back for a local recheck
 
 Rechecking one file locally normally means building the whole tree locally

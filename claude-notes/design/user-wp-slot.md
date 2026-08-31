@@ -457,3 +457,141 @@ user-mode-on-kernel engine — the full account is
   proofs are untouched; `uv_cap` and `UmodeKernelTie` therefore survive
   for them.  Loads and branches are not yet ported (sync needs neither).
 - Still open: whether `uvis_tf` shrinks to the 32 user-visible words.
+
+**Stage 4: the DESCRIPTOR VIEW in the key** (owner-directed; this is
+part (A)'s refinement taken at the KEY rather than as an iProp payload —
+see [`fd-row-pilot.md`](fd-row-pilot.md) §2 (c1), which recommended
+against it, and was overruled).
+
+- `uvis` gains `uvis_fd : list fdstate` — one `FdSlots.fdstate` per
+  descriptor, the user-visible state of `p->ofile[]` (CLOSED, or OPEN at a
+  type).  It is in the key for exactly `uvis_sz`'s reason: open(2) hands
+  back a descriptor of a known type and the program's next read(2) behaves
+  by that type, so a contract that cannot NAME it cannot say what the
+  program observes.
+- **It is a VALUE, not the ghost name.**  `ProcDefs.pv_fdg` names the
+  per-incarnation ghost; the states under it are what the kernel holds as
+  `FdSlots.fd_frags (pv_fdg V) sts`, and `sts` is what the key carries.
+  So `uvis_of` takes it as a PARAMETER (`uvis_of U sts`) rather than
+  projecting it: `ustate` has the name and not the values.  Every call
+  site is a boundary that already has the bundle in reach.
+- **`urun` hides it existentially**, beside `C`, `pt`, `Rut`, `sz`, `M`
+  and `pm` — so no program proof mentions it, and the ~250 `urun` uses in
+  `UkSh` / `UkCat*` / `UkInit*` / `UkRunLeaf` did not move.  A leaf that
+  is closing back up has just destructed the existential, so it can say
+  which view it is at: `urun_close` takes `fdv` as a parameter, exactly as
+  it already takes `sz`.
+- **`ukb_F` pins it** (`⌜uvis_fd W' = fdv⌝`, the third of the same kind
+  after the permission map and the break).  FREE at the dispatcher — the
+  trap-out key is built AT the contract's `fdv`, so all three are
+  `reflexivity` — and it is what gives the transparent arm its shape: a
+  page fault or an interrupt carries `W'` through unchanged, so the view
+  the contract names survives it.  Read that as a statement about the KEY
+  until the tie below lands.
+- **The syscall arms ∀-bind `fdv'` with no row.**  `usys_mem_ok` is
+  untouched: its vocabulary is `(n, tf, r, M, π, szv)` and the fd table is
+  not a function of any of them.  The loop's choice is the entry view
+  (`UexecApply.uexec_ret_round_slot` takes `uvis_fd W' = uvis_fd W` as a
+  premise), which is exact for every entry but the four that touch
+  `p->ofile[]` — pipe (4), dup (10), open (15), close (21).
+- **The value is a READING, and the park channel is where it is read.**
+  `FdSlots.fd_frags` lives in exactly one place on this route: allocproc
+  mints it with the block (`SpecAllocproc`), the parker CAPTURES it into
+  the resume closer (`ParkCap.park_token_park`'s `Hfrag` premise —
+  deliberately not part of `park_child`, which goes straight to the cap),
+  and at the resume the closer re-keys it onto `U'` and spends it into
+  `park_chan`'s closer, which is what manufactures the residue
+  (`UsertrapRes.ut_own`'s `fd_frags_any` conjunct).  So the bundle is in
+  hand at exactly the point the key is minted, and that is where `sts`
+  comes from.
+- **Hence `∃ sts`, not `∀ sts`, in the closers' conclusion.**  The
+  PRODUCER picks the descriptor view, because the producer is the party
+  holding the fragments; a ∀ would let the CONSUMER name any view at all,
+  including one the process does not have — which is precisely the sense
+  in which the field would carry no information.  `park_token_park` reads
+  `sts` off `Hfrag` and re-weakens to `fd_frags_any` for the residue, so
+  the view the slot is keyed at and the view the residue carries are the
+  same list by construction.
+- **Why the reading stays true across the park.**  Holding
+  `fd_frags γ sts` pins the states (`FdSlots.fd_st_agree`: either half
+  pins it, and the authority rides with the array in
+  `ProcInv.proc_ofiles`), and nothing can move them between the park and
+  the resume, because an update needs BOTH halves (`fd_st_both_update`)
+  and the closure holds one.  Not even forkret's boot arm, which runs
+  `kexec("/init")` in between: exec does not touch `p->ofile[]`.
+- **What is still not STATED.**  The tie is by construction, not by a
+  proposition: no consumer can yet PROVE `uvis_fd W = sts` against the
+  residue it holds, because `ut_own` carries `fd_frags_any` and not
+  `fd_frags γ sts` at an `sts` the residue names.  Indexing the residue is
+  what would state it — and it is the same change the four fd-touching
+  syscall rows need, since their receipts have to travel with an explicit
+  bundle.
+
+**Stage 5: the descriptor RESOURCE follows the image into `uvb`**
+(owner-directed, "keep pushing up the stack"; answers the owner's own
+question — "should we take the fd_frags out of the UT residue, and move it
+into wherever the process memory-image view is tracked?" — with *yes*).
+
+Stage 4 put the descriptor states in the KEY, where they are a reading
+taken off the residue.  Stage 5 moves the RESOURCE to sit beside the image,
+so that `uvis_fd W = sts` stops being true-by-construction at the mint and
+becomes something the contract carries.  It lands in two increments.
+
+- **`Rfd : list fdstate -> iProp Σ`, abstract, beside `Rut`.**  `uvb_F`
+  gains a `Rfd fdv` conjunct next to `user_ptm_inv pt sz M`, and `ukb_F`
+  takes `Rfd (uvis_fd W')` BACK at the trap — without that second half the
+  resource is gone at the first trap and the process could never be
+  resumed again.  `uslot_F` ∀-binds `Rfd` beside `Rut`, so the PROCESS is
+  safe at any realization and it is the KERNEL that must produce it to
+  resume.  `urun` hides it existentially, so no program proof moved.
+- **Why abstract and not `FdSlots.fd_frags γ`.**  For `Rut`'s exact
+  reason: `fd_frags` needs `fdslotG Σ`, and naming it in `UexecRet` would
+  widen the whole engine's class context down to every `Uk*` leaf.  `Rfd`
+  is also NOT in the key, for the reason the realizing table is not — a
+  key is what two parties agree on, and the realization is the kernel's
+  private business.
+- **It sits beside the image in the KEY's bundle, but it travels like
+  `Rut`.**  Worth stating because the two differ mechanically: the engine
+  destructs `uvb` at each cycle's head (`UkStep.uvb_elim`) and rebuilds it
+  at the tail (`uvb_intro`), and the IMAGE is reconstructed there out of
+  the concrete machine bytes (`uv_land_close`) rather than carried.  An
+  abstract `Rfd fdv` cannot be reconstructed, so it has to be THREADED —
+  through exactly the channel `Rut pt` already uses, the cycle's payload
+  (`UkStep.uk_payload`, and the twenty `R -∗ Rut pt ∗ ukb …` closures in
+  `UkStep` / `UkStore` / `UkLoad`, each of which gains a `Rfd fdv`
+  conjunct).  Expect the ripple to land on the payload shape, not on the
+  image plumbing.
+- **Increment B1 (landed) instantiates `Rfd := λ _, emp`.**  The engine,
+  `UserretUser` and the loop all carry the resource POSITION; the
+  fragments stay in the residue.  This is the mechanical half — 19 files
+  of arity — and landing it green first is what keeps the semantic half
+  down to `ProofUserretClosed` plus the residue accessors.
+- **Increment B2 (next) moves the fragments.**  `ut_own_nopt` drops its
+  `fd_frags` conjunct, `ut_own_pt_open` hands them out with the image and
+  `ut_own_pt_close` takes them back, and the loop instantiates
+  `Rfd := fd_frags (pv_fdg (us_V U2))`.
+
+Two things B2 has to get right, both found by reading rather than by the
+compiler:
+
+- **`ut_own_nopt`'s `sts` index goes PHANTOM, and must be admitted as
+  such.**  Once the fragments are out on loan the reduced residue holds
+  only the authority, and `FdSlots.fd_st_agree` needs both halves — so
+  `_nopt` alone cannot pin its own index.  The index is worth keeping
+  anyway (every site that holds a `_nopt` holds the matching fragments in
+  the same context, and keeping it means Stage A's threading through
+  uservec, usertrap and the park channel stands unchanged), but
+  `ut_own_pt_close` must be ∀-GENERAL in the states that come back rather
+  than demanding them at the index.  Writing it the other way round reads
+  like a theorem and is not one.
+- **`uexec_ret_round_slot`'s `uvis_fd W' = uvis_fd W` premise is needed by
+  exactly ONE arm.**  Its proof binds the hypothesis as `Hfd` and uses it
+  in a single place, the TRANSPARENT branch (interrupt, page fault) —
+  which is right, because no syscall ran there, so the states genuinely
+  cannot have moved.  The exec and fork arms `iApply "Hmk"` (a mint, free
+  at any key), and the returning ecall arm already instantiates
+  `uexec_ret`'s ∀-bound `fdv'` at an arbitrary `uvis_fd W'`.  So letting
+  the loop resume at the POST-SYSCALL view — which is what the four fd
+  rows need — is a matter of weakening that premise to
+  `sc <> ECALL -> uvis_fd W' = uvis_fd W`, not of restructuring the
+  lemma.  This is the step that makes pipe/dup/open/close expressible.

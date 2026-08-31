@@ -136,17 +136,20 @@ Section UserretClosed.
      [ud_data = ud_pas] makes [ProcPtOwn.ud_norm] the identity on [pt], so
      the loop re-keys the index onto [pt] itself when it reads the residue
      back ([UV.usertrap_res_bare_norm]). *)
+  (* [sts] is ∃-packed here beside [ksp] and [U]: [Rut] is [uptd -> iProp],
+     so the loop carries the residue without naming its index.  Stage B --
+     the fd resource in [uvb] -- is what gives the key a name for it. *)
   Definition Rut_at (h : CpuId) (sz : Z) : uptd -> iProp Σ :=
-    fun p => (∃ (ksp : mword 64) (U : ustate),
+    fun p => (∃ (ksp : mword 64) (U : ustate) (sts : list fdstate),
                 ⌜uint (pv_sz (us_V U)) = sz⌝ ∗
-                UV.usertrap_res_bare (CID := h) p ksp U)%I.
+                UV.usertrap_res_bare (CID := h) p ksp U sts)%I.
 
   Lemma Rut_at_intro (h : CpuId) (sz : Z) (p : uptd) (ksp : mword 64)
-      (U : ustate) :
+      (U : ustate) (sts : list fdstate) :
     uint (pv_sz (us_V U)) = sz ->
-    UV.usertrap_res_bare (CID := h) p ksp U -∗ Rut_at h sz p.
+    UV.usertrap_res_bare (CID := h) p ksp U sts -∗ Rut_at h sz p.
   Proof.
-    intros Hsz. iIntros "H". rewrite /Rut_at. iExists ksp, U.
+    intros Hsz. iIntros "H". rewrite /Rut_at. iExists ksp, U, sts.
     iSplitR; [ iPureIntro; exact Hsz | iExact "H" ].
   Qed.
 
@@ -197,7 +200,9 @@ Section UserretClosed.
     iDestruct "Hframe" as (ms_v)
       "(%Hlen & %Hmsok & Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc &
         Hpc & Hgpr & Hupt & Hcfg & Hrut)".
-    iDestruct "Hrut" as (ksp U0) "[%Hsz Hures]".
+    (* [Rut_at] packs three: the stack, the record, and the descriptor
+       states the residue is indexed by. *)
+    iDestruct "Hrut" as (ksp U0 sts0) "[%Hsz Hures]".
     (* put [Hszw] in terms of the residue's size FIRST: otherwise [subst sz]
        has two equations to choose from and takes the wrong one. *)
     rewrite <- Hsz in Hszw.
@@ -219,13 +224,13 @@ Section UserretClosed.
     (* ---- one round.  [Hret] -- the linear [uexec_ret] user execution
            handed back -- is FRAMED across the crossing (R-a / K8). ---- *)
     iApply (UV.wp_uservec_pt C pt (fun _ : uptd => emp%I) j ksp
-              (us_upt U0 pt) (uvis_M W) (tf_resume_gpr0 (uvis_tf W))
+              (us_upt U0 pt) sts0 (uvis_M W) (tf_resume_gpr0 (uvis_tf W))
               ms_v sc stv (tf_w (uvis_tf W) tf_epc_idx)
               Hstv Hdqc Hmie Hj Hnorm Hptwf
               with "Hkt Hhw Hmin Hclaim Hframe Hures [-]").
     iApply wp_next_intro. iIntros (CID').
     rewrite /uservec_post.
-    iIntros (pt' mf ms' usatp uepc sc' stval' mdv0 U2)
+    iIntros (pt' mf ms' usatp uepc sc' stval' mdv0 U2 sts2)
       "%Huptpt' %Hround' %Hpcret' %Hgprtie'
        %Hpttf %Hmapwf %Hsatpr %Hnorm' %Hptwf' %Hmm %Hretms %Hacc'
        Hhs' Hpriv' Hms' Hmie' Hmdl' Hmenv' Hstvec' #Hsenv' Hsc' Hstval' Hsepc'
@@ -262,7 +267,9 @@ Section UserretClosed.
       iSplitR; [iExists mcen', scen'; iFrame "Hmcen' Hscen'"
                | iExists hpm'; iFrame "Hhpm'"]. }
     (* the residue, parked at the size the next round will resume under *)
-    iDestruct (Rut_at_intro CID' (uint (pv_sz (us_V U2))) pt' ksp U2 eq_refl
+    (* the residue comes back at whatever states the round left ([sts2'],
+       named where [uservec_post] handed it over); [Rut_at] packs them. *)
+    iDestruct (Rut_at_intro CID' (uint (pv_sz (us_V U2))) pt' ksp U2 _ eq_refl
                  with "Hures'") as "Hrut'".
     (* ---- STEPS A/B: the returned [uexec_ret], re-keyed onto the record
            the round left ([UexecApply]).  The round is stated at the RUN
@@ -282,26 +289,49 @@ Section UserretClosed.
                  with "Hmk Hret") as "Hslot".
     (* ---- STEPS C/D: the guard, and the bundle, both inside the named
            lemma -- the loop only says which key it is at. ---- *)
-    assert (Hpi2 : uvis_perm (uvis_of U2)
+    (* THE RESUMED KEY'S DESCRIPTOR VIEW is the one that trapped: user
+       execution runs no kernel code, and the loop's choice for the syscall
+       arms (which ∀-bind it) is the same value -- see
+       [UexecApply.uexec_ret_round_slot]'s header. *)
+    assert (Hpi2 : uvis_perm (uvis_of U2 (uvis_fd W))
                    = perm_of (ud_um pt') (uint (pv_sz (us_V U2))))
       by (cbn [uvis_of uvis_perm]; rewrite Huptpt'; reflexivity).
+    (* [Rfd] AT [emp], FOR NOW.  The bundle has the slot for the process's
+       descriptor view but the loop does not yet put the fragments in it:
+       they stay in the residue ([UsertrapRes.ut_own]'s named [sts]), and
+       moving them across is the next increment.  What this buys already is
+       that every layer between here and the program proofs carries the
+       view's RESOURCE POSITION, so that move is a change to this file and
+       the residue accessors rather than to the engine. *)
     iApply (uslot_apply_loop (CID := CID') (loop_ucfg mdv0 Hmm) pt'
+              (fun _ : list fdstate => emp)%I
               (Rut_at CID' (uint (pv_sz (us_V U2)))) (uint (pv_sz (us_V U2)))
-              (uvis_of U2) (us_M U2) mf
+              (uvis_fd W)
+              (uvis_of U2 (uvis_fd W)) (us_M U2) mf
               (sret_ms5 ms') sc' stval' uepc (ret_pc uepc)
               (loop_ok_loop_ucfg mdv0 Hmm pt' Hnorm' Hptwf')
               Hszok
               (user_mstatus_ok_sret_ms5 ms' HSXL HMXR HFS HVS HTVM HTSR
                  HXS HSD HMPP HSPIE)
-              Hpi2 eq_refl eq_refl (eq_sym Hgprtie') (eq_sym Hpcret')
-              with "Hslot Hhw' Hmin' Hwire Hregs' Hupt' Hcfg' Hrut' [-]").
+              Hpi2 eq_refl eq_refl eq_refl (eq_sym Hgprtie') (eq_sym Hpcret')
+              with "Hslot Hhw' Hmin' Hwire Hregs' Hupt' [] Hcfg' Hrut' [-]").
+    (* the bundle's [Rfd fdv] premise, which is [emp] while [Rfd] is
+       instantiated at [λ _, emp] -- this is the goal the fragments will
+       discharge once they move out of the residue *)
+    { iEmpIntro. }
     (* the next round's contract, under the later the bundle takes it at --
        which is exactly the shape of the Löb hypothesis.  A GENUINE Löb back
        edge, so [iNext] and not [bi.later_intro]. *)
     iNext. rewrite /ukb /ukb_F.
-    iIntros (W2 sc2 stv2) "%Hp2 %Hs2 Hpair".
+    (* the fd pin is DROPPED here: the Löb hypothesis is ∀-general in the
+       key, so the next round is proved at whatever descriptor view the
+       trap-out key names. *)
+    (* the middle conjunct is [Rfd (uvis_fd W2)] = [emp] at this
+       instantiation, so it is dropped; when the fragments move in, this is
+       where the loop takes them back and closes the residue with them. *)
+    iIntros (W2 sc2 stv2) "%Hp2 %Hs2 %Hf2 (Hframe2 & _ & Hret2)".
     iApply ("IH" $! CID' (loop_ucfg mdv0 Hmm) pt' (uint (pv_sz (us_V U2)))
-              W2 sc2 stv2 with "[%] [%] [%] Hhw' Hmin' Hpair").
+              W2 sc2 stv2 with "[%] [%] [%] Hhw' Hmin' [$Hframe2 $Hret2]").
     - exact (loop_ok_loop_ucfg mdv0 Hmm pt' Hnorm' Hptwf').
     - exact Hp2.
     - exact Hs2.
@@ -359,9 +389,10 @@ End Res.
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (C : ucfg) (pt : uptd)
       (kroot : mword 44) (j : nat) (ksp : mword 64)
-      (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64) (U : ustate) :
+      (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64) (U : ustate)
+      (fdv : list fdstate) :
       wp_userret_closed_body (fun h : CpuId => usertrap_res_bare (CID := h))
-        C pt kroot j ksp m usatp mstatus0 sepc0 sc_v stval_v U.
+        C pt kroot j ksp m usatp mstatus0 sepc0 sc_v stval_v U fdv fdv.
   Proof.
     cbv beta delta [wp_userret_closed_body].
     intros Hok Hj Hretms Hwf Ha0 Hsatpr Hinj Hacc.
@@ -418,7 +449,9 @@ End Res.
     iEval (rewrite <- (tf_resume_gpr_x0 m ws Hx0)) in "Hkc".
     iDestruct (tf_page_open36 (ud_tfp pt) ws Hlenws with "Htfp") as
       (u0 u1 u2 u3 u4 u40 u48 u56 u64 u72 u80 u88 u96 u104 u112 u120 u128 u136 u144 u152 u160 u168 u176 u184 u192 u200 u208 u216 u224 u232 u240 u248 u256 u264 u272 u280) "(-> & Hu0 & Hu8 & Hu16 & Hu24 & Hu32 & Htf40 & Htf48 & Htf56 & Htf64 & Htf72 & Htf80 & Htf88 & Htf96 & Htf104 & Htf112 & Htf120 & Htf128 & Htf136 & Htf144 & Htf152 & Htf160 & Htf168 & Htf176 & Htf184 & Htf192 & Htf200 & Htf208 & Htf216 & Htf224 & Htf232 & Htf240 & Htf248 & Htf256 & Htf264 & Htf272 & Htf280 & Htail)".
-    iApply (RU.wp_userret_user C pt (uint (pv_sz (us_V U))) (us_M U)
+    iApply (RU.wp_userret_user C pt (uint (pv_sz (us_V U))) fdv (us_M U)
+              (* [Rfd] at [emp] here too -- see the loop's note *)
+              (fun _ : list fdstate => emp)%I
               (LP.Rut_at CID (uint (pv_sz (us_V U)))) kroot m usatp
               mstatus0 sepc0 sc_v stval_v
               u40 u48 u56 u64 u72 u80 u88 u96 u104 u120 u128 u136 u144 u152 u160 u168 u176 u184 u192 u200 u208 u216 u224 u232 u240 u248 u256 u264 u272 u280 u112 (DfracOwn 1)
@@ -430,7 +463,9 @@ End Res.
                     Hsepc Hclaim Hktlb Hufr Hpc Hfile
                     Htf40 Htf48 Htf56 Htf64 Htf72 Htf80 Htf88 Htf96 Htf104 Htf120 Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176 Htf184 Htf192 Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256 Htf264 Htf272 Htf280 Htf112
                     Hsc Hstval Hstvec Hmedlc Hmsec Hssec Hmcen Hscen Hhpm Hdata
-                    [Hclose Hu0 Hu8 Hu16 Hu24 Hu32 Htail] Hkc [-]").
+                    [] [Hclose Hu0 Hu8 Hu16 Hu24 Hu32 Htail] Hkc [-]").
+    - (* the bundle's [Rfd fdv], [emp] at this stage's instantiation *)
+      iEmpIntro.
     - (* [Rut] at this hart, as a CLOSER: the residue minus the save slots,
          completed by the words userret gives back -- and WHOLE, since the
          slot never came out of it (R-a).  The size row is [reflexivity]:
@@ -441,16 +476,20 @@ End Res.
       (* the kernel words are untouched: userret only READ the page *)
       iDestruct ("Hclose" with "[%] Htfp'") as "Hres'";
         [ refine (tf_kernel_words_ok_tail _ _ _ _ _ _ _ _ _ Hokws) | ].
-      rewrite /LP.Rut_at. iExists ksp, _.
+      (* [Rut_at] packs three now: the stack, the record, and the states *)
+      rewrite /LP.Rut_at. iExists ksp, _, _.
       iSplitR; [| iExact "Hres'"].
       iPureIntro. reflexivity.
     - (* the trap seam, at the kernel obligation's own shape: the loop is
          handed the record that trapped and what user execution returned
          there, which is exactly this Löb hypothesis. *)
       iApply bi.later_intro. rewrite /ukb /ukb_F.
-      iIntros (W sc stv) "%Hp %Hs Hpair".
+      (* the fd pin is dropped: the loop's Löb hypothesis is ∀-general in
+         the key, so it is proved at whatever descriptor view the trap-out
+         key names. *)
+      iIntros (W sc stv) "%Hp %Hs %Hf (Hframe & _ & Hret)".
       iApply ("Hloop" $! CID C pt (uint (pv_sz (us_V U))) W sc stv
-                with "[%] [%] [%] Hhw Hmin Hpair").
+                with "[%] [%] [%] Hhw Hmin [$Hframe $Hret]").
       + rewrite /loop_ok.
         split; [exact Hstv | split; [exact Hdqc | split; [exact Hmie |
           split; [exact Hmedl | split; [exact Hnorm | exact Hptwf]]]]].

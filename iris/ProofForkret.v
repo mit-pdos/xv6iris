@@ -694,7 +694,7 @@ Proof.
      first round consumes. *)
   iDestruct ("Hyield" $! CIDf pt (MkUstate (upd_upt V' pt) (us_M U))
                with "[%] [%] [%] [%] Htfk' Hdone HW Htc Hyld")
-    as "[Hures Hslot]"; [reflexivity | exact Hnorm | exact Hptwf | | ].
+    as (sts) "[Hures Hslot]"; [reflexivity | exact Hnorm | exact Hptwf | | ].
   (* the resumed record names the parked process's fd-state ghost: forkret
      moved only [pv_upt], and [upd_upt] does not touch [pv_fdg]. *)
   { exact Hfg. }
@@ -709,10 +709,15 @@ Proof.
          key records, which is [ret_pc] of the trapframe's own epc word.
          [mepc_val] and [ret_pc] are the same function under two names, so
          [ret_pc_idem] closes it. ---- *)
+  (* THE KEY'S DESCRIPTOR VIEW comes out of the closer, not out of thin
+     air: the parker captured the process's [FdSlots.fd_frags] bundle and
+     the closer keyed the slot at ITS states ([ParkCap.park_pkg]), so this
+     [sts] is a reading of [p->ofile[]] and not a choice forkret makes.
+     Named at the [iDestruct] of the closer's shared existential above. *)
   assert (Hpcslot : tf_resume_pc
-                      (uvis_tf (uvis_of (MkUstate (upd_upt V' pt) (us_M U))))
+                      (uvis_tf (uvis_of (MkUstate (upd_upt V' pt) (us_M U)) sts))
                     = ret_pc (mepc_val epc)).
-  { change (uvis_tf (uvis_of (MkUstate (upd_upt V' pt) (us_M U))))
+  { change (uvis_tf (uvis_of (MkUstate (upd_upt V' pt) (us_M U)) sts))
       with (pv_tf V').
     rewrite <- (tf_ueq_resume_pc (pv_tf (us_V U)) (pv_tf V') Htueq).
     unfold tf_resume_pc, tf_w.
@@ -723,7 +728,7 @@ Proof.
   iApply (UC.wp_userret_closed (CID := CIDf)
             (loop_ucfg mdv0 Hmask) pt kroot j ksp (tp_pin SE)
             (kvi_satp_word (ud_root pt)) msg (mepc_val epc) scv stv
-            (MkUstate (upd_upt V' pt) (us_M U))
+            (MkUstate (upd_upt V' pt) (us_M U)) sts
             (loop_ok_loop_ucfg mdv0 Hmask pt Hnorm Hptwf)
             Hjlt
             Hretms Hmapwf HSEa0
