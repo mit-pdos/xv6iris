@@ -2199,6 +2199,17 @@ frozen touched; all EC2-green, zero `Admitted`, zero new `Axiom`):
   resolved row = `ADev CONSOLE 0`) and the functor
   `FdRowPilotWalk.wp_pilot_open2` (the same read through one sealed-leaf
   application — the shape the enriched init walk consumes).
+- `iris/FdRowMint.v` — **stage P3, LANDED** (619 lines vs a 508-line
+  budget; 138 statement/proof lines, the rest the era-0 argument and the
+  §6 ask).  The era-0 mirror value `era0_u S`, the two halves' HOMES
+  (`mirror_entry` = init's entry package, `mirror_tied` = the enriched
+  loop's residue), the mint, and the userinit-park arm in parallel form.
+  Sealed with `Global Typeclasses Opaque mirror_entry mirror_tied`
+  (`fd_frags` is a `big_sepL` two `Definition`s down — the standing
+  `iFrame`-delta rule).  **Nothing is sealed as a `Parameter` and no
+  `Axiom` is added: 0 sealed / 12 statements discharged.**  It is the
+  PILOT CONE's leaf now (it requires `FdRowPilot`, which requires
+  `FsImgCheck`); nothing may require `FdRowMint`.
 
 AS-LANDED FINDINGS:
 1. **A wand-shaped kernel seal would be a GAP-premise trap in Module-Type
@@ -2237,11 +2248,92 @@ THE STAGES (prover lanes; budgets keyed to the landed analogues):
   via `uheap_ustrq`, re-close with `urun_close_upd`'s twin).  BUDGET:
   `UkStep.wp_uk_ecall` measures 126 lines and `wp_uk_ecall_window` ~100;
   budget 300 with the re-close plumbing.  Opus-sized, blocked on nothing.
-- [ ] **P3 — the era-0 mint** at the userinit park: allocate the `mcur`
-  pair (`mcur_alloc`), seed = `era0_seed_boot` at the boot snapshot's S,
-  user half + seed into init's entry deposit, kernel half parked beside
-  the residue.  BUDGET: lane-P scale (`FsInitPin` port = 508 lines).
-  Sequenced with P4 (the kernel half's home is the enriched loop's).
+- [x] **P3 — the era-0 mint** at the userinit park.  LANDED in
+  `iris/FdRowMint.v` (EC2-green, zero `Admitted`, zero new `Axiom`).
+
+  THE MINT, as landed:
+
+  ```coq
+  Theorem mirror_era0_mint_tied (γfd : gname) Γ (S : fs_state_rec) :
+    snap_ok S era0_D ->
+    fd_frags γfd fdt0 -∗
+    astate Γ (abs_view (fss_inodes S)) -∗
+    |==> ∃ γm : gname,
+      mirror_tied γm γfd Γ FsImg.ROOTINO (era0_u S)
+      ∗ mirror_entry γm (era0_u S).
+  ```
+
+  with `era0_u S := MkUmirror fdt0 (abs_view (fss_inodes S)) ROOTINO` and
+  the two halves' homes
+
+  ```coq
+  mirror_entry γm u        := mcur γm u ∗ ⌜era0_seed u⌝
+  mirror_tied γm γfd Γ cw u := mcur γm u ∗ fd_frags γfd (um_fdt u)
+                              ∗ astate Γ (um_av u) ∗ ⌜um_cwd u = cw⌝
+  ```
+
+  WHERE THE HALVES LAND, and why the residue is shaped that way:
+  `mirror_entry` is init's entry deposit — the user half beside the seed,
+  i.e. exactly `pilot_console_pure`'s first premise packed with the
+  resource the enriched arm's right disjunct takes.  `mirror_tied` is the
+  enriched loop's residue: the kernel half held BESIDE the real ghosts, at
+  their reading, so faithfulness is DEFINITIONAL at the residue's index
+  rather than a conjunct that could quietly be false — the fd leg IS
+  `fd_frags`' list, the av leg IS `astate`'s view.  P4's obligation is
+  therefore to RE-INDEX the pair, which is what `mirror_tied_round` (the
+  join + the caller's real-ghost move + the re-index, with `⌜ud = u⌝` as
+  the anti-drift receipt) is shaped for.  Also proven: `mirror_tied_agree`
+  / `_open` / `_close` / `_fdlen` / `_row` (a `nview` share agrees with
+  the MIRROR's row — the move that justifies open's observed `anode` at
+  P4), `mirror_tied_quiet` (a non-`uenr_dom` row moves nothing),
+  `astate_era0_console_miss` and `mirror_tied_era0_console_miss` (the
+  console-miss read at the live authority and off the residue —
+  `FsInitPin` §6's route (a), for the pilot's own facts),
+  `mirror_era0_mint` (the bare mint, pure premise only),
+  `mirror_park_family_of_gen` / `_box` and `mirror_era0_park_arm`.
+
+  **THE SOLO SCOPING, CASHED OUT IN ONE CONJUNCT.**  The owner's ruling
+  costs exactly this: the residue holds `astate Γ (um_av u)` — the
+  EXCLUSIVE authority — rather than a share or an observation.  A residue
+  owning the whole authority across a process's excursion is inhabitable
+  only in a quiescent single-process era, so the scoping is a condition on
+  who may HOLD the residue, not a hedge inside it.  The post-fork row
+  weakens that ONE conjunct to existential observations + persistent
+  certificates and changes nothing else.
+
+  AUDIT (`Print Assumptions`, EC2): `mirror_era0_mint` and
+  `mirror_era0_mint_tied` report the SAME TEN as `FsInitPin.
+  era0_init_path_pin` and `FdRowPilot.era0_seed_boot` — the
+  `PrimInt63`/`PrimString` primitives entries 3–12 of the standing
+  thirteen, which the adequacy baseline records as image-backed, not
+  assumptions.  So the era-0 leg matches its budgeted analogue EXACTLY,
+  with no delta.  `mirror_tied_round` and `fd_frags_fdt0` are **Closed
+  under the global context**.  `mirror_park_family_of_gen` reports only
+  `resv_matches` + `resv_is_valid` (the machine layer, entering with
+  `uslot`/`uslot_fs`) and `mirror_era0_park_arm` the union — twelve of the
+  standing thirteen.  `functional_extensionality_dep` appears NOWHERE.
+
+  AS-LANDED FINDING (the ask's whole cost): **allocproc's fresh table is
+  minted at its VALUE and existentially closed one line later.**
+  `ProcInv.v:2403` builds `fd_frags γd (replicate NOFILE FdClosed)` — which
+  IS `fdt0` — and `ProcInv.v:2408` closes it into `fd_frags_any`, in which
+  form it travels through `SpecAllocproc`'s post (`SpecAllocproc.v:195`)
+  and `ParkCap.park_token_park` to the userinit park.  The value CANNOT be
+  recovered downstream (`fd_frags_any` yields the length and nothing else;
+  `FdRowMint.fd_frags_any_len` is everything it gives), so it has to be
+  CARRIED.  `FdSlots.v`'s own header already prices this class as a change
+  of parameter at the holder, not a re-plumb.
+
+  THE DIFF-SHAPED ASK for the upstream mint arm is `FdRowMint.v` §6,
+  verbatim; the one-line summary is that `ProofUserinit`'s MINT SITE #1
+  gains three `iMod` lines between two untouched blocks, the park's family
+  argument keeps its NAME and POSITION and changes only its type
+  (`∀ W, uslot W` → `∀ W, uslot_fs γm W`, discharged by the proven
+  `mirror_park_family_of_gen`), and the arm needs three things the site
+  does not have today: the pinned `fd_frags (pv_fdg V) fdt0` (finding
+  above), the founded `astate Γ (abs_view (fss_inodes S))` at the boot
+  instant (`FsInitPin` §6's posture; the mint is one `|==>`, so opening it
+  under an invariant is atomic), and the pure `snap_ok S era0_D`.
 - [ ] **P4 — the enriched loop round** (the kernel side; milestone-J
   shaped, upstream's with our support).  The excursion relays the AU
   receipts (the AU dispatch arms are landed; the relay is a
@@ -2249,7 +2341,11 @@ THE STAGES (prover lanes; budgets keyed to the landed analogues):
   `ProofSysOpenTails`' resource-generic continuations are the precedent
   that priced the AU walks) and the loop's right branch joins the mirror
   halves, steps them off `open_fd_ok`'s explicit `sts` /
-  `mknod_post_ok_era`, and supplies the `ufs_step` tie.  Also owes the
+  `mknod_post_ok_era`, and supplies the `ufs_step` tie.  The ghost
+  skeleton of that round is already proven — `FdRowMint.mirror_tied_round`
+  takes the real-ghost move as a wand and re-indexes both halves — so what
+  P4 owes on top is exactly the `ufs_step` tie and the wand's discharge.
+  Also owes the
   mirror-faithfulness invariant and the resolve-vs-namex alignment
   (design §5's caveat) BEFORE `uenr_dom` widens past dot-free paths.
   BUDGET: a full lane; do not start before the upstream arm ruling
@@ -2266,6 +2362,9 @@ THE STAGES (prover lanes; budgets keyed to the landed analogues):
 
 UPSTREAM ASKS (design §8, each a yes/no brief there): (1) the arm diff
 in `UexecRet.v` (conservative — the bridge is the compiled receipt;
-recommend YES); (2) the era-0 entry deposit at the userinit park (with
-P3); (3) the pure return-range conjuncts on open/mknod's rows
-(WINDOW-LEAF-style, independent; recommend YES).
+recommend YES); (2) the era-0 entry deposit at the userinit park —
+SPECIFIED, `FdRowMint.v` §6 is the diff and its three inputs (A) pinned
+`fd_frags … fdt0`, (B) the founded `astate` at the boot instant, (C) the
+pure `snap_ok S era0_D` are the whole cost; (3) the pure return-range
+conjuncts on open/mknod's rows (WINDOW-LEAF-style, independent;
+recommend YES).

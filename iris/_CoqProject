@@ -1719,8 +1719,13 @@ UkSh.v
 # FD-ROW PILOT (fs-syscall-specs; design/fd-row-pilot.md): the enriched
 # u-tier syscall row.  FsFdMirror = the pure mirror + step table;
 # UexecRetFs = the parallel enriched trap contract + the conservativity
-# bridge + the engine seal; FdRowPilot = the era-0 pilot theorems (an
-# image-check consumer -- the leaf rule applies, nothing may require it).
+# bridge + the engine seal; FdRowPilot = the era-0 pilot theorems;
+# FdRowMint = the era-0 mirror mint at the userinit park (both halves'
+# homes + the park arm in parallel form).  FdRowPilot and FdRowMint are
+# image-check consumers, so the leaf rule applies to the PILOT CONE:
+# FdRowMint is its leaf and nothing may require it; FdRowPilot is required
+# by FdRowMint alone.
 FsFdMirror.v
 UexecRetFs.v
 FdRowPilot.v
+FdRowMint.v
