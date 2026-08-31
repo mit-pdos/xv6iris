@@ -457,3 +457,49 @@ user-mode-on-kernel engine — the full account is
   proofs are untouched; `uv_cap` and `UmodeKernelTie` therefore survive
   for them.  Loads and branches are not yet ported (sync needs neither).
 - Still open: whether `uvis_tf` shrinks to the 32 user-visible words.
+
+**Stage 4: the DESCRIPTOR VIEW in the key** (owner-directed; this is
+part (A)'s refinement taken at the KEY rather than as an iProp payload —
+see [`fd-row-pilot.md`](fd-row-pilot.md) §2 (c1), which recommended
+against it, and was overruled).
+
+- `uvis` gains `uvis_fd : list fdstate` — one `FdSlots.fdstate` per
+  descriptor, the user-visible state of `p->ofile[]` (CLOSED, or OPEN at a
+  type).  It is in the key for exactly `uvis_sz`'s reason: open(2) hands
+  back a descriptor of a known type and the program's next read(2) behaves
+  by that type, so a contract that cannot NAME it cannot say what the
+  program observes.
+- **It is a VALUE, not the ghost name.**  `ProcDefs.pv_fdg` names the
+  per-incarnation ghost; the states under it are what the kernel holds as
+  `FdSlots.fd_frags (pv_fdg V) sts`, and `sts` is what the key carries.
+  So `uvis_of` takes it as a PARAMETER (`uvis_of U sts`) rather than
+  projecting it: `ustate` has the name and not the values.  Every call
+  site is a boundary that already has the bundle in reach.
+- **`urun` hides it existentially**, beside `C`, `pt`, `Rut`, `sz`, `M`
+  and `pm` — so no program proof mentions it, and the ~250 `urun` uses in
+  `UkSh` / `UkCat*` / `UkInit*` / `UkRunLeaf` did not move.  A leaf that
+  is closing back up has just destructed the existential, so it can say
+  which view it is at: `urun_close` takes `fdv` as a parameter, exactly as
+  it already takes `sz`.
+- **`ukb_F` pins it** (`⌜uvis_fd W' = fdv⌝`, the third of the same kind
+  after the permission map and the break).  FREE at the dispatcher — the
+  trap-out key is built AT the contract's `fdv`, so all three are
+  `reflexivity` — and it is what gives the transparent arm its shape: a
+  page fault or an interrupt carries `W'` through unchanged, so the view
+  the contract names survives it.  Read that as a statement about the KEY
+  until the tie below lands.
+- **The syscall arms ∀-bind `fdv'` with no row.**  `usys_mem_ok` is
+  untouched: its vocabulary is `(n, tf, r, M, π, szv)` and the fd table is
+  not a function of any of them.  The loop's choice is the entry view
+  (`UexecApply.uexec_ret_round_slot` takes `uvis_fd W' = uvis_fd W` as a
+  premise), which is exact for every entry but the four that touch
+  `p->ofile[]` — pipe (4), dup (10), open (15), close (21).
+- **What is NOT yet tied.**  The key's fd component is a reading of the
+  kernel's `fd_frags` only where a boundary instantiates it from a bundle
+  in hand.  At the park/resume closers (`ParkCap.park_pkg`,
+  `SpecForkret.forkret_closer`) `sts` is ∀-bound and the resumer picks;
+  `ProofForkret` holds no bundle of its own and passes `[]`.  Making it
+  exact means indexing the parked residue — `UsertrapRes.ut_own` carries
+  `fd_frags_any`, and it would carry `fd_frags γ sts` at an `sts` the
+  residue names — which is also what the four rows above need.  That is
+  ONE change and it buys both.

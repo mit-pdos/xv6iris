@@ -141,8 +141,15 @@ mentions; and the console tie is a function of the shared fs state.
 State-dependent content needs a state carrier, i.e. the seam.
 
 **(c1) enrich the KEY instead (a `uvis` fd-table projection field — the
-`uvis_perm`/`uvis_sz` precedent, stage 3, owner-ruled) — runner-up,
-loses on two counts.**  It could carry the fd HALF purely (rows relate
+`uvis_perm`/`uvis_sz` precedent, stage 3, owner-ruled) — OWNER-RULED IN,
+and landed: `uvis` carries `uvis_fd : list fdstate`
+([`user-wp-slot.md`](user-wp-slot.md) stage 4).  The two objections
+below stand as written and are what the landed field does NOT do — it
+carries the fd half only, and the av half stays this design's business —
+but the tax argument (ii) was mispriced: `urun` hides the field
+existentially, so no program proof names it and the ~250 `urun` sites did
+not move.  The record below is kept for the fs half's argument, which is
+unchanged.  Runner-up on the two counts:**  It could carry the fd HALF purely (rows relate
 the field; the loop pins it the way it pins `uvis_perm`).  But (i) the
 fs half cannot follow: a per-process key field mirroring the SHARED
 abstract view is not a faithful projection under concurrency, so the
@@ -306,6 +313,16 @@ the pure pilot chain), `UexecRetFs.v` (the parallel contract + bridge +
 seal), `FdRowPilot.v` (the era-0 seed + the pilot theorems), the enriched
 ecall leaf's proof once the arm lands (stage P2), and the enriched
 `UkInit` preamble walk (stage P4).
+
+**WHAT THE LANDED `uvis_fd` FIELD CHANGES HERE.**  The mirror's `um_fdt`
+leg is now a SECOND copy of something the key already carries.  When the
+enriched loop lands, `umirror` should shed `um_fdt` and keep `um_av` /
+`um_cwd`: the fd half rides the key (per-process, unconditionally
+faithful, and free across non-syscall traps by `ukb_F`'s new pin), the
+shared-fs half is what needs the deposit.  That also splits the payload
+along the line §5's solo-scoping note already draws.  Not done: the
+pilot's pure chain reads `um_fdt` throughout, so the split is a rewrite of
+`FsFdMirror`'s arm tables, not a deletion.
 
 ## 7. Non-goals, explicit
 

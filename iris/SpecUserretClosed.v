@@ -131,7 +131,11 @@ Definition wp_userret_closed_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN :
     (URes : CpuId -> uptd -> mword 64 -> ustate -> iProp Σ)
     (C : ucfg) (pt : uptd)
     (kroot : mword 44) (j : nat) (ksp : mword 64)
-    (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64) (U : ustate) :=
+    (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64) (U : ustate)
+    (* THE DESCRIPTOR VIEW the deposited slot is keyed at.  ∀-bound at the
+       entry: whoever holds the slot holds it at some [uvis_of U sts], and
+       the entry runs it at the same one. *)
+    (fdv : list fdstate) :=
   (* ---- the loop's own shape, re-established every round ---- *)
   loop_ok C pt ->
   (j < NPROC)%nat ->
@@ -190,7 +194,7 @@ Definition wp_userret_closed_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN :
          that one lemma plus the equation between its own [sepc] value and
          the trapframe's epc word. ---- *)
   ukc (perm_of (ud_um pt) (uint (pv_sz (us_V U)))) (us_M U)
-      (uint (pv_sz (us_V U)))
+      (uint (pv_sz (us_V U))) fdv
       (tf_resume_gpr0 (pv_tf (us_V U))) (ret_pc sepc0) -∗
   (* ---- the kernel-side bundle, at THIS hart ---- *)
   URes CID pt ksp U -∗
@@ -209,7 +213,8 @@ Module Type USERRET_CLOSED.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
       (C : ucfg) (pt : uptd)
       (kroot : mword 44) (j : nat) (ksp : mword 64)
-      (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64) (U : ustate),
+      (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64) (U : ustate)
+      (fdv : list fdstate),
       wp_userret_closed_body (fun h : CpuId => usertrap_res_bare (CID := h))
-        C pt kroot j ksp m usatp mstatus0 sepc0 sc_v stval_v U.
+        C pt kroot j ksp m usatp mstatus0 sepc0 sc_v stval_v U fdv.
 End USERRET_CLOSED.

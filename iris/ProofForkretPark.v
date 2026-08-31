@@ -260,7 +260,7 @@ Proof.
   (* the child's two allowances are captured HERE, at the build, and fed
      to the closer at the resume: they are the record's, not the resuming
      hart's, and forkret itself never sees them. *)
-  iAssert (∀ (h : CpuId) (pt' : uptd) (U' : ustate),
+  iAssert (∀ (h : CpuId) (pt' : uptd) (U' : ustate) (sts : list fdstate),
              ⌜pv_upt (us_V U') = pt'⌝ -∗
              ⌜ud_data pt' = ud_pas pt'⌝ -∗
              ⌜proc_pt_wf pt'⌝ -∗
@@ -275,9 +275,9 @@ Proof.
                (add_vec ks (mword_of_int 4096)) pid av (us_V U') -∗
              (FR.usertrap_res_bare (CID := h) pt'
                 (add_vec ks (mword_of_int 4096)) U'
-              ∗ uslot (uvis_of U')))%I
+              ∗ uslot (uvis_of U' sts)))%I
     with "[Hclose Hfd Hirsp]" as "Hclose".
-  { iIntros (h pt' U') "%HV %Hnorm %Hptwf %Hfg #Htfk Hdone HW #Htc Hy".
+  { iIntros (h pt' U' sts) "%HV %Hnorm %Hptwf %Hfg #Htfk Hdone HW #Htc Hy".
     iApply ("Hclose" with "[%] [%] [%] [%] Htfk Hdone HW Htc Hy Hfd Hirsp");
       [exact HV | exact Hnorm | exact Hptwf | exact Hfg]. }
   iIntros (h m eb') "%Hadm %Himg Hcg Hcpu Hpc Hcells Hpay".
@@ -379,8 +379,8 @@ Proof.
   iNext. iEval (rewrite /park_pkg) in "Hpkg". iEval (rewrite /forkret_park_pkg).
   iDestruct "Hpkg" as "(#Htext & #Hwire & #Hkmap & #Hpinv & #Hmk & Hstk & Hclose)".
   iFrame "Htext Hwire Hkmap Hpinv Hmk Hstk".
-  iIntros (h pt' U') "%HV %Hnorm %Hptwf %Hfg #Htfk Hdone HW #Htc [Htrap Hpv] Hfd Hirsp".
-  iApply ("Hclose" $! h pt' U'
+  iIntros (h pt' U' sts) "%HV %Hnorm %Hptwf %Hfg #Htfk Hdone HW #Htc [Htrap Hpv] Hfd Hirsp".
+  iApply ("Hclose" $! h pt' U' sts
             with "[%] [%] [%] [%] Htfk Hdone HW Htc Htrap Hpv Hfd Hirsp");
     [exact HV | exact Hnorm | exact Hptwf | exact Hfg].
 Qed.

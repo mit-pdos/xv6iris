@@ -244,7 +244,7 @@ Section UkSh.
     urun γt γd γs h m pc avail -∗ ubyteq γd dq a b -∗ ⌜ 0 <= a < 2 ^ 38 ⌝.
   Proof.
     iIntros "Hrun Hb".
-    iDestruct "Hrun" as (C pt Rut sz M pm) "(_ & _ & Hh & _ & _)".
+    iDestruct "Hrun" as (C pt Rut sz M pm fdv) "(_ & _ & Hh & _ & _)".
     iDestruct (uheap_ubyte with "Hh Hb") as %(_ & _ & Hbnd).
     iPureIntro. exact Hbnd.
   Qed.
@@ -275,10 +275,10 @@ Section UkSh.
     ⌜ m !!! Regidx x0_idx = zero_reg ⌝ ∗ urun γt γd γs h m pc avail.
   Proof.
     iIntros "Hrun".
-    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct "Hrun" as (C pt Rut sz M pm fdv) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
     iSplitR; [ iPureIntro; exact Hx0 | ].
-    iExists C, pt, Rut, sz, M, pm. iFrame "Hheap Hstk Hb".
+    iExists C, pt, Rut, sz, M, pm, fdv. iFrame "Hheap Hstk Hb".
     iPureIntro. split; [ exact Hlo | exact Hpm ].
   Qed.
 

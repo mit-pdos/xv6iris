@@ -70,6 +70,7 @@ Require Import UexecRet.  (* [ukc] / [ukb] / [uvb] -- the U-mode contract.
                              file puts a [uvb]-carrying continuation in the
                              proofmode context and the [Typeclasses Opaque]
                              seal does not travel (durable-notes). *)
+Require Import FdSlots.   (* [fdstate] -- the key's descriptor view *)
 Require Import UexecApply.  (* [ukc_apply] -- the bundle build, named *)
 Require Import SpecUserret.
 From Kernel Require KernelSyms.
@@ -92,7 +93,7 @@ Section UserretUser.
          MAPPED view, so the proof forgets it again ([umem_lazy_any]) before
          the bridge.  Taking the named form here is what keeps the weakening
          in ONE place instead of at every entry into the loop. *)
-      (sz : Z) (M : gmap Z (bv 8))
+      (sz : Z) (fdv : list fdstate) (M : gmap Z (bv 8))
       (Rut : uptd -> iProp Σ)
       (kroot : mword 44)
       (m : regfile) (usatp : mword 64)
@@ -252,7 +253,7 @@ Section UserretUser.
            and size.  [UexecRet.ukc] IS the slot at a natural state
            ([uslot_ukc]), so the caller does the re-key and this lemma's
            whole job is "build [uvb] and apply". ---- *)
-    ukc (perm_of (ud_um pt) sz) M sz
+    ukc (perm_of (ud_um pt) sz) M sz fdv
         (userret_gpr m vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2
            va3 va4 va5 va6 va7 vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10
            vs11 vt3 vt4 vt5 vt6 va0f)
@@ -265,7 +266,7 @@ Section UserretUser.
            actually produce.  The old shape hid all five under
            [user_trap_frame]'s existentials and typed the successor at
            [uexec_wp] (defect F1/F2, design/user-wp-slot.md). ---- *)
-    ▷ ukb C pt Rut sz (perm_of (ud_um pt) sz) -∗
+    ▷ ukb C pt Rut sz (perm_of (ud_um pt) sz) fdv -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HSIE HMPRV HSXL HTVM HMXR Hmm Hwf HTSR Hsup Ha0 HuMode Huasid Huppn
@@ -328,7 +329,7 @@ Section UserretUser.
     (* AND THE CONTINUATION RUNS.  The bundle is built row by row inside
        [UexecApply.ukc_apply] -- where the context is that lemma's own
        premises -- rather than inline here (optimization.md, RULE ONE). *)
-    iApply (ukc_apply C pt Rut sz M
+    iApply (ukc_apply C pt Rut sz fdv M
               (userret_gpr m vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2
                  va3 va4 va5 va6 va7 vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10
                  vs11 vt3 vt4 vt5 vt6 va0f)

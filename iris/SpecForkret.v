@@ -247,7 +247,7 @@ Definition forkret_closer
     (* the parked process's fd-state ghost name *)
     (g : gname)
     (pid : mword 32) (av : nat) : iProp Σ :=
-  (∀ (h : CpuId) (pt' : uptd) (U' : ustate),
+  (∀ (h : CpuId) (pt' : uptd) (U' : ustate) (sts : list fdstate),
      ⌜pv_upt (us_V U') = pt'⌝ -∗
      ⌜ud_data pt' = ud_pas pt'⌝ -∗
      ⌜proc_pt_wf pt'⌝ -∗
@@ -281,7 +281,7 @@ Definition forkret_closer
         here -- see [ParkCap.park_pkg], of which this is the forkret-side
         spelling, and projects/user-wp-slot.md SS4c (R-b) for why the key
         cannot be the parked one (the boot arm's kexec moves it). *)
-     (URes h pt' ksp U' ∗ uslot (uvis_of U')))%I.
+     (URes h pt' ksp U' ∗ uslot (uvis_of U' sts)))%I.
 
 
 (* THE CONTRACT.  One statement, no [first] premise and no [first] reading:

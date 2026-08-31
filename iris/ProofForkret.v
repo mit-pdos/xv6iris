@@ -692,7 +692,13 @@ Proof.
      BOTH ARE SPENT NOW (milestone J, S5): [wp_userret_closed] runs the
      process's own continuation, so the second is what the trap loop's
      first round consumes. *)
-  iDestruct ("Hyield" $! CIDf pt (MkUstate (upd_upt V' pt) (us_M U))
+  (* THE KEY'S DESCRIPTOR VIEW, at [[]].  The closer is ∀-general in it and
+     nothing on this path reads it: forkret holds no [FdSlots.fd_frags]
+     bundle of its own (the residue does), so there is no value here that
+     would be a READING of the process's table rather than a choice.  Tying
+     the key's fd component to the kernel's fragments is the residue's job
+     -- see the note on [UexecSlot.uvis_fd]. *)
+  iDestruct ("Hyield" $! CIDf pt (MkUstate (upd_upt V' pt) (us_M U)) []
                with "[%] [%] [%] [%] Htfk' Hdone HW Htc Hyld")
     as "[Hures Hslot]"; [reflexivity | exact Hnorm | exact Hptwf | | ].
   (* the resumed record names the parked process's fd-state ghost: forkret
@@ -710,9 +716,9 @@ Proof.
          [mepc_val] and [ret_pc] are the same function under two names, so
          [ret_pc_idem] closes it. ---- *)
   assert (Hpcslot : tf_resume_pc
-                      (uvis_tf (uvis_of (MkUstate (upd_upt V' pt) (us_M U))))
+                      (uvis_tf (uvis_of (MkUstate (upd_upt V' pt) (us_M U)) []))
                     = ret_pc (mepc_val epc)).
-  { change (uvis_tf (uvis_of (MkUstate (upd_upt V' pt) (us_M U))))
+  { change (uvis_tf (uvis_of (MkUstate (upd_upt V' pt) (us_M U)) []))
       with (pv_tf V').
     rewrite <- (tf_ueq_resume_pc (pv_tf (us_V U)) (pv_tf V') Htueq).
     unfold tf_resume_pc, tf_w.
@@ -723,7 +729,7 @@ Proof.
   iApply (UC.wp_userret_closed (CID := CIDf)
             (loop_ucfg mdv0 Hmask) pt kroot j ksp (tp_pin SE)
             (kvi_satp_word (ud_root pt)) msg (mepc_val epc) scv stv
-            (MkUstate (upd_upt V' pt) (us_M U))
+            (MkUstate (upd_upt V' pt) (us_M U)) []
             (loop_ok_loop_ucfg mdv0 Hmask pt Hnorm Hptwf)
             Hjlt
             Hretms Hmapwf HSEa0

@@ -54,6 +54,7 @@ Require Import ProcDefs ProcPt ProcPtOwn.   (* [tf_sp_idx] / [tf_arg_idx] *)
 Require Import UserPtTree UserExec.
 Require Import UmodeAbi.
 Require Import UserPerm UexecWp UexecSlot UexecRet.
+Require Import FdSlots.  (* [fdstate] -- the key's descriptor view *)
 Require Import UkAbi.   (* [uk_xpage] / [uk_stack] / [uk_args_c]: the key-level facts *)
 Require Import WpMmodeLeafBase.
 Require Import USyncKernel.
@@ -253,14 +254,14 @@ Section UexecCondCongr.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
 
-  Lemma uslot_congr (U1 U2 : ustate) :
+  Lemma uslot_congr (U1 U2 : ustate) (sts : list fdstate) :
     pv_tf (us_V U1) = pv_tf (us_V U2) ->
     us_M U1 = us_M U2 ->
     perm_of (ud_um (pv_upt (us_V U1))) (uint (pv_sz (us_V U1)))
     = perm_of (ud_um (pv_upt (us_V U2))) (uint (pv_sz (us_V U2))) ->
     (* the break is key material now *)
     pv_sz (us_V U1) = pv_sz (us_V U2) ->
-    uslot (uvis_of U1) -∗ uslot (uvis_of U2).
+    uslot (uvis_of U1 sts) -∗ uslot (uvis_of U2 sts).
   Proof.
     intros Htf Hm Hp Hs. rewrite /uvis_of Htf Hm Hp Hs. iIntros "H". iExact "H".
   Qed.

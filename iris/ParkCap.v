@@ -89,7 +89,13 @@ Section ParkCap.
      procs_inv γs ∗
      pslot_used_at pa ∗
      stack_own (KTR := KT1) (add_vec ks (mword_of_int 4096)) av ∗
-     (∀ (h : CpuId) (pt' : uptd) (U' : ustate),
+     (* [sts] IS THE RESUMED RECORD'S DESCRIPTOR VIEW, and it is ∀-bound for
+        the same reason [U'] is: the party that resumes may have replaced
+        the address space AND retyped descriptors between the park and the
+        resume, so the only honest key is the one the RESUME names.  What
+        the parker captured is the generic family, which inhabits every
+        [sts] at no cost. *)
+     (∀ (h : CpuId) (pt' : uptd) (U' : ustate) (sts : list fdstate),
         ⌜pv_upt (us_V U') = pt'⌝ -∗
         ⌜ud_data pt' = ud_pas pt'⌝ -∗
         ⌜proc_pt_wf pt'⌝ -∗
@@ -113,7 +119,7 @@ Section ParkCap.
            record, so a key captured at userinit's park is stale by then
            (projects/user-wp-slot.md SS4c, refutation R-b). *)
         (URB h pt' (add_vec ks (mword_of_int 4096)) U'
-         ∗ uslot (uvis_of U'))))%I.
+         ∗ uslot (uvis_of U' sts))))%I.
 
   (* the child's own rows, the ones the park spends *)
   Definition park_child (γs : list gname) (γf : gname) (pa ks : mword 64)
@@ -254,7 +260,7 @@ Section ParkCap.
       iNext.
       iFrame "Htext Hwire Hkmap Hprocs Hmk Hstack".
       iDestruct ("Hclose" with "Henv Hown") as "Hclose'".
-      iIntros (h pt' U') "%Hupt %Hnorm %Hptwf %Hfg #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
+      iIntros (h pt' U' sts) "%Hupt %Hnorm %Hptwf %Hfg #Htfk #Hdone HW #Htc Htrap Hpriv Hfd Hiref".
       (* the parked bundle, re-keyed onto the resumed record *)
       iEval (rewrite -Hfg) in "Hfrag".
       (* row by row, never a frame past a bundle carrying a slot
@@ -266,7 +272,7 @@ Section ParkCap.
         exact Hupt.
       + (* THE INSTANTIATION -- the whole of milestone J's park channel:
            a generic family in, the resumed record's key out. *)
-        iApply ("Hslot" $! (uvis_of U')).
+        iApply ("Hslot" $! (uvis_of U' sts)).
     - iNext. iExact "Htok".
   Qed.
 
