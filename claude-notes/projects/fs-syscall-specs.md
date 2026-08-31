@@ -2426,8 +2426,11 @@ durable-notes warns about.
   | `ProofFilewriteAU.v` | `HQ3a2` (a2 named — the landed walk left it deliberately unconstrained), `Hchunkb` at the fire | ~25 lines |
   | `ProofSysWriteAU{,Stable}.v` | `HS4a1` + one `iEval` | ~10 lines |
 
-  Compile iterations: 3 for the writei relay, 4 for the console chain, 3
-  for the fs-AU chain.  The one genuine obstacle, twice: `rget` carries the
+  Whole seam, `git diff --numstat` over 24 files: **+740 / −235**, of
+  which the three biggest are `ProofConsolewriteLoc` (+90/−34),
+  `ProofWritei` (+69/−22 in 5091 lines) and `SpecCopyin` (+69/−0, the new
+  vocabulary).  Compile iterations: 3 for the writei relay, 4 for the
+  console chain, 3 for the fs-AU chain.  The one genuine obstacle, twice: `rget` carries the
   ambient `CpuId`, so an `a2` equation must be asserted at the `set` that
   built it, not at the consumer block (both `ProofConsolewriteLoc` and
   `ProofFilewriteAU` hit it).
