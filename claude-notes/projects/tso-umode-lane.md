@@ -202,21 +202,47 @@ Also frozen for you (green, other lanes' landed work): `StartedInv.v`,
 `WpSconfLock.v`, `ProofForkretPark.v` (red, but it is the scheduler
 lane's).
 
-## 6. Coordination protocol
+## 6. Checkout, branches, and coordination protocol
 
-- Commit YOUR notes to this file (branch `tso`, commit from the repo
-  root `/shared/xv6iris-3` — committing from inside `claude-notes/`
-  breaks relative paths) at every meaningful step: measurements, landed
-  lemmas, requests, dead ends.
-- Do NOT snapshot `tso-flip` or run `--pull-vo` / rsync the mirror —
-  the kernel lane coordinates snapshots at green boundaries.  Just
-  leave your tree edits in `/shared/xv6iris-3-fliptree` and say in this
-  file which files you touched and their build state.
-- Do not launch full rounds (`ZZbuild.sh`) without checking this file /
-  the handoff for an in-flight round — a sync mid-round corrupts the
-  remote build.  Targeted `make <File>.vo` builds are always fine.
-- Sentinel-backed numbers only: report green counts from an actual make
-  run, never from memory.
+**Your own checkout, your own branch.**  `tso-flip` is a SNAPSHOT
+branch: every commit on it is a whole-tree state (temp-index
+`commit-tree`, `.vo` binaries included), not a diff — so a snapshot
+pushed from a tree that lacks the kernel lane's latest edits would
+silently revert them.  Therefore:
+
+- Bootstrap your checkout from `tso-flip` @ r60 (`86e7eca4c7b9f`) into
+  a directory that is NOT `/shared/xv6iris-3-fliptree` (e.g.
+  `/shared/xv6iris-3-umode`).  The snapshot carries the matching `.vo`
+  set, so your first VM build is warm-ish.  `run-on-gcp` derives the
+  remote build tree from your local path, so a distinct directory name
+  automatically gives you your own VM tree — no build collisions with
+  the kernel lane.
+- Push YOUR whole-tree snapshots (same temp-index recipe, drop
+  `iris/.lia.cache` with `git update-index --force-remove` — it is
+  229MB) to your OWN branch **`tso-flip-umode`**, parented on the r60
+  snapshot.  Never push to `tso-flip`.
+- At green boundaries the kernel lane merges your u-cone files into the
+  main tree and the combined state lands on `tso-flip`.  Keep the file
+  fences of §5 and the merge is a plain copy of disjoint files.
+- To PICK UP kernel-lane progress mid-flight (e.g. a landed request
+  from §7): copy the named files from the latest `tso-flip` snapshot
+  into your tree — do not rebase your whole tree onto it unless the
+  kernel lane says the snapshot is a certified round.
+- `_CoqProject`: append-only, and record every addition in §8 so the
+  merge is mechanical.
+
+**Notes**: commit your entries in THIS file to branch `tso` (commit
+from the repo root `/shared/xv6iris-3`; committing from inside
+`claude-notes/` breaks relative paths) at every meaningful step:
+measurements, landed lemmas, requests, dead ends, build state.
+
+**Builds**: targeted `make <File>.vo` on your own tree any time.  Full
+rounds (`ZZbuild.sh`) only on your own tree/tmux session (pick a
+distinct session name).  Never `--pull-vo` into or rsync the kernel
+lane's tree or its mirror `/shared/xv6iris-3-fliptree-backup`.
+
+**Numbers**: sentinel-backed only — report green counts from an actual
+make run, never from memory.
 
 ## 7. Requests to the kernel lane
 
