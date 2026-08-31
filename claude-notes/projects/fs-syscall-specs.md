@@ -2328,6 +2328,13 @@ durable-notes warns about.
   read, dup, and any future lseek.  RECOMMEND: (a) YES but AFTER
   ruling A's lane (they touch the same file-layer proofs; sequencing
   them avoids a double re-elaboration).
+  **RULED (owner, 2026-08-31): POSTPONED until a consumer exists.**
+  The "consumers waiting" above are all *would-benefit*, none *blocked*:
+  today's write/read/dup theorems close over the existential offsets.
+  The trigger to re-raise this: the first proof that needs a POSITION
+  across two syscalls — an lseek spec, a sequential-write client
+  ("these two writes concatenated"), or the app-facing API's fd layer.
+  Whoever hits it, cite this entry and re-brief.
 
 Sizing: D is spike-sized — the readings exist, the work is assembly and
 statement.  S0 is one design session.  A and W are the campaign's bulk.
