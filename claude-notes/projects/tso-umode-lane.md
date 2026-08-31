@@ -288,8 +288,11 @@ records for the later (out-of-lane) conversions, no action needed now:
 ## 8. U-lane log
 
 **2026-08-31 (session 1): the §0.37′ cone is GREEN — 1279/1305, snapshot
-`tso-flip-umode` @ `9bfb42d9ed4` (parent r60 `86e7eca4c7b`), zero admits,
-sentinel-backed (full `make -k` on the VM, `ZZ-iris3.log.aux`).**
+`tso-flip-umode` @ `9bfb42d9ed4` (parent r60 `86e7eca4c7b`), zero admits.
+CERTIFIED by a CLEAN round (rm all iris `.vo`, full `ZZbuild.sh`):
+GREEN=1279/1305, 26 red, error roots exactly ProofForkretPark:318 +
+ProofKernelvec:1704 (other lanes), UptWalkTramp:101 (deliberate),
+Pt2WalkPt:427 / UserretPt:195 / ProofUser:75 (out-of-scope, §7).**
 
 Baseline reproduced first: fresh tree from the r60 snapshot rebuilt to
 exactly 1265/1304 with the four certified red roots.  Two tooling facts
