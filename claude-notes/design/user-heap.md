@@ -222,10 +222,68 @@ authority holds exactly the mirrored fragments plus the stack run — so a
 forked child cannot sbrk until the sbrk row exists and hands over slack
 explicitly.
 
+## Programs on the tier, and what `cat` cost
+
+`init` (`UkInit*.v`) and `cat` (`UkCat*.v`) are proved on this heap.  Both
+are split one function to a file — the compile-time reason is in
+[`../optimization.md`](../optimization.md), and the dev-cycle reason is that
+a 2000-line proof file is a 4-minute edit-build loop.
+
+`cat` is the first program here whose **syscalls write its memory**
+(`read(fd, buf, 512)` into a 512-byte global) and the first to reach
+**vprintf's `%s` arm**, through `fprintf(2, "cat: cannot open %s\n",
+argv[i])` when `open` fails.  Four things came out of that arm and are
+reusable:
+
+- **The dispatch is stated for `c0 = 's'`, deliberately.**  vprintf decides
+  a directive with thirty instructions of tests on three characters --
+  `c0`, `c1 = fmt[i+1]`, `c2 = fmt[i+2]` -- because `%ld`/`%lld`/`%lu` etc.
+  need the lookahead.  Every one of those tests is stepped either way; what
+  fixing `c0` buys is that each test's outcome is then decided by one
+  `vm_compute` on a concrete pair, where a proof general in `c0` would have
+  to carry the case analysis for arms the program never enters.  `a3` and
+  `a4` are left as the opaque expressions the leaves produce: the two
+  branches that read them are reached only when `c1` or `c2` IS the
+  character the path just excluded.
+- **`moi_sub_ne_zero`** (`UkCatVprintfS.v`) is what every byte test needs.
+  The dispatch compares `c - K` against zero with `K` one of 100/108/117/120,
+  and the difference is NEGATIVE for a small byte, so `moi_eq_zero` -- which
+  wants a nonnegative argument -- does not apply directly.  Take the wrap
+  first, then divisibility says exactly `c = K`.
+- **`vp_inv3` is `vp_inv` with s3 free.**  From 0x6f2 to 0x712 the `%s` arm
+  parks the bumped va_list in the state register, so for those thirty
+  instructions the loop invariant holds of every register but that one.
+  Stating it with s3's value a parameter (and `vp_inv` as the instance at
+  `zero_reg`, the two conversions definitional) beats weakening `vp_inv` for
+  the one arm that needs it.
+- **A CALL can be a premise.**  `fprintf`'s forty instructions say nothing
+  about the format string -- they carve the frame, spill a2..a7 into it,
+  point a2 at the spill area and jump -- and two callers want two different
+  things out of that jump.  `wp_kcat_fprintf_gen` takes the call as a
+  premise and hands it the word at `sp0-48` (the a2 slot, which IS the
+  va_list's first element); `wp_kcat_fprintf` and `wp_kcat_fprintf_s` are
+  the instances.  This is the alternative to duplicating a 460-line proof,
+  and it is the shape to reach for whenever two callers differ at ONE call
+  site in the middle of a body.
+
+`cat`'s `main` also shows the cheapest possible loop invariant: **both its
+paths end in `exit`**, so it never restores the five registers it spilled
+and has no continuation at all, and the invariant names three registers
+(sp, the argv cursor, the end it stops at) rather than a callee-saved set.
+
+One precondition of `wp_kcat_start` is NOT derivable from `uargv` and is
+asked for instead: that no argv pointer is null.  vprintf's `%s` arm has a
+"(null)" branch that reads its replacement out of **.rodata** rather than
+the data half, so walking it would need the string loop to be polymorphic
+in where its bytes live.  If a later program needs that branch, the honest
+fix is to give `uargv` the clause, which means one producer
+(`UEchoKernel.echo_uargv_of_area`) has to prove it.
+
 ## Status
 
-The engine is complete except the two syscall rows above.  `UkSync.v` and
-`UkEcho.v` are still on the OLD interface (`ukc`, `uvb`, `uk_instr`) and
+The engine is complete except the two syscall rows above.  `init` and `cat`
+are proved on it end to end (`wp_kinit_start`, `wp_kcat_start`).  `UkSync.v`
+and `UkEcho.v` are still on the OLD interface (`ukc`, `uvb`, `uk_instr`) and
 have not been re-cut; the old leaves in `UkLeaf.v` / `UkStore.v` /
 `UkLoad.v` / `UkBranch.v` stay because the new ones are wrappers over them.
 
@@ -258,6 +316,37 @@ terminating, look for a post-state whose register write was not recognised.
 
 ## Gotchas
 
+- **`ltac:(...)` inside a term runs against an EVAR.**  `rewrite`/`lia`
+  spliced in as an implicit argument's proof fires before the statement is
+  known, so `ltac:(rewrite Zminus_mod Hal8; reflexivity)` reports "the LHS
+  does not match any subterm" and `ltac:(unfold Z64; lia)` reports "cannot
+  find witness".  Hoist the fact to a named `assert` and pass the name.
+  Same cause as the `moi_small x ltac:(lia)` trap already known here.
+- **`unfold Z64` in the GOAL leaves `Z64` in the hypotheses**, where lia
+  then sees two unrelated atoms.  State the assert in the goal's own
+  spelling (`0 <= p + 1 < Z64`) and let lia connect them.
+- **`pose proof (vp_inv3_upd … r _ …)` cannot infer the written value.**
+  The value appears only in the conclusion's regfile, so there is nothing
+  to unify against; `assert (H : … m_new …) by exact (…)` fixes it, because
+  `m_new` names the update.  Same for any lemma whose only occurrence of an
+  argument is under an `<[ ]>`.
+- **`zero_extend' 64 b` will not elaborate when `b : bv 8`** even though
+  `mword 8` and `bv 8` are convertible -- the width index is `Z_idx 8` on
+  one side and `8%N` on the other, so `?n` has nothing to unify with.
+  Annotate: `zero_extend' 64 (b : mword 8)`.
+- **`f_equal` may close the goal outright** when the remaining equation
+  reduces (`37 + 0 = 37`); chain with `;` rather than sequencing, or the
+  next tactic reports "No such goal".
+- **`cbn [default]` leaves `id b`, not `b`.**  `default d (Some b)` is
+  `from_option id d (Some b)`; unfolding only `default` stops one step
+  short.  Either name the equation you want (`assert (b = ubyte0) by
+  (rewrite <- He; reflexivity)` -- conversion does the rest) or unfold
+  `from_option` and `id` too.
+- **A regex rewrite of proof text across statement boundaries WILL eat
+  code.**  A non-greedy `[\s\S]*?` spanning to the next occurrence of a
+  pattern silently swallows everything between when one instance is
+  line-broken differently.  Bound such edits to a few lines, and note that
+  `run-on-gcp --no-sync --pull <path>` recovers the last synced copy.
 - `iInduction` generalises the hypotheses in an order that is not the
   statement's; check what the IH actually looks like before feeding it, and
   instantiate a `forall`-generalised variable (`"IH" $! f`) first.

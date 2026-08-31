@@ -116,7 +116,10 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   break as a ghost variable and the slack the invariant owns, the running
   predicate `urun` (and why `ukc` is dead), the leaf shape and its
   normalised immediates and numeric addresses, what ownership buys at a
-  memory leaf, the entry, and the syscall boundary.  Read before touching
+  memory leaf, the entry, the syscall boundary, and what the two programs
+  proved on it (`init`, `cat`) cost — including vprintf's `%s` arm, why its
+  dispatch is stated for one directive, and the trick of making a CALL a
+  premise so two callers can share a body.  Read before touching
   `UkRun*.v` or any user-program proof.
 - **[`elf.md`](design/elf.md)** — ELF file semantics: the file-side
   `ElfFile.v` layer vs `ElfEnc.v`'s code-side readers, the PrimString import
