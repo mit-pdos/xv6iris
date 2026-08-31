@@ -17592,3 +17592,104 @@ now wait ONLY on the user cone (via LinkUserinit/LinkUserret) and
 ProofForkretPark — the kernelvec leg of their dependency cone is paid.
 Snapshot chain: r62 05ff8bf16c8e4 → **r63 bfe7168564bc0**; mirror
 refreshed; .vo pulled (1309).
+
+## A6.140 — THE TRAMPOLINE EXECUTION REASONING PORTED (owner lifted the
+## userret/uservec half of §0.37′; per-binary tier stays deferred)
+
+*(Coordinator successor session, 2026-08-31.  Scope per owner: "the
+per-binary proofs don't need to be done (they changed quite a bit on
+main), but the reasoning about executing in the kernel's trampoline
+page, in userret / usertrap, does need to be ported over.")*
+
+### §1. THE TOKEN TRANCHE (A6.61 lane 2), AS BUILT
+
+`TrampStepPt.tramp_tr_obl`'s inner ∀ now takes and returns
+`own_context XI` (a □-obligation cannot capture the linear token).  The
+engine threads it as the composite `(own_context XI ∗ W)` through
+`tramp_run_hart_active_instr_S` (the five `iApply "Htr"` sites peel it
+off the carried frame, the ex obligation is instantiated at the
+composite), and `wp_instr_tramp_pt` / `wp_instr_ktramp_pt_share` take
+it beside `Res` and hand it to their Hex continuation and back through
+the ▷-continuation.  Producers adapted: `tramp_tr_obl_of_regime` /
+`tramp_fetch_tr_of_regime` (pass-through), `UptWalkTramp.utramp_tr_obl`
+(pays `swp_translate_upt`), `Pt2WalkPt.pt2_tramp_tr_obl_kcur/_kprev`.
+
+### §2. NEWLY-REACHED DRIFT IN Pt2WalkPt (was hidden behind :427)
+
+- The OWNED-tree walks (`swp_translate_pt_slot`/`_hit_slot`) take and
+  return the token (their `swp_hmrun_of_exec` does).
+- The SHARED-walk read seams moved to the A6.135 gates: `kpt_obl`/
+  `kpt_obl_ex` via `kpt_pte2_obl`/`kpt_pte1_obl`/`kpt_leaf_obl` (need
+  `kpt_bound B ∗ cv_boot_cred B`), `xread_obl_ex` via
+  `kpt_leaf_node_canon_obl`, and the write seam is `wpte_obl_at` via
+  `kpt_leaf_write_node`.  KPT_CREDS THREAD ONLY THE KCUR CHAIN
+  (uservec's window walks the shared CURRENT table on a miss; userret's
+  kprev side only ever HITS kernel-provenance entries): kpt_slot →
+  pt2_kcur → obl_kcur → fetch_tr_kcur → wp_instr_pt2_tramp_kcur.
+- `SRegime.kpt_res_at` gained `kpt_creds` (third conjunct) — reseals in
+  the switch legs frame it from the ambient premise.
+
+### §3. HartSMemTok.v (NEW): token-threaded S-mode RAM engines, width 8
+
+The generic LOAD/STORE chains hand translate-closure and memory
+obligation to the engine SEPARATELY, so one token cannot serve both
+when BOTH need it — which is exactly the user-table data access
+(`utf_translate` pays the A/D append; the ctx-tier trapframe word pays
+`Mobl_ram`/`Wobl_ram`).  The variants (`swp_execute_LOAD_ram_S8_tok`,
+`swp_execute_STORE_ram_S8_tok` + the three glue layers each) carry the
+token in the translate post and take the obligation as
+`own_context -∗ Mobl/Wobl`, filled at the one seam where the engine
+holds both (`swp_translate_and_read_value_S`'s twin).  Discharges:
+`HartMLoad.robl_ram_ctx` (read; pure conclusion, everything survives)
+and `HartMStore.wobl_ram_ctx` (store; one authored append, dirty-set
+registered).  New leaf file — HartSMem's cone is 468.
+
+### §4. THE LEAVES AND CHAINS, PORTED
+
+- `UserretPt.wp_uld_pt` / `UservecPt.wp_usd_pt`: trapframe words moved
+  from raw `↦ₚ₈` to `TsoCtx.ctx_phys_word_pointsto` (matching ProcInv's
+  tf_page tier); RAM-ness read off byte 0 via `ctx_phys_pointsto_ram`
+  (pure, non-consuming); both use the §3 engines with the token in the
+  rider `R := (word ∗ own_context)`.  `wp_ualu_pt`/`wp_usret_pt`/the
+  two sscratch leaves: trivial take-and-return threading.
+- `UserretEntryPt`/`UservecExitPt` (satp-switch legs): token threaded
+  through all steps; `UservecExitPt` takes `kpt_creds` (kcur window);
+  `UserretEntryPt` needs none beyond `tlb_res_pt`'s own.
+- `SpecUserret`: gains `kpt_creds` + `own_context` rows (its tf words
+  were already `↦ₚ₈c` = ctx tier).  `SpecUservec`: gains `kpt_creds`;
+  the TOKEN IS NOT A PREMISE — it rides the residue.
+- THE RESIDUE OPENS HAND THE TOKEN OUT: `usertrap_res_tf_csrs_open`,
+  `usertrap_res_tf_open` (bare) and `ut_res_tf_open` (parked) now yield
+  `own_context cur_ctx` and their closers take it back — the token is
+  `ut_trap_parked`'s own conjunct, borrowed for the walk windows.
+  (SpecUsertrap Parameters, UsertrapRes proofs, UtResFits/ProofUsertrap
+  wrappers, all adjusted; ProofUsertrap's own chain recompiled green.)
+- `ProofUserret` (38-instr chain) / `ProofUservec` (44-instr chain +
+  usertrap + userret): mechanical threading (~70 uniform sites each via
+  the `Hmenv Hutlb Hpc Hfile` → `… Htok …` spelling).  At the RESUMING
+  hart, userret's `kpt_creds` comes off `tlb_res_pt kroot2` (A6.91's
+  ninth conjunct) via a local projection OUTSIDE the CID-fixing section
+  (the resumer is not the section's CID — the file's own [UT.] note).
+- `SpecUser.wp_user_exec_closed_body` gained the recorded `Rut_ctx`
+  borrow premise (u-lane §7); `ProofUser` closes with it.
+
+### §5. GOTCHAS (new, each cost a cycle)
+
+- IPM flat patterns vs a LEFT-nested pair in the STORE post
+  (`Rt ∗ (word ∗ tok) ∗ resv`): spell the nesting explicitly
+  (`(Hword & Htok) & Hfrag`); the LOAD post's tail-position pair
+  flattens fine.
+- `iEval (cbn …) in "H"` for proofmode hyps — a bare `cbn … in *` does
+  not touch the spatial context (the Wobl massage needs
+  `ak_excl/av_excl/Explicit_access_kind_variety` reduced INSIDE "Hobl").
+- `wstore_tv` collapses on the plain store only after the access-kind
+  projections reduce; `subst tvv` first, then one iEval.
+
+### §6. NUMBERS
+
+Targeted-green this session (r64 pending): UptWalkTramp, Pt2WalkPt,
+UserretEntryPt, UservecExitPt, UserretPt, UservecPt, ProofUserret,
+ProofUservec, ProofUser, HartSMemTok (new), with TrampStepPt/TransPt/
+UptWalkPt/UsertrapRes/UtResFits/ProofUsertrap staying green under the
+new shapes.  All five r63 error roots except ProofForkretPark:318 are
+gone.
