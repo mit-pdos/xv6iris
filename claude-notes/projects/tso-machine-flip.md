@@ -17419,3 +17419,31 @@ every carrier arity UNCHANGED (27 files hold `intr_res kt`):
   ProofMainSecondary's ms_inithart_sched, boot-chain intro sites) pass
   `E := E_kv` + their `#Hcaps` (both already in hand at those sites).
 
+### A6.139 build log (running)
+
+- IntrDefs GREEN with the E-threading: `ihs_trap_of` takes
+  `(E : CurCtx -d> iPropO Σ)` + a `□ E XI` premise after the pures;
+  `ihs_body_of/ihs_of/ihs_pre/ihs/intr_handler_spec` all E-parameterized
+  (the Contractive/NonExpansive split survives verbatim — E is constant
+  in R).  `intr_res kt := ∃ E, intr_res_at kt E ∗ □ E XI` with
+  `intr_res_at kt E` the old body at `▷ intr_handler_spec kt E h`;
+  `ires_pack kt c := ∃ E, ires_of (ihs kt E) c ∗ □ E XI` keeps ALL FOUR
+  funnel bridges (`intr_res_of_eq`/`sie_arm_of_eq`/`sie_cap_of_eq`/
+  `sie_cap_gpr_of_eq`) `reflexivity` — the load-bearing property.  New:
+  `intr_res_at_of_eq` (the E-fixed face), `intr_res_pack`,
+  E-threaded `intr_res_intro` (+ `□ E XI` premise),
+  `intr_handler_spec_apply` (+ `□ E XI` premise),
+  `intr_handler_spec_intro` (□∀XIc body gets `□ E XIc`).
+  `trap_csrs_ext_transport` (outside the section) gained an `{XI}` binder
+  — the migration transports at the SAME context (the M2 sentence).
+- Cascade -k build over the whole tree running (tmux `fix`); next:
+  adapt the fallout (expected: WpIntrInv engine assembly ~3118-3129 +
+  unfold 2679 + 2646, WpSconfSret:201, WpSconfCsr ×3 flips,
+  ProofPrepareReturn:288, UsertrapRes 428/1566 fold sites +
+  `ihs_with_env`-style opaque rows if needed, SpecUsertrap fold,
+  ProofUsertrap 697, SpecKernelvec (E_kv := the ∃-packed devintr_caps
+  with ⌜length γs = NPROC⌝; drop the caps premise), ProofKernelvec (THE
+  FIX: caps at XIc from the □E premise; kerneltrap at the ∃-bound γs),
+  ProofKerneltrap (park threading), intro sites ProofMain ~2291 /
+  ProofMainSecondary ms_inithart_sched (pass E_kv + #Hcaps)).
+
