@@ -787,10 +787,6 @@ Section ProofUserinit.
     iDestruct "Hpctx" as (ξb Tb) "[Hbox Hpctx]".
     iDestruct (proc_slots_park_at γs ξb (proc_addr j) RUNNABLE needs_ctx_RUNNABLE
                  with "Hpctx Hhart Hmk") as "Hslots".
-    iDestruct (proc_cells_reindex_sc TsoCtx.cur_ctx ξb (proc_addr j) RUNNABLE ch
-                 with "Hpstcell Hpchan Hppub") as "(Hpstcell & Hpchan & Hppub)".
-    iDestruct (proc_lock_res_at_intro γs ξb γl (proc_addr j) RUNNABLE ch
-                 with "Hpstcell Hplock Hpchan Hppub Hslots") as "HR".
     (* ===== +0x2c c.mv a0,s1 ===== *)
     iApply (wp_cmv_s_sconf (mword_of_int (UI + 0x2c)) Ra0 Rs1 R9
               (trap_res b + (K - 4))%nat false ltac:(nz) ltac:(rdok)
@@ -830,10 +826,16 @@ Section ProofUserinit.
     iApply (RLI.wp_release_in_sconf KT1 γl (proc_addr j) "proc"%string
               (proc_lock_pay γs γl (proc_addr j)) R11 0%nat b pj (K - 4)%nat
               ({["proc"]} ∪ lks) Hlka Krl
-              with "Hcg Htext Hpc [] Htok [Hbox HR] Hcpu Hpay").
+              with "Hcg Htext Hpc [] Htok [Hbox Hpstcell Hplock Hpchan Hppub Hslots] Hcpu Hpay").
     { iApply (procs_inv_lookup γs j γl Hgl with "Hpinv"). }
-    { iIntros "Hrun". iModIntro. iFrame "Hrun". iApply proc_lock_pay_of_box.
-      iExists ξb, Tb. iFrame "Hbox HR". }
+    { (* A6.129: the cells are deposited into the record's box, which the
+         release makes the lock's context *)
+      iIntros "Hrun".
+      iMod (proc_lock_res_deposit γs γl (proc_addr j) RUNNABLE ch ξb Tb
+              with "Hrun Hbox Hpstcell Hplock Hpchan Hppub Hslots")
+        as "[Hrun (%Tb' & _ & Hbox & HR)]".
+      iModIntro. iFrame "Hrun". iApply proc_lock_pay_of_box.
+      iExists ξb, Tb'. iFrame "Hbox HR". }
     iIntros (CID20 Hq20 mr3) "Hcg Hpc %Hcsrl Hcpu".
     iEval (rewrite (_ : ({["proc"]} ∪ lks) ∖ {["proc"]} = lks);
            [| apply locks_add_del_below; exact Hbelow]) in "Hcpu".

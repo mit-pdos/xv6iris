@@ -906,21 +906,25 @@ Section SchedCtxPay.
   Qed.
 
   (* THE RECLAIMING SCHEDULER'S SLOT, AT THE BOX: [proc_slots_park_gen] with
-     the record's box as the slot's context.  A ZOMBIE park brings no box
-     (its cells are context-free in the slot), so one is minted. *)
-  Lemma proc_slots_park_box (E : coPset) (pa : mword 64) (st : mword 32) :
+     the record's box as the slot's context.  A ZOMBIE park brings no box,
+     so one is minted -- and (A6.129) the dormant block is DEPOSITED into
+     it from the reclaimer's context, which is why the running token comes
+     through: the slot's rows are at the box, not at the ambient. *)
+  Lemma proc_slots_park_box (pa : mword 64) (st : mword 32) :
     park_ok st = true ->
+    own_context cur_ctx -∗
     (if needs_ctx st
      then ∃ (ξb : CtxId) (Tb : nat), ctx_parked ξb Tb ∗ proc_ctx_at ξb pa
      else own_ctx (p_context pa)) -∗
     hart_at_any pa -∗ pslot_used_at pa -∗ park_pay pa st
-    ={E}=∗ ∃ (ξb : CtxId) (Tb : nat), ctx_parked ξb Tb ∗ proc_slots_at ξb pa st.
+    ==∗ own_context cur_ctx ∗
+        ∃ (ξb : CtxId) (Tb : nat), ctx_parked ξb Tb ∗ proc_slots_at ξb pa st.
   Proof.
-    intros Hst. iIntros "Hctx Hpark #Hused Hpay".
+    intros Hst. iIntros "Hrun Hctx Hpark #Hused Hpay".
     pose proof (is_unused_of_park_ok st Hst) as Hu.
     apply park_ok_cases in Hst as [Hn | Hz].
     - rewrite Hn. iDestruct "Hctx" as (ξb Tb) "[Hbox Hctx]".
-      iModIntro. iExists ξb, Tb. iFrame "Hbox".
+      iModIntro. iFrame "Hrun". iExists ξb, Tb. iFrame "Hbox".
       rewrite /proc_slots_at Hn Hu.
       rewrite (inv_dormant_of_needs_ctx st Hn) (not_running_of_needs_ctx st Hn).
       rewrite (is_running_of_needs_ctx st Hn).
@@ -929,13 +933,9 @@ Section SchedCtxPay.
       iMod ctx_parked_alloc as (ξb) "Hbox".
       iAssert (proc_dormant pa ZOMBIE) with "[Hpay Hctx]" as "Hdorm".
       { iEval (rewrite proc_dormant_split). iFrame "Hpay Hctx". }
-      (* SC seam: tso-flip DEPOSITS the dormant block into the fresh box
-         ([ctx_deposit], raising the box's stamp); on main it re-tiers by
-         [TsoCtxShim.ctx_dom_sc] until the deposit machinery lands. *)
-      iPoseProof (TsoCtxShim.ctx_dom_sc TsoCtx.cur_ctx ξb) as "Hdom".
-      iDestruct (ctx_morph (R := λ ξ, proc_dormant (XI := ξ) pa ZOMBIE)
-                   TsoCtx.cur_ctx ξb with "Hdom Hdorm") as "[_ Hdorm]".
-      iModIntro. iExists ξb, 0%nat. iFrame "Hbox".
+      iMod (ctx_deposit (λ ξ, proc_dormant (XI := ξ) pa ZOMBIE) cur_ctx ξb 0
+              with "Hrun Hbox Hdorm") as "(Hrun & %Tb & _ & Hbox & Hdorm)".
+      iModIntro. iFrame "Hrun". iExists ξb, Tb. iFrame "Hbox".
       rewrite /proc_slots_at not_running_ZOMBIE inv_dormant_ZOMBIE
               is_unused_ZOMBIE needs_ctx_ZOMBIE_false is_running_ZOMBIE.
       iSplitR; [done|]. iSplitR; [done|]. iFrame "Hdorm Hpark Hused".
@@ -1070,6 +1070,35 @@ Section SchedCtxPay.
     proc_lock_res_at ξl γl pa.
   Proof. iIntros "Hs Hg Hc Hpub Hsl". iExists st, ch. iFrame. Qed.
 
+  (* A6.129: THE PRODUCER'S FORM -- the cells at the ambient, the slot at a
+     PARKED box (a child record's, or the reclaimer's fresh one): the cells
+     are deposited into the box from the running context, which raises the
+     box's stamp.  What the release then hands the lock is
+     [proc_lock_pay_of_box]'s [lock_pay]. *)
+  Lemma proc_lock_res_deposit (γl : gname) (pa : mword 64) (st : mword 32) (ch : mword 64)
+      (ξb : CtxId) (Tb : nat) :
+    own_context cur_ctx -∗ ctx_parked ξb Tb -∗
+    p_state pa ↦₄ st -∗
+    pstate_lock pa st -∗
+    p_chan pa ↦₈ ch -∗
+    proc_pub pa -∗
+    proc_slots_at ξb pa st ==∗
+    own_context cur_ctx ∗
+    ∃ Tb' : nat, ⌜(Tb ≤ Tb')%nat⌝ ∗ ctx_parked ξb Tb' ∗ proc_lock_res_at ξb γl pa.
+  Proof.
+    iIntros "Hrun Hbox Hs Hg Hc Hpub Hsl".
+    pose (R := (λ ξ, ctx_word4_pointsto ξ (p_state pa) (DfracOwn 1) st ∗
+                     ctx_word_pointsto ξ (p_chan pa) (DfracOwn 1) ch ∗
+                     proc_pub (XI := ξ) pa)%I).
+    assert (HR : CtxMorph R) by (subst R; ctx_morph_solve).
+    iMod (ctx_deposit R cur_ctx ξb Tb with "Hrun Hbox [Hs Hc Hpub]")
+      as "(Hrun & %Tb' & %HT & Hbox & (Hs & Hc & Hpub))".
+    { subst R. iFrame "Hs Hc". iExact "Hpub". }
+    subst R.
+    iModIntro. iFrame "Hrun". iExists Tb'. iFrame "Hbox". iSplitR; [done|].
+    iApply (proc_lock_res_at_intro with "Hs Hg Hc Hpub Hsl").
+  Qed.
+
   (* the free arm's record, off a slot at its box: what a release that just
      reclaimed a park hands the input-side finisher ([WpLockIn]) *)
   Lemma proc_lock_pay_of_box (γl : gname) (pa : mword 64) :
@@ -1123,32 +1152,6 @@ Section SchedCtxMove.
   Proof. rewrite /procs_inv. ctx_morph_solve. Qed.
 End SchedCtxMove.
 
-(* THE SC SEAM (the sibling of [TsoCtxShim.ctx_word4_reindex], quarantined
-   by its use of the shim): the producer sites hold the child record's
-   cells at the AMBIENT context and the box wants them at [ξb].  At the
-   cutover each caller adopts tso-flip's [proc_lock_res_deposit] (the
-   [ctx_deposit] into the box, which raises the box's stamp) and this
-   lemma dies -- grep for it. *)
-Section ProcCellsReindexSC.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
-  Lemma proc_cells_reindex_sc (ξ0 ξ1 : CtxId) (pa : mword 64)
-      (st : mword 32) (ch : mword 64) :
-    ctx_word4_pointsto ξ0 (p_state pa) (DfracOwn 1) st -∗
-    ctx_word_pointsto ξ0 (p_chan pa) (DfracOwn 1) ch -∗
-    proc_pub (XI := ξ0) pa -∗
-    ctx_word4_pointsto ξ1 (p_state pa) (DfracOwn 1) st ∗
-    ctx_word_pointsto ξ1 (p_chan pa) (DfracOwn 1) ch ∗
-    proc_pub (XI := ξ1) pa.
-  Proof.
-    iIntros "Hs Hc Hpub".
-    iDestruct (TsoCtxShim.ctx_word4_reindex _ ξ0 ξ1 with "Hs") as "$".
-    iDestruct (TsoCtxShim.ctx_word_reindex _ ξ0 ξ1 with "Hc") as "$".
-    iPoseProof (TsoCtxShim.ctx_dom_sc ξ0 ξ1) as "Hdom".
-    iDestruct (ctx_morph (R := λ ξ, proc_pub (XI := ξ) pa) ξ0 ξ1
-                 with "Hdom Hpub") as "[_ $]".
-  Qed.
-End ProcCellsReindexSC.
 
 
 (* A BIG-OP UNDER A TRANSPARENT NAME IS AN [iFrame] BOMB (optimization.md):
