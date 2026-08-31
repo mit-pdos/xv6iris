@@ -1252,7 +1252,7 @@ Section UkLoad.
     iApply (wp_uk_step C pt Rut π sz Hlo Hpm _ M m pc Hal2 with "Hb [] Hcont").
     iModIntro.
     rewrite /uk_step_obl.
-    iIntros (R CIDo C' pt' Rut' Mp' t rs1s rsA usatp pcfg paddr)
+    iIntros (R CIDo XIo C' pt' Rut' Mp' t rs1s rsA usatp pcfg paddr)
       "%Hlo' %Hpm' %Hpure %Hpre #Hamb Hk Hany Hrw Hro Hmm Hres".
     destruct (uk_instr_mapped π M Mp' pc _ i pt' sz
                 (loop_ok_wf C' pt' Hlo') Hpm' Hpure Hui)
@@ -1304,7 +1304,7 @@ Section UkLoad.
       iFrame "Hrut Hkb". iSplit.
       - iDestruct "Hkc" as "[Hkc _]".
         iIntros "Hb". rewrite /ukc.
-        iApply ("Hkc" $! CIDo C' pt' Rut' with "[%] [%] Hb");
+        iApply ("Hkc" $! CIDo XIo C' pt' Rut' with "[%] [%] Hb");
           [ exact Hlo' | exact Hpm' ].
       - iDestruct "Hkc" as "[_ Hkc]".
         rewrite (uslot_run m pc M π sz Hx0 Hal2). iExact "Hkc". }

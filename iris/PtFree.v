@@ -291,6 +291,10 @@ Qed.
 
 Section PtFreeIris.
   Context `{!riscvGS Σ, !xv6G Σ}.
+  (* A6.49: [ProcPtOwn.phys_page_own] is at the REGISTERED physical tier now,
+     and so are the loose node slots freewalk holds -- they come out of
+     [PtTree.pt_slot_own (Some ξ)], which IS [ctx_phys_word_pointsto ξ]. *)
+  Context `{XI : CurCtx}.
 
   (* the 512 slot doublewords of a node page, at ARBITRARY contents, are
      the page's 4096 loose physical bytes.  The inverse regrouping of
@@ -298,7 +302,9 @@ Section PtFreeIris.
      [pa_add_page_slot]; [phys_word_pointsto_bytes] replaces
      [phys_word_pointsto_intro]. *)
   Lemma pt_slots_any_phys (b : mword 44) :
-    ([∗ list] i ∈ seqZ 0 512, ∃ w : mword 64, u_pte_addr b (mword_of_int i) ↦ₚ₈ w)
+    ([∗ list] i ∈ seqZ 0 512, ∃ w : mword 64,
+       TsoCtx.ctx_phys_word_pointsto XI (u_pte_addr b (mword_of_int i))
+         (DfracOwn 1) w)
     ⊢ phys_page_own b.
   Proof.
     iIntros "Hs".
@@ -313,7 +319,7 @@ Section PtFreeIris.
     intros k i Hki. apply lookup_seq in Hki. destruct Hki as [-> Hlt].
     cbn [Nat.add]. iIntros "H". iDestruct "H" as (w) "H".
     replace (Z.of_nat k + 0) with (Z.of_nat k) by lia.
-    iDestruct (phys_word_pointsto_bytes with "H") as "H".
+    iDestruct (TsoCtx.ctx_phys_word_pointsto_bytes with "H") as "H".
     iApply (big_sepL_mono with "H").
     intros k' j Hkj. apply lookup_seq in Hkj. destruct Hkj as [-> Hjlt].
     cbn [Nat.add]. iIntros "Hb".
@@ -328,10 +334,12 @@ Section PtFreeIris.
      description's are gone).  [page_valid] comes out of the node's own
      claim ([PtTree.pt_node_claim]), the tier move from
      [ProcPtOwn.phys_to_page_own]. *)
-  Lemma pt_slots_kfree_pre `{XI : CurCtx} (b : mword 44) :
+  Lemma pt_slots_kfree_pre (b : mword 44) :
     page_valid (page_base b) ->
     kmap_static_claims -∗
-    ([∗ list] i ∈ seqZ 0 512, ∃ w : mword 64, u_pte_addr b (mword_of_int i) ↦ₚ₈ w) -∗
+    ([∗ list] i ∈ seqZ 0 512, ∃ w : mword 64,
+       TsoCtx.ctx_phys_word_pointsto XI (u_pte_addr b (mword_of_int i))
+         (DfracOwn 1) w) -∗
       kfree_pre (page_base b).
   Proof.
     intros Hv. iIntros "#Hb Hs".

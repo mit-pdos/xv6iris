@@ -1099,7 +1099,7 @@ Section ProofUvmcopy.
     (* ========== walk reached the level-0 slot ========== *)
     iDestruct (ptree_own_level0_ro (DfracOwn 1) to (vpn_at vpn0 j) p2 p1 w0 Hl0
                  with "Hptreeo") as "(#Hcl0 & Hcell & Hclose)".
-    iDestruct (phys_word_pointsto_ram with "Hcell") as %Hslotram.
+    iDestruct (pt_slot_own_ram with "Hcell") as %Hslotram.
     iDestruct (pt_slot_phys_to_mem (u_next_base p1) (vpn_idx 0 (vpn_at vpn0 j))
                  (DfracOwn 1) w0 with "Hcl0 Hcell") as "Hcell".
     assert (Ha0nz : mw !!! Regidx Ra0 <> (mword_of_int 0 : mword 64)).

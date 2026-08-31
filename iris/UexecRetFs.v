@@ -130,6 +130,7 @@ Section UexecRetFs.
   (* (B) the kernel obligation, and (C) the bundle -- UexecRet.v verbatim
      at the enriched return *)
   Definition ukb_fs_F (γm : gname) (X : uvis -d> iPropO Σ) `{CID : CpuId}
+      `{XI : TsoCtx.CurCtx}
       (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (sz : Z)
       (π : gmap (mword 27) uperm) : iProp Σ :=
     (∀ (W' : uvis) (sc stv : mword 64),
@@ -139,11 +140,13 @@ Section UexecRetFs.
        WP (Loop : expr riscv_lang))%I.
 
   Definition ukont_fs_F (γm : gname) (X : uvis -d> iPropO Σ) `{CID : CpuId}
+      `{XI : TsoCtx.CurCtx}
       (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (sz : Z)
       (π : gmap (mword 27) uperm) : iProp Σ :=
     (▷ ukb_fs_F γm X C pt Rut sz π)%I.
 
   Definition uvb_fs_F (γm : gname) (X : uvis -d> iPropO Σ) `{CID : CpuId}
+      `{XI : TsoCtx.CurCtx}
       (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (sz : Z)
       (π : gmap (mword 27) uperm)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) : iProp Σ :=
@@ -153,10 +156,11 @@ Section UexecRetFs.
   Definition uslot_fs_F (γm : gname) (X : uvis -d> iPropO Σ)
       : uvis -d> iPropO Σ :=
     fun W =>
-      (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ),
+      (∀ (h : CpuId) (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd)
+         (Rut : uptd -> iProp Σ),
          ⌜loop_ok C pt⌝ -∗
          ⌜perm_of (ud_um pt) (uvis_sz W) = uvis_perm W⌝ -∗
-         uvb_fs_F γm X (CID := h) C pt Rut (uvis_sz W) (uvis_perm W)
+         uvb_fs_F γm X (CID := h) (XI := xi) C pt Rut (uvis_sz W) (uvis_perm W)
            (uvis_M W) (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W))
          -∗
          WP (Loop : expr riscv_lang))%I.
@@ -172,23 +176,28 @@ Section UexecRetFs.
     fixpoint (uslot_fs_F γm).
   Definition uexec_ret_fs (γm : gname) : mword 64 -> uvis -> iProp Σ :=
     uexec_ret_fs_F γm (uslot_fs γm).
-  Definition ukb_fs `{CID : CpuId} (γm : gname) (C : ucfg) (pt : uptd)
+  Definition ukb_fs `{CID : CpuId} `{XI : TsoCtx.CurCtx}
+      (γm : gname) (C : ucfg) (pt : uptd)
       (Rut : uptd -> iProp Σ) (sz : Z) (π : gmap (mword 27) uperm)
       : iProp Σ := ukb_fs_F γm (uslot_fs γm) C pt Rut sz π.
-  Definition ukont_fs `{CID : CpuId} (γm : gname) (C : ucfg) (pt : uptd)
+  Definition ukont_fs `{CID : CpuId} `{XI : TsoCtx.CurCtx}
+      (γm : gname) (C : ucfg) (pt : uptd)
       (Rut : uptd -> iProp Σ) (sz : Z) (π : gmap (mword 27) uperm)
       : iProp Σ := ukont_fs_F γm (uslot_fs γm) C pt Rut sz π.
-  Definition uvb_fs `{CID : CpuId} (γm : gname) (C : ucfg) (pt : uptd)
+  Definition uvb_fs `{CID : CpuId} `{XI : TsoCtx.CurCtx}
+      (γm : gname) (C : ucfg) (pt : uptd)
       (Rut : uptd -> iProp Σ) (sz : Z) (π : gmap (mword 27) uperm)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) : iProp Σ :=
     uvb_fs_F γm (uslot_fs γm) C pt Rut sz π M m pc.
 
   Lemma uslot_fs_unfold (γm : gname) (W : uvis) :
     uslot_fs γm W ⊣⊢
-    (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ),
+    (∀ (h : CpuId) (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd)
+       (Rut : uptd -> iProp Σ),
        ⌜loop_ok C pt⌝ -∗
        ⌜perm_of (ud_um pt) (uvis_sz W) = uvis_perm W⌝ -∗
-       uvb_fs (CID := h) γm C pt Rut (uvis_sz W) (uvis_perm W) (uvis_M W)
+       uvb_fs (CID := h) (XI := xi) γm C pt Rut (uvis_sz W) (uvis_perm W)
+         (uvis_M W)
          (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)) -∗
        WP (Loop : expr riscv_lang)).
   Proof. exact (fixpoint_unfold (uslot_fs_F γm) W). Qed.
@@ -235,11 +244,11 @@ Section UexecRetFs.
     iLöb as "IH" forall (W).
     iIntros "Hs".
     rewrite uslot_fs_unfold.
-    iIntros (h C pt Rut) "%Hlo %Hpm Hb".
+    iIntros (h xi C pt Rut) "%Hlo %Hpm Hb".
     rewrite /uvb_fs /uvb_fs_F.
     iDestruct "Hb" as "(Hamb & Hur & %Hsz & Hpt & Hcfg & Hg & Hpc & Hrut & Hk)".
     iEval (rewrite uslot_unfold) in "Hs".
-    iApply ("Hs" $! h C pt Rut with "[%] [%] [-]");
+    iApply ("Hs" $! h xi C pt Rut with "[%] [%] [-]");
       [exact Hlo | exact Hpm |].
     rewrite /uvb /uvb_F.
     iFrame "Hamb Hur Hpt Hcfg Hg Hpc Hrut".
@@ -267,7 +276,8 @@ Section UexecRetFs.
   (* ...and the fallback direction: the enriched kernel promise implies
      the plain one (the enrichment is FORGOTTEN, not refunded -- the
      one-way street the design note records) *)
-  Lemma ukont_fs_ukont `{CID : CpuId} (γm : gname) (C : ucfg) (pt : uptd)
+  Lemma ukont_fs_ukont `{CID : CpuId} `{XIK : TsoCtx.CurCtx}
+      (γm : gname) (C : ucfg) (pt : uptd)
       (Rut : uptd -> iProp Σ) (sz : Z) (π : gmap (mword 27) uperm) :
     ukont_fs γm C pt Rut sz π -∗ ukont C pt Rut sz π.
   Proof.
@@ -288,21 +298,21 @@ Section UexecRetFs.
 
   Definition urun_fs (γm γt γd γs : gname) (h : CpuId) (m : regfile)
       (pc : mword 64) (avail : nat) : iProp Σ :=
-    (∃ (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (sz : Z)
-       (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm),
+    (∃ (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+       (sz : Z) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm),
        ⌜ loop_ok C pt ⌝ ∗ ⌜ perm_of (ud_um pt) sz = pm ⌝ ∗
        uheap γt γd γs M pm ∗
        ustack γd (m !!! Regidx csp_rs1) avail ∗
-       uvb_fs (CID := h) γm C pt Rut sz pm M m pc)%I.
+       uvb_fs (CID := h) (XI := xi) γm C pt Rut sz pm M m pc)%I.
 
   Lemma urun_fs_urun (γm γt γd γs : gname) (h : CpuId) (m : regfile)
       (pc : mword 64) (avail : nat) :
     urun_fs γm γt γd γs h m pc avail -∗ urun γt γd γs h m pc avail.
   Proof.
     iIntros "H".
-    iDestruct "H" as (C pt Rut sz M pm)
+    iDestruct "H" as (xi C pt Rut sz M pm)
       "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
-    rewrite /urun. iExists C, pt, Rut, sz, M, pm.
+    rewrite /urun. iExists xi, C, pt, Rut, sz, M, pm.
     iSplitR; [iPureIntro; exact Hlo |].
     iSplitR; [iPureIntro; exact Hpm |].
     iFrame "Hheap Hstk".

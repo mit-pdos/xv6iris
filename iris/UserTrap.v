@@ -700,12 +700,12 @@ Section UTrapReduce.
     (* ---- piece 1: the hartSupports gate, read-only ---- *)
     iApply (swp_bind_use (Defs.bind0 (returnM tt) (hartSupports Ext_Zicfilp))
               _ _ _ with "[Hany Hrw Hro] [-]").
-    { iApply (swp_hmrun_of_exec Dr Dw Drw Dro Df
+    { iApply (swp_hmrun_of_exec_reg Dr Dw Drw Dro Df
                 (Defs.bind0 (returnM tt) (hartSupports Ext_Zicfilp)) s s true
-                rs ∅ Hdisj HDr HDw Hag0 (map_empty_subseteq _) HgZ HZ
-                with "Hcert Hany Hrw Hro Hemp"). }
+                rs  Hdisj HDr HDw Hag0 (map_empty_subseteq _) HgZ HZ
+                with "Hcert Hany Hrw Hro"). }
     iIntros (b) "(-> & Hpost)".
-    iDestruct "Hpost" as (rs1 mm1) "(%Hag1 & _ & _ & Hrw & Hro & _ & Hany)".
+    iDestruct "Hpost" as (rs1) "(%Hag1 & Hrw & Hro & Hany)".
     cbn match.
     iApply swp_bind0.
     unfold zicfilp_preserve_elp_on_trap. cbn match.
@@ -721,11 +721,11 @@ Section UTrapReduce.
       gm_peel (Gr elp s HRelp) (exec_read_reg elp s). cbn beta.
       rewrite Hms Help. etransitivity; [ apply goodmb_write_reg | exact HWms ]. }
     iApply (swp_mono with "[] [Hany Hrw Hro]").
-    2:{ iApply (swp_hmrun_of_exec Dr Dw Drw Dro Df _ s s1 tt rs1 ∅
+    2:{ iApply (swp_hmrun_of_exec_reg Dr Dw Drw Dro Df _ s s1 tt rs1
                   Hdisj HDr HDw Hag1 (map_empty_subseteq _) HgARM HARM
-                  with "Hcert Hany Hrw Hro Hemp"). }
+                  with "Hcert Hany Hrw Hro"). }
     iIntros (u) "(-> & Hpost)".
-    iDestruct "Hpost" as (rs2 mm2) "(%Hag2 & _ & _ & Hrw & Hro & _ & Hany)".
+    iDestruct "Hpost" as (rs2) "(%Hag2 & Hrw & Hro & Hany)".
     (* ---- piece 3: THE elp NODE, a write of the value already there ---- *)
     unfold reset_elp.
     iApply (swp_write_reg_same (R_bitvector_1 elp) DfracDiscarded
@@ -851,12 +851,12 @@ Section UTrapReduce.
     apply goodmb_returnm.
       }
     iApply (swp_mono with "[] [Hany Hrw Hro]").
-    2:{ iApply (swp_hmrun_of_exec Dr Dw Drw Dro Df _ s1e s9
-                  (stvec_base stvec_v) rs2 ∅
+    2:{ iApply (swp_hmrun_of_exec_reg Dr Dw Drw Dro Df _ s1e s9
+                  (stvec_base stvec_v) rs2 
                   Hdisj HDr HDw Hag2e (map_empty_subseteq _) HgREST HTH
-                  with "Hcert Hany Hrw Hro Hemp"). }
+                  with "Hcert Hany Hrw Hro"). }
     iIntros (v) "(-> & Hpost)".
-    iDestruct "Hpost" as (rs3 mm3) "(%Hag3 & _ & _ & Hrw & Hro & _ & Hany)".
+    iDestruct "Hpost" as (rs3) "(%Hag3 & Hrw & Hro & Hany)".
     iSplitR; [ done |]. iExists rs3. iFrame "Hrw Hro Hany". done.
     (* the node-shape side condition [swp_write_reg_same] shelved: the
        [decide (r' = r)] does not reduce on its own, so collapse its proof
@@ -924,14 +924,14 @@ Section UTrapReduce.
          sync_exception_ext].
     iApply (swp_bind_use (exception_delegatee e User) _ _ _
               with "[Hany Hrw Hro] [-]").
-    { iApply (swp_hmrun_of_exec Dr Dw Drw Dro Df (exception_delegatee e User)
-                s s Supervisor rs ∅ Hdisj HDr HDw Hag0 (map_empty_subseteq _)
+    { iApply (swp_hmrun_of_exec_reg Dr Dw Drw Dro Df (exception_delegatee e User)
+                s s Supervisor rs  Hdisj HDr HDw Hag0 (map_empty_subseteq _)
                 (goodmb_exception_delegatee_U Dr Dw e _ s HRmedel HRmisa
                    eq_refl HESs Hdel)
                 (exec_exception_delegatee_U e _ s eq_refl HESs Hdel)
-                with "Hcert Hany Hrw Hro Hemp"). }
+                with "Hcert Hany Hrw Hro"). }
     iIntros (d) "(-> & Hpost)".
-    iDestruct "Hpost" as (rs1 mm1) "(%Hag1 & _ & _ & Hrw & Hro & _ & Hany)".
+    iDestruct "Hpost" as (rs1) "(%Hag1 & Hrw & Hro & Hany)".
     change (get_config_print_exception tt) with false. cbn match.
     iApply swp_bind0. iApply swp_ret.
     rewrite <- Hc. rewrite <- Hinfo.
@@ -977,27 +977,27 @@ Section UTrapReduce.
     unfold handle_exception.
     iApply (swp_bind_use (Defs.read_reg cur_privilege : M _) _ _ _
               with "[Hany Hrw Hro] [-]").
-    { iApply (swp_hmrun_of_exec Dr Dw Drw Dro Df
+    { iApply (swp_hmrun_of_exec_reg Dr Dw Drw Dro Df
                 (Defs.read_reg cur_privilege : M _) s s
-                (register_lookup cur_privilege s.(sregs)) rs ∅
+                (register_lookup cur_privilege s.(sregs)) rs 
                 Hdisj HDr HDw Hag0 (map_empty_subseteq _)
                 ltac:(etransitivity; [ apply goodmb_read_reg | exact HRcp ])
                 (exec_read_reg cur_privilege s)
-                with "Hcert Hany Hrw Hro Hemp"). }
+                with "Hcert Hany Hrw Hro"). }
     iIntros (p) "(-> & Hpost)".
-    iDestruct "Hpost" as (rs1 mm1) "(%Hag1 & _ & _ & Hrw & Hro & _ & Hany)".
+    iDestruct "Hpost" as (rs1) "(%Hag1 & Hrw & Hro & Hany)".
     cbn beta. rewrite Hpriv.
     iApply (swp_bind_use (Defs.read_reg (R_bitvector_64 PC) : M _) _ _ _
               with "[Hany Hrw Hro] [-]").
-    { iApply (swp_hmrun_of_exec Dr Dw Drw Dro Df
+    { iApply (swp_hmrun_of_exec_reg Dr Dw Drw Dro Df
                 (Defs.read_reg (R_bitvector_64 PC) : M _) s s
-                (register_lookup (R_bitvector_64 PC) s.(sregs)) rs1 ∅
+                (register_lookup (R_bitvector_64 PC) s.(sregs)) rs1 
                 Hdisj HDr HDw Hag1 (map_empty_subseteq _)
                 ltac:(etransitivity; [ apply goodmb_read_reg | exact HRpc ])
                 (exec_read_reg (R_bitvector_64 PC) s)
-                with "Hcert Hany Hrw Hro Hemp"). }
+                with "Hcert Hany Hrw Hro"). }
     iIntros (q) "(-> & Hpost)".
-    iDestruct "Hpost" as (rs2 mm2) "(%Hag2 & _ & _ & Hrw & Hro & _ & Hany)".
+    iDestruct "Hpost" as (rs2) "(%Hag2 & Hrw & Hro & Hany)".
     cbn beta. rewrite Hpc.
     iApply (swp_bind_use (exception_handler User (make_sync_exception e xv) pc0)
               _ _ _ with "[Hany Hrw Hro] [-]").
@@ -1008,15 +1008,15 @@ Section UTrapReduce.
     iIntros (v) "(-> & Hpost)".
     iDestruct "Hpost" as (rs3) "(%Hag3 & Hrw & Hro & Hany)".
     iApply (swp_mono with "[] [Hany Hrw Hro]").
-    2:{ iApply (swp_hmrun_of_exec Dr Dw Drw Dro Df
+    2:{ iApply (swp_hmrun_of_exec_reg Dr Dw Drw Dro Df
                   (set_next_pc (stvec_base stvec_v)) s9
                   (set_reg s9 (R_bitvector_64 nextPC) (stvec_base stvec_v)) tt
-                  rs3 ∅ Hdisj HDr HDw Hag3 (map_empty_subseteq _)
+                  rs3  Hdisj HDr HDw Hag3 (map_empty_subseteq _)
                   (goodmb_set_next_pc Dr Dw (stvec_base stvec_v) s9 HWnpc)
                   (exec_set_next_pc (stvec_base stvec_v) s9)
-                  with "Hcert Hany Hrw Hro Hemp"). }
+                  with "Hcert Hany Hrw Hro"). }
     iIntros (u) "(-> & Hpost)".
-    iDestruct "Hpost" as (rs4 mm4) "(%Hag4 & _ & _ & Hrw & Hro & _ & Hany)".
+    iDestruct "Hpost" as (rs4) "(%Hag4 & Hrw & Hro & Hany)".
     iExists rs4. iFrame "Hrw Hro Hany". done.
   Qed.
 
@@ -1052,15 +1052,15 @@ Section UTrapReduce.
     unfold handle_interrupt.
     iApply (swp_bind_use (Defs.read_reg (R_bitvector_64 PC) : M _) _ _ _
               with "[Hany Hrw Hro] [-]").
-    { iApply (swp_hmrun_of_exec Dr Dw Drw Dro Df
+    { iApply (swp_hmrun_of_exec_reg Dr Dw Drw Dro Df
                 (Defs.read_reg (R_bitvector_64 PC) : M _) s s
-                (register_lookup (R_bitvector_64 PC) s.(sregs)) rs ∅
+                (register_lookup (R_bitvector_64 PC) s.(sregs)) rs 
                 Hdisj HDr HDw Hag0 (map_empty_subseteq _)
                 ltac:(etransitivity; [ apply goodmb_read_reg | exact HRpc ])
                 (exec_read_reg (R_bitvector_64 PC) s)
-                with "Hcert Hany Hrw Hro Hemp"). }
+                with "Hcert Hany Hrw Hro"). }
     iIntros (q) "(-> & Hpost)".
-    iDestruct "Hpost" as (rs1 mm1) "(%Hag1 & _ & _ & Hrw & Hro & _ & Hany)".
+    iDestruct "Hpost" as (rs1) "(%Hag1 & Hrw & Hro & Hany)".
     cbn beta. rewrite Hpc. rewrite <- Hc. rewrite <- Hinfo.
     iApply (swp_bind_use (trap_handler Supervisor c pc0 info None) _ _ _
               with "[Hany Hrw Hro] [-]").
@@ -1071,15 +1071,15 @@ Section UTrapReduce.
     iIntros (v) "(-> & Hpost)".
     iDestruct "Hpost" as (rs2) "(%Hag2 & Hrw & Hro & Hany)".
     iApply (swp_mono with "[] [Hany Hrw Hro]").
-    2:{ iApply (swp_hmrun_of_exec Dr Dw Drw Dro Df
+    2:{ iApply (swp_hmrun_of_exec_reg Dr Dw Drw Dro Df
                   (set_next_pc (stvec_base stvec_v)) s9
                   (set_reg s9 (R_bitvector_64 nextPC) (stvec_base stvec_v)) tt
-                  rs2 ∅ Hdisj HDr HDw Hag2 (map_empty_subseteq _)
+                  rs2  Hdisj HDr HDw Hag2 (map_empty_subseteq _)
                   (goodmb_set_next_pc Dr Dw (stvec_base stvec_v) s9 HWnpc)
                   (exec_set_next_pc (stvec_base stvec_v) s9)
-                  with "Hcert Hany Hrw Hro Hemp"). }
+                  with "Hcert Hany Hrw Hro"). }
     iIntros (u) "(-> & Hpost)".
-    iDestruct "Hpost" as (rs3 mm3) "(%Hag3 & _ & _ & Hrw & Hro & _ & Hany)".
+    iDestruct "Hpost" as (rs3) "(%Hag3 & Hrw & Hro & Hany)".
     iExists rs3. iFrame "Hrw Hro Hany". done.
   Qed.
 
@@ -1130,15 +1130,15 @@ Section UTrapReduce.
     iIntros (v) "(-> & Hpost)".
     iDestruct "Hpost" as (rs1) "(%Hag1 & Hrw & Hro & Hany)".
     iApply (swp_mono with "[] [Hany Hrw Hro]").
-    2:{ iApply (swp_hmrun_of_exec Dr Dw Drw Dro Df
+    2:{ iApply (swp_hmrun_of_exec_reg Dr Dw Drw Dro Df
                   (set_next_pc (stvec_base stvec_v)) s9
                   (set_reg s9 (R_bitvector_64 nextPC) (stvec_base stvec_v)) tt
-                  rs1 ∅ Hdisj HDr HDw Hag1 (map_empty_subseteq _)
+                  rs1  Hdisj HDr HDw Hag1 (map_empty_subseteq _)
                   (goodmb_set_next_pc Dr Dw (stvec_base stvec_v) s9 HWnpc)
                   (exec_set_next_pc (stvec_base stvec_v) s9)
-                  with "Hcert Hany Hrw Hro Hemp"). }
+                  with "Hcert Hany Hrw Hro"). }
     iIntros (u) "(-> & Hpost)".
-    iDestruct "Hpost" as (rs2 mm2) "(%Hag2 & _ & _ & Hrw & Hro & _ & Hany)".
+    iDestruct "Hpost" as (rs2) "(%Hag2 & Hrw & Hro & Hany)".
     iExists rs2. iFrame "Hrw Hro Hany". done.
   Qed.
 

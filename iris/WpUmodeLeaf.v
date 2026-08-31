@@ -227,8 +227,8 @@ Section WpUmodeLeaf.
                       (regval_into_reg wval))) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc (if is_rvc then 2 else 4)) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -267,8 +267,8 @@ Section WpUmodeLeaf.
     wval = vf (m !!! Regidx rs1) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc (if is_rvc then 2 else 4)) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -311,8 +311,8 @@ Section WpUmodeLeaf.
     wval = vf (m !!! Regidx rs1) (m !!! Regidx rs2) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc (if is_rvc then 2 else 4)) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -353,8 +353,8 @@ Section WpUmodeLeaf.
     wval = add_vec zero_reg (sign_extend' 64 (sign_extend' 12 imm)) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 2) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -400,8 +400,8 @@ Section WpUmodeLeaf.
     wval = add_vec (m !!! Regidx rd) (sign_extend' 64 (sign_extend' 12 imm)) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 2) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -438,8 +438,8 @@ Section WpUmodeLeaf.
              (sign_extend' 64 (caddi4spn_imm nzimm)) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 2) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -497,8 +497,8 @@ Section WpUmodeLeaf.
     eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) tgt -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -548,8 +548,8 @@ Section WpUmodeLeaf.
     tgt = ret_pc (m !!! Regidx rs1) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M m -∗
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M m -∗
        pc_is (CID := CID0) tgt -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -610,8 +610,8 @@ Section WpUmodeLeaf.
              (sign_extend' 64 (caddi16sp_imm imm)) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx csp_rs1 := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 2) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -650,8 +650,8 @@ Section WpUmodeLeaf.
     wval = add_vec zero_reg (m !!! Regidx rs2) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 2) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -703,8 +703,8 @@ Section WpUmodeLeaf.
                          (sign_extend' 64 (sign_extend' 12 imm))) 31 0) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 2) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -743,8 +743,8 @@ Section WpUmodeLeaf.
     eq_vec (access_vec_dec tgt 0) ('b"0") = true ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M m -∗
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M m -∗
        pc_is (CID := CID0) tgt -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -797,8 +797,8 @@ Section WpUmodeLeaf.
     wval = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 4) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -829,8 +829,8 @@ Section WpUmodeLeaf.
     wval = add_vec (m !!! Regidx rs1) (m !!! Regidx rs2) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 4) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -867,8 +867,8 @@ Section WpUmodeLeaf.
              (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 4) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -896,8 +896,8 @@ Section WpUmodeLeaf.
              (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 4) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -932,8 +932,8 @@ Section WpUmodeLeaf.
                       (subrange_vec_dec (m !!! Regidx rs2) 31 0 : mword 32)) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 4) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -970,8 +970,8 @@ Section WpUmodeLeaf.
     wval = add_vec pc (auipc_off imm) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 4) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -1003,8 +1003,8 @@ Section WpUmodeLeaf.
     wval = sub_vec (m !!! Regidx rs1) (m !!! Regidx rs2) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 4) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -1037,8 +1037,8 @@ Section WpUmodeLeaf.
     wval = and_vec (m !!! Regidx rs1) (m !!! Regidx rs2) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 4) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -1080,8 +1080,8 @@ Section WpUmodeLeaf.
              (bool_to_bit (zopz0zI_u (m !!! Regidx rs1) (m !!! Regidx rs2))) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 4) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -1126,8 +1126,8 @@ Section WpUmodeLeaf.
                       (subrange_vec_dec (m !!! Regidx rs2) 31 0 : mword 32)) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 4) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -1163,8 +1163,8 @@ Section WpUmodeLeaf.
              (bool_to_bit (zopz0zI_u (m !!! Regidx rs1) (sign_extend' 64 imm))) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 4) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -1196,8 +1196,8 @@ Section WpUmodeLeaf.
     wval = and_vec (m !!! Regidx rs1) (sign_extend' 64 imm) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 4) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -1226,8 +1226,8 @@ Section WpUmodeLeaf.
     wval = xor_vec (m !!! Regidx rs1) (sign_extend' 64 imm) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 4) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -1262,8 +1262,8 @@ Section WpUmodeLeaf.
                 (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) 31 0) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 4) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -1298,8 +1298,8 @@ Section WpUmodeLeaf.
                               shamt) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 4) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -1331,8 +1331,8 @@ Section WpUmodeLeaf.
     wval = luival imm ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 4) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -1367,8 +1367,8 @@ Section WpUmodeLeaf.
               else Z.quot (uint (m !!! Regidx rs1)) (uint (m !!! Regidx rs2))) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 4) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -1410,8 +1410,8 @@ Section WpUmodeLeaf.
               else Z.rem (uint (m !!! Regidx rs1)) (uint (m !!! Regidx rs2))) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 4) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -1470,8 +1470,8 @@ Section WpUmodeLeaf.
     tgt = ret_pc (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M (uv_upd m wr) -∗
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M (uv_upd m wr) -∗
        pc_is (CID := CID0) tgt -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1528,8 +1528,8 @@ Section WpUmodeLeaf.
     tgt = ret_pc (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M m -∗
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M m -∗
        pc_is (CID := CID0) tgt -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1558,8 +1558,8 @@ Section WpUmodeLeaf.
     wval = add_vec (m !!! Regidx rd) (m !!! Regidx rs2) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 2) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -1587,8 +1587,8 @@ Section WpUmodeLeaf.
     wval = and_vec (m !!! Regidx rd) (m !!! Regidx rs2) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 2) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -1632,8 +1632,8 @@ Section WpUmodeLeaf.
                       (subrange_vec_dec (m !!! Regidx rs2) 31 0 : mword 32)) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 2) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -1668,8 +1668,8 @@ Section WpUmodeLeaf.
     wval = luival (sign_extend' 20 imm) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 2) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -1695,8 +1695,8 @@ Section WpUmodeLeaf.
              (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 2) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -1724,8 +1724,8 @@ Section WpUmodeLeaf.
              (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 2) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -1760,8 +1760,8 @@ Section WpUmodeLeaf.
     wval = add_vec zero_reg (sign_extend' 64 imm) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ M
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 4) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -1798,8 +1798,8 @@ End WpUmodeLeaf.
 (*       sync_layout pt -> sync_text_sub M ->                               *)
 (*       uv_cap_gpr C pt Ψ M m -∗                                           *)
 (*       pc_is (mword_of_int 0x0c) -∗                                       *)
-(*       (∀ CID0 : CpuId,                                                   *)
-(*          uv_cap_gpr (CID := CID0) C pt Ψ M                               *)
+(*       (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),                                                   *)
+(*          uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ M                               *)
 (*            (<[Regidx (mword_of_int 10) := regval_into_reg               *)
 (*                 (add_vec zero_reg (sign_extend' 64                       *)
 (*                    (sign_extend' 12 (mword_of_int 0 : mword 6))))]> m) -∗*)

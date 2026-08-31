@@ -59,6 +59,7 @@ Require Import SpecUserret.  (* [userret_gpr] -- the 31-insert register file *)
 Require Import UexecSlot.    (* [uvis] / [tf_w] / [tf_resume_gpr] / [ret_pc_idem] *)
 Require Import UexecRet.     (* [tf_resume_gpr0] / [tf_of] / [uslot] / [uexec_ret] *)
 Require Import UexecRound.   (* the round this vocabulary is applied under *)
+Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -459,7 +460,7 @@ End Apply.
 (* ===================================================================== *)
 Section Frame.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : TsoCtx.CurCtx}.
 
   Lemma trapped_machine_frame (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
       (sz : Z) (sc stv : mword 64) (W : uvis) :
@@ -550,7 +551,7 @@ Qed.
 
 Section LoopApply.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : TsoCtx.CurCtx}.
 
   (* ------------------------------------------------------------------ *)
   (* STEPS A + B: the returned [uexec_ret], re-keyed at the resume state. *)
@@ -658,7 +659,7 @@ Section LoopApply.
     (* the cell bundle splits into the U-mode residue, the file and the pc *)
     iDestruct (u_regs_uv_regs ms_v sc_v stv_v sepc_v pc m Hms with "Hregs")
       as "(Hur & Hg & Hpc)".
-    iApply ("Hkc" $! CID C pt Rut
+    iApply ("Hkc" $! CID XI C pt Rut
               with "[%] [%] [Hhw Hmi Hwi Hur Hg Hpc Hupt Hcfg Hrut Hk]").
     - exact Hlo.
     - reflexivity.

@@ -200,7 +200,7 @@ Section UProofShTop.
   (* it [uv_stack] permits a frame at 4096 and the prologue's two [sd]s    *)
   (* may land on the program TEXT, after which no [ui_sh_*] fact holds.    *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_sh_fork1 (CIDp : CpuId) (M : gmap Z (bv 8)) (m : regfile)
+  Lemma wp_sh_fork1 (CIDp : CpuId) {XICIDp : TsoCtx.CurCtx} (M : gmap Z (bv 8)) (m : regfile)
       (sp0 : mword 64) :
     wp_sh_fork1_body (CID := CIDp) C pt gin gbrk hbase hlen Q M m sp0.
   Proof.
@@ -228,7 +228,7 @@ Section UProofShTop.
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc").
-    iIntros (CID1) "Hcg Hpc".
+    iIntros (CID1 ?) "Hcg Hpc".
     set (M1 := uM_store8 M (uint sp0 - 8) (m !!! Regidx ra_idx)).
     set (M2 := uM_store8 M1 (uint sp0 - 16) (m !!! Regidx s0_idx)).
     set (mp := <[Regidx s0_idx := (mword_of_int (uint sp0) : mword 64)]>
@@ -261,7 +261,7 @@ Section UProofShTop.
               ltac:(vm_compute; discriminate) Htgt Hlink
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc").
-    iIntros (CID2) "Hcg Hpc".
+    iIntros (CID2 ?) "Hcg Hpc".
     set (mq := <[Regidx ra_idx
                  := regval_into_reg (mword_of_int 0x74 : mword 64)]> mp).
     iEval (rewrite <- Hsfork) in "Hpc".
@@ -274,7 +274,7 @@ Section UProofShTop.
                     [ exact Hlay | exact Htext2
                     | rewrite Hra_q; vm_compute; reflexivity ])
               with "Hcg Hpc [Hcont]").
-    iIntros (CID3 ret) "%Hpid Hcg Hpc".
+    iIntros (CID3 ? ret) "%Hpid Hcg Hpc".
     iEval (rewrite Hra_q) in "Hpc".
     set (mf := <[Regidx a0_idx := ret]>
                  (<[Regidx a7_idx := (mword_of_int SYS_fork : mword 64)]> mq)).
@@ -288,7 +288,7 @@ Section UProofShTop.
               (ui_sh_74 pt M2 Hltext Htext2)
               ltac:(vm_compute; discriminate) Hwm1
               with "Hcg Hpc").
-    iIntros (CID4) "Hcg Hpc".
+    iIntros (CID4 ?) "Hcg Hpc".
     set (mr := <[Regidx a5_idx
                  := regval_into_reg (mword_of_int (-1) : mword 64)]> mf).
     assert (E74 : add_vec_int (mword_of_int 0x74 : mword 64) 2
@@ -321,7 +321,7 @@ Section UProofShTop.
               (ui_sh_76 pt M2 Hltext Htext2)
               Hntaken Htgt76 ltac:(intro Hc; discriminate Hc)
               with "Hcg Hpc").
-    iIntros (CID5) "Hcg Hpc".
+    iIntros (CID5 ?) "Hcg Hpc".
     assert (E76 : add_vec_int (mword_of_int 0x76 : mword 64) 4
                   = mword_of_int 0x7a)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -375,7 +375,7 @@ Section UProofShTop.
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc [Hcont]").
-    iIntros (CID6 m') "%HA %HB %HC Hcg Hpc".
+    iIntros (CID6 ? m') "%HA %HB %HC Hcg Hpc".
     (* ---- the register postcondition ---- *)
     assert (Hcs : ucallee_saved m m').
     { intros r Hr. unfold ucallee_saved_idx in Hr.
@@ -408,7 +408,7 @@ Section UProofShTop.
                  ltac:(vm_compute; discriminate)
                  ltac:(vm_compute; discriminate)).
       exact Ha0_r. }
-    iApply ("Hcont" $! CID6 m' M2 ret with "[] [] [] [] Hcg Hpc").
+    iApply ("Hcont" $! CID6 _ m' M2 ret with "[] [] [] [] Hcg Hpc").
     - iPureIntro. exact Hcs.
     - iPureIntro. exact Hreta.
     - iPureIntro. exact Hpid.
@@ -430,7 +430,7 @@ Section UProofShTop.
   (* aligned, which nothing in the body implies), and the exec picture's   *)
   (* address bounds.                                                       *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_sh_runcmd_exec (CIDp : CpuId) (M : gmap Z (bv 8)) (m : regfile)
+  Lemma wp_sh_runcmd_exec (CIDp : CpuId) {XICIDp : TsoCtx.CurCtx} (M : gmap Z (bv 8)) (m : regfile)
       (sp0 : mword 64) (cmd p0 : Z)
       (path : list (bv 8)) (args : list (list (bv 8))) :
     wp_sh_runcmd_exec_body (CID := CIDp) C pt gin gbrk hbase hlen Q
@@ -499,7 +499,7 @@ Section UProofShTop.
     iApply (wp_uv_caddi16sp C pt Psh M m (mword_of_int 0x8e)
               (mword_of_int 61 : mword 6) (mword_of_int (uint sp0 - 48))
               (ui_sh_8e pt M Hltext Htext) Hspw with "Hcg Hpc").
-    iIntros (CID1) "Hcg Hpc".
+    iIntros (CID1 ?) "Hcg Hpc".
     set (m1 := <[Regidx csp_rs1
                  := regval_into_reg (mword_of_int (uint sp0 - 48) : mword 64)]> m).
     assert (E8e : add_vec_int (mword_of_int 0x8e : mword 64) 2 = mword_of_int 0x90)
@@ -519,7 +519,7 @@ Section UProofShTop.
               (ui_sh_90 pt M Hltext Htext)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc").
-    iIntros (CID2) "Hcg Hpc".
+    iIntros (CID2 ?) "Hcg Hpc".
     set (Ma := uM_store8 M (uint sp0 - 48 + 40) (m1 !!! Regidx ra_idx)).
     assert (HtextA : sh_text_sub Ma)
       by (unfold Ma; apply sht_text_store8; [ exact Htext | lia ]).
@@ -536,7 +536,7 @@ Section UProofShTop.
               (ui_sh_92 pt Ma Hltext HtextA)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc").
-    iIntros (CID3) "Hcg Hpc".
+    iIntros (CID3 ?) "Hcg Hpc".
     set (Mb := uM_store8 Ma (uint sp0 - 48 + 32) (m1 !!! Regidx s0_idx)).
     assert (HtextB : sh_text_sub Mb)
       by (unfold Mb; apply sht_text_store8; [ exact HtextA | lia ]).
@@ -559,7 +559,7 @@ Section UProofShTop.
               (ui_sh_94 pt Mb Hltext HtextB)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) Hs0w
               with "Hcg Hpc").
-    iIntros (CID4) "Hcg Hpc".
+    iIntros (CID4 ?) "Hcg Hpc".
     set (m2 := <[Regidx s0_idx
                  := regval_into_reg (mword_of_int (uint sp0) : mword 64)]> m1).
     assert (E94 : add_vec_int (mword_of_int 0x94 : mword 64) 2 = mword_of_int 0x96)
@@ -584,7 +584,7 @@ Section UProofShTop.
               ltac:(symmetry; exact Hcmdz) eq_refl
               ltac:(intro Hc; discriminate Hc)
               with "Hcg Hpc").
-    iIntros (CID5) "Hcg Hpc".
+    iIntros (CID5 ?) "Hcg Hpc".
     assert (E96 : add_vec_int (mword_of_int 0x96 : mword 64) 2 = mword_of_int 0x98)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite E96) in "Hpc".
@@ -596,7 +596,7 @@ Section UProofShTop.
               (ui_sh_98 pt Mb Hltext HtextB)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc").
-    iIntros (CID6) "Hcg Hpc".
+    iIntros (CID6 ?) "Hcg Hpc".
     set (Mc := uM_store8 Mb (uint sp0 - 48 + 24) (m2 !!! Regidx s1_idx)).
     assert (HtextC : sh_text_sub Mc)
       by (unfold Mc; apply sht_text_store8; [ exact HtextB | lia ]).
@@ -631,7 +631,7 @@ Section UProofShTop.
               (ui_sh_9a pt Mc Hltext HtextC)
               ltac:(vm_compute; discriminate) Hmvw
               with "Hcg Hpc").
-    iIntros (CID7) "Hcg Hpc".
+    iIntros (CID7 ?) "Hcg Hpc".
     set (m3 := <[Regidx s1_idx := regval_into_reg (mword_of_int cmd : mword 64)]> m2).
     assert (E9a : add_vec_int (mword_of_int 0x9a : mword 64) 2 = mword_of_int 0x9c)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -666,7 +666,7 @@ Section UProofShTop.
               ltac:(rewrite Hcu; exact HtypeC)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc").
-    iIntros (CID8) "Hcg Hpc".
+    iIntros (CID8 ?) "Hcg Hpc".
     set (m4 := <[Regidx a4_idx := regval_into_reg (mword_of_int 1 : mword 64)]> m3).
     assert (E9c : add_vec_int (mword_of_int 0x9c : mword 64) 2 = mword_of_int 0x9e)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -678,7 +678,7 @@ Section UProofShTop.
               ltac:(vm_compute; discriminate)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc").
-    iIntros (CID9) "Hcg Hpc".
+    iIntros (CID9 ?) "Hcg Hpc".
     set (m5 := <[Regidx a5_idx := regval_into_reg (mword_of_int 5 : mword 64)]> m4).
     assert (E9e : add_vec_int (mword_of_int 0x9e : mword 64) 2 = mword_of_int 0xa0)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -706,7 +706,7 @@ Section UProofShTop.
               (ui_sh_a0 pt Mc Hltext HtextC)
               Hbltu eq_refl ltac:(intro Hc; discriminate Hc)
               with "Hcg Hpc").
-    iIntros (CID10) "Hcg Hpc".
+    iIntros (CID10 ?) "Hcg Hpc".
     assert (Ea0 : add_vec_int (mword_of_int 0xa0 : mword 64) 4 = mword_of_int 0xa4)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Ea0) in "Hpc".
@@ -726,7 +726,7 @@ Section UProofShTop.
               ltac:(rewrite Hcu; exact HtypeC)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc").
-    iIntros (CID11) "Hcg Hpc".
+    iIntros (CID11 ?) "Hcg Hpc".
     set (m6 := <[Regidx a5_idx := regval_into_reg (mword_of_int 1 : mword 64)]> m5).
     assert (Ea4 : add_vec_int (mword_of_int 0xa4 : mword 64) 4 = mword_of_int 0xa8)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -745,7 +745,7 @@ Section UProofShTop.
               (ui_sh_a8 pt Mc Hltext HtextC)
               ltac:(vm_compute; discriminate) Hsllw
               with "Hcg Hpc").
-    iIntros (CID12) "Hcg Hpc".
+    iIntros (CID12 ?) "Hcg Hpc".
     set (m7 := <[Regidx a5_idx := regval_into_reg (mword_of_int 4 : mword 64)]> m6).
     assert (Ea8 : add_vec_int (mword_of_int 0xa8 : mword 64) 2 = mword_of_int 0xaa)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -757,7 +757,7 @@ Section UProofShTop.
               ltac:(vm_compute; discriminate)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc").
-    iIntros (CID13) "Hcg Hpc".
+    iIntros (CID13 ?) "Hcg Hpc".
     set (m8 := <[Regidx a4_idx
                  := regval_into_reg (mword_of_int 0x10aa : mword 64)]> m7).
     assert (Eaa : add_vec_int (mword_of_int 0xaa : mword 64) 4 = mword_of_int 0xae)
@@ -776,7 +776,7 @@ Section UProofShTop.
               (ui_sh_ae pt Mc Hltext HtextC)
               ltac:(vm_compute; discriminate) Haddw
               with "Hcg Hpc").
-    iIntros (CID14) "Hcg Hpc".
+    iIntros (CID14 ?) "Hcg Hpc".
     set (m9 := <[Regidx a4_idx
                  := regval_into_reg (mword_of_int 0x1398 : mword 64)]> m8).
     assert (Eae : add_vec_int (mword_of_int 0xae : mword 64) 4 = mword_of_int 0xb2)
@@ -799,7 +799,7 @@ Section UProofShTop.
               (ui_sh_b2 pt Mc Hltext HtextC)
               ltac:(vm_compute; discriminate) Haddb2
               with "Hcg Hpc").
-    iIntros (CID15) "Hcg Hpc".
+    iIntros (CID15 ?) "Hcg Hpc".
     set (m10 := <[Regidx a5_idx
                   := regval_into_reg (mword_of_int 0x139c : mword 64)]> m9).
     assert (Eb2 : add_vec_int (mword_of_int 0xb2 : mword 64) 2 = mword_of_int 0xb4)
@@ -857,7 +857,7 @@ Section UProofShTop.
               ltac:(rewrite Htu; exact Htab)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc").
-    iIntros (CID16) "Hcg Hpc".
+    iIntros (CID16 ?) "Hcg Hpc".
     set (m11 := <[Regidx a5_idx
                   := regval_into_reg (mword_of_int (-4810) : mword 64)]> m10).
     assert (Eb4 : add_vec_int (mword_of_int 0xb4 : mword 64) 2 = mword_of_int 0xb6)
@@ -877,7 +877,7 @@ Section UProofShTop.
               (ui_sh_b6 pt Mc Hltext HtextC)
               ltac:(vm_compute; discriminate) Haddb6
               with "Hcg Hpc").
-    iIntros (CID17) "Hcg Hpc".
+    iIntros (CID17 ?) "Hcg Hpc".
     set (m12 := <[Regidx a5_idx
                   := regval_into_reg (mword_of_int 0xce : mword 64)]> m11).
     assert (Eb6 : add_vec_int (mword_of_int 0xb6 : mword 64) 2 = mword_of_int 0xb8)
@@ -913,7 +913,7 @@ Section UProofShTop.
               (ui_sh_b8 pt Mc Hltext HtextC)
               ltac:(vm_compute; discriminate) Hjt
               with "Hcg Hpc").
-    iIntros (CID18) "Hcg Hpc".
+    iIntros (CID18 ?) "Hcg Hpc".
     (* ---- 0xce  ld a0,8(a0)  --  a0 := cmd->argv[0] ---- *)
     destruct (uv_slot8_facts (cmd + 8) (mword_of_int (cmd + 8)) ltac:(lia) Hal8
                 ltac:(change (2 ^ 38) with 274877906944; lia) eq_refl)
@@ -937,7 +937,7 @@ Section UProofShTop.
               Halg8
               ltac:(rewrite Hau; exact Hp0C)
               with "Hcg Hpc").
-    iIntros (CID19) "Hcg Hpc".
+    iIntros (CID19 ?) "Hcg Hpc".
     set (m13 := <[Regidx a0_idx
                   := regval_into_reg (mword_of_int p0 : mword 64)]> m12).
     assert (Ece : add_vec_int (mword_of_int 0xce : mword 64) 2 = mword_of_int 0xd0)
@@ -962,7 +962,7 @@ Section UProofShTop.
               ltac:(symmetry; exact Hp0z) eq_refl
               ltac:(intro Hc; discriminate Hc)
               with "Hcg Hpc").
-    iIntros (CID20) "Hcg Hpc".
+    iIntros (CID20 ?) "Hcg Hpc".
     assert (Ed0 : add_vec_int (mword_of_int 0xd0 : mword 64) 2 = mword_of_int 0xd2)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Ed0) in "Hpc".
@@ -976,7 +976,7 @@ Section UProofShTop.
               (ui_sh_d2 pt Mc Hltext HtextC)
               ltac:(vm_compute; discriminate) Ha1w
               with "Hcg Hpc").
-    iIntros (CID21) "Hcg Hpc".
+    iIntros (CID21 ?) "Hcg Hpc".
     set (m14 := <[Regidx a1_idx
                   := regval_into_reg (mword_of_int (cmd + 8) : mword 64)]> m13).
     assert (Ed2 : add_vec_int (mword_of_int 0xd2 : mword 64) 4 = mword_of_int 0xd6)
@@ -992,7 +992,7 @@ Section UProofShTop.
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc").
-    iIntros (CID22) "Hcg Hpc".
+    iIntros (CID22 ?) "Hcg Hpc".
     set (m15 := <[Regidx ra_idx
                   := regval_into_reg (mword_of_int 0xda : mword 64)]> m14).
     iEval (rewrite <- Hsexec) in "Hpc".

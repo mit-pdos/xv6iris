@@ -58,6 +58,13 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartRegNode
         HartSpan HartSpanChar HartEvents.
+(* THE CONTEXT ALGEBRA, IMPORTED AT THE TOP (it used to arrive only at the
+   exec-bridge section, halfway down, which would make the [`{XI : CurCtx}]
+   binders ABOVE it generalize a fresh [CurCtx : Type] variable instead of
+   the class -- the tso-flip caught this).  [bytes_own] is context-indexed
+   now, so the class has to be in scope where it is defined. *)
+Require Import TsoCtx.
+Require Import TsoCtxShim.   (* the SC write path's unseal; a cutover seam *)
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -178,9 +185,25 @@ Proof.
   apply lookup_insert_is_Some'. right. exact IH.
 Qed.
 
-(* the owned bytes, as the resource the hart holds *)
-Definition bytes_own `{!riscvGS Σ} (mm : gmap Arch.pa (bv 8)) : iProp Σ :=
-  ([∗ map] a ↦ b ∈ mm, a ↦ₚ b)%I.
+(* THE OWNED BYTES, AS THE RESOURCE THE HART HOLDS -- A LEDGER MAP NOW
+   (tso-machine-flip.md §6 amendments A6.12 + A6.16; on main the index is
+   phantom under the seal, and this file's write path converts through
+   [TsoCtxShim] -- exactly the migration seam the shim's charter names).
+   The user tier's RAM branches split three ways post-flip and two of them
+   are unprovable from a raw [↦ₚ]: the PLAIN data load owes the plain-load
+   licence, and the STORE owes the append's ghost steps.  So the map's
+   members carry their ledger residue.
+
+   SAME NAME, SAME ARITY -- the context is an AMBIENT instance argument,
+   exactly like the tier, so the pass-through call sites are textually
+   unchanged.  What is NOT free is [own_context cur_ctx] on [swp_hmrun]:
+   the token is exclusive, so it cannot be folded into [bytes_own] (which
+   would duplicate it under [bytes_own (mm1 ∪ mm2)]) and has to be a
+   premise. *)
+Definition bytes_own `{!riscvGS Σ} `{XI : TsoCtx.CurCtx}
+    (mm : gmap Arch.pa (bv 8)) : iProp Σ :=
+  ([∗ map] a ↦ b ∈ mm,
+     TsoCtx.ctx_phys_pointsto XI a (DfracOwn 1) b)%I.
 
 Section memrun.
   Context `{!riscvGS Σ}.
@@ -205,6 +228,7 @@ Section memrun.
       pose proof (read_bytes_spec _ _ _ _ Hrb j Hj) as Hmm.
       rewrite /bytes_own.
       iDestruct (big_sepM_lookup _ _ _ _ Hmm with "Hown") as "Ha".
+      iDestruct (ctx_phys_pointsto_forget with "Ha") as "Ha".
       by iDestruct (phys_valid with "Hi Ha") as %?. }
     iPureIntro. by apply read_bytes_of_bytes.
   Qed.
@@ -232,8 +256,13 @@ Section memrun.
       destruct Hj as [b0 Hb0].
       rewrite /bytes_own.
       iDestruct (big_sepM_insert_acc _ _ _ _ Hb0 with "Hown") as "[Hcell Hback]".
+      (* the SC write path: unseal the registered cell to the raw one and
+         back (TsoCtxShim's charter -- at cutover this whole path is
+         replaced by the one-message store gate, tso-flip [bytes_own_wobl]) *)
+      iDestruct (TsoCtxShim.ctx_phys_to_mem with "Hcell") as "Hcell".
       iMod (phys_update _ (pa_add pa j) b0 (nth_byte v j) with "Hi Hcell")
         as "[Hi Hcell]".
+      iDestruct (TsoCtxShim.ctx_phys_of_mem XI with "Hcell") as "Hcell".
       iModIntro. iFrame "Hi". by iApply "Hback".
   Qed.
 
@@ -299,8 +328,10 @@ Section memrun.
     resv_any cpu_id -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
+    TsoCtx.own_context XI -∗
     bytes_own mm -∗
     swp m (fun v => ⌜v = x⌝ ∗ hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro ∗
+                    TsoCtx.own_context XI ∗
                     bytes_own mm' ∗ resv_any cpu_id).
   Proof.
     intros Hdisj. revert rs mm m x rs' mm'.
@@ -308,7 +339,7 @@ Section memrun.
     destruct m as [y|T oc k].
     { (* [Ret]: the walker's answer is what it was handed *)
       rewrite hmrun_ret in Hf. injection Hf as H1 H2 H3; subst.
-      iIntros "#Hcert Hany Hrw Hro Hown". iApply swp_ret.
+      iIntros "#Hcert Hany Hrw Hro Hrun Hown". iApply swp_ret.
       iSplitR; [done|]. iFrame. }
     destruct oc as [ reg ak | reg ak regval | nb rreq | nb wreq | opc
                    | bsz bpa | bar | cop | tlbo | flt | rpa | tst | ten
@@ -321,11 +352,11 @@ Section memrun.
                         (fun t => Interface.Ret t))
                    = Some (register_lookup reg rs, rs))
         by (rewrite hfrun_read Hin; reflexivity).
-      iIntros "#Hcert Hany Hrw Hro Hown".
+      iIntros "#Hcert Hany Hrw Hro Hrun Hown".
       iApply (swp_hfnode Drw Dro Df rs rs _ k _ _ Hdisj HH
-                with "Hcert Hrw Hro [Hany Hown]").
+                with "Hcert Hrw Hro [Hany Hrun Hown]").
       iIntros "Hrw Hro".
-      iApply (IH rs mm _ x rs' mm' Hf with "Hcert Hany Hrw Hro Hown"). }
+      iApply (IH rs mm _ x rs' mm' Hf with "Hcert Hany Hrw Hro Hrun Hown"). }
     { (* REGISTER WRITE inside the exclusive frame *)
       destruct (bool_decide (reg ∈ Drw)) eqn:Hin; [|discriminate Hf].
       assert (HH : hfrun 2 (Drw ∪ Dro) Drw rs
@@ -333,12 +364,12 @@ Section memrun.
                         (fun t => Interface.Ret t))
                    = Some (tt, register_set reg regval rs))
         by (rewrite hfrun_write Hin; reflexivity).
-      iIntros "#Hcert Hany Hrw Hro Hown".
+      iIntros "#Hcert Hany Hrw Hro Hrun Hown".
       iApply (swp_hfnode Drw Dro Df rs (register_set reg regval rs) _ k _ _
-                Hdisj HH with "Hcert Hrw Hro [Hany Hown]").
+                Hdisj HH with "Hcert Hrw Hro [Hany Hrun Hown]").
       iIntros "Hrw Hro".
       iApply (IH (register_set reg regval rs) mm _ x rs' mm' Hf
-                with "Hcert Hany Hrw Hro Hown"). }
+                with "Hcert Hany Hrw Hro Hrun Hown"). }
     { (* RAM READ: the walker's map answers, and the machine's memory holds
          those bytes because the caller owns them *)
       destruct (dev_addr (Interface.ReadReq.pa rreq)) eqn:Hdev;
@@ -355,7 +386,7 @@ Section memrun.
                        (Interface.Next (Interface.MemRead nb rreq) k)
                      = k (inl (w, None))).
       { cbv beta iota delta [hread_resume]. by rewrite Z_to_bv_bv_unsigned. }
-      iIntros "#Hcert Hany Hrw Hro Hown".
+      iIntros "#Hcert Hany Hrw Hro Hrun Hown".
       destruct (ak_excl (Interface.ReadReq.access_kind rreq)) eqn:Hex.
       + (* EXCLUSIVE: the frag goes in and the snapshot comes back *)
         iDestruct "Hany" as (rr) "Hfrag".
@@ -369,7 +400,7 @@ Section memrun.
         iExists w. iSplitR; [done|]. iApply bi.later_intro. iMod "Hcl" as "_". iModIntro.
         iSplitL "Hri Hmem Hdv"; [iFrame|].
         iIntros "Hfrag". rewrite Hres.
-        iApply (IH rs mm _ x rs' mm' Hf with "Hcert [Hfrag] Hrw Hro Hown").
+        iApply (IH rs mm _ x rs' mm' Hf with "Hcert [Hfrag] Hrw Hro Hrun Hown").
         by iApply resv_any_intro.
       + (* PLAIN *)
         iApply (swp_hart_ram_read nb rreq _ _ Hproj Hdev Hex with "Hcert").
@@ -381,7 +412,7 @@ Section memrun.
         iExists w. iSplitR; [done|]. iApply bi.later_intro. iMod "Hcl" as "_". iModIntro.
         iSplitL "Hri Hmem Hdv"; [iFrame|].
         rewrite Hres.
-        iApply (IH rs mm _ x rs' mm' Hf with "Hcert Hany Hrw Hro Hown"). }
+        iApply (IH rs mm _ x rs' mm' Hf with "Hcert Hany Hrw Hro Hrun Hown"). }
     { (* RAM WRITE: the footprint is owned, so the update happens in the
          caller's own cells and the map moves with memory *)
       destruct (dev_addr (Interface.WriteReq.pa wreq)) eqn:Hdev;
@@ -398,7 +429,7 @@ Section memrun.
                        (Interface.Next (Interface.MemWrite nb wreq) k)
                      = k (inl None))
         by (cbv beta iota delta [hwrite_resume]; reflexivity).
-      iIntros "#Hcert Hany Hrw Hro Hown".
+      iIntros "#Hcert Hany Hrw Hro Hrun Hown".
       iDestruct "Hany" as (rr) "Hfrag".
       iApply (swp_hart_ram_write nb wreq _ _ rr Hproj Hdev
                 with "Hcert Hfrag").
@@ -411,23 +442,23 @@ Section memrun.
               with "Hmem Hown") as "[Hmem Hown]".
       iModIntro. iSplitL "Hri Hmem Hdv"; [iFrame|].
       iIntros "Hfrag". rewrite Hres.
-      iApply (IH rs _ _ x rs' mm' Hf with "Hcert [Hfrag] Hrw Hro Hown").
+      iApply (IH rs _ _ x rs' mm' Hf with "Hcert [Hfrag] Hrw Hro Hrun Hown").
       by iApply resv_any_intro. }
     (* THE TWELVE SILENT CLASSES: the file and the map do not move *)
     (* [oc] is read back OUT OF THE GOAL rather than left to unification:
        the walker equation is discharged by [reflexivity] at elaboration
        time, which needs the node already spelled. *)
-    all: iIntros "#Hcert Hany Hrw Hro Hown";
+    all: iIntros "#Hcert Hany Hrw Hro Hrun Hown";
          match goal with
          | |- context [Interface.Next ?oc ?kk] =>
              first
                [ iApply (swp_hfnode Drw Dro Df rs rs oc kk tt _ Hdisj
-                           ltac:(reflexivity) with "Hcert Hrw Hro [Hany Hown]")
+                           ltac:(reflexivity) with "Hcert Hrw Hro [Hany Hrun Hown]")
                | iApply (swp_hfnode Drw Dro Df rs rs oc kk 0%Z _ Hdisj
-                           ltac:(reflexivity) with "Hcert Hrw Hro [Hany Hown]") ]
+                           ltac:(reflexivity) with "Hcert Hrw Hro [Hany Hrun Hown]") ]
          end;
          iIntros "Hrw Hro";
-         iApply (IH rs mm _ x rs' mm' Hf with "Hcert Hany Hrw Hro Hown").
+         iApply (IH rs mm _ x rs' mm' Hf with "Hcert Hany Hrw Hro Hrun Hown").
   Qed.
 
 End memrun.
@@ -705,7 +736,6 @@ Qed.
 (* ([hmrun_of_exec_after]).                                                 *)
 (* ====================================================================== *)
 Require Import RiscvTryStep WpDecodeBridge.
-Require Import TsoCtx.
 
 (* ---------------------------------------------------------------------- *)
 (* ONLY [dom mm] IS EVER CONSULTED (the header's claim, as a lemma): the     *)
@@ -1645,12 +1675,14 @@ Section memrun_exec.
     resv_any cpu_id -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
+    TsoCtx.own_context XI -∗
     bytes_own mm -∗
     swp m (fun v => ⌜v = x⌝ ∗
              ∃ (rs' : regstate) (mm' : gmap Arch.pa (bv 8)),
                ⌜reg_agree_on (Drw ∪ Dro) rs' s'.(sregs)⌝ ∗
                ⌜mm' ⊆ s'.(mem)⌝ ∗ ⌜dom mm' = dom mm⌝ ∗
                hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro ∗
+               TsoCtx.own_context XI ∗
                bytes_own mm' ∗ resv_any cpu_id).
   Proof.
     intros Hdisj Hdr Hdw Hag Hsub Hg He.
@@ -1662,19 +1694,73 @@ Section memrun_exec.
                 (mm_after m s mm) Hag' Hw) as (rs2 & Hw2 & Hag2).
     assert (Hag3 : reg_agree_on (Drw ∪ Dro) rs2 s'.(sregs))
       by (intros r Hr; symmetry; exact (Hag2 r Hr)).
-    iIntros "#Hcert Hany Hrw Hro Hown".
+    iIntros "#Hcert Hany Hrw Hro Hrun Hown".
     iApply (swp_mono _ (fun v => ⌜v = x⌝ ∗ hreg_frame rs2 Drw ∗
                                  hreg_frame_ro Df rs2 Dro ∗
+                                 TsoCtx.own_context XI ∗
                                  bytes_own (mm_after m s mm) ∗
                                  resv_any cpu_id)%I with "[] [-]").
-    - iIntros (v) "(-> & Hrw & Hro & Hown & Hany)". iSplitR; [done|].
+    - iIntros (v) "(-> & Hrw & Hro & Hrun & Hown & Hany)". iSplitR; [done|].
       iExists rs2, (mm_after m s mm). iFrame.
       iSplitR; [done|]. iSplitR; [done|]. done.
     - iApply (swp_hmrun n Drw Dro Df rs rs2 mm (mm_after m s mm) m x
-                Hdisj Hw2 with "Hcert Hany Hrw Hro Hown").
+                Hdisj Hw2 with "Hcert Hany Hrw Hro Hrun Hown").
   Qed.
 
 End memrun_exec.
+
+Section memrun_reg.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* THE REGISTER-ONLY FORM (tso-flip HartMemRun.v): a whole-cycle exec
+     fact whose certificate proves it touches NO memory ([mm := ∅]) needs
+     no caller token -- the run's identity is a throwaway, minted, used to
+     hold the empty map, dropped.  This is what the trap towers and every
+     register-only stretch call, so their statements gain nothing. *)
+  Lemma swp_hmrun_of_exec_reg (Dr Dw : register -> bool)
+      (Drw Dro : gset register) (Df : register -> dfrac) {X : Type} (m : M X)
+      (s s' : mstate) (x : X) (rs : regstate) :
+    Drw ## Dro ->
+    (forall r, Dr r = true -> r ∈ Drw ∪ Dro) ->
+    (forall r, Dw r = true -> r ∈ Drw) ->
+    reg_agree_on (Drw ∪ Dro) rs s.(sregs) ->
+    (∅ : gmap Arch.pa (bv 8)) ⊆ s.(mem) ->
+    goodmb Dr Dw m s ∅ = true ->
+    exec m s = Some (x, s') ->
+    gen_cert -∗
+    resv_any cpu_id -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    swp m (fun v => ⌜v = x⌝ ∗
+             ∃ rs' : regstate,
+               ⌜reg_agree_on (Drw ∪ Dro) rs' s'.(sregs)⌝ ∗
+               hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro ∗
+               resv_any cpu_id).
+  Proof.
+    intros Hdisj Hdr Hdw Hag Hsub Hg He.
+    iIntros "#Hcert Hany Hrw Hro".
+    (* the throwaway identity: minted, used, dropped -- it never escapes *)
+    iApply swp_fupd.
+    iMod (TsoCtx.own_context_boot) as (xi0) "Hrun".
+    iModIntro.
+    iAssert (bytes_own (XI := xi0) (∅ : gmap Arch.pa (bv 8))) as "Hemp".
+    { by rewrite /bytes_own big_sepM_empty. }
+    iApply (swp_mono _ (fun v => ⌜v = x⌝ ∗
+             ∃ (rs2 : regstate) (mm2 : gmap Arch.pa (bv 8)),
+               ⌜reg_agree_on (Drw ∪ Dro) rs2 s'.(sregs)⌝ ∗
+               ⌜mm2 ⊆ s'.(mem)⌝ ∗ ⌜dom mm2 = dom (∅ : gmap Arch.pa (bv 8))⌝ ∗
+               hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro ∗
+               TsoCtx.own_context xi0 ∗ bytes_own (XI := xi0) mm2 ∗
+               resv_any cpu_id)%I with "[] [-]").
+    { iIntros (v) "(-> & %rs2 & %mm2 & %Hag2 & _ & _ & Hrw & Hro & _ & _ & Hany)".
+      iSplitR; [done|]. iExists rs2. by iFrame. }
+    iApply (swp_hmrun_of_exec (XI := xi0) Dr Dw Drw Dro Df m s s' x rs ∅
+              Hdisj Hdr Hdw Hag Hsub Hg He
+              with "Hcert Hany Hrw Hro Hrun Hemp").
+  Qed.
+
+End memrun_reg.
 
 (* ====================================================================== *)
 (* 6. A SANITY INSTANCE: the certificate COMPUTES where the data is         *)

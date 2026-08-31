@@ -59,7 +59,7 @@ From Stdlib Require Import ZArith Lia.
 From stdpp Require Import bitvector.definitions gmap.
 From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import dfrac.
-From iris.base_logic.lib Require Import ghost_var.
+From iris.base_logic.lib Require Import ghost_var gen_heap.
 Require Import SailStdpp.Base SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.   (* [is_aligned_paddr]/[Physaddr]: the word tower's alignment vocabulary *)
 Require Import RiscvModelBytes RiscvLang RiscvPtsto Ktier.
@@ -1047,6 +1047,117 @@ Section ctx.
   Qed.
 
   (* ---------------------------------------------------------------- *)
+  (* THE PHYSICAL-TIER BYTE, context-registered.                        *)
+  (*                                                                    *)
+  (* The U-mode tier's cells: the process's memory and its page table   *)
+  (* are keyed by PHYSICAL address (the walker computes pas; the twin's  *)
+  (* gates are stated over them).  SC body: the raw [↦ₚ], the index      *)
+  (* phantom exactly as [ctx_pointsto]'s.  TSO (tso-flip TsoCtx.v:2095): *)
+  (* the flat byte + its stamp cell + the clean-or-dirty justification   *)
+  (*   [∃ t, ↦ₚ ∗ a ↪[ts]{dq} (t,none) ∗ (llb (bound ξ) t ∨ dirty (t,a))]*)
+  (* IT IS NOT A NEW TIER on the TSO side: the VA family IS the kmap     *)
+  (* claim over this one.                                                *)
+  (* ---------------------------------------------------------------- *)
+  Definition ctx_phys_pointsto_def (ξ : CtxId) (a : Arch.pa) (dq : dfrac)
+      (v : bv 8) : iProp Σ :=
+    phys_pointsto a dq v.
+  Lemma ctx_phys_pointsto_aux : { f | f = ctx_phys_pointsto_def }.
+  Proof. by eexists. Qed.
+  Definition ctx_phys_pointsto (ξ : CtxId) (a : Arch.pa) (dq : dfrac)
+      (v : bv 8) : iProp Σ := proj1_sig ctx_phys_pointsto_aux ξ a dq v.
+  Lemma ctx_phys_pointsto_unseal (ξ : CtxId) (a : Arch.pa) (dq : dfrac)
+      (v : bv 8) :
+    ctx_phys_pointsto ξ a dq v = phys_pointsto a dq v.
+  Proof.
+    unfold ctx_phys_pointsto. by rewrite (proj2_sig ctx_phys_pointsto_aux).
+  Qed.
+
+  Global Instance ctx_phys_pointsto_timeless ξ a dq v :
+    Timeless (ctx_phys_pointsto ξ a dq v).
+  Proof. rewrite ctx_phys_pointsto_unseal. apply _. Qed.
+  Global Instance ctx_phys_pointsto_discarded_persistent ξ a v :
+    Persistent (ctx_phys_pointsto ξ a DfracDiscarded v).
+  Proof. rewrite ctx_phys_pointsto_unseal. apply _. Qed.
+
+  (* the forgetful projection at this tier (A6.8's price, same words: at
+     TSO the ledger residue is dropped and with it the load license) *)
+  Lemma ctx_phys_pointsto_forget ξ a dq v :
+    ctx_phys_pointsto ξ a dq v ⊢ phys_pointsto a dq v.
+  Proof. by rewrite ctx_phys_pointsto_unseal. Qed.
+
+  Lemma ctx_phys_pointsto_ram ξ a dq v :
+    ctx_phys_pointsto ξ a dq v ⊢ ⌜addr_is_ram a⌝.
+  Proof.
+    rewrite ctx_phys_pointsto_forget /phys_pointsto. by iIntros "[_ $]".
+  Qed.
+
+  Lemma ctx_phys_pointsto_agree ξ1 ξ2 a dq1 b1 dq2 b2 :
+    ctx_phys_pointsto ξ1 a dq1 b1 -∗ ctx_phys_pointsto ξ2 a dq2 b2 -∗
+    ⌜b1 = b2⌝.
+  Proof.
+    rewrite !ctx_phys_pointsto_unseal /phys_pointsto.
+    iIntros "[H1 _] [H2 _]".
+    by iDestruct (pointsto_agree with "H1 H2") as %->.
+  Qed.
+
+  Lemma ctx_phys_pointsto_ne (ξ1 ξ2 : CtxId) (a1 a2 : Arch.pa) (dq2 : dfrac)
+      (v1 v2 : bv 8) :
+    ctx_phys_pointsto ξ1 a1 (DfracOwn 1) v1 -∗
+    ctx_phys_pointsto ξ2 a2 dq2 v2 -∗ ⌜a1 ≠ a2⌝.
+  Proof.
+    rewrite !ctx_phys_pointsto_unseal /phys_pointsto.
+    iIntros "[H1 _] [H2 _]".
+    by iDestruct (pointsto_ne with "H1 H2") as %?.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (* THE 8-BYTE PHYSICAL LEDGER WORD -- [phys_word_pointsto]'s twin,     *)
+  (* character for character [ctx_word_pointsto] at the physical tier,   *)
+  (* so the towers' law names line up (tso-flip TsoCtx.v:6178).           *)
+  (* ---------------------------------------------------------------- *)
+  Definition ctx_phys_word_pointsto (ξ : CtxId) (a : Arch.pa) (dq : dfrac)
+      (w : bv 64) : iProp Σ :=
+    (⌜is_aligned_paddr (Physaddr a) 8 = true⌝ ∗
+     [∗ list] j ∈ seq 0 8, ctx_phys_pointsto ξ (pa_add a j) dq (nth_byte w j))%I.
+
+  Lemma ctx_phys_word_pointsto_unfold ξ a dq w :
+    ctx_phys_word_pointsto ξ a dq w ⊣⊢
+    ⌜is_aligned_paddr (Physaddr a) 8 = true⌝ ∗
+    ([∗ list] j ∈ seq 0 8, ctx_phys_pointsto ξ (pa_add a j) dq (nth_byte w j)).
+  Proof. reflexivity. Qed.
+
+  Lemma ctx_phys_word_pointsto_aligned_p ξ a dq w :
+    ctx_phys_word_pointsto ξ a dq w ⊢
+    ⌜is_aligned_paddr (Physaddr a) 8 = true⌝.
+  Proof. iIntros "[$ _]". Qed.
+
+  Lemma ctx_phys_word_pointsto_bytes ξ a dq w :
+    ctx_phys_word_pointsto ξ a dq w ⊢
+    [∗ list] j ∈ seq 0 8, ctx_phys_pointsto ξ (pa_add a j) dq (nth_byte w j).
+  Proof. iIntros "[_ $]". Qed.
+
+  Lemma ctx_phys_word_pointsto_intro ξ a dq w :
+    is_aligned_paddr (Physaddr a) 8 = true ->
+    ([∗ list] j ∈ seq 0 8, ctx_phys_pointsto ξ (pa_add a j) dq (nth_byte w j))
+    ⊢ ctx_phys_word_pointsto ξ a dq w.
+  Proof. iIntros (Hal) "H". by iFrame. Qed.
+
+  Global Instance ctx_phys_word_pointsto_timeless ξ a dq w :
+    Timeless (ctx_phys_word_pointsto ξ a dq w).
+  Proof. rewrite /ctx_phys_word_pointsto. apply _. Qed.
+  Global Instance ctx_phys_word_pointsto_discarded_persistent ξ a w :
+    Persistent (ctx_phys_word_pointsto ξ a DfracDiscarded w).
+  Proof. rewrite /ctx_phys_word_pointsto. apply _. Qed.
+
+  Lemma ctx_phys_word_pointsto_forget ξ a dq w :
+    ctx_phys_word_pointsto ξ a dq w ⊢ phys_word_pointsto a dq w.
+  Proof.
+    iIntros "[%Hal Hb]". rewrite /phys_word_pointsto. iSplitR; first done.
+    iApply (big_sepL_mono with "Hb"). intros k j Hj.
+    apply ctx_phys_pointsto_forget.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
   (* Transport: the ONLY ways a fact changes context                   *)
   (* ---------------------------------------------------------------- *)
 
@@ -1184,6 +1295,19 @@ Section ctx.
       iFrame.
   Qed.
 
+  Global Instance ctx_morph_big_sepS `{Countable A} (X : gset A)
+      (Φ : A → CtxId → iProp Σ) :
+    (∀ x, CtxMorph (Φ x)) → CtxMorph (λ ξ, [∗ set] x ∈ X, Φ x ξ)%I.
+  Proof.
+    intros HΦ. induction X as [|x X Hx IH] using set_ind_L.
+    - iIntros (ξ ξ') "Hd _". rewrite big_sepS_empty. by iFrame.
+    - iIntros (ξ ξ') "Hd HR".
+      iDestruct (big_sepS_insert _ _ _ Hx with "HR") as "[HR HRs]".
+      iDestruct (ctx_morph with "Hd HR") as "[Hd HR]".
+      iDestruct (IH ξ ξ' with "Hd HRs") as "[Hd HRs]".
+      iFrame "Hd". rewrite (big_sepS_insert _ _ _ Hx). iFrame.
+  Qed.
+
   (* THE GUARDED SLOT.  A payload that is present on some states and [emp]
      on the others -- [SchedCtx.proc_slots]' five arms, every [if ... then
      ... else emp] in a lock invariant -- transports arm by arm.  Stated as
@@ -1253,6 +1377,27 @@ Section ctx.
     iDestruct (ctx_morph_big_sepL (seq 0 4)
             (λ _ j ξ0, ctx_pointsto (KTR := kt) ξ0 (pa_add a j) dq (nth_byte w j))
             (λ i x, ctx_morph_pointsto _ _ _ _)
+            ξ ξ' with "Hd H") as "[Hd H]".
+    iFrame "Hd". iSplit; [done|]. iExact "H".
+  Qed.
+
+  (* the physical-tier byte and word's transport obligations (the U-mode
+     cells: a dormant process's memory and page-table pages) *)
+  Global Instance ctx_morph_phys_pointsto (a : Arch.pa) (dq : dfrac) (v : bv 8) :
+    CtxMorph (λ ξ, ctx_phys_pointsto ξ a dq v).
+  Proof.
+    iIntros (ξ ξ') "Hd HP". iFrame "Hd".
+    iEval (rewrite ctx_phys_pointsto_unseal) in "HP".
+    rewrite ctx_phys_pointsto_unseal. iExact "HP".
+  Qed.
+
+  Global Instance ctx_morph_phys_word (a : Arch.pa) (dq : dfrac) (w : bv 64) :
+    CtxMorph (λ ξ, ctx_phys_word_pointsto ξ a dq w).
+  Proof.
+    iIntros (ξ ξ') "Hd [%Hal H]".
+    iDestruct (ctx_morph_big_sepL (seq 0 8)
+            (λ _ j ξ0, ctx_phys_pointsto ξ0 (pa_add a j) dq (nth_byte w j))
+            (λ i x, ctx_morph_phys_pointsto _ _ _)
             ξ ξ' with "Hd H") as "[Hd H]".
     iFrame "Hd". iSplit; [done|]. iExact "H".
   Qed.

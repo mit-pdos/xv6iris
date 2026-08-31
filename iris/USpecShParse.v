@@ -172,7 +172,7 @@ Section USpecShParse.
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
     UVG m M -∗
     pc_is (mword_of_int ShSyms.peek) -∗
-    (∀ CID : CpuId, ∀ (m' : regfile) (M' : gmap Z (bv 8)),
+    (∀ (CID : CpuId) (XIC : TsoCtx.CurCtx), ∀ (m' : regfile) (M' : gmap Z (bv 8)),
        ⌜ucallee_saved m m'⌝ -∗
        ⌜m' !!! Regidx a0_idx
           = (mword_of_int (sh_peek_ret bs off tbs) : mword 64)⌝ -∗
@@ -226,7 +226,7 @@ Section USpecShParse.
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
     UVG m M -∗
     pc_is (mword_of_int ShSyms.gettoken) -∗
-    (∀ CID : CpuId, ∀ (m' : regfile) (M' : gmap Z (bv 8)),
+    (∀ (CID : CpuId) (XIC : TsoCtx.CurCtx), ∀ (m' : regfile) (M' : gmap Z (bv 8)),
        let k  := sh_skipws (drop off bs) in
        let n  := sh_toklen (drop (off + k) bs) in
        let k2 := sh_skipws (drop (off + k + n) bs) in
@@ -277,7 +277,7 @@ Section USpecShParse.
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
     UVG m M -∗
     pc_is (mword_of_int ShSyms.parseredirs) -∗
-    (∀ CID : CpuId, ∀ (m' : regfile) (M' : gmap Z (bv 8)),
+    (∀ (CID : CpuId) (XIC : TsoCtx.CurCtx), ∀ (m' : regfile) (M' : gmap Z (bv 8)),
        ⌜ucallee_saved m m'⌝ -∗
        ⌜m' !!! Regidx a0_idx = (mword_of_int cmd : mword 64)⌝ -∗
        ⌜uM_bytes M' psaddr 8
@@ -340,7 +340,7 @@ Section USpecShParse.
     UVG m M -∗
     ubrk gbrk hbase -∗
     pc_is (mword_of_int entry) -∗
-    (∀ CID : CpuId, ∀ (m' : regfile) (M' : gmap Z (bv 8)) (cmd : Z),
+    (∀ (CID : CpuId) (XIC : TsoCtx.CurCtx), ∀ (m' : regfile) (M' : gmap Z (bv 8)) (cmd : Z),
        ⌜ucallee_saved m m'⌝ -∗
        ⌜m' !!! Regidx a0_idx = (mword_of_int cmd : mword 64)⌝ -∗
        ⌜cmd = hbase + 65536 - 16 * (sh_nunits SH_EXECCMD_SZ - 1)⌝ -∗
@@ -420,7 +420,7 @@ Section USpecShParse.
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
     UVG m M -∗
     pc_is (mword_of_int ShSyms.nulterminate) -∗
-    (∀ CID : CpuId, ∀ (m' : regfile) (M' : gmap Z (bv 8)),
+    (∀ (CID : CpuId) (XIC : TsoCtx.CurCtx), ∀ (m' : regfile) (M' : gmap Z (bv 8)),
        ⌜ucallee_saved m m'⌝ -∗
        (* every token is now a NUL-terminated string at its own address *)
        ⌜forall (i : nat) (t : nat * nat), toks !! i = Some t ->
@@ -456,7 +456,7 @@ Section USpecShParse.
     UVG m M -∗
     ubrk gbrk hbase -∗
     pc_is (mword_of_int ShSyms.parsecmd) -∗
-    (∀ CID : CpuId, ∀ (m' : regfile) (M' : gmap Z (bv 8)) (cmd p0 : Z),
+    (∀ (CID : CpuId) (XIC : TsoCtx.CurCtx), ∀ (m' : regfile) (M' : gmap Z (bv 8)) (cmd p0 : Z),
        ⌜ucallee_saved m m'⌝ -∗
        ⌜m' !!! Regidx a0_idx = (mword_of_int cmd : mword 64)⌝ -∗
        ⌜cmd = hbase + 65536 - 16 * (sh_nunits SH_EXECCMD_SZ - 1)⌝ -∗

@@ -25,6 +25,8 @@ From stdpp Require Import bitvector.definitions bitvector.tactics.
 Require Import SailStdpp.Operators_mwords.
 Require Import SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import RiscvModelBytes.   (* [nth_byte] / [bv_eq_of_bytes]: §5.5's
+                                     byte -> word reassembly lives here *)
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -484,4 +486,83 @@ Proof.
   all: first [ reflexivity | f_equal; lia | lia ].
 Qed.
 
+(* ===================================================================== *)
+(* THE BYTE VIEW OF A/D VARIANCE, AND THE REASSEMBLY (tso-pin-memo §5.5). *)
+(*                                                                       *)
+(* The canon pin hands the kernel-PT walk one ALLOWED SET per byte of a  *)
+(* leaf slot: bytes 1..7 pin to singletons, byte 0 to the four-element   *)
+(* A/D class (§2's measurement -- [pte_set_ad] touches bits 6 and 7 and  *)
+(* nothing else, so all its variance is inside byte 0).  What the walk   *)
+(* owes is a WORD certificate, [pte_canon w = pte_canon leaf0].  These   *)
+(* four lemmas are the step between, and they are the whole of it.       *)
+(* ===================================================================== *)
 
+(* the byte projection, read bit by bit *)
+Lemma nth_byte_testbit {m : N} (w : bv m) (j : nat) (k : Z) :
+  0 <= k < 8 ->
+  Z.testbit (bv_unsigned (nth_byte w j)) k
+  = Z.testbit (bv_unsigned w) (8 * Z.of_nat j + k).
+Proof.
+  intros Hk. rewrite nth_byte_unsigned.
+  rewrite Z.mod_pow2_bits_low by lia.
+  rewrite Z.shiftr_spec by lia.
+  f_equal. rewrite N2Z.inj_mul, nat_N_Z. lia.
+Qed.
+
+(* MEMO §2, AT THE BYTE: A/D variance lives entirely in byte 0. *)
+Lemma pte_set_ad_nth_byte_high (w : mword 64) (a d : mword 1) (j : nat) :
+  (1 <= j < 8)%nat -> nth_byte (pte_set_ad w a d) j = nth_byte w j.
+Proof.
+  intros Hj. apply (bv_eq_testbit 8). intros k Hk.
+  change (Z.of_N 8) with 8 in Hk.
+  rewrite !(nth_byte_testbit _ j k ltac:(lia)).
+  rewrite (pte_set_ad_testbit w a d (8 * Z.of_nat j + k) ltac:(lia)).
+  rewrite (proj2 (Z.eqb_neq (8 * Z.of_nat j + k) 6) ltac:(lia)).
+  rewrite (proj2 (Z.eqb_neq (8 * Z.of_nat j + k) 7) ltac:(lia)).
+  reflexivity.
+Qed.
+
+(* THE REASSEMBLY.  A word whose byte 0 is one of the leaf's A/D variants'
+   byte 0 and whose bytes 1..7 are the leaf's own IS that variant, hence
+   canon-equal to the leaf. *)
+Lemma pte_bytes_canon (leaf0 w : mword 64) (a d : mword 1) :
+  nth_byte w 0%nat = nth_byte (pte_set_ad leaf0 a d) 0%nat ->
+  (forall j : nat, (1 <= j < 8)%nat -> nth_byte w j = nth_byte leaf0 j) ->
+  pte_canon w = pte_canon leaf0.
+Proof.
+  intros H0 Hhi.
+  assert (Hall : forall j : nat, (j < 8)%nat ->
+            nth_byte w j = nth_byte (pte_set_ad leaf0 a d) j).
+  { intros j Hj. destruct j as [|j']; [exact H0 |].
+    rewrite (Hhi (S j') ltac:(lia)).
+    symmetry. exact (pte_set_ad_nth_byte_high leaf0 a d (S j') ltac:(lia)). }
+  assert (Hw : w = pte_set_ad leaf0 a d).
+  { apply (bv_eq_of_bytes (n := 8%N)). intros j Hj. apply Hall. lia. }
+  rewrite Hw. apply pte_canon_set_ad.
+Qed.
+
+(* ...and the form the pin actually hands over: the byte-0 SET membership
+   as an existential over the A/D pair (the four-element class of §2). *)
+Definition pte_byte0_class (leaf0 : mword 64) (b : bv 8) : Prop :=
+  exists a d : mword 1, b = nth_byte (pte_set_ad leaf0 a d) 0%nat.
+
+Lemma pte_bytes_canon_class (leaf0 w : mword 64) :
+  pte_byte0_class leaf0 (nth_byte w 0%nat) ->
+  (forall j : nat, (1 <= j < 8)%nat -> nth_byte w j = nth_byte leaf0 j) ->
+  pte_canon w = pte_canon leaf0.
+Proof.
+  intros (a & d & H0) Hhi. exact (pte_bytes_canon leaf0 w a d H0 Hhi).
+Qed.
+
+(* the class is inhabited by the leaf itself (the mint's obligation) and by
+   every write-back variant (the store gate's [vnew ∈ S]) *)
+Lemma pte_byte0_class_self (leaf0 : mword 64) :
+  pte_byte0_class leaf0 (nth_byte leaf0 0%nat).
+Proof.
+  destruct (pte_set_ad_refl leaf0) as (a & d & Hw).
+  exists a, d. by rewrite <- Hw.
+Qed.
+
+Lemma pte_byte0_class_set_ad (leaf0 : mword 64) (a d : mword 1) :
+  pte_byte0_class leaf0 (nth_byte (pte_set_ad leaf0 a d) 0%nat).
+Proof. by exists a, d. Qed.

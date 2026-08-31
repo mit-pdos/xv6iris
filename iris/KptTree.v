@@ -46,6 +46,7 @@ Require Import SmodePte.
 Require Import PtAdBits.
 Require Import CommonWalk.
 Require Import PtTree.
+Require Import PtBytes.
 Require Import PtTreeAdue.
 Require Import KptPt.
 Require Import KptExecMap.
@@ -53,6 +54,7 @@ Require Import KMap.
 Require Import Pt4kWalk.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import TsoCtx.
+Require Import TsoCtxShim.
 Require TsoCtxShim.   (* the ↦ₚ₈/↦₈ bridge crosses the ctx/mem seam *)
 Local Open Scope Z_scope.
 Import Defs.
@@ -466,13 +468,17 @@ Section PtSlotBridge.
       reflexivity.
   Qed.
 
-  (* the word-level ↦ₚ₈ → ↦₈ bridge for a PT slot, from the node's claim *)
+  (* the word-level slot → ↦₈ bridge for a PT slot, from the node's claim.
+     The slot is the TIERED cell now ([pt_slot_own (UTier cur_ctx)], the
+     thread's own registered word); at SC the registration is phantom and
+     the shim unseals it to the raw word this proof always moved. *)
   Lemma pt_slot_phys_to_mem (b : mword 44) (idx : mword 9) (dq : dfrac) (w : mword 64) :
     pt_node_claim b -∗
-    u_pte_addr b idx ↦ₚ₈{dq} w -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (u_pte_addr b idx) dq w -∗
     u_pte_addr b idx ↦₈{dq} w.
   Proof.
     iIntros "(%Hkd & %Hpv & #Hk) Hw".
+    iEval (rewrite TsoCtxShim.ctx_phys_word_shim) in "Hw".
     iApply ctx_word_pointsto_intro; [exact (pte_addr_at_aligned8 b idx) |].
     iDestruct (phys_word_pointsto_bytes with "Hw") as "Hbs".
     iApply (big_sepL_impl with "Hbs").
@@ -486,14 +492,15 @@ Section PtSlotBridge.
               Hid Hram Hcan with "Hk' Hp").
   Qed.
 
-  (* the reverse ↦₈ → ↦ₚ₈ (walk restores the physical slot after its load /
+  (* the reverse ↦₈ → slot (walk restores the tiered slot after its load /
      stores the rewritten leaf word) *)
   Lemma pt_slot_mem_to_phys (b : mword 44) (idx : mword 9) (dq : dfrac) (w : mword 64) :
     pt_node_claim b -∗
     u_pte_addr b idx ↦₈{dq} w -∗
-    u_pte_addr b idx ↦ₚ₈{dq} w.
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx (u_pte_addr b idx) dq w.
   Proof.
     iIntros "(%Hkd & %Hpv & #Hk) Hw".
+    iEval (rewrite TsoCtxShim.ctx_phys_word_shim).
     iApply phys_word_pointsto_intro; [exact (pte_addr_at_aligned8 b idx) |].
     iDestruct (ctx_word_pointsto_bytes with "Hw") as "Hbs".
     iApply (big_sepL_impl with "Hbs").
@@ -990,19 +997,44 @@ End KptTranslateAddr.
 
 Section PtTranslateOwn.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
+  Context `{GEN : GenId} `{CID : CpuId}.
   Context (acc : MemoryAccessType mem_payload) (p : Privilege).
+  (* A6.24: THE TIER INDEX.  The core is shared by the KERNEL table
+     ([PTT = None], inside [KptShare.kpt_inv]) and by a USER table
+     ([PTT = Some ξ], owned by the translating thread), so it is generic in
+     [PtTree]'s slot index rather than pinned at the ambient context. *)
+  Context (PTT : ptier).
 
   (* THE GENERIC ABSORPTION CORE, over the raw pieces: any owned tree, any
      canonical leaf [w] mapped at [va]'s vpn as an A/D variant, any output
      page [pa].  Translation succeeds at [pa]; the tree and the TLB move by
      at most a fill or the Svadu A/D write-back, tracked in the returned
      [t']/[tlbvec'] with consistency re-established.  The kernel and user
-     page-table invariants both instantiate this. *)
+     page-table invariants both instantiate this.
+
+     A6.24 -- THE CORE TAKES ITS PAYER, IT DOES NOT BE ONE.  The Svadu A/D
+     write-back is a real store and post-flip owes the log append; but the
+     two tiers pay DIFFERENTLY ([TsoCtx.ledger_store_ok] with no context for
+     the kernel table, [TsoCtx.ctx_store_win_ok] plus [own_context] for a
+     user one), and this lemma is at the wrong ALTITUDE to pay either -- it
+     is an [mstate]-level fact with no memory-model bundle in it.  So the
+     append is a THREADED PREMISE ([Sto]/[Stoq] carry the caller's currency;
+     a wand that CONSUMED the caller's bundle could not give it back, which
+     is why both appear).  The ruling, verbatim:
+
+       the index says which ledger a slot is in;
+       the payer says who may move it.
+
+     And the premise must take [gen_heap_interp] TOGETHER with whatever the
+     caller's [Sto] is, because every gate in [TsoCtx] does: the interp's own
+     tie relates the flat cell and the ledger, so a gate that moved one
+     without the other could not restore it.  ([HartPilot]'s bundle-only
+     premise cannot be copied here for exactly that reason.) *)
   Lemma ptree_translateAddr_own (root_ppn : mword 44) (t : ptree)
       (w va pa satp0 : mword 64)
       (tlbvec : vec (option TLB_Entry) (2 ^ 6))
-      (p2 p1 : mword 64) (a0 d0 : mword 1) (σ : mstate) :
+      (p2 p1 : mword 64) (a0 d0 : mword 1) (σ : mstate)
+      (S : PtBytes.pamap -> iProp Σ) :
     (forall (a d : mword 1) (mxr do_sum : bool),
        pte_check_ok acc p mxr do_sum (pte_set_ad w a d)) ->
     (forall a d : mword 1,
@@ -1036,26 +1068,54 @@ Section PtTranslateOwn.
     (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z ->
     pma_allows_pte_read (register_lookup pma_regions σ.(sregs)) ->
     pma_allows_pte_write (register_lookup pma_regions σ.(sregs)) ->
+    (* THE PAYER (A6.24), threaded -- AND THE CURRENCY IS INDEXED BY THE
+       FLAT MEMORY, which is what makes it CHAINABLE.  A one-shot
+       [Sto]/[Stoq wnew] pair cannot serve a caller that translates TWICE
+       (a straddling fetch does), because the second translation would need
+       a second [Sto] and the currency is not duplicable.  Indexing by the
+       memory instead makes "before" and "after" the SAME predicate at
+       different arguments, so n translations chain with no extra
+       parameters -- and it is what the discharger wants anyway, since the
+       bundle it hands back IS at the new memory. *)
+    (∀ wnew : mword 64,
+       (* A6.53: the ONE side condition the pinned kernel tier needs, stated
+          TIER-GENERICALLY -- the walk only ever writes an A/D variant, so
+          [pte_canon_set_ad] discharges it at the [UTier] arm for free and
+          at [KTier] it is exactly [PtTree.pte_slot_set_mem_set_ad]'s
+          hypothesis via [pte_canon_inv]. *)
+       ⌜pte_wb_ok (pte_set_ad w a0 d0) wnew⌝ -∗
+       gen_heap_interp σ.(mem) -∗ S σ.(mem) -∗
+       pt_slot_own PTT (pt_addr0 p1 (svpn_of va)) (DfracOwn 1)
+         (pte_set_ad w a0 d0) ==∗
+       gen_heap_interp (write_bytes σ.(mem) (pt_addr0 p1 (svpn_of va)) 8 wnew) ∗
+       S (write_bytes σ.(mem) (pt_addr0 p1 (svpn_of va)) 8 wnew) ∗
+       pt_slot_own PTT (pt_addr0 p1 (svpn_of va)) (DfracOwn 1) wnew) -∗
+    S σ.(mem) -∗
     reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗
-    tlb ↦ᵣ tlbvec -∗ ptree_own 2 (DfracOwn 1) t ==∗
+    tlb ↦ᵣ tlbvec -∗ ptree_own_at PTT 2 (DfracOwn 1) t ==∗
     ∃ (σ' : mstate) (t' : ptree) (tlbvec' : vec (option TLB_Entry) (2 ^ 6)),
       ⌜ exec (translateAddr (Virtaddr va) acc) σ
         = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
       ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
       ⌜ (σ'.(sregs) = σ.(sregs) \/
          exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+      (* THE PURE DISJUNCT IS UNTOUCHED -- with a memory-indexed currency
+         the resource says nothing the state does not already say, so no
+         caller gains a case split it did not already have (A6.24), and
+         the ones that had one keep their [%Htsh] intro verbatim. *)
       ⌜ (t' = t \/ exists (a1 d1 : mword 1),
            t' = ptree_set_leaf t (svpn_of va) (pte_set_ad w a1 d1))%type ⌝ ∗
       ⌜ tlb_ok_pt (mword_of_int 0) t' tlbvec' ⌝ ∗
+      S σ'.(mem) ∗
       reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗
-      tlb ↦ᵣ tlbvec' ∗ ptree_own 2 (DfracOwn 1) t'.
+      tlb ↦ᵣ tlbvec' ∗ ptree_own_at PTT 2 (DfracOwn 1) t'.
   Proof.
     intros Hchk Hvar Hcanon Hout Hbase Hmaps Htlbok
            Hmisa Hmenv Hhtif Hcp Htm Heff Hss Hsatpv Hppn Hasid Htlbv
            HA' Hord' HR' HW' Hcov' Hpmar Hpmaw.
-    iIntros "Hri Hgh Htlb Ht".
+    iIntros "Hpay Hsto Hri Hgh Htlb Ht".
     set (vpn := svpn_of va) in *.
-    iDestruct (ptree_own_path_mem σ (DfracOwn 1) t vpn p2 p1 _ Hmaps with "Hgh Ht")
+    iDestruct (ptree_own_path_mem_at PTT σ (DfracOwn 1) t vpn p2 p1 _ Hmaps with "Hgh Ht")
       as %(Hsm2 & Hsm1 & Hsm0).
     assert (Hvarp : forall a d : mword 1, pte_pbmt0 (pte_set_ad w a d))
       by (intros a d; exact (proj2 (proj2 (proj2 (Hvar a d))))).
@@ -1065,15 +1125,18 @@ Section PtTranslateOwn.
                 HA' Hord' HR' HW' Hcov' Hpmar Hpmaw)
       as (σ' & Htrans & Hshape).
     destruct Hshape as [-> | [ -> | (a1 & d1 & ->) ]].
-    - (* O1: nothing moved *)
+    - (* O1: nothing moved -- the payer is not used, and [Sto] comes back *)
+      iClear "Hpay".
       iModIntro. iExists σ, t, tlbvec.
       iSplit; [iPureIntro; exact Htrans |].
       iSplit; [iPureIntro; reflexivity |].
       iSplit; [iPureIntro; left; reflexivity |].
       iSplit; [iPureIntro; left; reflexivity |].
       iSplit; [iPureIntro; exact Htlbok |].
-      iFrame "Hri Hgh Htlb Ht".
-    - (* O2: TLB fill with the current leaf *)
+      iFrame "Hsto Hri Hgh Htlb Ht".
+    - (* O2: TLB fill with the current leaf -- memory untouched, so again
+         the payer is not used and [Sto] comes back *)
+      iClear "Hpay".
       iMod (reg_update σ.(sregs) tlb tlbvec
               (vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
                  (Some (u_walk_entry vpn p2 p1 (pte_set_ad w a0 d0) (mword_of_int 0))))
@@ -1091,7 +1154,7 @@ Section PtTranslateOwn.
       iSplit; [iPureIntro; left; reflexivity |].
       iSplit; [iPureIntro;
         exact (tlb_ok_pt_fill_self (mword_of_int 0) t tlbvec vpn p2 p1 _ Hmaps Htlbok) |].
-      iFrame "Hri Hgh Htlb Ht".
+      iFrame "Hsto Hri Hgh Htlb Ht".
     - (* O3: the Svadu write-back, absorbed *)
       set (p0 := pte_set_ad w a0 d0) in *.
       set (w' := pte_set_ad p0 a1 d1) in *.
@@ -1103,10 +1166,12 @@ Section PtTranslateOwn.
         by (rewrite Habs; exact (proj1 (proj2 (proj2 (Hvar a1 d1))))).
       assert (Hp' : pte_pbmt0 w')
         by (rewrite Habs; exact (proj2 (proj2 (proj2 (Hvar a1 d1))))).
-      iDestruct (ptree_own_path_upd (DfracOwn 1) t vpn p2 p1 p0 Hmaps with "Ht")
+      iDestruct (ptree_own_path_upd_at PTT (DfracOwn 1) t vpn p2 p1 p0 Hmaps with "Ht")
         as "(Hs2 & Hs1 & Hs0 & Hrest)".
-      iMod (phys_word_pointsto_write σ.(mem) (pt_addr0 p1 vpn) p0 w' with "Hgh Hs0")
-        as "[Hgh Hs0]".
+      (* THE APPEND IS THE CALLER'S, not this lemma's (A6.24). *)
+      iMod ("Hpay" $! w' with "[] Hgh Hsto Hs0") as "(Hgh & Hstoq & Hs0)".
+      { iPureIntro. subst w'.
+        apply pte_wb_ok_set_ad. exact (proj1 (proj2 (Hvar a0 d0))). }
       iDestruct ("Hrest" $! w' with "Hs2 Hs1 Hs0") as "Ht".
       iMod (reg_update σ.(sregs) tlb tlbvec
               (vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
@@ -1131,7 +1196,7 @@ Section PtTranslateOwn.
                  (ptree_set_leaf_maps_self t vpn p2 p1 p0 w' Hmaps Hv' Hl' Hn' Hp')
                  (tlb_ok_pt_set_leaf (mword_of_int 0) t tlbvec vpn p2 p1 p0 a1 d1
                     Hmaps Hv' Hl' Hn' Hp' Htlbok)) |].
-      iFrame "Hri Hgh Htlb Ht".
+      iFrame "Hstoq Hri Hgh Htlb Ht".
   Qed.
 
 End PtTranslateOwn.

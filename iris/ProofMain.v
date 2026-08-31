@@ -129,6 +129,7 @@ Require Import WaitInv.   (* [wait_res] -- what main finally brings wait_lock up
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import PtTreeShim.
 Local Open Scope Z_scope.
 Require Import TsoCtx.
 Import Defs.
@@ -978,7 +979,14 @@ Section ProofMain.
        ([SpecProcinit.procs_inv_alloc]) -- so a process's kernel stack comes
        from HERE for the rest of the system's life. ---- *)
     iDestruct (kstack_bank_intro pas Hpasok with "Hkstx Hkstacks") as "Hbank".
-    iMod (kpt_inv_alloc (pt_base t) t (kvm_M pas) ⊤
+    (* THE PUBLICATION SEAM: kvminit built the tree at the ambient tier;
+       the shared body is context-free ([KTier], A6.20/A6.21).  At SC the
+       move is the shim rewrite; the T-leg replaces it with the real
+       publication (pin mint + drain, tso-flip KptPublish). *)
+    iEval (rewrite (PtTreeShim.ptree_own_retier_sc
+                      (PtTree.UTier TsoCtx.cur_ctx) (PtTree.KTier 0%nat) 2))
+      in "Htree".
+    iMod (kpt_inv_alloc (pt_base t) 0%nat t (kvm_M pas) ⊤
             (kvm_bridge pas t (pt_base t) Hpasok eq_refl Hrep)
             with "Htree Hauth Hunset") as "[#Hkinv #Hlbt]".
     iModIntro.

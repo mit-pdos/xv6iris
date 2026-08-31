@@ -93,22 +93,33 @@ Ltac ctx_morph_leaf :=
 Ltac ctx_morph_step :=
   cbv beta;
   lazymatch goal with
+  (* the ξ-CONSTANT leaf, dispatched SYNTACTICALLY: a pattern metavariable
+     cannot capture the binder, so this row fires exactly on bodies that do
+     not mention ξ -- no delta, none of the measured unifier blowups (the
+     tso-flip solver's shape) *)
+  | |- CtxMorph (fun _ => ?body) => apply ctx_morph_const
   | |- CtxMorph (fun _ => bi_sep _ _)    => apply ctx_morph_sep
   | |- CtxMorph (fun _ => bi_exist _)    => apply ctx_morph_exist; intros ?
   | |- CtxMorph (fun _ => bi_or _ _)     => apply ctx_morph_or
   | |- CtxMorph (fun _ => big_opL _ _ _) => apply ctx_morph_big_sepL; intros ? ?
   | |- CtxMorph (fun _ => big_opM _ _ _) => apply ctx_morph_big_sepM; intros ? ?
+  | |- CtxMorph (fun _ => big_opS _ _ _) => apply ctx_morph_big_sepS; intros ?
   | |- CtxMorph (fun _ => ctx_pointsto _ _ _ _)        => apply ctx_morph_pointsto
   | |- CtxMorph (fun _ => ctx_word_pointsto _ _ _ _)   => apply ctx_morph_word
   | |- CtxMorph (fun _ => ctx_word2_pointsto _ _ _ _)  => apply ctx_morph_word2
   | |- CtxMorph (fun _ => ctx_word4_pointsto _ _ _ _)  => apply ctx_morph_word4
   | |- CtxMorph (fun _ => ctx_string_pointsto _ _ _ _) => apply ctx_morph_string
+  | |- CtxMorph (fun _ => ctx_phys_pointsto _ _ _ _)      => apply ctx_morph_phys_pointsto
+  | |- CtxMorph (fun _ => ctx_phys_word_pointsto _ _ _ _) => apply ctx_morph_phys_word
   (* the boolean guards are a [match] on a [bool], which an Ltac1 pattern
      cannot name; they are cheap to try, and [ctx_morph_const] behind them
      is the ξ-constant leaf (pure facts, ghost state, invariant handles). *)
   | |- _ => first [ apply ctx_morph_if_then
                   | apply ctx_morph_if_else
-                  | apply ctx_morph_const ]
+                  (* a named ξ-dependent leaf goes to instance search,
+                     where its file registers one keyed instance per name
+                     (PtTreeMove's tree; the tso-flip solver's tail) *)
+                  | apply _ ]
   end.
 
 Ltac ctx_morph_solve :=

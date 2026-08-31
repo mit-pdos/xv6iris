@@ -250,7 +250,7 @@ Section USpecSh.
       (Hsem : xv6_io_sem n = IoPureRet),
     UVG m M -∗
     pc_is (mword_of_int entry) -∗
-    (∀ CID : CpuId, ∀ ret : mword 64,
+    (∀ (CID : CpuId) (XIC : TsoCtx.CurCtx), ∀ ret : mword 64,
        UVG (StubFile n ret m) M -∗
        pc_is (m !!! Regidx ra_idx) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -270,7 +270,7 @@ Section USpecSh.
                          (uint (m !!! Regidx a2_idx))),
     UVG m M -∗
     pc_is (mword_of_int ShSyms.write) -∗
-    (∀ CID : CpuId, ∀ ret : mword 64,
+    (∀ (CID : CpuId) (XIC : TsoCtx.CurCtx), ∀ ret : mword 64,
        UVG (StubFile SYS_write ret m) M -∗
        pc_is (m !!! Regidx ra_idx) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -282,7 +282,7 @@ Section USpecSh.
       (Hpath : uio_str_arg pt M (uint (m !!! Regidx a0_idx))),
     UVG m M -∗
     pc_is (mword_of_int ShSyms.open) -∗
-    (∀ CID : CpuId, ∀ ret : mword 64,
+    (∀ (CID : CpuId) (XIC : TsoCtx.CurCtx), ∀ ret : mword 64,
        ⌜3 <= sint ret⌝ -∗
        UVG (StubFile SYS_open ret m) M -∗
        pc_is (m !!! Regidx ra_idx) -∗
@@ -294,7 +294,7 @@ Section USpecSh.
     forall (Hpre : StubPre M m),
     UVG m M -∗
     pc_is (mword_of_int ShSyms.fork) -∗
-    (∀ CID : CpuId, ∀ ret : mword 64,
+    (∀ (CID : CpuId) (XIC : TsoCtx.CurCtx), ∀ ret : mword 64,
        ⌜uint ret = 0 \/ 0 < sint ret⌝ -∗
        UVG (StubFile SYS_fork ret m) M -∗
        pc_is (m !!! Regidx ra_idx) -∗
@@ -326,7 +326,7 @@ Section USpecSh.
     UVG m M -∗
     ustdin gin str -∗
     pc_is (mword_of_int ShSyms.read) -∗
-    (∀ CID : CpuId, ∀ (k : nat) (M' : gmap Z (bv 8)),
+    (∀ (CID : CpuId) (XIC : TsoCtx.CurCtx), ∀ (k : nat) (M' : gmap Z (bv 8)),
        ⌜(k <= length str)%nat⌝ -∗
        ⌜Z.of_nat k <= uint (m !!! Regidx a2_idx)⌝ -∗
        ⌜(k = 0)%nat -> str = []⌝ -∗
@@ -345,7 +345,7 @@ Section USpecSh.
     UVG m M -∗
     ubrk gbrk b -∗
     pc_is (mword_of_int ShSyms.sys_sbrk) -∗
-    (∀ CID : CpuId, ∀ M' : gmap Z (bv 8),
+    (∀ (CID : CpuId) (XIC : TsoCtx.CurCtx), ∀ M' : gmap Z (bv 8),
        ⌜uM_grown M M' b (sint (m !!! Regidx a0_idx))⌝ -∗
        ubrk gbrk (b + sint (m !!! Regidx a0_idx)) -∗
        UVG (StubFile SYS_sbrk (mword_of_int b : mword 64) m) M' -∗
@@ -367,7 +367,7 @@ Section USpecSh.
     UVG m M -∗
     ubrk gbrk b -∗
     pc_is (mword_of_int ShSyms.sbrk) -∗
-    (∀ CID : CpuId, ∀ (m' : regfile) (M' M'' : gmap Z (bv 8)),
+    (∀ (CID : CpuId) (XIC : TsoCtx.CurCtx), ∀ (m' : regfile) (M' M'' : gmap Z (bv 8)),
        ⌜ucallee_saved m m'⌝ -∗
        (* what sbrk RETURNS -- the old break.  [morecore] needs exactly this. *)
        ⌜m' !!! Regidx a0_idx = (mword_of_int b : mword 64)⌝ -∗
@@ -406,7 +406,7 @@ Section USpecSh.
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
     UVG m M -∗
     pc_is (mword_of_int ShSyms.strlen) -∗
-    (∀ CID : CpuId, ∀ (m' : regfile) (M' : gmap Z (bv 8)),
+    (∀ (CID : CpuId) (XIC : TsoCtx.CurCtx), ∀ (m' : regfile) (M' : gmap Z (bv 8)),
        ⌜ucallee_saved m m'⌝ -∗
        ⌜m' !!! Regidx a0_idx = (mword_of_int len : mword 64)⌝ -∗
        ⌜uM_only M M' (uint sp0 - 16) 16⌝ -∗
@@ -438,7 +438,7 @@ Section USpecSh.
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
     UVG m M -∗
     pc_is (mword_of_int ShSyms.strchr) -∗
-    (∀ CID : CpuId, ∀ (m' : regfile) (M' : gmap Z (bv 8)),
+    (∀ (CID : CpuId) (XIC : TsoCtx.CurCtx), ∀ (m' : regfile) (M' : gmap Z (bv 8)),
        ⌜ucallee_saved m m'⌝ -∗
        ⌜m' !!! Regidx a0_idx
           = (mword_of_int (match ustr_find bs c with
@@ -474,7 +474,7 @@ Section USpecSh.
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
     UVG m M -∗
     pc_is (mword_of_int ShSyms.memset) -∗
-    (∀ CID : CpuId, ∀ (m' : regfile) (M' : gmap Z (bv 8)),
+    (∀ (CID : CpuId) (XIC : TsoCtx.CurCtx), ∀ (m' : regfile) (M' : gmap Z (bv 8)),
        ⌜ucallee_saved m m'⌝ -∗
        ⌜m' !!! Regidx a0_idx = (mword_of_int dst : mword 64)⌝ -∗
        (* the destination now reads [c] ... *)
@@ -543,7 +543,7 @@ Section USpecSh.
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
     UVG m M -∗
     pc_is (mword_of_int ShSyms.free) -∗
-    (∀ CID : CpuId, ∀ (m' : regfile) (M' : gmap Z (bv 8)),
+    (∀ (CID : CpuId) (XIC : TsoCtx.CurCtx), ∀ (m' : regfile) (M' : gmap Z (bv 8)),
        ⌜ucallee_saved m m'⌝ -∗
        (* base.s.ptr = bp, bp->s.ptr = &base, freep = &base *)
        ⌜uM_bytes M' SH_BASE 8 (mword_of_int bp : mword 64)⌝ -∗
@@ -585,7 +585,7 @@ Section USpecSh.
     UVG m M -∗
     ubrk gbrk hbase -∗
     pc_is (mword_of_int ShSyms.malloc) -∗
-    (∀ CID : CpuId, ∀ (m' : regfile) (M' : gmap Z (bv 8)),
+    (∀ (CID : CpuId) (XIC : TsoCtx.CurCtx), ∀ (m' : regfile) (M' : gmap Z (bv 8)),
        ⌜ucallee_saved m m'⌝ -∗
        ⌜m' !!! Regidx a0_idx
           = (mword_of_int (hbase + 65536 - 16 * (sh_nunits nbytes - 1))
@@ -624,7 +624,7 @@ Section USpecSh.
     UVG m M -∗
     ubrk gbrk hbase -∗
     pc_is (mword_of_int ShSyms.execcmd) -∗
-    (∀ CID : CpuId, ∀ (m' : regfile) (M' : gmap Z (bv 8)) (cmd : Z),
+    (∀ (CID : CpuId) (XIC : TsoCtx.CurCtx), ∀ (m' : regfile) (M' : gmap Z (bv 8)) (cmd : Z),
        ⌜ucallee_saved m m'⌝ -∗
        ⌜m' !!! Regidx a0_idx = (mword_of_int cmd : mword 64)⌝ -∗
        ⌜cmd = hbase + 65536 - 16 * (sh_nunits SH_EXECCMD_SZ - 1)⌝ -∗
@@ -660,7 +660,7 @@ Section USpecSh.
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
     UVG m M -∗
     pc_is (mword_of_int ShSyms.fork1) -∗
-    (∀ CID : CpuId, ∀ (m' : regfile) (M' : gmap Z (bv 8)) (ret : mword 64),
+    (∀ (CID : CpuId) (XIC : TsoCtx.CurCtx), ∀ (m' : regfile) (M' : gmap Z (bv 8)) (ret : mword 64),
        ⌜ucallee_saved m m'⌝ -∗
        ⌜m' !!! Regidx a0_idx = ret⌝ -∗
        ⌜uint ret = 0 \/ 0 < sint ret⌝ -∗
@@ -712,7 +712,7 @@ Section USpecSh.
     UVG m M -∗
     ustdin gin (taken ++ rest) -∗
     pc_is (mword_of_int ShSyms.gets) -∗
-    (∀ CID : CpuId, ∀ (m' : regfile) (M' : gmap Z (bv 8)),
+    (∀ (CID : CpuId) (XIC : TsoCtx.CurCtx), ∀ (m' : regfile) (M' : gmap Z (bv 8)),
        ⌜ucallee_saved m m'⌝ -∗
        ⌜m' !!! Regidx a0_idx = (mword_of_int buf : mword 64)⌝ -∗
        (* the line, NUL-terminated ... *)
@@ -754,7 +754,7 @@ Section USpecSh.
     UVG m M -∗
     ustdin gin (taken ++ rest) -∗
     pc_is (mword_of_int ShSyms.getcmd) -∗
-    (∀ CID : CpuId, ∀ (m' : regfile) (M' : gmap Z (bv 8)),
+    (∀ (CID : CpuId) (XIC : TsoCtx.CurCtx), ∀ (m' : regfile) (M' : gmap Z (bv 8)),
        ⌜ucallee_saved m m'⌝ -∗
        (* 0 when a line was read, -1 at EOF *)
        ⌜m' !!! Regidx a0_idx

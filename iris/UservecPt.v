@@ -41,6 +41,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import TsoCtx.
+Require Import TsoCtxShim.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -122,10 +123,11 @@ Section WpUsdPt.
     mideleg ↦ᵣ{ dq } mdv0 -∗
     menvcfg ↦ᵣ{ dq } menvcfg0 -∗
     utlb_inv_pt uroot tfp um -∗
+    TsoCtx.own_context TsoCtx.cur_ctx -∗
     pc_is va -∗
     gpr_file m -∗
     instr pa is_rvc (STORE (imm, Regidx rs2, Regidx (mword_of_int 10), 8)) -∗
-    tfpa ↦ₚ₈ wold -∗
+    TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx tfpa (DfracOwn 1) wold -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗
       mstatus ↦ᵣ{ dq } mstatus0 -∗
@@ -133,18 +135,21 @@ Section WpUsdPt.
       mideleg ↦ᵣ{ dq } mdv0 -∗
       menvcfg ↦ᵣ{ dq } menvcfg0 -∗
       utlb_inv_pt uroot tfp um -∗
+      TsoCtx.own_context TsoCtx.cur_ctx -∗
       pc_is (add_vec_int va (if is_rvc then 2 else 4)) -∗
       gpr_file m -∗
-      tfpa ↦ₚ₈ (m !!! Regidx rs2 : mword 64) -∗
+      TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx tfpa (DfracOwn 1)
+        (m !!! Regidx rs2 : mword 64) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros va pa imm iva tfpa HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Ha0
       Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4 Hpa2al Hpa2al2 Hpa4al
       Heva Hcanond Hvpnd Halignd Hmod8.
-    iIntros "#Hhw #Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb
+    iIntros "#Hhw #Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx
              Hpc Hfile Hinstr Hbw Hcont".
     iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+    iEval (rewrite TsoCtxShim.ctx_phys_word_shim) in "Hbw".
     iDestruct (phys_word_pointsto_ram with "Hbw") as %Hram_tf.
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
@@ -163,14 +168,15 @@ Section WpUsdPt.
               (fun npc ms1 mdv1 =>
                  (⌜npc = add_vec_int va (if is_rvc then 2 else 4)⌝ ∗
                   ⌜ms1 = mstatus0⌝ ∗ ⌜mdv1 = mdv0⌝ ∗ gpr_file m ∗
-                  tfpa ↦ₚ₈ (m !!! Regidx rs2 : mword 64))%I)
+                  TsoCtx.ctx_phys_word_pointsto TsoCtx.cur_ctx tfpa (DfracOwn 1)
+                    (m !!! Regidx rs2 : mword 64))%I)
               (dq := dq) HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4
-              with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hinstr
+              with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hinstr
                     [Hfile Hbw] [Hcont]").
     - iIntros (satp0 pcfg paddr tv') "%Hsok %Hpok
         Hpriv Hms Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc HRes Hclk HPC HnPC
-        Hresv".
+        Hresv Hctx".
       pose proof Hpok as (HA & Hord & HX & HW & HR & Hcov).
       iDestruct (sda_frames_in dq mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv'
                    with "Htlbc Hms Hpriv Hmenv Hsatp Hpma Hpcfg Hpaddr Hhtif
@@ -220,7 +226,8 @@ Section WpUsdPt.
                     imm rs2 (mword_of_int 10) m tfpa (m !!! Regidx rs2)
                     pmar0 pcfg paddr
                     (tfpa ↦ₚ₈ (m !!! Regidx rs2 : mword 64))%I
-                    (fun rs => upt_res_pt uroot tfp um (register_lookup tlb rs))
+                    (fun rs => TsoCtx.own_context TsoCtx.cur_ctx ∗
+                               upt_res_pt uroot tfp um (register_lookup tlb rs))%I
                     rr Sv39
                     (store_data8 (m !!! Regidx rs2))
                     sda_disj sda_in_mst sda_in_priv sda_in_menv sda_in_satp
@@ -241,8 +248,11 @@ Section WpUsdPt.
                        (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv') Sv39 sda_in_mst sda_in_satp Lsxl Lmd)
                     Lep HA Hord HW Hcov (pma_all_ram Hpma_all) Hram_tf
                     Lalign Hpalign8
-                    with "Hcert Hfrag HRes Hfile Hrw Hro [] [Hbw]").
-          - iIntros "Hfrag HRes Hrw Hro".
+                    with "Hcert Hfrag [Hctx HRes] Hfile Hrw Hro [] [Hbw]").
+          - iFrame "Hctx". iExact "HRes".
+          - iIntros "Hfrag [Hctx HRes] Hrw Hro".
+            iApply (swp_mono with "[] [-]").
+            2:{
             iApply (utf_translate (Store Data) sda_Drw sda_Dro (sda_Df dq) (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv')
                       uroot tfp um
                       (add_vec (m !!! Regidx (mword_of_int 10 : mword 5))
@@ -260,7 +270,10 @@ Section WpUsdPt.
                       (sda_rs_paddr _ _ _ _ _ _ _)
                       (sda_rs_pma _ _ _ _ _ _ _)
                       Hsok Hpok Hpma_all Lvpn Lcanon Lid
-                      with "Hcert Hfrag HRes Hrw Hro").
+                      with "Hcert Hfrag Hctx HRes Hrw Hro"). }
+            iIntros (r) "($ & Hpost)".
+            iDestruct "Hpost" as (rsf) "(%Hshp & Hrw & Hro & HRes & Hctx & Hany)".
+            iExists rsf. iFrame "Hrw Hro Hctx HRes Hany". done.
           - iIntros (sigma) "Hsi".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
             iMod (phys_word_pointsto_write sigma.(mem) tfpa wold
@@ -269,7 +282,7 @@ Section WpUsdPt.
             iModIntro. iApply bi.later_intro. iMod "Hclose" as "_". iModIntro.
             iFrame "Hreg Hmem Hdev Hbw". }
       iIntros (e) "(-> & Hfile & Hland)".
-      iDestruct "Hland" as (rsf) "(%Hshape & Hrw & Hro & HRes & Hword & Hfrag)".
+      iDestruct "Hland" as (rsf) "(%Hshape & Hrw & Hro & (Hctx & HRes) & Hword & Hfrag)".
       iAssert (∃ tv2 : type_of_register tlb,
                  hreg_frame (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv2)
                    sda_Drw ∗
@@ -294,15 +307,16 @@ Section WpUsdPt.
       iFrame "Hpriv Hmie Hmenv Hsatp Hpcfg Hpaddr".
       iSplitL "Htlbc HRes". { iExists tv2. iFrame "Htlbc HRes". }
       iFrame "Hclk".
-      iSplitR "Hfrag"; [| by iApply resv_any_intro].
+      iSplitR "Hctx Hfrag"; [| iFrame "Hctx"; by iApply resv_any_intro].
       iExists mstatus0, mdv0, (add_vec_int va (if is_rvc then 2 else 4)).
       iFrame "Hms Hmdl HPC HnPC".
       iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
-      iFrame "Hfile Hword".
+      iFrame "Hfile".
+      iEval (rewrite TsoCtxShim.ctx_phys_word_shim). iFrame "Hword".
     - iApply bi.later_intro. iIntros (npc ms1 mdv1)
-        "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc
+        "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc
          (-> & -> & -> & Hfile & Hword)".
-      iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile
+      iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hfile
                             Hword").
   Qed.
 
@@ -504,6 +518,7 @@ Section WpUCsrPt.
     menvcfg ↦ᵣ{ dq } menvcfg0 -∗
     sscratch ↦ᵣ sscr0 -∗
     utlb_inv_pt uroot tfp um -∗
+    TsoCtx.own_context TsoCtx.cur_ctx -∗
     pc_is va -∗
     gpr_file m -∗
     instr pa is_rvc (CSRReg (csr_sscratch, Regidx rs1, zreg, CSRRW)) -∗
@@ -515,6 +530,7 @@ Section WpUCsrPt.
       menvcfg ↦ᵣ{ dq } menvcfg0 -∗
       sscratch ↦ᵣ (m !!! Regidx rs1 : mword 64) -∗
       utlb_inv_pt uroot tfp um -∗
+      TsoCtx.own_context TsoCtx.cur_ctx -∗
       pc_is (add_vec_int va (if is_rvc then 2 else 4)) -∗
       gpr_file m -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -524,7 +540,7 @@ Section WpUCsrPt.
       Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4 Hpa2al Hpa2al2 Hpa4al.
     assert (Hfresh : cw_fresh (R_bitvector_64 sscratch))
       by (split_and!; vm_compute; reflexivity).
-    iIntros "#Hhw #Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Hsscr Hutlb
+    iIntros "#Hhw #Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Hsscr Hutlb Hctx
              Hpc Hfile Hinstr Hcont".
     iDestruct (hw_config_cert with "Hhw") as "#Hcert".
     iPoseProof "Hhw" as "#Hhwc".
@@ -542,17 +558,17 @@ Section WpUCsrPt.
                   sscratch ↦ᵣ (m !!! Regidx rs1 : mword 64))%I)
               (dq := dq) HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4
-              with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hinstr
+              with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hinstr
                     [Hfile Hsscr] [Hcont]").
     - iIntros (satp0 pcfg paddr tv') "%Hsok %Hpok
         Hpriv Hms Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc HRes Hclk HPC HnPC
-        Hresv".
+        Hresv Hctx".
       iDestruct (pw_frames_in Supervisor dq (R_bitvector_64 sscratch) sscr0
                    Hfresh with "Hsscr Hpriv Hmseccfg Hmisa") as "[Hrw Hro]".
       change (execute (CSRReg (csr_sscratch, Regidx rs1, zreg, CSRRW)))
         with (execute_CSRReg csr_sscratch (Regidx rs1) zreg CSRRW).
       iApply (swp_mono with "[Hms Hmie Hmdl Hmenv Hclk Hsatp Hpcfg Hpaddr Htlbc
-                              HRes Hresv HPC HnPC] [Hrw Hro Hfile]").
+                              HRes Hresv Hctx HPC HnPC] [Hrw Hro Hfile]").
       2:{ iApply (swp_execute_CSRReg_w_p (cw_Drw (R_bitvector_64 sscratch))
                     cw_Dro (cw_Df dq)
                     (pw_rs Supervisor (R_bitvector_64 sscratch) sscr0)
@@ -608,15 +624,15 @@ Section WpUCsrPt.
       iFrame "Hpriv Hmie Hmenv Hsatp Hpcfg Hpaddr".
       iSplitL "Htlbc HRes". { iExists tv'. iFrame "Htlbc HRes". }
       iFrame "Hclk".
-      iSplitR "Hresv"; [| iExact "Hresv"].
+      iSplitR "Hctx Hresv"; [| by iFrame "Hctx Hresv"].
       iExists mstatus0, mdv0, (add_vec_int va (if is_rvc then 2 else 4)).
       iFrame "Hms Hmdl HPC HnPC".
       iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
       iFrame "Hfile Hsscr".
     - iApply bi.later_intro. iIntros (npc ms1 mdv1)
-        "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc
+        "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc
          (-> & -> & -> & Hfile & Hsscr)".
-      iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsscr Hutlb Hpc
+      iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsscr Hutlb Hctx Hpc
                             Hfile").
   Qed.
 
@@ -660,6 +676,7 @@ Section WpUCsrPt.
     menvcfg ↦ᵣ{ dq } menvcfg0 -∗
     sscratch ↦ᵣ{ dqs } sv -∗
     utlb_inv_pt uroot tfp um -∗
+    TsoCtx.own_context TsoCtx.cur_ctx -∗
     pc_is va -∗
     gpr_file m -∗
     instr pa is_rvc (CSRReg (csr_sscratch, zreg, Regidx rd, CSRRS)) -∗
@@ -671,6 +688,7 @@ Section WpUCsrPt.
       menvcfg ↦ᵣ{ dq } menvcfg0 -∗
       sscratch ↦ᵣ{ dqs } sv -∗
       utlb_inv_pt uroot tfp um -∗
+      TsoCtx.own_context TsoCtx.cur_ctx -∗
       pc_is (add_vec_int va (if is_rvc then 2 else 4)) -∗
       gpr_file (<[Regidx rd := regval_into_reg sv]> m) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -680,7 +698,7 @@ Section WpUCsrPt.
       Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4 Hpa2al Hpa2al2 Hpa4al.
     assert (Hfresh : cw_fresh (R_bitvector_64 sscratch))
       by (split_and!; vm_compute; reflexivity).
-    iIntros "#Hhw #Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Hsscr Hutlb
+    iIntros "#Hhw #Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Hsscr Hutlb Hctx
              Hpc Hfile Hinstr Hcont".
     iDestruct (hw_config_cert with "Hhw") as "#Hcert".
     iPoseProof "Hhw" as "#Hhwc".
@@ -699,17 +717,17 @@ Section WpUCsrPt.
                   sscratch ↦ᵣ{ dqs } sv)%I)
               (dq := dq) HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4
-              with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hinstr
+              with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc Hinstr
                     [Hfile Hsscr] [Hcont]").
     - iIntros (satp0 pcfg paddr tv') "%Hsok %Hpok
         Hpriv Hms Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc HRes Hclk HPC HnPC
-        Hresv".
+        Hresv Hctx".
       iDestruct (pr_frames_in Supervisor dq dqs (R_bitvector_64 sscratch) sv
                    Hfresh with "Hsscr Hpriv Hmseccfg Hmisa") as "[Hrw Hro]".
       change (execute (CSRReg (csr_sscratch, zreg, Regidx rd, CSRRS)))
         with (execute_CSRReg csr_sscratch zreg (Regidx rd) CSRRS).
       iApply (swp_mono with "[Hms Hmie Hmdl Hmenv Hclk Hsatp Hpcfg Hpaddr Htlbc
-                              HRes Hresv HPC HnPC] [Hrw Hro Hfile]").
+                              HRes Hresv Hctx HPC HnPC] [Hrw Hro Hfile]").
       2:{ iApply (swp_execute_CSRReg_r_p ∅ (cr_Dro (R_bitvector_64 sscratch))
                     (cr_Df dq dqs (R_bitvector_64 sscratch))
                     (pw_rs Supervisor (R_bitvector_64 sscratch) sv) m
@@ -748,15 +766,15 @@ Section WpUCsrPt.
       iFrame "Hpriv Hmie Hmenv Hsatp Hpcfg Hpaddr".
       iSplitL "Htlbc HRes". { iExists tv'. iFrame "Htlbc HRes". }
       iFrame "Hclk".
-      iSplitR "Hresv"; [| iExact "Hresv"].
+      iSplitR "Hctx Hresv"; [| by iFrame "Hctx Hresv"].
       iExists mstatus0, mdv0, (add_vec_int va (if is_rvc then 2 else 4)).
       iFrame "Hms Hmdl HPC HnPC".
       iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
       iFrame "Hfile Hsscr".
     - iApply bi.later_intro. iIntros (npc ms1 mdv1)
-        "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc
+        "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hctx Hpc
          (-> & -> & -> & Hfile & Hsscr)".
-      iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsscr Hutlb Hpc
+      iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsscr Hutlb Hctx Hpc
                             Hfile").
   Qed.
 

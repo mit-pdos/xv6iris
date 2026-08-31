@@ -283,6 +283,10 @@ Section UptWalk.
         (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
            (Z.sub pagesize_bits 1) 0)) = pa ->
     gen_cert -∗ resv_frag cpu_id rr -∗
+    (* A6.28/A6.55: the user tree's slots are LEDGER words, so the walk's
+       own A/D write-back owes the era log's append and therefore takes the
+       running token; it is handed straight back. *)
+    TsoCtx.own_context XI -∗
     upt_res_pt uroot tfp um tlbv -∗
     hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
     swp (translateAddr (Virtaddr va) acc)
@@ -291,6 +295,7 @@ Section UptWalk.
                   ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
                   upt_res_pt uroot tfp um (register_lookup tlb rsf) ∗
+                  TsoCtx.own_context XI ∗
                   resv_any cpu_id).
   Proof.
     intros Hdisjf HDr HDw Hacc Hmisa Hmenv Hhtif Hcp Hms HSXL HMPRV
@@ -298,7 +303,7 @@ Section UptWalk.
            Hcanon Hout.
     pose proof Hsatpok as (Hmode & Hasid & Hppn & Hpmaw_of).
     pose proof Hpmpok as (HA & Hord & HX & HW & HR & Hcov).
-    iIntros "#Hcert Hfrag Hres Hrw Hro".
+    iIntros "#Hcert Hfrag Hrun Hres Hrw Hro".
     iDestruct "Hres" as (t) "(%Hok & %Hspec & %Hwfm & Htree)".
     iDestruct (ptree_own_bytes 2 t with "Htree") as "(#Hclaims & %Hdisj & Hmm)".
     iDestruct (bytes_own_ram with "Hmm") as %Hram.
@@ -543,10 +548,11 @@ Section UptWalk.
                    (MState rs (ptree_bytes 2 t) dev0_state) _ _ rs
                    (ptree_bytes 2 t) Hdisjf HDr HDw (fun r _ => eq_refl)
                    ltac:(reflexivity) Htrg Htr
-                   with "Hcert [Hfrag] Hrw Hro Hmm") ].
+                   with "Hcert [Hfrag] Hrw Hro Hrun Hmm") ].
     2:{ iExists rr. iExact "Hfrag". }
     iIntros (v) "(-> & Hf)".
-    iDestruct "Hf" as (rs' mm') "(%Hag' & %Hsub' & %Hdom' & Hrw & Hro & Hmm' & Hany)".
+    iDestruct "Hf" as (rs' mm')
+      "(%Hag' & %Hsub' & %Hdom' & Hrw & Hro & Hrun & Hmm' & Hany)".
     assert (Hmmeq : mm' = ptree_bytes 2 t')
       by exact (u_map_eq mm' (ptree_bytes 2 t') Hsub'
                   ltac:(rewrite Hdom' Hdomt; reflexivity)).
@@ -558,7 +564,7 @@ Section UptWalk.
     rewrite (hreg_frame_ro_ext Df rs' rsf Dro
                (fun r Hr => Hag' r (elem_of_union_r _ _ _ Hr))).
     iSplitR; [iPureIntro; exact Hfile |].
-    iFrame "Hrw Hro Hany".
+    iFrame "Hrw Hro Hany Hrun".
     iExists t'.
     iSplitR; [iPureIntro; exact Hok' |].
     iSplitR; [iPureIntro; exact Hspec' |].
@@ -661,7 +667,7 @@ Section UptTramp.
   Proof.
     intros Hmisa Hmenv HSXL HMPRV Hsatpok Hpmpok Hpma.
     iIntros "#Hcert". rewrite /tramp_tr_obl. iModIntro.
-    iIntros (va pax tv rr) "%Hcanon %Hvpn %Hident Hfrag HRes Hrw Hro".
+    iIntros (va pax tv rr) "%Hcanon %Hvpn %Hident Hfrag Hrun HRes Hrw Hro".
     assert (Hout : zero_extend' 64 (concat_vec
         ((autocast (T := mword) ((autocast (T := mword)
             (PPN_of_PTE (pte_tramp : mword 64))) : mword 44)) : mword 44)
@@ -688,11 +694,11 @@ Section UptTramp.
                   (fun a d mxr do_sum Db s0 =>
                      tramp_variant_goodb_check_fetch a d mxr do_sum Db s0)
                   Hcanon Hout
-                  with "Hcert Hfrag HRes Hrw Hro"). }
-    iIntros (r) "(-> & %rsf & %Hshape & Hrw & Hro & HRes & Hany)".
+                  with "Hcert Hfrag Hrun HRes Hrw Hro"). }
+    iIntros (r) "(-> & %rsf & %Hshape & Hrw & Hro & HRes & Hrun & Hany)".
     iSplitR; [done |].
     destruct Hshape as [-> | (tvx & ->)].
-    - iExists tv. rewrite s_rs_tlb. iFrame "Hany Hrw Hro HRes".
+    - iExists tv. rewrite s_rs_tlb. iFrame "Hrun Hany Hrw Hro HRes".
     - assert (Ltlbv : register_lookup tlb
                 (register_set tlb tvx
                    (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
@@ -734,7 +740,7 @@ Section UptTramp.
           | tlbpeel; apply s_rs_menv ]. }
       iDestruct (s_rw_ext _ _ Hag with "Hrw") as "Hrw".
       iDestruct (s_ro_ext_gen Df _ _ Hag with "Hro") as "Hro".
-      iExists tvx. rewrite Ltlbv. iFrame "Hany Hrw Hro HRes".
+      iExists tvx. rewrite Ltlbv. iFrame "Hrun Hany Hrw Hro HRes".
   Qed.
 
   (* the whole-tower form the engine takes.  [tramp_fetch_tr] ∀-quantifies
@@ -760,7 +766,7 @@ Section UptTramp.
     rewrite /tramp_fetch_tr.
     iIntros (ms bmi cy ti ip mc micfg misa0 mseccfg0 senv0 pmar0 elp0).
     rewrite /tramp_tr_obl. iModIntro.
-    iIntros (va pax tv rr) "%Hcanon %Hvpn %Hident Hfrag HRes Hrw Hro".
+    iIntros (va pax tv rr) "%Hcanon %Hvpn %Hident Hfrag Hrun HRes Hrw Hro".
     iAssert (⌜ misa0 = MISA_C /\ pma_allows_all pmar0 ⌝)%I as %[Hmisa Hpma].
     { iEval (rewrite s_ro_split_mix) in "Hro".
       iDestruct "Hro" as "(_ & _ & _ & _ & _ & _ & _ & Hmisac & _ & Hpmac & _)".
@@ -776,7 +782,7 @@ Section UptTramp.
                  pcfg paddr mc micfg MISA_C mseccfg0 senv0 pmar0 elp0 satp0
                  mie0 mdv0 menv0 eq_refl Hmenv HSXL HMPRV Hsatpok Hpmpok Hpma
                  with "Hcert") as "#Hobl".
-    iApply ("Hobl" $! va pax tv rr with "[%] [%] [%] Hfrag HRes Hrw Hro");
+    iApply ("Hobl" $! va pax tv rr with "[%] [%] [%] Hfrag Hrun HRes Hrw Hro");
       [ exact Hcanon | exact Hvpn | exact Hident ].
   Qed.
 
@@ -828,6 +834,7 @@ Section UptTramp.
     mideleg ↦ᵣ{ dq } mdv0 -∗
     menvcfg ↦ᵣ{ dq } menvcfg0 -∗
     utlb_inv_pt uroot tfp um -∗
+    TsoCtx.own_context TsoCtx.cur_ctx -∗
     pc_is pc -∗
     instr pa is_rvc i -∗
     (∀ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
@@ -844,6 +851,7 @@ Section UptTramp.
        (R_bitvector_64 PC) ↦ᵣ pc -∗
        (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
        resv_any cpu_id -∗
+       TsoCtx.own_context TsoCtx.cur_ctx -∗
        swp (execute i)
          (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
                    cur_privilege ↦ᵣ{ dq } Supervisor ∗
@@ -858,6 +866,7 @@ Section UptTramp.
                       mstatus ↦ᵣ{ dq } ms1 ∗ mideleg ↦ᵣ{ dq } mdv1 ∗
                       (R_bitvector_64 PC) ↦ᵣ pc ∗
                       (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc ms1 mdv1) ∗
+                   TsoCtx.own_context TsoCtx.cur_ctx ∗
                    resv_any cpu_id)) -∗
     ▷ (∀ npc ms1 mdv1 : mword 64,
          hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -867,13 +876,14 @@ Section UptTramp.
          mideleg ↦ᵣ{ dq } mdv1 -∗
          menvcfg ↦ᵣ{ dq } menvcfg1 -∗
          utlb_inv_pt uroot tfp um -∗
+         TsoCtx.own_context TsoCtx.cur_ctx -∗
          pc_is npc -∗ Rl npc ms1 mdv1 -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HSIE HMPRV HSXL Hmm HPBMTE Hmenvval
            Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4.
-    iIntros "#Hhw #Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hinv Hpc
+    iIntros "#Hhw #Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hinv Hrun Hpc
              Hinstr Hex Hcont".
     iDestruct (upt_swp_open uroot tfp um with "Hinv")
       as (satp0 tlbv pcfg paddr)
@@ -885,7 +895,7 @@ Section UptTramp.
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval Hpmpok
               Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4
               with "Hhw Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp
-                    Hpcfg Hpaddr Htlbc HRes Hpc Hinstr [] [Hex] [Hcont]").
+                    Hpcfg Hpaddr Htlbc HRes Hrun Hpc Hinstr [] [Hex] [Hcont]").
     - iApply (utramp_fetch_tr uroot tfp um dq pc mstatus0 satp0 mie_v mdv0
                 menvcfg0 pcfg paddr Hmenvval HSXL HMPRV Hsatpok Hpmpok
                 with "Hhw").
@@ -894,10 +904,10 @@ Section UptTramp.
         [ exact Hsatpok | exact Hpmpok ].
     - iNext. iIntros (npc ms1 mdv1 tv1)
         "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg Hpaddr Htlbc
-         HRes Hpc HRl".
+         HRes Hrun Hpc HRl".
       iApply ("Hcont" $! npc ms1 mdv1 with
                 "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc
-                 [Hsatp Htlbc Hpcfg Hpaddr HRes] Hpc HRl").
+                 [Hsatp Htlbc Hpcfg Hpaddr HRes] Hrun Hpc HRl").
       iApply (upt_swp_close uroot tfp um satp0 tv1 pcfg paddr Hsatpok Hpmpok
                 with "Hsatp Htlbc Hpcfg Hpaddr HRes").
   Qed.
@@ -945,6 +955,7 @@ Section UptTramp.
     mideleg ↦ᵣ{ dq } mdv0 -∗
     menvcfg ↦ᵣ{ dq } menvcfg0 -∗
     utlb_inv_pt uroot tfp um -∗
+    TsoCtx.own_context TsoCtx.cur_ctx -∗
     pc_is pc -∗
     instr pa is_rvc i -∗
     (∀ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
@@ -961,6 +972,7 @@ Section UptTramp.
        (R_bitvector_64 PC) ↦ᵣ pc -∗
        (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
        resv_any cpu_id -∗
+       TsoCtx.own_context TsoCtx.cur_ctx -∗
        swp (execute i)
          (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
                    cur_privilege ↦ᵣ{ dq } User ∗
@@ -975,6 +987,7 @@ Section UptTramp.
                       mstatus ↦ᵣ{ dq } ms1 ∗ mideleg ↦ᵣ{ dq } mdv1 ∗
                       (R_bitvector_64 PC) ↦ᵣ pc ∗
                       (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc ms1 mdv1) ∗
+                   TsoCtx.own_context TsoCtx.cur_ctx ∗
                    resv_any cpu_id)) -∗
     ▷ (∀ npc ms1 mdv1 : mword 64,
          hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -984,13 +997,14 @@ Section UptTramp.
          mideleg ↦ᵣ{ dq } mdv1 -∗
          menvcfg ↦ᵣ{ dq } menvcfg1 -∗
          utlb_inv_pt uroot tfp um -∗
+         TsoCtx.own_context TsoCtx.cur_ctx -∗
          pc_is npc -∗ Rl npc ms1 mdv1 -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HSIE HMPRV HSXL Hmm HPBMTE Hmenvval
            Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4.
-    iIntros "#Hhw #Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hinv Hpc
+    iIntros "#Hhw #Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hinv Hrun Hpc
              Hinstr Hex Hcont".
     iDestruct (upt_swp_open uroot tfp um with "Hinv")
       as (satp0 tlbv pcfg paddr)
@@ -1002,7 +1016,7 @@ Section UptTramp.
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval Hpmpok
               Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4
               with "Hhw Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp
-                    Hpcfg Hpaddr Htlbc HRes Hpc Hinstr [] [Hex] [Hcont]").
+                    Hpcfg Hpaddr Htlbc HRes Hrun Hpc Hinstr [] [Hex] [Hcont]").
     - iApply (utramp_fetch_tr uroot tfp um dq pc mstatus0 satp0 mie_v mdv0
                 menvcfg0 pcfg paddr Hmenvval HSXL HMPRV Hsatpok Hpmpok
                 with "Hhw").
@@ -1011,10 +1025,10 @@ Section UptTramp.
         [ exact Hsatpok | exact Hpmpok ].
     - iNext. iIntros (npc ms1 mdv1 tv1)
         "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg Hpaddr Htlbc
-         HRes Hpc HRl".
+         HRes Hrun Hpc HRl".
       iApply ("Hcont" $! npc ms1 mdv1 with
                 "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc
-                 [Hsatp Htlbc Hpcfg Hpaddr HRes] Hpc HRl").
+                 [Hsatp Htlbc Hpcfg Hpaddr HRes] Hrun Hpc HRl").
       iApply (upt_swp_close uroot tfp um satp0 tv1 pcfg paddr Hsatpok Hpmpok
                 with "Hsatp Htlbc Hpcfg Hpaddr HRes").
   Qed.
@@ -1107,6 +1121,9 @@ Section UptData.
            (Z.sub pagesize_bits 1) 0)) = pa ->
     gen_cert -∗
     resv_frag cpu_id rr -∗
+    (* the walk's A/D write-back is a ledger append on the ξ-owned table,
+       so the translate takes the running token and hands it back *)
+    TsoCtx.own_context XI -∗
     upt_res_pt uroot tfp um (register_lookup tlb rs) -∗
     hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
     swp (translateAddr (Virtaddr va) acc)
@@ -1115,6 +1132,7 @@ Section UptData.
                   ⌜ rsf = rs \/ exists tv, rsf = register_set tlb tv rs ⌝ ∗
                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro ∗
                   upt_res_pt uroot tfp um (register_lookup tlb rsf) ∗
+                  TsoCtx.own_context XI ∗
                   resv_any cpu_id).
   Proof.
     intros Hacc Hdisjf HDr HDw Hmisa Hmenv Hhtif Hcp Hms HSXL HMPRV Hsatp
@@ -1126,7 +1144,7 @@ Section UptData.
            (Z.sub pagesize_bits 1) 0)) = pa).
     { rewrite <- (tf_variant_ppn tfp ('b"1") ('b"1")) in Hid.
       rewrite pte_set_ad_ppn in Hid. exact Hid. }
-    iIntros "#Hcert Hfrag Hres Hrw Hro".
+    iIntros "#Hcert Hfrag Hrun Hres Hrw Hro".
     destruct Hacc as [-> | ->].
     - iApply (swp_translate_upt (Load Data) Drw Dro Df rs uroot tfp um
                 va pa satp0 (pte_tf tfp) mst0 (register_lookup tlb rs)
@@ -1138,7 +1156,7 @@ Section UptData.
                 (fun a d mxr do_sum => tf_variant_check_load tfp a d mxr do_sum)
                 (fun a d mxr do_sum Db s0 =>
                    tf_variant_goodb_check_load tfp a d mxr do_sum Db s0)
-                Hcanon Hout with "Hcert Hfrag Hres Hrw Hro").
+                Hcanon Hout with "Hcert Hfrag Hrun Hres Hrw Hro").
     - iApply (swp_translate_upt (Store Data) Drw Dro Df rs uroot tfp um
                 va pa satp0 (pte_tf tfp) mst0 (register_lookup tlb rs)
                 pcfg paddr pmar0 rr Hdisjf HDr HDw
@@ -1149,7 +1167,7 @@ Section UptData.
                 (fun a d mxr do_sum => tf_variant_check_store tfp a d mxr do_sum)
                 (fun a d mxr do_sum Db s0 =>
                    tf_variant_goodb_check_store tfp a d mxr do_sum Db s0)
-                Hcanon Hout with "Hcert Hfrag Hres Hrw Hro").
+                Hcanon Hout with "Hcert Hfrag Hrun Hres Hrw Hro").
   Qed.
 
 End UptData.

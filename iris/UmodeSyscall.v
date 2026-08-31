@@ -99,7 +99,7 @@ Section UmodeSyscall.
      other registers, the image, pc+4 -- comes back intact. *)
   Definition usys_ret (g : regfile) (va : mword 64)
       (M : gmap Z (bv 8)) : iProp Σ :=
-    (∀ (CID : CpuId) (ret : mword 64),
+    (∀ (CID : CpuId) (XIC : TsoCtx.CurCtx) (ret : mword 64),
        uv_run C pt M (<[Regidx a0_idx := ret]> g) (add_vec_int va 4) -∗
        WP (Loop : expr riscv_lang))%I.
 

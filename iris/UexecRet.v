@@ -401,7 +401,7 @@ Proof. reflexivity. Qed.
 (* ===================================================================== *)
 Section TrappedMachine.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
+  Context `{GEN : GenId} `{CID : CpuId} `{XI : TsoCtx.CurCtx}.
 
   (* A THIN WRAPPER ON [UserExec.user_trap_frame_atm] (milestone J, stage
      S3).  The rows below the length conjunct ARE that predicate, at the
@@ -510,7 +510,7 @@ Section UexecRet.
      else X W)%I.
 
   (* (B) the kernel obligation: its later-free BODY, and the guarded form *)
-  Definition ukb_F (X : uvis -d> iPropO Σ) `{CID : CpuId}
+  Definition ukb_F (X : uvis -d> iPropO Σ) `{CID : CpuId} `{XI : TsoCtx.CurCtx}
       (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (sz : Z)
       (π : gmap (mword 27) uperm)
       : iProp Σ :=
@@ -523,14 +523,14 @@ Section UexecRet.
        trapped_machine C pt Rut sz sc stv W' ∗ uexec_ret_F X sc W' -∗
        WP (Loop : expr riscv_lang))%I.
 
-  Definition ukont_F (X : uvis -d> iPropO Σ) `{CID : CpuId}
+  Definition ukont_F (X : uvis -d> iPropO Σ) `{CID : CpuId} `{XI : TsoCtx.CurCtx}
       (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (sz : Z)
       (π : gmap (mword 27) uperm)
       : iProp Σ :=
     (▷ ukb_F X C pt Rut sz π)%I.
 
   (* (C) the bundle *)
-  Definition uvb_F (X : uvis -d> iPropO Σ) `{CID : CpuId}
+  Definition uvb_F (X : uvis -d> iPropO Σ) `{CID : CpuId} `{XI : TsoCtx.CurCtx}
       (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (sz : Z)
       (π : gmap (mword 27) uperm)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) : iProp Σ :=
@@ -541,10 +541,11 @@ Section UexecRet.
      at THE process's size rather than at every size a table might realize. *)
   Definition uslot_F (X : uvis -d> iPropO Σ) : uvis -d> iPropO Σ :=
     fun W =>
-      (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ),
+      (∀ (h : CpuId) (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd)
+         (Rut : uptd -> iProp Σ),
          ⌜loop_ok C pt⌝ -∗
          ⌜perm_of (ud_um pt) (uvis_sz W) = uvis_perm W⌝ -∗
-         uvb_F X (CID := h) C pt Rut (uvis_sz W) (uvis_perm W) (uvis_M W)
+         uvb_F X (CID := h) (XI := xi) C pt Rut (uvis_sz W) (uvis_perm W) (uvis_M W)
            (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)) -∗
          WP (Loop : expr riscv_lang))%I.
 
@@ -556,11 +557,14 @@ Section UexecRet.
 
   Definition uslot : uvis -> iProp Σ := fixpoint uslot_F.
   Definition uexec_ret : mword 64 -> uvis -> iProp Σ := uexec_ret_F uslot.
-  Definition ukb `{CID : CpuId} (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+  Definition ukb `{CID : CpuId} `{XI : TsoCtx.CurCtx}
+      (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
       (sz : Z) (π : gmap (mword 27) uperm) : iProp Σ := ukb_F uslot C pt Rut sz π.
-  Definition ukont `{CID : CpuId} (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+  Definition ukont `{CID : CpuId} `{XI : TsoCtx.CurCtx}
+      (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
       (sz : Z) (π : gmap (mword 27) uperm) : iProp Σ := ukont_F uslot C pt Rut sz π.
-  Definition uvb `{CID : CpuId} (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+  Definition uvb `{CID : CpuId} `{XI : TsoCtx.CurCtx}
+      (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
       (sz : Z) (π : gmap (mword 27) uperm)
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) : iProp Σ :=
     uvb_F uslot C pt Rut sz π M m pc.
@@ -571,18 +575,20 @@ Section UexecRet.
      slot is this at the key's state ([uslot_ukc]). *)
   Definition ukc (π : gmap (mword 27) uperm) (M : gmap Z (bv 8))
       (szv : Z) (m : regfile) (pc : mword 64) : iProp Σ :=
-    (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ),
+    (∀ (h : CpuId) (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd)
+       (Rut : uptd -> iProp Σ),
        ⌜loop_ok C pt⌝ -∗
        ⌜perm_of (ud_um pt) szv = π⌝ -∗
-       uvb (CID := h) C pt Rut szv π M m pc -∗
+       uvb (CID := h) (XI := xi) C pt Rut szv π M m pc -∗
        WP (Loop : expr riscv_lang))%I.
 
   Lemma uslot_unfold (W : uvis) :
     uslot W ⊣⊢
-    (∀ (h : CpuId) (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ),
+    (∀ (h : CpuId) (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd)
+       (Rut : uptd -> iProp Σ),
        ⌜loop_ok C pt⌝ -∗
        ⌜perm_of (ud_um pt) (uvis_sz W) = uvis_perm W⌝ -∗
-       uvb (CID := h) C pt Rut (uvis_sz W) (uvis_perm W) (uvis_M W)
+       uvb (CID := h) (XI := xi) C pt Rut (uvis_sz W) (uvis_perm W) (uvis_M W)
          (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)) -∗
        WP (Loop : expr riscv_lang)).
   Proof. exact (fixpoint_unfold uslot_F W). Qed.
@@ -596,9 +602,9 @@ Section UexecRet.
   Lemma uslot_bupd (W : uvis) : (|==> uslot W) -∗ uslot W.
   Proof.
     rewrite !(uslot_unfold W).
-    iIntros "H" (h C pt Rut) "%Hl %Hp Hb".
+    iIntros "H" (h xi C pt Rut) "%Hl %Hp Hb".
     iMod "H".
-    iApply ("H" $! h C pt Rut with "[//] [//] Hb").
+    iApply ("H" $! h xi C pt Rut with "[//] [//] Hb").
   Qed.
 
   Lemma uslot_ukc (W : uvis) :
@@ -635,7 +641,8 @@ Section UexecRet.
     reflexivity.
   Qed.
 
-  Lemma ukont_unfold `{CID : CpuId} (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+  Lemma ukont_unfold `{CID : CpuId} `{XI : TsoCtx.CurCtx}
+      (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
       (sz : Z) (π : gmap (mword 27) uperm) :
     ukont C pt Rut sz π ⊣⊢ ▷ ukb C pt Rut sz π.
   Proof. reflexivity. Qed.
@@ -711,7 +718,7 @@ Section UexecRetGen.
     iIntros "#Hwp".
     iLöb as "IH" forall (W).
     rewrite uslot_unfold.
-    iIntros (h C pt Rut) "%Hlo %Hpm Hb".
+    iIntros (h xi C pt Rut) "%Hlo %Hpm Hb".
     rewrite /uvb /uvb_F.
     iDestruct "Hb" as "(#Hamb & Hur & %Hsz & Hpt & Hcfg & Hg & Hpc & Hrut & Hk)".
     iDestruct (user_ptm_inv_pt with "Hpt") as (Mp) "Hpt".
@@ -719,7 +726,7 @@ Section UexecRetGen.
     iDestruct "Hamb" as "(Hhw & Hmi & Hwi)".
     iPoseProof "Hwp" as "Hwp0".
     iEval (rewrite uexec_wp_unfold /uexec_F) in "Hwp0".
-    iApply ("Hwp0" $! h C pt Rut Mp (tf_resume_gpr0 (uvis_tf W))
+    iApply ("Hwp0" $! h xi C pt Rut Mp (tf_resume_gpr0 (uvis_tf W))
               ms_v sc_v stval_v sepc_v (tf_resume_pc (uvis_tf W))
               with "[] [] Hhw Hmi Hwi Hregs Hpt Hcfg Hrut [Hk]");
       [ iPureIntro; exact Hlo | iPureIntro; exact Hms | ].

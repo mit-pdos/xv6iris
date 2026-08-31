@@ -33,9 +33,9 @@
    TSO cutover the bodies are replaced and no consumer above this file moves.
    [TsoCtxPark.v] / [TsoCtxAbsorbLb.v] are the precedent for exactly this
    arrangement.  The T-leg's [view_lb_max'] is below the seal and not
-   stated; so are the two physical-tier leaves ([ctx_phys_pointsto] /
-   [ctx_phys_word_pointsto] do not exist on main), and their two rows of the
-   solver go with them.
+   stated; the two physical-tier leaves ([ctx_phys_pointsto] /
+   [ctx_phys_word_pointsto], the U-mode cells) are stated below with their
+   two solver rows.
 
    WHY ITS OWN FILE: [TsoCtx.v] is under the whole tree; this is a derivation
    off its public unseal lemmas ([TsoCtxAbsorbLb] / [TsoCtxPark] precedent). *)
@@ -191,6 +191,35 @@ Section Move.
     iModIntro. iFrame "H0 H1". iSplit; [done|]. iExact "H".
   Qed.
 
+  (* THE PHYSICAL-TIER LEAVES (tso-flip TsoCtxMove.v): the U-mode cells --
+     a dormant process's memory and page-table pages cross swtch between
+     two running contexts.  SC: the index is phantom, the tokens pass
+     straight through; TSO: the clean half moves by the floor, the dirty
+     half is re-registered under the same-hart authorship justification. *)
+  Lemma ctx_move_phys_pointsto `{CID : CpuId} (ξ0 ξ1 : CtxId)
+      (a : Arch.pa) (dq : dfrac) (v : bv 8) :
+    own_context ξ0 -∗ own_context ξ1 -∗ ctx_phys_pointsto ξ0 a dq v ==∗
+    own_context ξ0 ∗ own_context ξ1 ∗ ctx_phys_pointsto ξ1 a dq v.
+  Proof.
+    iIntros "H0 H1 HP". iFrame "H0 H1".
+    iEval (rewrite ctx_phys_pointsto_unseal) in "HP".
+    rewrite ctx_phys_pointsto_unseal. by iFrame "HP".
+  Qed.
+
+  Global Instance ctx_move_phys_pointsto_inst `{CID : CpuId} a dq v :
+    CtxMove (λ ξ, ctx_phys_pointsto ξ a dq v).
+  Proof. intros ξ0 ξ1. apply ctx_move_phys_pointsto. Qed.
+
+  Global Instance ctx_move_phys_word `{CID : CpuId} a dq w :
+    CtxMove (λ ξ, ctx_phys_word_pointsto ξ a dq w).
+  Proof.
+    iIntros (ξ0 ξ1) "H0 H1 [%Hal H]".
+    iMod (ctx_move_big_sepL (seq 0 8)
+            (λ _ j ξ, ctx_phys_pointsto ξ (pa_add a j) dq (nth_byte w j))
+            (λ i x, ctx_move_phys_pointsto_inst _ _ _) ξ0 ξ1 with "H0 H1 H") as "(H0 & H1 & H)".
+    iModIntro. iFrame "H0 H1". iSplit; [done|]. iExact "H".
+  Qed.
+
 End Move.
 
 (* THE DRIVER ([CtxMorphTac.ctx_morph_solve]'s mirror): [cur_ctx] unfolded
@@ -225,6 +254,8 @@ Ltac ctx_move_step :=
   | |- CtxMove (λ ξ, ctx_word_pointsto ξ _ _ _) => apply ctx_move_word
   | |- CtxMove (λ ξ, ctx_word2_pointsto ξ _ _ _) => apply ctx_move_word2
   | |- CtxMove (λ ξ, ctx_word4_pointsto ξ _ _ _) => apply ctx_move_word4
+  | |- CtxMove (λ ξ, ctx_phys_pointsto ξ _ _ _) => apply ctx_move_phys_pointsto_inst
+  | |- CtxMove (λ ξ, ctx_phys_word_pointsto ξ _ _ _) => apply ctx_move_phys_word
   | |- _ => apply _
   end.
 Ltac ctx_move_solve := repeat ctx_move_step.

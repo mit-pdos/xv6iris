@@ -50,7 +50,7 @@ Section UmodeStub.
   (* THE HEAD: [c.li a7,N] then [ecall], ending at the protocol payload    *)
   (* for number [N] with a7 already set.  [Ps] is never inspected.         *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_uv_stub_head (CIDp : CpuId) (Ps : usys_protocol Σ) (entry n : Z)
+  Lemma wp_uv_stub_head (CIDp : CpuId) {XICIDp : TsoCtx.CurCtx} (Ps : usys_protocol Σ) (entry n : Z)
       (M : gmap Z (bv 8)) (m : regfile) :
     uinstr pt M (mword_of_int entry) true
       (C_LI (mword_of_int n : mword 6, Regidx a7_idx)) ->
@@ -75,7 +75,7 @@ Section UmodeStub.
               (mword_of_int n : mword 6) a7_idx (mword_of_int n : mword 64)
               Hui1 ltac:(vm_compute; discriminate) Hwv
               with "Hcg Hpc").
-    iIntros (CID1) "Hcg Hpc".
+    iIntros (CID1 ?) "Hcg Hpc".
     assert (Hnorm : <[Regidx a7_idx := regval_into_reg (mword_of_int n : mword 64)]> m
                     = <[Regidx a7_idx := (mword_of_int n : mword 64)]> m)
       by reflexivity.
@@ -106,7 +106,7 @@ Section UmodeStub.
   (* identity on it.  The image is a PARAMETER [M'] -- a syscall that       *)
   (* wrote the caller's buffer hands back a different one.                 *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_uv_stub_tail (CIDp : CpuId) (Ps : usys_protocol Σ) (entry n : Z)
+  Lemma wp_uv_stub_tail (CIDp : CpuId) {XICIDp : TsoCtx.CurCtx} (Ps : usys_protocol Σ) (entry n : Z)
       (M' : gmap Z (bv 8)) (m : regfile) (r : mword 64) :
     uinstr pt M' (mword_of_int (entry + 6)) true (C_JR (Regidx ra_idx)) ->
     is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true ->
@@ -114,8 +114,8 @@ Section UmodeStub.
     uv_run (CID := CIDp) C pt M'
       (<[Regidx a0_idx := r]> (<[Regidx a7_idx := (mword_of_int n : mword 64)]> m))
       (mword_of_int (entry + 6)) -∗
-    (∀ CID : CpuId,
-       uv_cap_gpr (CID := CID) C pt Ps M'
+    (∀ (CID : CpuId) (XIC : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID) (XI := XIC) C pt Ps M'
          (<[Regidx a0_idx := r]> (<[Regidx a7_idx := (mword_of_int n : mword 64)]> m)) -∗
        pc_is (CID := CID) (m !!! Regidx ra_idx) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -141,8 +141,8 @@ Section UmodeStub.
               ra_idx (m !!! Regidx ra_idx)
               Hui3 ltac:(vm_compute; discriminate) Htgt
               with "Hcg Hpc").
-    iIntros (CID3) "Hcg Hpc".
-    iApply ("Hcont" $! CID3 with "Hcg Hpc").
+    iIntros (CID3 ?) "Hcg Hpc".
+    iApply ("Hcont" $! CID3 _ with "Hcg Hpc").
   Qed.
 
 End UmodeStub.

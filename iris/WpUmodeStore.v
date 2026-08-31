@@ -94,6 +94,7 @@ Require Import UserMemCert UserMemArmsBase UserMemArmsC.
 Require Import UmodeMem UmodeCap UmodeFetch.
 Require Import WpUmodeStep.
 Require Import TsoCtx.
+Require Import TsoCtxShim.  (* [own_context_sc]: SC-minted token (cutover seam) *)
 Local Open Scope Z_scope.
 Import Defs.
 Set Printing Depth 40.
@@ -1133,6 +1134,7 @@ Section UvStoreRes.
   Proof.
     intros Hred Hg1 Hg2 He Hdom.
     iIntros "#Hcert Hany Hrw Hro Hmm Hk".
+    iPoseProof (TsoCtxShim.own_context_sc XI) as "Hrun".
     destruct o as [j | ].
     - iApply (swp_mono with "[Hk] [Hany Hrw Hro Hmm]").
       2:{ iApply (swp_hmrun_of_exec Du_r Du_w u_Drw u_Dro (u_Df dq)
@@ -1141,9 +1143,10 @@ Section UvStoreRes.
                     ltac:(intros q _; reflexivity) ltac:(reflexivity)
                     (Hg1 (u_state rsx mm) mm)
                     (Hred (u_state rsx mm))
-                    with "Hcert Hany Hrw Hro Hmm"). }
+                    with "Hcert Hany Hrw Hro Hrun Hmm"). }
       iIntros (v) "(-> & Hpost)".
-      iDestruct "Hpost" as (rs1 mm1) "(%Hag1 & %Hsub1 & %Hdom1 & Hrw & Hro & Hmm & Hany)".
+      iDestruct "Hpost" as (rs1 mm1)
+        "(%Hag1 & %Hsub1 & %Hdom1 & Hrw & Hro & _ & Hmm & Hany)".
       assert (Hmm1 : mm1 = mm) by (apply (u_map_eq mm1 mm Hsub1); exact Hdom1).
       subst mm1.
       iApply run_exec_post_redirect.
@@ -1152,9 +1155,10 @@ Section UvStoreRes.
                     (execute j) (u_state rsx mm) (u_state rs_x mm2) RETIRE_SUCCESS
                     rs1 mm u_disj Du_r_sub Du_w_sub Hag1 ltac:(reflexivity)
                     Hg2 He
-                    with "Hcert Hany Hrw Hro Hmm"). }
+                    with "Hcert Hany Hrw Hro Hrun Hmm"). }
       iIntros (v) "(-> & Hpost)".
-      iDestruct "Hpost" as (rs2 mm3) "(%Hag & %Hsub & %Hdm & Hrw & Hro & Hmm & Hany)".
+      iDestruct "Hpost" as (rs2 mm3)
+        "(%Hag & %Hsub & %Hdm & Hrw & Hro & _ & Hmm & Hany)".
       assert (Hmm3 : mm3 = mm2)
         by (apply (u_map_eq mm3 mm2 Hsub); rewrite Hdm; exact (eq_sym Hdom)).
       subst mm3.
@@ -1165,9 +1169,10 @@ Section UvStoreRes.
                     rsx mm u_disj Du_r_sub Du_w_sub
                     ltac:(intros q _; reflexivity) ltac:(reflexivity)
                     Hg2 He
-                    with "Hcert Hany Hrw Hro Hmm"). }
+                    with "Hcert Hany Hrw Hro Hrun Hmm"). }
       iIntros (v) "(-> & Hpost)".
-      iDestruct "Hpost" as (rs2 mm3) "(%Hag & %Hsub & %Hdm & Hrw & Hro & Hmm & Hany)".
+      iDestruct "Hpost" as (rs2 mm3)
+        "(%Hag & %Hsub & %Hdm & Hrw & Hro & _ & Hmm & Hany)".
       assert (Hmm3 : mm3 = mm2)
         by (apply (u_map_eq mm3 mm2 Hsub); rewrite Hdm; exact (eq_sym Hdom)).
       subst mm3.
@@ -1269,8 +1274,8 @@ Section UvStorePostFetch.
     agree_on D_u (u_state rs2 ∅) dstateU ->
     uv_tree_ok pt (upa_map pt M) t' ->
     gen_cert -∗ uv_amb -∗ uv_cap C pt Ψ -∗
-    (R -∗ ∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ (uM_store M (uint va) kk wval) m -∗
+    (R -∗ ∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ (uM_store M (uint va) kk wval) m -∗
        pc_is (CID := CID0) (add_vec_int pc dpc) -∗
        WP (Loop : expr riscv_lang)) -∗
     resv_any cpu_id -∗
@@ -1559,8 +1564,8 @@ Section UvStoreObl.
     (forall j : nat, (j < Z.to_nat kk)%nat ->
        exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     gen_cert -∗ uv_amb -∗ uv_cap C pt Ψ -∗
-    (R -∗ ∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ (uM_store M (uint va) kk wval) m -∗
+    (R -∗ ∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ (uM_store M (uint va) kk wval) m -∗
        pc_is (CID := CID0) (add_vec_int pc 4) -∗ WP (Loop : expr riscv_lang)) -∗
     resv_any cpu_id -∗
     hreg_frame rsA u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
@@ -1681,8 +1686,8 @@ Section UvStoreObl.
     (forall j : nat, (j < Z.to_nat kk)%nat ->
        exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     gen_cert -∗ uv_amb -∗ uv_cap C pt Ψ -∗
-    (R -∗ ∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ (uM_store M (uint va) kk wval) m -∗
+    (R -∗ ∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ (uM_store M (uint va) kk wval) m -∗
        pc_is (CID := CID0) (add_vec_int pc 2) -∗ WP (Loop : expr riscv_lang)) -∗
     resv_any cpu_id -∗
     hreg_frame rsA u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
@@ -1818,8 +1823,8 @@ Section WpUmodeStore.
        exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    ▷ (∀ CID0 : CpuId,
-         uv_cap_gpr (CID := CID0) C pt Ψ (uM_store M (uint va) k wval) m -∗
+    ▷ (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+         uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ (uM_store M (uint va) k wval) m -∗
          pc_is (CID := CID0) (add_vec_int pc (if is_rvc then 2 else 4)) -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1830,7 +1835,7 @@ Section WpUmodeStore.
     iIntros "Hcg Hpc Hcont".
     iApply (wp_uv_step C pt _ Ψ M m pc with "Hcg Hpc [] Hcont").
     rewrite /uv_step_obl.
-    iIntros (R CIDo t rs1s rsA usatp pcfg paddr)
+    iIntros (R CIDo XIo t rs1s rsA usatp pcfg paddr)
       "%Hpre #Hamb #Hcap Hk Hany Hrw Hro Hmm Hres".
     iPoseProof "Hamb" as "(#Hhw & _ & _)".
     iPoseProof "Hhw" as (misa0 mseccfg0 pmar0 elp0)
@@ -1919,8 +1924,8 @@ Section WpUmodeStore.
        exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ (uM_store M (uint va) k wval) m -∗
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ (uM_store M (uint va) k wval) m -∗
        pc_is (CID := CID0) (add_vec_int pc (if is_rvc then 2 else 4)) -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1951,8 +1956,8 @@ Section WpUmodeStore.
     (forall j : nat, (j < 8)%nat -> exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ (uM_store8 M (uint va) wval) m -∗
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ (uM_store8 M (uint va) wval) m -∗
        pc_is (CID := CID0) (add_vec_int pc 4) -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1985,8 +1990,8 @@ Section WpUmodeStore.
     (forall j : nat, (j < 4)%nat -> exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ (uM_store M (uint va) 4 wval) m -∗
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ (uM_store M (uint va) 4 wval) m -∗
        pc_is (CID := CID0) (add_vec_int pc 4) -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -2020,8 +2025,8 @@ Section WpUmodeStore.
     M !! (uint va) = Some bb ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ (uM_store M (uint va) 1 wval) m -∗
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ (uM_store M (uint va) 1 wval) m -∗
        pc_is (CID := CID0) (add_vec_int pc 4) -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -2060,8 +2065,8 @@ Section WpUmodeStore.
     (forall j : nat, (j < 8)%nat -> exists bb : bv 8, M !! (uint tgt + Z.of_nat j) = Some bb) ->
     uv_cap_gpr C pt Psi M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Psi (uM_store8 M (uint tgt) wval) m -∗
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Psi (uM_store8 M (uint tgt) wval) m -∗
        pc_is (CID := CID0) (add_vec_int pc 2) -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -2105,8 +2110,8 @@ Section WpUmodeStore.
     (forall j : nat, (j < 8)%nat -> exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ (uM_store8 M (uint va) wval) m -∗
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ (uM_store8 M (uint va) wval) m -∗
        pc_is (CID := CID0) (add_vec_int pc 2) -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -2150,8 +2155,8 @@ Section WpUmodeStore.
     (forall j : nat, (j < 4)%nat -> exists bb : bv 8, M !! (uint va + Z.of_nat j) = Some bb) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    (∀ CID0 : CpuId,
-       uv_cap_gpr (CID := CID0) C pt Ψ (uM_store M (uint va) 4 wval) m -∗
+    (∀ (CID0 : CpuId) (XI0 : TsoCtx.CurCtx),
+       uv_cap_gpr (CID := CID0) (XI := XI0) C pt Ψ (uM_store M (uint va) 4 wval) m -∗
        pc_is (CID := CID0) (add_vec_int pc 2) -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).

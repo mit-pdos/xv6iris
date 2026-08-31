@@ -56,8 +56,19 @@ Require Import TsoCtx.
 Local Open Scope Z_scope.
 Import Defs.
 
+(* THE RESIDUE-TOKEN ACCESSOR PREMISE (tso-port M2 / A6.61's user half).
+   The class's fetch/execute bridges pay the memory ledger with the
+   thread's running token, which across a user excursion lives in the
+   parked residue ([UsertrapRes.ut_trap_parked]'s [own_context cur_ctx]
+   conjunct, riding inside [Rut pt]).  The closed theorem is quantified
+   over [Rut], so the borrow accessor is a PREMISE: the concrete caller
+   supplies it from its residue (a two-line borrow at [ut_trap_parked]),
+   and the generic inhabitant on this SC leg mints it
+   ([TsoCtxShim.rut_ctx_sc]). *)
 Definition wp_user_exec_closed_body `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}
     (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) :=
+  (forall pt' : uptd,
+     ⊢ Rut pt' -∗ own_context cur_ctx ∗ (own_context cur_ctx -∗ Rut pt')) ->
   hw_config -∗ minstret_inv -∗ wire_inv -∗
   user_inv C pt Rut -∗ ▷ stvec_handler_wp C pt Rut -∗
   WP (Loop : expr riscv_lang).

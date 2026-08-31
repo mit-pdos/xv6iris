@@ -66,6 +66,7 @@ Require Import UmodeRegs.
 Require Import WpUmodeStep WpUmodeStore.
 Require Import ProcPtOwn UserPerm UexecWp UexecRet UkStep.
 Require Import TsoCtx.   (* [CurCtx]: ambient, per the WpUmode* precedent *)
+Require Import TsoCtxShim.  (* [own_context_sc]: SC-minted token (cutover seam) *)
 Local Open Scope Z_scope.
 Import Defs.
 Set Printing Depth 40.
@@ -348,6 +349,7 @@ Section UkStoreTrapWrap.
   Proof.
     intros Hred Hg1 Hg2 He Hnr.
     iIntros "#Hcert Hany Hrw Hro Hmm Hk".
+    iPoseProof (TsoCtxShim.own_context_sc XI) as "Hrun".
     destruct o as [j | ].
     - iApply (swp_mono with "[Hk] [Hany Hrw Hro Hmm]").
       2:{ iApply (swp_hmrun_of_exec Du_r Du_w u_Drw u_Dro (u_Df dq)
@@ -356,9 +358,10 @@ Section UkStoreTrapWrap.
                     ltac:(intros q _; reflexivity) ltac:(reflexivity)
                     (Hg1 (u_state rsx mm) mm)
                     (Hred (u_state rsx mm))
-                    with "Hcert Hany Hrw Hro Hmm"). }
+                    with "Hcert Hany Hrw Hro Hrun Hmm"). }
       iIntros (v) "(-> & Hpost)".
-      iDestruct "Hpost" as (rs1 mm1) "(%Hag1 & %Hsub1 & %Hdom1 & Hrw & Hro & Hmm & Hany)".
+      iDestruct "Hpost" as (rs1 mm1)
+        "(%Hag1 & %Hsub1 & %Hdom1 & Hrw & Hro & _ & Hmm & Hany)".
       assert (Hmm1 : mm1 = mm) by (apply (u_map_eq mm1 mm Hsub1); exact Hdom1).
       subst mm1.
       iApply run_exec_post_redirect.
@@ -367,9 +370,10 @@ Section UkStoreTrapWrap.
                     (execute j) (u_state rsx mm) (u_state rsx mm) er
                     rs1 mm u_disj Du_r_sub Du_w_sub Hag1 ltac:(reflexivity)
                     Hg2 He
-                    with "Hcert Hany Hrw Hro Hmm"). }
+                    with "Hcert Hany Hrw Hro Hrun Hmm"). }
       iIntros (v) "(-> & Hpost)".
-      iDestruct "Hpost" as (rs2 mm3) "(%Hag & %Hsub & %Hdm & Hrw & Hro & Hmm & Hany)".
+      iDestruct "Hpost" as (rs2 mm3)
+        "(%Hag & %Hsub & %Hdm & Hrw & Hro & _ & Hmm & Hany)".
       assert (Hmm3 : mm3 = mm)
         by (apply (u_map_eq mm3 mm Hsub); exact Hdm).
       subst mm3.
@@ -380,9 +384,10 @@ Section UkStoreTrapWrap.
                     rsx mm u_disj Du_r_sub Du_w_sub
                     ltac:(intros q _; reflexivity) ltac:(reflexivity)
                     Hg2 He
-                    with "Hcert Hany Hrw Hro Hmm"). }
+                    with "Hcert Hany Hrw Hro Hrun Hmm"). }
       iIntros (v) "(-> & Hpost)".
-      iDestruct "Hpost" as (rs2 mm3) "(%Hag & %Hsub & %Hdm & Hrw & Hro & Hmm & Hany)".
+      iDestruct "Hpost" as (rs2 mm3)
+        "(%Hag & %Hsub & %Hdm & Hrw & Hro & _ & Hmm & Hany)".
       assert (Hmm3 : mm3 = mm)
         by (apply (u_map_eq mm3 mm Hsub); exact Hdm).
       subst mm3.
@@ -1376,7 +1381,7 @@ Section UkStore.
     iApply (wp_uk_step C pt Rut π sz Hlo Hpm _ M m pc Hal2 with "Hb [] Hcont").
     iModIntro.
     rewrite /uk_step_obl.
-    iIntros (R CIDo C' pt' Rut' Mp' t rs1s rsA usatp pcfg paddr)
+    iIntros (R CIDo XIo C' pt' Rut' Mp' t rs1s rsA usatp pcfg paddr)
       "%Hlo' %Hpm' %Hpure %Hpre #Hamb Hk Hany Hrw Hro Hmm Hres".
     destruct (uk_instr_mapped π M Mp' pc _ i pt' sz
                 (loop_ok_wf C' pt' Hlo') Hpm' Hpure Hui)
@@ -1436,7 +1441,7 @@ Section UkStore.
       iFrame "Hrut Hkb". iSplit.
       - iDestruct "Hkc" as "[Hkc _]".
         iIntros "Hb". rewrite /ukc.
-        iApply ("Hkc" $! CIDo C' pt' Rut' with "[%] [%] Hb");
+        iApply ("Hkc" $! CIDo XIo C' pt' Rut' with "[%] [%] Hb");
           [ exact Hlo' | exact Hpm' ].
       - iDestruct "Hkc" as "[_ Hkc]".
         rewrite (uslot_run m pc M π sz Hx0 Hal2). iExact "Hkc". }

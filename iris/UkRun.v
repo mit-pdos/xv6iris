@@ -104,12 +104,12 @@ Section UkRun.
      index this ownership is keyed by). *)
   Definition urun (γt γd γs : gname) (h : CpuId) (m : regfile) (pc : mword 64)
       (avail : nat) : iProp Σ :=
-    (∃ (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (sz : Z)
-       (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm),
+    (∃ (xi : TsoCtx.CurCtx) (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+       (sz : Z) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm),
        ⌜ loop_ok C pt ⌝ ∗ ⌜ perm_of (ud_um pt) sz = pm ⌝ ∗
        uheap γt γd γs M pm ∗
        ustack γd (m !!! Regidx csp_rs1) avail ∗
-       uvb (CID := h) C pt Rut sz pm M m pc)%I.
+       uvb (CID := h) (XI := xi) C pt Rut sz pm M m pc)%I.
 
   (* "this instruction does not write sp".  Every leaf that writes a general
      register carries it; a concrete [rd] decides it by [vm_compute]. *)
@@ -133,8 +133,8 @@ Section UkRun.
     ukc pm M sz m pc.
   Proof.
     iIntros "Hheap Hstk Hcont".
-    rewrite /ukc. iIntros (h C pt Rut) "%Hlo %Hpm Hb".
-    iApply ("Hcont" $! h). iExists C, pt, Rut, sz, M, pm.
+    rewrite /ukc. iIntros (h xi C pt Rut) "%Hlo %Hpm Hb".
+    iApply ("Hcont" $! h). iExists xi, C, pt, Rut, sz, M, pm.
     iFrame "Hheap Hstk Hb". iPureIntro. split; [ exact Hlo | exact Hpm ].
   Qed.
 
@@ -399,7 +399,7 @@ Section UkRun.
       /\ 8 * Z.of_nat avail <= uint (m !!! Regidx csp_rs1) ⌝.
   Proof.
     iIntros "Hrun".
-    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct "Hrun" as (xi C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (ustack_align with "Hstk") as %Hal.
     iDestruct (ustack_room with "Hheap Hstk") as %Hroom.
     iPureIntro. exact (conj Hal Hroom).
@@ -420,7 +420,7 @@ Section UkRun.
      sits in a page the table maps, and [upt_map_wf] puts every such page
      below the trapframe; a LIVE address is below the break, and [usz_ok]
      puts the break below the trapframe too. *)
-  Lemma umem_lazy_bound (pt : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+  Lemma umem_lazy_bound {XIL : TsoCtx.CurCtx} (pt : uptd) (sz : Z) (M : gmap Z (bv 8)) :
     proc_pt_wf pt -> usz_ok sz ->
     umem_lazy pt sz M -∗ ⌜ forall a : Z, is_Some (M !! a) -> 0 <= a < 2 ^ 38 ⌝.
   Proof.
@@ -473,7 +473,7 @@ Section UkRun.
     -∗ uslot W.
   Proof.
     intros Hal8 Hroom Hstk. iIntros "Hprog". rewrite uslot_ukc /ukc.
-    iIntros (h C pt Rut) "%Hlo %Hpm Hb".
+    iIntros (h xi C pt Rut) "%Hlo %Hpm Hb".
     set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)
       by (destruct Hlo as (_ & _ & _ & _ & _ & H); exact H).
@@ -498,7 +498,7 @@ Section UkRun.
     iDestruct (ustack_of_ubytes γd sp avail f Hal8 Hroom with "Hbs") as "Hstk".
     iSpecialize ("Hprog" $! γt γd γs h with "[%] Hszf Ht"); [ exact Hsz | ].
     iApply "Hprog".
-    iExists C, pt, Rut, sz, (uvis_M W), (uvis_perm W).
+    iExists xi, C, pt, Rut, sz, (uvis_M W), (uvis_perm W).
     iSplitR; [ iPureIntro; exact Hlo | ].
     iSplitR; [ iPureIntro; exact Hpm | ].
     iFrame "Hheap Hstk".
@@ -545,7 +545,7 @@ Section UkRun.
     -∗ uslot W.
   Proof.
     intros Hal8 Hroom Hstk. iIntros "Hprog". rewrite uslot_ukc /ukc.
-    iIntros (h C pt Rut) "%Hlo %Hpm Hb".
+    iIntros (h xi C pt Rut) "%Hlo %Hpm Hb".
     set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)
       by (destruct Hlo as (_ & _ & _ & _ & _ & H); exact H).
@@ -582,7 +582,7 @@ Section UkRun.
     iDestruct (ustack_of_ubytes γd sp avail f Hal8 Hroom with "Hbs") as "Hstk".
     iSpecialize ("Hprog" $! γt γd γs h with "[%] Hszf Ht Dhi"); [ exact Hsz | ].
     iApply "Hprog".
-    iExists C, pt, Rut, sz, (uvis_M W), (uvis_perm W).
+    iExists xi, C, pt, Rut, sz, (uvis_M W), (uvis_perm W).
     iSplitR; [ iPureIntro; exact Hlo | ].
     iSplitR; [ iPureIntro; exact Hpm | ].
     iFrame "Hheap Hstk".

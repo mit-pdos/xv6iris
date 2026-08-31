@@ -69,7 +69,7 @@ Section UkRunBr.
     WP (Loop : expr riscv_lang).
   Proof.
     intros H1 H2 H3. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct "Hrun" as (xi C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkBranch.wp_uk_btype0 C pt Rut pm sz Hlo Hpm M m pc imm rs1 op taken tgt
               Hui H1 H2 H3
@@ -97,7 +97,7 @@ Section UkRunBr.
     WP (Loop : expr riscv_lang).
   Proof.
     intros H1 H2 H3. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct "Hrun" as (xi C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iApply (UkBranch.wp_uk_btype0_later C pt Rut pm sz Hlo Hpm M m pc imm rs1 op
               taken tgt Hui H1 H2 H3
@@ -124,7 +124,7 @@ Section UkRunBr.
     WP (Loop : expr riscv_lang).
   Proof.
     intros H1 H2 H3. iIntros "#Hi Hrun Hcont".
-    iDestruct "Hrun" as (C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
+    iDestruct "Hrun" as (xi C pt Rut sz M pm) "(%Hlo & %Hpm & Hheap & Hstk & Hb)".
     iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
     iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
     iApply (UkBranch.wp_uk_btype C pt Rut pm sz Hlo Hpm M m pc imm rs2

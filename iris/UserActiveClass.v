@@ -249,6 +249,16 @@ Section UserActiveClass.
   Context `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx}.
   Context (C : ucfg) (pt : uptd).
   Context (Rut : uptd -> iProp Σ).
+  (* THE THREAD'S RUNNING TOKEN, BORROWED FROM THE RESIDUE.  The fetch and
+     execute bridges run [HartMemRun.swp_hmrun_of_exec], whose RAM arms pay
+     the ledger through [own_context cur_ctx] (§0.44′: the generic U-mode
+     tier runs at the ambient context).  Across a user excursion the token
+     lives in the kernel residue -- concretely [UsertrapRes.ut_trap_parked]'s
+     [own_context cur_ctx] conjunct, riding inside [Rut pt] -- so the class
+     borrows it per bridge and hands it straight back. *)
+  Context (Rut_ctx : forall pt' : uptd,
+      ⊢ Rut pt' -∗
+        own_context cur_ctx ∗ (own_context cur_ctx -∗ Rut pt')).
 
   (* every canonical/non-canonical va either fetches or faults; the
      tramp/tf pages are denied leaves (U=0), a genuinely unmapped canonical
@@ -1112,30 +1122,32 @@ Section UserActiveClass.
     u_mem_step_ok pt t t' mm mm' ->
     gen_cert -∗ resv_any cpu_id -∗
     hreg_frame rsf u_Drw -∗ hreg_frame_ro (u_Df dq) rsf u_Dro -∗
+    own_context cur_ctx -∗
     bytes_own mm -∗
     (∀ rs2 : regstate,
        ⌜reg_agree_on (u_Drw ∪ u_Dro) rs2 rsf'⌝ -∗
        hreg_frame rs2 u_Drw -∗ hreg_frame_ro (u_Df dq) rs2 u_Dro -∗
+       own_context cur_ctx -∗
        bytes_own mm' -∗ resv_any cpu_id -∗
        run_fetch_post u_Drw u_Dro (u_Df dq) Pe Pf Px fr) -∗
     swp (fetch tt) (run_fetch_post u_Drw u_Dro (u_Df dq) Pe Pf Px).
   Proof.
     intros He Hg Hwf Hstep.
-    iIntros "#Hcert Hany Hrw Hro Hown Hk".
-    iApply (swp_mono with "[Hk] [Hany Hrw Hro Hown]").
+    iIntros "#Hcert Hany Hrw Hro Hrun Hown Hk".
+    iApply (swp_mono with "[Hk] [Hany Hrw Hro Hrun Hown]").
     2:{ iApply (swp_hmrun_of_exec Du_r Du_w u_Drw u_Dro (u_Df dq) (fetch tt)
                   (u_state rsf mm) (u_state rsf' mm') fr rsf mm
                   u_disj Du_r_sub Du_w_sub
                   ltac:(intros r _; reflexivity) ltac:(reflexivity) Hg He
-                  with "Hcert Hany Hrw Hro Hown"). }
+                  with "Hcert Hany Hrw Hro Hrun Hown"). }
     iIntros (v) "(-> & Hpost)".
     iDestruct "Hpost"
-      as (rs2 mm2) "(%Hag & %Hsub & %Hdom & Hrw & Hro & Hown & Hany)".
+      as (rs2 mm2) "(%Hag & %Hsub & %Hdom & Hrw & Hro & Hrun & Hown & Hany)".
     assert (Hmm2 : mm2 = mm')
       by exact (u_landing_map pt t t' mm mm2 (u_state rsf' mm') Hstep
                   Hsub Hdom).
     subst mm2.
-    iApply ("Hk" $! rs2 with "[%] Hrw Hro Hown Hany"). exact Hag.
+    iApply ("Hk" $! rs2 with "[%] Hrw Hro Hrun Hown Hany"). exact Hag.
   Qed.
 
   (* ===================================================================== *)
@@ -1164,64 +1176,66 @@ Section UserActiveClass.
     u_mem_step_ok pt t t' mm s_x.(mem) ->
     gen_cert -∗ resv_any cpu_id -∗
     hreg_frame rsx u_Drw -∗ hreg_frame_ro (u_Df dq) rsx u_Dro -∗
+    own_context cur_ctx -∗
     bytes_own mm -∗
     (∀ rs2 : regstate,
        ⌜reg_agree_on (u_Drw ∪ u_Dro) rs2 s_x.(sregs)⌝ -∗
        hreg_frame rs2 u_Drw -∗ hreg_frame_ro (u_Df dq) rs2 u_Dro -∗
+       own_context cur_ctx -∗
        bytes_own s_x.(mem) -∗ resv_any cpu_id -∗
        Pe r ib) -∗
     swp (execute instr) (run_exec_post Pe ib).
   Proof.
     intros Hexe Hnr Hwf Hstep.
-    iIntros "#Hcert Hany Hrw Hro Hown Hk".
+    iIntros "#Hcert Hany Hrw Hro Hrun Hown Hk".
     destruct Hexe as [(He & Hg) | (other & He1 & Hg1 & He2 & Hg2)].
     - (* DIRECT: one execute, and the result is not a redirect *)
-      iApply (swp_mono with "[Hk] [Hany Hrw Hro Hown]").
+      iApply (swp_mono with "[Hk] [Hany Hrw Hro Hrun Hown]").
       2:{ iApply (swp_hmrun_of_exec Du_r Du_w u_Drw u_Dro (u_Df dq)
                     (execute instr) (u_state rsx mm) s_x r rsx mm
                     u_disj Du_r_sub Du_w_sub
                     ltac:(intros q _; reflexivity) ltac:(reflexivity) Hg He
-                    with "Hcert Hany Hrw Hro Hown"). }
+                    with "Hcert Hany Hrw Hro Hrun Hown"). }
       iIntros (v) "(-> & Hpost)".
       iDestruct "Hpost"
-        as (rs2 mm2) "(%Hag & %Hsub & %Hdom & Hrw & Hro & Hown & Hany)".
+        as (rs2 mm2) "(%Hag & %Hsub & %Hdom & Hrw & Hro & Hrun & Hown & Hany)".
       assert (Hmm2 : mm2 = s_x.(mem))
         by exact (u_landing_map pt t t' mm mm2 s_x Hstep Hsub Hdom).
       subst mm2.
       iApply (run_exec_post_direct Pe ib r Hnr).
-      iApply ("Hk" $! rs2 with "[%] Hrw Hro Hown Hany"). exact Hag.
+      iApply ("Hk" $! rs2 with "[%] Hrw Hro Hrun Hown Hany"). exact Hag.
     - (* REDIRECT: the first execute answers [ExecuteAs other] AT THE SAME
          STATE, so the second starts from the frame the first handed back *)
-      iApply (swp_mono with "[Hk] [Hany Hrw Hro Hown]").
+      iApply (swp_mono with "[Hk] [Hany Hrw Hro Hrun Hown]").
       2:{ iApply (swp_hmrun_of_exec Du_r Du_w u_Drw u_Dro (u_Df dq)
                     (execute instr) (u_state rsx mm) (u_state rsx mm)
                     (ExecuteAs other) rsx mm
                     u_disj Du_r_sub Du_w_sub
                     ltac:(intros q _; reflexivity) ltac:(reflexivity)
-                    Hg1 He1 with "Hcert Hany Hrw Hro Hown"). }
+                    Hg1 He1 with "Hcert Hany Hrw Hro Hrun Hown"). }
       iIntros (v) "(-> & Hpost)".
       iDestruct "Hpost"
-        as (rs1 mm1) "(%Hag1 & %Hsub1 & %Hdom1 & Hrw & Hro & Hown & Hany)".
+        as (rs1 mm1) "(%Hag1 & %Hsub1 & %Hdom1 & Hrw & Hro & Hrun & Hown & Hany)".
       assert (Hmm1 : mm1 = mm)
         by exact (u_landing_map pt t t mm mm1 (u_state rsx mm)
                     (u_mem_step_ok_refl pt t mm Hwf) Hsub1 Hdom1).
       subst mm1.
       iApply run_exec_post_redirect.
-      iApply (swp_mono with "[Hk] [Hany Hrw Hro Hown]").
+      iApply (swp_mono with "[Hk] [Hany Hrw Hro Hrun Hown]").
       2:{ iApply (swp_hmrun_of_exec Du_r Du_w u_Drw u_Dro (u_Df dq)
                     (execute other) (u_state rsx mm) s_x r rs1 mm
                     u_disj Du_r_sub Du_w_sub Hag1 ltac:(reflexivity)
-                    Hg2 He2 with "Hcert Hany Hrw Hro Hown"). }
+                    Hg2 He2 with "Hcert Hany Hrw Hro Hrun Hown"). }
       iIntros (v) "(-> & Hpost)".
       iDestruct "Hpost"
-        as (rs2 mm2) "(%Hag & %Hsub & %Hdom & Hrw & Hro & Hown & Hany)".
+        as (rs2 mm2) "(%Hag & %Hsub & %Hdom & Hrw & Hro & Hrun & Hown & Hany)".
       assert (Hmm2 : mm2 = s_x.(mem))
         by exact (u_landing_map pt t t' mm mm2 s_x Hstep Hsub Hdom).
       subst mm2.
       (* NO [run_exec_post_direct] here: [run_exec_post_redirect] already
          stripped the wrapper, so the second execute's continuation is
          [fun e' => Pe e' ib] and the goal IS [Pe r ib]. *)
-      iApply ("Hk" $! rs2 with "[%] Hrw Hro Hown Hany"). exact Hag.
+      iApply ("Hk" $! rs2 with "[%] Hrw Hro Hrun Hown Hany"). exact Hag.
   Qed.
 
   (* ===================================================================== *)
@@ -1449,11 +1463,13 @@ Section UserActiveClass.
     intros Hbase Hrvc Lhs Lcp Hmsok Lmi Lpc Lstvec Lmie Lmdl Lmenv Lsatp
       Lpcfg Lpaddr Hpins Hwf Hex Hg Hfrok Htr Htlbok' Hstep.
     iIntros "#Hcert Hany Hrw Hro Hbytes Hoback Hrut".
+    (* borrow the running token from the residue for the hmrun bridges *)
+    iDestruct (Rut_ctx pt with "Hrut") as "[Hrun Hback]".
     iApply (swp_fetch_of_pure (uc_dqc C) t t' mm mm' rsA rsf' fr _ _ _
               Hex Hg (u_mem_wf_ok pt t mm Hwf)
               (u_mem_step_ok_of pt t t' mm mm' Hwf Hstep)
-              with "Hcert Hany Hrw Hro Hbytes").
-    iIntros (rsF) "%Hag Hrw Hro Hbytes Hany".
+              with "Hcert Hany Hrw Hro Hrun Hbytes").
+    iIntros (rsF) "%Hag Hrw Hro Hrun Hbytes Hany".
     (* the landing file agrees with [rsA] off the TLB, so every pin moves *)
     assert (TF : forall q : register, q ∈ u_Dfix ->
               register_lookup q rsF = register_lookup q rsA).
@@ -1501,6 +1517,7 @@ Section UserActiveClass.
     destruct Hfrok as [ (Hshape & Hal2) | (ex & xv & -> & Hue) ].
     2:{ (* ---- THE FETCH FAULTED ---- *)
       rewrite /run_fetch_post.
+      iDestruct ("Hback" with "Hrun") as "Hrut".
       iDestruct ("Hoback" $! t' mm' with "[%] Hbytes") as "Hopen";
         [ exact Hstep |].
       iApply (u_arm_fetch_failure t' mm' usatp pcfg paddr mcenv scenv hpm
@@ -1536,8 +1553,8 @@ Section UserActiveClass.
                 (register_set nextPC (add_vec_int va 2) rsF) instr r s_x
                 (zero_extend' 32 h) _ Hexe Hnr (u_mem_wf_ok pt t' mm' HwfF)
                 (u_mem_step_ok_of pt t' t'' mm' s_x.(mem) HwfF Hstep'')
-                with "Hcert Hany Hrw Hro Hbytes").
-      iIntros (rsX) "%Hag2 Hrw Hro Hbytes Hany".
+                with "Hcert Hany Hrw Hro Hrun Hbytes").
+      iIntros (rsX) "%Hag2 Hrw Hro Hrun Hbytes Hany".
       assert (TX : forall q : register, q ∈ u_Dfix ->
                 register_lookup q rsX = register_lookup q rsF).
       { intros q Hq. rewrite (Hag2 q (u_Dfix_sub q Hq)) (Hfix q Hq).
@@ -1550,6 +1567,7 @@ Section UserActiveClass.
           | exact HpinsF ]. }
       iDestruct ("Hoback" $! t'' s_x.(mem) with "[%] Hbytes") as "Hopen".
       { exact (u_mem_step_trans pt t t' t'' mm mm' s_x.(mem) Hstep Hstep''). }
+      iDestruct ("Hback" with "Hrun") as "Hrut".
       iApply (u_arm_of_result t'' s_x.(mem) usatp pcfg paddr mcenv scenv hpm
                 rs1 rsX r (zero_extend' 32 h) Hrok
                 ltac:(rewrite (TX _ u_fix_hart); exact LhsF)
@@ -1584,8 +1602,8 @@ Section UserActiveClass.
                 (register_set nextPC (add_vec_int va 4) rsF) instr r s_x
                 (zero_extend' 32 w) _ Hexe Hnr (u_mem_wf_ok pt t' mm' HwfF)
                 (u_mem_step_ok_of pt t' t'' mm' s_x.(mem) HwfF Hstep'')
-                with "Hcert Hany Hrw Hro Hbytes").
-      iIntros (rsX) "%Hag2 Hrw Hro Hbytes Hany".
+                with "Hcert Hany Hrw Hro Hrun Hbytes").
+      iIntros (rsX) "%Hag2 Hrw Hro Hrun Hbytes Hany".
       assert (TX : forall q : register, q ∈ u_Dfix ->
                 register_lookup q rsX = register_lookup q rsF).
       { intros q Hq. rewrite (Hag2 q (u_Dfix_sub q Hq)) (Hfix q Hq).
@@ -1598,6 +1616,7 @@ Section UserActiveClass.
           | exact HpinsF ]. }
       iDestruct ("Hoback" $! t'' s_x.(mem) with "[%] Hbytes") as "Hopen".
       { exact (u_mem_step_trans pt t t' t'' mm mm' s_x.(mem) Hstep Hstep''). }
+      iDestruct ("Hback" with "Hrun") as "Hrut".
       iApply (u_arm_of_result t'' s_x.(mem) usatp pcfg paddr mcenv scenv hpm
                 rs1 rsX r (zero_extend' 32 w) Hrok
                 ltac:(rewrite (TX _ u_fix_hart); exact LhsF)
