@@ -623,3 +623,107 @@ tso-port.md.  Same terms as Amendments 9–11.
 - **Not landed, for the owner**: the barrier ABSTRACTION (§0.45′ NEXT),
   the invariant class (A6.129 §4), the bcache escrow recycler ruling.
 
+
+## Amendment 13 (2026-08-31, from the U-mode lane, LANDED ON MAIN): the U-mode cone's context threading -- generic tier mirrored from tso-flip r60, binary tier threaded, tree GREEN
+
+This one is different from Amendments 9-12: it is not a vocabulary
+request, it is a REPORT of a slice that already landed on main
+(branch umode-main-work -> origin/main, iris/ only; merged with the
+concurrent fd-view seam -- uvis carries the descriptor states, Rfd/fdv
+through uvb/ukc/urun, first-generation sh proofs retired -- and GREEN
+after the merge: 1468/1468 targets, MAKEEXIT=0 clean rebuild, zero
+admits).  What main now has, so the T-leg can consume it rather than
+re-derive it:
+
+**Mirrored verbatim from tso-flip r60 (statements identical, SC
+bodies where the flip's are ledger-real):**
+- `TsoCtx.ctx_phys_pointsto`/`ctx_phys_word_pointsto` (sealed, SC body
+  = the raw phys facts) + morph/move instances and solver rows
+  (`CtxMorphTac`, `TsoCtxMove`).
+- `PtTree` transplanted (ptier = `KTier B | UTier ξ`; `kpt_slot_pin`
+  SC-trivial), `PtAdBits`, `UptTree`, `UserPtTree` (flip base + main's
+  five addition hunks), `PtBuild`, `PtFree`, `UserBytes`, `HartMemAsm`,
+  `Pt4kWalk`, `KptPt`, `UmodeMem`, `HartStepFull`, `UserTrap`,
+  `UserActiveClass`, `TfPage36`; the four SC-era interp files deleted.
+- The payer-threaded walk (`KptTree.ptree_translateAddr_own`), the
+  A6.61 trampoline threading end to end (`TrampStepPt`, `UptWalkPt`
+  with `utf_translate` GREEN in place, `Pt2WalkPt`), `HartMemRun`'s
+  token-in/token-out `swp_hmrun_of_exec` (+ `_reg` minting form).
+- `ProcDefs.tf_words/tf_tail` and the whole trapframe tier at
+  `ctx_phys_word_pointsto` (A6.58), with `tf_page` morph/move rows.
+- **kpt_body at the CONTEXT-FREE KTier** (A6.20/A6.21: an invariant
+  body may not name a context): `kpt_body = ∃ t M B, kptree_own B 2 1 t
+  ∗ …`, arity-stable, WITHOUT the T-leg pin receipt (`kpt_bound`/`llb`
+  have no SC content).  Openers (KptShare walk, HartSKpt, TransPt)
+  walk at `(KTier B)`.  The PUBLICATION seam is
+  `PtTreeShim.ptree_own_retier_sc` at ProofMain's `kpt_inv_alloc` call
+  -- the T-leg replaces exactly that rewrite with `KptPublish`.
+
+**The design rule the binary tier now follows (hart-AND-context
+quantification, §0.43'/0.44'):** every migration-surviving shape that
+already quantified `∀ CID` now quantifies `∀ (CID) (XI)`:
+`UmodeCap.uv_intr_wp/uv_sys_wp`, `UexecWp.uexec_F`,
+`UexecRet.uslot/ukc/uvb/ukb` (+ `UexecRetFs` twins), `UkRun.urun`
+(xi EXISTENTIAL inside, arity unchanged -- the program never names
+it), `WpUmodeStep.uv_step_obl/uv_ih/uv_resume` and the retire
+continuations (`∀ CID0 XI0, uv_cap_gpr (CID:=CID0) (XI:=XI0) …`),
+`UkStep.uk_step_obl/uk_ih`, `UmodeIo`/`UmodeSyscall` protocol rows
+(the PROTOCOL itself is xi-free -- rows quantify internally; do NOT
+re-add an XI parameter to `xv6_io_protocol`/`xv6_sys_protocol`, it
+makes Ψ vary under the continuation binder and nothing unifies).
+(The first-generation sh proof
+tier -- UProofSh*/USpecSh* -- was retired by the owner in the
+concurrent fd-view seam, so its threading died with it; the
+new-generation sh files take the plain tier's xi binders at their
+`urun` destructs.)
+
+**The residue-token contract (M2), as landed:**
+- `SpecUser.wp_user_exec_closed_body` takes the `Rut_ctx` borrow
+  accessor as a premise (`forall pt', ⊢ Rut pt' -∗ own_context cur_ctx
+  ∗ (own_context cur_ctx -∗ Rut pt')`); `ProofUser` threads it to
+  `wp_user_exec_full`; a CONCRETE caller supplies it from
+  `ut_trap_parked`'s conjunct.
+- The A6.61 trampoline-consumer blocks are statement-threaded for
+  real: `UserretPt.wp_uld_pt/wp_ualu_pt/wp_usret_pt`,
+  `UservecPt.wp_usd_pt/wp_ucsrw(r)_sscratch_pt`,
+  `UservecExitPt.wp_uservec_exit_pt`,
+  `UserretEntryPt.wp_userret_entry_pt`, `SpecUserret`'s body (tf cells
+  at the ctx tier), `UserretUser`, `ProofUserret`, `ProofUservec`.
+
+**SC-only seams added (the cutover worklist is the import/grep list):**
+- `TsoCtxShim.own_context_sc` (the M-leg body is `True ∨ …`, so the
+  token is FREE on main) and `rut_ctx_sc` (minted accessor for a
+  ∀-bound residue).  Mint sites: `WpUmodeStep.uv_swp_fetch/execute/
+  uv_swp_exec` + the ecall nodes (UkStep/UkStore/WpUmodeStore twins),
+  `ProofUexecWp` (accessor for the iProp-∀ Rut), `ProofUservec`,
+  `UserretUser`, `ProofUservec`'s resumed-hart userret call.  Each is
+  where the T-leg substitutes the residue borrow.
+- `PtTreeShim.pt_slot_payer_sc` (generic payer), `pt_slot_raw_sc`,
+  `ptree_own_retier_sc` (SC re-tier; real publication at cutover).
+
+**Two Coq facts that cost rounds, recorded as rules:**
+- A definitional-class implicit (`CurCtx`) in a lemma STATEMENT
+  resolves to the NEWEST instance in scope at statement elaboration --
+  a per-lemma `{XIp}` binder therefore wins over the section ambient,
+  which is what makes the sh-tier helper pattern work; but an
+  `iPoseProof`-minted token lands in the INTUITIONISTIC context and
+  survives its first use, so never re-bind the same name at the next
+  continuation intro (rename or clear).
+- Implicit binders inside a `forall`-stated lemma auto-insert at
+  CONSTANT applications but are POSITIONAL in an `induction`-generated
+  IH -- `intros` lists and `IH _` applications need the slot, direct
+  lemma applications must not pass it.
+
+**Deferred, for the owner / the T-leg:**
+- The retire/park quantification stops at the uv/uk tier;
+  `wp_next` (the usertrap park) still re-binds the hart only -- the
+  context exchange at swtch is the kernel lane's (A6.127/A6.129).
+- `uk_step_obl`'s XIo and the `$! CIDo XIo` retire applies assume the
+  resumed context is the obligation's own; when the T-leg makes parks
+  real, those sites are the frontier (grep `XIo`).
+- The fs enrichment (`UexecRetFs`/`UkRunSysFs`/`UkRunFsLeaf`, the
+  fd-view seam's own tier) stays uniformly at its section-ambient XI;
+  its two bridges to the honestly-∀-quantified plain tier are
+  instantiated at the ambient (`uslot_uslot_fs`, `urun_fs_urun`).
+  Making the enrichment migration-honest is the fs lane's, when it
+  cares.
