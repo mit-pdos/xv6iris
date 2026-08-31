@@ -853,7 +853,9 @@ Proof.
            carved yet at the era's first state. *)
         - intros W Hc. discriminate Hc.
         (* and the RELEASE arm (§0.41′) *)
-        - intros R Hc. discriminate Hc. }
+        - intros R Hc. discriminate Hc.
+        (* and the WORD-SET pin (§12f / A6.143) *)
+        - intros W Hc. discriminate Hc. }
       iFrame "Hlogmauth".
       iSplitR.
       { iPureIntro. intros i. rewrite lookup_empty Hlog0 //. }
@@ -1490,7 +1492,8 @@ Section power.
               intros t' Ht'. destruct t' as [|i]; [lia | reflexivity].
             - intros Sv B Hc. discriminate Hc.
             - intros W Hc. discriminate Hc.
-            - intros R0 Hc0. discriminate Hc0. }
+            - intros R0 Hc0. discriminate Hc0.
+            - intros Wp Hcp. discriminate Hcp. }
           iFrame "Hlogmauth2".
           iSplitR.
           { iPureIntro. intros i. rewrite lookup_empty Hlog0 //. }

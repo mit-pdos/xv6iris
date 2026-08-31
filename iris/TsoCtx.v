@@ -2532,7 +2532,10 @@ Section ctx.
                      (ts_ok_win _ _ _ _ _ _ Hok HW0) Hmb).
           + intros R0 HR0. rewrite Hlog Himg.
             apply (rel_ok1_app_frame _ _ _ _ _
-                     (ts_ok_rel _ _ _ _ _ _ Hok HR0) Hmb). }
+                     (ts_ok_rel _ _ _ _ _ _ Hok HR0) Hmb).
+          + intros Wp HWp. rewrite Hlog Himg.
+            apply (pinw_ok1_app_frame _ _ _ _ _
+                     (ts_ok_pinw _ _ _ _ _ _ Hok HWp) Hmb). }
       iSplitR.
       { iPureIntro. intros j. rewrite Hlog.
         destruct (decide (j = length g.(glog))) as [->|Hne].
@@ -3652,7 +3655,7 @@ Section ctx.
         rewrite (lookup_union_Some_l _ _ _ _ Hl) in Hlk. injection Hlk as <-.
         assert (Hmb : msg_byte msg a = Some vn)
           by (rewrite /msg_byte /=; exact Hpa).
-        split_and!; [ | | by move => W0 HW0 | by move => R0 HR0 ].
+        split_and!; [ | | by move => W0 HW0 | by move => R0 HR0 | by move => Wp HWp ].
         + exists vn. split.
           { rewrite Hmem. by apply lookup_union_Some_l. }
           rewrite Hlog Himg. apply latest_app_new. exact Hmb.
@@ -3682,7 +3685,10 @@ Section ctx.
                    (ts_ok_win _ _ _ _ _ _ Hok HW0) Hmb).
         + intros R0 HR0. rewrite Hlog Himg.
           apply (rel_ok1_app_frame _ _ _ _ _
-                   (ts_ok_rel _ _ _ _ _ _ Hok HR0) Hmb). }
+                   (ts_ok_rel _ _ _ _ _ _ Hok HR0) Hmb).
+        + intros Wp HWp. rewrite Hlog Himg.
+          apply (pinw_ok1_app_frame _ _ _ _ _
+                   (ts_ok_pinw _ _ _ _ _ _ Hok HWp) Hmb). }
     iSplitR.
     { iPureIntro. intros j. rewrite Hlog.
       destruct (decide (j = length g.(glog))) as [->|Hne].
@@ -3889,6 +3895,7 @@ Section ctx.
                move => k Hk. rewrite /msg_byte /=. exact (Hme k Hk).
           * cbn [pm_tid]. exact Hoth.
         + intros R0 HR0. rewrite (HWf j Hj) in HR0. discriminate HR0.
+        + intros Wp HWp. rewrite (HWf j Hj) in HWp. discriminate HWp.
       - assert (Hl : wpay_tm (length g.(glog)) Wf Pnew !! a = None)
           by (rewrite wpay_tm_lookup Hpa //).
         rewrite (lookup_union_r _ _ _ Hl) in Hlk.
@@ -3909,7 +3916,10 @@ Section ctx.
                    (ts_ok_win _ _ _ _ _ _ Hok HW0) Hmb).
         + intros R0 HR0. rewrite Hlog Himg.
           apply (rel_ok1_app_frame _ _ _ _ _
-                   (ts_ok_rel _ _ _ _ _ _ Hok HR0) Hmb). }
+                   (ts_ok_rel _ _ _ _ _ _ Hok HR0) Hmb).
+        + intros Wp HWp. rewrite Hlog Himg.
+          apply (pinw_ok1_app_frame _ _ _ _ _
+                   (ts_ok_pinw _ _ _ _ _ _ Hok HWp) Hmb). }
     iSplitR.
     { iPureIntro. intros j. rewrite Hlog.
       destruct (decide (j = length g.(glog))) as [->|Hne].
@@ -4019,7 +4029,10 @@ Section ctx.
                    (ts_ok_win _ _ _ _ _ _ Hok HW0) Hmb).
         + intros R0 HR0. rewrite Hlog Himg.
           apply (rel_ok1_app_frame _ _ _ _ _
-                   (ts_ok_rel _ _ _ _ _ _ Hok HR0) Hmb). }
+                   (ts_ok_rel _ _ _ _ _ _ Hok HR0) Hmb).
+        + intros Wp HWp. rewrite Hlog Himg.
+          apply (pinw_ok1_app_frame _ _ _ _ _
+                   (ts_ok_pinw _ _ _ _ _ _ Hok HWp) Hmb). }
     iSplitR.
     { iPureIntro. intros j. rewrite Hlog.
       destruct (decide (j = length g.(glog))) as [->|Hne].
@@ -4619,7 +4632,7 @@ Section ctx.
     iPureIntro. intros a' e Hlk.
     destruct (decide (a' = a)) as [->|Hne].
     - rewrite lookup_insert in Hlk. injection Hlk as <-.
-      split_and!; [ | | by move => W0 HW0 | by move => R0 HR0 ].
+      split_and!; [ | | by move => W0 HW0 | by move => R0 HR0 | by move => Wp HWp ].
       + exists v. split; [exact Hgm | exact Hlat].
       + intros Sv' B' Heq. cbn in Heq. injection Heq as <- <-.
         exact (pin_ok_mint _ _ _ _ _ t v Hlat HtB Hv).
@@ -4675,6 +4688,7 @@ Section ctx.
       + by move => Sv' B' Heq.
       + by move => W0 HW0.
       + by move => R0 HR0.
+      + by move => Wp HWp.
     - rewrite lookup_insert_ne in Hlk; last done. exact (Htie _ _ Hlk).
   Qed.
 
@@ -4812,6 +4826,7 @@ Section ctx.
       + move => Sv' B' Heq. discriminate Heq.
       + move => W0 HW0. cbn in HW0. injection HW0 as <-. exact Hw.
       + by move => R0 HR0.
+      + by move => Wp HWp.
     - rewrite lookup_insert_ne in Hlk; last done. exact (Htie _ _ Hlk).
   Qed.
 
@@ -5432,6 +5447,7 @@ Section ctx.
       + move => Sv' B' Heq. discriminate Heq.
       + by move => W0 HW0.
       + move => R0 HR0. cbn in HR0. injection HR0 as <-. exact Hr.
+      + by move => Wp HWp.
     - rewrite lookup_insert_ne in Hlk; last done. exact (Htie _ _ Hlk).
   Qed.
 
@@ -5466,6 +5482,7 @@ Section ctx.
       + by move => Sv' B' Heq.
       + by move => W0 HW0.
       + by move => R0 HR0.
+      + by move => Wp HWp.
     - rewrite lookup_insert_ne in Hlk; last done. exact (Htie _ _ Hlk).
   Qed.
 

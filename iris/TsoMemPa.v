@@ -1441,6 +1441,46 @@ Section floor_window.
   Qed.
 
   (* ------------------------------------------------------------------ *)
+  (* A6.143: THE OWN-LAST-FREE FORM, for the WORD-SET pin (§12f).  A      *)
+  (* reader that may itself have written the window since the floor       *)
+  (* needs no classification of the settle: every timestamp the scan can  *)
+  (* land on at or above the floor -- its own included -- is a whole-     *)
+  (* window write, and the word-set pin constrains them all uniformly.    *)
+  (* So [racy_read_window_fl] minus [own_last_fl], with the third arm     *)
+  (* keeping only what the pin needs: the settle is the floor, or a real  *)
+  (* message at or above it.                                              *)
+  (* ------------------------------------------------------------------ *)
+  Lemma racy_read_window_any_fl (h : agent) (tv Bm : nat) :
+    win_ok_fl Bm ->
+    visibleb h tv log Bm = true ->
+    (Bm <= length log)%nat ->
+    (forall k, (k < n)%nat -> is_Some (log_byte img log Bm (pa_add a k))) ->
+    exists T : nat,
+      (Bm <= T)%nat
+      /\ (forall j, (j < n)%nat ->
+            tso_read img log h tv (pa_add a j) = log_byte img log T (pa_add a j))
+      /\ (T = Bm \/ exists i m, T = S i /\ log !! i = Some m /\ (Bm <= S i)%nat
+                             /\ is_Some (msg_byte m (pa_add a 0))).
+  Proof.
+    move => Hw Htv Hlen Hcov.
+    have [T [HT Hge]] :=
+      find_top_max img log a n Hn h tv (length log) Bm Hlen Htv (Hcov 0%nat Hn).
+    exists T. split; first done.
+    split.
+    { move => j Hj.
+      rewrite /tso_read
+        (read_down_win_fl h tv Bm (length log) j Hw Hj Htv ltac:(lia) Hcov)
+        HT //. }
+    case: (decide (T = Bm)) => [->|Hne]; first by left.
+    right.
+    have [Hle [Hv [b0 Hb0]]] := find_top_spec img log a n Hn h tv (length log) T HT.
+    case ET : T => [|i]; first lia.
+    move: Hb0. rewrite ET /log_byte.
+    case El : (log !! i) => [m|]; last by [].
+    move => Hb0. exists i, m. split_and!; [done|done|lia|by eexists].
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
   (* THE GATE-MEDIATED FORM AT AN ANCHOR THE READER OWNS.  This is the    *)
   (* shape [win_ok1]'s conjunct (3) hands over -- "my own last write to    *)
   (* this window, at or above the floor, is at [t] and left the clear      *)
@@ -2495,6 +2535,164 @@ Section rel_read.
   Qed.
 End rel_read.
 
+(* ===================================================================== *)
+(* §12f  THE WORD-SET PIN (A6.143): [pin_ok]'s guarantee at WORD          *)
+(* granularity.  [ip->ref] is the client: its value set [1..IREFSLOTS]    *)
+(* is not a per-byte box (422 needs two bytes, and the box of the two     *)
+(* bytes' observable sets readmits the all-zero word), so the byte pin    *)
+(* cannot kill ilock's [ref < 1] panic.  The claim is [ts_win]'s in       *)
+(* shape -- every message at or above the floor that touches this byte    *)
+(* writes the WHOLE window -- with the two-valued clear/author word       *)
+(* replaced by an arbitrary member PREDICATE on the written word.  Like   *)
+(* [win_ok1] it hangs on EVERY byte of the window (§12c: a coverage       *)
+(* claim's home is the finest key whose frame arm the store gate can      *)
+(* already discharge), and its frame arm is [msg_byte m a = None],        *)
+(* definitionally.                                                        *)
+(* ===================================================================== *)
+
+Record ts_pinw : Type := TsPinw {
+  pw_base : Arch.pa;                (* byte 0 of the window *)
+  pw_n    : nat;                    (* its width *)
+  pw_j    : nat;                    (* THIS byte's offset inside it *)
+  pw_lo   : nat;                    (* the arm store's position: the floor *)
+  pw_S    : (nat -> bv 8) -> Prop;  (* the member predicate, byte-wise *)
+}.
+
+Definition pinw_ok1 (img : gmap Arch.pa (bv 8)) (log : list pwmsg)
+    (a : Arch.pa) (W : ts_pinw) : Prop :=
+  a = pa_add (pw_base W) (pw_j W)
+  /\ (pw_j W < pw_n W)%nat
+  /\ (0 < pw_n W)%nat
+  (* (1) any message at or above the floor touching THIS byte writes the
+     whole window, with a member word *)
+  /\ (forall i m, (pw_lo W <= S i)%nat -> log !! i = Some m ->
+        is_Some (msg_byte m a) ->
+        exists f : nat -> bv 8,
+          pw_S W f /\
+          forall k, (k < pw_n W)%nat ->
+            msg_byte m (pa_add (pw_base W) k) = Some (f k))
+  (* (2) the floor is a legal position and holds a member word over the
+     whole window (the arm store's own bytes, or the era image at 0) *)
+  /\ (pw_lo W <= length log)%nat
+  /\ (exists f : nat -> bv 8,
+        pw_S W f /\
+        forall k, (k < pw_n W)%nat ->
+          log_byte img log (pw_lo W) (pa_add (pw_base W) k) = Some (f k)).
+
+(* THE FRAME ARM, definitional exactly as [win_ok1_app_frame]'s. *)
+Lemma pinw_ok1_app_frame img log m a W :
+  pinw_ok1 img log a W -> msg_byte m a = None ->
+  pinw_ok1 img (log ++ [m]) a W.
+Proof.
+  move => [Ha [Hj [Hn [H1 [Hlo Hfl]]]]] Hm.
+  split_and!; [exact Ha | exact Hj | exact Hn | | | ].
+  - move => i m0 Hge Hlk Hs.
+    apply lookup_app_Some in Hlk. destruct Hlk as [Hlk | [Hge2 Hlk]].
+    + exact (H1 i m0 Hge Hlk Hs).
+    + destruct (i - length log)%nat as [|k] eqn:Hk; cbn in Hlk; last done.
+      injection Hlk as <-. rewrite /is_Some Hm in Hs. by destruct Hs as [? ?].
+  - rewrite length_app /=. lia.
+  - destruct Hfl as [f [HS Hf]]. exists f. split; [exact HS|].
+    move => k Hk. rewrite (log_byte_app_le _ _ _ _ _ Hlo). exact (Hf k Hk).
+Qed.
+
+(* THE STORE ARM: an append that writes the whole window with a member
+   word preserves the claim -- the storer's per-store side condition,
+   exactly the byte pin's shape ([vnew ∈ Sv]) one level up. *)
+Lemma pinw_ok1_app_member img log m a W (f : nat -> bv 8) :
+  pinw_ok1 img log a W ->
+  pw_S W f ->
+  (forall k, (k < pw_n W)%nat ->
+     msg_byte m (pa_add (pw_base W) k) = Some (f k)) ->
+  pinw_ok1 img (log ++ [m]) a W.
+Proof.
+  move => [Ha [Hj [Hn [H1 [Hlo Hfl]]]]] HS Hf.
+  split_and!; [exact Ha | exact Hj | exact Hn | | | ].
+  - move => i m0 Hge Hlk Hs.
+    apply lookup_app_Some in Hlk. destruct Hlk as [Hlk | [Hge2 Hlk]].
+    + exact (H1 i m0 Hge Hlk Hs).
+    + destruct (i - length log)%nat as [|k] eqn:Hk; cbn in Hlk; last done.
+      injection Hlk as <-. exists f. split; [exact HS | exact Hf].
+  - rewrite length_app /=. lia.
+  - destruct Hfl as [g [HSg Hg]]. exists g. split; [exact HSg|].
+    move => k Hk. rewrite (log_byte_app_le _ _ _ _ _ Hlo). exact (Hg k Hk).
+Qed.
+
+(* THE MINT: right after the arm store -- the floor is the log's top, so
+   clause (1)'s domain above it holds exactly the arm message itself. *)
+Lemma pinw_ok1_mint img log (base : Arch.pa) (nn j : nat)
+    (Sw : (nat -> bv 8) -> Prop) (f : nat -> bv 8) :
+  (j < nn)%nat -> (0 < nn)%nat -> Sw f ->
+  (forall k, (k < nn)%nat ->
+     log_byte img log (length log) (pa_add base k) = Some (f k)) ->
+  pinw_ok1 img log (pa_add base j) (TsPinw base nn j (length log) Sw).
+Proof.
+  move => Hj Hn HS Hfl.
+  split_and!; [done | exact Hj | exact Hn | | cbn; lia | by exists f].
+  move => i m Hge Hlk Hs.
+  apply lookup_lt_Some in Hlk as Hlt. cbn in Hge.
+  have Hi : Datatypes.S i = length log by lia.
+  exists f. split; [exact HS|].
+  move => k Hk.
+  have HF := Hfl k Hk. rewrite -Hi /log_byte Hlk in HF. exact HF.
+Qed.
+
+(* THE READ, assembled over the [n] copies the reader holds: one member
+   word serves every byte, at any view where the floor is visible (below
+   the view, or the reader's own arm store). *)
+Lemma pinw_read img log (base : Arch.pa) (nn lo : nat)
+    (Sw : (nat -> bv 8) -> Prop) (h : agent) (tv : nat) :
+  (0 < nn)%nat ->
+  (forall j, (j < nn)%nat ->
+     pinw_ok1 img log (pa_add base j) (TsPinw base nn j lo Sw)) ->
+  visibleb h tv log lo = true ->
+  exists f : nat -> bv 8,
+    Sw f /\
+    forall j, (j < nn)%nat ->
+      tso_read img log h tv (pa_add base j) = Some (f j).
+Proof.
+  intros Hn Hall Hvis.
+  destruct (Hall 0%nat Hn) as (_ & _ & _ & H1b & Hlo & fB & HfBS & HfB).
+  cbn [pw_base pw_n pw_j pw_lo pw_S] in H1b, Hlo, HfB.
+  (* the relativised whole-or-none coverage, from clause (1) at each byte *)
+  assert (Hw : win_ok_fl img log base nn lo).
+  { intros t Hget. destruct t as [|i].
+    - (* t = 0 with lo = 0: the floor fact covers the window *)
+      assert (Hl0 : lo = 0%nat) by lia.
+      left. intros j Hj.
+      pose proof (HfB j Hj) as HB. rewrite Hl0 in HB. rewrite HB. by eexists.
+    - destruct (log !! i) as [m|] eqn:El; last first.
+      + right. intros j Hj. by rewrite /log_byte El.
+      + (* whole-or-none, decided at byte 0: a message touching any byte
+           touches byte 0 too (clause (1) at that byte), so byte 0 decides *)
+        destruct (msg_byte m (pa_add base 0)) as [b0|] eqn:E0.
+        * left.
+          destruct (Hall 0%nat Hn) as (_ & _ & _ & H10 & _).
+          cbn [pw_base pw_n pw_j pw_lo pw_S] in H10.
+          destruct (H10 i m ltac:(lia) El ltac:(by rewrite E0; eexists))
+            as (g & _ & Hg).
+          intros j Hj. rewrite /log_byte El /= (Hg j Hj). by eexists.
+        * right. intros j Hj. rewrite /log_byte El /=.
+          destruct (msg_byte m (pa_add base j)) as [b|] eqn:Emb; last done.
+          exfalso.
+          destruct (Hall j Hj) as (_ & _ & _ & H1j & _).
+          cbn [pw_base pw_n pw_j pw_lo pw_S] in H1j.
+          destruct (H1j i m ltac:(lia) El ltac:(by rewrite Emb; eexists))
+            as (g & _ & Hg).
+          pose proof (Hg 0%nat Hn) as Hg0. rewrite E0 in Hg0. discriminate. }
+  assert (Hcov : forall k, (k < nn)%nat ->
+      is_Some (log_byte img log lo (pa_add base k))).
+  { intros k Hk. rewrite (HfB k Hk). by eexists. }
+  destruct (racy_read_window_any_fl img log base nn Hn h tv lo Hw Hvis Hlo Hcov)
+    as (T & HgeT & Hrd & Harm).
+  destruct Harm as [-> | (i & m & -> & El & Hgei & Hs0)].
+  - exists fB. split; [exact HfBS|].
+    intros j Hj. rewrite (Hrd j Hj). exact (HfB j Hj).
+  - destruct (H1b i m Hgei El Hs0) as (g & HgS & Hg).
+    exists g. split; [exact HgS|].
+    intros j Hj. rewrite (Hrd j Hj) /log_byte El /=. exact (Hg j Hj).
+Qed.
+
 Record ts_pay : Type := TsPay {
   (* the field names are [tsp_], not [tp_]: [HartTp.tp_pin] already exists
      tree-wide (the hart's register-file pin) and a record field shadows it
@@ -2504,12 +2702,14 @@ Record ts_pay : Type := TsPay {
   tsp_pin : option (byteset * nat);   (* tso-pin-memo.md §5's confinement *)
   tsp_win : option ts_win;            (* §12c's per-byte window claim *)
   tsp_rel : option ts_rel;            (* §12e's release arm (§0.41′) *)
+  tsp_pinw : option ts_pinw;          (* §12f's word-set pin (A6.143) *)
 }.
 
-Definition ts_pay_none : ts_pay := TsPay None None None.
-Definition ts_pay_pin (Sv : byteset) (B : nat) : ts_pay := TsPay (Some (Sv, B)) None None.
-Definition ts_pay_win (W : ts_win) : ts_pay := TsPay None (Some W) None.
-Definition ts_pay_rel (R : ts_rel) : ts_pay := TsPay None None (Some R).
+Definition ts_pay_none : ts_pay := TsPay None None None None.
+Definition ts_pay_pin (Sv : byteset) (B : nat) : ts_pay := TsPay (Some (Sv, B)) None None None.
+Definition ts_pay_win (W : ts_win) : ts_pay := TsPay None (Some W) None None.
+Definition ts_pay_rel (R : ts_rel) : ts_pay := TsPay None None (Some R) None.
+Definition ts_pay_pinw (W : ts_pinw) : ts_pay := TsPay None None None (Some W).
 
 Definition ts_elem : Type := nat * ts_pay.
 
@@ -2519,7 +2719,8 @@ Definition ts_ok (img mem : gmap Arch.pa (bv 8)) (log : list pwmsg)
   /\ (forall (Sv : byteset) (B : nat),
         tsp_pin e.2 = Some (Sv, B) -> pin_ok img log a B Sv)
   /\ (forall W : ts_win, tsp_win e.2 = Some W -> win_ok1 img log a W)
-  /\ (forall R : ts_rel, tsp_rel e.2 = Some R -> rel_ok1 img log a R).
+  /\ (forall R : ts_rel, tsp_rel e.2 = Some R -> rel_ok1 img log a R)
+  /\ (forall W : ts_pinw, tsp_pinw e.2 = Some W -> pinw_ok1 img log a W).
 
 Lemma ts_ok_latest img mem log a e :
   ts_ok img mem log a e -> exists v, mem !! a = Some v /\ latest img log a e.1 v.
@@ -2535,7 +2736,11 @@ Proof. move => [_ [_ [H _]]]. by apply H. Qed.
 
 Lemma ts_ok_rel img mem log a e R :
   ts_ok img mem log a e -> tsp_rel e.2 = Some R -> rel_ok1 img log a R.
-Proof. move => [_ [_ [_ H]]]. by apply H. Qed.
+Proof. move => [_ [_ [_ [H _]]]]. by apply H. Qed.
+
+Lemma ts_ok_pinw img mem log a e W :
+  ts_ok img mem log a e -> tsp_pinw e.2 = Some W -> pinw_ok1 img log a W.
+Proof. move => [_ [_ [_ [_ H]]]]. by apply H. Qed.
 
 (* the UNPAYLOADED element: exactly the old tie, and nothing more to prove *)
 Lemma ts_ok_unpinned img mem log a t v :
@@ -2543,5 +2748,5 @@ Lemma ts_ok_unpinned img mem log a t v :
   ts_ok img mem log a (t, ts_pay_none).
 Proof.
   move => Hm Hl. split; [by exists v |].
-  split; [by move => * |]. split; by move => *.
+  split; [by move => * |]. split; [by move => * |]. split; by move => *.
 Qed.
