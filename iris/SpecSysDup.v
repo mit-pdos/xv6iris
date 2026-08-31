@@ -94,11 +94,25 @@ Section SpecSysDup.
      type ([ProcInv.proc_priv_settle]).  The SOURCE descriptor's state does
      not change and its authority round-trips through the loan, which is why
      one bundle access is enough for a two-descriptor syscall. *)
+  (* THE TABLE IS NAMED, and the three arms differ in exactly one row.  The
+     two failure arms hand [sts] back untouched; the success arm hands back
+     [<[fd1 := sts !!! fd0]> sts] -- the DESTINATION becomes a COPY of the
+     SOURCE, which is what dup means at this level: filedup only bumps
+     [f->ref], so the two descriptors name one [struct file] and therefore
+     have one state.  The source row is unchanged, and [list_insert] says
+     every other row is too.  This is [UsysMemOk.usys_fd_ok]'s dup row.
+
+     [sts !!! fd0] RATHER THAN A PREMISE naming the source's state (which
+     [SpecSysDupAU]'s design note weighed as an open question): the total
+     lookup needs nothing of the caller and it is the form the syscall
+     table already uses, so the two compose without a translation step.
+     The proof pays for it once, with [FdSlots.fd_st_agree] against the
+     loan's own authority -- see [ProofSysDup]. *)
   Definition sys_dup_post `{XI : CurCtx} (γf : gname) (p : mword 64) (pid : mword 32)
-      (U : ustate) (v : mword 64) (r : mword 64) : iProp Σ :=
+      (U : ustate) (sts : list fdstate) (v : mword 64) (r : mword 64) : iProp Σ :=
     ((* argfd said no: the argument is not an open descriptor *)
      ⌜r = (mword_of_int (-1) : mword 64) /\ arg_fd v (pv_ofile (us_V U)) = None⌝ ∗
-       proc_priv γf p pid U ∗ fd_frags_any (pv_fdg (us_V U))
+       proc_priv γf p pid U ∗ fd_frags (pv_fdg (us_V U)) sts
      ∨
      (* the descriptor exists but the table is full.  xv6 does NOT close
         anything here -- it never took a reference -- so the block is
@@ -108,7 +122,7 @@ Section SpecSysDup.
         ⌜r = (mword_of_int (-1) : mword 64) /\
          arg_fd v (pv_ofile (us_V U)) = Some (fd0, fv) /\
          fd_frees (pv_ofile (us_V U)) = []⌝ ∗
-        proc_priv γf p pid U ∗ fd_frags_any (pv_fdg (us_V U)))
+        proc_priv γf p pid U ∗ fd_frags (pv_fdg (us_V U)) sts)
      ∨
      (* duplicated: the least free descriptor now names the same file the
         source did, and the count behind it has gone up by one. *)
@@ -116,13 +130,15 @@ Section SpecSysDup.
         ⌜r = (mword_of_int (Z.of_nat fd1) : mword 64) /\
          arg_fd v (pv_ofile (us_V U)) = Some (fd0, fv) /\
          fd_frees (pv_ofile (us_V U)) = fd1 :: l⌝ ∗
-        proc_priv γf p pid (us_ofile U fd1 fv) ∗ fd_frags_any (pv_fdg (us_V U))))%I.
+        proc_priv γf p pid (us_ofile U fd1 fv) ∗
+        fd_frags (pv_fdg (us_V U)) (<[fd1 := sts !!! fd0]> sts)))%I.
 
 End SpecSysDup.
 
 Definition wp_sys_dup_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γl γf : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
-    (v : mword 64) (pid : mword 32) (U : ustate) (b : bool) (lks : gset string) :=
+    (v : mword 64) (pid : mword 32) (U : ustate) (sts : list fdstate)
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_dup in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (* sys_dup reads syscall argument 0, out of the trapframe page [proc_priv]
@@ -148,15 +164,16 @@ Definition wp_sys_dup_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG
   (* the ftable lock, for filedup's ghost step *)
   is_ftable γl γf -∗
   proc_priv γf p pid U -∗
-  (* the descriptor-state fragments -- spent on the destination descriptor *)
-  fd_frags_any (pv_fdg (us_V U)) -∗
+  (* the descriptor-state fragments -- spent on the destination descriptor,
+     at the table the post states its row against *)
+  fd_frags (pv_fdg (us_V U)) sts -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
-      sys_dup_post γf p pid U v (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
+      sys_dup_post γf p pid U sts v (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -164,6 +181,7 @@ Module Type SYSDUP.
   Parameter wp_sys_dup_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} `{XI : CurCtx} (γl γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
-      (v : mword 64) (pid : mword 32) (U : ustate) (b : bool) (lks : gset string),
-      wp_sys_dup_sconf_body γl γf m av n eb p v pid U b lks.
+      (v : mword 64) (pid : mword 32) (U : ustate) (sts : list fdstate)
+    (b : bool) (lks : gset string),
+      wp_sys_dup_sconf_body γl γf m av n eb p v pid U sts b lks.
 End SYSDUP.

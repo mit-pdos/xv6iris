@@ -317,19 +317,27 @@ Section SpecSysDupAU.
       (U : ustate) (v fv : mword 64) (fd0 : nat)
       (rb wb : bool) (t : fdtype) (sts : list fdstate) (r : mword 64) :
     arg_fd v (pv_ofile (us_V U)) = Some (fd0, fv) ->
+    (* THE SOURCE ROW, TIED TO THE TABLE.  The AU form names the source's
+       state as the parameters [rb wb t]; the landed post says the
+       destination lands at [sts !!! fd0].  This premise is what identifies
+       the two, and it is the frame's own -- an AU caller knows its source
+       descriptor's state, since that is the whole premise of the AU form
+       (this file's header, point 2 of WHAT THE PROVER OWES). *)
+    sts !! fd0 = Some (FdOpen rb wb t) ->
     sys_dup_au_post γf p pid U fd0 fv rb wb t sts r
-    ⊢ sys_dup_post γf p pid U v r.
+    ⊢ sys_dup_post γf p pid U sts v r.
   Proof.
-    iIntros (Ha) "[[[%Hr %Hfr] [Hp Hb]] |
+    iIntros (Ha Hsrc) "[[[%Hr %Hfr] [Hp Hb]] |
                    (%fd1 & %l & (%Hr & %Hfr & %Hcl) & Hp & Hb)]".
     - iRight. iLeft. iExists fd0, fv.
       iSplitR.
       { iPureIntro. split; [exact Hr | split; [exact Ha | exact Hfr]]. }
-      iFrame "Hp". iApply (dup_fd_frags_any with "Hb").
+      iFrame "Hp Hb".
     - iRight. iRight. iExists fd0, fd1, fv, l.
       iSplitR.
       { iPureIntro. split; [exact Hr | split; [exact Ha | exact Hfr]]. }
-      iFrame "Hp". iApply (dup_fd_frags_any with "Hb").
+      rewrite (list_lookup_total_correct sts fd0 (FdOpen rb wb t) Hsrc).
+      iFrame "Hp Hb".
   Qed.
 
 End SpecSysDupAU.

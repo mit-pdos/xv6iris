@@ -3281,8 +3281,8 @@ Section SyscallArms.
      moves [V] at all, and [upd_ofile] rewrites the fd array alone -- the
      descriptor [pv_upt] (hence [ud_tfp]) is the same record field. *)
   Lemma sysc_dup_priv (γf : gname) (p : mword 64) (pid : mword 32)
-      (U : ustate) (v r : mword 64) :
-    sys_dup_post γf p pid U v r -∗
+      (U : ustate) (sts : list fdstate) (v r : mword 64) :
+    sys_dup_post γf p pid U sts v r -∗
     ∃ V' : pprivate, ⌜ud_tfp (pv_upt V') = ud_tfp (pv_upt (us_V U))⌝ ∗
       (* the fd-state ghost name does not move: every arm returns either [V]
          itself or an [upd_ofile] of it *)
@@ -3341,7 +3341,10 @@ Section SyscallArms.
     iDestruct (syscall_env_all with "Henvc") as (γp γw γft γtk)
       "(_ & _ & _ & _ & #Hftable & _)".
     (* ---- the call ---- *)
-    iApply (SysDup.wp_sys_dup_sconf γft γf M (av - 4)%nat 0%nat true pj v0 pid U true ∅
+    (* name the table for the call -- sys_dup's post states its row against
+       it ([<[fd1 := sts !!! fd0]> sts] on the success arm) *)
+    iDestruct "Hufrag" as (sts) "Hufrag".
+    iApply (SysDup.wp_sys_dup_sconf γft γf M (av - 4)%nat 0%nat true pj v0 pid U sts true ∅
               Hv0 sysc_noff0 ltac:(lia) (locks_below_empty "ftable")
               with "Hcg Hcpu Htext Hdata Hpc Hftable Hpriv Hufrag").
     iIntros (CIDy Hsy mf) "%Hcs Hcg Hcpu Hpc Hpost".

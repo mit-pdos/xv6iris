@@ -339,8 +339,9 @@ Section ProofSysDup.
   (* =================================================================== *)
   Lemma wp_sys_dup_sconf (γl γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
-      (v : mword 64) (pid : mword 32) (U : ustate) (b : bool) (lks : gset string)
-    : wp_sys_dup_sconf_body γl γf m av n eb p v pid U b lks.
+      (v : mword 64) (pid : mword 32) (U : ustate) (sts : list fdstate)
+      (b : bool) (lks : gset string)
+    : wp_sys_dup_sconf_body γl γf m av n eb p v pid U sts b lks.
   Proof.
     cbv beta delta [wp_sys_dup_sconf_body].
     intros pcE ret_tgt Harg Hn Hav Hftno.
@@ -1020,8 +1021,29 @@ Section ProofSysDup.
     (* THE DESTINATION IS THE ONE THAT CHANGES STATE.  fdalloc handed out its
        authority at [FdClosed]; it has to arrive at the source file's type,
        and that move is what this syscall spends the fragment bundle on. *)
-    iDestruct (fd_frags_any_acc (pv_fdg (us_V U)) fd1 Hfd1N with "Hfrag")
-      as (stq) "[Hfr Hfrback]".
+    (* THE SOURCE'S ROW, READ AND PUT BACK UNCHANGED.  The post says the
+       destination lands at [sts !!! fd0]; the proof below lands it at
+       [stf], the file's type off the loan.  [fd_st_agree] against the
+       loan's own authority is what identifies the two -- and it is the
+       only reason the source's row is opened at all, since dup does not
+       move it ([list_insert_id] puts it back on the nose). *)
+    assert (Hfd0N : (fd0 < NOFILE)%nat)
+      by (rewrite <- Hoflen; exact (lookup_lt_Some _ _ _ Hlk0)).
+    iDestruct (fd_frags_len with "Hfrag") as %Hstslen.
+    assert (Hst0x : is_Some (sts !! fd0))
+      by (apply lookup_lt_is_Some_2; rewrite Hstslen; exact Hfd0N).
+    destruct Hst0x as [st0 Hst0].
+    iDestruct (fd_frags_acc (pv_fdg (us_V U)) sts fd0 st0 Hst0 with "Hfrag")
+      as "[Hfr0 Hfrback0]".
+    iDestruct (fd_st_agree with "Hauth0 Hfr0") as %<-.
+    iDestruct ("Hfrback0" with "Hfr0") as "Hfrag".
+    rewrite (list_insert_id sts fd0 stf Hst0).
+    (* ...and now the DESTINATION, which is the row that moves *)
+    assert (Hst1x : is_Some (sts !! fd1))
+      by (apply lookup_lt_is_Some_2; rewrite Hstslen; exact Hfd1N).
+    destruct Hst1x as [stq Hst1].
+    iDestruct (fd_frags_acc (pv_fdg (us_V U)) sts fd1 stq Hst1 with "Hfrag")
+      as "[Hfr Hfrback]".
     iMod (fd_st_move _ fd1 FdClosed stq stf with "Hauth1 Hfr")
       as "[Hauth1 Hfr]".
     iDestruct ("Hfrback" with "Hfr") as "Hfrag".
@@ -1122,6 +1144,11 @@ Section ProofSysDup.
     rewrite /sys_dup_post. iRight. iRight.
     iExists fd0, fd1, fv, l. iSplitR.
     { iPureIntro. split; [exact HFa0|]. split; [exact Hsome | exact Hfr1]. }
+    (* the post says the destination lands at [sts !!! fd0]; the ghost step
+       landed it at [stf], and [Hst0] -- the source row [fd_st_agree]
+       identified with the loan's authority -- is what says those are the
+       same descriptor state. *)
+    rewrite (list_lookup_total_correct sts fd0 stf Hst0).
     rewrite Hfvk. iFrame "Hpriv Hfrag".
   Qed.
 
