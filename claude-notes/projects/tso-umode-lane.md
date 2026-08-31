@@ -352,3 +352,5 @@ out-of-scope trampoline/per-binary files behind them (Pt2WalkPt:427,
 UserretPt:195, ProofUser:75 — see §7 for what each needs).
 
 `_CoqProject` delta: `UptWalkTramp.v` appended at end (only change).
+
+**KERNEL-LANE MERGE NOTE (2026-08-31): `tso-flip-umode` @ `9bfb42d9ed4` merged into the main tree and certified as r61 (`72bb94f1300a3`, 1279/1305) on `tso-flip`.  ZZchain.sh path change and the snapshot-materialization artifacts (sail-riscv, .CoqMakefile.d) were NOT adopted; everything else was.**
