@@ -1,4 +1,4 @@
-# TSO port: LIVE HANDOFF CHECKPOINT (2026-08-28, evening session #2)
+# TSO port: LIVE HANDOFF CHECKPOINT (2026-08-31, r63 banked)
 
 This file is the resumption point for a FRESH agent taking over the TSO
 port coordination.  It is updated at green boundaries; trust the newest
@@ -23,7 +23,7 @@ measured record; `main-tso-readiness.md` is the separate main-side handoff.
    temp-index recipe; `ZZchain.sh <File>…` at the tree root rechecks files
    locally in order against pulled `.vo`).
    Build driver: `ZZbuild.sh` at the tree root (the intr lane's, log names
-   suffixed `.aux` -- see the gotcha).  **Last certified: r62 (`05ff8bf16c8e4`), 1279/1305, zero admits.  A6.138 (secondary wiring / position-indexed started payload) LANDED AND CERTIFIED — secondaries mint their own kpt_creds from the started acquire.  IN FLIGHT: A6.139 (the kernelvec fix, owner-approved option 1) — full implementation design in tso-machine-flip.md A6.139; next step is the IntrDefs E-parameter surgery.  Builds via `run-on-gcp` ONLY.**
+   suffixed `.aux` -- see the gotcha).  **Last certified: r63 (`bfe7168564bc0`), 1283/1305, zero admits.  A6.139 (the kernelvec handler-environment fix, owner-approved option 1) LANDED AND CERTIFIED — the ihs family fixpoint (`IntrDefs.ihs_fam`/`ires_pack_of`/`ihs_env`), `kernelvec_env` + `env_move`, ProofKernelvec/ProofUsertrap/LinkKernelvec/LinkUsertrap/LinkMainSecondary all GREEN.  True red roots are 5: the out-of-scope user cone (ProofUser/UserretPt/Pt2WalkPt), ProofForkretPark (stamped_rec design session with the owner pending), UptWalkTramp (deliberate).  LinkMain/BootChain/BootShared/SystemAdequacy now wait ONLY on those.  Builds via `run-on-gcp` ONLY.**
 2. **KPT tree**: `/shared/xv6iris-3-kpttree` — FROZEN mid-K15d, unchanged
    this session EXCEPT one mirrored hunk: `iris/SmodeCorePt.v`'s
    `word_pointsto_wpay_mint_c` gained the trailing own-message fragment

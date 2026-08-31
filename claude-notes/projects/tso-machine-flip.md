@@ -17578,3 +17578,17 @@ referenced unqualified).  ProofKerneltrap needed NOTHING (kerneltrap
 sits below the env threading).  The rest of r63a's RED list was the
 standing out-of-scope cone (ProofUser / UptWalkTramp / UserretPt /
 Pt2WalkPt / ProofForkretPark roots).  r63b relaunched.
+
+### r63 BANKED — A6.139 CERTIFIED
+
+r63b clean: GREEN=1283/1305, 5 true error roots (ProofUser :75,
+UserretPt :195, Pt2WalkPt :427 — the out-of-scope user cone;
+ProofForkretPark :318 — stamped_rec pending; UptWalkTramp :101 —
+deliberate).  **ProofKernelvec and ProofUsertrap have left the red
+roots; LinkKernelvec, LinkUsertrap and LinkMainSecondary are green for
+the first time on the fliptree.**  The remaining RED list is exactly
+the out-of-scope cone: LinkMain/BootChain/BootShared/SystemAdequacy
+now wait ONLY on the user cone (via LinkUserinit/LinkUserret) and
+ProofForkretPark — the kernelvec leg of their dependency cone is paid.
+Snapshot chain: r62 05ff8bf16c8e4 → **r63 bfe7168564bc0**; mirror
+refreshed; .vo pulled (1309).
