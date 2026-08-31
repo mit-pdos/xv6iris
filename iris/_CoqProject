@@ -1685,10 +1685,14 @@ LinkSysUnlinkAU.v
 # while the port gets [shk_text_sub] / [uis_shk_*] / [shk_code] over the
 # same ShInstrs.sh_bytes.  It covers 192 instructions in 10 functions:
 # start, main, getcmd, memset, gets and the open/close/exit/write/read
-# stubs.  IT IS THE LANE'S COMPILE-TIME BUDGET: measured serially a catalog
-# costs ~22 s fixed plus ~1.9 s PER INSTRUCTION (91 instr = 191 s, 192 =
-# 380 s), so the parser's ~500 more belong in a SECOND catalog file, not
-# appended here.
+# stubs.  IT IS NO LONGER THE LANE'S COMPILE-TIME BUDGET.  A catalog used
+# to cost ~22 s fixed plus ~1.9 s PER INSTRUCTION (192 instr = 320 s), and
+# that is why this note used to say the parser's ~500 more belonged in a
+# SECOND catalog file; the whole of it was ONE inline [ltac:] in [uis_run]
+# (see the tactic's own comment, and optimization.md's "unshelve hoist").
+# Hoisted, this file is 10.6 s and an instruction costs ~0.03 s, so a
+# 700-instruction catalog would be well under a minute -- split it for
+# readability if you like, but not for the build.
 #   UkRunBr.v is the ONE branch leaf UkRunLeaf.v does not have and should
 # ([wp_uk_btype0], the base branch against x0, whose value is not readable
 # off the register file) -- a six-line re-thread of an existing UkBranch

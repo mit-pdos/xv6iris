@@ -1573,6 +1573,16 @@ things, and the answer differs:
     `ucode_sh.txt`'s 1032 would be ~32 min in one file, and **the split
     plan stands**: the parser's ~500 instructions go in a SECOND catalog
     file, which costs one more ~22 s prelude and divides the wall clock.
+    **OVERTAKEN — the per-instruction bill was one inline `ltac:`.**  The
+    byte side condition in `uis_run` was spliced into the `iApply` term
+    instead of discharged as a goal; hoisting it (`unshelve iApply … _`;
+    `[ … | ]`, in `tools/gen_ucode.py` and all five catalogs) took
+    `UCodeShK.v` from **319 s to 10.6 s**, `UCodeInit.v` 245 → 15.9 s and
+    `UCodeCat.v` 260 → 16.5 s, i.e. ~0.03 s per instruction against 0.75 s.
+    `ucode_sh.txt`'s 1032 is now well under a minute in ONE file, so the
+    split is a readability choice, not a build constraint.  This is
+    `optimization.md`'s "unshelve hoist"; the tell was that `coqc -time`
+    put 233 s of `UCodeInit.v`'s 243 s in the three `uis_*` sentences.
   * **Two engine leaves were missing, and both are UkRunLeaf's.**
     `wp_uk_btype0` — the base branch against x0 (`bltz`/`bgez`/…): the
     value of x0 is not readable off the register file, so `wp_uk_btype`'s
