@@ -240,25 +240,68 @@ Section SpecSysOpen.
      [upd_upt], so this predicate is purely about the DESCRIPTORS).
 
      Both arms hand the fd unit back: see the header's file-table ledger. *)
+  (* THE BUNDLE MOVED INSIDE THE DISJUNCTION, and that is the whole of the
+     sharpening.  It used to sit outside as [fd_frags_any], shared by every
+     arm -- which is the only way to write it when the arms cannot say
+     different things about the table.  They can now: the failure arms hand
+     [sts] back on the nose, and the success arm hands back [sts] with ONE
+     row replaced.
+
+     THE MODE AND THE TYPE ARE EXISTENTIAL, and this is where they honestly
+     live.  [f->readable]/[f->writable] are a function of the omode argument
+     and the type is [FdDevice] exactly when the path resolved to a
+     T_DEVICE inode -- neither is a fact about the DESCRIPTOR TABLE, so
+     pinning them here would mean this row reaching into argument decoding
+     and the path walk.  [SpecSysOpenAU.open_fd_ok] is where they are named,
+     because the AU frame observes the inode.  What the caller needs and
+     gets here is that the slot is now OPEN and that no other slot moved --
+     which is [UsysMemOk.usys_fd_ok]'s open row exactly. *)
   Definition sys_open_post `{XI : CurCtx} (γf : gname) (p : mword 64) (pid : mword 32)
-      (UW : ustate) (r : mword 64) : iProp Σ :=
+      (UW : ustate) (sts : list fdstate) (r : mword 64) : iProp Σ :=
     ((* FAILURE, on any of the seven arms.  The descriptor array is EXACTLY
         as it came in: no arm that installed a descriptor can fail after
-        doing so -- fdalloc is the last thing that can refuse. *)
-     ⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ proc_priv γf p pid UW
+        doing so -- fdalloc is the last thing that can refuse.  The bundle
+        comes back at the caller's own [sts]. *)
+     (⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ proc_priv γf p pid UW ∗
+        fd_frags (pv_fdg (us_V UW)) sts)
      ∨
      (* SUCCESS.  The LEAST free descriptor now names the new file, and the
         returned a0 is that descriptor.  Which file slot it is is
-        existential: the file table is not the caller's to name. *)
-     ∃ (fd : nat) (l : list nat) (k : nat),
+        existential: the file table is not the caller's to name.  The
+        descriptor fdalloc opened is retyped from [FdClosed] to the new
+        file's type ([ProcInv.proc_priv_settle]), and that ONE row is the
+        only one that moves. *)
+     (∃ (fd : nat) (l : list nat) (k : nat) (rb wb : bool) (t : fdtype),
        ⌜r = (mword_of_int (Z.of_nat fd) : mword 64) /\
         fd_frees (pv_ofile (us_V UW)) = fd :: l⌝ ∗
-       proc_priv γf p pid (us_ofile UW fd (fnode k)))
-    (* THE fd-STATE FRAGMENT BUNDLE, in and out.  Only the success arm spends
-       it: the descriptor fdalloc opened has to be retyped from [FdClosed] to
-       the new file's type ([ProcInv.proc_priv_settle]).  Every failure arm
-       hands it straight back -- none of them installed a descriptor. *)
-    ∗ fd_frags_any (pv_fdg (us_V UW)) ∗ fd_slot.
+       proc_priv γf p pid (us_ofile UW fd (fnode k)) ∗
+       fd_frags (pv_fdg (us_V UW)) (<[fd := FdOpen rb wb t]> sts)))
+    ∗ fd_slot.
+
+  (* THE LANDED SHAPE, DERIVED.  Callers that do not yet name their table --
+     the dispatch arm, until [ProofSyscall.sysc_arm_pre] is indexed too --
+     want the post as it used to be: the descriptor disjunction with the
+     bundle beside it.  Forgetting the row is sound and one-directional,
+     which is exactly the asymmetry [fd_frags_any] always had; keeping the
+     weakening HERE, as a named lemma, means there is one place to delete
+     when the last caller is updated. *)
+  Lemma sys_open_post_any `{XI : CurCtx} (γf : gname) (p : mword 64)
+      (pid : mword 32) (UW : ustate) (sts : list fdstate) (r : mword 64) :
+    sys_open_post γf p pid UW sts r ⊢
+    ((⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ proc_priv γf p pid UW
+      ∨ ∃ (fd : nat) (l : list nat) (k : nat),
+          ⌜r = (mword_of_int (Z.of_nat fd) : mword 64) /\
+           fd_frees (pv_ofile (us_V UW)) = fd :: l⌝ ∗
+          proc_priv γf p pid (us_ofile UW fd (fnode k)))
+     ∗ fd_frags_any (pv_fdg (us_V UW)) ∗ fd_slot).
+  Proof.
+    rewrite /sys_open_post /fd_frags_any.
+    iIntros "[[(%Hr & Hp & Hb) | (%fd & %l & %k & %rb & %wb & %t & %Hpu & Hp & Hb)] Hfd]".
+    - iFrame "Hfd". iSplitR "Hb"; [| by iExists sts].
+      iLeft. by iFrame "Hp".
+    - iFrame "Hfd". iSplitR "Hb"; [| by iExists (<[fd := FdOpen rb wb t]> sts)].
+      iRight. iExists fd, l, k. by iFrame "Hp".
+  Qed.
 
 End SpecSysOpen.
 
@@ -272,7 +315,7 @@ Definition wp_sys_open_sconf_body
     (ns : nat)                                          (* the iref ledger     *)
     (dqb dqs dqbs dqn : dfrac)
     (v vom : mword 64)                       (* syscall arguments 0 and 1   *)
-    (pid : mword 32) (U : ustate)
+    (pid : mword 32) (U : ustate) (sts : list fdstate)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_open in
@@ -368,8 +411,9 @@ Definition wp_sys_open_sconf_body
   iref_slots ns -∗
   fd_slot -∗
   proc_priv γf pj pid U -∗
-  (* the descriptor-state fragments -- spent on the descriptor open returns *)
-  fd_frags_any (pv_fdg (us_V U)) -∗
+  (* the descriptor-state fragments -- spent on the descriptor open returns,
+     at the table the post states its row against *)
+  fd_frags (pv_fdg (us_V U)) sts -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b]: sys_open sleeps in create,
      in namei, in ilock, in itrunc and in the two op brackets, so it can
      return on another hart whatever SIE was doing.  Vacuous at [true], so
@@ -408,7 +452,7 @@ Definition wp_sys_open_sconf_body
       ⌜ns' = ns⌝ -∗
       iref_slots ns' -∗
       (* the descriptor table, the fd unit and the return value *)
-      sys_open_post γf pj pid (us_upt U P')
+      sys_open_post γf pj pid (us_upt U P') sts
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -422,11 +466,11 @@ Module Type SYSOPEN.
       (ns : nat)
       (dqb dqs dqbs dqn : dfrac)
       (v vom : mword 64)
-      (pid : mword 32) (U : ustate)
+      (pid : mword 32) (U : ustate) (sts : list fdstate)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_sys_open_sconf_body γfl γf gs j gl pd pav pu
 
  ns dqb dqs dqbs dqn v vom
-                             pid U m K eb b lks.
+                             pid U sts m K eb b lks.
 End SYSOPEN.

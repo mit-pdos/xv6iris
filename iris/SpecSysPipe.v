@@ -142,27 +142,72 @@ Section SpecSysPipe.
      [upd_upt], so this predicate is purely about the DESCRIPTORS).
 
      Both arms hand back the two fd units: see the table in the header. *)
+  (* THE BUNDLE MOVED INSIDE THE DISJUNCTION.  The failure arms hand [sts]
+     back on the nose -- each of them nulls whatever it had installed, and
+     writing 0 back over a slot that was already 0 is the identity, so no
+     descriptor's state moved.  The success arm replaces TWO rows, and
+     names WHICH END IS WHICH: [FdOpen true false FdPipe] reads and
+     [FdOpen false true FdPipe] writes, per [FdSlots]'s note that on a pipe
+     the mode flags ARE the identity of the end.
+
+     THIS IS SHARPER THAN THE SYSCALL TABLE'S PIPE ROW.
+     [UsysMemOk.usys_fd_ok] has to bind the two descriptor NUMBERS
+     existentially, because at that vocabulary they are reported by being
+     WRITTEN into user memory and the fd table cannot see the bytes.  Here
+     they are named: they are the two least-free descriptors, which is a
+     fact about the array this post already carries ([fd_frees … = fd0 ::
+     fd1 :: l]).  When the two tables are read together, this is the row
+     that lets the existential be discharged. *)
   Definition sys_pipe_post `{XI : CurCtx} (γf : gname) (p : mword 64) (pid : mword 32)
-      (UW : ustate) (r : mword 64) : iProp Σ :=
+      (UW : ustate) (sts : list fdstate) (r : mword 64) : iProp Σ :=
     ((* FAILURE.  Whichever tail ran, the descriptor array is EXACTLY as it
         came in: the two arms that had already installed a descriptor null
         it again, and writing 0 back over a slot that was 0 is the identity
         ([ProcInv.upd_ofile_id], since [fd_frees] only ever names free
         slots). *)
-     ⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ proc_priv γf p pid UW
+     (⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ proc_priv γf p pid UW ∗
+        fd_frags (pv_fdg (us_V UW)) sts)
      ∨
      (* SUCCESS.  The two least free descriptors now hold the read and the
         write end, in that order. *)
-     ∃ (fd0 fd1 : nat) (l : list nat) (k0 k1 : nat),
+     (∃ (fd0 fd1 : nat) (l : list nat) (k0 k1 : nat),
        ⌜r = (zero_reg : mword 64) /\ fd_frees (pv_ofile (us_V UW)) = fd0 :: fd1 :: l⌝ ∗
        proc_priv γf p pid
-         (upd_usV UW (upd_ofile (upd_ofile (us_V UW) fd0 (fnode k0)) fd1 (fnode k1))))
-    (* THE fd-STATE FRAGMENT BUNDLE, in and out.  The success arm spends TWO
-       accesses -- fd[0] goes from [FdClosed] to [FdOpen true false FdPipe]
-       and fd[1] to [FdOpen false true FdPipe] --
-       and every failure arm hands it straight back: each of them nulls
-       whatever it had installed, so no descriptor's state has moved. *)
-    ∗ fd_frags_any (pv_fdg (us_V UW)) ∗ fd_slot ∗ fd_slot.
+         (upd_usV UW (upd_ofile (upd_ofile (us_V UW) fd0 (fnode k0)) fd1 (fnode k1))) ∗
+       (* written in the order the two settles run: fd0's read end first,
+          then fd1's write end.  [fd0 <> fd1] (they are distinct entries of
+          [fd_frees]), so the two inserts commute and the order is a
+          presentation choice, not a constraint. *)
+       fd_frags (pv_fdg (us_V UW))
+         (<[fd1 := FdOpen false true FdPipe]>
+            (<[fd0 := FdOpen true false FdPipe]> sts))))
+    ∗ fd_slot ∗ fd_slot.
+
+  (* THE LANDED SHAPE, DERIVED -- [SpecSysOpen.sys_open_post_any]'s twin,
+     and for the same reason: the dispatch arm does not name its table yet.
+     One named weakening beats a scatter of [iExists], and it is the line to
+     delete when the arm bundle is indexed. *)
+  Lemma sys_pipe_post_any `{XI : CurCtx} (γf : gname) (p : mword 64)
+      (pid : mword 32) (UW : ustate) (sts : list fdstate) (r : mword 64) :
+    sys_pipe_post γf p pid UW sts r ⊢
+    ((⌜r = (mword_of_int (-1) : mword 64)⌝ ∗ proc_priv γf p pid UW
+      ∨ ∃ (fd0 fd1 : nat) (l : list nat) (k0 k1 : nat),
+          ⌜r = (zero_reg : mword 64) /\
+           fd_frees (pv_ofile (us_V UW)) = fd0 :: fd1 :: l⌝ ∗
+          proc_priv γf p pid
+            (upd_usV UW (upd_ofile (upd_ofile (us_V UW) fd0 (fnode k0)) fd1 (fnode k1))))
+     ∗ fd_frags_any (pv_fdg (us_V UW)) ∗ fd_slot ∗ fd_slot).
+  Proof.
+    rewrite /sys_pipe_post /fd_frags_any.
+    iIntros "[[(%Hr & Hp & Hb) | (%fd0 & %fd1 & %l & %k0 & %k1 & %Hpu & Hp & Hb)]
+              [Hu0 Hu1]]".
+    - iFrame "Hu0 Hu1". iSplitR "Hb"; [| by iExists sts].
+      iLeft. by iFrame "Hp".
+    - iFrame "Hu0 Hu1". iSplitR "Hb";
+        [| by iExists (<[fd1 := FdOpen false true FdPipe]>
+                         (<[fd0 := FdOpen true false FdPipe]> sts))].
+      iRight. iExists fd0, fd1, l, k0, k1. by iFrame "Hp".
+  Qed.
 
 End SpecSysPipe.
 
@@ -172,7 +217,8 @@ Definition wp_sys_pipe_sconf_body
     (γa : gname)  (γfl γf : gname)
     (fn : fclose_names) (on : option nat)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64)
-    (v : mword 64) (pid : mword 32) (U : ustate) (b : bool) (lks : gset string) :=
+    (v : mword 64) (pid : mword 32) (U : ustate) (sts : list fdstate)
+    (b : bool) (lks : gset string) :=
   (* [pipeG] is not a separate binder: [fileG] subsumes it (FileInv.v), and
      naming both would put TWO instance paths to [inG Σ fracR] in scope --
      they print identically and do not unify, so a [pipe_ref] built through
@@ -237,8 +283,9 @@ Definition wp_sys_pipe_sconf_body
      acquire on the way has its own panic arm *)
   kalloc_env γa None -∗
   proc_priv γf p pid U -∗
-  (* the descriptor-state fragments -- spent on the two new descriptors *)
-  fd_frags_any (pv_fdg (us_V U)) -∗
+  (* the descriptor-state fragments -- spent on the two new descriptors, at
+     the table the post states its rows against *)
+  fd_frags (pv_fdg (us_V U)) sts -∗
   (* the syscall's own allowance -- two references may be live in locals
      before they reach descriptors.  Both come back. *)
   fd_slot -∗ fd_slot -∗
@@ -284,7 +331,7 @@ Definition wp_sys_pipe_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb p -∗
       pc_is ret_tgt -∗
-      sys_pipe_post γf p pid (upd_usM (us_upt U P') (umem_wr (us_M U) v d bs))
+      sys_pipe_post γf p pid (upd_usM (us_upt U P') (umem_wr (us_M U) v d bs)) sts
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       iref_slot -∗
       (* the environment back; the page count has moved if either close was
@@ -301,6 +348,7 @@ Module Type SYSPIPE.
       (γa : gname) (γfl γf : gname)
       (fn : fclose_names) (on : option nat)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64)
-      (v : mword 64) (pid : mword 32) (U : ustate) (b : bool) (lks : gset string),
-      wp_sys_pipe_sconf_body γa γfl γf fn on m av eb p v pid U b lks.
+      (v : mword 64) (pid : mword 32) (U : ustate) (sts : list fdstate)
+    (b : bool) (lks : gset string),
+      wp_sys_pipe_sconf_body γa γfl γf fn on m av eb p v pid U sts b lks.
 End SYSPIPE.

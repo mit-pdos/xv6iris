@@ -1082,8 +1082,9 @@ Section ProofSysPipe.
   Lemma wp_sys_pipe_sconf (γa : gname) (γfl γf : gname)
       (fn : fclose_names) (on : option nat)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64)
-      (v : mword 64) (pid : mword 32) (U : ustate) (b : bool) (lks : gset string)
-    : wp_sys_pipe_sconf_body γa γfl γf fn on m av eb p v pid U b lks.
+      (v : mword 64) (pid : mword 32) (U : ustate) (sts : list fdstate)
+      (b : bool) (lks : gset string)
+    : wp_sys_pipe_sconf_body γa γfl γf fn on m av eb p v pid U sts b lks.
   Proof.
     cbv beta delta [wp_sys_pipe_sconf_body].
     intros pcE ret_tgt Harg Hav Hbelow Hfpid Hfdq.
@@ -1246,7 +1247,7 @@ Section ProofSysPipe.
         (∃ lo hi : mword 32,
            ctx_word4_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 8) (DfracOwn 1) lo ∗
            ctx_word4_pointsto (KTR := KT1) cur_ctx (pa_add (pa_stk sp0 8) 4) (DfracOwn 1) hi) -∗
-        sys_pipe_post γf p pid (upd_usM (us_upt U P') (umem_wr (us_M U) v d bs)) res -∗
+        sys_pipe_post γf p pid (upd_usM (us_upt U P') (umem_wr (us_M U) v d bs)) sts res -∗
         WP (Loop : expr riscv_lang)))%I).
     iAssert EPI with "[Hcont Hb1 Hb2 Hb3 Hb4]" as "Hepi".
     { rewrite /EPI.
@@ -1614,10 +1615,9 @@ Section ProofSysPipe.
          an [fd_slot] -- 16 ofile slots and a 4096-byte trapframe page deep --
          and does not come back. *)
       rewrite /sys_pipe_post us_upt_id. cbn [umem_wr]. rewrite upd_usM_id.
-      iSplitR "Hfrag Hua Hub";
-        [| iSplitL "Hfrag"; [iExact "Hfrag"
-         | iSplitL "Hua"; [iExact "Hua" | iExact "Hub"]]].
-      iLeft. iSplitR; [done|]. iExact "Hpriv". }
+      iSplitR "Hua Hub";
+        [| iSplitL "Hua"; [iExact "Hua" | iExact "Hub"]].
+      iLeft. iSplitR; [done|]. iFrame "Hpriv Hfrag". }
     (* ============ pipealloc succeeded ================================= *)
     iDestruct "Hsucc" as "(%Hr0 & _ & Hpipe)".
     iDestruct "Hpipe" as (k0 k1) "(%Hklt & Hb6 & Hb7 & Href0 & Href1)".
@@ -1831,10 +1831,9 @@ Section ProofSysPipe.
          an [fd_slot] -- 16 ofile slots and a 4096-byte trapframe page deep --
          and does not come back. *)
       rewrite /sys_pipe_post us_upt_id. cbn [umem_wr]. rewrite upd_usM_id.
-      iSplitR "Hfrag Hua Hub";
-        [| iSplitL "Hfrag"; [iExact "Hfrag"
-         | iSplitL "Hua"; [iExact "Hua" | iExact "Hub"]]].
-      iLeft. iSplitR; [done|]. iExact "Hpriv". }
+      iSplitR "Hua Hub";
+        [| iSplitL "Hua"; [iExact "Hua" | iExact "Hub"]].
+      iLeft. iSplitR; [done|]. iFrame "Hpriv Hfrag". }
     (* ===== the first descriptor is taken ===== *)
     iDestruct "Hs1" as (fd0 l0) "([%Hr1 %Hfr0] & Hof & Hu0 & Hauth0)".
     pose proof (fd_frees_head_lt (pv_ofile (us_V U)) fd0 l0 Hfr0) as Hfd0lt.
@@ -1846,10 +1845,15 @@ Section ProofSysPipe.
     (* THE FIRST DESCRIPTOR'S RETYPE: fdalloc handed out its authority at
        [FdClosed] and the pipe end makes it [FdOpen _ _ FdPipe], at the
        flags that say which end it is. *)
-    iDestruct (fd_frags_any_acc (pv_fdg (us_V U)) fd0 Hfd0N with "Hfrag")
-      as (stq0) "[Hfr0 Hfrback0]".
-    iMod (proc_priv_settle γf p pid U fd0 k0 1%Qp
-                 (FdOpen true false FdPipe) FdClosed stq0
+    iDestruct (fd_frags_acc_lt (pv_fdg (us_V U)) _ fd0 Hfd0N with "Hfrag")
+      as (stq0) "[%Hlkstq0 [Hfr0 Hfrback0]]".
+    (* the slot fdalloc handed out is FREE, so its fragment is closed --
+       which is what makes the failure tails' re-null the IDENTITY on
+       the table, and hence what lets the failure arm say [sts]
+       unchanged *)
+    iDestruct (fd_st_agree with "Hauth0 Hfr0") as %<-.
+    iMod (proc_priv_settle     γf p pid U fd0 k0 1%Qp
+                 (FdOpen true false FdPipe) FdClosed FdClosed
                  Hfd0N Hlen1 Hk0lt ltac:(discriminate)
                  with "Hcore Hof Href0 Hauth0 Hfr0") as "[Hpriv Hfr0]".
     iDestruct ("Hfrback0" with "Hfr0") as "Hfrag".
@@ -2034,8 +2038,8 @@ Section ProofSysPipe.
         by (rewrite (HF2thr Rs0 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)); exact HF1s0).
       (* the descriptor is nulled again on this failure path, so its state
          goes back to [FdClosed] -- out of the bundle, like every retype. *)
-      iDestruct (fd_frags_any_acc (pv_fdg (us_V U)) fd0 Hfd0N with "Hfrag")
-        as (stqx) "[Hfrx Hfrbackx]".
+      iDestruct (fd_frags_acc_lt (pv_fdg (us_V U)) _ fd0 Hfd0N with "Hfrag")
+        as (stqx) "[%Hlkstqx [Hfrx Hfrbackx]]".
       iMod (fd_st_move _ fd0 st0' stqx FdClosed with "Hst0 Hfrx")
         as "[Hst0 Hfrx]".
       iDestruct ("Hfrbackx" with "Hfrx") as "Hfrag".
@@ -2090,10 +2094,15 @@ Section ProofSysPipe.
          an [fd_slot] -- 16 ofile slots and a 4096-byte trapframe page deep --
          and does not come back. *)
       rewrite /sys_pipe_post us_upt_id. cbn [umem_wr]. rewrite upd_usM_id.
-      iSplitR "Hfrag Hua Hub";
-        [| iSplitL "Hfrag"; [iExact "Hfrag"
-         | iSplitL "Hua"; [iExact "Hua" | iExact "Hub"]]].
-      iLeft. iSplitR; [done|]. iExact "Hpriv". }
+      iSplitR "Hua Hub";
+        [| iSplitL "Hua"; [iExact "Hua" | iExact "Hub"]].
+      (* THE TAIL'S RE-NULL IS THE IDENTITY ON THE TABLE.  It retyped fd0
+         back to [FdClosed] over its own open, so the two inserts collapse
+         ([list_insert_insert]) and the survivor writes [FdClosed] over a
+         row that was already closed -- which is what [Hlkstq0] says, off
+         the free slot's own authority. *)
+      rewrite list_insert_insert (list_insert_id sts fd0 FdClosed Hlkstq0).
+      iLeft. iSplitR; [done|]. iFrame "Hpriv Hfrag". }
     (* ===== both descriptors are taken: copy them out ===== *)
     iDestruct "Hs2" as (fd1 l1) "([%Hr2 %Hfr1] & Hof & Hu1 & Hauth1)".
     (* the second descriptor is a DIFFERENT one: [fd_frees] only names free
@@ -2119,10 +2128,15 @@ Section ProofSysPipe.
     assert (Hlen2' : length (pv_ofile (upd_ofile (us_V U) fd0 (fnode k0))) = NOFILE)
       by (rewrite upd_ofile_length; exact Hlen2).
     (* ...and the second's, out of the same bundle *)
-    iDestruct (fd_frags_any_acc (pv_fdg (us_V U)) fd1 Hfd1N with "Hfrag")
-      as (stq1) "[Hfr1 Hfrback1]".
-    iMod (proc_priv_settle γf p pid (us_ofile U fd0 (fnode k0)) fd1 k1
-                 1%Qp (FdOpen false true FdPipe) FdClosed stq1 Hfd1N Hlen2' Hk1lt
+    iDestruct (fd_frags_acc_lt (pv_fdg (us_V U)) _ fd1 Hfd1N with "Hfrag")
+      as (stq1) "[%Hlkstq1 [Hfr1 Hfrback1]]".
+    (* the slot fdalloc handed out is FREE, so its fragment is closed --
+       which is what makes the failure tails' re-null the IDENTITY on
+       the table, and hence what lets the failure arm say [sts]
+       unchanged *)
+    iDestruct (fd_st_agree with "Hauth1 Hfr1") as %<-.
+    iMod (proc_priv_settle     γf p pid (us_ofile U fd0 (fnode k0)) fd1 k1
+                 1%Qp (FdOpen false true FdPipe) FdClosed FdClosed Hfd1N Hlen2' Hk1lt
                  ltac:(discriminate)
                  with "Hcore Hof Href1 Hauth1 Hfr1") as "[Hpriv Hfr1]".
     iDestruct ("Hfrback1" with "Hfr1") as "Hfrag".
@@ -2440,9 +2454,14 @@ Section ProofSysPipe.
         proc_priv γf p pid
           (upd_usM (upd_usV U (upd_upt (upd_ofile (upd_ofile (us_V U) fd0 (fnode k0)) fd1 (fnode k1)) P'))
              (umem_wr (us_M U) v d bs)) -∗
-        (* the fd-state fragments: this tail nulls both descriptors again, so
-           it retypes both back to [FdClosed] and needs them *)
-        fd_frags_any (pv_fdg (us_V U)) -∗
+        (* the fd-state fragments: this tail nulls both descriptors again,
+           so it ARRIVES at the table both settles left -- with fd0's read
+           end and fd1's write end installed -- and retypes both back.  The
+           post it produces is at [sts], because writing [FdClosed] over
+           two rows that were free is the identity. *)
+        fd_frags (pv_fdg (us_V U))
+          (<[fd1 := FdOpen false true FdPipe]>
+             (<[fd0 := FdOpen true false FdPipe]> sts)) -∗
         fd_slot -∗ fd_slot -∗
         ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) v -∗
         ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) (fnode k0) -∗
@@ -2505,8 +2524,8 @@ Section ProofSysPipe.
       { iApply (spi_8a with "Htext"). }
       { iApply (spi_8c with "Htext"). }
       iIntros (CID63 Hcr63 E2) "%HE2thr Hcg Hpc Hcell".
-      iDestruct (fd_frags_any_acc (pv_fdg (us_V U)) fd0 Hfd0N with "Hfrag")
-        as (stqz) "[Hfrz Hfrbackz]".
+      iDestruct (fd_frags_acc_lt (pv_fdg (us_V U)) _ fd0 Hfd0N with "Hfrag")
+        as (stqz) "[%Hlkstqz [Hfrz Hfrbackz]]".
       iMod (fd_st_move _ fd0 st0' stqz FdClosed with "Hst0 Hfrz")
         as "[Hst0 Hfrz]".
       iDestruct ("Hfrbackz" with "Hfrz") as "Hfrag".
@@ -2557,8 +2576,8 @@ Section ProofSysPipe.
       { iApply (spi_9a with "Htext"). }
       { iApply (spi_9c with "Htext"). }
       iIntros (CID65 Hcr65 E4) "%HE4thr Hcg Hpc Hcell1".
-      iDestruct (fd_frags_any_acc (pv_fdg (us_V U)) fd1 Hfd1N with "Hfrag")
-        as (stqy) "[Hfry Hfrbacky]".
+      iDestruct (fd_frags_acc_lt (pv_fdg (us_V U)) _ fd1 Hfd1N with "Hfrag")
+        as (stqy) "[%Hlkstqy [Hfry Hfrbacky]]".
       iMod (fd_st_move _ fd1 st1' stqy FdClosed with "Hst1 Hfry")
         as "[Hst1 Hfry]".
       iDestruct ("Hfrbacky" with "Hfry") as "Hfrag".
@@ -2638,10 +2657,27 @@ Section ProofSysPipe.
       { iExists (trunc32 (mword_of_int (Z.of_nat fd1) : mword 64)),
                 (trunc32 (mword_of_int (Z.of_nat fd0) : mword 64)). iFrame "Hlo Hhi". }
       rewrite /sys_pipe_post.
-      iSplitR "Hfrag Hua Hub";
-        [| iSplitL "Hfrag"; [iExact "Hfrag"
-         | iSplitL "Hua"; [iExact "Hua" | iExact "Hub"]]].
-      iLeft. iSplitR; [done|]. iExact "Hpriv". }
+      iSplitR "Hua Hub";
+        [| iSplitL "Hua"; [iExact "Hua" | iExact "Hub"]].
+      (* BOTH re-nulls are the identity: each writes [FdClosed] over a row
+         that was free, hence already closed.  fd1's own closedness is read
+         off [Hlkstq1] at the FIRST insert's table, which [fd0 <> fd1] lets
+         through to [sts]. *)
+      assert (Hst1c : sts !! fd1 = Some FdClosed)
+        by (rewrite <- (list_lookup_insert_ne sts fd0 fd1
+                          (FdOpen true false FdPipe) Hne01);
+            exact Hlkstq1).
+      (* BOTH re-nulls are the identity on the table.  The two [FdClosed]
+         writes sit outside BOTH opens, so each has to be commuted past the
+         other descriptor's open before it meets its own ([fd0 <> fd1]);
+         then each pair collapses ([list_insert_insert]) and the survivors
+         write [FdClosed] over rows that were free, hence already closed. *)
+      rewrite (list_insert_commute _ fd0 fd1 FdClosed
+                 (FdOpen false true FdPipe) Hne01)
+              !list_insert_insert
+              (list_insert_id sts fd0 FdClosed Hlkstq0)
+              (list_insert_id sts fd1 FdClosed Hst1c).
+      iLeft. iSplitR; [done|]. iFrame "Hpriv Hfrag". }
     (* +0x62 blt a0,x0 -- did the first copyout fail? *)
     destruct Hret1 as [[Hco0 HM1s]|[Hcom1 (d1 & Hd1 & HM1f)]].
     2:{ (* ===== copyout(&fd0) failed: null both descriptors, close both ===== *)
@@ -3011,12 +3047,13 @@ Section ProofSysPipe.
       { iExists (trunc32 (mword_of_int (Z.of_nat fd1) : mword 64)),
                 (trunc32 (mword_of_int (Z.of_nat fd0) : mword 64)). iFrame "Hlo Hhi". }
       rewrite /sys_pipe_post.
-      iSplitR "Hfrag Hu0 Hu1";
-        [| iSplitL "Hfrag"; [iExact "Hfrag"
-         | iSplitL "Hu0"; [iExact "Hu0" | iExact "Hu1"]]].
+      (* the bundle rides INSIDE the success arm now, at the two rows the
+         two settles installed -- which is what the post says *)
+      iSplitR "Hu0 Hu1";
+        [| iSplitL "Hu0"; [iExact "Hu0" | iExact "Hu1"]].
       iRight. iExists fd0, fd1, l1, k0, k1.
       iSplitR; [iPureIntro; split; [reflexivity | exact Hfr1']|].
-      rewrite -sp_us_upt_ofile_comm. iExact "Hpriv".
+      rewrite -sp_us_upt_ofile_comm. iFrame "Hpriv Hfrag".
     - (* ============ copyout(&fd1) failed: the shared tail ============ *)
       (* the second run landed only a [d2 <= 4] prefix: the composed window
          is [4 + d2] -- idiom 4, re-instantiating the count already in hand *)

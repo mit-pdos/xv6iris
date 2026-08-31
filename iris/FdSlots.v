@@ -527,6 +527,28 @@ Section FdSlots.
   (* ...and at the quantified bundle, which is what a syscall actually
      holds.  The state it finds is whatever the authority says
      ([ProcInv.ofile_slot_agree] is how a caller learns it). *)
+  (* THE NAMED ACCESSOR AT A BOUND, which is what a syscall proof actually
+     wants: [fd_frags_any_acc]'s shape (open one row, learn its state) but
+     with the closer that puts the table back AT THE INSERT.  The lookup is
+     derived from the bundle's own length invariant rather than asked of
+     the caller, so this is a drop-in for the [_any] form -- which is the
+     point, since every call site of that form is a place where a row was
+     moved and then forgotten. *)
+  Lemma fd_frags_acc_lt (γ : gname) (sts : list fdstate) (fd : nat) :
+    (fd < NOFILE)%nat ->
+    fd_frags γ sts -∗
+    ∃ st : fdstate,
+      ⌜sts !! fd = Some st⌝ ∗ fd_st γ fd st ∗
+      (∀ st', fd_st γ fd st' -∗ fd_frags γ (<[fd := st']> sts)).
+  Proof.
+    iIntros (Hfd) "Hb".
+    iDestruct (fd_frags_len with "Hb") as %Hlen.
+    assert (Hlk : is_Some (sts !! fd)) by (apply lookup_lt_is_Some_2; lia).
+    destruct Hlk as [st Hst].
+    iExists st. iSplitR; [by iPureIntro |].
+    iApply (fd_frags_acc γ sts fd st Hst with "Hb").
+  Qed.
+
   Lemma fd_frags_any_acc (γ : gname) (fd : nat) :
     (fd < NOFILE)%nat ->
     fd_frags_any γ -∗

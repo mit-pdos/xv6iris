@@ -647,6 +647,23 @@ Qed.
 
 (* the three ways a descriptor's file can be typed, as ONE fact -- what
    every producer of an [ofile_slot] file disjunct actually has to pay. *)
+(* ...and the SHAPE the three per-type readings share: an open descriptor is
+   [FdOpen] at some mode and type.  [sys_open]'s post wants exactly this and
+   nothing finer -- which mode and which type are facts about the omode
+   argument and the resolved inode, not about the descriptor table. *)
+Lemma fdstate_ok_opened (inum : mword 32) (C : fcontent) (st : fdstate) :
+  fdstate_ok inum C st ->
+  fc_type C = FD_PIPE \/ fc_type C = FD_INODE \/ fc_type C = FD_DEVICE ->
+  ∃ (r w : bool) (t : fdtype), st = FdOpen r w t.
+Proof.
+  intros Hok [H|[H|H]].
+  - destruct (fdstate_ok_pipe   inum C st Hok H) as (r & w & ->). by exists r, w, FdPipe.
+  - destruct (fdstate_ok_inode  inum C st Hok H) as (r & w & ->).
+    by exists r, w, (FdInode (bv_unsigned inum)).
+  - destruct (fdstate_ok_device inum C st Hok H) as (r & w & ->).
+    by exists r, w, (FdDevice (bv_unsigned (fc_major C))).
+Qed.
+
 Lemma fdstate_ok_open (inum : mword 32) (C : fcontent) (st : fdstate) :
   fdstate_ok inum C st ->
   fc_type C = FD_PIPE \/ fc_type C = FD_INODE \/ fc_type C = FD_DEVICE ->

@@ -4578,8 +4578,10 @@ Section SyscallArms.
        reaches fileclose on three error paths and through pipealloc, and one
        unit serves them all. *)
     iDestruct (sysc_iref_split3 with "Hir") as "[Hir Hiru]".
+    (* name the table -- sys_pipe's post states two rows against it *)
+    iDestruct "Hufrag" as (sts) "Hufrag".
     iApply (SysPipe.wp_sys_pipe_sconf fsc_kalloc γft γf fn None M (av - 4)%nat
-              true (proc_addr j) v0 pid U true ∅
+              true (proc_addr j) v0 pid U sts true ∅
               Hv0 ltac:(lia) (locks_below_empty "log")
               Hpidt (sct_dq _ _ T)
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpanic Hftable Hkalloc
@@ -4596,7 +4598,7 @@ Section SyscallArms.
        had to give it back and the post no longer quantifies a used-set. *)
     iDestruct (sysc_fclose_fs_out fn 0%nat true (proc_addr j)
                  with "Hfe'") as "Hbs".
-    iDestruct "Hpost" as "(Hpv & Hufrag & Hfd0 & Hfd1)".
+    iDestruct (sys_pipe_post_any with "Hpost") as "(Hpv & Hufrag & Hfd0 & Hfd1)".
     iDestruct (fd_slots_combine 1 2 with "Hfd1 Hfd") as "Hfd".
     iDestruct (fd_slots_combine 1 3 with "Hfd0 Hfd") as "Hfd".
     (* BOTH ARMS RETURN THE BLOCK, and the epilogue needs only that its
@@ -4946,6 +4948,8 @@ Section SyscallArms.
     iDestruct (fd_slots_split 1 3 with "Hfd") as "[Hfd0 Hfd]".
     iPoseProof sysc_trap_ext_true as "Htcx".
     iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
+    (* name the table -- sys_open's post states its row against it *)
+    iDestruct "Hufrag" as (sts) "Hufrag".
     iApply (SysOpen.wp_sys_open_sconf γft γf γs j γl
 
               (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)
@@ -4954,7 +4958,7 @@ Section SyscallArms.
 
  IREFSPARE
               DfracDiscarded DfracDiscarded DfracDiscarded DfracDiscarded
-              v0 v1 pid U M (av - 4)%nat true true ∅
+              v0 v1 pid U sts M (av - 4)%nat true true ∅
               ltac:(lia) Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
               Hbml Hist0 Hcb Hbmgeo Hib Hn1 Hn2 Hn3 Hn4 Hprg
               ltac:(compute; lia) Hj Hgamma eq_refl Hv0 Hv1
@@ -4974,7 +4978,10 @@ Section SyscallArms.
     subst ns'.
     (* the fd unit, back: installed in a descriptor on the success arm and
        freed by fileclose on the others, but a unit either way *)
-    iDestruct "Hpost" as "(Hpv & Hufrag & Hfd0)".
+    (* the precise post, weakened to the landed shape for this arm --
+       [SpecSysOpen.sys_open_post_any] is the one place that forgetting
+       happens, and it goes away when the arm bundle is indexed *)
+    iDestruct (sys_open_post_any with "Hpost") as "(Hpv & Hufrag & Hfd0)".
     iDestruct (fd_slots_combine 1 3 with "Hfd0 Hfd") as "Hfd".
     (* the trapframe page has not moved -- [uptd_ext]'s own second conjunct *)
     pose proof Hext as Hupte.
