@@ -27,6 +27,46 @@ its park_globals bullet :345) + its cone (LinkForkretParkPaid,
 LinkUserinit, LinkMain, BootChain, BootShared, FsAdequacyImg,
 SystemAdequacy).**
 
+**THE A6.142-144 INSTRUMENT LAYER (post-r67, all GREEN, snapshot
+`25e3f031004`):** the owner ruled the three remaining ξ-bodied cases
+case-by-case: ctx_values/word-pins for `ip->ref` (set [1..2^31), never
+0), CtxAnchor for the bcache, `f->off` delegated to a main-side agent.
+Instruments now ALL BUILT AND CERTIFIED:
+- `CtxAnchor.v` (A6.142): parked-context custody in an [inv] --
+  anchor/astamp/aguard, deposit/withdraw/open_close; guard = floor row on
+  guarding locks.
+- `TsoMemPa` §12f + `TsoCtx` + `CtxPinw.v` (A6.143): the WORD-SET PIN
+  (ts_pinw/pinw_ok1 + 4th ts_pay arm; phys_ledger_pinw with
+  ok/mint1/drop; racy read gate `ledger_read_pinw_ok`; exact read
+  `ledger_read_pinw_latest`; member store `ledger_store_pinw_ok` +
+  `pinw_write_c` the au_dat leaf face).  The racy LOAD leaf is the
+  existing `wp_load_s_sconf_au_rel` (generic; no clone needed).
+- `WpLock.lock_pay_intro_llb` (A6.144): the floored payload mint via
+  `ctx_parked_raise` on the lock record -- serves BOTH the itable exact
+  read row and the anchor's guard mint; closes A6.142's one gap.
+
+**NEXT: the ICACHE RESTRUCTURE (Phase 4, designed, not started).**  Plan:
+(4a) `icfg` gains two per-slot gname families `icfg_ieplo`(epoch floor)
++ `icfg_istmp`(cell stamp), both mono_nat (no Σ change; one MkIcfg site
+in IcacheRef.icfg_alloc); epoch cell = fractional mono_nat_auth_own,
+fraction riding each reference so epochs cannot retire under a live
+cred.  (4b) `IcacheInv.itable_body`: live slots hold pinw windows (set =
+words [1..IREFSLOTS], per-byte via `iref_set`) + epoch half + stamp
+half; free-slot cells move to `itable_res` (the lock payload) as
+ctx-tier zeros; `is_itable` takes the λ-flip (should CtxMorph clean --
+no nested cinvs); the lock payload gains the A6.144 floor row (stamp
+half + ctx_floor at it).  (4c) accessor family rewritten (racy load =
+au_rel + `ledger_read_pinw_ok` at the cred; locked exact =
+`ledger_read_pinw_latest` at the floor row; count stores =
+`pinw_write_c`; arm/retire = mint/drop + epoch update); 7 AU-consumer
+proofs (ProofIget/Idup/Iput/Ilock/Iunlock + Specs) + `iref_cred`
+threading through SpecIlock/SpecIunlock callers.  IREFSLOTS bound: the
+increment's member premise needs n+1 <= 422 = the caller's unit
+(strengthen `iref_slots_no_overflow`).  THEN Phase 5: the bcache anchor
+refactor per the agreed three-way split (transit custody + b->valid in
+the anchor; refcnt==0 custody in bcache.lock's payload; recycler
+trivial).
+
 r63 was 1283/1305 with five error roots.  This round LANDED, per the
 owner's direction ("the per-binary proofs don't need to be done … but
 the reasoning about executing in the kernel's trampoline page, in
