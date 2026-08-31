@@ -45,7 +45,28 @@ Instruments now ALL BUILT AND CERTIFIED:
   `ctx_parked_raise` on the lock record -- serves BOTH the itable exact
   read row and the anchor's guard mint; closes A6.142's one gap.
 
-**NEXT: the ICACHE RESTRUCTURE (Phase 4, designed, not started).**  Plan:
+**ICACHE RESTRUCTURE PROGRESS (A6.145; snapshots `d9dc2d46dbe`,
+`1578c811f86`, `7703294ca9d`, all GREEN):** 4a (icfg families) DONE; 4b-i
+(iref_set + panic bounds + iref_pin_slot + itable_body_pinw additive in
+IcacheInv) DONE; 4b-ii (iliveUR agree payload -> (gname * epoch-floor);
+live_genlo real element; live_gen/live_frac arity-preserved wrappers;
+live_genlo_bump takes the fresh floor) DONE.  The FLOORED-SLICE
+architecture is decided and recorded (flip notes A6.145 cont.): cred
+threading vanishes into the inode_ref/inode_shr bundle tier via
+live_fracc; floor-free live_genlo/iref_tok are the ONLY forms inside inv
+bodies.  REMAINING (4b-iii/4c/4d, mapped, not built): live_fracc + flat
+inode_ref restatement + conversion lemmas; body cutover (itable_body :=
+itable_body_pinw with live arms at live_genlo, per-slot lo bound across
+pin row and live arm); itable_res gains free-slot ctx cells + istmp
+halves + the A6.144 floor row + the is_itable λ-flip; icM_wf gains n <=
+IREFSLOTS; accessor family (racy read = wp_load_s_sconf_au_rel +
+ledger_read_pinw_ok at the slice+floor; locked exact =
+ledger_read_pinw_latest at the row; count stores = pinw_write_c; arm =
+live_genlo_bump at the arm store's position + pinw mint; retire = drop +
+cells back to the payload); then ProofIget/Idup/Iput/Ilock/Iunlock +
+Specs + IcacheBoot.
+
+**OLD PLAN NOTE (superseded in part):**  Plan:
 (4a) `icfg` gains two per-slot gname families `icfg_ieplo`(epoch floor)
 + `icfg_istmp`(cell stamp), both mono_nat (no Σ change; one MkIcfg site
 in IcacheRef.icfg_alloc); epoch cell = fractional mono_nat_auth_own,
