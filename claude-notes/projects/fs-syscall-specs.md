@@ -1783,6 +1783,15 @@ things, and the answer differs:
      Until it is made, both catalogs stay on-build and the port carries
      the `shk_` prefix.
 
+**FD-ROW PILOT P4 provenance note (owner discussion, Aug 31).** The
+solo/quiescence premise the enriched loop needs at era 0 is NOT a new
+assumption — it is a reading of landed ghosts: `SpecProcinit.
+procs_inv_alloc` deposits all 64 slots UNUSED at procinit;
+`ProofUserinit`'s paid park allocates exactly ONE (init's, with its
+trap-loop WP); nothing before init's own fork touches another slot;
+the landed scheduler proofs run only table entries.  P4 must source
+its quiescence from these — do not seal it as a Parameter.
+
 ## WINDOW LEAF (in-house) — ASK 1 ANSWERED, LANDED 2026-08-30
 
 **TWIN NOTE (Aug 31 merge).** Upstream's cat batch landed its own
