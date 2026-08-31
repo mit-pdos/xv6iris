@@ -17171,3 +17171,47 @@ Gotcha log additions: `git rm --cached` under GIT_DIR/GIT_INDEX_FILE does
 NOT drop the blob — use `git update-index --force-remove` (the r59
 snapshot push failed once on iris/.lia.cache, 229MB).
 
+### A6.135 §5 LANDED — THE ESTABLISHMENT (same session, r60 pending)
+
+The whole satp-hook chain compiled and `ProofMain.mn_grp_kvm` is GREEN:
+
+- `HartRegNode.wp_hart_regwrite_gs` / `swp_hart_regwrite_gs`: the register
+  write node with a ⊤-FUPD hook run against the live interp (the
+  `tso_interp_of_at_gs` + `tso_interp_of_pin` sandwich, exactly
+  `wp_hart_barrier_gs`'s).  The hook is a FUPD, not a bupd — the
+  establishment allocates `kpt_inv`.
+- `WpSconfCsr.swp_write_reg_owned_gs` (direct node proof:
+  `hreg_frame_update` in the σ-callback; the node projection is
+  `reflexivity` only at concrete registers — abstract needs the
+  `proof_irrel`-collapse idiom, HartSCsr:1316) and
+  `swp_write_CSR_satp_S_gs` (step 4's write swapped, Q threaded through
+  its own post).
+- **No engine clones were needed**: `HartSCsr.swp_doCSR_w_ex_p` /
+  `swp_execute_CSRReg_w_ex_p` (built for stimecmp) already thread a
+  parametric Q through the CSR write engine; the leaf supplies the check
+  swp via `swp_span` + `hval_check_CSR_result_satp_S_w`.
+- `wp_csrw_satp_s_sconf_gs`: the hooked switch.  The hook borrows the
+  capability's own `own_context` ("Hctx" moves to the swp side of the
+  mono split and returns through the Q-threaded engine post); the SLOT
+  CALLBACK receives Q (the established `kpt_inv ∗ kpt_creds ∗ Qk`) — it
+  runs after the write in the same leaf, so the snapshot
+  (`kpt_inv_snapshot`) moved inside it.
+- `SpecKvminithart` contract: `kpt_inv ∗ kpt_creds` premises replaced by
+  `(Pk Qk : iProp Σ)` + the establishment hook
+  `∀g, gh -∗ interp -∗ own_context -∗ Pk ={⊤}=∗ … ∗ (kpt_inv ∗ kpt_creds ∗ Qk)`;
+  continuation gains Qk.  ProofKvminithart: no up-front snapshot; satp
+  leaf → `_gs`; Rout carries Qk.
+- ProofMainSecondary: identity hook (it holds both).  ProofMain
+  `mn_grp_kvm`: new premise `hart_agent cpu_id = 0%nat` (caller
+  discharges via `StartedInv.cid_zero_agent`, un-Local'd); the
+  establishment hook = `kptree_publish_boot` + `kpt_inv_alloc (length
+  g.(glog))` + `kpt_creds_intro_boot`; Pk = UTier tree + kmap_auth + both
+  one-shots (qualified `PtTree.ptree_own_at (PtTree.UTier cur_ctx)` — no
+  PtTree Import in ProofMain, notation-clash risk); Qk = persistent
+  copies of `kpt_inv ∗ kpt_creds` for the caller.
+
+Gotchas: re-importing gen_heap at the END of a spec file breaks the
+`↦ᵣ`/vec coercion (scope reopening) — SpecKvminithart already imported
+it; `iApply ("Hcont" … ); last first` scrambles bullet order — spell the
+subgoals in order instead.
+
